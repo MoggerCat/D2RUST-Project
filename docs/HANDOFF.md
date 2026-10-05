@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, first fix-ups | `data-tool tables`: 73 live tables, 69 byte-identical, 4 explained; 4/4 code buffers identical (before callbacks; rerun queued, §5) |
+| 2 Data | in progress: core, callbacks, first fix-ups, typed tables | `data-tool tables`: 73 live tables, 69 byte-identical, 4 explained; 4/4 code buffers identical (before callbacks; rerun queued, §5) |
 | 3 Simulation | not started; RNG spec ready | `specs/sim/rng.md`, traces `traces/sim/rng/` |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -29,14 +29,11 @@ rather than restating them.
    `AnimData.d2` format (OQ11); ideally a post-load memory dump to check
    them (OQ15). Then implement them in `d2-data::fixup` (`PENDING` lists
    them).
-3. **Typed tables** (implementation, medium): generate Rust structs from
-   `specs/data/fields.tsv` + `tables.tsv` (a generator tool; generated
-   code committed; a test that regenerating gives the same output).
-4. **Cross-reference validation** (implementation, medium): broken links
+3. **Cross-reference validation** (implementation, medium): broken links
    reported with table, row, column (`field-types.md` §6).
-5. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
+4. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
    Phase 2 exit = "patches apply"; the mod itself is deferred.
-6. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
+5. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
    `specs/sim/rng.md`, test against `traces/sim/rng/*.json`. Good first
    cloud task (needs no game files).
 
@@ -50,6 +47,7 @@ rather than restating them.
 | `crates/d2-data/src/schema.rs` | embedded `fields.tsv` / `tables.tsv` | `data/schema.md` |
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
+| `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
 | `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
@@ -60,7 +58,7 @@ rather than restating them.
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check | |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs | |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
@@ -89,8 +87,8 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-- From branch `claude/happy-maxwell-93ocnk` (callbacks + fix-ups,
-  2026-10-05):
+- From branch `claude/happy-maxwell-93ocnk` (callbacks, fix-ups, typed
+  tables, 2026-10-05):
   1. `cargo run --release -p data-tool -- tables`: expect 73/73 runtime
      tables matching, 72 byte-identical, `monstats` differing only by the
      record 707 `NameStr` explanation; no "unwritten byte" mismatch in
@@ -100,7 +98,8 @@ a local session runs them, records the result, and removes the entry.
      record offset: compare with `callbacks.md` §2–§6.
   2. `cargo test -p d2-data -- --ignored`: all pass, in particular
      `compiled_text_reproduces_live_bins`, `callback_vectors`,
-     `fixups_on_live_set`, `crosscheck_catches_perturbations`.
+     `fixups_on_live_set`, `typed_tables_decode`,
+     `crosscheck_catches_perturbations`.
   Record the results in `docs/PLAN.md` (Phase 2 status) and the spec
   statuses (`callbacks.md`, `field-types.md` §10), then merge.
 

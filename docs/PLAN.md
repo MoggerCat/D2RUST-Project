@@ -106,7 +106,9 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       `data-tool tables` confirmation in the local run queue)
 - [ ] Post-load fix-ups and runtime maps (`loading.md` §7.4): fully stated
       rows done in `d2-data::fixup`; the rest wait for `loading.md` OQ13
-- [ ] Typed structs for all tables (generated from the schema)
+- [x] Typed structs for all tables (generated from the schema:
+      `d2-data::tables`, `data-tool gen-tables`; callback and fix-up bytes
+      are read from the raw record)
 - [ ] Cross-reference resolution with validation errors
 - [ ] Mod patch layer format + loader
 **Exit:** all tables load from the user's install; patches apply; broken

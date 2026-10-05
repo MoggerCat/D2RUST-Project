@@ -401,3 +401,23 @@ fn fixups_on_live_set() {
     // The shipped bytes stay untouched in the loaded set.
     assert_eq!(u16_at(data.table("uniqueitems").unwrap().record(5), 0), 0);
 }
+
+/// Every live table decodes with its generated struct (`schema.md`).
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn typed_tables_decode() {
+    use d2_data::tables::{decode_all, decode_by_name, text, Uniqueitems, Weapons};
+    let data = bin::load(set(), bin::DEFAULT_LANGUAGE).unwrap();
+    for t in &data.tables {
+        let n = decode_by_name(t)
+            .expect("runtime table")
+            .expect("right size");
+        assert_eq!(n, t.count, "{}", t.name);
+    }
+    let w: Vec<Weapons> = decode_all(data.table("weapons").unwrap()).unwrap();
+    assert_eq!(w.len(), 306);
+    assert_eq!(&w[0].code, b"hax ");
+    let u: Vec<Uniqueitems> = decode_all(data.table("uniqueitems").unwrap()).unwrap();
+    assert_eq!(text(&u[122].index), b"The Stone of Jordan");
+    assert_eq!((&u[122].code, u[122].lvl), (b"rin ", 39));
+}

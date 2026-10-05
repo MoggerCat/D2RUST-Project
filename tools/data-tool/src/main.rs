@@ -3,11 +3,15 @@
 //!
 //! Usage (run with --release):
 //!   data-tool tables [game_dir]
+//!   data-tool gen-tables
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
 //! buffers, `hitclass`), compiles every table's highest-priority `.txt` in
 //! load order and compares them byte for byte. Exit status 1 when a
 //! runtime table or code buffer differs in a way no spec rule explains.
+//!
+//! `gen-tables` regenerates `crates/d2-data/src/tables/generated.rs` (the
+//! typed record structs) from the embedded schema.
 
 use std::path::PathBuf;
 
@@ -26,8 +30,19 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("tables") if args.len() <= 2 => tables(&game_dir(args.get(1))?),
-        _ => bail!("usage: data-tool tables [game_dir]"),
+        Some("gen-tables") if args.len() == 1 => gen_tables(),
+        _ => bail!("usage: data-tool tables [game_dir] | data-tool gen-tables"),
     }
+}
+
+fn gen_tables() -> Result<()> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../crates/d2-data")
+        .join(d2_data::codegen::GENERATED_PATH);
+    let code = d2_data::codegen::generate(d2_data::schema::schema());
+    std::fs::write(&path, &code).with_context(|| format!("writing {}", path.display()))?;
+    println!("wrote {} ({} bytes)", path.display(), code.len());
+    Ok(())
 }
 
 fn hex(b: &[u8]) -> String {
