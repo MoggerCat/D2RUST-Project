@@ -12,31 +12,28 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, first fix-ups, typed tables | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (`typed_tables_decode` queued, §5) |
-| 3 Simulation | not started; RNG spec ready | `specs/sim/rng.md`, traces `traces/sim/rng/` |
+| 2 Data | in progress: core, callbacks, first fix-ups, typed tables | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`) |
+| 3 Simulation | in progress: RNG done | `cargo test -p d2-sim -p conformance`: spec vectors pass; all 256 draws of `traces/sim/rng/*.json` replay exactly |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
 
-1. **Run the local queue** (§5): the typed-tables game-file test.
-2. **Fix-up specs** (spec writing / RE, local, high): the §7.4 rows
+1. **Fix-up specs** (spec writing / RE, local, high): the §7.4 rows
    `loading.md` OQ13 leaves open (equivalence matrix, op-stat tables and
    flags, per-class skill lists, charstats strings, set attachment, gems,
    gamble, monstats class chain, levels, automap form) and the
    `AnimData.d2` format (OQ11); ideally a post-load memory dump to check
    them (OQ15). Then implement them in `d2-data::fixup` (`PENDING` lists
    them).
-3. **Cross-reference validation** (implementation, medium): broken links
-   reported with table, row, column (`field-types.md` §6).
-4. **Patch layers**: implemented on branch `claude/patch-layers`
+2. **Patch layers**: implemented on branch `claude/patch-layers`
    (`specs/data/patch-layers.md`); synthetic vectors pass. Next: run the
    §5 queue entry (G1–G8), then merge. Phase 2 exit = "patches apply";
    the mod itself is deferred.
-5. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
-   `specs/sim/rng.md`, test against `traces/sim/rng/*.json`. Good first
-   cloud task (needs no game files).
+3. **Phase 3 specs** (spec writing / RE, local, high): the tick loop,
+   intents in / events out and unit ordering, then units and stats
+   (`docs/PLAN.md` Phase 3). Only `specs/sim/rng.md` exists so far.
 
 ## 3. Code map
 
@@ -49,6 +46,7 @@ rather than restating them.
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
 | `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
+| `crates/d2-data/src/links.rs` (+ `links/tests.rs`) | cross-reference validation: linker sizes, broken links by table/row/column | `data/field-types.md` §6.7 |
 | `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
@@ -58,11 +56,14 @@ rather than restating them.
 | `crates/d2-data/src/strings.rs` | string tables, `strkey` | `field-types.md` §7 |
 | `crates/d2-client/src/map/` | DS1+DT1 map assembly, CPU reference renderer | `render/map-preview.md` |
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
-| `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
+| `crates/d2-sim/src/rng.rs` | seeded RNG: `Seed`, draw helpers, `derive`, `time_value` | `sim/rng.md` |
+| `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
+| `d2-proto`, `d2-net`, `d2-server`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs; `patch check/render/diff`: mod stacks | `data/patch-layers.md` §10 |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs; `links`: broken links in the live set; `patch check/render/diff`: mod stacks | `data/patch-layers.md` §10 |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
+| `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
 | `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
 | `tools/ghidra/` | Ghidra scripts (label import, export) | |
@@ -77,6 +78,7 @@ rather than restating them.
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo run --release -p data-tool -- links` | no broken link in the live `.bin` set | `game/` |
 | `cargo test -p d2-data --test patch_game -- --ignored` | patch layers on the live tables (G1–G8) | `game/` |
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
@@ -89,6 +91,10 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
+
+Cross-reference validation: done 2026-10-06 (`data-tool links`:
+72,175 valid, 84,277 misses, 0 broken, 0 unchecked; exit 0;
+`live_set_has_no_broken_links` passes).
 
 **Patch layers G1–G8** (branch `claude/patch-layers`):
 `cargo test --release -p d2-data --test patch_game -- --ignored`.

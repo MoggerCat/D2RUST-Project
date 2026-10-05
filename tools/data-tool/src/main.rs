@@ -1,9 +1,10 @@
-// Spec: specs/data/loading.md ("d2-data policy" 3), specs/data/field-types.md §10
+// Spec: specs/data/loading.md ("d2-data policy" 3), specs/data/field-types.md §6.7, §10
 //! Data-table tool.
 //!
 //! Usage (run with --release):
 //!   data-tool tables [game_dir]
 //!   data-tool gen-tables
+//!   data-tool links [game_dir]
 //!   data-tool patch (check | render | diff) ...
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
@@ -14,6 +15,11 @@
 //! `gen-tables` regenerates `crates/d2-data/src/tables/generated.rs` (the
 //! typed record structs) from the embedded schema.
 //!
+//! `links` checks every lookup field of the live set against its linker's
+//! key count (`field-types.md` §6.7) and prints each broken link with
+//! table, row and column. Exit status 1 when a link is broken or a linker
+//! size is unknown.
+//!
 //! `patch` checks a mod stack, renders patched tables or diffs an edited
 //! table into a layer (`specs/data/patch-layers.md` §10).
 
@@ -23,6 +29,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use d2_data::crosscheck::{self, CrossCheck, Role, TableReport};
+use d2_data::{bin, links as xref};
 use d2_formats::mpq::ArchiveSet;
 
 fn game_dir(arg: Option<&String>) -> Result<PathBuf> {
@@ -37,10 +44,11 @@ fn main() -> Result<()> {
     match args.first().map(String::as_str) {
         Some("tables") if args.len() <= 2 => tables(&game_dir(args.get(1))?),
         Some("gen-tables") if args.len() == 1 => gen_tables(),
+        Some("links") if args.len() <= 2 => links(&game_dir(args.get(1))?),
         Some("patch") => std::process::exit(patch::main(&args[1..])),
-        _ => {
-            bail!("usage: data-tool tables [game_dir] | data-tool gen-tables | data-tool patch ...")
-        }
+        _ => bail!(
+            "usage: data-tool tables|links [game_dir] | data-tool gen-tables | data-tool patch ..."
+        ),
     }
 }
 
@@ -224,6 +232,37 @@ fn tables(dir: &std::path::Path) -> Result<()> {
     }
 
     if bad > 0 || buffers_ok != report.buffers.len() {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn links(dir: &std::path::Path) -> Result<()> {
+    let set = ArchiveSet::open_dir(dir).with_context(|| format!("opening {}", dir.display()))?;
+    let data = bin::load(&set, bin::DEFAULT_LANGUAGE).context("loading the live .bin set")?;
+    let lookups = xref::load_lookups(&set).context("loading lookup by-products")?;
+    let (sizes, report) = xref::validate_set(&data, &lookups);
+    println!("linker sizes (field-types.md §6.7)");
+    for (linker, n) in sizes.iter() {
+        println!("  {linker:<24} {n:>6}");
+    }
+    for f in &report.unchecked {
+        println!(
+            "UNCHECKED: {} column `{}`: size of {} unknown",
+            f.table, f.column, f.linker
+        );
+    }
+    for b in &report.broken {
+        println!("BROKEN: {b}");
+    }
+    println!(
+        "\nsummary: {} valid, {} misses (-1), {} broken, {} unchecked fields",
+        report.valid,
+        report.misses,
+        report.broken.len(),
+        report.unchecked.len()
+    );
+    if !report.is_clean() || !report.unchecked.is_empty() {
         std::process::exit(1);
     }
     Ok(())
