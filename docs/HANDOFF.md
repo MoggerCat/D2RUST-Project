@@ -26,7 +26,7 @@ rather than restating them.
    kind is the open part, `tick.md` §5.6–§5.7 and open question 3) and
    `sim/unit-order.md`. Record with `record_tick.py` (it already logs
    every timer run with unit and arguments); extend it per M10 for stats.
-   First the two Phase 3 recordings of §5 (need the user at the game).
+   The Phase 3 recordings are done (§5); use them.
 2. **Implement the tick core** (implementation, medium; cloud or local,
    after or alongside step 1): `d2-sim::tick` timer queue and step order
    (`tick.md`), `d2-sim::units::lists` (`unit-order.md`), `d2-proto`
@@ -103,17 +103,13 @@ patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
 game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
 `66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
 
-Phase 3 recordings (local, need the user at the game, ~3 min each;
-the game does not enter a game by itself):
-- Combat with missiles: `py tools/trace-recorder/record_tick.py
-  --seconds 200`, a caster or bow character fighting outside town;
-  then `check_tick.py <file>`. Expected: 0 errors and many class-2
-  (missile) runs (the 2026-10-06 run had 4). Settles `tick.md` open
-  question 1.
-- More message ids: `py tools/trace-recorder/record_packets.py
-  --seconds 180`: waypoint, stat and skill points, stash, cube, party
-  menu if any, exit to menu; then `check_packets.py <file>` (expect
-  `OK`) and `--perturb <seq>` (expect "reported").
+Phase 3 recordings: done 2026-10-06 (first skipped at the user's
+request, then recorded when the user asked). Combat with missiles
+`traces/raw/20261006-022304-tick.jsonl` (4,632 ticks, 24,894 timer runs
+incl. 1,580 missile, 186 snapshots) and melee `...-021854-tick.jsonl`:
+`check_tick.py` 0 errors. Messages `...-022633-packets.jsonl`:
+`check_packets.py` OK, perturbation reported, new client ids 0x0C,
+0x3A, 0x3B. Still open: a hosted (multi-client) game.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a

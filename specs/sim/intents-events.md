@@ -36,9 +36,9 @@
 | Constants & data dependencies | 471–489 |
 | Randomness | 490–495 |
 | Edge cases & original bugs | 496–518 |
-| Test vectors | 519–561 |
-| Provenance | 562–601 |
-| Open questions | 602–625 |
+| Test vectors | 519–564 |
+| Provenance | 565–604 |
+| Open questions | 605–628 |
 <!-- /index -->
 
 ## Summary
@@ -558,6 +558,9 @@ that event. Client ids seen: 0x01–0x04, 0x06, 0x09, 0x0D, 0x10, 0x13,
 0x59; system ids 0x67, 0x69, 0x6B, 0x6D. Game type (game +0x6A) = 3 on
 every tick. The committed format-1 trace (`packets-0001`) is written by
 the converter of §6 rule 4 once `d2-sim` can replay a game.
+Second recording `20261006-022633-packets.jsonl` (waypoint, stat and
+skill points, stash): `check_packets.py` OK, `--perturb` reported; adds
+client ids 0x0C, 0x3A, 0x3B (28 client ids seen in total).
 
 ## Provenance
 
@@ -602,7 +605,7 @@ the converter of §6 rule 4 once `d2-sim` can replay a game.
 ## Open questions
 
 1. R1–R7 on a hosted game and with more message ids (the single-player
-   recording covers 25 client ids).
+   recordings cover 28 client ids).
 2. Order of the system messages single player sends (seen: 0x67, 0x69,
    0x6B, 0x6D), and does the server send its session messages (0x00–0x06, 0x0B,
    0x5B, 0x5C, 0xAF, 0xB0) in the same frame? Read from `packets-0001`.
