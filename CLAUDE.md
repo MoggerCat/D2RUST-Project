@@ -1,6 +1,7 @@
 # CLAUDE.md — Project instructions for Claude Code
 
-Read this file at the start of every session. Detailed docs live in `docs/`.
+Read this file at the start of every session, then `docs/METHODS.md` (how
+work is done). Detailed docs live in `docs/`.
 For the current project state, findings and open questions, read
 `docs/HANDOFF.md`.
 Before any architectural change, read `docs/ARCHITECTURE.md` and
@@ -128,56 +129,12 @@ don't open it.
 
 ## Working rules
 
-- **Quality comes from evidence, not from more reviewers.** Prove things
-  with executable checks against the real 1.14d data (e.g. `data-tool
-  tables`, `mpq-tool formats`, `d2-client verify`, traces). Don't stack
-  agent review/revise/critic layers; one focused writer per spec or module,
-  then the check. Keep agent prompts tight, with exact file pointers.
-- **Specs are the project's memory.** Hold the bar in `specs/README.md`:
-  1.14d-confirmed facts with provenance, one owner spec per rule, dense
-  plain prose, machine-readable data where it beats prose.
-- **Read by section.** Specs over 12 KB start with a section index
-  (`<!-- index -->`, with line ranges). Read the index, then only the
-  sections you need; agent prompts name them ("loading.md §6 and §8").
-  After editing a spec, run `py tools/spec_index.py` (CI checks it).
-- **Start from the map.** `docs/HANDOFF.md` has the code map and the
-  command that proves each thing. Use it instead of exploring the repo.
-- **Turn facts into checks.** When a spec holds a list or table code
-  consumes, make it a TSV plus a mechanical check (like `fields.tsv` +
-  `data-tool tables`). A failing check beats an agent rereading prose.
-- **Say where a claim holds.** A fact passed between sessions, agents or
-  documents names its scope: the branch or commit, the game version, the
-  archive or table it was checked on. "Exists" means "exists on `main`"
-  unless stated otherwise. A claim without its scope is treated as
-  unverified by the receiver.
-- **Proven methods before new ones.** For a problem, first use a project
-  convention, an existing tool in `tools/`, or an established method
-  (debugger traces, Ghidra exports, byte-exact cross-checks, strict
-  parsers, TSV + check). Invent only when none fits; then say so in the
-  commit and the spec, and give the new piece its own check before
-  anything builds on it.
-- **Match the agent to the task.**
+Every method in `docs/METHODS.md` applies (21 entries; each one's **Here**
+line is its binding in this project, with the model/effort table and the
+token budget). Read it at the start of a session, after this file. New
+methods go there (`py tools/methods.py new "Title"`), not here. Project-only
+rule:
 
-  | Task | Model | Effort |
-  |---|---|---|
-  | RE / spec writing, debugging an exactness mismatch, architecture | Opus | high |
-  | Implementation from a clear spec, extraction scripts, tools | Opus or Sonnet | medium |
-  | Doc cleanup, formatting, boilerplate, renames, simple fixes | Sonnet or Haiku | low |
-
-  Parallel agents buy speed, not savings: split only genuinely
-  independent work, and give each its own files.
-- **Token budget** (user's plan, 2026-10-05): ~15–20M tokens per 5-hour
-  window, ~400M per week. Measured costs: a focused agent run is
-  ~250–500k tokens; a long main thread costs more with every turn. Plan a
-  5-hour window at **under 6M** (user's cap): roughly 8–12 agent runs plus
-  the main thread. Spend it on the critical path first; run independent
-  agents in parallel for speed.
-  Say the planned spend before launching a batch. Raise effort to high
-  only for: RE/spec writing, an exactness mismatch the first fix didn't
-  solve, architecture decisions, and a spec a whole phase will build on.
-- **Short sessions.** One step per session: start from `docs/HANDOFF.md`
-  and the latest commit, end by updating HANDOFF/PLAN, committing and
-  pushing. Start a fresh session rather than continuing a long one.
 - **Disk is limited on the developer PC.** Build only the crates you need;
   build `d2-client` (Bevy) only for client work.
 

@@ -19,6 +19,9 @@ jobs:
       - name: Spec section indexes
         run: python3 tools/spec_index.py --check
 
+      - name: Methods collection
+        run: python3 tools/methods.py check
+
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries
         run: |

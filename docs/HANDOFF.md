@@ -60,6 +60,7 @@ rather than restating them.
 | `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs | |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
+| `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
 | `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
 | `tools/ghidra/` | Ghidra scripts (label import, export) | |
