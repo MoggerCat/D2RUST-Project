@@ -288,23 +288,10 @@ const POINTER_FIELDS: &[(&str, usize, usize, &str)] = &[(
 
 /// Where the `fixup::PENDING` rows write, as `loading.md` §7.4 states
 /// it: (pending row, table, record byte range). Bytes the game changes
-/// outside these ranges are reported as differences.
+/// outside these ranges are reported as differences. Empty: every §7.4
+/// row is implemented.
 type PendingTarget = (&'static str, &'static str, (usize, usize));
-const PENDING_TARGETS: &[PendingTarget] = &[
-    ("itemstatcost", "itemstatcost", (0x51, 0x54)),
-    ("itemstatcost", "itemstatcost", (0x5E, 0x100)),
-    ("charstats", "charstats", (0x00, 0x20)),
-    ("setitems", "sets", (0x0C, 0x10)),
-    ("setitems", "setitems", (0x2E, 0x30)),
-    ("gems", "gems", (0x2C, 0x2E)),
-    ("gems", "weapons", (0xF0, 0xF4)),
-    ("gems", "armor", (0xF0, 0xF4)),
-    ("gems", "misc", (0xF0, 0xF4)),
-    ("monstats", "monstats", (0x36, 0x3A)),
-    ("monstats", "monstats", (0x4A, 0x4C)),
-    ("levels", "levels", (0x33, 0x36)),
-    ("levels", "levels", (0x16E, 0x20E)),
-];
+const PENDING_TARGETS: &[PendingTarget] = &[];
 
 struct DumpEntry {
     kind: String,
@@ -439,32 +426,149 @@ fn diff_table(name: &str, size: usize, ours: &[u8], game: &[u8], shipped: &[u8])
     d
 }
 
-/// Maps d2rs builds, compared with the dumped ones; the rest are listed.
-fn compare_maps(dir: &Path, fixed: &FixedSet, manifest: &BTreeMap<String, DumpEntry>) -> bool {
-    let mut ok = true;
-    println!("\nruntime maps (map-<name>.bin)");
-    for (name, e) in manifest.iter().filter(|(_, e)| e.kind == "map") {
-        let data = std::fs::read(dir.join(format!("map-{name}.bin"))).unwrap_or_default();
-        let ours: Option<Vec<u8>> = match name.as_str() {
-            "superunique_hc" => Some(
-                fixed
-                    .superunique_hc
-                    .iter()
-                    .flat_map(|v| v.unwrap_or(0xFFFF).to_le_bytes())
-                    .collect(),
-            ),
-            "stat_stuff" => Some(fixed.stat_stuff.to_le_bytes().to_vec()),
-            _ => None,
+fn u16s(v: &[u16]) -> Vec<u8> {
+    v.iter().flat_map(|x| x.to_le_bytes()).collect()
+}
+
+fn u32s(v: impl IntoIterator<Item = u32>) -> Vec<u8> {
+    v.into_iter().flat_map(|x| x.to_le_bytes()).collect()
+}
+
+/// A pointer word in d2rs form: a record index, or `u32::MAX` for none.
+fn ptr(v: Option<u32>) -> u32 {
+    v.unwrap_or(u32::MAX)
+}
+
+/// The d2rs counterpart of dumped map `name` (`runtime-maps.md`), with the
+/// table its pointer words point into and which u32 words are pointers.
+type PointerWords = (&'static str, fn(usize) -> bool);
+fn our_map(name: &str, f: &FixedSet) -> Option<(Vec<u8>, Option<PointerWords>)> {
+    let bytes = match name {
+        "superunique_hc" => u16s(
+            &f.superunique_hc
+                .iter()
+                .map(|v| v.unwrap_or(0xFFFF))
+                .collect::<Vec<_>>(),
+        ),
+        "stat_stuff" => u32s([f.stat_stuff, f.stat_mask]),
+        "itemtypes_equiv" => u32s(f.itemtypes_equiv.bits.iter().copied()),
+        "montype_equiv" => u32s(f.montype_equiv.bits.iter().copied()),
+        "isc_desc_list" => u16s(&f.stat_desc_list),
+        "states_bitsets" => u32s(f.states.bitsets.iter().copied()),
+        "states_pgsv" => u16s(&f.states.pgsv),
+        "states_curse" => u16s(&f.states.curse),
+        "states_disguise" => u16s(&f.states.disguise),
+        "states_active" => u16s(&f.states.active),
+        "states_itemtype" => u16s(&f.states.itemtype),
+        "skills_class_counts" => u32s(f.skill_lists.counts),
+        "skills_class_lists" => u16s(&f.skill_lists.lists),
+        "skills_desc_list" => u16s(&f.skill_lists.passives),
+        "items_f6_list" => u16s(&f.version0_items),
+        "gamble_index" => u32s(f.gamble.index.iter().flatten().copied()),
+        "gamble_levels" => u32s(f.gamble.thresholds),
+        "automap_runtime" => f.automap.records.concat(),
+        "automap_level_index" => f
+            .automap
+            .ranges
+            .iter()
+            .flat_map(|&(a, b)| [a, b])
+            .flat_map(i32::to_le_bytes)
+            .collect(),
+        "hireling_first" => f
+            .hireling_first
+            .iter()
+            .flatten()
+            .flat_map(|v| v.to_le_bytes())
+            .collect(),
+        "leveldefs_portals" => u32s(f.portals.iter().copied()),
+        "lvlsub_type_first" => u32s(f.lvlsub_types.iter().copied()),
+        "monseq_index" => {
+            let words = f
+                .monseq
+                .iter()
+                .flat_map(|e| [ptr(e.first), e.count, e.count2]);
+            return Some((u32s(words), Some(("monseq", |w| w % 3 == 0))));
+        }
+        "monpreset_acts" => {
+            let words = f
+                .monpreset
+                .first
+                .iter()
+                .map(|&v| ptr(v))
+                .chain(f.monpreset.count);
+            return Some((u32s(words), Some(("monpreset", |w| w < 5))));
+        }
+        _ => return None,
+    };
+    Some((bytes, None))
+}
+
+/// Dumped pointer words → record indices of `table` (null → `u32::MAX`;
+/// a value outside the table stays as it is and so differs).
+fn pointers_to_indices(
+    data: &mut [u8],
+    words: PointerWords,
+    manifest: &BTreeMap<String, DumpEntry>,
+) -> Result<()> {
+    let (table, is_ptr) = words;
+    let e = manifest
+        .get(table)
+        .with_context(|| format!("{table} not in the dump manifest"))?;
+    let base = u32::from_str_radix(e.address.trim_start_matches("0x"), 16)
+        .with_context(|| format!("{table} address {}", e.address))?;
+    let (size, end) = (e.size as u32, base + (e.count * e.size) as u32);
+    for (w, chunk) in data.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+        if !is_ptr(w) {
+            continue;
+        }
+        let v = u32::from_le_bytes(*chunk);
+        let index = if v == 0 {
+            u32::MAX
+        } else if (base..end).contains(&v) && (v - base) % size == 0 {
+            (v - base) / size
+        } else {
+            v
         };
-        let result = match ours {
+        *chunk = index.to_le_bytes();
+    }
+    Ok(())
+}
+
+/// Maps d2rs builds, compared with the dumped ones; the rest are listed.
+fn compare_maps(
+    dir: &Path,
+    fixed: &FixedSet,
+    manifest: &BTreeMap<String, DumpEntry>,
+) -> Result<bool> {
+    let mut ok = true;
+    println!("\nruntime maps (map-<name>.bin; pointer words compared as record indices)");
+    for (name, e) in manifest.iter().filter(|(_, e)| e.kind == "map") {
+        let mut data = std::fs::read(dir.join(format!("map-{name}.bin"))).unwrap_or_default();
+        let result = match our_map(name, fixed) {
             None => "no d2rs counterpart".to_string(),
-            Some(o) => {
-                let g = &data[..o.len().min(data.len())];
-                if g == o.as_slice() {
+            Some((o, pointers)) => {
+                if let Some(p) = pointers {
+                    pointers_to_indices(&mut data, p, manifest)?;
+                }
+                if data == o {
                     "identical".into()
                 } else {
                     ok = false;
-                    format!("DIFFERS: d2rs [{}] game [{}]", hex(&o), hex(g))
+                    let first = o.iter().zip(&data).position(|(a, b)| a != b);
+                    match first {
+                        Some(at) => {
+                            let w = &o[at..o.len().min(at + 8)];
+                            let g = &data[at..data.len().min(at + 8)];
+                            format!(
+                                "DIFFERS at byte {at}: d2rs [{}] game [{}] ({} vs {} bytes)",
+                                hex(w),
+                                hex(g),
+                                o.len(),
+                                data.len()
+                            )
+                        }
+                        None => format!("DIFFERS in length: d2rs {}, game {}", o.len(), data.len()),
+                    }
                 }
             }
         };
@@ -473,14 +577,15 @@ fn compare_maps(dir: &Path, fixed: &FixedSet, manifest: &BTreeMap<String, DumpEn
             e.address, e.count, e.size
         );
     }
-    ok
+    Ok(ok)
 }
 
 fn dump_compare(dir: &Path, game: &Path) -> Result<()> {
     let manifest = read_manifest(dir)?;
     let set = ArchiveSet::open_dir(game).with_context(|| format!("opening {}", game.display()))?;
     let data = d2_data::bin::load(&set, d2_data::bin::DEFAULT_LANGUAGE).context("loading .bin")?;
-    let fixed = fixup::apply(&data).context("fix-ups")?;
+    let anim = fixup::read_animdata(&set).context("AnimData.d2")?;
+    let fixed = fixup::apply(&data, &anim).context("fix-ups")?;
     println!(
         "dump {} vs live .bin + d2_data::fixup (loading.md §7.4, open question 15)",
         dir.display()
@@ -570,7 +675,7 @@ fn dump_compare(dir: &Path, game: &Path) -> Result<()> {
             }
         }
     }
-    let maps_ok = compare_maps(dir, &fixed, &manifest);
+    let maps_ok = compare_maps(dir, &fixed, &manifest)?;
     println!(
         "\nsummary: {identical} identical, {pending_only} differ only in PENDING rows, \
          {bad} differ elsewhere; compared maps: {}",

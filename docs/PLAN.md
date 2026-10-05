@@ -107,12 +107,14 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
 - [x] Table-specific callbacks (`callbacks.md`, `d2-data::compile::callbacks`;
       confirmed by `data-tool tables` 2026-10-05: 73/73 runtime tables
       match, 72 byte-identical, 1 explained; 4/4 code buffers identical)
-- [ ] Post-load fix-ups and runtime maps (`fixups.md`, `runtime-maps.md`;
-      summary `loading.md` §7.4): specs complete, every rule confirmed by
-      the 1.14d post-load dump (`dump_tables.py`, 2026-10-06). Part done
-      in `d2-data::fixup` (monequip wrong, 8 bytes); the rest to
-      implement. Done when `data-tool dump-compare` shows 70/70 tables
-      and every map identical
+- [ ] Post-load fix-ups and runtime maps (`fixups.md`, `runtime-maps.md`,
+      `formats/animdata.md`; summary `loading.md` §7.4): specs complete,
+      every rule confirmed by the 1.14d post-load dump (`dump_tables.py`,
+      2026-10-06). All implemented (2026-10-06, cloud) in `d2-data::fixup`
+      (`records`, `maps`, `text`, `qsort`) and `d2-formats::animdata`;
+      `fixup::PENDING` empty; unit tests from the synthetic vectors pass.
+      Unverified on game files: done when `data-tool dump-compare` shows
+      70/70 tables and every map identical (`HANDOFF.md` §5)
 - [x] Typed structs for all tables (generated from the schema:
       `d2-data::tables`, `data-tool gen-tables`; callback and fix-up bytes
       are read from the raw record; every live table decodes,
@@ -139,7 +141,9 @@ the table callbacks are implemented, so the target is 73/73 with only
 `d2-data::fixup` to a copy of the loaded set.
 2026-10-06: `dump_tables.py` dumps the tables and maps from 1.14d memory
 after the load; `fixups.md` and `runtime-maps.md` specify every fix-up
-and map, each reproduced byte for byte against that dump.
+and map, each reproduced byte for byte against that dump. Then (cloud)
+all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
+`d2-formats::animdata`; `dump-compare` compares every map d2rs builds.
 
 ### Phase 3 — Core simulation (`d2-sim`)
 - [x] D2 seeded RNG (exact sequence match) — **first**. *`d2-sim::rng` (`Seed`: step, `roll`, `mask`, `mask_range`, `roll_range`, setters, `derive`, `time_value`); unit tests from the spec vectors; `conformance` replays all 256 draws of `traces/sim/rng/*.json` exactly. Spec status `conformance-passing`.*

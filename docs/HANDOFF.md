@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, first fix-ups, typed tables, cross-reference validation (`data-tool links`: 0 broken); fix-up specs complete and dump-confirmed | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`); `data-tool dump-compare`: 57/70 tables identical to 1.14d memory (rest: unimplemented fix-ups, §2) |
+| 2 Data | in progress: core, callbacks, typed tables, cross-reference validation (`data-tool links`: 0 broken); all fix-ups and runtime maps implemented (unverified: §5 queue) | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`); `data-tool dump-compare`: 57/70 tables identical to 1.14d memory before the full fix-ups (rerun queued, §5) |
 | 3 Simulation | in progress: RNG done | `cargo test -p d2-sim -p conformance`: spec vectors pass; all 256 draws of `traces/sim/rng/*.json` replay exactly |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -20,16 +20,11 @@ rather than restating them.
 
 ## 2. Next steps (in order)
 
-1. **Implement the fix-ups** (implementation, medium; cloud or local):
-   `specs/data/fixups.md` and `specs/data/runtime-maps.md` in
-   `d2-data::fixup`: every `PENDING` row, the fix-ups the dump found
-   (lvltypes/lvlprest/lvlsub tile paths, objects names and frame counts,
-   monumod clamp), the monequip correction (`fixups.md` §9: empty item
-   code exempt, rows without a valid monster untouched), the runtime maps
-   (`runtime-maps.md`, with the CRT `qsort` of §1), and `AnimData.d2`
-   (`formats/animdata.md`) for the monstats speeds. Unit tests from the
-   synthetic vectors; `dump-compare` compares the maps too (add their
-   d2rs counterparts). Proof: local queue entry (§5).
+1. **Fix-ups: confirm on game files** (local): all of `fixups.md`,
+   `runtime-maps.md` and `formats/animdata.md` are implemented
+   (`claude/implement-fixups`, 2026-10-06; `fixup::PENDING` empty,
+   synthetic vectors pass). Run the §5 fix-ups queue entry; on a
+   mismatch, fix against the spec (exactness debugging, high).
 2. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`
    (in progress on `claude/patch-layers`).
    Phase 2 exit = "patches apply"; the mod itself is deferred.
@@ -42,14 +37,14 @@ rather than restating them.
 | Path | What | Spec |
 |---|---|---|
 | `crates/d2-formats/src/mpq/` | MPQ archive (`mod.rs`), hash/block tables (`tables.rs`), crypto, PKWARE explode, Huffman, ADPCM, `ArchiveSet` (`set.rs`) | `formats/mpq.md`, `mpq-tables.md`, `data/loading.md` §2 |
-| `crates/d2-formats/src/{palette,dc6,dcc,dt1,ds1,cof,tbl,font}.rs` | file formats | `specs/formats/*.md` |
+| `crates/d2-formats/src/{palette,dc6,dcc,dt1,ds1,cof,tbl,font,animdata}.rs` | file formats | `specs/formats/*.md` |
 | `crates/d2-data/src/txt.rs` | strict `.txt` reader, column binding | `data/txt-format.md` |
 | `crates/d2-data/src/schema.rs` | embedded `fields.tsv` / `tables.tsv` | `data/schema.md` |
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
 | `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
 | `crates/d2-data/src/links.rs` (+ `links/tests.rs`) | cross-reference validation: linker sizes, broken links by table/row/column | `data/field-types.md` §6.7 |
-| `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/fixups.md`, `data/runtime-maps.md` (summary `loading.md` §7.4) |
+| `crates/d2-data/src/fixup.rs` (+ `fixup/{records,maps,text,qsort,tests}.rs`) | post-load fix-ups (`records`), runtime maps (`maps`), wide text and tile paths (`text`), the CRT `qsort`; on a copy of the loaded set; `apply(&BinSet, &AnimData)` | `data/fixups.md`, `data/runtime-maps.md` (summary `loading.md` §7.4) |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
 | `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
@@ -93,13 +88,19 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-Fix-ups (after step 1 of §2 lands): `py tools/trace-recorder/dump_tables.py`
-(or reuse `traces/raw/20261006-004246-tables`), then `cargo run --release
--p data-tool -- dump-compare traces/raw/<time>-tables`. Expected: all 70
-kept tables identical (today 57), `PENDING` empty, every map with a d2rs
-counterpart identical (pointer maps compared as indices). Before step 1
-the result is the 2026-10-06 baseline: 57 identical, 13 differ (monequip
-8 bytes is a d2rs bug).
+Fix-ups (implemented on `claude/implement-fixups`, 2026-10-06):
+`py tools/trace-recorder/dump_tables.py` (or reuse
+`traces/raw/20261006-004246-tables`), then `cargo run --release -p
+data-tool -- dump-compare traces/raw/<time>-tables`. Expected: all 70
+kept tables identical (baseline 57/70 before this step), no table line
+with `[pending]` (`PENDING` is empty), and every map line `identical`
+except the three with no d2rs counterpart (`item_counts`, `affix_count`,
+`rare_count`, owned by `loading.md` §9). Pointer words of `monseq_index`
+and `monpreset_acts` are compared as record indices. Also `cargo test
+--release -p d2-data --test game_data -- --ignored fixups_on_live_set`
+(spec real vectors: monstats speeds, pettype, lvlsub path, gamble,
+automap, lists). Exit status 0 = done; record the result here and in
+`docs/PLAN.md`, then set the three specs' status.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a

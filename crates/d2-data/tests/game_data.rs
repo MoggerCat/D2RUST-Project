@@ -374,7 +374,8 @@ fn callback_vectors() {
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn fixups_on_live_set() {
     let data = bin::load(set(), bin::DEFAULT_LANGUAGE).unwrap();
-    let f = d2_data::fixup::apply(&data).unwrap();
+    let anim = d2_data::fixup::read_animdata(set()).unwrap();
+    let f = d2_data::fixup::apply(&data, &anim).unwrap();
     assert_eq!(f.uniques.len(), 402);
     assert_eq!(f.uniques.find(b"the stone of jordan"), Some(122));
     assert_eq!(f.sets.len(), 127);
@@ -400,6 +401,40 @@ fn fixups_on_live_set() {
     assert!(pets > 0);
     // The shipped bytes stay untouched in the loaded set.
     assert_eq!(u16_at(data.table("uniqueitems").unwrap().record(5), 0), 0);
+    // fixups.md / runtime-maps.md real vectors.
+    let ms = f.table("monstats").unwrap();
+    let speeds = |r: usize| {
+        let m = ms.record(r);
+        (u16_at(m, 0x36), u16_at(m, 0x38), m[0x4A], m[0x4B])
+    };
+    assert_eq!(speeds(0), (128, 64, 7, 0));
+    assert_eq!(speeds(443), (138, 329, 5, 2));
+    assert_eq!(speeds(671), (208, 374, 5, 3));
+    assert_eq!(speeds(684), (256, 256, 11, 10));
+    let golem = f.table("pettype").unwrap().record(3);
+    let list: Vec<u16> = (0..4).map(|k| u16_at(golem, 0xC0 + 2 * k)).collect();
+    assert_eq!((u32_at(golem, 0xBC), list), (4, vec![75, 85, 90, 94]));
+    let lvlsub = f.table("lvlsub").unwrap().record(0);
+    assert!(lvlsub[4..].starts_with(b"DATA\\GLOBAL\\TILES\\Act1\\Outdoors\\BorderCliffs.ds1\0"));
+    assert_eq!(u32_at(f.table("objects").unwrap().record(1), 0xD8), 256);
+    assert_eq!((f.stat_stuff, f.stat_mask), (6, 0x3F));
+    assert_eq!(f.stat_desc_list.len(), 207);
+    assert_eq!(&f.stat_desc_list[..4], [91, 252, 204, 253]);
+    assert_eq!(f.skill_lists.counts, [30; 7]);
+    assert_eq!(
+        f.portals,
+        [1, 3, 5, 7, 27, 29, 33, 36, 40, 43, 45, 46, 53, 54, 74, 134]
+    );
+    assert_eq!(
+        f.lvlsub_types,
+        [0, 1, 2, 3, 4, 6, 10, 16, 17, 21, 28, 31, 33]
+    );
+    assert_eq!(f.monpreset.count, [47, 59, 39, 28, 56]);
+    let g = f.gamble.index.as_ref().unwrap();
+    assert_eq!((g.len(), &g[..3]), (125, &[520, 522, 25][..]));
+    assert_eq!(&f.gamble.thresholds[..4], [2, 10, 11, 17]);
+    assert_eq!(f.automap.records.len(), 3286);
+    assert_eq!(f.automap.ranges[1], (0, 83));
 }
 
 /// Every live table decodes with its generated struct (`schema.md`).

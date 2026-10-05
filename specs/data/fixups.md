@@ -1,10 +1,12 @@
 # Spec: Data — Post-load fix-ups (record bytes)
 
-- **Status:** draft. Every rule below reproduces the 1.14d tables in
+- **Status:** implemented. Every rule below reproduces the 1.14d tables in
   memory after the excel load byte for byte: scratch reimplementations run
   on the live `.bin` files match the post-load dump (`dump_tables.py`,
-  2026-10-06) for all 70 dumped tables. `d2-data::fixup` implements part
-  of it (`loading.md` §7.4, d2rs paragraph).
+  2026-10-06) for all 70 dumped tables. `d2-data::fixup` (`records`,
+  `text`) implements every rule and passes the synthetic vectors
+  (2026-10-06); `data-tool dump-compare` on game files is queued
+  (`docs/HANDOFF.md` §5).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::fixup`
 - **Related specs:** `data/loading.md` (§6 load order, §7.4 summary, §8
@@ -17,29 +19,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–57 |
-| Inputs | 58–67 |
-| Outputs / state changes | 68–74 |
-| Rules | 75–76 |
-|   1. Conventions and shared lookups | 77–113 |
-|   2. itemstatcost | 114–144 |
-|   3. skills → pettype | 145–153 |
-|   4. charstats | 154–160 |
-|   5. Items, gems | 161–182 |
-|   6. Unique and set items | 183–207 |
-|   7. Other string-id rows | 208–221 |
-|   8. monstats | 222–288 |
-|   9. monequip | 289–306 |
-|   10. monumod, missiles | 307–315 |
-|   11. levels | 316–335 |
-|   12. Tile paths: lvltypes, lvlprest, lvlsub | 336–358 |
-|   13. objects | 359–371 |
-| Constants & data dependencies | 372–389 |
-| Randomness | 390–393 |
-| Edge cases & original bugs | 394–413 |
-| Test vectors | 414–463 |
-| Provenance | 464–512 |
-| Open questions | 513–527 |
+| Summary | 47–59 |
+| Inputs | 60–69 |
+| Outputs / state changes | 70–76 |
+| Rules | 77–78 |
+|   1. Conventions and shared lookups | 79–115 |
+|   2. itemstatcost | 116–146 |
+|   3. skills → pettype | 147–155 |
+|   4. charstats | 156–162 |
+|   5. Items, gems | 163–184 |
+|   6. Unique and set items | 185–209 |
+|   7. Other string-id rows | 210–223 |
+|   8. monstats | 224–290 |
+|   9. monequip | 291–308 |
+|   10. monumod, missiles | 309–317 |
+|   11. levels | 318–337 |
+|   12. Tile paths: lvltypes, lvlprest, lvlsub | 338–360 |
+|   13. objects | 361–373 |
+| Constants & data dependencies | 374–391 |
+| Randomness | 392–395 |
+| Edge cases & original bugs | 396–415 |
+| Test vectors | 416–465 |
+| Provenance | 466–514 |
+| Open questions | 515–535 |
 <!-- /index -->
 
 ## Summary
@@ -524,3 +526,9 @@ register arguments. D2MOO (1.10f) supplied field names only.
    was not attached (no 1.14d item is affected).
 5. The texts were checked with the ENG string tables only; other
    languages change the §4/§11/§13 bytes and the §7 ids, not the rules.
+6. Inputs this spec does not cover, which d2rs reports as a
+   `FixupError` (strict input, no 1.14d row reaches them; 1.14d behavior
+   not traced): a sets +0x0C count < 0 at attachment (§6); a gem count
+   larger than the item count (§5 loop 2 resets items[k]); a tile path
+   field with no NUL in its 60 bytes (§12); a missing monmode row 2 or
+   15 (§8); a byte ≥ 0x80 in a miss key or a hit text (Open question 1).
