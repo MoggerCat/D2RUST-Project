@@ -2340,6 +2340,9 @@ dependencies = [
 [[package]]
 name = "d2-proto"
 version = "0.0.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "d2-server"
@@ -2380,6 +2383,7 @@ dependencies = [
  "anyhow",
  "d2-data",
  "d2-formats",
+ "d2-proto",
 ]
 
 [[package]]

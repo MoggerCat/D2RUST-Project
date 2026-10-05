@@ -1,9 +1,10 @@
-// Spec: specs/data/loading.md ("d2-data policy" 3), specs/data/field-types.md §6.7, §10
+// Spec: specs/data/loading.md ("d2-data policy" 3), specs/data/field-types.md §6.7, §10, specs/sim/intents-events.md §5
 //! Data-table tool.
 //!
 //! Usage (run with --release):
 //!   data-tool tables [game_dir]
 //!   data-tool gen-tables
+//!   data-tool gen-proto
 //!   data-tool links [game_dir]
 //!   data-tool dump-compare <dump_dir> [game_dir]
 //!   data-tool patch (check | render | diff) ...
@@ -15,6 +16,10 @@
 //!
 //! `gen-tables` regenerates `crates/d2-data/src/tables/generated.rs` (the
 //! typed record structs) from the embedded schema.
+//!
+//! `gen-proto` regenerates `crates/d2-proto/src/generated.rs` (message
+//! descriptors and typed messages) from `specs/sim/client-messages.tsv`
+//! and `server-messages.tsv` (`specs/sim/intents-events.md` §5).
 //!
 //! `links` checks every lookup field of the live set against its linker's
 //! key count (`field-types.md` §6.7) and prints each broken link with
@@ -53,13 +58,14 @@ fn main() -> Result<()> {
     match args.first().map(String::as_str) {
         Some("tables") if args.len() <= 2 => tables(&game_dir(args.get(1))?),
         Some("gen-tables") if args.len() == 1 => gen_tables(),
+        Some("gen-proto") if args.len() == 1 => gen_proto(),
         Some("links") if args.len() <= 2 => links(&game_dir(args.get(1))?),
         Some("dump-compare") if (2..=3).contains(&args.len()) => {
             dump_compare(Path::new(&args[1]), &game_dir(args.get(2))?)
         }
         Some("patch") => std::process::exit(patch::main(&args[1..])),
         _ => bail!(
-            "usage: data-tool tables|links [game_dir] | data-tool gen-tables | \
+            "usage: data-tool tables|links [game_dir] | data-tool gen-tables | data-tool gen-proto | \
              data-tool dump-compare <dump_dir> [game_dir] | data-tool patch ..."
         ),
     }
@@ -70,6 +76,16 @@ fn gen_tables() -> Result<()> {
         .join("../../crates/d2-data")
         .join(d2_data::codegen::GENERATED_PATH);
     let code = d2_data::codegen::generate(d2_data::schema::schema());
+    std::fs::write(&path, &code).with_context(|| format!("writing {}", path.display()))?;
+    println!("wrote {} ({} bytes)", path.display(), code.len());
+    Ok(())
+}
+
+fn gen_proto() -> Result<()> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../crates/d2-proto")
+        .join(d2_proto::codegen::GENERATED_PATH);
+    let code = d2_proto::codegen::generate(d2_proto::tsv::CLIENT_TSV, d2_proto::tsv::SERVER_TSV)?;
     std::fs::write(&path, &code).with_context(|| format!("writing {}", path.display()))?;
     println!("wrote {} ({} bytes)", path.display(), code.len());
     Ok(())
