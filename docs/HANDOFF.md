@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, typed tables, cross-reference validation (`data-tool links`: 0 broken); all fix-ups and runtime maps implemented (unverified: §5 queue) | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`); `data-tool dump-compare`: 57/70 tables identical to 1.14d memory before the full fix-ups (rerun queued, §5) |
+| 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
 | 3 Simulation | in progress: RNG done; tick, unit-ordering and intents/events specs written and confirmed on recordings (not implemented) | `cargo test -p d2-sim -p conformance`: spec vectors pass; all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -20,21 +20,15 @@ rather than restating them.
 
 ## 2. Next steps (in order)
 
-1. **Confirm on game files** (local): run the §5 queue entries for the
-   fix-ups (`fixups.md`, `runtime-maps.md`, `formats/animdata.md`, all
-   implemented, `fixup::PENDING` empty) and for the patch layers
-   (`patch-layers.md`, G1–G8). Both are on `main` with synthetic vectors
-   passing, unverified on 1.14d until then. On a mismatch, fix against
-   the spec (exactness debugging, high). Phase 2 exit = both pass
-   ("patches apply"; the mod itself is deferred).
-2. **Phase 3 specs, part 2** (spec writing / RE, local, high): units,
+1. **Phase 3 specs, part 2** (spec writing / RE, local, high): units,
    stats, stat lists and modifiers (`docs/PLAN.md` Phase 3). Built on
    `specs/sim/tick.md` (timer events: what each event type does per unit
    kind is the open part, `tick.md` §5.6–§5.7 and open question 3) and
    `sim/unit-order.md`. Record with `record_tick.py` (it already logs
    every timer run with unit and arguments); extend it per M10 for stats.
-3. **Implement the tick core** (implementation, medium; cloud or local,
-   after or alongside step 2): `d2-sim::tick` timer queue and step order
+   First the two Phase 3 recordings of §5 (need the user at the game).
+2. **Implement the tick core** (implementation, medium; cloud or local,
+   after or alongside step 1): `d2-sim::tick` timer queue and step order
    (`tick.md`), `d2-sim::units::lists` (`unit-order.md`), `d2-proto`
    ids and sizes from the two TSVs (`intents-events.md`). Unit tests from
    the specs' synthetic vectors; the recordings become format-1 traces
@@ -102,33 +96,12 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-Fix-ups (on `main`, from `claude/implement-fixups`, 2026-10-06):
-`py tools/trace-recorder/dump_tables.py` (or reuse
-`traces/raw/20261006-004246-tables`), then `cargo run --release -p
-data-tool -- dump-compare traces/raw/<time>-tables`. Expected: all 70
-kept tables identical (baseline 57/70 before this step), no table line
-with `[pending]` (`PENDING` is empty), and every map line `identical`
-except the three with no d2rs counterpart (`item_counts`, `affix_count`,
-`rare_count`, owned by `loading.md` §9). Pointer words of `monseq_index`
-and `monpreset_acts` are compared as record indices. Also `cargo test
---release -p d2-data --test game_data -- --ignored fixups_on_live_set`
-(spec real vectors: monstats speeds, pettype, lvlsub path, gamble,
-automap, lists). Exit status 0 = done; record the result here and in
-`docs/PLAN.md`, then set the three specs' status.
-
-**Patch layers G1–G8** (on `main`, from `claude/patch-layers`):
-`cargo test --release -p d2-data --test patch_game -- --ignored`.
-Expect 4 passed: G1 85 tables, 21,632 rows, render identity, empty diff
-`d2patch 1\n`; G2 base-as-patch compiles with no finding and fix-ups
-apply; G3 the spec's Example gives the one N01 and digests weapons
-`ef2ca1073f89cf91`, armor `a3bd13b18286ee12`, magicprefix
-`63b952e7aa3c56f0`, treasureclassex `0a0a4c940f8f3fb9`, then compiles
-and fix-ups apply; G4–G8 the A/C codes of the spec table. On a failure,
-record the assertion output here (a digest or C finding mismatch is a
-spec-vs-code question for `patch-layers.md`, not a test to loosen).
-Then try `data-tool patch check <stack>` on that Example (layers from
-`crates/d2-data/tests/patch_game.rs`, saved under `game/`): exit 0, one
-note, the data digest.
+Done 2026-10-06 (local): fix-ups (`dump-compare
+traces/raw/20261006-021210-tables`: 70/70 tables, every map with a d2rs
+counterpart identical, nothing pending; `fixups_on_live_set` ok) and
+patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
+game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
+`66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
 
 Phase 3 recordings (local, need the user at the game, ~3 min each;
 the game does not enter a game by itself):
