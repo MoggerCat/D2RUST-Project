@@ -58,8 +58,15 @@ decompiled code.
 9. **Mods ship as patches, not copies.** Mod data is expressed as changes
    applied to the user's own tables at load time. Never write out full
    modified Blizzard tables into the repo or a release.
-10. **Fidelity is measured, not guessed.** A simulation feature is "done" only
-    when conformance tests pass against traces recorded from the original game.
+10. **Fidelity is measured, not guessed — everywhere.** Every behavior taken
+    from the original is held to exact match; there is no "close enough" tier.
+    "Exact" means equal under a comparison defined in the feature's spec:
+    identical bytes for logic, data and RNG; identical pixels for rendering;
+    identical decoded samples and trigger ticks for audio; identical tick
+    numbers (not wall-clock time) for timing. A feature is "done" only when
+    its check passes against the original 1.14d (traces, live data, renders).
+    A feature without a check yet is "unverified", never "done": queue the
+    check (`docs/HANDOFF.md` §5) instead of judging by eye.
 
 ## Repository layout
 
