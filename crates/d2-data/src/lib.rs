@@ -12,6 +12,7 @@
 //! - [`bin`]: `.bin` container, live files, load checks (`loading.md`).
 //! - [`crosscheck`]: compiled text vs live `.bin`.
 //! - [`fixup`]: post-load fix-ups and runtime maps (`loading.md` §7.4).
+//! - [`links`]: cross-reference validation (`field-types.md` §6.7).
 
 pub mod bin;
 pub mod calc;
@@ -19,6 +20,7 @@ pub mod compile;
 pub mod compile_set;
 pub mod crosscheck;
 pub mod fixup;
+pub mod links;
 pub mod schema;
 pub mod strings;
 pub mod txt;

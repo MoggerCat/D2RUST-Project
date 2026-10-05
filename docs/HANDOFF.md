@@ -32,8 +32,8 @@ rather than restating them.
 3. **Typed tables** (implementation, medium): generate Rust structs from
    `specs/data/fields.tsv` + `tables.tsv` (a generator tool; generated
    code committed; a test that regenerating gives the same output).
-4. **Cross-reference validation** (implementation, medium): broken links
-   reported with table, row, column (`field-types.md` §6).
+4. **Cross-reference validation**: done in cloud (`d2-data::links`,
+   `field-types.md` §6.7, OQ11); live-set result pending in §5.
 5. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
    Phase 2 exit = "patches apply"; the mod itself is deferred.
 6. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
@@ -50,6 +50,7 @@ rather than restating them.
 | `crates/d2-data/src/schema.rs` | embedded `fields.tsv` / `tables.tsv` | `data/schema.md` |
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
+| `crates/d2-data/src/links.rs` (+ `links/tests.rs`) | cross-reference validation: linker sizes, broken links by table/row/column | `data/field-types.md` §6.7 |
 | `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
@@ -60,7 +61,7 @@ rather than restating them.
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check | |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set | |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
@@ -77,6 +78,7 @@ rather than restating them.
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo run --release -p data-tool -- links` | no broken link in the live `.bin` set | `game/` |
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
 | `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |
@@ -88,6 +90,15 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
+
+Cross-reference validation (branch `claude/cross-reference-validation`):
+run `cargo test --release -p d2-data -- --ignored live_set_has_no_broken_links`
+and `cargo run --release -p data-tool -- links`. Expect: no `UNCHECKED`
+line, `0 broken`, exit 0; linker sizes `items.code` 659, `@treasureclass`
+1013, `sounds.Sound` 4699, `monseq.sequence` 60. If a link is broken,
+check first whether a table callback (§8.3) writes over that field
+(`field-types.md` OQ11) before calling it a data error. Record the
+summary line here and in `field-types.md` §6.7.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
