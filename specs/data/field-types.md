@@ -342,7 +342,7 @@ E13.
 loaders rebuild a linker from the loaded records. Confirmed for item
 codes: the items loader registers `code` (offset 128) of the combined
 records in order with the §6.1 add, so duplicates bump as in a compile.
-The other runtime maps: `loading.md` §7.4; whether each rebuild treats
+The other runtime maps: `runtime-maps.md`; whether each rebuild treats
 duplicates the same way: Open question 3.
 
 ### 7. String keys (`strkey`)

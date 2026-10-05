@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-05)
+# Handoff (updated 2026-10-06)
 
 Start here in a fresh session, after `CLAUDE.md`. This file holds state,
 the next steps, the code and command map, and the local run queue. Rules
@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, first fix-ups, typed tables | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (`typed_tables_decode` queued, §5) |
+| 2 Data | in progress: core, callbacks, first fix-ups, typed tables; fix-up specs complete and dump-confirmed | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (`typed_tables_decode` queued, §5) |
 | 3 Simulation | not started; RNG spec ready | `specs/sim/rng.md`, traces `traces/sim/rng/` |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -21,13 +21,16 @@ rather than restating them.
 ## 2. Next steps (in order)
 
 1. **Run the local queue** (§5): the typed-tables game-file test.
-2. **Fix-up specs** (spec writing / RE, local, high): the §7.4 rows
-   `loading.md` OQ13 leaves open (equivalence matrix, op-stat tables and
-   flags, per-class skill lists, charstats strings, set attachment, gems,
-   gamble, monstats class chain, levels, automap form) and the
-   `AnimData.d2` format (OQ11); ideally a post-load memory dump to check
-   them (OQ15). Then implement them in `d2-data::fixup` (`PENDING` lists
-   them).
+2. **Implement the fix-ups** (implementation, medium; cloud or local):
+   `specs/data/fixups.md` and `specs/data/runtime-maps.md` in
+   `d2-data::fixup`: every `PENDING` row, the fix-ups the dump found
+   (lvltypes/lvlprest/lvlsub tile paths, objects names and frame counts,
+   monumod clamp), the monequip correction (`fixups.md` §9: empty item
+   code exempt, rows without a valid monster untouched), the runtime maps
+   (`runtime-maps.md`, with the CRT `qsort` of §1), and `AnimData.d2`
+   (`formats/animdata.md`) for the monstats speeds. Unit tests from the
+   synthetic vectors; `dump-compare` compares the maps too (add their
+   d2rs counterparts). Proof: local queue entry (§5).
 3. **Cross-reference validation** (implementation, medium): broken links
    reported with table, row, column (`field-types.md` §6).
 4. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
@@ -47,7 +50,7 @@ rather than restating them.
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
 | `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
-| `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
+| `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/fixups.md`, `data/runtime-maps.md` (summary `loading.md` §7.4) |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
 | `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
@@ -57,8 +60,8 @@ rather than restating them.
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs | |
-| `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs; `dump-compare`: fix-ups vs a 1.14d memory dump | `data/fixups.md`, `data/runtime-maps.md` |
+| `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows); `dump_tables.py`: the excel tables and runtime maps in 1.14d memory after the load | `sim/rng.md`, `traces/FORMAT.md`, `data/runtime-maps.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
 | `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
@@ -77,6 +80,7 @@ rather than restating them.
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
 | `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |
+| `py tools/trace-recorder/dump_tables.py` (~7 s) then `cargo run --release -p data-tool -- dump-compare traces/raw/<time>-tables` | d2rs fix-ups and maps equal 1.14d memory after the load | `game/`, Windows |
 
 Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 `export D2_GAME_DIR="$PWD/game"`.
@@ -85,6 +89,14 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
+
+Fix-ups (after step 2 of §2 lands): `py tools/trace-recorder/dump_tables.py`
+(or reuse `traces/raw/20261006-004246-tables`), then `cargo run --release
+-p data-tool -- dump-compare traces/raw/<time>-tables`. Expected: all 70
+kept tables identical (today 57), `PENDING` empty, every map with a d2rs
+counterpart identical (pointer maps compared as indices). Before step 2
+the result is the 2026-10-06 baseline: 57 identical, 13 differ (monequip
+8 bytes is a d2rs bug).
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
