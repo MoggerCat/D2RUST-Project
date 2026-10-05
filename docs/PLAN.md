@@ -27,6 +27,7 @@ behaviors the engine reproduces exactly.
 | Network model | Server-authoritative; single player = local server | Same protocol for both. |
 | Method | Clean-room specs → Rust | See `CLEAN_ROOM.md`. |
 | Mod data | Patch layers applied to user's tables | Release never contains Blizzard tables. |
+| Trace reading | `conformance` crate reads traces (`serde_json`); `d2-sim` stays I/O-free | 2026-10-05, RNG step. `conformance::Trace` checks the top-level fields of `traces/FORMAT.md`; per-behavior replayers (`conformance::rng`) check events. |
 | Ownership gate | "Has the game" check + online account | Changed 2026-10-05. Required MPQs must exist, open, and contain the files the engine loads. No exact-hash match against a Blizzard release, since official installs changed over time. Reads only the chosen game folder. No CD-key validation logic. |
 | Distribution | Private engine build; public mod only | Public mod contains our engine code, so clean-room records matter. |
 | Exact pins (Phase 0) | Rust 1.99.0, Bevy =0.19.1 | Bevy 0.19.1 needs Rust 1.95 or later. Pins live in `rust-toolchain.toml` and the workspace `Cargo.toml`. |
@@ -130,7 +131,7 @@ the table callbacks are implemented, so the target is 73/73 with only
 `d2-data::fixup` to a copy of the loaded set.
 
 ### Phase 3 — Core simulation (`d2-sim`)
-- [ ] D2 seeded RNG (exact sequence match) — **first**. *Spec `specs/sim/rng.md` done and matched by 32,543 recorded draws; Rust code not started.*
+- [x] D2 seeded RNG (exact sequence match) — **first**. *`d2-sim::rng` (`Seed`: step, `roll`, `mask`, `mask_range`, `roll_range`, setters, `derive`, `time_value`); unit tests from the spec vectors; `conformance` replays all 256 draws of `traces/sim/rng/*.json` exactly. Spec status `conformance-passing`.*
 - [ ] Tick loop, intents in / events out, unit ordering
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
