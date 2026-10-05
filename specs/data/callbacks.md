@@ -4,8 +4,10 @@
   reproduce the callback bytes of all 17,355 calls in the live `cubemain`,
   `monpreset`, `monstats` and `monstats2` bins (Provenance). Implemented
   in `d2-data::compile::callbacks` with the test vectors below as unit
-  tests; the `data-tool tables` confirmation of the Rust code is in the
-  local run queue (`docs/HANDOFF.md` §5).
+  tests. The Rust code is confirmed by `data-tool tables` (2026-10-05):
+  `cubemain`, `monpreset` and `monstats2` byte-identical, `monstats`
+  differing only by the `field-types.md` §10 `NameStr` row; CbMiss/CbStop
+  count 0.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::compile` (suggested: `compile::callbacks`)
 - **Related specs:** `specs/data/field-types.md` (callback call convention

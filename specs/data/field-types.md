@@ -3,8 +3,8 @@
 - **Status:** verified by `data-tool tables` (2026-10-05). Checked against 1.14d: 92 field lists recovered from
   `Game.exe`; compiling the live `.txt` files with these rules reproduces
   82 live `.bin` tables byte for byte (see Provenance). Implemented in
-  `d2-data::compile` (callbacks of §8.3 in `compile::callbacks`; their
-  bytes await a local `data-tool tables` run, `docs/HANDOFF.md` §5); the
+  `d2-data::compile` (callbacks of §8.3 in `compile::callbacks`, their bytes confirmed by
+  `data-tool tables` on 2026-10-05); the
   d2rs cross-check reproduces the §10 result (confirmed by bin
   cross-check, `loading.md` §11).
 - **Target version:** 1.14d
@@ -476,10 +476,9 @@ Acceptance test for the compiler (`#[ignore]`, reads `D2_GAME_DIR`):
 Nothing else may differ. The shipped bins hold no garbage bytes (§9).
 
 Result of the d2rs implementation (confirmed by bin cross-check,
-2026-10-05): all 86 tables match under these rules; 82 are
-byte-identical (69 of the 73 runtime tables); in `monstats`, `monstats2`, `monpreset` and `cubemain`
-the only other differences are bytes outside every field footprint
-(step 5) and the row above. Before the §8.3 callbacks were implemented
+2026-10-05, with the §8.3 callbacks): all 86 tables match under these
+rules; 85 are byte-identical (72 of the 73 runtime tables), and the only
+difference in `monstats` is the row above. Before the §8.3 callbacks were implemented
 (they wrote nothing), those bytes were 12,200 / 118,780 / 430 / 1,657. The callbacks are called
 5,872 (`monstats` `Sk*mode`, 734 × 8), 9,744 (`monstats2`, 609 × 16), 229
 (`monpreset` `Place`), 1,057 (`cubemain` inputs, 151 × 7) and 453

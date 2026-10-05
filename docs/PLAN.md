@@ -103,7 +103,8 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       `calc`, `param`), `.bin` loader with the `loading.md` checks, and a
       byte-exact cross-check against 1.14d (`data-tool tables`)
 - [x] Table-specific callbacks (`callbacks.md`, `d2-data::compile::callbacks`;
-      `data-tool tables` confirmation in the local run queue)
+      confirmed by `data-tool tables` 2026-10-05: 73/73 runtime tables
+      match, 72 byte-identical, 1 explained; 4/4 code buffers identical)
 - [ ] Post-load fix-ups and runtime maps (`loading.md` §7.4): fully stated
       rows done in `d2-data::fixup`; the rest wait for `loading.md` OQ13
 - [ ] Typed structs for all tables (generated from the schema)
