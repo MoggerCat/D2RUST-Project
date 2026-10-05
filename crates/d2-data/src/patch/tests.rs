@@ -45,7 +45,7 @@ fn table(r: TableRules, header: &[&str], rows: &[&str]) -> PatchTable {
 }
 
 /// The fixture: `items`, `gear` (same scope), `recipes`.
-fn fixture() -> PatchData {
+pub(super) fn fixture() -> PatchData {
     let items = table(
         rules(
             "items",

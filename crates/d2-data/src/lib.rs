@@ -32,3 +32,5 @@ pub mod txt;
 
 #[cfg(test)]
 mod robust;
+#[cfg(test)]
+mod robust_tests;

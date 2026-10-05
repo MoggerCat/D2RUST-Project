@@ -766,4 +766,6 @@ pub fn validate_buffer(
 }
 
 #[cfg(test)]
+mod robust_tests;
+#[cfg(test)]
 mod tests;

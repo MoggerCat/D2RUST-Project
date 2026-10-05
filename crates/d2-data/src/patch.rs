@@ -14,6 +14,8 @@
 mod apply;
 mod check;
 mod diff;
+#[cfg(test)]
+mod robust_tests;
 mod syntax;
 #[cfg(test)]
 mod tests;

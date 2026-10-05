@@ -111,6 +111,30 @@ pub(crate) fn mutated(valid: Vec<u8>) -> impl Strategy<Value = Vec<u8>> {
     })
 }
 
+/// Property-test config: `PROPTEST_CASES` from the environment, else
+/// `default` (`ProptestConfig::with_cases` would override the variable).
+/// No failure persistence files are written into the source tree.
+pub(crate) fn config(default: u32) -> ProptestConfig {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default);
+    ProptestConfig {
+        cases,
+        failure_persistence: None,
+        ..ProptestConfig::default()
+    }
+}
+
+/// Byte strings up to `max_parts` pieces long, each piece drawn from
+/// `parts`: inputs biased to a text format's alphabet and keywords.
+pub(crate) fn text_of(
+    parts: &'static [&'static [u8]],
+    max_parts: usize,
+) -> impl Strategy<Value = Vec<u8>> {
+    prop::collection::vec(prop::sample::select(parts), 0..max_parts).prop_map(|ps| ps.concat())
+}
+
 /// Arbitrary bytes up to `max` long.
 pub(crate) fn bytes(max: usize) -> impl Strategy<Value = Vec<u8>> {
     prop::collection::vec(any::<u8>(), 0..max)
