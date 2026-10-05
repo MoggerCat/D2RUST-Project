@@ -4,8 +4,10 @@
   2026-10-05 (Provenance). Implemented 2026-10-05 on branch
   `claude/patch-layers` (`d2-data::patch`, `data-tool patch`): every
   synthetic vector and both properties pass (`cargo test -p d2-data
-  patch`); G1–G8 unverified, queued (`docs/HANDOFF.md` §5,
-  `crates/d2-data/tests/patch_game.rs`). Implementation readings of
+  patch`). Verified on the 1.14d set 2026-10-06: `cargo test --release
+  -p d2-data --test patch_game -- --ignored` passes G1–G8 (5 tests), and
+  `data-tool patch check` on the Example stack exits 0 with the one N01
+  note (data digest `66010ecda7c8df5b…`). Implementation readings of
   unstated details: open question 5.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::patch`; CLI `data-tool patch`
@@ -16,29 +18,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–52 |
-| Inputs | 53–56 |
-| Outputs / state changes | 57–62 |
-| Example | 63–119 |
-| Rules | 120–121 |
-|   1. Pipeline | 122–130 |
-|   2. Tables and keys | 131–162 |
-|   3. Syntax | 163–202 |
-|   4. Selectors and columns | 203–216 |
-|   5. Applying a stack | 217–251 |
-|   6. Conflicts and drift | 252–264 |
-|   7. Compile and checks | 265–282 |
-|   8. Report | 283–293 |
-|   9. Render, digests, diff | 294–329 |
-|   10. Tools (`data-tool patch`, `anyhow`) | 330–340 |
-|   11. Versioning and determinism | 341–352 |
-|   12. Deferred | 353–359 |
-| Constants & data dependencies | 360–363 |
-| Randomness | 364–367 |
-| Edge cases & original bugs | 368–375 |
-| Test vectors | 376–471 |
-| Provenance | 472–483 |
-| Open questions | 484–507 |
+| Summary | 46–54 |
+| Inputs | 55–58 |
+| Outputs / state changes | 59–64 |
+| Example | 65–121 |
+| Rules | 122–123 |
+|   1. Pipeline | 124–132 |
+|   2. Tables and keys | 133–164 |
+|   3. Syntax | 165–204 |
+|   4. Selectors and columns | 205–218 |
+|   5. Applying a stack | 219–253 |
+|   6. Conflicts and drift | 254–266 |
+|   7. Compile and checks | 267–284 |
+|   8. Report | 285–295 |
+|   9. Render, digests, diff | 296–331 |
+|   10. Tools (`data-tool patch`, `anyhow`) | 332–342 |
+|   11. Versioning and determinism | 343–354 |
+|   12. Deferred | 355–361 |
+| Constants & data dependencies | 362–365 |
+| Randomness | 366–369 |
+| Edge cases & original bugs | 370–377 |
+| Test vectors | 378–473 |
+| Provenance | 474–485 |
+| Open questions | 486–509 |
 <!-- /index -->
 
 ## Summary

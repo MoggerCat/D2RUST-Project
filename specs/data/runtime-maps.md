@@ -1,12 +1,13 @@
 # Spec: Data — Runtime maps built by the table loaders
 
-- **Status:** implemented. Every map below was reproduced byte for byte
+- **Status:** verified: `data-tool dump-compare traces/raw/20261006-021210-tables` (2026-10-06) shows every map with a d2rs counterpart
+  identical (24 of 27; `item_counts`, `affix_count`, `rare_count` have
+  none, `loading.md` §9). Every map below was reproduced byte for byte
   from the live `.bin` files by scratch reimplementations and compared
   with the 1.14d post-load dump (`dump_tables.py`, 2026-10-06; 27 dumped
   maps, the pointer-holding ones compared as indices). `d2-data::fixup`
   (`maps`, `qsort`) builds every map and passes the synthetic vectors
-  (2026-10-06); `data-tool dump-compare` on game files is queued
-  (`docs/HANDOFF.md` §5).
+  (2026-10-06).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::fixup` (the maps live next to the fixed
   tables)
@@ -17,26 +18,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–50 |
-| Inputs | 51–55 |
-| Outputs / state changes | 56–83 |
-| Rules | 84–85 |
-|   1. The CRT sort (`qsort`) | 86–117 |
-|   2. Type-equivalence matrices (itemtypes, montype) | 118–153 |
-|   3. itemstatcost globals and description list | 154–169 |
-|   4. states | 170–187 |
-|   5. skills: class lists and passive list | 188–202 |
-|   6. Items: version-0 list | 203–210 |
-|   7. gamble | 211–231 |
-|   8. monseq, monpreset, hireling | 232–256 |
-|   9. leveldefs, lvlsub | 257–270 |
-|   10. automap | 271–299 |
-| Constants & data dependencies | 300–312 |
-| Randomness | 313–316 |
-| Edge cases & original bugs | 317–335 |
-| Test vectors | 336–386 |
-| Provenance | 387–425 |
-| Open questions | 426–441 |
+| Summary | 43–51 |
+| Inputs | 52–56 |
+| Outputs / state changes | 57–84 |
+| Rules | 85–86 |
+|   1. The CRT sort (`qsort`) | 87–118 |
+|   2. Type-equivalence matrices (itemtypes, montype) | 119–154 |
+|   3. itemstatcost globals and description list | 155–170 |
+|   4. states | 171–188 |
+|   5. skills: class lists and passive list | 189–203 |
+|   6. Items: version-0 list | 204–211 |
+|   7. gamble | 212–232 |
+|   8. monseq, monpreset, hireling | 233–257 |
+|   9. leveldefs, lvlsub | 258–271 |
+|   10. automap | 272–300 |
+| Constants & data dependencies | 301–313 |
+| Randomness | 314–317 |
+| Edge cases & original bugs | 318–336 |
+| Test vectors | 337–387 |
+| Provenance | 388–426 |
+| Open questions | 427–442 |
 <!-- /index -->
 
 ## Summary

@@ -1,12 +1,13 @@
 # Spec: Data — Post-load fix-ups (record bytes)
 
-- **Status:** implemented. Every rule below reproduces the 1.14d tables in
+- **Status:** verified: `data-tool dump-compare traces/raw/20261006-021210-tables` (2026-10-06) shows all 70 dumped tables identical to
+  1.14d memory after the load, nothing pending, and `fixups_on_live_set`
+  passes. Every rule below reproduces the 1.14d tables in
   memory after the excel load byte for byte: scratch reimplementations run
   on the live `.bin` files match the post-load dump (`dump_tables.py`,
   2026-10-06) for all 70 dumped tables. `d2-data::fixup` (`records`,
   `text`) implements every rule and passes the synthetic vectors
-  (2026-10-06); `data-tool dump-compare` on game files is queued
-  (`docs/HANDOFF.md` §5).
+  (2026-10-06).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::fixup`
 - **Related specs:** `data/loading.md` (§6 load order, §7.4 summary, §8
@@ -19,29 +20,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 47–59 |
-| Inputs | 60–69 |
-| Outputs / state changes | 70–76 |
-| Rules | 77–78 |
-|   1. Conventions and shared lookups | 79–115 |
-|   2. itemstatcost | 116–146 |
-|   3. skills → pettype | 147–155 |
-|   4. charstats | 156–162 |
-|   5. Items, gems | 163–184 |
-|   6. Unique and set items | 185–209 |
-|   7. Other string-id rows | 210–223 |
-|   8. monstats | 224–290 |
-|   9. monequip | 291–308 |
-|   10. monumod, missiles | 309–317 |
-|   11. levels | 318–337 |
-|   12. Tile paths: lvltypes, lvlprest, lvlsub | 338–360 |
-|   13. objects | 361–373 |
-| Constants & data dependencies | 374–391 |
-| Randomness | 392–395 |
-| Edge cases & original bugs | 396–415 |
-| Test vectors | 416–465 |
-| Provenance | 466–514 |
-| Open questions | 515–535 |
+| Summary | 48–60 |
+| Inputs | 61–70 |
+| Outputs / state changes | 71–77 |
+| Rules | 78–79 |
+|   1. Conventions and shared lookups | 80–116 |
+|   2. itemstatcost | 117–147 |
+|   3. skills → pettype | 148–156 |
+|   4. charstats | 157–163 |
+|   5. Items, gems | 164–185 |
+|   6. Unique and set items | 186–210 |
+|   7. Other string-id rows | 211–224 |
+|   8. monstats | 225–291 |
+|   9. monequip | 292–309 |
+|   10. monumod, missiles | 310–318 |
+|   11. levels | 319–338 |
+|   12. Tile paths: lvltypes, lvlprest, lvlsub | 339–361 |
+|   13. objects | 362–374 |
+| Constants & data dependencies | 375–392 |
+| Randomness | 393–396 |
+| Edge cases & original bugs | 397–416 |
+| Test vectors | 417–466 |
+| Provenance | 467–515 |
+| Open questions | 516–536 |
 <!-- /index -->
 
 ## Summary
