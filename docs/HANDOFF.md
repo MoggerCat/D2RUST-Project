@@ -27,13 +27,9 @@ rather than restating them.
    `AnimData.d2` format (OQ11); ideally a post-load memory dump to check
    them (OQ15). Then implement them in `d2-data::fixup` (`PENDING` lists
    them).
-2. **Cross-reference validation**: implemented on branch
-   `claude/cross-reference-validation` (not on `main`). Local: run
-   `data-tool links` on that branch (its §5 entry is there), record the
-   result, merge.
-3. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
+2. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
    Phase 2 exit = "patches apply"; the mod itself is deferred.
-4. **Phase 3 specs** (spec writing / RE, local, high): the tick loop,
+3. **Phase 3 specs** (spec writing / RE, local, high): the tick loop,
    intents in / events out and unit ordering, then units and stats
    (`docs/PLAN.md` Phase 3). Only `specs/sim/rng.md` exists so far.
 
@@ -48,6 +44,7 @@ rather than restating them.
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
 | `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
+| `crates/d2-data/src/links.rs` (+ `links/tests.rs`) | cross-reference validation: linker sizes, broken links by table/row/column | `data/field-types.md` §6.7 |
 | `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
@@ -61,6 +58,7 @@ rather than restating them.
 | `d2-proto`, `d2-net`, `d2-server`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
 | `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs | |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set | |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
@@ -78,6 +76,7 @@ rather than restating them.
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo run --release -p data-tool -- links` | no broken link in the live `.bin` set | `game/` |
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
 | `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |
@@ -89,6 +88,10 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
+
+Cross-reference validation: done 2026-10-06 (`data-tool links`:
+72,175 valid, 84,277 misses, 0 broken, 0 unchecked; exit 0;
+`live_set_has_no_broken_links` passes).
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
