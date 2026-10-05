@@ -23,11 +23,13 @@ behaviors the engine reproduces exactly.
 | Reference sources | `../refs/<project>/`, outside the repo | Spec sessions only. GPL projects are read only. |
 | Language | Rust | Toolchain pinned in `rust-toolchain.toml`. |
 | Fidelity scope | Exact match everywhere, no "close enough" tier (`CLAUDE.md` rule 10) | Decided 2026-10-05. No boundary between "must be exact" and "may be approximate" can be drawn reliably, and one slipped area costs more debugging than loosening saves. Each area defines its comparison (bytes, pixels, decoded samples, ticks); unchecked features stay "unverified". |
+| Methods collection | `docs/METHODS.md` + `tools/methods.py` | Decided 2026-10-05. General methods live there, each with its project binding (Here) and status (proven with evidence, or trial); `CLAUDE.md` keeps hard rules and project facts. `methods.py export` gives the general form for future projects. |
 | Client engine | Bevy, pinned version (0.19.x at time of writing) | Client crate only. Upgrades are separate tasks between milestones. |
 | Simulation | Plain Rust, deterministic, integer math, 25 Hz | Never depends on Bevy. |
 | Network model | Server-authoritative; single player = local server | Same protocol for both. |
 | Method | Clean-room specs → Rust | See `CLEAN_ROOM.md`. |
 | Mod data | Patch layers applied to user's tables | Release never contains Blizzard tables. |
+| Trace reading | `conformance` crate reads traces (`serde_json`); `d2-sim` stays I/O-free | 2026-10-05, RNG step. `conformance::Trace` checks the top-level fields of `traces/FORMAT.md`; per-behavior replayers (`conformance::rng`) check events. |
 | Ownership gate | "Has the game" check + online account | Changed 2026-10-05. Required MPQs must exist, open, and contain the files the engine loads. No exact-hash match against a Blizzard release, since official installs changed over time. Reads only the chosen game folder. No CD-key validation logic. |
 | Distribution | Private engine build; public mod only | Public mod contains our engine code, so clean-room records matter. |
 | Exact pins (Phase 0) | Rust 1.99.0, Bevy =0.19.1 | Bevy 0.19.1 needs Rust 1.95 or later. Pins live in `rust-toolchain.toml` and the workspace `Cargo.toml`. |
@@ -37,7 +39,7 @@ behaviors the engine reproduces exactly.
 | Data source of truth (Phase 2) | The `.bin` set 1.14d loads; `.txt` compiler verified byte for byte against it | 1.14d never reads excel `.txt` in normal play (a missing `.bin` is fatal). Full policy: `specs/data/loading.md` "d2-data policy". Mods patch `.txt` cells and compile (`patch-layers.md`). |
 | Per-table layouts | `specs/data/fields.tsv` + `tables.tsv`, extracted from 1.14d `Game.exe` | 92 field lists, 3,499 fields (`specs/data/schema.md`). Replace prose per-table specs; Rust table code is generated from them. Column meanings are specified by the Phase 3 specs that use them. |
 | Archive search order | `specs/data/loading.md` §2: priority descending, ties newest-opened first | `ArchiveSet` (d2-formats) computes it from the open order; second group and video path assumed opened after the startup group (loading.md open question 1). Excel files resolve P → X → D either way. |
-| Unspecified table callbacks (Phase 2) | Write nothing until their specs exist | `monstats` `Sk*mode`, `monstats2` composit, `monpreset` `Place`, `cubemain` inputs/outputs. The cross-check counts their bytes as explained (`field-types.md` §8.3, §10 step 5); every byte inside a field footprint must still match. |
+| Unspecified table callbacks (Phase 2) | Superseded 2026-10-05: implemented from `specs/data/callbacks.md` | Was: write nothing until specified, with their bytes counted as explained by the cross-check. Now every byte must match. |
 | Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 
@@ -50,9 +52,8 @@ Each phase lists its exit criteria. Check items off as they land.
       enforced (no Bevy outside `d2-client`, via `cargo run -p depcheck`)
 - [x] `rust-toolchain.toml` (1.99.0); Bevy pinned `=0.19.1` in workspace
       `Cargo.toml`
-- [ ] CI: fmt, clippy, tests without game files. *`.github/workflows/ci.yml`
-      written, and the same steps pass locally on Windows. Not yet run on
-      GitHub (no remote).*
+- [x] CI: fmt, clippy, tests without game files, spec indexes, methods
+      collection (`.github/workflows/ci.yml`, green on GitHub)
 - [x] Pre-commit hook installed (`tools/hooks/install.sh`)
 - [x] `game/` populated with 1.14d (`Game.exe` 1.14.3.71); game-file test
       passes. *`D2_GAME_DIR` still needs setting permanently (`setx`).*
@@ -112,7 +113,7 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       `d2-data::tables`, `data-tool gen-tables`; callback and fix-up bytes
       are read from the raw record; every live table decodes,
       `typed_tables_decode` 2026-10-06)
-- [ ] Cross-reference resolution with validation errors
+- [x] Cross-reference resolution with validation errors (`d2-data::links`, `data-tool links`; `field-types.md` §6.7; 1.14d live set 2026-10-06: 0 broken, 0 unchecked)
 - [ ] Mod patch layer format + loader
 **Exit:** all tables load from the user's install; patches apply; broken
 references are reported.
@@ -134,7 +135,7 @@ the table callbacks are implemented, so the target is 73/73 with only
 `d2-data::fixup` to a copy of the loaded set.
 
 ### Phase 3 — Core simulation (`d2-sim`)
-- [ ] D2 seeded RNG (exact sequence match) — **first**. *Spec `specs/sim/rng.md` done and matched by 32,543 recorded draws; Rust code not started.*
+- [x] D2 seeded RNG (exact sequence match) — **first**. *`d2-sim::rng` (`Seed`: step, `roll`, `mask`, `mask_range`, `roll_range`, setters, `derive`, `time_value`); unit tests from the spec vectors; `conformance` replays all 256 draws of `traces/sim/rng/*.json` exactly. Spec status `conformance-passing`.*
 - [ ] Tick loop, intents in / events out, unit ordering
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
