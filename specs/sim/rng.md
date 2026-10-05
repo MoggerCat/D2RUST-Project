@@ -1,12 +1,14 @@
 # Spec: Simulation — Seeded RNG
 
-- **Status:** verified: `tools/trace-recorder/check_rng.py` recomputes
-  every draw recorded from the running 1.14d game (32,543 draws, 1,226
-  seed writes in `traces/raw/20261005-232125-rng.jsonl`, plus three
-  earlier runs) with no mismatch and no unexplained seed state.
-  Not yet implemented in Rust.
+- **Status:** conformance-passing: `tools/trace-recorder/check_rng.py`
+  recomputes every draw recorded from the running 1.14d game (32,543
+  draws, 1,226 seed writes in `traces/raw/20261005-232125-rng.jsonl`,
+  plus three earlier runs) with no mismatch and no unexplained seed
+  state; `d2-sim::rng` replays all committed traces exactly
+  (`cargo test -p conformance`, `tests/rng_traces.rs`).
 - **Target version:** 1.14d
-- **Crate/module:** `d2-sim::rng` (planned)
+- **Crate/module:** `d2-sim::rng` (`crates/d2-sim/src/rng.rs`); trace
+  replay in `conformance::rng`
 - **Related specs:** `traces/FORMAT.md` (trace files, `rng_draw` events);
   per-system specs (items, DRLG, monsters, combat) own the draw *order*
   and what each draw decides; this spec owns the generator, the helper
@@ -15,23 +17,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 37–49 |
-| Inputs | 50–57 |
-| Outputs / state changes | 58–63 |
-| Rules | 64–65 |
-|   1. Seed state | 66–72 |
-|   2. Step | 73–94 |
-|   3. Draw helpers | 95–124 |
-|   4. Setting and reading seeds | 125–141 |
-|   5. Where seeds come from | 142–208 |
-|   6. Inlined draws | 209–228 |
-|   7. Which systems draw from which seed | 229–252 |
-| Constants & data dependencies | 253–263 |
-| Randomness | 264–268 |
-| Edge cases & original bugs | 269–281 |
-| Test vectors | 282–330 |
-| Provenance | 331–363 |
-| Open questions | 364–378 |
+| Summary | 39–51 |
+| Inputs | 52–59 |
+| Outputs / state changes | 60–65 |
+| Rules | 66–67 |
+|   1. Seed state | 68–74 |
+|   2. Step | 75–96 |
+|   3. Draw helpers | 97–126 |
+|   4. Setting and reading seeds | 127–143 |
+|   5. Where seeds come from | 144–210 |
+|   6. Inlined draws | 211–230 |
+|   7. Which systems draw from which seed | 231–254 |
+| Constants & data dependencies | 255–265 |
+| Randomness | 266–270 |
+| Edge cases & original bugs | 271–283 |
+| Test vectors | 284–332 |
+| Provenance | 333–365 |
+| Open questions | 366–380 |
 <!-- /index -->
 
 ## Summary
