@@ -1,0 +1,219 @@
+// Spec: specs/formats/palette.md
+//! `.dat` palettes and `.pl2` palette transforms.
+
+use crate::cursor::{invalid, FormatError};
+
+const FORMAT_DAT: &str = "palette";
+const FORMAT_PL2: &str = "pl2";
+
+/// One palette color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Rgb {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+/// A 256-color palette (`.dat`). Index 0 is drawn transparent in sprites.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Palette {
+    pub colors: [Rgb; 256],
+}
+
+impl Palette {
+    /// Parses a 768-byte `.dat` palette stored as blue, green, red.
+    pub fn parse(data: &[u8]) -> Result<Palette, FormatError> {
+        if data.len() != 768 {
+            return Err(invalid(
+                FORMAT_DAT,
+                format!("expected 768 bytes, got {}", data.len()),
+            ));
+        }
+        let mut colors = [Rgb::default(); 256];
+        for (c, bgr) in colors.iter_mut().zip(data.as_chunks::<3>().0) {
+            *c = Rgb {
+                r: bgr[2],
+                g: bgr[1],
+                b: bgr[0],
+            };
+        }
+        Ok(Palette { colors })
+    }
+}
+
+/// A palette index → palette index lookup table.
+pub type ColorMap = [u8; 256];
+
+/// Size of the fixed part of a `.pl2`: base palette + 1714 maps.
+const PL2_FIXED: usize = 1024 + 1714 * 256;
+/// Bytes per text color: 3 (rgb) + one 256-byte shift map.
+const PL2_TEXT_COLOR: usize = 3 + 256;
+
+/// Palette transform tables (`.pl2`). Field meanings for rendering are
+/// defined by the rendering spec; this type only exposes the layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pl2 {
+    pub light_levels: Vec<ColorMap>,
+    pub inventory_variations: Vec<ColorMap>,
+    pub selected_unit_shift: ColorMap,
+    /// `[level][source index]`, each a map over the destination index.
+    pub alpha_blend: Vec<Vec<ColorMap>>,
+    pub additive_blend: Vec<ColorMap>,
+    pub multiplicative_blend: Vec<ColorMap>,
+    pub hue_variations: Vec<ColorMap>,
+    pub red_tones: ColorMap,
+    pub green_tones: ColorMap,
+    pub blue_tones: ColorMap,
+    pub unknown_variations: Vec<ColorMap>,
+    pub max_component_blend: Vec<ColorMap>,
+    pub darkened_shift: ColorMap,
+    pub text_colors: Vec<Rgb>,
+    pub text_color_shifts: Vec<ColorMap>,
+}
+
+/// Sequential reader of 256-byte maps.
+struct Maps<'a> {
+    data: &'a [u8],
+    pos: usize,
+}
+
+impl Maps<'_> {
+    fn one(&mut self) -> ColorMap {
+        let mut m = [0u8; 256];
+        m.copy_from_slice(&self.data[self.pos..self.pos + 256]);
+        self.pos += 256;
+        m
+    }
+    fn many(&mut self, n: usize) -> Vec<ColorMap> {
+        (0..n).map(|_| self.one()).collect()
+    }
+}
+
+impl Pl2 {
+    pub fn parse(data: &[u8]) -> Result<Pl2, FormatError> {
+        if data.len() < PL2_FIXED {
+            return Err(invalid(
+                FORMAT_PL2,
+                format!("expected at least {PL2_FIXED} bytes, got {}", data.len()),
+            ));
+        }
+        let rest = data.len() - PL2_FIXED;
+        if !rest.is_multiple_of(PL2_TEXT_COLOR) {
+            return Err(invalid(
+                FORMAT_PL2,
+                format!("{rest} trailing bytes is not a whole number of text colors"),
+            ));
+        }
+        let text_count = rest / PL2_TEXT_COLOR;
+
+        let mut m = Maps { data, pos: 1024 };
+        let light_levels = m.many(32);
+        let inventory_variations = m.many(16);
+        let selected_unit_shift = m.one();
+        let alpha_blend = (0..3).map(|_| m.many(256)).collect();
+        let additive_blend = m.many(256);
+        let multiplicative_blend = m.many(256);
+        let hue_variations = m.many(111);
+        let red_tones = m.one();
+        let green_tones = m.one();
+        let blue_tones = m.one();
+        let unknown_variations = m.many(14);
+        let max_component_blend = m.many(256);
+        let darkened_shift = m.one();
+        debug_assert_eq!(m.pos, PL2_FIXED);
+
+        let text_colors = data[PL2_FIXED..PL2_FIXED + 3 * text_count]
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|c| Rgb {
+                r: c[0],
+                g: c[1],
+                b: c[2],
+            })
+            .collect();
+        let mut shifts = Maps {
+            data,
+            pos: PL2_FIXED + 3 * text_count,
+        };
+        let text_color_shifts = shifts.many(text_count);
+
+        Ok(Pl2 {
+            light_levels,
+            inventory_variations,
+            selected_unit_shift,
+            alpha_blend,
+            additive_blend,
+            multiplicative_blend,
+            hue_variations,
+            red_tones,
+            green_tones,
+            blue_tones,
+            unknown_variations,
+            max_component_blend,
+            darkened_shift,
+            text_colors,
+            text_color_shifts,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dat_is_bgr() {
+        let mut data = vec![0u8; 768];
+        data[3..6].copy_from_slice(&[10, 20, 30]);
+        let p = Palette::parse(&data).unwrap();
+        assert_eq!(
+            p.colors[1],
+            Rgb {
+                r: 30,
+                g: 20,
+                b: 10
+            }
+        );
+    }
+
+    #[test]
+    fn dat_length_is_checked() {
+        assert!(Palette::parse(&[0; 767]).is_err());
+        assert!(Palette::parse(&[0; 769]).is_err());
+    }
+
+    fn pl2(text_colors: usize, extra: usize) -> Vec<u8> {
+        let mut d = vec![0u8; PL2_FIXED + text_colors * PL2_TEXT_COLOR + extra];
+        // Mark the first light-level map and the last fixed map.
+        d[1024] = 0xAA;
+        d[PL2_FIXED - 256] = 0xBB;
+        if text_colors > 0 {
+            d[PL2_FIXED..PL2_FIXED + 3].copy_from_slice(&[1, 2, 3]);
+        }
+        d
+    }
+
+    #[test]
+    fn pl2_layout() {
+        let p = Pl2::parse(&pl2(13, 0)).unwrap();
+        assert_eq!(p.text_colors.len(), 13);
+        assert_eq!(p.text_colors[0], Rgb { r: 1, g: 2, b: 3 });
+        assert_eq!(p.light_levels[0][0], 0xAA);
+        assert_eq!(p.darkened_shift[0], 0xBB);
+        assert_eq!(p.alpha_blend.len(), 3);
+        assert_eq!(p.alpha_blend[2].len(), 256);
+        assert_eq!(p.hue_variations.len(), 111);
+    }
+
+    #[test]
+    fn pl2_twelve_text_colors() {
+        assert_eq!(Pl2::parse(&pl2(12, 0)).unwrap().text_colors.len(), 12);
+    }
+
+    #[test]
+    fn pl2_bad_tail() {
+        assert!(Pl2::parse(&pl2(0, 100)).is_err());
+        assert!(Pl2::parse(&[0; 1000]).is_err());
+    }
+}

@@ -1,0 +1,16 @@
+[package]
+name = "d2-server"
+description = "Authoritative game server: owns d2-sim, accounts and character storage."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+d2-sim.workspace = true
+d2-proto.workspace = true
+d2-net.workspace = true
+
+[lints]
+workspace = true

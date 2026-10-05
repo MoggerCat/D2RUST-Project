@@ -1,0 +1,24 @@
+[package]
+name = "d2-client"
+description = "Bevy client: rendering, input, UI, audio, and the bridge to the server."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The only crate allowed to depend on Bevy (enforced by tools/depcheck).
+bevy.workspace = true
+d2-formats.workspace = true
+d2-proto.workspace = true
+d2-net.workspace = true
+d2-verify.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+# PNG output for the CPU reference renderer and verification images. Same
+# version Bevy already uses, so no extra copy is built.
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

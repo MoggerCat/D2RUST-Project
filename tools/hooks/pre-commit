@@ -1,0 +1,9 @@
+#!/bin/sh
+# Blocks commits that include original game files or RE output.
+blocked=$(git diff --cached --name-only --diff-filter=ACM | \
+  grep -Ei '\.(mpq|exe|dll|d2s|dc6|dcc|dt1|ds1|cof|tbl|bin)$|^game/|^re/')
+if [ -n "$blocked" ]; then
+  echo "Commit blocked: original game files or RE output staged:"
+  echo "$blocked"
+  exit 1
+fi

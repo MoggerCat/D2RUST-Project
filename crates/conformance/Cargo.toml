@@ -1,0 +1,15 @@
+[package]
+name = "conformance"
+description = "Trace-based tests of d2-sim against behavior recorded from the original game."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+d2-sim.workspace = true
+d2-data.workspace = true
+
+[lints]
+workspace = true

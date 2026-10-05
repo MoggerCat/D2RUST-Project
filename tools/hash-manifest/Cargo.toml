@@ -1,0 +1,15 @@
+[package]
+name = "hash-manifest"
+description = "Dev tool: records SHA-256 hashes of the local reference install that traces are recorded from."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+/target
+/game/
+/re/
+/traces/raw/
+*.mpq
+*.MPQ
+*.exe
+*.dll
+*.d2s
+*.bin
+*.dc6
+*.dcc
+*.dt1
+*.ds1
+*.cof
+.env
+*.tbl
