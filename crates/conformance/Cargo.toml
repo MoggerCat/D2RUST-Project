@@ -10,6 +10,8 @@ license.workspace = true
 [dependencies]
 d2-sim.workspace = true
 d2-data.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
