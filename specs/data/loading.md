@@ -3,9 +3,9 @@
 - **Status:** verified by `data-tool tables` (2026-10-05). Rules checked against the 1.14d `Game.exe` (Ghidra
   exports plus raw bytes) and the 1.14d data files on 2026-10-05, except
   where an Open question says otherwise; see Provenance. Implemented in
-  `d2-data::bin` (§2–§4, §6, §8, §10.8), `d2-data::fixup` (the §7.4 rows
-  whose rule is complete; the rest wait for Open question 13) and
-  checked by `data-tool tables` (§11, "d2rs cross-check").
+  `d2-data::bin` (§2–§4, §6, §8, §10.8), `d2-data::fixup` (part of
+  §7.4, see the d2rs paragraph there) and checked by `data-tool tables`
+  (§11, "d2rs cross-check").
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::bin` (loader, checks); `d2-data::crosscheck` (§11)
 - **Related specs:** `specs/formats/mpq.md` (archive reads, archive set),
@@ -14,34 +14,35 @@
   binding, cell conversions, linkers, error policy),
   `specs/data/field-types.md` (type vocabulary, string keys, callbacks,
   `@tc`), `specs/data/calc-expressions.md` (code buffers),
-  `specs/data/patch-layers.md` (mod layers). Still to write: one spec per
-  table for record layouts and fix-up details.
+  `specs/data/patch-layers.md` (mod layers), `specs/data/fixups.md` and
+  `specs/data/runtime-maps.md` (§7.4 rules), `specs/formats/animdata.md`
+  (`AnimData.d2`, `expfield.d2`).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 47–60 |
-| Inputs | 61–68 |
-| Outputs / state changes | 69–76 |
-| Rules | 77–82 |
-|   1. Paths | 83–95 |
-|   2. Archive search order | 96–135 |
-|   3. Choosing `.bin` or `.txt` | 136–199 |
-|   4. The `.bin` container | 200–251 |
-|   5. `.txt` record counting | 252–263 |
-|   6. Load order and record sizes (runtime tables) | 264–351 |
-|   7. Links and dependencies | 352–491 |
-|   8. Post-load checks (fatal in 1.14d) | 492–537 |
-|   9. Combined index spaces | 538–552 |
-|   10. Special cases | 553–611 |
-|   11. Txt vs bin cross-check | 612–652 |
-| Constants & data dependencies | 653–673 |
-| Randomness | 674–677 |
-| Edge cases & original bugs | 678–694 |
-| d2-data policy | 695–721 |
-| Test vectors | 722–755 |
-| Provenance | 756–850 |
-| Open questions | 851–900 |
+| Summary | 48–61 |
+| Inputs | 62–69 |
+| Outputs / state changes | 70–77 |
+| Rules | 78–83 |
+|   1. Paths | 84–96 |
+|   2. Archive search order | 97–136 |
+|   3. Choosing `.bin` or `.txt` | 137–200 |
+|   4. The `.bin` container | 201–252 |
+|   5. `.txt` record counting | 253–264 |
+|   6. Load order and record sizes (runtime tables) | 265–352 |
+|   7. Links and dependencies | 353–494 |
+|   8. Post-load checks (fatal in 1.14d) | 495–543 |
+|   9. Combined index spaces | 544–558 |
+|   10. Special cases | 559–617 |
+|   11. Txt vs bin cross-check | 618–658 |
+| Constants & data dependencies | 659–679 |
+| Randomness | 680–683 |
+| Edge cases & original bugs | 684–700 |
+| d2-data policy | 701–727 |
+| Test vectors | 728–761 |
+| Provenance | 762–850 |
+| Open questions | 851–904 |
 <!-- /index -->
 
 ## Summary
@@ -90,8 +91,8 @@ header (`txt-format.md` §5).
    as `plrmode.txt`.
 3. Two other files load inside the same load sequence but are not excel
    tables: `DATA\GLOBAL\AnimData.d2` (after `experience`) and
-   `DATA\GLOBAL\expfield.d2` (after `inventory`). Their formats are out of
-   scope here.
+   `DATA\GLOBAL\expfield.d2` (after `inventory`). Formats:
+   `formats/animdata.md`.
 
 ### 2. Archive search order
 
@@ -439,55 +440,57 @@ tables (§10.1) at compile time (`field-types.md` §7).
 
 #### 7.4 Post-load fix-ups and runtime maps
 
-After its `.bin` loads, a loader fills bytes the compiler leaves 0,
-corrects compiled values (clamps, BaseId, loc, sorting) or builds maps.
-Offsets are hex, in the table's own
-record unless another table is named. "→ id" is the string-id lookup of
-`field-types.md` §7 without its 5382 substitution: an empty or unknown key
-gives 0 unless a miss value is given. Exact algorithms: per-table specs.
+Right after its `.bin` loads (and before the next step of §6), a loader
+rewrites some record bytes and may build maps outside the records. The
+rules are owned by `fixups.md` (record bytes) and `runtime-maps.md`
+(maps); this table lists them by load step. "→ id" is a string id
+(`fixups.md` §1).
 
-| Table | Fix-up |
-|---|---|
-| itemtypes | rebuilds its code link from the records; builds the type-equivalence bit matrix |
-| itemstatcost | builds the op-stat tables (+0x5E…, +0xE0…); sets flags +0x51–0x53; clears op byte +0x54 when > 13; record 0 +0x140 becomes a global (outside 1–8 → 6) |
-| missiles | byte +0x183 capped at 8 |
-| skills | appends each skill index to its pettype record (count +0xBC, u16 list +0xC0, at most 15); per-class skill lists |
-| charstats | class-name strings from the string tables |
-| weapons, armor, misc | item code map: `code` (+0x80) of the combined records (§9), in order, with the code-linker add (`field-types.md` §6.1, duplicates bump) |
-| magic affixes | name (+0x00) → id at +0x20 |
-| rare affixes | name (+0x26) → id at +0x0C |
-| uniqueitems | u16 +0x00 := record index; name (+0x02) added to a name link (add-always); name → id at +0x22, miss 5383 |
-| setitems | as uniqueitems, id at +0x24, miss 5383; then each item is attached to its set (at most 6 per set; extra items are not attached) |
-| gems | code → id at +0x2C; items +0xF0 := −1 only for item indices below the gem count, then items[gem +0x28] +0xF0 := gem index |
-| qualityitems | non-empty strings at +0x2C / +0x4C → ids at +0x6C / +0x6E |
-| lowqualityitems | name (+0x00) → id at +0x20 |
-| runes | name (+0x00) → id at +0x82 |
-| gamble | item level at +0x04 and item index at +0x08 from the item code map (§8); rows sorted by level |
-| monstats | BaseId (+0x02) outside 0..count−1 := own index; +0x4A := length of the chain BaseId → NextInClass (+0x04) (stops at a self link, −1 or 256 steps), +0x4B := the row's position in it; +0x36 / +0x38 from `AnimData.d2` walk / run entries, scaled by Velocity +0x32 / Run +0x34 against the BaseId row, capped at 32,767 (rows < 410: run = BaseId row's +0x36 / 2 before scaling) |
-| superuniques | hcIdx map (§8) |
-| hireling | NameFirst (+0xD3) / NameLast (+0xF3) → ids at +0x114 / +0x116 (§8) |
-| monequip | monstats +0x2A := first monequip row of that monster (else −1); loc bytes outside 1–10, or with an unknown item code, cleared |
-| levels | wide strings (40 characters) at +0x16E / +0x1BE from the string tables; +0x33–0x35 := entry counts of the three 25-entry monster lists |
-| automap | converted to an internal form (§8) |
+| Step | Table | Fix-up (owner §) |
+|---|---|---|
+| 2 | itemtypes | rebuilds its code link (`field-types.md` §6.6); equivalence matrix (`runtime-maps.md` §2) |
+| 3 | montype | equivalence matrix (`runtime-maps.md` §2) |
+| 6 | itemstatcost | op clamp, op-base lists +0x5E, op-stat tables +0xDE, flags +0x51–0x53 and +0x04 bits 5–8 (`fixups.md` §2); `stuff`, description list (`runtime-maps.md` §3) |
+| 8 | missiles | +0x183 capped at 8 (`fixups.md` §10) |
+| 9 | states | flag bitsets and lists (`runtime-maps.md` §4) |
+| 10 | skills | class and passive lists (`runtime-maps.md` §5); pettype lists +0xBC/+0xC0 (`fixups.md` §3) |
+| 12 | charstats | class name, wide, +0x00 (`fixups.md` §4) |
+| 15–17 | weapons, armor, misc | combined array (§9); item code map: `code` (+0x80) of the combined records, in order, code-linker add (`field-types.md` §6.1, §6.6); version-0 list (`runtime-maps.md` §6) |
+| 18–22 | magic, rare affixes | name → id (`fixups.md` §7) |
+| 23 | uniqueitems | index, name link, name → id (`fixups.md` §6) |
+| 24–25 | sets, setitems | index, name link, name → id, set attachment (`fixups.md` §6) |
+| 26 | gems | +0x2C id, items `gemoffset` +0xF0 (`fixups.md` §5) |
+| 28–30 | qualityitems, lowqualityitems, runes | → id (`fixups.md` §7) |
+| 32 | gamble | sorted index list and level thresholds; records freed (`runtime-maps.md` §7) |
+| 50 | monseq | sequence index (`runtime-maps.md` §8) |
+| 51 | monstats | class chain +0x4A/+0x4B, BaseId repair, speeds +0x36/+0x38 from `AnimData.d2` (`fixups.md` §8) |
+| 52 | monumod | count clamp 256 (`fixups.md` §10) |
+| 53 | superuniques | hcIdx map (§8) |
+| 54 | monpreset | per-act ranges (`runtime-maps.md` §8) |
+| 55 | hireling | names → ids (`fixups.md` §7), §8 checks, id tables (`runtime-maps.md` §8) |
+| 57 | monequip | monstats +0x2A, loc clears (`fixups.md` §9) |
+| 58 | levels | wide names +0x16E/+0x1BE, monster counts +0x33–0x35 (`fixups.md` §11) |
+| 59 | leveldefs | portal list (`runtime-maps.md` §9) |
+| 60, 61, 64 | lvltypes, lvlprest, lvlsub | tile path prefix `DATA\GLOBAL\TILES\`, `/` → `\` (`fixups.md` §12); lvlsub type index (`runtime-maps.md` §9) |
+| 65 | automap | converted records, level-name ranges; records freed (`runtime-maps.md` §10) |
+| 66 | objects | wide name +0x40, `FrameCnt0`–`7` × 256 (`fixups.md` §13) |
+
+Every table and map in this list was compared with 1.14d memory after
+the load (`dump_tables.py`, 2026-10-06; `fixups.md`, `runtime-maps.md`
+Provenance). `AnimData.d2` (§1.3) loads before `monstats`, whose fix-up
+reads it.
 
 d2rs (`d2-data::fixup`, applied to a copy of the loaded set so the
-shipped bytes stay comparable, §11) applies the rows as written for:
-itemtypes (code link only), itemstatcost (op byte, the +0x140 global),
-missiles, skills (pettype lists only), magic and rare affixes,
-uniqueitems, setitems (not the set attachment), qualityitems,
-lowqualityitems, runes, monstats (BaseId only), superuniques, hireling,
-monequip, and the item code map. Not yet (their exact algorithms: Open
-questions 11 and 13): the equivalence matrix, op-stat tables and flags,
-per-class skill lists, charstats strings, set attachment, gems, gamble,
-the monstats class chain and AnimData speeds, levels, automap. Where a
-row leaves a detail open, d2rs takes: skills append in record order and
-only for a pettype byte below the pettype count; a pettype list stops at
-15 (later skills are dropped); monequip clears a loc byte to 0. None of
-this is checked against 1.14d memory yet (Open question 15).
-
-`AnimData.d2` (§1.3) loads before `monstats`, whose fix-up reads it. Runtime
-maps other than the item code map, the itemtypes code link and the
-uniqueitems/setitems name links: Open question 13.
+shipped bytes stay comparable, §11) applies: the itemtypes code link,
+the item code map, itemstatcost op clamp and `stuff`, missiles, the
+pettype lists, the affix, quality, lowquality and runes ids, uniqueitems,
+setitems (not the set attachment), monstats BaseId repair, the
+superunique hcIdx map, hireling ids and monequip. `data-tool dump-compare`
+on the 1.14d dump: these give identical bytes, except **monequip, which is
+wrong** (8 bytes): d2rs clears the loc of an empty item (`    `), which
+1.14d keeps, and runs the loc test on rows with no valid monster
+(`fixups.md` §9). Everything else in the table above is not implemented
+yet.
 
 ### 8. Post-load checks (fatal in 1.14d)
 
@@ -519,9 +522,12 @@ Offsets are hex record offsets; ids are the §7.4 string ids.
 | difficultylevels | count = 3 |
 | runes, cubemain | §3.3 server files absent |
 
-automap names: exact, case-sensitive compare; a value whose first byte is
-`0` gives 0 without a compare; otherwise the converted value is the list
-index (from 0).
+automap names: a value whose first byte is the character `0` (0x30)
+gives 0 without a compare; otherwise an exact, case-sensitive compare
+against the list, and the converted value is the list index (from 0). A
+value in neither case, the empty string included, fails the check (fatal
+0x4A5 for LevelName, 0x4D0 for TileName; Cel1 = −1: 0x50D). The
+converted form: `runtime-maps.md` §10.
 - A (LevelName, 36): `None`, `1 Town`, `1 Wilderness`, `1 Cave`,
   `1 Crypt`, `1 Monestary`, `1 Courtyard`, `1 Barracks`, `1 Jail`,
   `1 Cathedral`, `1 Catacombs`, `1 Tristram`, `2 Town`, `2 Sewer`,
@@ -750,7 +756,7 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 | `chartemplate` rows with Level 9, then 3 | load error | §8 |
 | `experience` count 100, or `leveldefs` count ≠ `levels` count | load error | §10.8 |
 | P `monstats.bin` record 0 `TreasureClass1` (u16 +0x86) | 430 = 161 + 269 (`treasureclassex` row 269 `Act 1 H2H A`) | §10.6 |
-| P `uniqueitems.bin` record 5, after fix-up | u16 +0x00 = 5 (file: 0) | §7.4 |
+| P `uniqueitems.bin` record 5, after fix-up | u16 +0x00 = 5 (file: 0) | `fixups.md` §6 |
 | an archive set (or test lookup stub) in which `runessrv.txt` resolves | load error before `runes` | §3.3 |
 
 ## Provenance
@@ -810,17 +816,11 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
   `0x0065A2C0` (chest TC lookups only), TC allocator `0x00653F90`
   (add-always into the TC link). Data: P `monstats.bin` TC links equal
   161 + row for `treasureclassex` names.
-- **Fix-ups (§7.4):** itemtypes `0x00638D80`, itemstatcost `0x00637A00`,
-  missiles `0x00661B20`, skills `0x00613F80`, items `0x006315D0`,
-  affixes `0x00633730` / `0x00633F40`, uniqueitems `0x006342B0`,
-  setitems `0x00634DC0`, gems `0x00636B70`, qualityitems `0x00636770`,
-  lowqualityitems `0x00637500`, runes `0x006394A0`, gamble `0x00638AE0`,
-  monstats `0x00651040` / `0x00650F00` (AnimData lookup `0x0066A9B0`),
-  monequip `0x00659E60`, levels `0x0061C540`. String ids through
-  `0x00524D30`, the `strkey` lookup. Data: the target bytes are 0 in every
-  live record (checked for pettype, levels, monstats, items, uniqueitems,
-  setitems, affixes, gems, quality tables, runes, hireling); missiles
-  +0x183 is at most 8 in the file.
+- **Fix-ups (§7.4):** loader addresses and evidence in `fixups.md` and
+  `runtime-maps.md` Provenance. String ids through `0x00524D30`, the
+  `strkey` lookup. Confirmed by post-load dump (`dump_tables.py`,
+  2026-10-06): every row of the §7.4 table, and the d2rs paragraph's
+  monequip finding (`data-tool dump-compare`).
 - **Dependencies (§7.3):** extracted from the field tables in each 1.14d
   loader: each link is created right before its owner table loads, and
   other loaders' field entries point at it. Lookup key columns and kinds
@@ -882,18 +882,22 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    therefore never runs.
 10. `0x00653DB0`, a generic 2-byte-record loader, has no callers (dead
     code); not part of the load.
-11. Record layouts of the sound tables (142 and 88 bytes) and the formats
-    of `AnimData.d2` and `expfield.d2`.
+11. Record layouts of the sound tables (142 and 88 bytes). Answered for
+    the rest: `AnimData.d2` and `expfield.d2` are `formats/animdata.md`.
 12. The index limits the code relies on for `arena`, `composit`,
     `armtype` and `experience` (e.g. the highest level read from
     `experience`); until known, d2rs requires the 1.14d counts (§10.8).
-13. Runtime lookup maps beyond those in §7.4, and the exact algorithms of
-    the §7.4 fix-ups (equivalence matrix, op-stat tables, per-class skill
-    lists, set attachment, levels strings): per-table specs.
-14. §8 automap: "a value whose first byte is `0`" is read by d2rs as an
-    empty string (first byte 0x00); the character `0` is the other
-    reading. No 1.14d row has either, so the data cannot decide.
-15. The applied §7.4 fix-ups (d2rs list above) are not compared with the
-    tables in 1.14d memory after load. A dump of the loaded records
-    (trace recorder) would confirm them byte for byte, including the
-    choices d2rs made where a row is silent.
+13. Answered: the §7.4 algorithms are `fixups.md` and `runtime-maps.md`,
+    which also cover the further maps found in the loaders (states,
+    montype, monseq, monpreset, hireling, leveldefs, lvlsub, items; a
+    scan of every loader's code after its load call).
+    Still open there: the treasure-class runtime form (`runtime-maps.md`
+    Open question 3) and the readers of several maps.
+14. Answered: the special first byte is the character `0` (0x30); an
+    empty name is fatal like any unknown name (§8; `0x0061FC13`).
+15. Answered: a dump of the tables in 1.14d memory after the load
+    (`tools/trace-recorder/dump_tables.py`, compared by `data-tool
+    dump-compare`) confirms every §7.4 rule byte for byte (70 tables,
+    27 maps). It found d2rs's monequip rule wrong (§7.4, d2rs paragraph)
+    and four fix-ups the old §7.4 table missed (lvltypes, lvlprest,
+    lvlsub tile paths; objects names and frame counts).
