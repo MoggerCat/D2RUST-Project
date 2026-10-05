@@ -145,6 +145,17 @@ don't open it.
 - **Turn facts into checks.** When a spec holds a list or table code
   consumes, make it a TSV plus a mechanical check (like `fields.tsv` +
   `data-tool tables`). A failing check beats an agent rereading prose.
+- **Say where a claim holds.** A fact passed between sessions, agents or
+  documents names its scope: the branch or commit, the game version, the
+  archive or table it was checked on. "Exists" means "exists on `main`"
+  unless stated otherwise. A claim without its scope is treated as
+  unverified by the receiver.
+- **Proven methods before new ones.** For a problem, first use a project
+  convention, an existing tool in `tools/`, or an established method
+  (debugger traces, Ghidra exports, byte-exact cross-checks, strict
+  parsers, TSV + check). Invent only when none fits; then say so in the
+  commit and the spec, and give the new piece its own check before
+  anything builds on it.
 - **Match the agent to the task.**
 
   | Task | Model | Effort |
