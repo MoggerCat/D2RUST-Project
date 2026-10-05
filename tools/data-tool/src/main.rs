@@ -4,6 +4,7 @@
 //! Usage (run with --release):
 //!   data-tool tables [game_dir]
 //!   data-tool gen-tables
+//!   data-tool patch (check | render | diff) ...
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
 //! buffers, `hitclass`), compiles every table's highest-priority `.txt` in
@@ -12,6 +13,11 @@
 //!
 //! `gen-tables` regenerates `crates/d2-data/src/tables/generated.rs` (the
 //! typed record structs) from the embedded schema.
+//!
+//! `patch` checks a mod stack, renders patched tables or diffs an edited
+//! table into a layer (`specs/data/patch-layers.md` §10).
+
+mod patch;
 
 use std::path::PathBuf;
 
@@ -31,7 +37,10 @@ fn main() -> Result<()> {
     match args.first().map(String::as_str) {
         Some("tables") if args.len() <= 2 => tables(&game_dir(args.get(1))?),
         Some("gen-tables") if args.len() == 1 => gen_tables(),
-        _ => bail!("usage: data-tool tables [game_dir] | data-tool gen-tables"),
+        Some("patch") => std::process::exit(patch::main(&args[1..])),
+        _ => {
+            bail!("usage: data-tool tables [game_dir] | data-tool gen-tables | data-tool patch ...")
+        }
     }
 }
 

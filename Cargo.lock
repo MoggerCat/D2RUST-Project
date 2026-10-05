@@ -2317,6 +2317,7 @@ name = "d2-data"
 version = "0.0.0"
 dependencies = [
  "d2-formats",
+ "sha2",
  "thiserror 2.0.21",
 ]
 

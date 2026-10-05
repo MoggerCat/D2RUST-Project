@@ -30,8 +30,10 @@ rather than restating them.
    them).
 3. **Cross-reference validation** (implementation, medium): broken links
    reported with table, row, column (`field-types.md` §6).
-4. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
-   Phase 2 exit = "patches apply"; the mod itself is deferred.
+4. **Patch layers**: implemented on branch `claude/patch-layers`
+   (`specs/data/patch-layers.md`); synthetic vectors pass. Next: run the
+   §5 queue entry (G1–G8), then merge. Phase 2 exit = "patches apply";
+   the mod itself is deferred.
 5. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
    `specs/sim/rng.md`, test against `traces/sim/rng/*.json`. Good first
    cloud task (needs no game files).
@@ -52,12 +54,13 @@ rather than restating them.
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
 | `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
 | `crates/d2-data/src/crosscheck.rs` | txt → bin byte comparison | `data/loading.md` §11 |
+| `crates/d2-data/src/patch.rs` (+ `patch/{syntax,apply,diff,check,tests}.rs`) | mod patch layers: parse, apply, render/digests, diff, patched compile (branch `claude/patch-layers`) | `data/patch-layers.md` |
 | `crates/d2-data/src/strings.rs` | string tables, `strkey` | `field-types.md` §7 |
 | `crates/d2-client/src/map/` | DS1+DT1 map assembly, CPU reference renderer | `render/map-preview.md` |
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs | |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs; `patch check/render/diff`: mod stacks | `data/patch-layers.md` §10 |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
@@ -74,6 +77,7 @@ rather than restating them.
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo test -p d2-data --test patch_game -- --ignored` | patch layers on the live tables (G1–G8) | `game/` |
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
 | `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |
@@ -85,6 +89,20 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
+
+**Patch layers G1–G8** (branch `claude/patch-layers`):
+`cargo test --release -p d2-data --test patch_game -- --ignored`.
+Expect 4 passed: G1 85 tables, 21,632 rows, render identity, empty diff
+`d2patch 1\n`; G2 base-as-patch compiles with no finding and fix-ups
+apply; G3 the spec's Example gives the one N01 and digests weapons
+`ef2ca1073f89cf91`, armor `a3bd13b18286ee12`, magicprefix
+`63b952e7aa3c56f0`, treasureclassex `0a0a4c940f8f3fb9`, then compiles
+and fix-ups apply; G4–G8 the A/C codes of the spec table. On a failure,
+record the assertion output here (a digest or C finding mismatch is a
+spec-vs-code question for `patch-layers.md`, not a test to loosen).
+Then try `data-tool patch check <stack>` on that Example (layers from
+`crates/d2-data/tests/patch_game.rs`, saved under `game/`): exit 0, one
+note, the data digest.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
