@@ -33,9 +33,9 @@
 | Constants & data dependencies | 409–422 |
 | Randomness | 423–430 |
 | Edge cases & original bugs | 431–448 |
-| Test vectors | 449–498 |
-| Provenance | 499–523 |
-| Open questions | 524–539 |
+| Test vectors | 449–499 |
+| Provenance | 500–524 |
+| Open questions | 525–540 |
 <!-- /index -->
 
 ## Summary
@@ -476,14 +476,15 @@ gitignored):
 | Recording | Ticks | Runs (every-tick / due) | Checked |
 |---|---|---|---|
 | `20261006-015554-tick.jsonl` | frames 1–4902 | 10,020 / 6,684 (players, monsters, a few missiles, objects, items) | `check_tick.py`: 0 errors; step order and every periodic step (incl. frames 1500, 3000, 4500); 197 snapshots |
+| `20261006-022304-tick.jsonl` (combat with missiles) | frames 1–4632 | 15,154 / 9,740 (incl. 1,580 missile runs) | `check_tick.py`: 0 errors; 186 snapshots |
+| `20261006-021854-tick.jsonl` (melee) | frames 1–1572 | 4,413 / 2,305 | 0 errors; 63 snapshots |
 | smoke run (15 s, not kept) | frames 1–185 | 401 | 0 errors |
 
 `check_tick.py --perturb-ex N` (swapped runs at frames 4, 242, 2665) and
 `--perturb-snap N` are each reported at exactly the changed record (M08);
 `--selftest` checks the checker on a hand-built recording of this
 table's vectors and fails when a rule in the checker is mutated.
-Coverage gaps: few missiles (4 runs), no unit-less timer, no hosted
-game.
+Coverage gaps: no unit-less timer, no hosted game.
 
 Comparison (exact): for each tick of a recording,
 the frame number, the step markers, and the ordered list of executed
@@ -523,8 +524,8 @@ game; a combat-heavy recording is queued (`docs/HANDOFF.md` §5).
 
 ## Open questions
 
-1. Missile-heavy and hosted-game recordings: confirm §5 with many
-   missiles and more than one client.
+1. Hosted-game recording: confirm §5 and the client pass with more than
+   one client (missiles confirmed: 1,580 runs, 2026-10-06).
 2. Timers without a unit (edge case 3): does any 1.14d path schedule one?
    Search callers of `0x005417D0` / `0x00541800` passing unit 0. None in
    the recordings.
