@@ -1,0 +1,37 @@
+{
+  "area": "sim",
+  "behavior": "rng",
+  "compare": {
+    "ignore": [
+      "site"
+    ],
+    "mode": "exact"
+  },
+  "expected": [
+    {"data": {"op": "step", "site": "0x642e09", "state": {"hi": 268778232, "lo": 4014346869}, "value": 4014346869}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x676165", "state": {"hi": 1674353446, "lo": 1406222081}, "value": 1406222081}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x676669", "state": {"hi": 586524499, "lo": 3154683627}, "value": 3154683627}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x67669f", "state": {"hi": 1315794468, "lo": 457460266}, "value": 457460266}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x676469", "state": {"hi": 190803186, "lo": 1949180022}, "value": 1949180022}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x67649f", "state": {"hi": 812988113, "lo": 1550108608}, "value": 1550108608}, "kind": "rng_draw", "tick": 0},
+    {"data": {"op": "step", "site": "0x676165", "state": {"hi": 646538471, "lo": 4175359377}, "value": 4175359377}, "kind": "rng_draw", "tick": 0}
+  ],
+  "format_version": 1,
+  "game_version": "1.14d",
+  "id": "sim-0003",
+  "inputs": [],
+  "notes": "DRLG seed: init-low with the character's map seed (0x642DA0), first step gives the level start seed (level seed = start seed + level id). Chain 2 of raw recording 20261005-232125-rng.jsonl (Game.exe -w -ns); 7 of 7 draws; seed address(es) unknown (inline only). Untimed: tick is 0 for every event.",
+  "recorded": {
+    "by": "tools/trace-recorder (automated)",
+    "date": "2026-10-05",
+    "method": "debugger",
+    "tool": "trace-recorder 0.1.0"
+  },
+  "setup": {
+    "seed": {
+      "hi": 666,
+      "lo": 644409375
+    }
+  },
+  "spec": "specs/sim/rng.md"
+}

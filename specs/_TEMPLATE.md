@@ -1,6 +1,7 @@
 # Spec: <System> — <Behavior>
 
-- **Status:** draft | reviewed | implemented | conformance-passing
+- **Status:** draft | implemented | verified | conformance-passing, plus one
+  sentence of evidence (see `specs/README.md`)
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::items::affixes` (example)
 - **Related specs:** 

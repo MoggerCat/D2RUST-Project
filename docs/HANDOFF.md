@@ -1,188 +1,135 @@
-# Handoff: project state after Phases 0, 1 and 1b (2026-10-05)
+# Handoff (updated 2026-10-05)
 
-Read this first in a new session, then `CLAUDE.md` and `docs/PLAN.md`.
+Start here in a fresh session, after `CLAUDE.md`. This file holds state,
+the next steps, the code and command map, and the local run queue. Rules
+and facts live in specs (`specs/README.md`); this file points to them
+rather than restating them.
 
-## 1. Where things stand
+## 1. State
 
 | Phase | Status | Proof |
 |---|---|---|
-| 0 Setup | Done, except Git commit/push and CI on GitHub | builds, tests pass |
-| 1 Formats | Done | every live file in the 1.14d MPQs decodes (`mpq-tool check`, `mpq-tool formats`) |
-| 1b First pixels | Done | Act 1 town renders; GPU output byte-identical to CPU reference (`d2-client verify`) |
-| 2 Data tables | **Next** | — |
+| 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
+| 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
+| 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
+| 2 Data | in progress: core done | `data-tool tables`: 73 live tables, 69 byte-identical, 4 explained; 4/4 code buffers identical |
+| 3 Simulation | not started; RNG spec ready | `specs/sim/rng.md`, traces `traces/sim/rng/` |
+| 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
+| 5–6 | not started | |
+| 7–9 | deferred (out of current scope) | |
 
-**The repo has no Git commits yet.** Before a cloud session can use it:
-```bash
-git config user.name "Your Name"
-```
-```bash
-git config user.email "you@example.com"
-```
-```bash
-git add -A
-```
-```bash
-git commit -m "Phases 0, 1, 1b: workspace, formats, map preview"
-```
-Then create a GitHub repo and push. The pre-commit hook blocks game files.
-`game/`, `re/` and `target/` are gitignored. `../refs/` is outside the repo.
+## 2. Next steps (in order)
 
-**Cloud sessions have no game files.** Tests that need them are `#[ignore]`
-and read `D2_GAME_DIR`. Work that needs real data (surveys, render checks)
-must run on a machine with the install, or the user must provide the
-specific extracted tables. Never commit extracted Blizzard data.
+1. **Callbacks in code** (implementation, medium): implement
+   `specs/data/callbacks.md` in `d2-data::compile`; target `data-tool
+   tables` = 73/73 byte-identical (except monstats record 707 `NameStr`,
+   open question). Add error E15 and diagnostics CbMiss/CbStop to
+   `txt-format.md` §9.
+2. **Post-load fix-ups** (implementation, medium): `loading.md` §7.4.
+3. **Typed tables** (implementation, medium): generate Rust structs from
+   `specs/data/fields.tsv` + `tables.tsv` (a generator tool; generated
+   code committed; a test that regenerating gives the same output).
+4. **Cross-reference validation** (implementation, medium): broken links
+   reported with table, row, column (`field-types.md` §6).
+5. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`.
+   Phase 2 exit = "patches apply"; the mod itself is deferred.
+6. **Phase 3 start: RNG in `d2-sim`** (implementation, medium):
+   `specs/sim/rng.md`, test against `traces/sim/rng/*.json`. Good first
+   cloud task (needs no game files).
 
-## 2. Key decisions
+## 3. Code map
 
-- **Target:** D2 LoD **1.14d** (single merged `Game.exe`, version
-  1.14.3.71). D2MOO documents 1.10f: use it as a guide and confirm against
-  1.14d.
-- **Ownership gate:** check that the player *has* the game (required MPQs
-  present, valid, containing expected files) plus an online account. No
-  exact-hash matching against a Blizzard release, and nothing read outside
-  the chosen game folder. `tools/hash-manifest` only records the
-  developer's reference install (`traces/reference-install.toml`).
-- **Clean room:** specs in `specs/` are the source of truth. Code cites its
-  spec (`// Spec: ...`). Implementation never copies decompiler output.
-  Reference sources live in `../refs/` (D2MOO MIT, Riiablo Apache-2.0,
-  CE_Database, a small 1.14d address list). Constant tables taken from
-  Riiablo are credited in `THIRD_PARTY_NOTICES.md`.
-- **Parsers are strict.** Odd files are investigated, not tolerated. Unused
-  leftovers are listed with reasons; live-data quirks become spec rules.
-- **Pins:** Rust 1.99.0 (`rust-toolchain.toml`), Bevy `=0.19.1` (client
-  only, enforced by `cargo run -p depcheck`).
+| Path | What | Spec |
+|---|---|---|
+| `crates/d2-formats/src/mpq/` | MPQ archive (`mod.rs`), hash/block tables (`tables.rs`), crypto, PKWARE explode, Huffman, ADPCM, `ArchiveSet` (`set.rs`) | `formats/mpq.md`, `mpq-tables.md`, `data/loading.md` §2 |
+| `crates/d2-formats/src/{palette,dc6,dcc,dt1,ds1,cof,tbl,font}.rs` | file formats | `specs/formats/*.md` |
+| `crates/d2-data/src/txt.rs` | strict `.txt` reader, column binding | `data/txt-format.md` |
+| `crates/d2-data/src/schema.rs` | embedded `fields.tsv` / `tables.tsv` | `data/schema.md` |
+| `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, callbacks | `data/field-types.md`, `callbacks.md` |
+| `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
+| `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
+| `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
+| `crates/d2-data/src/crosscheck.rs` | txt → bin byte comparison | `data/loading.md` §11 |
+| `crates/d2-data/src/strings.rs` | string tables, `strkey` | `field-types.md` §7 |
+| `crates/d2-client/src/map/` | DS1+DT1 map assembly, CPU reference renderer | `render/map-preview.md` |
+| `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
+| `crates/d2-sim`, `d2-proto`, `d2-net`, `d2-server`, `d2-verify`, `conformance` | stubs | |
+| `tools/mpq-tool` | info, list, extract, check, formats, render | |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check | |
+| `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows) | `sim/rng.md`, `traces/FORMAT.md` |
+| `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
+| `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
+| `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
+| `tools/ghidra/` | Ghidra scripts (label import, export) | |
 
-## 3. Environment (developer PC, Windows 10)
+## 4. Command map (what proves what)
 
-- Installed: Git 2.55, rustup (Rust 1.99.0), VS 2022 Build Tools (MSVC
-  linker), Temurin JDK 21 and 25, Ghidra 12.1.4 at
-  `%LOCALAPPDATA%\Programs\ghidra_12.1.4_PUBLIC`.
-- `D2_GAME_DIR` = `<repo>\game` (set with `setx`).
-- Ghidra project: `re/ghidra/D2_114d.gpr` (`Game.exe` analyzed, 66 community
-  labels applied). Exports in `re/exports/` (`functions.tsv` + 13,048
-  decompiled functions). Commands are in `tools/ghidra/README.md`.
+| Command | Proves | Needs |
+|---|---|---|
+| `cargo test -p <crate>` | unit tests from spec vectors | repo |
+| `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo fmt --all` | lint/format gate | repo |
+| `cargo run -p depcheck` | crate dependency rules | repo |
+| `py tools/spec_index.py --check` | spec indexes current | repo |
+| `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
+| `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
+| `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
+| `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |
 
-## 4. Code map
+Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
+`export D2_GAME_DIR="$PWD/game"`.
 
-```
-crates/d2-formats   MPQ + all Phase 1 formats (no Bevy)
-  mpq/              archive, crypto, PKWARE explode, Huffman, ADPCM, ArchiveSet
-  palette, dc6, dcc, dt1, ds1, cof, tbl (strings), font (font .tbl)
-crates/d2-client    Bevy app (only crate allowed to use Bevy)
-  map/              DS1+DT1 assembly, CPU reference renderer (no Bevy types)
-  assets.rs         mpq:// asset source + format loaders
-  render/           palette material + palette.wgsl
-  app.rs            view / verify modes
-tools/mpq-tool      info, list, extract, check, formats, render
-tools/depcheck      dependency rules (no Bevy outside d2-client)
-tools/hash-manifest reference-install record
-tools/ghidra        Ghidra scripts (label import, decompiled export)
-specs/formats/      mpq, mpq-tables, palette, dc6, dcc, dt1, ds1, cof, tbl, font-tbl
-specs/render/       map-preview
-```
+## 5. Local run queue
 
-Useful commands (release builds; game files required):
-```bash
-cargo run --release -p mpq-tool -- check
-```
-```bash
-cargo run --release -p mpq-tool -- formats
-```
-```bash
-cargo run --release -p d2-client -- verify
-```
-```bash
-cargo run --release -p d2-client -- view
-```
+Cloud sessions add game-file checks here (command + what to look for);
+a local session runs them, records the result, and removes the entry.
 
-## 5. Format facts learned from the 1.14d data
+- (empty)
 
-- **MPQ:** format v0, sector size 4096. Masks used: PKWARE (0x08), ADPCM
-  (0x40/0x80), Huffman+ADPCM (0x41/0x81). No zlib/bzip2/LZMA/sparse.
-  `patch_d2.mpq` uses the old IMPLODE flag and has no `(listfile)`.
-  `d2sfx.mpq` lists only 31 of 2,360 files: names for unlisted encrypted
-  files are unknown, but their keys are recovered from the sector offset
-  table, so all 35,364 blocks decode. Only locale 0 appears.
-- **Archive priority:** `specs/data/loading.md` §2 (priority descending,
-  ties newest-opened first): patch_d2, d2xvideo, d2xtalk, d2xmusic, d2exp,
-  d2video, d2music, d2char, d2speech, d2sfx, d2data.
-- **DC6:** 140 frames with `flip = 1` (inventory item sheets) decode
-  top-down. Verified upright visually.
-- **DCC:** all 21,717 decode with every sub-stream exactly consumed. No
-  bottom-up frames. The "equal cell" copy must read from a persistent
-  direction buffer, not the previous frame (Riiablo's newer decoder gets
-  this wrong).
-- **DS1:** versions 3–18 seen. `ACT1\OUTDOORS\trees.ds1` (live, used by
-  LvlSub) has truncated group records; missing fields read as 0. 55 v12/13
-  files have trailing bytes, kept raw (open question).
-- **TBL:** `.tbl` covers three things: string tables, font tables (`"Woo!"`
-  magic) and two plain-text files (`font\latin\DEFAULT.TBL`, `FONTER.TBL`).
-- **Known unused leftovers** (excluded, documented in specs): six
-  version-4 DT1s in ACT1 (barracks, gargtrap, Catacombs, Cathedrl, Court,
-  Outdoor1) and `chars\am\cof\amblxbow.cof` (junk).
+Next RNG capture when convenient (local, needs the user at the game):
+start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
+single-player game, kill a few monsters and pick up a drop. Recording
+slows the game a lot (all 846 inline RNG sites are hooked).
 
-## 6. Map rendering facts (Phase 1b)
+## 6. Environment
 
-- Cell origin: `sx = (x − y)·80`, `sy = (x + y)·40`. Floors are 160×80 diamonds.
-- `WALL_BASE = 80`: walls and roofs are shifted down 80 px (roofs also up
-  by roof height). Decided by rendering 0 and 80.
-- Cells with bit 31 (hidden) are not drawn. This removed blue collision
-  tiles along the river.
-- Orientation 3 also draws orientation 4 at the same spot. 10, 11 and 13 in
-  wall layers are skipped. Shadows are not drawn yet.
-- Tile files come from the DS1's embedded list (`.tg1` → `.dt1`). The game
-  actually uses `LvlTypes.txt` + `LvlPrest.txt` Dt1Mask; switch to that in
-  Phase 2.
-- GPU exactness requires: R8Uint index textures and an sRGB palette read
-  with `textureLoad`, an sRGB target, `Msaa::Off`, `Tonemapping::None`,
-  quads on pixel boundaries, and unique z per item.
+- Developer PC: Windows 10, Git, rustup (default and pinned 1.99.0),
+  VS 2022 Build Tools, Temurin JDK 21, Ghidra 12.1.4 at
+  `%LOCALAPPDATA%\Programs\ghidra_12.1.4_PUBLIC`, Python 3.10 (`py`),
+  GitHub CLI (`gh`, logged in as MoggerCat). Disk is tight: build only the
+  crates you need.
+- `game/`: 1.14d install (`Game.exe` 1.14.3.71), gitignored. Extracted
+  tables in `game/extracted/{patch_d2,d2exp,d2data}/` (scratch).
+- `re/`: Ghidra project `re/ghidra/D2_114d.gpr` and exports
+  (`re/exports/functions.tsv`, `re/exports/funcs/`), gitignored. How to
+  regenerate: `tools/ghidra/README.md`.
+- `../refs/`: D2MOO (MIT), Riiablo (Apache-2.0), CE_Database,
+  1.14d-notes. Spec sessions only.
+- Git: `main` on `git@github.com:MoggerCat/MXL-ULTIMATE.git`. CI runs on
+  pushes to `main` and on pull requests. A cold CI run takes ~40 min
+  (Bevy), cached ~3 min.
 
-## 7. Problems met and how they were solved
+## 7. Where facts live
+
+Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
+Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
+`specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
+Carried-over open questions not yet in a spec's list:
+
+1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
+   patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
+2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
+3. DC6/DCC vertical placement (one-row disagreement between sources).
+4. Meaning of the PL2 rendering tables (Phase 6).
+
+## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |
 |---|---|
-| No Rust/Git/MSVC on the PC | installed via winget (with approval) |
-| Cargo can't extend workspace lints | d2-sim repeats them in its own `[lints]` |
-| Ghidra 12.1 crashed on JDK 25 ("data file must be inside the data dir") | it targets JDK 21: installed Temurin 21, pinned via `JAVA_HOME_OVERRIDE` in Ghidra's `launch.properties` |
-| A download failed because the temp folder was gone | recreate the scratch folder before downloading |
-| Install contained third-party repack files | user replaced them; ownership gate redefined (section 2) |
-| Clippy 1.99 lints (`as_chunks`, `is_multiple_of`, `too_many_arguments`) | code updated; Bevy system params grouped with `SystemParam` |
-| Font and text files fail as string tables | classify `.tbl` by content |
-| 8 files failed parsing in the survey | 7 unused leftovers documented; 1 live DS1 quirk became a spec rule |
-| Walls 80 px off | `WALL_BASE = 80` |
-| Solid blue strips on the map | skip hidden cells |
-| First GPU capture partially rendered | verify judges a capture only when identical to the previous one; capped retries |
-| Weak demo sprite (waypoint glow layer) | replaced with the bonfire DCC |
-
-## 8. Open questions (carry forward)
-
-1. **8 unflagged invisible collision tiles** in `townN1.ds1` (river.dt1
-   tile 28, key 1/5/0, cells x 44|51, y 29|32|33|34) draw as blue patches.
-   Ruled out: rarity, cell prop1 bits, LvlTypes/Dt1Mask file selection.
-   Needs RE of the client's tile draw path.
-2. DS1 v12/13 trailing bytes: possibly an early NPC-path section.
-3. ~~MPQ archive priority order~~: answered by `specs/data/loading.md` §2.
-4. DC6/DCC vertical placement (one-row disagreement between sources).
-5. Meaning of the rendering tables in PL2 (Phase 6).
-6. The original game's handling of truncated DS1 groups.
-
-## 9. Starting Phase 2 (data tables, `d2-data`)
-
-Goals from `docs/PLAN.md`: typed structs for all `.txt` tables,
-cross-reference validation, and the mod patch-layer format and loader.
-
-Facts and suggestions:
-- Tables live at `data\global\excel\*.txt` in d2data/d2exp (274 `.txt` and
-  116 `.bin` files listed). `patch_d2.mpq` may override some files; it has
-  no listfile, so look up known names directly with `ArchiveSet::read`.
-- 1.14d loads compiled `.bin` files at runtime. Decide early whether to
-  parse `.txt` (readable, used by mods) or `.bin` (what the game uses), or
-  both with a cross-check. Write that decision into the PLAN decisions log.
-- Suggested order: a generic tab-separated reader with a spec, then
-  `LvlTypes`/`LvlPrest`/`LvlSub` (they unblock correct map tile selection
-  for the renderer), then the item, monster, skill and string-key tables.
-- Mod patch layers: patches (add/change/remove rows and columns) applied to
-  the user's tables at load time. Never write full modified tables to the
-  repo.
-- Keep the same workflow: spec first, unit tests from spec vectors, a
-  survey over the real files, and visual or exact checks where possible.
+| Ghidra 12.1 crashes on JDK 25 | use JDK 21 (`JAVA_HOME_OVERRIDE` in Ghidra's `launch.properties`) |
+| Cargo can't extend workspace lints | `d2-sim` repeats them in its own `[lints]` |
+| Running `cargo` outside the repo reinstalled `stable` (1.3 GB) | default toolchain set to 1.99.0 |
+| `.txt` tables in the MPQs aren't what 1.14d uses | `.bin` is truth; the txt compiler is proven against it (`loading.md`) |
+| 1.14d inlines its RNG step (846 sites) | recorder hooks every site, not one function (`sim/rng.md`) |
+| A 24-agent review workflow cost ~6M tokens for little gain | one writer per spec + executable checks (`CLAUDE.md` working rules) |
+| GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |

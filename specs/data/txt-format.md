@@ -1,6 +1,6 @@
 # Spec: Data — Excel text tables (.txt) reader
 
-- **Status:** draft, revised after review (2026-10-05). Every rule was
+- **Status:** verified by `data-tool tables` (2026-10-05). revised after review (2026-10-05). Every rule was
   checked against the 1.14d `Game.exe` code; record counts against all 128
   same-archive `.txt`/`.bin` pairs; conversions and linkers by compiling
   the live `.txt` files with the 91 field lists recovered from `Game.exe`
@@ -20,6 +20,32 @@
   `specs/data/field-types.md` (the type vocabulary per-table specs use,
   string keys, callbacks; it builds on §6–§8 here and must agree with
   them); per-table specs (field lists, record sizes).
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 50–66 |
+| Inputs | 67–75 |
+| Outputs / state changes | 76–91 |
+| Rules | 92–93 |
+|   1. Where this reader is used | 94–108 |
+|   2. Bytes | 109–119 |
+|   3. Lines | 120–132 |
+|   4. Header row | 133–145 |
+|   5. Data rows and record numbering | 146–171 |
+|   6. Column binding | 172–228 |
+|   7. Cell conversions | 229–338 |
+|   8. Linkers | 339–399 |
+|   9. Strictness policy | 400–475 |
+|   10. Original-only behaviors not reproduced | 476–484 |
+| Constants & data dependencies | 485–497 |
+| Randomness | 498–501 |
+| Edge cases & original bugs | 502–525 |
+| Survey (1.14d data) | 526–692 |
+| Test vectors | 693–878 |
+| Provenance | 879–937 |
+| Open questions | 938–967 |
+<!-- /index -->
 
 ## Summary
 

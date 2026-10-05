@@ -6,6 +6,37 @@
 - **Crate/module:** `d2-formats::mpq`
 - **Related specs:** `specs/formats/mpq-tables.md` (constant tables)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 40–47 |
+| Inputs | 48–54 |
+| Outputs / state changes | 55–60 |
+| Rules | 61–65 |
+|   1. Archive header | 66–90 |
+|   2. Crypt table | 91–107 |
+|   3. String hash | 108–127 |
+|   4. Decryption | 128–148 |
+|   5. Hash table | 149–173 |
+|   6. Block table | 174–202 |
+|   7. File key | 203–208 |
+|   8. Reading file data | 209–239 |
+|   9. Sector decompression | 240–258 |
+|   10. PKWARE Data Compression Library ("implode") stream | 259–295 |
+|   11. Huffman (Storm adaptive Huffman) | 296–350 |
+|   12. IMA ADPCM (Storm variant) | 351–377 |
+|   13. Recovering the key of an unnamed file | 378–395 |
+|   14. Listfile | 396–401 |
+| Constants & data dependencies | 402–406 |
+| Randomness | 407–410 |
+| Edge cases & original bugs | 411–420 |
+| Archive set (D2-specific) | 421–427 |
+| Observations (1.14d install) | 428–451 |
+| Test vectors | 452–465 |
+| Provenance | 466–483 |
+| Open questions | 484–497 |
+<!-- /index -->
+
 ## Summary
 
 D2 stores all of its data (tables, graphics, sound, video) in MPQ archives

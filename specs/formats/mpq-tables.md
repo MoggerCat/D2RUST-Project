@@ -1,5 +1,14 @@
 # Spec appendix: MPQ constant tables
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| A. Crypt table | 17–21 |
+| B. PKWARE DCL tables | 22–100 |
+| C. Huffman weight tables | 101–282 |
+| D. IMA ADPCM tables | 283–307 |
+<!-- /index -->
+
 Constants for `specs/formats/mpq.md`. These are format constants (facts
 about the file format), taken from Riiablo (Apache-2.0); see
 `THIRD_PARTY_NOTICES.md`. Arrays are written so they can be copied into code

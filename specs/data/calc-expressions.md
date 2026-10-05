@@ -1,6 +1,6 @@
 # Spec: Data — Calc expressions (formula fields)
 
-- **Status:** draft. A scratch model of the rules below compiles every
+- **Status:** verified by `data-tool tables` (2026-10-05). A scratch model of the rules below compiles every
   formula cell of the 1.14d tables into byte-identical `misscode.bin`,
   `skillscode.bin`, `skilldesccode.bin` and `itemscode.bin`, and reproduces
   all 30,217 formula field values of `missiles.bin`, `skills.bin`,
@@ -19,6 +19,32 @@
   `specs/data/field-types.md` (§8.1 `calc(<buffer>)` fields, §8.2 `param`
   fields). Per-table record specs (skills, skilldesc, missiles, items) take
   the column → offset lists of §1.2 from here.
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 49–62 |
+| Inputs | 63–73 |
+| Outputs / state changes | 74–81 |
+| Rules | 82–85 |
+|   1. Where formulas live | 86–176 |
+|   2. Bytecode | 177–222 |
+|   3. Evaluator | 223–328 |
+|   4. Compiler | 329–525 |
+|   5. Code tables (compile-time links, 1.14d) | 526–560 |
+| Constants & data dependencies | 561–578 |
+| Randomness | 579–597 |
+| Edge cases & original bugs | 598–607 |
+| d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented) | 608–638 |
+| Test vectors | 639–640 |
+|   Real 1.14d formulas (`#[ignore]`, need `D2_GAME_DIR`) | 641–680 |
+|   Compiler, synthetic (skills family, 1.14d links) | 681–729 |
+|   Compiler, other families | 730–744 |
+|   Evaluator | 745–776 |
+|   Validation | 777–788 |
+| Provenance | 789–846 |
+| Open questions | 847–881 |
+<!-- /index -->
 
 ## Summary
 
@@ -140,7 +166,8 @@ has formula columns.
    compiler can emit: 0x00, 0x01, 0x02, 0x04–0x16. Operands must fit inside
    the buffer.
 2. Every formula field must be 0xFFFFFFFF or an expression start.
-3. Diagnostics, not errors: an expression start referenced by no field or
+3. `misscode` must not contain CALL 2 (`rand`; policy 6, Open question 1).
+4. Diagnostics, not errors: an expression start referenced by no field or
    by more than one; opcode 0x02 (§4.7); a CALL index without an evaluator
    entry (§3.4).
 
@@ -222,8 +249,8 @@ it and its operand, act:
 | Op | Action |
 |---|---|
 | 0x01 | `i` = operand. If `i` < the family's function count (§3.4): `k` = that function's arity; pop `k` values (the last argument is popped first, so the arguments are in source order); call the function with them and the context; push its result. If `i` ≥ count, or `k` is not 0–3: push 0 and pop nothing. |
-| 0x04–0x06 | If the family has no parameter callback: stop, result 0. If no byte follows the opcode: stop, result 0. Push `param(operand, context)`. Operand: 0x04 u8, zero-extended; 0x05 i16, sign-extended; 0x06 i32. |
-| 0x07–0x09 | If no byte follows the opcode: stop, result 0. Push the operand: i8 and i16 sign-extended, i32. |
+| 0x04–0x06 | Push `param(operand, context)`. Operand: 0x04 u8, zero-extended; 0x05 i16, sign-extended; 0x06 i32. |
+| 0x07–0x09 | Push the operand: i8 and i16 sign-extended, i32. |
 | 0x0A–0x0F | `b` = pop, `a` = pop. Push 1 if `a < b` / `a > b` / `a ≤ b` / `a ≥ b` / `a = b` / `a ≠ b`, else 0. |
 | 0x10–0x12 | `b` = pop, `a` = pop. Push `a + b` / `a − b` / `a × b`. |
 | 0x13 | `b` = pop, `a` = pop. `b` = 0 → push 0. Otherwise push `a / b` truncated toward zero. `a` = −2³¹, `b` = −1 makes the original fault (process crash). |
@@ -232,10 +259,11 @@ it and its operand, act:
 | 0x16 | `f` = pop, `t` = pop, `c` = pop. Push `t` if `c` ≠ 0, else `f`. Evaluation continues with the next instruction. |
 | any other (0x00, 0x02, 0x03, 0x17–0xFF) | Stop. Result = pop (0 if empty). |
 
-If the position reaches the end without a stop, the result is 0. The
-"byte follows" checks test for one byte only; a 2- or 4-byte operand cut by
-the buffer end reads past it in the original. Validated buffers (§1.5)
-cannot do that.
+If the position reaches the end without a stop, the result is 0. An
+operand that does not fit before the end (CALL's index byte included)
+also stops with result 0. (The original checks only that one byte follows
+0x04–0x09, so a cut 2- or 4-byte operand reads past the buffer; validated
+buffers, §1.5, contain none.)
 
 #### 3.4 Functions and keywords
 
@@ -280,7 +308,7 @@ caller passes belongs to the items spec (Open question 6).
 Functions:
 - `min(a, b)`, `max(a, b)`: signed minimum / maximum.
 - `rand(a, b)`: no context → 0. `a ≥ b` → `a`, no RNG draw. Otherwise
-  `a + R(b − a + 1)`, one draw (§Randomness) from the unit's own seed
+  `a + R(b − a + 1)` (§Randomness) on the unit's own seed
   (skills, skilldesc: the caster; items: the unit). Missiles: Open
   question 1.
 - skills `skill(s, c)`: `L` = the context unit's level in skill `s`,
@@ -314,8 +342,10 @@ For each calc column of each record, in the order of §1.4:
 - space: 0x09–0x0D, 0x20. digit: `0`–`9`. letter: `A`–`Z`, `a`–`z`.
   alnum: digit or letter. `_` is not alnum.
 - Bytes ≥ 0x80: the original passes them to the C library's class tests as
-  negative values (undefined). d2rs rejects such a formula (Open
-  questions). 1.14d formula cells are ASCII.
+  negative values (undefined; Open question 2). d2rs: a byte ≥ 0x80
+  anywhere in the text (the first 256 cell bytes, even after a stop) is an
+  error and the table does not compile (Open question 10). 1.14d formula
+  cells are ASCII.
 
 #### 4.3 Tokens
 
@@ -357,8 +387,9 @@ Lookups:
   with spaces to 4. Exact, case-sensitive match (`txt-format.md` §8).
   Hit → (index, parameter). Miss → −1. Only the first 4 bytes count:
   `par34` finds `par3`, `ln123` finds `ln12`; `LVL` misses.
-- **Stat mode**: `base` → (1, parameter), `mod` → (2, parameter), anything
-  else → (0, parameter). Case-insensitive.
+- **Stat mode**: the whole name, ASCII case-insensitive: `base` →
+  (1, parameter), `mod` → (2, parameter), any other name (`accr`
+  included) → (0, parameter). Whole-name compare: Open question 9.
 
 | Family | Context | Resolution |
 |---|---|---|
@@ -487,7 +518,9 @@ so only the 64-entry `ops` limit is reachable (e.g. 65 nested `(`).
   stops evaluation where it sits (`lvl*(2` → `04 10 07 02 02 12 00`,
   value 2).
 - Extra arguments stay on the stack (`min(1,2,3)` evaluates to
-  min(2,3) = 2); missing arguments fail (`stat('strength')`).
+  min(2,3) = 2). A call fails only when the whole stack so far holds fewer
+  values than its arity: `min(1)` and `stat('strength')` fail, but
+  `1 min(2)` compiles as min(1,2).
 - Two values with no operator: the last one wins (`5 3` = 3, `1,2` = 2).
 
 ### 5. Code tables (compile-time links, 1.14d)
@@ -520,9 +553,10 @@ holds (PARAM operands, and the code argument of `skill`, `miss`, `sklvl`).
 `cl34` · 36 `cd34` · 37 `shl1` · 38 `shd1` · 39 `chl1` · 40 `chd1` · 41
 `dl12` · 42 `dd12`
 
-Three-letter codes (`lvl`, `mps`, `len`, `rng`) are stored space-padded
-(`lvl `). A code link cannot hold an empty or a 5+ byte name, which is why
-`par34` resolves to `par3`.
+Codes compare as 4 bytes: a longer name is cut (`par34` → `par3`), a
+shorter one is space-padded (`lvl ` is stored so), and the empty name
+looks up `"    "`, which misses in 1.14d (no empty skillcalc or misscalc
+code).
 
 ## Constants & data dependencies
 
@@ -530,7 +564,7 @@ Three-letter codes (`lvl`, `mps`, `len`, `rng`) are stored space-padded
 |---|---|
 | keywords (index order) | `min`, `max`, `rand`, `skill`, `miss`, `stat`, `sklvl` (skills); first 5 (missiles); `min`, `max`, `rand`, `stat` (items) |
 | stat modes | `base` 1, `mod` 2, else 0 |
-| strength table, indexed by entry 0x00–0x17 | 23, 1, 2, 3, 9, 9, 9, 9, 9, 9, 15, 15, 15, 15, 15, 15, 17, 17, 19, 19, 20, 21, 22, 0 (only entries 0x02 and 0x0A–0x16 are ever pending) |
+| strengths | §4.5 (the 1.14d table at 0x6FC874 matches) |
 | compile scratch / op stack / value stack | 1,024 bytes / 64 / 64 |
 | callback text | first 256 bytes of the cell |
 | name key / code width | 31 bytes lowercased / 4 bytes space-padded |
@@ -544,10 +578,10 @@ skilldesc).
 
 ## Randomness
 
-Only `rand(a, b)` with `a < b` draws, once per evaluation of that CALL.
-Draw `R(n)` with `n = b − a + 1` (wrapping i32) on a seed (lo, hi), two
+`rand(a, b)` with `a < b` computes `a + R(n)`, `n = b − a + 1` (wrapping
+i32), once per evaluation of that CALL. `R(n)` on a seed (lo, hi), two
 u32:
-1. `n` < 1 → 0, no step.
+1. `n` < 1 (the subtraction wrapped) → 0, no step.
 2. Step: `x = lo × 0x6AC690C5 + hi` (64-bit); `lo = x mod 2³²`,
    `hi = x div 2³²`.
 3. `n` a power of two → `lo & (n − 1)`; otherwise `lo mod n` (unsigned).
@@ -557,33 +591,21 @@ other instruction draws. The compiler never draws: folding happens only
 when no function was called. 1.14d uses `rand` once (skills `Imp Inferno`
 `calc1`).
 
+Vectors, seed (1, 0): `rand(1,6)` → 4, seed becomes (0x6AC690C5, 0);
+`rand(0,7)` → 5 (power of two); `rand(5,5)` → 5 and
+`rand(−2, 2147483647)` → −2, seed unchanged.
+
 ## Edge cases & original bugs
 
-Reproduced unless noted.
-- **Ternary continues.** After COND the original keeps evaluating. 1.14d
-  formulas depend on it (skills `Zeal` `calc2` adds a synergy after the
-  conditional). D2MOO's evaluator returns right after COND; that is wrong
-  for 1.14d.
-- **Unclosed `(`** in skills `Fire Wall` `EDmgSymPerCalc`: 0x02 is emitted
-  after the whole sum, so the value is unaffected.
-- **`par34`** in skills `Bone Wall` `calc2` compiles to `par3`.
-- **A single space** (skilldesc `revive` `desccalcb2`) compiles to nothing:
-  0xFFFFFFFF.
-- **Missile `miss()`** evaluates to 0 and leaves its arguments on the
-  stack. Unused in 1.14d.
-- **Missile `rand()`** reads its seed from the context block, not from a
-  unit (Open questions). Unused in 1.14d.
-- **−2³¹ / −1** crashes the original, at compile time (folding) or at run
-  time. Unreachable from 1.14d data.
-- **Large exponents**: the original loops `b − 1` times; d2rs computes the
-  same wrapping result directly.
-- **Stat names without `stat(`**: in skills formulas a quoted stat name
-  outside `stat(` is looked up as a skillcalc code; an unknown stat inside
-  `stat(` becomes PARAM 0 (the context skill's `ln12`), not 0.
-- **Items**: every bare or quoted name outside `stat(` is PARAM8 0, and the
-  items parameter callback returns 0.
+The original's quirks are rules here and are reproduced: evaluation
+continues after COND (§3.3; D2MOO returns), missile `miss()` (§3.4),
+stops, open parens and argument counts (§4.7), name contexts (§4.4),
+4-byte codes (§5). Differences (d2rs policy): −2³¹ / −1 gives −2³¹ (the
+original crashes, when folding or at run time; unreachable from 1.14d
+data); a byte ≥ 0x80 is an error (§4.2); a missile formula with CALL 2 is
+rejected (its seed source, Open question 1).
 
-## d2rs policy (proposed decisions)
+## d2rs policy (proposed, not yet logged in `docs/PLAN.md`; 1, 2, 4, 6 implemented)
 
 1. d2-data loads the four code files as raw bytes (`loading.md`), validates
    them with their fields (§1.5), and exposes each formula field as
@@ -600,17 +622,19 @@ Reproduced unless noted.
    Offsets are not stable across layers; nothing persistent (saves,
    protocol, traces) stores an offset.
 4. Strictness: the compiler accepts and reproduces every original outcome
-   (failure → 0xFFFFFFFF, stop with ignored text, unknown name → 0, code
-   truncation, case mismatch, open parens and functions, extra arguments)
-   and reports each as a diagnostic. A formula cell with a byte ≥ 0x80 is
-   an error.
-5. Evaluator: §3 exactly, on validated buffers only; −2³¹ / −1 gives −2³¹
-   (wrapping) instead of crashing; `^` uses wrapping exponentiation by
-   squaring.
-6. Missile `rand()`: the compiler rejects a missile formula that calls
-   `rand` (error) until the seed source is settled (Open questions 1); no
-   1.14d data uses it. The validator reports CALL 2 in `misscode` as an
-   error for the same reason.
+   and reports, per formula cell: `Fail` (a non-empty cell gives
+   0xFFFFFFFF, §4.1 step 4), `Stop` (a stop before the end of the text,
+   §4.3), `UnknownName` (a name or quoted name resolved to −1, §4.3),
+   `OpenParen` (0x02 emitted, §4.6 End), `OpenFunction` (a function
+   still open at End). 1.14d: one `OpenParen` (skills `Fire Wall`) and
+   one `Fail` (skilldesc `revive`), nothing else. A byte ≥ 0x80 is an
+   error (§4.2).
+5. Evaluator: §3 exactly (it accepts any bytes; d2-data hands it
+   validated buffers); −2³¹ / −1 gives −2³¹ (wrapping) instead of
+   crashing; `^` uses wrapping exponentiation by squaring.
+6. Missile `rand()`: a missile formula whose compiled bytes contain CALL 2
+   is an error until the seed source is settled (Open question 1); no
+   1.14d data uses it. The validator rejects it too (§1.5).
 
 ## Test vectors
 
@@ -626,9 +650,9 @@ offset (§1.2). Bytes = the buffer from Field to the END byte.
 | missiles 230 `immolationfire`, `EDmgSymPerCalc` | `skill('Fire Arrow'.blvl) * 5` | 24 | `07 07 07 29 01 03 07 05 12 00` |
 | missiles 455 `moltenboulderfirepath`, `EDmgSymPerCalc` | `skill('Firestorm'.blvl)*8` | 78 | `08 E1 00 07 29 01 03 07 08 12 00` |
 | missiles 648 `viper_poisjav`, `SrvCalc1` | `3` | 193 | `07 03 00` (last; buffer ends at 196) |
-| misc 0 `elx`, `calc1` | `5` | 0 | `07 05 00` |
-| misc 5 `vps`, `len` | `750` | 3 | `08 EE 02 00` |
-| misc 94 `hrb`, `calc1` | `25` | 155 | `07 19 00` (last; 158) |
+| misc 0 `elixir` (`elx`), `calc1` | `5` | 0 | `07 05 00` |
+| misc 5 `Stamina Potion` (`vps`), `len` | `750` | 3 | `08 EE 02 00` |
+| misc 94 `herb` (`hrb`), `calc1` | `25` | 155 | `07 19 00` (last; 158) |
 | weapons, any record, `calc1` | (no column) | 0xFFFFFFFF | — |
 | skills 7 `Fire Arrow`, `EDmgSymPerCalc` | `(skill('Exploding Arrow'.blvl)) * par8` | 0 | `07 10 07 29 01 03 04 0F 12 00` |
 | skills 12 `Multiple Shot`, `calc1` | `"min(24,ln12)"` | 36 | `07 18 04 00 01 00 00` |
@@ -657,7 +681,8 @@ longest expression is 51 bytes (skills); the deepest evaluation stack is 6
 ### Compiler, synthetic (skills family, 1.14d links)
 
 Links used: `Fire Bolt` = skill 36, `firebolt` = missile 58, `strength` =
-stat 0; codes from §5. "fail" = field 0xFFFFFFFF.
+stat 0; codes from §5 (stubs of these suffice; no game files). "fail" =
+field 0xFFFFFFFF.
 
 | Text | Bytes |
 |---|---|
@@ -670,17 +695,21 @@ stat 0; codes from §5. "fail" = field 0xFFFFFFFF.
 | `2^3^2` / `-2^2` / `2^-1` / `0^0` | `07 40 00` / `07 04 00` / `07 01 00` / `07 01 00` |
 | `2*-3` / `7/2` / `-7/2` / `7/-2` / `5/0` | `07 FA 00` / `07 03 00` / `07 FD 00` / `07 FD 00` / `07 00 00` |
 | `1<2` / `2>=2` / `2<=1` / `3==3` / `3!=3` / `3>2>1` | `07 01 00` / `07 01 00` / `07 00 00` / `07 01 00` / `07 00 00` / `07 00 00` |
+| `lvl<2` / `lvl>2` / `lvl<=2` / `lvl>=2` / `lvl==2` / `lvl!=2` / `lvl^2` | `04 10 07 02` then `0A` / `0B` / `0C` / `0D` / `0E` / `0F` / `14`, then `00` |
 | `1?2:3` / `0?2:3` / `1 < 2 ? 5 : 6` / `(1<2)?5:6` | `07 02 00` / `07 03 00` / `07 01 00` / `07 05 00` |
 | `1?2:3+10` / `-1?2:3` / `(1<2)?(3+4):5*2` | `07 0C 00` / `07 FE 00` / `07 0E 00` |
 | `1?2 3` / `0?2 3` / `(lvl<4)?lvl 3` | `07 02 00` / `07 03 00` / `04 10 07 04 0A 04 10 07 03 16 00` |
 | `1?2+1:3`, `1?-2:3`, `1?2`, `--5`, `+5`, `5*`, `lvl+`, `1)` | fail |
 | `1=1` / `1.5` / `5 $ 3` / `5 3` / `1:2` / `1,2` / `(` | `07 01 00` / `07 01 00` / `07 05 00` / `07 03 00` / `07 02 00` / `07 02 00` / `07 00 00` |
-| `ln12` / `lvl` / `'lvl'` / `"ln12"` | `04 00 00` / `04 10 00` / `04 10 00` / `04 00 00` |
-| `LVL` / `foo` / `a.b` | `07 00 00` (all three) |
+| `ln12` / `lvl` / `'lvl'` / `'lvl` / `"ln12"` / `.lvl` | `04 00 00` / `04 10 00` / `04 10 00` / `04 10 00` / `04 00 00` / `07 10 00` (a suffix is a constant) |
+| `LVL` / `foo` / `a.b` / `''` | `07 00 00` (all four) |
 | `par34` | `04 0A 00` |
 | `1+ln12` / `ln12"+1"` | `07 01 04 00 10 00` / `04 00 07 01 10 00` |
 | `min(3,5)` / `MIN(3,5)` / `min (3,5)` | `07 03 07 05 01 00 00` (all three) |
-| `min(-1,2)`, `min((-1),2)`, `skill(ln12)`, `stat('strength')` | fail |
+| `min(-1,2)`, `min((-1),2)`, `min(1)`, `skill(ln12)`, `stat('strength')` | fail |
+| `1 min(2)` / `min"(1,2)` | `07 01 07 02 01 00 00` / `07 02 00` (only spaces may precede `(`) |
+| 64 × `(` then `1` / 65 × `(` then `1` | `07 01 00` / fail |
+| `5 $ \xE9` | error (§4.2) |
 | `min(0-1,2)` | `07 00 07 01 11 07 02 01 00 00` |
 | `max(2,0-1)` | `07 02 07 00 07 01 11 01 01 00` |
 | `min(1,2,3)` | `07 01 07 02 07 03 01 00 00` |
@@ -692,7 +721,7 @@ stat 0; codes from §5. "fail" = field 0xFFFFFFFF.
 | `skill('Fire Bolt'.blvl` | `07 24 07 29 00` |
 | `skill('fire bolt'.LVL)` | `07 24 00` |
 | `skill('No Such Skill'.lvl)` | `07 00 07 10 01 03 00` |
-| `stat('strength'.base)` / `.mod` / `.accr` | `07 00 07 01 01 05 00` / `07 00 07 02 01 05 00` / `07 00 07 00 01 05 00` |
+| `stat('strength'.base)` / `.BASE` / `.mod` / `.accr` | `07 00 07 01 01 05 00` / `07 00 07 01 01 05 00` / `07 00 07 02 01 05 00` / `07 00 07 00 01 05 00` |
 | `stat('strength'.base)+1` | `07 00 07 01 01 05 07 01 10 00` |
 | `stat('nosuchstat'.base)` | `04 00 07 01 01 05 00` |
 | `miss('firebolt'.edmn)` | `07 3A 07 13 01 04 00` |
@@ -706,7 +735,7 @@ stat 0; codes from §5. "fail" = field 0xFFFFFFFF.
 | missiles | `miss('firebolt'.dl12)` | `07 3A 07 29 01 04 00` |
 | missiles | `skill('Fire Bolt'.sl12)` | `07 24 00` (`sl12` is not a skillcalc code: stop) |
 | missiles | `stat('strength'.base)`, `sklvl('Fire Bolt'.ln12.lvl)` | `07 00 00` (not keywords; folded) |
-| items | `5` | `07 05 00` |
+| items | `5` / `1.5` | `07 05 00` / `07 00 00` (`.5` is PARAM 0 as a constant; skills: `07 01 00`) |
 | items | `lvl` / `lvl+1` | `04 00 00` / `04 00 07 01 10 00` |
 | items | `stat('strength'.base)` | `07 00 07 01 01 03 00` |
 | items | `min(stat('strength'.base),10)` | `07 00 07 01 01 03 07 0A 01 00 00` |
@@ -730,14 +759,18 @@ Stub context for these rows: `param(c)` = `c`; skills functions `min`,
 | `07 F9 07 02 13 00` / `07 07 07 FE 13 00` | −3 / −3 | truncation toward zero |
 | `07 FE 07 03 14 00` / `07 02 07 00 14 00` / `07 02 07 FF 14 00` | −8 / 1 / 1 | POW |
 | `09 00 00 00 80 15 00` | −2,147,483,648 | NEG wraps |
+| `07 FF 07 01 op 00` / `07 02 07 02 op 00` / `07 03 07 02 op 00` | op 0A: 1/0/0; 0B: 0/0/1; 0C: 1/1/0; 0D: 0/1/1; 0E: 0/1/0; 0F: 1/0/1 | signed comparisons, opcode order |
+| `07 05 07 07 11 00` / `06 00 00 01 00 00` | −2 / 65,536 | SUB; PARAM32 |
+| `07 03 07 64 14 00` / `09 00 00 01 00 09 00 00 01 00 12 00` | −818,408,495 / 0 | POW, MUL wrap |
+| `09 00 00 00 80 07 FF 13 00` | −2,147,483,648 | d2rs policy 5 (the original crashes) |
 | `10 00` | 0 | pops on an empty stack give 0 |
 | `07 05 07 06 16 00` | 6 | COND with a missing condition (0) |
 | `07 00 07 01 16 07 05 00` | 5 | COND result then another value |
 | `07 05 07 06 01 09 00` | 0 | CALL index ≥ count pushes 0 |
 | `04 FF 00` / `05 FF FF 00` / `07 FF 00` | 255 / −1 / −1 | PARAM8 zero-extends, PARAM16 and INT8 sign-extend |
-| `07 05 03 07 06 00` / `07 05 17 …` / `07 05 FF …` | 5 | unknown opcodes stop |
+| `07 05 03 07 06 00` / `07 05 17 07 06 00` / `07 05 FF 07 06 00` | 5 | unknown opcodes stop |
 | `07 05 02 07 06 10 00` | 5 | PAREN stops |
-| `07` / `07 05` | 0 / 0 | cut operand; no END |
+| `07` / `08 05` / `01` / `07 05` | 0 | cut operand (§3.3); no END |
 | 64 × `07 01`, then `07 02 00` | 1 | 65th push dropped |
 | any family, offset 0xFFFFFFFF or ≥ buffer length | 0 | entry check |
 
@@ -749,6 +782,8 @@ Stub context for these rows: `param(c)` = `c`; skills functions `min`,
 | buffer `07 05 00 07` | invalid (last expression cut) |
 | buffer `08 05` | invalid (operand past end) |
 | buffer `07 05 03 00` | invalid (0x03 not emittable) |
+| misscode buffer `07 01 07 02 01 02 00` with its field | invalid (CALL 2, §1.5) |
+| buffer `07 05 00`, no field / items buffer `07 01 07 02 01 07 00` with its field / empty buffer, every field 0xFFFFFFFF | valid with an "unreferenced" diagnostic / valid with a CALL-index diagnostic / valid |
 | buffer `04 29 00 07 00 00`, fields {0, 3} / {0, 1} / {0, 3, 3} | valid / invalid (1 is not a start) / valid with a "shared" diagnostic |
 
 ## Provenance
@@ -760,10 +795,10 @@ routines read from the PE bytes):
 |---|---|
 | 0x6C1AE0 | compiler: token loop, `pending` / `called` flags, `)` handling, end, folding. Epilogue bytes: success returns end − start (full length including END); failure writes 0 to the first byte and returns 0 |
 | 0x6C11C0 | tokenizer: space and `"` skipping, numbers (`v·10 + c − 48`), quoted names, words with keyword test (≥ 0 = function), `.` suffix, two-char operators. Bytes: a character map at 0x6C1798 (codes 0–0x5E) selects 16 handlers (table 0x6C1754); every other byte, a lone `!`/`=` and an unresolved suffix return NULL (stop); quoted names and words set the token to 0x10 + (kind = parameter) |
-| 0x6C18A0 | operator handling with the strength table at 0x6FC874 (24 bytes, §Constants) |
+| 0x6C18A0 | operator handling with the strength table at 0x6FC874 (24 bytes; §4.5) |
 | 0x6C1820 | arity: functions via the family callback (default 2), 0x0A–0x14 → 2, 0x15 → 1, 0x16 → 3, else 0 |
 | 0x6C19C0 / 0x6C1A50 | push constant / parameter; width by signed range; buffer checks |
-| 0x6C0BC0 | evaluator, jump table at 0x6C1164 (opcodes 1–22; 2 and 3 share the stop handler). Confirmed from the bytes: operand reads 0x04 `movzx` byte, 0x05 `movsx` word, 0x07 `movsx` byte, 0x08 `movsx` word; comparisons `cmp a, b` + `setl`/`setg`/`setle`/`setge`/`sete`/`setne` for 0x0A/0x0B/0x0C/0x0D/0x0E/0x0F; DIV `cdq; idiv`; pops of an empty stack load 0 |
+| 0x6C0BC0 | evaluator, jump table at 0x6C1164 (opcodes 1–22; 2 and 3 share the stop handler). Confirmed from the bytes: 0x04 reads its operand zero-extended, 0x05, 0x07 and 0x08 sign-extended; 0x0A–0x0F are signed less, greater, less-or-equal, greater-or-equal, equal, not-equal; DIV is signed 32-bit division; pops of an empty stack give 0 |
 | 0x6C0B80 / 0x6C0BA0 | push (drops at 64) / pop (0 when empty) |
 | 0x611BD0, 0x611C70, 0x6619A0, 0x631530 | field callbacks (skills, skilldesc, missiles, items): 1,024-byte scratch, compile, append or 0xFFFFFFFF |
 | 0x6118B0 | append to a growable buffer, returns the start offset |

@@ -1,7 +1,9 @@
 name: CI
 
+# Branch pushes are covered by their pull request; this saves Actions minutes.
 on:
   push:
+    branches: [main]
   pull_request:
 
 env:
@@ -13,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Spec section indexes
+        run: python3 tools/spec_index.py --check
 
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries

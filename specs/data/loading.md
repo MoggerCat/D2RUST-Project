@@ -1,10 +1,10 @@
 # Spec: Data — Table loading (which files 1.14d loads)
 
-- **Status:** draft. Every rule below was checked against the 1.14d
-  `Game.exe` (Ghidra exports plus raw bytes) and the 1.14d data files on
-  2026-10-05; see Provenance. Implemented in `d2-data::bin` (§2–§4, §6,
-  §8, §10.8; fix-ups of §7.4 not yet) and checked by `data-tool tables`
-  (§11, "d2rs cross-check").
+- **Status:** verified by `data-tool tables` (2026-10-05). Rules checked against the 1.14d `Game.exe` (Ghidra
+  exports plus raw bytes) and the 1.14d data files on 2026-10-05, except
+  where an Open question says otherwise; see Provenance. Implemented in
+  `d2-data::bin` (§2–§4, §6, §8, §10.8; fix-ups of §7.4 not yet) and
+  checked by `data-tool tables` (§11, "d2rs cross-check").
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::bin` (loader, checks); `d2-data::crosscheck` (§11)
 - **Related specs:** `specs/formats/mpq.md` (archive reads, archive set),
@@ -15,6 +15,33 @@
   `@tc`), `specs/data/calc-expressions.md` (code buffers),
   `specs/data/patch-layers.md` (mod layers). Still to write: one spec per
   table for record layouts and fix-up details.
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 46–59 |
+| Inputs | 60–67 |
+| Outputs / state changes | 68–75 |
+| Rules | 76–81 |
+|   1. Paths | 82–94 |
+|   2. Archive search order | 95–134 |
+|   3. Choosing `.bin` or `.txt` | 135–198 |
+|   4. The `.bin` container | 199–250 |
+|   5. `.txt` record counting | 251–262 |
+|   6. Load order and record sizes (runtime tables) | 263–350 |
+|   7. Links and dependencies | 351–475 |
+|   8. Post-load checks (fatal in 1.14d) | 476–521 |
+|   9. Combined index spaces | 522–536 |
+|   10. Special cases | 537–595 |
+|   11. Txt vs bin cross-check | 596–636 |
+| Constants & data dependencies | 637–657 |
+| Randomness | 658–661 |
+| Edge cases & original bugs | 662–678 |
+| d2-data policy | 679–705 |
+| Test vectors | 706–739 |
+| Provenance | 740–834 |
+| Open questions | 835–880 |
+<!-- /index -->
 
 ## Summary
 
@@ -83,17 +110,18 @@ later comes first.
 | `d2exp.mpq` | 3000 | startup group, 7th |
 | `d2char.mpq` | 1000 | second group |
 | `d2music.mpq` | 1000 | second group |
-| `d2xmusic.mpq` | 3000 | second group, only if d2exp exists |
-| `d2xtalk.mpq` | 3000 | second group, only if d2exp exists |
-| `d2xvideo.mpq` | 3000 | second group, only if d2exp exists (a video path can also open it at 1000) |
+| `d2xmusic.mpq` | 3000 | second group, LoD only |
+| `d2xtalk.mpq` | 3000 | second group, LoD only |
+| `d2xvideo.mpq` | 3000 | second group, LoD only (a video path can also open it at 1000) |
 | `d2video.mpq` | 1000 | video path |
+
+LoD only: d2exp exists (§10.7) and the launcher configuration's callback
+at +0x211, when present, returns non-zero.
 
 Excel files exist only in P, X and D (name-hash probe of every candidate
 name, `.txt`/`.bin`/`.xls`, in all 11 archives). Their priorities differ,
-so the **excel search order is P → X → D**, independent of the tie rule.
-The data agrees: for 41 tables the X copy of the `.bin` has an older record
-size that the 1.14d code cannot read (§11); the game works only because P
-is searched first.
+so the **excel search order is P → X → D**, independent of the tie rule
+(41 X `.bin` files have an older record size, §11, so P must come first).
 
 d2rs: `d2_formats::mpq::ArchiveSet` searches in this order, assuming the
 second group opens after the startup group and the video path last (Open
@@ -108,30 +136,19 @@ With this order every live `.bin` resolves to the archive §6 names (56 P,
 
 #### 3.1 Normal play: `.bin` only
 
-The loader has two global switches:
-
-| Switch | 1.14d value | Effect |
-|---|---|---|
-| load-from-bin | constant 1 (initialized to 1, never written) | read `<name>.bin` |
-| compile | 0 unless `-txt` is on the command line | compile `.txt` to `.bin` first (§3.2) |
-
-Per table, with compile off:
+Per table, with the compile switch (§3.2) off:
 1. Read `DATA\GLOBAL\EXCEL\<name>.bin` through the archive set.
 2. If the file is not found: fatal error ("Unrecoverable internal error"),
-   process exit. There is **no `.txt` fallback**.
+   process exit. There is **no `.txt` fallback** (the `.txt` branch behind
+   a load-from-bin switch that is constant 1 is dead code).
 3. Record count = the u32 at offset 0. Records = the bytes from offset 4.
-4. Store the count where the caller asked for it (some tables discard it,
-   §6 note "count not kept").
-
-The `.txt` reading branch that exists behind load-from-bin = 0 is dead code
-in 1.14d.
 
 #### 3.2 `-txt` mode (compile; not reproduced by d2rs)
 
-The command-line option `-txt` sets the compile switch. Then, for each
-table in §6, before step 1 above:
-1. Read `DATA\GLOBAL\EXCEL\<name>.txt` (for `leveldefs`: `levels.txt`,
-   name compared case-insensitively). Missing file: fatal error.
+The command-line option `-txt` sets the compile switch (0 otherwise).
+Then, for each table in §6, before step 1 above:
+1. Read `DATA\GLOBAL\EXCEL\<name>.txt` (when the table name is
+   `leveldefs`, in any case: `levels.txt`). Missing file: fatal error.
 2. Parse and compile it (`txt-format.md`, `field-types.md`): `count × record_size`
    bytes (zero-filled, then fields written). Write
    `DATA\GLOBAL\EXCEL\<name>.bin` to the disk path relative to the current
@@ -163,7 +180,8 @@ initialization, with the same parser (§5). They have no `.bin` path:
 | `soundenviron.txt` | P (5,741 bytes) | 50 | 24 | 88 bytes |
 
 `sounds.bin` (P, 4,699 × 2) is a compile-mode by-product (§7.2) and is never
-read in normal play.
+read in normal play. 1.14d does not check that either file exists or
+parses (a missing one crashes at the record count); d2rs: load error.
 
 #### 3.5 Client composite loader
 
@@ -197,8 +215,9 @@ not stored in the file; it is fixed per table by the code (§6).
 1.14d does **not** check the file size; it trusts `count`. d2rs is strict:
 
 1. `file_len ≥ 4`.
-2. `file_len == 4 + count × record_size`, with `record_size` from §6.
-   Otherwise reject the file (it is from another version or corrupt).
+2. `file_len == 4 + count × record_size`, with `record_size` from §6,
+   computed without overflow (count 0 passes). Otherwise reject the file
+   (it is from another version or corrupt).
 3. Apply the 1.14d post-load checks (§8) and the d2rs count checks
    (§10.8).
 
@@ -324,18 +343,6 @@ by the 1.14d code; "Live" is the archive whose `.bin` the game reads.
 | 72 | cubemain | 328 | P | 151 | 49,532 | P 151, X 271 | §3.3 check first |
 | 73 | difficultylevels | 88 | P | 3 | 268 | P 3, X 3, D 3 | count must be 3 |
 
-Loader grouping (one 1.14d load routine per line, in order): 1 (with the
-compile-only lookup group, §7.2) · 2 · 3 · sounds (compile-only) · 4 · 5 ·
-6 · 7 · 8 · 9 · 10–11 · 12 · 13 · 14 · 15–17 · 18–20 · 21–22 · 23 · 24–25 ·
-26 · 27 · 28 · 29 · 30 · 31 · 32 · 33–34 · 35 · 36–37 · 38 · 39 · 40 ·
-AnimData.d2 · 41–57 (one monster routine: 41–44, 45, auto TCs + 46, 47, 48,
-49, 50, 51, 52, 53, 54, 55, 56, 57) · 58 · 59 · 60 · 61 · 62 · 63 · 64 · 65
-· 66 · 67 · 68 · 69 · expfield.d2 · 70 · 71 · 72 · 73 · free the
-compile-only `sounds` link.
-
-This is the same sequence as D2MOO's 1.10f load-all list; the record sizes
-are the 1.14d ones.
-
 Totals: 73 record tables (56 live in P, 17 in X) + 4 code buffers + 1
 client-only table (`hitclass`, X) = 78 `.bin` files, plus 2 runtime `.txt`.
 All 18 live X files have exactly the 1.14d record size; X is the real
@@ -358,11 +365,12 @@ mandatory: a table can be compiled only after every table it links to
 
 With `-txt`, these load at step 1 (`sounds` after step 3; `monstats` and
 `skilldesc` inside step 10) only to build links. Their `.bin` files are
-by-products; normal play never reads them. A **code** key is a
-`key(code4)` field (type 10): the record stores the 4-byte code
-(`compcode.bin` starts `nil `, `lit `). A **name** key is a `key(name16)`
-field (type 17): the record stores its find-or-add index as u16 (= the row
-index while keys are unique; duplicates: `field-types.md` §6.2).
+by-products that normal play never reads, except `hitclass.bin` (§3.5).
+A **code** key is a `key(code4)` field (type 10): the record stores the
+4-byte code (`compcode.bin` starts `nil `, `lit `). A **name** key is a
+`key(name16)` field (type 17): the record stores its find-or-add index as
+u16 (= the row index while keys are unique; duplicates: `field-types.md`
+§6.2).
 
 | Table | Key column | Kind | Size | `.bin` present | `.txt` present |
 |---|---|---|---|---|---|
@@ -390,7 +398,8 @@ index while keys are unique; duplicates: `field-types.md` §6.2).
 #### 7.3 Dependency table
 
 "Links to" lists the tables whose links a table's `.txt` columns use
-(from the 1.14d field tables); `*` marks a compile-only link (§7.2).
+(from the 1.14d field tables, and for formula columns
+`calc-expressions.md` §4.4); `*` marks a compile-only link (§7.2).
 Every dependency points to an earlier step, so §6 order is a valid
 compile order. Every table with `strkey` fields also needs the string
 tables (§10.1) at compile time (`field-types.md` §7).
@@ -400,9 +409,9 @@ tables (§10.1) at compile time (`field-types.md` §7).
 | itemtypes | bodylocs*, playerclass*, storepage* |
 | itemstatcost | events* |
 | properties | itemstatcost |
-| missiles | elemtypes*, overlay, skills*, sounds* |
+| missiles | elemtypes*, misscalc*, overlay, skillcalc*, skills*, sounds* |
 | states | colors*, events*, itemstatcost, itemtypes, missiles, overlay, skills*, sounds* |
-| skills, skilldesc | elemtypes*, events*, itemstatcost, itemtypes, missiles, monmode*, overlay, pettype, playerclass*, plrmode*, sounds*, states; compile-only monstats and skilldesc name links and `@skillrange` (§10.3) |
+| skills, skilldesc | elemtypes*, events*, itemstatcost, itemtypes, misscalc*, missiles, monmode*, overlay, pettype, playerclass*, plrmode*, skillcalc*, sounds*, states; compile-only monstats and skilldesc name links and `@skillrange` (§10.3) |
 | charstats | bodylocs*, skills |
 | weapons, armor, misc | hitclass*, itemstatcost, itemtypes, sounds*, states |
 | magic affixes | colors*, itemtypes, playerclass*, properties |
@@ -458,9 +467,9 @@ gives 0 unless a miss value is given. Exact algorithms: per-table specs.
 | hireling | NameFirst (+0xD3) / NameLast (+0xF3) → ids at +0x114 / +0x116 (§8) |
 | monequip | monstats +0x2A := first monequip row of that monster (else −1); loc bytes outside 1–10, or with an unknown item code, cleared |
 | levels | wide strings (40 characters) at +0x16E / +0x1BE from the string tables; +0x33–0x35 := entry counts of the three 25-entry monster lists |
-| automap | converted to an internal form (§8, §10.9) |
+| automap | converted to an internal form (§8) |
 
-`AnimData.d2` must load before the monster routine (§6 grouping). Runtime
+`AnimData.d2` (§1.3) loads before `monstats`, whose fix-up reads it. Runtime
 maps other than the item code map, the itemtypes code link and the
 uniqueitems/setitems name links: Open question 13.
 
@@ -571,117 +580,27 @@ Suffixes come before prefixes in both affix arrays.
    classic-only or expansion-only table. Install-dependent processing
    exists only for `expansionstring.tbl` (§10.1), the hireling name check
    (§8), and the DS1 handling inside the `lvlprest`/`lvlsub` loaders, which
-   skips rows flagged as expansion when `d2exp.mpq` is absent (lvlprest:
-   the u32 at record offset 0x20; details for the levels spec). "d2exp
-   exists" means the file `d2exp.mpq` is present in the game folder.
-   Game-type differences come from per-row columns, not from loading.
+   skips rows whose u32 `Expansion` column (lvlprest +0x20, lvlsub +0x158)
+   is non-zero when d2exp is absent (details: levels spec, Open question
+   9). "d2exp exists" means `d2exp.mpq` is found in the game folder or,
+   failing that, relative to the current directory (checked once, then
+   cached). Game-type differences come from per-row columns, not from
+   loading.
 8. **Counts not kept.** `arena`, `composit`, `armtype`, `experience` and
    `leveldefs` discard their count; the code relies on fixed sizes or on
    another table (levels). d2rs checks, besides the file size: `leveldefs`
    count = `levels` count; `arena` 1, `composit` 16, `armtype` 3,
    `experience` 101, exactly (the 1.14d counts, until the limits the code
    relies on are known: Open question 12).
-9. **Freed after conversion.** `automap` records are converted to an
-   internal form and the `.bin` buffer is released; the combined arrays
-   (§9) are copies. Behavior is unaffected.
 
 ### 11. Txt vs bin cross-check
 
-For each runtime table: the highest-priority `.txt` (P → X → D), its data
-lines, `Expansion` rows removed, resulting records (§5), and the live
-`.bin` count.
-
-| Table | Txt | Lines | Exp. | Records | Live bin | Result |
-|---|---|---|---|---|---|---|
-| compcode | P | 115 | 0 | 115 | P 115 | same archive, match |
-| itemtypes | P | 104 | 1 | 103 | P 103 | same archive, match |
-| montype | P | 59 | 0 | 59 | P 59 | same archive, match |
-| pettype | P | 20 | 0 | 20 | P 20 | same archive, match |
-| overlay | P | 294 | 1 | 293 | P 293 | same archive, match |
-| itemstatcost | P | 359 | 0 | 359 | P 359 | same archive, match |
-| properties | P | 269 | 1 | 268 | P 268 | same archive, match |
-| missiles | P | 684 | 0 | 684 | P 684 | same archive, match |
-| states | P | 185 | 0 | 185 | P 185 | same archive, match |
-| skills | P | 357 | 0 | 357 | P 357 | same archive, match |
-| skilldesc | P | 221 | 0 | 221 | P 221 | same archive, match |
-| charstats | P | 8 | 1 | 7 | P 7 | same archive, match |
-| arena | X | 1 | 0 | 1 | X 1 | same archive, match |
-| chartemplate | X | 30 | 0 | 30 | X 30 | same archive, match |
-| weapons | P | 307 | 1 | 306 | P 306 | same archive, match |
-| armor | P | 203 | 1 | 202 | P 202 | same archive, match |
-| misc | P | 152 | 1 | 151 | P 151 | same archive, match |
-| magicsuffix | P | 748 | 1 | 747 | P 747 | same archive, match |
-| magicprefix | P | 670 | 1 | 669 | P 669 | same archive, match |
-| **automagic** | X | 36 | 0 | 36 | P 36 | **cross-archive**, match |
-| **raresuffix** | X | 155 | 0 | 155 | P 155 | **cross-archive**, match |
-| **rareprefix** | X | 46 | 0 | 46 | P 46 | **cross-archive**, match |
-| uniqueitems | P | 403 | 1 | 402 | P 402 | same archive, match |
-| sets | P | 33 | 1 | 32 | P 32 | same archive, match |
-| setitems | P | 128 | 1 | 127 | P 127 | same archive, match |
-| gems | P | 69 | 1 | 68 | P 68 | same archive, match |
-| books | P | 3 | 0 | 3 | P 3 | same archive, match |
-| qualityitems | X | 8 | 0 | 8 | X 8 | same archive, match |
-| lowqualityitems | X | 4 | 0 | 4 | X 4 | same archive, match |
-| runes | P | 169 | 0 | 169 | P 169 | same archive, match |
-| itemratio | P | 6 | 0 | 6 | P 6 | same archive, match |
-| gamble | X | 126 | 1 | 125 | X 125 | same archive, match |
-| plrtype | X | 8 | 1 | 7 | X 7 | same archive, match |
-| **plrmode** | P | 20 | 0 | 20 | X 20 | **cross-archive**, match |
-| monmode | P | 16 | 0 | 16 | P 16 | same archive, match |
-| objtype | X | 574 | 1 | 573 | X 573 | same archive, match |
-| objmode | X | 8 | 0 | 8 | X 8 | same archive, match |
-| composit | X | 16 | 0 | 16 | X 16 | same archive, match |
-| armtype | X | 3 | 0 | 3 | X 3 | same archive, match |
-| experience | P | 101 | 0 | 101 | P 101 | same archive, match |
-| uniquetitle | P | 16 | 0 | 16 | P 16 | same archive, match |
-| uniqueprefix | P | 53 | 0 | 53 | P 53 | same archive, match |
-| uniquesuffix | P | 69 | 0 | 69 | P 69 | same archive, match |
-| uniqueappellation | P | 25 | 0 | 25 | P 25 | same archive, match |
-| monlvl | P | 111 | 0 | 111 | P 111 | same archive, match |
-| treasureclassex | P | 853 | 0 | 853 | P 853 | same archive, match |
-| monstats2 | P | 610 | 1 | 609 | P 609 | same archive, match |
-| monprop | P | 13 | 0 | 13 | P 13 | same archive, match |
-| monsounds | P | 141 | 0 | 141 | P 141 | same archive, match |
-| monseq | P | 1,010 | 0 | 1,010 | P 1,010 | same archive, match |
-| monstats | P | 735 | 1 | 734 | P 734 | same archive, match |
-| monumod | P | 43 | 0 | 43 | P 43 | same archive, match |
-| superuniques | P | 67 | 1 | 66 | P 66 | same archive, match |
-| monpreset | P | 229 | 0 | 229 | P 229 | same archive, match |
-| hireling | P | 120 | 0 | 120 | P 120 | same archive, match |
-| npc | P | 17 | 0 | 17 | P 17 | same archive, match |
-| monequip | P | 45 | 0 | 45 | P 45 | same archive, match |
-| levels | P | 138 | 1 | 137 | P 137 | same archive, match |
-| leveldefs | P `levels.txt` | 138 | 1 | 137 | P 137 | same archive, match |
-| lvltypes | P | 37 | 1 | 36 | P 36 | same archive, match |
-| lvlprest | P | 1,092 | 1 | 1,091 | P 1,091 | same archive, match |
-| lvlwarp | X | 89 | 1 | 88 | X 88 | same archive, match |
-| lvlmaze | P | 82 | 1 | 81 | P 81 | same archive, match |
-| lvlsub | P | 35 | 1 | 34 | P 34 | same archive, match |
-| automap | X | 3,287 | 1 | 3,286 | X 3,286 | same archive, match |
-| objects | P | 574 | 1 | 573 | P 573 | same archive, match |
-| objgroup | X | 133 | 0 | 133 | X 133 | same archive, match (`EXPANSION` row kept) |
-| shrines | P | 23 | 0 | 23 | P 23 | same archive, match |
-| **inventory** | P | 33 | 1 | 32 | X 32 | **cross-archive**, match |
-| belts | X | 15 | 1 | 14 | X 14 | same archive, match |
-| monitempercent | X | 2 | 0 | 2 | X 2 | same archive, match |
-| cubemain | P | 151 | 0 | 151 | P 151 | same archive, match |
-| difficultylevels | P | 3 | 0 | 3 | P 3 | same archive, match |
-
-Record counts match for all 73 tables. A matching count does not prove the
-same data; these field-level checks were also run (offsets from the
-1.10f layouts, which the matches confirm for these fields):
-
-| Table | Txt → bin | Fields compared | Result |
-|---|---|---|---|
-| inventory | P txt → X bin | all 74 fields, 32 rows | identical. X `inventory.txt` names two columns `gridRows`/`gridCols`; 1.14d reads `gridX`/`gridY`, so only the P txt compiles to the live bin |
-| plrmode | P txt and X txt → X bin | name, token | identical (both) |
-| plrtype, monmode, objtype, objmode, composit, armtype | same-archive txt → bin | name, token | identical (X `MonMode.txt` differs only in name case; P wins) |
-| automagic | X txt → P bin | name, version, spawnable, level, group, maxlevel, rare, levelreq, frequency, divide, multiply, add, mod1–3 min/max | identical. X `automagic.bin` is the older 132-byte layout |
-| raresuffix, rareprefix | X txt → P bin | name, version | identical. D txt is an older generation (e.g. `Wraith` vs `Wraithra`) |
-| magicprefix, magicsuffix | P txt → P bin | same fields as automagic | identical |
-| experience | P → P | all 8 columns | identical (values above 2³¹−1 are stored as u32 bit patterns) |
-| difficultylevels | P → P | all 22 columns | identical |
-| charstats | P → P | 11 stat columns | identical |
+Source of each runtime table: the highest-priority `.txt` (P → X → D;
+`levels.txt` for `leveldefs`). Its record count (§5) equals the live
+`.bin` count for all 73 tables (per-file line and `Expansion` counts:
+`txt-format.md` Survey). Five pairs are cross-archive: `automagic`,
+`raresuffix`, `rareprefix` (X `.txt` → P `.bin`) and `plrmode`,
+`inventory` (P `.txt` → X `.bin`).
 
 **d2rs cross-check** (`cargo run --release -p data-tool -- tables`,
 2026-10-05; confirmed by bin cross-check). The live set loads and passes
@@ -724,8 +643,8 @@ the 1.14d size, also shadowed: gems, monmode, shrines.
   `cubetype.txt/.bin`, `weaponclass.txt` (X); `aiparms.txt`,
   `monname.txt`, `treasureclass.txt` (X, D). No code references their
   names.
-- Files read only in `-txt` mode: every excel `.txt` except `sounds.txt`
-  and `soundenviron.txt`.
+- Files read only in `-txt` mode: the `.txt` of every table in §6 and §7.2
+  (`levels.txt` for `leveldefs`), except `sounds.txt` (§3.4).
 - `.bin` files never read in normal play: the §7.2 by-products
   (`playerclass`, `bodylocs`, `storepage`, `elemtypes`, `colors`,
   `hiredesc`, `monai`, `monplace`, `skillcalc`, `misscalc`, `events`,
@@ -748,8 +667,9 @@ None.
   record 401; `txt-format.md` §5). Its compiled bytes are not all zero
   (empty code cells and empty link cells: `field-types.md` §5.2, §6).
   Observed: bytes 40–43 (`code`) = `20 20 20 20`; 56–57 (`chrtransform`,
-  `invtransform` → colors) = `FF FF` and 140–143 (`prop1` → properties) =
-  `FF FF FF FF`, whose linkers hold no empty key.
+  `invtransform` → colors) = `FF FF`; `FF FF FF FF` at 140 + 16k, k = 0–11
+  (`prop1`–`prop12` → properties); the linkers of the `FF` fields hold no
+  empty key. All other bytes are 0.
 - Original-only `.txt` reader behaviors (unterminated last line, its
   `Expansion` quirk): `txt-format.md` §10.
 - The live data relies on P→X fallback: 17 tables (plus `hitclass`) have
@@ -770,14 +690,18 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 3. A separate `.txt` compiler serves mod authoring. Its acceptance test:
    compiling each table's highest-priority `.txt` (with the cross-archive
    sources of §11, and `levels.txt` for `leveldefs`) reproduces the live
-   `.bin` byte for byte, for all 73 tables and the 4 code buffers.
+   `.bin` byte for byte, for all 73 tables and the 4 code buffers, except
+   the bytes `field-types.md` §10 lists.
 4. Mod patch layers: `patch-layers.md` (they patch `.txt` cells only;
    under `Ruleset::Mod` every table is compiled from text). Never by
    editing or shipping `.bin` files.
 5. Not reproduced: `-txt` mode, loose files on disk, the dead `.txt`
-   runtime branch. Presence of `runessrv.*` or `cubeserver.*` is reported
-   as an error, like 1.14d.
-6. The survey tool lists the never-read files above as known unused.
+   runtime branch, classic installs (`d2exp.mpq` is required, so every
+   "d2exp exists" branch takes the expansion path; Open question 6).
+   Presence of `runessrv.*` or `cubeserver.*` is reported as an error,
+   like 1.14d.
+6. Survey tools list exactly the never-read files of Constants as known
+   unused; shadowed copies and §7.2 by-products are not reported.
 
 ## Test vectors
 
@@ -800,15 +724,18 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 | `"a\tb\r\n"` | E2 (1.14d: the parser returns nothing) | `txt-format.md` §9 |
 | `"a\tb\r1\t2\r\n"` | E4, line 1 (1.14d: fatal 92) | `txt-format.md` §9 |
 | header with 281 columns | E7 (1.14d: fatal 103); 280 columns accepted | `txt-format.md` §9 |
-| `inventory` count 31 or 33 | load error | §8 |
-| `belts` count 15 / 16 | 15 passes (15 ÷ 2 = 7); 16 fails | §8 |
-| `difficultylevels` count 4 | load error | §8 |
+| a 3-byte file / a 4-byte file with count 0 | load error / valid size (§8, §10.8 still apply) | §4.2 |
+| `inventory` file of 4 + 31 × 240 bytes, count 31 (size valid); same for 33 | §8 load error | §8 |
+| `belts` count 15 / 16 (size valid) | 15 passes (15 ÷ 2 = 7); 16 fails | §8 |
+| `difficultylevels` count 4 (size valid) | load error | §8 |
+| count limits (size valid): `pettype` 255 / 256, `itemstatcost` 511 / 512, `levels` 1,023 / 1,024, `skills` 32,766 / 32,767 | valid / load error | §8 |
+| combined indices | items 306 = armor 0, 508 = misc 0; magic affixes 747 = magicprefix 0, 1,416 = automagic 0; rare affixes 155 = rareprefix 0; player tokens 7 = plrmode 0; object tokens 573 = objmode 0 | §9 |
 | `automap` row with LevelName `6 Town` | load error | §8 |
 | `chartemplate` rows with Level 9, then 3 | load error | §8 |
 | `experience` count 100, or `leveldefs` count ≠ `levels` count | load error | §10.8 |
 | P `monstats.bin` record 0 `TreasureClass1` (u16 +0x86) | 430 = 161 + 269 (`treasureclassex` row 269 `Act 1 H2H A`) | §10.6 |
 | P `uniqueitems.bin` record 5, after fix-up | u16 +0x00 = 5 (file: 0) | §7.4 |
-| `runessrv.txt` added to any archive | load error before `runes` | §3.3 |
+| an archive set (or test lookup stub) in which `runessrv.txt` resolves | load error before `runes` | §3.3 |
 
 ## Provenance
 
@@ -832,10 +759,13 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
   0x215 in the dword at `0x007063FC`) sets that byte. The `.bin` writer
   skips the write when `fopen(…, "wb")` fails.
 - **Load-all routine** `0x00619300` (single caller `0x0044B8A0`, after the
-  string-table loader `0x005259C0`) gives the order in §6; the monster
-  group is `0x0065A400`; TC group `0x0065A390`; lookup group `0x00612750`.
-  D2MOO 1.10f `DATATBLS_LoadAllTxts` has the same sequence; the record
-  sizes and the post-load checks were taken from 1.14d.
+  string-table loader `0x005259C0`) gives the order in §6, one load
+  routine per step except 10–11, 15–17, 18–20, 21–22, 24–25, 33–34, 36–37
+  and the monster group 41–57 (`0x0065A400`, with the TC group
+  `0x0065A390` before 46); lookup group `0x00612750` (step 1); it frees the
+  compile-only `sounds` link at the end. D2MOO 1.10f
+  `DATATBLS_LoadAllTxts` has the same sequence; the record sizes and the
+  post-load checks were taken from 1.14d.
 - **Code buffers:** `0x00613E90` with names `skillscode`,
   `skilldesccode`, `itemscode`, `misscode` read from `.rdata` at its four
   call sites.
@@ -844,7 +774,8 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
 - **Runtime txt:** sound header loader `0x00481950` (`sounds.txt` 0x8E,
   `soundenviron.txt` 0x58 bytes per record).
 - **Client composite loader** `0x00504430` with switch `0x0072EF2C` = 1
-  (compares only), callers `0x00506000`/`0x00504570`.
+  (compares only), callers `0x00506000`/`0x00504570`, and `0x00504920`
+  (`itemtypes`).
 - **Server-file checks:** `runessrv` probe `0x00639420` (extensions `.txt`,
   `.bin`, `.xls`); `cubeserver` in `0x00669130`. Fatal path:
   `0x00408A60` ("Unrecoverable internal error %08x") then exit. D2MOO
@@ -878,9 +809,12 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
   loader: each link is created right before its owner table loads, and
   other loaders' field entries point at it. Lookup key columns and kinds
   (§7.2) from `0x00612750` (type 10 = code, 0x11 = name).
-- **Expansion installed:** `0x00408F20` returns true when `d2exp.mpq`
-  exists in the game folder (file-attribute check, cached); used by the
-  string-table, archive, lvlprest, lvlsub and hireling code.
+- **Expansion installed:** `0x00408F20`: file-attribute check of
+  `d2exp.mpq` in the game folder, then of the bare name; the result is
+  cached. Used by the string-table, archive, lvlprest, lvlsub and hireling
+  code; the d2x archives also call the configuration callback +0x211
+  (`0x004FAEC0`). Expansion columns from the field lists (`fields.tsv`):
+  lvlprest 0x20, lvlsub 0x158, lvltypes 0x784.
 - **Combined arrays (§9):** the copy loops after loading in `0x006315D0`,
   `0x00633730`, `0x00633F40`, `0x0065ADC0`, `0x0065B1B0`.
 - **Archive priorities (§2):** `0x004FAB90`, `0x004FAEC0`, `0x004FAD10`
@@ -925,9 +859,11 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
 8. When the client composite loader (§3.5) and the sound loader (§3.4)
    first run relative to game start (both after the excel load).
 9. The DS1 handling inside the `lvlprest`/`lvlsub` loaders (which rows,
-   which flags from the load-all routine's two other inputs) and one more
-   `lvlsub` abort condition tied to it were not analyzed; the lvlsub
-   expansion-flag offset is unconfirmed.
+   and the `lvlsub` abort 0x3C8 tied to it) was not analyzed. It is gated
+   by the load-all routine's inputs, which its only caller sets to
+   input 2 = 0 and input 3 = (config byte +0x19 == 6). Input 2 also gates
+   a `lvltypes` tile step between steps 60 and 61 (`0x0061FAE0`), which
+   therefore never runs.
 10. `0x00653DB0`, a generic 2-byte-record loader, has no callers (dead
     code); not part of the load.
 11. Record layouts of the sound tables (142 and 88 bytes) and the formats

@@ -1,24 +1,46 @@
 # Spec: Data — Field types and txt-to-record compilation
 
-- **Status:** draft. Checked against 1.14d: 92 field lists recovered from
+- **Status:** verified by `data-tool tables` (2026-10-05). Checked against 1.14d: 92 field lists recovered from
   `Game.exe`; compiling the live `.txt` files with these rules reproduces
   82 live `.bin` tables byte for byte (see Provenance). Implemented in
   `d2-data::compile` (callbacks of §8.3 not yet: they write nothing); the
   d2rs cross-check reproduces the §10 result (confirmed by bin
   cross-check, `loading.md` §11).
 - **Target version:** 1.14d
-- **Crate/module:** `d2-data::compile` (suggested: type vocabulary, record
-  compiler, linkers, string keys, callbacks)
+- **Crate/module:** `d2-data::compile` (type vocabulary, record compiler,
+  linkers, string keys, callbacks); reader and binding: `d2-data::txt`
 - **Related specs:** `specs/data/txt-format.md` (splitting text into
   cells, column binding; its §7–8 describe the same conversions by type ID
   and must agree with this spec), `specs/data/loading.md` (which file is
   live, the `.bin` container, load order, link dependencies, code buffers),
   `specs/formats/tbl.md` (string tables), `specs/data/calc-expressions.md`
-  (formula bytecode), per-table specs (field lists, table callbacks; not
-  yet written, Open question 1).
+  (formula bytecode), `specs/data/schema.md` (the 92 field lists in
+  `fields.tsv` / `tables.tsv`), per-table specs (table callbacks, §8.3).
 
-Implementable now: §1–§9 with the synthetic test vectors. §10 runs per
-table once its field list is published.
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 45–64 |
+| Inputs | 65–75 |
+| Outputs / state changes | 76–81 |
+| Rules | 82–83 |
+|   1. Field lists | 84–111 |
+|   2. Compile procedure | 112–137 |
+|   3. Type vocabulary | 138–200 |
+|   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 201–228 |
+|   5. Text, codes and names | 229–255 |
+|   6. Linkers (key → index) | 256–346 |
+|   7. String keys (`strkey`) | 347–378 |
+|   8. Callback fields (`cb`) | 379–430 |
+|   9. Records | 431–451 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 452–486 |
+| Constants & data dependencies | 487–501 |
+| Randomness | 502–505 |
+| Edge cases & original bugs | 506–513 |
+| Test vectors | 514–639 |
+| Provenance | 640–718 |
+| Open questions | 719–740 |
+<!-- /index -->
 
 ## Summary
 
@@ -45,8 +67,8 @@ would produce.
 | Name | Type | Source |
 |---|---|---|
 | header and records of cells | byte strings | `txt-format.md` §4–5 |
-| field list | ordered (column, type, length, offset, link) | per-table spec |
-| record size | bytes | per-table spec, `loading.md` §6 |
+| field list | ordered (column, type, length, offset, link) | `fields.tsv` (`schema.md`) |
+| record size | bytes | `tables.tsv`, `loading.md` §6 |
 | linkers | key → index tables | own keys of tables compiled earlier (§6) |
 | string tables | `patchstring.tbl`, `expansionstring.tbl`, `string.tbl` | `tbl.md`, `loading.md` §10.1 |
 | code buffers | growable byte buffers | calc fields (§8.1) |
@@ -65,7 +87,7 @@ would produce.
 |---|---|
 | column | header name the field reads; binding per `txt-format.md` §6 (ASCII case-insensitive, whole name, leftmost duplicate column wins) |
 | type | type ID 0–26 (§3) |
-| length | per type: string length, bit number, callback argument; else 0 |
+| length | per type: string length, bit number, `u8?` group size, callback argument; else 0 |
 | offset | byte offset in the record; callbacks get it passed through |
 | link | a linker (own-key and link types), a callback (types 22–25), else none |
 
@@ -77,8 +99,10 @@ would produce.
 - A field bound to no column is *missing*.
 - Header columns + missing fields must be ≤ 280 (the original keeps both
   in one 280-slot map and would overrun it).
-- In 1.14d every 2-byte field sits at an even offset and every 4-byte field
-  at a multiple of 4. The compiler itself does not require it.
+- In the 92 recovered 1.14d lists every 2-byte field sits at an even
+  offset and every 4-byte field at a multiple of 4 (the runtime sound
+  lists are unexamined, Open question 9). The compiler requires no
+  alignment.
 - Errors use the codes of `txt-format.md` §9: a field list that fails
   `txt-format.md` §6.1 (size, type IDs, names, record size, `u8?` runs,
   linker kinds and existence, callbacks, field footprints) is E13; too
@@ -103,36 +127,40 @@ pass 2: for each record r in file order:
 - Pass 1 finishes for all records before pass 2 starts, so a table can
   look up its own keys, later rows included.
 - Writes land in the order above. Where fields overlap, the later write
-  wins. 1.14d lists have overlaps: `levels` `camt1`–`camt4` are all u16 at
-  offset 220 (the rightmost bound column wins); a `str(N)` terminator can
-  land on the next field (`pettype` `baseicon` str(32) at 15 and `micon1`
-  at 47; `treasureclassex` `Treasure Class` str(32) at 0 and `Picks` at
-  32). A missing field is written after the record's bound columns, so it
-  wins over a bound field it overlaps.
+  wins. 1.14d lists have overlaps, e.g. `levels` `camt1`–`camt4` are all
+  u16 at offset 220 (the rightmost bound column wins), and several
+  `str(N)` terminators land on the next field (e.g. `pettype` `baseicon`
+  str(32) at 15 and `micon1` at 47); those matter only for cells of N or
+  more bytes. A missing field is written after the record's bound columns,
+  so it wins over a bound field it overlaps.
 - Fatal in the original: record count 0 (E3), record size 0 (E13).
 
 ### 3. Type vocabulary
 
-Per-table specs give each field's type as one of these words. IDs in the
-same row compile identically; a spec may add the ID for cross-checking.
-`u`/`i` only says how the game reads the bytes; the compiled bytes are the
-same. "−1" means 0xFF, 0xFFFF or 0xFFFFFFFF by width.
+Per-table specs give each field's type as one of these words. IDs
+separated by a comma compile identically; in link rows the ID before the
+slash is used with a code linker K, the one after it with a name linker
+(K decides, so the vocabulary needs no ID). A spec may add the ID for
+cross-checking. `u`/`i` only says how the game reads the bytes; the
+compiled bytes are the same. "−1" means 0xFF, 0xFFFF or 0xFFFFFFFF by
+width. "Missing column writes" is a write (§2 order); own-key types with a
+missing column add no key.
 
-| Vocabulary | ID | D2MOO name | Pass | Bytes | Bound cell | Missing column | 1.14d |
+| Vocabulary | ID | D2MOO name | Pass | Bytes | Bound cell | Missing column writes | 1.14d |
 |---|---|---|---|---|---|---|---|
 | `u8` / `i8` | 4, 6 | BYTE, UNKNOWN2 | 2 | 1 | integer (§4), low 8 bits | 0 | both used |
 | `u16` / `i16` | 3 | WORD | 2 | 2 | integer, low 16 bits | 0 | used |
 | `u32` / `i32` | 2, 8 | DWORD, DWORD2 | 2 | 4 | integer | 0 | both used |
 | `u8?` | 5 | UNKNOWN1 | 2 | 1 | integer, low 8 bits; empty cell writes nothing | 0 | unused |
 | `bit(n)` | 26 | BIT | 2 | 1 bit | integer ≠ 0 sets bit n, 0 clears it | nothing | used |
-| `str(N)` | 1, 7 | ASCII, BYTE2 | 2 | ≤ N+1 | text + NUL (§5.1) | byte 0 = 0 | 1 used, 7 unused |
+| `str(N)` | 1, 7 | ASCII, BYTE2 | 2 | ≤ N+1 | text + NUL (§5.1) | `00` at `offset` | 1 used, 7 unused |
 | `code4` | 9 | RAW | 2 | 4 | code (§5.2) | `00 00 00 00` | used |
-| `key(code4)` | 10 | ASCIITOCODE | 1 | 4 | code; added to own linker | `00 00 00 00`, no key | used |
+| `key(code4)` | 10 | ASCIITOCODE | 1 | 4 | code; added to own linker | `00 00 00 00` | used |
 | `key(code1)` | 12 | UNKNOWN4 | 1 | 1 | code; added; first code byte | 0 | unused |
 | `key(code2)` | 14 | UNKNOWN5 | 1 | 2 | code; added; first 2 code bytes | 0 | unused |
-| `key(str(N))` | 16 | UNKNOWN6 | 1 | ≤ N | first N−1 bytes + NUL; added (add-always) | byte 0 = 0 | unused |
-| `key(name16)` | 17 | NAMETOINDEX | 1 | 2 | name; find-or-add; index | 0, no key | used |
-| `key(name32)` | 18 | NAMETOINDEX2 | 1 | 4 | name; find-or-add; index | 0, no key | used |
+| `key(str(N))` | 16 | UNKNOWN6 | 1 | max(N, 1) | first min(L, max(N, 1) − 1) bytes + NUL; that text added (add-always) | `00` at `offset` | unused |
+| `key(name16)` | 17 | NAMETOINDEX | 1 | 2 | name; find-or-add; index | 0 | used |
+| `key(name32)` | 18 | NAMETOINDEX2 | 1 | 4 | name; find-or-add; index | 0 | used |
 | `link8(K)` | 13 / 21 | CODETOBYTE / NAMETOWORD2 | 2 | 1 | index in K, low 8 bits; miss −1 | −1 | used |
 | `link16(K)` | 15 / 20 | CODETOWORD / NAMETOWORD | 2 | 2 | index in K, low 16 bits; miss −1 | −1 | used |
 | `link32(K)` | 11 / 19 | UNKNOWN3 / NAMETODWORD | 2 | 4 | index in K; miss −1 | −1 | used |
@@ -140,8 +168,6 @@ same. "−1" means 0xFF, 0xFFFF or 0xFFFFFFFF by width.
 | `cb(F)` | 23, 24, 25 | CUSTOMLINK, UNKNOWN7, CALCTODWORD | 2 | any | callback F (§8) | F with no text | 23, 25 used; 24 unused |
 | `end` | 0 | NONE | — | — | ends the list | — | used |
 
-- **Link IDs.** A code linker K gives IDs 13 / 15 / 11, a name linker K
-  gives 21 / 20 / 19. The vocabulary needs no ID: K decides.
 - **K notation.** `<table>.<column>` names the own-key column that fills the
   linker (its type is a `key(...)`); `items.code` is the one linker filled
   by three tables (§6.4). `@<name>` names a hand-built linker (§6.4).
@@ -191,9 +217,9 @@ if neg: v = −v
 - 1.14d data has such cells, and the shipped bins hold exactly what the
   rule gives (`misc` `TMogMin` `" "` → 0xF0, `misc` `rarity` `999` → 0xE7).
 - `u8?`: the same, except that an empty cell writes nothing (the byte keeps
-  its value, normally 0). `"-"` writes 0. The original also requires a
-  `u8?` entry with length L > 1 to be followed by L − 1 more `u8?` entries
-  (exact rule and E13: `txt-format.md` §6.1).
+  its value, normally 0). `"-"` writes 0. Its length only groups entries:
+  a `u8?` with length > 1 must be followed by more `u8?` entries (exact
+  rule and E13: `txt-format.md` §6.1 type-5 runs).
 - `bit(n)`: n is the field's length. Byte `offset + (n >> 3)`, mask
   `1 << (n & 7)`. A value ≠ 0 sets the bit, 0 clears it. So n numbers the
   bits of a little-endian bit string that starts at `offset` (`skills` uses
@@ -207,7 +233,7 @@ if neg: v = −v
   `offset + min(L, N)`. Longer text is cut at N bytes without warning.
 - The field can use N + 1 bytes. Bytes after the NUL are not written (they
   stay 0).
-- Empty cell → one 0x00. Missing column → the byte at `offset` is 0.
+- Empty cell or missing column → one 0x00 at `offset`.
 - Lists usually give N = room − 1 (`lowqualityitems` `Name` str(31) in a
   34-byte record), but not always: `pettype` `baseicon` is str(32) with
   `micon1` 32 bytes later, so a 32-byte text puts its NUL on `micon1`'s
@@ -246,10 +272,10 @@ crashes; d2rs: E13.
     the code as written, not the bumped value.
   - `key(code1)` / `key(code2)`: E12 if the result exceeds 255 / 65,535.
 - *find(code):* exact 4-byte match → its index, else −1. Case-sensitive.
-- 1.14d: `itemtypes.txt` rows 0, 1, 14, 17 and 23 have empty codes. Row 0
-  owns `"    "`, so an empty `link16(itemtypes.code)` cell gives 0, not −1.
-  24,442 empty code lookups in the live tables hit a key this way
-  (`txt-format.md` §8).
+- 1.14d: record 0 of `bodylocs`, `elemtypes`, `hitclass`, `hiredesc` and
+  `itemtypes` owns `"    "` (`itemtypes` records 1, 14, 17, 23 are bumped
+  empty duplicates; table: `txt-format.md` §8), so an empty link cell
+  into these linkers gives 0, not −1 (24,442 live cells).
 
 **6.2 Name linker** (filled by `key(name16)`, `key(name32)`,
 `key(str(N))`; read by IDs 19, 20, 21). Keys are normalized names (§5.3):
@@ -330,7 +356,11 @@ else:                                     id = 0
 store u16 (id if id ≠ 0 else 5,382)
 ```
 
-- Key lookup is exact and case-sensitive (`tbl.md` §Key lookup). "LoD"
+- Key lookup as 1.14d: the `tbl.md` §Key lookup hash, with key bytes
+  added as signed chars; probe up to `max_tries` slots from there,
+  wrapping, skipping entries whose used byte ≠ 1 without stopping; the
+  first exact, case-sensitive key match wins, and `element` is that hash
+  entry's index field. For the 1.14d tables this equals `tbl.md`. "LoD"
   means `expansionstring.tbl` is loaded (`loading.md` §10.1).
 - 5,382 (0x1506) is the no-string ID: `string.tbl` element 5382 has the
   key `dummy`. Empty and unknown keys both give 5382.
@@ -339,9 +369,9 @@ store u16 (id if id ≠ 0 else 5,382)
 - A key present in several tables resolves to the first in the order
   patch → expansion → base.
 - Missing column → u16 0, with no lookup.
-- IDs are element numbers of the string tables used at compile time.
-  Compile with the tables of the installed language. This install has only
-  `ENG`.
+- IDs are element numbers of the string tables used at compile time:
+  those d2rs loads (`loading.md` §10.1). This install has only `ENG`
+  (Open question 8).
 - Live 1.14d `strkey` cells: 8,716 empty, 15 unknown (e.g. `misc` `namestr`
   `hpo`), 3,217 base, 927 expansion, 613 patch. All match the bins except
   one (§10).
@@ -388,11 +418,12 @@ store u16 (id if id ≠ 0 else 5,382)
 - 1.14d: `runes` record 27 `t1param4` `Battle Command` → 155 (skills record
   155); `runes` record 6 `t1param4` `41` → 41.
 
-**8.3 Table-specific callbacks in 1.14d** (defined in their table specs):
+**8.3 Table-specific callbacks in 1.14d** (`specs/data/callbacks.md`):
 `monstats` `Sk1mode`–`Sk8mode`; `monstats2` `HDv`, `TRv`, `LGv`, `Rav`,
 `Lav`, `RHv`, `LHv`, `SHv`, `S1v`–`S8v`; `monpreset` `Place`; `cubemain`
 `input 1`–`input 7`, `output`, `output b`, `output c`. They write bytes
-outside their own offset.
+outside their own offset; `callbacks.md` gives the bytes, cell grammar,
+lookups and errors of each.
 
 `strkey` also goes through a function pointer in the original, but its
 behavior is fixed (§7), so the vocabulary does not treat it as a callback.
@@ -404,6 +435,11 @@ behavior is fixed (§7), so the vocabulary does not treat it as a callback.
 - Inside a record: fields at their list offsets; integers little-endian;
   codes as 4 raw bytes; strings NUL-terminated. The compiler inserts no
   padding and no alignment.
+- A field's *footprint* is the bytes it can write: from `offset`, the
+  width of `txt-format.md` §6.1 *Field fits* (`bit(n)`: the one byte
+  `offset + (n >> 3)`; callbacks: as their spec says). Every 1.14d
+  footprint lies inside its record; d2rs rejects a list where one does not
+  (E13).
 - Bytes no field writes are 0. Measured on the live bins of the 82 tables
   checked: every byte outside the field footprints is 0. There are no
   uninitialized or garbage bytes. Only table-specific callbacks (§8.3)
@@ -417,10 +453,12 @@ behavior is fixed (§7), so the vocabulary does not treat it as a callback.
 
 Acceptance test for the compiler (`#[ignore]`, reads `D2_GAME_DIR`):
 
-1. Take the source `.txt` and live `.bin` per `loading.md` §11, including
-   the cross-archive pairs (d2exp `automagic`, `rareprefix`, `raresuffix`
-   `.txt` → patch_d2 `.bin`; patch_d2 `inventory`, `plrmode` `.txt` → d2exp
-   `.bin`) and `levels.txt` → `leveldefs.bin`.
+1. Take the source `.txt` and live `.bin` per `loading.md` §11 (the 73
+   runtime tables, `hitclass` and the 12 shipped by-products of
+   `loading.md` §7.2: 86 tables), including the cross-archive pairs
+   (d2exp `automagic`, `rareprefix`, `raresuffix` `.txt` → patch_d2
+   `.bin`; patch_d2 `inventory`, `plrmode` `.txt` → d2exp `.bin`) and
+   `levels.txt` → `leveldefs.bin`.
 2. Compile with the table's field list, every linker available (§6.5) and
    the install's string tables.
 3. The counts must be equal, and every record byte, except:
@@ -437,8 +475,8 @@ Acceptance test for the compiler (`#[ignore]`, reads `D2_GAME_DIR`):
 Nothing else may differ. The shipped bins hold no garbage bytes (§9).
 
 Result of the d2rs implementation (confirmed by bin cross-check,
-2026-10-05): every runtime table matches under these rules, 69 of 73
-byte-identical; in `monstats`, `monstats2`, `monpreset` and `cubemain`
+2026-10-05): all 86 tables match under these rules; 82 are
+byte-identical (69 of the 73 runtime tables); in `monstats`, `monstats2`, `monpreset` and `cubemain`
 the only other differences are bytes outside every field footprint
 (step 5) and the row above. With the §8.3 callbacks writing nothing,
 those bytes are 12,200 / 118,780 / 430 / 1,657. The callbacks are called
@@ -467,17 +505,11 @@ None.
 
 ## Edge cases & original bugs
 
-- Missing `code4` / `key(code4)` column → zeros; empty cell → spaces.
-- Missing `strkey` column → 0; empty cell → 5382.
-- Missing link column → −1, even when the target has an empty key; an
-  empty link cell → that empty key's index.
-- `string.tbl` element 0 cannot be referenced by a `strkey`.
-- A `str(N)` terminator can spill one byte into the next field (§5.1).
-- Duplicate codes are stored under bumped values (§6.1).
-- `link8` keeps the low byte of indexes ≥ 256 (no check in pass 2).
-- Name keys compare on 31 bytes; longer names can collide.
-- Non-ASCII bytes in name keys read unrelated memory in the original;
-  d2rs rejects them.
+All reproduced unless noted; the rules carry them: missing vs empty
+`code4` (§5.2), `strkey` (§7) and link cells (§3, §6.1–§6.2);
+unreachable `string.tbl` element 0 (§7); `str(N)` NUL spill (§5.1);
+bumped duplicate codes (§6.1); unchecked `link8` low byte (§6.3); 31-byte
+name keys (§6.2). Not reproduced: name-key bytes ≥ 0x80 (§5.3, E11).
 
 ## Test vectors
 
@@ -534,6 +566,13 @@ set it; `"0"`, `""`, `"-"` clear it.
 | `code4`, missing column | — | `00 00 00 00` |
 | `key(code1)` | `"abc"` (index ≤ 255) | `61` |
 
+Overlaps (§2): four `u16` fields at one offset, cells `1`–`4` in column
+order → `04 00`; `str(4)` @0 then `u8` @4, cells `abcd`, `7` →
+`61 62 63 64 07` (with the `u8` column first: `61 62 63 64 00`).
+Binding, field-list, missing-field overlap, callback-argument,
+code-displacement, 256-byte `strkey` and E11/E12 vectors: `txt-format.md`
+Test vectors.
+
 **Linkers**
 
 | Steps | Result |
@@ -544,7 +583,7 @@ set it; `"0"`, `""`, `"-"` clear it.
 | name find-or-add `Fire Bolt`, `fire bolt`, `Ice`, `""` | stored 0, 0, 1, 2; `n` = 3 |
 | then find `FIRE BOLT`, `""`, `Fire` | 0, 2, −1 |
 | name add-always `a`, `A`, `b` | `a` → 0, `b` → 2; `n` = 3 |
-| two 40-byte names equal in their first 31 bytes | same key, same index |
+| `barbarian_act1_complete_andariel`, `barbarian_act1_complete_andarieX` | same key (first 31 bytes), same index |
 | `link8` miss / `link16` miss / `link32` miss | `FF` / `FF FF` / `FF FF FF FF` |
 
 **String keys** (1.14d `ENG` tables, LoD)
@@ -564,7 +603,7 @@ set it; `"0"`, `""`, `"-"` clear it.
 | `WarrivAct1IntroGossip1` (base element 0) | 5382 |
 | `nonexistent_key_zz` | 5382 |
 
-**1.14d data** (live `.txt` → live `.bin`; record numbers 0-based)
+**1.14d data** (live `.txt` → live `.bin`; records and columns 0-based)
 
 | Table, record, column | Type, offset | Cell | `.bin` bytes |
 |---|---|---|---|
@@ -580,13 +619,13 @@ set it; `"0"`, `""`, `"-"` clear it.
 | armor 0 `namestr` | `strkey` @244 | `cap` | `8A 07` |
 | misc 1 (`Healing Potion`) `namestr` | `strkey` @244 | `hpo` | `06 15` |
 | monstats 723 `Id` | `key(name16)` @0 | `cr_lancer8` | `69 02` (617) |
-| monseq 0 / 1–7 `sequence` | `key(name16)` @0 | `""` / `seq_pinheadsmite` | `00 00` / `01 00` |
+| monseq 0 / 1–15 `sequence` | `key(name16)` @0 | `""` / `seq_pinheadsmite` | `00 00` / `01 00` |
 | runes 0 `Rune1` | `link32(items.code)` @152 | `r08` | `69 02 00 00` (617) |
 | monstats 0 `TreasureClass1` | `link16(@tc)` @134 | `Act 1 H2H A` (treasureclassex 269) | `AE 01` (430) |
-| runes 27 `t1param4` | `param` | `Battle Command` | 155 |
-| runes 6 `t1param4` | `param` | `41` | 41 |
-| skills `pettype` (326 rows; was 324, corrected: confirmed by bin cross-check) | `link8(pettype.pet type)` @190 | `""` | `FF` |
-| skills `pettype` | `link8(pettype.pet type)` @190 | `assassintrap` | `11` |
+| runes 27 `t1param4` | `param` @228 | `Battle Command` | `9B 00 00 00` (155) |
+| runes 6 `t1param4` | `param` @228 | `41` | `29 00 00 00` (41) |
+| skills `pettype` (empty in 326 records) | `link8(pettype.pet type)` @190 | `""` | `FF` |
+| skills 257, 261, 262, 271, 272, 276 `pettype` | `link8(pettype.pet type)` @190 | `assassintrap` | `11` |
 | armor 22 `mindam` (columns 63 and 161) | `u8` (ID 6) @254 | `1`, `0` | `01` (leftmost wins) |
 | levels, all records, `mon11` (no column) | `link16(monstats.Id)` @74 | missing | `FF FF` |
 | armor, all records, `hit class` (no column) | `link8(hitclass.code)` @316 | missing | `FF` |
@@ -596,9 +635,7 @@ set it; `"0"`, `""`, `"-"` clear it.
 | weapons, all records, `calc1` (no column) | `calc(itemscode)` @164 | missing | `FF FF FF FF` |
 | d2exp objgroup 97 (`EXPANSION`) | all fields | row kept | 52 × `00`; count 133 |
 
-**Whole tables.** Compiling the live `.txt` of each of the 82 tables in
-Provenance reproduces its live `.bin` byte for byte (calc fields masked;
-`calc-expressions.md`); monstats differs as in §10.
+**Whole tables:** the §10 acceptance test and its result.
 
 ## Provenance
 
@@ -629,7 +666,10 @@ scratch script, and bytes read from the PE file; addresses are virtual):
 list on the stack. A scratch script rebuilt all 92 lists (column name, ID,
 length, offset, linker or callback) from the decompiled assignments; names
 behind data addresses were read from `.rdata`. Only these facts were
-taken. Every record size passed equals the live `.bin` size. 92 = 73
+taken. Every runtime list's record size equals its live `.bin` size; the
+compile-only lists whose `.bin` a later step overwrites (`monmode`,
+`plrmode` 4, `skills`, `monstats`, `skilldesc` 2) and the dead list do
+not. 92 = 73
 runtime tables (`loading.md` §6) + 18 compile-only lists (`loading.md`
 §7.2) + 1 in the dead loader 0x653DB0; `txt-format.md` counts the 91 live
 ones. They cover 86 table names, because monmode, plrmode, skills,
@@ -678,10 +718,8 @@ functions) agrees with every rule here.
 
 ## Open questions
 
-1. The 92 recovered field lists exist only in a scratch file. Before §10
-   can run per table they must be published as facts (column, type,
-   length, offset, link, record size, loader), in per-table specs or one
-   generated field-list spec.
+1. Answered: the 92 field lists are published in `fields.tsv` /
+   `tables.tsv` (`schema.md`).
 2. The table-specific callbacks (§8.3) were not analyzed.
 3. Runtime linker rebuilds other than the item codes (§6.6): which loaders
    rebuild which linker, and whether duplicates bump as in §6.1.

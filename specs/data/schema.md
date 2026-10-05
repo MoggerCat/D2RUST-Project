@@ -1,6 +1,6 @@
 # Spec: Data — Bin field tables (`fields.tsv`, `tables.tsv`)
 
-- **Status:** draft. Extracted from 1.14d `Game.exe` on 2026-10-05; checks below. Embedded and parsed by
+- **Status:** verified by `data-tool tables` (2026-10-05). Extracted from 1.14d `Game.exe` on 2026-10-05; checks below. Embedded and parsed by
   `d2-data::schema` (data-driven; typed structs come later). A unit test recomputes the §5 unwritten ranges from
   the footprints (1,702 bytes, 55 tables, equal to the notes); compiling every list reproduces the live `.bin`
   files (`loading.md` §11, d2rs cross-check; confirmed by bin cross-check).

@@ -124,7 +124,7 @@ the 12 shipped by-products byte-identical. Compiler diagnostics equal the
 `txt-format.md` §9 counts. Fix-ups (§7.4) are not applied yet.
 
 ### Phase 3 — Core simulation (`d2-sim`)
-- [ ] D2 seeded RNG (exact sequence match) — **first**
+- [ ] D2 seeded RNG (exact sequence match) — **first**. *Spec `specs/sim/rng.md` done and matched by 32,543 recorded draws; Rust code not started.*
 - [ ] Tick loop, intents in / events out, unit ordering
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
@@ -136,7 +136,7 @@ the 12 shipped by-products byte-identical. Compiler diagnostics equal the
 **Exit per item:** spec status `conformance-passing`.
 
 ### Phase 4 — Conformance (runs alongside Phase 3)
-- [ ] Trace recorder for the original game
+- [ ] Trace recorder for the original game. *Feasibility proven 2026-10-05: `tools/trace-recorder` records every RNG draw of 1.14d (Python debugger); traces in `traces/sim/rng/`. Other event types not yet.*
 - [ ] Replay harness
 - [ ] Coverage report (the "99.x%" number)
 
@@ -152,17 +152,22 @@ the 12 shipped by-products byte-identical. Compiler diagnostics equal the
 - [ ] UI panels, inventory, fonts, audio, controls config
 **Exit:** play through all acts locally with correct visuals.
 
-### Phase 7 — Online
+> **Current scope ends at Phase 6** (decided 2026-10-05). Phases 7–9 are
+> deferred and not yet planned in detail. The mod is a separate future
+> project. Keep the decisions that keep them possible (local server,
+> versioned formats, `Ruleset`), but spend no effort on them now.
+
+### Phase 7 — Online (deferred)
 - [ ] Network transport, remote server
 - [ ] Accounts (argon2, TLS), character storage (versioned format)
 - [ ] Server-side validation of all actions
 
-### Phase 8 — Ownership gate (`d2-verify`)
+### Phase 8 — Ownership gate (`d2-verify`) (deferred)
 - [ ] "Has the game" check at launch (required MPQs present, valid, contain
       expected files), with clear error messages
 - [ ] Server rejects clients that fail verification
 
-### Phase 9 — The mod
+### Phase 9 — The mod (deferred; separate project)
 - [ ] Mod patch layers and assets
 - [ ] Mod systems behind `Ruleset::Mod`
 - [ ] Release packaging verified to contain **no Blizzard files**
@@ -179,6 +184,7 @@ the 12 shipped by-products byte-identical. Compiler diagnostics equal the
 - *Bevy upgrade session (between milestones only):* "Upgrade Bevy to <ver> in
   `d2-client` only, following the official migration guide."
 
+Where each kind runs (cloud vs local) is in `CLAUDE.md` "Where work runs".
 Commit after every session. Update this checklist at the end of each one.
 
 ## Risks
