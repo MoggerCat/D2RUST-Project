@@ -33,6 +33,9 @@ behaviors the engine reproduces exactly.
 | Dependency rules | Enforced by `tools/depcheck` (CI) | No Bevy outside `d2-client`, and `d2-sim` can't depend on proto/net/server/client. |
 | Sim determinism lints | `crates/d2-sim/clippy.toml` + `float_arithmetic = deny` | Bans HashMap/HashSet, Instant/SystemTime and float arithmetic in `d2-sim`. |
 | Reference install record | `tools/hash-manifest` → `traces/reference-install.toml` | Dev only, never shipped or used for gating. Records the local `game/` that traces come from, so a changed install is noticed. |
+| Data source of truth (Phase 2) | The `.bin` set 1.14d loads; `.txt` compiler verified byte for byte against it | 1.14d never reads excel `.txt` in normal play (a missing `.bin` is fatal). Full policy: `specs/data/loading.md` "d2-data policy". Mods patch `.txt` cells and compile (`patch-layers.md`). |
+| Per-table layouts | `specs/data/fields.tsv` + `tables.tsv`, extracted from 1.14d `Game.exe` | 92 field lists, 3,499 fields (`specs/data/schema.md`). Replace prose per-table specs; Rust table code is generated from them. Column meanings are specified by the Phase 3 specs that use them. |
+| Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 
 ## Phases
 
@@ -97,6 +100,9 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
 - [ ] Mod patch layer format + loader
 **Exit:** all tables load from the user's install; patches apply; broken
 references are reported.
+**Status (2026-10-05):** foundation specs written in `specs/data/`
+(`loading`, `txt-format`, `field-types`, `calc-expressions`,
+`patch-layers`, plus `fields.tsv`/`tables.tsv`/`schema.md`). No code yet.
 
 ### Phase 3 — Core simulation (`d2-sim`)
 - [ ] D2 seeded RNG (exact sequence match) — **first**
