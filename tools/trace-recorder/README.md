@@ -13,6 +13,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_rng.py` | Recomputes every recorded event from its own seed-before with `d2rng.py`; exit 1 on any mismatch |
 | `convert_rng.py` | Splits a raw file into seed chains and writes chosen chains as `traces/sim/rng/sim-NNNN.json` |
 | `d2rng.py` | The RNG rule from the spec (step and the five helpers), used by the two above |
+| `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
 
@@ -81,3 +82,43 @@ game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 new event kind, `rng_draw`, whose data fields are listed in the converter
 and in `specs/sim/rng.md` (Test vectors). `tick` is 0 (untimed), and the
 1.14d `site` is kept for reference and listed in `compare.ignore`.
+
+## dump_tables.py: the excel tables in 1.14d memory
+
+```
+py tools/trace-recorder/dump_tables.py                 # Game.exe -w -ns
+cargo run --release -p data-tool -- dump-compare traces/raw/<time>-tables
+```
+
+Options: `--seconds N` (give up after N s, default 60), `--force-after N`
+(default 6), `--no-force`, `--out DIR`, `--game PATH`, Game.exe arguments
+after `--`. Same reference-hash check and kill guarantees as
+`record_rng.py`, whose Win32 code it imports. One run takes about 7 s.
+
+When the tables load: 1.14d starts in the menu (launcher mode 4) and loads
+the excel tables only when client mode starts, i.e. when a game is
+started. The client entry `0x0044B8A0` loads the string tables
+(`0x005259C0`) and then calls the load-all routine `0x00619300` once. With
+no table loaded after `--force-after` seconds and the game in mode 4
+(`0x0074C704`), the script ends the menu the way starting a game does: it
+writes next mode = 1 to `0x007795E8` (returned by the menu routine
+`0x004359D0`) and 0 to the menu message-loop flag `0x0072DDD4`. Nothing
+else is touched, and the dump is taken before client mode does anything
+beyond the load. `--no-force` waits for a game to be started by hand
+instead (Single Player, any character). An unforced dump and the forced
+ones are byte-identical except pointers.
+
+| Hook / address | Use |
+|---|---|
+| `0x006122F0` entry | table loader (stdcall: context, name, field list, `int *count`, record size); a one-shot INT3 on its return gives the record pointer (EAX) and the count |
+| `0x00619300` entry | load-all routine; a one-shot INT3 on its return address (`0x0044B93C`) is the dump point, after every §7.4 fix-up |
+| data-tables globals `0x0096BCAC`–`0x0096D62C` | pointer and count of each table (`GLOBALS` in the script; each checked against the hooked loader return) |
+| combined arrays | weapons/armor/misc `0x0096CA60/68/70`, magic affixes `0x0096CA84/88/8C`, rare affixes `0x0096CAA8/AC`, plrtype/plrmode `0x0096D4E0/E4`, objtype/objmode `0x0096D4D0/D4`: the loader's own buffer is freed after the copy |
+| freed tables | gamble, automap, treasureclassex: raw records freed after conversion; only their maps are dumped |
+| runtime maps | `MAPS` in the script (`specs/data/runtime-maps.md`): itemtypes and montype equivalence matrices, per-class skill lists and the passive list (`skills_desc_list`), the itemstatcost description list, gamble index and level brackets, automap runtime form and level index, superunique hcIdx map, itemstatcost record-0 global, item lists and counts, states bitsets and lists, hireling, leveldefs, monseq and lvlsub indexes |
+
+Output (`traces/raw/<time>-tables/`, gitignored): `<table>.bin` (records
+only, no count header), `map-<name>.bin`, `manifest.json` (every loader
+call with pointer, count, call site; per table address, count, record
+size, source global; per map address and size; notes) and `manifest.tsv`
+(the table and map list read by `data-tool dump-compare`).
