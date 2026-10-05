@@ -1,50 +1,45 @@
-// Spec: specs/data/loading.md §7.4 (post-load fix-ups and runtime maps), §8 (superuniques hcIdx)
+// Spec: specs/data/fixups.md, specs/data/runtime-maps.md; specs/data/loading.md §7.4 (summary), §8 (superuniques hcIdx)
 //! The post-load fix-ups: bytes the loaders fill or correct after a
-//! `.bin` loads, and the runtime maps they build. Applied to a copy of the
-//! live set; [`crate::bin::load`] keeps the shipped bytes (the txt → bin
+//! `.bin` loads (`fixups.md`), and the runtime maps they build
+//! (`runtime-maps.md`). Applied to a copy of the live set;
+//! [`crate::bin::load`] keeps the shipped bytes (the txt → bin
 //! cross-check compares those).
 //!
-//! Only the §7.4 rows whose rule is fully stated are applied; the others
-//! wait for their algorithms (`loading.md` open questions 11 and 13) and
-//! are listed in [`PENDING`].
+//! Submodules: [`records`] (record bytes), [`maps`] (runtime maps),
+//! [`text`] (wide text, tile paths), [`qsort`] (the CRT sort).
+
+pub mod maps;
+pub mod qsort;
+pub mod records;
+pub mod text;
+
+use d2_formats::animdata::{self, AnimData};
+use d2_formats::mpq::ArchiveSet;
 
 use crate::bin::{cstr, item_code_map, u32_at, BinSet, BinTable};
 use crate::compile::{code4, special_linker, CodeLinker, NameLinker};
 use crate::strings::StringTables;
+use maps::{ActRanges, Automap, EquivKind, EquivMatrix, Gamble, SeqEntry, SkillLists, StateMaps};
 
-/// String id of a missing unique or set item name (§7.4).
+/// String id of a missing unique or set item name (`fixups.md` §6).
 pub const MISSING_ITEM_NAME: u16 = 5383;
-/// hcIdx values the superunique map covers (§8).
+/// hcIdx values the superunique map covers (`loading.md` §8).
 pub const HC_INDICES: usize = 66;
-/// Superunique rows the loader reads (§8).
+/// Superunique rows the loader reads (`loading.md` §8).
 pub const SUPERUNIQUE_ROWS: usize = 512;
-/// Skills one pettype record lists (§7.4).
+/// Skills one pettype record lists (`fixups.md` §3).
 pub const PETTYPE_SKILLS: usize = 15;
 
-/// §7.4 fix-ups not applied yet, with what they wait for.
-pub const PENDING: &[(&str, &str)] = &[
-    ("itemtypes", "type-equivalence bit matrix (loading.md OQ13)"),
-    ("itemstatcost", "op-stat tables and flags +0x51–0x53 (OQ13)"),
-    ("skills", "per-class skill lists (OQ13)"),
-    ("charstats", "class-name strings (OQ13)"),
-    ("setitems", "attachment of items to their sets (OQ13)"),
-    (
-        "gems",
-        "code → id at +0x2C and items +0xF0 (field widths, OQ13)",
-    ),
-    ("gamble", "item level / index and the level sort (OQ13)"),
-    (
-        "monstats",
-        "class chain +0x4A/+0x4B and AnimData speeds (OQ11, OQ13)",
-    ),
-    ("levels", "wide strings and monster list counts (OQ13)"),
-    ("automap", "internal form (OQ13)"),
-];
+/// `loading.md` §7.4 fix-ups not applied yet, with what they wait for.
+/// Empty: every row of §7.4 is implemented.
+pub const PENDING: &[(&str, &str)] = &[];
 
 /// The fixed-up tables and the runtime maps.
 #[derive(Debug, Clone)]
 pub struct FixedSet {
-    /// The 73 record tables, fixed up, in load order.
+    /// The 73 record tables, fixed up, in load order. `gamble` and
+    /// `automap`, freed by 1.14d after conversion, are kept (gamble with
+    /// its +0x04/+0x08 writes).
     pub tables: Vec<BinTable>,
     /// The itemtypes code link, rebuilt from the records.
     pub item_types: CodeLinker,
@@ -55,8 +50,32 @@ pub struct FixedSet {
     pub sets: NameLinker,
     /// hcIdx → first superunique row holding it.
     pub superunique_hc: [Option<u16>; HC_INDICES],
-    /// itemstatcost record 0 `stuff` (+0x140), 6 when outside 1–8.
+    /// itemstatcost record 0 `stuff` (+0x140), 6 when outside 1–8, and
+    /// its mask (`runtime-maps.md` §3).
     pub stat_stuff: u32,
+    pub stat_mask: u32,
+    /// Type-equivalence matrices (`runtime-maps.md` §2).
+    pub itemtypes_equiv: EquivMatrix,
+    pub montype_equiv: EquivMatrix,
+    /// itemstatcost description list (§3).
+    pub stat_desc_list: Vec<u16>,
+    /// states bitsets and lists (§4).
+    pub states: StateMaps,
+    /// skills class and passive lists (§5).
+    pub skill_lists: SkillLists,
+    /// Version-0 item list (§6).
+    pub version0_items: Vec<u16>,
+    /// gamble index and thresholds (§7).
+    pub gamble: Gamble,
+    /// monseq index, monpreset act ranges, hireling id tables (§8).
+    pub monseq: Vec<SeqEntry>,
+    pub monpreset: ActRanges,
+    pub hireling_first: [[i32; maps::HIRELING_IDS]; 2],
+    /// leveldefs portal list, lvlsub first row per type (§9).
+    pub portals: Vec<u32>,
+    pub lvlsub_types: Vec<u32>,
+    /// automap converted records and ranges (§10).
+    pub automap: Automap,
 }
 
 impl FixedSet {
@@ -65,8 +84,8 @@ impl FixedSet {
     }
 }
 
-/// A fix-up could not run (a table it needs is absent, or a name has a
-/// byte ≥ 0x80).
+/// A fix-up could not run (a table it needs is absent, a name has a
+/// byte ≥ 0x80, or data 1.14d would read or write outside an array).
 #[derive(Debug, thiserror::Error)]
 #[error("{table}: {detail}")]
 pub struct FixupError {
@@ -89,6 +108,19 @@ fn get_u16(r: &[u8], o: usize) -> u16 {
     u16::from_le_bytes([r[o], r[o + 1]])
 }
 
+fn i16_at(r: &[u8], o: usize) -> i16 {
+    get_u16(r, o) as i16
+}
+
+fn i32_at(r: &[u8], o: usize) -> i32 {
+    u32_at(r, o) as i32
+}
+
+fn rec(t: &mut BinTable, k: usize) -> &mut [u8] {
+    let size = t.record_size;
+    &mut t.records[k * size..(k + 1) * size]
+}
+
 fn records_mut(t: &mut BinTable) -> impl Iterator<Item = &mut [u8]> {
     t.records.chunks_exact_mut(t.record_size.max(1))
 }
@@ -106,8 +138,17 @@ fn name_id(t: &mut BinTable, strings: &StringTables, from: usize, to: usize, mis
     }
 }
 
-/// Applies the fix-ups of every table, in load order.
-pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
+/// Reads and parses `AnimData.d2` from the archive set (`animdata.md` §1).
+pub fn read_animdata(set: &ArchiveSet) -> Result<AnimData, FixupError> {
+    let bytes = set
+        .read(animdata::PATH)
+        .map_err(|e| err("AnimData.d2", e.to_string()))?;
+    AnimData::parse(&bytes).map_err(|e| err("AnimData.d2", e.to_string()))
+}
+
+/// Applies the fix-ups of every table and builds the runtime maps, in
+/// load order. `anim` is the loaded `AnimData.d2` (monstats speeds).
+pub fn apply(data: &BinSet, anim: &AnimData) -> Result<FixedSet, FixupError> {
     let mut tables = data.tables.clone();
     let strings = &data.strings;
     let index = |tables: &[BinTable], n: &str| {
@@ -115,6 +156,12 @@ pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
             .iter()
             .position(|t| t.name == n)
             .ok_or_else(|| err(n, "table not loaded"))
+    };
+    let items = |tables: &[BinTable]| -> Vec<BinTable> {
+        ["weapons", "armor", "misc"]
+            .iter()
+            .filter_map(|n| tables.iter().find(|t| t.name == *n).cloned())
+            .collect()
     };
     let mut out = FixedSet {
         tables: Vec::new(),
@@ -124,6 +171,26 @@ pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
         sets: NameLinker::default(),
         superunique_hc: [None; HC_INDICES],
         stat_stuff: 0,
+        stat_mask: 0,
+        itemtypes_equiv: EquivMatrix::default(),
+        montype_equiv: EquivMatrix::default(),
+        stat_desc_list: Vec::new(),
+        states: StateMaps::default(),
+        skill_lists: SkillLists::default(),
+        version0_items: Vec::new(),
+        gamble: Gamble {
+            index: None,
+            thresholds: [0; maps::GAMBLE_LEVELS],
+        },
+        monseq: Vec::new(),
+        monpreset: ActRanges::default(),
+        hireling_first: [[-1; maps::HIRELING_IDS]; 2],
+        portals: Vec::new(),
+        lvlsub_types: Vec::new(),
+        automap: Automap {
+            records: Vec::new(),
+            ranges: Vec::new(),
+        },
     };
     for i in 0..tables.len() {
         let (earlier, rest) = tables.split_at_mut(i);
@@ -133,25 +200,32 @@ pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
                 for r in t.iter() {
                     out.item_types.add(u32::from_le_bytes(code4(&r[..4])));
                 }
+                out.itemtypes_equiv = maps::equiv_matrix(t, EquivKind::ItemTypes)?;
             }
+            "montype" => out.montype_equiv = maps::equiv_matrix(t, EquivKind::MonType)?,
             "itemstatcost" => {
-                for r in records_mut(t) {
-                    if r[0x54] > 13 {
-                        r[0x54] = 0;
-                    }
-                }
-                let stuff = t.iter().next().map_or(0, |r| u32_at(r, 0x140));
-                out.stat_stuff = if (1..=8).contains(&stuff) { stuff } else { 6 };
+                let stuff = t.iter().next().map_or(0, |r| i32_at(r, 0x140));
+                out.stat_stuff = if (1..=8).contains(&stuff) {
+                    stuff as u32
+                } else {
+                    6
+                };
+                out.stat_mask = (1 << out.stat_stuff) - 1;
+                records::stat_ops(t);
+                out.stat_desc_list = maps::desc_list(t);
             }
             "missiles" => {
                 for r in records_mut(t) {
                     r[0x183] = r[0x183].min(8);
                 }
             }
+            "states" => out.states = maps::states(t),
             "skills" => {
+                out.skill_lists = maps::skill_lists(t);
                 let p = index(earlier, "pettype")?;
                 append_pet_skills(t, &mut earlier[p]);
             }
+            "charstats" => records::charstats(t, strings)?,
             "magicsuffix" | "magicprefix" | "automagic" | "lowqualityitems" => {
                 name_id(t, strings, 0x00, 0x20, 0)
             }
@@ -174,16 +248,24 @@ pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
                     out.uniques = linker;
                 } else {
                     out.sets = linker;
+                    let s = index(earlier, "sets")?;
+                    records::attach_set_items(t, &mut earlier[s])?;
                 }
             }
+            "gems" => records::gems(t, earlier, strings)?,
+            "gamble" => {
+                let items = items(earlier);
+                let refs: Vec<&BinTable> = items.iter().collect();
+                out.gamble = maps::gamble(t, &out.item_codes, &refs)?;
+            }
+            "monseq" => out.monseq = maps::monseq(t)?,
             "monstats" => {
-                let count = t.count;
-                for (n, r) in records_mut(t).enumerate() {
-                    if get_u16(r, 0x02) as usize >= count {
-                        set_u16(r, 0x02, n as u16);
-                    }
-                }
+                let m2 = index(earlier, "monstats2")?;
+                let mm = index(earlier, "monmode")?;
+                records::monstats_chains(t)?;
+                records::monstats_speeds(t, &earlier[m2], &earlier[mm], anim)?;
             }
+            "monumod" => records::clamp_monumod(t),
             "superuniques" => {
                 for (n, r) in t.iter().take(SUPERUNIQUE_ROWS).enumerate() {
                     let hc = u32_at(r, 0x08) as usize;
@@ -192,156 +274,55 @@ pub fn apply(data: &BinSet) -> Result<FixedSet, FixupError> {
                     }
                 }
             }
+            "monpreset" => out.monpreset = maps::monpreset(t)?,
             "hireling" => {
                 name_id(t, strings, 0xD3, 0x114, 0);
                 name_id(t, strings, 0xF3, 0x116, 0);
+                out.hireling_first = maps::hireling_first(t)?;
             }
             "monequip" => {
                 let m = index(earlier, "monstats")?;
-                let items = item_code_map(earlier);
-                link_monequip(t, &mut earlier[m], &items);
+                records::link_monequip(t, &mut earlier[m], &out.item_codes);
             }
+            "levels" => records::levels(t, strings)?,
+            "leveldefs" => out.portals = maps::portals(t),
+            "lvltypes" | "lvlprest" => records::tile_paths(t, data.lod)?,
+            "lvlsub" => {
+                out.lvlsub_types = maps::lvlsub_types(t)?;
+                records::tile_paths(t, data.lod)?;
+            }
+            "automap" => out.automap = maps::automap(t)?,
+            "objects" => records::objects(t, strings)?,
             _ => {}
         }
         if t.name == "misc" {
             out.item_codes = item_code_map(&tables[..=i]);
+            let items = items(&tables[..=i]);
+            let refs: Vec<&BinTable> = items.iter().collect();
+            out.version0_items = maps::version0_items(&refs);
         }
     }
     out.tables = tables;
     Ok(out)
 }
 
-/// skills → pettype (§7.4): each skill whose `pettype` byte (+0xBE) names
-/// a pettype record is appended to that record's list (count +0xBC, u16
-/// skill indices from +0xC0), at most 15 per record.
+/// skills → pettype (`fixups.md` §3): each skill whose i8 `pettype`
+/// (+0xBE) names a pettype record is appended to that record's list (u32
+/// count +0xBC, u16 skill indices from +0xC0), at most 15 per record.
 fn append_pet_skills(skills: &BinTable, pettype: &mut BinTable) {
-    let size = pettype.record_size;
     for (s, r) in skills.iter().enumerate() {
-        let p = usize::from(r[0xBE]);
-        if p >= pettype.count {
+        let p = r[0xBE] as i8;
+        if p < 0 || p as usize >= pettype.count {
             continue;
         }
-        let rec = &mut pettype.records[p * size..(p + 1) * size];
-        let n = usize::from(get_u16(rec, 0xBC));
+        let rec = rec(pettype, p as usize);
+        let n = u32_at(rec, 0xBC) as usize;
         if n < PETTYPE_SKILLS {
             set_u16(rec, 0xC0 + 2 * n, s as u16);
-            set_u16(rec, 0xBC, n as u16 + 1);
-        }
-    }
-}
-
-/// monequip (§7.4): monstats +0x2A := first monequip row of that monster
-/// (else −1); loc bytes (+0x14..+0x17) outside 1–10, or whose item code
-/// (+0x08, +0x0C, +0x10) is not in the item code map, are cleared.
-fn link_monequip(monequip: &mut BinTable, monstats: &mut BinTable, items: &CodeLinker) {
-    let size = monstats.record_size;
-    for r in records_mut(monstats) {
-        set_u16(r, 0x2A, 0xFFFF);
-    }
-    for (n, r) in records_mut(monequip).enumerate() {
-        let m = usize::from(get_u16(r, 0x00));
-        if m < monstats.count {
-            let rec = &mut monstats.records[m * size..(m + 1) * size];
-            if get_u16(rec, 0x2A) == 0xFFFF {
-                set_u16(rec, 0x2A, n as u16);
-            }
-        }
-        for k in 0..3 {
-            let code = u32_at(r, 0x08 + 4 * k);
-            let loc = &mut r[0x14 + k];
-            if !(1..=10).contains(loc) || items.find(code).is_none() {
-                *loc = 0;
-            }
+            rec[0xBC..0xC0].copy_from_slice(&(n as u32 + 1).to_le_bytes());
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn table(name: &str, size: usize, records: Vec<Vec<u8>>) -> BinTable {
-        BinTable {
-            name: name.into(),
-            source: "test".into(),
-            count: records.len(),
-            record_size: size,
-            records: records
-                .into_iter()
-                .flat_map(|mut r| {
-                    r.resize(size, 0);
-                    r
-                })
-                .collect(),
-        }
-    }
-
-    fn rec(size: usize, writes: &[(usize, &[u8])]) -> Vec<u8> {
-        let mut r = vec![0; size];
-        for (o, b) in writes {
-            r[*o..*o + b.len()].copy_from_slice(b);
-        }
-        r
-    }
-
-    #[test]
-    fn pet_skills_cap_at_15() {
-        let mut pet = table("pettype", 224, vec![vec![]; 2]);
-        let skills = table(
-            "skills",
-            572,
-            (0..20)
-                .map(|s| {
-                    rec(
-                        572,
-                        &[(
-                            0xBE,
-                            &[if s == 3 {
-                                1
-                            } else if s == 4 {
-                                0xFF
-                            } else {
-                                0
-                            }],
-                        )],
-                    )
-                })
-                .collect(),
-        );
-        append_pet_skills(&skills, &mut pet);
-        let p0 = pet.record(0);
-        assert_eq!(get_u16(p0, 0xBC), 15);
-        let listed: Vec<u16> = (0..15).map(|k| get_u16(p0, 0xC0 + 2 * k)).collect();
-        assert_eq!(listed, [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        let p1 = pet.record(1);
-        assert_eq!((get_u16(p1, 0xBC), get_u16(p1, 0xC0)), (1, 3));
-    }
-
-    #[test]
-    fn monequip_links_and_clears() {
-        let mut items = CodeLinker::default();
-        items.add(u32::from_le_bytes(*b"hax "));
-        let mut ms = table("monstats", 424, vec![vec![]; 3]);
-        let mut me = table(
-            "monequip",
-            28,
-            vec![
-                rec(
-                    28,
-                    &[
-                        (0, &[2, 0]),
-                        (0x08, b"hax "),
-                        (0x0C, b"zzz "),
-                        (0x14, &[4, 4, 11]),
-                    ],
-                ),
-                rec(28, &[(0, &[2, 0]), (0x08, b"hax "), (0x14, &[0, 0, 0])]),
-                rec(28, &[(0, &[0, 0])]),
-            ],
-        );
-        link_monequip(&mut me, &mut ms, &items);
-        let at = |n| get_u16(ms.record(n), 0x2A);
-        assert_eq!([at(0), at(1), at(2)], [2, 0xFFFF, 0]);
-        assert_eq!(&me.record(0)[0x14..0x17], [4, 0, 0]);
-    }
-}
+mod tests;

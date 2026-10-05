@@ -31,18 +31,18 @@
 |   4. The `.bin` container | 201–252 |
 |   5. `.txt` record counting | 253–264 |
 |   6. Load order and record sizes (runtime tables) | 265–352 |
-|   7. Links and dependencies | 353–494 |
-|   8. Post-load checks (fatal in 1.14d) | 495–543 |
-|   9. Combined index spaces | 544–558 |
-|   10. Special cases | 559–617 |
-|   11. Txt vs bin cross-check | 618–658 |
-| Constants & data dependencies | 659–679 |
-| Randomness | 680–683 |
-| Edge cases & original bugs | 684–700 |
-| d2-data policy | 701–727 |
-| Test vectors | 728–761 |
-| Provenance | 762–850 |
-| Open questions | 851–904 |
+|   7. Links and dependencies | 353–489 |
+|   8. Post-load checks (fatal in 1.14d) | 490–538 |
+|   9. Combined index spaces | 539–553 |
+|   10. Special cases | 554–612 |
+|   11. Txt vs bin cross-check | 613–653 |
+| Constants & data dependencies | 654–674 |
+| Randomness | 675–678 |
+| Edge cases & original bugs | 679–695 |
+| d2-data policy | 696–722 |
+| Test vectors | 723–756 |
+| Provenance | 757–845 |
+| Open questions | 846–899 |
 <!-- /index -->
 
 ## Summary
@@ -481,16 +481,11 @@ Provenance). `AnimData.d2` (§1.3) loads before `monstats`, whose fix-up
 reads it.
 
 d2rs (`d2-data::fixup`, applied to a copy of the loaded set so the
-shipped bytes stay comparable, §11) applies: the itemtypes code link,
-the item code map, itemstatcost op clamp and `stuff`, missiles, the
-pettype lists, the affix, quality, lowquality and runes ids, uniqueitems,
-setitems (not the set attachment), monstats BaseId repair, the
-superunique hcIdx map, hireling ids and monequip. `data-tool dump-compare`
-on the 1.14d dump: these give identical bytes, except **monequip, which is
-wrong** (8 bytes): d2rs clears the loc of an empty item (`    `), which
-1.14d keeps, and runs the loc test on rows with no valid monster
-(`fixups.md` §9). Everything else in the table above is not implemented
-yet.
+shipped bytes stay comparable, §11) applies every row of the table above
+(2026-10-06; `fixup::PENDING` is empty), with `AnimData.d2` read by
+`d2-formats::animdata`. Before that step `data-tool dump-compare` gave 57
+of 70 tables identical; the full comparison on game files is queued
+(`docs/HANDOFF.md` §5).
 
 ### 8. Post-load checks (fatal in 1.14d)
 

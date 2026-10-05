@@ -1,0 +1,275 @@
+// Spec: specs/formats/animdata.md
+//! `AnimData.d2`: frames, speed and event bytes per COF name, in 256
+//! hash buckets, with a default record for names not in the file.
+
+use crate::cursor::{invalid, Cursor, FormatError};
+
+const FORMAT: &str = "animdata";
+
+/// Archive path (§1).
+pub const PATH: &str = "data\\global\\AnimData.d2";
+/// Buckets (§2).
+pub const BUCKETS: usize = 256;
+/// Record size (§2).
+pub const RECORD_SIZE: usize = 160;
+/// Event bytes per record (§2).
+pub const EVENTS: usize = 144;
+/// Default record frames / speed (§3).
+pub const DEFAULT_FRAMES: u32 = 2048;
+pub const DEFAULT_SPEED: u32 = 256;
+
+/// One 160-byte record (§2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnimRecord {
+    /// Name, NUL-padded to 8 bytes.
+    pub name: [u8; 8],
+    pub frames: u32,
+    pub speed: u32,
+    pub events: [u8; EVENTS],
+}
+
+/// The default record (§3): name all zero, 2048 frames, speed 256, no
+/// events.
+pub const DEFAULT_RECORD: AnimRecord = AnimRecord {
+    name: [0; 8],
+    frames: DEFAULT_FRAMES,
+    speed: DEFAULT_SPEED,
+    events: [0; EVENTS],
+};
+
+/// Result of the info query (§6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnimInfo {
+    pub frames: u32,
+    pub speed: u32,
+    pub first_event: u32,
+    pub found: bool,
+}
+
+/// The loaded table: 256 buckets of records in file order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnimData {
+    pub buckets: Vec<Vec<AnimRecord>>,
+}
+
+/// Uppercases `a`..`z` (§4 step 1); bytes ≥ 0x80 stay.
+pub fn uppercase(name: &mut [u8]) {
+    for b in name.iter_mut() {
+        if b.is_ascii_lowercase() {
+            *b -= 0x20;
+        }
+    }
+}
+
+/// Bucket of a name (§4 step 2): sum of its bytes up to the first NUL,
+/// mod 256. No uppercasing here.
+pub fn hash(name: &[u8]) -> usize {
+    name.iter()
+        .take_while(|&&b| b != 0)
+        .fold(0u32, |s, &b| s + u32::from(b)) as usize
+        % BUCKETS
+}
+
+impl AnimData {
+    /// Parses the file with the d2rs validation of §2: non-negative
+    /// counts, blocks ending exactly at the end of the file, a NUL in
+    /// every record name.
+    pub fn parse(data: &[u8]) -> Result<AnimData, FormatError> {
+        let mut c = Cursor::new(data, FORMAT);
+        let mut buckets = Vec::with_capacity(BUCKETS);
+        for b in 0..BUCKETS {
+            let count = c.i32()?;
+            if count < 0 {
+                return Err(invalid(FORMAT, format!("bucket {b}: count {count}")));
+            }
+            let mut records = Vec::with_capacity(count as usize);
+            for _ in 0..count {
+                let at = c.pos();
+                let raw = c.bytes(RECORD_SIZE)?;
+                let mut name = [0u8; 8];
+                name.copy_from_slice(&raw[..8]);
+                if !name.contains(&0) {
+                    return Err(invalid(
+                        FORMAT,
+                        format!("record at {at:#x}: name has no NUL"),
+                    ));
+                }
+                let mut events = [0u8; EVENTS];
+                events.copy_from_slice(&raw[0x10..]);
+                records.push(AnimRecord {
+                    name,
+                    frames: u32::from_le_bytes([raw[8], raw[9], raw[10], raw[11]]),
+                    speed: u32::from_le_bytes([raw[12], raw[13], raw[14], raw[15]]),
+                    events,
+                });
+            }
+            buckets.push(records);
+        }
+        if c.pos() != data.len() {
+            return Err(invalid(
+                FORMAT,
+                format!(
+                    "blocks end at {:#x}, file has {:#x} bytes",
+                    c.pos(),
+                    data.len()
+                ),
+            ));
+        }
+        Ok(AnimData { buckets })
+    }
+
+    /// Name lookup (§4): uppercases, hashes, and returns the first record
+    /// whose 8 name bytes equal the NUL-padded query. A query longer than
+    /// 8 characters is an error when its bucket is non-empty (fatal 0xD9
+    /// in 1.14d). `name` ends at its first NUL or its end.
+    pub fn find(&self, name: &[u8]) -> Result<Option<&AnimRecord>, FormatError> {
+        let len = name.iter().position(|&b| b == 0).unwrap_or(name.len());
+        let mut key = name[..len].to_vec();
+        uppercase(&mut key);
+        let bucket = &self.buckets[hash(&key)];
+        if bucket.is_empty() {
+            return Ok(None);
+        }
+        if key.len() > 8 {
+            return Err(invalid(
+                FORMAT,
+                format!("query {:?} longer than 8", String::from_utf8_lossy(&key)),
+            ));
+        }
+        let mut padded = [0u8; 8];
+        padded[..key.len()].copy_from_slice(&key);
+        Ok(bucket.iter().find(|r| r.name == padded))
+    }
+
+    /// §5: the record for a composed name, or the default record.
+    pub fn record(&self, name: &[u8]) -> Result<&AnimRecord, FormatError> {
+        Ok(self.find(name)?.unwrap_or(&DEFAULT_RECORD))
+    }
+
+    /// Info query (§6).
+    pub fn info(&self, name: &[u8]) -> Result<AnimInfo, FormatError> {
+        Ok(match self.find(name)? {
+            Some(r) => {
+                let limit = r.frames.min(EVENTS as u32);
+                let first_event = (0..limit)
+                    .find(|&i| r.events[i as usize] != 0)
+                    .unwrap_or(limit);
+                AnimInfo {
+                    frames: r.frames,
+                    speed: r.speed,
+                    first_event,
+                    found: true,
+                }
+            }
+            None => AnimInfo {
+                frames: DEFAULT_FRAMES,
+                speed: DEFAULT_SPEED,
+                first_event: DEFAULT_FRAMES,
+                found: false,
+            },
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// (name, frames, speed, events as (frame, value)).
+    type Rec<'a> = (&'a [u8], u32, u32, &'a [(usize, u8)]);
+
+    /// A file with the given records in their hash buckets.
+    fn file(records: &[Rec]) -> Vec<u8> {
+        let mut buckets: Vec<Vec<u8>> = vec![Vec::new(); BUCKETS];
+        let mut counts = [0i32; BUCKETS];
+        for (name, frames, speed, events) in records {
+            let b = hash(name);
+            counts[b] += 1;
+            let mut r = vec![0u8; RECORD_SIZE];
+            r[..name.len()].copy_from_slice(name);
+            r[8..12].copy_from_slice(&frames.to_le_bytes());
+            r[12..16].copy_from_slice(&speed.to_le_bytes());
+            for &(i, v) in *events {
+                r[0x10 + i] = v;
+            }
+            buckets[b].extend(r);
+        }
+        let mut out = Vec::new();
+        for b in 0..BUCKETS {
+            out.extend(counts[b].to_le_bytes());
+            out.extend(&buckets[b]);
+        }
+        out
+    }
+
+    #[test]
+    fn hash_vectors() {
+        assert_eq!(hash(b""), 0);
+        assert_eq!(hash(b"A"), 65);
+        assert_eq!(hash(b"ZZZZZZZ"), 118);
+        let mut n = *b"skwl1hs";
+        uppercase(&mut n);
+        assert_eq!(&n, b"SKWL1HS");
+        assert_eq!(hash(&n), 13);
+    }
+
+    #[test]
+    fn empty_file_gives_default() {
+        let a = AnimData::parse(&vec![0; 1024]).unwrap();
+        assert_eq!(a.record(b"X").unwrap(), &DEFAULT_RECORD);
+        assert_eq!(
+            a.info(b"X").unwrap(),
+            AnimInfo {
+                frames: 2048,
+                speed: 256,
+                first_event: 2048,
+                found: false
+            }
+        );
+    }
+
+    #[test]
+    fn first_event_frame() {
+        let a = AnimData::parse(&file(&[
+            (b"AAWL1HS", 4, 128, &[(2, 2)]),
+            (b"BBWL1HS", 3, 64, &[]),
+            (b"CCDTHTH", 200, 168, &[]),
+        ]))
+        .unwrap();
+        let i = a.info(b"aawl1hs").unwrap();
+        assert_eq!(
+            (i.frames, i.speed, i.first_event, i.found),
+            (4, 128, 2, true)
+        );
+        assert_eq!(a.info(b"BBWL1HS").unwrap().first_event, 3);
+        assert_eq!(a.info(b"CCDTHTH").unwrap().first_event, 144);
+    }
+
+    #[test]
+    fn first_duplicate_wins() {
+        let a = AnimData::parse(&file(&[
+            (b"VMS1HTH", 17, 200, &[]),
+            (b"VMS1HTH", 17, 160, &[]),
+        ]))
+        .unwrap();
+        assert_eq!(a.record(b"VMS1HTH").unwrap().speed, 200);
+    }
+
+    #[test]
+    fn strict_layout() {
+        assert!(AnimData::parse(&[0; 1023]).is_err());
+        assert!(AnimData::parse(&[0; 1025]).is_err());
+        let mut f = vec![0u8; 1024];
+        f[..4].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(AnimData::parse(&f).is_err());
+    }
+
+    #[test]
+    fn long_query_in_used_bucket_is_an_error() {
+        let a = AnimData::parse(&file(&[(b"A", 1, 1, &[])])).unwrap();
+        // "AAAAAAAAA" hashes to 9 × 65 = 585 → 73, an empty bucket.
+        assert!(a.find(b"AAAAAAAAA").unwrap().is_none());
+        // 9 bytes summing to 65 mod 256: "A" + eight 0x20 → 65 + 256.
+        assert!(a.find(b"A        ").is_err());
+    }
+}
