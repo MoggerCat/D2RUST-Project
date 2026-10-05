@@ -151,7 +151,9 @@ don't open it.
 - **Token budget** (user's plan, 2026-10-05): ~15–20M tokens per 5-hour
   window, ~400M per week. Measured costs: a focused agent run is
   ~250–500k tokens; a long main thread costs more with every turn. Plan a
-  5-hour window at ≤12M (headroom for fixes): roughly 15–25 agent runs.
+  5-hour window at **under 6M** (user's cap): roughly 8–12 agent runs plus
+  the main thread. Spend it on the critical path first; run independent
+  agents in parallel for speed.
   Say the planned spend before launching a batch. Raise effort to high
   only for: RE/spec writing, an exactness mismatch the first fix didn't
   solve, architecture decisions, and a spec a whole phase will build on.
