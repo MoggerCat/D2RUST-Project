@@ -113,10 +113,10 @@ evidence; a trial that fails is removed or rewritten, not kept.
 - Status: proven — medium-effort implementation sessions finished specced work first time.
 
 ## M15 Budget the spend
-- Rule: Plan token spend per usage window, state it before launching a batch, spend on the critical path first, and raise effort only where the task class needs it.
-- Why: spend grows quietly; a stated plan makes overruns visible.
+- Rule: Plan token spend per usage window against both a cap and a floor, state it before launching a batch, spend on the critical path first, and raise effort only where the task class needs it. Reach the floor with more independent useful work running in parallel, never with padding (review layers, repeated runs, higher effort than the task class needs).
+- Why: spend grows quietly, and unused budget is lost speed; a stated plan makes both overruns and idle capacity visible.
 - Check: each batch launch states its planned spend.
-- Here: user's plan (2026-10-05): about 15–20M tokens per 5-hour window, about 400M per week; plan a window at under 6M (user's cap), roughly 8–12 agent runs plus the main thread. A focused run costs about 250–500k; a long main thread costs more every turn. High effort only for RE and spec writing, an exactness mismatch the first fix did not solve, architecture, and a spec a whole phase builds on.
+- Here: user's plan (2026-10-06, Max 20x): cap 24M tokens per 5-hour window (4× the earlier 6M), floor 80% (about 19M) whenever enough independent work exists; if it does not, say so instead of padding. That is roughly 30–50 agent runs, or several parallel cloud sessions (implementation) beside the local spec session. A focused run costs about 250–500k; a long main thread costs more every turn. High effort only for RE and spec writing, an exactness mismatch the first fix did not solve, architecture, and a spec a whole phase builds on.
 - Status: proven — measured costs match the plan.
 
 ## M16 Split work by access to ground truth

@@ -24,6 +24,7 @@ behaviors the engine reproduces exactly.
 | Language | Rust | Toolchain pinned in `rust-toolchain.toml`. |
 | Fidelity scope | Exact match everywhere, no "close enough" tier (`CLAUDE.md` rule 10) | Decided 2026-10-05. No boundary between "must be exact" and "may be approximate" can be drawn reliably, and one slipped area costs more debugging than loosening saves. Each area defines its comparison (bytes, pixels, decoded samples, ticks); unchecked features stay "unverified". |
 | Methods collection | `docs/METHODS.md` + `tools/methods.py` | Decided 2026-10-05. General methods live there, each with its project binding (Here) and status (proven with evidence, or trial); `CLAUDE.md` keeps hard rules and project facts. `methods.py export` gives the general form for future projects. |
+| Token budget | Cap 24M per 5-hour window, floor 80% (METHODS M15) | Decided 2026-10-06 with the Max 20x plan (was: under 6M). The floor is met with more independent work in parallel, never with padding. |
 | Client engine | Bevy, pinned version (0.19.x at time of writing) | Client crate only. Upgrades are separate tasks between milestones. |
 | Simulation | Plain Rust, deterministic, integer math, 25 Hz | Never depends on Bevy. |
 | Network model | Server-authoritative; single player = local server | Same protocol for both. |
