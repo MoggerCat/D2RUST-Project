@@ -30,17 +30,17 @@
 |   3. Type vocabulary | 139–201 |
 |   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 202–229 |
 |   5. Text, codes and names | 230–256 |
-|   6. Linkers (key → index) | 257–347 |
-|   7. String keys (`strkey`) | 348–379 |
-|   8. Callback fields (`cb`) | 380–431 |
-|   9. Records | 432–452 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 453–486 |
-| Constants & data dependencies | 487–501 |
-| Randomness | 502–505 |
-| Edge cases & original bugs | 506–513 |
-| Test vectors | 514–639 |
-| Provenance | 640–718 |
-| Open questions | 719–740 |
+|   6. Linkers (key → index) | 257–365 |
+|   7. String keys (`strkey`) | 366–397 |
+|   8. Callback fields (`cb`) | 398–449 |
+|   9. Records | 450–470 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 471–504 |
+| Constants & data dependencies | 505–519 |
+| Randomness | 520–523 |
+| Edge cases & original bugs | 524–531 |
+| Test vectors | 532–657 |
+| Provenance | 658–736 |
+| Open questions | 737–764 |
 <!-- /index -->
 
 ## Summary
@@ -344,6 +344,24 @@ codes: the items loader registers `code` (offset 128) of the combined
 records in order with the §6.1 add, so duplicates bump as in a compile.
 The other runtime maps: `runtime-maps.md`; whether each rebuild treats
 duplicates the same way: Open question 3.
+
+**6.7 Link validation (d2rs).** A lookup field (IDs 11, 13, 15, 19–21)
+of a loaded record holds value `v` (its width, little-endian). It is
+valid when `v < n(K)`, legal as a miss when `v` is −1 at its width
+(§6.3), and otherwise broken; d2rs reports each broken cell with table,
+row and column (`d2-data::links`, `data-tool links`). `n(K)` is K's key
+count after its owner compiled: a code or add-always key adds one key per
+record (`items.code`: weapons + armor + misc counts); a find-or-add name
+key stores its index, so `n` = largest stored index + 1; `@range` 5;
+`@treasureclass` the TC count (`loading.md` §10.6). Since §6.3 keeps only
+the low bits, `v < n(K)` is exact for every field width. Linker sizes come
+from the live records; a compile-only linker (`loading.md` §7.2) takes its
+size from its `.bin` by-product, or for a `<table>_lookup` list from the
+runtime table compiled from the same `.txt` (code: its record count;
+name: its own key's size). Gap: Open question 11. On the 1.14d set
+(`data-tool links`, 2026-10-06): 72,175 valid, 84,277 misses, 0 broken,
+0 unchecked fields; `items.code` 659, `@treasureclass` 1,013,
+`sounds.Sound` 4,699, `monseq.sequence` 60.
 
 ### 7. String keys (`strkey`)
 
@@ -737,3 +755,9 @@ functions) agrees with every rule here.
    `soundenviron.txt` 88-byte records) were not examined; they use the same
    compiler functions.
 10. Bytes ≥ 0x80 in name keys: the original's mapping is not reproduced.
+11. §6.7 checks range only. Not checked: that a by-product `.bin` was
+    compiled from the same `.txt` as the runtime tables that link to it
+    (sizes assume so); whether a table-specific callback (§8.3) overwrites
+    a lookup field's bytes after the lookup (no `fields.tsv` field overlaps
+    a lookup field, callbacks were not examined for this); and whether
+    1.14d code relies on a narrower range than `n(K)` for some fields.

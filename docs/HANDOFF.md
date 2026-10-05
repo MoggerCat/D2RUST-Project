@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core, callbacks, first fix-ups, typed tables; fix-up specs complete and dump-confirmed | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`); `data-tool dump-compare`: 57/70 tables identical to 1.14d memory (rest: unimplemented fix-ups, §2) |
+| 2 Data | in progress: core, callbacks, first fix-ups, typed tables, cross-reference validation (`data-tool links`: 0 broken); fix-up specs complete and dump-confirmed | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `d2-data` game-file tests all pass (including `typed_tables_decode`); `data-tool dump-compare`: 57/70 tables identical to 1.14d memory (rest: unimplemented fix-ups, §2) |
 | 3 Simulation | in progress: RNG done | `cargo test -p d2-sim -p conformance`: spec vectors pass; all 256 draws of `traces/sim/rng/*.json` replay exactly |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -30,13 +30,10 @@ rather than restating them.
    (`formats/animdata.md`) for the monstats speeds. Unit tests from the
    synthetic vectors; `dump-compare` compares the maps too (add their
    d2rs counterparts). Proof: local queue entry (§5).
-2. **Cross-reference validation**: on branch
-   `claude/cross-reference-validation`, checked locally 2026-10-06
-   (`data-tool links`: 0 broken, 0 unchecked); merge it.
-3. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`
+2. **Patch layers** (implementation, medium): `specs/data/patch-layers.md`
    (in progress on `claude/patch-layers`).
    Phase 2 exit = "patches apply"; the mod itself is deferred.
-4. **Phase 3 specs** (spec writing / RE, local, high): the tick loop,
+3. **Phase 3 specs** (spec writing / RE, local, high): the tick loop,
    intents in / events out and unit ordering, then units and stats
    (`docs/PLAN.md` Phase 3). Only `specs/sim/rng.md` exists so far.
 
@@ -51,6 +48,7 @@ rather than restating them.
 | `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
 | `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
 | `crates/d2-data/src/codegen.rs`, `tables/` | typed record structs: generator, generated `tables/generated.rs` (don't edit; `data-tool gen-tables`), `Record`, `decode_all` | `data/schema.md` |
+| `crates/d2-data/src/links.rs` (+ `links/tests.rs`) | cross-reference validation: linker sizes, broken links by table/row/column | `data/field-types.md` §6.7 |
 | `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/fixups.md`, `data/runtime-maps.md` (summary `loading.md` §7.4) |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
@@ -63,7 +61,7 @@ rather than restating them.
 | `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
 | `d2-proto`, `d2-net`, `d2-server`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
-| `tools/data-tool` | `tables`: the Phase 2 cross-check; `gen-tables`: regenerate typed structs; `dump-compare`: fix-ups vs a 1.14d memory dump | `data/fixups.md`, `data/runtime-maps.md` |
+| `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set; `gen-tables`: regenerate typed structs; `dump-compare`: fix-ups vs a 1.14d memory dump | `data/field-types.md` §6.7, `data/fixups.md`, `data/runtime-maps.md` |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows); `dump_tables.py`: the excel tables and runtime maps in 1.14d memory after the load | `sim/rng.md`, `traces/FORMAT.md`, `data/runtime-maps.md` |
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
@@ -81,6 +79,7 @@ rather than restating them.
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
+| `cargo run --release -p data-tool -- links` | no broken link in the live `.bin` set | `game/` |
 | `cargo run --release -p mpq-tool -- check` / `formats` | every archive block / every format file decodes | `game/` |
 | `cargo run --release -p d2-client -- verify` | GPU render byte-identical to CPU reference | `game/`, GPU |
 | `py tools/trace-recorder/record_rng.py --seconds N` then `check_rng.py` | RNG spec matches the real game | `game/`, Windows |

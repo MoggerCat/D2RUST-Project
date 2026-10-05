@@ -117,7 +117,7 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       `d2-data::tables`, `data-tool gen-tables`; callback and fix-up bytes
       are read from the raw record; every live table decodes,
       `typed_tables_decode` 2026-10-06)
-- [ ] Cross-reference resolution with validation errors
+- [x] Cross-reference resolution with validation errors (`d2-data::links`, `data-tool links`; `field-types.md` §6.7; 1.14d live set 2026-10-06: 0 broken, 0 unchecked)
 - [ ] Mod patch layer format + loader
 **Exit:** all tables load from the user's install; patches apply; broken
 references are reported.
