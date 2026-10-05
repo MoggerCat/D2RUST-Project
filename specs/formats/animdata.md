@@ -1,11 +1,13 @@
 # Spec: Formats — AnimData.d2 (animation length, speed and events by COF name)
 
-- **Status:** draft. Layout, lookup and defaults confirmed against the
+- **Status:** implemented (`d2-formats::animdata`, synthetic vectors
+  pass 2026-10-06; the real-file vectors are not yet tests). Layout,
+  lookup and defaults confirmed against the
   1.14d `Game.exe` loader and lookup code and measured on the 1.14d file
   (exact size, every record in its hash bucket, frames/speed/events equal
   to the matching `.cof` for every non-duplicate record).
 - **Target version:** 1.14d
-- **Crate/module:** `d2-formats::animdata` (not written yet)
+- **Crate/module:** `d2-formats::animdata`
 - **Related specs:** `specs/data/loading.md` §1.3 (when it loads), §2
   (archive order); `specs/data/fixups.md` §8 (monstats speeds read it);
   `specs/formats/cof.md` (the files this table caches).
@@ -13,24 +15,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 36–45 |
-| Inputs | 46–52 |
-| Outputs / state changes | 53–59 |
-| Rules | 60–63 |
-|   1. Source file | 64–78 |
-|   2. Layout | 79–106 |
-|   3. Default record | 107–112 |
-|   4. Name lookup (`0x0066A8F0`) | 113–135 |
-|   5. Record by unit, class and mode (`0x0066A9B0`) | 136–146 |
-|   6. Info query (`0x0066AA80`) | 147–160 |
-|   7. Speed setter (debug) | 161–166 |
-| Constants & data dependencies | 167–177 |
-| Randomness | 178–181 |
-| Edge cases & original bugs | 182–197 |
-| Test vectors | 198–230 |
-| expfield.d2 | 231–266 |
-| Provenance | 267–292 |
-| Open questions | 293–307 |
+| Summary | 38–47 |
+| Inputs | 48–54 |
+| Outputs / state changes | 55–61 |
+| Rules | 62–65 |
+|   1. Source file | 66–80 |
+|   2. Layout | 81–108 |
+|   3. Default record | 109–114 |
+|   4. Name lookup (`0x0066A8F0`) | 115–137 |
+|   5. Record by unit, class and mode (`0x0066A9B0`) | 138–148 |
+|   6. Info query (`0x0066AA80`) | 149–162 |
+|   7. Speed setter (debug) | 163–168 |
+| Constants & data dependencies | 169–179 |
+| Randomness | 180–183 |
+| Edge cases & original bugs | 184–199 |
+| Test vectors | 200–232 |
+| expfield.d2 | 233–268 |
+| Provenance | 269–294 |
+| Open questions | 295–309 |
 <!-- /index -->
 
 ## Summary

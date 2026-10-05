@@ -1,9 +1,12 @@
 # Spec: Data — Runtime maps built by the table loaders
 
-- **Status:** draft. Every map below was reproduced byte for byte from the
-  live `.bin` files by scratch reimplementations and compared with the
-  1.14d post-load dump (`dump_tables.py`, 2026-10-06; 27 dumped maps, the
-  pointer-holding ones compared as indices). None is built by d2rs yet.
+- **Status:** implemented. Every map below was reproduced byte for byte
+  from the live `.bin` files by scratch reimplementations and compared
+  with the 1.14d post-load dump (`dump_tables.py`, 2026-10-06; 27 dumped
+  maps, the pointer-holding ones compared as indices). `d2-data::fixup`
+  (`maps`, `qsort`) builds every map and passes the synthetic vectors
+  (2026-10-06); `data-tool dump-compare` on game files is queued
+  (`docs/HANDOFF.md` §5).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::fixup` (the maps live next to the fixed
   tables)
@@ -14,26 +17,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–47 |
-| Inputs | 48–52 |
-| Outputs / state changes | 53–80 |
-| Rules | 81–82 |
-|   1. The CRT sort (`qsort`) | 83–114 |
-|   2. Type-equivalence matrices (itemtypes, montype) | 115–150 |
-|   3. itemstatcost globals and description list | 151–166 |
-|   4. states | 167–184 |
-|   5. skills: class lists and passive list | 185–199 |
-|   6. Items: version-0 list | 200–207 |
-|   7. gamble | 208–228 |
-|   8. monseq, monpreset, hireling | 229–253 |
-|   9. leveldefs, lvlsub | 254–267 |
-|   10. automap | 268–296 |
-| Constants & data dependencies | 297–309 |
-| Randomness | 310–313 |
-| Edge cases & original bugs | 314–332 |
-| Test vectors | 333–383 |
-| Provenance | 384–422 |
-| Open questions | 423–433 |
+| Summary | 42–50 |
+| Inputs | 51–55 |
+| Outputs / state changes | 56–83 |
+| Rules | 84–85 |
+|   1. The CRT sort (`qsort`) | 86–117 |
+|   2. Type-equivalence matrices (itemtypes, montype) | 118–153 |
+|   3. itemstatcost globals and description list | 154–169 |
+|   4. states | 170–187 |
+|   5. skills: class lists and passive list | 188–202 |
+|   6. Items: version-0 list | 203–210 |
+|   7. gamble | 211–231 |
+|   8. monseq, monpreset, hireling | 232–256 |
+|   9. leveldefs, lvlsub | 257–270 |
+|   10. automap | 271–299 |
+| Constants & data dependencies | 300–312 |
+| Randomness | 313–316 |
+| Edge cases & original bugs | 317–335 |
+| Test vectors | 336–386 |
+| Provenance | 387–425 |
+| Open questions | 426–441 |
 <!-- /index -->
 
 ## Summary
@@ -430,3 +433,8 @@ data-table offsets (`D2DataTbls.h`), as hints only.
    specs that read them.
 3. The treasure-class runtime form (`loading.md` §10.6; the
    `treasureclassex` records are freed) is not dumped or specified here.
+4. Where 1.14d reads out of range, d2rs reports the error at the point
+   the spec names; for §2 that is when a negative link is pushed, even if
+   the walk would end before popping it (1.14d reads out of range only on
+   the pop). Equal for every 1.14d row; whether the earlier error can
+   reject data 1.14d accepts is not traced.
