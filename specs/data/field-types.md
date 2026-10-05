@@ -30,17 +30,17 @@
 |   3. Type vocabulary | 139–201 |
 |   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 202–229 |
 |   5. Text, codes and names | 230–256 |
-|   6. Linkers (key → index) | 257–362 |
-|   7. String keys (`strkey`) | 363–394 |
-|   8. Callback fields (`cb`) | 395–446 |
-|   9. Records | 447–467 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 468–501 |
-| Constants & data dependencies | 502–516 |
-| Randomness | 517–520 |
-| Edge cases & original bugs | 521–528 |
-| Test vectors | 529–654 |
-| Provenance | 655–733 |
-| Open questions | 734–761 |
+|   6. Linkers (key → index) | 257–365 |
+|   7. String keys (`strkey`) | 366–397 |
+|   8. Callback fields (`cb`) | 398–449 |
+|   9. Records | 450–470 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 471–504 |
+| Constants & data dependencies | 505–519 |
+| Randomness | 520–523 |
+| Edge cases & original bugs | 524–531 |
+| Test vectors | 532–657 |
+| Provenance | 658–736 |
+| Open questions | 737–764 |
 <!-- /index -->
 
 ## Summary
@@ -358,7 +358,10 @@ the low bits, `v < n(K)` is exact for every field width. Linker sizes come
 from the live records; a compile-only linker (`loading.md` §7.2) takes its
 size from its `.bin` by-product, or for a `<table>_lookup` list from the
 runtime table compiled from the same `.txt` (code: its record count;
-name: its own key's size). Gap: Open question 11.
+name: its own key's size). Gap: Open question 11. On the 1.14d set
+(`data-tool links`, 2026-10-06): 72,175 valid, 84,277 misses, 0 broken,
+0 unchecked fields; `items.code` 659, `@treasureclass` 1,013,
+`sounds.Sound` 4,699, `monseq.sequence` 60.
 
 ### 7. String keys (`strkey`)
 

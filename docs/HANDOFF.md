@@ -91,14 +91,9 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-Cross-reference validation (branch `claude/cross-reference-validation`):
-run `cargo test --release -p d2-data -- --ignored live_set_has_no_broken_links`
-and `cargo run --release -p data-tool -- links`. Expect: no `UNCHECKED`
-line, `0 broken`, exit 0; linker sizes `items.code` 659, `@treasureclass`
-1013, `sounds.Sound` 4699, `monseq.sequence` 60. If a link is broken,
-check first whether a table callback (§8.3) writes over that field
-(`field-types.md` OQ11) before calling it a data error. Record the
-summary line here and in `field-types.md` §6.7.
+Cross-reference validation: done 2026-10-06 (`data-tool links`:
+72,175 valid, 84,277 misses, 0 broken, 0 unchecked; exit 0;
+`live_set_has_no_broken_links` passes).
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
