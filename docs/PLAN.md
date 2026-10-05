@@ -143,7 +143,13 @@ and map, each reproduced byte for byte against that dump.
 
 ### Phase 3 — Core simulation (`d2-sim`)
 - [x] D2 seeded RNG (exact sequence match) — **first**. *`d2-sim::rng` (`Seed`: step, `roll`, `mask`, `mask_range`, `roll_range`, setters, `derive`, `time_value`); unit tests from the spec vectors; `conformance` replays all 256 draws of `traces/sim/rng/*.json` exactly. Spec status `conformance-passing`.*
-- [ ] Tick loop, intents in / events out, unit ordering
+- [ ] Tick loop, intents in / events out, unit ordering. *Specs written
+      (2026-10-06): `specs/sim/tick.md`, `sim/unit-order.md`,
+      `sim/intents-events.md` (+ `client-messages.tsv`,
+      `server-messages.tsv`), each confirmed on a hand-played 1.14d
+      recording (`check_tick.py`: 4,902 ticks, 16,704 timer runs, 197 list
+      snapshots, 0 mismatches; `check_packets.py`: rules R1–R7, 0
+      failures). Status draft until implemented.*
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops
