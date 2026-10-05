@@ -15,6 +15,9 @@ pub mod mpq;
 pub mod palette;
 pub mod tbl;
 
+#[cfg(test)]
+mod robust;
+
 pub use cursor::FormatError;
 
 /// The data archives every supported install must contain (see
