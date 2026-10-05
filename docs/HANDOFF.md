@@ -86,11 +86,6 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-- From branch `claude/happy-maxwell-93ocnk` (typed tables, 2026-10-05):
-  `cargo test -p d2-data -- --ignored typed_tables_decode`: passes (every
-  live table decodes with its generated struct; `weapons` 306 records,
-  `uniqueitems` 122 = The Stone of Jordan, `rin `, lvl 39).
-
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
 single-player game, kill a few monsters and pick up a drop. Recording
