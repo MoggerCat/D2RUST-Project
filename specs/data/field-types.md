@@ -34,13 +34,13 @@
 |   7. String keys (`strkey`) | 348–379 |
 |   8. Callback fields (`cb`) | 380–431 |
 |   9. Records | 432–452 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 453–487 |
-| Constants & data dependencies | 488–502 |
-| Randomness | 503–506 |
-| Edge cases & original bugs | 507–514 |
-| Test vectors | 515–640 |
-| Provenance | 641–719 |
-| Open questions | 720–741 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 453–486 |
+| Constants & data dependencies | 487–501 |
+| Randomness | 502–505 |
+| Edge cases & original bugs | 506–513 |
+| Test vectors | 514–639 |
+| Provenance | 640–718 |
+| Open questions | 719–740 |
 <!-- /index -->
 
 ## Summary

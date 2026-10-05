@@ -58,8 +58,15 @@ decompiled code.
 9. **Mods ship as patches, not copies.** Mod data is expressed as changes
    applied to the user's own tables at load time. Never write out full
    modified Blizzard tables into the repo or a release.
-10. **Fidelity is measured, not guessed.** A simulation feature is "done" only
-    when conformance tests pass against traces recorded from the original game.
+10. **Fidelity is measured, not guessed — everywhere.** Every behavior taken
+    from the original is held to exact match; there is no "close enough" tier.
+    "Exact" means equal under a comparison defined in the feature's spec:
+    identical bytes for logic, data and RNG; identical pixels for rendering;
+    identical decoded samples and trigger ticks for audio; identical tick
+    numbers (not wall-clock time) for timing. A feature is "done" only when
+    its check passes against the original 1.14d (traces, live data, renders).
+    A feature without a check yet is "unverified", never "done": queue the
+    check (`docs/HANDOFF.md` §5) instead of judging by eye.
 
 ## Repository layout
 
@@ -138,6 +145,17 @@ don't open it.
 - **Turn facts into checks.** When a spec holds a list or table code
   consumes, make it a TSV plus a mechanical check (like `fields.tsv` +
   `data-tool tables`). A failing check beats an agent rereading prose.
+- **Say where a claim holds.** A fact passed between sessions, agents or
+  documents names its scope: the branch or commit, the game version, the
+  archive or table it was checked on. "Exists" means "exists on `main`"
+  unless stated otherwise. A claim without its scope is treated as
+  unverified by the receiver.
+- **Proven methods before new ones.** For a problem, first use a project
+  convention, an existing tool in `tools/`, or an established method
+  (debugger traces, Ghidra exports, byte-exact cross-checks, strict
+  parsers, TSV + check). Invent only when none fits; then say so in the
+  commit and the spec, and give the new piece its own check before
+  anything builds on it.
 - **Match the agent to the task.**
 
   | Task | Model | Effort |

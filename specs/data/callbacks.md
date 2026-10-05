@@ -19,25 +19,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–53 |
-| Inputs | 54–63 |
-| Outputs / state changes | 64–69 |
-| Rules | 70–71 |
-|   1. Shared rules | 72–110 |
-|   2. `cb(cubemain.input)` — recipe inputs | 111–168 |
-|   3. `cb(cubemain.output)` — recipe outputs | 169–249 |
-|   4. `cb(monstats.skillmode)` — skill modes | 250–273 |
-|   5. `cb(monstats2.composit)` — component choices | 274–294 |
-|   6. `cb(monpreset.place)` — preset placement | 295–308 |
-|   7. Lookups | 309–337 |
-|   8. Errors and diagnostics | 338–356 |
-|   9. `cubemain` `param` | 357–366 |
-| Constants & data dependencies | 367–384 |
-| Randomness | 385–388 |
-| Edge cases & original bugs | 389–416 |
-| Test vectors | 417–495 |
-| Provenance | 496–563 |
-| Open questions | 564–572 |
+| Summary | 43–55 |
+| Inputs | 56–65 |
+| Outputs / state changes | 66–71 |
+| Rules | 72–73 |
+|   1. Shared rules | 74–112 |
+|   2. `cb(cubemain.input)` — recipe inputs | 113–170 |
+|   3. `cb(cubemain.output)` — recipe outputs | 171–251 |
+|   4. `cb(monstats.skillmode)` — skill modes | 252–275 |
+|   5. `cb(monstats2.composit)` — component choices | 276–296 |
+|   6. `cb(monpreset.place)` — preset placement | 297–310 |
+|   7. Lookups | 311–339 |
+|   8. Errors and diagnostics | 340–358 |
+|   9. `cubemain` `param` | 359–368 |
+| Constants & data dependencies | 369–386 |
+| Randomness | 387–390 |
+| Edge cases & original bugs | 391–418 |
+| Test vectors | 419–497 |
+| Provenance | 498–565 |
+| Open questions | 566–574 |
 <!-- /index -->
 
 ## Summary
