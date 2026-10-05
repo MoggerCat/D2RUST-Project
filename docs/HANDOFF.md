@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-06, branch `claude/phase3-specs`)
+# Handoff (updated 2026-10-06, branch `claude/phase3-tick`)
 
 Start here in a fresh session, after `CLAUDE.md`. This file holds state,
 the next steps, the code and command map, and the local run queue. Rules
@@ -13,7 +13,7 @@ rather than restating them.
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
-| 3 Simulation | in progress: RNG done; tick, unit-ordering and intents/events specs written and confirmed on recordings (not implemented) | `cargo test -p d2-sim -p conformance`: spec vectors pass; all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches |
+| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented on `claude/phase3-tick` from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; intents/events spec written (d2-proto: parallel session) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
@@ -27,13 +27,23 @@ rather than restating them.
    `sim/unit-order.md`. Record with `record_tick.py` (it already logs
    every timer run with unit and arguments); extend it per M10 for stats.
    The Phase 3 recordings are done (§5); use them.
-2. **Implement the tick core** (implementation, medium; cloud or local,
-   after or alongside step 1): `d2-sim::tick` timer queue and step order
-   (`tick.md`), `d2-sim::units::lists` (`unit-order.md`), `d2-proto`
-   ids and sizes from the two TSVs (`intents-events.md`). Unit tests from
-   the specs' synthetic vectors; the recordings become format-1 traces
-   (`tick-0001`, `packets-0001`) once a converter and enough of `d2-sim`
-   exist.
+2. **Tick core**: done on `claude/phase3-tick` (2026-10-06, cloud):
+   timer queue, step order, room/client passes, periodic steps, unit,
+   room, update-queue and client lists. Step bodies owned by unwritten
+   specs are hooks (`TickHooks`), timer events go to `EventDispatch`
+   (open question 3 of `tick.md`); unit specs plug in there. `d2-proto`
+   ids and sizes from the TSVs: parallel cloud session.
+3. **Trace replay of the tick** (implementation, after the converter on
+   `claude/phase3-units`): hook in at `d2_sim::tick::run_timer_events`
+   with an `EventDispatch` that logs each `TimerRun` (its fields are the
+   comparison record of `tick.md` Test vectors: class, list, event type,
+   unit type, GUID, expire, arg1, arg2) and replays the recorded
+   schedules and cancels through `Game::schedule_event` /
+   `TimerQueue::cancel*`; list snapshots compare against
+   `UnitLists::{units_of_type, hash_bucket, active_rooms, room_units,
+   update_queue, clients}`. A test in `crates/conformance/tests/` like
+   `rng_traces.rs`. The host-schedule vectors of `tick.md` §1 (driver:
+   last/now/catch-up) belong to `d2-server`, not tested yet.
 
 ## 3. Code map
 
@@ -57,6 +67,9 @@ rather than restating them.
 | `crates/d2-client/src/map/` | DS1+DT1 map assembly, CPU reference renderer | `render/map-preview.md` |
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim/src/rng.rs` | seeded RNG: `Seed`, draw helpers, `derive`, `time_value` | `sim/rng.md` |
+| `crates/d2-sim/src/tick/{mod,timer,events}.rs` (+ `tick/tests.rs`) | `tick()` step order and passes, `TickHooks` / `EventDispatch` hooks; timer queue (`TimerQueue`: schedule, every-tick, cancel helpers, cursor run); event types and §5.6 dispatch data | `sim/tick.md` |
+| `crates/d2-sim/src/units/lists.rs` (+ `lists/tests.rs`) | GUID counters, hash lists, room/act/update-queue/client lists (`UnitLists`) | `sim/unit-order.md` |
+| `crates/d2-sim/src/game.rs` | `Game`: frame counter, lists, timers; spawn/remove unit, schedule, hash iteration helpers | `sim/tick.md` §2, §5; `sim/unit-order.md` §2.5, §3 |
 | `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
 | `d2-proto`, `d2-net`, `d2-server`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
@@ -148,6 +161,25 @@ Carried-over open questions not yet in a spec's list:
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
 3. DC6/DCC vertical placement (one-row disagreement between sources).
 4. Meaning of the PL2 rendering tables (Phase 6).
+
+From the tick-core implementation (`claude/phase3-tick`; each has a
+`TODO` in code naming it):
+
+- T1. Negative timer buckets (frame past 2^31 − 1, `tick.md` §2.2): in
+  1.14d they address neighbouring queue fields (§5.1 layout); d2rs
+  panics. Unreachable (≈ 994 days); model only if ever needed.
+- T2. Step 6 update-queue walk (`tick.md` §3 step 6): `unit-order.md`
+  §10 does not say whether the next link is read before or after
+  `0x00553220`; d2rs saves it before. Confirm in the disassembly.
+- T3. `tick.md` §5.2 rule 4 (monster AI-think with state 54): left to
+  the caller (`timer::needs_uninterruptable_check`) until monster states
+  exist; the monster spec should say whether `0x005544B0` schedules or
+  cancels timers (order relative to the new timer's allocation).
+- T4. Unit-less timers (`tick.md` OQ 2) and tile timers: rejected
+  (`TimerError::NoTimerClass`); `TimerOwner` always has a unit.
+- T5. Step 9 `0x0061A910` and `compress_unit`: d2rs only unlinks the
+  room from the act list; whether compression unlinks units and what
+  else room removal frees belong to the DRLG / room-lifecycle spec.
 
 ## 8. Lessons (problems met, fixes)
 
