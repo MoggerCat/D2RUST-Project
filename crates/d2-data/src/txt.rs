@@ -29,6 +29,7 @@ pub enum ErrorCode {
     E12,
     E13,
     E14,
+    E15,
 }
 
 impl ErrorCode {
@@ -49,6 +50,7 @@ impl ErrorCode {
             ErrorCode::E12 => "code registration index too large",
             ErrorCode::E13 => "invalid field list",
             ErrorCode::E14 => "columns + missing fields exceed 280",
+            ErrorCode::E15 => "callback value missing or write past the record",
         }
     }
 }

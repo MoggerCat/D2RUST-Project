@@ -313,12 +313,12 @@ fn formula_vectors() {
 }
 
 /// The comparison is not vacuous: perturbed compiled bytes are reported
-/// against the right field, and only bytes outside every footprint of a
-/// table with table callbacks count as explained.
+/// against the right field or unwritten byte, also in a table with table
+/// callbacks (their bytes are compiled now, `callbacks.md`).
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn crosscheck_catches_perturbations() {
-    use d2_data::crosscheck::{compare_sets, REASON_TABLE_CALLBACK};
+    use d2_data::crosscheck::compare_sets;
     let data = bin::load(set(), bin::DEFAULT_LANGUAGE).unwrap();
     let mut c = compiled().clone();
     let mut poke = |table: &str, rec: usize, offset: usize| {
@@ -339,11 +339,13 @@ fn crosscheck_catches_perturbations() {
         t("pettype").mismatches.keys().collect::<Vec<_>>(),
         ["unwritten byte +5"]
     );
-    assert!(t("monstats").matches());
-    assert!(t("monstats").explained.contains_key(REASON_TABLE_CALLBACK));
+    assert_eq!(
+        t("monstats").mismatches.keys().collect::<Vec<_>>(),
+        ["unwritten byte +10"]
+    );
     assert_eq!(
         report.tables.iter().filter(|t| !t.matches()).count(),
-        2,
-        "only the two perturbed tables differ"
+        3,
+        "only the three perturbed tables differ"
     );
 }

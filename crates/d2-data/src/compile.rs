@@ -269,6 +269,10 @@ pub enum DiagKind {
     DupColumn,
     DupCode,
     DupName,
+    /// Non-empty callback text whose lookup misses (`callbacks.md` §8).
+    CbMiss,
+    /// A non-empty part of a callback's text is ignored (`callbacks.md` §8).
+    CbStop,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -292,6 +296,8 @@ pub struct FieldCall<'a> {
     pub slot: u32,
     /// Linkers as of pass 2 (read-only).
     pub linkers: &'a Linkers,
+    /// Diagnostics of this call (CbMiss, CbStop).
+    pub diagnostics: &'a mut Vec<DiagKind>,
 }
 
 /// A callback refused its input.
@@ -312,15 +318,17 @@ pub trait Callbacks {
 /// Calc outcomes counted by [`StdCallbacks`].
 pub type CalcDiagCounts = BTreeMap<(CalcBuffer, CalcDiag), usize>;
 
-/// The 1.14d callbacks: `strkey` (§7), `calc(<buffer>)` (§8.1) and `param`
-/// (§8.2). The table-specific callbacks of §8.3 are not specified yet
-/// (`field-types.md` open question 2); they write nothing and are counted
+/// The 1.14d callbacks: `strkey` (§7), `calc(<buffer>)` (§8.1), `param`
+/// (§8.2) and the table-specific callbacks of §8.3 (`callbacks.md`).
+/// A `cb(...)` name outside `callbacks.md` writes nothing and is counted
 /// in `unspecified`.
 pub struct StdCallbacks<'s> {
     pub strings: &'s StringTables,
     /// The four code buffers, filled in compile order.
     pub buffers: BTreeMap<CalcBuffer, Vec<u8>>,
-    /// Calls of table-specific callbacks, by callback name.
+    /// Unique and set items behind `@uniques` / `@sets` (`callbacks.md` §7).
+    pub special: SpecialItems,
+    /// Calls of unknown table-specific callbacks, by callback name.
     pub unspecified: BTreeMap<String, usize>,
     pub calc_diagnostics: CalcDiagCounts,
 }
@@ -330,6 +338,7 @@ impl<'s> StdCallbacks<'s> {
         StdCallbacks {
             strings,
             buffers: CalcBuffer::ALL.iter().map(|&b| (b, Vec::new())).collect(),
+            special: SpecialItems::default(),
             unspecified: BTreeMap::new(),
             calc_diagnostics: BTreeMap::new(),
         }
@@ -447,13 +456,18 @@ impl Callbacks for StdCallbacks<'_> {
                 put_u32(call.record, call.field.offset, value)
             }
             Link::Table(name) => {
-                *self.unspecified.entry(name.clone()).or_default() += 1;
+                if !callbacks::run(name, call, &self.special)? {
+                    *self.unspecified.entry(name.clone()).or_default() += 1;
+                }
                 Ok(())
             }
             Link::None | Link::Linker(_) => Ok(()),
         }
     }
 }
+
+pub mod callbacks;
+pub use callbacks::{special_linker, SpecialItem, SpecialItems, SETS_LINKER, UNIQUES_LINKER};
 
 // --------------------------------------------------------- field checks
 
@@ -711,10 +725,16 @@ pub fn compile_table(
         }
         for (k, &fi) in missing.iter().enumerate() {
             let f = &fields[fi];
-            missing_value(f, record, r, columns + k, linkers, callbacks).map_err(|e| {
-                ctx.err(e.code, rec.line, columns + k, f)
-                    .with_detail(e.detail)
-            })?;
+            let mut diags = Vec::new();
+            missing_value(f, record, r, columns + k, linkers, callbacks, &mut diags).map_err(
+                |e| {
+                    ctx.err(e.code, rec.line, columns + k, f)
+                        .with_detail(e.detail)
+                },
+            )?;
+            for d in diags {
+                ctx.diag(d, rec.line, columns + k, f);
+            }
         }
     }
 
@@ -862,16 +882,23 @@ fn pass2(
             let id = callbacks.key(f, &cell[..cell.len().min(256)]);
             put(record, f.offset, &id.to_le_bytes());
         }
-        23..=25 => callbacks
-            .field(FieldCall {
-                field: f,
-                text: Some(&cell[..cell.len().min(256)]),
-                record,
-                record_index: r as u32,
-                slot: c as u32,
-                linkers,
-            })
-            .map_err(|e| ctx.err(e.code, line, c, f).with_detail(e.detail))?,
+        23..=25 => {
+            let mut diags = Vec::new();
+            callbacks
+                .field(FieldCall {
+                    field: f,
+                    text: Some(&cell[..cell.len().min(256)]),
+                    record,
+                    record_index: r as u32,
+                    slot: c as u32,
+                    linkers,
+                    diagnostics: &mut diags,
+                })
+                .map_err(|e| ctx.err(e.code, line, c, f).with_detail(e.detail))?;
+            for d in diags {
+                ctx.diag(d, line, c, f);
+            }
+        }
         _ => unreachable!("own-key types are handled in pass 1"),
     }
     Ok(())
@@ -885,6 +912,7 @@ fn missing_value(
     slot: usize,
     linkers: &Linkers,
     callbacks: &mut dyn Callbacks,
+    diagnostics: &mut Vec<DiagKind>,
 ) -> Result<(), CallbackError> {
     match f.field_type.id() {
         2 | 8 | 9 | 10 | 18 => put(record, f.offset, &[0; 4]),
@@ -900,6 +928,7 @@ fn missing_value(
             record_index: r as u32,
             slot: slot as u32,
             linkers,
+            diagnostics,
         })?,
         _ => {} // 26: nothing
     }

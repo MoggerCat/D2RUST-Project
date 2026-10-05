@@ -1,15 +1,15 @@
 // Spec: specs/data/field-types.md §6.4–§6.5 (load order, hand-built linkers); order from specs/data/loading.md §6–§7
 //! Compiles every table of the 1.14d load sequence from text, in
 //! `tables.tsv` execution order, with linkers kept across tables and the
-//! hand-built `@range` and `@treasureclass` linkers built where their
-//! loaders build them.
+//! hand-built `@range`, `@treasureclass`, `@uniques` and `@sets` linkers
+//! built where their loaders build them.
 
 use std::collections::BTreeMap;
 
 use crate::calc::CalcDiag;
 use crate::compile::{
-    check_field_list, compile_table, range_linker, tc_linker, Compiled, Linker, Linkers,
-    StdCallbacks, RANGE_LINKER, TC_LINKER,
+    check_field_list, compile_table, range_linker, special_linker, tc_linker, Compiled, Linker,
+    Linkers, StdCallbacks, RANGE_LINKER, SETS_LINKER, TC_LINKER, UNIQUES_LINKER,
 };
 use crate::schema::{schema, CalcBuffer};
 use crate::strings::StringTables;
@@ -32,8 +32,8 @@ pub struct CompiledSet {
     pub tables: Vec<CompiledTable>,
     /// The four code buffers.
     pub buffers: BTreeMap<CalcBuffer, Vec<u8>>,
-    /// Calls of unspecified table-specific callbacks (`field-types.md`
-    /// §8.3), by callback.
+    /// Calls of unknown table-specific callbacks (`field-types.md` §8.3),
+    /// by callback; empty for the 1.14d field lists.
     pub unspecified_callbacks: BTreeMap<String, usize>,
     pub calc_diagnostics: BTreeMap<(CalcBuffer, CalcDiag), usize>,
     /// Linkers after the last table.
@@ -99,6 +99,25 @@ pub fn compile_all(
             txt_source: source,
             compiled,
         });
+        let special = match def.name.as_str() {
+            "uniqueitems" => Some((UNIQUES_LINKER, 52)),
+            "setitems" => Some((SETS_LINKER, 48)),
+            _ => None,
+        };
+        if let Some((name, lvl_offset)) = special {
+            // The loader's name registration (`callbacks.md` §7).
+            let c = &tables.last().expect("just pushed").compiled;
+            let (linker, items) =
+                special_linker(c.records.chunks_exact(c.record_size), 40, lvl_offset).ok_or_else(
+                    || TxtError::new(&file, ErrorCode::E11).with_detail("unique or set name"),
+                )?;
+            linkers.insert(name, Linker::Name(linker));
+            if name == UNIQUES_LINKER {
+                callbacks.special.uniques = items;
+            } else {
+                callbacks.special.sets = items;
+            }
+        }
         if def.name == "treasureclassex" {
             // The TC routine of step 46 (`loading.md` §10.6).
             let records = |n: &str| {

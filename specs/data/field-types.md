@@ -3,7 +3,8 @@
 - **Status:** verified by `data-tool tables` (2026-10-05). Checked against 1.14d: 92 field lists recovered from
   `Game.exe`; compiling the live `.txt` files with these rules reproduces
   82 live `.bin` tables byte for byte (see Provenance). Implemented in
-  `d2-data::compile` (callbacks of §8.3 not yet: they write nothing); the
+  `d2-data::compile` (callbacks of §8.3 in `compile::callbacks`; their
+  bytes await a local `data-tool tables` run, `docs/HANDOFF.md` §5); the
   d2rs cross-check reproduces the §10 result (confirmed by bin
   cross-check, `loading.md` §11).
 - **Target version:** 1.14d
@@ -20,26 +21,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–64 |
-| Inputs | 65–75 |
-| Outputs / state changes | 76–81 |
-| Rules | 82–83 |
-|   1. Field lists | 84–111 |
-|   2. Compile procedure | 112–137 |
-|   3. Type vocabulary | 138–200 |
-|   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 201–228 |
-|   5. Text, codes and names | 229–255 |
-|   6. Linkers (key → index) | 256–346 |
-|   7. String keys (`strkey`) | 347–378 |
-|   8. Callback fields (`cb`) | 379–430 |
-|   9. Records | 431–451 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 452–486 |
-| Constants & data dependencies | 487–501 |
-| Randomness | 502–505 |
-| Edge cases & original bugs | 506–513 |
-| Test vectors | 514–639 |
-| Provenance | 640–718 |
-| Open questions | 719–740 |
+| Summary | 46–65 |
+| Inputs | 66–76 |
+| Outputs / state changes | 77–82 |
+| Rules | 83–84 |
+|   1. Field lists | 85–112 |
+|   2. Compile procedure | 113–138 |
+|   3. Type vocabulary | 139–201 |
+|   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 202–229 |
+|   5. Text, codes and names | 230–256 |
+|   6. Linkers (key → index) | 257–347 |
+|   7. String keys (`strkey`) | 348–379 |
+|   8. Callback fields (`cb`) | 380–431 |
+|   9. Records | 432–452 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 453–487 |
+| Constants & data dependencies | 488–502 |
+| Randomness | 503–506 |
+| Edge cases & original bugs | 507–514 |
+| Test vectors | 515–640 |
+| Provenance | 641–719 |
+| Open questions | 720–741 |
 <!-- /index -->
 
 ## Summary
@@ -469,8 +470,8 @@ Acceptance test for the compiler (`#[ignore]`, reads `D2_GAME_DIR`):
 
 4. Calc fields and the code buffers: `calc-expressions.md` (its
    acceptance test reproduces them).
-5. Bytes written by table-specific callbacks (§8.3): equal once their
-   specs exist and are implemented.
+5. Bytes written by table-specific callbacks (§8.3): equal, by the rules
+   of `callbacks.md` (no exception).
 
 Nothing else may differ. The shipped bins hold no garbage bytes (§9).
 
@@ -478,8 +479,8 @@ Result of the d2rs implementation (confirmed by bin cross-check,
 2026-10-05): all 86 tables match under these rules; 82 are
 byte-identical (69 of the 73 runtime tables); in `monstats`, `monstats2`, `monpreset` and `cubemain`
 the only other differences are bytes outside every field footprint
-(step 5) and the row above. With the §8.3 callbacks writing nothing,
-those bytes are 12,200 / 118,780 / 430 / 1,657. The callbacks are called
+(step 5) and the row above. Before the §8.3 callbacks were implemented
+(they wrote nothing), those bytes were 12,200 / 118,780 / 430 / 1,657. The callbacks are called
 5,872 (`monstats` `Sk*mode`, 734 × 8), 9,744 (`monstats2`, 609 × 16), 229
 (`monpreset` `Place`), 1,057 (`cubemain` inputs, 151 × 7) and 453
 (`cubemain` outputs, 151 × 3) times.
@@ -720,7 +721,7 @@ functions) agrees with every rule here.
 
 1. Answered: the 92 field lists are published in `fields.tsv` /
    `tables.tsv` (`schema.md`).
-2. The table-specific callbacks (§8.3) were not analyzed.
+2. Answered: the table-specific callbacks (§8.3) are in `callbacks.md`.
 3. Runtime linker rebuilds other than the item codes (§6.6): which loaders
    rebuild which linker, and whether duplicates bump as in §6.1.
 4. IDs 5, 7, 12, 14, 16 and 24 appear in no 1.14d list. Their rules come

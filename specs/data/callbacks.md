@@ -2,9 +2,10 @@
 
 - **Status:** draft: applied to the live `.txt` cells, these rules
   reproduce the callback bytes of all 17,355 calls in the live `cubemain`,
-  `monpreset`, `monstats` and `monstats2` bins (Provenance). Not yet in
-  `d2-data::compile`, which writes nothing for them (`field-types.md`
-  §10).
+  `monpreset`, `monstats` and `monstats2` bins (Provenance). Implemented
+  in `d2-data::compile::callbacks` with the test vectors below as unit
+  tests; the `data-tool tables` confirmation of the Rust code is in the
+  local run queue (`docs/HANDOFF.md` §5).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::compile` (suggested: `compile::callbacks`)
 - **Related specs:** `specs/data/field-types.md` (callback call convention
@@ -16,25 +17,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–52 |
-| Inputs | 53–62 |
-| Outputs / state changes | 63–68 |
-| Rules | 69–70 |
-|   1. Shared rules | 71–109 |
-|   2. `cb(cubemain.input)` — recipe inputs | 110–167 |
-|   3. `cb(cubemain.output)` — recipe outputs | 168–248 |
-|   4. `cb(monstats.skillmode)` — skill modes | 249–272 |
-|   5. `cb(monstats2.composit)` — component choices | 273–293 |
-|   6. `cb(monpreset.place)` — preset placement | 294–307 |
-|   7. Lookups | 308–336 |
-|   8. Errors and diagnostics | 337–355 |
-|   9. `cubemain` `param` | 356–365 |
-| Constants & data dependencies | 366–383 |
-| Randomness | 384–387 |
-| Edge cases & original bugs | 388–415 |
-| Test vectors | 416–494 |
-| Provenance | 495–562 |
-| Open questions | 563–572 |
+| Summary | 41–53 |
+| Inputs | 54–63 |
+| Outputs / state changes | 64–69 |
+| Rules | 70–71 |
+|   1. Shared rules | 72–110 |
+|   2. `cb(cubemain.input)` — recipe inputs | 111–168 |
+|   3. `cb(cubemain.output)` — recipe outputs | 169–249 |
+|   4. `cb(monstats.skillmode)` — skill modes | 250–273 |
+|   5. `cb(monstats2.composit)` — component choices | 274–294 |
+|   6. `cb(monpreset.place)` — preset placement | 295–308 |
+|   7. Lookups | 309–337 |
+|   8. Errors and diagnostics | 338–356 |
+|   9. `cubemain` `param` | 357–366 |
+| Constants & data dependencies | 367–384 |
+| Randomness | 385–388 |
+| Edge cases & original bugs | 389–416 |
+| Test vectors | 417–495 |
+| Provenance | 496–563 |
+| Open questions | 564–572 |
 <!-- /index -->
 
 ## Summary
@@ -562,9 +563,8 @@ Addresses are virtual addresses.
 
 ## Open questions
 
-1. `txt-format.md` §9 does not list E15, CbMiss and CbStop yet. It should
-   point to §8 here and place E15 in its check order (conversion order,
-   with E11 / E12).
+1. Answered: `txt-format.md` §9 lists E15, CbMiss and CbStop and places
+   E15 in conversion order with E11 / E12.
 2. The code-only branches (Provenance) have no 1.14d data or trace behind
    them. A `-txt` run of 1.14d on a `cubemain.txt` with a set output plus
    modifiers, a unique output, and `"rin,qty"` would confirm the set

@@ -13,7 +13,7 @@ use crate::bin::{self, read_excel, BinSet, BinTable, LoadError};
 use crate::calc::{BufferReport, CalcDiag};
 use crate::compile::{Compiled, DiagKind};
 use crate::compile_set::{compile_all, CompileSetError, CompiledSet};
-use crate::schema::{schema, CalcBuffer, Link, TableDef};
+use crate::schema::{schema, CalcBuffer, TableDef};
 
 /// Why a table is compared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,8 +47,6 @@ pub struct FieldDiff {
 /// Differences a spec rule explains.
 pub const REASON_NAMESTR_707: &str =
     "monstats record 707 NameStr: shipped 5382, compiled 11154 (field-types.md §10)";
-pub const REASON_TABLE_CALLBACK: &str =
-    "bytes outside every field footprint, written by the unspecified table callbacks (field-types.md §8.3, §10 step 5)";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableReport {
@@ -254,7 +252,6 @@ fn coverage(def: &TableDef) -> Vec<Vec<usize>> {
 
 fn compare_records(def: &TableDef, compiled: &Compiled, bin: &BinTable, report: &mut TableReport) {
     let cover = coverage(def);
-    let has_table_callbacks = def.fields.iter().any(|f| matches!(f.link, Link::Table(_)));
     let namestr = (def.name == "monstats")
         .then(|| def.field("NameStr").map(|f| f.offset as usize))
         .flatten();
@@ -272,8 +269,6 @@ fn compare_records(def: &TableDef, compiled: &Compiled, bin: &BinTable, report: 
                     (u16::from_le_bytes([shipped[ns], shipped[ns + 1]]) == 5382
                         && u16::from_le_bytes([ours[ns], ours[ns + 1]]) == 11154)
                         .then_some(REASON_NAMESTR_707)
-                } else if cover[o].is_empty() && has_table_callbacks {
-                    Some(REASON_TABLE_CALLBACK)
                 } else {
                     None
                 };
@@ -336,7 +331,10 @@ mod tests {
         assert_eq!(runtime.len(), 73);
         for t in &runtime {
             assert!(t.matches(), "{}: {:?}", t.name, t.mismatches);
+            // The one explained difference left: monstats 707 NameStr.
+            assert!(t.identical() || t.name == "monstats", "{}", t.name);
         }
+        assert!(report.unspecified_callbacks.is_empty());
         for b in &report.buffers {
             assert!(b.identical(), "{:?}", b);
         }

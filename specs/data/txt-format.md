@@ -36,15 +36,15 @@
 |   6. Column binding | 172–228 |
 |   7. Cell conversions | 229–338 |
 |   8. Linkers | 339–399 |
-|   9. Strictness policy | 400–475 |
-|   10. Original-only behaviors not reproduced | 476–484 |
-| Constants & data dependencies | 485–497 |
-| Randomness | 498–501 |
-| Edge cases & original bugs | 502–525 |
-| Survey (1.14d data) | 526–692 |
-| Test vectors | 693–878 |
-| Provenance | 879–937 |
-| Open questions | 938–967 |
+|   9. Strictness policy | 400–479 |
+|   10. Original-only behaviors not reproduced | 480–488 |
+| Constants & data dependencies | 489–501 |
+| Randomness | 502–505 |
+| Edge cases & original bugs | 506–529 |
+| Survey (1.14d data) | 530–696 |
+| Test vectors | 697–882 |
+| Provenance | 883–941 |
+| Open questions | 942–971 |
 <!-- /index -->
 
 ## Summary
@@ -416,8 +416,9 @@ conditions are also reported as diagnostics.
 7. E8, at the first bad line.
 8. E3.
 9. E14 (after binding).
-10. E11 and E12 in conversion order: pass 1 by record then column, then
-    pass 2 by record then column.
+10. E11, E12 and E15 in conversion order: pass 1 by record then column,
+    then pass 2 by record then column (missing-field callbacks after a
+    record's bound columns).
 
 **Errors** (reject the file):
 
@@ -437,6 +438,7 @@ conditions are also reported as diagnostics.
 | E12 | type 12 registration index > 0xFF, or type 14 index > 0xFFFF | line, column, field | fatal 342 / 346 |
 | E13 | field list fails §6.1 | field | see §6.1 |
 | E14 | `C` + missing fields > 280 | — | column map overrun (Edge cases) |
+| E15 | a table callback's value word has no value, or its write would pass the record end (`callbacks.md` §8) | line, column, field | null-pointer read; write into the next record |
 
 **Quirks** (accept and reproduce; all occur in 1.14d data):
 
@@ -469,6 +471,8 @@ from the 1.14d compile (Provenance).
 | DupColumn | column name equal (§6) to an earlier column's | line 1, the later column, no field | 11 |
 | DupCode | code registration whose code is already a key (stored under a bumped key, §8) | the cell's | 4 |
 | DupName | type-16 registration of a key already present | the cell's | 0 |
+| CbMiss | non-empty table-callback text whose lookup misses (`callbacks.md` §8) | the cell's | 0 |
+| CbStop | a non-empty part of a table callback's text is ignored (`callbacks.md` §8) | the cell's | 0 |
 
 Find-or-register duplicates (types 17, 18) are not reported: 1.14d data
 relies on them (`monseq`). Empty lookup cells that miss are not reported.

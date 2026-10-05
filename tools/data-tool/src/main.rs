@@ -192,10 +192,12 @@ fn tables(dir: &std::path::Path) -> Result<()> {
         .iter()
         .map(|(c, n)| format!("cb({c}) {n}"))
         .collect();
-    println!(
-        "unspecified table callbacks (wrote nothing): {}",
-        cbs.join(", ")
-    );
+    if !cbs.is_empty() {
+        println!(
+            "unknown table callbacks (wrote nothing): {}",
+            cbs.join(", ")
+        );
+    }
 
     if bad > 0 || buffers_ok != report.buffers.len() {
         std::process::exit(1);
