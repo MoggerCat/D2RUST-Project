@@ -11,12 +11,14 @@
 //! - [`compile_set`]: every table in load order.
 //! - [`bin`]: `.bin` container, live files, load checks (`loading.md`).
 //! - [`crosscheck`]: compiled text vs live `.bin`.
+//! - [`fixup`]: post-load fix-ups and runtime maps (`loading.md` §7.4).
 
 pub mod bin;
 pub mod calc;
 pub mod compile;
 pub mod compile_set;
 pub mod crosscheck;
+pub mod fixup;
 pub mod schema;
 pub mod strings;
 pub mod txt;

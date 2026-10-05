@@ -12,7 +12,7 @@ rather than restating them.
 | 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
-| 2 Data | in progress: core done | `data-tool tables`: 73 live tables, 69 byte-identical, 4 explained; 4/4 code buffers identical |
+| 2 Data | in progress: core, callbacks, first fix-ups | `data-tool tables`: 73 live tables, 69 byte-identical, 4 explained; 4/4 code buffers identical (before callbacks; rerun queued, §5) |
 | 3 Simulation | not started; RNG spec ready | `specs/sim/rng.md`, traces `traces/sim/rng/` |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
@@ -20,12 +20,15 @@ rather than restating them.
 
 ## 2. Next steps (in order)
 
-1. **Callbacks in code** (implementation, medium): implement
-   `specs/data/callbacks.md` in `d2-data::compile`; target `data-tool
-   tables` = 73/73 byte-identical (except monstats record 707 `NameStr`,
-   open question). Add error E15 and diagnostics CbMiss/CbStop to
-   `txt-format.md` §9.
-2. **Post-load fix-ups** (implementation, medium): `loading.md` §7.4.
+1. **Run the local queue** (§5): confirms the callbacks and fix-ups on
+   the game files.
+2. **Fix-up specs** (spec writing / RE, local, high): the §7.4 rows
+   `loading.md` OQ13 leaves open (equivalence matrix, op-stat tables and
+   flags, per-class skill lists, charstats strings, set attachment, gems,
+   gamble, monstats class chain, levels, automap form) and the
+   `AnimData.d2` format (OQ11); ideally a post-load memory dump to check
+   them (OQ15). Then implement them in `d2-data::fixup` (`PENDING` lists
+   them).
 3. **Typed tables** (implementation, medium): generate Rust structs from
    `specs/data/fields.tsv` + `tables.tsv` (a generator tool; generated
    code committed; a test that regenerating gives the same output).
@@ -45,7 +48,9 @@ rather than restating them.
 | `crates/d2-formats/src/{palette,dc6,dcc,dt1,ds1,cof,tbl,font}.rs` | file formats | `specs/formats/*.md` |
 | `crates/d2-data/src/txt.rs` | strict `.txt` reader, column binding | `data/txt-format.md` |
 | `crates/d2-data/src/schema.rs` | embedded `fields.tsv` / `tables.tsv` | `data/schema.md` |
-| `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, callbacks | `data/field-types.md`, `callbacks.md` |
+| `crates/d2-data/src/compile.rs` (+ `compile/tests.rs`) | cell → bytes, linkers, `strkey`/`calc`/`param` | `data/field-types.md` |
+| `crates/d2-data/src/compile/callbacks.rs` (+ `callbacks/tests.rs`) | cube, skill-mode, composit, place callbacks; `@uniques`/`@sets` | `data/callbacks.md` |
+| `crates/d2-data/src/fixup.rs` | post-load fix-ups and runtime maps (on a copy of the loaded set) | `data/loading.md` §7.4 |
 | `crates/d2-data/src/calc.rs` (+ `calc/tests.rs`) | formula compiler, code buffers | `data/calc-expressions.md` |
 | `crates/d2-data/src/compile_set.rs` | all tables in load order | `data/loading.md` §6–7 |
 | `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
@@ -84,7 +89,20 @@ Tools read `D2_GAME_DIR` (= `<repo>/game`). If a shell doesn't have it:
 Cloud sessions add game-file checks here (command + what to look for);
 a local session runs them, records the result, and removes the entry.
 
-- (empty)
+- From branch `claude/happy-maxwell-93ocnk` (callbacks + fix-ups,
+  2026-10-05):
+  1. `cargo run --release -p data-tool -- tables`: expect 73/73 runtime
+     tables matching, 72 byte-identical, `monstats` differing only by the
+     record 707 `NameStr` explanation; no "unwritten byte" mismatch in
+     `cubemain`, `monstats`, `monstats2`, `monpreset`; no "unknown table
+     callbacks" line; CbMiss/CbStop absent from the diagnostics line (1.14d
+     count 0). If a callback byte differs, the mismatch label names the
+     record offset: compare with `callbacks.md` §2–§6.
+  2. `cargo test -p d2-data -- --ignored`: all pass, in particular
+     `compiled_text_reproduces_live_bins`, `callback_vectors`,
+     `fixups_on_live_set`, `crosscheck_catches_perturbations`.
+  Record the results in `docs/PLAN.md` (Phase 2 status) and the spec
+  statuses (`callbacks.md`, `field-types.md` §10), then merge.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a

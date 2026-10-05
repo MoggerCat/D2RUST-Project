@@ -3,7 +3,8 @@
 - **Status:** verified by `data-tool tables` (2026-10-05). Rules checked against the 1.14d `Game.exe` (Ghidra
   exports plus raw bytes) and the 1.14d data files on 2026-10-05, except
   where an Open question says otherwise; see Provenance. Implemented in
-  `d2-data::bin` (§2–§4, §6, §8, §10.8; fix-ups of §7.4 not yet) and
+  `d2-data::bin` (§2–§4, §6, §8, §10.8), `d2-data::fixup` (the §7.4 rows
+  whose rule is complete; the rest wait for Open question 13) and
   checked by `data-tool tables` (§11, "d2rs cross-check").
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::bin` (loader, checks); `d2-data::crosscheck` (§11)
@@ -19,28 +20,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–59 |
-| Inputs | 60–67 |
-| Outputs / state changes | 68–75 |
-| Rules | 76–81 |
-|   1. Paths | 82–94 |
-|   2. Archive search order | 95–134 |
-|   3. Choosing `.bin` or `.txt` | 135–198 |
-|   4. The `.bin` container | 199–250 |
-|   5. `.txt` record counting | 251–262 |
-|   6. Load order and record sizes (runtime tables) | 263–350 |
-|   7. Links and dependencies | 351–475 |
-|   8. Post-load checks (fatal in 1.14d) | 476–521 |
-|   9. Combined index spaces | 522–536 |
-|   10. Special cases | 537–595 |
-|   11. Txt vs bin cross-check | 596–636 |
-| Constants & data dependencies | 637–657 |
-| Randomness | 658–661 |
-| Edge cases & original bugs | 662–678 |
-| d2-data policy | 679–705 |
-| Test vectors | 706–739 |
-| Provenance | 740–834 |
-| Open questions | 835–880 |
+| Summary | 47–60 |
+| Inputs | 61–68 |
+| Outputs / state changes | 69–76 |
+| Rules | 77–82 |
+|   1. Paths | 83–95 |
+|   2. Archive search order | 96–135 |
+|   3. Choosing `.bin` or `.txt` | 136–199 |
+|   4. The `.bin` container | 200–251 |
+|   5. `.txt` record counting | 252–263 |
+|   6. Load order and record sizes (runtime tables) | 264–351 |
+|   7. Links and dependencies | 352–491 |
+|   8. Post-load checks (fatal in 1.14d) | 492–537 |
+|   9. Combined index spaces | 538–552 |
+|   10. Special cases | 553–611 |
+|   11. Txt vs bin cross-check | 612–652 |
+| Constants & data dependencies | 653–673 |
+| Randomness | 674–677 |
+| Edge cases & original bugs | 678–694 |
+| d2-data policy | 695–721 |
+| Test vectors | 722–755 |
+| Provenance | 756–850 |
+| Open questions | 851–900 |
 <!-- /index -->
 
 ## Summary
@@ -469,6 +470,21 @@ gives 0 unless a miss value is given. Exact algorithms: per-table specs.
 | levels | wide strings (40 characters) at +0x16E / +0x1BE from the string tables; +0x33–0x35 := entry counts of the three 25-entry monster lists |
 | automap | converted to an internal form (§8) |
 
+d2rs (`d2-data::fixup`, applied to a copy of the loaded set so the
+shipped bytes stay comparable, §11) applies the rows as written for:
+itemtypes (code link only), itemstatcost (op byte, the +0x140 global),
+missiles, skills (pettype lists only), magic and rare affixes,
+uniqueitems, setitems (not the set attachment), qualityitems,
+lowqualityitems, runes, monstats (BaseId only), superuniques, hireling,
+monequip, and the item code map. Not yet (their exact algorithms: Open
+questions 11 and 13): the equivalence matrix, op-stat tables and flags,
+per-class skill lists, charstats strings, set attachment, gems, gamble,
+the monstats class chain and AnimData speeds, levels, automap. Where a
+row leaves a detail open, d2rs takes: skills append in record order and
+only for a pettype byte below the pettype count; a pettype list stops at
+15 (later skills are dropped); monequip clears a loc byte to 0. None of
+this is checked against 1.14d memory yet (Open question 15).
+
 `AnimData.d2` (§1.3) loads before `monstats`, whose fix-up reads it. Runtime
 maps other than the item code map, the itemtypes code link and the
 uniqueitems/setitems name links: Open question 13.
@@ -877,3 +893,7 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
 14. §8 automap: "a value whose first byte is `0`" is read by d2rs as an
     empty string (first byte 0x00); the character `0` is the other
     reading. No 1.14d row has either, so the data cannot decide.
+15. The applied §7.4 fix-ups (d2rs list above) are not compared with the
+    tables in 1.14d memory after load. A dump of the loaded records
+    (trace recorder) would confirm them byte for byte, including the
+    choices d2rs made where a row is silent.

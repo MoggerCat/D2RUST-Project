@@ -3,7 +3,8 @@
 //! archive set (§2), the `.bin` container and its size check (§4), the load
 //! sequence (§6), server-file checks (§3.3), code buffers (§4.3), the
 //! runtime `.txt` sound tables (§3.4), the post-load checks (§8) and the
-//! d2rs count checks (§10.8). Fix-ups (§7.4) are not applied yet.
+//! d2rs count checks (§10.8). The records keep their shipped bytes;
+//! fix-ups (§7.4) are applied to a copy by [`crate::fixup`].
 
 use std::collections::BTreeMap;
 

@@ -349,3 +349,55 @@ fn crosscheck_catches_perturbations() {
         "only the three perturbed tables differ"
     );
 }
+
+/// `callbacks.md` test vectors taken from 1.14d records.
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn callback_vectors() {
+    let cube = |rec: usize, at: usize| record("cubemain", rec)[at..at + 8].to_vec();
+    assert_eq!(cube(15, 28), [0x02, 0, 0x5d, 0, 0, 0, 0, 3]); // "gem2,qty=3"
+    assert_eq!(cube(11, 20), [0x02, 0, 0x1c, 0, 0, 0, 0, 0]); // axe
+    assert_eq!(cube(62, 36), [0x41, 0, 0x0a, 0x02, 0x7b, 0, 7, 0]); // SoJ
+    assert_eq!(record("cubemain", 2)[76 + 8], 1); // Cow Portal
+    assert_eq!(record("monstats2", 0)[37], 49); // skeleton1 total
+    assert_eq!(&record("monstats2", 0)[22..23], [3]); // TRv count
+    assert_eq!(&record("monstats2", 0)[50..53], [1, 2, 4]); // lit,med,hvy
+    assert_eq!(&record("monpreset", 0)[1..4], [1, 0x93, 0]); // gheed
+    assert_eq!(&record("monpreset", 40)[1..4], [2, 6, 0]); // The Countess
+    assert_eq!(&record("monpreset", 39)[1..4], [2, 5, 0]); // Griswold
+    let m45 = record("monstats", 45);
+    assert!((0..8).any(|i| m45[384 + i] == 4)); // A1 with skill 321
+}
+
+/// The applied `loading.md` §7.4 fix-ups on the live set.
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn fixups_on_live_set() {
+    let data = bin::load(set(), bin::DEFAULT_LANGUAGE).unwrap();
+    let f = d2_data::fixup::apply(&data).unwrap();
+    assert_eq!(f.uniques.len(), 402);
+    assert_eq!(f.uniques.find(b"the stone of jordan"), Some(122));
+    assert_eq!(f.sets.len(), 127);
+    assert_eq!(f.item_codes.len(), 306 + 202 + 151);
+    assert!(f.superunique_hc.iter().all(Option::is_some));
+    let u = f.table("uniqueitems").unwrap();
+    for (i, r) in u.iter().enumerate() {
+        assert_eq!(u16_at(r, 0), i as u16);
+        assert_ne!(u16_at(r, 0x22), 0);
+    }
+    for r in f.table("hireling").unwrap().iter() {
+        assert!(u16_at(r, 0x116) > u16_at(r, 0x114) && u16_at(r, 0x114) != 0);
+    }
+    for r in f.table("missiles").unwrap().iter() {
+        assert!(r[0x183] <= 8);
+    }
+    let pets: usize = f
+        .table("pettype")
+        .unwrap()
+        .iter()
+        .map(|r| usize::from(u16_at(r, 0xBC)))
+        .sum();
+    assert!(pets > 0);
+    // The shipped bytes stay untouched in the loaded set.
+    assert_eq!(u16_at(data.table("uniqueitems").unwrap().record(5), 0), 0);
+}

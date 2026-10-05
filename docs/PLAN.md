@@ -102,8 +102,10 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       `tables.tsv`), txt → record compiler (types, linkers, `strkey`,
       `calc`, `param`), `.bin` loader with the `loading.md` checks, and a
       byte-exact cross-check against 1.14d (`data-tool tables`)
-- [ ] Post-load fix-ups and runtime maps (`loading.md` §7.4)
-- [ ] Table-specific callbacks (`field-types.md` §8.3; need specs)
+- [x] Table-specific callbacks (`callbacks.md`, `d2-data::compile::callbacks`;
+      `data-tool tables` confirmation in the local run queue)
+- [ ] Post-load fix-ups and runtime maps (`loading.md` §7.4): fully stated
+      rows done in `d2-data::fixup`; the rest wait for `loading.md` OQ13
 - [ ] Typed structs for all tables (generated from the schema)
 - [ ] Cross-reference resolution with validation errors
 - [ ] Mod patch layer format + loader
@@ -121,7 +123,10 @@ on the 1.14d install: the live set (73 record tables, 4 code buffers,
 the rest explained by spec rules (unspecified table callbacks; `monstats`
 record 707 `NameStr`); 4 of 4 code buffers byte-identical; `hitclass` and
 the 12 shipped by-products byte-identical. Compiler diagnostics equal the
-`txt-format.md` §9 counts. Fix-ups (§7.4) are not applied yet.
+`txt-format.md` §9 counts. Since then (cloud, unconfirmed on game files):
+the table callbacks are implemented, so the target is 73/73 with only
+`NameStr` explained; the fully stated §7.4 fix-ups are applied by
+`d2-data::fixup` to a copy of the loaded set.
 
 ### Phase 3 — Core simulation (`d2-sim`)
 - [ ] D2 seeded RNG (exact sequence match) — **first**. *Spec `specs/sim/rng.md` done and matched by 32,543 recorded draws; Rust code not started.*
