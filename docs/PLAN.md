@@ -22,6 +22,7 @@ behaviors the engine reproduces exactly.
 | Map draw rules (1b) | `WALL_BASE` 80, hidden cells skipped, first-match tiles | Wall base and hidden rule decided from evidence (renders, probes); see `specs/render/map-preview.md`. |
 | Reference sources | `../refs/<project>/`, outside the repo | Spec sessions only. GPL projects are read only. |
 | Language | Rust | Toolchain pinned in `rust-toolchain.toml`. |
+| Fidelity scope | Exact match everywhere, no "close enough" tier (`CLAUDE.md` rule 10) | Decided 2026-10-05. No boundary between "must be exact" and "may be approximate" can be drawn reliably, and one slipped area costs more debugging than loosening saves. Each area defines its comparison (bytes, pixels, decoded samples, ticks); unchecked features stay "unverified". |
 | Client engine | Bevy, pinned version (0.19.x at time of writing) | Client crate only. Upgrades are separate tasks between milestones. |
 | Simulation | Plain Rust, deterministic, integer math, 25 Hz | Never depends on Bevy. |
 | Network model | Server-authoritative; single player = local server | Same protocol for both. |
