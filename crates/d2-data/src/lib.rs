@@ -1,4 +1,22 @@
-//! Typed D2 tables loaded from the user's MPQs, plus mod patch layers
-//! applied at load time. Phase 2 fills this in.
+// Spec: specs/data/loading.md ("d2-data policy")
+//! D2 game data: the live `.bin` set 1.14d loads (game truth), the `.txt`
+//! reader and the txt → record compiler verified byte for byte against it.
+//! Mod patch layers come later. Must not depend on Bevy.
 //!
-//! Must not depend on Bevy.
+//! - [`txt`]: strict `.txt` reader and column binding (`txt-format.md`).
+//! - [`schema`]: the 1.14d field lists (`fields.tsv`, `tables.tsv`).
+//! - [`compile`]: field types, linkers, callbacks (`field-types.md`).
+//! - [`calc`]: formula compiler and code buffers (`calc-expressions.md`).
+//! - [`strings`]: string tables and `strkey` (`field-types.md` §7).
+//! - [`compile_set`]: every table in load order.
+//! - [`bin`]: `.bin` container, live files, load checks (`loading.md`).
+//! - [`crosscheck`]: compiled text vs live `.bin`.
+
+pub mod bin;
+pub mod calc;
+pub mod compile;
+pub mod compile_set;
+pub mod crosscheck;
+pub mod schema;
+pub mod strings;
+pub mod txt;

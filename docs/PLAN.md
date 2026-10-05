@@ -35,6 +35,9 @@ behaviors the engine reproduces exactly.
 | Reference install record | `tools/hash-manifest` → `traces/reference-install.toml` | Dev only, never shipped or used for gating. Records the local `game/` that traces come from, so a changed install is noticed. |
 | Data source of truth (Phase 2) | The `.bin` set 1.14d loads; `.txt` compiler verified byte for byte against it | 1.14d never reads excel `.txt` in normal play (a missing `.bin` is fatal). Full policy: `specs/data/loading.md` "d2-data policy". Mods patch `.txt` cells and compile (`patch-layers.md`). |
 | Per-table layouts | `specs/data/fields.tsv` + `tables.tsv`, extracted from 1.14d `Game.exe` | 92 field lists, 3,499 fields (`specs/data/schema.md`). Replace prose per-table specs; Rust table code is generated from them. Column meanings are specified by the Phase 3 specs that use them. |
+| Archive search order | `specs/data/loading.md` §2: priority descending, ties newest-opened first | `ArchiveSet` (d2-formats) computes it from the open order; second group and video path assumed opened after the startup group (loading.md open question 1). Excel files resolve P → X → D either way. |
+| Unspecified table callbacks (Phase 2) | Write nothing until their specs exist | `monstats` `Sk*mode`, `monstats2` composit, `monpreset` `Place`, `cubemain` inputs/outputs. The cross-check counts their bytes as explained (`field-types.md` §8.3, §10 step 5); every byte inside a field footprint must still match. |
+| Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 
 ## Phases
@@ -95,14 +98,30 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
 `townN1.ds1` draw as blue patches (spec open question 3, needs RE).
 
 ### Phase 2 — Data (`d2-data`)
-- [ ] Typed structs for all .txt tables
+- [x] Core: strict `.txt` reader, embedded schema (`fields.tsv`/
+      `tables.tsv`), txt → record compiler (types, linkers, `strkey`,
+      `calc`, `param`), `.bin` loader with the `loading.md` checks, and a
+      byte-exact cross-check against 1.14d (`data-tool tables`)
+- [ ] Post-load fix-ups and runtime maps (`loading.md` §7.4)
+- [ ] Table-specific callbacks (`field-types.md` §8.3; need specs)
+- [ ] Typed structs for all tables (generated from the schema)
 - [ ] Cross-reference resolution with validation errors
 - [ ] Mod patch layer format + loader
 **Exit:** all tables load from the user's install; patches apply; broken
 references are reported.
 **Status (2026-10-05):** foundation specs written in `specs/data/`
 (`loading`, `txt-format`, `field-types`, `calc-expressions`,
-`patch-layers`, plus `fields.tsv`/`tables.tsv`/`schema.md`). No code yet.
+`patch-layers`, plus `fields.tsv`/`tables.tsv`/`schema.md`).
+Step 1 (d2-data core) done. `cargo run --release -p data-tool -- tables`
+on the 1.14d install: the live set (73 record tables, 4 code buffers,
+`hitclass`, the sound `.txt` tables) loads and passes every `loading.md`
+§4.2/§8/§10.8 check. Compiling every table from its highest-priority
+`.txt` in load order: 69 of 73 runtime tables byte-identical; `monstats`,
+`monstats2`, `monpreset`, `cubemain` identical in every field footprint,
+the rest explained by spec rules (unspecified table callbacks; `monstats`
+record 707 `NameStr`); 4 of 4 code buffers byte-identical; `hitclass` and
+the 12 shipped by-products byte-identical. Compiler diagnostics equal the
+`txt-format.md` §9 counts. Fix-ups (§7.4) are not applied yet.
 
 ### Phase 3 — Core simulation (`d2-sim`)
 - [ ] D2 seeded RNG (exact sequence match) — **first**

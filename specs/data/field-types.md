@@ -2,7 +2,10 @@
 
 - **Status:** draft. Checked against 1.14d: 92 field lists recovered from
   `Game.exe`; compiling the live `.txt` files with these rules reproduces
-  82 live `.bin` tables byte for byte (see Provenance). Not implemented.
+  82 live `.bin` tables byte for byte (see Provenance). Implemented in
+  `d2-data::compile` (callbacks of §8.3 not yet: they write nothing); the
+  d2rs cross-check reproduces the §10 result (confirmed by bin
+  cross-check, `loading.md` §11).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::compile` (suggested: type vocabulary, record
   compiler, linkers, string keys, callbacks)
@@ -433,6 +436,16 @@ Acceptance test for the compiler (`#[ignore]`, reads `D2_GAME_DIR`):
 
 Nothing else may differ. The shipped bins hold no garbage bytes (§9).
 
+Result of the d2rs implementation (confirmed by bin cross-check,
+2026-10-05): every runtime table matches under these rules, 69 of 73
+byte-identical; in `monstats`, `monstats2`, `monpreset` and `cubemain`
+the only other differences are bytes outside every field footprint
+(step 5) and the row above. With the §8.3 callbacks writing nothing,
+those bytes are 12,200 / 118,780 / 430 / 1,657. The callbacks are called
+5,872 (`monstats` `Sk*mode`, 734 × 8), 9,744 (`monstats2`, 609 × 16), 229
+(`monpreset` `Place`), 1,057 (`cubemain` inputs, 151 × 7) and 453
+(`cubemain` outputs, 151 × 3) times.
+
 ## Constants & data dependencies
 
 | Constant | Value |
@@ -572,7 +585,7 @@ set it; `"0"`, `""`, `"-"` clear it.
 | monstats 0 `TreasureClass1` | `link16(@tc)` @134 | `Act 1 H2H A` (treasureclassex 269) | `AE 01` (430) |
 | runes 27 `t1param4` | `param` | `Battle Command` | 155 |
 | runes 6 `t1param4` | `param` | `41` | 41 |
-| skills `pettype` (324 rows) | `link8(pettype.pet type)` @190 | `""` | `FF` |
+| skills `pettype` (326 rows; was 324, corrected: confirmed by bin cross-check) | `link8(pettype.pet type)` @190 | `""` | `FF` |
 | skills `pettype` | `link8(pettype.pet type)` @190 | `assassintrap` | `11` |
 | armor 22 `mindam` (columns 63 and 161) | `u8` (ID 6) @254 | `1`, `0` | `01` (leftmost wins) |
 | levels, all records, `mon11` (no column) | `link16(monstats.Id)` @74 | missing | `FF FF` |

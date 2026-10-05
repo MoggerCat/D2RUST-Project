@@ -1,6 +1,6 @@
 [package]
-name = "d2-data"
-description = "Typed D2 .txt/.bin tables and mod patch layers."
+name = "data-tool"
+description = "Load, validate and cross-check the user's D2 data tables."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,8 +8,9 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+d2-data.workspace = true
 d2-formats.workspace = true
-thiserror.workspace = true
 
 [lints]
 workspace = true

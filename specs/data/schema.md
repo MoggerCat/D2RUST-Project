@@ -1,8 +1,11 @@
 # Spec: Data — Bin field tables (`fields.tsv`, `tables.tsv`)
 
-- **Status:** draft. Extracted from 1.14d `Game.exe` on 2026-10-05; checks below. Not implemented.
+- **Status:** draft. Extracted from 1.14d `Game.exe` on 2026-10-05; checks below. Embedded and parsed by
+  `d2-data::schema` (data-driven; typed structs come later). A unit test recomputes the §5 unwritten ranges from
+  the footprints (1,702 bytes, 55 tables, equal to the notes); compiling every list reproduces the live `.bin`
+  files (`loading.md` §11, d2rs cross-check; confirmed by bin cross-check).
 - **Target version:** 1.14d
-- **Crate/module:** `d2-data::compile` (generated field lists), `d2-data::load` (record sizes)
+- **Crate/module:** `d2-data::schema` (parsed lists), `d2-data::compile` (field lists), `d2-data::bin` (record sizes)
 - **Related specs:** `field-types.md` (§1, §3 type IDs, §6 linkers, §8 callbacks), `loading.md` (§6–§10), `txt-format.md` §6
 
 ## Summary

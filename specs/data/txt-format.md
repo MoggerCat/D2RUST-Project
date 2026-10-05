@@ -4,7 +4,13 @@
   checked against the 1.14d `Game.exe` code; record counts against all 128
   same-archive `.txt`/`.bin` pairs; conversions and linkers by compiling
   the live `.txt` files with the 91 field lists recovered from `Game.exe`
-  and comparing with the live `.bin` files (Provenance). Not implemented.
+  and comparing with the live `.bin` files (Provenance). Implemented in
+  `d2-data::txt` (reader, binding) and `d2-data::compile` (conversions,
+  linkers). The d2rs compile of all 91 called lists reproduces the
+  survey (193 files, `Aiparms.txt` E8 at line 13, 128 count pairs) and the
+  §9 diagnostic counts exactly: IntSyntax 9, IntRange 9, TextCut 46,
+  LinkMiss 14, DupColumn 11, DupCode 4, DupName 0 (confirmed by bin
+  cross-check).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::txt` (reader, column binding, cell
   conversions, linkers)

@@ -16,7 +16,9 @@ mod huffman;
 mod set;
 mod tables;
 
-pub use set::{priority, ArchiveSet, PRIORITY};
+pub use set::{
+    archive_file_name, priority, search_order, ArchiveSet, ArchiveSpec, OPEN_ORDER, PRIORITY,
+};
 
 use std::fs::File;
 use std::io;

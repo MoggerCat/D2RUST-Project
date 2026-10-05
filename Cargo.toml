@@ -13,6 +13,7 @@ members = [
     "tools/depcheck",
     "tools/hash-manifest",
     "tools/mpq-tool",
+    "tools/data-tool",
 ]
 
 [workspace.package]

@@ -103,8 +103,9 @@ cargo run --release -p d2-client -- view
   `d2sfx.mpq` lists only 31 of 2,360 files: names for unlisted encrypted
   files are unknown, but their keys are recovered from the sector offset
   table, so all 35,364 blocks decode. Only locale 0 appears.
-- **Archive priority (provisional):** patch_d2, d2exp, d2xmusic, d2xtalk,
-  d2xvideo, d2data, d2char, d2sfx, d2music, d2speech, d2video.
+- **Archive priority:** `specs/data/loading.md` §2 (priority descending,
+  ties newest-opened first): patch_d2, d2xvideo, d2xtalk, d2xmusic, d2exp,
+  d2video, d2music, d2char, d2speech, d2sfx, d2data.
 - **DC6:** 140 frames with `flip = 1` (inventory item sheets) decode
   top-down. Verified upright visually.
 - **DCC:** all 21,717 decode with every sub-stream exactly consumed. No
@@ -160,7 +161,7 @@ cargo run --release -p d2-client -- view
    Ruled out: rarity, cell prop1 bits, LvlTypes/Dt1Mask file selection.
    Needs RE of the client's tile draw path.
 2. DS1 v12/13 trailing bytes: possibly an early NPC-path section.
-3. MPQ archive priority order: confirm in RE.
+3. ~~MPQ archive priority order~~: answered by `specs/data/loading.md` §2.
 4. DC6/DCC vertical placement (one-row disagreement between sources).
 5. Meaning of the rendering tables in PL2 (Phase 6).
 6. The original game's handling of truncated DS1 groups.

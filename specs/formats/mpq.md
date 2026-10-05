@@ -389,9 +389,10 @@ None.
 
 ## Archive set (D2-specific)
 
-Lookup across archives (first match wins), provisional order: `patch_d2`,
-`d2exp`, `d2xmusic`, `d2xtalk`, `d2xvideo`, `d2data`, `d2char`, `d2sfx`,
-`d2music`, `d2speech`, `d2video`. See Open questions.
+Lookup across archives (first match wins): the order is defined in
+`specs/data/loading.md` §2 (priority descending, ties newest-opened first):
+`patch_d2`, `d2xvideo`, `d2xtalk`, `d2xmusic`, `d2exp`, `d2video`,
+`d2music`, `d2char`, `d2speech`, `d2sfx`, `d2data`.
 
 ## Observations (1.14d install)
 
@@ -451,8 +452,9 @@ Riiablo uses 16-bit Java `short` for the step sum, which can overflow.
 
 ## Open questions
 
-1. Archive priority order for 1.14d (Archive set): confirm in an RE session
-   against `Game.exe` (the archive-open sequence).
+1. ~~Archive priority order for 1.14d (Archive set).~~ Answered by
+   `loading.md` §2; the open timing of its second group and video path is
+   its open question 1.
 2. Locale handling: does 1.14d ever request a non-neutral locale? The
    observation survey records which locales appear in the tables.
 3. ~~Which compression masks and flags 1.14d uses, and whether archives

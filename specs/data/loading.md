@@ -2,9 +2,11 @@
 
 - **Status:** draft. Every rule below was checked against the 1.14d
   `Game.exe` (Ghidra exports plus raw bytes) and the 1.14d data files on
-  2026-10-05; see Provenance. Not implemented yet.
+  2026-10-05; see Provenance. Implemented in `d2-data::bin` (§2–§4, §6,
+  §8, §10.8; fix-ups of §7.4 not yet) and checked by `data-tool tables`
+  (§11, "d2rs cross-check").
 - **Target version:** 1.14d
-- **Crate/module:** `d2-data::load` (suggested)
+- **Crate/module:** `d2-data::bin` (loader, checks); `d2-data::crosscheck` (§11)
 - **Related specs:** `specs/formats/mpq.md` (archive reads, archive set),
   `specs/formats/tbl.md` (string tables, loaded before any excel table),
   `specs/data/txt-format.md` (`.txt` reader, record numbering, column
@@ -93,10 +95,14 @@ The data agrees: for 41 tables the X copy of the `.bin` has an older record
 size that the 1.14d code cannot read (§11); the game works only because P
 is searched first.
 
-d2rs: excel lookups need only P → X → D, which the provisional
-archive-set order of `mpq.md` also gives, so they do not depend on the
-open tie and second-group questions (Open question 1). d2rs does not open
-`d2delta` or `d2kfixup`.
+d2rs: `d2_formats::mpq::ArchiveSet` searches in this order, assuming the
+second group opens after the startup group and the video path last (Open
+question 1): `patch_d2`, `d2xvideo`, `d2xtalk`, `d2xmusic`, `d2exp`,
+`d2video`, `d2music`, `d2char`, `d2speech`, `d2sfx`, `d2data`. Excel
+lookups need only P → X → D, so they do not depend on that assumption.
+With this order every live `.bin` resolves to the archive §6 names (56 P,
+17 X; confirmed by bin cross-check). d2rs does not open `d2delta` or
+`d2kfixup`.
 
 ### 3. Choosing `.bin` or `.txt`
 
@@ -677,6 +683,27 @@ same data; these field-level checks were also run (offsets from the
 | difficultylevels | P → P | all 22 columns | identical |
 | charstats | P → P | 11 stat columns | identical |
 
+**d2rs cross-check** (`cargo run --release -p data-tool -- tables`,
+2026-10-05; confirmed by bin cross-check). The live set loads and passes
+§4.2, §8 and §10.8 (TC count 1,013; every gamble code is an item; every
+hireling, automap, superuniques and chartemplate row passes). Compiling
+every list of `tables.tsv` in order from the highest-priority `.txt`
+gives, against the live `.bin`:
+
+- 69 of the 73 runtime tables byte-identical, including all five
+  cross-archive pairs and `leveldefs` from `levels.txt`.
+- `monstats`, `monstats2`, `monpreset`, `cubemain`: identical in every
+  byte inside a field footprint. The other differing bytes (12,200 /
+  118,780 / 430 / 1,657 in 734 / 609 / 213 / 151 records) lie outside
+  every footprint, where the unspecified table callbacks write
+  (`field-types.md` §8.3); plus `monstats` record 707 `NameStr`
+  (`field-types.md` §10).
+- The four code buffers byte-identical (196, 5,891, 4,252, 158 bytes).
+- `hitclass` (X, §3.5) and the 12 shipped by-products of §7.2
+  (`playerclass`, `bodylocs`, `storepage`, `elemtypes`, `colors`,
+  `hiredesc`, `monai`, `monplace`, `skillcalc`, `misscalc`, `events`,
+  `sounds`) byte-identical.
+
 Older-generation copies (never loaded): X `.bin` files with a record size
 different from 1.14d's, shadowed by P: itemtypes 236, montype 52, overlay
 128, itemstatcost 36, properties 16, missiles 220, states 16, skills 360,
@@ -886,11 +913,10 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    is read back depends on question 2.
 4. Answered: the field compiler rules are `txt-format.md` §6–§8 and
    `field-types.md`.
-5. Byte-exact equality of every live `.bin` with its `.txt`: compiling
-   with the 91 recovered field lists reproduces the live `.bin` files
-   (formula fields: `calc-expressions.md`) except the table-specific
-   callbacks (`field-types.md` §8.3) and `monstats` record 707 `NameStr`
-   (`field-types.md` §10).
+5. Answered: byte-exact equality of every live `.bin` with its `.txt`
+   holds except the table-specific callback bytes (`field-types.md` §8.3)
+   and `monstats` record 707 `NameStr` (`field-types.md` §10); confirmed
+   by bin cross-check (§11, d2rs cross-check).
 6. How a 1.14d install without `d2exp.mpq` would load the 18 `.bin` files
    that exist only in X. Out of scope (d2rs requires LoD).
 7. Answered: evaluation with an absent code buffer gives 0
@@ -912,3 +938,6 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
 13. Runtime lookup maps beyond those in §7.4, and the exact algorithms of
     the §7.4 fix-ups (equivalence matrix, op-stat tables, per-class skill
     lists, set attachment, levels strings): per-table specs.
+14. §8 automap: "a value whose first byte is `0`" is read by d2rs as an
+    empty string (first byte 0x00); the character `0` is the other
+    reading. No 1.14d row has either, so the data cannot decide.

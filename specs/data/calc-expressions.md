@@ -5,7 +5,11 @@
   `skillscode.bin`, `skilldesccode.bin` and `itemscode.bin`, and reproduces
   all 30,217 formula field values of `missiles.bin`, `skills.bin`,
   `skilldesc.bin`, `weapons.bin`, `armor.bin` and `misc.bin` (Provenance).
-  Not implemented.
+  Compiler (§4), folding evaluator and validator (§1.5) implemented in
+  `d2-data::calc`; the d2rs compile reproduces the four buffers and every
+  formula field byte for byte, and the validator reports exactly the one
+  0x02 diagnostic (confirmed by bin cross-check). The run-time evaluator
+  (§3) is for `d2-sim`.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::calc` (bytecode decoder, validator, `.txt`
   compiler); `d2-sim::calc` (evaluator, later)
@@ -833,3 +837,9 @@ sign-extended (D2MOO: zero-extended).
    the low 8 bits): only reachable with hand-made PARAM16 operands.
 8. `skill(s, c)` level: that flag 1 of the 1.14d level getter means "with
    bonuses" is D2MOO's 1.10f reading, unconfirmed for 1.14d.
+9. Stat mode (§4.4): d2rs compares the whole name case-insensitively
+   (`basex` → 0); a prefix compare would give 1. 1.14d formulas use only
+   `.accr`, so the data cannot decide.
+10. The refusals of d2rs policy 4 and 6 (byte ≥ 0x80, missile `rand`)
+    have no `txt-format.md` §9 code; d2rs reports both as E11 with a
+    detail text.
