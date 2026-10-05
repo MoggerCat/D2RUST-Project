@@ -159,7 +159,11 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       `server-messages.tsv`), each confirmed on a hand-played 1.14d
       recording (`check_tick.py`: 4,902 ticks, 16,704 timer runs, 197 list
       snapshots, 0 mismatches; `check_packets.py`: rules R1–R7, 0
-      failures). Status draft until implemented.*
+      failures). Status draft until implemented. `d2-server` local
+      transport and host loop (queues, drain, gate, size check,
+      point/unit parse, buffers, flush, delivery, tick driver) done
+      against seams on `claude/phase3-server` (34 unit tests from the
+      synthetic vectors); wiring to `d2-proto` / `d2-sim` pending.*
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops

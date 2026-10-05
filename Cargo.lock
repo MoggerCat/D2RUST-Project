@@ -2348,6 +2348,7 @@ dependencies = [
  "d2-net",
  "d2-proto",
  "d2-sim",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
