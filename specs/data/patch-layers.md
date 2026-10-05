@@ -1,7 +1,12 @@
 # Spec: Data — Mod patch layers
 
 - **Status:** draft; our own format (`d2patch 1`). Vectors rechecked
-  2026-10-05 (Provenance). Not implemented.
+  2026-10-05 (Provenance). Implemented 2026-10-05 on branch
+  `claude/patch-layers` (`d2-data::patch`, `data-tool patch`): every
+  synthetic vector and both properties pass (`cargo test -p d2-data
+  patch`); G1–G8 unverified, queued (`docs/HANDOFF.md` §5,
+  `crates/d2-data/tests/patch_game.rs`). Implementation readings of
+  unstated details: open question 5.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-data::patch`; CLI `data-tool patch`
 - **Related specs:** `txt-format.md` (reader, binding, diagnostics),
@@ -11,29 +16,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–47 |
-| Inputs | 48–51 |
-| Outputs / state changes | 52–57 |
-| Example | 58–114 |
-| Rules | 115–116 |
-|   1. Pipeline | 117–125 |
-|   2. Tables and keys | 126–157 |
-|   3. Syntax | 158–197 |
-|   4. Selectors and columns | 198–211 |
-|   5. Applying a stack | 212–246 |
-|   6. Conflicts and drift | 247–259 |
-|   7. Compile and checks | 260–277 |
-|   8. Report | 278–288 |
-|   9. Render, digests, diff | 289–324 |
-|   10. Tools (`data-tool patch`, `anyhow`) | 325–335 |
-|   11. Versioning and determinism | 336–347 |
-|   12. Deferred | 348–354 |
-| Constants & data dependencies | 355–358 |
-| Randomness | 359–362 |
-| Edge cases & original bugs | 363–370 |
-| Test vectors | 371–466 |
-| Provenance | 467–478 |
-| Open questions | 479–488 |
+| Summary | 44–52 |
+| Inputs | 53–56 |
+| Outputs / state changes | 57–62 |
+| Example | 63–119 |
+| Rules | 120–121 |
+|   1. Pipeline | 122–130 |
+|   2. Tables and keys | 131–162 |
+|   3. Syntax | 163–202 |
+|   4. Selectors and columns | 203–216 |
+|   5. Applying a stack | 217–251 |
+|   6. Conflicts and drift | 252–264 |
+|   7. Compile and checks | 265–282 |
+|   8. Report | 283–293 |
+|   9. Render, digests, diff | 294–329 |
+|   10. Tools (`data-tool patch`, `anyhow`) | 330–340 |
+|   11. Versioning and determinism | 341–352 |
+|   12. Deferred | 353–359 |
+| Constants & data dependencies | 360–363 |
+| Randomness | 364–367 |
+| Edge cases & original bugs | 368–375 |
+| Test vectors | 376–471 |
+| Provenance | 472–483 |
+| Open questions | 484–507 |
 <!-- /index -->
 
 ## Summary
@@ -485,3 +490,17 @@ random input; the parser never panics.
 3. `treasureclassex` rows after the empty #852 are no TCs, and a name
    equal to an automatic TC (`bow3`) is shadowed (`loading.md` §10.6).
 4. Layers hold single base values: confirm this fits rule 9.
+5. Details the rules leave open, implemented as follows (2026-10-05,
+   `claude/patch-layers`); confirm or restate: (a) the 1,024-byte token
+   limit counts a bracket token's content, not its brackets; (b) line 1
+   `d2patch <v>` / `d2stack <v>` with `v` ≠ `1` is P03 / S02, any other
+   line 1 P02 / S01; (c) a `table` line with a shape error still ends
+   the P09 zone; (d) a `layer` line with a missing or extra token is S03,
+   a bracketed path S04; S07 is at the path; (e) N03 counts every
+   skipped statement, a repeated `table T` included, at its keyword; (f)
+   A12 end-of-layer related rows and A04/A05 related rows are
+   `<table> <index>`, sorted by table name then index (V8 lists `gear 0,
+   items 4`); A02 related are the columns named exactly so (G4); (g) C
+   findings name the base file, the row's base line (0 for added rows)
+   and column + 1; a code buffer that fails validation is also C03; (h)
+   D findings name the edited row (`line` = row + 2).

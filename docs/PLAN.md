@@ -120,7 +120,10 @@ exactly N pixels. Known gap: 8 unflagged invisible collision tiles in
       are read from the raw record; every live table decodes,
       `typed_tables_decode` 2026-10-06)
 - [x] Cross-reference resolution with validation errors (`d2-data::links`, `data-tool links`; `field-types.md` §6.7; 1.14d live set 2026-10-06: 0 broken, 0 unchecked)
-- [ ] Mod patch layer format + loader
+- [ ] Mod patch layer format + loader (`patch-layers.md`): implemented on
+      branch `claude/patch-layers` (`d2-data::patch`, `data-tool patch`),
+      synthetic vectors pass; unverified until the G1–G8 game-file run
+      (`docs/HANDOFF.md` §5)
 **Exit:** all tables load from the user's install; patches apply; broken
 references are reported.
 **Status (2026-10-05):** foundation specs written in `specs/data/`

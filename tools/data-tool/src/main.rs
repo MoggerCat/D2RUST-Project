@@ -6,6 +6,7 @@
 //!   data-tool gen-tables
 //!   data-tool links [game_dir]
 //!   data-tool dump-compare <dump_dir> [game_dir]
+//!   data-tool patch (check | render | diff) ...
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
 //! buffers, `hitclass`), compiles every table's highest-priority `.txt` in
@@ -25,6 +26,11 @@
 //! with the live `.bin` set after `d2_data::fixup` (`loading.md` §7.4,
 //! open question 15). Exit status 1 when a byte differs outside a pointer
 //! field and outside the rows `fixup::PENDING` lists.
+//!
+//! `patch` checks a mod stack, renders patched tables or diffs an edited
+//! table into a layer (`specs/data/patch-layers.md` §10).
+
+mod patch;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -51,9 +57,10 @@ fn main() -> Result<()> {
         Some("dump-compare") if (2..=3).contains(&args.len()) => {
             dump_compare(Path::new(&args[1]), &game_dir(args.get(2))?)
         }
+        Some("patch") => std::process::exit(patch::main(&args[1..])),
         _ => bail!(
             "usage: data-tool tables|links [game_dir] | data-tool gen-tables | \
-             data-tool dump-compare <dump_dir> [game_dir]"
+             data-tool dump-compare <dump_dir> [game_dir] | data-tool patch ..."
         ),
     }
 }
