@@ -32,3 +32,12 @@ $G = "$env:LOCALAPPDATA\Programs\ghidra_12.1.4_PUBLIC\support\analyzeHeadless.ba
 count) and is the starting point for finding things. Open the project in
 the GUI with `ghidraRun.bat` to rename functions and define structs as you
 learn them. Later exports pick up those names.
+
+## Disassembly and cross-references
+
+The decompile export drops register arguments, so read register use from
+the disassembly: `py tools/ghidra/disasm.py fn|at|xref|dump|selftest`
+(capstone + pefile; usage in the script's docstring). `dump
+re/exports/all.asm` writes the whole binary as one greppable file
+(~7 s, ~890k lines), the fastest way to find every reader and writer of
+a global or a struct offset.

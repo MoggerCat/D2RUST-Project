@@ -13,6 +13,10 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_rng.py` | Recomputes every recorded event from its own seed-before with `d2rng.py`; exit 1 on any mismatch |
 | `convert_rng.py` | Splits a raw file into seed chains and writes chosen chains as `traces/sim/rng/sim-NNNN.json` |
 | `d2rng.py` | The RNG rule from the spec (step and the five helpers), used by the two above |
+| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; writes `traces/raw/<time>-packets.jsonl` (gitignored). Spec: `specs/sim/intents-events.md` |
+| `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
+| `record_tick.py` | Launches `game/Game.exe` under the debugger, logs each server tick and its step markers, every timer event scheduled, cancelled and run, every unit/room/update-queue list change, and list snapshots every 25 frames; writes `traces/raw/<time>-tick.jsonl` (gitignored). Specs: `specs/sim/tick.md`, `specs/sim/unit-order.md` |
+| `check_tick.py` | Replays a tick recording through a model of those specs: must predict every timer run and reproduce every snapshot; `--perturb-ex N`, `--perturb-snap N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -122,3 +126,60 @@ only, no count header), `map-<name>.bin`, `manifest.json` (every loader
 call with pointer, count, call site; per table address, count, record
 size, source global; per map address and size; notes) and `manifest.tsv`
 (the table and map list read by `data-tool dump-compare`).
+
+## record_packets.py: client↔server messages
+
+```
+py tools/trace-recorder/record_packets.py --seconds 180      # Game.exe -w -ns; play by hand
+py tools/trace-recorder/check_packets.py traces/raw/<time>-packets.jsonl
+py tools/trace-recorder/check_packets.py traces/raw/<time>-packets.jsonl --perturb <seq>
+py tools/trace-recorder/check_packets.py --selftest
+```
+
+Same reference-hash check, kill guarantees and Win32 code as
+`record_rng.py` (imported). Hooks (INT3 at function entry unless noted;
+addresses and rules in `specs/sim/intents-events.md`):
+
+| Event | Address | Logged |
+|---|---|---|
+| `drain`, `flush` | `0x0052CFE0`, `0x0052FD90` | loop markers |
+| `tick`, `tick_end` | `0x0052D870` entry; `0x0052FD1E`, `0x00564608` (after the call) | frame (game +0xA8 + 1), game, game type (+0x6A) |
+| `c2s`, `c2s_sys` | `0x0053F3D0`, `0x0053F100` | client id, size, bytes (≤ 0x1FC) |
+| `dispatch`, `result` | `0x0054D750`; `0x0053F45E` (after the call) | id, size, unit GUID, frame; result code (EAX) |
+| `s2c` | `0x0053B280` | client id, size, bytes, caller |
+| `net` | `0x0052B330` | type, client id, size, bytes, caller (`0x52e3b5` = flush) |
+| `client_send`, `client_out` | `0x00478350`, `0x0052AE50` | the client's message before and after its duplicate filter |
+
+Raw format `packets-raw-1` (JSON lines): header and footer as in
+`rng-raw-1`; one record per event with `type`, the fields above, `frame`
+(last tick's frame), `phase` (`input` after a drain, `tick`, `post`,
+`flush`), `tid`, `seq`, `ms`.
+
+## record_tick.py: the server tick and unit lists
+
+```
+py tools/trace-recorder/record_tick.py --seconds 200          # Game.exe -w -ns; play by hand
+py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl
+py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl --perturb-ex 500
+py tools/trace-recorder/check_tick.py --selftest
+```
+
+Same reference-hash check, kill guarantees and Win32 code as
+`record_rng.py`. 35 persistent INT3s (each stepped over and re-armed);
+the expected bytes of every hook are checked before arming. Hooks and
+offsets: the constants block at the top of the script, each naming its
+spec section (`tick.md` §3, §5; `unit-order.md` §2, §4–§6). Only the
+first game that ticks is recorded; client-side calls of the shared room
+code are dropped (server-unit flag, act membership). Options:
+`--seconds`, `--ticks N`, `--snap-every N` (default 25; 0 = none),
+`--out`.
+
+Raw format `tick-raw-1` (JSON lines, key `k`): `header`, `game`, `tick`
+(frame), `step` (name), `set` (timer, list `d`/`i`, class, type, final
+and requested expire, unit type/GUID, args, callback), `cancel` (timer,
+deferred), `ex` (timer run: class, list, type, expire, unit, args),
+`hin`/`hout` (hash list), `rin`/`rout` (room list), `qin`/`qout`/`qclear`
+(update queue), `ract`/`rdeact` (act room list), `snap` (every list, by
+unit type and GUID; rooms by address with their adjacent-room arrays),
+`footer`. The game runs near full speed under the recorder (4,902 ticks
+in a 200 s run, start-up included).
