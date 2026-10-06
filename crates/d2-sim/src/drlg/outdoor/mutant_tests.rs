@@ -1019,3 +1019,727 @@ fn outdoor_room_waypoint_and_shrine_rows() {
         assert_eq!(drlg.room(r).seed, s, "flags {flags:#x}");
     }
 }
+
+// ---- tilesub.rs: sub-theme pick (§3) and room substitution (§4) -------------
+
+use super::tilesub::{apply, fixed_test, pick_sub_themes, random_test, room_substitution, RoomSub};
+use crate::drlg::tiles::CellGrid;
+
+/// `outdoor-tilesub.md` §3: one room-seed step per row; bit k when
+/// lo' mod 100 < Prob[theme] (strict) of row k, by the theme's column;
+/// t = −1 or h = −1: nothing.
+#[test]
+fn sub_theme_pick_by_theme_column() {
+    let seed = Seed::init_low(4242);
+    let r: Vec<i32> = {
+        let mut s = seed;
+        (0..3).map(|_| (s.step() % 100) as i32).collect()
+    };
+    let mut od = od();
+    // Row 0: theme 1 column above r0; row 1: exactly r1 (not picked);
+    // row 2: theme 1 column 0 but theme 0 column 100.
+    for (k, p1) in [(0, r[0] + 1), (1, r[1]), (2, 0)] {
+        let mut prob = [100; 5];
+        prob[1] = p1;
+        od.subs.push(SubRow {
+            type_: 6,
+            prob,
+            dt1_mask: 1 << (4 * k),
+            ..SubRow::default()
+        });
+    }
+    let mut s = seed;
+    assert_eq!(pick_sub_themes(&od, &mut s, 6, 1), Ok((0b001, 0x1)));
+    let mut s = seed;
+    assert_eq!(pick_sub_themes(&od, &mut s, 6, 0), Ok((0b111, 0x111)));
+    for (t, h) in [(-1, 1), (6, -1)] {
+        let mut s = seed;
+        assert_eq!(pick_sub_themes(&od, &mut s, t, h), Ok((0, 0)));
+        assert_eq!(s, seed);
+    }
+}
+
+/// An 8 × 8 room side: 9 × 9 grids, floor 0x2 on cells (0..7, 0..7).
+fn room_side() -> OutdoorRoom {
+    let mut floor = CellGrid::new(9, 9);
+    for y in 0..8 {
+        for x in 0..8 {
+            floor.set(x, y, 0x2);
+        }
+    }
+    OutdoorRoom {
+        tile_type: CellGrid::new(9, 9),
+        wall: CellGrid::new(9, 9),
+        floor,
+        ..OutdoorRoom::default()
+    }
+}
+
+fn rsub(room: &mut OutdoorRoom) -> RoomSub<'_> {
+    RoomSub {
+        w: 8,
+        h: 8,
+        tile_x: 800,
+        tile_y: 900,
+        room,
+    }
+}
+
+/// A file with one group (x 0, y 0, w × h, N variants), method `m`, and a
+/// floor pattern: match cells 0x2, variant v (at x offset (v + 1)·(w +
+/// 1)) cells 0x2 | (v + 1) << 4.
+fn pattern(w: i32, h: i32, n: i32, m: u32) -> SubFile {
+    let width = ((n + 1) * (w + 1)) as usize;
+    let mut f = CellGrid::new(width, h as usize);
+    for v in -1..n {
+        let o = (v + 1) * (w + 1);
+        for j in 0..h {
+            for i in 0..w {
+                f.set((o + i) as usize, j as usize, 0x2 | ((v + 1) as u32) << 4);
+            }
+        }
+    }
+    SubFile {
+        method: m,
+        groups: vec![SubGroup {
+            x: 0,
+            y: 0,
+            w,
+            h,
+            variants: n,
+        }],
+        floor: Some(f),
+        ..SubFile::default()
+    }
+}
+
+/// `outdoor-tilesub.md` §4: rows of type t while mask bits remain, bit k
+/// = row k (the mask shifts right per row); a scattered row draws Max[h]
+/// group rolls.
+#[test]
+fn room_substitution_rows_by_mask() {
+    let mut od = od();
+    let mut subs = SubFileMap::default();
+    for (k, max) in [(0, 2), (1, 3)] {
+        let name = format!("m{k}").into_bytes();
+        od.subs.push(SubRow {
+            type_: 9,
+            file: name.clone(),
+            max: [max; 5],
+            ..SubRow::default()
+        });
+        subs.0.insert(name, pattern(1, 1, 1, 2));
+    }
+    for (mask, steps) in [(0, 0), (0b01, 2), (0b10, 3), (0b11, 5)] {
+        let mut room = room_side();
+        let mut rs = rsub(&mut room);
+        let start = Seed::init_low(77);
+        let mut s = start;
+        room_substitution(&od, &subs, &mut s, &mut rs, 9, 0, mask).unwrap();
+        let mut want = start;
+        for _ in 0..steps {
+            want.step();
+        }
+        assert_eq!(s, want, "mask {mask:#b}");
+    }
+}
+
+/// The pasted floor cells (bit 0x80) of a room side.
+fn pasted(room: &OutdoorRoom) -> Vec<(i32, i32, u32)> {
+    let mut out = Vec::new();
+    for y in 0..9 {
+        for x in 0..9 {
+            let v = room.floor.get(x, y);
+            if v & 0x80 != 0 {
+                out.push((x, y, v));
+            }
+        }
+    }
+    out
+}
+
+/// `outdoor-tilesub.md` §4.2: per repetition G := group[roll(count)];
+/// aw, ah := w − G.w, h − G.h (≤ 0: next, the roll stays drawn); Trials
+/// > 0: x := roll(aw) + 1, y := roll(ah) + 1, apply on a passing fixed
+/// test; Trials −1: shuffle aw·ah entries, the first passing at (x + 1,
+/// y + 1).
+#[test]
+fn scattered_positions() {
+    let file = pattern(1, 1, 1, 2);
+    let row = |trials: i32| SubRow {
+        type_: 9,
+        file: b"p".to_vec(),
+        max: [1; 5],
+        trials: [trials; 5],
+        ..SubRow::default()
+    };
+    let mut subs = SubFileMap::default();
+    subs.0.insert(b"p".to_vec(), file.clone());
+    for k in 0..6u32 {
+        let start = Seed::init_low(500 + 7919 * k);
+        // Trials 1.
+        let mut odt = od();
+        odt.subs.push(row(1));
+        let mut room = room_side();
+        let mut s = start;
+        room_substitution(&odt, &subs, &mut s, &mut rsub(&mut room), 9, 0, 1).unwrap();
+        let mut e = start;
+        e.roll(1);
+        let x = e.roll(7) as i32 + 1;
+        let y = e.roll(7) as i32 + 1;
+        assert_eq!(pasted(&room), [(x, y, 0x82)], "trials 1, k {k}");
+        assert_eq!(s, e);
+        // Trials −1. The cell left of the first entry's candidate fails
+        // the fixed test (the candidate is (x + 1, y + 1)).
+        let (x0, y0) = {
+            let mut e = start;
+            e.roll(1);
+            shuffle_cells(&mut e, 7, 7)[0]
+        };
+        let mut odt = od();
+        odt.subs.push(row(-1));
+        let mut room = room_side();
+        room.floor.set(x0 as usize, y0 as usize + 1, 0);
+        let mut s = start;
+        room_substitution(&odt, &subs, &mut s, &mut rsub(&mut room), 9, 0, 1).unwrap();
+        let mut e = start;
+        e.roll(1);
+        let (x, y) = shuffle_cells(&mut e, 7, 7)[0];
+        assert_eq!(pasted(&room), [(x + 1, y + 1, 0x82)], "trials -1, k {k}");
+        assert_eq!(s, e);
+    }
+    // A group as wide as the room (aw = 0): only the group roll.
+    let mut subs = SubFileMap::default();
+    subs.0.insert(b"p".to_vec(), pattern(8, 1, 1, 2));
+    let mut odt = od();
+    odt.subs.push(row(1));
+    let mut room = room_side();
+    let start = Seed::init_low(9);
+    let mut s = start;
+    room_substitution(&odt, &subs, &mut s, &mut rsub(&mut room), 9, 0, 1).unwrap();
+    let mut e = start;
+    e.step();
+    assert_eq!(s, e);
+    assert!(pasted(&room).is_empty());
+}
+
+/// `outdoor-tilesub.md` §4.1: method 1 applies variant 0 at every
+/// passing (x, y) with y in 1..H−1, x in 1..W−1, no draws; method 2 scans
+/// 0..H−1 × 0..W−1, one room-seed step r := lo' mod 100 per passing cell,
+/// and if Prob[h] < r: v := roll(N), apply at x offset (v + 1)·(G.w + 1).
+#[test]
+fn check_all_methods() {
+    let row = |prob: i32| SubRow {
+        type_: 9,
+        file: b"c".to_vec(),
+        check_all: 1,
+        prob: [prob; 5],
+        ..SubRow::default()
+    };
+    // Method 1.
+    let mut subs = SubFileMap::default();
+    subs.0.insert(b"c".to_vec(), pattern(1, 1, 1, 1));
+    let mut odt = od();
+    odt.subs.push(row(0));
+    let mut room = room_side();
+    let start = Seed::init_low(3);
+    let mut s = start;
+    room_substitution(&odt, &subs, &mut s, &mut rsub(&mut room), 9, 0, 1).unwrap();
+    assert_eq!(s, start);
+    let want: Vec<_> = (1..8)
+        .flat_map(|y| (1..8).map(move |x| (x, y, 0x82)))
+        .collect();
+    assert_eq!(pasted(&room), want);
+    // Method 2, two variants: the pasted value tells v.
+    let mut subs = SubFileMap::default();
+    subs.0.insert(b"c".to_vec(), pattern(1, 1, 2, 2));
+    for prob in [30, 70] {
+        let mut odt = od();
+        odt.subs.push(row(prob));
+        let mut room = room_side();
+        let start = Seed::init_low(11 + prob as u32);
+        let mut s = start;
+        room_substitution(&odt, &subs, &mut s, &mut rsub(&mut room), 9, 0, 1).unwrap();
+        let mut e = start;
+        let mut want = Vec::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                let r = (e.step() % 100) as i32;
+                if prob < r {
+                    let v = e.roll(2);
+                    want.push((x, y, (0x2 | (v + 1) << 4) | 0x80));
+                }
+            }
+        }
+        assert_eq!(pasted(&room), want, "prob {prob}");
+        assert_eq!(s, e);
+    }
+}
+
+/// `outdoor-tilesub.md` §4.3 fixed test: every group cell whose pattern
+/// floor has bit 2 needs room floor bit 2 and no bit of 0x3F0FF00, and no
+/// room wall bit 1.
+#[test]
+fn fixed_test_covers_the_group_box() {
+    let file = pattern(2, 2, 1, 1);
+    let g = file.groups[0];
+    for (block, x, y, want) in [
+        ((5, 3), 3, 2, true),
+        ((5, 3), 4, 2, false),
+        ((5, 3), 4, 3, false),
+        ((5, 3), 5, 2, false),
+        ((5, 3), 4, 1, true),
+        ((5, 3), 3, 3, true),
+    ] {
+        for kind in 0..3 {
+            let mut room = room_side();
+            match kind {
+                0 => room.floor.set(block.0, block.1, 0),
+                1 => room.floor.set(block.0, block.1, 0x2 | 0x100),
+                _ => room.wall.set(block.0, block.1, 0x1),
+            }
+            let rs = rsub(&mut room);
+            assert_eq!(
+                fixed_test(&rs, &file, g, x, y),
+                want,
+                "{kind} at ({x}, {y})"
+            );
+        }
+    }
+}
+
+/// `outdoor-tilesub.md` §4.3 random test: pattern tile type equals the
+/// room's; floor bit 2 needs room bit 2 and equal 0x3F0FF00 bits; wall
+/// bit 1 likewise.
+#[test]
+fn random_test_rules() {
+    let mut file = pattern(2, 1, 1, 2);
+    let mut tt = CellGrid::new(6, 1);
+    tt.set(1, 0, 5);
+    file.tile_types = vec![tt];
+    let mut w = CellGrid::new(6, 1);
+    w.set(0, 0, 0x1 | 0x100);
+    file.walls = vec![w];
+    let g = file.groups[0];
+    let base = || {
+        let mut room = room_side();
+        room.tile_type.set(4, 2, 5);
+        room.wall.set(3, 2, 0x1 | 0x100);
+        room
+    };
+    let mut room = base();
+    assert!(random_test(&rsub(&mut room), &file, g, 3, 2));
+    // Shifted: tile types and wall no longer line up.
+    assert!(!random_test(&rsub(&mut room), &file, g, 2, 2));
+    let mut room = base();
+    room.tile_type.set(4, 2, 6);
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    let mut room = base();
+    room.floor.set(4, 2, 0x2 | 0x200);
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    let mut room = base();
+    room.floor.set(4, 2, 0);
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    let mut room = base();
+    room.wall.set(3, 2, 0x1 | 0x200);
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    let mut room = base();
+    room.wall.set(3, 2, 0x100);
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+}
+
+/// `outdoor-tilesub.md` §4.4: roof growth by pattern shadow cells with
+/// 0x8000000 at offset o; floor bit 2 → value | 0x80; wall bit 1 and tile
+/// type ≠ 0 overwrite; shadows at (tile x + x + i, tile y + y + j); units
+/// strictly inside the match box move to (5x + ux − 5G.x, 5y + uy −
+/// 5G.y).
+#[test]
+fn apply_writes_the_variant() {
+    let mut file = pattern(2, 2, 1, 1);
+    // Variant 0 at x offset 3.
+    let mut w = CellGrid::new(6, 2);
+    w.set(4, 1, 0x1 | 0x300);
+    w.set(3, 1, 0x100);
+    file.walls = vec![w];
+    let mut tt = CellGrid::new(6, 2);
+    tt.set(3, 0, 7);
+    file.tile_types = vec![tt];
+    let mut sh = CellGrid::new(6, 2);
+    sh.set(4, 0, 0x800_0000 | 9);
+    sh.set(1, 1, 0x800_0000);
+    file.shadow = Some(sh);
+    file.units = vec![
+        PresetUnit {
+            unit_type: 2,
+            class: 1,
+            x: 4,
+            y: 6,
+        },
+        PresetUnit {
+            unit_type: 2,
+            class: 2,
+            x: 0,
+            y: 6,
+        },
+        PresetUnit {
+            unit_type: 2,
+            class: 3,
+            x: 12,
+            y: 3,
+        },
+    ];
+    let g = file.groups[0];
+    let mut room = room_side();
+    apply(&mut rsub(&mut room), &file, g, 2, 5, 3);
+    assert_eq!(room.roof_count, 1);
+    assert_eq!(room.floor.get(2, 5), 0x12 | 0x80);
+    assert_eq!(room.floor.get(3, 6), 0x12 | 0x80);
+    assert_eq!(room.floor.get(4, 5), 0x2);
+    assert_eq!(room.wall.get(3, 6), 0x1 | 0x300);
+    assert_eq!(room.wall.get(2, 6), 0);
+    assert_eq!(room.tile_type.get(2, 5), 7);
+    assert_eq!(room.shadows, [(803, 905, 0x800_0000 | 9)]);
+    assert_eq!(room.units.len(), 1);
+    assert_eq!(
+        (room.units[0].class, room.units[0].x, room.units[0].y),
+        (1, 14, 31)
+    );
+}
+
+// ---- tilesub.rs: border substitution (§2, Acts I/II/IV callbacks) ---------
+
+use super::tilesub::{style_map, BorderCtx, SKIP_STYLE, STYLE_ANY};
+
+/// A wall pattern value of style s (`(s + 1) << 8 | 1`).
+fn wall_style(s: i32) -> u32 {
+    ((s + 1) as u32) << 8 | 1
+}
+
+/// A border file: group (0, 0, w, h, N) whose match cells are `cells`
+/// (wall styles, or `None` for a floor-bit-2 cell, or `Some(-1)` for an
+/// empty cell); variant v's cells are `variant(v, i, j)`.
+fn border_file(
+    w: i32,
+    h: i32,
+    n: i32,
+    cells: &[Option<i32>],
+    variant: impl Fn(i32, i32, i32) -> Option<i32>,
+) -> SubFile {
+    let width = ((n + 1) * (w + 1)) as usize;
+    let mut floor = CellGrid::new(width, h as usize);
+    let mut wall = CellGrid::new(width, h as usize);
+    let mut put = |x: i32, y: i32, c: Option<i32>| match c {
+        Some(-1) => {}
+        Some(s) => wall.set(x as usize, y as usize, wall_style(s)),
+        None => floor.set(x as usize, y as usize, 0x2),
+    };
+    for j in 0..h {
+        for i in 0..w {
+            put(i, j, cells[(j * w + i) as usize]);
+            for v in 0..n {
+                put((v + 1) * (w + 1) + i, j, variant(v, i, j));
+            }
+        }
+    }
+    SubFile {
+        method: 2,
+        groups: vec![SubGroup {
+            x: 0,
+            y: 0,
+            w,
+            h,
+            variants: n,
+        }],
+        floor: Some(floor),
+        walls: vec![wall],
+        ..SubFile::default()
+    }
+}
+
+/// The rules of `outdoor-tilesub.md` §2.2–§2.3 (Wild callbacks), applied
+/// to copies of grids 0 and 2 with the level seed; stamps use 1 × 1
+/// presets of one file (`outdoor.md` §5.1).
+#[allow(clippy::too_many_arguments)]
+fn border_model(
+    seed: &mut Seed,
+    g0: &mut Grid,
+    g2: &mut Grid,
+    id: u32,
+    flags: u32,
+    ctx: BorderCtx,
+    rows: &[(SubRow, SubFile)],
+) {
+    let (gw, gh) = (g0.w, g0.h);
+    let mut built: Vec<u32> = Vec::new();
+    for (row, file) in rows {
+        let skip = SKIP_STYLE;
+        let count = file.groups.len() as i32;
+        let first = if row.bord_type == 0 {
+            seed.roll(count) as i32
+        } else {
+            0
+        };
+        'groups: for j in 0..count {
+            let g = file.groups[((first + j) % count) as usize];
+            let off = if ctx.t == 1 && flags & 0xC != 0 {
+                -1
+            } else {
+                1
+            };
+            let w = gw - row.grid_size * g.w + off;
+            let h = gh - row.grid_size * g.h + 1;
+            if w * h <= 0 {
+                continue;
+            }
+            let small = ctx.t == 1 && (2..=7).contains(&id) && w < 6 && h < 6;
+            for (x, y) in shuffle_cells(seed, w, h) {
+                if small && (x, y) == (2, 2) {
+                    continue;
+                }
+                let gs = row.grid_size;
+                let (sx, sy) = (x - x % gs, y - y % gs);
+                let cell_at = |i: i32, jj: i32| (sx + i * gs, sy + jj * gs);
+                let mut pass = true;
+                for jj in 0..g.h {
+                    for i in 0..g.w {
+                        let (cx, cy) = cell_at(i, jj);
+                        let f = file.floor_at(g.x + i, g.y + jj);
+                        let wv = file.wall_at(0, g.x + i, g.y + jj);
+                        let c = g0.get(cx, cy) as i32;
+                        let not_link = g2.get(cx, cy) & cell::LINK == 0;
+                        let ok = if wv & 1 != 0 {
+                            let s = (wv >> 8 & 0xFF) as i32 - 1;
+                            (s == skip || c == ctx.base as i32 + s) && not_link
+                        } else if f & 2 != 0 {
+                            g2.contains(cx, cy) && g2.get(cx, cy) & cell::NOT_SPAWN == 0
+                        } else {
+                            true
+                        };
+                        pass &= ok;
+                    }
+                }
+                if !pass {
+                    continue;
+                }
+                let v = seed.roll(g.variants) as i32;
+                let xoff = (v + 1) * (g.w + 1);
+                for jj in 0..g.h {
+                    for i in 0..g.w {
+                        let (cx, cy) = cell_at(i, jj);
+                        let f = file.floor_at(g.x + i + xoff, g.y + jj);
+                        let wv = file.wall_at(0, g.x + i + xoff, g.y + jj);
+                        if wv & 1 != 0 {
+                            let s = (wv >> 8 & 0xFF) as i32 - 1;
+                            let p = (ctx.base as i32 + s) as u32;
+                            if s != skip {
+                                if !built.contains(&p) {
+                                    seed.roll(1);
+                                    built.push(p);
+                                }
+                                let border = matches!(p, 4..=15 | 364..=375);
+                                g2.op(cx, cy, Op::AndNot, cell::FILE_MASK);
+                                g2.op(
+                                    cx,
+                                    cy,
+                                    Op::Or,
+                                    cell::PRESET | if border { cell::BORDER } else { 0 },
+                                );
+                                g0.op(cx, cy, Op::Set, p);
+                            }
+                        } else if f & 2 != 0 {
+                            g0.op(cx, cy, Op::Set, 0);
+                            g2.op(cx, cy, Op::Set, 0);
+                        } else {
+                            g0.op(cx, cy, Op::Set, 0);
+                            g2.op(cx, cy, Op::Set, cell::BLANK);
+                        }
+                    }
+                }
+                match row.bord_type {
+                    0 => break 'groups,
+                    1 => continue 'groups,
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+/// `outdoor-tilesub.md` §2.2, §2.3: border substitution against the rule
+/// model, over seeds, BordType 0/1/2, GridSize 1/2, type 1 with outdoor
+/// flags 0xC (Off −1) and the small-area skip in levels 2..7, the skip
+/// style S = 62, keep and blank cells, links.
+#[test]
+fn border_substitution_by_the_rules() {
+    struct Case {
+        id: u32,
+        t: i32,
+        flags: u32,
+        bord: i32,
+        gs: i32,
+        gw: i32,
+        gh: i32,
+    }
+    let cases = [
+        Case {
+            id: 10,
+            t: 2,
+            flags: 0,
+            bord: 2,
+            gs: 1,
+            gw: 7,
+            gh: 6,
+        },
+        Case {
+            id: 10,
+            t: 3,
+            flags: 0,
+            bord: 1,
+            gs: 2,
+            gw: 9,
+            gh: 8,
+        },
+        Case {
+            id: 3,
+            t: 1,
+            flags: 0xC,
+            bord: 0,
+            gs: 1,
+            gw: 6,
+            gh: 6,
+        },
+        Case {
+            id: 3,
+            t: 1,
+            flags: 0,
+            bord: 2,
+            gs: 1,
+            gw: 6,
+            gh: 5,
+        },
+        Case {
+            id: 30,
+            t: 1,
+            flags: 0x4,
+            bord: 2,
+            gs: 1,
+            gw: 6,
+            gh: 6,
+        },
+    ];
+    let base = 4;
+    let mut stamped = [0usize; 5];
+    for (ci, c) in cases.iter().enumerate() {
+        // Two-cell group: a style-3 wall then a floor (fit) cell; variant
+        // 0: style 5 wall, empty; variant 1: style 61 (= S, no stamp),
+        // style 6 wall. A second file with one 1 × 1 cell of style S
+        // (matches anything) replaced by a floor (keep) cell.
+        let f1 = border_file(2, 1, 2, &[Some(3), None], |v, i, _| match (v, i) {
+            (0, 0) => Some(5),
+            (0, _) => Some(-1),
+            (1, 0) => Some(SKIP_STYLE),
+            _ => Some(6),
+        });
+        let f2 = border_file(1, 1, 1, &[Some(SKIP_STYLE)], |_, _, _| None);
+        // A 2 × 2 group (row 0 style S, row 1 style 3) replaced by styles
+        // 7 + 4v + i + 2j, and a second 1 × 1 group whose replacement column is empty
+        // (blank cell).
+        let s = Some(SKIP_STYLE);
+        let mut f3 = border_file(2, 2, 2, &[s, s, Some(3), Some(3)], |v, i, j| {
+            Some(7 + 4 * v + i + 2 * j)
+        });
+        f3.groups.push(SubGroup {
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            variants: 1,
+        });
+        let row = |file: &str| SubRow {
+            type_: c.t,
+            file: file.as_bytes().to_vec(),
+            bord_type: c.bord,
+            grid_size: c.gs,
+            ..SubRow::default()
+        };
+        for k in 0..6u32 {
+            let mut e = Env::new(c.id, c.gw, c.gh);
+            e.od.subs = vec![row("f1"), row("f2"), row("f3")];
+            e.subs.0.insert(b"f1".to_vec(), f1.clone());
+            e.subs.0.insert(b"f2".to_vec(), f2.clone());
+            e.subs.0.insert(b"f3".to_vec(), f3.clone());
+            e.info.flags = c.flags;
+            e.drlg.level_mut(e.l).seed = Seed::init_low(31 + 7919 * (k + 8 * ci as u32));
+            // Grid 0: style-3 borders (base + 3) on a diagonal pattern;
+            // a link cell and a not-spawn cell.
+            for y in 0..c.gh {
+                for x in 0..c.gw {
+                    if (x + 2 * y + k as i32) % 3 == 0 {
+                        e.info.grids[0].op(x, y, Op::Set, base + 3);
+                    }
+                }
+            }
+            e.info.grids[2].op(1, 1, Op::Set, cell::LINK);
+            e.info.grids[2].op(4, 2, Op::Set, cell::LINK);
+            e.info.grids[2].op(2, 3, Op::Set, cell::BLANK);
+            let mut s = e.seed();
+            let (mut m0, mut m2) = (e.info.grids[0].clone(), e.info.grids[2].clone());
+            let before = m0.clone();
+            let rows = [
+                (row("f1"), f1.clone()),
+                (row("f2"), f2.clone()),
+                (row("f3"), f3.clone()),
+            ];
+            let ctx = BorderCtx::wild(c.t, base);
+            border_model(&mut s, &mut m0, &mut m2, c.id, c.flags, ctx, &rows);
+            let mut g = e.gen();
+            g.border_sub(ctx).unwrap();
+            let (r0, r2) = (&g.info.grids[0], &g.info.grids[2]);
+            assert_eq!(r0.cells, m0.cells, "case {ci} k {k}: grid 0");
+            // Grid 2 without the file bits (build-list files).
+            let strip = |g: &Grid| {
+                g.cells
+                    .iter()
+                    .map(|v| v & !cell::FILE_MASK)
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(strip(r2), strip(&m2), "case {ci} k {k}: grid 2");
+            assert_eq!(*g.seed(), s, "case {ci} k {k}: seed");
+            let changed = before
+                .cells
+                .iter()
+                .zip(&m0.cells)
+                .filter(|(a, b)| a != b)
+                .count();
+            stamped[ci] += changed;
+        }
+    }
+    // Every case replaced something.
+    assert!(stamped.iter().all(|&n| n > 0), "{stamped:?}");
+}
+
+/// `outdoor-tilesub.md` §2.1: the Wild and Barricade contexts start with
+/// skip style S = −1 (then 62); the Act V context is type 12, base 0.
+#[test]
+fn border_contexts() {
+    let w = BorderCtx::wild(3, 364);
+    assert_eq!((w.t, w.base, w.skip), (3, 364, -1));
+    let b = BorderCtx::barricade();
+    assert_eq!((b.t, b.base, b.skip), (12, 0, -1));
+    assert_eq!(STYLE_ANY, -5);
+}
+
+/// `outdoor-tilesub.md` §2.3: the Act V style map gives P + v − lo (P
+/// snow for level 117); P ≤ 0 rows return P itself.
+#[test]
+fn style_map_rows() {
+    assert_eq!(style_map(49, 1, false), Ok(915));
+    assert_eq!(style_map(49, 16, false), Ok(930));
+    assert_eq!(style_map(49, 31, true), Ok(987));
+    assert_eq!(style_map(48, 3, false), Ok(882));
+    assert_eq!(style_map(48, 7, true), Ok(970));
+    assert_eq!(style_map(48, 30, false), Ok(0));
+    assert_eq!(style_map(48, 31, false), Ok(-5));
+    assert!(style_map(48, 9, false).is_err());
+    assert!(style_map(47, 1, false).is_err());
+}
