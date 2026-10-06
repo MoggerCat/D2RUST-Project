@@ -95,6 +95,7 @@ behaviors the engine reproduces exactly.
 | Nightly deep property runs (2026-10-06, `ci-nightly-props`) | `.github/workflows/nightly-props.yml` (03:17 UTC and manual) runs `tools/props-deep.sh` groups `sim`, `wire`, `worldsim` at 20,000 / 20,000 / 500 cases with `PROPTEST_MAX_SHRINK_TIME=60000`; PR CI keeps `PROPTEST_CASES` unset | Answers SF1. `sim` measured 670 s; `wire` and `worldsim` are estimates; a counterexample is a real bug, never a flake (HANDOFF §8). |
 | Game from a synthetic install (2026-10-06, `fixedset-game`) | `test-fixtures` builds the install, a one-room town and a `SimGame` in CI (`GameData`, `ActCreation::TownOnly`: the DRLG without the act placer, then the town); `ActCreation::Full` is the 1.14d path on real data | The TownOnly DRLG seed skips the placer's draws (a fixture state); `test-fixtures` depends on `d2-sim` and `d2-server`, still test-only. |
 | MPQ Huffman decoder (2026-10-06, `mpq-huffman`, BB1) | Output and errors unchanged; the leader lookup is a 256-slot cache used only as a hint (a stale or colliding entry costs time, never changes a result) and tables 1–8 take a 1024-entry fast path until the first escape; the encoder exists under `test-support` | 2–3.7× on tables 0–3 (criterion, cloud); decided on the tables the 1.14d `.wav` files use (HANDOFF §5 C62). `specs/formats/mpq.md` unchanged. |
+| Character save format (2026-10-06, `impl-d2s`) | `d2_formats::d2s` owns bytes, checksum and the loader's format checks; item records stay opaque `ItemEntry` bytes whose length comes from a `SaveTables` callback (d2-proto's save-format reader on the server/tool side); context checks (§2.2 rules 4–5) are a separate `check_header` that `read` runs in place when given a `GameContext`; load effects (§9) are `d2-server`'s | `d2-formats` stays below `d2-proto`/`d2-sim`. The model keeps every byte the writer emits (unread fields, corpse u32, trailing bytes), so parse→write is byte-identical. Hand-made-file cases the game reads past the buffer (stats with no terminator, short skills section, `kf` without its g byte) are rejected with the section's code instead (no observable to match). |
 
 ## Phases
 
@@ -270,6 +271,16 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       synthetic DRLG, black window by design). Still open: session code is a
       placeholder (HANDOFF §2 step 4). No tick
       interpolation (decisions log).*
+- [ ] Character save (`.d2s`, `specs/formats/d2s.md`). *Format layer done
+      2026-10-06 (`claude/impl-d2s`, `docs/handoff/impl-d2s.md`):
+      `d2_formats::d2s` reader/writer (header, checksum, all sections,
+      loader internal codes and result table; item entries opaque, sized
+      by `d2_proto::item_bits::save_entry_len`), the item bit stream's
+      save format in `d2-sim` (writer) and `d2-proto` (reader), and the
+      dev tool `d2s-tool` (generate / edit / dump / check saves).
+      Unverified: no 1.14d save compared yet (HANDOFF §5 queue, d2s Open
+      question 3). Still open: the load effects (§9) in `d2-server`
+      character storage.*
 **Exit:** walk around Act 1 town via the local server.
 
 ### Phase 6 — Full client
