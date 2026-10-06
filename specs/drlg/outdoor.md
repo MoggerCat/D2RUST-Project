@@ -7,7 +7,9 @@
   read from the code but not yet recorded.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::drlg::outdoor`
-- **Related specs:** `drlg/outdoor-tilesub.md` (lvlsub tile substitution:
+- **Related specs:** `drlg/outdoor-act3-act5.md` (Act III jungle
+  placer and stamping; Act III / Act V geometry, rooms, draw order,
+  vectors); `drlg/outdoor-tilesub.md` (lvlsub tile substitution:
   border substitution called from here, room sub-themes and per-room
   substitution); `drlg/levels.md` (DRLG, act creation order, level
   allocation and seeds, level generation dispatch, vis/warp records,
@@ -19,28 +21,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–61 |
-| Inputs | 62–73 |
-| Outputs / state changes | 74–83 |
-| Rules | 84–89 |
-|   1. Structures (1.14d) | 90–149 |
-|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 150–288 |
-|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 289–302 |
-|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 303–327 |
-|   5. Preset primitives on the grids | 328–385 |
-|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 386–440 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 441–608 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 609–653 |
-|   9. Act III | 654–732 |
-|   10. Act IV (`0x0067E890`) | 733–744 |
-|   11. Act V (`0x0067E600`) | 745–816 |
-|   12. Rooms | 817–852 |
-| Constants & data dependencies | 853–875 |
-| Randomness | 876–897 |
-| Edge cases & original bugs | 898–919 |
-| Test vectors | 920–979 |
-| Provenance | 980–1012 |
-| Open questions | 1013–1036 |
+| Summary | 48–63 |
+| Inputs | 64–75 |
+| Outputs / state changes | 76–85 |
+| Rules | 86–91 |
+|   1. Structures (1.14d) | 92–151 |
+|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 152–290 |
+|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 291–304 |
+|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 305–329 |
+|   5. Preset primitives on the grids | 330–387 |
+|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 388–442 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 443–610 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 611–655 |
+|   9. Act III | 656–715 |
+|   10. Act IV (`0x0067E890`) | 716–727 |
+|   11. Act V (`0x0067E600`) | 728–799 |
+|   12. Rooms | 800–835 |
+| Constants & data dependencies | 836–858 |
+| Randomness | 859–880 |
+| Edge cases & original bugs | 881–902 |
+| Test vectors | 903–962 |
+| Provenance | 963–995 |
+| Open questions | 996–1019 |
 <!-- /index -->
 
 ## Summary
@@ -653,43 +655,24 @@ entry +0 = P, +4 = F, +8 = x, +12 = y.)
 
 ### 9. Act III
 
-#### 9.1 Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`; DRLG seed itself)
+#### 9.1 Jungle placer (`0x00677880`; DRLG seed itself)
 
-Draws directly from the DRLG seed (drlg +0x00), during act creation.
-Three jungle blocks of Spider Forest's leveldefs size (SX, SY), measured
-in 32-tile blocks. Block 0 is anchored at Kurast Docks' position (x, y −
-SY). For k = 1, 2: base := **roll(k)** (steps even for k = 1), case :=
-**`lo' mod 5`** (in this order); the new block := block[base] offset by
-case (`0x006777D0`): 0: (0, −SY); 1: (−SX, y1); 2: (SX, y1); 3: (−SX,
-y3); 4: (SX, y3), with y1 := ⌊(⌊SY·0x55555555 / 2³²⌋ − SY) / 2⌋, plus 1
-if negative, and y3 := −2SY/3 truncated toward zero (SY = 192: y1 = −64,
-y3 = −128). If the new block overlaps an earlier block (gap test §2.6),
-redo k with new draws. Then a block grid of attach points is generated with draws
-`roll(2)` (first block's side), `roll(3)` per column step, `roll(count)`
-to drop attach points beyond 3, and per-cell `roll(4)` direction bases
-plus `roll(2)` and `roll(4)` for unattached points, repeating until every
-attach point resolves; blocks become levels 76..78 sorted by y
-descending; each level stores its jungle preset ids. 1.14d draw sites:
-`0x00677966`, `0x0067799A`, `0x00677C43`, `0x00677E4F`, `0x00677F1C`,
-`0x006782AA`, `0x006784AE`, `0x006784D9`. Details beyond these draws are
-from D2MOO and not yet confirmed (OQ 7).
+Owner: `drlg/outdoor-act3-act5.md` §2 (placement of levels 76..78,
+river and attach-point block grid, block ids, every draw).
 
 #### 9.2 Kurast chain (`0x00678910`)
 
-For ids 79..83 in order: y −= SizeY(id); level x := docks.x + docks.w/2 −
-SizeX/2, y := docks.y + y, w, h := leveldefs size. Then adjacency warps
-and neighbour entries 75..83 (§2.7).
+Anchor: the level the jungle placer returns, **level 78** (Flayer
+Jungle; `0x006789B0` passes it on). For ids 79..83 in order: y −=
+SizeY(id); level x := 78.x + 78.w/2 − SizeX/2, y := 78.y + y, w, h :=
+leveldefs size (allocation order 79..83). Then adjacency warps and
+neighbour entries 75..83 (§2.7).
 
 #### 9.3 Level build (`0x0067F450`)
 
-Link flags (§5.5); jungle stamping (`0x0067E910`, levels 76..78: r :=
-roll(2 + 4·(jungle def count = 3)); per 32-tile block row/column stamp the
-level's stored preset id at (4j, 4i), Spider Forest head row and Flayer
-Jungle tail row special; ids > 574 get + 0/10/20 for levels 76/77/78
-(`0x006F2370`) and file := F[3r + c] with c the count of such cells so
-far (F = 0,1,2, 1,0,2, 0,2,1, 1,2,0, 2,0,1, 2,1,0 at `0x006F2328`; c ≥ 3
-leaves the error path at `0x0067EAC2`), other ids file −1); Kurast
-(`0x0067F190`, §9.4); Travincal (`0x0067F3B0`, §9.4).
+Link flags (§5.5); jungle stamping (`0x0067E910`, levels 76..78; owner
+`drlg/outdoor-act3-act5.md` §3); Kurast (`0x0067F190`, §9.4);
+Travincal (`0x0067F3B0`, §9.4).
 
 #### 9.4 Kurast and Travincal stamps
 
@@ -1019,15 +1002,15 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    in the export) and compare with §2.4 (draw forms, B/A choice, BM size).
 3. Record entering Act 2 (desert chain, `R8` / `RW` / `VS` draws, Lut
    Gholein direction from R0[i+1]) and Act 4 (Outer Steppes flag).
-4. Record Act 3 entry: jungle placer draws on the DRLG seed (§9.1 sites).
+4. Record Act 3 entry: jungle placer draws on the DRLG seed
+   (`drlg/outdoor-act3-act5.md` OQ 1).
 5. Stony Field, Dark Wood, Black Marsh, Tamoe builds (river, bridge,
    cliff caves, side cave draws `0x00680251`, `0x0068034F`): record a run
    that generates them.
 6. *Answered:* path floor table `0x006F2700` (not `0x006F2860`) is in
    `drlg/outdoor-path-floor.tsv`, the bit order in §7.5.3.
-7. Jungle placer details (case offsets for SY/3 rounding, attach-point
-   loops, `0x006777D0`) — needs a full read of `0x00677880` and an Act 3
-   recording.
+7. *Answered:* the jungle placer is read in full from 1.14d in
+   `drlg/outdoor-act3-act5.md` §2 (its OQ 1 asks for the recording).
 8. *Answered:* Kurast and Travincal lists and positions are §9.4, read
    from 1.14d; the jungle file table is §9.3. A recording of the Act 3
    levels would confirm them (as for OQ 4).

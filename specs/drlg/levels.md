@@ -24,23 +24,23 @@
 | Inputs | 62–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–104 |
-|   2. Act creation (server) | 105–119 |
-|   3. DRLG creation (`0x00642DA0`) | 120–154 |
-|   4. Level list, get-or-allocate | 155–172 |
-|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 173–204 |
-|   6. Level position, size, act number | 205–221 |
-|   7. Vis and warp records | 222–245 |
-|   8. Coordinates to rooms | 246–259 |
-|   9. Level lifecycle: activity and freeing | 260–290 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 291–330 |
-|   11. Logical rooms (coordinate lists) and population queries | 331–518 |
-| Constants & data dependencies | 519–539 |
-| Randomness | 540–558 |
-| Edge cases & original bugs | 559–582 |
-| Test vectors | 583–626 |
-| Provenance | 627–657 |
-| Open questions | 658–682 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–105 |
+|   2. Act creation (server) | 106–120 |
+|   3. DRLG creation (`0x00642DA0`) | 121–155 |
+|   4. Level list, get-or-allocate | 156–173 |
+|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 174–205 |
+|   6. Level position, size, act number | 206–222 |
+|   7. Vis and warp records | 223–246 |
+|   8. Coordinates to rooms | 247–260 |
+|   9. Level lifecycle: activity and freeing | 261–291 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 292–331 |
+|   11. Logical rooms (coordinate lists) and population queries | 332–519 |
+| Constants & data dependencies | 520–540 |
+| Randomness | 541–559 |
+| Edge cases & original bugs | 560–583 |
+| Test vectors | 584–627 |
+| Provenance | 628–658 |
+| Open questions | 659–683 |
 <!-- /index -->
 
 ## Summary
@@ -98,6 +98,7 @@ data; the drlg seed and level seeds advance as listed under Randomness.
 | level | | next level; drlg; level type; level seed (lo, hi); level id | +0x1AC; +0x1B4; +0x1C0; +0x1C4, +0x1C8; +0x1D0 |
 | level | | warp-room centres x[9], y[9]; count; populated-room memory | +0x1E0, +0x204; +0x228; +0x22C |
 | level | | coordinate-list counter (§11.2) | +0x1DC |
+| level | | Act III jungle clearing count; jungle block ids (`drlg/outdoor-act3-act5.md` §2.8) | +0x1B8; +0x1BC |
 | vis/warp record | 0x48 | level id; vis[8]; warp[8]; next | +0x00; +0x04; +0x24; +0x44 |
 
 Coordinates are in tiles; subtile = tile × 5 (`0x00643560`).
