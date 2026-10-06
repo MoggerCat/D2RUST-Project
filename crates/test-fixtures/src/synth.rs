@@ -144,6 +144,9 @@ pub struct Synthetic {
     /// `soundenviron.txt` is only parsed at runtime (`loading.md` §3.4).
     pub soundenviron: Vec<u8>,
     pub animdata: Vec<crate::animdata::Anim>,
+    /// Other files of `d2data.mpq`, (archive name, bytes): the DRLG's
+    /// DS1 / DT1 files ([`crate::drlg::files`]).
+    pub files: Vec<(String, Vec<u8>)>,
 }
 
 /// The synthetic set.
@@ -155,5 +158,6 @@ pub fn synthetic() -> Synthetic {
         strings,
         soundenviron: b"Handle\tIndex\r\nnone\t0\r\n".to_vec(),
         animdata,
+        files: crate::drlg::files(),
     }
 }

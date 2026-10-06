@@ -40,12 +40,14 @@ pub mod population_init;
 #[cfg(test)]
 #[path = "tests/routing.rs"]
 mod routing_tests;
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
+pub(crate) mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::{
     Difficultylevels, Levels, Monequip, Monlvl, Monprop, Monstats, Monstats2, Monumod, Superuniques,
 };
@@ -195,6 +197,9 @@ pub struct WorldTables {
     pub monstats_extra: Vec<MonstatsExtra>,
     pub components: Vec<[u8; 16]>,
     pub ids: NamedIds,
+    /// The montype equivalence matrix (`runtime-maps.md` §2): init's
+    /// "MonType is that type or nested in it" (`init.md` §17.3).
+    pub montype_equiv: EquivMatrix,
 }
 
 impl WorldTables {

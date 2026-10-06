@@ -240,6 +240,29 @@ fn cancelled_timer_goes_to_the_free_list() {
     assert_eq!(g.timers.unit_timers(a), [t2]);
     // The next schedule takes it back from the free list.
     let t3: TimerId = sched(&mut g, &rec, "A", 30).unwrap();
-    assert_eq!(t3, t1);
+    assert_eq!(t3.slot(), t1.slot());
     assert_eq!(g.timers.unit_timers(a), [t3, t2]);
+}
+
+/// A stale [`TimerId`] (its timer freed, its record reused by a later
+/// schedule) names no timer: cancelling it is cancelling a free timer
+/// (§5.4: nothing), and the new timer stays.
+// Covers: specs/sim/tick.md §5.4 r4
+#[test]
+fn stale_timer_id_does_not_reach_the_reused_record() {
+    let (mut g, rec, _) = setup(&[("A", UnitType::Object)]);
+    let a = id(&rec, "A");
+    let t1 = sched(&mut g, &rec, "A", 20).unwrap();
+    g.timers.cancel(t1);
+    let t3 = sched(&mut g, &rec, "A", 30).unwrap();
+    assert_eq!(t3.slot(), t1.slot());
+    assert_ne!(t3, t1);
+    assert_eq!(
+        (g.timers.flags(t1), g.timers.expire(t1), g.timers.event(t1)),
+        (None, None, None)
+    );
+    g.timers.cancel(t1);
+    assert_eq!(g.timers.expire(t3), Some(30));
+    assert_eq!(g.timers.unit_timers(a), [t3]);
+    assert_eq!(g.timers.bucket(TimerClass::Object, 30), [t3]);
 }

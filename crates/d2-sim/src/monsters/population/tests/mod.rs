@@ -1713,3 +1713,8 @@ fn spawn_mode_xy_rule() {
     let cx = ctx(&t, &mut st, &mut f);
     assert_eq!(spawn_mode_xy(&cx, 206, 100, 100), Some((210, 98, 103, 1)));
 }
+
+// Tests written against surviving mutants (METHODS M08); a child module so
+// they share this module's fakes.
+#[path = "../../mutant_tests/population.rs"]
+mod mutant_tests;

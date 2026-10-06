@@ -11,7 +11,12 @@
 //! owner spec (`bridge-dispatch.tsv`), so the client world model stays
 //! empty, and every rule of how a unit, tile or panel looks is a
 //! `TODO(spec: …)` hook answered by `world_view::Unspecified` (draw
-//! nothing). The frame is the composed empty list: palette index 0 over
+//! nothing). Placement is the original's: the world view builds each
+//! frame through `rules::OriginalView` with the camera of
+//! `render/camera.md` §3, fed by `world_view::NoFeed` until the owner
+//! specs state the local player's position, the open mode, the shake,
+//! unit positions and the map (no player: no camera, nothing placeable).
+//! One frame per server tick (§9). The frame is the composed empty list: palette index 0 over
 //! the whole view. The frame palette is a hook too (`ViewAssets::palette`,
 //! TODO(spec: render/shading.md) §B3): all zeros until it is specified.
 //!
@@ -31,7 +36,7 @@ use super::sound::{self, AudioParts, GameAudio};
 use crate::bridge::mirror::DynLink;
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
-use crate::world_view::{Unspecified, ViewAssets, WorldViewPlugin, WorldViewState};
+use crate::world_view::{NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState};
 
 /// Frames between two progress lines in the log.
 const LOG_EVERY: u64 = 250;
@@ -57,6 +62,7 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
         .insert_resource(WorldViewState::new(
             ViewAssets::new(unspecified_palette()),
             Box::new(Unspecified),
+            Box::new(NoFeed),
         ))
         .add_systems(Last, log_progress);
     sound::add_audio(app, AudioParts::empty());

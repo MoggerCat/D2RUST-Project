@@ -2,7 +2,7 @@
 //! End-to-end vendor path: the bridge (`d2_client::bridge`) on its local
 //! link over the in-process `d2-server` host, whose game is `SimGame` on
 //! the wired `d2-sim` (`wiring::action::ActionSim`) with the server's
-//! [`TradeWorld`] as its world host: the NPC and vendor handlers run on
+//! [`WiredWorld`] as its world host: the NPC and vendor handlers run on
 //! `wiring::interaction` (`Desk`, `VendorDesk`) over the action sim's own
 //! units and stat lists, from synthetic tables (no game files).
 //!
@@ -22,9 +22,14 @@
 //!    permanent codes): **stops** at the same copy into the NPC (§7.2
 //!    rule 8): 0x2A code 9, nothing received;
 //! 7. C→S 0x33 of the player's cap (a permanent code: no copy back,
-//!    rule 8): the removal from the player is the inventory stub (rule
-//!    9), the price is received (§9.1): 0x2A code 1, kind 3, the item's
-//!    GUID, the new gold.
+//!    rule 8): rule 9 removes it from the player's inventory (the
+//!    server's one inventory model: unlinked, freed), the price is
+//!    received (§9.1): 0x2A code 1, kind 3, the item's GUID, the new
+//!    gold.
+//!
+//! The player's buckler and cap are in the server host's inventory
+//! model (`WiredWorld::inventory`, the item moves' own), which answers
+//! the vendors' ownership and removal calls.
 //!
 //! Every S→C message the specs lay out is asserted byte for byte (0x2A
 //! bytes 3–6 are not written by the original, `npc.md` §9; d2rs writes
@@ -42,7 +47,7 @@ use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemstatcost, Record};
 use d2_proto::client::{BuyItem, EntityAction, InitEntityChat, InteractWithEntity, SellItem};
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::dispatch::Outcome;
 use d2_server::host::{Handled, Host};
@@ -59,7 +64,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-use d2_sim::wiring::economy::{GameFields, ItemSpawn};
+use d2_sim::wiring::economy::ItemSpawn;
 use d2_sim::world::npc::{class, NpcControl};
 use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 
@@ -145,7 +150,7 @@ fn stat_data() -> Arc<StatData> {
 
 // ---- the game ---------------------------------------------------------------------------
 
-type World = TradeWorld<Rest>;
+type World = WiredWorld<Rest>;
 type Sim = SimGame<ActionSim<ActionRest>, World>;
 
 /// Manual host clock (ms), injected into the host (`tick.md` §8).
@@ -282,9 +287,8 @@ impl Fx {
 
         let mut rest = Rest::default();
         rest.quests.insert(player, PlayerQuests::default());
-        let mut world: World = TradeWorld::new(
+        let mut world: World = WiredWorld::new(
             ActionWorld::default(),
-            GameFields::new(Seed::init_low(game_seed), false),
             item_tables(),
             quests,
             ctl,
@@ -294,8 +298,13 @@ impl Fx {
         );
         // Monster init embeds the NPC's interaction list (`npc.md` §2).
         world.state.add_npc(npc);
+        // The inventory model (cap and buckler 2 × 2) with the player's
+        // inventory; the item-move seams staged (`InvFx`).
+        let pg = events.sys.units.get(player).unwrap().guid;
+        let tables = inv_tables(&world.tables, &[(2, 2), (2, 2)]);
+        world.inventory = Some(inv_parts(tables, InvFx::default(), player, 1, pg));
         // The player's buckler and cap, made by the economy wiring on
-        // the game seed (stored, mode 0).
+        // the game seed and stored (mode 0) in its inventory.
         let (buckler, cap) = world.with_economy(&mut game, &mut events, |econ, _| {
             let mut make = |record: usize| {
                 let mut rq = ItemRequest {
@@ -314,7 +323,9 @@ impl Fx {
             };
             (make(BUC), make(CAP))
         });
-        world.rest.inventory.extend([buckler, cap]);
+        for item in [buckler, cap] {
+            store(&mut world, &mut game, &mut events, (player, item), 0);
+        }
 
         let mut s: Sim = SimGame::with_world(game, events, world);
         s.join(LOCAL, Some(player), None, client_state::IN_GAME)
@@ -397,7 +408,21 @@ impl Fx {
         e.extend(s.events.sys.errors.iter().map(|e| format!("{e:?}")));
         e.extend(s.world.state.errors.iter().map(|e| format!("{e:?}")));
         e.extend(s.world.action.faults.iter().map(|f| format!("{f:?}")));
+        if let Some(i) = &s.world.inventory {
+            e.extend(i.state.errors.iter().map(|f| format!("{f:?}")));
+        }
         e
+    }
+
+    /// The player's items in its inventory (link order).
+    fn inventory(&self) -> Vec<UnitId> {
+        let s = self.sim_ref();
+        s.world
+            .inventory
+            .as_ref()
+            .unwrap()
+            .state
+            .items_of(self.player)
     }
 
     /// Sends `msgs` through the bridge, advances the host clock 40 ms
@@ -453,6 +478,8 @@ struct Transcript {
     npc_seed: Seed,
     store: Vec<Row>,
     gold: i32,
+    /// The player's items at the end (link order).
+    inventory: Vec<UnitId>,
     rest_log: Vec<String>,
     unhandled: Vec<(u32, u8, usize)>,
     errors: Vec<String>,
@@ -554,7 +581,7 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
         let guid = fx.guid(item);
         let ac = fx.base(item, ARMORCLASS);
         let s = fx.sim_ref();
-        let it = s.world.items.get(item).unwrap();
+        let it = s.events.sys.hooks.items.get(item).unwrap();
         assert_ne!(it.flags & IDENTIFIED, 0);
         assert_eq!(it.inv_page, 0);
         let u = s.events.sys.units.get(item).unwrap();
@@ -616,8 +643,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert_eq!(fx.stat(player, GOLD), gold);
 
     // 6. C→S 0x33 of the player's buckler (stored, mode 0): rules 1–7
-    // pass (the player's per the staged inventory, mode 0, no flag, the
-    // price, re-sellable). STOP at rule 8 (not a permanent code): the
+    // pass (the player's per its inventory, mode 0, no flag, the price,
+    // re-sellable). STOP at rule 8 (not a permanent code): the
     // copy into the NPC is the same unwritten `0x0055A2A0`: code 9, GUID
     // −1, result 3.
     let pg = fx.guid(fx.buckler);
@@ -640,8 +667,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
 
     // 7. C→S 0x33 of the player's cap: re-sellable but one of Akara's
     // permanent codes, so no copy (rule 8: the permanent store item
-    // stays); rule 9 takes it from the player (stored: `0x0055DF10`, the
-    // inventory stub), rule 10 receives the price (§9.1; under the
+    // stays); rule 9 takes it from the player (stored: `0x0055DF10`:
+    // unlinked from its inventory, freed), rule 10 receives the price (§9.1; under the
     // staged carried-gold cap): 0x2A code 1, kind 3, the sold item's
     // GUID, the new gold. The price by hand (§9.2, t = 1): B = 100·AC/5
     // (rule 2), not ethereal, class 7 (rule 7: no /4), buy mult 512:
@@ -661,11 +688,14 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     assert_eq!(f.received, [tx(3, 1, eg, gold + sold)]);
     frames.push(f);
     assert_eq!(fx.stat(player, GOLD), gold + sold);
-    assert!(!fx.sim_ref().world.rest.inventory.contains(&fx.cap));
+    assert_eq!(fx.inventory(), [fx.buckler]);
+    assert!(fx.sim_ref().game.lists.unit(fx.cap).is_none(), "freed");
+    assert!(!fx.sim_ref().events.sys.hooks.items.contains(fx.cap));
 
     let errors = fx.errors();
     assert!(errors.is_empty(), "{errors:?}");
     let gold_now = fx.stat(player, GOLD);
+    let inventory = fx.inventory();
     let s = fx.sim_ref();
     // No id fell back to the stub: every message had a provider.
     assert!(s.unhandled.is_empty(), "{:?}", s.unhandled);
@@ -675,6 +705,7 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
         npc_seed: s.world.npc.seed,
         store: store_rows,
         gold: gold_now,
+        inventory,
         rest_log: s.world.rest.log.clone(),
         unhandled: s.unhandled.clone(),
         errors,
@@ -693,7 +724,9 @@ fn vendor_end_to_end() {
         .filter(|l| l.starts_with("copy"))
         .collect();
     assert_eq!(copies.len(), 2, "{:?}", t.rest_log);
-    assert!(t.rest_log.iter().any(|l| l.starts_with("remove stored")));
+    // The sold cap left the player's inventory; the buckler (its sale
+    // stopped at the copy) stayed.
+    assert_eq!(t.inventory.len(), 1);
 }
 
 /// Same seed → the same run: every C→S byte, result, S→C chunk, seed,
@@ -711,6 +744,7 @@ fn one_gold_more_changes_only_the_gold_fields() {
     let (a, b) = (run(), run_with(GAME_SEED, PLAYER_GOLD + 1));
     assert_eq!(b.gold, a.gold + 1);
     assert_eq!(a.store, b.store);
+    assert_eq!(a.inventory, b.inventory);
     assert_eq!((a.game_seed, a.npc_seed), (b.game_seed, b.npc_seed));
     assert_eq!(a.rest_log, b.rest_log);
     let mut diffs = Vec::new();

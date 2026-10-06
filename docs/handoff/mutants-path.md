@@ -9,6 +9,22 @@ files (M09). Tool: `cargo-mutants` 27.1.0, `-p d2-sim --file
 (`CARGO_PROFILE_DEV_DEBUG=0`). **Stopped early on the coordinator's
 budget call**: the run is incomplete (below) and no "after" run was made.
 
+## 0. Status after the base merge (2026-10-06, later)
+
+Merged `origin/claude/tender-meitner-mphas3`; the walk module there was
+reworked (core `DynamicPath` records and `PathTables`, one context
+object for `PathWorld` + `WalkUnits`, new `tests/fake.rs`). The 50 tests
+of §1 no longer compile against it (61 errors) and the port was not
+close, so on the coordinator's budget call they were **removed from the
+tree** in the merge commit; they live at `e7c10b5`
+(`crates/d2-sim/src/path/mutant_tests.rs`,
+`crates/d2-sim/src/path/walk/mutant_tests.rs`). Next session: restore
+both from `e7c10b5` (`git show e7c10b5:<path>`), port them to the new
+API without weakening any assertion (same scenarios and expected
+values), add the `mod` lines back (`path/mod.rs` keeps `gap_tests` too),
+gate, then the steps of §4. Sections 1–3 describe the tests as written
+at `e7c10b5`.
+
 ## 1. State
 
 New tests only, in two new files plus one `mod` line each:

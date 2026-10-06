@@ -149,6 +149,8 @@ Cloud sessions have the repo only: no `game/`, no `re/`, no `../refs/`.
 | Game-file checks: `data-tool tables`, `mpq-tool formats`, ignored tests, `d2-client verify`, renders | local | `game/` |
 | Recording traces from the original game | local (Windows) | `game/`, `tools/trace-recorder` |
 
+The ordered local run guide is `docs/LOCAL-RUN.md`.
+
 A cloud session that needs a game-file check adds it to the "Local run
 queue" in `docs/HANDOFF.md` (exact command and what to look for) and
 leaves its work on a branch. A local session runs the queue, records the

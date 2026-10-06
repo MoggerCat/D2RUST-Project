@@ -410,12 +410,12 @@ None.
 
 ## Edge cases & original bugs
 
-- Encrypted lengths that aren't a multiple of 4 leave the last 1–3 bytes
+1. Encrypted lengths that aren't a multiple of 4 leave the last 1–3 bytes
   unencrypted (§4).
-- A compressed sector exactly `expected(i)` long is stored raw, even under
+2. A compressed sector exactly `expected(i)` long is stored raw, even under
   COMPRESS (§8.4).
-- The PKWARE end marker may end exactly at the end of input (§10).
-- Huffman tables 1–8 aren't adaptive, but escaped values still get two
+3. The PKWARE end marker may end exactly at the end of input (§10).
+4. Huffman tables 1–8 aren't adaptive, but escaped values still get two
   increments (§11 Decode step 3).
 
 ## Archive set (D2-specific)

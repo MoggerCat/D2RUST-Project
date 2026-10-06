@@ -108,15 +108,33 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         self.v.h.drlg.find_room(self.game, room, x, y)
     }
 
-    /// `0x0064D9B0` on the act's collision grids (`rooms.md` §10).
-    // TODO(rooms.md §10, wire-action W5): the footprint a size covers is
-    // not specified; the sub-tile at (x, y) is read for every size.
-    fn collides(&self, room: RoomId, x: i32, y: i32, _size: i32, mask: u16) -> bool {
+    /// `0x0064D9B0` on the act's collision grids (`rooms.md` §10;
+    /// `path-placement.md` §4 rules 1–5 with the path provider, as the
+    /// missile adapter: size 0, 1 point, 2 plus, 3 box, other 0xFFFF; a
+    /// cell without a room reads 0x27).
+    // TODO(wire-action W5): without the path provider the sub-tile at
+    // (x, y) is read for every size.
+    fn collides(&self, room: RoomId, x: i32, y: i32, size: i32, mask: u16) -> bool {
+        if self.v.h.paths.is_some() {
+            return crate::path::collision::size_value(
+                &self.v.h.drlg,
+                Some(room),
+                x,
+                y,
+                size,
+                mask,
+            ) != 0;
+        }
         self.v.h.drlg.collision(self.game, room, x, y).unwrap_or(0) & mask != 0
     }
 
-    /// `0x0064CB30`.
+    /// `0x0064CB30` (`path-placement.md` §4 rules 1, 2 with the path
+    /// provider).
     fn mask_at(&self, room: RoomId, x: i32, y: i32, mask: u16) -> bool {
+        if self.v.h.paths.is_some() {
+            return crate::path::collision::point_value(&self.v.h.drlg, Some(room), x, y, mask)
+                != 0;
+        }
         self.v.h.drlg.collision(self.game, room, x, y).unwrap_or(0) & mask != 0
     }
 
@@ -187,7 +205,7 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
     }
 
     fn unit_position(&self, unit: UnitId) -> (i32, i32) {
-        self.v.h.x.position(unit)
+        self.v.h.path_position(unit)
     }
 
     fn quest_flag(&self, flag: u8) -> bool {
@@ -198,7 +216,22 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         self.v.h.x.chaos_blocks_population()
     }
 
+    /// `0x0064E840` (`path-placement.md` §8) with the path provider:
+    /// the coarse free-box search with the arguments of its population
+    /// caller (`population.md` §6.3 rule 4: mask 0x3C01, size 1);
+    /// without it [`WorldPending::nearest_free_point`].
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
-        self.v.h.x.nearest_free_point(room, x, y)
+        if self.v.h.paths.is_none() {
+            return self.v.h.x.nearest_free_point(room, x, y);
+        }
+        let mut p = crate::path::coords::Point::new(x, y);
+        let r = crate::wiring::path::place::coarse_free_box(
+            &self.v.h.drlg,
+            room,
+            &mut p,
+            1,
+            u32::from(crate::path::collision::masks::MONSTER_MOVE),
+        )?;
+        Some((r, p.x, p.y))
     }
 }

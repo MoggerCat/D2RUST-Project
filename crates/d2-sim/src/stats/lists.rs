@@ -45,10 +45,28 @@ pub mod owner {
 const MOD_EXCLUDED: [u16; 5] = [6, 8, 10, 13, 14];
 
 /// A list, by arena slot and generation.
+///
+/// A stale handle (its list freed, its slot perhaps reused) names no
+/// list: the public readers and writers treat it as the original treats
+/// a null list pointer (`stats.md` §4.2 reads 0; §5 writes do nothing;
+/// §8.4 a missing item list does nothing), and every other operation
+/// does nothing and answers 0 / none / empty. TODO(spec: stat-lists.md
+/// §1): the spec gives no null rule for the chain operations (attach,
+/// detach, free, toggles) nor the field accessors; the original's
+/// callers never pass a freed list (handoff `prop-fixes` Q1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ListId {
     index: u32,
     generation: u32,
+}
+
+/// A stat-list operation the original cannot complete.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum StatListError {
+    /// Edge case 4 (§10.4): an expired extended list in the unit's active
+    /// chain; 1.14d loops forever on it.
+    #[error("expired extended stat list {0:?}: endless loop in 1.14d (stat-lists.md §10.4)")]
+    EndlessExpiry(ListId),
 }
 
 /// An extended list's value-change callback (+0x5C, §7).
@@ -235,6 +253,14 @@ impl StatLists {
         }
     }
 
+    /// [`Self::lm`] that answers `None` for a stale handle.
+    fn try_lm(&mut self, id: ListId) -> Option<&mut List> {
+        match self.slots.get_mut(id.index as usize) {
+            Some((g, Some(l))) if *g == id.generation => Some(l),
+            _ => None,
+        }
+    }
+
     fn lm(&mut self, id: ListId) -> &mut List {
         match self.slots.get_mut(id.index as usize) {
             Some((g, Some(l))) if *g == id.generation => l,
@@ -252,10 +278,7 @@ impl StatLists {
 
     /// [`Self::ext_mut`] that answers `None` for a freed list.
     fn try_ext_mut(&mut self, id: ListId) -> Option<&mut Extended> {
-        match self.slots.get_mut(id.index as usize) {
-            Some((g, Some(l))) if *g == id.generation => l.ext.as_mut(),
-            _ => None,
-        }
+        self.try_lm(id)?.ext.as_mut()
     }
 
     fn insert(&mut self, list: List) -> ListId {
@@ -364,12 +387,13 @@ impl StatLists {
     // ---- record fields -------------------------------------------------
 
     pub fn flags(&self, l: ListId) -> u32 {
-        self.l(l).flags
+        self.try_l(l).map_or(0, |l| l.flags)
     }
 
     /// Sets or clears flag bits the callers own (§2, open question 3).
     pub fn set_flags(&mut self, l: ListId, bits: u32, on: bool) {
-        let f = &mut self.lm(l).flags;
+        let Some(list) = self.try_lm(l) else { return };
+        let f = &mut list.flags;
         if on {
             *f |= bits;
         } else {
@@ -378,15 +402,15 @@ impl StatLists {
     }
 
     pub fn is_extended(&self, l: ListId) -> bool {
-        self.l(l).ext.is_some()
+        self.ext(l).is_some()
     }
 
     pub fn owner_type(&self, l: ListId) -> u32 {
-        self.l(l).owner_type
+        self.try_l(l).map_or(0, |l| l.owner_type)
     }
 
     pub fn owner_guid(&self, l: ListId) -> u32 {
-        self.l(l).owner_guid
+        self.try_l(l).map_or(0, |l| l.owner_guid)
     }
 
     /// Extended list owner unit (+0x44).
@@ -396,19 +420,19 @@ impl StatLists {
 
     /// Unit the list is attached to (+0x04).
     pub fn attached_unit(&self, l: ListId) -> Option<UnitId> {
-        self.l(l).unit
+        self.try_l(l)?.unit
     }
 
     pub fn parent(&self, l: ListId) -> Option<ListId> {
-        self.l(l).parent
+        self.try_l(l)?.parent
     }
 
     pub fn prev(&self, l: ListId) -> Option<ListId> {
-        self.l(l).prev
+        self.try_l(l)?.prev
     }
 
     pub fn next(&self, l: ListId) -> Option<ListId> {
-        self.l(l).next
+        self.try_l(l)?.next
     }
 
     /// Heads of the active and parked chains of an extended list.
@@ -418,22 +442,24 @@ impl StatLists {
 
     /// `0x006252F0`.
     pub fn state(&self, l: ListId) -> u32 {
-        self.l(l).state
+        self.try_l(l).map_or(0, |l| l.state)
     }
 
     /// `0x006252D0`.
     pub fn set_state(&mut self, l: ListId, state: u32) {
-        self.lm(l).state = state;
+        if let Some(list) = self.try_lm(l) {
+            list.state = state;
+        }
     }
 
     pub fn expire(&self, l: ListId) -> i32 {
-        self.l(l).expire
+        self.try_l(l).map_or(0, |l| l.expire)
     }
 
     /// `0x00625310` / `0x006260B0`: sets the expire frame and, when > 0,
     /// NEWLENGTH.
     pub fn set_expire(&mut self, l: ListId, frame: i32) {
-        let list = self.lm(l);
+        let Some(list) = self.try_lm(l) else { return };
         list.expire = frame;
         if frame > 0 {
             list.flags |= flag::NEWLENGTH;
@@ -442,23 +468,26 @@ impl StatLists {
 
     /// Skill id and level (+0x1C, +0x20; callers' bookkeeping).
     pub fn skill(&self, l: ListId) -> (u32, u32) {
-        let list = self.l(l);
-        (list.skill, list.skill_level)
+        self.try_l(l).map_or((0, 0), |l| (l.skill, l.skill_level))
     }
 
     pub fn set_skill(&mut self, l: ListId, skill: u32, level: u32) {
-        let list = self.lm(l);
+        let Some(list) = self.try_lm(l) else { return };
         list.skill = skill;
         list.skill_level = level;
     }
 
     pub fn set_remove_callback(&mut self, l: ListId, cb: Option<RemoveCallback>) {
-        self.lm(l).remove_callback = cb;
+        if let Some(list) = self.try_lm(l) {
+            list.remove_callback = cb;
+        }
     }
 
     /// The base array as sorted (key, value) pairs.
     pub fn base_entries(&self, l: ListId) -> Vec<(i32, i32)> {
-        self.l(l).base.iter().map(|e| (e.key, e.value)).collect()
+        self.try_l(l)
+            .map(|l| l.base.iter().map(|e| (e.key, e.value)).collect())
+            .unwrap_or_default()
     }
 
     /// The full array as sorted (key, value) pairs (empty for a plain
@@ -527,7 +556,7 @@ impl StatLists {
 
     /// Base value of a list (`0x00625350`): base array, minimum rule.
     pub fn base(&self, l: ListId, s: u16, layer: u16) -> i32 {
-        if self.info(s).is_none() {
+        if self.info(s).is_none() || !self.is_live(l) {
             return 0;
         }
         match get(&self.l(l).base, key(s, layer)) {
@@ -539,7 +568,7 @@ impl StatLists {
     /// Total value of a list (`0x00625420`): full array if extended,
     /// else base array; minimum rule.
     pub fn total(&self, l: ListId, s: u16, layer: u16) -> i32 {
-        if self.info(s).is_none() {
+        if self.info(s).is_none() || !self.is_live(l) {
             return 0;
         }
         match self.raw_total(l, key(s, layer)) {
@@ -608,7 +637,7 @@ impl StatLists {
     /// must be extended.
     pub fn eval(&self, host: &dyn StatHost, l: ListId, k: i32) -> i32 {
         let s = key_stat(k);
-        let list = self.l(l);
+        let Some(list) = self.try_l(l) else { return 0 };
         let damagerelated = self.info(s).is_some_and(|i| i.damagerelated);
         // §6.1 sum (0x00624FE0).
         let mut v = get(&list.base, k).unwrap_or(0);
@@ -815,7 +844,7 @@ impl StatLists {
             return;
         };
         let (simple, damagerelated) = (!info.a51 && !info.a52, info.damagerelated);
-        if d == 0 || self.l(l).flags & flag::SET != 0 {
+        if d == 0 || !self.is_live(l) || self.l(l).flags & flag::SET != 0 {
             return;
         }
         let mut cur = if self.is_extended(l) {
@@ -845,6 +874,9 @@ impl StatLists {
         k: i32,
         unit: Option<UnitId>,
     ) -> i32 {
+        if !self.is_live(l) {
+            return 0;
+        }
         let v = self.eval(host, l, k);
         let s = key_stat(k);
         let data = Arc::clone(&self.data);
@@ -1022,7 +1054,9 @@ impl StatLists {
         unit: Option<UnitId>,
     ) -> bool {
         let k = key(s, layer);
-        let list = self.lm(l);
+        let Some(list) = self.try_lm(l) else {
+            return false;
+        };
         let i = match find(&list.base, k) {
             Ok(i) => i,
             Err(_) if value == 0 => return false,
@@ -1068,7 +1102,7 @@ impl StatLists {
             return;
         }
         let k = key(s, layer);
-        let list = self.lm(l);
+        let Some(list) = self.try_lm(l) else { return };
         let i = find(&list.base, k).unwrap_or_else(|i| {
             list.base.insert(i, Entry { key: k, value: 0 });
             i
@@ -1092,7 +1126,7 @@ impl StatLists {
 
     /// Remove all `0x00627340` (§5.4).
     pub fn remove_all(&mut self, host: &mut dyn StatHost, l: ListId) {
-        while let Some(&e) = self.l(l).base.first() {
+        while let Some(&e) = self.try_l(l).and_then(|l| l.base.first()) {
             self.lm(l).base.remove(0);
             self.propagate(host, l, e.key, e.value.wrapping_neg(), None);
             self.mod_insert_player(l, e.key);
@@ -1101,7 +1135,13 @@ impl StatLists {
 
     /// Merge `0x006274F0` (§5.5): add each source base entry, in order.
     pub fn merge(&mut self, host: &mut dyn StatHost, target: ListId, source: ListId) {
-        for e in self.l(source).base.clone() {
+        if !self.is_live(target) {
+            return;
+        }
+        let Some(source) = self.try_l(source) else {
+            return;
+        };
+        for e in source.base.clone() {
             self.add(
                 host,
                 target,
@@ -1146,6 +1186,9 @@ impl StatLists {
         let Some(r) = self.unit_list(unit).filter(|&r| self.is_extended(r)) else {
             return;
         };
+        if !self.is_live(l) {
+            return;
+        }
         self.detach(host, l);
         let mut a = Some(r);
         while let Some(x) = a {
@@ -1206,7 +1249,8 @@ impl StatLists {
     /// (edge case 6) has no live parent whose heads could name it: only
     /// its own links are cleared.
     pub fn detach(&mut self, host: &mut dyn StatHost, l: ListId) {
-        let p = self.l(l).parent;
+        let Some(list) = self.try_l(l) else { return };
+        let p = list.parent;
         if let Some(p) = p {
             let prev = self.l(l).prev;
             if let Some(e) = self.try_ext_mut(p) {
@@ -1262,6 +1306,9 @@ impl StatLists {
     /// Free `0x00626C00`(L) (§8.3). Parked children keep pointing at the
     /// freed parent (edge case 6): their parent id no longer resolves.
     pub fn free(&mut self, host: &mut dyn StatHost, l: ListId) {
+        if !self.is_live(l) {
+            return;
+        }
         self.detach(host, l);
         if self.is_extended(l) {
             let mut cur = self.heads(l).0;
@@ -1297,7 +1344,7 @@ impl StatLists {
 
     /// `0x00626CD0`: frees `l` only when it is a plain list.
     pub fn free_plain(&mut self, host: &mut dyn StatHost, l: ListId) {
-        if !self.is_extended(l) {
+        if self.is_live(l) && !self.is_extended(l) {
             self.free(host, l);
         }
     }
@@ -1312,7 +1359,7 @@ impl StatLists {
         swap_location: bool,
         reset: bool,
     ) {
-        let Some(il) = item_list else {
+        let Some(il) = item_list.filter(|&il| self.is_live(il)) else {
             return;
         };
         if swap_location {
@@ -1348,7 +1395,8 @@ impl StatLists {
         swap: bool,
         dynamic: bool,
     ) {
-        if self.l(il).unit != Some(unit) {
+        let Some(list) = self.try_l(il) else { return };
+        if list.unit != Some(unit) {
             self.equip(host, unit, Some(il), swap, !dynamic);
             return;
         }
@@ -1516,10 +1564,18 @@ impl StatLists {
     /// form (expire −= 1 first, expired at ≤ 0).
     ///
     /// An expired extended list loops forever in 1.14d (edge case 4, open
-    /// question 5); d2rs panics there instead of hanging.
-    pub fn expire_lists(&mut self, host: &mut dyn StatHost, unit: UnitId, frame: i32) {
+    /// question 5): the restarted walk meets it before any list behind it,
+    /// so nothing changes after the first time it is met. d2rs stops
+    /// there and answers [`StatListError::EndlessExpiry`], leaving the
+    /// lists in the state the original spins in.
+    pub fn expire_lists(
+        &mut self,
+        host: &mut dyn StatHost,
+        unit: UnitId,
+        frame: i32,
+    ) -> Result<(), StatListError> {
         let Some(r) = self.unit_list(unit).filter(|&r| self.is_extended(r)) else {
-            return;
+            return Ok(());
         };
         if frame == 0 {
             for c in self.active_chain(r) {
@@ -1534,16 +1590,16 @@ impl StatLists {
             let list = self.l(c);
             let next = list.prev;
             if list.flags & flag::NEWLENGTH != 0 && list.expire <= frame {
-                assert!(
-                    list.ext.is_none(),
-                    "expired extended stat list: endless loop in 1.14d (stat-lists.md §10.4)"
-                );
+                if list.ext.is_some() {
+                    return Err(StatListError::EndlessExpiry(c));
+                }
                 self.free(host, c);
                 cur = self.heads(r).0;
             } else {
                 cur = next;
             }
         }
+        Ok(())
     }
 
     // ---- §11 mod array -------------------------------------------------------

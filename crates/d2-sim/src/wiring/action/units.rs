@@ -94,7 +94,20 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
 
     fn has_path(&mut self, _: &Sim<'_>, unit: UnitId) -> bool {
-        self.x.has_path(unit)
+        self.path_has(unit)
+    }
+
+    /// Player event 0 in modes 2, 3, 6, 19: the player step `0x00580C20`
+    /// (`pathing.md` §9.2) with the path provider; the step result (2:
+    /// stopped, the ENDANIM handler follows). Without the provider: the
+    /// trait default (1, nothing moves).
+    fn player_movement_step(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) -> u32 {
+        let _ = (a1, a2);
+        if self.paths.is_none() {
+            return 1;
+        }
+        let mut v = View::of(sim.units, sim.stats, sim.data, self);
+        crate::wiring::path::walk::player_step(&mut v, sim.game, unit)
     }
 
     /// Player event 0 in attack, cast and skill modes (`0x00580460`,
@@ -272,7 +285,12 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     /// AI control (`AiStore::remove`), missile data, combat list; then
     /// the lent monster world's part (monster data, minion list, owner
     /// link).
-    fn free_kind(&mut self, _: &mut Sim<'_>, unit: UnitId) {
+    fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let (ty, mode) = sim
+            .units
+            .get(unit)
+            .map_or((None, 0), |r| (Some(r.ty), r.mode));
+        self.path_free(unit, ty, mode);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
         }
@@ -385,7 +403,8 @@ impl<X: Pending> View<'_, X> {
     }
 
     /// Unit allocation `0x00555230` (`units.md` §3.1) on the game seed,
-    /// then the position (path spec, [`Pending::place`]).
+    /// then the path part of `SUNIT_Add` (`path-placement.md` §2.5,
+    /// [`View::path_place`]; without the path provider [`Pending::place`]).
     pub fn allocate(
         &mut self,
         game: &mut Game,
@@ -406,7 +425,7 @@ impl<X: Pending> View<'_, X> {
         self.h.game_seed = seed;
         match r {
             Ok(Some(u)) => {
-                self.h.x.place(u, x, y);
+                self.path_place(game, u, x, y);
                 Some(u)
             }
             Ok(None) => None,

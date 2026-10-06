@@ -682,9 +682,9 @@ fn stat_list_vector_on_live_records() {
     lists.toggle_state(PU, 30, true);
     assert_eq!(lists.total(p, 0, 0), 35);
     assert!(lists.has_state(PU, 30));
-    lists.expire_lists(&mut log, PU, 19);
+    lists.expire_lists(&mut log, PU, 19).unwrap();
     assert!(lists.is_live(s));
-    lists.expire_lists(&mut log, PU, 20);
+    lists.expire_lists(&mut log, PU, 20).unwrap();
     assert!(!lists.is_live(s));
     assert_eq!(lists.total(p, 0, 0), 30);
     assert_eq!(log.removed, [(PU, 30)]);

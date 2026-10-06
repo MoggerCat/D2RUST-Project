@@ -1,6 +1,6 @@
 # Handoff: item-move intents and deferred item messages (`d2_sim::items::moves`) — `claude/impl-moves`
 
-> Not folded into `docs/HANDOFF.md` / `docs/PLAN.md` yet; for the coordinator (§1 row 3d / 3k, §3 code map, §7 questions). This file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14). Branch `claude/impl-moves` from

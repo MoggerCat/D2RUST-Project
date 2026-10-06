@@ -1,0 +1,466 @@
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6
+//! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
+//! and cube systems on their `d2-sim` providers
+//! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
+//! NpcVendors`, [`VendorDesk`] for `VendorWorld`;
+//! `d2_sim::wiring::economy`: [`EconomyQuests`] for `QuestWorld`, on the
+//! same desk; `EconomyCube` for the cube, `handlers::items`), beside the
+//! waypoints and skill handlers of [`ActionWorld`].
+//!
+//! One unit world: the economy ([`Economy`]) is built per call from the
+//! action wiring's own unit records, stat lists, unit data and hooks
+//! (`ActionSim::sys`), so the player, the NPCs, the store items, the
+//! cube's items and the monsters' drops are the same units the rest of
+//! the game sees, in the game's one item store (`ActionHooks::items`,
+//! lent to the economy for the call).
+//!
+//! One inventory per unit: the inventory model of the item moves
+//! ([`WiredWorld::inventory`], `d2_sim::wiring::inventory`) is also the
+//! vendors' ([`InvVendors`]: ownership, cursor, placement, removal of the
+//! player's items) and the cube's (item list, checks, placement,
+//! removal), so an item placed by C→S 0x18 can be sold and cubed, and an
+//! item bought or transmuted lands where the moves see it.
+//!
+//! One home per game field: the game seed and the creation fields
+//! (difficulty, expansion, game type, ladder; the item format follows
+//! from the expansion) live on the action wiring (`ActionHooks::game_seed`,
+//! `ActionHooks::ai_info`, `UnitData::expansion`, written at game
+//! creation by
+//! [`super::ActionEvents::create_game`]); the economy's [`GameFields`]
+//! are built from them for each call and the seed is written back
+//! ([`WiredWorld::with_economy`]). The unique bits (+0x1B24) only the
+//! item code touches live here.
+//!
+//! One owner of the player's interaction (+0x64 GUID, +0x68 type, +0x6C
+//! active): the NPC wiring's player-data rest (`NpcRest::interact_unit`,
+//! `set_interact`, `reset_interact`). The NPC handlers ask it directly;
+//! the cube asks it through [`Interact`], the waypoints through
+//! [`HostWaypoints`] (instead of the action wiring's `Pending`).
+//!
+//! What no written spec provides (player data, the item copy
+//! `0x0055A2A0`, the item routines of `vendors.md` without a written body,
+//! the transport of the rests' messages) is the rest `R` ([`TradeRest`]);
+//! its messages leave through [`Outbox`].
+
+use d2_sim::game::Game;
+use d2_sim::items::{ItemTables, UniqueBits};
+use d2_sim::units::{RoomId, UnitId};
+use d2_sim::wiring::action::ActionHooks;
+use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, QuestRest};
+use d2_sim::wiring::interaction::{
+    Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
+};
+use d2_sim::world::npc::NpcControl;
+use d2_sim::world::quests::QuestControl;
+use d2_sim::world::vendors::{GlobalLists, VendorTables};
+use d2_sim::world::waypoints::{
+    ObjectFacts, PlayerFacts, RoomRect, WaypointRecords, WaypointWorld,
+};
+
+use super::super::items::moves::{InvParts, MoveCall};
+use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
+use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
+use super::super::walk::{WalkCall, WalkResult};
+use super::{
+    ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
+    WorldHost,
+};
+
+/// The seams of the NPC and vendor wiring without a provider: the
+/// interaction rests of `d2_sim::wiring::interaction`
+/// (`docs/handoff/wire-interaction.md` §6 lists each call's owner) and
+/// the outbox their messages go to (`QuestRest::send`, and
+/// `VendorRest::send_transaction` as `d2_sim::world::npc::transaction`
+/// bytes), in send order. Its `NpcRest` interaction calls are the
+/// host's one owner of the player's interaction.
+pub trait TradeRest: NpcRest + VendorRest + QuestRest + PlayerQuestsRef + Outbox {}
+
+impl<R: NpcRest + VendorRest + QuestRest + PlayerQuestsRef + Outbox> TradeRest for R {}
+
+/// The wired host of a game on `ActionSim` (or `WorldSim`): the action
+/// systems ([`ActionWorld`], with the skill slot `S`), the economy's own
+/// parts (item tables, unique bits; the item store is the action
+/// wiring's `ActionHooks::items`), the cube's parts, the inventory
+/// model, the quests, the NPC control block, the vendor tables and the
+/// interaction state (one vendor record per NPC record, the NPCs'
+/// interaction lists), and the rest.
+pub struct WiredWorld<R, S = NoSkills> {
+    /// Waypoints, arrivals, the skill slot and the handlers' faults.
+    pub action: ActionWorld<S>,
+    /// Game +0x1B24 (`quality.md` §8.1).
+    pub uniques: UniqueBits,
+    pub tables: ItemTables,
+    /// The cube (`None`: 0x2A, 0x4F stay stubs).
+    pub cube: Option<CubeParts>,
+    /// The game's one inventory model and the item-move seams (`None`:
+    /// the item-move ids stay stubs, `handlers::items::moves`; the
+    /// vendors and the cube see empty inventories).
+    pub inventory: Option<InvParts>,
+    pub quests: QuestControl,
+    pub npc: NpcControl,
+    pub vendor_tables: VendorTables,
+    pub state: InteractionState,
+    pub rest: R,
+    /// Host milliseconds (`GetTickCount`), an input of store generation
+    /// and refresh (`vendors.md` edge case 10); the caller keeps it
+    /// current.
+    pub now: u32,
+    /// What the inventory rules queued during vendor calls (receiving
+    /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
+    inv_sent: Vec<(UnitId, Vec<u8>)>,
+}
+
+impl<R, S> WiredWorld<R, S> {
+    /// The vendor records at game creation (`npc.md` §1.1 step 5,
+    /// `vendors.md` §1 rules 3–5) from the NPC records and the global
+    /// column lists (`GlobalLists::build`). The creation fields are the
+    /// action wiring's ([`super::ActionEvents::create_game`]).
+    pub fn new(
+        action: ActionWorld<S>,
+        tables: ItemTables,
+        quests: QuestControl,
+        npc: NpcControl,
+        vendor_tables: VendorTables,
+        rest: R,
+        now: u32,
+    ) -> Self {
+        let state = InteractionState::new(&npc, &GlobalLists::build(&vendor_tables));
+        Self {
+            action,
+            uniques: UniqueBits::default(),
+            tables,
+            cube: None,
+            inventory: None,
+            quests,
+            npc,
+            vendor_tables,
+            state,
+            rest,
+            now,
+            inv_sent: Vec::new(),
+        }
+    }
+
+    /// Runs `f` on the economy over the action wiring's unit side
+    /// (units, stat lists, unit data, hooks, the game's item store, lent
+    /// out of the hooks for the call) and this world's item parts, with
+    /// the game fields built from their home (game seed, creation fields)
+    /// and the seed, the store and the unique bits written back after the
+    /// call. Item creation outside a handler (a fixture) goes through it;
+    /// the inventory model is in [`Parts::inventory`] (`InvParts::desk`
+    /// on the same economy).
+    pub fn with_economy<D: ActionEvents, T>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        f: impl FnOnce(&mut Economy<'_, ActionHooks<D::X>>, &mut Parts<'_, R>) -> T,
+    ) -> T {
+        let s = &mut events.action().sys;
+        let mut fields = GameFields::from_action(
+            s.hooks.game_seed,
+            &s.hooks.ai_info,
+            s.data.expansion,
+            std::mem::take(&mut self.uniques),
+        );
+        let mut items = std::mem::take(&mut s.hooks.items);
+        let out = {
+            let mut econ = Economy {
+                game,
+                units: &mut s.units,
+                stats: &mut s.stats,
+                data: &s.data,
+                hooks: &mut s.hooks,
+                fields: &mut fields,
+                tables: &self.tables,
+                items: &mut items,
+            };
+            let mut parts = Parts {
+                quests: &mut self.quests,
+                npc: &mut self.npc,
+                vendor_tables: &self.vendor_tables,
+                state: &mut self.state,
+                cube: self.cube.as_mut(),
+                inventory: self.inventory.as_mut(),
+                rest: &mut self.rest,
+                now: self.now,
+            };
+            f(&mut econ, &mut parts)
+        };
+        s.hooks.items = items;
+        s.hooks.game_seed = fields.seed;
+        self.uniques = fields.uniques;
+        out
+    }
+
+    /// Runs `f` on the desk over [`Self::with_economy`]'s economy and
+    /// this world, with the NPC control block and the inventory model.
+    fn desk<D: ActionEvents, T>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        f: impl FnOnce(
+            &mut Desk<'_, '_, ActionHooks<D::X>, R>,
+            &mut NpcControl,
+            Option<&mut InvParts>,
+        ) -> T,
+    ) -> T {
+        self.with_economy(game, events, |econ, p| {
+            let mut desk = Desk {
+                econ,
+                quests: &mut *p.quests,
+                vendor_tables: p.vendor_tables,
+                state: &mut *p.state,
+                rest: &mut *p.rest,
+                now: p.now,
+            };
+            f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
+        })
+    }
+}
+
+/// The parts of a [`WiredWorld`] beside the economy, borrowed for one
+/// [`WiredWorld::with_economy`] call.
+pub struct Parts<'p, R> {
+    pub quests: &'p mut QuestControl,
+    pub npc: &'p mut NpcControl,
+    pub vendor_tables: &'p VendorTables,
+    pub state: &'p mut InteractionState,
+    pub cube: Option<&'p mut CubeParts>,
+    /// The inventory model (`InvParts::desk` on the call's economy).
+    pub inventory: Option<&'p mut InvParts>,
+    pub rest: &'p mut R,
+    pub now: u32,
+}
+
+/// The rest's interaction calls as the cube's [`Interact`].
+struct RestInteract<'r, R>(&'r mut R);
+
+impl<R: NpcRest> Interact for RestInteract<'_, R> {
+    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
+        self.0.interact_unit(player)
+    }
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        self.0.set_interact(player, unit_type, guid);
+    }
+    fn reset_interact(&mut self, player: UnitId) {
+        self.0.reset_interact(player);
+    }
+}
+
+/// The action wiring's [`WaypointWorld`] with the player's interaction
+/// asked of the host's owner (the rest's `NpcRest` calls) and the
+/// difficulty of the game's home (`ActionHooks::ai_info`); every other
+/// call goes to the action wiring.
+pub struct HostWaypoints<'w, W, R> {
+    pub inner: &'w mut W,
+    pub rest: &'w mut R,
+    pub difficulty: u8,
+}
+
+impl<W: WaypointWorld, R: NpcRest> WaypointWorld for HostWaypoints<'_, W, R> {
+    fn frame(&self) -> i32 {
+        self.inner.frame()
+    }
+    fn difficulty(&self) -> u8 {
+        self.difficulty
+    }
+    fn records(&mut self, player: UnitId) -> Option<&mut WaypointRecords> {
+        self.inner.records(player)
+    }
+    fn object(&self, guid: u32) -> Option<(UnitId, ObjectFacts)> {
+        self.inner.object(guid)
+    }
+    fn player(&self, player: UnitId) -> PlayerFacts {
+        self.inner.player(player)
+    }
+    fn room_rect(&self, room: RoomId) -> RoomRect {
+        self.inner.room_rect(room)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: u8) {
+        self.inner.set_object_mode(object, mode);
+    }
+    fn schedule_endanim(&mut self, object: UnitId, frame: i32) {
+        self.inner.schedule_endanim(object, frame);
+    }
+    /// `0x00535060`: the interaction part from the owner, the cursor and
+    /// player data +0x4C parts from the action wiring.
+    fn player_busy(&self, player: UnitId) -> bool {
+        self.rest.interact_unit(player).is_some() || self.inner.player_busy(player)
+    }
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        self.rest.set_interact(player, unit_type, guid);
+    }
+    fn reset_interact(&mut self, player: UnitId) {
+        self.rest.reset_interact(player);
+    }
+    fn interact_guid(&self, player: UnitId) -> Option<u32> {
+        self.rest.interact_unit(player).map(|(_, guid)| guid)
+    }
+    fn hostile_delay(&self, player: UnitId) -> bool {
+        self.inner.hostile_delay(player)
+    }
+    fn attach_sound(&mut self, player: UnitId, event: u8) {
+        self.inner.attach_sound(player, event);
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.inner.send(player, msg);
+    }
+    fn warp(&mut self, player: UnitId, level: u32, tile_code: u8) {
+        self.inner.warp(player, level, tile_code);
+    }
+    fn spawn_room(&mut self, level: u32, tile_code: u8) -> Option<RoomId> {
+        self.inner.spawn_room(level, tile_code)
+    }
+    fn set_player_mode_arrival(&mut self, player: UnitId) {
+        self.inner.set_player_mode_arrival(player);
+    }
+}
+
+/// A waypoint call on the action wiring's view, wrapped by
+/// [`HostWaypoints`].
+struct HostWaypointRun<'r, C, R> {
+    call: C,
+    rest: &'r mut R,
+    difficulty: u8,
+}
+
+impl<C: WaypointCall, R: NpcRest> WaypointCall for HostWaypointRun<'_, C, R> {
+    type Out = C::Out;
+    fn call<W: WaypointWorld>(
+        self,
+        data: &d2_sim::world::waypoints::WaypointData,
+        arrivals: &mut d2_sim::world::waypoints::ArrivalList,
+        w: &mut W,
+    ) -> C::Out {
+        let mut hw = HostWaypoints {
+            inner: w,
+            rest: self.rest,
+            difficulty: self.difficulty,
+        };
+        self.call.call(data, arrivals, &mut hw)
+    }
+}
+
+impl<D: ActionEvents, R: TradeRest, S: SkillHost<D>> WorldHost<D> for WiredWorld<R, S>
+where
+    D::X: Outbox,
+{
+    fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        Some(self.desk(game, events, |desk, ctl, _| call.call(ctl, desk)))
+    }
+
+    /// The vendor records are lent out of the interaction state for the
+    /// call (the module holds them while it calls the world, as
+    /// `VendorDesk`'s own entry points do); the world is [`VendorDesk`]
+    /// with the NPC control block (`NpcLink`), its player inventories
+    /// answered by the inventory model ([`InvVendors`]).
+    fn vendors<C: VendorCall>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        call: C,
+    ) -> Option<C::Out> {
+        let (out, sent) = self.desk(game, events, |desk, ctl, inv| {
+            let mut records = std::mem::take(&mut desk.state.vendors);
+            let tables = desk.vendor_tables;
+            let inner: VendorDesk<'_, '_, '_, _, _> = desk.vendors(Some(ctl));
+            let mut w = InvVendors::new(inner, inv);
+            let out = call.call(tables, &mut records, &mut w);
+            let sent = std::mem::take(&mut w.sent);
+            drop(w);
+            desk.state.vendors = records;
+            (out, sent)
+        });
+        self.inv_sent.extend(sent);
+        Some(out)
+    }
+
+    /// The action wiring's waypoints, with the interaction of the host's
+    /// owner ([`HostWaypoints`]).
+    fn waypoints<C: WaypointCall>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        call: C,
+    ) -> Option<C::Out> {
+        let difficulty = events.action().hooks().ai_info.difficulty;
+        let run = HostWaypointRun {
+            call,
+            rest: &mut self.rest,
+            difficulty,
+        };
+        WorldHost::<D>::waypoints(&mut self.action, game, events, run)
+    }
+
+    /// The quest control on the desk's economy and rest
+    /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
+    /// quest grants (`quests.md` §10.2) are collected during the call and
+    /// run on the NPC control block right after it (`npc.md` §7.5,
+    /// [`d2_sim::world::npc::NpcControl::quest_mercenary`] with the desk
+    /// as its world), before the result is returned: the order of
+    /// `Desk::quest_message`, here for every quest call. A reward's NPC
+    /// error goes to the interaction state's errors, as there.
+    fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        Some(self.desk(game, events, |desk, ctl, _| {
+            let mut rewards = Vec::new();
+            let out = {
+                let mut w = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
+                w.mercenaries = Some(&mut rewards);
+                call.call(&mut *desk.quests, &mut w)
+            };
+            for (p, class) in rewards {
+                if let Err(e) = ctl.quest_mercenary(desk, p, class) {
+                    desk.state.errors.push(InteractionError::Npc(e));
+                }
+            }
+            out
+        }))
+    }
+
+    /// The cube on this world's economy and inventory model, with the
+    /// rest as the interaction owner.
+    fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        self.cube.as_ref()?;
+        Some(self.with_economy(game, events, |econ, p| {
+            let parts = p.cube.as_deref_mut().expect("checked above");
+            let inv = p.inventory.as_deref_mut();
+            call.call(econ, parts, inv, &mut RestInteract(&mut *p.rest))
+        }))
+    }
+
+    /// The item moves on this world's economy and inventory parts (lent
+    /// out of the world for the call).
+    fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        let mut inv = self.inventory.take()?;
+        let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        self.inventory = Some(inv);
+        Some(out)
+    }
+
+    fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
+        WorldHost::<D>::skill(&mut self.action, call)
+    }
+
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        WorldHost::<D>::walk(&mut self.action, game, events, call)
+    }
+
+    /// The action wiring's sends (waypoints, tick paths), then the rest's
+    /// (NPC, vendor and quest messages), then what the inventory rules
+    /// queued in vendor calls; one system runs per message, so the
+    /// systems never interleave.
+    ///
+    /// TODO(spec: vendors.md §7): the order of a vendor call's inventory
+    /// messages (a targeting reset's 0x3F) against its 0x2A is not
+    /// written; they follow it.
+    fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
+        let mut sent = events.action().hooks().x.take_sent();
+        sent.extend(self.rest.take_sent());
+        sent.append(&mut self.inv_sent);
+        sent
+    }
+
+    fn fault(&mut self, fault: WorldFault) {
+        self.action.faults.push(fault);
+    }
+}

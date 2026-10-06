@@ -19,6 +19,8 @@ pub mod item;
 pub mod order;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod tests;
 
 pub use bins::{bin, Bins};
@@ -99,6 +101,16 @@ impl Rect {
     pub fn contains(&self, x: i64, y: i64) -> bool {
         x >= i64::from(self.x) && x < self.right() && y >= i64::from(self.y) && y < self.bottom()
     }
+
+    /// A view's pixels must be screen points (i32): items are placed in
+    /// i32, and bin rectangles ([`Bins::rect`]) are `Rect`s.
+    pub(crate) fn check_view(&self) -> Result<(), SceneError> {
+        let end = i64::from(i32::MAX) + 1;
+        if self.right() > end || self.bottom() > end {
+            return Err(SceneError::View(*self));
+        }
+        Ok(())
+    }
 }
 
 /// Errors of draw-list construction and composition. Inputs are strict
@@ -124,6 +136,8 @@ pub enum SceneError {
     BlendTable(MapId),
     #[error("flip_x is reserved until an owner spec defines it")]
     FlipX,
+    #[error("view {0:?} has pixels past the i32 screen range")]
+    View(Rect),
     #[error("bins were built for {built:?}, composing {view:?}")]
     BinsView { built: Rect, view: Rect },
     #[error("bins were built for {built} items, composing {items}")]

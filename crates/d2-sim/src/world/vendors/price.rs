@@ -583,3 +583,6 @@ pub fn gamble_price(t: &VendorTables, it: &PriceItem, player_level: i32, rp: i32
         price
     }
 }
+
+#[cfg(test)]
+mod mutant_tests;

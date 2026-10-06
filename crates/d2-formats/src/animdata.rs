@@ -4,6 +4,9 @@
 
 use crate::cursor::{invalid, Cursor, FormatError};
 
+#[cfg(test)]
+mod gaps_numbered_tests;
+
 const FORMAT: &str = "animdata";
 
 /// Archive path (§1).

@@ -13,5 +13,8 @@ d2-data.workspace = true
 d2-formats.workspace = true
 d2-proto.workspace = true
 
+[dev-dependencies]
+test-fixtures.workspace = true
+
 [lints]
 workspace = true

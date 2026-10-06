@@ -23,6 +23,8 @@ pub mod layouts;
 pub mod seams;
 
 #[cfg(test)]
+mod prop_tests;
+#[cfg(test)]
 mod tests;
 
 pub use deferred::{

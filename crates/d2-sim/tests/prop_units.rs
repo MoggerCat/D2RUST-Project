@@ -200,6 +200,32 @@ fn form() -> impl Strategy<Value = Form> {
     ]
 }
 
+/// Longest §4.2 loop the closed-form property runs (2^31 / s iterations
+/// are possible for a wrapped start).
+const MAX_LOOP: i64 = 200_000;
+
+/// Form, frame, step, frame count and current frame of the closed-form
+/// property. A step whose loop would exceed [`MAX_LOOP`] is doubled until
+/// it does not, so (nearly) no case is rejected (`ci-nightly-props`).
+fn schedule_inputs() -> impl Strategy<Value = (Form, i32, i32, i32, i32)> {
+    (
+        form(),
+        prop_oneof![0i32..1_000_000, Just(i32::MAX - 600)],
+        prop_oneof![1 => Just(0i32), 1 => -300i32..0, 8 => 1i32..2000],
+        prop_oneof![-1000i32..80_000, Just(0)],
+        0i32..80_000,
+    )
+        .prop_map(|(form, f, mut s, frame_count, cur)| {
+            while s > 0
+                && s <= i32::MAX / 2
+                && loop_length(form, f, s, frame_count, cur) >= MAX_LOOP
+            {
+                s *= 2;
+            }
+            (form, f, s, frame_count, cur)
+        })
+}
+
 fn event_bytes() -> impl Strategy<Value = [u8; ANIM_EVENTS]> {
     prop::collection::vec(prop_oneof![6 => Just(0u8), 1 => 1u8..=6], ANIM_EVENTS)
         .prop_map(|v| v.try_into().unwrap())
@@ -210,17 +236,13 @@ proptest! {
 
     #[test]
     fn anim_schedule_matches_the_closed_form(
-        form in form(),
-        f in prop_oneof![0i32..1_000_000, Just(i32::MAX - 600)],
-        s in prop_oneof![1 => Just(0i32), 1 => -300i32..0, 8 => 1i32..2000],
-        frame_count in prop_oneof![-1000i32..80_000, Just(0)],
-        cur in 0i32..80_000,
+        (form, f, s, frame_count, cur) in schedule_inputs(),
         byte_0f in any::<u8>(),
         events in event_bytes(),
     ) {
         // Keep the implementation's loop short (2^31 / s iterations are
         // possible for a wrapped start).
-        prop_assume!(loop_length(form, f, s, frame_count, cur) < 200_000);
+        prop_assume!(loop_length(form, f, s, frame_count, cur) < MAX_LOOP);
         let got = schedule(form, f, s, frame_count, cur, Events::Record { byte_0f, events: &events });
         let want = reference(form, f, s, frame_count, cur, byte_0f, &events);
         prop_assert_eq!(&got, &want);

@@ -18,6 +18,8 @@ use crate::rng::Seed;
 use crate::units::UnitId;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
@@ -687,6 +689,12 @@ pub fn ratio(a: i32, b: u8) -> i32 {
     }
 }
 
+/// S→C 0x77 TradeAction (§1, 2 bytes): the action byte (0x0C, 0x11,
+/// 0x15).
+pub fn trade_action(action: u8) -> [u8; 2] {
+    [0x77, action]
+}
+
 impl CubeData {
     /// A stat op's guard and compare (§5). `None`: passes without a test.
     fn stat_op<W: CubeWorld>(
@@ -1316,7 +1324,7 @@ impl CubeData {
         button: u16,
     ) -> Option<u32> {
         let Some((ty, _)) = w.interaction(player) else {
-            w.send(player, &[0x77, 0x0C]);
+            w.send(player, &trade_action(0x0C));
             return Some(0);
         };
         match button {
@@ -1339,10 +1347,10 @@ impl CubeData {
         if w.interacting_with_stash(player) {
             w.reset_interaction(player);
             w.inventory_pass(player);
-            w.send(player, &[0x77, 0x11]);
+            w.send(player, &trade_action(0x11));
         }
         w.set_interaction(player, INTERACT_CUBE, cube_guid);
-        w.send(player, &[0x77, 0x15]);
+        w.send(player, &trade_action(0x15));
         w.inventory_pass(player);
     }
 
@@ -1388,3 +1396,6 @@ impl CubeData {
         0
     }
 }
+
+#[cfg(test)]
+mod mutant_tests;

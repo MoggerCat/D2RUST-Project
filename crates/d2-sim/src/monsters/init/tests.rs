@@ -358,6 +358,9 @@ impl InitHost for Fake {
     fn set_alignment(&mut self, unit: UnitId, a: u8) {
         self.log.push(format!("align {} {a}", unit.0));
     }
+    fn register_spawn(&mut self, unit: UnitId, _: &CreateRequest, never_count: u32) {
+        self.log.push(format!("register {} {never_count}", unit.0));
+    }
     fn party_minions(&mut self, unit: UnitId, _: &CreateRequest) {
         self.log.push(format!("party {}", unit.0));
     }
@@ -1936,3 +1939,12 @@ fn real_level_stats() {
     let s = stats_by_level(&ms[5], &ml, false, 2, l);
     assert_eq!((s.min_hp, s.max_hp, s.ac, s.xp), (3238, 4626, 907, 28069));
 }
+
+// Tests written against surviving mutants (METHODS M08); a child module so
+// they share this module's fakes.
+#[path = "../mutant_tests/init_seams.rs"]
+mod mutant_seams;
+#[path = "../mutant_tests/init.rs"]
+mod mutant_tests;
+#[path = "../mutant_tests/umods.rs"]
+mod mutant_umods;

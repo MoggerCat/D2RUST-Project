@@ -27,3 +27,22 @@ pub mod world;
 
 /// Simulation ticks per second, matching the original game.
 pub const TICKS_PER_SECOND: u32 = 25;
+
+/// The synthetic fixtures of the unit tests, for `benches/` (criterion).
+/// Only with the `bench-fixtures` feature; no game logic lives here.
+#[cfg(feature = "bench-fixtures")]
+pub mod bench_fixtures {
+    pub use crate::items::tests::{
+        item, item_rec, push_item, tables as item_tables, FakeGame, FakeStats,
+    };
+    pub fn stat_data() -> std::sync::Arc<crate::stats::StatData> {
+        crate::stats::tests::data()
+    }
+    pub use crate::wiring::worldgen::tests::{ds1, Ds1s, Fx, ISLE, ISLE_DEF};
+    /// The combat / missile fixtures of the e2e combat path and the
+    /// "fight" tick fixture (`wiring::action::tests::fight`).
+    pub mod combat {
+        pub use crate::wiring::action::tests::fight::*;
+        pub use crate::wiring::action::tests::Fx as ActionFx;
+    }
+}

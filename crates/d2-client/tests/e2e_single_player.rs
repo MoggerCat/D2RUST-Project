@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4, §5.2, §5.4; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/items/treasure.md §3, §7, §8; specs/world/npc.md §2, §3, §9; specs/world/vendors.md §3, §4, §7, §9; specs/world/quests.md §1.5; specs/world/cube.md §1, §2, §3, §8; specs/world/waypoints.md §6, §7 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4, §5.2, §5.4; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/items/treasure.md §3, §7, §8; specs/world/npc.md §2, §3, §9; specs/world/vendors.md §3, §4, §7, §9; specs/world/quests.md §1.5; specs/world/cube.md §1, §2, §3, §8; specs/world/waypoints.md §6, §7; specs/items/inventory.md §6, §7, §11 (end to end)
 //! End-to-end single player: the bridge (`d2_client::bridge`) on its
 //! local link (`bridge::local::LocalLink`) over the in-process
 //! `d2-server` host, whose game is `SimGame` on the fully wired `d2-sim`
@@ -27,32 +27,48 @@
 //!    item unit in the monster's room (`treasure.md` §3, §7, §8); the
 //!    kill's experience levels the player up (`vitals.md` §4.3 → §3);
 //!    then (step 7) a stat point is spent (C→S 0x3A, `vitals.md` §2);
-//!    (step 5b) pick-up (C→S 0x16) **stops at the stub** (no inventory
-//!    spec);
-//! 8. (steps 8–13) Akara on the server's `TradeWorld` (the same units): talk
-//!    (C→S 0x13: S→C 0x27, 0x29, 0x28, `npc.md` §2), chat (0x2F), trade
-//!    (0x38: the store generated, `vendors.md` §3, §4), buy (0x32)
-//!    **stops at the item copy** `0x0055A2A0` (§7.1 rule 9.2: S→C 0x2A
-//!    code 9), sell of a buckler **stops at the same copy** (§7.2 rule
-//!    8), sell of the cap runs (§7.2 rules 8–10: S→C 0x2A kind 3);
-//!    quests (0x31, 0x40, 0x58) are a marked step for after the
-//!    quest-host merge;
-//! 9. (steps 14–15) the cube (C→S 0x2A, 0x4F, `cube.md` §1, §2, §3,
-//!    §8) on the server's item world, a second unit world (`item_world`);
-//! 10. (step 6) last, a waypoint travel (C→S 0x49) runs through the
+//!    (step 5b) pick-up of that gold (C→S 0x16, `inventory.md` §7.1 →
+//!    §8.1 → §10.1): the drop created it in the game's one item store,
+//!    so the item-move handler finds it and the gold is credited;
+//! 8. (steps 8–10) Akara on the server's `WiredWorld` (the same units):
+//!    talk (C→S 0x13: S→C 0x27, 0x29, 0x28, `npc.md` §2), chat (0x2F),
+//!    trade (0x38: the store generated, `vendors.md` §3, §4);
+//! 9. (steps 11–18) item moves on the game's one inventory model
+//!    (`inventory.md` §7, `d2_sim::wiring::inventory` under
+//!    `handlers::items::moves`): a cap on the ground is picked to the
+//!    cursor (0x16), placed in the grid (0x18), lifted (0x19), equipped
+//!    (0x1A), unequipped (0x1C), dropped (0x17), picked and placed
+//!    again; each frame's tick sends the deferred item messages (§6,
+//!    §11: 0x9C / 0x9D with an empty item bit stream, OQ1) and 0x47,
+//!    0x48;
+//! 10. (steps 19–22) the vendor on the same inventory: the cap placed by
+//!     0x18 is sold (0x33: removed, freed, the price received: S→C 0x2A
+//!     kind 3), a buy (0x32) **stops at the item copy** `0x0055A2A0`
+//!     (§7.1 rule 9.2: 0x2A code 9), the stored buckler's sale **stops
+//!     at the same copy** (§7.2 rule 8), the stored cap is sold; quests
+//!     (0x31, 0x40, 0x58) are a marked step for after the quest-host
+//!     merge;
+//! 11. (steps 23–25) the cube (C→S 0x2A, 0x4F, `cube.md` §1, §2, §3, §8)
+//!     on the same inventory: a ground ring picked to the cursor, put in
+//!     the cube (§2.4 placement: 0x9C action 4), transmuted (the ring's
+//!     0x9D action 5 now, the amulet's 0x9C action 4 in the update
+//!     pass);
+//! 12. (step 6) a waypoint travel (C→S 0x49) runs through the
 //!     handler, the warp seam and the destination's spawn search, **then
-//!     stops**: the same-act placement belongs to the unwritten path
-//!     spec, so the player is not moved and `waypoints.md` §7 rule 7
-//!     sends no S→C 0x0D.
+//!     stops**: this run keeps the path provider off (step 4's missile
+//!     would get no path points with it on, blocker WP1), so the warp's
+//!     placement stays `Pending`, the player is not moved and
+//!     `waypoints.md` §7 rule 7 sends no S→C 0x0D. With the provider on
+//!     the step holds: `e2e_walk.rs` (placement, 0x07 then 0x0D).
 //!
-//! The S→C messages the specs lay out (0x27, 0x29, 0x28, 0x2A) are
-//! asserted byte for byte; every other frame's received bytes are
-//! asserted empty: the wiring sends no S→C message on the other paths
-//! (no written spec ties a mode, missile, death, item, stat or cube
-//! message to them yet). Where a step needs behaviour no written spec
+//! The S→C messages the specs lay out (0x27, 0x29, 0x28, 0x2A, 0x9C,
+//! 0x9D, 0x47, 0x48) are asserted byte for byte; every other frame's
+//! received bytes are asserted empty: the wiring sends no S→C message on
+//! the other paths (no written spec ties a mode, missile, death, stat or
+//! cube message to them yet). Where a step needs behaviour no written spec
 //! owns (the COF-name composer, the animation rate, the missile's path
 //! and damage setup, the death start's body, the free-spot search, the
-//! inventories, the item copy, the cube's opening), the fixture answers
+//! item copy, the cube's opening, the item-move seams of `InvFx`), the fixture answers
 //! the seam and says so at the answer (`docs/handoff/e2e-next.md`).
 //!
 //! The whole run is repeated: same seed → byte-identical transcript.
@@ -65,29 +81,24 @@ use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::{Bridge, FrameReport};
 use d2_data::bin::BinTable;
-use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{
-    Charstats, Difficultylevels, Experience, Itemratio, Itemstatcost, Itemtypes, Levels,
-    Missiles as MissileRow, Monlvl, Monstats, Monstats2, Objects, Record, Skilldesc, Skills,
-};
-use d2_formats::animdata::{self, AnimData, AnimRecord};
+use d2_data::tables::{Difficultylevels, Itemstatcost, Levels, Monlvl, Objects, Record};
 use d2_proto::client::{
-    AddStatPoint, BuyItem, ClickButton, EntityAction, InitEntityChat, InteractWithEntity,
-    ItemToCube, PickItem, RightSkill, SellItem, TakeOrCloseWp,
+    AddStatPoint, BuyItem, ClickButton, DropItem, EntityAction, EquipItem, InitEntityChat,
+    InsertItemInBuffer, InteractWithEntity, ItemToCube, PickItem, RemoveBodyItem,
+    RemoveItemFromBuffer, RightSkill, SellItem, TakeOrCloseWp,
 };
-use d2_server::adapters::handlers::items::{
-    Interaction, Inventory, ItemHooks, ItemPending, ItemWorld, Staged,
-};
-use d2_server::adapters::handlers::skills::seams::SkillSeams;
+use d2_server::adapters::handlers::items::{CubeParts, ItemPending};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use d2_server::adapters::handlers::skills::LearnRest;
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::dispatch::Outcome;
 use d2_server::host::{Handled, Host};
 use d2_server::seams::{Clock, PlayerGate, Pos, ResultCode};
-use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::{CombatTables, RoomKind};
+use d2_sim::bench_fixtures::combat::{
+    anim_data, arrow, combat_tables, monster_class, skills, vitals, MONSTER_DT, MULTI, PLAYER_SC,
+};
 use d2_sim::drlg::collision::bits;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs, SubFileMap};
@@ -97,6 +108,8 @@ use d2_sim::drlg::preset::{
 use d2_sim::drlg::tiles::{cell, FIXED_LIBRARY};
 use d2_sim::drlg::{Drlg, DrlgData, DrlgRoomId, Dungeon, LevelDef, TileInfo, TileSource};
 use d2_sim::game::Game;
+use d2_sim::items::inventory::InvItem;
+use d2_sim::items::moves::Owner;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, q, ty, ItemRequest, ItemTables};
 use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
@@ -104,14 +117,13 @@ use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::rng::Seed;
 use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
-use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
-use d2_sim::stats::{StatData, StatLists, StatTable};
+use d2_sim::skills::SkillEntry;
+use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::modes;
-use d2_sim::units::record::Units;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
 use d2_sim::wiring::economy::{
@@ -131,7 +143,7 @@ use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
 mod e2e_support;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, tx, vendor_tables, Rest};
-use e2e_support::{BUC, CAP, N_MONSTATS};
+use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
 
 // ---- constants -----------------------------------------------------------------------
 
@@ -159,6 +171,7 @@ const PLAYER_GOLD: i32 = 5000;
 const STATPTS: u16 = 4;
 const NEWSKILLS: u16 = 5;
 const STRENGTH: u16 = 0;
+const DEXTERITY: u16 = 2;
 const LEVEL: u16 = 12;
 const GOLD: u16 = 14;
 const NEXTEXP: u16 = 30;
@@ -176,22 +189,21 @@ const WP_AT: (i32, i32) = (40_024, 40_020);
 /// Skills of the synthetic table: attack, and a right skill (srvst 4,
 /// mana 4 + 1 per level, shift 8; `use.md`'s Multiple Shot vector).
 const ATTACK: i32 = 0;
-const MULTI: i32 = 1;
 
 // ---- seams without a provider --------------------------------------------------
 
 /// The action and world-generation seams no written spec provides yet
-/// (positions and a straight-line path, interaction, warp, arrival mode,
-/// transport, the DRLG population reads, the COF-name composer and the
-/// animation rate, the monster death start's body), the skill use
-/// pipeline's rest ([`UseRest`]: the player's skill state, shared with
-/// the server's skill seams through [`Book`]), the drop state, and a log
-/// of the calls that change something. The answers are the narrowest
-/// ones (`Pending`'s defaults) except those the test stages (see each).
+/// (positions and a straight-line path, warp, arrival mode, transport,
+/// the DRLG population reads, the COF-name composer and the animation
+/// rate, the monster death start's body), the skill use pipeline's rest
+/// ([`UseRest`]: the player's skill state in [`Book`], for the message
+/// and the timer paths alike), the drop state, and a log of the calls
+/// that change something. The answers are the narrowest ones
+/// (`Pending`'s defaults) except those the test stages (see each). The
+/// player's interaction is the server host's (the NPC rest, `Rest`).
 #[derive(Default)]
 struct TestPending {
     pos: BTreeMap<UnitId, (i32, i32)>,
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     log: Vec<String>,
     /// Missile target points (`0x00648AD0`) and the sub-tiles each step
@@ -206,12 +218,6 @@ struct TestPending {
     /// The game's drop state (`treasure.md` §3), lent out during a drop.
     drops: Option<DeathDrops>,
 }
-
-/// The fixture's COF names (the composer `0x0064F5B0` for units with a
-/// unit is `animdata.md` Open question 2): the sorceress casting (SC)
-/// and the monster dying (DT). Other modes get no name.
-const PLAYER_SC: &[u8; 8] = b"SOSCHTH\0";
-const MONSTER_DT: &[u8; 8] = b"M0DTHTH\0";
 
 impl Pending for TestPending {
     fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
@@ -290,15 +296,6 @@ impl Pending for TestPending {
     }
     fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
         self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -383,9 +380,9 @@ impl Outbox for TestPending {
     }
 }
 
-/// The skill use pipeline's rest on the timer path (the action frame):
-/// the player's skill state from [`Book`] (the same state the server's
-/// skill seams use for the message path), the rest narrowest.
+/// The skill use pipeline's rest (the message path through the server's
+/// skill handlers, the action frame on the timer path): the player's
+/// skill state from [`Book`], the rest narrowest.
 impl UseRest for TestPending {
     fn send(&mut self, u: UnitId, msg: ServerMsg) {
         self.log.push(format!("send {} {msg:?}", u.0));
@@ -500,16 +497,25 @@ impl UseRest for TestPending {
         (p.target_x, p.target_y) = self.aim_at;
     }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.book.clone().srvst(index, u, skill, lvl)
+        self.book.srvst(index, u, skill, lvl)
     }
     fn srvdo(&mut self, i: u16, u: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
-        self.book.clone().srvdo(i, u, s, l, c, it, a)
+        self.book.srvdo(i, u, s, l, c, it, a)
     }
 }
 
-/// The skill pipeline's seams without a provider (skill list, skill
-/// bodies, missile creation: `use.md` OQ10, `server-skills.md` §4): the
-/// player's skill list and a call log, shared with the test.
+/// The skill-point calls (`levels.md` §6.4): not reached in this run.
+impl LearnRest for TestPending {
+    fn is_class_skill(&self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn add_skill_level(&mut self, _: UnitId, _: i32, _: i32) {}
+    fn after_skill_point(&mut self, _: UnitId) {}
+}
+
+/// The skill pipeline's state without a provider (skill list, skill
+/// bodies: `use.md` OQ10): the player's skill list and a call log,
+/// shared with the test.
 #[derive(Default)]
 struct Inner {
     list: Vec<SkillEntry>,
@@ -525,21 +531,6 @@ impl Book {
     fn get(&self) -> MutexGuard<'_, Inner> {
         self.0.lock().unwrap()
     }
-}
-
-impl SkillSeams for Book {
-    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
-        self.get().list.clone()
-    }
-    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().used
-    }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.get().used = e;
-    }
-    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().right
-    }
     fn find_entry(&self, _: UnitId, skill: i32) -> Option<SkillEntry> {
         self.get().list.iter().copied().find(|e| e.skill == skill)
     }
@@ -552,26 +543,18 @@ impl SkillSeams for Book {
             7
         }
     }
-    fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
-        UseState::Usable
-    }
-    fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
+    fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
     }
     /// The do bodies are catalogued only (`use.md` OQ10): logged, result
     /// 0 (the generic `srvmissile` creation of §5.4 step 7 still runs).
-    fn srvdo(&mut self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
+    #[allow(clippy::too_many_arguments)]
+    fn srvdo(&self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
         self.get()
             .log
             .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
         0
-    }
-    fn create_skill_missile(&mut self, _: UnitId, s: i32, l: i32, m: u16, _: bool, _: MissileAim) {
-        self.get().log.push(format!("missile {s} {l} {m}"));
-    }
-    fn room(&self, _: UnitId) -> RoomKind {
-        RoomKind::Field
     }
 }
 
@@ -790,30 +773,6 @@ fn maze_data() -> MazeData {
     }
 }
 
-/// Monster class 0: killable, AI 1 (Idle), no skills, no minions; level
-/// 1, 5 life, 100 experience (`noRatio`: the monstats values as they
-/// are, `monsters/init.md` §8.1); treasure class 1 (Normal).
-fn monster_class() -> Monstats {
-    let mut m: Monstats = blank();
-    m.killable = true;
-    m.noratio = true;
-    m.level = 1;
-    (m.minhp, m.maxhp, m.exp) = (5, 5, 100);
-    m.treasureclass1 = 1;
-    m.velocity = 1;
-    (m.drain, m.drain_n, m.drain_h) = (100, 100, 100);
-    m.montype = 0xFFFF;
-    m.ai = 1;
-    (m.aidel, m.aidel_n, m.aidel_h) = (15, 15, 15);
-    (m.skill1, m.skill2, m.skill3) = (0xFFFF, 0xFFFF, 0xFFFF);
-    m.rarity = 1;
-    (m.mingrp, m.maxgrp) = (1, 1);
-    (m.minion1, m.minion2) = (0xFFFF, 0xFFFF);
-    m.enabled = true;
-    m.isspawn = true;
-    m
-}
-
 /// levels.txt: no monsters, act by level id; waypoints at [`ISLE`] and
 /// [`GATE`] only.
 fn levels() -> Vec<Levels> {
@@ -882,183 +841,13 @@ fn stat_data() -> Arc<StatData> {
     })
 }
 
-fn skill_rec() -> Skills {
-    let mut s: Skills = blank();
-    for f in [
-        &mut s.auralencalc,
-        &mut s.aurarangecalc,
-        &mut s.aurastatcalc1,
-        &mut s.calc1,
-        &mut s.calc2,
-        &mut s.calc3,
-        &mut s.calc4,
-        &mut s.passivecalc1,
-        &mut s.passivecalc2,
-        &mut s.passivecalc3,
-        &mut s.passivecalc4,
-        &mut s.passivecalc5,
-        &mut s.petmax,
-        &mut s.skpoints,
-        &mut s.tohitcalc,
-        &mut s.dmgsympercalc,
-        &mut s.edmgsympercalc,
-        &mut s.elensympercalc,
-        &mut s.delay,
-        &mut s.perdelay,
-    ] {
-        *f = 0xFFFF_FFFF;
-    }
-    s.skilldesc = 0xFFFF;
-    s.charclass = 0xFF;
-    (s.reqskill1, s.reqskill2, s.reqskill3) = (0xFFFF, 0xFFFF, 0xFFFF);
-    s.itypea1 = 0xFFFF;
-    s.srvmissile = 0xFFFF;
-    s.intown = true;
-    s.ingame = true;
-    s
-}
-
-/// Missile 0: an arrow-like row (default flight, one sub-tile per frame,
-/// collide type 3, kill on collision, to-hit), as the action wiring's
-/// tests use.
-fn arrow() -> MissileRow {
-    let mut r: MissileRow = blank();
-    r.psrvdofunc = 1;
-    r.vel = 1;
-    r.maxvel = 1;
-    r.range = 50;
-    r.collidetype = 3;
-    r.collidekill = 1;
-    r.lastcollide = true;
-    r.tohit = 1;
-    r.size = 1;
-    r
-}
-
-/// The right skill: start function 4, do function 8 (the Multiple Shot
-/// slot, body catalogued only), `srvmissile` 0 (the generic missile of
-/// `use.md` §5.4 step 7).
-fn skills() -> SkillTables {
-    let mut v = vec![skill_rec(), skill_rec()];
-    let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (8, 0);
-    SkillTables {
-        skills: v,
-        skilldesc: vec![blank::<Skilldesc>()],
-        missiles: vec![arrow()],
-        skills_code: Vec::new(),
-        miss_code: Vec::new(),
-        level_cap: LEVEL_CAP_114D,
-        stat_count: 359,
-    }
-}
-
-fn combat_tables() -> CombatTables {
-    let mut d: Difficultylevels = blank();
-    (d.monsterfreezedivisor, d.monstercolddivisor) = (1, 1);
-    (d.lifestealdivisor, d.manastealdivisor) = (1, 1);
-    CombatTables {
-        charstats: vec![blank::<Charstats>(); 7],
-        difficultylevels: vec![d; 3],
-        monstats: vec![monster_class()],
-        monstats2: vec![blank::<Monstats2>()],
-        hitclass: vec![*b"none", *b"hth "],
-    }
-}
-
-/// experience.txt: max level 3, thresholds 0, 100, 1500 for every class
-/// (the kill's 100 experience reaches level 2, `vitals.md` §4.3);
-/// charstats: the sorceress (class 1) gets 5 stat points per level (the
-/// other per-level columns 0).
-fn vitals() -> VitalsTables {
-    let row = |v: u32| Experience {
-        amazon: v,
-        sorceress: v,
-        necromancer: v,
-        paladin: v,
-        barbarian: v,
-        druid: v,
-        assassin: v,
-        ..blank()
-    };
-    let mut charstats = vec![blank::<Charstats>(); 7];
-    charstats[1].statperlevel = 5;
-    VitalsTables {
-        charstats,
-        experience: vec![row(3), row(0), row(100), row(1500)],
-    }
-}
-
-/// AnimData with the fixture's two names (`animdata.md` §2): the
-/// sorceress' cast, 8 frames at speed 256 with a missile event (2) on
-/// frame 4; the monster's death, 4 frames at speed 256, no events.
-fn anim_data() -> AnimData {
-    let mut a = AnimData {
-        buckets: vec![Vec::new(); animdata::BUCKETS],
-    };
-    let mut put = |name: &[u8; 8], frames, event: Option<usize>| {
-        let mut events = [0u8; animdata::EVENTS];
-        if let Some(i) = event {
-            events[i] = 2;
-        }
-        let len = name.iter().position(|&b| b == 0).unwrap();
-        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
-            name: *name,
-            frames,
-            speed: 256,
-            events,
-        });
-    };
-    put(PLAYER_SC, 8, Some(4));
-    put(MONSTER_DT, 4, None);
-    a
-}
-
 /// Items: gold only (`ty::GOLD`, a child of `ty::MISC`); treasure class
 /// 1: one pick of gold.
 fn drop_tables() -> DropTables {
-    let n: usize = 40;
-    let words = n.div_ceil(32);
-    let mut equiv = EquivMatrix {
-        n,
-        words,
-        bits: vec![0; n * words],
-    };
-    for i in 1..n {
-        equiv.bits[i * words] |= 1;
-        equiv.bits[i * words + i / 32] |= 1 << (i % 32);
-    }
-    let (g, m) = (usize::from(ty::GOLD), usize::from(ty::MISC));
-    equiv.bits[g * words + m / 32] |= 1 << (m % 32);
-    let mut itemtypes: Vec<Itemtypes> = (0..n)
-        .map(|_| {
-            let mut t: Itemtypes = blank();
-            (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
-            t
-        })
-        .collect();
-    // Gold is always normal quality (itemtypes `Normal`, `treasure.md`
-    // §6 step 1).
-    itemtypes[g].normal = 1;
-    let mut ratio: Itemratio = blank();
-    ratio.version = 1;
-    let gold = ItemRec {
-        code: *b"gld ",
-        type_: ty::GOLD as i16,
-        level: 1,
-        ..ItemRec::default()
-    };
-    let items = ItemTables {
-        items: vec![gold],
-        itemtypes,
-        equiv,
-        itemratio: vec![ratio],
-        valshift: vec![0; 359],
-        stat_shift: 6,
-        stat_mask: 0x3F,
-        ..ItemTables::default()
-    };
+    // The game's one item table (gold among the vendor and cube items):
+    // the drop creates into the game's one item store, which every item
+    // system reads with these records.
+    let items = game_item_tables();
     let treasure_items = items
         .items
         .iter()
@@ -1089,7 +878,7 @@ fn drop_tables() -> DropTables {
     let gold_entry = TcEntry {
         start_classic: 0,
         start_expansion: 0,
-        id: 0,
+        id: GOLD_REC as _,
         row: 0,
         flags: 0,
         mods: [0; 6],
@@ -1118,57 +907,41 @@ fn waypoint_data() -> WaypointData {
 
 // ---- the cube's item world --------------------------------------------------------------
 
-/// Item types of the cube's tables (`cube.md` V12 shape).
+/// Item types of the cube's items (`cube.md` V12 shape).
 const T_RING: u16 = 10;
 const T_BOX: u16 = 11;
 const T_AMULET: u16 = 12;
-/// Item records of the cube's tables.
-const CUBE_BOX: usize = 0;
-const RING: usize = 1;
-const AMULET: usize = 2;
+/// The cube's item records, after the vendor items (`CAP`, `BUC`) in the
+/// game's one item table.
+const CUBE_BOX: usize = 2;
+const RING: usize = 3;
+const AMULET: usize = 4;
+/// The gold pile's record (`gld `), the drop's item.
+const GOLD_REC: usize = 5;
 
-/// The cube's item tables: the cube (`box `), a ring, an amulet; every
-/// type is its own and type 0's.
-fn cube_item_tables() -> ItemTables {
-    let n: usize = 80;
-    let words = n.div_ceil(32);
-    let mut equiv = EquivMatrix {
-        n,
-        words,
-        bits: vec![0; n * words],
-    };
-    for i in 1..n {
-        equiv.bits[i * words] |= 1;
-        equiv.bits[i * words + i / 32] |= 1 << (i % 32);
-    }
-    let mut ratio: Itemratio = blank();
-    ratio.version = 1;
-    let rec = |t: u16, code: &[u8; 4]| ItemRec {
+/// The game's item tables: the vendor items (`e2e_support::item_tables`:
+/// cap, buckler) and the cube's items (`box `, a ring, an amulet; each
+/// type is its own and type 0's).
+fn game_item_tables() -> ItemTables {
+    let mut t = item_tables();
+    let rec = |ty: u16, code: &[u8; 4]| ItemRec {
         code: *code,
-        type_: t as i16,
+        type_: ty as i16,
         level: 1,
         ..ItemRec::default()
     };
-    ItemTables {
-        items: vec![
-            rec(T_BOX, b"box "),
-            rec(T_RING, b"rin "),
-            rec(T_AMULET, b"amu "),
-        ],
-        itemtypes: (0..n)
-            .map(|_| {
-                let mut t: Itemtypes = blank();
-                (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
-                t
-            })
-            .collect(),
-        equiv,
-        itemratio: vec![ratio],
-        valshift: vec![0; 359],
-        stat_shift: 6,
-        stat_mask: 0x3F,
-        ..ItemTables::default()
-    }
+    t.items.extend([
+        rec(T_BOX, b"box "),
+        rec(T_RING, b"rin "),
+        rec(T_AMULET, b"amu "),
+        rec(ty::GOLD, b"gld "),
+    ]);
+    // Gold is always normal quality (itemtypes `Normal`, `treasure.md`
+    // §6 step 1) and misc.
+    t.itemtypes[usize::from(ty::GOLD)].normal = 1;
+    let (g, m, w) = (usize::from(ty::GOLD), usize::from(ty::MISC), t.equiv.words);
+    t.equiv.bits[g * w + m / 32] |= 1 << (m % 32);
+    t
 }
 
 /// One recipe (`cube.md` V12 shape without mods): one ring → a normal
@@ -1214,10 +987,9 @@ fn cube_data(t: &ItemTables) -> CubeData {
     }
 }
 
-/// The cube's calls no written spec owns (`ItemPending`: inventory
-/// placement and removal `0x00560200` / `0x0055DF10`, the inventory
-/// pass): placement appends to the staged list, removal drops from it;
-/// every call is logged.
+/// The cube's calls no written spec owns (`ItemPending`: the inventory
+/// pass, the item routines no items spec writes); every call is logged.
+/// Placement and removal are the server's inventory model's.
 #[derive(Clone, Default)]
 struct CubeRest(Arc<Mutex<Vec<String>>>);
 
@@ -1230,33 +1002,6 @@ impl CubeRest {
 impl ItemPending for CubeRest {
     fn inventory_pass(&mut self, _: UnitId, _: &mut Vec<Vec<u8>>) {
         self.log("inventory pass".into());
-    }
-    fn place(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) -> bool {
-        inv.items.push(item);
-        if inv.cursor == Some(item) {
-            inv.cursor = None;
-        }
-        self.log(format!("place {}", item.0));
-        true
-    }
-    fn remove_cube_item(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) {
-        inv.items.retain(|&i| i != item);
-        self.log(format!("remove {}", item.0));
-    }
-    fn socketed(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
     }
     fn duplicate(&mut self, _: UnitId, _: bool) -> Option<UnitId> {
         None
@@ -1273,72 +1018,9 @@ impl ItemPending for CubeRest {
     }
 }
 
-/// The server's item world (`handlers::items::ItemWorld`) for the cube
-/// handlers, with the player's cube (stored, in the staged inventory)
-/// and a ring on the cursor (mode 4). SEAM (`docs/HANDOFF.md` §7 J1):
-/// `ItemWorld` owns its own unit records, stat lists and game fields
-/// (a second game seed); the action wiring's `ActionSim` holds the
-/// game's. Its items share only the game's unit lists (GUIDs) with the
-/// rest of the run.
-fn item_world(
-    game: &mut Game,
-    player: UnitId,
-    game_seed: u32,
-    rest: CubeRest,
-) -> (ItemWorld, UnitId, UnitId) {
-    let tables = cube_item_tables();
-    let mut w = ItemWorld {
-        units: Units::new(),
-        stats: StatLists::new(stat_data()),
-        data: UnitData::default(),
-        hooks: ItemHooks,
-        fields: GameFields::new(Seed::init_low(game_seed), false),
-        cube: cube_data(&tables),
-        tables,
-        items: ItemStore::new(),
-        staged: Staged {
-            local_date: (15, 3),
-            ..Staged::default()
-        },
-        creation: BTreeMap::new(),
-        pending: Box::new(rest),
-        errors: Vec::new(),
-    };
-    let mut make = |w: &mut ItemWorld, record: usize, mode: u32| {
-        let mut rq = ItemRequest {
-            item: record as i32,
-            format: 1,
-            ilvl: 5,
-            quality: q::NORMAL,
-            ..ItemRequest::default()
-        };
-        let spawn = ItemSpawn {
-            room: None,
-            mode,
-            init_flags: 1,
-        };
-        let u = w
-            .economy(game)
-            .create_item(&mut rq, false, spawn)
-            .expect("item");
-        w.items.get_mut(u).unwrap().inv_page = 0;
-        u
-    };
-    let cube = make(&mut w, CUBE_BOX, 0);
-    let ring = make(&mut w, RING, 4);
-    w.staged.inventories.insert(
-        player,
-        Inventory {
-            items: vec![cube],
-            cursor: Some(ring),
-        },
-    );
-    (w, cube, ring)
-}
-
 // ---- the game --------------------------------------------------------------------------
 
-type Sim = SimGame<WorldSim<TestPending>, TradeWorld<Rest>>;
+type Sim = SimGame<WorldSim<TestPending>, WiredWorld<Rest, WiredSkills>>;
 
 /// Manual host clock (ms), injected into the host (`tick.md` §8).
 struct Ms(u32);
@@ -1395,10 +1077,12 @@ struct Fx {
     npc: UnitId,
     buckler: UnitId,
     cap: UnitId,
-    /// The cube and the cursor ring (in the cube's item world).
+    /// The cube and the cursor ring.
     cube: UnitId,
     ring: UnitId,
     cube_rest: CubeRest,
+    /// The item-move seams' staged answers and log.
+    inv: InvFx,
 }
 
 impl Fx {
@@ -1532,26 +1216,30 @@ impl Fx {
         let rec = sim.action.hooks().waypoints.entry(player).or_default();
         rec.get_mut(0).set(ISLE_WP.into()).unwrap();
         rec.get_mut(0).set(GATE_WP.into()).unwrap();
-        // Mana and max mana 4000 (1/256 units), gold.
+        // Mana and max mana 4000 (1/256 units), gold; dexterity 25
+        // (synthetic; the equip requirements, `inventory.md` §4.2, refuse
+        // a stat below 1).
         sim.action.with(&mut game, |_, v| {
             v.set_base(player, 8, 4000);
             v.set_base(player, 9, 4000);
             v.set_base(player, GOLD, PLAYER_GOLD);
+            v.set_base(player, DEXTERITY, 25);
         });
         let wp = game.lists.unit(object).unwrap().guid;
 
-        // The world host: waypoints (`ActionWorld`) and the NPC / vendor
-        // systems on the same units (`TradeWorld`).
+        // The world host: waypoints and skills (`ActionWorld`), the NPC /
+        // vendor / quest systems and the cube on the same units
+        // (`WiredWorld`).
         let mut rest = Rest::default();
         rest.quests.insert(player, PlayerQuests::default());
         let action = ActionWorld {
             waypoints: Some(waypoint_data()),
+            skills: WiredSkills::default(),
             ..ActionWorld::default()
         };
-        let mut world = TradeWorld::new(
+        let mut world = WiredWorld::new(
             action,
-            GameFields::new(Seed::init_low(game_seed), false),
-            item_tables(),
+            game_item_tables(),
             quests,
             ctl,
             vendor_tables(),
@@ -1560,34 +1248,73 @@ impl Fx {
         );
         // Monster init embeds the NPC's interaction list (`npc.md` §2).
         world.state.add_npc(npc);
-        // The player's buckler and cap, made by the economy wiring on
-        // the game seed (stored, mode 0); the inventory that holds them
-        // is the staged one (no inventory spec).
-        let (buckler, cap) = world.with_economy(&mut game, &mut sim, |econ, _| {
-            let mut make = |record: usize| {
+        // The game's one inventory model (`inventory.md`, the server's
+        // `InvParts`): the player's inventory (`0x0063ABD0` at player
+        // creation: the unit spec's, done here), the staged answers of the
+        // item-move seams (`InvFx`). The vendors and the cube read and
+        // write the same inventory.
+        let inv = InvFx::default();
+        let pg = game.lists.unit(player).unwrap().guid;
+        inv.with(|r| {
+            r.distance = 3;
+            r.room = Some(room);
+            r.pos.insert(Owner::player(pg), PLAYER_AT);
+        });
+        // Synthetic sizes: cap, buckler, cube 2 × 2; ring, amulet, gold
+        // 1 × 1.
+        let sizes = [(2, 2), (2, 2), (2, 2), (1, 1), (1, 1), (1, 1)];
+        let tables = inv_tables(&world.tables, &sizes);
+        world.inventory = Some(inv_parts(tables, inv.clone(), player, 1, pg));
+        // The player's buckler and cap, then the cube, made by the economy
+        // wiring on the game seed into the game's one item store and
+        // stored (mode 0, page 0) in the player's inventory (§2.4, as a
+        // loaded character's); a ring on the ground beside the player
+        // (mode 3, in its room, its position in its item data, §2.2).
+        let (buckler, cap, cube, ring) = world.with_economy(&mut game, &mut sim, |econ, _| {
+            let mut make = |record: usize, quality: u8, ilvl: i32, spawn: ItemSpawn| {
                 let mut rq = ItemRequest {
                     item: record as i32,
-                    ilvl: 1,
-                    quality: 2,
+                    ilvl,
+                    quality,
                     format: 1,
                     ..ItemRequest::default()
                 };
-                let spawn = ItemSpawn {
-                    room: None,
-                    mode: 0,
-                    init_flags: 1,
-                };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
-            (make(BUC), make(CAP))
+            let held = ItemSpawn {
+                room: None,
+                mode: 4,
+                init_flags: 1,
+            };
+            let ground = ItemSpawn {
+                room: Some(room),
+                mode: 3,
+                init_flags: 1,
+            };
+            let (buckler, cap) = (make(BUC, 2, 1, held), make(CAP, 2, 1, held));
+            let cube = make(CUBE_BOX, q::NORMAL, 5, held);
+            let ring = make(RING, q::NORMAL, 5, ground);
+            (buckler, cap, cube, ring)
         });
-        world.rest.inventory.extend([buckler, cap]);
-        // The cube's item world (a second unit world, see `item_world`).
+        for item in [buckler, cap, cube] {
+            store(&mut world, &mut game, &mut sim, (player, item), 0);
+        }
+        let rg = game.lists.unit(ring).unwrap().guid;
+        world.inventory.as_mut().unwrap().state.items.insert(
+            ring,
+            InvItem {
+                x: PLAYER_AT.0 + 1,
+                y: PLAYER_AT.1 + 1,
+                ..InvItem::new(rg, RING)
+            },
+        );
+        // The cube's parts: its tables, the local date, the pending calls.
         let cube_rest = CubeRest::default();
-        let (items, cube, ring) = item_world(&mut game, player, game_seed, cube_rest.clone());
+        let mut parts = CubeParts::new(cube_data(&world.tables), Box::new(cube_rest.clone()));
+        parts.staged.local_date = (15, 3);
+        world.cube = Some(parts);
 
         let mut s: Sim = SimGame::with_world(game, sim, world);
-        s.items = Some(items);
         s.join(LOCAL_CLIENT_ID, Some(player), None, client_state::IN_GAME)
             .unwrap();
         s.set_player(
@@ -1619,7 +1346,6 @@ impl Fx {
             ];
             b.right = Some(multi);
         }
-        s.skills = Some(Box::new(WiredSkills::new(vitals(), book.clone())));
 
         let link = LocalLink::new(Host::new(
             s,
@@ -1644,6 +1370,7 @@ impl Fx {
             cube,
             ring,
             cube_rest,
+            inv,
         }
     }
 
@@ -1729,9 +1456,66 @@ impl Fx {
         &mut self.sim().events.action.hooks().x
     }
 
-    /// The server's item world (the cube's).
-    fn items(&mut self) -> &mut ItemWorld {
-        self.sim().items.as_mut().unwrap()
+    /// A normal cap on the ground of the player's room at (x + 1, y + 1)
+    /// of the player, made by the economy wiring on the game seed into
+    /// the game's one item store; identified (callers set 0x10,
+    /// `generation.md` §1.4); its position in its item data (§2.2).
+    fn ground_cap(&mut self) -> UnitId {
+        let room = self.sim_ref().game.lists.unit(self.player).unwrap().room();
+        let sim = self.sim();
+        let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+        let cap = world.with_economy(game, events, |econ, _| {
+            let mut rq = ItemRequest {
+                item: CAP as i32,
+                ilvl: 1,
+                quality: q::NORMAL,
+                format: 1,
+                ..ItemRequest::default()
+            };
+            let spawn = ItemSpawn {
+                room,
+                mode: 3,
+                init_flags: 1,
+            };
+            econ.create_item(&mut rq, false, spawn).expect("cap")
+        });
+        events.action.sys.hooks.items.get_mut(cap).unwrap().flags |= flag::IDENTIFIED;
+        let guid = game.lists.unit(cap).unwrap().guid;
+        let inv = world.inventory.as_mut().unwrap();
+        inv.state.items.insert(
+            cap,
+            InvItem {
+                x: PLAYER_AT.0 + 1,
+                y: PLAYER_AT.1 + 1,
+                ..InvItem::new(guid, CAP)
+            },
+        );
+        cap
+    }
+
+    /// The server host's cube parts.
+    fn cube_parts(&mut self) -> &mut CubeParts {
+        self.sim().world.cube.as_mut().unwrap()
+    }
+
+    /// The game's one item store.
+    fn items(&mut self) -> &mut ItemStore {
+        &mut self.sim().events.action.sys.hooks.items
+    }
+
+    /// The player's items in its inventory (link order), the game's one
+    /// inventory model.
+    fn inventory(&self) -> Vec<UnitId> {
+        let inv = self.sim_ref().world.inventory.as_ref().unwrap();
+        inv.state.items_of(self.player)
+    }
+
+    /// Whether the w × h cells at (x, y) of the player's page-0 grid
+    /// (grid 2, `inventory.md` §1.2) are empty.
+    fn page0_free(&self, x: u32, y: u32, w: u32, h: u32) -> bool {
+        let inv = self.sim_ref().world.inventory.as_ref().unwrap();
+        let i = inv.state.of(self.player).unwrap();
+        (x..x + w).all(|cx| (y..y + h).all(|cy| i.item_at(2, cx as i32, cy as i32).is_none()))
     }
 
     fn guid(&self, u: UnitId) -> u32 {
@@ -1768,9 +1552,13 @@ impl Fx {
         let mut e = s.events.errors();
         e.extend(s.world.action.faults.iter().map(|f| format!("{f:?}")));
         e.extend(s.world.state.errors.iter().map(|f| format!("{f:?}")));
-        if let Some(w) = &s.items {
-            e.extend(w.errors.iter().map(|f| format!("{f:?}")));
+        if let Some(c) = &s.world.cube {
+            e.extend(c.errors.iter().map(|f| format!("{f:?}")));
         }
+        if let Some(i) = &s.world.inventory {
+            e.extend(i.state.errors.iter().map(|f| format!("{f:?}")));
+        }
+        e.extend(s.tick_faults.iter().map(|f| format!("{f:?}")));
         e
     }
 
@@ -1856,6 +1644,10 @@ struct Transcript {
     npc_seed: Seed,
     rest_log: Vec<String>,
     cube_log: Vec<String>,
+    /// The item-move seams' log.
+    inv_log: Vec<String>,
+    /// The player's items at the end (inventory link order).
+    inventory: Vec<UnitId>,
     unhandled: Vec<(u32, u8, usize)>,
     client: (u64, u64, usize),
     errors: Vec<String>,
@@ -1882,8 +1674,8 @@ fn run_with(game_seed: u32) -> Transcript {
     let mut fx = Fx::new(game_seed);
     let mut frames = Vec::new();
     let (player, wp) = (fx.player, fx.wp);
-    // No step below has a defined S→C message that fires (see each step):
-    // every frame's received bytes are asserted empty.
+    // Each step says what it sends; a frame that sends nothing is
+    // asserted empty.
     let none: Vec<Vec<u8>> = Vec::new();
 
     // Before any frame: one active room (the player's), no monster, the
@@ -2025,7 +1817,10 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(fx.sim_ref().game.lists.unit(gold).unwrap().room(), room);
     let rec = fx.sim_ref().events.action.sys.units.get(gold).unwrap();
-    assert_eq!((rec.ty, rec.class, rec.mode), (UnitType::Item, 0, 3));
+    assert_eq!(
+        (rec.ty, rec.class, rec.mode),
+        (UnitType::Item, GOLD_REC as u32, 3)
+    );
     let amount = fx.stat(gold, 14);
     assert!((1..=6).contains(&amount), "roll(5 · 1) + 1: {amount}");
     for f in &frames[2..] {
@@ -2058,18 +1853,37 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.stat(player, STATPTS), 4);
     assert_eq!(fx.stat(player, STRENGTH), 1);
 
-    // 5b. Pick-up (0x16). STOP: no owner spec (inventory spec not
-    // written, `server-items.md` §2): the stub (result 0, recorded).
-    // (The dropped gold exists, but 0x16 has no handler to pick it up.)
+    // 5b. Pick-up of the kill's gold (C→S 0x16 cursor 0, `inventory.md`
+    // §7.1 → §8.1 → §10.1) through the item-move handler. The drop
+    // created the pile in the game's one item store, so the inventory
+    // model finds it: the staged distance 3 (< 5); not busy; can-pick
+    // (§8.4: an inventory, not a quest item); the sound event on the
+    // player (§8.1 step 3); gold → §10.1: limit = level 2 × 10000, g +
+    // p ≤ limit, so take = p; no pile owner, no party share: stat 14 +=
+    // take; the pile leaves its room and is freed. Result 0. No message:
+    // inventory gold reaches the client through the vitals sync (§10.3,
+    // no owner spec).
+    let gold_guid = fx.guid(gold);
     let pick = bytes(&PickItem {
         type_: 4,
-        id: fx.guid(gold),
+        id: gold_guid,
         cursor: 0,
     });
     record(&mut fx, &mut frames, vec![pick]);
+    let done = Some(ResultCode::Done);
     assert_eq!(frames[16].1.codes, [(0x16, done)]);
     assert_eq!(frames[16].2, none);
-    assert_eq!(fx.sim_ref().unhandled, [(LOCAL_CLIENT_ID, 0x16, 13)]);
+    assert!(fx.sim_ref().unhandled.is_empty());
+    assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
+    assert!(!fx.items().contains(gold));
+    let mut gold_now = PLAYER_GOLD + amount;
+    assert_eq!(fx.stat(player, GOLD), gold_now);
+    let pg = fx.guid(player);
+    assert_eq!(
+        fx.inv.with(|r| std::mem::take(&mut r.log)),
+        [format!("pickup_sound {pg} {gold_guid}")]
+    );
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // 8. NPC talk (C→S 0x13, `npc.md` §2) with Akara: distance 3 (the
     // unit spec's distance, staged), the talk starts: interact unit (1,
@@ -2133,33 +1947,151 @@ fn run_with(game_seed: u32) -> Transcript {
     for &item in &store {
         let guid = fx.guid(item);
         let ac = fx.stat(item, ARMORCLASS);
-        let it = fx.sim_ref().world.items.get(item).unwrap();
+        let it = fx.items().get(item).unwrap().clone();
         assert_ne!(it.flags & flag::IDENTIFIED, 0);
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
     assert!(store_rows[..store.len() - 1].iter().all(|r| r.1 == BUC));
 
-    // 11. Buy (C→S 0x32) the store's cap with enough gold: rules 1–8
-    // pass, the purchase copies the store item (§7.1 rule 9.2). STOP at
-    // the item copy `0x0055A2A0` (`VendorRest::copy_item`, no items
-    // spec writes it): its null runs the spec's refusal: S→C 0x2A code
-    // 9, GUID −1, result 1; nothing paid.
-    let store_cap = fx.guid(*store.last().unwrap());
-    let buy = bytes(&BuyItem {
-        npc: ng,
-        item: store_cap,
-        mode: 0,
-        cost: 0,
-    });
-    record(&mut fx, &mut frames, vec![buy]);
-    assert_eq!(frames[20].1.codes, [(0x32, Some(ResultCode::Refused))]);
-    assert_eq!(frames[20].2, [tx(0, 9, u32::MAX, PLAYER_GOLD)]);
-    assert_eq!(fx.stat(player, GOLD), PLAYER_GOLD);
+    // 11–16. Item moves (`inventory.md` §7) on the game's inventory
+    // model, with Akara's trade open (the item-move seams answer no
+    // interaction: `InvFx`): a cap on the ground beside the player, made
+    // by the economy wiring on the game seed into the game's one item
+    // store, identified, at (x + 1, y + 1).
+    let cap = fx.ground_cap();
+    let cg = fx.guid(cap);
+    // The deferred item messages of §6 and §11 (the item bit stream is
+    // the unwritten serialization spec's, `inventory.md` OQ1: empty;
+    // category 0: no `component`), then 0x47 and 0x48, in the frame's
+    // tick (§6.1).
+    let x9c = |action: u8, g: u32| {
+        let mut b = vec![0x9C, action, 8, 0];
+        b.extend_from_slice(&g.to_le_bytes());
+        b
+    };
+    let x9d = |action: u8, g: u32| {
+        let mut b = vec![0x9D, action, 13, 0];
+        b.extend_from_slice(&g.to_le_bytes());
+        b.push(0);
+        b.extend_from_slice(&pg.to_le_bytes());
+        b
+    };
+    let relators = || {
+        let mut r = vec![0x47, 0, 0];
+        r.extend_from_slice(&pg.to_le_bytes());
+        r.extend_from_slice(&[0; 4]);
+        let mut r2 = r.clone();
+        r2[0] = 0x48;
+        [r, r2]
+    };
+    let pass = |m: Vec<Vec<u8>>| {
+        let mut v = m;
+        v.extend(relators());
+        v
+    };
 
-    // 12. Sell (C→S 0x33) the player's buckler (re-sellable, not a
-    // permanent code). STOP at §7.2 rule 8: the copy into the NPC is the
-    // same unwritten `0x0055A2A0`: 0x2A code 9, GUID −1, result 3.
+    // 11. Pick-up to the cursor (C→S 0x16 cursor 1, §7.1 → §8.2): the
+    // staged distance 3 (< 5), the cap leaves the room for the cursor
+    // (mode 4) → 0x9C action 1.
+    let pick_cap = bytes(&PickItem {
+        type_: 4,
+        id: cg,
+        cursor: 1,
+    });
+    record(&mut fx, &mut frames, vec![pick_cap.clone()]);
+    assert_eq!(frames[20].1.codes, [(0x16, done)]);
+    assert_eq!(frames[20].2, pass(vec![x9c(0x01, cg)]));
+    assert_eq!(fx.mode(cap), 4);
+    assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), None);
+
+    // 12. Inventory placement (C→S 0x18, §7.3 → §2.4) at (8, 0) of page
+    // 0 of the sorceress' 10 × 4 grid (record 1), free beside the
+    // stored buckler, cap and cube: mode 0 → 0x9C action 4.
+    let (px, py) = (8u32, 0u32);
+    assert!(fx.page0_free(px, py, 2, 2));
+    let insert = bytes(&InsertItemInBuffer {
+        item: cg,
+        x: px,
+        y: py,
+        page: 0,
+    });
+    record(&mut fx, &mut frames, vec![insert.clone()]);
+    assert_eq!(frames[21].1.codes, [(0x18, done)]);
+    assert_eq!(frames[21].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(fx.mode(cap), 0);
+    assert_eq!(fx.items().get(cap).unwrap().inv_page, 0);
+
+    // 13. Back to the cursor (C→S 0x19, §7.4) → 0x9D action 5 (owner the
+    // player).
+    let lift = bytes(&RemoveItemFromBuffer { item: cg });
+    record(&mut fx, &mut frames, vec![lift]);
+    assert_eq!(frames[22].1.codes, [(0x19, done)]);
+    assert_eq!(frames[22].2, pass(vec![x9d(0x05, cg)]));
+    assert_eq!(fx.mode(cap), 4);
+
+    // 14. Equip on the head (C→S 0x1A location 1, §7.5 → §4.6): mode 1
+    // → 0x9D action 6.
+    let equip = bytes(&EquipItem {
+        item: cg,
+        bodyloc: 1,
+    });
+    record(&mut fx, &mut frames, vec![equip]);
+    assert_eq!(frames[23].1.codes, [(0x1A, done)]);
+    assert_eq!(frames[23].2, pass(vec![x9d(0x06, cg)]));
+    assert_eq!(fx.mode(cap), 1);
+
+    // 15. Unequip (C→S 0x1C location 1, §7.7): to the cursor → 0x9D
+    // action 8.
+    let unequip = bytes(&RemoveBodyItem { bodyloc: 1 });
+    record(&mut fx, &mut frames, vec![unequip]);
+    assert_eq!(frames[24].1.codes, [(0x1C, done)]);
+    assert_eq!(frames[24].2, pass(vec![x9d(0x08, cg)]));
+    assert_eq!(fx.mode(cap), 4);
+
+    // 16. Drop (C→S 0x17, §7.2 → §9.1): no room at (x + 2, y + 3) (the
+    // staged answer), so the search starts at the player; the staged
+    // free-spot search answers that spot: the cap on the ground (mode 3,
+    // in the player's room, at the player's position), the ITEMDROPPED
+    // hook. No owner refresh, so no update pass; the ground message
+    // (§6.3) is not built on real units (`wire-inventory-sim.md` WV1).
+    let drop_msg = bytes(&DropItem { item: cg });
+    record(&mut fx, &mut frames, vec![drop_msg]);
+    assert_eq!(frames[25].1.codes, [(0x17, done)]);
+    assert_eq!(frames[25].2, none);
+    assert_eq!(fx.mode(cap), 3);
+    let room = fx.sim_ref().game.lists.unit(player).unwrap().room();
+    assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), room);
+    assert_eq!(
+        fx.inv.with(|r| std::mem::take(&mut r.log)),
+        [
+            format!("quest_item_picked {cg}"),
+            format!("pickup_sound {pg} {cg}"),
+            format!("quest_item_dropped {cg}"),
+        ]
+    );
+
+    // 17–18. The cap again: picked to the cursor (0x16 → 0x9C action 1)
+    // and placed by 0x18 at (8, 0) (→ 0x9C action 4): an item of the
+    // inventory model, as the vendor sees it next.
+    record(&mut fx, &mut frames, vec![pick_cap]);
+    assert_eq!(frames[26].1.codes, [(0x16, done)]);
+    assert_eq!(frames[26].2, pass(vec![x9c(0x01, cg)]));
+    record(&mut fx, &mut frames, vec![insert]);
+    assert_eq!(frames[27].1.codes, [(0x18, done)]);
+    assert_eq!(frames[27].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(fx.mode(cap), 0);
+    assert!(fx.inventory().contains(&cap));
+    assert!(fx.inv.with(|r| r.log.len()) == 2);
+    fx.inv.with(|r| r.log.clear());
+
+    // 19. Sell (C→S 0x33) the cap placed by 0x18 (`vendors.md` §7.2):
+    // the player's per its inventory (rule 3, the model), mode 0 (rule
+    // 4), one of Akara's permanent codes, so no copy (rule 8); rule 9
+    // removes it (stored: `0x0055DF10`: unlinked from the inventory,
+    // freed); rule 10 receives the price (§9.1, §9.2 by hand: B =
+    // 100·AC/5, buy mult 512 → B·512/1024): 0x2A kind 3, code 1, the
+    // cap's GUID, the new gold.
     let sell = |item| {
         bytes(&SellItem {
             npc: ng,
@@ -2168,68 +2100,122 @@ fn run_with(game_seed: u32) -> Transcript {
             cost: 0,
         })
     };
+    let sold = (100 * fx.stat(cap, ARMORCLASS) / 5) * 512 / 1024;
+    assert!(sold > 0);
+    record(&mut fx, &mut frames, vec![sell(cg)]);
+    assert_eq!(frames[28].1.codes, [(0x33, done)]);
+    gold_now += sold;
+    assert_eq!(frames[28].2, [tx(3, 1, cg, gold_now)]);
+    assert_eq!(fx.stat(player, GOLD), gold_now);
+    assert!(!fx.inventory().contains(&cap));
+    assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
+    assert!(fx.page0_free(px, py, 2, 2), "its cells cleared");
+
+    // 20. Buy (C→S 0x32) the store's cap with enough gold: rules 1–8
+    // pass (in the NPC inventory, the price, gold, no cursor item in the
+    // player's inventory), the purchase copies the store item (§7.1 rule
+    // 9.2). STOP at the item copy `0x0055A2A0` (`VendorRest::copy_item`,
+    // no items spec writes it): its null runs the spec's refusal: S→C
+    // 0x2A code 9, GUID −1, result 1; nothing paid.
+    let store_cap = fx.guid(*store.last().unwrap());
+    let buy = bytes(&BuyItem {
+        npc: ng,
+        item: store_cap,
+        mode: 0,
+        cost: 0,
+    });
+    record(&mut fx, &mut frames, vec![buy]);
+    assert_eq!(frames[29].1.codes, [(0x32, Some(ResultCode::Refused))]);
+    assert_eq!(frames[29].2, [tx(0, 9, u32::MAX, gold_now)]);
+    assert_eq!(fx.stat(player, GOLD), gold_now);
+
+    // 21. Sell the player's stored buckler (re-sellable, not a
+    // permanent code). STOP at §7.2 rule 8: the copy into the NPC is the
+    // same unwritten `0x0055A2A0`: 0x2A code 9, GUID −1, result 3; the
+    // buckler stays in the inventory.
     let buckler = fx.guid(fx.buckler);
     record(&mut fx, &mut frames, vec![sell(buckler)]);
-    assert_eq!(frames[21].1.codes, [(0x33, Some(ResultCode::Malformed))]);
-    assert_eq!(frames[21].2, [tx(0, 9, u32::MAX, PLAYER_GOLD)]);
+    assert_eq!(frames[30].1.codes, [(0x33, Some(ResultCode::Malformed))]);
+    assert_eq!(frames[30].2, [tx(0, 9, u32::MAX, gold_now)]);
+    assert!(fx.inventory().contains(&fx.buckler));
 
-    // 13. Sell the player's cap: one of Akara's permanent codes, so no
-    // copy (rule 8); rule 9's removal is the inventory stub
-    // (`remove_stored`); rule 10 receives the price (§9.1, §9.2 by hand:
-    // B = 100·AC/5, buy mult 512 → B·512/1024): 0x2A kind 3, code 1, the
-    // cap's GUID, the new gold.
-    let cap = fx.guid(fx.cap);
+    // 22. Sell the player's stored cap (stored at creation, §2.4): as
+    // step 19: 0x2A kind 3, code 1, its GUID, the new gold.
+    let scap = fx.guid(fx.cap);
     let sold = (100 * fx.stat(fx.cap, ARMORCLASS) / 5) * 512 / 1024;
-    assert!(sold > 0);
-    record(&mut fx, &mut frames, vec![sell(cap)]);
-    assert_eq!(frames[22].1.codes, [(0x33, done)]);
-    assert_eq!(frames[22].2, [tx(3, 1, cap, PLAYER_GOLD + sold)]);
-    assert_eq!(fx.stat(player, GOLD), PLAYER_GOLD + sold);
-    assert!(!fx.sim_ref().world.rest.inventory.contains(&fx.cap));
+    record(&mut fx, &mut frames, vec![sell(scap)]);
+    assert_eq!(frames[31].1.codes, [(0x33, done)]);
+    gold_now += sold;
+    assert_eq!(frames[31].2, [tx(3, 1, scap, gold_now)]);
+    assert_eq!(fx.stat(player, GOLD), gold_now);
+    assert_eq!(fx.inventory(), [fx.buckler, fx.cube]);
     let copies = fx.sim_ref().world.rest.log.iter();
     let copies: Vec<&String> = copies.filter(|l| l.starts_with("copy")).collect();
     assert_eq!(copies.len(), 2, "the two stops at 0x0055A2A0");
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // TODO(after the quest-host merge): quest messages 0x31, 0x40, 0x58
-    // on `TradeWorld` (`QuestCall`) are being added in parallel; until
+    // on `WiredWorld` (`QuestCall`) are being added in parallel; until
     // then they stay stubs and this run sends none. The step goes here.
 
-    // 14. Cube (C→S 0x2A, `cube.md` §2): the cursor ring into the
-    // player's cube: the checks pass, the targeting reset, page 3, the
-    // placement (inventory stub); result 0, no message. (The cube's
-    // item world is the server's `ItemWorld`: see `item_world`.)
+    // 23. The ring on the ground beside the player picked to the cursor
+    // (C→S 0x16 cursor 1, §8.2) → 0x9C action 1.
     let (cube, ring) = (fx.cube, fx.ring);
+    let rg = fx.guid(ring);
+    record(
+        &mut fx,
+        &mut frames,
+        vec![bytes(&PickItem {
+            type_: 4,
+            id: rg,
+            cursor: 1,
+        })],
+    );
+    assert_eq!(frames[32].1.codes, [(0x16, done)]);
+    assert_eq!(frames[32].2, pass(vec![x9c(0x01, rg)]));
+    assert_eq!(fx.mode(ring), 4);
+    // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
+    assert_eq!(
+        fx.inv.with(|r| std::mem::take(&mut r.log)),
+        [
+            format!("quest_item_picked {rg}"),
+            format!("pickup_sound {pg} {rg}"),
+        ]
+    );
+
+    // 24. Cube (C→S 0x2A, `cube.md` §2): the cursor ring into the
+    // player's cube: the checks of `inventory.md` §5.1 on the model pass
+    // (the ring is the cursor item; the cube is stored in the player's
+    // inventory), the targeting reset (§5.3), page 3, the placement
+    // (§2.4, free position and "send": the cube's 3 × 4 grid, record 9);
+    // result 0; the placement's 0x9C action 4 in the tick's update pass.
     let mut put = vec![0x2A];
-    put.extend_from_slice(&fx.guid(ring).to_le_bytes());
+    put.extend_from_slice(&rg.to_le_bytes());
     put.extend_from_slice(&fx.guid(cube).to_le_bytes());
     assert_eq!(
         put,
         bytes(&ItemToCube {
-            item: fx.guid(ring),
+            item: rg,
             cube: fx.guid(cube)
         })
     );
     record(&mut fx, &mut frames, vec![put]);
-    assert_eq!(frames[23].1.codes, [(0x2A, done)]);
-    assert_eq!(frames[23].2, none);
-    assert_eq!(fx.items().items.get(ring).unwrap().inv_page, CUBE_PAGE);
-    assert_eq!(fx.items().staged.targeting_resets, [player]);
-    assert_eq!(fx.items().staged.inventories[&player].items, [cube, ring]);
+    assert_eq!(frames[33].1.codes, [(0x2A, done)]);
+    assert_eq!(frames[33].2, pass(vec![x9c(0x04, rg)]));
+    assert_eq!(fx.items().get(ring).unwrap().inv_page, CUBE_PAGE);
+    assert_eq!(fx.mode(ring), 0);
+    assert_eq!(fx.inventory(), [fx.buckler, cube, ring]);
 
-    // 15. Transmute (C→S 0x4F button 0x18, `cube.md` §1, §3, §8) with
+    // 25. Transmute (C→S 0x4F button 0x18, `cube.md` §1, §3, §8) with
     // the cube open. The cube's opening (item use, `cube.md` §10) has no
-    // spec: the interaction (type 4, the cube's GUID) is staged. The
-    // ring matches the recipe: the amulet is created, the ring removed
-    // and freed, sound 4, the amulet placed on page 3, identified.
-    let cg = fx.guid(cube);
-    fx.items().staged.interactions.insert(
-        player,
-        Interaction {
-            guid: cg,
-            unit_type: 4,
-            active: true,
-        },
-    );
+    // spec: the interaction (type 4, the cube's GUID) is staged at the
+    // host's one owner. The ring matches the recipe: the amulet is
+    // created; the ring gets 0x9D action 5 now (§8 step 1, `inventory.md`
+    // §6.4: owner the player) and is removed from the inventory and
+    // freed; sound 4; the amulet is placed on page 3 (§2.4, "send"),
+    // identified: its 0x9C action 4 in the tick's update pass.
+    let cg2 = fx.guid(cube);
+    fx.sim().world.rest.interact.insert(player, (4, cg2));
     let click = bytes(&ClickButton {
         button: 0x18,
         p1: 0,
@@ -2237,37 +2223,38 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     assert_eq!(click, [0x4F, 0x18, 0, 0, 0, 0, 0]);
     record(&mut fx, &mut frames, vec![click]);
-    assert_eq!(frames[24].1.codes, [(0x4F, done)]);
-    assert_eq!(frames[24].2, none);
-    assert!(!fx.items().items.contains(ring));
-    let amulet = *fx.items().staged.inventories[&player].items.last().unwrap();
-    let it = fx.items().items.get(amulet).unwrap().clone();
+    assert_eq!(frames[34].1.codes, [(0x4F, done)]);
+    let inv = fx.inventory();
+    assert_eq!(inv.len(), 3, "{inv:?}");
+    let amulet = inv[2];
+    let ag = fx.guid(amulet);
+    let mut want = vec![x9d(0x05, rg)];
+    want.extend(pass(vec![x9c(0x04, ag)]));
+    assert_eq!(frames[34].2, want);
+    assert!(!fx.items().contains(ring));
+    assert!(fx.sim_ref().game.lists.unit(ring).is_none(), "freed");
+    let it = fx.items().get(amulet).unwrap().clone();
     assert_eq!(
         (it.record, it.quality, it.inv_page),
         (AMULET, q::NORMAL, CUBE_PAGE)
     );
+    assert_eq!(fx.mode(amulet), 0);
     assert_ne!(it.flags & flag::IDENTIFIED, 0);
-    assert_eq!(fx.items().staged.sounds, [(player, 4)]);
-    assert_eq!(
-        *fx.cube_rest.0.lock().unwrap(),
-        [
-            format!("place {}", ring.0),
-            format!("remove {}", ring.0),
-            format!("place {}", amulet.0)
-        ]
-    );
+    assert_eq!(fx.cube_parts().staged.sounds, [(player, 4)]);
+    assert!(fx.cube_rest.0.lock().unwrap().is_empty());
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
-    assert_eq!(fx.sim_ref().unhandled.len(), 1, "only the pick-up");
+    assert!(fx.sim_ref().unhandled.is_empty());
 
     // 6. Waypoint travel (C→S 0x49, `waypoints.md` §6–§7): accepted,
     // the interaction closed (rule 2), the destination bit tested (rule
     // 3), tile code 0 (rule 4), the warp called (rule 5), the spawn
     // search streamed the destination's room (rule 7's `0x00619E50`: 5
     // active rooms), the arrival node prepended (rule 8). STOP: the
-    // warp's same-act placement `0x00554EA0` belongs to the unwritten
-    // path / placement spec (`Pending::warp`), so the player stays in
-    // the ISLE room and rule 7's room test sends no S→C 0x0D.
-    fx.pending().interact.insert(player, (2, wp));
+    // warp's same-act placement `0x00554EA0` (`path-placement.md` §11)
+    // is the path provider's, off in this run (WP1), so `Pending::warp`
+    // logs it, the player stays in the ISLE room and rule 7's room test
+    // sends no S→C 0x0D (provider on: `e2e_walk.rs`).
+    fx.sim().world.rest.interact.insert(player, (2, wp));
     let travel = bytes(&TakeOrCloseWp {
         wp,
         level: GATE as u16,
@@ -2277,9 +2264,9 @@ fn run_with(game_seed: u32) -> Transcript {
     want.extend_from_slice(&[GATE as u8, 0, 0, 0]);
     assert_eq!(travel, want);
     record(&mut fx, &mut frames, vec![travel]);
-    assert_eq!(frames[25].1.codes, [(0x49, done)]);
-    assert_eq!(frames[25].2, none);
-    assert!(fx.pending().interact.is_empty());
+    assert_eq!(frames[35].1.codes, [(0x49, done)]);
+    assert_eq!(frames[35].2, none);
+    assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
     let log = fx.pending().log.clone();
     assert_eq!(log.last(), Some(&format!("warp {} {GATE} 0", player.0)));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);
@@ -2287,19 +2274,31 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(arrivals.len(), 1);
     assert_eq!((arrivals[0].x, arrivals[0].y), PLAYER_AT);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+    assert_eq!(fx.inv.with(|r| r.log.clone()), Vec::<String>::new());
 
-    // The client: 27 frames, 26 server ticks. The S→C messages it got
-    // (0x27, 0x29, 0x28 once, 0x2A three times) have no client owner
+    // The client: 37 frames, 36 server ticks. The S→C messages it got
+    // (0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31); 0x9C seven
+    // times (frames 20, 21, 26, 27, 32, 33, 34), 0x9D four times (22, 23,
+    // 24, 34), 0x47 and 0x48 ten times each, one per update pass) have no client owner
     // yet (`bridge-dispatch.tsv`: every id TBD), so they are counted
     // unowned and no unit is in the model; nothing rejected or
     // discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (27, 26, 0));
+    assert_eq!(client, (37, 36, 0));
     let log = fx.bridge.log();
     assert_eq!(
         log.unowned,
-        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 3)])
+        BTreeMap::from([
+            (0x27, 1),
+            (0x28, 1),
+            (0x29, 1),
+            (0x2A, 4),
+            (0x47, 10),
+            (0x48, 10),
+            (0x9C, 7),
+            (0x9D, 4),
+        ])
     );
     assert!(log.rejected.is_empty() && log.discarded.is_empty());
 
@@ -2320,6 +2319,8 @@ fn run_with(game_seed: u32) -> Transcript {
         .map(|&st| fx.stat(player, st))
         .collect();
     let cube_log = fx.cube_rest.0.lock().unwrap().clone();
+    let inv_log = fx.inv.with(|r| r.log.clone());
+    let inventory = fx.inventory();
     let s = fx.sim_ref();
     let x = &s.events.action.sys;
     Transcript {
@@ -2350,6 +2351,8 @@ fn run_with(game_seed: u32) -> Transcript {
         npc_seed: s.world.npc.seed,
         rest_log: s.world.rest.log.clone(),
         cube_log,
+        inv_log,
+        inventory,
         unhandled: s.unhandled.clone(),
         client,
         errors: fx.errors(),
@@ -2361,11 +2364,15 @@ fn run_with(game_seed: u32) -> Transcript {
 #[test]
 fn single_player_end_to_end() {
     let t = run();
-    assert_eq!(t.game_frame, 26);
-    assert_eq!(t.frames.len(), 26);
+    assert_eq!(t.game_frame, 36);
+    assert_eq!(t.frames.len(), 36);
+    // The buckler (its sale stopped at the copy), the cube and the
+    // transmuted amulet: one inventory for moves, vendor and cube.
+    assert_eq!(t.inventory.len(), 3);
     assert_eq!(t.player_exp, 100);
     assert_eq!(t.drops.len(), 1);
-    // Level 2, 4 stat points left, strength 1, gold after the cap sale.
+    // Level 2, 4 stat points left, strength 1, gold after the pickup and
+    // the two cap sales.
     assert_eq!(t.player_stats[..3], [2, 4, 1]);
     assert!(t.player_stats[3] > PLAYER_GOLD);
 }

@@ -26,8 +26,9 @@
 //! is `e2e_single_player.rs`'s, copied without the bridge and the
 //! cube's item world (a second unit world, `docs/handoff/e2e-next.md`
 //! finding 1); the NPC / vendor rests and tables are `e2e_support`'s.
-//! The world host is `TradeWorld` (waypoints, Akara beside the player,
-//! the player's buckler and cap), the skills `WiredSkills`. The seam
+//! The world host is `WiredWorld<_, WiredSkills>` (waypoints, the skill
+//! handlers in its skill slot, Akara beside the player, the player's
+//! buckler and cap). The seam
 //! answers are the e2e's (see each); none is behaviour. The messages go
 //! straight to the server's dispatcher (`d2_server::dispatch`), as the
 //! host's drain hands them over, and the S→C output is what the
@@ -56,15 +57,15 @@ use d2_proto::client::{
 };
 use d2_proto::schema::FieldType;
 use d2_proto::{FixedMessage, CLIENT_MESSAGES};
-use d2_server::adapters::handlers::skills::seams::SkillSeams;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use d2_server::adapters::handlers::skills::LearnRest;
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::buffers::ClientBuffers;
 use d2_server::dispatch::{dispatch, gate, is_point, is_unit, kind, Gate, Kind};
 use d2_server::seams::{Intents, PlayerGate, Pos, ResultCode, Tick};
 use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::{CombatTables, RoomKind};
+use d2_sim::combat::CombatTables;
 use d2_sim::drlg::collision::bits;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs, SubFileMap};
@@ -106,7 +107,7 @@ use proptest::test_runner::Config;
 
 mod e2e_support;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, vendor_tables, Rest};
-use e2e_support::{BUC, CAP, N_MONSTATS};
+use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
 
 /// Proptest config with `default` cases, or `PROPTEST_CASES` when set.
 fn config(default: u32) -> Config {
@@ -480,16 +481,27 @@ impl UseRest for TestPending {
         (p.target_x, p.target_y) = self.aim_at;
     }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.book.clone().srvst(index, u, skill, lvl)
+        self.book.srvst(index, u, skill, lvl)
     }
     fn srvdo(&mut self, i: u16, u: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
-        self.book.clone().srvdo(i, u, s, l, c, it, a)
+        self.book.srvdo(i, u, s, l, c, it, a)
     }
 }
 
-/// The skill pipeline's seams without a provider (skill list, skill
-/// bodies, missile creation: `use.md` OQ10, `server-skills.md` §4): the
-/// player's skill list and a call log, shared with the test.
+/// The skill-point calls (`levels.md` §6.4): no class skill (the
+/// pre-merge `SkillSeams` default), so 0x3B stops at its check.
+impl LearnRest for TestPending {
+    fn is_class_skill(&self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn add_skill_level(&mut self, _: UnitId, _: i32, _: i32) {}
+    fn after_skill_point(&mut self, _: UnitId) {}
+}
+
+/// The skill pipeline's state without a provider (skill list, skill
+/// bodies: `use.md` OQ10): the player's skill list and a call log,
+/// shared with the test (the message path and the timer path read the
+/// same state through the action wiring's `UseView`).
 #[derive(Default)]
 struct Inner {
     list: Vec<SkillEntry>,
@@ -507,19 +519,7 @@ impl Book {
     }
 }
 
-impl SkillSeams for Book {
-    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
-        self.get().list.clone()
-    }
-    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().used
-    }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.get().used = e;
-    }
-    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().right
-    }
+impl Book {
     fn find_entry(&self, _: UnitId, skill: i32) -> Option<SkillEntry> {
         self.get().list.iter().copied().find(|e| e.skill == skill)
     }
@@ -532,26 +532,18 @@ impl SkillSeams for Book {
             7
         }
     }
-    fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
-        UseState::Usable
-    }
-    fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
+    fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
     }
     /// The do bodies are catalogued only (`use.md` OQ10): logged, result
     /// 0 (the generic `srvmissile` creation of §5.4 step 7 still runs).
-    fn srvdo(&mut self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
+    #[allow(clippy::too_many_arguments)]
+    fn srvdo(&self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
         self.get()
             .log
             .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
         0
-    }
-    fn create_skill_missile(&mut self, _: UnitId, s: i32, l: i32, m: u16, _: bool, _: MissileAim) {
-        self.get().log.push(format!("missile {s} {l} {m}"));
-    }
-    fn room(&self, _: UnitId) -> RoomKind {
-        RoomKind::Field
     }
 }
 
@@ -1100,7 +1092,7 @@ fn waypoint_data() -> WaypointData {
 
 // ---- the wired game ---------------------------------------------------------------------
 
-type Sim = SimGame<WorldSim<TestPending>, TradeWorld<Rest>>;
+type Sim = SimGame<WorldSim<TestPending>, WiredWorld<Rest, WiredSkills>>;
 
 /// The transport client id of the local player.
 const CLIENT: u32 = 0;
@@ -1277,11 +1269,11 @@ impl Fx {
         rest.quests.insert(player, PlayerQuests::default());
         let action = ActionWorld {
             waypoints: Some(waypoint_data()),
+            skills: WiredSkills::default(),
             ..ActionWorld::default()
         };
-        let mut world = TradeWorld::new(
+        let mut world = WiredWorld::new(
             action,
-            GameFields::new(Seed::init_low(game_seed), false),
             item_tables(),
             quests,
             ctl,
@@ -1290,8 +1282,14 @@ impl Fx {
             1000,
         );
         world.state.add_npc(npc);
+        // The game's one inventory model (the item moves', the vendors'
+        // and the cube's) with the player's inventory; its item-move
+        // seams answer as `InvFx` stages them.
+        let pg = game.lists.unit(player).unwrap().guid;
+        let inv_t = inv_tables(&world.tables, &[(2, 2), (2, 2)]);
+        world.inventory = Some(inv_parts(inv_t, InvFx::default(), player, 1, pg));
         // The player's buckler and cap, made by the economy wiring on the
-        // game seed, held in the staged inventory.
+        // game seed and stored (mode 0) in its inventory (§2.4).
         let (buckler, cap) = world.with_economy(&mut game, &mut sim, |econ, _| {
             let mut make = |record: usize| {
                 let mut rq = ItemRequest {
@@ -1303,14 +1301,16 @@ impl Fx {
                 };
                 let spawn = ItemSpawn {
                     room: None,
-                    mode: 0,
+                    mode: 4,
                     init_flags: 1,
                 };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
             (make(BUC), make(CAP))
         });
-        world.rest.inventory.extend([buckler, cap]);
+        for item in [buckler, cap] {
+            store(&mut world, &mut game, &mut sim, (player, item), 0);
+        }
         let mut s: Sim = SimGame::with_world(game, sim, world);
         s.join(CLIENT, Some(player), None, client_state::IN_GAME)
             .unwrap();
@@ -1343,7 +1343,6 @@ impl Fx {
             ];
             b.right = Some(multi);
         }
-        s.skills = Some(Box::new(WiredSkills::new(vitals(), book)));
         let mut out = ClientBuffers::new();
         out.add_client(CLIENT);
         Fx {
@@ -1458,7 +1457,8 @@ impl Fx {
     }
 
     /// Every error so far: world adapters, level types, action adapters,
-    /// the unit dispatch, the world handlers' faults.
+    /// the unit dispatch, the world handlers' faults, the tick's queueing
+    /// faults.
     fn errors(&self) -> Vec<String> {
         let mut e = self.sim.events.errors();
         e.extend(
@@ -1470,6 +1470,7 @@ impl Fx {
                 .map(|f| format!("{f:?}")),
         );
         e.extend(self.sim.world.state.errors.iter().map(|f| format!("{f:?}")));
+        e.extend(self.sim.tick_faults.iter().map(|f| format!("{f:?}")));
         e
     }
 
@@ -1581,11 +1582,11 @@ impl Fx {
                 .collect();
             let _ = writeln!(d, " timers {timers:?}");
         }
-        // The trade world: the item store (records, flags, seeds), the
-        // vendor records (stores), the NPC control, the quest state, the
+        // The game's one item store (records, flags, seeds); the trade
+        // world: the vendor records (stores), the NPC control, the quest state, the
         // world's interaction lists.
+        let _ = writeln!(d, "items {:?}", sim.events.action.sys.hooks.items);
         let w = &sim.world;
-        let _ = writeln!(d, "items {:?}", w.items);
         let _ = writeln!(d, "vendors {:?}", w.state.vendors);
         let _ = writeln!(d, "interactions {:?}", w.state.lists);
         let _ = writeln!(d, "npc {:?}", w.npc);
@@ -1761,7 +1762,7 @@ enum Msg {
     Trade,
     /// Buy the `n`-th store item (`vendors.md` §7.1).
     Buy(u8),
-    /// Sell the `n`-th item of the player's staged inventory (§7.2).
+    /// Sell the `n`-th item of the player's inventory (§7.2).
     Sell(u8),
     /// Anything, valid or not.
     Any(Gen),
@@ -1854,7 +1855,8 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
             })
         }
         Msg::Sell(n) => {
-            let inv: Vec<UnitId> = fx.sim.world.rest.inventory.iter().copied().collect();
+            let state = &fx.sim.world.inventory.as_ref()?.state;
+            let inv = state.items_of(fx.player);
             let item = nth(&inv, *n)?;
             bytes(&SellItem {
                 npc: fx.guid(fx.npc),

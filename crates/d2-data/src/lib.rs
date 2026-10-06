@@ -35,6 +35,8 @@ mod gaps_loading_tests;
 #[cfg(test)]
 mod gaps_patch_fixup_tests;
 #[cfg(test)]
+mod loading_gaps_numbered_tests;
+#[cfg(test)]
 mod robust;
 #[cfg(test)]
 mod robust_tests;

@@ -2,7 +2,8 @@
 //! A synthetic install on disk, in two stages:
 //!
 //! 1. **Text install** ([`write_text_install`]): `d2data.mpq` holds
-//!    `string.tbl` and every excel `.txt`; `d2exp.mpq` holds
+//!    `string.tbl`, every excel `.txt` and the DRLG's DS1 / DT1 files
+//!    ([`Synthetic::files`]); `d2exp.mpq` holds
 //!    `expansionstring.tbl` and `AnimData.d2`; `patch_d2.mpq` holds
 //!    `patchstring.tbl` and `soundenviron.txt`.
 //! 2. **Compile and pack** ([`compile_and_pack`]): the text set is
@@ -104,6 +105,9 @@ pub fn write_text_install(dir: &Path, data: &Synthetic) -> Result<(), FixtureErr
             _ => FileOptions::stored(),
         };
         d.add(&excel_path(&name), bytes, options);
+    }
+    for (name, bytes) in &data.files {
+        d.add(name, bytes.clone(), FileOptions::default());
     }
     write(&d, dir.join("d2data.mpq"))?;
 

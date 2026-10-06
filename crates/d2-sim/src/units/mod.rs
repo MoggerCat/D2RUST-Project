@@ -10,6 +10,8 @@ pub mod hooks;
 pub mod lifecycle;
 pub mod lists;
 pub mod modes;
+#[cfg(test)]
+mod mutant_tests;
 pub mod record;
 #[cfg(test)]
 mod tests;

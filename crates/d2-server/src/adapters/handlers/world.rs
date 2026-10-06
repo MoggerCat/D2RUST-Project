@@ -15,19 +15,27 @@
 //! [`WORLD_IDS`] lists every world-related C→S id with its owner spec.
 //! An id with no written owner, or whose system the host does not
 //! provide, stays a stub ([`handle`] returns `None`).
+//!
+//! [`WorldHost`] is the one host trait of a game: besides the world
+//! systems it carries the cube ([`WorldHost::cube`], `handlers::items`)
+//! and the skill handlers ([`WorldHost::skill`], `handlers::skills`).
+//! Hosts: [`NoWorld`] (nothing), [`ActionWorld`] (the systems on the
+//! action wiring alone: waypoints, skills), [`WiredWorld`] (the wired
+//! single-player host: those, plus the economy, NPCs, vendors, quests
+//! and the cube on the same unit world).
 
 mod action;
-mod trade;
+mod wired;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 pub use action::{ActionEvents, ActionWorld, Outbox};
-pub use trade::{Parts, TradeRest, TradeWorld};
+pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::{UnitId, UnitType};
+use d2_sim::units::UnitId;
 use d2_sim::world::npc::{NpcControl, NpcError, NpcVendors, NpcWorld};
 use d2_sim::world::quests::{QuestControl, QuestError, QuestWorld};
 use d2_sim::world::vendors::gamble::identify_gamble;
@@ -37,8 +45,12 @@ use d2_sim::world::vendors::{VendorRecord, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, WaypointWorld};
 
 use super::super::SimGame;
+use super::items::moves::MoveCall;
+use super::items::CubeCall;
+use super::skills::{Call as SkillCall, Handled as SkillHandled};
+use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
-use crate::seams::{ClientId, Intents, MessageSink, ResultCode};
+use crate::seams::{ClientId, MessageSink, ResultCode};
 
 /// Where a world-related C→S id's behaviour is specified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -160,6 +172,8 @@ pub enum WorldError {
     Quest(#[from] QuestError),
     #[error(transparent)]
     Price(#[from] PriceFatal),
+    #[error(transparent)]
+    Move(#[from] d2_sim::items::moves::MoveFatal),
     #[error("sink: {0}")]
     Sink(String),
 }
@@ -215,13 +229,15 @@ pub trait QuestCall {
     fn call<W: QuestWorld>(self, ctl: &mut QuestControl, w: &mut W) -> Self::Out;
 }
 
-/// The world systems of a game and the providers of their seams, as the
-/// handlers reach them. `D` is the game's event dispatch (it owns the
+/// The systems of a game beyond its event dispatch and the providers of
+/// their seams, as the handlers reach them: the world systems, the cube
+/// and the skill handlers. `D` is the game's event dispatch (it owns the
 /// unit side, e.g. `d2_sim::wiring::action::ActionSim`).
 ///
 /// A method returning `None` means the game has no provider for that
 /// system: the ids stay stubs. Every seam `send` must be kept in order
-/// and handed back by [`WorldHost::take_sent`].
+/// and handed back by [`WorldHost::take_sent`] (after a handler, and
+/// after each tick).
 #[allow(unused_variables)]
 pub trait WorldHost<D> {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
@@ -244,6 +260,23 @@ pub trait WorldHost<D> {
         None
     }
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        None
+    }
+    /// The cube (`handlers::items`) on the host's economy.
+    fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        None
+    }
+    /// The item moves and the deferred item messages
+    /// (`handlers::items::moves`) on the host's economy and inventories.
+    fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        None
+    }
+    /// The skill handlers (`handlers::skills`).
+    fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
+        None
+    }
+    /// The walk / run handlers (`handlers::walk`) on the path provider.
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
     /// The messages the seams sent since the last take, in send order:
@@ -291,7 +324,7 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
 ) -> Option<ResultCode> {
     let id = *msg.first()?;
     let sys = system(id)?;
-    let player = player_unit(sim, client)?;
+    let player = sim.player_of(client)?;
     // Every handled id has a fixed size ≤ 17 (`client-messages.tsv`), so
     // the drained copy is the whole message.
     let msg = &msg[..size.min(msg.len())];
@@ -308,7 +341,7 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     let mut faults = Vec::new();
     for (unit, bytes) in sent {
         // §3.2 rule 1: a player without a client receives nothing.
-        if let Some(c) = client_of(sim, unit) {
+        if let Some(c) = sim.client_of(unit) {
             if let Err(e) = out.queue(c, &bytes) {
                 faults.push(WorldError::from(e));
             }
@@ -330,25 +363,6 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
         return Some(ResultCode::Malformed);
     }
     result
-}
-
-/// The client's player unit (unit type 0).
-fn player_unit<D: EventDispatch, W>(sim: &SimGame<D, W>, client: ClientId) -> Option<UnitId> {
-    let rec = sim.game.lists.client(sim.sim_client(client)?)?;
-    let unit = rec.player?;
-    (sim.game.lists.unit(unit)?.ty == UnitType::Player).then_some(unit)
-}
-
-/// The transport client whose player is `unit`.
-fn client_of<D: EventDispatch, W: WorldHost<D>>(
-    sim: &SimGame<D, W>,
-    unit: UnitId,
-) -> Option<ClientId> {
-    sim.clients().into_iter().find(|&c| {
-        sim.sim_client(c)
-            .and_then(|id| sim.game.lists.client(id))
-            .is_some_and(|r| r.player == Some(unit))
-    })
 }
 
 struct NpcRun<'m> {

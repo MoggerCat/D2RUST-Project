@@ -2,17 +2,18 @@
 //! The world handlers through the real host frame (drain → tick →
 //! flush, `intents-events.md` §1) on the real `d2-proto` sizes.
 //! Waypoints run on the wired `ActionSim` ([`waypoints`]); the quests
-//! also run on the wired `TradeWorld` ([`trade_quests`]). The NPC,
+//! also run on the wired `WiredWorld` ([`trade_quests`]). The NPC,
 //! vendor and quest tests in [`npc`], [`vendors`], [`quests`] run the
 //! real `d2-sim` modules on a seam fake ([`fake`]).
 
 mod fake;
+mod gaps;
 mod ids;
 mod npc;
 mod quests;
-mod trade_quests;
+pub(crate) mod trade_quests;
 mod vendors;
-mod waypoints;
+pub(crate) mod waypoints;
 
 use crate::adapters::ProtoSizes;
 use crate::dispatch::Outcome;

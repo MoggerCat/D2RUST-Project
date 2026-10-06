@@ -85,6 +85,10 @@ None.
   COF pattern (token + mode + 3-letter weapon class); the real file is
   `amblxbw.cof`, which parses. It's never loaded and is not supported.
 
+- **Game read of the draw order:** 1.14d reads the draw-order rows as if
+  the event block were exactly `F` bytes, so the three padded files read
+  their order 3 bytes early (`render/unit-composite.md` §3 r6).
+
 ## Test vectors
 
 | Input / seed | Expected output | Source |

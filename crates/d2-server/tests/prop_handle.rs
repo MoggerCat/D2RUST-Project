@@ -6,12 +6,17 @@
 //! goes through the dispatcher into `SimGame::handle` without a panic and
 //! with a frame that does not fail.
 //!
-//! Two hosts, as the server's handler tests build them:
-//! - the action host: `SimGame<ActionSim<_>, ActionWorld>` with the wired
-//!   skill handlers (`WiredSkills`) and waypoint tables: a player, a
-//!   monster, a ground item and a waypoint object;
-//! - the item host: `SimGame` with an `ItemWorld` (the cube handlers): a
-//!   player, a cube in the inventory and a ring.
+//! Three hosts, as the server's handler tests build them:
+//! - the action host: `SimGame<ActionSim<Book>, ActionWorld<WiredSkills>>`
+//!   (the skill handlers in the host's skill slot, the vitals tables on
+//!   the action wiring) with waypoint tables: a player, a monster, a
+//!   ground item and a waypoint object in one field room;
+//! - the item host: `SimGame<ActionSim<_>, WiredWorld<_>>` with the
+//!   cube's parts (`CubeParts`) and the inventory model (`InvParts`): a
+//!   player, a cube in its inventory and a ring, units of the action sim,
+//!   items in the game's one store;
+//! - the trade host (below): the same `WiredWorld` with Akara, vendor
+//!   tables and the player's items in its inventory.
 //!
 //! The dispatcher's own rejections (§2.3 rule 2, §2.4 rules 1–4: null
 //! handler, stub, wrong size, unit type, point range) run before any
@@ -34,36 +39,48 @@ use d2_data::tables::{
 };
 use d2_proto::schema::FieldType;
 use d2_proto::CLIENT_MESSAGES;
-use d2_server::adapters::handlers::items::{Inventory, ItemHooks, ItemPending, ItemWorld, Staged};
-use d2_server::adapters::handlers::skills::seams::SkillSeams;
+use d2_server::adapters::handlers::items::moves::{InvParts, MoveRest};
+use d2_server::adapters::handlers::items::{CubeParts, ItemPending};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
+use d2_server::adapters::handlers::skills::LearnRest;
+use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::buffers::ClientBuffers;
 use d2_server::dispatch::{dispatch, gate, is_point, is_unit, kind, Gate, Kind};
 use d2_server::seams::{PlayerGate, Pos, ResultCode, Tick};
 use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::{CombatTables, RoomKind};
-use d2_sim::drlg::data::DrlgData;
-use d2_sim::drlg::{Dungeon, NoLevelTypes, TileInfo, TileSource};
+use d2_sim::combat::CombatTables;
+use d2_sim::drlg::room::LinkAt;
+use d2_sim::drlg::{
+    CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
+    LevelTypes, RoomGrids, RoomKind as DrlgRoomKind, TileInfo, TileRect, TileSource,
+};
 use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::moves::{Guid, MovePending, Owner};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ty, ItemRequest, ItemTables};
+use d2_sim::missiles::MissileParams;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, UseState};
+use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
-use d2_sim::stats::{ClassStats, StatData, StatLists, StatTable, StateTable};
+use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::hooks::{MonsterInfo, Sim, UnitData};
-use d2_sim::units::lifecycle::{allocate, AllocRequest};
+use d2_sim::units::hooks::{MonsterInfo, UnitData};
+use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
-use d2_sim::units::record::Units;
-use d2_sim::units::{UnitId, UnitType};
+use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-use d2_sim::wiring::economy::{GameFields, ItemSpawn, ItemStore};
+use d2_sim::wiring::economy::{GameFields, ItemSpawn};
+use d2_sim::wiring::interaction::UseRest;
+use d2_sim::wiring::inventory::InvRest;
 use d2_sim::world::cube::{
     input_flags, kind as cube_kind, CraftMod, CubeData, InputSlot, ItemRecord, OutputSlot, Recipe,
 };
+use d2_sim::world::npc::NpcControl;
+use d2_sim::world::quests::{QuestControl, QuestTables};
+use d2_sim::world::vendors::VendorTables;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 use proptest::prelude::*;
 use proptest::test_runner::Config;
@@ -129,7 +146,7 @@ fn stat_data() -> Arc<StatData> {
 
 // ---- the action host -------------------------------------------------------------------
 
-struct NoTiles;
+pub struct NoTiles;
 impl TileSource for NoTiles {
     fn dt1(&self, _: &[u8]) -> Option<&[TileInfo]> {
         None
@@ -225,14 +242,21 @@ fn vitals() -> VitalsTables {
     }
 }
 
-/// The skill seams no written spec provides: a fixed skill list (every
-/// skill of the table), the right hand on Multiple Shot.
+/// The action wiring's `Pending` value: the seams without a provider
+/// (positions, interaction, warp, arrival mode, transport, as the
+/// bridge's local tests give them), the skill use pipeline's `UseRest`
+/// and the skill-point calls (`LearnRest`): a fixed skill list (every
+/// skill of the table), the right hand on Multiple Shot; the test keeps
+/// a handle.
 #[derive(Default)]
 struct Inner {
     list: Vec<SkillEntry>,
     left: Option<SkillEntry>,
     right: Option<SkillEntry>,
     used: Option<SkillEntry>,
+    pos: BTreeMap<UnitId, (i32, i32)>,
+    interact: BTreeMap<UnitId, (u8, u32)>,
+    sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 #[derive(Clone, Default)]
@@ -244,15 +268,73 @@ impl Book {
     }
 }
 
-impl SkillSeams for Book {
+impl Pending for Book {
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.get().pos.get(&unit).copied().unwrap_or_default()
+    }
+    fn place(&mut self, unit: UnitId, x: i32, y: i32) {
+        self.get().pos.insert(unit, (x, y));
+    }
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        self.get()
+            .interact
+            .entry(player)
+            .or_insert((unit_type, guid));
+    }
+    fn reset_interact(&mut self, player: UnitId) {
+        self.get().interact.remove(&player);
+    }
+    fn interact_guid(&self, player: UnitId) -> Option<u32> {
+        self.get().interact.get(&player).map(|i| i.1)
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.get().sent.push((player, msg.to_vec()));
+    }
+    fn warp(&mut self, _: &mut Game, _: UnitId, _: u32, _: u8) {}
+    fn set_player_mode_arrival(&mut self, _: &mut Game, _: UnitId) {}
     fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
         self.get().list.clone()
     }
     fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
         self.get().used
     }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.get().used = e;
+}
+
+impl Outbox for Book {
+    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.get().sent)
+    }
+}
+
+/// The narrowest answer wherever nothing is staged (as the server's
+/// skill handler tests give it). The message path's player data,
+/// positions, reach and sends are the server's (`skills::world::World`).
+impl UseRest for Book {
+    fn send(&mut self, _: UnitId, _: ServerMsg) {}
+    fn has_player_data(&self, _: UnitId) -> bool {
+        false
+    }
+    fn last_point_frame(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_last_point_frame(&mut self, _: UnitId, _: i32) {}
+    fn cursor_item(&self, _: UnitId) -> bool {
+        false
+    }
+    fn in_own_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn within_reach(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn owner(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn is_pet(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn is_ally(&self, _: UnitId, _: UnitId) -> bool {
+        false
     }
     fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
         self.get().left
@@ -276,66 +358,218 @@ impl SkillSeams for Book {
             .copied()
             .find(|e| e.skill == skill && e.owner_guid == owner)
     }
+    fn owns_skill(&self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
+        self.get().used = e;
+    }
+    fn used_skill_flags(&self, _: UnitId) -> u32 {
+        0
+    }
+    fn set_used_skill_flags(&mut self, _: UnitId, _: u32) {}
     fn entry_mode(&self, _: UnitId, _: &SkillEntry) -> u32 {
         0
     }
+    fn attack_param4(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_attack_param4(&mut self, _: UnitId, _: i32) {}
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
+    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
+    fn shapeshifted(&self, _: UnitId) -> bool {
+        false
+    }
+    fn consume_charges(&mut self, _: UnitId, _: &SkillEntry) -> bool {
+        false
+    }
+    fn pay_life(&mut self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn can_dual_wield(&self, _: UnitId) -> bool {
+        false
+    }
+    fn equippable(&self, _: UnitId) -> bool {
+        false
+    }
+    fn bow_equipped(&self, _: UnitId) -> bool {
+        false
+    }
+    fn state_mask(&self, _: UnitId, _: u32) -> bool {
+        false
+    }
+    fn start_mode(&mut self, _: &mut Game, _: UnitId, _: u32, _: ModeTarget<UnitId>) {}
+    fn run_to(&mut self, _: UnitId, _: UnitId, _: SkillEntry) {}
+    fn target(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn clear_target(&mut self, _: UnitId) {}
+    fn event_arg(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_event_arg(&mut self, _: UnitId, _: i32) {}
+    fn step_path(&mut self, _: UnitId) -> i32 {
+        0
+    }
+    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
+        false
+    }
+    fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
+    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, _: &mut MissileParams) {}
     fn srvst(&mut self, _: u16, _: UnitId, _: i32, _: i32) -> i32 {
         1
     }
     fn srvdo(&mut self, _: u16, _: UnitId, _: i32, _: i32, _: bool, _: bool, _: bool) -> i32 {
         1
     }
-    fn create_skill_missile(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: bool, _: MissileAim) {}
+}
+
+impl LearnRest for Book {
     fn is_class_skill(&self, _: UnitId, skill: i32) -> bool {
         skill == 3
     }
     fn add_skill_level(&mut self, _: UnitId, _: i32, _: i32) {}
     fn after_skill_point(&mut self, _: UnitId) {}
-    fn room(&self, _: UnitId) -> RoomKind {
-        RoomKind::Field
-    }
-    fn refresh(&mut self, _: UnitId) {}
 }
 
-/// The action wiring's seams without a provider (positions, interaction,
-/// warp, arrival mode, transport), as the bridge's local tests give them.
-#[derive(Default)]
-struct TestPending {
-    pos: BTreeMap<UnitId, (i32, i32)>,
-    interact: BTreeMap<UnitId, (u8, u32)>,
-    sent: Vec<(UnitId, Vec<u8>)>,
+/// One 8×8-tile room per listed level (the server's waypoint tests'
+/// DRLG types).
+struct FieldTypes(BTreeMap<u32, TileRect>);
+
+impl LevelTypes for FieldTypes {
+    fn generate(
+        &mut self,
+        drlg: &mut Drlg,
+        _: &DrlgData,
+        level: LevelIdx,
+    ) -> Result<(), DrlgError> {
+        let id = drlg.level(level).id;
+        if let Some(&rect) = self.0.get(&id) {
+            let r = drlg.alloc_room(level, DrlgRoomKind::Preset, rect);
+            drlg.room_mut(r).dt1_mask = 1;
+            drlg.link_room(r, LinkAt::Tail);
+        }
+        Ok(())
+    }
+    fn room_grids(
+        &mut self,
+        drlg: &mut Drlg,
+        _: &DrlgData,
+        room: DrlgRoomId,
+    ) -> Result<RoomGrids, DrlgError> {
+        let r = drlg.room(room).rect;
+        let (w, h) = (r.w as usize + 1, r.h as usize + 1);
+        let mut g = CellGrid::new(w, h);
+        for y in 0..h {
+            for x in 0..w {
+                g.set(x, y, d2_sim::drlg::tiles::cell::FLOOR);
+            }
+        }
+        Ok(RoomGrids {
+            passes: vec![GridPass {
+                cells: g,
+                orientation: None,
+                fill_blanks: false,
+            }],
+            ..RoomGrids::default()
+        })
+    }
 }
 
-impl Pending for TestPending {
-    fn position(&self, unit: UnitId) -> (i32, i32) {
-        self.pos.get(&unit).copied().unwrap_or_default()
+struct FieldTiles(BTreeMap<Vec<u8>, Vec<TileInfo>>);
+
+impl TileSource for FieldTiles {
+    fn dt1(&self, path: &[u8]) -> Option<&[TileInfo]> {
+        self.0.get(path).map(Vec::as_slice)
     }
-    fn place(&mut self, unit: UnitId, x: i32, y: i32) {
-        self.pos.insert(unit, (x, y));
-    }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
-    fn send(&mut self, player: UnitId, msg: &[u8]) {
-        self.sent.push((player, msg.to_vec()));
-    }
-    fn warp(&mut self, _: &mut Game, _: UnitId, _: u32, _: u8) {}
-    fn set_player_mode_arrival(&mut self, _: &mut Game, _: UnitId) {}
 }
 
-impl Outbox for TestPending {
-    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-        std::mem::take(&mut self.sent)
+fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
+    TileInfo {
+        orientation,
+        main,
+        sub,
+        rarity,
+        material: 0,
+        subtile_flags: [0; 25],
     }
+}
+
+/// Cold Plains, a field level (`levels` row 3, waypoint index 1).
+const COLD_PLAINS: u32 = 3;
+/// The other waypoint levels of [`waypoint_data`]: 1 (act 0, index 0)
+/// and 40 (act 1, index 9).
+const WAYPOINT_LEVELS: [u32; 3] = [1, COLD_PLAINS, 40];
+
+/// A DRLG world for acts 0 and 1 where each waypoint level has one
+/// 8×8-tile room, as the server's waypoint and skill handler tests build
+/// it: the skill use pipeline reads the room kind from the unit's real
+/// room (`UseView`), so the units stand in Cold Plains (a field room),
+/// and a waypoint travel finds a spawn room on every level the waypoint
+/// table lists.
+fn field_drlg() -> DrlgWorld {
+    use d2_sim::drlg::tiles::FIXED_LIBRARY;
+    let mut data = DrlgData {
+        levels: vec![LevelDef::default(); 150],
+        ..DrlgData::default()
+    };
+    for l in &mut data.levels {
+        l.warp = [-1; 8];
+    }
+    let mut files = vec![Vec::new(); 32];
+    files[0] = b"floor.dt1".to_vec();
+    data.lvltypes = vec![vec![Vec::new(); 32], files];
+    for id in WAYPOINT_LEVELS {
+        data.levels[id as usize].drlg_type = 2;
+        data.levels[id as usize].level_type = 1;
+    }
+    let mut types = FieldTypes(
+        WAYPOINT_LEVELS
+            .iter()
+            .map(|&id| (id, TileRect::new(0, 0, 8, 8)))
+            .collect(),
+    );
+    let mut dungeon = Dungeon::default();
+    dungeon.acts[0] = Some(Drlg::create(0, 1, 0, 0, false, &data, &mut types).unwrap());
+    dungeon.acts[1] = Some(Drlg::create(1, 2, 0, 0, false, &data, &mut types).unwrap());
+    let mut t = BTreeMap::new();
+    t.insert(b"floor.dt1".to_vec(), vec![tile(0, 0, 0, 1)]);
+    let blank = |sub| {
+        let mut x = tile(0, 30, sub, 0);
+        x.subtile_flags = [0x20; 25];
+        x
+    };
+    t.insert(FIXED_LIBRARY[0].to_vec(), vec![blank(0), blank(1)]);
+    t.insert(FIXED_LIBRARY[1].to_vec(), vec![]);
+    t.insert(FIXED_LIBRARY[2].to_vec(), vec![tile(10, 0, 0, 0)]);
+    DrlgWorld {
+        dungeon,
+        data: Arc::new(data),
+        tiles: Box::new(FieldTiles(t)),
+        types: Box::new(types),
+    }
+}
+
+/// [`field_drlg`]'s Cold Plains room, generated and streamed on `sim`
+/// (act 0 is made in `game`'s lists).
+fn field_room<X: Pending>(sim: &mut ActionSim<X>, game: &mut Game) -> RoomId {
+    game.lists.ensure_act(0).unwrap();
+    sim.hooks()
+        .drlg
+        .with_act(0, &mut game.lists, |d, svc| {
+            let l = d.get_or_alloc_level(svc.data, svc.types, COLD_PLAINS)?;
+            d.generate_level(svc.data, svc.types, l)?;
+            let r = d.level_rooms(l)[0];
+            d.stream_room(svc, r)
+        })
+        .unwrap()
+        .unwrap()
+        .unwrap()
 }
 
 /// `levels` (150 rows, acts by id; waypoints on levels 1 and 3, and 40 in
@@ -361,11 +595,13 @@ const ALIVE: PlayerGate = PlayerGate {
     uninterruptable: false,
 };
 
-type ActionGame = SimGame<ActionSim<TestPending>, ActionWorld>;
+type ActionGame = SimGame<ActionSim<Book>, ActionWorld<WiredSkills>>;
 
 /// The player (class `class`, mode NU, at (100, 100)) for client 0, a
 /// monster at (120, 100), an item on the ground at (101, 100) and a
-/// waypoint object at (102, 100).
+/// waypoint object at (102, 100), all in one field room; the vitals
+/// tables on the action wiring (0x3A), the skill handlers in the host's
+/// skill slot.
 fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
     let book = Book::default();
     {
@@ -394,18 +630,13 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
         levels: Vec::new(),
         skill_modes: Vec::new(),
     };
-    let drlg = DrlgWorld {
-        dungeon: Dungeon::default(),
-        data: Arc::new(DrlgData::default()),
-        tiles: Box::new(NoTiles),
-        types: Box::new(NoLevelTypes),
-    };
-    let hooks = ActionHooks::new(
+    let mut hooks = ActionHooks::new(
         Arc::new(tables),
-        drlg,
+        field_drlg(),
         Seed::init_low(1234),
-        TestPending::default(),
+        book.clone(),
     );
+    hooks.vitals = Some(Arc::new(vitals()));
     let data = UnitData {
         monsters: vec![MonsterInfo {
             enabled: true,
@@ -416,19 +647,19 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
     };
     let mut events = ActionSim::new(stat_data(), data, hooks);
     let mut game = Game::new();
-    game.lists.ensure_act(0).unwrap();
+    let room = field_room(&mut events, &mut game);
     let mut alloc = |ty, class| {
         let req = AllocRequest {
             ty,
             class,
-            room: None,
+            room: Some(room),
             add: true,
             fixed_guid: None,
             mode: 1,
             allied: ty == UnitType::Player,
         };
         events
-            .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+            .with(&mut game, |g, v| v.allocate(g, &req, 20, 20))
             .expect("allocated")
     };
     let player = alloc(UnitType::Player, class);
@@ -437,14 +668,21 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
     let wp = alloc(UnitType::Object, 0);
     events.sys.units.get_mut(player).unwrap().mode = 1;
     // Stat points (4) and skill points (5) to spend, so 0x3A and 0x3B get
-    // past their first check (`vitals.md` §2, `levels.md` §6.4).
+    // past their first check (`vitals.md` §2, `levels.md` §6.4); level
+    // (12) 1, the learnable skill's required level (reqlevel 0 + base 1),
+    // so 0x3B reaches the spend.
     events.with(&mut game, |_, v| {
+        v.set_base(player, 12, 1);
         v.set_base(player, 4, 5);
         v.set_base(player, 5, 5);
     });
-    let mut sim: ActionGame = SimGame::with_events(game, events);
-    sim.world.waypoints = Some(waypoint_data());
-    sim.join(0, Some(player), None, client_state::IN_GAME)
+    let world = ActionWorld {
+        waypoints: Some(waypoint_data()),
+        skills: WiredSkills::default(),
+        ..ActionWorld::default()
+    };
+    let mut sim: ActionGame = SimGame::with_world(game, events, world);
+    sim.join(0, Some(player), Some(room), client_state::IN_GAME)
         .unwrap();
     sim.set_player(
         player,
@@ -463,9 +701,8 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
     sim.set_unit(item, at(101, 100));
     sim.set_unit(wp, at(102, 100));
     for (u, x) in [(player, 100), (monster, 120), (item, 101), (wp, 102)] {
-        sim.events.hooks().x.place(u, x, 100);
+        book.get().pos.insert(u, (x, 100));
     }
-    sim.skills = Some(Box::new(WiredSkills::new(vitals(), book)));
     let guids = [player, monster, item, wp]
         .iter()
         .map(|&u| sim.game.lists.unit(u).unwrap().guid)
@@ -583,37 +820,11 @@ fn cube_data(t: &ItemTables) -> CubeData {
     }
 }
 
-/// [`ItemPending`] stand-in: placement appends to the list, removal drops
-/// from it.
+/// [`ItemPending`] stand-in: nothing happens.
 struct ItemRest;
 
 impl ItemPending for ItemRest {
     fn inventory_pass(&mut self, _: UnitId, _: &mut Vec<Vec<u8>>) {}
-    fn place(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) -> bool {
-        inv.items.push(item);
-        if inv.cursor == Some(item) {
-            inv.cursor = None;
-        }
-        true
-    }
-    fn remove_cube_item(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) {
-        inv.items.retain(|&i| i != item);
-    }
-    fn socketed(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
-    }
     fn duplicate(&mut self, _: UnitId, _: bool) -> Option<UnitId> {
         None
     }
@@ -629,7 +840,142 @@ impl ItemPending for ItemRest {
     }
 }
 
-fn new_item(w: &mut ItemWorld, game: &mut Game, class: usize, mode: u32) -> UnitId {
+/// The item-move seams no d2-sim module provides, answered narrowest
+/// (`InvRest` / `MovePending` defaults: distance 0, no free spot, no
+/// interaction); the sends are collected for the host.
+#[derive(Default)]
+struct InvStandIn {
+    sent: Vec<(Owner, Vec<u8>)>,
+}
+
+impl MovePending for InvStandIn {
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.sent.push((player, bytes));
+    }
+}
+
+impl InvRest for InvStandIn {
+    fn percent_of(&self, value: i32, p: i32) -> i32 {
+        value.wrapping_mul(p) / 100
+    }
+    fn item_active_on(&self, _: Guid, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: Guid, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn level_requirement(&self, _: Guid, _: Owner) -> i32 {
+        -1
+    }
+    fn two_handed(&self, _: Guid) -> bool {
+        false
+    }
+    fn one_or_two_handed(&self, _: Owner, _: Guid) -> bool {
+        false
+    }
+    fn ammo_type(&self, _: Guid) -> Option<i16> {
+        None
+    }
+    fn stack_quality_ok(&self, _: Guid) -> bool {
+        true
+    }
+    fn has_allowed_location(&self, _: Guid) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: Guid) -> bool {
+        false
+    }
+    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
+        true
+    }
+    fn interaction(&self, _: Owner) -> InteractionTarget {
+        InteractionTarget::None
+    }
+    fn clear_interaction(&mut self, _: Owner) {}
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for InvStandIn {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+/// Inventory tables (`inventory.md` §1.3 grid records) over items of
+/// (code, type, invwidth, invheight), in record order.
+fn inv_tables(items: &[([u8; 4], u16, u8, u8)], n_types: usize, equiv: EquivMatrix) -> InvTables {
+    let g = |x, y| GridRec {
+        grid_x: x,
+        grid_y: y,
+    };
+    let mut grids = vec![g(10, 4); 16];
+    grids[5] = g(10, 10);
+    grids[8] = g(6, 4);
+    grids[9] = g(3, 4);
+    grids[12] = g(6, 8);
+    grids[13] = g(0, 0);
+    InvTables {
+        grids,
+        belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
+        items: items
+            .iter()
+            .map(|&(code, t, w, h)| InvItemRec {
+                code,
+                type_: t as i16,
+                invwidth: w,
+                invheight: h,
+                ..InvItemRec::default()
+            })
+            .collect(),
+        itemtypes: vec![
+            InvTypeRec {
+                class: 7,
+                ..InvTypeRec::default()
+            };
+            n_types
+        ],
+        equiv,
+    }
+}
+
+/// The inventory parts of a wired host, with the player's inventory
+/// (`0x0063ABD0` at player creation).
+fn inv_parts(tables: InvTables, player: UnitId, class: u8, guid: u32) -> InvParts {
+    let mut parts = InvParts::new(tables, Box::new(InvStandIn::default()));
+    parts
+        .state
+        .add_inventory(player, InvKind::Player { class }, guid);
+    parts
+}
+
+/// Places `item` (put on the cursor, page `page`) into the player's
+/// inventory through `inventory.md` §2.4 (free position, no "send"): a
+/// fixture's stored item.
+fn store_item(sim: &mut trade::TradeGame, player: UnitId, item: UnitId, page: u8) {
+    sim.events.sys.units.get_mut(item).unwrap().mode = 4;
+    sim.events.sys.hooks.items.get_mut(item).unwrap().inv_page = page;
+    let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+    let placed = world.with_economy(game, events, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory parts");
+        inv.desk(econ).place(player, item, (0, 0), true, false)
+    });
+    assert!(placed);
+}
+
+type ItemGame = trade::TradeGame;
+
+fn new_item(sim: &mut ItemGame, class: usize, mode: u32) -> UnitId {
     let mut rq = ItemRequest {
         item: class as i32,
         format: 101,
@@ -642,34 +988,47 @@ fn new_item(w: &mut ItemWorld, game: &mut Game, class: usize, mode: u32) -> Unit
         mode,
         init_flags: 1,
     };
-    w.economy(game).create_item(&mut rq, false, spawn).unwrap()
+    let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+    world
+        .with_economy(game, events, |econ, _| {
+            econ.create_item(&mut rq, false, spawn)
+        })
+        .unwrap()
 }
 
-/// A player (class 2) for client 0 with the cube stored in its inventory
-/// and a ring in mode `ring_mode`.
-fn item_host(ring_mode: u32) -> (SimGame, Vec<u32>) {
+/// The wired host as the server's cube tests build it: game creation on
+/// the action sim (expansion, the game seed), the NPC control and the
+/// quests on the game seed, the cube's parts on the host; a player
+/// (class 2) for client 0 with the cube stored in its inventory and a
+/// ring in mode `ring_mode`, real units of the action sim.
+fn item_host(ring_mode: u32) -> (ItemGame, Vec<u32>) {
     let tables = item_tables();
-    let mut world = ItemWorld {
-        units: Units::new(),
-        stats: StatLists::new(stat_data()),
-        data: UnitData {
-            expansion: true,
-            ..UnitData::default()
-        },
-        hooks: ItemHooks,
-        fields: GameFields::new(Seed::init_low(0x5EED), true),
-        cube: cube_data(&tables),
-        tables,
-        items: ItemStore::new(),
-        staged: Staged {
-            local_date: (15, 3),
-            ..Staged::default()
-        },
-        creation: BTreeMap::new(),
-        pending: Box::new(ItemRest),
-        errors: Vec::new(),
-    };
+    let hooks = ActionHooks::new(
+        Arc::new(empty_action_tables()),
+        field_drlg(),
+        Seed::init(),
+        trade::ActionRest::default(),
+    );
+    let mut events = ActionSim::new(stat_data(), UnitData::default(), hooks);
+    events.create_game(&GameFields::new(Seed::init_low(0x5EED), true));
     let mut game = Game::new();
+    game.lists.ensure_act(0).unwrap();
+    let mut seed = events.hooks().game_seed;
+    let npc = NpcControl::new(&[], Vec::new(), true, 0, &mut seed).unwrap();
+    let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
+    events.hooks().game_seed = seed;
+    let mut world = WiredWorld::new(
+        ActionWorld::default(),
+        tables,
+        quests,
+        npc,
+        VendorTables::default(),
+        trade::Rest::default(),
+        1000,
+    );
+    let mut parts = CubeParts::new(cube_data(&world.tables), Box::new(ItemRest));
+    parts.staged.local_date = (15, 3);
+    world.cube = Some(parts);
     let req = AllocRequest {
         ty: UnitType::Player,
         class: 2,
@@ -679,29 +1038,34 @@ fn item_host(ring_mode: u32) -> (SimGame, Vec<u32>) {
         mode: 1,
         allied: false,
     };
-    let player = {
-        let mut sim = Sim {
-            game: &mut game,
-            units: &mut world.units,
-            stats: &mut world.stats,
-            data: &world.data,
-        };
-        allocate(&mut sim, &mut world.hooks, &mut world.fields.seed, &req)
-            .unwrap()
-            .unwrap()
-    };
-    let cube = new_item(&mut world, &mut game, CUBE, 0);
-    let ring = new_item(&mut world, &mut game, RING, ring_mode);
-    world.items.get_mut(cube).unwrap().inv_page = 0;
-    world.items.get_mut(ring).unwrap().inv_page = 0;
-    world.staged.inventories.insert(
+    let player = events
+        .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    let pg = events.sys.units.get(player).unwrap().guid;
+    let items = [
+        (*b"box ", T_BOX, 2, 2),
+        (*b"rin ", T_RING, 1, 1),
+        (*b"amu ", T_AMULET, 1, 1),
+    ];
+    world.inventory = Some(inv_parts(
+        inv_tables(&items, N_TYPES, equiv()),
         player,
-        Inventory {
-            items: vec![cube],
-            cursor: None,
-        },
-    );
-    let mut sim = SimGame::new(game);
+        2,
+        pg,
+    ));
+    let mut sim: ItemGame = SimGame::with_world(game, events, world);
+    let cube = new_item(&mut sim, CUBE, 4);
+    store_item(&mut sim, player, cube, 0);
+    let ring = new_item(&mut sim, RING, ring_mode);
+    sim.events.sys.hooks.items.get_mut(ring).unwrap().inv_page = 0;
+    if ring_mode == 4 {
+        let inv = sim.world.inventory.as_mut().unwrap();
+        inv.state
+            .inventories
+            .get_mut(&player)
+            .unwrap()
+            .set_cursor(Some(ring));
+    }
     sim.join(0, Some(player), None, client_state::IN_GAME)
         .unwrap();
     sim.set_player(
@@ -720,10 +1084,34 @@ fn item_host(ring_mode: u32) -> (SimGame, Vec<u32>) {
     sim.set_unit(ring, at(100, 100));
     let guids = [player, cube, ring]
         .iter()
-        .map(|&u| world.units.get(u).unwrap().guid)
+        .map(|&u| sim.events.sys.units.get(u).unwrap().guid)
         .collect();
-    sim.items = Some(world);
     (sim, guids)
+}
+
+/// Action tables with no skills (the economy hosts).
+fn empty_action_tables() -> ActionTables {
+    ActionTables {
+        missiles: Vec::new(),
+        skills: SkillTables {
+            skills: Vec::new(),
+            skilldesc: Vec::new(),
+            missiles: Vec::new(),
+            skills_code: Vec::new(),
+            miss_code: Vec::new(),
+            level_cap: 0,
+            stat_count: 0,
+        },
+        combat: CombatTables {
+            charstats: Vec::new(),
+            difficultylevels: Vec::new(),
+            monstats: Vec::new(),
+            monstats2: Vec::new(),
+            hitclass: Vec::new(),
+        },
+        levels: Vec::new(),
+        skill_modes: Vec::new(),
+    }
 }
 
 // ---- messages --------------------------------------------------------------------------
@@ -882,23 +1270,12 @@ impl Snapshot for ActionGame {
         format!("{:?}{:?}{:?}", self.game, s.units, s.stats)
     }
     fn faults(&self) -> Vec<String> {
+        let s = &self.events.sys;
         let mut v: Vec<String> = self.world.faults.iter().map(|f| format!("{f:?}")).collect();
-        v.extend(self.events.sys.errors.iter().map(|e| format!("{e:?}")));
+        v.extend(s.errors.iter().map(|e| format!("{e:?}")));
+        v.extend(s.hooks.errors.iter().map(|e| format!("{e:?}")));
+        v.extend(self.tick_faults.iter().map(|f| format!("{f:?}")));
         v
-    }
-}
-
-impl Snapshot for SimGame {
-    fn snapshot(&self) -> String {
-        let w = self.items.as_ref().unwrap();
-        format!(
-            "{:?}{:?}{:?}{:?}{:?}",
-            self.game, w.units, w.stats, w.items, w.staged
-        )
-    }
-    fn faults(&self) -> Vec<String> {
-        let w = self.items.as_ref().unwrap();
-        w.errors.iter().map(|e| format!("{e:?}")).collect()
     }
 }
 
@@ -988,11 +1365,12 @@ proptest! {
 
 /// Each handled id alone, many times, on fresh hosts: the ids the
 /// handler modules own (skills 0x05–0x11, 0x3A–0x3C; waypoints 0x49;
-/// cube 0x2A, 0x4F) get most of the cases.
+/// cube 0x2A, 0x4F; quests 0x31, 0x40, 0x58, which the item host's
+/// `WiredWorld` handles) get most of the cases.
 fn owned_id() -> impl Strategy<Value = u8> {
     prop::sample::select(vec![
-        0x05u8, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x2A, 0x3A,
-        0x3B, 0x3C, 0x49, 0x4F,
+        0x05u8, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x2A, 0x31,
+        0x3A, 0x3B, 0x3C, 0x40, 0x49, 0x4F, 0x58,
     ])
 }
 
@@ -1038,22 +1416,34 @@ fn hosts_reach_the_handlers() {
     m.extend_from_slice(&guids[1].to_le_bytes());
     dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &m, 9);
     assert!(sim.unhandled.is_empty(), "{:?}", sim.unhandled);
+    // 0x31, 0x40, 0x58 on the wired hosts: the quest handlers.
+    let (mut trade, _) = trade::trade_host(1);
+    for m in [
+        vec![0x31, 1, 0, 0, 0, 0, 0, 0, 0],
+        vec![0x40],
+        vec![0x58, 5, 0],
+    ] {
+        for sim in [&mut sim, &mut trade] {
+            dispatch(sim, &ProtoSizes, &mut out, 0, ALIVE, &m, m.len());
+            assert!(sim.unhandled.is_empty(), "{:02X?}: {:?}", m, sim.unhandled);
+        }
+    }
 }
 
 // ---- the trade host --------------------------------------------------------------------
 //
-// `SimGame<ActionSim<_>, TradeWorld<_>>` as `d2-client`'s
+// `SimGame<ActionSim<_>, WiredWorld<_>>` as `d2-client`'s
 // `e2e_vendor.rs` builds it: the NPC, vendor and quest handlers on
 // `wiring::interaction` over the action sim's own units. Akara (class
 // 148) next to the player; the player owns a buckler and a cap and
 // carries 5000 gold.
 
 mod trade {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
     use std::sync::Arc;
 
     use d2_data::tables::{Itemratio, Itemtypes, Monstats};
-    use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+    use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
     use d2_server::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts};
     use d2_server::seams::Pos;
     use d2_sim::combat::CombatTables;
@@ -1069,7 +1459,7 @@ mod trade {
     use d2_sim::units::lists::client_state;
     use d2_sim::units::{UnitId, UnitType};
     use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-    use d2_sim::wiring::economy::{GameFields, ItemSpawn, QuestRest};
+    use d2_sim::wiring::economy::{ItemSpawn, QuestRest};
     use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
     use d2_sim::world::npc::{self, class, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
     use d2_sim::world::quests::{
@@ -1105,14 +1495,19 @@ mod trade {
         }
     }
 
+    /// The vendors' player-inventory calls `WiredWorld` answers from its
+    /// inventory model (`InvVendors`) before they reach a rest.
+    const MODEL: &str = "WiredWorld answers from the inventory model";
+
     /// The interaction seams no written spec provides, answered as in
-    /// `e2e_vendor.rs` (talk range, the staged inventory, room in the
-    /// NPC grid, no item copy).
+    /// `e2e_vendor.rs` (talk range, room in the NPC grid, no item copy).
+    /// The player's inventory is the host's inventory model
+    /// (`WiredWorld::inventory`), which answers the vendors' inventory
+    /// calls before they reach this rest.
     #[derive(Default)]
     pub struct Rest {
         interact: BTreeMap<UnitId, (u8, u32)>,
         quests: BTreeMap<UnitId, PlayerQuests>,
-        inventory: BTreeSet<UnitId>,
         last_bought: BTreeMap<UnitId, u32>,
         sent: Vec<(UnitId, Vec<u8>)>,
     }
@@ -1238,7 +1633,7 @@ mod trade {
             self.last_bought.insert(p, guid);
         }
         fn has_cursor_item(&self, _: UnitId) -> bool {
-            false
+            unreachable!("{MODEL}")
         }
         fn copy_item(&mut self, _: UnitId) -> Option<UnitId> {
             None
@@ -1271,14 +1666,14 @@ mod trade {
         fn remove_gamble_item(&mut self, _: u16, _: u32, _: UnitId) {}
         fn refresh_npc_inventory(&mut self, _: UnitId) {}
         fn add_trade_inventory(&mut self, _: u16, _: UnitId) {}
-        fn owns_item(&self, _: UnitId, item: UnitId) -> bool {
-            self.inventory.contains(&item)
+        fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
+            unreachable!("{MODEL}")
         }
-        fn in_inventory(&self, _: UnitId, item: UnitId) -> bool {
-            self.inventory.contains(&item)
+        fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
+            unreachable!("{MODEL}")
         }
         fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
-            Vec::new()
+            unreachable!("{MODEL}")
         }
         fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
             None
@@ -1297,14 +1692,14 @@ mod trade {
             false
         }
         fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
+            unreachable!("{MODEL}")
         }
         fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
             false
         }
         fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
-        fn remove_stored(&mut self, _: UnitId, item: UnitId) {
-            self.inventory.remove(&item);
+        fn remove_stored(&mut self, _: UnitId, _: UnitId) {
+            unreachable!("{MODEL}")
         }
         fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
             false
@@ -1495,14 +1890,16 @@ mod trade {
         v
     }
 
-    pub type TradeGame = SimGame<ActionSim<ActionRest>, TradeWorld<Rest>>;
+    pub type TradeGame = SimGame<ActionSim<ActionRest>, WiredWorld<Rest>>;
 
     impl Snapshot for TradeGame {
         fn snapshot(&self) -> String {
             let s = &self.events.sys;
+            let staged = self.world.cube.as_ref().map(|c| &c.staged);
+            let inv = self.world.inventory.as_ref().map(|i| &i.state);
             format!(
-                "{:?}{:?}{:?}{:?}",
-                self.game, s.units, s.stats, self.world.items
+                "{:?}{:?}{:?}{:?}{:?}{:?}",
+                self.game, s.units, s.stats, s.hooks.items, staged, inv
             )
         }
         fn faults(&self) -> Vec<String> {
@@ -1511,6 +1908,13 @@ mod trade {
             e.extend(s.errors.iter().map(|e| format!("{e:?}")));
             e.extend(self.world.state.errors.iter().map(|e| format!("{e:?}")));
             e.extend(self.world.action.faults.iter().map(|f| format!("{f:?}")));
+            if let Some(c) = &self.world.cube {
+                e.extend(c.errors.iter().map(|x| format!("{x:?}")));
+            }
+            if let Some(i) = &self.world.inventory {
+                e.extend(i.state.errors.iter().map(|x| format!("{x:?}")));
+            }
+            e.extend(self.tick_faults.iter().map(|f| format!("{f:?}")));
             e
         }
     }
@@ -1591,9 +1995,8 @@ mod trade {
         });
         let mut rest = Rest::default();
         rest.quests.insert(player, PlayerQuests::default());
-        let mut world = TradeWorld::new(
+        let mut world = WiredWorld::new(
             ActionWorld::default(),
-            GameFields::new(Seed::init_low(game_seed), false),
             item_tables(),
             quests,
             ctl,
@@ -1613,15 +2016,21 @@ mod trade {
                 };
                 let spawn = ItemSpawn {
                     room: None,
-                    mode: 0,
+                    mode: 4,
                     init_flags: 1,
                 };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
             (make(BUC), make(CAP))
         });
-        world.rest.inventory.extend([buckler, cap]);
+        let pg = events.sys.units.get(player).unwrap().guid;
+        let items = [(*b"cap ", ty::HELM, 2, 2), (*b"buc ", ty::SHIE, 2, 2)];
+        let tables = super::inv_tables(&items, N_TYPES, equiv());
+        world.inventory = Some(super::inv_parts(tables, player, 1, pg));
         let mut s: TradeGame = SimGame::with_world(game, events, world);
+        // The player's buckler and cap, stored (mode 0) in its inventory.
+        super::store_item(&mut s, player, buckler, 0);
+        super::store_item(&mut s, player, cap, 0);
         s.join(0, Some(player), None, client_state::IN_GAME)
             .unwrap();
         s.set_player(
@@ -1646,7 +2055,7 @@ mod trade {
     }
 }
 
-/// The NPC, vendor and quest ids `TradeWorld` handles.
+/// The NPC, vendor and quest ids `WiredWorld` handles.
 fn trade_id() -> impl Strategy<Value = u8> {
     prop::sample::select(vec![
         0x13u8, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x40, 0x58, 0x62,

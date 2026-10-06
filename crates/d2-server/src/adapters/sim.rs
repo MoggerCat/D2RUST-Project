@@ -6,8 +6,13 @@
 //! 54, player data, positions, owners, acts of units outside rooms) is
 //! owned by unit, path and item specs not written yet. Until they are,
 //! the caller stages those fields here ([`PlayerFields`], [`UnitFacts`]);
-//! nothing here derives or defaults them. Intent handlers are stubs
-//! (see [`SimGame`]'s `handle`).
+//! nothing here derives or defaults them.
+//!
+//! The game's systems beyond the event dispatch (world, items, skills)
+//! are one host value `W` ([`WorldHost`]): the intent handlers
+//! ([`handlers`]) reach their `d2-sim` providers through it, and the
+//! messages its seams send, from a handler or from a tick, go to the
+//! receivers' clients.
 
 use std::collections::BTreeMap;
 
@@ -16,8 +21,8 @@ use d2_sim::tick::timer::TimerRun;
 use d2_sim::tick::{self, EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
-use super::handlers::world::{self as world_handlers, NoWorld, WorldHost};
-use super::handlers::{self, items::ItemView, items::ItemWorld};
+use super::handlers;
+use super::handlers::world::{self as world_handlers, NoWorld, WorldError, WorldHost};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
     UnitTarget,
@@ -79,7 +84,8 @@ impl TickHooks for Unspecified {}
 /// One `d2-sim` game behind the `d2-server` seams.
 ///
 /// Transport client ids (`d2-server`) and client records (`d2-sim` slots)
-/// are mapped by [`SimGame::join`]. Timer events go to `events`.
+/// are mapped by [`SimGame::join`]. Timer events go to `events`; the
+/// game's world, item and skill systems are the host `world`.
 pub struct SimGame<D = Unspecified, W = NoWorld> {
     pub game: Game,
     pub events: D,
@@ -94,13 +100,20 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// Intents that passed the gate, size check and parse, in order:
     /// (client, id, size). Their handlers are not written (see `handle`).
     pub unhandled: Vec<(ClientId, u8, usize)>,
-    /// Item state of the item handlers (`None`: their ids stay stubs).
-    pub items: Option<ItemWorld>,
-    /// World systems for the world intent handlers
-    /// ([`world_handlers`]).
+    /// The game's systems for the intent handlers ([`handlers`]: world,
+    /// cube, skills) and the outbox of their seams.
     pub world: W,
-    /// Skill / combat handlers (`handlers::skills`); `None`: stubs.
-    pub skills: Option<Box<dyn super::handlers::skills::SkillHost<D> + Send + Sync>>,
+    /// Messages sent during a tick that could not be queued, in order.
+    pub tick_faults: Vec<(ClientId, WorldError)>,
+}
+
+/// [`SimGame`]'s fields borrowed apart (for a handler).
+pub struct SimParts<'s, D, W> {
+    pub game: &'s mut Game,
+    pub events: &'s mut D,
+    pub world: &'s mut W,
+    /// The staged unit facts (act, position, owner).
+    pub facts: &'s BTreeMap<UnitId, UnitFacts>,
 }
 
 impl SimGame<Unspecified> {
@@ -118,7 +131,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     }
 
     /// A game with the given world host (one without a `Default`, e.g.
-    /// `handlers::world::TradeWorld`, built from the game's tables).
+    /// `handlers::world::WiredWorld`, built from the game's tables).
     pub fn with_world(game: Game, events: D, world: W) -> Self {
         Self {
             game,
@@ -129,9 +142,8 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             units: BTreeMap::new(),
             resyncs: Vec::new(),
             unhandled: Vec::new(),
-            items: None,
             world,
-            skills: None,
+            tick_faults: Vec::new(),
         }
     }
 
@@ -189,6 +201,37 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         let id = self.clients.get(&client)?;
         let unit = self.game.lists.client(*id)?.player?;
         (self.game.lists.unit(unit)?.ty == UnitType::Player).then_some(unit)
+    }
+
+    /// The client's player unit (unit type 0), for the handlers.
+    pub fn player_of(&self, client: ClientId) -> Option<UnitId> {
+        self.player_unit(client)
+    }
+
+    /// The fields a handler works on, borrowed apart.
+    pub fn parts(&mut self) -> SimParts<'_, D, W> {
+        SimParts {
+            game: &mut self.game,
+            events: &mut self.events,
+            world: &mut self.world,
+            facts: &self.units,
+        }
+    }
+
+    /// The transport client whose player is `unit` (`None`: a player
+    /// without a client, `intents-events.md` §3.2 rule 1).
+    pub fn client_of(&self, unit: UnitId) -> Option<ClientId> {
+        self.game
+            .lists
+            .clients()
+            .into_iter()
+            .find(|&id| {
+                self.game
+                    .lists
+                    .client(id)
+                    .is_some_and(|r| r.player == Some(unit))
+            })
+            .and_then(|id| self.transport_ids.get(&id).copied())
     }
 }
 
@@ -271,10 +314,11 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
 
     /// Per-intent behaviour belongs to the system specs (movement,
     /// skills, items, NPCs, quests; §4 rule 1). Ids a [`handlers`]
-    /// module owns run there; every other handler is a stub: it records the intent and returns 0, the "does
-    /// nothing" result of 1.14d's stubs (§2.4 rule 2). TODO(stats spec):
-    /// skill messages (0x05–0x11 except 0x0B) owe `pierce_idx` += 1
-    /// (§2.4 rule 5).
+    /// module owns run there when the host provides their system (the
+    /// skill messages' `pierce_idx` += 1 of §2.4 rule 5 is
+    /// `use_::handle_message`'s); every other handler is a stub: it
+    /// records the intent and returns 0, the "does nothing" result of
+    /// 1.14d's stubs (§2.4 rule 2).
     fn handle(
         &mut self,
         client: ClientId,
@@ -282,13 +326,19 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         size: usize,
         out: &mut dyn MessageSink,
     ) -> ResultCode {
-        if let Some(r) = handlers::items::handle(self.item_view(client), client, msg, out) {
+        if let Some(r) = handlers::items::handle(self, client, msg, out) {
+            return r;
+        }
+        if let Some(r) = handlers::items::moves::handle(self, client, msg, size, out) {
             return r;
         }
         if let Some(code) = world_handlers::handle(self, client, msg, size, out) {
             return code;
         }
         if let Some(code) = super::handlers::skills::handle(self, client, msg, out) {
+            return code;
+        }
+        if let Some(code) = handlers::walk::handle(self, client, msg, out) {
             return code;
         }
         self.unhandled.push((client, msg[0], size));
@@ -307,28 +357,24 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     }
 }
 
-impl<D: TickHooks, W> Tick for SimGame<D, W> {
+impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// `d2_sim::tick::tick` with `D` as the step hooks (`tick.md` §3:
     /// the wired dispatch's room, DRLG and population steps run; a
-    /// dispatch without them keeps the defaults). No step sends a
-    /// message yet: every sender belongs to an unwritten spec, so `out`
-    /// is unused.
-    fn tick(&mut self, _out: &mut dyn MessageSink) {
+    /// dispatch without them keeps the defaults). What the host's seams
+    /// sent during the tick ([`WorldHost::take_sent`]) is queued to the
+    /// receivers' clients in send order (§3.2 rule 1: a player without a
+    /// client receives nothing); a queueing failure is recorded in
+    /// [`SimGame::tick_faults`]. Then the deferred item messages
+    /// (`handlers::items::moves::update_pass`, `inventory.md` §6.1).
+    fn tick(&mut self, out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut self.events);
-    }
-}
-
-/// The item handlers' view (`handlers::items`).
-impl<D: EventDispatch, W> SimGame<D, W> {
-    /// The client's player unit, the game, the item world and the staged
-    /// unit facts, borrowed apart; `None` without a player or item world.
-    fn item_view(&mut self, client: ClientId) -> Option<ItemView<'_>> {
-        let player = self.player_unit(client)?;
-        Some(ItemView {
-            player,
-            game: &mut self.game,
-            world: self.items.as_mut()?,
-            facts: &self.units,
-        })
+        for (unit, bytes) in self.world.take_sent(&mut self.events) {
+            if let Some(c) = self.client_of(unit) {
+                if let Err(e) = out.queue(c, &bytes) {
+                    self.tick_faults.push((c, WorldError::from(e)));
+                }
+            }
+        }
+        handlers::items::moves::update_pass(self, out);
     }
 }
