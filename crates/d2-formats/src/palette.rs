@@ -53,12 +53,14 @@ const PL2_TEXT_COLOR: usize = 3 + 256;
 /// defined by the rendering spec; this type only exposes the layout.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pl2 {
+    /// The first 1,024 bytes: 256 × (R, G, B, x), the 4th byte not a
+    /// color. 1.14d presents this palette (`render/composition.md` §4).
+    pub base_palette: Palette,
     pub light_levels: Vec<ColorMap>,
     pub inventory_variations: Vec<ColorMap>,
     pub selected_unit_shift: ColorMap,
-    /// `[level][dest][src]`: row = destination index, column = source
-    /// index, as 1.14d's drawer reads them (`render/composition.md` §5;
-    /// `formats/palette.md` open question 2).
+    /// `[level][destination index]`, each a map over the source index
+    /// (row = destination, column = source: `render/composition.md` §5).
     pub alpha_blend: Vec<Vec<ColorMap>>,
     pub additive_blend: Vec<ColorMap>,
     pub multiplicative_blend: Vec<ColorMap>,
@@ -108,6 +110,20 @@ impl Pl2 {
         }
         let text_count = rest / PL2_TEXT_COLOR;
 
+        let mut base_palette = Palette {
+            colors: [Rgb::default(); 256],
+        };
+        for (c, e) in base_palette
+            .colors
+            .iter_mut()
+            .zip(data[..1024].as_chunks::<4>().0)
+        {
+            *c = Rgb {
+                r: e[0],
+                g: e[1],
+                b: e[2],
+            };
+        }
         let mut m = Maps { data, pos: 1024 };
         let light_levels = m.many(32);
         let inventory_variations = m.many(16);
@@ -141,6 +157,7 @@ impl Pl2 {
         let text_color_shifts = shifts.many(text_count);
 
         Ok(Pl2 {
+            base_palette,
             light_levels,
             inventory_variations,
             selected_unit_shift,
@@ -209,6 +226,27 @@ mod tests {
         assert_eq!(p.alpha_blend.len(), 3);
         assert_eq!(p.alpha_blend[2].len(), 256);
         assert_eq!(p.hue_variations.len(), 111);
+    }
+
+    // Covers: specs/formats/palette.md §pl2-palette-transform
+    #[test]
+    fn pl2_base_palette_is_rgbx_and_blend_rows_are_destinations() {
+        let mut d = pl2(0, 0);
+        d[..8].copy_from_slice(&[1, 2, 3, 0xEE, 0x10, 0x20, 0x30, 0xFF]);
+        // Alpha level 1, destination 7, source 9.
+        let at = 1024 + (32 + 16 + 1) * 256 + 256 * 256 + 7 * 256 + 9;
+        d[at] = 0x5C;
+        let p = Pl2::parse(&d).unwrap();
+        assert_eq!(p.base_palette.colors[0], Rgb { r: 1, g: 2, b: 3 });
+        assert_eq!(
+            p.base_palette.colors[1],
+            Rgb {
+                r: 0x10,
+                g: 0x20,
+                b: 0x30
+            }
+        );
+        assert_eq!(p.alpha_blend[1][7][9], 0x5C);
     }
 
     // Covers: specs/formats/palette.md §pl2-palette-transform, §edge-cases-original-bugs

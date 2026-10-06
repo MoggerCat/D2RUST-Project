@@ -190,11 +190,7 @@ pub fn frame_shake<F: ViewFeed + ?Sized>(
         })?;
     let ticks = u32::try_from(ticks)
         .map_err(|_| camera_error("screen shake", format!("{ticks} ticks exceed 32 bits")))?;
-    let a = running
-        .shake
-        .amplitude(Shake::time_of(ticks))
-        .map_err(|e| camera_error("screen shake", e.to_string()))?;
-    match a {
+    match running.shake.amplitude(Shake::time_of(ticks)) {
         None | Some(0) => Ok((0, 0)),
         Some(a) => Ok(shake_offsets(a, feed.player_seed(world)?)),
     }
