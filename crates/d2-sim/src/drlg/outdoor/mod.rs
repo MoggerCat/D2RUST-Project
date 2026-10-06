@@ -606,8 +606,10 @@ impl LevelTypes for OutdoorTypes<'_> {
         wx: i32,
         wy: i32,
         cell: u32,
+        orientation: u32,
     ) {
-        self.others.door_unit(drlg, data, room, wx, wy, cell);
+        self.others
+            .door_unit(drlg, data, room, wx, wy, cell, orientation);
     }
 
     fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {
