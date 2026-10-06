@@ -20,32 +20,39 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–70 |
-| Inputs | 71–78 |
-| Outputs / state changes | 79–83 |
-| Rules | 84–85 |
-|   1. Server-do 17 Cairn Stones `0x005AF240` | 86–105 |
-|   2. Server-do 28 Volcano `0x005AFB80` | 106–128 |
-|   3. Server-do 34 Baal taunt control `0x005B04A0` | 129–151 |
-|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 152–172 |
-|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 173–187 |
-|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 188–225 |
-|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 226–243 |
-|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 244–274 |
-|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 275–316 |
-|   10. Server-hit 36 missile in air `0x005ABF70` | 317–333 |
-|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 334–376 |
-|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 377–405 |
-|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 406–420 |
-|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 421–435 |
-|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 436–455 |
-|   16. Server-hit 52 Blade Fury `0x005AC940` | 456–474 |
-| Constants & data dependencies | 475–509 |
-| Randomness | 510–523 |
-| Edge cases & original bugs | 524–542 |
-| Test vectors | 543–561 |
-| Provenance | 562–585 |
-| Open questions | 586–599 |
+| Summary | 58–77 |
+| Inputs | 78–85 |
+| Outputs / state changes | 86–90 |
+| Rules | 91–92 |
+|   1. Server-do 17 Cairn Stones `0x005AF240` | 93–112 |
+|   2. Server-do 28 Volcano `0x005AFB80` | 113–135 |
+|   3. Server-do 34 Baal taunt control `0x005B04A0` | 136–158 |
+|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 159–179 |
+|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 180–194 |
+|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 195–232 |
+|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 233–250 |
+|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 251–281 |
+|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 282–323 |
+|   10. Server-hit 36 missile in air `0x005ABF70` | 324–340 |
+|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 341–383 |
+|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 384–412 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 413–427 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 428–442 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 443–462 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 463–481 |
+|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 482–510 |
+|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 511–527 |
+|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 528–584 |
+|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 585–597 |
+|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 598–608 |
+|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 609–628 |
+|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 629–645 |
+| Constants & data dependencies | 646–683 |
+| Randomness | 684–700 |
+| Edge cases & original bugs | 701–726 |
+| Test vectors | 727–750 |
+| Provenance | 751–778 |
+| Open questions | 779–795 |
 <!-- /index -->
 
 ## Summary
@@ -472,6 +479,170 @@ Rows: bladefury1 (505), bladefury2 (507), bladefury3 (509); `sHitPar1`
 BX (`0x006E2A58`) = 16, 16, 0, −16, −16, −16, 0, 16; BY (`0x006E2A38`) =
 0, 16, 16, 16, 0, −16, −16, −16: eight directions, 16 sub-tiles out.
 
+### 17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0`
+
+Rows: holybolt (55), fistoftheheavensbolt (234); `sHitPar1` 1 (heal
+allies), `sHitPar2` 1 (which monsters it damages: 0 all, 2 demons, any
+other value undead).
+
+1. Missile none, no record or no unit → return 1.
+2. k = skill, L = level, O = owner.
+3. Heal: `sHitPar1` ≠ 0, O exists, and the unit is O's pet
+   (`0x005542C0(game, O, unit, k)`) or ally (`0x00554D20(game, O, unit,
+   k)`; `skills/use.md` §5.3 step 2), tested in that order:
+   1. R = k's record (`0x0045C4B0`); none → return 1.
+   2. lo = `eval(O, R.calc1, k, L)` << 8; hi = `eval(O, R.calc2, k, L)`
+      << 8 (calc1 first).
+   3. v = lo + `roll(hi − lo)` on the **missile** seed (`0x0045C3E0`; no
+      step when hi − lo < 1).
+   4. v ≤ 0 → v = the §R6.2 per-element roll of stats 21 / 22 with no
+      mastery (`0x005A8910`, missile seed).
+   5. Unit life (stat 6) := min(life + v, max life) (`0x00625480`,
+      `0x00625D10`, `0x00627260(unit, 6, ·, 0)`).
+   6. `ProgOverlay` (+0x36, i16) > 0 → overlay on the unit
+      (`0x00621E40(unit, ProgOverlay, 0)`).
+   7. Return 1.
+4. Otherwise by unit type: player → 3 when `sHitPar2` = 0, else 4.
+   Monster → `sHitPar2` 0: 3; 2: 3 if demon (`0x0063E940`) else 4; any
+   other: 3 if undead (`0x0063E990`) else 4. Other types → 4.
+
+Result 3 = damage and die, 4 = pass through untouched.
+
+### 18. Server-do 22 lightning trailing javelin `0x005AF620`
+
+Rows: lightingtrailingjavalin (431), advlighttrailingjav (438);
+`Param1` 3; `SubMissile1` lightjavalintrail, advlighttrailingjav2.
+
+1. Missile none, no record, `SubMissile1` = 0 (equality: −1 passes and
+   its creations fail) or no path → return 2.
+2. (x, y) = position.
+3. Elapsed < 2: d = path target point (path +0x10, +0x12: `0x00648A00`,
+   `0x00648A10`) − (x, y); data +0x28 := −d.y, data +0x2C := d.x (the
+   perpendicular of the flight direction).
+4. Path new-step flag: zeroed record, flags 0xB (position given, target
+   relative, add loops); owner (none → fails); start (x, y); skill,
+   level; class `SubMissile1`; loops field `Param1`. Target offset (data
+   +0x28, data +0x2C): create; offset negated: create.
+5. Return flight.
+
+### 19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0`
+
+Server-hit 45 rows: lightingtrailingjavalin (431), advlighttrailingjav
+(438); `sHitPar1` 10, 18; `sHitPar2` 1; `HitSubMissile1`
+lightjavalinexplosion, advlightjavexplode. Server-hit 38 row:
+catapultchargedball (407); `sHitPar1` 4, `sHitPar2` 2;
+`HitSubMissile1` catapultchargedballbolt.
+
+Server-hit 45:
+
+1. Missile none, no record, `HitSubMissile1` < 0 or `sHitPar1` ≤ 0 →
+   return 1.
+2. Zeroed record, flags 3 (position given, target relative); start =
+   the missile's position; skill, owner (may be none), class
+   `HitSubMissile1`, level. `sHitPar2` ≠ 0 → init callback (+0x54) :=
+   `zigzag` (`0x005AC040`), argument 0.
+3. `nova(game, sHitPar1, record)`. Return 1.
+
+Server-hit 38:
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. Record as server-hit 45, owner O, init callback `zigzag` always.
+3. n = `sHitPar1` + (L − 1) × `sHitPar2`. n ≤ 0: k's record
+   (`0x0045C4B0`) none → return 1 (nothing made); n = max(`eval(O,
+   k.calc4, k, L)`, 1).
+4. `nova(game, n, record)`. Return 1.
+
+`nova(game, n, record)` = `0x0056D4E0` (ECX game, EDX n, stack record):
+
+1. (n − 1) / 5 (signed, truncating) > 7 → fatal assertion and process
+   exit (n ≥ 41).
+2. Target offset (14, −14); create.
+3. c = n − 1. For j = 0…6:
+   1. c = 0 → stop (**equality**; D2MOO 1.10f stops at c ≤ 0).
+   2. For i = 0…3 while c > 0: offset (SX[i] × P[j], SY[i] × Q[j]),
+      create; offset (SX[i] × Q[j], SY[i] × P[j]), create; c −= 2.
+   3. Offset (EX[j], EY[j]); create; c −= 1.
+
+SX (`0x006E1510`) = −1, 1, 1, −1; SY (`0x006E14E4`) = −1, −1, 1, 1; P
+(`0x006E14F4`) = 18, 20, 17, 20, 15, 19, 18; Q (`0x006E14C8`) = 8, 2,
+11, 4, 13, 6, 9; EX (`0x006E14A8`) = 20, −20, 0, 0, 14, −14, −14 (8th
+entry 14 unused); EY (`0x006E1488`) = 0, 0, 20, −20, 14, 14, −14.
+Exactly n missiles only when n − 1 is a multiple of 9; otherwise c
+passes 0 inside a round and every remaining round still adds its EX/EY
+missile (totals under Test vectors).
+
+`zigzag(missile)` = `0x005AC040` (ECX missile; init callback,
+`missiles.md` §R2.3 step 21):
+
+1. Missile none → nothing. t = min(total frames (`0x0064A300`), 255).
+2. **Re-seed** the missile seed: `init_low(path target x)` (path +0x10,
+   `0x00648A00`; `0x00650E40`).
+3. Path type := 10 (`0x00648CF0`; charged-bolt zigzag compute,
+   `missiles.md` §R4.3); path distance := t (`0x00648E70`); rebuild
+   (`0x00649970(path, missile, 0)`).
+
+### 20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790`
+
+Rows (index 23): sucfireball (441, `Param1` 3, `SubMissile1`
+sucfireballtrail), firestormmaker (458, no `Param1`, `SubMissile1`
+firestorm). Index 24 points at the same function; no row uses it.
+
+1. Missile none, no record or `SubMissile1` = 0 (equality) → return 2.
+2. Path new-step flag (`0x006505C0`, 0 without a path): zeroed record,
+   flags 1 (position given; target = start); `Param1` > 0 → flags 9 and
+   loops field `Param1`; owner (none → fails); start = the missile's
+   position; skill, level; class `SubMissile1`. Create.
+3. Return flight.
+
+### 21. Server-do 26 Vines, Plague Vines `0x005AF980`
+
+Rows: vines (471), plague vines (474); `Param1` 9; `SubMissile1`
+vines trail, plague vines trail.
+
+1. Missile none, no record or `SubMissile1` = 0 → return 2.
+2. Elapsed mod max(`Param1`, 1) = 0 (signed) → `0x0056EDE0(game, owner,
+   skill, level, SubMissile1, x, y)` at the missile's position
+   (`skills/bodies.md` §6.13).
+3. Return flight (tail jump).
+
+### 22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0`
+
+Rows: wake of destruction maker (517), baal cold maker (589);
+`SubMissile1` wake of destruction, baal cold trail. Data +0x28 / +0x2C
+hold an offset (a, b) set at creation (skills spec).
+
+1. Missile none, no record or `SubMissile1` < 0 → return 2.
+2. O = owner. None → the hit handler's no-unit path inlined
+   (`missiles.md` §R5 with unit none, a4 = 0): c = 0 with `Explosion`,
+   else 2; `CollideKill` → c |= 1; `AlwaysExplode` → `justhit` (nothing
+   without a unit), unit event 0 with no unit (`0x005C0C30`), then
+   `pSrvHitFunc` in 1…70 → c = its result (game, missile, no unit), c
+   & 4 → return 2; then c & 1 and the missile has a room → clear
+   collision 0x40 under it with its size (`0x0064EBA0`). Return 2
+   whatever c.
+3. Path new-step flag: zeroed record, flags 2 (target relative; start =
+   the origin's position); owner O; origin = the missile; skill, level;
+   class `SubMissile1`. Offset (a, b): create; offset (−a, −b): create.
+4. Return flight.
+
+### 23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50`
+
+Rows: armageddoncontrol (577), diablogeddoncontrol (670); `sHitPar1`
+3; `HitSubMissile1` armageddonfire, diablogeddonfire.
+
+1. Missile none or no record → return 1. O = owner; none → return 1.
+2. k = skill, L = level, (x, y) = position.
+3. Zeroed 0x70 record; full damage roll `0x005A89A0(missile, no unit,
+   record)` (§R6.2 draws on the missile seed).
+4. r = `sHitPar1`; r ≤ 0: k invalid → return 1; r = max(`eval(O,
+   k.aurarangecalc, k, L)`, 1).
+5. Hit flags |= `HitFlags`, result flags |= `ResultFlags`;
+   `area_damage(game, O, x, y, r, record, 0)`.
+6. `HitSubMissile1` ≥ 0 → `0x0056EDE0(game, O, k, L, HitSubMissile1, x,
+   y)` (`skills/bodies.md` §6.13).
+7. Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -491,6 +662,9 @@ BX (`0x006E2A58`) = 16, 16, 0, −16, −16, −16, 0, 16; BY (`0x006E2A38`) =
 | grim ward range | `sHitPar1`, else max(`calc1`, 5) | `0x005AB8D0` |
 | skill server-do table | `0x007322B0`, index ≤ 190 | `0x0056D810` |
 | blade fury BX / BY | 8 entries each, ±16 (§16) | `0x006E2A58` / `0x006E2A38` |
+| nova SX, SY, P, Q, EX, EY | §19 | `0x006E1510`, `0x006E14E4`, `0x006E14F4`, `0x006E14C8`, `0x006E14A8`, `0x006E1488` |
+| nova limit | (n − 1) / 5 ≤ 7, else fatal | `0x0056D4E0` |
+| zigzag path | type 10, distance min(total frames, 255) | `0x005AC040` |
 
 Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 `pSrvHitFunc` cells holding that index; royalstrikechainlightning's
@@ -503,9 +677,9 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 | 6 | hit 2 (43) §6 |
 | 4 | hit 3 (44) §8, do 6 (68) §7, hit 14 (101) §9, hit 36 (385) §10 |
 | 3 | hit 10 (86) §11, hit 16 (146) §12, hit 18 (149) §13, hit 26 (249) §14, do 14 (250) §15, hit 27 (250) §15, hit 52 (505) §16 |
-| 2 | hit 7 (55), hit 44 (429) §8, do 22 (431), hit 45 (431), do 23 (441), do 26 (471), do 31 (517), hit 56 (577) |
-| 1 | hit 8 (67), hit 9 (85), do 9 (123), hit 15 (143), hit 17 (148), do 11 (177), hit 19 (177), do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407), hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
-| 0 | do 24 (shares do 23's address), do 37, hit 5, hit 6, hit 11, hit 23 |
+| 2 | hit 7 (55) §17, hit 44 (429) §8, do 22 (431) §18, hit 45 (431) §19, do 23 (441) §20, do 26 (471) §21, do 31 (517) §22, hit 56 (577) §23 |
+| 1 | hit 8 (67), hit 9 (85), do 9 (123), hit 15 (143), hit 17 (148), do 11 (177), hit 19 (177), do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407) §19, hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
+| 0 | do 24 (shares do 23's address) §20, do 37, hit 5, hit 6, hit 11, hit 23 |
 
 ## Randomness
 
@@ -517,6 +691,9 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 | 35 | data +0x28 | one step, bit 0; low word saved |
 | 58 | missile x | `roll(2r + 1)` × 2 (x first) |
 | hit 2, do 6, hit 36, hit 10, hit 16, hit 18, hit 26, do 14, hit 27, hit 52 | — | none of their own (do 14's skill function may draw: skills spec) |
+| hit 7 | — | heal only: `roll(hi − lo)`, then if v ≤ 0 the stat 21/22 roll |
+| zigzag callback (hit 38, 45) | path target x (path +0x10) | none in the callback; the new missile's zigzag path compute (path type 10) uses this seed (`missiles.md` Open question 12) |
+| hit 56 | — | §R6.2 rolls; `area_damage` per unit |
 | hit 44, hit 14 | — (allocation seed) | `missiles.md` §R6.2 rolls in element order; then `area_damage`'s per-unit draws (not on the missile seed) |
 
 Created missiles draw on their own seeds (`missiles.md` §R2.3).
@@ -539,6 +716,13 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
    the first contact gives the state with no stat values.
 9. Server-hit 52 never sets the class: Blade Fury contacts create class
    0 (arrow) missiles, with the Blade Fury skill and level.
+10. `nova` (§19) stops only when its counter is exactly 0, so most
+    counts overshoot (n = 18 makes 24 missiles); n ≥ 41 kills the
+    process.
+11. Server-do 22, 23 and 26 reject `SubMissile1` = 0 (class arrow), not
+    an empty column (−1); server-do 6 and 31 reject < 0.
+12. Server-do 31 without an owner removes the missile (result 2) even
+    when the server-hit result would keep it.
 
 ## Test vectors
 
@@ -557,6 +741,11 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 | skill_range(Meteor, 0) | 0 (range field not set; table range) | §9 |
 | grimwardsmallstart expiry, `calc1` 3 | grimwardsmall with range 5 | synthetic, §14 |
 | grimwardsmall, elapsed 12, k > 0, L > 0 | skill server-do 30 runs with the missile as caster | live row, §15 |
+| nova n = 1, 2, 3, 5, 9, 10, 11, 18, 19, 28 | 1, 10, 10, 12, 16, 10, 18, 24, 19, 28 missiles | synthetic, §19 |
+| nova n = 3 offsets | (14, −14), (−18, −8), (−8, −18), (20, 0), (−20, 0), (0, 20), (0, −20), (14, 14), (−14, 14), (−14, −14) | synthetic, §19 |
+| catapultchargedball, L = 3 | n = 4 + 2 × 2 = 8 → 16 missiles | live row, §19 |
+| trailing javelin at (50, 50), target (60, 50), elapsed 0 | data +0x28 = 0, +0x2C = 10; trails aimed at offsets (0, 10) and (0, −10) | synthetic, §18 |
+| holybolt on a hostile non-undead monster | 4 (passes) | live row, §17 |
 | bladefury1 hit at (100, 100) | 8 class-0 missiles aimed at (116, 100), (116, 116), (100, 116), (84, 116), (84, 100), (84, 84), (100, 84), (116, 84) | live row, §16 |
 
 ## Provenance
@@ -573,10 +762,14 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
   `0x005AA650`, `0x005AA5B0`, `0x005AA460`, `0x0056BD10`, `0x005AAE10`,
   `0x006260B0` (null-safe), `0x005C6CC0` (null-safe), `0x005AB0B0`,
   `0x005AB8D0`, `0x005AEF70`, `0x0056D810` (table entry 30 =
-  `0x005C37C0`, dumped), `0x005ABA00`, `0x005AC940`; table
+  `0x005C37C0`, dumped), `0x005ABA00`, `0x005AC940`, `0x005A9FB0`,
+  `0x005AF620`, `0x00648A00` (path +0x10), `0x005AC480`, `0x005AC0A0`,
+  `0x0056D4E0` (callers: only these two, `disasm.py xref`),
+  `0x005AC040`, `0x005AF790`, `0x005AF980`, `0x005B01F0`,
+  `0x005ACC50`; table
   pointers checked (`disasm.py xref`: server-hit table `0x0073C840` +
   4 × index, server-do `0x0073C768` + 4 × index); offset tables dumped
-  from `Game.exe` (`0x006E24D0`–`0x006E25DF`, `0x006E2A38`–`0x006E2A77`). Live rows listed per
+  from `Game.exe` (`0x006E1488`–`0x006E151F`, `0x006E24D0`–`0x006E25DF`, `0x006E2A38`–`0x006E2A77`). Live rows listed per
   section; use counts from `patch_d2` `missiles.txt`, the `*12` cell
   from `missiles.bin` row 568. The D2MOO 1.10f bodies of the same names
   agree step for step (hints only; every step above is a 1.14d read).
@@ -596,3 +789,6 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 4. Blade Fury contacts create class-0 (arrow) missiles (§16): record a
    Blade Fury hit and check for the eight extra missiles and their
    damage.
+5. `nova` (§19) stops on c = 0 where D2MOO 1.10f stops on c ≤ 0:
+   record a lightning trailing javelin (`sHitPar1` 18) explosion and
+   count the bolts (24 by this rule, 18 by D2MOO's).
