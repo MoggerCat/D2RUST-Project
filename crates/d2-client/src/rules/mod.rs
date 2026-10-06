@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md, specs/render/sprite-placement.md
+// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md
 //! Original-behavior answers to the world-view hooks, one owner spec per
 //! module. Plain Rust, integer math, no Bevy types.
 //!
@@ -8,13 +8,21 @@
 //! - [`placement`]: what a draw at (X, Y) covers, row clipping, DT1
 //!   blocks, and the `DrawItem` top-left of an `IndexFrame`
 //!   (`render/sprite-placement.md`).
+//! - [`unit_composite`]: COF and component file names, directions and
+//!   cels, component requests, colormap sources, COF box culling, extra
+//!   offsets and single-cel units (`render/unit-composite.md`).
 //! - [`view`]: [`view::OriginalView`], the `ViewRules` implementation that
 //!   answers `tiles`, `unit_params` and `place` with the two modules above
 //!   and hands every other hook (pose, component frame, draw keys,
 //!   shading, blend, UI) to the rules it wraps.
+//! - [`draw_order`]: the draw-cell grid, its lists, the world passes and
+//!   the draw keys of a frame (`render/draw-order.md`), wired in through
+//!   [`draw_order::source::OrderedSource`].
 
 pub mod camera;
+pub mod draw_order;
 pub mod placement;
+pub mod unit_composite;
 pub mod view;
 
 #[cfg(test)]
