@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 1590–1638 |
 | Test vectors | 1639–1659 |
 | Provenance | 1660–1686 |
-| Open questions | 1687–1715 |
+| Open questions | 1687–1713 |
 <!-- /index -->
 
 ## Summary
@@ -449,7 +449,7 @@ invalid skill reads a null record: fatal in the original.)
 
 Return 1 only when: T is a monster; the unit is a player; T's minion
 owner (`0x0058F0D0`) is the unit; T's pet type in the player's pet
-lists (`0x00574A20(unit, T GUID)`) has a pettype record with
+lists (`0x00574A20(unit, T GUID)`, `sim/pets.md` §9) has a pettype record with
 `unsummon` (+0x04 bit 3); the used skill entry exists — then entry
 param 1 (+0x18, `0x00644560`) := T's GUID. Otherwise 0.
 
@@ -757,7 +757,7 @@ flag 0x80000000 clear.
    removed (`0x00555600`); else flags |= 0x4000000 (no experience) and
    `0x0057CCB0(it, 1)`; then the link := −1 (`0x00554040`); then the
    link := m's GUID. Last: pet list add `0x00575D90(game, owner, m, pet
-   type, max(pet max, 1))` (players only; Open question 8).
+   type, max(pet max, 1))` (players only; `sim/pets.md` §2).
 5. m flags |= 0x20000 (no drop).
 6. Owner data `0x0058F030(game, m, owner GUID, owner type, 0, 0)` (no
    owner: GUID −1, type 6).
@@ -1704,10 +1704,8 @@ per ring, n per Multiple Shot) takes one game-seed step
 7. `0x005B0DA0` second argument (monstats) and AI kinds 10–12
    (`monsters/ai.md` special states): confirm which classes Terror and
    Dim Vision can switch.
-8. Player pet lists (no owner spec yet; D2MOO `PlayerPets.cpp`): pet add
-   `0x00575D90(game, owner, m, pet type, max)` (eviction over the
-   maximum, messages), pet type lookup `0x00574A20`. Write a
-   `sim/pets.md` from 1.14d and link §3.3 and §6.2 to it.
+8. Answered: the player pet lists (add `0x00575D90`, lookup
+   `0x00574A20`) are specified in `sim/pets.md`.
 9. Recording: Raise a Druid summon and a Clay Golem: confirm stats 12,
    31, 19, 7, 6 on the summon (§6.4, §6.5) and the AI think at F + 25.
 
