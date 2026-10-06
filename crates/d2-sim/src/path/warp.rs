@@ -47,14 +47,15 @@ pub fn warp_tile_preset<W: WarpTileView>(
     if lx == r.w || ly == r.h {
         return Ok(false);
     }
-    // Rule 3.
+    // Rule 3. 32-bit adds with the table's offsets: wrap, never trap
+    // (the original's integer arithmetic; lvlwarp values are data).
     w.add_preset_unit(
         room,
         TILE_UNIT_TYPE,
         rec.id,
         0,
-        5 * lx + rec.offset_x,
-        5 * ly + rec.offset_y,
+        lx.wrapping_mul(5).wrapping_add(rec.offset_x),
+        ly.wrapping_mul(5).wrapping_add(rec.offset_y),
     );
     Ok(true)
 }
@@ -119,7 +120,11 @@ where
         return Ok(WarpOutcome::NotPlaced);
     }
     // Rule 5.
-    let (tx, ty) = (p.x + dest.exit_walk_x, p.y + dest.exit_walk_y);
+    // 32-bit adds with lvlwarp `ExitWalkX/Y` (data): wrap, never trap.
+    let (tx, ty) = (
+        p.x.wrapping_add(dest.exit_walk_x),
+        p.y.wrapping_add(dest.exit_walk_y),
+    );
     host.request_walk(player, tx, ty);
     // Rule 6.
     let life_pct = host.life_percent(player);
@@ -139,10 +144,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::coords::Point;
     use super::super::place::tests::{unit, Host};
-    use super::super::place_seams::{LvlWarp, SubPoint, TileRect, WarpDestination};
+    use super::super::place_seams::{LvlWarp, WarpDestination};
     use super::super::search::tests::Grid;
     use super::*;
+    use crate::drlg::TileRect;
 
     #[derive(Default)]
     struct Drlg {
@@ -211,7 +218,7 @@ mod tests {
     fn dest(level: u32) -> WarpDestination<usize> {
         WarpDestination {
             room: 0,
-            point: SubPoint::new(10, 10),
+            point: Point::new(10, 10),
             exit_walk_x: 3,
             exit_walk_y: -2,
             source_level: 1,
@@ -310,7 +317,7 @@ mod tests {
         // point either → no free point.
         let lv = Host {
             warp: Some(WarpDestination {
-                point: SubPoint::new(-60, -60),
+                point: Point::new(-60, -60),
                 ..dest(2)
             }),
             ..Host::default()

@@ -620,6 +620,61 @@ fn bridge_with_units() -> (Bridge<RecordingLink>, RecordingLink) {
     (Bridge::with_dispatch(link.clone(), d).unwrap(), link)
 }
 
+/// Fixture camera feed: the player at client (1000, 2000), unit `guid`
+/// at client (1000 + 10 × guid, 2000), one floor tile on cell (26, 18)
+/// (screen (40, 40)), open mode 0, no shake.
+struct TestFeed;
+
+fn moving(px: i32, py: i32) -> crate::rules::UnitPosition {
+    let (a, b) = (px + 2 * py, 2 * py - px);
+    crate::rules::UnitPosition::Moving {
+        x16: (a as u32) << 11,
+        y16: (b as u32) << 11,
+    }
+}
+
+impl crate::rules::ViewSource for TestFeed {
+    fn unit_position(&self, u: &ClientUnit) -> Result<crate::rules::UnitPosition, String> {
+        Ok(moving(1000 + 10 * u.key.guid as i32, 2000))
+    }
+    fn unit_offset(&self, _: &ClientUnit, _: &UnitPose) -> Result<(i32, i32), String> {
+        Ok((0, 0))
+    }
+    fn map_tiles(
+        &self,
+        _: &ClientWorld,
+        _: &ViewAssets,
+    ) -> Result<Vec<crate::rules::MapTile>, ViewError> {
+        Ok(vec![crate::rules::MapTile {
+            cell: (26, 18),
+            list: crate::rules::TileList::Floor,
+            frame: ComponentFrame {
+                set: tile_key(),
+                index: 0,
+            },
+            blocks: Vec::new(),
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+            key: DrawKey::new(0, 0, 0, 0).unwrap(),
+        }])
+    }
+}
+
+impl ViewFeed for TestFeed {
+    fn player(&self, _: &ClientWorld) -> Result<Option<crate::rules::UnitPosition>, ViewError> {
+        Ok(Some(moving(1000, 2000)))
+    }
+    fn open_mode(&self, _: &ClientWorld) -> Result<crate::rules::OpenMode, ViewError> {
+        Ok(crate::rules::OpenMode::NONE)
+    }
+    fn shake(&self, _: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
+        Ok(None)
+    }
+    fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut d2_sim::rng::Seed, ViewError> {
+        unreachable!("no shake")
+    }
+}
+
 /// C→S Walk to (3, 4).
 const WALK: [u8; 5] = [0x01, 3, 0, 4, 0];
 
@@ -697,7 +752,11 @@ fn bevy_frame_presents_the_cpu_image() {
         .init_resource::<ButtonInput<MouseButton>>()
         .add_plugins((crate::bridge::BridgePlugin, WorldViewPlugin { gpu: false }))
         .insert_resource(BridgeResource(boxed))
-        .insert_resource(WorldViewState::new(assets(), Box::new(TestRules)));
+        .insert_resource(WorldViewState::new(
+            assets(),
+            Box::new(TestRules),
+            Box::new(TestFeed),
+        ));
     let mut ui = WorldViewUi::new(ui_root(), Box::new(NoStrings));
     ui.queue.0.push(PRESS);
     app.insert_non_send(ui);
@@ -718,7 +777,12 @@ fn bevy_frame_presents_the_cpu_image() {
     assert_eq!((stats.ui_sent, stats.gpu), (1, false));
     assert_eq!(*link.sent.lock().unwrap(), vec![WALK.to_vec()]);
 
-    let (f, a) = scene_frame();
+    // The app builds through the original's placement (`OriginalView`,
+    // camera from the feed), not the fixture's `place` / `tiles`.
+    let a = assets();
+    let w = world(&[(0, 7), (1, 4), (1, 9)]);
+    let f = build_frame(&w, &[ui_image(300, 200)], &TestRules, &mut TestFeed, &a).unwrap();
+    assert_eq!(f.items.len(), 6);
     let expected = compose_cpu(&f, &a).unwrap();
     let target = app.world().resource::<present::WorldViewTarget>();
     let image = app
