@@ -258,21 +258,18 @@ impl Drlg {
         if !self.room(n).rect.contains_closed(x, y) {
             return;
         }
-        let (Some(a), Some(b)) = (self.coord_at_tile(n, x, y), self.coord_at_tile(id, x, y))
-        else {
+        let (Some(a), Some(b)) = (self.coord_at_tile(n, x, y), self.coord_at_tile(id, x, y)) else {
             return;
         };
-        let same_level =
-            self.level(self.room(n).level).id == self.level(self.room(id).level).id;
-        if a.index != 0 && b.index != 0 && same_level && a.index != b.index && a.node == b.node
-        {
+        let same_level = self.level(self.room(n).level).id == self.level(self.room(id).level).id;
+        if a.index != 0 && b.index != 0 && same_level && a.index != b.index && a.node == b.node {
             self.rename_logic(id, b.index, a.index);
         }
     }
 
     /// Step 11 (`0x0066C770`): rename `old` to `new` in a grid-built room
     /// and, if any record changed, in its rooms near of the same level id.
-    fn rename_logic(&mut self, id: DrlgRoomId, old: u32, new: u32) {
+    pub(super) fn rename_logic(&mut self, id: DrlgRoomId, old: u32, new: u32) {
         let Some(info) = self.room_mut(id).logic.as_mut() else {
             return;
         };

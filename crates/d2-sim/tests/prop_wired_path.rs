@@ -1152,6 +1152,26 @@ fn monsters(h: &Host) -> Vec<UnitId> {
     v
 }
 
+/// The monsters created from the DS1's preset (the pending log's
+/// `preset` lines); room population (`population.md` §3) places the
+/// others.
+fn preset_monsters(h: &Host) -> Vec<UnitId> {
+    monsters(h)
+        .into_iter()
+        .filter(|u| {
+            let tag = format!("preset {} ", u.0);
+            h.fx.sim
+                .action
+                .sys
+                .hooks
+                .x
+                .log
+                .iter()
+                .any(|l| l.starts_with(&tag))
+        })
+        .collect()
+}
+
 /// Counterexample 1: without a client the player's rooms are
 /// deactivated after 10 counts of tick step 9 (`rooms.md` §7.2: the
 /// inactivity counter is reset only by clients), with the player in
@@ -1187,7 +1207,7 @@ fn regress_a_size_one_monster_is_placed_by_its_cell_not_its_plus() {
     let wall = vec![(12, 11, bits::WALL)];
     let mut h = host(&plain(1, 1, wall.clone()));
     tick(&mut h.fx);
-    let m = monsters(&h);
+    let m = preset_monsters(&h);
     assert_eq!(m.len(), 1);
     let f = feet(&h.fx)[&m[0]].clone();
     assert_eq!((f.x, f.y, f.size, f.pattern), (40012, 40010, 1, 1));
@@ -1207,7 +1227,7 @@ fn regress_a_size_one_monster_is_placed_by_its_cell_not_its_plus() {
 fn regress_population_tests_the_size_shape() {
     let mut h = host(&plain(1, 2, vec![(12, 11, bits::WALL)]));
     tick(&mut h.fx);
-    let m = monsters(&h);
+    let m = preset_monsters(&h);
     assert_eq!(m.len(), 1);
     let f = feet(&h.fx)[&m[0]].clone();
     assert_ne!((f.x, f.y), (40012, 40010));

@@ -149,24 +149,27 @@ fn a_level_d2rs_cannot_build_is_unsupported() {
     assert!(e.to_string().contains("no levels.txt row"), "{e}");
 }
 
+// M08 for the wiring: room population runs on the live host
+// (`levels.md` §11.6), so random-boss queries are answered: the unique
+// seeds of the earlier fake (one record per room, index 1) are the live
+// host's too, because a one-record room's list is exactly that record
+// (`levels.md` §11.2 step 2).
 #[test]
-fn the_live_host_refuses_random_boss_queries() {
-    // Without coordinate lists (the live seams) room population places
-    // nothing: champion and unique queries are refused, preset ones run.
+fn the_live_host_answers_random_boss_queries() {
     let p = prepared();
-    for k in ["champion", "unique"] {
-        let q = query(&format!("--level 2 --monster kind={k}"));
-        let e = search(p, &q, Seams::default).unwrap_err().to_string();
-        assert!(e.starts_with("unsupported query"), "{e}");
-    }
+    let q = query("--level 2 --seeds 1-100 --monster kind=unique --threads 2");
+    let o = search(p, &q, Seams::default).unwrap();
+    assert_eq!(o.unsupported, None);
+    assert_eq!(seeds(&o), UNIQUE_SEEDS);
     let q = query("--level 2 --seeds 1-20");
     let o = search(p, &q, Seams::default).unwrap();
     assert_eq!(o.hits.len(), 20);
-    assert!(o.hits.iter().all(|h| h.view.monsters.is_empty()));
+    assert!(o.hits.iter().any(|h| !h.view.monsters.is_empty()));
 }
 
 /// The binary on a synthetic install as `D2_GAME_DIR` (`--town-only`):
-/// matches printed, exit 0; an unsupported query or level, exit 2.
+/// matches printed, exit 0; a unique query accepted; an unsupported
+/// level, exit 2.
 #[test]
 fn the_binary_runs_on_an_install() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
@@ -187,9 +190,15 @@ fn the_binary_runs_on_an_install() {
         out.ends_with("3 match(es) in 3 seed(s) checked from 1\n"),
         "{out}"
     );
-    let o = run("--level 2 --monster kind=champion --town-only");
-    assert_eq!(o.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&o.stderr).starts_with("unsupported query"));
+    let o = run("--level 2 --seeds 1-100 --monster kind=unique --threads 2 --town-only");
+    assert_eq!(o.status.code(), Some(0));
+    let out = String::from_utf8_lossy(&o.stdout);
+    // Accepted (no longer refused); the binary's tables have no
+    // spawnable rows (no `tweak_world`), so the count is not pinned.
+    assert!(
+        out.ends_with(" match(es) in 100 seed(s) checked from 1\n"),
+        "{out}"
+    );
     let o = run("--level 3 --seeds 1-3 --town-only");
     assert_eq!(o.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&o.stderr).contains("unsupported level 3 (seed 1)"));

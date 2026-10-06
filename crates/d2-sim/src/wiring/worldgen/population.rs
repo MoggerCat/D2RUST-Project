@@ -94,7 +94,9 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         match r {
             Some(Ok(n)) => n as i32,
             Some(Err(e)) => {
-                self.w.errors.push(WorldgenError::Wiring(WiringError::Drlg(e)));
+                self.w
+                    .errors
+                    .push(WorldgenError::Wiring(WiringError::Drlg(e)));
                 0
             }
             None => 0,
@@ -164,17 +166,24 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
     fn spawn_location(&mut self, room: RoomId, kind: u8) -> Option<(i32, i32)> {
         let level = self.room_level_id(room) as u32;
         let act = crate::drlg::act_of_level(level);
-        let r = self.v.h.drlg.with_act(act, &mut self.game.lists, |d, svc| {
-            if u32::from(kind) == crate::drlg::level::KIND11_TILE {
-                d.kind11_location(svc, level)
-            } else {
-                d.spawn_room(svc, level, u32::from(kind)).map(|p| (p.x, p.y))
-            }
-        })?;
+        let r = self
+            .v
+            .h
+            .drlg
+            .with_act(act, &mut self.game.lists, |d, svc| {
+                if u32::from(kind) == crate::drlg::level::KIND11_TILE {
+                    d.kind11_location(svc, level)
+                } else {
+                    d.spawn_room(svc, level, u32::from(kind))
+                        .map(|p| (p.x, p.y))
+                }
+            })?;
         match r {
             Ok(p) => Some(p),
             Err(e) => {
-                self.w.errors.push(WorldgenError::Wiring(WiringError::Drlg(e)));
+                self.w
+                    .errors
+                    .push(WorldgenError::Wiring(WiringError::Drlg(e)));
                 None
             }
         }

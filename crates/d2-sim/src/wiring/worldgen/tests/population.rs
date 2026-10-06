@@ -199,3 +199,39 @@ fn room_population_creates_packs_through_monster_init() {
     }
     assert_eq!(units, populate().0);
 }
+
+// Covers: specs/drlg/levels.md §11.5 r1, §11.5 r2, §11.5 r3, §11.5 r4, §11.4
+#[test]
+fn drlg_population_reads_are_the_act_drlgs() {
+    let mut fx = Fx::new(isle_ds1s());
+    let (a, b) = isle(&mut fx);
+    let dr = fx.drlg().drlg_room_of(a).unwrap();
+    let l = fx.drlg().room(dr).level;
+    let n = fx.drlg().level_rooms(l).len() as i32;
+    fx.sim.host(&mut fx.game, |h| {
+        // §11.5 items 1 and 2.
+        assert_eq!(h.populated_level(a), ISLE as i32);
+        assert_eq!(h.populated_room_count(0, ISLE as i32), n);
+        // §11.4 `0x0061B130`: B's one record (index 1) found from A
+        // through the adjacency array; a point in no room → 0.
+        assert_eq!(h.coord_index_at(a, 40045, 40005), 1);
+        assert_eq!(h.coord_index_at(a, 0, 0), 0);
+        // §11.5 item 3: no warp-room centres on this level.
+        assert!(h.warp_points(a).is_empty());
+        // §11.5 item 4: Position 0, no waypoint or warp room: the room
+        // holding the level's centre (8018, 8007), i.e. (8016, 8000, 8, 8),
+        // and its centre in tiles.
+        assert_eq!(h.spawn_location(a, 11), Some((8020, 8004)));
+    });
+    // A flag-0x800000 room is not populated and not counted; the warp
+    // points are the level's warp-room centres.
+    fx.drlg_mut().room_mut(dr).flags |= crate::drlg::room_flags::NO_POPULATION;
+    fx.drlg_mut().level_mut(l).warp_centres.push((40020, 40020));
+    fx.sim.host(&mut fx.game, |h| {
+        assert_eq!(h.populated_level(a), 0);
+        assert_eq!(h.populated_level(b), ISLE as i32);
+        assert_eq!(h.populated_room_count(0, ISLE as i32), n - 1);
+        assert_eq!(h.warp_points(b), [(40020, 40020)]);
+    });
+    fx.assert_clean();
+}

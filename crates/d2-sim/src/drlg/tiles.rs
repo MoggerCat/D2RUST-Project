@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 
 use super::data::DrlgData;
 use super::level::Drlg;
+use super::logic::LogicGrids;
 use super::room::RoomKind;
 use super::seams::{Services, TileInfo, TileSource};
-use super::logic::LogicGrids;
 use super::{room_flags, DrlgError, DrlgRoomId, TileRect};
 
 /// The three fixed library files loaded after the mask's files (§9.3).
