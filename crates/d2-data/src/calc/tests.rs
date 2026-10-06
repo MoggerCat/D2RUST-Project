@@ -1159,8 +1159,10 @@ mod game {
                     &text.table(table).unwrap().compiled,
                 );
                 assert_eq!(b.count, c.count, "{table}");
-                for f in calc_fields(table, buffer) {
-                    for r in 0..b.count {
+                // Record-major, as `bin::formula_fields` collects them.
+                let fields = calc_fields(table, buffer);
+                for r in 0..b.count {
+                    for f in &fields {
                         let o = f.offset as usize;
                         let v = bin::u32_at(b.record(r), o);
                         assert_eq!(bin::u32_at(c.record(r), o), v, "{table} {r} {}", f.name());
