@@ -872,7 +872,8 @@ pub enum Dispatch {
     Waypoint(Operate),
     /// A quest function: the caller runs the quest spec's.
     Quest(Operate),
-    /// A `todo` function: nothing ran.
+    /// A `todo` function: nothing ran. Also a portal (operate 15) whose
+    /// rule 3 the host did not run (§12, open question 7).
     NotCovered(Operate),
 }
 
@@ -943,24 +944,29 @@ pub fn dispatch<W: ObjectHost>(
         Route::Waypoint => Dispatch::Waypoint(op),
         Route::Quest => Dispatch::Quest(op),
         Route::NotCovered => Dispatch::NotCovered(op),
-        Route::Here => Dispatch::Done(run_operate(ctl, t, w, &op)?),
+        Route::Here => match run_operate(ctl, t, w, &op)? {
+            Some(r) => Dispatch::Done(r),
+            None => Dispatch::NotCovered(op),
+        },
     })
 }
 
+/// The operate functions this spec owns; `None`: the function stopped at a
+/// step not specified yet (portal rule 3).
 fn run_operate<W: ObjectHost>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
     op: &Operate,
-) -> Result<i32, ObjectError> {
+) -> Result<Option<i32>, ObjectError> {
     match op.operate_fn {
-        1 | 3 | 4 | 5 | 7 | 14 | 68 => chests::operate(ctl, t, w, op),
-        2 => shrines::operate(ctl, t, w, op),
-        8 => misc::door(ctl, t, w, op),
-        11 => misc::torch(ctl, t, w, op),
+        1 | 3 | 4 | 5 | 7 | 14 | 68 => chests::operate(ctl, t, w, op).map(Some),
+        2 => shrines::operate(ctl, t, w, op).map(Some),
+        8 => misc::door(ctl, t, w, op).map(Some),
+        11 => misc::torch(ctl, t, w, op).map(Some),
         15 => misc::portal(ctl, t, w, op),
-        22 => misc::well(ctl, t, w, op),
-        _ => Ok(0),
+        22 => misc::well(ctl, t, w, op).map(Some),
+        _ => Ok(Some(0)),
     }
 }
 
