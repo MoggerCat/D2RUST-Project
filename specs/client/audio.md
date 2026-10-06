@@ -1,0 +1,186 @@
+# Spec: Client — Audio (decode, mixer, triggers)
+
+- **Status:** draft; d2rs-own design draft (2026-10-06, architecture
+  session). Part (a) is our design; part (b) lists original behavior to
+  reproduce, each with an owner spec to be written locally (RE).
+- **Target version:** 1.14d
+- **Crate/module:** `d2-client::audio` (scheduler, mixer, voice log;
+  plain Rust core), `d2-client::audio::output` (Bevy/rodio stream)
+- **Related specs:** `formats/mpq.md` §12 (ADPCM sectors), `data/loading.md`
+  §3.4 (`sounds.txt`, `soundenviron.txt` read at runtime),
+  `formats/cof.md` (frame event 3 = sound), `sim/intents-events.md`
+  (S→C 0x2C `PlaySound`), `sim/tick.md` (tick numbers),
+  `client/assets.md` §A5 (sound budget)
+
+## Summary
+
+Sounds are decoded to exact i16 samples from the user's archives, started
+by **trigger events** stamped with the tick they belong to, and mixed by
+our own integer mixer. Fidelity is measured where the original can be
+observed exactly: the **decoded samples** of every sound file and the
+**voice log** (which file, at which tick, with which integer volume, pan,
+loop and stop parameters). The mixed output stream is ours: it is
+deterministic and golden-tested, but it is not compared to the original
+(the original hands voices to DirectSound; its mix is not ours to
+reproduce).
+
+## Inputs
+
+| Name | Type | Source |
+|---|---|---|
+| sound files | `.wav` bytes after MPQ decode | `client/assets.md` |
+| sound table | `sounds.txt`, `soundenviron.txt` rows | `data/loading.md` §3.4 |
+| sim events | sound-bearing events with tick `t` | bridge (snapshots/events, S→C 0x2C, unit modes and frames) |
+| UI events | panel/click events at client tick `t` | `client/ui.md` §B8 |
+| listener | player position, settings volumes | bridge, `ClientConfig` |
+
+## Outputs / state changes
+
+Voice log entries (§A5), a stereo i16 stream to the device.
+
+## Rules
+
+### A. d2rs design (ours)
+
+#### A1. Decode path
+
+1. `ArchiveSet` reads the `.wav` file; sector decompression (Huffman +
+   ADPCM, `mpq.md` §9–§12) is done in `d2-formats` and gives RIFF bytes
+   (all 5,008 such files decode to their RIFF size, `mpq.md`
+   Observations).
+2. A RIFF/WAVE parser (`d2-formats::wav`, owner `formats/wav.md`, to be
+   written from a survey of the live files, §B1) gives
+   `Sound { rate, channels, samples: Vec<i16> }`.
+3. Stored once per file in the sound pool (`client/assets.md` §A5).
+   No resampling, no float, at decode.
+
+Exactness check 1 (**decoded samples**): for every live `.wav`, our
+`samples` equal the samples 1.14d hands to its sound output for that file
+(§B1 measurement), compared as i16 arrays.
+
+#### A2. Triggers
+
+Every sound start is a `Trigger`:
+
+```
+Trigger { tick: u32, source: TriggerSource, sound: SoundId,
+          params: VoiceParams, cause: CauseTag }
+```
+
+- `tick` is the simulation tick the cause belongs to (from the bridge's
+  tick stamp), or the client tick for UI causes. Triggers are produced by
+  plain-Rust rule functions from snapshots and events, one function per
+  cause class (§B2–§B6). The audio module never inspects Bevy state.
+- `SoundId` and `VoiceParams` (integer volume 0..=255 or as §B3 says,
+  integer pan, loop flag, priority, group) come from the §B3 rules over
+  `sounds.txt`. Floats are not used.
+- Random choices among sound variants use a client RNG
+  (`d2_sim::rng::Seed` algorithm, its own seed and draw order per §B3),
+  never the sim's seeds and never a thread RNG. This adds a
+  `d2-client → d2-sim` dependency for the RNG type only (allowed by
+  `tools/depcheck`); no sim state is touched.
+- Triggers for one tick are processed in the order the §B rules emit
+  them; the scheduler keeps that order (stable).
+
+#### A3. Scheduler and clock
+
+- The audio clock is slaved to the presentation tick: when the client
+  presents tick `t`, all triggers with `tick ≤ t` not yet started are
+  started at the next mixer block.
+- Voice limits, stealing and per-sound repeat suppression are §B3; the
+  scheduler exposes a `VoicePolicy` hook for them.
+- Stops (unit death, area change, loop end) are also tick-stamped
+  events and are logged.
+
+#### A4. Mixer
+
+- Fixed output rate `R` = 44,100 Hz stereo, block 512 frames (ours;
+  changeable). Each voice resamples from its file rate with an integer
+  phase accumulator (32.32 fixed point), nearest-sample (no
+  interpolation) unless §B3 shows the original asks for a different
+  playback rate per voice.
+- Gain: `out = (s × vol × pan_l) >> shift` in i32, summed per block in
+  i32, saturated to i16. Pan and volume curves are tables from §B3, not
+  formulas we invent.
+- The mixer is pure: `mix(voices, block) -> [i16; 1024]`; golden tests
+  hash the output of scripted voice sets (determinism, not fidelity).
+- Output: one custom `rodio::Source` registered through Bevy's
+  `Decodable` (checked in pinned `bevy_audio 0.19.1`: the decoder item is
+  `rodio::Sample`, an f32). i16 → f32 is `s / 32768.0`, exact in f32;
+  device conversion and resampling after that are outside the
+  exactness boundary.
+
+#### A5. Voice log (exactness check 2)
+
+Every start and stop appends a record:
+
+```
+VoiceEvent { tick: u32, kind: Start | Stop | Param, file: CanonicalPath,
+             vol: i32, pan: i32, looped: bool, cause: CauseTag }
+```
+
+- `d2-client --audio-log FILE` writes it as JSON lines with a header
+  `{ "format": "d2rs-audio-log", "version": 1 }` (M20).
+- The original's counterpart is a trace of the sound output calls with
+  the tick number (§B7). Comparison: identical sequence of
+  `(tick, kind, file, vol, pan, looped)` for a replayed recording.
+  `cause` is ours (debugging) and not compared.
+
+### B. Original behavior to reproduce (not specified here)
+
+| # | Behavior | Owner spec (to write) | Measure | Comparison |
+|---|---|---|---|---|
+| B1 | WAV subset in 1.14d archives (format tags, bit depths, rates, channels, chunk order) and the samples 1.14d passes to its sound output | `formats/wav.md` | survey of every live `.wav` (`mpq-tool formats` extension); debugger dump of buffers at the sound output | identical i16 samples per file |
+| B2 | Which sim events make sounds: S→C 0x2C fields (`server-messages.tsv`, status partial), unit mode changes, COF frame event 3, missiles, skills (`skills.txt` sound columns), monsters (`monsounds`), items (drop/use sounds), objects | `audio/triggers.md` | packet + sound-call trace on a recorded game | identical (tick, file) sequence |
+| B3 | `sounds.txt` semantics: volume, pan from listener distance, falloff, priority, groups and variants (and their RNG), loop, repeat suppression, voice limit and stealing | `audio/sound-table.md` | sound path; traces with known positions | identical (vol, pan, looped) per voice event |
+| B4 | Environment and ambient sound: `soundenviron.txt` by level, day/night, random ambient cues | `audio/environment.md` | traces while walking between areas | identical voice log |
+| B5 | Music: which track per level, transitions, loop | `audio/environment.md` | traces | identical (tick, file) |
+| B6 | UI and speech sounds (NPC dialog, quests, item pickup, panel clicks) | `audio/triggers.md` | traces | identical voice log |
+| B7 | Recording the original's sound calls with tick numbers | `tools/trace-recorder` (`record_sound.py`) + `traces/FORMAT.md` | debugger hooks on the sound-output entry points | a static scene recorded twice gives identical logs (stability first) |
+| B8 | Volume settings (sound/music sliders) to integer volume | `audio/sound-table.md` | traces at known slider settings | identical vol |
+
+## Constants & data dependencies
+
+Ours: `R` = 44,100 Hz, block 512 frames, log format version 1. Data:
+`sounds.txt`, `soundenviron.txt` (runtime, `data/loading.md` §3.4).
+
+## Randomness
+
+Variant choices and ambient cues use a client-side seeded RNG (§A2); its
+seeding and draw order are §B3/§B4. No other randomness.
+
+## Edge cases & original bugs
+
+To be listed by the §B owners. Design rule: a trigger naming a missing
+file is an error logged with its cause; the voice log records it as a
+`Start` with `file` and an error flag, so a log comparison still shows
+it.
+
+## Test vectors
+
+| Input | Expected output | Source |
+|---|---|---|
+| ADPCM mono vectors | as `mpq.md` Test vectors (already pass) | `mpq.md` §12 |
+| two triggers in one tick | started in emission order | §A2 |
+| trigger at tick 10, presented tick 9 then 10 | starts in the block after tick 10 is presented | §A3 |
+| mixer: one voice, full volume, centered, constant 1000 | output per §B3 tables (vector added with B3) | §A4 |
+| mixer: two voices summing past 32767 | saturates to 32767 | §A4 |
+| file rate 22,050 → 44,100 | each sample output twice (nearest) | §A4 |
+| scripted voice set | stable output hash across runs and platforms | §A4 golden |
+| audio log header | `{"format":"d2rs-audio-log","version":1}` | §A5 |
+
+## Provenance
+
+Design decided 2026-10-06 (architecture session) from `mpq.md` (ADPCM,
+observations), `data/loading.md` §3.4, `cof.md` events and the S→C
+message table. Bevy audio interface checked in the pinned registry
+source. No original behavior is stated here.
+
+## Open questions
+
+1. §B1–§B8.
+2. If the original changes playback rate per voice (pitch variation),
+   the mixer gains a rate field and the voice log a rate column (§B3).
+3. Whether 44,100 Hz suits all devices or the device rate should be used
+   directly: ours to decide after first use; no effect on either
+   exactness check.

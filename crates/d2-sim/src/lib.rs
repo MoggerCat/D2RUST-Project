@@ -9,8 +9,10 @@
 //! of these are enforced by `clippy.toml` and `[lints]` in this crate.
 
 pub mod game;
+pub mod items;
 pub mod rng;
 pub mod tick;
+pub mod treasure;
 pub mod units;
 
 /// Simulation ticks per second, matching the original game.

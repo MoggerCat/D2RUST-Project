@@ -245,6 +245,7 @@ fn decode_rle(encoded: &[u8]) -> Result<Vec<u8>, FormatError> {
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/dt1.md §block-pixels
     #[test]
     fn iso_vector() {
         let encoded: Vec<u8> = (0..=255).collect();
@@ -256,6 +257,7 @@ mod tests {
         assert!(decode_iso(&encoded[..255]).is_err());
     }
 
+    // Covers: specs/formats/dt1.md §block-pixels
     #[test]
     fn rle_vector() {
         let px = decode_rle(&[2, 3, 10, 11, 12, 0, 0, 1, 1, 13]).unwrap();
@@ -295,6 +297,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
     #[test]
     fn whole_file() {
         let dt1 = Dt1::parse(&file()).unwrap();
@@ -307,6 +310,7 @@ mod tests {
         assert_eq!(&b.pixels[1..3], &[7, 8]);
     }
 
+    // Covers: specs/formats/dt1.md §block-header-20-bytes-each-at-the-tile-s-block-headers-offset
     #[test]
     fn bad_block_offset() {
         let mut data = file();

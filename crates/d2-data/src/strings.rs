@@ -105,6 +105,7 @@ mod tests {
     }
 
     /// `field-types.md` §7 test vectors (1.14d ENG, LoD).
+    // Covers: specs/data/field-types.md §7
     #[test]
     #[ignore = "needs original game files in D2_GAME_DIR"]
     fn strkey_vectors() {

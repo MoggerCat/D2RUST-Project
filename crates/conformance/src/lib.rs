@@ -3,6 +3,7 @@
 //! `d2-sim` itself does no I/O.
 
 pub mod rng;
+pub mod tick;
 mod trace;
 
 pub use trace::{Trace, TraceError};

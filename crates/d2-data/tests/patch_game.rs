@@ -54,6 +54,7 @@ fn errors(f: &[Finding]) -> Vec<&Finding> {
     f.iter().filter(|f| f.code.is_error()).collect()
 }
 
+// Covers: specs/data/patch-layers.md §9
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn g1_rows_render_identity_and_empty_diff() {
@@ -78,6 +79,7 @@ fn g1_rows_render_identity_and_empty_diff() {
     }
 }
 
+// Covers: specs/data/patch-layers.md §7 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn g2_empty_stack_compiles_clean() {
@@ -155,6 +157,7 @@ fn g3_example_stack() {
     fixup::apply(&patched, anim()).expect("fix-ups apply");
 }
 
+// Covers: specs/data/patch-layers.md §4, §5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn g4_g5_selector_and_key_errors() {
@@ -182,6 +185,7 @@ fn c02(body: &str) -> Vec<Finding> {
     compile_patched(base(), &data, live()).findings
 }
 
+// Covers: specs/data/patch-layers.md §7
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn g6_g7_g8_compile_checks() {

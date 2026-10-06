@@ -45,6 +45,7 @@ fn wide(r: &[u8], at: usize, units: usize) -> String {
 
 // ------------------------------------------------------------- fixups.md
 
+// Covers: specs/data/fixups.md §3
 #[test]
 fn pet_skills_cap_at_15() {
     let mut pet = table("pettype", 224, vec![vec![]; 2]);
@@ -85,6 +86,7 @@ fn isc(n: usize, stats: &[(usize, u8, u8, u16, [u16; 3])]) -> BinTable {
     t
 }
 
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 fn stat_ops_base_and_targets() {
     let mut t = isc(3, &[(1, 2, 3, 0, [2, 0xFFFF, 0])]);
@@ -102,6 +104,7 @@ fn stat_ops_base_and_targets() {
     assert_eq!(u32_at(t.record(1), 0x04), 0);
 }
 
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 fn stat_ops_bad_op_is_cleared() {
     let mut t = isc(3, &[(1, 14, 3, 0, [2, 0xFFFF, 0])]);
@@ -114,6 +117,7 @@ fn stat_ops_bad_op_is_cleared() {
     }
 }
 
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 fn stat_ops_flags_for_maxhp() {
     let mut t = isc(8, &[(5, 1, 0, 0xFFFF, [7, 0xFFFF, 0xFFFF])]);
@@ -122,6 +126,7 @@ fn stat_ops_flags_for_maxhp() {
     assert_eq!(&t.record(7)[0xDE..0xE4], [0xFF, 0xFF, 5, 0, 1, 0]);
 }
 
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 fn stat_ops_op4_sets_053() {
     let mut t = isc(3, &[(2, 4, 0, 1, [0xFFFF; 3])]);
@@ -130,6 +135,7 @@ fn stat_ops_op4_sets_053() {
     assert_eq!(get_u16(t.record(1), 0x5E), 2);
 }
 
+// Covers: specs/data/fixups.md §6
 #[test]
 fn set_attachment() {
     let mut sets = table("sets", 0x128, vec![rec(0x128, &[(0x04, &u16s(100))])]);
@@ -162,6 +168,7 @@ fn set_attachment() {
     }
 }
 
+// Covers: specs/data/fixups.md §5
 #[test]
 fn gem_offsets() {
     let item = |k: u32| rec(424, &[(0xF0, &k.to_le_bytes())]);
@@ -201,6 +208,7 @@ fn monstats(rows: &[(i16, i16)]) -> BinTable {
     )
 }
 
+// Covers: specs/data/fixups.md §8 text
 #[test]
 fn monstats_chain_positions() {
     for last in [-1, 2] {
@@ -267,6 +275,7 @@ fn speeds(rows: &[(i16, i16, i16, i16)], walk: u32) -> BinTable {
     t
 }
 
+// Covers: specs/data/fixups.md §8 r3, §8 r4, §8 r6, §8 r7
 #[test]
 fn monstats_walk_scaling() {
     let walk = |t: &BinTable, r: usize| get_u16(t.record(r), 0x36);
@@ -282,12 +291,14 @@ fn monstats_walk_scaling() {
     assert_eq!((run(0), run(1)), (50, 100));
 }
 
+// Covers: specs/data/fixups.md §8 r5
 #[test]
 fn monstats_run_base_from_later_row() {
     let t = speeds(&[(1, 0, 0, 0), (1, 0, 0, -3)], 100);
     assert_eq!(get_u16(t.record(0), 0x38), SPEED_CAP as u16);
 }
 
+// Covers: specs/data/fixups.md §8 r1
 #[test]
 fn monstats_out_of_range_base_is_repaired_in_pass_b() {
     let t = speeds(&[(7, 0, 0, 0)], 90);
@@ -297,6 +308,7 @@ fn monstats_out_of_range_base_is_repaired_in_pass_b() {
     );
 }
 
+// Covers: specs/data/fixups.md §8 r2
 #[test]
 fn monstats_missing_name_gives_default() {
     let t = speeds(&[(0, 0, 0, 0)], 90);
@@ -306,6 +318,7 @@ fn monstats_missing_name_gives_default() {
     assert_eq!(get_u16(t2.record(0), 0x36), 256);
 }
 
+// Covers: specs/data/fixups.md §9
 #[test]
 fn monequip_links_and_clears() {
     let mut items = CodeLinker::default();
@@ -341,6 +354,7 @@ fn monequip_links_and_clears() {
     assert_eq!(&me.record(3)[0x14..0x17], [12, 12, 12]);
 }
 
+// Covers: specs/data/fixups.md §10
 #[test]
 fn monumod_clamp() {
     let mut t = table("monumod", 32, vec![vec![]; 300]);
@@ -348,6 +362,7 @@ fn monumod_clamp() {
     assert_eq!((t.count, t.records.len()), (256, 256 * 32));
 }
 
+// Covers: specs/data/fixups.md §11 r2
 #[test]
 fn level_monster_counts() {
     let mut r = rec(0x220, &[]);
@@ -360,6 +375,7 @@ fn level_monster_counts() {
     assert_eq!(&t.record(0)[0x33..0x36], [1, 25, 25]);
 }
 
+// Covers: specs/data/fixups.md §11 r1
 #[test]
 fn level_names_miss_text_is_cut() {
     let mut r = rec(
@@ -378,6 +394,7 @@ fn level_names_miss_text_is_cut() {
     assert_eq!((get_u16(r, 0x1BC), get_u16(r, 0x20C)), (0, 0));
 }
 
+// Covers: specs/data/fixups.md §1
 #[test]
 fn wide_text_vectors() {
     let s = StringTables::default();
@@ -393,6 +410,7 @@ fn wide_text_vectors() {
     assert_eq!(r, [0x41, 0, 0x41, 0, 0x41, 0, 0x41, 0]);
 }
 
+// Covers: specs/data/fixups.md §12
 #[test]
 fn tile_path_vectors() {
     let fixed = |s: &[u8]| {
@@ -410,6 +428,7 @@ fn tile_path_vectors() {
     assert!(fixed(&[b'x'; 42]).is_err());
 }
 
+// Covers: specs/data/fixups.md §13
 #[test]
 fn objects_frames_and_names() {
     let mut t = table(
@@ -434,6 +453,7 @@ fn sorted(keys: &[u8]) -> Vec<usize> {
     v.into_iter().map(|(_, i)| i).collect()
 }
 
+// Covers: specs/data/runtime-maps.md §1
 #[test]
 fn qsort_vectors() {
     assert_eq!(sorted(&[0; 8]), [1, 2, 3, 4, 5, 6, 7, 0]);
@@ -466,6 +486,7 @@ fn row(m: &maps::EquivMatrix, i: usize) -> Vec<usize> {
     (0..m.n).filter(|&j| m.get(i, j)).collect()
 }
 
+// Covers: specs/data/runtime-maps.md §2
 #[test]
 fn equivalence_vectors() {
     let t = equiv_table("itemtypes", 0xE4, &[(0, 0), (0, 0), (1, 0), (2, 0)]);
@@ -491,6 +512,7 @@ fn equivalence_vectors() {
     assert!(maps::equiv_matrix(&t, EquivKind::MonType).is_err());
 }
 
+// Covers: specs/data/runtime-maps.md §3
 #[test]
 fn desc_list_sorts_by_signed_priority() {
     let mut t = table("itemstatcost", 0x144, vec![vec![]; 4]);
@@ -502,6 +524,7 @@ fn desc_list_sorts_by_signed_priority() {
     assert_eq!(maps::desc_list(&t), [1, 3, 0]);
 }
 
+// Covers: specs/data/runtime-maps.md §4
 #[test]
 fn state_maps() {
     let mut t = table("states", 0x3C, vec![vec![]; 34]);
@@ -518,6 +541,7 @@ fn state_maps() {
     assert!(m.disguise.is_empty() && m.active.is_empty());
 }
 
+// Covers: specs/data/runtime-maps.md §5
 #[test]
 fn skill_class_lists() {
     let classes = [0u8, 0xFF, 2, 0, 7, 2, 0];
@@ -536,6 +560,7 @@ fn skill_class_lists() {
     assert_eq!(l.passives, [4]);
 }
 
+// Covers: specs/data/runtime-maps.md §6
 #[test]
 fn version0_list() {
     let w = table(
@@ -547,6 +572,7 @@ fn version0_list() {
     assert_eq!(maps::version0_items(&[&w, &a]), [1, 2, 0, 0]);
 }
 
+// Covers: specs/data/runtime-maps.md §7
 #[test]
 fn gamble_vectors() {
     let items = table(
@@ -581,6 +607,7 @@ fn gamble_vectors() {
     assert!(maps::gamble(&mut bad, &codes, &[&items]).is_err());
 }
 
+// Covers: specs/data/runtime-maps.md §8
 #[test]
 fn monseq_index() {
     let t = table(
@@ -605,6 +632,7 @@ fn monseq_index() {
     assert!(maps::monseq(&t).is_err());
 }
 
+// Covers: specs/data/runtime-maps.md §8
 #[test]
 fn monpreset_acts() {
     let t = table(
@@ -619,6 +647,7 @@ fn monpreset_acts() {
     assert!(maps::monpreset(&t).is_err());
 }
 
+// Covers: specs/data/runtime-maps.md §8
 #[test]
 fn hireling_tables() {
     let row = |v: u16, id: i32| rec(0x118, &[(0, &u16s(v)), (4, &id.to_le_bytes())]);
@@ -632,6 +661,7 @@ fn hireling_tables() {
     assert!(maps::hireling_first(&table("hireling", 0x118, vec![row(0, -1)])).is_err());
 }
 
+// Covers: specs/data/runtime-maps.md §9
 #[test]
 fn leveldefs_and_lvlsub() {
     let t = table(
@@ -653,6 +683,7 @@ fn leveldefs_and_lvlsub() {
     assert!(maps::lvlsub_types(&t).unwrap().is_empty());
 }
 
+// Covers: specs/data/runtime-maps.md §10
 #[test]
 fn automap_conversion() {
     let row = |level: &[u8], tile: &[u8], cels: [i32; 4]| {

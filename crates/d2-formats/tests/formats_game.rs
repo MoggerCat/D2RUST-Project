@@ -44,6 +44,7 @@ fn parse_all(archive_name: &str, ext: &str, parse: impl Fn(&str, &[u8])) -> usiz
     count
 }
 
+// Covers: specs/formats/palette.md §dat-palette, §pl2-palette-transform
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn palettes() {
@@ -55,6 +56,7 @@ fn palettes() {
     }
 }
 
+// Covers: specs/formats/tbl.md §header-21-bytes, §strings; specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn string_and_font_tables() {
@@ -65,6 +67,7 @@ fn string_and_font_tables() {
     assert_eq!(f.glyphs.len(), 256);
 }
 
+// Covers: specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn all_dc6_in_d2data() {
@@ -74,6 +77,7 @@ fn all_dc6_in_d2data() {
     assert!(n > 1000);
 }
 
+// Covers: specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn all_cof_in_d2exp() {
@@ -83,6 +87,7 @@ fn all_cof_in_d2exp() {
     assert!(n > 100);
 }
 
+// Covers: specs/formats/ds1.md §rules; specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn all_ds1_and_dt1_in_d2exp() {
@@ -94,6 +99,7 @@ fn all_ds1_and_dt1_in_d2exp() {
     });
 }
 
+// Covers: specs/formats/dcc.md §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn sample_dcc() {

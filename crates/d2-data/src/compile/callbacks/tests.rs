@@ -151,6 +151,7 @@ fn input(text: &str) -> Result<Vec<u8>, ErrorCode> {
     Ok(r[28..36].to_vec())
 }
 
+// Covers: specs/data/callbacks.md §2
 #[test]
 fn cube_inputs() {
     for (text, bytes) in [
@@ -183,6 +184,7 @@ fn output(text: &str, slot: u32) -> (Vec<u8>, Vec<DiagKind>) {
     (r[o..o + 24].to_vec(), d)
 }
 
+// Covers: specs/data/callbacks.md §3
 #[test]
 fn cube_outputs() {
     let z = |n: usize| vec!["00"; n].join(" ");
@@ -238,6 +240,7 @@ fn cube_outputs() {
     assert_eq!(output("\"rin,mag,\"", 0).1, []);
 }
 
+// Covers: specs/data/callbacks.md §3
 #[test]
 fn cube_output_overflow() {
     let mut r = vec![0u8; 328];
@@ -261,6 +264,7 @@ fn skillmode(text: Option<&str>, skill: i16) -> (u8, u16) {
     (r[386], u16::from_le_bytes([r[396], r[397]]))
 }
 
+// Covers: specs/data/callbacks.md §4
 #[test]
 fn skill_modes() {
     assert_eq!(skillmode(Some("A1"), 321), (4, 0xFFFF));
@@ -280,6 +284,7 @@ fn composit(text: Option<&str>) -> (u8, Vec<u8>, Vec<DiagKind>) {
     (r[22], r[50..62].to_vec(), d)
 }
 
+// Covers: specs/data/callbacks.md §5
 #[test]
 fn composits() {
     let ff = |n: usize| vec![0xFF; n];
@@ -310,6 +315,7 @@ fn composits() {
     );
 }
 
+// Covers: specs/data/callbacks.md §5
 #[test]
 fn composit_total() {
     // `skeleton1`: total 49, written by the S8v call only.
@@ -332,6 +338,7 @@ fn place(text: &str) -> Vec<u8> {
     r[1..].to_vec()
 }
 
+// Covers: specs/data/callbacks.md §6
 #[test]
 fn places() {
     assert_eq!(place("gheed"), [1, 0x93, 0]);
@@ -342,6 +349,7 @@ fn places() {
     assert_eq!(place(""), [0, 0, 0]);
 }
 
+// Covers: specs/data/callbacks.md §1
 #[test]
 fn helpers() {
     assert_eq!(unquote(b"\"lit,med\""), b"lit,med");
@@ -357,6 +365,7 @@ fn helpers() {
 
 /// Through the compiler: diagnostics carry line and column, and E15
 /// rejects the file at the cell.
+// Covers: specs/data/callbacks.md §8
 #[test]
 fn compiled_with_diagnostics() {
     let (mut l, sp) = setup();

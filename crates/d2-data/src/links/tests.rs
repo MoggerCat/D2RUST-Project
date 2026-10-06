@@ -21,6 +21,7 @@ fn set(t: &mut BinTable, row: usize, offset: usize, bytes: &[u8]) {
 const ITEM1LOC: usize = 96; // charstats item1loc: link8(bodylocs.code)
 const ITEM2LOC: usize = 104;
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn valid_out_of_range_and_miss() {
     let bodylocs = table("bodylocs", 3);
@@ -51,6 +52,7 @@ fn valid_out_of_range_and_miss() {
     );
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn unknown_linker_is_unchecked() {
     let mut charstats = table("charstats", 1);
@@ -64,6 +66,7 @@ fn unknown_linker_is_unchecked() {
         .any(|f| f.column == "item1loc" && f.linker == "bodylocs.code"));
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn name_linker_size_is_largest_index_plus_one() {
     // monseq: key(name16) `sequence` at 0; duplicates share an index
@@ -75,6 +78,7 @@ fn name_linker_size_is_largest_index_plus_one() {
     assert_eq!(sizes.get("monseq.sequence"), Some(2));
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn lookup_linker_takes_the_runtime_table_size() {
     // monseq `mode` is link8(monmode_lookup.code); monmode_lookup compiles
@@ -92,6 +96,7 @@ fn lookup_linker_takes_the_runtime_table_size() {
     assert_eq!(report.misses, 1);
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn shared_and_hand_built_linkers() {
     let weapons = table("weapons", 2);
@@ -113,6 +118,7 @@ fn shared_and_hand_built_linkers() {
     assert_eq!((report.valid, report.misses), (1, 1));
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn treasure_class_linker() {
     let mut itemtypes = table("itemtypes", 2);
@@ -125,6 +131,7 @@ fn treasure_class_linker() {
 }
 
 /// The live 1.14d set has no broken links (`field-types.md` §6.7).
+// Covers: specs/data/field-types.md §6
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_set_has_no_broken_links() {

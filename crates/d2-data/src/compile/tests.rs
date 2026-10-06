@@ -63,6 +63,7 @@ fn diag_kinds(c: &Compiled) -> Vec<DiagKind> {
     c.diagnostics.iter().map(|d| d.kind).collect()
 }
 
+// Covers: specs/data/field-types.md §4
 #[test]
 fn integer_vectors() {
     // (cell, u32) from field-types.md and txt-format.md.
@@ -109,6 +110,7 @@ fn integer_vectors() {
     assert_eq!(parse_int(b"\x85"), 0xFFFF_FF55);
 }
 
+// Covers: specs/data/field-types.md §4
 #[test]
 fn bit_and_optional_byte() {
     let f = [field("b", T::Bit, 10, 16, "")];
@@ -135,6 +137,7 @@ fn bit_and_optional_byte() {
     assert_eq!(c.records, [0x07, 0x00]);
 }
 
+// Covers: specs/data/field-types.md §5
 #[test]
 fn text_and_code_vectors() {
     let mut l = Linkers::default();
@@ -164,6 +167,7 @@ fn text_and_code_vectors() {
     assert_eq!(c.records, [0, 0, 0, 0, 1]);
 }
 
+// Covers: specs/data/field-types.md §5
 #[test]
 fn own_key_text_types() {
     let mut l = Linkers::default();
@@ -196,6 +200,7 @@ fn own_key_text_types() {
     assert_eq!(c.records, b"ab");
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn code_linker_vectors() {
     let mut l = CodeLinker::default();
@@ -231,6 +236,7 @@ fn code_linker_vectors() {
     assert_eq!(l.find(code(b"")), Some(0));
 }
 
+// Covers: specs/data/field-types.md §6
 #[test]
 fn name_linker_vectors() {
     let mut linkers = Linkers::default();
@@ -289,6 +295,7 @@ fn name_linker_vectors() {
     assert_eq!(diag_kinds(&c), [DiagKind::TextCut]);
 }
 
+// Covers: specs/data/field-types.md §2
 #[test]
 fn whole_record_vectors() {
     // k ASCIITOCODE@0 → L, n CODETOBYTE@4 → L, m CODETOWORD@6 → L2 (no
@@ -391,6 +398,7 @@ fn whole_record_vectors() {
     assert_eq!(c.records, [2, 0, 0, 0, 0, 0, 0, 0]);
 }
 
+// Covers: specs/data/field-types.md §8 r1, §8 r2
 #[test]
 fn callback_vectors() {
     let mut l = Linkers::default();
@@ -431,6 +439,7 @@ fn callback_vectors() {
     assert_eq!(diag_kinds(&c), [DiagKind::TextCut]);
 }
 
+// Covers: specs/data/txt-format.md §9 text
 #[test]
 fn diagnostics_vectors() {
     let mut l = Linkers::default();
@@ -501,6 +510,7 @@ fn diagnostics_vectors() {
     assert_eq!(diag_kinds(&c), [DiagKind::LinkMiss]);
 }
 
+// Covers: specs/data/txt-format.md §6 r3
 #[test]
 fn binding_diagnostics() {
     let mut l = Linkers::default();
@@ -525,6 +535,7 @@ fn e13(fields: &[FieldDef], size: usize, text: &[u8]) -> ErrorCode {
         .unwrap_or_else(|e| e.code)
 }
 
+// Covers: specs/data/txt-format.md §6.1
 #[test]
 fn field_list_checks() {
     const OK: ErrorCode = ErrorCode::E1; // stands for "compiled"
@@ -590,6 +601,7 @@ fn field_list_checks() {
     );
 }
 
+// Covers: specs/data/txt-format.md §6 r5
 #[test]
 fn slot_limit() {
     let f = [field("zz", T::Byte, 0, 0, "")];
@@ -607,6 +619,7 @@ fn slot_limit() {
     assert_eq!(e13(&f, 1, &text(279)), ErrorCode::E1);
 }
 
+// Covers: specs/data/loading.md §10 r3
 #[test]
 fn range_linker_codes() {
     let Linker::Code(r) = range_linker() else {
@@ -620,6 +633,7 @@ fn range_linker_codes() {
     }
 }
 
+// Covers: specs/data/field-types.md §8
 #[test]
 fn param_callback() {
     let strings = StringTables::default();
@@ -647,6 +661,7 @@ fn param_callback() {
     assert_eq!(values, [1, 41, 12, (-5i32) as u32, 0, 0]);
 }
 
+// Covers: specs/data/field-types.md §8
 #[test]
 fn calc_callback_appends() {
     let strings = StringTables::default();

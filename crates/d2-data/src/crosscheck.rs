@@ -317,6 +317,7 @@ mod tests {
     /// The acceptance test (`loading.md` d2-data policy 3): all 73 tables
     /// and the 4 code buffers match, up to differences a spec rule
     /// explains.
+    // Covers: specs/data/loading.md §11, §d2-data-policy r3
     #[test]
     #[ignore = "needs original game files in D2_GAME_DIR"]
     fn compiled_text_reproduces_live_bins() {

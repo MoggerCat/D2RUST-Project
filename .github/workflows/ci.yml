@@ -22,6 +22,13 @@ jobs:
       - name: Methods collection
         run: python3 tools/methods.py check
 
+      # Claims of spec rules by tests (docs/COVERAGE.md): fails on a dangling
+      # claim, never on low coverage; the selftest holds its perturbations.
+      - name: Spec rule claims
+        run: |
+          python3 tools/coverage.py --check
+          python3 tools/coverage.py --selftest
+
       # The tick traces (specs/sim/tick.md) replay through the spec model;
       # the checkers' selftests include their perturbations (METHODS M08).
       - name: Trace checkers
@@ -29,6 +36,8 @@ jobs:
           python3 tools/trace-recorder/check_tick.py --selftest
           python3 tools/trace-recorder/convert_tick.py --selftest
           python3 tools/trace-recorder/convert_tick.py --check traces/sim/tick/*.json
+          python3 tools/trace-recorder/check_rooms.py --selftest
+          python3 tools/trace-recorder/check_rooms.py traces/sim/tick/*.json
 
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries

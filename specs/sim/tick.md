@@ -1,6 +1,10 @@
 # Spec: Simulation — Game tick
 
-- **Status:** draft (implemented in `d2-sim`; synthetic vectors pass, trace replay pending); every rule read from the
+- **Status:** conformance-passing: `cargo test -p conformance --test
+  tick_replay` replays `traces/sim/tick/sim-0006..0008` (11,105 ticks,
+  48,316 timer runs, 446 list snapshots, 65,754 recorded inputs) through
+  `d2_sim::tick::tick` with 0 mismatches (2026-10-06; host schedule §1:
+  `d2-server` unit tests only). Every rule read from the
   1.14d `Game.exe` code and confirmed on the running game: `check_tick.py`
   replays `traces/raw/20261006-015554-tick.jsonl` (4,902 ticks of a
   hand-played single-player game, 16,704 timer runs, 7,674 schedules,
@@ -18,24 +22,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–54 |
-| Inputs | 55–62 |
-| Outputs / state changes | 63–68 |
-| Rules | 69–70 |
-|   1. Tick rate and host schedule | 71–117 |
-|   2. Frame counter | 118–131 |
-|   3. Tick steps in order | 132–162 |
-|   4. Room pass (step 3) | 163–185 |
-|   5. Timer events (step 4) | 186–338 |
-|   6. Client pass (step 5) | 339–368 |
-|   7. Periodic steps, summary | 369–378 |
-|   8. Wall-clock and host-only parts | 379–391 |
-| Constants & data dependencies | 392–405 |
-| Randomness | 406–413 |
-| Edge cases & original bugs | 414–431 |
-| Test vectors | 432–517 |
-| Provenance | 518–542 |
-| Open questions | 543–559 |
+| Summary | 45–58 |
+| Inputs | 59–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   1. Tick rate and host schedule | 75–121 |
+|   2. Frame counter | 122–135 |
+|   3. Tick steps in order | 136–166 |
+|   4. Room pass (step 3) | 167–189 |
+|   5. Timer events (step 4) | 190–342 |
+|   6. Client pass (step 5) | 343–372 |
+|   7. Periodic steps, summary | 373–382 |
+|   8. Wall-clock and host-only parts | 383–395 |
+| Constants & data dependencies | 396–409 |
+| Randomness | 410–417 |
+| Edge cases & original bugs | 418–435 |
+| Test vectors | 436–521 |
+| Provenance | 522–546 |
+| Open questions | 547–563 |
 <!-- /index -->
 
 ## Summary

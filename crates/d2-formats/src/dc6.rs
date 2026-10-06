@@ -172,18 +172,21 @@ fn decode_pixels(
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/dc6.md §pixel-decoding
     #[test]
     fn spec_vector_bottom_up() {
         let px = decode_pixels(&[0x02, 5, 6, 0x80, 0x82, 0x01, 7, 0x80], 3, 2, false).unwrap();
         assert_eq!(px, [0, 0, 7, 5, 6, 0]);
     }
 
+    // Covers: specs/formats/dc6.md §pixel-decoding
     #[test]
     fn top_down_when_flipped() {
         let px = decode_pixels(&[0x02, 5, 6, 0x80, 0x82, 0x01, 7, 0x80], 3, 2, true).unwrap();
         assert_eq!(px, [5, 6, 0, 0, 0, 7]);
     }
 
+    // Covers: specs/formats/dc6.md §pixel-decoding
     #[test]
     fn errors() {
         assert!(
@@ -227,6 +230,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/dc6.md §file-header-24-bytes, §frame
     #[test]
     fn whole_file() {
         let data = file(&[(1, 1, &[0x01, 42, 0x80]), (0, 0, &[])]);
@@ -237,6 +241,7 @@ mod tests {
         assert!(dc6.frame(0, 2).is_none());
     }
 
+    // Covers: specs/formats/dc6.md §file-header-24-bytes
     #[test]
     fn bad_version() {
         let mut data = file(&[(1, 1, &[0x01, 42])]);

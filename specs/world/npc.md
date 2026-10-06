@@ -1,0 +1,576 @@
+# Spec: World — NPC interaction (talk, menus, heal, identify, mercenaries, services)
+
+- **Status:** draft: every rule is read from the 1.14d `Game.exe` (addresses
+  below) and the talk / trade / buy / sell message sequences match the
+  hand-played recording `traces/raw/20261006-015956-packets.jsonl`
+  (Charsi, Akara, Warriv, Flavie; Test vectors); hire, resurrect, heal and
+  the service actions have no recording yet.
+- **Target version:** 1.14d
+- **Crate/module:** `d2-sim::world::npc`
+- **Related specs:** `world/vendors.md` (store inventories, gamble lists,
+  prices, buy / sell / repair; it uses the NPC records of §1 and the 0x2A
+  message of §9); `world/quests.md` (quest slots and bits, the 0x27 text
+  list §7.1, 0x28 / 0x29, act completion §8.1, the respec slot 41 §10.3);
+  `world/waypoints.md` (act change and waypoint activation used by §8.3);
+  `sim/intents-events.md` §2 (dispatcher, gate, result codes) +
+  `client-messages.tsv` / `server-messages.tsv`; `sim/tick.md` §5
+  (timer events); `sim/rng.md` §3, §5.2, §7 (seeds and helpers);
+  `data/fields.tsv` (`hireling`, `monstats`, `npc`); item, monster,
+  mercenary and player specs (Phase 3, not written: item creation and
+  item messages, NPC AI, the mercenary unit, stat messages).
+  Machine table: `world/vendors.tsv` (per-NPC roles, shared with
+  `vendors.md`).
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 49–62 |
+| Inputs | 63–73 |
+| Outputs / state changes | 74–81 |
+| Rules | 82–83 |
+|   1. NPC control and records | 84–138 |
+|   2. Starting an interaction (C→S 0x13) | 139–178 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 179–197 |
+|   4. Menu actions (C→S 0x38) | 198–219 |
+|   5. Healing on chat open | 220–244 |
+|   6. Cain identify (C→S 0x34) | 245–262 |
+|   7. Mercenaries | 263–360 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 361–418 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 419–452 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 453–464 |
+| Constants & data dependencies | 465–477 |
+| Randomness | 478–490 |
+| Edge cases & original bugs | 491–517 |
+| Test vectors | 518–536 |
+| Provenance | 537–563 |
+| Open questions | 564–577 |
+<!-- /index -->
+
+## Summary
+
+Town NPCs are monsters whose `monstats` row has the `interact` flag. Each
+game keeps one NPC record per such monster class (§1). A player starts an
+interaction with C→S 0x13 when close enough (§2): the NPC stops, the
+player is added to the NPC's interaction list and the server sends the
+NPC's text list (0x27) and quest state (0x29, 0x28). C→S 0x2F opens the
+chat (healers heal, §5), 0x30 closes it (§3). C→S 0x38 picks a menu
+action: trade, gamble, hire list, or an NPC-specific service (imbue,
+socket, personalize, respec, act travel, §4, §8). Dedicated messages
+identify items at Cain (0x34, §6), hire (0x36) and resurrect (0x62) a
+mercenary (§7). Results of NPC transactions are reported with S→C 0x2A
+(§9). Store contents and prices belong to `vendors.md`.
+
+## Inputs
+
+| Name | Type | Source |
+|---|---|---|
+| C→S 0x13, 0x2F, 0x30, 0x34, 0x36, 0x37, 0x38, 0x62 | intents | `client-messages.tsv` |
+| NPC table (43 entries) | `Game.exe` data `0x00731184` | §1.2, `vendors.tsv` |
+| `monstats` flags `npc` (bit 8), `interact` (bit 9) of the flag word +0x0C | table | `fields.tsv` |
+| `hireling` rows | table | §7 |
+| player quest record of the game's difficulty | player data +0x10 + 4·difficulty | `quests.md` §1 |
+| NPC-control seed | game +0x1D24 → control +8 | §1.1, `rng.md` §5.2 |
+
+## Outputs / state changes
+
+NPC records (interaction, hire lists); player interact unit; S→C 0x27,
+0x28, 0x29 (talk), 0x4F + 0x4E (hire list), 0x2A (transaction result),
+0x58 (service result), 0x9B (resurrect), stat messages (heal), sound 10
+on the NPC; gold; items identified, created, socketed, personalized;
+mercenary units (creation itself: mercenary spec); act changes.
+
+## Rules
+
+### 1. NPC control and records
+
+#### 1.1 Creation (`0x00536070`, at game creation)
+
+1. Allocate 64 records of 0x44 bytes (zeroed) and the control block
+   (game +0x1D24): +0x00 record count, +0x04 record array, +0x08 seed,
+   +0x10 count (same value).
+2. Seed: `init()`, one game-seed step, `init_low(lo')` (`rng.md` §5.2,
+   "NPC-control seed").
+3. Look up the item ids of `cqv` and `aqv` once (globals `0x00883E9C`,
+   `0x00883EA0`; used by `vendors.md`).
+4. For every `monstats` row in row order whose flag word has `interact`:
+   take the next record; more than 64 → fatal assert. 1.14d: 47 records
+   (live `monstats.txt` rows with `interact` = 1).
+5. Fill the record from the NPC table (§1.2) when the class is listed;
+   traders also get their store data (`vendors.md` §1). Unlisted classes
+   (e.g. `drehyaiced` 527, `ancientstatue1`–`3` 537–539) keep act 0,
+   trader 0.
+
+Record lookup by class (`0x00535EA0` / `0x00535F10`): first of the 64
+slots whose class matches; none → null (`0x00535EA0` asserts on class 0).
+
+Record layout (1.14d offsets):
+
+| Off | Field | Set by |
+|---|---|---|
+| +0x00 | monstats class | §1.1 |
+| +0x04 | NPC inventory (store grid) | §1.1, `vendors.md` §4 |
+| +0x08 | per-player gamble lists (node: inventory, player GUID, next) | `vendors.md` §5 |
+| +0x0C | has gamble list (u32) | `vendors.md` §1 |
+| +0x10 | hire list (0x450 bytes, §7.1) | §7 |
+| +0x14 | NPC event list (§10) | `vendors.md` §3.4 |
+| +0x18 | per-player vendor-chain list (node: player GUID, gamble-mode byte at +4, next) | `vendors.md` §4 |
+| +0x1C | has traded (u32, set at trade open) | `vendors.md` §4 |
+| +0x20 | store generated (u8) | `vendors.md` §3 |
+| +0x21 | hire list made (u8) | §7.1 |
+| +0x22 | act 0–4 (u8) | NPC table |
+| +0x23 | trader (u8) | NPC table |
+| +0x24, +0x25 | flags set for 9 traders (u8) | `vendors.md` §1 |
+| +0x26 | NPC table byte 6 (u8) | NPC table |
+| +0x27 | refresh pending (u8) | `vendors.md` §6 |
+| +0x28 | store time (`GetTickCount`, u32) | `vendors.md` §6 |
+| +0x2C / +0x30 | store item list / count | `vendors.md` §1 |
+| +0x34 / +0x38 | permanent item codes / count | `vendors.md` §1 |
+| +0x40 | NPC GUID of the last trade | `vendors.md` §4 |
+
+#### 1.2 NPC table (`0x00731184`)
+
+u32 count (43), then 8-byte entries from `0x00731188`: u32 monstats class,
+u8 trader, u8 act (0–4), u8 flag (byte 6), u8 0. The full table with each
+NPC's roles is `vendors.tsv` (columns `trader`, `act`,
+`force_vendor` = byte 6). Cain's act rows: cain5 (265) act 0, cain2 (244) 1, cain3 (245)
+2, cain4 (246) 3, cain6 (520) 4; cain1 (146) is listed with act 0, not a
+trader.
+
+### 2. Starting an interaction (C→S 0x13)
+
+Handler `0x0054AA90`: size 9 else 3; unit type (u32 @1) > 5 → 2; then
+`0x00548B00(GUID u32 @5, type)`. For type 1 (monster):
+
+1. Monster missing, or unit distance (`0x00641530`, unit spec) > 50 →
+   result 1, nothing else.
+2. If the monster's `monstats` row has both `npc` and `interact`: clear
+   its path (`0x00648730`), call `0x0058EC00` with 0x28 (AI parameter;
+   monster spec), cancel its AI-think events (type 2) and schedule one
+   at frame + 1 (`tick.md` §5.2–5.4). This happens for every distance
+   ≤ 50.
+3. Distance 9..50: result 0, no interaction. Distance 7..8:
+   `0x00548A50` (player movement toward the target; movement spec),
+   result 0.
+4. Distance ≤ 6: if the player is free (`0x00535060` returns 0: no
+   interact unit, no cursor item, player data +0x4C = 0): clear the
+   player's path and start (`0x00573020` → `0x00572C10`).
+
+Start (`0x00572C10`):
+
+1. Requires: the player has no interact unit; NPC mode ≠ 0 (death) and ≠
+   12 (dead); `0x00535060` ≠ 1; `0x00457490` true (else result 1);
+   for cain1 (146) `0x00594610` false (Tristram Cain, `quests.md`). A
+   player already in the NPC's list → result 1.
+2. Prepend a node {player, state 0, next} to the NPC's interaction list
+   (monster data +0x30 → interaction block; its first field is the list
+   head). States: 0 talking, 1 chatting, 2 trading.
+3. `0x00576770`: hire list to the player if the NPC sells mercenaries
+   (§7.2), with "first" = the list was empty.
+4. Player interact unit := (type 1, NPC GUID) (`0x00554120`).
+5. Text list: new list, quest event 0 for player and NPC, send S→C 0x27
+   (40 bytes: 0x27, u8 1, u32 NPC GUID, 34 bytes of list built by
+   `0x00661480`; contents `quests.md` §7.1), free it; send 0x29
+   (`0x00544520`) and 0x28 (`0x0053D670`, type 1, NPC GUID; `quests.md`
+   §1.5).
+
+Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
+1720, 1751, 3570).
+
+### 3. Chat open and close (C→S 0x2F, 0x30)
+
+Both handlers (`0x0054B930`, `0x0054B9F0`): size 9 else 3; the NPC is
+the unit with GUID u32 @5 (bytes 1–4 are not read); missing → 1; not a
+monster with an interaction list → 3; NPC in another act than the player
+(`0x00548A80`) → 2.
+
+- **0x2F**: player position within 50 subtiles of the NPC on both axes
+  (`0x00548EF0`) else its result (1); then `0x00572E60`: the player's
+  node in state 0 goes to state 1 and the heal hook runs (§5). Other
+  states: nothing.
+- **0x30** (`0x00572F20`, no distance test): quest event dispatch
+  `0x00543D50` (`quests.md` §4.2), then the player's node:
+  - state ≥ 1: unlink and free it; if the player's interact type is 1,
+    reset the interact unit (`0x00554190`: GUID −1, type 6, flag 0); if
+    the list is now empty: drop the player's gamble list at this NPC
+    (`0x00537190`, `vendors.md` §5.4);
+  - state 0: unlink, reset as above, free; the gamble list is kept.
+
+### 4. Menu actions (C→S 0x38)
+
+Handler `0x0054BCA0`: size 13 else 3; unit check `0x00548F80`
+(`intents-events.md` §2.4 rule 4) must return 0; then `0x00579D60(action
+u32 @1, NPC GUID u32 @5, item GUID u32 @9)`. Nothing happens unless the
+NPC exists, has `interact` and an interaction list. single := the list
+has exactly 1 node. No 0x2A is sent by this handler.
+
+| Action | NPCs (class) | Does |
+|---|---|---|
+| 1 trade | gheed 147, akara 148, charsi 154, drognan 177, fara 178, elzix 199, lysander 202, asheara 252, hratli 253, alkor 254, ormus 255, halbu 257, jamella 405, larzuk 511, drehya 512, malah 513 | node state 1 → 2 (`0x00572EA0`); trade open `0x00579430(npc, single, 0)` (`vendors.md` §4) |
+| 2 gamble | gheed 147, elzix 199, alkor 254, jamella 405, drehya 512, nihlathak 514 | state 1 → 2; `0x00579430(npc, single, 1)` |
+| 3 hire list | any (only merc sellers send, §7.2) | `0x00576770(npc, first = node count < 2)` |
+| other values | charsi 154 | imbue (§8.1) |
+| other | larzuk 511 | socket (§8.1) |
+| other | drehya 512 | personalize (§8.1) |
+| other | akara 148 | respec (§8.2) |
+| other | warriv1 155, warriv2 175, meshif1 210, meshif2 264, tyrael2 367, cain6 520 | act travel (§8.3) |
+
+Any other NPC / action pair: nothing. Nihlathak has no trade action
+although a store is cached for him (`vendors.md` §1).
+
+### 5. Healing on chat open
+
+`0x00578E70(npc)`: global `0x0088CAC4` := NPC GUID (−1 for none; read
+only by dead code, §10). Healers: akara 148, atma 176, fara 178, ormus
+255, jamella 405, malah 513 → `0x00578D30(player, npc)`, which does
+nothing unless the player's interact unit is that NPC. Then, in order:
+
+1. Life (stat 6) < max life (`0x00625D10`): set it to max and send the
+   stat (`0x00548520` → SetStat 0x1D–0x1F, stat spec).
+2. Same for mana (stat 8, max `0x00625D60`) and stamina (stat 10, max
+   `0x00625DB0`). Comparisons are unsigned.
+3. Remove the stat list of state 2 (poison) and of state 1 (freeze)
+   when present.
+4. `0x00578C20`: for each state id 0 … states count − 1 that the player
+   has, whose curable mask is set (`0x0063A460`) and that has a stat
+   list: remove it.
+5. Pets (`0x00574DE0` with `0x00578CA0`, pet iteration order of the
+   player spec): life to max (no message), curable states (step 4),
+   poison, freeze.
+6. If anything changed: sound 10 attached to the NPC (`0x00553380`,
+   delivered by the unit spec).
+
+Heal is free and happens on every 0x2F that moves the node from state 0
+to 1, i.e. once per interaction.
+
+### 6. Cain identify (C→S 0x34)
+
+Handler `0x0054BBA0` (size 5 else 3) → `0x00578460(npc GUID u32 @1)`:
+
+1. NPC missing or not the player's interact unit → 0x2A code 9.
+2. Class not cain2 244, cain3 245, cain4 246, cain5 265, cain6 520 →
+   return, **no message** (cain1 146 included).
+3. n = unidentified items (`0x0062A530`): items without flag 0x10 that
+   are in a grid page with inventory page 0 (backpack) or 3 (cube), or
+   equipped (node page 3). n = 0 → 0x2A code 9.
+4. Unless quest slot 4 (Search for Cain) bit 0 or bit 1 is set: pay
+   100·n (`vendors.md` §9.1); not enough → 0x2A code 12.
+5. Identify (`0x00562590`, item spec) every item of step 3 without flag
+   0x10, inventory order; stash (page 4) and belt are skipped.
+6. One 0x2A code 3, flag 0, GUID −1.
+
+C→S 0x37 (identify the item just gambled) is `vendors.md` §5.5.
+
+### 7. Mercenaries
+
+Sellers: kashya 150 (Act I), greiz 198 (II), asheara 252 (III),
+qual-kehk 515 (V). Resurrection also at tyrael2 367 (IV).
+
+#### 7.1 Hire list (`0x00576070(record)`)
+
+Runs when record +0x21 = 0: set +0x21 := 1; if no list yet (+0x10 = 0):
+
+1. Allocate 0x450 bytes (69 slots of 16: u16 name id, u32 seed @4, u32
+   hired @8, u32 offered @0xC), zeroed.
+2. Hireling row = first `hireling` row with seller = NPC class,
+   difficulty column = 1 (Normal, for every game difficulty) and version
+   = 100 in expansion games, 0 otherwise (`0x00575FF0` → `0x006564D0`);
+   none → fatal. first, last = its name ids (+0x114, +0x116; ids from
+   `fixups.md` §7); n = last − first + 1.
+3. Slot i (i = 0 … n−1): name = first + i; seed = lo' of one step of the
+   NPC-control seed; hired = offered = 0.
+4. 10 times: s = roll(NPC-control seed, n); from slot s, probe upward
+   (wrapping to 0) for a slot neither offered nor hired; mark it offered.
+   If the probe returns to s, stop at once (no more draws).
+
+The list is made at the first of: a 0x13 start with a seller (§2 step
+3), a 0x38 action 3, a trade open (`vendors.md` §4; only these four
+classes), or a hire that empties the offer (§7.3 step 8).
+
+#### 7.2 Sending the list (`0x00576770(npc, first)`)
+
+Only for kashya, greiz, qual-kehk, asheara: S→C 0x4F (1 byte); make the
+list if needed (§7.1); then for each slot 0 … n−1 that is offered and not
+hired: S→C 0x4E (7 bytes: 0x4E, u16 name id, u32 slot seed). The client
+derives each offer's stats and price from name and seed with the same
+routine as §7.3 step 5.
+
+#### 7.3 Hire (C→S 0x36)
+
+Handler `0x0054BBD0` (size 9 else 3) → `0x00577FE0(npc GUID u32 @1,
+name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
+`0x005770E0`:
+
+1. lvl = player level, capped in Normal by the NPC's act (12, 20, 28,
+   36, 45; `0x00576890`).
+2. qual-kehk: quest slot 36 (Rescue on Mount Arreat) bit 0 clear → 0x2A
+   code 11. kashya with lvl < 8: slot 2 (Sisters' Burial Grounds) bit 0
+   clear → code 11. (D2MOO names the first check `QUEST_A5Q6_BAAL`, 36 of
+   another enumeration; 1.14d reads quest slot 36.)
+3. No record → code 9. Name outside first … last of the §7.1 row →
+   code 9. Slot (name − first): name differs → 9; hired ≠ 0 → 9. An
+   offered = 0 slot is accepted.
+4. act = `0x00663750(name)` (act of the hireling row whose name range
+   holds it, minus 1).
+5. Hire init `0x006637F0(seed = slot seed, act, difficulty)`; fails (no
+   rows) → return without a message:
+   - local seed := `init()`, `init_low(slot seed)`;
+   - candidates: the first row with act + 1, difficulty + 1 and the
+     game's version, then every later row with the same act, difficulty,
+     version and the same `level` as that first row (`0x00656580`);
+   - row = candidates[roll(local, count)];
+   - one step of the local seed: L = (lo' mod 5) + player level − 5,
+     at least 2;
+   - price = gold · (100 + 15·(L − row level)) / 100 (signed), at least
+     the row's `gold`. Other outputs (life, damage, skills…) belong to
+     the mercenary spec.
+6. Pay the price (`vendors.md` §9.1); not enough → 0x2A code 12.
+7. Create the mercenary unit near the NPC, else near the player
+   (`0x005B23C0(class, 1, 4, 0)` twice; mercenary spec); fails → code
+   15 (gold already taken).
+8. Slot hired := 1; mercenary init `0x00573270`; resend the
+   list (§7.2, first = node count < 2); 0x2A code 5, flag 0, GUID =
+   mercenary; then `0x00577010`: if no slot is offered-and-not-hired,
+   free the list, clear +0x21 and make a new list (§7.1 draws).
+
+#### 7.4 Resurrect (C→S 0x62)
+
+Handler `0x0054BC00`: expansion game and size 5, else 3; `0x00579C00
+(npc GUID u32 @1)`:
+
+1. NPC missing or not the interact unit → 0x2A code 9; class not kashya,
+   greiz, asheara, tyrael2, qual-kehk → code 9.
+2. Dead hireling of the player (`0x00574EC0(7, 1)`) missing → code 9.
+3. cost = min((L·L / 2)·15, 50000), L = mercenary level (stat 12),
+   signed division, unsigned cap (`0x006637B0`). Pay → else code 12.
+4. Clear unit flag 0x10000, mode 1, life := max, revive `0x00579AA0`
+   (mercenary spec); S→C 0x9B (u16 0xFFFF @1, u32 0 @3); 0x2A code 5,
+   flag 0, GUID = mercenary.
+
+#### 7.5 Quest-granted mercenary (`0x00579180`)
+
+Called by quest code (`0x00590980`, `0x005B9240`; `quests.md`). Needs
+the NPC record and its hire list. Skipped when the player already has a
+hireling: expansion `0x00574EC0(7, 1)` non-null (then only the refill
+check runs), classic `0x00574EC0(7, 0)` non-null (nothing). Else: the
+hireling row for the game's **difficulty** (unlike §7.1); the first slot
+offered and not hired becomes hired; S→C 0x50 (`0x0053D7E0`; u16 2 @1,
+u16 name @3; `quests.md` §6.2); mercenary created near the player
+(spawn modes 4, then 6, then 12; all fail → stop, no refill check) and
+initialised; then the §7.3 step 8 refill check.
+
+### 8. NPC services (C→S 0x38, action ∉ {1, 2, 3})
+
+#### 8.1 Imbue, socket, personalize
+
+Common: the item GUID (u32 @9) must be the player's cursor item
+(`0x00578610`), else return silently. Result S→C 0x58 (7 bytes via
+`0x0053D8D0`: 0x58, u32 NPC GUID, u8 result @5, byte 6 not written):
+6 done, 7 refused. "Refuse" below = 0x58 result 7 and the item is put
+back (`0x00563C00`).
+
+| NPC | Quest gate (slot.bit) | Item must be (predicate) |
+|---|---|---|
+| charsi 154 | 3.1 (Tools of the Trade, reward pending) | `0x0062C590`: not gold, no flag 0x1000, `bitfield1` bit 0, not a throwable unless unit flag bit 25, not a quest item except `leg`, no socketed items, not socketed (0x800), quality 1–3 |
+| larzuk 511 | 35.1 (Siege on Harrogath) | `0x0062C770`: not gold, no 0x1000, quest only `leg`, not broken (0x100), no socketed items, not socketed, max sockets > 0, stat 194 = 0 |
+| drehya 512 | 38.1 (Betrayal of Harrogath) | `0x0062C6A0`: not gold, no 0x1000, type ≠ 7, 5, 6 (ear, quivers), not broken, not personalized (0x1000000), no socketed items, `Nameable` set |
+
+Gate bit clear or predicate false → refuse.
+
+- **Imbue**: fill a drop request from the input (`0x00558270`); flags
+  |= 0x20 and (ethereal input ? 4 : 2); item format := game +0x78; keep
+  the personalized name; remove the input from the cursor (fail →
+  refuse); quality 6 (rare), item level = player's base level (stat 12,
+  at least 1, `0x00558200`) + 4 if > 5; create (`0x00558D90`, item
+  spec); null → 0x58 result 7 (input lost). Else repair (`0x005761C0`,
+  `vendors.md` §8.2), `0x0055FE00`, inventory page 0, name restored,
+  place in the inventory or drop at a free spot near the player; quest
+  reward hook `0x00591790` (`quests.md`); result 6.
+- **Socket**: duplicate the input into the player (`0x0055A2A0`) and
+  remove the input from the cursor (`0x0055EEA0`); either fails →
+  refuse. Flag 0x800; s = max sockets (`0x0062BC20`); quality 4: s :=
+  roll(item seed of the duplicate, min(s, 2)) + 1 (`rng.md` §7); quality
+  5–9: s := 1 if s > 0; other qualities keep s; add s sockets
+  (`0x0062BCB0`); repair, `0x0055FE00`, page 0, place or drop; hook
+  `0x005877C0`; result 6.
+- **Personalize**: duplicate as above; a failed duplicate sends result
+  7 and puts the item back but does not stop (edge case 6). Remove the
+  input from the cursor (fail → refuse); repair, page 0, place or drop;
+  flag 0x1000000; name := player name; hook `0x0058BC00`; result 6.
+
+#### 8.2 Akara respec
+
+Hell only (difficulty 2): if slot 1 bit 0 is set and slot 41 bits 1 and
+0 are clear → `0x0058FD20` (sets 41.13, 41.1). Then any difficulty: if
+slot 41 bit 1 is set → reset stats (`0x00570360`) and skills
+(`0x00570C80`) (player spec), sound for the player (`0x00553380`),
+`0x0058FD50` (41.0 set, 41.1 cleared; `quests.md` §10.3).
+
+#### 8.3 Act travel
+
+| NPC | Action | Condition | Calls |
+|---|---|---|---|
+| warriv1 155 | any ∉ 1–3 | slot 6 bit 0 | act change to level 40 (`0x0054B830(40, 0)`), `0x005467E0(npc, 40, 1)` (`quests.md` §8.1), activate level 40's waypoint (`0x00660E00`, `0x00660EC0`; `waypoints.md`) |
+| warriv2 175 | any ∉ 1–3 | none | `0x0054B830(1, 5)` |
+| meshif1 210 | 0 | slot 14 bit 0 | level 75, `0x005467E0(npc, 75, 40)`, waypoint 75 |
+| meshif2 264 | 0 | none | `0x0054B830(40, 5)` |
+| tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109, `0x005467E0(npc, 109, 103)`, waypoint 109 |
+| cain6 520 | 0 | none | `0x0054B830(103, 5)` |
+
+### 9. S→C 0x2A NPC transaction (15 bytes)
+
+Builder `0x0053D740(code, gold, GUID, kind)`:
+
+| Off | Size | Value |
+|---|---|---|
+| 0 | 1 | 0x2A |
+| 1 | 1 | kind |
+| 2 | 1 | result code |
+| 3 | 4 | **not written**: stack contents of the builder's frame |
+| 7 | 4 | GUID (item, mercenary) or −1 |
+| 11 | 4 | player gold (stat 14) after the transaction |
+
+| Code | Kind | Meaning (sender) |
+|---|---|---|
+| 0 | 4 | bought, GUID = new item (`vendors.md` §7) |
+| 0 | 5 | bought into a stack or tome, GUID = that item |
+| 1 | 3 | sold, GUID = the sold item |
+| 2 | 1 | repaired (one or all) |
+| 3 | 0 | identified (§6) |
+| 5 | 0 | mercenary hired or resurrected, GUID = mercenary |
+| 6 | 0 | healed (dead code, §10) |
+| 7 | 0 | buy refused: item missing, not offered, cursor busy |
+| 9 | 0 | refused: NPC not the interact unit, wrong NPC, invalid item or name |
+| 10 | 0 | no room for the bought item |
+| 11 | 0 | sell: item not the player's; hire: quest gate |
+| 12 | 0 | not enough gold |
+| 14 | 0 | nothing to heal (dead code) |
+| 15 | 0 | mercenary could not be placed |
+
+Recorded: `2a 03 01 05a4f619 07000000 f4010000` (sell, frame 1157),
+`2a 04 00 056cf619 36000000 bc010000` (buy, frame 1279): bytes 3–6
+differ between messages.
+
+### 10. Dead code in 1.14d (no caller, no pointer reference)
+
+- `0x00578ED0` purchase heal (D2MOO `D2GAME_NPC_PurchaseHeal`): cost =
+  (player level · (missing life >> 8 + missing mana >> 8)) >> 2, at
+  least 1 (`0x00622DE0`); codes 14, 12, 9, 6.
+- `0x00579090` store regeneration of the last healer (global
+  `0x0088CAC4`).
+- `0x005368F0` / `0x005367B0` NPC event processing; `0x00579030` /
+  `0x00576C90` random cache pick (draws from the NPC-control seed).
+  Level-up (`0x00570880`) still pushes events (`0x00536850`,
+  `vendors.md` §3.4); they are freed with the record data, never run.
+
+## Constants & data dependencies
+
+- NPC table `0x00731184` (§1.2, `vendors.tsv`); healer, Cain, seller,
+  resurrector, trade, gamble and service class lists are code constants
+  (§4–§8, `vendors.tsv` columns).
+- Normal-difficulty level cap per NPC act: 12, 20, 28, 36, 45
+  (`0x00576890`).
+- Distances: 50 (start), 6 (talk), 7–8 (approach), 50 subtiles (0x2F).
+- `hireling`: seller +0x14, difficulty +0x10 (1-based), act +0x0C
+  (1-based), version +0x00, level +0x1C, gold +0x18, name ids
+  +0x114/+0x116 (`fields.tsv`).
+- Costs: identify 100 per item; resurrection min((L²/2)·15, 50000).
+
+## Randomness
+
+All draws use `rng.md` §3 semantics.
+
+| When | Seed | Draws, in order |
+|---|---|---|
+| hire list (§7.1) | NPC-control | n steps (slot seeds), then up to 10 × roll(n) (fewer when the probe wraps) |
+| hire / client offer (§7.3) | local, `{slot seed, 666}` | roll(candidate rows), one step (level) |
+| socket (§8.1) | item seed of the duplicate | roll(min(max sockets, 2)) for quality 4 only |
+| imbue (§8.1) | item spec | item creation |
+
+Talk, chat, heal, identify, resurrect and act travel draw nothing.
+
+## Edge cases & original bugs
+
+Reproduced by default.
+
+1. 0x2A bytes 3–6 are uninitialised stack (§9). Exact-match comparison
+   (`intents-events.md` §6) must mask them; d2rs writes 0.
+2. The hire list always uses the Normal `hireling` row's names (§7.1)
+   while the price uses the game's difficulty rows (§7.3).
+3. A hire slot that was never offered can be hired by a crafted 0x36
+   (only "hired" is checked).
+4. Gold is taken before the mercenary is placed; placement failure
+   (code 15) keeps the gold.
+5. Cain with no unidentified items answers code 9; non-Cain NPCs get no
+   answer to 0x34 at all.
+6. Personalize: a failed duplicate sends result 7 and puts the item
+   back, then continues: the input is taken from the cursor
+   (`0x0055EEA0`) and the null output reaches repair and placement. The
+   outcome was not traced (Open question 4); d2rs stops after the
+   refusal until it is.
+7. 0x38 trade / gamble does not require that the player is in the
+   NPC's interaction list (state change is skipped if absent).
+8. Healing triggers only on the 0 → 1 chat transition; a second 0x2F in
+   the same interaction does not heal.
+9. Nihlathak (514) owns a store but no trade action; he can still be
+   sold to while gambling (`vendors.md` §7.2).
+10. 0x58 byte 6 is not written (stack), like 0x2A bytes 3–6.
+
+## Test vectors
+
+| Input | Expected | Source |
+|---|---|---|
+| C→S `13 01000000 06000000` (Charsi, GUID 6, close) | S→C 0x27 `27 01 06000000 01000000 25 00…`, 0x29, 0x28 in that order, same frame | `20261006-015956-packets`, frame 746 |
+| C→S `2f 01000000 06000000` after 0x13 | no S→C message (Charsi is not a healer) | same, frame 747 |
+| C→S `38 01000000 06000000 00000000` | no 0x2A; 43 S→C 0x9C action 11 (store) | same, frame 898–899 |
+| C→S `30 01000000 10000000` (Akara) | no message | same, frame 1958 |
+| 0x2A sell, kind 3, code 1, GUID 7, gold 500 | `2a 03 01 ?? ?? ?? ?? 07 00 00 00 f4 01 00 00` (?? masked) | frame 1157 |
+| hire list, NPC seed {12345, 666}, n = 41 | slot seeds 22752887, 2337785264, 1617882871, …; offered slots in order 24, 29, 19, 10, 8, 11, 27, 5, 22, 28; seed after {1296536796, 747986489} | synthetic (§7.1) |
+| same seed, n = 3 | seeds 22752887, 2337785264, 1617882871; offered 1, 2, 0; 4th roll wraps → stop; seed after {4247383538, 1001282318} | synthetic |
+| hire init, slot seed 22752887, 2 candidate rows, player level 10 | row 1, L = 6 | synthetic (§7.3 step 5) |
+| price: row gold 100, row level 3, L = 5 / 7 / 9 | 130 / 160 / 190 | synthetic |
+| resurrect L = 10 / 30 / 82 | 750 / 6750 / 50000 | synthetic (§7.4) |
+| identify, 3 unidentified, slot 4 bits 0, 1 clear | pay 300; 0x2A code 3 | synthetic (§6) |
+
+Game-file test (`#[ignore]`): with live `monstats.txt`, §1.1 yields 47
+records in row order; the 43 table entries (`vendors.tsv`) attach.
+
+## Provenance
+
+- 1.14d code (read from `re/exports`): records `0x00536070`, lookups
+  `0x00535EA0`/`0x00535F10`; 0x13 `0x0054AA90` → `0x00548B00` →
+  `0x00572C10`; 0x2F/0x30 `0x0054B930`/`0x0054B9F0` → `0x00572E60`/
+  `0x00572F20`; 0x38 `0x0054BCA0` → `0x00579D60`; heal `0x00578E70`,
+  `0x00578D30`, `0x00578C20`, `0x00578CA0`; Cain `0x00578460`,
+  `0x0062A530`; hire `0x00576070`, `0x00576770`, `0x00577FE0`,
+  `0x005770E0`, `0x00577010`, `0x006637F0`, `0x00663750`, `0x00656580`,
+  `0x006564D0`; resurrect `0x00579C00`, `0x006637B0`; quest merc
+  `0x00579180`; 0x2A `0x0053D740` (stack layout read from the
+  instructions); 0x4E `0x0053D7B0`; 0x9B `0x0053E0E0`. The NPC table and
+  the switch targets were read from the `Game.exe` image (data at
+  `0x00731184`, jump tables `0x00536454`/`0x00536488`).
+- Dead code: no call and no 32-bit pointer to `0x00578ED0`,
+  `0x00579090`, `0x005368F0`, `0x005367B0` in `Game.exe`.
+- D2MOO 1.10f `SUnitNpc.cpp` / `SUnitProxy.cpp` were used as a map
+  (names, structure); every rule above was re-read in 1.14d. Differences:
+  D2MOO sends the identify 0x2A per item inside the loop (1.14d once
+  after it); D2MOO's trade-open class switch is inverted
+  (`vendors.md` §4); D2MOO names the Qual-Kehk gate `QUEST_A5Q6_BAAL`;
+  1.14d adds the Hell respec branch (§8.2) and 0x2A codes are confirmed
+  by recording.
+- Recording `20261006-015956-packets.jsonl`: GUID → class from S→C 0xAC
+  (`ac 06000000 9a00` Charsi, `ac 10000000 9400` Akara, `ac 0b000000
+  9b00` Warriv, `ac 26000000 0a01` Flavie).
+
+## Open questions
+
+1. `0x00457490` in the start check: what it tests (result 1 when false);
+   settle with a debugger break on a refused 0x13.
+2. `0x0058EC00(npc, ?, 0x28)` parameter slot and effect on NPC AI
+   (monster spec); settle with the AI spec.
+3. Record bytes +0x24, +0x25, +0x26: no reader found in `0x00535000`–
+   `0x0057A000`; grep the whole image for readers.
+4. Personalize after a failed duplicate (edge case 6): trace the drehya
+   branch of `0x00579D60` with a null duplicate.
+5. 0x9B bytes: confirm `9b ffff 00000000` with a resurrect recording.
+6. Hire / resurrect / heal / Cain / services: record one of each
+   (`packets-0002`, HANDOFF §5) to confirm message order.

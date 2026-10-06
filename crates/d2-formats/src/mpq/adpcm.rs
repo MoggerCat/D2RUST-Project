@@ -84,18 +84,21 @@ mod tests {
             .collect()
     }
 
+    // Covers: specs/formats/mpq.md §12 r2, §12 r3
     #[test]
     fn encoded_sample() {
         let out = decompress(&[0x00, 0x00, 0x10, 0x00, 0x01], 1, 64);
         assert_eq!(samples(&out), [16, 1004]);
     }
 
+    // Covers: specs/formats/mpq.md §12 r3
     #[test]
     fn repeat_command() {
         let out = decompress(&[0x00, 0x00, 0x10, 0x00, 0x80], 1, 64);
         assert_eq!(samples(&out), [16, 16]);
     }
 
+    // Covers: specs/formats/mpq.md §12 r3
     #[test]
     fn negative_sample_clamps() {
         // Initial -32000, then subtract a large step: clamps at -32768.
@@ -104,6 +107,7 @@ mod tests {
         assert_eq!(samples(&out), [-32000, -32768]);
     }
 
+    // Covers: specs/formats/mpq.md §12 r2, §12 r3
     #[test]
     fn stereo_interleaves() {
         // Two initial samples, then a repeat on each channel.
@@ -111,6 +115,7 @@ mod tests {
         assert_eq!(samples(&out), [1, 2, 1, 2]);
     }
 
+    // Covers: specs/formats/mpq.md §12 r3
     #[test]
     fn output_is_capped() {
         let out = decompress(&[0x00, 0x00, 0x10, 0x00, 0x80, 0x80, 0x80], 1, 4);

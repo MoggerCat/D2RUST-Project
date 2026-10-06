@@ -20,6 +20,7 @@ fn game_file(name: &str) -> PathBuf {
         .unwrap_or_else(|| panic!("{name} not found in {}", dir.display()))
 }
 
+// Covers: specs/formats/mpq.md §1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn required_archives_open() {
@@ -30,6 +31,7 @@ fn required_archives_open() {
     }
 }
 
+// Covers: specs/formats/mpq.md §5, §8, §14
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn listed_files_resolve_and_decode() {
@@ -50,6 +52,7 @@ fn listed_files_resolve_and_decode() {
     }
 }
 
+// Covers: specs/formats/mpq.md §8, §10
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn imploded_patch_archive_decodes() {
@@ -66,6 +69,7 @@ fn imploded_patch_archive_decodes() {
     }
 }
 
+// Covers: specs/formats/mpq.md §13
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn unnamed_encrypted_wav_recovers_key() {

@@ -12,6 +12,8 @@
 
 use thiserror::Error;
 
+mod alloc;
+
 /// Hash buckets per unit class (§2): `GUID & 0x7F`.
 pub const HASH_BUCKETS: usize = 128;
 

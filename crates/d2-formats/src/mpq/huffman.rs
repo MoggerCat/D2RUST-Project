@@ -488,6 +488,7 @@ mod tests {
         assert!(tree.increment(root).is_err());
     }
 
+    // Covers: specs/formats/mpq.md §11 text
     #[test]
     fn rejects_bad_table_type() {
         assert!(decompress(&[9, 0, 0], 16).is_err());

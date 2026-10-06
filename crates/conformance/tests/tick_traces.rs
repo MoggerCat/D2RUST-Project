@@ -1,8 +1,7 @@
 //! The committed tick traces in `traces/sim/tick/` load and are well formed
-//! (`specs/sim/tick.md`, Test vectors, "Trace sim/tick"). Replaying them
-//! against `d2-sim::tick` comes with the timer queue implementation; until
-//! then `tools/trace-recorder/convert_tick.py --check` replays them through
-//! the spec model (CI).
+//! (`specs/sim/tick.md`, Test vectors). `tick_replay.rs` replays them
+//! against `d2-sim::tick`; `tools/trace-recorder/convert_tick.py --check`
+//! replays them through the spec model (CI).
 
 use std::path::PathBuf;
 

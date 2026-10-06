@@ -22,6 +22,7 @@ import sys
 import d2rng
 
 
+# Covers: specs/sim/rng.md §2, §3 text
 def main(path):
     events = [json.loads(line) for line in open(path, encoding="utf-8")]
     header = events[0]
