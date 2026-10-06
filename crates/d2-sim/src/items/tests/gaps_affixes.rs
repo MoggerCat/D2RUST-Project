@@ -440,7 +440,7 @@ fn rare_fits_rules() {
 
 /// Rare name: fitting rows of the part in order, capped at 511;
 /// r := roll(count), unweighted; rare ids count suffixes first.
-// Covers: specs/items/affixes.md §5 text
+// Covers: specs/items/affixes.md §5 text, §5 r0
 #[test]
 fn rare_name_pick() {
     let mut t = tables();

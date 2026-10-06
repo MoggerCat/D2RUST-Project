@@ -1,0 +1,4 @@
+# Accepted determinism-lint exceptions (CLAUDE.md rule 6), one per line:
+#   <path from repo root> <TAB> <rule> <TAB> <reason>
+# Rules: float hash-collection clock ambient-rng io env global-state unsafe.
+# Every entry needs a reason; an entry that matches no hit is an error.

@@ -16,6 +16,8 @@ pub mod softfloat;
 pub mod walk;
 
 #[cfg(test)]
+mod gap_tests;
+#[cfg(test)]
 mod tests;
 
 pub use drop::{

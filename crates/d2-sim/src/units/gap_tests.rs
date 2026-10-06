@@ -43,6 +43,8 @@ struct Probe {
     class_record: Option<MonsterModeRecord>,
     /// Life fractions sent (`0x00571A10`).
     fractions: Vec<i32>,
+    /// At each per-type init: (record GUID, the type's counter).
+    init_guids: Vec<(u32, u32)>,
 }
 
 impl Probe {
@@ -167,6 +169,9 @@ impl UnitHooks for Probe {
 impl LifecycleHooks for Probe {
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         let stats = sim.stats.unit_list(unit).is_some();
+        let guid = sim.units.get(unit).map_or(0, |r| r.guid);
+        self.init_guids
+            .push((guid, sim.game.lists.guids.get(req.ty)));
         self.push(format!("init {:?} stats={stats}", req.ty));
     }
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
@@ -1542,4 +1547,91 @@ fn stat_352_is_the_last_sent_fraction() {
     .expect("regen");
     assert_eq!(sys.stats.unit_total(m, stat::LAST_SENT_HP_PCT, 0), 0);
     assert_eq!(sys.hooks.fractions, [66, 128, 0]);
+}
+
+// ---- unit-order.md §1 r4, r5 (GUID draw point) ----------------------------------------
+
+// Covers: specs/sim/unit-order.md §1 r4, §1 r5
+#[test]
+fn guid_drawn_once_after_seed_before_init() {
+    let mut game = Game::new();
+    let mut sys = system();
+    let mut seed = Seed::init();
+    let mut expect = Seed::init();
+    // r4: one counter step per unit, after the seed draw, before the init.
+    let mut req = request(UnitType::Monster, 0, 1, None);
+    for n in 1..=2 {
+        let u = sys
+            .with(&mut game, |sim, hooks| {
+                allocate(sim, hooks, &mut seed, &req)
+            })
+            .unwrap()
+            .unwrap();
+        let lo = expect.step();
+        assert_eq!(seed, expect);
+        let rec = sys.units.get(u).unwrap();
+        assert_eq!((rec.guid, rec.init_seed), (n, lo));
+        assert_eq!(game.lists.guids.get(UnitType::Monster), n);
+        assert_eq!(sys.hooks.init_guids.last(), Some(&(n, n)));
+    }
+    // r4 exception: a fixed GUID (flag 2) leaves the counter where it was,
+    // the seed is still derived.
+    req.fixed_guid = Some(500);
+    let u = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    let lo = expect.step();
+    assert_eq!(seed, expect);
+    assert_eq!(
+        (
+            sys.units.get(u).unwrap().guid,
+            sys.units.get(u).unwrap().init_seed
+        ),
+        (500, lo)
+    );
+    assert_eq!(game.lists.guids.get(UnitType::Monster), 2);
+    assert_eq!(sys.hooks.init_guids.last(), Some(&(500, 2)));
+    let u = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(
+                sim,
+                hooks,
+                &mut seed,
+                &request(UnitType::Monster, 0, 1, None),
+            )
+        })
+        .unwrap()
+        .unwrap();
+    expect.step();
+    assert_eq!(sys.units.get(u).unwrap().guid, 3);
+    // r5: players draw from counter 0 (only), with no seed derivation.
+    let before = game.lists.guids;
+    let p = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(
+                sim,
+                hooks,
+                &mut seed,
+                &request(UnitType::Player, 0, 0, None),
+            )
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(seed, expect);
+    let rec = sys.units.get(p).unwrap();
+    assert_eq!((rec.guid, rec.init_seed), (1, 0));
+    assert_eq!(game.lists.guids.get(UnitType::Player), 1);
+    for ty in [
+        UnitType::Monster,
+        UnitType::Object,
+        UnitType::Missile,
+        UnitType::Item,
+        UnitType::Tile,
+    ] {
+        assert_eq!(game.lists.guids.get(ty), before.get(ty));
+    }
+    assert_eq!(sys.hooks.init_guids.last(), Some(&(1, 1)));
 }
