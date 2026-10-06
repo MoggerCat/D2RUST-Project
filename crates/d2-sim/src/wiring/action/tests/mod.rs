@@ -50,6 +50,8 @@ pub struct TestPending {
     /// COF names per (unit type, mode) for the AnimData lookup.
     pub names: BTreeMap<(UnitType, u32), [u8; 8]>,
     pub log: Vec<String>,
+    /// Every `Pending::send` (player, bytes), in order.
+    pub sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for TestPending {
@@ -136,6 +138,9 @@ impl Pending for TestPending {
     }
     fn set_object_mode(&mut self, _: &mut Game, object: UnitId, mode: u8) {
         self.log.push(format!("object mode {} {mode}", object.0));
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.sent.push((player, msg.to_vec()));
     }
 }
 
