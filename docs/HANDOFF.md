@@ -403,7 +403,10 @@ Cloud (repo only):
    `ui::text::TextOpts` carry the clip rect now (it is on `TextRequest`) or
    wait for `ui/text.md` to say what the original's text call takes? Until
    answered the code keeps the current reading (previous-frame rank; no
-   fields in `TextOpts`).
+   fields in `TextOpts`). **Answered 2026-10-06** (`docs/PLAN.md`
+   decisions log): CG1 keep the previous-frame rank; CG2 both,
+   `TextOpts::clip` now carries the request's clip rect (unused until
+   `ui/text.md` §B3 says what the original takes).
 7h. **Spec questions of the fifth fold** (spec writing / Ghidra, §7 fifth
    set): RT1–RT6 (where the umod mode 0 / 1 calls sit in `0x005A7C20`,
    the monster-level getter, umod mode 4, `dwAiState`, the boss /
