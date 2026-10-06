@@ -28,19 +28,19 @@
 |   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 289–302 |
 |   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 303–327 |
 |   5. Preset primitives on the grids | 328–385 |
-|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 386–436 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 437–597 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 598–631 |
-|   9. Act III | 632–674 |
-|   10. Act IV (`0x0067E890`) | 675–686 |
-|   11. Act V (`0x0067E600`) | 687–702 |
-|   12. Rooms | 703–738 |
-| Constants & data dependencies | 739–761 |
-| Randomness | 762–783 |
-| Edge cases & original bugs | 784–805 |
-| Test vectors | 806–865 |
-| Provenance | 866–898 |
-| Open questions | 899–922 |
+|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 386–440 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 441–608 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 609–653 |
+|   9. Act III | 654–696 |
+|   10. Act IV (`0x0067E890`) | 697–708 |
+|   11. Act V (`0x0067E600`) | 709–724 |
+|   12. Rooms | 725–760 |
+| Constants & data dependencies | 761–783 |
+| Randomness | 784–805 |
+| Edge cases & original bugs | 806–827 |
+| Test vectors | 828–887 |
+| Provenance | 888–920 |
+| Open questions | 921–944 |
 <!-- /index -->
 
 ## Summary
@@ -405,8 +405,12 @@ next edge's dir likewise):
    - Act III: nothing.
 4. Corner at n: d := v.direction, or n.direction if v's is 0 (grid bit 0x2
    := d ≠ 0); style s' as step 1 but from d. Corner piece := Corner(a, b,
-   c, e, s') with a = dx, b = dy, c = next dx, e = next dy, each doubled
-   unless its vertex is a preset link. Piece 19 (cliff 6A) becomes 20
+   c, e, s') with a = dx, b = dy, c = next dx, e = next dy. The corner
+   index is computed inline (`0x00675BB7`–`0x00675CDD`; same table
+   reads as `0x00675600`): first (a, b) are doubled unless v is a
+   preset link and (c, e) doubled unless n is one; **then** a and c
+   (not b, e) grow by 2 in magnitude when non-zero; k := N[a + b +
+   9(c + e) + 50]. Piece 19 (cliff 6A) becomes 20
    (6B) if v.direction = 1 and n.direction ≠ 1, 21 (6C) if v.direction ≠
    1; any nonzero piece is stamped at n (F = −1) and grid 2 ORed as in
    step 2.
@@ -577,10 +581,17 @@ adjusted[i], and a vertex at start[i] is appended.
 **7.5.3 Per room** (`0x00680C80` → `0x00680A70`, `0x00680B10`; no draws):
 when an Act I outdoor room's grids are built (§12.2), a (w+3)×(h+3) path
 grid over the room's tiles (origin room − 1) gets every path segment
-drawn 2 cells thick (Bresenham-like, `0x0067C8E0`); then each path tile's
-8-neighbour mask (bit order as D2MOO `byte_6FDCF958`, 256-entry table at
-`0x006F2860`) selects a floor style s; s ≠ 0 → floor cell := (s << 8) |
-0x82 (overwrite). Table bytes and bit order: open question 6.
+drawn 2 cells thick (Bresenham-like, `0x0067C8E0`); then (`0x00680B10`)
+for path-grid columns X = 1..w+1 (outer) and rows Y = h+1 down to 1
+(inner), a cell G(X, Y) ≠ 0 gets the 8-neighbour mask, most significant
+bit first: b7 G(X+1, Y−1), b6 G(X+1, Y), b5 G(X+1, Y+1), b4 G(X, Y−1),
+b3 G(X, Y+1), b2 G(X−1, Y−1), b1 G(X−1, Y), b0 G(X−1, Y+1) (each bit =
+cell ≠ 0). Mask 0 → nothing; else s := byte `0x006F2700`[mask]
+(`drlg/outdoor-path-floor.tsv`, 256 rows, values 0..46, 240 non-zero);
+s ≠ 0 → floor cell (X − 1, Y − 1) of the room := (s << 8) | 0x82
+(overwrite, grid op 3). Reads come from the path grid only, so the visit
+order does not change the result. (Earlier text named `0x006F2860`,
+which holds ASCII text.)
 
 #### 7.6 River (`0x0067FE90`) and bridge (`0x0067FD20`)
 
@@ -618,13 +629,24 @@ r := (r + 1) mod n. (S = SpawnOutdoorLevelPreset with m 0, flags 15.)
 8.2 **Town transition** (`0x0067F560`): first neighbour entry whose level
 is 40: direction 3 → stamp 363 at (0, gh−1); else stamp 362 at (gw−1, 0);
 F −1. None: nothing.
-8.3 **Cliffs** (`0x0067F5C0`): r := `lo' & 7`; stamp the 5 entries of row
-r (P, F, x, y) of `0x006F2390`: rows 0–2: (376,1,0,4), (378|377 …) — row
-r ∈ 0..2 puts the path piece 378 at x = 2 + 2r among walls 377 at x 2..6,
-ends 376 at (0,4) F1 and (8,4) F2; rows 3/4: (376,2,8,4), (377 or 378,
-−1,6,4), (382,−1,4,4), (381 or 380,−1,4,6), (379,2,4,8) (row 3: 377 and
-381; row 4: 378 and 380); rows 5–7: (379,1,4,0), path 381 at y = 2 +
-2(r−5) among walls 380 at y 2..6, (379,2,4,8).
+8.3 **Cliffs** (`0x0067F5C0`): r := `lo' & 7` (one level-seed step);
+stamp the 5 entries of row r of `0x006F2390` in entry order, each (P, F,
+x, y) (§5.1; F −1 takes the build-list file, so the first stamp of each
+P in the level draws `roll(Files)`):
+
+| r | entries in stamp order (P, F, x, y) |
+|---|---|
+| 0 | (376,1,0,4) (378,−1,2,4) (377,−1,4,4) (377,−1,6,4) (376,2,8,4) |
+| 1 | (376,1,0,4) (377,−1,2,4) (378,−1,4,4) (377,−1,6,4) (376,2,8,4) |
+| 2 | (376,1,0,4) (377,−1,2,4) (377,−1,4,4) (378,−1,6,4) (376,2,8,4) |
+| 3 | (376,2,8,4) (377,−1,6,4) (382,−1,4,4) (381,−1,4,6) (379,2,4,8) |
+| 4 | (376,2,8,4) (378,−1,6,4) (382,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 5 | (379,1,4,0) (381,−1,4,2) (380,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 6 | (379,1,4,0) (380,−1,4,2) (381,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 7 | (379,1,4,0) (380,−1,4,2) (380,−1,4,4) (381,−1,4,6) (379,2,4,8) |
+
+(Read from the file image; arguments mapped at `0x0067F600`–`0x0067F612`:
+entry +0 = P, +4 = F, +8 = x, +12 = y.)
 8.4 **Tomb row** (`0x0067F8D0`): stamp (384,0,8,0), (383,2,6,0),
 (383,1,4,0), (383,0,2,0), (387,0,0,0), (385,0,0,2), (385,1,0,4),
 (385,2,0,6), (386,0,0,8); then 394 at (4, 4), F −1.
@@ -909,8 +931,8 @@ recording; level rects and outdoor flags equal a level-coordinate probe
 5. Stony Field, Dark Wood, Black Marsh, Tamoe builds (river, bridge,
    cliff caves, side cave draws `0x00680251`, `0x0068034F`): record a run
    that generates them.
-6. Path floor table `0x006F2860` (256 bytes) and the neighbour-bit order
-   of `0x00680B10`: dump and describe (no draws; tile output only).
+6. *Answered:* path floor table `0x006F2700` (not `0x006F2860`) is in
+   `drlg/outdoor-path-floor.tsv`, the bit order in §7.5.3.
 7. Jungle placer details (case offsets for SY/3 rounding, attach-point
    loops, `0x006777D0`) — needs a full read of `0x00677880` and an Act 3
    recording.
