@@ -16,6 +16,10 @@
 //!   expected rejections are written from §7, step by step, below
 //!   (`early`).
 
+// The oracle keeps each §7 step as its own branch, even where two steps
+// give the same code, so it reads against the spec line by line.
+#![allow(clippy::if_same_then_else)]
+
 use proptest::prelude::*;
 
 use super::seams::InventoryOps;

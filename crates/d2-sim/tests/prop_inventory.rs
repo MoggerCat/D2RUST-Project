@@ -570,6 +570,7 @@ impl Model {
         })
     }
     /// §2.1 bounds and fit (the moving item's own cells count as taken).
+    #[allow(clippy::too_many_arguments)]
     fn fits(&self, c: &Ctx, w: &World, g: usize, x: i32, y: i32, iw: u8, ih: u8) -> bool {
         let Some((gw, gh)) = c.grid_size(g) else {
             return false;
