@@ -17,10 +17,10 @@ use crate::path::coords::Point;
 use crate::path::place_seams::{
     CollisionView, LevelView, PlaceError, PlaceHost, PlaceMessage, RoomReveal,
 };
+use crate::path::search::ExpField;
 use crate::path::warp::WarpOutcome;
 use crate::path::CollisionRooms;
 use crate::units::{RoomId, UnitId, UnitType};
-use crate::path::search::ExpField;
 use crate::wiring::action::{DrlgWorld, Pending, WiringError};
 
 use super::walk::PathCtx;
@@ -116,9 +116,11 @@ impl<X: Pending> CollisionView for Shared<'_, '_, X> {
         let mut c = self.0.borrow_mut();
         let c = &mut *c;
         if let Err(e) = c.game.lists.change_room(unit, room) {
-            c.v.h.errors.push(WiringError::Unit(
-                crate::units::modes::UnitError::Game(e.into()),
-            ));
+            c.v.h
+                .errors
+                .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                    e.into(),
+                )));
             return;
         }
         let game: &crate::game::Game = c.game;
@@ -146,9 +148,11 @@ impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
     fn queue_update(&mut self, unit: UnitId) {
         let mut c = self.0.borrow_mut();
         if let Err(e) = c.game.lists.queue_update(unit) {
-            c.v.h.errors.push(WiringError::Unit(
-                crate::units::modes::UnitError::Game(e.into()),
-            ));
+            c.v.h
+                .errors
+                .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                    e.into(),
+                )));
         }
     }
     fn or_flags2(&mut self, unit: UnitId, bits: u32) {
@@ -165,9 +169,7 @@ impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
     fn send(&mut self, player: UnitId, msg: PlaceMessage<UnitId>) {
         let mut c = self.0.borrow_mut();
         let id = |c: &PathCtx<'_, X>, u: UnitId| {
-            c.v.units
-                .get(u)
-                .map_or((0, 0), |r| (r.ty as u8, r.guid))
+            c.v.units.get(u).map_or((0, 0), |r| (r.ty as u8, r.guid))
         };
         let bytes: Vec<u8> = match msg {
             PlaceMessage::MapReveal { x, y, level } => map_reveal(x, y, level).to_vec(),
@@ -201,9 +203,9 @@ impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
             .game
             .schedule_event(unit, u32::from(event), expire, callback, 0, 0)
         {
-            c.v.h.errors.push(WiringError::Unit(
-                crate::units::modes::UnitError::Game(e),
-            ));
+            c.v.h
+                .errors
+                .push(WiringError::Unit(crate::units::modes::UnitError::Game(e)));
         }
     }
     fn request_walk(&mut self, player: UnitId, x: i32, y: i32) {
@@ -219,13 +221,9 @@ impl<X: Pending> LevelView<RoomId> for Shared<'_, '_, X> {
     fn spawn_room(&mut self, act: u8, level: u32, tile_index: u32) -> Option<(RoomId, i32, i32)> {
         let mut c = self.0.borrow_mut();
         let c = &mut *c;
-        let r = c
-            .v
-            .h
-            .drlg
-            .with_act(act, &mut c.game.lists, |d, svc| {
-                d.spawn_room(svc, level, tile_index)
-            })?;
+        let r = c.v.h.drlg.with_act(act, &mut c.game.lists, |d, svc| {
+            d.spawn_room(svc, level, tile_index)
+        })?;
         match r {
             Ok(p) => Some((p.active?, p.x, p.y)),
             Err(e) => {
@@ -314,7 +312,9 @@ pub fn level_warp<X: Pending>(
     }
     let size = c.v.path_size(player);
     Some(with_shared(c, |cv, host, lv| {
-        let r = crate::path::place::level_warp_place(cv, host, lv, player, act, level, tile_index, size);
+        let r = crate::path::place::level_warp_place(
+            cv, host, lv, player, act, level, tile_index, size,
+        );
         log(cv, r).unwrap_or(false)
     }))
 }
@@ -366,4 +366,3 @@ fn log<X: Pending, T>(cv: &mut Shared<'_, '_, X>, r: Result<T, PlaceError>) -> O
         }
     }
 }
-

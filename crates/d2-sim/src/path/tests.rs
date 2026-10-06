@@ -1179,6 +1179,36 @@ impl PathMotion for Motion {
     }
 }
 
+/// The rooms and a motion recorder as one teleport context.
+struct Both<'a>(&'a mut Rooms, &'a mut Motion);
+
+impl CollisionRooms for Both<'_> {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        self.0.subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.0.adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        self.0.adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        self.0.grid(room)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut CollisionGrid> {
+        self.0.grid_mut(room)
+    }
+}
+
+impl PathMotion for Both<'_> {
+    fn set_position(&mut self, path: &mut DynamicPath, x: i32, y: i32, hint: Option<RoomId>) {
+        self.1.set_position(path, x, y, hint);
+    }
+    fn reset(&mut self, path: &mut DynamicPath) {
+        self.1.reset(path);
+    }
+}
+
 // Covers: specs/sim/path-placement.md §6 r4
 #[test]
 fn teleport_player_and_missile() {
@@ -1186,7 +1216,7 @@ fn teleport_player_and_missile() {
     let mut p = player_path(&mut w, a, 5, 5);
     w.set(15, 5, bits::WALL);
     let mut m = Motion::default();
-    teleport(&mut w, &mut m, &mut p, false, Some(b), 15, 5).unwrap();
+    teleport(&mut Both(&mut w, &mut m), &mut p, false, Some(b), 15, 5).unwrap();
     // Forced: lands on the wall; flag 0x1 for the other room.
     assert_eq!(w.at(15, 5), 0x1 | 0x80 | bits::NO_PATH);
     assert_eq!(w.at(5, 5), 0);
@@ -1200,20 +1230,27 @@ fn teleport_player_and_missile() {
     // Same room: no 0x1 added.
     let mut p = player_path(&mut w, a, 2, 2);
     let mut m = Motion::default();
-    teleport_and_clear(&mut w, &mut m, &mut p, false, Some(a), 3, 3).unwrap();
+    teleport_and_clear(&mut Both(&mut w, &mut m), &mut p, false, Some(a), 3, 3).unwrap();
     assert_eq!(p.flags & 0x1, 0);
     assert_eq!(p.point_count, 0);
     assert_eq!(w.at(3, 3), 0x80 | bits::NO_PATH);
     // (0, 0): clear only.
     let mut m = Motion::default();
-    teleport(&mut w, &mut m, &mut p, false, Some(a), 0, 0).unwrap();
+    teleport(&mut Both(&mut w, &mut m), &mut p, false, Some(a), 0, 0).unwrap();
     assert_eq!(w.at(3, 3), 0);
     assert_eq!(m.calls.len(), 2);
     // A non-zero point without a room: fatal, nothing changed.
     let mut p = player_path(&mut w, a, 6, 6);
     let before = (p.clone(), nonzero(&w));
     assert_eq!(
-        teleport(&mut w, &mut Motion::default(), &mut p, false, None, 7, 7),
+        teleport(
+            &mut Both(&mut w, &mut Motion::default()),
+            &mut p,
+            false,
+            None,
+            7,
+            7
+        ),
         Err(PathError::TeleportNoRoom { x: 7, y: 7 })
     );
     assert_eq!((p, nonzero(&w)), before);
@@ -1234,7 +1271,15 @@ fn teleport_player_and_missile() {
     ms.move_mask = 0x5;
     stamp_size(&mut w, Some(a), 2, 2, 1, 0x40);
     w.set(4, 4, bits::WALL);
-    teleport(&mut w, &mut Motion::default(), &mut ms, true, Some(a), 4, 4).unwrap();
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(a),
+        4,
+        4,
+    )
+    .unwrap();
     assert_eq!(ms.collided_mask, 0x1);
     assert_eq!(ms.flags & flags::MOVED, flags::MOVED);
     assert_eq!(

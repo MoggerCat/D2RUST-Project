@@ -232,19 +232,22 @@ impl<X: Pending> PathWorld for PathCtx<'_, X> {
     }
     fn room_list_remove(&mut self, unit: UnitId, _: RoomId) {
         if let Err(e) = self.game.lists.room_remove(unit) {
-            self.v.unit_error(crate::units::modes::UnitError::Game(e.into()));
+            self.v
+                .unit_error(crate::units::modes::UnitError::Game(e.into()));
         }
     }
     /// `0x0064C350` (`unit-order.md` §5.2: d2rs's insert also queues the
     /// unit, which the following `0x0064C040` would do).
     fn room_list_insert(&mut self, unit: UnitId, room: RoomId) {
         if let Err(e) = self.game.lists.room_insert(unit, room) {
-            self.v.unit_error(crate::units::modes::UnitError::Game(e.into()));
+            self.v
+                .unit_error(crate::units::modes::UnitError::Game(e.into()));
         }
     }
     fn queue_for_update(&mut self, unit: UnitId) {
         if let Err(e) = self.game.lists.queue_update(unit) {
-            self.v.unit_error(crate::units::modes::UnitError::Game(e.into()));
+            self.v
+                .unit_error(crate::units::modes::UnitError::Game(e.into()));
         }
     }
     /// The active room's client array (`drlg/rooms.md` §7).
@@ -292,7 +295,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
         q.unit_timers(unit)
             .into_iter()
             .filter_map(|t| {
-                let (ev, _) = q.event(t)?;
+                let (ev, _, _) = q.event(t)?;
                 (ev == crate::tick::events::event::END_ANIM).then_some(q.expire(t)?)
             })
             .filter(|&e| e > 0)
@@ -341,7 +344,12 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// Mode set `0x00553570` (`units.md` §4.1) through the unit system.
     fn set_mode(&mut self, unit: UnitId, mode: u32) {
         let r = {
-            let mut sim = self.v.sim(self.game);
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
             crate::units::modes::set_mode(&mut sim, &mut *self.v.h, unit, mode)
         };
         if let Err(e) = r {
@@ -350,9 +358,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     }
     /// `0x00553990`-style cancel of one event type.
     fn cancel_events(&mut self, unit: UnitId, ty: u8) {
-        self.game
-            .timers
-            .cancel_unit_events(unit, u32::from(ty), None);
+        self.game.timers.cancel_unit_events(unit, ty, None);
     }
     /// `0x00553F00` (`units.md` §4.4).
     fn schedule_event0(&mut self, unit: UnitId) {
@@ -372,7 +378,12 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     fn start_other_mode(&mut self, unit: UnitId, mode: u32, _: StartTarget) {
         let player = self.unit_type(unit) == UnitType::Player;
         let r = {
-            let mut sim = self.v.sim(self.game);
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
             if player {
                 crate::units::modes::player_start(&mut sim, &mut *self.v.h, unit, mode).map(|_| ())
             } else {

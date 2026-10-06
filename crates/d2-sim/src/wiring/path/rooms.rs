@@ -15,14 +15,10 @@ use crate::wiring::action::DrlgWorld;
 impl DrlgWorld {
     /// The act DRLG owning an active room and the room's DRLG room.
     fn owner_of(&self, room: RoomId) -> Option<(usize, &Drlg, DrlgRoomId)> {
-        self.dungeon
-            .acts
-            .iter()
-            .enumerate()
-            .find_map(|(i, d)| {
-                let d = d.as_ref()?;
-                Some((i, d, d.drlg_room_of(room)?))
-            })
+        self.dungeon.acts.iter().enumerate().find_map(|(i, d)| {
+            let d = d.as_ref()?;
+            Some((i, d, d.drlg_room_of(room)?))
+        })
     }
 }
 

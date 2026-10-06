@@ -173,9 +173,10 @@ pub(crate) fn footprint_of(
             fp(FootShape::Pattern(d.pattern), d.foot_mask),
             RemoveRule::Monster { mode },
         ),
-        (UnitType::Missile, UnitPath::Dynamic(d)) => {
-            (fp(FootShape::Size(d.unit_size), d.foot_mask), RemoveRule::Other)
-        }
+        (UnitType::Missile, UnitPath::Dynamic(d)) => (
+            fp(FootShape::Size(d.unit_size), d.foot_mask),
+            RemoveRule::Other,
+        ),
         (UnitType::Object, UnitPath::Static(_)) => {
             let o = object?;
             (
@@ -190,11 +191,17 @@ pub(crate) fn footprint_of(
             )
         }
         (UnitType::Item, UnitPath::Static(_)) => (
-            fp(FootShape::Size(UnitShape::Item.size()), UnitShape::Item.foot_mask(None)),
+            fp(
+                FootShape::Size(UnitShape::Item.size()),
+                UnitShape::Item.foot_mask(None),
+            ),
             RemoveRule::Other,
         ),
         (UnitType::Tile, UnitPath::Static(_)) => (
-            fp(FootShape::Size(UnitShape::Tile.size()), UnitShape::Tile.foot_mask(None)),
+            fp(
+                FootShape::Size(UnitShape::Tile.size()),
+                UnitShape::Tile.foot_mask(None),
+            ),
             RemoveRule::Other,
         ),
         _ => return None,
