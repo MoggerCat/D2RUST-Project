@@ -600,3 +600,89 @@ fn resist_sanctuary() {
     let r = totals_of(&mut f, a, d, rec);
     assert_eq!((r.physical, r.fire), (1000, 500));
 }
+
+// §4.4 step 3: lengths are touched only when > 0.
+#[test]
+fn totals_length_guards() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(118, 1));
+    let len = |cold_len, freeze_len| DamageRecord {
+        cold_len,
+        freeze_len,
+        ..DamageRecord::default()
+    };
+    // Half freeze: a freeze length alone is enough.
+    let r = totals_of(&mut f, a, d, len(0, 10));
+    assert_eq!((r.cold_len, r.freeze_len), (0, 5));
+    let r = totals_of(&mut f, a, d, len(10, 0));
+    assert_eq!((r.cold_len, r.freeze_len), (5, 0));
+    // Burn length and state 131.
+    let burn = DamageRecord {
+        burn_len: 10,
+        ..DamageRecord::default()
+    };
+    assert_eq!(totals_of(&mut f, a, d, burn).burn_len, 10);
+    f.units[d].states.push(131);
+    assert_eq!(totals_of(&mut f, a, d, burn).burn_len, 0);
+}
+
+// §4.4 step 4: `no_absorb` for a monster defender by its kind and the
+// matching bypass flag (seen through a 20 % fire absorb).
+#[test]
+fn totals_no_absorb_matrix() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(142, 20));
+    let bu = hitflag::BYPASS_UNDEAD;
+    let bd = hitflag::BYPASS_DEMONS;
+    let bb = hitflag::BYPASS_BEASTS;
+    // (undead, demon, flags, no_absorb)
+    for (undead, demon, hf, none) in [
+        (true, false, bu, true),
+        (true, false, bd | bb, false),
+        (false, true, bd, true),
+        (false, true, bu | bb, false),
+        (false, false, bb, true),
+        (false, false, bu | bd, false),
+        (true, true, bb, false),
+    ] {
+        f.units[d].undead = undead;
+        f.units[d].demon = demon;
+        let r = totals_of(
+            &mut f,
+            a,
+            d,
+            DamageRecord {
+                hit_flags: hf,
+                ..fire(1000)
+            },
+        );
+        let want = if none { (1000, 0) } else { (800, 200) };
+        assert_eq!((r.fire, r.absorbed), want, "{undead} {demon} {hf:#x}");
+    }
+    // A player defender (monster attacker: damage percent 100): only
+    // 0x400.
+    let m = f.add(FUnit::new(UnitType::Monster, 0));
+    let p = f.add(FUnit::new(UnitType::Player, 0).with(142, 20));
+    let r = totals_of(
+        &mut f,
+        m,
+        p,
+        DamageRecord {
+            hit_flags: bu | bd,
+            ..fire(1000)
+        },
+    );
+    assert_eq!((r.fire, r.absorbed), (800, 200));
+    let r = totals_of(
+        &mut f,
+        m,
+        p,
+        DamageRecord {
+            hit_flags: bb,
+            ..fire(1000)
+        },
+    );
+    assert_eq!((r.fire, r.absorbed), (1000, 0));
+}
