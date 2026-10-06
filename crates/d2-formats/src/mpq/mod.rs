@@ -14,6 +14,10 @@ pub mod crypto;
 mod explode;
 mod huffman;
 #[cfg(test)]
+mod mutant_tests_archive;
+#[cfg(test)]
+mod mutant_tests_codecs;
+#[cfg(test)]
 mod robust_tests;
 mod set;
 mod tables;

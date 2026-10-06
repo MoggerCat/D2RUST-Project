@@ -35,6 +35,16 @@ mod gaps_loading_tests;
 #[cfg(test)]
 mod gaps_patch_fixup_tests;
 #[cfg(test)]
+mod mutant_tests_bin_calc;
+#[cfg(test)]
+mod mutant_tests_compile;
+#[cfg(test)]
+mod mutant_tests_fixup;
+#[cfg(test)]
+mod mutant_tests_misc;
+#[cfg(test)]
+mod mutant_tests_patch;
+#[cfg(test)]
 mod robust;
 #[cfg(test)]
 mod robust_tests;
