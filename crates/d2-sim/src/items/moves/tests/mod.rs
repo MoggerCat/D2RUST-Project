@@ -6,6 +6,9 @@ mod ground;
 mod handlers;
 mod tsv;
 
+#[path = "../mutant_tests.rs"]
+mod mutant_tests;
+
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
