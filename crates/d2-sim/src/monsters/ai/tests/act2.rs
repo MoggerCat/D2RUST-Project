@@ -679,7 +679,7 @@ fn dim_vision_strikes_or_wanders() {
     assert_eq!(w.thinks(), [10]);
 }
 
-// Covers: specs/monsters/ai-bodies-2.md §16 text
+// Covers: specs/monsters/ai-bodies-2.md §16 text, §16 l2 r1, §16 l2 r2, §16 l2 r3
 #[test]
 fn terror_flees_then_leaves() {
     let mut w = world(act_row(3, &[]));
@@ -734,4 +734,160 @@ fn taunted_charges_the_taunter() {
     w.fake.town.insert(w.room);
     w.think_with(None, 0, false);
     assert_eq!(w.thinks(), [1]);
+}
+
+// Covers: specs/monsters/ai-bodies-2.md §16 r1, §16 r2, §16 l2 r4, §16 l2 r5, §16 l3 r1, §16 l3 r2
+#[test]
+fn special_state_steps() {
+    // 10 / 17 step 1 and step 2 (draw < 20 → wander 3).
+    let (mut w, lo) = seeded(act_row(3, &[]), 1, |v| v[0] < 20);
+    w.store.control_mut(w.mon).unwrap().function = 0x005E_8020;
+    w.think_with(Some(w.player), 9, false);
+    let mut s = Seed::init_low(lo);
+    s.step();
+    let (x, y) = tactics::wander_point(&mut s, (100, 100), 3);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, x, y)]);
+    // 11 step 4: C, no `interact`, mode A1 → A1; step 5: escape with
+    // delete; not started → wander 6.
+    let mut w = world(act_row(3, &[]));
+    let mon = w.mon;
+    w.store.control_mut(mon).unwrap().function = 0x005E_8140;
+    w.fake.states.insert((mon, 56));
+    set_param_of(&mut w, 2, 1);
+    w.think_with(Some(w.player), 1, true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    w.fake.walk_fails = true;
+    w.think_with(Some(w.player), 5, false);
+    assert_eq!(w.vel_request().method, 2);
+    assert_eq!(w.fake.modes().len(), 3);
+    // 12 step 1.3: the finder finds a target in combat → param 0 := 0, A1
+    // at it; step 2 without a path target: back to state 0.
+    let mut w = world(act_row(3, &[]));
+    let mon = w.mon;
+    w.store.control_mut(mon).unwrap().function = 0x005E_8340;
+    let p = w.add_unit(UnitType::Player, (130, 100));
+    w.fake.path_target = Some(p);
+    set_param_of(&mut w, 0, 1);
+    w.fake.nodes = vec![vec![w.player]];
+    w.fake.melee.insert(w.player);
+    w.think_with(None, 0, false);
+    assert_eq!(param_of(&w, 0), 0);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    let mut w = world(act_row(3, &[]));
+    w.store.control_mut(w.mon).unwrap().function = 0x005E_8340;
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [1]);
+}
+
+// Covers: specs/monsters/ai-bodies-2.md §3 r1, §3 r2, §3 r7, §3 r9
+#[test]
+fn greater_mummy_melee_and_bolt() {
+    let unraveler1 = [70, 30, 40, 60, 24];
+    // C, P(aip1) → A1; D < 5, P(aip1) → A2.
+    let (mut w, _) = seeded(act_row(22, &unraveler1), 1, |v| v[0] < 70);
+    w.think_with(Some(w.player), 1, true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    let (mut w, _) = seeded(act_row(22, &unraveler1), 1, |v| v[0] < 70);
+    w.think_with(Some(w.player), 4, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
+    // No scan match, `Skill3`, P(aip4), a secondary target → bolt at S.
+    let (mut w, _) = seeded(act_row(22, &unraveler1), 1, |v| v[0] < 60);
+    give_skill(&mut w, 3, 222, 14);
+    let s = w.add_unit(UnitType::Player, (115, 100));
+    w.fake.secondary = Some((s, 15));
+    w.think_with(Some(w.player), 10, false);
+    assert_eq!(w.fake.modes(), [unit_mode(14, s)]);
+}
+
+// Covers: specs/monsters/ai-bodies-2.md §11 r1, §11 r2, §11 r4
+#[test]
+fn vulture_carrion_and_rooms() {
+    let vulture1 = [70, 8, 75, 30, 40];
+    // Flying (p ≥ 2), a hurt monster within 11: p := 1, then the landing.
+    let mut w = world(act_row(23, &vulture1));
+    set_param_of(&mut w, 0, 5);
+    let c = w.add_unit(UnitType::Monster, (105, 100));
+    w.fake.stats.insert((c, 6), 70);
+    w.fake.x.max_life.insert(c, 100);
+    w.fake.stats.insert((w.player, 6), 100);
+    w.fake.x.max_life.insert(w.player, 100);
+    w.fake.x.place_ok = true;
+    w.think_with(Some(w.player), 9, false);
+    assert!(logged(&w, &format!("mode-radius 9 {} 2 3", w.mon.0)));
+    assert_eq!(param_of(&w, 0), -1);
+    // T in another room and far, p < 1: walk in radius of T (9, 0).
+    let mut w = world(act_row(23, &vulture1));
+    let other = w.game.lists.create_room(0).unwrap();
+    let t = w
+        .game
+        .spawn_unit(UnitType::Player, Some(other), true)
+        .unwrap();
+    w.fake.pos.insert(t, (120, 100));
+    w.think_with(Some(t), 20, false);
+    assert!(logged(&w, "radius 9 0"));
+    // T = 0 with p < 1: wait 12.
+    let mut w = world(act_row(23, &vulture1));
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [12]);
+}
+
+// Covers: specs/monsters/ai-bodies-2.md §12 r3
+#[test]
+fn bat_demon_hovering() {
+    let bat = [33, 20, 60, 50, 8];
+    // s = 2: draw < 33 → walk to T, s := 3.
+    let (mut w, _) = seeded(act_row(29, &bat), 1, |v| v[0] < 33);
+    set_param_of(&mut w, 0, 2);
+    w.think_with(Some(w.player), 9, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, w.player)]);
+    assert_eq!(param_of(&w, 0), 3);
+    // Both draws fail → idle 10.
+    let (mut w, _) = seeded(act_row(29, &bat), 2, |v| v[0] >= 33 && v[1] >= 15);
+    set_param_of(&mut w, 0, 2);
+    w.think_with(Some(w.player), 9, false);
+    assert_eq!(w.thinks(), [10]);
+}
+
+// Covers: specs/monsters/ai-bodies-2.md §15 r8, §15 r9, §15 r10, §15 r11, §15 r12
+#[test]
+fn summoner_later_steps() {
+    let summoner = [85, 5, 63, 40, 120, 33, 5, 40];
+    let setup = |w: &mut World| {
+        for (k, id) in [(1, 64), (2, 44), (3, 47), (4, 51)] {
+            give_skill(w, k, id, 10);
+        }
+        w.game.frame = 100;
+        set_param_of(w, 0, 1);
+    };
+    // K = 1 (fire ≥ cold), D ≥ aip7, no S: step 8, the firewall at T,
+    // param 2 := frame + aip5.
+    let (mut w, _) = seeded(act_row(53, &summoner), 3, |v| v[0] < 85 && v[1] <= 63);
+    setup(&mut w);
+    w.think_with(Some(w.player), 20, false);
+    assert!(logged(&w, "skill 51"));
+    assert_eq!(param_of(&w, 2), 220);
+    // Firewall cooling, S near: step 9, the fire ball at S.
+    let (mut w, _) = seeded(act_row(53, &summoner), 3, |v| v[0] < 85 && v[1] > 63);
+    setup(&mut w);
+    set_param_of(&mut w, 2, 500);
+    let s = w.add_unit(UnitType::Player, (110, 100));
+    w.fake.secondary = Some((s, 10));
+    w.think_with(Some(w.player), 20, false);
+    assert!(logged(&w, "skill 47"));
+    assert_eq!(w.fake.modes(), [unit_mode(10, s)]);
+    // K turned off, no S, nova ready (D < aip7): step 10, the nova (D < 5
+    // adds the escape draw first).
+    let (mut w, _) = seeded(act_row(53, &summoner), 3, |v| {
+        v[0] >= 33 && v[1] < 85 && v[2] > 63
+    });
+    setup(&mut w);
+    set_param_of(&mut w, 2, 500);
+    w.think_with(Some(w.player), 3, false);
+    assert!(logged(&w, "skill 44"));
+    // Nothing else: `Skill5` (step 11) or wander 4 (step 12).
+    let (mut w, _) = seeded(act_row(53, &summoner), 3, |v| v[0] < 85 && v[1] > 63);
+    setup(&mut w);
+    set_param_of(&mut w, 2, 500);
+    w.think_with(Some(w.player), 20, false);
+    assert!(w.fake.modes()[0].starts_with("mode 2 Point"));
 }

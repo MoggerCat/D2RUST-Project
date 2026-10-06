@@ -358,7 +358,7 @@ fn diablo_world() -> World {
     w
 }
 
-// Covers: specs/monsters/ai-bodies-4.md §7 text, §7 r1, §7 r2, §7 r3, §7 r5, §7.1 r1, §7.1 r4, §7.3 r1, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6
+// Covers: specs/monsters/ai-bodies-4.md §7 text, §7 r1, §7 r2, §7 r3, §7 r5, §7.1 r1, §7.1 r4, §7.3 r1, §7.3 r3, §7.3 r4, §7.3 r5, §7.3 r6, §edge-cases-original-bugs r5
 #[test]
 fn diablo_choice_vectors() {
     // X in melee, clear, life ≥ 20 %, no cold, f39 = f41, not near: Σ = 229,
@@ -424,6 +424,7 @@ fn diablo_choice_vectors() {
 }
 
 // Covers: specs/monsters/ai-bodies-4.md §7.2 r1, §7.2 r2, §7.2 r4, §7.2 r5, §7.2 r6
+// Covers: specs/monsters/ai-bodies-5.md §21.1
 #[test]
 fn boss_score_formula() {
     let mut w = diablo_world();
@@ -473,4 +474,68 @@ fn diablo_alternate_keeps_home() {
     assert_eq!(c.commands[0].params, [10, 70, 80, 0, 0]);
     assert!(!w.fake.states.contains(&(mon, 12)));
     assert_eq!(w.thinks(), [1]);
+}
+
+// Covers: specs/monsters/ai-bodies-4.md §7.1 text, §7.1 r2, §7.1 r3, §7.2 r3, §7.3 r2, §edge-cases-original-bugs r3
+#[test]
+fn boss_pick_slots() {
+    // Slot 8: a node in the boss's act is scored and counted; one in
+    // another act is not.
+    let mut w = diablo_world();
+    let (mon, p) = (w.mon, w.player);
+    let a = w.add_unit(UnitType::Monster, (110, 100));
+    let b = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.acts.insert(b, 1);
+    w.fake.nodes = vec![
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![a, b],
+    ];
+    let (best, max, n) = w.with(|g, cx| {
+        bodies4::boss_pick(g, cx, mon, bodies4::Cull::Act, bodies4::Score::Diablo(None))
+    });
+    assert_eq!((best, max, n), (Some(a), 17, 1));
+    // Slot 9: the alternative within 5 replaces the best when no path
+    // exists and the boss is not in melee range of it.
+    let mut w = diablo_world();
+    let c = w.add_unit(UnitType::Monster, (103, 100));
+    let mut nodes = vec![vec![p]];
+    nodes.resize(9, vec![]);
+    nodes.push(vec![c]);
+    w.fake.nodes = nodes.clone();
+    w.fake.life_of.insert(c, 10); // low life: a higher score than p
+    let (best, _, n) = w.with(|g, cx| {
+        bodies4::boss_pick(g, cx, mon, bodies4::Cull::Act, bodies4::Score::Diablo(None))
+    });
+    assert_eq!((best, n), (Some(c), 1));
+    assert!(logged(&w, &format!("pathcompute {}", p.0)));
+    // A path exists: the best stays.
+    let mut w = diablo_world();
+    let c = w.add_unit(UnitType::Monster, (103, 100));
+    let mut nodes = vec![vec![w.player]];
+    nodes.resize(9, vec![]);
+    nodes.push(vec![c]);
+    w.fake.nodes = nodes;
+    w.fake.x.path_points = true;
+    let (best, _, _) = w.with(|g, cx| {
+        bodies4::boss_pick(g, cx, mon, bodies4::Cull::Act, bodies4::Score::Diablo(None))
+    });
+    assert_eq!(best, Some(w.player));
+    // The attack rank: `attackrank` × level of the left and right skills.
+    let mut w = diablo_world();
+    let p = w.player;
+    let mut sk = Skills::decode(&vec![0u8; Skills::SIZE]);
+    sk.attackrank = 8;
+    w.skills = vec![sk; 3];
+    w.fake.x.hand.insert((p, false), (1, 10));
+    w.fake.x.hand.insert((p, true), (2, 1));
+    // K = 88: (5 × 75 + 2 × (88 / 4)) / 22 = 19.
+    let s = w.with(|g, cx| bodies4::score(g, cx, mon, p, bodies4::Score::Diablo(None)));
+    assert_eq!(s, (375 + 44) / 22);
 }

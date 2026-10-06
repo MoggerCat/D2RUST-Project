@@ -271,6 +271,8 @@ pub fn regurgitator<W: AiHost + ?Sized>(
             return;
         }
         // 2. Walk then idle on the same think (edge case 2).
+        // TODO(spec: ai-bodies-4.md §5 step 2): "Then s := 3; idle 8" is
+        // read as following both the walk and the near case (d ≤ 4).
         2 => {
             let Some(k) = corpse else {
                 regurg_reset(cx, u);

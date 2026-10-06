@@ -946,8 +946,8 @@ fn ai_index_of_every_row() {
     let tsv = tsv_rows(d2_sim::monsters::ai::table::AI_FUNCTIONS_TSV);
     assert_eq!(tsv.len(), AI_TABLE.len());
     // Every mismatch is gathered before failing, so one local run prints
-    // the whole set (the row numbering of `monstats_rows` is the suspect:
-    // triage-game-findings, `528 drehyaiced` live AI 129).
+    // the whole set (`monstats_rows` was rebuilt on `claude/specs-staging`:
+    // rows from 410 on were off by one, `528 drehyaiced` is now `527`).
     let mut bad_counts = Vec::new();
     let mut bad_rows = Vec::new();
     for row in tsv {

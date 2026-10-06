@@ -211,6 +211,8 @@ pub fn zakarum_zealot<W: AiHost + ?Sized>(
     // 1.
     if let Some(tt) = t {
         let mut q = Some(tt);
+        // TODO(spec: ai-bodies-3.md §4 step 1): a monster without an owner
+        // record is read as keeping Q = T.
         if is_monster(game, tt) {
             if let Some((0, guid)) = cx.world.owner_record(tt) {
                 q = game.lists.find_unit(UnitType::Player, guid);

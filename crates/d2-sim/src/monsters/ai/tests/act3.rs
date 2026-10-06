@@ -162,7 +162,7 @@ fn zakarum_zealot_hurt_cooldown() {
 
 // ---- §5 ZakarumPriest --------------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-3.md §5 text, §5 r2, §5 r3, §5 r4, §5 r6
+// Covers: specs/monsters/ai-bodies-3.md §5 text, §5 r2, §5 r3, §5 r4, §5 r6, §edge-cases-original-bugs r1
 #[test]
 fn zakarum_priest_vectors() {
     let cantor1 = [25, 5, 50, 25, 120, 36];
@@ -581,4 +581,24 @@ fn mephisto_roams() {
     w.think_with(Some(w.player), 1, true);
     assert!(logged(&w, "skill 154"));
     assert_eq!(param_of(&w, 1), 2);
+}
+
+// Covers: specs/monsters/ai-bodies-3.md §5 r5
+#[test]
+fn zakarum_priest_blocked_line() {
+    let cantor1 = [25, 5, 50, 25, 120, 36];
+    // Blocked line: P(aip1), `Skill4`, frame > param 1, draw < aip2 →
+    // MonBlizzard; else circle / idle 20.
+    let (mut w, _) = seeded(act_row(49, &cantor1), 2, |v| v[0] < 25 && v[1] < 5);
+    give_skill(&mut w, 4, 123, 10);
+    w.fake.line_blocked.insert(w.player);
+    w.game.frame = 10;
+    w.think_with(Some(w.player), 9, false);
+    assert!(logged(&w, "skill 123"));
+    assert_eq!(param_of(&w, 1), 130);
+    let (mut w, _) = seeded(act_row(49, &cantor1), 2, |v| v[0] >= 25 && v[1] >= 30);
+    give_skill(&mut w, 4, 123, 10);
+    w.fake.line_blocked.insert(w.player);
+    w.think_with(Some(w.player), 9, false);
+    assert_eq!(w.thinks(), [20]);
 }

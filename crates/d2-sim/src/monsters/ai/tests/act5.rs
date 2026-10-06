@@ -754,3 +754,194 @@ fn nihlathak_alternate() {
     assert!(!w.fake.states.contains(&(mon, 12)));
     assert_eq!(w.thinks(), [1]);
 }
+
+// Covers: specs/monsters/ai-bodies-5.md §3 text, §3 l2 r2, §3 l2 r4, §3 l2 r5
+#[test]
+fn imp_combat_and_fire() {
+    let setup = || {
+        let mut w = world(act_row(122, &[]));
+        rows(&mut w, 496);
+        w.monstats[492].aip1 = 25;
+        w.monstats[492].aip2 = 14;
+        w.monstats[494].aip1 = 10;
+        w.monstats[494].aip2 = 40;
+        w.monstats[494].aip3 = 22;
+        w.monstats[494].aip4 = 25;
+        w.monstats[495].aip3 = 13;
+        w.monstats[495].aip4 = 60;
+        set_param_of(&mut w, 0, -1);
+        w
+    };
+    // C, L < I1.aip1: teleport (two range draws).
+    let mut w = setup();
+    give_skill(&mut w, 1, 264, 10);
+    w.fake.life = 20;
+    w.seed(1);
+    w.think_with(Some(w.player), 1, true);
+    assert_eq!(steps_since(&w, 1), 2);
+    assert!(w.fake.modes()[0].starts_with("mode 10 Point"));
+    // C, draw < I3.aip2: escape by 5 with delete.
+    let lo = seed_raw(1, |v| v[0] % 100 < 40);
+    let mut w = setup();
+    w.seed(lo);
+    w.think_with(Some(w.player), 1, true);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 95, 100)]);
+    // `Skill4`, E = 15 < 22: the I3 draw fails, E ≥ 13 → no fire; then the
+    // walk draw < 33 → walk with 4 steps.
+    let lo = seed_raw(4, |v| {
+        v[0] % 100 >= 40 && v[1] % 100 >= 25 && v[2] % 100 < 33
+    });
+    let mut w = setup();
+    give_skill(&mut w, 4, 265, 8);
+    w.seed(lo);
+    let s = w.add_unit(UnitType::Player, (115, 100));
+    w.fake.secondary = Some((s, 15));
+    w.think_with(Some(w.player), 15, false);
+    assert!(logged(&w, "steps 4"));
+    // E = 12 < 13: the I4 draw < 60 → fire at S.
+    let lo = seed_raw(3, |v| {
+        v[0] % 100 >= 40 && v[1] % 100 >= 25 && v[2] % 100 < 60
+    });
+    let mut w = setup();
+    give_skill(&mut w, 4, 265, 8);
+    w.seed(lo);
+    let s = w.add_unit(UnitType::Player, (112, 100));
+    w.fake.secondary = Some((s, 12));
+    w.think_with(Some(w.player), 15, false);
+    assert_eq!(w.fake.modes(), [unit_mode(8, s)]);
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §7 r4, §7 r7
+#[test]
+fn overseer_attacks_and_whips() {
+    let ov = [250, 50, 50, 17, 7, 100, 50];
+    // C: draw < aip6, draw ≥ aip7 → A1.
+    let (mut w, _) = seeded(act_row(120, &ov), 2, |v| v[1] >= 50);
+    w.think_with(Some(w.player), 1, true);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    // A non-unique minion1 within 20: the whip by draw < aip3 and "has 3".
+    let (mut w, _) = seeded(act_row(120, &ov), 1, |v| v[0] < 50);
+    give_skill(&mut w, 3, 381, 10);
+    w.monstats[0].baseid = 453;
+    let m = w.add_unit(UnitType::Monster, (110, 100));
+    w.think_with(Some(w.player), 30, false);
+    assert_eq!(w.fake.modes(), [unit_mode(10, m)]);
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §12 l2 r1, §12 l2 r2, §12 l2 r3, §12 l2 r4, §12 l2 r5, §12 l3 r2, §12 l3 r3, §12 l3 r4
+#[test]
+fn madawc_and_korlic() {
+    let setup = |class: i32, aips: &[i16]| {
+        let mut w = world(act_row(133, aips));
+        rows(&mut w, 543);
+        w.fake.class.insert(w.mon, class);
+        w.fake.nodes = vec![vec![w.player]];
+        w
+    };
+    let madawc = [15, 50, 25, 25, 7];
+    // In melee, draw < aip4, the escape by aip5 with delete → wait 25.
+    let lo = seed_raw(1, |v| v[0] % 100 < 25);
+    let mut w = setup(541, &madawc);
+    w.seed(lo);
+    w.fake.melee.insert(w.player);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 93, 100)]);
+    assert_eq!(w.thinks(), [25]);
+    // The shout: `Skill1` > 0, no aura states, draw < aip3, no target.
+    let lo = seed_raw(1, |v| v[0] % 100 < 25);
+    let mut w = setup(541, &madawc);
+    w.seed(lo);
+    for r in w.monstats.iter_mut() {
+        r.skill1 = 138;
+    }
+    w.skills = vec![Skills::decode(&vec![0u8; Skills::SIZE]); 139];
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [point_mode(0, 0, 0)]);
+    // d < aip1 (in reach), draw < aip2: A1 at X.
+    let lo = seed_raw(1, |v| v[0] % 100 < 50);
+    let mut w = setup(541, &madawc);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    // Far (d = 26 ≥ 15): walk with d − aip1 = 11 steps.
+    let mut w = setup(541, &madawc);
+    w.fake.pos.insert(w.player, (126, 100));
+    w.think_with(None, 0, false);
+    assert!(logged(&w, "steps 11"));
+    // Korlic: `Skill1` > 0, in reach, draw < aip2, has it → leap (sequence).
+    let korlic = [15, 50, 75];
+    let lo = seed_raw(1, |v| v[0] % 100 < 50);
+    let mut w = setup(542, &korlic);
+    w.seed(lo);
+    for r in w.monstats.iter_mut() {
+        r.skill1 = 143;
+    }
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::SEQUENCE, w.player)]);
+    // Out of melee: walk to X, wait 10.
+    let lo = seed_raw(1, |v| v[0] % 100 >= 50);
+    let mut w = setup(542, &korlic);
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, w.player)]);
+    assert_eq!(w.thinks(), [10]);
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §15 r4
+#[test]
+fn siege_beast_stomps_in_range() {
+    let sb = [25, 50, 1, 15, 1, 50, 100];
+    // D < `Param5` (8) of the stomp row and draw < aip5 → stomp.
+    let (mut w, _) = seeded(act_row(115, &sb), 1, |v| v[0] < 1);
+    give_skill(&mut w, 1, 7, 10);
+    let mut sk = Skills::decode(&vec![0u8; Skills::SIZE]);
+    sk.param5 = 8;
+    w.skills = vec![sk; 8];
+    w.think_with(Some(w.player), 5, false);
+    assert_eq!(w.fake.modes(), [point_mode(10, 0, 0)]);
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §20 r1, §20 r4
+#[test]
+fn baal_throne_with_allies() {
+    // No monstats row: idle 10.
+    let mut w = world(act_row(134, &[25]));
+    w.fake.class.insert(w.mon, 5);
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [10]);
+    // An ally: Decrepify at T (no aura states) by draw < aip1.
+    let (mut w, _) = seeded(act_row(134, &[25]), 1, |v| v[0] < 25);
+    give_skill(&mut w, 1, 87, 10);
+    w.skills = vec![Skills::decode(&vec![0u8; Skills::SIZE]); 88];
+    w.add_unit(UnitType::Monster, (120, 100));
+    w.think_with(Some(w.player), 20, false);
+    assert_eq!(w.fake.modes(), [unit_mode(10, w.player)]);
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §23 r6, §23 r7, §23 r9
+#[test]
+fn nihlathak_corpses_and_blast() {
+    let nih = [30, 20, 80, 75, 8];
+    // `Skill3` entry, draw < aip3, a corpse found, the cast succeeds.
+    let (mut w, _) = seeded(act_row(128, &nih), 2, |v| v[0] >= 40 && v[1] < 80);
+    give_skill(&mut w, 3, 74, 10);
+    w.fake.x.skill_entry.insert(74, (74, 10));
+    w.fake.x.skill_level.insert(74, 9);
+    let c = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.x.corpse = Some(c);
+    w.think_with(Some(w.player), 20, false);
+    assert!(logged(&w, "corpse search 74 9"));
+    assert_eq!(w.fake.modes(), [unit_mode(10, c)]);
+    // `Skill4` entry: draw < 60 and D < 14 → the blast.
+    let (mut w, _) = seeded(act_row(128, &nih), 2, |v| v[0] >= 40 && v[1] < 60);
+    give_skill(&mut w, 4, 372, 14);
+    w.fake.x.skill_entry.insert(372, (372, 14));
+    w.think_with(Some(w.player), 10, false);
+    assert_eq!(w.fake.modes(), [unit_mode(14, w.player)]);
+    // Step 9: the draw fails but D ≤ 13 → the blast.
+    let (mut w, _) = seeded(act_row(128, &nih), 2, |v| v[0] >= 40 && v[1] >= 60);
+    give_skill(&mut w, 4, 372, 14);
+    w.fake.x.skill_entry.insert(372, (372, 14));
+    w.think_with(Some(w.player), 13, false);
+    assert_eq!(w.fake.modes(), [unit_mode(14, w.player)]);
+}

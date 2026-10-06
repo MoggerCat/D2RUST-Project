@@ -28,11 +28,8 @@ mod class {
     pub const ROGUEHIRE: i32 = 271;
     /// cain1, Tristram (§9.32).
     pub const CAIN1: i32 = 146;
-    /// drehyaiced (§9.32).
-    ///
-    /// TODO(spec: ai.md §9.32): the text says 527; the catalogue's
-    /// `monstats_rows` column of index 31 lists `528 drehyaiced`. The
-    /// rule text is used.
+    /// drehyaiced (§9.32; the rebuilt catalogue's `monstats_rows` of
+    /// index 31 lists `527 drehyaiced` too).
     pub const DREHYAICED: i32 = 527;
 }
 

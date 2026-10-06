@@ -137,6 +137,8 @@ pub fn imp<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
         return;
     }
     // 5. The I4 test runs when the I3 draw fails.
+    // TODO(spec: ai-bodies-5.md §3 step 5): "else" is read as the I3
+    // draw failing (E < I4.aip3 implies E < I3.aip3 with live data).
     if cx.skill(p, 4).0 >= 0 {
         if let (Some(s), e, _) = cx.world.secondary_target(game, u) {
             if e < i(cx, 3, 3)
@@ -270,6 +272,8 @@ pub fn succubus_witch<W: AiHost + ?Sized>(
         return;
     }
     // 3.1.
+    // TODO(spec: ai-bodies-5.md §6 step 3.1): the second draw is read as
+    // made only when S was found.
     let (s5, _) = cx.skill(p, 5);
     let aip8 = cx.aip(p, 8);
     if s5 >= 0 && aip8 > 0 && pct(cx, u) < cx.aip(p, 5) {
@@ -425,6 +429,8 @@ pub fn overseer<W: AiHost + ?Sized>(
         }
     }
     // 4.
+    // TODO(spec: ai-bodies-5.md §7 step 4): a draw ≥ aip6 with C is read
+    // as going on to step 5.
     if p.combat && pct(cx, u) < cx.aip(p, 6) {
         if pct(cx, u) >= cx.aip(p, 7) {
             a1(game, cx, u, t);
@@ -896,6 +902,8 @@ pub fn siege_beast<W: AiHost + ?Sized>(
         });
         if let Some(v) = rider {
             // `0x005E17E0(U, beast)`.
+            // TODO(spec: ai-bodies-5.md §15 step 2): "nearer" is read as
+            // the squared distance `0x005B0BD0`.
             let cur = game
                 .lists
                 .find_unit(UnitType::Monster, param(cx, v, 0) as u32);
