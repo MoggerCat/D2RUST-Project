@@ -1,0 +1,1037 @@
+// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv
+//! Boss spawns after the spawn (§16), umod choice (§17), boss minions
+//! and umod init (§18), the umod init functions (§19), superuniques
+//! (§20), restore paths (§21), and the umod callback dispatcher with the
+//! type-7 event (§22). [`UMODS`] is copied from `umods.tsv` (columns
+//! `id`, `uniquemod`, `init_fn`, `unique_gate`, `cb_mode0`…`cb_mode5`)
+//! and checked against it by `tests::umods_match_tsv` (METHODS M05).
+
+use crate::rng::Seed;
+use crate::units::UnitId;
+
+use super::calc::{monlvl_dm, pct};
+use super::create::seed;
+use super::{
+    s16, stat, type_flag, CreateRequest, Ctx, InitHost, MonsterData, Unhandled, EVENT_UMOD,
+    MAX_UMODS,
+};
+
+/// How an init function treats its `unique` argument (`unique_gate`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gate {
+    /// No init function (`-`).
+    None,
+    /// Does nothing when unique = 0 (`yes`).
+    Unique,
+    /// Ignores it (`no`).
+    Any,
+    /// Different constants (`branch`).
+    Branch,
+}
+
+/// One umod: init function and callbacks (`0x0073C008`, `0x0073C0B8`).
+/// Addresses are 1.14d; 0 = none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UmodRow {
+    pub id: u8,
+    pub name: &'static str,
+    pub init_fn: u32,
+    pub gate: Gate,
+    /// Modes 0..5 (§22).
+    pub callbacks: [u32; 6],
+}
+
+const fn row(id: u8, name: &'static str, init_fn: u32, gate: Gate, callbacks: [u32; 6]) -> UmodRow {
+    UmodRow {
+        id,
+        name,
+        init_fn,
+        gate,
+        callbacks,
+    }
+}
+
+/// The catalogue text, for the consistency test.
+pub const UMODS_TSV: &str = include_str!("../../../../../specs/monsters/umods.tsv");
+
+/// The umod table, by id (§19, §22).
+pub const UMODS: [UmodRow; 43] = [
+    row(0, "none", 0, Gate::None, [0, 0, 0, 0, 0, 0]),
+    row(1, "rndname", 0x005A_0CE0, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(
+        2,
+        "hpmultiply",
+        0x005A_0DC0,
+        Gate::Branch,
+        [0, 0, 0, 0, 0, 0],
+    ),
+    row(3, "light", 0, Gate::None, [0, 0, 0, 0, 0, 0]),
+    row(4, "leveladd", 0x005A_0E40, Gate::Any, [0, 0, 0, 0, 0, 0]),
+    row(5, "strong", 0x005A_17E0, Gate::Branch, [0, 0, 0, 0, 0, 0]),
+    row(6, "fast", 0x005A_1910, Gate::Any, [0, 0, 0, 0, 0, 0]),
+    row(7, "curse", 0, Gate::None, [0, 0, 0, 0x005A_2530, 0, 0]),
+    row(8, "resist", 0x005A_1370, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(
+        9,
+        "fire",
+        0x005A_1990,
+        Gate::Branch,
+        [0, 0x005A_25F0, 0x005A_2620, 0, 0, 0],
+    ),
+    row(
+        10,
+        "poisondead",
+        0,
+        Gate::None,
+        [0, 0x005A_3800, 0x005A_2C20, 0, 0, 0],
+    ),
+    row(11, "durieldead", 0, Gate::None, [0, 0, 0, 0, 0, 0]),
+    row(12, "bloodraven", 0, Gate::None, [0, 0, 0, 0, 0, 0]),
+    row(13, "rage", 0, Gate::None, [0, 0, 0, 0, 0, 0]),
+    row(14, "spcdamage", 0, Gate::None, [0x005A_3B50, 0, 0, 0, 0, 0]),
+    row(15, "partydead", 0, Gate::None, [0, 0x005A_2D10, 0, 0, 0, 0]),
+    row(
+        16,
+        "champion",
+        0x005A_0E80,
+        Gate::Unique,
+        [0, 0, 0, 0, 0, 0],
+    ),
+    row(
+        17,
+        "lightning",
+        0x005A_1B00,
+        Gate::Branch,
+        [0, 0x005A_37D0, 0x005A_29A0, 0, 0x005A_2BA0, 0],
+    ),
+    row(
+        18,
+        "cold",
+        0x005A_1C70,
+        Gate::Branch,
+        [0, 0x005A_3800, 0x005A_2BD0, 0, 0, 0],
+    ),
+    row(
+        19,
+        "hireable",
+        0,
+        Gate::None,
+        [0x005A_2D80, 0, 0, 0, 0, 0x005A_2E00],
+    ),
+    row(
+        20,
+        "scarab",
+        0,
+        Gate::None,
+        [0, 0x005A_2EB0, 0x005A_2EE0, 0, 0, 0],
+    ),
+    row(21, "killself", 0, Gate::None, [0, 0, 0x005A_3AA0, 0, 0, 0]),
+    row(
+        22,
+        "questcomplete",
+        0,
+        Gate::None,
+        [0, 0x005A_3250, 0, 0, 0, 0],
+    ),
+    row(
+        23,
+        "poisonhit",
+        0x005A_1E00,
+        Gate::Branch,
+        [0x005A_3490, 0, 0, 0, 0, 0],
+    ),
+    row(24, "thief", 0, Gate::None, [0, 0, 0, 0x005A_30E0, 0, 0]),
+    row(25, "manahit", 0x005A_1F90, Gate::Branch, [0, 0, 0, 0, 0, 0]),
+    row(
+        26,
+        "teleport",
+        0x005A_1600,
+        Gate::Unique,
+        [0, 0, 0, 0, 0, 0],
+    ),
+    row(
+        27,
+        "spectralhit",
+        0x005A_1370,
+        Gate::Unique,
+        [0x005A_3040, 0, 0, 0, 0, 0x005A_30B0],
+    ),
+    row(
+        28,
+        "stoneskin",
+        0x005A_1370,
+        Gate::Unique,
+        [0, 0, 0, 0, 0, 0],
+    ),
+    row(29, "multishot", 0, Gate::None, [0, 0, 0, 0, 0, 0x005A_3610]),
+    row(30, "aura", 0x005A_1650, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(
+        31,
+        "goboom",
+        0,
+        Gate::None,
+        [0, 0x005A_3800, 0x005A_2840, 0, 0, 0],
+    ),
+    row(
+        32,
+        "firespike_explode",
+        0,
+        Gate::None,
+        [0, 0x005A_3800, 0x005A_3D20, 0, 0, 0],
+    ),
+    row(
+        33,
+        "suicideminion_explode",
+        0,
+        Gate::None,
+        [0, 0x005A_3E70, 0x005A_3EF0, 0, 0, 0],
+    ),
+    row(
+        34,
+        "ai_after_death",
+        0,
+        Gate::None,
+        [0, 0x005A_3840, 0x005A_3910, 0, 0, 0],
+    ),
+    row(
+        35,
+        "shatter_on_death",
+        0,
+        Gate::None,
+        [0, 0x005A_3A80, 0, 0, 0, 0],
+    ),
+    row(36, "ghostly", 0x005A_1080, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(37, "fanatic", 0x005A_11F0, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(
+        38,
+        "possessed",
+        0x005A_1230,
+        Gate::Unique,
+        [0, 0, 0, 0, 0, 0],
+    ),
+    row(39, "berserk", 0x005A_1280, Gate::Unique, [0, 0, 0, 0, 0, 0]),
+    row(
+        40,
+        "worms_on_death",
+        0,
+        Gate::None,
+        [0, 0x005A_4200, 0, 0, 0, 0],
+    ),
+    row(
+        41,
+        "always_run_ai",
+        0x005A_1330,
+        Gate::Any,
+        [0, 0, 0x005A_4230, 0, 0, 0],
+    ),
+    row(
+        42,
+        "lightningdeath",
+        0,
+        Gate::None,
+        [0, 0x005A_3800, 0x005A_2910, 0, 0, 0],
+    ),
+];
+
+/// Callback addresses with bodies here (§22).
+pub mod callback {
+    /// Umod 9 mode 1: unique and new mode 0 → event 7 at frame + 4.
+    pub const FIRE_MODE: u32 = 0x005A_25F0;
+    /// Umod 17 mode 1: unique and new mode 3 → frame + 2.
+    pub const LIGHTNING_MODE: u32 = 0x005A_37D0;
+    /// Umods 10, 18, 31, 32, 42 mode 1: new mode 0 (18: and unique) →
+    /// frame + 4.
+    pub const DEATH_MODE: u32 = 0x005A_3800;
+    /// Umod 34 mode 1 (revive draw).
+    pub const AI_AFTER_DEATH: u32 = 0x005A_3840;
+    /// Umod 41 event 7 handler.
+    pub const ALWAYS_RUN_AI: u32 = 0x005A_4230;
+}
+
+/// The aura table `0x0073BF68` (§19.5): (min level, level offset,
+/// multiplier, divisor, skill).
+pub const AURAS: [(i32, i32, i32, i32, u16); 8] = [
+    (0, 0, 1, 6, 98),
+    (0, 0, 1, 6, 102),
+    (0, 0, 1, 5, 108),
+    (0, 0, 1, 7, 114),
+    (0, 0, 1, 8, 123),
+    (0, 0, 1, 8, 122),
+    (20, 0, 1, 8, 118),
+    (999, 0, 0, 1, 103),
+];
+
+/// Conviction (class 704's fixed aura, §19.5).
+const CONVICTION: u16 = 123;
+/// Willowisp1 `BaseId` (§19.2 halving).
+const WILLOWISP: u16 = 118;
+/// The list `0x006E2168` run before the unit's own umods (§18 step 2).
+const FIXED_UMODS: [u8; 4] = [1, 2, 3, 4];
+
+fn data<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) -> MonsterData {
+    h.monsters().get(unit).cloned().unwrap_or_default()
+}
+
+fn flags_or<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, f: u16) {
+    h.monsters().entry(unit).type_flags |= f;
+}
+
+fn add<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, s: u16, d: i32) {
+    let v = h.stat(unit, s);
+    h.set_stat(unit, s, v.wrapping_add(d));
+}
+
+fn schedule<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, n: i32) {
+    let g = h.game();
+    let at = g.frame.wrapping_add(n);
+    // A monster in the lists always has a timer owner; a unit outside
+    // them schedules nothing.
+    let _ = g.schedule_event(unit, EVENT_UMOD, at, None, 0, 0);
+}
+
+fn class_of<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) -> u32 {
+    h.units().get(unit).map_or(0, |r| r.class)
+}
+
+fn base_id<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) -> Option<u16> {
+    let class = class_of(h, unit);
+    cx.monstats(class).map(|m| m.baseid)
+}
+
+// ---- §16 ----
+
+/// `0x005A0320`: unless type flag 8 is set, count the boss in its region;
+/// then set type flag 8.
+pub fn mark_unique<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) {
+    if !data(h, unit).has_flag(type_flag::UNIQUE) {
+        h.count_region_boss(unit);
+    }
+    flags_or(h, unit, type_flag::UNIQUE);
+}
+
+/// `0x005A09E0` step 5 (`population.md` §6.3): unique mark, type flag 1,
+/// quest hook, owner data.
+pub fn mark_boss<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) {
+    mark_unique(h, unit);
+    flags_or(h, unit, type_flag::BOSS);
+    h.boss_quest_hook(unit);
+    h.boss_owner_data(unit);
+}
+
+/// Random boss `0x005A43E0` (§16.1). `req` carries room, coord list,
+/// class and position for the boss spawn.
+pub fn random_boss<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    req: &CreateRequest,
+    champion_allowed: bool,
+    warp_check: bool,
+) -> Option<UnitId> {
+    let unit = h.boss_spawn(req, None, warp_check)?;
+    mark_boss(h, unit);
+    choose_umods(cx, h, unit, champion_allowed);
+    boss_minions_and_init(cx, h, unit, 3, 6, req.coord_list, true);
+    Some(unit)
+}
+
+/// Champion pack member `0x005A48C0(game, unit, umod)` (§16.2).
+pub fn champion_pack_member<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, umod: u8) {
+    if data(h, unit).has_flag(type_flag::CHAMPION) {
+        return;
+    }
+    mark_unique(h, unit);
+    flags_or(h, unit, type_flag::BOSS | type_flag::CHAMPION);
+    h.monsters().entry(unit).push_umod(umod);
+    boss_minions_and_init(cx, h, unit, 0, 0, None, true);
+}
+
+// ---- §17 ----
+
+/// Eligibility `0x005A03E0` (§17.3) of umod `id` for `class`.
+pub fn eligible<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, class: u32, id: usize) -> bool {
+    let Some(r) = cx.tables.monumod.get(id) else {
+        return false;
+    };
+    if r.enabled == 0 || (!h.info().expansion && r.version >= 100) {
+        return false;
+    }
+    let Some(m) = cx.monstats(class) else {
+        return false;
+    };
+    for ex in [r.exclude1, r.exclude2] {
+        if s16(ex) > 0 && h.montype_is(m.montype, ex) {
+            return false;
+        }
+    }
+    let m2 = cx.monstats2(class);
+    match r.fpick {
+        1 => m2.is_some_and(|m2| m2.ma1),
+        2 => !(m.ismelee || m.nomultishot),
+        3 => m2.is_some_and(|m2| m2.mwl),
+        _ => true,
+    }
+}
+
+fn weighted<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, cands: &[(u8, i32)]) -> u8 {
+    let total: i32 = cands.iter().map(|c| c.1).sum();
+    let mut r = seed(h, unit).roll(total) as i32;
+    for &(id, w) in cands {
+        if w > r {
+            return id;
+        }
+        r -= w;
+    }
+    0
+}
+
+/// Champion pick `0x005A0500` (§17.1); 0 = none.
+pub fn pick_champion<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: usize) -> u8 {
+    let class = class_of(h, unit);
+    let mut cands = Vec::new();
+    for (i, r) in cx.tables.monumod.iter().enumerate() {
+        let w = i32::from([r.cpick, r.cpick_n, r.cpick_h][d.min(2)]);
+        if w > 0 && r.champion != 0 && eligible(cx, h, class, i) {
+            cands.push((i as u8, w));
+        }
+    }
+    weighted(h, unit, &cands)
+}
+
+/// Unique pick `0x005A0600` (§17.2); 0 = none.
+pub fn pick_unique<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    d: usize,
+    used: &[u8],
+) -> u8 {
+    let class = class_of(h, unit);
+    let mut cands = Vec::new();
+    for (i, r) in cx.tables.monumod.iter().enumerate() {
+        let w = i32::from([r.upick, r.upick_n, r.upick_h][d.min(2)]);
+        if w > 0 && r.champion == 0 && !used.contains(&(i as u8)) && eligible(cx, h, class, i) {
+            cands.push((i as u8, w));
+        }
+    }
+    weighted(h, unit, &cands)
+}
+
+/// Choosing umods `0x005A0760` (§17).
+pub fn choose_umods<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    champion_allowed: bool,
+) {
+    let diff = h.info().difficulty;
+    if diff >= 3 {
+        return;
+    }
+    let Some(existing) = h.monsters().get(unit).map(|m| m.umod_count()) else {
+        return;
+    };
+    if existing >= 8 {
+        return;
+    }
+    let d = usize::from(diff);
+    // Step 1.
+    if champion_allowed {
+        let chance = cx.tables.monumod.first().map_or(0, |r| r.constants as i32);
+        if (seed(h, unit).roll(100) as i32) < chance {
+            flags_or(h, unit, type_flag::CHAMPION);
+            let c = pick_champion(cx, h, unit, d);
+            if c != 0 {
+                h.monsters().entry(unit).push_umod(c);
+            }
+            return;
+        }
+    }
+    // Step 2.
+    let mut count = seed(h, unit).roll(1) as usize + 1 + d;
+    if count + existing >= MAX_UMODS {
+        count = MAX_UMODS - existing;
+    }
+    // Step 3.
+    let mut used = data(h, unit).umod_list().to_vec();
+    for _ in 0..count {
+        let u = pick_unique(cx, h, unit, d, &used);
+        if u == 0 {
+            break;
+        }
+        h.monsters().entry(unit).push_umod(u);
+        used.push(u);
+    }
+}
+
+// ---- §18 ----
+
+/// Umod transfer `0x005A0930` (§18 step 1): the boss's `xfer` umods are
+/// appended to the minion's; every boss umod visited counts against the
+/// minion's free slots (edge case 7).
+pub fn xfer_umods<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, boss: UnitId, minion: UnitId) {
+    let b = data(h, boss);
+    let own = data(h, minion).umod_count();
+    for &u in b.umods.iter().take(MAX_UMODS - own) {
+        if u == 0 {
+            break;
+        }
+        if cx
+            .tables
+            .monumod
+            .get(usize::from(u))
+            .is_some_and(|r| r.xfer == 1)
+        {
+            h.monsters().entry(minion).push_umod(u);
+        }
+    }
+}
+
+/// Boss minions and umod init `0x005A2120` (§18).
+pub fn boss_minions_and_init<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    min: i32,
+    max: i32,
+    coord_list: Option<u32>,
+    spawn_minions: bool,
+) {
+    // Step 1 (spawn rules `population.md` §6.5 steps 1–3; the count draw
+    // is on the boss's unit seed, held here).
+    if spawn_minions && !data(h, unit).has_flag(type_flag::CHAMPION) {
+        let own = class_of(h, unit);
+        let class = cx
+            .monstats(own)
+            .map(|m| s16(m.minion1))
+            .and_then(|c| u32::try_from(c).ok())
+            .filter(|&c| (c as usize) < cx.tables.monstats.len())
+            .unwrap_or(own);
+        let count = seed(h, unit).roll_range(min, max.wrapping_sub(min).wrapping_add(1));
+        for _ in 0..count.max(0) {
+            if let Some(m) = h.spawn_boss_minion(unit, class, coord_list) {
+                xfer_umods(cx, h, unit, m);
+                h.link_minion(unit, m);
+                flags_or(h, m, type_flag::MINION);
+            }
+        }
+    }
+    // Step 2.
+    let mut list = FIXED_UMODS.to_vec();
+    list.extend_from_slice(data(h, unit).umod_list());
+    let minions = h.minions(unit);
+    for u in list {
+        run_umod_init(cx, h, unit, u, true);
+        for &m in &minions {
+            run_umod_init(cx, h, m, u, false);
+        }
+    }
+}
+
+// ---- §19 ----
+
+/// Runs umod `umod`'s init function on `unit` (table `0x0073C008`).
+pub fn run_umod_init<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    umod: u8,
+    unique: bool,
+) {
+    let Some(r) = UMODS.get(usize::from(umod)) else {
+        return;
+    };
+    match r.gate {
+        Gate::None => return,
+        Gate::Unique if !unique => return,
+        _ => {}
+    }
+    let d = h.info().d();
+    match umod {
+        1 => {
+            // §19.1: low 16 bits of lo'.
+            let v = seed(h, unit).step() as u16;
+            h.monsters().entry(unit).name_seed = v;
+        }
+        2 => hp_multiply(cx, h, unit, unique, d),
+        4 => {
+            add(h, unit, stat::LEVEL, 3);
+            let e = h.stat(unit, stat::EXPERIENCE);
+            h.set_stat(unit, stat::EXPERIENCE, e.wrapping_mul(5));
+        }
+        5 => strong(cx, h, unit, unique, d),
+        6 => fast(cx, h, unit),
+        8 | 27 | 28 => resist(h, unit, umod),
+        9 | 17 | 18 | 23 | 25 => elemental(cx, h, unit, umod, unique, d),
+        16 => champion_fn(cx, h, unit, 16, d),
+        26 => teleport(cx, h, unit),
+        30 => aura(cx, h, unit),
+        36 => ghostly(cx, h, unit, d),
+        37 => {
+            h.set_stat(unit, stat::ITEM_ARMOR_PERCENT, -70);
+            champion_fn(cx, h, unit, 37, d);
+        }
+        38 => {
+            flags_or(h, unit, type_flag::POSSESSED);
+            raise_hp(h, unit, 100);
+            champion_fn(cx, h, unit, 38, d);
+        }
+        39 => {
+            raise_hp(h, unit, -75);
+            let b = cx.champion_bonus(d);
+            damage_bonus(cx, h, unit, 300 * b / 100);
+            add(h, unit, stat::ITEM_TOHIT_PERCENT, 300 * b / 100);
+        }
+        41 => schedule(h, unit, 75),
+        _ => {}
+    }
+}
+
+/// maxhp and hitpoints += pct(maxhp, p, 100) (umods 38, 39).
+fn raise_hp<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, p: i32) {
+    let hp = h.stat(unit, stat::MAXHP);
+    let delta = pct(hp, p, 100);
+    add(h, unit, stat::MAXHP, delta);
+    add(h, unit, stat::HITPOINTS, delta);
+}
+
+/// damagepercent += v, halved (signed / 2) for `BaseId` 118.
+fn damage_bonus<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, v: i32) {
+    let v = if base_id(cx, h, unit) == Some(WILLOWISP) {
+        v / 2
+    } else {
+        v
+    };
+    add(h, unit, stat::DAMAGEPERCENT, v);
+}
+
+/// Umod 2 (§19.1).
+fn hp_multiply<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    unique: bool,
+    d: usize,
+) {
+    let k = if !unique {
+        cx.k(d + 1)
+    } else if data(h, unit).has_flag(type_flag::CHAMPION) {
+        cx.k(d + 4)
+    } else {
+        cx.k(d + 7)
+    };
+    let hp = h.stat(unit, stat::MAXHP);
+    let v = hp.wrapping_add(pct(hp, k, 100));
+    h.set_stat(unit, stat::MAXHP, v);
+    h.set_stat(unit, stat::HITPOINTS, v);
+    if unique {
+        h.set_stat(unit, stat::HPREGEN, 0);
+    }
+}
+
+/// The champion function (umod 16; also 36, 37, 38; §19.2).
+fn champion_fn<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, umod: u8, d: usize) {
+    add(h, unit, stat::LEVEL, -1);
+    let e = h.stat(unit, stat::EXPERIENCE);
+    h.set_stat(unit, stat::EXPERIENCE, e - 2 * (e / 5));
+    let b = cx.champion_bonus(d);
+    damage_bonus(cx, h, unit, cx.k(11) * b / 100);
+    add(h, unit, stat::ITEM_TOHIT_PERCENT, cx.k(10) * b / 100);
+    let class = class_of(h, unit);
+    let v = cx.monstats(class).map_or(0, |m| s16(m.velocity));
+    if v > 0 && umod != 36 {
+        if umod == 37 {
+            add(
+                h,
+                unit,
+                stat::VELOCITYPERCENT,
+                (2048 / v - 128).clamp(10, 100),
+            );
+        } else {
+            add(h, unit, stat::VELOCITYPERCENT, 20);
+        }
+    }
+}
+
+/// Umod 5 strong (§19.4).
+fn strong<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, unique: bool, d: usize) {
+    let b = cx.champion_bonus(d);
+    let (kd, kt) = if unique { (15, 13) } else { (14, 12) };
+    damage_bonus(cx, h, unit, cx.k(kd) * b / 100);
+    add(h, unit, stat::ITEM_TOHIT_PERCENT, cx.k(kt) * b / 100);
+}
+
+/// Umod 6 fast (§19.4).
+fn fast<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    let class = class_of(h, unit);
+    let v = cx.monstats(class).map_or(0, |m| s16(m.velocity));
+    if v > 0 {
+        add(
+            h,
+            unit,
+            stat::VELOCITYPERCENT,
+            (2048 / v - 128).clamp(10, 100),
+        );
+    }
+}
+
+/// The resistance function `0x005A1370` (§19.3); unique only.
+fn resist<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, umod: u8) {
+    if umod == 28 {
+        let ac = h.stat(unit, stat::ARMORCLASS);
+        h.set_stat(unit, stat::ARMORCLASS, ac.wrapping_mul(2));
+    }
+    let mut immune = [
+        stat::FIRERESIST,
+        stat::LIGHTRESIST,
+        stat::COLDRESIST,
+        stat::POISONRESIST,
+        stat::DAMAGERESIST,
+        stat::MAGICRESIST,
+    ]
+    .iter()
+    .filter(|&&s| h.stat(unit, s) >= 100)
+    .count();
+    if immune >= 2 {
+        return;
+    }
+    match umod {
+        8 | 27 => {
+            let (plus, below) = if umod == 8 { (40, 100) } else { (20, 75) };
+            for s in [stat::COLDRESIST, stat::FIRERESIST, stat::LIGHTRESIST] {
+                if immune >= 2 {
+                    break;
+                }
+                let v = h.stat(unit, s);
+                if v < below {
+                    h.set_stat(unit, s, v + plus);
+                    if v + plus >= 100 {
+                        immune += 1;
+                    }
+                }
+            }
+        }
+        9 => add(h, unit, stat::FIRERESIST, 75),
+        17 => add(h, unit, stat::LIGHTRESIST, 75),
+        18 => add(h, unit, stat::COLDRESIST, 75),
+        23 => add(h, unit, stat::POISONRESIST, 75),
+        25 => add(h, unit, stat::MAGICRESIST, 20),
+        28 => add(h, unit, stat::DAMAGERESIST, 50),
+        _ => {}
+    }
+}
+
+/// Umods 9, 17, 18, 23, 25 (§19.4).
+/// TODO(spec: monsters/init.md open question 7): 17, 18, 23, 25 follow
+/// D2MOO; the constants are read "as fire" (`umods.tsv`), the mana
+/// drain ×256 is applied to the added value.
+fn elemental<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    umod: u8,
+    unique: bool,
+    d: usize,
+) {
+    let level = h.stat(unit, stat::LEVEL);
+    let dm = monlvl_dm(cx.tables.monlvl, h.info().l_flag(), d, level);
+    let (kmin, kmax) = if unique {
+        (cx.k(d + 28), cx.k(d + 31))
+    } else {
+        (cx.k(d + 16), cx.k(d + 19))
+    };
+    let (smin, smax, mul) = match umod {
+        9 => (stat::FIREMINDAM, stat::FIREMAXDAM, 1),
+        17 => (stat::LIGHTMINDAM, stat::LIGHTMAXDAM, 1),
+        18 => (stat::COLDMINDAM, stat::COLDMAXDAM, 1),
+        23 => (stat::POISONMINDAM, stat::POISONMAXDAM, 1),
+        _ => (stat::MANADRAINMINDAM, stat::MANADRAINMAXDAM, 256),
+    };
+    add(h, unit, smin, dm.wrapping_mul(kmin) / 100 * mul);
+    add(h, unit, smax, dm.wrapping_mul(kmax) / 100 * mul);
+    match umod {
+        18 => add(h, unit, stat::COLDLENGTH, 5 * level + 100),
+        23 => add(h, unit, stat::POISONLENGTH, 2 * (5 * level + 150)),
+        _ => {}
+    }
+    if unique {
+        resist(h, unit, umod);
+    }
+}
+
+/// Umod 36 ghostly (§19.6).
+fn ghostly<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: usize) {
+    flags_or(h, unit, type_flag::GHOSTLY);
+    h.set_stat(unit, stat::DAMAGERESIST, 80);
+    champion_fn(cx, h, unit, 36, d);
+    let level = h.stat(unit, stat::LEVEL);
+    let dm = monlvl_dm(cx.tables.monlvl, h.info().l_flag(), d, level);
+    add(
+        h,
+        unit,
+        stat::COLDMINDAM,
+        dm.wrapping_mul(cx.k(d + 22)) / 100,
+    );
+    add(
+        h,
+        unit,
+        stat::COLDMAXDAM,
+        dm.wrapping_mul(cx.k(d + 25)) / 100,
+    );
+    add(h, unit, stat::COLDLENGTH, 150);
+}
+
+/// Umod 26 teleport (§19.6).
+/// TODO(spec: monsters/init.md open question 7): body `0x005A1600`
+/// unread; D2MOO's effect as the spec states it.
+fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    if let Some(sk) = cx.tables.ids.monteleport {
+        h.give_skill(unit, sk, 1, Some(4));
+    }
+    h.set_ai_flag(unit, crate::monsters::ai::flag::MAY_TELEPORT);
+}
+
+/// The aura index and skill level of umod 30 (§19.5) for a unit with
+/// `level`, name seed `name_seed`, class and superunique row.
+pub fn aura_choice(level: i32, name_seed: u16, class: u32, superunique: Option<u16>) -> (u16, i32) {
+    if class == 704 {
+        return (CONVICTION, 20);
+    }
+    let lvl = level.max(1);
+    let n = AURAS.iter().filter(|a| a.0 <= lvl).count().max(1);
+    // A temporary seed; the unit seed is not touched.
+    let mut tmp = Seed::init_low(u32::from(name_seed));
+    let mut i = tmp.roll(n as i32) as usize;
+    if superunique == Some(37) {
+        i = 5;
+    }
+    let (_, off, mul, div, skill) = AURAS[i];
+    (skill, ((lvl + off) * mul / div).clamp(1, 99))
+}
+
+/// Umod 30 aura enchanted `0x005A1650` (§19.5).
+fn aura<H: InitHost + ?Sized>(_cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    let m = data(h, unit);
+    let su = m.has_flag(type_flag::SUPERUNIQUE).then_some(m.boss_hc_idx);
+    let class = class_of(h, unit);
+    let level = h.stat(unit, stat::LEVEL);
+    let (skill, lv) = aura_choice(level, m.name_seed, class, su);
+    h.give_aura(unit, skill, lv);
+}
+
+// ---- §20, §21 ----
+
+/// Superunique steps owned here (`0x005A49B0`, §20 steps 1–5), after
+/// `population.md` §11.4 spawned the unit and set type flag 2. `min` /
+/// `max` are the minion group (`MinGrp`/`MaxGrp` + difficulty).
+pub fn superunique_init<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    row: u16,
+    min: i32,
+    max: i32,
+) {
+    let Some(su) = cx.tables.superuniques.get(usize::from(row)) else {
+        return;
+    };
+    // Step 1.
+    h.monsters().entry(unit).boss_hc_idx = row;
+    // Step 2. The difficulty picks are read as part of the "fewer than
+    // 5" branch.
+    let mut aura = false;
+    if data(h, unit).umod_count() < 5 {
+        for m in [su.mod1, su.mod2, su.mod3] {
+            if m == 0 {
+                break;
+            }
+            if m == 24 {
+                continue;
+            }
+            aura |= m == 30;
+            h.monsters().entry(unit).push_umod(m as u8);
+        }
+        let d = h.info().difficulty;
+        let mut used = data(h, unit).umod_list().to_vec();
+        for _ in 0..d {
+            let u = pick_unique(cx, h, unit, usize::from(d), &used);
+            if u == 0 {
+                break;
+            }
+            h.monsters().entry(unit).push_umod(u);
+            used.push(u);
+        }
+    }
+    // Step 3.
+    boss_minions_and_init(cx, h, unit, min, max, None, true);
+    // Step 4.
+    if aura {
+        run_umod_init(cx, h, unit, 30, true);
+    }
+    // Step 5.
+    superunique_quest(h, unit, su.hcidx);
+    super::create::assign_umod(cx, h, unit, 22, true);
+}
+
+fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32) {
+    h.superunique_quest(unit, hc_idx);
+    if hc_idx == 6 {
+        h.set_state(unit, 118);
+        h.ai_install(unit, 13);
+    }
+}
+
+/// A saved boss or minion (`0x005424F0` restore, §21).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Saved {
+    pub umods: [u8; MAX_UMODS],
+    pub name_seed: u16,
+    pub champion: bool,
+    /// Superunique row, when the boss was one.
+    pub superunique: Option<u16>,
+}
+
+/// Boss restore `0x005A4440` (§21). `req` holds class and position;
+/// `guid` the saved GUID.
+pub fn restore_boss<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    req: &CreateRequest,
+    guid: u32,
+    saved: &Saved,
+) -> Option<UnitId> {
+    let unit = h.boss_spawn(req, Some(guid), false)?;
+    mark_boss(h, unit);
+    if saved.champion {
+        flags_or(h, unit, type_flag::CHAMPION);
+    }
+    h.monsters().entry(unit).umods = saved.umods;
+    boss_minions_and_init(cx, h, unit, 0, 0, None, false);
+    h.monsters().entry(unit).name_seed = saved.name_seed;
+    if data(h, unit).has_umod(30) {
+        run_umod_init(cx, h, unit, 30, true);
+    }
+    if let Some(row) = saved.superunique {
+        flags_or(h, unit, type_flag::SUPERUNIQUE);
+        h.monsters().entry(unit).boss_hc_idx = row;
+        if let Some(su) = cx.tables.superuniques.get(usize::from(row)) {
+            superunique_quest(h, unit, su.hcidx);
+        }
+    }
+    Some(unit)
+}
+
+/// Minion restore `0x005A46E0` (§21). `req` carries the saved GUID with
+/// flags 0x62.
+pub fn restore_minion<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    req: &CreateRequest,
+    saved: &Saved,
+) -> Option<UnitId> {
+    let unit = h.spawn_with_guid(req)?;
+    h.monsters().entry(unit).umods = saved.umods;
+    flags_or(h, unit, type_flag::MINION);
+    let mut list = FIXED_UMODS.to_vec();
+    list.extend_from_slice(data(h, unit).umod_list());
+    for u in list {
+        run_umod_init(cx, h, unit, u, false);
+    }
+    Some(unit)
+}
+
+// ---- §22 ----
+
+/// The umod dispatcher `0x005A4270(game, unit, arg, mode)` (§22). Mode
+/// 5 passes `arg` (the missile) to the callbacks instead of the unit.
+pub fn dispatch<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    arg: Option<UnitId>,
+    mode: u8,
+) {
+    let m = data(h, unit);
+    if m.umods[0] == 0 {
+        return;
+    }
+    let unique = m.has_flag(type_flag::UNIQUE);
+    let target = if mode == 5 { arg.unwrap_or(unit) } else { unit };
+    // All 9 slots, zero slots included (row 0 has no callbacks).
+    for u in m.umods {
+        let Some(addr) = UMODS
+            .get(usize::from(u))
+            .and_then(|r| r.callbacks.get(usize::from(mode)))
+            .copied()
+            .filter(|&a| a != 0)
+        else {
+            continue;
+        };
+        run_callback(cx, h, target, u, unique, mode, addr);
+    }
+}
+
+fn run_callback<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    umod: u8,
+    unique: bool,
+    mode: u8,
+    addr: u32,
+) {
+    // The "new mode" of the mode-1 callbacks is the unit's mode after
+    // the change (`0x005A7C20` calls them once it is set).
+    let cur = h.units().get(unit).map_or(u32::MAX, |r| r.mode);
+    match addr {
+        callback::FIRE_MODE => {
+            if unique && cur == super::mode::DEATH {
+                schedule(h, unit, 4);
+            }
+        }
+        callback::LIGHTNING_MODE => {
+            if unique && cur == super::mode::GETHIT {
+                schedule(h, unit, 2);
+            }
+        }
+        callback::DEATH_MODE => {
+            if cur == super::mode::DEATH && (umod != 18 || unique) {
+                schedule(h, unit, 4);
+            }
+        }
+        callback::AI_AFTER_DEATH => {
+            if cur == super::mode::DEATH && !h.umod34_gate(unit) {
+                h.game()
+                    .timers
+                    .cancel_unit_events(unit, EVENT_UMOD as u8, None);
+                let d = h.info().d();
+                let class = class_of(h, unit);
+                let (aip8, aip1) = cx.monstats(class).map_or((0, 0), |m| {
+                    (
+                        s16([m.aip8, m.aip8_n, m.aip8_h][d]),
+                        s16([m.aip1, m.aip1_n, m.aip1_h][d]),
+                    )
+                });
+                if ((seed(h, unit).step() % 100) as i32) < aip8 {
+                    schedule(h, unit, 10 * aip1 + 1);
+                }
+            }
+        }
+        callback::ALWAYS_RUN_AI => {
+            if !h.units().is_dead(unit) {
+                h.run_ai_tick(unit);
+                schedule(h, unit, 75);
+            }
+        }
+        _ => h.monsters().unhandled.push(Unhandled::Callback {
+            addr,
+            unit,
+            umod,
+            mode,
+        }),
+    }
+}
+
+/// Monster timer event type 7 (`0x005A4370` → dispatcher mode 2, §22).
+pub fn handle_event7<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    dispatch(cx, h, unit, None, 2);
+}
