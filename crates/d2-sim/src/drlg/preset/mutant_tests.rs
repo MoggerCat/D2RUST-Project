@@ -249,3 +249,128 @@ fn build_area_waypoint_cells() {
         [(0, 0, false), (0, 8, false), (8, 0, false), (8, 8, true)]
     );
 }
+
+// ---- map.rs: first activation (§8) and room.rs (§9) -------------------------
+
+/// Level 2 with one 8 × 8 room of map def `def`, the DS1 `f`, the map's
+/// picked file `file` and the hardcoded units pending.
+fn one_preset_room(def: u32, file: i32, f: Ds1Input) -> (World, DrlgRoomId, MapId) {
+    let mut w = World::new();
+    let l = w.level(2, def, 8, 8);
+    w.file(def, b"a.ds1", f);
+    // Every File column names the same DS1 (the picked file is set below).
+    w.pd.defs[def as usize].file = std::array::from_fn(|_| b"a.ds1".to_vec());
+    w.init(l);
+    w.generate(l).unwrap();
+    let r = w.drlg.level_rooms(l)[0];
+    let m = w.p.room(r).unwrap().map;
+    let map = w.p.map_mut(m).unwrap();
+    map.picked_file = file;
+    map.hardcoded_pending = true;
+    (w, r, m)
+}
+
+/// `preset.md` §8 r2: Blood Moor wild border maps (d 4–7) with picked
+/// file 3 add navi (class 266, or −1 when monstats has ≤ 266 rows) at
+/// ((map x + w/2)·5, (map y + h/2)·5), mode 1.
+#[test]
+fn navi_unit_on_blood_moor_border() {
+    for (rows, class) in [(734, 266), (266, -1)] {
+        let (mut w, r, m) = one_preset_room(5, 3, ds1(8, 8));
+        w.pd.monstats_count = rows;
+        w.run(|p, d, c| p.add_preset_units(d, c, r)).unwrap();
+        let u = &w.p.map(m).unwrap().units[0];
+        assert_eq!(
+            (u.unit_type, u.class, u.mode, u.x, u.y),
+            (1, class, 1, 20, 20)
+        );
+    }
+}
+
+/// `preset.md` §8 river objects, from the rule text: d ≠ 27 walks row 0
+/// of floor layer 0 for style 2 / sub 24 cells (c += 4 after one), each
+/// giving sounds(map x + c + 1) and strip(c); strips skip 3 rows after a
+/// style-4 cell with sub in {0, 4, 8, 16, 29, 39}.
+#[test]
+fn river_objects_by_the_rules() {
+    use crate::drlg::room_flags;
+    let style_cell = |style: u32, sub: u32| (style << 20) | (sub << 8);
+    let mut f = ds1(8, 8);
+    let fl = &mut f.floors[0];
+    // Row 0: style 2 / sub 24 at c = 1, 3 (skipped by c += 4) and 6.
+    for c in [1, 3, 6] {
+        fl[c] = style_cell(2, 24);
+    }
+    // Column 1, row 2: style 4 sub 8 → skip 3 rows; column 6 row 1: sub 5
+    // (no skip).
+    fl[2 * 9 + 1] = style_cell(4, 8);
+    fl[9 + 6] = style_cell(4, 5);
+    let (mut w, r, m) = one_preset_room(26, 0, f.clone());
+    w.drlg.room_mut(r).flags |= room_flags::AUTOMAP_REVEAL;
+    let rect = w.p.map(m).unwrap().rect;
+    w.run(|p, d, c| p.add_preset_units(d, c, r)).unwrap();
+    // The model.
+    let g = |c: i32, row: i32| f.floors[0][(row * 9 + c) as usize];
+    let mut out: Vec<(i32, i32, i32)> = Vec::new();
+    let sounds = |out: &mut Vec<(i32, i32, i32)>, cx: i32| {
+        let mut sy = rect.y * 5;
+        while sy < (rect.y + 8) * 5 {
+            out.push((65, cx * 5, sy));
+            sy += 40;
+        }
+    };
+    let strip = |out: &mut Vec<(i32, i32, i32)>, c: i32| {
+        let mut row = 0;
+        while row < rect.h {
+            let x0 = (rect.x + c) * 5 - 5;
+            let y = (rect.y + row) * 5;
+            for (k, class) in [40, 41, 41, 41, 42].into_iter().enumerate() {
+                out.push((class, x0 + 5 * k as i32, y));
+            }
+            let v = g(c.max(0), row);
+            if (v >> 20) & 0x3F == 4 && [0, 4, 8, 16, 29, 39].contains(&((v >> 8) & 0xFF)) {
+                row += 3;
+            }
+            row += 1;
+        }
+    };
+    let mut c = 0;
+    while c < rect.w {
+        let v = g(c, 0);
+        if (v >> 20) & 0x3F == 2 && (v >> 8) & 0xFF == 24 {
+            sounds(&mut out, rect.x + c + 1);
+            strip(&mut out, c);
+            c += 4;
+        }
+        c += 1;
+    }
+    out.reverse();
+    let got: Vec<(i32, i32, i32)> =
+        w.p.map(m)
+            .unwrap()
+            .units
+            .iter()
+            .filter(|u| u.flags == 1)
+            .map(|u| (u.class, u.x, u.y))
+            .collect();
+    assert_eq!(got, out);
+    assert!(out.len() > 40);
+}
+
+/// `preset.md` §9 r1, r4: the room's grids are (w + 1) × (h + 1) from the
+/// DS1 sub-rectangle; border cells of wall grid 0 and the floor grid get
+/// 0x84.
+#[test]
+fn room_grid_size_and_borders() {
+    let (mut w, r, _) = one_preset_room(9, 0, ds1(8, 8));
+    let grids = w.run(|p, d, c| {
+        p.add_preset_units(d, c, r)?;
+        p.room_grids(d, c, r)
+    });
+    let g = grids.unwrap();
+    for pass in &g.passes {
+        assert_eq!((pass.cells.width, pass.cells.height), (9, 9));
+        assert_eq!(pass.cells.get(8, 8) & 0x84, 0x84);
+        assert_eq!(pass.cells.get(4, 4) & 0x84, 0);
+    }
+}

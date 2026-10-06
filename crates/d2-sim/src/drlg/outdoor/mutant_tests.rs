@@ -546,7 +546,7 @@ fn far_away_case(rect: TileRect, seed: u32, blocked: &[(i32, i32)]) {
             let ax = (8 * x - cx + level.x + 4).abs();
             let ay = (8 * y - cy + level.y + 4).abs();
             let d = if ax > ay { ay + 2 * ax } else { ax + 2 * ay } / 2;
-            if best.map_or(true, |b| d > b.2) {
+            if best.is_none_or(|b| d > b.2) {
                 best = Some((x, y, d));
             }
         }
@@ -1159,8 +1159,8 @@ fn pasted(room: &OutdoorRoom) -> Vec<(i32, i32, u32)> {
 }
 
 /// `outdoor-tilesub.md` §4.2: per repetition G := group[roll(count)];
-/// aw, ah := w − G.w, h − G.h (≤ 0: next, the roll stays drawn); Trials
-/// > 0: x := roll(aw) + 1, y := roll(ah) + 1, apply on a passing fixed
+/// aw, ah := w − G.w, h − G.h (≤ 0: next, the roll stays drawn);
+/// Trials > 0: x := roll(aw) + 1, y := roll(ah) + 1, apply on a passing fixed
 /// test; Trials −1: shuffle aw·ah entries, the first passing at (x + 1,
 /// y + 1).
 #[test]
@@ -2294,8 +2294,8 @@ fn borders_model(
     };
     let n_of = |i: usize| vs[(i + 1) % vs.len()];
     let sgn = |a: &Vertex, b: &Vertex| ((b.x - a.x).signum(), (b.y - a.y).signum());
-    for i in 0..vs.len() {
-        let (v, n, nn) = (vs[i], n_of(i), n_of(i + 1));
+    for (i, &v) in vs.iter().enumerate() {
+        let (n, nn) = (n_of(i), n_of(i + 1));
         let ((dx, dy), (ndx, ndy)) = (sgn(&v, &n), sgn(&n, &nn));
         let straight = spec_border(dx, dy, spec_style(lt, id, v.direction));
         let bits = 0x1 | if v.direction != 0 { 0x2 } else { 0 };

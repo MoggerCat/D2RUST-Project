@@ -259,7 +259,7 @@ fn act3_sewers_1_corner_swaps() {
     for def in swapped {
         // File −1: the map keeps its default file (§9 r2).
         assert_eq!(maps.iter().filter(|m| m.0 == def).count(), 1, "def {def}");
-        assert!(maps.iter().any(|m| *m == (def, None)), "def {def}");
+        assert!(maps.contains(&(def, None)), "def {def}");
     }
     let maps = run(2, 93, 25, 30, 24).unwrap();
     assert!(maps.iter().all(|m| !swapped.contains(&m.0)));
