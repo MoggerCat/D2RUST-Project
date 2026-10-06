@@ -1,9 +1,11 @@
 // Spec: specs/sim/pathing.md §8.1 (velocity), §8.2 (run stat list), §8.4 (velocity and direction toward the next point)
 //! Velocity of a mode and the per-point aim. Integer arithmetic only.
 
-use super::geom::{centre, direction_vector, set_facing};
-use super::seams::{flag, WalkPath, WalkUnits};
-use super::tables::PathTables;
+use super::geom::{direction_vector, set_facing};
+use super::seams::{count, index, WalkUnits};
+use crate::path::coords::to_fp16_center;
+use crate::path::record::{flags, DynamicPath, PATH_POINTS};
+use crate::path::tables::PathTables;
 use crate::units::{UnitId, UnitType};
 
 /// Stat 67 `velocitypercent`.
@@ -35,10 +37,11 @@ fn has_modifier<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId, mode
         _ => None,
     };
     let Some(row) = row else { return false };
-    if row.b != 0 {
+    // Columns a (by passive skill), b (velocity modifier).
+    if row[1] != 0 {
         return true;
     }
-    if row.a != 0 {
+    if row[0] != 0 {
         if let Some(s) = u.used_skill(unit) {
             return s.skill_flags & 0x1 != 0 && s.skill_flags & 0x1000 == 0;
         }
@@ -63,10 +66,11 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
     if !has_modifier(t, u, unit, mode) {
         return None;
     }
-    let scale = t.animstat[4];
-    let raw = u.item_stat(unit, scale.stat as u16);
+    // animstat row 4: (has base, base, stat).
+    let [_, scale_base, scale_stat] = t.animstat[4];
+    let raw = u.item_stat(unit, scale_stat as u16);
     let f = if raw != 0 {
-        scale.base.wrapping_mul(raw) / (scale.base + raw)
+        scale_base.wrapping_mul(raw) / (scale_base + raw)
     } else {
         0
     };
@@ -79,7 +83,7 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
 }
 
 /// Velocity setter `0x00648690` (§8.1 rule 3).
-pub fn set_velocity(path: &mut WalkPath, v: i32) {
+pub fn set_velocity(path: &mut DynamicPath, v: i32) {
     if v != path.velocity {
         path.field_38 = 15;
     }
@@ -97,36 +101,36 @@ pub fn run_velocity_bonus(walk: i32, run: i32) -> Option<i32> {
 }
 
 /// Velocity and direction toward the next point (`0x0064FE40`, §8.4).
-pub fn aim(t: &PathTables, path: &mut WalkPath, ty: UnitType) {
+pub fn aim(t: &PathTables, path: &mut DynamicPath, ty: UnitType) {
     loop {
-        let i = path.index.clamp(0, super::seams::MAX_POINTS as i32 - 1) as usize;
-        let p = path.points[i];
-        if (centre(p.x), centre(p.y)) != (path.precise_x, path.precise_y) {
+        let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
+        let p = path.point(i);
+        if (to_fp16_center(p.x), to_fp16_center(p.y)) != (path.precise_x, path.precise_y) {
             break;
         }
-        if path.index >= path.count - 1 {
-            path.dir_vec = (0, 0);
-            path.vel_vec = (0, 0);
+        if index(path) >= count(path) - 1 {
+            path.dir_vec_x = 0;
+            path.dir_vec_y = 0;
+            path.vel_vec_x = 0;
+            path.vel_vec_y = 0;
             path.velocity = 0;
-            path.index = path.count;
+            path.cur_point = path.point_count;
             return;
         }
-        path.index += 1;
+        path.cur_point += 1;
     }
-    let i = path.index.clamp(0, super::seams::MAX_POINTS as i32 - 1) as usize;
-    let p = path.points[i];
+    let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
+    let p = path.point(i);
     let (v, mut d) = direction_vector(
         t,
         (path.precise_x, path.precise_y),
-        (centre(p.x), centre(p.y)),
+        (to_fp16_center(p.x), to_fp16_center(p.y)),
     );
-    if path.flags & flag::FACE_AWAY != 0 {
+    if path.flags & flags::FACE_AWAY != 0 {
         d = d.wrapping_sub(32) & 63;
     }
-    path.dir_vec = v;
-    path.vel_vec = (
-        v.0.wrapping_mul(path.velocity) >> 8,
-        v.1.wrapping_mul(path.velocity) >> 8,
-    );
+    (path.dir_vec_x, path.dir_vec_y) = v;
+    path.vel_vec_x = v.0.wrapping_mul(path.velocity) >> 8;
+    path.vel_vec_y = v.1.wrapping_mul(path.velocity) >> 8;
     set_facing(t, path, ty, d as i32);
 }

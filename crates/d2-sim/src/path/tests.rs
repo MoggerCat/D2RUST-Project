@@ -184,6 +184,77 @@ fn tables_tsv_check_catches_perturbations() {
     assert_eq!(t, want);
 }
 
+// Ported from the walk tables (`pathing.md` Constants: 582 rows; the §2
+// type table and the values the walk code reads).
+// Covers: specs/sim/pathing.md §2
+#[test]
+fn tables_parse_and_match_spec_values() {
+    let t = tables();
+    assert_eq!(PATH_TABLES_TSV.lines().count() - 1, 582);
+    // §2 type table: flags of types 0, 1, 7, 8, 11 and offsets of 5, 6, 12.
+    assert_eq!(t.pathtype_flags[0], 0x21900);
+    assert_eq!(t.pathtype_flags[1], 0x1900);
+    assert_eq!(t.pathtype_flags[7], 0x21900);
+    assert_eq!(t.pathtype_flags[8], 0x1E600);
+    assert_eq!(t.pathtype_flags[11], 0x1E604);
+    assert_eq!(t.pathtype_diroff[5], 2);
+    assert_eq!(t.pathtype_diroff[6], -2);
+    assert_eq!(t.pathtype_diroff[12], -4);
+    // §5.1 rule 2 steps.
+    assert_eq!(
+        t.dir8_toward,
+        vec![
+            [1, 0],
+            [1, 1],
+            [0, 1],
+            [-1, 1],
+            [-1, 0],
+            [-1, -1],
+            [0, -1],
+            [1, -1]
+        ]
+    );
+    assert_eq!(t.dir8_target, t.dir8_toward);
+    assert_eq!(t.dist8_unit, t.dist8_path);
+    // tan (x, y, angle); animstat (has base, base, stat).
+    assert_eq!(t.tan[127][0], 2896);
+    assert_eq!(t.animstat[4][1], 150);
+    assert_eq!(t.animstat[4][2], 96);
+}
+
+// Ported from the walk tables: M08, one changed value is seen exactly
+// there; a dropped row, a repeated row, an unknown table and a bad header
+// are errors.
+#[test]
+fn tables_parse_rejects_walk_perturbations() {
+    let changed = PATH_TABLES_TSV.replacen("snap9\t40\t0\t", "snap9\t40\t7\t", 1);
+    assert_ne!(changed, PATH_TABLES_TSV);
+    let t2 = PathTables::from_tsv(&changed).unwrap();
+    let t = tables();
+    assert_eq!(t2.snap9[40], 7);
+    let mut back = t2.clone();
+    back.snap9[40] = t.snap9[40];
+    assert_eq!(back, t);
+    let dropped: String = PATH_TABLES_TSV
+        .lines()
+        .filter(|l| !l.starts_with("tan\t5\t"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let dup = format!("{PATH_TABLES_TSV}tan\t5\t1\t2\t3\t\t\t0x0\n");
+    let unknown = format!("{PATH_TABLES_TSV}nope\t0\t1\t\t\t\t\t0x0\n");
+    for (name, bad) in [
+        ("dropped", dropped.as_str()),
+        ("repeated", dup.as_str()),
+        ("unknown", unknown.as_str()),
+        ("header", "x\n"),
+    ] {
+        assert!(
+            matches!(PathTables::from_tsv(bad), Err(PathError::Tsv(_))),
+            "{name}"
+        );
+    }
+}
+
 // ---- §1 coordinates --------------------------------------------------------
 
 // Covers: specs/sim/path-placement.md §1 r1, §1 r2, §1 r4
@@ -268,7 +339,11 @@ fn dynamic_path_fields() {
     let mut p = DynamicPath::default();
     assert_eq!(p.points.len(), 78);
     assert_eq!(p.saved_steps.len(), 10);
-    p.target_unit = Some(UnitId(4));
+    p.target_unit = Some(TargetUnit {
+        unit: UnitId(4),
+        ty: UnitType::Monster,
+        guid: 4,
+    });
     p.set_target_point(12, 34);
     assert_eq!((p.target_x, p.target_y, p.target_unit), (12, 34, None));
     p.precise_x = to_fp16_center(100);
@@ -1104,6 +1179,36 @@ impl PathMotion for Motion {
     }
 }
 
+/// The rooms and a motion recorder as one teleport context.
+struct Both<'a>(&'a mut Rooms, &'a mut Motion);
+
+impl CollisionRooms for Both<'_> {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        self.0.subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.0.adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        self.0.adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        self.0.grid(room)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut CollisionGrid> {
+        self.0.grid_mut(room)
+    }
+}
+
+impl PathMotion for Both<'_> {
+    fn set_position(&mut self, path: &mut DynamicPath, x: i32, y: i32, hint: Option<RoomId>) {
+        self.1.set_position(path, x, y, hint);
+    }
+    fn reset(&mut self, path: &mut DynamicPath) {
+        self.1.reset(path);
+    }
+}
+
 // Covers: specs/sim/path-placement.md §6 r4
 #[test]
 fn teleport_player_and_missile() {
@@ -1111,7 +1216,7 @@ fn teleport_player_and_missile() {
     let mut p = player_path(&mut w, a, 5, 5);
     w.set(15, 5, bits::WALL);
     let mut m = Motion::default();
-    teleport(&mut w, &mut m, &mut p, false, Some(b), 15, 5).unwrap();
+    teleport(&mut Both(&mut w, &mut m), &mut p, false, Some(b), 15, 5).unwrap();
     // Forced: lands on the wall; flag 0x1 for the other room.
     assert_eq!(w.at(15, 5), 0x1 | 0x80 | bits::NO_PATH);
     assert_eq!(w.at(5, 5), 0);
@@ -1125,20 +1230,27 @@ fn teleport_player_and_missile() {
     // Same room: no 0x1 added.
     let mut p = player_path(&mut w, a, 2, 2);
     let mut m = Motion::default();
-    teleport_and_clear(&mut w, &mut m, &mut p, false, Some(a), 3, 3).unwrap();
+    teleport_and_clear(&mut Both(&mut w, &mut m), &mut p, false, Some(a), 3, 3).unwrap();
     assert_eq!(p.flags & 0x1, 0);
     assert_eq!(p.point_count, 0);
     assert_eq!(w.at(3, 3), 0x80 | bits::NO_PATH);
     // (0, 0): clear only.
     let mut m = Motion::default();
-    teleport(&mut w, &mut m, &mut p, false, Some(a), 0, 0).unwrap();
+    teleport(&mut Both(&mut w, &mut m), &mut p, false, Some(a), 0, 0).unwrap();
     assert_eq!(w.at(3, 3), 0);
     assert_eq!(m.calls.len(), 2);
     // A non-zero point without a room: fatal, nothing changed.
     let mut p = player_path(&mut w, a, 6, 6);
     let before = (p.clone(), nonzero(&w));
     assert_eq!(
-        teleport(&mut w, &mut Motion::default(), &mut p, false, None, 7, 7),
+        teleport(
+            &mut Both(&mut w, &mut Motion::default()),
+            &mut p,
+            false,
+            None,
+            7,
+            7
+        ),
         Err(PathError::TeleportNoRoom { x: 7, y: 7 })
     );
     assert_eq!((p, nonzero(&w)), before);
@@ -1159,7 +1271,15 @@ fn teleport_player_and_missile() {
     ms.move_mask = 0x5;
     stamp_size(&mut w, Some(a), 2, 2, 1, 0x40);
     w.set(4, 4, bits::WALL);
-    teleport(&mut w, &mut Motion::default(), &mut ms, true, Some(a), 4, 4).unwrap();
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(a),
+        4,
+        4,
+    )
+    .unwrap();
     assert_eq!(ms.collided_mask, 0x1);
     assert_eq!(ms.flags & flags::MOVED, flags::MOVED);
     assert_eq!(

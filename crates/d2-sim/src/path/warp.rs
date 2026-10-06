@@ -139,10 +139,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::coords::Point;
     use super::super::place::tests::{unit, Host};
-    use super::super::place_seams::{LvlWarp, SubPoint, TileRect, WarpDestination};
+    use super::super::place_seams::{LvlWarp, WarpDestination};
     use super::super::search::tests::Grid;
     use super::*;
+    use crate::drlg::TileRect;
 
     #[derive(Default)]
     struct Drlg {
@@ -211,7 +213,7 @@ mod tests {
     fn dest(level: u32) -> WarpDestination<usize> {
         WarpDestination {
             room: 0,
-            point: SubPoint::new(10, 10),
+            point: Point::new(10, 10),
             exit_walk_x: 3,
             exit_walk_y: -2,
             source_level: 1,
@@ -310,7 +312,7 @@ mod tests {
         // point either → no free point.
         let lv = Host {
             warp: Some(WarpDestination {
-                point: SubPoint::new(-60, -60),
+                point: Point::new(-60, -60),
                 ..dest(2)
             }),
             ..Host::default()
