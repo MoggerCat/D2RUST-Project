@@ -6,8 +6,9 @@
 use super::*;
 use crate::items::affixes::{crafted, magic, rare};
 use crate::items::create::{class_skill_mods, init_item_stats, socket_count, socket_roll};
-use crate::items::tables::{RareRec, SkillRec};
+use crate::items::tables::{RareRec, SkillRec, UniqueRec};
 use crate::items::{create_item, flag, q, req, stat, ItemRequest, PlayerInfo, RequestUnit};
+use d2_data::tables::{Itemratio, Record};
 
 /// `quality.md` §8.1: bit 4096 is a real bit; only an index above 4096
 /// reads as dropped.
@@ -622,4 +623,680 @@ fn skill_event_level_cap_one() {
         it.stats.lists[&ListKey::ITEM],
         BTreeMap::from([((195, 1), 7)])
     );
+}
+
+/// The item list as a map (empty when there is none).
+fn list(it: &Item<FakeStats>) -> BTreeMap<(u16, u16), i32> {
+    it.stats
+        .lists
+        .get(&ListKey::ITEM)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// `properties.md` §5 r1: function 5 skips stat 21 when a weapon has only
+/// two-handed damage, 23 when it has only one-handed damage, 159 for a
+/// non-throwing weapon; a non-weapon gets all three.
+// Covers: specs/items/properties.md §5 r1
+#[test]
+fn func5_target_stats() {
+    let mut t = tables();
+    t.properties = vec![prop1(5, stat::MINDAMAGE)];
+    let mk = |t: &mut ItemTables, ty: u16, one: u8, two: u8| {
+        let mut r = item_rec(ty, b"xxx ");
+        r.mindam = one;
+        r.mindam2 = two;
+        push_item(t, r)
+    };
+    let two_only = mk(&mut t, AXE, 0, 4);
+    let one_only = mk(&mut t, AXE, 4, 0);
+    let both = mk(&mut t, AXE, 4, 4);
+    let thrown = mk(&mut t, THROWN, 4, 0);
+    let helm = mk(&mut t, ty::HELM, 0, 0);
+    for (i, want) in [
+        (two_only, vec![23]),
+        (one_only, vec![21]),
+        (both, vec![21, 23]),
+        (thrown, vec![21, 159]),
+        (helm, vec![21, 23, 159]),
+    ] {
+        let mut it = item(i, 1);
+        run_prop(&t, &mut it, rec(0, 0, 2, 2));
+        let got: Vec<u16> = list(&it).keys().map(|&(s, _)| s).collect();
+        assert_eq!(got, want, "item {i}");
+        assert!(list(&it).values().all(|&v| v == 2));
+    }
+}
+
+/// `properties.md` §5 r2: function 6's floor applies only when column + v
+/// < 1 (then −column); column 3, v −2 sums to 1 and adds −2. Function 5
+/// writes min damage only.
+// Covers: specs/items/properties.md §5 r2
+#[test]
+fn func6_floor_boundary_and_func5_min_only() {
+    let mut t = tables();
+    let mut r = item_rec(AXE, b"axe ");
+    (r.mindam, r.maxdam) = (2, 3);
+    let i = push_item(&mut t, r);
+    t.properties = vec![prop1(6, stat::MAXDAMAGE), prop1(5, stat::MINDAMAGE)];
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(0, 0, -2, -2));
+    assert_eq!(list(&it), BTreeMap::from([((22, 0), -2)]));
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(0, 0, -5, -5));
+    assert_eq!(list(&it), BTreeMap::from([((22, 0), -3)]));
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(1, 0, 1, 1));
+    assert_eq!(list(&it), BTreeMap::from([((21, 0), 1)]));
+}
+
+/// `properties.md` §5 r4: chance := `min`, 5 only when `min` < 1.
+// Covers: specs/items/properties.md §5 r4
+#[test]
+fn skill_event_chance_one() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = vec![prop1(11, 195)];
+    t.skills = vec![SkillRec {
+        itypea1: 0,
+        reqlevel: 1,
+        maxlvl: 20,
+    }];
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(0, 0, 1, 3));
+    assert_eq!(list(&it), BTreeMap::from([((195, 3), 1)]));
+}
+
+/// `property-functions.tsv` (function 13: base reset in mode 1 only).
+// Covers: specs/items/properties.md §4.3
+#[test]
+fn func13_reset_mode_one_only() {
+    use crate::items::props::{apply_property, PropCtx};
+    let mut t = tables();
+    let mut r = item_rec(ty::HELM, b"cap ");
+    (r.minac, r.maxac) = (3, 9);
+    let i = push_item(&mut t, r);
+    t.properties = vec![prop1(13, stat::ARMORCLASS)];
+    for (mode, base) in [(0u8, 0), (1, 10)] {
+        let mut it = item(i, 1);
+        apply_property(&t, &mut it, &mut PropCtx::item(mode), &rec(0, 0, 2, 2));
+        assert_eq!(it.stats.base(stat::ARMORCLASS, 0), base, "mode {mode}");
+        assert_eq!(it.stats.item_list(stat::ARMORCLASS, 0), 2);
+    }
+}
+
+/// `properties.md` §5 r9: c > 254 → 255; c = 254 stays.
+// Covers: specs/items/properties.md §5 r9
+#[test]
+fn func19_charges_254() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(ty::STAF, b"sst "));
+    t.properties = vec![prop1(19, 204)];
+    t.skills = vec![SkillRec::default(); 4];
+    let mut it = item(i, 7);
+    run_prop(&t, &mut it, rec(0, 3, 254, 1));
+    let r = Seed::init_low(7).roll(254 - 254 / 8) as i32;
+    let want = 254 * 256 + ((r + 254 / 8 + 1) & 0xFF);
+    assert_eq!(list(&it), BTreeMap::from([((204, (3 << 6) + 1), want)]));
+}
+
+/// `property-functions.tsv` layers: 9 and 22 take `param`, 21 the slot's
+/// `val`.
+// Covers: specs/items/properties.md §5 text
+#[test]
+fn generic_layers_param_and_val() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    let mut p21 = prop1(21, 40);
+    p21.slots[0].val = 5;
+    t.properties = vec![prop1(9, 41), prop1(22, 42), p21];
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(0, 7, 2, 2));
+    run_prop(&t, &mut it, rec(1, 8, 3, 3));
+    run_prop(&t, &mut it, rec(2, 9, 4, 4));
+    assert_eq!(
+        list(&it),
+        BTreeMap::from([((40, 5), 4), ((41, 7), 2), ((42, 8), 3)])
+    );
+}
+
+/// `properties.md` §5 r6: cap from `invwidth` × `invheight`; a roll < 1
+/// uses `param`, a roll of 1 stays 1; a cap of 1 still sets 1.
+// Covers: specs/items/properties.md §5 r6
+#[test]
+fn func14_cap_and_param() {
+    let mut t = tables();
+    let mk = |t: &mut ItemTables, w: u8, h: u8| {
+        let mut r = item_rec(ty::HELM, b"cap ");
+        (r.invwidth, r.invheight, r.gemsockets) = (w, h, 6);
+        push_item(t, r)
+    };
+    let i23 = mk(&mut t, 2, 3);
+    let i11 = mk(&mut t, 1, 1);
+    let h = &mut t.itemtypes[ty::HELM as usize];
+    (h.maxsock1, h.maxsock25, h.maxsock40) = (6, 6, 6);
+    t.properties = vec![prop1(14, stat::NUMSOCKETS)];
+    for (i, r, want) in [
+        (i23, rec(0, 0, 6, 6), 6),
+        (i23, rec(0, 4, 1, 1), 1),
+        (i23, rec(0, 3, 0, 0), 3),
+        (i11, rec(0, 0, 4, 4), 1),
+    ] {
+        let mut it = item(i, 1);
+        run_prop(&t, &mut it, r);
+        assert_eq!(it.stats.base(stat::NUMSOCKETS, 0), want, "{r:?}");
+        assert_ne!(it.flags & flag::SOCKETED, 0);
+    }
+}
+
+/// `properties.md` §8.1: partial record k goes to state 165 + k / 2.
+// Covers: specs/items/properties.md §8.1
+#[test]
+fn set_partial_state_per_record() {
+    use crate::items::tables::SetItemRec;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = (0..10).map(|k| prop1(1, 100 + k)).collect();
+    let mut aprops = [PropRec::NONE; 10];
+    for (k, a) in aprops.iter_mut().enumerate() {
+        *a = rec(k as i32, 0, 1, 1);
+    }
+    t.setitems = vec![SetItemRec {
+        add_func: 1,
+        props: [PropRec::NONE; 9],
+        aprops,
+        ..Default::default()
+    }];
+    let mut it = item(i, 1);
+    it.file_index = 0;
+    crate::items::props::apply_set_item(&t, &mut it);
+    for k in 0..10u16 {
+        let key = ListKey {
+            state: 165 + k / 2,
+            flags: 0x2040,
+        };
+        assert_eq!(it.stats.list_get(key, 100 + k, 0), 1, "record {k}");
+    }
+}
+
+/// `properties.md` §10.1: quest items and items without an inventory get
+/// no runeword; up to six fillers; the socket count must equal the filler
+/// count; the rune list must cover the fillers.
+// Covers: specs/items/properties.md §10.1
+#[test]
+fn runeword_match_conditions() {
+    use crate::items::props::runeword_match;
+    use crate::items::tables::RuneRec;
+    let mut t = tables();
+    let mut r = item_rec(AXE, b"axe ");
+    r.hasinv = 1;
+    let base = push_item(&mut t, r.clone());
+    r.quest = 1;
+    let quest = push_item(&mut t, r.clone());
+    r.quest = 0;
+    r.hasinv = 0;
+    let noinv = push_item(&mut t, r);
+    let rune = push_item(&mut t, item_rec(ty::RUNE, b"r01 ")) as i32;
+    t.runes = vec![
+        RuneRec {
+            complete: 1,
+            itype: [ty::WEAP as i16, 0, 0, 0, 0, 0],
+            runes: [rune; 6],
+            ..Default::default()
+        },
+        RuneRec {
+            complete: 1,
+            itype: [ty::WEAP as i16, 0, 0, 0, 0, 0],
+            runes: [rune, 0, 0, 0, 0, 0],
+            ..Default::default()
+        },
+    ];
+    let mk = |i: usize, sockets: i32| {
+        let mut it = item(i, 1);
+        it.quality = q::NORMAL;
+        it.stats.set_base(stat::NUMSOCKETS, 0, sockets);
+        it
+    };
+    let r = rune as usize;
+    assert_eq!(runeword_match(&t, &mk(base, 6), &[r; 6]), Some(0));
+    assert_eq!(runeword_match(&t, &mk(base, 1), &[r]), Some(1));
+    // Two fillers: row 0 lists six, row 1 only one rune.
+    assert_eq!(runeword_match(&t, &mk(base, 2), &[r; 2]), None);
+    assert_eq!(runeword_match(&t, &mk(base, 2), &[r]), None);
+    assert_eq!(runeword_match(&t, &mk(quest, 1), &[r]), None);
+    assert_eq!(runeword_match(&t, &mk(noinv, 1), &[r]), None);
+}
+
+/// `properties.md` §10.2: a `server` row needs the ladder flag; others
+/// activate without it.
+// Covers: specs/items/properties.md §10.2
+#[test]
+fn runeword_server_rows() {
+    use crate::items::props::activate_runeword;
+    use crate::items::tables::RuneRec;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(AXE, b"axe "));
+    t.runes = vec![
+        RuneRec {
+            server: 1,
+            ..Default::default()
+        },
+        RuneRec::default(),
+    ];
+    for (row, ladder, want) in [
+        (0, false, false),
+        (0, true, true),
+        (1, false, true),
+        (1, true, true),
+    ] {
+        let mut it = item(i, 1);
+        assert_eq!(
+            activate_runeword(&t, &mut it, row, ladder),
+            want,
+            "{row} {ladder}"
+        );
+    }
+}
+
+/// `properties.md` §11: n = min(c, count − 1); a full 3-item set takes
+/// the first 2n − 2 = 2 partial records plus the full records.
+// Covers: specs/items/properties.md §11
+#[test]
+fn set_bonus_full_set() {
+    use crate::items::props::set_bonuses;
+    use crate::items::tables::{SetItemRec, SetRec};
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = (0..16).map(|k| prop1(1, 100 + k)).collect();
+    let mut partial = [PropRec::NONE; 8];
+    for (k, p) in partial.iter_mut().enumerate() {
+        *p = rec(k as i32, 0, 1, 1);
+    }
+    let mut full = [PropRec::NONE; 8];
+    full[0] = rec(15, 0, 1, 1);
+    t.sets = vec![SetRec {
+        count: 3,
+        partial,
+        full,
+    }];
+    t.setitems = vec![SetItemRec::default()];
+    let mut it = item(i, 1);
+    it.file_index = 0;
+    let key = ListKey {
+        state: 1,
+        flags: 0x40,
+    };
+    let mut owner = FakeStats::default();
+    set_bonuses(&t, &mut it, 0b111, &mut owner, key);
+    let got: Vec<u16> = owner.lists[&key].keys().map(|&(s, _)| s).collect();
+    assert_eq!(got, vec![100, 101, 115]);
+}
+
+/// `properties.md` §12: a non-ethereal item is not made ethereal.
+// Covers: specs/items/properties.md §12
+#[test]
+fn craft_list_non_ethereal() {
+    use crate::items::props::apply_craft_list;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(ty::HELM, b"cap "));
+    t.properties = vec![prop1(1, 7)];
+    let mut it = item(i, 1);
+    it.stats.set_base(stat::ARMORCLASS, 0, 10);
+    apply_craft_list(&t, &mut it, &[rec(0, 0, 5, 5)]);
+    assert_eq!(it.stats.base(stat::ARMORCLASS, 0), 10);
+    assert_eq!(it.flags & flag::ETHEREAL, 0);
+}
+
+fn ratio_rows() -> Vec<Itemratio> {
+    [(0, 0), (1, 0), (0, 1), (1, 1)]
+        .into_iter()
+        .map(|(cs, uber)| {
+            let mut r = Itemratio::decode(&[0u8; Itemratio::SIZE]);
+            r.version = 1;
+            r.class_specific = cs;
+            r.uber = uber;
+            r
+        })
+        .collect()
+}
+
+/// `treasure.md` §6 step 3 (used by `quality.md` §3 r2): `Class Specific`
+/// is itemtypes `class` < 7; `Uber` needs a weapon or armor whose code is
+/// its `ubercode` or `ultracode`, not of type 38 and not a quest item.
+// Covers: specs/items/quality.md §3 r2
+#[test]
+fn ratio_row_class_and_uber() {
+    use crate::items::quality::ratio_row;
+    let mut t = tables();
+    t.itemratio = ratio_rows();
+    t.itemtypes[ty::GLOV as usize].class = 3;
+    t.itemtypes[ty::BOOT as usize].class = 7;
+    let mut ax = item_rec(AXE, b"axe ");
+    ax.ubercode = *b"axe ";
+    let uber_axe = push_item(&mut t, ax.clone());
+    ax.quest = 1;
+    let quest_axe = push_item(&mut t, ax);
+    let mut h = item_rec(ty::HELM, b"cap ");
+    h.ultracode = *b"cap ";
+    let ultra_helm = push_item(&mut t, h);
+    let plain_helm = push_item(&mut t, item_rec(ty::HELM, b"cap "));
+    let mut rg = item_rec(RING, b"rin ");
+    rg.ubercode = *b"rin ";
+    let ring = push_item(&mut t, rg);
+    let gloves = push_item(&mut t, item_rec(ty::GLOV, b"glv "));
+    let boots = push_item(&mut t, item_rec(ty::BOOT, b"bts "));
+    for (i, want) in [
+        (uber_axe, 2),
+        (quest_axe, 0),
+        (ultra_helm, 2),
+        (plain_helm, 0),
+        (ring, 0),
+        (gloves, 1),
+        (boots, 0),
+    ] {
+        assert_eq!(ratio_row(&t, i, 100), Some(want), "item {i}");
+    }
+}
+
+/// `quality.md` §3 r4: L := max(ilvl − items `level`, 1) for a non-misc
+/// item. Unique 15/1: ilvl 30, level 20 → c = 5, one roll(5); the other
+/// steps have c < 1.
+// Covers: specs/items/quality.md §3 r4
+#[test]
+fn quality_roll_level_difference() {
+    use crate::items::quality::roll_quality;
+    let mut t = tables();
+    let mut r = Itemratio::decode(&[0u8; Itemratio::SIZE]);
+    r.version = 1;
+    (r.unique, r.uniquedivisor) = (15, 1);
+    (r.raredivisor, r.setdivisor, r.magicdivisor) = (1, 1, 1);
+    (r.hiqualitydivisor, r.normaldivisor) = (1, 1);
+    t.itemratio = vec![r];
+    let mut h = item_rec(ty::HELM, b"cap ");
+    h.level = 20;
+    let i = push_item(&mut t, h);
+    for seed in 0..20 {
+        let mut it = item(i, seed);
+        let rq = ItemRequest {
+            ilvl: 30,
+            ..Default::default()
+        };
+        let mut s = Seed::init_low(seed);
+        let want = if s.roll(5) == 0 { q::UNIQUE } else { q::RARE };
+        assert_eq!(roll_quality(&t, &mut it, &rq), Ok(want));
+        assert_eq!(it.item_seed, s);
+    }
+}
+
+/// `quality.md` §4 r3.2: only quality 6 becomes 4 when itemtype `rare` is
+/// 0; a normal request stays normal.
+// Covers: specs/items/quality.md §4 r3
+#[test]
+fn rare_override_only_for_rare() {
+    use crate::items::quality::dispatch;
+    let mut t = tables();
+    t.itemtypes[ty::HELM as usize].rare = 0;
+    let i = push_item(&mut t, item_rec(ty::HELM, b"cap "));
+    let mut it = item(i, 1);
+    let mut rq = ItemRequest {
+        quality: q::NORMAL,
+        ..Default::default()
+    };
+    assert_eq!(
+        dispatch(&t, &mut FakeGame::default(), &mut it, &mut rq),
+        Ok(true)
+    );
+    assert_eq!(it.quality, q::NORMAL);
+}
+
+/// `quality.md` §7.1: each type column fits its own types only; `weapon`
+/// and `armor` exclude the listed types.
+// Covers: specs/items/quality.md §7.1
+#[test]
+fn superior_fits_matrix() {
+    use crate::items::quality::superior_fits;
+    use crate::items::tables::QualityRec;
+    let mut t = tables();
+    let items: Vec<(u16, usize)> = [
+        AXE,
+        ty::HELM,
+        ty::SHIE,
+        ty::SCEP,
+        ty::WAND,
+        ty::STAF,
+        ty::BOW,
+        ty::XBOW,
+        ty::BOOT,
+        ty::GLOV,
+        ty::BELT,
+        RING,
+    ]
+    .into_iter()
+    .map(|tp| (tp, push_item(&mut t, item_rec(tp, b"xxx "))))
+    .collect();
+    let col = |k: usize| {
+        let mut r = QualityRec::default();
+        *[
+            &mut r.weapon,
+            &mut r.armor,
+            &mut r.shield,
+            &mut r.scepter,
+            &mut r.wand,
+            &mut r.staff,
+            &mut r.bow,
+            &mut r.boots,
+            &mut r.gloves,
+            &mut r.belt,
+        ][k] = 1;
+        r
+    };
+    t.qualityitems = (0..10).map(col).collect();
+    let fits: [&[u16]; 10] = [
+        &[AXE],
+        &[ty::HELM],
+        &[ty::SHIE],
+        &[ty::SCEP],
+        &[ty::WAND],
+        &[ty::STAF],
+        &[ty::BOW, ty::XBOW],
+        &[ty::BOOT],
+        &[ty::GLOV],
+        &[ty::BELT],
+    ];
+    for (row, want) in fits.iter().enumerate() {
+        for &(tp, i) in &items {
+            let it = item(i, 1);
+            assert_eq!(
+                superior_fits(&t, &it, row),
+                want.contains(&tp),
+                "row {row} type {tp}"
+            );
+        }
+    }
+}
+
+fn unique_row(code: &[u8; 4]) -> UniqueRec {
+    UniqueRec {
+        code: *code,
+        enabled: true,
+        rarity: 1,
+        lvl: 1,
+        props: [PropRec::NONE; 12],
+        ..Default::default()
+    }
+}
+
+/// `quality.md` §8 r2, r6: success clears only the identified flag
+/// (forced and rolled).
+// Covers: specs/items/quality.md §8 r2
+#[test]
+fn unique_clears_identified_only() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.uniques = vec![unique_row(b"rin ")];
+    for force in [true, false] {
+        let mut it = item(i, 1);
+        it.flags = flag::IDENTIFIED | flag::INIT;
+        let rq = ItemRequest {
+            force,
+            ..Default::default()
+        };
+        assert!(unique(&t, &mut FakeGame::default(), &mut it, &rq));
+        assert_eq!(it.flags, flag::INIT, "force {force}");
+        assert_eq!(it.file_index, 0);
+    }
+}
+
+/// `quality.md` §8 r3: candidates need `version` < 100 or format ≥ 100;
+/// the ladder test passes with either ladder flag.
+// Covers: specs/items/quality.md §8 r3
+#[test]
+fn unique_candidate_version_and_ladder() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    for (version, format, ok) in [
+        (99u16, 2u16, true),
+        (100, 2, false),
+        (100, 99, false),
+        (100, 100, true),
+        (0, 101, true),
+    ] {
+        let mut u = unique_row(b"rin ");
+        u.version = version;
+        t.uniques = vec![u];
+        let mut it = item(i, 1);
+        it.format = format;
+        let got = unique(
+            &t,
+            &mut FakeGame::default(),
+            &mut it,
+            &ItemRequest::default(),
+        );
+        assert_eq!(got, ok, "version {version} format {format}");
+    }
+    let mut u = unique_row(b"rin ");
+    u.ladder = true;
+    t.uniques = vec![u];
+    for (ladder, ok) in [
+        ((false, false), false),
+        ((true, false), true),
+        ((false, true), true),
+    ] {
+        let mut game = FakeGame {
+            ladder,
+            ..Default::default()
+        };
+        let mut it = item(i, 1);
+        let got = unique(&t, &mut game, &mut it, &ItemRequest::default());
+        assert_eq!(got, ok, "ladder {ladder:?}");
+    }
+}
+
+/// `quality.md` §8 r3, r5: without a preference (index 0) the pick draws.
+// Covers: specs/items/quality.md §8 r5
+#[test]
+fn unique_no_preference_draws() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.uniques = vec![unique_row(b"rin "), unique_row(b"rin ")];
+    let seed = find_seed(|s| s.roll(2) == 0);
+    let mut it = item(i, seed);
+    assert!(unique(
+        &t,
+        &mut FakeGame::default(),
+        &mut it,
+        &ItemRequest::default()
+    ));
+    assert_eq!(it.file_index, 0);
+    let mut s = Seed::init_low(seed);
+    s.roll(2);
+    assert_eq!(it.item_seed, s);
+}
+
+/// `quality.md` §8 r4: no candidate and items `unique` = 0 → file index
+/// −1, failure.
+// Covers: specs/items/quality.md §8 r4
+#[test]
+fn unique_no_candidate_file_index() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    let mut it = item(i, 1);
+    it.file_index = 5;
+    assert!(!unique(
+        &t,
+        &mut FakeGame::default(),
+        &mut it,
+        &ItemRequest::default()
+    ));
+    assert_eq!(it.file_index, -1);
+}
+
+/// `quality.md` §8.1: index 4096 is markable; a quest item ignores a set
+/// bit but not an index above 4096.
+// Covers: specs/items/quality.md §8.1
+#[test]
+fn unique_marking_bounds_and_quest() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    let mut q_rec = item_rec(RING, b"qst ");
+    q_rec.quest = 1;
+    let qi = push_item(&mut t, q_rec);
+    t.uniques = vec![unique_row(b"zzz "); 4098];
+    t.uniques[4096] = unique_row(b"rin ");
+    let mut game = FakeGame::default();
+    let mut it = item(i, 1);
+    assert!(unique(&t, &mut game, &mut it, &ItemRequest::default()));
+    assert_eq!(it.file_index, 4096);
+    assert!(game.uniques.get(4096));
+    // Quest item: bit 5 already set → still accepted and marked.
+    t.uniques[4096] = unique_row(b"zzz ");
+    t.uniques[5] = unique_row(b"qst ");
+    let mut game = FakeGame::default();
+    game.uniques.set(5);
+    let mut it = item(qi, 1);
+    assert!(unique(&t, &mut game, &mut it, &ItemRequest::default()));
+    assert_eq!(it.file_index, 5);
+    // Quest item at index 4097: accepted, but the mark fails.
+    t.uniques[5] = unique_row(b"zzz ");
+    t.uniques[4097] = unique_row(b"qst ");
+    let mut game = FakeGame::default();
+    let mut it = item(qi, 1);
+    assert!(!unique(&t, &mut game, &mut it, &ItemRequest::default()));
+    assert_eq!(it.file_index, -1);
+}
+
+/// `quality.md` §9 r1: set candidates need version < 100 or format ≥ 100.
+// Covers: specs/items/quality.md §9 r1
+#[test]
+fn set_candidate_version() {
+    use crate::items::quality::set_item;
+    use crate::items::tables::SetItemRec;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    for (version, format, ok) in [
+        (99u16, 2u16, true),
+        (100, 2, false),
+        (100, 99, false),
+        (100, 100, true),
+        (0, 101, true),
+    ] {
+        t.setitems = vec![SetItemRec {
+            item: *b"rin ",
+            version,
+            lvl: 1,
+            ..Default::default()
+        }];
+        let mut it = item(i, 1);
+        it.format = format;
+        assert_eq!(
+            set_item(&t, &mut it, &ItemRequest::default()),
+            ok,
+            "{version} {format}"
+        );
+    }
 }
