@@ -190,7 +190,8 @@ y −256..−32). No Blizzard code or decompiler output was consulted.
 1. ~~`WALL_BASE`: 0 or 80.~~ **80.** Rendered both with the CPU reference
    (`townN1.ds1`). At 80, palisade and stone walls stand on the grass. At 0,
    a black gap opens under every wall.
-2. Exact D2 draw order and shadow blending: Phase 6 rendering spec.
+2. Exact D2 draw order and shadow blending: Phase 6 rendering spec
+   (order: `render/draw-order.md`; blending: `render/blend-modes.md`).
 3. **Unflagged collision tiles.** `act1\outdoors\river.dt1` tile 28 (key
    orientation 1, main 5, sub 0) is a single-color tile (palette index 233,
    dark blue) with every sub-tile flag set to block walking: an invisible
@@ -200,5 +201,5 @@ y −256..−32). No Blizzard code or decompiler output was consulted.
    the cause: rarity-based choice (it is the only tile with that key), cell
    prop1 bits (visible fences have the same 0x81), and file selection
    (`LvlTypes` "Act 1 - Town" and `LvlPrest` Dt1Mask 959 both include
-   `River.dt1`). Next step: an RE session on the client's tile draw path to
-   find the skip condition.
+   `River.dt1`). The client's tile draw path has no such skip
+   (`render/draw-order.md` §7, its OQ7 carries the question).
