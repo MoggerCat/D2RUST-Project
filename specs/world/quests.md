@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 518–550 |
 |   8. Act transitions, warps and portals | 551–607 |
 |   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1231 |
-|   11. Acts II–V | 1232–1237 |
-| Constants & data dependencies | 1238–1252 |
-| Randomness | 1253–1271 |
-| Edge cases & original bugs | 1272–1290 |
-| Test vectors | 1291–1321 |
-| Provenance | 1322–1343 |
-| Open questions | 1344–1376 |
+|   10. Act I quests | 652–1309 |
+|   11. Acts II–V | 1310–1315 |
+| Constants & data dependencies | 1316–1330 |
+| Randomness | 1331–1349 |
+| Edge cases & original bugs | 1350–1368 |
+| Test vectors | 1369–1399 |
+| Provenance | 1400–1421 |
+| Open questions | 1422–1460 |
 <!-- /index -->
 
 ## Summary
@@ -1205,14 +1205,92 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
 
 #### 10.7 A1Q5 The Forgotten Tower (chain 5)
 
-Reading the tower tome (scroll message 127) starts the quest; entering
-the Forgotten Tower / Tower Cellar 5 advances it; the Countess's death
-sets bits 13 and 0 (granted at once, no NPC) for players in Tower Cellar 5
-and COMPLETEDNOW elsewhere in Act I, timer 7, and spawns firebolt traps
-at the tower chests (class 0x173 event 7, every 10 frames until done;
-monster/missile specs own the spawns). Town NPC messages 140–145 move a
-completed quest to state 5. (D2MOO-derived; 1.14d constants 127, 140–145,
-timer 7 confirmed.)
+Init `0x00595920`: callbacks per `quests.tsv`; active 1, status 0, state
+0, init_no 4, seq_id 3, filter 5, status fn none, active fn `0x005952C0`,
+seq fn `0x00595240`; extra 0x120 zeroed bytes, list C emptied.
+
+| Extra | Type | Field |
+|---|---|---|
+| +0x00 | 12 × u32, u16 count +0x30 | list A: players who reported the kill to a town NPC |
+| +0x34 | 12 × u32, u16 count +0x64 | list B: players credited in Tower Cellar 5 (appended only while count < 12) |
+| +0x68 | u32 list, u16 count +0x88 | chest object GUIDs for the trap step (filled outside the callbacks below) |
+| +0x8C | §9.3 GUID list | list C: players in Tower Cellar 5 at the kill |
+| +0x110, +0x114 | i32 × 2 | the Countess's death position |
+| +0x118, +0x119 | u8 | killed; trap spawned |
+| +0x11A | u8 | the next town report finishes the quest |
+| +0x11B | u8 | the tome was read before any status |
+| +0x11C | u8 | cleared by the timer |
+
+Removing from A or B swaps the last entry into the hole (`0x00594740`
+with 0 = A, else B, returns whether found).
+
+| Id | Function | Effect on one player P (slot 5) |
+|---|---|---|
+| M1 | `0x00594830` | broadcast iterate: 0x5D for chain 5 unless P has 5.0 and neither 5.13 nor 5.14 (no 5.15 test, unlike I1) |
+| M2 | `0x00594890` | if P has neither 5.0 nor 5.1: state 2 → set 5.2; state 3 → set 5.3, 5.4, 5.5, 5.6 for status 1, 2, 3, 4 (jump table `0x0059494C`); else nothing |
+| M3 | `0x00594DD0` | if P has neither 5.0 nor 5.1 and P's room's level is 25 (Tower Cellar 5): add P's GUID to list C; set 5.0, 5.13 |
+| M4 | `0x00594F10` | if P lacks 5.0 and has a room: level 25 → set 5.13, 5.0, clear 5.1, sound event 37 on P, append P's GUID to list B; other levels (any act) → set 5.14 |
+| M5 | `0x005953D0` | if P has 5.13 and a party: each member lacking 5.0 whose room's level is ≠ 0 and in Act I gets 5.13, 5.0 (`0x00595370`) |
+| M6 | `0x00595320` | if P lacks 5.0: set 5.14; `5D 05 00 0C 0000` (act 0) |
+
+1. **Event 0** `0x00594C50`: end if not-intro = 0, or R has 5.0 but not
+   5.13. If state ≥ 4, end unless the player is in list B or list A.
+   Then: in list B → add state 2. Else, R has 5.0 and 5.13 → add state 3
+   if in list A, else nothing. Else m = `0x007382AC`[state] (−1, −1, 0,
+   1, 2, 3); m ≠ −1 → add state m.
+2. **Event 3** `0x00595010` (old a, new b):
+   1. not-intro ≠ 0 and b = 20 (Forgotten Tower): state 0 → state := 2,
+      broadcast(3, 0), every player M2. Else state ≤ 3 and status = 1 →
+      broadcast(4, 0), every player M2. End.
+   2. not-intro ≠ 0 and b = 25: if state < 4 and status ≠ 2: state := 3
+      (unless 3), broadcast(2, 0), every player M2. End.
+   3. Otherwise, a = 1: state 2 and R lacks 5.0 → state := 3 (nothing
+      sent). State 5 and not-intro ≠ 0 → remove the player from list A;
+      if it was there and lists A and B are both empty, active := 0.
+3. **Event 8** `0x00595710` (the Countess's death; victim = target):
+   1. Store the victim's position at +0x110 (`0x00620870`).
+   2. If not-intro ≠ 0: callback 2 := null; state := 5; +0x11A := 1;
+      every player M4; game record 5.13; list B empty → active := 0,
+      else callback 10 := `0x00594BB0`. +0x118 := 1; callback 8 :=
+      null; game record 5.13; every player M3; `0x00595420(game, list
+      C, 5, 37)` (each listed player lacking 5.0 gets 5.13, 5.0 and
+      sound event 37); every player M5; every player M6; timer (record,
+      `0x005954C0`, period 7).
+   3. Trap step `0x005954F0` (both cases); if no trap was spawned
+      (+0x119 = 0), event 7 on the victim at frame + 10 (`0x005417D0`);
+      that event runs `0x005956C0` (trap step, then the same
+      reschedule).
+4. Timer `0x005954C0`: if state = 5, broadcast(13, 0); +0x11C := 0;
+   return 1.
+5. **Event 10** `0x00594BB0`: remove the player's GUID from list C,
+   list B and list A.
+6. **Event 11** `0x00594960` (class c, message m):
+   1. m = 127 (the tome) and not-intro ≠ 0: changed := 0. If +0x11B =
+      1: status < 1 → broadcast(1, 0), changed; status = 3 →
+      broadcast(2, 0), changed, and state := 3 if state < 3. Then state
+      < 2 → state := 2 and every player M2; else if changed, every
+      player M2.
+   2. c ∈ {154, 150, 265, 155, 148, 147} and m ∈ 140–145: if R has
+      5.13 and +0x11A ≠ 0: +0x11A := 0, state := 5, run the sequence
+      function (§10.1). Then, if the player is in list B: remove it and,
+      if list A has fewer than 12, append it to list A.
+7. **Event 13** `0x00595860`: unless R has 5.0 or 5.15: 5.4 → state 3,
+   status 1; else 5.6 → state 3, status 4; else 5.5 → state 2, status 3;
+   else 5.3 → state 3, status 1; else 5.2 → state 2, status 1.
+8. **Active** `0x005952C0`: the player is in list B and the NPC class is
+   neither 155 nor 147.
+9. **Tome operate** `0x00594E70` (object operate pointer `0x00732D30`;
+   args game, object, player, …; returns 0): if there is no object or its
+   mode is 0: mode := 1 and an object event 1 is scheduled at frame +
+   (anim length >> 8) (`0x00640E90`, `0x005417D0`). Then, if chain 5's
+   record exists with not-intro ≠ 0: `0x005456A0(player, object, 127)`
+   (opens message 127); if state ≤ 1: state := 2 and, if status < 1,
+   +0x11B := 1.
+10. **Sequence** `0x00595240`: §10.1.
+
+No quest-seed draws. The trap step's spawns (monster class 326 near each
+chest, then a missile 332 per chest, `0x0056EDE0`) are Open question 12.
+`0x00595160` and `0x00594DB0` have no direct caller in the exports.
 
 #### 10.8 A1Q6 Sisters to the Slaughter (chain 6)
 
@@ -1373,3 +1451,9 @@ monster specs). Quest-seed sites outside Act I (for later specs):
     and `0x00593710`, the portal helper `0x00592D50`, and the role of
     extra +0x4C, +0x4D, +0x4F, +0x6C/+0x70 (who sets them). Settle with a
     disassembly read of those four functions.
+12. A1Q5 trap step `0x005954F0` (Countess death, object list +0x68):
+    the spawn arguments (monster 326 mode 12 flags 8, retry at +5, +5;
+    missile 332 via `0x0056EDE0`, then `0x0064A710`, `0x0064A760`,
+    `0x0061AED0`) are read but not yet stated as rules, and who fills
+    the +0x68 list is not found (the chest object 0x173 handler, §9.5).
+    Settle with a disassembly read and a Countess-kill recording.
