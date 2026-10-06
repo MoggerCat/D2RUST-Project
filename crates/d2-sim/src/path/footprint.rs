@@ -1,0 +1,444 @@
+// Spec: specs/sim/path-placement.md §5, §6
+//! Footprints (§5): pattern and size stamps with their markers, the
+//! per-kind add and remove, mask and shape changes; moving a footprint
+//! (§6): try move, forced move, missile move and teleport.
+
+use crate::drlg::collision::bits;
+use crate::units::RoomId;
+
+use super::collision::{box_apply, find_room, pattern_value, size_value, CollisionRooms, PLUS};
+use super::record::{flags, DynamicPath, ObjectShape, PathPoint};
+use super::PathError;
+
+/// Cells of a pattern (§3): 0 the cell; 1, 3, 5 plus; 2, 4 3×3 box.
+/// `None` for any other pattern.
+fn pattern_cells(pattern: u32) -> Option<&'static [(i32, i32)]> {
+    const POINT: [(i32, i32); 1] = [(0, 0)];
+    const BOX: [(i32, i32); 9] = [
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (-1, 0),
+        (0, 0),
+        (1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
+    ];
+    match pattern {
+        0 => Some(&POINT),
+        1 | 3 | 5 => Some(&PLUS),
+        2 | 4 => Some(&BOX),
+        _ => None,
+    }
+}
+
+/// Marker of a pattern stamp (§3 table): (marker, cells).
+fn pattern_marker(pattern: u32) -> Option<(u16, &'static [(i32, i32)])> {
+    const CENTRE: [(i32, i32); 1] = [(0, 0)];
+    match pattern {
+        1 => Some((bits::NO_PATH, &CENTRE)),
+        2 => Some((bits::NO_PATH, &PLUS)),
+        3 => Some((bits::PET, &CENTRE)),
+        4 => Some((bits::PET, &PLUS)),
+        _ => None,
+    }
+}
+
+/// OR (set) or AND out (clear) `mask` on each cell (dx, dy) around
+/// (x, y). Cells are looked up from the centre's room, or from `room`
+/// when the centre has none; cells without a room are skipped (§5.1).
+// TODO(spec: path-placement.md §5.1): the room each stamped cell is
+// looked up from is not stated; this follows the queries (§4 rule 3).
+fn apply_cells<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    cells: &[(i32, i32)],
+    mask: u16,
+    set: bool,
+) {
+    let base = find_room(&*rooms, room, x, y).or(room);
+    for &(dx, dy) in cells {
+        let (cx, cy) = (x.wrapping_add(dx), y.wrapping_add(dy));
+        let Some(r) = find_room(&*rooms, base, cx, cy) else {
+            continue;
+        };
+        if let Some(m) = rooms.grid_mut(r).and_then(|g| g.get_mut(cx, cy)) {
+            if set {
+                *m |= mask;
+            } else {
+                *m &= !mask;
+            }
+        }
+    }
+}
+
+fn pattern_apply<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    pattern: u32,
+    mask: u16,
+    set: bool,
+) {
+    if room.is_none() {
+        return;
+    }
+    // TODO(spec: path-placement.md §5.1): a pattern outside 0..5 (jump
+    // tables `0x0064EB88` / `0x0064ED00`) is not specified; nothing here.
+    let Some(cells) = pattern_cells(pattern) else {
+        return;
+    };
+    apply_cells(rooms, room, x, y, cells, mask, set);
+    if mask != 0 {
+        if let Some((marker, cells)) = pattern_marker(pattern) {
+            apply_cells(rooms, room, x, y, cells, marker, set);
+        }
+    }
+}
+
+/// Pattern stamp `0x0064EA90(room, x, y, pattern, mask)` (§5.1): the
+/// pattern's cells with `mask`, then, only when `mask` ≠ 0, its marker.
+pub fn stamp_pattern<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    pattern: u32,
+    mask: u16,
+) {
+    pattern_apply(rooms, room, x, y, pattern, mask, true);
+}
+
+/// Pattern clear `0x0064EC10` (§5.1): AND out the mask (and, when the
+/// mask ≠ 0, the marker); a null room does nothing.
+pub fn clear_pattern<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    pattern: u32,
+    mask: u16,
+) {
+    pattern_apply(rooms, room, x, y, pattern, mask, false);
+}
+
+fn size_apply<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    size: i32,
+    mask: u16,
+    set: bool,
+) {
+    let cells = match size {
+        1 => pattern_cells(0),
+        2 => pattern_cells(1),
+        3 => pattern_cells(2),
+        _ => None,
+    };
+    if let Some(cells) = cells {
+        if room.is_some() {
+            apply_cells(rooms, room, x, y, cells, mask, set);
+        }
+    }
+}
+
+/// Size stamp `0x0064EA00` (§5.1): size 1 the cell, 2 plus, 3 box,
+/// others nothing; no marker.
+pub fn stamp_size<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    size: i32,
+    mask: u16,
+) {
+    size_apply(rooms, room, x, y, size, mask, true);
+}
+
+/// Size clear `0x0064EBA0` (§5.1).
+pub fn clear_size<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    size: i32,
+    mask: u16,
+) {
+    size_apply(rooms, room, x, y, size, mask, false);
+}
+
+/// The shape a unit's footprint is stamped with (§5.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FootShape {
+    /// Players and monsters: the path's pattern (+0x48).
+    Pattern(u32),
+    /// Objects: sizeX × sizeY box (`0x0064DE30` / `0x0064DC00`).
+    Box { size_x: u32, size_y: u32 },
+    /// Others: the unit size (§3).
+    Size(i32),
+}
+
+/// A unit's footprint: where and with what (§5.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Footprint {
+    pub room: Option<RoomId>,
+    pub x: i32,
+    pub y: i32,
+    pub shape: FootShape,
+    pub mask: u16,
+}
+
+impl Footprint {
+    fn apply<R: CollisionRooms + ?Sized>(&self, rooms: &mut R, set: bool) {
+        match self.shape {
+            FootShape::Pattern(p) => {
+                pattern_apply(rooms, self.room, self.x, self.y, p, self.mask, set)
+            }
+            FootShape::Box { size_x, size_y } => box_apply(
+                rooms,
+                self.room,
+                self.x,
+                self.y,
+                (size_x, size_y),
+                self.mask,
+                set,
+            ),
+            FootShape::Size(s) => size_apply(rooms, self.room, self.x, self.y, s, self.mask, set),
+        }
+    }
+}
+
+/// Footprint add `0x00649400(unit)` (§5.2): stamp at the unit's position
+/// and room with its footprint mask.
+pub fn add_footprint<R: CollisionRooms + ?Sized>(rooms: &mut R, fp: &Footprint) {
+    fp.apply(rooms, true);
+}
+
+/// Who a footprint removal is for (§5.2 remove table).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RemoveRule {
+    /// Player in `mode` (0 DT, 17 DD keep their footprint).
+    Player { mode: u32 },
+    /// Monster in `mode` (0 DT, 12 DD keep it).
+    Monster { mode: u32 },
+    /// Object in `mode`: cleared when `HasCollision[mode]` ≠ 0.
+    Object { mode: u32, shape: ObjectShape },
+    /// Missiles, items, tiles: always.
+    Other,
+}
+
+/// Footprint remove `0x00649560(unit, force)` (§5.2): clears when
+/// `force` or the type's condition holds; returns whether it cleared.
+pub fn remove_footprint<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    fp: &Footprint,
+    rule: RemoveRule,
+    force: bool,
+) -> bool {
+    let clear = force
+        || match rule {
+            RemoveRule::Player { mode } => mode != 0 && mode != 17,
+            RemoveRule::Monster { mode } => mode != 0 && mode != 12,
+            RemoveRule::Object { mode, shape } => shape.collides_in(mode),
+            RemoveRule::Other => true,
+        };
+    if clear {
+        fp.apply(rooms, false);
+    }
+    clear
+}
+
+/// Footprint mask change `0x00648C30(path, mask)` (§5.3 rule 1): clear
+/// the old footprint with the current pattern (missiles: size) and the
+/// old mask, store `mask`, stamp again.
+pub fn set_foot_mask<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    path: &mut DynamicPath,
+    is_missile: bool,
+    mask: u16,
+) {
+    let (x, y) = (path.x(), path.y());
+    if is_missile {
+        clear_size(rooms, path.room, x, y, path.unit_size, path.foot_mask);
+        path.foot_mask = mask;
+        stamp_size(rooms, path.room, x, y, path.unit_size, mask);
+    } else {
+        clear_pattern(rooms, path.room, x, y, path.pattern, path.foot_mask);
+        path.foot_mask = mask;
+        stamp_pattern(rooms, path.room, x, y, path.pattern, mask);
+    }
+}
+
+/// Pattern set `0x00649190` (§5.3 rule 2): writes +0x48, no restamp.
+pub fn set_pattern(path: &mut DynamicPath, pattern: u32) {
+    path.pattern = pattern;
+}
+
+/// Dead-body footprint (§5.3 rule 3): remove (force), pattern := 5, mask
+/// := 0x8000 through the mask change.
+pub fn make_corpse_footprint<R: CollisionRooms + ?Sized>(rooms: &mut R, path: &mut DynamicPath) {
+    let fp = Footprint {
+        room: path.room,
+        x: path.x(),
+        y: path.y(),
+        shape: FootShape::Pattern(path.pattern),
+        mask: path.foot_mask,
+    };
+    remove_footprint(rooms, &fp, RemoveRule::Other, true);
+    set_pattern(path, 5);
+    set_foot_mask(rooms, path, false, bits::CORPSE);
+}
+
+/// Try move `0x0064EDA0(room, old, new, pattern, foot, test)` (§6 rule
+/// 1): clear at old; r := pattern query at new with `test`; r ≠ 0 →
+/// stamp at old again and return r; else stamp at new and return 0.
+pub fn try_move<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    old: (i32, i32),
+    new: (i32, i32),
+    pattern: u32,
+    foot: u16,
+    test: u16,
+) -> u16 {
+    clear_pattern(rooms, room, old.0, old.1, pattern, foot);
+    let r = pattern_value(&*rooms, room, new.0, new.1, pattern, test);
+    if r != 0 {
+        stamp_pattern(rooms, room, old.0, old.1, pattern, foot);
+        r
+    } else {
+        stamp_pattern(rooms, room, new.0, new.1, pattern, foot);
+        0
+    }
+}
+
+/// Forced move `0x0064EFA0` (§6 rule 2): clear at old, stamp at new, no
+/// test; a null room does nothing.
+pub fn forced_move<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    old: (i32, i32),
+    new: (i32, i32),
+    pattern: u32,
+    foot: u16,
+) {
+    if room.is_none() {
+        return;
+    }
+    clear_pattern(rooms, room, old.0, old.1, pattern, foot);
+    stamp_pattern(rooms, room, new.0, new.1, pattern, foot);
+}
+
+/// Missile move `0x0064ED20` (§6 rule 3, size shapes): clear at old,
+/// query at new; stamp at new unless the result has 0x1 or 0x4, else at
+/// old; returns the result.
+pub fn missile_move<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room: Option<RoomId>,
+    old: (i32, i32),
+    new: (i32, i32),
+    size: i32,
+    foot: u16,
+    test: u16,
+) -> u16 {
+    clear_size(rooms, room, old.0, old.1, size, foot);
+    let r = size_value(&*rooms, room, new.0, new.1, size, test);
+    let at = if r & 0x5 == 0 { new } else { old };
+    stamp_size(rooms, room, at.0, at.1, size, foot);
+    r
+}
+
+/// What teleport needs from `sim/pathing.md` (provider: the wiring,
+/// with `path::walk`).
+pub trait PathMotion {
+    /// Set position (`0x0064FB90(Q, hint)`, pathing §9.6 rule 8) to the
+    /// cell centre of (x, y), with the room recache (rule 9) when flag
+    /// 0x1 is set, `hint` the destination room.
+    fn set_position(&mut self, path: &mut DynamicPath, x: i32, y: i32, hint: Option<RoomId>);
+    /// Movement reset (`0x006507B0`, pathing §9.7).
+    fn reset(&mut self, path: &mut DynamicPath);
+}
+
+/// Teleport `0x00650910(path, room, x, y)` (§6 rule 4), always succeeds;
+/// a non-zero point without a room is the original's fatal assert,
+/// returned as an error before any change.
+// TODO(spec: path-placement.md §6 r4): the room the clears and queries
+// use is not stated; the path's room is used, as §6 rule 1 says for
+// moves. "flags 0x8 := moved" is read as "the cell changed".
+pub fn teleport<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
+    rooms: &mut R,
+    motion: &mut M,
+    path: &mut DynamicPath,
+    is_missile: bool,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+) -> Result<(), PathError> {
+    if (x, y) != (0, 0) && room.is_none() {
+        return Err(PathError::TeleportNoRoom { x, y });
+    }
+    let old = (path.x(), path.y());
+    let zero = (x, y) == (0, 0);
+    if is_missile {
+        if zero {
+            clear_size(
+                rooms,
+                path.room,
+                old.0,
+                old.1,
+                path.unit_size,
+                path.foot_mask,
+            );
+        } else {
+            let moved = old != (x, y);
+            path.flags = (path.flags & !flags::MOVED) | if moved { flags::MOVED } else { 0 };
+            path.collided_mask =
+                size_value(&*rooms, path.room, x, y, path.unit_size, path.move_mask);
+            clear_size(
+                rooms,
+                path.room,
+                old.0,
+                old.1,
+                path.unit_size,
+                path.foot_mask,
+            );
+            stamp_size(rooms, path.room, x, y, path.unit_size, path.foot_mask);
+            path.saved_count = 1;
+            path.saved_steps[0] = PathPoint {
+                x: x as u16,
+                y: y as u16,
+            };
+        }
+    } else if zero {
+        clear_pattern(rooms, path.room, old.0, old.1, path.pattern, path.foot_mask);
+    } else {
+        forced_move(rooms, path.room, old, (x, y), path.pattern, path.foot_mask);
+    }
+    if room != path.room {
+        path.flags |= flags::OUTSIDE_ROOM;
+    }
+    motion.set_position(path, x, y, room);
+    motion.reset(path);
+    Ok(())
+}
+
+/// `0x00650BE0`: teleport, then point count := 0.
+pub fn teleport_and_clear<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
+    rooms: &mut R,
+    motion: &mut M,
+    path: &mut DynamicPath,
+    is_missile: bool,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+) -> Result<(), PathError> {
+    teleport(rooms, motion, path, is_missile, room, x, y)?;
+    path.point_count = 0;
+    Ok(())
+}
