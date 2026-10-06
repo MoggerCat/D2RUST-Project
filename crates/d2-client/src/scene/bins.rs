@@ -61,6 +61,7 @@ pub fn bin<F: FrameSource + ?Sized>(
     maps: &MapTable,
     view: Rect,
 ) -> Result<Bins, SceneError> {
+    view.check_view()?;
     let cols = view.width.div_ceil(BIN_SIZE);
     let rows = view.height.div_ceil(BIN_SIZE);
     let mut lists = vec![Vec::new(); cols as usize * rows as usize];
