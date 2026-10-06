@@ -530,6 +530,12 @@ const OBJECT: u32 = 2;
 /// bottom-up DC6) at subtile (163, 93), a floor and a wall tile on cell
 /// (26, 18) and a floor on cell (0, 0) (culled).
 fn golden_scene() -> (ClientWorld, ViewAssets, Scene) {
+    golden_scene_with(one(filled(3, 2, 5, 10, 6).with_anchor(FrameAnchor::Bottom)))
+}
+
+/// [`golden_scene`] with the object's frame set given (the frame store
+/// takes each key once).
+fn golden_scene_with(object: FrameSet) -> (ClientWorld, ViewAssets, Scene) {
     let mut world = ClientWorld::default();
     for (unit_type, guid) in [(0, PLAYER), (2, OBJECT)] {
         let key = UnitKey { unit_type, guid };
@@ -538,18 +544,18 @@ fn golden_scene() -> (ClientWorld, ViewAssets, Scene) {
     let mut assets = ViewAssets::new(palette());
     assets.cofs.insert(CanonicalPath::new(COF).unwrap(), cof());
     assets
-        .sets
-        .insert(unit_key(PLAYER), one(filled(8, 20, -4, -20, 5)));
-    assets.sets.insert(
-        unit_key(OBJECT),
-        one(filled(3, 2, 5, 10, 6).with_anchor(FrameAnchor::Bottom)),
-    );
+        .frames
+        .insert(unit_key(PLAYER), one(filled(8, 20, -4, -20, 5)))
+        .unwrap();
+    assets.frames.insert(unit_key(OBJECT), object).unwrap();
     assets
-        .sets
-        .insert(tile_key("floor"), one(filled(4, 2, 80, 0, 3)));
+        .frames
+        .insert(tile_key("floor"), one(filled(4, 2, 80, 0, 3)))
+        .unwrap();
     assets
-        .sets
-        .insert(tile_key("wall"), one(filled(2, 2, 64, -64, 4)));
+        .frames
+        .insert(tile_key("wall"), one(filled(2, 2, 64, -64, 4)))
+        .unwrap();
     let wall_block = BlockRect {
         x: 64,
         y: -64,
@@ -576,7 +582,7 @@ fn compose(world: &ClientWorld, assets: &ViewAssets, scene: &Scene, player: Clie
     for item in &frame.items {
         assert_eq!(item.clip, Rect::FRAME);
     }
-    scene::compose(&frame.items, &frame.frames.bind(assets), &assets.maps, VIEW).unwrap()
+    scene::compose(&frame.items, &assets.frames, &assets.maps, VIEW).unwrap()
 }
 
 fn paint(buf: &mut [u8], x: i32, y: i32, w: i32, h: i32, v: u8) {
@@ -687,12 +693,10 @@ fn wall_blocks_culled_in_mode_2() {
 // Covers: specs/render/sprite-placement.md §4
 #[test]
 fn a_cut_top_down_unit_cel_is_an_error() {
-    let (world, mut assets, mut scene) = golden_scene();
-    // The object's frame becomes top-down near the top edge: rows cut.
-    assets.sets.insert(
-        unit_key(OBJECT),
-        one(filled(3, 20, 0, -340, 6).with_anchor(FrameAnchor::TopDown)),
-    );
+    // The object's frame is top-down near the top edge: rows cut.
+    let (world, assets, mut scene) = golden_scene_with(one(
+        filled(3, 20, 0, -340, 6).with_anchor(FrameAnchor::TopDown)
+    ));
     scene.tiles.clear();
     let view = OriginalView::new(camera(0, pos(1000, 2000)), &Fixture, &scene);
     let err = world_view::build(&world, &[], &view, &assets).unwrap_err();
