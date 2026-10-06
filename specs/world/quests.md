@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 518–550 |
 |   8. Act transitions, warps and portals | 551–607 |
 |   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–935 |
-|   11. Acts II–V | 936–941 |
-| Constants & data dependencies | 942–956 |
-| Randomness | 957–975 |
-| Edge cases & original bugs | 976–994 |
-| Test vectors | 995–1020 |
-| Provenance | 1021–1042 |
-| Open questions | 1043–1069 |
+|   10. Act I quests | 652–1074 |
+|   11. Acts II–V | 1075–1080 |
+| Constants & data dependencies | 1081–1095 |
+| Randomness | 1096–1114 |
+| Edge cases & original bugs | 1115–1133 |
+| Test vectors | 1134–1159 |
+| Provenance | 1160–1181 |
+| Open questions | 1182–1208 |
 <!-- /index -->
 
 ## Summary
@@ -869,21 +869,160 @@ No draws. 0x50 and 0x5D carry `left` while the status ≠ 0 (§6.2,
 
 #### 10.5 A1Q2 Sisters' Burial Grounds (chain 2) and A1Q3 Tools of the Trade (chain 3)
 
-- A1Q2 follows §10.1 with kashya messages 81 (start) and 92 (reward)
-  (both confirmed in `0x00590980`), area = the Burial Grounds level
-  (D2MOO 17), Blood Raven's kill setting bits 13 and 1
-  for players in her room or an adjacent room (D2MOO
-  `ACT1Q2_UnitIterate_SetRewardPending`), sound 34, timer 15. The reward
-  does not clear bits 2–11 (D2MOO and 1.14d agree).
-- A1Q3: charsi message 146 starts (state 2); the Malus object (operate
-  `0x00591AC0`): if chain 3 is not-intro and the player has neither 3.0
-  nor 3.1 and character level (stat 12) ≥ 8, drop item `hdm ` (normal
-  quality, `0x00559A30`) at the object, set it opened, count it in the
-  extra data, state 4; if level < 8 only a sound is played and nothing
-  drops (D2MOO 1.10f drops anyway). Message 163 while carrying `hdm `:
-  bits 13, 1, delete the Malus, party members get bits 13, 1, state 5,
-  game 3.13, seq fn. The imbue itself is an NPC menu action
-  (`world/npc.md`); it calls `0x00591790` (set 3.0, clear 3.1).
+**A1Q2.** Init `0x00591210`: callbacks per `quests.tsv`; active 1, state
+0, init_no 4, seq_id 4, filter 2, status fn none, active fn
+`0x00591080`, seq fn `0x005910F0`; extra 0x0C bytes: +0 u8 killed, +1 u8,
++2 u8 (both set on the kill), +3 u8 talked, +4 u32 (set to 1 on the
+kill; not initialized, never read by chain 2), +8 u32 victim GUID; init
+zeroes +0..+3 and +8.
+
+| Id | Function | Effect on one player P (slot 2, chain 2) |
+|---|---|---|
+| J1 | `0x00590830` | broadcast iterate: as I1 (§10.4) for slot 2, 0x5D for chain 2 |
+| J2 | `0x00590890` | as I2 for slot 2 and chain 2's state / status |
+| J3 | `0x00590C40` | chain 2's record (lookup fatal if absent); end unless extra +2 ≠ 0; V = the monster with GUID extra +8 (`0x00552F60`, type 1), fatal if V is missing; end if P has no room; near := P's room is V's room, or V's room (none when V has no room) is in P's room's room list (`0x00619790`, `drlg/rooms.md` §10.4); if P has neither 2.0 nor 2.1 and near: set 2.13, then 2.1 |
+| J4 | `0x00590D60` | party member: as `0x00590120` (§10.4 I3) for slot 2 |
+| J5 | `0x00590DD0` | if P has neither 2.0 nor 2.1: set 2.14; `5D 02 00 0C 0000` (`0x00545920`, act 0); no 0x28 |
+| J6 | `0x00590E30` | if P has 2.13: sound event 34 on P, target P |
+| J7 | `0x00590E70` | if P has 2.13 and a party: J4 for each member (as I3) |
+
+1. **Event 0** `0x00590B10`: R has 2.1 → add state 3; else player GUID
+   in the record's list → add state 4; else if state ≠ 0, R lacks 2.0
+   and state < 4: m = `0x00737180`[state] (−1, 0, 1, 2); m ≠ −1 → add
+   state m. No not-intro test.
+2. **Event 2** `0x00590920`: target class 150 (kashya) and talked = 1:
+   broadcast(1, 0); talked := 0; callback 2 := null; every player J2.
+3. **Event 3** `0x00590FA0` (old a, new b): if b = 17 (Burial Grounds,
+   1.14d constant) and not-intro = 1: changed := (state < 3, so also
+   from state 0); if so state := 3, flags := 0. If status ≤ 1:
+   status 2 through J1 (flags as they are), then every player J2. Else
+   if changed: every player J2. Otherwise (b ≠ 17 or not-intro ≠ 1),
+   if a = 1: remove the player's GUID from a non-empty record list
+   (`0x00545310`); if state = 2 and R lacks 2.0 and 2.1: state := 3,
+   every player J2 (no status message).
+4. **Event 8** `0x00590EC0` (any monster with a chain-2 link; the killer
+   is not read): end if not-intro = 0. state := 4; extra +1 := 1, +2 :=
+   1, +8 := victim GUID (−1 if none). Every player J3, then J7, then J5,
+   then J6 (arg = the victim). Timer (record, `0x00590BF0`, period 15).
+   callback 2 := null; killed := 1; extra +4 := 1; game record 2.13.
+   Callback 8 stays: a second linked death repeats all of it.
+5. Timer `0x00590BF0`: broadcast(3, 0); return 1 (runs once).
+6. **Event 10** `0x00590C10`: remove the player's GUID from the record's
+   list.
+7. **Event 11** `0x00590980` (only class 150): message 81: talked := 1;
+   state := 2 (no guard); every player J2; refresh text. Message 92 with
+   R 2.1: if R has 2.13 and state ≠ 5: flags := 0, status(13), state :=
+   5, run the sequence function (§10.1). Then (always) set 2.0, clear
+   2.1, 0x28 to the player, add its GUID to the record's list, Kashya's
+   mercenary (`world/npc.md` §7.5, `0x00579180(game, player, 150)`),
+   refresh text. Bits 2–11 stay; callback 2 is not cleared.
+8. **Event 13** `0x00591180`: §10.1 restore, slot 2.
+9. **Active** `0x00591080`: as A1Q1's (§10.4) with class 150 and slot 2.
+
+**A1Q3.** Init `0x00591F70`: callbacks per `quests.tsv`; active 1, state
+0, init_no 5, seq_id 6, filter 3, status fn `0x00591D30`, active fn
+`0x00591C30`, seq fn `0x00591E40`; extra 0xA4 zeroed bytes, GUID list at
++0x14 emptied.
+
+| Extra | Type | Field |
+|---|---|---|
+| +0x01 | u8 | Malus object known (set by the object init and the drop) |
+| +0x02 | u8 | talked: message 146 given, chat end not yet handled |
+| +0x03 | u8 | rewarded: message 163 finished the quest, chat end not yet handled |
+| +0x04 | u32 | Malus object GUID |
+| +0x08 | u8 | cleared by `0x005918D0` |
+| +0x14 | GUID list (count u16 +0x94) | players who brought the Malus (message 163) |
+| +0x98 | i32 | Malus object mode to restore: 2 = the Malus was taken |
+| +0x9C | i32 | Malus items in the game (players carrying `hdm `) |
+| +0xA0 | u8 | scratch for the party test of the status fn |
+| +0xA1 | u8 | a player started the game carrying `hdm ` |
+
+"has hdm" = the player has an item with code `hdm ` (`0x00558110`);
+"level" = the player's base stat 12 (`0x006253B0`, layer 0).
+
+| Id | Function | Effect on one player P (slot 3) |
+|---|---|---|
+| K1 | `0x005912E0` | broadcast iterate: as I1 for slot 3, 0x5D for chain 3 |
+| K2 | `0x00591340` | if P has neither 3.0 nor 3.1: chain 3 state 2 → set 3.2; state 3 or 4 → set 3.3 |
+| K3 | `0x00591430` | party member: if it has neither 3.0 nor 3.1 and level ≥ 8: set 3.13, 3.1 |
+| K4 | `0x00591CD0` | true if P has hdm; else, with a party, extra +0xA0 := 0, each member with hdm sets it to 1 (`0x00591CA0`), true iff +0xA0 ≠ 0; no party → false |
+
+1. **Object init** (Malus object; pointer at `0x00731BFC` →
+   `0x00544950`): if chain 3's record exists (`0x00592090`): Malus known
+   := 1, GUID := the object's; if not-intro = 0, extra +0x98 := 2; object
+   mode := extra +0x98 (`0x00624690`). Without the record: object mode
+   := 2 unless it is 2 already.
+2. **Operate** `0x00591AC0` (pointer at `0x00732D6C`; args game, object,
+   player; returns 0):
+   1. No chain 3 record → end. mode = the object's mode (+0x10; 0 when
+      no object).
+   2. not-intro = 0: object mode := 2; sound event 19 on the player. End.
+   3. mode ≠ 0, or R has 3.0 or 3.1 → end.
+   4. Level < 8: sound event 19 on the player. End (nothing drops).
+   5. Object drop code (+0xB8) := `hdm `; drop at the object
+      (`0x00559A30(game, object, 2, &out, 0, −1, 0)`, items spec); failed
+      → end.
+   6. Object mode := 2; Malus known := 1; +0x98 := 2; +0x9C += 1; GUID
+      := the object's.
+   7. If state ≠ 4: state := 4; every player K2.
+   8. If status ≠ 1: flags := 0; status(1) (nothing sent).
+3. **Event 0** `0x005916A0`: end if R has 3.0 but not 3.13. If the
+   player has hdm: if level ≥ 8 and R lacks 3.0, add state 3. Else: end
+   if R has 3.0 or state is 0 or 4; m = `0x00737630`[state] (−1, 0, 1,
+   2, 3, 4); m ≠ −1 → add state m.
+4. **Event 2** `0x005913C0` (target class 154, charsi): if talked = 1:
+   every player K2, broadcast(1, 0), talked := 0. Else if rewarded = 1:
+   broadcast(13, 0), rewarded := 0.
+5. **Event 3** `0x00591810`: not-intro = 0 → callback 3 := null, end. If
+   a = 1, state = 2 and R lacks 3.0 and 3.1: if status ≠ 1,
+   broadcast(1, 0); state := 3; every player K2; callback 3 := null.
+6. **Event 4** `0x00591960` (item picked up, along the item's chain, so
+   only while the record is active, §4.3): if R lacks 3.6: set 3.6,
+   sound event 36 on the player. Then broadcast(2, 0).
+7. **Event 6** `0x00591A90` (never raised in 1.14d, §4.1): if
+   not-intro ≠ 0: +0x9C −= 1; if it reaches 0 and +0x98 = 2: reset
+   (`0x005918D0`, below).
+8. **Event 9** `0x00591A20` (a player leaves with the Malus): if
+   not-intro ≠ 0 and state ≠ 5: +0x9C −= 1; if it reaches 0, Malus
+   known ≠ 0 and +0x98 = 2: broadcast(3, 0).
+9. **Event 10** `0x00591A60`: remove the player's GUID from the +0x14
+   list.
+10. **Event 11** `0x00591490` (only class 154):
+    1. Message 146: state := 2 (no guard); talked := 1; refresh text.
+    2. Message 163: end if R has 3.0 (no refresh). Add the player's GUID
+       to the +0x14 list. Without hdm: refresh text, end. With hdm: set
+       3.13, 3.1; 0x28 to the player; delete its `hdm ` (§9.2); +0x9C
+       −= 1; with a party, K3 for each member. Then, if not-intro ≠ 0:
+       if state = 4: state := 5, rewarded := 1, game record 3.13, run
+       the sequence function (§10.1); else if +0xA1 ≠ 0 and the
+       `seq_id` record (6) exists: run that record's sequence function
+       (§10.8). Refresh text.
+    3. Other messages: nothing.
+11. **Event 13** `0x00591ED0`: if the player has hdm: +0x9C += 1, +0xA1
+    := 1. Then unless R has 3.0 or 3.15: 3.2 → state 2, status 1; else
+    3.3 → state 3, status 1.
+12. **Event 14** `0x005919D0` (player joins): if the player has hdm,
+    not-intro ≠ 0 and state ≠ 5: +0x9C += 1; if it is now 1, Malus
+    known ≠ 0 and +0x98 = 2: status := 2 (nothing sent).
+13. **Status** `0x00591D30` (writes out, always returns 1): out := 0; R has 3.1 → 10. Else K4 true → 2 if R lacks
+    3.0, else 0. Else not-intro = 0 → 0. Else R has 3.13 → 13; R has
+    3.14 → 12; state < 5 → the status byte; else game record 3.13 →
+    (level ≥ 8 ? 12 : 4); else 0.
+14. **Active** `0x00591C30`: true iff class 154, R lacks 3.0, and either
+    (state = 1 and R lacks 3.1) or (level ≥ 8 and the player has hdm).
+15. **Reset** `0x005918D0` (from event 6 only): returns 0 if not-intro
+    = 0. +0x98 := 0; end (0) if Malus known = 0. state := 3; flags := 1;
+    status 1 through K1; +0x08 := 0. The object with the stored GUID
+    (`0x00552F60` type 2) of class 108: mode := 0, return 1; else Malus
+    known := 0, return 1.
+16. **Imbue granted** `0x00591790` (from the NPC imbue, `world/npc.md`):
+    set 3.0, clear 3.1; if R lacks 3.15: chain 3's record (fatal if
+    absent) gets active := 0.
+17. **Sequence** `0x00591E40`: §10.1.
+
+No draws in A1Q2 or A1Q3 (the Malus drop draws from the item seeds,
+items spec). The Malus needs level 8 in 1.14d (D2MOO 1.10f drops it at
+any level).
 
 #### 10.6 A1Q4 The Search for Cain (chain 4)
 
