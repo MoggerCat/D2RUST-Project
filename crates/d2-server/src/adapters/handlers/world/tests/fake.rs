@@ -337,7 +337,7 @@ impl NpcLink for Fake {
         false
     }
     fn set_hire_list_made(&mut self, _: u16) {}
-    fn make_hire_list(&mut self, _: u16) {}
+    fn make_hire_list(&mut self, _: u16, _: &mut d2_sim::rng::Seed) {}
 }
 
 impl VendorWorld for Fake {
