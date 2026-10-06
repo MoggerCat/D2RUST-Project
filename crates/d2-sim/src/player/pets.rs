@@ -1,0 +1,533 @@
+// Spec: specs/sim/pets.md
+//! Player pet lists: one list per `pettype.txt` row (§1), add with group
+//! eviction and trimming (§2–§5), remove / unlink (§6), dismiss (§7), the
+//! 0x7A / 0x81 broadcast (§8) and the GUID lookup (§9).
+//!
+//! Everything outside the lists (units, monstats, kill, mode requests,
+//! messages, the resync `0x00575900`) is reached through [`PetWorld`]. The
+//! lists themselves are owned by the world (player data +0x44) and borrowed
+//! through [`PetWorld::pet_lists`] again after every world call, the way the
+//! original re-reads its entry pointer's fields.
+//!
+//! Fatal assertions of the original are returned as [`PetError`] instead
+//! of aborting. The state may already be changed when one is returned.
+
+use std::fmt::Debug;
+
+#[cfg(test)]
+#[path = "pets_tests.rs"]
+mod tests;
+
+/// Pet type 1 `single`: its maximum is only ever 1 (§4 rule 2).
+pub const PETTYPE_SINGLE: i32 = 1;
+/// Pet type 7 `hireable`: never trimmed by §4 (§4 rule 3).
+pub const PETTYPE_HIREABLE: i32 = 7;
+/// Unit flag (+0xC4) cleared when a pet is unlinked without a kill (§6).
+pub const FLAG_PET: u32 = 0x8000_0000;
+/// Unit flag (+0xC4) set on a dismissed pet: no experience (§7).
+pub const FLAG_NO_EXPERIENCE: u32 = 0x0400_0000;
+/// The player state that skips the broadcast (§8).
+pub const STATE_NO_BROADCAST: u16 = 7;
+/// Message id of S→C PetAction (§8).
+pub const MSG_PET_ACTION: u8 = 0x7A;
+/// Message id of S→C AssignMerc (§8).
+pub const MSG_ASSIGN_MERC: u8 = 0x81;
+/// Node flags bit 0: skipped by [`first_pet`] with `any` = false (§1 rule 3).
+pub const NODE_SKIP: u32 = 1;
+
+/// Fatal assertions of the original, returned instead of aborting.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum PetError {
+    /// `0x006221A0(player)` returned none (§1 rule 1).
+    #[error("player data missing")]
+    NoPlayerData,
+    /// Any other fatal assertion; the text names the step.
+    #[error("pet list assertion: {0}")]
+    Fatal(&'static str),
+}
+
+/// One pet node (0x18 bytes, §1 rule 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PetNode {
+    /// +0x00; bit 0 ([`NODE_SKIP`]) is skipped by [`first_pet`] with `any` = false.
+    pub flags: u32,
+    /// +0x04 pet GUID (−1 for none).
+    pub guid: i32,
+    /// +0x08, +0x0C, +0x10 caller values (0 from §2; pets.md Open question 4).
+    pub extra: [i32; 3],
+}
+
+/// One 12-byte list entry per pet type (§1 rule 2).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PetEntry {
+    /// The list: index 0 is the head (oldest), the last is the tail (newest).
+    pub nodes: Vec<PetNode>,
+    /// +0x04 count. Kept as its own field like the original, not `nodes.len()`.
+    pub count: i32,
+    /// +0x08 max.
+    pub max: i32,
+}
+
+impl PetEntry {
+    /// The head's GUID, −1 without a head (`0x005747B0`).
+    pub fn head_guid(&self) -> i32 {
+        head_guid(self)
+    }
+}
+
+/// The pet lists P (player data +0x44, §1 rule 2): one entry per `pettype`
+/// row.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PetLists {
+    pub entries: Vec<PetEntry>,
+}
+
+impl PetLists {
+    /// `pettype_count` empty entries with count 0 and max 0.
+    ///
+    /// Who sets the initial max (from `basemax`) is pets.md Open question 1.
+    pub fn new(pettype_count: usize) -> Self {
+        Self {
+            entries: vec![PetEntry::default(); pettype_count],
+        }
+    }
+
+    /// One empty entry per value of `max`, with that max. The caller (player
+    /// init, pets.md Open question 1) decides the values.
+    pub fn with_max(max: &[i32]) -> Self {
+        Self {
+            entries: max
+                .iter()
+                .map(|&max| PetEntry {
+                    nodes: Vec::new(),
+                    count: 0,
+                    max,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// The add record handed to the broadcast (§2 step 6, §8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AddRecord {
+    /// Pet GUID (−1 none).
+    pub pet_guid: i32,
+    /// The player's GUID.
+    pub owner_guid: i32,
+    /// Pet class (0xFFFF none).
+    pub class: u16,
+    /// Pet type t.
+    pub pet_type: i32,
+    /// Record +0x10: both it and `x14` 0 → 0x7A, else 0x81 (§8).
+    pub x10: i32,
+    /// Record +0x14 (§8).
+    pub x14: i32,
+}
+
+/// A message the broadcast sends to one player's client (§8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PetMsg {
+    /// S→C 0x7A PetAction (13 bytes).
+    PetAction {
+        /// 1 add, 0 remove.
+        action: u8,
+        pet_type: u8,
+        class: u16,
+        owner: u32,
+        pet: u32,
+    },
+    /// S→C 0x81 AssignMerc (`0x0053CB80`); its layout belongs to the
+    /// hireling spec, so the add record is carried as is.
+    AssignMerc { record: AddRecord },
+}
+
+impl PetMsg {
+    /// The 0x7A wire bytes (§8 layout); `None` for 0x81, whose layout the
+    /// hireling spec owns.
+    pub fn bytes(&self) -> Option<[u8; 13]> {
+        match *self {
+            PetMsg::PetAction {
+                action,
+                pet_type,
+                class,
+                owner,
+                pet,
+            } => {
+                let mut b = [0u8; 13];
+                b[0] = MSG_PET_ACTION;
+                b[1] = action;
+                b[2] = pet_type;
+                b[3..5].copy_from_slice(&class.to_le_bytes());
+                b[5..9].copy_from_slice(&owner.to_le_bytes());
+                b[9..13].copy_from_slice(&pet.to_le_bytes());
+                Some(b)
+            }
+            PetMsg::AssignMerc { .. } => None,
+        }
+    }
+}
+
+/// The world outside the pet lists.
+pub trait PetWorld {
+    type Unit: Copy + Eq + Debug;
+
+    /// Unit type 0 (player).
+    fn is_player(&self, u: Self::Unit) -> bool;
+    /// `0x006221A0(player)` returns player data (false → fatal assertion).
+    fn has_player_data(&self, player: Self::Unit) -> bool;
+    /// Player data +0x44: the pet lists, `None` when P is null. Only called
+    /// when [`has_player_data`](Self::has_player_data) is true.
+    fn pet_lists(&mut self, player: Self::Unit) -> Option<&mut PetLists>;
+    /// `pettype.txt` row count (data tables +0xBF0).
+    fn pettype_count(&self) -> i32;
+    /// `group` (+0x08, read as i16) of `pettype` row `t`, 0 ≤ t < count.
+    fn pettype_group(&self, t: i32) -> i16;
+    /// The monster of a GUID, `0x00552F60(game, 1, GUID)`.
+    fn monster_by_guid(&self, guid: i32) -> Option<Self::Unit>;
+    /// Unit GUID.
+    fn unit_guid(&self, u: Self::Unit) -> i32;
+    /// Unit class id (monstats row for a monster).
+    fn unit_class(&self, u: Self::Unit) -> u16;
+    /// Unit +0xC8 bit 8 (0x100) set.
+    fn flag_c8_bit8(&self, u: Self::Unit) -> bool;
+    /// Unit flags (+0xC4).
+    fn unit_flags(&self, u: Self::Unit) -> u32;
+    /// Writes the unit flags (+0xC4).
+    fn set_unit_flags(&mut self, u: Self::Unit, flags: u32);
+    /// The unit's monstats has `killable` (+0x0D bit 7).
+    fn killable(&self, u: Self::Unit) -> bool;
+    /// Kill `0x0057CCB0(game, unit, 0, 0)` (`combat/damage.md` §7.2).
+    fn kill(&mut self, u: Self::Unit);
+    /// The unit's owner (`0x00552FD0`).
+    fn owner(&self, u: Self::Unit) -> Option<Self::Unit>;
+    /// Mode request 0 (death) for `u` with `target`
+    /// (`0x005A7E60`, `0x005A7C20(game, &req, 1)`).
+    fn request_death_mode(&mut self, u: Self::Unit, target: Option<Self::Unit>);
+    /// The resync `0x00575900(game, player)` (pets.md Open question 2); it
+    /// may change entry maxima through [`pet_lists`](Self::pet_lists).
+    fn resync(&mut self, player: Self::Unit);
+    /// Every player of the game in player-list order (`sim/unit-order.md` §2).
+    fn players(&self) -> Vec<Self::Unit>;
+    /// The unit has state `state`.
+    fn has_state(&self, u: Self::Unit, state: u16) -> bool;
+    /// Sends `msg` to the client of `client_player`.
+    fn send(&mut self, client_player: Self::Unit, msg: PetMsg);
+}
+
+/// Entry `t` of the player's lists: `None` for P null or t out of
+/// 0…pettype count − 1 (`0x00574540`). Player data must be present.
+fn entry<W: PetWorld>(w: &mut W, player: W::Unit, t: i32) -> Option<&mut PetEntry> {
+    if t < 0 || t >= w.pettype_count() {
+        return None;
+    }
+    w.pet_lists(player)?.entries.get_mut(t as usize)
+}
+
+fn require_data<W: PetWorld>(w: &W, player: W::Unit) -> Result<(), PetError> {
+    if w.has_player_data(player) {
+        Ok(())
+    } else {
+        Err(PetError::NoPlayerData)
+    }
+}
+
+/// The head's GUID, −1 without a head (`0x005747B0`).
+pub fn head_guid(entry: &PetEntry) -> i32 {
+    entry.nodes.first().map_or(-1, |n| n.guid)
+}
+
+/// The first pet of type `t` (`0x00574EC0(game, player, t, any)`): the
+/// first node from the head (with `any` false: the first node whose flags
+/// bit 0 is clear) and its monster (`0x00552F60`). `None` when the player
+/// data, P, the entry, the node or its unit is missing.
+pub fn first_pet<W: PetWorld>(w: &mut W, player: W::Unit, t: i32, any: bool) -> Option<W::Unit> {
+    if !w.has_player_data(player) {
+        return None;
+    }
+    let guid = entry(w, player, t)?
+        .nodes
+        .iter()
+        .find(|n| any || n.flags & NODE_SKIP == 0)?
+        .guid;
+    w.monster_by_guid(guid)
+}
+
+/// Add `0x00575D90(game, player, pet, t, max)` (§2).
+pub fn add<W: PetWorld>(
+    w: &mut W,
+    player: Option<W::Unit>,
+    pet: Option<W::Unit>,
+    t: i32,
+    max: i32,
+) -> Result<(), PetError> {
+    // Step 1.
+    let Some(player) = player else { return Ok(()) };
+    if !w.is_player(player) || t < 1 || t >= w.pettype_count() {
+        return Ok(());
+    }
+    // Steps 2, 3.
+    group_evict(w, player, t)?;
+    set_max(w, player, t, max)?;
+    // Step 4.
+    if !w.has_player_data(player) || entry(w, player, t).is_none() {
+        return Ok(());
+    }
+    // Step 5.
+    if !append(w, player, t, pet, [0; 3])? {
+        return Ok(());
+    }
+    // Step 6. The record's +0x10 / +0x14 are not set by §2; narrowest
+    // reading: 0, so the add path always sends 0x7A.
+    // TODO(pets.md OQ4): confirm with the hireling caller.
+    let record = AddRecord {
+        pet_guid: pet.map_or(-1, |p| w.unit_guid(p)),
+        owner_guid: w.unit_guid(player),
+        class: pet.map_or(0xFFFF, |p| w.unit_class(p)),
+        pet_type: t,
+        x10: 0,
+        x14: 0,
+    };
+    broadcast_add(w, &record);
+    Ok(())
+}
+
+/// Group eviction `0x00575720(t)` (§3): removes, with kill, every pet of
+/// the other types of `t`'s `group`, in row order, each list from its head
+/// until a head's unit is missing (edge case 3).
+pub fn group_evict<W: PetWorld>(w: &mut W, player: W::Unit, t: i32) -> Result<(), PetError> {
+    let g = w.pettype_group(t);
+    if g <= 0 {
+        return Ok(());
+    }
+    for u in 0..w.pettype_count() {
+        if u == t || w.pettype_group(u) != g {
+            continue;
+        }
+        let mut k = first_pet(w, player, u, true);
+        while let Some(unit) = k {
+            let guid = w.unit_guid(unit);
+            remove(w, player, guid, true)?;
+            k = first_pet(w, player, u, true);
+        }
+    }
+    Ok(())
+}
+
+/// Set the maximum `0x00575850(game, player, t, max)` (§4): trims the list
+/// from its head while it holds more than `max` (never the hirelings).
+pub fn set_max<W: PetWorld>(w: &mut W, player: W::Unit, t: i32, max: i32) -> Result<(), PetError> {
+    require_data(w, player)?;
+    if t == PETTYPE_SINGLE && max != 1 {
+        return Ok(());
+    }
+    let Some(e) = entry(w, player, t) else {
+        return Ok(());
+    };
+    e.max = max;
+    loop {
+        let Some(e) = entry(w, player, t) else {
+            return Ok(());
+        };
+        if !(max < e.count && e.count > 0 && t != PETTYPE_HIREABLE) {
+            return Ok(());
+        }
+        let guid = head_guid(e);
+        remove(w, player, guid, true)?;
+    }
+}
+
+/// Append `0x00575C70(pet, extra)` to entry `t` (§5). Returns whether the
+/// pet was linked (the original's 1 / 0).
+pub fn append<W: PetWorld>(
+    w: &mut W,
+    player: W::Unit,
+    t: i32,
+    pet: Option<W::Unit>,
+    extra: [i32; 3],
+) -> Result<bool, PetError> {
+    let pet_guid = pet.map_or(-1, |p| w.unit_guid(p));
+    // The original receives the entry pointer itself (§2 step 4 checked
+    // it); a missing entry is a caller error here, not a rule.
+    let e = entry(w, player, t).ok_or(PetError::Fatal("append: no entry"))?;
+    // Rule 1.
+    if e.max == 0 {
+        w.resync(player);
+        // TODO(pets.md OQ2): the resync's effect is unknown; an entry that
+        // vanished is read as still 0 (narrowest reading).
+        let max = entry(w, player, t).map_or(0, |e| e.max);
+        if max == 0 {
+            dismiss(w, pet_guid)?;
+            return Ok(false);
+        }
+    }
+    // Rule 2.
+    let e = entry(w, player, t).ok_or(PetError::Fatal("append: no entry"))?;
+    if e.count == e.max {
+        if e.nodes.is_empty() {
+            return Err(PetError::Fatal("append: full list without a head"));
+        }
+        let head = head_guid(e);
+        unlink(w, player, t, head, true)?;
+        let e = entry(w, player, t).ok_or(PetError::Fatal("append: no entry"))?;
+        if e.count == e.max {
+            return Err(PetError::Fatal("append: still full after unlink"));
+        }
+    }
+    // Rule 3.
+    let e = entry(w, player, t).ok_or(PetError::Fatal("append: no entry"))?;
+    e.nodes.push(PetNode {
+        flags: 0,
+        guid: pet_guid,
+        extra,
+    });
+    e.count += 1;
+    if e.count > e.max {
+        return Err(PetError::Fatal("append: count above max"));
+    }
+    Ok(true)
+}
+
+/// Remove `0x005750E0(game, player, GUID, kill)` (§6 rules 1–4). Broadcasts
+/// "remove" even for a GUID in no list (edge case 2), and a second time
+/// after the unlink's own (edge case 1).
+pub fn remove<W: PetWorld>(
+    w: &mut W,
+    player: W::Unit,
+    guid: i32,
+    kill: bool,
+) -> Result<(), PetError> {
+    // Rule 1.
+    require_data(w, player)?;
+    if w.pet_lists(player).is_none() {
+        return Ok(());
+    }
+    // Rule 2.
+    let t = lookup(w, player, guid)?;
+    if t == 0 && kill {
+        dismiss(w, guid)?;
+    }
+    // Rule 3.
+    if t >= 0 && t < w.pettype_count() {
+        unlink(w, player, t, guid, kill)?;
+    }
+    // Rule 4.
+    broadcast_remove(w, guid);
+    Ok(())
+}
+
+/// Unlink `0x00574850` (§6): drops the first node of `guid` from entry `t`,
+/// broadcasts "remove", then clears the pet flag (no kill) or dismisses
+/// (kill) the unit if it exists.
+pub fn unlink<W: PetWorld>(
+    w: &mut W,
+    player: W::Unit,
+    t: i32,
+    guid: i32,
+    kill: bool,
+) -> Result<(), PetError> {
+    let Some(e) = entry(w, player, t) else {
+        return Ok(());
+    };
+    let Some(i) = e.nodes.iter().position(|n| n.guid == guid) else {
+        return Ok(());
+    };
+    e.nodes.remove(i);
+    broadcast_remove(w, guid);
+    if let Some(unit) = w.monster_by_guid(guid) {
+        if kill {
+            dismiss(w, guid)?;
+        } else {
+            let flags = w.unit_flags(unit) & !FLAG_PET;
+            w.set_unit_flags(unit, flags);
+        }
+    }
+    let e = entry(w, player, t).ok_or(PetError::Fatal("unlink: entry vanished"))?;
+    e.count -= 1;
+    if e.count < 0 {
+        return Err(PetError::Fatal("unlink: count below 0"));
+    }
+    Ok(())
+}
+
+/// Dismiss `0x00574450` (§7): no-experience flag, then kill (`killable`) or
+/// a death mode request aimed at the owner; broadcasts "remove".
+pub fn dismiss<W: PetWorld>(w: &mut W, guid: i32) -> Result<(), PetError> {
+    let Some(unit) = w.monster_by_guid(guid) else {
+        return Ok(());
+    };
+    if w.flag_c8_bit8(unit) {
+        return Err(PetError::Fatal("dismiss: unit +0xC8 bit 8 set"));
+    }
+    let flags = w.unit_flags(unit) | FLAG_NO_EXPERIENCE;
+    w.set_unit_flags(unit, flags);
+    if w.killable(unit) {
+        w.kill(unit);
+    } else {
+        let owner = w.owner(unit);
+        w.request_death_mode(unit, owner);
+    }
+    broadcast_remove(w, guid);
+    Ok(())
+}
+
+/// Sends `msg` to every player without state 7, in player-list order
+/// (`0x005538D0`, §8).
+fn broadcast<W: PetWorld>(w: &mut W, msg: PetMsg) {
+    for p in w.players() {
+        if !w.has_state(p, STATE_NO_BROADCAST) {
+            w.send(p, msg);
+        }
+    }
+}
+
+/// Broadcast "add" `0x00574930` (§8): 0x7A action 1 when record +0x10 and
+/// +0x14 are both 0, else 0x81.
+pub fn broadcast_add<W: PetWorld>(w: &mut W, record: &AddRecord) {
+    let msg = if record.x10 == 0 && record.x14 == 0 {
+        PetMsg::PetAction {
+            action: 1,
+            pet_type: record.pet_type as u8,
+            class: record.class,
+            owner: record.owner_guid as u32,
+            pet: record.pet_guid as u32,
+        }
+    } else {
+        PetMsg::AssignMerc { record: *record }
+    };
+    broadcast(w, msg);
+}
+
+/// Broadcast "remove" `0x00574410` (§8): 0x7A action 0, type, class and
+/// owner 0.
+pub fn broadcast_remove<W: PetWorld>(w: &mut W, guid: i32) {
+    broadcast(
+        w,
+        PetMsg::PetAction {
+            action: 0,
+            pet_type: 0,
+            class: 0,
+            owner: 0,
+            pet: guid as u32,
+        },
+    );
+}
+
+/// Lookup `0x00574A20(player, GUID)` (§9): the first type t in 1…pettype
+/// count − 1 whose list holds `guid`, else 0 (also for P null).
+pub fn lookup<W: PetWorld>(w: &mut W, player: W::Unit, guid: i32) -> Result<i32, PetError> {
+    require_data(w, player)?;
+    let count = w.pettype_count();
+    let Some(lists) = w.pet_lists(player) else {
+        return Ok(0);
+    };
+    for t in 1..count {
+        let Some(e) = lists.entries.get(t as usize) else {
+            break;
+        };
+        if e.nodes.iter().any(|n| n.guid == guid) {
+            return Ok(t);
+        }
+    }
+    Ok(0)
+}
