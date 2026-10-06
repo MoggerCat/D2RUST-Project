@@ -1064,3 +1064,101 @@ fn no_get_hit_poison_only() {
     };
     assert!(no_get_hit(&mut f, &c.hitclass, u, &rec, 0));
 }
+
+/// The first `Seed::new(lo, 0)` whose first two steps satisfy `p`.
+fn seed_where(p: impl Fn(u32, u32) -> bool) -> Seed {
+    (1u32..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|&s| {
+            let mut t = s;
+            let (a, b) = (t.step(), t.step());
+            p(a, b)
+        })
+        .unwrap()
+}
+
+// §6.2: the size tests are strict and a total < 256 alone skips get-hit.
+// Max life 16000, hit class 0 (div 16): M / 16 = 1000, M / 8 = 2000,
+// M / 4 = 4000.
+#[test]
+fn no_get_hit_size_bounds() {
+    let c = ct();
+    let total = |t| DamageRecord {
+        total: t,
+        ..DamageRecord::default()
+    };
+    let mut f = world();
+    let u = f.add(FUnit::new(UnitType::Player, 0));
+    // Step 2: total 100 with max life 0 (no size test passes).
+    assert!(no_get_hit(&mut f, &c.hitclass, u, &total(100), 0));
+    f.set(u, 7, 1000);
+    // Total 256 is not < 256; 256 ≥ 1000 / 4: get-hit.
+    assert!(!no_get_hit(&mut f, &c.hitclass, u, &total(256), 0));
+    f.set(u, 7, 16_000);
+    // 1000: steps 5 and 6 draw; mask(2) = 1, mask(4) ≠ 0 → false.
+    f.units[u].seed = seed_where(|a, b| a & 1 == 1 && b & 3 != 0);
+    assert!(!no_get_hit(&mut f, &c.hitclass, u, &total(1000), 0));
+    // 2000: only step 6 draws; first step ≡ 2 (mod 4) → false.
+    f.units[u].seed = seed_where(|a, _| a & 3 == 2);
+    assert!(!no_get_hit(&mut f, &c.hitclass, u, &total(2000), 0));
+    // 4000: no draw; a first step ≡ 0 (mod 4) would pass mask(4).
+    f.units[u].seed = seed_where(|a, _| a & 3 == 0);
+    assert!(!no_get_hit(&mut f, &c.hitclass, u, &total(4000), 0));
+}
+
+// ---------------------------------------------------------------- §8
+
+/// Crushing blow (event 5, chance stat 136 = 100 %) on `d`.
+fn crush(f: &mut Fake, a: usize, d: usize) -> DamageRecord {
+    let mut rec = DamageRecord::default();
+    assert_eq!(crushing_blow(f, 5, a, d, &mut rec, 136 << 16), 1);
+    rec
+}
+
+// Crushing blow: hireling divisor 10; the player-count term
+// `div += pct(div, h, 100)`; no will-die while life stays > 0; life 0 →
+// will die without the overlay (x = 0).
+#[test]
+fn crushing_blow_divisors_and_result() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(136, 100));
+    let mut h = FUnit::new(UnitType::Monster, 0).with(6, 1000);
+    h.hireling = true;
+    let hd = f.add(h);
+    let r = crush(&mut f, a, hd);
+    assert_eq!(f.get(hd, 6), 900);
+    assert_eq!(r.result & result::WILL_DIE, 0);
+    // Player count 3: bonus (3 − 1) × 50 = 100 % → div 8.
+    let m = f.add(FUnit::new(UnitType::Monster, 0).with(6, 1000).with(100, 3));
+    crush(&mut f, a, m);
+    assert_eq!(f.get(m, 6), 875);
+    let z = f.add(FUnit::new(UnitType::Monster, 0).with(6, 0));
+    f.log.clear();
+    let r = crush(&mut f, a, z);
+    assert_ne!(r.result & result::WILL_DIE, 0);
+    assert!(
+        !f.log.iter().any(|l| l.starts_with("overlay")),
+        "{:?}",
+        f.log
+    );
+}
+
+// Open wounds `ow(lvl)`: one level inside each branch and each upper
+// bound.
+#[test]
+fn open_wounds_base_branches() {
+    for (lvl, v) in [
+        (1, 0),
+        (7, 54),
+        (15, 126),
+        (20, 216),
+        (30, 396),
+        (37, 585),
+        (45, 801),
+        (50, 981),
+        (60, 1341),
+        (70, 1791),
+    ] {
+        assert_eq!(open_wounds_base(lvl), v, "{lvl}");
+    }
+}
