@@ -21,6 +21,7 @@ pub mod stats;
 pub mod tick;
 pub mod treasure;
 pub mod units;
+pub mod wiring;
 pub mod world;
 
 /// Simulation ticks per second, matching the original game.
