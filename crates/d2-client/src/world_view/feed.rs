@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/client/render-pipeline.md (A1 stage 1)
+// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/client/render-pipeline.md (A1 stage 1), specs/render/draw-order.md (§9)
 //! The camera of a drawn frame, fed from the client world, and the frame
 //! built through the original's view rules ([`rules::OriginalView`]).
 //!
@@ -8,7 +8,9 @@
 //! (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
 //! Each is a `TODO(spec: …)` hook of its owner; [`NoFeed`] is the
 //! placeholder: no local player, no map, no shake, and an error for
-//! anything that would need a rule.
+//! anything that would need a rule. A feed that states the near rooms
+//! (`draw-order.md` §9) has its frame ordered by `rules::draw_order`:
+//! map tiles and unit draw keys then come from the order.
 //!
 //! [`frame_camera`] computes the camera once per drawn frame (§3) with
 //! the d2rs time base of §9: the shake envelope runs on `t = 40 × (server
@@ -26,6 +28,8 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
+use crate::rules::draw_order::source::{ordered_source, TileArt};
+use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
@@ -64,6 +68,34 @@ pub trait ViewFeed: ViewSource {
     /// the local player unit's seed (`unit +0x20`), advanced by the two
     /// draws of each shaking frame.
     fn player_seed(&mut self, world: &ClientWorld) -> Result<&mut Seed, ViewError>;
+
+    /// TODO(spec: the DRLG → client owner spec; `drlg/rooms.md` §3, §6,
+    /// §9) (`draw-order.md` §9): the near-room array of the local player's
+    /// active room with its tile records and unit lists; the draw order
+    /// writes the frame's flag and fade changes back. `None` (the default)
+    /// = the model states no map, and `map_tiles` answers alone.
+    fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
+        Ok(None)
+    }
+
+    /// TODO(spec: render/blend-modes.md, render/lighting.md)
+    /// (`draw-order.md` §8): the fade clock of the frame.
+    fn fade_clock(&self, _world: &ClientWorld) -> Result<FadeClock, ViewError> {
+        Err(ViewError::unresolved(
+            "wall fade clock",
+            "render/blend-modes.md",
+        ))
+    }
+
+    /// TODO(spec: render/draw-order.md open question 12, render/shading.md,
+    /// render/lighting.md, render/blend-modes.md): the DT1 frame, blocks,
+    /// shading and blend of an ordered tile.
+    fn tile_art(&self, _tile: &OrderedTile, _assets: &ViewAssets) -> Result<TileArt, ViewError> {
+        Err(ViewError::unresolved(
+            "tile art",
+            "render/draw-order.md open question 12",
+        ))
+    }
 }
 
 /// The placeholder feed: the client world states no local player, no map
@@ -164,7 +196,8 @@ pub fn frame_camera<F: ViewFeed + ?Sized>(
 }
 
 /// Builds the frame through the original's view rules: the camera once
-/// (§3), then [`OriginalView`] over `rules` and `feed`; without a local
+/// (§3), then [`OriginalView`] over `rules` and `feed` (ordered by
+/// `draw-order.md` when the feed states the near rooms); without a local
 /// player, through [`NoCamera`].
 pub fn build_frame<R, F>(
     world: &ClientWorld,
@@ -178,7 +211,18 @@ where
     F: ViewFeed + ?Sized,
 {
     match frame_camera(world, feed)? {
-        Some(camera) => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
+        Some(camera) => {
+            let mode = feed.open_mode(world)?;
+            match ordered_source(world, &camera, mode, feed, assets)? {
+                Some(source) => build(
+                    world,
+                    ui,
+                    &OriginalView::new(camera, rules, &source),
+                    assets,
+                ),
+                None => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
+            }
+        }
         None => build(
             world,
             ui,
