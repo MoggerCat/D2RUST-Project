@@ -85,9 +85,12 @@ pub fn is_unit(id: u8) -> bool {
     )
 }
 
-/// The 50-subtile Chebyshev test `0x00548EF0` (spec §2.4 rule 3).
+/// The 50-subtile Chebyshev test `0x00548EF0` (spec §2.4 rule 3): the
+/// exact |dx| and |dy| for any two positions (no `i32` overflow; the same
+/// answer wherever the `i32` difference fits).
 pub fn in_range(player: Pos, target: Pos) -> bool {
-    (target.x - player.x).abs() <= TARGET_RANGE && (target.y - player.y).abs() <= TARGET_RANGE
+    let r = TARGET_RANGE.unsigned_abs();
+    target.x.abs_diff(player.x) <= r && target.y.abs_diff(player.y) <= r
 }
 
 /// Out-of-range point target: does it queue S→C 0x15 (spec §2.4 rule 3)?
