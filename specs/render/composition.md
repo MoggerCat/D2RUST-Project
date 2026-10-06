@@ -23,15 +23,15 @@
 |   2. Framebuffer | 105–113 |
 |   3. Frame cycle | 114–146 |
 |   4. Palette (one per presented frame) | 147–164 |
-|   5. One pixel write (index domain) | 165–202 |
-|   6. d2rs answers | 203–216 |
-|   7. DirectDraw (display type 3) differences | 217–228 |
-| Constants & data dependencies | 229–234 |
-| Randomness | 235–238 |
-| Edge cases & original bugs | 239–248 |
-| Test vectors | 249–260 |
-| Provenance | 261–278 |
-| Open questions | 279–299 |
+|   5. One pixel write (index domain) | 165–203 |
+|   6. d2rs answers | 204–217 |
+|   7. DirectDraw (display type 3) differences | 218–229 |
+| Constants & data dependencies | 230–235 |
+| Randomness | 236–239 |
+| Edge cases & original bugs | 240–249 |
+| Test vectors | 250–261 |
+| Provenance | 262–279 |
+| Open questions | 280–300 |
 <!-- /index -->
 
 ## Summary
@@ -194,11 +194,12 @@ owns which draws pass which tables.
 The tables are copied unchanged from `pal.pl2` by `0x004FB1E0` (no
 transposition): blend tables from file offset `0x3500` (3 × 65,536 bytes),
 light/variation maps from `0x400`, further 65,536-byte tables from
-`0x33500`, `0x43500`, `0x5B500`. Hence the PL2 alpha tables are laid out
-`[level][destination][source]`. This contradicts `formats/palette.md`
-("[level][source index], gives a map over the destination index") and
-`render-pipeline.md` §A5 `IndexTable` (`map[base + src][dest]`): both must
-read row = destination (hook `scene/item.rs` `BlendOp::IndexTable`).
+`0x33500`, `0x43500`, `0x5B500`. So for the cel drawers the PL2 blend
+tables read `[level][destination][source]` (`render-pipeline.md` §A5
+`IndexTable`, hook `scene/item.rs` `BlendOp::IndexTable`). Which of the
+two indices is the destination is a property of each drawer, not of the
+file: the lit translucent wall drawer reads the transpose
+(`blend-modes.md` §2, owner of the orientation).
 
 ### 6. d2rs answers
 
