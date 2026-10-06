@@ -223,10 +223,10 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
     assert!(
         matches!(
             e,
-            ViewError::Unresolved {
-                what: "UI pass",
-                ..
-            }
+            // The UI rules' refusal of request 0 (the UI binding now resolves
+            // requests one by one), never a world error.
+            ViewError::Ui { index: 0, ref error }
+                if matches!(**error, ViewError::Unresolved { what: "UI image", .. })
         ),
         "{e}"
     );
