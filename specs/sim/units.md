@@ -27,17 +27,17 @@
 | Rules | 74–75 |
 |   1. Unit kinds | 76–95 |
 |   2. Unit record | 96–134 |
-|   3. Lifecycle | 135–172 |
-|   4. Modes and mode schedules | 173–314 |
-|   5. Event dispatch | 315–329 |
-|   6. Events per kind | 330–410 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 411–432 |
-| Constants & data dependencies | 433–449 |
-| Randomness | 450–457 |
-| Edge cases & original bugs | 458–476 |
-| Test vectors | 477–536 |
-| Provenance | 537–563 |
-| Open questions | 564–586 |
+|   3. Lifecycle | 135–178 |
+|   4. Modes and mode schedules | 179–320 |
+|   5. Event dispatch | 321–335 |
+|   6. Events per kind | 336–416 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 417–438 |
+| Constants & data dependencies | 439–455 |
+| Randomness | 456–463 |
+| Edge cases & original bugs | 464–482 |
+| Test vectors | 483–542 |
+| Provenance | 543–569 |
+| Open questions | 570–592 |
 <!-- /index -->
 
 ## Summary
@@ -129,8 +129,8 @@ offset seen in the 1.14d code named in the last column):
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |
 | +0xE0, +0xE4, +0xE8 | update, hash, room links | `unit-order.md` | — |
 
-"Dead" (`0x005541B0`): flag 0x10000, or a player in mode 0 or 17, or a
-monster in mode 0 or 12.
+"Dead" (`0x005541B0`): a null unit, flag 0x10000, a player in mode 0 or
+17, a monster in mode 0 or 12, or any unit of another type.
 
 ### 3. Lifecycle
 
@@ -152,11 +152,17 @@ fixed GUID):
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
 7. Per-kind init (§1 table).
-8. Flags bit 1: `SUNIT_Add` `0x00554850(unit, x, y, game, room, 1)`
-   (`unit-order.md` §3.1). Then a player in mode 0 or 17, or a monster
-   for which `0x0063EA40` holds and `0x004638A0(class, 0x13)` does not,
-   gets path settings (`0x00649560(1)`, `0x00649190(5)`,
+8. Flags & 0x1 (`0x00555443`): `SUNIT_Add` `0x00554850(unit, x, y,
+   game, room, 1)` (`unit-order.md` §3.1), after the per-kind init of
+   step 7; its result is not tested. Then a player in mode 0 or 17, or a
+   monster for which `0x0063EA40` holds and `0x004638A0(class, 0x13)`
+   does not, gets path settings (`0x00649560(1)`, `0x00649190(5)`,
    `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3).
+9. Flags & 0x1 clear: no `SUNIT_Add` and no path settings; the unit is
+   returned as it is after step 7 (seeds drawn, GUID taken, per-kind
+   init done), in no room list, hash list or update queue. This is not
+   a failure: the allocator returns the unit in both cases, and null
+   only from step 1.
 
 Events scheduled by a per-kind init are listed in §6 (missile: §6.3;
 objects: their init functions, §6.4).
@@ -338,7 +344,7 @@ becomes f + 1 (`tick.md` §5.2). Sites: `unit-events.tsv`.
 |---|---|---|---|
 | 0 | §4.2, §4.4; skills `0x005C8CA0` (f + 2, a1 4), `0x005CF900` (f + 1, a1 1), `0x005D1350` (f + 3) | §4 | §4.5 |
 | 1 | §4.2; skills `0x005CF900`, `0x005C8C10`, `0x005CC3B0`, `0x005DA120`, `0x005DA7E0` | §4.2 or per skill | §4.5 |
-| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead and `0x00580610`, regenerate (`0x00580500`, `0x005806F0`; `sim/stats.md`). So a player has a regen event every frame from its join on |
+| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead, life (`0x00580610`), and when it returns non-zero, stamina and mana (`0x00580500`, `0x005806F0`); `0x00580610` always returns 1, so all three run (`sim/stat-lists.md` §10.1). So a player has a regen event every frame from its join on |
 | 5, 8, 9, 12 | states, skills, shrines, items (`unit-events.tsv`) | per scheduler | `0x0056D790`, `0x0056FCB0`, `0x0056FE40`, `0x00580800` (remove expired states, `0x00627460(unit, f)`): `sim/stat-lists.md` |
 | 6 | hover text set `0x0054A290`; handler | the hover's timeout | `0x00580B70`: timeout (`0x006611D0`) ≤ f → free the hover, +0xA4 := 0, queue for update, flags \|= 0x100; else reschedule at the timeout |
 | 11 | join `0x00534AD0` (f + 250); handler (f + 30) | (0, 0) | `0x00580BE0`: party refresh (`0x005406A0`), pet refresh (`0x00575630`), reschedule f + 30. D2MOO calls it DELAYEDPORTAL; in 1.14d it is a 30-frame refresh |
