@@ -184,7 +184,8 @@ impl SkillTables {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
 pub(crate) mod fake;
 #[cfg(test)]
 mod levels_gap_tests;
