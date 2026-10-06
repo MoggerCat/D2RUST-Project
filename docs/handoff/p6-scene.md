@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C4 — `d2-client::scene`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/p6-scene`, from `claude/bold-ptolemy-jvyvxy` at
 `978e6c4`. Spec: `specs/client/render-pipeline.md` (d2rs-own design
 draft) §A3–A8 and the bins of §A9. Cloud session, repo only (no game

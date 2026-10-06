@@ -50,6 +50,12 @@ behaviors the engine reproduces exactly.
 | Phase 6 client design (2026-10-06, drafts `specs/client/*`) | Draw list (plain Rust) → CPU reference compositor + GPU **compute** compositor with integer math (no fixed-function blending), proven byte-identical per verify case; UI is our own integer-pixel panel framework on the same compositor (not `bevy_ui`); audio exactness = decoded samples + voice log (tick, file, integer params), the mix itself is ours | Two fidelity links: original → CPU reference (captures; images stay in `game/captures/`, hashes in `traces/render/`) and CPU → GPU (`d2-client verify`). Every original rule is an RE owner spec listed in each draft's part (b). Assets: in-memory only, synchronous load on miss (never a dropped draw), deterministic LRU budgets. Controls file `d2controls 1`, strict TOML. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 | Spec rule coverage (2026-10-06) | Rule IDs read from spec headings and numbered lists (`§5.2 r4`); tests claim them with `// Covers:` comments; `tools/coverage.py` (Python, like `spec_index.py`) reports unit / game-file / trace coverage per spec; only game-file and trace count as verified | `docs/COVERAGE.md`. Comments over a TSV map: one owner per claim, no sync check needed. `--check` in CI fails on dangling claims, never on low coverage. Rows of spec TSVs are not counted yet. |
+| Phase 3 system seams (2026-10-06, `docs/handoff/impl-*.md`) | Each system module in `d2-sim` takes the world through narrow traits (`StatHost`, `UnitHooks`, `ItemStats`, `SkillUnits`, `CombatWorld`, `MissileUnits`, `AiUnits`, `DropSink`, `LevelTypes`, `WaypointWorld`, `CubeWorld`, `QuestWorld`, …) with fakes in tests; tables come in as `d2_data` typed records (no `d2-formats` dependency in `d2-sim`: DT1 tiles as `TileInfo`, DS1 grids as `RoomGrids`) | Lets the groups be implemented in parallel and unit-tested without a provider. Cost: overlapping getters across traits, to be merged by the provider session (HANDOFF §3 "Seams"). Where the live-data tests live is open (HANDOFF §7 I1). |
+| Machine tables in code (2026-10-06) | A spec TSV that mirrors hard-coded `Game.exe` data is either embedded and parsed strictly (`quests.tsv`, `quest-messages.tsv` via `include_str!`) or copied into a Rust constant that a test compares row by row (`stat-ops`, `unit-handlers`, `property-functions`, `treasure-quality`, `treasure-chest-acts`, `skillcalc`, `misscalc`, `srvdo`, `srvhit`, `ai-functions`, `cube-ops`); every check has a perturbation test | METHODS M05, M08. `waypoints.tsv` is an expectation, never read by code. |
+| x87 arithmetic in the sim (2026-10-06) | No floats in `d2-sim` (rule 6): the max-life rescale is emulated with integers at a configurable precision (default 53 bits); treasure NoDrop uses an integer binary64 (`treasure::softfloat`, round to nearest even, checked against host IEEE in tests only) | Open: x87 precision control and out-of-range conversion (`stat-lists.md` OQ1, `treasure.md` OQ5); unreachable on 1.14d data for NoDrop. |
+| Unwritten bodies are logged, not guessed (2026-10-06) | A function a spec names without specifying (server-do / server-hit bodies, AI functions, Act II–V quest callbacks, level generators) is a stub that logs `Unhandled::…` and does the neutral thing; narrowest reading wherever a spec is ambiguous, each with a `TODO(<spec ref>)` | Same rule as the `d2-server` handler stubs. Readings are listed in HANDOFF §7. |
+| Phase 6 infrastructure (2026-10-06, `docs/handoff/p6-*.md`) | Paths: strict canonical `mpq://` form, anything else is an error naming the path (`CanonicalPath`). Residency: byte-budget `Pool` with deterministic LRU (frame, key), never evicts the current frame, evicts only when an insert needs room. Frames: first-fit shelf packer over 2048² R8 pages with 1-pixel gutters, frame sets go in whole or not at all, a whole page is evicted at once. Scene: `DrawItem` list stable-sorted by `DrawKey`, 32×32 bins, per-pixel `dest = blend(chain(src), dest)`; index 0 is transparent. UI: panels emit `UiDraw` into a sink (not `DrawItem`s); frame mapping is integer scale with bars rounded down; window < 800×600 refused. Audio: Q8 gains, 32.32 phase, nearest = `floor(phase)`, voice log `d2rs-audio-log 1`. Controls: `d2controls 1` strict TOML, `preset` required | d2rs-own design (specs part (a)); the original behavior behind each is an owner spec in part (b) and stays a `TODO(spec: …)` hook. |
+| Dependency: `toml_edit` (2026-10-06) | `d2-client` uses `toml_edit 0.25` (`parse` only) for the controls file | METHODS M10: a real TOML parser over a hand-written subset; already in `Cargo.lock` through Bevy; chosen over `toml` for byte spans (line numbers in errors). |
 
 ## Phases
 
@@ -183,7 +189,7 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       and a TSV-fake agreement check run on `d2-proto`; one single-player
       host frame runs end to end. Intent handlers are stubs until their
       system specs exist; S→C 0x15 (resync) has no layout yet.*
-- [ ] Units, stats, stat lists, modifiers. *Specs written (2026-10-06,
+- [ ] Units, stats, stat lists, modifiers. *Implemented 2026-10-06 (`d2_sim::{units,stats}`, `docs/handoff/impl-units-stats.md`), unverified: synthetic vectors, TSV checks and perturbation tests pass; recordings queued (HANDOFF §5 A). Specs written (2026-10-06,
       branch `claude/phase3-units`): `specs/sim/units.md` (+ TSVs; per-kind
       event rules 0 errors on the three recordings, `check_units.py`),
       `sim/stats.md`, `sim/stat-lists.md` (unverified: recording queued,
@@ -194,35 +200,37 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       §5): items, treasure, skills/combat, monsters/missiles pushed;
       world (quests, waypoints, cube, NPC, vendors), DRLG pushed. Branches
       `claude/phase3-{items,treasure,skills,drlg,monsters,world}`.*
-- [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
-- [ ] Treasure classes and drops
-- [ ] Skills and combat formulas
-- [ ] Level generation (DRLG)
-- [ ] Monsters: spawning, AI, missiles
-- [ ] Quests, waypoints, NPCs, vendors, Horadric Cube
+- [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords. *Implemented, unverified (`d2_sim::items`: 57 tests; item-creation recording R1 and live-table counts queued).*
+- [ ] Treasure classes and drops. *Implemented, unverified (`d2_sim::treasure`: 48 tests; live set vectors, memory dump and walk recording queued).*
+- [ ] Skills and combat formulas. *Implemented, unverified (`d2_sim::{skills,combat}`: hit, damage, skill levels, mana, learning; 3 game-file tests queued; vitals, skill use functions, experience not implemented).*
+- [ ] Level generation (DRLG). *Levels and rooms implemented, unverified (`d2_sim::drlg`); level types (preset, maze, outdoor) have no code and no spec yet.*
+- [ ] Monsters: spawning, AI, missiles. *Missiles (creation, flight, hit, pierce) and the AI core with 17 AI functions implemented, unverified; server-do / server-hit bodies, the other AI functions, monster population and init not implemented.*
+- [ ] Quests, waypoints, NPCs, vendors, Horadric Cube. *Quest control and Act I, waypoints, cube implemented, unverified (`d2_sim::world`); Act II–V quests, NPC and vendor code not implemented.*
+- [ ] Seam providers and wiring: `UnitSystem` as the sim's `EventDispatch`, providers of every system trait, `d2-server` intent handlers (still stubs); economy and action wiring in parallel sessions (HANDOFF §2 steps 1–3).
 **Exit per item:** spec status `conformance-passing`.
 
 ### Phase 4 — Conformance (runs alongside Phase 3)
 - [ ] Trace recorder for the original game. *Feasibility proven 2026-10-05: `tools/trace-recorder` records every RNG draw of 1.14d (Python debugger); traces in `traces/sim/rng/`. Other event types not yet.*
 - [ ] Replay harness. *Per-behavior replayers in `crates/conformance`: RNG draws (`conformance::rng`) and the tick (`conformance::tick`: timer runs and unit lists, perturbation-tested).*
-- [ ] Coverage report (the "99.x%" number). *Tool and claim scheme done 2026-10-06 (`docs/COVERAGE.md`, `py tools/coverage.py`, `--check` in CI); claims seeded in d2-sim rng, d2-data, d2-formats. Open: claims in conformance, d2-server, d2-sim tick, d2-proto, d2-client and the trace checkers; then the number is meaningful.*
+- [ ] Coverage report (the "99.x%" number). *Tool and claim scheme done 2026-10-06 (`docs/COVERAGE.md`, `py tools/coverage.py`, `--check` in CI); claims seeded in d2-sim rng, d2-data, d2-formats. At this commit: 386 claims, 2,704 rule units, verified 146 (5.4%), any tier 274 (10.1%). Open: claims in conformance, d2-server, d2-sim tick and the Phase 3 systems, d2-proto, d2-client `verify` and the trace checkers (parallel session `coverage-claims`); then the number is meaningful.*
 
 ### Phase 5 — Local server + bridge
 - [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); the bridge carries these 1.14d messages unchanged and needs no d2rs-own message so far (`specs/client/bridge.md` §1 rule 4).*
-- [ ] In-process server running `d2-sim`
+- [ ] In-process server running `d2-sim`. *Host loop runs on the real adapters (one single-player frame end to end); intent handlers are stubs until the system providers are wired.*
 - [ ] `d2-client::bridge`: S→C messages → client world model → Bevy
       mirror entities, input → intents. *Design `specs/client/bridge.md`
       and skeleton done 2026-10-06 (branch `claude/phase5-bridge`):
       receive split + dispatch by id (all ids unowned until client-model
       specs exist), intent send path, `ClientWorld`, `BridgePlugin`
       mirror; synthetic vectors pass. `ServerLink` adapter over the
-      `d2-server` host waits for its wiring. No tick interpolation
-      (decisions log).*
+      `d2-server` host not written yet (the `d2-server` seams are wired, host
+      constructor and `Send + Sync` still needed, HANDOFF §2 step 4). No tick
+      interpolation (decisions log).*
 **Exit:** walk around Act 1 town via the local server.
 
 ### Phase 6 — Full client
-- [ ] Animation (COF/DCC), lighting, blend modes, draw ordering
-- [ ] UI panels, inventory, fonts, audio, controls config
+- [ ] Animation (COF/DCC), lighting, blend modes, draw ordering. *Infrastructure only (C3 frames, C4 scene + CPU compositor); COF composite C7 and GPU compositor C5 not done; original-behavior RE specs not written.*
+- [ ] UI panels, inventory, fonts, audio, controls config. *Cores only (C8 UI, C9 controls file, C10 audio mixer / voice log); no real panel, font, sound table or WAV parser.*
 **Exit:** play through all acts locally with correct visuals.
 
 #### Phase 6 work breakdown (2026-10-06, design drafts)
@@ -237,18 +245,18 @@ for the local RE spec named.
 **Cloud, ready now (pure infrastructure).** Independent unless noted;
 none touches `d2-client::bridge` (`claude/phase5-bridge`).
 
-| # | Task | Spec | Proof in cloud |
-|---|---|---|---|
-| C1 | Canonical lowercase `mpq://` paths; loaders for `pl2`, `cof`, `tbl` (font vs strings by magic) | `assets.md` §A1–A2 | unit tests §Test vectors |
-| C2 | Residency cache core: byte budgets, deterministic LRU, never evict the current frame, stall metric (plain Rust) | `assets.md` §A4–A5 | unit tests |
-| C3 | `IndexFrame` + per-direction `FrameSet` from DCC/DC6/DT1; deterministic shelf atlas packer (plain Rust) + R8Uint page upload | `render-pipeline.md` §A2, `assets.md` §A3 | unit tests (packing, determinism) |
-| C4 | `d2-client::scene`: `DrawItem`, `DrawKey` stable sort, shade chain, `BlendOp::{Opaque, IndexTable}`, bins, CPU reference compositor | `render-pipeline.md` §A3–A8 | §Test vectors (CPU, CI) |
-| C5 | GPU compute compositor matching C4 (after C4) | §A9 | CPU half in CI; GPU byte-exact queued locally |
-| C6 | Verify harness: case files (`version = 1`), runner, per-case `--perturb`; port today's map verify as case `map`; `synthetic` cases (after C4) | §A10 | CPU half in CI; GPU queued |
-| C7 | COF composite mechanics: slot order → per-component items, path and placement behind `TODO(spec)` hooks | §A7 | synthetic COF vectors |
-| C8 | UI core: `Panel`/`UiRoot`, widgets, integer hit tests, event routing, frame-coordinate mapping | `ui.md` §A2, §A4 | §Test vectors |
-| C9 | Controls file `d2controls 1`: strict parser, writer, presets (`dev` only), clash check, migration hook | `ui.md` §A6 | §Test vectors |
-| C10 | Audio core: trigger queue, tick scheduler, integer mixer, voice log (`d2rs-audio-log 1`), rodio `Decodable` output | `audio.md` §A2–A5 | §Test vectors, golden hashes |
+| # | Task | Spec | Proof in cloud | Status (2026-10-06) |
+|---|---|---|---|---|
+| C1 | Canonical lowercase `mpq://` paths; loaders for `pl2`, `cof`, `tbl` (font vs strings by magic) | `assets.md` §A1–A2 | unit tests §Test vectors | done (`claude/p6-assets`); game-file check queued |
+| C2 | Residency cache core: byte budgets, deterministic LRU, never evict the current frame, stall metric (plain Rust) | `assets.md` §A4–A5 | unit tests | done (`claude/p6-assets`); prefetch waits for the bridge hook |
+| C3 | `IndexFrame` + per-direction `FrameSet` from DCC/DC6/DT1; deterministic shelf atlas packer (plain Rust) + R8Uint page upload | `render-pipeline.md` §A2, `assets.md` §A3 | unit tests (packing, determinism) | done (`claude/p6-frames`); game-file check queued |
+| C4 | `d2-client::scene`: `DrawItem`, `DrawKey` stable sort, shade chain, `BlendOp::{Opaque, IndexTable}`, bins, CPU reference compositor | `render-pipeline.md` §A3–A8 | §Test vectors (CPU, CI) | done (`claude/p6-scene`) |
+| C5 | GPU compute compositor matching C4 (after C4) | §A9 | CPU half in CI; GPU byte-exact queued locally | not done (`p6-gpu`) |
+| C6 | Verify harness: case files (`version = 1`), runner, per-case `--perturb`; port today's map verify as case `map`; `synthetic` cases (after C4) | §A10 | CPU half in CI; GPU queued | not done (`p6-verify`) |
+| C7 | COF composite mechanics: slot order → per-component items, path and placement behind `TODO(spec)` hooks | §A7 | synthetic COF vectors | not done (`p6-cof`) |
+| C8 | UI core: `Panel`/`UiRoot`, widgets, integer hit tests, event routing, frame-coordinate mapping | `ui.md` §A2, §A4 | §Test vectors | done (`claude/p6-ui`) |
+| C9 | Controls file `d2controls 1`: strict parser, writer, presets (`dev` only), clash check, migration hook | `ui.md` §A6 | §Test vectors | done (`claude/p6-controls`); `original` preset waits for `ui/controls.md` |
+| C10 | Audio core: trigger queue, tick scheduler, integer mixer, voice log (`d2rs-audio-log 1`), rodio `Decodable` output | `audio.md` §A2–A5 | §Test vectors, golden hashes | done (`claude/p6-audio`); not wired in `app.rs` |
 
 **Waits for local RE specs** (spec session, high effort; order is the
 critical path to a first playable scene):

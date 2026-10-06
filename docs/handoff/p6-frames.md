@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C3, indexed frames and atlas (`d2_client::frames`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/p6-frames`, based on `claude/bold-ptolemy-jvyvxy` at
 `978e6c4` (2026-10-06, cloud). Specs: `specs/client/render-pipeline.md`
 §A2, `specs/client/assets.md` §A3 (+ the atlas half of §A5, §A7); both

@@ -1,5 +1,7 @@
 # Handoff: world systems (quests, waypoints, cube) — `claude/impl-world`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, branched from
 `claude/bold-ptolemy-jvyvxy` at `4c7a7c7`. Specs: `specs/world/quests.md`
 (+ `quests.tsv`, `quest-messages.tsv`), `world/waypoints.md` (+

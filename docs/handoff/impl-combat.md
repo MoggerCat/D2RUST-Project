@@ -1,5 +1,7 @@
 # Handoff: combat and skill levels (branch `claude/impl-combat`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: implementation of `specs/combat/hit.md`, `specs/combat/damage.md`,
 `specs/skills/levels.md` (+ `skillcalc.tsv`, `misscalc.tsv`) in `d2-sim`,
 started from `claude/bold-ptolemy-jvyvxy` at `4c7a7c7` (cloud session,
