@@ -372,9 +372,7 @@ impl LightList {
             if room == leaving {
                 continue;
             }
-            let (ux, uy) = world
-                .owner_subtile(&owner)
-                .ok_or(LightError::Fatal0x591)?;
+            let (ux, uy) = world.owner_subtile(&owner).ok_or(LightError::Fatal0x591)?;
             let m = rec.radius >> 3;
             let probes = [(ux + m, uy), (ux - m, uy), (ux, uy + m), (ux, uy - m)];
             if probes

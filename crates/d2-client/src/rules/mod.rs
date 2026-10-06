@@ -38,6 +38,8 @@ pub mod unit_composite;
 pub mod view;
 
 #[cfg(test)]
+mod blend_gdi_tests;
+#[cfg(test)]
 mod gaps_numbered_tests;
 #[cfg(test)]
 mod shading_blend_tests;

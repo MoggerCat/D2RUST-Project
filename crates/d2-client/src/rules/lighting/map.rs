@@ -28,7 +28,10 @@ pub struct LightCell {
 impl LightCell {
     /// The dword a draw receives (§11 r1): `B << 24 | G << 16 | R << 8 | I`.
     pub fn word(&self) -> u32 {
-        u32::from(self.b) << 24 | u32::from(self.g) << 16 | u32::from(self.r) << 8 | u32::from(self.i)
+        u32::from(self.b) << 24
+            | u32::from(self.g) << 16
+            | u32::from(self.r) << 8
+            | u32::from(self.i)
     }
 }
 

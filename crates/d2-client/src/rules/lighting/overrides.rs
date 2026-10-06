@@ -157,7 +157,12 @@ impl Overrides {
                     let a = self.den_counter * 128 / 30;
                     wave(a, 80.0)
                 };
-                return Ambient { i: i as u8, r, g, b };
+                return Ambient {
+                    i: i as u8,
+                    r,
+                    g,
+                    b,
+                };
             }
             return Ambient::ZERO;
         }

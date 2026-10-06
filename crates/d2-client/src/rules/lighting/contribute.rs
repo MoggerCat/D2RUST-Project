@@ -74,8 +74,7 @@ pub fn window(map: &LightMap, x: i32, y: i32, r: i32) -> Option<Window> {
     let y0 = (y - y % 8) - r;
     let n = (2 * r) >> 3;
     let (ox, oy) = map.origin;
-    if x0 >> 3 > ox + 48 || (x0 >> 3) + n + 1 < ox || y0 >> 3 > oy + 48 || (y0 >> 3) + n + 1 < oy
-    {
+    if x0 >> 3 > ox + 48 || (x0 >> 3) + n + 1 < ox || y0 >> 3 > oy + 48 || (y0 >> 3) + n + 1 < oy {
         return None;
     }
     Some(Window { x0, y0, n })
@@ -224,14 +223,7 @@ impl ShadeGrid {
                     (-t, s),
                 ];
                 for (ox, oy) in offs {
-                    self.shade_cell(
-                        CENTRE + oy,
-                        CENTRE + ox,
-                        centre.0 + ox,
-                        centre.1 + oy,
-                        x,
-                        y,
-                    );
+                    self.shade_cell(CENTRE + oy, CENTRE + ox, centre.0 + ox, centre.1 + oy, x, y);
                 }
             }
         }
