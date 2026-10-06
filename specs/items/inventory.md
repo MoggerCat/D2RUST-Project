@@ -33,22 +33,22 @@
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
 |   1. Inventory model | 89–181 |
-|   2. Grid placement | 182–276 |
-|   3. Belt | 277–334 |
-|   4. Equipping | 335–512 |
-|   5. Shared checks | 513–637 |
-|   6. Deferred item messages | 638–731 |
-|   7. Intents | 732–1142 |
-|   8. Pickup from the ground | 1143–1249 |
-|   9. Drop to the ground | 1250–1297 |
-|   10. Gold | 1298–1337 |
-|   11. Message layouts | 1338–1367 |
-| Constants & data dependencies | 1368–1390 |
-| Randomness | 1391–1403 |
-| Edge cases & original bugs | 1404–1448 |
-| Test vectors | 1449–1497 |
-| Provenance | 1498–1554 |
-| Open questions | 1555–1644 |
+|   2. Grid placement | 182–277 |
+|   3. Belt | 278–335 |
+|   4. Equipping | 336–520 |
+|   5. Shared checks | 521–645 |
+|   6. Deferred item messages | 646–739 |
+|   7. Intents | 740–1150 |
+|   8. Pickup from the ground | 1151–1257 |
+|   9. Drop to the ground | 1258–1305 |
+|   10. Gold | 1306–1345 |
+|   11. Message layouts | 1346–1375 |
+| Constants & data dependencies | 1376–1398 |
+| Randomness | 1399–1411 |
+| Edge cases & original bugs | 1412–1456 |
+| Test vectors | 1457–1505 |
+| Provenance | 1506–1562 |
+| Open questions | 1563–1652 |
 <!-- /index -->
 
 ## Summary
@@ -265,7 +265,8 @@ quests.
    `0x0055C2C0(owner, 0)`.
 7. Cursor := none (unless step 3 said not), mode := 0 (stored). The
    clear (`0x0063C180(inventory, none)`, §1.4 rule 3) does not test what
-   the cursor holds: only step 3's page-1 flag gates it (`0x00560200`).
+   the cursor holds: only step 3's page-1 flag gates it (`0x00560200`;
+   the call at `0x0056035C` follows only the flag test at `0x00560353`).
    A caller placing a mode-4 item that is not the cursor item while the
    player holds one orphans the held item (edge case 12).
 8. "Send" set: command flag 0x2; item flag 0x1 when the item is socketed
@@ -509,6 +510,13 @@ Differences from §4.6: no mode test and no §4.3 (the caller's), no
 weapon-in-use update `0x006233A0`, command flag 0x200 instead of 0x8, no
 item flag 0x1, item flag 0x4000 not cleared, no inventory pass, no out
 argument.
+
+Re-read in full (handoff A6, `prop-unified-items` Q3): the steps above
+are the whole routine. Neither game nor U's inventory (unit +0x60) is
+tested for none; L is written into the skip argument's slot after step
+1. When each caller tries it: §8.1 step 5 (after §4.3), `world/vendors.md`
+§7.1.1 (buy), and `0x00562F30` (the corpse take-back of `0x0057FB70`,
+§7.1 step 2; corpse spec, not specified here).
 
 ### 5. Shared checks
 
@@ -1106,7 +1114,7 @@ without an inventory, or location ∉ 1..10 → 3 (`0x0054D141`–`0x0054D15E`);
 the hireling's item at the location must exist in mode 1 and its unlink
 must return it, else 2; unlink, slot cleared, hireling
 stat refresh `0x0055C730(merc, 0, 0)`, command flag 0x10 on it, update
-list of the hireling, hireling refresh; a **copy** (`0x0055A2A0`,
+list of the hireling, hireling refresh; a **copy** (`world/vendors.md` §7.3, `0x0055A2A0`,
 `items/generation.md` duplicate) becomes the player's cursor item
 (`0x0063C180`, then `0x0055FB10`: mode 4, command flag 0x100000 = 0x9C
 action 0x12, update list, owner refresh), the original gets item flag
