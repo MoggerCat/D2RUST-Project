@@ -1,5 +1,7 @@
 # Handoff: quest world host on the server — `claude/quest-host`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, task class: integration from
 clear specs, medium (METHODS M14). Base: `main` at `edad871`. Repo only,
 synthetic tables, fixed seed (1234), no game files (M09). For the

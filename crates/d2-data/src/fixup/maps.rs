@@ -8,6 +8,11 @@ use crate::compile::CodeLinker;
 
 /// Equivalence walk stack (§2): 128 ints, overflow test > 124.
 const WALK_LIMIT: usize = 124;
+/// Pops allowed per matrix cell, on average over the whole matrix. A link
+/// cycle that keeps the stack under [`WALK_LIMIT`] (a row whose `equiv1`
+/// leads back to itself) never ends the walk: 1.14d hangs at load, d2rs
+/// reports a load error once the matrix has used this budget.
+const WALK_STEPS_PER_CELL: usize = 128;
 /// State flag bitsets (§4).
 pub const STATE_FLAGS: usize = 40;
 /// Player classes (§5).
@@ -85,7 +90,13 @@ pub enum EquivKind {
     MonType,
 }
 
-fn equiv(t: &BinTable, kind: EquivKind, i: i32, j: i32) -> Result<bool, FixupError> {
+fn equiv(
+    t: &BinTable,
+    kind: EquivKind,
+    i: i32,
+    j: i32,
+    steps: &mut usize,
+) -> Result<bool, FixupError> {
     let n = t.count as i32;
     if j <= 0 {
         return Ok(kind == EquivKind::ItemTypes);
@@ -99,6 +110,12 @@ fn equiv(t: &BinTable, kind: EquivKind, i: i32, j: i32) -> Result<bool, FixupErr
     };
     let mut stack = vec![i];
     while let Some(tt) = stack.pop() {
+        *steps = steps.checked_sub(1).ok_or_else(|| {
+            err(
+                &t.name,
+                format!("equivalence walk ({i}, {j}) does not end (link cycle)"),
+            )
+        })?;
         if tt == j {
             return Ok(true);
         }
@@ -140,9 +157,10 @@ pub fn equiv_matrix(t: &BinTable, kind: EquivKind) -> Result<EquivMatrix, FixupE
     let n = t.count;
     let words = n.div_ceil(32);
     let mut bits = vec![0u32; n * words];
+    let mut steps = n.saturating_mul(n).saturating_mul(WALK_STEPS_PER_CELL);
     for i in 0..n {
         for j in 0..n {
-            if equiv(t, kind, i as i32, j as i32)? {
+            if equiv(t, kind, i as i32, j as i32, &mut steps)? {
                 bits[i * words + j / 32] |= 1 << (j % 32);
             }
         }

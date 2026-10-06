@@ -2,7 +2,7 @@
 //! Send path (§4): C→S bytes built with `d2-proto`, checked with the
 //! 1.14d classifier before they reach the link.
 
-use d2_proto::transport::{classify_client, Classified, ClientQueue};
+use d2_proto::transport::{classify_client, Classified, ClientQueue, MAX_MESSAGE};
 use d2_proto::FixedMessage;
 
 use super::link::SendQueue;
@@ -20,6 +20,11 @@ pub enum IntentError {
     AdminQueue,
     #[error("game message of {0} bytes (the sender asserts < 0x200)")]
     GameTooLarge(usize),
+    /// A system message the classifier queues (it accepts a buffer longer
+    /// than the size rule) but the transport asserts on (size ≤ 0x204,
+    /// `intents-events.md` §2.1 rule 3).
+    #[error("message of {0} bytes (the transport asserts <= 0x204)")]
+    TooLarge(usize),
 }
 
 /// Encodes a typed C→S message (the TSV layout; unlisted bytes 0).
@@ -36,6 +41,9 @@ pub fn route(msg: &[u8]) -> Result<SendQueue, IntentError> {
             let queue = SendQueue::of(q).ok_or(IntentError::AdminQueue)?;
             if q == ClientQueue::Game && msg.len() >= MAX_GAME_SEND {
                 return Err(IntentError::GameTooLarge(msg.len()));
+            }
+            if msg.len() > MAX_MESSAGE {
+                return Err(IntentError::TooLarge(msg.len()));
             }
             Ok(queue)
         }

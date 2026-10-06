@@ -9,6 +9,8 @@ license.workspace = true
 
 [dependencies]
 d2-sim.workspace = true
+d2-data.workspace = true
+d2-formats.workspace = true
 d2-proto.workspace = true
 d2-net.workspace = true
 thiserror.workspace = true
@@ -17,4 +19,4 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
-d2-data.workspace = true
+proptest.workspace = true

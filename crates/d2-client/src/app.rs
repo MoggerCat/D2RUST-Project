@@ -4,6 +4,14 @@
 //! - `View`: a window with pan (arrows/WASD) and zoom (mouse wheel).
 //! - `Verify`: headless; renders a view to an offscreen image, captures it,
 //!   and compares it byte-for-byte with the CPU reference renderer.
+//!
+//! [`play`] is the client proper: a window running the local
+//! single-player game ([`single_player`], on a server thread,
+//! [`server_thread`]) through the bridge and the world view.
+
+pub mod play;
+pub mod server_thread;
+pub mod single_player;
 
 use std::path::PathBuf;
 use std::sync::Arc;

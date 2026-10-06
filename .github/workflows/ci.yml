@@ -8,10 +8,23 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   # CI has no game files: tests that need them are #[ignore] and read D2_GAME_DIR.
+  # Parser/property tests keep their in-source default case counts (<1 s);
+  # PROPTEST_CASES is deliberately unset (it would override every default).
+  # Shrinking is bounded so a failing property cannot stall a job.
+  PROPTEST_MAX_SHRINK_TIME: "10000"
 
+# A newer push to the same PR/branch supersedes the running one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Same steps, same order, as `sh tools/gate.sh`; the jobs run in parallel.
 jobs:
-  check:
+  # Python checkers, hook check, fmt, dependency + determinism rules.
+  # No Bevy libraries needed.
+  tools:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +52,76 @@ jobs:
           python3 tools/trace-recorder/check_rooms.py --selftest
           python3 tools/trace-recorder/check_rooms.py traces/sim/tick/*.json
 
+      # CLAUDE.md hard rule 1: the pre-commit hook's patterns, tested in a
+      # scratch repo and applied to every tracked file.
+      - name: Blizzard-file check
+        run: sh tools/hooks/selftest.sh
+
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tools
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      # Crate dependency rules and the d2-sim determinism lint (rule 6).
+      - name: Dependency rules
+        run: cargo run -p depcheck
+
+  clippy-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy-core
+      # --all-targets also compiles tests, benches and examples.
+      - name: Clippy (all but d2-client)
+        run: cargo clippy --workspace --exclude d2-client --all-targets -- -D warnings
+
+  test-sim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-sim
+      # nextest selects the same tests as `cargo test` (ignored ones stay
+      # skipped); doc-tests are not run by nextest, so they run separately.
+      - uses: taiki-e/install-action@nextest
+      - name: Test d2-sim + conformance
+        run: cargo nextest run --no-tests=pass -p d2-sim -p conformance
+      - name: Doc-tests
+        run: cargo test --doc -p d2-sim -p conformance
+
+  test-rest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-rest
+      - uses: taiki-e/install-action@nextest
+      - name: Test (all but d2-sim, conformance, d2-client)
+        run: cargo nextest run --no-tests=pass --workspace --exclude d2-sim --exclude conformance --exclude d2-client
+      - name: Doc-tests
+        run: cargo test --doc --workspace --exclude d2-sim --exclude conformance --exclude d2-client
+
+  # The Bevy crate: the long pole on a cold cache, so it has its own job.
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries
         run: |
@@ -46,20 +129,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
 
-      # rustup reads rust-toolchain.toml and installs the pinned toolchain.
       - name: Install toolchain
         run: rustup show active-toolchain || rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: client
 
-      - name: Format
-        run: cargo fmt --all -- --check
+      - uses: taiki-e/install-action@nextest
 
-      - name: Dependency rules
-        run: cargo run -p depcheck
+      - name: Clippy d2-client
+        run: cargo clippy -p d2-client --all-targets -- -D warnings
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test d2-client
+        run: cargo nextest run --no-tests=pass -p d2-client
 
-      - name: Test
-        run: cargo test --workspace
+      - name: Doc-tests
+        run: cargo test --doc -p d2-client

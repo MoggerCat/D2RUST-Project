@@ -35,7 +35,7 @@ use d2_formats::palette::{Palette, Rgb};
 use crate::composite::{
     self, ComponentFrame, ComponentRequest, ComponentResolver, CompositeError, UnitParams,
 };
-use crate::frames::{FramePart, FrameSetKey};
+use crate::frames::{FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
 use crate::scene::{
     self, Bins, BlendOp, DrawItem, DrawKey, FrameId, FrameImage, ItemTag, MapId, MapTable, Rect,
     SceneError, ShadeChain,
@@ -155,14 +155,23 @@ pub enum BuildError {
 /// The case's fixture answers for one unit, resolved to scene values: per
 /// COF component, the frame drawn, the top-left, the shade chain and the
 /// blend. A component the COF draws without an answer is an error
-/// (`Unresolved`), never a default.
+/// (`Unresolved`), never a default. The frame is frame `n` of the case's
+/// one frame set ([`case_frames_key`]); its scene id comes from the frame
+/// store ([`composite::build_with`]), not from the fixture.
 struct UnitFixture {
     /// Indexed by component id.
     components: [Option<Answer>; 16],
 }
 
-/// One component's answer: frame, top-left x and y, shade chain, blend.
-type Answer = (FrameId, i32, i32, ShadeChain, BlendOp);
+/// One component's answer: case frame index, top-left x and y, shade
+/// chain, blend.
+type Answer = (u32, i32, i32, ShadeChain, BlendOp);
+
+/// The frame set holding a synthetic case's `[[frame]]`s in file order, so
+/// the frame store gives `[[frame]]` `n` the scene id `FrameId(n)`.
+pub fn case_frames_key() -> FrameSetKey {
+    FrameSetKey::new("synthetic/case-frames.dc6", FramePart::Dir(0)).expect("canonical path")
+}
 
 impl UnitFixture {
     fn get(
@@ -184,25 +193,10 @@ impl UnitFixture {
 
 impl ComponentResolver for UnitFixture {
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
-        self.get(req, "frame")?;
-        let dir = u8::try_from(req.dir).expect("COF directions are a u8");
-        let set = FrameSetKey::new(
-            format!("synthetic/c{}.dcc", req.slot.component),
-            FramePart::Dir(dir),
-        )
-        .expect("canonical synthetic path");
         Ok(ComponentFrame {
-            set,
-            index: req.frame,
+            set: case_frames_key(),
+            index: self.get(req, "frame")?.0 as usize,
         })
-    }
-
-    fn frame_id(
-        &self,
-        req: &ComponentRequest<'_>,
-        _: &ComponentFrame,
-    ) -> Result<FrameId, CompositeError> {
-        Ok(self.get(req, "frame_id")?.0)
     }
 
     fn place(
@@ -301,6 +295,23 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         item.flip_x = spec.flip_x;
         items.push(item);
     }
+    let mut store = FrameStore::new();
+    store
+        .insert(
+            case_frames_key(),
+            FrameSet {
+                frames: frames
+                    .iter()
+                    .map(|f| {
+                        // Same check as the compositor's frame source.
+                        scene::FrameView::new(f.width, f.height, &f.pixels)?;
+                        Ok(IndexFrame::new(f.width, f.height, 0, 0, f.pixels.clone())
+                            .expect("pixel count checked"))
+                    })
+                    .collect::<Result<_, SceneError>>()?,
+            },
+        )
+        .expect("a new store has no sets");
     for (u, spec) in s.units.iter().enumerate() {
         let mut fixture = UnitFixture {
             components: Default::default(),
@@ -336,7 +347,7 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
                 None => BlendOp::Opaque,
             };
             fixture.components[usize::from(cs.component)] =
-                Some((FrameId(cs.frame), cs.x, cs.y, shade, blend));
+                Some((cs.frame, cs.x, cs.y, shade, blend));
         }
         let cof = d2_formats::cof::Cof::parse(&spec.cof).map_err(|e| BuildError::Cof {
             unit: u,
@@ -352,12 +363,13 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
                 .map_or(Rect::FRAME, |(x, y, w, h)| Rect::new(x, y, w, h)),
             tag: ItemTag::Unit(u as u32),
         };
-        let draws = composite::build(
+        let draws = composite::build_with(
             &cof,
             spec.dir as usize,
             spec.frame as usize,
             &unit,
             &fixture,
+            &store,
         )
         .map_err(|error| BuildError::Composite { unit: u, error })?;
         items.extend(draws.into_iter().map(|d| d.item));
