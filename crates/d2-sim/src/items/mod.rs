@@ -17,6 +17,7 @@
 
 pub mod affixes;
 pub mod create;
+pub mod moves;
 pub mod props;
 pub mod quality;
 pub mod tables;
