@@ -638,3 +638,6 @@ pub fn arrival_message(guid: u32, x: i32, y: i32) -> [u8; 13] {
     m[9..11].copy_from_slice(&((y + 3) as u16).to_le_bytes());
     m
 }
+
+#[cfg(test)]
+mod mutant_tests;
