@@ -188,7 +188,7 @@ fn dc6_direction_gives_its_frames_with_offsets_unchanged() {
     );
 }
 
-// Covers: specs/render/sprite-placement.md §8, §edge-cases-original-bugs r5
+// Covers: specs/render/sprite-placement.md §8, §edge-cases-original-bugs r2
 #[test]
 fn dc6_frames_carry_the_orientation_bit_and_refuse_other_flips() {
     let mut f = dc6(1, 2);
@@ -207,7 +207,7 @@ fn dc6_frames_carry_the_orientation_bit_and_refuse_other_flips() {
     );
 }
 
-// Covers: specs/render/sprite-placement.md §3, §edge-cases-original-bugs r5
+// Covers: specs/render/sprite-placement.md §3, §edge-cases-original-bugs r2
 #[test]
 fn dcc_frames_are_top_anchored_and_refuse_an_odd_variable0() {
     let mut d = dcc(&[vec![dcc_frame(2, 2, -1, -2, 7)]]);
