@@ -7,6 +7,7 @@
 //! Also: `affixes.md`, `quality.md`, `properties.md` (Constants & data
 //! dependencies).
 
+use super::bitstream::Isc;
 use d2_data::bin::BinTable;
 use d2_data::fixup::maps::{EquivMatrix, SkillLists};
 use d2_data::fixup::FixedSet;
@@ -81,6 +82,11 @@ pub struct ItemRec {
     pub questdiffcheck: u8,
     pub ubercode: [u8; 4],
     pub ultracode: [u8; 4],
+    /// `compactsave` (+0x143; `items/bitstream.md` §2 rule 1).
+    pub compactsave: u8,
+    /// `normcode` (+0x84; the alt-code record's base code,
+    /// `items/bitstream.md` §4.1 rule 4).
+    pub normcode: [u8; 4],
 }
 
 macro_rules! item_rec {
@@ -122,6 +128,8 @@ macro_rules! item_rec {
                     questdiffcheck: r.questdiffcheck,
                     ubercode: r.ubercode,
                     ultracode: r.ultracode,
+                    compactsave: r.compactsave,
+                    normcode: r.normcode,
                 }
             }
         }
@@ -563,6 +571,10 @@ pub struct ItemTables {
     pub properties: Vec<PropertyRec>,
     /// itemstatcost `valshift` per stat; its length is the stat count.
     pub valshift: Vec<u8>,
+    /// itemstatcost save columns per stat (`items/bitstream.md`); empty
+    /// in fixtures that never write a stream (every stat reads as
+    /// `Save Bits` 0).
+    pub isc: Vec<Isc>,
     /// Layer split: `stuff` and its mask (`runtime-maps.md` §3).
     pub stat_shift: u32,
     pub stat_mask: u32,
@@ -648,6 +660,15 @@ impl ItemTables {
             valshift: typed::<Itemstatcost>(f)?
                 .iter()
                 .map(|r| r.valshift)
+                .collect(),
+            isc: typed::<Itemstatcost>(f)?
+                .iter()
+                .map(|r| Isc {
+                    valshift: r.valshift,
+                    save_bits: r.save_bits,
+                    save_add: r.save_add,
+                    save_param_bits: r.save_param_bits,
+                })
                 .collect(),
             stat_shift: f.stat_stuff,
             stat_mask: f.stat_mask,

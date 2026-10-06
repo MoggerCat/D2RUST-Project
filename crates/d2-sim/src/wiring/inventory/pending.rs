@@ -4,7 +4,8 @@
 //! (`0x0064C040`, §6), "alive" (`0x005541B0`, `units.md` §2), "has
 //! durability" (`0x00629930`, `generation.md` §1.3), item
 //! freeing (`units.md` §3.2 through the economy) and the creation of gold
-//! piles (`generation.md` §3 through the economy, request from the rest).
+//! piles (`generation.md` §3 through the economy, request from the rest),
+//! the item bit stream (`items/bitstream.md`, [`super::bits`]).
 //! Every other call goes to [`InvRest`] unchanged.
 
 use super::{InvDesk, InvError, InvRest};
@@ -314,8 +315,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
         self.rest.send_item_stat(player, item, stat)
     }
+    /// The item bit stream (`items/bitstream.md`) of the real item
+    /// ([`InvDesk::item_stream`]); the rest's default is not asked.
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
-        self.rest.item_bits(item, flags, page)
+        self.item_stream(item, flags, page)
     }
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
         self.rest.store_messages(client, item)

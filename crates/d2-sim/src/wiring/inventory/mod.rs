@@ -34,6 +34,7 @@
 //! R1–R6 exists). Nothing here decides behaviour: rules stay in the
 //! modules; an adapter maps a seam call to a provider call.
 
+pub mod bits;
 pub mod host;
 pub mod inv_world;
 pub mod ops;
