@@ -347,7 +347,6 @@ fn want_regen(maxhp: i32, r: u32) -> i32 {
 /// Whole-table sweep: the stats and skills of every monstats row, at every
 /// level id (and one past the table) and difficulty, in an expansion
 /// single-player game. Must not panic; every stat §6 sets equals the rule.
-// Covers: specs/monsters/init.md §6 r1, §6 r4, §6 r5, §6 r6, §6 r7, §6 r8, §6 r9, §6 r10, §6 r14, §6 r15, §7 r1, §7 r2, §7 r3, §9 r1, §9 r3, §10 r2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn stats_and_skills_every_class_level_difficulty() {
@@ -477,7 +476,6 @@ fn stats_and_skills_every_class_level_difficulty() {
 /// Whole-table sweep of the type init itself (§5) for every row and
 /// difficulty, in a classic and an expansion game: no panic, and the
 /// steps §5 names happen.
-// Covers: specs/monsters/init.md §5 r1, §5 r2, §5 r3, §5 r5, §5 r6, §5 r7
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn type_init_every_class() {
@@ -520,7 +518,6 @@ fn type_init_every_class() {
 /// Resistances and ToBlock of the six recorded Act 1 classes per
 /// difficulty (`init.md` "Real 1.14d values"). The one `block` value the
 /// spec gives per class is read as holding at every difficulty.
-// Covers: specs/monsters/init.md §6 r6
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_resistances_and_block() {
@@ -574,7 +571,6 @@ fn real_resistances_and_block() {
 /// `ChampionDamageBonus` 90 / 75 / 66 (§19), monumod row 0 = 20 (§17
 /// step 1); the live champion candidates 16, 36–39 with weight 1, 36–39
 /// at `version` 100 (§17.1).
-// Covers: specs/monsters/init.md §9 r3, §17 r1, §17.1, §19 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_umod_constants() {
@@ -613,7 +609,6 @@ fn real_umod_constants() {
 /// Normal mods: brute1's `BaseId` is brute2 (24), whose normal mod is
 /// rage (13); every recorded brute1 carries umods [13] and no type flags
 /// (`init.md` §14.1, recorded checks).
-// Covers: specs/monsters/init.md §14.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_brute1_normal_mods() {
@@ -635,7 +630,6 @@ fn real_brute1_normal_mods() {
 
 /// Recorded champion pack (20261006-022633, frame 678): three brute1 with
 /// umods [13, 16], champion and unique flags (`init.md` §16.2).
-// Covers: specs/monsters/init.md §16.2 r1, §16.2 r2, §16.2 r3, §16.2 r4
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_brute1_champion_pack() {
@@ -674,7 +668,6 @@ fn boss(h: &mut Host, class: u32, seed: u32, champion: bool, umods: &[u8]) -> Un
 
 /// Champion fallenshaman1, Normal, Blood Moor (`init.md` "Bosses"):
 /// umods [16] and the ghostly [36].
-// Covers: specs/monsters/init.md §16.1 r3, §18 r1, §18 r2, §19.1, §19.2, §19.6
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_champion_fallenshaman1() {
@@ -726,7 +719,6 @@ fn real_champion_fallenshaman1() {
 /// Unique fallen1, Normal: level 4, maxhp 4 × base, experience 90, one
 /// unique umod, 3..6 fallen1 minions with HP × 2, level 4, experience × 5
 /// (`init.md` "Bosses").
-// Covers: specs/monsters/init.md §16.1 r2, §16.1 r3, §17 r2, §17 r3, §17.2, §18 r1, §18 r2, §19.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_unique_fallen1() {
@@ -761,7 +753,6 @@ fn real_unique_fallen1() {
 
 /// HP factors NM / Hell (`init.md` "Bosses"): champion × 2.5 / × 2,
 /// unique × 3 / × 2, boss minion × 1.75 / × 1.5.
-// Covers: specs/monsters/init.md §19.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_boss_hp_factors() {
@@ -795,7 +786,6 @@ fn real_boss_hp_factors() {
 /// not, at every difficulty: no panic; an umod whose `init_fn` is `-` does
 /// nothing at init, and a `unique_gate` = yes umod does nothing when called
 /// with unique = 0.
-// Covers: specs/monsters/init.md §19 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_umod_on_every_class() {
@@ -838,7 +828,6 @@ fn every_umod_on_every_class() {
 /// without the champion chance: no panic; a champion gets one umod from
 /// the live candidates (16, 36–39), a unique gets at most 1 + d umods, none
 /// repeated, each with `upick` > 0, `champion` = 0 and eligible (§17.3).
-// Covers: specs/monsters/init.md §17 r1, §17 r2, §17 r3, §17.1, §17.2, §17.3 r1, §17.3 r2, §17.3 r3
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn choose_umods_every_class() {
@@ -882,7 +871,6 @@ fn choose_umods_every_class() {
 /// monstats2 component counts of the recorded classes (`init.md` recorded
 /// checks): zombie1 [3,3,3,3,3,0,0,0,3,3,3, …]; brute1 and quillrat1 have
 /// no count above 1.
-// Covers: specs/monsters/init.md §10 r2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_component_counts() {
@@ -898,7 +886,6 @@ fn real_component_counts() {
 /// `monster_level` and `stats_by_level` over every row, level id (and past
 /// the table), difficulty and L-flag: no panic; levels past the monlvl
 /// table clamp (§8.1).
-// Covers: specs/monsters/init.md §7 r2, §8.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn level_stats_every_row() {
@@ -938,7 +925,6 @@ fn level_stats_every_row() {
 /// Every monstats row's `AI` is an index of the AI table (148 records), and
 /// the per-index row counts equal `ai-functions.tsv` `monstats_rows`; the
 /// rows it names use that index (`ai.md` §10).
-// Covers: specs/monsters/ai.md §10, §4
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn ai_index_of_every_row() {
@@ -966,7 +952,6 @@ fn ai_index_of_every_row() {
 
 /// The recorded classes' AI index, Normal aip1..aip5 and `aidel` (`ai.md`
 /// §9.1).
-// Covers: specs/monsters/ai.md §9.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_recorded_ai_params() {
@@ -1016,7 +1001,6 @@ fn level(id: i32) -> &'static LevelPop {
 /// levels.txt values (`population.md` Real): Blood Moor, Cold Plains, Den
 /// of Evil, Crypt / Mausoleum, the Act 1 town, Act 1 `WarpDist`. Where the
 /// spec gives one MonDen without "×3", only Normal is checked.
-// Covers: specs/monsters/population.md §2.2, §3.1 r1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_levels_rows() {
@@ -1059,7 +1043,6 @@ fn real_levels_rows() {
 /// monstats.txt values (`population.md` Real): Rarity, groups, parties,
 /// the placespawn and sparsePopulate rows; superuniques 0–9 (§11.4);
 /// monumod row 0 = 20.
-// Covers: specs/monsters/population.md §4 r4, §7 r1, §10.1 r1, §11.4 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_monstats_population_rows() {
@@ -1140,7 +1123,6 @@ fn real_monstats_population_rows() {
 /// `population.md` §2.3 step 3: no level list holds a non-`isSpawn` class
 /// except level 120; `rangedspawn` only on Act 5 levels 110–119, 123–131,
 /// 135; no listed class has `Rarity` above 2.
-// Covers: specs/monsters/population.md §2.3 r3
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_level_list_facts() {
@@ -1165,7 +1147,6 @@ fn real_level_list_facts() {
 /// copies equals its levels column; the list holds at most min(NumMon, 13,
 /// list count) entries, each from the difficulty's list and `isSpawn`; the
 /// rarity total is their sum; variants stay within the component counts.
-// Covers: specs/monsters/population.md §2.1 r1, §2.1 r2, §2.2, §2.3 r1, §2.3 r2, §2.4 r1, §2.4 r2, §2.4 r3, §2.4 r5
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn regions_every_level() {

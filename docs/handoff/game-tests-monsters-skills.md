@@ -7,11 +7,13 @@ at `4b5b0bf`. Cloud session (repo only, no game files), medium effort (M14).
 Task class: tests from specs. Test code and this note only: no spec, no
 library code, no `docs/HANDOFF.md` / `docs/PLAN.md` edit.
 
-**None of these tests has run.** They are `#[ignore]` and read the extracted
-1.14d tables, so every game-tier claim below is **unverified** until the local
-run in §3 passes (METHODS M02, `docs/COVERAGE.md` §3). If a test fails there,
-fix the code or the test (whichever the spec says is wrong) or remove its claim
-in the same session.
+**None of these tests has run: every expected value is unconfirmed.** They
+are `#[ignore]` and read the extracted 1.14d tables. Following the HANDOFF §8
+lesson on blind-written game assertions (merged from
+`claude/local-2026-10-06`), the tests carry **no `Covers:` claim**; the
+intended claims are listed in §4 and are added by the session whose local
+run (§3) passes. If a test fails, fix the side the spec says is wrong (code,
+test or spec) before adding its claims.
 
 ## 1. What was added
 
@@ -144,23 +146,50 @@ side the spec says is wrong; for §2 item 1 record the evilhut row in
 `population.md`. Then record the result here and in §5 Done, and only then
 count the claims as verified.
 
-## 4. Coverage (claims on `#[ignore]` tests: game tier, unverified)
+## 4. Claims to add after the local run (not in the code yet)
 
-`python3 tools/coverage.py --summary`, before → after (any tier unchanged
-except where noted):
+Add each line as `// Covers: <specs>` above its test once that test passes
+locally (game tier). Measured with the claims in place, before the merge of
+`claude/local-2026-10-06`, they raised the game tier from 187 to 277 units
+(total `coverage.py --summary`); without them coverage is unchanged.
 
-| spec | game-file before → after | any before → after |
-|---|---|---|
-| `monsters/init.md` | 3 → 44 | 111 → 111 |
-| `monsters/population.md` | 0 → 15 | 158 → 158 |
-| `monsters/ai.md` | 0 → 3 | 108 → 109 |
-| `missiles/missiles.md` | 0 → 12 | 104 → 106 |
-| `skills/levels.md` | 3 → 8 | 43 → 45 |
-| `skills/use.md` | 0 → 5 | 64 → 64 |
-| `combat/vitals.md` | 0 → 9 | 19 → 19 |
-| total | 187 → 277 (6.9 % → 10.2 %) | 2459 → 2464 |
-
-Read the game column as an upper bound until §3 passes.
+| Test | Covers |
+|---|---|
+| `game_monsters::stats_and_skills_every_class_level_difficulty` | specs/monsters/init.md §6 r1, §6 r4, §6 r5, §6 r6, §6 r7, §6 r8, §6 r9, §6 r10, §6 r14, §6 r15, §7 r1, §7 r2, §7 r3, §9 r1, §9 r3, §10 r2 |
+| `game_monsters::type_init_every_class` | specs/monsters/init.md §5 r1, §5 r2, §5 r3, §5 r5, §5 r6, §5 r7 |
+| `game_monsters::real_resistances_and_block` | specs/monsters/init.md §6 r6 |
+| `game_monsters::real_umod_constants` | specs/monsters/init.md §9 r3, §17 r1, §17.1, §19 text |
+| `game_monsters::real_brute1_normal_mods` | specs/monsters/init.md §14.1 |
+| `game_monsters::real_brute1_champion_pack` | specs/monsters/init.md §16.2 r1, §16.2 r2, §16.2 r3, §16.2 r4 |
+| `game_monsters::real_champion_fallenshaman1` | specs/monsters/init.md §16.1 r3, §18 r1, §18 r2, §19.1, §19.2, §19.6 |
+| `game_monsters::real_unique_fallen1` | specs/monsters/init.md §16.1 r2, §16.1 r3, §17 r2, §17 r3, §17.2, §18 r1, §18 r2, §19.1 |
+| `game_monsters::real_boss_hp_factors` | specs/monsters/init.md §19.1 |
+| `game_monsters::every_umod_on_every_class` | specs/monsters/init.md §19 text |
+| `game_monsters::choose_umods_every_class` | specs/monsters/init.md §17 r1, §17 r2, §17 r3, §17.1, §17.2, §17.3 r1, §17.3 r2, §17.3 r3 |
+| `game_monsters::real_component_counts` | specs/monsters/init.md §10 r2 |
+| `game_monsters::level_stats_every_row` | specs/monsters/init.md §7 r2, §8.1 |
+| `game_monsters::ai_index_of_every_row` | specs/monsters/ai.md §10, §4 |
+| `game_monsters::real_recorded_ai_params` | specs/monsters/ai.md §9.1 |
+| `game_monsters::real_levels_rows` | specs/monsters/population.md §2.2, §3.1 r1 |
+| `game_monsters::real_monstats_population_rows` | specs/monsters/population.md §4 r4, §7 r1, §10.1 r1, §11.4 text |
+| `game_monsters::real_level_list_facts` | specs/monsters/population.md §2.3 r3 |
+| `game_monsters::regions_every_level` | specs/monsters/population.md §2.1 r1, §2.1 r2, §2.2, §2.3 r1, §2.3 r2, §2.4 r1, §2.4 r2, §2.4 r3, §2.4 r5 |
+| `game_skills::every_skill_formula_evaluates` | specs/skills/levels.md §2 |
+| `game_skills::every_missile_formula_evaluates` | specs/skills/levels.md §2 |
+| `game_skills::every_skill_value_evaluates` | specs/skills/levels.md §2, §3.1 text, §3.2, §3.3 text, §3.4, §4, §5 |
+| `game_skills::real_level_vectors` | specs/skills/levels.md §2, §3.3 text, §4, §5 |
+| `game_skills::real_skills_table_facts` | specs/skills/levels.md §4 |
+| `game_skills::every_skill_function_in_table` | specs/skills/use.md §8 |
+| `game_skills::real_use_table_facts` | specs/skills/use.md §6, §7 |
+| `game_skills::real_use_vectors` | specs/skills/use.md §5.1, §5.2 text |
+| `game_skills::real_missiles_record_layout` | specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r1, §r1-data-the-server-keeps-per-missile r3 |
+| `game_skills::every_missile_flags_dword` | specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r2 |
+| `game_skills::every_missile_function_in_catalogue` | specs/missiles/missiles.md §r3-per-tick-dispatch r1, §r3-per-tick-dispatch r7, §r9-1-tables-dumped-from-game-exe-1-14d-confirmed, §r9-2-tsv-columns-srvdo-tsv-srvhit-tsv |
+| `game_skills::real_recorded_missiles` | specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles text, §r10-behaviour-of-the-recorded-missiles r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7, §r7-lifetime-and-expiry r2 |
+| `game_skills::every_missile_creation_velocity` | specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7 |
+| `game_skills::real_charstats_and_experience` | specs/combat/vitals.md §4.1 |
+| `game_skills::real_vitals_vectors` | specs/combat/vitals.md §1, §2 text, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6 |
+| `game_skills::every_class_every_level` | specs/combat/vitals.md §1, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6, §4.1 |
 
 ## 5. Gate
 
@@ -168,5 +197,7 @@ All pass on this branch: `cargo fmt --all -- --check`;
 `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test -p d2-sim`
 (1232 passed, 5 ignored in the lib; the two new binaries 19 + 16 ignored);
 `cargo run -p depcheck`; `python3 tools/spec_index.py --check`;
-`python3 tools/methods.py check`; `python3 tools/coverage.py --check` (3387
-claims, 0 errors) and `--selftest`.
+`python3 tools/methods.py check`; `python3 tools/coverage.py --check` and
+`--selftest`. Base merged: `origin/claude/tender-meitner-mphas3` at `5edceb8`
+(the local group C results); none of its observations touches a value
+asserted here (its live counts skills 357 and monstats 734 match).

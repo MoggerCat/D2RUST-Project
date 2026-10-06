@@ -236,7 +236,6 @@ fn miss_calcs(m: &Missiles) -> [u32; 7] {
 /// Every formula field of every skills row, at every level 0..=99, with no
 /// unit and with a bare player: no panic; an unset field (−1) gives 0
 /// (`levels.md` §2).
-// Covers: specs/skills/levels.md §2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_skill_formula_evaluates() {
@@ -258,7 +257,6 @@ fn every_skill_formula_evaluates() {
 /// Every formula field of every missiles row, at every level 0..=99, with
 /// no unit and with a bare missile and owner: no panic; an unset field
 /// gives 0.
-// Covers: specs/skills/levels.md §2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_missile_formula_evaluates() {
@@ -281,7 +279,6 @@ fn every_missile_formula_evaluates() {
 /// damage, length, to-hit and mana function on every skills and missiles
 /// row at every level 0..=99, no unit: no panic. The shifted mana cost is
 /// never negative (§4).
-// Covers: specs/skills/levels.md §2, §3.1 text, §3.2, §3.3 text, §3.4, §4, §5
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_skill_value_evaluates() {
@@ -321,7 +318,6 @@ fn every_skill_value_evaluates() {
 /// `levels.md` Test vectors not covered by the in-crate
 /// `real_skill_vectors`: Tornado physical damage, the dm / ln specials,
 /// Sacrifice to-hit, the `usmc` / `mana` specials of Fire Bolt and Teleport.
-// Covers: specs/skills/levels.md §2, §3.3 text, §4, §5
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_level_vectors() {
@@ -379,7 +375,6 @@ fn real_level_vectors() {
 /// 64 rows, DmgSymPerCalc 6, ELenSymPerCalc 4, ToHitCalc 3, skpoints 0;
 /// SrcDam in 63; HitShift 8 in 316 rows and 7 in 20; 7 negative
 /// `lvlmana`. Mana columns of the vector skills (§4).
-// Covers: specs/skills/levels.md §4
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_skills_table_facts() {
@@ -418,7 +413,6 @@ fn real_skills_table_facts() {
 /// slot of `table::FUNCS` (or 0); the filled slots referenced are exactly
 /// the `mapped` ones, the three `unreferenced` ones are not referenced
 /// (`use.md` §8, `functions.tsv`).
-// Covers: specs/skills/use.md §8
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_skill_function_in_table() {
@@ -471,7 +465,6 @@ fn every_skill_function_in_table() {
 /// periodic 2 (Thunder Storm, Blade Shield); the `delay` of Frozen Orb 25,
 /// Fire Wall 35, Meteor 30, Blizzard 45, Hydra 40; Might `perdelay` 50 and
 /// immediate (§7 vector); Multiple Shot srvst 4 (§5 vector).
-// Covers: specs/skills/use.md §6, §7
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_use_table_facts() {
@@ -512,7 +505,6 @@ fn real_use_table_facts() {
 /// minmana 1, no start / do function, srvmissile firebolt), Fire Ball L10
 /// 2,432, Teleport 6,144 / 1,280 / 0 / −1,280, Multiple Shot L10 (srvst 4;
 /// 4, +1, shift 8) 3,328.
-// Covers: specs/skills/use.md §5.1, §5.2 text
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_use_vectors() {
@@ -535,7 +527,6 @@ fn real_use_vectors() {
 /// `missiles.bin`: 684 records of 420 bytes, the count stored at offset 0
 /// (§R1.1); row 568's `pSrvHitFunc` holds 0xFDB4, read signed as none
 /// (§R1.3).
-// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r1, §r1-data-the-server-keeps-per-missile r3
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_missiles_record_layout() {
@@ -551,7 +542,6 @@ fn real_missiles_record_layout() {
 
 /// The flags dword (record +0x04) holds the typed flag columns at the bits
 /// §R1.2 names, for every row.
-// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_missile_flags_dword() {
@@ -589,7 +579,6 @@ fn every_missile_flags_dword() {
 /// the `rows` column of `srvdo.tsv` / `srvhit.tsv` (numeric cells only:
 /// row 568 is not counted); usage server-do 1: 551, 0: 53; server-hit 0:
 /// 591.
-// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r1, §r3-per-tick-dispatch r7, §r9-1-tables-dumped-from-game-exe-1-14d-confirmed, §r9-2-tsv-columns-srvdo-tsv-srvhit-tsv
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_missile_function_in_catalogue() {
@@ -645,7 +634,6 @@ fn every_missile_function_in_catalogue() {
 /// Activate 0, Accel 0, LevRange 0, and the per-row columns of the table;
 /// their creation speeds (§R10 consequence 5) and lifetimes in runs
 /// `Range + level × LevRange` (§R7.2).
-// Covers: specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles text, §r10-behaviour-of-the-recorded-missiles r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7, §r7-lifetime-and-expiry r2
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_recorded_missiles() {
@@ -723,7 +711,6 @@ fn real_recorded_missiles() {
 /// The creation speed of every missiles row at every level 0..=99 (§R2.3
 /// steps 5 and 7): no panic, and v = ((Vel + level × VelLev / 8) << 8) ×
 /// 75 / 100.
-// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_missile_creation_velocity() {
@@ -813,7 +800,6 @@ const BARBARIAN: i32 = 4;
 
 /// `vitals.md` Constants: the charstats columns of the seven classes and
 /// `experience.txt` MaxLvl 99, level 1 → 500, level 99 → 3,837,739,017.
-// Covers: specs/combat/vitals.md §4.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_charstats_and_experience() {
@@ -861,7 +847,6 @@ fn real_charstats_and_experience() {
 
 /// `vitals.md` Test vectors: creation values of the Sorceress and the
 /// Barbarian, level 1 → 10, +10 vitality, +10 energy.
-// Covers: specs/combat/vitals.md §1, §2 text, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_vitals_vectors() {
@@ -926,7 +911,6 @@ fn real_vitals_vectors() {
 /// 99 (§1, §3): no panic; the level is `level_from_exp`, the maxima grow by
 /// the class's per-level columns × d (<< 6), statpts by StatPerLevel × d,
 /// newskills by d; and the thresholds bracket each level (§4.1).
-// Covers: specs/combat/vitals.md §1, §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6, §4.1
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_class_every_level() {
