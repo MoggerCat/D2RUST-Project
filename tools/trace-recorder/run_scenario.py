@@ -11,7 +11,7 @@ traces/raw/<time>-scenario.jsonl (format scenario-raw-0, traces/FORMAT.md;
 provisional until the scenario format of specs/tools/scenario.md lands).
 
 Scenario file (version 1, minimal):
-  {"version": 1, "seed": <u32>, "save": "<character name>", "difficulty": 0,
+  {"version": 1, "seed": <time value, < 2^31>, "init_seed": <u32, optional>, "save": "<character name>", "difficulty": 0,
    "steps": [{"tick": N, "c2s": "<hex message>"}, ...], "ticks": <total>,
    "streams": ["units", "packets", "rng"]}
 
@@ -20,8 +20,13 @@ record_packets.py), "rng" (every seeded draw and seed set).
 
 Game-side facts (injection point and method, seed override point, tick
 hook, unit fields, non-interactive start, save loading) come from
-specs/tools/original-hooks.md. Where that spec leaves a question open, a
-`--probe <name>` mode prints what the coordinator needs to settle it.
+specs/tools/original-hooks.md; comments cite its sections. The start is
+`Game.exe -w -ns -nosave -name <save> -<class>` with the menu ended by the
+tool (spec §5.4); `--manual-start` lets a person start the game instead.
+`--probe <name>` settles the spec's open questions on the running game:
+start (OQ2), inject (OQ1), seed (OQ3, two runs), savepath (OQ4), plus
+ready (first tick the client accepts messages) and unit_fields (raw dump
+of the player unit to confirm the snapshot fields).
 
   --selftest   everything that needs no game (parsing and its errors,
                hex parsing, writer output, hash perturbation check)
@@ -34,20 +39,24 @@ Our own code. Nothing here is derived from Blizzard code.
 """
 
 import argparse
+import ctypes as C
 import datetime
 import hashlib
 import json
 import os
 import re
+import struct
 import sys
 import tempfile
+import threading
+import time
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import record_rng as rr  # noqa: E402  (the shared Win32 debugger definitions)
 import record_packets as rp  # noqa: E402  (message hooks, loop-phase markers)
 import record_tick as rt  # noqa: E402  (game / unit-list layout and readers)
 
-TOOL = "trace-recorder run_scenario 0.1.0"
+TOOL = "trace-recorder run_scenario 0.2.0"
 RAW_FORMAT = "scenario-raw-0"
 RAW_FORMAT_VERSION = 0          # bumps when a record changes meaning (FORMAT.md)
 SCENARIO_VERSION = 1            # the scenario file version this tool reads
@@ -108,9 +117,15 @@ def parse_scenario(text):
             raise ScenarioError(f"{name}: {v} outside {lo}..{hi}")
         return v
 
-    seed = int_field("seed", 0, 0xFFFFFFFF)
+    # specs/tools/original-hooks.md §2.1: the time value is below 2^31; the init
+    # value (game +0x7C, DRLG seed when the save has none) is any u32 and defaults to it
+    seed = int_field("seed", 0, 0x7FFFFFFF)
+    init_seed = int_field("init_seed", 0, 0xFFFFFFFF) if "init_seed" in d else seed
     ticks = int_field("ticks", 1, MAX_TICKS)
     difficulty = int_field("difficulty", 0, 2) if "difficulty" in d else 0
+    cls = d.get("class", "ama")
+    if cls not in ("ama", "sor", "nec", "pal", "bar", "dru", "ass"):
+        raise ScenarioError(f"class: {cls!r} is not one of ama sor nec pal bar dru ass")
     save = d.get("save")
     if not isinstance(save, str) or not save:
         raise ScenarioError("save: character name required")
@@ -136,7 +151,8 @@ def parse_scenario(text):
             raise ScenarioError(f"steps[{i}]: tick must be an integer in 0..{ticks - 1}, got {t!r}")
         steps.append({"tick": t, "c2s": parse_hex(st.get("c2s"), f"steps[{i}].c2s")})
     steps.sort(key=lambda s: s["tick"])  # stable: same-tick steps keep file order
-    return {"seed": seed, "save": save, "difficulty": difficulty, "ticks": ticks,
+    return {"seed": seed, "init_seed": init_seed, "save": save, "class": CLASS_NAMES[cls],
+            "difficulty": difficulty, "ticks": ticks,
             "streams": list(streams), "steps": steps}
 
 
@@ -194,53 +210,117 @@ def make_header(scenario, scenario_path, scenario_sha, game_sha, args):
             "tool": TOOL, "date": datetime.date.today().isoformat(),
             "game_exe_sha256": game_sha, "scenario": scenario_path.replace("\\", "/"),
             "scenario_sha256": scenario_sha, "scenario_version": SCENARIO_VERSION,
-            "seed": scenario["seed"], "save": scenario["save"],
-            "difficulty": scenario["difficulty"], "ticks": scenario["ticks"],
+            "seed": scenario["seed"], "init_seed": scenario["init_seed"], "save": scenario["save"],
+            "class": scenario["class"], "difficulty": scenario["difficulty"], "ticks": scenario["ticks"],
             "streams": scenario["streams"], "steps": len(scenario["steps"]), "args": args}
 
 
 # --- game-side facts: specs/tools/original-hooks.md ---------------------------
-# Filled in from the spec in phase 2; None = not known yet. Any use of a None
-# raises HookMissing, so a probe or a clear error shows instead of a guess.
+# Every address below is cited to the section of the spec that owns it. What the
+# spec does not settle yet is None: any use raises HookMissing (and a probe, below,
+# prints what the coordinator needs), nothing is guessed.
 
 class HookMissing(RuntimeError):
     pass
 
 
-HOOK = {
-    "start_args": None,       # command line for a non-interactive single-player start
-    "seed_override": None,    # where / how the game seed is replaced before any draw
-    "inject": None,           # where / how a C->S message enters the server queue
-    "unit_x": None, "unit_y": None, "unit_life": None, "unit_mana": None,
-}
+INJECT_POINT = 0x44F136   # §1.3, §3: `call drain` of the single-player client frame
+INJECT_BYTES = bytes.fromhex("E8A5DE0D00")
+TRANSPORT_SEND = 0x52AE50  # §1: stdcall (size, channel, message), ret 0xC, EAX 1 = queued
+SEED_TIME = 0x52C2BB      # §2.1: `mov edx, eax` after the first time_value call
+SEED_TIME_BYTES = bytes.fromhex("8BD0")
+SEED_INIT = 0x52C2E3      # §2.1: `mov [edi+0x7C], eax`
+SEED_INIT_BYTES = bytes.fromhex("89477C")
+TICK_RETURN = 0x52FD1E    # §3: tick driver return, ESI = game, game+0xA8 = frame N
+CLIENT_STATE_OK = 4       # §1.5: client list head game+0x88, state client+0x04
+G_CLIENTS, C_STATE = rt.G_CLIENTS, 0x04
+SCRATCH_SIZE = 0x1000     # §1.4.1: one RWX page, S+0 is the return trap, S+0x10 the message
+SCRATCH_MSG = 0x10
+
+# Unit fields. The spec's §4 is not written yet; these come from the specs that own
+# them (cited) and `--probe unit_fields` prints the raw bytes to confirm them.
+U_PATH, U_STATLIST = 0x2C, 0x5C           # units.md §2
+PATH_DYN_X, PATH_DYN_Y = 0x02, 0x06       # path-placement.md §2.1 (types 0, 1, 3: u16 sub-tile)
+PATH_STATIC_X, PATH_STATIC_Y = 0x0C, 0x10  # path-placement.md §2.1 (types 2, 4, 5: u32)
+SL_FULL_ARRAY, SL_FULL_COUNT = 0x48, 0x4C  # stat-lists.md §1: extended list full array, i16 count
+STAT_LIFE, STAT_MANA = 6, 8               # stats.md §2: stored in 1/256 points
+
+# §5 start without a human
+CLIENT_ENTRY = 0x44B8A0   # §5.4.3: stdcall, [ESP+8] = config; bytes 55 8B EC 56 8B 75
+CLIENT_ENTRY_BYTES = bytes.fromhex("558BEC568B75")
+CFG_DIFFICULTY = 0x210    # §5.2: config byte that becomes 0x67 byte +0x14
+CFG_CLASS_EXTRA = {5: 0x8A, 6: 0x8B}   # §5.1.3: classes with no switch
+CLASS_SWITCH = {0: "-ama", 1: "-sor", 2: "-nec", 3: "-pal", 4: "-bar"}
+CLASS_NAMES = {"ama": 0, "sor": 1, "nec": 2, "pal": 3, "bar": 4, "dru": 5, "ass": 6}
+GAME_MODE, NEXT_MODE, MENU_LOOP = 0x74C704, 0x7795E8, 0x72DDD4   # §5.4.2 (dump_tables.py)
+MENU_MODE = 4
+CLIENT_STATE_WORD = 0x70EF18  # §5 OQ2: logged while no tick runs
+SAVE_FOPEN = 0x534410     # §5.3.2 / OQ4: [ESP] = path string
+MANUAL_ARGS = ["-w", "-ns"]   # --manual-start: a person clicks through the menus
 
 
-def need(name):
-    if HOOK[name] is None:
-        raise HookMissing(f"hook {name!r} is not implemented: specs/tools/original-hooks.md "
-                          f"did not settle it (see `--probe {name}`)")
-    return HOOK[name]
+def start_args(sc):
+    """§5.4.1 command line (classes 5, 6 have no switch; written to the config instead)."""
+    args = ["-w", "-ns", "-nosave", "-name", sc["save"]]
+    if sc["class"] in CLASS_SWITCH:
+        args.append(CLASS_SWITCH[sc["class"]])
+    return args
+
+
+def need(value, what):
+    if value is None:
+        raise HookMissing(f"{what} is not known: specs/tools/original-hooks.md did not settle it")
+    return value
+
+
+def steps_due(steps, done_frame):
+    """Steps to inject at the stop after tick `done_frame` returned (§3.1)."""
+    return [s for s in steps if s["tick"] == done_frame + 1]
+
+
+def stat_value(entries, count, stat, layer=0):
+    """Value of (stat, layer) in a full array: 8-byte entries u16 layer, u16 stat, i32
+    value (stat-lists.md §1); absent = 0 (a missing stat reads 0)."""
+    for i in range(min(count, 4096)):
+        lay, st, val = struct.unpack_from("<HHi", entries, 8 * i)
+        if st == stat and lay == layer:
+            return val
+    return 0
 
 
 # --- the recorder --------------------------------------------------------------
 
 class ScenarioRecorder(rp.PacketRecorder):
     """PacketRecorder (message hooks + the shared debug loop, which also hooks
-    the RNG helpers and setters) plus tick counting, seed override, injection
-    and per-tick unit snapshots."""
+    the RNG helpers and setters) plus seed override, message injection and
+    per-tick unit snapshots."""
 
-    def __init__(self, exe, args, writer, scenario, seconds):
+    def __init__(self, exe, args, writer, scenario, seconds, probe=None, probe_frame=None,
+                 auto_start=False, force_after=6.0):
         super().__init__(exe, args, "", seconds, 0)
         self.out, self.writer = writer, writer
         self.sc = scenario
         self.want = set(scenario["streams"])
         self.game = None
-        self.tick_no = -1              # index of the current tick since the first one
-        self.steps = list(scenario["steps"])
+        self.last_frame = None         # frame of the last tick that returned
+        self.todo = list(scenario["steps"])
+        self.queue = []                # messages of the stop being injected
+        self.saved = None              # thread context at the injection point
+        self.inj_tid = None
+        self.scratch = None
         self.injected = 0
         self.recording = False
+        self.failed = None
+        self.probe, self.probe_frame = probe, probe_frame
+        self.probe_out = []
+        self.seeds_done = set()
+        self.max_events = 0
+        self.auto_start, self.force_after = auto_start, force_after
+        self.forced = False
+        self.stopping = False
 
-    # deterministic output: no wall-clock ms, no thread ids
+    # --- output: deterministic (no wall-clock ms, no thread ids) -----------
+
     def emit(self, rec):
         stream = STREAM_OF.get(rec["type"])
         if (stream is not None and stream not in self.want) or not self.recording:
@@ -251,74 +331,472 @@ class ScenarioRecorder(rp.PacketRecorder):
         self.count(":".join(x for x in (rec["type"], rec.get("via"), rec.get("op")) if x))
         self.writer.record(rec)
 
+    def stop(self, why, failed=False):
+        self.notes.append(why)
+        if failed:
+            self.failed = why
+        self.max_events = max(1, self.seq)  # the shared loop stops on its event limit
+
+    # --- install -----------------------------------------------------------
+
+    def install(self, base):
+        if base != rr.IMAGE_BASE:
+            raise RuntimeError(f"Game.exe loaded at {base:#x}, expected {rr.IMAGE_BASE:#x}")
+        needed = {a: rp.HOOKS[a][1] for a in rp.HOOKS
+                  if "packets" in self.want or rp.HOOKS[a][0] == "tick"}
+        for addr, first in needed.items():
+            if self.read(addr, len(first) // 2) != bytes.fromhex(first):
+                raise RuntimeError(f"unexpected code at {addr:#x}: not the 1.14d Game.exe?")
+            self.add_role(addr, "pkt")
+        for addr, want in ((INJECT_POINT, INJECT_BYTES), (SEED_TIME, SEED_TIME_BYTES),
+                           (SEED_INIT, SEED_INIT_BYTES), (TICK_RETURN, bytes.fromhex("8b7618"))):
+            if self.read(addr, len(want)) != want:
+                raise RuntimeError(f"unexpected code at {addr:#x}: not the 1.14d Game.exe?")
+            self.add_role(addr, "pkt")
+        if self.auto_start:
+            if self.read(CLIENT_ENTRY, 6) != CLIENT_ENTRY_BYTES:
+                raise RuntimeError(f"unexpected code at {CLIENT_ENTRY:#x}: not the 1.14d Game.exe?")
+            self.add_role(CLIENT_ENTRY, "start")
+        if self.probe == "savepath":
+            self.add_role(SAVE_FOPEN, "start")       # bytes not in the spec: not checked
+        if "rng" in self.want:
+            rr.Recorder.install(self, base)
+        return 0
+
+    # --- breakpoints -------------------------------------------------------
+
+    def on_breakpoint(self, tid, addr):
+        if addr in (SEED_TIME, SEED_INIT):
+            self.override_seed(tid, addr)           # §2.1
+        elif addr == CLIENT_ENTRY:
+            self.configure_client(tid)              # §5.4.3
+        elif addr == SAVE_FOPEN:
+            self.log_save_path(tid)                 # OQ4
+        elif addr == INJECT_POINT and self.inject_stop(tid):
+            return                                  # redirected into the send; no step-over yet
+        super().on_breakpoint(tid, addr)
+
+    def on_exception(self, tid, info):
+        rec = info.ExceptionRecord
+        if self.scratch and (rec.ExceptionAddress or 0) == self.scratch \
+                and rec.ExceptionCode in rr.BREAKPOINT_CODES:
+            self.inject_return(tid)
+            return rr.DBG_CONTINUE
+        return super().on_exception(tid, info)
+
     def on_hook(self, tid, addr, ctx):
-        if rp.HOOKS[addr][0] == "tick":
+        if addr not in rp.HOOKS:
+            return
+        kind = rp.HOOKS[addr][0]
+        if kind == "tick":
             if self.game is None:
                 self.game = ctx.Ecx
                 self.recording = True
-            if ctx.Ecx != self.game:
-                return
-            if self.tick_no >= 0:
-                self.snapshot_units(self.tick_no)   # end state of the previous tick
-            self.tick_no += 1
-            if self.tick_no >= self.sc["ticks"]:
-                self.notes.append(f"{self.sc['ticks']} ticks recorded")
-                self.max_events = max(1, self.seq)  # the shared loop stops on its event limit
+            elif ctx.Ecx != self.game:
                 return
         super().on_hook(tid, addr, ctx)
-        if rp.HOOKS[addr][0] == "tick":
-            self.emit({"type": "tick_no", "n": self.tick_no, "frame": self.frame})
+        if addr == TICK_RETURN and ctx.Esi == self.game:
+            self.tick_done(self.read_i32(self.game + rt.G_FRAME))
 
-    # --- units stream -------------------------------------------------------
+    # §5.4.3: difficulty (and class 5, 6) into the config before the handlers copy them
+    def configure_client(self, tid):
+        ctx = self.get_ctx(tid)
+        cfg = self.read_u32(ctx.Esp + 8)
+        self.write(cfg + CFG_DIFFICULTY, bytes([self.sc["difficulty"]]))
+        if self.sc["class"] in CFG_CLASS_EXTRA:
+            self.write(cfg + CFG_CLASS_EXTRA[self.sc["class"]], b"\x01")
+        self.notes.append(f"client entry: config {cfg:#x}, difficulty {self.sc['difficulty']}, "
+                          f"class {self.sc['class']}")
+
+    def log_save_path(self, tid):
+        ctx = self.get_ctx(tid)
+        ptr = self.read_u32(ctx.Esp)
+        path = self.read(ptr, 260).split(b"\0")[0].decode("latin-1")
+        print("save path read at 0x534410:", path)
+        self.notes.append(f"save path: {path}")
+        if self.probe == "savepath":
+            print(f"RESULT save path (OQ4): {path}")
+            self.stop("probe savepath done")
+
+    # §5.4.2: end the menu the way starting a game does (as dump_tables.py)
+    def force_menu(self):
+        t0 = time.perf_counter()
+        last = 0
+        while not self.stopping:
+            time.sleep(0.1)
+            try:
+                el = time.perf_counter() - t0
+                if not self.forced and el >= self.force_after and self.read_u32(GAME_MODE) == MENU_MODE:
+                    self.write(NEXT_MODE, struct.pack("<I", 1))
+                    self.write(MENU_LOOP, struct.pack("<I", 0))
+                    self.forced = True
+                    self.notes.append(f"menu ended by the tool at {el:.1f}s")
+                elif self.forced and self.game is None and el - last >= 2:   # OQ2 diagnostics
+                    last = el
+                    print(f"{el:.0f}s: no tick yet, 0x70EF18 = {self.read_u32(CLIENT_STATE_WORD):#x}")
+            except OSError:
+                pass
+
+    # §2.1: replace the clock-derived values before the first draw of the game seed
+    def override_seed(self, tid, addr):
+        ctx = self.get_ctx(tid)
+        ctx.Eip = addr
+        which = "time" if addr == SEED_TIME else "init"
+        val = self.sc["seed"] if which == "time" else self.sc["init_seed"]
+        self.recording = True                      # from game creation on
+        self.emit({"type": "seed_override", "which": which, "old": ctx.Eax, "new": val})
+        ctx.Eax = val
+        self.set_ctx(tid, ctx)
+        self.seeds_done.add(which)
+
+    # --- injection (§1.4) --------------------------------------------------
+
+    def client_state(self):
+        """State of the first client of the game (§1.5), or None."""
+        head = self.read_u32(self.game + G_CLIENTS)
+        return self.read_u32(head + C_STATE) if head else None
+
+    def inject_stop(self, tid):
+        """At the drain call. True = a message call was started (thread redirected)."""
+        if self.game is None or self.last_frame is None:
+            return False
+        due = steps_due(self.todo, self.last_frame)
+        if not due:
+            return False
+        if self.client_state() != CLIENT_STATE_OK:
+            self.stop(f"step at tick {due[0]['tick']}: client not in state {CLIENT_STATE_OK} "
+                      f"(is {self.client_state()}); the first usable tick is later (§1.5)", True)
+            return False
+        for s in due:
+            self.todo.remove(s)
+        self.queue = [s["c2s"] for s in due]
+        ctx = self.get_ctx(tid)
+        ctx.Eip = INJECT_POINT
+        self.saved, self.inj_tid = ctx, tid
+        self.inj_tick = due[0]["tick"]
+        self.start_call(tid)
+        return True
+
+    def poke(self, addr, data):
+        """Write without changing page protection (the stack)."""
+        buf = (C.c_ubyte * len(data)).from_buffer_copy(data)
+        got = C.c_size_t()
+        if not rr.WriteProcessMemory(self.h_process, C.c_void_p(addr), buf, len(data), C.byref(got)):
+            raise rr.winerr(f"WriteProcessMemory {addr:#x}")
+
+    def start_call(self, tid):
+        if self.scratch is None:  # §1.4.1
+            self.scratch = need_alloc(self.h_process, SCRATCH_SIZE)
+            self.write(self.scratch, rr.INT3)
+        msg = self.queue.pop(0)
+        self.cur_msg = msg
+        self.write(self.scratch + SCRATCH_MSG, msg)
+        ctx = type(self.saved).from_buffer_copy(self.saved)
+        ctx.Esp = (self.saved.Esp - 16) & rr.M32
+        self.poke(ctx.Esp, struct.pack("<4I", self.scratch, len(msg), 1,
+                                       self.scratch + SCRATCH_MSG))
+        ctx.Eip = TRANSPORT_SEND
+        self.set_ctx(tid, ctx)
+
+    def inject_return(self, tid):
+        ctx = self.get_ctx(tid)
+        ok = ctx.Eax == 1
+        self.emit({"type": "inject", "tick": self.inj_tick, "c2s": self.cur_msg.hex(),
+                   "result": ctx.Eax, "via": "0x52ae50 at 0x44f136"})
+        if not ok:
+            self.stop(f"injection at tick {self.inj_tick} refused (send returned {ctx.Eax}): "
+                      f"message {self.cur_msg.hex()}", True)
+        else:
+            self.injected += 1
+        if self.queue and ok:
+            self.start_call(tid)
+            return
+        self.set_ctx(tid, self.saved)     # back at the drain call, as before the injection
+        self.saved = None
+        rr.Recorder.on_breakpoint(self, tid, INJECT_POINT)  # step over the original call
+
+    # --- tick boundary (§3.3) ----------------------------------------------
+
+    def tick_done(self, frame):
+        self.last_frame = frame
+        self.snapshot_units(frame)
+        for s in self.todo:
+            if s["tick"] <= frame:
+                self.stop(f"step at tick {s['tick']} was not injected (tick {frame} already ran; "
+                          f"the client was not ready one tick earlier, or the tick is before the "
+                          f"first usable one)", True)
+                return
+        if self.probe:
+            self.probe_tick(frame)
+        if frame >= self.sc["ticks"]:
+            self.stop(f"{self.sc['ticks']} ticks recorded")
+
+    def read_i32(self, addr):
+        return struct.unpack("<i", self.read(addr, 4))[0]
+
+    # --- units stream ------------------------------------------------------
 
     u32 = rt.TickRecorder.u32
     i32 = rt.TickRecorder.i32
     walk = rt.TickRecorder.walk
 
-    def snapshot_units(self, tick):
-        if "units" not in self.want:
-            return
-        units = []
+    def server_units(self):
+        out = []
         for t, off in rt.HASH_OFFSETS.items():
-            for b in range(128):
-                head = self.u32(self.game + rt.HASH_BASE + off + 4 * b)
+            heads = struct.unpack("<128I", self.read(self.game + rt.HASH_BASE + off, 512))
+            for head in heads:
                 for u in self.walk(head, rt.U_HASH_NEXT) if head else ():
-                    if not self.u32(u + rt.U_FLAGS2) & rt.SERVER_UNIT:
-                        continue
-                    units.append(self.unit_record(u))
-        units.sort(key=lambda r: (r["t"], r["id"]))
-        self.emit({"type": "units", "tick": tick, "units": units})
+                    if self.u32(u + rt.U_FLAGS2) & rt.SERVER_UNIT:
+                        out.append(u)
+        return out
+
+    def snapshot_units(self, frame):
+        if "units" not in self.want and not self.probe:
+            return
+        units = sorted((self.unit_record(u) for u in self.server_units()),
+                       key=lambda r: (r["t"], r["id"]))
+        self.emit({"type": "units", "tick": frame, "units": units})
 
     def unit_record(self, u):
-        rec = {"id": self.u32(u + rt.U_GUID), "t": self.u32(u + rt.U_TYPE),
-               "cl": self.u32(u + rt.U_CLASS), "m": self.u32(u + rt.U_MODE)}
-        for k in ("unit_x", "unit_y", "unit_life", "unit_mana"):
-            rec[k[5:]] = self.read_field(k, u) if HOOK[k] is not None else None
+        t = self.u32(u + rt.U_TYPE)
+        rec = {"id": self.u32(u + rt.U_GUID), "t": t, "cl": self.u32(u + rt.U_CLASS),
+               "m": self.u32(u + rt.U_MODE)}
+        path = self.u32(u + U_PATH)
+        if not path:
+            rec["x"] = rec["y"] = 0                 # path-placement.md §2.1
+        elif t in (0, 1, 3):
+            rec["x"], rec["y"] = struct.unpack("<HH", self.read(path + PATH_DYN_X, 2) +
+                                               self.read(path + PATH_DYN_Y, 2))
+        else:
+            rec["x"], rec["y"] = struct.unpack("<II", self.read(path + PATH_STATIC_X, 4) +
+                                               self.read(path + PATH_STATIC_Y, 4))
+        sl = self.u32(u + U_STATLIST)
+        for key, stat in (("life", STAT_LIFE), ("mana", STAT_MANA)):
+            rec[key] = self.stat_of(sl, stat) if sl else None   # raw, 1/256 points
         return rec
 
-    def read_field(self, name, unit):
-        raise HookMissing(f"unit field {name}")  # replaced once the spec gives the layout
+    def stat_of(self, statlist, stat):
+        n = struct.unpack("<h", self.read(statlist + SL_FULL_COUNT, 2))[0]
+        arr = self.u32(statlist + SL_FULL_ARRAY)
+        if n <= 0 or not arr:
+            return 0
+        return stat_value(self.read(arr, 8 * min(n, 4096)), n, stat)
 
-    def run_scenario(self, scenario_path, scenario_sha, game_sha):
-        raise HookMissing("start-up, seed override and injection come from "
-                          "specs/tools/original-hooks.md")
+    # --- probes (run with the scenario machinery; see PROBES) --------------
+
+    def probe_tick(self, frame):
+        if self.probe == "ready":
+            st = self.client_state()
+            print(f"frame {frame}: client state {st}")
+            if st == CLIENT_STATE_OK:
+                print(f"RESULT first ready frame {frame}: inject at tick >= {frame + 1}")
+                self.stop("probe ready done")
+        elif self.probe == "unit_fields" and frame >= self.probe_frame:
+            for u in self.server_units():
+                if self.u32(u + rt.U_TYPE) != 0:
+                    continue
+                print(f"player unit {u:#x}, record:", self.unit_record(u))
+                print("unit +0x00..0x100:", self.read(u, 0x100).hex(" ", 4))
+                path = self.u32(u + U_PATH)
+                print(f"path {path:#x} +0x00..0x40:", self.read(path, 0x40).hex(" ", 4))
+                sl = self.u32(u + U_STATLIST)
+                n = struct.unpack("<h", self.read(sl + SL_FULL_COUNT, 2))[0]
+                arr = self.u32(sl + SL_FULL_ARRAY)
+                print(f"full stat array {arr:#x}, {n} entries (layer, stat, value):")
+                for i in range(min(n, 200)):
+                    print("  ", struct.unpack("<HHi", self.read(arr + 8 * i, 8)))
+                print("RESULT compare these with the in-game values (life, mana, position)")
+            self.stop("probe unit_fields done")
 
 
-PROBES = {}  # name -> function(args); filled in phase 2 from the spec's open questions
+def need_alloc(h_process, size):
+    k32 = rr.k32
+    k32.VirtualAllocEx.restype = C.c_void_p
+    k32.VirtualAllocEx.argtypes = [C.c_void_p, C.c_void_p, C.c_size_t, C.c_uint32, C.c_uint32]
+    p = k32.VirtualAllocEx(h_process, None, size, 0x3000, 0x40)  # commit|reserve, RWX
+    if not p:
+        raise rr.winerr("VirtualAllocEx")
+    return p
+
+
+def run_game(rec):
+    """Start the game under the debugger and run the shared loop (the process part of
+    record_rng.Recorder.run; header and footer are written by the caller)."""
+    si = rr.STARTUPINFOW()
+    si.cb = C.sizeof(si)
+    pi = rr.PROCESS_INFORMATION()
+    cmd = C.create_unicode_buffer(" ".join([f'"{rec.exe}"'] + rec.args))
+    if not rr.CreateProcessW(rec.exe, cmd, None, None, False, rr.DEBUG_ONLY_THIS_PROCESS,
+                             None, os.path.dirname(rec.exe), C.byref(si), C.byref(pi)):
+        raise rr.winerr("CreateProcessW")
+    rec.h_process, rec.pid = pi.hProcess, pi.dwProcessId
+    rr.DebugSetProcessKillOnExit(True)
+    rec.t0 = time.perf_counter()
+    if rec.auto_start:
+        threading.Thread(target=rec.force_menu, daemon=True).start()
+    try:
+        rec.loop(rec.t0 + rec.seconds)
+    finally:
+        rec.stopping = True
+        rec.kill()
+        rr.CloseHandle(pi.hThread)
+
+
+# --- probes ----------------------------------------------------------------------
+# Each answers an open question of original-hooks.md by running the game (the person at
+# the keyboard starts a game by hand: --manual-start) and printing a RESULT line.
+
+def probe_scenario(a, name, ticks, steps, streams):
+    return {"seed": 1, "init_seed": 1, "save": a.save, "class": CLASS_NAMES[a.cls],
+            "difficulty": a.difficulty, "ticks": ticks, "streams": streams, "steps": steps}
+
+
+def probe_run(a, name, sc, summarize=None):
+    out = os.path.join(REPO, "traces", "raw",
+                       datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + f"-probe-{name}.jsonl")
+    game = check_game(a.game)
+    writer = ScenarioWriter(out)
+    args = MANUAL_ARGS if a.manual_start else start_args(sc)
+    r = ScenarioRecorder(game, args, writer, sc, a.seconds, probe=name,
+                         probe_frame=a.probe_frame, auto_start=not a.manual_start,
+                         force_after=a.force_after)
+    writer.header(make_header(sc, f"probe:{name}", "-", rr.GAME_EXE_SHA256, args))
+    print(f"probe {name}: Game.exe {' '.join(args)}"
+          + ("  (start a single-player game by hand)" if a.manual_start else ""))
+    try:
+        run_game(r)
+    finally:
+        writer.footer({"counts": r.counts, "notes": r.notes})
+        writer.close()
+    if summarize:
+        summarize(out)
+    for n in r.notes:
+        print("note:", n)
+    return 4 if r.failed else 0
+
+
+def records_of(path):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f]
+
+
+def probe_inject(a):
+    """Open question 1: does a 0x01 walk queued through 0x52AE50 at 0x44F136 give c2s,
+    dispatch and result 0 in the same drain, with dispatch.game_frame = N-1?"""
+    n = a.probe_frame
+    walk = bytes.fromhex("01f113b513")
+    sc = probe_scenario(a, "inject", n + 3, [{"tick": n, "c2s": walk}], ["packets"])
+
+    def summarize(path):
+        recs = [r for r in records_of(path) if r.get("type") in
+                ("inject", "c2s", "dispatch", "result")]
+        shown = [r for r in recs if r["type"] == "inject" or r.get("frame") in (n - 1, n)]
+        for r in shown:
+            print({k: v for k, v in r.items() if k not in ("seq", "tid")})
+        d = [r for r in recs if r["type"] == "dispatch" and r.get("id") == 1
+             and r.get("game_frame") == n - 1]
+        res = [r for r in recs if r["type"] == "result" and r.get("dispatched")]
+        c = [r for r in recs if r["type"] == "c2s" and r.get("bytes") == walk.hex()]
+        print(f"RESULT inject at {n}: c2s={len(c)} dispatch(frame {n - 1})={len(d)} "
+              f"result codes={[r.get('code') for r in res[-1:]]}: "
+              f"{'ANSWERS Q1 yes' if c and d and res and res[-1].get('code') == 0 else 'DOES NOT MATCH'}")
+    return probe_run(a, "inject", sc, summarize)
+
+
+def probe_seed(a):
+    """OQ3: with T and I set, does the first game-seed draw chain from one step of
+    {T, 666}, and do two runs give identical rng chains? Runs the game twice."""
+    sc = probe_scenario(a, "seed", 5, [], ["rng"])
+    sc["seed"], sc["init_seed"] = 0x1234567, 0x89ABCDEF
+    hashes = []
+
+    def summarize(path):
+        rng = [r for r in records_of(path) if r.get("type") in ("seed_override", "seed_set", "draw")]
+        for r in rng[:6]:
+            print({k: v for k, v in r.items() if k not in ("seq", "ms")})
+        n = sum(1 for r in rng if r["type"] == "seed_override")
+        h = hashlib.sha256("".join(ScenarioWriter.line(r) for r in rng).encode()).hexdigest()
+        hashes.append((n, h))
+        print(f"run {len(hashes)}: {n} seed_override records (want 2), {len(rng)} rng records, "
+              f"sha256 {h[:16]}")
+    rc = probe_run(a, "seed", sc, summarize)
+    if not rc:
+        rc = probe_run(a, "seed", sc, summarize)
+    if len(hashes) == 2:
+        print(f"RESULT OQ3 two runs identical: {hashes[0] == hashes[1] and hashes[0][0] == 2}; "
+              f"check by eye that the first draw's seed-before equals one step of "
+              f"{{{sc['seed']:#x}, 666}}")
+    return rc
+
+
+def probe_ready(a):
+    """Open question: the first tick at which the client is in state 4 (first usable N)."""
+    return probe_run(a, "ready", probe_scenario(a, "ready", 100000, [], ["units"]))
+
+
+def probe_start(a):
+    """OQ2: after the forced start does the client send 0x67 with the name, class and
+    difficulty, and does tick 1 run with no input?"""
+    sc = probe_scenario(a, "start", 3, [], ["packets"])
+
+    def summarize(path):
+        recs = records_of(path)
+        sysmsgs = [r for r in recs if r.get("type") == "c2s_sys" and r.get("bytes", "")[:2] == "67"]
+        for r in sysmsgs[:2]:
+            b = bytes.fromhex(r["bytes"])
+            print("0x67:", {"type": b[0x11] if len(b) > 0x11 else None,
+                            "class": b[0x12] if len(b) > 0x12 else None,
+                            "difficulty": b[0x14] if len(b) > 0x14 else None,
+                            "name": b[0x15:0x25].split(b"\0")[0].decode("latin-1")
+                            if len(b) >= 0x25 else None})
+        ticks = [r for r in recs if r.get("type") == "tick"]
+        print(f"RESULT OQ2 0x67 sent: {bool(sysmsgs)}; first tick frame: "
+              f"{ticks[0]['frame'] if ticks else None} (want 1)")
+    return probe_run(a, "start", sc, summarize)
+
+
+def probe_savepath(a):
+    """OQ4: the save path at the fopen of the save loader (0x534410)."""
+    return probe_run(a, "savepath", probe_scenario(a, "savepath", 100000, [], ["units"]))
+
+
+def probe_unit_fields(a):
+    """Unit snapshot fields (§4 is not written yet): raw dumps of the player unit."""
+    n = a.probe_frame
+    return probe_run(a, "unit_fields", probe_scenario(a, "unit_fields", n + 1, [], ["units"]))
+
+
+PROBES = {"start": probe_start, "savepath": probe_savepath, "inject": probe_inject, "seed": probe_seed, "ready": probe_ready,
+          "unit_fields": probe_unit_fields}
 
 
 # --- plan, selftest, main ----------------------------------------------------
 
+def check_game(path):
+    game = os.path.abspath(path)
+    with open(game, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    if sha != rr.GAME_EXE_SHA256:
+        raise RuntimeError(f"{game}: sha256 {sha} is not the reference 1.14d Game.exe")
+    return game
+
+
 def plan_text(sc, path, sha, game):
     lines = [f"scenario   {path} (sha256 {sha[:16]}...)",
              f"game       {game}",
-             f"save       {sc['save']}  difficulty {sc['difficulty']}  seed {sc['seed']:#010x}",
-             f"ticks      {sc['ticks']}   streams {', '.join(sc['streams'])}",
+             f"save       {sc['save']}  difficulty {sc['difficulty']}",
+             f"seed       time value {sc['seed']:#x}, init value {sc['init_seed']:#x} "
+             f"(overridden at {SEED_TIME:#x} and {SEED_INIT:#x}, spec §2.1)",
+             f"ticks      frames 1..{sc['ticks']}   streams {', '.join(sc['streams'])}",
              f"steps      {len(sc['steps'])}"]
     for s in sc["steps"]:
-        lines.append(f"  tick {s['tick']:>6}  C->S {len(s['c2s'])} bytes  {s['c2s'].hex(' ')}")
-    for name in HOOK:
-        lines.append(f"hook {name:<14} {'implemented' if HOOK[name] is not None else 'NOT KNOWN YET'}")
+        lines.append(f"  tick {s['tick']:>6}  C->S {len(s['c2s'])} bytes  {s['c2s'].hex(' ')}"
+                     f"  (queued via {TRANSPORT_SEND:#x} at {INJECT_POINT:#x} after tick "
+                     f"{s['tick'] - 1}, spec §1, §3.1)")
+    lines.append("start-up   Game.exe " + " ".join(start_args(sc)) + f"  (spec §5.4: menu ended by "
+                 f"the tool, difficulty {sc['difficulty']} written to config +{CFG_DIFFICULTY:#x} "
+                 f"at {CLIENT_ENTRY:#x}); --manual-start: Game.exe {' '.join(MANUAL_ARGS)}, "
+                 f"a person starts the game")
     return "\n".join(lines)
 
 
@@ -353,7 +831,7 @@ def selftest():
           "same-tick order")
     # every field error, one at a time
     for patch, frag in [({"version": 2}, "version"), ({"seed": -1}, "seed"),
-                        ({"seed": 2 ** 32}, "seed"), ({"seed": "1"}, "seed"),
+                        ({"seed": 2 ** 31}, "seed"), ({"init_seed": 2 ** 32}, "init_seed"), ({"seed": "1"}, "seed"),
                         ({"seed": True}, "seed"), ({"ticks": 0}, "ticks"),
                         ({"ticks": 1.5}, "ticks"), ({"save": ""}, "save"),
                         ({"save": "../x"}, "save"), ({"save": 3}, "save"),
@@ -426,13 +904,60 @@ def selftest():
     check(json.loads(write(records[::-1])[-1])["records_sha256"] != base_hash,
           "reordering did not change the hash")
 
-    # hook table: nothing guessed
-    try:
-        need("inject")
-    except HookMissing:
-        pass
-    else:
-        check(HOOK["inject"] is not None, "need() accepted an unknown hook")
+    # injection schedule (§3.1): a step for tick N is due after tick N-1 returned
+    st = [{"tick": 5, "c2s": b"a"}, {"tick": 5, "c2s": b"b"}, {"tick": 7, "c2s": b"c"}]
+    check([s["c2s"] for s in steps_due(st, 4)] == [b"a", b"b"], "steps due after tick 4")
+    check(steps_due(st, 5) == [] and len(steps_due(st, 6)) == 1, "steps due after 5 and 6")
+
+    # unit field readers on synthetic game memory (perturbation: each field is read from
+    # its own offset, so changing one byte changes exactly that field)
+    class Fake(ScenarioRecorder):
+        def __init__(self, mem):
+            self.mem = mem
+
+        def read(self, addr, n):
+            return bytes(self.mem.get(addr + i, 0) for i in range(n))
+
+        read_u32 = rr.Recorder.read_u32
+
+    def put(mem, addr, data):
+        for i, b in enumerate(data):
+            mem[addr + i] = b
+
+    def make():
+        mem = {}
+        u, path, sl, arr = 0x1000, 0x2000, 0x3000, 0x4000
+        put(mem, u, struct.pack("<IIII", 0, 1, 0, 0x55))   # type, class, -, guid at +0x0C
+        put(mem, u + 0x10, struct.pack("<I", 2))            # mode
+        put(mem, u + 0x2C, struct.pack("<I", path))
+        put(mem, u + 0x5C, struct.pack("<I", sl))
+        put(mem, path + 2, struct.pack("<H", 5123))
+        put(mem, path + 6, struct.pack("<H", 5045))
+        put(mem, sl + 0x48, struct.pack("<I", arr))
+        put(mem, sl + 0x4C, struct.pack("<h", 3))
+        put(mem, arr, struct.pack("<HHi", 0, 6, 100 << 8) + struct.pack("<HHi", 0, 7, 120 << 8)
+            + struct.pack("<HHi", 0, 9, 30 << 8))
+        return mem, u
+    mem, u = make()
+    rec = Fake(mem).unit_record(u)
+    check(rec == {"id": 0x55, "t": 0, "cl": 1, "m": 2, "x": 5123, "y": 5045,
+                  "life": 100 << 8, "mana": 0}, f"unit record {rec}")
+    mem, u = make()
+    mem[0x2000 + 2] ^= 1
+    check(Fake(mem).unit_record(u)["x"] == 5122, "x perturbation")
+    mem, u = make()
+    mem[0x4000 + 4] ^= 0x80
+    r2 = Fake(mem).unit_record(u)
+    check(r2["life"] != 100 << 8 and r2["mana"] == 0, "life perturbation")
+    mem, u = make()
+    put(mem, 0x2C + u, struct.pack("<I", 0))
+    check(Fake(mem).unit_record(u)["x"] == 0, "no path reads (0, 0)")
+    check(stat_value(struct.pack("<HHi", 1, 6, 9), 1, 6) == 0, "layer must match")
+    check(start_args({"save": "Foo", "class": 3}) == ["-w", "-ns", "-nosave", "-name", "Foo", "-pal"]
+          and start_args({"save": "Foo", "class": 5})[-1] == "Foo", "start args")
+    sc_cls = parse_scenario(json.dumps(dict(base, **{"class": "pal"})))
+    check(sc_cls["class"] == 3, "class parsed")
+    bad(json.dumps(dict(base, **{"class": "mage"})), "class")
 
     if fails:
         for f in fails:
@@ -451,6 +976,16 @@ def main():
     ap.add_argument("--out", default=None, help="output (default traces/raw/<time>-scenario.jsonl)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and exit")
     ap.add_argument("--selftest", action="store_true", help="check everything that needs no game")
+    ap.add_argument("--manual-start", action="store_true",
+                    help="run Game.exe -w -ns and let a person start the game by hand")
+    ap.add_argument("--force-after", type=float, default=6.0,
+                    help="seconds before the tool ends the start-up menu (default 6)")
+    ap.add_argument("--save", default="Probe", help="probes: character name")
+    ap.add_argument("--class", dest="cls", default="ama", choices=sorted(CLASS_NAMES),
+                    help="probes: character class")
+    ap.add_argument("--difficulty", type=int, default=0, choices=(0, 1, 2), help="probes")
+    ap.add_argument("--probe-frame", type=int, default=30,
+                    help="probes inject / unit_fields: the tick to act at (default 30)")
     ap.add_argument("--probe", metavar="NAME", help="print what the coordinator needs "
                     "to settle an open question of original-hooks.md")
     a = ap.parse_args()
@@ -458,7 +993,7 @@ def main():
         return selftest()
     if a.probe:
         if a.probe not in PROBES:
-            print(f"unknown probe {a.probe!r}; known: {', '.join(sorted(PROBES)) or '(none yet)'}")
+            print(f"unknown probe {a.probe!r}; known: {', '.join(sorted(PROBES)) or '(none)'}")
             return 2
         return PROBES[a.probe](a)
     if not a.scenario:
@@ -487,26 +1022,23 @@ def main():
         return 2
     out = a.out or os.path.join(
         REPO, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-scenario.jsonl")
-    try:
-        need("start_args")
-    except HookMissing as e:
-        print("error:", e, file=sys.stderr)
-        return 3
+    args = MANUAL_ARGS if a.manual_start else start_args(sc)
     writer = ScenarioWriter(out)
-    r = ScenarioRecorder(game, HOOK["start_args"], writer, sc, a.seconds)
-    writer.header(make_header(sc, rel, sha, game_sha, HOOK["start_args"]))
+    r = ScenarioRecorder(game, args, writer, sc, a.seconds, auto_start=not a.manual_start,
+                         force_after=a.force_after)
+    writer.header(make_header(sc, rel, sha, game_sha, args))
     try:
-        r.run_scenario(rel, sha, game_sha)
+        run_game(r)
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
     finally:
-        writer.footer({"counts": r.counts, "notes": r.notes, "ticks": r.tick_no,
-                       "injected": r.injected})
+        writer.footer({"counts": r.counts, "notes": r.notes, "ticks": r.last_frame,
+                       "injected": r.injected, "failed": r.failed})
         writer.close()
     for n in r.notes:
         print("note:", n)
-    print(f"wrote {out}: {r.tick_no} ticks, {r.counts}")
-    return 0
+    print(f"wrote {out}: {r.last_frame} ticks, {r.injected} injected, {r.counts}")
+    return 4 if r.failed else 0
 
 
 if __name__ == "__main__":

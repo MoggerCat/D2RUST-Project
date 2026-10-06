@@ -138,8 +138,8 @@ record bumps it.
 
 JSON lines, UTF-8, LF. First line `{"type":"header",...}`: `format`,
 `format_version`, `tool`, `date`, `game_exe_sha256`, `scenario` (repo
-path), `scenario_sha256`, `scenario_version`, `seed`, `save`,
-`difficulty`, `ticks`, `streams`, `steps`, `args`. Last line
+path), `scenario_sha256`, `scenario_version`, `seed`, `init_seed`,
+`save`, `class`, `difficulty`, `ticks`, `streams`, `steps`, `args`. Last line
 `{"type":"footer",...}`: `records`, `records_sha256` (SHA-256 of the
 record lines in order), `counts`, `notes`, `ticks`, `injected`.
 
@@ -148,9 +148,10 @@ so two runs of one scenario compare byte for byte):
 
 | `type` | Stream | Fields |
 |---|---|---|
-| `tick`, `tick_no` | always | server tick of the recorded game; `n` = index since the first tick, `frame` |
-| `inject` | always | `tick`, `c2s` (hex), where the message entered |
-| `units` | `units` | `tick`, `units`: server units sorted by (`t`, `id`): `id`, `t` type, `cl` class, `m` mode, `x`, `y`, `life`, `mana` (null until the field layout is settled) |
+| `tick` (and `tick_end` in `packets`) | always | server tick of the recorded game; `frame` = game +0xA8 after the tick's increment; scenario ticks are these frame numbers |
+| `seed_override` | always | `which` (`time` at 0x52C2BB, `init` at 0x52C2E3), `old`, `new` |
+| `inject` | always | `tick`, `c2s` (hex), `result` (send return, 1 = queued), `via` |
+| `units` | `units` | `tick`, `units`: server units sorted by (`t`, `id`): `id`, `t` type, `cl` class, `m` mode, `x`, `y` (sub-tile), `life`, `mana` (raw full-array values, 1/256 points; null without a stat list) |
 | `c2s`, `c2s_sys`, `dispatch`, `result`, `s2c`, `net`, `client_send`, `client_out`, `drain`, `flush`, `tick_end` | `packets` | as `packets-raw-1` (`record_packets.py`) |
 | `draw`, `seed_set` | `rng` | as `rng-raw-1` (`record_rng.py`) |
 
