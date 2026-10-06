@@ -63,6 +63,10 @@ The headers must fit in the file. Every index must be < hash_table_size.
 - **Value**: `value_length − 1` bytes at `value_offset` (the final byte is a
   NUL). A `value_length` of 0 means an empty value.
 - Offsets and lengths must stay inside the file.
+- The keys and values of all used entries together (without NULs) must not
+  exceed the file length: strings that don't overlap never do, and entries
+  sharing one string could otherwise copy it once per entry (quadratic in
+  the file size; see Open questions).
 - Strings are raw 8-bit text. English 1.14d uses Windows-1252. Byte 0xFF
   followed by `c` and a character is an in-game color code. Text is kept as
   bytes; decoding to Unicode is a presentation step.
@@ -130,3 +134,5 @@ consulted.
 2. Does the game read the plain-text `DEFAULT.TBL` / `FONTER.TBL` at all?
    Check in an RE session. Until then they're treated as unused tool
    leftovers.
+3. String-size limit (§Strings) assumes entries never share key or value
+   bytes: confirm on all 33 1.14d tables (`mpq-tool formats`).

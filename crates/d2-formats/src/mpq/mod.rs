@@ -13,6 +13,8 @@ mod bits;
 pub mod crypto;
 mod explode;
 mod huffman;
+#[cfg(test)]
+mod robust_tests;
 mod set;
 mod tables;
 
@@ -263,7 +265,7 @@ impl Archive {
     /// (following a user-data header if one is found first).
     fn find_header(file: &File, file_len: u64) -> Result<Header, MpqError> {
         const CHUNK: u64 = 1 << 20;
-        let mut chunk = vec![0u8; CHUNK as usize];
+        let mut chunk = vec![0u8; CHUNK.min(file_len) as usize];
         let mut base = 0u64;
         while base + 32 <= file_len {
             let len = CHUNK.min(file_len - base) as usize;
@@ -504,7 +506,8 @@ impl Archive {
         }
 
         let sectors = file_size.div_ceil(sector_size);
-        let mut out = Vec::with_capacity(file_size);
+        // Grows with decoded sectors: `file_size` is untrusted.
+        let mut out = Vec::new();
 
         if block.is_compressed() {
             let entries = sectors + 1 + usize::from(block.has(flags::SECTOR_CRC));

@@ -21,7 +21,7 @@ const MISSCALC: [&str; 43] = [
 
 /// The 1.14d links of the synthetic vectors: `Fire Bolt` = skill 36,
 /// `firebolt` = missile 58, `strength` = stat 0, `Holy Fire` = skill 102.
-struct Links;
+pub(super) struct Links;
 
 impl CalcLinks for Links {
     fn skill(&self, key: &[u8]) -> Option<u32> {

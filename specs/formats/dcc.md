@@ -110,7 +110,10 @@ bottom-up: `y_min = y_offset`, `y_max = y_min + height − 1`; else
 the union of the frame boxes, with `dir_w = x_max − x_min + 1` and `dir_h`
 likewise. Frame positions below are relative to the direction box:
 `fx = x_min(frame) − x_min(dir)`, `fy` likewise. A width or height of 0, or a
-direction box larger than 16M pixels, is an error.
+direction box larger than 16M pixels, is an error. So is a frame box corner
+outside the i32 range, and direction boxes adding up to more than 0x400_0000
+(64M) pixels over the whole file (implementation limits: a few header bits
+can make a box, and the work to decode it, large; see Open questions).
 
 ### Cells
 
@@ -228,3 +231,6 @@ consulted.
 2. Exact screen placement (the same one-row question as DC6): rendering
    spec.
 3. Meaning of variable0 and the optional bytes.
+4. Whole-file direction-box limit (64M pixels, §Boxes) is an
+   implementation limit, not observed original behavior: confirm every
+   1.14d `.dcc` stays under it (`mpq-tool formats`).

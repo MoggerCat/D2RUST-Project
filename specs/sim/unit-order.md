@@ -1,6 +1,6 @@
 # Spec: Simulation — Unit ordering
 
-- **Status:** draft (no `d2-sim` code yet); rules read from the 1.14d
+- **Status:** draft (implemented in `d2-sim`; synthetic vectors pass, trace replay pending); rules read from the 1.14d
   `Game.exe` code; §2, §4, §5, §6 confirmed on the running game:
   `check_tick.py` reproduces all 197 list snapshots of
   `traces/raw/20261006-015554-tick.jsonl` (4,902 ticks, hand-played)
