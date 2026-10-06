@@ -9,25 +9,25 @@ srvst	6	0x005DA940	SrvSt06_PowerStrike_ChargedStrike	spec'd-here	Power Strike,Ch
 srvst	7	0x005DAB40	SrvSt07_Impale	spec'd-here	Impale	body: bodies-2.md §5.1
 srvst	8	0x005DACD0	SrvSt08_Strafe	spec'd-here	Strafe	body: bodies-2.md §7.1
 srvst	9	0x005DAE30	SrvSt09_Fend	spec'd-here	Fend	body: bodies-2.md §7.4
-srvst	10	0x005DB020	SrvSt10_LightningStrike	mapped	Lightning Strike	
+srvst	10	0x005DB020	SrvSt10_LightningStrike	spec'd-here	Lightning Strike	body: bodies-2.md §8.2
 srvst	11	0x005C8FA0	SrvSt11_Inferno_ArcticBlast	spec'd-here	Inferno,Arctic Blast	body: bodies.md §7.3
 srvst	12	0x005C9030	SrvSt12_Telekinesis_DragonFlight	spec'd-here	Telekinesis,Dragon Flight	body: bodies.md §7.4
 srvst	13	0x005C91C0	SrvSt13_ThunderStorm	spec'd-here	Thunder Storm	body: bodies-2.md §7.5
-srvst	14	0x005C9220	SrvSt14_Hydra	mapped	Hydra	
+srvst	14	0x005C9220	SrvSt14_Hydra	spec'd-here	Hydra	body: bodies-2.md §8.4
 srvst	15	0x005C3070	SrvSt15_RaiseSkeleton_Mage	spec'd-here	Raise Skeleton,Raise Skeletal Mage	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.6
 srvst	16	0x005C30A0	SrvSt16_PoisonDagger	spec'd-here	Poison Dagger	body: bodies-2.md §4.3
 srvst	17	0x005C31C0	SrvSt17_Poison_CorpseExplosion	spec'd-here	Corpse Explosion,Poison Explosion,NihlathakCorpseExplosion	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §7.5
 srvst	18	0x005C3260	SrvSt18_Attract	spec'd-here	Attract	1.14d body is "return 1" (bytes B8 01 00 00 00 C2 08 00); D2MOO points it at shared stub 0x6FC808D0; no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §7.7
 srvst	19	0x005C3270	SrvSt19_BonePrison	spec'd-here	Bone Prison	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §7.9
 srvst	20	0x005C32A0	SrvSt20_IronGolem	spec'd-here	IronGolem	body: bodies-2.md §7.11
-srvst	21	0x005C3350	SrvSt21_Revive	mapped	Revive	no function at this entry in the Ghidra export (data-only xref)
+srvst	21	0x005C3350	SrvSt21_Revive	spec'd-here	Revive	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §8.6
 srvst	22	0x005D30F0	SrvSt22_PsychicHammer	spec'd-here	Psychic Hammer	body: bodies-2.md §3.8
 srvst	23	0x005D32F0	SrvSt23_AssasinChargeStrikes	spec'd-here	Tiger Strike,Fists of Fire,Cobra Strike,Claws of Thunder,Blades of Ice,Royal Strike	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §7.1
 srvst	24	0x005D5970	SrvSt24_DragonTalon	spec'd-here	Dragon Talon	body: bodies-2.md §3.10
 srvst	25	0x005D6330	SrvSt25_64_DragonClaw_MonFrenzy	spec'd-here	Dragon Claw	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §4.12
 srvst	26	0x005D69D0	SrvSt26_BladeFury	spec'd-here	Blade Fury	body: bodies-2.md §6.16
 srvst	27	0x005D7090	SrvSt27_DragonTail	spec'd-here	Dragon Tail	body: bodies-2.md §6.18
-srvst	28	0x005D7A00	SrvSt28_BladeShield	mapped	Blade Shield	
+srvst	28	0x005D7A00	SrvSt28_BladeShield	spec'd-here	Blade Shield	body: bodies-2.md §8.13
 srvst	29	0x005CE790	SrvSt29_Sacrifice	spec'd-here	Sacrifice	body: bodies.md §3.7
 srvst	31	0x005CF6B0	SrvSt31_Charge	spec'd-here	Charge,SerpentCharge	body: bodies-2.md §5.3
 srvst	32	0x005D7EA0	SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite	spec'd-here	Conversion,Bash,Stun,Concentrate,BearSmite	body: bodies.md §3.8
@@ -36,8 +36,8 @@ srvst	34	0x005D8760	SrvSt34_FindItem	spec'd-here	Find Item	no function at this e
 srvst	35	0x005CFE10	SrvSt35_Vengeance	spec'd-here	Vengeance	body: bodies-2.md §6.8
 srvst	36	0x005D0180	SrvSt36_HolyShield	spec'd-here	Holy Shield	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §7.14
 srvst	37	0x005DAF40	SrvSt37_Zeal_Fury_BloodLordFrenzy	spec'd-here	Zeal,Fury,BloodLordFrenzy	body: bodies.md §7.6
-srvst	38	0x005D8F50	SrvSt38_Whirlwind	mapped	Whirlwind	
-srvst	39	0x005D97F0	SrvSt39_Berserk	mapped	Berserk	
+srvst	38	0x005D8F50	SrvSt38_Whirlwind	spec'd-here	Whirlwind	body: bodies-2.md §8.10
+srvst	39	0x005D97F0	SrvSt39_Berserk	spec'd-here	Berserk	body: bodies-2.md §8.12
 srvst	40	0x005D9D50	SrvSt40_Leap	spec'd-here	Leap	body: bodies-2.md §4.6
 srvst	41	0x005DA540	SrvSt41_LeapAttack	spec'd-here	Leap Attack	body: bodies-2.md §6.11
 srvst	42	0x005CAE40	SrvSt42_FireHit	mapped	Fire Hit	
@@ -80,9 +80,9 @@ srvdo	10	0x005DB6D0	SrvDo010_GuidedArrow_BoneSpirit	spec'd-here	Guided Arrow,Bon
 srvdo	11	0x005DB850	SrvDo011_ChargedStrike	spec'd-here	Charged Strike	body: bodies-2.md §6.1
 srvdo	12	0x005DBA40	SrvDo012_Strafe	spec'd-here	Strafe	body: bodies-2.md §7.2
 srvdo	13	0x005DBC60	SrvDo013_Fend_Zeal_Fury	spec'd-here	Fend,Zeal,Fury	body: bodies.md §8.11
-srvdo	14	0x005DBE50	SrvDo014_LightningStrike	mapped	Lightning Strike	
+srvdo	14	0x005DBE50	SrvDo014_LightningStrike	spec'd-here	Lightning Strike	body: bodies-2.md §8.3
 srvdo	15	0x005DC000	SrvDo015_Dopplezon	spec'd-here	Dopplezon	body: bodies-2.md §7.3
-srvdo	16	0x005DC1E0	SrvDo016_Valkyrie	mapped	Valkyrie	
+srvdo	16	0x005DC1E0	SrvDo016_Valkyrie	spec'd-here	Valkyrie	body: bodies-2.md §8.1
 srvdo	17	0x005C9300	SrvDo017_ChargedBolt_BoltSentry	spec'd-here	Charged Bolt,PrimeBolt,BoltSentry,ImpBolt	body: bodies-2.md §3.2
 srvdo	18	0x005C9480	SrvDo018_DefensiveBuff	spec'd-here	11 skills (e.g. Frozen Armor,Shiver Armor,Chilling Armor,Bone Armor)	body: bodies.md §4.3
 srvdo	19	0x005C9640	SrvDo019_Inferno_ArcticBlast	spec'd-here	Inferno,Arctic Blast	body: bodies.md §8.16
@@ -120,11 +120,11 @@ srvdo	50	0x005D7180	SrvDo050_DragonTail	spec'd-here	Dragon Tail	body: bodies-2.m
 srvdo	51	0x005D76E0	SrvDo051_MindBlast	spec'd-here	Mind Blast	body: bodies-2.md §7.19
 srvdo	52	0x005D7850	SrvDo052_DragonFlight	spec'd-here	Dragon Flight	body: bodies-2.md §7.20
 srvdo	53	0x005D7B60	SrvDo053_Unused	unreferenced	(none)	no 1.14d data row references it
-srvdo	54	0x005D7E10	SrvDo054_BladeShield	mapped	Blade Shield	
+srvdo	54	0x005D7E10	SrvDo054_BladeShield	spec'd-here	Blade Shield	body: bodies-2.md §8.14
 srvdo	55	0x005C4DF0	SrvDo055_CorpseExplosion	spec'd-here	Corpse Explosion,mon death sentry,NihlathakCorpseExplosion	body: bodies-2.md §4.5
 srvdo	56	0x005C5100	SrvDo056_Golem	spec'd-here	Clay Golem,BloodGolem,FireGolem	body: bodies.md §8.9
 srvdo	57	0x005C5250	SrvDo057_IronGolem	spec'd-here	IronGolem	body: bodies-2.md §7.12
-srvdo	58	0x005C56C0	SrvDo058_Revive	mapped	Revive	
+srvdo	58	0x005C56C0	SrvDo058_Revive	spec'd-here	Revive	body: bodies-2.md §8.7
 srvdo	59	0x005C3B90	SrvDo059_Attract	spec'd-here	Attract	body: bodies-2.md §7.8
 srvdo	60	0x005C58B0	SrvDo060_BoneWall	spec'd-here	Bone Wall	body: bodies-2.md §5.2
 srvdo	61	0x005C3F20	SrvDo061_Confuse	spec'd-here	Confuse	body: bodies-2.md §6.6
@@ -142,13 +142,13 @@ srvdo	72	0x005D8780	SrvDo072_FindItem	spec'd-here	Find Item	body: bodies-2.md §
 srvdo	73	0x005D0040	SrvDo073_BlessedHammer	spec'd-here	Blessed Hammer	body: bodies-2.md §6.9
 srvdo	74	0x005D88B0	SrvDo074_DoubleThrow	spec'd-here	Double Throw	body: bodies-2.md §5.5
 srvdo	75	0x005D89B0	SrvDo075_GrimWard	spec'd-here	Grim Ward	body: bodies-2.md §7.16
-srvdo	76	0x005D9580	SrvDo076_Whirlwind	mapped	Whirlwind	hard-coded in 0x0057EEC0: re-requesting the same skill is always allowed
+srvdo	76	0x005D9580	SrvDo076_Whirlwind	spec'd-here	Whirlwind	hard-coded in 0x0057EEC0: re-requesting the same skill is always allowed; body: bodies-2.md §8.11
 srvdo	77	0x005DA370	SrvDo077_Leap	spec'd-here	Leap	body: bodies-2.md §4.7
 srvdo	78	0x005DA7E0	SrvDo078_LeapAttack	spec'd-here	Leap Attack	body: bodies-2.md §6.12
 srvdo	79	0x005D0350	SrvDo079_Conversion	spec'd-here	Conversion	body: bodies-2.md §7.13
-srvdo	80	0x005D0670	SrvDo080_FistOfTheHeavens	mapped	Fist of the Heavens	
+srvdo	80	0x005D0670	SrvDo080_FistOfTheHeavens	spec'd-here	Fist of the Heavens	body: bodies-2.md §8.8
 srvdo	81	0x005D0920	SrvDo081_HolyFreeze	spec'd-here	Holy Freeze	body: bodies-2.md §6.10
-srvdo	82	0x005D0E90	SrvDo082_Redemption	mapped	Redemption	
+srvdo	82	0x005D0E90	SrvDo082_Redemption	spec'd-here	Redemption	body: bodies-2.md §8.9
 srvdo	83	0x005CAF30	SrvDo083_FireHit	mapped	Fire Hit	
 srvdo	84	0x005CAFA0	SrvDo084_MaggotEgg	mapped	MaggotEgg	
 srvdo	85	0x005CB0C0	SrvDo085_UnholyBolt_ShamanFire	mapped	UnHolyBolt,ShamanFire	
@@ -208,9 +208,9 @@ srvdo	138	0x005D27B0	SrvDo138_Unused	unreferenced	(none)	no 1.14d data row refer
 srvdo	139	0x005D2940	SrvDo139_BaalColdMissiles	mapped	Baal Cold Missiles	
 srvdo	140	0x005D2C20	SrvDo140_BaalTentacle	mapped	Baal Tentacle	
 srvdo	141	0x005D2E80	SrvDo141_BaalCorpseExplode	mapped	Baal Corpse Explode	
-srvdo	142	0x005D7CE0	SrvDo142_Unused	unreferenced	(none)	no 1.14d data row references it
+srvdo	142	0x005D7CE0	SrvDo142_Unused	unreferenced	(none)	no 1.14d data row references it; called directly by srvdo 54 (Blade Shield pulse), body: bodies-2.md §2.26
 srvdo	143	0x005D4F40	SrvDo143_FistsOfFire_RoyalStrike_ProgressiveFn	mapped	(none)	srvprgfunc1: Fists of Fire srvprgfunc2: Royal Strike
-srvdo	144	0x005CA910	SrvDo144_Hydra	mapped	Hydra	
+srvdo	144	0x005CA910	SrvDo144_Hydra	spec'd-here	Hydra	body: bodies-2.md §8.5
 srvdo	145	0x005C8380	SrvDo145_Unused	mapped	(none)	states.txt srvactivefunc of state hurricane (type-5 event); D2MOO name "Unused" is wrong
 srvdo	146	0x005C8520	SrvDo146_Unused	mapped	(none)	states.txt srvactivefunc of state armageddon (type-5 event); D2MOO name "Unused" is wrong
 srvdo	147	0x005D2B20	SrvDo147_Unused	mapped	(none)	states.txt srvactivefunc of state attached (type-5 event); D2MOO name "Unused" is wrong; no function at this entry in the Ghidra export (data-only xref)
