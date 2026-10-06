@@ -306,26 +306,25 @@ lists), `sim/intents-events.md` (+ `client-messages.tsv`,
 what each timer event does per kind; `unit-events.tsv`,
 `unit-handlers.tsv`). Stats: `sim/stats.md` (ids, values, ops;
 `stat-ops.tsv`), `sim/stat-lists.md` (lists, modifiers, states, regen).
-These are on `claude/phase3-units` until merged. Treasure classes and
+Treasure classes and
 drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
-`treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Items:
+`treasure-chest-acts.tsv`). Items:
 `specs/items/generation.md`, `quality.md`, `affixes.md`, `properties.md`
-(+ `property-functions.tsv`; `claude/phase3-items`). Combat and skills:
+(+ `property-functions.tsv`). Combat and skills:
 `specs/combat/hit.md`, `damage.md`, `specs/skills/levels.md` (+
 `skillcalc.tsv`, `misscalc.tsv`), `use.md` (+ `functions.tsv`;
-`claude/phase3-skills`; `combat/vitals.md`: creation, stat points,
+`combat/vitals.md`: creation, stat points,
 level-up, experience table). Monsters and
 missiles: `specs/monsters/population.md` (+ `preset-monsters.tsv`),
 `init.md` (+ `umods.tsv`), `ai.md` (+ `ai-functions.tsv`),
-`specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`;
-`claude/phase3-monsters`). World: `specs/world/quests.md` (+
+`specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`). World: `specs/world/quests.md` (+
 `quests.tsv`, `quest-messages.tsv`), `waypoints.md` (+ `waypoints.tsv`), `cube.md` (+ `cube-ops.tsv`), `npc.md`,
 `vendors.md` (+ `vendors.tsv`; store generation reproduces the two
-recorded stores item for item; `claude/phase3-world`). Level generation:
+recorded stores item for item). Level generation:
 `specs/drlg/levels.md`, `rooms.md` (rooms-near order, adjacency arrays,
 the deactivation counter = `tick.md` OQ4), `preset.md` (+
 `preset-tables.tsv`), `maze.md` (+ `maze-specials.tsv`), `outdoor.md`,
-`outdoor-tilesub.md` (`claude/phase3-drlg`). All draft: rules
+`outdoor-tilesub.md`. All draft: rules
 from the 1.14d disassembly, RNG draw order not yet checked on a trace. Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
 `specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
