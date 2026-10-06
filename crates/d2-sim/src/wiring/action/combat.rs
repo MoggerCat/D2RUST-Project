@@ -319,7 +319,8 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn thorns(&mut self, a: UnitId, d: UnitId, record: &mut DamageRecord) {
         self.v.h.x.thorns(a, d, record);
     }
+    /// `damage.md` §7.1 ([`super::reaction::reaction`]).
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut DamageRecord) {
-        self.v.h.x.reaction(a, d, record);
+        super::reaction::reaction(self, a, d, record);
     }
 }

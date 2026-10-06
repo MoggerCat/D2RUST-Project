@@ -6,6 +6,7 @@
 
 mod ai;
 mod combat;
+mod death;
 mod e2e;
 mod missiles;
 mod rooms;
@@ -46,10 +47,37 @@ pub struct TestPending {
     pub dir: BTreeMap<UnitId, i32>,
     pub crossed: BTreeMap<UnitId, Vec<(i32, i32)>>,
     pub velocity: BTreeMap<UnitId, i32>,
+    /// COF names per (unit type, mode) for the AnimData lookup.
+    pub names: BTreeMap<(UnitType, u32), [u8; 8]>,
     pub log: Vec<String>,
 }
 
 impl Pending for TestPending {
+    fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
+        self.names.get(&(ty, mode)).copied()
+    }
+    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
+        speed.map_or(0, |s| s as i16)
+    }
+    fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
+        self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
+    }
+    fn level_up_event(&mut self, unit: UnitId) {
+        self.log.push(format!("level up {}", unit.0));
+    }
+    /// The death start's body is not written: the fake sets mode DT, as
+    /// a start function sets its mode (monster spec).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool {
+        h.x.log
+            .push(format!("death start {} {:?}", unit.0, target.map(|t| t.0)));
+        crate::units::modes::set_mode(sim, h, unit, 0).expect("mode DT");
+        true
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or((0, 0))
     }

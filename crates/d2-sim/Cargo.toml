@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 d2-data.workspace = true
+d2-formats.workspace = true
 thiserror.workspace = true
 
 # Cargo can't extend workspace lints, so this repeats them with additions.
