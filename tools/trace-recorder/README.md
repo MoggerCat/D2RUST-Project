@@ -17,6 +17,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
 | `record_tick.py` | Launches `game/Game.exe` under the debugger, logs each server tick and its step markers, every timer event scheduled, cancelled and run, every unit/room/update-queue list change, and list snapshots every 25 frames; writes `traces/raw/<time>-tick.jsonl` (gitignored). Specs: `specs/sim/tick.md`, `specs/sim/unit-order.md` |
 | `check_tick.py` | Replays a tick recording through a model of those specs: must predict every timer run and reproduce every snapshot; `--perturb-ex N`, `--perturb-snap N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors |
+| `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -162,13 +163,16 @@ py tools/trace-recorder/record_tick.py --seconds 200          # Game.exe -w -ns;
 py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl
 py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl --perturb-ex 500
 py tools/trace-recorder/check_tick.py --selftest
+py tools/trace-recorder/check_units.py traces/raw/<time>-tick.jsonl [--tables traces/raw/<time>-tables]
+py tools/trace-recorder/check_units.py --selftest
 ```
 
 Same reference-hash check, kill guarantees and Win32 code as
-`record_rng.py`. 35 persistent INT3s (each stepped over and re-armed);
+`record_rng.py`. 39 persistent INT3s (each stepped over and re-armed);
 the expected bytes of every hook are checked before arming. Hooks and
 offsets: the constants block at the top of the script, each naming its
-spec section (`tick.md` §3, §5; `unit-order.md` §2, §4–§6). Only the
+spec section (`tick.md` §3, §5; `unit-order.md` §2, §4–§6; `units.md`
+§4). Only the
 first game that ticks is recorded; client-side calls of the shared room
 code are dropped (server-unit flag, act membership). Options:
 `--seconds`, `--ticks N`, `--snap-every N` (default 25; 0 = none),
@@ -183,3 +187,20 @@ deferred), `ex` (timer run: class, list, type, expire, unit, args),
 unit type and GUID; rooms by address with their adjacent-room arrays),
 `footer`. The game runs near full speed under the recorder (4,902 ticks
 in a 200 s run, start-up included).
+
+Version 0.2.0 (same format name; both additions are optional, so
+`check_tick.py` reads old and new files alike):
+
+- `set` gains `site` (address of the call to the public scheduling
+  function: the return address two frames above the scheduler, minus 5;
+  one more frame for an every-tick event made through the timed API),
+  `cl` (unit class id) and `m` (unit mode, +0x10) at schedule time.
+- New record `anim`, written when a mode animation schedule starts
+  (`units.md` §4.2): after the frame-bonus call in `0x5539B0`
+  (`0x5539CC`) and at the entries of `0x553B10`, `0x553C70`,
+  `0x553DC0`. Fields: `fn` (scheduler), `f`, `ut`, `g`, `cl`, `m`, `seq`
+  (sequence animation), `cur` (+0x44), `fc` and `sp` (frame count and
+  speed: +0x34/+0x3C with a sequence, else +0x48/+0x4C), `b` (frame
+  bonus, main form) or `arg` (variants), and from the AnimData record
+  (+0x50): `ad` (name), `ad_frames`, `ad_speed`, `ev` (non-zero event
+  bytes as `[index, value]`).
