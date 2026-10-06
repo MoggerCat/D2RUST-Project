@@ -20,6 +20,7 @@ fn steps(a: Seed, b: Seed) -> Option<usize> {
     None
 }
 
+// Covers: specs/drlg/rooms.md §9.4 r4
 #[test]
 fn rarity_walk_rules() {
     assert_eq!(
@@ -44,6 +45,7 @@ fn rarity_walk_rules() {
     assert_eq!(rarity_walk(&[0, 0], 0), 0);
 }
 
+// Covers: specs/drlg/rooms.md §9.5 text
 #[test]
 fn record_flag_rules() {
     assert_eq!(record_flags(0, 0, 0, 0, false), 1 << 14);
@@ -109,6 +111,7 @@ fn key(main: u32, sub: u32) -> u32 {
     (main << 20) | (sub << 8)
 }
 
+// Covers: specs/drlg/rooms.md §9.3 text, §9.3 r1, §9.3 r3
 #[test]
 fn library_order_and_lookup() {
     let (mut w, mut d, r) = one_room(RoomGrids::default(), 2);
@@ -134,6 +137,7 @@ fn library_order_and_lookup() {
     );
 }
 
+// Covers: specs/drlg/rooms.md §9.3 text
 #[test]
 fn lookup_cap_library_full_and_missing_file() {
     let (mut w, mut d, r) = one_room(RoomGrids::default(), 2);
@@ -163,6 +167,7 @@ fn lookup_cap_library_full_and_missing_file() {
     );
 }
 
+// Covers: specs/drlg/rooms.md §9.4 r1, §9.4 r3
 #[test]
 fn choice_fallback_and_no_tile() {
     // Unknown key: falls back to (10, 0, 0) (Warp.dt1), rarity 0: no draw.
@@ -187,6 +192,7 @@ fn choice_fallback_and_no_tile() {
     assert_eq!(d.stream_room(&mut svc, r), Err(DrlgError::NoTile));
 }
 
+// Covers: specs/drlg/rooms.md §9.5 text, §9.5 r1, §9.5 r2, §9.5 r3, §9.5 r5, §9.5 r6, §9.5 r7
 #[test]
 fn cell_rules_and_draw_order() {
     // Cell 0: floor + wall (type 3 corner) + shadow: draws floor, 3, 4, 13.
@@ -232,6 +238,7 @@ fn cell_rules_and_draw_order() {
     assert_ne!(d.room(r).flags & room_flags::NO_POPULATION, 0);
 }
 
+// Covers: specs/drlg/rooms.md §9.5 r5
 #[test]
 fn fill_blank_key_in_arcane_sanctuary() {
     let (mut w, mut d, r) = one_room(grids(vec![pass(&[0; 9], None, true)]), 74);
@@ -242,6 +249,7 @@ fn fill_blank_key_in_arcane_sanctuary() {
     assert_eq!(d.tile_info(t.floors[0].tile).sub, 1);
 }
 
+// Covers: specs/drlg/rooms.md §9.5 text
 #[test]
 fn kill_edges() {
     let mut g = grids(vec![pass(&[cell::FLOOR; 9], None, false)]);
@@ -275,6 +283,7 @@ fn pair(b_first: bool) -> (World, Drlg, DrlgRoomId, DrlgRoomId) {
     (w, d, r[0], r[1])
 }
 
+// Covers: specs/drlg/rooms.md §9.6 r1, §9.6 r2
 #[test]
 fn linked_column_is_shared() {
     // Standalone: 81 draws. Built after its neighbour: the shared 9-cell
@@ -290,6 +299,7 @@ fn linked_column_is_shared() {
     assert_eq!((n(a), n(b)), (72, 81));
 }
 
+// Covers: specs/drlg/rooms.md §10.3, §10.4 text, §10.4 r1, §10.4 r2, §10.4 r3
 #[test]
 fn collision_from_own_and_neighbour_records() {
     let (_w, d, a, b) = pair(false);
@@ -309,6 +319,7 @@ fn collision_from_own_and_neighbour_records() {
     assert_eq!(d.collision_at(80, 4), None);
 }
 
+// Covers: specs/drlg/rooms.md §10.3, §10.4 r4
 #[test]
 fn collision_record_flag_bits() {
     let v = cell::FLOOR | cell::UNWALKABLE | cell::FILL_LOS;
@@ -320,6 +331,7 @@ fn collision_record_flag_bits() {
     assert_eq!(g.masks.len(), 100);
 }
 
+// Covers: specs/drlg/rooms.md §5 r2, §9.6 r3, §10.5
 #[test]
 fn blank_floor_rechosen_on_neighbour_seed_with_collision_update() {
     // A = (0, 8) built first; its top row (world y 8) is linked blank
@@ -435,6 +447,7 @@ fn wall_merge_needs_the_remap_table() {
     assert_eq!(wall_pair(None).err(), Some(DrlgError::MissingWallRemap));
 }
 
+// Covers: specs/drlg/rooms.md §9.6 r3
 #[test]
 fn wall_merge_to_corner() {
     // Remap row for new type 2 (index 1), column R.type 1 → 3.
@@ -460,6 +473,7 @@ fn wall_merge_to_corner() {
     assert!(tb.other_links.iter().all(|&(k, _)| k == RecordKind::Wall));
 }
 
+// Covers: specs/drlg/rooms.md §9.7
 #[test]
 fn animated_tiles() {
     let mut g = grids(vec![pass(&[cell::FLOOR | key(2, 0); 9], None, false)]);
@@ -499,6 +513,7 @@ fn animated_tiles() {
     assert_eq!(t.floors[8].flags & rec_flags::HIDDEN, 0);
 }
 
+// Covers: specs/drlg/rooms.md §9.7
 #[test]
 fn missing_animation_frame_is_fatal() {
     let mut g = grids(vec![pass(&[cell::FLOOR | key(2, 0); 9], None, false)]);
@@ -511,6 +526,7 @@ fn missing_animation_frame_is_fatal() {
     assert_eq!(d.stream_room(&mut svc, r), Err(DrlgError::MissingFrame(2)));
 }
 
+// Covers: specs/drlg/rooms.md §4 text
 #[test]
 fn client_copy_frees_tiles_on_status_4() {
     let mut dat = data();

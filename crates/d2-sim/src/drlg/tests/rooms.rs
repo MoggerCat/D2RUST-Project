@@ -8,6 +8,7 @@ use crate::units::ClientId;
 
 const INIT: u32 = 644_409_375;
 
+// Covers: specs/drlg/rooms.md §3 r1
 #[test]
 fn near_gap_vectors() {
     let a = TileRect::new(0, 0, 8, 8);
@@ -24,6 +25,7 @@ fn near_gap_vectors() {
     assert_eq!(near_gaps(&a, &a), (-8, -8));
 }
 
+// Covers: specs/drlg/rooms.md §3 r2
 #[test]
 fn sort_vectors() {
     let f = |v: &[TileRect]| {
@@ -78,6 +80,7 @@ fn statuses(d: &Drlg, rooms: &[DrlgRoomId]) -> Vec<u8> {
     rooms.iter().map(|&r| d.room(r).status).collect()
 }
 
+// Covers: specs/drlg/rooms.md §4 text, §4 r1, §4 r2, §4 r3, §4.1, §5 r5, §6 r1, §6 r2, §7 r1
 #[test]
 fn client_enter_and_move_statuses() {
     let (mut w, mut d, r) = row_world();
@@ -130,6 +133,7 @@ fn client_enter_and_move_statuses() {
     assert_eq!(d.room(r[0]).counts, [0; 4]);
 }
 
+// Covers: specs/drlg/rooms.md §4.3, §4.4 r2, §4.4 r5, §5 r4, §8 r2, §8 r3
 #[test]
 fn build_seeds_and_rebuild_repeat() {
     let (mut w, mut d, r) = row_world();
@@ -158,6 +162,7 @@ fn build_seeds_and_rebuild_repeat() {
     assert_eq!((d.rooms_built, d.builds_since_update), (2, 2));
 }
 
+// Covers: specs/drlg/rooms.md §5 r3, §5 r6, §6 r2, §6 r3, §8 r2
 #[test]
 fn removal_fixes_neighbours_and_copies_populated() {
     let (mut w, mut d, r) = row_world();
@@ -189,6 +194,7 @@ fn removal_fixes_neighbours_and_copies_populated() {
     assert!(w.lists.room(a).unwrap().populated);
 }
 
+// Covers: specs/drlg/rooms.md §6 r3
 #[test]
 fn adjacency_removal_vector() {
     // [R, X, Y, Z]; remove X → [R, Z, Y]. Four rooms near R in that near
@@ -227,6 +233,7 @@ fn adjacency_removal_vector() {
     );
 }
 
+// Covers: specs/drlg/rooms.md §7 r2, §7 r3, §8 r1
 #[test]
 fn inactivity_counter_and_removal_test() {
     let (mut w, mut d, r) = row_world();
@@ -259,6 +266,7 @@ fn inactivity_counter_and_removal_test() {
     assert_eq!(d.allows_removal(a5), Ok(false));
 }
 
+// Covers: specs/drlg/rooms.md §8 r1
 #[test]
 fn town_rooms_stay_while_any_room_is_seen() {
     let mut dat = data();
@@ -280,6 +288,7 @@ fn town_rooms_stay_while_any_room_is_seen() {
     assert_eq!(d.allows_removal(a5), Ok(false));
 }
 
+// Covers: specs/drlg/rooms.md §8 r1
 #[test]
 fn client_copy_removal_is_fatal() {
     let mut w = World::new(data(), FakeTypes::default());
@@ -290,6 +299,7 @@ fn client_copy_removal_is_fatal() {
     );
 }
 
+// Covers: specs/drlg/rooms.md §7 r1
 #[test]
 fn client_arrays_sorted() {
     let (mut w, mut d, r) = row_world();
@@ -347,6 +357,7 @@ fn warp_world(warp: i32) -> (World, Drlg, DrlgRoomId, LevelIdx) {
     (w, d, room, l3)
 }
 
+// Covers: specs/drlg/rooms.md §3 r3; specs/drlg/levels.md §5 r5
 #[test]
 fn warp_link_with_warp_id() {
     let (w, d, room, l3) = warp_world(5);
@@ -366,6 +377,7 @@ fn warp_link_with_warp_id() {
     );
 }
 
+// Covers: specs/drlg/rooms.md §3 r3
 #[test]
 fn warp_link_without_warp_id_uses_gap_rule() {
     let (_w, d, room, l3) = warp_world(-1);
@@ -377,6 +389,7 @@ fn warp_link_without_warp_id_uses_gap_rule() {
     assert!(d.room(room).warp_links.is_empty());
 }
 
+// Covers: specs/drlg/rooms.md §3 r4
 #[test]
 fn town_border_flag() {
     let mut dat = data();
@@ -412,6 +425,7 @@ fn town_border_flag() {
     assert_eq!(d.room(t).flags & room_flags::NO_POPULATION, 0);
 }
 
+// Covers: specs/drlg/rooms.md §4 text
 #[test]
 fn preset_units_added_once_by_handler_3() {
     let (mut w, mut d, r) = row_world();

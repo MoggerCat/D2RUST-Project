@@ -348,6 +348,7 @@ impl World {
     }
 }
 
+// Covers: specs/sim/rng.md §2
 #[test]
 fn draw_vectors() {
     let want = [
@@ -363,6 +364,7 @@ fn draw_vectors() {
     }
 }
 
+// Covers: specs/monsters/ai.md §7.2
 #[test]
 fn wander_vectors() {
     let want = [
@@ -386,6 +388,7 @@ fn walk_point(x: i32, y: i32) -> String {
     format!("mode 2 Point({x}, {y})")
 }
 
+// Covers: specs/monsters/ai.md §9.3 r1, §9.3 r2, §9.3 r3
 #[test]
 fn zombie_vectors() {
     let row = || monstats(3, [30, 10, 0, 20, 0], 15);
@@ -438,6 +441,7 @@ fn zombie_vectors() {
     assert_eq!(w.fake.seeds[&w.mon], Seed::init_low(1));
 }
 
+// Covers: specs/monsters/ai.md §9.4 r1, §9.4 r5
 #[test]
 fn fallen_vectors() {
     let want = [None, None, None, Some(5)];
@@ -458,6 +462,7 @@ fn fallen_vectors() {
     }
 }
 
+// Covers: specs/monsters/ai.md §9.5 r1, §9.5 r2
 #[test]
 fn brute_vectors() {
     for (s, m) in SEEDS.iter().zip([4, 5, 5, 4]) {
@@ -475,6 +480,7 @@ fn brute_vectors() {
     assert_eq!(last_mode(&w), format!("mode 2 Unit({:?})", w.player));
 }
 
+// Covers: specs/monsters/ai.md §9.7 r4, §9.7 r5, §9.7 r6
 #[test]
 fn quill_rat_vectors() {
     for (s, escape) in SEEDS.iter().zip([true, true, true, false]) {
@@ -495,6 +501,7 @@ fn quill_rat_vectors() {
     assert_eq!(last_mode(&w), walk_point(103, 100));
 }
 
+// Covers: specs/monsters/ai.md §7.2
 #[test]
 fn circle_vectors() {
     for (s, m) in SEEDS.iter().zip([5, 5, 6, 5]) {
@@ -507,6 +514,7 @@ fn circle_vectors() {
     }
 }
 
+// Covers: specs/monsters/ai.md §9.8 r1, §9.8 r3
 #[test]
 fn corrupt_lancer_vectors() {
     for (s, walk) in SEEDS.iter().zip([true, false, true, true]) {
@@ -529,6 +537,7 @@ fn corrupt_lancer_vectors() {
     assert_eq!(w.store.control(w.mon).unwrap().params[0], 1);
 }
 
+// Covers: specs/monsters/ai.md §9.2
 #[test]
 fn idle_ai_thinks_every_200() {
     for ai in [1, 100] {
@@ -541,6 +550,7 @@ fn idle_ai_thinks_every_200() {
 
 // ---- §1 scheduling ----------------------------------------------------
 
+// Covers: specs/monsters/ai.md §1.2, §1.3 r2, §1.3 r3
 #[test]
 fn neutral_start_schedules_aidel() {
     let cases = [
@@ -564,6 +574,7 @@ fn neutral_start_schedules_aidel() {
     }
 }
 
+// Covers: specs/monsters/ai.md §1.3 r1, §edge-cases-original-bugs r2
 #[test]
 fn aidel_difficulty_gate() {
     // Edge case 2: the Normal column unless game +0x6A or +0x74 is set.
@@ -589,6 +600,7 @@ fn aidel_difficulty_gate() {
     assert_eq!(cx.aidel(0), 14);
 }
 
+// Covers: specs/monsters/ai.md §2.3 r3
 #[test]
 fn target_mode_1_idle_by_distance() {
     for (d, want) in [
@@ -612,6 +624,7 @@ fn target_mode_1_idle_by_distance() {
     }
 }
 
+// Covers: specs/monsters/ai.md §2.3 text
 #[test]
 fn target_mode_4_idles_20() {
     let mut w = World::new(monstats(15, [0; 5], 15));
@@ -622,6 +635,7 @@ fn target_mode_4_idles_20() {
     assert!(w.fake.modes().is_empty());
 }
 
+// Covers: specs/monsters/ai.md §1.2
 #[test]
 fn idle_helpers() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -649,6 +663,7 @@ fn idle_helpers() {
     assert_eq!(w.thinks(), [110]);
 }
 
+// Covers: specs/monsters/ai.md §1.1, §edge-cases-original-bugs r10
 #[test]
 fn state_54_schedule_cancels_pending_thinks() {
     // Edge case 10.
@@ -662,6 +677,7 @@ fn state_54_schedule_cancels_pending_thinks() {
     assert!(!w.fake.has_state(mon, state::UNINTERRUPTABLE));
 }
 
+// Covers: specs/monsters/ai.md §1.2
 #[test]
 fn update_ai_callback_rules() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -681,6 +697,7 @@ fn update_ai_callback_rules() {
     assert_eq!(w.thinks(), [12]);
 }
 
+// Covers: specs/monsters/ai.md §1.5 r1, §1.5 r2
 #[test]
 fn creation_pair_and_room_entry() {
     // §1.5: neutral start +15, then 0x00573780 cancels it and adds +2.
@@ -695,6 +712,7 @@ fn creation_pair_and_room_entry() {
     assert_eq!(w.thinks(), [42]);
 }
 
+// Covers: specs/monsters/ai.md §1.2
 #[test]
 fn knockback_end_rules() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -707,6 +725,7 @@ fn knockback_end_rules() {
     assert_eq!(w.thinks(), [15]);
 }
 
+// Covers: specs/monsters/ai.md §1.4
 #[test]
 fn mode_end_inline_think() {
     // Walk end: neutral, think at once (Idle AI → +200).
@@ -728,6 +747,7 @@ fn mode_end_inline_think() {
     assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
 }
 
+// Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1
 #[test]
 fn freeze_drops_thinks_and_type_10_resets() {
     let mut w = World::new(monstats(1, [0; 5], 15));
@@ -762,6 +782,7 @@ fn freeze_drops_thinks_and_type_10_resets() {
 
 // ---- §2–§5 dispatch and targets -------------------------------------
 
+// Covers: specs/monsters/ai.md §2.2 r1
 #[test]
 fn stun_idles_3() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -771,6 +792,7 @@ fn stun_idles_3() {
     assert_eq!(w.thinks(), [3]);
 }
 
+// Covers: specs/monsters/ai.md §5.2 r5, §5.2 r6, §5.2 r7
 #[test]
 fn main_search_picks_nearest_qualifying_player() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -796,6 +818,7 @@ fn main_search_picks_nearest_qualifying_player() {
     assert_eq!((s.target, s.distance), (None, target::NO_DISTANCE));
 }
 
+// Covers: specs/monsters/ai.md §2.4 r1
 #[test]
 fn boss_sound_once() {
     let mut w = World::new(monstats(3, [30, 10, 0, 20, 0], 15));
@@ -809,6 +832,7 @@ fn boss_sound_once() {
     assert_eq!(w.fake.log.iter().filter(|s| *s == "sound 16").count(), 1);
 }
 
+// Covers: specs/monsters/ai.md §6, §edge-cases-original-bugs r4
 #[test]
 fn distances() {
     assert_eq!(distance_no_size((0, 0), (10, 4)), 12);
@@ -818,6 +842,7 @@ fn distances() {
     assert_eq!(distance_full_size((0, 0), 2, (0, 0)), 0);
 }
 
+// Covers: specs/monsters/ai.md §7.3
 #[test]
 fn velocity_request() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -838,6 +863,7 @@ fn velocity_request() {
     );
 }
 
+// Covers: specs/monsters/ai.md §7.2
 #[test]
 fn failed_move_fallback_draw() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -853,6 +879,7 @@ fn failed_move_fallback_draw() {
     assert_eq!(w.thinks(), [10]);
 }
 
+// Covers: specs/monsters/ai.md §8
 #[test]
 fn commands() {
     let mut w = World::new(monstats(6, [0; 5], 15));
@@ -883,6 +910,7 @@ fn commands() {
 
 // ---- §3 install and tables ----------------------------------------------
 
+// Covers: specs/monsters/ai.md §3.3 r2, §3.3 r3, §3.3 r4
 #[test]
 fn install_sets_think_and_alternate() {
     let mut w = World::new(monstats(15, [0; 5], 15));
@@ -908,6 +936,7 @@ fn install_sets_think_and_alternate() {
     assert_eq!(w.store.control(mon).unwrap().function, 0x005E_FE20);
 }
 
+// Covers: specs/monsters/ai.md §3.2
 #[test]
 fn special_states_10_to_12_need_switchai() {
     let mut w = World::new(monstats(3, [0; 5], 15));
@@ -974,6 +1003,7 @@ fn check_ai_table(tsv: &str, table: &[AiRecord]) -> Result<(), String> {
     Ok(())
 }
 
+// Covers: specs/monsters/ai.md §3.2
 #[test]
 fn ai_table_matches_tsv() {
     check_ai_table(AI_FUNCTIONS_TSV, &AI_TABLE).unwrap();

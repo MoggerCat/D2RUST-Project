@@ -534,6 +534,7 @@ pub fn check(client_tsv: &str, server_tsv: &str) -> Result<Vec<String>, TsvError
 mod tests {
     use super::*;
 
+    // Covers: specs/sim/intents-events.md §5, §2.4 r10
     #[test]
     fn spec_tables_parse() {
         let c = parse_client(CLIENT_TSV).unwrap();

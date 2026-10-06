@@ -6,6 +6,7 @@ use d2_proto::schema::{FieldType, Gate, HandlerSize, Kind, Scope, SizeRule};
 use d2_proto::server::{LoadAct, SetStatWord};
 use d2_proto::{DecodeError, FixedMessage, CLIENT_MESSAGES, SERVER_MESSAGES};
 
+// Covers: specs/sim/intents-events.md §2.4 r7
 #[test]
 fn select_skill_vector() {
     let b = [0x3C, 0x05, 0x00, 0x00, 0x80, 0xFF, 0xFF, 0xFF, 0xFF];
@@ -21,6 +22,7 @@ fn select_skill_vector() {
     assert_eq!(m.encode(), b);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r7
 #[test]
 fn bind_hotkey_vector() {
     let b = [0x51, 0x06, 0x80, 0x03, 0x00, 0xFF, 0xFF, 0xFF, 0xFF];
@@ -37,6 +39,7 @@ fn bind_hotkey_vector() {
     assert_eq!(m.encode(), b);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r10
 #[test]
 fn walk_and_unit() {
     let b = [0x01, 0x10, 0x00, 0x20, 0x00];
@@ -50,6 +53,7 @@ fn walk_and_unit() {
     assert_eq!(WalkToUnit::decode(&u.encode()).unwrap(), u);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r1
 #[test]
 fn decode_errors() {
     assert_eq!(Walk::decode(&[]), Err(DecodeError::Empty));
@@ -72,6 +76,7 @@ fn decode_errors() {
 
 /// Body location is a u8 inside a 4-byte slot; bytes +6..+8 are ignored
 /// (§2.4 rule 9) and encode as 0.
+// Covers: specs/sim/intents-events.md §2.4 r9, §edge-cases-original-bugs r5
 #[test]
 fn body_location_u8() {
     let b = [0x1A, 7, 0, 0, 0, 4, 0xAA, 0xBB, 0xCC];
@@ -98,6 +103,7 @@ fn bit_field_overflow_panics() {
     .encode();
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r10
 #[test]
 fn session_and_server_layouts() {
     let mut name = [0u8; 16];
@@ -125,6 +131,7 @@ fn session_and_server_layouts() {
 }
 
 /// Descriptor spot checks against the spec's prose (§2.1, §2.3, §2.4).
+// Covers: specs/sim/intents-events.md §2.4 r2, §3.1 r3, §edge-cases-original-bugs r9
 #[test]
 fn descriptors() {
     assert_eq!(CLIENT_MESSAGES.len(), 0x71);

@@ -7,6 +7,7 @@ use crate::rng::Seed;
 const INIT: u32 = 644_409_375;
 const START: u32 = 4_014_346_869;
 
+// Covers: specs/drlg/levels.md §3 r2, §3 r3
 #[test]
 fn drlg_seed_and_start_seed() {
     let mut w = World::new(data(), FakeTypes::default());
@@ -16,6 +17,7 @@ fn drlg_seed_and_start_seed() {
     assert_eq!((d.staff_tomb, d.boss_tomb, d.jungle_link), (0, 0, false));
 }
 
+// Covers: specs/drlg/levels.md §3 r4
 #[test]
 fn act2_tombs_and_act3_jungle_bit() {
     let mut w = World::new(data(), FakeTypes::default());
@@ -32,6 +34,7 @@ fn act2_tombs_and_act3_jungle_bit() {
     assert_eq!(d.seed.lo, 1_406_222_081);
 }
 
+// Covers: specs/drlg/levels.md §4 r3, §5 r1; specs/drlg/rooms.md §2 r2, §2 r3
 #[test]
 fn level_seed_and_room_seeds() {
     let mut dat = data();
@@ -67,6 +70,7 @@ fn level_seed_and_room_seeds() {
     assert_eq!(before, after);
 }
 
+// Covers: specs/drlg/levels.md §6 r3
 #[test]
 fn act_of_level_and_towns() {
     assert_eq!([39, 40, 109, 1024].map(act_of_level), [0, 1, 4, 0]);
@@ -74,6 +78,7 @@ fn act_of_level_and_towns() {
     assert!(is_town(75) && !is_town(76));
 }
 
+// Covers: specs/drlg/levels.md §7 r4
 #[test]
 fn lvlwarp_first_match() {
     let mut d = data();
@@ -100,6 +105,7 @@ fn lvlwarp_first_match() {
     assert_eq!(d.lvlwarp_row(7, b'b'), Err(DrlgError::NoLvlWarp(7)));
 }
 
+// Covers: specs/drlg/levels.md §3 r8, §4 r1, §4 r3, §5 r1
 #[test]
 fn recorded_act1_level_list_order() {
     // levels.md Test vectors: allocation order of the Act 1 placer and the
@@ -132,6 +138,7 @@ fn recorded_act1_level_list_order() {
     assert_eq!(w.types.generated, [1]);
 }
 
+// Covers: specs/drlg/levels.md §4 r1, §4 r4, §6 r1
 #[test]
 fn unknown_drlg_type_gets_no_init_and_position_from_depend() {
     let mut dat = data();
@@ -158,6 +165,7 @@ fn unknown_drlg_type_gets_no_init_and_position_from_depend() {
     );
 }
 
+// Covers: specs/drlg/levels.md §4 r3; specs/drlg/rooms.md §2 r4
 #[test]
 fn client_copy_flags() {
     let mut dat = data();
@@ -173,6 +181,7 @@ fn client_copy_flags() {
     assert_ne!(d.room(r).flags & room_flags::AUTOMAP_REVEAL, 0);
 }
 
+// Covers: specs/drlg/levels.md §7 r2, §7 r3, §edge-cases-original-bugs r2
 #[test]
 fn warp_records_and_set_warp() {
     let mut dat = data();
@@ -205,6 +214,7 @@ fn warp_records_and_set_warp() {
     assert_eq!(d.warp_records()[1].level_id, 2);
 }
 
+// Covers: specs/drlg/levels.md §7 r2
 #[test]
 fn warp_record_level_zero_is_fatal() {
     let mut w = World::new(data(), FakeTypes::default());
@@ -213,6 +223,7 @@ fn warp_record_level_zero_is_fatal() {
     assert_eq!(d.vis_array(&w.data, 0), Err(DrlgError::WarpRecordLevelZero));
 }
 
+// Covers: specs/drlg/levels.md §5 r5, §8 r1, §8 r2, §edge-cases-original-bugs r1
 #[test]
 fn room_at_hint_level_and_null_level() {
     let mut dat = data();
@@ -255,6 +266,7 @@ fn room_at_hint_level_and_null_level() {
     assert_eq!(d.level(d.level_list()[0]).id, 0);
 }
 
+// Covers: specs/drlg/levels.md §5 r3, §9 r1, §9 r2, §9 r4
 #[test]
 fn activity_counts_and_freeing_with_memory() {
     let mut dat = data();
@@ -345,6 +357,7 @@ fn activity_counts_and_freeing_with_memory() {
     assert_eq!(flags, [0, 0, 1, 0, 0, 0, 0, 0, 0]);
 }
 
+// Covers: specs/drlg/levels.md §9 r3
 #[test]
 fn free_test_blocks_on_warp_linked_rooms() {
     let mut dat = data();
@@ -373,6 +386,7 @@ fn free_test_blocks_on_warp_linked_rooms() {
     assert!(d.room(t).near().is_none());
 }
 
+// Covers: specs/drlg/levels.md §5 r4
 #[test]
 fn warp_room_centres() {
     let mut dat = data();
@@ -408,6 +422,7 @@ fn spawn_world(position: u32) -> (World, Drlg) {
     (w, d)
 }
 
+// Covers: specs/drlg/levels.md §10 r2
 #[test]
 fn spawn_room_by_tile_records() {
     let (mut w, mut d) = spawn_world(1);
@@ -468,6 +483,7 @@ fn spawn_room_by_tile_records() {
     assert_eq!(d.level(l).seed, before);
 }
 
+// Covers: specs/drlg/levels.md §10 r2, §10 r3, §10 r4, §10 r5
 #[test]
 fn spawn_room_waypoint_and_fallbacks() {
     let (mut w, mut d) = spawn_world(0);
@@ -517,6 +533,7 @@ fn spawn_room_waypoint_and_fallbacks() {
     );
 }
 
+// Covers: specs/drlg/levels.md §10 r3
 #[test]
 fn spawn_room_random_when_centre_is_empty() {
     let mut dat = data();
