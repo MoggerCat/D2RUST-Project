@@ -607,24 +607,6 @@ pub trait Pending {
     fn object_cursor_item(&self, player: UnitId) -> bool {
         false
     }
-    /// An object allocation from inside an object call (`ObjectWorld::
-    /// allocate_object`, the presets of `objects.md` §6).
-    ///
-    /// TODO(objects.md §6, module seam): the dispatcher holds the object
-    /// control (`&mut`) while it calls the allocation, which must run the
-    /// init `0x0054F5D0` on that same control; the wiring cannot lend it
-    /// twice. Default: not allocated.
-    fn object_allocate(
-        &mut self,
-        game: &mut Game,
-        room: RoomId,
-        class: u16,
-        x: i32,
-        y: i32,
-        mode: u8,
-    ) -> Option<UnitId> {
-        None
-    }
     /// `0x0061AEB0`: the act II staff-tomb level (quest spec). Default: a
     /// level id no level has.
     fn object_staff_tomb(&self) -> u32 {

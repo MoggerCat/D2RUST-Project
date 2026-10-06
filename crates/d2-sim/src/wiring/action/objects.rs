@@ -180,6 +180,11 @@ impl<X: Pending> View<'_, X> {
     /// allocation's when it went through [`View::create_object`], else
     /// (0, 0).
     pub fn object_init(&mut self, game: &mut Game, unit: UnitId) {
+        // An allocation from inside an object call: the caller holds the
+        // control and runs §3 itself (`objects::allocate`).
+        if self.h.objects_out {
+            return;
+        }
         let Some(r) = self.units.get(unit) else {
             return;
         };
@@ -509,8 +514,9 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn cursor_item(&self, player: UnitId) -> bool {
         self.v.h.x.object_cursor_item(player)
     }
-    /// An allocation from inside an object call (§6 presets) goes to
-    /// [`Pending::object_allocate`]: see its TODO.
+    /// An allocation from inside an object call (§6 presets, §8.3 fire
+    /// objects): the unit only; [`View::object_init`] sees the control
+    /// lent and leaves §3 to [`objects::allocate`].
     fn allocate_object(
         &mut self,
         room: RoomId,
@@ -519,10 +525,16 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         y: i32,
         mode: u8,
     ) -> Option<UnitId> {
-        self.v
-            .h
-            .x
-            .object_allocate(self.game, room, class, x, y, mode)
+        let req = crate::units::lifecycle::AllocRequest {
+            ty: UnitType::Object,
+            class: u32::from(class),
+            room: Some(room),
+            add: true,
+            fixed_guid: None,
+            mode: u32::from(mode),
+            allied: false,
+        };
+        self.v.allocate(self.game, &req, x, y)
     }
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()

@@ -616,7 +616,7 @@ pub fn trap_handler(ty: u8, level: u32) -> Option<u8> {
 /// Event 4 `0x005817A0` (§8.3).
 pub fn trap_event<W: ChestWorld>(
     ctl: &mut ObjectControl,
-    _t: &ObjectTables,
+    t: &ObjectTables,
     w: &mut W,
     obj: UnitId,
 ) -> Result<(), ObjectError> {
@@ -630,7 +630,7 @@ pub fn trap_event<W: ChestWorld>(
         2 | 6 => trap_monster_at(w, obj, 326),
         3 => trap_monster_at(w, obj, 329),
         4 => trap_monster_at(w, obj, 369),
-        5 | 7 => trap_fire(ctl, w, obj),
+        5 | 7 => trap_fire(ctl, t, w, obj)?,
         8 | 9 => {
             // TODO(objects.md §8.3, open question 3): whether the trap
             // monster id is read before or after the control-seed step,
@@ -664,23 +664,29 @@ fn trap_monster_at<W: ChestWorld>(w: &mut W, obj: UnitId, monster: u32) {
 }
 
 /// `0x00582380`: trap handlers 5 and 7 (fire objects).
-fn trap_fire<W: ChestWorld>(ctl: &mut ObjectControl, w: &mut W, obj: UnitId) {
+fn trap_fire<W: ChestWorld>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    obj: UnitId,
+) -> Result<(), ObjectError> {
     let Some(room) = w.room(obj) else {
-        return;
+        return Ok(());
     };
     let (x, y) = w.position(obj);
     // TODO(objects.md §8.3 handlers 5, 7): the allocation mode of objects
     // 162 and 160 is not stated; mode 0 is used.
-    if let Some(o) = w.allocate_object(room, TRAP_FIRE_OBJECT, x, y, 0) {
+    if let Some(o) = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT, x, y, 0)? {
         if let Some(d) = ctl.data.get_mut(&o) {
             d.spark = SPARK_TRAP_FIRE;
         }
     }
     if w.in_room(room, x + 1, y) {
-        if let Some(o) = w.allocate_object(room, TRAP_FIRE_OBJECT_2, x + 1, y, 0) {
+        if let Some(o) = super::allocate(ctl, t, w, room, TRAP_FIRE_OBJECT_2, x + 1, y, 0)? {
             if let Some(d) = ctl.data.get_mut(&o) {
                 d.spark = SPARK_TRAP_FIRE;
             }
         }
     }
+    Ok(())
 }

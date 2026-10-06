@@ -341,8 +341,9 @@ pub trait ObjectWorld {
     /// An item is on the player's cursor (inventory).
     fn cursor_item(&self, player: UnitId) -> bool;
     /// Allocate an object unit (`sim/units.md` §1) of `class` in `room` at
-    /// (x, y) and `mode`; the allocation runs [`create`]. `None`: not
-    /// allocated.
+    /// (x, y) and `mode`. A provider that cannot run [`create`] here (the
+    /// control is lent to the caller) leaves it to [`allocate`]. `None`:
+    /// not allocated.
     fn allocate_object(
         &mut self,
         room: RoomId,
@@ -480,7 +481,7 @@ pub struct Created {
 /// whose unit already holds `mode` (the allocation mode). Runs before the
 /// unit is added to the world.
 #[allow(clippy::too_many_arguments)]
-pub fn create<W: ObjectHost>(
+pub fn create<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
@@ -540,7 +541,7 @@ pub fn create<W: ObjectHost>(
 
 /// The init functions this spec owns (§5).
 #[allow(clippy::too_many_arguments)]
-fn run_init<W: ObjectHost>(
+fn run_init<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
@@ -770,6 +771,31 @@ fn init_permanent_portal<W: ObjectWorld>(
     Ok(())
 }
 
+/// An object allocated from inside an object call (§6, §8.3): the unit
+/// through [`ObjectWorld::allocate_object`], then, when the provider could
+/// not run the init dispatch (the control is held by the caller), §3 on it
+/// here.
+#[allow(clippy::too_many_arguments)]
+pub fn allocate<W: ObjectWorld>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    room: RoomId,
+    class: u16,
+    x: i32,
+    y: i32,
+    mode: u8,
+) -> Result<Option<UnitId>, ObjectError> {
+    let Some(obj) = w.allocate_object(room, class, x, y, mode) else {
+        return Ok(None);
+    };
+    if !ctl.data.contains_key(&obj) {
+        let guid = w.guid(obj);
+        create(ctl, t, w, obj, class, guid, Some(room), mode, x, y)?;
+    }
+    Ok(Some(obj))
+}
+
 // ------------------------------------------------------------------ §6
 
 /// `0x006E1080` rows {class, min, max} for presets 574–579 (§6).
@@ -818,7 +844,7 @@ pub fn create_preset<W: ObjectHost>(
     match class {
         574..=579 => {
             let (c, min, max) = PRESET_SHRINES[index as usize];
-            let Some(obj) = w.allocate_object(room, c, x, y, mode) else {
+            let Some(obj) = allocate(ctl, t, w, room, c, x, y, mode)? else {
                 return Ok(Preset::Object(None));
             };
             let r = w
@@ -835,7 +861,7 @@ pub fn create_preset<W: ObjectHost>(
             Ok(Preset::Object(Some(obj)))
         }
         580 if level == 25 => {
-            let Some(obj) = w.allocate_object(room, 371, x, y, mode) else {
+            let Some(obj) = allocate(ctl, t, w, room, 371, x, y, mode)? else {
                 return Ok(Preset::Object(None));
             };
             if let Some(d) = ctl.data.get_mut(&obj) {

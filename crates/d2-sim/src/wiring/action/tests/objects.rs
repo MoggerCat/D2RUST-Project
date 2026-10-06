@@ -256,3 +256,27 @@ fn update_pass_sends_the_state_message() {
     assert_eq!(fx.sim.hooks().x.sent, [(p, want.to_vec())]);
     fx.assert_clean();
 }
+
+// Covers: specs/world/objects.md §3 r1, §3 r9, §6
+#[test]
+fn preset_shrine_allocates_inside_the_object_call() {
+    // Preset 575 (`0x006E1080` {136, 7, 7}): the shrine object is
+    // allocated while the preset spawner holds the control; the init
+    // dispatch runs on it there, then the id is set (`roll(0)` draws
+    // nothing, id 7).
+    let mut fx = Fx::new();
+    let mut t = (*tables()).clone();
+    t.objects.resize(137, blank());
+    fx.sim.create_objects(Arc::new(t));
+    let a = fx.a;
+    let o = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.create_object(g, a, 575, 20, 20, 0))
+        .expect("allocated");
+    let g = guid(&fx, o);
+    let d = fx.sim.hooks().objects.as_ref().unwrap().control.data[&o];
+    assert_eq!((d.class, d.guid), (136, g));
+    assert_eq!((d.interact, d.shrine, d.owner), (7, Some(7), Some(-1)));
+    assert_eq!(fx.sim.sys.units.get(o).unwrap().class, 136);
+    fx.assert_clean();
+}
