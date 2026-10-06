@@ -29,16 +29,16 @@
 |   5. Base writes | 174–198 |
 |   6. Full values | 199–257 |
 |   7. Value-change notification | 258–286 |
-|   8. Chain operations | 287–368 |
-|   9. States | 369–395 |
-|   10. Timer event handlers | 396–471 |
-|   11. Mod array and stat messages | 472–489 |
-| Constants & data dependencies | 490–501 |
-| Randomness | 502–505 |
-| Edge cases & original bugs | 506–524 |
-| Test vectors | 525–561 |
-| Provenance | 562–585 |
-| Open questions | 586–601 |
+|   8. Chain operations | 287–386 |
+|   9. States | 387–418 |
+|   10. Timer event handlers | 419–494 |
+|   11. Mod array and stat messages | 495–512 |
+| Constants & data dependencies | 513–524 |
+| Randomness | 525–528 |
+| Edge cases & original bugs | 529–547 |
+| Test vectors | 548–584 |
+| Provenance | 585–608 |
+| Open questions | 609–624 |
 <!-- /index -->
 
 ## Summary
@@ -366,6 +366,24 @@ set-full(U's list, S, eval(U's list, S), unit U). Caller `0x005627F4`.
    Called from the room update queue step (`tick.md` §3 step 6,
    `0x00553220`) when the unit's list has 0x100.
 
+#### 8.9 Temporary lists (`0x006272E0`(unit))
+
+Run by every real mode change (`0x00624690`, `sim/units.md` §4.1: a
+new mode, not for unit type 5) after the mode is written, and by the
+client's twin (`0x004B0D5A`). R := the unit's list; R missing or
+without NEWLENGTH → nothing. Else walk R's active chain from the head:
+each TEMPONLY list whose state (+0x14) is non-zero first turns that
+state off (`0x00639DB0`(unit, state, 0), §9.2); a non-extended one is
+then freed (§8.3); after any TEMPONLY list the walk restarts at the
+head (an extended TEMPONLY list would loop forever, but extended lists
+keep only bit 0x1 of their allocation flags, §4, so none exists).
+Other lists are passed over (next := prev link). Finally R's NEWLENGTH is
+cleared, even when expiring lists are still attached (they then wait
+for the next attach that sets it again). So a TEMPONLY list (§8.1 step
+4; e.g. Bash's attack-rate list, `skills/bodies.md` §3.8) lives until
+the next mode change. 1.14d-confirmed (asm of `0x006272E0`,
+`0x00624690`).
+
 ### 9. States
 
 #### 9.1 Bits
@@ -380,6 +398,11 @@ Set or clear bit s. If it changed: set bit s of the second half; if the
 state has flag `disguise` (states flag bit 16): on → unit +0xC8 |= 8;
 off → clear it unless another disguise state is still on (`0x0063A7B0`).
 `0x00639E30` sets or clears a second-half bit only.
+
+`0x00639DB0`(unit, s, on): s outside 0 … states count − 1 → nothing
+(no toggle, no queue). Else the toggle above, then the update-queue
+insert (`unit-order.md` §6.2) **always**, whether or not the bit
+changed. 1.14d-confirmed (asm of `0x00639DB0`).
 
 #### 9.3 Queries
 
