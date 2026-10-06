@@ -9,6 +9,7 @@
 //! because `d2-sim` may not depend on `d2-proto`.
 
 pub mod cube;
+pub mod npc;
 pub mod quests;
 pub mod vendors;
 pub mod waypoints;
