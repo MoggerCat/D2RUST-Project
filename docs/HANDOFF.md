@@ -498,6 +498,15 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local, captures with the player): render captures with
+`record_frames.py` (branch `claude/spec-render-placement`), 800×600 GDI:
+run 1b Den of Evil (14,823 frames, 15,711 ticks; still segment 1,151
+frames, 140 distinct images: cursor + light flicker, §7 "first 1.14d frame
+captures") and run 2 Rogue Encampment (1,111 frames: walk, run, stop, Town
+Portal). Run 1 (automap open) kept as a record. `stability-0001` therefore
+**does not pass as specified**; the comparison rule needs the §7 changes
+before placement / camera / composition cases can be judged.
+
 Done 2026-10-06 (local, branch `claude/local-2026-10-06` from `edad871`;
 group C on game files and the real GPU; entries C1, C8, C9, C15, C16,
 C17, parser robustness and treasure memory dump removed below):
@@ -750,6 +759,13 @@ ones, but they need `traces/raw/`, so local):
   names it).
 
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**From the 2026-10-06 captures:** the player light flicker (find the
+per-frame light-level source of the player's light in the 1.14d client
+light pass; client RNG or time; owner `render/lighting.md`); the cursor
+draw call and its animation counter (owner `render/capture.md` /
+`ui/controls.md`); the weather (rain) particle RNG (owner
+`render/draw-order.md` or a weather spec).
 
 For the next local spec session. Apply each fix on the owning spec with
 evidence.
@@ -1999,6 +2015,40 @@ current reading):
   (F) and in-row order of the 377 / 378 / 380 / 381 wall and path pieces;
   `quests.md` §7.1 "every NPC id is a valid monstats row" needs a game-file
   check (§5 C19).
+
+From the first 1.14d frame captures (2026-10-06, local, `record_frames.py`
+of branch `claude/spec-render-placement`; raw files gitignored:
+`traces/raw/20261006-140102-frames-run1b.jsonl` +
+`game/captures/20261006-140102/`, `traces/raw/20261006-141725-frames-run2.jsonl`
++ `game/captures/20261006-141726/`, kept in that branch's worktree), by owner:
+
+- **`render/capture.md`** (stability, §5 A): the capture is stable (scene,
+  UI and palette identical frame to frame), but no 1.14d scene is fully
+  static: (1) the **mouse cursor** is drawn into the framebuffer and
+  animates (black ↔ index 172 pixels where it rests); log its position and
+  frame per capture, or mask it; (2) see lighting below; (3) run 1 (with the
+  automap open, mana regenerating, Quest Log button flashing) showed those
+  UI animations too. Stability must be defined as "equal outside the
+  listed animated sources", or each source must be modelled. Frame pacing
+  under the debugger: of 1,111 town frames, 625 follow 1 tick, 466 follow 2
+  ticks, 19 follow 0 ticks (frames dropped, never duplicated): every frame
+  carries its tick, so per-tick comparisons stay possible.
+- **`render/lighting.md`** (not written; §B8): in an empty Den of Evil
+  dead end, standing still, comparing the same idle animation frame 16
+  ticks apart, 82 of 84 pairs differ by ~30–300 pixels, all **±1 step on
+  the dark palette ramp** (30↔29, 22↔21, …), mostly on and around the
+  player sprite (x 350–450, y 200–300) and dim floor at the left: the
+  player's light level flickers over time. The spec must state the flicker
+  rule and its source (client RNG or time); Ghidra request in §5 B.
+- **`render/composition.md`, `blend-modes.md`**: `composition-0001` exists
+  (run 2: Town Portal open beside the player, 800×600 GDI, video type 1):
+  the input for settling the blend-table orientation (row = destination per
+  `composition.md` vs `palette.md` / `render-pipeline.md` §A5) and the
+  `pal.pl2` vs `pal.dat` palette question. Rain and torch flames animate in
+  town: town comparisons must mask them or model the weather RNG.
+- `placement-0001` (inventory open / close) and `camera-0001` (walk, run,
+  stop: modes 6 / 2 / 3 / 1) are in the same two runs; no comparison has
+  run yet (needs the d2rs side of each case).
 
 From the Phase 6 infrastructure (notes `docs/handoff/p6-*.md`), by owner:
 
