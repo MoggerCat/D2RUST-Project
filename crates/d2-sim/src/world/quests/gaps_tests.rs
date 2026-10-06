@@ -475,7 +475,19 @@ fn player_leaving_with_quest_items() {
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
+    // Chains 34 and 36 (quests-act5-2.md §6.5, §8.7) lose P1 from both
+    // lists, chain 35 (§7.5) from the record list.
+    for c in [34, 35, 36] {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
+    ctl.record_mut(34).unwrap().extra.a5.q4.guids.add(1);
+    ctl.record_mut(36).unwrap().extra.a5.q6.guids.add(1);
     ctl.player_leaves(&mut w, P1);
+    for c in [34, 35, 36] {
+        assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
+    }
+    assert!(!ctl.record(34).unwrap().extra.a5.q4.guids.contains(1));
+    assert!(!ctl.record(36).unwrap().extra.a5.q6.guids.contains(1));
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
             .iter()
@@ -491,7 +503,10 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
     let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=6).contains(&r.chain) {
+        if r.has_callback(event::PLAYER_LEAVES_GAME)
+            && !(1..=6).contains(&r.chain)
+            && !(34..=36).contains(&r.chain)
+        {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
@@ -687,16 +702,33 @@ fn object_quest_functions_by_class() {
         (0x155, "unhandled 20 0x5bcac0"),
         (0x173, "unhandled 5 0x5954f0"),
         (0x178, "unhandled 24 0x5b6710"),
-        (0x1CB, "unhandled 255 0x58b940"),
         (0x1CC, "unhandled 255 0x58a500"),
         (0x1CD, "unhandled 255 0x589540"),
-        (0x1DA, "unhandled 35 0x58c0e0"),
-        (0x1DB, "unhandled 35 0x58c0e0"),
-        (0x1DC, "unhandled 35 0x58c0e0"),
     ] {
         let mut f = Fake::new();
         object_event(&mut ctl, &mut f, obj, class);
         assert_eq!(f.log, [want], "class {class:#x}");
+    }
+    // 0x1CB (dummy 459, quests-act5-2.md §6.7): nothing until chain 34
+    // wants the temple portal; then the portal at the dummy + (10, 5).
+    let mut f = Fake::new();
+    object_event(&mut ctl, &mut f, obj, 0x1CB);
+    assert!(f.log.is_empty());
+    ctl.record_mut(34).unwrap().extra.a5.q4.portal_wanted = true;
+    f.pos.insert(obj, (100, 200, crate::units::RoomId(1)));
+    object_event(&mut ctl, &mut f, obj, 0x1CB);
+    assert_eq!(f.log, ["portal 110 205 60 121"]);
+    // 0x1DA–0x1DC (the statues, §7.6): each releases its superunique.
+    for (class, su) in [(0x1DA, 45), (0x1DB, 43), (0x1DC, 44)] {
+        let (mut ctl, _) = control();
+        let mut f = Fake::new();
+        f.objects.insert(obj, (0x70, class, 3));
+        f.a5_superuniques = vec![Some(UnitId(0x90))];
+        object_event(&mut ctl, &mut f, obj, class);
+        assert_eq!(
+            f.log,
+            [format!("superunique 112 {su}"), "mode 112 4".into()]
+        );
     }
     // 0x83 in a room: mode 1 → 2; level 76 → `0x005B23C0`.
     let mut f = Fake::new();

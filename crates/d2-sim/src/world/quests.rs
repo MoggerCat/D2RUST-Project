@@ -509,6 +509,140 @@ pub trait QuestWorld {
     // -- end Act V part 1 seams.
 
     // -- Act V part 2 (quests-act5-2.md).
+    /// `0x00660E00` / `0x00660E50` on player data +0x1C + 4·d: the
+    /// player's waypoint of `level` is active (`world/waypoints.md`).
+    fn waypoint_active(&mut self, player: UnitId, level: u32) -> bool {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0066_0E50);
+        false
+    }
+    /// `0x0061AED0(room, flag)`: set or clear the portal flag of the
+    /// unit's room.
+    fn unit_room_portal_flag(&mut self, unit: UnitId, flag: bool) {
+        let _ = (unit, flag);
+        self.unhandled(0xFE, 0x0061_AED0);
+    }
+    /// `0x00545C30(game, unit, position, 2, superunique)`: spawn the
+    /// superunique at the unit's position (monster spec).
+    fn spawn_superunique(&mut self, at: UnitId, superunique: u16) -> Option<UnitId> {
+        let _ = (at, superunique);
+        self.unhandled(0xFE, 0x0054_5C30);
+        None
+    }
+    /// The object's collision freed (inside `0x0058BF40`; the callee is
+    /// object spec).
+    fn free_object_collision(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFE, 0x0058_BF40);
+    }
+    /// `0x0058C8D0`: missile `missile` from `from` towards `to` (flags,
+    /// level; missile spec).
+    fn quest_missile(&mut self, from: UnitId, to: UnitId, missile: u16, flags: u32, level: u8) {
+        let _ = (from, to, missile, flags, level);
+        self.unhandled(0xFE, 0x0058_C8D0);
+    }
+    /// `0x0058BEC0`: remove a spawned Ancient (unit state 54 →
+    /// `0x005544B0`; in a room → mode 12, out of the room, collision
+    /// freed; monster spec).
+    fn remove_ancient(&mut self, monster: UnitId) {
+        let _ = monster;
+        self.unhandled(0xFE, 0x0058_BEC0);
+    }
+    /// `0x00611830`: the player class's maximum level.
+    fn max_level(&mut self, player: UnitId) -> i32 {
+        let _ = player;
+        self.unhandled(0xFE, 0x0061_1830);
+        0
+    }
+    /// `0x00611800`: the experience threshold T(level) of the player's
+    /// class.
+    fn experience_threshold(&mut self, player: UnitId, level: i32) -> u32 {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0061_1800);
+        0
+    }
+    /// `0x00570880`: level up (character progression spec).
+    fn level_up(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0057_0880);
+    }
+    /// The unit's mode (+0x10), as `0x0058D510` reads it for players.
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_D510);
+        0
+    }
+    /// `0x005353F0` then `0x00535430`: close the player's town portal
+    /// if it is in `level`.
+    fn close_town_portal(&mut self, player: UnitId, level: u32) {
+        let _ = (player, level);
+        self.unhandled(0xFE, 0x0053_5430);
+    }
+    /// `0x0059D9D0`: the stairs' warp of `object` for the player (object
+    /// spec).
+    fn object_stairs_warp(&mut self, player: UnitId, object: UnitId) {
+        let _ = (player, object);
+        self.unhandled(0xFE, 0x0059_D9D0);
+    }
+    /// `0x0053AEC0(game, player, level, entry)`: warp the player to a
+    /// level (`drlg/levels.md`).
+    fn quest_warp(&mut self, player: UnitId, level: u32, entry: u32) {
+        let _ = (player, level, entry);
+        self.unhandled(0xFE, 0x0053_AEC0);
+    }
+    /// `0x0056EDE0` with type 2: object `class` at the unit's position
+    /// (`flags` the first of the three trailing arguments, then 0, 0).
+    fn create_object_at(&mut self, at: UnitId, class: u16, flags: u32) -> Option<UnitId> {
+        let _ = (at, class, flags);
+        self.unhandled(0xFE, 0x0056_EDE0);
+        None
+    }
+    /// `0x0056EDE0` with the missile type: missile `class` at the unit
+    /// (missile spec).
+    fn create_missile_at(&mut self, at: UnitId, class: u16) -> Option<UnitId> {
+        let _ = (at, class);
+        self.unhandled(0xFE, 0x0056_EDE0);
+        None
+    }
+    /// `0x00538680(client, act, difficulty)`: character progression
+    /// (save spec; `quests-act5-2.md` open question 2).
+    fn character_progression(&mut self, player: UnitId, act: u8, difficulty: u8) {
+        let _ = (player, act, difficulty);
+        self.unhandled(0xFE, 0x0053_8680);
+    }
+    /// `0x0052E2A0(game)` (`quests-act5-2.md` open question 3).
+    fn game_hook_52e2a0(&mut self) {
+        self.unhandled(0xFE, 0x0052_E2A0);
+    }
+    /// `0x0055B030`: a gold pile of `amount` at the unit.
+    fn drop_gold(&mut self, at: UnitId, amount: u32) {
+        let _ = (at, amount);
+        self.unhandled(0xFE, 0x0055_B030);
+    }
+    /// `monstats.txt` row count (datatables +0xA80), read by `0x0058E830`.
+    fn monstats_rows(&mut self) -> u32 {
+        self.unhandled(0xFE, 0x0058_E830);
+        0
+    }
+    /// `monstats.txt` flags byte +0x0E bit 6 of `class` (the zoo test of
+    /// `0x0058E830`; open question 4).
+    fn zoo_eligible(&mut self, class: u32) -> bool {
+        let _ = class;
+        self.unhandled(0xFE, 0x0058_E830);
+        false
+    }
+    /// The player's client exists and `0x00535060` says the player is
+    /// not busy.
+    fn player_not_busy(&mut self, player: UnitId) -> bool {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_5060);
+        false
+    }
+    /// `0x00554190`: reset the player's interaction.
+    fn reset_interaction(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0055_4190);
+    }
     // -- end Act V part 2 seams.
 }
 
