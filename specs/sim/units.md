@@ -325,7 +325,7 @@ type): `unit-handlers.tsv` (read from tables `0x006E1810`, `0x006E2490`,
    exit). No 1.14d scheduler targets a null entry (U1).
 3. Missiles ignore the type (`tick.md` §5.6).
 4. A timed event with expire −1 through `0x005416B0` becomes an
-   every-tick event and loses its callback (`0x005416D7` passes 0).
+   every-tick event and loses its callback: `tick.md` §5.2 r2 (owner).
 
 ### 6. Events per kind
 

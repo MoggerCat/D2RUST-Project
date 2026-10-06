@@ -28,26 +28,26 @@
 | Inputs | 70–80 |
 | Outputs / state changes | 81–90 |
 | Rules | 91–92 |
-|   1. Entry points and order within a room | 93–112 |
-|   2. Monster regions | 113–232 |
-|   3. Room population (`0x0054EC90(game, room)`) | 233–289 |
-|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 290–316 |
-|   5. Boss or pack (`0x005BE020(region, room)`) | 317–334 |
-|   6. Random boss (champion or unique) | 335–407 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 408–431 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 432–459 |
-|   9. Placement search and creation call (`0x005B2A00`) | 460–573 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 574–617 |
-|   11. Preset monsters (DS1 presets) | 618–749 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 750–773 |
-|   13. Region bookkeeping | 774–806 |
-|   14. Other table-driven and AI spawns | 807–831 |
-| Constants & data dependencies | 832–885 |
-| Randomness | 886–929 |
-| Edge cases & original bugs | 930–970 |
-| Test vectors | 971–1042 |
-| Provenance | 1043–1065 |
-| Open questions | 1066–1089 |
+|   1. Entry points and order within a room | 93–131 |
+|   2. Monster regions | 132–251 |
+|   3. Room population (`0x0054EC90(game, room)`) | 252–308 |
+|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 309–335 |
+|   5. Boss or pack (`0x005BE020(region, room)`) | 336–353 |
+|   6. Random boss (champion or unique) | 354–426 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 427–450 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 451–478 |
+|   9. Placement search and creation call (`0x005B2A00`) | 479–592 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 593–636 |
+|   11. Preset monsters (DS1 presets) | 637–768 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 769–792 |
+|   13. Region bookkeeping | 793–825 |
+|   14. Other table-driven and AI spawns | 826–850 |
+| Constants & data dependencies | 851–904 |
+| Randomness | 905–948 |
+| Edge cases & original bugs | 949–989 |
+| Test vectors | 990–1061 |
+| Provenance | 1062–1084 |
+| Open questions | 1085–1107 |
 <!-- /index -->
 
 ## Summary
@@ -99,9 +99,28 @@ wandering monster to any active room.
    unit restore `0x00542B40` (`sim/units.md`), object population
    `0x00552610` (objects spec), and room monster population `0x0054EC90`
    (§3).
-2. `0x0052D0F0(game, room)` runs the same sequence for one room. Its
-   callers are `0x00553720`, `0x0056CF40` and `0x0059DFD0` (D2MOO
-   1.10f `sub_6FC385A0`). What triggers them is Open question 1.
+2. `0x0052D0F0(game, room)` runs the same sequence for one room,
+   including the ambient spawns `0x0054F060` of rule 1 (first, for every
+   call), without the tick's act-flag test (`sim/tick.md` §4 r5). D2MOO
+   1.10f `sub_6FC385A0`. It runs outside the tick room step, inside the
+   caller's step (1.14d callers, read from the disassembly):
+   - `0x00553720(game, portal)`: resolves a portal object's partner. It
+     reads the destination level (object data +0x04) and point (+0x18,
+     +0x1C), looks for an active room of that act containing the point
+     (`0x00619DA0`); if none, it streams the room there (`0x0061A140`,
+     `drlg/rooms.md` §4.3) and, if that returns a room, populates it at
+     once. Callers: `0x00535430`, `0x00571F90`, `0x00584870`,
+     `0x00585580` and the town-portal cast `0x005BE290`.
+   - `0x0056CF40(game, level, …)`: creates a portal object in the
+     destination level: spawn point of tile index 11 (`0x0061B060`,
+     `sim/path-placement.md` §11), then populates that room **before**
+     testing it for null (a level with no such spawn room would pass a
+     null room: the first read in `0x0054F060` faults). Callers: object
+     event 11 `0x00581410` (`sim/units.md` §6.4), `0x0056D130`,
+     `0x00585580`.
+   - `0x0059DFD0`: A2Q6 arrival (`0x00545830` for level 73): spawn point
+     of tile index 12 in level 40 (act 1), populated when found, then a
+     free point (`0x0064E7E0`, step 7).
 3. Recording-confirmed (all three tick recordings, 292 new monsters): every
    new monster unit appears during the `rooms` step and none during
    `events`. Rooms activated together are filled in the reverse of their
@@ -1065,10 +1084,9 @@ unique with 3 minions), and placement points.
 
 ## Open questions
 
-1. What triggers the per-room population `0x0052D0F0` (callers
-   `0x00553720`, `0x0056CF40`, `0x0059DFD0`), and does it run outside the
-   tick room step? Settled by reading the callers, or by a recording that
-   logs population calls with the step.
+1. Answered (§1 r2): `0x0052D0F0` runs from portal and arrival paths
+   outside the tick room step. A recording that logs population calls
+   with their step would confirm it on the running game.
 2. Draw-level check of §3–§10: record room-seed and game-seed draws
    (call site and `lo'`) during the first population of a Blood Moor room,
    then replay.
