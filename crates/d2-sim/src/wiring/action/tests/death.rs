@@ -438,7 +438,7 @@ fn a_dead_monster_drops_a_real_item_into_its_room() {
     assert!(fx.game.lists.units_of_type(UnitType::Item).contains(&item));
     let r = fx.sim.sys.units.get(item).unwrap();
     assert_eq!((r.ty, r.class, r.mode), (UnitType::Item, 0, 3));
-    assert_eq!(d.items.get(item).unwrap().ilvl, 3);
+    assert_eq!(fx.sim.sys.hooks.items.get(item).unwrap().ilvl, 3);
     assert!(fx.stat(item, GOLD_STAT) > 0);
     assert_eq!(fx.sim.sys.units.get(mon).unwrap().seed, want_mon);
     assert_eq!(fx.sim.hooks().game_seed, want_game);

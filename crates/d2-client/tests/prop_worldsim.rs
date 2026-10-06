@@ -107,7 +107,7 @@ use proptest::test_runner::Config;
 
 mod e2e_support;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, vendor_tables, Rest};
-use e2e_support::{BUC, CAP, N_MONSTATS};
+use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
 
 /// Proptest config with `default` cases, or `PROPTEST_CASES` when set.
 fn config(default: u32) -> Config {
@@ -1282,8 +1282,14 @@ impl Fx {
             1000,
         );
         world.state.add_npc(npc);
+        // The game's one inventory model (the item moves', the vendors'
+        // and the cube's) with the player's inventory; its item-move
+        // seams answer as `InvFx` stages them.
+        let pg = game.lists.unit(player).unwrap().guid;
+        let inv_t = inv_tables(&world.tables, &[(2, 2), (2, 2)]);
+        world.inventory = Some(inv_parts(inv_t, InvFx::default(), player, 1, pg));
         // The player's buckler and cap, made by the economy wiring on the
-        // game seed, held in the staged inventory.
+        // game seed and stored (mode 0) in its inventory (§2.4).
         let (buckler, cap) = world.with_economy(&mut game, &mut sim, |econ, _| {
             let mut make = |record: usize| {
                 let mut rq = ItemRequest {
@@ -1295,14 +1301,16 @@ impl Fx {
                 };
                 let spawn = ItemSpawn {
                     room: None,
-                    mode: 0,
+                    mode: 4,
                     init_flags: 1,
                 };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
             (make(BUC), make(CAP))
         });
-        world.rest.inventory.extend([buckler, cap]);
+        for item in [buckler, cap] {
+            store(&mut world, &mut game, &mut sim, (player, item), 0);
+        }
         let mut s: Sim = SimGame::with_world(game, sim, world);
         s.join(CLIENT, Some(player), None, client_state::IN_GAME)
             .unwrap();
@@ -1574,11 +1582,11 @@ impl Fx {
                 .collect();
             let _ = writeln!(d, " timers {timers:?}");
         }
-        // The trade world: the item store (records, flags, seeds), the
-        // vendor records (stores), the NPC control, the quest state, the
+        // The game's one item store (records, flags, seeds); the trade
+        // world: the vendor records (stores), the NPC control, the quest state, the
         // world's interaction lists.
+        let _ = writeln!(d, "items {:?}", sim.events.action.sys.hooks.items);
         let w = &sim.world;
-        let _ = writeln!(d, "items {:?}", w.items);
         let _ = writeln!(d, "vendors {:?}", w.state.vendors);
         let _ = writeln!(d, "interactions {:?}", w.state.lists);
         let _ = writeln!(d, "npc {:?}", w.npc);
@@ -1754,7 +1762,7 @@ enum Msg {
     Trade,
     /// Buy the `n`-th store item (`vendors.md` §7.1).
     Buy(u8),
-    /// Sell the `n`-th item of the player's staged inventory (§7.2).
+    /// Sell the `n`-th item of the player's inventory (§7.2).
     Sell(u8),
     /// Anything, valid or not.
     Any(Gen),
@@ -1847,7 +1855,8 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
             })
         }
         Msg::Sell(n) => {
-            let inv: Vec<UnitId> = fx.sim.world.rest.inventory.iter().copied().collect();
+            let state = &fx.sim.world.inventory.as_ref()?.state;
+            let inv = state.items_of(fx.player);
             let item = nth(&inv, *n)?;
             bytes(&SellItem {
                 npc: fx.guid(fx.npc),
