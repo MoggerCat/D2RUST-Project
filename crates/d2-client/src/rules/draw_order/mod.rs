@@ -13,7 +13,11 @@
 //! and fade bytes, unit flags 0x10000000 and flag-ex 0x80) and returns the
 //! items in draw order, each with its pass, major and minor.
 
+pub mod background;
+pub mod edges;
+pub mod sight;
 pub mod source;
+pub mod weather;
 
 #[cfg(test)]
 mod tests;
@@ -24,6 +28,7 @@ use crate::bridge::world::UnitKey;
 use crate::scene::order::pass;
 
 use super::camera::{tile_entry, Camera, ClientPos, OpenMode};
+use super::view::BlockRect;
 
 const SPEC: &str = "render/draw-order.md";
 
@@ -202,6 +207,17 @@ impl Fade {
     };
 }
 
+/// The coordinate record a wall record points at (+0x10; `drlg/levels.md`
+/// §11.1): its box corner (+0x00 x0, +0x04 y0, level tiles) and index
+/// (+0x28). Set only by the grid build of a preset room with lvlprest
+/// `Logicals` ≠ 0 (§8, `0x0066C9C0`); every other record has none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Logical {
+    pub x0: i32,
+    pub y0: i32,
+    pub index: i32,
+}
+
 /// One 0x30-byte tile record (§9).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TileRecord {
@@ -213,6 +229,8 @@ pub struct TileRecord {
     pub ty: u32,
     pub dt1: Dt1Facts,
     pub fade: Fade,
+    /// +0x10: the coordinate record (§8 group mode), `None` for 0.
+    pub logical: Option<Logical>,
 }
 
 impl TileRecord {
@@ -239,10 +257,10 @@ pub struct UnitFacts {
     pub playerbody: bool,
     pub attached: bool,
     pub invis: bool,
-    /// TODO(spec: draw-order open question 9): the answer of the sight
-    /// test (`0x00642840` level predicate, then `0x00622AA0(local player,
-    /// unit, 2)`), `true` = hidden. `None` until its owner spec exists: an
-    /// error for a unit the test applies to.
+    /// The answer of the sight test (`draw-order-2.md` §15:
+    /// [`sight::sight_hidden`] over the client DRLG's collision rooms),
+    /// `true` = hidden. The feed fills it; `None` (the feed has no
+    /// collision rooms yet) is an error for a unit the test applies to.
     pub sight_hidden: Option<bool>,
 }
 
@@ -265,6 +283,9 @@ pub struct TileRect {
 /// One room of the near-room array (§9).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Room {
+    /// Level id of the room (§6 r7: the reveal walks the player level's
+    /// rooms only).
+    pub level: u32,
     pub tiles: TileRect,
     /// Subtile origin (+0x4C, +0x50), for the fade test (§8).
     pub subtile_origin: (i32, i32),
@@ -281,9 +302,10 @@ pub struct LevelFacts {
     pub id: u32,
     /// levels `DrawEdges` (+9) (§6 r2).
     pub draw_edges: bool,
-    /// `[0x0072A968]` ≠ 0: the per-record group fade mode (§8, open
-    /// question 6).
-    pub fade_group_mode: bool,
+    /// `[0x0072A968]` = 0: the geometric fade branch of §8. 1.14d has 1
+    /// in `.data` and no writer, so `false` (the group mode) is the only
+    /// live value; the geometric branch is kept for its spec rule only.
+    pub fade_geometric: bool,
 }
 
 /// The §9 map-tile feed of a frame: the near-room array of the local
@@ -296,13 +318,18 @@ pub struct NearRooms {
     /// The player's tile `(px, py)` (`[0x007C8A08]`, `[0x007C8A10]`: path
     /// subtile / 5).
     pub player_tile: (i32, i32),
+    /// The player's coordinate-record index `[0x007C8A0C]`
+    /// (`0x0061B130(player room, path sub-tile x, y)`, set by `0x004DDB70`
+    /// each frame): 0 when the point is in no room, −1 for a null record.
+    pub player_logical: i32,
     pub level: LevelFacts,
 }
 
-/// The fade clock of a frame (§8): `now` is `GetTickCount()` in the
-/// original; `instant` is `0x00477730 ≤ 3`.
-/// TODO(spec: render/blend-modes.md, render/lighting.md): the d2rs time
-/// base and the light value.
+/// The fade clock of a frame (§8 clock arithmetic): `now` is the
+/// `GetTickCount()` millisecond count (`u32`, wrapping); `instant` is
+/// render kind `0x00477730` ≤ 3, the display type (`composition.md` §1:
+/// 1 GDI, 3 DirectDraw), so on the reference every ramp completes at its
+/// first walk and `now` only matters for the unreachable bit-2 branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct FadeClock {
     pub now: u32,
@@ -475,9 +502,6 @@ pub fn fill(
     clock: FadeClock,
     skip_units: bool,
 ) -> Result<Lists, OrderError> {
-    if near.level.fade_group_mode {
-        return Err(open(6, "fade mode [0x0072A968] ≠ 0 (per-record groups)"));
-    }
     let mut f = Filler {
         cells: vec![Cell::default(); grid.cells()],
         count: 0,
@@ -485,6 +509,8 @@ pub fn fill(
     };
     let view = grid.view;
     let player = near.player_tile;
+    let player_logical = near.player_logical;
+    let geometric = near.level.fade_geometric;
     for (ri, room) in near.rooms.iter_mut().enumerate() {
         let rect = room_rect(ri, &room.tiles)?;
         if !room_visible(&rect, &view) {
@@ -509,8 +535,8 @@ pub fn fill(
             };
             let flag4 = !matches!(rec.ty, 0 | 13) && rec.flags & REC_NO_FADE == 0;
             if rec.flags & REC_LAYER_BITS == 0 {
-                f.flags.shadows = true;
                 if f.take() {
+                    f.flags.shadows = true;
                     f.cells[ci].shadow.push(Entry::Tile {
                         room: ri,
                         array: TileArray::Wall,
@@ -518,32 +544,41 @@ pub fn fill(
                     });
                 }
             } else if rec.ty == 15 {
-                f.flags.roofs = true;
                 if f.take() {
+                    f.flags.roofs = true;
                     insert_layered(&mut f.cells[ci].roof, layered, |l| l.layer);
                 }
             } else if (16..=19).contains(&rec.ty) {
-                f.flags.lower_walls = true;
+                // Cell flag 4 comes before the pool test (§2 overflow).
                 if flag4 {
                     f.cells[ci].flags |= 4;
                 }
                 if f.take() {
+                    f.flags.lower_walls = true;
                     insert_layered(&mut f.cells[ci].lower, layered, |l| l.layer);
                 }
             } else {
                 if flag4 {
                     f.cells[ci].flags |= 4;
                 }
+                // A dropped wall gets no fade target (§2 overflow:
+                // `0x004DD180` returns before reading the clock).
+                if !f.take() {
+                    continue;
+                }
                 if rec.flags & REC_NO_FADE == 0 {
-                    let sub = (
-                        room.subtile_origin.0 + 5 * rec.tile.0,
-                        room.subtile_origin.1 + 5 * rec.tile.1,
-                    );
-                    retarget(&mut rec.fade, fade_near(sub, player, rec.ty), clock.now);
+                    let near = if geometric {
+                        let sub = (
+                            room.subtile_origin.0 + 5 * rec.tile.0,
+                            room.subtile_origin.1 + 5 * rec.tile.1,
+                        );
+                        fade_near(sub, player, rec.ty)
+                    } else {
+                        fade_near_group(rec.logical, player_logical, player)
+                    };
+                    retarget(&mut rec.fade, near, clock.now);
                 }
-                if f.take() {
-                    insert_layered(&mut f.cells[ci].wall, layered, |l| l.layer);
-                }
+                insert_layered(&mut f.cells[ci].wall, layered, |l| l.layer);
             }
         }
         // r3: the shadow array.
@@ -556,8 +591,8 @@ pub fn fill(
             let Some(ci) = record_cell(grid, e) else {
                 continue;
             };
-            f.flags.shadows = true;
             if f.take() {
+                f.flags.shadows = true;
                 f.cells[ci].shadow.push(Entry::Tile {
                     room: ri,
                     array: TileArray::Shadow,
@@ -578,8 +613,8 @@ pub fn fill(
                 continue;
             };
             if is_flat(&unit.facts) {
-                f.flags.shadows = true;
                 if f.take() {
+                    f.flags.shadows = true;
                     f.cells[ci].shadow.push(Entry::Unit { room: ri, unit: ui });
                 }
                 continue;
@@ -587,13 +622,11 @@ pub fn fill(
             if f.take() {
                 f.cells[ci].unit.push(Entry::Unit { room: ri, unit: ui });
             }
-            if unit.facts.flag_ex & UNIT_EX_VISIBLE != 0 {
+            if unit.facts.flag_ex & UNIT_EX_VISIBLE != 0 && f.take() {
                 f.flags.shadows = true;
-                if f.take() {
-                    f.cells[ci]
-                        .shadow
-                        .push(Entry::UnitShadow { room: ri, unit: ui });
-                }
+                f.cells[ci]
+                    .shadow
+                    .push(Entry::UnitShadow { room: ri, unit: ui });
             }
         }
     }
@@ -631,8 +664,12 @@ pub fn unit_draws(u: &mut UnitFacts) -> Result<bool, OrderError> {
         return Ok(false);
     }
     let hidden = if sight_tested(u) {
-        u.sight_hidden
-            .ok_or_else(|| open(9, "the sight test 0x00622AA0 has no owner spec yet"))?
+        u.sight_hidden.ok_or_else(|| {
+            open(
+                9,
+                "no sight answer (draw-order-2.md §15) for a sight-tested unit",
+            )
+        })?
     } else {
         false
     };
@@ -647,13 +684,21 @@ pub fn unit_draws(u: &mut UnitFacts) -> Result<bool, OrderError> {
 
 // ---------------------------------------------------------------- §8 fade
 
-/// §8 r1 "near" with `[0x0072A968]` = 0: the record's absolute subtile
-/// `sub` against the player's tile.
+/// §8 "near", unused geometric branch (`[0x0072A968]` = 0, never in
+/// 1.14d): the record's absolute subtile `sub` against the player's tile.
 pub fn fade_near(sub: (i32, i32), player: (i32, i32), ty: u32) -> bool {
     let (lx, ly) = sub;
     let (px, py) = player;
     (5 * px < lx && lx < 5 * px + 20 && matches!(ty, 1 | 4 | 5 | 7 | 8 | 10 | 12))
         || (5 * py < ly && ly < 5 * py + 20 && matches!(ty, 2 | 3 | 6 | 7 | 9 | 11 | 12))
+}
+
+/// §8 "near" in the group mode (`0x004DD060`, the live mode in 1.14d):
+/// the record's coordinate record `G` is set, its index differs from the
+/// player's, and the player's tile lies before `G`'s corner on x or y —
+/// the wall belongs to another logical room in front of the player.
+pub fn fade_near_group(g: Option<Logical>, player_index: i32, player: (i32, i32)) -> bool {
+    g.is_some_and(|g| g.index != player_index && (player.0 < g.x0 || player.1 < g.y0))
 }
 
 /// §8 r2: the fade target update at `now` (`t = now + 500`).
@@ -674,21 +719,25 @@ pub fn retarget(fade: &mut Fade, near: bool, now: u32) {
 }
 
 /// §8 r3: advances a running fade (state bit 1) at the clock and writes
-/// flags 0x400 / 0x8. TODO(spec: render/blend-modes.md): the end time is
-/// compared unsigned (`GetTickCount` wrap not specified).
+/// flags 0x400 / 0x8. Clock arithmetic (§8): "end reached" is the
+/// unsigned `end ≤ now`; the ramp `(to − from) × ((now − end) + 500)` is a
+/// wrapping 32-bit signed product, C-divided by 500, its low byte added
+/// to `from` mod 256 (so a ramp across the `GetTickCount` wrap
+/// overshoots, as in the original).
 pub fn advance(rec: &mut TileRecord, clock: FadeClock) {
     let f = &mut rec.fade;
     if f.state & 2 == 0 {
         return;
     }
-    let reached = clock.now >= f.end;
+    let reached = f.end <= clock.now;
     if clock.instant || reached {
         f.alpha = f.to;
         f.state &= !2;
     } else {
-        let span = i64::from(clock.now) - i64::from(f.end) + 500;
-        let (from, to) = (i64::from(f.from), i64::from(f.to));
-        f.alpha = (from + (to - from) * span / 500) as u8;
+        let span = (clock.now.wrapping_sub(f.end) as i32).wrapping_add(500);
+        let diff = i32::from(f.to) - i32::from(f.from);
+        let step = diff.wrapping_mul(span) / 500;
+        f.alpha = f.from.wrapping_add(step as u8);
     }
     if f.alpha == 0 {
         rec.flags |= REC_FADED_OUT;
@@ -701,6 +750,37 @@ pub fn advance(rec: &mut TileRecord, clock: FadeClock) {
 }
 
 // ---------------------------------------------------------------- §6 passes
+
+/// §6 r6: whether the draw of an ordered tile sets record flag 0x20000,
+/// decided after the drawer's culling (`camera.md` §7). Walls and lower
+/// walls: the wall drawer returned non-zero, i.e. at least one block
+/// (screen position = handed (X, Y) + the block's (x, y)) passed the
+/// block test. Floors and roofs: the whole-tile test passed. Shadow tiles
+/// never set it (units are not tiles).
+pub fn sets_drawn_flag(camera: &Camera, tile: &OrderedTile, blocks: &[BlockRect]) -> bool {
+    let list = source::placement_list(tile);
+    let handed = camera.tile_handed(list, tile.cell.0, tile.cell.1);
+    match tile.kind {
+        TileKind::ShadowTile => false,
+        TileKind::Floor { .. } | TileKind::Roof { .. } => camera.floor_roof_visible(handed),
+        TileKind::Wall | TileKind::LowerWall => blocks
+            .iter()
+            .any(|b| camera.wall_block_visible(handed.0 + b.x, handed.1 + b.y)),
+    }
+}
+
+/// §6 r6: writes flag 0x20000 into the records whose draw set it.
+pub fn mark_drawn(near: &mut NearRooms, drawn: &[(usize, TileArray, usize)]) {
+    for &(room, array, record) in drawn {
+        let r = &mut near.rooms[room];
+        let rec = match array {
+            TileArray::Wall => &mut r.walls[record],
+            TileArray::Floor => &mut r.floors[record],
+            TileArray::Shadow => &mut r.shadows[record],
+        };
+        rec.flags |= REC_DRAWN;
+    }
+}
 
 /// The `DrawKey` fields of an item (§10); `sub` is the unit composite's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -842,6 +922,72 @@ impl Passes<'_> {
     }
 }
 
+// ---------------------------------------------------------------- §6 r7
+
+/// The automap reveal state (`0x00459020`): countdown `[0x007A51A4]` and
+/// the position of the last reveal (`[0x007A51FC]`, `[0x007A51F4]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct AutomapReveal {
+    pub countdown: u32,
+    pub last: (i32, i32),
+}
+
+/// A record the reveal adds to the automap (`0x00457CF0`, owner: the
+/// automap spec).
+pub type RevealedRecord = (usize, TileArray, usize);
+
+/// `0x00458F40(room, all, ·)`: the room's floor array then its wall
+/// array, in order; a record is added when it lacks flag 0x8 and has flag
+/// 0x20000, or always when `all` (second argument 1, or `[0x007A51A0]`
+/// ≠ 0, which has no writer). The room objects (`0x00458DC0`) follow;
+/// they belong to the automap spec.
+pub fn reveal_room(ri: usize, room: &Room, all: bool, out: &mut Vec<RevealedRecord>) {
+    let keep = |r: &TileRecord| all || (r.flags & REC_HIDDEN == 0 && r.flags & REC_DRAWN != 0);
+    for (i, r) in room.floors.iter().enumerate() {
+        if keep(r) {
+            out.push((ri, TileArray::Floor, i));
+        }
+    }
+    for (i, r) in room.walls.iter().enumerate() {
+        if keep(r) {
+            out.push((ri, TileArray::Wall, i));
+        }
+    }
+}
+
+impl AutomapReveal {
+    /// One frame of `0x00459020` (called by the frame `0x0044C7EB`): a
+    /// non-zero countdown is decremented instead; otherwise, when the
+    /// player moved by `d = (2·max + min) / 2 ≥ 0x50` since the last
+    /// reveal, stores the position and reveals every near room of the
+    /// player's level (`level`).
+    pub fn frame(
+        &mut self,
+        player: (i32, i32),
+        level: u32,
+        near: &NearRooms,
+    ) -> Vec<RevealedRecord> {
+        let mut out = Vec::new();
+        if self.countdown != 0 {
+            self.countdown -= 1;
+            return out;
+        }
+        let dx = (player.0 - self.last.0).abs();
+        let dy = (player.1 - self.last.1).abs();
+        let d = (2 * dx.max(dy) + dx.min(dy)) / 2;
+        if d < 0x50 {
+            return out;
+        }
+        self.last = player;
+        for (ri, room) in near.rooms.iter().enumerate() {
+            if room.level == level {
+                reveal_room(ri, room, false, &mut out);
+            }
+        }
+        out
+    }
+}
+
 /// The draw order of a frame (§1, §3–§8, §10) through the grid of
 /// `camera`. Open mode 3 draws no world (§1).
 pub fn order_frame(
@@ -869,7 +1015,11 @@ pub fn order_grid(
     if matches!(near.level.id, 74 | 120) {
         return Err(open(
             1,
-            format!("level {} draws a background", near.level.id),
+            format!(
+                "level {} draws a background (draw-order-2.md §12, `background`): \
+                 the recorded time seeds and the view's art path are not wired",
+                near.level.id
+            ),
         ));
     }
     let lists = fill(grid, near, positions, clock, false)?;
@@ -893,7 +1043,11 @@ pub fn order_grid(
 
     // Pass 3: floors (r2), straight from the rooms.
     if p.near.level.draw_edges && mode.get() == 0 {
-        return Err(open(10, "the level draws edge floors (DrawEdges)"));
+        return Err(open(
+            10,
+            "the level draws edge floors (DrawEdges at open mode 0): draw-order-2.md §14 \
+             (`edges`) needs the resolution mode and the act edge record (its open question 2)",
+        ));
     }
     for ri in 0..p.near.rooms.len() {
         for layer in 1..=2 {
@@ -907,7 +1061,8 @@ pub fn order_grid(
         }
     }
 
-    // Pass 4: TODO(spec: draw-order open question 2) `0x00473C00`.
+    // Pass 4: the environment pools (`draw-order-2.md` §11.6) come from
+    // the feed's weather state (`weather::Weather::pass4`, source.rs).
 
     // Pass 5: the shadow pass (r3).
     if lists.flags.shadows {
@@ -955,7 +1110,6 @@ pub fn order_grid(
                 });
             }
             if p.walk_wall(l) {
-                p.wall_record(l).flags |= REC_DRAWN;
                 let k = key(pass::WALLS_UNITS, ci, pos);
                 p.tile(l.room, TileArray::Wall, l.record, TileKind::Wall, k);
             }
@@ -979,7 +1133,6 @@ pub fn order_grid(
                     let rec = p.wall_record(l);
                     advance(rec, clock);
                     if rec.flags & mask == mask && rec.flags & REC_SKIP == 0 {
-                        rec.flags |= REC_DRAWN;
                         let major = (roof_pass as usize - 1) * n2 + ci;
                         let k = key(pass::ROOFS, major, pos);
                         let kind = TileKind::Roof { pass: roof_pass };
@@ -990,8 +1143,9 @@ pub fn order_grid(
         }
     }
 
-    // Passes 8–10: TODO(spec: draw-order open question 2) `0x00475B20`,
-    // `0x00473910`; the screen fade `0x004DC000` has no d2rs input yet.
+    // Pass 8 never runs (`draw-order-2.md` §13, `background::pass8_items`);
+    // pass 9 is `weather::Weather::pass9` (§11.7, source.rs); the screen
+    // fade `0x004DC000` (pass 10) has no d2rs input yet.
 
     Ok(FrameOrder {
         items: p.out,

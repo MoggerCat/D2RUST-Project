@@ -30,7 +30,7 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
-use crate::rules::draw_order::source::{ordered_source, TileArt};
+use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile};
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
@@ -78,6 +78,17 @@ pub trait ViewFeed: ViewSource {
     /// writes the frame's flag and fade changes back. `None` (the default)
     /// = the model states no map, and `map_tiles` answers alone.
     fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
+        Ok(None)
+    }
+
+    /// The weather state of the frame (`draw-order-2.md` §11; pools,
+    /// floor context, the local player's seed, update count, `Mud`).
+    /// `None` (the default): no weather state; a frame that draws a water
+    /// floor then fails (§11.5 draws the player's seed per such floor).
+    fn weather_frame(
+        &mut self,
+        _world: &ClientWorld,
+    ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
         Ok(None)
     }
 

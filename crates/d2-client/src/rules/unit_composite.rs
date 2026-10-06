@@ -40,6 +40,20 @@ pub enum UnitCompositeError {
         directions: u8,
         frames: usize,
     },
+    /// An `armtype` index above 2 (§5.1 r3, Edge cases): the original
+    /// reads the dword after the 3-entry table (`[0x007C89CC]`), which is
+    /// unreproducible. The request fails (the slot draws nothing) and
+    /// d2rs reports it (§10); no 1.14d armor row has such a byte.
+    #[error("armtype index {0} is past the 3-entry table")]
+    ArmTypeIndex(u8),
+    /// An act II skeleton choice past the reachable entries of its
+    /// override array (§5.2): the original reads the neighbouring array.
+    #[error("act II override of component {component}, choice {choice} is past its table")]
+    OverrideTable { component: u8, choice: u8 },
+    /// A missile following a linked unit that is not a monster (fatal
+    /// 0x1A9, §8 r4).
+    #[error("missile motion record follows a unit that is not a monster")]
+    FollowTarget,
     /// A composed path the asset layer refuses.
     #[error("path {0:?}: {1}")]
     Path(String, String),
@@ -49,10 +63,6 @@ pub enum UnitCompositeError {
         what: &'static str,
         question: &'static str,
     },
-}
-
-fn unresolved(what: &'static str, question: &'static str) -> UnitCompositeError {
-    UnitCompositeError::Unresolved { what, question }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,10 +208,26 @@ fn canonical(path: String) -> Result<CanonicalPath, UnitCompositeError> {
     CanonicalPath::new(&path).map_err(|e| UnitCompositeError::Path(path, e.to_string()))
 }
 
-/// The mode override tables of §2 r2: every pair whose mode equals the
-/// unit's replaces the mode token, the last match wins. Their contents are
-/// runtime data (open question 1): the caller passes them; the original
-/// tables are TODO(spec: render/unit-composite.md OQ1).
+/// The player mode override table (`0x00745900`, count `[0x00745910]` =
+/// 2; static `.data`, §2 r2): SQ (18) and KB (19) use the GH COF.
+pub const PLAYER_MODE_OVERRIDES: [(Code, u8); 2] = [(*b"gh  ", 18), (*b"gh  ", 19)];
+/// The monster mode override table (`0x00745914`, count `[0x0074591C]` =
+/// 1; §2 r2): KB (13) uses the GH COF.
+pub const MONSTER_MODE_OVERRIDES: [(Code, u8); 1] = [(*b"gh  ", 13)];
+
+/// The mode override tables of the COF name (§2 r2) by kind; objects have
+/// none.
+pub fn mode_overrides(kind: CompositeKind) -> &'static [(Code, u8)] {
+    match kind {
+        CompositeKind::Player => &PLAYER_MODE_OVERRIDES,
+        CompositeKind::Monster => &MONSTER_MODE_OVERRIDES,
+        CompositeKind::Object => &[],
+    }
+}
+
+/// The mode override of §2 r2: every pair whose mode equals the unit's
+/// replaces the mode token, the last match wins. `overrides` is
+/// [`mode_overrides`] of the unit's kind.
 pub fn mode_token(token: Code, mode: u8, overrides: &[(Code, u8)]) -> Code {
     overrides
         .iter()
@@ -234,6 +260,13 @@ pub struct HandItem {
     pub two_handed_grip: bool,
 }
 
+/// A hand body location (§2.1): 4 right hand, 5 left hand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandLoc {
+    Loc4,
+    Loc5,
+}
+
 /// What §2.1 reads for a player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PlayerHands {
@@ -244,32 +277,84 @@ pub struct PlayerHands {
     /// Valid items in body locations 4 and 5.
     pub loc4: Option<HandItem>,
     pub loc5: Option<HandItem>,
+    /// The location of the weapon in use (inventory +0x1C, `0x0063BEF0`),
+    /// read by the Barbarian dual-wield rule (r-dual).
+    pub in_use: Option<HandLoc>,
+}
+
+/// Item type class of a weapon class (`0x00629FE0`, static table
+/// `0x007446A0`, §2.1 r-dual): `bow` 1, `1hs` 2, `1ht` 3, `stf` 4, `2hs` 5,
+/// `2ht` 6, `xbw` 7, `ht1` 12, otherwise 0.
+pub fn weapon_type_class(wclass: Code) -> u8 {
+    const TABLE: [(&[u8], u8); 8] = [
+        (b"bow", 1),
+        (b"1hs", 2),
+        (b"1ht", 3),
+        (b"stf", 4),
+        (b"2hs", 5),
+        (b"2ht", 6),
+        (b"xbw", 7),
+        (b"ht1", 12),
+    ];
+    TABLE
+        .iter()
+        .find(|(w, _)| part(&wclass) == *w)
+        .map_or(0, |&(_, c)| c)
+}
+
+/// §2.1 with the draw-time write of r-dual: the weapon class, and
+/// `Some(HandLoc::Loc4)` when the Barbarian rule found no weapon in use
+/// and made the right-hand item the weapon in use (`0x0063D1D0`).
+fn player_weapon_class_and_write(hands: &PlayerHands) -> (Code, Option<HandLoc>) {
+    let in_hand = |i: &Option<HandItem>| i.filter(|i| i.component == 5 || i.component == 6);
+    let Some(hand) = in_hand(&hands.loc4).or_else(|| in_hand(&hands.loc5)) else {
+        return (hands.base_wclass, None);
+    };
+    if let (Some(r), Some(l)) = (hands.loc4, hands.loc5) {
+        if r.item_type == 45 && l.item_type == 45 {
+            match hands.class {
+                4 => {
+                    // r-dual: `A` the weapon in use (none: the right-hand
+                    // item, written back), `B` the other hand item.
+                    let (a, b, write) = match hands.in_use {
+                        Some(HandLoc::Loc5) => (l, r, None),
+                        Some(HandLoc::Loc4) => (r, l, None),
+                        None => (r, l, Some(HandLoc::Loc4)),
+                    };
+                    let w = match (weapon_type_class(a.wclass), weapon_type_class(b.wclass)) {
+                        (2, 3) => *b"1js ",
+                        (3, 3) => *b"1jt ",
+                        (3, 2) => *b"1st ",
+                        _ => *b"1ss ",
+                    };
+                    return (w, write);
+                }
+                6 => return (HT2, None),
+                _ => {}
+            }
+        }
+    }
+    let w = if hand.two_handed_grip {
+        hand.two_handed_wclass
+    } else {
+        hand.wclass
+    };
+    (w, None)
+}
+
+/// The draw-time write of §2.1 r-dual: `Some(HandLoc::Loc4)` when a
+/// Barbarian holding two type-45 items has no weapon in use; the client
+/// then makes the right-hand item the weapon in use (`0x0063D1D0`).
+pub fn weapon_in_use_write(hands: &PlayerHands) -> Option<HandLoc> {
+    player_weapon_class_and_write(hands).1
 }
 
 /// Player weapon class for the component request (`0x0064F380`, §2.1).
 /// For the COF name, modes DT/DD use `hth` instead
 /// ([`player_cof_weapon_class`]).
+/// The draw-time write of the Barbarian rule is [`weapon_in_use_write`].
 pub fn player_weapon_class(hands: &PlayerHands) -> Result<Code, UnitCompositeError> {
-    let in_hand = |i: &Option<HandItem>| i.filter(|i| i.component == 5 || i.component == 6);
-    let Some(hand) = in_hand(&hands.loc4).or_else(|| in_hand(&hands.loc5)) else {
-        return Ok(hands.base_wclass);
-    };
-    if let (Some(a), Some(b)) = (hands.loc4, hands.loc5) {
-        if a.item_type == 45 && b.item_type == 45 {
-            match hands.class {
-                // TODO(spec: render/unit-composite.md OQ3): `1ss` / `1st` /
-                // `1js` / `1jt` by the type classes of `0x00629FE0`.
-                4 => return Err(unresolved("Barbarian dual-wield weapon class", "OQ3")),
-                6 => return Ok(HT2),
-                _ => {}
-            }
-        }
-    }
-    Ok(if hand.two_handed_grip {
-        hand.two_handed_wclass
-    } else {
-        hand.wclass
-    })
+    Ok(player_weapon_class_and_write(hands).0)
 }
 
 /// Player weapon class in the COF name (`0x0064F5B0`, §2.1): `hth` in
@@ -361,8 +446,9 @@ pub enum DirectionSource {
     Player {
         sixteen: bool,
     },
-    /// monstats2 `d<mode>` (+0xF4 + mode); `mode_table_zero`: the per-mode
-    /// table of `0x0046F9D0` holds 0 for the mode (open question 4).
+    /// monstats2 `d<mode>` (+0xF4 + mode); `mode_table_zero`: the class's
+    /// graphics-ready flag for the mode (`0x0046F9D0`) is 0 (§3 r3). With
+    /// synchronous loading d2rs treats a loaded class and mode as ready.
     Monster {
         d_mode: u8,
         mode_table_zero: bool,
@@ -593,9 +679,10 @@ pub struct MonsterLook {
     pub codes: [[Code; 12]; 16],
     /// monstats2 `compositeDeath`.
     pub composite_death: bool,
-    /// The level value `0x006427F0` of the unit's room is 1 (override
-    /// tables, open question 5).
-    pub override_level: bool,
+    /// The unit's room is in act II (`0x006427F0` = 1, §5.1 r2).
+    pub act_two: bool,
+    /// The monster's base class (`monstats` row +0x02, `0x00463860`).
+    pub base_class: u32,
 }
 
 /// What §5.1 r3 reads for a player.
@@ -612,9 +699,29 @@ pub struct PlayerLook {
     pub holy_shield: bool,
     /// An item in the shield hand (`0x0063C8F0`).
     pub shield_hand_item: bool,
-    /// The inventory is the linked unit's (§1 substitution, open question
-    /// 2); the caller cannot tell yet, so `true` is refused.
-    pub linked_inventory: bool,
+}
+
+impl PlayerLook {
+    /// §1.1 linked-unit inventory for the components of `0x004DAD80`
+    /// (§5.1 r3, all but TR, LG, RA, LA, S1, S2): the item codes and the
+    /// shield-hand item come from `linked`'s inventory; the body armor and
+    /// the `holyshield` state stay the unit's own. Use it when
+    /// [`linked_inventory`] holds.
+    pub fn with_linked_items(&self, linked: &PlayerLook) -> PlayerLook {
+        PlayerLook {
+            item_gfx: linked.item_gfx,
+            shield_hand_item: linked.shield_hand_item,
+            ..*self
+        }
+    }
+}
+
+/// §1.1: a draw reads the linked unit's inventory instead of the unit's
+/// when flag-ex bit 3 is set, the unit has a state with `states` flag
+/// `bossinv` (`0x0063A7B0(unit, 0x25)`) and the linked unit
+/// (`0x004639D0`) exists.
+pub fn linked_inventory(flag_ex_bit3: bool, bossinv_state: bool, linked_exists: bool) -> bool {
+    flag_ex_bit3 && bossinv_state && linked_exists
 }
 
 /// Index into `torso` … `lspad` of the armor-class components (`0x0064F420`).
@@ -645,20 +752,31 @@ pub fn armor_class(
     match source {
         ArmorSource::Object => Ok(Some(LIT)),
         ArmorSource::Monster(m) => {
-            if m.override_level {
-                // TODO(spec: render/unit-composite.md OQ5): tables
-                // `0x007489A8` / `0x00748A18` and their conditions.
-                return Err(unresolved("monster armor-class override", "OQ5"));
-            }
             if CompositeKind::Monster.is_death_mode(mode) && !m.composite_death {
                 return Ok(Some(LIT));
             }
             let v = m.choices[c16];
-            if v < m.counts[c16] && usize::from(v) < 12 {
-                Ok(Some(m.codes[c16][usize::from(v)]))
-            } else {
-                Ok(Some(LIT))
+            if v >= m.counts[c16] || usize::from(v) >= 12 {
+                return Ok(Some(LIT));
             }
+            let looked_up = m.codes[c16][usize::from(v)];
+            // §5.2: after the lookup, only for components with a table.
+            let table = if m.act_two {
+                act_two_table(m.base_class, c)
+            } else {
+                None
+            };
+            let Some(table) = table else {
+                return Ok(Some(looked_up));
+            };
+            let code = table
+                .get(usize::from(v))
+                .ok_or(UnitCompositeError::OverrideTable {
+                    component: c,
+                    choice: v,
+                })?;
+            // A zero code makes the request fail.
+            Ok(*code)
         }
         ArmorSource::Player(None) => Ok(None),
         ArmorSource::Player(Some(p)) => {
@@ -667,13 +785,13 @@ pub fn armor_class(
                     return Ok(Some(LIT));
                 }
                 let index = p.body_armor.map_or(0, |b| b[i]);
-                // An index above 2 reads past `armtype` (Edge cases); no
-                // 1.14d row has one: the request fails (armor class 0).
-                return Ok(ARMTYPE.get(usize::from(index)).copied());
-            }
-            if p.linked_inventory {
-                // TODO(spec: render/unit-composite.md OQ2).
-                return Err(unresolved("linked-unit inventory", "OQ2"));
+                // An index above 2 reads past `armtype` (Edge cases, §10):
+                // the request fails and is reported.
+                return ARMTYPE
+                    .get(usize::from(index))
+                    .copied()
+                    .map(Some)
+                    .ok_or(UnitCompositeError::ArmTypeIndex(index));
             }
             let gfx = |c: u8| p.item_gfx[usize::from(c)].unwrap_or(LIT);
             Ok(Some(match c {
@@ -683,6 +801,66 @@ pub fn armor_class(
                 _ => gfx(c),
             }))
         }
+    }
+}
+
+/// `des `: the act II skeleton variant (§5.2).
+pub const DES: Code = *b"des ";
+
+/// `monstats` base classes with act II override tables (§5.2).
+pub const BASE_SKELETON1: u32 = 0;
+pub const BASE_SK_ARCHER1: u32 = 170;
+
+const fn c4(s: &[u8; 3]) -> Option<Code> {
+    Some([s[0], s[1], s[2], b' '])
+}
+const LIT3: Option<Code> = Some(LIT);
+const DES3: Option<Code> = Some(DES);
+const MED3: Option<Code> = Some(MED);
+const HVY3: Option<Code> = Some(HVY);
+/// A zero code (the request fails).
+const ZERO: Option<Code> = None;
+
+const SK_HD: [Option<Code>; 7] = [LIT3, LIT3, DES3, DES3, HVY3, HVY3, HVY3];
+const SK_TR: [Option<Code>; 3] = [LIT3, MED3, HVY3];
+const SK_LIMB: [Option<Code>; 3] = [LIT3, DES3, HVY3];
+const SK_RH: [Option<Code>; 10] = [
+    c4(b"axe"),
+    c4(b"axe"),
+    c4(b"fla"),
+    c4(b"fla"),
+    c4(b"hax"),
+    c4(b"hax"),
+    c4(b"mac"),
+    c4(b"mac"),
+    c4(b"scm"),
+    c4(b"scm"),
+];
+const SK_SH: [Option<Code>; 5] = [ZERO, c4(b"buc"), c4(b"lrg"), c4(b"kit"), c4(b"sml")];
+const SK_SPAD: [Option<Code>; 12] = [
+    ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, LIT3, DES3, HVY3,
+];
+const SA_LH: [Option<Code>; 1] = [c4(b"sbw")];
+
+/// The act II override array of (`base`, component `c`) (`0x00664860`,
+/// tables `0x007489A8` / `0x00748A18`, §5.2), `None` for no table. Only
+/// the entries reachable with the 1.14d `monstats2` counts are held; an
+/// entry `None` is a zero code. `sk_archer1` S1 / S2 have a table with no
+/// reachable entry.
+pub fn act_two_table(base: u32, c: u8) -> Option<&'static [Option<Code>]> {
+    use component::*;
+    match (base, c) {
+        (BASE_SKELETON1, HD) => Some(&SK_HD),
+        (BASE_SKELETON1, TR) => Some(&SK_TR),
+        (BASE_SKELETON1, LG | RA | LA) => Some(&SK_LIMB),
+        (BASE_SKELETON1, RH) => Some(&SK_RH),
+        (BASE_SKELETON1, SH) => Some(&SK_SH),
+        (BASE_SKELETON1, S1 | S2) => Some(&SK_SPAD),
+        (BASE_SK_ARCHER1, HD | LG | RA | LA) => Some(&SK_LIMB),
+        (BASE_SK_ARCHER1, TR) => Some(&SK_TR),
+        (BASE_SK_ARCHER1, LH) => Some(&SA_LH),
+        (BASE_SK_ARCHER1, S1 | S2) => Some(&[]),
+        _ => None,
     }
 }
 
@@ -787,9 +965,8 @@ pub fn file_format(codes: &ComponentCodes, class: u32, mode: u8) -> FileFormat {
         CompositeKind::Object => DC6_OBJECTS.contains(&class),
         CompositeKind::Player => false,
     };
-    // TODO(spec: render/unit-composite.md §6 r2): case of the name
-    // comparison is not stated; compared byte for byte.
-    if dc6 || codes.name() == DC6_NAME {
+    // ASCII case-insensitive over the whole name (`_strnicmp`, §6 r2).
+    if dc6 || codes.name().eq_ignore_ascii_case(DC6_NAME) {
         FileFormat::Dc6
     } else {
         FileFormat::Dcc
@@ -930,10 +1107,33 @@ pub struct MotionRecord {
     pub ticks_left: i32,
 }
 
+/// The linked unit `K` a record with flag 0x10 follows (§8 r4), as the
+/// caller reads it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FollowTarget {
+    /// `K` is a monster (type 1).
+    pub monster: bool,
+    /// `K`'s mode (DT 0 / DD 12 stop a following missile).
+    pub mode: u8,
+    /// (`a`, `b`): the `xoff`, `yoff` of `K`'s component 14 (S7) cel for
+    /// its current frame and direction (`0x004706E0`), or (0, 0) when `K`'s
+    /// COF for its draw mode is not loaded, its loaded-COF field `+0x14` is
+    /// 0, or the request fails.
+    pub s7_offset: (i32, i32),
+    /// `K`'s own `ox`, `oy`, `oz` (its motion record; 0 without one).
+    pub offset: [i32; 3],
+}
+
 impl MotionRecord {
     /// One update (`0x004DA350`, §8 r1–r6), once per client unit update;
-    /// nothing when done. The follow branch (flag 0x10) is open question 7.
-    pub fn update(&mut self) -> Result<(), UnitCompositeError> {
+    /// nothing when done. `missile`: this unit is a missile; `linked`: the
+    /// linked unit `K` of the follow branch (`0x004639D0`), `None` when it
+    /// does not exist.
+    pub fn update(
+        &mut self,
+        missile: bool,
+        linked: Option<&FollowTarget>,
+    ) -> Result<(), UnitCompositeError> {
         use motion::*;
         if self.flags & DONE != 0 {
             return Ok(());
@@ -975,8 +1175,32 @@ impl MotionRecord {
                 }
             }
         } else if self.flags & FOLLOW != 0 {
-            // r4. TODO(spec: render/unit-composite.md OQ7): `0x004706E0`.
-            return Err(unresolved("motion record follow branch", "OQ7"));
+            // r4; r6 is skipped.
+            let Some(k) = linked else {
+                return Ok(());
+            };
+            if missile {
+                if !k.monster {
+                    return Err(UnitCompositeError::FollowTarget);
+                }
+                if CompositeKind::Monster.is_death_mode(k.mode) {
+                    return Ok(());
+                }
+            }
+            let (a, b) = k.s7_offset;
+            let ox = a.wrapping_add(k.offset[0]);
+            let oz = b
+                .wrapping_add(if missile { 10 } else { 0 })
+                .wrapping_add(k.offset[2]);
+            let oy = self.offset[1];
+            self.offset[0] = ox;
+            self.offset[2] = oz;
+            // `0x00643510`(ox, oy), arithmetic shifts.
+            let two_oy = oy.wrapping_mul(2);
+            self.pos[0] = two_oy.wrapping_add(ox) >> 5;
+            self.pos[1] = two_oy.wrapping_sub(ox) >> 5;
+            self.pos[2] = oz.wrapping_neg().wrapping_mul(2048);
+            return Ok(());
         } else {
             // r5.
             let [a, b, c] = self.pos.map(|p| p >> 11);

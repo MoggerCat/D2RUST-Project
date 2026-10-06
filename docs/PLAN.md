@@ -322,7 +322,7 @@ critical path to a first playable scene):
 1. `render/sprite-placement.md`, `render/camera.md`, `render/composition.md`
    (+ frame capture in `tools/trace-recorder`, render §B9): unlocks link 1
    (original → CPU reference) at all.
-2. `render/unit-composite.md`, `render/draw-order.md`: units in the town. **Written (eighth fold, draft, no claim yet); implementation sessions `impl-unit-composite` and `impl-draw-order` are running.**
+2. `render/unit-composite.md`, `render/draw-order.md`: units in the town. **Written (eighth fold, draft, no claim yet); implementation sessions `impl-unit-composite` and `impl-draw-order` are running.** *`render/draw-order-2.md` implemented in `rules::draw_order` (`weather`, `background`, `edges`, `sight`; `impl-draw-order-2`, 2026-10-06): unit tier 43 / 44, unverified (captures queued, HANDOFF §5 A); the draw-order answers (A7 group fade, DO1, DO3–DO5, §6 r6–r7) and UC2–UC5, UT1–UT5 landed. Passes 1, 4, 9, edge floors and sight still fail the frame until the feed lends their state and the view an art path.*
 3. `render/shading.md`, `render/blend-modes.md`, `render/lighting.md`. **Implemented, unverified** (`impl-shading-blend`, then `impl-lighting-blend`: the light map, records, sources, environment, overrides and per-draw values; per-block tile shade; unit shade / blend through `LitRules` when a feed states a light; GDI lines / rectangles and unit shadow positions). No feed states a light yet (client model); checks queued (HANDOFF §5 C67–C70).
 4. `formats/wav.md`, `audio/triggers.md`, `audio/sound-table.md`
    (+ `record_sound.py`), then `audio/environment.md`.
