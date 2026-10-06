@@ -18,7 +18,7 @@ const STAT_EXTRA_STACK: u16 = 254;
 /// Cap of the total max stack (`0x006295B0`).
 const MAX_STACK_CAP: i32 = 511;
 
-impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     fn rec_of(&self, u: Owner) -> Option<&crate::units::record::UnitRecord> {
         self.econ.units.get(self.unit_of(u)?)
     }
@@ -64,7 +64,7 @@ impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
     }
 }
 
-impl<H: LifecycleHooks, R: InvRest> MoveUnits for InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R> {
     fn unit_exists(&self, u: Owner) -> bool {
         self.unit_of(u).is_some()
     }

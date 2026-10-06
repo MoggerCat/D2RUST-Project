@@ -21,6 +21,7 @@
 //! no items spec writes, quest hooks).
 
 mod cube_world;
+pub mod moves;
 #[cfg(test)]
 mod tests;
 
@@ -47,36 +48,37 @@ pub const CLICK_BUTTON: u8 = 0x4F;
 
 /// Every item-related C→S id (`client-messages.tsv`) and the spec that
 /// owns its behaviour; `None`: no written spec does, the id stays a stub.
+/// The `inventory.md` §7 ids are handled in [`moves`] ([`moves::MOVE_IDS`]).
 /// Vendor ids (0x32–0x38) belong to `world/vendors.md` and the world
 /// handlers, not here.
 pub const ITEM_IDS: &[(u8, Option<&str>)] = &[
-    (0x16, None), // PickItem
-    (0x17, None), // DropItem
-    (0x18, None), // InsertItemInBuffer
-    (0x19, None), // RemoveItemFromBuffer
-    (0x1A, None), // EquipItem
-    (0x1B, None), // Swap2HandedItem
-    (0x1C, None), // RemoveBodyItem
-    (0x1D, None), // SwapCursorWithBody
-    (0x1E, None), // Swap1HWith2H
-    (0x1F, None), // SwapCursorBufferItem
-    (0x20, None), // UseGridItem
-    (0x21, None), // StackItems
-    (0x22, None), // UnstackItems
-    (0x23, None), // ItemToBelt
-    (0x24, None), // ItemFromBelt
-    (0x25, None), // SwitchBeltItem
-    (0x26, None), // UseBeltItem
-    (0x27, None), // UseItemAction
-    (0x28, None), // SocketItem
-    (0x29, None), // ScrollToBook
+    (0x16, Some("specs/items/inventory.md §7.1")), // PickItem
+    (0x17, Some("specs/items/inventory.md §7.2")), // DropItem
+    (0x18, Some("specs/items/inventory.md §7.3")), // InsertItemInBuffer
+    (0x19, Some("specs/items/inventory.md §7.4")), // RemoveItemFromBuffer
+    (0x1A, Some("specs/items/inventory.md §7.5")), // EquipItem
+    (0x1B, Some("specs/items/inventory.md §7.6")), // Swap2HandedItem
+    (0x1C, Some("specs/items/inventory.md §7.7")), // RemoveBodyItem
+    (0x1D, Some("specs/items/inventory.md §7.8")), // SwapCursorWithBody
+    (0x1E, Some("specs/items/inventory.md §7.9")), // Swap1HWith2H
+    (0x1F, Some("specs/items/inventory.md §7.10")), // SwapCursorBufferItem
+    (0x20, Some("specs/items/inventory.md §7.11")), // UseGridItem
+    (0x21, Some("specs/items/inventory.md §7.12")), // StackItems
+    (0x22, Some("specs/items/inventory.md §7.13")), // UnstackItems
+    (0x23, Some("specs/items/inventory.md §7.14")), // ItemToBelt
+    (0x24, Some("specs/items/inventory.md §7.15")), // ItemFromBelt
+    (0x25, Some("specs/items/inventory.md §7.16")), // SwitchBeltItem
+    (0x26, Some("specs/items/inventory.md §7.17")), // UseBeltItem
+    (0x27, Some("specs/items/inventory.md §7.18")), // UseItemAction
+    (0x28, Some("specs/items/inventory.md §7.19")), // SocketItem
+    (0x29, Some("specs/items/inventory.md §7.20")), // ScrollToBook
     (ITEM_TO_CUBE, Some("specs/world/cube.md §2")),
     // `cube.md` §10 routes 0x4C to the item-use spec (not written).
     (0x4C, None), // Transmogrify
     (CLICK_BUTTON, Some("specs/world/cube.md §1")),
-    (0x50, None), // DropGold
-    (0x61, None), // MercItem
-    (0x63, None), // ItemToBeltShift
+    (0x50, Some("specs/items/inventory.md §7.22")), // DropGold
+    (0x61, Some("specs/items/inventory.md §7.23")), // MercItem
+    (0x63, Some("specs/items/inventory.md §7.24")), // ItemToBeltShift
 ];
 
 /// Errors the handler result code cannot carry, in order.

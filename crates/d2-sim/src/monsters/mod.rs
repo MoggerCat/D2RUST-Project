@@ -3,4 +3,6 @@
 
 pub mod ai;
 pub mod init;
+#[cfg(test)]
+mod mutant_tests;
 pub mod population;
