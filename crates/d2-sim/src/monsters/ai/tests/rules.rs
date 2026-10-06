@@ -1824,3 +1824,8 @@ fn catalogue_shape() {
         assert_eq!(r[9] == "-", r[10] == "unread", "row {i} summary");
     }
 }
+
+// Tests written against surviving mutants (METHODS M08); a child module so
+// they share the fakes and helpers of this module and its parent.
+#[path = "../../mutant_tests/ai.rs"]
+mod mutant_tests;

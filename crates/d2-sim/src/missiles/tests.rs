@@ -73,6 +73,8 @@ struct Fake {
     sizes: std::cell::RefCell<Vec<i32>>,
     /// Damage setup sets unit flag bit 3 on the missile.
     setup_sets_valid: bool,
+    /// Units that are hirelings.
+    hirelings: BTreeSet<UnitId>,
 }
 
 impl Fake {
@@ -161,8 +163,8 @@ impl MissileUnits for Fake {
             0
         }
     }
-    fn is_hireling(&self, _: UnitId) -> bool {
-        false
+    fn is_hireling(&self, unit: UnitId) -> bool {
+        self.hirelings.contains(&unit)
     }
     fn apply_justhit(&mut self, _: &mut Game, unit: UnitId, expire: i32) {
         self.log.push(format!("justhit {} {expire}", unit.0));
@@ -279,7 +281,9 @@ impl MissileCombat for Fake {
     fn target_damage_bonus(&self, _: UnitId, _: UnitId) -> i32 {
         0
     }
-    fn add_target_ac(&mut self, _: &mut Game, _: UnitId, _: i32) {}
+    fn add_target_ac(&mut self, _: &mut Game, unit: UnitId, delta: i32) {
+        self.log.push(format!("ac {} {delta}", unit.0));
+    }
 }
 
 impl MissileHooks for Fake {
@@ -2233,3 +2237,8 @@ fn null_table_entries_are_flagged() {
         assert_eq!(w.fake.logged("srvdmg"), 0);
     }
 }
+
+// Tests written against surviving mutants (METHODS M08); a child module so
+// they share this module's fakes.
+#[path = "mutant_tests.rs"]
+mod mutant_tests;
