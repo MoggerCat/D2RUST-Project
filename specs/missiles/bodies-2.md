@@ -14,6 +14,34 @@
   `aura_fill` §2.6, summons §6.1–§6.5, missile at a point §6.13);
   `monsters/init.md`, `monsters/ai.md` (umods, owner data, minion lists).
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 45–58 |
+| Inputs | 59–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 75–85 |
+|   32. Server-hit 20 Lightning Fury `0x005AB370` | 86–111 |
+|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 112–138 |
+|   34. Server-hit 21 Battle Cry `0x005AB500` | 139–157 |
+|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 158–185 |
+|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 186–197 |
+|   37. Server-hit 25 panther pot green `0x005AB820` | 198–221 |
+|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 222–240 |
+|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 241–279 |
+|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 280–296 |
+|   41. Server-hit 31 fire head `0x005ABD70` | 297–312 |
+|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 313–323 |
+|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 324–358 |
+| Constants & data dependencies | 359–375 |
+| Randomness | 376–387 |
+| Edge cases & original bugs | 388–403 |
+| Test vectors | 404–416 |
+| Provenance | 417–432 |
+| Open questions | 433–440 |
+<!-- /index -->
+
 ## Summary
 
 Continuation of `bodies.md` past its size limit, in the same order (most
@@ -191,6 +219,143 @@ rancidgascloud.
 GX (`0x006E2618`) = 0, 2, 2, 2, 0, −2, −2, −2; GY (`0x006E25F8`) = 2, 2,
 0, −2, −2, −2, 0, 2.
 
+### 38. Server-hit 28 Grim Ward scare `0x005ABA10`
+
+Row: grimwardscare (259). Data +0x28 = GUID of the grim ward missile
+(set at creation, skills spec).
+
+1. k = skill, L = level; k invalid → return 1. Owner none → return 1.
+2. No unit, or the unit is not a monster → return 1.
+3. W = the missile with GUID data +0x28 (`0x00552F60(game, 3, GUID)`);
+   none → return 1.
+4. d = `Param1` + (L − 1) × `Param2` of k (`0x004E6CA0`; 0 when L ≤ 0).
+5. Squared distance W → unit (`0x006492A0(W.x, W.y, U.x, U.y)`) ≥ d²
+   → return 1.
+6. Terror install `0x005DDD00(game, W, unit, k, Param5, Param6)` (the
+   ward missile is the source; `Param5` +0x158 and `Param6` +0x15C read
+   as they are, `0x004E6C70`, `0x004F4110`; `monsters/ai.md`). Return 1.
+
+Live: Grim Ward `Param1` 3, `Param2` 1 (radius 3 + (L − 1)), `Param5`
+10, `Param6` 60.
+
+### 39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00`
+
+Row: frozenorb (260); `Param1` 1, `Param2` 19, `SubMissile1`
+frozenorbbolt, `sHitPar1` 4, `HitSubMissile1` frozenorbnova.
+
+C64[i] = trunc(30 × cos(2πi / 64)) and S64[i] = C64[(i − 16) mod 64],
+i = 0…63: 30, 29, 29, 28, 27, 26, 24, 23, 21, 19, 16, 14, 11, 8, 5, 2,
+0, … (dumped twice: server-do 15 reads C64 at `0x006E2B78`, S64 at
+`0x006E2A78`; server-hit 29 C64 at `0x006E2738`, S64 at `0x006E2638`).
+
+Server-do 15:
+
+1. Missile none, no record or `SubMissile1` < 0 → return 2. O = owner;
+   none → return 2.
+2. n = max(`Param1`, 1). Elapsed mod n > 0 → return flight.
+3. Zeroed record, flags 2 (target relative; start = the origin's
+   position): owner O, origin the missile, skill, level, class
+   `SubMissile1`.
+4. i = |data +0x28 mod 64| (signed remainder, then absolute value).
+   Offset (C64[i], S64[i]). Data +0x28 := (i + `Param2`) mod 64
+   (signed). Create (after the store).
+5. Return flight.
+
+Server-hit 29:
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1.
+2. Frames left ≠ 0 → return 2 (unit contacts: damage, keep flying; an
+   expiry with frames left, e.g. movement stopped, removes it without a
+   nova).
+3. O = owner; none → return 1.
+4. Zeroed record as server-do 15 step 3 with class `HitSubMissile1`. s =
+   max(`sHitPar1`, 1). For i = 0, s, 2s, … while i < 64: offset (C64[i],
+   S64[i]); create; created → its data +0x28 := C64[i], +0x2C :=
+   S64[i].
+5. Return 3.
+
+Live: a bolt every frame, each 19 steps (≈ 107°) further round; at
+expiry 16 nova pieces (`sHitPar1` 4).
+
+### 40. Server-do 16 Frozen Orb nova `0x005AF170`
+
+Row: frozenorbnova (262); `Param1` 6, `Param2` 2. Data +0x28 / +0x2C =
+offset (a, b) from server-hit 29.
+
+1. Missile none or no record → return 2.
+2. s = max(`Param2`, 1); e = elapsed. e < `Param1` (signed) and e mod
+   s = 0:
+   1. a' = (a − b) / 2, b' = (a + b) / 2 (signed, truncating toward 0).
+   2. Path target point := (x + a', y + b') (`0x00648AD0`); rebuild
+      (`0x00649970(path, missile, 0)`).
+   3. Data +0x28 := a', data +0x2C := b'.
+3. Return flight.
+
+Each turn rotates the aim 45° and scales its length by 1/√2: the
+pieces curl. No draws.
+
+### 41. Server-hit 31 fire head `0x005ABD70`
+
+Row: firehead (277; `CollideKill` 1).
+
+1. Missile none or no record → return 1. O = owner; none, or no unit →
+   return 1.
+2. Zeroed 0x70 record; v = `elem_roll(game, missile, unit, record)`
+   (`missiles.md` §R9.6; `EType` fire, missile seed); the record is not
+   used further.
+3. O life (stat 6) := min(life + max(v, 0), max life) (`0x00625480`,
+   `0x00625D10`, `0x00627260`).
+4. Return 3 when `CollideKill` ≠ 0, else 2.
+
+The damage stage then rolls the hit's damage again (`missiles.md`
+§R6.2): the heal and the damage are two different rolls.
+
+### 42. Server-hit 32 Cairn Stones `0x005ABE50`
+
+Row: cairnstones (288); `Param4` 38.
+
+1. Missile none, no record, unit given, or data +0x28 ≠ 0 → return 0.
+2. Open the portal: `0x005A9930(game, missile, Param4)` (`bodies.md` §1
+   step 3; it sets data +0x28 := 1). Return 0.
+
+So the portal also opens when the stones expire before server-do 17
+opened it.
+
+### 43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0`
+
+Row: towerchestspawner (332); `Param1` 150, `Param2` 2, `Param3` 5,
+`Range` 400. Data +0x28 = chest object GUID, +0x2C = 0 at creation
+(`world/quests-act1-rest.md` §4 step 5).
+
+Server-do 18:
+
+1. Missile none or no record → return 2. f = frames left.
+2. f = 1: C = the object with GUID data +0x28 (`0x00552F60(game, 2,
+   GUID)`); C → sound event 0x5C on C (`0x00553380(C, 0x5C, 0)`).
+3. f = `Range` (i16) − `Param1`: C as in step 2; C → operate context
+   {game, C, operator none, C + 0x20, C's class} and the chest drop
+   `0x00585E00` (`items/treasure.md` §4, Q = 4). Then data +0x2C := 1
+   (with or without C).
+4. Data +0x2C ≠ 0 and f mod max(4 × `Param2`, 1) = 0 (signed):
+   1. (px, py) = the missile's coordinates (`0x00620870`). r = `Param3`;
+      px += `roll(2r + 1)` − r, then py += `roll(2r + 1)` − r
+      (`0x0045C3E0`, missile seed).
+   2. Floor drop spot `0x00555DA0(missile room, (px, py), &out, size 1,
+      fallback 1)` (`items/treasure.md` §7 step 2); none → skip.
+   3. Gold: item request (0x84 bytes, zeroed) {unit the missile, game,
+      item level = area level of out's level (`0x0061DCA0(0x0061A1B0(
+      room), difficulty game +0x6D, expansion game +0x70)`), item index
+      of code `gld ` (`0x00633680`), spawn type 3, out position and
+      room, init flags 1, item format game +0x78, quality 2}; create
+      (`0x00558D90(game, request, 0)`, `items/generation.md` §3).
+5. Return flight.
+
+Server-hit 33: no unit and the missile has a room → refresh the room
+(`0x0061AED0(room, 1)`). Return 0.
+
+Live: the chest pops open with 250 frames left, then a gold pile within
+±5 sub-tiles every 8 frames.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -200,6 +365,9 @@ GX (`0x006E2618`) = 0, 2, 2, 2, 0, −2, −2, −2; GY (`0x006E25F8`) = 2, 2,
 | bone wall summon request | flags 0xD, AI state 0, pet max 0 | `0x005AEDA0` |
 | bone wall umod | 15 (`partydead`) | `monumod.txt` row 15 |
 | panther green ring | GX / GY, radius 2, 8 entries | `0x006E2618` / `0x006E25F8` |
+| frozen orb circle | C64 / S64, radius 30, 64 steps | `0x006E2B78` / `0x006E2A78` (do 15), `0x006E2738` / `0x006E2638` (hit 29) |
+| tower chest | sound 0x5C at f = 1; chest drop Q 4 at f = `Range` − `Param1`; gold every 4 × `Param2` frames within ±`Param3` | `0x005AF300` |
+| grim ward scare | radius `Param1` + (L − 1) × `Param2`; terror `Param5`, `Param6` | `0x005ABA10` |
 | missiles.txt | `sHitPar1..2`, `HitSubMissile1`, `SubMissile1`, `HitFlags`, `ResultFlags` | `data/fields.tsv` |
 | skills.txt | `aurarangecalc`, `auralencalc` +0x60, `aurafilter` +0x50, `auratargetstate` +0x82, `calc1`, `calc4`, `pettype` +0xBE | `data/fields.tsv` |
 
@@ -210,6 +378,9 @@ Use counts and order: `bodies.md` Constants.
 | Body | Re-seed | Draws, in order |
 |---|---|---|
 | do 12, hit 20, do 13, hit 21, hit 25 | — | none of their own (summon and state helpers: skills / monsters specs) |
+| hit 28, do 15, hit 29, do 16, hit 32, hit 33 | — | none of their own |
+| hit 31 | — | `elem_roll` (missile seed) |
+| do 18 | — | `roll(2r + 1)` × 2 on the missile seed (x first) per gold pile; then the item pipeline's own draws |
 | hit 22, hit 24 | — | `missiles.md` §R6.2 rolls on the missile seed; then the damage tail (hit 22) or `area_damage`'s per-unit draws |
 
 Created missiles and monsters draw on their own seeds.
@@ -224,6 +395,11 @@ Created missiles and monsters draw on their own seeds.
    invalid.
 4. `ring8` sets flag 8 with loops = level − 1, so a level-0 missile
    passes −1 loops.
+5. Server-hit 31 heals the owner with one roll and the damage stage
+   rolls the hit again.
+6. Server-hit 29 returns 2 (no nova) for any expiry with frames left.
+7. Server-do 18 sets data +0x2C := 1 even when the chest is gone, so
+   gold still drops.
 
 ## Test vectors
 
@@ -233,13 +409,21 @@ Created missiles and monsters draw on their own seeds.
 | pantherpotgreen hit, `sHitPar1` 1 | 8 rancidgascloud, offsets (0, 2), (2, 2), (2, 0), (2, −2), (0, −2), (−2, −2), (−2, 0), (−2, 2) | live row, §37 |
 | bonewallmaker, data +0x2C = 0 | return 2 (removed) | synthetic, §33 |
 | fistoftheheavensdelay, struck unit gone | return 0, no bolts | synthetic, §35 |
+| frozenorb, data +0x28 = 60, elapsed 5 | bolt at offset (C64[60], S64[60]) = (27, −11); data +0x28 := 15 | live row, §39 |
+| frozenorb, data +0x28 = −70 | i = |−70 mod 64| = 6 | synthetic, §39 |
+| frozenorbnova (a, b) = (30, 0), elapsed 0, 2, 4 | (15, 15), (0, 15), (−7, 7) | synthetic, §40 |
+| towerchestspawner, frames left 250 | chest drop; data +0x2C := 1; 250 mod 8 ≠ 0, no gold | live row, §43 |
 
 ## Provenance
 
 - 1.14d `Game.exe`: `0x005AECA0`, `0x005AB370`, `0x005AB2A0`,
   `0x005AEDA0`, `0x005AB500`, `0x005ADD20`, `0x005AB630`,
   `0x005ADCD0`, `0x005A89A0` (zeroes its record), `0x005A9BF0`,
-  `0x005AB820`, `0x005AB700`; table `0x006E25F8`–`0x006E2637` dumped.
+  `0x005AB820`, `0x005AB700`, `0x005ABA10`, `0x004E6CA0`,
+  `0x004E6C70`, `0x004F4110`, `0x005AF030`, `0x005ABB00`, `0x005AF170`,
+  `0x005ABD70`, `0x005ABE50`, `0x005AF300`, `0x005ABEB0`; tables
+  `0x006E25F8`–`0x006E2637`, `0x006E2638`–`0x006E2837`,
+  `0x006E2A78`–`0x006E2C77` dumped.
   Table entries checked against `0x0073C768` / `0x0073C840`.
 - Live `patch_d2` missiles.txt rows per section; skills.txt Lightning
   Fury, Fist of the Heavens, Battle Cry, Bone Wall; monumod.txt row 15.

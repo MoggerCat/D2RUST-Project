@@ -27,12 +27,12 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 25	0x005AB820	MISSMODE_SrvHit25_PantherPotGreen	1	pantherpotgreen(239)	sHitPar1;HitSubMissile1	none	8-direction radius-2 ring (step sHitPar1) of HitSubMissile1 at the hit unit or missile, velocity Param1<<7, loops lvl-1; returns 3 (bodies-2.md §37)	spec'd-here
 26	0x005AB8D0	MISSMODE_SrvHit26_GrimWardStart	3	grimwardsmallstart(249) grimwardmediumstart(252) grimwardlargestart(255)	sHitPar1;HitSubMissile1;skill calc1	none	creates HitSubMissile1 at the missile with range sHitPar1 or max(calc1,5); returns 1 (bodies.md §14)	spec'd-here
 27	0x005ABA00	MISSMODE_SrvHit27_GrimWard	3	grimwardsmall(250) grimwardmedium(253) grimwardlarge(256)	-	none	returns 1 (bodies.md §15)	spec'd-here
-28	0x005ABA10	MISSMODE_SrvHit28_GrimWardScare	1	grimwardscare(259)	- (skill params)	-	scares the hit monster	D2MOO-only
-29	0x005ABB00	MISSMODE_SrvHit29_FrozenOrb	1	frozenorb(260)	sHitPar1;HitSubMissile1	-	final nova HitSubMissile1 burst	D2MOO-only
+28	0x005ABA10	MISSMODE_SrvHit28_GrimWardScare	1	grimwardscare(259)	- (skill Param1-2, Param5-6)	none	monster within Param1+(lvl-1)*Param2 of the grim ward (missile GUID data +0x28): terror install from the ward (Param5, Param6); returns 1 (bodies-2.md §38)	spec'd-here
+29	0x005ABB00	MISSMODE_SrvHit29_FrozenOrb	1	frozenorb(260)	sHitPar1;HitSubMissile1	none	frames left 0: circle of HitSubMissile1 every sHitPar1 steps, offsets stored in data +0x28/+0x2C, 3; frames left: 2 (bodies-2.md §39)	spec'd-here
 30	-	-	0	-	-	-	null entry	spec'd-here
-31	0x005ABD70	MISSMODE_SrvHit31_FireHead	1	firehead(277)	-	damage rolls	damage on hit	D2MOO-only
-32	0x005ABE50	MISSMODE_SrvHit32_CairnStones	1	cairnstones(288)	Param4	-	creates the portal object Param4	D2MOO-only
-33	0x005ABEB0	MISSMODE_SrvHit33_TowerChestSpawner	1	towerchestspawner(332)	-	-	no effect on hit	D2MOO-only
+31	0x005ABD70	MISSMODE_SrvHit31_FireHead	1	firehead(277)	-	elem_roll (missile seed)	heals the owner by an elem_roll value; returns 2, or 3 with CollideKill (bodies-2.md §41)	spec'd-here
+32	0x005ABE50	MISSMODE_SrvHit32_CairnStones	1	cairnstones(288)	Param4	none	no unit and portal not yet opened: opens the Tristram portal (Param4); returns 0 (bodies-2.md §42)	spec'd-here
+33	0x005ABEB0	MISSMODE_SrvHit33_TowerChestSpawner	1	towerchestspawner(332)	-	none	no unit: refreshes the missile's room; returns 0 (bodies-2.md §43)	spec'd-here
 34	-	-	0	-	-	-	null entry	spec'd-here
 35	0x005ABEE0	MISSMODE_SrvHit35_OrbMist	1	orbmist(368)	-	-	no effect on hit	D2MOO-only
 36	0x005ABF70	MISSMODE_SrvHit36_MissileInAir	4	bomb in air(385) shock field in air(388) catapult spike in air(412) sentryspikeinair(496)	HitSubMissile1	none	no unit: creates HitSubMissile1 at the missile via 0x0056EDE0 and copies data +0x28; with a unit: 0 (bodies.md §10)	spec'd-here
