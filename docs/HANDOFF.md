@@ -2723,6 +2723,14 @@ the dev-dependency) and record results here.
     'crates/d2-sim/src/items/**' -- --lib -- items:: --iterate` with
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
+65. Panel files (`impl-ui-panels` §4): `D2_GAME_DIR=<install> cargo test -p
+    d2-client --test game_panels -- --ignored`. Expect both tests to pass:
+    every quad set of `panel-layout.tsv` (`art0` rows, the seven
+    `skltree_?_back`) has frames f … f + 3 of 256 × 256, 64 × 256, 256 × 176,
+    64 × 176 with offsets 0; the frame counts / sizes of `ui/panels.md`
+    §Constants (`buysellbtn` 23 from `d2exp`, `buyselltabs` 8 × 79 × 31, …).
+    A different count is a finding for the spec (archive order,
+    `client/assets.md`), not a reason to change the test.
 
 Kept entries (unchanged):
 
