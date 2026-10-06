@@ -218,13 +218,13 @@ impl World {
             });
         }
         let n = rooms.len();
-        for i in 0..n {
+        for (i, room) in rooms.iter_mut().enumerate() {
             let mut others: Vec<usize> = (0..n).filter(|&j| j != i && m.below(3) != 0).collect();
             for a in (1..others.len()).rev() {
                 let b = m.below(a as u64 + 1) as usize;
                 others.swap(a, b);
             }
-            rooms[i].adj = others;
+            room.adj = others;
         }
         World {
             rooms,
@@ -514,10 +514,13 @@ fn free_static(w: &World, x: i32, y: i32, size: i32, mask: u32) -> bool {
         .is_some_and(|r| w.size_query(r, x, y, size, mask) == 0)
 }
 
+/// Ring key of [`ref_k1`]: (d, (columns 0 / rows 1, y or x, far side)).
+type RingKey = (i32, (u8, i32, bool));
+
 /// Step 1, max distance 50, independent key form (module docs).
 fn ref_k1(w: &World, x0: i32, y0: i32, size: i32, mask: u32) -> Option<SubPoint> {
     for r in 1..=49 {
-        let mut best: Option<((i32, (u8, i32, bool)), SubPoint)> = None;
+        let mut best: Option<(RingKey, SubPoint)> = None;
         for y in y0 - r..=y0 + r {
             for x in x0 - r..=x0 + r {
                 let (ax, ay) = ((x - x0).abs(), (y - y0).abs());
