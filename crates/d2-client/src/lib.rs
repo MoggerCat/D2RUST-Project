@@ -9,3 +9,4 @@ pub mod assets;
 pub mod bridge;
 pub mod map;
 pub mod render;
+pub mod ui;
