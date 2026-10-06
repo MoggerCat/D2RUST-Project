@@ -1,6 +1,6 @@
 # Spec: Simulation — Game tick
 
-- **Status:** draft (no `d2-sim` code yet); every rule read from the
+- **Status:** draft (implemented in `d2-sim`; synthetic vectors pass, trace replay pending); every rule read from the
   1.14d `Game.exe` code and confirmed on the running game: `check_tick.py`
   replays `traces/raw/20261006-015554-tick.jsonl` (4,902 ticks of a
   hand-played single-player game, 16,704 timer runs, 7,674 schedules,

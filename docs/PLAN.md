@@ -43,6 +43,7 @@ behaviors the engine reproduces exactly.
 | Unspecified table callbacks (Phase 2) | Superseded 2026-10-05: implemented from `specs/data/callbacks.md` | Was: write nothing until specified, with their bytes counted as explained by the cross-check. Now every byte must match. |
 | Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
+| Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 
 ## Phases
 
@@ -159,7 +160,10 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       `server-messages.tsv`), each confirmed on a hand-played 1.14d
       recording (`check_tick.py`: 4,902 ticks, 16,704 timer runs, 197 list
       snapshots, 0 mismatches; `check_packets.py`: rules R1–R7, 0
-      failures). Status draft until implemented.*
+      failures). Status draft until implemented.* *Tick core implemented
+      2026-10-06 on `claude/phase3-tick` (`d2-sim::tick`, `units::lists`,
+      `game`): unit tests from every synthetic vector pass; trace replay
+      and `d2-proto` (intents/events) still open.*
 - [ ] Units, stats, stat lists, modifiers
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops
