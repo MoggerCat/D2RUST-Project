@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 522–554 |
 |   8. Act transitions, warps and portals | 555–623 |
 |   9. Quest items, rewards and helpers | 624–689 |
-|   10. Act I quests | 690–1444 |
-|   11. Acts II–V | 1445–1450 |
-| Constants & data dependencies | 1451–1465 |
-| Randomness | 1466–1484 |
-| Edge cases & original bugs | 1485–1503 |
-| Test vectors | 1504–1535 |
-| Provenance | 1536–1557 |
-| Open questions | 1558–1596 |
+|   10. Act I quests | 690–1479 |
+|   11. Acts II–V | 1480–1485 |
+| Constants & data dependencies | 1486–1500 |
+| Randomness | 1501–1519 |
+| Edge cases & original bugs | 1520–1538 |
+| Test vectors | 1539–1570 |
+| Provenance | 1571–1592 |
+| Open questions | 1593–1632 |
 <!-- /index -->
 
 ## Summary
@@ -1254,11 +1254,45 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
   object's drop code becomes `gld `; each run with piles > 0 drops one
   gold item (`0x00559A30`, normal quality); if a drop succeeded, piles −=
   1 and, if still > 0, schedule event 7 at frame + 10.
-- Not read for this spec: the gibbet object function `0x00593290`
-  (`0x005449E0` class 26: frees Cain, spawns class 146, Tristram
-  portal), the operate functions `0x00593480` (pointer `0x00732D40`) and
-  `0x00593710` (`0x00732D3C`), and the portal helper `0x00592D50` (Open
-  question 11).
+- **Tree operate** `0x00593AF0` (operate pointer `0x00732D48`; args
+  game, object, player; returns 0): chain 4's record (fatal if absent).
+  not-intro = 0 → object mode 1, end. End if state ≥ 6, the object's
+  mode ≠ 0, or R has 4.0 or 4.1. The player has `bkd ` or `bks ` → sound
+  event 19, end. Else: sound event 45 on the player; object drop code :=
+  `bks `; state := 4; drop at the object (`0x00559A30(game, object, 2,
+  &out, 0, −1, 0)`). Dropped: callback 9 := `0x00592C80`; broadcast(2,
+  0); +0x4B := 1; +0x38 := the scroll's GUID; +0x7C += 1; +0x58 := 1;
+  +0x78 := 1; object mode := 1. Always then: +0x47 := 1; +0x30 := the
+  object's GUID.
+- **Stone operate** `0x00593710` (operate pointer `0x00732D3C`; args
+  game, object, player, …, stone value u16 at args +0x10; returns 0):
+  1. Chain 4's record (fatal if absent); compute the order if +0x4A = 0.
+  2. R has 4.0 or 4.1: sound event 19. End.
+  3. No `bkd `: if the touch counter u16 +0x2C mod 64 = 0 and R lacks
+     4.3 and 4.4, sound event 39; +0x2C += 1. End.
+  4. End if not-intro = 0 or state ≥ 6. P := the linked class-61 object
+     (+0x28, when +0x49 = 1). If +0x4E = 0 and P exists: state 0 with
+     not-intro 1 → state := 1. End if +0x4F = 1.
+  5. state ≠ 5: state 0 with not-intro 1 → state := 1; state := 5.
+  6. k := +0x0C. End unless the stone value = order[k]. Store the
+     object's GUID at +0x10 + 4k; +0x0C += 1. End if the object's mode ≠
+     0.
+  7. n = +0x0C ≤ 4: object mode := 1; P mode := n + 1. End.
+  8. n = 5: object mode := 1; P mode := 6; +0x4F := 1; delete the
+     player's `bkd `; +0x7C −= 1. Position: the stored stone whose order
+     value is 21 if it is an object of class 21, else the first class-21
+     object in the rooms of the operated object's room list. Found: an
+     object of class 288 at (x + 6, y − 3) (`0x0056EDE0`), its room
+     refreshed (`0x0061AED0`). If status < 4: broadcast(4, 0); with a
+     party, members lacking 4.0 and 4.1 in an Act I level get 4.4
+     (`0x005936B0`); set R 4.4. Finally `0x00545760(game, 1)` (0x28 and
+     `89 01` to every player).
+  Stone values come from the object (args +0x10), 17–21 as in the
+  order.
+- Not read for this spec: the gibbet function `0x00593290` (§9.5 class
+  26), the operate function `0x00593480` (pointer `0x00732D40`), the
+  object init `0x005935E0` (pointer `0x00731BD8`) and the portal helper
+  `0x00592D50` (Open question 11).
 
 #### 10.7 A1Q5 The Forgotten Tower (chain 5)
 
@@ -1353,7 +1387,8 @@ with 0 = A, else B, returns whether found).
 11. **Sequence** `0x00595240`: §10.1.
 
 No quest-seed draws. The trap step's spawns (monster class 326 near each
-chest, then a missile 332 per chest, `0x0056EDE0`) are Open question 12.
+chest, then an object of class 332 per chest, `0x0056EDE0`) are Open
+question 12.
 `0x00595160` and `0x00594DB0` have no direct caller in the exports.
 
 #### 10.8 A1Q6 Sisters to the Slaughter (chain 6)
@@ -1580,14 +1615,15 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls.
 10. (Settled: §8.1 table, read from the call sites.) A recording of
     each act change would still confirm the 0x61 bytes.
-11. A1Q4 object functions not yet read: the gibbet quest function
-    `0x00593290` (object class 26), the operate functions `0x00593480`
-    and `0x00593710`, the portal helper `0x00592D50`, and the role of
-    extra +0x4C, +0x4D, +0x4F, +0x6C/+0x70 (who sets them). Settle with a
-    disassembly read of those four functions.
+11. A1Q4 object functions not yet stated: the gibbet quest function
+    `0x00593290` (object class 26), the operate function `0x00593480`,
+    the object init `0x005935E0`, the portal helper `0x00592D50`, who
+    sets extra +0x6C/+0x70, and what the stone value at operate args
+    +0x10 is (object data). Settle with a disassembly read of those
+    functions.
 12. A1Q5 trap step `0x005954F0` (Countess death, object list +0x68):
     the spawn arguments (monster 326 mode 12 flags 8, retry at +5, +5;
-    missile 332 via `0x0056EDE0`, then `0x0064A710`, `0x0064A760`,
+    object 332 via `0x0056EDE0`, then `0x0064A710`, `0x0064A760`,
     `0x0061AED0`) are read but not yet stated as rules. Settle with a
     disassembly read and a Countess-kill recording.
 13. `0x00538680(client, 1, difficulty)` in the A1Q6 credit (§10.8):
