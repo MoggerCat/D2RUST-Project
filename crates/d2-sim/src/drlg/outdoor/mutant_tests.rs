@@ -2229,3 +2229,258 @@ fn link_flags_mark_the_edge() {
         assert_eq!(g.g(2, 1, y), 0, "(1, {y})");
     }
 }
+
+// ---- vertex.rs: borders (§6) -------------------------------------------------
+
+/// Q of `outdoor.md` §6 (rows 0..11 × [barricade, snow]).
+fn spec_q(k: i32, col: i32) -> u32 {
+    [881, 957][col as usize] + k as u32
+}
+
+fn spec_border(dx: i32, dy: i32, s: i32) -> u32 {
+    let k = spec_n(dx + 3 * dy + 4);
+    if s < 4 {
+        spec_p(k + 1, s)
+    } else {
+        spec_q(k, s - 4)
+    }
+}
+
+fn spec_corner(a: i32, b: i32, c: i32, e: i32, s: i32) -> u32 {
+    let grow = |v: i32| v + 2 * v.signum();
+    let k = spec_n(b + grow(a) + 9 * (e + grow(c)) + 50);
+    if k == -1 {
+        0
+    } else if s < 4 {
+        spec_p(k, s)
+    } else {
+        spec_q(k - 1, s - 4)
+    }
+}
+
+fn spec_style(lt: u32, id: u32, d: u8) -> i32 {
+    match lt {
+        2 => i32::from(d == 0),
+        16 => 2,
+        27 => 3,
+        31 => 4 + i32::from(id == 117),
+        _ => -1,
+    }
+}
+
+/// The §6 rules on copies of grids 0 and 2 (stamps of 1 × 1 presets;
+/// grid-2 file bits are not modelled).
+#[allow(clippy::too_many_arguments)]
+fn borders_model(
+    seed: &mut Seed,
+    g0: &mut Grid,
+    g2: &mut Grid,
+    vs: &[Vertex],
+    lt: u32,
+    id: u32,
+    act: u8,
+) {
+    // Stamps with F = −1: the build list draws roll(Files = 1) on a
+    // preset's first use; the file is then (r + 1) mod 1 = 0.
+    let mut built: Vec<u32> = Vec::new();
+    let mut stamp = |g0: &mut Grid, g2: &mut Grid, x: i32, y: i32, p: u32| {
+        if !built.contains(&p) {
+            seed.roll(1);
+            built.push(p);
+        }
+        g2.op(x, y, Op::AndNot, cell::FILE_MASK);
+        g2.op(x, y, Op::Or, cell::PRESET);
+        g0.op(x, y, Op::Set, p);
+    };
+    let n_of = |i: usize| vs[(i + 1) % vs.len()];
+    let sgn = |a: &Vertex, b: &Vertex| ((b.x - a.x).signum(), (b.y - a.y).signum());
+    for i in 0..vs.len() {
+        let (v, n, nn) = (vs[i], n_of(i), n_of(i + 1));
+        let ((dx, dy), (ndx, ndy)) = (sgn(&v, &n), sgn(&n, &nn));
+        let straight = spec_border(dx, dy, spec_style(lt, id, v.direction));
+        let bits = 0x1 | if v.direction != 0 { 0x2 } else { 0 };
+        let preset = |x: &Vertex| x.flags & VERTEX_PRESET_LINK != 0;
+        if !preset(&v) {
+            let (mut x, mut y) = (v.x, v.y);
+            while (x, y) != (n.x, n.y) {
+                x += dx;
+                y += dy;
+                if straight != 0 {
+                    stamp(g0, g2, x, y, straight);
+                }
+                g2.op(x, y, Op::Or, bits);
+            }
+        }
+        if v.flags & VERTEX_LINK != 0 && !preset(&v) {
+            let l = (n.x - v.x).abs() + (n.y - v.y).abs();
+            let (mx, my) = (
+                v.x.min(n.x) + dx.abs() * l / 2,
+                v.y.min(n.y) + dy.abs() * l / 2,
+            );
+            match act {
+                0 | 3 | 4 => {
+                    let f = if act != 3 && id == 17 {
+                        0x40400
+                    } else {
+                        0x30400
+                    };
+                    g2.op(mx, my, Op::AndNot, cell::FILE_MASK);
+                    g2.op(mx, my, Op::Or, f);
+                }
+                1 => {
+                    let pairs = [(373, 372), (372, 375), (0, 0), (373, 374), (374, 375)];
+                    let (a, b) = pairs[(dx + 2 * dy + 2) as usize];
+                    if a != 0 {
+                        stamp(g0, g2, mx, my, a);
+                    }
+                    if b != 0 {
+                        stamp(g0, g2, mx + dx, my + dy, b);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let d = if v.direction != 0 {
+            v.direction
+        } else {
+            n.direction
+        };
+        let k2 = |x: i32, keep: bool| if keep { x } else { 2 * x };
+        let mut piece = spec_corner(
+            k2(dx, preset(&v)),
+            k2(dy, preset(&v)),
+            k2(ndx, preset(&n)),
+            k2(ndy, preset(&n)),
+            spec_style(lt, id, d),
+        );
+        if piece == 19 {
+            if v.direction == 1 && n.direction != 1 {
+                piece = 20;
+            } else if v.direction != 1 {
+                piece = 21;
+            }
+        }
+        if piece != 0 {
+            stamp(g0, g2, n.x, n.y, piece);
+            g2.op(n.x, n.y, Op::Or, 0x1 | if d != 0 { 0x2 } else { 0 });
+        }
+    }
+    // Step 5.
+    let (gw, gh) = (g2.w, g2.h);
+    for (cx, cy, sx, sy) in [
+        (0, 0, 1, 1),
+        (gw - 1, 0, -1, 1),
+        (0, gh - 1, 1, -1),
+        (gw - 1, gh - 1, -1, -1),
+    ] {
+        let mut y = cy;
+        while g2.contains(cx, y) && g2.get(cx, y) & 1 == 0 {
+            let mut x = cx;
+            while g2.contains(x, y) && g2.get(x, y) & 1 == 0 {
+                g2.op(x, y, Op::Or, cell::BLANK);
+                x += sx;
+            }
+            y += sy;
+        }
+        let mut x = cx;
+        while g2.contains(x, cy) && g2.get(x, cy) & 1 == 0 {
+            let mut y = cy;
+            while g2.contains(x, y) && g2.get(x, y) & 1 == 0 {
+                g2.op(x, y, Op::Or, cell::BLANK);
+                y += sy;
+            }
+            x += sx;
+        }
+    }
+}
+
+/// `outdoor.md` §6 against the rule model: straight pieces along the
+/// edges, link midpoints by act (file 3 / level 17 file 4 / the desert
+/// pairs / nothing), corner pieces with doubled directions unless preset
+/// links, the cliff 19 → 20 / 21 swap, and the blank corners.
+#[test]
+fn borders_by_the_rules() {
+    let v = |x, y, direction, flags| Vertex {
+        x,
+        y,
+        direction,
+        flags,
+    };
+    let link = VERTEX_LINK;
+    let plink = VERTEX_LINK | VERTEX_PRESET_LINK;
+    // (polygon, inset) shapes on a 10 × 8 grid.
+    let shapes: [Vec<Vertex>; 3] = [
+        vec![
+            v(0, 7, 0, 0),
+            v(0, 4, 1, link),
+            v(0, 0, 0, 0),
+            v(4, 0, 0, link),
+            v(6, 0, 0, plink),
+            v(9, 0, 1, 0),
+            v(9, 7, 0, 0),
+            v(5, 7, 0, link),
+        ],
+        vec![
+            v(1, 6, 1, 0),
+            v(1, 1, 1, link),
+            v(8, 1, 0, 0),
+            v(8, 6, 0, link),
+        ],
+        vec![
+            v(0, 7, 1, plink),
+            v(0, 0, 0, link),
+            v(9, 0, 1, link),
+            v(9, 3, 0, plink),
+            v(9, 7, 1, 0),
+        ],
+    ];
+    // (level id, level type, act).
+    let levels = [
+        (2, 2, 0),
+        (17, 2, 0),
+        (41, 16, 1),
+        (104, 27, 3),
+        (112, 31, 4),
+        (117, 31, 4),
+        (79, 2, 2),
+    ];
+    for (si, shape) in shapes.iter().enumerate() {
+        for &(id, lt, act) in &levels {
+            let mut e = Env::new(id, 10, 8);
+            e.drlg.level_mut(e.l).level_type = lt;
+            e.info.vertices = shape.clone();
+            let (mut m0, mut m2) = (e.info.grids[0].clone(), e.info.grids[2].clone());
+            let mut s = e.seed();
+            borders_model(&mut s, &mut m0, &mut m2, shape, lt, id, act);
+            let mut g = e.gen();
+            g.borders().unwrap();
+            assert_eq!(
+                g.info.grids[2].cells, m2.cells,
+                "shape {si} level {id}: grid 2 (files)"
+            );
+            assert_eq!(*g.seed(), s, "shape {si} level {id}: seed");
+            assert_eq!(
+                g.info.grids[0].cells, m0.cells,
+                "shape {si} level {id}: grid 0"
+            );
+            let strip = |g: &Grid| {
+                g.cells
+                    .iter()
+                    .map(|v| v & !cell::FILE_MASK)
+                    .collect::<Vec<_>>()
+            };
+            // Midpoint file bits are part of the rule: compare them where
+            // no stamp wrote a file.
+            assert_eq!(
+                strip(&g.info.grids[2]),
+                strip(&m2),
+                "shape {si} level {id}: grid 2"
+            );
+            for (k, (&a, &b)) in g.info.grids[2].cells.iter().zip(&m2.cells).enumerate() {
+                if b & cell::PRESET == 0 {
+                    assert_eq!(a, b, "shape {si} level {id}: grid 2 cell {k}");
+                }
+            }
+        }
+    }
+}
