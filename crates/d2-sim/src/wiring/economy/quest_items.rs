@@ -76,11 +76,20 @@ pub trait QuestRest {
 pub struct EconomyQuests<'e, 'a, H, R> {
     pub econ: &'e mut Economy<'a, H>,
     pub rest: &'e mut R,
+    /// Where the mercenary rewards `0x00579180` go when the caller runs
+    /// them on the NPC control block after the quest call
+    /// ([`crate::wiring::interaction::Desk::quest_message`]); `None`:
+    /// [`QuestRest::mercenary_reward`].
+    pub mercenaries: Option<&'e mut Vec<(UnitId, u16)>>,
 }
 
 impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
     pub fn new(econ: &'e mut Economy<'a, H>, rest: &'e mut R) -> Self {
-        Self { econ, rest }
+        Self {
+            econ,
+            rest,
+            mercenaries: None,
+        }
     }
 }
 
@@ -262,7 +271,10 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         self.rest.set_object_opened(object)
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
-        self.rest.mercenary_reward(player, npc)
+        match self.mercenaries.as_mut() {
+            Some(q) => q.push((player, npc)),
+            None => self.rest.mercenary_reward(player, npc),
+        }
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.rest.unhandled(chain, function)

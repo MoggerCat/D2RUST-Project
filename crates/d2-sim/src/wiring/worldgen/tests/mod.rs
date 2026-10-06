@@ -8,6 +8,7 @@
 //! [`Pending`]) are faked: positions, coordinate lists, a call log.
 
 mod e2e;
+mod events;
 mod init;
 mod levels;
 mod maze;

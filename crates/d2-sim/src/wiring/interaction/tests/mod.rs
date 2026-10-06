@@ -6,6 +6,9 @@
 //! [`super::VitalsRest`], the action wiring's `Pending`) are fakes.
 
 mod npc;
+mod quest_npc;
+mod regen;
+mod skill_events;
 mod skill_use;
 mod vendors;
 mod vitals;

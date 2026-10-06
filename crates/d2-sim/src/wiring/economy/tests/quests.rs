@@ -244,3 +244,90 @@ fn quest_unit_fields_on_real_records() {
     qw.add_stat(p, 0, 5);
     assert_eq!(qw.stat(p, 0), 5);
 }
+
+/// A unit system as the wrapped dispatcher of [`QuestTick`]: every other
+/// tick hook keeps its default.
+struct Inner(crate::units::dispatch::UnitSystem<Hooks>);
+
+impl crate::tick::EventDispatch for Inner {
+    fn run_event(&mut self, game: &mut Game, run: &crate::tick::timer::TimerRun) {
+        self.0.run_event(game, run);
+    }
+}
+
+impl crate::tick::TickHooks for Inner {}
+
+impl crate::wiring::economy::UnitSide for Inner {
+    type Hooks = Hooks;
+    fn unit_side(
+        &mut self,
+    ) -> (
+        &mut crate::units::record::Units,
+        &mut crate::stats::StatLists,
+        &crate::units::hooks::UnitData,
+        &mut Hooks,
+    ) {
+        self.0.unit_side()
+    }
+}
+
+/// Tick step 8 (`tick.md` §3: frame % 20 = 0) runs the quest updater
+/// (`quests.md` §5) through [`QuestTick`]: the Den of Evil status timer
+/// (period 1, due at updater tick 1) runs at the second update (frame
+/// 40), sets status 5 and sends 0x5D through the real quest world, and is
+/// removed.
+// Covers: specs/world/quests.md §5; specs/sim/tick.md §3
+#[test]
+fn quest_updater_runs_at_tick_step_8() {
+    use crate::wiring::economy::QuestTick;
+    use crate::world::quests::TimerFn;
+
+    let mut w = World::new();
+    let p = w.spawn(UnitType::Player, 0);
+    let mut ctl = control(&mut w);
+    let mut rest = Rest::new(p);
+    ctl.record_mut(1).unwrap().state = 4;
+    ctl.add_timer(1, TimerFn::DenOfEvilStatus, 1).unwrap();
+    let World {
+        mut game,
+        units,
+        stats,
+        data,
+        hooks,
+        mut fields,
+        tables,
+        mut items,
+    } = w;
+    let mut inner = Inner(crate::units::dispatch::UnitSystem {
+        units,
+        stats,
+        data,
+        hooks,
+        errors: Vec::new(),
+    });
+    let mut run = |game: &mut Game, ctl: &mut QuestControl, rest: &mut Rest, to: i32| {
+        let mut q = QuestTick {
+            sim: &mut inner,
+            fields: &mut fields,
+            tables: &tables,
+            items: &mut items,
+            quests: ctl,
+            rest,
+        };
+        while game.frame < to {
+            crate::tick::tick(game, &mut q);
+        }
+    };
+    run(&mut game, &mut ctl, &mut rest, 39);
+    assert_eq!(ctl.tick, 1);
+    assert_ne!(ctl.record(1).unwrap().status, 5);
+    assert!(rest.log.is_empty());
+    run(&mut game, &mut ctl, &mut rest, 40);
+    assert_eq!(ctl.tick, 2);
+    assert_eq!(ctl.record(1).unwrap().status, 5);
+    assert_eq!(rest.log, ["send 5d"]);
+    // Removed: the next updates run nothing.
+    run(&mut game, &mut ctl, &mut rest, 100);
+    assert_eq!(ctl.tick, 5);
+    assert_eq!(rest.log, ["send 5d"]);
+}

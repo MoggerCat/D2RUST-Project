@@ -51,7 +51,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
-pub use pending::{NoPending, Pending};
+pub use pending::{NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
