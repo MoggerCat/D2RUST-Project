@@ -15,3 +15,7 @@
 *.cof
 .env
 *.tbl
+
+# Python bytecode
+__pycache__/
+*.pyc
