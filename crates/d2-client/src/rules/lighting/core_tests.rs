@@ -11,11 +11,14 @@ use super::records::{
     RoomId,
 };
 
+/// An owner entry: (owner, precise position, sub-tile, room).
+type OwnerEntry = (Owner, (i32, i32), (i32, i32), Option<RoomId>);
+
 /// A world with configurable owners, rooms and blockers.
 #[derive(Default)]
 struct World {
     /// Owners: (owner, precise position, sub-tile, room).
-    owners: Vec<(Owner, (i32, i32), (i32, i32), Option<RoomId>)>,
+    owners: Vec<OwnerEntry>,
     local: Option<Owner>,
     blocked: Vec<(i32, i32)>,
     /// Cells `(x, y)` that belong to a room other than 1.
@@ -24,7 +27,7 @@ struct World {
 }
 
 impl World {
-    fn find(&self, o: &Owner) -> Option<&(Owner, (i32, i32), (i32, i32), Option<RoomId>)> {
+    fn find(&self, o: &Owner) -> Option<&OwnerEntry> {
         self.owners.iter().find(|e| e.0 == *o)
     }
 }
@@ -108,9 +111,10 @@ fn plain_vectors() {
     ] {
         assert_eq!(intensity(&map, sx, 100), want, "cell ({sx}, 100)");
     }
-    // White light on black: colour follows the intensity rule r6.
+    // White light on black: r6 gives (255·242·T[242]) >> 16 = 254 (the
+    // truncated reciprocal loses one step).
     let c = map.cell(24, 24).unwrap();
-    assert_eq!((c.r, c.g, c.b), (255, 255, 255));
+    assert_eq!((c.r, c.g, c.b), (254, 254, 254));
 }
 
 // Covers: specs/render/lighting.md §7.1 r1, §7.1 r2
@@ -195,16 +199,16 @@ fn colored_light_rule() {
     assert_eq!(contribute::recip(1), 65536);
     assert_eq!(contribute::recip(255), 257);
     let mut map = empty_map();
-    // A red source on black: I 100, R = (255·100·T[100]) >> 16.
+    // A red source on black: I 100, R = (255·100·655) >> 16 = 254.
     contribute::add(&mut map, 0, 0, 100, (255, 0, 0), true);
     let c = *map.cell(0, 0).unwrap();
-    assert_eq!((c.i, c.r, c.g, c.b), (100, 255, 0, 0));
+    assert_eq!((c.i, c.r, c.g, c.b), (100, 254, 0, 0));
     // A blue source of 100 more: old I 100 weights the old color.
     contribute::add(&mut map, 0, 0, 100, (0, 0, 255), true);
     let c = *map.cell(0, 0).unwrap();
     let t = 65536 / 200;
     assert_eq!(c.i, 200);
-    assert_eq!(i64::from(c.r), (255 * 100 * t) >> 16);
+    assert_eq!(i64::from(c.r), (254 * 100 * t) >> 16);
     assert_eq!(i64::from(c.b), (255 * 100 * t) >> 16);
     assert_eq!(c.g, 0);
     // Colored flag 0: R, G, B := 0.

@@ -14,7 +14,7 @@ use super::shading::{
 fn maps(lead: usize, n: usize) -> Vec<u8> {
     let mut v = vec![0xEE; lead];
     for k in 0..n {
-        v.extend(std::iter::repeat((k + 1) as u8).take(256));
+        v.extend(std::iter::repeat_n((k + 1) as u8, 256));
     }
     v
 }

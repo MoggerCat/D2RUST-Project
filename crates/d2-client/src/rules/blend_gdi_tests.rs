@@ -266,7 +266,9 @@ fn line_is_opaque_and_clipped_per_pixel() {
     let red = maps.push(blend::color_row(77));
     let b = base();
     // From (−2, 3) to (12, 3): only x 0…9 of row 3 are on the surface.
-    let d = blend::gdi_line(SURFACE, red, -2, 3, 12, 3).unwrap().unwrap();
+    let d = blend::gdi_line(SURFACE, red, -2, 3, 12, 3)
+        .unwrap()
+        .unwrap();
     let out = draw(&maps, &d, &b);
     for (i, (&o, &was)) in out.iter().zip(&b).enumerate() {
         let want = if i / 10 == 3 { 77 } else { was };
@@ -287,7 +289,9 @@ fn line_is_opaque_and_clipped_per_pixel() {
     }
     // Color 0 is written (opaque index 0), not transparent.
     let black = maps.push(blend::color_row(0));
-    let d = blend::gdi_line(SURFACE, black, 4, 4, 4, 4).unwrap().unwrap();
+    let d = blend::gdi_line(SURFACE, black, 4, 4, 4, 4)
+        .unwrap()
+        .unwrap();
     let out = draw(&maps, &d, &b);
     assert_eq!(out[44], 0);
     assert_eq!(out.iter().filter(|&&v| v == 0).count(), 1);

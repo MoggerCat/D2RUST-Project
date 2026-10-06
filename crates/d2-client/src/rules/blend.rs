@@ -337,9 +337,7 @@ pub enum BlendError {
     LineMajorAxisTie(u32),
     #[error("GDI rectangle y1 {y1} < y0 {y0}: fatal error 0x32 (§8 r2)")]
     RectangleRowsReversed { y0: i32, y1: i32 },
-    #[error(
-        "GDI rectangle x1 {x1} < x0 {x0} (TODO(spec: render/blend-modes.md §8 r2))"
-    )]
+    #[error("GDI rectangle x1 {x1} < x0 {x0} (TODO(spec: render/blend-modes.md §8 r2))")]
     RectangleColumnsReversed { x0: i32, x1: i32 },
 }
 
