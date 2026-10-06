@@ -20,6 +20,8 @@ pub mod tables;
 pub mod velocity;
 
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;
 
 pub use request::{handle_message, request, Outcome, WalkTarget};

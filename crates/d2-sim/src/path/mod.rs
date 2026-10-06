@@ -28,6 +28,8 @@ pub mod walk;
 pub mod warp;
 
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;
 
 pub use collision::CollisionRooms;
