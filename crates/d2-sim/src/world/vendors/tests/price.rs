@@ -150,7 +150,7 @@ fn repair_value() {
     assert_eq!(price(&t, &ctx(TEST_NPC), &lax, tx::REPAIR), 1, "R 0 → 1");
 }
 
-// Covers: specs/world/vendors.md §edge-cases-original-bugs r13
+// Covers: specs/world/vendors.md §edge-cases-original-bugs r13, §9.2 r0
 #[test]
 fn rule_zero() {
     let t = tables();
