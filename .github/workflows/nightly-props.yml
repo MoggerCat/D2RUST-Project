@@ -1,0 +1,64 @@
+name: Nightly properties
+
+# Deep property-test hunt: the state-machine / model tests at PROPTEST_CASES
+# 20000 and the wired-game `prop_worldsim` at 500. NOT part of the PR `check`
+# (ci.yml): PRs keep the in-source default case counts. Same runs locally:
+# `sh tools/props-deep.sh`. The filters live in that script.
+#
+# A failure means a real counterexample (docs/HANDOFF.md §8), never a flake:
+# the minimal input is in the job summary and the log is the artifact; turn it
+# into a fixed regression test, then fix the wrong side per the spec.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: "PROPTEST_CASES override for every group (empty = per-group default)"
+        required: false
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+  CASES: ${{ inputs.cases }}
+
+jobs:
+  props:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [sim, wire, worldsim]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only worldsim builds Bevy (d2-client), so only it needs the libraries.
+      - name: Install system libraries
+        if: matrix.group == 'worldsim'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: nightly-props-${{ matrix.group }}
+
+      - uses: taiki-e/install-action@nextest
+
+      - name: Properties (${{ matrix.group }})
+        run: sh tools/props-deep.sh ${{ matrix.group }}
+
+      # The raw log holds the shrunk counterexample and its panic message.
+      - name: Upload counterexample output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proptest-${{ matrix.group }}
+          path: target/props-deep/
+          retention-days: 30

@@ -3,6 +3,7 @@
 # steps as parallel jobs). One command for sessions and coordinators:
 #   sh tools/gate.sh            everything
 #   sh tools/gate.sh --no-client  skip the Bevy crate (clippy + tests)
+# Deep property hunts (nightly-props.yml): sh tools/props-deep.sh [sim|wire|worldsim|all]
 # Prints a summary and exits 1 if any step failed (all steps still run).
 cd "$(dirname "$0")/.." || exit 2
 
