@@ -7,8 +7,10 @@
 //! exactly N (M08).
 //!
 //! Kinds: `synthetic` (inline frames, repo only; the CPU half runs in
-//! `cargo test`) and `map` (today's `map-preview.md` verify, [`map`],
-//! game files and a GPU).
+//! `cargo test`), `map` (today's `map-preview.md` verify, [`map`],
+//! game files and a GPU) and `scene` (a 1.14d frame capture,
+//! `render/capture.md`: [`capture`] reads it, [`capture_case`] compares
+//! it; cases in `capture-cases/`).
 //!
 //! The GPU half of `synthetic` cases goes through the narrow
 //! [`GpuCompositor`] trait; [`gpu::Wgpu`] runs the compute compositor (C5,
@@ -20,10 +22,14 @@
 //! bytes go through `d2_formats::cof` and [`crate::composite::build`], so
 //! the case covers COF bytes → composite → scene → CPU and GPU.
 
+pub mod capture;
+pub mod capture_case;
 pub mod case;
 pub mod gpu;
 pub mod map;
 
+#[cfg(test)]
+mod capture_tests;
 #[cfg(test)]
 mod tests;
 
@@ -236,8 +242,9 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         .iter()
         .map(|rule| {
             let mut table = Box::new([[0u8; 256]; 256]);
-            for (src, row) in table.iter_mut().enumerate() {
-                for (dest, v) in row.iter_mut().enumerate() {
+            // Row = destination, column = source (composition.md §5).
+            for (dest, row) in table.iter_mut().enumerate() {
+                for (src, v) in row.iter_mut().enumerate() {
                     *v = rule.value(src as u8, dest as u8);
                 }
             }
@@ -541,6 +548,9 @@ pub enum Status {
     GpuNotWired,
     /// The CPU half passed; the GPU half found no adapter. Not a pass.
     NoAdapter(String),
+    /// A scene case's capture checks ran; no source of the d2rs scene
+    /// is wired, so nothing was compared. Not a pass.
+    SceneNotWired,
     /// A comparison or expectation failed.
     Fail(String),
     /// The case could not be built or run.
@@ -553,6 +563,7 @@ impl Status {
             Status::Pass => "PASS",
             Status::GpuNotWired => "GPU NOT WIRED",
             Status::NoAdapter(_) => "NO ADAPTER",
+            Status::SceneNotWired => "SCENE NOT WIRED",
             Status::Fail(_) => "FAIL",
             Status::Error(_) => "ERROR",
         }
@@ -758,6 +769,7 @@ pub struct Summary {
     pub pass: usize,
     pub not_wired: usize,
     pub no_adapter: usize,
+    pub scene_not_wired: usize,
     pub fail: usize,
     pub error: usize,
 }
@@ -768,18 +780,19 @@ impl Summary {
             Status::Pass => self.pass += 1,
             Status::GpuNotWired => self.not_wired += 1,
             Status::NoAdapter(_) => self.no_adapter += 1,
+            Status::SceneNotWired => self.scene_not_wired += 1,
             Status::Fail(_) => self.fail += 1,
             Status::Error(_) => self.error += 1,
         }
     }
 
     /// Process exit code: 0 all passed, 1 any failure or error, 2 none
-    /// failed but some GPU halves are not wired or found no adapter
-    /// (incomplete, not a pass).
+    /// failed but some GPU halves are not wired or found no adapter, or
+    /// some scene case has no scene source (incomplete, not a pass).
     pub fn exit_code(&self) -> i32 {
         if self.fail + self.error > 0 {
             1
-        } else if self.not_wired + self.no_adapter > 0 {
+        } else if self.not_wired + self.no_adapter + self.scene_not_wired > 0 {
             2
         } else {
             0
@@ -793,7 +806,11 @@ impl fmt::Display for Summary {
             f,
             "{} pass, {} fail, {} error, {} GPU not wired, {} no adapter",
             self.pass, self.fail, self.error, self.not_wired, self.no_adapter
-        )
+        )?;
+        if self.scene_not_wired > 0 {
+            write!(f, ", {} scene not wired", self.scene_not_wired)?;
+        }
+        Ok(())
     }
 }
 

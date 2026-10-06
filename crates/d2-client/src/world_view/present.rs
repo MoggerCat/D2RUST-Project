@@ -94,16 +94,15 @@ impl WorldViewUi {
     }
 }
 
-/// The GPU path's main-world half: the atlas the frames are packed
-/// against, and the pages last handed to the node (replaced only when a
-/// frame set was added). The compute compositor itself runs in the render
+/// The GPU path's main-world half: the atlas of the frame store, and the
+/// pages last handed to the node (replaced only when frames were added). The compute compositor itself runs in the render
 /// world ([`super::node`]).
 #[derive(Resource)]
 pub struct WorldViewGpu {
     pub atlas: GpuAtlas,
     pages: Arc<Vec<AtlasPage>>,
-    /// Frame sets in `pages` (sets are only added: the pages' version).
-    sets: usize,
+    /// Frames in `pages` (frames are only added: the pages' version).
+    held: usize,
     /// Jobs handed to the node.
     seq: u64,
 }
@@ -113,7 +112,7 @@ impl WorldViewGpu {
         Ok(WorldViewGpu {
             atlas: GpuAtlas::new(GPU_ATLAS_PAGES)?,
             pages: Arc::new(Vec::new()),
-            sets: 0,
+            held: 0,
             seq: 0,
         })
     }
@@ -309,9 +308,9 @@ fn world_view_frame(
     match gpu {
         Some(mut g) => {
             let g = &mut *g;
-            g.atlas.ensure(&frame, &state.assets)?;
-            if g.atlas.sets() != g.sets {
-                g.sets = g.atlas.sets();
+            g.atlas.ensure(&state.assets.frames)?;
+            if g.atlas.frames() != g.held {
+                g.held = g.atlas.frames();
                 g.pages = Arc::new(g.atlas.atlas().pages().to_vec());
             }
             let packed = g.atlas.pack(&frame, &state.assets)?;
@@ -321,7 +320,7 @@ fn world_view_frame(
                 frame: bridge_frame,
                 packed: Arc::new(packed),
                 pages: g.pages.clone(),
-                pages_version: g.sets as u64,
+                pages_version: g.held as u64,
                 palette: Arc::new(state.assets.palette.clone()),
                 target: image,
             });

@@ -1,9 +1,13 @@
 // Spec: specs/client/render-pipeline.md (A9)
+// Spec: specs/render/composition.md (§3 frame cycle, §5 one pixel write)
 // GPU compute compositor. Same formulas as the CPU reference
-// (`scene::cpu::compose_binned`): per pixel, walk the pixel's bin list in
-// order; index 0 of the frame leaves the pixel unchanged; otherwise the
-// shade chain maps the index (A4) and the blend op combines it with the
-// pixel's value (A5). Integers only; frames are read with textureLoad.
+// (`scene::cpu::compose_binned_frame`): per pixel, start from the base
+// (the previous frame; 0 in rows below `clear_rows`), walk the pixel's bin
+// list in order; index 0 of the frame leaves the pixel unchanged;
+// otherwise the shade chain maps the index (A4) and the blend op combines
+// it with the pixel's value (A5; a table is row = destination, column =
+// source); `clear_after` sets the result to 0. Integers only; frames are
+// read with textureLoad.
 // Buffer layouts: `pack.rs` (all little-endian).
 
 struct Params {
@@ -12,7 +16,11 @@ struct Params {
     item_count: u32,
     map_rows: u32,
     pages: u32,
-    pad: u32,
+    clear_rows: u32,   // view rows 0..clear_rows start at 0 (StartDraw clear)
+    clear_after: u32,  // 1: every pixel 0 after drawing (ClearScreen)
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 }
 
 struct Item {
@@ -34,6 +42,12 @@ const BLEND_OPAQUE: u32 = 0u;
 @group(0) @binding(6) var<storage, read_write> indices: array<u32>;
 @group(0) @binding(7) var<storage, read> palette: array<u32, 256>;
 @group(0) @binding(8) var<storage, read_write> rgba: array<u32>;
+@group(0) @binding(9) var<storage, read> base: array<u32>;
+
+// Byte `i` of the base framebuffer: four pixels per word, little-endian.
+fn base_byte(i: u32) -> u32 {
+    return (base[i >> 2u] >> ((i & 3u) << 3u)) & 0xffu;
+}
 
 // Byte `b` of map row `row`: rows are 256 bytes, four per word, little-endian.
 fn map_byte(row: u32, b: u32) -> u32 {
@@ -56,7 +70,11 @@ fn compose(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
     let bin = (py / BIN_SIZE) * params.bins.x + px / BIN_SIZE;
+    let at = py * params.size.x + px;
     var value = 0u;
+    if py >= params.clear_rows {
+        value = base_byte(at);
+    }
     for (var k = bin_ranges[bin]; k < bin_ranges[bin + 1u]; k++) {
         let it = items[bin_items[k]];
         if px < it.area.x || px >= it.area.z || py < it.area.y || py >= it.area.w {
@@ -71,10 +89,13 @@ fn compose(@builtin(global_invocation_id) gid: vec3<u32>) {
         if it.blend.x == BLEND_OPAQUE {
             value = s;
         } else {
-            value = map_byte(it.blend.y + s, value);
+            value = map_byte(it.blend.y + value, s);
         }
     }
-    indices[py * params.size.x + px] = value;
+    if params.clear_after != 0u {
+        value = 0u;
+    }
+    indices[at] = value;
 }
 
 // Index framebuffer -> RGBA8 bytes through the frame palette: a bit copy of

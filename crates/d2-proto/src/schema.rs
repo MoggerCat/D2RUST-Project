@@ -182,11 +182,56 @@ pub enum FieldType {
     Bit(u8),
     /// `name@off` without a type: the bytes from the offset to the end.
     Tail,
+    /// A field of a `bits:` layout (§5, server-messages.tsv `layout`):
+    /// `width` bits starting at absolute message bit `bit`, counted
+    /// LSB-first from bit 0 of byte 0 (the id byte included). The
+    /// field's [`Field::offset`] is `None`.
+    Packed {
+        bit: u16,
+        width: u8,
+    },
+}
+
+/// Bits a packed field can hold at most.
+pub const PACKED_MAX_WIDTH: u8 = 32;
+
+/// Reads `width` (1..=32) bits of `b` starting at message bit `bit`,
+/// LSB-first from bit 0 of byte 0: field bit `i` is bit `(bit + i) % 8`
+/// of byte `(bit + i) / 8`. Panics if the bits run past `b`.
+pub fn packed_get(b: &[u8], bit: usize, width: u32) -> u32 {
+    assert!(
+        (1..=PACKED_MAX_WIDTH as u32).contains(&width),
+        "width {width}"
+    );
+    (0..width as usize).fold(0, |v, i| {
+        let p = bit + i;
+        v | ((b[p / 8] >> (p % 8)) as u32 & 1) << i
+    })
+}
+
+/// ORs `v` into `width` bits of `out` starting at message bit `bit`
+/// (the order of [`packed_get`]). Fields share no bit, so ORing into a
+/// zeroed buffer builds the message in any order. Panics if `v` is wider
+/// than `width` bits or the bits run past `out`.
+pub fn packed_put(out: &mut [u8], bit: usize, width: u32, v: u32) {
+    assert!(
+        (1..=PACKED_MAX_WIDTH as u32).contains(&width),
+        "width {width}"
+    );
+    assert!(
+        width == 32 || v < 1u32 << width,
+        "value {v} does not fit in {width} bits"
+    );
+    for i in 0..width as usize {
+        let p = bit + i;
+        out[p / 8] |= ((v >> i & 1) as u8) << (p % 8);
+    }
 }
 
 /// One layout entry: `name:type@offset`. `name` is empty for an unnamed
 /// entry (`type@offset`); `offset` is `None` for a `cstr` that follows the
-/// previous string.
+/// previous string or for a [`FieldType::Packed`] field (its bit offset
+/// is in the type).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Field<'a> {
     pub name: &'a str,

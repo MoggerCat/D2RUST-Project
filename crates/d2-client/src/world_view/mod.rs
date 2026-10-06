@@ -5,9 +5,10 @@
 //! types outside [`present`].
 //!
 //! The mechanism is ours: units go through the C7 COF composite
-//! ([`composite::build`]) in unit-key order, frames come from the resident
-//! C3 frame sets ([`ViewAssets::sets`]) and get scene [`FrameId`]s in
-//! first-use order ([`FrameTable`]), UI requests of the C8 core become
+//! ([`composite::build_with`]) in unit-key order, frames come from the
+//! frame store of resident C3 frame sets ([`ViewAssets::frames`],
+//! [`FrameStore`]: `(FrameSetKey, index)` → scene [`FrameId`], §A7 step
+//! 3), UI requests of the C8 core become
 //! items in emission order ([`ui_bind`]), and the list is sorted by the C4
 //! key ([`scene::order`], stable). Every rule of the original (which COF
 //! and frame a unit shows, where a sprite goes, draw keys, shading, blend,
@@ -27,25 +28,26 @@ pub mod ui_bind;
 #[cfg(test)]
 mod tests;
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use d2_formats::cof::Cof;
+use d2_formats::font::FontTable;
 use d2_formats::palette::Palette;
 
 use crate::assets::path::CanonicalPath;
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
 use crate::composite::{self, ComponentFrame, ComponentRequest, CompositeError, UnitParams};
-use crate::frames::{Atlas, AtlasError, AtlasSlot, FrameSet, FrameSetKey, IndexFrame};
-use crate::gpu_compositor::{self, Gpu, GpuError, SlotSource};
+use crate::frames::{
+    Atlas, AtlasError, AtlasSlot, FrameSetKey, FrameStore, IndexFrame, StoreError,
+};
+use crate::gpu_compositor::{self, Gpu, GpuError};
 use crate::scene::{
-    self, BlendOp, DrawItem, DrawKey, FrameId, FrameSource, FrameView, ItemTag, MapTable, Rect,
-    SceneError, ShadeChain,
+    self, BlendOp, DrawItem, DrawKey, FrameId, ItemTag, MapTable, Rect, SceneError, ShadeChain,
 };
 
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
-pub use ui_bind::{UiQueue, UiRules, UiSprite};
+pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
 
 /// The region composed each frame: the full 800×600 frame. Which part of
 /// the world it shows is the camera's (render-pipeline §B7), decided by
@@ -66,14 +68,18 @@ pub enum ViewError {
     },
     #[error("COF {0:?} is not loaded")]
     CofMissing(CanonicalPath),
-    #[error("frame set {0:?} is not resident")]
-    SetMissing(FrameSetKey),
-    #[error("frame {index} of {key:?} does not exist ({count} frames)")]
-    FrameIndex {
-        key: FrameSetKey,
-        index: usize,
-        count: usize,
-    },
+    #[error("font table {0:?} is not loaded")]
+    FontMissing(CanonicalPath),
+    #[error(transparent)]
+    Text(#[from] crate::ui::TextError),
+    /// A frame the frame store does not hold (set not resident, index
+    /// past the set's end).
+    #[error(transparent)]
+    Frame(#[from] StoreError),
+    /// The GPU atlas was built for another store (C2 eviction rebuilds
+    /// both; not wired).
+    #[error("GPU atlas holds {atlas} frames, the frame store {store}: rebuild the atlas")]
+    AtlasAhead { atlas: usize, store: usize },
     #[error("unit ({unit_type}, {guid}): {error}")]
     Unit {
         unit_type: u8,
@@ -103,14 +109,18 @@ impl ViewError {
     }
 }
 
-/// Everything a frame reads besides the model: parsed COFs, resident frame
-/// sets (residency is `client/assets.md` §A4: a set missing here is an
-/// error, never a skipped draw), the map table (PL2 rows, blend tables)
-/// and the frame palette.
+/// Everything a frame reads besides the model: parsed COFs, the frame
+/// store of resident frame sets (residency is `client/assets.md` §A4: a
+/// set missing here is an error, never a skipped draw), the map table
+/// (PL2 rows, blend tables) and the frame palette.
 #[derive(Debug, Clone)]
 pub struct ViewAssets {
     pub cofs: BTreeMap<CanonicalPath, Cof>,
-    pub sets: BTreeMap<FrameSetKey, FrameSet>,
+    /// Parsed font tables (`formats/font-tbl.md`) for UI text.
+    pub fonts: BTreeMap<CanonicalPath, FontTable>,
+    /// Resident frame sets and their scene ids (verify-map's store: the
+    /// same numbering for the CPU reference and the GPU atlas).
+    pub frames: FrameStore,
     pub maps: MapTable,
     /// TODO(spec: render/shading.md) (§B3): one palette per frame until
     /// palettes per screen region are specified.
@@ -122,23 +132,25 @@ impl ViewAssets {
     pub fn new(palette: Palette) -> Self {
         ViewAssets {
             cofs: BTreeMap::new(),
-            sets: BTreeMap::new(),
+            fonts: BTreeMap::new(),
+            frames: FrameStore::new(),
             maps: MapTable::new(),
             palette,
         }
     }
 
+    /// The scene id of frame `index` of the resident set `key`.
+    pub fn id(&self, key: &FrameSetKey, index: usize) -> Result<FrameId, ViewError> {
+        Ok(self.frames.id(key, index)?)
+    }
+
     /// Frame `index` of the resident set `key`.
     pub fn frame(&self, key: &FrameSetKey, index: usize) -> Result<&IndexFrame, ViewError> {
-        let set = self
-            .sets
-            .get(key)
-            .ok_or_else(|| ViewError::SetMissing(key.clone()))?;
-        set.frames.get(index).ok_or_else(|| ViewError::FrameIndex {
-            key: key.clone(),
-            index,
-            count: set.frames.len(),
-        })
+        let id = self.id(key, index)?;
+        Ok(self
+            .frames
+            .frame(id)
+            .expect("the store gave the id, so it holds the frame"))
     }
 }
 
@@ -303,91 +315,24 @@ impl ViewRules for Unspecified {
     }
 }
 
-/// Scene frame ids of one draw list: `FrameId(n)` is the n-th distinct
-/// (frame set, frame) the build asked for, in build order, so numbering is
-/// deterministic and independent of what else is resident.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct FrameTable {
-    refs: Vec<(FrameSetKey, usize)>,
-    ids: BTreeMap<(FrameSetKey, usize), FrameId>,
-}
-
-impl FrameTable {
-    /// The id of `(key, index)`, assigning the next one on first use.
-    pub fn id(&mut self, key: &FrameSetKey, index: usize) -> FrameId {
-        if let Some(&id) = self.ids.get(&(key.clone(), index)) {
-            return id;
-        }
-        let id = FrameId(self.refs.len() as u32);
-        self.refs.push((key.clone(), index));
-        self.ids.insert((key.clone(), index), id);
-        id
-    }
-
-    /// What `id` stands for.
-    pub fn get(&self, id: FrameId) -> Option<(&FrameSetKey, usize)> {
-        self.refs.get(id.0 as usize).map(|(k, i)| (k, *i))
-    }
-
-    /// Every referenced (set, frame), in id order.
-    pub fn refs(&self) -> &[(FrameSetKey, usize)] {
-        &self.refs
-    }
-
-    pub fn len(&self) -> usize {
-        self.refs.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.refs.is_empty()
-    }
-
-    /// The table as a scene frame source over `assets`' resident sets.
-    pub fn bind<'a>(&'a self, assets: &'a ViewAssets) -> BoundFrames<'a> {
-        BoundFrames {
-            table: self,
-            assets,
-        }
-    }
-}
-
-/// A [`FrameTable`] reading pixels from resident frame sets: the frame
-/// source of the CPU compositor (§A8).
-#[derive(Debug, Clone, Copy)]
-pub struct BoundFrames<'a> {
-    table: &'a FrameTable,
-    assets: &'a ViewAssets,
-}
-
-impl FrameSource for BoundFrames<'_> {
-    fn frame(&self, id: FrameId) -> Result<FrameView<'_>, SceneError> {
-        let (key, index) = self.table.get(id).ok_or(SceneError::FrameMissing(id))?;
-        let f = self
-            .assets
-            .frame(key, index)
-            .map_err(|_| SceneError::FrameMissing(id))?;
-        FrameView::new(f.width, f.height, &f.pixels)
-    }
-}
-
-/// One built frame: the ordered draw list and the frames it references.
+/// One built frame: the ordered draw list. Its frame ids are
+/// [`ViewAssets::frames`] ids.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorldFrame {
     /// Sorted by [`DrawKey`] (stable: equal keys keep build order).
     pub items: Vec<DrawItem>,
-    pub frames: FrameTable,
     /// Units drawn, and units the rules left undrawn (`unit_pose` = None).
     pub units_drawn: usize,
     pub units_hidden: usize,
 }
 
-/// The C7 resolver of one unit: the hooks plus frame id assignment.
+/// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
+/// come from the frame store ([`composite::build_with`]).
 struct UnitResolver<'a, R: ?Sized> {
     rules: &'a R,
     unit: &'a ClientUnit,
     pose: &'a UnitPose,
     assets: &'a ViewAssets,
-    table: &'a RefCell<FrameTable>,
 }
 
 fn not_resident(req: &ComponentRequest<'_>, what: &'static str, e: ViewError) -> CompositeError {
@@ -402,17 +347,6 @@ fn not_resident(req: &ComponentRequest<'_>, what: &'static str, e: ViewError) ->
 impl<R: ViewRules + ?Sized> composite::ComponentResolver for UnitResolver<'_, R> {
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
         self.rules.component_frame(self.unit, self.pose, req)
-    }
-
-    fn frame_id(
-        &self,
-        req: &ComponentRequest<'_>,
-        frame: &ComponentFrame,
-    ) -> Result<FrameId, CompositeError> {
-        self.assets
-            .frame(&frame.set, frame.index)
-            .map_err(|e| not_resident(req, "frame_id", e))?;
-        Ok(self.table.borrow_mut().id(&frame.set, frame.index))
     }
 
     fn place(
@@ -438,15 +372,14 @@ impl<R: ViewRules + ?Sized> composite::ComponentResolver for UnitResolver<'_, R>
 
 /// Builds and orders the frame's draw list (§A1 stages 1–2): map tiles,
 /// then units in key order (C7 composite each), then the UI requests in
-/// emission order; then the stable sort by key. Frame ids are assigned in
-/// that build order. Any error fails the frame.
+/// emission order; then the stable sort by key. Frame ids are the frame
+/// store's. Any error fails the frame.
 pub fn build<R: ViewRules + UiRules + ?Sized>(
     world: &ClientWorld,
     ui: &[crate::ui::UiDraw],
     rules: &R,
     assets: &ViewAssets,
 ) -> Result<WorldFrame, ViewError> {
-    let table = RefCell::new(FrameTable::default());
     let mut items = Vec::new();
 
     for (index, t) in rules.tiles(world, assets)?.into_iter().enumerate() {
@@ -454,8 +387,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             index,
             error: Box::new(error),
         };
-        assets.frame(&t.frame.set, t.frame.index).map_err(at)?;
-        let id = table.borrow_mut().id(&t.frame.set, t.frame.index);
+        let id = assets.id(&t.frame.set, t.frame.index).map_err(at)?;
         let mut item = DrawItem::new(id, t.x, t.y);
         item.clip = t.clip;
         item.shade = t.shade;
@@ -484,26 +416,29 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             unit,
             pose: &pose,
             assets,
-            table: &table,
         };
-        let draws =
-            composite::build(cof, pose.dir, pose.frame, &params, &resolver).map_err(|error| {
-                ViewError::Unit {
-                    unit_type: unit.key.unit_type,
-                    guid: unit.key.guid,
-                    error,
-                }
-            })?;
+        let draws = composite::build_with(
+            cof,
+            pose.dir,
+            pose.frame,
+            &params,
+            &resolver,
+            &assets.frames,
+        )
+        .map_err(|error| ViewError::Unit {
+            unit_type: unit.key.unit_type,
+            guid: unit.key.guid,
+            error,
+        })?;
         items.extend(draws.into_iter().map(|d| d.item));
         units_drawn += 1;
     }
 
-    ui_bind::ui_items(ui, rules, assets, &mut table.borrow_mut(), &mut items)?;
+    ui_bind::ui_items(ui, rules, assets, &mut items)?;
 
     scene::order(&mut items);
     Ok(WorldFrame {
         items,
-        frames: table.into_inner(),
         units_drawn,
         units_hidden,
     })
@@ -514,44 +449,46 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
 pub fn compose_cpu(frame: &WorldFrame, assets: &ViewAssets) -> Result<Vec<u8>, ViewError> {
     Ok(scene::compose_rgba(
         &frame.items,
-        &frame.frames.bind(assets),
+        &assets.frames,
         &assets.maps,
         &assets.palette,
         VIEW,
     )?)
 }
 
-/// The atlas the GPU compositor reads, filled with whole frame sets on
-/// first use (C3 packer). TODO(spec: none, design C2): page eviction on
+/// The atlas the GPU compositor reads: every frame of the frame store in
+/// id order, so `slots[n]` is the slot of `FrameId(n)` (the
+/// [`FrameStore::atlas`] numbering). The store is append-only, so frames
+/// added since the last call are packed on top (C3 packer); packed frames
+/// never move. TODO(spec: none, design C2): page eviction on
 /// `AtlasError::Full` is the residency cache's (`assets.md` §A5); until it
 /// is wired, a full atlas is an error.
 #[derive(Debug, Clone)]
 pub struct GpuAtlas {
     atlas: Atlas,
-    slots: BTreeMap<FrameSetKey, Vec<AtlasSlot>>,
+    slots: Vec<AtlasSlot>,
 }
 
 impl GpuAtlas {
     pub fn new(max_pages: u32) -> Result<Self, ViewError> {
         Ok(GpuAtlas {
             atlas: Atlas::new(max_pages)?,
-            slots: BTreeMap::new(),
+            slots: Vec::new(),
         })
     }
 
-    /// Inserts every set `frame` references that is not in the atlas yet,
-    /// in frame-id order (deterministic packing).
-    pub fn ensure(&mut self, frame: &WorldFrame, assets: &ViewAssets) -> Result<(), ViewError> {
-        for (key, _) in frame.frames.refs() {
-            if self.slots.contains_key(key) {
-                continue;
-            }
-            let set = assets
-                .sets
-                .get(key)
-                .ok_or_else(|| ViewError::SetMissing(key.clone()))?;
-            let slots = self.atlas.insert_set(&set.frames)?;
-            self.slots.insert(key.clone(), slots);
+    /// Packs the frames `store` gained since the last call, in id order.
+    pub fn ensure(&mut self, store: &FrameStore) -> Result<(), ViewError> {
+        let held = self.slots.len();
+        if held > store.len() {
+            return Err(ViewError::AtlasAhead {
+                atlas: held,
+                store: store.len(),
+            });
+        }
+        if held < store.len() {
+            let slots = self.atlas.insert_set(&store.frames()[held..])?;
+            self.slots.extend(slots);
         }
         Ok(())
     }
@@ -560,14 +497,15 @@ impl GpuAtlas {
         &self.atlas
     }
 
-    /// Frame sets inserted so far (sets are only ever added).
-    pub fn sets(&self) -> usize {
+    /// Frames packed so far (frames are only ever added: the pages'
+    /// version).
+    pub fn frames(&self) -> usize {
         self.slots.len()
     }
 
-    /// The slot source of `frame`'s ids.
-    pub fn slots<'a>(&'a self, frame: &'a WorldFrame) -> FrameSlots<'a> {
-        FrameSlots { atlas: self, frame }
+    /// The slot of each [`FrameId`] (`slots[n]` for `FrameId(n)`).
+    pub fn slots(&self) -> &[AtlasSlot] {
+        &self.slots
     }
 
     /// Packs `frame` for the compute compositor (§A9): bins, items, slots,
@@ -577,13 +515,12 @@ impl GpuAtlas {
         frame: &WorldFrame,
         assets: &ViewAssets,
     ) -> Result<gpu_compositor::Packed, ViewError> {
-        let frames = frame.frames.bind(assets);
-        let bins = scene::bin(&frame.items, &frames, &assets.maps, VIEW)?;
+        let bins = scene::bin(&frame.items, &assets.frames, &assets.maps, VIEW)?;
         Ok(gpu_compositor::pack(
             &frame.items,
             &bins,
-            &frames,
-            &self.slots(frame),
+            &assets.frames,
+            self.slots(),
             &assets.maps,
             self.atlas.pages().len() as u32,
         )?)
@@ -597,24 +534,10 @@ impl GpuAtlas {
         frame: &WorldFrame,
         assets: &ViewAssets,
     ) -> Result<Vec<u8>, ViewError> {
-        self.ensure(frame, assets)?;
+        self.ensure(&assets.frames)?;
         let packed = self.pack(frame, assets)?;
         Ok(gpu
             .compose_rgba(&packed, self.atlas.pages(), &assets.palette)?
             .1)
-    }
-}
-
-/// Atlas slot of each [`FrameId`] of one frame.
-#[derive(Debug, Clone, Copy)]
-pub struct FrameSlots<'a> {
-    atlas: &'a GpuAtlas,
-    frame: &'a WorldFrame,
-}
-
-impl SlotSource for FrameSlots<'_> {
-    fn slot(&self, id: FrameId) -> Option<AtlasSlot> {
-        let (key, index) = self.frame.frames.get(id)?;
-        self.atlas.slots.get(key)?.get(index).copied()
     }
 }
