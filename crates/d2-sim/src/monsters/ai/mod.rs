@@ -9,7 +9,9 @@
 //! events (type 2 think, type 10 reset) plug into the tick through
 //! [`MonsterDispatch`].
 
+mod bodies;
 mod functions;
+mod npc;
 pub mod seams;
 pub mod table;
 mod tactics;
@@ -26,8 +28,10 @@ use crate::tick::timer::{TimerClass, TimerRun};
 use crate::tick::EventDispatch;
 use crate::units::{UnitId, UnitType};
 
-pub use functions::{implemented, run_function};
-pub use seams::{AiHost, AiModes, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget};
+pub use functions::{implemented, run_function, run_init, INIT_IMPLEMENTED};
+pub use seams::{
+    AiHost, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
+};
 pub use table::{AiRecord, AI_TABLE, SPECIAL_TABLE};
 pub use tactics::*;
 pub use target::{main_search, precheck_a, precheck_b, precheck_c};
@@ -104,6 +108,17 @@ pub struct AiControl {
     /// +0x34: GUIDs of this leader's minions (written by population
     /// code, `monsters/population.md`).
     pub minions: Vec<u32>,
+    /// +0x38: the Npc map-AI nodes (§9.9); `None` = no record. Who builds
+    /// it is open question 8.
+    pub map_ai: Option<Vec<MapNode>>,
+}
+
+/// A map-AI node (12 bytes: action, x, y; §9.9).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MapNode {
+    pub action: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// The AI param record's velocity request (monster data +0x2C, §7.3).
@@ -144,6 +159,13 @@ pub enum Unhandled {
 pub struct AiStore {
     units: BTreeMap<UnitId, MonsterAi>,
     pub unhandled: Vec<Unhandled>,
+    /// The Npc command counter G (`0x0088CADC`, §9.9 commands step 1).
+    ///
+    /// TODO(spec: ai.md open question 12): G is process-wide in 1.14d and
+    /// never reset between games; `d2-sim` has no process state, so it is
+    /// kept with the game's AI store (equal to 1.14d for the first game of
+    /// a fresh process).
+    pub npc_walk_counter: u32,
 }
 
 impl AiStore {
@@ -185,16 +207,17 @@ pub struct AiTables<'a> {
     pub monstats: &'a [Monstats],
     pub monstats2: &'a [Monstats2],
     pub levels: &'a [Levels],
-    pub skill_modes: &'a [[u8; 3]],
+    pub skill_modes: &'a [[u8; 4]],
 }
 
-/// The `Sk1mode..Sk3mode` bytes of every `monstats.bin` record (+0x180).
-pub fn skill_modes(t: &d2_data::bin::BinTable) -> Vec<[u8; 3]> {
+/// The `Sk1mode..Sk4mode` bytes of every `monstats.bin` record (+0x180;
+/// `Sk4mode` at +0x183 is read by Vampire, §9.22).
+pub fn skill_modes(t: &d2_data::bin::BinTable) -> Vec<[u8; 4]> {
     t.iter()
         .map(|r| {
-            r.get(0x180..0x183)
+            r.get(0x180..0x184)
                 .and_then(|b| b.try_into().ok())
-                .unwrap_or([0; 3])
+                .unwrap_or([0; 4])
         })
         .collect()
 }
@@ -306,7 +329,7 @@ impl<W: AiHost + ?Sized> Ctx<'_, W> {
             .map_or(-1, |r| i32::from(r.baseid as i16))
     }
 
-    /// Skill `n` (1…3) of the row as a signed id (< 0 = none) and its mode.
+    /// Skill `n` (1…4) of the row as a signed id (< 0 = none) and its mode.
     pub fn skill(&self, p: &TickParam, n: usize) -> (i32, u8) {
         let Some(r) = self.tables.monstats.get(p.class) else {
             return (-1, 0);
@@ -314,7 +337,8 @@ impl<W: AiHost + ?Sized> Ctx<'_, W> {
         let s = match n {
             1 => r.skill1,
             2 => r.skill2,
-            _ => r.skill3,
+            3 => r.skill3,
+            _ => r.skill4,
         };
         let m = self.tables.skill_modes.get(p.class).map_or(0, |m| m[n - 1]);
         (i32::from(s as i16), m)
@@ -633,15 +657,12 @@ pub fn install<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: U
     }
     let rec = record_for(cx, unit, state);
     // The init function runs with a fresh tick record; nothing when either
-    // record is missing. No init body is spec'd: logged as a stub.
+    // record is missing.
     let rows = cx
         .monstats(class)
         .is_some_and(|r| (r.monstatsex as usize) < cx.tables.monstats2.len());
     if rec.init != 0 && rows {
-        cx.store.unhandled.push(Unhandled::Function {
-            addr: rec.init,
-            unit,
-        });
+        functions::run_init(game, cx, rec.init, unit);
     }
     let c = cx.store.control_mut(unit).expect("control");
     c.special_state = state;

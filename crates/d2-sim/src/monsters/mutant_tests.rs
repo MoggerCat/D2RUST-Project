@@ -29,13 +29,17 @@ fn bin(record_size: usize, records: Vec<u8>) -> BinTable {
 
 // Covers: specs/monsters/ai.md §7.1
 #[test]
-fn skill_modes_reads_bytes_0x180_to_0x182() {
-    // `Sk1mode..Sk3mode` are bytes +0x180..+0x182 of each monstats record.
+fn skill_modes_reads_bytes_0x180_to_0x183() {
+    // `Sk1mode..Sk3mode` are bytes +0x180..+0x182 of each monstats record,
+    // `Sk4mode` +0x183 (§9.22 Vampire).
     let size = 0x190;
     let mut records = vec![0u8; 2 * size];
     records[0x180..0x183].copy_from_slice(&[8, 9, 4]);
     records[size + 0x17F..size + 0x184].copy_from_slice(&[7, 5, 14, 1, 7]);
-    assert_eq!(skill_modes(&bin(size, records)), [[8, 9, 4], [5, 14, 1]]);
+    assert_eq!(
+        skill_modes(&bin(size, records)),
+        [[8, 9, 4, 0], [5, 14, 1, 7]]
+    );
 }
 
 // Covers: specs/monsters/init.md §8.1
