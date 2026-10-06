@@ -15,7 +15,7 @@ use crate::items::inventory::{
 use crate::items::moves::{Guid, InventoryOps, Owner};
 use crate::units::lifecycle::LifecycleHooks;
 
-impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// A guarded item lookup: the unit of `item`, or none.
     fn iu(&self, item: Guid) -> Option<crate::units::UnitId> {
         self.item_unit(item)
@@ -32,7 +32,7 @@ impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
     }
 }
 
-impl<H: LifecycleHooks, R: InvRest> InventoryOps for InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H, R> {
     // ---- §1.4 ----------------------------------------------------------
 
     fn has_inventory(&self, owner: Owner) -> bool {

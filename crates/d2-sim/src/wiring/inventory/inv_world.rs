@@ -21,7 +21,7 @@ pub const STAT_SOCKETS: u16 = 194;
 /// §4.1 row 5).
 pub const ETHEREAL: u32 = 0x40_0000;
 
-impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     fn g(&self, u: UnitId) -> Guid {
         self.guid_of(u)
     }
@@ -39,7 +39,7 @@ impl<H: LifecycleHooks, R: InvRest> InvDesk<'_, '_, H, R> {
     }
 }
 
-impl<H: LifecycleHooks, R: InvRest> InvWorld for InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> {
     fn expansion(&self) -> bool {
         self.econ.fields.expansion
     }

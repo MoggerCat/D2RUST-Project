@@ -681,8 +681,10 @@ fn click_button_transmutes() {
     assert_eq!(t.cube().staged.sounds, [(player, 4)]);
 }
 
-/// Item ids no written spec owns stay stubs (recorded, result 0); the
-/// table names an owner for exactly the handled ids.
+/// Item ids no written spec owns stay stubs (recorded, result 0), as do
+/// owned ids whose system the host lacks (0x17: this host has no
+/// inventory parts, `moves`); the table names an owner for exactly the
+/// handled ids.
 // Covers: specs/sim/intents-events.md §4 r1
 #[test]
 fn unowned_item_ids_stay_stubs() {
@@ -700,7 +702,10 @@ fn unowned_item_ids_stay_stubs() {
         .filter(|(_, o)| o.is_some())
         .map(|&(id, _)| id)
         .collect();
-    assert_eq!(owned, [ITEM_TO_CUBE, CLICK_BUTTON]);
+    let mut want: Vec<u8> = moves::MOVE_IDS.iter().map(|&(id, _, _)| id).collect();
+    want.extend([ITEM_TO_CUBE, CLICK_BUTTON]);
+    want.sort_unstable();
+    assert_eq!(owned, want);
     assert!(ITEM_IDS.windows(2).all(|w| w[0].0 < w[1].0));
 
     // Without the cube on the host the owned ids are stubs too.
