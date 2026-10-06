@@ -12,6 +12,7 @@
 //! | [`search`] | §7 nearest free point, §8 coarse free-box search |
 //! | [`place`] | §9 floor drop, §10 placing a unit, §11 level spawn ([`place_seams`]: its seams) |
 //! | [`warp`] | §12 warp tiles and arrival |
+//! | [`walk`] | `sim/pathing.md`: walk / run requests, path compute, per-tick movement |
 //!
 //! No function here draws (spec "Randomness").
 
@@ -23,6 +24,7 @@ pub mod place_seams;
 pub mod record;
 pub mod search;
 pub mod tables;
+pub mod walk;
 pub mod warp;
 
 #[cfg(test)]
