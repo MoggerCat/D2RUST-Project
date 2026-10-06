@@ -3,6 +3,10 @@
 
 mod affixes;
 mod create;
+mod gaps_affixes;
+mod gaps_generation;
+mod gaps_props;
+mod gaps_quality;
 mod props;
 mod quality;
 

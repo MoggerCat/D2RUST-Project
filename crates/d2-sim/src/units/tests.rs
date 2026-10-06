@@ -23,7 +23,7 @@ use super::{UnitId, UnitType};
 
 // ---- §4.2 synthetic vectors ---------------------------------------------------
 
-fn bytes(pairs: &[(usize, u8)]) -> [u8; ANIM_EVENTS] {
+pub(super) fn bytes(pairs: &[(usize, u8)]) -> [u8; ANIM_EVENTS] {
     let mut e = [0u8; ANIM_EVENTS];
     for &(i, v) in pairs {
         e[i] = v;
@@ -165,7 +165,7 @@ fn anim_edge_cases() {
 // ---- TSV checks (M05) -----------------------------------------------------------
 
 const HANDLERS_TSV: &str = include_str!("../../../../specs/sim/unit-handlers.tsv");
-const EVENTS_TSV: &str = include_str!("../../../../specs/sim/unit-events.tsv");
+pub(super) const EVENTS_TSV: &str = include_str!("../../../../specs/sim/unit-events.tsv");
 
 fn class_of(name: &str) -> TimerClass {
     match name {
@@ -557,7 +557,7 @@ impl UnitHooks for Fake {
 
 impl LifecycleHooks for Fake {}
 
-fn data() -> UnitData {
+pub(super) fn data() -> UnitData {
     UnitData {
         monsters: vec![
             MonsterInfo {
@@ -613,7 +613,7 @@ fn step(game: &mut Game, sys: &mut UnitSystem<Fake>) {
 }
 
 /// The unit's pending timers as (type, expire, a1, a2), sorted.
-fn pending(game: &Game, unit: UnitId) -> Vec<(u8, i32, u32, u32)> {
+pub(super) fn pending(game: &Game, unit: UnitId) -> Vec<(u8, i32, u32, u32)> {
     let mut v: Vec<_> = game
         .timers
         .unit_timers(unit)

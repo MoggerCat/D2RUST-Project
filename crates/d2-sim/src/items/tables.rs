@@ -249,6 +249,18 @@ pub struct UniqueRec {
     pub props: [PropRec; 12],
 }
 
+impl UniqueRec {
+    /// From the typed record and its raw bytes: `rarity` is the 32-bit
+    /// value at +0x30, the u16 column plus the two unwritten bytes after it
+    /// (`items/quality.md` edge case 4; 0 in 1.14d).
+    pub fn from_record(r: &Uniqueitems, raw: &[u8]) -> Self {
+        UniqueRec {
+            rarity: u32::from_le_bytes([raw[0x30], raw[0x31], raw[0x32], raw[0x33]]),
+            ..UniqueRec::from(r)
+        }
+    }
+}
+
 impl From<&Uniqueitems> for UniqueRec {
     fn from(r: &Uniqueitems) -> Self {
         UniqueRec {
@@ -612,6 +624,13 @@ impl ItemTables {
             .zip(sets_raw.iter())
             .map(|(r, raw)| SetRec::from_record(r, raw))
             .collect();
+        // Edge case 4 (`items/quality.md`): rarity read as 32 bits.
+        let uniques_raw = get(f, Uniqueitems::TABLE)?;
+        let uniques = typed::<Uniqueitems>(f)?
+            .iter()
+            .zip(uniques_raw.iter())
+            .map(|(r, raw)| UniqueRec::from_record(r, raw))
+            .collect();
         Ok(ItemTables {
             items,
             itemtypes: typed::<Itemtypes>(f)?,
@@ -643,10 +662,7 @@ impl ItemTables {
                 .map(QualityRec::from)
                 .collect(),
             n_lowquality: typed::<Lowqualityitems>(f)?.len(),
-            uniques: typed::<Uniqueitems>(f)?
-                .iter()
-                .map(UniqueRec::from)
-                .collect(),
+            uniques,
             setitems,
             sets,
             gems: typed::<Gems>(f)?.iter().map(GemRec::from).collect(),
