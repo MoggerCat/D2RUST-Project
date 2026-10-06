@@ -17,7 +17,9 @@
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
 //! for byte; exit code 0 = all pass, 1 = a failure or error, 2 = none
-//! failed but a GPU half is incomplete (no adapter). With a map flag (`--ds1`,
+//! failed but a GPU half is incomplete (no adapter) or a scene case has
+//! no scene source. `verify --cases crates/d2-client/capture-cases` runs
+//! the 1.14d capture cases (`render/capture.md`). With a map flag (`--ds1`,
 //! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
 //! instead (default view: the whole map; exit 0 means identical).
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
@@ -243,7 +245,9 @@ fn verify(o: Options) -> Result<()> {
             verify::Status::Pass => Ok(()),
             verify::Status::Fail(why) => bail!(why),
             verify::Status::Error(e) => bail!(e),
-            verify::Status::GpuNotWired | verify::Status::NoAdapter(_) => {
+            verify::Status::GpuNotWired
+            | verify::Status::NoAdapter(_)
+            | verify::Status::SceneNotWired => {
                 unreachable!("map cases run their GPU half in the Bevy app")
             }
         };
@@ -276,6 +280,16 @@ fn verify(o: Options) -> Result<()> {
                 verify::run_synthetic(&case.name, s, o.perturb, &mut gpu)
             }
             verify::CaseKind::Map(m) => verify::map::run(&case.name, m, None, o.perturb),
+            // render/capture.md: no scene source is wired yet (the world
+            // view's rules); the capture's own checks run.
+            verify::CaseKind::Scene(sc) => verify::capture_case::run_capture(
+                &case.name,
+                sc,
+                &verify::capture_case::repo_root(),
+                o.perturb,
+                &mut verify::capture_case::SceneNotWired,
+                &mut gpu,
+            ),
         };
         verify::print_report(&report);
         summary.add(&report.status);
