@@ -1264,6 +1264,23 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local PC 2, coordinator #2, main `63a706b`, Windows 11
+Pro 26200; `hash-manifest` of the install = `traces/reference-install.toml`
+byte for byte, 19 entries): `cargo build --workspace --release` OK;
+`cargo run -p depcheck` OK; `cargo test --workspace -- --ignored`: 66 pass,
+5 fail, the same five `game_sweep` counts as the entry below (stops at the
+first failing crate, so not a full count). **Second real GPU: AMD Radeon
+RX 9070 XT (Vulkan, DiscreteGpu, driver "AMD proprietary driver 26.8.1
+(LLPC)")**: `d2-client verify` (release) `summary: 11 pass, 0 fail, 0
+error, 0 GPU not wired, 0 no adapter`, map `townN1.ds1` 2,697 draw items,
+view 7840×4112 at −3200,−192, CPU binned / GPU indices / GPU RGBA all 0 of
+32,238,080 differ; `--perturb 7`: all 11 cases FAIL with exactly 7 on each
+of the three comparisons, `0 pass, 11 fail`, exit 1. GPU byte-exactness
+now holds on two real adapters (Intel iGPU and AMD discrete). Fresh table
+dump `traces/raw/20261006-201456-tables` (73 tables, 30 maps, not
+committed). The full LOCAL-RUN batches 1–5 on main `0472619` run as the
+buddy session (`docs/handoff/local-buddy-2026-10-06.md`).
+
 Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
 install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
 clean). `cargo test --workspace --no-fail-fast -- --ignored`: 112 pass,
