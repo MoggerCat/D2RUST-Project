@@ -6,7 +6,7 @@
 //!
 //! ```toml
 //! version = 1
-//! kind = "synthetic"          # or "map"
+//! kind = "synthetic"          # or "map", "scene"
 //! description = "..."         # optional, any kind
 //!
 //! # synthetic
@@ -51,6 +51,17 @@
 //! ds1 = 'data\global\tiles\ACT1\TOWN\townN1.ds1'
 //! wall_base = 80
 //! view = [l, t, w, h]         # optional, default the whole map
+//!
+//! # scene (a 1.14d capture, render/capture.md; capture-cases/)
+//! raw = "latest"              # or a frames-raw-1 path (repo-relative or
+//!                             # absolute); "latest" = newest
+//!                             # traces/raw/*-frames.jsonl
+//! images = 'game/captures/…'  # optional; default game/captures/<stamp>
+//!                             # for a raw file named <stamp>-frames.jsonl
+//! check = "compare"           # or "stability" (capture.md §7)
+//! draws = [1201, 1202]        # optional, compare only: these draw
+//!                             # counters; default every captured frame
+//!                             # but the first (capture.md edge cases)
 //! ```
 
 use std::fmt;
@@ -72,6 +83,7 @@ pub struct Case {
 pub enum CaseKind {
     Synthetic(Synthetic),
     Map(MapCase),
+    Scene(SceneCase),
 }
 
 impl CaseKind {
@@ -79,6 +91,7 @@ impl CaseKind {
         match self {
             CaseKind::Synthetic(_) => "synthetic",
             CaseKind::Map(_) => "map",
+            CaseKind::Scene(_) => "scene",
         }
     }
 }
@@ -184,6 +197,35 @@ pub struct MapCase {
     pub view: Option<ViewRect>,
 }
 
+/// A 1.14d capture compared with the d2rs pipeline (`render/capture.md`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneCase {
+    pub raw: RawRef,
+    pub images: Option<String>,
+    pub check: CaptureCheck,
+    /// Draw counters to compare; empty = the default selection.
+    pub draws: Vec<u32>,
+}
+
+/// Which `frames-raw-1` file a scene case reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RawRef {
+    /// The newest `traces/raw/*-frames.jsonl` (file names start with the
+    /// recording time, so the newest sorts last).
+    Latest,
+    Path(String),
+}
+
+/// What a scene case checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureCheck {
+    /// Each selected frame against the CPU reference (and GPU) of its
+    /// recorded state (capture.md §6).
+    Compare,
+    /// The stability rule (capture.md §7); needs no renderer.
+    Stability,
+}
+
 /// A case file error: the key path (`item[2].frame`) and what is wrong.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub struct CaseError {
@@ -277,6 +319,14 @@ pub fn parse(name: &str, text: &str) -> Result<Case, CaseError> {
                 view: rect(root, "", "view")?,
             })
         }
+        "scene" => {
+            only_keys(
+                root,
+                "",
+                &[&common[..], &["raw", "images", "check", "draws"]].concat(),
+            )?;
+            CaseKind::Scene(scene(root)?)
+        }
         other => return Err(err("kind", CaseErrorKind::UnknownValue(other.to_owned()))),
     };
     Ok(Case {
@@ -345,6 +395,60 @@ fn synthetic(root: &Table) -> Result<Synthetic, CaseError> {
         items,
         units,
         expects,
+    })
+}
+
+fn scene(root: &Table) -> Result<SceneCase, CaseError> {
+    let raw = string(root, "", "raw")?.ok_or_else(|| err("raw", CaseErrorKind::Missing))?;
+    let raw = match raw.as_str() {
+        "latest" => RawRef::Latest,
+        "" => return Err(err("raw", CaseErrorKind::Invalid("empty path".into()))),
+        _ => RawRef::Path(raw),
+    };
+    let check = string(root, "", "check")?.ok_or_else(|| err("check", CaseErrorKind::Missing))?;
+    let check = match check.as_str() {
+        "compare" => CaptureCheck::Compare,
+        "stability" => CaptureCheck::Stability,
+        _ => return Err(err("check", CaseErrorKind::UnknownValue(check))),
+    };
+    let draws = match root.get("draws") {
+        None => Vec::new(),
+        Some(item) => {
+            let arr = item
+                .as_array()
+                .ok_or_else(|| err("draws", CaseErrorKind::WrongType("an array of integers")))?;
+            let mut draws = Vec::with_capacity(arr.len());
+            for (i, v) in arr.iter().enumerate() {
+                let at = format!("draws[{i}]");
+                let d = value_int(v, &at, 0, u32::MAX.into())? as u32;
+                if draws.contains(&d) {
+                    return Err(err(
+                        at,
+                        CaseErrorKind::Invalid(format!("draw {d} is listed twice")),
+                    ));
+                }
+                draws.push(d);
+            }
+            if draws.is_empty() {
+                return Err(err(
+                    "draws",
+                    CaseErrorKind::Invalid("empty; omit it for the default".into()),
+                ));
+            }
+            if check == CaptureCheck::Stability {
+                return Err(err(
+                    "draws",
+                    CaseErrorKind::Invalid("the stability check uses every frame".into()),
+                ));
+            }
+            draws
+        }
+    };
+    Ok(SceneCase {
+        raw,
+        images: string(root, "", "images")?,
+        check,
+        draws,
     })
 }
 
