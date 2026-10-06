@@ -102,6 +102,8 @@ pub struct Fake {
     pub counter: u8,
     pub hostile: bool,
     pub in_range: bool,
+    /// `Some(r)`: in melee range only for range argument `r`.
+    pub range_needed: Option<i32>,
     pub log: Vec<String>,
 }
 
@@ -261,8 +263,8 @@ impl CombatWorld for Fake {
     fn melee_range(&self, _u: usize) -> i32 {
         0
     }
-    fn in_melee_range(&self, _a: usize, _d: usize, _range: i32) -> bool {
-        self.in_range
+    fn in_melee_range(&self, _a: usize, _d: usize, range: i32) -> bool {
+        self.in_range && self.range_needed.is_none_or(|r| r == range)
     }
     fn has_shield(&self, u: usize) -> bool {
         self.units[u].shield

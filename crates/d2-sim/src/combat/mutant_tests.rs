@@ -1162,3 +1162,354 @@ fn open_wounds_base_branches() {
         assert_eq!(open_wounds_base(lvl), v, "{lvl}");
     }
 }
+
+// Open wounds: no draw when the chance is ≤ 0; a failed draw gives
+// `None`; `h = ow(1) + 40 = 40`, halved for a unique or champion monster
+// (flag 0xC), quartered for a player.
+#[test]
+fn open_wounds_chance_and_targets() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(12, 1));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    let before = f.units[a].seed;
+    assert_eq!(open_wounds(&mut f, 5, a, d, 135 << 16), None);
+    assert_eq!(f.units[a].seed, before);
+    // Chance 50, r = 70: no curse.
+    f.set(a, 135, 50);
+    f.units[a].seed = seed_giving(70);
+    assert_eq!(open_wounds(&mut f, 5, a, d, 135 << 16), None);
+    f.set(a, 135, 100);
+    assert_eq!(open_wounds(&mut f, 5, a, d, 135 << 16), Some(40));
+    f.units[d].flags = 4;
+    assert_eq!(open_wounds(&mut f, 5, a, d, 135 << 16), Some(20));
+    let p = f.add(FUnit::new(UnitType::Player, 0));
+    assert_eq!(open_wounds(&mut f, 5, a, p, 135 << 16), Some(10));
+}
+
+// ---------------------------------------------------------------- §9
+
+/// A player defender wearing armor (type 50, with durability) in every
+/// slot of the weight table; returns (defender, items by slot index).
+fn armored(f: &mut Fake) -> (usize, Vec<usize>) {
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    let mut items = Vec::new();
+    for (loc, _) in DURABILITY_WEIGHTS {
+        let i = f.add_item(FItem {
+            types: vec![50],
+            durability: true,
+            ..FItem::default()
+        });
+        f.units[d].items.insert(loc, i);
+        items.push(i);
+    }
+    (d, items)
+}
+
+// §9 step 2: `i = roll(7)`, `w = roll(22)`; walk the slots from `i`,
+// `w < weight` picks (strict), else `w −= weight`, `i = (i + 1) mod 7`.
+// The pick then draws `r < 10` (seeds chosen so).
+#[test]
+fn durability_slot_walk() {
+    // (i, w, picked slot index)
+    for (i0, w0, slot) in [(0, 0, 0), (0, 3, 1), (0, 10, 2), (6, 3, 0)] {
+        let mut f = world();
+        let a = f.add(FUnit::new(UnitType::Monster, 0));
+        let (d, items) = armored(&mut f);
+        let seed = (1u32..)
+            .map(|lo| Seed::new(lo, 0))
+            .find(|&s| {
+                let mut t = s;
+                t.roll(7) == i0 && t.roll(22) == w0 && t.step() % 100 < 10
+            })
+            .unwrap();
+        f.units[d].seed = seed;
+        durability(&mut f, a, d);
+        assert_eq!(
+            f.log,
+            [format!("durability {d} {}", items[slot])],
+            "{i0} {w0}"
+        );
+    }
+}
+
+// §9: only armor or weapons *with durability* lose durability.
+#[test]
+fn durability_hit_needs_durability() {
+    let mut f = world();
+    let u = f.add(FUnit::new(UnitType::Player, 0));
+    f.units[u].seed = seed_giving(0);
+    for t in [50, 45] {
+        let i = f.add_item(FItem {
+            types: vec![t],
+            ..FItem::default()
+        });
+        durability_hit(&mut f, u, i);
+    }
+    assert!(f.log.is_empty(), "{:?}", f.log);
+}
+
+// ---------------------------------------------------------------- hit.md
+
+// hit.md §2 step 3: Holy Shield needs skill > 0 and level > 0.
+#[test]
+fn defense_holy_shield_needs_skill_and_level() {
+    let mut r = skill_rec();
+    r.calc1 = 0;
+    let mut s = skill_tables(vec![r.clone(), r]);
+    s.skills_code = vec![0x07, 100, 0x00];
+    let mut f = world();
+    let u = f.add(FUnit::new(UnitType::Player, 3).with(31, 100));
+    f.units[u].shield = true;
+    f.units[u].states.push(101);
+    f.units[u].state_stats.insert((101, 350), 0);
+    f.units[u].state_stats.insert((101, 351), 5);
+    assert_eq!(defense(&mut f, &s, u), 100);
+    f.units[u].state_stats.insert((101, 350), 1);
+    f.units[u].state_stats.insert((101, 351), 0);
+    assert_eq!(defense(&mut f, &s, u), 100);
+    f.units[u].state_stats.insert((101, 351), 5);
+    assert_eq!(defense(&mut f, &s, u), 200);
+}
+
+fn terms(ar: i32, def: i32) -> HitTerms {
+    HitTerms {
+        ar,
+        pct_ar: 0,
+        def,
+        alvl: 1,
+        dlvl: 1,
+    }
+}
+
+// hit.md §3.3: `toHit < 0` moves to def (factor 0 → 5); the final
+// `def < 0 → 0` matters when `def − toHit` wraps (AR = i32::MIN).
+#[test]
+fn hit_chance_negative_terms() {
+    assert_eq!(hit_chance(terms(-50, 50)), 5);
+    // def = 0 − i32::MIN wraps to i32::MIN → 0; sum 0 → factor 100.
+    assert_eq!(hit_chance(terms(i32::MIN, 0)), 95);
+}
+
+// hit.md §3.2 step 2.2: fractional target AC is halved against a
+// hireling; step 2.3: demon / undead to-hit only against that kind.
+#[test]
+fn hit_terms_fractional_and_kind_bonuses() {
+    let (s, c) = (st(), ct());
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(116, 50));
+    let mut h = FUnit::new(UnitType::Monster, 0).with(31, 100);
+    h.hireling = true;
+    let hd = f.add(h);
+    // f = 25: 100 − 25.
+    assert_eq!(hit_terms(&mut f, &s, &c, a, hd, 0, false).def, 75);
+    let m = f.add(FUnit::new(UnitType::Monster, 0).with(31, 100));
+    assert_eq!(hit_terms(&mut f, &s, &c, a, m, 0, false).def, 50);
+    f.set(a, 116, 0);
+    let base = hit_terms(&mut f, &s, &c, a, m, 0, false).ar;
+    f.set(a, 123, 30);
+    assert_eq!(hit_terms(&mut f, &s, &c, a, m, 0, false).ar, base);
+    f.units[m].demon = true;
+    assert_eq!(hit_terms(&mut f, &s, &c, a, m, 0, false).ar, base + 30);
+    f.units[m].demon = false;
+    f.set(a, 123, 0);
+    f.set(a, 124, 20);
+    assert_eq!(hit_terms(&mut f, &s, &c, a, m, 0, false).ar, base);
+    f.units[m].undead = true;
+    assert_eq!(hit_terms(&mut f, &s, &c, a, m, 0, false).ar, base + 20);
+}
+
+// hit.md §3.5: prevent-heal only from a player attacker on a monster
+// with `item_preventheal ≠ 0`.
+#[test]
+fn hit_test_prevent_heal_targets() {
+    let (s, c) = (st(), ct());
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(12, 1).with(117, 1));
+    let p = f.add(FUnit::new(UnitType::Player, 0).with(12, 1));
+    let m = f.add(FUnit::new(UnitType::Monster, 0).with(12, 1));
+    let b = f.add(FUnit::new(UnitType::Monster, 0).with(12, 1).with(117, 1));
+    for (x, y) in [(a, p), (b, m)] {
+        f.units[x].seed = seed_giving(0);
+        assert!(hit_test(&mut f, &s, &c, Some(x), Some(y), 0, false));
+    }
+    f.set(a, 117, 0);
+    f.units[a].seed = seed_giving(0);
+    assert!(hit_test(&mut f, &s, &c, Some(a), Some(m), 0, false));
+    assert!(f.log.is_empty(), "{:?}", f.log);
+    f.set(a, 117, 1);
+    f.units[a].seed = seed_giving(0);
+    assert!(hit_test(&mut f, &s, &c, Some(a), Some(m), 0, false));
+    assert_eq!(f.log.len(), 1);
+}
+
+// hit.md §4 step 1: both units must be players or monsters and hostile;
+// step 3: range 1 (player) or 3 (monster) minus `range_offset +
+// melee_range` when the offset ≠ 0; step 4: the hit test sets hit.
+#[test]
+fn melee_result_gates_and_range() {
+    let (s, c) = (st(), ct());
+    let mut f = world();
+    let p = f.add(FUnit::new(UnitType::Player, 0).with(12, 1));
+    let m = f.add(FUnit::new(UnitType::Monster, 0).with(12, 1));
+    let o = f.add(FUnit::new(UnitType::Object, 0).with(12, 1));
+    for u in [p, m] {
+        f.units[u].seed = seed_giving(0);
+    }
+    assert_eq!(melee_result(&mut f, &s, &c, Some(o), Some(m), 0, 0), 0);
+    assert_eq!(melee_result(&mut f, &s, &c, Some(p), Some(o), 0, 0), 0);
+    f.hostile = false;
+    assert_eq!(melee_result(&mut f, &s, &c, Some(p), Some(m), 0, 0), 0);
+    f.hostile = true;
+    let hit = result::HIT | result::GET_HIT;
+    for (a, d, offset, range) in [(p, m, 0, 1), (m, p, 0, 3), (m, p, 2, 1)] {
+        f.units[a].seed = seed_giving(0);
+        f.range_needed = Some(range + 1);
+        assert_eq!(melee_result(&mut f, &s, &c, Some(a), Some(d), 0, offset), 0);
+        f.range_needed = Some(range);
+        assert_eq!(
+            melee_result(&mut f, &s, &c, Some(a), Some(d), 0, offset),
+            hit,
+            "{a} {offset}"
+        );
+    }
+}
+
+// hit.md §6.2 step 1: a monster in mode 2 or 15 is moving (no dodge);
+// e = 0 → no evade draw.
+#[test]
+fn dodge_monster_moving_modes() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(338, 100));
+    for (mode, want) in [
+        (2, BlockResult::None),
+        (15, BlockResult::None),
+        (1, BlockResult::Dodge),
+    ] {
+        f.units[d].mode = mode;
+        f.units[d].seed = seed_giving(0);
+        let before = f.units[d].seed;
+        assert_eq!(dodge(&mut f, a, d, false), want, "{mode}");
+        if want == BlockResult::None {
+            assert_eq!(f.units[d].seed, before, "{mode}");
+        }
+    }
+}
+
+// ---------------------------------------------------------------- vitals.md
+
+mod vitals_mutants {
+    use super::super::vitals::*;
+    use crate::skills::fake::blank;
+    use crate::units::UnitType;
+    use d2_data::tables::Experience;
+    use std::collections::BTreeMap;
+
+    #[derive(Default)]
+    struct V {
+        class: i32,
+        base: BTreeMap<u16, i32>,
+        log: Vec<String>,
+    }
+
+    impl VitalsUnits for V {
+        type Unit = ();
+        fn unit_type(&self, _: ()) -> UnitType {
+            UnitType::Player
+        }
+        fn class_id(&self, _: ()) -> i32 {
+            self.class
+        }
+        fn base_stat(&self, _: (), s: u16) -> i32 {
+            self.base.get(&s).copied().unwrap_or(0)
+        }
+        fn stat(&self, _: (), s: u16) -> i32 {
+            self.base_stat((), s)
+        }
+        fn set_base_stat(&mut self, _: (), s: u16, v: i32) {
+            self.base.insert(s, v);
+        }
+        fn add_base_stat(&mut self, _: (), s: u16, v: i32) {
+            *self.base.entry(s).or_default() += v;
+        }
+        fn max_life(&self, _: ()) -> i32 {
+            self.base_stat((), stat::MAXHP)
+        }
+        fn max_mana(&self, _: ()) -> i32 {
+            self.base_stat((), stat::MAXMANA)
+        }
+        fn max_stamina(&self, _: ()) -> i32 {
+            self.base_stat((), stat::MAXSTAMINA)
+        }
+        fn refresh(&mut self, _: ()) {
+            self.log.push("refresh".into());
+        }
+        fn level_up_notify(&mut self, _: ()) {
+            self.log.push("notify".into());
+        }
+        fn level_up_event(&mut self, _: ()) {
+            self.log.push("event12".into());
+        }
+    }
+
+    /// `experience.txt` with a distinct column per class: level `L` of
+    /// class `c` needs `500 × L² × (c + 1)`; `MaxLvl` 99.
+    fn tables() -> VitalsTables {
+        let row = |f: &dyn Fn(u32) -> u32| {
+            let mut e: Experience = blank();
+            e.amazon = f(1);
+            e.sorceress = f(2);
+            e.necromancer = f(3);
+            e.paladin = f(4);
+            e.barbarian = f(5);
+            e.druid = f(6);
+            e.assassin = f(7);
+            e
+        };
+        let mut experience = vec![row(&|_| 99)];
+        experience.extend((0..=99u32).map(|l| row(&move |k| 500 * l * l * k)));
+        let charstats = (0..7).map(|_| blank()).collect();
+        VitalsTables {
+            charstats,
+            experience,
+        }
+    }
+
+    // §4.1: each class reads its own column; ids outside 0–6 use class 0.
+    #[test]
+    fn threshold_class_columns() {
+        let t = tables();
+        for class in 0..7 {
+            assert_eq!(t.threshold(class, 1), 500 * (class as u32 + 1), "{class}");
+        }
+        assert_eq!(t.threshold(7, 1), 500);
+    }
+
+    // §4.1: `level_from_exp` counts the rows with `exp ≥ row(i + 1)`.
+    #[test]
+    fn level_from_exp_counts() {
+        let t = tables();
+        // Rows of class 0: 0, 500, 2000, 4500 → 2000 is level 3.
+        assert_eq!(t.level_from_exp(0, 2000), 3);
+        assert_eq!(t.level_from_exp(0, 1999), 2);
+    }
+
+    // §1 `0x0057EB10`: adds `threshold − experience` when positive; equal
+    // experience adds nothing (no level-up).
+    #[test]
+    fn target_level_adds_difference() {
+        let t = tables();
+        let mut v = V::default();
+        v.base.insert(stat::LEVEL, 1);
+        v.base.insert(stat::EXPERIENCE, 100);
+        let need = t.threshold(0, 15);
+        set_experience_for_target_level(&mut v, &t, (), 15);
+        assert_eq!(v.base_stat((), stat::EXPERIENCE), need as i32);
+        let mut v = V::default();
+        v.base.insert(stat::LEVEL, 1);
+        v.base.insert(stat::EXPERIENCE, need as i32);
+        set_experience_for_target_level(&mut v, &t, (), 15);
+        assert_eq!(v.base_stat((), stat::LEVEL), 1);
+        assert!(v.log.is_empty(), "{:?}", v.log);
+    }
+}
