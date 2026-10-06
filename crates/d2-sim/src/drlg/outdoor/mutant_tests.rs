@@ -1955,3 +1955,277 @@ fn vertex_polygon_by_the_rules() {
         assert_eq!(got, polygon_model(rect, &orth), "case {case}");
     }
 }
+
+/// `outdoor.md` §3 step 2: consecutive equal cell vertices merge, the
+/// earlier keeping its place, OR-ing the later's flags and taking its
+/// direction.
+#[test]
+fn to_cells_merges_into_the_earlier_vertex() {
+    use super::vertex::to_cells;
+    let v = |x, y, direction, flags| Vertex {
+        x,
+        y,
+        direction,
+        flags,
+    };
+    let mut vs = vec![
+        v(0, 0, 0, 0),
+        v(16, 8, 0, 1),
+        v(17, 15, 3, 2),
+        v(40, 8, 1, 0),
+    ];
+    to_cells(&mut vs);
+    assert_eq!(vs, [v(0, 0, 0, 0), v(2, 1, 3, 3), v(5, 1, 1, 0)]);
+}
+
+/// Table N of `outdoor.md` §6 (index: value, −1 elsewhere).
+fn spec_n(i: i32) -> i32 {
+    const N: [(i32, i32); 37] = [
+        (1, 1),
+        (3, 0),
+        (5, 2),
+        (7, 3),
+        (9, 0),
+        (10, 1),
+        (11, 9),
+        (12, 9),
+        (15, 1),
+        (16, 8),
+        (19, 12),
+        (24, 12),
+        (25, 4),
+        (28, 5),
+        (29, 2),
+        (30, 2),
+        (31, 10),
+        (36, 10),
+        (37, 1),
+        (38, 9),
+        (39, 9),
+        (61, 11),
+        (62, 11),
+        (63, 3),
+        (64, 12),
+        (69, 12),
+        (70, 4),
+        (71, 4),
+        (72, 7),
+        (75, 2),
+        (76, 10),
+        (81, 10),
+        (84, 6),
+        (85, 3),
+        (88, 11),
+        (89, 11),
+        (90, 3),
+    ];
+    N.iter().find(|e| e.0 == i).map_or(-1, |e| e.1)
+}
+
+/// Table P rows 1..12 of `outdoor.md` §6.
+fn spec_p(k: i32, s: i32) -> u32 {
+    const P: [[u32; 4]; 12] = [
+        [0, 4, 364, 799],
+        [16, 5, 365, 800],
+        [17, 6, 366, 801],
+        [0, 7, 367, 802],
+        [18, 8, 368, 803],
+        [19, 9, 369, 804],
+        [22, 10, 370, 805],
+        [0, 11, 371, 806],
+        [0, 12, 372, 807],
+        [23, 13, 373, 808],
+        [0, 14, 374, 809],
+        [0, 15, 375, 810],
+    ];
+    P[(k - 1) as usize][s as usize]
+}
+
+/// `outdoor.md` §6 lookups: Corner(a, b, c, e, s): a and c grow by 2 in
+/// magnitude; k := N[b + a + 9(e + c) + 50]; −1 → 0; s < 4: P[k][s], else
+/// Q[k − 1][s − 4] = (881, 957)[s − 4] + k − 1. Border(dx, dy, s): k :=
+/// N[dx + 3dy + 4]; s < 4: P[k + 1][s], else Q[k][s − 4].
+#[test]
+fn corner_and_border_pieces_by_the_tables() {
+    use super::vertex::{border_piece, corner_piece};
+    let grow = |v: i32| v + 2 * v.signum();
+    let mut checked = 0;
+    for a in -1..=1 {
+        for b in -1..=1 {
+            for c in -1..=1 {
+                for e in -1..=1 {
+                    let k = spec_n(b + grow(a) + 9 * (e + grow(c)) + 50);
+                    for s in 0..6 {
+                        let want = if k == -1 {
+                            0
+                        } else if s < 4 {
+                            spec_p(k, s)
+                        } else if k >= 1 {
+                            [881, 957][(s - 4) as usize] + (k - 1) as u32
+                        } else {
+                            continue;
+                        };
+                        assert_eq!(
+                            corner_piece(a, b, c, e, s),
+                            want,
+                            "({a}, {b}, {c}, {e}, {s})"
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked > 100);
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            let k = spec_n(dx + 3 * dy + 4);
+            if k < 0 {
+                continue;
+            }
+            for s in 0..6 {
+                let want = if s < 4 {
+                    spec_p(k + 1, s)
+                } else {
+                    [881, 957][(s - 4) as usize] + k as u32
+                };
+                assert_eq!(border_piece(dx, dy, s), want, "({dx}, {dy}, {s})");
+            }
+        }
+    }
+}
+
+/// `outdoor.md` §5.5 link vis flag: side s from the vertex position, probe
+/// point (level.x + 8vx + dx[s], level.y + 8vy + dy[s]) with (dx, dy) =
+/// (−4, 4), (4, −4), (12, 4), (4, 12); the first entry of direction s
+/// whose box contains it: init 0 → 1 << (j + 4) for the vis slot j
+/// holding it, else 0.
+#[test]
+fn link_vis_side_and_probe() {
+    let (gw, gh) = (6, 5);
+    let d = [(-4, 4), (4, -4), (12, 4), (4, 12)];
+    let cases = [
+        ((0, 0), 1),
+        ((0, 3), 0),
+        ((5, 0), 2),
+        ((2, 0), 1),
+        ((5, 4), 3),
+        ((5, 2), 2),
+        ((2, 4), 3),
+    ];
+    for ((vx, vy), s) in cases {
+        for (dx_off, init, want_hit) in [(0, false, true), (1, false, false), (0, true, false)] {
+            let mut e = Env::new(2, gw, gh);
+            e.data.levels[2].vis = [0, 8, 9, 0, 0, 0, 0, 0];
+            let lr = e.drlg.level(e.l).rect;
+            let (px, py) = (lr.x + 8 * vx + d[s].0, lr.y + 8 * vy + d[s].1);
+            e.info.orth = vec![
+                // A box of another direction holding the probe comes first.
+                Orth {
+                    level_id: 8,
+                    direction: (s as i32 + 1) % 4,
+                    init: false,
+                    rect: TileRect::new(px, py, 1, 1),
+                    preset: false,
+                },
+                Orth {
+                    level_id: 9,
+                    direction: s as i32,
+                    init,
+                    rect: TileRect::new(px + dx_off, py, 1, 1),
+                    preset: false,
+                },
+            ];
+            let g = e.gen();
+            let v = Vertex {
+                x: vx,
+                y: vy,
+                direction: 0,
+                flags: VERTEX_LINK,
+            };
+            let want = if want_hit { 1 << (2 + 4) } else { 0 };
+            assert_eq!(
+                g.link_vis(v),
+                Ok(want),
+                "({vx}, {vy}) off {dx_off} init {init}"
+            );
+        }
+    }
+    // An interior vertex has no side.
+    let e = &mut Env::new(2, gw, gh);
+    let g = e.gen();
+    let v = Vertex {
+        x: 2,
+        y: 2,
+        direction: 0,
+        flags: VERTEX_LINK,
+    };
+    assert_eq!(g.link_vis(v), Ok(0));
+}
+
+/// `outdoor.md` §5.5: each link vertex marks the polygon edge to the next
+/// vertex, both ends included: grid 1 |= its link vis flag, grid 2 |=
+/// 0x1 (| 0x2 if its direction ≠ 0).
+#[test]
+fn link_flags_mark_the_edge() {
+    let mut e = Env::new(2, 6, 5);
+    e.data.levels[2].vis = [9, 0, 0, 0, 0, 0, 0, 0];
+    let lr = e.drlg.level(e.l).rect;
+    // The east edge (5, 0) → (5, 4): side 2 at (5, 0), probe (12, 4).
+    e.info.orth = vec![Orth {
+        level_id: 9,
+        direction: 2,
+        init: false,
+        rect: TileRect::new(lr.x + 8 * 5 + 12, lr.y + 4, 1, 1),
+        preset: false,
+    }];
+    let v = |x, y, direction, flags| Vertex {
+        x,
+        y,
+        direction,
+        flags,
+    };
+    e.info.vertices = vec![
+        v(0, 4, 0, 0),
+        v(0, 0, 0, 0),
+        v(5, 0, 1, VERTEX_LINK),
+        v(5, 4, 0, 0),
+    ];
+    let mut g = e.gen();
+    g.link_flags().unwrap();
+    for y in 0..5 {
+        for x in 0..6 {
+            let on = x == 5;
+            assert_eq!(g.g(1, x, y), if on { 1 << 4 } else { 0 }, "({x}, {y})");
+            assert_eq!(g.g(2, x, y), if on { 0x3 } else { 0 }, "({x}, {y})");
+        }
+    }
+    // The walk from (5, 4) back to (0, 4) (leftward, the last edge).
+    let mut e = Env::new(2, 6, 5);
+    e.info.vertices = vec![
+        v(0, 4, 0, 0),
+        v(0, 0, 0, 0),
+        v(5, 0, 0, 0),
+        v(5, 4, 0, VERTEX_LINK),
+    ];
+    let mut g = e.gen();
+    g.link_flags().unwrap();
+    for x in 0..6 {
+        assert_eq!(g.g(2, x, 4), 0x1, "({x}, 4)");
+        assert_eq!(g.g(2, x, 3), 0, "({x}, 3)");
+    }
+    // Upward: (0, 4) → (0, 0).
+    let mut e = Env::new(2, 6, 5);
+    e.info.vertices = vec![
+        v(0, 4, 0, VERTEX_LINK),
+        v(0, 0, 0, 0),
+        v(5, 0, 0, 0),
+        v(5, 4, 0, 0),
+    ];
+    let mut g = e.gen();
+    g.link_flags().unwrap();
+    for y in 0..5 {
+        assert_eq!(g.g(2, 0, y), 0x1, "(0, {y})");
+        assert_eq!(g.g(2, 1, y), 0, "(1, {y})");
+    }
+}
