@@ -2,7 +2,7 @@
 
 - **Status:** draft: think scheduling, dispatch, AI tables and the
   shared helpers read from the 1.14d `Game.exe` (addresses below; AI
-  tables dumped from the file); 33 AI functions read in full; think
+  tables dumped from the file); 37 AI functions read in full; think
   intervals checked against 4,409 recorded type-2 runs in three tick
   recordings (mode-end re-think: 79/79 at aidel; no rule contradicted).
 - **Target version:** 1.14d
@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1343 |
-|   10. The catalogue `ai-functions.tsv` | 1344–1364 |
-| Constants & data dependencies | 1365–1388 |
-| Randomness | 1389–1410 |
-| Edge cases & original bugs | 1411–1452 |
-| Test vectors | 1453–1541 |
-| Provenance | 1542–1581 |
-| Open questions | 1582–1619 |
+|   9. Per-AI behaviours | 633–1409 |
+|   10. The catalogue `ai-functions.tsv` | 1410–1430 |
+| Constants & data dependencies | 1431–1454 |
+| Randomness | 1455–1476 |
+| Edge cases & original bugs | 1477–1518 |
+| Test vectors | 1519–1607 |
+| Provenance | 1608–1647 |
+| Open questions | 1648–1685 |
 <!-- /index -->
 
 ## Summary
@@ -1340,6 +1340,72 @@ Brackets: scarab1 Normal [75, 50, 15, 35, 20]; `Skill1` Jab. AI param
    P(aip4) [35] → `Skill1` at T. End. P(aip2) [50] → A1, else A2, at T.
 
 1.14d-confirmed.
+
+#### 9.30 Smith (98) `0x005E3890`, Griswold (90) `0x005E5AC0`
+
+Smith (the Smith, hephasto), no draws:
+
+1. C → A1 at T. End.
+2. L = own life percent clamped to 0..100; velocity request (method
+   unchanged, speed (100 − L) >> 1, steps 0); walk to T with flags 7.
+
+Griswold:
+
+1. C: draw `lo' % 100` < 80 → A1 at T; else idle 10. End.
+2. Not C: draw `lo' % 100` < 50 → walk to T with flags 7; else idle 10.
+
+1.14d-confirmed.
+
+#### 9.31 GoodNpcRanged (60) `0x005E7AC0`
+
+Also the think of special state 5 (§3.2).
+
+1. Anim mode (unit +0x10) not neutral (1) → idle 5. End.
+2. Unless the unit's room is in town (`0x0061AB00`): S, E := secondary
+   target (`0x005DDC30`). If S and E < 20: `roll(100)` < 30 → for class
+   271 (roguehire) `Skill1` in `Sk1mode` at S, for any other class A1
+   at S; end. Else `roll(100)` < 30 → circle 4 at S (no delete), else
+   idle 10; end.
+3. Draw `lo' % 100` < 20 → wander 5; else idle 10.
+
+1.14d-confirmed.
+
+#### 9.32 NpcOutOfTown (31) `0x005E7880`
+
+Classes cain1 (146, Tristram) and drehyaiced (527). The quest calls are
+seams (`world/quests.md`; D2MOO names), chosen by class: cain1 → Act 1
+quest 4 functions, drehyaiced → Act 5 quest 3 functions:
+
+| Role | cain1 | drehyaiced |
+|---|---|---|
+| set up portal coordinates (0 = failed) | `0x005944B0` [`ACT1Q4_UpdateCainPortalCoordinates`] | `0x0058A940` [`ACT5Q3_InitializeDrehyaPortalCoordinates`] |
+| spawn the town portal | `0x005944F0` [`ACT1Q4_SpawnCainPortalInTown`] | `0x0058A980` |
+| spawn the portal out of town (0 = failed) | `0x005943B0` [`ACT1Q4_SpawnCainPortalOutsideTown`] | `0x0058A820` [`ACT5Q3_SpawnDrehyaPortalOutsideTown`] |
+| portal coordinates (0 = none) | `0x00594450` [`ACT1Q4_GetCainPortalOutsideTownCoordinates`] | `0x0058A8D0` [`ACT5Q3_GetDrehyaPortalCoordinates`] |
+
+"Leave" = spawn the town portal, set stat 6 (life) to 0
+(`0x00627260`), request mode 12 (dead) at the unit's own position.
+
+1. Portal setup (`0x005E77A0`): K = command 3 (`0x0058EFA0(3, 0)`). If
+   K exists with params 1, 2 = 0: params 1, 2 := own x + 3, own y + 3;
+   set up portal coordinates, and if that returns 0, leave; K's params
+   3, 4 := 1, 0; idle 1; end.
+2. drehyaiced: `0x0058AA10(game)`.
+3. Someone talks to the NPC (`0x00572DC0`) → idle 40. End.
+4. K = command 3 (`0x0058EEF0`). Anim mode 12 (dead) → end, nothing
+   scheduled.
+5. Interaction handler of §9.9 (`0x005E68F0`); its result is ignored.
+6. No K: step 1 again, then idle 40. End.
+7. K's param 3 ≥ 2: param 3 += 1; portal coordinates (x, y) found: if
+   param 3 < 8 and the path distance to (x, y) ≠ 0 → walk to (x, y),
+   else leave; end. Not found → idle 20, end.
+8. K's param 3 < 2: if the path distance to (param 1, param 2) > 1 and
+   param 4 ≤ 5: param 4 += 1; drehyaiced and `0x0058A9F0(game)` ≠ 0 →
+   idle 20, param 4 := 0; else walk to (param 1, param 2); end. Else if
+   param 3 = 1: spawn the portal out of town; 0 → params 3, 4 := 1,
+   idle 20, end; else param 3 := 2. Idle 20.
+
+No draws. 1.14d-confirmed; same as D2MOO.
 
 ### 10. The catalogue `ai-functions.tsv`
 

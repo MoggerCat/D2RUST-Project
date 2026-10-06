@@ -30,7 +30,7 @@ index	monai	think_1_14d	init_1_14d	alt_1_14d	target_mode	d2moo_name	monstats_row
 28	Vampire	0x005F4A70	-	-	1	AITHINK_Fn028_Vampire	9: 131 vampire1 132 vampire2 133 vampire3	aip1=melee?; aip2=cast?; aip3=active dist; aip4=upgrade cast?; aip5=spell flags	Spell flags aip5; flee under 33% life (state 2, escape 8) until 75%; bolts Skill1/Skill4 50/50 at the secondary target within 20; Skill2/Skill3 with cooldown 11 by aip4; melee P(aip1); circle 4 / idle 10/15 (ai.md §9.22).	spec'd-here
 29	BatDemon	0x005F5040	-	0x005F4FD0	1	AITHINK_Fn029_BatDemon	7: 136 batdemon1 137 batdemon2 138 batdemon3	aip1=hurt%; aip2=disengage on hit?; aip3=attack?; aip4=att1/ltng?; aip5=regen roosted	-	unread
 30	Fetish	0x005F53E0	-	-	1	AITHINK_Fn030_Fetish	16: 141 fetish1 142 fetish2 143 fetish3	aip1=attack?; aip2=stall time; aip3=attack loop; aip4=weak%	Command 1/14 walk to unit; combat attack loop of aip3 thinks (P(aip1) A1 / idle aip2), then back off 14 while the target's life% > aip4; else walk to target flags 7 (ai.md §9.21).	spec'd-here
-31	NpcOutOfTown	0x005E7880	-	-	0	AITHINK_Fn031_NpcOutOfTown	2: 146 cain1 528 drehyaiced	-	-	unread
+31	NpcOutOfTown	0x005E7880	-	-	0	AITHINK_Fn031_NpcOutOfTown	2: 146 cain1 528 drehyaiced	-	Quest NPC out of town (Tristram Cain, iced Anya): command 3 portal setup (idle 1), talking idle 40, walk to the portal point, spawn the portal outside, then walk in and leave (life 0, dead mode); idle 20/40; no draws (ai.md §9.32).	spec'd-here
 32	Npc	0x005E7130	-	-	0	AITHINK_Fn032_Npc	35: 147 gheed 148 akara 150 kashya	-	Home command 10 (first think idle 20); quest class cases; interaction (idle 8 / greet sound 18 idle 20 / walk around player / home if > 16: command 4); commands 4 (walk, idle param4 = 10), 5 (wander), 7 (mode action); map AI P(66) then roll(nodes); fallback idle 8 (ai.md §9.9).	spec'd-here
 33	HellMeteor	0x005F56D0	-	-	1	AITHINK_Fn033_HellMeteor	1: 153 hellmeteor	aip1=attack?; aip2=stall time; aip3=range	Skill1 with P(aip1) at a random point within aip3 of itself (x then y roll(2*aip3)); else idle aip2 (ai.md §9.25).	spec'd-here
 34	Andariel	0x005F5830	-	-	1	AITHINK_Fn034_Andariel	2: 156 andariel 708 uberandariel	aip1=spray in melee?; aip2=stall?; aip3=fire or engage?; aip4=spray from dist?	Combat: P(aip1) skill1 else A1; P(aip2) idle 5; P(aip3): P(aip4) skill1 else skill2; else walk to target flags 7 (ai.md §9.12).	spec'd-here
@@ -59,7 +59,7 @@ index	monai	think_1_14d	init_1_14d	alt_1_14d	target_mode	d2moo_name	monstats_row
 57	TentacleHead	0x005F9270	-	-	2	AITHINK_Fn057_TentacleHead	3: 261 tentaclehead1 262 tentaclehead2 263 tentaclehead3	aip1=shoot?; aip2=submerge?; aip3=submerge secs; aip4=emerge secs; aip5=stall time; aip6=active dist	-	unread
 58	Navi	0x005E7E20	-	-	0	AITHINK_Fn058_Navi	1: 266 navi	-	Interacting: idle 10; player within 15 and roll(3)!=0 and close: greet (sound 18 every 60 thinks) idle 20; secondary target under 25: A1; else idle 50 (ai.md §9.10).	spec'd-here
 59	BloodRaven	0x005E6320	0x005E6300	-	1	AITHINK_Fn059_BloodRaven	1: 267 bloodraven	-	Leash to home command 10 (45 idle 5 / 50 run home); run near target if far; raise Skill1 at a random point with a growing chance (2*diff+8 max); secondary target: 80% Skill2/A1; circle 4; 30% back off; A1 (ai.md §9.18).	spec'd-here
-60	GoodNpcRanged	0x005E7AC0	-	-	0	AITHINK_Fn060_GoodNpcRanged	1: 270 rogue2	-	-	unread
+60	GoodNpcRanged	0x005E7AC0	-	-	0	AITHINK_Fn060_GoodNpcRanged	1: 270 rogue2	-	Not neutral: idle 5; out of town, secondary target under 20: 30% A1 (roguehire: Skill1), else 30% circle 4, else idle 10; else 20% wander 5, else idle 10 (ai.md §9.31).	spec'd-here
 61	Hireable	0x005E52D0	-	0x005E5280	0	AITHINK_Fn061_Hireable	5: 271 roguehire 338 act2hire 359 act3hire	-	-	unread
 62	TownRogue	0x005E7D60	-	-	1	AITHINK_Fn062_TownRogue	1: 272 rogue3	-	Secondary target under 25: A1; else idle 50 (ai.md §9.10).	spec'd-here
 63	GargoyleTrap	0x005F9490	-	-	1	AITHINK_Fn063_GargoyleTrap	1: 273 gargoyletrap	aip1=shoot dist; aip2=shoot?; aip3=fire recovery; aip4=stall time	-	unread
@@ -89,7 +89,7 @@ index	monai	think_1_14d	init_1_14d	alt_1_14d	target_mode	d2moo_name	monstats_row
 87	Trap-Melee	0x005FBA60	-	-	1	AITHINK_Fn087_TrapMelee	1: 354 trap-melee	-	-	unread
 88	7TIllusion	0x005EA080	-	-	1	AITHINK_Fn088_7TIllusion	1: 355 seventombs	-	-	unread
 89	Megademon	0x005E0C80	-	-	1	AITHINK_Fn089_Megademon	7: 360 megademon1 361 megademon2 362 megademon3	aip1=inferno ranged?; aip2=inferno melee?; aip3=swing melee?; aip4=approach?; aip5=circle melee?; aip6=inferno timer	-	unread
-90	Griswold	0x005E5AC0	-	-	1	AITHINK_Fn090_Griswold	1: 365 griswold	-	-	unread
+90	Griswold	0x005E5AC0	-	-	1	AITHINK_Fn090_Griswold	1: 365 griswold	-	Combat: 80% A1 else idle 10; not combat: 50% walk to target flags 7 else idle 10 (ai.md §9.30).	spec'd-here
 91	DarkWanderer	0x005EA130	-	-	1	AITHINK_Fn091_DarkWanderer	1: 368 darkwanderer	-	-	unread
 92	Trap-Nova	0x005FB9B0	-	-	1	AITHINK_Fn080_092_TrapPoison_TrapNova	1: 369 trap-nova	aip1=range; aip2=num times; aip3=delay	-	unread
 93	ArcaneTower	0x005E0F60	-	-	1	AITHINK_Fn093_ArcaneTower	1: 371 lightningspire	aip1=num sk1; aip2=sk1 stall; aip3=sk1 long delay; aip4=num sk2; aip5=sk2 stall; aip6=sk2 long delay	-	unread
@@ -97,7 +97,7 @@ index	monai	think_1_14d	init_1_14d	alt_1_14d	target_mode	d2moo_name	monstats_row
 95	PantherJavelin	0x005E1080	-	-	1	AITHINK_Fn095_PantherJavelin	9: 373 slinger1 374 slinger2 375 slinger3	aip1=approach?; aip2=throw?; aip3=group dist; aip4=walk away?; aip5=stall time; aip6=throw dist	-	unread
 96	FetishBlowgun	0x005E1250	-	-	1	AITHINK_Fn096_FetishBlowgun	8: 396 fetishblow1 397 fetishblow2 398 fetishblow3	aip1=stay in range; aip2=run away?	-	unread
 97	Spirit	0x005E3840	-	-	1	AITHINK_Fn097_Spirit	1: 401 mephistospirit	-	-	unread
-98	Smith	0x005E3890	-	-	1	AITHINK_Fn098_Smith	2: 402 smith 409 hephasto	-	-	unread
+98	Smith	0x005E3890	-	-	1	AITHINK_Fn098_Smith	2: 402 smith 409 hephasto	-	Combat: A1; else velocity (100 - life%)/2 and walk to target flags 7; no draws (ai.md §9.30).	spec'd-here
 99	TrappedSoul	0x005E9F10	-	-	1	AITHINK_Fn099_TrappedSoul	2: 403 trappedsoul1 404 trappedsoul2	-	-	unread
 100	Buffy	0x005E7F50	-	-	0	AITHINK_Fn001_100_Idle_Buffy	1: 408 malachai	-	Same behaviour as Idle (index 1), separate copy of the function (ai.md §9.2).	spec'd-here
 101	AssassinSentry	0x005EA3D0	0x005EA290	-	0	AITHINK_Fn101_AssassinSentry	4: 411 wakeofdestruction 412 chargeboltsentry 413 lightningsentry	-	-	unread
