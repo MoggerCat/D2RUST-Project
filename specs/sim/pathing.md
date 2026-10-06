@@ -35,15 +35,15 @@
 |   5. Toward (type 2, `0x00679C80`) | 279–338 |
 |   6. Straight (type 7, `0x00679ED0`) | 339–348 |
 |   7. A* (type 1, `0x0067B850`) | 349–386 |
-|   8. Velocity, direction vector, facing | 387–452 |
-|   9. Per-tick movement | 453–603 |
-|   10. Messages | 604–626 |
-| Constants & data dependencies | 627–663 |
-| Randomness | 664–674 |
-| Edge cases & original bugs | 675–705 |
-| Test vectors | 706–741 |
-| Provenance | 742–777 |
-| Open questions | 778–807 |
+|   8. Velocity, direction vector, facing | 387–453 |
+|   9. Per-tick movement | 454–606 |
+|   10. Messages | 607–629 |
+| Constants & data dependencies | 630–666 |
+| Randomness | 667–677 |
+| Edge cases & original bugs | 678–708 |
+| Test vectors | 709–745 |
+| Provenance | 746–781 |
+| Open questions | 782–817 |
 <!-- /index -->
 
 ## Summary
@@ -400,7 +400,8 @@ animation-speed half of it belongs to the future animation-rate spec,
    `velmod_monster_x` (class ≥ 410): column b ≠ 0, or column a ≠ 0 and
    the used skill's flags (`0x006446A0`, skill +0x0C) have bit 0x1 and
    not 0x1000. Column b: player modes 2, 3, 6; monster modes 2, 15
-   (and 8–11 for classes < 410). Then p = f + stat 67, at least 25, where f = stat 96
+   (and 8–11 for classes < 410). Then p = f + stat 67 (unit total `0x00625480`; a player's
+   base is 100 from creation, `combat/vitals.md` §1), at least 25, where f = stat 96
    (item/skill getter `0x00625500`) scaled by `animstat` row 4: f ≠ 0 →
    150·f / (150 + f) (truncated). Velocity := base · p / 100
    (truncated), base = charstats `WalkVelocity` × 256 for players,
@@ -577,9 +578,11 @@ Only when path flag 0x2 is set. Old room := previous room (path +0x20),
 new := room. A monster's AI room memo (monster data +0x50) := 0. Walk
 both rooms' client arrays (sorted by client address, `drlg/rooms.md`
 §7) as a merge: a client only in the old array, whose player is not the
-unit, gets the unit's removal (`0x00571F90`); only in the new array (not
-the unit) gets the unit's add messages (`0x00571600`, the unit-update
-spec); in both: nothing. Then flag 0x2 := 0 (`0x00648B40`). In single
+unit, gets the unit's removal (`0x00571600`: S→C 0x0A, type and GUID);
+only in the new array (not the unit) gets the unit's add messages
+(`0x00571F90`, the unit-update spec); in both: nothing. (The previous
+room is found by `0x005545C0`: path +0x20 when it is still a room of the
+unit's act, else none.) Then flag 0x2 := 0 (`0x00648B40`). In single
 player the only client is the player's own: a moving player sends
 nothing here, a monster crossing into or out of the player's rooms gets
 add/remove messages.
@@ -725,9 +728,10 @@ max distance 73.
 | D4 | `tan` | (0,0) → (3,1) | (3888, 1286), 59 |
 | M1 | open | walk (velocity 0x600 = 6·256, 100 %) from (100,100) to (105,100) | precise x per tick 0x64E000 + k·0x6000 (k = 1..13), tick 14 = 0x698000 (arrives, stops in tick 14) |
 | M2 | open | run (0x900) from (100,100) to (103,101) | (x, y) per tick: (0x6508B0, 0x64AD36), (0x659160, 0x64DA6C), (0x661A10, 0x6507A2), (0x66A2C0, 0x6534D8), (0x672B1F, 0x656301), arrives (0x678000, 0x658000) at tick 6 |
-| V1 | stats | `WalkVelocity` 6, stat 67 = 0, stat 96 = 0 | velocity 0x600 |
-| V2 | stats | run: stat 67 = 50 | 0x600 · 150 / 100 = 0x900 |
-| V3 | stats | run, stat 96 = 20 | f = 150·20/170 = 17; p = 67; 0x600·67/100 = 1029 |
+| V1 | stats | walk: `WalkVelocity` 6, stat 67 = 100 (creation value, `combat/vitals.md` §1), stat 96 = 0 | p = 100; velocity 0x600 |
+| V2 | stats | run: stat 67 = 150 (100 + the run list's 50, §8.2), stat 96 = 0 | p = 150; 0x600 · 150 / 100 = 0x900 |
+| V3 | stats | run as V2, stat 96 = 20 | f = 150·20/170 = 17; p = 17 + 150 = 167; 0x600·167/100 = 2565 |
+| V4 | stats | walk, stat 67 = 10, stat 96 = 0 | p = 10 → floor 25; 0x600·25/100 = 384 |
 | S1 | stamina | Amazon, `RunDrain` 20, no armor, stat 154 = 0 | −40 per tick (stamina 8.8: −0.15625) |
 | S2 | stamina | `RunDrain` 20, armor `speed` 10, stat 154 = 25 | d = 40·2 = 80; 80 − 20 = 60 |
 
@@ -804,3 +808,9 @@ Real (recordings; message side):
    (`0x00598220`, `0x00571600`, `0x00571F90`): the unit-update spec.
 8. `0x00649120` (monster re-path budget) and `0x00649140`: read only in
    §9.10; confirm with the AI spec.
+
+Answered handoff questions (`docs/HANDOFF.md` §7):
+
+- PQ1: stat 67 is read as the unit total (`0x00625480` in `0x00623F50`);
+  a player's base is 100, so V1–V3 now state stat 67 = 100 / 150 / 150
+  and V3's result is 2565; V4 adds the floor of 25 (§8.1).
