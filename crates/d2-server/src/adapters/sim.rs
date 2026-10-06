@@ -338,6 +338,9 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         if let Some(code) = super::handlers::skills::handle(self, client, msg, out) {
             return code;
         }
+        if let Some(code) = handlers::walk::handle(self, client, msg, out) {
+            return code;
+        }
         self.unhandled.push((client, msg[0], size));
         ResultCode::Done
     }

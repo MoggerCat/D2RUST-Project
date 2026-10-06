@@ -392,28 +392,28 @@ None.
 
 All reproduced by default.
 
-- Set outputs skip their modifiers (§3 step 3.9); D2MOO 1.10f reads them. An
+1. Set outputs skip their modifiers (§3 step 3.9); D2MOO 1.10f reads them. An
   input set name does read them: `"Civerb's Ward,mag"` ends with
   quality 4.
-- Unique and set outputs write `ilvl` (+11), but the `ilvl` / `b ilvl` /
+2. Unique and set outputs write `ilvl` (+11), but the `ilvl` / `b ilvl` /
   `c ilvl` column is to the right and overwrites it (an empty cell writes
   0). A layer that removes that column keeps the item's level.
-- Non-`qty` words with `=v` stop the input parse at `v`; in outputs only
+3. Non-`qty` words with `=v` stop the input parse at `v`; in outputs only
   `qty`, `pre`, `suf`, `sock` take values.
-- An unknown word stops the parse silently in the original; later valid
+4. An unknown word stops the parse silently in the original; later valid
   words are lost (`"usetype,foo,mag"` → no quality).
-- A first token that is empty becomes code `"    "`: `itemtypes` row 0
+5. A first token that is empty becomes code `"    "`: `itemtypes` row 0
   owns it, so input `",qty=2"` → item type 0 (flags 0x0002, qty 2), and
   output `""` (text `""`) → kind 0xFD, item 0. Input text that is empty
   after unquote writes nothing.
-- Text after a second quote is dropped (`rin",mag"` → `rin`).
-- Input and output test item types and item codes in opposite orders
+6. Text after a second quote is dropped (`rin",mag"` → `rin`).
+7. Input and output test item types and item codes in opposite orders
   (§3).
-- A unique or set whose base code is not an item gets item 0, the same
+8. A unique or set whose base code is not an item gets item 0, the same
   value as item 0 (`hax`).
-- `pre`/`suf` beyond 3 overwrite neighbouring slot bytes (§3 step 5).
-- Skill-mode bytes depend on the skill column being compiled first (§4).
-- The composit total is written only by the `S8v` call and only from the
+9. `pre`/`suf` beyond 3 overwrite neighbouring slot bytes (§3 step 5).
+10. Skill-mode bytes depend on the skill column being compiled first (§4).
+11. The composit total is written only by the `S8v` call and only from the
   counts present then; a missing `S8v` column leaves it 0.
 
 ## Test vectors

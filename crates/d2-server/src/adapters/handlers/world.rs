@@ -48,6 +48,7 @@ use super::super::SimGame;
 use super::items::moves::MoveCall;
 use super::items::CubeCall;
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
+use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
 
@@ -272,6 +273,10 @@ pub trait WorldHost<D> {
     }
     /// The skill handlers (`handlers::skills`).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
+        None
+    }
+    /// The walk / run handlers (`handlers::walk`) on the path provider.
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
     /// The messages the seams sent since the last take, in send order:

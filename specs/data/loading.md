@@ -678,18 +678,18 @@ None.
 
 ## Edge cases & original bugs
 
-- 1.14d never checks a `.bin`'s size. A short file makes it read past the
+1. 1.14d never checks a `.bin`'s size. A short file makes it read past the
   buffer; a long one is silently accepted. d2rs rejects both (§4.2).
-- A record whose cells are all empty is a real record (P `uniqueitems.txt`
+2. A record whose cells are all empty is a real record (P `uniqueitems.txt`
   record 401; `txt-format.md` §5). Its compiled bytes are not all zero
   (empty code cells and empty link cells: `field-types.md` §5.2, §6).
   Observed: bytes 40–43 (`code`) = `20 20 20 20`; 56–57 (`chrtransform`,
   `invtransform` → colors) = `FF FF`; `FF FF FF FF` at 140 + 16k, k = 0–11
   (`prop1`–`prop12` → properties); the linkers of the `FF` fields hold no
   empty key. All other bytes are 0.
-- Original-only `.txt` reader behaviors (unterminated last line, its
+3. Original-only `.txt` reader behaviors (unterminated last line, its
   `Expansion` quirk): `txt-format.md` §10.
-- The live data relies on P→X fallback: 17 tables (plus `hitclass`) have
+4. The live data relies on P→X fallback: 17 tables (plus `hitclass`) have
   their only live `.bin` in X, while P carries newer `.txt` for two of them
   (`inventory`, `plrmode`).
 

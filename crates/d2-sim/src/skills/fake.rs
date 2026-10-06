@@ -35,6 +35,8 @@ pub struct FUnit {
     pub hireling: bool,
     pub demon: bool,
     pub undead: bool,
+    pub revived: bool,
+    pub prime_evil: bool,
     pub shield: bool,
     pub weapon_class: i32,
     pub combat: Vec<CombatEntry>,
@@ -65,6 +67,8 @@ impl FUnit {
             hireling: false,
             demon: false,
             undead: false,
+            revived: false,
+            prime_evil: false,
             shield: false,
             weapon_class: 0,
             combat: Vec::new(),
@@ -102,6 +106,10 @@ pub struct Fake {
     pub counter: u8,
     pub hostile: bool,
     pub in_range: bool,
+    /// `Some(r)`: in melee range only for range argument `r`.
+    pub range_needed: Option<i32>,
+    /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
+    pub shifted: bool,
     pub log: Vec<String>,
 }
 
@@ -246,11 +254,11 @@ impl CombatWorld for Fake {
     fn is_undead(&self, u: usize) -> bool {
         self.units[u].undead
     }
-    fn is_prime_evil(&self, _u: usize) -> bool {
-        false
+    fn is_prime_evil(&self, u: usize) -> bool {
+        self.units[u].prime_evil
     }
-    fn is_revived(&self, _u: usize) -> bool {
-        false
+    fn is_revived(&self, u: usize) -> bool {
+        self.units[u].revived
     }
     fn alignment(&self, _u: usize) -> i32 {
         0
@@ -261,8 +269,8 @@ impl CombatWorld for Fake {
     fn melee_range(&self, _u: usize) -> i32 {
         0
     }
-    fn in_melee_range(&self, _a: usize, _d: usize, _range: i32) -> bool {
-        self.in_range
+    fn in_melee_range(&self, _a: usize, _d: usize, range: i32) -> bool {
+        self.in_range && self.range_needed.is_none_or(|r| r == range)
     }
     fn has_shield(&self, u: usize) -> bool {
         self.units[u].shield
@@ -377,7 +385,7 @@ impl CombatWorld for Fake {
 
 impl ManaUnits for Fake {
     fn shapeshifted(&self, _u: usize) -> bool {
-        false
+        self.shifted
     }
     fn consume_charges(&mut self, _u: usize, _e: &SkillEntry) -> bool {
         self.log.push("charges".into());

@@ -8,6 +8,8 @@ use super::hire::{capped_level, hire_init, price, resurrect_cost};
 use super::services::{can_imbue, can_personalize, can_socket, imbue_level, socket_count};
 use super::*;
 
+mod mutant_tests;
+
 // ------------------------------------------------------------ fake
 
 const PLAYER: UnitId = UnitId(1);

@@ -194,6 +194,52 @@ pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId
     }
 }
 
+/// The player part of the per-unit update message `0x0053A500`, for one
+/// client of the per-client update (`tick.md` §6.5; `pathing.md` §10
+/// rules 3 and 2, in that order): S→C 0x15 when the unit's flags 2 ask
+/// for it (`0x00548010`), then, for a player whose mode changed (unit
+/// flag 0x1), the walk modes' update function `0x00548180` (0x0F / 0x10;
+/// other modes have their own rows, not specified: nothing). Sent through
+/// [`Pending::send`] to the client's player. Units other than players
+/// with a dynamic path, and clients without a player, get nothing.
+///
+/// TODO(spec: tick.md §3 step 6, `0x00553220`): the room clean-up
+/// "clears per-unit flags" (`items/inventory.md` §6.3 rule 4) without
+/// naming them; flags 2 bits 0x10000 / 0x800 and unit flag 0x1 are not
+/// cleared here, so they are sent again whenever the unit is queued
+/// later (`docs/handoff/wire-path-server.md` §4 finding 2).
+pub fn update_messages<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &Game,
+    client: ClientId,
+    unit: UnitId,
+) {
+    use crate::path::walk::messages::{mode_update, reassign_flag, reassign_player};
+    let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
+        return;
+    };
+    let Some(r) = v.units.get(unit) else {
+        return;
+    };
+    if r.ty != UnitType::Player {
+        return;
+    }
+    let (ty, guid, mode, flags, flags2) = (r.ty as u8, r.guid, r.mode, r.flags, r.flags2);
+    let Some(path) = v.h.paths.as_ref().and_then(|p| p.dynamic(unit)).cloned() else {
+        return;
+    };
+    let own = receiver == unit;
+    if let Some(flag) = reassign_flag(flags2, own) {
+        let msg = reassign_player(ty, guid, path.x() as u16, path.y() as u16, flag);
+        v.h.x.send(receiver, &msg);
+    }
+    if flags & crate::units::record::flags::CHANGED != 0 {
+        if let Some(msg) = mode_update(mode, ty, guid, &path, own) {
+            v.h.x.send(receiver, &msg);
+        }
+    }
+}
+
 impl<X: Pending> CollisionRooms for PathCtx<'_, X> {
     fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
         self.v.h.drlg.subtile_rect(room)

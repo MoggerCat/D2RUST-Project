@@ -13,7 +13,10 @@
 //! Real here: the unit flags and the collision word of the gate, the
 //! monster's monstats row, the dropper and recipient stats, the walk on
 //! the monster's unit seed, the start offset's room search
-//! (`0x00463740`), item creation and allocation on the game seed. Seams
+//! (`0x00463740`), item creation and allocation on the game seed, into
+//! the game's one item store (`ActionHooks::items`, the store every
+//! other item system reads: a dropped item can be picked up, sold and
+//! cubed). Seams
 //! ([`Pending`]): position, superunique index, champion / unique flags,
 //! minion owner, party, the quest TC test; [`FreeSpot`]: the free-spot
 //! search `0x0064E810` (collision spec, `treasure.md` OQ 8).
@@ -24,7 +27,6 @@ use d2_data::tables::Superuniques;
 
 use super::{
     dropper, recipient, DropPlacer, DropSpot, Economy, EconomyError, GameFields, ItemDrops,
-    ItemStore,
 };
 use crate::items::ItemTables;
 use crate::treasure::drop::{monster_drop, monster_drop_gate, MonsterDrop, MonsterRank};
@@ -50,8 +52,9 @@ pub struct DropTables {
     pub superuniques: Vec<Superuniques>,
 }
 
-/// A game's drop state: tables, game-creation fields, the item store,
-/// the host's player counts (§5.4) and what the drops left.
+/// A game's drop state: tables, game-creation fields, the host's player
+/// counts (§5.4) and what the drops left. The items go to the game's one
+/// item store (`ActionHooks::items`).
 #[derive(Debug)]
 pub struct DeathDrops {
     pub tables: Arc<DropTables>,
@@ -62,7 +65,6 @@ pub struct DeathDrops {
     /// `uniques` is read here, and the drop's fields are written back
     /// (the seed to the action wiring).
     pub fields: GameFields,
-    pub items: ItemStore,
     /// Living players and the `players` setting (`treasure.md` Inputs).
     pub living_players: i32,
     pub players_setting: i32,
@@ -79,7 +81,6 @@ impl DeathDrops {
         Self {
             tables,
             fields,
-            items: ItemStore::new(),
             living_players: 1,
             players_setting: 0,
             placed: Vec::new(),
@@ -202,6 +203,8 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         rank,
         find_item: false,
     };
+    // The game's one item store, lent out of the hooks for the drop.
+    let mut items = std::mem::take(&mut h.items);
     let (out, placed, failures) = {
         let mut econ = Economy {
             game: &mut *sim.game,
@@ -211,7 +214,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
             hooks: &mut *h,
             fields: &mut fields,
             tables: &t.items,
-            items: &mut d.items,
+            items: &mut items,
         };
         let mut sink = ItemDrops::new(
             &mut econ,
@@ -233,6 +236,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         );
         (out, sink.placed, sink.failures)
     };
+    h.items = items;
     h.game_seed = fields.seed;
     d.fields = fields;
     if let Some(r) = sim.units.get_mut(unit) {
