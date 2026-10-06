@@ -41,10 +41,10 @@
 |   10. Object mode change (consequence used above) | 375–382 |
 | Constants & data dependencies | 383–410 |
 | Randomness | 411–434 |
-| Edge cases & original bugs | 435–467 |
-| Test vectors | 468–507 |
-| Provenance | 508–546 |
-| Open questions | 547–568 |
+| Edge cases & original bugs | 435–471 |
+| Test vectors | 472–511 |
+| Provenance | 512–550 |
+| Open questions | 551–572 |
 <!-- /index -->
 
 ## Summary
@@ -464,6 +464,10 @@ Reproduced by default.
    cannot fire in single player (§6.1).
 9. **Index ≥ 0x70** in a modded `levels.txt` → fatal assert at the first
    bit test or set.
+10. **Town portal delay differs:** operate function 15 (`0x00584870`)
+    tests hostile time + 5000 ms (`0x005848C1`), not 10000 ms as §9 and
+    the constants row say for it; the 10000 ms applies to the 0x49
+    handler only. Owner of the portal rule: `world/objects.md` §12.
 
 ## Test vectors
 
