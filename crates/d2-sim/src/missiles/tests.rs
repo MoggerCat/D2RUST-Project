@@ -2185,7 +2185,8 @@ fn damage_roll_never_reaches_max() {
     assert_eq!(seen.into_iter().collect::<Vec<_>>(), [1, 2]);
 }
 
-// Covers: specs/missiles/missiles.md §edge-cases-original-bugs r10
+// Not a claim on missiles.md §edge-cases-original-bugs r10: the original
+// crashes on these entries, d2rs logs them (a deliberate difference).
 #[test]
 fn null_table_entries_are_flagged() {
     // The original would call a null entry and crash; d2rs logs it.

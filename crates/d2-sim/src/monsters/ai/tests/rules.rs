@@ -214,7 +214,9 @@ fn tick_record_initial_values_and_missing_rows() {
     }
 }
 
-// Covers: specs/monsters/ai.md §2.1 r1, §2.1 r2, §2.1 r3, §2.1 r4
+// §2.1 r4 is not claimed: its fatal assert on a bad code pointer has no
+// d2rs counterpart (an unknown address logs a stub call).
+// Covers: specs/monsters/ai.md §2.1 r1, §2.1 r2, §2.1 r3
 #[test]
 fn dispatch_order_and_stops() {
     let row = || monstats(3, [30, 10, 0, 20, 0], 15);
