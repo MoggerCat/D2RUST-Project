@@ -884,7 +884,8 @@ fn pick_item_auto_and_refusals() {
 /// 0x17 (§7.2, §9.1): the cursor item dropped at the free spot: mode 3,
 /// in the room, at the spot, expiry frame + 15000. §9.1 runs no owner
 /// refresh and no update list, so the tick sends nothing to the owner;
-/// the ground message (§6.3) is not built on real units (WV1). An item
+/// the ground message (§6.3) is not sent: the per-unit update that would
+/// send it is not wired (see `update_pass`). An item
 /// that is not the cursor item → 1.
 // Covers: specs/items/inventory.md §7.2 r1, §9.1
 #[test]

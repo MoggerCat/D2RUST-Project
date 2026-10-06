@@ -496,12 +496,39 @@ pub fn player_update<W: MoveWorld>(
     Ok(out)
 }
 
-/// Ground item update (§6.3, `0x0055BED0`): a mode-3 item without unit
-/// flag 0x10 sends 0x9C action 2 (unit flag 0x1000) or 3. The caller is
-/// the item unit update (`unit-order.md` §6).
+/// Item part of the per-unit update `0x0053A500` (§6.3, `tick.md` §6
+/// step 5). Unit flag 0x10 set (new, not yet announced): part 1, the
+/// unit-add message of `0x00571F90` ([`announce_item`]). Otherwise part 2: the
+/// item unit update `0x0055BF30`, which runs [`ground_update`] only when
+/// unit flag 0x1 (changed) is set. At most one message per call.
+pub fn item_unit_update<W: MoveWorld>(w: &W, item: Guid) -> Result<Option<Vec<u8>>, MoveFatal> {
+    let flags = w.unit_flags(Owner::item(item));
+    if flags & uflag::NOT_ANNOUNCED != 0 {
+        return announce_item(w, item).map(Some);
+    }
+    if flags & uflag::CHANGED == 0 {
+        return Ok(None);
+    }
+    ground_update(w, item)
+}
+
+/// §6.3 part 1, the item case of the unit-add messages `0x00571F90`:
+/// mode 3 with unit flag 0x1000 → 0x9C action 2 (dropped, `0x0053EC90`);
+/// otherwise → 0x9C action 0 (new, `0x0053EC00`).
+pub fn announce_item<W: MoveWorld>(w: &W, item: Guid) -> Result<Vec<u8>, MoveFatal> {
+    let dropped =
+        w.mode(item) == mode::GROUND && w.unit_flags(Owner::item(item)) & uflag::DROPPED != 0;
+    let action = if dropped { 2 } else { 0 };
+    let bits = w.item_bits(item, 0, w.page(item));
+    layouts::item_world(action, category(w, item), item, &bits)
+}
+
+/// Ground item update (§6.3 part 2, `0x0055BED0`): a mode-3 item without
+/// unit flag 0x10 (already announced) sends 0x9C action 2 (unit flag
+/// 0x1000) or 3. The caller is [`item_unit_update`].
 pub fn ground_update<W: MoveWorld>(w: &W, item: Guid) -> Result<Option<Vec<u8>>, MoveFatal> {
     let u = Owner::item(item);
-    if w.mode(item) != mode::GROUND || w.unit_flags(u) & uflag::NO_GROUND_MSG != 0 {
+    if w.mode(item) != mode::GROUND || w.unit_flags(u) & uflag::NOT_ANNOUNCED != 0 {
         return Ok(None);
     }
     let action = if w.unit_flags(u) & uflag::DROPPED != 0 {

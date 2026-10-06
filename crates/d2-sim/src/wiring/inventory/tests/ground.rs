@@ -2,7 +2,7 @@
 //! unit lists, item data and the inventory model.
 
 use super::*;
-use crate::items::moves::{ground_update, MoveUnits};
+use crate::items::moves::{ground_update, item_unit_update, MoveUnits};
 
 /// §7.1 step 2.3 → §8.2: a ground key to the cursor. Mode 4, the cursor,
 /// out of the room list, unit flags 0x2 / 0x2000000 cleared, command flag
@@ -114,17 +114,22 @@ fn auto_pickup_with_a_full_inventory_is_refused() {
     assert_ground_update(&mut w, k);
 }
 
-/// §6.3 on a real item unit: the allocator sets unit flag 0x10 ("seed
-/// set", `units.md` §2 table, §3.1 step 5) on every unit, and §6.3 sends
-/// only for items *without* unit flag 0x10, so no ground message is
-/// built. Open question (handoff `wire-inventory-sim.md` WV1); with the
-/// bit cleared the spec's 0x9C action 2 comes out.
+/// §6.3 on a real item unit: the allocator sets unit flag 0x10 ("not yet
+/// announced", `units.md` §2 table, §3.1 step 5) on every unit, so the
+/// first update is part 1 (the unit-add message, 0x9C action 2 for a
+/// dropped ground item) and part 2 (`ground_update`) builds nothing; once
+/// the room clean-up has cleared 0x10 and 0x1, a later change (bit 0)
+/// sends part 2's 0x9C action 2.
 fn assert_ground_update(w: &mut World, k: Guid) {
     let u = w.unit(k).unwrap();
     assert_ne!(w.units.get(u).unwrap().flags & 0x10, 0);
     assert_eq!(w.desk(|d| ground_update(d, k)), Ok(None));
-    w.units.get_mut(u).unwrap().flags &= !0x10;
-    let m = w.desk(|d| ground_update(d, k)).unwrap().unwrap();
+    let m = w.desk(|d| item_unit_update(d, k)).unwrap().unwrap();
+    assert_eq!(head(&m), (0x9C, 0x02, k));
+    w.units.get_mut(u).unwrap().flags &= !0x11;
+    assert_eq!(w.desk(|d| item_unit_update(d, k)), Ok(None));
+    w.units.get_mut(u).unwrap().flags |= 0x1;
+    let m = w.desk(|d| item_unit_update(d, k)).unwrap().unwrap();
     assert_eq!(head(&m), (0x9C, 0x02, k));
 }
 

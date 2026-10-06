@@ -2,7 +2,8 @@
 
 use super::{me, Fake, P};
 use crate::items::moves::deferred::{
-    category, dispatch, ground_update, mark, owner_refresh, player_update,
+    announce_item, category, dispatch, ground_update, item_unit_update, mark, owner_refresh,
+    player_update,
 };
 use crate::items::moves::{layouts, mode, MoveFatal, MoveUnits, Owner};
 
@@ -150,6 +151,33 @@ fn ground_items() {
     assert_eq!(ground_update(&f, 10).unwrap(), None);
     f.item(11, mode::STORED);
     assert_eq!(ground_update(&f, 11).unwrap(), None);
+}
+
+// Covers: specs/items/inventory.md §6.3 text, §6.3 r1, §6.3 r2
+#[test]
+fn item_unit_update_announces_once_then_updates() {
+    let mut f = Fake::new();
+    f.item(10, mode::GROUND);
+    // Part 1: flag 0x10 (not yet announced) → unit-add message; mode 3
+    // with 0x1000 → action 2, otherwise action 0 (also without bit 0).
+    f.unit(Owner::item(10)).uflags = 0x10;
+    assert_eq!(item_unit_update(&f, 10).unwrap().unwrap()[..2], [0x9C, 0]);
+    f.unit(Owner::item(10)).uflags = 0x1011;
+    assert_eq!(item_unit_update(&f, 10).unwrap().unwrap()[..2], [0x9C, 2]);
+    assert_eq!(announce_item(&f, 10).unwrap()[..2], [0x9C, 2]);
+    f.item(11, mode::STORED);
+    f.unit(Owner::item(11)).uflags = 0x1010;
+    assert_eq!(item_unit_update(&f, 11).unwrap().unwrap()[..2], [0x9C, 0]);
+    // Part 2 (flag 0x10 cleared by the room clean-up): only when changed
+    // (bit 0), then 0x9C action 2 or 3; a stored item sends nothing.
+    f.unit(Owner::item(10)).uflags = 0x1000;
+    assert_eq!(item_unit_update(&f, 10).unwrap(), None);
+    f.unit(Owner::item(10)).uflags = 0x1001;
+    assert_eq!(item_unit_update(&f, 10).unwrap().unwrap()[..2], [0x9C, 2]);
+    f.unit(Owner::item(10)).uflags = 0x1;
+    assert_eq!(item_unit_update(&f, 10).unwrap().unwrap()[..2], [0x9C, 3]);
+    f.unit(Owner::item(11)).uflags = 0x1;
+    assert_eq!(item_unit_update(&f, 11).unwrap(), None);
 }
 
 // Covers: specs/items/inventory.md §11

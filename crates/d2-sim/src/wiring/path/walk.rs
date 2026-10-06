@@ -203,11 +203,12 @@ pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId
 /// [`Pending::send`] to the client's player. Units other than players
 /// with a dynamic path, and clients without a player, get nothing.
 ///
-/// TODO(spec: tick.md §3 step 6, `0x00553220`): the room clean-up
-/// "clears per-unit flags" (`items/inventory.md` §6.3 rule 4) without
-/// naming them; flags 2 bits 0x10000 / 0x800 and unit flag 0x1 are not
-/// cleared here, so they are sent again whenever the unit is queued
-/// later (`docs/handoff/wire-path-server.md` §4 finding 2).
+/// TODO(spec: tick.md §3 step 6, `0x00553220`): the room clean-up is
+/// not wired. `items/inventory.md` §6.3 names unit flags 0x1 and 0x10
+/// (and, for items, 0x1000 and item flags 0x20 / 0x2000); whether it
+/// clears flags 2 bits 0x10000 / 0x800 is still not written, so they are
+/// sent again whenever the unit is queued later
+/// (`docs/handoff/wire-path-server.md` §4 finding 2).
 pub fn update_messages<X: Pending>(
     v: &mut View<'_, X>,
     game: &Game,
@@ -304,6 +305,11 @@ impl<X: Pending> PathWorld for PathCtx<'_, X> {
             .drlg_room(self.game, room)
             .and_then(|(d, r)| d.active_room(r))
             .map_or_else(Vec::new, |a| a.clients.clone())
+    }
+    /// `0x005545C0`: the room still exists and belongs to the unit's act.
+    fn room_in_unit_act(&self, unit: UnitId, room: RoomId) -> bool {
+        let act = self.v.units.get(unit).map(|r| r.act);
+        act.is_some() && self.game.lists.room(room).map(|r| r.act) == act
     }
 }
 

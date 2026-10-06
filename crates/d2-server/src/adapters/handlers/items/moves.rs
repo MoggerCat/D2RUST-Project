@@ -278,8 +278,11 @@ impl MoveCall for UpdateRun {
 /// 5, last), so the queue membership test is the room test above. The
 /// client's room is read after the tick's room switch (`0x00537B50`, in
 /// the per-client update after the unit updates): in the tick of a
-/// switch 1.14d walks the old room's adjacent rooms. The ground items' unit update (§6.3) is not run: on real units it builds
-/// nothing (`wire-inventory-sim.md` WV1).
+/// switch 1.14d walks the old room's adjacent rooms. The ground items' unit update (§6.3,
+/// `d2_sim::items::moves::item_unit_update`) is not run: it belongs to the
+/// per-unit update `0x0053A500` over the client's rooms, and its flag 0x10
+/// is cleared by the room clean-up `0x00553220`, neither of which the
+/// tick wiring implements yet (IS2, IS3).
 pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     out: &mut dyn MessageSink,

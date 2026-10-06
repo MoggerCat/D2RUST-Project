@@ -215,31 +215,46 @@ fn room_pass<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
         }
         let mut cur = game.lists.room_first(act);
         while let Some(room) = cur {
-            hooks.ambient_spawns(game, room);
-            let (populated, active) = match game.lists.room(room) {
-                Some(r) => (r.populated, r.units_active),
-                None => (true, true),
-            };
-            if !populated {
-                hooks.spawn_presets(game, room);
-                hooks.restore_inactive_units(game, room);
-                hooks.populate_objects(game, room);
-                hooks.populate_monsters(game, room);
-                if let Some(r) = game.lists.room_mut(room) {
-                    r.populated = true;
-                    r.units_active = true;
-                }
-            } else if !active {
-                hooks.restore_inactive_units(game, room);
-                if let Some(r) = game.lists.room_mut(room) {
-                    r.units_active = true;
-                }
-            }
+            room_body(game, hooks, room);
             // Next read after the body (unit-order.md §10).
             cur = game.lists.room_next(room);
         }
         if let Some(a) = game.lists.act_mut(act) {
             a.pending_rooms = false;
+        }
+    }
+}
+
+/// Off-tick population `0x0052D0F0(game, room)` (§4 r5): the room
+/// pass body (rules 1–3) for one room, without the act flag test and
+/// without clearing act +0x54. Called by the portal and arrival paths of
+/// `monsters/population.md` §1 r2 inside whichever step runs them; the
+/// room stays in its act list, so the next step 3 visits it again (one
+/// more ambient call, then nothing).
+pub fn populate_room<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H, room: RoomId) {
+    room_body(game, hooks, room);
+}
+
+/// §4 rules 1–3 for one room.
+fn room_body<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H, room: RoomId) {
+    hooks.ambient_spawns(game, room);
+    let (populated, active) = match game.lists.room(room) {
+        Some(r) => (r.populated, r.units_active),
+        None => (true, true),
+    };
+    if !populated {
+        hooks.spawn_presets(game, room);
+        hooks.restore_inactive_units(game, room);
+        hooks.populate_objects(game, room);
+        hooks.populate_monsters(game, room);
+        if let Some(r) = game.lists.room_mut(room) {
+            r.populated = true;
+            r.units_active = true;
+        }
+    } else if !active {
+        hooks.restore_inactive_units(game, room);
+        if let Some(r) = game.lists.room_mut(room) {
+            r.units_active = true;
         }
     }
 }

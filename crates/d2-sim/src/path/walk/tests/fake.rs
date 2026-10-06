@@ -27,6 +27,8 @@ pub struct FakeWorld {
     pub room0: TileRect,
     pub paths: BTreeMap<UnitId, DynamicPath>,
     pub clients: BTreeMap<RoomId, Vec<ClientId>>,
+    /// Rooms that are no longer rooms of the unit's act (`0x005545C0`).
+    pub other_act: Vec<RoomId>,
     /// Extra rooms: id → rect; cells outside the main room resolve here.
     pub rooms: BTreeMap<RoomId, TileRect>,
     pub log: Vec<String>,
@@ -40,6 +42,7 @@ impl FakeWorld {
             room0: TileRect::new(0, 0, w, h),
             paths: BTreeMap::new(),
             clients: BTreeMap::new(),
+            other_act: Vec::new(),
             rooms: BTreeMap::new(),
             log: Vec::new(),
         }
@@ -168,6 +171,9 @@ impl PathWorld for Ctx {
     }
     fn room_clients(&self, room: RoomId) -> Vec<ClientId> {
         self.w.clients.get(&room).cloned().unwrap_or_default()
+    }
+    fn room_in_unit_act(&self, _: UnitId, room: RoomId) -> bool {
+        !self.w.other_act.contains(&room)
     }
 }
 

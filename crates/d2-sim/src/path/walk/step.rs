@@ -439,8 +439,11 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
         if self.c.unit_type(unit) == UnitType::Monster {
             self.c.clear_ai_room_memo(unit);
         }
+        // The previous room `0x005545C0`: path +0x20 while it is still a
+        // room of the unit's act, else none.
         let old = path
             .prev_room
+            .filter(|&r| self.c.room_in_unit_act(unit, r))
             .map(|r| self.c.room_clients(r))
             .unwrap_or_default();
         let new = path

@@ -97,6 +97,12 @@ pub trait PathWorld: CollisionRooms {
     /// The room's client array, sorted by client address (`drlg/rooms.md`
     /// §7).
     fn room_clients(&self, room: RoomId) -> Vec<ClientId>;
+    /// `0x005545C0`'s test (§9.8): `room` (path +0x20) is still a room of
+    /// the unit's act. Default: yes.
+    fn room_in_unit_act(&self, unit: UnitId, room: RoomId) -> bool {
+        let _ = (unit, room);
+        true
+    }
 }
 
 /// Units, modes, timers, stats, skills and messages. Every default is
@@ -151,7 +157,7 @@ pub trait WalkUnits {
     fn state_stat(&self, unit: UnitId, state: u16, stat: u16) -> i32 {
         0
     }
-    /// Stat value (`sim/stats.md`).
+    /// Stat value, the unit total (`0x00625480`, `sim/stats.md`).
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         0
     }
@@ -214,9 +220,10 @@ pub trait WalkUnits {
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         None
     }
-    /// Unit removal message (`0x00571F90`). Owner: the unit-update spec.
+    /// Unit removal message (`0x00571600`: S→C 0x0A, type and GUID).
+    /// Owner: the unit-update spec.
     fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {}
-    /// Unit add messages (`0x00571600`). Owner: the unit-update spec.
+    /// Unit add messages (`0x00571F90`). Owner: the unit-update spec.
     fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {}
     /// Target lead `0x00679190` / `0x00679250` (path +0x68 ≠ 0): x87
     /// floating point, pathing.md open question 4. `None` = unspecified;
