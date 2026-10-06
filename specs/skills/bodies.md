@@ -25,21 +25,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–57 |
-| Inputs | 58–68 |
-| Outputs / state changes | 69–76 |
-| Rules | 77–78 |
-|   1. Conventions | 79–110 |
-|   2. Shared helpers | 111–424 |
-|   3. Start functions (srvst) | 425–514 |
-|   4. Do functions (srvdo) | 515–698 |
-|   5. `srvmissile` path | 699–714 |
-| Constants & data dependencies | 715–729 |
-| Randomness | 730–739 |
-| Edge cases & original bugs | 740–760 |
-| Test vectors | 761–775 |
-| Provenance | 776–789 |
-| Open questions | 790–810 |
+| Summary | 48–60 |
+| Inputs | 61–71 |
+| Outputs / state changes | 72–79 |
+| Rules | 80–81 |
+|   1. Conventions | 82–113 |
+|   2. Shared helpers | 114–427 |
+|   3. Start functions (srvst) | 428–517 |
+|   4. Do functions (srvdo) | 518–701 |
+|   5. `srvmissile` path | 702–717 |
+|   6. Shared helpers, batch 2 | 718–894 |
+|   7. Start functions (srvst), batch 2 | 895–901 |
+|   8. Do functions (srvdo), batch 2 | 902–957 |
+| Constants & data dependencies | 958–1002 |
+| Randomness | 1003–1012 |
+| Edge cases & original bugs | 1013–1033 |
+| Test vectors | 1034–1048 |
+| Provenance | 1049–1062 |
+| Open questions | 1063–1089 |
 <!-- /index -->
 
 ## Summary
@@ -712,6 +715,246 @@ unit; list = the last list made (the self list right after step 5).
 5. r = 1 whatever the creation gave. Ammunition is spent by the core's
    `decquant` step (§2.5).
 
+### 6. Shared helpers, batch 2
+
+Bodies of §7–§8 were picked by use count (Constants, "Batch 2 order").
+
+#### 6.1 Summon class `0x0056E620`
+
+`summon_class(unit, skill, L, &mode)` (ECX unit, EDX 0; stack skill, L,
+&mode, 0, 0; D2MOO `D2GAME_GetSummonIdFromSkill_6FD15580`) calls
+`0x0063EA70(unit, 0, skill, L, &mode, null, null)`:
+
+1. With EDX = 0 (every caller here) the skill path runs: R invalid →
+   −1. c = `summon` (+0xBC, i16); c < 0 or ≥ monstats count → −1. mode
+   := `summode` (+0xBF, signed byte); outside 0…15 → 1. Return c.
+   (EDX ≠ 0 and a monster unit read the monstats `spawn` columns
+   instead, `monsters/population.md` §14.)
+2. Back in `0x0056E620`: c valid (0 ≤ c < monstats count) → c. Else c'
+   = monster data +0x14 → AI control +0x28 → +0x3C (`nMinionSpawnClassId`,
+   `monsters/ai.md` AI control fields) of the unit (`0x0058F710`; a non-monster
+   reads through a null pointer: fatal); 0 < c' < count → c'; else −1.
+
+#### 6.2 Summon spawn `0x0056D940`
+
+Request (ECX game, EDX request; D2MOO `D2SummonArgStrc`): +0x00 flags,
++0x04 owner, +0x08 monster class, +0x0C AI special state, +0x10 mode,
++0x14 x, +0x18 y, +0x1C pet type, +0x20 pet max. Flags: 1 position
+given, 2 replace the owner's linked unit, 4 no second try, 8 keep unit
+flag 0x80000000 clear.
+
+1. Flags & 1 → (x, y) from the request; else target position of the
+   owner (`0x0056D2C0`, §2.4; its result is not tested).
+2. Room = the room containing (x, y), searched from the owner's room
+   (`0x00620BB0`, `0x00463740`); none → none.
+3. m = `0x005B2F20(game, room, x, y, class, mode, spread −1, flags
+   0x42)` (`monsters/init.md` §1). None: flags & 4 → none; else m =
+   the same call with spread 4; none → none.
+4. Finish `0x0056D8D0`: flags & 8 clear → m flags (+0xC4) |= 0x80000000.
+   Flags & 2: `0x0056D840` — the owner's linked unit (GUID `0x00554070`,
+   looked up as a monster `0x00552F60`) if any: its +0xC8 bit 8 set →
+   removed (`0x00555600`); else flags |= 0x4000000 (no experience) and
+   `0x0057CCB0(it, 1)`; then the link := −1 (`0x00554040`); then the
+   link := m's GUID. Last: pet list add `0x00575D90(game, owner, m, pet
+   type, max(pet max, 1))` (players only; Open question 8).
+5. m flags |= 0x20000 (no drop).
+6. Owner data `0x0058F030(game, m, owner GUID, owner type, 0, 0)` (no
+   owner: GUID −1, type 6).
+7. m has state 54 (`uninterruptable`) → fatal assertion.
+8. AI `0x005B0E00(game, m, m's AI control, request AI special state)`
+   (`monsters/ai.md` §3.3); `0x00573780(game, m)`; delete m's type-2
+   timers (`0x00540E60(game, m, 2, 0)`); type-2 timer at F + 25
+   (`0x005417D0`). Return m.
+
+#### 6.3 Target-node insert `0x005B1900`
+
+`node_insert(game, m, 0, slot)` (ECX game, EDX m): slot = the owner's
+node index (unit +0xD0). Nothing unless m +0xD0 = 11 (in no list),
+slot < 8, m is a player or monster, and the game's list `slot` (game
++0x10F8 + 4·slot, `monsters/ai.md` §5.2) has a head with a unit. Then a
+0x10-byte node {unit m, 0, next, prev} is linked right after the head
+and m +0xD0 := slot. Effect: monster AIs see the summon with its owner.
+
+#### 6.4 Summon base stats `0x005C49E0`
+
+`base_stats(game, owner, m, p, L)` (ECX game, EDX owner; `ret 0xC`):
+
+1. p ≤ 0: c = owner `level(12)` (unit getter); p = L + (3c) / 4
+   (signed, truncating); p < 1 → 1; p ≥ c → c (so c ≤ 0 gives p = c).
+2. p ≠ 0 → m stat 12 := p (`0x00627260`).
+3. i = min(p, monlvl count − 1); not 0 ≤ i < count → return 0.
+4. d = difficulty (game +0x6D), capped at 2; e = 1 when game +0x6A ≠ 0
+   or game +0x74 ≠ 0, else 0. m stat 31 (`armorclass`) += monlvl[i]
+   `AC` column d of the classic (e = 0) or `L-AC` (e = 1) group; m stat
+   19 (`tohit`) += `TH` / `L-TH` likewise (`0x006272B0`; `fields.tsv`
+   monlvl). Return 1.
+
+#### 6.5 Summon skill stats `0x005C4470`
+
+`skill_stats(game, owner, m, skill, L, ilvl)` (ECX game, EDX owner; `ret
+0x10`; D2MOO `D2GAME_SetSummonPassiveStats_6FD0C530`). Formulas are
+evaluated on the owner with (skill, L).
+
+1. skill = 0 → return 0.
+2. For i = 1…5: s = `passivestat_i` valid (0 ≤ s < itemstatcost count):
+   m stat s += `eval(passivecalc_i)` (`0x006272B0`). Stat event: s's
+   `itemevent1` (itemstatcost +0x48) > 0 and m has no handler with
+   (type 2, key m GUID, skill field = s) (`0x005C0BE0`) → register (§2.13)
+   (`itemevent1`, skill field s << 16, level 0, `itemeventfunc1` (+0x4C),
+   type 2, key m GUID); `itemevent2` (+0x4A) > 0 → also (`itemevent2`,
+   s << 16, 0, `itemeventfunc2` (+0x4E), 2, m GUID).
+3. List = none. For i = 1…6: s = `aurastat_i` valid; v =
+   `eval(aurastatcalc_i)`; v ≠ 0: no list yet → alloc (game pool +0x1C,
+   flags 0, expire 0, m type, m GUID; failure → return 0) and attach to
+   m; list set s := v; the stat event step of 2.
+4. `aurastate` (+0x80) in 1…states count (count itself accepted): m state
+   on; list → its state id := it.
+5. h = m's maximum life (`0x00625D10`); h' = h + `pct(h,
+   eval(calc1), 100)` (`combat/damage.md` §0, inlined); m stat 7
+   (`maxhp`) := h', stat 6 (`hitpoints`) := h'.
+6. For i = 1…5: k = `sumskill_i` (+0xC4) in 1…skills count − 1, v =
+   `eval(sumsk_i_calc)` (+0xD0) > 0: `set_skill(m, k, v)` (`0x0056DEB0`:
+   the entry of k (owner −1, `0x006439B0`), added when missing
+   (`0x00647110`); base level (+0x28) := v; `0x00646D60(m, k)`; passive
+   refresh `0x00646F20(m)`; a player also `0x00575900`); k has `aura`
+   (flags bit 5) → right skill := k (`0x005701B0(m, 0, k, −1)`,
+   `use.md` §7).
+7. `auraevent1` ≥ 0: unregister (1, `aurastate`) on m; for i = 1…3 while
+   `auraevent_i` ≥ 0: register (`auraevent_i`, skill, L,
+   `auraeventfunc_i`, 1, `aurastate`) on m.
+8. `sumumod` (+0xE4) in 1…42 → `0x005A4850(game, m, sumumod, 1)`
+   (`monsters/init.md` umods). `sumoverlay` (+0xE6) in 1…overlay count −
+   1 → overlay on m (`0x00621E40(m, it, 0)`).
+9. ilvl = 0 → ilvl = 3L, < 1 → 1, ≥ owner `level(12)` → that level.
+   Equipment `0x005D6B60(game, owner, m, skill, L, ilvl, 0)`
+   (`monsters/init.md` §12 with: no `oninit` test (last argument 0),
+   rows skipped while `level` > L, items at item level ilvl, and an
+   item code of four spaces copies the base code of the owner's item at
+   that location when the owner has one there (`0x00628590`); draws on
+   m's seed). Return 1.
+
+#### 6.6 Progressive missile `0x005D3CF0`
+
+`prog_missile(unit, skill)` (ECX unit, EDX skill): R invalid → −1. R
+`progressive` (flags bit 2), `aurastate` and `aurastat1` valid and the
+unit has a list of `aurastate` (`0x006256B0`): n = list[`aurastat1`]; n
+≥ 2 → the missile column `srvmissile` + min(n, 3) (`srvmissileb`,
+`srvmissilec`); else `srvmissilea`. Every other case: `srvmissilea`
+(+0x48).
+
+#### 6.7 Missile ring `0x0056D400`
+
+`ring(game, owner, at, m, skill, L, v)` (ECX game, EDX owner; `ret
+0x14`): record (§R2.1, zeroed) flags 3 (position given, target
+relative), owner, class m, position of `at` (§1), skill, L; v ≠ 0 →
+flags |= 4, velocity := v. For i = 0…63 in order: target offset (x_i,
+y_i); create (`0x0059FA30`, result ignored). With c = 30, 29, 29, 28,
+27, 26, 24, 23, 21, 19, 16, 14, 11, 8, 5, 2, 0 (c_j, j = 0…16; table
+`0x006E1288` / `0x006E1388`, = trunc(30 cos(2πi/64))): x_i = c_i (i ≤
+16), −c_(32−i) (16…32), −c_(i−32) (32…48), c_(64−i) (48…63); y_i =
+x_((i − 16) mod 64).
+
+#### 6.8 Shout state `0x005D8290`
+
+`shout_state(game, T, src, skill, L)` (ECX game, EDX T; `ret 0xC`):
+
+1. R invalid or `aurastate` not in 0…count − 1 → 0.
+2. e = F + `eval(src, auralencalc)`.
+3. T's list of `aurastate` exists → keep it. Else alloc (game pool,
+   flags 2, expire e, owner src type / GUID; no src → 6 / −1; failure →
+   0), set state, callback `0x0056E900`, attach to T, T state on.
+4. Mark `aurastate` changed on T; expiry := e (`0x006260B0`); timer 12 at
+   e on T; `aura_fill(src, list, R, skill, L)` (§2.6, formulas on src);
+   passive refresh `0x0056DE40(T)`. Return 1.
+
+A recast refreshes the expiry of an existing list (unlike §4.2 step 3).
+
+#### 6.9 Sentry spawn `0x005D5E10`
+
+`sentry(game, unit, x, y, R, skill, L)` (ECX game, EDX unit; `ret
+0x14`; D2MOO `sub_6FCF8610`):
+
+1. c = `summon_class(unit, skill, L, &mode)` (§6.1); invalid → 0.
+2. pt = `pettype` (+0xBE, signed); outside 0…pettype count − 1 → pt =
+   0. pm = `eval(petmax)` (+0xC0).
+3. x = 0 or y = 0 → (x, y) := the unit's position.
+4. While the unit is a monster: unit := its minion owner
+   (`0x0058F0D0`); none → 0. (A monster caster lays the trap for the
+   player that owns it.)
+5. x = 0 or y = 0 → target position of that owner (§2.4); failure → 0.
+6. Room containing (x, y) from the owner's room; none → 0. R lacks
+   `InTown` (flags bit 8) and that room is in town (`0x0061AB00`) → 0.
+7. Spawn (§6.2) {flags 1, owner, class c, AI state 0, mode, x, y, pt,
+   pm}; none → 0.
+8. `base_stats(game, owner, m, 0, L)` (§6.4: level from the owner);
+   `skill_stats(game, owner, m, skill, L, 0)` (§6.5).
+9. Alignment `0x005543B0(m, 2, 1)` (`monsters/init.md`); monster mode
+   change of m to `mode` (`0x005A7E60(m, mode, &req)` then
+   `0x005A7C20(game, &req, 1)`, `monsters/ai.md`). Return m.
+
+### 7. Start functions (srvst), batch 2
+
+#### 7.1 23 Tiger Strike, Fists of Fire, Cobra Strike, Claws of Thunder, Blades of Ice, Royal Strike `0x005D32F0`
+
+T none → 0. Return the melee range test `0x00622C40(unit, T, 0)` (1 in
+range). Skill and level are not read.
+
+### 8. Do functions (srvdo), batch 2
+
+#### 8.1 119 Druid summon `0x005C7390`
+
+Skills (6): Oak Sage, Summon Spirit Wolf, Heart of Wolverine, Summon
+Fenris, Spirit of Barbs, Summon Grizzly.
+
+1. R invalid → 0.
+2. c = `summon_class(unit, skill, L, &mode)` (§6.1); < 0 → 0.
+3. pt = `pettype` (+0xBE, signed byte); < 0 or ≥ pettype count → 0.
+4. Unit flags |= 0x40.
+5. Target position (§2.4) fails → 0 (the point is not used further).
+6. m = spawn (§6.2) {flags 0, owner unit, class c, AI state 0, mode, x
+   = y = 0, pt, pet max `eval(petmax)`}; none → 0.
+7. `node_insert(game, m, 0, unit +0xD0)` (§6.3).
+8. `base_stats(game, unit, m, max(eval(calc2), 1), L)` (§6.4).
+9. `skill_stats(game, unit, m, skill, L, 0)` (§6.5). Return 1.
+
+#### 8.2 68 Basic shout `0x005D83E0`
+
+Skills (5): Shout, Battle Cry, Battle Orders, Battle Command, War Cry.
+
+1. Unit flags |= 0x40 (also when the rest fails).
+2. R invalid → 0.
+3. m = `prog_missile(unit, skill)` (§6.6); not 0 ≤ m < missiles count →
+   0.
+4. `ring(game, unit, unit, m, skill, L, 0)` (§6.7): 64 missiles at table
+   speed; the missiles carry the effect to others (`missiles.md`).
+5. `shout_state(game, unit, unit, skill, L)` (§6.8) on the caster.
+   Return 1.
+
+#### 8.3 45 Sentry `0x005D6170`
+
+Skills (5): Charged Bolt Sentry, Wake of Fire Sentry, Lightning Sentry,
+Inferno Sentry, Death Sentry.
+
+1. R invalid → 0.
+2. Unit flags |= 0x40.
+3. Target position (§2.4) → (x, y); failure → 0.
+4. Return 1 if `sentry(game, unit, x, y, R, skill, L)` (§6.9) made a
+   unit, else 0.
+
+#### 8.4 22 Nova attack `0x005C9B50`
+
+Skills (class, 4): Howl, Frost Nova, Nova, Poison Nova (also 5 monster
+skills, `functions.tsv`).
+
+1. Unit flags |= 0x40.
+2. R invalid → 0.
+3. m = `prog_missile(unit, skill)`; invalid → 0.
+4. v = `Vel` + (`VelLev` × L) / 8 of missile m (`0x00663270`; missiles
+   +0x9A, +0x9B, u8; signed truncating division) + `eval(calc1)`.
+5. `ring(game, unit, unit, m, skill, L, v)` (§6.7; flag 4: the missile
+   creator still applies its 75 % factor, `missiles.md` §R2.3 step 7).
+   Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -726,6 +969,36 @@ unit; list = the last list made (the self list right after step 5).
 | skills columns | srvoverlay +0x4E, aurafilter +0x50, aurastat1–6 +0x54, auralencalc +0x60, aurarangecalc +0x64, aurastatcalc1–6 +0x68, aurastate +0x80, auratargetstate +0x82, auraevent1–3 +0x84, auraeventfunc1–3 +0x8A, passivestate +0x94, passivestat1–5 +0x98, passivecalc1–5 +0xA4, tgtoverlay +0x108, ResultFlags +0x12E, HitFlags +0x130, HitClass +0x134, calc1–4 +0x138, Param2 +0x14C, Param5 +0x158, HitShift +0x1A4, SrcDam +0x1A5, MinDam +0x1A8, EType +0x1DC, prgdam +0x44, srvprgfunc1–3 +0x30 | `fields.tsv` |
 | item types | 27 bow, 35 crossbow, 38 missile potion | |
 | missiles | 0 arrow, 27 magicarrow, 31 bolt, 41 explodingarrow | §2.3 |
+| skills columns (batch 2) | srvmissilea–c +0x48–+0x4C, summon +0xBC, pettype +0xBE (i8), summode +0xBF (i8), petmax +0xC0, sumskill1–5 +0xC4, sumsk1–5calc +0xD0, sumumod +0xE4, sumoverlay +0xE6, Param2 +0x14C; flags +0x04 bits 2 `progressive`, 5 `aura`, 8 `InTown` | `fields.tsv` |
+| summon request flags | 1 position given, 2 replace linked unit, 4 no second spawn try, 8 no unit flag 0x80000000 | §6.2 |
+| missile ring | 64 offsets, radius 30, tables `0x006E1288` (x) / `0x006E1388` (y) | §6.7 |
+| state ids (batch 2) | 54 uninterruptable (fatal on a fresh summon), 150 vine_beast | §6.2, §8 |
+
+Batch 2 order: class skills (`charclass` one of the 7 classes) of the
+1.14d `patch_d2` `skills.txt` per `srvstfunc` / `srvdofunc` slot not
+`spec'd-here` before batch 2; descending count, ties by the lowest
+`reqlevel` of the skills using it. The `srvmissile*` columns name
+missiles, not function slots, and are not counted.
+
+| Slot | Count | Skills (reqlevel) |
+|---|---|---|
+| srvst 23 | 6 | Tiger Strike (1) … Royal Strike (30) |
+| srvdo 119 | 6 | Oak Sage (6), Summon Spirit Wolf (6) … Summon Grizzly (30) |
+| srvdo 68 | 5 | Shout (6) … War Cry (30) |
+| srvdo 45 | 5 | Charged Bolt Sentry (12) … Death Sentry (30) |
+| srvdo 22 | 4 | Howl (1), Frost Nova (6), Nova (12), Poison Nova (30) |
+| srvdo 66 | 4 | Holy Fire (6), Holy Shock, Sanctuary (24), Conviction (30) |
+| srvdo 8 | 3 | Teeth (1), Multiple Shot (6), Shock Wave (24) |
+| srvdo 115 | 3 | Plague Poppy (1), Cycle of Life (12), Vines (24) |
+| srvdo 34 | 3 | Tiger Strike (1), Cobra Strike (12), Royal Strike (30) |
+| srvdo 56 | 3 | Clay Golem (6), BloodGolem (18), FireGolem (30) |
+| srvdo 35 | 3 | Fists of Fire (6), Claws of Thunder (18), Blades of Ice (24) |
+| srvdo 13 | 3 | Zeal (12), Fend (24), Fury (30) |
+| srvdo 28 | 3 | Eruption (12), Blizzard, Meteor (24) |
+| count 2, in order | 2 | srvdo 6, srvdo 31, srvdo 116, srvst 6, srvst 11, srvdo 19, srvst 12, srvst 17, srvdo 23, srvst 37, srvst 56, srvdo 120, srvdo 10, srvdo 118, srvdo 49, srvdo 124 |
+| count 1, in order | 1 | srvdo 7, 17, 64, 150, 69, 114, 117; srvst 22; srvdo 33; srvst 24; srvdo 42, 20, 21; srvst 16; srvdo 32, 55; srvst 40; srvdo 77, 70, 71, 43, 44; srvst 25; srvdo 46; srvst 7; srvdo 60; srvst 31; srvdo 67, 74; srvst 34; srvdo 72, 47, 11, 24, 25, 26, 27, 61, 63; srvst 35; srvdo 73, 81; srvst 41; srvdo 78; srvst 57; srvdo 121; srvst 58, 26; srvdo 48; srvst 27; srvdo 50; srvst 8; srvdo 12, 15; srvst 9, 13; srvdo 29; srvst 18; srvdo 59; srvst 19; srvdo 62; srvst 20; srvdo 57, 79; srvst 36; srvdo 9, 75, 122, 123, 51, 52, 16; srvst 10; srvdo 14; srvst 14; srvdo 144; srvst 21; srvdo 58, 80, 82; srvst 38; srvdo 76; srvst 39, 28; srvdo 54 |
+
+114 slots: 13 of count ≥ 3, 16 of count 2, 85 of count 1.
 
 ## Randomness
 
@@ -807,3 +1080,9 @@ bodies draw nothing.
 7. `0x005B0DA0` second argument (monstats) and AI kinds 10–12
    (`monsters/ai.md` special states): confirm which classes Terror and
    Dim Vision can switch.
+8. Player pet lists (no owner spec yet; D2MOO `PlayerPets.cpp`): pet add
+   `0x00575D90(game, owner, m, pet type, max)` (eviction over the
+   maximum, messages), pet type lookup `0x00574A20`. Write a
+   `sim/pets.md` from 1.14d and link §3.3 and §6.2 to it.
+9. Recording: Raise a Druid summon and a Clay Golem: confirm stats 12,
+   31, 19, 7, 6 on the summon (§6.4, §6.5) and the AI think at F + 25.

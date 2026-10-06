@@ -22,7 +22,7 @@ srvst	19	0x005C3270	SrvSt19_BonePrison	mapped	Bone Prison	no function at this en
 srvst	20	0x005C32A0	SrvSt20_IronGolem	mapped	IronGolem	
 srvst	21	0x005C3350	SrvSt21_Revive	mapped	Revive	no function at this entry in the Ghidra export (data-only xref)
 srvst	22	0x005D30F0	SrvSt22_PsychicHammer	mapped	Psychic Hammer	
-srvst	23	0x005D32F0	SrvSt23_AssasinChargeStrikes	mapped	Tiger Strike,Fists of Fire,Cobra Strike,Claws of Thunder,Blades of Ice,Royal Strike	no function at this entry in the Ghidra export (data-only xref)
+srvst	23	0x005D32F0	SrvSt23_AssasinChargeStrikes	spec'd-here	Tiger Strike,Fists of Fire,Cobra Strike,Claws of Thunder,Blades of Ice,Royal Strike	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §7.1
 srvst	24	0x005D5970	SrvSt24_DragonTalon	mapped	Dragon Talon	
 srvst	25	0x005D6330	SrvSt25_64_DragonClaw_MonFrenzy	mapped	Dragon Claw	no function at this entry in the Ghidra export (data-only xref)
 srvst	26	0x005D69D0	SrvSt26_BladeFury	mapped	Blade Fury	
@@ -88,7 +88,7 @@ srvdo	18	0x005C9480	SrvDo018_DefensiveBuff	spec'd-here	11 skills (e.g. Frozen Ar
 srvdo	19	0x005C9640	SrvDo019_Inferno_ArcticBlast	mapped	Inferno,Arctic Blast	
 srvdo	20	0x005C9800	SrvDo020_StaticField	mapped	Static Field	
 srvdo	21	0x005C98F0	SrvDo021_Telekinesis	mapped	Telekinesis	
-srvdo	22	0x005C9B50	SrvDo022_NovaAttack	mapped	9 skills (e.g. Frost Nova,Nova,Poison Nova,Howl)	
+srvdo	22	0x005C9B50	SrvDo022_NovaAttack	spec'd-here	9 skills (e.g. Frost Nova,Nova,Poison Nova,Howl)	body: bodies.md §8.4
 srvdo	23	0x005C9C10	SrvDo023_Blaze_EnergyShield_SpiderLay	mapped	Blaze,Energy Shield,SpiderLay,PrimeBlaze	
 srvdo	24	0x005C9EA0	SrvDo024_FireWall	mapped	Fire Wall,VampireFirewall,PrimeFirewall,CountessFirewall	
 srvdo	25	0x005CA030	SrvDo025_Enchant	mapped	Enchant	
@@ -111,7 +111,7 @@ srvdo	41	0x005D5080	SrvDo041_RoyalStrike_ProgressiveFn3	mapped	(none)	srvprgfunc
 srvdo	42	0x005D5A30	SrvDo042_DragonTalon	mapped	Dragon Talon	
 srvdo	43	0x005D5D70	SrvDo043_ShockField	mapped	Shock Field	
 srvdo	44	0x005D6020	SrvDo044_BladeSentinel	mapped	Blade Sentinel	
-srvdo	45	0x005D6170	SrvDo045_Sentry	mapped	Charged Bolt Sentry,Wake of Fire Sentry,Lightning Sentry,Inferno Sentry,Death Sentry	
+srvdo	45	0x005D6170	SrvDo045_Sentry	spec'd-here	Charged Bolt Sentry,Wake of Fire Sentry,Lightning Sentry,Inferno Sentry,Death Sentry	body: bodies.md §8.3
 srvdo	46	0x005D6340	SrvDo046_DragonClaw	mapped	Dragon Claw	
 srvdo	47	0x005D6630	SrvDo047_CloakOfShadows	mapped	Cloak of Shadows	
 srvdo	48	0x005D68A0	SrvDo048_BladeFury	mapped	Blade Fury	
@@ -134,7 +134,7 @@ srvdo	64	0x005CE8E0	SrvDo064_Sacrifice	mapped	Sacrifice
 srvdo	65	0x005CF010	SrvDo065_BasicAura	spec'd-here	17 skills (e.g. Might,Prayer,Resist Fire,Thorns)	aura tick: statlist on self/targets, mana via 0x0056C110; body: bodies.md §4.5
 srvdo	66	0x005CF3A0	SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction	mapped	Holy Fire,Holy Shock,Sanctuary,Conviction	
 srvdo	67	0x005CF900	SrvDo067_Charge	mapped	Charge,SerpentCharge	hard-coded in 0x0057EEC0: re-requesting the same skill is always allowed
-srvdo	68	0x005D83E0	SrvDo068_BasicShout	mapped	Shout,Battle Cry,Battle Orders,War Cry,Battle Command	
+srvdo	68	0x005D83E0	SrvDo068_BasicShout	spec'd-here	Shout,Battle Cry,Battle Orders,War Cry,Battle Command	body: bodies.md §8.2
 srvdo	69	0x005D81C0	SrvDo069_FindPotion	mapped	Find Potion	
 srvdo	70	0x005D8470	SrvDo070_DoubleSwing	mapped	Double Swing	
 srvdo	71	0x005D8570	SrvDo071_Taunt	mapped	Taunt	
@@ -185,7 +185,7 @@ srvdo	115	0x005C6A80	SrvDo115_Vines	mapped	Plague Poppy,Cycle of Life,Vines
 srvdo	116	0x005C6EC0	SrvDo116_Wearwolf_Wearbear	mapped	Wearwolf,Wearbear,Delerium Change	hard-coded in mana check 0x00647540/0x0056C160: free while shapeshifted
 srvdo	117	0x005C7160	SrvDo117_Firestorm	mapped	Firestorm	
 srvdo	118	0x005C72F0	SrvDo118_Twister_Tornado	mapped	Twister,Tornado	
-srvdo	119	0x005C7390	SrvDo119_DruidSummon	mapped	Oak Sage,Summon Spirit Wolf,Heart of Wolverine,Summon Fenris,Spirit of Barbs,Summon Grizzly	
+srvdo	119	0x005C7390	SrvDo119_DruidSummon	spec'd-here	Oak Sage,Summon Spirit Wolf,Heart of Wolverine,Summon Fenris,Spirit of Barbs,Summon Grizzly	body: bodies.md §8.1
 srvdo	120	0x005C77C0	SrvDo120_FeralRage_Maul	mapped	Feral Rage,Maul	
 srvdo	121	0x005C8AD0	SrvDo121_Rabies	mapped	Rabies	only entry whose 1.14d address breaks the D2MOO source-file order (identified by index only)
 srvdo	122	0x005C7F10	SrvDo122_Hunger	mapped	Hunger	
