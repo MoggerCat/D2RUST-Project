@@ -28,19 +28,19 @@
 |   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 289–302 |
 |   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 303–327 |
 |   5. Preset primitives on the grids | 328–385 |
-|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 386–436 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 437–597 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 598–631 |
-|   9. Act III | 632–674 |
-|   10. Act IV (`0x0067E890`) | 675–686 |
-|   11. Act V (`0x0067E600`) | 687–702 |
-|   12. Rooms | 703–738 |
-| Constants & data dependencies | 739–761 |
-| Randomness | 762–783 |
-| Edge cases & original bugs | 784–805 |
-| Test vectors | 806–865 |
-| Provenance | 866–898 |
-| Open questions | 899–922 |
+|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 386–440 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 441–608 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 609–653 |
+|   9. Act III | 654–732 |
+|   10. Act IV (`0x0067E890`) | 733–744 |
+|   11. Act V (`0x0067E600`) | 745–816 |
+|   12. Rooms | 817–852 |
+| Constants & data dependencies | 853–875 |
+| Randomness | 876–897 |
+| Edge cases & original bugs | 898–919 |
+| Test vectors | 920–979 |
+| Provenance | 980–1012 |
+| Open questions | 1013–1036 |
 <!-- /index -->
 
 ## Summary
@@ -405,8 +405,12 @@ next edge's dir likewise):
    - Act III: nothing.
 4. Corner at n: d := v.direction, or n.direction if v's is 0 (grid bit 0x2
    := d ≠ 0); style s' as step 1 but from d. Corner piece := Corner(a, b,
-   c, e, s') with a = dx, b = dy, c = next dx, e = next dy, each doubled
-   unless its vertex is a preset link. Piece 19 (cliff 6A) becomes 20
+   c, e, s') with a = dx, b = dy, c = next dx, e = next dy. The corner
+   index is computed inline (`0x00675BB7`–`0x00675CDD`; same table
+   reads as `0x00675600`): first (a, b) are doubled unless v is a
+   preset link and (c, e) doubled unless n is one; **then** a and c
+   (not b, e) grow by 2 in magnitude when non-zero; k := N[a + b +
+   9(c + e) + 50]. Piece 19 (cliff 6A) becomes 20
    (6B) if v.direction = 1 and n.direction ≠ 1, 21 (6C) if v.direction ≠
    1; any nonzero piece is stamped at n (F = −1) and grid 2 ORed as in
    step 2.
@@ -577,10 +581,17 @@ adjusted[i], and a vertex at start[i] is appended.
 **7.5.3 Per room** (`0x00680C80` → `0x00680A70`, `0x00680B10`; no draws):
 when an Act I outdoor room's grids are built (§12.2), a (w+3)×(h+3) path
 grid over the room's tiles (origin room − 1) gets every path segment
-drawn 2 cells thick (Bresenham-like, `0x0067C8E0`); then each path tile's
-8-neighbour mask (bit order as D2MOO `byte_6FDCF958`, 256-entry table at
-`0x006F2860`) selects a floor style s; s ≠ 0 → floor cell := (s << 8) |
-0x82 (overwrite). Table bytes and bit order: open question 6.
+drawn 2 cells thick (Bresenham-like, `0x0067C8E0`); then (`0x00680B10`)
+for path-grid columns X = 1..w+1 (outer) and rows Y = h+1 down to 1
+(inner), a cell G(X, Y) ≠ 0 gets the 8-neighbour mask, most significant
+bit first: b7 G(X+1, Y−1), b6 G(X+1, Y), b5 G(X+1, Y+1), b4 G(X, Y−1),
+b3 G(X, Y+1), b2 G(X−1, Y−1), b1 G(X−1, Y), b0 G(X−1, Y+1) (each bit =
+cell ≠ 0). Mask 0 → nothing; else s := byte `0x006F2700`[mask]
+(`drlg/outdoor-path-floor.tsv`, 256 rows, values 0..46, 240 non-zero);
+s ≠ 0 → floor cell (X − 1, Y − 1) of the room := (s << 8) | 0x82
+(overwrite, grid op 3). Reads come from the path grid only, so the visit
+order does not change the result. (Earlier text named `0x006F2860`,
+which holds ASCII text.)
 
 #### 7.6 River (`0x0067FE90`) and bridge (`0x0067FD20`)
 
@@ -618,13 +629,24 @@ r := (r + 1) mod n. (S = SpawnOutdoorLevelPreset with m 0, flags 15.)
 8.2 **Town transition** (`0x0067F560`): first neighbour entry whose level
 is 40: direction 3 → stamp 363 at (0, gh−1); else stamp 362 at (gw−1, 0);
 F −1. None: nothing.
-8.3 **Cliffs** (`0x0067F5C0`): r := `lo' & 7`; stamp the 5 entries of row
-r (P, F, x, y) of `0x006F2390`: rows 0–2: (376,1,0,4), (378|377 …) — row
-r ∈ 0..2 puts the path piece 378 at x = 2 + 2r among walls 377 at x 2..6,
-ends 376 at (0,4) F1 and (8,4) F2; rows 3/4: (376,2,8,4), (377 or 378,
-−1,6,4), (382,−1,4,4), (381 or 380,−1,4,6), (379,2,4,8) (row 3: 377 and
-381; row 4: 378 and 380); rows 5–7: (379,1,4,0), path 381 at y = 2 +
-2(r−5) among walls 380 at y 2..6, (379,2,4,8).
+8.3 **Cliffs** (`0x0067F5C0`): r := `lo' & 7` (one level-seed step);
+stamp the 5 entries of row r of `0x006F2390` in entry order, each (P, F,
+x, y) (§5.1; F −1 takes the build-list file, so the first stamp of each
+P in the level draws `roll(Files)`):
+
+| r | entries in stamp order (P, F, x, y) |
+|---|---|
+| 0 | (376,1,0,4) (378,−1,2,4) (377,−1,4,4) (377,−1,6,4) (376,2,8,4) |
+| 1 | (376,1,0,4) (377,−1,2,4) (378,−1,4,4) (377,−1,6,4) (376,2,8,4) |
+| 2 | (376,1,0,4) (377,−1,2,4) (377,−1,4,4) (378,−1,6,4) (376,2,8,4) |
+| 3 | (376,2,8,4) (377,−1,6,4) (382,−1,4,4) (381,−1,4,6) (379,2,4,8) |
+| 4 | (376,2,8,4) (378,−1,6,4) (382,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 5 | (379,1,4,0) (381,−1,4,2) (380,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 6 | (379,1,4,0) (380,−1,4,2) (381,−1,4,4) (380,−1,4,6) (379,2,4,8) |
+| 7 | (379,1,4,0) (380,−1,4,2) (380,−1,4,4) (381,−1,4,6) (379,2,4,8) |
+
+(Read from the file image; arguments mapped at `0x0067F600`–`0x0067F612`:
+entry +0 = P, +4 = F, +8 = x, +12 = y.)
 8.4 **Tomb row** (`0x0067F8D0`): stamp (384,0,8,0), (383,2,6,0),
 (383,1,4,0), (383,0,2,0), (387,0,0,0), (385,0,0,2), (385,1,0,4),
 (385,2,0,6), (386,0,0,8); then 394 at (4, 4), F −1.
@@ -666,11 +688,47 @@ level's stored preset id at (4j, 4i), Spider Forest head row and Flayer
 Jungle tail row special; ids > 574 get + 0/10/20 for levels 76/77/78
 (`0x006F2370`) and file := F[3r + c] with c the count of such cells so
 far (F = 0,1,2, 1,0,2, 0,2,1, 1,2,0, 2,0,1, 2,1,0 at `0x006F2328`; c ≥ 3
-leaves the error path at `0x0067EAC2`), other ids file −1); Kurast (`0x0067F190`: border rows of 79/80/81 depend on the
-jungle-link bit drlg +0x474; then fixed and random presets; random preset
-placer `0x0067EED0`: shuffle over the full grid gw·gh (not W·H) with a
-`roll(variants)` per tried cell); Travincal fixed 6 presets
-(`0x0067F3B0`). Lists and positions as D2MOO `BuildKurast` (OQ 8).
+leaves the error path at `0x0067EAC2`), other ids file −1); Kurast
+(`0x0067F190`, §9.4); Travincal (`0x0067F3B0`, §9.4).
+
+#### 9.4 Kurast and Travincal stamps
+
+Read from the 1.14d calls (stamp arguments: x in EDX, then y, P, F,
+border; all stamps here have border 0). gw := w/8, gh := h/8 (level
+size in cells, truncated toward zero); J := the jungle-link bit (drlg
++0x474, `drlg/levels.md` §1). "Stamp P at (x, y), F" is §5.1; "S(P, F)"
+is SpawnOutdoorLevelPreset(P, F, m 0, flags 15) (§5.4); "R(lo, hi,
+max)" is the random preset placer below.
+
+**Border rows** (levels 79–81 only, before anything else; all F −1):
+
+| Level | Top row y = 0 | Bottom row y = gh−1 | Sides, for i = 1..gh−2 | Corners (0,0), (gw−1,0), (0,gh−1), (gw−1,gh−1) |
+|---|---|---|---|---|
+| 79 Lower Kurast (`0x0067EAD0`) | i = 1..gw−2: 605, or 613 at i = T (T = 1 if J else gw−2) | i from 1 while i < gw−1: 606, or 614 at i = (gw−1)/2, which also skips the next i | (gw−1, i) 607, then (0, i) 608 | 610, 609, 612, 611 |
+| 80 Kurast Bazaar (`0x0067EC30`) | for i = 1..gw−2, first (i, 0) 619, or 627 at i = B; then (i, gh−1) 620, or 628 at i = A; A = gw−2, B = 1 if J = 0, A = 1, B = gw−2 if J ≠ 0 | (with the top row) | (gw−1, i) 621, then (0, i) 622 | 624, 623, 626, 625 |
+| 81 Upper Kurast (`0x0067ED70`) | i from 1 while i < gw−1: 636, or 644 at i = (gw−1)/2, which also skips the next i | i = 1..gw−2: 637, or 645 at i = T (T = gw−2 if J else 1) | (gw−1, i) 638, then (0, i) 639 | 641, 640, 643, 642 |
+
+Halves truncate toward zero. Corners are stamped in the column order
+given.
+
+**Fixed and random presets** (`0x0067F190`, after the border rows;
+X := gw − 4, Y := gh − 4):
+
+| Level | Sequence |
+|---|---|
+| 79 | S(631, 0); R(618, 618, 4); R(616, 617, none); R(615, 615, none) |
+| 80 | stamp 629 at (3, 3) F 0; stamp 629 at (X, 3) F 1; S(630, 0); S(630, 1); S(631, 0); R(635, 635, 4); R(633, 634, none); R(632, 632, none) |
+| 81 | stamp 646 at (3, Y) F 0; stamp 646 at (X, Y) F 1; S(647, 0); S(647, 1); S(631, 0); R(651, 651, 4); R(649, 650, none); R(648, 648, none) |
+| 82 Kurast Causeway | stamp 652 at (0, 0) F 0 |
+| 83 Travincal (`0x0067F3B0`) | stamp, all F −1: 653 at (0, 0), 654 at (2, 0), 655 at (6, 0), 656 at (0, 4), 657 at (2, 4), 658 at (6, 4) |
+
+**Random preset placer** R(lo, hi, max) (`0x0067EED0`, level seed): n
+:= hi − lo + 1; A := gw·gh (the full grid, unlike §5.3); A = 0 →
+nothing. Entry k := (k mod gw, k div gw); A swaps of entries `roll(A)`,
+`roll(A)` (in this order, as §5.3). Then for each entry in order: P :=
+lo + `roll(n)` (drawn for every tried entry; n = 1 still steps); if
+the preset fits at the entry's cell (§5.2, m 0, flags 15): stamp P
+there, F −1; count += 1; stop when max > 0 and count ≥ max.
 
 ### 10. Act IV (`0x0067E890`)
 
@@ -688,17 +746,73 @@ S(T+3)×4. (All S with F −1, m 0, flags 15.)
 
 Level 110: siege strip (`0x0067E560`): s := SizeX(865)/8; for i in
 0..14: x := gw − s·(i + 1); x < 0 is a fatal error; stamp 865 + i ("Siege
-To Town", "Siege Strip 1..13", "Siege To Barricade") at (x, 0), F 0. Other levels: link
-flags; barricade border walk (`0x0067DCF0`, polygon edges stepped 2 cells,
-style 4 + (level = 117)); ravine walk and two corner stamps
-(`0x0067DEF0`); barricade entrances/exits (`0x0067DB50`); caves
-(`0x0067DA70`); level 111: connect to siege (`0x0067E4B0`); border
-substitution with lvlsub type 12 and the barricade callbacks
-(`0x0067E0E0`, `outdoor-tilesub.md` §2.3); prisons (`0x0067E240`, level
-111: up to 90 tries of 2·roll(gw/2), 2·roll(gh/2) via helper
-`0x0045C390`, then a scan from another such pair); special presets
-(`0x0067E160`). Details from D2MOO `OutSiege`, order confirmed on 1.14d;
-lists not yet compared (OQ 9).
+To Town", "Siege Strip 1..13", "Siege To Barricade") at (x, 0), F 0.
+
+Other Act V outdoor levels, in this order (`0x0067E600`; gw, gh = grid
+size, outdoor data +0x5C, +0x60; every stamp has border 0; "S(P, F)" =
+SpawnOutdoorLevelPreset(P, F, m 0, flags 15)):
+
+1. Link flags (§5.5).
+2. **Barricade border walk** (`0x0067DCF0`), s := 4 + (level = 117),
+   for each polygon edge v → n (the list from its head, circular):
+   (dx, dy) := sign of n − v (`0x0067D280`), (dx', dy') likewise for n →
+   n.next. (vx, vy) := v's cell with bit 0 cleared, (nx, ny) likewise.
+   If v is not a preset link (flag 2): step (x, y) from (vx, vy) by
+   (2dx, 2dy) until it equals (nx, ny), stamping Border(dx, dy, s)
+   (§6) at each new (x, y), F −1, and grid 2 |= 0x1 there. If v has flag
+   1 (link): x := (max(v.x, n.x) − 4|dx|) with bit 0 cleared, y :=
+   (max(v.y, n.y) − 4|dy|) with bit 0 cleared; grid 2 |= 0x400 at (x, y)
+   and at (x + 2|dx|, y + 2|dy|). Corner: `0x00675600` with a = 2dx, b
+   = 2dy, c = 2dx', e = 2dy' (a and c then grow by 2 in magnitude, §6
+   lookup); a non-zero piece is stamped at (nx, ny), F −1, grid 2 |= 0x1.
+   After the walk, level 111 only: grid 2 |= 0x400 at (gw−2, gh−4) and
+   (gw−2, gh−3).
+3. **Ravine walk** (`0x0067DEF0`): B := 881, B' := 893, ends 906 / 905
+   (level 117: 957, 969, 982 / 981). (x, y) := (gw−2, 0); while (x, y)
+   ≠ (0, gh−2): k := grid 0 (x, y) − B; stamp B' + k at (x, y), F −1;
+   (x, y) += 2·D[k] with D (`0x006F1FD8`, k = 0..11) = (−1,0), (0,−1),
+   (1,0), (0,1), (0,−1), (1,0), (0,1), (−1,0), (−1,0), (0,−1), (1,0),
+   (0,1). Then stamp 906 at (gw−2, 0) and 905 at (0, gh−2), F −1.
+4. **Entrances** (`0x0067DB50`; F −1, the code's F 1 branch is for
+   level 110 only): the first x = 0..gw−1 with grid 2 (x, 0) & 0x400 →
+   stamp 909 at (x, 0); the first x = 0..gw−1 with grid 2 (x, gh−2) &
+   0x400 → 908 at (x, gh−2); the first y = 0..gh−1 with grid 2 (0, y) &
+   0x400 → 910 at (0, y); the first y = 0..gh−1 with grid 2 (gw−2, y) &
+   0x400 → 907 at (gw−2, y).
+5. **Caves** (`0x0067DA70`, table `0x006F1F9C`, rows (level, F, side,
+   P tall, P wide): (112, 0, 0, 913, 914), (117, 0, 1, 983, 984), (117,
+   0, 0, 985, 986)): for each row of this level: if level w > h: stamp P
+   wide at (side ? gw−2 : 0, 2); else P tall at (2, side ? gh−2 : 0); F
+   from the row.
+6. Level 111: **connect to siege** (`0x0067E4B0`): x := gw −
+   SizeX(880)/8, y := gh − SizeY(880)/8 (lvlprest sizes); stamp 880 at
+   (x, y) and 896 at (x, y − 2), F −1 (fatal if the level, its outdoor
+   data or lvlprest 880 is missing).
+7. Border substitution with lvlsub type 12 and the barricade callbacks
+   (`0x0067E0E0`, `outdoor-tilesub.md` §2.3).
+8. **Prisons** (`0x0067E240`, level 111 only): cell value V(x, y) :=
+   grid 0 (x, y) when grid 2 (x, y) has 0x200, else 0 (`0x00674120`).
+   Up to 90 tries while placed < 3: x := 2·roll(gw/2), y :=
+   2·roll(gh/2) (level seed, helper `0x0045C390`, in this order); if
+   915 ≤ V ≤ 922: stamp V + 16 at (x, y), F −1, placed += 1. Then sx :=
+   roll(gw/2), sy := roll(gh/2) (inline, level seed, always drawn); for
+   i = 0..gh−1 (outer), j = 0..gw−1 (inner), while placed < 3: x := (j
+   + 2sx) mod gw, y := (i + 2sy) mod gh, same test and stamp. Fewer than
+   3 placed: fatal (error 0x259).
+9. **Special presets** (`0x0067E160`, 15 rows of 7 dwords at
+   `0x006F2100`: level, P tall (used when level w < h), P wide, F, a
+   dword this code does not read, count, fatal): for each row of this
+   level, count times S(P, F); if the last call placed nothing and the
+   row is fatal: fatal error 0x219. Rows: (111, 955, 956, F 0, ×1,
+   fatal), (112, 955, 956, 0, ×1, fatal), (117, 955, 956, 1, ×1, fatal),
+   (112, 953, 953, −1, ×1, fatal), (117, 954, 954, −1, ×1, fatal), (111,
+   944, 947, −1, ×1), (111, 942, 945, −1, ×4), (111, 943, 946, −1, ×4),
+   (112, 941, 941, −1, ×1), (112, 939, 939, −1, ×1), (112, 940, 940,
+   −1, ×5), (117, 948, 948, −1, ×4), (117, 949, 949, −1, ×4), (117, 950,
+   950, −1, ×4), (117, 951, 951, −1, ×3).
+
+All of the above read from the 1.14d functions named (stamp arguments
+mapped from the disassembly); D2MOO `OutSiege` was not needed.
 
 ### 12. Rooms
 
@@ -909,13 +1023,13 @@ recording; level rects and outdoor flags equal a level-coordinate probe
 5. Stony Field, Dark Wood, Black Marsh, Tamoe builds (river, bridge,
    cliff caves, side cave draws `0x00680251`, `0x0068034F`): record a run
    that generates them.
-6. Path floor table `0x006F2860` (256 bytes) and the neighbour-bit order
-   of `0x00680B10`: dump and describe (no draws; tile output only).
+6. *Answered:* path floor table `0x006F2700` (not `0x006F2860`) is in
+   `drlg/outdoor-path-floor.tsv`, the bit order in §7.5.3.
 7. Jungle placer details (case offsets for SY/3 rounding, attach-point
    loops, `0x006777D0`) — needs a full read of `0x00677880` and an Act 3
    recording.
-8. Kurast stamping (`0x0067F190`, `0x0067EED0`, `0x0067E910` file table)
-   lists and positions vs D2MOO `BuildKurast`.
-9. Act V (`0x0067DCF0`–`0x0067E4B0`) lists, special-preset and cave
-   tables and the prison loop vs D2MOO `OutSiege` (read the tables
-   referenced by `0x0067DA70` and `0x0067E160`).
+8. *Answered:* Kurast and Travincal lists and positions are §9.4, read
+   from 1.14d; the jungle file table is §9.3. A recording of the Act 3
+   levels would confirm them (as for OQ 4).
+9. *Answered:* Act V beyond the siege strip is §11, read from 1.14d.
+   A recording of levels 111, 112 and 117 would confirm the draws.
