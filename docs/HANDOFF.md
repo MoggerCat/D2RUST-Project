@@ -136,6 +136,19 @@ one session, batched with the topic writers' requests):
    `--perturb-cb 0` must fail at the changed record. The max-life
    rescale sets must match too (`stat-lists.md` §7.2).
 
+**Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
+1. Memory dump (no player needed; extend `dump_tables.py` per M10): the TC
+   array `[0x96C5EC]` (count `[0x96C5F0]`, 0x2C bytes each, entry list at
+   +0x28 with count × 0x1C) and the chest table `0x96C5F4` (45 dwords);
+   compare with `treasure.md` §1.
+2. Recording (player): `record_rng.py` extended with hooks at `0x0055A6D0`
+   entry (TC index = (ptr − [0x96C5EC]) / 0x2C, quality, level, mode),
+   `0x0055AEE7` (item id ECX, quality, index, flags) and `0x0055A9B9`
+   (nodrop, total, n, result EAX, FPU control word); kill monsters incl.
+   champions and uniques with `players 8`, open chests. Draws in
+   `0x0055A6D0`–`0x0055AF80` and from `0x00558640` must match
+   `treasure.md` §Randomness in order and count.
+
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
 single-player game, kill a few monsters and pick up a drop. Recording
@@ -168,7 +181,9 @@ lists), `sim/intents-events.md` (+ `client-messages.tsv`,
 what each timer event does per kind; `unit-events.tsv`,
 `unit-handlers.tsv`). Stats: `sim/stats.md` (ids, values, ops;
 `stat-ops.tsv`), `sim/stat-lists.md` (lists, modifiers, states, regen).
-These are on `claude/phase3-units` until merged. Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
+These are on `claude/phase3-units` until merged. Treasure classes and
+drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
+`treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
 `specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
 Carried-over open questions not yet in a spec's list:
