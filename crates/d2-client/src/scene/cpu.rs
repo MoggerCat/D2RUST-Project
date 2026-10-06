@@ -170,6 +170,7 @@ fn resolve_all<'f, F: FrameSource + ?Sized>(
     maps: &MapTable,
     view: &Rect,
 ) -> Result<Resolved<'f>, SceneError> {
+    view.check_view()?;
     items
         .iter()
         .enumerate()

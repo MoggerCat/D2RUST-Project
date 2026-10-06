@@ -1,0 +1,157 @@
+{"format": "packets-raw-1", "tool": "hand-built fixture (conformance-path-render)", "type": "header"}
+{"frame": 1, "game": "0x1000", "game_type": 0, "ms": 1000, "phase": "tick", "seq": 0, "tid": 1, "type": "tick"}
+{"bytes": "071400140001", "client": 0, "frame": 1, "ms": 1001, "phase": "tick", "seq": 1, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "071c00140001", "client": 0, "frame": 1, "ms": 1002, "phase": "tick", "seq": 2, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "1500010000006400640001", "client": 0, "frame": 1, "ms": 1003, "phase": "tick", "seq": 3, "size": 11, "tid": 1, "type": "s2c"}
+{"frame": 1, "ms": 1004, "phase": "post", "seq": 4, "tid": 1, "type": "tick_end"}
+{"frame": 1, "ms": 1005, "phase": "input", "seq": 5, "tid": 1, "type": "drain"}
+{"bytes": "130100000007000000", "client": 0, "frame": 1, "ms": 1006, "phase": "input", "seq": 6, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 1, "game_frame": 1, "id": 19, "ms": 1007, "phase": "input", "seq": 7, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 1, "ms": 1008, "phase": "input", "seq": 8, "tid": 1, "type": "result"}
+{"frame": 1, "ms": 1009, "phase": "input", "seq": 9, "tid": 1, "type": "drain"}
+{"bytes": "0169006400", "client": 0, "frame": 1, "ms": 1010, "phase": "input", "seq": 10, "size": 5, "tid": 1, "type": "c2s"}
+{"frame": 1, "game_frame": 1, "id": 1, "ms": 1011, "phase": "input", "seq": 11, "size": 5, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 1, "ms": 1012, "phase": "input", "seq": 12, "tid": 1, "type": "result"}
+{"frame": 2, "game": "0x1000", "game_type": 0, "ms": 1013, "phase": "tick", "seq": 13, "tid": 1, "type": "tick"}
+{"bytes": "963412320032000000", "client": 0, "frame": 2, "ms": 1014, "phase": "tick", "seq": 14, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 2, "ms": 1015, "phase": "post", "seq": 15, "tid": 1, "type": "tick_end"}
+{"frame": 3, "game": "0x1000", "game_type": 0, "ms": 1016, "phase": "tick", "seq": 16, "tid": 1, "type": "tick"}
+{"bytes": "963492320032000000", "client": 0, "frame": 3, "ms": 1017, "phase": "tick", "seq": 17, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 3, "ms": 1018, "phase": "post", "seq": 18, "tid": 1, "type": "tick_end"}
+{"frame": 4, "game": "0x1000", "game_type": 0, "ms": 1019, "phase": "tick", "seq": 19, "tid": 1, "type": "tick"}
+{"bytes": "963492320032000000", "client": 0, "frame": 4, "ms": 1020, "phase": "tick", "seq": 20, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 4, "ms": 1021, "phase": "post", "seq": 21, "tid": 1, "type": "tick_end"}
+{"frame": 5, "game": "0x1000", "game_type": 0, "ms": 1022, "phase": "tick", "seq": 22, "tid": 1, "type": "tick"}
+{"bytes": "963412330032000000", "client": 0, "frame": 5, "ms": 1023, "phase": "tick", "seq": 23, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 5, "ms": 1024, "phase": "post", "seq": 24, "tid": 1, "type": "tick_end"}
+{"frame": 6, "game": "0x1000", "game_type": 0, "ms": 1025, "phase": "tick", "seq": 25, "tid": 1, "type": "tick"}
+{"bytes": "963412330032000000", "client": 0, "frame": 6, "ms": 1026, "phase": "tick", "seq": 26, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 6, "ms": 1027, "phase": "post", "seq": 27, "tid": 1, "type": "tick_end"}
+{"frame": 7, "game": "0x1000", "game_type": 0, "ms": 1028, "phase": "tick", "seq": 28, "tid": 1, "type": "tick"}
+{"bytes": "963412330032000000", "client": 0, "frame": 7, "ms": 1029, "phase": "tick", "seq": 29, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 7, "ms": 1030, "phase": "post", "seq": 30, "tid": 1, "type": "tick_end"}
+{"frame": 8, "game": "0x1000", "game_type": 0, "ms": 1031, "phase": "tick", "seq": 31, "tid": 1, "type": "tick"}
+{"bytes": "963492330032000000", "client": 0, "frame": 8, "ms": 1032, "phase": "tick", "seq": 32, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 8, "ms": 1033, "phase": "post", "seq": 33, "tid": 1, "type": "tick_end"}
+{"frame": 9, "game": "0x1000", "game_type": 0, "ms": 1034, "phase": "tick", "seq": 34, "tid": 1, "type": "tick"}
+{"bytes": "963492330032000000", "client": 0, "frame": 9, "ms": 1035, "phase": "tick", "seq": 35, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 9, "ms": 1036, "phase": "post", "seq": 36, "tid": 1, "type": "tick_end"}
+{"frame": 10, "game": "0x1000", "game_type": 0, "ms": 1037, "phase": "tick", "seq": 37, "tid": 1, "type": "tick"}
+{"bytes": "963492330032000000", "client": 0, "frame": 10, "ms": 1038, "phase": "tick", "seq": 38, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 10, "ms": 1039, "phase": "post", "seq": 39, "tid": 1, "type": "tick_end"}
+{"frame": 11, "game": "0x1000", "game_type": 0, "ms": 1040, "phase": "tick", "seq": 40, "tid": 1, "type": "tick"}
+{"bytes": "963412340032000000", "client": 0, "frame": 11, "ms": 1041, "phase": "tick", "seq": 41, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 11, "ms": 1042, "phase": "post", "seq": 42, "tid": 1, "type": "tick_end"}
+{"frame": 12, "game": "0x1000", "game_type": 0, "ms": 1043, "phase": "tick", "seq": 43, "tid": 1, "type": "tick"}
+{"bytes": "963412340032000000", "client": 0, "frame": 12, "ms": 1044, "phase": "tick", "seq": 44, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 12, "ms": 1045, "phase": "post", "seq": 45, "tid": 1, "type": "tick_end"}
+{"frame": 13, "game": "0x1000", "game_type": 0, "ms": 1046, "phase": "tick", "seq": 46, "tid": 1, "type": "tick"}
+{"bytes": "963492340032000000", "client": 0, "frame": 13, "ms": 1047, "phase": "tick", "seq": 47, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 13, "ms": 1048, "phase": "post", "seq": 48, "tid": 1, "type": "tick_end"}
+{"frame": 14, "game": "0x1000", "game_type": 0, "ms": 1049, "phase": "tick", "seq": 49, "tid": 1, "type": "tick"}
+{"bytes": "963492340032000000", "client": 0, "frame": 14, "ms": 1050, "phase": "tick", "seq": 50, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 14, "ms": 1051, "phase": "post", "seq": 51, "tid": 1, "type": "tick_end"}
+{"frame": 15, "game": "0x1000", "game_type": 0, "ms": 1052, "phase": "tick", "seq": 52, "tid": 1, "type": "tick"}
+{"bytes": "963492340032000000", "client": 0, "frame": 15, "ms": 1053, "phase": "tick", "seq": 53, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 15, "ms": 1054, "phase": "post", "seq": 54, "tid": 1, "type": "tick_end"}
+{"frame": 16, "game": "0x1000", "game_type": 0, "ms": 1055, "phase": "tick", "seq": 55, "tid": 1, "type": "tick"}
+{"frame": 16, "ms": 1056, "phase": "post", "seq": 56, "tid": 1, "type": "tick_end"}
+{"frame": 16, "ms": 1057, "phase": "input", "seq": 57, "tid": 1, "type": "drain"}
+{"bytes": "0367006800", "client": 0, "frame": 16, "ms": 1058, "phase": "input", "seq": 58, "size": 5, "tid": 1, "type": "c2s"}
+{"frame": 16, "game_frame": 16, "id": 3, "ms": 1059, "phase": "input", "seq": 59, "size": 5, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 16, "ms": 1060, "phase": "input", "seq": 60, "tid": 1, "type": "result"}
+{"frame": 17, "game": "0x1000", "game_type": 0, "ms": 1061, "phase": "tick", "seq": 61, "tid": 1, "type": "tick"}
+{"bytes": "963412348032000000", "client": 0, "frame": 17, "ms": 1062, "phase": "tick", "seq": 62, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 17, "ms": 1063, "phase": "post", "seq": 63, "tid": 1, "type": "tick_end"}
+{"frame": 18, "game": "0x1000", "game_type": 0, "ms": 1064, "phase": "tick", "seq": 64, "tid": 1, "type": "tick"}
+{"bytes": "963412348032000000", "client": 0, "frame": 18, "ms": 1065, "phase": "tick", "seq": 65, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 18, "ms": 1066, "phase": "post", "seq": 66, "tid": 1, "type": "tick_end"}
+{"frame": 19, "game": "0x1000", "game_type": 0, "ms": 1067, "phase": "tick", "seq": 67, "tid": 1, "type": "tick"}
+{"bytes": "963492330033000000", "client": 0, "frame": 19, "ms": 1068, "phase": "tick", "seq": 68, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 19, "ms": 1069, "phase": "post", "seq": 69, "tid": 1, "type": "tick_end"}
+{"frame": 20, "game": "0x1000", "game_type": 0, "ms": 1070, "phase": "tick", "seq": 70, "tid": 1, "type": "tick"}
+{"bytes": "963492330033000000", "client": 0, "frame": 20, "ms": 1071, "phase": "tick", "seq": 71, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 20, "ms": 1072, "phase": "post", "seq": 72, "tid": 1, "type": "tick_end"}
+{"frame": 21, "game": "0x1000", "game_type": 0, "ms": 1073, "phase": "tick", "seq": 73, "tid": 1, "type": "tick"}
+{"bytes": "963492338033000000", "client": 0, "frame": 21, "ms": 1074, "phase": "tick", "seq": 74, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 21, "ms": 1075, "phase": "post", "seq": 75, "tid": 1, "type": "tick_end"}
+{"frame": 22, "game": "0x1000", "game_type": 0, "ms": 1076, "phase": "tick", "seq": 76, "tid": 1, "type": "tick"}
+{"bytes": "963492338033000000", "client": 0, "frame": 22, "ms": 1077, "phase": "tick", "seq": 77, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 22, "ms": 1078, "phase": "post", "seq": 78, "tid": 1, "type": "tick_end"}
+{"frame": 23, "game": "0x1000", "game_type": 0, "ms": 1079, "phase": "tick", "seq": 79, "tid": 1, "type": "tick"}
+{"bytes": "963492330034000000", "client": 0, "frame": 23, "ms": 1080, "phase": "tick", "seq": 80, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 23, "ms": 1081, "phase": "post", "seq": 81, "tid": 1, "type": "tick_end"}
+{"frame": 24, "game": "0x1000", "game_type": 0, "ms": 1082, "phase": "tick", "seq": 82, "tid": 1, "type": "tick"}
+{"bytes": "963492330034000000", "client": 0, "frame": 24, "ms": 1083, "phase": "tick", "seq": 83, "size": 9, "tid": 1, "type": "s2c"}
+{"bytes": "072400140001", "client": 0, "frame": 24, "ms": 1084, "phase": "tick", "seq": 84, "size": 6, "tid": 1, "type": "s2c"}
+{"frame": 24, "ms": 1085, "phase": "post", "seq": 85, "tid": 1, "type": "tick_end"}
+{"frame": 24, "ms": 1086, "phase": "input", "seq": 86, "tid": 1, "type": "drain"}
+{"bytes": "020100000007000000", "client": 0, "frame": 24, "ms": 1087, "phase": "input", "seq": 87, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 24, "game_frame": 24, "id": 2, "ms": 1088, "phase": "input", "seq": 88, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 24, "ms": 1089, "phase": "input", "seq": 89, "tid": 1, "type": "result"}
+{"frame": 25, "game": "0x1000", "game_type": 0, "ms": 1090, "phase": "tick", "seq": 90, "tid": 1, "type": "tick"}
+{"bytes": "963492330034000000", "client": 0, "frame": 25, "ms": 1091, "phase": "tick", "seq": 91, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 25, "ms": 1092, "phase": "post", "seq": 92, "tid": 1, "type": "tick_end"}
+{"frame": 26, "game": "0x1000", "game_type": 0, "ms": 1093, "phase": "tick", "seq": 93, "tid": 1, "type": "tick"}
+{"bytes": "963412348033000000", "client": 0, "frame": 26, "ms": 1094, "phase": "tick", "seq": 94, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 26, "ms": 1095, "phase": "post", "seq": 95, "tid": 1, "type": "tick_end"}
+{"frame": 27, "game": "0x1000", "game_type": 0, "ms": 1096, "phase": "tick", "seq": 96, "tid": 1, "type": "tick"}
+{"bytes": "963412348033000000", "client": 0, "frame": 27, "ms": 1097, "phase": "tick", "seq": 97, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 27, "ms": 1098, "phase": "post", "seq": 98, "tid": 1, "type": "tick_end"}
+{"frame": 28, "game": "0x1000", "game_type": 0, "ms": 1099, "phase": "tick", "seq": 99, "tid": 1, "type": "tick"}
+{"bytes": "963492348033000000", "client": 0, "frame": 28, "ms": 1100, "phase": "tick", "seq": 100, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 28, "ms": 1101, "phase": "post", "seq": 101, "tid": 1, "type": "tick_end"}
+{"frame": 29, "game": "0x1000", "game_type": 0, "ms": 1102, "phase": "tick", "seq": 102, "tid": 1, "type": "tick"}
+{"bytes": "963492340033000000", "client": 0, "frame": 29, "ms": 1103, "phase": "tick", "seq": 103, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 29, "ms": 1104, "phase": "post", "seq": 104, "tid": 1, "type": "tick_end"}
+{"frame": 30, "game": "0x1000", "game_type": 0, "ms": 1105, "phase": "tick", "seq": 105, "tid": 1, "type": "tick"}
+{"bytes": "963492340033000000", "client": 0, "frame": 30, "ms": 1106, "phase": "tick", "seq": 106, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 30, "ms": 1107, "phase": "post", "seq": 107, "tid": 1, "type": "tick_end"}
+{"frame": 31, "game": "0x1000", "game_type": 0, "ms": 1108, "phase": "tick", "seq": 108, "tid": 1, "type": "tick"}
+{"bytes": "963412358032000000", "client": 0, "frame": 31, "ms": 1109, "phase": "tick", "seq": 109, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 31, "ms": 1110, "phase": "post", "seq": 110, "tid": 1, "type": "tick_end"}
+{"frame": 32, "game": "0x1000", "game_type": 0, "ms": 1111, "phase": "tick", "seq": 111, "tid": 1, "type": "tick"}
+{"bytes": "963412358032000000", "client": 0, "frame": 32, "ms": 1112, "phase": "tick", "seq": 112, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 32, "ms": 1113, "phase": "post", "seq": 113, "tid": 1, "type": "tick_end"}
+{"frame": 33, "game": "0x1000", "game_type": 0, "ms": 1114, "phase": "tick", "seq": 114, "tid": 1, "type": "tick"}
+{"bytes": "963412358032000000", "client": 0, "frame": 33, "ms": 1115, "phase": "tick", "seq": 115, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 33, "ms": 1116, "phase": "post", "seq": 116, "tid": 1, "type": "tick_end"}
+{"frame": 34, "game": "0x1000", "game_type": 0, "ms": 1117, "phase": "tick", "seq": 117, "tid": 1, "type": "tick"}
+{"bytes": "963492350032000000", "client": 0, "frame": 34, "ms": 1118, "phase": "tick", "seq": 118, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 34, "ms": 1119, "phase": "post", "seq": 119, "tid": 1, "type": "tick_end"}
+{"frame": 35, "game": "0x1000", "game_type": 0, "ms": 1120, "phase": "tick", "seq": 120, "tid": 1, "type": "tick"}
+{"bytes": "963492350032000000", "client": 0, "frame": 35, "ms": 1121, "phase": "tick", "seq": 121, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 35, "ms": 1122, "phase": "post", "seq": 122, "tid": 1, "type": "tick_end"}
+{"frame": 36, "game": "0x1000", "game_type": 0, "ms": 1123, "phase": "tick", "seq": 123, "tid": 1, "type": "tick"}
+{"bytes": "963412360032000000", "client": 0, "frame": 36, "ms": 1124, "phase": "tick", "seq": 124, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 36, "ms": 1125, "phase": "post", "seq": 125, "tid": 1, "type": "tick_end"}
+{"frame": 37, "game": "0x1000", "game_type": 0, "ms": 1126, "phase": "tick", "seq": 126, "tid": 1, "type": "tick"}
+{"bytes": "963412368031000000", "client": 0, "frame": 37, "ms": 1127, "phase": "tick", "seq": 127, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 37, "ms": 1128, "phase": "post", "seq": 128, "tid": 1, "type": "tick_end"}
+{"frame": 38, "game": "0x1000", "game_type": 0, "ms": 1129, "phase": "tick", "seq": 129, "tid": 1, "type": "tick"}
+{"bytes": "963412368031000000", "client": 0, "frame": 38, "ms": 1130, "phase": "tick", "seq": 130, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 38, "ms": 1131, "phase": "post", "seq": 131, "tid": 1, "type": "tick_end"}
+{"frame": 39, "game": "0x1000", "game_type": 0, "ms": 1132, "phase": "tick", "seq": 132, "tid": 1, "type": "tick"}
+{"bytes": "963492360031000000", "client": 0, "frame": 39, "ms": 1133, "phase": "tick", "seq": 133, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 39, "ms": 1134, "phase": "post", "seq": 134, "tid": 1, "type": "tick_end"}
+{"frame": 40, "game": "0x1000", "game_type": 0, "ms": 1135, "phase": "tick", "seq": 135, "tid": 1, "type": "tick"}
+{"bytes": "963492360031000000", "client": 0, "frame": 40, "ms": 1136, "phase": "tick", "seq": 136, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 40, "ms": 1137, "phase": "post", "seq": 137, "tid": 1, "type": "tick_end"}
+{"frame": 41, "game": "0x1000", "game_type": 0, "ms": 1138, "phase": "tick", "seq": 138, "tid": 1, "type": "tick"}
+{"bytes": "963492360031000000", "client": 0, "frame": 41, "ms": 1139, "phase": "tick", "seq": 139, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 41, "ms": 1140, "phase": "post", "seq": 140, "tid": 1, "type": "tick_end"}
+{"frame": 42, "game": "0x1000", "game_type": 0, "ms": 1141, "phase": "tick", "seq": 141, "tid": 1, "type": "tick"}
+{"bytes": "963412370031000000", "client": 0, "frame": 42, "ms": 1142, "phase": "tick", "seq": 142, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 42, "ms": 1143, "phase": "post", "seq": 143, "tid": 1, "type": "tick_end"}
+{"frame": 43, "game": "0x1000", "game_type": 0, "ms": 1144, "phase": "tick", "seq": 144, "tid": 1, "type": "tick"}
+{"bytes": "963412370031000000", "client": 0, "frame": 43, "ms": 1145, "phase": "tick", "seq": 145, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 43, "ms": 1146, "phase": "post", "seq": 146, "tid": 1, "type": "tick_end"}
+{"frame": 43, "ms": 1147, "phase": "input", "seq": 147, "tid": 1, "type": "drain"}
+{"bytes": "040100000007000000", "client": 0, "frame": 43, "ms": 1148, "phase": "input", "seq": 148, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 43, "game_frame": 43, "id": 4, "ms": 1149, "phase": "input", "seq": 149, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 43, "ms": 1150, "phase": "input", "seq": 150, "tid": 1, "type": "result"}
+{"frame": 44, "game": "0x1000", "game_type": 0, "ms": 1151, "phase": "tick", "seq": 151, "tid": 1, "type": "tick"}
+{"bytes": "963412370031000000", "client": 0, "frame": 44, "ms": 1152, "phase": "tick", "seq": 152, "size": 9, "tid": 1, "type": "s2c"}
+{"frame": 44, "ms": 1153, "phase": "post", "seq": 153, "tid": 1, "type": "tick_end"}
+{"frame": 45, "game": "0x1000", "game_type": 0, "ms": 1154, "phase": "tick", "seq": 154, "tid": 1, "type": "tick"}
+{"frame": 45, "ms": 1155, "phase": "post", "seq": 155, "tid": 1, "type": "tick_end"}

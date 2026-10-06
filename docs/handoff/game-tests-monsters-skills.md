@@ -1,6 +1,6 @@
 # Game-file tests: monsters, missiles, skills, combat vitals
 
-> To be folded into `docs/HANDOFF.md` (§1, §4, §5 C) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/game-tests-monsters-skills`, from `claude/tender-meitner-mphas3`
 at `4b5b0bf`. Cloud session (repo only, no game files), medium effort (M14).

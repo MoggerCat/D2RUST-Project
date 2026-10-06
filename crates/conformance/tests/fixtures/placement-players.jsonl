@@ -1,0 +1,21 @@
+{"format": "packets-raw-1", "tool": "hand-built fixture (conformance-path-render)", "type": "header"}
+{"frame": 1, "game": "0x1000", "game_type": 0, "ms": 1000, "phase": "tick", "seq": 0, "tid": 1, "type": "tick"}
+{"bytes": "07ca03680401", "client": 0, "frame": 1, "ms": 1001, "phase": "tick", "seq": 1, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "07d203680401", "client": 0, "frame": 1, "ms": 1002, "phase": "tick", "seq": 2, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "07da03680401", "client": 0, "frame": 1, "ms": 1003, "phase": "tick", "seq": 3, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "150001000000ff12151601", "client": 0, "frame": 1, "ms": 1004, "phase": "tick", "seq": 4, "size": 11, "tid": 1, "type": "s2c"}
+{"frame": 1, "ms": 1005, "phase": "post", "seq": 5, "tid": 1, "type": "tick_end"}
+{"frame": 2, "game": "0x1000", "game_type": 0, "ms": 1006, "phase": "tick", "seq": 6, "tid": 1, "type": "tick"}
+{"frame": 2, "ms": 1007, "phase": "post", "seq": 7, "tid": 1, "type": "tick_end"}
+{"frame": 2, "ms": 1008, "phase": "input", "seq": 8, "tid": 1, "type": "drain"}
+{"bytes": "490100000003000000", "client": 0, "frame": 2, "ms": 1009, "phase": "input", "seq": 9, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 2, "game_frame": 2, "id": 73, "ms": 1010, "phase": "input", "seq": 10, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 2, "ms": 1011, "phase": "input", "seq": 11, "tid": 1, "type": "result"}
+{"bytes": "07d003e00303", "client": 0, "frame": 2, "ms": 1012, "phase": "input", "seq": 12, "size": 6, "tid": 1, "type": "s2c"}
+{"bytes": "0d000100000001201384130064", "client": 0, "frame": 2, "ms": 1013, "phase": "input", "seq": 13, "size": 13, "tid": 1, "type": "s2c"}
+{"frame": 3, "game": "0x1000", "game_type": 0, "ms": 1014, "phase": "tick", "seq": 14, "tid": 1, "type": "tick"}
+{"bytes": "1500010000001d13811301", "client": 0, "frame": 3, "ms": 1015, "phase": "tick", "seq": 15, "size": 11, "tid": 1, "type": "s2c"}
+{"bytes": "ac00000000000000000000000d", "client": 0, "frame": 3, "ms": 1016, "phase": "tick", "seq": 16, "size": 13, "tid": 1, "type": "s2c"}
+{"frame": 3, "ms": 1017, "phase": "post", "seq": 17, "tid": 1, "type": "tick_end"}
+{"frame": 4, "game": "0x1000", "game_type": 0, "ms": 1018, "phase": "tick", "seq": 18, "tid": 1, "type": "tick"}
+{"frame": 4, "ms": 1019, "phase": "post", "seq": 19, "tid": 1, "type": "tick_end"}

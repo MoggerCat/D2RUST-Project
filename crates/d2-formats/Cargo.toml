@@ -19,4 +19,11 @@ test-support = []
 workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
+# The MPQ bench builds a synthetic archive with the test-support writer.
+d2-formats = { path = ".", features = ["test-support"] }
 proptest.workspace = true
+
+[[bench]]
+name = "formats"
+harness = false
