@@ -1555,6 +1555,16 @@ fn slaughter_start_catacombs_and_reward() {
     ctl.record_mut(6).unwrap().state = 4;
     ctl.changed_level(&mut f, P1, 1, 40);
     assert_eq!(ctl.record(6).unwrap().state, 5);
+    // Catacombs entry keeps states 4 and 5 (not changed: no O2 with
+    // status ≠ 0 below Catacombs 4).
+    for s in [4, 5] {
+        ctl.record_mut(6).unwrap().state = s;
+        ctl.record_mut(6).unwrap().status = 1;
+        f.sent.clear();
+        ctl.changed_level(&mut f, P1, 33, 34);
+        assert_eq!(ctl.record(6).unwrap().state, s);
+        assert!(f.sent.is_empty());
+    }
     // Event 13: §10.1 restore.
     let (mut ctl, _) = control();
     let mut f = cain_fake();

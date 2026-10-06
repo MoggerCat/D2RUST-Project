@@ -191,8 +191,11 @@ pub(super) fn changed_level<W: QuestWorld>(
     args: EventArgs,
 ) {
     if CATACOMBS.contains(&args.b) && ctl.records[i].not_intro {
+        // State 3 only from below 3: states 4 and 5 are kept.
         let changed = ctl.records[i].state < 3;
-        ctl.records[i].state = 3;
+        if changed {
+            ctl.records[i].state = 3;
+        }
         let status = ctl.records[i].status;
         if args.b == CATACOMBS_4 {
             if status < 2 {
