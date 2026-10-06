@@ -1,5 +1,7 @@
 # Handoff: `d2-server` skill and combat intent handlers
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/server-skills`, from `claude/bold-ptolemy-jvyvxy` at
 `1470723` (cloud session, 2026-10-06). Task class: implementation from
 clear specs, medium (METHODS M14). Scope of every claim: this branch,

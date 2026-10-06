@@ -1,5 +1,7 @@
 # Handoff: interaction wiring (`d2_sim::wiring::interaction`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, task class: integration from
 clear specs, medium (METHODS M14). Branch `claude/wire-interaction`, from
 `claude/bold-ptolemy-jvyvxy` at `1470723`. Repo only. Scope of every

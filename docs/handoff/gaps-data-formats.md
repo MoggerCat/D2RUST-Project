@@ -1,5 +1,7 @@
 # Handoff: gap tests for data and format specs (branch `claude/gaps-data-formats`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 The branch starts from `claude/bold-ptolemy-jvyvxy` at `ac01471` and is
 targeted at PR #15. This was a cloud session with the repo only and no game
 files. Task class: tests from specs, medium effort (M14). The work was split

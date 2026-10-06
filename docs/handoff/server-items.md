@@ -1,5 +1,7 @@
 # Handoff: `d2-server` item / inventory / cube intent handlers
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06. Task class: implementation
 from clear specs, medium effort (METHODS M14). Branch
 `claude/server-items`, from `claude/bold-ptolemy-jvyvxy` at `1470723`.

@@ -1,5 +1,7 @@
 # Gap tests: monsters/ai, missiles, combat/damage
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/gaps-combat-ai`, from `claude/bold-ptolemy-jvyvxy` at
 `ac01471` (PR #15). Cloud session, tests from specs (M14 medium, M08).
 Test code only in `crates/d2-sim/src/{monsters/ai,missiles,combat}/`.

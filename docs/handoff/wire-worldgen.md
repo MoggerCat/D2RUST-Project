@@ -1,5 +1,7 @@
 # Handoff: wiring of the world-generation seams (`d2_sim::wiring::worldgen`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/wire-worldgen`, from `claude/bold-ptolemy-jvyvxy` at
 `1470723` (cloud session, 2026-10-06). Task class: integration from
 clear specs, medium (METHODS M14). Scope of every claim: this branch,

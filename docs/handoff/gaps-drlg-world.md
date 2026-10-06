@@ -1,5 +1,7 @@
 # Gap tests: drlg, world, tick, unit-order, intents-events
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/gaps-drlg-world`, based on `claude/bold-ptolemy-jvyvxy`
 at `ac01471` (PR #15). Unit-tier tests only, so no rule became
 "verified" (CLAUDE.md rule 10). Each claim names only what its test asserts.

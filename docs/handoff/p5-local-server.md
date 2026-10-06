@@ -1,5 +1,7 @@
 # Handoff: in-process server behind the bridge (branch `claude/p5-local-server`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: PLAN Phase 5 "In-process server running d2-sim" + bridge wiring
 (`specs/client/bridge.md` §3, open question 1). Base: `claude/bold-ptolemy-jvyvxy`
 at `ac01471`. Implementation session; repo only.
