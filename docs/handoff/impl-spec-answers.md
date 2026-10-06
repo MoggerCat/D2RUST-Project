@@ -53,24 +53,48 @@ No other test changed; nothing was skipped, ignored or weakened.
   `tick::populate_room` yet (`population.md` §1 r2 callers).
 - §5.2 r4 (state-54 check) is still the caller's (`needs_uninterruptable_check`).
 
-## 4. Gate
+## 4. Second round: base `7f684ad` (path / inventory answers)
 
-`sh tools/gate.sh` (after `tools/cloud-setup.sh`): **FAIL, only on tests
-that already fail on the base `b435f5a`**. This diff touches no file they
-read. Everything else passes: spec_index, methods, coverage
-check/selftest, trace checkers, hook selftest, fmt, depcheck, clippy
-workspace, rest tests (879), doc-tests. d2-sim: 990 of 992 run pass.
-nextest stopped at the first failures, so the rest of d2-sim did not
-run in the gate; the targeted run of every module this diff touches
-passed (298 tests).
+The coordinator asked to merge the updated base (`claude/spec-path-inv-answers`
+@ `198f226`, merged as `0439aec`) and cover its path and inventory answers.
+Excluded (another session): `items/bitstream.md`, the server-messages.tsv
+0x18 / 0x95 `bits:` layouts, `combat/vitals.md` §5. Two parallel agents
+on disjoint files. Each wrote a detailed record (answer → code → test
+table, the test expectations each answer changed and why, and the open
+items):
 
-- d2-sim `monsters::ai::tests::implemented_matches_catalogue` and
-  `rules::d2moo_only_act1_ais_are_stubs`: `ai-functions.tsv` now marks
-  more thinks `spec'd-here` (merged spec branch) than `IMPLEMENTED` has.
-- d2-client `bridge::local_tests::{protocol_version_check,
-  unknown_and_unowned_ids, spec_table_records_the_server_message_as_unowned}`,
-  `bridge::tests::bridge_modules_except_mirror_have_no_bevy_type`: the
-  client message table (merged `spec-client-model`) now names handlers
-  for ids 0–8, 10–16, … 172 that the bridge does not have (`NoHandler`).
+- path (`pathing.md` PQ2–PQ9, OQ4, OQ5, OQ8, §1.6 0x5F resync, missile
+  paths §11, edge case 12; `path-placement.md` PC1–PC5, WP4, WP5, PF1,
+  PP1–PP7, W5, W6, GX4): `docs/handoff/impl-spec-answers-path.part.md`;
+  commit `9765412`.
+- inventory (`inventory.md` OQ3–OQ17, OQ19, IV1–IV8, MV1–MV6, WN2, WN3,
+  PN1, IS1, GX2, GX3): `docs/handoff/impl-spec-answers-inv.part.md`.
 
-Both belong to the sessions that implement those specs.
+`missiles.md` changed in the base only through `spec-skill-bodies` (not
+this task); `rng.md` (index) and `population.md` (one cross-reference)
+need no code.
+
+## 5. Gate (HEAD of this branch, after the second round)
+
+`sh tools/gate.sh`: **FAIL, only on checks that are red because of other
+merged spec branches**. Nothing in this diff touches what they read (`git
+diff 7f684ad HEAD` touches no file under `missiles/`, `monsters/ai/`,
+`skills/`, `d2-client/src/bridge/` or `specs/`). PASS: spec_index,
+methods, coverage check/selftest (4,521 claims), trace checkers, hook
+selftest, fmt, depcheck, clippy workspace, rest tests (879), doc-tests.
+
+Full runs with `--no-fail-fast`:
+- d2-sim + conformance: 2,349 run, 2,340 pass, 9 fail. All 9 are
+  catalogue / table checks: `missiles::tests_bodies` ×2, `monsters::ai`
+  `implemented_matches_catalogue` and `d2moo_only_act1_ais_are_stubs`,
+  and `skills::use_` / `skills::mutant_tests` ×5. The TSVs from the
+  `spec-skill-bodies` / AI spec merges list bodies the code does not have
+  yet.
+- d2-client: 494 run, 448 pass, 46 fail, all with `Dispatch::from_spec`
+  → `Mismatch([NoHandler { id: 172 }])`. The client dispatch table
+  (spec-client-model merge) names a handler for S→C 0xAC that the bridge
+  lacks, so every e2e test stops at setup. **Consequence:** the e2e
+  expectation the path agent flagged cannot run yet. `e2e_full_loop.rs`
+  step 5 still expects the missile path build to fail and the monster to
+  survive, which the new §11 missile paths may change. Re-run it once the
+  bridge has the 0xAC handler.
