@@ -1,5 +1,5 @@
 // Spec: specs/client/ui.md
-//! UI core (spec §A2, §A4): our integer-pixel panel framework, not
+//! UI core (spec §A2–§A4): our integer-pixel panel framework, not
 //! `bevy_ui` (§A1). Panels live in a [`UiRoot`] in a fixed order, answer
 //! integer hit tests, take [`UiEvent`]s in 800×600 frame coordinates and
 //! emit plain draw requests ([`UiDraw`]) to a [`UiDrawSink`]. A panel never
@@ -20,6 +20,7 @@ pub mod frame;
 pub mod geom;
 pub mod panel;
 pub mod root;
+pub mod text;
 pub mod widget;
 
 #[cfg(test)]
@@ -33,3 +34,7 @@ pub use panel::{
     UiInput, UiResponse, WidgetId,
 };
 pub use root::{NoPanelRules, PanelRules, Routed, UiError, UiHit, UiRoot};
+pub use text::{
+    layout_text, GlyphDraw, GlyphLookup, GlyphPlacement, NoTextRules, TextError, TextOpts,
+    TextRules,
+};

@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`)
+// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6; specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`)
 //! Missiles ↔ units, DRLG and combat: [`View`] implements
 //! [`crate::missiles::MissileWorld`]. Real providers: unit allocation and
 //! removal (`units.md` §3), seeds, stats, states and state lists
@@ -15,10 +15,12 @@ use crate::missiles::{
 };
 use crate::rng::Seed;
 use crate::tick::events::event;
+use crate::units::hooks::Sim;
 use crate::units::lifecycle::AllocRequest;
 use crate::units::{RoomId, UnitId, UnitType};
 
 use super::combat::CombatView;
+use super::monsters::umod_mode;
 use super::units::STATE_JUSTHIT;
 use super::{Pending, View};
 
@@ -417,7 +419,22 @@ impl<X: Pending> MissileHooks for View<'_, X> {
     fn init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
         self.h.x.missile_init_callback(game, missile, callback, arg);
     }
+    /// `0x005A43B0(game, owner, missile)` (`missiles.md` rule 28): the
+    /// umod dispatcher in mode 5 (`init.md` §22, the callbacks get the
+    /// missile) on the lent monster world; without one,
+    /// [`Pending::unique_mod_missile`].
     fn unique_mod_missile(&mut self, game: &mut Game, owner: UnitId, missile: UnitId) {
-        self.h.x.unique_mod_missile(game, owner, missile);
+        let mut sim = Sim {
+            game: &mut *game,
+            units: &mut *self.units,
+            stats: &mut *self.stats,
+            data: self.data,
+        };
+        if !self
+            .h
+            .run_umods(&mut sim, owner, Some(missile), umod_mode::MISSILE)
+        {
+            self.h.x.unique_mod_missile(game, owner, missile);
+        }
     }
 }
