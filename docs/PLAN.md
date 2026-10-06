@@ -189,8 +189,11 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       `sim/stats.md`, `sim/stat-lists.md` (unverified: recording queued,
       HANDOFF §5). Tick traces `traces/sim/tick/sim-0006`–`0008` committed
       (`convert_tick.py`). Status draft until implemented.*
-- [ ] *Specs for the remaining items below in progress (2026-10-06), one
-      writer per topic on `claude/phase3-{items,treasure,skills,drlg,monsters,world}`.*
+- [ ] *Specs for the items below (2026-10-06), one writer per topic, all
+      draft (rules from the 1.14d disassembly; recordings queued, HANDOFF
+      §5): items, treasure, skills/combat, monsters/missiles pushed;
+      world (quests, waypoints, cube, NPC, vendors), DRLG pushed. Branches
+      `claude/phase3-{items,treasure,skills,drlg,monsters,world}`.*
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops
 - [ ] Skills and combat formulas
