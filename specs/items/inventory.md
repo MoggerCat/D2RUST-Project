@@ -48,7 +48,7 @@
 | Edge cases & original bugs | 1332–1347 |
 | Test vectors | 1348–1395 |
 | Provenance | 1396–1442 |
-| Open questions | 1443–1510 |
+| Open questions | 1443–1509 |
 <!-- /index -->
 
 ## Summary
@@ -1442,9 +1442,8 @@ the 1.14d `patch_d2` `.txt` files (the `Expansion` row skipped). The
 
 ## Open questions
 
-1. Item bit-stream format of 0x9C/0x9D (`0x006313E0`). Settle: an item
-   serialization spec (owner to be named by the coordinator) checked
-   against R1–R5 bytes.
+1. Answered: `items/bitstream.md` (owner; checked on all 144 recorded
+   0x9C / 0x9D streams).
 2. Order of 0x9C/0x9D relative to other per-player update messages in
    one client pass (life, stats, 0x47/0x48). Settle: R1–R3 packet order.
 3. Answered: §3 rule 7 (no `numboxes` check server-side; slot ≤ 15).
