@@ -143,6 +143,17 @@ pub struct FrameReport {
     pub stalls: Vec<(String, u64)>,
 }
 
+/// What [`Pool::offer`] did with a prefetched value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Offer {
+    /// Inserted.
+    Taken,
+    /// Already resident; the offered value is dropped.
+    Resident,
+    /// Would exceed the budget; dropped (the frame that needs it loads it).
+    NoRoom,
+}
+
 /// Time source for stall durations; [`WallClock`] in the client, a fake in
 /// tests. Durations are logged only, never used for a decision.
 pub trait Clock {
@@ -335,6 +346,34 @@ impl<K: Ord + Clone + fmt::Debug, V> Pool<K, V> {
             report.stalls.push((name, micros));
         }
         Ok(report)
+    }
+
+    /// Offers a value loaded ahead of need (§A4 rule 3, prefetch). It is
+    /// taken only if the key is not resident and it fits the budget as is:
+    /// a prefetch never evicts and never overruns, so it changes timing
+    /// only. A taken entry counts as last used by the frame before the
+    /// current one (it is not protected by the current frame, and is
+    /// evicted ahead of anything this frame uses); a frame that lists it
+    /// marks it used as usual.
+    pub fn offer(&mut self, key: K, value: V, bytes: u64) -> Offer {
+        if self.entries.contains_key(&key) {
+            return Offer::Resident;
+        }
+        if self.used.saturating_add(bytes) > self.budget {
+            return Offer::NoRoom;
+        }
+        let last_used = self.frame.saturating_sub(1);
+        self.order.insert((last_used, key.clone()));
+        self.entries.insert(
+            key,
+            Entry {
+                value,
+                bytes,
+                last_used,
+            },
+        );
+        self.used += bytes;
+        Offer::Taken
     }
 
     /// Takes the events logged since the last call, oldest first.
