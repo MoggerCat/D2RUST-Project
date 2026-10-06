@@ -10,6 +10,7 @@ members = [
     "crates/d2-client",
     "crates/d2-verify",
     "crates/conformance",
+    "crates/test-fixtures",
     "tools/depcheck",
     "tools/hash-manifest",
     "tools/mpq-tool",
@@ -32,6 +33,7 @@ d2-proto = { path = "crates/d2-proto" }
 d2-net = { path = "crates/d2-net" }
 d2-server = { path = "crates/d2-server" }
 d2-verify = { path = "crates/d2-verify" }
+test-fixtures = { path = "crates/test-fixtures" }
 
 # Bevy is pinned to one exact version and may only be used by d2-client.
 # Upgrades are their own task between milestones (see CLAUDE.md).

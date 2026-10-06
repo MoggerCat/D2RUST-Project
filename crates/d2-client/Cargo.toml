@@ -16,6 +16,11 @@ d2-net.workspace = true
 # The in-process server of single player (`bridge::local`). Never the
 # reverse (tools/depcheck).
 d2-server.workspace = true
+# The app's single-player game (`app::single_player`): the wired sim and
+# the user's own tables. Game logic stays in d2-sim; the app only builds
+# and stages it, as the server tests do.
+d2-sim.workspace = true
+d2-data.workspace = true
 d2-verify.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
@@ -31,9 +36,7 @@ toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan", "naga-ir"] }
 
 [dev-dependencies]
-# The local-server end-to-end test builds a wired sim from synthetic tables.
-d2-sim.workspace = true
-d2-data.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true

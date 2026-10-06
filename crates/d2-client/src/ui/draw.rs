@@ -38,7 +38,8 @@ pub struct ImageRequest {
 
 /// Text as UTF-16 code units, the way the string tables hold them
 /// (spec §A3); layout (advance, wrap, alignment, color codes) is done by
-/// the sink through `layout_text` (§A3, `TODO(spec: ui/text.md §B3)`).
+/// the sink through [`super::text::layout_text`] (§A3; its rules are
+/// `TODO(spec: ui/text.md §B3)`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextRequest {
     pub text: Vec<u16>,

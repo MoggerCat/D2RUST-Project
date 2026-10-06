@@ -21,3 +21,6 @@ unsafe_code = "forbid"
 all = { level = "warn", priority = -1 }
 # Determinism (CLAUDE.md rule 6): no floats in game logic.
 float_arithmetic = "deny"
+
+[dev-dependencies]
+proptest.workspace = true

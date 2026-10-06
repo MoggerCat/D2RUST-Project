@@ -7,13 +7,19 @@
 //! through [`ComponentResolver`], whose methods are the `TODO(spec: …)`
 //! hooks: this module never picks a file, a frame inside it, a screen
 //! position, a shade chain or a blend op on its own.
+//!
+//! The scene id of the chosen frame is not a hook: [`build_with`] looks
+//! `(FrameSetKey, index)` up in a frame store ([`FrameIds`], implemented by
+//! [`crate::frames::FrameStore`]).
 
+#[cfg(test)]
+mod store_tests;
 #[cfg(test)]
 mod tests;
 
 use d2_formats::cof::{Cof, CofLayer, COMPONENTS};
 
-use crate::frames::FrameSetKey;
+use crate::frames::{FrameSetKey, FrameStore, StoreError};
 use crate::scene::{BlendOp, DrawItem, DrawKey, FrameId, ItemTag, Rect, SceneError, ShadeChain};
 
 /// Errors of composite building. Strict input (METHODS M07): a COF this
@@ -176,14 +182,6 @@ pub trait ComponentResolver {
     /// slot is drawn.
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError>;
 
-    /// The scene id of a resident frame (residency, `client/assets.md`
-    /// §A4). Not resident is an error (render-pipeline §Edge cases).
-    fn frame_id(
-        &self,
-        req: &ComponentRequest<'_>,
-        frame: &ComponentFrame,
-    ) -> Result<FrameId, CompositeError>;
-
     /// TODO(spec: render/sprite-placement.md) (§B1): screen top-left of the
     /// component's image, from the unit's position and the frame offsets.
     fn place(
@@ -199,6 +197,38 @@ pub trait ComponentResolver {
     /// TODO(spec: render/blend-modes.md) (§B5): the blend op, including the
     /// layer's translucency override fields.
     fn blend(&self, req: &ComponentRequest<'_>) -> Result<BlendOp, CompositeError>;
+
+    /// The scene id of a resident frame (residency, `client/assets.md`
+    /// §A4). Not resident is an error (render-pipeline §Edge cases).
+    ///
+    /// Read only by [`build`]. [`build_with`] takes the id from a frame
+    /// store instead and never calls this; a resolver used only with
+    /// [`build_with`] keeps the default, which refuses.
+    fn frame_id(
+        &self,
+        req: &ComponentRequest<'_>,
+        _frame: &ComponentFrame,
+    ) -> Result<FrameId, CompositeError> {
+        Err(CompositeError::Unresolved {
+            slot: req.slot.slot,
+            component: req.slot.component,
+            what: "frame_id",
+            message: "no frame store: use composite::build_with".into(),
+        })
+    }
+}
+
+/// `(FrameSetKey, index)` → scene [`FrameId`] for resident frames (§A7
+/// step 3, `client/assets.md` §A4). Not resident, or an index past the
+/// set's end, is an error.
+pub trait FrameIds {
+    fn frame_id(&self, set: &FrameSetKey, index: usize) -> Result<FrameId, StoreError>;
+}
+
+impl FrameIds for FrameStore {
+    fn frame_id(&self, set: &FrameSetKey, index: usize) -> Result<FrameId, StoreError> {
+        self.id(set, index)
+    }
 }
 
 /// Per-unit draw parameters shared by all its components.
@@ -227,13 +257,52 @@ pub struct ComponentDraw {
 /// The draw items of one unit for COF direction `dir`, frame `frame`
 /// (§A7 steps 2–4), in slot order (back to front), so list order equals
 /// key order. Keys share `unit`'s pass/major/minor with `sub` = slot index.
-/// Any hook error fails the whole unit: no partial composite.
+/// Any hook error fails the whole unit: no partial composite. Frame ids
+/// come from the resolver's [`ComponentResolver::frame_id`].
 pub fn build<R: ComponentResolver + ?Sized>(
     cof: &Cof,
     dir: usize,
     frame: usize,
     unit: &UnitParams,
     resolver: &R,
+) -> Result<Vec<ComponentDraw>, CompositeError> {
+    build_core(cof, dir, frame, unit, resolver, |req, cf| {
+        resolver.frame_id(req, cf)
+    })
+}
+
+/// [`build`] with frame ids from the frame store `frames`: the frame of
+/// each component ([`ComponentResolver::frame`]) is looked up as
+/// `(set, index)`; a frame not in the store fails the unit
+/// (`Unresolved`, `what` = `"frame_id"`). The resolver's `frame_id` is
+/// not called.
+pub fn build_with<R: ComponentResolver + ?Sized, S: FrameIds + ?Sized>(
+    cof: &Cof,
+    dir: usize,
+    frame: usize,
+    unit: &UnitParams,
+    resolver: &R,
+    frames: &S,
+) -> Result<Vec<ComponentDraw>, CompositeError> {
+    build_core(cof, dir, frame, unit, resolver, |req, cf| {
+        frames
+            .frame_id(&cf.set, cf.index)
+            .map_err(|e| CompositeError::Unresolved {
+                slot: req.slot.slot,
+                component: req.slot.component,
+                what: "frame_id",
+                message: e.to_string(),
+            })
+    })
+}
+
+fn build_core<R: ComponentResolver + ?Sized>(
+    cof: &Cof,
+    dir: usize,
+    frame: usize,
+    unit: &UnitParams,
+    resolver: &R,
+    frame_id: impl Fn(&ComponentRequest<'_>, &ComponentFrame) -> Result<FrameId, CompositeError>,
 ) -> Result<Vec<ComponentDraw>, CompositeError> {
     let slots = slot_order(cof, dir, frame)?;
     let mut out = Vec::with_capacity(slots.len());
@@ -250,7 +319,7 @@ pub fn build<R: ComponentResolver + ?Sized>(
             error,
         };
         let cf = resolver.frame(&req)?;
-        let id = resolver.frame_id(&req, &cf)?;
+        let id = frame_id(&req, &cf)?;
         let (x, y) = resolver.place(&req, &cf)?;
         let mut item = DrawItem::new(id, x, y);
         item.clip = unit.clip;
