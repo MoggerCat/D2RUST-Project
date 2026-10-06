@@ -1,8 +1,6 @@
-// Spec: specs/monsters/ai.md §9.9 (the Npc home step and interaction handler), §9.31 GoodNpcRanged, §9.32 NpcOutOfTown
-//! Town and quest NPC thinks: GoodNpcRanged (60, also special state 5),
-//! NpcOutOfTown (31), and the pieces of the Npc think (§9.9) they call:
-//! the home step `0x005E6800`, the home check `0x005E6860` and the
-//! interaction handler `0x005E68F0`.
+// Spec: specs/monsters/ai.md §9.9 Npc (home step, class cases, interaction handler, commands, map AI), §9.31 GoodNpcRanged, §9.32 NpcOutOfTown
+//! Town and quest NPC thinks: Npc (32), GoodNpcRanged (60, also special
+//! state 5), NpcOutOfTown (31, which calls the Npc interaction handler).
 
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
@@ -18,6 +16,10 @@ mod cmd {
     pub const PORTAL: i32 = 3;
     /// Home position (x, y).
     pub const HOME: i32 = 10;
+    /// Wander (count, distance, idles, delay).
+    pub const WANDER: i32 = 5;
+    /// Mode action (mode, x, y, tries).
+    pub const MODE_ACTION: i32 = 7;
 }
 
 /// Monstats rows named by the bodies.
@@ -320,4 +322,278 @@ pub fn npc_out_of_town<W: AiHost + ?Sized>(
         set_cmd(cx, u, k, 3, 2);
     }
     idle(game, cx, u, 20);
+}
+
+// ---- §9.9 Npc --------------------------------------------------------
+
+/// Npc class cases of §9.9 step 2 (monstats rows).
+mod npc_class {
+    pub const JERHYN: i32 = 201;
+    pub const ALKOR: i32 = 254;
+    pub const ORMUS: i32 = 255;
+    pub const CAIN5: i32 = 265;
+    pub const DREHYA: i32 = 512;
+    pub const CHARSI: i32 = 154;
+    pub const WARRIV1: i32 = 155;
+    pub const FARA: i32 = 178;
+    pub const JAMELLA: i32 = 405;
+    pub const LARZUK: i32 = 511;
+}
+
+/// §9.9 Npc (32) `0x005E7130`.
+pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, _p: &TickParam) {
+    // 1.
+    if npc_home(game, cx, u) {
+        return;
+    }
+    // 2.
+    match cx.world.class(u) {
+        npc_class::JERHYN => {
+            if !cx.world.jerhyn_palace_active(game) {
+                idle(game, cx, u, 40);
+                return;
+            }
+            let (a, b) = cx.world.jerhyn_npc_state(game, u);
+            if b != 0 {
+                idle(game, cx, u, 20);
+            }
+            if a == 0 {
+                return;
+            }
+            if cx.world.guard_moving(game, u) {
+                if let Some(h) = get_or_create_command(cx, u, cmd::HOME, false) {
+                    let (x, y) = cx.world.position(u);
+                    set_cmd(cx, u, h, 1, x.wrapping_add(9));
+                    set_cmd(cx, u, h, 2, y);
+                    idle(game, cx, u, 50);
+                    return;
+                }
+            }
+        }
+        npc_class::ALKOR => {
+            if cx.world.alkor_bird(game) {
+                cx.world
+                    .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                cx.world.alkor_reset(game);
+                return;
+            }
+        }
+        npc_class::ORMUS => {
+            if let Some((x, y)) = cx.world.ormus_altar(game) {
+                if path_distance(cx, u, x, y) as u32 > 3 {
+                    walk_to_point(game, cx, u, x, y);
+                } else {
+                    cx.world
+                        .change_mode(game, u, mode::SKILL1, ModeTarget::Point(0, 0));
+                    cx.world.ormus_set_altar_mode(game);
+                }
+                return;
+            }
+        }
+        npc_class::CAIN5 => {
+            if let Some((x, y)) = cx.world.cain_town_coords(game, u) {
+                if path_distance(cx, u, x, y) as u32 > 2 {
+                    walk_to_point(game, cx, u, x, y);
+                    return;
+                }
+                cx.world.cain_in_town_activated(game, u);
+            }
+        }
+        npc_class::DREHYA => cx.world.anya_open_portal(game, u),
+        _ => {}
+    }
+    // 3.–5.
+    if npc_interaction_think(game, cx, u) || npc_commands(game, cx, u) || npc_map_ai(game, cx, u) {
+        return;
+    }
+    // 6.
+    idle(game, cx, u, 8);
+}
+
+/// §9.9 the command handler `0x005E6AE0`. True = handled.
+fn npc_commands<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+    // 1. Command 4: walk to (x, y), tries n, delay t.
+    if let Some(k) = find_command(cx, u, cmd::WALK_TO, false) {
+        let [_, x, y, n, t] = params(cx, u, k);
+        if n > 0 {
+            if x != 0 && y != 0 && path_distance(cx, u, x, y) as u32 > 3 {
+                let g = cx.store.npc_walk_counter;
+                set_velocity(cx, u, if g & 3 == 0 { 5 } else { 1 }, 0, 0);
+                walk_step0(game, cx, u, x, y);
+                cx.store.npc_walk_counter = g.wrapping_add(1);
+            } else {
+                idle(game, cx, u, t);
+            }
+            set_cmd(cx, u, k, 3, n - 1);
+            return true;
+        }
+    }
+    // 2. Command 5: wander count c, distance w, idles k, delay t.
+    if let Some(k) = find_command(cx, u, cmd::WANDER, false) {
+        let [_, c, w, idles, t] = params(cx, u, k);
+        if c > 0 && c % 2 == 1 {
+            wander(game, cx, u, i32::from(w as u8));
+            set_cmd(cx, u, k, 1, c - 1);
+            return true;
+        }
+        if c > 0 {
+            if idles > 0 {
+                idle(game, cx, u, t);
+                set_cmd(cx, u, k, 1, c - 1);
+                set_cmd(cx, u, k, 3, idles - 1);
+                return true;
+            }
+            set_cmd(cx, u, k, 1, c - 1);
+        } else if idles > 0 {
+            idle(game, cx, u, t);
+            set_cmd(cx, u, k, 3, idles - 1);
+            return true;
+        }
+    }
+    // 3. Command 7: mode m at (x, y), tries n.
+    let Some(k) = find_command(cx, u, cmd::MODE_ACTION, false) else {
+        return false;
+    };
+    let [_, mut m, x, y, n] = params(cx, u, k);
+    if m == 0 {
+        return false;
+    }
+    // 3.1.
+    if !(8..=11).contains(&m) {
+        set_cmd(cx, u, k, 1, 0);
+        idle(game, cx, u, 50);
+        return true;
+    }
+    // 3.2.
+    let e = path_distance(cx, u, x, y);
+    if e > 0 {
+        if n > 0 {
+            set_velocity(cx, u, 7, 0, 0);
+            if !walk_step0(game, cx, u, x, y) {
+                idle(game, cx, u, 25);
+            }
+            set_cmd(cx, u, k, 4, n - 1);
+            return true;
+        } else if e > 1 {
+            m = 0;
+        }
+    }
+    // 3.3.
+    let class = cx.world.class(u);
+    let facing = match class {
+        npc_class::CHARSI => Some(56),
+        npc_class::WARRIV1 => Some(52),
+        npc_class::FARA => Some(4),
+        npc_class::JAMELLA if m == 8 => Some(52),
+        npc_class::JAMELLA if m == 9 => Some(48),
+        _ => None,
+    };
+    if let Some(dir) = facing {
+        cx.world.set_facing(u, dir);
+    }
+    if class == npc_class::LARZUK && cx.world.seed(u).roll(100) > 4 {
+        set_cmd(cx, u, k, 1, 0);
+        idle(game, cx, u, 50);
+        return true;
+    }
+    // 3.4.
+    if m != 0 {
+        if i32::from(cx.world.anim_mode(u)) == m {
+            set_cmd(cx, u, k, 1, m);
+            idle(game, cx, u, 50);
+            return true;
+        }
+        cx.world.change_mode(game, u, m as u8, ModeTarget::Unit(u));
+        set_cmd(cx, u, k, 1, 0);
+        return true;
+    }
+    // 3.5.
+    if class == npc_class::FARA && cx.world.seed(u).roll(100) < 66 {
+        m = 8;
+    }
+    set_cmd(cx, u, k, 1, m);
+    false
+}
+
+/// Command 4 := (x, y, tries, delay), found or created.
+fn set_walk_command<W: AiHost + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    x: i32,
+    y: i32,
+    tries: i32,
+) {
+    if let Some(k) = get_or_create_command(cx, u, cmd::WALK_TO, false) {
+        for (i, v) in [(1, x), (2, y), (3, tries), (4, 10)] {
+            set_cmd(cx, u, k, i, v);
+        }
+    }
+}
+
+/// Map action 1 (`0x005E6DE0`, also 3).
+fn map_walk<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    if x == 0 || y == 0 || path_distance(cx, u, x, y) == 0 {
+        return false;
+    }
+    set_velocity(cx, u, 7, 0, 0);
+    walk_step0(game, cx, u, x, y);
+    set_walk_command(cx, u, x, y, 12);
+    true
+}
+
+/// §9.9 the map AI `0x005E7080`. True = handled.
+fn npc_map_ai<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+    // 1.
+    let Some(nodes) = cx.store.control(u).and_then(|c| c.map_ai.clone()) else {
+        return false;
+    };
+    // 2.
+    if cx.world.seed(u).step() % 100 >= 66 {
+        return false;
+    }
+    // 3.
+    if nodes.is_empty() {
+        return false;
+    }
+    let i = cx.world.seed(u).roll(nodes.len() as i32) as usize;
+    let node = nodes[i];
+    let (x, y) = (node.x, node.y);
+    match node.action {
+        1 | 3 => map_walk(game, cx, u, x, y),
+        2 => {
+            if x == 0 || y == 0 {
+                return false;
+            }
+            let r = map_walk(game, cx, u, x, y);
+            set_walk_command(cx, u, x, y, 20);
+            r
+        }
+        a @ (4 | 5) => {
+            if x == 0 || y == 0 {
+                return false;
+            }
+            let r = map_walk(game, cx, u, x, y);
+            let want = if a == 4 { mode::SKILL1 } else { mode::SKILL2 };
+            let class = cx.world.class(u);
+            let m = if cx.world.class_has_mode(class, want) {
+                i32::from(want)
+            } else {
+                1
+            };
+            if let Some(k) = get_or_create_command(cx, u, cmd::MODE_ACTION, false) {
+                for (j, v) in [(1, m), (2, x), (3, y), (4, 4)] {
+                    set_cmd(cx, u, k, j, v);
+                }
+            }
+            set_walk_command(cx, u, x, y, 12);
+            r
+        }
+        _ => false,
+    }
 }

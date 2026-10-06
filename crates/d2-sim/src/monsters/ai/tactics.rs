@@ -471,3 +471,49 @@ pub fn walk_step0<W: AiHost + ?Sized>(
 ) -> bool {
     move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 0, 0)
 }
+
+/// `0x005DC480` half-size distance from the unit to (x, y) (§6): each
+/// axis distance minus (size / 2 + 1) (unsigned halving), clamped at 0.
+pub fn half_size_distance<W: AiHost + ?Sized>(
+    cx: &Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> i32 {
+    let (ux, uy) = cx.world.position(unit);
+    let cut = ((cx.world.size(unit) as u32) / 2) as i32 + 1;
+    let dx = (ux.wrapping_sub(x).wrapping_abs() - cut).max(0);
+    let dy = (uy.wrapping_sub(y).wrapping_abs() - cut).max(0);
+    distance_formula(dx, dy)
+}
+
+/// `0x005DEDE0`: run to coordinates (walk with the velocity reset under
+/// state 60, §7.2).
+///
+/// TODO(spec: ai.md §7.2): the step count of the coordinate runs is not
+/// given in the table; 1 is used, as for the unit runs.
+pub fn run_to_point<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::RUN, 1, 0)
+}
+
+/// `0x005DF680` `AITACTICS_RunCloseToTargetUnit` ("run near t n", §7.2):
+/// the wander draws around t with n as a byte, then a run (a walk with
+/// the velocity reset under state 60) there, step 1, no flags.
+pub fn run_near<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    t: Option<UnitId>,
+    n: i32,
+) -> bool {
+    // TODO(spec gap): running near target 0 uses the own position.
+    let center = cx.world.position(t.unwrap_or(unit));
+    let (x, y) = wander_point(cx.world.seed(unit), center, i32::from(n as u8));
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::RUN, 1, 0)
+}

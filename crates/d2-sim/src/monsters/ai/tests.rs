@@ -72,6 +72,18 @@ struct Fake {
     drehya_wait: bool,
     /// Path stops (`stop_path` calls).
     stops: u32,
+    /// Unit stats by (unit, stat) for `stat` / `set_stat`.
+    stats: BTreeMap<(UnitId, u16), i32>,
+    /// Life percent per unit, overriding `life` (Fetish reads T's).
+    life_of: BTreeMap<UnitId, i32>,
+    path_target: Option<UnitId>,
+    footprint: bool,
+    evil_monster: Option<UnitId>,
+    /// Npc class-case quest answers (§9.9 step 2).
+    jerhyn: Option<(i32, i32, bool)>,
+    alkor_bird: bool,
+    ormus_altar: Option<(i32, i32)>,
+    cain_town: Option<(i32, i32)>,
 }
 
 impl Fake {
@@ -118,8 +130,8 @@ impl AiUnits for Fake {
     fn monster_level(&self, _: UnitId) -> i32 {
         5
     }
-    fn life_percent(&self, _: UnitId) -> i32 {
-        self.life
+    fn life_percent(&self, unit: UnitId) -> i32 {
+        self.life_of.get(&unit).copied().unwrap_or(self.life)
     }
     fn add_life(&mut self, _: UnitId, amount: i32) {
         self.log.push(format!("life {amount}"));
@@ -160,6 +172,25 @@ impl AiUnits for Fake {
     }
     fn set_life(&mut self, unit: UnitId, value: i32) {
         self.log.push(format!("setlife {} {value}", unit.0));
+    }
+    fn stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.stats.get(&(unit, stat)).copied().unwrap_or(0)
+    }
+    fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.stats.insert((unit, stat), value);
+    }
+    fn set_unit_flag(&mut self, _: UnitId, mask: u32) {
+        self.log.push(format!("flag {mask:#x}"));
+    }
+    fn set_state(&mut self, unit: UnitId, state: u16, on: bool) {
+        if on {
+            self.states.insert((unit, state));
+        } else {
+            self.states.remove(&(unit, state));
+        }
+    }
+    fn path_target(&self, _: UnitId) -> Option<UnitId> {
+        self.path_target
     }
 }
 
@@ -217,6 +248,12 @@ impl AiModes for Fake {
     fn operate_door(&mut self, _: &mut Game, _: UnitId, door: UnitId) {
         self.log.push(format!("door {door:?}"));
     }
+    fn start_overlay(&mut self, _: UnitId, overlay: i32) {
+        self.log.push(format!("overlay {overlay}"));
+    }
+    fn set_facing(&mut self, _: UnitId, dir: i32) {
+        self.log.push(format!("facing {dir}"));
+    }
 }
 
 impl AiWorld for Fake {
@@ -244,6 +281,10 @@ impl AiWorld for Fake {
     }
     fn last_dead(&self, _: &Game, room: RoomId) -> [Option<UnitId>; 4] {
         self.last_dead.get(&room).copied().unwrap_or([None; 4])
+    }
+    fn footprint_ok(&self, _: &Game, class: i32, _: Option<RoomId>, x: i32, y: i32) -> bool {
+        let _ = (class, x, y);
+        self.footprint
     }
 }
 
@@ -301,6 +342,10 @@ impl AiTargets for Fake {
         self.log.push(format!("corpses {max_sq} {own}"));
         self.corpses
     }
+    fn nearest_evil_monster(&mut self, _: &mut Game, _: UnitId) -> Option<UnitId> {
+        self.log.push("help scan".into());
+        self.evil_monster
+    }
 }
 
 impl AiSkills for Fake {
@@ -333,6 +378,36 @@ impl AiQuests for Fake {
         self.log.push("quest drehya wait".into());
         self.drehya_wait
     }
+    fn jerhyn_palace_active(&mut self, _: &mut Game) -> bool {
+        self.jerhyn.is_some()
+    }
+    fn jerhyn_npc_state(&mut self, _: &mut Game, _: UnitId) -> (i32, i32) {
+        self.jerhyn.map_or((0, 0), |(a, b, _)| (a, b))
+    }
+    fn guard_moving(&mut self, _: &mut Game, _: UnitId) -> bool {
+        self.jerhyn.is_some_and(|j| j.2)
+    }
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.log.push("quest alkor reset".into());
+    }
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.log.push("quest ormus altar".into());
+    }
+    fn cain_town_coords(&mut self, _: &mut Game, _: UnitId) -> Option<(i32, i32)> {
+        self.cain_town
+    }
+    fn cain_in_town_activated(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest cain activated".into());
+    }
+    fn anya_open_portal(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest anya portal".into());
+    }
 }
 
 /// A monstats row using AI `ai` with Normal aip1..aip5 and `aidel`.
@@ -358,7 +433,7 @@ struct World {
     monstats: Vec<Monstats>,
     monstats2: Vec<Monstats2>,
     levels: Vec<Levels>,
-    modes: Vec<[u8; 3]>,
+    modes: Vec<[u8; 4]>,
     room: RoomId,
     mon: UnitId,
     player: UnitId,
@@ -388,7 +463,7 @@ impl World {
             monstats: vec![row],
             monstats2: vec![Monstats2::decode(&vec![0u8; Monstats2::SIZE])],
             levels: vec![Levels::decode(&vec![0u8; Levels::SIZE])],
-            modes: vec![[0; 3]],
+            modes: vec![[0; 4]],
             room,
             mon,
             player,
@@ -1018,15 +1093,20 @@ fn install_sets_think_and_alternate() {
     w.with(|g, cx| install(g, cx, mon, 0));
     let c = w.store.control(mon).unwrap();
     assert_eq!((c.function, c.params), (0x005F_1750, [1, 2, 3]));
-    // An init function is a logged stub; a record without think → Idle.
+    // An init function runs (FoulCrowNest's, §9.17: param 0 := frame);
+    // one without a body is a logged stub (BoneWall, 84).
     let mut w = World::new(monstats(43, [0; 5], 15));
     let mon = w.mon;
-    assert!(w.store.unhandled.contains(&Unhandled::Function {
-        addr: 0x005F_6630,
-        unit: mon
-    }));
+    assert!(w.store.unhandled.is_empty());
+    w.game.frame = 77;
+    w.store.control_mut(mon).unwrap().function = 0;
     w.with(|g, cx| install(g, cx, mon, 0));
-    let _ = w;
+    assert_eq!(w.store.control(mon).unwrap().params, [77, 0, 0]);
+    let w = World::new(monstats(84, [0; 5], 15));
+    assert!(w.store.unhandled.contains(&Unhandled::Function {
+        addr: 0x005E_0390,
+        unit: w.mon
+    }));
     let mut w = World::new(monstats(3, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| install(g, cx, mon, 18)); // state ≥ 18: nothing
@@ -1057,13 +1137,13 @@ fn special_states_10_to_12_need_switchai() {
 
 #[test]
 fn stub_ai_logged() {
-    let mut w = World::new(monstats(32, [0; 5], 15)); // Npc (not implemented yet)
+    let mut w = World::new(monstats(50, [0; 5], 15)); // Mephisto (unread)
     w.run(false, 0);
     let mon = w.mon;
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7130,
+            addr: 0x005F_78B0,
             unit: mon
         }]
     );
@@ -1122,10 +1202,6 @@ fn ai_table_check_catches_perturbations() {
     assert!(err.starts_with("index 15:"), "{err}");
 }
 
-/// `spec'd-here` bodies not implemented yet (other sessions' tasks);
-/// an index leaves this list when its body lands.
-const NOT_IMPLEMENTED_YET: [u8; 16] = [4, 5, 8, 10, 11, 15, 20, 26, 28, 30, 32, 33, 37, 43, 59, 64];
-
 /// Checks [`SPECD_HERE`] against the catalogue's `status` column, row by
 /// row. Returns the first disagreement.
 fn check_specd_here(tsv: &str, specd: &[u8]) -> Result<(), String> {
@@ -1179,15 +1255,8 @@ fn specd_here_check_catches_perturbations() {
 
 #[test]
 fn implemented_matches_catalogue() {
-    // Every implemented think is a spec'd-here row, and every spec'd-here
-    // row is implemented or listed as not implemented yet.
+    // Every spec'd-here think has a body here, and only those.
     let mut ours: Vec<u8> = IMPLEMENTED.iter().map(|&(_, i)| i).collect();
-    ours.sort_unstable();
-    for i in NOT_IMPLEMENTED_YET {
-        assert!(!ours.contains(&i), "index {i} is implemented");
-        assert!(!implemented(AI_TABLE[i as usize].think), "index {i}");
-    }
-    ours.extend(NOT_IMPLEMENTED_YET);
     ours.sort_unstable();
     assert_eq!(ours, SPECD_HERE);
     for (addr, i) in IMPLEMENTED {
@@ -1195,5 +1264,6 @@ fn implemented_matches_catalogue() {
         assert!(implemented(addr));
     }
 }
+mod bodies;
 mod npc;
 mod rules;

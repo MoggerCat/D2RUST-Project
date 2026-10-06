@@ -279,6 +279,21 @@ pub trait Pending {
     fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool {
         false
     }
+    /// `0x00553540`: the unit's path target unit.
+    fn path_target(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// Path facing `0x00648820(path, dir)`.
+    fn set_facing(&mut self, unit: UnitId, dir: i32) {}
+    /// `0x005FD350(class, room, x, y, 0)`, the monster footprint test
+    /// (`population.md` §9); `false` (no room) by default.
+    fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
+        false
+    }
+    /// SandRaider's help search (scan 1, `ai.md` §9.26 step 4).
+    fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
     /// The unit's last attacker (`0x00621D50`; unit field not described).
     fn set_last_attacker(&mut self, defender: UnitId, attacker: UnitId) {}
     /// `0x005A4390(game, attacker)` after a monster's hit.
@@ -370,6 +385,30 @@ pub trait Pending {
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         false
     }
+    /// The Npc class cases (`ai.md` §9.9 step 2); defaults: no quest
+    /// state (jerhyn's palace inactive, nothing brought or found).
+    fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
+        false
+    }
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
+        false
+    }
+    fn alkor_bird(&mut self, game: &mut Game) -> bool {
+        false
+    }
+    fn alkor_reset(&mut self, game: &mut Game) {}
+    fn ormus_altar(&mut self, game: &mut Game) -> Option<(i32, i32)> {
+        None
+    }
+    fn ormus_set_altar_mode(&mut self, game: &mut Game) {}
+    fn cain_town_coords(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    fn cain_in_town_activated(&mut self, game: &mut Game, unit: UnitId) {}
+    fn anya_open_portal(&mut self, game: &mut Game, unit: UnitId) {}
 
     /// `0x005FD470(skill, target)`.
     fn skill_usable(&mut self, game: &mut Game, unit: UnitId, skill: i32, target: UnitId) -> bool {

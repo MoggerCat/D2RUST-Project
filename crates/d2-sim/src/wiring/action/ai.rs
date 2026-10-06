@@ -135,6 +135,28 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn set_life(&mut self, unit: UnitId, value: i32) {
         self.set_base(unit, stat::HITPOINTS, value);
     }
+    fn stat(&self, unit: UnitId, s: u16) -> i32 {
+        View::stat(self, unit, s)
+    }
+    fn set_stat(&mut self, unit: UnitId, s: u16, value: i32) {
+        self.set_base(unit, s, value);
+    }
+    /// Unit flags (unit +0xC4, `units.md` §2).
+    fn set_unit_flag(&mut self, unit: UnitId, mask: u32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.flags |= mask;
+        }
+    }
+    /// The state toggle `0x00625A70` (`stat-lists.md` §9.2).
+    ///
+    /// TODO(spec: ai.md §9.26): SandRaider calls `0x00639DB0`; read as the
+    /// state toggle of `stat-lists.md` §9.2.
+    fn set_state(&mut self, unit: UnitId, s: u16, on: bool) {
+        View::set_state(self, unit, s, on);
+    }
+    fn path_target(&self, unit: UnitId) -> Option<UnitId> {
+        self.h.x.path_target(unit)
+    }
 }
 
 impl<X: Pending> AiModes for View<'_, X> {
@@ -199,6 +221,13 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {
         self.h.x.operate_door(game, unit, door);
     }
+    /// Overlay `0x00621E40` ([`Pending::overlay`]).
+    fn start_overlay(&mut self, unit: UnitId, overlay: i32) {
+        self.h.x.overlay(unit, overlay);
+    }
+    fn set_facing(&mut self, unit: UnitId, dir: i32) {
+        self.h.x.set_facing(unit, dir);
+    }
 }
 
 impl<X: Pending> AiWorld for View<'_, X> {
@@ -243,6 +272,9 @@ impl<X: Pending> AiWorld for View<'_, X> {
     }
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
         self.h.x.last_dead(game, room)
+    }
+    fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
+        self.h.x.footprint_ok(game, class, room, x, y)
     }
 }
 
@@ -294,6 +326,9 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> (Option<UnitId>, u32) {
         self.h.x.shaman_corpses(game, unit, max_sq, own_minions)
     }
+    fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
+        self.h.x.nearest_evil_monster(game, unit)
+    }
 }
 
 impl<X: Pending> AiSkills for View<'_, X> {
@@ -325,5 +360,35 @@ impl<X: Pending> AiQuests for View<'_, X> {
     }
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         self.h.x.drehya_wait(game)
+    }
+    fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
+        self.h.x.jerhyn_palace_active(game)
+    }
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
+        self.h.x.jerhyn_npc_state(game, unit)
+    }
+    fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
+        self.h.x.guard_moving(game, unit)
+    }
+    fn alkor_bird(&mut self, game: &mut Game) -> bool {
+        self.h.x.alkor_bird(game)
+    }
+    fn alkor_reset(&mut self, game: &mut Game) {
+        self.h.x.alkor_reset(game);
+    }
+    fn ormus_altar(&mut self, game: &mut Game) -> Option<(i32, i32)> {
+        self.h.x.ormus_altar(game)
+    }
+    fn ormus_set_altar_mode(&mut self, game: &mut Game) {
+        self.h.x.ormus_set_altar_mode(game);
+    }
+    fn cain_town_coords(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32)> {
+        self.h.x.cain_town_coords(game, unit)
+    }
+    fn cain_in_town_activated(&mut self, game: &mut Game, unit: UnitId) {
+        self.h.x.cain_in_town_activated(game, unit);
+    }
+    fn anya_open_portal(&mut self, game: &mut Game, unit: UnitId) {
+        self.h.x.anya_open_portal(game, unit);
     }
 }

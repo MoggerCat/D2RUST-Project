@@ -9,7 +9,7 @@ const NPC_OUT_OF_TOWN: u16 = 31;
 
 /// The first unit-seed low word whose first `k` `lo' % 100` values
 /// satisfy `pred`.
-fn seed_with(k: usize, pred: impl Fn(&[u32]) -> bool) -> u32 {
+pub(super) fn seed_with(k: usize, pred: impl Fn(&[u32]) -> bool) -> u32 {
     (1..1_000_000u32)
         .find(|&lo| {
             let mut s = Seed::init_low(lo);
@@ -20,7 +20,7 @@ fn seed_with(k: usize, pred: impl Fn(&[u32]) -> bool) -> u32 {
 }
 
 /// Steps the monster's seed took since it was set to `init_low(lo)`.
-fn steps_since(w: &World, lo: u32) -> usize {
+pub(super) fn steps_since(w: &World, lo: u32) -> usize {
     let now = w.fake.seeds[&w.mon];
     let mut s = Seed::init_low(lo);
     (0..64)
@@ -32,13 +32,13 @@ fn steps_since(w: &World, lo: u32) -> usize {
         .expect("seed not reached")
 }
 
-fn unit_mode(m: u8, u: UnitId) -> String {
+pub(super) fn unit_mode(m: u8, u: UnitId) -> String {
     format!("mode {m} Unit({u:?})")
 }
 
 impl World {
     /// Runs the current AI function with `p`.
-    fn think_with(&mut self, target: Option<UnitId>, distance: i32, combat: bool) {
+    pub(super) fn think_with(&mut self, target: Option<UnitId>, distance: i32, combat: bool) {
         let p = TickParam {
             target,
             distance,
@@ -53,18 +53,18 @@ impl World {
         });
     }
 
-    fn add_unit(&mut self, ty: UnitType, at: (i32, i32)) -> UnitId {
+    pub(super) fn add_unit(&mut self, ty: UnitType, at: (i32, i32)) -> UnitId {
         let u = self.game.spawn_unit(ty, Some(self.room), false).unwrap();
         self.fake.pos.insert(u, at);
         u
     }
 
-    fn commands(&self) -> Vec<[i32; 5]> {
+    pub(super) fn commands(&self) -> Vec<[i32; 5]> {
         let c = self.store.control(self.mon).unwrap();
         c.commands.iter().map(|k| k.params).collect()
     }
 
-    fn vel_request(&self) -> VelocityRequest {
+    pub(super) fn vel_request(&self) -> VelocityRequest {
         self.store.get(self.mon).unwrap().velocity
     }
 }
@@ -220,7 +220,7 @@ fn good_npc_ranged_out_of_town() {
     // roguehire (271): `Skill1` in `Sk1mode` at S.
     let mut w = ranged_world();
     w.monstats[0].skill1 = 7;
-    w.modes[0] = [10, 0, 0];
+    w.modes[0] = [10, 0, 0, 0];
     w.fake.class.insert(w.mon, 271);
     let s = w.add_unit(UnitType::Monster, (110, 100));
     w.fake.secondary = Some((s, 19));

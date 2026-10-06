@@ -73,6 +73,18 @@ pub trait AiUnits {
     fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool;
     /// `0x00627260(unit, 6, value)`: sets stat 6 (life).
     fn set_life(&mut self, unit: UnitId, value: i32);
+    /// Unit getter `0x00625480(unit, stat, 0)` (Baboon's stat 74).
+    fn stat(&self, unit: UnitId, stat: u16) -> i32;
+    /// Unit set `0x00627260(unit, stat, value, 0)`.
+    fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32);
+    /// Sets bits of the unit flags (unit +0xC4; FoulCrowNest's 0x20000).
+    fn set_unit_flag(&mut self, unit: UnitId, mask: u32);
+    /// State on / off (`0x00639DB0(unit, state, on)`, `stat-lists.md`
+    /// §9.2; SandRaider's states 90, 91).
+    fn set_state(&mut self, unit: UnitId, state: u16, on: bool);
+    /// `0x00553540`: the unit's path target unit (`None` when there is
+    /// none).
+    fn path_target(&self, unit: UnitId) -> Option<UnitId>;
 }
 
 /// The mode machinery, paths and sounds. Provider: the units session
@@ -112,6 +124,11 @@ pub trait AiModes {
     ) -> bool;
     /// Operates a door (`0x00584540`, object spec).
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId);
+    /// Starts an overlay (`0x00621E40(unit, overlay, 0)`, stat 178
+    /// `unit_dooverlay`).
+    fn start_overlay(&mut self, unit: UnitId, overlay: i32);
+    /// Path facing `0x00648820(path, dir)` (path spec).
+    fn set_facing(&mut self, unit: UnitId, dir: i32);
 }
 
 /// Rooms, collision and line tests. Provider: the DRLG session (and
@@ -134,6 +151,9 @@ pub trait AiWorld {
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)>;
     /// The four last-dead GUIDs of a room (room +0x38..+0x44), as units.
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4];
+    /// `0x005FD350(class, room, x, y, 0)`: the monster footprint test
+    /// (`monsters/population.md` §9).
+    fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool;
 }
 
 /// Target sources: the game's target-node lists, room scans and forced
@@ -184,6 +204,10 @@ pub trait AiTargets {
         max_sq: i32,
         own_minions: bool,
     ) -> (Option<UnitId>, u32);
+    /// SandRaider's help search (§9.26 step 4): scan 1 for the nearest
+    /// other monster with alignment 0 not in mode 0 or 12, by squared
+    /// distance (`0x005B0BD0`, strictly smaller wins).
+    fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId>;
 }
 
 /// Skill code. Provider: the combat/skills session.
@@ -224,6 +248,29 @@ pub trait AiQuests {
     fn drehya_update(&mut self, game: &mut Game);
     /// drehyaiced's walk gate `0x0058A9F0(game)` (nonzero → wait).
     fn drehya_wait(&mut self, game: &mut Game) -> bool;
+
+    // ---- the Npc class cases (§9.9 step 2) ----
+
+    /// jerhyn: `0x0059F570` `ACT2Q4_IsJerhynPalaceActivated`.
+    fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool;
+    /// jerhyn: `0x0059F580` `ACT2Q4_GetAndUpdatePalaceNpcState`: (a, b).
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32);
+    /// jerhyn: `0x0059B6E0` `ACT2Q4_IsGuardMoving`.
+    fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool;
+    /// alkor: `0x005BAD20` `ACT3Q4_GoldenBirdBroughtToAlkor`.
+    fn alkor_bird(&mut self, game: &mut Game) -> bool;
+    /// alkor: `0x005BAD40` `ACT3Q4_ResetAlkor`.
+    fn alkor_reset(&mut self, game: &mut Game);
+    /// ormus: `0x005B9CA0` `ACT3Q3_GetAltarCoordinates`.
+    fn ormus_altar(&mut self, game: &mut Game) -> Option<(i32, i32)>;
+    /// ormus: `0x005B9CD0` `ACT3Q3_SetAltarMode`.
+    fn ormus_set_altar_mode(&mut self, game: &mut Game);
+    /// cain5: `0x00594360` `ACT1Q4_GetCainPortalInTownCoordinates`.
+    fn cain_town_coords(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32)>;
+    /// cain5: `0x005945F0` `ACT1Q4_OnCainInTownActivated`.
+    fn cain_in_town_activated(&mut self, game: &mut Game, unit: UnitId);
+    /// drehya: `0x0058BC80` `ACT5Q4_AnyaOpenPortal`.
+    fn anya_open_portal(&mut self, game: &mut Game, unit: UnitId);
 }
 
 /// Everything AI code needs.
