@@ -11,8 +11,9 @@
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
 //! once per frame through the bridge, the world view composed by the GPU
 //! compositor's render-graph node. With $D2_GAME_DIR set it reads the
-//! game's `levels` and `objects` tables from the user's files (unless
-//! `--synthetic`); otherwise it uses synthetic tables.
+//! game's `levels` and `objects` tables and generates its levels from the
+//! user's DS1 / DT1 files (unless `--synthetic`); otherwise it uses
+//! synthetic tables and levels.
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -21,7 +22,8 @@
 //! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
 //! instead (default view: the whole map; exit 0 means identical).
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
-//! exactly N. `cpu-render` writes the CPU reference image only.
+//! exactly N. Every case (map and synthetic) runs on one headless compute
+//! compositor. `cpu-render` writes the CPU reference image only.
 //!
 //! Game files are read from $D2_GAME_DIR. Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
@@ -238,13 +240,17 @@ fn verify(o: Options) -> Result<()> {
             wall_base: o.wall_base,
             view: o.view.map(|v| (v.left, v.top, v.width, v.height)),
         };
-        let report = verify::map::run("map", &case, o.out, o.perturb);
+        let mut gpu = verify::gpu::Wgpu::new();
+        let report = verify::map::run_with("map", &case, o.out, o.perturb, &mut gpu);
+        verify::print_report(&report);
         return match report.status {
             verify::Status::Pass => Ok(()),
             verify::Status::Fail(why) => bail!(why),
             verify::Status::Error(e) => bail!(e),
-            verify::Status::GpuNotWired | verify::Status::NoAdapter(_) => {
-                unreachable!("map cases run their GPU half in the Bevy app")
+            verify::Status::GpuNotWired => bail!("map case: GPU half not wired"),
+            verify::Status::NoAdapter(why) => {
+                eprintln!("map case: no GPU adapter: {why}");
+                std::process::exit(2)
             }
         };
     }
@@ -261,21 +267,24 @@ fn verify(o: Options) -> Result<()> {
         cases.retain(|c| o.cases.contains(&c.name));
     }
     println!("verify: {} cases from {}", cases.len(), dir.display());
-    // The compute compositor on a headless adapter, opened at the first
-    // synthetic case (after the map case's Bevy app, which sorts first).
+    // One compute compositor on a headless adapter for every case (map and
+    // synthetic alike), so the process opens one device; opened at the
+    // first case.
     let mut gpu = verify::gpu::Wgpu::new();
     let mut announced = false;
     let mut summary = verify::Summary::default();
     for case in &cases {
         println!("case {} ({})", case.name, case.kind.name());
+        if !std::mem::replace(&mut announced, true) {
+            println!("GPU compositor: {}", gpu.open());
+        }
         let report = match &case.kind {
             verify::CaseKind::Synthetic(s) => {
-                if !std::mem::replace(&mut announced, true) {
-                    println!("GPU compositor: {}", gpu.open());
-                }
                 verify::run_synthetic(&case.name, s, o.perturb, &mut gpu)
             }
-            verify::CaseKind::Map(m) => verify::map::run(&case.name, m, None, o.perturb),
+            verify::CaseKind::Map(m) => {
+                verify::map::run_with(&case.name, m, None, o.perturb, &mut gpu)
+            }
         };
         verify::print_report(&report);
         summary.add(&report.status);
@@ -307,22 +316,20 @@ fn view(o: Options) -> Result<()> {
 
 fn play(o: Options) -> Result<()> {
     use d2_client::app::{play, single_player};
-    let data = match std::env::var_os("D2_GAME_DIR") {
-        Some(_) if !o.synthetic => {
-            let tables = single_player::WaypointTables::live(&archives()?)?;
-            println!(
-                "play: game tables from D2_GAME_DIR ({} levels, {} objects, waypoint object class {})",
-                tables.levels.len(),
-                tables.objects.len(),
-                tables.object_class
-            );
-            single_player::GameData::Live(tables)
-        }
-        _ => {
-            println!("play: synthetic tables");
-            single_player::GameData::Synthetic
-        }
-    };
+    let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
+    let data = single_player::GameData::select(dir.as_deref(), o.synthetic)?;
+    match &data {
+        single_player::GameData::Live(d) => println!(
+            "play: game data from D2_GAME_DIR ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
+            d.waypoints.levels.len(),
+            d.waypoints.objects.len(),
+            d.waypoints.object_class,
+            d.files.ds1.0.len(),
+            d.files.subs.0.len(),
+            d.files.dt1.0.len()
+        ),
+        single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
+    }
     let result = play::run(play::PlayConfig {
         data,
         seed: o.seed,
