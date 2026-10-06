@@ -15,6 +15,8 @@ mod apply;
 mod check;
 mod diff;
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod robust_tests;
 mod syntax;
 #[cfg(test)]
@@ -231,7 +233,8 @@ impl Finding {
             0 | 1 => (
                 class, self.pos, self.line, self.col, self.code, table, 0, column,
             ),
-            2 => (class, 0, 0, 0, self.code, table, 0, column),
+            // B findings sort by table (§8); the code only breaks ties.
+            2 => (class, 0, 0, 0, Code::B01, table, self.code as usize, column),
             3 if self.code == Code::N04 => (class, usize::MAX, 0, 0, self.code, table, 0, column),
             3 => (
                 class, self.pos, self.line, self.col, self.code, table, 0, column,

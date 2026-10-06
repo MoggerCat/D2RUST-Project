@@ -80,3 +80,112 @@ fn champion_pack_member_counts_in_the_real_region() {
         bosses + 1
     );
 }
+
+/// A montype matrix of 4 rows (`runtime-maps.md` §2): 1 and 2 are their
+/// own types, 2 is nested in 1, 3 in 2 (so in 1 too); row and column 0
+/// empty.
+fn montype_matrix() -> d2_data::fixup::maps::EquivMatrix {
+    let row = |cols: &[usize]| cols.iter().fold(0u32, |w, &c| w | 1 << c);
+    d2_data::fixup::maps::EquivMatrix {
+        n: 4,
+        words: 1,
+        bits: vec![0, row(&[1]), row(&[1, 2]), row(&[1, 2, 3])],
+    }
+}
+
+// Covers: specs/monsters/init.md §17.3 r2; specs/data/runtime-maps.md §2 r1, §2 r2
+#[test]
+fn montype_nesting_reads_the_montype_matrix() {
+    use crate::monsters::init::InitHost;
+    let mut fx = Fx::with_tables(isle_ds1s(), |t| t.montype_equiv = montype_matrix());
+    let got = fx.sim.host(&mut fx.game, |h| {
+        [
+            (1, 1),
+            (2, 1),
+            (3, 1),
+            (3, 2),
+            (1, 2),
+            (2, 3),
+            (0, 0),
+            (0, 1),
+            (1, 0),
+            (4, 4),
+            (0xFFFF, 1),
+        ]
+        .map(|(m, t)| h.montype_is(m, t))
+    });
+    // Nested types answer yes; parents are not of a child's type; row 0,
+    // column 0 and out-of-range rows are no (unlike plain equality).
+    assert_eq!(
+        got,
+        [true, true, true, true, false, false, false, false, false, false, false]
+    );
+}
+
+// Covers: specs/monsters/init.md §5 r6, §18 r1
+#[test]
+fn init_host_answers_from_the_wired_world() {
+    use crate::monsters::init::InitHost;
+    let mut fx = Fx::new(isle_ds1s());
+    let (a, _) = isle(&mut fx);
+    fx.sim.create_regions();
+    fx.sim
+        .population(&mut fx.game, |cx| preset::place_presets(cx, a));
+    fx.assert_clean();
+    let u = monsters(&fx)[0];
+    let (level, before, after, inv, item) = fx.sim.host(&mut fx.game, |h| {
+        let before = h.minions(u);
+        h.link_minion(u, UnitId(900));
+        h.link_minion(u, UnitId(901));
+        (
+            h.level_id(u),
+            before,
+            h.minions(u),
+            h.has_inventory(u),
+            h.has_item_at(u, 4),
+        )
+    });
+    // The level of the unit's room; a unit in no room is in level 0.
+    assert_eq!(level, ISLE as i32);
+    assert_eq!(fx.sim.host(&mut fx.game, |h| h.level_id(UnitId(999))), 0);
+    // The minion list `0x0058F380`, in link order; other units have none.
+    assert!(before.is_empty());
+    assert_eq!(after, [UnitId(900), UnitId(901)]);
+    assert!(fx
+        .sim
+        .host(&mut fx.game, |h| h.minions(UnitId(900)))
+        .is_empty());
+    // No monster inventory exists in this wiring (`new_inventory` pending).
+    assert!(!inv && !item);
+}
+
+// Covers: specs/monsters/init.md §9 r3, §4 r2
+#[test]
+fn init_host_state_reaches_the_action_systems() {
+    use crate::monsters::init::InitHost;
+    let mut fx = Fx::new(isle_ds1s());
+    let (a, _) = isle(&mut fx);
+    fx.sim.create_regions();
+    fx.sim
+        .population(&mut fx.game, |cx| preset::place_presets(cx, a));
+    let u = monsters(&fx)[0];
+    fx.sim.action.sys.hooks.x.log.clear();
+    let (base, info) = fx.sim.host(&mut fx.game, |h| {
+        // Base stats (layer 0) round-trip through the unit's stat list.
+        h.set_stat(u, 7, 1234);
+        h.set_stat(u, 6, 77);
+        h.set_difficulty(2);
+        InitHost::set_alignment(h, u, 1);
+        ([h.stat(u, 7), h.stat(u, 6)], h.info())
+    });
+    fx.assert_clean();
+    assert_eq!(base, [1234, 77]);
+    assert_eq!(fx.sim.action.sys.stats.unit_base(u, 7, 0), 1234);
+    // `0x00573930`'s difficulty 2 is the game's for init, population
+    // and the AI.
+    assert_eq!(info.difficulty, 2);
+    assert_eq!(fx.sim.world.pop_info.difficulty, 2);
+    assert_eq!(fx.sim.action.sys.hooks.ai_info.difficulty, 2);
+    // The alignment value goes to its pending provider (`0x005543B0`).
+    assert_eq!(fx.sim.action.sys.hooks.x.log, [format!("align {} 1", u.0)]);
+}
