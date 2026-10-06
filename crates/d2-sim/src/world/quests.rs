@@ -11,6 +11,9 @@
 //! `QuestWorld::unhandled` instead of being guessed.
 
 pub mod act1;
+pub mod act4;
+pub mod act5;
+pub mod late;
 pub mod tables;
 
 #[cfg(test)]
@@ -277,6 +280,10 @@ pub enum TimerFn {
     AndarielPortals,
     /// `0x00596580`: chain 6's sequence timer, state 0 → 1 (§10.8).
     SlaughterOpen,
+    /// Act IV timers (`quests-act4.md`).
+    Act4(act4::Timer),
+    /// Act V timers (`quests-act5.md`, `quests-act5-2.md`).
+    Act5(act5::Timer),
     /// Test probe: logs through `unhandled(chain, tick)`, never removed.
     #[cfg(test)]
     Probe,
@@ -487,6 +494,22 @@ pub trait QuestWorld {
     /// A function the spec names but does not specify was reached; the
     /// host logs it (open questions 6–8).
     fn unhandled(&mut self, chain: u8, function: u32);
+
+    // Act IV / V seams. Each has a default that reports the 1.14d
+    // function through `unhandled` (chain 0xFE) so hosts that do not
+    // provide it yet keep building.
+
+    // -- Act IV, Fallen Angel / Hell's Forge / gossip (quests-act4.md §3, §4, §6).
+    // -- end Act IV q1/q3 seams.
+
+    // -- Act IV, Terror's End (quests-act4.md §5).
+    // -- end Act IV q2 seams.
+
+    // -- Act V part 1 (quests-act5.md).
+    // -- end Act V part 1 seams.
+
+    // -- Act V part 2 (quests-act5-2.md).
+    // -- end Act V part 2 seams.
 }
 
 /// A unit as the kill parse sees it (§4.4).
@@ -1014,9 +1037,8 @@ impl QuestControl {
                 m[5..7].copy_from_slice(&tomb.to_le_bytes());
             }
             if list[36] != 0 {
-                // TODO(quests OQ8): `0x00588C50` (barbarians left, Act V)
-                // is not specified; reported as 0.
-                w.unhandled(32, 0x0058_8C50);
+                let left = act5::barbarians_left(self, w);
+                m[7..9].copy_from_slice(&left.to_le_bytes());
             }
             w.send(player, &m);
         }
@@ -1045,10 +1067,7 @@ impl QuestControl {
         let status = self.status_for(w, i, player)?.unwrap_or(r.status);
         let extra = match r.filter {
             1 => act1::den_monsters_left(r),
-            36 => {
-                w.unhandled(32, 0x0058_8C50);
-                0
-            }
+            36 => act5::barbarians_left(self, w),
             _ => 0,
         };
         let mut m = [0u8; 6];
@@ -1452,24 +1471,32 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
             }
             match level {
                 76 => w.unhandled(0xFF, 0x005B_23C0),
-                108 => w.unhandled(0xFF, 0x005B_5750),
+                108 => act4::q2::dummy_event(ctl, w, object),
                 _ => {}
             }
         }
         0xBD => match (w.unit_act(object), w.unit_level(object)) {
             (Some(0), _) => record(ctl, w, 4, 0x0059_42C0),
-            (_, Some(l)) if l == 109 || l >= 113 => record(ctl, w, 33, 0x0058_A730),
-            _ => record(ctl, w, 32, 0x0058_8CA0),
+            (_, Some(l)) if l == 109 || l >= 113 => {
+                if ctl.find(33).is_some() {
+                    act5::q3::portal_event(ctl, w, object);
+                }
+            }
+            _ => {
+                if ctl.find(32).is_some() {
+                    act5::q2::portal_event(ctl, w, object);
+                }
+            }
         },
         act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
         0x155 => record(ctl, w, 20, 0x005B_CAC0),
         0x16F => record(ctl, w, 16, 0x005B_85E0),
         0x173 => act1::q5::chest_event(ctl, w, object),
-        0x178 => record(ctl, w, 24, 0x005B_6710),
-        0x1CB => w.unhandled(0xFF, 0x0058_B940),
-        0x1CC => w.unhandled(0xFF, 0x0058_A500),
-        0x1CD => w.unhandled(0xFF, 0x0058_9540),
-        0x1DA..=0x1DC => record(ctl, w, 35, 0x0058_C0E0),
+        0x178 if ctl.find(24).is_some() => act4::q3::forge_event(ctl, w, object),
+        0x1CB => act5::q4::temple_portal_event(ctl, w, object),
+        0x1CC => act5::q3::anya_dummy_event(ctl, w, object),
+        0x1CD => act5::q3::nihlathak_dummy_event(ctl, w, object),
+        0x1DA..=0x1DC if ctl.find(35).is_some() => act5::q5::statue_event(ctl, w, object),
         _ => {}
     }
 }

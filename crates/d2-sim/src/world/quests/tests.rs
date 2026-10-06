@@ -208,6 +208,17 @@ pub(super) struct Fake {
     pub(super) near_object: Option<UnitId>,
     pub(super) sent: Vec<(UnitId, Vec<u8>)>,
     pub(super) log: Vec<String>,
+    // -- Act IV q1/q3 fake fields.
+    // -- end Act IV q1/q3 fake fields.
+
+    // -- Act IV q2 fake fields.
+    // -- end Act IV q2 fake fields.
+
+    // -- Act V part 1 fake fields.
+    // -- end Act V part 1 fake fields.
+
+    // -- Act V part 2 fake fields.
+    // -- end Act V part 2 fake fields.
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -520,6 +531,18 @@ impl QuestWorld for Fake {
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
     }
+
+    // -- Act IV q1/q3 seam fakes.
+    // -- end Act IV q1/q3 seam fakes.
+
+    // -- Act IV q2 seam fakes.
+    // -- end Act IV q2 seam fakes.
+
+    // -- Act V part 1 seam fakes.
+    // -- end Act V part 1 seam fakes.
+
+    // -- Act V part 2 seam fakes.
+    // -- end Act V part 2 seam fakes.
 }
 
 pub(super) fn control() -> (QuestControl, Seed) {
@@ -571,14 +594,18 @@ fn fresh_game_entry() {
     // chain 2 stays at 0.
     assert_eq!(ctl.record(1).unwrap().state, 1);
     assert_eq!(ctl.record(2).unwrap().state, 0);
+    // Chain 22 holds at its init state 1 and chain 31 at 0 (act4 §1.3,
+    // act5 §1.3: state ≠ 5 and not-intro → 1), so neither walk moves on.
+    assert_eq!(ctl.record(22).unwrap().state, 1);
+    assert_eq!(ctl.record(24).unwrap().state, 0);
+    assert_eq!(ctl.record(31).unwrap().state, 0);
+    assert_eq!(ctl.record(32).unwrap().state, 0);
     assert_eq!(
         f.log,
         [
-            // Sequence functions of chains 8, 18, 22, 31.
+            // Sequence functions of chains 8, 18 (Acts II, III).
             "unhandled 8 0x5991c0",
             "unhandled 18 0x5ba7b0",
-            "unhandled 22 0x5b38e0",
-            "unhandled 31 0x587560"
         ]
     );
     // A second entry: callback 14 only, same messages.

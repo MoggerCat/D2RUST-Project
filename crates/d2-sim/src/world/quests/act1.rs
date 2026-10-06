@@ -75,6 +75,10 @@ pub struct Extra {
     pub stone_order: Option<[u8; 5]>,
     /// A1Q4: gold piles left on Wirt's body.
     pub wirt_piles: Option<i32>,
+    /// The Act IV records' fields (`quests-act4.md`).
+    pub a4: super::act4::Extra,
+    /// The Act V records' fields (`quests-act5.md`, `quests-act5-2.md`).
+    pub a5: super::act5::Extra,
     /// A2Q6 (chain 13) +0x34: the true tomb's level (§9.4).
     pub tomb_level: u32,
     /// A1Q4's other fields (§10.6).
@@ -96,6 +100,8 @@ pub fn init(r: &mut QuestRecord) {
             r.active = true;
             r.state = 0;
         }
+        c if super::act4::owns(c) => super::act4::init(r),
+        c if super::act5::owns(c) => super::act5::init(r),
         _ => {}
     }
 }
@@ -142,6 +148,8 @@ pub fn sequence<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, chain: u8) -> 
             }
             return true;
         }
+        c if super::act4::owns(c) => return super::act4::sequence(ctl, w, c),
+        c if super::act5::owns(c) => return super::act5::sequence(ctl, w, c),
         _ => {
             w.unhandled(chain, seq_fn.unwrap_or(0));
             return false;
@@ -312,6 +320,8 @@ pub fn callback<W: QuestWorld>(
         (5, _) => q5::callback(ctl, w, i, args, list),
         (6, _) => q6::callback(ctl, w, i, args, list),
         (37, _) => intro::callback(ctl, w, i, args, list),
+        (c, _) if super::act4::owns(c) => super::act4::callback(ctl, w, i, args, list),
+        (c, _) if super::act5::owns(c) => super::act5::callback(ctl, w, i, args, list),
         _ => false,
     };
     let _ = force;
@@ -403,6 +413,8 @@ pub fn active_fn<W: QuestWorld>(
         5 => q5::active(ctl, w, i, player, npc_class),
         6 => q6::active(ctl, w, i, player, npc_class),
         37 => intro::active(w, player, npc_class),
+        c if super::act4::owns(c) => super::act4::active(ctl, w, i, player, npc_class, f),
+        c if super::act5::owns(c) => super::act5::active(ctl, w, i, player, npc_class, f),
         c => {
             w.unhandled(c, f);
             false
@@ -421,8 +433,10 @@ pub fn status_fn<W: QuestWorld>(
     f: u32,
 ) -> Option<u8> {
     match ctl.records[i].chain {
-        0 | 25 | 30 | 37..=40 => None,
+        0 | 25 | 30 | 37..=39 => None,
         3 => Some(q3::status(ctl, w, i, player, pf)),
+        c if super::act4::owns(c) => super::act4::status(ctl, w, i, player, pf, f),
+        c if super::act5::owns(c) => super::act5::status(ctl, w, i, player, pf, f),
         c => {
             w.unhandled(c, f);
             None
@@ -471,6 +485,8 @@ pub fn run_timer<W: QuestWorld>(
             }
             true
         }
+        TimerFn::Act4(t) => super::act4::run_timer(ctl, w, t, chain),
+        TimerFn::Act5(t) => super::act5::run_timer(ctl, w, t, chain),
         #[cfg(test)]
         TimerFn::Probe => {
             w.unhandled(chain, ctl.tick);
