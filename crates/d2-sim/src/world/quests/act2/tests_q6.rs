@@ -781,7 +781,8 @@ fn jerhyn_and_meshif_messages() {
     // callback 2, chain 10's sequence.
     say(&mut ctl, &mut f, JERHYN_U, JERHYN, 430);
     assert_eq!(f.sent_ids(), [0x27, 0x29]);
-    assert!(f.log.contains(&"0x27 48 [(430, 0)]".to_string()));
+    // Chain 7 adds Jerhyn's 253 (8.0 clear) to the same list.
+    assert!(f.log.contains(&"0x27 48 [(430, 0), (253, 0)]".to_string()));
     assert_eq!(ctl.records[i].state, 2);
     assert!(ex(&ctl).chat_start && ctl.records[i].has_callback(2));
     // 442 without 14.3: nothing.

@@ -473,9 +473,9 @@ fn player_leaving_with_quest_items() {
     };
     // Chains 1–6 have bodies (§10.4–§10.8): the chain 1–3 lists lose P1.
     // So do the Act II chains with bodies (quests-act2.md §1.1 event 10).
-    const BODIES: [u8; 4] = [7, 8, 9, 12];
+    const BODIES: [u8; 5] = [7, 8, 9, 12, 13];
     ctl.record_mut(7).unwrap().extra.a2.q0.add(1);
-    for c in [8, 9, 12] {
+    for c in [8, 9, 12, 13] {
         ctl.record_mut(c).unwrap().guids.add(1);
     }
     ctl.record_mut(1).unwrap().guids.add(1);
@@ -496,7 +496,7 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(2).unwrap().guids.contains(1));
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
     assert!(!ctl.record(7).unwrap().extra.a2.q0.contains(1));
-    for c in [8, 9, 12] {
+    for c in [8, 9, 12, 13] {
         assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
     }
     let mut want = Vec::new();
