@@ -162,19 +162,13 @@ patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
 game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
 `66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
 
-Parser robustness (branch `claude/parser-robustness`, 2026-10-06): parser
-code changed in `d2-formats` (mpq decoders, animdata, dc6, dcc, dt1, ds1,
-tbl, cof) and `d2-data` (`bin.rs`, `patch/apply.rs`). Run
-`cargo test -p d2-data -p d2-formats -- --ignored`,
-`cargo run --release -p data-tool -- tables` and
-`cargo run --release -p mpq-tool -- check` / `formats`: expect the same
-results as before (every block and format file decodes, 72/73 tables
-identical). New whole-file limits that are implementation limits, not
-observed 1.14d behavior (each an Open question in its spec): DC6 frames
-and DCC direction boxes ≤ 64M pixels per file, DT1 block counts over all
-tiles ≤ file length / 20, TBL key+value bytes ≤ file length. Any
-`formats` failure naming one of these limits means 1.14d files exceed or
-share data, and the limit must be redesigned (not raised by guess).
+Done 2026-10-06 (local, `main` at `bc739e4`): parser robustness. `cargo
+test -p d2-data -p d2-formats -- --ignored` 29/29 pass; `data-tool tables`
+73 runtime tables 72 identical, 1 explained, 0 mismatched, code buffers
+4/4; `mpq-tool check` all blocks decoded; `mpq-tool formats` 0 errors in
+every kind (cof 3605/3606, dt1 254/260: the 7 gaps are the `KNOWN_UNUSED`
+files, failing as expected). No file reaches the new whole-file limits
+(DC6/DCC ≤ 64M pixels, DT1 blocks ≤ len/20, TBL bytes ≤ len).
 
 Phase 3 recordings: done 2026-10-06 (first skipped at the user's
 request, then recorded when the user asked). Combat with missiles
