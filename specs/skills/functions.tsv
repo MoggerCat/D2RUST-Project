@@ -5,12 +5,12 @@ srvst	2	0x0056CAF0	SrvSt02_Kick	spec'd-here	Kick	body: bodies.md §3.2
 srvst	3	0x0056CBA0	SrvSt03_Unsummon	spec'd-here	Unsummon	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.3
 srvst	4	0x005DA8B0	SrvSt04_Arrow_Bolt	spec'd-here	18 skills (e.g. Fire Arrow,Cold Arrow,Multiple Shot,Poison Javelin)	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.4
 srvst	5	0x005DA8F0	SrvSt05_Jab	spec'd-here	Jab	body: bodies.md §3.5
-srvst	6	0x005DA940	SrvSt06_PowerStrike_ChargedStrike	mapped	Power Strike,Charged Strike,MonPowerStrike,MonIceSpear	
+srvst	6	0x005DA940	SrvSt06_PowerStrike_ChargedStrike	spec'd-here	Power Strike,Charged Strike,MonPowerStrike,MonIceSpear	body: bodies.md §7.2
 srvst	7	0x005DAB40	SrvSt07_Impale	mapped	Impale	
 srvst	8	0x005DACD0	SrvSt08_Strafe	mapped	Strafe	
 srvst	9	0x005DAE30	SrvSt09_Fend	mapped	Fend	
 srvst	10	0x005DB020	SrvSt10_LightningStrike	mapped	Lightning Strike	
-srvst	11	0x005C8FA0	SrvSt11_Inferno_ArcticBlast	mapped	Inferno,Arctic Blast	
+srvst	11	0x005C8FA0	SrvSt11_Inferno_ArcticBlast	spec'd-here	Inferno,Arctic Blast	body: bodies.md §7.3
 srvst	12	0x005C9030	SrvSt12_Telekinesis_DragonFlight	mapped	Telekinesis,Dragon Flight	
 srvst	13	0x005C91C0	SrvSt13_ThunderStorm	mapped	Thunder Storm	
 srvst	14	0x005C9220	SrvSt14_Hydra	mapped	Hydra	
@@ -72,7 +72,7 @@ srvdo	2	0x0056F1F0	SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun_Concen
 srvdo	3	0x0056F460	SrvDo003_Throw	mapped	Throw	
 srvdo	4	0x0056CC20	SrvDo004_Unsummon	mapped	Unsummon	no function at this entry in the Ghidra export (data-only xref)
 srvdo	5	0x0056F550	SrvDo005_LeftHandThrow	mapped	Left Hand Throw	
-srvdo	6	0x005DB1C0	SrvDo006_InnerSight_SlowMissiles	mapped	Inner Sight,Slow Missiles	
+srvdo	6	0x005DB1C0	SrvDo006_InnerSight_SlowMissiles	spec'd-here	Inner Sight,Slow Missiles	body: bodies.md §8.13
 srvdo	7	0x005DB2D0	SrvDo007_Jab	mapped	Jab	
 srvdo	8	0x005DB410	SrvDo008_MultipleShot_Teeth_ShockWave	spec'd-here	Multiple Shot,Teeth,PrimePoisonball,Shock Wave	body: bodies.md §8.6
 srvdo	9	0x005D8E00	SrvDo009_Frenzy	mapped	Frenzy	
@@ -85,7 +85,7 @@ srvdo	15	0x005DC000	SrvDo015_Dopplezon	mapped	Dopplezon
 srvdo	16	0x005DC1E0	SrvDo016_Valkyrie	mapped	Valkyrie	
 srvdo	17	0x005C9300	SrvDo017_ChargedBolt_BoltSentry	mapped	Charged Bolt,PrimeBolt,BoltSentry,ImpBolt	
 srvdo	18	0x005C9480	SrvDo018_DefensiveBuff	spec'd-here	11 skills (e.g. Frozen Armor,Shiver Armor,Chilling Armor,Bone Armor)	body: bodies.md §4.3
-srvdo	19	0x005C9640	SrvDo019_Inferno_ArcticBlast	mapped	Inferno,Arctic Blast	
+srvdo	19	0x005C9640	SrvDo019_Inferno_ArcticBlast	spec'd-here	Inferno,Arctic Blast	body: bodies.md §8.16
 srvdo	20	0x005C9800	SrvDo020_StaticField	mapped	Static Field	
 srvdo	21	0x005C98F0	SrvDo021_Telekinesis	mapped	Telekinesis	
 srvdo	22	0x005C9B50	SrvDo022_NovaAttack	spec'd-here	9 skills (e.g. Frost Nova,Nova,Poison Nova,Howl)	body: bodies.md §8.4
@@ -97,7 +97,7 @@ srvdo	27	0x005CA360	SrvDo027_Teleport	mapped	Teleport
 srvdo	28	0x005CA3E0	SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult	spec'd-here	12 skills (e.g. Meteor,Blizzard,VampireMeteor,MonBlizzard)	body: bodies.md §8.12
 srvdo	29	0x005CA4D0	SrvDo029_ThunderStorm	mapped	Thunder Storm	
 srvdo	30	0x005C37C0	SrvDo030_Curse	spec'd-here	10 skills (e.g. Amplify Damage,Dim Vision,Weaken,Iron Maiden)	body: bodies.md §4.4
-srvdo	31	0x005C4B00	SrvDo031_RaiseSkeleton_Mage	mapped	Raise Skeleton,Raise Skeletal Mage	
+srvdo	31	0x005C4B00	SrvDo031_RaiseSkeleton_Mage	spec'd-here	Raise Skeleton,Raise Skeletal Mage	body: bodies.md §8.14
 srvdo	32	0x005C4CD0	SrvDo032_PoisonDagger	mapped	Poison Dagger	no function at this entry in the Ghidra export (data-only xref)
 srvdo	33	0x005D3140	SrvDo033_PsychicHammer	mapped	Psychic Hammer	
 srvdo	34	0x005D3490	SrvDo034_TigerStrike_CobraStrike_RoyalStrike	spec'd-here	Tiger Strike,Cobra Strike,Royal Strike	body: bodies.md §8.8
@@ -182,7 +182,7 @@ srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	mapped	MonCurseCast
 srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	mapped	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	
 srvdo	114	0x005C6910	SrvDo114_Raven	mapped	Raven	
 srvdo	115	0x005C6A80	SrvDo115_Vines	spec'd-here	Plague Poppy,Cycle of Life,Vines	body: bodies.md §8.7
-srvdo	116	0x005C6EC0	SrvDo116_Wearwolf_Wearbear	mapped	Wearwolf,Wearbear,Delerium Change	hard-coded in mana check 0x00647540/0x0056C160: free while shapeshifted
+srvdo	116	0x005C6EC0	SrvDo116_Wearwolf_Wearbear	spec'd-here	Wearwolf,Wearbear,Delerium Change	hard-coded in mana check 0x00647540/0x0056C160: free while shapeshifted; body: bodies.md §8.15
 srvdo	117	0x005C7160	SrvDo117_Firestorm	mapped	Firestorm	
 srvdo	118	0x005C72F0	SrvDo118_Twister_Tornado	mapped	Twister,Tornado	
 srvdo	119	0x005C7390	SrvDo119_DruidSummon	spec'd-here	Oak Sage,Summon Spirit Wolf,Heart of Wolverine,Summon Fenris,Spirit of Barbs,Summon Grizzly	body: bodies.md §8.1

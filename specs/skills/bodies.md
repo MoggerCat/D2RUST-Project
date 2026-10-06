@@ -35,15 +35,15 @@
 |   3. Start functions (srvst) | 429–518 |
 |   4. Do functions (srvdo) | 519–702 |
 |   5. `srvmissile` path | 703–718 |
-|   6. Shared helpers, batch 2 | 719–947 |
-|   7. Start functions (srvst), batch 2 | 948–954 |
-|   8. Do functions (srvdo), batch 2 | 955–1183 |
-| Constants & data dependencies | 1184–1228 |
-| Randomness | 1229–1247 |
-| Edge cases & original bugs | 1248–1284 |
-| Test vectors | 1285–1305 |
-| Provenance | 1306–1329 |
-| Open questions | 1330–1356 |
+|   6. Shared helpers, batch 2 | 719–1017 |
+|   7. Start functions (srvst), batch 2 | 1018–1045 |
+|   8. Do functions (srvdo), batch 2 | 1046–1342 |
+| Constants & data dependencies | 1343–1387 |
+| Randomness | 1388–1406 |
+| Edge cases & original bugs | 1407–1450 |
+| Test vectors | 1451–1471 |
+| Provenance | 1472–1497 |
+| Open questions | 1498–1524 |
 <!-- /index -->
 
 ## Summary
@@ -945,12 +945,103 @@ still both 0 → none. Distance `0x006417F0(unit, tx, ty)` (max(|dx|,
 Record (§R2.1, zeroed): flags 1 (position given), owner the unit, (x, y)
 = (tx, ty), class m, skill, L; no target. Return the creation's result.
 
+#### 6.14 Paladin raise penalty `0x005C2FF0`
+
+`raise_penalty(game, unit)`: only a player of class 3 (Paladin). h = max
+life (`0x00625D10`); zeroed record: hit flags 0x1000, result 4, physical
+(+0x08) = total (+0x4C) = h / 8 (signed, truncating); `apply(game, unit,
+unit, 0, record)` (`combat/damage.md` §5.2); reaction `0x0057CEE0(game,
+unit, unit, record)`.
+
+#### 6.15 Skeleton components `0x005C4430`
+
+`components(owner, m, skill, L)` (ECX owner, EDX m): by m's class: 363
+(necroskeleton) → skeleton form, 364 (necromage) → mage form, other →
+nothing.
+
+1. lvl = 1; the owner has state 97 (`skel_mastery`) with a list → lvl =
+   its stat 351. lvl > 10 → 10.
+2. Skeleton: shield = 0; L > 2: p = `Param1` (+0x148) of the skill (0
+   when invalid); one draw on the **owner's** seed, r = `lo' mod 100`
+   (unsigned); r < p → shield = 1. Mage: shield = 0.
+3. Set m's component bytes (monster data +0x04 + k; k = 0 HD, 1 TR, 2 LG,
+   3 RA, 4 LA, 5 RH, 7 SH, 8 S1, 9 S2, 11 S4, 12 S5) from row lvl of the
+   9-byte table `0x00741940` (t0…t8): HD := t0, TR := t2, S1 := t3, S2
+   := t4, LG := t5, RA := t6, LA := t7; shield → SH := t1.
+4. Mage: one draw on the owner's seed, c = `lo' & 3`; S4 := c, S5 := c;
+   AI params 0 := 1, 1 := 0 (`0x005B0D70(control, 1, 0, −666)`; −666 =
+   unchanged). Skeleton: RH := t8.
+
+Table rows lvl 0…10 (t0…t8): 0–1 all 0; 2 (0,1,0,0,0,0,0,0,1); 3
+(0,1,0,0,0,0,0,1,1); 4–5 (1,1,0,0,0,0,1,1,2); 6 (1,1,1,0,0,1,1,1,3); 7
+(2,2,1,0,0,1,1,1,3); 8 (2,2,1,0,0,1,1,2,4); 9–10 (2,3,1,0,0,1,2,2,4).
+
+#### 6.16 Inferno start `0x005C8E30`
+
+`inferno_start(game, unit, skill, L, m)` (ECX game, EDX unit; `ret
+0xC`; D2MOO `SKILLS_StartInferno`):
+
+1. R invalid → 0.
+2. A monster: used entry param 1 := F + max(`eval(calc2)`, 1).
+3. The unit has a list of state 12 (`inferno`): rewind `0x00553C70(game,
+   unit, 1)` (`sim/units.md` §4.2 variants); expiry := F + 6; timer 12
+   at F + 6; `inferno_do(game, unit, skill, L, m)` (§6.17); return 1.
+4. Else: alloc (game pool, flags 2, expire F + 20, owner the unit;
+   failure → 0); timer 12 at F + 20; attach; remove callback `0x005C8BF0`
+   (state off, then unit flags |= 0x40); state 12 set and on; used entry
+   param 1 := 0. Return 1.
+
+#### 6.17 Inferno do `0x005C8CA0`
+
+`inferno_do(game, unit, skill, L, m)` (D2MOO `SKILLS_DoInferno`):
+
+1. R invalid, or not 0 ≤ m < missiles count → 0.
+2. Target position (§2.4) → (tx, ty); failure → 0.
+3. E = used skill entry; none → 0.
+4. E param 1 ≠ 0: record (§R2.1, zeroed): flags 0x8020 (target absolute,
+   range given), owner = origin = the unit, class m, target (tx, ty),
+   skill, L, range = max(`eval(calc1)`, 1); create.
+5. E param 1 := 1.
+6. Not a monster: rewind `0x00553C70(game, unit, 1)`; return 1.
+7. Monster: unit +0x44 := 0xB00 (frame 11). F < E param 1 (= 1) and
+   state 12 on → delete type-1 timers (`0x00540E60(game, unit, 1, 0)`),
+   type-0 timer at F + 2 args (4, 0). Else (`0x005C8C10`): state 12 off;
+   delete type-0 timers; type-1 timer (ENDANIM) at F + d, d =
+   monstats2 `InfernoLen` (+0x108) of the class, 1 without a record.
+   Return 1.
+
+The first call after a fresh start (param 1 = 0) creates nothing; every
+later one creates one missile. Step 5 overwrites the monster timeout of
+§6.16 step 2, so a monster always takes the "else" branch of step 7
+(Edge case 16).
+
 ### 7. Start functions (srvst), batch 2
 
 #### 7.1 23 Tiger Strike, Fists of Fire, Cobra Strike, Claws of Thunder, Blades of Ice, Royal Strike `0x005D32F0`
 
 T none → 0. Return the melee range test `0x00622C40(unit, T, 0)` (1 in
 range). Skill and level are not read.
+
+#### 7.2 6 Power Strike, Charged Strike `0x005DA940`
+
+Also MonPowerStrike, MonIceSpear.
+
+1. T none → 0. R invalid → 0.
+2. Zeroed record; result = `melee_result(game, unit, T, 0, 0)` (no skill
+   to-hit bonus).
+3. Hit: enhanced damage % (+0x0C) := `eval(calc1)`. `EType` ≠ 0: c =
+   `eval(calc4)`; conversion % := c; c > 0 → conversion element :=
+   `EType`. `roll_elemental(unit, record, skill, L)` (whatever `EType`).
+4. `start_combat(game, unit, T, record, SrcDam)` (0 passed as 0). Return
+   1.
+
+#### 7.3 11 Inferno, Arctic Blast `0x005C8FA0`
+
+1. R invalid → 0.
+2. The unit lacks state 12 (`inferno`) and its `mana(8)` < `startmana`
+   (+0x184) << 8 → 0.
+3. m = `srvmissilea`; not 0 ≤ m < missiles count → 0.
+4. Return `inferno_start(game, unit, skill, L, m)` (§6.16).
 
 ### 8. Do functions (srvdo), batch 2
 
@@ -1181,6 +1272,74 @@ Class skills: Eruption, Blizzard, Meteor (also 9 monster rows,
 5. Return 1 if `missile_at(game, unit, skill, L, m, 0, 0)` (§6.13) made a
    missile, else 0.
 
+#### 8.13 6 Inner Sight, Slow Missiles `0x005DB1C0`
+
+1. R invalid, `auratargetstate` not in 0…states count − 1, or
+   `aurastat1` not in 0…itemstatcost count − 1 → 0. (Unit flag 0x40 is
+   not set.)
+2. Context {skill, L, duration `eval(auralencalc)`, state
+   `auratargetstate`, stat `aurastat1`, value `eval(aurastatcalc1)`}
+   (evaluated in this order, then the range).
+3. `scan_unit(game, unit, 0, 0, eval(aurarangecalc), aurafilter,
+   0x005DB150, context, noaura = 1)` (§2.12). Return 1.
+
+Callback `0x005DB150` (ECX scan context, EDX U): `apply_state` (§2.7)
+{source the unit, target U, skill, L, duration, stat, value, state,
+default callback}; return 1 whatever it gave.
+
+#### 8.14 31 Raise Skeleton, Raise Skeletal Mage `0x005C4B00`
+
+1. T none → 0. `0x00645510(T, 0)` (corpse test of §3.6) = 0 → 0.
+2. `raise_penalty(game, unit)` (§6.14).
+3. R invalid → 0.
+4. c = `summon_class(unit, skill, L, &mode)`; < 0 → 0. pt = `pettype`
+   (signed); outside 0…count − 1 → 0.
+5. (x, y) = T's position (`0x0045ADF0`, `0x0045AE20`). Room delete
+   record `0x0061A270(T's room, T type, T GUID)` (prepends {type, GUID}
+   to the room's delete list +0x18 and flags the room); remove T
+   (`0x00555600(game, T)`).
+6. m = spawn (§6.2) {flags 1, owner unit, class c, AI state 0, mode, x,
+   y, pt, pet max `eval(petmax)`}; none → 0 (the corpse is gone anyway).
+7. `base_stats(game, unit, m, 0, L)` (§6.4); `components(unit, m, skill,
+   L)` (§6.15); `skill_stats(game, unit, m, skill, L, 0)` (§6.5);
+   `summon_resist(unit, m)` (§6.11); `node_insert(game, m, 0, unit
+   +0xD0)`. Return 1.
+
+1.14d differs from D2MOO 1.10f: the penalty runs before the record test,
+and the components come between base and skill stats.
+
+#### 8.15 116 Werewolf, Werebear `0x005C6EC0`
+
+Also Delerium Change (monster).
+
+1. R invalid, or `aurastate` not in 0…states count − 1 → 0.
+2. Unit flags |= 0x40.
+3. `clear_group(unit, aurastate, 1)` (§2.9) removed something (the unit
+   was shifted): delay `0x0056F020(game, unit, skill, L)` (d =
+   `eval(delay)` > 0 → `set_delay(game, unit, d)`, `use.md` §6); return
+   0.
+4. d = `eval(auralencalc)`. The unit already has a list of `aurastate`
+   → 0.
+5. Alloc (game pool, flags 2, expire F + d, owner the unit; failure → 0);
+   set state; remove callback `0x005C6C50`; attach; state on; timer 12 at
+   F + d.
+6. `aura_fill(unit, list, R, skill, L)`; list set 350 := skill, 351 :=
+   L. The unit's entry of the skill (`0x006439F0`) → its mode (+0x08) :=
+   10 (`0x00644340`, values ≤ 0x20). Return 1.
+
+Remove callback `0x005C6C50` (ECX unit, EDX state, stack list):
+`clear_group(unit, state, 1)`; list given: entry of skill list[350] →
+mode := 10 passed through the disguise remap (`0x005C6BF0` →
+`0x00645270`); state off.
+
+Shifting back returns 0: the core charges nothing, so the delay is set
+here.
+
+#### 8.16 19 Inferno, Arctic Blast `0x005C9640`
+
+R invalid, or m = `srvmissilea` not 0 ≤ m < missiles count → 0. Return
+`inferno_do(game, unit, skill, L, m)` (§6.17).
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -1281,6 +1440,13 @@ per ring, n per Multiple Shot) takes one game-seed step
     flag 0x40 as it was; srvdo 35 sets or clears it first (§8.10).
 15. Srvdo 8 returns 1 without a missile when the target position fails;
     srvdo 13 returns 0 after a hit (§8.6 step 3, §8.11).
+16. Monster Inferno: §6.17 step 5 sets the entry's param 1 to 1 before
+    step 7 compares the frame with it, so the monster channel always ends
+    after one call (state 12 off, ENDANIM at F + `InfernoLen`); the
+    timeout of §6.16 step 2 is never used (as D2MOO).
+17. A Paladin who casts Raise Skeleton / Skeletal Mage (item charges)
+    takes max life / 8 physical damage before the record test, even when
+    the raise then fails (§8.14 step 2).
 
 ## Test vectors
 
@@ -1317,9 +1483,11 @@ per ring, n per Multiple Shot) takes one game-seed step
   event 1 each time (as D2MOO); `0x005C3540` resistance scaling and the
   hireling exception are not in D2MOO's curse callback.
 - Batch 2 (§6–§8): every address disassembled (`disasm.py fn|at`);
-  ring tables `0x006E1288` / `0x006E1388` read from the image; use
+  ring tables `0x006E1288` / `0x006E1388` and the component table
+  `0x00741940` read from the image; use
   counts from the 1.14d `patch_d2` `skills.txt`. D2MOO names compared:
-  `SrvSt23`, `SrvDo008/013/022/028/034/035/045/056/066/068/115/119`,
+  `SrvSt06/11/23`, `SrvDo006/008/013/019/022/028/031/034/035/045/056/066/068/115/116/119`,
+  `SKILLS_StartInferno`, `SKILLS_DoInferno`, `D2GAME_SetUnitComponent_6FD0C3A0`,
   `D2SummonArgStrc`, `D2GAME_GetSummonIdFromSkill_6FD15580`,
   `D2GAME_SetSummonPassiveStats_6FD0C530`,
   `D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10`,
