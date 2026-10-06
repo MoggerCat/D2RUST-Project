@@ -60,6 +60,7 @@ use d2_sim::world::waypoints::{
 use super::super::items::moves::{InvParts, MoveCall};
 use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
+use super::super::walk::{WalkCall, WalkResult};
 use super::{
     ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
     WorldHost,
@@ -438,6 +439,10 @@ where
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         WorldHost::<D>::skill(&mut self.action, call)
+    }
+
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        WorldHost::<D>::walk(&mut self.action, game, events, call)
     }
 
     /// The action wiring's sends (waypoints, tick paths), then the rest's

@@ -56,6 +56,10 @@ struct Fake {
     special_walk: Option<(UnitId, i32)>,
     corpses: (Option<UnitId>, u32),
     skill_unusable: bool,
+    /// Acts by unit (default 0).
+    acts: BTreeMap<UnitId, u8>,
+    /// `choose_alternative` takes the slot-9 alternative.
+    take_alt: bool,
 }
 
 impl Fake {
@@ -93,8 +97,8 @@ impl AiUnits for Fake {
     fn size(&self, _: UnitId) -> i32 {
         1
     }
-    fn act(&self, _: UnitId) -> u8 {
-        0
+    fn act(&self, unit: UnitId) -> u8 {
+        self.acts.get(&unit).copied().unwrap_or(0)
     }
     fn level_id(&self, _: &Game, _: UnitId) -> i32 {
         self.level
@@ -240,9 +244,10 @@ impl AiTargets for Fake {
         _: &mut Game,
         _: UnitId,
         _: Option<UnitId>,
-        _: UnitId,
+        alt: UnitId,
     ) -> bool {
-        false
+        self.log.push(format!("alt {}", alt.0));
+        self.take_alt
     }
     fn secondary_target(&mut self, _: &mut Game, _: UnitId) -> (Option<UnitId>, i32, bool) {
         match self.secondary {

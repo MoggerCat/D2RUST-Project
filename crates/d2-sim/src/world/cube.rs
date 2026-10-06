@@ -1388,3 +1388,6 @@ impl CubeData {
         0
     }
 }
+
+#[cfg(test)]
+mod mutant_tests;

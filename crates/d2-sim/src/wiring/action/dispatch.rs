@@ -16,7 +16,7 @@ use crate::tick::timer::TimerRun;
 use crate::tick::{EventDispatch, TickHooks};
 use crate::units::dispatch::UnitSystem;
 use crate::units::hooks::UnitData;
-use crate::units::{ClientId, RoomId};
+use crate::units::{ClientId, RoomId, UnitId};
 
 use super::combat::CombatView;
 use super::waypoints::WaypointView;
@@ -185,6 +185,19 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     fn free_inactive_rooms(&mut self, _: &mut Game, act: u8) {
         let r = self.sys.hooks.drlg.free_inactive_rooms(act);
         self.log(r);
+    }
+
+    /// Per-client update (`tick.md` §6.5, `0x0053A5D0`): with the path
+    /// provider on, a player's movement messages (`pathing.md` §10 rules
+    /// 2–3, [`crate::wiring::path::walk::update_messages`]). Other units'
+    /// update messages (the unit-update spec) are not written.
+    fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
+        if self.sys.hooks.paths.is_none() {
+            return;
+        }
+        let s = &mut self.sys;
+        let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
     }
 
     /// Per-client update (`tick.md` §6.5): the player's room differs from
