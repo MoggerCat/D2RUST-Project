@@ -138,6 +138,7 @@ fn scroll_list_row_at() {
 #[test]
 fn text_input_rect_and_draw() {
     use d2_client::ui::panel::WidgetId;
+    use d2_client::ui::text::TextOpts;
     use d2_client::ui::widget::{TextInput, Widget};
     use d2_client::ui::{Rect, TextRequest, TextStyle, UiDraw, FRAME};
 
@@ -154,6 +155,7 @@ fn text_input_rect_and_draw() {
             text: vec![0x41, 0x42],
             at: rect.origin(),
             style: TextStyle::default(),
+            opts: TextOpts::default(),
             clip: FRAME,
         })]
     );
