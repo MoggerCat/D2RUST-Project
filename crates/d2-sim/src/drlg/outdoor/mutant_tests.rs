@@ -3033,3 +3033,314 @@ fn river_and_bridge_by_the_rules() {
     }
     assert!(bridges[0] > 3 && bridges[1] > 3, "{bridges:?}");
 }
+
+/// `outdoor.md` §7.5 from the rule text on a prepared level: starts
+/// (neighbour entries of levels 1 and 26, then grid cells x outer, y
+/// inner), adjusted points, the join point (bridge or the centre search),
+/// grid paths (bit 0x80 in grid 2) and the jitter.
+#[test]
+fn dirt_paths_by_the_rules() {
+    use super::wild::grid_path;
+    use super::{PathEnds, PathPoint};
+    let pt = |x, y, direction| PathPoint { x, y, direction };
+    for (case, flags) in [(0u32, 0u32), (1, 0x10), (2, 0), (3, 0x10)] {
+        for k in 0..4u32 {
+            let (gw, gh) = (10, 8);
+            let mut e = Env::new(4, gw, gh);
+            e.drlg.level_mut(e.l).seed = Seed::init_low(900 + 7919 * (k + 4 * case));
+            e.info.flags = flags;
+            let lr = e.drlg.level(e.l).rect;
+            // Neighbour entries: the town on side `case`, level 26, another.
+            let town = TileRect::new(700 + 3 * k as i32, 650 + 5 * case as i32, 56, 40);
+            let orth = |id, d, r| Orth {
+                level_id: id,
+                direction: d,
+                init: false,
+                rect: r,
+                preset: true,
+            };
+            e.info.orth = vec![
+                orth(1, case as i32, town),
+                orth(26, 1, TileRect::new(900, 600, 40, 18)),
+                orth(3, 2, TileRect::new(1000, 800, 80, 80)),
+            ];
+            // Grid cells: border pieces with file 3, caves, river pieces.
+            let put = |e: &mut Env, x: i32, y: i32, p: u32, f: u32| {
+                e.info.grids[0].op(x, y, Op::Set, p);
+                e.info.grids[2].op(x, y, Op::Set, cell::PRESET | f << 16);
+            };
+            put(&mut e, 0, 2 + k as i32 % 3, 5, 3);
+            put(&mut e, 4, 0, 6, 3);
+            put(&mut e, 9, 5, 7, 3);
+            put(&mut e, 3, 7, 4, 3);
+            put(&mut e, 2, 0, 4, 2); // file ≠ 3: no start
+            put(&mut e, 8, 6, if case < 2 { 51 } else { 52 }, k % 2);
+            put(&mut e, 6, 3, 24, 0);
+            put(&mut e, gw - 2, 1, 28, 1);
+            put(&mut e, gw / 2 - 1, 2 + k as i32 % 2, 28, 1);
+            // The model.
+            let mut starts: Vec<PathPoint> = Vec::new();
+            let d = case as i32;
+            let (tx, ty) = [(59, 19), (29, 35), (4, 22), (29, 3)][case as usize];
+            starts.push(pt(town.x + tx, town.y + ty, d));
+            starts.push(pt(927, 613, 1));
+            for x in 0..gw {
+                for y in 0..gh {
+                    let p = e.info.grids[0].get(x, y);
+                    let f = (e.info.grids[2].get(x, y) >> 16) & 0xF;
+                    let dir = match (p, f) {
+                        (4, 3) => 3,
+                        (5, 3) => 0,
+                        (6, 3) => 1,
+                        (7, 3) => 2,
+                        (24, _) => 1,
+                        (25, _) => 0,
+                        (28, 1) if x == gw - 2 => 2,
+                        (51 | 52, f) => i32::from(f != 0),
+                        _ => continue,
+                    };
+                    starts.push(pt(lr.x + 8 * x + 3, lr.y + 8 * y + 3, dir));
+                }
+            }
+            let adjust = |p: PathPoint| {
+                let (mut qx, mut qy) = (p.x - lr.x, p.y - lr.y);
+                match p.direction {
+                    0 => qx = 8 * (qx / 8) + 11,
+                    1 => qy = 8 * (qy / 8) + 11,
+                    2 => qx = 8 * (qx / 8) - 5,
+                    3 => qy = 8 * (qy / 8) - 5,
+                    _ => {}
+                }
+                pt(qx + lr.x, qy + lr.y, p.direction)
+            };
+            let bridge = if flags & 0x10 != 0 {
+                let x = gw / 2 - 1;
+                (1..gw - 1)
+                    .find(|&y| {
+                        e.info.grids[0].get(x, y) == 28
+                            && (e.info.grids[2].get(x, y) >> 16) & 0xF == 1
+                    })
+                    .map(|y| (x, y))
+            } else {
+                None
+            };
+            let n = starts.len() as i32;
+            let joins: Vec<PathPoint> = match bridge {
+                Some((x, y)) => {
+                    let (bx, by) = (lr.x + 8 * x + 3, lr.y + 8 * y + 3);
+                    starts
+                        .iter()
+                        .map(|s| {
+                            if s.x <= bx {
+                                pt(bx, by, 2)
+                            } else {
+                                pt(bx + 8, by, 0)
+                            }
+                        })
+                        .collect()
+                }
+                None => {
+                    let cx = starts.iter().map(|s| s.x - lr.x).sum::<i32>() / (8 * n);
+                    let cy = starts.iter().map(|s| s.y - lr.y).sum::<i32>() / (8 * n);
+                    let mut last = (cx, cy);
+                    'f: for r in 0..8 {
+                        for (dx, dy) in [(-1, 0), (0, 1), (0, -1), (1, 0)] {
+                            last = (cx + r * dx, cy + r * dy);
+                            let c = e.info.grids[2].get(last.0, last.1);
+                            if e.info.grids[2].contains(last.0, last.1) && c & cell::NOT_SPAWN == 0
+                            {
+                                break 'f;
+                            }
+                        }
+                    }
+                    vec![pt(lr.x + 8 * last.0 + 3, lr.y + 8 * last.1 + 3, 4); starts.len()]
+                }
+            };
+            let ends: Vec<PathEnds> = starts
+                .iter()
+                .zip(&joins)
+                .map(|(&s, &j)| PathEnds {
+                    start: s,
+                    start_adjusted: adjust(s),
+                    join_adjusted: adjust(j),
+                    join: j,
+                })
+                .collect();
+            let mut m2 = e.info.grids[2].clone();
+            let mut s = e.seed();
+            let mut paths = Vec::new();
+            for en in &ends {
+                let a = (
+                    (en.start_adjusted.x - lr.x) / 8,
+                    (en.start_adjusted.y - lr.y) / 8,
+                );
+                let b = (
+                    (en.join_adjusted.x - lr.x) / 8,
+                    (en.join_adjusted.y - lr.y) / 8,
+                );
+                let snapshot = m2.clone();
+                let path = grid_path(a, b, gw, gh, |c| snapshot.get(c.0, c.1) & cell::PRESET != 0);
+                let mut kk = (s.step() & 3) as usize;
+                let mut out = Vec::new();
+                if let Some(p) = &path {
+                    for &(x, y) in p {
+                        m2.op(x, y, Op::Or, cell::PATH);
+                    }
+                    if en.join.direction != 4 {
+                        out.push((en.join.x, en.join.y));
+                    }
+                    for (i, &(x, y)) in p.iter().enumerate() {
+                        if i == 0 {
+                            out.push((en.join_adjusted.x, en.join_adjusted.y));
+                        } else if i + 1 < p.len() {
+                            let ox = ((s.step() & 1) as i32 + 2) * [1, 0, -1, 0][kk];
+                            let oy = ((s.step() & 1) as i32 + 2) * [0, 1, 0, -1][kk];
+                            kk = (kk + 1) % 4;
+                            out.push((8 * x + lr.x + ox + 3, 8 * y + lr.y + oy + 3));
+                        } else {
+                            out.push((en.start_adjusted.x, en.start_adjusted.y));
+                        }
+                    }
+                    out.push((en.start.x, en.start.y));
+                }
+                paths.push(out);
+            }
+            let mut g = e.gen();
+            g.dirt_paths().unwrap();
+            assert_eq!(g.info.path_ends, ends, "case {case} k {k}: ends");
+            assert_eq!(g.info.paths, paths, "case {case} k {k}: paths");
+            assert_eq!(g.info.grids[2].cells, m2.cells, "case {case} k {k}: grid 2");
+            assert_eq!(*g.seed(), s, "case {case} k {k}: seed");
+            assert!(
+                paths.iter().any(|p| p.len() > 3),
+                "case {case} k {k}: a real path"
+            );
+        }
+    }
+}
+
+/// `outdoor.md` §7.5 step 3: with one start the join search starts at
+/// the grid centre (gw/2, gh/2); the first in-grid spawn-valid cell of
+/// r = 0.. and the four directions (−1, 0), (0, 1), (0, −1), (1, 0).
+#[test]
+fn dirt_path_single_start_centre() {
+    use super::PathPoint;
+    let (gw, gh) = (9, 7);
+    for blocked in [
+        vec![],
+        vec![(4, 3)],
+        vec![(4, 3), (3, 3)],
+        vec![(4, 3), (3, 3), (4, 4)],
+    ] {
+        let mut e = Env::new(4, gw, gh);
+        e.info.orth = vec![Orth {
+            level_id: 26,
+            direction: 1,
+            init: false,
+            rect: TileRect::new(700, 600, 40, 18),
+            preset: true,
+        }];
+        for &(x, y) in &blocked {
+            e.info.grids[2].op(x, y, Op::Set, cell::WAYPOINT);
+        }
+        let lr = e.drlg.level(e.l).rect;
+        let want = match blocked.len() {
+            0 => (4, 3),
+            1 => (3, 3),
+            2 => (4, 4),
+            _ => (4, 2),
+        };
+        let mut g = e.gen();
+        g.dirt_paths().unwrap();
+        assert_eq!(
+            g.info.path_ends[0].join,
+            PathPoint {
+                x: lr.x + 8 * want.0 + 3,
+                y: lr.y + 8 * want.1 + 3,
+                direction: 4
+            },
+            "{blocked:?}"
+        );
+    }
+}
+
+/// `outdoor.md` §7.4: Burial Grounds stamps 108 at (1, 1) with F −1 (the
+/// build list: file 0 with Files 1); Moo Moo Farm spawns 50, 46, 31, 38,
+/// 39, 29, 30 once each.
+#[test]
+fn act1_special_presets_17_and_39() {
+    use super::grid::file_of;
+    let mut e = Env::new(17, 8, 8);
+    let mut g = e.gen();
+    g.act1().unwrap();
+    assert_eq!(g.g(0, 1, 1), 108);
+    assert_eq!(file_of(g.g(2, 1, 1)), 0);
+    let mut e = Env::new(39, 10, 10);
+    for t in 0..4 {
+        let name = format!("inert{t}").into_bytes();
+        e.od.subs.push(SubRow {
+            type_: t,
+            file: name.clone(),
+            bord_type: 1,
+            grid_size: 1,
+            ..SubRow::default()
+        });
+        e.subs
+            .0
+            .insert(name, super::tests::one_cell_file(0, (200 << 8) | 1, 1));
+    }
+    // The level outline (borders keep the inside spawnable).
+    let v = |x, y| Vertex {
+        x,
+        y,
+        direction: 0,
+        flags: 0,
+    };
+    e.info.vertices = vec![v(0, 9), v(0, 0), v(9, 0), v(9, 9)];
+    let mut g = e.gen();
+    g.act1().unwrap();
+    let specials = [29, 30, 31, 38, 39, 46, 50];
+    let mut placed: Vec<u32> = g.info.grids[0]
+        .cells
+        .iter()
+        .copied()
+        .filter(|c| specials.contains(c))
+        .collect();
+    placed.sort();
+    assert_eq!(placed, specials);
+}
+
+/// `outdoor.md` §7.4 Cottage(P, extra): one step lo' & 3; non-zero:
+/// RandomDS1(P), and with extra one step lo' & 1, non-zero →
+/// RandomDS1(49); zero: RandomDS1(P) twice.
+#[test]
+fn cottage_counts() {
+    let mut seen = [false; 3];
+    for k in 0..40u32 {
+        for extra in [false, true] {
+            let mut e = Env::new(4, 10, 10);
+            e.drlg.level_mut(e.l).seed = Seed::init_low(5 + 7919 * k);
+            let mut s = e.seed();
+            let first = s.step() & 3;
+            let mut g = e.gen();
+            g.cottage(47, extra).unwrap();
+            let count = |p: u32| g.info.grids[0].cells.iter().filter(|&&c| c == p).count();
+            let (n47, n49) = (count(47), count(49));
+            if first == 0 {
+                assert_eq!((n47, n49), (2, 0), "k {k}");
+                seen[0] = true;
+            } else {
+                assert_eq!(n47, 1, "k {k}");
+                if extra {
+                    // The second draw follows the first RandomDS1's draws:
+                    // only its effect is checked.
+                    assert!(n49 <= 1);
+                    seen[1 + n49] = true;
+                } else {
+                    assert_eq!(n49, 0);
+                }
+            }
+        }
+    }
+    assert_eq!(seen, [true; 3]);
+}
