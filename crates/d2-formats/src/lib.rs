@@ -6,6 +6,7 @@
 pub mod animdata;
 pub mod cof;
 mod cursor;
+pub mod d2s;
 pub mod dc6;
 pub mod dcc;
 pub mod ds1;

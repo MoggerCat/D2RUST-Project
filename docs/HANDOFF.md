@@ -2733,6 +2733,17 @@ the dev-dependency) and record results here.
     Kurast chain; Act V rects of 110, 111, 112, 117) to pass. A mismatch is
     a finding for `outdoor-act3-act5.md`. Recordings of Act 3 creation and
     of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
+65. **C65 Character saves** (`claude/impl-d2s`, note
+    `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
+    (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
+    d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
+    `.d2s` parses in `formats/d2s.md` §1 order and rewrites byte for
+    byte; record header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD,
+    `jf`/`kf` bytes (d2s OQ3). (2) The three `d2s-tool new` / `new-stub`
+    characters of LOCAL-RUN 6.7 load in 1.14d; after the game re-saves
+    them, `d2s-tool check` passes and `dump` of ours vs the game's shows
+    no difference outside the save time. A difference in an item record
+    is an `items/bitstream.md` §5 finding.
 
 Kept entries (unchanged):
 

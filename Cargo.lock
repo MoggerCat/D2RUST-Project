@@ -2499,6 +2499,19 @@ name = "d2-verify"
 version = "0.0.0"
 
 [[package]]
+name = "d2s-tool"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "d2-data",
+ "d2-formats",
+ "d2-proto",
+ "d2-server",
+ "d2-sim",
+ "test-fixtures",
+]
+
+[[package]]
 name = "dasp_sample"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
