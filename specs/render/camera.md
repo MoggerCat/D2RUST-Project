@@ -34,7 +34,7 @@
 | Edge cases & original bugs | 250–259 |
 | Test vectors | 260–276 |
 | Provenance | 277–291 |
-| Open questions | 292–313 |
+| Open questions | 292–316 |
 <!-- /index -->
 
 ## Summary
@@ -310,3 +310,6 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
    tick plus the client's own path step.
 6. How the client's copy of the player unit seed (`unit +0x20`) is
    initialised, so d2rs can reproduce shake offsets without recordings.
+   Partly answered: at a single-player join it is {0x6AC6935F, 0}
+   (`client/model.md` Randomness rule 2); later draws on it are
+   `client/model.md` open question 6.
