@@ -161,3 +161,7 @@ of all three seams.
 -p depcheck` (determinism lint clean); `python3 tools/spec_index.py
 --check`; `python3 tools/methods.py check`; `python3 tools/coverage.py
 --check` (0 errors) and `--selftest` (ok).
+
+Update: merged `origin/claude/tender-meitner-mphas3` at `93b37c8` (includes
+the regenerated `d2-proto` tables, `e909c15`) into this branch; `sh
+tools/gate.sh --no-client` → GATE: PASS on the merge.
