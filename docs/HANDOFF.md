@@ -13,7 +13,7 @@ rather than restating them.
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
-| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; `d2-proto` message tables implemented from the two TSVs | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass |
+| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented against seams (unwired, unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 34 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1 |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
@@ -44,6 +44,25 @@ rather than restating them.
    update_queue, clients}`. A test in `crates/conformance/tests/` like
    `rng_traces.rs`. The host-schedule vectors of `tick.md` §1 (driver:
    last/now/catch-up) belong to `d2-server`, not tested yet.
+4. **Wire the `d2-server` seams** (implementation; all three branches are merged):
+   `d2-server` reaches other crates only through
+   `crates/d2-server/src/seams.rs`. Public signatures to implement:
+
+   | Seam | Signature | Provider |
+   |---|---|---|
+   | `MessageSizes` | `client_size(&self, msg: &[u8]) -> Result<usize, SizeError>` (ids 0x00..=0x70; 0xFF and 0x71..=0xFE are handled by the classifier), `server_size(&self, msg: &[u8]) -> Result<usize, SizeError>` (ids ≥ 0xB5 → `Invalid`); `SizeError::{Invalid, Incomplete}` | `d2-proto` (TSV size rules) |
+   | `Intents` | `player(&self, ClientId) -> PlayerLookup`, `frame(&self) -> i32`, `point_state(&self, ClientId) -> Option<PointState>`, `set_point_accept(&mut self, ClientId, i32)`, `queue_resync(&mut self, ClientId, &mut dyn MessageSink)` (builds S→C 0x15), `unit_target(&self, ClientId, u32, u32) -> UnitTarget`, `handle(&mut self, ClientId, &[u8], usize, &mut dyn MessageSink) -> ResultCode` (kind `handler` ids only; owes the skill `pierce_idx` += 1), `clients(&self) -> Vec<ClientId>` (client list order, `unit-order.md` §7) | `d2-sim` |
+   | `Tick` | `tick(&mut self, &mut dyn MessageSink)` | `d2-sim::tick` |
+   | `SessionHandler` | `system_message(&mut self, ClientId, &[u8], usize, &mut dyn MessageSink)` | `d2-server` session code (Phase 5) |
+   | `Clock` | `now_ms(&mut self) -> u32` | `host::SystemClock`; tests a manual clock |
+   | `MessageSink` (implemented by `buffers::ClientBuffers`) | `queue(&mut self, ClientId, &[u8]) -> Result<(), QueueError>` | used by `d2-sim` handlers and tick |
+
+   `d2-sim` may not depend on `d2-server` (depcheck), so the adapter
+   implementing `Intents`/`Tick` and taking `&mut dyn MessageSink` lives
+   in `d2-server` (or `d2-sim` exposes byte-level hooks the adapter
+   calls). Then run the size vectors of
+   `crates/d2-server/src/tests/messages.rs` (`size_vectors`, generic over
+   the seam) on the `d2-proto` implementation.
 
 ## 3. Code map
 
@@ -73,7 +92,13 @@ rather than restating them.
 | `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
 | `crates/d2-proto/src/{schema,transport,wire}.rs` | message descriptors and size rules; size lookup per direction, C→S classifier, S→C buffer split; LE reads/writes, `FixedMessage` | `sim/intents-events.md` §2–3 |
 | `crates/d2-proto/src/{tsv,codegen}.rs`, `generated.rs` | strict TSV parser + TSV-vs-code check (`tsv::check`); generator; generated `CLIENT_MESSAGES` / `SERVER_MESSAGES` and typed `client::*` / `server::*` (don't edit; `data-tool gen-proto`) | `sim/intents-events.md` §5 |
-| `d2-net`, `d2-server`, `d2-verify` | stubs | |
+| `crates/d2-server/src/seams.rs` | the traits `d2-server` needs from `d2-proto` / `d2-sim` / session code (§2 step 3) | `sim/intents-events.md` |
+| `crates/d2-server/src/transport.rs` | client duplicate filter, classifier, three server queues, drain (truncating copy) | `sim/intents-events.md` §2.1 |
+| `crates/d2-server/src/dispatch.rs` | game message entry, dispatcher, gate, stubs, exact size, point/unit parse, chat check, 0x3C/0x51 decode | `sim/intents-events.md` §2.2–2.4 |
+| `crates/d2-server/src/buffers.rs` | per-client 0x200-byte buffers, local delivery split, receive lists | `sim/intents-events.md` §3 |
+| `crates/d2-server/src/host.rs` | tick driver, `Host::frame` (drain → tick → flush), flush, injectable `Clock` | `sim/tick.md` §1, §8; `sim/intents-events.md` §1 |
+| `crates/d2-server/src/tests/` | vectors; `fakes.rs`: TSV-driven size fake, fake game | |
+| `d2-proto`, `d2-net`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
 | `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set; `gen-tables`: regenerate typed structs; `gen-proto`: regenerate `d2-proto`'s message tables from the TSVs; `dump-compare`: fix-ups vs a 1.14d memory dump; `patch check/render/diff`: mod stacks | `data/field-types.md` §6.7, `data/fixups.md`, `data/runtime-maps.md`, `data/patch-layers.md` §10 |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows); `dump_tables.py`: the excel tables and runtime maps in 1.14d memory after the load; `record_tick.py` + `check_tick.py`: server tick, timer events, unit lists; `record_packets.py` + `check_packets.py`: client↔server messages | `sim/rng.md`, `traces/FORMAT.md`, `data/runtime-maps.md`, `sim/tick.md`, `sim/unit-order.md`, `sim/intents-events.md` |
@@ -126,6 +151,16 @@ incl. 1,580 missile, 186 snapshots) and melee `...-021854-tick.jsonl`:
 `check_tick.py` 0 errors. Messages `...-022633-packets.jsonl`:
 `check_packets.py` OK, perturbation reported, new client ids 0x0C,
 0x3A, 0x3B. Still open: a hosted (multi-client) game.
+
+Spec question for the next local spec session (from the `d2-server`
+implementation, 2026-10-06): `tick.md` §1.2 takes `now & 0x7FFFFFFF`
+and a signed `now − last`; read literally, across the 31-bit wrap of
+`timeGetTime` (~24.8 days of uptime) the difference is negative and no
+tick runs until `now` catches up with `last`. Confirm in `0x0052FC20`'s
+disassembly (`tools/ghidra/disasm.py`) whether `last` is masked too and
+whether the compare is signed; record it as an edge case in `tick.md`.
+`d2-server` reproduces the literal reading (test
+`driver_first_use_and_mask`).
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
