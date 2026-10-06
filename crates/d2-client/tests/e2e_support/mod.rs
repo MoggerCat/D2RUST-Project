@@ -1,11 +1,17 @@
 // Spec: specs/world/npc.md §2–§4, §9; specs/world/vendors.md §3, §4, §7, §9 (end-to-end fixtures)
 //! Fixtures shared by the end-to-end tests that run the server's
-//! `WiredWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`): the rest of
+//! `WiredWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`,
+//! `prop_worldsim.rs`): the rest of
 //! the NPC / vendor / quest wiring no written spec provides (staged
 //! answers and a call log, never behaviour), and the synthetic item,
 //! vendor and NPC tables, and the item-move seams no d2-sim module
-//! provides ([`InvFx`]). Each test crate uses a part of it.
+//! provides ([`InvFx`]); and ([`world`]) the wired single-player
+//! world's seams, sources and tables. `d2-server`'s `prop_handle.rs`
+//! includes this module by path (one copy for both crates' tests). Each
+//! test crate uses a part of it.
 #![allow(dead_code)]
+
+pub mod world;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -46,7 +52,7 @@ pub fn blank<T: Record>() -> T {
 /// inventory, the NPC grid always having room, the carried-gold caps)
 /// and a log of every call that would change state outside `d2-sim`.
 /// The item copy `0x0055A2A0` answers null: no spec writes it.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Rest {
     pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,

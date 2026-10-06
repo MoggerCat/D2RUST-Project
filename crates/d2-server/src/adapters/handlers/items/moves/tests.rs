@@ -1321,3 +1321,115 @@ fn without_inventory_parts_the_ids_stay_stubs() {
     assert_eq!(t.frame(&msg(0x17, &[k])).0, Refused);
     assert_eq!(t.sim().unhandled.len(), 1);
 }
+
+// ---- early refusals ---------------------------------------------------------------------
+
+impl T {
+    /// Everything a refusal could touch, as text: the game, the units,
+    /// stats and items, the inventory state, the player's fields, the
+    /// stubs, and the seams' logs and outboxes.
+    fn digest(&mut self) -> String {
+        let p = self.player;
+        let (log, sent) = self.rest.with(|r| (r.log.clone(), r.sent.clone()));
+        let sim = self.sim();
+        let s = &sim.events.sys;
+        let w = &sim.world;
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}{:?}|{:?}{:?}{:?}{:?}{:?}|{log:?}{sent:?}",
+            sim.game,
+            s.units,
+            s.stats,
+            w.items,
+            w.inventory.as_ref().map(|i| &i.state),
+            sim.player_fields(p),
+            sim.unhandled,
+            sim.resyncs,
+            s.hooks.x.sent,
+            w.rest.sent,
+            w.rest.log,
+            w.rest.interact,
+            w.action.faults,
+        )
+    }
+
+    /// `m` through the dispatcher alone (no tick, so the digest compares
+    /// the handler's effect only): result `code`, nothing changed,
+    /// nothing queued for client 0.
+    fn refused(&mut self, m: &[u8], code: ResultCode, what: &str) {
+        let before = self.digest();
+        let mut out = crate::buffers::ClientBuffers::new();
+        out.add_client(0);
+        let got =
+            crate::dispatch::dispatch(self.sim(), &ProtoSizes, &mut out, 0, ALIVE.gate, m, m.len());
+        assert_eq!(got, code, "{what}: {m:02X?}");
+        assert_eq!(out.pop(0), None, "{what}: {m:02X?} sent a message");
+        let after = self.digest();
+        assert!(
+            before == after,
+            "{what}: {m:02X?} changed the host:\n{before}\n{after}"
+        );
+    }
+}
+
+/// The refusals `inventory.md` §7 orders before any effect (the item,
+/// cursor, stored, owned and location checks of §5.1, before the
+/// targeting reset and the placement; `docs/HANDOFF.md` PK1) leave the
+/// game, the inventories and the outgoing messages unchanged. The
+/// refusals after a write are left out (§7.3 placement → 3 after the
+/// page and the reset; §7.5 §4.6 → 3 after the reset; §7.10 after T
+/// moved; §7.14, §7.19 after the reset; the item-move gate's 0, §5.4).
+// Covers: specs/items/inventory.md §5.1
+#[test]
+fn early_refusals_change_nothing() {
+    let mut t = setup();
+    let k = t.picked(KEY);
+    let g = t.ground_item(KEY, 12, 12);
+    let c = t.cursor_item(CAP);
+    let me = t.pguid();
+    t.rest.take_log();
+    // 0x16 (§7.1): the own player → 3; a missing item → 1; too far → 1.
+    t.refused(&msg(0x16, &[0, me, 0]), Malformed, "§7.1 own player");
+    t.refused(&pick(0xDEAD, 0), Refused, "§7.1 missing");
+    t.rest.with(|r| r.distance = 51);
+    t.refused(&pick(g, 0), Refused, "§7.1 distance");
+    t.rest.with(|r| r.distance = 1);
+    // 0x17 (§7.2): not the cursor item → 1.
+    t.refused(&msg(0x17, &[k]), Refused, "§7.2 cursor");
+    // 0x18 (§7.3): not the cursor item → 1; page 1 → 2; page 2 without
+    // a trade → 3.
+    t.refused(&msg(0x18, &[k, 0, 0, 0]), Refused, "§7.3 cursor");
+    t.refused(&msg(0x18, &[c, 0, 0, 1]), Invalid, "§7.3 page 1");
+    t.refused(&msg(0x18, &[c, 0, 0, 2]), Malformed, "§7.3 page 2");
+    // 0x19 (§7.4): not stored → 1.
+    t.refused(&msg(0x19, &[g]), Refused, "§7.4 stored");
+    // 0x1A (§7.5): not the cursor item → 1; location 11 → 2.
+    t.refused(&body(0x1A, k, 1), Refused, "§7.5 cursor");
+    t.refused(&body(0x1A, c, 11), Invalid, "§7.5 location");
+    // 0x1B (§7.6): location 11 → 2; location 3 → 3.
+    t.refused(&body(0x1B, c, 11), Invalid, "§7.6 location");
+    t.refused(&body(0x1B, c, 3), Malformed, "§7.6 not a hand");
+    // 0x1C (§7.7): location 11 → 2.
+    t.refused(&loc16(0x1C, 11), Invalid, "§7.7 location");
+    // 0x1D (§7.8): location 11 → 2; an empty location → 1.
+    t.refused(&body(0x1D, c, 11), Invalid, "§7.8 location");
+    t.refused(&body(0x1D, c, 1), Refused, "§7.8 empty");
+    // 0x1E (§7.9): location 3 → 3; an empty hand → 1.
+    t.refused(&body(0x1E, c, 3), Malformed, "§7.9 not a hand");
+    t.refused(&body(0x1E, c, 4), Refused, "§7.9 empty");
+    // 0x20 (§7.11): a ground item → 1.
+    t.refused(&msg(0x20, &[g, 10, 10]), Refused, "§7.11 stored");
+    // 0x21 (§7.12): source = destination → 3; 0x22 (§7.13) → 3.
+    t.refused(&msg(0x21, &[k, k]), Malformed, "§7.12 same item");
+    t.refused(&msg(0x22, &[k]), Malformed, "§7.13");
+    // 0x27 (§7.18): a ground item → 1; 0x28 (§7.19): not the cursor → 1.
+    t.refused(&msg(0x27, &[g, k]), Refused, "§7.18 owned");
+    t.refused(&msg(0x28, &[g, k]), Refused, "§7.19 cursor");
+    // 0x50 (§7.22): more than the gold → 3; another unit → 3.
+    t.refused(&msg(0x50, &[me, 1]), Malformed, "§7.22 amount");
+    t.refused(&msg(0x50, &[me + 1, 1]), Malformed, "§7.22 unit");
+    // 0x63 (§7.24): not stored → 1.
+    t.refused(&msg(0x63, &[g]), Refused, "§7.24 stored");
+    // 0x61 (§7.23): a classic game → 3.
+    let mut t = setup_with(false);
+    t.refused(&loc16(0x61, 1), Malformed, "§7.23 classic");
+}
