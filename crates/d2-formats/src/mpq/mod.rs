@@ -12,6 +12,8 @@ mod adpcm;
 mod bits;
 pub mod crypto;
 mod explode;
+#[cfg(feature = "fuzz")]
+pub mod fuzz_api;
 mod huffman;
 #[cfg(test)]
 mod huffman_tests;

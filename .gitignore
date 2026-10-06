@@ -19,3 +19,8 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# cargo-fuzz (fuzz/): corpora are built from live Blizzard files, never committed
+/fuzz/target
+/fuzz/corpus/
+/fuzz/artifacts/
