@@ -37,14 +37,14 @@
 |   4. Chest drop (`0x00585B90`) | 276–302 |
 |   5. The TC walk (`0x0055A6D0`) | 303–409 |
 |   6. Drop quality (`0x00558640`) | 410–441 |
-|   7. Creation inputs and placement (`0x0055A550`) | 442–456 |
-|   8. Gold amount | 457–469 |
-| Constants & data dependencies | 470–499 |
-| Randomness | 500–516 |
-| Edge cases & original bugs | 517–532 |
-| Test vectors | 533–561 |
-| Provenance | 562–586 |
-| Open questions | 587–607 |
+|   7. Creation inputs and placement (`0x0055A550`) | 442–458 |
+|   8. Gold amount | 459–471 |
+| Constants & data dependencies | 472–501 |
+| Randomness | 502–518 |
+| Edge cases & original bugs | 519–534 |
+| Test vectors | 535–563 |
+| Provenance | 564–588 |
+| Open questions | 589–609 |
 <!-- /index -->
 
 ## Summary
@@ -442,7 +442,9 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 ### 7. Creation inputs and placement (`0x0055A550`)
 
 1. Item id < 0 → nothing.
-2. Position: from `U`'s position (`x`, `y`): start = (`x` + 2, `y` + 3) if
+2. Position: from `U`'s position (`x`, `y`; unit coordinates
+   `0x00620870`, `sim/path-placement.md` §2.1: a monster's dynamic path
+   sub-tile, (0, 0) only when it has no path): start = (`x` + 2, `y` + 3) if
    a room exists there (`0x00463740`), else (`x`, `y`); the free-spot
    search `0x0064E810`(room, start, (`x`, `y`), 1, 0x3E01, 0x801, 1)
    gives the final room and position; none → nothing. Items of one walk
