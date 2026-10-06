@@ -16,8 +16,10 @@ use test_fixtures::content::{self, CLASSES};
 use test_fixtures::install::{self, FixtureError, Install};
 use test_fixtures::synth::{self, Synthetic};
 
+/// One directory per test process: nextest runs each test in its own
+/// process, and two processes writing the same archives race.
 fn dir(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name)
+    PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}-{}", std::process::id()))
 }
 
 fn built() -> &'static Install {
