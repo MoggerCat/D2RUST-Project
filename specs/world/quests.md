@@ -37,20 +37,20 @@
 |   1. Quest flag records | 91–193 |
 |   2. Quest control and quest records | 194–289 |
 |   3. Game entry: picking the quest set | 290–322 |
-|   4. Events and dispatch | 323–405 |
-|   5. Quest updater and timers (tick step 8) | 406–427 |
-|   6. Status reporting | 428–517 |
-|   7. NPC dialog hooks | 518–550 |
-|   8. Act transitions, warps and portals | 551–607 |
-|   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1406 |
-|   11. Acts II–V | 1407–1412 |
-| Constants & data dependencies | 1413–1427 |
-| Randomness | 1428–1446 |
-| Edge cases & original bugs | 1447–1465 |
-| Test vectors | 1466–1497 |
-| Provenance | 1498–1519 |
-| Open questions | 1520–1560 |
+|   4. Events and dispatch | 323–407 |
+|   5. Quest updater and timers (tick step 8) | 408–429 |
+|   6. Status reporting | 430–521 |
+|   7. NPC dialog hooks | 522–554 |
+|   8. Act transitions, warps and portals | 555–623 |
+|   9. Quest items, rewards and helpers | 624–689 |
+|   10. Act I quests | 690–1444 |
+|   11. Acts II–V | 1445–1450 |
+| Constants & data dependencies | 1451–1465 |
+| Randomness | 1466–1484 |
+| Edge cases & original bugs | 1485–1503 |
+| Test vectors | 1504–1535 |
+| Provenance | 1536–1557 |
+| Open questions | 1558–1596 |
 <!-- /index -->
 
 ## Summary
@@ -397,6 +397,8 @@ all records (§4.2, (1, 0)).
   has no record. Special cases before adding: chain 4 with an object of
   class 61 → `0x00592F80`; chain 8 with monster 229 (radament) →
   `0x005991B0`; chain 12 with monster 250 (summoner) → `0x0059C3B0`.
+  The last two are `ret 4` stubs in 1.14d (they change nothing); the
+  link is added after the special case in all three.
   `0x005435C0` then returns 0 if the unit's chain already holds the
   record (scan stops at a null record), else prepends a new link and
   returns 1.
@@ -455,7 +457,9 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 3. 0x50 (15 bytes: u8 0x50, u16 1, u16 Den of Evil monsters left, i16
    staff tomb, u16 barbarians left, 6 zero bytes) is sent if list[1] ≠ 0
    (then monsters left = `0x005901E0` of chain 1's record), or list[36] ≠
-   0 (barbarians = `0x00588C50` of chain 32's record), or the player
+   0 (barbarians = `0x00588C50` of chain 32's record: 5 for each of
+   extra bytes +0x86, +0x87, +0x88 that is 0, plus extra +0xA4 − +0xAC −
+   +0xA8 (i32), floored at 0), or the player
    record has slot 12 bit 0 or 13 and the game has an Act II (game
    +0xC0) (then staff tomb = level id of the true tomb `0x0061AEB0` −
    66). Fields not computed stay 0.
@@ -562,17 +566,29 @@ before the act change; only for a monster NPC:
 | meshif1 (210) | slot 15 bit 0 clear | if slot 10 bit 0 clear: 10.0, 10.13 and delete items `msf ` and `vip ` (§9.2); then 15.0, 15.13 | intro flags; 0x28; +0x4C / 0x61 |
 | tyrael2 (367) | slot 28 bit 0 clear and game is expansion (game +0x70) | 28.0, 28.13 | intro flags; 0x28; if +0x4C ≠ 1: set, send 0x5D then 0x61 |
 
-0x61 is 2 bytes, `61 <byte>`; D2MOO 1.10f sends 2, 3, 5 (and 4 for
-Durance) and sets the intro flags of Acts I, II, II (sic) and III; the
-1.14d argument registers of `0x00544FA0` and `0x0053D940` were not
-resolved (Open question 10).
+0x61 is 2 bytes, `61 <byte>`. Intro flags are `0x00544FA0(game,
+player, act)` (act in CL, jump table `0x00545078` over the §6.7 lists).
+1.14d values (read at the call sites; same as D2MOO 1.10f):
+
+| Transition | Intro-flag act | 0x61 byte | Order of sends |
+|---|---|---|---|
+| warriv1 | 0 (Act I list) | 2 | 0x28, 0x61, then intro flags |
+| meshif1 | 1 (Act II list) | 3 | intro flags, 0x28, 0x61 |
+| tyrael2 | 1 (Act II list, sic) | 5 | intro flags, 0x28, `5D 17 02 00 0000`, 0x61 |
+| Durance (`0x00546AC0`) | 2 (Act III list) | 4 | intro flags, 0x28, 0x61 |
+
+0x5D and 0x61 go only when player data +0x4C ≠ 1 (it is then set to
+1).
 
 `0x00546AC0(game, player, level)` (object warp, from `0x00584750`):
 level 102 (Durance of Hate 3): if slot 23 bit 0 clear: if slot 18 bit 0
 clear: set 18.0, 18.13 and delete items `qey`, `qhr`, `qbr`, `qf1`,
 `qf2`; then 23.0, 23.13; intro flags; 0x28 (1.14d sends it, D2MOO
-1.10f does not); +0x4C / 0x61. Other levels: `0x005BCFD0` (Mephisto
-bridge / hell gate, A3Q6).
+1.10f does not); +0x4C / 0x61. Other levels: `0x005BCFD0`: chain 20's
+record (A3Q6; none → nothing): extra +0x0C := 2, +0x10 := 2; if extra
++1 ≠ 0, the object with GUID +4 gets mode 1; if extra +2 ≠ 0, the
+object with GUID +8 gets mode 2 (the Act III record fields are
+otherwise uncatalogued, §11).
 
 #### 8.2 Level warp check (`0x00545B80(game, player, from, to)`)
 
@@ -640,14 +656,36 @@ sound (`0x00553380`).
 Handler `0x0054BF60` (size 5): item GUID u32 @1; the item must exist,
 be the player's and in the same act; `0x00544840`: code `bkd ` (deciphered
 Inifuss scroll) → `0x00593CB0` (sends the Cairn stone order, §10.6); code
-`trs ` → `0x0059D6A0` (A2Q6 true tomb).
+`trs ` → `0x0059D6A0` (A2Q6 true tomb): send 0x50 to the player:
+u8 0x50, u16 13, i16 = true tomb level − 66 (`0x0061AEB0` on the Act II
+DRLG, game +0xC0), or 0 when that is 0; a nonzero level is also stored
+at chain 13's extra +0x34. Bytes 5–14 are never written (stack, as in
+§10.6).
 
 #### 9.5 Quest functions called from object events
 
 Object timer event 7 (QUESTFN, `sim/tick.md` §5.6) dispatches through
-`0x005449E0` by object class: 0x16F, 0xBD, 0x1A, 0x7A, 0x83, 0x10C (Wirt's
-body, §10.6), 0x155, 0x173 (Countess chest, §10.7), 0x178, 0x1CB–0x1CD,
-0x1DA–0x1DC. Each case calls its quest's function (Act I cases in §10).
+`0x005449E0(game, object)` by object class. "Record c" means: look up
+chain c's record (no record → nothing) and call the function with
+(record, object); other cases pass (game, object). Other classes do
+nothing.
+
+| Class | Case | Function |
+|---|---|---|
+| 0x1A (26) | Cain's gibbet | `0x00593290` (§10.6, Open question 11) |
+| 0x7A (122) | record 11 | `0x0059B710` |
+| 0x83 (131) | needs a room; mode 1 → mode 2; room level 76 → `0x005B23C0(game, object, 301, 1, −1, 0)`; level 108 → `0x005B5750` | — |
+| 0xBD (189) | room level in Act I → record 4, `0x005942C0`; level 109 or ≥ 113 → record 33, `0x0058A730`; other → record 32, `0x00588CA0` | — |
+| 0x10C (268) | Wirt's body, record 4 | `0x00594630` (§10.6) |
+| 0x155 (341) | record 20 | `0x005BCAC0` |
+| 0x16F (367) | record 16 | `0x005B85E0` |
+| 0x173 (371) | Countess chest, record 5 | `0x005956C0` (§10.7) |
+| 0x178 (376) | record 24 | `0x005B6710` |
+| 0x1CB / 0x1CC / 0x1CD (459–461) | — | `0x0058B940` / `0x0058A500` / `0x00589540` |
+| 0x1DA–0x1DC (474–476) | record 35 | `0x0058C0E0` |
+
+Classes 0x173–0x1DC use the jump tables `0x00544DA0` / `0x00544DBC` (index =
+class − 0x173). The Act II–V functions are catalogued only (§11).
 
 ### 10. Act I quests
 
@@ -1276,9 +1314,7 @@ with 0 = A, else B, returns whether found).
       sound event 37); every player M5; every player M6; timer (record,
       `0x005954C0`, period 7).
    3. Trap step `0x005954F0` (both cases); if no trap was spawned
-      (+0x119 = 0), event 7 on the victim at frame + 10 (`0x005417D0`);
-      that event runs `0x005956C0` (trap step, then the same
-      reschedule).
+      (+0x119 = 0), event 7 on the victim at frame + 10 (`0x005417D0`).
 4. Timer `0x005954C0`: if state = 5, broadcast(13, 0); +0x11C := 0;
    return 1.
 5. **Event 10** `0x00594BB0`: remove the player's GUID from list C,
@@ -1305,13 +1341,15 @@ with 0 = A, else B, returns whether found).
    record exists with not-intro ≠ 0: `0x005456A0(player, object, 127)`
    (opens message 127); if state ≤ 1: state := 2 and, if status < 1,
    +0x11B := 1.
-10. **Chest** (object class 0x173, quest function from `0x005449E0`,
-    `0x00595A50`; args game, object): chain 5's record must exist
-    (else nothing). Add the object's GUID (−1 when none) to the +0x68
-    list unless present or the list holds 8; trap step; if killed and no
-    trap spawned yet, object event 7 at frame + 10. Chest init
-    `0x00595A00`: chain 5's record must exist (else fatal); not-intro =
-    0 → object mode 3.
+10. **Chest** (object class 0x173): init `0x00595A50` (object init
+    pointer `0x00731C7C`; args game, object): chain 5's record must
+    exist (else nothing); add the object's GUID (−1 when none) to the
+    +0x68 list unless present or the list holds 8; trap step; if killed
+    and no trap spawned yet, object event 7 at frame + 10. Its event 7
+    (§9.5) runs `0x005956C0`: trap step, then the same reschedule.
+    Object init `0x00595A00` (pointer `0x00731BD0`, object class not
+    traced): chain 5's record must exist (else fatal); not-intro = 0 →
+    object mode 3.
 11. **Sequence** `0x00595240`: §10.1.
 
 No quest-seed draws. The trap step's spawns (monster class 326 near each
@@ -1540,10 +1578,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    spec.
 8. Acts II–V state machines (later spec).
 9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls.
-10. The act/argument values of 0x61 and the intro-flag act in §8.1
-    (registers of `0x0053D940` and `0x00544FA0` at their call sites in
-    `0x005467E0` and `0x00546AC0`); settle with a disassembly read or a
-    recording of an act change (packets).
+10. (Settled: §8.1 table, read from the call sites.) A recording of
+    each act change would still confirm the 0x61 bytes.
 11. A1Q4 object functions not yet read: the gibbet quest function
     `0x00593290` (object class 26), the operate functions `0x00593480`
     and `0x00593710`, the portal helper `0x00592D50`, and the role of
