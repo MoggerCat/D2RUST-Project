@@ -21,14 +21,14 @@
 | Inputs | 51–60 |
 | Outputs / state changes | 61–65 |
 | Rules | 66–67 |
-|   A. d2rs design (ours) | 68–248 |
-|   B. Original behavior to reproduce (not specified here) | 249–267 |
-| Constants & data dependencies | 268–274 |
-| Randomness | 275–280 |
-| Edge cases & original bugs | 281–286 |
-| Test vectors | 287–301 |
-| Provenance | 302–309 |
-| Open questions | 310–322 |
+|   A. d2rs design (ours) | 68–250 |
+|   B. Original behavior to reproduce (not specified here) | 251–269 |
+| Constants & data dependencies | 270–276 |
+| Randomness | 277–282 |
+| Edge cases & original bugs | 283–288 |
+| Test vectors | 289–303 |
+| Provenance | 304–311 |
+| Open questions | 312–324 |
 <!-- /index -->
 
 ## Summary
@@ -198,10 +198,12 @@ bit-exact, and indexed blends need the destination index. Design:
 
 - The screen is split into 32×32 **bins**. Stage 1 also emits, per bin,
   the ordered list of item indices touching it (CPU, plain Rust).
-- One workgroup per bin, one invocation per pixel. Each invocation walks
-  its bin's list in order and updates a private integer pixel value with
-  the same formulas as §A8; then writes it once to a storage texture
-  (R8Uint or R32Uint by domain).
+- One invocation per pixel. The workgroup size is free (the compositor
+  uses 16 × 16, so one 32×32 bin spans 2 × 2 workgroups; the bin size must
+  be a multiple of the workgroup edge). Each invocation finds its bin from
+  its own pixel, walks that bin's list in order and updates a private
+  integer pixel value with the same formulas as §A8; then writes it once
+  to the frame's index storage (R8Uint or R32Uint by domain).
 - A final pass maps the framebuffer to RGBA8 sRGB through the frame
   palette with `textureLoad` (indexed domain) or a bit copy (rgb domain).
 - Presentation scales the 800×600 image to the window by integer factor,

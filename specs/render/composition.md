@@ -22,16 +22,16 @@
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
 |   3. Frame cycle | 114–146 |
-|   4. Palette (one per presented frame) | 147–164 |
-|   5. One pixel write (index domain) | 165–202 |
-|   6. d2rs answers | 203–216 |
-|   7. DirectDraw (display type 3) differences | 217–228 |
-| Constants & data dependencies | 229–234 |
-| Randomness | 235–238 |
-| Edge cases & original bugs | 239–248 |
-| Test vectors | 249–260 |
-| Provenance | 261–278 |
-| Open questions | 279–299 |
+|   4. Palette (one per presented frame) | 147–173 |
+|   5. One pixel write (index domain) | 174–211 |
+|   6. d2rs answers | 212–227 |
+|   7. DirectDraw (display type 3) differences | 228–239 |
+| Constants & data dependencies | 240–245 |
+| Randomness | 246–249 |
+| Edge cases & original bugs | 250–259 |
+| Test vectors | 260–271 |
+| Provenance | 272–291 |
+| Open questions | 292–310 |
 <!-- /index -->
 
 ## Summary
@@ -162,6 +162,15 @@ So index `i` presents as `(pl2[4i], pl2[4i + 1], pl2[4i + 2])`, index 0
 included (`formats/palette.md` OQ1: the base palette's order is R, G, B and
 it is the palette used).
 
+Live data (all 17 `pal.pl2` and their 17 `pal.dat` siblings: d2data
+ACT1–ACT5, EndGame, fechar, loading, Menu0–menu4, Sky, Trademark; d2exp
+ACT5, EndGame2; `patch_d2` holds none): the PL2 base palette equals the
+`.dat` palette with B and R swapped (`pl2[4i + k] = dat[3i + 2 − k]`) for
+all 256 entries of every pair, every 4th byte is 0 in the file, and entry
+0 is (0, 0, 0) in every PL2 and every `.dat` (also `STATIC`, `Units`).
+So reading the `.dat` (B, G, R) gives the same 256 colors, and index 0
+presents black in every act.
+
 ### 5. One pixel write (index domain)
 
 The row drawer `0x00608540` writes each non-transparent source index `s`
@@ -211,8 +220,10 @@ read row = destination (hook `scene/item.rs` `BlendOp::IndexTable`).
 - `scene/item.rs` domain: indexed, `Rgb` stays out of `BlendOp`.
 - `IndexTable`: row = destination (§5).
 - RGBA for verify and present: `(R, G, B, 255)` of §4 for every index,
-  0 included. `map::cpu::to_rgba` (0 → black) equals this exactly when
-  each act's PL2 entry 0 is black (Open question 1).
+  0 included. `map::cpu::to_rgba` (0 → black) equals this exactly: every
+  live palette's entry 0 is (0, 0, 0) (§4 measurement). Confirmed by
+  `d2-client verify --case map` (`townN1.ds1`): 0 differing RGBA pixels
+  on an AMD Radeon RX 9070 XT (Vulkan), 2026-10-06.
 
 ### 7. DirectDraw (display type 3) differences
 
@@ -273,17 +284,17 @@ the table cases to `0x00606E40`, `0x00607060`, `0x006072F0`,
 `0x00607480`, `0x00607970`, `0x00607B90`), blend getter `0x00511D70`,
 act load `0x0045C8E0` → `0x0044E100`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
 D2MOO `DisplayType.h`. Levels BlankScreen counted in
-`game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1). No
-capture yet.
+`game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1).
+Palettes measured 2026-10-06 on the files extracted with `mpq-tool
+extract` from `d2data.mpq` / `d2exp.mpq` (`patch_d2.mpq` probed by name:
+no palette). No capture yet.
 
 ## Open questions
 
-1. For every act palette: does the PL2 base palette (R, G, B at bytes
-   `4i…4i + 2`) equal the `.dat` palette (B, G, R at `3i…`), and is entry 0
-   (0, 0, 0)? Game-file check (`mpq-tool` extension); decides whether
-   d2rs may keep reading `.dat`. Each capture also holds the presented
-   palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
-   `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
+1. ~~PL2 base palette vs `.dat`, entry 0~~: answered in §4 (equal with B
+   and R swapped in all 17 pairs; entry 0 is black everywhere). Open
+   only as a live-frame check: a capture's presented palette (PNG `PLTE`,
+   `capture.md` §5) equals the act's `pal.pl2` first 1,024 bytes.
 2. ~~Write order when both `L` and `T` are present~~: answered in §5
    (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). Open: the
    identification of the two 256-byte arguments as `L` (outer) and `P`

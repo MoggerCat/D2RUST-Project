@@ -25,17 +25,17 @@
 |   3. Camera origins (once per drawn frame) | 118–133 |
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
-|   6. Tiles | 159–182 |
-|   7. View culling | 183–212 |
-|   8. Screen shake | 213–244 |
-|   9. Time base: no interpolation | 245–260 |
-|   10. What d2rs hooks get | 261–269 |
-| Constants & data dependencies | 270–276 |
-| Randomness | 277–282 |
-| Edge cases & original bugs | 283–292 |
-| Test vectors | 293–314 |
-| Provenance | 315–333 |
-| Open questions | 334–364 |
+|   6. Tiles | 159–189 |
+|   7. View culling | 190–222 |
+|   8. Screen shake | 223–254 |
+|   9. Time base: no interpolation | 255–270 |
+|   10. What d2rs hooks get | 271–279 |
+| Constants & data dependencies | 280–286 |
+| Randomness | 287–292 |
+| Edge cases & original bugs | 293–302 |
+| Test vectors | 303–324 |
+| Provenance | 325–347 |
+| Open questions | 348–376 |
 <!-- /index -->
 
 ## Summary
@@ -174,7 +174,14 @@ orientations are in which list, the order, shadows and the fade alpha are
 `draw-order.md` / `blend-modes.md`. The floor/wall alignment equals
 `map-preview.md` (walls 80 below floors, `WALL_BASE`); the absolute x is
 80 left of its `sx`. Roofs differ from `map-preview.md` (no `+WALL_BASE`):
-Open question 1.
+live roof blocks lie where floor blocks do (all 15,432 blocks of the 715
+orientation-15 tiles in the 250 used DT1 files have y in {0, 8, …, 64},
+the floor diamond rows), so a roof is its cell's floor diamond raised by
+`roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
+puts it `WALL_BASE` (80) rows lower than 1.14d. `roof_height` is read
+unsigned (`0x004DEBA6`, 16-bit zero-extended); live values 0, 80, 100,
+120, 156, 160, 190, 230, 240 and once 56,376 (`expansion\Siege\
+temptile.dt1` tile 15: drawn 56,376 rows up, so always culled by §7).
 
 Tile vs unit: a unit at the exact top vertex of cell `(tx, ty)`
 (`px = sx`, `py = sy`) is drawn 12 rows below the floor's top vertex:
@@ -195,9 +202,12 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   is drawn whole even where it reaches past the bound (up to 31 pixels).
   It equals one clip of the assembled tile image to the union of the kept
   blocks only when no culled block overlaps a kept one; with 32-wide
-  blocks whose x lies on a 32 grid of the tile that always holds (count
-  of live wall blocks: Open question 7). In modes 0/3 a culled block has
-  no pixel in the frame, so culling changes no pixel there.
+  blocks whose x and y lie on a 32 grid of the tile that always holds,
+  and it does for the live data: all 104,767 blocks of non-floor,
+  non-shadow, non-roof tiles (orientation ∉ {0, 13, 15}) of the 250 used
+  DT1 files have x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32
+  wide). In modes 0/3 a culled block has no pixel in the frame, so
+  culling changes no pixel there.
 - Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
   unit only (a) by the unit flags and states it checks (owner
   `draw-order.md`), (b) in perspective mode (not GDI) by `0x004F66E0`, and
@@ -329,14 +339,18 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
 `0x004F68E0` (`+0x7C`), `0x004F6920` (`+0x9C`), `0x004F6950` (`+0xA0`) and
 the driver tables `0x0072F6D0` / `0x0074C4A8`; unit visibility
 `0x004DC710`, `0x004DC7B0`; shake arithmetic `0x00476D40`. §1–§3 confirmed
-by the `frames-raw-1` capture runs (`capture.md` Test vectors).
+by the `frames-raw-1` capture runs (`capture.md` Test vectors). Roof
+block y's, roof heights and wall block grid counted 2026-10-06 over the
+DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
+(`patch_d2.mpq` holds no listed DT1; the 6 known-unused files of
+`formats/dt1.md` excluded); roof height read `0x004DEBA6`.
 
 ## Open questions
 
-1. Roof Y: 1.14d hands `sy − roof_height − cy_t` to the floor drawer
-   (§6); `map-preview.md` places roofs at `sy + 80 − roof_height`. Which
-   y range do live roof (orientation 15) blocks use? A game-file read of
-   roof block y's plus a capture under a roof settles it.
+1. ~~Roof Y~~: answered in §6 (live roof blocks use the floor rows 0–64;
+   1.14d's `sy − roof_height` stands, `map-preview.md` is 80 rows low).
+   The pixel proof is a capture with a roof in view (e.g. the Rogue
+   Encampment, player under a tent edge, roofs not faded).
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
    `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
    `0x00642840` test (line of sight vs room; owner `draw-order.md`).
@@ -355,9 +369,7 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    The cursor (state 1, wall clock) and the weather step the same seed
    each frame (`capture.md` §3.3), so shake offsets also depend on them;
    captures record the seed at frame start and end.
-7. Wall blocks: is every live wall block 32 pixels wide with an x on a 32
-   grid of its tile (§7 clip equivalence)? Game-file count with the C52
-   DT1 counts.
+7. ~~Wall blocks on a 32 grid~~: yes, all 104,767 (§7).
 8. Draws with no server tick between them (118 frames of run 1 while not
    paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
    not draw"; the `frames-raw-2` client-update counter settles it.
