@@ -153,7 +153,10 @@ fn quest_data_reads_barbarians_only_for_list_36() {
     let mut f = Fake::new();
     ctl.record_mut(1).unwrap().status = 1;
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert!(f.sent_ids().contains(&0x50));
+    let m = f.sent.iter().find(|m| m.1[0] == 0x50).unwrap();
+    // Barbarians left would be 15 (no cage spawned, quests-act5.md
+    // §4.1); not read, the field stays 0.
+    assert_eq!(m.1[7..9], [0, 0]);
     assert!(!f.log.iter().any(|l| l.starts_with("unhandled 32")));
 }
 
@@ -161,13 +164,15 @@ fn quest_data_reads_barbarians_only_for_list_36() {
 // left.
 #[test]
 fn status_message_filter_36_reads_barbarians() {
-    let (ctl, _) = control();
+    let (mut ctl, _) = control();
     let mut f = Fake::new();
     let r = ctl.records.iter().find(|r| r.filter == 36).unwrap();
     let (chain, act) = (r.chain, r.act);
     f.p(P1).act = Some(act);
+    ctl.record_mut(chain).unwrap().extra.a5.q2.cage_spawned[0] = true;
     ctl.send_status(&mut f, P1, chain).unwrap();
-    assert!(f.log.iter().any(|l| l == "unhandled 32 0x588c50"));
+    // `0x00588C50`: 5 per cage group not spawned (two here).
+    assert_eq!(f.sent.last().unwrap().1[4..6], [10, 0]);
 }
 
 // From specs/world/quests.md §8.1, §10.8: Warriv calls chain 6's callback
@@ -558,8 +563,12 @@ fn unspecified_status_function_is_reported() {
         .records
         .iter()
         .find_map(|r| match r.status_fn {
-            // Chain 34's (`0x0058AF00`) is quests-act5-2.md §6.9.
-            Some(func) if !matches!(r.chain, 0 | 34 | 37..=40) => Some((r.chain, func)),
+            // Flavie (25, 30: quests.md §10.3), chains 21 and 29
+            // (quests-act4.md §6), 31, 33 (quests-act5.md
+            // §3.10, §5.11) and 34 (quests-act5-2.md §6.9) are specified.
+            Some(func) if !matches!(r.chain, 0 | 21 | 25 | 29..=31 | 33 | 34 | 37..=40) => {
+                Some((r.chain, func))
+            }
             _ => None,
         })
         .unwrap();

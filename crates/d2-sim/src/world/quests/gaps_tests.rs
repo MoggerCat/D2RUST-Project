@@ -485,6 +485,12 @@ fn player_leaving_with_quest_items() {
     }
     ctl.record_mut(34).unwrap().extra.a5.q4.guids.add(1);
     ctl.record_mut(36).unwrap().extra.a5.q6.guids.add(1);
+    // Chains 31–33 have bodies too (quests-act5.md §3.7, §4.9, §5.10).
+    for c in 31..=33 {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
+    ctl.record_mut(32).unwrap().extra.a5.q2.guids.add(1);
+    ctl.record_mut(33).unwrap().extra.a5.q3.guids.add(1);
     ctl.player_leaves(&mut w, P1);
     for c in [34, 35, 36] {
         assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
@@ -506,9 +512,14 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(1).unwrap().guids.contains(1));
     assert!(!ctl.record(2).unwrap().guids.contains(1));
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
+    for c in 31..=33 {
+        assert!(!ctl.record(c).unwrap().guids.contains(1));
+    }
+    assert!(!ctl.record(32).unwrap().extra.a5.q2.guids.contains(1));
+    assert!(!ctl.record(33).unwrap().extra.a5.q3.guids.contains(1));
     let mut want = Vec::new();
     for r in &ctl.records {
-        let body = (1..=6).contains(&r.chain) || matches!(r.chain, 22 | 24 | 34..=36);
+        let body = (1..=6).contains(&r.chain) || matches!(r.chain, 22 | 24 | 31..=36);
         if r.has_callback(event::PLAYER_LEAVES_GAME) && !body {
             want.push(format!(
                 "unhandled {} {:#x}",
@@ -699,12 +710,10 @@ fn object_quest_functions_by_class() {
     // the object has no room here: 0x83 does nothing, 0xBD is not in Act I.
     for (class, want) in [
         (0x16F, "unhandled 16 0x5b85e0"),
-        (0xBD, "unhandled 32 0x588ca0"),
         (0x1A, "unhandled 4 0x593290"),
         (0x7A, "unhandled 11 0x59b710"),
         (0x155, "unhandled 20 0x5bcac0"),
         (0x173, "unhandled 5 0x5954f0"),
-        (0x1CC, "unhandled 255 0x58a500"),
         (0x1CD, "unhandled 255 0x589540"),
     ] {
         let mut f = Fake::new();
@@ -742,6 +751,23 @@ fn object_quest_functions_by_class() {
             [format!("superunique 112 {su}"), "mode 112 4".into()]
         );
     }
+    // 0xBD outside Act I, levels 109 / ≥ 113 excluded: chain 32's rescue
+    // portal `0x00588CA0` (quests-act5.md §4.8): mode 1 → 2, event 7
+    // again at frame + 25, for a group's portal only.
+    let mut f = Fake::new();
+    f.objects.insert(obj, (0x70, 0xBD, 1));
+    object_event(&mut ctl, &mut f, obj, 0xBD);
+    assert!(f.log.is_empty());
+    ctl.record_mut(32).unwrap().extra.a5.q2.portal_guid[1] = 0x70;
+    object_event(&mut ctl, &mut f, obj, 0xBD);
+    assert_eq!(f.log, ["mode 112 2", "event7 112 25"]);
+    ctl.record_mut(32).unwrap().extra.a5.q2.portal_guid[1] = 0;
+    // 0x1CC: dummy 460 `0x0058A500` (§5.6): object 558 at the dummy,
+    // else event 7 again at frame + 25.
+    let mut f = Fake::new();
+    f.pos.insert(obj, (3, 4, crate::units::RoomId(2)));
+    object_event(&mut ctl, &mut f, obj, 0x1CC);
+    assert_eq!(f.log, ["place 558 3 4 room 2 [1, 0, 0]", "event7 112 25"]);
     // 0x83 in a room: mode 1 → 2; level 76 → `0x005B23C0`.
     let mut f = Fake::new();
     f.objects.insert(obj, (0x70, 0x83, 1));

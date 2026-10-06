@@ -456,7 +456,8 @@ fn wiped_summit_resets_the_fight() {
         },
     );
     start_fight(&mut ctl, &mut f);
-    // P1 dies (mode 0), P2 alive: counted 1, nothing reset.
+    // P1 dies (mode 0), P2 alive (mode 1): counted 1, nothing reset.
+    f.a5_modes.insert(P2, 1);
     f.a5_modes.insert(P1, 0);
     super::player_died(&mut ctl, &mut f, P1);
     assert_eq!(ctl.records[i].extra.a5.q5.living, 1);

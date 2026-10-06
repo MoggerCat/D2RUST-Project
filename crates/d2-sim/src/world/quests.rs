@@ -511,7 +511,8 @@ pub trait QuestWorld {
     }
 
     /// `0x006416D0`: the distance between two units (`None`: not known;
-    /// act4 §3.6, players within 5 of Izual's ghost).
+    /// act4 §3.6 Izual's ghost, act5 §4.6 / §4.10 barbarians; paths
+    /// spec).
     fn unit_distance(&mut self, a: UnitId, b: UnitId) -> Option<i32> {
         let _ = (a, b);
         self.unhandled(0xFE, 0x0064_16D0);
@@ -651,6 +652,123 @@ pub trait QuestWorld {
     // -- end Act IV q2 seams.
 
     // -- Act V part 1 (quests-act5.md).
+    /// `0x00555230(game, 2, class, x, y, room, f0, f1, f2)`: an object
+    /// of `class` at (x, y) in `room` with the three flag arguments the
+    /// spec lists ("flags 1, 1, 0"; object spec). `None`: not created.
+    fn place_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        flags: [u8; 3],
+    ) -> Option<UnitId> {
+        let _ = (room, x, y, class, flags);
+        self.unhandled(0xFE, 0x0055_5230);
+        None
+    }
+    /// `0x0061AED0(room, 0)`: clear the room's portal flag (DRLG).
+    fn clear_room_portal_flag(&mut self, room: RoomId) {
+        let _ = room;
+        self.unhandled(0xFE, 0x0061_AED0);
+    }
+    /// The units of every room in `room`'s adjacent-room list
+    /// (`0x00619790`, the room itself included as the list holds it),
+    /// room by room in list order, each room's unit list in order.
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        let _ = room;
+        self.unhandled(0xFE, 0x0061_9790);
+        Vec::new()
+    }
+    /// A unit's mode (+0x10), read inline by `0x00588040`, `0x005888D0`
+    /// and `0x00588E10` (monsters), and as `0x0058D510` reads it for
+    /// players; 0 when there is no unit.
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_8040);
+        0
+    }
+    /// "Critical spawn" `0x005459A0(game, x, y, room, 1, class)`
+    /// (monster spec).
+    fn critical_spawn(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        let _ = (room, x, y, class);
+        self.unhandled(0xFE, 0x0054_59A0);
+        None
+    }
+    /// "Kill in place" (`quests-act5.md` §1.1): the unit's interaction
+    /// is ended, it is put in mode 12 and removed (`0x005A7E60`,
+    /// `0x005A7C20`, `0x0061A270`, `0x00623830`, `0x0064C370`).
+    fn kill_in_place(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x005A_7E60);
+    }
+    /// `0x0058F000` then `0x00666120`: apply a stored NPC map AI (the
+    /// map-AI record `map_ai`, a handle the map-AI store passed) to the
+    /// unit. False (nothing applied) when the record's +4 is 0.
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        let _ = (unit, map_ai);
+        self.unhandled(0xFE, 0x0058_F000);
+        false
+    }
+    /// Town cleanup (`0x005893E0`, inline): Anya's interaction ends and
+    /// she leaves her room without dying (monster spec).
+    fn npc_leave_town(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_93E0);
+    }
+    /// `0x00589340`: Nihlathak killed in town (interaction ended, path
+    /// freed, AI event 2 deleted, stat 6 := 0, mode 12, refresh, unit
+    /// flags |= 1; monster spec).
+    fn kill_in_town(&mut self, unit: UnitId) {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0058_9340);
+    }
+    /// The object's collision freed: thaw step 0 (`0x0058AAB0`, inline)
+    /// and inside `0x0058BF40` (object spec).
+    fn free_object_collision(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFE, 0x0058_AAB0);
+    }
+    /// Thaw step 1 (`0x0058AAB0`, inline): the frozen object leaves its
+    /// room (object spec).
+    fn object_leave_room(&mut self, object: UnitId) {
+        let _ = object;
+        self.unhandled(0xFE, 0x0058_AAB0);
+    }
+    /// `0x00558200(player, 0)`: the item level of Anya's rare item
+    /// (item spec; `quests-act5.md` open question 2).
+    fn quest_item_level(&mut self, player: UnitId) -> i32 {
+        let _ = player;
+        self.unhandled(0xFE, 0x0055_8200);
+        0
+    }
+    /// The item's `items.txt` drop sound (record +0x124), read inline by
+    /// `0x00589580`.
+    fn item_drop_sound(&mut self, item: UnitId) -> i32 {
+        let _ = item;
+        self.unhandled(0xFE, 0x0058_9580);
+        0
+    }
+    /// `0x006251F0` + `0x00626E10` + `0x00548520`: a new stat list on
+    /// the player with stats 39, 41, 43, 45 := `v`, the four sent
+    /// (`quests-act5.md` open question 3: stacking).
+    fn add_resist_list(&mut self, player: UnitId, v: i32) {
+        let _ = (player, v);
+        self.unhandled(0xFE, 0x0062_51F0);
+    }
+    /// `0x0054E600`: preset spawn of superunique `superunique`'s monster
+    /// at (x, y) in `room` (monster spec).
+    fn preset_superunique_spawn(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        superunique: u16,
+    ) -> Option<UnitId> {
+        let _ = (room, x, y, superunique);
+        self.unhandled(0xFE, 0x0054_E600);
+        None
+    }
     // -- end Act V part 1 seams.
 
     // -- Act V part 2 (quests-act5-2.md).
@@ -675,12 +793,6 @@ pub trait QuestWorld {
         let _ = (at, superunique);
         self.unhandled(0xFE, 0x0054_5C30);
         None
-    }
-    /// The object's collision freed (inside `0x0058BF40`; the callee is
-    /// object spec).
-    fn free_object_collision(&mut self, object: UnitId) {
-        let _ = object;
-        self.unhandled(0xFE, 0x0058_BF40);
     }
     /// `0x0058C8D0`: missile `missile` from `from` towards `to` (flags,
     /// level; missile spec).
@@ -712,12 +824,6 @@ pub trait QuestWorld {
     fn level_up(&mut self, player: UnitId) {
         let _ = player;
         self.unhandled(0xFE, 0x0057_0880);
-    }
-    /// The unit's mode (+0x10), as `0x0058D510` reads it for players.
-    fn unit_mode(&mut self, unit: UnitId) -> i32 {
-        let _ = unit;
-        self.unhandled(0xFE, 0x0058_D510);
-        0
     }
     /// `0x005353F0` then `0x00535430`: close the player's town portal
     /// if it is in `level`.
