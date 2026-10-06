@@ -17,6 +17,8 @@ pub mod states;
 #[cfg(test)]
 mod gap_tests;
 #[cfg(test)]
+mod prop_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 
 use d2_data::bin::BinTable;
@@ -337,9 +339,9 @@ pub fn life_fraction(hp: i32, max: i32) -> i32 {
 }
 
 /// Whether a new life fraction is sent (§9.3): |f − stat 352 low byte|
-/// > 4.
+/// > 4, in 32-bit arithmetic (no overflow panic outside 0–128).
 pub fn fraction_changed(f: i32, last_sent: i32) -> bool {
-    (f - (last_sent & 0xFF)).abs() > 4
+    f.wrapping_sub(last_sent & 0xFF).wrapping_abs() > 4
 }
 
 /// The max-rescale of `stat-lists.md` §7.2 without floating point: the
