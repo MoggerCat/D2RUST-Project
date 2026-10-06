@@ -566,3 +566,18 @@ fn delivery_asserts() {
     assert_eq!(inbox.push(&[]), Err(QueueError::BadSize(0)));
     assert_eq!(inbox.push(&[0; 0x205]), Err(QueueError::BadSize(0x205)));
 }
+
+/// Regression (CI-only `prop_transport::inbox_any` seed): a split whose
+/// size rule gives more than 0x204 bytes, all present, is the §3.3 rule 2
+/// assert, not a discarded tail.
+// Covers: specs/sim/intents-events.md §3.3 r2
+#[test]
+fn delivery_asserts_on_an_oversized_split() {
+    let mut buf = vec![0x94, 177, 132, 188, 247, 18];
+    buf.resize(537, 0);
+    let mut inbox = Inbox::default();
+    assert_eq!(
+        inbox.deliver(&crate::adapters::ProtoSizes, &buf),
+        Err(QueueError::BadSize(537))
+    );
+}
