@@ -51,7 +51,31 @@ holds on this branch, on synthetic data.
     SaveEntry { len, item, children: Vec<SaveEntry> }`; `ItemBits`
     gains `save`, `save_unit28`, `save_trailer`; errors `BadMarker`,
     `TrailerTail`.
-- **`d2s-tool`** (`tools/d2s-tool`): TOOL_SECTION
+- **`d2s-tool`** (`tools/d2s-tool`): generates and inspects saves for local game
+  testing (args hand-parsed; tables from `--game-dir` or `D2_GAME_DIR`).
+  `SaveTables` from the loaded itemstatcost (`csvbits`, `csvparam`,
+  `csvsigned`) and `save_entry_len` with `d2_server::adapters::item_bits::TablesLookup`.
+  - `new --name N --class C -o OUT` with `--level`, `--expansion`,
+    `--hardcore`/`--softcore`, `--stat ID=V` (stored units: life/mana/
+    stamina in 1/256), `--gold`, `--skill I=L`, `--all-skills L`,
+    `--quests none|acts=N|LIST`, `--waypoints none|all|LIST`,
+    `--difficulty-unlocked normal|nightmare|hell`, `--act`,
+    `--difficulty`, `--item CODE[@X,Y][:PAGE]` (0 inventory, 3 cube, 4
+    stash), `--seed`, `--map-seed`, `--time`. Stats: `vitals.md` §1
+    creation values, then the level's experience through §4.3 (d2-sim
+    `init_player_stats`, `add_experience`). Items: `generation.md` §10.4
+    via d2-sim `create_item` (quality 2, identified, ilvl = level, format
+    101 expansion / 2 classic), placed by the free-position search or at
+    the given cell, written with `write_save`, each re-read through
+    `save_entry_len`. Refuses what would not read back: clamped values,
+    `CSvBits` 0 stats, gold over level × 10,000 or stash gold outside
+    0..=2,500,000 (the loader zeroes it), a town in a locked difficulty.
+  - `new-stub` (§2.6), `dump FILE` (header, quests, waypoints, NPC,
+    stats, skills, each item decoded), `check FILE` (read → write → first
+    differing offset), `set IN -o OUT [edit flags]` (edit an existing
+    save; class changes refused; `--level` sets stats 12/13 only).
+  - Every file `new`/`set` writes is read back and must rewrite to
+    itself before it is saved.
 
 ## 2. Tests
 
@@ -66,7 +90,19 @@ holds on this branch, on synthetic data.
 - `d2-sim` `items::bitstream::save_tests` (6) and `d2-proto`
   `item_bits::save_tests` (7): byte-exact synthetic save-format streams
   (expected bytes from an independent bit packer following the spec).
-- TOOL_TESTS
+- `d2s-tool` `tests/synthetic.rs` (9, synthetic install from
+  `test-fixtures`, stats 0–15 widened to the §7.1 measured widths):
+  `new_save_round_trips`, `stats_level_and_gold_in_stats_section`,
+  `gold_over_the_carry_limit_is_refused`, `skill_bytes`, `status_bits`,
+  `items_parse_back`, `quests_and_waypoints`, `set_edits_a_save`,
+  `command_line`; `tests/real_saves.rs::real_saves_round_trip`
+  (`#[ignore]`, `D2_SAVE_DIR` + `D2_GAME_DIR`; claim added after the
+  first local pass).
+- Gate on this branch: `cargo test -p d2-formats -p d2-proto -p d2s-tool`
+  and `items::bitstream` in d2-sim green; clippy `-D warnings` on
+  d2-formats, d2-proto, d2-sim, d2s-tool; `cargo fmt --all --check`;
+  `coverage.py --check` (5,359 claims, 0 errors); `spec_index.py
+  --check`; depcheck (tool agent).
 
 ## 3. Decisions (also in `docs/PLAN.md`)
 
@@ -83,7 +119,13 @@ holds on this branch, on synthetic data.
 
 ## 4. Local run queue (added to `docs/HANDOFF.md` §5 C and `docs/LOCAL-RUN.md`)
 
-LOCAL_QUEUE
+C65 (`docs/HANDOFF.md` §5 C; `docs/LOCAL-RUN.md` 2.18 and 6.7):
+(1) `real_saves_round_trip` on the user's 1.14d saves: every file parses
+in §1 order and rewrites byte for byte; record header +0x10..+0x37,
++0x88..+0xA7, stats at 0x2FD, `jf`/`kf` (d2s OQ3). (2) The `d2s-tool new`
+/ `new-stub` characters load in 1.14d; after the game re-saves them,
+`check` passes and `dump` ours vs the game's differs only in the save
+time.
 
 ## 5. Open questions / Pending
 
@@ -97,4 +139,12 @@ LOCAL_QUEUE
   `filled == children.len()`.
 - `kf` with its marker but no g byte (file ends after `6B 66`): not
   specified; d2rs rejects with 23.
-- TOOL_PENDING
+- Tool (not specified, so refused or written as noted): `--quests all`
+  is refused (`world/quests.md` does not say which bits a completed
+  quest leaves); `acts=N` sets only bit 0 of the slots the §8.1
+  transitions set (7; 10 and 15; 18 and 23; 28; bit 13 left out because
+  loading clears it). Every item gets the 1-bit 0 trailer
+  (`bitstream.md` OQ3). +0x88..+0xA7 of a full save are the stub's
+  bytes. Item flag 0x2000 (instore, set by the creation pipeline) is
+  kept; `inventory.md` §5.7 flag changes are not applied. All four are
+  what C65 (2) checks.

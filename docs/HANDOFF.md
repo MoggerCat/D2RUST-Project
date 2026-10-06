@@ -2724,6 +2724,18 @@ the dev-dependency) and record results here.
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
 
+65. **C65 Character saves** (`claude/impl-d2s`, note
+    `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
+    (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
+    d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
+    `.d2s` parses in `formats/d2s.md` §1 order and rewrites byte for
+    byte; record header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD,
+    `jf`/`kf` bytes (d2s OQ3). (2) The three `d2s-tool new` / `new-stub`
+    characters of LOCAL-RUN 6.7 load in 1.14d; after the game re-saves
+    them, `d2s-tool check` passes and `dump` of ours vs the game's shows
+    no difference outside the save time. A difference in an item record
+    is an `items/bitstream.md` §5 finding.
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
