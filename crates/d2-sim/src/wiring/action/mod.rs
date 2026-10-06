@@ -30,7 +30,8 @@ pub mod rooms;
 pub mod units;
 pub mod waypoints;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
 pub(crate) mod tests;
 
 use std::collections::BTreeMap;

@@ -1,8 +1,9 @@
 name: Nightly properties
 
 # Deep property-test hunt: the state-machine / model tests at PROPTEST_CASES
-# 20000 and the wired-game `prop_worldsim` at 500. NOT part of the PR `check`
-# (ci.yml): PRs keep the in-source default case counts. Same runs locally:
+# 20000, the wired-game `prop_worldsim` at 500 and the wired path
+# `prop_wired_path` at 300. NOT part of the PR `check` (ci.yml): PRs keep the
+# in-source default case counts. Same runs locally:
 # `sh tools/props-deep.sh`. The filters live in that script.
 #
 # A failure means a real counterexample (docs/HANDOFF.md §8), never a flake:
@@ -30,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [sim, wire, worldsim]
+        group: [sim, wire, worldsim, wiredpath]
     steps:
       - uses: actions/checkout@v4
 

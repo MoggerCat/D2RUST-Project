@@ -1,5 +1,7 @@
 # Handoff: MPQ Huffman encoder, bench and decoder speed-up — `claude/mpq-huffman`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, medium. HANDOFF §2 step 7r BB1.
 Repo only, synthetic data, no game files. Spec: `specs/formats/mpq.md` §9,
 §11 (no spec change).

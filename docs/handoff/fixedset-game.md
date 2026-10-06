@@ -1,5 +1,7 @@
 # Handoff: game from a `FixedSet` — `claude/fixedset-game`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, HANDOFF §2 step 7e
 (`synthetic-data` §6). Repo only, no game files. Medium effort.
 

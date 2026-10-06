@@ -28,7 +28,11 @@ mod map;
 mod room;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod gaps_tests;
+#[cfg(test)]
+mod mutant_tests;
 #[cfg(test)]
 mod tests;
 

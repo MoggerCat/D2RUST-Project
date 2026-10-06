@@ -229,7 +229,11 @@ fn decode_rle(encoded: &[u8]) -> Result<Vec<u8>, FormatError> {
             .get(i..i + count)
             .ok_or_else(|| invalid(FORMAT, "RLE run past end of data"))?;
         i += count;
-        if count > 0 && (row >= RLE_HEIGHT || x + count > RLE_WIDTH) {
+        if count == 0 {
+            // A skip with no pixels writes nothing, even past the block.
+            continue;
+        }
+        if row >= RLE_HEIGHT || x + count > RLE_WIDTH {
             return Err(invalid(
                 FORMAT,
                 format!("RLE pixels outside the block at row {row}, x {x}"),

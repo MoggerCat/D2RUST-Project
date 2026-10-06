@@ -15,6 +15,8 @@ mod apply;
 mod check;
 mod diff;
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod robust_tests;
 mod syntax;
 #[cfg(test)]
@@ -231,11 +233,11 @@ impl Finding {
             0 | 1 => (
                 class, self.pos, self.line, self.col, self.code, table, 0, column,
             ),
-            2 => (class, 0, 0, 0, self.code, table, 0, column),
             3 if self.code == Code::N04 => (class, usize::MAX, 0, 0, self.code, table, 0, column),
             3 => (
                 class, self.pos, self.line, self.col, self.code, table, 0, column,
             ),
+            // B (table) and C (table, row, column): never by code.
             _ => (class, 0, 0, 0, Code::C01, table, row, column),
         }
     }
