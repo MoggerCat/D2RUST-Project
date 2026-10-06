@@ -193,7 +193,7 @@ fn view_culling() {
 fn shake_envelope_and_offsets() {
     assert_eq!(Shake::start(10, 100, 0, 100), None);
     let s = Shake::start(10, 100, 200, 100).unwrap();
-    let a = |t| s.amplitude(t).unwrap();
+    let a = |t| s.amplitude(t);
     assert_eq!(a(0), Some(0));
     assert_eq!(a(50), Some(5));
     assert_eq!(a(99), Some(9));
@@ -204,11 +204,6 @@ fn shake_envelope_and_offsets() {
     assert_eq!(a(399), Some(0));
     assert_eq!(a(400), Some(0));
     assert_eq!(a(401), None);
-    let no_release = Shake::start(10, 100, 200, 0).unwrap();
-    assert_eq!(
-        no_release.amplitude(300),
-        Err(ShakeError::ZeroRelease { t: 300 })
-    );
     assert_eq!(Shake::time_of(0), 0);
     assert_eq!(Shake::time_of(3), 120);
 
@@ -230,6 +225,36 @@ fn shake_envelope_and_offsets() {
     let before = seed;
     assert_eq!(shake_offsets(0, &mut seed), (0, 0));
     assert_eq!(seed, before);
+}
+
+// The 32-bit arithmetic of §8: a zero release time gives a = 0 for the
+// one frame at t = t1 + t2 (no division, no draw), then the shake ends;
+// the attack product keeps its low 32 bits.
+// Covers: specs/render/camera.md §8
+#[test]
+fn shake_envelope_is_unsigned_32_bit() {
+    let no_release = Shake::start(10, 100, 200, 0).unwrap();
+    assert_eq!(no_release.amplitude(299), Some(10));
+    assert_eq!(no_release.amplitude(300), Some(0));
+    assert_eq!(no_release.amplitude(301), None);
+    // a = 0 while not ended: no draw, the origins get no offset.
+    let mut seed = Seed::new(7, 666);
+    let before = seed;
+    let offsets = shake_offsets(0, &mut seed);
+    assert_eq!((offsets, seed), ((0, 0), before));
+    let c = Camera::new(FrameSize::D2RS, OpenMode::NONE, pos(0, 0), offsets);
+    assert_eq!((c.tile, c.unit), (pos(-400, -280), pos(-400, -284)));
+
+    // A = 0x10000, t = 0x10000 in the attack: product 2^32 keeps 0.
+    let wide = Shake::start(0x1_0000, 0x2_0000, 1, 1).unwrap();
+    assert_eq!(wide.amplitude(0x1_0000), Some(0));
+    // t = 0x18000: 0x18000 × 0x10000 mod 2^32 = 2^31; 2^31 / 2^17 = 0x4000.
+    assert_eq!(wide.amplitude(0x1_8000), Some(0x4000));
+    // Release product wraps the same way: t1 + t2 + t3 − t = 0x10000.
+    let rel = Shake::start(0x1_0000, 1, 1, 0x2_0000).unwrap();
+    assert_eq!(rel.amplitude(2), Some(0));
+    // Sustain returns the peak unchanged, whatever its size.
+    assert_eq!(rel.amplitude(1), Some(0x1_0000));
 }
 
 // ---- sprite-placement.md §2–§5, §7, §8 ---------------------------------
@@ -329,6 +354,10 @@ fn top_down_cels_clip_as_bottom_up() {
     assert_eq!((p.y, p.clip), (H - 3, Some(Rect::new(0, H - 1, 800, 1))));
     // Above the top: nothing at all.
     assert_eq!(placement::place(&f, 0, -1, Rect::FRAME).clip, None);
+    // First row at H − 2: the original writes rows H and H + 1 past the
+    // surface; d2rs keeps the two rows inside the frame.
+    let p = placement::place(&f, 0, H - 2, Rect::FRAME);
+    assert_eq!((p.y, p.clip), (H - 2, Some(Rect::new(0, H - 2, 800, 2))));
 }
 
 // Covers: specs/render/sprite-placement.md §7
@@ -688,6 +717,95 @@ fn wall_blocks_culled_in_mode_2() {
         vec![block(-184), block(-152)],
     );
     assert_eq!(view.tile(&tile, &image).unwrap().unwrap().clip, Rect::FRAME);
+}
+
+// The spec vector of §7: mode 1, W = 800, blocks at screen x 399 and
+// 400: 399 is drawn whole (pixels 399–430, past the bound), 400 is
+// skipped; the translucent wall drawer culls the same way.
+// Covers: specs/render/camera.md §7
+#[test]
+fn wall_blocks_culled_in_mode_1_lit_and_translucent() {
+    // Mode 1: left = −200, cx_t = −400; wall cell (0, 0) handed (120, 360).
+    let c = camera(1, pos(0, 0));
+    assert_eq!(c.tile_handed(TileList::Wall, 0, 0), (120, 360));
+    let block = |x| BlockRect {
+        x,
+        y: 0,
+        width: 32,
+        height: 32,
+    };
+    let scene = Scene {
+        units: Vec::new(),
+        tiles: Vec::new(),
+    };
+    let view = OriginalView::new(c, &Fixture, &scene);
+    let image = filled(64, 32, 279, 0, 1);
+    for blend in [BlendOp::Opaque, BlendOp::IndexTable(scene::MapId(0))] {
+        let mut tile = map_tile((0, 0), TileList::Wall, "wall", vec![block(279), block(311)]);
+        tile.blend = blend;
+        // Block 0 at x 399 (kept), block 1 at 431 (culled).
+        let d = view.tile(&tile, &image).unwrap().unwrap();
+        assert_eq!((d.x, d.clip), (399, Rect::new(399, 360, 32, 32)));
+        // A block at x 400 alone: skipped.
+        let mut tile = map_tile((0, 0), TileList::Wall, "wall", vec![block(280)]);
+        tile.blend = blend;
+        let image = filled(32, 32, 280, 0, 1);
+        assert_eq!(view.tile(&tile, &image).unwrap(), None);
+    }
+}
+
+// Floors and roofs go through the floor drawer: only the whole-tile test
+// of §7, no per-block culling, the frame as the pixel clip.
+// Covers: specs/render/camera.md §6, §7; specs/render/sprite-placement.md §7
+#[test]
+fn roofs_and_floors_are_not_culled_per_block() {
+    let c = camera(2, pos(0, 0));
+    let scene = Scene {
+        units: Vec::new(),
+        tiles: Vec::new(),
+    };
+    let view = OriginalView::new(c, &Fixture, &scene);
+    // Blocks the wall drawer would cull in mode 2 (x < 368).
+    let blocks = vec![BlockRect {
+        x: 0,
+        y: 0,
+        width: 32,
+        height: 32,
+    }];
+    let image = filled(32, 32, 0, 0, 1);
+    for list in [TileList::Floor, TileList::Roof { roof_height: 40 }] {
+        let tile = map_tile((-1, 1), list, "floor", blocks.clone());
+        let handed = c.tile_handed(list, -1, 1);
+        let origin = c.block_origin(list, handed);
+        // −80 and the panel shift (+200) on X.
+        assert_eq!(origin.0, handed.0 - 80 + 200);
+        let d = view.tile(&tile, &image).unwrap().unwrap();
+        assert_eq!((d.x, d.y, d.clip), (origin.0, origin.1, Rect::FRAME));
+        assert!(!c.wall_block_visible(d.x, d.y));
+    }
+}
+
+// Units have no view-rectangle test: a unit far outside the view is still
+// placed; its pixels are cut by the frame clip only.
+// Covers: specs/render/camera.md §7, §10
+#[test]
+fn units_are_not_culled_by_the_view() {
+    let (world, assets, mut scene) = golden_scene();
+    scene.tiles.clear();
+    // The object 2,000 client pixels right of the player.
+    scene.units[1].1 = UnitPosition::Static {
+        sx: 163 + 125,
+        sy: 93 - 125,
+    };
+    let view = OriginalView::new(camera(0, pos(1000, 2000)), &Fixture, &scene);
+    let frame = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!(frame.items.len(), 2);
+    let object = frame
+        .items
+        .iter()
+        .find(|i| i.tag == ItemTag::Unit(OBJECT))
+        .unwrap();
+    assert_eq!((object.x, object.clip), (520 + 4000 + 5, Rect::FRAME));
 }
 
 // Covers: specs/render/sprite-placement.md §4

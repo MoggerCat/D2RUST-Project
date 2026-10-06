@@ -291,9 +291,9 @@ fn verify(o: Options) -> Result<()> {
             }
             // render/capture.md: the recorded camera is checked against
             // camera.md §1, §3, then the frame goes through the world view
-            // and `rules::OriginalView`; the recording holds no units, map
-            // or UI yet, so compare cases stop at that seam
-            // (`scene_source::RECORDER_GAP`).
+            // and `rules::OriginalView`; d2rs does not yet read the draw
+            // log into units, map and UI, so compare cases stop at that
+            // seam (`scene_source::NotRecorded`).
             verify::CaseKind::Scene(sc) => verify::capture_case::run_capture(
                 &case.name,
                 sc,
