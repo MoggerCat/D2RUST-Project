@@ -1212,3 +1212,23 @@ mod text {
         );
     }
 }
+
+// Covers: specs/ui/panels.md §2 r1
+#[test]
+fn root_mirrors_the_original_ui_flags() {
+    let log = Log::default();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    for id in [1, 2, 40] {
+        root.add(TestPanel::boxed(id, FRAME, UiResponse::Ignored, &log))
+            .unwrap();
+    }
+    root.open(PanelId(40)).unwrap();
+    let mut states = states::UiStates::new().unwrap();
+    states.force(2, true);
+    root.sync_states(&states);
+    assert_eq!(root.open_panels(), vec![PanelId(2), PanelId(40)]);
+    states.force(2, false);
+    states.force(1, true);
+    root.sync_states(&states);
+    assert_eq!(root.open_panels(), vec![PanelId(1), PanelId(40)]);
+}
