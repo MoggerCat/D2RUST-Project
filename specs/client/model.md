@@ -29,18 +29,18 @@
 |   2. Unit table | 117–162 |
 |   3. Local player | 163–185 |
 |   4. Receive and the unit message queue | 186–223 |
-|   5. Client update pass | 224–247 |
-|   6. Position check (`0x004804E0`) | 248–285 |
-|   7. Session messages | 286–322 |
-|   8. Mode requests | 323–337 |
-|   9. Room-in-sight messages | 338–358 |
-|   10. Bit reader | 359–373 |
-| Constants & data dependencies | 374–386 |
-| Randomness | 387–398 |
-| Edge cases & original bugs | 399–407 |
-| Test vectors | 408–437 |
-| Provenance | 438–459 |
-| Open questions | 460–480 |
+|   5. Client update pass | 224–258 |
+|   6. Position check (`0x004804E0`) | 259–298 |
+|   7. Session messages | 299–335 |
+|   8. Mode requests | 336–386 |
+|   9. Room-in-sight messages | 387–407 |
+|   10. Bit reader | 408–422 |
+| Constants & data dependencies | 423–435 |
+| Randomness | 436–447 |
+| Edge cases & original bugs | 448–456 |
+| Test vectors | 457–486 |
+| Provenance | 487–514 |
+| Open questions | 515–538 |
 <!-- /index -->
 
 ## Summary
@@ -230,7 +230,7 @@ position check of the local player.
    after `receive` in a frame whose pump ran a tick, while `in_game`
    (`client/bridge.md` §8 rule 1).
 2. Per unit (`0x00480810`): unless the unit is not the local player
-   and has unit flag 0x800000 (open question 4), run the per-type update
+   and has unit flag 0x800000 (rule 5), run the per-type update
    (player `0x00463390`, monster `0x004B13A0`, object `0x004BDFF0`,
    missile `0x004D2C70`, item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
@@ -244,6 +244,17 @@ position check of the local player.
 4. d2rs order for the queue drains: types in the order above (S only:
    missiles 3, players 0, monsters 1, objects 2, items 4), then
    `GUID & 0x7F` ascending, then GUID descending.
+5. Unit flag 0x800000 is set only by the active-room free `0x0061A840`
+   (`drlg/rooms.md` §8 rule 4: a client room unloaded under the unit;
+   no other instruction in `Game.exe` sets it). In the update pass a
+   unit other than the local player with this flag runs nothing of rule
+   2 (no per-type update, no queue drain); when its flag-ex (`+0xC8`)
+   bit 0x20 is set (the room free sets it for units without flag
+   0x400000) the client sends C→S 0x4B (9 bytes: 0x4B, type u32, GUID
+   u32; `0x004786A0`, appended to `outgoing`) and clears 0x800000 and
+   0x20; then a client-only unit (flag 0x200000, set C) is removed
+   (`0x00465F00` → `0x00465E80`); a server unit stays until the server
+   answers.
 
 ### 6. Position check (`0x004804E0`)
 
@@ -258,7 +269,9 @@ position check of the local player.
    static-path kinds 2, 4, 5 read the static path).
 4. Tolerance T: kind 1 → 10; kind 2 → 0; any other kind: U is the local
    player → mode 1 → 3 + L, mode 3 → 7 + L, other modes → 5 + L, with
-   L = (`[0x007A04A4]` + 0x32) >> 7 (open question 3: L = 0); U is a
+   L = (`[0x007A04A4]` + 0x32) >> 7 (L = 0: the global is only ever
+   zeroed, by the `0x007A0480` block clears of `0x0044E200` and
+   `0x0044C890`; no other writer); U is a
    monster in mode 3–5 → 5, mode 6–11 → 7; otherwise 15.
 5. far := |x − cx| > T. If far or |y − cy| > T: if kind = 0 and tx > 0
    (signed): d1 := (cx − x)² + (cy − y)² (`0x006492A0`); d1 ≥ 100 →
@@ -329,11 +342,47 @@ position check of the local player.
    nothing (returns 1), item `0x004C1B80(record[0], record[1])`.
 2. What a mode machine does with a request (mode, path, animation
    start, the position checks it runs) is client animation behaviour:
-   Phase 6, open question 1.
+   Phase 6; the dispatch per code is rules 4–6, the monster machine is
+   open question 1.
 3. d2rs: until that spec exists the model stores the request as
    `last_mode_request = {code, record}` on the unit; record entries
    1.14d leaves unset (stack contents) are 0 in the model and marked in
    `msg-units.md` §4.
+4. **Player** (`0x00461250`, ECX code, EDX unit, stack record, flag):
+   first the unit's cast light is detached and removed (`0x00643A00(U,
+   0)`, `0x004743D0`); unless code = 0x13, `0x004611F0(U is the local
+   player)` and `0x00620210(U, 0)`. A unit in mode 0x13 with flag 0
+   ignores the request (returns 1); with flag 1 its path is stopped
+   (`0x00650590`). Then `0x00648DC0(path)`. Neutral / walk modes: 5 / 6
+   when the unit's room is in town (`0x0061AB00`), else 1 / 2.
+
+   | Code | Effect |
+   |---|---|
+   | 0x00 | `0x00480780(U, r0, r1)`; mode := walk (`0x00480E70`) |
+   | 0x01 | `0x004804A0(U, r0, r1)`; mode := walk |
+   | 0x02 | `0x00480930(r0 & 0xFFFF, r1)` |
+   | 0x06 | `+0xB0` := r2; mode := 4; `check(U, r0, r1, 1, 0, 0)` |
+   | 0x07 | was-dead := `0x00464820(U)`; `0x004647D0(U)`; flag 0x2 set; mode := neutral; with a record `0x00480EF0(U, r0, r1, was-dead)` |
+   | 0x08 | local player → `0x00456300(1, 0)`; `+0xB0` := r2; U the hover target (`0x00467A10`) → `0x00466FE0` unless `0x0044BF00` or `0x0044BF10` has bit 8, else `0x0044DA40` + `0x00467A70(0)`; `check(U, r0, r1, 0, 0, 0)`; mode := 0; `0x00461010(U)`; `0x0045C470(U)` |
+   | 0x09 | mode := 0x11; `0x00461010(U)` |
+   | 0x12 | `+0xB0` := r2; mode := 9 when `0x0063C8F0(inventory, 0)` or the COF weapon class (`0x0064F380`) is 0xD; `check(U, r0, r1, 1, 0, 0)` |
+   | 0x13 | `+0xB0` := r2; `0x00480D20(U, 0x13)`; `0x004CC5B0(U, 3 if 0x0063A400(U) else 0x13, 1)`; `check(U, r0, r1, 1, 0, 0)` |
+   | 0x14 | `+0xB0` := r2; path: stop, type 0xB (`0x00648CF0`), `0x00648E40(path, 5)`, target (r0, r1) (`0x00648AD0`), compute (`0x00649970`); mode := 0x13 |
+   | 0x15 | target fix-up `0x00461180(U, record, 0)`, then `0x004C6F40(U, record)` (client skill start, `render/lighting.md` §8 r3) |
+   | 0x16 | the same with `0x004C6EB0` |
+   | 0x17 | `0x004804A0(U, r0, r1)`; mode := 3 |
+   | 0x18 | `0x00480780(U, r0, r1)`; mode := 3 |
+   | 0x19 | mode := 0xD; `check(U, r0, r1, 0, 0, 0)` |
+   | 3–5, 0x0A–0x11, > 0x19 | fatal 0x432 |
+
+   A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
+   neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.
+5. **Object** (`0x004BD6D0`): code 3 → `0x004BCF60(U, record)` (object
+   mode change: lights `render/lighting.md` §8), then `0x004BD650` when
+   `0x00621B00(U)`; code 0x15 → `0x004BD5C0(record)`; any other code is
+   fatal 0x39C.
+6. **Item** (`0x004C1B80`): code 2 → mode := r1 (`0x00624690`), unit
+   flag 0x2 := (r0 ≠ 0); other codes do nothing.
 
 ### 9. Room-in-sight messages
 
@@ -456,20 +505,29 @@ D2MOO's `D2UnitStrc` (1.10f) names the record fields (+0xD8
 (join order 0x01, 0x00, 0x02, then frame 1: 0x59, 0x0B, ..., 0x03,
 0x07 × 10, 0x15; frame 2: monsters, objects, 0x04). No C→S 0x5F occurs
 in either recording (no correction of the local player happened).
+Ghidra backlog (2026-10-06): mode machines `0x00461250` (jump tables
+`0x004616A4` / `0x004616E4` read from the file), `0x004BD6D0`,
+`0x004C1B80`; flag 0x800000: every write of unit `+0xC4` in the export
+(only `0x0061A840` sets bit 23), update `0x00480810`, C→S 0x4B
+`0x004786A0`; `[0x007A04A4]`: all references (reader `0x0044CE60`,
+block clears `0x0044E200` / `0x0044C890`).
 
 ## Open questions
 
-1. The mode machines (`0x00461250`, `0x004AFF60`, `0x004BD6D0`,
-   `0x004C1B80`): mode, path and animation effects of each code; owner:
-   a Phase 6 client unit-modes spec.
+1. The mode machines: dispatch of the player, object and item machines
+   answered in §8 rules 4–6. Open: the monster machine `0x004AFF60`
+   (3,678 bytes, 10 callers) per code, and the effects of the helpers
+   the tables name (`0x00480E70` mode set, `0x004804A0` / `0x00480780`,
+   `0x00480930`, `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
+   client unit-modes spec.
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
    `ViewFeed::player`; Phase 6 movement spec; check against
    `record_frames.py` positions.
-3. `[0x007A04A4]` (L of §6 rule 4) has no direct write in the binary;
-   confirm it stays 0 with a memory read during play.
-4. Unit flag 0x800000 (skips the update and keeps the queue): who sets
-   it on the client.
+3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 (only zeroed; L = 0). A
+   memory read during play confirms.
+4. ~~Unit flag 0x800000~~: answered in §5 rule 5 (room free
+   `0x0061A840`).
 5. The client DRLG (act build, rooms in sight, tiles) as a d2rs
    component: which spec owns it (`drlg/` client parts, map-tile feed
    RW2).

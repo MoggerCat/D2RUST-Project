@@ -462,7 +462,7 @@ Metrics from the 1.14d font files (`text-fonts.tsv`; probe of
 | capture case `text-0002`: an item hover box with a magic (blue) item and a multi-line description | same | capture, queued |
 | row window: cel bottom row `B` = 100, skip 3, lines 10, `H` = 600 | screen rows 88 … 97 (encoded rows 3 … 12 from the bottom) | §9 details r2 |
 | row window: `B` = 5, skip 0, lines 18 | `top` = −13 → 0, rows 1 … 5 only (row 0 lost) | §9 details r2 |
-| `ÿc!` (`k` = −15) | remap = inventory color variation 13 (`+0x94`) | §4 r5 |
+| `ÿc!` (`k` = −15) | remap = inventory color variation 2 (`+0x94`) | §4 r5 |
 
 ## Provenance
 
