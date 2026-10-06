@@ -25,16 +25,16 @@
 |   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 148–154 |
 |   6. Magic item (`0x005565E0`) | 155–170 |
 |   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 171–190 |
-|   8. Crafted item (`0x005C21D0`) | 191–205 |
-|   9. Tempered item (dispatch case 9) | 206–211 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 212–225 |
-|   11. Automagic (finishing step, `0x00557450`) | 226–232 |
-| Constants & data dependencies | 233–249 |
-| Randomness | 250–265 |
-| Edge cases & original bugs | 266–280 |
-| Test vectors | 281–297 |
-| Provenance | 298–317 |
-| Open questions | 318–323 |
+|   8. Crafted item (`0x005C21D0`) | 191–212 |
+|   9. Tempered item (dispatch case 9) | 213–218 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 219–232 |
+|   11. Automagic (finishing step, `0x00557450`) | 233–239 |
+| Constants & data dependencies | 240–256 |
+| Randomness | 257–272 |
+| Edge cases & original bugs | 273–304 |
+| Test vectors | 305–323 |
+| Provenance | 324–346 |
+| Open questions | 347–358 |
 <!-- /index -->
 
 ## Summary
@@ -200,6 +200,13 @@ forced.
       same kind holds a or an affix of a's `group`; not taken → store in
       slot P (S), advance, end the tries. All 252 taken → slot P (S) := 0
       (not advanced).
+      Stores go into the item at once (prefix slot `0x00627EF0`, suffix
+      slot `0x00627FB0`), so the next §3 call's group test (§4.2) sees
+      them. The taken test reads slots 0–2 of the kind, skipping empty
+      ones (it does not stop at the first empty slot, unlike §4.2), in
+      slot order: slot record none → next slot; a = slot id → taken;
+      else group(a) = group(slot) → taken. group(a) is read without a
+      test that a has a record (edge case 3).
 4. Clear identified; properties interleaved as §7 step 5; class skill
    mods; return 1 (also with no affix).
 
@@ -274,9 +281,26 @@ magic items roll the prefix's values before the suffix is chosen.
    (`0x00633EE0` returns none for id 0): a read at address 0x5C, which
    crashes the game. With no slot filled, 0 is "not taken" and is stored
    (slot stays empty but the count advances).
+   Confirmed on 1.14d (handoff triage Q2): `0x00633EE0` returns none for
+   ids ≤ 0 and > the count; at `0x005C2371` / `0x005C2451` the result is
+   used at +0x5C (`0x005C237C` prefix, `0x005C2460` suffix) with no test.
+   §3 is called with force 1, so its coin never returns 0: a = 0 means
+   no row passed step 4. Reachable whenever the kind's remaining rows
+   all share a group with a filled slot, which is common at low alvl on
+   bases with few fitting rows; d2rs reproduces it as a fatal error
+   (`Ruleset::Original`).
 4. Charm with no fitting affix exits the game process.
 5. The charm's prefix roll passes the suffix preference (harmless: it is ≤ 0).
 6. The coin step is drawn even when force is set.
+7. Crafted: the taken test of §8 step 3.2 is not redundant with §4.2.
+   A stored 0 (edge case 3, no slot of the kind filled) leaves slot P
+   empty and advances P, so later picks of that kind land after a hole.
+   §4.2 stops at the hole and no longer sees them; only the taken test
+   (which skips empty slots) keeps a second affix of their group out.
+   (A 0 store means no row of that kind passed §3 step 4; later calls
+   of that kind exclude at least as much, so the hole is followed by
+   more 0 stores unless the request names a different preferred affix
+   for the next slot, §3 step 4.3.)
 
 ## Test vectors
 
@@ -294,6 +318,8 @@ Synthetic, from the rules:
 | rare count, seed `{6, 666}` / `{7, 666}` / `{8, 666}` | 3 / 5 / 4 | synthetic |
 | §3 weights: freq 3, 0, 5 (no magic lvl), total 8, r = roll(9) = 3 | row 1 skipped (freq 0); 3 − 3 = 0 not < 0, 0 − 5 < 0 → second candidate | synthetic |
 | §3 weighted (magic lvl ≠ 0): levels 10, 20, freq 2, 1 | weights 20, 20; total 40; roll(41) | synthetic |
+| §8, synthetic table: one suffix row (group 5) fits; n = 2, both picks suffix | pick 1 stores it in suffix slot 0; pick 2: §3 excludes group 5 → a = 0; slot 0 filled → fatal (edge case 3) | synthetic |
+| §8, same table, both picks prefix (no prefix row fits) | a = 0 twice, nothing filled → prefix slots 0, 1 := 0, P = 2; success, no prefix | synthetic |
 
 ## Provenance
 
@@ -301,7 +327,10 @@ Synthetic, from the rules:
   `0x005C1839`), wrappers `0x005C18E0`, `0x005C1940`, group check
   `0x005C1500`, fit tests `0x0065E620`, `0x0065E710`, rare names
   `0x005C1AB0`, magic `0x005565E0`, rare `0x005C21A0`/`0x005C1BF0`
-  (count table `0x006E3014`), crafted `0x005C21D0`, tempered
+  (count table `0x006E3014`), crafted `0x005C21D0` (disassembled again
+  for the triage questions: slot setters `0x00627EF0`, `0x00627FB0`,
+  slot getters `0x00627EC0`, `0x00627F80`, record lookup `0x00633EE0`),
+  tempered
   `0x005C1BC0` (dispatch `0x0055782E`), charm `0x00556A60`, automagic
   `0x005579C6`; affix table root `0x0096CA7C`, rare `0x0096CAA0`.
 - D2MOO 1.10f (`ItemsMagic.cpp`: `ITEMS_RollMagicAffixesNew`,
@@ -320,3 +349,9 @@ Synthetic, from the rules:
 1. No recording confirms the routines (request R1 in the session report).
 2. Format-0 rollers (`0x005C12F0`, `0x005C19A0`, `0x005C1E80`) are not
    specified.
+3. Answered (handoff `triage-game-findings` Q1, Q2): §8 step 3.2 (picks
+   written into the item at once; taken test skips empty slots), edge
+   cases 3 (the crash is real: no test before the +0x5C read) and 7.
+   The d2rs creation sweep's ~570 crafted requests ending in edge case
+   3 are expected 1.14d behavior for those bases; a live craft at a low
+   resulting ilvl on a base with one fitting group would show it.
