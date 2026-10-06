@@ -16,6 +16,7 @@ use d2_sim::tick::timer::TimerRun;
 use d2_sim::tick::{self, EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
+use super::handlers::{self, items::ItemView, items::ItemWorld};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
     UnitTarget,
@@ -101,6 +102,8 @@ pub struct SimGame<D = Unspecified> {
     /// Intents that passed the gate, size check and parse, in order:
     /// (client, id, size). Their handlers are not written (see `handle`).
     pub unhandled: Vec<(ClientId, u8, usize)>,
+    /// Item state of the item handlers (`None`: their ids stay stubs).
+    pub items: Option<ItemWorld>,
 }
 
 impl SimGame<Unspecified> {
@@ -120,6 +123,7 @@ impl<D: EventDispatch> SimGame<D> {
             units: BTreeMap::new(),
             resyncs: Vec::new(),
             unhandled: Vec::new(),
+            items: None,
         }
     }
 
@@ -258,8 +262,8 @@ impl<D: EventDispatch> Intents for SimGame<D> {
     }
 
     /// Per-intent behaviour belongs to the system specs (movement,
-    /// skills, items, NPCs, quests; §4 rule 1), none written yet. Every
-    /// handler is a stub: it records the intent and returns 0, the "does
+    /// skills, items, NPCs, quests; §4 rule 1). Ids a [`handlers`]
+    /// module owns run there; every other handler is a stub: it records the intent and returns 0, the "does
     /// nothing" result of 1.14d's stubs (§2.4 rule 2). TODO(stats spec):
     /// skill messages (0x05–0x11 except 0x0B) owe `pierce_idx` += 1
     /// (§2.4 rule 5).
@@ -268,8 +272,11 @@ impl<D: EventDispatch> Intents for SimGame<D> {
         client: ClientId,
         msg: &[u8],
         size: usize,
-        _out: &mut dyn MessageSink,
+        out: &mut dyn MessageSink,
     ) -> ResultCode {
+        if let Some(r) = handlers::items::handle(self.item_view(client), client, msg, out) {
+            return r;
+        }
         self.unhandled.push((client, msg[0], size));
         ResultCode::Done
     }
@@ -291,5 +298,20 @@ impl<D: EventDispatch> Tick for SimGame<D> {
     /// belongs to an unwritten spec, so `out` is unused.
     fn tick(&mut self, _out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut Steps(&mut self.events));
+    }
+}
+
+/// The item handlers' view (`handlers::items`).
+impl<D: EventDispatch> SimGame<D> {
+    /// The client's player unit, the game, the item world and the staged
+    /// unit facts, borrowed apart; `None` without a player or item world.
+    fn item_view(&mut self, client: ClientId) -> Option<ItemView<'_>> {
+        let player = self.player_unit(client)?;
+        Some(ItemView {
+            player,
+            game: &mut self.game,
+            world: self.items.as_mut()?,
+            facts: &self.units,
+        })
     }
 }

@@ -13,5 +13,8 @@ d2-proto.workspace = true
 d2-net.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+d2-data.workspace = true
+
 [lints]
 workspace = true
