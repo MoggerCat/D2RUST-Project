@@ -204,6 +204,15 @@ fn direction_offset_may_skip_bytes_after_the_header() {
     assert!(Dcc::parse(&inside).is_err());
 }
 
+#[test]
+fn frame_of_zero_width_or_height_is_an_error() {
+    // §Boxes: a width or height of 0 is an error, each on its own.
+    for (w, h) in [(0, 1), (1, 0)] {
+        let dir = direction(0, 0, &[frame(w, h, 0, 0)], &Streams::default());
+        assert!(Dcc::parse(&dcc_file(1, &[dir])).is_err(), "{w}x{h}");
+    }
+}
+
 // ---------------------------------------------------------------- optional bytes
 
 #[test]

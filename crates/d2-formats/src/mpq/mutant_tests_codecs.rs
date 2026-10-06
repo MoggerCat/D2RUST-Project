@@ -216,7 +216,8 @@ fn adpcm_stereo_channel_rotation() {
 // ---------------------------------------------------------------------
 // §4 decryption: dwords after the first depend on the key schedule.
 
-/// Plaintexts of four zero dwords, worked from the §2/§4 pseudocode.
+/// Plaintexts of four zero dwords, worked from the §2/§4 pseudocode;
+/// trailing bytes stay as they are.
 // Covers: specs/formats/mpq.md §4
 #[test]
 fn decrypt_key_schedule_vectors() {
@@ -231,9 +232,12 @@ fn decrypt_key_schedule_vectors() {
         ),
         (0, [0x0829_9586, 0x31C9_1E96, 0x0435_8EC1, 0xE3B2_DEB8]),
     ] {
-        let mut data = [0u8; 16];
+        // Two trailing bytes (len mod 4) are left unchanged.
+        let mut data = [0u8; 18];
+        data[16..].copy_from_slice(&[0xAB, 0xCD]);
         decrypt(&mut data, key);
-        let got: Vec<u32> = data
+        assert_eq!(data[16..], [0xAB, 0xCD], "key {key:#010X}");
+        let got: Vec<u32> = data[..16]
             .as_chunks::<4>()
             .0
             .iter()

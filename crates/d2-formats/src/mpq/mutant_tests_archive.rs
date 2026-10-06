@@ -747,3 +747,69 @@ fn archive_set_without_known_archives() {
     assert!(set.archives().is_empty());
     assert!(!set.contains("x.txt"));
 }
+
+/// §5 lookup step 4: an entry matches only if `block_index <
+/// block_table_count`. An entry whose block index equals the count is
+/// passed over: the probe goes on to the next match, or ends not found.
+// Covers: specs/formats/mpq.md §5 r4
+#[test]
+fn lookup_rejects_block_index_equal_to_count() {
+    let name = "w.txt";
+    let start = Builder::start(name);
+    let at = |i: usize| (start + i) % HASH_COUNT;
+    let mut b = Builder::new();
+    let real = b.block(flags::EXISTS, b"real".to_vec(), 4);
+    let count = 1u32; // one block
+    b.slots[at(0)] = Builder::slot_of(name, 0, count);
+    b.slots[at(1)] = Builder::slot_of(name, 0, real);
+    let (_t, a) = open(&b.bytes());
+    let a = a.unwrap();
+    assert_eq!(a.block_table().len(), count as usize);
+    assert_eq!(a.find(name), Some(real as usize));
+    assert_eq!(a.read(name).unwrap(), b"real");
+
+    // Only the out-of-range entry: not found.
+    b.slots[at(1)] = EMPTY;
+    let (_t, a) = open(&b.bytes());
+    let a = a.unwrap();
+    assert_eq!(a.find(name), None);
+    assert!(matches!(a.read(name), Err(MpqError::NotFound(_))));
+}
+
+/// §8 step 2: offsets never decrease, and `offset[N] ≤ compressed_size`.
+/// Either violation alone makes the file corrupt.
+#[test]
+fn sector_offsets_validated() {
+    // Two raw sectors of a 0x300-byte file (sector size 0x200) would need
+    // 0x300 bytes; these tables are rejected before any sector is used.
+    let block = |offsets: [u32; 3], data_len: usize| {
+        let mut s: Vec<u8> = offsets.iter().flat_map(|o| o.to_le_bytes()).collect();
+        s.resize(data_len, 0x41);
+        s
+    };
+    let mut b = Builder::new();
+    // Decreasing (12 → 30 → 20), last offset inside the data.
+    let dec = b.file(
+        "dec",
+        flags::EXISTS | flags::COMPRESS,
+        block([12, 30, 20], 40),
+        0x300,
+    );
+    // Increasing, last offset past the data.
+    let past = b.file(
+        "past",
+        flags::EXISTS | flags::COMPRESS,
+        block([12, 20, 50], 40),
+        0x300,
+    );
+    let (_t, a) = open(&b.bytes());
+    let a = a.unwrap();
+    assert!(matches!(
+        a.read_block(dec as usize, None),
+        Err(MpqError::Corrupt(_))
+    ));
+    assert!(matches!(
+        a.read_block(past as usize, None),
+        Err(MpqError::Corrupt(_))
+    ));
+}
