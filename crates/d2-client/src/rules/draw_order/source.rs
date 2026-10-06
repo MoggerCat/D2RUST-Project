@@ -248,12 +248,15 @@ pub fn resolve(
     resolve_drawn(camera, order, art).map(|(t, u, _)| (t, u))
 }
 
+/// The map tiles, unit slots and [`DrawEffects`] of an order.
+pub type Resolved = (Vec<MapTile>, BTreeMap<UnitKey, UnitSlot>, DrawEffects);
+
 /// [`resolve`], plus the frame's [`DrawEffects`].
 pub fn resolve_drawn(
     camera: &Camera,
     order: &FrameOrder,
     art: impl Fn(&OrderedTile) -> Result<TileArt, ViewError>,
-) -> Result<(Vec<MapTile>, BTreeMap<UnitKey, UnitSlot>, DrawEffects), ViewError> {
+) -> Result<Resolved, ViewError> {
     let mut tiles = Vec::new();
     let mut units = BTreeMap::new();
     let mut fx = DrawEffects::default();

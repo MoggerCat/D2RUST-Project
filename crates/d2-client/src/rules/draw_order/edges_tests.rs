@@ -18,6 +18,7 @@ fn edge_record() -> TileRecord {
         ty: 0,
         dt1: Dt1Facts::default(),
         fade: Fade::OPAQUE,
+        logical: None,
     }
 }
 

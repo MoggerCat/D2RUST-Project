@@ -1015,7 +1015,11 @@ pub fn order_grid(
     if matches!(near.level.id, 74 | 120) {
         return Err(open(
             1,
-            format!("level {} draws a background", near.level.id),
+            format!(
+                "level {} draws a background (draw-order-2.md §12, `background`): \
+                 the recorded time seeds and the view's art path are not wired",
+                near.level.id
+            ),
         ));
     }
     let lists = fill(grid, near, positions, clock, false)?;
@@ -1039,7 +1043,11 @@ pub fn order_grid(
 
     // Pass 3: floors (r2), straight from the rooms.
     if p.near.level.draw_edges && mode.get() == 0 {
-        return Err(open(10, "the level draws edge floors (DrawEdges)"));
+        return Err(open(
+            10,
+            "the level draws edge floors (DrawEdges at open mode 0): draw-order-2.md §14 \
+             (`edges`) needs the resolution mode and the act edge record (its open question 2)",
+        ));
     }
     for ri in 0..p.near.rooms.len() {
         for layer in 1..=2 {
@@ -1053,7 +1061,8 @@ pub fn order_grid(
         }
     }
 
-    // Pass 4: TODO(spec: draw-order open question 2) `0x00473C00`.
+    // Pass 4: the environment pools (`draw-order-2.md` §11.6) come from
+    // the feed's weather state (`weather::Weather::pass4`, source.rs).
 
     // Pass 5: the shadow pass (r3).
     if lists.flags.shadows {
@@ -1134,8 +1143,9 @@ pub fn order_grid(
         }
     }
 
-    // Passes 8–10: TODO(spec: draw-order open question 2) `0x00475B20`,
-    // `0x00473910`; the screen fade `0x004DC000` has no d2rs input yet.
+    // Pass 8 never runs (`draw-order-2.md` §13, `background::pass8_items`);
+    // pass 9 is `weather::Weather::pass9` (§11.7, source.rs); the screen
+    // fade `0x004DC000` (pass 10) has no d2rs input yet.
 
     Ok(FrameOrder {
         items: p.out,
