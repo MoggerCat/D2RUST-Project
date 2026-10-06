@@ -22,21 +22,21 @@
 | Outputs / state changes | 67–77 |
 | Rules | 78–79 |
 |   1. Routing | 80–95 |
-|   2. Put an item into the cube (C→S 0x2A) | 96–128 |
-|   3. Transmute entry (`0x005665F0`) | 129–141 |
-|   4. Recipe eligibility | 142–156 |
-|   5. Ops | 157–176 |
-|   6. Input matching | 177–241 |
-|   7. Outputs | 242–345 |
-|   8. Commit | 346–373 |
-|   9. Portals | 374–393 |
-|   10. C→S 0x4C is not the cube | 394–408 |
-| Constants & data dependencies | 409–432 |
-| Randomness | 433–451 |
-| Edge cases & original bugs | 452–481 |
-| Test vectors | 482–526 |
-| Provenance | 527–565 |
-| Open questions | 566–590 |
+|   2. Put an item into the cube (C→S 0x2A) | 96–127 |
+|   3. Transmute entry (`0x005665F0`) | 128–140 |
+|   4. Recipe eligibility | 141–155 |
+|   5. Ops | 156–175 |
+|   6. Input matching | 176–240 |
+|   7. Outputs | 241–344 |
+|   8. Commit | 345–372 |
+|   9. Portals | 373–392 |
+|   10. C→S 0x4C is not the cube | 393–407 |
+| Constants & data dependencies | 408–431 |
+| Randomness | 432–450 |
+| Edge cases & original bugs | 451–480 |
+| Test vectors | 481–525 |
+| Provenance | 526–564 |
+| Open questions | 565–589 |
 <!-- /index -->
 
 ## Summary
@@ -106,9 +106,8 @@ Handler `0x0054B790`, size == 9 else 3.
    (stored) and be in the player's inventory, else result 1.
 3. `0x005628C0`, with a "refused" flag cleared first:
    1. Targeting reset `0x0055BF50` (shared, 26 callers): every inventory
-      item with item flag 0x4 gets it cleared; when `0x0044BE50` (unit
-      type of its argument, 6 for none) returns 0, 0x3F is queued
-      (`0x0053D220`, arguments 0xFF, 1, 0, 0xFFFF).
+      item with item flag 0x4 gets it cleared and, for a player, a 0x3F
+      is queued (`items/inventory.md` §5.3).
    2. Cube = item unit `cube`; it must exist, be mode 0 and have code
       `box ` (items.txt code, `0x00628590`), else refused.
    3. If the player is trading (interaction type 0 with a live unit,

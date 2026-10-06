@@ -36,19 +36,19 @@
 |   2. Grid placement | 173–251 |
 |   3. Belt | 252–281 |
 |   4. Equipping | 282–381 |
-|   5. Shared checks | 382–425 |
-|   6. Deferred item messages | 426–475 |
-|   7. Intents | 476–762 |
-|   8. Pickup from the ground | 763–828 |
-|   9. Drop to the ground | 829–863 |
-|   10. Gold | 864–894 |
-|   11. Message layouts | 895–919 |
-| Constants & data dependencies | 920–942 |
-| Randomness | 943–955 |
-| Edge cases & original bugs | 956–971 |
-| Test vectors | 972–1019 |
-| Provenance | 1020–1055 |
-| Open questions | 1056–1106 |
+|   5. Shared checks | 382–429 |
+|   6. Deferred item messages | 430–479 |
+|   7. Intents | 480–767 |
+|   8. Pickup from the ground | 768–833 |
+|   9. Drop to the ground | 834–868 |
+|   10. Gold | 869–899 |
+|   11. Message layouts | 900–924 |
+| Constants & data dependencies | 925–947 |
+| Randomness | 948–960 |
+| Edge cases & original bugs | 961–976 |
+| Test vectors | 977–1024 |
+| Provenance | 1025–1060 |
+| Open questions | 1061–1111 |
 <!-- /index -->
 
 ## Summary
@@ -407,8 +407,12 @@ interaction is with a player unit that exists (multiplayer only).
 #### 5.3 Targeting reset
 
 `0x0055BF50`: for every item in the player's item list with item flag
-0x4: clear it; if `0x0044BE50` returns 0 queue S→C 0x3F (code 0xFF, the
-item's GUID, 0xFFFF; §11). Runs first in most item routines (cited as
+0x4: clear it; then, if the **targeted unit** (the argument of
+`0x0055BF50`, the player) is a player, queue S→C 0x3F (code 0xFF, the
+item's GUID, 0xFFFF; §11). `0x0044BE50(unit)` returns the unit's type
+(unit +0x00), or 6 for a null unit; 0 = player. It is called with the
+same unit for every item, never with the item, so for a player owner
+every flagged item sends a 0x3F and for any other owner none does. Runs first in most item routines (cited as
 "targeting reset").
 
 #### 5.4 Item-move gate
@@ -712,7 +716,8 @@ the unit looked up by the GUID must be the player itself, else 3; amount
 must be 0 ≤ amount ≤ gold (stat 14) and ≤ the gold limit (level × 10000,
 `0x00622E70`), else 3. Amount 0 → 0. Else cap 2,000,000,000; create up to
 32 gold piles (`0x0055A090`, §10.2); for each pile, in creation order:
-owner := player (`0x00621CE0`, only when `0x0044BE50` is 0); gold :=
+owner := player (`0x00621CE0`, only when `0x0044BE50(player)`, the
+player's unit type, is 0); gold :=
 gold − pile gold (`0x00530EA0`). Result 0.
 
 #### 7.23 0x61 MercItem (`0x0054D430`), expansion only

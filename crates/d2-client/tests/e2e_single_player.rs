@@ -2009,7 +2009,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // count − 1 = 0 (Open question 4 reads byte +2 so): one `spend`:
     // stat points 5 → 4, strength 0 → 1, result 0. No message (none is
     // written for it).
-    let point = bytes(&AddStatPoint { stat: STRENGTH });
+    let point = bytes(&AddStatPoint {
+        stat: STRENGTH as u8,
+        count_minus_one: 0,
+    });
     assert_eq!(point, [0x3A, 0, 0]);
     record(&mut fx, &mut frames, vec![point]);
     let done = Some(ResultCode::Done);

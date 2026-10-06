@@ -41,7 +41,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x27	NpcInfo	40		-	0x0045E0A0	-	sim	partial
 0x28	QuestInfo	103		0x0053D670	0x0045D370	-	sim	yes
 0x29	GameQuestInfo	97		0x0053D700	0x0045D3A0	-	sim	yes
-0x2A	NpcTransaction	15		0x0053D740	0x0045E0D0	-	sim	yes
+0x2A	NpcTransaction	15	kind:u8@1 code:u8@2 guid:u32@7 gold:u32@11	0x0053D740	0x0045E0D0	-	sim	yes
 0x2B	-	0		-	0x0045C900	-	none	yes
 0x2C	PlaySound	8		-	0x0045E110	-	sim	partial
 0x2D	-	0		-	0x0045C900	-	none	yes
@@ -79,7 +79,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x4D	UnitSkillOnPoint	17		-	0x0045C900	0x0045DF60	sim	partial
 0x4E	MercForHire	7		-	0x0045E3D0	-	sim	partial
 0x4F	StartMercList	1		0x0053B320	0x0045E3C0	-	sim	yes
-0x50	QuestSpecial	15		-	0x0045E370	-	sim	partial
+0x50	QuestSpecial	15	kind:u16@1 v0:u16@3 v1:u16@5 v2:u16@7 v3:u16@9 v4:u16@11	0x0053D7E0	0x0045E370	-	sim	yes
 0x51	AssignObject	14		0x0053BD10	0x0045CBD0	-	sim	yes
 0x52	QuestLogInfo	42		0x0053D840	0x0045CC00	-	sim	yes
 0x53	Darkness	10		-	0x0045E300	-	sim	partial
@@ -87,18 +87,18 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x55	-	0		-	0x0045C900	-	none	yes
 0x56	-	0		-	0x0045C900	-	none	yes
 0x57	NpcEnchants	14		0x0053D880	0x0045E400	-	sim	yes
-0x58	OpenUi	7		-	0x0045E490	-	sim	partial
+0x58	OpenUi	7	npc:u32@1 result:u8@5	0x0053D8D0	0x0045E490	-	sim	yes
 0x59	AssignPlayer	26		0x0053E8F0	0x0045E4C0	-	sim	yes
 0x5A	EventMessage	40		0x0053C850	0x0045E070	-	sim	yes
 0x5B	PlayerJoined	u16@1;min=34		0x0053C940	0x0045E4E0	-	session	yes
 0x5C	PlayerLeft	5		0x0053CA90	0x0045E530	-	session	yes
-0x5D	QuestItemState	6		-	0x0045E540	-	sim	partial
+0x5D	QuestItemState	6	chain:u8@1 flags:u8@2 status:u8@3 extra:u16@4	0x0053D710	0x0045E540	-	sim	yes
 0x5E	GameQuestAvailability	38		0x0053D830	0x0045E570	-	sim	yes
 0x5F	PortalFlags	5	u32@1	0x0053B400	0x0045E5D0	-	sim	yes
 0x60	TownPortalState	7		0x0053D900	0x0045E610	-	sim	yes
 0x61	CanGoToAct	2		0x0053D940	0x0045E660	-	sim	yes
 0x62	MakeUnitTargetable	7		0x0053D6D0	0x0045D390	-	sim	yes
-0x63	WaypointMenu	21		-	0x0045E670	-	sim	partial
+0x63	WaypointMenu	21	guid:u32@1 record:cstr16@5	0x0053D960	0x0045E670	-	sim	yes
 0x64	-	0		-	0x0045C900	-	none	yes
 0x65	PlayerKillCount	7		0x0053D9C0	0x0045E6B0	-	sim	yes
 0x66	Unknown66	7		-	0x0045E6C0	-	sim	partial
@@ -118,7 +118,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x74	PlayerCorpseAssign	10		0x0053DA40	0x0045E7B0	-	sim	yes
 0x75	PlayerPartyInfo	13		0x0053DA90	0x0045E7E0	-	out	yes
 0x76	PlayerInProximity	6		0x0053B3D0	0x0045E050	-	sim	yes
-0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	out	yes
+0x77	TradeAction	2		0x0053CAB0	0x0045E800	-	sim	yes
 0x78	TradeAccepted	21		-	0x0045E810	-	out	partial
 0x79	GoldInTrade	6		0x0053CBE0	0x0045E850	-	out	yes
 0x7A	PetAction	13		0x0053CB30	0x0045E860	-	sim	yes
@@ -144,7 +144,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x8E	CorpseAssign	10		0x0053DFB0	0x0045EAA0	-	sim	yes
 0x8F	Pong	33		0x0053E020	0x0045EB00	-	transport	yes
 0x90	PartyAutomapInfo	13		0x0053CDF0	0x0045E9C0	-	out	yes
-0x91	NpcGossipAct	26		-	0x0045E580	-	sim	partial
+0x91	NpcGossipAct	26	act:u8@1 npc0:u16@2 npc1:u16@4 npc2:u16@6 npc3:u16@8 npc4:u16@10 npc5:u16@12 npc6:u16@14 npc7:u16@16 npc8:u16@18 npc9:u16@20 npc10:u16@22 npc11:u16@24	0x0053E060	0x0045E580	-	sim	yes
 0x92	RemoveItemsDisplay	6		0x0053B3D0	0x0045E5B0	-	sim	yes
 0x93	Unknown93	8		0x0053C6F0	0x0045DD10	-	sim	yes
 0x94	BaseSkillLevels	u8@1*3+6;min=9		-	0x0045DD60	-	sim	partial
@@ -171,7 +171,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0xA9	EndState	7		0x0053E290	0x0045EF60	-	sim	yes
 0xAA	AddUnit	u8@6;min=7		-	0x0045EFA0	-	sim	partial
 0xAB	NpcHeal	7		0x0053C150	0x0045F120	-	sim	yes
-0xAC	AssignMonster	u8@12;min=13		0x0053E2E0	0x0045F190	-	sim	yes
+0xAC	AssignMonster	u8@12;min=13	guid:u32@1 class:u16@5 x:u16@7 y:u16@9 life:u8@11 len:u8@12 data@13	0x0053E2E0	0x0045F190	-	sim	yes
 0xAD	-	0		-	0x0045C900	-	none	yes
 0xAE	WardenRequest	u16@1+3;cap=0x1FD;min=3	len:u16@1 data@3	0x0053E840	0x0045F5F0	-	transport	yes
 0xAF	ConnectionInfo	af		0x0052B720 0x0052B780	0x0045C86C	-	transport	yes

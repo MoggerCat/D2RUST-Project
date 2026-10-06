@@ -57,7 +57,7 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x37	IdentifyGamble	5	==5	item:u32@1	0x0054BC30	handler	alive	identify a gambled item	sim	yes
 0x38	EntityAction	13	==13	action:u32@1 npc:u32@5 item:u32@9	0x0054BCA0	handler	alive	NPC menu action (trade, gamble, ...)	sim	partial
 0x39	PurchaseLife	5	-		0x0054BD00	stub3	alive	rejected (handler returns 3)	none	yes
-0x3A	AddStatPoint	3	==3	stat:u16@1	0x0054BD10	handler	alive	spend a stat point	sim	yes
+0x3A	AddStatPoint	3	==3	stat:u8@1 count_minus_one:u8@2	0x0054BD10	handler	alive	spend a stat point	sim	yes
 0x3B	AddSkillPoint	3	==3	skill:u16@1	0x0054BD90	handler	alive	spend a skill point	sim	yes
 0x3C	SelectSkill	9	==9	skill:u31@1 left:bit31@1 item:u32@5	0x0054BE70	handler	none	choose the left or right skill	sim	yes
 0x3D	HighlightDoor	5	==5	id:u32@1	0x0054BF10	handler	alive	door highlight hint	sim	partial
@@ -75,7 +75,7 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x49	TakeOrCloseWp	9	==9	wp:u32@1 level:u16@5	0x0054C5D0	handler	alive	travel by waypoint or close it	sim	yes
 0x4A	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x4B	RequestEntityUpdate	9	==9	type:u32@1 id:u32@5	0x0054C6D0	handler	alive	request a unit refresh	sim	yes
-0x4C	Transmogrify	5	==5	cube:u32@1	0x0054C760	handler	alive	transmute the cube contents	sim	yes
+0x4C	Transmogrify	5	==5	item:u32@1	0x0054C760	handler	alive	body-part transmogrify of an item (misc.txt Transmogrify; not the cube)	sim	yes
 0x4D	PlayNpcMessage	3	==3	msg:u16@1	0x0054C690	handler	alive	NPC speech played	sim	partial
 0x4E	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x4F	ClickButton	7	==7	button:u16@1 p1:u16@3 p2:u16@5	0x0054C7C0	handler	alive	UI button (trade, stash gold, ...)	sim	partial

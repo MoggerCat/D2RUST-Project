@@ -27,15 +27,15 @@
 | Outputs / state changes | 65–68 |
 | Rules | 69–70 |
 |   1. Creation values | 71–93 |
-|   2. Spending stat points (message 0x3A) | 94–131 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 132–153 |
-|   4. Experience | 154–193 |
-| Constants & data dependencies | 194–210 |
-| Randomness | 211–214 |
-| Edge cases & original bugs | 215–226 |
-| Test vectors | 227–247 |
-| Provenance | 248–259 |
-| Open questions | 260–280 |
+|   2. Spending stat points (message 0x3A) | 94–132 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 133–154 |
+|   4. Experience | 155–194 |
+| Constants & data dependencies | 195–211 |
+| Randomness | 212–215 |
+| Edge cases & original bugs | 216–227 |
+| Test vectors | 228–248 |
+| Provenance | 249–260 |
+| Open questions | 261–281 |
 <!-- /index -->
 
 ## Summary
@@ -96,8 +96,9 @@ experience` if positive, through §4.3, which levels up).
 Handler `0x0054BD10`: size must be 3, else 3. Byte +1 is the stat id
 `s`, byte +2 is `count − 1`. `s > 15` or `count − 1 > 99` → 3. Repeat
 `count` times `spend(unit, s)` (`0x00570D60`); the first failure stops
-and returns 2; else 0. (`client-messages.tsv` describes the field as a
-u16 stat: Open question 4.)
+and returns 2; else 0. (`client-messages.tsv` layout `stat:u8@1
+count_minus_one:u8@2`; the handler reads them as one u16 at +1 and
+splits it, `0x0054BD29`.)
 
 `spend(unit, s)`: `statpts(4)` (unit getter) = 0 → fail. By `s`:
 
@@ -269,8 +270,8 @@ stat points: three spends succeed, the fourth fails, result 2.
 3. §4.2 branch for `dlvl > alvl`: confirm the operand roles of the
    `pct(exp, alvl, dlvl)` call (the read gives EAX = defender level,
    EDX = attacker level, ECX = experience).
-4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
-   byte +1 as the stat and byte +2 as count − 1.
+4. Answered: `client-messages.tsv` row 0x3A now has `stat:u8@1
+   count_minus_one:u8@2` (§2).
 5. Monster life, mana, attack rating, defense, damage and experience at
    spawn (`monstats` + `monlvl`, champion / unique bonuses, player
    count; D2MOO `D2Common` `Monsters.cpp`, 1.14d `0x0063EFA0` area):

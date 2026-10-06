@@ -37,18 +37,18 @@
 |   3. Game entry: picking the quest set | 288–320 |
 |   4. Events and dispatch | 321–403 |
 |   5. Quest updater and timers (tick step 8) | 404–425 |
-|   6. Status reporting | 426–513 |
-|   7. NPC dialog hooks | 514–546 |
-|   8. Act transitions, warps and portals | 547–603 |
-|   9. Quest items, rewards and helpers | 604–647 |
-|   10. Act I quests | 648–805 |
-|   11. Acts II–V | 806–811 |
-| Constants & data dependencies | 812–826 |
-| Randomness | 827–845 |
-| Edge cases & original bugs | 846–864 |
-| Test vectors | 865–881 |
-| Provenance | 882–903 |
-| Open questions | 904–926 |
+|   6. Status reporting | 426–516 |
+|   7. NPC dialog hooks | 517–549 |
+|   8. Act transitions, warps and portals | 550–606 |
+|   9. Quest items, rewards and helpers | 607–650 |
+|   10. Act I quests | 651–810 |
+|   11. Acts II–V | 811–816 |
+| Constants & data dependencies | 817–831 |
+| Randomness | 832–850 |
+| Edge cases & original bugs | 851–869 |
+| Test vectors | 870–886 |
+| Provenance | 887–908 |
+| Open questions | 909–931 |
 <!-- /index -->
 
 ## Summary
@@ -165,7 +165,7 @@ status functions return false, §6.1).
 
 | Msg | Size | Layout | Sender |
 |---|---|---|---|
-| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 0, 96 bytes player record (current difficulty) | `0x0053D670` |
+| S→C 0x28 QuestInfo | 103 | u8 0x28, u8 unit type, u32 unit GUID, u8 at 6 (the builder's fourth argument: 0 from quest code; from the NPC chat path `0x00572C10` its own third argument), 96 bytes player record (current difficulty) at 7 | `0x0053D670` |
 | S→C 0x29 GameQuestInfo | 97 | u8 0x29, 96 bytes game record | `0x00544520` → `0x0053D700` |
 
 0x28's unit is the NPC being talked to (type 1, its GUID) when sent by the
@@ -450,8 +450,11 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 2. list[41] = 0. For each record (list order) with status ≠ 0: assert
    chain ≤ 40; status from status_fn if set (written to list[filter] only
    if it returns 1), else the default rule into list[filter].
-3. 0x50 (15 bytes: u8 0x50, u16 1, u16 Den of Evil monsters left, i16
-   staff tomb, u16 barbarians left, 6 zero bytes) is sent if list[1] ≠ 0
+3. 0x50 (15 bytes, sender `0x0053D7E0` copying a 15-byte record: u8
+   0x50, u16 kind 1 at 1, u16 Den of Evil monsters left at 3, i16 staff
+   tomb at 5, u16 barbarians left at 7, bytes 9–11 zero; bytes 12–14
+   are never written in `0x00546040` (stack contents, masked in the
+   exact comparison, `sim/intents-events.md` §6 r3)) is sent if list[1] ≠ 0
    (then monsters left = `0x005901E0` of chain 1's record), or list[36] ≠
    0 (barbarians = `0x00588C50` of chain 32's record), or the player
    record has slot 12 bit 0 or 13 and the game has an Act II (game
@@ -767,7 +770,9 @@ compare constants in the 1.14d scroll callbacks (`quests.tsv` callback
   is read, §9.4, or a stone is operated, `0x00593710`): order[0..4] = 0;
   i = 0; while i < 5: step the quest seed, k = lo' mod 5; if order[k] =
   0: order[k] = 17 + i, i += 1. 0x50 then carries order[k] − 17 for k =
-  0..4 (`0x00593CB0`).
+  0..4 (`0x00593CB0`): u8 0x50, u16 kind 4 at 1, five u16 values at 3,
+  5, 7, 9, 11; bytes 13–14 are never written (masked). A value ≥ 5 after
+  the subtraction is a fatal assertion (line 0x87F, `0x00593D25`).
 - Wirt's body (object class 268, event 7): the first time, piles =
   roll_range(quest seed, 10, 10) (one step, lo' mod 10 + 10) and the
   object's drop code becomes `gld `; each run with piles > 0 drops one
@@ -859,8 +864,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 6. Timer due values are compared unsigned; the wrap at tick 2^32 − 1
    rewrites them as 0xFFFFFFFF − due.
 7. The Malus needs character level 8 in 1.14d (§10.5).
-8. 0x50's unused fields are 0; the client reads all three counters from
-   one message.
+8. 0x50 kind 1's unused fields 9–11 are 0 and 12–14 unwritten (§6.2);
+   the client reads all three counters from one message.
 
 ## Test vectors
 
@@ -912,8 +917,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    confirm its draws (`world/cube.md` open question 4).
 4. Which game-entry path (mode 0 or 1, §3) single player takes: record a
    game start with a breakpoint on `0x00546270`.
-5. Layout of the stone-order 0x50 (`0x00593CB0`): bytes before the five
-   values.
+5. Answered (§10.6): the stone-order 0x50 has u16 kind 4 at 1, the five
+   values as u16 at 3–12.
 6. Act V intro init `0x0058EA50` (not disassembled): callbacks and table.
 7. Exact party/area membership tests of the per-quest iterate functions
    (`0x00590190`, A1Q2's reward-pending iterate) beyond what §10 states.
