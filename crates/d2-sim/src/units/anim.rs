@@ -50,6 +50,13 @@ pub enum AnimError {
     /// A negative speed never ends the loop in 1.14d (edge case 3).
     #[error("negative animation speed {0}: the 1.14d loop never ends")]
     NegativeSpeed(i32),
+    /// The frame position `a += s` passes 2^31 − 1 before reaching the
+    /// frame count: the signed 1.14d loop wraps and never ends, as with a
+    /// negative speed (edge case 3).
+    #[error(
+        "animation speed {speed} wraps before frame count {frame_count}: the 1.14d loop never ends"
+    )]
+    Endless { speed: i32, frame_count: i32 },
     /// A variant read an event byte outside the AnimData record
     /// (index ≥ 144, or < −1): the record bytes past it are not known
     /// here. TODO(units.md edge case 1): reproduce from the record set.
@@ -131,19 +138,33 @@ pub fn schedule(
     let (start, c) = match form {
         Form::Main { bonus } => (bonus, bonus),
         Form::Percent(p) => {
-            let c = (100 - p).wrapping_mul(f.wrapping_sub(cur_frame)) / 100;
-            (c - 1, c)
+            let c = 100i32
+                .wrapping_sub(p)
+                .wrapping_mul(f.wrapping_sub(cur_frame))
+                / 100;
+            (c.wrapping_sub(1), c)
         }
         Form::Frames(p) => {
             let c = f.wrapping_sub(cur_frame).wrapping_sub(p);
-            (c - 1, c)
+            (c.wrapping_sub(1), c)
         }
-        Form::StartFrame(p) => (p - 1, p),
+        Form::StartFrame(p) => (p.wrapping_sub(1), p),
     };
     let mut n = f;
     let mut i = start;
     let mut k = 0u32;
     let mut a = c.wrapping_mul(256).wrapping_add(s);
+    if a < frame_count {
+        // The last a + s (i64) must stay a valid i32, else the loop wraps.
+        let (a0, s64, fc) = (i64::from(a), i64::from(s), i64::from(frame_count));
+        let iterations = (fc - a0 + s64 - 1) / s64;
+        if a0 + iterations * s64 > i64::from(i32::MAX) {
+            return Err(AnimError::Endless {
+                speed: s,
+                frame_count,
+            });
+        }
+    }
     let mut out = Vec::new();
     while a < frame_count {
         n = n.wrapping_add(1);
