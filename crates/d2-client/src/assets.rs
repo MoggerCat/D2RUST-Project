@@ -213,6 +213,7 @@ mod tests {
     use super::*;
     use bevy::asset::LoadState;
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn path_conversion() {
         assert_eq!(
@@ -253,6 +254,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity, §a2-loaders
     #[test]
     fn two_spellings_one_handle() {
         // Test vector §A1, through the AssetServer; and §A2 `tbl` with the
@@ -272,6 +274,7 @@ mod tests {
         assert!(matches!(assets.get(&a), Some(TblAsset::Font(_))));
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn missing_asset_fails_naming_the_path() {
         // Test vector §A1: no fallback asset.

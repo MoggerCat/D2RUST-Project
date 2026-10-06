@@ -14,6 +14,7 @@ fn run(t: &ItemTables, it: &mut Item<FakeStats>, r: PropRec) {
     apply_property(t, it, &mut PropCtx::item(0), &r);
 }
 
+// Covers: specs/items/properties.md §4.1
 #[test]
 fn value_roll() {
     let mut s = Seed::init_low(1);
@@ -31,6 +32,7 @@ fn charge_tables() -> (ItemTables, usize) {
     (t, i)
 }
 
+// Covers: specs/items/properties.md §5 r9
 #[test]
 fn func19_charges_vectors() {
     let (t, i) = charge_tables();
@@ -50,6 +52,7 @@ fn func19_charges_vectors() {
     }
 }
 
+// Covers: specs/items/properties.md §5 r8
 #[test]
 fn func18_by_time_vectors() {
     let mut t = tables();
@@ -63,6 +66,7 @@ fn func18_by_time_vectors() {
     assert_eq!(it.stats.item_list(268, 0), 4_190_211);
 }
 
+// Covers: specs/items/properties.md §5 text
 #[test]
 fn func10_layer() {
     let mut t = tables();
@@ -80,6 +84,7 @@ fn weapon(t: &mut ItemTables, mindam: u8, maxdam: u8) -> usize {
     push_item(t, r)
 }
 
+// Covers: specs/items/properties.md §5 r1, §5 r2
 #[test]
 fn func5_func6_floors() {
     let mut t = tables();
@@ -97,6 +102,7 @@ fn func5_func6_floors() {
 
 /// Edge case 1: later slots reuse slot 0's value (one roll for a min/max
 /// pair).
+// Covers: specs/items/properties.md §3, §edge-cases-original-bugs r1
 #[test]
 fn slot_zero_value_shared() {
     let mut t = tables();
@@ -119,6 +125,7 @@ fn slot_zero_value_shared() {
 }
 
 /// Edge cases 2 and 5: a 0 value adds nothing; function 0 in slot 0 ends.
+// Covers: specs/items/properties.md §3, §edge-cases-original-bugs r2, §edge-cases-original-bugs r5
 #[test]
 fn zero_value_and_function_zero() {
     let mut t = tables();
@@ -141,6 +148,7 @@ fn zero_value_and_function_zero() {
 }
 
 /// Edge case 4: enhanced damage rounding to ≤ 0 adds +1 max damage.
+// Covers: specs/items/properties.md §5 r3, §edge-cases-original-bugs r4
 #[test]
 fn func7_small_bonus() {
     let mut t = tables();
@@ -158,6 +166,7 @@ fn func7_small_bonus() {
 }
 
 /// Edge case 3: function 14 ignores the generation quality caps.
+// Covers: specs/items/properties.md §5 r6, §edge-cases-original-bugs r3
 #[test]
 fn func14_no_quality_cap() {
     let mut t = tables();
@@ -175,6 +184,7 @@ fn func14_no_quality_cap() {
     assert_ne!(it.flags & flag::SOCKETED, 0);
 }
 
+// Covers: specs/items/properties.md §4.2
 #[test]
 fn poison_count_and_valshift() {
     let mut t = tables();
@@ -191,6 +201,7 @@ fn poison_count_and_valshift() {
 }
 
 /// §11 vector: mask 0b1011 on a 6-item set → c 3, n 3, records 1–4.
+// Covers: specs/items/properties.md §11
 #[test]
 fn set_bonus_records() {
     let mut t = tables();
@@ -232,6 +243,7 @@ fn set_bonus_records() {
     assert_eq!(crate::items::props::set_mask_count(64), 0);
 }
 
+// Covers: specs/items/properties.md §8.1
 #[test]
 fn set_item_partial_states() {
     let mut t = tables();
@@ -266,6 +278,7 @@ fn set_item_partial_states() {
     assert_eq!(it.stats.list_get(k, 7, 0), 2);
 }
 
+// Covers: specs/items/properties.md §9 r2, §10.1, §10.2
 #[test]
 fn gem_filler_and_runeword() {
     let mut t = tables();
@@ -335,6 +348,7 @@ fn gem_filler_and_runeword() {
     assert_eq!(runeword_match(&t, &it, &[r1, r2]), None);
 }
 
+// Covers: specs/items/properties.md §12
 #[test]
 fn craft_list_reapplies_ethereal() {
     let mut t = tables();

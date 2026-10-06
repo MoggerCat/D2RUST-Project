@@ -168,6 +168,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/render/map-preview.md §tile-images
     #[test]
     fn assembles_spec_vector() {
         let t = tile(0, 0, 0, vec![iso_block(0, 0, 5), iso_block(64, 32, 6)]);
@@ -178,6 +179,7 @@ mod tests {
         assert_eq!(img.pixels[20 * 96 + 50], 0, "gap between blocks");
     }
 
+    // Covers: specs/render/map-preview.md §tile-images
     #[test]
     fn negative_offsets() {
         let t = tile(1, 0, 0, vec![iso_block(16, -40, 3)]);
@@ -186,6 +188,7 @@ mod tests {
         assert!(assemble(&tile(1, 0, 0, vec![])).is_none());
     }
 
+    // Covers: specs/render/map-preview.md §tile-library-and-lookup
     #[test]
     fn first_match_wins() {
         let dt1 = Dt1 {
@@ -210,6 +213,7 @@ mod tests {
         assert_eq!(lib.lookup(key(4)), None);
     }
 
+    // Covers: specs/render/map-preview.md §tile-files
     #[test]
     fn tile_file_paths() {
         let ds1 = Ds1 {

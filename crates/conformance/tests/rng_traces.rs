@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use conformance::{rng, Trace};
 
+// Covers: specs/sim/rng.md §2, §3 text, §3 r2, §3 r4
 #[test]
 fn recorded_rng_traces_replay_exactly() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../traces/sim/rng");

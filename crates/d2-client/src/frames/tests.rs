@@ -267,6 +267,7 @@ fn frame_source_refuses_the_wrong_part_kind() {
     );
 }
 
+// Covers: specs/client/assets.md §a5-budgets-and-eviction
 #[test]
 fn frame_set_byte_size_counts_pixels_and_headers() {
     let set = FrameSet {
@@ -316,6 +317,7 @@ fn shelf_packer_wraps_rows_and_pages() {
     assert_eq!(a.pages().len(), 2);
 }
 
+// Covers: specs/client/render-pipeline.md §a2-indexed-frames
 #[test]
 fn largest_frame_fits_exactly_and_larger_is_an_error() {
     let mut a = Atlas::new(1).unwrap();
@@ -556,6 +558,7 @@ fn upload_creates_one_texture_per_page_and_reuses_handles() {
 /// Every live DCC/DC6/DT1 builds all its frame sets, and every set packs
 /// into the default 64-page atlas. Run:
 /// `D2_GAME_DIR=... cargo test -p d2-client --lib frames::tests::all_live_frame_sets_build_and_pack -- --ignored --nocapture`
+// Covers: specs/client/render-pipeline.md §a2-indexed-frames; specs/client/assets.md §a3-derived-assets
 #[test]
 #[ignore = "needs D2_GAME_DIR"]
 fn all_live_frame_sets_build_and_pack() {

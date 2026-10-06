@@ -58,16 +58,19 @@ fn replays_exactly(id: &str) {
     );
 }
 
+// Covers: specs/sim/tick.md §2 r1, §2 r3, §5.2 r2, §5.2 r6, §5.4 r1, §5.5 r1, §5.5 r2, §5.5 r3, §5.5 l2 r1, §5.4 r3, §5.5 l2 r2, §5.5 l2 r3, §5.5 l2 r4, §edge-cases-original-bugs r2; specs/sim/unit-order.md §1 r2, §1 r3, §2 r1, §2 r2, §3 r1, §4 r2, §4 r3, §5 r2, §5 r3, §5 r4, §5 r5, §6 r2
 #[test]
 fn sim_0006_replays_exactly() {
     replays_exactly("sim-0006");
 }
 
+// Covers: specs/sim/tick.md §2 r1, §2 r3, §5.2 r2, §5.2 r6, §5.4 r1, §5.5 r1, §5.5 r2, §5.5 r3, §5.5 l2 r1, §5.5 l2 r4, §edge-cases-original-bugs r2; specs/sim/unit-order.md §1 r2, §1 r3, §2 r1, §2 r2, §3 r1, §4 r2, §4 r3, §5 r2, §5 r3, §5 r4, §5 r5, §6 r2
 #[test]
 fn sim_0007_replays_exactly() {
     replays_exactly("sim-0007");
 }
 
+// Covers: specs/sim/tick.md §2 r1, §2 r3, §5.2 r2, §5.2 r6, §5.4 r1, §5.5 r1, §5.5 r2, §5.5 r3, §5.5 l2 r1, §5.4 r3, §5.5 l2 r2, §5.5 l2 r3, §5.5 l2 r4, §edge-cases-original-bugs r2; specs/sim/unit-order.md §1 r2, §1 r3, §2 r1, §2 r2, §3 r1, §4 r2, §4 r3, §5 r2, §5 r3, §5 r4, §5 r5, §6 r2
 #[test]
 fn sim_0008_replays_exactly() {
     replays_exactly("sim-0008");

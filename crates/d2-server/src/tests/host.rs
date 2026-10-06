@@ -20,12 +20,14 @@ fn host() -> TestHost {
     h
 }
 
+// Covers: specs/sim/tick.md §1 r1
 #[test]
 fn tick_length() {
     assert_eq!(TICK_RATE, 25);
     assert_eq!(TICK_MS, 40);
 }
 
+// Covers: specs/sim/tick.md §1 r2, §1 r3, §edge-cases-original-bugs r6
 #[test]
 fn driver_vectors() {
     let at = |last, now, catch_up| {
@@ -46,6 +48,7 @@ fn driver_vectors() {
     assert!(!d.poll(1150, true));
 }
 
+// Covers: specs/sim/tick.md §1 r2
 #[test]
 fn driver_first_use_and_mask() {
     let mut d = TickDriver::new();
@@ -65,6 +68,7 @@ fn driver_first_use_and_mask() {
     assert_eq!(d.last, Some(0x38));
 }
 
+// Covers: specs/sim/tick.md §1 r4; specs/sim/intents-events.md §1 r1, §1 r2, §1 r3, §1 r4
 #[test]
 fn loop_order() {
     let mut h = host();
@@ -109,6 +113,7 @@ impl From<Outcome> for Handled {
     }
 }
 
+// Covers: specs/sim/tick.md §1 r5; specs/sim/intents-events.md §1 r2
 #[test]
 fn messages_between_ticks_run_with_the_previous_frame() {
     let mut h = host();
@@ -129,6 +134,7 @@ fn messages_between_ticks_run_with_the_previous_frame() {
     assert_eq!(h.game.frame, 2);
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r7
 #[test]
 fn drain_routes_every_queue() {
     let mut h = host();
@@ -158,6 +164,7 @@ fn drain_routes_every_queue() {
     assert_eq!(h.session.seen, [(0, vec![0x6B], 1)]);
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r1, §2.1 r2
 #[test]
 fn duplicate_filter_on_the_host() {
     let mut h = host();
@@ -194,6 +201,7 @@ fn flush_follows_the_client_list() {
     assert_eq!(h.buffers.buffers(2).unwrap().len(), 1);
 }
 
+// Covers: specs/sim/intents-events.md §3.3 r5, §3.4 r1
 #[test]
 fn direct_sends_overtake_buffered_messages() {
     let mut h = host();
@@ -226,6 +234,7 @@ impl crate::buffers::ClientBuffers {
     }
 }
 
+// Covers: specs/sim/tick.md §1 text
 #[test]
 fn same_messages_same_result_regardless_of_timing() {
     // tick.md §1: the same messages before the same frame give the same

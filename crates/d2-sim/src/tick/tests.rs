@@ -173,12 +173,14 @@ fn tick_to(g: &mut Game, rec: &mut Rec, frame: i32) -> Vec<String> {
     rec.runs()
 }
 
+// Covers: specs/sim/tick.md §1 r1
 #[test]
 fn tick_length() {
     // Vector: rate 25 → 40 ms.
     assert_eq!(TICK_LENGTH_MS, 40);
 }
 
+// Covers: specs/sim/tick.md §2 r1, §5.5 r1
 #[test]
 fn first_tick_is_frame_one() {
     // Vector: frame 0 → tick → frame 1; bucket 1.
@@ -189,6 +191,7 @@ fn first_tick_is_frame_one() {
     assert_eq!(g.timers.current_bucket(), 1);
 }
 
+// Covers: specs/sim/tick.md §2 r2, §edge-cases-original-bugs r1
 #[test]
 fn signed_remainders() {
     // Vector: frame −1 → bucket −1 (signed); edge case 1.
@@ -199,6 +202,7 @@ fn signed_remainders() {
     assert_eq!(frame_mod(i32::MIN, 64), 0);
 }
 
+// Covers: specs/sim/tick.md §2 r1
 #[test]
 fn frame_counter_wraps() {
     let (mut g, mut rec, _) = setup(&[]);
@@ -222,12 +226,14 @@ fn periodic_steps(frame: i32) -> Vec<String> {
         .collect()
 }
 
+// Covers: specs/sim/tick.md §3 r1
 #[test]
 fn periodic_steps_at_660() {
     // Vector: 660 → steps 8, 9, 10 in order; 11 not.
     assert_eq!(periodic_steps(660), ["step8", "step9", "step10 0"]);
 }
 
+// Covers: specs/sim/tick.md §3 r1
 #[test]
 fn periodic_steps_at_1500() {
     // Vector: 1500 → 8, 9, 11; 10 not (1500 % 11 = 4).
@@ -238,6 +244,7 @@ fn periodic_steps_at_1500() {
     assert!(periodic_steps(1501).is_empty());
 }
 
+// Covers: specs/sim/tick.md §5.2 r6, §5.5 l2 r4, §edge-cases-original-bugs r2
 #[test]
 fn bucket_aliasing() {
     // Vector: at frame 10 schedule A(12), B(76), C(12) → bucket 12 =
@@ -259,6 +266,7 @@ fn bucket_aliasing() {
     assert_eq!(tick_to(&mut g, &mut rec, 76), ["B"]);
 }
 
+// Covers: specs/sim/tick.md §5.2 r3
 #[test]
 fn past_expire_moves_to_next_frame() {
     // Vector: at frame 10, expire 5 → 11. Also expire == frame.
@@ -270,6 +278,7 @@ fn past_expire_moves_to_next_frame() {
     assert_eq!(g.timers.expire(t), Some(11));
 }
 
+// Covers: specs/sim/tick.md §5.5 l2 r4
 #[test]
 fn every_tick_runs_newest_first() {
     // Vector: every-tick X then Y → Y, X each tick.
@@ -280,6 +289,7 @@ fn every_tick_runs_newest_first() {
     assert_eq!(tick_to(&mut g, &mut rec, 2), ["Y", "X"]);
 }
 
+// Covers: specs/sim/tick.md §5.5 r2
 #[test]
 fn class_run_order() {
     // Vector: frame 12, due P1, M1, S1; every-tick S2 → S2, S1, P1, M1.
@@ -303,6 +313,7 @@ fn class_run_order() {
     );
 }
 
+// Covers: specs/sim/tick.md §5.2 r3, §5.5 l2 r1, §edge-cases-original-bugs r5
 #[test]
 fn scheduled_for_now_during_run_moves_to_next_frame() {
     // Vector: during M1's event at 12, schedule M2 expire 12 → expire 13,
@@ -321,6 +332,7 @@ fn scheduled_for_now_during_run_moves_to_next_frame() {
     assert_eq!(tick_to(&mut g, &mut rec, 13), ["M2"]);
 }
 
+// Covers: specs/sim/tick.md §5.4 r3, §5.5 l2 r2
 #[test]
 fn cancel_later_timer_during_run() {
     // Vector: during M1's event, cancel M3 (due 12, later in bucket).
@@ -343,6 +355,7 @@ fn cancel_later_timer_during_run() {
     assert_eq!(tick_to(&mut g, &mut rec, 76), Vec::<String>::new());
 }
 
+// Covers: specs/sim/tick.md §5.4 r2, §5.5 l2 r2
 #[test]
 fn cancel_cursor_target_advances_cursor() {
     // §5.4 rule 2, consequence 2: cancelling the next timer while the one
@@ -365,6 +378,7 @@ fn cancel_cursor_target_advances_cursor() {
     assert_eq!(tick_to(&mut g, &mut rec, 12), ["A", "C"]);
 }
 
+// Covers: specs/sim/tick.md §5.2 r1
 #[test]
 fn event_type_15_not_scheduled() {
     // Vector: event type 15 → not scheduled (timed and every-tick).
@@ -385,6 +399,7 @@ fn tiles_have_no_timer_class() {
     );
 }
 
+// Covers: specs/sim/tick.md §5.5 l2 r1, §edge-cases-original-bugs r4
 #[test]
 fn every_tick_scheduled_during_run_waits_a_tick() {
     // Edge case 4: scheduled inside the run → not this tick; scheduled in
@@ -403,6 +418,7 @@ fn every_tick_scheduled_during_run_waits_a_tick() {
     assert_eq!(tick_to(&mut g, &mut rec, 2), ["Y", "X"]);
 }
 
+// Covers: specs/sim/tick.md §edge-cases-original-bugs r4
 #[test]
 fn every_tick_scheduled_before_step_4_runs_same_tick() {
     struct Pre {
@@ -426,6 +442,7 @@ fn every_tick_scheduled_before_step_4_runs_same_tick() {
     assert_eq!(pre.inner.runs(), ["X"]);
 }
 
+// Covers: specs/sim/tick.md §5.5 l2 r3
 #[test]
 fn unit_removed_during_its_event() {
     // Consequence 3: the unit's other timers are cancelled, the executing
@@ -456,6 +473,7 @@ fn unit_removed_during_its_event() {
     assert_eq!(tick_to(&mut g, &mut rec, 5), ["S"]);
 }
 
+// Covers: specs/sim/tick.md §5.4 r1
 #[test]
 fn every_tick_cancelled_during_its_run_is_freed_after() {
     let (mut g, mut rec, _) = setup(&[("X", UnitType::Player), ("Y", UnitType::Player)]);
@@ -476,6 +494,7 @@ fn every_tick_cancelled_during_its_run_is_freed_after() {
     assert_eq!(tick_to(&mut g, &mut rec, 2), ["Y"]);
 }
 
+// Covers: specs/sim/tick.md §5.2 r5, §5.4 text; specs/sim/unit-order.md §8
 #[test]
 fn cancel_helpers() {
     // §5.3 / §5.4: by type, by type and argument, by type and callback.
@@ -544,6 +563,7 @@ fn uninterruptable_check_applies_to_timed_monster_ai_think() {
     assert!(!f(UnitType::Player, 2, 30));
 }
 
+// Covers: specs/sim/tick.md §3 r1
 #[test]
 fn step_order() {
     // §3: environment, rooms, timers, clients, update queues, removal
@@ -584,6 +604,7 @@ fn step_order() {
     assert!(!g.lists.act(0).unwrap().pending_removals);
 }
 
+// Covers: specs/sim/tick.md §4; specs/sim/unit-order.md §4 r4
 #[test]
 fn room_pass_newest_first_and_flags() {
     // §4: rooms activated together are populated newest first; the act
@@ -646,6 +667,7 @@ fn room_pass_newest_first_and_flags() {
     );
 }
 
+// Covers: specs/sim/tick.md §6 r5; specs/sim/unit-order.md §6 r4, §6 r5
 #[test]
 fn client_pass_join_and_updates() {
     // §6.4–§6.5 and unit-order §6.4–§6.5: newest client first; update
@@ -698,6 +720,7 @@ fn client_pass_join_and_updates() {
     assert_eq!(g.lists.client(c).unwrap().room, Some(r2));
 }
 
+// Covers: specs/sim/tick.md §6 r4
 #[test]
 fn changing_act_client_does_not_rejoin() {
     let (mut g, mut rec, room) = setup(&[("P", UnitType::Player)]);
@@ -713,6 +736,7 @@ fn changing_act_client_does_not_rejoin() {
     assert_eq!(g.lists.client(c).unwrap().state, client_state::IN_GAME);
 }
 
+// Covers: specs/sim/unit-order.md §4 r3, §5 r5
 #[test]
 fn room_deactivation_compresses_and_unlinks() {
     // Step 9: units compressed in room-list order with the next saved
@@ -738,6 +762,7 @@ fn room_deactivation_compresses_and_unlinks() {
     assert_eq!(g.lists.active_rooms(0).len(), 1);
 }
 
+// Covers: specs/sim/unit-order.md §2 r5, §edge-cases-original-bugs r3
 #[test]
 fn hash_helpers() {
     // unit-order §2.5 and edge case 3.

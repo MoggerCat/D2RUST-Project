@@ -169,6 +169,7 @@ fn item_list(lists: &mut StatLists, log: &mut Log, stats: &[(u16, i32)]) -> List
     l
 }
 
+// Covers: specs/sim/stats.md §5 r1, §5 r2, §5 r3, §5 r4, §edge-cases-original-bugs r3
 #[test]
 fn muldiv_vectors() {
     assert_eq!(muldiv(250, 40, 100), 100);
@@ -180,6 +181,7 @@ fn muldiv_vectors() {
     assert_eq!(muldiv(0x10_0000, 0x1_0000, 1), 0);
 }
 
+// Covers: specs/sim/stats.md §8 text, §8 r1, §8 r2, §8 r3
 #[test]
 fn by_time_vectors() {
     let v = (356 << 12) | (306 << 2);
@@ -190,6 +192,7 @@ fn by_time_vectors() {
     assert_eq!(act_base_time(1000, 10), 100);
 }
 
+// Covers: specs/sim/stats.md §1 r3
 #[test]
 fn keys_order_stat_then_layer() {
     assert_eq!(key(7, 0), 0x0007_0000);
@@ -197,6 +200,7 @@ fn keys_order_stat_then_layer() {
     assert_eq!((key_stat(key(216, 3)), key_layer(key(216, 3))), (216, 3));
 }
 
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 fn op_tables_from_the_fixup() {
     let d = data();
@@ -224,6 +228,7 @@ fn op_tables_from_the_fixup() {
     assert_eq!(a53, [214]);
 }
 
+// Covers: specs/sim/stats.md §9 r3
 #[test]
 fn life_fraction_and_clamp_rule() {
     assert_eq!(life_fraction(12800, 25600), 64);
@@ -233,6 +238,7 @@ fn life_fraction_and_clamp_rule() {
     assert!(!fraction_changed(68, 0x140));
 }
 
+// Covers: specs/sim/stat-lists.md §edge-cases-original-bugs r7
 #[test]
 fn x87_rescale_exact_cases() {
     // 23050 / 12800 = 1.80078125 exactly: no rounding anywhere.
@@ -246,6 +252,7 @@ fn x87_rescale_exact_cases() {
     assert_eq!(x87_rescale(-512, 256, 100, 53), -200);
 }
 
+// Covers: specs/sim/stat-lists.md §edge-cases-original-bugs r7
 #[test]
 fn x87_rescale_rounds_to_float32() {
     // 16777217 is not a float32: it rounds to 16777216 (even).
@@ -255,6 +262,7 @@ fn x87_rescale_rounds_to_float32() {
 }
 
 /// stat-lists.md Test vectors, steps 1–4 and 6.
+// Covers: specs/sim/stat-lists.md §7.1, §7.2 r2, §8.1 r6, §8.1 r8, §8.2 r5, §8.2 r6, §10.4, §11 r1, §edge-cases-original-bugs r2
 #[test]
 fn stat_list_vectors() {
     let mut log = Log::default();
@@ -316,6 +324,7 @@ fn stat_list_vectors() {
 }
 
 /// stats.md §6 vector: maxhp and maxstamina of the player with the item.
+// Covers: specs/sim/stats.md §6.1, §6.2
 #[test]
 fn evaluation_vector() {
     let mut log = Log::default();
@@ -330,6 +339,7 @@ fn evaluation_vector() {
     assert_eq!(lists.total(p, 11, 0), (4 * 10) << 6);
 }
 
+// Covers: specs/sim/stats.md §1 r1, §4.1, §4.3, §edge-cases-original-bugs r1, §edge-cases-original-bugs r2; specs/sim/stat-lists.md §5 r6, §edge-cases-original-bugs r1
 #[test]
 fn minimum_rule() {
     let mut log = Log::default();
@@ -351,6 +361,7 @@ fn minimum_rule() {
     assert!(lists.base_entries(p).contains(&(key(400, 0), 9)));
 }
 
+// Covers: specs/sim/stat-lists.md §5 r1, §5 r3, §5 r4, §5 r5, §11 r1, §11 r2, §11 r3, §11 r4
 #[test]
 fn base_writes() {
     let mut log = Log::default();
@@ -378,6 +389,7 @@ fn base_writes() {
     assert!(lists.base_entries(src).is_empty());
 }
 
+// Covers: specs/sim/stats.md §6.1; specs/sim/stat-lists.md §6.1 r3, §8.1 r8, §8.4, §8.6, §edge-cases-original-bugs r3
 #[test]
 fn dynamic_lists_and_damage_related() {
     let mut log = Log::default();
@@ -406,6 +418,7 @@ fn dynamic_lists_and_damage_related() {
     assert_eq!(lists.eval(&log, p, key(19, 0)), 0);
 }
 
+// Covers: specs/sim/stat-lists.md §6.1 r1, §8.1 r5, §8.5
 #[test]
 fn parked_lists_count_nowhere() {
     let mut log = Log::default();
@@ -429,6 +442,7 @@ fn parked_lists_count_nowhere() {
     assert_eq!(lists.list_of_state(p, 30), Some(s));
 }
 
+// Covers: specs/sim/stat-lists.md §8.1 r3, §8.1 r6, §8.2 r2, §8.3 r2
 #[test]
 fn chains_link_newest_first() {
     let mut log = Log::default();
@@ -458,6 +472,7 @@ fn chains_link_newest_first() {
     assert_eq!(lists.unit_list(P), None);
 }
 
+// Covers: specs/sim/stat-lists.md §8.1 r4
 #[test]
 fn temponly_sets_newlength_on_the_unit_list() {
     let mut log = Log::default();
@@ -468,6 +483,7 @@ fn temponly_sets_newlength_on_the_unit_list() {
     assert_ne!(lists.flags(p) & flag::NEWLENGTH, 0);
 }
 
+// Covers: specs/sim/stat-lists.md §8.1 r7, §8.2 r4
 #[test]
 fn per_level_of_the_wearer() {
     let mut log = Log::default();
@@ -484,6 +500,7 @@ fn per_level_of_the_wearer() {
     assert_eq!(lists.total(p, 31, 0), 0);
 }
 
+// Covers: specs/sim/stats.md §6.2
 #[test]
 fn energy_and_percent_ops() {
     let mut log = Log::default();
@@ -496,6 +513,7 @@ fn energy_and_percent_ops() {
     assert_eq!(lists.total(p, 9, 0), 7048 + 2500);
 }
 
+// Covers: specs/sim/stats.md §6.2
 #[test]
 fn item_own_base_percent() {
     let mut log = Log::default();
@@ -504,6 +522,7 @@ fn item_own_base_percent() {
     assert_eq!(lists.total(i, 73, 0), 60);
 }
 
+// Covers: specs/sim/stat-lists.md §8.7
 #[test]
 fn by_time_ops_need_an_act() {
     let mut log = Log::default();
@@ -521,6 +540,7 @@ fn by_time_ops_need_an_act() {
     assert_eq!(lists.total(p, 7, 0), 12850);
 }
 
+// Covers: specs/sim/stat-lists.md §8.8 r1
 #[test]
 fn death_frees_plain_lists_except_basic() {
     let mut log = Log::default();
@@ -539,6 +559,7 @@ fn death_frees_plain_lists_except_basic() {
     assert_eq!(lists.total(p, 0, 0), 32);
 }
 
+// Covers: specs/sim/stat-lists.md §8.8 r2
 #[test]
 fn overlay_removal() {
     let mut log = Log::default();
@@ -554,6 +575,7 @@ fn overlay_removal() {
     assert!(lists.is_live(o));
 }
 
+// Covers: specs/sim/stat-lists.md §9.1, §9.2
 #[test]
 fn state_toggles_and_groups() {
     let mut log = Log::default();
@@ -579,6 +601,7 @@ fn state_toggles_and_groups() {
     assert!(!lists.has_state(UnitId(77), state::POISON));
 }
 
+// Covers: specs/sim/stats.md §9 r2
 #[test]
 fn clamp_current_to_max() {
     let mut log = Log::default();
@@ -593,6 +616,7 @@ fn clamp_current_to_max() {
     assert!(lists.full_entries(p).contains(&(key(8, 0), 0)));
 }
 
+// Covers: specs/sim/stat-lists.md §7.2 r2
 #[test]
 fn rescale_callback_on_max_life() {
     let mut log = Log::default();
@@ -609,6 +633,7 @@ fn rescale_callback_on_max_life() {
     assert_eq!(lists.total(p, 8, 0), 195);
 }
 
+// Covers: specs/sim/stat-lists.md §7.2 r2
 #[test]
 fn monster_damage_regen_from_max_life() {
     let mut log = Log::default();

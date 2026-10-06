@@ -228,6 +228,7 @@ mod tests {
     use crate::map::add_sprites;
     use d2_formats::dt1::{Dt1, Dt1Block, Dt1Tile};
 
+    // Covers: specs/render/map-preview.md §screen-position
     #[test]
     fn origins() {
         assert_eq!(cell_origin(0, 0), (0, 0));
@@ -235,6 +236,7 @@ mod tests {
         assert_eq!(cell_origin(0, 1), (-80, 40));
     }
 
+    // Covers: specs/render/map-preview.md §cells
     #[test]
     fn cell_fields() {
         assert_eq!(cell_indices(0x0050_00C2), Some((5, 0)));
@@ -318,6 +320,7 @@ mod tests {
         (ds1, lib)
     }
 
+    // Covers: specs/render/map-preview.md §draw-order r2, §draw-order r4, §what-is-drawn, §screen-position
     #[test]
     fn draw_order_and_positions() {
         let (ds1, lib) = map();
@@ -339,6 +342,7 @@ mod tests {
         assert_eq!((b.x0, b.y0, b.x1, b.y1), (0, 0, 112, 135));
     }
 
+    // Covers: specs/render/map-preview.md §sprites-demo
     #[test]
     fn sprites_go_on_top() {
         use d2_formats::dc6::{Dc6, Dc6Frame, Dc6Header};
@@ -407,6 +411,7 @@ mod tests {
         assert!(sprites.iter().all(|s| s.source == Source::Sprite));
     }
 
+    // Covers: specs/render/map-preview.md §what-is-drawn
     #[test]
     fn missing_tiles_are_counted() {
         let (mut ds1, lib) = map();

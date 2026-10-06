@@ -13,6 +13,7 @@ fn one_room() -> (UnitLists, RoomId) {
     (l, r)
 }
 
+// Covers: specs/sim/unit-order.md §1 r2, §1 r3
 #[test]
 fn guid_allocation_per_type() {
     // Vector: fresh game; monster, monster, item, monster → 1, 2, 1, 3.
@@ -26,6 +27,7 @@ fn guid_allocation_per_type() {
     assert_eq!(got, [1, 2, 1, 3]);
 }
 
+// Covers: specs/sim/unit-order.md §1 r3
 #[test]
 fn guid_wraps_to_one() {
     // Vector: monster counter 0xFFFFFFFE; allocate → 1.
@@ -36,6 +38,7 @@ fn guid_wraps_to_one() {
     assert_eq!(g.get(UnitType::Player), 0);
 }
 
+// Covers: specs/sim/unit-order.md §2 r1
 #[test]
 fn hash_bucket_sorted_descending_any_order() {
     // Vector: monster GUIDs 1, 129, 257 into bucket 1 → [257, 129, 1].
@@ -51,6 +54,7 @@ fn hash_bucket_sorted_descending_any_order() {
     }
 }
 
+// Covers: specs/sim/unit-order.md §2 r4, §edge-cases-original-bugs r1
 #[test]
 fn hash_iteration_order() {
     // Vector: players 1, 2, 128, 129 → 128, 129, 1, 2.
@@ -73,6 +77,7 @@ fn hash_iteration_order() {
     );
 }
 
+// Covers: specs/sim/unit-order.md §2 r1, §2 r3
 #[test]
 fn hash_lists_separate_per_type_and_tiles_single_list() {
     let mut l = UnitLists::new();
@@ -88,6 +93,7 @@ fn hash_lists_separate_per_type_and_tiles_single_list() {
     assert_eq!(guids(&l, &l.units_of_type(UnitType::Tile)), [200, 7, 3]);
 }
 
+// Covers: specs/sim/unit-order.md §2 r1
 #[test]
 fn duplicate_guid_is_fatal_and_changes_nothing() {
     // §2.1 / edge case 2.
@@ -103,6 +109,7 @@ fn duplicate_guid_is_fatal_and_changes_nothing() {
     assert_eq!(l.room_units(r).len(), 1);
 }
 
+// Covers: specs/sim/unit-order.md §2 r2
 #[test]
 fn hash_remove_keeps_order() {
     let mut l = UnitLists::new();
@@ -118,6 +125,7 @@ fn hash_remove_keeps_order() {
     assert_eq!(l.find_unit(UnitType::Object, 257), None);
 }
 
+// Covers: specs/sim/unit-order.md §5 r2
 #[test]
 fn room_list_prepends() {
     // Vector: add A, B, C → [C, B, A].
@@ -128,6 +136,7 @@ fn room_list_prepends() {
     assert_eq!(l.room_units(r), [c, b, a]);
 }
 
+// Covers: specs/sim/unit-order.md §5 r4
 #[test]
 fn walking_back_in_moves_to_head() {
     // Vector: [C, B, A]; B walks out and back in → [B, C, A].
@@ -144,6 +153,7 @@ fn walking_back_in_moves_to_head() {
     assert!(l.room_units(r2).is_empty());
 }
 
+// Covers: specs/sim/unit-order.md §4 r2, §4 r3
 #[test]
 fn room_activation_prepends() {
     // Vector: activate R1, R2, R3 in act 0 → [R3, R2, R1].
@@ -160,6 +170,7 @@ fn room_activation_prepends() {
     assert!(!l.room(rs[1]).unwrap().is_active());
 }
 
+// Covers: specs/sim/unit-order.md §6 r2, §6 r3
 #[test]
 fn update_queue_keeps_first_position() {
     // Vector: queue A, B, A in one tick → [B, A].
@@ -175,6 +186,7 @@ fn update_queue_keeps_first_position() {
     assert!(l.act(0).unwrap().pending_updates);
 }
 
+// Covers: specs/sim/unit-order.md §edge-cases-original-bugs r4
 #[test]
 fn update_queue_ignores_flag_bit_2() {
     // Edge case 4.
@@ -186,6 +198,7 @@ fn update_queue_ignores_flag_bit_2() {
     assert!(!l.act(0).unwrap().pending_updates);
 }
 
+// Covers: specs/sim/unit-order.md §5 r3
 #[test]
 fn room_remove_unqueues_and_clear_resets_flags() {
     let (mut l, r) = one_room();
@@ -217,6 +230,7 @@ fn removal_unlinks_everywhere() {
     assert!(l.unit(a).is_none());
 }
 
+// Covers: specs/sim/unit-order.md §7 r2
 #[test]
 fn client_list_prepends() {
     // Vector: X then Y → [Y, X].

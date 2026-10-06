@@ -237,6 +237,7 @@ fn h2h() -> TreasureClass {
 
 // ------------------------------------------------------------- walk (§5)
 
+// Covers: specs/items/treasure.md §5.3 r3, §5.3 r4, §5.7 r3
 #[test]
 fn walk_vector_nodrop_then_c() {
     let w = World::new(vec![h2h()], abcd());
@@ -258,6 +259,7 @@ fn walk_vector_nodrop_then_c() {
     assert_eq!(seed, Seed::new(2_337_785_264, 9_490_055));
 }
 
+// Covers: specs/items/treasure.md §5.3 r3, §5.4 r3, §5.4 r5
 #[test]
 fn walk_vector_three_players() {
     let w = World::new(vec![h2h()], abcd());
@@ -279,6 +281,7 @@ fn walk_vector_three_players() {
     assert_eq!(sink.reqs[0].id, 1, "b");
 }
 
+// Covers: specs/items/treasure.md §5.5
 #[test]
 fn search_vectors() {
     let t = h2h();
@@ -305,6 +308,7 @@ fn classic_search_skips_expansion_entries() {
     assert_eq!(select_entry(&t, 0, false), None);
 }
 
+// Covers: specs/items/treasure.md §5.4 r5
 #[test]
 fn nodrop_vectors() {
     let got: Vec<i32> = (2..=8).map(|n| nodrop(100, 60, n).unwrap()).collect();
@@ -315,6 +319,7 @@ fn nodrop_vectors() {
     assert_eq!(nodrop(100, 60, -3), Ok(100));
 }
 
+// Covers: specs/items/treasure.md §5.4 r5
 #[test]
 fn nodrop_matches_exact_rational_on_vectors() {
     // §5.4: C·n0^n / ((n0 + C)^n − n0^n), floored, on the vector pairs.
@@ -330,6 +335,7 @@ fn nodrop_matches_exact_rational_on_vectors() {
     }
 }
 
+// Covers: specs/items/treasure.md §5.4 r1, §5.4 r2, §5.4 r3, §5.4 r4, §edge-cases-original-bugs r5
 #[test]
 fn player_factor_rules() {
     let party = |k| Recipient {
@@ -367,6 +373,7 @@ fn player_factor_rules() {
     assert_eq!(player_factor(&g, &m(0), None), 1);
 }
 
+// Covers: specs/items/treasure.md §5.3 r2
 #[test]
 fn negative_picks_draw_nothing() {
     let w = World::new(vec![tc(-2, 0, &[(0, 1, 0), (1, 2, 0)])], abcd());
@@ -387,6 +394,7 @@ fn negative_picks_draw_nothing() {
     assert_eq!(seed, Seed::new(12345, 666));
 }
 
+// Covers: specs/items/treasure.md §5.3 r2
 #[test]
 fn negative_picks_end_when_r_reaches_total() {
     // picks −5 over total 3: r = 0, 1, 2, then 3 ≥ 3 ends the slot.
@@ -407,6 +415,7 @@ fn negative_picks_end_when_r_reaches_total() {
     assert_eq!(ids, [0, 1, 1]);
 }
 
+// Covers: specs/items/treasure.md §5.3 r3
 #[test]
 fn find_item_ignores_nodrop() {
     let w = World::new(vec![h2h()], abcd());
@@ -429,6 +438,7 @@ fn find_item_ignores_nodrop() {
     assert_eq!(ids, [2, 2]);
 }
 
+// Covers: specs/items/treasure.md §5.2
 #[test]
 fn sub_tc_slots_and_mods() {
     // TC 1 picks 2 → TC 2 (picks 1, magic mod 900) each time; TC 1 mod
@@ -476,6 +486,7 @@ fn slot_overflow_is_fatal() {
     assert_eq!(r, Err(TreasureError::SlotOverflow));
 }
 
+// Covers: specs/items/treasure.md §5.1, §5.7 r8
 #[test]
 fn max_rules() {
     let w = World::new(vec![tc(8, 0, &[(0, 1, 0)])], abcd());
@@ -516,6 +527,7 @@ fn max_rules() {
     assert_eq!(r, Err(TreasureError::NoTc));
 }
 
+// Covers: specs/items/treasure.md §5.7 r3
 #[test]
 fn unique_and_set_entries() {
     let w = World::new(
@@ -547,6 +559,7 @@ fn unique_and_set_entries() {
     assert_eq!((sink.reqs[1].quality, sink.reqs[1].index), (5, 5));
 }
 
+// Covers: specs/items/treasure.md §5.7 r1
 #[test]
 fn missing_item_id_skips() {
     let w = World::new(vec![tc(-1, 0, &[(0xFFFF, 1, 0)])], abcd());
@@ -564,6 +577,7 @@ fn missing_item_id_skips() {
     assert!(sink.reqs.is_empty());
 }
 
+// Covers: specs/items/treasure.md §5.7 r4
 #[test]
 fn drop_flag_draws() {
     let mut t = tc(-1, 0, &[(0, 1, 0)]);
@@ -590,6 +604,7 @@ fn drop_flag_draws() {
     assert_eq!(seed, s);
 }
 
+// Covers: specs/items/treasure.md §7 r3, §7 r4
 #[test]
 fn creation_request_fields() {
     let w = World::new(vec![tc(-1, 0, &[(0, 1, 0)])], abcd());
@@ -665,6 +680,7 @@ use super::walk::item_level;
 
 // ------------------------------------------------------- classic (§5.7)
 
+// Covers: specs/items/treasure.md §5.7 r2, §edge-cases-original-bugs r4
 #[test]
 fn classic_skips_expansion_items_and_raises_mods() {
     let mut items = abcd();
@@ -706,6 +722,7 @@ fn classic_skips_expansion_items_and_raises_mods() {
     assert_eq!(seed2, Seed::default());
 }
 
+// Covers: specs/items/treasure.md §5.7 r5
 #[test]
 fn classic_throwables_repick_then_long_sword() {
     let mut items = abcd();
@@ -740,6 +757,7 @@ fn classic_throwables_repick_then_long_sword() {
 
 // ------------------------------------------------------------ gold (§8)
 
+// Covers: specs/items/treasure.md §5.7 r7, §5.7 r9, §8 text, §8 r2, §8 r3
 #[test]
 fn gold_multiplier_and_gold_find() {
     let mut items = abcd();
@@ -790,6 +808,7 @@ fn gold_multiplier_and_gold_find() {
     assert_eq!(sink.gold[0], 0);
 }
 
+// Covers: specs/items/treasure.md §5.7 r8, §5.7 r9, §edge-cases-original-bugs r3
 #[test]
 fn sixth_item_gets_no_gold_find() {
     let mut items = abcd();
@@ -817,6 +836,7 @@ fn sixth_item_gets_no_gold_find() {
     assert_eq!(sink.gold, [20, 20, 20, 20, 20, 10]);
 }
 
+// Covers: specs/items/treasure.md §8 r1
 #[test]
 fn gold_base_rules() {
     let mut s = Seed::default();
@@ -835,6 +855,7 @@ fn quality_world(rare: bool, magic: bool) -> World {
     w
 }
 
+// Covers: specs/items/treasure.md §6 r6, §6 r7, §6 r8
 #[test]
 fn quality_vector() {
     let w = quality_world(true, false);
@@ -857,6 +878,7 @@ fn quality_vector() {
     );
 }
 
+// Covers: specs/items/treasure.md §6 r6
 #[test]
 fn quality_vector_magic_find() {
     let row = ratio_row();
@@ -881,6 +903,7 @@ fn quality_vector_magic_find() {
     );
 }
 
+// Covers: specs/items/treasure.md §6 r6
 #[test]
 fn quality_slot_mod_full_magic() {
     // Not rare: unique and set draw and fail, magic chance 0 → 4.
@@ -894,6 +917,7 @@ fn quality_slot_mod_full_magic() {
     assert_eq!(seed, s);
 }
 
+// Covers: specs/items/treasure.md §6 r1, §6 r2, §6 r6
 #[test]
 fn quality_gates_and_shortcuts() {
     // itemtypes magic: unique and set draw, rare skipped, magic step 4
@@ -917,6 +941,7 @@ fn quality_gates_and_shortcuts() {
     assert_eq!(roll_quality(&w.data(), 9, 50, 0, &[0; 6], &mut seed), Ok(0));
 }
 
+// Covers: specs/items/treasure.md §6 r5, §6 r7, §6 r8
 #[test]
 fn quality_mf_floor_skips_to_superior() {
     let w = quality_world(true, false);
@@ -929,6 +954,7 @@ fn quality_mf_floor_skips_to_superior() {
     assert_eq!(seed, s);
 }
 
+// Covers: specs/items/treasure.md §6 r3
 #[test]
 fn ratio_row_selection() {
     let mk = |v: u16, cs: u8, uber: u8, unique: u32| {
@@ -965,6 +991,7 @@ fn ratio_row_selection() {
     );
 }
 
+// Covers: specs/items/treasure.md §6 r3
 #[test]
 fn quality_uber_and_class_rows() {
     // weap item with code = ubercode reads the uber row.
@@ -1153,6 +1180,7 @@ fn src() -> Src {
     }
 }
 
+// Covers: specs/items/treasure.md §1.3 text, §1.3 r1, §1.3 r2, §1.3 r3, §1.3 r4
 #[test]
 fn automatic_tcs() {
     let s = src();
@@ -1178,6 +1206,7 @@ fn automatic_tcs() {
     assert_eq!(t.tcs[32].level, 93);
 }
 
+// Covers: specs/items/treasure.md §1.4, §1.5 r1, §1.5 r2, §1.5 r3, §1.5 r4, §1.5 r5, §edge-cases-original-bugs r2, §edge-cases-original-bugs r7
 #[test]
 fn treasureclassex_rows() {
     let mut s = src();
@@ -1237,6 +1266,7 @@ fn treasureclassex_rows() {
     assert_eq!(t.tcs[34].picks, -2);
 }
 
+// Covers: specs/items/treasure.md §1.5 r5
 #[test]
 fn item_string_parameters_stop_at_unknown_key() {
     let mut s = src();
@@ -1274,6 +1304,7 @@ fn grouped() -> TreasureClasses {
     ])
 }
 
+// Covers: specs/items/treasure.md §2
 #[test]
 fn get_by_level() {
     let t = grouped();
@@ -1287,6 +1318,7 @@ fn get_by_level() {
     assert_eq!(t.get(4, 1), Some(4));
 }
 
+// Covers: specs/items/treasure.md §1.6, §4 r5
 #[test]
 fn chest_table_by_name() {
     let mut s = src();
@@ -1310,6 +1342,7 @@ fn non_ascii_names_are_rejected() {
 
 // ------------------------------------------------ monster, chest (§3–§4)
 
+// Covers: specs/items/treasure.md §3.2
 #[test]
 fn monster_tc_choice() {
     let mut m: Monstats = zeroed();
@@ -1373,6 +1406,7 @@ fn monster_tc_choice() {
     );
 }
 
+// Covers: specs/items/treasure.md §3.1, §3.4
 #[test]
 fn monster_gate_and_upgrade() {
     assert_eq!(monster_drop_gate(0x20000, 0, 344), Ok(false));
@@ -1407,6 +1441,7 @@ fn monster_gate_and_upgrade() {
     assert_eq!(upgrade_level(&g, &mon, &m), 0);
 }
 
+// Covers: specs/items/treasure.md §3.4, §7 r3
 #[test]
 fn monster_drop_walks_the_upgraded_tc() {
     let mut w = World::new(vec![], abcd());
@@ -1479,6 +1514,7 @@ fn levels() -> Vec<Levels> {
     ls
 }
 
+// Covers: specs/items/treasure.md §4 r2, §4 r3, §4 r4
 #[test]
 fn area_levels_and_chest_tiers() {
     let ls = levels();
@@ -1499,6 +1535,7 @@ fn area_levels_and_chest_tiers() {
     assert_eq!(chest_tier(&ls, 5, 1, 0, true), Err(TreasureError::Act(5)));
 }
 
+// Covers: specs/items/treasure.md §4 r1, §4 r5
 #[test]
 fn chest_drop_passes_the_tier_as_level() {
     let mut w = World::new(vec![tc(1, 0, &[(0, 1, 0)])], abcd());
@@ -1553,6 +1590,7 @@ fn chest_drop_passes_the_tier_as_level() {
     assert_eq!(none, None);
 }
 
+// Covers: specs/items/treasure.md §6 r6
 #[test]
 fn chest_level_is_the_tier_for_quality() {
     // Edge case 1: D = tier − item level. Tier 2, item level 30: D = −28.

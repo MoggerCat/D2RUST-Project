@@ -54,6 +54,7 @@ fn check(tsv: &[Row], map: &WaypointMap) -> Vec<String> {
     out
 }
 
+// Covers: specs/world/waypoints.md §1 r2, §1 r4, §7 r4
 #[test]
 fn tsv_matches_town_and_tile_rules() {
     let rows = parse_tsv(WAYPOINTS_TSV).unwrap();
@@ -93,6 +94,7 @@ fn tsv_check_catches_perturbations() {
     assert!(matches!(parse_tsv(&text), Err(TsvError::Value { .. })));
 }
 
+// Covers: specs/world/waypoints.md §1 r1, §1 r2, §7 r4
 #[test]
 fn index_mapping() {
     // Index order is not level order (§1 rule 2).
@@ -126,6 +128,7 @@ fn rec(s: &str) -> [u8; 16] {
     hex(s).try_into().unwrap()
 }
 
+// Covers: specs/world/waypoints.md §1 r3, §2 text, §2 r1, §2 r2, §2 r3, §2 r4, §edge-cases-original-bugs r9
 #[test]
 fn record_vectors() {
     let mut r = WaypointRecord::allocate();
@@ -149,6 +152,7 @@ fn record_vectors() {
     assert!(r.set(0x6F).is_ok());
 }
 
+// Covers: specs/world/waypoints.md §2 r5, §2 r6, §edge-cases-original-bugs r1
 #[test]
 fn load_and_out_copy() {
     // Edge case 1: the load wipe.
@@ -171,6 +175,7 @@ fn load_and_out_copy() {
     assert_eq!(bad.out_copy(), Err(WaypointError::BadMagic(0x0103)));
 }
 
+// Covers: specs/world/waypoints.md §3 text, §3 r1, §3 r2
 #[test]
 fn save_section() {
     let mut recs = WaypointRecords::default();
@@ -197,6 +202,7 @@ fn save_section() {
     assert_eq!(read_section(&b).unwrap(), recs);
 }
 
+// Covers: specs/world/waypoints.md §5.3
 #[test]
 fn menu_message_vector() {
     let mut r = WaypointRecord::allocate();
@@ -373,6 +379,7 @@ fn msg49(wp: u32, level: u16) -> Vec<u8> {
     m
 }
 
+// Covers: specs/world/waypoints.md §5 r1
 #[test]
 fn waypoint_classes() {
     assert_eq!(
@@ -381,6 +388,7 @@ fn waypoint_classes() {
     );
 }
 
+// Covers: specs/world/waypoints.md §5.2 r1, §5.2 r2, §edge-cases-original-bugs r2
 #[test]
 fn operate_neutral_activates_without_menu() {
     // Edge case 2; §5.2 steps 1–2.
@@ -396,6 +404,7 @@ fn operate_neutral_activates_without_menu() {
     assert!(f.records[&P].0[0].test(1).unwrap());
 }
 
+// Covers: specs/world/waypoints.md §5.2 r1, §5.2 r3, §5.3
 #[test]
 fn operate_active_sends_menu() {
     // Recorded `022633` frame 108: `63 0a000000 0201 0300 …`.
@@ -421,6 +430,7 @@ fn operate_active_sends_menu() {
     );
 }
 
+// Covers: specs/world/waypoints.md §5.2 r1, §5.2 r3, §5.2 r4
 #[test]
 fn operate_busy_sets_bit_only() {
     let d = data();
@@ -445,6 +455,7 @@ fn operate_busy_sets_bit_only() {
     assert!(f.records[&P].0[2].test(2).unwrap());
 }
 
+// Covers: specs/world/waypoints.md §6 text, §6.2, §6.3 r1
 #[test]
 fn close_and_validation() {
     let d = data();
@@ -503,6 +514,7 @@ fn close_and_validation() {
     );
 }
 
+// Covers: specs/world/waypoints.md §6.1
 #[test]
 fn hostile_delay_refuses() {
     let d = data();
@@ -514,6 +526,7 @@ fn hostile_delay_refuses() {
     assert_eq!(f.log, ["sound 0x13", "reset"]);
 }
 
+// Covers: specs/world/waypoints.md §7 r4, §7 r7, §7 r8
 #[test]
 fn travel_same_act() {
     // Recorded `022633` frame 132: → level 3, player lands at
@@ -559,6 +572,7 @@ fn travel_same_act() {
     assert_eq!(arr.0[0].room, None);
 }
 
+// Covers: specs/world/waypoints.md §7 r1, §edge-cases-original-bugs r4
 #[test]
 fn travel_through_non_waypoint_object_does_nothing() {
     // Edge case 4: validation passes, travel stops at rule 1.
@@ -571,6 +585,7 @@ fn travel_through_non_waypoint_object_does_nothing() {
     assert!(f.log.is_empty() && f.sent.is_empty() && arr.0.is_empty());
 }
 
+// Covers: specs/world/waypoints.md §5.1 r1, §5.1 r2, §5.1 r3, §edge-cases-original-bugs r3
 #[test]
 fn init17() {
     let d = data();

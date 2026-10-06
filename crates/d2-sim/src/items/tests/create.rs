@@ -35,6 +35,7 @@ fn armor_durability_and_defense_vector() {
     assert_eq!(it.unit_seed, Seed::new(2466107339, 165470233));
 }
 
+// Covers: specs/items/generation.md §7.1 r6, §7.1 r7, §edge-cases-original-bugs r4
 #[test]
 fn socket_count_from_start_seed() {
     let mut t = tables();
@@ -73,6 +74,7 @@ fn sized(t: &mut ItemTables, w: u8, h: u8, sockets: u8) -> usize {
     push_item(t, r)
 }
 
+// Covers: specs/items/generation.md §7.3, §edge-cases-original-bugs r6
 #[test]
 fn socket_count_caps() {
     let mut t = tables();
@@ -100,6 +102,7 @@ fn socket_count_caps() {
     assert_eq!(it.stats.base(stat::NUMSOCKETS, 0), 1);
 }
 
+// Covers: specs/items/generation.md §7.2
 #[test]
 fn max_sockets_by_ilvl() {
     let mut t = tables();
@@ -115,6 +118,7 @@ fn max_sockets_by_ilvl() {
     }
 }
 
+// Covers: specs/items/generation.md §8.2
 #[test]
 fn ethereal_apply_weapon() {
     let mut t = tables();
@@ -129,6 +133,7 @@ fn ethereal_apply_weapon() {
 }
 
 /// Edge case 1: stack rolls exclude the maximum.
+// Covers: specs/items/generation.md §edge-cases-original-bugs r1
 #[test]
 fn stack_roll_excludes_max() {
     let mut t = tables();
@@ -150,6 +155,7 @@ fn stack_roll_excludes_max() {
 
 /// Edge cases 2 and 3: classic body armor gets no socket draw; the roll
 /// draws even with "no sockets".
+// Covers: specs/items/generation.md §7.1 r3, §7.1 r4, §7.1 r5, §edge-cases-original-bugs r2, §edge-cases-original-bugs r3
 #[test]
 fn socket_roll_draws() {
     let mut t = tables();
@@ -179,6 +185,7 @@ fn socket_roll_draws() {
 }
 
 /// Edge case 7: no stat list → no durability → no ethereal draw.
+// Covers: specs/items/generation.md §edge-cases-original-bugs r7
 #[test]
 fn no_stat_list_no_durability() {
     let mut t = tables();
@@ -197,6 +204,7 @@ fn no_stat_list_no_durability() {
 
 /// Staffmods (§6.2) and edge case 5: after 6 rejected tries the last
 /// tried skill is used.
+// Covers: specs/items/generation.md §6.2 r3, §6.2 r4, §edge-cases-original-bugs r5
 #[test]
 fn staffmods_last_rejected_skill() {
     let mut t = tables();
@@ -248,6 +256,7 @@ fn staffmods_last_rejected_skill() {
     assert_eq!(it.stats.lists[&ListKey::ITEM], want);
 }
 
+// Covers: specs/items/generation.md §5 r2
 #[test]
 fn elixir_table() {
     let mut t = tables();
@@ -281,6 +290,7 @@ fn helm_tables() -> (ItemTables, usize) {
 
 /// The pipeline derives the seeds from the game seed (§2.1), writes the
 /// flags and is deterministic.
+// Covers: specs/items/generation.md §2 r1, §3 r4, §3 r5
 #[test]
 fn pipeline_seeds_and_flags() {
     let (t, i) = helm_tables();
@@ -319,6 +329,7 @@ fn pipeline_seeds_and_flags() {
     assert_eq!(c, c2);
 }
 
+// Covers: specs/items/generation.md §3 r1, §3 r2
 #[test]
 fn pipeline_failures() {
     let (mut t, i) = helm_tables();
@@ -337,6 +348,7 @@ fn pipeline_failures() {
     assert_eq!(e.unwrap_err(), CreateError::Classic);
 }
 
+// Covers: specs/items/generation.md §3 r3, §3 r5, §9 r1, §9 r3, §9 r4
 #[test]
 fn forced_request() {
     let (t, i) = helm_tables();
@@ -372,6 +384,7 @@ fn forced_request() {
     assert_eq!(it.unit_seed, u2);
 }
 
+// Covers: specs/items/generation.md §6.1 r3, §9 r5
 #[test]
 fn ears() {
     let mut t = tables();
@@ -418,6 +431,7 @@ fn ears() {
     assert_eq!(e.unwrap_err(), CreateError::NotPlayer);
 }
 
+// Covers: specs/items/generation.md §9 r6
 #[test]
 fn replenish_period() {
     let mut s = FakeStats::default();
@@ -435,6 +449,7 @@ fn replenish_period() {
     assert_eq!(crate::items::replenish_timer(&s, true, 10), None);
 }
 
+// Covers: specs/items/generation.md §4 r1
 #[test]
 fn gold_amount() {
     let mut t = tables();

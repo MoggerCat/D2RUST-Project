@@ -5,6 +5,7 @@ use crate::items::affixes::{alvl, crafted, magic, rare, roll_affix, RARE_COUNTS}
 use crate::items::tables::RareRec;
 use crate::items::{flag, q, Fatal, ItemRequest};
 
+// Covers: specs/items/affixes.md §2
 #[test]
 fn affix_level_vectors() {
     for (ilvl, qlvl, m, want) in [
@@ -40,6 +41,7 @@ fn ring_suffixes(rows: Vec<crate::items::tables::AffixRec>) -> (ItemTables, usiz
 
 /// §3 vector: frequencies 3, 0, 5 (no magic lvl), total 8, r = 3 picks the
 /// second candidate (row 3).
+// Covers: specs/items/affixes.md §3 r6
 #[test]
 fn roller_frequency_walk() {
     let rows = [3, 0, 5]
@@ -69,6 +71,7 @@ fn roller_frequency_walk() {
 
 /// §3 vector: weighted mode (magic lvl ≠ 0): levels 10, 20, freq 2, 1 →
 /// weights 20, 20, roll(41); r = 40 picks the last (edge case 2).
+// Covers: specs/items/affixes.md §3 r3, §3 r6, §edge-cases-original-bugs r2
 #[test]
 fn roller_weighted() {
     let rows = [(10, 2), (20, 1)]
@@ -102,6 +105,7 @@ fn roller_weighted() {
 
 /// Edge case 6 and the coin: the coin step is drawn even when forced;
 /// an even coin without force returns 0.
+// Covers: specs/items/affixes.md §3 r2, §edge-cases-original-bugs r6
 #[test]
 fn roller_coin() {
     let (t, i) = ring_suffixes(vec![affix_row(RING, 1)]);
@@ -117,6 +121,7 @@ fn roller_coin() {
 
 /// Edge case 1: rows past the 511 cap still add weight; a roll landing
 /// there picks the last listed candidate.
+// Covers: specs/items/affixes.md §edge-cases-original-bugs r1
 #[test]
 fn roller_candidate_cap() {
     let rows = (0..600).map(|k| affix_row(RING, k + 1)).collect();
@@ -129,6 +134,7 @@ fn roller_candidate_cap() {
     assert_eq!(roll_affix(&t, &mut it, true, true, false, false, 0, 0), 511);
 }
 
+// Covers: specs/items/affixes.md §4.2
 #[test]
 fn roller_filters() {
     let mut rows: Vec<_> = (0..6).map(|k| affix_row(RING, k + 1)).collect();
@@ -155,6 +161,7 @@ fn roller_filters() {
 }
 
 /// §6: no affix rows → magic fails (downgrade).
+// Covers: specs/items/affixes.md §6 r3
 #[test]
 fn magic_without_rows_fails() {
     let (t, i) = ring_suffixes(vec![]);
@@ -171,6 +178,7 @@ fn rare_rows(n: usize) -> Vec<RareRec> {
         .collect()
 }
 
+// Covers: specs/items/affixes.md §1 r1, §7 r2, §7 r3, §7 r4, §7 r5
 #[test]
 fn rare_item() {
     let mut rows: Vec<_> = (0..4).map(|k| affix_row(RING, k + 1)).collect();
@@ -199,6 +207,7 @@ fn rare_item() {
 
 /// Edge case 3: crafted with a filled slot and no candidate crashes the
 /// original (group of id 0).
+// Covers: specs/items/affixes.md §edge-cases-original-bugs r3
 #[test]
 fn crafted_null_group() {
     let (mut t, i) = ring_suffixes(vec![affix_row(RING, 1), affix_row(RING, 2)]);
@@ -215,6 +224,7 @@ fn crafted_null_group() {
     assert_eq!(crafted(&t, &mut it, &rq), Err(Fatal::NullAffixGroup));
 }
 
+// Covers: specs/items/affixes.md §8 r2
 #[test]
 fn crafted_minimum_count() {
     let mut rows: Vec<_> = (0..6).map(|k| affix_row(RING, k + 1)).collect();
@@ -243,6 +253,7 @@ fn crafted_minimum_count() {
 }
 
 /// Edge case 4: a charm with no fitting affix is fatal.
+// Covers: specs/items/affixes.md §edge-cases-original-bugs r4
 #[test]
 fn charm_without_affix() {
     let mut t = tables();
@@ -254,6 +265,7 @@ fn charm_without_affix() {
     );
 }
 
+// Covers: specs/items/affixes.md §11
 #[test]
 fn automagic_group() {
     let mut t = tables();
