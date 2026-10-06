@@ -21,17 +21,17 @@
 | Rules | 63–64 |
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
-|   3. Frame cycle | 114–146 |
-|   4. Palette (one per presented frame) | 147–164 |
-|   5. One pixel write (index domain) | 165–203 |
-|   6. d2rs answers | 204–217 |
-|   7. DirectDraw (display type 3) differences | 218–229 |
-| Constants & data dependencies | 230–235 |
-| Randomness | 236–239 |
-| Edge cases & original bugs | 240–249 |
-| Test vectors | 250–261 |
-| Provenance | 262–279 |
-| Open questions | 280–300 |
+|   3. Frame cycle | 114–151 |
+|   4. Palette (one per presented frame) | 152–182 |
+|   5. One pixel write (index domain) | 183–221 |
+|   6. d2rs answers | 222–235 |
+|   7. DirectDraw (display type 3) differences | 236–247 |
+| Constants & data dependencies | 248–253 |
+| Randomness | 254–257 |
+| Edge cases & original bugs | 258–267 |
+| Test vectors | 268–279 |
+| Provenance | 280–301 |
+| Open questions | 302–331 |
 <!-- /index -->
 
 ## Summary
@@ -122,7 +122,12 @@ The in-game frame (`0x0044C990`), once per client tick (`camera.md` §9):
    `0 … H − 48` are set to index 0 (`0x006C9220` with partial = 1: the first
    `(H − 47) × W` bytes); rows `H − 47 … H − 1` are not cleared. If
    `bClear = 0` nothing is cleared. All 137 rows of the live
-   `patch_d2` `levels.txt` have BlankScreen = 1.
+   `patch_d2` `levels.txt` have BlankScreen = 1. "The player's current
+   level" is the level of the local player unit's current room
+   (`0x0044CA8F`–`0x0044CAC8`: `0x004646A0` → `0x0061A1B0` level id →
+   `0x0061DB70` record; the chain `capture.md` §3 records as "level id").
+   No room (player not yet placed) → `bClear` = 0, nothing cleared; a
+   level id without a Levels record is fatal (error 0x5DE).
 3. World (`0x00476BC0`, skipped in screen open mode 3), then UI, cursor
    and overlays (`0x00456EE0`, `0x004F98E0`, `0x00468820`, `0x004684C0`,
    `0x00477980`); order is `draw-order.md`.
@@ -161,6 +166,19 @@ named next to it is loaded by `0x004FB1E0` but its colors are not used.
 So index `i` presents as `(pl2[4i], pl2[4i + 1], pl2[4i + 2])`, index 0
 included (`formats/palette.md` OQ1: the base palette's order is R, G, B and
 it is the palette used).
+
+**Which act's palette** (frame-cycle FC1). `0x004FB480(a)` loads
+`DATA\GLOBAL\palette\act<n>\pal.pl2` (and `pal.dat`) with `n = a + 1`,
+`n` outside 1…5 → 1, then `SetPalette`. In game it is called by the
+client loop at game start with `a = 0` (`0x0044F2DC`: act 1) and by the
+client unit room change `0x004654C0` when the moved unit is the local
+player (`[0x007A6A70]`) and the Levels `Act` byte (`+0x02`) of the new
+room's level differs from the old room's (`0x00465603`–`0x0046562A`),
+with `a` = the new level's act; the first placement (no old room) does
+not switch. So while playing, the presented palette is that of the act of
+the local player's current room's level, switched on the room change that
+crosses acts. Which call sets it for a game that starts outside act 1
+(callers `0x0044D100`, `0x00482EF0`): Open question 5.
 
 ### 5. One pixel write (index domain)
 
@@ -275,7 +293,11 @@ the table cases to `0x00606E40`, `0x00607060`, `0x006072F0`,
 act load `0x0045C8E0` → `0x0044E100`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
 D2MOO `DisplayType.h`. Levels BlankScreen counted in
 `game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1). No
-capture yet.
+capture yet. Frame-cycle follow-ups (FC1, FC2): BlankScreen level chain
+read at `0x0044CA8F`–`0x0044CAD5`; act palette loader `0x004FB480`
+(format `%s\palette\act%d\%s`), callers `0x0044F2DC`, `0x0046562A`
+(room change in `0x004654C0`: old room `0x00620BB0`, new room
+`0x00465420`), `0x0044D1A5`, `0x00483293`.
 
 ## Open questions
 
@@ -297,3 +319,12 @@ capture yet.
    `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
+5. Act palette at game start outside act 1 (§4): what `0x0044D100` (act
+   table at `0x0070F238` + 13 × `[0x007A060D]`) and `0x00482EF0` load and
+   when, relative to the first in-game frame. Ghidra read; a capture of
+   the first frames after loading a character saved in act 2.
+6. d2rs input for §3 step 2 and §4: the local player's current room and
+   its level come from the client unit model fed by the S→C unit and
+   room messages; their owner spec (client unit model / S→C messages)
+   must state it. Until then the feed supplies the level (frame-cycle
+   FC1).

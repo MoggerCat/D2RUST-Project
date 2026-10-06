@@ -10,7 +10,7 @@
   §4–§5 (palette and the pixel write), `render/blend-modes.md` (draw modes,
   blend tables), `render/unit-composite.md` §7 (which colormap source a
   component uses), `ui/text.md` §4 (text-color maps), `render/lighting.md`
-  (light values; to write), `client/render-pipeline.md` §A4, §B3
+  (light values, §11), `client/render-pipeline.md` §A4, §B3
 
 <!-- index -->
 | Section | Lines |
@@ -56,8 +56,8 @@ the unit and item colormap tables, and the rule for a mapped index 0. How
 |---|---|---|
 | act `pal.pl2` | 439,808 + 259·T bytes | `formats/palette.md`; act by `composition.md` §4 |
 | light value of a cel draw | byte `v` (0xFF = unlit) | caller; for units `lighting.md` |
-| light values of a wall/roof block | 4 ints `c0…c3` | caller's light record (`lighting.md`) |
-| floor light grid | 12-byte cells, 8 per row | `lighting.md` (`0x00477730` grid) |
+| light values of a wall/roof block | 4 ints `c0…c3` | `lighting.md` §11 r2 |
+| floor light grid | 12-byte cells, 8 per row | `lighting.md` §11 r3 (`0x004DDEF0`) |
 | remap request | unit palette index, monster shift, item, text color | `unit-composite.md` §7, `ui/text.md` §5 |
 | `items\Palette\*.dat`, monster `palshift.dat`, `RandTransforms.dat`, `GreenBlood.dat` | index maps | archives (§6) |
 

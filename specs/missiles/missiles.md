@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–275 |
-|   R3. Per-tick dispatch | 276–305 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 306–385 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 386–435 |
-|   R6. Damage stage (missile-owned part) | 436–489 |
-|   R7. Lifetime and expiry | 490–513 |
-|   R8. Pierce | 514–539 |
-|   R9. Server-do and server-hit catalogues | 540–754 |
-|   R10. Behaviour of the recorded missiles | 755–788 |
-|   R11. `missiles.txt` columns and their server use | 789–823 |
-| Constants & data dependencies | 824–850 |
-| Randomness | 851–883 |
-| Edge cases & original bugs | 884–907 |
-| Test vectors | 908–982 |
-| Provenance | 983–1018 |
-| Open questions | 1019–1057 |
+|   R2. Creation | 141–281 |
+|   R3. Per-tick dispatch | 282–311 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 312–432 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 433–482 |
+|   R6. Damage stage (missile-owned part) | 483–536 |
+|   R7. Lifetime and expiry | 537–560 |
+|   R8. Pierce | 561–586 |
+|   R9. Server-do and server-hit catalogues | 587–803 |
+|   R10. Behaviour of the recorded missiles | 804–837 |
+|   R11. `missiles.txt` columns and their server use | 838–872 |
+| Constants & data dependencies | 873–899 |
+| Randomness | 900–932 |
+| Edge cases & original bugs | 933–956 |
+| Test vectors | 957–1036 |
+| Provenance | 1037–1079 |
+| Open questions | 1080–1125 |
 <!-- /index -->
 
 ## Summary
@@ -227,7 +227,13 @@ Missile-owned helpers: `0x005A9720` (D2MOO
     table `0x0073C720` (§R4.2) (`0x00648CE0`); `CanDestroy` → unit flag
     bit 2 set.
 16. If v ≠ 0: path velocity = v, then the path is built toward the
-    target (`0x00649970`, D2MOO `D2Common_10142`).
+    target (`0x00649970`, D2MOO `D2Common_10142`). The missile's path
+    has type 4 from its allocation (`sim/path-placement.md` §2.4 calls
+    set type `0x00648CF0` with 4), and set type ORs in the type's table
+    flags 0x60000 (`sim/pathing.md` §2; `pathtype_flags` row 4 =
+    393216): that is where path flag 0x40000 comes from, so
+    `0x00649970` takes its first branch to the missile path compute
+    (§R4.3), never the walking path functions.
 17. Last-collided unit := owner (`0x0064A400`; only when `LastCollide`,
     §R5.1). With `LastCollide` the missile never hits its owner first.
 18. Path acceleration = `Accel` (signed); maximum velocity =
@@ -382,6 +388,47 @@ missile/unit footprint, 0x80 player, 0x100 monster. Shared unit filter
 (`NextHit` and unit has state 86); not the last-collided unit; and, if
 the missile has an owner, the owner may attack the unit
 (`0x00554200`, D2MOO `sub_6FCBD900`, `units.md`) or `CollideFriend` ≠ 0.
+
+#### R4.3 Missile path compute (`0x00649760`, 1.14d-confirmed)
+
+`0x00649970` (`sim/pathing.md` §3 step 1) hands a path with flag
+0x40000 here before any of its own steps: no collided-mask reset, no
+footprint removal, no room or town checks. By path type (+0x3C):
+
+| Type | Function | Result |
+|---|---|---|
+| 4 (every missile created by §R2.3) | `0x006492F0`, below | 0 → path flag 0x20 cleared, result 0; else flag 0x20 set, result = point count (+0x28) |
+| 10 | `0x0067A240` (charged-bolt zigzag, open question 12) | flag 0x20 set, result = point count |
+| 14 | `0x0067A140` (blessed-hammer spiral, open question 12) | flag 0x20 set, result = point count |
+| any other | fatal assert | — |
+
+Type 4, straight line to the target (`0x006492F0`):
+
+1. Current point index (+0x24) := 0.
+2. With a target unit (+0x58): target (+0x10, +0x12) := that unit's
+   position (`sim/path-placement.md` §2.1 getter: static x/y for types
+   2, 4, 5; dynamic sub-tile for 0, 1, 3; (0, 0) without a path).
+   Without one the target point set at creation (§R2.3 step 15) stays.
+3. |target x − sub-tile x| > 99 or |target y − sub-tile y| > 99
+   (unsigned 16-bit words, difference taken as a signed int) → result
+   0. Target x = 0 or target y = 0 → result 0.
+4. Point[0] (+0x9C) := target; count (+0x28) := 1; +0x38 := 0.
+5. Velocity and direction toward point[0] (`0x0064FE40`,
+   `sim/pathing.md` §8.4). The direction is set once here: the flight
+   step (§R4 step 2, `sim/pathing.md` §9.4) skips the arrival check and
+   the per-point re-aim for missiles, so the missile keeps this
+   direction past the target point until its frames run out (§R7) or it
+   hits.
+6. Room-exit flag: path flag 0x1 := 1 when the path has no room (+0x1C)
+   or the target lies outside that room's sub-tile rectangle (active
+   room +0x4C x, +0x50 y, +0x54 w, +0x58 h, `drlg/rooms.md` §1; inside
+   means x ≤ tx < x + w and y ≤ ty < y + h). Only set here, never
+   cleared.
+7. Result = count (1).
+
+The limit is ±99 here, not the ±100 of the walking compute
+(`sim/pathing.md` §3 step 5); §R2.3 step 8 already refuses aims 100 or
+more away, so the two agree for a missile aimed at a point.
 
 ### R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`)
 
@@ -752,6 +799,8 @@ Bodies:
    from the row as in 1; `area_damage(…, 0)`, which always returns 1, so
    the result is always 1 (the code maps a 0 to 3).
 
+Server-do 17, 28, 34, 35 and server-hit 58: `missiles/bodies.md`.
+
 ### R10. Behaviour of the recorded missiles
 
 All four use server-do 1, server-hit 0, server-damage 0, `CollideType`
@@ -927,6 +976,11 @@ Synthetic (CI-safe):
 | R9.3 helper: x = 5000, elapsed 8, r = 4 | seed {5008, 666}; `lo'` 3429896298, 4050930106 → dx = 0 − 3 = −3, dy = 4 − 3 = 1 | R9.3 |
 | damage min 0x100, max 0x100 | 0x100, no draw | R6.2 |
 | min 0x300, max 0x100 | swapped: 0x100 + roll(0x200) | R6.2 |
+| type-4 path at sub-tile (100, 100), room sub-tile rect (80, 80, 40, 40), target point (110, 104) | index 0, count 1, point[0] (110, 104), flag 0x20 set, flag 0x1 clear, result 1 | R4.3 |
+| same, target point (199, 100) | Δx 99: count 1, result 1; flag 0x1 set (199 ≥ 120) | R4.3 |
+| same, target point (200, 100) | Δx 100 > 99: result 0, flag 0x20 cleared, index 0 | R4.3 |
+| same, target unit with a null path (position (0, 0)) | Δ 100 > 99: result 0 | R4.3 |
+| new missile path: flags 0, set type 4 (`0x00648CF0`) | flags 0x60000 (0x40000 missile branch, 0x20000 saved steps) | R2.3.16 |
 
 Real (1.14d data and recordings):
 
@@ -1015,6 +1069,13 @@ Reading:
 - Recording: `traces/raw/20261006-022304-tick.jsonl` (69 missiles,
   1,580 runs), `20261006-015554-tick.jsonl` (1 missile), analysed with a
   scratch script pairing "hin"/"ex"/"hout" per GUID.
+- Missile path compute (R4.3): `0x00649970` tests path flag 0x40000
+  first and returns `0x00649760`'s result; `0x00649760` switches on
+  path +0x3C (4 → `0x006492F0`, 10 → `0x0067A240`, 14 → `0x0067A140`,
+  else assert 0x207); `0x006492F0` read in full. Flag 0x40000's
+  source: `0x00649D00` (missile: masks 0, then `0x00648CF0(path, 4)`)
+  and `0x00648CF0` (flags := flags & 0xFFF800FF | table
+  `0x006EB690`[t]; row 4 = 0x60000).
 
 ## Open questions
 
@@ -1054,3 +1115,10 @@ Reading:
     while client messages are handled)? It would then run in its creation
     frame. Settle: a recording hooking `0x0059FA30` with the tick step
     in progress.
+12. Path types 10 and 14 (`0x0067A240`, `0x0067A140`, R4.3): who sets
+    them (a skill init callback, R2.3 step 21?), which seed
+    `0x0067A240` draws on (a seed pointer passed in a register; one
+    draw per point, 8-way turns over max distance / 2 points) and
+    `0x0067A140`'s x87 sine/cosine spiral (77 points). Settle: asm read
+    of both and of their callers; d2rs needs a bit-exact replacement of
+    the x87 part (hard rule 6).

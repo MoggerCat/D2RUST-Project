@@ -39,16 +39,16 @@
 |   6. Moving a footprint | 379–411 |
 |   7. Nearest free point (`0x0064DEA0`) | 412–476 |
 |   8. Coarse free-box search (`0x0064E840`) | 477–509 |
-|   9. Floor drop placement (`0x00555DA0`) | 510–528 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 529–578 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 579–620 |
-|   12. Warp tiles and warp arrival | 621–679 |
-| Constants & data dependencies | 680–698 |
-| Randomness | 699–708 |
-| Edge cases & original bugs | 709–735 |
-| Test vectors | 736–772 |
-| Provenance | 773–801 |
-| Open questions | 802–859 |
+|   9. Floor drop placement (`0x00555DA0`) | 510–532 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 533–582 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 583–624 |
+|   12. Warp tiles and warp arrival | 625–685 |
+| Constants & data dependencies | 686–704 |
+| Randomness | 705–714 |
+| Edge cases & original bugs | 715–750 |
+| Test vectors | 751–788 |
+| Provenance | 789–817 |
+| Open questions | 818–885 |
 <!-- /index -->
 
 ## Summary
@@ -522,8 +522,12 @@ The rule items use to put a dropped item on the floor; 20 call sites
 3. Out := the written point; result := the room (null: no place; with
    fallback the unchanged start's room).
 
-`items/treasure.md` §7 step 2 calls `0x0064E810` with the same
-arguments directly (size 1, fallback 1). Item size is 1, so the size
+The room argument of rule 2 is the caller's `room` unchanged
+(`0x00555DEC`), not the room rule 1's lookup found. `items/treasure.md`
+§7 step 2 (`0x0055A550`) is one of the callers: room of the dropper
+(`0x00620BB0`), its position, size 1, fallback 1. The inventory drops
+(`items/inventory.md` §9.1, §9.3) also pass size 1, fallback 1; the gold
+piles (§10.2 there) call `0x0064E810` directly with fallback 0. Item size is 1, so the size
 query is a single cell against 0x3E01.
 
 ### 10. Placing a unit at a point (`0x00554EA0`)
@@ -626,7 +630,9 @@ Called by the tile grid fill (`drlg/rooms.md` §9.5.1 step 3) for a
 hidden exit cell of type t (10 or 11) at world tile (wx, wy) with packed
 value v, DRLG room R:
 
-1. Direction letter: t = 11 → 'l', else 'r'. Warp slot = main index
+1. Direction letter: t = 11 → 'r', else (10) 'l' (read at
+   `0x0066E1C4`–`0x0066E1D5`; D2MOO `DRLGROOMTILE_AddWarp` agrees: the
+   right exit type takes 'r'). Earlier text had the letters swapped. Warp slot = main index
    (v bits 20–25). lvlwarp record: `drlg/levels.md` §7 rule 4 for R's
    level, that slot and letter (no record → fatal).
 2. Local tile (lx, ly) = (wx − R tile x, wy − R tile y). If lx = R tile
@@ -732,6 +738,15 @@ Reproduced by default.
    (dead-body sequence §5.3 rule 3 is safe because it removes first).
 9. §12.1: an exit cell on the room's far column or far row adds no warp
    tile (only one of the two needs to match).
+10. §8: the out room need not hold the out point. The row test reads the
+   rect last read (a cell visit's row room) but a row inside it takes
+   `room` (the argument) as row room, and a cell inside the row room's
+   columns takes the row room without testing its rows (`0x0064E840`).
+   Vector C1: the result is A with a point in the room above. Callers
+   pass the room on as returned (monster spawn `0x005A09E0` →
+   `0x005B30E0`, `monsters/init.md`); a later §7 search from it
+   (§10 rule 3) or the first move's room recache (`sim/pathing.md` §9.6)
+   finds the holding room.
 
 ## Test vectors
 
@@ -756,6 +771,7 @@ Expected values come from the rules above (scratch model
 | D1 | 20×20, walls x = 12 (all y) | §9 drop from (10, 10), size 1 | start (12, 13) is a wall; ring 1: (11, 12) d 2 kept, (13, 12) fails the walk-back, (11, 13) d 1 wins → (11, 13) |
 | D2 | 20×20 empty | §9 drop from (10, 10) | (12, 13) (start free, walk-back passes) |
 | D3 | empty, item bit 0x200 at (12, 13) | §9 drop from (10, 10) | (11, 13) |
+| C1 | room A sub-tiles x 40000..40039, y 40080..40089; room B (adjacent) x 40000..40039, y 40070..40079; wall at (40008, 40078) | §8 from A, (40008, 40080), n = 1, mask 0x1 | pass 1 (40007, 40079) in B: box hits the wall; pass 2 row 40078 is inside B's rect, so row room A; (40006, 40078) free → out room **A**, point (40006, 40078) (in B). Without the wall: out room B, (40007, 40079) |
 
 Real vectors (recordings, `traces/raw/`, reproducible once the DRLG of
 the recorded game is regenerated from its seeds). The map seed (game
@@ -856,3 +872,13 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   §12.2 rule 1, `world/quests.md` §8.2; §10 rule 7 stays host-only.
 - CR1, CR2: open question 1 (recording design). CR3: `combat/vitals.md`
   §5.
+- `docs/handoff/prop-wired-path.md` PWQ1: edge case 10, vector C1
+  (`0x0064E840` re-read). Its row 4 (warp footprint room): §6 rule 4 as
+  written: `0x00650910` clears from the path's room (ECX = path +0x1C)
+  and stamps from its destination-room argument (`0x006509FD`–
+  `0x00650A0B`), so a warp to a non-adjacent room is stamped. Its row 3
+  (room deactivation compress): `sim/units.md` §3.3.
+- `docs/handoff/drop-freespot.md` DF1: §9 (the caller's room, i.e. the
+  dropper's room). DF2: `items/treasure.md` §7 step 4 (the allocation
+  adds the dropped item to the world, path and footprint included).
+  DF3: no spec question (provider-off wiring).

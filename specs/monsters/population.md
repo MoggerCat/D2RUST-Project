@@ -16,38 +16,39 @@
   (what happens inside one monster's creation: level, stats, boss
   modifiers, superunique init, events); `monsters/ai.md` (spawns started
   by AI functions); `sim/units.md` (claude/phase3-units: unit
-  allocation, modes, collision primitives); DRLG spec
-  (claude/phase3-drlg: rooms, coordinate lists, presets, warps); skills
+  allocation, modes, collision primitives); `drlg/levels.md` §11
+  (coordinate lists, populated level, room count, warp points, kind-11
+  location), `drlg/rooms.md` (rooms, tile records); skills
   spec (summons); quests spec (quest flags read here);
   `monsters/preset-monsters.tsv` (§11 table, machine-readable).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–69 |
-| Inputs | 70–80 |
-| Outputs / state changes | 81–90 |
-| Rules | 91–92 |
-|   1. Entry points and order within a room | 93–131 |
-|   2. Monster regions | 132–251 |
-|   3. Room population (`0x0054EC90(game, room)`) | 252–308 |
-|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 309–335 |
-|   5. Boss or pack (`0x005BE020(region, room)`) | 336–353 |
-|   6. Random boss (champion or unique) | 354–426 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 427–450 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 451–478 |
-|   9. Placement search and creation call (`0x005B2A00`) | 479–592 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 593–636 |
-|   11. Preset monsters (DS1 presets) | 637–768 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 769–792 |
-|   13. Region bookkeeping | 793–825 |
-|   14. Other table-driven and AI spawns | 826–850 |
-| Constants & data dependencies | 851–904 |
-| Randomness | 905–948 |
-| Edge cases & original bugs | 949–989 |
-| Test vectors | 990–1061 |
-| Provenance | 1062–1084 |
-| Open questions | 1085–1107 |
+| Summary | 54–70 |
+| Inputs | 71–81 |
+| Outputs / state changes | 82–91 |
+| Rules | 92–93 |
+|   1. Entry points and order within a room | 94–132 |
+|   2. Monster regions | 133–252 |
+|   3. Room population (`0x0054EC90(game, room)`) | 253–309 |
+|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 310–336 |
+|   5. Boss or pack (`0x005BE020(region, room)`) | 337–354 |
+|   6. Random boss (champion or unique) | 355–427 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–451 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 452–483 |
+|   9. Placement search and creation call (`0x005B2A00`) | 484–598 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 599–642 |
+|   11. Preset monsters (DS1 presets) | 643–774 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 775–798 |
+|   13. Region bookkeeping | 799–831 |
+|   14. Other table-driven and AI spawns | 832–856 |
+| Constants & data dependencies | 857–910 |
+| Randomness | 911–954 |
+| Edge cases & original bugs | 955–995 |
+| Test vectors | 996–1067 |
+| Provenance | 1068–1090 |
+| Open questions | 1091–1113 |
 <!-- /index -->
 
 ## Summary
@@ -73,7 +74,7 @@ wandering monster to any active room.
 |---|---|---|
 | game | game record | difficulty u8 game +0x6D, expansion flag game +0x70, game seed +0xD0, region array +0xF0, superunique flags +0x1D30 |
 | room | active room | active room seed +0x6C, client count +0x78, populated bits +0x34 (`sim/tick.md` §4), DRLG room +0x10 |
-| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (DRLG spec) |
+| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; clipped rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (`drlg/levels.md` §11) |
 | preset units | DS1 preset list of the room | `0x00619FD0(room)` (DRLG spec) |
 | tables | levels, monstats, monstats2, superuniques, monumod | Constants & data dependencies |
 | monster-region seed | seed | derived at game creation (§2.1, `rng.md` §5.2) |
@@ -158,7 +159,7 @@ wandering monster to any active room.
 | +0x000 | u8 | act | levels `Act` (+0x03) |
 | +0x004 | i32 | rooms visited | +1 per population attempt (§3.1); boss chance (§5) |
 | +0x008 | i32 | rooms with spawns | +1 per room where population created something (§3.4) |
-| +0x00C | i32 | room count | −1 at init; set on first use to the level's populated-room count `0x0061ABF0(act, level)` (DRLG spec) |
+| +0x00C | i32 | room count | −1 at init; set on first use to the level's populated-room count `0x0061ABF0(act, level)` (`drlg/levels.md` §11.5) |
 | +0x010 | u8 | monster count (`nMonCount`) | entries the picker may choose (§2.3, §4) |
 | +0x011 | u8 | total rarity | sum of entry rarities (u8, wraps) |
 | +0x012 | u8 | entry count (`nSpawnCount`) | entries in use, including ones added by §2.5 |
@@ -462,10 +463,14 @@ Draws use the active room seed of `room`.
       step when w or h < 1).
    2. Warp check (only when asked, `0x0054DB50`): reject if
       dx² + dy² < levels `WarpDist` (+0x0C) for any warp point of the room
-      (`0x0061AC10(room)`: x at +4·i, y at +0x24 + 4·i, count at +0x48).
-      Also reject if dx² + dy² < WarpDist for the level's spawn location
-      of kind 11 (`0x006427F0`, tile coordinates × 5), when that location
-      has x > 0 and y > 0. 1.14d Act 1 WarpDist is 2025 (45 subtiles).
+      (`0x0061AC10(room)`: x at +4·i, y at +0x24 + 4·i, count at +0x48;
+      `drlg/levels.md` §11.5 item 3). Only when no warp point rejects:
+      also reject if dx² + dy² < WarpDist for the level's spawn location
+      of kind 11 (`0x00619E50` with the act of the level from
+      `0x006427F0`; tile coordinates × 5), when that location has x > 0
+      and y > 0. That query is the spawn-room choice of `drlg/levels.md`
+      §11.5 item 4: it is made again on every such try, can draw on the
+      **level seed** and streams the chosen room. 1.14d Act 1 WarpDist is 2025 (45 subtiles).
    3. With cl: reject if the coordinate index at (x, y)
       (`0x0061B130`) ≠ cl index.
    4. Probe placement: §9 at (x, y), mode 1, r = −1, flags 1 (test only,
@@ -510,7 +515,8 @@ the ring search is skipped.
 (0x30 bytes each; DRLG spec); n = 0 or no list → none. s = `roll(n)`
 (room seed); s = 0 → s = 1. Then visit indices s, s+1, … mod n until
 back at s − 1 (never visiting s − 1 itself). For a tile record with tile
-data (+0x18) whose `0x00604BC0` flags have bit 2: the point is
+data (+0x18) whose material flags (`0x00604BC0`, DT1 header +0x06,
+`drlg/rooms.md` §9.3) have bit 0x2: the point is
 x = (rec+8 + room tile x) × 5 + 3, y = (rec+0xC + room tile y) × 5 + 3.
 The point must pass `0x0064CB30(room, x, y, 0x100)` = 0, and at least one
 of (x, y) + (0,−3), (3,0), (0,3), (−3,0) (table `0x006E2D50`) must be

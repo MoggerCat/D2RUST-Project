@@ -160,7 +160,7 @@ value as an input (determinism rule), never from the clock.
 <!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
-| game seed, game +0xD0 [`pGameSeed`] | `0x0052C280` at game creation | `init()`, then `init_low(time_value(QueryPerformanceCounter low word))`. A fixed-seed global `0x00731004` (≠ −1) would replace this; its only writer `0x0052C320` has no callers (dead code). |
+| game seed, game +0xD0 [`pGameSeed`] | `0x0052C280` at game creation | `init()`, then `init_low(time_value(QueryPerformanceCounter low word))`. A fixed-seed global `0x00731004` (≠ −1) would replace this; its writer `0x0052C320` is called by the `-seed N` switch handler `0x0044D860` (N ≠ 0) and by `0x00451909`; that branch (game +0x84 := 1, +0x7C := N, seed `{N, 666}` unstepped) is `tools/original-hooks.md` §2 rule 3. |
 | `dwInitSeed`, game +0x7C | `0x0052C280` | one game-seed step, then `time_value(lo')`. Single player's DRLG does not use it; it uses the character's map seed (§5.4, observed). |
 
 Game creation (`0x00530930`; `0x00530BF0` with a client) then derives,

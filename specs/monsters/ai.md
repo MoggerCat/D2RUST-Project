@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1409 |
-|   10. The catalogue `ai-functions.tsv` | 1410–1430 |
-| Constants & data dependencies | 1431–1454 |
-| Randomness | 1455–1476 |
-| Edge cases & original bugs | 1477–1518 |
-| Test vectors | 1519–1607 |
-| Provenance | 1608–1647 |
-| Open questions | 1648–1685 |
+|   9. Per-AI behaviours | 633–1411 |
+|   10. The catalogue `ai-functions.tsv` | 1412–1432 |
+| Constants & data dependencies | 1433–1456 |
+| Randomness | 1457–1478 |
+| Edge cases & original bugs | 1479–1520 |
+| Test vectors | 1521–1609 |
+| Provenance | 1610–1649 |
+| Open questions | 1650–1687 |
 <!-- /index -->
 
 ## Summary
@@ -1406,6 +1406,8 @@ quest 4 functions, drehyaiced → Act 5 quest 3 functions:
    idle 20, end; else param 3 := 2. Idle 20.
 
 No draws. 1.14d-confirmed; same as D2MOO.
+
+Act II bodies (PantherJavelin, GreaterMummy, Mummy, PantherWoman, MaggotLarva, SandLeaper, MaggotEgg, PinHead, ClawViper, Vulture, BatDemon, SandMaggotQueen, Duriel, Summoner) and the special-state thinks 10/17, 11, 12: `monsters/ai-bodies-2.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 
