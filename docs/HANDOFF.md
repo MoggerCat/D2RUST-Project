@@ -33,8 +33,10 @@ rather than restating them.
    specs are hooks (`TickHooks`), timer events go to `EventDispatch`
    (open question 3 of `tick.md`); unit specs plug in there. `d2-proto`
    ids, sizes and layouts from the TSVs: done (open questions in §7).
-3. **Trace replay of the tick** (implementation, after the converter on
-   `claude/phase3-units`): hook in at `d2_sim::tick::run_timer_events`
+3. **Trace replay of the tick** (implementation; the converter
+   `tools/trace-recorder/convert_tick.py` and the traces
+   `traces/sim/tick/sim-0006..0008.json` are merged, shape-checked by
+   `crates/conformance/tests/tick_traces.rs`): hook in at `d2_sim::tick::run_timer_events`
    with an `EventDispatch` that logs each `TimerRun` (its fields are the
    comparison record of `tick.md` Test vectors: class, list, event type,
    unit type, GUID, expire, arg1, arg2) and replays the recorded
