@@ -1,1 +1,423 @@
+// Spec: specs/world/hirelings.md §3.2, §6, §8, §9, §10 (tests)
+//! Init, replace, death, revive, follow, the classic act change and the
+//! restore.
 
+use super::fake::{row, tables, Fake};
+use crate::units::UnitId;
+use crate::world::hirelings::life::{
+    self, RestorePlan, RestoreSkip, SavedHireling, MODE_DEAD, MODE_NEUTRAL,
+};
+use crate::world::hirelings::pets::{assign_merc, merc_dead_message, pet_action};
+use crate::world::hirelings::{
+    flags, stat, HirelingRow, HirelingState, HirelingTables, PetList, PetNode, Slot, NEW_HIRE,
+    UNIT_PLAYER,
+};
+
+const P_GUID: u32 = 1;
+const M_GUID: u32 = 0x20;
+const OLD_GUID: u32 = 0x21;
+
+/// Expansion Act 1 Normal: Id 0 (bracket 3) and Id 1 (brackets 3 / 36 /
+/// 67), Exp/Lvl 105, names 100–140 (act 0).
+fn act1_rows() -> Vec<HirelingRow> {
+    let mk = |id: u32, level: i32| HirelingRow {
+        exp_lvl: 105,
+        name_first: 100,
+        name_last: 140,
+        ..row(100, id, 1, 1, level)
+    };
+    vec![mk(0, 3), mk(1, 3), mk(1, 36), mk(1, 67)]
+}
+
+fn act1_tables() -> HirelingTables {
+    tables(act1_rows())
+}
+
+/// Two players (ids 1, 2; GUIDs 1, 2; player 1 level 10) and the new
+/// hireling unit (id 10, class 271, GUID 0x20).
+fn world() -> (Fake, UnitId, UnitId, UnitId) {
+    let mut w = Fake::new(true);
+    let p = w.add(1, UNIT_PLAYER, 0, P_GUID);
+    let q = w.add(2, UNIT_PLAYER, 0, 2);
+    let m = w.add(10, 1, 271, M_GUID);
+    w.set(p, stat::LEVEL, 10);
+    (w, p, q, m)
+}
+
+fn node(guid: u32, dead: bool) -> PetNode {
+    PetNode {
+        dead,
+        guid,
+        seed: 0x1234,
+        name: 0x0F21,
+        id: 1,
+    }
+}
+
+fn with_nodes(player: UnitId, nodes: Vec<PetNode>) -> HirelingState {
+    let mut st = HirelingState::default();
+    let max = nodes.len() as i32;
+    st.lists.insert(player, PetList { nodes, max });
+    st
+}
+
+fn remove_msg(guid: u32) -> Vec<u8> {
+    pet_action(0, 0, 0, guid, 0).to_vec()
+}
+
+/// Asserts that `want` appears in `log` in this order (other entries may
+/// sit between them).
+fn assert_in_order(log: &[String], want: &[&str]) {
+    let mut it = log.iter();
+    for w in want {
+        assert!(
+            it.any(|l| l == w),
+            "`{w}` missing or out of order in {log:?}"
+        );
+    }
+}
+
+// Covers: specs/world/hirelings.md §8 r2, §9 r1, §13 r2, §13 r3
+#[test]
+fn death_sends_name_and_cost() {
+    let (mut w, p, q, m) = world();
+    w.set(m, stat::LEVEL, 30);
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    assert!(life::death(&mut w, &mut st, p, m));
+    assert!(st.list(p).unwrap().nodes[0].dead);
+    // Test vector: name id 0x0F21, level 30 → 6750.
+    assert_eq!(
+        w.sent_to(p),
+        vec![
+            vec![0x9b, 0x21, 0x0f, 0x5e, 0x1a, 0x00, 0x00],
+            remove_msg(M_GUID)
+        ]
+    );
+    assert_eq!(w.sent_to(q), vec![remove_msg(M_GUID)]);
+    // A unit in no hireling node.
+    let other = w.add(11, 1, 271, OLD_GUID);
+    assert!(!life::death(&mut w, &mut st, p, other));
+}
+
+// Covers: specs/world/hirelings.md §3.2 r1, §3.2 r2, §3.2 r3, §3.2 r4, §3.2 r6, §3.2 r7, §3.2 r8, §3.2 r10, §3.2 r11, §13 r3
+#[test]
+fn init_replaces_the_old_hireling() {
+    let (mut w, p, q, m) = world();
+    let old = w.add(11, 1, 271, OLD_GUID);
+    w.unit_mut(old).flags = flags::OWNED;
+    w.unit_mut(old).owner = Some((P_GUID, 0));
+    let t = act1_tables();
+    // The old hireling is dead: "any" node counts.
+    let mut st = with_nodes(p, vec![node(OLD_GUID, true)]);
+    let slot = Slot {
+        name: 105,
+        seed: 22_752_887,
+    };
+    // A saved id (no level stats): only the replace and the link run.
+    let offer = life::init(&mut w, &t, &mut st, p, m, 1, slot, false)
+        .unwrap()
+        .expect("offer");
+    assert_eq!(offer.id, 1);
+    assert!(!w.units.contains_key(&old));
+    assert_in_order(
+        &w.log,
+        &[
+            "state_stat 10 105 172 2",
+            "team 10 1",
+            "owner 11 0xffffffff 1",
+            "free 11",
+            "owner 10 0x1 0",
+            "ai 10",
+        ],
+    );
+    assert!(!w.log.iter().any(|l| l.starts_with("set 10 13")));
+    assert_eq!(w.unit(m).flags, flags::INIT | flags::OWNED);
+    assert_eq!(w.unit(m).owner, Some((P_GUID, UNIT_PLAYER)));
+    assert_eq!(
+        st.list(p).unwrap().nodes,
+        vec![PetNode {
+            dead: false,
+            guid: M_GUID,
+            seed: 22_752_887,
+            name: 105,
+            id: 1,
+        }]
+    );
+    let add = assign_merc(271, P_GUID, M_GUID, 22_752_887, 105).to_vec();
+    // 0x9B ffff/0 first, then the two removes of the old node, then the
+    // add.
+    assert_eq!(
+        w.sent_to(p),
+        vec![
+            merc_dead_message(0xFFFF, 0).to_vec(),
+            remove_msg(OLD_GUID),
+            remove_msg(OLD_GUID),
+            add.clone()
+        ]
+    );
+    assert_eq!(
+        w.sent_to(q),
+        vec![remove_msg(OLD_GUID), remove_msg(OLD_GUID), add]
+    );
+}
+
+// Covers: specs/world/hirelings.md §3.2 r5, §3.2 r9
+#[test]
+fn init_new_hire_sets_offer_experience_and_level() {
+    let (mut w, p, _, m) = world();
+    let t = act1_tables();
+    let mut st = HirelingState::default();
+    let slot = Slot {
+        name: 105,
+        seed: 22_752_887,
+    };
+    let offer = life::init(&mut w, &t, &mut st, p, m, NEW_HIRE, slot, false)
+        .unwrap()
+        .expect("offer");
+    // Test vector: seed 22752887, 2 candidates, player level 10 → Id 1,
+    // L 6; experience (6 + 1)·105·6·6 = 26460.
+    assert_eq!((offer.id, offer.level, offer.experience), (1, 6, 26460));
+    assert_eq!(w.base(m, stat::EXPERIENCE), 26460);
+    assert_eq!(w.base(m, stat::LEVEL), 6);
+    assert_in_order(
+        &w.log,
+        &["owner 10 0x1 0", "set 10 13 26460", "set 10 12 6", "ai 10"],
+    );
+    // No old hireling: no 0x9B.
+    assert!(w.sent_to(p).iter().all(|b| b[0] != 0x9B));
+}
+
+// Covers: specs/world/hirelings.md §3.2 r5, §3.2 text
+#[test]
+fn init_without_offer_or_player_stops() {
+    let (mut w, p, _, m) = world();
+    let t = act1_tables();
+    let mut st = HirelingState::default();
+    // Hell has no candidate rows.
+    w.difficulty = 2;
+    let slot = Slot { name: 105, seed: 7 };
+    assert_eq!(
+        life::init(&mut w, &t, &mut st, p, m, NEW_HIRE, slot, false),
+        Ok(None)
+    );
+    assert!(st.list(p).is_none_or(|l| l.nodes.is_empty()));
+    assert_eq!(w.unit(m).owner, None);
+    assert_eq!(w.unit(m).flags, flags::INIT);
+    // The "player" is a monster: nothing happens.
+    let mut w2 = Fake::new(true);
+    let not_player = w2.add(3, 1, 271, 3);
+    let m2 = w2.add(10, 1, 271, M_GUID);
+    assert_eq!(
+        life::init(&mut w2, &t, &mut st, not_player, m2, NEW_HIRE, slot, false),
+        Ok(None)
+    );
+    assert_eq!(w2.unit(m2).flags, 0);
+    assert!(w2.log.is_empty());
+}
+
+// Covers: specs/world/hirelings.md §9 r3, §9 r4, §9 r5, §9 r6, §9 r7, §9 r8, §9 r9
+#[test]
+fn revive_order() {
+    let (mut w, p, q, m) = world();
+    let other = w.add(11, 1, 271, OLD_GUID);
+    w.unit_mut(m).mode = u32::from(MODE_DEAD);
+    w.unit_mut(m).max_life = Some(5000);
+    w.unit_mut(m).flags = flags::OWNED;
+    w.unit_mut(m).flags2 = flags::REVIVE_CLEAR2 | 1;
+    let t = act1_tables();
+    let mut st = with_nodes(p, vec![node(M_GUID, true), node(OLD_GUID, false)]);
+    life::revive(&mut w, &t, &mut st, p, m).unwrap();
+    // Rule 3: the living hireling leaves first.
+    assert!(!w.units.contains_key(&other));
+    assert_in_order(
+        &w.log,
+        &[
+            "owner 11 0xffffffff 1",
+            "free 11",
+            "mode 10 1",
+            "set 10 6 5000",
+            "team 10 1",
+            "remove_state 10 1",
+            "remove_state 10 107",
+            "remove_state 10 154",
+            "reapply 10",
+            "warp 10 1",
+        ],
+    );
+    assert_eq!(st.list(p).unwrap().nodes, vec![node(M_GUID, false)]);
+    assert_eq!(w.unit(m).flags, flags::OWNED | flags::REVIVE);
+    assert_eq!(w.unit(m).flags2, 1 | flags::WARP2);
+    let add = assign_merc(271, P_GUID, M_GUID, 0x1234, 0x0F21).to_vec();
+    assert_eq!(
+        w.sent_to(q),
+        vec![remove_msg(OLD_GUID), remove_msg(OLD_GUID), add.clone()]
+    );
+    // The owner then gets the stats (§13 rule 4: 14 messages).
+    let to_p = w.sent_to(p);
+    assert_eq!(to_p[..3], [remove_msg(OLD_GUID), remove_msg(OLD_GUID), add]);
+    assert_eq!(to_p.len(), 3 + 14);
+    assert!(to_p[3..].iter().all(|b| matches!(b[0], 0x9E..=0xA0)));
+}
+
+// Covers: specs/world/hirelings.md §6 r1, §6 r2, §6 r5
+#[test]
+fn follow_warps_living_only() {
+    let (mut w, p, _, m) = world();
+    let dead = w.add(11, 1, 271, OLD_GUID);
+    let t = act1_tables();
+    let mut st = with_nodes(p, vec![node(M_GUID, false), node(OLD_GUID, true)]);
+    life::follow(&mut w, &t, &mut st, p);
+    assert_eq!(w.log, vec!["warp 10 1".to_string()]);
+    assert_eq!(w.unit(m).flags2, flags::WARP2);
+    assert_eq!(w.unit(dead).flags2, 0);
+    assert_eq!(st.list(p).unwrap().nodes.len(), 2);
+}
+
+// Covers: specs/world/hirelings.md §6 r1
+#[test]
+fn follow_without_warp_or_range_frees_nodes() {
+    let (mut w, p, _, m) = world();
+    let mut t = act1_tables();
+    t.pet_flags = 0;
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::follow(&mut w, &t, &mut st, p);
+    assert!(st.list(p).unwrap().nodes.is_empty());
+    assert!(w.log.is_empty());
+    assert!(w.units.contains_key(&m));
+}
+
+// Covers: specs/world/hirelings.md §6 r4, §9 r1, §edge-cases-original-bugs r11
+#[test]
+fn classic_act_change_marks_dead() {
+    let (mut w, p, q, m) = world();
+    w.expansion = false;
+    w.set(m, stat::LEVEL, 30);
+    let mut st = with_nodes(p, vec![node(M_GUID, false)]);
+    life::classic_act_change(&mut w, &mut st, p);
+    assert_eq!(st.list(p).unwrap().nodes, vec![node(M_GUID, true)]);
+    assert_eq!(
+        w.log,
+        vec!["room_remove 10".to_string(), "death_event 10".to_string()]
+    );
+    assert_eq!(
+        w.sent_to(p),
+        vec![remove_msg(M_GUID), merc_dead_message(0x0F21, 6750).to_vec()]
+    );
+    assert_eq!(w.sent_to(q), vec![remove_msg(M_GUID)]);
+    // Again: the node is dead now (kept; no 0x9B, no death event).
+    w.log.clear();
+    w.sent.clear();
+    life::classic_act_change(&mut w, &mut st, p);
+    assert_eq!(w.log, vec!["room_remove 10".to_string()]);
+    assert_eq!(w.sent_to(p), vec![remove_msg(M_GUID)]);
+    assert_eq!(st.list(p).unwrap().nodes.len(), 1);
+}
+
+// Covers: specs/world/hirelings.md §10 r1, §10 r2, §10 r3
+#[test]
+fn restore_plan_clamps_name_and_checks_act() {
+    let t = act1_tables();
+    let saved = SavedHireling {
+        dead: false,
+        seed: 0x1234,
+        name_index: 5,
+        id: 1,
+        experience: 26460,
+    };
+    assert_eq!(
+        life::restore_plan(&t, true, &saved, 3),
+        Ok(RestorePlan {
+            name: 105,
+            mode: MODE_NEUTRAL
+        })
+    );
+    // 100 + 40 = NameLast stays; 100 + 41 → NameFirst.
+    let last = SavedHireling {
+        name_index: 40,
+        ..saved
+    };
+    assert_eq!(life::restore_plan(&t, true, &last, 0).unwrap().name, 140);
+    let above = SavedHireling {
+        name_index: 41,
+        dead: true,
+        ..saved
+    };
+    assert_eq!(
+        life::restore_plan(&t, true, &above, 0),
+        Ok(RestorePlan {
+            name: 100,
+            mode: MODE_DEAD
+        })
+    );
+    // Rule 1.
+    let none = SavedHireling {
+        dead: true,
+        id: 1,
+        ..SavedHireling::default()
+    };
+    assert_eq!(
+        life::restore_plan(&t, true, &none, 0),
+        Err(RestoreSkip::NoHireling)
+    );
+    // Rule 2: no row of the Id.
+    let bad = SavedHireling { id: 9, ..saved };
+    assert_eq!(
+        life::restore_plan(&t, true, &bad, 0),
+        Err(RestoreSkip::NoRow)
+    );
+    // Rule 3: classic, only in the name's act (act 0).
+    let classic = tables(
+        act1_rows()
+            .into_iter()
+            .map(|r| HirelingRow { version: 0, ..r })
+            .collect(),
+    );
+    assert_eq!(
+        life::restore_plan(&classic, false, &saved, 1),
+        Err(RestoreSkip::OtherAct)
+    );
+    assert_eq!(
+        life::restore_plan(&classic, false, &saved, 0).unwrap().name,
+        105
+    );
+}
+
+// Covers: specs/world/hirelings.md §10 r3, §10 r4, §10 r7
+#[test]
+fn restore_sets_node_values_and_dead() {
+    let (mut w, p, _, m) = world();
+    let t = act1_tables();
+    let mut st = HirelingState::default();
+    let saved = SavedHireling {
+        dead: true,
+        seed: 0x5555,
+        name_index: 5,
+        id: 1,
+        experience: 26460,
+    };
+    let plan = life::restore_plan(&t, true, &saved, 0).unwrap();
+    assert!(life::restore(&mut w, &t, &mut st, p, m, &plan, &saved).unwrap());
+    let want = PetNode {
+        dead: false,
+        guid: M_GUID,
+        seed: 0x5555,
+        name: 105,
+        id: 1,
+    };
+    assert_eq!(st.list(p).unwrap().nodes, vec![want]);
+    // Restore: no team join, no experience reset, no level stats.
+    assert!(!w.log.iter().any(|l| l.starts_with("team")));
+    assert!(!w.log.iter().any(|l| l.starts_with("set 10")));
+    assert_eq!(w.unit(m).flags, flags::INIT | flags::OWNED);
+
+    w.sent.clear();
+    w.set(m, stat::LEVEL, 30);
+    life::restore_dead(&mut w, &mut st, p, m);
+    assert!(st.list(p).unwrap().nodes[0].dead);
+    assert_eq!(w.unit(m).flags, flags::INIT | flags::OWNED | flags::DEAD);
+    assert_eq!(w.unit(m).mode, u32::from(MODE_DEAD));
+    assert_eq!(
+        w.sent_to(p),
+        vec![merc_dead_message(105, 6750).to_vec(), remove_msg(M_GUID)]
+    );
+}

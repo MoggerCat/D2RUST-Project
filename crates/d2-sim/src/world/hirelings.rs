@@ -25,6 +25,9 @@ mod tests;
 
 use std::collections::BTreeMap;
 
+use d2_data::bin::BinTable;
+use d2_data::tables::{Pettype, Record};
+
 use crate::units::UnitId;
 
 pub use rows::{resurrect_cost, threshold, HirelingRow, HirelingRows, Offer, RowSkill};
@@ -159,6 +162,32 @@ impl HirelingTables {
     pub const WARP: u8 = 0x1;
     /// `pettype` row 7 `range` (mask `0x006CE26C`).
     pub const RANGE: u8 = 0x2;
+
+    /// The tables from the fixed-up `hireling` and `pettype` tables and
+    /// the `experience` `MaxLvl` of class 0 (`vitals.md` §4.1).
+    pub fn from_tables(
+        hireling: &BinTable,
+        pettype: &BinTable,
+        max_level: i32,
+    ) -> Result<Self, HirelingError> {
+        if pettype.name != Pettype::TABLE || pettype.record_size != Pettype::SIZE {
+            return Err(HirelingError::Table(format!(
+                "{} ({}-byte records) is not pettype",
+                pettype.name, pettype.record_size
+            )));
+        }
+        let row = pettype
+            .iter()
+            .nth(usize::from(PET_HIRELING))
+            .map(Pettype::decode)
+            .ok_or_else(|| HirelingError::Table("pettype has no row 7".into()))?;
+        Ok(Self {
+            rows: HirelingRows::from_table(hireling)?,
+            max_level,
+            pet_flags: u8::from(row.warp) * Self::WARP | u8::from(row.range) * Self::RANGE,
+            pet_basemax: i32::from(row.basemax),
+        })
+    }
 }
 
 /// The game's hireling state: one [`PetList`] per player with lists.
