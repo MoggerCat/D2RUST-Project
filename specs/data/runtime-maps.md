@@ -23,21 +23,21 @@
 | Outputs / state changes | 57–84 |
 | Rules | 85–86 |
 |   1. The CRT sort (`qsort`) | 87–118 |
-|   2. Type-equivalence matrices (itemtypes, montype) | 119–154 |
-|   3. itemstatcost globals and description list | 155–170 |
-|   4. states | 171–188 |
-|   5. skills: class lists and passive list | 189–203 |
-|   6. Items: version-0 list | 204–211 |
-|   7. gamble | 212–232 |
-|   8. monseq, monpreset, hireling | 233–257 |
-|   9. leveldefs, lvlsub | 258–271 |
-|   10. automap | 272–300 |
-| Constants & data dependencies | 301–313 |
-| Randomness | 314–317 |
-| Edge cases & original bugs | 318–336 |
-| Test vectors | 337–387 |
-| Provenance | 388–426 |
-| Open questions | 427–442 |
+|   2. Type-equivalence matrices (itemtypes, montype) | 119–162 |
+|   3. itemstatcost globals and description list | 163–178 |
+|   4. states | 179–196 |
+|   5. skills: class lists and passive list | 197–211 |
+|   6. Items: version-0 list | 212–219 |
+|   7. gamble | 220–240 |
+|   8. monseq, monpreset, hireling | 241–265 |
+|   9. leveldefs, lvlsub | 266–279 |
+|   10. automap | 280–308 |
+| Constants & data dependencies | 309–321 |
+| Randomness | 322–325 |
+| Edge cases & original bugs | 326–344 |
+| Test vectors | 345–395 |
+| Provenance | 396–434 |
+| Open questions | 435–450 |
 <!-- /index -->
 
 ## Summary
@@ -151,6 +151,14 @@ negative t reads before the table (Edge cases). 1.14d: itemtypes W = 4
 Readers: `0x00629B50` and the item test `0x00629A90` (row = the item's
 type, column = the asked type, out-of-range i or j → 0; the item test
 also tries the item's second type, items +0x120, when non-zero).
+These read the **itemtypes** matrix (data tables +0xBFC count, +0xC00
+width W, +0xC04 words). The **montype** matrix (+0xC40 count, +0xC44
+words, +0xC48 width) has three readers, each word W·row + col / 32:
+`0x0057A830(col in ECX, row in EDX)`, both in 1 … count − 1 else 0
+(`combat/hit.md`, `combat/damage.md`); `0x0057B6A0` (inline);
+`0x005A0070(unit, row)` with col = the monster class's `MonType`, both
+in 0 … count − 1 (`monsters/init.md` §17.3). Both matrices are built by
+`0x006C2110`.
 
 ### 3. itemstatcost globals and description list
 

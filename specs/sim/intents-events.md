@@ -34,17 +34,17 @@
 | Outputs / state changes | 76–82 |
 | Rules | 83–84 |
 |   1. Loop order (single player) | 85–106 |
-|   2. Client → server | 107–273 |
-|   3. Server → client | 274–373 |
-|   4. d2rs mapping and scope | 374–401 |
-|   5. Machine-readable tables | 402–438 |
-|   6. Exact-match comparison | 439–476 |
-| Constants & data dependencies | 477–495 |
-| Randomness | 496–501 |
-| Edge cases & original bugs | 502–524 |
-| Test vectors | 525–570 |
-| Provenance | 571–610 |
-| Open questions | 611–634 |
+|   2. Client → server | 107–276 |
+|   3. Server → client | 277–376 |
+|   4. d2rs mapping and scope | 377–404 |
+|   5. Machine-readable tables | 405–441 |
+|   6. Exact-match comparison | 442–479 |
+| Constants & data dependencies | 480–498 |
+| Randomness | 499–504 |
+| Edge cases & original bugs | 505–527 |
+| Test vectors | 528–573 |
+| Provenance | 574–613 |
+| Open questions | 614–637 |
 <!-- /index -->
 
 ## Summary
@@ -220,7 +220,10 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    `0x005496F0`: size 5; player data (`0x006221A0`) required, else 2;
    target (x, y) must be within 50 subtiles of the player on both axes
    (`0x00548EF0`, Chebyshev test |dx| ≤ 50 and |dy| ≤ 50; position from
-   the dynamic path, or the static path for unit types 2, 4, 5). Out of
+   the dynamic path, or the static path for unit types 2, 4, 5; the
+   message's x, y are zero-extended u16 and a player's dynamic position
+   is a u16 sub-tile word, so the signed 32-bit difference never wraps
+   and the test is exact for every input). Out of
    range → 1, and if more than 25 frames passed since player data +0x168,
    the server queues message 0x15 (reassign player) to resync the client;
    in range → player data +0x168 = frame, accept.

@@ -25,20 +25,20 @@
 |   1. Records | 76–116 |
 |   2. Flags (+0x10) | 117–133 |
 |   3. Stat arrays | 134–149 |
-|   4. Allocation and ownership | 150–164 |
-|   5. Base writes | 165–189 |
-|   6. Full values | 190–248 |
-|   7. Value-change notification | 249–277 |
-|   8. Chain operations | 278–359 |
-|   9. States | 360–386 |
-|   10. Timer event handlers | 387–462 |
-|   11. Mod array and stat messages | 463–480 |
-| Constants & data dependencies | 481–492 |
-| Randomness | 493–496 |
-| Edge cases & original bugs | 497–510 |
-| Test vectors | 511–547 |
-| Provenance | 548–571 |
-| Open questions | 572–587 |
+|   4. Allocation and ownership | 150–173 |
+|   5. Base writes | 174–198 |
+|   6. Full values | 199–257 |
+|   7. Value-change notification | 258–286 |
+|   8. Chain operations | 287–368 |
+|   9. States | 369–395 |
+|   10. Timer event handlers | 396–471 |
+|   11. Mod array and stat messages | 472–489 |
+| Constants & data dependencies | 490–501 |
+| Randomness | 502–505 |
+| Edge cases & original bugs | 506–524 |
+| Test vectors | 525–561 |
+| Provenance | 562–585 |
+| Open questions | 586–601 |
 <!-- /index -->
 
 ## Summary
@@ -161,6 +161,15 @@ Callers pass other bits (e.g. 0x08, 0x20, 0x40) for their own lookups
    units `0x00460BF0` (callback `0x004609F0`), `0x004AE8D0`,
    `0x004AEDD0`, `0x004C1910`, `0x004CD540`. Objects and tiles have no
    list. All pass flags 0.
+4. A freed list is never passed again by 1.14d code: the specs found
+   no caller that keeps a list pointer past its free (§8.3) and then
+   reads, writes, attaches, detaches, frees or toggles it. So only the
+   null list has original behaviour (`stats.md` §4.2: reads 0; §5.1 /
+   §5.3: no-op; §8.4: nothing). A d2rs handle naming a freed list is
+   outside fidelity: an implementation may treat it as the null list
+   where a null rule exists and do nothing / answer 0 elsewhere, and a
+   replay that reaches such a call is itself a mismatch to report, not
+   a behaviour to match.
 
 ### 5. Base writes
 
@@ -501,7 +510,12 @@ None.
    (§6.4); per-level stats never appear in a player's full array.
 3. A plain DYNAMIC child's damage-related base changes still reach its
    parent (§6.1).
-4. Expiry of an extended list loops forever (§10.4).
+4. Expiry of an extended list loops forever (§10.4). The state it
+   spins in is fixed: every expired plain list met before it in the
+   walk is freed, nothing behind it changes. d2rs stops there instead
+   of hanging and reports `StatListError::EndlessExpiry(list)` with the
+   lists in that state; a recording that finished the walk contradicts
+   the loop and is a mismatch.
 5. Attach/detach collect at most 16 A53 keys (a 16-slot buffer, no
    bound check); 1.14d data has 4 such stats.
 6. Free leaves parked children pointing at the freed parent (§8.3).
