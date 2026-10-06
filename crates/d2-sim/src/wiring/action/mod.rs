@@ -24,6 +24,7 @@ pub mod combat;
 pub mod dispatch;
 pub mod missiles;
 pub mod pending;
+pub mod reaction;
 pub mod rooms;
 pub mod units;
 pub mod waypoints;
@@ -35,7 +36,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::tables::{Levels, Missiles as MissileRow};
+use d2_formats::animdata::AnimData;
 
+use crate::combat::vitals::VitalsTables;
 use crate::combat::{CombatEntry, CombatTables};
 use crate::drlg::{DrlgData, DrlgError, Dungeon, LevelTypes, TileSource};
 use crate::game::Game;
@@ -51,7 +54,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
-pub use pending::{NoPending, Pending, SkillEvent};
+pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
@@ -84,6 +87,9 @@ pub enum WiringError {
     Reentrant(&'static str),
     Drlg(DrlgError),
     Unit(UnitError),
+    /// The AnimData name lookup failed (`animdata.md` §4: a name longer
+    /// than 8 characters, fatal 0xD9 / 0xDA in 1.14d).
+    AnimData(d2_formats::FormatError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -105,6 +111,18 @@ pub struct ActionHooks<X> {
     pub game_seed: Seed,
     /// Waypoint records per player (player data +0x1C, `waypoints.md` §2).
     pub waypoints: BTreeMap<UnitId, WaypointRecords>,
+    /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
+    /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
+    /// COF name. `None`: no record for any unit (as before the table is
+    /// given).
+    pub anim_data: Option<Arc<AnimData>>,
+    /// `experience.txt` / `charstats.txt` of the experience on a kill
+    /// (`combat/vitals.md` §4). `None`: no experience is given.
+    pub vitals: Option<Arc<VitalsTables>>,
+    /// The target of the monster mode change running now (the record
+    /// argument of `0x005A7C20`, `units.md` §4.6); set by the kill's
+    /// death mode change only (`damage.md` §7.2).
+    pub mode_target: Option<UnitId>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -125,6 +143,9 @@ impl<X> ActionHooks<X> {
             hit_class: 0,
             game_seed,
             waypoints: BTreeMap::new(),
+            anim_data: None,
+            vitals: None,
+            mode_target: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

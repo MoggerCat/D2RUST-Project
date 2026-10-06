@@ -1,9 +1,12 @@
-// Spec: specs/sim/units.md §3, §5, §6; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
+// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
 //! scheduled, the town test, the combat list drop, the kind frees, the
-//! skill events 5 / 8 / 9 through [`Pending::skill_event`]), and
+//! skill events 5 / 8 / 9 through [`Pending::skill_event`], the player
+//! action frame through [`Pending::action_frame`], the AnimData record
+//! of a unit's mode (`formats/animdata.md` §5) and the monster death
+//! start through [`Pending::monster_death_start`]), and
 //! the unit-field helpers of [`View`] the other adapters share (stats,
 //! states, state lists, seeds).
 
@@ -17,7 +20,8 @@ use crate::tick::events::event;
 use crate::units::hooks::{Sim, UnitHooks};
 use crate::units::lifecycle::{AllocRequest, LifecycleHooks};
 use crate::units::modes::UnitError;
-use crate::units::record::flags2;
+use crate::units::modes::MONSTER_MODES;
+use crate::units::record::{flags2, AnimRecord, ANIM_EVENTS};
 use crate::units::{UnitId, UnitType};
 
 use super::combat::HIRELING_CLASSES;
@@ -30,9 +34,81 @@ pub const STATE_DEATH_DELAY: u16 = 92;
 
 impl<X: Pending> StatHost for ActionHooks<X> {}
 
+impl<X: Pending> ActionHooks<X> {
+    /// `0x0066A9B0` (`animdata.md` §5): the record of the COF name the
+    /// composer ([`Pending::anim_name`]) builds for the unit's type,
+    /// class and mode, looked up by §4; a name the file lacks gets the
+    /// default record (§3). `None` when no table is loaded, the unit has
+    /// no record, or the composer gives no name.
+    fn anim_lookup(
+        &mut self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+    ) -> Option<d2_formats::animdata::AnimRecord> {
+        let data = self.anim_data.clone()?;
+        let r = sim.units.get(unit)?;
+        let name = self.x.anim_name(unit, r.ty, r.class, r.mode)?;
+        match data.record(&name) {
+            Ok(rec) => Some(rec.clone()),
+            Err(e) => {
+                self.errors.push(WiringError::AnimData(e));
+                None
+            }
+        }
+    }
+}
+
+/// The fields `units.md` §4.2 reads from an AnimData record: frames,
+/// byte +0x0F (the speed's high byte, read as event index −1 by the
+/// variants) and the 144 event bytes.
+pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
+    let mut events = [0u8; ANIM_EVENTS];
+    events.copy_from_slice(&r.events[..ANIM_EVENTS]);
+    AnimRecord {
+        frames: r.frames,
+        byte_0f: (r.speed >> 24) as u8,
+        events,
+    }
+}
+
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// `0x00620F00`: the AnimData record of the unit's mode
+    /// (`units.md` §4.1, `animdata.md` §5).
+    fn anim_record(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<AnimRecord> {
+        self.anim_lookup(sim, unit).map(|r| anim_record(&r))
+    }
+
+    /// `0x00623F50` (`units.md` §4.3) from the record's speed (+0x0C).
+    fn anim_rate(&mut self, sim: &Sim<'_>, unit: UnitId) -> i16 {
+        let speed = self.anim_lookup(sim, unit).map(|r| r.speed);
+        self.x.anim_rate(unit, speed)
+    }
+
+    /// `0x00623B10` (`units.md` §4.3).
+    fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
+        self.x.frame_bonus(unit)
+    }
+
     fn has_path(&mut self, _: &Sim<'_>, unit: UnitId) -> bool {
         self.x.has_path(unit)
+    }
+
+    /// Player event 0 in attack, cast and skill modes (`0x00580460`,
+    /// `units.md` §4.5), through [`Pending::action_frame`].
+    fn player_action_frame(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) -> u32 {
+        X::action_frame(self, sim, unit, a1, a2)
+    }
+
+    /// Monster mode functions (`units.md` §4.6): the death start
+    /// `0x005A6FF0` goes to [`Pending::monster_death_start`] with the
+    /// mode change's target; every other function keeps the default
+    /// (started, nothing done: monster spec).
+    fn monster_mode_function(&mut self, sim: &mut Sim<'_>, unit: UnitId, address: u32) -> bool {
+        if address == MONSTER_MODES[0].start {
+            let target = self.mode_target;
+            return X::monster_death_start(self, sim, unit, target);
+        }
+        true
     }
 
     /// `0x0057C980`: the unit's own entries leave its combat list
