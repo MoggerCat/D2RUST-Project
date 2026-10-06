@@ -225,7 +225,6 @@ impl Cells {
 /// the players allocated at their spawn points.
 struct Host {
     fx: Fx,
-    rooms: Vec<RoomId>,
     players: Vec<UnitId>,
     /// The static grid (before any unit): (x, y) → bits.
     base: Cells,
@@ -310,12 +309,7 @@ fn host(s: &Setup) -> Host {
             .add_client(Some(p), None, client_state::IN_GAME);
         players.push(p);
     }
-    Host {
-        fx,
-        rooms,
-        players,
-        base,
-    }
+    Host { fx, players, base }
 }
 
 impl Host {
@@ -387,7 +381,8 @@ fn footprint(pattern: u32, mask: u16, x: i32, y: i32) -> Vec<(i32, i32, u16)> {
     let boxed: Vec<(i32, i32)> = (-1..=1)
         .flat_map(|dy| (-1..=1).map(move |dx| (dx, dy)))
         .collect();
-    let (cells, marker, marked): (Vec<(i32, i32)>, u16, &[(i32, i32)]) = match pattern {
+    type Shape<'a> = (Vec<(i32, i32)>, u16, &'a [(i32, i32)]);
+    let (cells, marker, marked): Shape<'_> = match pattern {
         0 => (vec![(0, 0)], 0, &[]),
         1 => (plus.to_vec(), bits::NO_PATH, &plus[..1]),
         2 => (boxed, bits::NO_PATH, &plus[..]),
@@ -1173,7 +1168,7 @@ fn regress_a_client_keeps_the_players_rooms_active() {
     // M08: the same game without the client loses the room.
     let mut h = host(&plain(1, 0, Vec::new()));
     let c = h.fx.game.lists.clients().first().copied().expect("client");
-    h.fx.game.lists.remove_client(c);
+    h.fx.game.lists.remove_client(c).expect("removed");
     for _ in 0..300 {
         tick(&mut h.fx);
     }

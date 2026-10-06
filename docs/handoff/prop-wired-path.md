@@ -4,8 +4,8 @@
 
 Cloud test session, 2026-10-06. Task class: property tests from specs plus
 root-cause fixes, medium effort (METHODS M14). Base:
-`claude/tender-meitner-mphas3` at `99b1e72`, merged up to the latest base
-before the gate (§6). Repo only, synthetic tables and DS1s, no game files
+`claude/tender-meitner-mphas3` at `99b1e72`, merged with its head `6cd6480`
+before the gate (§8). Repo only, synthetic tables and DS1s, no game files
 (M09). Inputs read: `specs/sim/pathing.md` §1, §8–§10,
 `specs/sim/path-placement.md` §3–§12, `specs/monsters/population.md`
 §9, §11, `specs/sim/intents-events.md` §2.4, `specs/drlg/levels.md` §10,
@@ -86,6 +86,7 @@ in any run.
 | 3 | A monster whose room tick step 9 deactivated leaves the room list but keeps its path record and footprint | the compress to inactive storage (`0x005433F0`) is not specified (`unit-order.md` OQ 3); `TickHooks::compress_unit` is a no-op. The property skips such monsters (their last footprint is still allowed in a neighbour's grid) | `regress_a_deactivated_room_leaves_its_monster_path_record` |
 | 4 | Two players warped to ISLE land on the same point | the teleport stamps from the old room's lookups (path core reading of §6 r4; open point `wire-path-sim.md` §6: which room `0x00650910` passes to `0x0064EFA0`); the first player's spawn room is not adjacent to its old room, so nothing is stamped and the second free search does not see it. The property treats a warped player as unstamped until it next changes cell | `regress_second_warp_lands_on_an_unstamped_player` (a spec answer that stamps from the destination room changes it) |
 | 5 | After 132 ticks a warp's check read the static grid before the spawn room was streamed back in (test mistake) | levels §10.5 makes the room active | `regress_a_warp_streams_its_spawn_room_back_in` |
+| 6 | A monster placed through the coarse free-box search stands outside the room the search returned: from room A (40000, 40080, 40 × 10) around (40008, 40080) with a wall at (40008, 40078), §8 returns A with (40006, 40078), a cell of the room above | the code follows §8's wording: pass 1's row y = 40079 is outside A's rows, so its cell visit reads the room above's rect; pass 2's row y = 40078 is inside "the rect last read" (the room above's), so rule 2 takes `room` (A) as the row room, and the cell is inside A's columns. **PWQ1** (for the spec owner): §8's edge cases could state that the out room need not hold the point, and §10 / population then put a unit in a room that does not hold its cell until its first move (room recache, pathing §9.6 r9). The property exempts such a monster until it changes cell | `regress_coarse_box_room_need_not_hold_the_point` (M08: without the wall pass 1 returns the room above) |
 
 ## 4. M08 (the properties can fail)
 
@@ -108,7 +109,15 @@ a box, walk outcomes `Moving(1..34)` and `Neutral`.
 
 - Release, 400 cases (first op mix): one failure, counterexample 5 (test
   side).
-- Release, 600 cases (with `WalkNear`): HUNT2_RESULT.
+- Release, 600 cases (with `WalkNear`): one failure, counterexample 6
+  (§8 quirk, PWQ1).
+- Release, 600 cases after the exemption: clean (71 s).
+- Release, 2,500 cases: clean (283 s).
+
+Nightly: `tools/props-deep.sh` runs every d2-sim `prop_*` binary at 20,000
+debug cases in its `sim` group; this file takes ~2 s per debug case, so it
+is moved to a group of its own, `wiredpath` (300 cases, ≈ 11 min), and
+`.github/workflows/nightly-props.yml` gains that matrix entry.
 
 ## 6. Not covered, questions
 
@@ -132,7 +141,15 @@ a box, walk outcomes `Moving(1..34)` and `Neutral`.
 
 - `crates/d2-sim/src/wiring/worldgen/population.rs`: PWP1 (two adapter
   methods, provider-gated). No signature change.
+- `tools/props-deep.sh`, `.github/workflows/nightly-props.yml`: the
+  `wiredpath` group (§5); the `sim` group's filter excludes
+  `prop_wired_path`.
 
 ## 8. Gate
 
-GATE_RESULT
+`sh tools/gate.sh all` on this branch after the merge of `6cd6480`
+(2026-10-06, `cargo nextest` installed): **GATE: PASS** — spec_index,
+methods, coverage `--check` / `--selftest`, trace checkers, pre-commit
+selftest, fmt, depcheck (+determinism), workspace clippy, d2-sim +
+conformance (2,042 passed, 107 skipped), the other crates (599 passed),
+d2-client (363 passed), doc-tests.
