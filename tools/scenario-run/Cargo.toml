@@ -15,6 +15,7 @@ d2-formats.workspace = true
 d2-proto.workspace = true
 d2-server.workspace = true
 d2-sim.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 

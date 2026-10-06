@@ -128,6 +128,35 @@ their hashes and the state they were drawn from.
 - `compare.mode` is `"exact"`: the CPU reference's index frame and palette
   must hash to the recorded values (`capture.md` §6).
 
+## Scenario raw recordings (`scenario-raw-0`, provisional)
+
+Written by `tools/trace-recorder/run_scenario.py` to
+`traces/raw/<time>-scenario.jsonl` (gitignored). Provisional: replaced by
+the scenario format of `specs/tools/scenario.md` when that lands. Format
+name `scenario-raw-0`, `format_version` 0; any change in the meaning of a
+record bumps it.
+
+JSON lines, UTF-8, LF. First line `{"type":"header",...}`: `format`,
+`format_version`, `tool`, `date`, `game_exe_sha256`, `scenario` (repo
+path), `scenario_sha256`, `scenario_version`, `seed`, `init_seed`,
+`save`, `class`, `difficulty`, `ticks`, `streams`, `steps`, `args`. Last line
+`{"type":"footer",...}`: `records`, `records_sha256` (SHA-256 of the
+record lines in order), `counts`, `notes`, `ticks`, `injected`.
+
+Records (keys sorted; each has `seq`; no wall-clock time, no thread ids,
+so two runs of one scenario compare byte for byte):
+
+| `type` | Stream | Fields |
+|---|---|---|
+| `tick` (and `tick_end` in `packets`) | always | server tick of the recorded game; `frame` = game +0xA8 after the tick's increment; scenario ticks are these frame numbers |
+| `seed_override` | always | `which` (`time` at 0x52C2BB, `init` at 0x52C2E3), `old`, `new` |
+| `inject` | always | `tick`, `c2s` (hex), `result` (send return, 1 = queued), `via` |
+| `units` | `units` | `tick`, `units`: server units sorted by (`t`, `id`): `id`, `t` type, `cl` class, `m` mode, `x`, `y` (sub-tile), `life`, `mana` (raw full-array values, 1/256 points; null without a stat list) |
+| `c2s`, `c2s_sys`, `dispatch`, `result`, `s2c`, `net`, `client_send`, `client_out`, `drain`, `flush`, `tick_end` | `packets` | as `packets-raw-1` (`record_packets.py`) |
+| `draw`, `seed_set` | `rng` | as `rng-raw-1` (`record_rng.py`) |
+
+`units` at `tick` N is the state after tick N completed.
+
 ## Scenario traces
 
 A scenario trace is what one runner (the original 1.14d or d2rs)
@@ -223,4 +252,6 @@ that states the bytes are unwritten or clock values, as
 | 1 | 2026-10-05 | Initial format. |
 | 1 | 2026-10-06 | Added §Render captures (new area and kind, no bump; its payload carries `capture_format` 1). |
 | 1 | 2026-10-06 | §Render captures payload `capture_format` 2 (raw `frames-raw-2`, `record_frames.py` 0.2.0): `seq`, cursor, level, seeds, light, weather and the optional draw log; images named by `seq`. Readers keep accepting 1. |
+| 1 | 2026-10-06 | §Scenario raw recordings (`scenario-raw-0`, provisional; no bump to the trace format). |
+
 | 1 | 2026-10-06 | Added §Scenario traces: a separate JSON-lines kind with its own version (`scenario-trace` 1); format-1 traces unchanged. |
