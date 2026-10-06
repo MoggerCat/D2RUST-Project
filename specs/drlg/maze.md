@@ -23,20 +23,20 @@
 | Outputs / state changes | 66–74 |
 | Rules | 75–76 |
 |   1. lvlmaze row and level init | 77–91 |
-|   2. Cells, sides and links | 92–119 |
-|   3. Cell primitives | 120–237 |
-|   4. Generation sequence (`0x00673B30`, D2MOO `DRLGMAZE_GenerateLevel`) | 238–280 |
-|   5. Layout builders | 281–355 |
-|   6. Special cells by level | 356–438 |
-|   7. Placement against a neighbouring preset level | 439–477 |
-|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 478–495 |
-|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 496–519 |
-| Constants & data dependencies | 520–533 |
-| Randomness | 534–569 |
-| Edge cases & original bugs | 570–595 |
-| Test vectors | 596–610 |
-| Provenance | 611–663 |
-| Open questions | 664–677 |
+|   2. Cells, sides and links | 92–122 |
+|   3. Cell primitives | 123–242 |
+|   4. Generation sequence (`0x00673B30`, D2MOO `DRLGMAZE_GenerateLevel`) | 243–285 |
+|   5. Layout builders | 286–363 |
+|   6. Special cells by level | 364–446 |
+|   7. Placement against a neighbouring preset level | 447–495 |
+|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 496–513 |
+|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 514–546 |
+| Constants & data dependencies | 547–560 |
+| Randomness | 561–596 |
+| Edge cases & original bugs | 597–622 |
+| Test vectors | 623–637 |
+| Provenance | 638–690 |
+| Open questions | 691–704 |
 <!-- /index -->
 
 ## Summary
@@ -108,7 +108,10 @@ draw and the merge draw, which use DRLG room seeds.
    (`drlg/rooms.md`). "List order" below always means newest first.
 4. Linking P to N in direction d (`0x0066B5E0`, `drlg/rooms.md`) gives P
    a link (N, d) and N a link (P, (d+2) mod 4), each only if that room
-   has no link to the other yet. Lock is not touched.
+   has no link to the other yet. Lock is not touched. Each new link is
+   **prepended** to the room's link list (`0x0066B560`; P's first, then
+   N's), so a link list is newest first; record layout `drlg/rooms.md`
+   §1 (room +0x00).
 5. **Overlap test** (`0x0066B800`, margin m): for rects A, B, the gap dx
    = B.x − A.w − A.x if A.x < B.x, else A.x − B.w − B.x; dy likewise on
    y/h. A and B "collide at margin m" when dx < m and dy < m.
@@ -217,7 +220,9 @@ advance r.
 `CheckIfMayPlaceAdjacentPresetRoom`): false at once if P is locked or P
 already has a link with direction d. Otherwise Allocate, Place test; on
 success link, add, pick the new cell, then free it (net: P unchanged,
-room count unchanged). Returns whether the place test passed. Cost: one
+room count unchanged: freeing a room removes, for each of its links with
+the init flag, the matching link from the neighbour's list,
+`drlg/rooms.md` §2.1, so P loses the link it just gained). Returns whether the place test passed. Cost: one
 allocation (2 steps) whenever it gets past the first checks.
 
 Extreme-cell finders walk the list in order, keeping a best cell; a
@@ -323,8 +328,11 @@ parent F, place cells k = 0 … 14 by "grow" (merge on) in direction
 k ∈ {2, 12}, +1 for k ∈ {7, 9}, +2 for k ∈ {10, 11, 13, 14}. Each new
 cell becomes the parent of the next, except cells k = 8 and k = 12, which
 are dead ends: the next cell grows from the previous parent (9 from 7,
-13 from 11). Afterwards every kept cell except k = 8 and k = 12 gets
-file = (r + b) mod 4 (slot index / 15), and F gets file 4. Cells 8 and
+13 from 11). The kept cells are recorded in a 60-slot array (slot
+15·b + k; rejected cells and k = 8, 12 leave 0). **After all four
+branches** a separate pass gives every recorded cell file = (r + slot /
+15) mod 4 = (r + b) mod 4, then F gets file 4. A file reset to −1 by a
+later branch's merge is therefore overwritten for every recorded cell. Cells 8 and
 12 keep file −1. A rejected grow leaves a null parent (crash; never
 happens). Total 1 + 60 cells = lvlmaze `Rooms` 61.
 
@@ -449,7 +457,17 @@ preset direction (L's preset data +4, `drlg/preset.md` owner).
 | 2 | smallest x, probe W | dir 0, def 167 | 2 | dir 0 | (L.x + L.w − C.x, L.y + L.h/2 − C.y + 1) |
 
 C is the new court cell; its link to L is a cross-level link without
-the init flag (`0x0066B790`, `drlg/rooms.md`); halves truncate toward
+the init flag (`0x0066B790`): a link record whose target field is the
+**level** L itself (not a room) and whose box is L's rect (level +0x1C:
+x, y, w, h), init flag 0. It is not prepended but inserted in order
+(`0x0066B720` with comparator `0x0066B6A0`): before the first record,
+from the second on, that it precedes, where a precedes b when a.dir <
+b.dir, or the directions are equal and by box: dir 0 a.y < b.y, dir 1
+a.x > b.x, dir 2 a.y > b.y, dir 3 a.x < b.x; an empty list takes it as
+head; with one record it goes before or after the head by the
+comparator; with more, the head is never displaced. Being init 0 it is
+never copied to a built room (§9 step 4) nor removed from a neighbour
+on free; halves truncate toward
 zero; SizeX/SizeY are the Barracks lvlmaze sizes (10 × 14). A null C
 crashes (D2MOO notes the same). Then one level-seed step: if `lo'` is
 odd stamp barracks_next[q] then barracks_forge[q+1]; if even stamp
@@ -508,10 +526,19 @@ For each cell (list order):
    value v = `roll(n)` on the level seed (`0x0045C3E0`), prepended to
    the list. Then v := (v + 1) mod n (signed) and the map's file := v.
    Otherwise the default from step 1 stays.
-3. Build the DS1 into room(s) (`0x00667ED0`, `drlg/preset.md`) with the
-   "small" flag set when the cell's w ≤ 12 and h ≤ 12.
-4. For every link of the cell with the init flag, link the built room to
-   that neighbour with the same direction; free the cell.
+3. Build the DS1 into room(s) (`0x00667ED0`, `drlg/preset.md`) with
+   room flags F = 0 and the single-room flag set when the cell's w ≤ 12
+   and h ≤ 12.
+4. For every link of the cell with the init flag (link list order,
+   newest first), link the **room BuildArea returned** (the last room
+   built: in multi-room mode the room of the last row's last column) to
+   that neighbour with the same direction (`0x0066B5E0`); then free the
+   cell (`0x0066C100`, `drlg/rooms.md` §2.1), which removes its links and
+   the neighbours' links back to it. A neighbour that was a cell already
+   built is no longer in the list: its own build moved its link to its
+   built room, so the link resolves to that room. A neighbour still to
+   be built gets a link to the new room, which its own step 4 later
+   copies to its built room.
 
 Effect: plain cells of one shape cycle through that def's files, the
 first one at (roll(Files) + 1) mod Files. Special, theme and fixed cells

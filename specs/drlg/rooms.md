@@ -27,22 +27,22 @@
 | Inputs | 63–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–117 |
-|   2. DRLG room creation and seeds (`0x0066B3E0`) | 118–135 |
-|   3. Rooms-near arrays (`0x0066C370`) | 136–179 |
-|   4. Status and activation | 180–278 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 279–301 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 302–317 |
-|   7. Room clients and the inactivity counter | 318–338 |
-|   8. Deactivation (tick step 9) | 339–358 |
-|   9. Room tile grid | 359–895 |
-|   10. Collision map from tiles | 896–974 |
-| Constants & data dependencies | 975–989 |
-| Randomness | 990–1007 |
-| Edge cases & original bugs | 1008–1025 |
-| Test vectors | 1026–1073 |
-| Provenance | 1074–1093 |
-| Open questions | 1094–1133 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–118 |
+|   2. DRLG room creation and seeds (`0x0066B3E0`) | 119–151 |
+|   3. Rooms-near arrays (`0x0066C370`) | 152–195 |
+|   4. Status and activation | 196–294 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 295–317 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 318–333 |
+|   7. Room clients and the inactivity counter | 334–354 |
+|   8. Deactivation (tick step 9) | 355–374 |
+|   9. Room tile grid | 375–911 |
+|   10. Collision map from tiles | 912–990 |
+| Constants & data dependencies | 991–1005 |
+| Randomness | 1006–1023 |
+| Edge cases & original bugs | 1024–1041 |
+| Test vectors | 1042–1089 |
+| Provenance | 1090–1109 |
+| Open questions | 1110–1149 |
 <!-- /index -->
 
 ## Summary
@@ -83,6 +83,7 @@ DRLG room (0xEC bytes):
 
 | Offset | Field |
 |---|---|
+| +0x00 | link list ("orths"; node 0x18 bytes: +0x00 target room, or the level for a cross-level link, +0x04 direction 0..3, +0x08 extra, +0x0C init flag, +0x10 target box (x, y, w, h), +0x14 next) |
 | +0x04 | `dwInitSeed` (u32) |
 | +0x08, +0x2C | rooms-near array pointer, count |
 | +0x0C | status reference counts, u16 × 4 (statuses 0..3) |
@@ -132,6 +133,21 @@ order:
 So room k of a level (k-th creation) has a seed fixed by the level seed
 and k. Rooms are never re-seeded from the level later: activation resets
 the room seed to `init_low(dwInitSeed)` (§4.4).
+
+#### 2.1 Room free (`0x0066C100`)
+
+No draws. In order: free the warp links (`0x0066B4F0`); free the
+rooms-near array (+0x08, count +0x2C := 0); free the type data (type 1
+`0x0067D610`, type 2 `0x006665B0`); free each preset unit (+0x5C); for
+each link of the room's list (+0x00, list order) with init flag 1 and
+target N: remove from this room's list, then from N's list, the first
+init-1 link whose target is the other room (`0x0066B610`); free the
+remaining links (`0x0066B530`); unlink the room from its level's list
+(level +0x10, next +0x24) and decrement the level's room count (+0x08)
+when it was found; free the tile grid (`0x0066F0B0`) and the logical
+rooms (`drlg/levels.md` §11); free the room. Links without the init
+flag (cross-level links, `drlg/maze.md` §7.1) are dropped from this
+room only.
 
 ### 3. Rooms-near arrays (`0x0066C370`)
 
