@@ -2,7 +2,7 @@
 
 - **Status:** draft: think scheduling, dispatch, AI tables and the
   shared helpers read from the 1.14d `Game.exe` (addresses below; AI
-  tables dumped from the file); 28 AI functions read in full; think
+  tables dumped from the file); 33 AI functions read in full; think
   intervals checked against 4,409 recorded type-2 runs in three tick
   recordings (mode-end re-think: 79/79 at aidel; no rule contradicted).
 - **Target version:** 1.14d
@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1208 |
-|   10. The catalogue `ai-functions.tsv` | 1209–1229 |
-| Constants & data dependencies | 1230–1253 |
-| Randomness | 1254–1275 |
-| Edge cases & original bugs | 1276–1311 |
-| Test vectors | 1312–1398 |
-| Provenance | 1399–1436 |
-| Open questions | 1437–1474 |
+|   9. Per-AI behaviours | 633–1343 |
+|   10. The catalogue `ai-functions.tsv` | 1344–1364 |
+| Constants & data dependencies | 1365–1388 |
+| Randomness | 1389–1410 |
+| Edge cases & original bugs | 1411–1452 |
+| Test vectors | 1453–1541 |
+| Provenance | 1542–1581 |
+| Open questions | 1582–1619 |
 <!-- /index -->
 
 ## Summary
@@ -1206,6 +1206,141 @@ last think".
 
 1.14d-confirmed; same as D2MOO.
 
+#### 9.25 HellMeteor (33) `0x005F56D0`
+
+Brackets: hellmeteor Normal [50, 50, 10]; `Skill1` HellMeteor in A1.
+
+1. `Skill1` ≥ 0 and P(aip1) [50]: x = own x − aip3 + `roll(2·aip3)`,
+   then y = own y − aip3 + `roll(2·aip3)` (`0x0045C3E0`, two draws, x
+   first); use `Skill1` in `Sk1mode`, no target, at (x, y). End.
+2. Idle aip2 [50] (also when `Skill1` < 0, without a draw).
+
+1.14d-confirmed.
+
+#### 9.26 SandRaider (8) `0x005F0700`
+
+Brackets: sandraider1 Normal [40, 70, 75, 70, 18, 0, 50]; `Skill1` Fire
+Hit. AI params: 0 = charge counter, 1 = charged, 2 = help searches.
+States 90 (blue) and 91 (red) and overlays 150 (sricehit) and 46
+(srfirehit) by aip6: 1 → blue / sricehit, else red / srfirehit.
+
+1. Param 0 = 0: clear states 90 and 91 (`0x00639DB0(unit, s, 0)`,
+   `sim/stat-lists.md` §9.2); param 1 := 0.
+2. Param 0 += 1. Param 0 = aip5 [18]: start the overlay
+   (`0x00621E40(unit, overlay, 0)`, stat 178 `unit_dooverlay`); idle
+   `aidel` + 1 (monstats +79 + difficulty, a byte read with no game-type
+   gate). End.
+3. Param 0 > aip5: set the state (on); param 1 := 1.
+4. Param 2 < 7 and own life percent < aip1 [40]: scan 1 (§5.4, every
+   unit of the adjacent rooms) for the nearest other monster with
+   alignment 0 (`0x006259B0`) that is not in mode 0 or 12
+   (`0x0063EA40`), by squared distance (`0x005B0BD0`, strictly smaller
+   wins). Found → walk to it (flags 0), end. Else param 2 += 1.
+5. D > 4, param 1 = 0 and P(aip2) [70] → circle 0 at T (no delete).
+   End.
+6. Not C: param 1 = 0 and P(aip4) [70] fails → rest (step 8); else walk
+   to T (flags 0). End.
+7. C: param 1 = 1 and `Skill1` ≥ 0 → `Skill1` in `Sk1mode` at T, params
+   0, 1 := 0, end. P(aip3) [75] → `roll(100)` < aip7 [50] → A2, else A1,
+   at T; end. Else rest.
+8. Rest: k = max(24 − aip5, 6); param 0 > aip5 + k → params 0, 1 := 0.
+   Idle 15.
+
+So a raider charges for aip5 thinks, glows, hits once with `Skill1`,
+and the counter resets after a further k thinks without a hit.
+1.14d-confirmed.
+
+#### 9.27 Baboon (11) `0x005F0CD0`
+
+Brackets: baboon1 Normal [33, 20, 55, 0, 1]. AI params: 0 = regen
+countdown, 1 = "attacked", 2 = hpregen bonus added. L = own life
+percent. v = `Run` × 100 / `Velocity` (signed, truncating; monstats
++52, +50) − 100, clamped to 0..120, and 0 when `Velocity` ≤ 0 or the
+quotient < 100. "Stat 74" is `hpregen`, read with `0x00625480(unit, 74,
+0)` and written with `0x00627260(unit, 74, value, 0)`.
+
+1. Param 0 ≠ 0 (regenerating):
+   1. Param 0 −= 1; param 1 := 0. Param 0 = 0 or L > 75 → stat 74 :=
+      stat 74 − param 2 (param 2 is kept).
+   2. Not C: L > 75 → param 0 := 0, velocity request (13, v, 0), lunge
+      (`0x005DED40(T, 7)`), end; else step 4.
+   3. C: draw `lo' % 100` < 33 → draw `lo' % 100` < aip4 [0] → A1, else
+      A2, at T; end. Else step 4.
+   4. D ≥ 24 and AI state not 3/19: `roll(100)` < 33 → circle 4 at T
+      (no delete); then idle 20 in either case (the idle's neutral mode
+      request ends the circle walk at once). End.
+   5. Velocity (2, v, 0); escape from T by 15 with think delete; started
+      → end. Not C → wander 5; C → `roll(100)` < aip4 → A1, else A2.
+2. Param 0 = 0:
+   1. Not C → lunge (`0x005DED40(T, 7)`, no velocity request). End.
+   2. C from here. AI state 3/19: if L < aip1 [33] and `roll(100)` < 50: param 0 :=
+      `roll(5)` + 2; R = stat 74; R ≠ 0 → param 2 := aip5 × R / 8
+      (signed, rounding toward 0) and stat 74 := R + param 2; R = 0 →
+      param 2 := 0. Velocity (2, v, 0); escape from T by 15 (no delete).
+      End. Else if param 1 ≠ 0 and `roll(100)` < 20: circle 3 at T (no
+      delete), param 1 := 0, end.
+   3. Param 1 ≠ 0 and P(aip3) [55] fails: `roll(100)` < aip2 [20] →
+      circle 3 at T (no delete) and param 1 := 0; then idle 15. End.
+   4. Param 1 := 1; P(aip4) → A1, else A2, at T.
+
+1.14d-confirmed. Bug kept: step 1.4 starts a circle and then idles in
+neutral mode over it.
+
+#### 9.28 SandMaggot (15) `0x005F1800`, alternate `0x005F1750`
+
+Target mode 4 (§2.3). Brackets: sandmaggot1 Normal [35, 35, 2, 75,
+120]; `Skill1` MagottUp, `Skill2` MagottDown, `Skill3` MagottLay. AI
+params: 0 = state (0–2 above ground; 1 just surfaced or laid, 2 circled;
+3 burrowed), 1 = frame before which it does not burrow or surface
+again, 2 = eggs laid. "Wait N" = `0x005DE130(N)` (§1.2). S, E as in
+§9.19. "Burrow (X)" = `Skill2` in `Sk2mode` at X with (0, 0); wait 30;
+param 1 := frame + aip5; state := 3.
+
+1. State < 3, T = 0: if (no S or E > 10), frame > param 1 and `Skill2` ≥
+   0 → burrow (no target), end. Otherwise go to step 3.
+2. State = 3: unless T ≠ 0, or S with E < 16: wait 20, end. If frame >
+   param 1 and `Skill1` ≥ 0: `Skill1` in `Sk1mode` at T with (0, 0);
+   wait 25; param 1 := frame + aip5; state := 1; end. Else wait 20, end.
+3. Above ground:
+   1. Own life percent < 25, `Skill2` ≥ 0, E < 7, frame > param 1 and
+      `roll(100)` < 20 → burrow (target T). End.
+   2. C and P(aip4) [75] → A1 at T. End.
+   3. S, E < 15 and `roll(100)` < aip2 [35] → A2 at S. End.
+   4. Draw `lo' % 100` < 20 → circle 6 at T (no delete). End.
+   5. Param 2 < aip3 [2] and `roll(100)` < aip1 [35]: state = 2 and
+      `Skill3` ≥ 0 → param 2 += 1, state := 1, `Skill3` in `Sk3mode` at
+      T, wait 20; else circle 6 at T (no delete), state := 2. End.
+   6. Wait 12.
+
+Alternate `0x005F1750` (the think while the AI was re-installed over a
+running one, §3.3): K = command 14 (`0x0058EFA0(14, 0)`). K's param 4 =
+1 and `Skill1` ≥ 0 → `Skill1` in `Sk1mode` at the unit's path target
+(`0x00553540`; 0 when that is the unit itself) with (0, 0), wait 30, K's
+param 4 := 0. Otherwise re-install the AI for the control's current
+state (`0x005B0E00`) keeping AI param 2 across it, then wait 1. No
+draws. 1.14d-confirmed (both).
+
+#### 9.29 Scarab (20) `0x005F2540`
+
+Brackets: scarab1 Normal [75, 50, 15, 35, 20]; `Skill1` Jab. AI param
+0 = "circled".
+
+1. Current command K (`0x0058EE80`). None: if D < 20, the scarab is its
+   own minion owner (`0x0058F0D0`) and P(aip5) [20]: a command of type
+   1 (params 1–4 uninitialised stack, unused) goes to all minions
+   (`0x0058F730`) and to itself (`0x0058EF40`); K := it. Else step 3.
+2. K of type 1: C and `Skill1` ≥ 0 → free the current command,
+   `Skill1` in `Sk1mode` at T, end. Else velocity request (2, 100, 0);
+   walk to T (flags 0); not started → free the current command. End.
+   K of another type: step 3 (K stays).
+3. Not C: param 0 ≠ 0 → velocity (2, 0, 4), walk to T with flags 7,
+   then draw `lo' % 100` > 10 → param 0 := 0; end. Param 0 = 0 → circle
+   0 at T (no delete), param 0 := 1; end.
+4. C: P(aip1) [75] fails → idle aip3 [15]. End. `Skill1` ≥ 0 and
+   P(aip4) [35] → `Skill1` at T. End. P(aip2) [50] → A1, else A2, at T.
+
+1.14d-confirmed.
+
 ### 10. The catalogue `ai-functions.tsv`
 
 One row per AI table index (148 rows), tab-separated, header row:
@@ -1308,6 +1443,12 @@ spec and happen later, when the mode's action frame runs.
     near" (step 3) and uses it for the 5 / 12 tests of steps 5 and 6.
 14. FoulCrowNest ends by requesting death mode on itself with unit flag
     0x20000 (no drop) once it has made aip3 summons.
+15. Vampire uses `Skill1`, `Skill4` (and `Skill2`, `Skill3` under its
+    flags) without testing the skill id for < 0; a row without them
+    requests a skill mode with skill −1 (`0x005DEAD0`).
+16. Secondary searches (`0x005DDC30`) report distance 0x7FFFFFFF when
+    they find nothing; SkeletonMage and SkeletonBow then take their
+    "far" branch.
 
 ## Test vectors
 
@@ -1344,6 +1485,8 @@ think; draws per `rng.md` §2):
 | Vampire [§9.22], state 0, not C, D = 10, L ≥ 33, no S, param 2 = 0 | 51 ≥ 40; 31 < 50 → circle 4 | 87; 64 → idle 10 | 53; 46 → circle 4 | 0 < 40; no F2/F4; no S → walk to T flags 7 |
 | Bighead [§9.23], hurt, D = 10, no S | 51 ≥ 40 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 40 → circle 3 (low byte 46 → method 5) |
 | BloodHawk [§9.24], not C, D = 10, param 0 = 0 | 51 ≥ 30; 31 < 90 → speed −50, wander 4 | 87; 64 → wander 4 | 53; 46 → wander 4 | 0 < 30 → charge: speed 100, steps 10, walk to T |
+| HellMeteor [§9.25], unit at (100, 100) | 51 ≥ 50 → idle 50 | 87 → idle 50 | 53 → idle 50 | 0 < 50: roll(20) 2, 13 → `Skill1` at (92, 103) |
+| Scarab [§9.29], C, D = 25, no command | 51 < 75; 31 < 35 → `Skill1` at T | 87 → idle 15 | 53; 46; 20 < 50 → A1 | 0; 42; 13 → A1 |
 | Npc after steps 1–4 (no class case, no interaction, no command), map AI with 3 nodes | 51 < 66; node 0 | 87 ≥ 66 → 0 (then idle 8) | 53; node 0 | 0; node 2 |
 
 Scheduling (no draws):
@@ -1411,7 +1554,9 @@ Other recorded checks:
   with their helpers: Npc `0x005E6800`, `0x005E6860`, `0x005E68F0`,
   `0x005E6AE0`, `0x005E7080`, map actions `0x005E6DE0`–`0x005E6FC0`;
   `0x005DC480`, `0x005DF680`, `0x005DEF30`, `0x0058EEF0`,
-  `0x00472210`, `0x005FD350`, `0x00573930`, `0x0054CA10`.
+  `0x00472210`, `0x005FD350`, `0x00573930`, `0x0054CA10`,
+  `0x00621F20`, `0x005B0BD0`, `0x0063EA40`, `0x00553540`,
+  `0x00621E40`, `0x00639DB0`, `0x005DDC30`.
 - Tables dumped from the file's .rdata/.data with a PE-section parser:
   AI and special-state tables (`0x0073CA18`, 166 records), monster
   event table `0x006E2490`, mode table `0x006E2260`, inline-think bytes
