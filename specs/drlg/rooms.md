@@ -596,7 +596,7 @@ to the room, flags, chosen DT1 entry, type, next-in-chain, RGB = 0xFF.
 
 **Door preset units** (`0x0066D9E0`, also from step 3): for the levels
 in the 1.14d table at `0x006EEFD0` (level id, first, last), the door
-table at `0x006EF18C` (7 dwords per row: main, sub, right-door flag, unit
+table at `0x006EF188` (7 dwords per row: main, sub, right-door flag, unit
 id, unit type, dx, dy) gives a unit at the cell's sub-tile position plus
 (dx, dy), placed when inside the room's sub-tile rectangle. **RNG:**
 object ids 91–92 only: `roll(3)` on the room seed (`0x0066DAC1`), the
@@ -1028,7 +1028,7 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 9. `map-preview.md` OQ 3 (8 visible-flagged invisible tiles in
    `townN1.ds1`): the tile build does not hide them (§9.10); the cause is
    in the client draw path (Phase 6).
-10. Door tables `0x006EEFD0` / `0x006EF18C` (§9.5) not transcribed; needed
+10. Door tables `0x006EEFD0` / `0x006EF188` (§9.5) not transcribed; needed
     for levels with door units.
 11. Collision build (§10.4) reads each listed room's grid header: confirm
     the new room's own header is allocated before the loop
