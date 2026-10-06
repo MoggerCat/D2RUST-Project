@@ -173,7 +173,7 @@ fn pin_head_vectors() {
 
 // ---- §5 PantherWoman, §2 PantherJavelin ---------------------------------
 
-// Covers: specs/monsters/ai-bodies-2.md §5 text, §5 r1, §5 r2, §5 r3, §5 r4, §1
+// Covers: specs/monsters/ai-bodies-2.md §5 text, §5 r1, §5 r2, §5 r3, §5 r4
 #[test]
 fn panther_woman_vectors() {
     let pw = [70, 70, 8, 6, 0];
