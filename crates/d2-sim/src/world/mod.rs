@@ -10,6 +10,7 @@
 
 pub mod cube;
 pub mod npc;
+pub mod objects;
 pub mod quests;
 pub mod vendors;
 pub mod waypoints;
