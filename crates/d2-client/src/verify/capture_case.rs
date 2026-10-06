@@ -56,9 +56,11 @@ pub fn capture_case_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("capture-cases")
 }
 
-/// One frame to render: the record, its state and the frame captured just
-/// before it, when that one is the previous draw (the original keeps the
-/// pixels a frame does not write, `composition.md` §3, §6).
+/// One frame to render: the record, its state and the initial
+/// framebuffer (capture.md §6): the captured frame `seq − 1` of a
+/// recording made with `--every 1`, the previous in-game draw (the
+/// original keeps the pixels a frame does not write, `composition.md` §3).
+/// `None` otherwise: the frame cannot be composed.
 pub struct SceneJob<'a> {
     pub case: &'a str,
     pub frame: &'a Frame,
@@ -175,8 +177,12 @@ pub fn run_capture(
     };
     let refused = raw.frames.iter().filter(|f| f.captured().is_none()).count();
     report.lines.push(format!(
-        "raw {}: {} frames ({refused} refused), {} ticks; {}; Game.exe {}",
+        "raw {} ({}): {} frames ({refused} refused), {} ticks; {}; Game.exe {}",
         raw_path.display(),
+        match raw.format {
+            capture::RawFormat::Raw1 => capture::FORMAT_1,
+            capture::RawFormat::Raw2 => capture::FORMAT_2,
+        },
         raw.frames.len(),
         raw.ticks.len(),
         raw.header.tool,
@@ -192,8 +198,8 @@ pub fn run_capture(
             "flag: {} ticks carry more than one frame (capture.md §4)",
             repeated.len()
         ));
-        for (tick, draws) in repeated.iter().take(SHOWN) {
-            report.lines.push(format!("  tick {tick}: draws {draws:?}"));
+        for (tick, seqs) in repeated.iter().take(SHOWN) {
+            report.lines.push(format!("  tick {tick}: frames {seqs:?}"));
         }
     }
     if perturb_n > 0 {
@@ -230,8 +236,8 @@ fn stability(raw: &Raw, images: &Path, perturb_n: usize, lines: &mut Vec<String>
             };
             if (i64::from(image.width), i64::from(image.height)) != (f.w.into(), f.h.into()) {
                 return Status::Error(format!(
-                    "draw {}: PNG is {}x{}, the record {}x{}",
-                    c.draw, image.width, image.height, f.w, f.h
+                    "frame {}: PNG is {}x{}, the record {}x{}",
+                    f.seq, image.width, image.height, f.w, f.h
                 ));
             }
             saved += 1;
@@ -241,13 +247,13 @@ fn stability(raw: &Raw, images: &Path, perturb_n: usize, lines: &mut Vec<String>
             }
             hash = capture::sha256_hex(&image.indices);
             if hash != c.index_sha256 {
-                rehash_bad.push(c.draw);
+                rehash_bad.push(f.seq);
             }
             if c.state.clear_counter > 0 && image.indices.iter().any(|&b| b != 0) {
-                zero_bad.push(c.draw);
+                zero_bad.push(f.seq);
             }
         }
-        hashed.push((c, hash));
+        hashed.push((f.seq, c, hash));
     }
     if perturb_n > saved {
         return Status::Error(format!(
@@ -261,14 +267,14 @@ fn stability(raw: &Raw, images: &Path, perturb_n: usize, lines: &mut Vec<String>
         "re-hash: {} of {saved} frames differ from their record",
         rehash_bad.len()
     ));
-    for d in rehash_bad.iter().take(SHOWN) {
+    for q in rehash_bad.iter().take(SHOWN) {
         lines.push(format!(
-            "  draw {d}: PNG index hash differs from index_sha256"
+            "  frame {q}: PNG index hash differs from index_sha256"
         ));
     }
     if !zero_bad.is_empty() {
         lines.push(format!(
-            "clear: {} frames with clear_counter > 0 are not all index 0, draws {:?}",
+            "clear: {} frames with clear_counter > 0 are not all index 0, frames {:?}",
             zero_bad.len(),
             &zero_bad[..zero_bad.len().min(SHOWN)]
         ));
@@ -276,11 +282,11 @@ fn stability(raw: &Raw, images: &Path, perturb_n: usize, lines: &mut Vec<String>
     lines.push(format!("stability: {st}"));
     for g in st.differing().take(SHOWN) {
         lines.push(format!(
-            "  key {:?}: {} frames, {} different images, draws {:?}",
+            "  key {:?}: {} frames, {} different images, frames {:?}",
             g.key,
-            g.draws.len(),
+            g.seqs.len(),
             g.hashes.len(),
-            &g.draws[..g.draws.len().min(SHOWN)]
+            &g.seqs[..g.seqs.len().min(SHOWN)]
         ));
     }
     let mut why = Vec::new();
@@ -346,18 +352,26 @@ fn compare_frames(
         .collect();
     // Default: every captured frame but the first, whose uncleared rows
     // come from frames before the recording (capture.md edge cases).
-    let selected: Vec<usize> = if case.draws.is_empty() {
+    let selected: Vec<usize> = if case.seqs.is_empty() {
         (1..captured.len()).collect()
     } else {
         let mut sel = Vec::new();
-        for d in &case.draws {
-            match captured.iter().position(|(_, c)| c.draw == *d) {
+        for q in &case.seqs {
+            match captured.iter().position(|(f, _)| f.seq == *q) {
                 Some(i) => sel.push(i),
-                None => return Status::Error(format!("draw {d} is not a captured frame")),
+                None => return Status::Error(format!("frame {q} is not a captured frame")),
             }
         }
         sel
     };
+    // capture.md §6: the initial framebuffer is frame seq − 1, only when
+    // every in-game draw was captured.
+    let every_draw = raw.capture.as_ref().is_some_and(|m| m.every_draw());
+    if !every_draw {
+        lines.push(
+            "initial framebuffer: none (the recording is not --every 1, capture.md §6)".into(),
+        );
+    }
     if selected.is_empty() {
         return Status::Error("no frame to compare (a capture needs at least two)".into());
     }
@@ -369,19 +383,20 @@ fn compare_frames(
         let (frame, c) = captured[k];
         let image = match capture::read_image(images, c).and_then(|(_, img)| {
             img.check(frame, c)
-                .map_err(|e| format!("draw {}: {e}", c.draw))?;
+                .map_err(|e| format!("frame {}: {e}", frame.seq))?;
             Ok(img)
         }) {
             Ok(img) => img,
             Err(e) => return Status::Error(e),
         };
-        // The previous draw, when it was captured: from the run before when
+        // Frame seq − 1, when it was captured: from the run before when
         // consecutive, else read on demand.
-        let prev = match (previous.take(), c.draw.checked_sub(1)) {
-            (Some((d, img)), Some(p)) if d == p => Some(img),
-            (_, Some(p)) => match captured.iter().find(|(_, pc)| pc.draw == p) {
+        let want = frame.seq.checked_sub(1).filter(|_| every_draw);
+        let prev = match (previous.take(), want) {
+            (Some((q, img)), Some(p)) if q == p => Some(img),
+            (_, Some(p)) => match captured.iter().find(|(pf, _)| pf.seq == p) {
                 Some((pf, pc)) => match capture::read_image(images, pc).and_then(|(_, img)| {
-                    img.check(pf, pc).map_err(|e| format!("draw {p}: {e}"))?;
+                    img.check(pf, pc).map_err(|e| format!("frame {p}: {e}"))?;
                     Ok(img)
                 }) {
                     Ok(img) => Some(img),
@@ -413,7 +428,8 @@ fn compare_frames(
         if show && shown < SHOWN {
             shown += 1;
             lines.push(format!(
-                "draw {} (tick {}, raw line {})",
+                "frame {} (draw {}, tick {}, raw line {})",
+                frame.seq,
                 c.draw,
                 frame.tick.map_or("none".into(), |t| t.to_string()),
                 frame.line
@@ -421,7 +437,7 @@ fn compare_frames(
             lines.extend(frame_lines.into_iter().map(|l| format!("  {l}")));
         }
         status = worse(status, frame_status);
-        previous = Some((c.draw, image));
+        previous = Some((frame.seq, image));
     }
     lines.push(format!(
         "frames: {passed} match, {failed} differ or fail, {not_wired} scene not wired"
