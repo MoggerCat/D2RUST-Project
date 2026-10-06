@@ -15,5 +15,8 @@ d2-proto.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+d2-formats.workspace = true
+
 [lints]
 workspace = true
