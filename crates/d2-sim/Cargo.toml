@@ -21,3 +21,18 @@ unsafe_code = "forbid"
 all = { level = "warn", priority = -1 }
 # Determinism (CLAUDE.md rule 6): no floats in game logic.
 float_arithmetic = "deny"
+
+
+[dev-dependencies]
+criterion.workspace = true
+# The benches reuse the unit tests' synthetic fixtures (`bench_fixtures`).
+d2-sim = { path = ".", features = ["bench-fixtures"] }
+
+[[bench]]
+name = "sim"
+harness = false
+
+[features]
+# Exposes the synthetic fixtures of the unit tests to `benches/` (criterion);
+# never enabled in a normal build.
+bench-fixtures = []

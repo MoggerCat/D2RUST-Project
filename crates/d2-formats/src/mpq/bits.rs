@@ -76,14 +76,14 @@ pub(crate) const fn build_decode_table<const N: usize>(codes: &[u16], bits: &[u8
 
 /// LSB-first bit writer, the inverse of [`BitReader`]. Used by tests to
 /// build valid streams.
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
 #[derive(Default)]
 pub(crate) struct BitWriter {
     pub(crate) bytes: Vec<u8>,
     bits: u32,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
 impl BitWriter {
     /// Appends the low `n` bits of `v`, least significant first.
     pub(crate) fn write(&mut self, v: u32, n: u32) {

@@ -14,4 +14,15 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
+# The benches build a synthetic archive (`bench_fixtures`).
+d2-formats = { path = ".", features = ["bench-fixtures"] }
 proptest.workspace = true
+
+[[bench]]
+name = "formats"
+harness = false
+
+[features]
+# A synthetic MPQ for `benches/formats.rs`; never enabled in a normal build.
+bench-fixtures = []

@@ -88,8 +88,9 @@ pub fn decrypt(data: &mut [u8], mut key: u32) {
     }
 }
 
-/// Encrypts `data` in place (inverse of [`decrypt`]). Used by tests.
-#[cfg(test)]
+/// Encrypts `data` in place (inverse of [`decrypt`]). Used by tests and the
+/// bench fixtures.
+#[cfg(any(test, feature = "bench-fixtures"))]
 pub fn encrypt(data: &mut [u8], mut key: u32) {
     let mut seed: u32 = 0xEEEE_EEEE;
     for chunk in data.as_chunks_mut::<4>().0 {

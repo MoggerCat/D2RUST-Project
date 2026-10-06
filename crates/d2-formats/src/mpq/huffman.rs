@@ -352,7 +352,7 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
 /// Encodes `data` with weight table `table`, mirroring [`decompress`]'s
 /// tree updates, and appends the end symbol. Test helper for building
 /// valid streams.
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
 pub(crate) fn compress(table: u8, data: &[u8]) -> Vec<u8> {
     use super::bits::BitWriter;
 

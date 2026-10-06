@@ -21,8 +21,9 @@ pub mod props;
 pub mod quality;
 pub mod tables;
 
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
+pub(crate) mod tests;
 
 use crate::rng::Seed;
 

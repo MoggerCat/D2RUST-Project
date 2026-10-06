@@ -32,8 +32,9 @@ pub mod outdoor_presets;
 pub mod population;
 pub mod population_init;
 
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
+pub(crate) mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

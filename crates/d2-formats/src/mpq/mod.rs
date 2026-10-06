@@ -9,6 +9,9 @@
 //! ```
 
 mod adpcm;
+/// A synthetic archive for `benches/` (criterion); not part of the reader.
+#[cfg(feature = "bench-fixtures")]
+pub mod bench_fixtures;
 mod bits;
 pub mod crypto;
 mod explode;
