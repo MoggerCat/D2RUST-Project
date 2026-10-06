@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-06, branch `claude/bold-ptolemy-jvyvxy`: tick, proto, server, parser robustness merged)
+# Handoff (updated 2026-10-06, branch `claude/bold-ptolemy-jvyvxy`: tick, proto, server, parser robustness merged; Phase 6 design drafts on `claude/phase6-design`)
 
 Start here in a fresh session, after `CLAUDE.md`. This file holds state,
 the next steps, the code and command map, and the local run queue. Rules
@@ -15,7 +15,7 @@ rather than restating them.
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
 | 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented against seams (unwired, unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 34 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1 |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
-| 5–6 | not started | |
+| 5–6 | 5 not started here (bridge on `claude/phase5-bridge`); 6 design drafts (`specs/client/*`, 2026-10-06), nothing implemented | |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
@@ -65,6 +65,15 @@ rather than restating them.
    calls). Then run the size vectors of
    `crates/d2-server/src/tests/messages.rs` (`size_vectors`, generic over
    the seam) on the `d2-proto` implementation.
+
+5. **Phase 6 client** (design drafts 2026-10-06 on `claude/phase6-design`):
+   `specs/client/{render-pipeline,assets,ui,audio}.md`, each split into
+   (a) d2rs design and (b) original behavior still to specify. Cloud
+   infrastructure tasks C1–C10 are listed in `docs/PLAN.md` Phase 6 work
+   breakdown (ready now, independent of the `claude/phase5-bridge`
+   bridge work). The local RE specs that unlock fidelity, in order, are
+   listed there too; first: sprite placement, camera, composition domain
+   and a frame-capture recorder (render §B1, §B2, §B7, §B9).
 
 ## 3. Code map
 
@@ -180,6 +189,12 @@ whether the compare is signed; record it as an edge case in `tick.md`.
 `d2-server` reproduces the literal reading (test
 `driver_first_use_and_mask`).
 
+Phase 6 asset budgets (from `specs/client/assets.md` OQ 1, design
+only, no code yet): measure the decoded size (`Σ width × height`) of
+every live DCC/DC6/DT1 frame, per file and in total, and of the files a
+town and a dungeon scene use; record the numbers in `assets.md` §A5 and
+set the default budgets from them.
+
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
 single-player game, kill a few monsters and pick up a drop. Recording
@@ -209,14 +224,16 @@ Simulation core: `specs/sim/tick.md` (tick rate, steps, timer events),
 `sim/unit-order.md` (GUIDs, unit/room/client lists), `sim/intents-events.md`
 (+ `client-messages.tsv`, `server-messages.tsv`). Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
-`specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
+`specs/sim/rng.md`. Phase 6 client design (d2rs-own drafts, original
+behavior listed as unwritten owner specs in each part (b)):
+`specs/client/{render-pipeline,assets,ui,audio}.md`. Each spec's "Open questions" holds its unknowns.
 Carried-over open questions not yet in a spec's list:
 
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
-3. DC6/DCC vertical placement (one-row disagreement between sources).
-4. Meaning of the PL2 rendering tables (Phase 6).
+3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
+4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
    (0x67 at 0x2B/0x2C, 0x68 at 8/0x14); the generator names them
    `unk_43`, `unk_44`, `unk_8`, `unk_20` (offset suffix). A spec session
