@@ -2,9 +2,9 @@
 
 - **Status:** draft: creation (§1), stat points (§2), level-up (§3) and
   the experience table lookups (§4.1) read in full from the 1.14d
-  `Game.exe`; the experience-on-kill level factor (§4.2) read in full;
-  the rest of §4 (experience ratio, party share, hireling experience) is
-  D2MOO 1.10f structure that is only partly confirmed (Open question 2).
+  `Game.exe`; the experience on a kill (§4.2, §4.3: ratio, party share,
+  hireling experience) read in full; the hireling level-up body belongs
+  to the mercenary spec.
   No trace check yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::combat::vitals` (player creation and
@@ -149,8 +149,8 @@ skill reset `0x00570360` (skills spec).
    0x00570850)`, `0x0055F500`, `0x0055FDE0(…, 1)` (client updates),
    host callback `[0x00883D50]+0x2C` if present.
 
-The caller of level-up (§4.3) triggers unit event 12 (`levelup`) after
-it (D2MOO; Open question 2).
+The caller of level-up (§4.3 add, `0x0057E58A`) triggers unit event 12
+(`levelup`) after it.
 
 ### 4. Experience
 
