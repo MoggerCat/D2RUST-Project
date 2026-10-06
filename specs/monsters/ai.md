@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1411 |
-|   10. The catalogue `ai-functions.tsv` | 1412–1432 |
-| Constants & data dependencies | 1433–1456 |
-| Randomness | 1457–1478 |
-| Edge cases & original bugs | 1479–1520 |
-| Test vectors | 1521–1609 |
-| Provenance | 1610–1649 |
-| Open questions | 1650–1687 |
+|   9. Per-AI behaviours | 633–1417 |
+|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
+| Constants & data dependencies | 1439–1462 |
+| Randomness | 1463–1484 |
+| Edge cases & original bugs | 1485–1526 |
+| Test vectors | 1527–1615 |
+| Provenance | 1616–1655 |
+| Open questions | 1656–1693 |
 <!-- /index -->
 
 ## Summary
@@ -1103,7 +1103,7 @@ attacking, 2 backing off), 1 = counter. L = life percent of **T**
 (`0x00621F20(T)`).
 
 1. Current command K (`0x0058EE80`): if K's type is 1 or 14 and the unit
-   it names exists (`0x00552F60`, type param 1, GUID param 2): params 0,
+   it names exists (`0x00552F60`, type param 2, GUID param 1): params 0,
    1 := 0; velocity request (13, 50, 0); walk to that unit (flags 0,
    `0x005DEC80`); free K. End. Any other K: free it and go on.
 2. State 0: C → param 1 := 0, state := 1, P(aip1) [100] → A1 at T, else
@@ -1408,6 +1408,12 @@ quest 4 functions, drehyaiced → Act 5 quest 3 functions:
 No draws. 1.14d-confirmed; same as D2MOO.
 
 Act II bodies (PantherJavelin, GreaterMummy, Mummy, PantherWoman, MaggotLarva, SandLeaper, MaggotEgg, PinHead, ClawViper, Vulture, BatDemon, SandMaggotQueen, Duriel, Summoner) and the special-state thinks 10/17, 11, 12: `monsters/ai-bodies-2.md`.
+
+Act III bodies (Mosquito, ThornHulk, ZakarumZealot, ZakarumPriest, FrogDemon, FetishShaman, HighPriest, FetishBlowgun, WillOWisp, Mephisto) with the FrogDemon and FetishShaman alternates: `monsters/ai-bodies-3.md`.
+
+Act IV bodies (VileMother, VileDog, FingerMage, Regurgitator, Megademon, Diablo with its alternate and the boss target pick and score, Izual, DoomKnight, AbyssKnight, OblivionKnight): `monsters/ai-bodies-4.md`.
+
+Act V bodies (Minion, Imp, Succubus, BloodLord, SuccubusWitch, Overseer, ReanimatedHorde, ClawViperEx, DeathMauler, PutridDefiler, Ancient, AncientStatue, FrozenHorror, SiegeBeast, SuicideMinion, BaalMinion, BaalTaunt, BaalToStairs, BaalThrone, BaalCrab, BaalCrabClone, Nihlathak): `monsters/ai-bodies-5.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 
