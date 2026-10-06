@@ -226,6 +226,13 @@ impl UiRoot {
         &self.outbox
     }
 
+    /// Queues an intent a panel handed out beside its [`UiResponse`] (the
+    /// original panels' outputs, [`super::original`]); it leaves with the
+    /// next [`Self::forward`], after the intents queued before it.
+    pub fn queue_intent(&mut self, intent: ClientIntent) {
+        self.outbox.push(intent);
+    }
+
     pub fn take_intents(&mut self) -> Vec<ClientIntent> {
         std::mem::take(&mut self.outbox)
     }

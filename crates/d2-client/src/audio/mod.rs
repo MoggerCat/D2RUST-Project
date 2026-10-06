@@ -19,6 +19,7 @@
 //!   reading and keeping each file once is ours): `formats/wav.md`.
 
 pub mod calls;
+pub mod driver;
 pub mod environment;
 pub mod log;
 pub mod mixer;

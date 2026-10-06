@@ -31,6 +31,7 @@
 pub mod feed;
 pub mod model_feed;
 pub mod node;
+pub mod panel_art;
 pub mod present;
 pub mod ui_bind;
 
@@ -60,10 +61,10 @@ pub use feed::{
     blank_screen, build_frame, frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
 };
 pub use model_feed::ModelFeed;
-pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
+pub use present::{UiSounds, WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{
-    original_text_font, text_sprites, OriginalTextHooks, TextColors, TextFont, TextHooks, UiQueue,
-    UiRules, UiSprite,
+    original_text_font, run_ui, run_ui_with, text_sprites, OriginalTextHooks, TextColors, TextFont,
+    TextHooks, UiQueue, UiRules, UiRunError, UiSprite,
 };
 
 /// The region composed each frame: the full 800×600 frame. Which part of

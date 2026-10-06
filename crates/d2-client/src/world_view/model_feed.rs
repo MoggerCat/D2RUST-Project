@@ -1,10 +1,12 @@
 // Spec: specs/client/model.md (§3 rule 3, §1 rule 2, §11 rules 3, 5), specs/render/camera.md (§2, §3)
 //! [`ModelFeed`]: the [`ViewFeed`] hooks the client world model answers
 //! (RW2): the local player's position (camera §3) and unit positions
-//! (camera §2), and, given the `Levels.txt` rows, BlankScreen of the
-//! local player's level (`model.md` §11 rule 5). Every other hook (open mode, shake, player seed, unit
-//! offsets, map tiles) goes to the wrapped feed, [`NoFeed`] by default,
-//! until its owner spec is implemented.
+//! (camera §2), given the `Levels.txt` rows, BlankScreen of the local
+//! player's level (`model.md` §11 rule 5), and, once the world view hands
+//! it over, the original UI's open mode (`ui/panels.md` §4.2). Every
+//! other hook (shake, player seed, unit offsets, map tiles, light,
+//! weather) goes to the wrapped feed, [`NoFeed`] by default; why the model
+//! cannot answer them yet is [`PENDING`].
 //!
 //! Positions are the model's cells (`ClientUnit::position`). A moving
 //! unit (players, monsters, missiles) is on a dynamic path: its 16.16
@@ -53,6 +55,41 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
     }
 }
 
+/// The [`ViewFeed`] / model hooks the client model cannot fill yet, each
+/// with the input it lacks (M02: named, never guessed). [`ModelFeed`]
+/// leaves them to `inner` ([`NoFeed`]: none).
+pub const PENDING: &[(&str, &str)] = &[
+    (
+        "ClientWorld::active_rooms",
+        "no client DRLG on the base: the act of `model.md` §12 r1 is not built from the 0x03 \
+         seed, so no room becomes active from 0x07 (§9 r1)",
+    ),
+    (
+        "ViewFeed::near_rooms, ViewSource::map_tiles, ViewFeed::tile_art",
+        "the tiles come from the client DRLG's rooms (`draw-order.md` §9): none",
+    ),
+    (
+        "ViewSource::tile_blocks",
+        "no map tiles (above); walls also need the wall direction and fade state",
+    ),
+    (
+        "ViewFeed::light",
+        "the light map needs room ambients and collision (no client rooms), the act environment \
+         (S→C 0x53 has no client handler), light records and the per-unit look inputs (fade, \
+         ghostly, hover, items, remaps); none is in the model",
+    ),
+    (
+        "ViewFeed::weather_frame",
+        "the weather state needs the player's level presets (no level without active rooms) and \
+         no water floor is drawn without tiles; passes 4 / 9 have no art path yet",
+    ),
+    (
+        "ViewFeed::player_seed, ViewFeed::shake",
+        "the local player's client seed is read-only in the model (`camera.md` open question 6); \
+         no effect spec starts a shake",
+    ),
+];
+
 /// The client world model's answers, over `inner` for the rest.
 #[derive(Debug, Clone, Default)]
 pub struct ModelFeed<F = NoFeed> {
@@ -60,6 +97,9 @@ pub struct ModelFeed<F = NoFeed> {
     /// The `Levels.txt` rows by level id. `None`: BlankScreen goes to
     /// `inner` (the app supplies no rows yet).
     pub levels: Option<Vec<LevelRow>>,
+    /// The original UI's open mode (`ui/panels.md` §4.2), once the world
+    /// view has handed one over; `None`: `open_mode` goes to `inner`.
+    pub ui_open_mode: Option<OpenMode>,
 }
 
 impl<F> ModelFeed<F> {
@@ -67,6 +107,7 @@ impl<F> ModelFeed<F> {
         Self {
             inner,
             levels: None,
+            ui_open_mode: None,
         }
     }
 }
@@ -109,8 +150,17 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             })
     }
 
+    /// `ui/panels.md` §4.2: the UI flags' open mode (camera §1); without
+    /// the original UI, the inner feed's answer.
     fn open_mode(&self, world: &ClientWorld) -> Result<OpenMode, ViewError> {
-        self.inner.open_mode(world)
+        match self.ui_open_mode {
+            Some(m) => Ok(m),
+            None => self.inner.open_mode(world),
+        }
+    }
+
+    fn set_ui_open_mode(&mut self, mode: OpenMode) {
+        self.ui_open_mode = Some(mode);
     }
 
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
@@ -187,6 +237,45 @@ mod tests {
         );
         // The other hooks are still the placeholder's.
         assert!(feed.open_mode(&w).is_err());
+    }
+
+    // Covers: specs/ui/panels.md §4 r2
+    #[test]
+    fn open_mode_is_the_uis_once_handed_over() {
+        let mut feed = ModelFeed::<NoFeed>::default();
+        let w = ClientWorld::default();
+        assert!(
+            feed.open_mode(&w).is_err(),
+            "no UI: the inner feed's answer"
+        );
+        feed.set_ui_open_mode(OpenMode::new(3).unwrap());
+        assert_eq!(feed.open_mode(&w).unwrap().get(), 3);
+        // A feed that ignores the UI keeps its own answer.
+        let mut inner = NoFeed;
+        inner.set_ui_open_mode(OpenMode::new(1).unwrap());
+        assert!(inner.open_mode(&w).is_err());
+    }
+
+    /// The pending hooks answer "nothing" through the app's feed, never a
+    /// guess (M02).
+    // Covers: specs/client/model.md §12 r1, §9 r4
+    #[test]
+    fn pending_hooks_answer_nothing() {
+        let mut feed = ModelFeed::<NoFeed>::default();
+        let w = ClientWorld::default();
+        assert!(w.active_rooms.is_none());
+        assert!(feed.light(&w).unwrap().is_none());
+        assert!(feed.weather_frame(&w).unwrap().is_none());
+        assert!(feed.near_rooms(&w).unwrap().is_none());
+        assert!(feed
+            .map_tiles(
+                &w,
+                &ViewAssets::new(crate::app::play::unspecified_palette())
+            )
+            .unwrap()
+            .is_empty());
+        assert!(feed.player_seed(&w).is_err());
+        assert!(PENDING.len() >= 6);
     }
 
     // Covers: specs/client/model.md §1 r2

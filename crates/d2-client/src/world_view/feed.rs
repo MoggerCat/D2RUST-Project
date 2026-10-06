@@ -63,6 +63,12 @@ pub trait ViewFeed: ViewSource {
     /// TODO(spec: ui/panels.md) (camera §1): the screen open mode.
     fn open_mode(&self, world: &ClientWorld) -> Result<OpenMode, ViewError>;
 
+    /// The screen open mode the UI set for this frame (`ui/panels.md`
+    /// §4.2, [`crate::ui::original::OriginalUi::open_mode`]), handed over
+    /// by the world view before each build when the original UI runs. The
+    /// default ignores it: the feed answers [`Self::open_mode`] itself.
+    fn set_ui_open_mode(&mut self, _mode: OpenMode) {}
+
     /// TODO(spec: the effect specs that call `0x00476A80`) (camera §8):
     /// the shake running at this frame, if any.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError>;

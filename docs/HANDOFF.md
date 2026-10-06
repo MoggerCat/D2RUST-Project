@@ -2825,6 +2825,25 @@ the dev-dependency) and record results here.
     DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
     `music\act1\crypt.wav`) for the C65 files; expect byte equality with
     our `data`.
+76. Original UI on game files (`wire-client-staging`): `D2_GAME_DIR=<install>
+    cargo test -p d2-client --test app_original_ui -- --ignored`. Expect the
+    test to pass: `inventory.bin` has 32 records, record 0 `inv` = (320,
+    640, 0, 441), record 16 = (400, 720, 60, 501) (`ui/panels.md` §Test
+    vectors); `sounds.txt` / `soundenviron.txt` compile; for every class
+    0–6 with character + inventory and character + skill tree open, every
+    DC6 the root draws loads (`PanelArtLoader::ensure`). A file in no
+    archive or a frame past a file's end is a finding for
+    `panel-layout.tsv` / `client/assets.md`, not a reason to skip it.
+77. `play` smoke with the UI and sound layer (`wire-client-staging`):
+    `D2_GAME_DIR=<install> cargo run -p d2-client --release -- play
+    --frames 500`, pressing I, C, T a few times. Expect: no error from the
+    world view or audio frames (a `UI image file`, `sound world: …
+    (pending …)` or `SetUIState` error is a finding); the panels toggle per
+    the conflict table (I then T closes the inventory); the image is still
+    black (the frame palette is `unspecified_palette` until the act
+    palette is wired, `play.rs`), so judge by the log only. Then the
+    capture cases `ui-0001` / `ui-0002` (`ui/panels.md` §Test vectors)
+    once a palette is presented.
 
 Kept entries (unchanged):
 

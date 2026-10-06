@@ -39,12 +39,15 @@ use bevy::window::PrimaryWindow;
 use std::sync::Arc;
 
 use crate::bridge::BridgeResource;
+use crate::controls::Bindings;
 use crate::frames::atlas::AtlasPage;
+use crate::ui::original::OriginalUi;
 use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
-use super::ui_bind::{run_ui, UiQueue, UiRules};
+use super::panel_art::PanelArtLoader;
+use super::ui_bind::{run_ui_with, UiQueue, UiRules};
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
 
@@ -113,6 +116,14 @@ pub struct WorldViewUi {
     pub root: UiRoot,
     pub strings: Box<dyn StringLookup>,
     pub queue: UiQueue,
+    /// The original UI (`ui/panels.md`) whose panels are in `root`: it
+    /// applies their outputs, and its open mode is the feed's
+    /// ([`ViewFeed::set_ui_open_mode`]).
+    pub original: Option<OriginalUi>,
+    /// Key bindings: pressed keys become [`UiEvent::Action`]s (§A4, §A6).
+    pub bindings: Option<Bindings>,
+    /// Makes the panel DC6 files of the frame's UI draws resident.
+    pub art: Option<PanelArtLoader>,
     /// Last cursor position sent, so moves are reported once.
     cursor: Option<FramePos>,
 }
@@ -123,10 +134,19 @@ impl WorldViewUi {
             root,
             strings,
             queue: UiQueue::default(),
+            original: None,
+            bindings: None,
+            art: None,
             cursor: None,
         }
     }
 }
+
+/// Sound requests (`sounds.txt` ids, no unit, delay 0) the UI made, in
+/// order, for the audio frame (`audio/triggers.md` §11: UI sounds). The
+/// world view appends; the audio side drains.
+#[derive(Resource, Debug, Default, Clone, PartialEq, Eq)]
+pub struct UiSounds(pub Vec<i32>);
 
 /// The GPU path's main-world half: the atlas of the frame store, and the
 /// pages last handed to the node (replaced only when frames were added). The compute compositor itself runs in the render
@@ -213,10 +233,22 @@ fn ui_input(
     ui: Option<NonSendMut<WorldViewUi>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     buttons: Res<ButtonInput<MouseButton>>,
+    keys: Option<Res<ButtonInput<KeyCode>>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
     };
+    // Keys in `KEY_CODES` order, so one frame's actions are ordered the
+    // same on every run.
+    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys) {
+        let pressed: Vec<KeyCode> = edge::KEY_CODES
+            .iter()
+            .map(|&(c, _)| c)
+            .filter(|&c| keys.just_pressed(c))
+            .collect();
+        let actions = edge::key_actions(bindings, &pressed);
+        ui.queue.0.extend(actions);
+    }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
     let pos = edge::cursor_frame_pos(window).unwrap_or(FramePos::Outside);
@@ -276,6 +308,7 @@ fn world_view_frame(
     indices: Option<Res<NodeIndices>>,
     target: Option<Res<WorldViewTarget>>,
     mut images: ResMut<Assets<Image>>,
+    mut sounds: Option<ResMut<UiSounds>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -292,20 +325,35 @@ fn world_view_frame(
             g.pending = None;
         }
     }
+    let state = &mut *state;
     let ui_frame = match ui {
         Some(mut ui) => {
             let ui = &mut *ui;
-            Some(run_ui(
+            let frame = run_ui_with(
                 &mut ui.root,
                 &mut ui.queue,
                 &mut bridge.0,
                 ui.strings.as_ref(),
-            )?)
+                ui.original.as_mut(),
+            )?;
+            if let Some(original) = ui.original.as_mut() {
+                let outcome = original.take_outcome();
+                for e in &outcome.effects {
+                    debug!("ui: {e:?}");
+                }
+                if let Some(s) = sounds.as_deref_mut() {
+                    s.0.extend(outcome.sounds);
+                }
+                state.feed.set_ui_open_mode(original.open_mode());
+            }
+            if let Some(art) = &ui.art {
+                art.ensure(&frame.draws, &mut state.assets)?;
+            }
+            Some(frame)
         }
         None => None,
     };
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
-    let state = &mut *state;
     let frame = build_frame(
         bridge.0.world(),
         draws,
