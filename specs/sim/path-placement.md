@@ -34,21 +34,21 @@
 |   1. Coordinates | 86–99 |
 |   2. Path records | 100–200 |
 |   3. Size, collision pattern, footprint mask | 201–241 |
-|   4. Collision queries | 242–309 |
-|   5. Footprints | 310–357 |
-|   6. Moving a footprint | 358–381 |
-|   7. Nearest free point (`0x0064DEA0`) | 382–444 |
-|   8. Coarse free-box search (`0x0064E840`) | 445–473 |
-|   9. Floor drop placement (`0x00555DA0`) | 474–492 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 493–527 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 528–550 |
-|   12. Warp tiles and warp arrival | 551–587 |
-| Constants & data dependencies | 588–606 |
-| Randomness | 607–616 |
-| Edge cases & original bugs | 617–643 |
-| Test vectors | 644–676 |
-| Provenance | 677–705 |
-| Open questions | 706–730 |
+|   4. Collision queries | 242–322 |
+|   5. Footprints | 323–370 |
+|   6. Moving a footprint | 371–394 |
+|   7. Nearest free point (`0x0064DEA0`) | 395–457 |
+|   8. Coarse free-box search (`0x0064E840`) | 458–486 |
+|   9. Floor drop placement (`0x00555DA0`) | 487–505 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 506–540 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 541–563 |
+|   12. Warp tiles and warp arrival | 564–614 |
+| Constants & data dependencies | 615–633 |
+| Randomness | 634–643 |
+| Edge cases & original bugs | 644–670 |
+| Test vectors | 671–703 |
+| Provenance | 704–732 |
+| Open questions | 733–753 |
 <!-- /index -->
 
 ## Summary
@@ -261,6 +261,19 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
    boxes (the inside one, the strip right of the room, the strip above
    it at the inside box's width); each outside strip is queried again
    from that room (recursively). The inside box ORs its cells.
+   Split (`0x0064CDF0`; boxes are inclusive {left, bottom, right, top};
+   R, T = the room's sub-tile right and top edge, exclusive):
+   - bottom > top or left > right, or the room has no collision record
+     (`0x0061A010` null; R, T come from it, `drlg/rooms.md` §10) → no
+     boxes → the query returns 0x27;
+   - box 1 := the box; if right ≥ R: box 1 right := R − 1 and the
+     right strip := {R, bottom, right, top} (**full height**, so the
+     corner beyond both edges belongs to it);
+   - if top ≥ T: box 1 top := T − 1 and the top strip := {box 1 left,
+     T, box 1 right (already clipped), top};
+   - order: box 1, right strip, top strip. Box 1 is read by
+     `0x0064CC30`; each strip by `0x0064CEB0` again with the room found
+     for (left, bottom) as the lookup start; results are ORed.
 5. Query functions (room, x, y, size or pattern, mask):
 
 | Function | Shape argument | Result |
@@ -569,6 +582,20 @@ value v, DRLG room R:
 
 1. Game or player null → fatal. Destination tile and its lvlwarp record:
    `0x006195A0(room of the tile, tile class)`; none → nothing.
+   `0x006195A0(room, class, &record)` (room null → fatal):
+   1. Via `0x0066AB00` on the room's DRLG room S: in S's warp-link list
+      (+0x4C, list order, next +4; `drlg/rooms.md` §3 rule 3 prepends)
+      the first link whose lvlwarp record (+0x10) has `Id` = class
+      gives the destination DRLG room D (link +0x00); in D's warp-link
+      list the first link whose room is S gives the destination record
+      R. Either not found → fatal assert (line 0x71). So with several
+      warps in one room the tile class picks the link, and the
+      destination is always D's link back to S.
+   2. record := R; D's active room (+0x30), activated by `0x0061B730`
+      when D has none.
+   3. Result: the first unit of type 5 (tile) with class = R's `Id` in
+      that active room's unit list (head +0x74, next +0xE8); none →
+      null.
 2. Point := the destination tile's position; free point (§7,
    `0x0064E7B0`, player size, 0x1C09, **fallback 1**) from the
    destination tile's room; none → nothing.
@@ -709,15 +736,11 @@ the recorded game is regenerated from its seeds):
    `sim/pathing.md` open question 1) and the placement calls (`0x0064DEA0`
    entry/exit, `0x00554EA0` arguments/result) to check §7 and §10 on
    live data.
-2. §4 rule 4 sub-box recursion: confirm on a box straddling two room
-   edges (corner) that the strip above uses the inside box's clipped
-   width (D2MOO's reading; `0x0064CDF0`/`0x0064CC30` not traced
-   line by line). Settle: Ghidra on `0x0064CDF0`, or a recorded drop at a
-   room corner.
-3. `0x006195A0` (destination warp tile of a source tile) is named but
-   not specified: which tile and lvlwarp record it returns for a level
-   with several warps. Settle: Ghidra `0x006195A0` (with
-   `drlg/levels.md` §7).
+2. *Answered:* §4 rule 4 sub-box recursion (`0x0064CDF0`): the top
+   strip uses the inside box's clipped width; the right strip takes the
+   corner.
+3. *Answered:* `0x006195A0` (destination warp tile and lvlwarp record)
+   is §12.2 rule 1.
 4. Player position history (§10 rule 7): which code reads player data
    +0xA0..+0x14C (anti-cheat, C→S 0x5F?). Settle: xref the readers.
 5. `0x00545B80` quest warp gate (§12.2 rule 3): owner is the quests
