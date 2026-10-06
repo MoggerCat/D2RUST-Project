@@ -66,4 +66,6 @@ They do not decide those questions.
 
 `cargo test -p d2-sim --test prop_path_place` (default 256 / 128 / 512
 cases; `PROPTEST_CASES=2000` passes in about 70 s, debug). Gate: `sh
-tools/gate.sh` (results in the commit message).
+tools/gate.sh all` PASS on `3a5cf4e` (all 13 steps: spec_index, methods,
+coverage, trace checkers, hook selftest, fmt, depcheck, clippy workspace,
+tests d2-sim + conformance / rest / d2-client, doc-tests).
