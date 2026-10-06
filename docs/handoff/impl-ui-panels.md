@@ -111,7 +111,7 @@ session's area).
 
 ## 5. Local run queue
 
-1. HANDOFF §5 C65: `D2_GAME_DIR=<install> cargo test -p d2-client --test
+1. HANDOFF §5 C71: `D2_GAME_DIR=<install> cargo test -p d2-client --test
    game_panels -- --ignored` (panel DC6 sizes, counts, offsets).
 2. Capture cases `placement-0001` (inventory frames), `ui-0001`, `ui-0002`
    (spec §Test vectors) once the panels are wired into the app.
