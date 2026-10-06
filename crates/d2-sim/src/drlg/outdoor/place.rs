@@ -773,3 +773,7 @@ pub fn jungle_offsets(sy: i32) -> (i32, i32) {
     }
     (y1, -2 * sy / 3)
 }
+
+#[cfg(test)]
+#[path = "linker_tests.rs"]
+mod linker_tests;
