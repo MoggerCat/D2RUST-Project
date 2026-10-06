@@ -13,6 +13,8 @@
 //! and fade bytes, unit flags 0x10000000 and flag-ex 0x80) and returns the
 //! items in draw order, each with its pass, major and minor.
 
+pub mod background;
+pub mod edges;
 pub mod sight;
 pub mod source;
 pub mod weather;
