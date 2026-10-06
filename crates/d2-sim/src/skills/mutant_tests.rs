@@ -765,3 +765,33 @@ mod use_mutants {
         assert_eq!(f.take_log(), ["missile 0 1 1 0 false None"]);
     }
 }
+
+// ---------------------------------------------------------------- functions.tsv check (M08)
+
+mod table_check_mutants {
+    use crate::skills::use_::table::check_tsv;
+
+    const TSV: &str = include_str!("../../../../specs/skills/functions.tsv");
+
+    fn whats(tsv: &str) -> Vec<String> {
+        check_tsv(tsv).into_iter().map(|m| m.what).collect()
+    }
+
+    // A repeated slot is reported by its kind code and index.
+    #[test]
+    fn repeated_slot_names_kind() {
+        let row = TSV.lines().nth(2).unwrap();
+        let tsv = format!("{TSV}\n{row}\n");
+        assert_eq!(whats(&tsv), ["srvst 1 repeated"]);
+    }
+
+    // An index range must be ordered and below the slot count (91 start
+    // slots): `91` and `5-3` are bad indices.
+    #[test]
+    fn index_bounds() {
+        for idx in ["91", "5-3"] {
+            let tsv = format!("{TSV}\nsrvst\t{idx}\tnull\t-\tnull\t(none)\t\n");
+            assert_eq!(whats(&tsv), [format!("index {idx}")], "{idx}");
+        }
+    }
+}
