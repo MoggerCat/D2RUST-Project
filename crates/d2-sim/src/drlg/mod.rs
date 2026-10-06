@@ -30,6 +30,7 @@ pub mod data;
 pub mod level;
 pub mod maze;
 pub mod outdoor;
+pub mod preset;
 pub mod room;
 pub mod seams;
 pub mod tiles;
