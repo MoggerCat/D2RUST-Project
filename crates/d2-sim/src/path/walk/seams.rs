@@ -13,7 +13,9 @@
 //! nothing), like `wiring::action::Pending`, and each default names the
 //! spec that will own it.
 
+use super::resync::ResyncRing;
 use crate::path::collision::CollisionRooms;
+use crate::path::history::PositionHistory;
 use crate::path::record::DynamicPath;
 use crate::path::PathError;
 use crate::rng::Seed;
@@ -212,7 +214,8 @@ pub trait WalkUnits {
     }
     /// Unit flag set (unit +0xC4).
     fn set_unit_flag(&mut self, unit: UnitId, bit: u32) {}
-    /// State 13 event-0 branch (`0x005C9D90`). Owner: the skills spec.
+    /// State 13 event-0 call (`0x005C9D90`); its result is ignored and
+    /// the step goes on (§9.2 step 2). Owner: the skills spec.
     fn state13_step(&mut self, unit: UnitId) {}
     /// A monster's AI room memo (monster data +0x50) := 0.
     fn clear_ai_room_memo(&mut self, unit: UnitId) {}
@@ -225,23 +228,52 @@ pub trait WalkUnits {
     fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {}
     /// Unit add messages (`0x00571F90`). Owner: the unit-update spec.
     fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {}
-    /// Target lead `0x00679190` / `0x00679250` (path +0x68 ≠ 0): x87
-    /// floating point, pathing.md open question 4. `None` = unspecified;
-    /// the caller then keeps the target unchanged.
-    fn target_lead(&self, unit: UnitId, target: Point, lead: u8) -> Option<Point> {
-        None
-    }
     /// Monster circling `0x00679B30` (direction offset ≠ 0), and the
     /// path functions of types 0, 3, 8, 9, 11, 12, 15, 16 (pathing.md open
     /// question 3). Returns the point count; the default finds no path.
     fn other_path_function(&mut self, path: &mut DynamicPath, info: &PathInfo) -> i32 {
         0
     }
-    /// `0x00649120`: a player's or monster's re-path budget (pathing.md
-    /// open question 8). Default 0 = no re-path.
-    fn repath_budget(&self, unit: UnitId) -> i32 {
+    /// The player's position history (player data +0xA0..+0x14C,
+    /// `path-placement.md` §10 rule 7); `None` = not kept (nothing is
+    /// written).
+    fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {
+        None
+    }
+
+    // ---- C→S 0x5F resync (§1.6) ---------------------------------------
+
+    /// The player's client (`0x005531C0`: player data +0x9C) exists; the
+    /// handler treats a null client as fatal.
+    fn has_client(&self, unit: UnitId) -> bool {
+        true
+    }
+    /// `0x005541B0`: the player is dead. Owner: `sim/units.md`.
+    fn is_dead(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The placement `0x00554EA0(room 0, x, y, exact 0, alt 1)`
+    /// (`path-placement.md` §10) of the resync; true = placed. The caller
+    /// stores the path record before and loads it after.
+    fn place_resync(&mut self, unit: UnitId, x: i32, y: i32) -> bool {
+        false
+    }
+    /// The client's 5-slot resync ring (client +0x3C0); `None` = not kept
+    /// (nothing recorded, never full).
+    fn resync_ring(&mut self, unit: UnitId) -> Option<&mut ResyncRing> {
+        None
+    }
+    /// The game type byte (game +0x6A).
+    fn game_type(&self) -> u8 {
         0
     }
+    /// The resync lock (§1.6 rule 4.2): set state 108; attach a stat list
+    /// (`0x006251F0` flags 2, expire `expire`, state 108, remove callback
+    /// `0x0054CC30` clearing state 108); schedule event 12 at `expire`
+    /// (`sim/stat-lists.md` §10.4).
+    fn resync_lock(&mut self, unit: UnitId, expire: i32) {}
+    /// Sends message bytes to the player's own client.
+    fn send_to_client(&mut self, unit: UnitId, bytes: &[u8]) {}
 }
 
 /// Target of a mode start (point or unit form).

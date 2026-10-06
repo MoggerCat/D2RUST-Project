@@ -78,23 +78,28 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
     ) -> Result<Step, WalkError> {
         // Step 1.
         self.target_check(path);
-        // Step 2.
+        // Step 2: `0x005C9D90` (skills spec); its result is ignored and
+        // the step goes on.
         if self.c.has_state(unit, 13) {
-            // `0x005C9D90` (skills spec). TODO(spec: pathing.md §9.2 step 2,
-            // whether the step continues after it): treated as a branch.
             self.c.state13_step(unit);
-            return Ok(Step::Moving);
         }
-        // Step 3.
+        // Step 3: exhausted → restart with mode 2 (walk, or town walk in
+        // a town; §1.5 step 2), path recomputed.
         if self.c.mode(unit) == 3
             && self.run_drain(unit, path)
-            && start_movement(self.t, self.c, unit, path, 3)? == 0
+            && start_movement(self.t, self.c, unit, path, 2)? == 0
         {
             neutral_start(self.c, unit, path);
         }
         // Step 4.
-        self.step(unit, path)
-        // Step 5 (host-only position history) is not simulated.
+        let s = self.step(unit, path)?;
+        // Step 5: position history (`path-placement.md` §10 rule 7; the
+        // 25 ms wall-clock gate reads as open).
+        let cell = path.cell();
+        if let Some(h) = self.c.position_history(unit) {
+            h.walk_write(cell.x, cell.y);
+        }
+        Ok(s)
     }
 
     /// Target check `0x00553490` (§9.2 step 1).
@@ -163,8 +168,8 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
                 // 2.3, 2.4.
                 let q = self.one_step(unit, path)?;
                 self.set_position(unit, path, q, None);
-                // 2.5.
-                if !missile && index(path) < count(path) {
+                // 2.5: path type ≠ 4.
+                if path.path_type != path_types::MISSILE && index(path) < count(path) {
                     aim(self.t, path, ty);
                 }
                 // 2.6.
@@ -217,7 +222,8 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
         // Rule 1.
         path.collided_mask = 0;
         let monster_repath = ty == UnitType::Monster && path.flags & flags::KEEP_TARGET != 0;
-        // Rule 2.
+        // Rule 2 (dead in 1.14d: the only caller, §9.4 rule 2.2, resets
+        // before calling with a (0, 0) vector).
         if (path.vel_vec_x, path.vel_vec_y) == (0, 0) {
             path.point_count = 0;
             path.cur_point = 0;
@@ -499,7 +505,12 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
         true
     }
 
-    /// Re-path `0x00650350(unit, finish)` (§9.10).
+    /// Re-path `0x00650350(unit, finish)` (§9.10). Unless flag 0x10: a
+    /// monster whose re-path budget (path +0x94, `0x00649120`) is 0 → 0
+    /// (players skip the test); else queue for update, unit flag 1, and
+    /// budget −= index, clamped to 0..255 (`0x00649140`). Types are written
+    /// to +0x3C directly (flags and direction offset unchanged); every
+    /// compute passes town access 0.
     pub fn repath(
         &mut self,
         unit: UnitId,
@@ -507,34 +518,30 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
         finish: bool,
     ) -> Result<i32, WalkError> {
         let ty = self.c.unit_type(unit);
-        let player = ty == UnitType::Player;
         if path.flags & flags::KEEP_TARGET == 0 {
-            if matches!(ty, UnitType::Player | UnitType::Monster) && self.c.repath_budget(unit) == 0
-            {
+            if ty == UnitType::Monster && path.repath_budget == 0 {
                 return Ok(0);
             }
             self.c.queue_for_update(unit);
             self.c.set_unit_flag(unit, 1);
-            path.dist_budget = path.dist_budget.wrapping_sub(path.cur_point as u8);
+            path.add_repath_budget((path.cur_point as i32).wrapping_neg());
         }
-        // TODO(spec: pathing.md §9.10, the town-access argument of the
-        // re-path's compute): 0, the walk request's value.
         let town = false;
         if matches!(
             path.path_type,
             path_types::TOWARD | path_types::TOWARD_FINISH | path_types::WALL_FOLLOW
         ) {
             if finish {
-                path.set_path_type(self.t, player, path_types::TOWARD_FINISH)?;
+                path.path_type = path_types::TOWARD_FINISH;
             } else {
-                path.set_path_type(self.t, player, path_types::TOWARD)?;
+                path.path_type = path_types::TOWARD;
                 path.put_target(path.final_target());
             }
             let r = compute(self.t, self.c, path, unit, town)?;
             if r != 0 {
                 return Ok(r);
             }
-            path.set_path_type(self.t, player, path_types::WALL_FOLLOW)?;
+            path.path_type = path_types::WALL_FOLLOW;
             return compute(self.t, self.c, path, unit, town);
         }
         compute(self.t, self.c, path, unit, town)

@@ -1,6 +1,7 @@
 //! Unit tests from pathing.md's test vectors and edge cases, on the
 //! fakes of [`fake`].
 
+mod answers;
 mod fake;
 mod gaps;
 mod messages;
@@ -780,19 +781,34 @@ fn room_change_without_previous_room_only_adds() {
 // Covers: specs/sim/pathing.md §9.10, §9.5 r2
 #[test]
 fn repath_without_budget_stops() {
+    // §9.10: only a monster tests the re-path budget (path +0x94).
     let (t, mut c) = setup(40, 40, 10, 10);
+    c.u.unit(P).ty = UnitType::Monster;
     let mut p = c.w.paths[&P].clone();
-    c.u.repath_budget = 0;
+    p.set_path_type(&t, false, 2).unwrap();
+    p.repath_budget = 0;
     let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
     assert_eq!(r, 0);
-    // With budget: queue, unit flag, budget −= index, compute.
-    c.u.repath_budget = 1;
+    assert!(c.w.log.is_empty());
+    // With budget: queue, unit flag, budget −= index (clamped at 0), the
+    // distance budget (+0x90) untouched, compute.
+    p.repath_budget = 1;
     p.put_target(Point::new(20, 10));
+    p.put_final_target(Point::new(20, 10));
     p.dist_budget = 5;
     p.cur_point = 2;
     let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
     assert_eq!(r, 1);
-    assert_eq!(p.dist_budget, 3);
+    assert_eq!(p.repath_budget, 0);
+    assert_eq!(p.dist_budget, 5);
+    assert!(c.w.log.contains(&"queue 1".to_string()));
+    // A player skips the budget test: budget 0 still re-paths.
+    let (t, mut c) = setup(40, 40, 10, 10);
+    let mut p = c.w.paths[&P].clone();
+    p.put_target(Point::new(20, 10));
+    assert_eq!(p.repath_budget, 0);
+    let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
+    assert_eq!(r, 1);
     assert!(c.w.log.contains(&"queue 1".to_string()));
 }
 

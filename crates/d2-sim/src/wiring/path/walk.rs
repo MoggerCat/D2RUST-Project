@@ -20,6 +20,7 @@ use crate::drlg::{CollisionGrid, TileRect};
 use crate::game::Game;
 use crate::path::coords::{to_fp16_center, Point};
 use crate::path::footprint::{teleport, PathMotion};
+use crate::path::history::PositionHistory;
 use crate::path::walk::request::{handle_message, request, Outcome, WalkTarget};
 use crate::path::walk::seams::{PathInfo, PathWorld, StartTarget, UsedSkill, WalkUnits};
 use crate::path::walk::{Step, Walk, WalkError};
@@ -469,6 +470,13 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     }
     fn other_path_function(&mut self, _: &mut DynamicPath, _: &PathInfo) -> i32 {
         0
+    }
+    /// [`crate::wiring::path::PathState::history`] (players only).
+    fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {
+        if self.unit_type(unit) != UnitType::Player {
+            return None;
+        }
+        Some(self.v.h.paths.as_mut()?.history.entry(unit).or_default())
     }
 }
 
