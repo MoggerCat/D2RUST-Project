@@ -882,7 +882,7 @@ fn generate_one(
 }
 
 /// `outdoor.md` §3 step 3: Act IV dispatch (Chaos Sanctum's 25 stamps,
-/// §10), Act III dispatch (levels 76..78 draw roll(14), §9.3) and Act II
+/// §10), Act III dispatch (levels 76..78 reach jungle stamping, §9.3) and Act II
 /// dispatch (level 134 stamps 394 at (4, 4), §8).
 #[test]
 fn generation_dispatches_by_act() {
@@ -892,12 +892,12 @@ fn generation_dispatches_by_act() {
     assert_eq!(calls.len(), 25);
     assert_eq!(calls.iter().filter(|c| c.0 == 862).count(), 1);
     assert_eq!(calls.iter().filter(|c| c.0 == 836).count(), 19);
-    // Act III, 76 (one cell): roll(14), then the room's allocation step.
-    let (drlg, l, mut s, calls) = generate_one(76, 8, 8, &od(), &subs).unwrap();
-    assert!(calls.is_empty());
-    s.roll(14);
-    s.step();
-    assert_eq!(drlg.level(l).seed, s);
+    // Act III, 76 (one cell): jungle stamping (`outdoor-act3-act5.md` §3)
+    // runs; this level has no block ids (no act creation): fatal 0x27.
+    assert_eq!(
+        generate_one(76, 8, 8, &od(), &subs).err(),
+        Some(OutdoorError::Fatal(0x27))
+    );
     // Act II, 134: with inert lvlsub rows for PB.
     let mut od = od();
     let mut subs = SubFileMap::default();

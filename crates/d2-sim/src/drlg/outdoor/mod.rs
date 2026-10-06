@@ -32,6 +32,7 @@ pub mod act3;
 pub mod act5;
 pub mod acts;
 pub mod grid;
+pub mod jungle;
 pub mod kurast;
 pub mod place;
 pub mod rooms;

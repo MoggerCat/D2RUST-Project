@@ -166,11 +166,12 @@ fn act_wide_placement_per_act() {
     assert!(orth_of(&drlg, &o, 41).contains(&(40, dir, true)));
 
     // Act III: docks at leveldefs offset and size; jungles; Kurast chain
-    // (§9.2); adjacency warps and neighbour entries 75..83.
+    // anchored on level 78 (§9.2); adjacency warps and neighbour entries
+    // 75..83.
     let mut d = data();
     set(&mut d, 75, 2, (400, 100), (2000, 5000));
     for id in 76..=78 {
-        set(&mut d, id, 3, (32, 32), (0, 0));
+        set(&mut d, id, 3, (64, 192), (0, 0));
     }
     let sizes = [(80, 40), (80, 48), (80, 56), (40, 40), (120, 80)];
     for (k, id) in (79..=83).enumerate() {
@@ -181,19 +182,20 @@ fn act_wide_placement_per_act() {
     for id in 76..=78 {
         assert!(drlg.find_level(id).is_some(), "level {id}");
     }
+    let r78 = rect_of(&drlg, 78);
     let mut y = 0;
     for (k, id) in (79..=83).enumerate() {
         let (w, h) = sizes[k];
         y -= h;
         assert_eq!(
             rect_of(&drlg, id),
-            TileRect::new(2000 + 200 - w / 2, 5000 + y, w, h),
+            TileRect::new(r78.x + 32 - w / 2, r78.y + y, w, h),
             "level {id}"
         );
     }
     // Vis came only from the adjacency warps (data vis empty).
     let n79 = orth_of(&drlg, &o, 79);
-    assert!(n79.contains(&(75, 3, true)), "{n79:?}");
+    assert!(n79.contains(&(78, 3, false)), "{n79:?}");
     assert!(n79.contains(&(80, 1, false)), "{n79:?}");
 
     // Act IV: A4 (OS draws on the copy), A4C, Outer Steppes takes the OS
