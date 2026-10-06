@@ -263,7 +263,8 @@ fn all_server(b: &[u8]) -> Result<(), TestCaseError> {
         GameExit, MapReveal, MonsterHit, AddExpByte, AddExpWord, AddExpDword,
         SetStatByte, SetStatWord, SetStatDword, StartMercList, PortalFlags,
         Unknown6E, Unknown6F, Unknown70, Unknown71, Unknown72, WeaponSwitch,
-        ConnectionTerminated,
+        ConnectionTerminated, PlayerStop, PlayerMove, PlayerToTarget, ReassignPlayer,
+        WalkVerify,
     );
     Ok(())
 }
@@ -313,4 +314,5 @@ fn typed_sizes_match_tables() {
     s::<LoadAct>();
     s::<SetStatWord>();
     s::<ConnectionTerminated>();
+    s::<WalkVerify>();
 }
