@@ -69,7 +69,8 @@ fn panel_quads_have_the_stated_sizes_and_zero_offsets() {
 fn panel_files_frame_counts_and_sizes() {
     let set = set();
     // (file, frames, Some(frame size) when every frame has it)
-    let cases: &[(&str, usize, Option<(u32, u32)>)] = &[
+    type Case = (&'static str, usize, Option<(u32, u32)>);
+    let cases: &[Case] = &[
         ("panel\\invchar", 8, None),
         ("panel\\invchar6", 8, None),
         ("panel\\bank", 4, None),
