@@ -569,6 +569,26 @@ mod tests {
         assert_eq!(p.stalls().count, 1);
     }
 
+    // Covers: specs/client/assets.md §a4-residency text
+    #[test]
+    fn resolved_frame_has_every_listed_key_even_over_budget() {
+        // Budget for one entry; the frame lists four (one twice). After
+        // resolve every listed key is resident: no missing sprite.
+        let mut p: Pool<u32, u32> = Pool::new("t", 1);
+        let mut clock = Tick(0);
+        p.begin_frame(1).unwrap();
+        p.insert(9, 90, 1).unwrap();
+        p.begin_frame(2).unwrap();
+        let keys = [4, 2, 4, 7, 1];
+        p.resolve(&keys, &mut clock, |k: &u32| Ok::<_, String>((k * 10, 1)))
+            .unwrap();
+        for k in keys {
+            assert_eq!(p.peek(&k), Some(&(k * 10)), "key {k}");
+        }
+        assert_eq!(p.used(), 4);
+        assert!(p.used() > p.budget());
+    }
+
     #[test]
     fn resolve_load_error_names_the_key() {
         let mut p: Pool<&str, ()> = Pool::new("parsed", 10);

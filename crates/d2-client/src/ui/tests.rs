@@ -645,3 +645,32 @@ fn text_input_keeps_code_units() {
     assert_eq!(t.take(), vec![0x00FF]);
     assert!(t.text().is_empty());
 }
+
+// Covers: specs/client/ui.md §a5-logical-resolution
+#[test]
+fn one_logical_frame_of_800_by_600() {
+    assert_eq!((FRAME_W, FRAME_H), (800, 600));
+    assert_eq!(FRAME, Rect::new(0, 0, 800, 600));
+    // Every window shows the same 800×600 frame, only scaled: its last
+    // image pixel is frame pixel (799, 599) whatever the window size.
+    for (w, h) in [
+        (800, 600),
+        (1024, 768),
+        (1280, 720),
+        (1920, 1080),
+        (2560, 1440),
+    ] {
+        let p = Presentation::new(w, h).unwrap();
+        let (x1, y1) = (p.left + 800 * p.scale - 1, p.top + 600 * p.scale - 1);
+        assert_eq!(
+            p.to_frame(i64::from(x1), i64::from(y1)),
+            FramePos::Inside(Point::new(799, 599)),
+            "{w}×{h}"
+        );
+    }
+    // No 640×480 layout: a window that cannot hold 800×600 is refused.
+    assert_eq!(
+        Presentation::new(640, 480),
+        Err(FrameError::TooSmall { w: 640, h: 480 })
+    );
+}

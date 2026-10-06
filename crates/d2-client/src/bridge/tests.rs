@@ -462,3 +462,303 @@ fn bevy_mirror_follows_the_model() {
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!((world.frames, world.server_ticks), (3, 1));
 }
+
+// Gap tests (docs/handoff/gaps-client-formats.md).
+
+thread_local! {
+    /// Messages seen by [`record`], in dispatch order (per test thread).
+    static SEEN: std::cell::RefCell<Vec<Vec<u8>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Synthetic handler: records the message bytes as the handler got them.
+fn record(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    SEEN.with(|s| s.borrow_mut().push(msg.bytes.to_vec()));
+    Ok(())
+}
+
+fn seen() -> Vec<Vec<u8>> {
+    SEEN.with(|s| s.borrow().clone())
+}
+
+fn recording_dispatch() -> Dispatch {
+    let mut d = Dispatch::empty();
+    for id in [0x0E, 0x6D, 0x1A] {
+        d.set(id, "test", record);
+    }
+    d
+}
+
+/// Every line of `src` outside `//` comments.
+fn code_lines(src: &str) -> impl Iterator<Item = &str> {
+    src.lines()
+        .map(|l| l.split("//").next().unwrap_or(""))
+        .filter(|l| !l.trim().is_empty())
+}
+
+// Covers: specs/client/bridge.md §1 r3
+#[test]
+fn bridge_modules_except_mirror_have_no_bevy_type() {
+    let sources = [
+        ("mod.rs", include_str!("mod.rs")),
+        ("dispatch.rs", include_str!("dispatch.rs")),
+        ("intent.rs", include_str!("intent.rs")),
+        ("link.rs", include_str!("link.rs")),
+        ("local.rs", include_str!("local.rs")),
+        ("receive.rs", include_str!("receive.rs")),
+        ("world.rs", include_str!("world.rs")),
+    ];
+    for (name, src) in sources {
+        for line in code_lines(src) {
+            assert!(
+                !line.to_ascii_lowercase().contains("bevy"),
+                "{name}: {line}"
+            );
+        }
+    }
+    // The mirror is the one that does use Bevy (the scan can fail).
+    assert!(code_lines(include_str!("mirror.rs")).any(|l| l.contains("bevy::")));
+    // And the plain part runs without a window, GPU or `App`.
+    let (mut b, _) = bridge();
+    b.send(&Walk { x: 1, y: 1 }).unwrap();
+    b.frame().unwrap();
+}
+
+// Covers: specs/client/bridge.md §1 r1
+#[test]
+fn model_changes_only_through_dispatched_messages() {
+    let (mut b, link) = bridge();
+    // Intents are sent, never predicted: no model change.
+    b.send(&Walk { x: 5, y: 6 }).unwrap();
+    b.send(&WalkToUnit { type_: 1, id: 7 }).unwrap();
+    assert_eq!(b.world(), &ClientWorld::default());
+    // Unowned messages (even unit messages) change nothing but the
+    // bridge's own counters.
+    link.deliver(
+        true,
+        &[&[msg(0x6D, 10, 1, 7), msg(0x0E, 12, 2, 9)].concat()],
+    );
+    b.frame().unwrap();
+    assert_eq!(
+        b.world(),
+        &ClientWorld {
+            frames: 1,
+            server_ticks: 1,
+            ..ClientWorld::default()
+        }
+    );
+}
+
+// Covers: specs/client/bridge.md §1 r4
+#[test]
+fn bytes_cross_the_boundary_unchanged() {
+    // Out: typed and raw messages reach the link byte for byte.
+    let (mut b, link) = bridge();
+    let warden = [0x66, 0x02, 0x00, 0xAB, 0xCD];
+    let walk = [0x01, 0x34, 0x12, 0x78, 0x56];
+    b.send_bytes(&warden).unwrap();
+    b.send_bytes(&walk).unwrap();
+    b.send_bytes(&[0x6B]).unwrap();
+    assert_eq!(
+        sent(&link),
+        vec![
+            (SendQueue::Game, warden.to_vec()),
+            (SendQueue::Game, walk.to_vec()),
+            (SendQueue::System, vec![0x6B]),
+        ]
+    );
+    // In: each handler sees exactly its message's bytes of the chunk.
+    let mut b = Bridge::with_dispatch(ScriptedLink::new(), recording_dispatch()).unwrap();
+    let (m1, m2) = (msg(0x0E, 12, 2, 0xA1B2_C3D4), msg(0x6D, 10, 1, 0x0102_0304));
+    let chunk = [m1.clone(), vec![0x1A, 0x07], m2.clone()].concat();
+    b.receive_chunk(&chunk).unwrap();
+    assert_eq!(seen(), vec![m1, vec![0x1A, 0x07], m2]);
+}
+
+// Covers: specs/client/bridge.md §2 r1
+#[test]
+fn buffer_and_node_chunks_split_alike() {
+    let messages = [msg(0x6D, 10, 1, 7), vec![0x1A, 0x07], msg(0x0E, 12, 2, 9)];
+    let run = |chunks: &[&[u8]]| {
+        let link = ScriptedLink::new();
+        link.deliver(false, chunks);
+        let mut b = Bridge::with_dispatch(link, test_dispatch()).unwrap();
+        let report = b.frame().unwrap();
+        (report.messages, b.world().clone(), b.log().rejected.len())
+    };
+    let buffer = messages.concat();
+    let whole = run(&[&buffer]);
+    let nodes = run(&[&messages[0], &messages[1], &messages[2]]);
+    assert_eq!(whole, nodes);
+    assert_eq!((whole.0, whole.1.units.len(), whole.2), (3, 2, 1));
+}
+
+// Covers: specs/client/bridge.md §2 r5
+#[test]
+fn chunks_are_handled_in_delivery_order() {
+    let link = ScriptedLink::new();
+    let (a, c) = (msg(0x6D, 10, 1, 1), msg(0x0E, 12, 2, 2));
+    // Delivered "system list" first, then game list; neither is reordered
+    // even though the ids would sort the other way.
+    link.deliver(false, &[&[0x1A, 0x07], &a, &c]);
+    let mut b = Bridge::with_dispatch(link, recording_dispatch()).unwrap();
+    assert_eq!(b.frame().unwrap().chunks, 3);
+    assert_eq!(seen(), vec![vec![0x1A, 0x07], a, c]);
+}
+
+// Covers: specs/client/bridge.md §5 r2
+#[test]
+fn units_iterate_in_type_then_guid_order() {
+    let mut b = Bridge::with_dispatch(ScriptedLink::new(), test_dispatch()).unwrap();
+    let chunk = [
+        msg(0x0E, 12, 4, 1),
+        msg(0x6D, 10, 1, 9),
+        msg(0x0E, 12, 2, 0),
+        msg(0x0E, 12, 1, 0xFFFF_FFFF),
+        msg(0x6D, 10, 1, 3),
+    ]
+    .concat();
+    b.receive_chunk(&chunk).unwrap();
+    let key = |unit_type, guid| UnitKey { unit_type, guid };
+    let keys: Vec<_> = b.world().units.keys().copied().collect();
+    assert_eq!(
+        keys,
+        vec![
+            key(1, 3),
+            key(1, 9),
+            key(1, 0xFFFF_FFFF),
+            key(2, 0),
+            key(4, 1)
+        ]
+    );
+    assert!(b.world().units.iter().all(|(k, u)| u.key == *k));
+}
+
+// Covers: specs/client/bridge.md §6 r2
+#[test]
+fn every_row_is_tbd_and_no_handler_is_registered() {
+    let rows = dispatch::parse(dispatch::TSV).unwrap();
+    assert!(rows.iter().all(|r| r.owner.is_none()));
+    assert!(dispatch::HANDLERS.is_empty());
+    let d = Dispatch::from_spec().unwrap();
+    assert!((0..=0xB4u8).all(|id| d.get(id).is_none()));
+}
+
+// Covers: specs/client/bridge.md §7 r2
+#[test]
+fn views_are_overwritten_from_the_model() {
+    let link = ScriptedLink::new();
+    link.deliver(false, &[&msg(0x6D, 10, 1, 7)]);
+    let bridge = Bridge::with_dispatch(Box::new(link) as _, test_dispatch()).unwrap();
+    let mut app = App::new();
+    app.add_plugins(BridgePlugin)
+        .insert_resource(BridgeResource(bridge));
+    app.update();
+    let key = UnitKey {
+        unit_type: 1,
+        guid: 7,
+    };
+    let bogus = UnitKey {
+        unit_type: 3,
+        guid: 99,
+    };
+    let mut q = app.world_mut().query::<&mut UnitView>();
+    for mut v in q.iter_mut(app.world_mut()) {
+        v.key = bogus;
+    }
+    app.update();
+    let mut q = app.world_mut().query::<&UnitView>();
+    let views: Vec<_> = q.iter(app.world()).map(|v| v.key).collect();
+    assert_eq!(views, vec![key]);
+    // Never written back: the model is unchanged.
+    let world = app.world().resource::<BridgeResource>().0.world();
+    assert_eq!(world.units.keys().copied().collect::<Vec<_>>(), vec![key]);
+}
+
+// Covers: specs/client/bridge.md §8 r2
+#[test]
+fn one_pump_per_frame_whether_or_not_it_ticked() {
+    let (mut b, link) = bridge();
+    for ticked in [true, true, false, true, false, false] {
+        link.deliver(ticked, &[]);
+    }
+    for _ in 0..6 {
+        b.frame().unwrap();
+    }
+    let pumps = link
+        .script()
+        .events
+        .iter()
+        .filter(|e| **e == Event::Pump)
+        .count();
+    assert_eq!(pumps, 6);
+    assert_eq!((b.world().frames, b.world().server_ticks), (6, 3));
+}
+
+/// A link whose pump fails.
+struct BrokenLink;
+
+impl ServerLink for BrokenLink {
+    fn protocol_version(&self) -> u32 {
+        PROTOCOL_VERSION
+    }
+    fn send(&mut self, _: SendQueue, _: &[u8]) -> Result<Sent, LinkError> {
+        Ok(Sent::Queued)
+    }
+    fn pump(&mut self) -> Result<Pumped, LinkError> {
+        Err(LinkError::Server("server down".into()))
+    }
+    fn receive(&mut self) -> Vec<Vec<u8>> {
+        Vec::new()
+    }
+}
+
+// Covers: specs/client/bridge.md §8 r4
+#[test]
+fn errors_stop_the_frame_records_do_not() {
+    let mut broken = Bridge::new(BrokenLink).unwrap();
+    assert!(matches!(broken.frame(), Err(BridgeError::Link(_))));
+
+    // A refused chunk is an error; the chunk after it is not processed.
+    let link = ScriptedLink::new();
+    link.deliver(false, &[&[0x1A, 0x07, 0x5F, 1], &[0x1A, 0x07]]);
+    let mut b = Bridge::with_dispatch(link.clone(), recording_dispatch()).unwrap();
+    assert!(matches!(
+        b.frame(),
+        Err(BridgeError::Split(SplitError::Truncated { .. }))
+    ));
+    assert!(seen().is_empty());
+
+    // Unowned ids, discarded bytes and handler rejections are recorded,
+    // and the frame succeeds.
+    link.deliver(false, &[&[0x5F, 1, 2, 3, 4, 0x1A, 0x07, 0x80, 0x00]]);
+    let mut b = Bridge::with_dispatch(link, test_dispatch()).unwrap();
+    let r = b.frame().unwrap();
+    assert_eq!((r.unowned, r.rejected, r.discarded_bytes), (1, 1, 2));
+}
+
+// Covers: specs/client/bridge.md §edge-cases-original-bugs
+#[test]
+fn size_zero_ids_end_the_split_and_one_byte_unit_ids_address_nothing() {
+    for id in [0x83u8, 0x84, 0x88, 0x80] {
+        let (mut b, _) = bridge();
+        let r = b.receive_chunk(&[0x1A, 0x07, id, 0x1A, 0x07]).unwrap();
+        assert_eq!((r.messages, r.discarded_bytes), (1, 3), "id {id:#04X}");
+        assert_eq!(
+            b.log().discarded,
+            vec![super::receive::Discarded {
+                first: id,
+                bytes: 3
+            }]
+        );
+    }
+    for id in 0x6Eu8..=0x72 {
+        assert!(
+            d2_proto::transport::server_message(id)
+                .unwrap()
+                .client_unit_handler
+                .is_some(),
+            "{id:#04X} has a unit handler"
+        );
+        assert_eq!(addressed_unit(&[id]), None);
+    }
+}

@@ -100,6 +100,45 @@ fn all_ds1_and_dt1_in_d2exp() {
     });
 }
 
+// Covers: specs/formats/ds1.md §edge-cases-original-bugs
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn ds1_layer_limits_and_truncated_trees_groups() {
+    // Up to 4 walls and 2 floors, and exactly one shadow layer (synthetic
+    // v18, 1×1 grid, tag_type 0, no files, objects or paths).
+    let mut d = Vec::new();
+    let mut put = |x: u32| d.extend_from_slice(&x.to_le_bytes());
+    for x in [18, 0, 0, 0, 0, 0, 4, 2] {
+        put(x); // version, width-1, height-1, act, tag_type, files, walls, floors
+    }
+    for l in 0..11 {
+        put(if l < 8 && l % 2 == 1 { 1 } else { 100 + l }); // 4×(wall, orientation), 2 floors, shadow
+    }
+    put(0); // objects
+    put(0); // paths
+    let ds1 = Ds1::parse(&d).unwrap();
+    assert_eq!((ds1.walls.len(), ds1.orientations.len()), (4, 4));
+    assert_eq!(ds1.floors.len(), 2);
+    assert_eq!(ds1.floors[1], [109]);
+    assert_eq!(ds1.shadow, [110]);
+    assert!(ds1.tags.is_none());
+
+    // trees.ds1 declares 14 groups and ends 4 bytes into the 14th.
+    let (exp, data) = (archive("d2exp.mpq"), archive("d2data.mpq"));
+    let name = r"data\global\tiles\ACT1\OUTDOORS\trees.ds1";
+    let bytes = read_first(&[&exp, &data], name).expect("trees.ds1 present");
+    let trees = Ds1::parse(&bytes).unwrap();
+    assert_eq!((trees.version, trees.tag_type), (12, 1));
+    assert_eq!(trees.groups.len(), 14);
+    assert!(trees.groups_truncated);
+    let last = &trees.groups[13];
+    assert_eq!((last.y, last.width, last.height), (0, 0, 0));
+    assert!(trees
+        .files
+        .iter()
+        .any(|f| f.eq_ignore_ascii_case(br"C:\D2\DATA\GLOBAL\TILES\ACT1\TOWN\trees.tg1")));
+}
+
 // Covers: specs/formats/dcc.md §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
