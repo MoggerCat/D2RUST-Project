@@ -34,21 +34,21 @@
 | Rules | 87–88 |
 |   1. Inventory model | 89–181 |
 |   2. Grid placement | 182–272 |
-|   3. Belt | 273–328 |
-|   4. Equipping | 329–483 |
-|   5. Shared checks | 484–608 |
-|   6. Deferred item messages | 609–695 |
-|   7. Intents | 696–1079 |
-|   8. Pickup from the ground | 1080–1180 |
-|   9. Drop to the ground | 1181–1223 |
-|   10. Gold | 1224–1254 |
-|   11. Message layouts | 1255–1280 |
-| Constants & data dependencies | 1281–1303 |
-| Randomness | 1304–1316 |
-| Edge cases & original bugs | 1317–1332 |
-| Test vectors | 1333–1380 |
-| Provenance | 1381–1427 |
-| Open questions | 1428–1465 |
+|   3. Belt | 273–330 |
+|   4. Equipping | 331–485 |
+|   5. Shared checks | 486–610 |
+|   6. Deferred item messages | 611–704 |
+|   7. Intents | 705–1090 |
+|   8. Pickup from the ground | 1091–1191 |
+|   9. Drop to the ground | 1192–1234 |
+|   10. Gold | 1235–1265 |
+|   11. Message layouts | 1266–1295 |
+| Constants & data dependencies | 1296–1318 |
+| Randomness | 1319–1331 |
+| Edge cases & original bugs | 1332–1347 |
+| Test vectors | 1348–1395 |
+| Provenance | 1396–1442 |
+| Open questions | 1443–1510 |
 <!-- /index -->
 
 ## Summary
@@ -135,7 +135,7 @@ codes; the intents accept 1–10 only).
 |---|---|---|
 | player | 1 / 2 / 3 | 6 / 7 / 9 |
 | player | 4 | 8 in a classic game, 12 in an expansion game (game +0x70) |
-| player | other (0) | class table `0x00744544` (7 pairs): class 0–4 → 0–4, 5 → 14, 6 → 15; no match → −1 |
+| player | any other page (0 and 5–255: `0x00621050` tests page − 1 ≤ 3 unsigned) | class table `0x00744544` (7 pairs): class 0–4 → 0–4, 5 → 14, 6 → 15; no match → −1 |
 | monster | any | 5 |
 | object | any | class 0x152 → 10, 0x153 → 11, else −1 |
 | missile, item, tile (types 3–5) | any | −1 (no record; socket fillers join an item's inventory through the link `0x0063B210`, not a grid) |
@@ -273,7 +273,9 @@ quests.
 ### 3. Belt
 
 1. **Belt type** = items `belt` (+0x130) of the item at body location 8
-   (`0x00621ED0`); no belt → record 2. `numboxes` from `belts.bin`
+   (`0x00621ED0`, no item-type test: whatever item is at location 8);
+   no belt → record 2. In 1.14d only itemtype `belt` has body location
+   `belt` (`ItemTypes.txt`, measured), so location 8 holds belts only. `numboxes` from `belts.bin`
    (14 records, `.txt` `Expansion` row not compiled): records 0–6 =
    belt 12, sash 8, default 4, girdle 16, light belt 8, heavy belt 12,
    uber belt 16; records 7–13 repeat them (800 × 600 copies).
@@ -628,7 +630,8 @@ hirelings). U without an inventory → nothing (after step 1).
    the update-list reset `0x00597B00(game, unit)` (D2MOO
    `D2GAME_INVMODE_Last`). Unit without an inventory → nothing. Else:
    owner refresh with 0 (`0x00621000(unit, 0)`: clears +0xC8 bit 0 only;
-   bit 1 stays set). For each node of the update list, in order, the
+   bit 1 stays set: only the character save `0x00532400` clears it, so
+   bit 1 is a "save pending" mark and no message depends on it). For each node of the update list, in order, the
    item looked up by GUID (type 4; missing → skip):
    1. command flag 0x10 or 0x4000 → body location := 0 (`0x00627D70`);
       command flag 0x20 with item flag 0x80 → body location := 0.
@@ -654,7 +657,13 @@ store checks (the item's +0xC8 bits 2 and 4 → `0x0053EF30` with 0x38 /
 `items/item-actions.tsv` sends one message; later rows are skipped. A row matches only when its
 flag test **and** its `to` test pass: a row whose flags
 match but whose `to` excludes this client does not end the walk; later
-rows are tried (`0x005973F0`: each test is "flag and client is owner").
+rows are tried (`0x005973F0`: each test is "flag and client is owner"). Exception, the
+item-flag rows 18 and 19: flag set but the client neither the owner
+nor the item in mode 1 → the walk **ends** with nothing sent
+(`0x0059775B`–`0x00597767`, `0x005977B4`–`0x005977C1`), so row 20 is
+not tried; row 20 itself sends nothing in the same case. Every send of
+the walk passes the bit-stream flag argument 0 (§11), except the 0x7D
+rows, whose state = item flags & the row's flag (`0x006280A0`).
 Only the store checks end the walk for every client (item +0xC8 bit 2
 or 4 set: 0x38 / 0x39 to the trading client, nothing to others, done).
 Columns: `order`; `test` (`cmd` = command flags, `item` = item flags);
@@ -753,7 +762,9 @@ Fields: item u32 @1, x u32 @5, y u32 @9, page u32 @13.
 
 `0x00560420(item, &out, "send" 1, 0, 0, 0)`: cursor present → 0. Item
 missing → out 1. Player, not busy, page ≠ 0 → out 1 (players may lift
-only page-0 items when idle; open question 12 for the busy case). Mode ≠ 0
+only page-0 items when idle; a busy player — open stash or cube is an
+interaction — passes this test on any page, the page-1 check of the
+handler aside; R2 confirms). Mode ≠ 0
 → out 1. Targeting reset; unit flag 0x2 cleared; unlink (missing or
 mismatch → fatal); stat refresh `0x0055C730(player, 0, 1)`; inventory
 pass if active; item-skill unlink `0x0055C6E0`; room-change notice
@@ -1198,7 +1209,7 @@ player.
 
 #### 9.2 Ground expiry (`0x00558A10`)
 
-Frame (game +0xA8) plus: quest items (items `quest` ≠ 0) → 0 (never);
+Quest items (`0x00628CD0` ≠ 0) → the absolute value 0 (never expires; not frame + 0). Others: frame (game +0xA8) plus:
 quality (item data +0) 4 (magic) → 30000; quality 5–9 → 45000; gold
 (type 4) with more than 10000 → 45000; other items for which
 `0x0062BEB0` is true (the socket-filler test of §7.19) → 30000; else
@@ -1267,12 +1278,16 @@ Machine copy: `server-messages.tsv` `layout` column (rows 0x19, 0x22,
 | 0x3F | [1] code (0xFF when the "reset" argument ≠ 0), [2..5] item GUID (0 when no item), [6..7] u16 argument |
 | 0x22 | 12 bytes (`0x0053C520`; ECX = client, DL = unit type, stack GUID, skill, quantity): [1] unit type (6 none), [2] unwritten, [3..6] unit GUID (−1 none), [7..8] skill id, [9] quantity (low byte), [10] unwritten, [11] 1 when the unit found by (type, GUID) in the client's game has state 7 (`playerbody`, `0x00639DF0`), else 0 |
 
-Bit stream: written by `0x006313E0(item, buffer, 0xF4, …)` before the
-command flags are restored: the item's item flags are temporarily OR-ed
-with the sender's flag argument, serialized, then restored
-(`0x006280D0`), then `0x0053EA50` (for an item with sockets: one 0x9D
-action 0x13 per filler, after its parent). Bit-stream format: unwritten
-item-serialization spec (open question 1). Total size ≥ 0xFD → fatal.
+Bit stream: written by `0x006313E0(item, buffer, 0xF4, 0, 0, arg)`
+(format: `items/bitstream.md`): the item's item flags are temporarily
+OR-ed with the sender's flag argument, serialized, then restored
+(`0x006280D0`), then `0x0053EA50(flags)`: when the item is socketed
+(`0x00629900`) and `flags` lacks 0x20, for each filler of its
+inventory in list order one 0x9D action 0x13 (`0x0053CEF0`: owner =
+the parent item, type 4 and its GUID; flag argument = `flags` | 0x8;
+arg 0), after its parent. The dispatcher (§6.2) passes flags 0 and arg
+0; the cube spill passes 0x20 (§9.3: no fillers). The
+wrapper `0x0053D330` (action 0x13) has no caller. Total size ≥ 0xFD → fatal.
 Category ([3], `0x00623D60`): items `component` (+0x115); except an item
 of body location 4 or 5 when both hands hold non-broken items, neither
 two-handed, the owner is a player of class 4 or 6 or a monster of class
@@ -1442,8 +1457,9 @@ the 1.14d `patch_d2` `.txt` files (the `Expansion` row skipped). The
 9. Answered: §6.1 rule 4 (`0x00597B00`, per-item reset `0x005979B0`).
 10. Answered: §7.1 step 2 (types 0, 3, 5).
 11. Answered: §7.4 step 2 (`0x00549A60` = "can't do that" 0x5A).
-12. 0x19 for a busy player lifting from page 3/4 (allowed?). Settle:
-    R2 (stash and cube use while the panels are open).
+12. Answered by the code (§7.4, `0x00560420`): a busy player has no page
+    restriction there; R2 (stash and cube use while the panels are
+    open) confirms on live data.
 13. Answered: §3 rules 9–10 (from the binary; a recording removing a belt with potions in rows 2–4 would confirm the 0x9C order: R3).
 14. Answered: §7.9 (0x1E), §7.11 (0x20), §7.18 (0x27), §8.1 step 4 (pickup specials). The use effects behind `0x005BF240` stay with the item-use spec (`world/cube.md` OQ7).
 15. Answered: §7.12 (stat 72 = `durability`).
@@ -1462,3 +1478,32 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   from `0x0053A500`, `0x00571F90`, `0x00553220`).
 - GX1: record 29 (Hireling2) is 255 × 255 because its `.txt` grid is −1;
   records 16–31 are not copies (§1.3 table).
+- WN2: answered on `origin/claude/spec-answers-inventory` (§7.6: no
+  cursor clear in `0x00563D20`; X stays the cursor item).
+- IS1: §6.1 rule 4 (the clean-up clears +0xC8 bit 0 only; bit 1 is
+  cleared by the character save `0x00532400`).
+- IS2: no spec change: `sim/tick.md` §6 rule 5 runs the unit updates
+  (`0x0053A620`) inside the per-client update, before the room switch
+  `0x00537B50`; running them after the tick is a wiring difference.
+- GX2: §1.3 (pages 0 and 5–255 take the class record). GX3: §3 rule 1
+  (no type test; only `belt` items reach location 8 in 1.14d).
+- MV2: §11 (flag argument 0 from the dispatcher; fillers: owner = the
+  parent item, flag | 0x8; `0x0053D330` has no caller). MV3: §6.2 (0x7D
+  state = item flags & flag), §9.2 (absolute 0).
+- MV4 (failure results, read per site): §7.7 no item from `0x0063E490`
+  → out 1; §7.8 E not in mode 1, N's placement or link failing → out 1,
+  N missing or not in mode 4 → out 0; §7.10 target not in mode 0 →
+  nothing (out 0), C's link failing → out 1; §7.16 C's link failing →
+  fatal assert (line 0x12D4); §7.19 only "filler missing / not in mode
+  4 / target missing" set out, every other check → 0 with out 0. Not
+  re-read here: §7.17, §7.23 copy, §8.1 rules 5 and 7, §9.3 unlink,
+  §10.2 pile creation (Ghidra on `0x00562390`, `0x0054D130`,
+  `0x0055D0D0`, `0x00563840`, `0x0055A090`).
+- MV5: type tests through `0x00629BB0` use itemtypes equivalence; those
+  through `0x0062B400` compare the primary type only (§4.7 type 38;
+  §7.6–§7.8 type 19; §7.12 and §7.20 the book type 18); §7.12 reads the
+  max stack of the item it fills first and announces it first
+  (`0x0055E590`); §7.16 both items join the update list.
+- MV6: §8.2 a refused pickup returns at once (no pickup sound,
+  `0x0055D01C`); 0x26 reads bytes 1–8 only (`0x0054B560`: +1, +5),
+  bytes 9–12 are unread.
