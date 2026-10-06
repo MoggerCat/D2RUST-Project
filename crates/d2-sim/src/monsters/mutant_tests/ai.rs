@@ -581,3 +581,23 @@ fn circle_low_byte_128_is_method_6() {
     w.with(|g, cx| circle(g, cx, mon, Some(pl), 3, false));
     assert_eq!(w.velocity().method, 6);
 }
+
+// Covers: specs/monsters/ai.md §3.3 r3
+#[test]
+fn install_switches_to_alternate_only_when_nonzero() {
+    // The current record's think is the control's function but its
+    // alternate is 0: not step 3; step 4 resets the params and keeps the
+    // think.
+    let ai = table::AI_TABLE
+        .iter()
+        .position(|r| r.think != 0 && r.alt == 0)
+        .expect("an AI") as u16;
+    let mut w = World::new(monstats(ai, [0; 5], 15));
+    let mon = w.mon;
+    let think = w.control().function;
+    assert_ne!(think, 0);
+    w.control().params[0] = 5;
+    w.with(|g, cx| install(g, cx, mon, 0));
+    let c = w.control().clone();
+    assert_eq!((c.params[0], c.function), (0, think));
+}
