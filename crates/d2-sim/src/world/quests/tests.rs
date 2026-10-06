@@ -214,6 +214,33 @@ pub(super) struct Fake {
     pub(super) next_missile: u32,
     /// Client save flags by player (absent: no client).
     pub(super) client_flags: BTreeMap<UnitId, u16>,
+    // Act II seams (`world/quests-act2.md`).
+    /// Levels of non-player units (objects, monsters).
+    pub(super) unit_levels: BTreeMap<UnitId, u32>,
+    /// The quest-chest gate is closed (`quest_chest_gate` false).
+    pub(super) gate_closed: bool,
+    /// `quest_drop` fails.
+    pub(super) drop_fails: bool,
+    /// Items made by `quest_drop`, in order (ids from 600).
+    pub(super) dropped: Vec<UnitId>,
+    /// `spawn_quest_object` results in order (empty: fails).
+    pub(super) object_spawns: Vec<Option<UnitId>>,
+    /// Busy players.
+    pub(super) busy: Vec<UnitId>,
+    /// Interact units by player.
+    pub(super) interact: BTreeMap<UnitId, (u8, u32)>,
+    /// `missiles.txt` Range by row.
+    pub(super) missile_ranges: BTreeMap<u32, i32>,
+    /// Trading players.
+    pub(super) trading: Vec<UnitId>,
+    /// `npc_hold_chat` answer.
+    pub(super) npc_held: bool,
+    /// `spawn_location` answer.
+    pub(super) spawn_loc: Option<(i32, i32, RoomId)>,
+    /// `unit_distance` answers by (a, b); missing: `i32::MAX`.
+    pub(super) distances: BTreeMap<(UnitId, UnitId), i32>,
+    /// `living_player_within` answer.
+    pub(super) living_near: bool,
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -312,7 +339,10 @@ impl QuestWorld for Fake {
         self.players.get(&unit).and_then(|p| p.act)
     }
     fn unit_level(&self, unit: UnitId) -> Option<u32> {
-        self.players.get(&unit).and_then(|p| p.level)
+        match self.players.get(&unit) {
+            Some(p) => p.level,
+            None => self.unit_levels.get(&unit).copied(),
+        }
     }
     fn player_class(&self, player: UnitId) -> u8 {
         self.players[&player].class
@@ -523,6 +553,124 @@ impl QuestWorld for Fake {
     fn open_quest_message(&mut self, p: UnitId, o: UnitId, msg: u16) {
         self.log.push(format!("message {} {} {msg}", p.0, o.0));
     }
+    fn client_in_act(&mut self, p: UnitId, act: u8) -> bool {
+        self.unit_act(p) == Some(act)
+    }
+    fn start_tainted_sun(&mut self, act: u8) {
+        self.log.push(format!("sun start {act}"));
+    }
+    fn end_tainted_sun(&mut self) {
+        self.log.push("sun end".into());
+    }
+    fn quest_chest_gate(&mut self, _: UnitId, _: UnitId) -> bool {
+        !self.gate_closed
+    }
+    fn quest_drop(
+        &mut self,
+        u: UnitId,
+        code: [u8; 4],
+        quality: u8,
+        level: Option<i32>,
+        droppable: bool,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "qdrop {} {} {quality} {level:?} {droppable}",
+            u.0,
+            String::from_utf8_lossy(&code)
+        ));
+        if self.drop_fails {
+            return None;
+        }
+        let item = UnitId(600 + self.dropped.len() as u32);
+        self.dropped.push(item);
+        self.item_codes.insert(item, code);
+        Some(item)
+    }
+    fn identify_item(&mut self, item: UnitId) {
+        self.log.push(format!("identify {}", item.0));
+    }
+    fn object_treasure(&mut self, o: UnitId, kind: u8) {
+        self.log.push(format!("treasure {} {kind}", o.0));
+    }
+    fn drop_gold(&mut self, o: UnitId) {
+        self.log.push(format!("gold {}", o.0));
+    }
+    fn set_room_portal(&mut self, room: RoomId, on: bool) {
+        self.log.push(format!("room portal {room:?} {on}"));
+    }
+    fn spawn_quest_object(&mut self, _: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.log.push(format!("spawn object {class} {x} {y}"));
+        if self.object_spawns.is_empty() {
+            None
+        } else {
+            self.object_spawns.remove(0)
+        }
+    }
+    fn free_object_collision(&mut self, o: UnitId) {
+        self.log.push(format!("free collision {}", o.0));
+    }
+    fn player_busy(&mut self, p: UnitId) -> bool {
+        self.busy.contains(&p)
+    }
+    fn interact_unit(&mut self, p: UnitId) -> Option<(u8, u32)> {
+        self.interact.get(&p).copied()
+    }
+    fn set_interact_unit(&mut self, p: UnitId, unit: Option<(u8, u32)>) {
+        self.log.push(format!("interact {} {unit:?}", p.0));
+        match unit {
+            Some(u) => self.interact.insert(p, u),
+            None => self.interact.remove(&p),
+        };
+    }
+    fn open_insert_dialog(&mut self, p: UnitId, o: UnitId) {
+        self.log.push(format!("insert dialog {} {}", p.0, o.0));
+    }
+    fn missile_range(&mut self, row: u32) -> Option<i32> {
+        self.missile_ranges.get(&row).copied()
+    }
+    fn is_trading(&mut self, p: UnitId) -> bool {
+        self.trading.contains(&p)
+    }
+    fn remove_unit(&mut self, u: UnitId) {
+        self.log.push(format!("remove unit {}", u.0));
+    }
+    fn npc_hold_chat(&mut self, n: UnitId) -> bool {
+        self.log.push(format!("hold chat {}", n.0));
+        self.npc_held
+    }
+    fn spawn_location(&mut self, act: u8, level: u32, kind: u8) -> Option<(i32, i32, RoomId)> {
+        self.log
+            .push(format!("spawn location {act} {level} {kind}"));
+        self.spawn_loc
+    }
+    fn free_spot_near(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+    ) -> Option<(i32, i32, RoomId)> {
+        self.log
+            .push(format!("spot near {x} {y} {size} {mask:#x} {radius}"));
+        self.spot.map(|(dx, dy)| (x + dx, y + dy, room))
+    }
+    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
+        self.distances.get(&(a, b)).copied().unwrap_or(i32::MAX)
+    }
+    fn living_player_within(&mut self, _: UnitId, radius: i32) -> bool {
+        self.log.push(format!("living within {radius}"));
+        self.living_near
+    }
+    fn npc_intro_heard(&mut self, p: UnitId, class: u16) -> bool {
+        let d = usize::from(self.difficulty);
+        self.p(p).quests.intro[d].contains(&class)
+    }
+    fn set_npc_intro(&mut self, p: UnitId, class: u16) {
+        let d = usize::from(self.difficulty);
+        self.p(p).quests.intro[d].insert(class);
+    }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
     }
@@ -663,11 +811,12 @@ fn fresh_game_entry() {
     // chain 2 stays at 0.
     assert_eq!(ctl.record(1).unwrap().state, 1);
     assert_eq!(ctl.record(2).unwrap().state, 0);
+    assert_eq!(ctl.record(13).unwrap().state, 0);
     assert_eq!(
         f.log,
         [
-            // Sequence functions of chains 8, 18, 22, 31.
-            "unhandled 8 0x5991c0",
+            // Sequence functions of chains 18, 22, 31 (chain 8's is
+            // `act2::sequence`: state 1, not-intro → 1, chain 13 stays 0).
             "unhandled 18 0x5ba7b0",
             "unhandled 22 0x5b38e0",
             "unhandled 31 0x587560"
