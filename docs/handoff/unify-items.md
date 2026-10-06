@@ -1,6 +1,6 @@
 # Handoff: one item store and one inventory per game — `claude/unify-items`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it (§1 state, §3 code map, §7 questions).
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: wiring
 architecture, high (METHODS M14). Base: `claude/tender-meitner-mphas3`

@@ -95,9 +95,11 @@ impl Gpu {
 
     /// Records both dispatches of `packed` into `encoder` over a resident
     /// atlas (from [`Gpu::atlas_texture`] of `pages` pages) and returns
-    /// the RGBA8 buffer: one RGBA8 word per pixel, rows of `width × 4`
-    /// bytes, usable as a copy source. Nothing is submitted or read back;
-    /// `None` for an empty view.
+    /// `(indices, rgba)`: the index framebuffer (one u32 word per pixel
+    /// holding 0..=255, the frame cycle's next base) and the RGBA8 buffer
+    /// (one RGBA8 word per pixel, rows of `width × 4` bytes), both usable
+    /// as copy sources. Nothing is submitted or read back; `None` for an
+    /// empty view.
     pub fn encode_rgba(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -105,7 +107,7 @@ impl Gpu {
         atlas: &wgpu::Texture,
         pages: u32,
         palette: &Palette,
-    ) -> Result<Option<wgpu::Buffer>, GpuError> {
+    ) -> Result<Option<(wgpu::Buffer, wgpu::Buffer)>, GpuError> {
         if pages != packed.params.pages {
             return Err(GpuError::PageCount {
                 pages: pages as usize,
@@ -116,7 +118,8 @@ impl Gpu {
             return Ok(None);
         }
         self.check_limits(packed, u64::from(pages))?;
-        Ok(self.encode(encoder, packed, atlas, Some(palette)).1)
+        let (indices, rgba) = self.encode(encoder, packed, atlas, Some(palette));
+        Ok(rgba.map(|rgba| (indices, rgba)))
     }
 
     fn run(

@@ -72,7 +72,9 @@ fn live_inventory_records_both_resolutions() {
         let g = t.grids[r];
         assert_eq!((g.grid_x, g.grid_y), spec_grid(r), "record {r}");
     }
-    // Records 16–31: the 800 × 600 copies of 0–15, record 29 255 × 255.
+    // Records 16–31: the 800 × 600 layouts of 0–15 with the grid sizes of
+    // record r − 16, except 29 (Hireling2): 255 × 255, its `.txt` grid is
+    // −1 stored as u8 (inventory.md §1.3, GX1 answered).
     for r in 16..32 {
         let g = t.grids[r];
         let want = if r == 29 {
@@ -83,7 +85,7 @@ fn live_inventory_records_both_resolutions() {
         assert_eq!(
             (g.grid_x, g.grid_y),
             want,
-            "record {r} (copy of {})",
+            "record {r} (grid of {})",
             r - 16
         );
     }

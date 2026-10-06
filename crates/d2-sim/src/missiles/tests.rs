@@ -5,6 +5,7 @@ use d2_data::tables::Record;
 
 use super::catalogue::{self, seeded_offset, SRVDO_TSV, SRVHIT_TSV, SRV_DO, SRV_HIT};
 use super::create::MissileParams;
+use super::seams::SkillCalc;
 use super::*;
 use crate::rng::Seed;
 use crate::tick::run_timer_events;
@@ -75,6 +76,23 @@ struct Fake {
     setup_sets_valid: bool,
     /// Units that are hirelings.
     hirelings: BTreeSet<UnitId>,
+    /// The server bodies' seams (`MissileBodies`, `tests/r9.rs`).
+    mb: Bodies,
+}
+
+/// Scripted answers of the server bodies' seams.
+#[derive(Default)]
+struct Bodies {
+    /// `missile_calc` result.
+    calc: i32,
+    /// Skills that exist, with (calc1, calc2, aurarange, auralen).
+    skills: BTreeMap<i32, [i32; 4]>,
+    new_step: bool,
+    target: Option<UnitId>,
+    frames: BTreeMap<UnitId, i32>,
+    dead: BTreeSet<UnitId>,
+    /// `area_units` answer.
+    area: Vec<UnitId>,
 }
 
 impl Fake {
@@ -292,6 +310,73 @@ impl MissileHooks for Fake {
     }
     fn unique_mod_missile(&mut self, _: &mut Game, _: UnitId, _: UnitId) {
         self.log.push("umod".into());
+    }
+}
+
+impl MissileBodies for Fake {
+    fn missile_calc(
+        &mut self,
+        _: &mut Game,
+        m: UnitId,
+        _: Option<UnitId>,
+        field: u32,
+        _: i32,
+        level: i32,
+    ) -> i32 {
+        self.log.push(format!("calc {} {field} {level}", m.0));
+        self.mb.calc
+    }
+    fn skill_exists(&self, skill: i32) -> bool {
+        self.mb.skills.contains_key(&skill)
+    }
+    fn skill_calc(
+        &mut self,
+        _: &mut Game,
+        _: Option<UnitId>,
+        skill: i32,
+        calc: SkillCalc,
+        _: i32,
+    ) -> i32 {
+        let v = self.mb.skills.get(&skill).copied().unwrap_or_default();
+        self.log.push(format!("skillcalc {calc:?}"));
+        v[calc as usize]
+    }
+    fn path_new_step(&self, _: UnitId) -> bool {
+        self.mb.new_step
+    }
+    fn path_target(&mut self, _: &Game, _: UnitId) -> Option<UnitId> {
+        self.mb.target
+    }
+    fn or_collision(&mut self, _: &mut Game, _: RoomId, x: i32, y: i32, bits: u16) {
+        self.log.push(format!("or {x} {y} {bits:#x}"));
+    }
+    fn stamp_collision(&mut self, _: &mut Game, unit: UnitId, bits: u16) {
+        self.log.push(format!("stamp {} {bits:#x}", unit.0));
+    }
+    fn anim_frame(&self, unit: UnitId) -> i32 {
+        self.mb.frames.get(&unit).copied().unwrap_or(0)
+    }
+    fn set_anim_frame(&mut self, unit: UnitId, v: i32) {
+        self.mb.frames.insert(unit, v);
+    }
+    fn is_dead(&self, unit: UnitId) -> bool {
+        self.mb.dead.contains(&unit)
+    }
+    fn area_units(&mut self, _: &Game, _: UnitId, at: (i32, i32), r: i32, f: u32) -> Vec<UnitId> {
+        self.log.push(format!("scan {at:?} {r} {f:#x}"));
+        self.mb.area.clone()
+    }
+    fn area_hit(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        unit: UnitId,
+        rec: &crate::combat::DamageRecord,
+    ) {
+        self.log.push(format!(
+            "areahit {} {} {} {:#x}",
+            unit.0, rec.fire, rec.cold_len, rec.result
+        ));
     }
 }
 
@@ -923,7 +1008,8 @@ fn explosion_rows_skip_direct_damage() {
 #[test]
 fn server_hit_stub_logged_on_expiry() {
     let mut r = row();
-    r.psrvhitfunc = 1;
+    // Server-hit 2: a stub (body not specified).
+    r.psrvhitfunc = 2;
     r.range = 1;
     let mut w = World::new(r);
     let m = w.create(&w.params()).unwrap();
@@ -932,7 +1018,7 @@ fn server_hit_stub_logged_on_expiry() {
     assert_eq!(
         w.store.unhandled,
         [Unhandled::SrvHit {
-            index: 1,
+            index: 2,
             missile: m
         }]
     );
@@ -954,8 +1040,8 @@ fn server_do_dispatch_limits() {
         assert!(w.alive(m));
         assert!(w.store.unhandled.is_empty());
     }
-    // A stub and a null entry are logged.
-    for (f, want) in [(2u16, false), (4, true)] {
+    // A stub (6: body not specified) and a null entry are logged.
+    for (f, want) in [(6u16, false), (4, true)] {
         let mut r = row();
         r.psrvdofunc = f;
         let mut w = World::new(r);
@@ -968,7 +1054,7 @@ fn server_do_dispatch_limits() {
             }
         } else {
             Unhandled::SrvDo {
-                index: 2,
+                index: 6,
                 missile: m,
             }
         };
@@ -1820,7 +1906,9 @@ fn collide_kill_sets_result_bit_one() {
 fn no_unit_no_a4_skips_to_exit_unless_always_explode() {
     for (always, kill) in [(0, 1), (0, 0), (1, 1)] {
         let mut r = row();
-        r.psrvhitfunc = 1;
+        // Server-hit 2: a stub (body not specified), observable in
+        // `unhandled`.
+        r.psrvhitfunc = 2;
         r.alwaysexplode = always;
         r.collidekill = kill;
         let mut w = World::new(r);
@@ -2242,3 +2330,5 @@ fn null_table_entries_are_flagged() {
 // they share this module's fakes.
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
+
+mod r9;

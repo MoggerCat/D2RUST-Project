@@ -48,16 +48,10 @@ pub struct Finder<'a, C: ?Sized> {
 }
 
 /// Target refresh point (`0x00679250`, §9.5): the target unit's position
-/// plus the lead.
-pub fn refresh_point<U: WalkUnits + ?Sized>(u: &U, path: &DynamicPath, unit: UnitId) -> Point {
-    let p = u.position(unit);
-    let ty = u.unit_type(unit);
-    if path.target_lead != 0 && (ty == UnitType::Player || ty == UnitType::Monster) {
-        // TODO(spec: pathing.md open question 4, x87 target lead)
-        u.target_lead(unit, p, path.target_lead).unwrap_or(p)
-    } else {
-        p
-    }
+/// plus the lead of §3. The lead byte (+0x68) has no reachable writer in
+/// 1.14d (§3 "Target lead"), so the lead adds 0: the position.
+pub fn refresh_point<U: WalkUnits + ?Sized>(u: &U, _path: &DynamicPath, unit: UnitId) -> Point {
+    u.position(unit)
 }
 
 /// Path compute `0x00649970(path, unit, town access)` (§3). Returns the
@@ -75,9 +69,8 @@ pub fn compute<C: PathWorld + WalkUnits + ?Sized>(
     }
     let owner_ty = c.unit_type(unit);
     if path.flags & flags::MISSILE != 0 {
-        // Missile path `0x00649760`: owner `missiles/missiles.md`.
-        let info = info_of(path, path.cell(), path.target(), None, None, 1);
-        return Ok(c.other_path_function(path, &info));
+        // Missile path `0x00649760` (§11).
+        return super::missile::missile_path(t, c, path, unit);
     }
     // Step 2.
     path.collided_mask = 0;
@@ -103,12 +96,9 @@ pub fn compute<C: PathWorld + WalkUnits + ?Sized>(
             }
             match c.unit_type(tu.unit) {
                 UnitType::Player | UnitType::Monster => {
-                    if path.target_lead != 0 {
-                        // TODO(spec: pathing.md open question 4, x87 target lead)
-                        if let Some(p) = c.target_lead(tu.unit, tp, path.target_lead) {
-                            path.put_target(p);
-                        }
-                    }
+                    // Target lead `0x00679190` (path +0x68 ≠ 0): +0x68 has
+                    // no reachable writer in 1.14d, so the lead adds 0
+                    // (§3 "Target lead"); r = 1 either way.
                     slack = 1;
                 }
                 UnitType::Object => {
@@ -261,6 +251,8 @@ fn run_function<C: PathWorld + WalkUnits + ?Sized>(
         // 2, 5, 6, 13 share `0x00679C80`; 5 and 6 have a direction offset.
         path_types::TOWARD | 5 | 6 | path_types::TOWARD_FINISH => toward(&mut f, path, info),
         path_types::STRAIGHT => straight(&mut f, path, info),
+        // 4, 10, 14 carry flag 0x40000 and are computed by §11; reaching
+        // the function table without it is fatal (§2).
         4 | 10 | 14 | 17 => Err(WalkError::Fatal("path type without a function")),
         _ => Ok(f.c.other_path_function(path, info)),
     }

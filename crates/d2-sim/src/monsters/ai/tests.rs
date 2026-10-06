@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use d2_data::tables::{Levels, Monstats, Monstats2, Record};
 
 use super::functions::IMPLEMENTED;
-use super::table::AI_FUNCTIONS_TSV;
+use super::table::{AI_FUNCTIONS_TSV, SPECD_HERE};
 use super::*;
 use crate::rng::Seed;
 use crate::units::RoomId;
@@ -60,6 +60,30 @@ struct Fake {
     acts: BTreeMap<UnitId, u8>,
     /// `choose_alternative` takes the slot-9 alternative.
     take_alt: bool,
+    /// NPC interaction block (monster data +0x30).
+    npc_block: bool,
+    /// Players in the NPC's interaction list.
+    npc_list: BTreeSet<UnitId>,
+    /// Quest seams (§9.32): setup result, out-of-town spawn result,
+    /// portal coordinates, drehya walk gate.
+    portal_setup_fails: bool,
+    portal_spawn_ok: bool,
+    portal: Option<(i32, i32)>,
+    drehya_wait: bool,
+    /// Path stops (`stop_path` calls).
+    stops: u32,
+    /// Unit stats by (unit, stat) for `stat` / `set_stat`.
+    stats: BTreeMap<(UnitId, u16), i32>,
+    /// Life percent per unit, overriding `life` (Fetish reads T's).
+    life_of: BTreeMap<UnitId, i32>,
+    path_target: Option<UnitId>,
+    footprint: bool,
+    evil_monster: Option<UnitId>,
+    /// Npc class-case quest answers (§9.9 step 2).
+    jerhyn: Option<(i32, i32, bool)>,
+    alkor_bird: bool,
+    ormus_altar: Option<(i32, i32)>,
+    cain_town: Option<(i32, i32)>,
 }
 
 impl Fake {
@@ -106,8 +130,8 @@ impl AiUnits for Fake {
     fn monster_level(&self, _: UnitId) -> i32 {
         5
     }
-    fn life_percent(&self, _: UnitId) -> i32 {
-        self.life
+    fn life_percent(&self, unit: UnitId) -> i32 {
+        self.life_of.get(&unit).copied().unwrap_or(self.life)
     }
     fn add_life(&mut self, _: UnitId, amount: i32) {
         self.log.push(format!("life {amount}"));
@@ -140,6 +164,34 @@ impl AiUnits for Fake {
     fn busy(&self, unit: UnitId) -> bool {
         self.busy.contains(&unit)
     }
+    fn has_interaction_block(&self, _: UnitId) -> bool {
+        self.npc_block
+    }
+    fn in_interaction_list(&self, _: UnitId, player: UnitId) -> bool {
+        self.npc_list.contains(&player)
+    }
+    fn set_life(&mut self, unit: UnitId, value: i32) {
+        self.log.push(format!("setlife {} {value}", unit.0));
+    }
+    fn stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.stats.get(&(unit, stat)).copied().unwrap_or(0)
+    }
+    fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.stats.insert((unit, stat), value);
+    }
+    fn set_unit_flag(&mut self, _: UnitId, mask: u32) {
+        self.log.push(format!("flag {mask:#x}"));
+    }
+    fn set_state(&mut self, unit: UnitId, state: u16, on: bool) {
+        if on {
+            self.states.insert((unit, state));
+        } else {
+            self.states.remove(&(unit, state));
+        }
+    }
+    fn path_target(&self, _: UnitId) -> Option<UnitId> {
+        self.path_target
+    }
 }
 
 impl AiModes for Fake {
@@ -167,7 +219,9 @@ impl AiModes for Fake {
     fn path_blocked(&self, _: UnitId) -> bool {
         self.blocked_path
     }
-    fn stop_path(&mut self, _: UnitId) {}
+    fn stop_path(&mut self, _: UnitId) {
+        self.stops += 1;
+    }
     fn set_current_skill(&mut self, _: UnitId, skill: i32) -> bool {
         self.log.push(format!("skill {skill}"));
         skill >= 0
@@ -193,6 +247,12 @@ impl AiModes for Fake {
     }
     fn operate_door(&mut self, _: &mut Game, _: UnitId, door: UnitId) {
         self.log.push(format!("door {door:?}"));
+    }
+    fn start_overlay(&mut self, _: UnitId, overlay: i32) {
+        self.log.push(format!("overlay {overlay}"));
+    }
+    fn set_facing(&mut self, _: UnitId, dir: i32) {
+        self.log.push(format!("facing {dir}"));
     }
 }
 
@@ -221,6 +281,10 @@ impl AiWorld for Fake {
     }
     fn last_dead(&self, _: &Game, room: RoomId) -> [Option<UnitId>; 4] {
         self.last_dead.get(&room).copied().unwrap_or([None; 4])
+    }
+    fn footprint_ok(&self, _: &Game, class: i32, _: Option<RoomId>, x: i32, y: i32) -> bool {
+        let _ = (class, x, y);
+        self.footprint
     }
 }
 
@@ -278,12 +342,71 @@ impl AiTargets for Fake {
         self.log.push(format!("corpses {max_sq} {own}"));
         self.corpses
     }
+    fn nearest_evil_monster(&mut self, _: &mut Game, _: UnitId) -> Option<UnitId> {
+        self.log.push("help scan".into());
+        self.evil_monster
+    }
 }
 
 impl AiSkills for Fake {
     fn skill_usable(&mut self, _: &mut Game, _: UnitId, skill: i32, _: UnitId) -> bool {
         self.log.push(format!("usable {skill}"));
         !self.skill_unusable
+    }
+}
+
+impl AiQuests for Fake {
+    fn portal_setup(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest setup {npc:?}"));
+        !self.portal_setup_fails
+    }
+    fn spawn_town_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) {
+        self.log.push(format!("quest town portal {npc:?}"));
+    }
+    fn spawn_outside_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest outside portal {npc:?}"));
+        self.portal_spawn_ok
+    }
+    fn portal_coords(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> Option<(i32, i32)> {
+        self.log.push(format!("quest coords {npc:?}"));
+        self.portal
+    }
+    fn drehya_update(&mut self, _: &mut Game) {
+        self.log.push("quest drehya update".into());
+    }
+    fn drehya_wait(&mut self, _: &mut Game) -> bool {
+        self.log.push("quest drehya wait".into());
+        self.drehya_wait
+    }
+    fn jerhyn_palace_active(&mut self, _: &mut Game) -> bool {
+        self.jerhyn.is_some()
+    }
+    fn jerhyn_npc_state(&mut self, _: &mut Game, _: UnitId) -> (i32, i32) {
+        self.jerhyn.map_or((0, 0), |(a, b, _)| (a, b))
+    }
+    fn guard_moving(&mut self, _: &mut Game, _: UnitId) -> bool {
+        self.jerhyn.is_some_and(|j| j.2)
+    }
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.log.push("quest alkor reset".into());
+    }
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.log.push("quest ormus altar".into());
+    }
+    fn cain_town_coords(&mut self, _: &mut Game, _: UnitId) -> Option<(i32, i32)> {
+        self.cain_town
+    }
+    fn cain_in_town_activated(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest cain activated".into());
+    }
+    fn anya_open_portal(&mut self, _: &mut Game, _: UnitId) {
+        self.log.push("quest anya portal".into());
     }
 }
 
@@ -310,7 +433,7 @@ struct World {
     monstats: Vec<Monstats>,
     monstats2: Vec<Monstats2>,
     levels: Vec<Levels>,
-    modes: Vec<[u8; 3]>,
+    modes: Vec<[u8; 4]>,
     room: RoomId,
     mon: UnitId,
     player: UnitId,
@@ -340,7 +463,7 @@ impl World {
             monstats: vec![row],
             monstats2: vec![Monstats2::decode(&vec![0u8; Monstats2::SIZE])],
             levels: vec![Levels::decode(&vec![0u8; Levels::SIZE])],
-            modes: vec![[0; 3]],
+            modes: vec![[0; 4]],
             room,
             mon,
             player,
@@ -970,15 +1093,20 @@ fn install_sets_think_and_alternate() {
     w.with(|g, cx| install(g, cx, mon, 0));
     let c = w.store.control(mon).unwrap();
     assert_eq!((c.function, c.params), (0x005F_1750, [1, 2, 3]));
-    // An init function is a logged stub; a record without think → Idle.
+    // An init function runs (FoulCrowNest's, §9.17: param 0 := frame);
+    // one without a body is a logged stub (BoneWall, 84).
     let mut w = World::new(monstats(43, [0; 5], 15));
     let mon = w.mon;
-    assert!(w.store.unhandled.contains(&Unhandled::Function {
-        addr: 0x005F_6630,
-        unit: mon
-    }));
+    assert!(w.store.unhandled.is_empty());
+    w.game.frame = 77;
+    w.store.control_mut(mon).unwrap().function = 0;
     w.with(|g, cx| install(g, cx, mon, 0));
-    let _ = w;
+    assert_eq!(w.store.control(mon).unwrap().params, [77, 0, 0]);
+    let w = World::new(monstats(84, [0; 5], 15));
+    assert!(w.store.unhandled.contains(&Unhandled::Function {
+        addr: 0x005E_0390,
+        unit: w.mon
+    }));
     let mut w = World::new(monstats(3, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| install(g, cx, mon, 18)); // state ≥ 18: nothing
@@ -1009,13 +1137,13 @@ fn special_states_10_to_12_need_switchai() {
 
 #[test]
 fn stub_ai_logged() {
-    let mut w = World::new(monstats(32, [0; 5], 15)); // Npc (summarized)
+    let mut w = World::new(monstats(50, [0; 5], 15)); // Mephisto (unread)
     w.run(false, 0);
     let mon = w.mon;
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7130,
+            addr: 0x005F_78B0,
             unit: mon
         }]
     );
@@ -1074,23 +1202,68 @@ fn ai_table_check_catches_perturbations() {
     assert!(err.starts_with("index 15:"), "{err}");
 }
 
+/// Checks [`SPECD_HERE`] against the catalogue's `status` column, row by
+/// row. Returns the first disagreement.
+fn check_specd_here(tsv: &str, specd: &[u8]) -> Result<(), String> {
+    let rows: Vec<&str> = tsv.lines().skip(1).filter(|l| !l.is_empty()).collect();
+    if specd.windows(2).any(|w| w[0] >= w[1]) {
+        return Err("SPECD_HERE not ascending".into());
+    }
+    if let Some(&i) = specd.iter().find(|&&i| usize::from(i) >= rows.len()) {
+        return Err(format!("index {i}: no row"));
+    }
+    for (i, line) in rows.iter().enumerate() {
+        let c: Vec<&str> = line.split('\t').collect();
+        if c.len() != 11 || c[0] != i.to_string() {
+            return Err(format!("row {i}: bad row"));
+        }
+        let tsv = c[10] == "spec'd-here";
+        let ours = specd.contains(&(i as u8));
+        if tsv != ours {
+            return Err(format!("index {i}: status {}, mirror {ours}", c[10]));
+        }
+    }
+    Ok(())
+}
+
+// Covers: specs/monsters/ai.md §10
+#[test]
+fn specd_here_matches_tsv() {
+    check_specd_here(AI_FUNCTIONS_TSV, &SPECD_HERE).unwrap();
+}
+
+#[test]
+fn specd_here_check_catches_perturbations() {
+    // A row's status changed in the catalogue.
+    let row98 = AI_FUNCTIONS_TSV
+        .lines()
+        .find(|l| l.starts_with("98\t"))
+        .unwrap();
+    let bad = AI_FUNCTIONS_TSV.replacen(row98, &row98.replace("\tspec'd-here", "\tsummarized"), 1);
+    let err = check_specd_here(&bad, &SPECD_HERE).unwrap_err();
+    assert!(err.starts_with("index 98:"), "{err}");
+    // An index dropped from, or added to, the mirror.
+    let mut fewer = SPECD_HERE.to_vec();
+    fewer.retain(|&i| i != 60);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &fewer).unwrap_err();
+    assert!(err.starts_with("index 60:"), "{err}");
+    let mut more = SPECD_HERE.to_vec();
+    more.push(147);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &more).unwrap_err();
+    assert!(err.starts_with("index 147:"), "{err}");
+}
+
 #[test]
 fn implemented_matches_catalogue() {
-    // Every spec'd-here think has a body here, and only those (Npc, 32,
-    // is `summarized` and stays a stub).
-    let mut spec: Vec<u8> = AI_FUNCTIONS_TSV
-        .lines()
-        .skip(1)
-        .filter(|l| l.ends_with("\tspec'd-here"))
-        .map(|l| l.split('\t').next().unwrap().parse().unwrap())
-        .collect();
-    spec.sort_unstable();
+    // Every spec'd-here think has a body here, and only those.
     let mut ours: Vec<u8> = IMPLEMENTED.iter().map(|&(_, i)| i).collect();
     ours.sort_unstable();
-    assert_eq!(ours, spec);
+    assert_eq!(ours, SPECD_HERE);
     for (addr, i) in IMPLEMENTED {
         assert_eq!(AI_TABLE[i as usize].think, addr, "index {i}");
         assert!(implemented(addr));
     }
 }
+mod bodies;
+mod npc;
 mod rules;

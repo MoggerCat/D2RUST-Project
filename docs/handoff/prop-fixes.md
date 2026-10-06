@@ -1,5 +1,7 @@
 # Handoff: property-test fixes — `claude/prop-fixes`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06. Task: `docs/HANDOFF.md` §2 step
 7n (the fixes `prop-sim-core` §5 and `fuzz-server` §5 deferred). Task class:
 implementation, medium effort (METHODS M14). Base: `01dff69`

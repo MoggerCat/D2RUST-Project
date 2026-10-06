@@ -11,6 +11,7 @@
 //! [`EventDispatch`] that runs the missile class handler and hands every
 //! other event to the next dispatcher.
 
+pub mod bodies;
 pub mod catalogue;
 mod create;
 mod flight;
@@ -38,7 +39,8 @@ pub use hit::{
     damage_roll, fill_damage, hit_handler, pct, result_flag, result_flags, Damage, ELEMENTS,
 };
 pub use seams::{
-    MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits, MissileWorld,
+    MissileBodies, MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits,
+    MissileWorld, SkillCalc,
 };
 
 /// Flag bits of the parameter record (§R2.1, record +0x00) read by

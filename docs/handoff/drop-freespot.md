@@ -1,6 +1,6 @@
 # Handoff: the treasure drop's FreeSpot on the path provider — `claude/drop-freespot`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it (§1 rows 3s / 3aa, §2 step 7p WP2, §3 code map).
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: wiring, medium
 (METHODS M14). Base: `claude/tender-meitner-mphas3` at `6cd6480` (with

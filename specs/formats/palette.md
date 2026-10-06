@@ -47,7 +47,7 @@ giving a palette index.
 | light level variations [32] | 8192 | 32 |
 | inventory color variations [16] | 4096 | 16 |
 | selected-unit shift | 256 | 1 |
-| alpha blend [3][256] (indexed by [level][destination index], each a map over the source index: `render/composition.md` §5) | 196608 | 768 |
+| alpha blend [3][256] (table `k` byte `256·i + j`; which of `i`, `j` is the destination is per drawer: `render/blend-modes.md` §2) | 196608 | 768 |
 | additive blend [256] | 65536 | 256 |
 | multiplicative blend [256] | 65536 | 256 |
 | hue variations [111] | 28416 | 111 |
@@ -65,9 +65,8 @@ The fixed part (everything before the text colors) is 1024 + 1714 × 256 =
 length: `remaining = 259 × T`. Normally `T = 13`, but some files have
 `T = 12`. A remaining length that isn't a multiple of 259 is an error.
 
-The exact rendering use of each table (which light level maps to which
-brightness, which blend level means which alpha) is a rendering rule for
-Phase 1b/6, not part of the format.
+The rendering use of each table is `render/shading.md` (maps) and
+`render/blend-modes.md` (blend tables), not part of the format.
 
 ## Constants & data dependencies
 
@@ -107,9 +106,10 @@ No Blizzard code or decompiler output was consulted.
    ignored: 1.14d presents it (`render/composition.md` §4). Whether it
    equals the `.dat` colors is `composition.md` OQ1.
 2. ~~Index order of the alpha / additive / multiplicative 256×256
-   tables~~: row = destination, column = source (`render/composition.md`
-   §5; the Layout table now says so). The `d2-formats` doc comment of
-   `Pl2::alpha_blend` still says `[level][source index]`: a code-doc edit.
-   Owner of the meaning: `render/blend-modes.md`.
-2. Rendering meaning of each table: to be specified in a Phase 1b rendering
-   spec, checked visually against the original game.
+   tables~~: the file stores `T[256·i + j]`; cel drawers read `i` =
+   destination, `j` = source, the lit translucent wall drawer the
+   transpose (`render/blend-modes.md` §2). The `d2-formats` doc comment of
+   `Pl2::alpha_blend` still says `[level][source index]`: a code-doc edit
+   (it should name the storage order only).
+3. ~~Rendering meaning of each table~~: `render/shading.md` §1–§2,
+   `render/blend-modes.md` §1.

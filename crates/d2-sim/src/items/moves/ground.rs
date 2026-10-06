@@ -41,7 +41,7 @@ pub fn pickup_auto<W: MoveWorld>(
         gold_pickup(w, player, item);
         return Ok(Outcome::DONE);
     }
-    if w.pickup_special(player, item) {
+    if pickup_special(w, player, item)? {
         return Ok(Outcome::DONE);
     }
     if let Some(l) = w.auto_equip(player, item, false) {
@@ -158,13 +158,144 @@ pub fn refused_pickup<W: MoveWorld>(w: &mut W, player: Owner, item: Guid, s: u32
     w.sound(player, s);
 }
 
-/// Code pairs the held test treats as equal (§8.4 rule 6; more pairs not
-/// read: OQ19).
-pub const HELD_PAIRS: [([u8; 4], [u8; 4]); 4] = [
+/// Pickup specials `0x00560020` (§8.1 step 4): a scroll into a tome, a
+/// book onto a tome, an auto-stack item onto existing stacks. True =
+/// handled.
+pub fn pickup_special<W: MoveWorld>(
+    w: &mut W,
+    player: Owner,
+    item: Guid,
+) -> Result<bool, MoveFatal> {
+    if w.is_type(item, ty::SCRO) {
+        let Some(t) = tome_for(w, player, item) else {
+            return Ok(false);
+        };
+        return Ok(super::handlers::scroll_into_book(w, player, item, t)?.ok);
+    }
+    if w.is_type(item, ty::BOOK) {
+        return book_onto_tome(w, player, item);
+    }
+    if w.stackable(item) && w.autostack(item) {
+        return Ok(auto_stack(w, player, item));
+    }
+    Ok(false)
+}
+
+/// "Tome for P" `0x0063C3B0` (§8.1 step 4): the first item of page 0's
+/// grid item list of primary type 18 whose spell equals P's and whose
+/// stat 70 is below its total max stack.
+pub fn tome_for<W: MoveWorld>(w: &W, player: Owner, p: Guid) -> Option<Guid> {
+    let spell = w.spell(p);
+    w.page_items(player, page::INVENTORY)
+        .into_iter()
+        .find(|&t| {
+            w.primary_type(t) == ty::BOOK
+                && w.spell(t) == spell
+                && w.stat(Owner::item(t), stat::QUANTITY) < w.max_stack(t)
+        })
+}
+
+/// P leaves its room and is freed, cursor := none (§8.1 step 4).
+fn consume_picked<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) {
+    leave_room(w, p);
+    clear_uflags(w, p, uflag::TARGETABLE);
+    w.free_item(p);
+    w.set_cursor(player, None);
+}
+
+/// Book onto a tome `0x0055D370` (§8.1 step 4).
+fn book_onto_tome<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) -> Result<bool, MoveFatal> {
+    let Some(t) = tome_for(w, player, p) else {
+        return Ok(false);
+    };
+    let (po, to) = (Owner::item(p), Owner::item(t));
+    let (qp, qt, m) = (
+        w.stat(po, stat::QUANTITY),
+        w.stat(to, stat::QUANTITY),
+        w.max_stack(t),
+    );
+    if qp < 0 || qt < 0 || m < 0 {
+        return Err(MoveFatal::NegativeQuantity);
+    }
+    if qt.wrapping_add(qp) > m {
+        w.set_stat(to, stat::QUANTITY, m);
+        w.send_item_stat(player, t, stat::QUANTITY);
+        w.set_stat(po, stat::QUANTITY, qt.wrapping_add(qp).wrapping_sub(m));
+        w.send_item_stat(player, p, stat::QUANTITY);
+        w.book_count_changed(player, m.wrapping_sub(qt));
+    } else {
+        w.set_stat(to, stat::QUANTITY, qt.wrapping_add(qp));
+        w.send_item_stat(player, t, stat::QUANTITY);
+        w.book_count_changed(player, qp);
+        consume_picked(w, player, p);
+    }
+    Ok(true)
+}
+
+/// Auto-stack `0x0055D0D0` (§8.1 step 4): onto the stacks of the body
+/// grid (when P's itemtype `quiver` ≠ 0), then of page 0's grid, in grid
+/// list order, while P's quantity lasts. No candidate → not handled
+/// (earlier partial merges stay).
+fn auto_stack<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) -> bool {
+    let po = Owner::item(p);
+    let mut cands = Vec::new();
+    if w.quiver(p) {
+        cands.extend(w.body_items(player));
+    }
+    cands.extend(w.page_items(player, page::INVENTORY));
+    let books = |w: &W, d: Guid| w.primary_type(p) == ty::BOOK && w.primary_type(d) == ty::BOOK;
+    let mut next = cands.into_iter();
+    while w.stat(po, stat::QUANTITY) > 0 {
+        let Some(d) = next.by_ref().find(|&d| {
+            d != p && w.stack_test(p, d) && w.stat(Owner::item(d), stat::QUANTITY) < w.max_stack(d)
+        }) else {
+            return false;
+        };
+        let dd = Owner::item(d);
+        let (q, qd, m) = (
+            w.stat(po, stat::QUANTITY),
+            w.stat(dd, stat::QUANTITY),
+            w.max_stack(d),
+        );
+        if qd.wrapping_add(q) <= m {
+            if w.merge_allowed(p) {
+                let dp = w.stat(po, stat::DURABILITY);
+                if dp < w.stat(dd, stat::DURABILITY) {
+                    w.set_stat(dd, stat::DURABILITY, dp);
+                    w.send_item_stat(player, d, stat::DURABILITY);
+                }
+            }
+            w.set_stat(dd, stat::QUANTITY, qd.wrapping_add(q));
+            w.send_item_stat(player, d, stat::QUANTITY);
+            w.set_stat(po, stat::QUANTITY, 0);
+            if books(w, d) {
+                w.book_count_changed(player, q);
+            }
+            consume_picked(w, player, p);
+            return true;
+        }
+        w.set_stat(dd, stat::QUANTITY, m);
+        w.send_item_stat(player, d, stat::QUANTITY);
+        w.set_stat(po, stat::QUANTITY, q.wrapping_add(qd).wrapping_sub(m));
+        if books(w, d) {
+            w.book_count_changed(player, m.wrapping_sub(qd));
+        }
+    }
+    false
+}
+
+/// Code pairs the held test treats as equal, both orders (§8.4 rule 6,
+/// `0x0055CA00`; the full list).
+pub const HELD_PAIRS: [([u8; 4], [u8; 4]); 9] = [
     (*b"j34 ", *b"g34 "),
     (*b"bks ", *b"bkd "),
     (*b"d33 ", *b"g33 "),
     (*b"hst ", *b"msf "),
+    (*b"hst ", *b"vip "),
+    (*b"qf2 ", *b"qf1 "),
+    (*b"qf2 ", *b"qhr "),
+    (*b"qf2 ", *b"qey "),
+    (*b"qf2 ", *b"qbr "),
 ];
 
 /// Quest-pickup table `0x00731FEC`: (quest, `quest` value).
@@ -182,7 +313,8 @@ fn carry_one_unique<W: MoveWorld>(w: &W, item: Guid) -> bool {
 }
 
 /// Held test `0x0055CA40` (§8.4 rule 6): true = the player already holds
-/// a matching item.
+/// a matching item. Walks the player's item list, then the item lists of
+/// the player's corpses; each walk stops at the picked item P itself.
 pub fn held<W: MoveWorld>(w: &W, player: Owner, item: Guid) -> bool {
     let unique = carry_one_unique(w, item);
     let quest = w.quest(item);
@@ -190,11 +322,12 @@ pub fn held<W: MoveWorld>(w: &W, player: Owner, item: Guid) -> bool {
     let mut units = vec![player];
     units.extend(w.held_test_units(player));
     units.into_iter().any(|u| {
-        w.items(u).into_iter().any(|h| {
-            h != item
-                && w.page(h) != page::TRADE1
-                && ((unique && carry_one_unique(w, h) && w.file_index(h) == w.file_index(item))
-                    || (quest != 0 && w.quest(h) == quest && same_code(w.code(h), code)))
+        w.items(u).into_iter().take_while(|&h| h != item).any(|h| {
+            w.page(h) != page::TRADE1
+                && ((unique
+                    && w.quality(h) == crate::items::q::UNIQUE
+                    && w.file_index(h) == w.file_index(item))
+                    || (w.quest(h) != 0 && w.quest(h) == quest && same_code(w.code(h), code)))
         })
     })
 }
@@ -251,7 +384,7 @@ pub fn drop_spot<W: MoveWorld>(w: &W, unit: Owner, last: u32) -> Option<Spot> {
 }
 
 /// Ground expiry `0x00558A10` (§9.2): the value stored at item data +0x24.
-/// Quest items store 0 ("never").
+/// Quest items store the absolute value 0 ("never"; not frame + 0).
 pub fn ground_expiry<W: MoveWorld>(w: &W, item: Guid) -> i32 {
     if w.quest(item) != 0 {
         return 0;
@@ -394,4 +527,21 @@ pub fn gold_piles<W: MoveWorld>(w: &mut W, unit: Owner, amount: i32, max: usize)
         placed += pile;
     }
     out
+}
+
+/// Interval of the ground expiry reader (§9.2: every 1,500 frames).
+pub const EXPIRY_INTERVAL: i32 = 1500;
+
+/// Ground expiry reader `0x00558B90(game, act)` (§9.2): of the units of
+/// an act's rooms, in room order and room unit-list order, the items
+/// whose expiry is ≠ 0 and ≤ `frame` (read once at entry). Returns them
+/// in that order; removing each (room unit removal when in a room, unit
+/// flag 0x2 cleared, `0x005538D0`, unit free `0x00555600`) is the
+/// caller's.
+pub fn expired_items(units: &[(Guid, i32)], frame: i32) -> Vec<Guid> {
+    units
+        .iter()
+        .filter(|&&(_, e)| e != 0 && e <= frame)
+        .map(|&(g, _)| g)
+        .collect()
 }

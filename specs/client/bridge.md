@@ -4,8 +4,10 @@
   `data/patch-layers.md`. Implemented as a skeleton in
   `d2-client::bridge` (2026-10-06, branch `claude/phase5-bridge`): receive
   path, intent send path, client world model, Bevy mirror; synthetic
-  vectors pass (`cargo test -p d2-client bridge`). No S→C message has an
-  owner spec yet (§6), so the world model holds no game facts. The
+  vectors pass (`cargo test -p d2-client bridge`). Owner specs for 51
+  S→C ids exist (`client/model.md`, `client/msg-units.md`,
+  `client/msg-stats-items.md`); their handlers are not registered yet
+  (§6), so the world model holds no game facts. The
   in-process link to `d2-server` is a trait until the server's wiring
   lands (§3, open question 1).
 - **Target version:** 1.14d (the message bytes it carries); the bridge
@@ -22,25 +24,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–60 |
-| Inputs | 61–69 |
-| Outputs / state changes | 70–79 |
-| Rules | 80–81 |
-|   1. Boundary | 82–97 |
-|   2. Receive path | 98–120 |
-|   3. Server link | 121–139 |
-|   4. Send path (intents) | 140–160 |
-|   5. Client world model | 161–180 |
-|   6. Dispatch table | 181–203 |
-|   7. Bevy mirror | 204–222 |
-|   8. Frame pacing | 223–243 |
-|   9. Versioning | 244–254 |
-| Constants & data dependencies | 255–269 |
-| Randomness | 270–273 |
-| Edge cases & original bugs | 274–282 |
-| Test vectors | 283–308 |
-| Provenance | 309–319 |
-| Open questions | 320–339 |
+| Summary | 48–62 |
+| Inputs | 63–71 |
+| Outputs / state changes | 72–81 |
+| Rules | 82–83 |
+|   1. Boundary | 84–99 |
+|   2. Receive path | 100–122 |
+|   3. Server link | 123–141 |
+|   4. Send path (intents) | 142–162 |
+|   5. Client world model | 163–182 |
+|   6. Dispatch table | 183–205 |
+|   7. Bevy mirror | 206–224 |
+|   8. Frame pacing | 225–245 |
+|   9. Versioning | 246–256 |
+| Constants & data dependencies | 257–271 |
+| Randomness | 272–275 |
+| Edge cases & original bugs | 276–284 |
+| Test vectors | 285–310 |
+| Provenance | 311–321 |
+| Open questions | 322–346 |
 <!-- /index -->
 
 ## Summary
@@ -184,7 +186,7 @@ receive).
    name owner`; `0x`-prefixed hex ids in order; `name` = the
    `server-messages.tsv` name). `owner` is the spec that owns what the
    message means for the client model, or `TBD`.
-2. Today every row is `TBD`. A spec that takes an id sets its path as
+2. A spec that takes an id sets its path as
    owner and the implementation registers one handler for the id in
    `dispatch::HANDLERS`.
 3. A message whose row has no handler is **unowned**: counted per id in
@@ -324,15 +326,20 @@ from `specs/`, `docs/` and `crates/` only.
    adapter over `d2_server::host::Host` (method mapping in §3 rule 1) is
    written once that lands; until then the link is the trait plus test
    fakes.
-2. Whether `ClientUnit` needs fields beyond its key, and which S→C ids
-   create and remove client units, belongs to the first client-model
-   spec (unit add/remove messages, Phase 5–6).
-3. Ids 0x6E–0x72 (1 byte) have a unit handler in the receive table: what
-   1.14d's unit lookup reads for them (bytes past the message in the
-   node) is not in `intents-events.md` §3.4. The bridge gives no unit.
-4. 1.14d's client frame rate and what its client does between ticks
-   (path stepping, animation) decide how views advance (§7 rule 4,
-   §8 rule 2); owned by the Phase 6 animation spec.
-5. The per-id pre-steps of the receive handler (0x0D type byte 1, 0x18,
-   0x95, 0x96; `intents-events.md` §3.4 rule 3) are client semantics; the
-   owner spec of those ids states them.
+2. Answered by `client/model.md` §1–§2 (`ClientUnit` fields, the unit
+   table, add-replaces and remove rules) and `client/msg-units.md` §1–§2
+   (0x59, 0xAC, 0x51 add; 0x0A removes; items: `client/msg-stats-items.md`
+   §2). New for the bridge: unit-handler messages are queued on the unit
+   at receive and applied in an update pass after the receive, only in
+   frames where the server ticked (`client/model.md` §4–§5); §5 rule 4
+   and §8 rule 1 follow that once implemented.
+3. Answered by `client/model.md` §4 rule 4: the unit handlers of
+   0x6E–0x72 are a bare `ret`; whatever unit the lookup finds, the
+   message has no effect. "No unit" is equal in effect.
+4. Partly answered by `client/model.md` §5: in single player the client
+   update (unit updates and queue drains) runs only in loop passes where
+   the server ticked. Path stepping and animation between messages stay
+   with the Phase 6 movement and unit-modes specs (`client/model.md`
+   open questions 1, 2).
+5. Answered by `client/model.md` §4 rule 2: the pre-steps of 0x0D, 0x18,
+   0x95, 0x96 write nothing any handler reads; they have no effect.

@@ -11,10 +11,12 @@
 //! timers, rooms and messages through [`UseWorld`] (units/stats, tick,
 //! `d2-server`); missile creation through [`UseMissiles`] (missiles, wired
 //! by the action wiring still in progress on `claude/wire-action`); the
-//! per-skill start / do bodies through [`SkillFunctions`] (not specified:
-//! `functions.tsv` status `mapped`, Open question 10), except the few
-//! the spec states in full ([`bodies`]). Mana formulas come
-//! from [`super::levels`] (`skills/levels.md` §4).
+//! per-skill start / do bodies through [`SkillFunctions`]: a provider
+//! runs the bodies of `functions.tsv` status `spec'd-here` from
+//! [`bodies`] (`skills/bodies.md`, over [`bodies::BodyWorld`]) and the
+//! rest (status `mapped`, Open question 10) from its own seam; the
+//! bodies that read nothing ([`bodies::start`]) run in the start core.
+//! Mana formulas come from [`super::levels`] (`skills/levels.md` §4).
 
 pub mod bodies;
 pub mod table;
@@ -125,9 +127,11 @@ pub enum MissileAim {
     At { offset: (i32, i32), aim: (i32, i32) },
 }
 
-/// The per-skill bodies of the two function tables (a seam; bodies are
-/// not specified, `functions.tsv` status `mapped`, Open question 10).
-/// Only filled slots ([`table::lookup`]) are called.
+/// The per-skill bodies of the two function tables (a seam). A provider
+/// answers the slots of [`bodies::START_BODIES`] / [`bodies::DO_BODIES`]
+/// with [`bodies::run_start`] / [`bodies::run_do`]; the other slots'
+/// bodies are not specified (`functions.tsv` status `mapped`, Open
+/// question 10). Only filled slots ([`table::lookup`]) are called.
 pub trait SkillFunctions: ManaUnits {
     /// `srvst[index](game, unit, skill, level)`; 0 refuses.
     fn srvst(&mut self, index: u16, u: Self::Unit, skill: i32, lvl: i32) -> i32;
@@ -1058,10 +1062,7 @@ pub fn do_core<W: UseWorld>(
     }
     let mut res = 0;
     if table::lookup(table::Kind::Do, index).is_some() {
-        res = match bodies::do_(index) {
-            Some(v) => v,
-            None => w.srvdo(index, u, skill, l, charge, item, aim),
-        };
+        res = w.srvdo(index, u, skill, l, charge, item, aim);
     }
     if r.srvmissile != 0xFFFF && t.missile(i32::from(r.srvmissile)).is_some() {
         let f = w.unit_flags(u);
@@ -1229,10 +1230,7 @@ pub fn active_state_event<W: UseWorld>(
     if table::lookup(table::Kind::Do, srvactivefunc).is_none() {
         return 0;
     }
-    match bodies::do_(srvactivefunc) {
-        Some(v) => v,
-        None => w.srvdo(srvactivefunc, u, skill, l, true, false, false),
-    }
+    w.srvdo(srvactivefunc, u, skill, l, true, false, false)
 }
 
 /// 0x3C SelectSkill → `assign(…)` = `0x005701B0` (§7): 0, or 3.

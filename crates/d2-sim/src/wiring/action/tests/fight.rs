@@ -115,13 +115,15 @@ pub fn arrow() -> MissileRow {
     r
 }
 
-/// The right skill: start function 4, do function 8 (the Multiple Shot
-/// slot, body catalogued only), `srvmissile` 0 (the generic missile of
+/// The right skill: start function 6 (a `mapped` slot standing in for
+/// Multiple Shot's 4, whose body, `skills/bodies.md` §3.4, now runs on
+/// the wired host), do function 8 (the Multiple Shot slot, body
+/// catalogued only), `srvmissile` 0 (the generic missile of
 /// `use.md` §5.4 step 7).
 pub fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
     (m.srvdofunc, m.srvmissile) = (8, 0);
     SkillTables {
         skills: v,
@@ -237,7 +239,7 @@ impl Fight {
             skills: skills(),
             combat: combat_tables(),
             levels: vec![blank::<Levels>(); 150],
-            skill_modes: vec![[0; 3]],
+            skill_modes: vec![[0; 4]],
         });
         h.anim_data = Some(Arc::new(anim_data()));
         h.vitals = Some(Arc::new(vitals()));

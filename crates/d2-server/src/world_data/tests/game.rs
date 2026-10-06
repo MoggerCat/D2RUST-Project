@@ -118,7 +118,12 @@ fn act1_placement_matches_the_recorded_vector() {
     assert_eq!(d.seed, Seed::new(1_406_222_081, 1_674_353_446));
     let mut order: Vec<u32> = d.level_list().into_iter().map(|l| d.level(l).id).collect();
     order.reverse();
-    assert_eq!(order, [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5]);
+    // `levels.md` Test vectors (seq 2425–2452): the placer rows, then the
+    // `outdoor.md` §2.7 neighbour-entry walk over 1..17 allocates 8..16.
+    assert_eq!(
+        order,
+        [4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    );
     // The final rects the spec derives from the rules (`outdoor.md` Test
     // vectors, "derived, not yet recorded").
     assert_eq!(act.rect(4), TileRect::new(1000, 1000, 80, 80));
@@ -176,13 +181,22 @@ fn outdoor_levels_generate_through_the_dispatcher() {
     assert_eq!(act.drlg.level(l2).rect, TileRect::new(904, 1064, 56, 96));
     assert_eq!(blood.len(), 81);
     let (_, cold) = act.generate(3);
-    assert_eq!(cold.len(), 98);
     let outdoor = |rooms: &[DrlgRoomId]| {
         rooms
             .iter()
             .filter(|&&r| act.drlg.room(r).kind != RoomKind::Preset)
             .count()
     };
+    // Diagnostic for the local run (1.14d recorded 61 preset + 37
+    // outdoor = 98, `outdoor.md` Test vectors, per-site draw counts):
+    // which side the live build is short on.
+    eprintln!(
+        "Cold Plains rooms: {} total, {} preset, {} outdoor (recorded 98 = 61 + 37)",
+        cold.len(),
+        cold.len() - outdoor(&cold),
+        outdoor(&cold)
+    );
+    assert_eq!(cold.len(), 98);
     assert_eq!((outdoor(&blood), outdoor(&cold)), (33, 37));
     // Streaming a room loads its DT1 library from the live files
     // (no recorded expectation: the call must not fail).

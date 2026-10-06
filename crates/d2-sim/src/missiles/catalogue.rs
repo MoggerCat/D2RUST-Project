@@ -155,9 +155,9 @@ pub const SRVDO_TSV: &str = include_str!("../../../../specs/missiles/srvdo.tsv")
 pub const SRVHIT_TSV: &str = include_str!("../../../../specs/missiles/srvhit.tsv");
 
 /// Server-do indices with a body here.
-pub const SRV_DO_IMPLEMENTED: [i16; 1] = [1];
+pub const SRV_DO_IMPLEMENTED: [i16; 8] = [1, 2, 3, 5, 7, 8, 10, 25];
 /// Server-hit indices with a body here.
-pub const SRV_HIT_IMPLEMENTED: [i16; 0] = [];
+pub const SRV_HIT_IMPLEMENTED: [i16; 4] = [1, 4, 12, 13];
 
 /// Whether a server-hit index is called (1…70, §R5 step 6.3).
 pub fn srv_hit_in_range(index: i16) -> bool {
@@ -171,8 +171,16 @@ pub fn run_srv_do<W: MissileWorld + ?Sized>(
     index: i16,
     m: UnitId,
 ) -> i32 {
+    use super::bodies::*;
     match index {
         1 => default_flight(game, cx, m),
+        2 => srv_do_2(game, cx, m),
+        3 => srv_do_3(game, cx, m),
+        5 => srv_do_5(game, cx, m),
+        7 => srv_do_7(game, cx, m),
+        8 => srv_do_8(game, cx, m),
+        10 => srv_do_10(game, cx, m),
+        25 => srv_do_25(game, cx, m),
         _ => {
             let entry = SRV_DO.get(index as usize).copied().flatten();
             cx.store.unhandled.push(match entry {
@@ -187,16 +195,25 @@ pub fn run_srv_do<W: MissileWorld + ?Sized>(
 }
 
 /// Runs server-hit `index` with the handler's current result `c`
-/// (§R5 step 5/6.3; the caller checked 1…70). A stub returns `c`
-/// unchanged, as if the row had no function.
+/// (§R5 step 5/6.3; the caller checked 1…70): the §R9.6 bodies
+/// ([`super::bodies`]); a stub returns `c` unchanged, as if the row had
+/// no function.
 pub fn run_srv_hit<W: MissileWorld + ?Sized>(
-    _game: &mut Game,
+    game: &mut Game,
     cx: &mut Ctx<'_, W>,
     index: i16,
     m: UnitId,
-    _unit: Option<UnitId>,
+    unit: Option<UnitId>,
     c: i32,
 ) -> i32 {
+    use super::bodies::*;
+    match index {
+        1 => return srv_hit_1(game, cx, m, unit),
+        4 => return srv_hit_4(game, cx, m, unit),
+        12 => return srv_hit_12(game, cx, m, unit),
+        13 => return srv_hit_13(game, cx, m, unit),
+        _ => {}
+    }
     let entry = SRV_HIT.get(index as usize).copied().flatten();
     cx.store.unhandled.push(match entry {
         Some(_) => Unhandled::SrvHit { index, missile: m },

@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9)
+// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9), specs/render/composition.md (§3)
 //! Bevy edge of the world view: after the bridge frame (`PreUpdate`,
 //! `bridge.md` §8), one `Update` system runs UI → [`super::build_frame`]
 //! (the frame's camera from the [`super::ViewFeed`], then the original's
@@ -12,6 +12,16 @@
 //! packed here and composed by the render-graph node, [`super::node`],
 //! straight into the image's texture), else the CPU reference written
 //! into the image.
+//!
+//! Each composed frame is one frame of the 1.14d frame cycle
+//! (`composition.md` §3): [`WorldViewState::cycle`] holds the index
+//! framebuffer between frames and the clears come from
+//! `cycle.plan(blank_screen)` with the feed's BlankScreen. CPU:
+//! `cycle.compose`. GPU: the frame is packed onto `cycle.pixels()`, the
+//! node composes it and reads the indices back ([`NodeIndices`]), and the
+//! next frame is built only after they are committed to the cycle (a Bevy
+//! frame that would build before that waits, like one whose bridge frame
+//! ran no tick).
 //!
 //! Inert until the app inserts [`crate::bridge::BridgeResource`] and
 //! [`WorldViewState`]: nothing here builds a server or chooses rules.
@@ -33,9 +43,10 @@ use crate::frames::atlas::AtlasPage;
 use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 
 use super::feed::{build_frame, ViewFeed};
-use super::node::{add_node, ComposeJob};
+use super::node::{add_node, ComposeJob, NodeIndices};
 use super::ui_bind::{run_ui, UiQueue, UiRules};
-use super::{compose_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use crate::scene::{FrameCycle, FramePlan};
 
 /// Render layer of the presented frame and its camera, so the world view
 /// never mixes with other sprites of the app.
@@ -58,6 +69,9 @@ pub struct WorldViewState {
     pub assets: ViewAssets,
     pub rules: Box<dyn WorldRules + Send + Sync>,
     pub feed: Box<dyn ViewFeed + Send + Sync>,
+    /// The persistent index framebuffer (`composition.md` §3), `VIEW`
+    /// sized: the last presented frame once committed.
+    pub cycle: FrameCycle,
     /// Counts of the last frame, for logs and tests.
     pub last: Option<FrameStats>,
 }
@@ -72,6 +86,8 @@ impl WorldViewState {
             assets,
             rules,
             feed,
+            cycle: FrameCycle::new(VIEW.width, VIEW.height)
+                .expect("VIEW is taller than the uncleared band"),
             last: None,
         }
     }
@@ -123,6 +139,9 @@ pub struct WorldViewGpu {
     held: usize,
     /// Jobs handed to the node.
     seq: u64,
+    /// The job whose indices are not committed to the cycle yet, and its
+    /// plan.
+    pending: Option<(u64, FramePlan)>,
 }
 
 impl WorldViewGpu {
@@ -132,6 +151,7 @@ impl WorldViewGpu {
             pages: Arc::new(Vec::new()),
             held: 0,
             seq: 0,
+            pending: None,
         })
     }
 }
@@ -252,13 +272,25 @@ fn world_view_frame(
     mut bridge: ResMut<BridgeResource>,
     mut state: ResMut<WorldViewState>,
     ui: Option<NonSendMut<WorldViewUi>>,
-    gpu: Option<ResMut<WorldViewGpu>>,
+    mut gpu: Option<ResMut<WorldViewGpu>>,
+    indices: Option<Res<NodeIndices>>,
     target: Option<Res<WorldViewTarget>>,
     mut images: ResMut<Assets<Image>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
         return Ok(());
+    }
+    // The previous GPU frame is the base of this one: commit its indices
+    // first, or wait for them.
+    if let Some(g) = gpu.as_deref_mut() {
+        if let Some((seq, plan)) = g.pending {
+            let Some(back) = indices.as_ref().and_then(|i| i.take(seq)) else {
+                return Ok(());
+            };
+            state.cycle.commit(plan, back)?;
+            g.pending = None;
+        }
     }
     let ui_frame = match ui {
         Some(mut ui) => {
@@ -281,6 +313,7 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     )?;
+    let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
     state.last = Some(FrameStats {
@@ -345,8 +378,11 @@ fn world_view_frame(
                 g.held = g.atlas.frames();
                 g.pages = Arc::new(g.atlas.atlas().pages().to_vec());
             }
-            let packed = g.atlas.pack(&frame, &state.assets)?;
+            let (packed, plan) =
+                g.atlas
+                    .pack_cycle(&state.cycle, blank_screen, &frame, &state.assets)?;
             g.seq += 1;
+            g.pending = Some((g.seq, plan));
             commands.insert_resource(ComposeJob {
                 seq: g.seq,
                 frame: bridge_frame,
@@ -358,7 +394,7 @@ fn world_view_frame(
             });
         }
         None => {
-            let rgba = compose_cpu(&frame, &state.assets)?;
+            let rgba = compose_cycle_cpu(&mut state.cycle, blank_screen, &frame, &state.assets)?;
             let mut image = images
                 .get_mut(&image)
                 .ok_or("world view image asset is gone")?;

@@ -3,14 +3,18 @@
 //! and 0x63, each in the spec's validation order with its result codes.
 //! 0x4C is `world/cube.md` §10's. Layouts: `sim/client-messages.tsv`.
 
-use super::deferred::{mark, owner_refresh, send_item_page, send_to_belt};
-use super::ground::{drop_cursor_item, gold_limit, gold_piles, pickup_auto, pickup_to_cursor};
+use super::deferred::{
+    mark, owner_refresh, send_item_page, send_item_world, send_to_belt, NO_FILLERS,
+};
+use super::ground::{
+    drop_cursor_item, gold_limit, gold_piles, ground_place, pickup_auto, pickup_to_cursor,
+};
 use super::layouts;
 use super::seams::MoveWorld;
 use super::{
     add_cmd, add_iflags, changed_if_filled, clear_iflags, clear_uflags, cmd, exists, iflag, mode,
-    page, res, stat, ty, uflag, Guid, MoveFatal, Outcome, Owner, CUBE_CODE, MAX_PILES,
-    PICK_COLLISION_MASK, PICK_RANGE, PILE_CAP, USE_RANGE, WALK_RANGE,
+    page, res, stat, ty, uflag, Guid, MoveFatal, Outcome, Owner, CUBE_CODE, DROP_MASK, DROP_MASK2,
+    MAX_PILES, PICK_COLLISION_MASK, PICK_RANGE, PILE_CAP, USE_RANGE, WALK_RANGE,
 };
 
 /// The ids handled here with their exact handler size (`handler_size`
@@ -74,8 +78,8 @@ pub fn handle<W: MoveWorld>(w: &mut W, player: Guid, msg: &[u8]) -> Option<Resul
         0x1A => Ok(equip_item(w, p, u32_at(m, 1), m[5])),
         0x1B => swap_2handed(w, p, u32_at(m, 1), m[5]),
         0x1C => remove_body_item(w, p, u16_at(m, 1)),
-        0x1D => Ok(swap_cursor_with_body(w, p, u32_at(m, 1), m[5])),
-        0x1E => Ok(swap_1h_with_2h(w, p, u32_at(m, 1), m[5])),
+        0x1D => swap_cursor_with_body(w, p, u32_at(m, 1), m[5]),
+        0x1E => swap_1h_with_2h(w, p, u32_at(m, 1), m[5]),
         0x1F => swap_cursor_buffer(
             w,
             p,
@@ -136,8 +140,11 @@ pub fn pick_item<W: MoveWorld>(
         return Ok(res::REFUSED);
     }
     match unit_type {
+        0 => Ok(pick_player(w, p, guid, cursor)),
         1 => Ok(w.pick_npc(p, guid, cursor)),
         2 => Ok(w.pick_object(p, guid, cursor)),
+        3 => Ok(res::RANGE),
+        5 => Ok(pick_tile(w, p, guid, cursor)),
         4 => {
             let it = Owner::item(guid);
             if !exists(w, guid) || w.mode(guid) != mode::GROUND || w.distance(p, it) > PICK_RANGE {
@@ -154,10 +161,49 @@ pub fn pick_item<W: MoveWorld>(
             };
             Ok(o.result())
         }
-        // TODO(spec: inventory.md §7.1 r2, OQ10): types 0, 3 and 5.
-        t => Ok(w.pick_other(p, t, guid, cursor)),
+        _ => unreachable!("types above 5 return 2 first"),
     }
 }
+
+/// 0x16 type 0 (§7.1 step 2): another player P.
+fn pick_player<W: MoveWorld>(w: &mut W, p: Owner, guid: Guid, cursor: u32) -> u32 {
+    let o = Owner::player(guid);
+    if !w.unit_exists(o) || w.distance(p, o) > PICK_RANGE {
+        return res::RANGE;
+    }
+    if w.distance(p, o) > PLAYER_WALK_RANGE {
+        w.walk_to_unit(p, o, cursor != 0);
+        return res::OK;
+    }
+    // Busy test `0x005678A0(1)` = the trading test (§5.2).
+    if w.unit_mode(o) == MODE_DEAD && !w.trading(p) {
+        w.corpse_pickup(p, o);
+    } else {
+        w.player_interact(p, o);
+    }
+    res::OK
+}
+
+/// 0x16 type 5 (§7.1 step 2): a tile.
+fn pick_tile<W: MoveWorld>(w: &mut W, p: Owner, guid: Guid, cursor: u32) -> u32 {
+    let o = Owner { ty: TILE, guid };
+    if !w.unit_exists(o) || w.distance(p, o) > PICK_RANGE {
+        return res::RANGE;
+    }
+    if w.distance(p, o) < WALK_RANGE {
+        w.tile_warp(p, o);
+    } else {
+        w.walk_to_unit(p, o, cursor != 0);
+    }
+    res::OK
+}
+
+/// Unit type of a tile (§7.1).
+const TILE: u8 = 5;
+/// Player mode "dead" (§7.1 type 0).
+const MODE_DEAD: u32 = 17;
+/// Walk range of a player target (§7.1 type 0: distance > 8 → walk).
+const PLAYER_WALK_RANGE: i32 = 8;
 
 // ------------------------------------------------------------------ 0x17
 
@@ -222,7 +268,7 @@ pub fn remove_from_buffer<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) -> Resu
         return Ok(r);
     }
     if w.cursor(p).is_some() {
-        w.resync(p);
+        w.send(p, layouts::cant_do_that());
         return Ok(res::BAD);
     }
     if !exists(w, item) {
@@ -246,7 +292,8 @@ pub fn to_cursor<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) -> Result<Outcom
         return Ok(Outcome::REFUSED);
     }
     let pg = w.page(item);
-    // TODO(spec: inventory.md §7.4, OQ12): the busy player's case.
+    // Only an idle player is held to page 0; a busy one (open stash or
+    // cube) passes on any page (§7.4, OQ12).
     if p.is_player() && !w.busy(p) && pg != page::INVENTORY {
         return Ok(Outcome::REFUSED);
     }
@@ -305,7 +352,8 @@ fn other_hand(loc: u8) -> u8 {
 }
 
 /// Removal from the body (§7.6): `0x0062A360`, `0x0063D2B0`, unlink, slot
-/// cleared; a belt (type 19) then `0x005608C0`.
+/// cleared; a belt (primary type 19) then the belt change with no new
+/// belt (§3 rule 9).
 fn remove_from_body<W: MoveWorld>(w: &mut W, owner: Owner, item: Guid) -> Result<(), MoveFatal> {
     let loc = w.body_loc(item);
     w.body_leave_effects(owner, item);
@@ -313,36 +361,49 @@ fn remove_from_body<W: MoveWorld>(w: &mut W, owner: Owner, item: Guid) -> Result
         return Err(MoveFatal::Unlink);
     }
     w.clear_body_slot(owner, loc);
-    if w.is_type(item, ty::BELT) {
-        w.belt_unequip(owner, item);
+    if w.primary_type(item) == ty::BELT {
+        belt_change(w, owner, None)?;
     }
     Ok(())
 }
 
-/// §4.6 step 5 with command flag `c` (0x8 there; 0x10000 for 0x1B).
-fn equip_at<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, loc: u8, c: u32) -> Outcome {
-    let kind = if loc == 11 || loc == 12 { 4 } else { 3 };
-    if !w.place_body(p, item, loc) || !w.link_check(p, item, kind) {
-        return Outcome::REFUSED;
+/// Belt change `0x005608C0(game, unit U, new belt N or none)` (§3 rule
+/// 9): every item in a belt slot s ≥ `numboxes` of N's belt type (record
+/// 2 when none), in slot order, gets a direct 0x9C action 0xF (flag 0x20),
+/// leaves grid 1 (mode 4, item-skill unlink, page 0) and goes to page 0
+/// as §2.4 with find-free; with no free position it is dropped at U's
+/// position, and with no free spot either it stays detached in mode 4
+/// (original bug, reproduced).
+pub fn belt_change<W: MoveWorld>(w: &mut W, u: Owner, new: Option<Guid>) -> Result<(), MoveFatal> {
+    let n = w.belt_boxes(new);
+    for s in 0..BELT_SLOTS {
+        let Some(p) = w.belt_item(u, s) else {
+            continue;
+        };
+        if s < n {
+            continue;
+        }
+        send_item_world(w, u, p, 0x0F, NO_FILLERS)?;
+        if !w.unlink(u, p) {
+            return Err(MoveFatal::Unlink);
+        }
+        w.set_mode(p, mode::CURSOR);
+        w.charm_unlink(u, p);
+        w.set_page(p, page::INVENTORY);
+        if w.place_in_page(u, p, 0, 0, true, true) {
+            continue;
+        }
+        let (x, y) = w.pos(u);
+        if let Some(spot) = w.free_spot((x, y), (x, y), 1, DROP_MASK, DROP_MASK2, 1) {
+            w.stat_refresh_unlink(u, 1);
+            ground_place(w, p, spot);
+        }
     }
-    w.set_body_loc(item, loc);
-    if loc != 11 && loc != 12 {
-        w.stat_link(p, item);
-        w.stat_refresh(p);
-    }
-    w.set_cursor(p, None);
-    clear_uflags(w, item, uflag::TARGETABLE);
-    w.set_mode(item, mode::EQUIPPED);
-    w.set_page(item, page::NONE);
-    add_cmd(w, item, c);
-    add_iflags(w, item, iflag::CHANGED);
-    clear_iflags(w, item, iflag::NOEQUIP);
-    w.update_list_add(p, item);
-    owner_refresh(w, p);
-    w.weapon_bookkeeping(p);
-    w.inventory_pass(p);
-    Outcome::DONE
+    Ok(())
 }
+
+/// Belt slots (grid 1, §1.2).
+const BELT_SLOTS: u8 = 16;
 
 /// 0x1B Swap2HandedItem `0x0054AE30` → `0x00563D20` (§7.6).
 pub fn swap_2handed<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8) -> Result<u32, MoveFatal> {
@@ -368,15 +429,39 @@ pub fn swap_2handed<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8) -> Resu
         return Ok(res::OK);
     }
     remove_from_body(w, p, x)?;
+    // X becomes the cursor item: no command flag, no update-list entry.
     w.set_cursor(p, Some(x));
     w.set_mode(x, mode::CURSOR);
     clear_uflags(w, x, uflag::TARGETABLE);
-    Ok(equip_at(w, p, n, loc, cmd::INDIRECT_SWAP).result())
+    // N goes to the location; the cursor is not cleared (X stays the
+    // cursor item). A failed put leaves N detached with result 1
+    // (original bug, reproduced); a failed link → out 1.
+    if w.place_body(p, n, loc) {
+        if !w.link_check(p, n, 3) {
+            return Ok(res::REFUSED);
+        }
+        w.set_body_loc(n, loc);
+        w.stat_link(p, n);
+        w.stat_refresh(p);
+        clear_uflags(w, n, uflag::TARGETABLE);
+        w.set_mode(n, mode::EQUIPPED);
+        w.set_page(n, page::NONE);
+        add_cmd(w, n, cmd::INDIRECT_SWAP);
+        add_iflags(w, n, iflag::CHANGED);
+        clear_iflags(w, n, iflag::NOEQUIP);
+        w.update_list_add(p, n);
+        w.weapon_bookkeeping(p);
+        w.inventory_pass(p);
+    }
+    owner_refresh(w, p);
+    Ok(res::OK)
 }
 
 // ------------------------------------------------------------------ 0x1C
 
-/// 0x1C RemoveBodyItem `0x0054AEC0` → `0x00560CD0` (§7.7).
+/// 0x1C RemoveBodyItem `0x0054AEC0` → `0x00560CD0` (§7.7). The empty
+/// location is tested before §4.3, so result 4 (the two-handed item in
+/// the other hand) never occurs here.
 pub fn remove_body_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u32, MoveFatal> {
     if !valid_loc(u32::from(loc)) {
         return Ok(res::BAD);
@@ -396,10 +481,9 @@ pub fn remove_body_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u
     if r != 3 && r != 4 {
         return Ok(res::REFUSED);
     }
-    // TODO(spec: inventory.md §7.7): `0x0063E490` finding no item is not
-    // written; read as "nothing".
+    // `0x0063E490` without an item → out 1 (MV4).
     let Some(it) = w.item_to_remove(p, loc) else {
-        return Ok(res::OK);
+        return Ok(res::REFUSED);
     };
     remove_from_body(w, p, it)?;
     w.set_cursor(p, Some(it));
@@ -419,49 +503,53 @@ pub fn remove_body_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u
 // ------------------------------------------------------------------ 0x1D
 
 /// 0x1D SwapCursorWithBody `0x0054AF50` → `0x00560F00` (§7.8).
-pub fn swap_cursor_with_body<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8) -> u32 {
+pub fn swap_cursor_with_body<W: MoveWorld>(
+    w: &mut W,
+    p: Owner,
+    n: Guid,
+    loc: u8,
+) -> Result<u32, MoveFatal> {
     let r = w.check_cursor_item(p, n);
     if r != 0 {
-        return r;
+        return Ok(r);
     }
     if !valid_loc(u32::from(loc)) {
-        return res::BAD;
+        return Ok(res::BAD);
     }
     let Some(at) = w.body_item(p, loc) else {
-        return res::RANGE;
+        return Ok(res::RANGE);
     };
     if loc == 8 && !w.belt_remove_allowed(p) {
-        return res::OK;
+        return Ok(res::OK);
     }
     if !w.item_move_gate(p, Some(at)) {
-        return res::OK;
+        return Ok(res::OK);
     }
     if w.equip_check(p, loc, Some(n), false) != 5 {
-        return res::OK;
+        return Ok(res::OK);
     }
     w.weapon_in_use_update(p);
-    // TODO(spec: inventory.md §7.8): the result when `0x0063E490` gives no
-    // item or one not in mode 1 is not written; read as "nothing".
+    // E (`0x0063E490`) missing or not in mode 1 → out 1 (MV4).
     let Some(e) = w
         .item_to_remove(p, loc)
         .filter(|&e| w.mode(e) == mode::EQUIPPED)
     else {
-        return res::OK;
+        return Ok(res::REFUSED);
     };
     w.stat_refresh(p);
     if !w.requirements(n, p, false) {
         w.stat_refresh(p);
         w.requirement_sound(p);
-        return res::OK;
+        return Ok(res::OK);
     }
-    if w.is_type(n, ty::BELT) {
-        w.belt_unequip(p, n);
+    if w.primary_type(n) == ty::BELT {
+        belt_change(w, p, Some(n))?;
     }
     // E leaves the body (as §7.6, without its own belt step).
     let eloc = w.body_loc(e);
     w.body_leave_effects(p, e);
-    // TODO(spec: inventory.md §7.8): an unlink failure here is not
-    // written; ignored.
+    // TODO(spec: inventory.md §7.8): an unlink failure of E is not
+    // written (MV4 does not list it); ignored.
     w.unlink(p, e);
     w.clear_body_slot(p, eloc);
     w.set_cursor(p, Some(e));
@@ -470,10 +558,10 @@ pub fn swap_cursor_with_body<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8
     add_cmd(w, e, cmd::SWAP_BODY);
     add_iflags(w, e, iflag::CHANGED);
     w.update_list_add(p, e);
-    // N goes to the location.
-    // TODO(spec: inventory.md §7.8): a failed placement of N is not
-    // written; its result is ignored.
-    w.place_body(p, n, loc);
+    // N goes to the location; a failed put or link → out 1 (MV4).
+    if !w.place_body(p, n, loc) || !w.link_check(p, n, 3) {
+        return Ok(res::REFUSED);
+    }
     w.set_body_loc(n, loc);
     w.stat_link(p, n);
     w.set_mode(n, mode::EQUIPPED);
@@ -484,31 +572,144 @@ pub fn swap_cursor_with_body<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8
     owner_refresh(w, p);
     w.weapon_bookkeeping(p);
     w.inventory_pass(p);
-    res::OK
+    Ok(res::OK)
 }
 
 // ------------------------------------------------------------------ 0x1E
 
-/// 0x1E Swap1HWith2H `0x0054B030` (§7.9; body `0x00561220` is OQ14).
-pub fn swap_1h_with_2h<W: MoveWorld>(w: &mut W, p: Owner, n: Guid, loc: u8) -> u32 {
+/// 0x1E Swap1HWith2H `0x0054B030` (§7.9).
+pub fn swap_1h_with_2h<W: MoveWorld>(
+    w: &mut W,
+    p: Owner,
+    n: Guid,
+    loc: u8,
+) -> Result<u32, MoveFatal> {
     let r = w.check_cursor_item(p, n);
     if r != 0 {
-        return r;
+        return Ok(r);
     }
     if !valid_loc(u32::from(loc)) {
-        return res::BAD;
+        return Ok(res::BAD);
     }
     if loc != 4 && loc != 5 {
-        return res::REFUSED;
+        return Ok(res::REFUSED);
     }
     let Some(at) = w.body_item(p, loc) else {
-        return res::RANGE;
+        return Ok(res::RANGE);
     };
     if !w.item_move_gate(p, Some(at)) {
-        return res::OK;
+        return Ok(res::OK);
     }
-    let (ok, out) = w.swap_1h_with_2h(p, n, loc);
-    Outcome { ok, out }.result()
+    Ok(swap_1h_2h_body(w, p, n, loc)?.result())
+}
+
+/// `0x00561220(game, player, N, L, &out)` (§7.9): the cursor item N to
+/// hand L, the item T at L to the cursor, the item X in the other hand to
+/// page 0.
+pub fn swap_1h_2h_body<W: MoveWorld>(
+    w: &mut W,
+    p: Owner,
+    n: Guid,
+    loc: u8,
+) -> Result<Outcome, MoveFatal> {
+    // Step 1.
+    if !exists(w, n) || w.mode(n) != mode::CURSOR {
+        return Ok(Outcome::NOTHING);
+    }
+    // Step 2.
+    if w.equip_check(p, loc, Some(n), false) != 7 {
+        return Ok(Outcome::NOTHING);
+    }
+    if !w.requirements(n, p, false) {
+        return Ok(Outcome::REFUSED);
+    }
+    // Step 3: `0x0063CB00` = a free position of page 0 for X (§2.3).
+    let o = other_hand(loc);
+    let x = w.body_item(p, o);
+    let Some(x) = x.filter(|&x| w.find_free(p, x, page::INVENTORY).is_some()) else {
+        return Ok(Outcome::REFUSED);
+    };
+    // Step 4.
+    if w.mode(x) == mode::EQUIPPED {
+        leave_body_quiet(w, p, x)?;
+        let placed = match w.find_free(p, x, page::INVENTORY) {
+            Some((fx, fy)) => w.place_at(p, x, page::INVENTORY, fx, fy),
+            None => false,
+        };
+        if placed {
+            if !w.link_check(p, x, 1) {
+                return Ok(Outcome::REFUSED);
+            }
+            w.set_page(x, page::INVENTORY);
+            clear_uflags(w, x, uflag::TARGETABLE);
+            w.set_cursor(p, None);
+            w.set_mode(x, mode::STORED);
+            changed_if_filled(w, x);
+            clear_iflags(w, x, iflag::NOEQUIP);
+            add_cmd(w, x, cmd::AUTO_UNEQUIP);
+            add_iflags(w, x, iflag::CHANGED);
+            w.update_list_add(p, x);
+        }
+    }
+    // Step 5.
+    let Some(t) = w.body_item(p, loc) else {
+        return Err(MoveFatal::Missing);
+    };
+    if w.mode(t) != mode::EQUIPPED {
+        return Ok(Outcome::REFUSED);
+    }
+    w.stat_refresh_unlink(p, 1);
+    if !w.requirements(n, p, false) {
+        w.stat_refresh(p);
+        w.set_cursor(p, Some(n));
+        w.requirement_sound(p);
+        owner_refresh(w, p);
+        return Ok(Outcome::NOTHING);
+    }
+    // Step 6.
+    leave_body_quiet(w, p, t)?;
+    w.set_cursor(p, Some(t));
+    clear_uflags(w, t, uflag::TARGETABLE);
+    w.set_mode(t, mode::CURSOR);
+    add_cmd(w, t, cmd::UNEQUIP);
+    add_iflags(w, t, iflag::CHANGED);
+    clear_iflags(w, t, iflag::NOEQUIP);
+    w.update_list_add(p, t);
+    // Step 7.
+    if !w.place_body(p, n, loc) || !w.link_check(p, n, 3) {
+        return Ok(Outcome::REFUSED);
+    }
+    w.set_body_loc(n, loc);
+    w.stat_link(p, n);
+    w.stat_refresh(p);
+    clear_uflags(w, n, uflag::TARGETABLE);
+    w.set_mode(n, mode::EQUIPPED);
+    w.set_page(n, page::NONE);
+    add_iflags(w, n, iflag::STACK_FULL);
+    add_cmd(w, n, cmd::EQUIP);
+    add_iflags(w, n, iflag::CHANGED);
+    clear_iflags(w, n, iflag::NOEQUIP);
+    w.update_list_add(p, n);
+    w.weapon_bookkeeping(p);
+    w.inventory_pass(p);
+    // The inventory pass ends with the owner refresh (§5.7 step 7); the
+    // pass is a seam, so the refresh is run here.
+    owner_refresh(w, p);
+    Ok(Outcome::DONE)
+}
+
+/// "Leaves the body" of §7.9 steps 4 and 6: `0x0062A360` and the stat
+/// unlink `0x0063D2B0`, removed from grid 0 (not found → fatal), slot
+/// cleared, deactivation `0x0055C730`.
+fn leave_body_quiet<W: MoveWorld>(w: &mut W, p: Owner, x: Guid) -> Result<(), MoveFatal> {
+    let loc = w.body_loc(x);
+    w.body_leave_effects(p, x);
+    if !w.unlink(p, x) {
+        return Err(MoveFatal::Unlink);
+    }
+    w.clear_body_slot(p, loc);
+    w.stat_refresh_unlink(p, 1);
+    Ok(())
 }
 
 // ------------------------------------------------------------------ 0x1F
@@ -546,8 +747,7 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     if pg == page::TRADE2 {
         return Ok(res::REFUSED);
     }
-    // TODO(spec: inventory.md §7.10 r3): the result for a target not in
-    // mode 0 is not written; read as "nothing".
+    // A target not in mode 0 → nothing, out 0 (MV4).
     if w.mode(t) != mode::STORED {
         return Ok(res::OK);
     }
@@ -574,9 +774,10 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     w.set_stored_page(c, 0);
     w.set_page(c, pg);
     w.set_pos(Owner::item(c), x as i32, y as i32);
-    // TODO(spec: inventory.md §7.10 r3): the "link" step's failure is not
-    // written; ignored.
-    w.link_check(p, c, 1);
+    // C's link failing → out 1 (MV4).
+    if !w.link_check(p, c, 1) {
+        return Ok(res::REFUSED);
+    }
     w.charm_relink(p, c);
     if w.is_active(p, c) {
         w.stat_refresh(p);
@@ -593,7 +794,7 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
 
 // ------------------------------------------------------------------ 0x20
 
-/// 0x20 UseGridItem `0x0054B1E0` (§7.11; body is the item-use spec's).
+/// 0x20 UseGridItem `0x0054B1E0` → `0x0055E170` (§7.11).
 pub fn use_grid_item<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, x: u32, y: u32) -> u32 {
     let r = w.check_stored(p, item);
     if r != 0 {
@@ -602,9 +803,111 @@ pub fn use_grid_item<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, x: u32, y: u
     if !within(w, p, x as i32, y as i32, USE_RANGE) {
         return res::RANGE;
     }
-    let (ok, out) = w.use_grid_item(p, item, x as i32, y as i32);
-    Outcome { ok, out }.result()
+    use_grid_body(w, p, item, x as i32, y as i32).result()
 }
+
+/// `0x0055E170(game, player, I, x, y, &out)` (§7.11 steps 1–4); the use
+/// effects behind `0x005BF240` are the item-use spec's.
+pub fn use_grid_body<W: MoveWorld>(w: &mut W, p: Owner, i: Guid, x: i32, y: i32) -> Outcome {
+    // Step 1.
+    w.targeting_reset(p);
+    if !exists(w, i) {
+        return Outcome::REFUSED;
+    }
+    if w.cursor(p).is_some() {
+        return Outcome::NOTHING;
+    }
+    if w.mode(i) != mode::STORED || !w.useable(i) {
+        return Outcome::REFUSED;
+    }
+    // Step 2.
+    let it = Owner::item(i);
+    let book = w.primary_type(i) == ty::BOOK;
+    if book && w.stat(it, stat::QUANTITY) < 1 {
+        return Outcome::NOTHING;
+    }
+    if w.trading(p) {
+        return Outcome::NOTHING;
+    }
+    // Step 3.
+    if w.use_item_at(p, i, x, y) {
+        let s = w.item_skill(i);
+        if book {
+            let q = w.stat(it, stat::QUANTITY);
+            if s != -1 && q > 0 {
+                w.set_stat(it, stat::QUANTITY, q - 1);
+                w.send_item_stat(p, i, stat::QUANTITY);
+                w.send(p, layouts::item_used(Owner::ITEM, i));
+                w.skill_decrement(p, s);
+            }
+            return Outcome::DONE;
+        }
+        if s != -1 && w.has_skill(p, s) {
+            w.skill_decrement(p, s);
+        }
+        w.targeting_reset(p);
+        w.consume_item(p, i);
+        return Outcome::DONE;
+    }
+    // Step 4: quest items, with the player's quest record.
+    let quest = |w: &mut W, q: u8, f: u8| w.quest_flag(p, q, f);
+    let used = match &w.code(i) {
+        b"ass " => {
+            w.targeting_reset(p);
+            if quest(w, 9, 5) {
+                w.set_quest_flag(p, 9, 5, false);
+                let v = w.stat(p, STAT_NEWSKILLS);
+                w.set_stat(p, STAT_NEWSKILLS, v.wrapping_add(1));
+                true
+            } else {
+                false
+            }
+        }
+        b"xyz " => {
+            w.targeting_reset(p);
+            if quest(w, 20, 5) {
+                w.set_quest_flag(p, 20, 5, false);
+                let v = w.stat(p, STAT_MAXHP);
+                w.set_stat(p, STAT_MAXHP, v.wrapping_add(XYZ_LIFE));
+                true
+            } else {
+                false
+            }
+        }
+        b"tr2 " => {
+            w.targeting_reset(p);
+            if quest(w, 37, 8) && !quest(w, 37, 7) {
+                w.set_quest_flag(p, 37, 7, true);
+                w.quest_tr2_used(p);
+                true
+            } else {
+                false
+            }
+        }
+        b"toa " => {
+            w.targeting_reset(p);
+            w.reset_skills_stats(p);
+            w.consume_item(p, i);
+            w.pickup_sound(p, i);
+            return Outcome::DONE;
+        }
+        _ => return Outcome::NOTHING,
+    };
+    if used {
+        w.quest_item_used(p);
+        w.consume_item(p, i);
+    } else {
+        // The sound event on the player `0x00553380` (as §8.1 step 3).
+        w.pickup_sound(p, i);
+    }
+    Outcome::DONE
+}
+
+/// Stat 5 `newskills`, stat 7 `maxhp` (§7.11 step 4).
+const STAT_NEWSKILLS: u16 = 5;
+const STAT_MAXHP: u16 = 7;
+/// `xyz`: 20 life in 8.8 fixed point.
+const XYZ_LIFE: i32 = 0x1400;
 
 // ------------------------------------------------------------------ 0x21
 
@@ -629,7 +932,8 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
     let qs = w.stat(s, stat::QUANTITY);
     let qd = w.stat(d, stat::QUANTITY);
     let m = w.max_stack(dst);
-    let books = w.is_type(src, ty::BOOK) && w.is_type(dst, ty::BOOK);
+    // Primary type 18 (`0x0062B400`, MV5).
+    let books = w.primary_type(src) == ty::BOOK && w.primary_type(dst) == ty::BOOK;
     if i64::from(qs) + i64::from(qd) > i64::from(m) {
         w.set_stat(d, stat::QUANTITY, m);
         w.send_item_stat(p, dst, stat::QUANTITY);
@@ -642,7 +946,7 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
     } else if w.merge_allowed(src) {
         let ds = w.stat(s, stat::DURABILITY);
         if ds < w.stat(d, stat::DURABILITY) {
-            // TODO(spec: inventory.md §7.12, OQ15): stat 72's meaning here.
+            // Stat 72 `durability`: throwing weapons keep the worse one.
             w.set_stat(d, stat::DURABILITY, ds);
             w.send_item_stat(p, dst, stat::DURABILITY);
         }
@@ -782,9 +1086,10 @@ pub fn switch_belt_item<W: MoveWorld>(
         return Err(MoveFatal::BeltSwitch);
     }
     w.set_pos(Owner::item(c), slot, 0);
-    // TODO(spec: inventory.md §7.16): the link's failure is not written;
-    // ignored.
-    w.link_check(p, c, 2);
+    // C's link failing → fatal assert (line 0x12D4, MV4).
+    if !w.link_check(p, c, 2) {
+        return Err(MoveFatal::Link);
+    }
     w.set_mode(c, mode::BELT);
     w.set_page(c, page::NONE);
     add_cmd(w, c, cmd::SWAP_BELT);
@@ -842,7 +1147,7 @@ pub fn use_belt_item<W: MoveWorld>(w: &mut W, p: Owner, item: Guid, on_merc: u32
 
 // ------------------------------------------------------------------ 0x27
 
-/// 0x27 UseItemAction `0x0054B280` (§7.18; body `0x00561ED0` is OQ14).
+/// 0x27 UseItemAction `0x0054B280` → `0x00561ED0` (§7.18).
 pub fn use_item_action<W: MoveWorld>(w: &mut W, p: Owner, target: Guid, used: Guid) -> u32 {
     for g in [target, used] {
         let r = w.check_owned(p, g);
@@ -850,8 +1155,97 @@ pub fn use_item_action<W: MoveWorld>(w: &mut W, p: Owner, target: Guid, used: Gu
             return r;
         }
     }
-    let (ok, out) = w.use_item_action(p, target, used);
-    Outcome { ok, out }.result()
+    use_item_action_body(w, p, target, used).result()
+}
+
+/// `0x00561ED0(game, player, T, U, &out)` (§7.18): U (scroll or tome)
+/// used on item T; the effect `0x005BF240` is the item-use spec's.
+pub fn use_item_action_body<W: MoveWorld>(w: &mut W, p: Owner, t: Guid, u: Guid) -> Outcome {
+    // Step 1.
+    if !exists(w, u) {
+        return Outcome::REFUSED;
+    }
+    if !exists(w, t) || t == u {
+        w.targeting_reset(p);
+        return Outcome::NOTHING;
+    }
+    // Step 2.
+    let um = w.mode(u);
+    if um == mode::BELT && !w.is_type(u, ty::SCRO) {
+        return Outcome::REFUSED;
+    }
+    if w.trading(p) {
+        return Outcome::NOTHING;
+    }
+    if w.cursor(p).is_some() {
+        return Outcome::NOTHING;
+    }
+    let uo = Owner::item(u);
+    let book = w.primary_type(u) == ty::BOOK;
+    // Step 3.
+    let tm = w.mode(t);
+    if tm != mode::STORED && tm != mode::EQUIPPED {
+        if um == mode::BELT {
+            w.targeting_reset(p);
+            w.remove_used(p, u);
+            return Outcome::NOTHING;
+        }
+        if um == mode::STORED {
+            if book {
+                let q = w.stat(uo, stat::QUANTITY);
+                w.set_stat(uo, stat::QUANTITY, (q - 1).max(0));
+                w.send_item_stat(p, u, stat::QUANTITY);
+            }
+            return Outcome::NOTHING;
+        }
+        return Outcome::REFUSED;
+    }
+    // Step 4.
+    if book && w.stat(uo, stat::QUANTITY) < 1 {
+        w.targeting_reset(p);
+        w.send(p, layouts::item_used(Owner::ITEM, u));
+        return Outcome::NOTHING;
+    }
+    // Step 5.
+    if !w.use_item(p, Owner::item(t), u) {
+        return Outcome::DONE;
+    }
+    // Step 6.
+    let s = w.item_skill(u);
+    // Step 7.
+    if um == mode::BELT {
+        if s == -1 {
+            w.send(p, layouts::item_used(Owner::ITEM, u));
+        } else {
+            w.skill_decrement(p, s);
+            w.remove_used(p, u);
+        }
+        w.targeting_reset(p);
+        return Outcome::DONE;
+    }
+    // Step 8.
+    if um != mode::STORED {
+        return Outcome::REFUSED;
+    }
+    // Step 9.
+    if book {
+        let q = w.stat(uo, stat::QUANTITY);
+        if s != -1 && q >= 1 {
+            w.set_stat(uo, stat::QUANTITY, q - 1);
+            w.send_item_stat(p, u, stat::QUANTITY);
+            w.skill_decrement(p, s);
+            w.send(p, layouts::item_used(Owner::ITEM, u));
+        } else {
+            w.consume_item(p, u);
+        }
+    } else {
+        if s != -1 {
+            w.skill_decrement(p, s);
+        }
+        w.consume_item(p, u);
+    }
+    w.targeting_reset(p);
+    Outcome::DONE
 }
 
 // ------------------------------------------------------------------ 0x28
@@ -884,8 +1278,8 @@ pub fn socket_item<W: MoveWorld>(
     if w.item_flags(target) & iflag::IDENTIFIED == 0 {
         return Ok(res::OK);
     }
-    // TODO(spec: inventory.md §7.19 r2): the results of the mode, filler and
-    // socket checks are not written; read as "nothing".
+    // Only "filler missing / not in mode 4 / target missing" set out; the
+    // other checks → 0 with out 0 (MV4).
     if w.mode(target) > mode::EQUIPPED {
         return Ok(res::OK);
     }
@@ -929,18 +1323,30 @@ pub fn scroll_to_book<W: MoveWorld>(
     if r != 0 {
         return Ok(r);
     }
+    Ok(scroll_into_book(w, p, scroll, book)?.result())
+}
+
+/// `0x0055EF20(scroll, book, &out)` (§7.20; also the scroll pickup of
+/// §8.1 step 4).
+pub fn scroll_into_book<W: MoveWorld>(
+    w: &mut W,
+    p: Owner,
+    scroll: Guid,
+    book: Guid,
+) -> Result<Outcome, MoveFatal> {
     if !exists(w, scroll) {
-        return Ok(res::REFUSED);
+        return Ok(Outcome::REFUSED);
     }
     let sm = w.mode(scroll);
     if (sm != mode::GROUND && sm != mode::CURSOR) || !w.is_type(scroll, ty::SCRO) {
-        return Ok(res::REFUSED);
+        return Ok(Outcome::REFUSED);
     }
     if !exists(w, book) {
-        return Ok(res::REFUSED);
+        return Ok(Outcome::REFUSED);
     }
-    if w.mode(book) != mode::STORED || !w.is_type(book, ty::BOOK) {
-        return Ok(res::REFUSED);
+    // The book type is the primary type (`0x0062B400`, MV5).
+    if w.mode(book) != mode::STORED || w.primary_type(book) != ty::BOOK {
+        return Ok(Outcome::REFUSED);
     }
     if w.spell(book) != w.spell(scroll) {
         return Err(MoveFatal::SpellMismatch);
@@ -948,7 +1354,7 @@ pub fn scroll_to_book<W: MoveWorld>(
     let b = Owner::item(book);
     let q = w.stat(b, stat::QUANTITY);
     if q >= w.max_stack(book) {
-        return Ok(res::OK);
+        return Ok(Outcome::NOTHING);
     }
     if !w.consume_one(scroll) {
         w.remove_from_room(scroll);
@@ -958,7 +1364,7 @@ pub fn scroll_to_book<W: MoveWorld>(
     w.set_stat(b, stat::QUANTITY, q.wrapping_add(1));
     w.send_item_stat(p, book, stat::QUANTITY);
     w.book_count_changed(p, 1);
-    Ok(res::OK)
+    Ok(Outcome::DONE)
 }
 
 // ------------------------------------------------------------------ 0x50
@@ -1007,7 +1413,7 @@ pub fn merc_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u32, Mov
     if w.busy(p) && w.trading(p) {
         return Ok(res::REFUSED);
     }
-    if !w.not_dead(p) || !w.alive(p) {
+    if w.has_used_skill(p) || !w.alive(p) {
         return Ok(res::OK);
     }
     let Some(merc) = w.hireling(p) else {
@@ -1113,7 +1519,7 @@ pub fn item_to_belt_shift<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) -> Resu
         return Ok(r);
     }
     if w.cursor(p).is_some() {
-        w.resync(p);
+        w.send(p, layouts::cant_do_that());
         return Ok(res::BAD);
     }
     if !exists(w, item) || !w.beltable(item) {

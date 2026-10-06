@@ -1,0 +1,21 @@
+[package]
+name = "seed-finder"
+description = "Searches game seeds for a wanted level and monster situation through the real DRLG and population path (differential-testing scenarios)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+d2-data.workspace = true
+d2-formats.workspace = true
+d2-sim.workspace = true
+d2-server.workspace = true
+# `GameData`: the table and DRLG-file builders the wired host tests use,
+# on the user's install or the synthetic one.
+test-fixtures.workspace = true
+
+[lints]
+workspace = true

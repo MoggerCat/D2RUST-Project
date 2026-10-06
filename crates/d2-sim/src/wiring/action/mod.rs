@@ -70,7 +70,7 @@ pub struct ActionTables {
     /// `levels.txt` rows (AI).
     pub levels: Vec<Levels>,
     /// `Sk1mode..Sk3mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
-    pub skill_modes: Vec<[u8; 3]>,
+    pub skill_modes: Vec<[u8; 4]>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -147,6 +147,14 @@ pub struct ActionHooks<X> {
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
     pub paths: Option<Box<crate::wiring::path::PathState>>,
+    /// The table data of the skill bodies (`skills/bodies.md`;
+    /// [`crate::skills::use_::bodies::BodyTables`]). `None`: no
+    /// itemstatcost flags, state groups or overlays (every lookup answers
+    /// "no record").
+    pub bodies: Option<Arc<crate::skills::use_::bodies::BodyTables>>,
+    /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
+    /// head.
+    pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -174,6 +182,8 @@ impl<X> ActionHooks<X> {
             monster_world: None,
             monster_world_out: false,
             paths: None,
+            bodies: None,
+            handlers: BTreeMap::new(),
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

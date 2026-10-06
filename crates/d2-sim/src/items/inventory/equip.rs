@@ -7,6 +7,7 @@ use super::{
     body, cmd, grid::place_at_body, iflag, mode, page, stat, targeting_reset, ty, InvTables,
     InvWorld, Inventory, UnitKind, NO_GUID,
 };
+use crate::combat::pct;
 use crate::units::UnitId;
 
 /// Itemtypes `class` "none" (§4.2 step 6).
@@ -90,8 +91,10 @@ pub fn requirements_met<W: InvWorld + ?Sized>(
     let p = w.req_percent(item);
     let (mut bonus_str, mut bonus_dex) = (0, 0);
     if p != 0 {
-        bonus_str = w.percent_of(reqstr, p);
-        bonus_dex = w.percent_of(reqdex, p);
+        // `0x00483360` with ECX = req, EDX = p (`0x0062EB86`): `pct`,
+        // signed and truncating (`combat/damage.md` §0).
+        bonus_str = pct(reqstr, p, 100);
+        bonus_dex = pct(reqdex, p, 100);
     }
     if d.flags & iflag::ETHEREAL != 0 {
         bonus_str -= 10;
@@ -111,6 +114,8 @@ pub fn requirements_met<W: InvWorld + ?Sized>(
     ) {
         return false;
     }
+    // §4.8 never returns a negative R, so the caller's "R = −1 → skip"
+    // test (`0x0062EC8A`) never fires.
     if w.unit_stat(unit, stat::LEVEL) < w.level_requirement(item, unit) {
         return false;
     }
@@ -180,12 +185,20 @@ pub fn hands_compatible<W: InvWorld + ?Sized>(
         Some(UnitKind::Monster { class }) => {
             (H2H_MONSTERS.contains(&class) && both_h2h) || DUAL_MONSTERS.contains(&class)
         }
-        // TODO(spec: §4.4 step 6 names players and monsters only)
+        // Objects, missiles, items, tiles (`0x0063DCBD`).
         Some(_) => false,
     }
 }
 
-/// Stack test (`0x0062C850`, §4.5).
+/// `0x0062A2F0` (§4.5): quality q ≠ 0 and q ∉ 4–9, so low, normal or
+/// superior (1–3).
+pub fn stack_quality_ok(q: u8) -> bool {
+    (1..=3).contains(&q)
+}
+
+/// Stack test (`0x0062C850`, §4.5): same class, quality and file index
+/// (item data +0x28), stackable, equal ethereal bits (`0x0062A8D0`), both
+/// qualities in 1–3, equal damage ranges and no sockets.
 pub fn stack_test<W: InvWorld + ?Sized>(w: &W, t: &InvTables, a: UnitId, b: UnitId) -> bool {
     let (Some(da), Some(db)) = (w.item(a), w.item(b)) else {
         return false;
@@ -203,9 +216,9 @@ pub fn stack_test<W: InvWorld + ?Sized>(w: &W, t: &InvTables, a: UnitId, b: Unit
         && w.quality(a) == w.quality(b)
         && w.stack_file_index(a) == w.stack_file_index(b)
         && stackable(da.record)
-        && w.stack_value(a) == w.stack_value(b)
-        && w.stack_quality_ok(a)
-        && w.stack_quality_ok(b)
+        && (da.flags & iflag::ETHEREAL) == (db.flags & iflag::ETHEREAL)
+        && stack_quality_ok(w.quality(a))
+        && stack_quality_ok(w.quality(b))
         && DAMAGE
             .iter()
             .all(|&s| w.item_stat(a, s) == w.item_stat(b, s))
@@ -336,7 +349,7 @@ pub fn equip_put<W: InvWorld + ?Sized>(
         w.stat_link(unit, item);
         w.stat_refresh(unit);
     }
-    inv.set_cursor(None);
+    inv.put_cursor(w, None);
     w.clear_targetable(item);
     let mut guid = NO_GUID;
     if let Some(d) = w.item_mut(item) {
@@ -422,13 +435,14 @@ pub fn auto_equip_location<W: InvWorld + ?Sized>(
     if d.flags & (iflag::BROKEN | iflag::F4000) != 0 {
         return None;
     }
-    // TODO(spec: whether "type ≠ 38" is the primary type or the equivalence test; primary used)
+    // The primary type (`0x0062B400`), not the equivalence test.
     if rec.type_ == ty::TPOT {
         return None;
     }
     // Step 2.
     if w.quiver_kind(item) {
-        // TODO(spec: which hand "an equipped hand weapon" means; both hands checked, right first)
+        // The right hand (4) first, then the left (5): the hand weapon's
+        // primary type `shoots` (`0x0062E6F0`), equivalence test.
         let fed = [body::RIGHT_HAND, body::LEFT_HAND].iter().any(|&l| {
             inv.body_item(l)
                 .and_then(|h| w.ammo_type(h))
@@ -444,10 +458,84 @@ pub fn auto_equip_location<W: InvWorld + ?Sized>(
         return inv.body_item(l1).is_none().then_some(l1);
     }
     // Step 4.
-    match (inv.body_item(l1).is_some(), inv.body_item(l2).is_some()) {
-        (false, false) => Some(l1),
-        (false, true) => w.auto_equip_allows(unit, item, l1).then_some(l1),
-        (true, false) => w.auto_equip_allows(unit, item, l2).then_some(l2),
-        (true, true) => None,
+    match (inv.body_item(l1), inv.body_item(l2)) {
+        (None, None) => Some(l1),
+        (None, Some(e)) => auto_equip_compatible(w, t, unit, item, e).then_some(l1),
+        (Some(e), None) => auto_equip_compatible(w, t, unit, item, e).then_some(l2),
+        (Some(_), Some(_)) => None,
     }
+}
+
+/// Itemtypes rows of the auto-equip profile (§4.7).
+mod pty {
+    pub const BOWQ: i16 = 5;
+    pub const XBOQ: i16 = 6;
+    pub const RING: i16 = 10;
+    pub const BOW: i16 = 27;
+    pub const XBOW: i16 = 35;
+    pub const SHLD: i16 = 51;
+}
+
+/// The profile of an item X for a unit U (`0x0055D560`, §4.7): the flags
+/// the compatibility test reads (`throw` is computed by the original but
+/// never read, so it is left out).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EquipProfile {
+    pub bow: bool,
+    pub xbow: bool,
+    pub bowq: bool,
+    pub xboq: bool,
+    pub shield: bool,
+    pub weapon: bool,
+    pub two_handed: bool,
+    pub dual: bool,
+    pub ring: bool,
+}
+
+/// `0x0055D560` (§4.7): the profile of `x` for `unit` ("type T" is the
+/// equivalence test).
+pub fn equip_profile<W: InvWorld + ?Sized>(
+    w: &W,
+    t: &InvTables,
+    unit: UnitId,
+    x: UnitId,
+) -> EquipProfile {
+    let is = |ty: i16| is_type(w, t, x, ty);
+    let dual = match w.unit_kind(unit) {
+        Some(UnitKind::Player { class: BARBARIAN }) => true,
+        Some(UnitKind::Player { class: ASSASSIN }) => is(ty::H2H),
+        _ => false,
+    };
+    EquipProfile {
+        bow: is(pty::BOW),
+        xbow: is(pty::XBOW),
+        bowq: is(pty::BOWQ),
+        xboq: is(pty::XBOQ),
+        shield: is(pty::SHLD),
+        weapon: is(ty::WEAP),
+        two_handed: w.two_handed(x),
+        dual,
+        ring: is(pty::RING),
+    }
+}
+
+/// Compatibility of the new item `n` with the equipped item `e`
+/// (`0x0055D670`, §4.7).
+pub fn auto_equip_compatible<W: InvWorld + ?Sized>(
+    w: &W,
+    t: &InvTables,
+    unit: UnitId,
+    n: UnitId,
+    e: UnitId,
+) -> bool {
+    let (a, b) = (equip_profile(w, t, unit, n), equip_profile(w, t, unit, e));
+    let one_hand = |p: &EquipProfile| p.weapon && !p.two_handed;
+    (a.bow && b.bowq)
+        || (a.bowq && b.bow)
+        || (a.xbow && b.xboq)
+        || (a.xboq && b.xbow)
+        || (one_hand(&a) && b.shield)
+        || (one_hand(&b) && a.shield)
+        || (one_hand(&a) && one_hand(&b) && a.dual && b.dual)
+        || (a.ring && b.ring)
 }

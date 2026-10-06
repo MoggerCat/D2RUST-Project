@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md
+// Spec: specs/client/render-pipeline.md, specs/render/unit-composite.md (§3 r6, §5, §10)
 //! Composite units (§A7): from a parsed COF, a COF direction and a frame,
 //! the slot order of the components (back to front) and one scene
 //! [`DrawItem`] per drawn component. Plain Rust, no Bevy types.
@@ -28,8 +28,11 @@ use crate::scene::{BlendOp, DrawItem, DrawKey, FrameId, ItemTag, Rect, SceneErro
 pub enum CompositeError {
     #[error("direction {dir} out of range ({directions} in the COF)")]
     Direction { dir: usize, directions: u8 },
-    #[error("frame {frame} out of range ({frames} per direction in the COF)")]
-    Frame { frame: usize, frames: u8 },
+    /// The draw-order row of (`dir`, `frame`) reaches past the file end
+    /// (`unit-composite.md` §3 r6 has no bound check; §10: an error, the
+    /// original reads memory past the file).
+    #[error("draw-order row of direction {dir}, frame {frame} is past the file end")]
+    RowPastEnd { dir: usize, frame: usize },
     #[error("COF has {count} layer records for {layers} layers")]
     LayerCount { layers: u8, count: usize },
     #[error("layer {index}: component {component} is not 0..{COMPONENTS}")]
@@ -42,8 +45,6 @@ pub enum CompositeError {
     },
     #[error("COF draw order has {len} bytes, header needs {expected}")]
     DrawOrderLength { len: usize, expected: usize },
-    #[error("slot {slot}: component {component} has no layer record")]
-    NoLayer { slot: u8, component: u8 },
     /// A [`ComponentResolver`] hook could not answer (frame not resident,
     /// unknown variant, …). `what` names the hook.
     #[error("slot {slot} ({component}): {what}: {message}")]
@@ -108,14 +109,18 @@ fn check(cof: &Cof) -> Result<(), CompositeError> {
     Ok(())
 }
 
-/// The slot order for COF direction `dir`, frame `frame` (§A7 step 2):
-/// `cof.component_at(dir, frame, s)` for `s = 0..L`, back to front, each
-/// with its layer record.
-///
-/// TODO(spec: render/unit-composite.md): unit direction → COF direction
-/// and the frame source (animdata vs COF rate) are §B4; the caller passes
-/// COF indices and anything out of range is an error.
-pub fn slot_order(cof: &Cof, dir: usize, frame: usize) -> Result<Vec<Slot>, CompositeError> {
+/// Component ID of S7 (`unit-composite.md` §5 r1): no own graphic.
+pub const S7: u8 = 14;
+
+/// The `L` component bytes of the draw-order row for COF direction `dir`,
+/// frame `frame`, as 1.14d reads them (`unit-composite.md` §3 r6): file
+/// offset `28 + 9L + F + (dir × F + frame) × L`, i.e. as if the event
+/// block were exactly `F` bytes. In a parsed [`Cof`] the bytes after the
+/// first `F` event bytes are `event_padding` then `draw_order`, so a file
+/// with padding is read `padding` bytes early. No bound check on `frame`:
+/// a frame ≥ `F` reads the next direction's rows; a row past the file end
+/// is an error.
+pub fn game_row(cof: &Cof, dir: usize, frame: usize) -> Result<Vec<u8>, CompositeError> {
     check(cof)?;
     if dir >= usize::from(cof.directions) {
         return Err(CompositeError::Direction {
@@ -123,29 +128,56 @@ pub fn slot_order(cof: &Cof, dir: usize, frame: usize) -> Result<Vec<Slot>, Comp
             directions: cof.directions,
         });
     }
-    if frame >= usize::from(cof.frames) {
-        return Err(CompositeError::Frame {
-            frame,
-            frames: cof.frames,
-        });
+    let l = usize::from(cof.layers_count);
+    let past = || CompositeError::RowPastEnd { dir, frame };
+    let start = dir
+        .checked_mul(usize::from(cof.frames))
+        .and_then(|r| r.checked_add(frame))
+        .and_then(|r| r.checked_mul(l))
+        .ok_or_else(past)?;
+    let end = start.checked_add(l).ok_or_else(past)?;
+    let tail = cof.event_padding.iter().chain(cof.draw_order.iter());
+    let len = cof.event_padding.len() + cof.draw_order.len();
+    if end > len {
+        return Err(past());
     }
-    (0..cof.layers_count)
-        .map(|slot| {
-            let component = cof
-                .component_at(dir, frame, usize::from(slot))
-                .expect("draw order length checked");
-            let layer = cof
-                .layers
-                .iter()
-                .position(|l| l.component == component)
-                .ok_or(CompositeError::NoLayer { slot, component })?;
-            Ok(Slot {
+    Ok(tail.skip(start).take(l).copied().collect())
+}
+
+/// The drawn slots for COF direction `dir`, frame `frame` (§A7 step 2,
+/// `unit-composite.md` §5): row byte `s` of [`game_row`] for
+/// `s = 0..L`, back to front, each with its layer record. A slot whose
+/// component has no layer record draws nothing (§5.1, §10: not an error)
+/// and S7 has no own graphic (§5 r1, see [`inline_slot`]); both are left
+/// out, the other slots keep their index `s`.
+pub fn slot_order(cof: &Cof, dir: usize, frame: usize) -> Result<Vec<Slot>, CompositeError> {
+    let row = game_row(cof, dir, frame)?;
+    Ok(row
+        .into_iter()
+        .zip(0u8..)
+        .filter(|&(component, _)| component != S7)
+        .filter_map(|(component, slot)| {
+            let layer = cof.layers.iter().position(|l| l.component == component)?;
+            Some(Slot {
                 slot,
                 component,
                 layer,
             })
         })
-        .collect()
+        .collect())
+}
+
+/// The first slot whose row byte is S7 (`unit-composite.md` §5 r1): where
+/// a linked missile or `attached` unit is drawn inline, sharing the host's
+/// slot as its draw key `sub` (§10). Whether such a unit exists is the
+/// caller's (`draw-order.md` §5).
+pub fn inline_slot(cof: &Cof, dir: usize, frame: usize) -> Result<Option<u8>, CompositeError> {
+    let row = game_row(cof, dir, frame)?;
+    Ok(row
+        .iter()
+        .zip(0u8..)
+        .find(|&(&c, _)| c == S7)
+        .map(|(_, s)| s))
 }
 
 /// What a hook is asked about: one slot of one COF frame.
@@ -181,6 +213,18 @@ pub trait ComponentResolver {
     /// slot is drawn at all is also §B4: until it says otherwise, every
     /// slot is drawn.
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError>;
+
+    /// The slot's frame, or `None` when the slot draws nothing
+    /// (`unit-composite.md` §5 r2, §6 r4, §10: a failed component request
+    /// or a component file that does not load; no error). [`build`] and
+    /// [`build_with`] call this; the default draws every slot with
+    /// [`ComponentResolver::frame`].
+    fn slot_frame(
+        &self,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.frame(req).map(Some)
+    }
 
     /// TODO(spec: render/sprite-placement.md) (§B1): screen top-left of the
     /// component's image, from the unit's position and the frame offsets.
@@ -256,7 +300,8 @@ pub struct ComponentDraw {
 
 /// The draw items of one unit for COF direction `dir`, frame `frame`
 /// (§A7 steps 2–4), in slot order (back to front), so list order equals
-/// key order. Keys share `unit`'s pass/major/minor with `sub` = slot index.
+/// key order. Slots that draw nothing ([`slot_order`],
+/// [`ComponentResolver::slot_frame`]) give no item. Keys share `unit`'s pass/major/minor with `sub` = slot index.
 /// Any hook error fails the whole unit: no partial composite. Frame ids
 /// come from the resolver's [`ComponentResolver::frame_id`].
 pub fn build<R: ComponentResolver + ?Sized>(
@@ -318,7 +363,9 @@ fn build_core<R: ComponentResolver + ?Sized>(
             slot: slot.slot,
             error,
         };
-        let cf = resolver.frame(&req)?;
+        let Some(cf) = resolver.slot_frame(&req)? else {
+            continue;
+        };
         let id = frame_id(&req, &cf)?;
         let (x, y) = resolver.place(&req, &cf)?;
         let mut item = DrawItem::new(id, x, y);
