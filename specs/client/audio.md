@@ -131,13 +131,13 @@ VoiceEvent { tick: u32, kind: Start | Stop | Param, file: CanonicalPath,
 | # | Behavior | Owner spec (to write) | Measure | Comparison |
 |---|---|---|---|---|
 | B1 | WAV subset in 1.14d archives (format tags, bit depths, rates, channels, chunk order) and the samples 1.14d passes to its sound output | `formats/wav.md` | survey of every live `.wav` (`mpq-tool formats` extension); debugger dump of buffers at the sound output | identical i16 samples per file |
-| B2 | Which sim events make sounds: S→C 0x2C fields (`server-messages.tsv`, status partial), unit mode changes, COF frame event 3, missiles, skills (`skills.txt` sound columns), monsters (`monsounds`), items (drop/use sounds), objects | `audio/triggers.md` | packet + sound-call trace on a recorded game | identical (tick, file) sequence |
-| B3 | `sounds.txt` semantics: volume, pan from listener distance, falloff, priority, groups and variants (and their RNG), loop, repeat suppression, voice limit and stealing | `audio/sound-table.md` | sound path; traces with known positions | identical (vol, pan, looped) per voice event |
-| B4 | Environment and ambient sound: `soundenviron.txt` by level, day/night, random ambient cues | `audio/environment.md` | traces while walking between areas | identical voice log |
-| B5 | Music: which track per level, transitions, loop | `audio/environment.md` | traces | identical (tick, file) |
-| B6 | UI and speech sounds (NPC dialog, quests, item pickup, panel clicks) | `audio/triggers.md` | traces | identical voice log |
+| B2 | Which sim events make sounds: S→C 0x2C fields (`server-messages.tsv`, status partial), unit mode changes, COF frame event 3, missiles, skills (`skills.txt` sound columns), monsters (`monsounds`), items (drop/use sounds), objects | `audio/triggers.md` (draft: all causes; COF event 3 unused, OQ 13) | packet + sound-call trace on a recorded game | identical (tick, file) sequence |
+| B3 | `sounds.txt` semantics: volume, pan from listener distance, falloff, priority, groups and variants (and their RNG), loop, repeat suppression, voice limit and stealing | `audio/sound-table.md` (draft: §1–§8, §10–§11) | sound path; traces with known positions | identical (vol, pan, looped) per voice event |
+| B4 | Environment and ambient sound: `soundenviron.txt` by level, day/night, random ambient cues | `audio/environment.md` (draft §1, §5–§8) | traces while walking between areas | identical voice log |
+| B5 | Music: which track per level, transitions, loop | `audio/environment.md` (draft §2–§4) | traces | identical (tick, file) |
+| B6 | UI and speech sounds (NPC dialog, quests, item pickup, panel clicks) | `audio/triggers.md` (draft §9–§11) | traces | identical voice log |
 | B7 | Recording the original's sound calls with tick numbers | `tools/trace-recorder` (`record_sound.py`) + `traces/FORMAT.md` | debugger hooks on the sound-output entry points | a static scene recorded twice gives identical logs (stability first) |
-| B8 | Volume settings (sound/music sliders) to integer volume | `audio/sound-table.md` | traces at known slider settings | identical vol |
+| B8 | Volume settings (sound/music sliders) to integer volume | `audio/sound-table.md` §9, §8.2 (draft; slider → 0–100 open) | traces at known slider settings | identical vol |
 
 ## Constants & data dependencies
 
