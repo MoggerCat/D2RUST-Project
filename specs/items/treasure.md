@@ -37,14 +37,14 @@
 |   4. Chest drop (`0x00585B90`) | 276–302 |
 |   5. The TC walk (`0x0055A6D0`) | 303–409 |
 |   6. Drop quality (`0x00558640`) | 410–441 |
-|   7. Creation inputs and placement (`0x0055A550`) | 442–458 |
-|   8. Gold amount | 459–471 |
-| Constants & data dependencies | 472–501 |
-| Randomness | 502–518 |
-| Edge cases & original bugs | 519–534 |
-| Test vectors | 535–563 |
-| Provenance | 564–588 |
-| Open questions | 589–609 |
+|   7. Creation inputs and placement (`0x0055A550`) | 442–466 |
+|   8. Gold amount | 467–479 |
+| Constants & data dependencies | 480–509 |
+| Randomness | 510–526 |
+| Edge cases & original bugs | 527–542 |
+| Test vectors | 543–571 |
+| Provenance | 572–596 |
+| Open questions | 597–617 |
 <!-- /index -->
 
 ## Summary
@@ -442,19 +442,27 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 ### 7. Creation inputs and placement (`0x0055A550`)
 
 1. Item id < 0 → nothing.
-2. Position: from `U`'s position (`x`, `y`; unit coordinates
-   `0x00620870`, `sim/path-placement.md` §2.1: a monster's dynamic path
-   sub-tile, (0, 0) only when it has no path): start = (`x` + 2, `y` + 3) if
-   a room exists there (`0x00463740`), else (`x`, `y`); the free-spot
-   search `0x0064E810`(room, start, (`x`, `y`), 1, 0x3E01, 0x801, 1)
-   gives the final room and position; none → nothing. Items of one walk
-   are placed one after another, each seeing the previous ones.
+2. Position: the floor drop `0x00555DA0`(room of `U` (`0x00620BB0`),
+   `U`'s position (`x`, `y`; unit coordinates `0x00620870`,
+   `sim/path-placement.md` §2.1: a monster's dynamic path sub-tile,
+   (0, 0) only when it has no path), size 1, fallback 1)
+   (`sim/path-placement.md` §9): start = (`x` + 2, `y` + 3) if a room
+   exists there (`0x00463740`), else (`x`, `y`); the free-spot search
+   `0x0064E810` gets `U`'s room as its room argument (never the room the
+   start lookup found, `0x00555DEC`) and gives the final room and
+   position; none → nothing. Items of one walk are placed one after
+   another, each seeing the previous ones.
 3. Item level: `U` none → 1; monster → its `level` stat; player → base
    `level`; else area level of `U`'s level (§4 `a`); at least 1.
 4. Drop request to the items spec (`0x00558D90`): id, quality, index,
    item level, room and position, spawn type 3, init flags 1, the game's
    item format (game +0x78), drop flags `d`, plus 0x01 when `U` is
    monster class 391 (`hellbovine`).
+   Spawn type 3 with init flag 1 makes the allocation add the item to the
+   world at the request's room and position (`sim/units.md` §3.1 step 8 →
+   `sim/path-placement.md` §2.5: static path, footprint, room list) inside
+   `0x00558D90`, before its base stats; so the next drop's search sees
+   it.
 
 ### 8. Gold amount
 
@@ -605,4 +613,4 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    effect in creation: items spec.
 7. `0x005541B0` ("living") in the player and party counts is read as
    D2MOO's living check, not confirmed.
-8. The free-spot search `0x0064E810` has no spec yet (collision).
+8. Answered: `sim/path-placement.md` §7 (search, no RNG draw) and §9 (floor drop, §7 step 2 here).

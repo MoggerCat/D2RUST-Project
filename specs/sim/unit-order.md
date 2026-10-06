@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 261–271 |
 | Test vectors | 272–305 |
 | Provenance | 306–323 |
-| Open questions | 324–335 |
+| Open questions | 324–337 |
 <!-- /index -->
 
 ## Summary
@@ -329,6 +329,8 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
 3. Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
    order in which restored units re-enter the room list and whether they
    keep their GUIDs (observed: GUIDs are reused after removal, §1.4).
-   Room-lifecycle spec.
+   Room-lifecycle spec. Which units are freed, stored or kept by the
+   compress: answered in `sim/units.md` §3.3; the restore stays open
+   there (OQ8).
 4. Which systems iterate hash lists rather than rooms (inventory of
    `0x005537D0` / `0x005538D0` callers by system), for the unit specs.

@@ -36,15 +36,15 @@
 |   6. Straight (type 7, `0x00679ED0`) | 414–423 |
 |   7. A* (type 1, `0x0067B850`) | 424–461 |
 |   8. Velocity, direction vector, facing | 462–544 |
-|   9. Per-tick movement | 545–711 |
-|   10. Messages | 712–734 |
-|   11. Missile paths (`0x00649760`) | 735–784 |
-| Constants & data dependencies | 785–821 |
-| Randomness | 822–832 |
-| Edge cases & original bugs | 833–879 |
-| Test vectors | 880–917 |
-| Provenance | 918–955 |
-| Open questions | 956–1009 |
+|   9. Per-tick movement | 545–717 |
+|   10. Messages | 718–740 |
+|   11. Missile paths (`0x00649760`) | 741–790 |
+| Constants & data dependencies | 791–827 |
+| Randomness | 828–838 |
+| Edge cases & original bugs | 839–886 |
+| Test vectors | 887–924 |
+| Provenance | 925–962 |
+| Open questions | 963–1020 |
 <!-- /index -->
 
 ## Summary
@@ -567,13 +567,18 @@ mode's end (`0x005A8030`).
 5. Position history (`sim/path-placement.md` §10 rule 7, the owner):
    when `GetTickCount` > last + 25 ms and the squared distance to the
    previous record is > 45. Simulated: monster AI reads it.
-6. s = 2 (stopped): player data +0x150 ≠ 0 would start a queued action
-   (`0x00548B00` NPC talk, or a skill on a unit through `0x00580A70`);
-   no 1.14d server code stores a non-zero value there (every server
-   write stores 0: `0x00580A70`, `0x00580C20`), so in 1.14d s = 2 always
-   means **neutral start** `0x0057F020`. Result s; `sim/units.md` §4.5
-   then runs the ENDANIM handler, which starts neutral again (edge case
-   6).
+6. s = 2 (stopped), a player with player data and +0x150 ≠ 0 (a queued
+   interaction: `0x00460780`, from `0x00641F20`, stores +0x150 := 1,
+   +0x154 := −1, or −2 when its caller passes flag ≠ 0, +0x158 := unit
+   type, +0x15C := GUID; `world/npc.md` §2 C→S 0x13): +0x154 < 0 →
+   **neutral start** `0x0057F020`, then `0x00548B00`(type +0x158, GUID
+   +0x15C, +0x154 = −2, game) (NPC / unit interaction); +0x154 ≥ 0 is a
+   skill id: `0x006439F0` finds the player's skill → `0x00580A70`(skill,
+   its mode `0x00643860`, type, GUID, 0) and result 1; not found →
+   neutral start. Then +0x150 := 0 (`0x00580E88`). Asm
+   `0x00580D94`–`0x00580E88`. +0x150 = 0: neutral start. Result s;
+   `sim/units.md` §4.5 then runs the ENDANIM handler, which starts
+   neutral again (edge case 6).
 
 #### 9.3 Step (`0x00554CA0(game, unit)`)
 
@@ -616,7 +621,8 @@ flag 0x2) → room-change messages (rule 9.8). Result 1 if m, else 2.
    index < count against the new path.
 
 Unit distance (`0x00641530`): Δ per axis; both < 8 and both sizes < 4:
-d = `dist8_unit`[Δx + 8Δy] (negative → 0); minus 1 if either size is 3
+d = `dist8_unit`[Δx + 8Δy]; a negative entry returns 0 at once, with no
+size adjustment (`0x00641634`); else d minus 1 if either size is 3
 (not below 0); result d + 1 if either size < 2, else d. Otherwise each
 axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
 
@@ -852,7 +858,8 @@ Reproduced by default.
    through the overshoot of edge case 12.
 6. Arrival: the step that reaches the last point also ends movement
    (index = count) in the same tick; the player event then starts
-   neutral twice (§9.2 step 6 and the ENDANIM handler).
+   neutral twice (§9.2 step 6 and the ENDANIM handler) when no
+   interaction is queued.
 7. A blocked cell ends the path (index := count) and the unit stays at
    the last free cell's centre; there is no retry for players.
 8. Request while moving: the path starts from the current cell; the
@@ -1003,6 +1010,10 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   case 12, vector W10.
 - GR1: §9.6 rule 2 is dead in 1.14d (`0x00650660` has one caller, which
   tests the vector first). PX1: edge case 4 now says P can collide.
+- `world/npc.md` OQ7 (§9.2 rule 6 vs the queued 0x13 interaction):
+  §9.2 rule 6 corrected (`0x00460780` writes +0x150 := 1; the arrival
+  branch runs `0x00548B00` or `0x00580A70`). §9.5 unit distance: a
+  negative `dist8_unit` entry returns 0 directly.
 - OQ3 (missile part), OQ6: §11, `combat/vitals.md` §5. The §9.8
   add / removal addresses were swapped (fixed: removal `0x00571600`
   sends 0x0A).
