@@ -2484,3 +2484,207 @@ fn borders_by_the_rules() {
         }
     }
 }
+
+// ---- wild.rs: Act I (§7) -----------------------------------------------------
+
+/// `outdoor.md` §7.5.1 Dir(p, q) from the rule text: d := q − p; if |dx|
+/// ≥ 2|dy|: dy := −1 if dy < 0 else dy & 1; else if |dy| ≥ 2|dx|: dx :=
+/// −1 if dx < 0 else dx & 1; clamp to −2..2; T[5dx + dy + 12].
+#[test]
+fn dir_by_the_rule() {
+    use super::wild::dir;
+    const T: [i32; 25] = [
+        5, 4, 4, 4, 3, 6, 5, 4, 3, 2, 6, 6, 6, 2, 2, 6, 7, 0, 1, 2, 7, 0, 0, 0, 1,
+    ];
+    for dx0 in -7i32..=7 {
+        for dy0 in -7i32..=7 {
+            let (mut dx, mut dy) = (dx0, dy0);
+            if dx.abs() >= 2 * dy.abs() {
+                dy = if dy < 0 { -1 } else { dy & 1 };
+            } else if dy.abs() >= 2 * dx.abs() {
+                dx = if dx < 0 { -1 } else { dx & 1 };
+            }
+            let (dx, dy) = (dx.clamp(-2, 2), dy.clamp(-2, 2));
+            let want = T[(5 * dx + dy + 12) as usize];
+            assert_eq!(dir((3, 4), (3 + dx0, 4 + dy0)), want, "d ({dx0}, {dy0})");
+        }
+    }
+}
+
+/// `outdoor.md` §7.5.1 order rows and steps, §7.6 river files.
+#[test]
+fn act1_tables() {
+    use super::wild::{ORDER, RIVER_FILES, STEP_X, STEP_Y};
+    assert_eq!(
+        ORDER,
+        [[0, 1, 2, 3], [0, 1, 1, 1], [3, 2, 1, 2], [0, 3, 2, 1]]
+    );
+    assert_eq!((STEP_X, STEP_Y), ([1, 0, -1, 0], [0, 1, 0, -1]));
+    assert_eq!(
+        RIVER_FILES,
+        [
+            (2, 2),
+            (0, 3),
+            (1, 1),
+            (3, 0),
+            (0, 2),
+            (0, 1),
+            (1, 0),
+            (2, 0),
+            (2, 3),
+            (1, 3),
+            (3, 1),
+            (3, 2)
+        ]
+    );
+}
+
+/// `outdoor.md` §7.5.1 grid path, from the rule text (the code's readings
+/// of the two unstated points: the root counts toward the 900 nodes; a
+/// climb to the root advances it, and its tries reaching 3 fail the
+/// round). Returns cells B … A.
+fn grid_path_model(
+    a: (i32, i32),
+    b: (i32, i32),
+    gw: i32,
+    gh: i32,
+    blocked: &[(i32, i32)],
+) -> Option<Vec<(i32, i32)>> {
+    use super::wild::dir;
+    const ROWS: [[i32; 4]; 4] = [[0, 1, 2, 3], [0, 1, 1, 1], [3, 2, 1, 2], [0, 3, 2, 1]];
+    const X: [i32; 4] = [1, 0, -1, 0];
+    const Y: [i32; 4] = [0, 1, 0, -1];
+    let h = |p: (i32, i32)| {
+        let (dx, dy) = ((p.0 - b.0).abs(), (p.1 - b.1).abs());
+        dx.min(dy) + 2 * dx.max(dy)
+    };
+    if (a.0 - b.0).abs() + (a.1 - b.1).abs() < 2 {
+        return Some(vec![a, b]);
+    }
+    // (cell, g, tries, row, pos, facing, parent, child)
+    type N = (
+        (i32, i32),
+        i32,
+        i32,
+        usize,
+        usize,
+        i32,
+        Option<usize>,
+        Option<usize>,
+    );
+    let start = h(a) + h(a) / 2;
+    let mut budget = start;
+    loop {
+        let mut nodes: Vec<N> = vec![(a, 0, -1, 0, 0, (dir(a, b) / 2) & 3, None, None)];
+        let mut cur = 0;
+        let mut failed = false;
+        while nodes[cur].0 != b {
+            let (cell, g, _, _, _, facing, _, _) = nodes[cur];
+            let c = (cell.0 + X[facing as usize], cell.1 + Y[facing as usize]);
+            let mut chain = false;
+            let mut k = Some(cur);
+            while let Some(i) = k {
+                chain |= nodes[i].0 == c;
+                k = nodes[i].6;
+            }
+            let inside = c.0 >= 0 && c.1 >= 0 && c.0 < gw && c.1 < gh;
+            if (c == b || (inside && !blocked.contains(&c) && !chain)) && g + 2 + h(c) <= budget {
+                let d = dir(c, b) / 2;
+                let row = ((facing - d) & 3) as usize;
+                let child: N = (c, g + 2, 0, row, 0, (d + ROWS[row][0]) & 3, Some(cur), None);
+                cur = match nodes[cur].7 {
+                    Some(id) => {
+                        nodes[id] = child;
+                        id
+                    }
+                    None => {
+                        if nodes.len() >= 900 {
+                            return None;
+                        }
+                        nodes.push(child);
+                        let id = nodes.len() - 1;
+                        nodes[cur].7 = Some(id);
+                        id
+                    }
+                };
+                continue;
+            }
+            loop {
+                let n = &mut nodes[cur];
+                if n.2 < 4 {
+                    n.4 += 1;
+                    if n.4 < 4 {
+                        n.5 = (n.5 + ROWS[n.3][n.4]) & 3;
+                    }
+                }
+                n.2 += 1;
+                if n.2 < 3 {
+                    break;
+                }
+                match n.6 {
+                    Some(p) => cur = p,
+                    None => {
+                        failed = true;
+                        break;
+                    }
+                }
+            }
+            if failed {
+                break;
+            }
+        }
+        if !failed {
+            let mut out = Vec::new();
+            let mut k = Some(cur);
+            while let Some(i) = k {
+                out.push(nodes[i].0);
+                k = nodes[i].6;
+            }
+            return Some(out);
+        }
+        budget += 5;
+        if budget >= start + 35 {
+            return None;
+        }
+    }
+}
+
+/// `outdoor.md` §7.5.1 against the rule model on pseudo-random grids
+/// with blocked (0x200) cells: found paths, give-ups and the adjacent
+/// shortcut.
+#[test]
+fn grid_path_by_the_rules() {
+    use super::wild::grid_path;
+    let mut seed = Seed::init_low(1618);
+    let mut r = |n: i32| seed.roll(n) as i32;
+    let (mut found, mut none) = (0, 0);
+    for case in 0..300 {
+        let (gw, gh) = (4 + r(10), 4 + r(10));
+        let nb = r(gw * gh / 3 + 1);
+        let blocked: Vec<(i32, i32)> = (0..nb).map(|_| (r(gw), r(gh))).collect();
+        let a = (r(gw), r(gh));
+        let b = (r(gw), r(gh));
+        let want = grid_path_model(a, b, gw, gh, &blocked);
+        let got = grid_path(a, b, gw, gh, |c| blocked.contains(&c));
+        assert_eq!(got, want, "case {case}: {a:?} → {b:?} on {gw} × {gh}");
+        if want.is_some() {
+            found += 1;
+        } else {
+            none += 1;
+        }
+    }
+    assert!(found > 50 && none > 5, "{found} found, {none} none");
+    // A detour longer than the last round's budget (h + h/2 + 30): a wall
+    // at x = 2 open only from y = 10; the path costs 2·24 = 48 > 12 + 30.
+    let wall: Vec<(i32, i32)> = (0..10).map(|y| (2, y)).collect();
+    assert_eq!(
+        grid_path((0, 0), (4, 0), 20, 15, |c| wall.contains(&c)),
+        None
+    );
+    assert_eq!(grid_path_model((0, 0), (4, 0), 20, 15, &wall), None);
+    // Open at y = 3: found within the rounds.
+    let wall: Vec<(i32, i32)> = (0..3).map(|y| (2, y)).collect();
+    let p = grid_path((0, 0), (4, 0), 20, 15, |c| wall.contains(&c));
+    assert_eq!(p, grid_path_model((0, 0), (4, 0), 20, 15, &wall));
+    assert!(p.is_some());
+}
