@@ -101,6 +101,8 @@ pub struct SimGame<D = Unspecified> {
     /// Intents that passed the gate, size check and parse, in order:
     /// (client, id, size). Their handlers are not written (see `handle`).
     pub unhandled: Vec<(ClientId, u8, usize)>,
+    /// Skill / combat handlers (`handlers::skills`); `None`: stubs.
+    pub skills: Option<Box<dyn super::handlers::skills::SkillHost<D> + Send + Sync>>,
 }
 
 impl SimGame<Unspecified> {
@@ -120,6 +122,7 @@ impl<D: EventDispatch> SimGame<D> {
             units: BTreeMap::new(),
             resyncs: Vec::new(),
             unhandled: Vec::new(),
+            skills: None,
         }
     }
 
@@ -268,8 +271,11 @@ impl<D: EventDispatch> Intents for SimGame<D> {
         client: ClientId,
         msg: &[u8],
         size: usize,
-        _out: &mut dyn MessageSink,
+        out: &mut dyn MessageSink,
     ) -> ResultCode {
+        if let Some(code) = super::handlers::skills::handle(self, client, msg, out) {
+            return code;
+        }
         self.unhandled.push((client, msg[0], size));
         ResultCode::Done
     }

@@ -1,0 +1,803 @@
+// Spec: specs/skills/use.md, specs/skills/levels.md §6.4, specs/combat/vitals.md §2
+//! The skill handlers through the real host frame (drain → tick →
+//! flush) on the wired sim (`ActionSim`): each handled id with the
+//! spec's vectors, accepted and refused, and the exact bytes the client
+//! receives.
+
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use d2_data::bin::BinTable;
+use d2_data::fixup::records::stat_ops;
+use d2_data::tables::{Charstats, Experience, Itemstatcost, Record, Skilldesc, Skills};
+use d2_sim::combat::vitals::VitalsTables;
+use d2_sim::combat::{CombatTables, RoomKind};
+use d2_sim::drlg::data::DrlgData;
+use d2_sim::drlg::Dungeon;
+use d2_sim::drlg::{NoLevelTypes, TileInfo, TileSource};
+use d2_sim::game::Game;
+use d2_sim::rng::Seed;
+use d2_sim::skills::use_::{MissileAim, ServerMsg, UseState};
+use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
+use d2_sim::stats::{StatData, StatTable};
+use d2_sim::units::anim::AnimError;
+use d2_sim::units::hooks::{MonsterInfo, UnitData};
+use d2_sim::units::lifecycle::AllocRequest;
+use d2_sim::units::lists::client_state;
+use d2_sim::units::modes::UnitError;
+use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::{
+    ActionHooks, ActionSim, ActionTables, DrlgWorld, NoPending, WiringError,
+};
+
+use super::seams::SkillSeams;
+use super::wired::WiredSkills;
+use crate::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
+use crate::dispatch::Outcome;
+use crate::host::{Handled, Host};
+use crate::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, ResultCode, SessionHandler};
+
+// ---- fixture -----------------------------------------------------------------------------
+
+struct NoTiles;
+impl TileSource for NoTiles {
+    fn dt1(&self, _: &[u8]) -> Option<&[TileInfo]> {
+        None
+    }
+}
+
+#[derive(Default)]
+struct NoSession;
+impl SessionHandler for NoSession {
+    fn system_message(&mut self, _: ClientId, _: &[u8], _: usize, _: &mut dyn MessageSink) {}
+}
+struct Clock0(u32);
+impl Clock for Clock0 {
+    fn now_ms(&mut self) -> u32 {
+        self.0
+    }
+}
+
+/// A synthetic itemstatcost: 359 stats, no ops, no shifts, no minimums
+/// (the handlers' stats are plain base values), fixed up.
+fn stat_data() -> Arc<StatData> {
+    let (n, size) = (359, Itemstatcost::SIZE);
+    let mut records = vec![0u8; n * size];
+    for (s, r) in records.chunks_mut(size).enumerate() {
+        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
+            r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        }
+        r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
+    }
+    let mut t = BinTable {
+        name: "itemstatcost".into(),
+        source: "synthetic".into(),
+        count: n,
+        record_size: size,
+        records,
+    };
+    stat_ops(&mut t);
+    Arc::new(StatData {
+        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
+        ..StatData::default()
+    })
+}
+
+fn blank<T: Record>() -> T {
+    T::decode(&vec![0u8; T::SIZE])
+}
+
+/// A skills record with no formulas and no required skills.
+fn skill_rec() -> Skills {
+    let mut s: Skills = blank();
+    for f in [
+        &mut s.auralencalc,
+        &mut s.aurarangecalc,
+        &mut s.aurastatcalc1,
+        &mut s.calc1,
+        &mut s.calc2,
+        &mut s.calc3,
+        &mut s.calc4,
+        &mut s.passivecalc1,
+        &mut s.passivecalc2,
+        &mut s.passivecalc3,
+        &mut s.passivecalc4,
+        &mut s.passivecalc5,
+        &mut s.petmax,
+        &mut s.skpoints,
+        &mut s.tohitcalc,
+        &mut s.dmgsympercalc,
+        &mut s.edmgsympercalc,
+        &mut s.elensympercalc,
+        &mut s.delay,
+        &mut s.perdelay,
+    ] {
+        *f = 0xFFFF_FFFF;
+    }
+    s.skilldesc = 0xFFFF;
+    s.charclass = 0xFF;
+    s.reqskill1 = 0xFFFF;
+    s.reqskill2 = 0xFFFF;
+    s.reqskill3 = 0xFFFF;
+    s.itypea1 = 0xFFFF;
+    s.srvmissile = 0xFFFF;
+    s.intown = true;
+    s.ingame = true;
+    s
+}
+
+/// Skill ids of the synthetic table.
+const ATTACK: i32 = 0;
+/// Multiple Shot as `use.md` gives it: srvst 4; mana 4, +1, shift 8.
+const MULTI: i32 = 1;
+/// Might: aura, immediate, perdelay 50, srvdo 65.
+const MIGHT: i32 = 2;
+/// A learnable skill: max level 3.
+const LEARN: i32 = 3;
+
+fn skills() -> SkillTables {
+    let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
+    let m = &mut v[MULTI as usize];
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    let m = &mut v[MIGHT as usize];
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 65, 33);
+    v[LEARN as usize].maxlvl = 3;
+    SkillTables {
+        skills: v,
+        skilldesc: vec![blank::<Skilldesc>()],
+        missiles: Vec::new(),
+        // Formula 0: the constant 50 (`calc-expressions.md` §3).
+        skills_code: vec![0x07, 50, 0x00],
+        miss_code: Vec::new(),
+        level_cap: LEVEL_CAP_114D,
+        stat_count: 359,
+    }
+}
+
+/// `vitals.md` Constants: 1.14d `charstats` (Sorceress, Barbarian rows
+/// used), `experience.txt` MaxLvl 99.
+fn vitals() -> VitalsTables {
+    let rows: [[u8; 13]; 7] = [
+        [20, 25, 15, 20, 84, 30, 8, 4, 6, 12, 4, 6, 5],
+        [10, 25, 35, 10, 74, 30, 4, 4, 8, 8, 4, 8, 5],
+        [15, 25, 25, 15, 79, 30, 6, 4, 8, 8, 4, 8, 5],
+        [25, 20, 15, 25, 89, 30, 8, 4, 6, 12, 4, 6, 5],
+        [30, 20, 10, 25, 92, 30, 8, 4, 4, 16, 4, 4, 5],
+        [15, 20, 20, 25, 84, 30, 6, 4, 8, 8, 4, 8, 5],
+        [20, 20, 25, 20, 95, 30, 8, 5, 6, 12, 5, 7, 5],
+    ];
+    let charstats = rows
+        .iter()
+        .map(|r| {
+            let mut c: Charstats = blank();
+            (c.str, c.dex, c.int, c.vit, c.stamina, c.hpadd) = (r[0], r[1], r[2], r[3], r[4], r[5]);
+            (c.lifeperlevel, c.staminaperlevel, c.manaperlevel) = (r[6], r[7], r[8]);
+            (c.lifepervitality, c.staminapervitality, c.manapermagic) = (r[9], r[10], r[11]);
+            c.statperlevel = r[12];
+            c
+        })
+        .collect();
+    let mut row: Experience = blank();
+    row.amazon = 99;
+    VitalsTables {
+        charstats,
+        experience: vec![row],
+    }
+}
+
+/// What the unspecified seams answer, staged by the test, and a log of
+/// the calls that change something.
+#[derive(Default)]
+struct Inner {
+    list: Vec<SkillEntry>,
+    left: Option<SkillEntry>,
+    right: Option<SkillEntry>,
+    used: Option<SkillEntry>,
+    /// Entry mode by skill (skill entry +8).
+    modes: BTreeMap<i32, u32>,
+    /// `use_state` by skill (default usable).
+    states: BTreeMap<i32, UseState>,
+    class_skills: Vec<i32>,
+    log: Vec<String>,
+}
+
+/// The test's handle on the seams the host owns.
+#[derive(Clone, Default)]
+struct Book(Arc<Mutex<Inner>>);
+
+impl Book {
+    fn of(i: Inner) -> Self {
+        Book(Arc::new(Mutex::new(i)))
+    }
+    fn get(&self) -> MutexGuard<'_, Inner> {
+        self.0.lock().unwrap()
+    }
+}
+
+impl SkillSeams for Book {
+    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
+        self.get().list.clone()
+    }
+    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        self.get().used
+    }
+    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
+        self.get().used = e;
+    }
+    fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        self.get().left
+    }
+    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        self.get().right
+    }
+    fn set_left_skill(&mut self, _: UnitId, e: SkillEntry) {
+        self.get().log.push(format!("left {}", e.skill));
+        self.get().left = Some(e);
+    }
+    fn set_right_skill(&mut self, _: UnitId, e: SkillEntry) {
+        self.get().log.push(format!("right {}", e.skill));
+        self.get().right = Some(e);
+    }
+    fn find_entry(&self, _: UnitId, skill: i32) -> Option<SkillEntry> {
+        self.get().list.iter().copied().find(|e| e.skill == skill)
+    }
+    fn find_entry_owned(&self, _: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
+        self.get()
+            .list
+            .iter()
+            .copied()
+            .find(|e| e.skill == skill && e.owner_guid == owner)
+    }
+    fn entry_mode(&self, _: UnitId, e: &SkillEntry) -> u32 {
+        self.get().modes.get(&e.skill).copied().unwrap_or(0)
+    }
+    fn use_state(&mut self, _: UnitId, e: &SkillEntry) -> UseState {
+        self.get()
+            .states
+            .get(&e.skill)
+            .copied()
+            .unwrap_or(UseState::Usable)
+    }
+    fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
+        self.get().log.push(format!("srvst {index} {skill} {lvl}"));
+        1
+    }
+    fn srvdo(&mut self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
+        self.get()
+            .log
+            .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
+        1
+    }
+    fn create_skill_missile(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: bool, _: MissileAim) {}
+    fn is_class_skill(&self, _: UnitId, skill: i32) -> bool {
+        self.get().class_skills.contains(&skill)
+    }
+    fn add_skill_level(&mut self, _: UnitId, skill: i32, cost: i32) {
+        self.get().log.push(format!("addskill {skill} {cost}"));
+    }
+    fn after_skill_point(&mut self, _: UnitId) {
+        self.get().log.push("after".into());
+    }
+    fn room(&self, _: UnitId) -> RoomKind {
+        RoomKind::Field
+    }
+    fn refresh(&mut self, _: UnitId) {
+        self.get().log.push("refresh".into());
+    }
+}
+
+const ALIVE: PlayerGate = PlayerGate {
+    mode: 1,
+    uninterruptable: false,
+};
+
+type Wired = SimGame<ActionSim<NoPending>>;
+
+/// A host with a player (class `class`, mode NU, at (100, 100)) for
+/// client 0, a monster at (120, 100) and an item on the ground at
+/// (101, 100), on the wired sim with [`Book`] as the unspecified seams.
+struct Fx {
+    host: Host<Wired, ProtoSizes, NoSession, Clock0>,
+    player: UnitId,
+    monster: UnitId,
+    item: UnitId,
+    book: Book,
+    errors: Vec<WiringError>,
+}
+
+impl Fx {
+    fn new(class: u32, inner: Inner) -> Self {
+        let book = Book::of(inner);
+        let tables = ActionTables {
+            missiles: Vec::new(),
+            skills: skills(),
+            combat: CombatTables {
+                charstats: Vec::new(),
+                difficultylevels: Vec::new(),
+                monstats: Vec::new(),
+                monstats2: Vec::new(),
+                hitclass: Vec::new(),
+            },
+            levels: Vec::new(),
+            skill_modes: Vec::new(),
+        };
+        let drlg = DrlgWorld {
+            dungeon: Dungeon::default(),
+            data: Arc::new(DrlgData::default()),
+            tiles: Box::new(NoTiles),
+            types: Box::new(NoLevelTypes),
+        };
+        let hooks = ActionHooks::new(Arc::new(tables), drlg, Seed::init_low(1234), NoPending);
+        let data = UnitData {
+            monsters: vec![MonsterInfo {
+                enabled: true,
+                aidel: [15; 3],
+                moves: 0,
+            }],
+            ..UnitData::default()
+        };
+        let mut events = ActionSim::new(stat_data(), data, hooks);
+        let mut game = Game::new();
+        game.lists.ensure_act(0).unwrap();
+        let mut alloc = |ty, class| {
+            let req = AllocRequest {
+                ty,
+                class,
+                room: None,
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: ty == UnitType::Player,
+            };
+            events
+                .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+                .expect("allocated")
+        };
+        let player = alloc(UnitType::Player, class);
+        let monster = alloc(UnitType::Monster, 0);
+        let item = alloc(UnitType::Item, 0);
+        // Players are allocated in mode 0; neutral (`units.md` §2).
+        events.sys.units.get_mut(player).unwrap().mode = 1;
+        let mut sim = SimGame::with_events(game, events);
+        sim.join(0, Some(player), None, client_state::IN_GAME)
+            .unwrap();
+        sim.set_player(
+            player,
+            PlayerFields {
+                gate: ALIVE,
+                data: Some(PlayerData { last_accept: 0 }),
+            },
+        );
+        let at = |x, y| UnitFacts {
+            act: 0,
+            pos: Pos { x, y },
+            owner: None,
+        };
+        sim.set_unit(player, at(100, 100));
+        sim.set_unit(monster, at(120, 100));
+        sim.set_unit(item, at(101, 100));
+        sim.skills = Some(Box::new(WiredSkills::new(vitals(), book.clone())));
+        let mut host = Host::new(sim, ProtoSizes, NoSession, Clock0(1000));
+        host.connect(0);
+        Fx {
+            host,
+            player,
+            monster,
+            item,
+            book,
+            errors: Vec::new(),
+        }
+    }
+
+    fn book(&self) -> MutexGuard<'_, Inner> {
+        self.book.get()
+    }
+
+    fn unsent(&self) -> Vec<(ClientId, ServerMsg)> {
+        self.host.game.skills.as_ref().unwrap().unsent().to_vec()
+    }
+
+    fn guid(&self, u: UnitId) -> u32 {
+        self.host.game.game.lists.unit(u).unwrap().guid
+    }
+
+    fn stat(&mut self, s: u16) -> i32 {
+        let p = self.player;
+        let g = &mut self.host.game;
+        g.events.with(&mut g.game, |_, v| v.stat(p, s))
+    }
+
+    fn set_stats(&mut self, values: &[(u16, i32)]) {
+        let p = self.player;
+        let g = &mut self.host.game;
+        g.events.with(&mut g.game, |_, v| {
+            for &(s, x) in values {
+                v.set_base(p, s, x);
+            }
+        });
+    }
+
+    fn mode(&self) -> u32 {
+        self.host
+            .game
+            .events
+            .sys
+            .units
+            .get(self.player)
+            .unwrap()
+            .mode
+    }
+
+    /// Sends `msgs` and runs one host frame; the result codes, then what
+    /// the client receives after the frame's flush.
+    fn frame(&mut self, msgs: &[&[u8]]) -> (Vec<ResultCode>, Vec<Vec<u8>>) {
+        for m in msgs {
+            self.host.send_game(0, m).unwrap();
+        }
+        self.host.clock.0 += 40;
+        let r = self.host.frame().unwrap();
+        let codes = r
+            .messages
+            .iter()
+            .map(|h| match h.handled {
+                Handled::Game(Outcome::Dispatched(c)) => c,
+                other => panic!("not dispatched: {other:?}"),
+            })
+            .collect();
+        let sys = &mut self.host.game.events.sys;
+        assert!(sys.errors.is_empty(), "{:?}", sys.errors);
+        self.errors.append(&mut sys.hooks.errors);
+        (codes, self.host.receive(0))
+    }
+
+    /// The wiring errors since the last call.
+    fn take_errors(&mut self) -> Vec<WiringError> {
+        std::mem::take(&mut self.errors)
+    }
+
+    fn pierce(&mut self) -> i32 {
+        self.stat(328)
+    }
+}
+
+fn entry(skill: i32, base: i32) -> SkillEntry {
+    SkillEntry {
+        skill,
+        base,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    }
+}
+
+fn point(id: u8, x: u16, y: u16) -> Vec<u8> {
+    let mut m = vec![id];
+    m.extend(x.to_le_bytes());
+    m.extend(y.to_le_bytes());
+    m
+}
+
+fn unit_msg(id: u8, ty: u32, guid: u32) -> Vec<u8> {
+    let mut m = vec![id];
+    m.extend(ty.to_le_bytes());
+    m.extend(guid.to_le_bytes());
+    m
+}
+
+use ResultCode::*;
+const NONE: Vec<Vec<u8>> = Vec::new();
+
+/// What one mode start reports on the wired sim today: the action
+/// wiring routes no AnimData record (`wire-action.md` §4, "animation
+/// records"), so `units.md` §4.1's schedule fails after the mode set.
+fn no_anim_record() -> WiringError {
+    WiringError::Unit(UnitError::Anim(AnimError::NoRecord))
+}
+
+/// A caster with Multiple Shot L10 as the right skill (mode SC) and
+/// 4,000 mana.
+fn caster() -> Fx {
+    let multi = entry(MULTI, 10);
+    let book = Inner {
+        list: vec![entry(ATTACK, 1), multi],
+        left: Some(entry(ATTACK, 1)),
+        right: Some(multi),
+        modes: [(ATTACK, 7), (MULTI, 10)].into(),
+        ..Inner::default()
+    };
+    let mut fx = Fx::new(0, book);
+    fx.set_stats(&[(8, 4000), (12, 1)]);
+    fx
+}
+
+// ---- 0x05–0x11 -------------------------------------------------------------------------
+
+/// `use.md` §1 rules 3–5, §4 (mode start), §5.3 and the Multiple Shot
+/// vector (3,328 charged at start), through one host frame.
+// Covers: specs/skills/use.md §1 r4, §1 r5, §2 r6
+#[test]
+fn right_skill_at_point_starts_and_charges_at_start() {
+    let mut fx = caster();
+    let (codes, recv) = fx.frame(&[&point(0x0C, 110, 90)]);
+    assert_eq!((codes, recv), (vec![Done], NONE));
+    assert_eq!(fx.pierce(), 1);
+    assert_eq!(fx.mode(), 10, "SC started (units.md §4.1)");
+    assert_eq!(fx.take_errors(), [no_anim_record()]);
+    assert_eq!(fx.stat(8), 4000 - 3328);
+    assert_eq!(fx.book().used, Some(entry(MULTI, 10)));
+    assert_eq!(fx.book().log, ["srvst 4 1 10"]);
+    // The point validator stored the frame (player data +0x168).
+    let p = fx.player;
+    let data = fx.host.game.player_fields(p).unwrap().data;
+    assert_eq!(data, Some(PlayerData { last_accept: 0 }));
+    assert!(fx.unsent().is_empty());
+}
+
+/// Refusals: no right skill → 3 without `pierce_idx`; out of range → 1
+/// (the shared parser, before the handler); a dead player → 0 (gate).
+// Covers: specs/skills/use.md §1 r1, §1 r3
+#[test]
+fn skill_message_refusals() {
+    let mut fx = caster();
+    fx.book().right = None;
+    let far = point(0x0C, 151, 100);
+    let (codes, recv) = fx.frame(&[&point(0x0C, 110, 90), &far]);
+    assert_eq!((codes, recv), (vec![Malformed, Refused], NONE));
+    assert_eq!(fx.pierce(), 0);
+    let p = fx.player;
+    fx.host.game.set_player(
+        p,
+        PlayerFields {
+            gate: PlayerGate { mode: 17, ..ALIVE },
+            data: Some(PlayerData { last_accept: 0 }),
+        },
+    );
+    fx.book().right = Some(entry(MULTI, 10));
+    let (codes, _) = fx.frame(&[&point(0x0C, 110, 90)]);
+    assert_eq!(codes, vec![Done]);
+    assert_eq!((fx.pierce(), fx.mode()), (0, 1));
+    assert!(fx.take_errors().is_empty());
+}
+
+/// `use.md` §2 step 6: no mana → 0x5A (layout unspecified: recorded, not
+/// queued), result 0 and `pierce_idx` + 1 (edge case 2).
+// Covers: specs/skills/use.md §2 r6, §edge-cases-original-bugs r2
+#[test]
+fn no_mana_records_cant_do_and_counts() {
+    let mut fx = caster();
+    fx.book().states.insert(MULTI, UseState::NoMana);
+    let (codes, recv) = fx.frame(&[&point(0x0C, 110, 90)]);
+    assert_eq!((codes, recv), (vec![Done], NONE));
+    assert_eq!((fx.pierce(), fx.mode(), fx.stat(8)), (1, 1, 4000));
+    assert_eq!(fx.unsent(), vec![(0, ServerMsg::CantDo)]);
+    assert!(fx.take_errors().is_empty());
+}
+
+/// Hold forms (§1 rule 6) and the left skill (0x05): 0 whatever the use
+/// did; one `pierce_idx` per message. 0x0B does nothing.
+// Covers: specs/skills/use.md §1 r6, §edge-cases-original-bugs r1
+#[test]
+fn hold_and_left_forms() {
+    let mut fx = caster();
+    // Attack is not affordable here: the use fails, the result is 0.
+    fx.book().states.insert(ATTACK, UseState::Cooldown);
+    let (codes, recv) = fx.frame(&[&point(0x08, 110, 90), &point(0x05, 110, 90), &[0x0B]]);
+    assert_eq!((codes, recv), (vec![Done, Done, Done], NONE));
+    assert_eq!((fx.pierce(), fx.mode()), (2, 1));
+    assert!(fx.take_errors().is_empty());
+    // 0x0F: the right hold form starts like 0x0C.
+    let (codes, _) = fx.frame(&[&point(0x0F, 110, 90)]);
+    assert_eq!(codes, vec![Done]);
+    assert_eq!((fx.pierce(), fx.mode()), (3, 10));
+    assert_eq!(fx.take_errors(), [no_anim_record()]);
+}
+
+/// Unit forms (§3): 0x0D on a monster uses now (range "none"); 0x0E on
+/// an item without `TargetItem` → 2 inside (§3 step 3), result 0; a
+/// missing unit → 1 and a bad type → 2 from the shared parser.
+// Covers: specs/skills/use.md §1 r2, §3 r3, §edge-cases-original-bugs r10
+#[test]
+fn unit_forms() {
+    let mut fx = caster();
+    let (m, i) = (fx.guid(fx.monster), fx.guid(fx.item));
+    let (codes, recv) = fx.frame(&[
+        &unit_msg(0x0E, 4, i),
+        &unit_msg(0x0D, 1, m + 50),
+        &unit_msg(0x0D, 6, m),
+    ]);
+    assert_eq!((codes, recv), (vec![Done, Refused, Invalid], NONE));
+    assert_eq!((fx.pierce(), fx.mode()), (1, 1));
+    assert!(fx.take_errors().is_empty());
+    let (codes, recv) = fx.frame(&[&unit_msg(0x0D, 1, m)]);
+    assert_eq!((codes, recv), (vec![Done], NONE));
+    assert_eq!((fx.pierce(), fx.mode()), (2, 10));
+    assert_eq!(fx.take_errors(), [no_anim_record()]);
+    let _ = fx.monster;
+}
+
+// ---- 0x3C -------------------------------------------------------------------------------
+
+/// `use.md` §7: Might assigned at frame 1234 runs its do now and
+/// schedules type 8 at 1251; the gate is none (a dead player may
+/// select); unknown or level-0 entries → 3.
+#[test]
+fn select_skill_might_and_refusals() {
+    let book = Inner {
+        list: vec![entry(ATTACK, 1), entry(MIGHT, 1), entry(LEARN, 0)],
+        ..Inner::default()
+    };
+    let mut fx = Fx::new(3, book);
+    let p = fx.player;
+    fx.host.game.game.frame = 1234;
+    fx.host.game.set_player(
+        p,
+        PlayerFields {
+            gate: PlayerGate { mode: 17, ..ALIVE },
+            data: None,
+        },
+    );
+    let sel = |skill: u32, owner: i32| {
+        let mut m = vec![0x3C];
+        m.extend(skill.to_le_bytes());
+        m.extend(owner.to_le_bytes());
+        m
+    };
+    let (codes, recv) = fx.frame(&[
+        &sel(MIGHT as u32, -1),
+        &sel(ATTACK as u32 | 0x8000_0000, -1),
+        &sel(9, -1),
+        &sel(LEARN as u32, -1),
+        &sel(MIGHT as u32, 7),
+    ]);
+    assert_eq!(
+        (codes, recv),
+        (vec![Done, Done, Malformed, Malformed, Malformed], NONE)
+    );
+    assert_eq!(
+        fx.book().log,
+        ["right 2", "srvdo 65 2 1 true false false", "left 0"]
+    );
+    let g = &fx.host.game.game;
+    let timers: Vec<_> = g
+        .timers
+        .unit_timers(p)
+        .into_iter()
+        .filter_map(|t| Some((g.timers.event(t)?, g.timers.expire(t)?)))
+        .collect();
+    assert_eq!(timers, vec![((8, u32::MAX, 0), 1251)]);
+    assert_eq!(fx.pierce(), 0);
+    assert!(fx.take_errors().is_empty());
+}
+
+// ---- 0x3A -------------------------------------------------------------------------------
+
+/// `vitals.md` §2 vectors on a Barbarian: `3A 03 04` with 3 points →
+/// three spends, then 2; +10 vitality → max life +10,240, max stamina
+/// +2,560; range checks → 3; ids 4–15 → 2 (edge case 1); size → 3.
+// Covers: specs/combat/vitals.md §2 text, §edge-cases-original-bugs r1
+#[test]
+fn add_stat_point_vectors() {
+    let mut fx = Fx::new(4, Inner::default());
+    let base = [(3, 25), (6, 14080), (7, 14080), (10, 23552), (11, 23552)];
+    fx.set_stats(&base);
+    fx.set_stats(&[(4, 3)]);
+    let (codes, recv) = fx.frame(&[&[0x3A, 0x03, 0x04]]);
+    assert_eq!((codes, recv), (vec![Invalid], NONE));
+    let got: Vec<_> = [3, 4, 6, 7, 10, 11].map(|s| fx.stat(s)).to_vec();
+    assert_eq!(
+        got,
+        [28, 0, 14080 + 3072, 14080 + 3072, 23552 + 768, 23552 + 768]
+    );
+
+    fx.set_stats(&base);
+    fx.set_stats(&[(4, 10)]);
+    let (codes, _) = fx.frame(&[&[0x3A, 0x03, 0x09]]);
+    assert_eq!(codes, vec![Done]);
+    let got: Vec<_> = [3, 4, 7, 11].map(|s| fx.stat(s)).to_vec();
+    assert_eq!(got, [35, 0, 14080 + 10240, 23552 + 2560]);
+
+    fx.set_stats(&[(4, 5), (0, 30)]);
+    let (codes, _) = fx.frame(&[
+        &[0x3A, 0x10, 0x00],
+        &[0x3A, 0x00, 0x64],
+        &[0x3A, 0x04, 0x00],
+        &[0x3A, 0x00, 0x00],
+    ]);
+    assert_eq!(codes, vec![Malformed, Malformed, Invalid, Done]);
+    assert_eq!((fx.stat(0), fx.stat(4)), (31, 4));
+    assert_eq!(fx.book().log, ["refresh"]);
+    assert!(fx.take_errors().is_empty());
+}
+
+/// Sorceress, +10 energy → max mana +5,120 (`vitals.md` vector).
+// Covers: specs/combat/vitals.md §2 text
+#[test]
+fn add_energy_vector() {
+    let mut fx = Fx::new(1, Inner::default());
+    fx.set_stats(&[(1, 35), (8, 8960), (9, 8960), (4, 10)]);
+    let (codes, recv) = fx.frame(&[&[0x3A, 0x01, 0x09]]);
+    assert_eq!((codes, recv), (vec![Done], NONE));
+    let got: Vec<_> = [1, 4, 8, 9].map(|s| fx.stat(s)).to_vec();
+    assert_eq!(got, [45, 0, 8960 + 5120, 8960 + 5120]);
+    assert!(fx.take_errors().is_empty());
+}
+
+// ---- 0x3B -------------------------------------------------------------------------------
+
+/// `levels.md` §6.4: not a class skill → 3; bad id → 2; at max level →
+/// 2; spend (cost 1, `skpoints` empty) then step 5; without points no
+/// level, step 5 still runs.
+// Covers: specs/skills/levels.md §6.4 r1, §6.4 r2, §6.4 r3, §6.4 r4, §6.4 r5
+#[test]
+fn add_skill_point_vectors() {
+    let book = Inner {
+        list: vec![entry(LEARN, 1)],
+        class_skills: vec![LEARN, MULTI],
+        ..Inner::default()
+    };
+    let mut fx = Fx::new(1, book);
+    fx.set_stats(&[(12, 1), (5, 1)]);
+    let sk = |s: u16| {
+        let mut m = vec![0x3B];
+        m.extend(s.to_le_bytes());
+        m
+    };
+    let (codes, recv) = fx.frame(&[&sk(ATTACK as u16), &sk(40), &sk(LEARN as u16)]);
+    assert_eq!((codes, recv), (vec![Malformed, Invalid, Done], NONE));
+    assert_eq!(fx.book().log, ["addskill 3 1", "after"]);
+    fx.book().log.clear();
+    fx.book().list = vec![entry(LEARN, 3)];
+    fx.set_stats(&[(5, 0), (12, 5)]);
+    // (Not 0x3B LEARN first: the client's duplicate filter, §2.1 rule
+    // 1, would drop a repeat of the last message.)
+    let (codes, _) = fx.frame(&[&sk(MULTI as u16), &sk(LEARN as u16)]);
+    assert_eq!(codes, vec![Done, Invalid]);
+    assert_eq!(fx.book().log, ["after"]);
+    assert!(fx.take_errors().is_empty());
+}
+
+// ---- the id table ------------------------------------------------------------------------
+
+const CLIENT_TSV: &str = include_str!("../../../../../../specs/sim/client-messages.tsv");
+
+/// Rows of [`super::IDS`] that disagree with `client-messages.tsv`: the
+/// name, and `kind` = handler for every handled id (M05).
+fn ids_vs_tsv(tsv: &str) -> Vec<String> {
+    let rows: BTreeMap<u8, (String, String)> = tsv
+        .lines()
+        .skip(1)
+        .filter_map(|l| {
+            let c: Vec<&str> = l.split('\t').collect();
+            let id = u8::from_str_radix(c.first()?.trim_start_matches("0x"), 16).ok()?;
+            Some((id, (c.get(1)?.to_string(), c.get(6)?.to_string())))
+        })
+        .collect();
+    let mut bad = Vec::new();
+    for &(id, name, _, status) in super::IDS {
+        match rows.get(&id) {
+            Some((n, k)) if n == name && (status != super::Status::Handled || k == "handler") => {}
+            other => bad.push(format!("{id:#04x} {name}: {other:?}")),
+        }
+    }
+    bad
+}
+
+#[test]
+fn ids_match_client_tsv() {
+    assert_eq!(ids_vs_tsv(CLIENT_TSV), Vec::<String>::new());
+}
+
+/// M08: a renamed row and a row whose kind is no longer `handler` are
+/// both reported, and nothing else.
+#[test]
+fn ids_check_reports_perturbations() {
+    let renamed = CLIENT_TSV.replace("\tAddSkillPoint\t", "\tAddSkillPointX\t");
+    let bad = ids_vs_tsv(&renamed);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].starts_with("0x3b AddSkillPoint"));
+    let stubbed = CLIENT_TSV.replace("0x0054C0C0\thandler", "0x0054C0C0\tstub0");
+    assert!(ids_vs_tsv(&stubbed).is_empty(), "0x40 is not in the table");
+    let stubbed = CLIENT_TSV.replace("0x0054BE70\thandler", "0x0054BE70\tstub0");
+    let bad = ids_vs_tsv(&stubbed);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].starts_with("0x3c SelectSkill"));
+}

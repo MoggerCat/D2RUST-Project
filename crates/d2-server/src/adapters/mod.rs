@@ -4,6 +4,7 @@
 //! `d2_sim::game::Game` and `d2_sim::tick`. `d2-sim` may not depend on
 //! `d2-server` (depcheck), so the adapters live here.
 
+pub mod handlers;
 mod sim;
 mod sizes;
 
