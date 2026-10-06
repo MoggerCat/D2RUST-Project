@@ -188,6 +188,42 @@ fn dc6_direction_gives_its_frames_with_offsets_unchanged() {
     );
 }
 
+// Covers: specs/render/sprite-placement.md §8
+#[test]
+fn dc6_frames_carry_the_orientation_bit_and_refuse_other_flips() {
+    let mut f = dc6(1, 2);
+    f.frames[1].flip = 1;
+    let set = FrameSet::from_dc6(&f, 0).unwrap();
+    assert_eq!(set.frames[0].anchor, FrameAnchor::Bottom);
+    assert_eq!(set.frames[1].anchor, FrameAnchor::TopDown);
+    f.frames[1].flip = 2;
+    assert_eq!(
+        FrameSet::from_dc6(&f, 0),
+        Err(FrameError::Dc6Flip {
+            dir: 0,
+            frame: 1,
+            flip: 2
+        })
+    );
+}
+
+// Covers: specs/render/sprite-placement.md §3
+#[test]
+fn dcc_frames_are_top_anchored_and_refuse_an_odd_variable0() {
+    let mut d = dcc(&[vec![dcc_frame(2, 2, -1, -2, 7)]]);
+    let set = FrameSet::from_dcc(&d, 0).unwrap();
+    assert_eq!(set.frames[0].anchor, FrameAnchor::Top);
+    d.directions[0].frames[0].variable0 = 3;
+    assert_eq!(
+        FrameSet::from_dcc(&d, 0),
+        Err(FrameError::DccVariable0 {
+            dir: 0,
+            frame: 0,
+            variable0: 3
+        })
+    );
+}
+
 #[test]
 fn dc6_with_missing_frame_is_an_error() {
     let mut f = dc6(1, 2);
@@ -368,6 +404,7 @@ fn inconsistent_frame_is_refused_by_the_atlas() {
         height: 2,
         x_off: 0,
         y_off: 0,
+        anchor: FrameAnchor::Top,
         pixels: vec![1; 3],
     };
     assert!(matches!(
