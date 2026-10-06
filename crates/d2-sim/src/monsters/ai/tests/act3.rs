@@ -162,7 +162,7 @@ fn zakarum_zealot_hurt_cooldown() {
 
 // ---- §5 ZakarumPriest --------------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-3.md §5 text, §5 r4, §5 r6, §5 l2 r1
+// Covers: specs/monsters/ai-bodies-3.md §5 text, §5 r2, §5 r3, §5 r4, §5 r6
 #[test]
 fn zakarum_priest_vectors() {
     let cantor1 = [25, 5, 50, 25, 120, 36];
@@ -452,7 +452,7 @@ fn fetish_blowgun_vectors() {
 
 // ---- §10 WillOWisp -----------------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-3.md §10 text, §10 r0, §10 r1, §10 r2, §edge-cases-original-bugs r7
+// Covers: specs/monsters/ai-bodies-3.md §10 text, §10 r0, §10 l2 r1, §10 l2 r2, §edge-cases-original-bugs r7
 #[test]
 fn will_o_wisp_ritual() {
     let wisp = [40, 70, 50];
@@ -501,7 +501,7 @@ fn will_o_wisp_ritual() {
     assert_eq!((param_of(&w, 0), w.thinks()), (2, vec![408]));
 }
 
-// Covers: specs/monsters/ai-bodies-3.md §10 r3, §10 r4, §10 r5
+// Covers: specs/monsters/ai-bodies-3.md §10 l2 r3, §10 l2 r4, §10 l2 r5
 #[test]
 fn will_o_wisp_casts() {
     let wisp = [40, 70, 50];
