@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 483–536 |
 |   R7. Lifetime and expiry | 537–560 |
 |   R8. Pierce | 561–586 |
-|   R9. Server-do and server-hit catalogues | 587–807 |
-|   R10. Behaviour of the recorded missiles | 808–841 |
-|   R11. `missiles.txt` columns and their server use | 842–876 |
-| Constants & data dependencies | 877–903 |
-| Randomness | 904–936 |
-| Edge cases & original bugs | 937–960 |
-| Test vectors | 961–1040 |
-| Provenance | 1041–1083 |
-| Open questions | 1084–1129 |
+|   R9. Server-do and server-hit catalogues | 587–812 |
+|   R10. Behaviour of the recorded missiles | 813–846 |
+|   R11. `missiles.txt` columns and their server use | 847–881 |
+| Constants & data dependencies | 882–908 |
+| Randomness | 909–941 |
+| Edge cases & original bugs | 942–965 |
+| Test vectors | 966–1045 |
+| Provenance | 1046–1088 |
+| Open questions | 1089–1134 |
 <!-- /index -->
 
 ## Summary
@@ -712,7 +712,9 @@ data +0x0C / +0x0A (`0x0064A210`, `0x0064A280`); frames left = data
    always valid). Else q = level / max(`Param3`, 1) (signed); range =
    `Param1` + max(q, 2); interval = max(`Param2` − q, 3); §R9.3 helper
    (missile, range, interval, `SubMissile1`, mask 5) — `SubMissile1` < 0
-   is passed on and the creation fails; return flight.
+   is passed on and the creation fails; return flight. (The missing
+   record cannot happen: a missile's class is the valid row it was
+   created from, §R2; an implementation may assert.)
 6. **10 BlizzardCenter** `0x005AEA60`: record missing → as 5. Missile
    skill k invalid → return 2 (removed). range = `eval(owner, k.calc1,
    k, level)`, interval = `eval(owner, k.calc2, k, level)` (calc1
@@ -757,7 +759,9 @@ result bits per §R5. Helpers:
   1 → 0x10, b ≠ 0 → clear 1; hit and U without state 54 → |= 4;
   monster critical hit `0x005A5560` (`combat/damage.md` §3.1 step 13);
   hit → `apply(game, attacker, U, missile 1, copy)` (§5.2); reaction
-  `0x0057CEE0` (§7.1).
+  `0x0057CEE0` (§7.1). b = 8 (evade) and any other bit outside 1, 2,
+  4, 0x10 adds no result bit; only the "b ≠ 0 → clear 1" applies
+  (asm of `0x0056B9C0`).
 
 Bodies:
 
@@ -795,8 +799,9 @@ Bodies:
    qualifies). No draws: the chain order is GUID order with wrap-around.
 4. **13 Glacial Spike, Hell Meteor down** `0x005AA8B0`: missile,
    record, or the missile skill k's record missing → 1. r = `sHitPar1`,
-   or max(`eval(owner, k.aurarangecalc)`, 1); len = `sHitPar2`, or
-   `eval(owner, k.auralencalc)` (unclamped), both at the missile level.
+   or max(`eval(owner, k.aurarangecalc)`, 1); len = `sHitPar2` when >
+   0, else `eval(owner, k.auralencalc)` (unclamped), both at the
+   missile level (same > 0 test as r; asm of `0x005AA8B0`).
    Zeroed record; `elem_roll`; len > 0 → `elem_len(record, len)`; flags
    from the row as in 1; `area_damage(…, 0)`, which always returns 1, so
    the result is always 1 (the code maps a 0 to 3).
