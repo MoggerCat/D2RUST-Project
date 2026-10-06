@@ -2130,7 +2130,9 @@ dependencies = [
  "d2-proto",
  "d2-server",
  "d2-sim",
+ "proptest",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
 ]
 
@@ -4923,6 +4925,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "scenario-run"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "conformance",
+ "d2-data",
+ "d2-formats",
+ "d2-proto",
+ "d2-server",
+ "d2-sim",
+ "test-fixtures",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4945,6 +4962,18 @@ dependencies = [
  "memmap2",
  "smithay-client-toolkit",
  "tiny-skia",
+]
+
+[[package]]
+name = "seed-finder"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "d2-data",
+ "d2-formats",
+ "d2-server",
+ "d2-sim",
+ "test-fixtures",
 ]
 
 [[package]]

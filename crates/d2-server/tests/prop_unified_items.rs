@@ -842,6 +842,9 @@ impl QuestRest for Rest {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn attach_sound(&mut self, _: UnitId, _: u16) {}
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -870,8 +873,69 @@ impl QuestRest for Rest {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, _: UnitId, _: i32) {}
     fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
+    fn unit_position(&self, _: UnitId) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn room_contains(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> bool {
+        false
+    }
+    fn room_at(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> Option<d2_sim::units::RoomId> {
+        None
+    }
+    fn free_spot_at(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn spawn_monster(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: u8,
+        _: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn or_unit_flags(&mut self, _: UnitId, _: u32) {}
+    fn monsters(&self) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn npc_chat_clients(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
+    fn remove_monster(&mut self, _: UnitId) {}
+    fn drop_preset_monster(&mut self, _: u8, _: u16) {}
+    fn find_object_near(&self, _: UnitId, _: u16) -> Option<UnitId> {
+        None
+    }
+    fn create_object(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn object_anim_length(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn schedule_object_event(&mut self, _: UnitId, _: u8, _: i32) {}
+    fn open_quest_message(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn unhandled(&mut self, _: u8, _: u32) {}
 }
 
@@ -937,9 +1001,6 @@ impl InvRest for InvFx {
     fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
         self.pos.insert(u, (x, y));
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value.wrapping_mul(p) / 100
-    }
     fn item_active_on(&self, _: Guid, _: Owner) -> bool {
         false
     }
@@ -958,17 +1019,11 @@ impl InvRest for InvFx {
     fn ammo_type(&self, _: Guid) -> Option<i16> {
         None
     }
-    fn stack_quality_ok(&self, _: Guid) -> bool {
-        true
-    }
     fn has_allowed_location(&self, _: Guid) -> bool {
         true
     }
     fn quiver_kind(&self, _: Guid) -> bool {
         false
-    }
-    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
-        true
     }
     fn interaction(&self, _: Owner) -> InteractionTarget {
         InteractionTarget::None

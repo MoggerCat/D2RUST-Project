@@ -1,11 +1,13 @@
 // Spec: specs/render/capture.md (§3–§7), traces/FORMAT.md (Render captures)
 //! Reader of the 1.14d frame captures written by
 //! `tools/trace-recorder/record_frames.py`: the raw JSON-lines file
-//! (format `frames-raw-1`, capture.md §5) and its 8-bit palettized PNGs.
-//! Strict (M07): a missing or other `format`, an unknown record kind, a
-//! missing field, a wrong type, a footer whose counts disagree with the
-//! lines, or a PNG that is not 8-bit color type 3 is an error naming the
-//! line or file, never a default.
+//! (formats `frames-raw-2` and the older `frames-raw-1`, capture.md §5)
+//! and its 8-bit palettized PNGs. Strict (M07): a missing or other
+//! `format`, an unknown record kind, a record or field of the other format
+//! version, a missing field, a wrong type, a `seq` out of order, a key that
+//! disagrees with the state it is built from, a footer whose counts
+//! disagree with the lines, or a PNG that is not 8-bit color type 3 is an
+//! error naming the line or file, never a default.
 //!
 //! Also the two checks that need no renderer: the hashes of §6
 //! ([`sha256_hex`], [`Image::check`]) and the stability rule of §7
@@ -13,15 +15,41 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::io::Cursor;
+use std::io::Cursor as IoCursor;
 use std::path::{Path, PathBuf};
 
 use d2_formats::palette::Palette;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-/// The raw format this build reads (capture.md §5; M20).
-pub const FORMAT: &str = "frames-raw-1";
+/// The raw formats this build reads (capture.md §5; M20). `frames-raw-1`
+/// is kept for the first recordings (`traces/FORMAT.md`: readers keep
+/// accepting it); each version refuses the other's records and fields.
+pub const FORMAT_1: &str = "frames-raw-1";
+pub const FORMAT_2: &str = "frames-raw-2";
+
+/// Which raw format a file is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawFormat {
+    Raw1,
+    Raw2,
+}
+
+/// Frame record fields `frames-raw-2` added (capture.md §5): refused in a
+/// `frames-raw-1` file.
+const RAW2_FRAME_FIELDS: [&str; 11] = [
+    "seq",
+    "client_update",
+    "level",
+    "cursor",
+    "cursor_key",
+    "seed_start",
+    "seed_end",
+    "light",
+    "light_key",
+    "weather",
+    "draws",
+];
 
 /// The video type a capture must have: GDI (capture.md §1).
 pub const GDI: u32 = 1;
@@ -56,10 +84,16 @@ fn err(at: impl Into<String>, what: impl Into<String>) -> CaptureError {
     }
 }
 
-/// One `frames-raw-1` file.
+/// One raw capture file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Raw {
+    pub format: RawFormat,
     pub header: Header,
+    /// The `capture` record (`frames-raw-2` only, the line after the
+    /// header).
+    pub capture: Option<CaptureMeta>,
+    /// `celfile` records (`frames-raw-2`, capture.md §3.6), in file order.
+    pub celfiles: Vec<CelFile>,
     /// `game` records: the game pointer the tick hook follows (hex text).
     pub games: Vec<String>,
     /// `tick` records: the server frame numbers `f`, in file order.
@@ -77,6 +111,37 @@ pub struct Header {
     pub args: Vec<String>,
 }
 
+/// The recording's settings (capture.md §5 `capture` record).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaptureMeta {
+    /// Image directory name under `game/captures/` (absent with
+    /// `--no-save`).
+    pub images: Option<String>,
+    /// `--every`: one in `every` in-game draws is captured.
+    pub every: u32,
+    /// `--draws-every`: one in `draws_every` captured frames carries a
+    /// draw log (0: none).
+    pub draws_every: u32,
+    /// The recorder's state key fields (§7).
+    pub state_key: Vec<String>,
+}
+
+impl CaptureMeta {
+    /// Every in-game draw was captured (`--every 1`): frame `seq − 1` is
+    /// the previous draw (capture.md §6, initial framebuffer).
+    pub fn every_draw(&self) -> bool {
+        self.every == 1
+    }
+}
+
+/// One cel file load (capture.md §3.6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CelFile {
+    /// The cel file pointer, hex text.
+    pub ptr: String,
+    pub path: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Footer {
     pub ticks: i64,
@@ -88,6 +153,10 @@ pub struct Footer {
 pub struct Frame {
     /// 1-based line in the raw file.
     pub line: usize,
+    /// The recorder's sequence number (capture.md §4, §5): frames are
+    /// numbered by it, never by the draw counter. `frames-raw-1` has none;
+    /// its frames get their 1-based position among the frame records.
+    pub seq: u32,
     /// `f`: the last server tick before this frame (capture.md §4); `None`
     /// before the first tick of the recording.
     pub tick: Option<i64>,
@@ -115,6 +184,10 @@ pub struct Captured {
     /// `--no-save`).
     pub image: Option<String>,
     pub state: State,
+    /// The draw log of §3.5 (`frames-raw-2`, frames selected by
+    /// `--draws-every`), entries in call order, each with its `op`. A
+    /// frame without one cannot be composed (§6).
+    pub draws: Option<Vec<Map<String, Value>>>,
 }
 
 /// The state a frame was drawn from (capture.md §3, `camera.md`).
@@ -132,6 +205,102 @@ pub struct State {
     pub shake: [i64; 3],
     pub clear_counter: i32,
     pub res_mode: u32,
+    /// The fields `frames-raw-2` added (capture.md §3.1–§3.4); `None` in a
+    /// `frames-raw-1` file.
+    pub more: Option<Box<State2>>,
+}
+
+/// The state `frames-raw-2` records beyond `frames-raw-1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct State2 {
+    /// Client updates `[0x007A0498]` (§3.1).
+    pub client_update: u32,
+    pub level: Level,
+    /// The cursor at frame start (§3.3); absent when the frame start hook
+    /// did not run for this frame.
+    pub cursor: Option<Cursor>,
+    /// Player seed (`+0x20/+0x24`) at frame start and end (§3.1); absent
+    /// or null without a player unit.
+    pub seed_start: Option<[u32; 2]>,
+    pub seed_end: Option<[u32; 2]>,
+    pub light: Light,
+    pub weather: Weather,
+}
+
+/// Level and act (capture.md §3.2).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Level {
+    /// The player's level id (`None`: no player, or a null link).
+    pub level_id: Option<u32>,
+    /// Client act byte `+0x14` (absent without a client act).
+    pub act: Option<u8>,
+    /// Environment: intensity, R, G, B.
+    pub env: Option<[i64; 4]>,
+}
+
+/// The mouse cursor at frame start (capture.md §3.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cursor {
+    pub visible: u32,
+    pub state: i32,
+    pub cursor_type: i32,
+    /// 8.8 fixed.
+    pub frame: i32,
+    pub x: i32,
+    pub y: i32,
+    pub adj: i32,
+    pub item: bool,
+    pub last_step: u32,
+    pub idle_since: u32,
+}
+
+/// The cursor part of the state key (capture.md §7): drawn flag, type,
+/// drawn frame `frame >> 8`, x, y, adj, item present. The timers are not
+/// part of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CursorKey {
+    pub visible: u32,
+    pub cursor_type: i32,
+    pub frame: i32,
+    pub x: i32,
+    pub y: i32,
+    pub adj: i32,
+    pub item: bool,
+}
+
+impl Cursor {
+    pub fn key(&self) -> CursorKey {
+        CursorKey {
+            visible: self.visible,
+            cursor_type: self.cursor_type,
+            frame: self.frame >> 8,
+            x: self.x,
+            y: self.y,
+            adj: self.adj,
+            item: self.item,
+        }
+    }
+}
+
+/// Light quality and its inputs (capture.md §3.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Light {
+    /// `[0x007B567C]`, 0–2: the state key's `light_key`.
+    pub quality: i32,
+    pub draw_rate: i32,
+    pub opt_a: u32,
+    pub opt_b: u32,
+    pub render_kind: u32,
+}
+
+/// Weather state (capture.md §3.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Weather {
+    pub rain: u32,
+    pub snow: u32,
+    pub lightning: i32,
+    pub flash: i32,
+    pub update: u32,
 }
 
 /// The client player unit (capture.md §3).
@@ -156,18 +325,21 @@ impl Frame {
     }
 }
 
-/// Reads a `frames-raw-1` file.
+/// Reads a raw capture file (`frames-raw-1` or `frames-raw-2`).
 pub fn read_raw(path: &Path) -> Result<Raw, CaptureError> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| err(path.display().to_string(), e.to_string()))?;
     parse_raw(&text).map_err(|e| err(format!("{}: {}", path.display(), e.at), e.what))
 }
 
-/// Parses the text of a `frames-raw-1` file.
+/// Parses the text of a raw capture file.
 pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
     let mut header = None;
+    let mut format = RawFormat::Raw1;
+    let mut capture = None;
     let mut footer = None;
     let (mut games, mut ticks, mut frames) = (Vec::new(), Vec::new(), Vec::new());
+    let mut celfiles = Vec::new();
     for (i, line) in text.lines().enumerate() {
         let n = i + 1;
         let at = format!("line {n}");
@@ -187,6 +359,13 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
                 format!("first record is {kind:?}, not the header"),
             ));
         }
+        // frames-raw-2: the `capture` record follows the header (§5).
+        if format == RawFormat::Raw2 && n == 2 && kind != "capture" {
+            return Err(err(
+                &at,
+                format!("second record is {kind:?}, not the {FORMAT_2} capture record"),
+            ));
+        }
         match kind {
             "header" => {
                 if header.is_some() {
@@ -194,13 +373,18 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
                 }
                 // Version first (M20): an unknown format is reported before
                 // anything it may have changed.
-                let format = r.str("format")?;
-                if format != FORMAT {
-                    return Err(err(
-                        &at,
-                        format!("format {format:?} is not supported (this build reads {FORMAT:?})"),
-                    ));
-                }
+                format = match r.str("format")? {
+                    FORMAT_1 => RawFormat::Raw1,
+                    FORMAT_2 => RawFormat::Raw2,
+                    other => {
+                        return Err(err(
+                            &at,
+                            format!(
+                                "format {other:?} is not supported (this build reads {FORMAT_1:?} and {FORMAT_2:?})"
+                            ),
+                        ))
+                    }
+                };
                 let args = r
                     .get("args")?
                     .as_array()
@@ -219,9 +403,28 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
                     args,
                 });
             }
+            "capture" | "celfile" if format == RawFormat::Raw1 => {
+                return Err(err(
+                    &at,
+                    format!("a {FORMAT_2} {kind:?} record in a {FORMAT_1} file"),
+                ))
+            }
+            "capture" => {
+                if n != 2 {
+                    return Err(err(at, "the capture record is not the second line"));
+                }
+                capture = Some(capture_meta(&r)?);
+            }
+            "celfile" => celfiles.push(CelFile {
+                ptr: r.str("ptr")?.to_owned(),
+                path: r.str("path")?.to_owned(),
+            }),
             "game" => games.push(r.str("g")?.to_owned()),
             "tick" => ticks.push(r.int("f", i64::MIN, i64::MAX)?),
-            "frame" => frames.push(frame(&r, n)?),
+            "frame" => {
+                let want = frames.len() as u32 + 1;
+                frames.push(frame(&r, n, format, want)?)
+            }
             "footer" => {
                 let counts = r
                     .get("counts")?
@@ -233,6 +436,8 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
                     ("game", games.len()),
                     ("tick", ticks.len()),
                     ("frame", frames.len()),
+                    ("capture", usize::from(capture.is_some())),
+                    ("celfile", celfiles.len()),
                 ];
                 for (k, v) in counts {
                     let want = v
@@ -283,8 +488,14 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
     }
     let header = header.ok_or_else(|| err("line 1", "empty file (no header)"))?;
     let footer = footer.ok_or_else(|| err("end of file", "no footer (the recording was cut)"))?;
+    if format == RawFormat::Raw2 && capture.is_none() {
+        return Err(err("line 2", format!("no {FORMAT_2} capture record")));
+    }
     Ok(Raw {
+        format,
         header,
+        capture,
+        celfiles,
         games,
         ticks,
         frames,
@@ -292,7 +503,57 @@ pub fn parse_raw(text: &str) -> Result<Raw, CaptureError> {
     })
 }
 
-fn frame(r: &Rec<'_>, line: usize) -> Result<Frame, CaptureError> {
+fn capture_meta(r: &Rec<'_>) -> Result<CaptureMeta, CaptureError> {
+    let images = match r.get("images")? {
+        Value::Null => None,
+        _ => Some(r.str("images")?.to_owned()),
+    };
+    let state_key = r
+        .get("state_key")?
+        .as_array()
+        .ok_or_else(|| r.wrong("state_key", "an array of strings"))?
+        .iter()
+        .map(|a| {
+            a.as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| r.wrong("state_key", "an array of strings"))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(CaptureMeta {
+        images,
+        every: r.int("every", 1, u32::MAX.into())? as u32,
+        draws_every: r.int("draws_every", 0, u32::MAX.into())? as u32,
+        state_key,
+    })
+}
+
+fn frame(
+    r: &Rec<'_>,
+    line: usize,
+    format: RawFormat,
+    want_seq: u32,
+) -> Result<Frame, CaptureError> {
+    let seq = match format {
+        RawFormat::Raw1 => {
+            if let Some(k) = RAW2_FRAME_FIELDS.iter().find(|k| r.rec.contains_key(**k)) {
+                return Err(err(
+                    r.at,
+                    format!("{k}: a {FORMAT_2} field in a {FORMAT_1} file"),
+                ));
+            }
+            want_seq
+        }
+        RawFormat::Raw2 => {
+            let seq = r.int("seq", 0, u32::MAX.into())? as u32;
+            if seq != want_seq {
+                return Err(err(
+                    r.at,
+                    format!("seq {seq}: frame records are numbered 1, 2, … (expected {want_seq})"),
+                ));
+            }
+            seq
+        }
+    };
     let tick = match r.get("f")? {
         Value::Null => None,
         _ => Some(r.int("f", i64::MIN, i64::MAX)?),
@@ -313,16 +574,22 @@ fn frame(r: &Rec<'_>, line: usize) -> Result<Frame, CaptureError> {
             None => None,
             Some(_) => Some(r.str("image")?.to_owned()),
         };
+        let draws = match r.rec.get("draws") {
+            None => None,
+            Some(v) => Some(draw_log(r, v)?),
+        };
         FrameBody::Captured(Box::new(Captured {
             index_sha256: r.hash("index_sha256")?,
             palette_sha256: r.hash("palette_sha256")?,
             draw: r.int("draw", 0, u32::MAX.into())? as u32,
             image,
-            state: state(r)?,
+            state: state(r, format)?,
+            draws,
         }))
     };
     Ok(Frame {
         line,
+        seq,
         tick,
         video_type,
         w,
@@ -331,7 +598,26 @@ fn frame(r: &Rec<'_>, line: usize) -> Result<Frame, CaptureError> {
     })
 }
 
-fn state(r: &Rec<'_>) -> Result<State, CaptureError> {
+/// The draw log (§3.5): an array of objects, each naming its `op`.
+fn draw_log(r: &Rec<'_>, v: &Value) -> Result<Vec<Map<String, Value>>, CaptureError> {
+    let arr = v
+        .as_array()
+        .ok_or_else(|| r.wrong("draws", "an array of draw entries"))?;
+    arr.iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let o = e
+                .as_object()
+                .ok_or_else(|| r.wrong(&format!("draws[{i}]"), "an object"))?;
+            o.get("op")
+                .and_then(Value::as_str)
+                .ok_or_else(|| r.wrong(&format!("draws[{i}].op"), "a string"))?;
+            Ok(o.clone())
+        })
+        .collect()
+}
+
+fn state(r: &Rec<'_>, format: RawFormat) -> Result<State, CaptureError> {
     let i32s = |key: &str| r.ints::<2>(key, i32::MIN.into(), i32::MAX.into());
     let player = match r.rec.get("player") {
         None => None,
@@ -391,6 +677,133 @@ fn state(r: &Rec<'_>) -> Result<State, CaptureError> {
         shake,
         clear_counter: r.int("clear_counter", i32::MIN.into(), i32::MAX.into())? as i32,
         res_mode: r.int("res_mode", 0, u32::MAX.into())? as u32,
+        more: match format {
+            RawFormat::Raw1 => None,
+            RawFormat::Raw2 => Some(Box::new(state2(r)?)),
+        },
+    })
+}
+
+const I32: (i64, i64) = (i32::MIN as i64, i32::MAX as i64);
+const U32: (i64, i64) = (0, u32::MAX as i64);
+
+/// The `frames-raw-2` state (capture.md §3.1–§3.4), with the recorded
+/// `cursor_key` and `light_key` checked against the state they are built
+/// from (§7).
+fn state2(r: &Rec<'_>) -> Result<State2, CaptureError> {
+    let object = |key: &str| {
+        r.get(key)?
+            .as_object()
+            .ok_or_else(|| r.wrong(key, "an object"))
+    };
+    let at = format!("{}: level", r.at);
+    let l = Rec {
+        at: &at,
+        rec: object("level")?,
+    };
+    let level = Level {
+        level_id: match l.rec.get("level_id") {
+            None | Some(Value::Null) => None,
+            Some(_) => Some(l.int("level_id", U32.0, U32.1)? as u32),
+        },
+        act: match l.rec.get("act") {
+            None => None,
+            Some(_) => Some(l.int("act", 0, 255)? as u8),
+        },
+        env: match l.rec.get("env") {
+            None => None,
+            Some(_) => {
+                let e = l.ints::<4>("env", I32.0, I32.1)?;
+                if e[1..].iter().any(|&c| !(0..=255).contains(&c)) {
+                    return Err(l.wrong("env", "[intensity, r, g, b] with bytes r, g, b"));
+                }
+                Some(e)
+            }
+        },
+    };
+    let cursor = match r.rec.get("cursor") {
+        None => None,
+        Some(_) => {
+            let at = format!("{}: cursor", r.at);
+            let c = Rec {
+                at: &at,
+                rec: object("cursor")?,
+            };
+            let i = |k: &str| c.int(k, I32.0, I32.1).map(|v| v as i32);
+            let u = |k: &str| c.int(k, U32.0, U32.1).map(|v| v as u32);
+            Some(Cursor {
+                visible: u("visible")?,
+                state: i("state")?,
+                cursor_type: i("type")?,
+                frame: i("frame")?,
+                x: i("x")?,
+                y: i("y")?,
+                adj: i("adj")?,
+                item: c
+                    .get("item")?
+                    .as_bool()
+                    .ok_or_else(|| c.wrong("item", "a boolean"))?,
+                last_step: u("last_step")?,
+                idle_since: u("idle_since")?,
+            })
+        }
+    };
+    // cursor_key: present exactly with the cursor, equal to its key.
+    match (cursor, r.rec.get("cursor_key")) {
+        (None, None) => {}
+        (Some(c), Some(v)) => {
+            let k = c.key();
+            let want =
+                serde_json::json!([k.visible, k.cursor_type, k.frame, k.x, k.y, k.adj, k.item]);
+            if *v != want {
+                return Err(r.wrong("cursor_key", &format!("{want} (the key of `cursor`)")));
+            }
+        }
+        (Some(_), None) => return Err(err(r.at, "cursor_key: missing")),
+        (None, Some(_)) => return Err(err(r.at, "cursor_key without a cursor")),
+    }
+    let seed = |key: &str| -> Result<Option<[u32; 2]>, CaptureError> {
+        match r.rec.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(_) => Ok(Some(r.ints::<2>(key, U32.0, U32.1)?.map(|v| v as u32))),
+        }
+    };
+    let at = format!("{}: light", r.at);
+    let lr = Rec {
+        at: &at,
+        rec: object("light")?,
+    };
+    let light = Light {
+        quality: lr.int("quality", I32.0, I32.1)? as i32,
+        draw_rate: lr.int("draw_rate", I32.0, I32.1)? as i32,
+        opt_a: lr.int("opt_a", U32.0, U32.1)? as u32,
+        opt_b: lr.int("opt_b", U32.0, U32.1)? as u32,
+        render_kind: lr.int("render_kind", U32.0, U32.1)? as u32,
+    };
+    let light_key = r.int("light_key", I32.0, I32.1)? as i32;
+    if light_key != light.quality {
+        return Err(r.wrong("light_key", &format!("{} (light.quality)", light.quality)));
+    }
+    let at = format!("{}: weather", r.at);
+    let w = Rec {
+        at: &at,
+        rec: object("weather")?,
+    };
+    let weather = Weather {
+        rain: w.int("rain", U32.0, U32.1)? as u32,
+        snow: w.int("snow", U32.0, U32.1)? as u32,
+        lightning: w.int("lightning", I32.0, I32.1)? as i32,
+        flash: w.int("flash", I32.0, I32.1)? as i32,
+        update: w.int("update", U32.0, U32.1)? as u32,
+    };
+    Ok(State2 {
+        client_update: r.int("client_update", U32.0, U32.1)? as u32,
+        level,
+        cursor,
+        seed_start: seed("seed_start")?,
+        seed_end: seed("seed_end")?,
+        light,
+        weather,
     })
 }
 
@@ -507,7 +920,7 @@ impl Image {
 /// Decodes a capture PNG: 8-bit, color type 3 (palettized), 256 PLTE
 /// entries; the indices are returned as stored (no expansion).
 pub fn decode_png(bytes: &[u8]) -> Result<Image, String> {
-    let mut decoder = png::Decoder::new(Cursor::new(bytes));
+    let mut decoder = png::Decoder::new(IoCursor::new(bytes));
     decoder.set_transformations(png::Transformations::IDENTITY);
     let mut reader = decoder.read_info().map_err(|e| format!("PNG: {e}"))?;
     let info = reader.info();
@@ -562,7 +975,10 @@ pub fn read_image(dir: &Path, c: &Captured) -> Result<(PathBuf, Image), String> 
 }
 
 /// The state key of capture.md §7: frames with equal keys were drawn from
-/// equal recorded state. Same fields as the recorder's key.
+/// equal recorded state. Same fields as the recorder's key: player record
+/// (with the 8.8 frame), tile origin, unit origin, shake, open mode,
+/// palette hash and, from `frames-raw-2`, `cursor_key`, `light_key` and
+/// level (`None` in a `frames-raw-1` file, whose key had none of them).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct StateKey {
     pub player: Option<Player>,
@@ -571,11 +987,15 @@ pub struct StateKey {
     pub shake: [i64; 3],
     pub open_mode: u32,
     pub palette_sha256: String,
+    pub cursor_key: Option<CursorKey>,
+    pub light_key: Option<i32>,
+    pub level: Option<Level>,
 }
 
 impl StateKey {
     pub fn of(c: &Captured) -> Self {
         let s = &c.state;
+        let more = s.more.as_deref();
         StateKey {
             player: s.player.clone(),
             tile_origin: s.tile_origin,
@@ -583,15 +1003,19 @@ impl StateKey {
             shake: s.shake,
             open_mode: s.open_mode,
             palette_sha256: c.palette_sha256.clone(),
+            cursor_key: more.and_then(|m| m.cursor).map(|c| c.key()),
+            light_key: more.map(|m| m.light.quality),
+            level: more.map(|m| m.level.clone()),
         }
     }
 }
 
-/// One state group: the draws with that key and the index hashes seen.
+/// One state group: the frames (`seq`) with that key and the index hashes
+/// seen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
     pub key: StateKey,
-    pub draws: Vec<u32>,
+    pub seqs: Vec<u32>,
     pub hashes: BTreeSet<String>,
 }
 
@@ -605,7 +1029,7 @@ pub struct Stability {
 impl Stability {
     /// Groups seen at least twice.
     pub fn repeated(&self) -> usize {
-        self.groups.iter().filter(|g| g.draws.len() >= 2).count()
+        self.groups.iter().filter(|g| g.seqs.len() >= 2).count()
     }
 
     /// Groups whose frames differ.
@@ -632,18 +1056,19 @@ impl fmt::Display for Stability {
     }
 }
 
-/// Groups captured frames by [`StateKey`] (capture.md §7). `hash` gives
-/// each frame's index hash (the record's, or a re-hash of its PNG).
-pub fn stability<'a>(frames: impl IntoIterator<Item = (&'a Captured, String)>) -> Stability {
+/// Groups captured frames by [`StateKey`] (capture.md §7). Each item is
+/// a frame's `seq`, its record and its index hash (the record's, or a
+/// re-hash of its PNG).
+pub fn stability<'a>(frames: impl IntoIterator<Item = (u32, &'a Captured, String)>) -> Stability {
     let mut groups: BTreeMap<StateKey, Group> = BTreeMap::new();
-    for (c, hash) in frames {
+    for (seq, c, hash) in frames {
         let key = StateKey::of(c);
         let g = groups.entry(key.clone()).or_insert_with(|| Group {
             key,
-            draws: Vec::new(),
+            seqs: Vec::new(),
             hashes: BTreeSet::new(),
         });
-        g.draws.push(c.draw);
+        g.seqs.push(seq);
         g.hashes.insert(hash);
     }
     Stability {
@@ -651,13 +1076,13 @@ pub fn stability<'a>(frames: impl IntoIterator<Item = (&'a Captured, String)>) -
     }
 }
 
-/// Ticks shared by more than one captured frame (capture.md §4: a pause or
-/// a skipped tick), as `(tick, draws)`.
+/// Ticks shared by more than one captured frame (capture.md §4: a draw
+/// with no server tick before it), as `(tick, seqs)`.
 pub fn repeated_ticks(frames: &[Frame]) -> Vec<(i64, Vec<u32>)> {
     let mut by_tick: BTreeMap<i64, Vec<u32>> = BTreeMap::new();
     for f in frames {
-        if let (Some(t), Some(c)) = (f.tick, f.captured()) {
-            by_tick.entry(t).or_default().push(c.draw);
+        if let (Some(t), Some(_)) = (f.tick, f.captured()) {
+            by_tick.entry(t).or_default().push(f.seq);
         }
     }
     by_tick.into_iter().filter(|(_, d)| d.len() > 1).collect()

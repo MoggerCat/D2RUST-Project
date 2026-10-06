@@ -368,8 +368,8 @@ fn one_step_clears_collided_and_only_a_monster_with_flag_0x10_repaths() {
         let (t, mut c) = setup(40, 40, 10, 10);
         c.w.wall(12, 10);
         c.u.unit(P).ty = ty;
-        c.u.repath_budget = 5;
         let mut p = moving(&c, 0x800);
+        p.repath_budget = 5;
         if ty == UnitType::Monster {
             p.set_path_type(&t, false, 2).unwrap();
         }
@@ -404,8 +404,8 @@ fn arrival_passes_for_circling_types_past_the_last_point() {
     for (ty, repaths) in [(5u32, false), (6, false), (2, true)] {
         let (t, mut c) = setup(40, 40, 10, 10);
         c.u.unit(P).ty = UnitType::Monster;
-        c.u.repath_budget = 5;
         let mut p = moving(&c, 0x800);
+        p.repath_budget = 5;
         p.set_path_type(&t, false, ty).unwrap();
         p.cur_point = 1;
         c.w.paths.insert(P, p.clone());

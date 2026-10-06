@@ -85,7 +85,7 @@ fn cof_md_vector_one_layer_two_frames() {
 }
 
 #[test]
-fn out_of_range_direction_and_frame_are_errors() {
+fn out_of_range_direction_and_row_past_end_are_errors() {
     let cof = three_layer();
     assert_eq!(
         slot_order(&cof, 2, 0),
@@ -94,12 +94,10 @@ fn out_of_range_direction_and_frame_are_errors() {
             directions: 2
         })
     );
+    // d1, frame 2 starts at the file end.
     assert_eq!(
-        slot_order(&cof, 0, 2),
-        Err(CompositeError::Frame {
-            frame: 2,
-            frames: 2
-        })
+        slot_order(&cof, 1, 2),
+        Err(CompositeError::RowPastEnd { dir: 1, frame: 2 })
     );
     // Zero directions: nothing is in range.
     let empty = parse(&cof_bytes(1, 0, &[(1, b"hth")], &[0], &[]));
@@ -109,17 +107,59 @@ fn out_of_range_direction_and_frame_are_errors() {
     ));
 }
 
+// Covers: specs/render/unit-composite.md §3 r6
 #[test]
-fn draw_order_component_without_layer_is_an_error() {
-    // Layers HD, TR; frame 0 draws LG (2), which has no record.
-    let cof = parse(&cof_bytes(1, 1, &[(0, b"hth"), (1, b"hth")], &[0], &[0, 2]));
+fn frame_past_cof_frames_reads_the_next_direction_row() {
+    // §3 r6: no bound check on `frame`; d0 f2 is d1 f0's row.
+    let cof = three_layer();
+    assert_eq!(components(&slot_order(&cof, 0, 2).unwrap()), [0, 5, 1]);
+    assert_eq!(components(&slot_order(&cof, 0, 3).unwrap()), [1, 5, 0]);
+}
+
+// Covers: specs/render/unit-composite.md §5.1
+#[test]
+fn draw_order_component_without_layer_draws_nothing() {
+    // Layers HD, TR; frame 0 draws LG (2), which has no record: the slot
+    // is left out, the others keep their index.
+    let cof = parse(&cof_bytes(1, 1, &[(0, b"hth"), (1, b"hth")], &[0], &[2, 1]));
     assert_eq!(
-        slot_order(&cof, 0, 0),
-        Err(CompositeError::NoLayer {
+        slot_order(&cof, 0, 0).unwrap(),
+        [Slot {
             slot: 1,
-            component: 2
-        })
+            component: 1,
+            layer: 1
+        }]
     );
+}
+
+// Covers: specs/render/unit-composite.md §3 r6
+#[test]
+fn padded_event_block_is_read_early_f9_vector() {
+    // `f9NUHTH.COF`: 42 bytes, L 1, F 1, D 1, K 4. Layer TR; the file's
+    // order byte is 1 (TR), but the game reads offset 38 = 0 (HD), which
+    // has no layer record: nothing is drawn.
+    let bytes = cof_bytes(1, 1, &[(1, b"hth")], &[0, 0, 0, 0], &[1]);
+    assert_eq!(bytes.len(), 42);
+    let cof = parse(&bytes);
+    assert_eq!(cof.event_padding.len(), 3);
+    assert_eq!(game_row(&cof, 0, 0).unwrap(), [0]);
+    assert_eq!(slot_order(&cof, 0, 0).unwrap(), []);
+}
+
+// Covers: specs/render/unit-composite.md §5 r1
+#[test]
+fn s7_slot_has_no_own_graphic_and_is_the_inline_slot() {
+    // Layers TR, S7 (14); order TR, S7.
+    let cof = parse(&cof_bytes(
+        1,
+        1,
+        &[(1, b"hth"), (14, b"hth")],
+        &[0],
+        &[1, 14],
+    ));
+    assert_eq!(components(&slot_order(&cof, 0, 0).unwrap()), [1]);
+    assert_eq!(inline_slot(&cof, 0, 0).unwrap(), Some(1));
+    assert_eq!(inline_slot(&three_layer(), 0, 0).unwrap(), None);
 }
 
 #[test]
@@ -443,4 +483,53 @@ fn all_live_cofs_give_slot_orders() {
         println!("  {f}");
     }
     assert!(failures.is_empty());
+}
+
+// Covers: specs/render/unit-composite.md §5 r2
+#[test]
+fn slot_without_frame_draws_nothing_and_others_keep_their_sub() {
+    // A resolver whose request for TR (1) fails: that slot gives no item,
+    // no error; HD and RH keep slot index (= key `sub`) 2 and 1.
+    struct NoTorso;
+    impl ComponentResolver for NoTorso {
+        fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
+            FIXTURE.frame(req)
+        }
+        fn slot_frame(
+            &self,
+            req: &ComponentRequest<'_>,
+        ) -> Result<Option<ComponentFrame>, CompositeError> {
+            if req.slot.component == 1 {
+                return Ok(None);
+            }
+            self.frame(req).map(Some)
+        }
+        fn frame_id(
+            &self,
+            req: &ComponentRequest<'_>,
+            f: &ComponentFrame,
+        ) -> Result<FrameId, CompositeError> {
+            FIXTURE.frame_id(req, f)
+        }
+        fn place(
+            &self,
+            req: &ComponentRequest<'_>,
+            f: &ComponentFrame,
+        ) -> Result<(i32, i32), CompositeError> {
+            FIXTURE.place(req, f)
+        }
+        fn shade(&self, req: &ComponentRequest<'_>) -> Result<ShadeChain, CompositeError> {
+            FIXTURE.shade(req)
+        }
+        fn blend(&self, req: &ComponentRequest<'_>) -> Result<BlendOp, CompositeError> {
+            FIXTURE.blend(req)
+        }
+    }
+    let draws = build(&three_layer(), 1, 1, &UNIT, &NoTorso).unwrap();
+    // d1 f1: TR RH HD → RH (slot 1), HD (slot 2).
+    let got: Vec<(u8, u8)> = draws
+        .iter()
+        .map(|d| (d.slot.component, d.item.key.sub()))
+        .collect();
+    assert_eq!(got, [(5, 1), (0, 2)]);
 }

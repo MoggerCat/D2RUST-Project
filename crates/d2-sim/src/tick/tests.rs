@@ -519,6 +519,32 @@ fn cancel_helpers() {
     assert!(tick_to(&mut g, &mut rec, 20).is_empty());
 }
 
+// Covers: specs/sim/tick.md §5.2 r2
+#[test]
+fn every_tick_schedule_drops_the_callback() {
+    // expire −1 through the timed scheduler: an every-tick event with the
+    // same type and arguments but a null callback, so the class default
+    // handler runs; a cancel by that callback no longer finds it.
+    let (mut g, mut rec, _) = setup(&[("A", UnitType::Monster)]);
+    let a = id(&rec, "A");
+    let cb = Some(CallbackId(9));
+    let t = g.schedule_event(a, 2, -1, cb, 11, 22).unwrap().unwrap();
+    assert_eq!(g.timers.every_tick(TimerClass::Monster), [t]);
+    g.timers.cancel_unit_events_with_callback(a, 2, cb);
+    assert_eq!(g.timers.unit_timers(a), [t]);
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let s2 = seen.clone();
+    rec.on_run = Some(Box::new(move |_, run| s2.borrow_mut().push(*run)));
+    tick_to(&mut g, &mut rec, 1);
+    let runs = seen.borrow();
+    assert_eq!(runs.len(), 1);
+    let r = runs[0];
+    assert_eq!(
+        (r.list, r.event, r.expire, r.arg1, r.arg2, r.callback),
+        (TimerList::EveryTick, 2, -1, 11, 22, None)
+    );
+}
+
 #[test]
 fn timer_run_record_carries_trace_fields() {
     let (mut g, mut rec, _) = setup(&[("A", UnitType::Monster)]);
@@ -665,6 +691,48 @@ fn room_pass_newest_first_and_flags() {
             format!("restore {b}")
         ]
     );
+}
+
+// Covers: specs/sim/tick.md §4 r5
+#[test]
+fn off_tick_population_runs_now_and_step3_revisits() {
+    // `0x0052D0F0`: the room body at once, outside step 3, without the act
+    // flag test and without clearing act +0x54; the next step 3 visits the
+    // room again: one more ambient call, then nothing.
+    let mut g = Game::new();
+    let mut rec = Rec::default();
+    g.lists.ensure_act(1).unwrap();
+    let r = g.lists.create_room(1).unwrap();
+    g.lists.activate_room(r).unwrap();
+    assert!(g.lists.act(1).unwrap().pending_rooms);
+    super::populate_room(&mut g, &mut rec, r);
+    let n = r.0;
+    assert_eq!(
+        rec.take(),
+        [
+            format!("ambient {n}"),
+            format!("presets {n}"),
+            format!("restore {n}"),
+            format!("objects {n}"),
+            format!("monsters {n}"),
+        ]
+    );
+    let e = g.lists.room(r).unwrap();
+    assert!(e.populated && e.units_active);
+    assert!(g.lists.act(1).unwrap().pending_rooms);
+    // Without the act flag the call still runs (ambient only now).
+    g.lists.act_mut(1).unwrap().pending_rooms = false;
+    super::populate_room(&mut g, &mut rec, r);
+    assert_eq!(rec.take(), [format!("ambient {n}")]);
+    g.lists.act_mut(1).unwrap().pending_rooms = true;
+    tick(&mut g, &mut rec);
+    let pass: Vec<_> = rec
+        .take()
+        .into_iter()
+        .filter(|s| !s.starts_with("env") && !s.starts_with("step"))
+        .collect();
+    assert_eq!(pass, [format!("ambient {n}")]);
+    assert!(!g.lists.act(1).unwrap().pending_rooms);
 }
 
 // Covers: specs/sim/tick.md §6 r5; specs/sim/unit-order.md §6 r4, §6 r5

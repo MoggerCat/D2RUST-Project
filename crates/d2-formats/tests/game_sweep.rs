@@ -9,8 +9,13 @@
 //! which counts files per archive (`cof.md`'s 3,605 counts files, not
 //! distinct names; `docs/HANDOFF.md` §5) and finds the 6 DC6 of
 //! `patch_d2.mpq`, which has no `(listfile)`. This file rebuilds that
-//! scope: every name of the union of all listfiles, in every archive that
-//! holds it. A count that differs while every file decodes is a scope
+//! scope: every name of the union of all listfiles and of `mpq-tool`'s
+//! `EXTRA_NAMES`, one per archive lookup key (`mpq.md` §3 `normalize`:
+//! case and `/` vs `\`), in every archive that holds it. Until 2026-10-06
+//! `mpq-tool formats` kept names case-sensitively and counted a file twice
+//! when two listfiles spelled it differently, so spec counts taken from it
+//! before that fix are inflated (`docs/handoff/local-buddy-2026-10-06.md`
+//! G1). A count that differs while every file decodes is a scope
 //! difference to record, not a decoder failure.
 //!
 //! Expected values unconfirmed: written without game files, so no test
@@ -37,12 +42,22 @@ fn set() -> ArchiveSet {
     ArchiveSet::open_dir(&dir).expect("archives in D2_GAME_DIR open")
 }
 
-/// Distinct listed names (lowercase) over every archive of `set`.
+/// Names missing from every `(listfile)` that `mpq-tool formats` adds
+/// (its `EXTRA_NAMES`, `tools/mpq-tool/src/formats.rs`; keep in step).
+const EXTRA_NAMES: &[&str] = &[
+    r"data\local\lng\eng\patchstring.tbl",
+    r"data\local\lng\eng\string.tbl",
+    r"data\local\lng\eng\expansionstring.tbl",
+];
+
+/// Distinct names over every archive of `set` (listfiles and
+/// [`EXTRA_NAMES`]), lowercase with `\` separators: one per archive lookup
+/// key (`mpq.md` §3 `normalize`).
 fn listed(set: &ArchiveSet) -> BTreeSet<String> {
-    let mut names = BTreeSet::new();
+    let mut names: BTreeSet<String> = EXTRA_NAMES.iter().map(|n| n.to_string()).collect();
     for a in set.archives() {
         for n in a.listfile().unwrap().unwrap_or_default() {
-            names.insert(n.to_ascii_lowercase());
+            names.insert(n.to_ascii_lowercase().replace('/', "\\"));
         }
     }
     names
@@ -110,6 +125,12 @@ fn holders(set: &ArchiveSet, name: &str) -> Vec<String> {
 
 // dc6.md Status: all 1,657 `.dc6` files (29,117 frames) decode; 140 frames
 // have flip = 1; termination EE×4 in 1,195 files, CD×4 in 400, 00×4 in 62.
+// Those counts came from `mpq-tool formats` with its case-sensitive name
+// set (4 files counted twice). Measured case-insensitively: 1,653 files
+// (spec session `claude/spec-answers-render` 6b8dc11, and this sweep on two
+// PCs, `docs/handoff/local-buddy-2026-10-06.md` G1); the same two runs
+// printed 26,317 frames, 140 flipped, EE×4 1,193 / CD×4 400 / 00×4 60
+// (the 4 removed files: 2 EE + 2 00). dc6.md Status still says 1,657.
 // Intended claim (unconfirmed until the first local run): specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -139,11 +160,11 @@ fn dc6_every_file_decodes() {
         "dc6: {} files, {frames} frames, {flipped} flipped, termination {termination:02X?}",
         names.len()
     );
-    assert_eq!(names.len(), 1_657);
-    assert_eq!(frames, 29_117);
+    assert_eq!(names.len(), 1_653);
+    assert_eq!(frames, 26_317);
     assert_eq!(flipped, 140);
     let want: BTreeMap<[u8; 4], usize> =
-        [([0xEE; 4], 1_195), ([0xCD; 4], 400), ([0x00; 4], 62)].into();
+        [([0xEE; 4], 1_193), ([0xCD; 4], 400), ([0x00; 4], 60)].into();
     assert_eq!(termination, want);
 }
 
@@ -191,6 +212,12 @@ fn dcc_every_file_decodes() {
 // dt1.md Status: all 254 live `.dt1` files parse and decode (the 6
 // version-4 leftovers excepted); block formats 0x0001 (226,996), 0x1001
 // (110,259), 0x2005 (15,712). Header: minor version 6 in 1.14d.
+// 254 = 260 − 6 from the case-sensitive `mpq-tool formats` (4 files
+// counted twice); measured case-insensitively 256 DT1 files (spec session
+// 6b8dc11), so 250 live + 6 version-4; this sweep printed 250 live on two
+// PCs (`local-buddy-2026-10-06.md` G1). The block-format counts include
+// the 4 duplicates too, but their corrected values were not recorded:
+// unconfirmed until the next local run prints them.
 // Intended claim (unconfirmed until the first local run): specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -224,7 +251,7 @@ fn dt1_every_live_file_decodes() {
     println!(
         "dt1: {live} live files, {tiles} tiles, version-4 {v4:?}, block formats {formats:04X?}"
     );
-    assert_eq!(live, 254);
+    assert_eq!(live, 250);
     assert_eq!(v4.len(), 6);
     let want: BTreeMap<u16, usize> =
         [(0x0001, 226_996), (0x1001, 110_259), (0x2005, 15_712)].into();
@@ -232,7 +259,9 @@ fn dt1_every_live_file_decodes() {
 }
 
 // ds1.md Status: all 2,456 `.ds1` files parse; versions seen 3, 8, 12, 13,
-// 15, 16, 17, 18 (1,997 at v18).
+// 15, 16, 17, 18 (1,997 at v18). Counted by the case-sensitive
+// `mpq-tool formats`; this sweep printed 2,372 (1,926 at v18) on two PCs.
+// Not changed until the fixed `mpq-tool formats` re-derives the count.
 // Intended claim (unconfirmed until the first local run): specs/formats/ds1.md §rules
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -296,6 +325,14 @@ fn cof_every_live_file_parses() {
         }
     }
     println!("cof: {parsed} parse, failed {failed:?}, 42-byte padded {padded}");
+    // Live: `amblxbw.cof` is in no archive (G1). For the spec writer:
+    // every listed Amazon block (`ambl*`) COF and its holders.
+    for n in listed(&set)
+        .iter()
+        .filter(|n| n.starts_with(r"data\global\chars\am\cof\ambl"))
+    {
+        println!("  {n}: {:?}", holders(&set, n));
+    }
     assert_eq!(parsed, 3_605);
     assert_eq!(failed, [(format!("d2char.mpq:{junk}"), 72)]);
     Cof::parse(&read(&set, r"data\global\chars\am\cof\amblxbw.cof")).unwrap();
@@ -375,6 +412,10 @@ fn font_tables_every_file_parses() {
     assert_eq!(fonts.len(), 14);
 }
 
+// Counted by the case-sensitive `mpq-tool formats`; before EXTRA_NAMES
+// were added here this sweep printed 29 tables in 10 languages on two PCs.
+// Not changed until the fixed `mpq-tool formats` re-derives the count, and
+// `tbl.md` names the 11th language.
 // tbl.md Status: all 33 string tables (11 languages) parse, every key
 // resolves to its own slot, all keys are ASCII, every version byte is 1.
 // Test vector: a key may instead resolve to an earlier slot holding the

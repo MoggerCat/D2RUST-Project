@@ -278,6 +278,15 @@ fn level_types() -> (Arc<DrlgData>, SharedTypes) {
 /// The first town preset unit of type 2 whose `objects` row has operate
 /// function 23 (`waypoints.md` §7 rule 1): (DRLG room, its room-relative
 /// sub-tile x, y, the object class).
+///
+/// Read from the town's **map** lists (`preset.md` §7: the unit filter
+/// copies the kept units onto the map at build, level-absolute sub-tiles,
+/// file order), not the room lists: units reach a room only at its tile
+/// build (`preset.md` §9 unit transfer `0x00666710`), and no town room is
+/// streamed yet when this runs. The room is the one whose sub-tile
+/// rectangle (room x·5, y·5, w·5, h·5) holds the unit; the room-relative
+/// x, y are the §9 shift. [`assert_transferred`] checks the room's list
+/// after the stream.
 fn town_waypoint(
     d: &Drlg,
     types: &SharedTypes,
@@ -286,19 +295,46 @@ fn town_waypoint(
     let lv = d.find_level(TOWN).expect("town allocated");
     let t = types.borrow();
     let presets = t.act_presets(0).expect("act 0 presets");
-    for r in d.level_rooms(lv) {
-        for u in presets.room_units(r) {
+    let rooms = d.level_rooms(lv);
+    for &m in presets.level_maps(lv) {
+        let map = presets.map(m).expect("town map");
+        for u in &map.units {
             let is_wp = u.unit_type == 2
                 && usize::try_from(u.class)
                     .ok()
                     .and_then(|c| objects.get(c))
                     .is_some_and(|o| o.operatefn == WAYPOINT_OPERATE);
-            if is_wp {
-                return (r, u.x, u.y, u.class as u32);
+            if !is_wp {
+                continue;
+            }
+            let room = rooms.iter().copied().find(|&r| {
+                let rr = d.room(r).rect;
+                (rr.x * SUB..(rr.x + rr.w) * SUB).contains(&u.x)
+                    && (rr.y * SUB..(rr.y + rr.h) * SUB).contains(&u.y)
+            });
+            if let Some(r) = room {
+                let rr = d.room(r).rect;
+                return (r, u.x - rr.x * SUB, u.y - rr.y * SUB, u.class as u32);
             }
         }
     }
     panic!("no town preset object with operate function {WAYPOINT_OPERATE}");
+}
+
+/// After the room's tile build: the waypoint unit is on the room's
+/// preset-unit list at the room-relative position (`preset.md` §9).
+fn assert_transferred(types: &SharedTypes, room: DrlgRoomId, x: i32, y: i32, class: u32) {
+    let t = types.borrow();
+    let presets = t.act_presets(0).expect("act 0 presets");
+    let units: Vec<(u32, i32, i32, i32)> = presets
+        .room_units(room)
+        .iter()
+        .map(|u| (u.unit_type, u.class, u.x, u.y))
+        .collect();
+    assert!(
+        units.contains(&(2, class as i32, x, y)),
+        "waypoint {class} at ({x}, {y}) not on the streamed room's list {units:?}"
+    );
 }
 
 impl Fx {
@@ -383,7 +419,7 @@ impl Fx {
         let objects = rows::<Objects>();
         let mut game = Game::new();
         game.lists.ensure_act(0).unwrap();
-        let (room, rect, wx, wy, wp_class) = sim
+        let (room_id, room, rect, wx, wy, wp_class) = sim
             .action
             .hooks()
             .drlg
@@ -394,11 +430,12 @@ impl Fx {
                 }
                 let (r, x, y, c) = town_waypoint(d, &types, &objects);
                 let rect = d.room(r).rect;
-                Ok::<_, d2_sim::drlg::DrlgError>((d.stream_room(svc, r)?, rect, x, y, c))
+                Ok::<_, d2_sim::drlg::DrlgError>((r, d.stream_room(svc, r)?, rect, x, y, c))
             })
             .expect("act 0 has a DRLG")
             .expect("town generated and streamed");
         let room = room.expect("the waypoint room is active");
+        assert_transferred(&types, room_id, wx, wy, wp_class);
         assert_eq!(sim.errors(), Vec::<String>::new(), "game creation");
 
         // Room-relative preset sub-tiles + the room's sub-tile origin

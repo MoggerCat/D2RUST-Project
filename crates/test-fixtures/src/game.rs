@@ -232,15 +232,31 @@ impl GameData {
         init_seed: u32,
         town: u32,
     ) -> Result<DrlgWorld, GameError> {
+        self.drlg_world_in(data, types, creation, init_seed, 0, town)
+    }
+
+    /// [`Self::drlg_world`] on a game `difficulty` (0 normal, 1
+    /// nightmare, 2 hell; `Drlg::create`'s difficulty).
+    pub fn drlg_world_in(
+        &self,
+        data: Arc<DrlgData>,
+        types: &SharedTypes,
+        creation: ActCreation,
+        init_seed: u32,
+        difficulty: u8,
+        town: u32,
+    ) -> Result<DrlgWorld, GameError> {
         let drlg_err = |source| GameError::Drlg { act: 0, source };
         let mut handle = types.clone();
         let drlg = match creation {
             ActCreation::Full => {
-                Drlg::create(0, init_seed, 0, town, false, &data, &mut handle).map_err(drlg_err)?
+                Drlg::create(0, init_seed, difficulty, town, false, &data, &mut handle)
+                    .map_err(drlg_err)?
             }
             ActCreation::TownOnly => {
-                let mut d = Drlg::create(0, init_seed, 0, 0, false, &data, &mut NoLevelTypes)
-                    .map_err(drlg_err)?;
+                let mut d =
+                    Drlg::create(0, init_seed, difficulty, 0, false, &data, &mut NoLevelTypes)
+                        .map_err(drlg_err)?;
                 let l = d
                     .get_or_alloc_level(&data, &mut handle, town)
                     .map_err(drlg_err)?;

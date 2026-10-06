@@ -229,7 +229,7 @@ fn travel(fx: &mut Fx) -> (UnitId, Option<crate::units::RoomId>) {
     (p, spawn)
 }
 
-// Covers: specs/sim/path-placement.md §10 r3, §10 r4, §10 r6, §11 r1, §11 r2, §11 r3, §11 r4; specs/world/waypoints.md §7 r5, §7 r7
+// Covers: specs/sim/path-placement.md §6 r4, §10 r3, §10 r4, §10 r6, §11 r1, §11 r2, §11 r3, §11 r4; specs/world/waypoints.md §7 r5, §7 r7
 #[test]
 fn waypoint_warp_places_the_player_in_the_spawn_room() {
     // The e2e step-6 condition in d2-sim terms: after the same-act warp
@@ -252,16 +252,13 @@ fn waypoint_warp_places_the_player_in_the_spawn_room() {
     let rect = fx.sim.hooks().drlg.subtile_rect(room.unwrap()).unwrap();
     assert!(rect.contains(x, y), "({x}, {y}) in {rect:?}");
     // The old footprint is cleared (0x4 is the fixture's barrier
-    // column). The stamp at the destination is looked up from the path's
-    // room before the move (A), which is not adjacent to the destination
-    // room: no cell is found, nothing is stamped. This is the path core's
-    // reading of §6 rule 4 (`footprint::teleport` TODO, spec open point:
-    // which room the teleport's forced move uses); recorded here so a
-    // spec answer changes this line.
+    // column). The stamp at the destination is looked up from the
+    // destination room (§6 rule 4: the forced move's room2), so a warp
+    // to a room not adjacent to the old one still stamps there.
     assert_eq!(cell(&mut fx, 22, 20), bits::MISSILE_BARRIER);
     let r = room.unwrap();
     let v = crate::path::collision::point_value(&fx.sim.hooks().drlg, Some(r), x, y, 0xFFFF);
-    assert_eq!(v & 0x80, 0);
+    assert_eq!(v & 0x80, 0x80);
     // §10 rule 6: flags 2 bit 0x10000, event 14 at f + 50.
     let f = fx.game.frame;
     assert_ne!(fx.sim.sys.units.get(p).unwrap().flags2 & 0x10000, 0);

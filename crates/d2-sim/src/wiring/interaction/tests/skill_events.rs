@@ -17,9 +17,12 @@ use crate::units::{UnitId, UnitType};
 
 use super::skill_use::{skills, Fx};
 
-/// The aura skill: `aura`, `srvdofunc` 65 (the aura do), no missile,
-/// no mana, no formulas.
+/// The aura skill: `aura`, `srvdofunc` 66 (an aura do whose body is not
+/// specified, so the fake logs it; the specified basic aura do 65 runs
+/// its body, `skill_bodies`), no missile, no mana, no formulas.
 const AURA: i32 = 1;
+/// Its do function (`functions.tsv` srvdo 66, status `mapped`).
+const AURA_DO: u16 = 66;
 /// Its aura state.
 const AURA_STATE: u16 = 40;
 /// `srvactivefunc` of the aura state: hurricane (`use.md` §7).
@@ -29,7 +32,7 @@ fn aura_skills() -> SkillTables {
     let mut t = skills();
     let mut a = skill_rec();
     a.aura = true;
-    a.srvdofunc = 65;
+    a.srvdofunc = AURA_DO;
     a.srvmissile = 0xFFFF;
     a.aurastate = AURA_STATE;
     a.perdelay = 0xFFFF_FFFF;
@@ -102,13 +105,13 @@ fn periodic_aura_event_runs_the_do_core_and_reschedules_on_the_queue() {
     fx.frame();
     // The do core ran the aura's do function once and rescheduled the
     // aura form at `period` (perdelay ≤ 5 → 5: frames ≡ 1 mod 5).
-    assert_eq!(srvdo_count(&fx, 65), 1);
+    assert_eq!(srvdo_count(&fx, AURA_DO), 1);
     assert_eq!(timers(&fx, p, event::PERIODIC_SKILLS), [(6, u32::MAX, 0)]);
     for _ in 1..11 {
         fx.frame();
     }
     // Frames 6 and 11: two more runs, the next one at 16.
-    assert_eq!(srvdo_count(&fx, 65), 3);
+    assert_eq!(srvdo_count(&fx, AURA_DO), 3);
     assert_eq!(timers(&fx, p, event::PERIODIC_SKILLS), [(16, u32::MAX, 0)]);
     fx.assert_clean();
 }
@@ -124,7 +127,7 @@ fn periodic_aura_event_without_an_aura_right_skill_is_not_rescheduled() {
         .schedule_event(p, u32::from(event::PERIODIC_SKILLS), 1, None, u32::MAX, 0)
         .unwrap();
     fx.frame();
-    assert_eq!(srvdo_count(&fx, 65), 0);
+    assert_eq!(srvdo_count(&fx, AURA_DO), 0);
     assert!(timers(&fx, p, event::PERIODIC_SKILLS).is_empty());
     fx.assert_clean();
 }
@@ -142,7 +145,7 @@ fn item_aura_event_reads_stat_151_and_runs_the_do_core() {
         .schedule_event(p, u32::from(event::PERIODIC_STATS), 1, None, 0, AURA as u32)
         .unwrap();
     fx.frame();
-    assert_eq!(srvdo_count(&fx, 65), 1);
+    assert_eq!(srvdo_count(&fx, AURA_DO), 1);
     // No item aura (stat 151 of the skill ≤ 0): the dispatch cancels the
     // unit's type-9 events and nothing reaches the skills.
     fx.sim.with(&mut fx.game, |_, v| {
@@ -156,7 +159,7 @@ fn item_aura_event_reads_stat_151_and_runs_the_do_core() {
         .schedule_event(p, u32::from(event::PERIODIC_STATS), 9, None, 0, AURA as u32)
         .unwrap();
     fx.frame();
-    assert_eq!(srvdo_count(&fx, 65), 1);
+    assert_eq!(srvdo_count(&fx, AURA_DO), 1);
     assert!(timers(&fx, p, event::PERIODIC_STATS).is_empty());
     fx.assert_clean();
 }

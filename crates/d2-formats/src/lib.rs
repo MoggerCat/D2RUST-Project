@@ -16,6 +16,10 @@ pub mod palette;
 pub mod tbl;
 
 #[cfg(test)]
+mod mutant_tests_dcc;
+#[cfg(test)]
+mod mutant_tests_formats;
+#[cfg(test)]
 mod robust;
 #[cfg(test)]
 mod robust_tests;

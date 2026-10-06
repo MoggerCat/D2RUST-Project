@@ -12,13 +12,17 @@
 //! | [`search`] | §7 nearest free point, §8 coarse free-box search |
 //! | [`place`] | §9 floor drop, §10 placing a unit, §11 level spawn ([`place_seams`]: its seams) |
 //! | [`warp`] | §12 warp tiles and arrival |
-//! | [`walk`] | `sim/pathing.md`: walk / run requests, path compute, per-tick movement |
+//! | [`history`] | §10 rule 7 player position history |
+//! | [`walk`] | `sim/pathing.md`: walk / run requests, path compute, per-tick movement, missile paths, the 0x5F resync |
 //!
-//! No function here draws (spec "Randomness").
+//! No function of `path-placement.md` draws (spec "Randomness"); in
+//! [`walk`], the concentration roll (`pathing.md` §1.4), the charged-bolt
+//! path (§11.2) and the 0x5F lock (§1.6) draw on the unit seed.
 
 pub mod collision;
 pub mod coords;
 pub mod footprint;
+pub mod history;
 pub mod place;
 pub mod place_seams;
 pub mod record;
@@ -53,4 +57,8 @@ pub enum PathError {
     /// `0x00650910` fatal assert: a non-zero point without a room (§6 rule 4).
     #[error("teleport to ({x}, {y}) without a room")]
     TeleportNoRoom { x: i32, y: i32 },
+    /// `0x006490E0` fatal assert: a re-path budget above 255
+    /// (`pathing.md` §9.10).
+    #[error("re-path budget {0} > 255: fatal assert")]
+    RepathBudget(u32),
 }

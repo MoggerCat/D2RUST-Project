@@ -207,7 +207,7 @@ proptest! {
             match (bridge.receive_chunk(c), split_server_buffer(c)) {
                 (Ok(r), Ok(s)) => {
                     prop_assert_eq!(r.messages, s.messages.len());
-                    prop_assert_eq!(r.handled + r.unowned + r.rejected, r.messages);
+                    prop_assert_eq!(r.handled + r.queued + r.dropped + r.unowned + r.rejected, r.messages);
                     prop_assert_eq!(r.discarded_bytes, s.discarded.len());
                 }
                 (Err(BridgeError::Split(e)), Err(w)) => prop_assert_eq!(e, w),

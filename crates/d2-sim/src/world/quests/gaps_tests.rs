@@ -295,6 +295,9 @@ impl QuestWorld for Leaving {
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.f.stat(unit, stat)
     }
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.f.base_stat(unit, stat)
+    }
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         self.f.add_stat(unit, stat, delta)
     }
@@ -321,6 +324,9 @@ impl QuestWorld for Leaving {
     }
     fn players_near(&self, unit: UnitId) -> Vec<UnitId> {
         self.f.players_near(unit)
+    }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.f.party_members(player)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.f.send(player, msg)
@@ -372,11 +378,82 @@ impl QuestWorld for Leaving {
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.f.schedule_quest_event(object, frame)
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.f.set_object_opened(object)
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.f.object_mode(object)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.f.set_object_mode(object, mode)
+    }
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        self.f.object_by_guid(guid)
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
         self.f.mercenary_reward(player, npc)
+    }
+    fn unit_position(&self, u: UnitId) -> Option<(i32, i32, crate::units::RoomId)> {
+        self.f.unit_position(u)
+    }
+    fn room_contains(&self, r: crate::units::RoomId, x: i32, y: i32) -> bool {
+        self.f.room_contains(r, x, y)
+    }
+    fn room_at(&self, r: crate::units::RoomId, x: i32, y: i32) -> Option<crate::units::RoomId> {
+        self.f.room_at(r, x, y)
+    }
+    fn free_spot_at(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        s: u32,
+        m: u32,
+        rad: u32,
+        l: u32,
+    ) -> Option<(i32, i32, crate::units::RoomId)> {
+        self.f.free_spot_at(r, x, y, s, m, rad, l)
+    }
+    fn spawn_monster(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        c: u16,
+        mode: u8,
+        rad: u32,
+    ) -> Option<UnitId> {
+        self.f.spawn_monster(r, x, y, c, mode, rad)
+    }
+    fn or_unit_flags(&mut self, u: UnitId, f: u32) {
+        self.f.or_unit_flags(u, f)
+    }
+    fn monsters(&self) -> Vec<UnitId> {
+        self.f.monsters()
+    }
+    fn npc_chat_clients(&self, n: UnitId) -> Option<Vec<UnitId>> {
+        self.f.npc_chat_clients(n)
+    }
+    fn remove_monster(&mut self, m: UnitId) {
+        self.f.remove_monster(m)
+    }
+    fn drop_preset_monster(&mut self, a: u8, c: u16) {
+        self.f.drop_preset_monster(a, c)
+    }
+    fn find_object_near(&self, o: UnitId, c: u16) -> Option<UnitId> {
+        self.f.find_object_near(o, c)
+    }
+    fn create_object(&mut self, r: crate::units::RoomId, x: i32, y: i32, c: u16) -> Option<UnitId> {
+        self.f.create_object(r, x, y, c)
+    }
+    fn object_anim_length(&self, o: UnitId) -> i32 {
+        self.f.object_anim_length(o)
+    }
+    fn schedule_object_event(&mut self, o: UnitId, ev: u8, frame: i32) {
+        self.f.schedule_object_event(o, ev, frame)
+    }
+    fn open_quest_message(&mut self, p: UnitId, o: UnitId, m: u16) {
+        self.f.open_quest_message(p, o, m)
+    }
+    fn item_code(&self, i: UnitId) -> Option<[u8; 4]> {
+        self.f.item_code(i)
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.f.unhandled(chain, function)
@@ -394,6 +471,10 @@ fn player_leaving_with_quest_items() {
         // quest 4 → chain 3 (callback 9 `0x00591A20`); quest 99 → no record.
         items: vec![(UnitId(0x80), 4), (UnitId(0x81), 99)],
     };
+    // Chains 1–6 have bodies (§10.4–§10.8): the chain 1–3 lists lose P1.
+    ctl.record_mut(1).unwrap().guids.add(1);
+    ctl.record_mut(2).unwrap().guids.add(1);
+    ctl.record_mut(3).unwrap().extra.guids.add(1);
     ctl.player_leaves(&mut w, P1);
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
@@ -403,9 +484,14 @@ fn player_leaving_with_quest_items() {
             .unwrap()
             .1
     };
-    let mut want = vec![format!("unhandled 3 {:#x}", fn_of(3, 9))];
+    // Chain 3's callback 9 (`0x00591A20`) ran first: one Malus fewer.
+    assert_eq!(ctl.record(3).unwrap().extra.malus_items, -1);
+    assert!(!ctl.record(1).unwrap().guids.contains(1));
+    assert!(!ctl.record(2).unwrap().guids.contains(1));
+    assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
+    let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) {
+        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=6).contains(&r.chain) {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
@@ -421,9 +507,10 @@ fn player_leaving_with_quest_items() {
 #[test]
 fn pick_up_and_drop_reach_only_active_records() {
     let item = UnitId(0x80);
-    // Chain 3 has callback 4 (`0x00591960`); chain 9 callback 5.
+    // Chain 9 (Act II, inactive at creation) has callback 4
+    // (`0x00599A30`, no body: the probe) and callback 5.
     for (ev, chain, fun) in [
-        (event::ITEM_PICKED_UP, 3, "0x591960"),
+        (event::ITEM_PICKED_UP, 9, "0x599a30"),
         (event::ITEM_DROPPED, 9, "0x599b30"),
     ] {
         let (mut ctl, _) = control();
@@ -590,14 +677,51 @@ fn object_quest_functions_by_class() {
     let mut f = Fake::new();
     object_event(&mut ctl, &mut f, obj, 0x10C); // Wirt's body
     assert!(f.log[0].starts_with("drop gld"));
-    for class in [
-        0x16F, 0xBD, 0x1A, 0x7A, 0x83, 0x155, 0x173, 0x178, 0x1CB, 0x1CC, 0x1CD, 0x1DA, 0x1DB,
-        0x1DC,
+    // Each class's function (the record's chain, or 255 without one);
+    // the object has no room here: 0x83 does nothing, 0xBD is not in Act I.
+    for (class, want) in [
+        (0x16F, "unhandled 16 0x5b85e0"),
+        (0xBD, "unhandled 32 0x588ca0"),
+        (0x1A, "unhandled 4 0x593290"),
+        (0x7A, "unhandled 11 0x59b710"),
+        (0x155, "unhandled 20 0x5bcac0"),
+        (0x173, "unhandled 5 0x5954f0"),
+        (0x178, "unhandled 24 0x5b6710"),
+        (0x1CB, "unhandled 255 0x58b940"),
+        (0x1CC, "unhandled 255 0x58a500"),
+        (0x1CD, "unhandled 255 0x589540"),
+        (0x1DA, "unhandled 35 0x58c0e0"),
+        (0x1DB, "unhandled 35 0x58c0e0"),
+        (0x1DC, "unhandled 35 0x58c0e0"),
     ] {
         let mut f = Fake::new();
         object_event(&mut ctl, &mut f, obj, class);
-        assert_eq!(f.log, [format!("unhandled 255 {class:#x}")]);
+        assert_eq!(f.log, [want], "class {class:#x}");
     }
+    // 0x83 in a room: mode 1 → 2; level 76 → `0x005B23C0`.
+    let mut f = Fake::new();
+    f.objects.insert(obj, (0x70, 0x83, 1));
+    f.players.insert(
+        obj,
+        Player {
+            level: Some(76),
+            ..Player::default()
+        },
+    );
+    object_event(&mut ctl, &mut f, obj, 0x83);
+    assert_eq!(f.log, ["mode 112 2", "unhandled 255 0x5b23c0"]);
+    // 0xBD in Act I: chain 4's `0x005942C0`.
+    let mut f = Fake::new();
+    f.players.insert(
+        obj,
+        Player {
+            level: Some(5),
+            act: Some(0),
+            ..Player::default()
+        },
+    );
+    object_event(&mut ctl, &mut f, obj, 0xBD);
+    assert_eq!(f.log, ["unhandled 4 0x5942c0"]);
     for class in [0x10B, 0x1CE, 0x1DD, 0] {
         let mut f = Fake::new();
         object_event(&mut ctl, &mut f, obj, class);

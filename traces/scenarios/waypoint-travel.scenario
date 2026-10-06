@@ -1,0 +1,23 @@
+# Operate the town waypoint and travel to the Cold Plains (level 3).
+# The character knows both waypoints (specs/world/waypoints.md §5–§6).
+scenario 1
+name waypoint-travel
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 150
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+char waypoint 1
+char waypoint 3
+
+record s2c rng units
+snapshot every 25
+
+at 2 msg InteractWithEntity type=2 id=@wp
+at 50 msg TakeOrCloseWp wp=@wp level=3

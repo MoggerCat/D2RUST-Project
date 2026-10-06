@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §1.1, §2, §3.3, §9 (Idle); specs/sim/tick.md §5.2 rule 4, §5.6; specs/sim/units.md §4.6
+// Spec: specs/monsters/ai.md §1.1, §2, §3.3, §9 (Idle, GoodNpcRanged); specs/sim/tick.md §5.2 rule 4, §5.6; specs/sim/units.md §4.6
 //! Monster AI ↔ units (modes, timer events): the think run by the unit
 //! dispatch, the freeze drop, mode changes through the real monster mode
 //! set, the state-54 rule before a think is scheduled.
@@ -128,5 +128,58 @@ fn think_scheduled_with_state_54_clears_it_first() {
     assert_eq!(r, Ok(()));
     assert!(!fx.sim.sys.stats.has_state(m, state::UNINTERRUPTABLE));
     assert_eq!(thinks(&fx, m), [25]);
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/ai.md §9.31 r3
+#[test]
+fn good_npc_ranged_takes_ai_turns() {
+    // `ai.md` §9.31 on the wired host: a class-0 monster with AI 60
+    // (GoodNpcRanged). No secondary target (the pending default), so each
+    // think ends in step 3: `lo' % 100` < 20 → wander 5, else idle 10.
+    let mut fx = Fx::new();
+    std::sync::Arc::get_mut(&mut fx.sim.sys.hooks.tables)
+        .expect("tables not shared yet")
+        .combat
+        .monstats[0]
+        .ai = 60;
+    let m = monster(&mut fx);
+    assert_eq!(
+        fx.sim.hooks().ai_store().control(m).map(|c| c.function),
+        Some(0x005E_7AC0)
+    );
+    fx.seed(m, seed_giving(50));
+    fx.game
+        .schedule_event(m, u32::from(event::AI_THINK), 1, None, 0, 0)
+        .unwrap();
+    fx.frame();
+    // 50 ≥ 20 → idle 10 (neutral already: no mode change).
+    assert_eq!(thinks(&fx, m), [11]);
+    assert_eq!(
+        fx.sim.sys.units.get(m).unwrap().mode,
+        u32::from(mode::NEUTRAL)
+    );
+    // Another idle-10 turn at 11.
+    fx.seed(m, seed_giving(99));
+    for _ in 0..10 {
+        fx.frame();
+    }
+    assert_eq!(thinks(&fx, m), [21]);
+    // The turn at 21 draws 5 < 20 → wander 5: exactly the wander draws
+    // around its own position (`ai.md` §7.2), and a walk request the real
+    // monster mode set accepts (the walk start itself is the path spec's,
+    // pending here), so no think is left: the next comes from the walk's
+    // end.
+    fx.seed(m, seed_giving(5));
+    let pos = fx.sim.hooks().x.position(m);
+    let mut want = seed_giving(5);
+    want.step();
+    crate::monsters::ai::wander_point(&mut want, pos, 5);
+    for _ in 0..10 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().seed, want);
+    assert!(thinks(&fx, m).is_empty());
+    assert!(fx.sim.hooks().ai_store().unhandled.is_empty());
     fx.assert_clean();
 }

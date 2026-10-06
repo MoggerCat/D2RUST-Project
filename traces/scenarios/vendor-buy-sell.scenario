@@ -1,0 +1,31 @@
+# Talk to Akara (monstats 148, specs/world/npc.md §4 trade row), open her
+# store, buy the first store item, sell the character's cap.
+# Gold is stat 14 (npc.md §9). Store items and the cap are found by GUID
+# order (`@4`); BuyItem / SellItem cost fields: what the client sends
+# is not specified yet, 0 here.
+scenario 1
+name vendor-buy-sell
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 200
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+char stat 14 5000
+char item cap inv 0 0
+
+record s2c rng units stats
+snapshot every 25
+
+at 2 msg RunToUnit type=1 id=@1:148
+at 60 msg InteractWithEntity type=1 id=@1:148
+at 70 msg InitEntityChat id=@1:148
+at 80 msg EntityAction action=1 npc=@1:148 item=0
+at 100 msg BuyItem npc=@1:148 item=@4#1 mode=0 cost=0
+at 130 msg SellItem npc=@1:148 item=@4 tab=0 cost=0
+at 160 msg TerminateEntityChat id=@1:148

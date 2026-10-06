@@ -582,8 +582,10 @@ fn ref_coarse(w: &World, room: usize, p: Point, n: i32, mask: u32) -> (Option<us
                         w.cell_room(Some(row), x, y)
                     };
                     if let Some(c) = cell {
+                        // §8 rule 3: n + 2 ≤ 1 reads the grid value
+                        // masked (0x27 unmasked without a room or grid).
                         let v = if n + 2 < 2 {
-                            w.cell_value(c, x, y)
+                            w.point_query(c, x, y, mask)
                         } else {
                             w.box_query(c, x, y, (n + 2) as u32, (n + 2) as u32, mask)
                         };
@@ -602,7 +604,7 @@ fn ref_coarse(w: &World, room: usize, p: Point, n: i32, mask: u32) -> (Option<us
 
 fn coarse_free(w: &World, room: usize, x: i32, y: i32, n: i32, mask: u32) -> bool {
     let v = if n + 2 < 2 {
-        w.cell_value(room, x, y)
+        w.point_query(room, x, y, mask)
     } else {
         w.box_query(room, x, y, (n + 2) as u32, (n + 2) as u32, mask)
     };
@@ -1110,8 +1112,8 @@ proptest! {
         let run = |w: &mut World, h: &mut Host, l: &mut Levels| -> Result<String, PlaceError> {
             match which {
                 0 => level_spawn_point(&*w, l, Some(act), level, tile_index, size).map(|r| format!("{r:?}")),
-                1 => game_entry(w, h, l, u, act, size).map(|r| format!("{r:?}")),
-                _ => level_warp_place(w, h, l, u, act, level, tile_index, size).map(|r| format!("{r:?}")),
+                1 => game_entry(w, h, l, u, act).map(|r| format!("{r:?}")),
+                _ => level_warp_place(w, h, l, u, act, level, tile_index).map(|r| format!("{r:?}")),
             }
         };
         let got = run(&mut w, &mut host, &mut levels);
@@ -1129,7 +1131,13 @@ proptest! {
         let spawn = has_spawn.then(|| ref_nearest(&w0, Some(sroom), start, &a));
         match spawn {
             None => {
-                prop_assert_eq!(got.unwrap(), if which == 0 { "None" } else { "false" });
+                // §11: game entry without a spawn room is a fatal assert;
+                // the level warp does nothing.
+                match which {
+                    0 => prop_assert_eq!(got.unwrap(), "None"),
+                    1 => prop_assert_eq!(got, Err(PlaceError::NoSpawnRoom)),
+                    _ => prop_assert_eq!(got.unwrap(), "false"),
+                }
                 prop_assert!(w.teleports.is_empty() && w.added.is_empty() && host.log.is_empty());
             }
             Some((None, _)) => {

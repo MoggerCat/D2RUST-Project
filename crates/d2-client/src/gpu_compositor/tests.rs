@@ -82,7 +82,13 @@ fn shader_struct_layouts_match_packing() {
         layout("Item"),
         (
             ITEM_SIZE as u32,
-            owned(&[("area", 0), ("texel", 16), ("shade", 32), ("blend", 48)])
+            owned(&[
+                ("area", 0),
+                ("texel", 16),
+                ("shade", 32),
+                ("blend", 48),
+                ("light", 64)
+            ])
         )
     );
     assert_eq!(
@@ -152,6 +158,7 @@ fn item_and_params_bytes_are_little_endian() {
         shade: [8, 9, 0, 0],
         blend: 1,
         blend_base: 0xAABB_CCDD,
+        light: [2, 0x0000_0300, 0x0403_0201, 0x0005_0006],
     };
     let b = item.to_le_bytes();
     assert_eq!(&b[0..4], &[1, 0, 0, 0]);
@@ -163,6 +170,10 @@ fn item_and_params_bytes_are_little_endian() {
     assert_eq!(&b[32..36], &[8, 0, 0, 0]);
     assert_eq!(&b[48..56], &[1, 0, 0, 0, 0xDD, 0xCC, 0xBB, 0xAA]);
     assert_eq!(&b[56..64], &[0; 8]);
+    assert_eq!(
+        &b[64..80],
+        &[2, 0, 0, 0, 0, 3, 0, 0, 1, 2, 3, 4, 6, 0, 5, 0]
+    );
     assert_eq!(GpuItem::from_le_bytes(&b), item);
 
     let params = Params {
@@ -226,6 +237,7 @@ fn pack_vector() {
             shade: [0, 0, 0, 0],
             blend: pack::BLEND_OPAQUE,
             blend_base: 0,
+            light: [0; 4],
         }
     );
     assert_eq!(p.items[1].area, [0; 4]);
@@ -305,10 +317,11 @@ fn empty_list_pads_buffers() {
 /// blend-op cases of `composition.md` included.
 // Covers: specs/client/render-pipeline.md §a9-gpu-compute-compositor, §a8-cpu-reference-compositor
 // Covers: specs/render/composition.md §3 text, §5
+// Covers: specs/render/shading.md §4 r4; specs/render/blend-modes.md §2; specs/client/render-pipeline.md §a5-blend-ops
 #[test]
 fn emulated_shader_matches_cpu_on_all_cases() {
     let all = cases();
-    assert_eq!(all.len(), 18);
+    assert_eq!(all.len(), 20);
     for case in &all {
         let reference = cpu(case);
         let bins = scene::bin(&case.items, &case.frames, &case.maps, case.view).unwrap();
@@ -352,6 +365,22 @@ fn cases_are_not_trivial() {
     assert!(p.items.iter().any(|i| i.shade_len == 4));
     assert!(p.items.iter().any(|i| i.area == [0; 4]));
     assert!(stress.items.iter().any(|i| i.frame == scene::FrameId(0)));
+    // The shading cases use both gradient kinds, both table orientations
+    // and areas that start inside their block.
+    let (_, p) = prepare(&case_named("shading-stress")).unwrap();
+    for code in [1, 2] {
+        assert!(p.items.iter().any(|i| i.light[0] == code));
+    }
+    assert!(p.items.iter().any(|i| i.light[0] == 0));
+    assert!(p.items.iter().any(|i| i.blend == pack::BLEND_INDEX_TABLE));
+    assert!(p
+        .items
+        .iter()
+        .any(|i| i.blend == pack::BLEND_INDEX_TABLE_SRC_ROW));
+    assert!(p
+        .items
+        .iter()
+        .any(|i| i.light[0] != 0 && i.light[3] != 0 && i.area != [0; 4]));
 }
 
 /// M08: the comparison reports exactly the bytes changed, in the CPU

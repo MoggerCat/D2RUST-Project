@@ -1,5 +1,7 @@
 // Spec: specs/client/render-pipeline.md (A2–A5)
 // Spec: specs/render/composition.md (§5 one pixel write, §6)
+// Spec: specs/render/shading.md (§4 tile light gradients, §7 mapped index 0)
+// Spec: specs/render/blend-modes.md (§2 table orientation per drawer)
 //! Draw items and their inputs: frames, the map table, shade chains, blend
 //! ops.
 
@@ -145,11 +147,14 @@ impl MapTable {
 }
 
 /// Up to four maps applied in order to a non-zero source index (§A4):
-/// `i' = m3[m2[m1[m0[i]]]]`, unused slots skipped.
+/// `i' = m3[m2[m1[m0[i]]]]`, unused slots skipped; then, when the chain
+/// has a [`LightGradient`], the gradient's light map of the pixel
+/// (`shading.md` §4: a tile block's light map varies per pixel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ShadeChain {
     maps: [MapId; MAX_SHADE],
     len: u8,
+    gradient: Option<LightGradient>,
 }
 
 impl ShadeChain {
@@ -157,6 +162,7 @@ impl ShadeChain {
     pub const EMPTY: ShadeChain = ShadeChain {
         maps: [MapId(0); MAX_SHADE],
         len: 0,
+        gradient: None,
     };
 
     pub fn new(maps: &[MapId]) -> Result<Self, SceneError> {
@@ -169,19 +175,122 @@ impl ShadeChain {
         Ok(chain)
     }
 
+    /// The chain followed by the per-pixel light map of `gradient`.
+    pub fn with_gradient(mut self, gradient: LightGradient) -> Self {
+        self.gradient = Some(gradient);
+        self
+    }
+
     pub fn maps(&self) -> &[MapId] {
         &self.maps[..usize::from(self.len)]
     }
 
-    /// Applies the chain. Index 0 is tested by the caller before this.
-    /// TODO(spec: render/shading.md): whether a mapped result of 0 is
-    /// transparent (§B3). Until then the result is used as is: a mapped 0
-    /// draws index 0.
-    pub(super) fn apply(&self, maps: &MapTable, index: u8) -> u8 {
-        self.maps()
-            .iter()
-            .fold(index, |i, &m| maps.row(m)[usize::from(i)])
+    pub fn gradient(&self) -> Option<&LightGradient> {
+        self.gradient.as_ref()
     }
+
+    /// Applies the chain at screen pixel `(sx, sy)`. Index 0 is tested by
+    /// the caller before this; a mapped result of 0 is used as is: it draws
+    /// opaque index 0 (`shading.md` §7).
+    pub(super) fn apply(&self, maps: &MapTable, index: u8, sx: i64, sy: i64) -> u8 {
+        let i = self
+            .maps()
+            .iter()
+            .fold(index, |i, &m| maps.row(m)[usize::from(i)]);
+        match &self.gradient {
+            None => i,
+            Some(g) => maps.row(g.map_at(sx, sy))[usize::from(i)],
+        }
+    }
+}
+
+/// The row geometry of a gradient-lit DT1 block (`shading.md` §4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GradientKind {
+    /// Walls and roofs (lit wall and translucent wall drawers): 32 rows,
+    /// `a_r = (32·c0 + r·(c3 − c0)) >> 8`.
+    Wall,
+    /// RLE floor blocks: 15 rows, `a_r = (16·c0 + r·(c3 − c0)) >> 7`.
+    RleFloor,
+}
+
+impl GradientKind {
+    /// Width of a block in pixels.
+    pub const WIDTH: u32 = 32;
+
+    /// Rows of a block.
+    pub fn rows(self) -> u32 {
+        match self {
+            GradientKind::Wall => 32,
+            GradientKind::RleFloor => 15,
+        }
+    }
+
+    /// `(scale, shift)` of the row interpolation.
+    pub fn row_terms(self) -> (i32, u32) {
+        match self {
+            GradientKind::Wall => (32, 8),
+            GradientKind::RleFloor => (16, 7),
+        }
+    }
+
+    /// The GPU code of the kind (0 = no gradient).
+    pub fn code(self) -> u32 {
+        match self {
+            GradientKind::Wall => 1,
+            GradientKind::RleFloor => 2,
+        }
+    }
+}
+
+/// Per-pixel light of one DT1 block (`shading.md` §4 gradient branch): the
+/// pixel in block column `x`, row `r` uses light map `G[a_r][b_r][x]` with
+/// `G[a][b][x] = ⌊(32·a + x·(b − a)) / 32⌋`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LightGradient {
+    pub kind: GradientKind,
+    /// Screen position of the block's top-left pixel. Every drawn pixel of
+    /// the item must lie inside the block (checked by `resolve`).
+    pub x: i32,
+    pub y: i32,
+    /// `c0` top-left, `c1` top-right, `c2` bottom-right, `c3` bottom-left.
+    pub corners: [u8; 4],
+    /// Light map 0; light map `k` (0…31) is row `light0 + k`.
+    pub light0: MapId,
+}
+
+impl LightGradient {
+    /// Number of light maps the gradient indexes.
+    pub const LIGHT_MAPS: u32 = 32;
+
+    /// The block's screen rectangle.
+    pub fn block(&self) -> Rect {
+        Rect::new(self.x, self.y, GradientKind::WIDTH, self.kind.rows())
+    }
+
+    /// Light map number (0…31) of block column `x`, row `r` (both inside
+    /// the block).
+    pub fn level(&self, x: u32, r: u32) -> u32 {
+        let [c0, c1, c2, c3] = self.corners.map(i32::from);
+        let (scale, shift) = self.kind.row_terms();
+        let r = r as i32;
+        let a = (scale * c0 + r * (c3 - c0)) >> shift;
+        let b = (scale * c1 + r * (c2 - c1)) >> shift;
+        gradient(a as u32, b as u32, x) as u32
+    }
+
+    fn map_at(&self, sx: i64, sy: i64) -> MapId {
+        let x = (sx - i64::from(self.x)) as u32;
+        let r = (sy - i64::from(self.y)) as u32;
+        MapId(self.light0.0 + self.level(x, r))
+    }
+}
+
+/// The gradient table `G[a][b][x] = ⌊(32·a + x·(b − a)) / 32⌋`
+/// (`shading.md` §4; `a`, `b`, `x` in 0…31, result in 0…31).
+pub fn gradient(a: u32, b: u32, x: u32) -> u8 {
+    let (a, b, x) = (a as i32, b as i32, x as i32);
+    ((32 * a + x * (b - a)) >> 5) as u8
 }
 
 impl Default for ShadeChain {
@@ -195,21 +304,23 @@ impl Default for ShadeChain {
 /// reference renderer composes in the index domain, so `Rgb` is not an op
 /// (`composition.md` §1, §6).
 ///
-/// One pixel write of 1.14d (`composition.md` §5) is: the source index `s`
-/// through the remap `P` and the light map `L` (the shade chain, in that
-/// order), then, if the draw has a blend table `T`, `T[256 × d + P[s]]`
-/// (row = destination). TODO(spec: render/composition.md OQ2): when both
-/// `L` and `T` are present the order is unconfirmed; this compositor applies
-/// the whole chain first, as for `P` alone. TODO(spec:
-/// render/blend-modes.md): which op and table each draw uses (§B5).
+/// One pixel write of 1.14d (`composition.md` §5) is a shade chain then a
+/// blend op; [`PixelTables::ops`] builds both from the draw's `P`, `L`
+/// and `T` (with `L` and `T` the remap `P` is dropped). Which op and table
+/// each draw uses is `blend-modes.md` (`rules::blend`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BlendOp {
     /// `dest = src` (no `T`: `d' = L[P[s]]`).
     Opaque,
     /// `dest = map[base + dest][src]`: a 256×256 table stored as rows
     /// `base..base + 256` of the map table, row = destination, column =
-    /// source (`T[256 × d + s]`).
+    /// source (`T[256 × d + s]`): cels, shadows, shadow tiles
+    /// (`blend-modes.md` §2).
     IndexTable(MapId),
+    /// `dest = map[base + src][dest]`: the same table read transposed, row
+    /// = source (`T[256 × L[s] + d]`): the lit translucent wall drawer
+    /// (`blend-modes.md` §2, §6).
+    IndexTableSrcRow(MapId),
 }
 
 impl BlendOp {
@@ -219,6 +330,51 @@ impl BlendOp {
             BlendOp::IndexTable(base) => {
                 maps.row(MapId(base.0 + u32::from(dest)))[usize::from(src)]
             }
+            BlendOp::IndexTableSrcRow(base) => {
+                maps.row(MapId(base.0 + u32::from(src)))[usize::from(dest)]
+            }
+        }
+    }
+
+    /// The first row of the op's 256×256 table, if it has one.
+    pub fn table(&self) -> Option<MapId> {
+        match *self {
+            BlendOp::Opaque => None,
+            BlendOp::IndexTable(base) | BlendOp::IndexTableSrcRow(base) => Some(base),
+        }
+    }
+}
+
+/// The up to three tables 1.14d's row drawer takes for one draw
+/// (`composition.md` §5): remap `P`, light `L` and blend table `T` (the
+/// base id of a 256×256 table pushed with [`MapTable::push_table`]).
+/// Which draw passes which tables is `blend-modes.md`'s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct PixelTables {
+    pub remap: Option<MapId>,
+    pub light: Option<MapId>,
+    pub blend: Option<MapId>,
+}
+
+impl PixelTables {
+    /// The shade chain and blend op of §5:
+    /// - no `T`: `d' = L[P[s]]` (chain `P`, `L`; absent steps skipped);
+    /// - `T`, no `L`: `d' = T[256 × d + P[s]]`;
+    /// - `T` and `L`: `d' = T[256 × d + L[s]]`: `P` is not applied, whether
+    ///   or not the draw passed one (the dispatcher picks the `L` routine).
+    pub fn ops(&self) -> (ShadeChain, BlendOp) {
+        let chain = |maps: &[Option<MapId>]| {
+            let mut c = ShadeChain::EMPTY;
+            for m in maps.iter().flatten() {
+                c.maps[usize::from(c.len)] = *m;
+                c.len += 1;
+            }
+            c
+        };
+        match (self.light, self.blend) {
+            (_, None) => (chain(&[self.remap, self.light]), BlendOp::Opaque),
+            (None, Some(t)) => (chain(&[self.remap]), BlendOp::IndexTable(t)),
+            (Some(l), Some(t)) => (chain(&[Some(l)]), BlendOp::IndexTable(t)),
         }
     }
 }
@@ -288,13 +444,27 @@ impl DrawItem {
         for &m in self.shade.maps() {
             maps.get(m).ok_or(SceneError::MapMissing(m))?;
         }
-        if let BlendOp::IndexTable(base) = self.blend {
+        if let Some(base) = self.blend.table() {
             if u64::from(base.0) + 256 > maps.len() as u64 {
                 return Err(SceneError::BlendTable(base));
             }
         }
         let image = Rect::new(self.x, self.y, frame.width(), frame.height());
         let area = image.intersect(&self.clip).and_then(|r| r.intersect(view));
+        if let Some(g) = self.shade.gradient() {
+            let last = u64::from(g.light0.0) + u64::from(LightGradient::LIGHT_MAPS);
+            if last > maps.len() as u64 {
+                return Err(SceneError::LightMaps(g.light0));
+            }
+            if let Some(a) = area {
+                if a.intersect(&g.block()) != Some(a) {
+                    return Err(SceneError::GradientArea {
+                        area: a,
+                        block: g.block(),
+                    });
+                }
+            }
+        }
         Ok((frame, area))
     }
 
@@ -315,6 +485,7 @@ impl DrawItem {
         if src == 0 {
             return dest;
         }
-        self.blend.apply(maps, self.shade.apply(maps, src), dest)
+        self.blend
+            .apply(maps, self.shade.apply(maps, src, sx, sy), dest)
     }
 }

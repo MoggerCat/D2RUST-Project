@@ -110,6 +110,9 @@ impl ViewFeed for Feed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 fn world(ticks: u64) -> ClientWorld {
@@ -203,7 +206,7 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
         unit_type: 1,
         guid: 7,
     };
-    w.units.insert(key, ClientUnit { key });
+    w.units.insert(key, ClientUnit::new(key));
     let frame = build_frame(&w, &[], &Unspecified, &mut Feed::new(3, 1, None), &assets()).unwrap();
     assert!(frame.items.is_empty());
     assert_eq!((frame.units_drawn, frame.units_hidden), (0, 1));
@@ -220,10 +223,10 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
     assert!(
         matches!(
             e,
-            ViewError::Unresolved {
-                what: "UI pass",
-                ..
-            }
+            // The UI rules' refusal of request 0 (the UI binding now resolves
+            // requests one by one), never a world error.
+            ViewError::Ui { index: 0, ref error }
+                if matches!(**error, ViewError::Unresolved { what: "UI image", .. })
         ),
         "{e}"
     );

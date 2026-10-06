@@ -16,16 +16,17 @@ pub struct Glyph {
     pub height: u8,
     pub unknown2: u8,
     pub unknown3: u16,
-    /// Frame index in the font's DC6.
-    pub frame: u8,
-    pub unknown4: u8,
+    /// Frame index in the font's DC6 (a u16, as 1.14d reads it).
+    pub frame: u16,
     pub unknown5: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FontTable {
     pub version: u16,
-    pub unknown: [u8; 4],
+    pub unknown: u16,
+    /// Records the by-code glyph lookup searches (`ui/text.md` §3).
+    pub count: u16,
     pub height: u8,
     pub width: u8,
     pub glyphs: Vec<Glyph>,
@@ -47,8 +48,8 @@ impl FontTable {
         if version != 1 {
             return Err(invalid(FORMAT, format!("version {version}, expected 1")));
         }
-        let mut unknown = [0u8; 4];
-        unknown.copy_from_slice(c.bytes(4)?);
+        let unknown = c.u16()?;
+        let count = c.u16()?;
         let height = c.u8()?;
         let width = c.u8()?;
 
@@ -68,8 +69,7 @@ impl FontTable {
                     height: c.u8()?,
                     unknown2: c.u8()?,
                     unknown3: c.u16()?,
-                    frame: c.u8()?,
-                    unknown4: c.u8()?,
+                    frame: c.u16()?,
                     unknown5: c.u32()?,
                 })
             })
@@ -77,6 +77,7 @@ impl FontTable {
         Ok(FontTable {
             version,
             unknown,
+            count,
             height,
             width,
             glyphs,
@@ -144,27 +145,27 @@ mod tests {
         assert!(FontTable::parse(&f).is_err());
     }
 
-    // Covers: specs/formats/font-tbl.md §edge-cases-original-bugs
+    // Covers: specs/formats/font-tbl.md §header-12-bytes, §edge-cases-original-bugs
     #[test]
-    fn frame_is_one_byte() {
-        // 300 records parse, but `frame` is the single byte at offset 8:
-        // record 256 can only say 0 again, so at most 256 frames are
-        // addressable.
+    fn frame_is_a_u16_and_count_is_header_byte_8() {
+        // `frame` is the u16 at record byte 8: byte 9 is its high byte, so
+        // more than 256 frames are addressable.
         let recs: Vec<[u8; 14]> = (0..300u16)
             .map(|i| {
                 let mut r = [0u8; 14];
                 r[..2].copy_from_slice(&i.to_le_bytes());
-                r[8] = i as u8;
-                r[9] = 0xEE; // unknown4: not part of the frame index
+                r[8..10].copy_from_slice(&i.to_le_bytes());
                 r
             })
             .collect();
-        let t = FontTable::parse(&file(&recs)).unwrap();
+        let mut d = file(&recs);
+        d[6..10].copy_from_slice(&[0x02, 0x01, 0x2C, 0x01]);
+        let t = FontTable::parse(&d).unwrap();
+        assert_eq!((t.unknown, t.count), (0x0102, 300));
         assert_eq!(t.glyphs.len(), 300);
         assert_eq!(t.glyphs[255].frame, 255);
-        assert_eq!(t.glyphs[256].frame, 0);
-        let distinct: std::collections::BTreeSet<u8> = t.glyphs.iter().map(|g| g.frame).collect();
-        assert_eq!(distinct.len(), 256);
+        assert_eq!(t.glyphs[256].frame, 256);
+        assert_eq!(t.glyphs[299].frame, 299);
     }
 
     mod robust {
