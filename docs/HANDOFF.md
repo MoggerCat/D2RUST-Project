@@ -9,7 +9,7 @@ rather than restating them.
 
 | Phase | Status | Proof |
 |---|---|---|
-| 0 Setup | done | CI green on GitHub (`MoggerCat/MXL-ULTIMATE`) |
+| 0 Setup | done | CI green on GitHub (`MoggerCat/D2RUST-Project`) |
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
@@ -244,7 +244,7 @@ slows the game a lot (all 846 inline RNG sites are hooked).
   regenerate: `tools/ghidra/README.md`.
 - `../refs/`: D2MOO (MIT), Riiablo (Apache-2.0), CE_Database,
   1.14d-notes. Spec sessions only.
-- Git: `main` on `git@github.com:MoggerCat/MXL-ULTIMATE.git`. CI runs on
+- Git: `main` on `git@github.com:MoggerCat/D2RUST-Project.git` (renamed from `MXL-ULTIMATE` on 2026-10-06; GitHub redirects the old URL; update a clone with `git remote set-url origin git@github.com:MoggerCat/D2RUST-Project.git`). CI runs on
   pushes to `main` and on pull requests. A cold CI run takes ~40 min
   (Bevy), cached ~3 min.
 
