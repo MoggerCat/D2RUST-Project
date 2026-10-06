@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md §A3–§A6, §A8, §A9 (robustness, METHODS M07)
+// Spec: specs/client/render-pipeline.md §A3–§A6, §A8, §A9; specs/render/composition.md §5 (robustness, METHODS M07)
 //! Property tests on the scene and the CPU reference compositor: random
 //! frames (transparent pixels, empty frames, wrong pixel counts), random
 //! draw items (positions and clips anywhere in i32, shade chains and
@@ -166,7 +166,8 @@ fn inside(r: &Rect, x: i64, y: i64) -> bool {
 }
 
 /// Per-pixel model of §A8 with §A4 (shade chain on non-zero source) and
-/// §A5 (opaque or `table[base + src][dest]`), framebuffer cleared to 0.
+/// §A5 / `render/composition.md` §5 (opaque, or `T[256 × d + s]`: row =
+/// destination), framebuffer cleared to 0.
 fn model(items: &[DrawItem], frames: &[FrameImage], maps: &MapTable, view: Rect) -> Vec<u8> {
     let mut out = Vec::with_capacity(view.width as usize * view.height as usize);
     for vy in 0..i64::from(view.height) {
@@ -195,7 +196,7 @@ fn model(items: &[DrawItem], frames: &[FrameImage], maps: &MapTable, view: Rect)
                 v = match it.blend {
                     BlendOp::Opaque => s,
                     BlendOp::IndexTable(b) => {
-                        maps.get(MapId(b.0 + u32::from(s))).unwrap()[usize::from(v)]
+                        maps.get(MapId(b.0 + u32::from(v))).unwrap()[usize::from(s)]
                     }
                 };
             }
