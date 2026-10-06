@@ -30,11 +30,11 @@
 |   7. Speed setter (debug) | 165–170 |
 | Constants & data dependencies | 171–181 |
 | Randomness | 182–185 |
-| Edge cases & original bugs | 186–201 |
-| Test vectors | 202–234 |
-| expfield.d2 | 235–270 |
-| Provenance | 271–296 |
-| Open questions | 297–311 |
+| Edge cases & original bugs | 186–208 |
+| Test vectors | 209–241 |
+| expfield.d2 | 242–277 |
+| Provenance | 278–303 |
+| Open questions | 304–318 |
 <!-- /index -->
 
 ## Summary
@@ -188,9 +188,16 @@ None.
 - **Duplicates:** 29 names occur twice in the X file, always in the same
   bucket. 20 pairs are identical. 9 differ: `VMS1HTH`, `VMGHHTH`,
   `MINUHTH`, `VMWLHTH`, `VMNUHTH`, `64A1HTH`, `64NUHTH`, `VMA1HTH`,
-  `3DNUHTH`. The game uses the **first** copy; in all 9 the second copy is
-  the one that matches the `.cof` (e.g. `VMS1HTH`: first copy speed 200,
-  `.cof` and second copy 160). Reproduce: first copy wins.
+  `3DNUHTH`. The game uses the **first** copy. The `.cof` found by the
+  lookup of the COF cross-check row matches the second copy for 6
+  (`3DNUHTH`, `VMA1HTH`, `VMGHHTH`, `VMNUHTH`, `VMS1HTH`, `VMWLHTH`; e.g.
+  `VMS1HTH`: first copy speed 200, `.cof` and second copy 160) and the
+  first copy for 3 (`64A1HTH`: speed 208, event[16] = 2, second copy 200,
+  event[13] = 2; `64NUHTH`: speed 112, second 256; `MINUHTH`: the
+  `objects` COF, 1 frame, second copy 8 frames). `3DNUHTH` has two COFs:
+  `monsters` (16 frames, 176) = second copy, `objects` (1 frame, 256) =
+  first copy (ignored game test `animdata_edge_cases`, 2026-10-06; the
+  earlier "second copy in all 9" was wrong). Reproduce: first copy wins.
 - **Frames above 144:** `42DTHTH` has 200 frames; only 144 event bytes
   exist, so the first-event scan stops at 144.
 - **Speed 0:** 4 records have speed 0 (kept as read).
@@ -230,7 +237,7 @@ Real 1.14d (`d2exp.mpq` copy; `#[ignore]`, `D2_GAME_DIR`):
 | `VMS1HTH` | first copy: bucket 11, 37th record, frames 17, speed 200, event[10] = 2 | measurement |
 | `GOWLHTH` (hash 29) | not found → default 2048 / 256 | measurement |
 | D copy (`d2data.mpq`) | 411,104 = 1,024 + 2,563 × 160; 130 empty buckets; 7 duplicate names | measurement |
-| COF cross-check | 3,529 of 3,558 names have a `.cof` at `data\global\{monsters,chars,objects}\<first 2 chars>\cof\<name>.cof` (P, X, `d2char`, D); for each, frames = COF frames, speed = COF animation rate, events = COF events (zero-filled to 144), except the first copies of the 9 differing duplicates | scratch probe using `d2-formats::cof` |
+| COF cross-check | 3,529 of 3,558 names have a `.cof` at `data\global\{monsters,chars,objects}\<first 2 chars>\cof\<name>.cof` (P, X, `d2char`, D); for each, frames = COF frames, speed = COF animation rate, events = COF events (zero-filled to 144), except, for each of the 9 differing duplicates, the copy that does not match (see Duplicates) | scratch probe using `d2-formats::cof` |
 
 ## expfield.d2
 
