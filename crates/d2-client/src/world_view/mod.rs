@@ -49,7 +49,10 @@ use crate::scene::{
 
 pub use feed::{build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
-pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
+pub use ui_bind::{
+    original_text_font, text_sprites, OriginalTextHooks, TextColors, TextFont, TextHooks, UiQueue,
+    UiRules, UiSprite,
+};
 
 /// The region composed each frame: the full 800×600 frame. Which part of
 /// the world it shows is the camera's (render-pipeline §B7), decided by
