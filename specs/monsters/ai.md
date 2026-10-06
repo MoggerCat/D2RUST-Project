@@ -2,7 +2,7 @@
 
 - **Status:** draft: think scheduling, dispatch, AI tables and the
   shared helpers read from the 1.14d `Game.exe` (addresses below; AI
-  tables dumped from the file); 22 AI functions read in full; think
+  tables dumped from the file); 26 AI functions read in full; think
   intervals checked against 4,409 recorded type-2 runs in three tick
   recordings (mode-end re-think: 79/79 at aidel; no rule contradicted).
 - **Target version:** 1.14d
@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–551 |
 |   7. Tactics helpers | 552–609 |
 |   8. AI commands and minions | 610–631 |
-|   9. Per-AI behaviours | 632–1043 |
-|   10. The catalogue `ai-functions.tsv` | 1044–1064 |
-| Constants & data dependencies | 1065–1088 |
-| Randomness | 1089–1110 |
-| Edge cases & original bugs | 1111–1146 |
-| Test vectors | 1147–1227 |
-| Provenance | 1228–1265 |
-| Open questions | 1266–1303 |
+|   9. Per-AI behaviours | 632–1166 |
+|   10. The catalogue `ai-functions.tsv` | 1167–1187 |
+| Constants & data dependencies | 1188–1211 |
+| Randomness | 1212–1233 |
+| Edge cases & original bugs | 1234–1269 |
+| Test vectors | 1270–1354 |
+| Provenance | 1355–1392 |
+| Open questions | 1393–1430 |
 <!-- /index -->
 
 ## Summary
@@ -1041,6 +1041,129 @@ a later step, which always schedules or starts a mode. 1.14d-confirmed; same as 
 secondary search's melee flag over h in step 5.2 (h is not read
 afterwards).
 
+#### 9.19 SkeletonMage (64) `0x005F96C0`
+
+Brackets: skmage_fire1 Normal [aip1..aip8 = 35, 9, 30, 5, 0, 18, 20, 5].
+S, E := secondary target and distance (`0x005DDC30`, second argument 0;
+E = 0x7FFFFFFF when there is no S). `Skill1` (SkeletonRaise) is not used
+here.
+
+1. If S:
+   1. E > aip2 [9] and P(aip3) [30] → velocity request (method
+      unchanged, speed 10, steps 0); walk to S with aip2 steps (a byte,
+      `0x005DEF80`). End.
+   2. E ≤ aip4 [5] and P(aip5) [0] → velocity (speed 25); escape from S
+      by 5 with think delete (`0x005DEFE0`); not started → A1 at T. End.
+   3. E < aip6 [18] and P(aip1) [35] → A1 at S. End.
+2. E > aip2 and P(aip3) → velocity (speed 10); walk to T with aip2
+   steps. End. (With no S, E is 0x7FFFFFFF and this test always draws.)
+3. P(aip7) [20] → circle 4 at T (no think delete; one more draw); else
+   idle aip8 [5].
+
+Each P(…) is drawn only when its distance test holds. 1.14d-confirmed;
+same as D2MOO.
+
+#### 9.20 Arach (26) `0x005F4510`
+
+Brackets: arach1 Normal [45, 33, 15, 8, 25]; `Skill1` SpiderLay in
+`Sk1mode` A2. AI params: 0 = state (0 idle, 1 retreating, 2 engaged),
+1 = approach latch, 2 = think counter. L = the unit's life percent
+(`0x00621F20`). "Lunge" = `0x005DED40(T, 0)` (velocity method 13, then
+walk to T, flags 0).
+
+1. State 1:
+   1. Param 1 := 0.
+   2. L > 75: state := 0; P(aip3) [15] → state := 2, lunge; else circle
+      6 at T (no delete). End.
+   3. C and aip1 > 25 and `roll(100)` < aip1 − 25 → A1 at T. End. (No
+      draw unless C and aip1 > 25.)
+   4. D ≥ aip4 [8] and AI state not 3/19 → state := 0; circle 12 at T
+      (no delete). End.
+   5. Escape from T by 4 (no delete). End.
+2. State ≠ 1, C:
+   1. State := 2. P(aip1) [45] → A1 at T. End.
+   2. L < aip5 [25]: state := 1; if `Skill1` ≥ 0 and the unit lacks
+      state 22 (`0x00639DF0`): use `Skill1` in `Sk1mode`, no target, at
+      (0, 0) (`0x005DEAD0`); else escape from T by 8 (no delete). End.
+   3. `roll(100)` < aip2 [33] → circle 4 at T (no delete); else idle 15.
+3. State ≠ 1, not C:
+   1. AI state 3/19 or param 1 = 1 → param 1 := 1, lunge. End.
+   2. Param 2 += 1, wrapping to 0 when it passes 20; param 1 := 0.
+   3. Param 2 = 1 and `roll(100)` < aip3 → param 1 := 1, lunge. End.
+   4. `roll(100)` < 20 → wander 6; else idle 15.
+
+So an idle spider rolls its engage chance once every 21 thinks.
+1.14d-confirmed.
+
+#### 9.21 Fetish (30) `0x005F53E0`
+
+Brackets: fetish1 Normal [100, 10, 4, 33]. AI params: 0 = state (0, 1
+attacking, 2 backing off), 1 = counter. L = life percent of **T**
+(`0x00621F20(T)`).
+
+1. Current command K (`0x0058EE80`): if K's type is 1 or 14 and the unit
+   it names exists (`0x00552F60`, type param 1, GUID param 2): params 0,
+   1 := 0; velocity request (13, 50, 0); walk to that unit (flags 0,
+   `0x005DEC80`); free K. End. Any other K: free it and go on.
+2. State 0: C → param 1 := 0, state := 1, P(aip1) [100] → A1 at T, else
+   idle aip2 [10]; end. Not C → step 5.
+3. State 1: param 1 += 1. If param 1 > aip3 [4] and L > aip4 [33]:
+   state := 2, param 1 := 0, velocity (method 2, speed 50, steps 0),
+   escape from T by 14 with think delete; end (started or not). Else C →
+   `roll(100)` < aip1 → A1 at T, else idle aip2; end. Not C → step 5.
+4. State 2: D > 12: param 1 += 1, reset state and param 1 to 0 when
+   param 1 > 1; draw `lo' % 100` < 20 → circle 4 at T (no delete), else
+   idle 10; end. D ≤ 12: velocity (2, 50, 0); escape from T by 14 with
+   think delete; started → end; else state, param 1 := 0, idle 10; end.
+   Any other state value: idle 10.
+5. Velocity (13, 50, 0); walk to T with flags 7. End.
+
+1.14d-confirmed. The minion's attack-then-back-off rhythm: aip3 attack
+thinks, then back off while the target is above aip4 % life.
+
+#### 9.22 Vampire (28) `0x005F4A70`
+
+Brackets: vampire5 Normal [85, 40, 28, 25, 1]. F = aip5 as spell flags:
+F1 (bit 0) Skill1 / Skill4 bolts, F2 (bit 1) Skill2, F4 (bit 2) Skill3.
+AI params: 0 = state (0, 1 engaged, 2 fleeing), 1 = farthest D seen
+under 30 while in AI state 3/19, 2 = spell cooldown. L = own life
+percent. S, E as in §9.19. "Bolt at X" = `roll(100)` < 50 → `Skill1` in
+`Sk1mode` at X, else `Skill4` in `Sk4mode` (byte +0x183) at X; neither
+skill id is tested for < 0. "Upgrade" = F2, param 2 ≤ 0 and
+`roll(100)` < aip4 → `Skill2` at T, param 2 := 11, end; else F4, param 2
+≤ 0 and `roll(100)` < aip4 → `Skill3` at T, param 2 := 11, end (each
+roll drawn only when its flag and cooldown hold).
+
+1. Param 2 > 0 → param 2 −= 1. S, E := `0x005DDC30`.
+2. AI state 3/19: state 0 → 1; D < 30 and D > param 1 → param 1 := D.
+   If C: draw `lo' % 100`; > 30 or no F1 → A1 at T; else bolt at T. End.
+3. State 2:
+   1. L ≥ 75 → state := 1, walk to T flags 7. End.
+   2. D < 14 or D ≤ param 1: velocity request (method unchanged, speed
+      v, steps 0) with v = `Run` × 100 / `Velocity` − 100 (monstats +52,
+      +50, signed, truncating; 0 when `Velocity` ≤ 0), clamped to 0..120;
+      escape from T by 8 with think delete; started → end.
+   3. D ≥ aip3 [28] → idle 15. End. `roll(100)` ≥ aip2 [40] → idle 15.
+      End.
+   4. Upgrade.
+   5. F1, S and E ≤ 20 → bolt at S; else circle 4 at T (no delete). End.
+4. State ≠ 2:
+   1. L < 33: state := 2; escape from T by 8 (no delete, no velocity);
+      started → end.
+   2. C: state := 1. P(aip1) [85]: no F1 or no S → A1 at T, end;
+      `roll(100)` > 30 → A1 at T, end; E ≤ 20 → bolt at S, end. Then
+      (P(aip1) failed, or E > 20): `roll(100)` < 33 → circle 4 at T
+      (no delete), else idle 10. End.
+   3. Not C, D ≥ aip3: state 1 → walk to T flags 7; else idle 15. End.
+   4. Not C: state := 1. `roll(100)` ≥ aip2: D > 20 → walk to T flags 7;
+      else D < 9 and `roll(100)` < 50 → escape from T by 8 (no delete);
+      else `roll(100)` < 50 → circle 4 at T, else idle 10. End.
+   5. Upgrade.
+   6. No F1, no S, or E > 20 → walk to T flags 7. Else `roll(100)` < 75
+      → bolt at S; else circle 4 at T. End.
+
+1.14d-confirmed; same as D2MOO.
+
 ### 10. The catalogue `ai-functions.tsv`
 
 One row per AI table index (148 rows), tab-separated, header row:
@@ -1173,6 +1296,10 @@ think; draws per `rng.md` §2):
 | SkeletonBow, no S | 51 ≥ 50 → idle 20 | 87 → idle 20 | 53 → idle 20 | 0 → walk in radius (5, 6) |
 | FoulCrowNest, D ≤ 20, summon not due: idle | 21 | 27 | 23 | 20 |
 | BloodRaven, D = 8, at home (steps 1–3 draw nothing), not C, param 0 = 0 → 3, param 1 = 0 | 51 ≥ 3: no raise | no raise | no raise | 0 < 3: L = 7; raise at (T.x − 7, T.y − 6); param 1 = 1 |
+| SkeletonMage [§9.19], S at E = 12 | 51 ≥ 30; 31 < 35 → A1 at S | 87; 64; step 2: 71 ≥ 30; 25 ≥ 20 → idle 5 | 53; 46; step 2: 20 < 30 → walk to T, 9 steps | 0 < 30 → walk to S, 9 steps |
+| Arach [§9.20], state 0, not C, AI state 0, params 1, 2 = 0 | 51 ≥ 15; 31 ≥ 20 → idle 15 | 87; 64 → idle 15 | 53; 46 → idle 15 | 0 < 15 → lunge |
+| Fetish [§9.21], state 2, D = 15, param 1 = 0 | 51 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 20 → circle 4 (low byte 46 → method 5) |
+| Vampire [§9.22], state 0, not C, D = 10, L ≥ 33, no S, param 2 = 0 | 51 ≥ 40; 31 < 50 → circle 4 | 87; 64 → idle 10 | 53; 46 → circle 4 | 0 < 40; no F2/F4; no S → walk to T flags 7 |
 | Npc after steps 1–4 (no class case, no interaction, no command), map AI with 3 nodes | 51 < 66; node 0 | 87 ≥ 66 → 0 (then idle 8) | 53; node 0 | 0; node 2 |
 
 Scheduling (no draws):
