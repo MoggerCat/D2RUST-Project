@@ -435,6 +435,7 @@ class ScenarioRecorder(rp.PacketRecorder):
         self.queue_i = []
         self.cur_i = None
         self.ended = False
+        self.dispatch_open = False
 
     # --- output: deterministic (no wall-clock ms, no thread ids) -----------
 
@@ -519,6 +520,15 @@ class ScenarioRecorder(rp.PacketRecorder):
                 self.recording = True
             elif ctx.Ecx != self.game:
                 return
+        if kind in ("c2s", "c2s_sys", "drain"):
+            self.dispatch_open = False
+        elif kind == "dispatch":
+            self.dispatch_open = True
+        elif kind == "result" and self.dispatch_open and self.last_kind in ("s2c", "net"):
+            # §1 rule 6: the result at 0x0053F45E belongs to the dispatch before it; a handler
+            # that queues a reply (s2c, net) between them made the base class call it "not
+            # dispatched" and drop its code
+            self.last_kind = "dispatch"
         super().on_hook(tid, addr, ctx)
         if addr == TICK_RETURN and ctx.Esi == self.game:
             self.tick_done(self.read_i32(self.game + rt.G_FRAME))
