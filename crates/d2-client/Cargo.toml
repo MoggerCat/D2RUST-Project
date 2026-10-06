@@ -22,6 +22,10 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 # Controls file parser (`specs/client/ui.md` §A6): same toml_edit Bevy's
 # macros already build, so no new crate is downloaded.
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
+# GPU compute compositor (`specs/client/render-pipeline.md` §A9): the wgpu
+# Bevy already builds (same version and backends), used directly so the
+# compositor runs headless for verify; `wgpu::naga` validates its WGSL in CI.
+wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan", "naga-ir"] }
 
 [lints]
 workspace = true
