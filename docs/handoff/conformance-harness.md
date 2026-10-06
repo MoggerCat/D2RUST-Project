@@ -1,6 +1,6 @@
 # Handoff: Rust replay harnesses for the coming recordings — `claude/conformance-harness`
 
-> Not folded into `docs/HANDOFF.md` / `docs/PLAN.md` yet; for the coordinator to fold (neither file is edited here).
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06. Task class: conformance
 harnesses from the specs, the recorder README and the Python checkers,

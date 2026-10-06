@@ -1,5 +1,7 @@
 # Handoff: end-to-end single-player test — `claude/e2e-single-player`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud integration-test session, 2026-10-06, task class: integration
 from clear specs, medium (METHODS M14). Base: `main` at `fd37fba`. Repo
 only, synthetic tables, no game files (M09). For the coordinator to fold
