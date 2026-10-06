@@ -326,6 +326,9 @@ pub trait WorldHost<D> {
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         Vec::new()
     }
+    /// The host's millisecond clock (`Intents::set_host_tick`): the
+    /// object code's `GetTickCount` input (`objects.md` edge case 9).
+    fn host_tick(&mut self, events: &mut D, ms: u32) {}
     /// Records a fatal path (see [`WorldError`]).
     fn fault(&mut self, fault: WorldFault);
 }

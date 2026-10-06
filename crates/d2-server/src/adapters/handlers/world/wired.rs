@@ -489,6 +489,15 @@ where
         sent
     }
 
+    /// The action wiring's object host tick. [`WiredWorld::now`] (the
+    /// vendors' clock) stays the caller's.
+    ///
+    /// TODO(vendors.md edge case 10): both read the host's millisecond
+    /// clock; `now` gets its value here once the callers stop pinning it.
+    fn host_tick(&mut self, events: &mut D, ms: u32) {
+        WorldHost::<D>::host_tick(&mut self.action, events, ms);
+    }
+
     fn fault(&mut self, fault: WorldFault) {
         self.action.faults.push(fault);
     }

@@ -256,6 +256,11 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         self.game.frame
     }
 
+    /// The host world's object host tick ([`WorldHost::host_tick`]).
+    fn set_host_tick(&mut self, ms: u32) {
+        self.world.host_tick(&mut self.events, ms);
+    }
+
     /// `None` without player data, or without a staged position.
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
