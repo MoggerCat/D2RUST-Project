@@ -71,7 +71,7 @@ unit with the last 0x9C record; the end state asserts the log: 6 applied,
 `app_frame_loop.rs`, `local_tests.rs` (their expectations changed from
 "every id unowned" to the new accounting; nothing weakened: each now
 also asserts the dropped / rejected sets). `py tools/coverage.py`:
-`model.md` 47 of 51, `msg-units.md` 28 of 30, `msg-stats-items.md` 13 of
+`model.md` 49 of 51, `msg-units.md` 28 of 30, `msg-stats-items.md` 13 of
 13 (uncovered: model §2 r7, §8 r2; msg-units §3 r3, §5 r4: all Phase 6 or
 client DRLG, nothing to model yet).
 
