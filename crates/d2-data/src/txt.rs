@@ -428,4 +428,45 @@ mod tests {
         let b = bind(&header(&[b"", b"a"]), &["a"]);
         assert_eq!(b.column_field, [None, Some(0)]);
     }
+
+    // Covers: specs/data/txt-format.md §5 r1
+    #[test]
+    fn lines_after_header_are_data() {
+        let t = parse(b"a\tb\r\nx\ty\r\na\tb\r\n").unwrap();
+        assert_eq!(t.header, [b"a".to_vec(), b"b".to_vec()]);
+        assert_eq!(t.records.len(), 2);
+        assert_eq!(cells(&t, 0), [b"x", b"y"]);
+        // A line equal to the header is data too.
+        assert_eq!(cells(&t, 1), [b"a", b"b"]);
+        assert_eq!((t.records[0].line, t.records[1].line), (2, 3));
+    }
+
+    // Covers: specs/data/txt-format.md §6 text
+    #[test]
+    fn name_equality() {
+        assert!(names_equal(b"MinDam", b"mindam"));
+        assert!(names_equal(b"A-Z_09", b"a-z_09"));
+        assert!(names_equal(b"", b""));
+        // Same length required; no trimming.
+        assert!(!names_equal(b"name", b"name "));
+        assert!(!names_equal(b" name", b"name"));
+        assert!(!names_equal(b"nam", b"name"));
+        // ASCII only: other bytes compare as they are.
+        assert!(!names_equal(b"caf\xC9", b"caf\xE9"));
+        assert!(names_equal(b"caf\xE9", b"CAF\xE9"));
+        assert!(!names_equal(b"[", b"{"));
+        assert!(!names_equal(b"@", b"`"));
+        let b = bind(&header(&[b"CAF\xC9", b"Caf\xE9"]), &[&b"caf\xE9"[..]]);
+        assert_eq!(b.field_column, [Some(1)]);
+    }
+
+    // Covers: specs/data/txt-format.md §10
+    #[test]
+    fn original_only_cases_are_rejected() {
+        // A final unterminated `Expansion` line: E6, no record is lost.
+        fails(b"a\tb\r\n1\t2\r\nExpansion", ErrorCode::E6, Some(3));
+        fails(b"a\tb\r\n1\t2\r\nExpansion\t", ErrorCode::E6, Some(3));
+        // A CR as the last byte: E4.
+        fails(b"a\r\n1\r\n2\r", ErrorCode::E4, Some(3));
+    }
 }
