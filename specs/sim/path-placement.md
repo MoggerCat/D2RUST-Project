@@ -42,13 +42,13 @@
 |   9. Floor drop placement (`0x00555DA0`) | 488–506 |
 |   10. Placing a unit at a point (`0x00554EA0`) | 507–556 |
 |   11. Level spawn point (`0x0061B060`) and game entry | 557–579 |
-|   12. Warp tiles and warp arrival | 580–630 |
-| Constants & data dependencies | 631–649 |
-| Randomness | 650–659 |
-| Edge cases & original bugs | 660–686 |
-| Test vectors | 687–719 |
-| Provenance | 720–748 |
-| Open questions | 749–770 |
+|   12. Warp tiles and warp arrival | 580–631 |
+| Constants & data dependencies | 632–650 |
+| Randomness | 651–660 |
+| Edge cases & original bugs | 661–687 |
+| Test vectors | 688–720 |
+| Provenance | 721–749 |
+| Open questions | 750–771 |
 <!-- /index -->
 
 ## Summary
@@ -616,7 +616,8 @@ value v, DRLG room R:
    `0x0064E7B0`, player size, 0x1C09, **fallback 1**) from the
    destination tile's room; none → nothing.
 3. Quest gate: destination level 73, 100, 118, 128 or 132 and
-   `0x00545B80(source level, destination level)` ≠ 0 → nothing.
+   `0x00545B80(source level, destination level)` ≠ 0 → nothing
+   (the checks: `world/quests.md` §8.2).
 4. `0x00554EA0(destination tile room, x, y, exact 0, alt 0)`; failure →
    nothing.
 5. Walk-out: target := (x + `ExitWalkX`, y + `ExitWalkY`) (lvlwarp
@@ -760,8 +761,8 @@ the recorded game is regenerated from its seeds):
 4. *Answered:* the position history (§10 rule 7) is read by the AI
    helpers `0x005E3930` / `0x005E3EA0`, not by the 0x5F handler.
    Their use of it is `monsters/ai.md`'s to specify.
-5. `0x00545B80` quest warp gate (§12.2 rule 3): owner is the quests
-   spec; its result for each level pair is not specified.
+5. *Answered:* `0x00545B80` quest warp gate (§12.2 rule 3): its
+   checks per destination level are `world/quests.md` §8.2.
 6. *Answered:* C→S 0x5F handler `0x0054CD50` → `0x0054CC40`, its
    state-108 lock and table `0x006E1064`: `sim/pathing.md` §1.6 (a
    recorded 0x5F would still confirm it on live data).
