@@ -1,4 +1,5 @@
 // Spec: specs/client/render-pipeline.md
+// Spec: specs/render/composition.md
 //! Scene: the draw list and the CPU reference compositor (§A3–A8, bins of
 //! §A9). Plain Rust, no Bevy types, integer math only: the GPU compositor
 //! (`render`) and the verify harness consume exactly these types.
@@ -13,6 +14,7 @@
 
 pub mod bins;
 pub mod cpu;
+pub mod frame;
 pub mod item;
 pub mod order;
 
@@ -20,7 +22,10 @@ pub mod order;
 mod tests;
 
 pub use bins::{bin, Bins};
-pub use cpu::{compose, compose_binned, compose_rgba, to_rgba};
+pub use cpu::{
+    compose, compose_binned, compose_binned_frame, compose_frame, compose_rgba, to_rgba,
+};
+pub use frame::{present_palette, FrameCycle, FramePlan, PL2_PALETTE_BYTES, UNCLEARED_ROWS};
 pub use item::{
     BlendOp, DrawItem, FrameId, FrameImage, FrameSource, FrameView, ItemTag, MapId, MapTable,
     ShadeChain,
@@ -123,6 +128,16 @@ pub enum SceneError {
     BinsView { built: Rect, view: Rect },
     #[error("bins were built for {built} items, composing {items}")]
     BinsItems { built: usize, items: usize },
+    #[error("base framebuffer has {len} bytes, the view {pixels} pixels")]
+    BaseSize { len: usize, pixels: u64 },
+    #[error(
+        "framebuffer height {height} leaves no rows for the frame clear (more than 47 needed)"
+    )]
+    FramebufferHeight { height: u32 },
+    #[error("frame plan {0:?} does not fit the framebuffer or the frame cycle")]
+    FramePlan(frame::FramePlan),
+    #[error("PL2 data of {len} bytes has no 1,024-byte palette")]
+    Pl2Size { len: usize },
     #[error("draw item {index}: {error}")]
     Item {
         index: usize,

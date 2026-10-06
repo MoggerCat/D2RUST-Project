@@ -236,8 +236,9 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         .iter()
         .map(|rule| {
             let mut table = Box::new([[0u8; 256]; 256]);
-            for (src, row) in table.iter_mut().enumerate() {
-                for (dest, v) in row.iter_mut().enumerate() {
+            // Row = destination, column = source (composition.md §5).
+            for (dest, row) in table.iter_mut().enumerate() {
+                for (src, v) in row.iter_mut().enumerate() {
                     *v = rule.value(src as u8, dest as u8);
                 }
             }

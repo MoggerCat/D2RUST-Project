@@ -19,7 +19,7 @@
 //! base = "identity"           # or "zero"
 //! set = [[5, 9]]              # (index, value), each index once
 //! [[table]]                   # 256×256 blend table; table = n-th [[table]]
-//! rule = "add"                # table[src][dest]: "src", "dest", "add", "xor"
+//! rule = "add"                # value of (src, dest): "src", "dest", "add", "xor"
 //! [[item]]
 //! frame = 0
 //! x = 10
@@ -112,7 +112,8 @@ pub struct MapSpec {
     pub row: [u8; 256],
 }
 
-/// How a synthetic 256×256 blend table is filled: `table[src][dest]`.
+/// How a synthetic 256×256 blend table is filled: the value of each
+/// (source, destination) pair (stored row = destination, `composition.md` §5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRule {
     Src,
