@@ -118,10 +118,9 @@ Riiablo (Apache-2.0) `file/Dc6.java`, `file/Dc6Decoder.java`,
 
 ## Open questions
 
-1. Exact screen placement: Riiablo's two codecs disagree by one row on the
-   vertical extent (`[offset_y − height, offset_y)` vs
-   `[offset_y − height + 1, offset_y]`). Decide in the Phase 1b rendering
-   spec against the original game.
+1. ~~Exact screen placement~~ (Riiablo's codecs disagree by one row).
+   1.14d draws `[offset_y − height + 1, offset_y]`: owner
+   `render/sprite-placement.md` §2.
 2. ~~Orientation of `flip = 1` frames.~~ Confirmed visually: the 140
    flipped frames (all in `data\global\items\inv1x1/1x2/2x2/2x3.dc6`)
    render upright when decoded top-down (`mpq-tool render`).
