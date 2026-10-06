@@ -1,0 +1,743 @@
+// Spec: specs/items/properties.md
+//! Properties to stats: the property modes (affix, quality row, gem,
+//! rune, unique, set), the dispatcher, the property functions
+//! (`property-functions.tsv`, mirrored in [`FUNCS`] and checked against
+//! the TSV by a test), socket fillers, runewords, set bonuses and craft
+//! property lists. All value draws use the item seed (§4.1).
+
+use super::create::{apply_ethereal, has_durability, max_sockets};
+use super::tables::{ItemTables, PropRec};
+use super::{flag, q, stat, ty, Item, ItemStats, ListKey, LIST_FLAGS};
+use crate::rng::Seed;
+
+/// One row of `property-functions.tsv`, as the code reads it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FuncRow {
+    pub func: u8,
+    pub address: &'static str,
+    pub value: &'static str,
+    pub draws: &'static str,
+    pub reset_base: &'static str,
+    pub writes: &'static str,
+    pub layer: &'static str,
+    pub returns: &'static str,
+}
+
+macro_rules! rows {
+    ($(($f:expr, $a:expr, $v:expr, $d:expr, $r:expr, $w:expr, $l:expr, $ret:expr)),* $(,)?) => {
+        &[$(FuncRow { func: $f, address: $a, value: $v, draws: $d, reset_base: $r, writes: $w, layer: $l, returns: $ret }),*]
+    };
+}
+
+/// The function table (`0x007462F8`), one row per non-empty entry, in the
+/// TSV's order. The generic functions read `value`, `reset_base` and
+/// `layer` from here; the test `funcs_match_tsv` keeps it equal to
+/// `specs/items/property-functions.tsv`.
+#[rustfmt::skip]
+pub const FUNCS: &[FuncRow] = rows![
+    (1, "0x0065EB30", "roll", "roll(min..max)", "mode1", "stat", "0", "added"),
+    (2, "0x0065EBA0", "roll", "roll(min..max)", "always", "stat", "0", "added"),
+    (3, "0x0065EC10", "prev_or_roll", "roll(min..max) if prev=0", "mode1", "stat", "0", "added"),
+    (4, "0x0065EC80", "prev_or_roll", "roll(min..max) if prev=0", "always", "stat", "0", "added"),
+    (5, "0x0065ECF0", "prev_or_roll", "roll(min..max) if prev=0", "no", "21,23,159", "0", "value"),
+    (6, "0x0065EE80", "prev_or_roll", "roll(min..max) if prev=0", "no", "22,24,160", "0", "value"),
+    (7, "0x0065F010", "prev_or_roll", "roll(min..max) if prev=0", "damage", "18,17 or func6(1)", "0", "value"),
+    (8, "0x0065F2B0", "prev_or_roll", "roll(min..max) if prev=0", "no", "stat", "0", "added"),
+    (9, "0x0065F310", "prev_or_roll", "roll(min..max) if prev=0", "no", "stat", "param", "added"),
+    (10, "0x0065F3F0", "prev_or_roll", "roll(min..max) if prev=0", "no", "stat", "param%3+param/3*8", "added"),
+    (11, "0x0065F470", "min", "none", "no", "stat", "param*64+level", "added"),
+    (12, "0x0065FC40", "param", "roll(min..max) for layer", "no", "stat", "rolled", "added"),
+    (13, "0x0065FC90", "roll", "roll(min..max)", "mode1", "stat,72", "0", "added"),
+    (14, "0x0065F590", "prev_or_roll_or_param", "roll(min..max) if prev<1", "no", "194 (set)", "0", "count"),
+    (15, "0x0065F960", "min", "none", "no", "stat or func5", "0", "min"),
+    (16, "0x0065F9D0", "max", "none", "no", "stat or func6", "0", "max"),
+    (17, "0x0065FA40", "param_or_roll", "roll(min..max) if param=0", "no", "stat or func6", "0", "value"),
+    (18, "0x0065F870", "packed", "none", "no", "stat (set)", "0", "max+256"),
+    (19, "0x0065F6A0", "packed", "roll(charges-charges/8)", "no", "stat (set)", "skill<<shift+level", "charges"),
+    (20, "0x0065FAE0", "1", "none", "no", "152 (add)", "0", "1"),
+    (21, "0x0065FB50", "roll", "roll(min..max)", "no", "stat", "val", "added"),
+    (22, "0x0065FBF0", "roll", "roll(min..max)", "no", "stat", "param (u16)", "added"),
+    (23, "0x0065FD20", "-", "none", "no", "ethereal", "-", "1 or 0"),
+    (24, "0x0065F390", "prev_or_roll", "roll(min..max) if prev=0", "no", "stat", "param", "added"),
+    (36, "0x0065FBA0", "val", "roll(min..max) for layer", "no", "stat", "rolled", "added"),
+];
+
+fn func_row(f: u8) -> Option<&'static FuncRow> {
+    FUNCS.iter().find(|r| r.func == f)
+}
+
+/// Mode numbers (`properties.md` §2).
+pub mod mode {
+    pub const AFFIX: u8 = 0;
+    pub const QUALITY: u8 = 1;
+    pub const GEM: u8 = 2;
+    pub const UNIQUE: u8 = 3;
+    pub const SET: u8 = 4;
+    pub const RUNE: u8 = 5;
+    pub const RUNEWORD: u8 = 6;
+    pub const CRAFT: u8 = 7;
+}
+
+/// Runeword list state (§10.2).
+pub const STATE_RUNEWORD: u16 = 171;
+/// First set partial state (`itemset1`, §8.1).
+pub const STATE_ITEMSET1: u16 = 165;
+/// Flags of the set partial lists (§8.1).
+pub const FLAGS_ITEMSET: u32 = 0x2040;
+
+/// The dispatcher's context: mode, target list and an optional foreign
+/// owner (a unit other than the item, e.g. the player for set bonuses).
+/// With no owner the item's own lists receive the stats (§4.2); an owner
+/// that is the item itself (runewords) is the same as none.
+pub struct PropCtx<'o> {
+    pub mode: u8,
+    pub list: ListKey,
+    pub owner: Option<&'o mut dyn ItemStats>,
+}
+
+impl PropCtx<'_> {
+    /// Mode `mode`, the item's list (state 0, flags 0x40), no owner.
+    pub fn item(mode: u8) -> PropCtx<'static> {
+        PropCtx {
+            mode,
+            list: ListKey::ITEM,
+            owner: None,
+        }
+    }
+}
+
+/// §4.1: `min` if `max = min`, else (swapped if `max < min`) `min +
+/// roll(max − min + 1)` on `seed`.
+pub fn roll_value(seed: &mut Seed, min: i32, max: i32) -> i32 {
+    if max == min {
+        return min;
+    }
+    let (lo, hi) = if max < min { (max, min) } else { (min, max) };
+    (seed.roll(hi.wrapping_sub(lo).wrapping_add(1)) as i32).wrapping_add(lo)
+}
+
+/// Runs one property record through the dispatcher (§3).
+pub fn apply_property<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    rec: &PropRec,
+) {
+    let Some(row) = usize::try_from(rec.code)
+        .ok()
+        .and_then(|c| t.properties.get(c))
+    else {
+        return;
+    };
+    let slots = row.slots;
+    let mut prev = 0;
+    for (k, s) in slots.iter().enumerate() {
+        if func_row(s.func).is_none() {
+            break;
+        }
+        let r = call(t, item, ctx, rec, s.func, s.set != 0, s.stat, s.val, prev);
+        if k == 0 {
+            prev = r;
+        }
+    }
+}
+
+/// §4.2: add (or set) `value << valshift` in the target list; returns
+/// `value`, or 0 when nothing was written.
+#[allow(clippy::too_many_arguments)]
+fn add_stat<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    set: bool,
+    id: u16,
+    layer: u16,
+    value: i32,
+) -> i32 {
+    if value == 0 || !t.stat_valid(id) {
+        return 0;
+    }
+    let v = value.wrapping_shl(u32::from(t.valshift[usize::from(id)]));
+    let key = ctx.list;
+    let target: &mut dyn ItemStats = match ctx.owner.as_deref_mut() {
+        Some(o) => o,
+        None => &mut item.stats,
+    };
+    if set {
+        target.list_set(key, id, layer, v);
+        if id == stat::POISONMAXDAM && target.list_get(key, stat::POISON_COUNT, 0) == 0 {
+            target.list_set(key, stat::POISON_COUNT, 0, 1);
+        }
+    } else {
+        target.list_add(key, id, layer, v);
+        if id == stat::POISONMAXDAM {
+            target.list_add(key, stat::POISON_COUNT, 0, 1);
+        }
+    }
+    value
+}
+
+/// §4.3: base reset for a slot's stat.
+fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
+    let Some(r) = t.item(item.record).cloned() else {
+        return;
+    };
+    let throwable = t.itype_of(item.record).is_some_and(|it| it.throwable != 0);
+    let weapon = t.is_type(item.record, ty::WEAP as i16);
+    let st = &mut item.stats;
+    match id {
+        stat::ARMOR_PERCENT | stat::ARMORCLASS => {
+            if t.is_type(item.record, ty::ARMO as i16) && r.maxac != 0 {
+                let b = st.base(stat::ARMORCLASS, 0).wrapping_add(1);
+                st.set_base(stat::ARMORCLASS, 0, b.max((r.maxac as i32).wrapping_add(1)));
+            }
+        }
+        stat::MAXDAMAGE_PERCENT | stat::MAXDAMAGE if weapon => {
+            for (s, v, go) in [
+                (stat::MAXDAMAGE, r.maxdam, true),
+                (stat::SECONDARY_MAXDAMAGE, r.maxdam2, true),
+                (stat::THROW_MAXDAMAGE, r.maxmisdam, throwable),
+            ] {
+                if go && v != 0 {
+                    st.set_base(s, 0, i32::from(v));
+                }
+            }
+        }
+        stat::MINDAMAGE_PERCENT | stat::MINDAMAGE if weapon => {
+            for (s, v, go) in [
+                (stat::MINDAMAGE, r.mindam, true),
+                (stat::SECONDARY_MINDAMAGE, r.mindam2, true),
+                (stat::THROW_MINDAMAGE, r.minmisdam, throwable),
+            ] {
+                if go && v != 0 {
+                    st.set_base(s, 0, i32::from(v));
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Skill level from a record's `max` (§5 rule 4).
+fn skill_level(ilvl: i32, reqlevel: i32, maxlvl: i32, max: i32) -> i32 {
+    if max > 0 {
+        max
+    } else if max == 0 {
+        let cap = if maxlvl < 1 { 20 } else { maxlvl };
+        ((ilvl - reqlevel) / 4 + 1).max(1).min(cap)
+    } else {
+        let s = (99 - reqlevel).max(1);
+        let d = (-(s / max)).max(1);
+        let l = (ilvl - reqlevel) / d;
+        if l <= 0 {
+            1
+        } else {
+            l
+        }
+    }
+}
+
+/// Function 5 (`up` = false) or 6 (`up` = true): min or max damage (§5
+/// rules 1–2).
+fn damage<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    rec: &PropRec,
+    set: bool,
+    prev: i32,
+    up: bool,
+) -> i32 {
+    let v = if prev != 0 {
+        prev
+    } else {
+        roll_value(&mut item.item_seed, rec.min, rec.max)
+    };
+    // The owner is never an item here (an item owner is the item itself).
+    let Some(r) = t.item(item.record).cloned() else {
+        return v;
+    };
+    let weapon = t.is_type(item.record, ty::WEAP as i16);
+    let throwable = t.itype_of(item.record).is_some_and(|it| it.throwable != 0);
+    let (one, two, mis) = if up {
+        (r.maxdam, r.maxdam2, r.maxmisdam)
+    } else {
+        (r.mindam, r.mindam2, r.minmisdam)
+    };
+    let (s1, s2, s3) = if up {
+        (
+            stat::MAXDAMAGE,
+            stat::SECONDARY_MAXDAMAGE,
+            stat::THROW_MAXDAMAGE,
+        )
+    } else {
+        (
+            stat::MINDAMAGE,
+            stat::SECONDARY_MINDAMAGE,
+            stat::THROW_MINDAMAGE,
+        )
+    };
+    let parts = [
+        (s1, one, !(weapon && one == 0 && two != 0)),
+        (s2, two, !(weapon && two == 0 && one != 0)),
+        (s3, mis, !(weapon && !throwable)),
+    ];
+    for (s, col, go) in parts {
+        if !go {
+            continue;
+        }
+        let col = i32::from(col);
+        let mut amount = v;
+        if col != 0 && col + v < 1 {
+            amount = if up { -col } else { 1 - col };
+        }
+        if amount != 0 {
+            add_stat(t, item, ctx, set, s, 0, amount);
+        }
+    }
+    v
+}
+
+/// One property function (§5). Returns the function's value.
+#[allow(clippy::too_many_arguments)]
+fn call<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    rec: &PropRec,
+    f: u8,
+    set: bool,
+    id: u16,
+    val: u16,
+    prev: i32,
+) -> i32 {
+    let Some(row) = func_row(f) else { return 0 };
+    let ilvl = item.item_level();
+    match f {
+        5 | 6 => damage(t, item, ctx, rec, set, prev, f == 6),
+        7 => {
+            let v = if prev != 0 {
+                prev
+            } else {
+                roll_value(&mut item.item_seed, rec.min, rec.max)
+            };
+            if ctx.owner.is_some() {
+                add_stat(t, item, ctx, set, stat::MINDAMAGE_PERCENT, 0, v);
+                add_stat(t, item, ctx, set, stat::MAXDAMAGE_PERCENT, 0, v);
+                return 1;
+            }
+            base_reset(t, item, stat::MAXDAMAGE_PERCENT);
+            base_reset(t, item, stat::MINDAMAGE_PERCENT);
+            let b = t
+                .item(item.record)
+                .map_or(0, |r| i64::from(r.maxdam.max(r.maxdam2)));
+            if t.is_type(item.record, ty::WEAP as i16) && b * i64::from(v) / 100 <= 0 {
+                return damage(t, item, ctx, rec, set, 1, true);
+            }
+            add_stat(t, item, ctx, set, stat::MINDAMAGE_PERCENT, 0, v);
+            add_stat(t, item, ctx, set, stat::MAXDAMAGE_PERCENT, 0, v);
+            v
+        }
+        11 => {
+            let Some(sk) = usize::try_from(rec.param)
+                .ok()
+                .and_then(|s| t.skills.get(s))
+                .copied()
+            else {
+                return 0;
+            };
+            let chance = if rec.min < 1 { 5 } else { rec.min };
+            let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
+            let layer = (rec.param as u16)
+                .wrapping_mul(64)
+                .wrapping_add((level & 63) as u16);
+            add_stat(t, item, ctx, set, id, layer, chance)
+        }
+        12 | 36 => {
+            let layer = roll_value(&mut item.item_seed, rec.min, rec.max) as u16;
+            let value = if f == 12 { rec.param } else { i32::from(val) };
+            add_stat(t, item, ctx, set, id, layer, value)
+        }
+        13 => {
+            let v = roll_value(&mut item.item_seed, rec.min, rec.max);
+            if ctx.mode == 1 {
+                base_reset(t, item, id);
+            }
+            let added = add_stat(t, item, ctx, set, id, 0, v);
+            if added != 0 {
+                let m = item.stats.stat(stat::MAXDURABILITY, 0);
+                if m > 0 {
+                    item.stats.set_base(stat::DURABILITY, 0, m);
+                }
+            }
+            added
+        }
+        14 => sockets(t, item, rec, prev),
+        15..=17 => {
+            let v = match f {
+                15 => rec.min,
+                16 => rec.max,
+                _ => {
+                    let v = if rec.param != 0 {
+                        rec.param
+                    } else {
+                        roll_value(&mut item.item_seed, rec.min, rec.max)
+                    };
+                    if v == 0 {
+                        return 0;
+                    }
+                    v
+                }
+            };
+            if f == 15 && id == stat::MINDAMAGE {
+                damage(t, item, ctx, rec, set, v, false);
+            } else if f != 15 && id == stat::MAXDAMAGE {
+                damage(t, item, ctx, rec, set, v, true);
+            } else {
+                add_stat(t, item, ctx, set, id, 0, v);
+            }
+            v
+        }
+        18 => {
+            let p = rec.param.clamp(0, 3);
+            let a = rec.min.wrapping_add(256).clamp(0, 1023);
+            let b = rec.max.wrapping_add(256).clamp(0, 1023);
+            // TODO(items OQ-P1): "set the stat" read as §4.2 with set = 1
+            // (valshift applies, 0 writes nothing).
+            add_stat(t, item, ctx, true, id, 0, p + (b * 1024 + a) * 4);
+            b
+        }
+        19 => {
+            let Some(sk) = usize::try_from(rec.param)
+                .ok()
+                .and_then(|s| t.skills.get(s))
+                .copied()
+            else {
+                return 0;
+            };
+            let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
+            let mut c = rec.min;
+            if c == 0 {
+                c = 5;
+            } else if c < 0 {
+                c = -c + (-c * level) / 8;
+            }
+            if c <= 1 {
+                c = 1;
+            } else if c > 254 {
+                c = 255;
+            }
+            let r = item.item_seed.roll(c - c / 8) as i32;
+            let layer =
+                ((rec.param as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
+            // TODO(items OQ-P1): as function 18.
+            add_stat(
+                t,
+                item,
+                ctx,
+                true,
+                id,
+                layer as u16,
+                c * 256 + ((r + c / 8 + 1) & 0xFF),
+            );
+            c
+        }
+        20 => {
+            if t.valshift.len() > usize::from(stat::INDESTRUCTIBLE) {
+                add_stat(t, item, ctx, false, stat::INDESTRUCTIBLE, 0, 1);
+            }
+            1
+        }
+        23 => {
+            if item.flags & flag::ETHEREAL == 0 && has_durability(t, item) {
+                apply_ethereal(t, item);
+                1
+            } else {
+                0
+            }
+        }
+        _ => {
+            // Generic stat functions 1–4, 8–10, 21, 22, 24: value, reset
+            // and layer per the table.
+            let v = match row.value {
+                "prev_or_roll" if prev != 0 => prev,
+                _ => roll_value(&mut item.item_seed, rec.min, rec.max),
+            };
+            if row.reset_base == "always" || (row.reset_base == "mode1" && ctx.mode == 1) {
+                base_reset(t, item, id);
+            }
+            let p = rec.param;
+            let layer = match row.layer {
+                "param" | "param (u16)" => p as u16,
+                "param%3+param/3*8" => (p % 3 + p / 3 * 8) as u16,
+                "val" => val,
+                _ => 0,
+            };
+            add_stat(t, item, ctx, set, id, layer, v)
+        }
+    }
+}
+
+/// Function 14 (§5 rule 6): sockets, set directly on the item.
+fn sockets<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rec: &PropRec, prev: i32) -> i32 {
+    let Some(r) = t.item(item.record) else {
+        return 0;
+    };
+    let mut cap = (i32::from(r.invwidth) * i32::from(r.invheight)).min(6);
+    if cap == 0 {
+        return 0;
+    }
+    cap = cap.min(max_sockets(t, item));
+    let mut n = if prev >= 1 {
+        prev
+    } else {
+        roll_value(&mut item.item_seed, rec.min, rec.max)
+    };
+    if n < 1 {
+        n = rec.param;
+    }
+    if cap < 1 {
+        // TODO(items OQ-P2): flag and stat left untouched when the cap is < 1.
+        return 0;
+    }
+    let result = n.max(1).min(cap);
+    item.flags |= flag::SOCKETED;
+    item.stats.set_base(stat::NUMSOCKETS, 0, result);
+    result
+}
+
+/// Mode 0: a magic affix row (`id` = combined index + 1).
+pub fn apply_affix<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
+    let Some(row) = usize::from(id).checked_sub(1).and_then(|i| t.magic.get(i)) else {
+        return;
+    };
+    let mods = row.mods;
+    run_until_none(t, item, &mut PropCtx::item(mode::AFFIX), &mods);
+}
+
+/// Mode 1: a qualityitems row.
+pub fn apply_quality_row<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, row: usize) {
+    let Some(r) = t.qualityitems.get(row) else {
+        return;
+    };
+    let mods = r.mods;
+    run_until_none(t, item, &mut PropCtx::item(mode::QUALITY), &mods);
+}
+
+fn run_until_none<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    recs: &[PropRec],
+) {
+    for rec in recs {
+        if rec.code < 0 {
+            break;
+        }
+        apply_property(t, item, ctx, rec);
+    }
+}
+
+/// Mode 3: the uniqueitems row = file index.
+pub fn apply_unique<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
+    let Some(r) = usize::try_from(item.file_index)
+        .ok()
+        .and_then(|i| t.uniques.get(i))
+    else {
+        return;
+    };
+    let props = r.props;
+    let mut ctx = PropCtx::item(mode::UNIQUE);
+    for rec in props.iter().filter(|r| r.code >= 0) {
+        apply_property(t, item, &mut ctx, rec);
+    }
+}
+
+/// Mode 4: the setitems row = file index (§8.1).
+pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
+    let Some(r) = usize::try_from(item.file_index)
+        .ok()
+        .and_then(|i| t.setitems.get(i))
+    else {
+        return;
+    };
+    let (props, aprops, add_func) = (r.props, r.aprops, r.add_func);
+    let mut ctx = PropCtx::item(mode::SET);
+    for rec in props.iter().filter(|r| r.code >= 0) {
+        apply_property(t, item, &mut ctx, rec);
+    }
+    for (k, rec) in aprops.iter().enumerate() {
+        if rec.code < 0 {
+            continue;
+        }
+        ctx.list = if add_func != 0 {
+            ListKey {
+                state: STATE_ITEMSET1 + (k / 2) as u16,
+                flags: FLAGS_ITEMSET,
+            }
+        } else {
+            ListKey::ITEM
+        };
+        apply_property(t, item, &mut ctx, rec);
+    }
+}
+
+/// Modes 2 / 5 on a socket filler (§9): its gems row and property set
+/// (the socketed item's `gemapplytype`). Properties land in the filler's
+/// own list. A quality-5 filler of another type is not specified
+/// (OQ 2): nothing happens.
+pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, apply_type: u8) {
+    let m = if t.is_type(filler.record, ty::GEM as i16) {
+        mode::GEM
+    } else if t.is_type(filler.record, ty::RUNE as i16) {
+        mode::RUNE
+    } else {
+        // TODO(items properties.md OQ 2): quality-5 filler `0x00663CC0`.
+        return;
+    };
+    let Some(r) = t.item(filler.record) else {
+        return;
+    };
+    let Some(gem) = usize::try_from(r.gemoffset)
+        .ok()
+        .and_then(|g| t.gems.get(g))
+    else {
+        return;
+    };
+    let Some(block) = gem.mods.get(usize::from(apply_type)).copied() else {
+        return;
+    };
+    run_until_none(t, filler, &mut PropCtx::item(m), &block);
+}
+
+/// §10.1: the first runes row the item and its fillers (items combined
+/// indices, insertion order) match.
+pub fn runeword_match<S: ItemStats>(
+    t: &ItemTables,
+    item: &Item<S>,
+    fillers: &[usize],
+) -> Option<usize> {
+    let r = t.item(item.record)?;
+    if (q::MAGIC..=q::TEMPERED).contains(&item.quality) || r.quest != 0 || r.hasinv == 0 {
+        return None;
+    }
+    if fillers.len() > 6 || item.stats.stat(stat::NUMSOCKETS, 0) != fillers.len() as i32 {
+        return None;
+    }
+    let n = fillers.len();
+    t.runes.iter().position(|w| {
+        if w.complete == 0 {
+            return false;
+        }
+        // TODO(items OQ-P3): "cover at least the socket count" read with
+        // every listed rune compared to a filler, so the list length is n.
+        let mut count = 0;
+        for &rune in w.runes.iter().take_while(|&&x| x >= 1) {
+            if count >= n || fillers[count] as i32 != rune {
+                return false;
+            }
+            count += 1;
+        }
+        if count < n {
+            return false;
+        }
+        let is = |x: i16| t.is_type(item.record, x);
+        if w.etype.iter().take_while(|&&e| e >= 1).any(|&e| is(e)) {
+            return false;
+        }
+        w.itype.iter().take_while(|&&e| e >= 1).any(|&e| is(e))
+    })
+}
+
+/// §10.2: activates runes row `row` on the item. `ladder` is game +0x74.
+/// Returns whether the runeword properties ran; the caller then re-runs
+/// the replenish timers ([`super::replenish_timer`]).
+pub fn activate_runeword<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    row: usize,
+    ladder: bool,
+) -> bool {
+    let Some(w) = t.runes.get(row) else {
+        return false;
+    };
+    if w.server != 0 && !ladder {
+        return false;
+    }
+    let key = ListKey {
+        state: STATE_RUNEWORD,
+        flags: LIST_FLAGS,
+    };
+    if item.stats.has_list(key) {
+        return false;
+    }
+    let props = w.props;
+    item.flags |= flag::RUNEWORD;
+    let mut ctx = PropCtx {
+        mode: mode::RUNEWORD,
+        list: key,
+        owner: None,
+    };
+    run_until_none(t, item, &mut ctx, &props);
+    true
+}
+
+/// Popcount of a set mask (`0x006EDA40`; masks ≥ 64 → 0).
+pub fn set_mask_count(mask: u32) -> u32 {
+    if mask >= 64 {
+        0
+    } else {
+        mask.count_ones()
+    }
+}
+
+/// §11: set bonuses of the equipped set item `item` (quality 5) with
+/// the owner's set mask (`0x0062A370`, computed by the caller's equip
+/// logic) into the owner's list `list` (state s).
+///
+/// TODO(items OQ-P4): the flags of the bonus list are not in the spec;
+/// the caller passes them in `list`.
+pub fn set_bonuses<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    mask: u32,
+    owner: &mut dyn ItemStats,
+    list: ListKey,
+) {
+    let Some(si) = usize::try_from(item.file_index)
+        .ok()
+        .and_then(|i| t.setitems.get(i))
+    else {
+        return;
+    };
+    let Some(set) = usize::try_from(si.set).ok().and_then(|s| t.sets.get(s)) else {
+        return;
+    };
+    let (count, partial, full) = (set.count, set.partial, set.full);
+    let c = set_mask_count(mask) as i32;
+    let n = c.min(count - 1);
+    let take = (2 * n - 2).max(0) as usize;
+    let mut ctx = PropCtx {
+        mode: mode::SET,
+        list,
+        owner: Some(owner),
+    };
+    for rec in partial.iter().take(take).filter(|r| r.code >= 0) {
+        apply_property(t, item, &mut ctx, rec);
+    }
+    if c >= count {
+        run_until_none(t, item, &mut ctx, &full);
+    }
+}
+
+/// §12: a craft property list (mode 7), then ethereal re-applied when the
+/// item is ethereal.
+pub fn apply_craft_list<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, recs: &[PropRec]) {
+    let mut ctx = PropCtx::item(mode::CRAFT);
+    for rec in recs {
+        apply_property(t, item, &mut ctx, rec);
+    }
+    if item.flags & flag::ETHEREAL != 0 {
+        apply_ethereal(t, item);
+    }
+}
