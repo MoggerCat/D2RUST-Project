@@ -660,4 +660,90 @@ mod use_mutants {
         f.hostile = true;
         assert_eq!(start(&mut f, &t, q), 1);
     }
+
+    /// Tables for the do core: 1 do function 1; 2 do function 1, mana
+    /// 10 paid at do; 3 do function 2, ItemEffect 1; 4 a missing
+    /// srvmissile 5, no do function; 5 do function 1, mana 10.
+    fn do_tables() -> crate::skills::SkillTables {
+        tables(
+            6,
+            &[
+                (1, &|r: &mut Skills| r.srvdofunc = 1),
+                (2, &|r: &mut Skills| {
+                    r.srvdofunc = 1;
+                    r.mana = 10;
+                    r.usemanaondo = true;
+                }),
+                (3, &|r: &mut Skills| {
+                    r.srvdofunc = 2;
+                    r.itemeffect = 1;
+                }),
+                (4, &|r: &mut Skills| r.srvmissile = 5),
+                (5, &|r: &mut Skills| {
+                    r.srvdofunc = 1;
+                    r.mana = 10;
+                }),
+            ],
+        )
+    }
+
+    // §5.4 step 2: the used skill with this id and level > 0 needs no
+    // entry of its own.
+    #[test]
+    fn do_core_used_skill_level() {
+        let t = do_tables();
+        let mut f = F::new();
+        let p = caster(&mut f, 1, 1, 0);
+        f.units[p].skills.clear();
+        assert_eq!(do_core(&mut f, &t, p, 1, 1, false, false, false), 1);
+    }
+
+    // §5.4 step 4: the mana check runs only with `usemanaondo`, on the
+    // used entry when it is this skill, else on a native entry of it.
+    #[test]
+    fn do_core_mana_at_do() {
+        let t = do_tables();
+        let mut f = F::new();
+        // No usemanaondo: no check (cost 10, mana 0).
+        let p = caster(&mut f, 5, 1, 0);
+        assert_eq!(do_core(&mut f, &t, p, 5, 1, false, false, false), 1);
+        // No used skill: a native entry of skill 2 (cost 10).
+        let p = caster(&mut f, 2, 1, 20);
+        f.units[p].used = None;
+        assert_eq!(do_core(&mut f, &t, p, 2, 1, false, false, false), 1);
+        f.units[p].stats.insert(crate::stats::stat::MANA, 5);
+        assert_eq!(do_core(&mut f, &t, p, 2, 1, false, false, false), 0);
+        // The used item entry of this skill: its charges decide.
+        let p = caster(&mut f, 2, 1, 0);
+        f.units[p].used = Some(crate::skills::SkillEntry {
+            skill: 2,
+            base: 1,
+            owner_guid: 9,
+            charges: 3,
+            ..Default::default()
+        });
+        assert_eq!(do_core(&mut f, &t, p, 2, 1, false, false, false), 1);
+    }
+
+    // §5.4 step 5: ItemEffect replaces the index only when > 1.
+    #[test]
+    fn do_core_item_effect_one() {
+        let t = do_tables();
+        let mut f = F::new();
+        let p = caster(&mut f, 3, 1, 0);
+        f.take_log();
+        do_core(&mut f, &t, p, 3, 1, false, true, true);
+        assert_eq!(f.take_log()[0], "srvdo 2 0 3 1 false true true");
+    }
+
+    // §5.4 step 7: only a valid srvmissile creates a missile.
+    #[test]
+    fn do_core_invalid_missile() {
+        let t = do_tables();
+        let mut f = F::new();
+        let p = caster(&mut f, 4, 1, 0);
+        f.take_log();
+        assert_eq!(do_core(&mut f, &t, p, 4, 1, false, false, false), 0);
+        assert!(f.take_log().iter().all(|l| !l.starts_with("missile")));
+    }
 }
