@@ -22,22 +22,22 @@
 | Inputs | 56–66 |
 | Outputs / state changes | 67–73 |
 | Rules | 74–75 |
-|   1. Which draw path | 76–86 |
-|   2. COF file | 87–134 |
-|   3. Direction and frame | 135–179 |
-|   4. Pre-test: COF box culling | 180–189 |
-|   5. The slot loop (`0x00470EC0`) | 190–261 |
-|   6. Component file and cel | 262–295 |
-|   7. Colormap source per component | 296–320 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 321–370 |
-|   9. Single-cel units (missiles, items) | 371–385 |
-|   10. d2rs mapping | 386–400 |
-| Constants & data dependencies | 401–414 |
-| Randomness | 415–418 |
-| Edge cases & original bugs | 419–433 |
-| Test vectors | 434–454 |
-| Provenance | 455–483 |
-| Open questions | 484–518 |
+|   1. Which draw path | 76–122 |
+|   2. COF file | 123–179 |
+|   3. Direction and frame | 180–224 |
+|   4. Pre-test: COF box culling | 225–234 |
+|   5. The slot loop (`0x00470EC0`) | 235–323 |
+|   6. Component file and cel | 324–357 |
+|   7. Colormap source per component | 358–382 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 383–432 |
+|   9. Single-cel units (missiles, items) | 433–447 |
+|   10. d2rs mapping | 448–462 |
+| Constants & data dependencies | 463–476 |
+| Randomness | 477–480 |
+| Edge cases & original bugs | 481–495 |
+| Test vectors | 496–516 |
+| Provenance | 517–552 |
+| Open questions | 553–587 |
 <!-- /index -->
 
 ## Summary
@@ -80,9 +80,45 @@ b) returns at once for type 5. Types 0–2 (`0x004DB180`) take the composite
 path `0x00470EC0` (§2–§7); types 3 and 4 draw one cel (§9). Before either,
 X and Y get the unit's extra offsets (§8). The unit's draw identity (type,
 class, mode) passes through `0x00645270` everywhere below (a substitution
-when the unit's flag-ex bit 3 is set; Open question 2); mode is
+when the unit's flag-ex bit 3 is set; §1.1); mode is
 `0x00621190`: types 0 and 1 with a running sequence (unit +0x30 ≠ 0) use
 the sequence mode (+0x40), else the unit mode (+0x10).
+
+#### 1.1 Draw identity substitution (`0x00645270`)
+
+Inputs (type, class, mode) start as the unit's own. Nothing changes
+unless flag-ex (`+0xC8`) bit 3 is set. Then the states of the list at
+data tables `+0x17C` (count `+0x180`, i16 state ids; built at load) are
+tested in list order; for the first one the unit has (`0x00639DF0`) whose
+`states` `gfxtype` (`+0x2D`) is 1 or 2 (others are passed over):
+
+| `gfxtype` | New type | New class | Mode |
+|---|---|---|---|
+| 1 | 1 (monster) | `gfxclass` (`+0x2E`) | if the unit is a player: player→monster map below |
+| 2 | 0 (player) | `gfxclass` | if the unit is a monster: monster→player map below |
+
+Player→monster (`0x00645190`): `m = T1[mode]`, T1 (`0x006EB348`, by
+player mode 0…19) = 0, 1, 2, 15, 3, 1, 2, 4, 5, 6, 7, 4, 11, 8, 9, 10, 11,
+12, 14, 13; then, while the class's `monstats2` mode bit `m` (`+0xF0`,
+mDT … bits) is clear: `m` := fallback(`m`), with fallback WL, GH, A1 → NU;
+A2 → A1; BL → GH; SC → A1; S1 → NU; S2, S3, S4 → S1; DD, KB, SQ → NU;
+RN → WL; DT and anything else → NU (NU ends the loop). Monster→player
+(`0x006EB308`, by monster mode 0…15): 0, 1, 2, 4, 7, 8, 9, 10, 13, 14,
+15, 16, 17, 19, 18, 3, except `gfxclass` 6 with monster mode 4 → 12.
+In 1.14d the states with `gfxtype` ≠ 0 are 63 `dopplezon` (2, class 0),
+93 `valkyrie` (2, class 0), 119 `shadowwarrior` (2, class 6), 139 `wolf`
+(1, class 430), 140 `bear` (1, class 431), 176 `monsterset` (1, class
+135), 177 `delerium` (1, class 212).
+
+**Linked-unit inventory.** Where a draw reads the unit's inventory
+(`+0x60`: §5.1 r3, the shadow draw `render/blend-modes.md` §5 r3), it
+uses the inventory of the linked unit (`0x004639D0`: flag-ex bit 10, the
+unit of type `+0x94` and GUID `+0x98`) instead when flag-ex bit 3 is set,
+the unit has a state with `states` flag `bossinv` (`0x0063A7B0(unit,
+0x25)`: state-flag list 37 at data tables `+0xCC + 4·37`, tested against
+the unit's state bits) and the linked unit exists. In 1.14d only state 63
+`dopplezon` has `bossinv`: the Decoy monster is drawn as an Amazon
+wearing its owner's items.
 
 ### 2. COF file
 
@@ -127,10 +163,19 @@ with every 0x20 turned into 0, so a part ends at its first space (the
   6, else the valid item in location 5 (with its component). No hand item,
   or its component not 5/6 → the `charstats` row's weapon class (+0x4C).
   Two hand items, both of item type 45: Barbarian (class 4) → `1ss` /
-  `1st` / `1js` / `1jt` by the two items' type classes (`0x00629FE0`,
-  Open question 3); Assassin (class 6) → `ht2`. Else the hand item's
+  `1st` / `1js` / `1jt` by the two items' type classes (r-dual below);
+  Assassin (class 6) → `ht2`. Else the hand item's
   `2handedwclass` when the grip test `0x0063D340` returns 2, else its
   `wclass`.
+- r-dual (Barbarian, `0x0064F1EE`–`0x0064F2D5`): `A` = the weapon in use
+  (inventory `+0x1C`, `0x0063BEF0`); with none, the right-hand item
+  (location 4) is taken and made the weapon in use (`0x0063D1D0`: a
+  draw-time write). `B` = the other hand item. Type class
+  (`0x00629FE0`): the item's `wclass` (`weapons` `+0xC0`) looked up in
+  the static table `0x007446A0` (8 entries, `[0x007446E0]` = 8): `bow`
+  1, `1hs` 2, `1ht` 3, `stf` 4, `2hs` 5, `2ht` 6, `xbw` 7, `ht1` 12,
+  otherwise 0. Result: (`A`, `B`) = (2, 3) → `1js`; (3, 3) → `1jt`;
+  (3, 2) → `1st`; anything else → `1ss`.
 
 ### 3. Direction and frame
 
@@ -205,7 +250,25 @@ For `s` = 0 … L − 1, component `c` = row byte `s` (§3 r6):
    light ×2 clamped to [0x40, 0xFF] when highlighted).
 3. Overlays: with flag b set, `0x0046E300` draws the unit's back overlays
    (third argument 1) before slot 0 and its front overlays (0) after the
-   last slot; their files and order are the overlay owner's.
+   last slot (r4).
+4. Overlay draw (`0x0046E300(unit, light, back, x, y, …)`): the list is
+   gfx (`+0x54`) `+0x2C`, next `+0xA4`; a new overlay is pushed at the
+   head (`0x00470390`), so the newest draws first. Record `+0x34` is the
+   `overlay.txt` `PreDraw` byte (`+0x48`) copied at creation: records with
+   `+0x34` ≠ 0 draw only in the back call, the others only in the front
+   call. Skipped: kind (`+0x00`) 6 with `+0x08` = 0; kind 8 with `+0x3C`
+   = 0. Frame `f = +0x18 >> 8`, drawn only while `f < +0x1C >> 8`, cel
+   from `overlay.txt` row `+0x04` (0x84-byte rows) with the unit's
+   direction byte (`0x00620100`) through `0x004DBB50`. Position
+   (GDI): `X = px − (cx_u − shiftX) + ox + (+0x20)`,
+   `Y = py − (cy_u − 8) + oy + oz + (+0x24)` with the motion offsets of
+   §8; items (type 4) on the ground take the (x, y) the caller passes
+   when both are not −1. Draw slot `+0x84` with light byte = the unit's,
+   draw mode `Trans` (`+0x7C`), palette argument always 0 (no `P`):
+   with `LocalBlood` (`+0x81`) ≠ 0 and the green-blood switch on
+   (`render/shading.md` §6 r7) the code fetches the blood map
+   (`0x00477680`) but discards it (original bug, reproduce: no remap). The overlay records' creation, timing and
+   files beyond this are the overlay owner's (no spec yet).
 
 #### 5.1 The component request (`0x004DB7B0`)
 
@@ -238,8 +301,7 @@ empty; the armor class ends up 0 (r3: an `armtype` index above 2).
    byte `torso`, `legs`, `rArm`, `lArm`, `rspad`, `lspad` respectively
    (`0x0064F500`; armor +0x116 … +0x11B); no valid body armor → index 0
    (`lit`). Other components (`0x004DAD80`; the inventory is that of the
-   linked unit under the r1-of-§1 substitution condition, Open question
-   2):
+   linked unit under the condition of §1.1):
    - weapon class `xbw`: RH and LH show the primary hand weapon's
      `alternategfx`, else its `code` (no weapon → `lit`);
    - weapon class `bow`: RH `lit`;
@@ -480,18 +542,23 @@ at `0x00471000` / `0x0047200F`; layer walks `0x004DB7B0`, `0x004DB050`,
 `0x004DB090`, `0x004DB140` (first match); `OYTRlitTNhth` compare
 `0x005FE610` → `0x00413590` (`_strnicmp`); bounce branch of `0x004DA350`
 re-read.
+Ghidra backlog (2026-10-06): substitution `0x00645270` (mode maps
+`0x00645190`, tables `0x006EB348`/`0x006EB308` and fallback jump table
+`0x00645248`/`0x00645260` read from the file), state-flag test
+`0x0063A7B0` → `0x0063A130`; Barbarian classes `0x0064F1EE`–
+`0x0064F2D5`, `0x00629FE0`, static table `0x007446A0`; overlays
+`0x0046E300`, creation link `0x00470390`. Live data: `states` gfxtype /
+gfxclass / bossinv columns of `patch_d2`.
 
 ## Open questions
 
 1. Contents of the mode override tables `0x00745900` / `0x00745914`
    (runtime-filled; counts `0x00745910`, `0x0074591C`): a memory read in a
    running 1.14d, or a Ghidra read of their writers.
-2. The draw-identity substitution `0x00645270` and the "linked unit
-   inventory" condition (flag-ex bit 3, `0x0063A7B0(unit, 0x25)`,
-   `0x004639D0`): which units (shapeshift, morphs) and which table. Ghidra
-   read of `0x00645270`, `0x0063A7B0`.
-3. Item type class `0x00629FE0` (table `0x007446A0`, values 2 and 3) for
-   the Barbarian dual-wield classes: Ghidra read plus the table dump.
+2. ~~The draw-identity substitution and the linked-unit inventory~~:
+   answered in §1.1.
+3. ~~Item type class `0x00629FE0`~~: answered in §2 (r-dual; static
+   table `0x007446A0`).
 4. Monster direction count 4: what `0x0046F9D0`'s per-mode table is.
    Ghidra read.
 5. Monster armor-class override tables `0x007489A8` / `0x00748A18`
@@ -513,5 +580,7 @@ re-read.
     padding (§3 r6); `cof.md` keeps the file-format reading.
 12. `CompressedData` = 0 (every composite part DC6): never the case in the
     reference install; d2rs supports 1 only until a capture needs 0.
-13. Overlay files and their back/front split inside `0x0046E300`: owner
-    of overlays (no spec yet).
+13. Overlay files and their back/front split: the split, order,
+    position and blend are answered in §5 r4; the creation of overlay
+    records (who adds which `overlay.txt` row, frame advance) stays with
+    the overlay owner (no spec yet; `0x00470390`).
