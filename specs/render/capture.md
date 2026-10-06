@@ -191,7 +191,7 @@ draw per tick (draws are more than 16 ms apart) the loop is 64 ticks.
 | quality options | `[0x0072DA50]`, `[0x0072A348]` | raw |
 | render kind | `[0x00712CCC]` (`0x00477730`) | wall / roof fade is instant below 4 |
 | rain, snow on | `[0x007A8A44]`, `[0x007A8A40]` | the level's Levels record `+0x05`, `+0x06` (`0x0061DBA0`, `0x0061DC20`) |
-| lightning countdown, flash | `[0x007A89E8]`, `[0x007BB390]` | `0x00473910` |
+| lightning frame trigger, frames drawn in the last second | `[0x007A89E8]`, `[0x007BB390]` | `0x00473910` (the flash needs > 9 frames per second, `draw-order-2.md` §11.7) |
 | weather update mark | `[0x007A8A0C]` | last client-update count the weather advanced on (`0x00473F50`) |
 
 #### 3.5 Draw log (frames selected by `--draws-every N`)
@@ -442,7 +442,7 @@ re-hashing and diffing the PNG indices. Recorder design follows
    what a capture must record §12 r1–r3 (light-map digest at frame end, not
    the quality alone); run 1b's first still segment §12 r4 (cursor, UI and
    a moving off-screen light; that source is `lighting.md` Open question 9).
-6. Weather is not modelled: rain particles (`0x00473090`, three draws of
+6. Weather (now specified in `draw-order-2.md` §11 except its Open question 3) was not modelled: rain particles (`0x00473090`, three draws of
    the player seed per new drop) and lightning (`0x00473910`: countdown
    500 + rnd(1,500), a flash rectangle of index 255, draw mode 5) advance
    in the weather update `0x00473F50`, which the frame calls before

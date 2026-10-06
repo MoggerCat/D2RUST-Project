@@ -16,23 +16,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 38–48 |
-| Inputs | 49–59 |
-| Outputs / state changes | 60–63 |
-| Rules | 64–65 |
-|   1. Draw modes | 66–90 |
-|   2. Blend-table orientation (per drawer) | 91–115 |
-|   3. Draw mode of a composite unit component | 116–161 |
-|   4. Single-cel units and overlays | 162–173 |
-|   5. Shadows (the darkening blend) | 174–236 |
-|   6. Translucent walls and roofs | 237–254 |
-|   7. d2rs answers | 255–265 |
-| Constants & data dependencies | 266–274 |
-| Randomness | 275–278 |
-| Edge cases & original bugs | 279–289 |
-| Test vectors | 290–317 |
-| Provenance | 318–339 |
-| Open questions | 340–358 |
+| Summary | 39–49 |
+| Inputs | 50–60 |
+| Outputs / state changes | 61–64 |
+| Rules | 65–66 |
+|   1. Draw modes | 67–91 |
+|   2. Blend-table orientation (per drawer) | 92–116 |
+|   3. Draw mode of a composite unit component | 117–162 |
+|   4. Single-cel units and overlays | 163–174 |
+|   5. Shadows (the darkening blend) | 175–237 |
+|   6. Translucent walls and roofs | 238–255 |
+|   7. d2rs answers | 256–266 |
+|   8. Lines and rectangles (GDI) | 267–291 |
+| Constants & data dependencies | 292–300 |
+| Randomness | 301–304 |
+| Edge cases & original bugs | 305–315 |
+| Test vectors | 316–343 |
+| Provenance | 344–370 |
+| Open questions | 371–389 |
 <!-- /index -->
 
 ## Summary
@@ -263,6 +264,31 @@ branch). Measured on act 1, `A0` read this way keeps 25 % of the wall and
 | `ComponentResolver::blend` | §3 decision |
 | COF override fields | §3 `ov`, `lv` |
 
+### 8. Lines and rectangles (GDI)
+
+Used by the weather passes and the Arcane Sanctuary stars
+(`draw-order-2.md` §11.7, §12), hover boxes (`ui/text.md` §8) and other
+UI. `W`, `H` = the GDI surface size (`[0x007C9138]`, display height).
+
+1. **Line** (`D2GFX_DrawLine` `0x004F6380` → slot `+0xC0`, GDI
+   `0x006C8C80`; arguments x0, y0, x1, y1, color, alpha): the alpha
+   argument is never read: every pixel is set to `color` (opaque). The
+   first pixel is (x0, y0); then `n` = max(|Δx|, |Δy|) steps along the
+   major axis, the minor axis advancing when the error (start 0, plus
+   the minor distance per step) **exceeds** the major distance (then
+   minus it). Pixels outside [0, `W`) × [0, `H`) are skipped one by one.
+   A zero-length line sets one pixel.
+2. **Rectangle** (`D2GFX_DrawRectangle` `0x004F6300` → slot `+0xB8`, GDI
+   `0x006C8A60`; arguments x0, y0, x1, y1, color, draw mode): each
+   coordinate is clamped to [0, `W` − 1] (x) or [0, `H` − 1] (y), values
+   ≤ 0 becoming 0; nothing is drawn when x0 = x1 or y0 = y1; y1 < y0 is
+   fatal 0x32. Pixels: columns x0 … x1 − 1, rows y0 … y1 − 1 (so the
+   last screen column and row are never reached). The blend getter (§1)
+   gives `T` and its per-mode value `k` (table `0x0074C5A0`): `k` = 0
+   (modes 5, 7, other) → `d' = color`; `k` = 1 (modes 3, 4, 6) → `d' =
+   T[d]` (the color is not used); `k` = 2 (modes 0–2) → `d' = T[256·d +
+   color]`.
+
 ## Constants & data dependencies
 
 Block offsets of `shading.md` §1; getter tables `0x006C8250`
@@ -336,6 +362,11 @@ Ghidra backlog (2026-10-06): unit shadow `0x00471620` (composite) and
 `0x00471450` (single cel), offset getters `0x004DA0B0`/`0x004DA0D0`/
 `0x004DA0F0`/`0x004DA110`/`0x004DA130`; monster fade inventory walk
 `0x004DB360` → `0x0063B2C0`/`0x0063DFD0`/`0x0063DFA0`.
+§8 (2026-10-06): wrappers `0x004F6380`, `0x004F6300` (argument order
+from their pushes), GDI slots `+0xB8` = `0x006C8A60`, `+0xC0` =
+`0x006C8C80` (read from the table `0x0074C4A8`; DirectDraw `0x00512710`,
+`0x00512930`, not read), the line's `ret 0x10` and stack reads (alpha
+unused).
 
 ## Open questions
 
