@@ -1346,3 +1346,29 @@ fn stat_id_at_count_is_invalid() {
     run_prop(&t, &mut it, rec(0, 0, 3, 3));
     assert!(it.stats.lists.is_empty());
 }
+
+/// `quality.md` §9 r2: walk the candidates subtracting weights until r <
+/// weight. Weights 1, 3, 2: r 0 → first, 1–3 → second, 4–5 → third.
+// Covers: specs/items/quality.md §9 r2
+#[test]
+fn set_pick_by_weight() {
+    use crate::items::quality::set_item;
+    use crate::items::tables::SetItemRec;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.setitems = [1, 3, 2]
+        .into_iter()
+        .map(|rarity| SetItemRec {
+            item: *b"rin ",
+            rarity,
+            lvl: 1,
+            ..Default::default()
+        })
+        .collect();
+    for (r, want) in [(0, 0), (1, 1), (2, 1), (3, 1), (4, 2), (5, 2)] {
+        let seed = find_seed(|s| s.roll(6) == r);
+        let mut it = item(i, seed);
+        assert!(set_item(&t, &mut it, &ItemRequest::default()));
+        assert_eq!(it.file_index, want, "r {r}");
+    }
+}
