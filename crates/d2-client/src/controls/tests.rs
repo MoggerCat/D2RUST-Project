@@ -15,6 +15,7 @@ const HEAD: &str = "version = 1\npreset = \"dev\"\n";
 
 // --- §Test vectors ---------------------------------------------------------
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
 #[test]
 fn missing_version_is_line_1() {
     let e = err("preset = \"dev\"\n\n[bindings]\ntoggle_inventory = [\"B\"]\n");
@@ -22,6 +23,7 @@ fn missing_version_is_line_1() {
     assert_eq!(e.line, Some(1));
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r5
 #[test]
 fn version_2_is_unsupported() {
     let e = err("# header\nversion = 2\npreset = \"dev\"\n[future]\nx = 1\n");
@@ -30,6 +32,7 @@ fn version_2_is_unsupported() {
     assert!(e.to_string().contains("unsupported version 2"), "{e}");
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
 #[test]
 fn unknown_action_names_it_and_its_line() {
     let e = err(&format!("{HEAD}\n[bindings]\nfoo = [\"A\"]\n"));
@@ -38,6 +41,7 @@ fn unknown_action_names_it_and_its_line() {
     assert!(e.to_string().contains("`foo`"), "{e}");
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r2
 #[test]
 fn two_world_actions_on_i_name_both() {
     // `toggle_inventory` is on `I` in the dev preset.
@@ -57,6 +61,7 @@ fn two_world_actions_on_i_name_both() {
     assert!(msg.contains("`world`"), "{msg}");
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r1
 #[test]
 fn dev_override_moves_inventory_to_b_only() {
     let b = ok(&format!("{HEAD}\n[bindings]\ntoggle_inventory = [\"B\"]\n"));
@@ -68,6 +73,7 @@ fn dev_override_moves_inventory_to_b_only() {
     assert_eq!(b.action_for(Context::World, Key::I), None);
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r1
 #[test]
 fn unbind_clears_an_action_also_in_bindings() {
     let b = ok(&format!(
@@ -77,6 +83,7 @@ fn unbind_clears_an_action_also_in_bindings() {
     assert_eq!(b.action_for(Context::World, Key::G), None);
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r4
 #[test]
 fn write_then_parse_keeps_bindings_in_enum_order() {
     // Entries deliberately out of enum order.
@@ -106,6 +113,7 @@ fn write_then_parse_keeps_bindings_in_enum_order() {
 
 // --- §A6 strictness --------------------------------------------------------
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r1
 #[test]
 fn minimal_file_is_the_dev_preset() {
     assert_eq!(ok(HEAD), Preset::Dev.bindings().unwrap());
@@ -120,6 +128,7 @@ fn dev_preset_has_no_clash_and_respects_slots() {
     }
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r2
 #[test]
 fn contexts_are_separate() {
     // Escape is game_menu (world), chat_cancel (chat), panel_close (panel).
@@ -138,6 +147,7 @@ fn contexts_are_separate() {
     );
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text, §a6-controls-file-d2controls-1-m20 r3
 #[test]
 fn rejections_carry_their_line() {
     let cases: &[(&str, usize, ErrorKind)] = &[
@@ -238,6 +248,7 @@ fn rejections_carry_their_line() {
     }
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
 #[test]
 fn duplicate_key_is_a_toml_error_with_line() {
     let e = err(
@@ -269,6 +280,7 @@ fn migrate_accepts_only_current_version() {
     );
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r1
 #[test]
 fn from_effective_is_minimal_and_round_trips() {
     let mut b = Preset::Dev.bindings().unwrap();
@@ -285,6 +297,7 @@ fn from_effective_is_minimal_and_round_trips() {
     assert_eq!(ControlsFile::from_effective(Preset::Original, &b), None);
 }
 
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r3
 #[test]
 fn name_lists_round_trip() {
     for &k in Key::ALL {
@@ -301,6 +314,7 @@ fn name_lists_round_trip() {
 /// For every pair of same-context actions, binding the later one to an
 /// input of the earlier one is reported as exactly that pair and input;
 /// the same input in another context is not a clash.
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r2
 #[test]
 fn clash_check_catches_every_perturbation() {
     let base = Preset::Dev.bindings().unwrap();

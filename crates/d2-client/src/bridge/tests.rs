@@ -116,6 +116,7 @@ fn from_layout(id: u8, size: usize, values: &[(&str, u32)]) -> Vec<u8> {
     b
 }
 
+// Covers: specs/client/bridge.md §4 r1, §4 r2
 #[test]
 fn intent_bytes_match_layouts() {
     let (mut b, link) = bridge();
@@ -142,6 +143,7 @@ fn intent_bytes_match_layouts() {
     );
 }
 
+// Covers: specs/client/bridge.md §4 r2, §4 r3
 #[test]
 fn intent_routing_and_refusals() {
     let (mut b, link) = bridge();
@@ -169,6 +171,7 @@ fn intent_routing_and_refusals() {
     assert_eq!(sent(&link), vec![(SendQueue::System, vec![0x6B])]);
 }
 
+// Covers: specs/client/bridge.md §4 r3
 #[test]
 fn game_send_limit() {
     // 0x66 (warden response): u16 at +1 plus 3, capped at 0x1FD.
@@ -183,6 +186,7 @@ fn game_send_limit() {
     assert_eq!(super::intent::route(&ok), Ok(SendQueue::Game));
 }
 
+// Covers: specs/client/bridge.md §2 r2, §6 r3
 #[test]
 fn split_and_unowned() {
     let (mut b, _) = bridge();
@@ -195,6 +199,7 @@ fn split_and_unowned() {
     assert_eq!(b.world(), &ClientWorld::default());
 }
 
+// Covers: specs/client/bridge.md §2 r3
 #[test]
 fn unknown_id_ends_split() {
     let (mut b, _) = bridge();
@@ -209,6 +214,7 @@ fn unknown_id_ends_split() {
     );
 }
 
+// Covers: specs/client/bridge.md §2 r4
 #[test]
 fn fatal_chunks_are_refused_whole() {
     let (mut b, _) = bridge();
@@ -226,6 +232,7 @@ fn fatal_chunks_are_refused_whole() {
     assert!(b.log().unowned.is_empty());
 }
 
+// Covers: specs/client/bridge.md §5 r4
 #[test]
 fn addressed_units() {
     let mut m6d = vec![0x6D, 7, 0, 0, 0];
@@ -288,6 +295,7 @@ fn msg(id: u8, size: usize, unit_type: u8, guid: u32) -> Vec<u8> {
     b
 }
 
+// Covers: specs/client/bridge.md §2 r2, §5 r4, §6 r4
 #[test]
 fn world_updates_from_messages() {
     let link = ScriptedLink::new();
@@ -309,6 +317,7 @@ fn world_updates_from_messages() {
     assert_eq!(b.log().rejected[0].id, 0x1A);
 }
 
+// Covers: specs/client/bridge.md §4 r4, §5 r3, §8 r1, §8 r3
 #[test]
 fn frame_order_and_counters() {
     let (mut b, link) = bridge();
@@ -332,6 +341,7 @@ fn frame_order_and_counters() {
     );
 }
 
+// Covers: specs/client/bridge.md §9 r1
 #[test]
 fn version_mismatch_is_refused() {
     let link = ScriptedLink::new();
@@ -345,6 +355,7 @@ fn version_mismatch_is_refused() {
     }
 }
 
+// Covers: specs/client/bridge.md §6 r1, §6 r5
 #[test]
 fn dispatch_table_matches_spec() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
@@ -354,6 +365,7 @@ fn dispatch_table_matches_spec() {
 }
 
 /// METHODS M08: a changed row is reported, and only that row.
+// Covers: specs/client/bridge.md §6 r5
 #[test]
 fn dispatch_check_catches_perturbations() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
@@ -409,6 +421,7 @@ fn dispatch_check_catches_perturbations() {
     );
 }
 
+// Covers: specs/client/bridge.md §7 r1, §7 r3
 #[test]
 fn bevy_mirror_follows_the_model() {
     let link = ScriptedLink::new();

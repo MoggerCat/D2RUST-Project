@@ -491,11 +491,13 @@ pub fn check_misscalc(tsv: &str) -> Vec<Mismatch> {
 mod tests {
     use super::*;
 
+    // Covers: specs/skills/levels.md §2
     #[test]
     fn skillcalc_tsv_matches_code() {
         assert_eq!(check_skillcalc(SKILLCALC_TSV), vec![]);
     }
 
+    // Covers: specs/skills/levels.md §2
     #[test]
     fn misscalc_tsv_matches_code() {
         assert_eq!(check_misscalc(MISSCALC_TSV), vec![]);
@@ -543,6 +545,7 @@ mod tests {
     /// column (`levels.md` "Mechanical check"). Needs the extracted text
     /// tables under `D2_GAME_DIR/extracted/patch_d2/data/global/excel/`
     /// (`mpq-tool extract`).
+    // Covers: specs/data/calc-expressions.md §5
     #[test]
     #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
     fn codes_match_game_tables() {

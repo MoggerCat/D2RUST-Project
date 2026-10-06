@@ -48,11 +48,13 @@ pub(super) fn size_vectors(s: &impl MessageSizes) {
     assert_eq!(s.server_size(&[0xB5]), Err(SizeError::Invalid));
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r5, §3.1 r1, §edge-cases-original-bugs r4
 #[test]
 fn size_rules() {
     size_vectors(&TsvSizes::new());
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r4
 #[test]
 fn classifier_vectors() {
     let s = TsvSizes::new();
@@ -83,6 +85,7 @@ fn classifier_vectors() {
     }
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r4, §2.1 r7, §edge-cases-original-bugs r2
 #[test]
 fn queues_keep_the_whole_buffer_and_drain_in_queue_order() {
     let s = TsvSizes::new();
@@ -129,6 +132,7 @@ fn queues_keep_the_whole_buffer_and_drain_in_queue_order() {
     assert!(q.is_empty());
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r7, §edge-cases-original-bugs r3
 #[test]
 fn drain_truncates_long_messages() {
     // Edge case 3: 0x66 of 512 bytes is copied short, size stays.
@@ -144,6 +148,7 @@ fn drain_truncates_long_messages() {
     assert_eq!(d[0].msg[..], m[..0x1FC]);
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r1, §edge-cases-original-bugs r6
 #[test]
 fn duplicate_filter_vectors() {
     let mut f = DuplicateFilter::default();
@@ -167,6 +172,7 @@ fn duplicate_filter_vectors() {
     );
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r1
 #[test]
 fn duplicate_filter_compares_over_the_new_size() {
     // The store keeps bytes past a shorter message (§2.1 rule 1).
@@ -176,6 +182,7 @@ fn duplicate_filter_compares_over_the_new_size() {
     assert_eq!(f.pass(&[0x01, 5, 1], 20), Ok(true));
 }
 
+// Covers: specs/sim/intents-events.md §2.1 r1
 #[test]
 fn window_table() {
     for id in 0..=0xFFu8 {
@@ -208,6 +215,7 @@ fn gate_of(mode: u32, uninterruptable: bool) -> PlayerGate {
     }
 }
 
+// Covers: specs/sim/intents-events.md §2.3 r1, §2.3 r2
 #[test]
 fn dispatch_bad_ids() {
     let mut g = FakeGame::with_player(0, ALIVE);
@@ -217,6 +225,7 @@ fn dispatch_bad_ids() {
     assert!(g.handled.is_empty());
 }
 
+// Covers: specs/sim/intents-events.md §2.3 r3
 #[test]
 fn dispatch_gates() {
     let mut dead = FakeGame::with_player(0, gate_of(0x11, false));
@@ -250,6 +259,7 @@ fn dispatch_gates() {
     assert_eq!(g.handled.len(), 2);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r1, §2.4 r2
 #[test]
 fn handler_size_and_stubs() {
     let mut g = FakeGame::with_player(0, ALIVE);
@@ -291,6 +301,7 @@ fn chat_string_checks() {
     assert_eq!(run(&mut g, &[0x14, 0, 0, b'a']), ResultCode::Invalid);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r3
 #[test]
 fn point_range_and_resync() {
     let mut g = FakeGame::with_player(0, ALIVE);
@@ -316,6 +327,7 @@ fn point_range_and_resync() {
     assert_eq!(run(&mut g, &at(100, 100)), ResultCode::Invalid);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r3
 #[test]
 fn point_resync_queues_its_message() {
     let s = TsvSizes::new();
@@ -328,6 +340,7 @@ fn point_resync_queues_its_message() {
     assert_eq!(out.buffers(0).unwrap()[0], [0x15; 11]);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r4
 #[test]
 fn unit_targets() {
     let mut g = FakeGame::with_player(0, ALIVE);
@@ -363,6 +376,7 @@ fn unit_targets() {
     assert_eq!(g.handled.len(), 2);
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r7
 #[test]
 fn skill_field_decoders() {
     let s = select_skill(&[0x3C, 0x05, 0x00, 0x00, 0x80, 0xFF, 0xFF, 0xFF, 0xFF]).unwrap();
@@ -371,6 +385,7 @@ fn skill_field_decoders() {
     assert_eq!((b.skill, b.left, b.slot, b.item), (6, true, 3, u32::MAX));
 }
 
+// Covers: specs/sim/intents-events.md §2.2 r1, §2.2 r2, §2.2 r3, §2.2 r4
 #[test]
 fn entry_drops_and_records() {
     let s = TsvSizes::new();
@@ -472,6 +487,7 @@ fn tables_match_tsv_catches_perturbations() {
     }
 }
 
+// Covers: specs/sim/intents-events.md §2.4 r1
 #[test]
 fn handler_sizes_match_transport() {
     // §2.4 rule 1: transport and handler sizes agree for every `==N` row,
@@ -487,6 +503,7 @@ fn handler_sizes_match_transport() {
 
 // ---- server → client ----
 
+// Covers: specs/sim/intents-events.md §3.2 r1, §3.2 r2
 #[test]
 fn buffer_packing() {
     let mut b = ClientBuffers::new();
@@ -509,6 +526,7 @@ fn buffer_packing() {
     assert_eq!(b.queue(0, &[0; 0x201]), Err(QueueError::TooLarge(0x201)));
 }
 
+// Covers: specs/sim/intents-events.md §3.3 r1, §3.4 r1
 #[test]
 fn delivery_splits_and_routes() {
     let s = TsvSizes::new();
@@ -525,6 +543,7 @@ fn delivery_splits_and_routes() {
     assert_eq!(ids, [0xB4, 0xAF, 0x0C, 0x01]);
 }
 
+// Covers: specs/sim/intents-events.md §3.3 r3, §edge-cases-original-bugs r7
 #[test]
 fn delivery_split_ends_at_a_size_zero_id() {
     // Edge case 7: 0x83 (size 0) ends the split; the rest is lost.
@@ -539,6 +558,7 @@ fn delivery_split_ends_at_a_size_zero_id() {
     assert_eq!(inbox.deliver(&s, &[0x80, 0, 0, 0]), Ok(4));
 }
 
+// Covers: specs/sim/intents-events.md §3.3 r1, §3.3 r2
 #[test]
 fn delivery_asserts() {
     let mut inbox = Inbox::default();

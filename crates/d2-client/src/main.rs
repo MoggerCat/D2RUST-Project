@@ -2,13 +2,19 @@
 //!
 //! Usage:
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
-//!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR]
+//!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
+//!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
 //!
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
-//! renders headlessly on the GPU and compares the result byte-for-byte with
-//! the CPU reference renderer (default view: the whole map); exit code 0
-//! means identical. `cpu-render` writes the CPU reference image only.
+//! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
+//! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
+//! for byte; exit code 0 = all pass, 1 = a failure or error, 2 = none
+//! failed but a GPU half is not wired yet. With a map flag (`--ds1`,
+//! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
+//! instead (default view: the whole map; exit 0 means identical).
+//! `--perturb N` corrupts N reference pixels per case: each must fail with
+//! exactly N. `cpu-render` writes the CPU reference image only.
 //!
 //! Game files are read from $D2_GAME_DIR. Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
@@ -19,7 +25,10 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use d2_client::map::{self, cpu};
-use d2_formats::mpq::ArchiveSet;
+use d2_client::verify::{
+    self,
+    map::{archives, file_stem},
+};
 
 const DEFAULT_DS1: &str = r"data\global\tiles\ACT1\TOWN\townN1.ds1";
 const DEFAULT_WALL_BASE: i32 = 80;
@@ -30,8 +39,16 @@ struct Options {
     view: Option<cpu::View>,
     out: Option<PathBuf>,
     probe: Option<(i32, i32)>,
-    /// Debug: corrupt this many reference pixels, to prove `verify` fails.
+    /// Debug: corrupt this many reference pixels per case, to prove
+    /// `verify` fails with exactly that count.
     perturb: usize,
+    /// `verify`: a map flag (`--ds1`, `--wall-base`, `--view`, `--out`) was
+    /// given, so run today's single-map verify instead of the case files.
+    map_flags: bool,
+    /// `verify`: case directory (default `crates/d2-client/render-cases`).
+    case_dir: Option<PathBuf>,
+    /// `verify`: run only these cases (file stems); default all.
+    cases: Vec<String>,
     /// `view`: close after this many frames (smoke test).
     frames: Option<u32>,
 }
@@ -61,12 +78,20 @@ fn parse_options(args: &[String]) -> Result<Options> {
         out: None,
         probe: None,
         perturb: 0,
+        map_flags: false,
+        case_dir: None,
+        cases: Vec::new(),
         frames: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
         let mut value = || it.next().with_context(|| format!("{flag} needs a value"));
+        if matches!(flag.as_str(), "--ds1" | "--wall-base" | "--view" | "--out") {
+            o.map_flags = true;
+        }
         match flag.as_str() {
+            "--case" => o.cases.push(value()?.clone()),
+            "--cases" => o.case_dir = Some(PathBuf::from(value()?)),
             "--ds1" => o.ds1 = value()?.clone(),
             "--wall-base" => o.wall_base = value()?.parse().context("--wall-base")?,
             "--view" => o.view = Some(parse_view(value()?)?),
@@ -82,19 +107,6 @@ fn parse_options(args: &[String]) -> Result<Options> {
         }
     }
     Ok(o)
-}
-
-fn archives() -> Result<ArchiveSet> {
-    let dir = std::env::var("D2_GAME_DIR").context("set D2_GAME_DIR to the game folder")?;
-    ArchiveSet::open_dir(&dir).with_context(|| format!("opening archives in {dir}"))
-}
-
-fn file_stem(ds1: &str) -> String {
-    ds1.rsplit(['\\', '/'])
-        .next()
-        .and_then(|f| f.split('.').next())
-        .unwrap_or("map")
-        .to_owned()
 }
 
 fn cpu_render(o: Options) -> Result<()> {
@@ -199,89 +211,57 @@ fn cpu_render(o: Options) -> Result<()> {
     Ok(())
 }
 
-/// Largest texture side the verifier will request (wgpu's default limit).
-const MAX_TEXTURE_SIDE: u32 = 8192;
-
-/// The whole-map view, rounded up to even sizes (pixel alignment) and
-/// clamped to the texture limit around the map center.
-fn full_view(bounds: map::Bounds) -> cpu::View {
-    let side = |lo: i32, hi: i32| -> (i32, u32) {
-        let len = ((hi - lo) as u32).div_ceil(2) * 2;
-        if len <= MAX_TEXTURE_SIDE {
-            (lo, len)
-        } else {
-            let center = (lo + hi) / 2;
-            (center - MAX_TEXTURE_SIDE as i32 / 2, MAX_TEXTURE_SIDE)
-        }
-    };
-    let (left, width) = side(bounds.x0, bounds.x1);
-    let (top, height) = side(bounds.y0, bounds.y1);
-    cpu::View {
-        left,
-        top,
-        width,
-        height,
-    }
-}
-
 fn verify(o: Options) -> Result<()> {
-    let archives = Arc::new(archives()?);
-    let mut loaded = map::load(&archives, &o.ds1)?;
-    let mut layout = map::build(&loaded.ds1, &loaded.library, o.wall_base);
-    let (dcc, dc6) = map::load_sprites(&archives)?;
-    map::add_sprites(&mut layout, &mut loaded.library, &loaded.ds1, &dcc, &dc6);
-    let bounds = layout.bounds.context("map has nothing to draw")?;
-    let view = o.view.unwrap_or_else(|| full_view(bounds));
-    anyhow::ensure!(
-        view.width.is_multiple_of(2) && view.height.is_multiple_of(2),
-        "--view width and height must be even (pixel alignment)"
-    );
-    println!(
-        "verify {}: {} draw items, view {}x{} at {},{}",
-        o.ds1,
-        layout.items.len(),
-        view.width,
-        view.height,
-        view.left,
-        view.top
-    );
-    let mut reference = cpu::to_rgba(
-        &cpu::render_indexed(&layout, &loaded.library, view),
-        &loaded.palette,
-    );
-    let pixels = reference.len() / 4;
-    if let Some(step) = pixels.checked_div(o.perturb) {
-        // Spread the corrupted pixels evenly; flip the red channel's top bit.
-        for i in (0..pixels).step_by(step.max(1)).take(o.perturb) {
-            reference[i * 4] ^= 0x80;
-        }
-        println!(
-            "debug: corrupted {} reference pixels; verify must FAIL",
-            o.perturb
+    if o.map_flags {
+        // Today's verify, unchanged: one map from the command line.
+        anyhow::ensure!(
+            o.cases.is_empty() && o.case_dir.is_none(),
+            "--case/--cases cannot be combined with --ds1/--wall-base/--view/--out"
         );
-    }
-    let out_dir = o
-        .out
-        .unwrap_or_else(|| PathBuf::from(format!("game/renders/verify-{}", file_stem(&o.ds1))));
-    let result = d2_client::app::run(
-        archives,
-        d2_client::app::MapConfig {
-            ds1_path: o.ds1,
+        let case = verify::case::MapCase {
+            ds1: o.ds1,
             wall_base: o.wall_base,
-        },
-        d2_client::app::Mode::Verify(d2_client::app::VerifyConfig {
-            view,
-            reference,
-            out_dir: out_dir.clone(),
-        }),
-    );
-    println!("images in {}", out_dir.display());
-    match result {
-        bevy::app::AppExit::Success => {
-            println!("PASS: GPU render matches the CPU reference exactly");
-            Ok(())
+            view: o.view.map(|v| (v.left, v.top, v.width, v.height)),
+        };
+        let report = verify::map::run("map", &case, o.out, o.perturb);
+        return match report.status {
+            verify::Status::Pass => Ok(()),
+            verify::Status::Fail(why) => bail!(why),
+            verify::Status::Error(e) => bail!(e),
+            verify::Status::GpuNotWired => unreachable!("map cases have a GPU half"),
+        };
+    }
+    let dir = o.case_dir.unwrap_or_else(verify::default_case_dir);
+    let mut cases = verify::load_dir(&dir).map_err(anyhow::Error::msg)?;
+    if !o.cases.is_empty() {
+        for name in &o.cases {
+            anyhow::ensure!(
+                cases.iter().any(|c| &c.name == name),
+                "no case {name} in {}",
+                dir.display()
+            );
         }
-        bevy::app::AppExit::Error(code) => bail!("FAIL (exit code {code})"),
+        cases.retain(|c| o.cases.contains(&c.name));
+    }
+    println!("verify: {} cases from {}", cases.len(), dir.display());
+    // TODO(C5): replace with the compute compositor's `GpuCompositor`.
+    let mut gpu = verify::NotWired;
+    let mut summary = verify::Summary::default();
+    for case in &cases {
+        println!("case {} ({})", case.name, case.kind.name());
+        let report = match &case.kind {
+            verify::CaseKind::Synthetic(s) => {
+                verify::run_synthetic(&case.name, s, o.perturb, &mut gpu)
+            }
+            verify::CaseKind::Map(m) => verify::map::run(&case.name, m, None, o.perturb),
+        };
+        verify::print_report(&report);
+        summary.add(&report.status);
+    }
+    println!("summary: {summary}");
+    match summary.exit_code() {
+        0 => Ok(()),
+        code => std::process::exit(code),
     }
 }
 
@@ -309,7 +289,7 @@ fn main() -> Result<()> {
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("view") | None => view(parse_options(args.get(1..).unwrap_or(&[]))?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N]"),
     }
 }
 
@@ -331,11 +311,19 @@ mod tests {
     }
 
     #[test]
-    fn full_view_is_even_and_clamped() {
-        let b = |x0, y0, x1, y1| map::Bounds { x0, y0, x1, y1 };
-        let v = full_view(b(-3, -5, 10, 8));
-        assert_eq!((v.left, v.top, v.width, v.height), (-3, -5, 14, 14));
-        let v = full_view(b(0, 0, 20000, 100));
-        assert_eq!((v.width, v.left), (MAX_TEXTURE_SIDE, 10000 - 4096));
+    fn map_flags_select_the_single_map_verify() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(!parse_options(&[]).unwrap().map_flags);
+        let o = parse_options(&args(&["--perturb", "3", "--case", "a"])).unwrap();
+        assert!(!o.map_flags);
+        assert_eq!((o.perturb, o.cases), (3, vec!["a".to_owned()]));
+        for flag in [
+            ["--ds1", "x.ds1"],
+            ["--wall-base", "1"],
+            ["--view", "0,0,2,2"],
+            ["--out", "d"],
+        ] {
+            assert!(parse_options(&args(&flag)).unwrap().map_flags, "{flag:?}");
+        }
     }
 }

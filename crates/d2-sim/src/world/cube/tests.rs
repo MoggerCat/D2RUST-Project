@@ -87,6 +87,7 @@ fn ops_check_catches_perturbations() {
 
 // ------------------------------------------------------------- decode
 
+// Covers: specs/data/callbacks.md §2 text, §3 text
 #[test]
 fn recipe_decode_reads_slot_bytes() {
     let mut r = vec![0u8; Cubemain::SIZE];
@@ -147,6 +148,7 @@ fn recipe_decode_reads_slot_bytes() {
     assert!(recipes(&t).is_err());
 }
 
+// Covers: specs/world/cube.md §7.1 r3
 #[test]
 fn ratio_rule() {
     assert_eq!(ratio(40, 75), 30);
@@ -661,6 +663,7 @@ fn pairs(f: &Fake) -> Vec<String> {
 
 // ------------------------------------------------------------ vectors
 
+// Covers: specs/world/cube.md §3 r4, §7.4, §8 r1, §8 r2, §8 r3
 #[test]
 fn v1_v2_gems() {
     let d = data(vec![ring_recipe(), arrows_recipe(), gem_recipe()]);
@@ -698,6 +701,7 @@ fn v1_v2_gems() {
     assert!(f.log.is_empty() && f.sent.is_empty());
 }
 
+// Covers: specs/world/cube.md §4
 #[test]
 fn v3_arrows_and_numinputs() {
     let d = data(vec![arrows_recipe()]);
@@ -712,6 +716,7 @@ fn v3_arrows_and_numinputs() {
     assert_eq!(d.transmute(&mut f, P).record, None);
 }
 
+// Covers: specs/world/cube.md §6.1 r5
 #[test]
 fn v4_slot_marks_every_match() {
     let r = recipe(
@@ -727,6 +732,7 @@ fn v4_slot_marks_every_match() {
     assert_eq!(d.transmute(&mut f, P).record, None);
 }
 
+// Covers: specs/world/cube.md §7.1 r2
 #[test]
 fn v5_quantity_is_exact_without_stackables() {
     let d = data(vec![ring_recipe()]);
@@ -746,6 +752,7 @@ fn v5_quantity_is_exact_without_stackables() {
     assert_eq!((f.requests[0].level, f.requests[0].class), (30, RIN));
 }
 
+// Covers: specs/world/cube.md §4, §6.3
 #[test]
 fn v6_upgrade_inputs() {
     // record 64: "fhl,mag,upg" + jew; version 100.
@@ -788,6 +795,7 @@ fn r_clone_with_slot(r: &Recipe, item: u32) -> Recipe {
     r
 }
 
+// Covers: specs/world/cube.md §7.1 r2, §7.1 r4
 #[test]
 fn v7_to_v11_levels() {
     let d = data(vec![]);
@@ -839,6 +847,7 @@ fn mod_recipe(chance: u8) -> Recipe {
     recipe(1, &[code_in(RIN)], a)
 }
 
+// Covers: specs/world/cube.md §7.6 r3
 #[test]
 fn v12_v13_mod_chance() {
     // No draw for chance 0 and ≥ 100.
@@ -871,6 +880,7 @@ fn v12_v13_mod_chance() {
     }
 }
 
+// Covers: specs/world/cube.md §7.6 r6
 #[test]
 fn v14_sockets() {
     let sock = |quality: u8, max: i32, have: i32| {
@@ -907,6 +917,7 @@ fn seed_for(n1: u32, r1: u32, n2: u32, r2: u32) -> Seed {
         .expect("seed")
 }
 
+// Covers: specs/world/cube.md §7.5 r1, §7.5 r2, §7.5 r3
 #[test]
 fn v15_v16_type_pick() {
     let mut d = data(vec![]);
@@ -935,6 +946,7 @@ fn v15_v16_type_pick() {
     assert_eq!(d.type_pick(&mut f, 9, 10), 0); // [] after filters → 0
 }
 
+// Covers: specs/world/cube.md §7.5 r2, §7.5 r3
 #[test]
 fn type_pick_output_draws_on_the_game_seed() {
     // record 19 style: item-type output; two game-seed rolls.
@@ -950,6 +962,7 @@ fn type_pick_output_draws_on_the_game_seed() {
     assert_eq!(f.requests[0].class, JEW);
 }
 
+// Covers: specs/world/cube.md §4
 #[test]
 fn v17_v18_eligibility() {
     let mut r = gem_recipe();
@@ -994,6 +1007,7 @@ fn v17_v18_eligibility() {
     assert_eq!(d3.transmute(&mut f, P).record, None); // Normal < 1
 }
 
+// Covers: specs/world/cube.md §8 r3
 #[test]
 fn v19_quest_difficulty() {
     let mut r = recipe(2, &[code_in(MSF), code_in(VIP)], out(kind::ITEMCODE, HST));
@@ -1018,6 +1032,7 @@ fn v19_quest_difficulty() {
     assert_eq!(d.transmute(&mut f, P).record, Some(0));
 }
 
+// Covers: specs/world/cube.md §7.2, §9
 #[test]
 fn v20_v21_v22_portals() {
     // V20: Pandemonium stub: matches, success 0, nothing changes.
@@ -1063,6 +1078,7 @@ fn v20_v21_v22_portals() {
     );
 }
 
+// Covers: specs/world/cube.md §7.2, §8 text
 #[test]
 fn portal_slot_overwrites_success() {
     // An item in slot a, then a failing portal in slot b: nothing commits
@@ -1081,6 +1097,7 @@ fn portal_slot_overwrites_success() {
     assert!(f.log.is_empty());
 }
 
+// Covers: specs/world/cube.md §7.6 r4
 #[test]
 fn v23_repair() {
     let mut a = out(kind::USEITEM, 0);
@@ -1102,6 +1119,7 @@ fn v23_repair() {
     assert!(f.log.contains(&"repair".to_string()));
 }
 
+// Covers: specs/world/cube.md §7.6 r4
 #[test]
 fn rep_refills_stackables() {
     let mut a = out(kind::USEITEM, 0);
@@ -1117,6 +1135,7 @@ fn rep_refills_stackables() {
     assert_eq!(f.items[&t.outputs[0]].stats[&STAT_QUANTITY], 255);
 }
 
+// Covers: specs/world/cube.md §1, §2 r3, §2 r4
 #[test]
 fn v24_v25_routing() {
     let d = data(vec![gem_recipe()]);
@@ -1175,6 +1194,7 @@ fn v24_v25_routing() {
     assert_eq!(d.put_in(&mut f, P, &msg(ring, cube)[..8]), 3);
 }
 
+// Covers: specs/world/cube.md §5
 #[test]
 fn v26_stat_op_guard() {
     let d = data(vec![]); // 10 itemstatcost records
@@ -1203,6 +1223,7 @@ fn v26_stat_op_guard() {
     assert!(!d2.recipe_op(&f, P, &r, (1, 1)));
 }
 
+// Covers: specs/world/cube.md §5
 #[test]
 fn date_ops() {
     let d = data(vec![]);
@@ -1222,6 +1243,7 @@ fn date_ops() {
     assert!(d.recipe_op(&f, P, &r, (1, 1)));
 }
 
+// Covers: specs/world/cube.md §6.1 r4, §6.2
 #[test]
 fn input_flags_filter() {
     use input_flags as fl;
@@ -1302,6 +1324,7 @@ fn input_op_on_slot0() {
     assert_eq!(d.transmute(&mut f, P).record, Some(0));
 }
 
+// Covers: specs/world/cube.md §6.4, §7.3
 #[test]
 fn capture_last_match_wins_and_upgrade() {
     // usetype,exc with qty 2: class = the last match's ubercode item.
@@ -1350,6 +1373,7 @@ fn capture_last_match_wins_and_upgrade() {
     assert_eq!(f.items[&t.outputs[0]].class, Some(0));
 }
 
+// Covers: specs/world/cube.md §7.4
 #[test]
 fn reg_keeps_unique_unfound() {
     let mut a = out(kind::USETYPE, 0);
@@ -1372,6 +1396,7 @@ fn reg_keeps_unique_unfound() {
     assert!(f.unique_found(41));
 }
 
+// Covers: specs/world/cube.md §7.3
 #[test]
 fn tempered_useitem_turns_off_craft() {
     let mut a = out(kind::USEITEM, 0);
@@ -1397,6 +1422,7 @@ fn tempered_useitem_turns_off_craft() {
         .any(|l| l.starts_with("prop") || l.starts_with("tempered")));
 }
 
+// Covers: specs/world/cube.md §7.6 r2, §8 r3, §8 r4
 #[test]
 fn rem_fillers_and_failed_placement() {
     let mut a = out(kind::USEITEM, 0);
@@ -1430,6 +1456,7 @@ fn rem_fillers_and_failed_placement() {
     assert!(f.cube_contents().is_empty());
 }
 
+// Covers: specs/world/cube.md §3 r3
 #[test]
 fn first_match_wins_even_if_outputs_fail() {
     // Record 0 matches but makes nothing; record 1 would succeed.

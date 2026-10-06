@@ -1,5 +1,7 @@
 # Handoff: controls file (`d2_client::controls`, PLAN Phase 6 C9)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/p6-controls`, based on `claude/bold-ptolemy-jvyvxy` at
 `978e6c4` (2026-10-06, cloud). Spec: `specs/client/ui.md` §A6 (d2rs-own
 design, draft) and its §Test vectors (controls rows).

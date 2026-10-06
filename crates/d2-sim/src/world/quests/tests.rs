@@ -17,6 +17,7 @@ fn hex(s: &str) -> Vec<u8> {
         .collect()
 }
 
+// Covers: specs/world/quests.md §1.1, §1.6
 #[test]
 fn flag_vectors() {
     let mut r = QuestFlags::default();
@@ -111,6 +112,7 @@ fn check_tables(t: &QuestTables) -> Vec<String> {
     e
 }
 
+// Covers: specs/world/quests.md §2.4, §edge-cases-original-bugs r4
 #[test]
 fn tables_parse_and_check() {
     let t = QuestTables::load().unwrap();
@@ -412,6 +414,7 @@ fn control() -> (QuestControl, Seed) {
 
 // ------------------------------------------------------------ §2, §3
 
+// Covers: specs/world/quests.md §2.3 text, §2.3 r1, §2.3 r2, §2.3 r3
 #[test]
 fn creation_order_and_seed() {
     let (ctl, game) = control();
@@ -431,6 +434,7 @@ fn creation_order_and_seed() {
     assert_eq!(ctl.game, QuestFlags::default());
 }
 
+// Covers: specs/world/quests.md §1.5, §3 r1, §3 r3, §3 r5, §3 r6, §3 r7
 #[test]
 fn fresh_game_entry() {
     // Recorded frame 1 of both recordings.
@@ -469,6 +473,7 @@ fn fresh_game_entry() {
     assert!(f.log.iter().all(|l| l.starts_with("unhandled")));
 }
 
+// Covers: specs/world/quests.md §3 text, §3 r2, §edge-cases-original-bugs r1
 #[test]
 fn first_player_switches_quests_off() {
     // Slot 0 bit 0 (Warriv gossip, no_set_state 1): game record stays 0.
@@ -496,6 +501,7 @@ fn first_player_switches_quests_off() {
 
 // ------------------------------------------------------------ §5
 
+// Covers: specs/world/quests.md §5 text, §5 r3
 #[test]
 fn timer_schedule() {
     let (mut ctl, _) = control();
@@ -517,6 +523,7 @@ fn timer_schedule() {
     );
 }
 
+// Covers: specs/world/quests.md §5 r1, §edge-cases-original-bugs r6
 #[test]
 fn timer_wrap() {
     // Edge case 6.
@@ -545,6 +552,7 @@ fn rec_with(chain: u8, state: u8, init_no: u8, status: u8) -> QuestRecord {
     r
 }
 
+// Covers: specs/world/quests.md §6.1 r1, §6.1 r2, §edge-cases-original-bugs r5
 #[test]
 fn default_status_rule() {
     let none = QuestFlags::default();
@@ -583,6 +591,7 @@ fn default_status_rule() {
     );
 }
 
+// Covers: specs/world/quests.md §6.3, §7.2, §7.3, §10.4
 #[test]
 fn akara_start_and_chat_end() {
     // `015956` frames 1729–1751.
@@ -608,6 +617,7 @@ fn akara_start_and_chat_end() {
     assert_eq!(ctl.quest_message(&mut f, P1, &msg[..8]), 3);
 }
 
+// Covers: specs/world/quests.md §6.2 r1, §6.2 r2, §6.2 r3, §6.2 r4
 #[test]
 fn request_quest_data() {
     let (mut ctl, _) = control();
@@ -633,6 +643,7 @@ fn request_quest_data() {
     assert_eq!(f.sent[1].1, hex("50 0100 0000 0200 0000 000000000000"));
 }
 
+// Covers: specs/world/quests.md §1.7
 #[test]
 fn quest_completed_message() {
     let (ctl, _) = control();
@@ -644,6 +655,7 @@ fn quest_completed_message() {
     assert!(f.sent.is_empty());
 }
 
+// Covers: specs/world/quests.md §6.4
 #[test]
 fn npc_wants_interact() {
     let (mut ctl, _) = control();
@@ -665,6 +677,7 @@ fn npc_wants_interact() {
     assert!(f.sent.is_empty());
 }
 
+// Covers: specs/world/quests.md §6.5, §6.7
 #[test]
 fn unique_event_and_gossip() {
     let (mut ctl, _) = control();
@@ -697,6 +710,7 @@ fn unique_event_and_gossip() {
 
 // ------------------------------------------------------------ §4
 
+// Covers: specs/world/quests.md §4.3, §4.4 r1, §4.4 r3, §4.4 r4, §4.4 r5, §4.6
 #[test]
 fn kill_parse_force_and_chain() {
     let (mut ctl, _) = control();
@@ -764,6 +778,7 @@ fn kill_parse_force_and_chain() {
     assert!(ctl.record(1).unwrap().extra.guids.contains(1));
 }
 
+// Covers: specs/world/quests.md §3 r8, §10.4
 #[test]
 fn den_of_evil_cleared() {
     let (mut ctl, _) = control();
@@ -807,6 +822,7 @@ fn den_of_evil_cleared() {
     assert_eq!(f.sent_ids(), [0x5E, 0x28, 0x29, 0x89]);
 }
 
+// Covers: specs/world/quests.md §10.4
 #[test]
 fn den_of_evil_few_left() {
     let (mut ctl, _) = control();
@@ -819,6 +835,7 @@ fn den_of_evil_few_left() {
     assert_eq!(f.sent[0].1, hex("5d 01 20 04 0500"));
 }
 
+// Covers: specs/world/quests.md §10.4
 #[test]
 fn den_of_evil_reward() {
     let (mut ctl, _) = control();
@@ -840,6 +857,7 @@ fn den_of_evil_reward() {
 
 // ------------------------------------------------------------ Act I
 
+// Covers: specs/world/quests.md §10.6
 #[test]
 fn cairn_stone_order_vector() {
     let mut seq = [2u32, 2, 0, 4, 1, 3].into_iter();
@@ -855,6 +873,7 @@ fn cairn_stone_order_vector() {
     assert_eq!(ctl.seed, seed);
 }
 
+// Covers: specs/world/quests.md §10.8
 #[test]
 fn andariel_gem_vector() {
     assert_eq!(&act1::gem_code(&act1::CHIPPED_GEMS, 9), b"gcb ");
@@ -892,6 +911,7 @@ fn andariel_gem_vector() {
     assert!(!f.log.iter().any(|l| l.starts_with("drop")));
 }
 
+// Covers: specs/world/quests.md §10.3, §edge-cases-original-bugs r2
 #[test]
 fn flavie_draws_per_record() {
     // Edge case 2: chains 25 and 30 both handle event 0: two draws.
@@ -914,6 +934,7 @@ fn flavie_draws_per_record() {
     assert_eq!(list[0], line(a));
 }
 
+// Covers: specs/world/quests.md §10.3
 #[test]
 fn warriv_gossip() {
     let (mut ctl, _) = control();
@@ -929,6 +950,7 @@ fn warriv_gossip() {
     assert!(f.flags(P1).get(0, 0));
 }
 
+// Covers: specs/world/quests.md §10.6
 #[test]
 fn cain_rewards() {
     let (mut ctl, _) = control();
@@ -956,6 +978,7 @@ fn cain_rewards() {
     }
 }
 
+// Covers: specs/world/quests.md §10.6
 #[test]
 fn wirt_body_gold() {
     let (mut ctl, _) = control();
@@ -983,6 +1006,7 @@ fn wirt_body_gold() {
     );
 }
 
+// Covers: specs/world/quests.md §10.5, §edge-cases-original-bugs r7
 #[test]
 fn malus_level_gate() {
     let (mut ctl, _) = control();
@@ -998,6 +1022,7 @@ fn malus_level_gate() {
     assert_eq!(ctl.record(3).unwrap().state, 4);
 }
 
+// Covers: specs/world/quests.md §8.4
 #[test]
 fn cow_portal_rules() {
     // V22: Rogue Encampment, expansion, slot 40 bit 0.
@@ -1028,6 +1053,7 @@ fn cow_portal_rules() {
     assert!(!cow_portal(&mut ctl, &mut f, P1));
 }
 
+// Covers: specs/world/quests.md §8.1
 #[test]
 fn act_transitions() {
     let (mut ctl, _) = control();
@@ -1058,6 +1084,7 @@ fn act_transitions() {
     assert_eq!(f.sent_ids(), [0x28, 0x61]);
 }
 
+// Covers: specs/world/quests.md §8.2, §8.3
 #[test]
 fn warp_and_portal_checks() {
     assert_eq!(warp_check(1, 73), WarpCheck::Delegate(0x0059_DB20));
@@ -1069,6 +1096,7 @@ fn warp_and_portal_checks() {
     assert_eq!(portal_check(74), WarpCheck::Open);
 }
 
+// Covers: specs/world/quests.md §10.3
 #[test]
 fn respec_flags() {
     let (mut ctl, _) = control();
@@ -1081,6 +1109,7 @@ fn respec_flags() {
     assert!(!ctl.record(30).unwrap().active);
 }
 
+// Covers: specs/world/quests.md §3 r2, §10.1
 #[test]
 fn restore_from_bits() {
     let (mut ctl, _) = control();

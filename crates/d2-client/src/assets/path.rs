@@ -179,6 +179,7 @@ impl FileSource for MemorySource {
 mod tests {
     use super::*;
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn two_spellings_one_path() {
         // Test vector §A1.
@@ -194,6 +195,7 @@ mod tests {
         );
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn invalid_paths_are_errors() {
         assert_eq!(CanonicalPath::new(""), Err(PathError::Empty));
@@ -229,6 +231,7 @@ mod tests {
         s
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn reader_reads_canonical_paths() {
         assert_eq!(
@@ -237,6 +240,7 @@ mod tests {
         );
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn missing_path_is_an_error_naming_it() {
         // Test vector §A1.
@@ -245,6 +249,7 @@ mod tests {
         assert!(err.to_string().contains("data/global/missing.dc6"), "{err}");
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn reader_rejects_non_canonical_paths() {
         // Perturbation (M08): the same file, spelled with capitals, is
@@ -260,6 +265,7 @@ mod tests {
         assert!(err.to_string().contains("data/global/X.dc6"));
     }
 
+    // Covers: specs/client/assets.md §a1-paths-and-identity
     #[test]
     fn archive_errors_name_the_path() {
         struct Broken;

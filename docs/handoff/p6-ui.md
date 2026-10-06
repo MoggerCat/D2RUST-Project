@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C8, UI core (`d2_client::ui`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/p6-ui`, based on `claude/bold-ptolemy-jvyvxy` at `978e6c4`
 (2026-10-06, cloud). Spec: `specs/client/ui.md` §A2 (panel model), §A4
 (input → actions: frame-coordinate mapping), Test vectors; d2rs-own

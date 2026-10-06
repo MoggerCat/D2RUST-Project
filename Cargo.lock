@@ -2313,6 +2313,7 @@ dependencies = [
  "image",
  "thiserror 2.0.21",
  "toml_edit",
+ "wgpu",
 ]
 
 [[package]]

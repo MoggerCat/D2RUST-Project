@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C1 + C2, assets paths, loaders, residency (`d2_client::assets`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/p6-assets`, based on `claude/bold-ptolemy-jvyvxy` at
 `978e6c4` (2026-10-06, cloud). Spec: `specs/client/assets.md` §A1–A2,
 §A4–A5 and Test vectors (d2rs-own design draft; no original behavior).

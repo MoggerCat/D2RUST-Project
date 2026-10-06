@@ -188,6 +188,7 @@ mod tests {
         eval(bytes, 0, &mut Stub)
     }
 
+    // Covers: specs/data/calc-expressions.md §3.1 r1, §3.2, §3.3
     #[test]
     fn evaluator_vectors() {
         assert_eq!(ev(&[0x04, 0x10, 0x07, 0x02, 0x12, 0x00]), 32);
@@ -238,6 +239,7 @@ mod tests {
         assert_eq!(eval(&[0x07, 0x05, 0x00], 3, &mut Stub), 0);
     }
 
+    // Covers: specs/data/calc-expressions.md §3.3
     #[test]
     fn comparisons() {
         // (a, b) = (−1, 1), (2, 2), (3, 2) per op 0x0A..0x0F.
@@ -261,6 +263,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/data/calc-expressions.md §3.5
     #[test]
     fn rand_vectors() {
         let mut s = Seed::new(1, 0);

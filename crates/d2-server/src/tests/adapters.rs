@@ -17,6 +17,7 @@ use crate::host::{Handled, Host};
 use crate::seams::*;
 use crate::transport::{classify, Classified};
 
+// Covers: specs/sim/intents-events.md §2.1 r5, §3.1 r1, §edge-cases-original-bugs r4
 #[test]
 fn proto_size_vectors() {
     size_vectors(&ProtoSizes);
@@ -103,6 +104,7 @@ fn agreement_catches_perturbations() {
     assert!(!disagreements(&fake).is_empty());
 }
 
+// Covers: specs/sim/intents-events.md §edge-cases-original-bugs r4
 #[test]
 fn negative_chat_size_is_its_own_result() {
     let chat = [0x15, 0x01, 0x00, b'h', b'i', 0, b'b', b'o', b'b', 0, 0x80];
@@ -165,6 +167,7 @@ fn guid(sim: &SimGame<impl EventDispatch>, u: UnitId) -> u32 {
     sim.game.lists.unit(u).unwrap().guid
 }
 
+// Covers: specs/sim/intents-events.md §2.2 r4
 #[test]
 fn player_lookup() {
     let mut w = world(Unspecified);
@@ -186,6 +189,7 @@ fn player_lookup() {
     assert_eq!(w.sim.leave(2), Err(AdapterError::NotJoined(2)));
 }
 
+// Covers: specs/sim/unit-order.md §7 r2
 #[test]
 fn client_order_is_the_sim_client_list() {
     let mut w = world(Unspecified);
@@ -257,6 +261,7 @@ impl EventDispatch for RunLog {
 
 /// One single-player host frame (drain → tick → flush) on the real
 /// adapters, from the synthetic vectors of §2.4 rule 3–4 and §3.1.
+// Covers: specs/sim/tick.md §1 r4, §2 r1; specs/sim/intents-events.md §1 r1, §2.4 r3, §3.4 r1
 #[test]
 fn single_player_host_frame() {
     let mut w = world(RunLog::default());

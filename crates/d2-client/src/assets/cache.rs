@@ -402,6 +402,7 @@ mod tests {
         p.keys().copied().collect()
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn lru_evicts_least_recent() {
         // Test vector §A5: budget 2 entries, use a, b, c → a evicted.
@@ -422,6 +423,7 @@ mod tests {
         assert_eq!(p.used(), 2);
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn use_refreshes_recency() {
         // Perturbation (M08) of the vector above: touching a in frame 3
@@ -434,6 +436,7 @@ mod tests {
         assert_eq!(keys(&p), ["a", "c"]);
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn ties_evict_lower_key_first() {
         // Test vector §A5: equal last-use frames → lower key first, not
@@ -446,6 +449,7 @@ mod tests {
         assert_eq!(keys(&p), ["b", "c"]);
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn current_frame_is_never_evicted() {
         // Test vector §A5: entries used this frame, budget exceeded → kept,
@@ -471,6 +475,7 @@ mod tests {
         assert_eq!(p.used(), 2);
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn oversize_single_entry_is_kept_for_its_frame() {
         let mut p: Pool<u32, ()> = Pool::new("t", 10);
@@ -502,6 +507,7 @@ mod tests {
         ));
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn set_budget_evicts_old_frames_only() {
         let mut p = Pool::new("t", 10);
@@ -520,6 +526,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/client/assets.md §a4-residency r2
     #[test]
     fn resolve_counts_stalls_and_protects_listed_keys() {
         let mut p: Pool<u32, u32> = Pool::new("t", 2);
@@ -578,6 +585,7 @@ mod tests {
         assert!(p.is_empty());
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn eviction_is_independent_of_insert_order() {
         // Same uses, different insertion order within each frame: same
@@ -596,6 +604,7 @@ mod tests {
         assert_eq!(run(&["b", "c", "a"]), ["c", "y", "z"]);
     }
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn default_budgets() {
         let b = Budgets::default();

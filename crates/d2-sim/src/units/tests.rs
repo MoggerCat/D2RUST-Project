@@ -62,6 +62,7 @@ fn sched(
 
 const MAIN: Form = Form::Main { bonus: 0 };
 
+// Covers: specs/sim/units.md §4.2 text, §4.2 r1, §4.2 r2, §4.2 r3, §4.2 r4
 #[test]
 fn anim_vectors() {
     let six = [(6, 1)];
@@ -104,6 +105,7 @@ fn anim_vectors() {
     assert_eq!(sched(Form::Frames(0), 256, 12, 96 * 256, &six), []);
 }
 
+// Covers: specs/sim/units.md §4.2 text, §4.2 r1, §4.2 r5
 #[test]
 fn anim_frame_and_cancel_flags() {
     let e = bytes(&[]);
@@ -124,6 +126,7 @@ fn anim_frame_and_cancel_flags() {
     assert_eq!(s.frame, None);
 }
 
+// Covers: specs/sim/units.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r2, §edge-cases-original-bugs r3
 #[test]
 fn anim_edge_cases() {
     // Variants start at index −1: AnimData +0x0F (edge case 1).
@@ -204,6 +207,7 @@ fn handler_mismatches(tsv: &str) -> Vec<(TimerClass, u8)> {
     bad
 }
 
+// Covers: specs/sim/units.md §5 text
 #[test]
 fn handlers_match_tsv() {
     assert_eq!(handler_mismatches(HANDLERS_TSV), []);
@@ -456,6 +460,7 @@ fn site_check_catches_perturbation() {
 }
 
 /// U1: every object and item schedule of the TSV has a handler.
+// Covers: specs/sim/units.md §5 r2
 #[test]
 fn object_and_item_sites_have_handlers() {
     for l in EVENTS_TSV.lines().skip(1).filter(|l| !l.is_empty()) {
@@ -628,6 +633,7 @@ fn stats(sys: &UnitSystem<Fake>) -> &StatLists {
 
 // ---- allocation ----------------------------------------------------------------------
 
+// Covers: specs/sim/units.md §3.1 r1, §3.1 r4, §3.1 r6
 #[test]
 fn allocation_seeds_and_rejections() {
     let mut game = Game::new();
@@ -702,6 +708,7 @@ fn allocation_seeds_and_rejections() {
     assert_eq!(r, Err(UnitError::NotAdded));
 }
 
+// Covers: specs/sim/units.md §6.3
 #[test]
 fn missile_setup_and_removal() {
     let mut game = Game::new();
@@ -762,6 +769,7 @@ fn join_in_town_is_town_neutral() {
 }
 
 /// stat-lists.md test vector step 5: life regeneration.
+// Covers: specs/sim/stat-lists.md §10.1 r1, §10.1 r3
 #[test]
 fn player_life_regen_vector() {
     let mut game = Game::new();
@@ -781,6 +789,7 @@ fn player_life_regen_vector() {
     assert_eq!(pending(&game, p), [(3, 1, 0, 0)]);
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 r3
 #[test]
 fn player_life_regen_caps_and_frees_healthpot() {
     let mut game = Game::new();
@@ -802,6 +811,7 @@ fn player_life_regen_caps_and_frees_healthpot() {
     assert!(stats(&sys).active_chain(r).is_empty());
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 r1, §10.1 r2
 #[test]
 fn dead_player_only_reschedules() {
     let mut game = Game::new();
@@ -818,6 +828,7 @@ fn dead_player_only_reschedules() {
     assert_eq!(pending(&game, p), [(3, 1, 4, 5)]);
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 r4
 #[test]
 fn stamina_regen_by_mode() {
     // (mode, bonus 28, max 11, current 10, expected 10).
@@ -851,6 +862,7 @@ fn stamina_regen_by_mode() {
     }
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 r5
 #[test]
 fn mana_regen() {
     let mut game = Game::new();
@@ -1035,6 +1047,7 @@ fn monster(game: &mut Game, sys: &mut UnitSystem<Fake>, class: u32) -> UnitId {
     m
 }
 
+// Covers: specs/sim/units.md §edge-cases-original-bugs r6
 #[test]
 fn monster_neutral_ai_delay() {
     let mut game = Game::new();
@@ -1125,6 +1138,7 @@ fn monster_mode_set_schedules() {
     assert_eq!(r, Err(UnitError::Uninterruptable));
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 l2 r2, §10.1 l2 r3, §10.1 l2 r5
 #[test]
 fn monster_regen_rules() {
     let mut game = Game::new();
@@ -1154,6 +1168,7 @@ fn monster_regen_rules() {
     assert!(pending(&game, m).is_empty());
 }
 
+// Covers: specs/sim/stat-lists.md §10.1 l2 r5, §10.1 l2 r6
 #[test]
 fn monster_regen_death_and_killer() {
     let mut game = Game::new();
@@ -1198,6 +1213,7 @@ fn frozen_monsters_drop_events() {
 
 // ---- objects and items ------------------------------------------------------------------
 
+// Covers: specs/sim/units.md §5 r2
 #[test]
 fn object_and_item_dispatch() {
     let mut game = Game::new();

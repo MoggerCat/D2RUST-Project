@@ -44,6 +44,7 @@ mod tests {
         vec![0; 21]
     }
 
+    // Covers: specs/client/assets.md §a2-loaders
     #[test]
     fn font_magic_gives_font() {
         // Test vector §A2.
@@ -53,6 +54,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/client/assets.md §a2-loaders
     #[test]
     fn no_magic_gives_strings() {
         // Test vector §A2.
@@ -62,6 +64,7 @@ mod tests {
         ));
     }
 
+    // Covers: specs/client/assets.md §edge-cases-original-bugs
     #[test]
     fn broken_font_is_an_error_not_strings() {
         // Perturbation (M08): version 2 breaks the font; the result is the

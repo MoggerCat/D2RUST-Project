@@ -6,6 +6,7 @@ use crate::items::quality::{dispatch, roll_quality, superior_fits, unique};
 use crate::items::tables::{QualityRec, UniqueRec};
 use crate::items::{flag, q, req, stat, ItemRequest};
 
+// Covers: specs/items/quality.md §3 r1
 #[test]
 fn request_quality_without_draw() {
     let mut t = tables();
@@ -19,6 +20,7 @@ fn request_quality_without_draw() {
     assert_eq!(it.item_seed, Seed::init_low(3));
 }
 
+// Covers: specs/items/quality.md §3 r4, §3 r5
 #[test]
 fn misc_item_level_one_first_draw() {
     let mut t = tables();
@@ -44,6 +46,7 @@ fn misc_item_level_one_first_draw() {
     }
 }
 
+// Covers: specs/items/quality.md §3 r6
 #[test]
 fn no_hit_fallback_and_divisor_zero() {
     let mut t = tables();
@@ -82,6 +85,7 @@ fn no_hit_fallback_and_divisor_zero() {
 }
 
 /// §5 vector: a downgrade replays the item seed from the saved value.
+// Covers: specs/items/quality.md §5 r2, §5 r4
 #[test]
 fn downgrade_restores_saved_seed() {
     let mut t = tables();
@@ -117,6 +121,7 @@ fn unique_rows(rarities: &[u32], code: &[u8; 4]) -> Vec<UniqueRec> {
 }
 
 /// §8 vector: weights 1, 0 (→ 1), 3 give starts 0, 1, 2 and total 5.
+// Covers: specs/items/quality.md §8 r3, §8 r5, §8 r6
 #[test]
 fn unique_weights() {
     let mut t = tables();
@@ -134,6 +139,7 @@ fn unique_weights() {
 }
 
 /// §8.1 vector: index 4097 is not markable; the not-forced unique fails.
+// Covers: specs/items/quality.md §8 r6, §8.1
 #[test]
 fn unique_index_4097() {
     let mut t = tables();
@@ -159,6 +165,7 @@ fn unique_index_4097() {
     assert_eq!(it.file_index, 4097);
 }
 
+// Covers: specs/items/quality.md §8 r2, §8 r6, §edge-cases-original-bugs r3
 #[test]
 fn unique_already_dropped_and_forced_mismatch() {
     let mut t = tables();
@@ -184,6 +191,7 @@ fn unique_already_dropped_and_forced_mismatch() {
 
 /// Edge cases 1 and 6: a failed unique becomes rare with triple
 /// durability; with items `unique` set it stays unique.
+// Covers: specs/items/quality.md §8 r4, §edge-cases-original-bugs r1, §edge-cases-original-bugs r6
 #[test]
 fn failed_unique_downgrades() {
     let mut t = tables();
@@ -215,6 +223,7 @@ fn failed_unique_downgrades() {
     assert_eq!(it.file_index, -1);
 }
 
+// Covers: specs/items/quality.md §7.1
 #[test]
 fn superior_row_fits() {
     let mut t = tables();
@@ -231,6 +240,7 @@ fn superior_row_fits() {
 }
 
 /// Superior: redraws on tried rows, then mode-1 properties.
+// Covers: specs/items/quality.md §7 r2
 #[test]
 fn superior_picks_fitting_row() {
     let mut t = tables();
@@ -256,6 +266,7 @@ fn superior_picks_fitting_row() {
 }
 
 /// Edge case 2: low-quality throwing damage clamps min ≥ 2, max ≥ 1.
+// Covers: specs/items/quality.md §6 r1, §6 r2, §6 r3, §edge-cases-original-bugs r2
 #[test]
 fn low_quality_throwing_bounds() {
     let mut t = tables();
@@ -285,6 +296,7 @@ fn low_quality_throwing_bounds() {
     assert_eq!(it.file_index, s.roll(4) as i32);
 }
 
+// Covers: specs/items/quality.md §9 r1, §9 r2
 #[test]
 fn set_item_weights_and_hellbovine() {
     use crate::items::tables::SetItemRec;

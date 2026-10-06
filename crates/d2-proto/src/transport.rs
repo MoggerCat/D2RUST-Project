@@ -173,6 +173,7 @@ mod tests {
     }
 
     /// Spec test vectors, C→S sizes.
+    // Covers: specs/sim/intents-events.md §2.1 r5, §edge-cases-original-bugs r4
     #[test]
     fn client_size_vectors() {
         let chat = |last: u8| bytes(&[&[0x15, 0x01, 0x00], b"hi\0bob\0", &[last]]);
@@ -195,6 +196,7 @@ mod tests {
     }
 
     /// Spec test vectors, classifier.
+    // Covers: specs/sim/intents-events.md §2.1 r4
     #[test]
     fn classifier_vectors() {
         assert_eq!(classify_client(&[0x80; 5]), Classified::Invalid);
@@ -229,6 +231,7 @@ mod tests {
     }
 
     /// Spec test vectors, S→C sizes.
+    // Covers: specs/sim/intents-events.md §3.1 r1
     #[test]
     fn server_size_vectors() {
         let mut m94 = vec![0x94, 0x03];
@@ -248,6 +251,7 @@ mod tests {
         assert_eq!(server_size(&[0x1A, 0x07]), Size::Bytes(2));
     }
 
+    // Covers: specs/sim/intents-events.md §3.3 r1, §3.3 r2, §3.3 r3
     #[test]
     fn split() {
         // 0x1A (2 bytes), 0x5F (5 bytes), then an id with size 0 ends it.
