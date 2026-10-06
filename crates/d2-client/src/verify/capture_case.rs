@@ -18,12 +18,14 @@
 //! `--perturb N` changes one byte in each of the first N saved frames, so
 //! exactly N re-hashes differ (§7 perturbation).
 //!
-//! The source of the d2rs scene is the seam [`SceneSource`]: which tiles,
-//! units and UI a recorded state draws is decided by the world-view rules
-//! (`camera.md`, `sprite-placement.md`, `draw-order.md`, …), owned
-//! elsewhere. Until a source is wired, compare cases report
-//! [`Status::SceneNotWired`]: the capture's own checks ran, the comparison
-//! did not. Never a pass.
+//! The source of the d2rs scene is the seam [`SceneSource`]. The wired
+//! one is [`scene_source::WorldScene`]: the recorded camera checked
+//! against `camera.md` §1, §3 (a difference fails the frame), then the
+//! recorded world through `world_view::build` and `rules::OriginalView`.
+//! What the recording does not hold (units, map, UI, assets) is a seam
+//! ([`SceneOutcome::Seam`], [`scene_source::RECORDER_GAP`]): such frames
+//! report [`Status::SceneNotWired`] — the capture's own checks and the
+//! camera check ran, the pixel comparison did not. Never a pass.
 
 use std::path::{Path, PathBuf};
 
@@ -34,6 +36,11 @@ use super::{
     GpuOutcome, Status,
 };
 use crate::scene::{self, Rect};
+
+pub mod scene_source;
+
+#[cfg(test)]
+mod scene_tests;
 
 /// The repository root (case paths are relative to it).
 pub fn repo_root() -> PathBuf {
@@ -65,6 +72,12 @@ pub enum SceneOutcome {
     Built(Box<Built>),
     /// No source of the d2rs scene is wired into this build.
     NotWired,
+    /// The source stops at a seam: the recording lacks what the pipeline
+    /// needs (the message names it). Reported as not wired, never a pass.
+    Seam(String),
+    /// The recorded state disagrees with a rule before any pixel is
+    /// composed (one line per difference): fails the frame.
+    Differs(Vec<String>),
     /// The source could not build the frame (a rule without an answer, a
     /// missing asset): fails the case.
     Error(String),
@@ -73,6 +86,12 @@ pub enum SceneOutcome {
 /// The seam from a recorded state (capture.md §3) to the d2rs scene.
 pub trait SceneSource {
     fn scene(&mut self, job: &SceneJob<'_>) -> SceneOutcome;
+
+    /// Report lines of the last [`SceneSource::scene`] call (checks that
+    /// passed), taken once.
+    fn take_notes(&mut self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// The scene source until the world view is wired to recorded states.
@@ -422,9 +441,23 @@ fn compare_one(
     gpu: &mut dyn GpuCompositor,
 ) -> (Status, Vec<String>) {
     let mut lines = Vec::new();
-    let built = match source.scene(job) {
+    let outcome = source.scene(job);
+    lines.extend(source.take_notes());
+    let built = match outcome {
         SceneOutcome::Built(b) => b,
         SceneOutcome::NotWired => return (Status::SceneNotWired, lines),
+        SceneOutcome::Seam(s) => {
+            lines.push(format!("scene: seam: {s}"));
+            return (Status::SceneNotWired, lines);
+        }
+        SceneOutcome::Differs(d) => {
+            let n = d.len();
+            lines.extend(d);
+            return (
+                Status::Fail(format!("{n} recorded camera values differ")),
+                lines,
+            );
+        }
         SceneOutcome::Error(e) => return (Status::Error(format!("scene: {e}")), lines),
     };
     let view = Rect::new(0, 0, image.width, image.height);
