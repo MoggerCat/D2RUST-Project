@@ -157,7 +157,13 @@ with `data-tool` on monstats.txt.
 
 ## 6. Gate
 
-See the commit message. Two `skills::mutant_tests::table_check_mutants`
+`sh tools/gate.sh` on `e5631e0` (after `tools/cloud-setup.sh`): every step
+passes except two test steps, whose only failures also fail on the base
+`b435f5a` (checked by checkout): `d2-client` `bridge::local_tests::{
+spec_table_records_the_server_message_as_unowned, protocol_version_check,
+unknown_and_unowned_ids}` and `bridge::tests::bridge_modules_except_mirror_have_no_bevy_type`
+(the bridge dispatch table reports `NoHandler` for 51 S→C ids; client
+bridge sessions' area), and two `skills::mutant_tests::table_check_mutants`
 tests (`index_bounds`, `repeated_slot_names_kind`) fail on the base
 `b435f5a` too (checked by checkout): `skills/functions.tsv` statuses
 changed under them; they belong to the skill-bodies session and are not
