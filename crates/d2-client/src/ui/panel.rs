@@ -99,6 +99,13 @@ pub enum UiResponse {
 /// String lookup by table key, UTF-16 as stored (`formats/tbl.md`).
 pub trait StringLookup {
     fn get(&self, key: &str) -> Option<&[u16]>;
+
+    /// Lookup by string-table id (`ui/text.md` §2; the panels of
+    /// `ui/panels.md` name strings by id). None until a table by id is
+    /// wired (`d2-data::strings`).
+    fn get_id(&self, _id: u16) -> Option<&[u16]> {
+        None
+    }
 }
 
 /// A lookup with no strings (tests, panels that need none).
