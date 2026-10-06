@@ -1178,3 +1178,14 @@ fn door_units() {
     let u = &w3.p.room_units(r3)[0];
     assert_eq!((u.unit_type, u.class, u.mode), (1, -1, 1));
 }
+
+// Covers: specs/drlg/preset.md §11
+#[test]
+fn door_record_flag_outcomes() {
+    // Flag 0x20 after a unit is added and when roll(3) gave 0 (the draw
+    // is spent); not when no row matches or the position is outside.
+    assert!(DoorOutcome::Placed.sets_record_flag());
+    assert!(DoorOutcome::Rolled0.sets_record_flag());
+    assert!(!DoorOutcome::NoRow.sets_record_flag());
+    assert!(!DoorOutcome::Outside.sets_record_flag());
+}
