@@ -1,5 +1,7 @@
 # Gap tests: items, stats, units
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Session: unit tests from specs for the uncovered rules of
 `specs/items/{affixes,generation,quality,properties}.md` and
 `specs/sim/{stats,stat-lists,units}.md` (METHODS M14, M08). Branch

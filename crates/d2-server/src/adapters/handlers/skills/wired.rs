@@ -1,6 +1,7 @@
 // Spec: specs/skills/use.md §1, §7; specs/skills/levels.md §6.4; specs/combat/vitals.md §2
 //! [`WiredSkills`]: the [`SkillHost`] of a game whose timer events run
-//! the action wiring ([`ActionSim`]). Each message builds a [`World`]
+//! the action wiring (`d2_sim::wiring::action::ActionSim`, alone or
+//! inside another dispatch: [`ActionEvents`]). Each message builds a [`World`]
 //! over the game, the wired unit system and the [`SkillSeams`], and runs
 //! the `d2-sim` handler its spec names.
 
@@ -8,8 +9,9 @@ use d2_sim::combat::vitals::{self, VitalsTables};
 use d2_sim::skills::use_::{self, MsgResult, ServerMsg, TargetError};
 use d2_sim::skills::{check_skill_point, spend_skill_point, SkillPointCheck, SkillTables};
 use d2_sim::units::UnitId;
-use d2_sim::wiring::action::{ActionSim, Pending, View};
+use d2_sim::wiring::action::{Pending, View};
 
+use super::super::world::ActionEvents;
 use super::seams::SkillSeams;
 use super::world::World;
 use super::{code, Call, Handled, SkillHost};
@@ -35,8 +37,8 @@ impl<S> WiredSkills<S> {
     }
 }
 
-impl<X: Pending, S: SkillSeams> SkillHost<ActionSim<X>> for WiredSkills<S> {
-    fn handle(&mut self, call: Call<'_, ActionSim<X>>) -> Handled {
+impl<D: ActionEvents, S: SkillSeams> SkillHost<D> for WiredSkills<S> {
+    fn handle(&mut self, call: Call<'_, D>) -> Handled {
         let Call {
             game,
             events,
@@ -45,7 +47,7 @@ impl<X: Pending, S: SkillSeams> SkillHost<ActionSim<X>> for WiredSkills<S> {
             staged,
         } = call;
         let player = staged.player;
-        let sys = &mut events.sys;
+        let sys = &mut events.action().sys;
         let tables = sys.hooks.tables.clone();
         let v = View::of(&mut sys.units, &mut sys.stats, &sys.data, &mut sys.hooks);
         let mut w = World::new(game, v, &mut self.seams, staged);

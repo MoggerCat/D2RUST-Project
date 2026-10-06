@@ -5,7 +5,7 @@
 
 use d2_sim::game::Game;
 use d2_sim::tick::timer::TimerRun;
-use d2_sim::tick::EventDispatch;
+use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 
@@ -258,6 +258,8 @@ impl EventDispatch for RunLog {
         self.0.push(*run);
     }
 }
+
+impl TickHooks for RunLog {}
 
 /// One single-player host frame (drain → tick → flush) on the real
 /// adapters, from the synthetic vectors of §2.4 rule 3–4 and §3.1.

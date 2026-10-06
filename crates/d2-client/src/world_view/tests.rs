@@ -1,0 +1,701 @@
+// Spec: specs/client/render-pipeline.md (A1, A6–A8), specs/client/ui.md (A2)
+//! Synthetic world → draw list (C4 key order, C7 slots), the CPU frame
+//! hash (golden, with perturbations, METHODS M08), the GPU packing checked
+//! through the shader emulation, the UI binding, and a windowless Bevy
+//! run. Every rule here is a test fixture ([`TestRules`]), not an original
+//! rule.
+
+use std::sync::{Arc, Mutex};
+
+use bevy::prelude::{
+    App, AssetApp, AssetPlugin, Assets, ButtonInput, Image, MinimalPlugins, MouseButton,
+};
+use d2_formats::cof::{Cof, CofLayer};
+use d2_formats::palette::{Palette, Rgb};
+use d2_proto::PROTOCOL_VERSION;
+
+use super::*;
+use crate::bridge::dispatch::{Dispatch, HandlerError, Message};
+use crate::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
+use crate::bridge::{Bridge, BridgeResource, UnitKey};
+use crate::frames::FramePart;
+use crate::gpu_compositor::pack::emulate;
+use crate::ui::{
+    ClientIntent, ImageRef, ImageRequest, NoPanelRules, NoStrings, Panel, PanelId, Point,
+    PointerButton, TextRequest, TextStyle, UiCtx, UiDraw, UiDrawSink, UiEvent, UiResponse, UiRoot,
+    WidgetId,
+};
+
+const COF: &str = "data/global/chars/tst/tst.cof";
+
+fn cof_path() -> CanonicalPath {
+    CanonicalPath::new(COF).unwrap()
+}
+
+fn set_key(component: u8, dir: u8) -> FrameSetKey {
+    FrameSetKey::new(
+        format!("data/global/chars/tst/c{component}.dcc"),
+        FramePart::Dir(dir),
+    )
+    .unwrap()
+}
+
+fn tile_key() -> FrameSetKey {
+    FrameSetKey::new("data/global/tiles/tst.dt1", FramePart::Tile(0)).unwrap()
+}
+
+/// A palette whose every entry is distinct, so RGBA reveals the index.
+fn palette() -> Palette {
+    let mut p = Palette {
+        colors: [Rgb::default(); 256],
+    };
+    for (i, c) in p.colors.iter_mut().enumerate() {
+        let i = i as u8;
+        *c = Rgb {
+            r: i,
+            g: 255 - i,
+            b: i ^ 0x5a,
+        };
+    }
+    p
+}
+
+fn layer(component: u8) -> CofLayer {
+    CofLayer {
+        component,
+        shadow: 0,
+        selectable: 1,
+        override_translucency: 0,
+        new_translucency: 0,
+        weapon_class: *b"hth\0",
+    }
+}
+
+/// Two directions, one frame, two layers (components 0 and 1). Direction
+/// 0 draws component 1 behind 0; direction 1 the reverse.
+fn cof() -> Cof {
+    Cof {
+        layers_count: 2,
+        frames: 1,
+        directions: 2,
+        version: 20,
+        unknown: [0; 4],
+        x_min: 0,
+        x_max: 0,
+        y_min: 0,
+        y_max: 0,
+        animation_rate: 256,
+        layers: vec![layer(0), layer(1)],
+        events: vec![0],
+        event_padding: Vec::new(),
+        draw_order: vec![1, 0, 0, 1],
+    }
+}
+
+fn set(width: u32, height: u32, x_off: i32, y_off: i32, pixels: &[u8]) -> FrameSet {
+    FrameSet {
+        frames: vec![IndexFrame::new(width, height, x_off, y_off, pixels.to_vec()).unwrap()],
+    }
+}
+
+fn assets() -> ViewAssets {
+    let mut a = ViewAssets::new(palette());
+    a.cofs.insert(cof_path(), cof());
+    a.sets
+        .insert(set_key(0, 0), set(2, 2, 1, -2, &[0, 5, 7, 0]));
+    a.sets.insert(set_key(1, 0), set(3, 1, 0, 0, &[9, 9, 9]));
+    a.sets.insert(set_key(0, 1), set(2, 1, 0, 0, &[4, 4]));
+    a.sets.insert(set_key(1, 1), set(1, 1, 0, 0, &[6]));
+    a.sets.insert(tile_key(), set(4, 2, 0, 0, &[3; 8]));
+    a
+}
+
+fn world(keys: &[(u8, u32)]) -> ClientWorld {
+    let mut w = ClientWorld::default();
+    for &(unit_type, guid) in keys {
+        let key = UnitKey { unit_type, guid };
+        w.units.insert(key, ClientUnit { key });
+    }
+    w
+}
+
+/// Fixture rules: guid 9 is not drawn; COF direction = guid % 2; draw key
+/// (2, guid, unit type); x = 10 × guid + x_off, y = 50 + y_off.
+struct TestRules;
+
+impl ViewRules for TestRules {
+    fn tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
+        Ok(vec![TileDraw {
+            frame: ComponentFrame {
+                set: tile_key(),
+                index: 0,
+            },
+            x: 100,
+            y: 100,
+            clip: Rect::FRAME,
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+            key: DrawKey::new(0, 0, 0, 0).unwrap(),
+            cell: (1, 2),
+        }])
+    }
+
+    fn unit_pose(&self, _: &ClientWorld, u: &ClientUnit) -> Result<Option<UnitPose>, ViewError> {
+        Ok((u.key.guid != 9).then(|| UnitPose {
+            cof: cof_path(),
+            dir: (u.key.guid % 2) as usize,
+            frame: 0,
+        }))
+    }
+
+    fn unit_params(
+        &self,
+        _: &ClientWorld,
+        u: &ClientUnit,
+        _: &UnitPose,
+    ) -> Result<UnitParams, ViewError> {
+        Ok(UnitParams {
+            pass: 2,
+            major: u.key.guid,
+            minor: u32::from(u.key.unit_type),
+            clip: Rect::FRAME,
+            tag: ItemTag::Unit(u.key.guid),
+        })
+    }
+
+    fn component_frame(
+        &self,
+        _: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<ComponentFrame, CompositeError> {
+        Ok(ComponentFrame {
+            set: set_key(req.slot.component, pose.dir as u8),
+            index: req.frame,
+        })
+    }
+
+    fn place(
+        &self,
+        u: &ClientUnit,
+        _: &UnitPose,
+        _: &ComponentRequest<'_>,
+        image: &IndexFrame,
+    ) -> Result<(i32, i32), CompositeError> {
+        Ok((10 * u.key.guid as i32 + image.x_off, 50 + image.y_off))
+    }
+
+    fn shade(
+        &self,
+        _: &ClientUnit,
+        _: &ComponentRequest<'_>,
+    ) -> Result<ShadeChain, CompositeError> {
+        Ok(ShadeChain::EMPTY)
+    }
+
+    fn blend(&self, _: &ClientUnit, _: &ComponentRequest<'_>) -> Result<BlendOp, CompositeError> {
+        Ok(BlendOp::Opaque)
+    }
+}
+
+impl UiRules for TestRules {
+    fn ui_image(&self, req: &ImageRequest, _: &ViewAssets) -> Result<UiSprite, ViewError> {
+        Ok(UiSprite {
+            frame: ComponentFrame {
+                set: set_key(1, 1),
+                index: req.image.frame as usize,
+            },
+            x: req.at.x,
+            y: req.at.y,
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+        })
+    }
+
+    fn ui_text(&self, _: &TextRequest, _: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
+        Err(ViewError::unresolved("UI text layout", "ui/text.md"))
+    }
+
+    fn ui_pass(&self) -> Result<u32, ViewError> {
+        Ok(5)
+    }
+}
+
+fn ui_image(x: i32, y: i32) -> UiDraw {
+    UiDraw::Image(ImageRequest {
+        image: ImageRef { file: 1, frame: 0 },
+        at: Point::new(x, y),
+        clip: crate::ui::Rect::new(0, 0, 800, 600),
+    })
+}
+
+/// (frame set, frame, x, y, key, tag) of each item, frame resolved
+/// through the table.
+type Row = (FrameSetKey, usize, i32, i32, (u32, u32, u32, u8), ItemTag);
+
+fn rows(frame: &WorldFrame) -> Vec<Row> {
+    frame
+        .items
+        .iter()
+        .map(|i| {
+            let (k, n) = frame.frames.get(i.frame).unwrap();
+            let key = (i.key.pass(), i.key.major(), i.key.minor(), i.key.sub());
+            (k.clone(), n, i.x, i.y, key, i.tag)
+        })
+        .collect()
+}
+
+fn scene_frame() -> (WorldFrame, ViewAssets) {
+    let a = assets();
+    let w = world(&[(0, 7), (1, 4), (1, 9)]);
+    let f = build(&w, &[ui_image(300, 200)], &TestRules, &a).unwrap();
+    (f, a)
+}
+
+// Covers: specs/client/render-pipeline.md §a1-layers-of-the-pipeline, §a6-draw-order, §a7-composite-units-cof text, §a7-composite-units-cof r2, §a7-composite-units-cof r4
+#[test]
+fn draw_list_is_ordered_by_key_with_cof_slots() {
+    let (f, _) = scene_frame();
+    assert_eq!(f.units_drawn, 2);
+    assert_eq!(f.units_hidden, 1);
+    let tile = ItemTag::Tile { x: 1, y: 2 };
+    let expected: Vec<Row> = vec![
+        (tile_key(), 0, 100, 100, (0, 0, 0, 0), tile),
+        // Unit (1, 4): built second, sorted first (major 4 < 7). COF
+        // direction 0: component 1 behind component 0.
+        (set_key(1, 0), 0, 40, 50, (2, 4, 1, 0), ItemTag::Unit(4)),
+        (set_key(0, 0), 0, 41, 48, (2, 4, 1, 1), ItemTag::Unit(4)),
+        // Unit (0, 7), COF direction 1: component 0 behind 1.
+        (set_key(0, 1), 0, 70, 50, (2, 7, 0, 0), ItemTag::Unit(7)),
+        (set_key(1, 1), 0, 70, 50, (2, 7, 0, 1), ItemTag::Unit(7)),
+        (set_key(1, 1), 0, 300, 200, (5, 0, 0, 0), ItemTag::Ui(0)),
+    ];
+    assert_eq!(rows(&f), expected);
+    // Ids in build order: tile, unit (0, 7)'s two, unit (1, 4)'s two; the
+    // UI image reuses the id of its frame.
+    let refs: Vec<_> = f.frames.refs().iter().map(|(k, _)| k.clone()).collect();
+    assert_eq!(
+        refs,
+        vec![
+            tile_key(),
+            set_key(0, 1),
+            set_key(1, 1),
+            set_key(1, 0),
+            set_key(0, 0)
+        ]
+    );
+    assert_eq!(f.items[5].frame, f.items[4].frame);
+}
+
+#[test]
+fn equal_keys_keep_build_order() {
+    struct Same;
+    impl ViewRules for Same {
+        fn tiles(&self, w: &ClientWorld, a: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
+            TestRules.tiles(w, a)
+        }
+        fn unit_pose(
+            &self,
+            w: &ClientWorld,
+            u: &ClientUnit,
+        ) -> Result<Option<UnitPose>, ViewError> {
+            TestRules.unit_pose(w, u)
+        }
+        fn unit_params(
+            &self,
+            _: &ClientWorld,
+            u: &ClientUnit,
+            _: &UnitPose,
+        ) -> Result<UnitParams, ViewError> {
+            Ok(UnitParams {
+                pass: 2,
+                major: 1,
+                minor: 1,
+                clip: Rect::FRAME,
+                tag: ItemTag::Unit(u.key.guid),
+            })
+        }
+        fn component_frame(
+            &self,
+            u: &ClientUnit,
+            p: &UnitPose,
+            r: &ComponentRequest<'_>,
+        ) -> Result<ComponentFrame, CompositeError> {
+            TestRules.component_frame(u, p, r)
+        }
+        fn place(
+            &self,
+            u: &ClientUnit,
+            p: &UnitPose,
+            r: &ComponentRequest<'_>,
+            i: &IndexFrame,
+        ) -> Result<(i32, i32), CompositeError> {
+            TestRules.place(u, p, r, i)
+        }
+        fn shade(
+            &self,
+            u: &ClientUnit,
+            r: &ComponentRequest<'_>,
+        ) -> Result<ShadeChain, CompositeError> {
+            TestRules.shade(u, r)
+        }
+        fn blend(
+            &self,
+            u: &ClientUnit,
+            r: &ComponentRequest<'_>,
+        ) -> Result<BlendOp, CompositeError> {
+            TestRules.blend(u, r)
+        }
+    }
+    impl UiRules for Same {
+        fn ui_image(&self, r: &ImageRequest, a: &ViewAssets) -> Result<UiSprite, ViewError> {
+            TestRules.ui_image(r, a)
+        }
+        fn ui_text(&self, r: &TextRequest, a: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
+            TestRules.ui_text(r, a)
+        }
+        fn ui_pass(&self) -> Result<u32, ViewError> {
+            TestRules.ui_pass()
+        }
+    }
+    let f = build(&world(&[(0, 7), (1, 4)]), &[], &Same, &assets()).unwrap();
+    // Same pass/major/minor: `sub` (the slot) decides, and items with the
+    // whole key equal keep build order, unit-key order (0, 7) before (1, 4).
+    let tags: Vec<_> = f.items.iter().map(|i| (i.tag, i.key.sub())).collect();
+    assert_eq!(
+        tags,
+        vec![
+            (ItemTag::Tile { x: 1, y: 2 }, 0),
+            (ItemTag::Unit(7), 0),
+            (ItemTag::Unit(4), 0),
+            (ItemTag::Unit(7), 1),
+            (ItemTag::Unit(4), 1),
+        ]
+    );
+}
+
+#[test]
+fn unspecified_rules_draw_nothing_and_refuse_ui() {
+    let a = assets();
+    let w = world(&[(0, 7), (1, 4)]);
+    let f = build(&w, &[], &Unspecified, &a).unwrap();
+    assert!(f.items.is_empty() && f.frames.is_empty());
+    assert_eq!((f.units_drawn, f.units_hidden), (0, 2));
+    // An empty list composes to the cleared frame (index 0 everywhere).
+    let rgba = compose_cpu(&f, &a).unwrap();
+    let c = a.palette.colors[0];
+    assert!(rgba.chunks(4).all(|p| p == [c.r, c.g, c.b, 255]));
+
+    let e = build(&w, &[ui_image(0, 0)], &Unspecified, &a).unwrap_err();
+    assert!(
+        matches!(
+            e,
+            ViewError::Unresolved {
+                spec: "render/draw-order.md",
+                ..
+            }
+        ),
+        "{e}"
+    );
+}
+
+#[test]
+fn missing_assets_and_text_are_errors() {
+    let w = world(&[(1, 4)]);
+    let mut a = assets();
+    a.sets.remove(&set_key(0, 0));
+    match build(&w, &[], &TestRules, &a).unwrap_err() {
+        ViewError::Unit { guid: 4, error, .. } => {
+            assert!(error.to_string().contains("c0.dcc"), "{error}")
+        }
+        e => panic!("{e}"),
+    }
+
+    let mut a = assets();
+    a.sets.remove(&tile_key());
+    assert!(matches!(
+        build(&w, &[], &TestRules, &a).unwrap_err(),
+        ViewError::Tile { index: 0, .. }
+    ));
+
+    let mut a = assets();
+    a.cofs.clear();
+    assert!(matches!(
+        build(&w, &[], &TestRules, &a).unwrap_err(),
+        ViewError::CofMissing(p) if p == cof_path()
+    ));
+
+    let text = UiDraw::Text(TextRequest {
+        text: vec![u16::from(b'a')],
+        at: Point::new(0, 0),
+        style: TextStyle::default(),
+        clip: crate::ui::Rect::new(0, 0, 800, 600),
+    });
+    assert!(matches!(
+        build(&w, &[ui_image(0, 0), text], &TestRules, &assets()).unwrap_err(),
+        ViewError::Ui { index: 1, .. }
+    ));
+}
+
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// FNV-1a 64 of the CPU-composited RGBA frame of [`scene_frame`].
+const GOLDEN: u64 = 0x0386_6d4b_e03b_3500;
+
+fn pixel(rgba: &[u8], x: u32, y: u32) -> [u8; 4] {
+    let o = (y * VIEW.width + x) as usize * 4;
+    rgba[o..o + 4].try_into().unwrap()
+}
+
+fn color(a: &ViewAssets, i: u8) -> [u8; 4] {
+    let c = a.palette.colors[usize::from(i)];
+    [c.r, c.g, c.b, 255]
+}
+
+#[test]
+fn cpu_frame_hash_is_golden() {
+    let (f, a) = scene_frame();
+    let rgba = compose_cpu(&f, &a).unwrap();
+    assert_eq!(rgba.len(), 800 * 600 * 4);
+    // Spot checks against the list: unit (1, 4) component 0 over 1.
+    assert_eq!(pixel(&rgba, 42, 48), color(&a, 5));
+    assert_eq!(pixel(&rgba, 41, 49), color(&a, 7));
+    assert_eq!(pixel(&rgba, 40, 50), color(&a, 9));
+    // Unit (0, 7): component 1 (index 6) over component 0 (index 4).
+    assert_eq!(pixel(&rgba, 70, 50), color(&a, 6));
+    assert_eq!(pixel(&rgba, 71, 50), color(&a, 4));
+    assert_eq!(pixel(&rgba, 103, 101), color(&a, 3));
+    assert_eq!(pixel(&rgba, 300, 200), color(&a, 6));
+    assert_eq!(fnv1a(&rgba), GOLDEN, "hash {:#018x}", fnv1a(&rgba));
+}
+
+fn differing(a: &[u8], b: &[u8]) -> Vec<(u32, u32)> {
+    a.chunks(4)
+        .zip(b.chunks(4))
+        .enumerate()
+        .filter(|(_, (x, y))| x != y)
+        .map(|(i, _)| (i as u32 % VIEW.width, i as u32 / VIEW.width))
+        .collect()
+}
+
+// M08: the hash check fails on exactly the perturbed input.
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn frame_hash_catches_perturbations() {
+    let (f, a) = scene_frame();
+    let base = compose_cpu(&f, &a).unwrap();
+
+    // One source pixel of one frame: exactly that screen pixel changes.
+    let mut a2 = a.clone();
+    a2.sets.get_mut(&set_key(0, 0)).unwrap().frames[0].pixels[1] = 8;
+    let changed = compose_cpu(&f, &a2).unwrap();
+    assert_eq!(differing(&base, &changed), vec![(42, 48)]);
+    assert_ne!(fnv1a(&changed), fnv1a(&base));
+
+    // One item (the 1×1 UI image) moved by one pixel: its old and new
+    // pixel change, nothing else.
+    let mut f2 = f.clone();
+    f2.items[5].x += 1;
+    let moved = compose_cpu(&f2, &a).unwrap();
+    assert_eq!(differing(&base, &moved), vec![(300, 200), (301, 200)]);
+
+    // Draw order: swapping two overlapping items changes exactly the
+    // overlap (unit (0, 7) at (70, 50)).
+    let mut f3 = f.clone();
+    f3.items.swap(3, 4);
+    let swapped = compose_cpu(&f3, &a).unwrap();
+    assert_eq!(differing(&base, &swapped), vec![(70, 50)]);
+}
+
+// Covers: specs/client/render-pipeline.md §a9-gpu-compute-compositor
+#[test]
+fn gpu_packing_emulates_to_the_cpu_image() {
+    let (f, a) = scene_frame();
+    let mut atlas = GpuAtlas::new(2).unwrap();
+    atlas.ensure(&f, &a).unwrap();
+    let packed = atlas.pack(&f, &a).unwrap();
+    let gpu = emulate(&packed, atlas.atlas().pages()).unwrap();
+    let cpu = scene::compose(&f.items, &f.frames.bind(&a), &a.maps, VIEW).unwrap();
+    assert_eq!(gpu, cpu);
+    // Sets go in once, in frame-id order.
+    let before = atlas.atlas().pages()[0].generation;
+    atlas.ensure(&f, &a).unwrap();
+    assert_eq!(atlas.atlas().pages()[0].generation, before);
+}
+
+// --- UI binding and the Bevy edge ---------------------------------------
+
+#[derive(Clone, Default)]
+struct RecordingLink {
+    sent: Arc<Mutex<Vec<Vec<u8>>>>,
+    deliveries: Arc<Mutex<Vec<Vec<u8>>>>,
+}
+
+impl ServerLink for RecordingLink {
+    fn protocol_version(&self) -> u32 {
+        PROTOCOL_VERSION
+    }
+
+    fn send(&mut self, _: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
+        self.sent.lock().unwrap().push(msg.to_vec());
+        Ok(Sent::Queued)
+    }
+
+    fn pump(&mut self) -> Result<Pumped, LinkError> {
+        Ok(Pumped { ticked: true })
+    }
+
+    fn receive(&mut self) -> Vec<Vec<u8>> {
+        std::mem::take(&mut *self.deliveries.lock().unwrap())
+    }
+}
+
+fn add_unit(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    let key = msg.unit.ok_or(HandlerError::Invalid("no unit"))?;
+    world.units.insert(key, ClientUnit { key });
+    Ok(())
+}
+
+/// A bridge whose first frame adds units (0, 7), (1, 4), (1, 9) through a
+/// synthetic 0x0E handler.
+fn bridge_with_units() -> (Bridge<RecordingLink>, RecordingLink) {
+    let link = RecordingLink::default();
+    let mut chunk = Vec::new();
+    for (t, g) in [(0u8, 7u32), (1, 4), (1, 9)] {
+        let mut m = vec![0x0E, t];
+        m.extend(g.to_le_bytes());
+        m.resize(12, 0);
+        chunk.extend(m);
+    }
+    link.deliveries.lock().unwrap().push(chunk);
+    let mut d = Dispatch::empty();
+    d.set(0x0E, "test", add_unit);
+    (Bridge::with_dispatch(link.clone(), d).unwrap(), link)
+}
+
+/// C→S Walk to (3, 4).
+const WALK: [u8; 5] = [0x01, 3, 0, 4, 0];
+
+/// A panel at (290, 190, 100×100) drawing one image; a press sends Walk.
+struct TestPanel;
+
+impl Panel for TestPanel {
+    fn id(&self) -> PanelId {
+        PanelId(1)
+    }
+    fn rect(&self) -> crate::ui::Rect {
+        crate::ui::Rect::new(290, 190, 100, 100)
+    }
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        // The panel sees the bridge's model read-only.
+        assert!(ctx.tick >= 1 && ctx.world.units.len() == 3);
+        out.push(ui_image(300, 200));
+    }
+    fn hit(&self, _: Point) -> Option<WidgetId> {
+        Some(WidgetId(0))
+    }
+    fn event(&mut self, e: UiEvent, _: &UiCtx) -> UiResponse {
+        match e {
+            UiEvent::Press { .. } => UiResponse::Intent(ClientIntent(WALK.to_vec())),
+            _ => UiResponse::Ignored,
+        }
+    }
+}
+
+fn ui_root() -> UiRoot {
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    root.add(Box::new(TestPanel)).unwrap();
+    root.open(PanelId(1)).unwrap();
+    root
+}
+
+const PRESS: UiEvent = UiEvent::Press {
+    button: PointerButton::Left,
+    at: Point::new(300, 200),
+};
+
+// Covers: specs/client/ui.md §a2-panel-model
+#[test]
+fn ui_binding_routes_forwards_and_draws() {
+    let (mut bridge, link) = bridge_with_units();
+    bridge.frame().unwrap();
+    let mut root = ui_root();
+    let outside = UiEvent::CursorMoved(Point::new(10, 10));
+    let mut queue = UiQueue(vec![outside, PRESS]);
+    let f = ui_bind::run_ui(&mut root, &mut queue, &mut bridge, &NoStrings).unwrap();
+    assert_eq!(f.unhandled, vec![outside]);
+    assert_eq!(f.sent, 1);
+    assert_eq!(f.draws, vec![ui_image(300, 200)]);
+    assert!(queue.0.is_empty());
+    assert_eq!(*link.sent.lock().unwrap(), vec![WALK.to_vec()]);
+
+    let frame = build(bridge.world(), &f.draws, &TestRules, &assets()).unwrap();
+    assert_eq!(frame, scene_frame().0);
+}
+
+#[test]
+fn bevy_frame_presents_the_cpu_image() {
+    let (bridge, link) = bridge_with_units();
+    let boxed = Bridge::with_dispatch(Box::new(link.clone()) as _, {
+        let mut d = Dispatch::empty();
+        d.set(0x0E, "test", add_unit);
+        d
+    })
+    .unwrap();
+    drop(bridge);
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>()
+        .add_plugins((crate::bridge::BridgePlugin, WorldViewPlugin { gpu: false }))
+        .insert_resource(BridgeResource(boxed))
+        .insert_resource(WorldViewState::new(assets(), Box::new(TestRules)));
+    let mut ui = WorldViewUi::new(ui_root(), Box::new(NoStrings));
+    ui.queue.0.push(PRESS);
+    app.insert_non_send(ui);
+
+    app.update();
+
+    let state = app.world().resource::<WorldViewState>();
+    let stats = state.last.unwrap();
+    assert_eq!(
+        (
+            stats.bridge_frame,
+            stats.items,
+            stats.units_drawn,
+            stats.units_hidden
+        ),
+        (1, 6, 2, 1)
+    );
+    assert_eq!((stats.ui_sent, stats.gpu), (1, false));
+    assert_eq!(*link.sent.lock().unwrap(), vec![WALK.to_vec()]);
+
+    let (f, a) = scene_frame();
+    let expected = compose_cpu(&f, &a).unwrap();
+    let target = app.world().resource::<present::WorldViewTarget>();
+    let image = app
+        .world()
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .unwrap();
+    assert_eq!(image.data.as_deref(), Some(&expected[..]));
+
+    // Second frame: the same target image is overwritten, not re-created.
+    let handle = target.image.clone();
+    app.update();
+    let target = app.world().resource::<present::WorldViewTarget>();
+    assert_eq!(target.image, handle);
+    assert_eq!(
+        app.world()
+            .resource::<WorldViewState>()
+            .last
+            .unwrap()
+            .bridge_frame,
+        2
+    );
+}

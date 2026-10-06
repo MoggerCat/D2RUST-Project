@@ -21,7 +21,7 @@ mod action;
 #[cfg(test)]
 mod tests;
 
-pub use action::{ActionWorld, Outbox};
+pub use action::{ActionEvents, ActionWorld, Outbox};
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;

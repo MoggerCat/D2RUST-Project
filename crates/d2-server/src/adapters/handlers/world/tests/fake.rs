@@ -12,7 +12,7 @@ use d2_data::tables::{Monstats, Record};
 use d2_sim::game::Game;
 use d2_sim::rng::Seed;
 use d2_sim::tick::timer::TimerRun;
-use d2_sim::tick::EventDispatch;
+use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::world::npc::{
@@ -685,6 +685,8 @@ pub struct NoEvents;
 impl EventDispatch for NoEvents {
     fn run_event(&mut self, _: &mut Game, _: &TimerRun) {}
 }
+
+impl TickHooks for NoEvents {}
 
 impl WorldHost<NoEvents> for FakeHost {
     fn npc<C: NpcCall>(&mut self, _: &mut Game, _: &mut NoEvents, call: C) -> Option<C::Out> {
