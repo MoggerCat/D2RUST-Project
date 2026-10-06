@@ -33,6 +33,33 @@ Missed by file, before → after:
 | `adapters/handlers/skills/seams.rs` | 46 | 46 |
 | `adapters/handlers/world.rs`, `world/trade.rs`, `world/action.rs` | 8 | 8 |
 
+### Re-baseline on the merged base (`453b7dd`, base `6810ec6`)
+
+The coordinator fixed the base's stale `d2-proto` generated tables
+(`e909c15`) and the branch merged it. The merge also brought new
+`d2-server` tests (`prop_handle.rs`, `prop_transport.rs`) and a new
+module, `world_data/`. On the merged tree:
+
+| Run | Mutants | Caught | Missed | Timeout | Unviable |
+|---|---|---|---|---|---|
+| `d2-server`, merged | 915 | 457 | 343 | 3 | 112 |
+
+- **Base's new tests:** they kill 3 of the handler survivors below
+  (`cube_world.rs` 117 → 115, `skills/world.rs` 170 → 169).
+- **The 25 kills from this branch:** all still hold.
+- **`world_data/`:** a new module that is outside this task's scope;
+  its 5 survivors are listed below.
+  - `ds1_input` `version < 7` → `<=` (`world_data/mod.rs:104`). Version
+    7 must be accepted. This boundary is decided by `drlg/preset.md`
+    §5, so a synthetic DS1 of version 7 kills it. It is a candidate for
+    the world-data owner.
+  - `lossy` → `""` / `"xyzzy"`. This only changes the path text in an
+    error message, which no spec governs; it is unobservable.
+  - `LevelTables::from_fixed` `delete -` (the `-1` default of
+    `hdm_item`) and `records` → `Ok(vec![])` (`tables.rs`). These are
+    reached only by loading a real table set; they need game files
+    (local run queue, `#[ignore]` tests).
+
 ## (a) Killed: 25 mutants, each by a spec vector
 
 All 25 were verified killed in the second full run.
