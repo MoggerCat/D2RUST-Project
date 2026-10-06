@@ -46,7 +46,7 @@ Voice log entries (§A5), a stereo i16 stream to the device.
 
 1. `ArchiveSet` reads the `.wav` file; sector decompression (Huffman +
    ADPCM, `mpq.md` §9–§12) is done in `d2-formats` and gives RIFF bytes
-   (all 5,008 such files decode to their RIFF size, `mpq.md`
+   (all 4,992 such files decode to their RIFF size, `mpq.md`
    Observations).
 2. A RIFF/WAVE parser (`d2-formats::wav`, owner `formats/wav.md`, to be
    written from a survey of the live files, §B1) gives
