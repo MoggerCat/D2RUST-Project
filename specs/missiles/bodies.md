@@ -20,39 +20,46 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 58–77 |
-| Inputs | 78–85 |
-| Outputs / state changes | 86–90 |
-| Rules | 91–92 |
-|   1. Server-do 17 Cairn Stones `0x005AF240` | 93–112 |
-|   2. Server-do 28 Volcano `0x005AFB80` | 113–135 |
-|   3. Server-do 34 Baal taunt control `0x005B04A0` | 136–158 |
-|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 159–179 |
-|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 180–194 |
-|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 195–232 |
-|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 233–250 |
-|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 251–281 |
-|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 282–323 |
-|   10. Server-hit 36 missile in air `0x005ABF70` | 324–340 |
-|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 341–383 |
-|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 384–412 |
-|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 413–427 |
-|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 428–442 |
-|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 443–462 |
-|   16. Server-hit 52 Blade Fury `0x005AC940` | 463–481 |
-|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 482–510 |
-|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 511–527 |
-|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 528–584 |
-|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 585–597 |
-|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 598–608 |
-|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 609–628 |
-|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 629–645 |
-| Constants & data dependencies | 646–683 |
-| Randomness | 684–700 |
-| Edge cases & original bugs | 701–726 |
-| Test vectors | 727–750 |
-| Provenance | 751–778 |
-| Open questions | 779–795 |
+| Summary | 65–84 |
+| Inputs | 85–92 |
+| Outputs / state changes | 93–97 |
+| Rules | 98–99 |
+|   1. Server-do 17 Cairn Stones `0x005AF240` | 100–119 |
+|   2. Server-do 28 Volcano `0x005AFB80` | 120–142 |
+|   3. Server-do 34 Baal taunt control `0x005B04A0` | 143–165 |
+|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 166–186 |
+|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 187–201 |
+|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 202–239 |
+|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 240–257 |
+|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 258–288 |
+|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 289–330 |
+|   10. Server-hit 36 missile in air `0x005ABF70` | 331–347 |
+|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 348–390 |
+|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 391–419 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 420–434 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 435–449 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 450–469 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 470–488 |
+|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 489–517 |
+|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 518–534 |
+|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 535–591 |
+|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 592–604 |
+|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 605–615 |
+|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 616–635 |
+|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 636–652 |
+|   24. Server-hit 8 Blaze `0x005AA180` | 653–664 |
+|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 665–702 |
+|   26. Server-do 9 bat lightning bolt `0x005AE940` | 703–714 |
+|   27. Server-hit 15 spider goo lay `0x005AAD40` | 715–724 |
+|   28. Server-hit 17 Howl `0x005AAFB0` | 725–741 |
+|   29. Server-do 11 finger mage spider `0x005AEB60` | 742–761 |
+|   30. Server-hit 19 finger mage spider `0x005AB110` | 762–771 |
+| Constants & data dependencies | 772–813 |
+| Randomness | 814–832 |
+| Edge cases & original bugs | 833–862 |
+| Test vectors | 863–890 |
+| Provenance | 891–920 |
+| Open questions | 921–937 |
 <!-- /index -->
 
 ## Summary
@@ -643,6 +650,125 @@ Rows: armageddoncontrol (577), diablogeddoncontrol (670); `sHitPar1`
    y)` (`skills/bodies.md` §6.13).
 7. Return 1.
 
+### 24. Server-hit 8 Blaze `0x005AA180`
+
+Row: blaze (67).
+
+1. No unit → return 2.
+2. O = owner. O exists, the unit is O, and O has state 13 (`blaze`,
+   `0x00639DF0(O, 13)`) → return 0.
+3. Else return 2.
+
+A blaze piece never burns its own caster while the caster's Blaze state
+is on; anyone else gets the damage stage (result 2, no death bit).
+
+### 25. Server-hit 9 Immolation Arrow `0x005AA250`
+
+Row: immolationarrow (85); `sHitPar1` 0, `sHitPar2` 0, `SHitCalc1`
+"100", `HitSubMissile1` immolationfire.
+
+1. Missile none or no record → return 1. k = skill, L = level; k
+   invalid → return 1. O = owner (may be none).
+2. `HitSubMissile1` ≥ 0:
+   1. Missile stats 56 (`coldlength`) := 0 and 134 (`item_freeze`) := 0
+      (`0x00627260(missile, s, 0, 0)`).
+   2. r = `sHitPar1`; r ≤ 0 → max(`eval(O, k.calc1, k, L)`, 1).
+   3. h = missiles evaluator `0x0064B7C0(missile, O, SHitCalc1 (+0x88),
+      class, L)` (`data/calc-expressions.md`).
+   4. `fire_disc(game, missile, r, HitSubMissile1, h)`.
+3. r2 = `sHitPar2`; r2 ≤ 0 → max(`eval(O, k.calc2, k, L)`, 1).
+4. Zeroed 0x70 record; `elem_roll(game, missile, unit, record)`
+   (`missiles.md` §R9.6: `EType` element only); hit flags |=
+   `HitFlags`, result flags |= `ResultFlags`.
+5. `area_damage(game, owner, x, y, r2, record, 0)` (owner fetched
+   again). Return 3.
+
+`fire_disc(game, missile, r, class, h)` = `0x005A9530` (ECX game, EDX
+missile, stack r, class, h):
+
+1. The missile has no room → nothing. h < 0 → h = 0.
+2. Zeroed record, flags 1 (position given; target = start), | 0x8000
+   when h ≠ 0 (range field := h before each creation); owner, skill,
+   level of the missile; class.
+3. (X, Y) = the missile's position. For a = −r…r (outer), b = −r…r
+   (inner): skip unless the missile still has a room and a² + b² ≤ r²;
+   skip when the line test `0x0064E260(room, (X + a, Y + b), (X + 2a,
+   Y + 2b), mask 4)` reports a hit; skip when no room contains (X + a,
+   Y + b) (`0x00463740(missile room, X + a, Y + b)`) or that room is in
+   town (`0x0061AB00`). Else start = (X + a, Y + b); create.
+
+r < 0 makes nothing. The line test runs from the cell outward, away
+from the centre, not from the centre to the cell.
+
+### 26. Server-do 9 bat lightning bolt `0x005AE940`
+
+Row: bat lightning bolt (123); `SubMissile1` bat lightning trail.
+
+1. Missile none or no record → the code reads `SubMissile1` through the
+   null record (fatal, as server-do 8). With a record `SubMissile1` is
+   not tested.
+2. (x, y) = position. Path new-step flag: zeroed record, flags 1
+   (position given; target = start); owner (none → fails); start (x, y);
+   skill, level; class `SubMissile1`. Create.
+3. Return flight.
+
+### 27. Server-hit 15 spider goo lay `0x005AAD40`
+
+Row: spidergoolay (143); `HitSubMissile1` spidergoo.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. Zeroed record, flags 1; owner O; start = the missile's position;
+   skill, level; class `HitSubMissile1`. Create.
+3. Return 0 (no damage, no death on a unit contact).
+
+### 28. Server-hit 17 Howl `0x005AAFB0`
+
+Row: howl (148).
+
+1. k = skill, L = level; k invalid → return 1. O = owner; none →
+   return 1.
+2. No unit, or the unit is not a monster (type 1) → return 0.
+3. s = k.`auratargetstate`; s < 0 or ≥ states count → return 1.
+4. The unit has s (`0x00639DF0`) → return 0.
+5. O's level (stat 12, `0x00625480(O, 12, 0)`) + L + k.`Param2`
+   (+0x14C, `0x004EFC20`) ≤ the unit's level (stat 12) → return 0.
+6. Terror install `0x005DDD00(game, O, unit, k, a, b)` (special state
+   11, `monsters/ai.md`, `monsters/ai-bodies-2.md` §16): a = `Param3` +
+   (L − 1) × `Param4` (`0x004CC7C0`), b = `Param5` + (L − 1) × `Param6`
+   (`0x004EFCB0`); both 0 when L ≤ 0.
+7. Return 0.
+
+### 29. Server-do 11 finger mage spider `0x005AEB60`
+
+Row: fingermagespider (177); `Param1` 5, `Param2` 20, `Param3` 2.
+
+1. Missile none or no record → return 2.
+2. T = the missile's path target (`0x00553540`, `skills/bodies.md`
+   §2.1). O = owner (always fetched). No T: O exists → T = O's path
+   target; still none → return flight.
+3. n = `Param1`, ≤ 0 → 5. Frames left mod n ≠ 0 (signed) → return
+   flight.
+4. `0x006416D0(missile, T)` (`missiles.md` §R9.5 item 4) > `Param2`
+   (signed) → return flight.
+5. s = max(`Param3`, 1); dx = sign(T.x − x) × s, dy = sign(T.y − y) × s
+   (0 when equal). Path target point := (x + dx, y + dy) (`0x00648AD0`);
+   rebuild (`0x00649970(path, missile, 0)`).
+6. Return flight.
+
+The spider steps toward its target one short leg (2 sub-tiles per axis)
+every 5 frames while within 20.
+
+### 30. Server-hit 19 finger mage spider `0x005AB110`
+
+Row: fingermagespider (177).
+
+As §12 (server-hit 16) with these differences: no unit → return 1 (not
+0); len = max(`eval(O, k.auralencalc (+0x60), k, L)`, 5); the result is
+3 (damage, die). The checks run in the order k valid, owner, unit,
+`auratargetstate` valid (each failing → 1). The fresh-list quirk of §12
+step 6 is the same.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -665,6 +791,10 @@ Rows: armageddoncontrol (577), diablogeddoncontrol (670); `sHitPar1`
 | nova SX, SY, P, Q, EX, EY | §19 | `0x006E1510`, `0x006E14E4`, `0x006E14F4`, `0x006E14C8`, `0x006E14A8`, `0x006E1488` |
 | nova limit | (n − 1) / 5 ≤ 7, else fatal | `0x0056D4E0` |
 | zigzag path | type 10, distance min(total frames, 255) | `0x005AC040` |
+| blaze state | 13 | `0x005AA180` |
+| immolation stats cleared | 56, 134 | `0x005AA250` |
+| howl level test | O level + L + `Param2` > unit level | `0x005AAFB0` |
+| spider step | sign × max(`Param3`, 1) every `Param1` (≤ 0 → 5) frames left, within `Param2` | `0x005AEB60` |
 
 Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 `pSrvHitFunc` cells holding that index; royalstrikechainlightning's
@@ -678,7 +808,7 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 | 4 | hit 3 (44) §8, do 6 (68) §7, hit 14 (101) §9, hit 36 (385) §10 |
 | 3 | hit 10 (86) §11, hit 16 (146) §12, hit 18 (149) §13, hit 26 (249) §14, do 14 (250) §15, hit 27 (250) §15, hit 52 (505) §16 |
 | 2 | hit 7 (55) §17, hit 44 (429) §8, do 22 (431) §18, hit 45 (431) §19, do 23 (441) §20, do 26 (471) §21, do 31 (517) §22, hit 56 (577) §23 |
-| 1 | hit 8 (67), hit 9 (85), do 9 (123), hit 15 (143), hit 17 (148), do 11 (177), hit 19 (177), do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407) §19, hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
+| 1 | hit 8 (67) §24, hit 9 (85) §25, do 9 (123) §26, hit 15 (143) §27, hit 17 (148) §28, do 11 (177) §29, hit 19 (177) §30, do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407) §19, hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
 | 0 | do 24 (shares do 23's address) §20, do 37, hit 5, hit 6, hit 11, hit 23 |
 
 ## Randomness
@@ -694,6 +824,8 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 | hit 7 | — | heal only: `roll(hi − lo)`, then if v ≤ 0 the stat 21/22 roll |
 | zigzag callback (hit 38, 45) | path target x (path +0x10) | none in the callback; the new missile's zigzag path compute (path type 10) uses this seed (`missiles.md` Open question 12) |
 | hit 56 | — | §R6.2 rolls; `area_damage` per unit |
+| hit 9 | — | `elem_roll` (`EType` element) on the missile seed, then `area_damage` per unit |
+| hit 8, do 9, hit 15, hit 17, do 11, hit 19 | — | none of their own (hit 17's terror install: monsters spec) |
 | hit 44, hit 14 | — (allocation seed) | `missiles.md` §R6.2 rolls in element order; then `area_damage`'s per-unit draws (not on the missile seed) |
 
 Created missiles draw on their own seeds (`missiles.md` §R2.3).
@@ -723,6 +855,10 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
     an empty column (−1); server-do 6 and 31 reject < 0.
 12. Server-do 31 without an owner removes the missile (result 2) even
     when the server-hit result would keep it.
+13. Server-do 9 with no record reads through a null pointer (fatal).
+14. `fire_disc` (§25) traces each cell's line outward (cell to 2 ×
+    offset), so a wall just beyond a cell can veto it.
+15. Server-hit 19 keeps §12's fresh-list quirk.
 
 ## Test vectors
 
@@ -746,6 +882,10 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 | catapultchargedball, L = 3 | n = 4 + 2 × 2 = 8 → 16 missiles | live row, §19 |
 | trailing javelin at (50, 50), target (60, 50), elapsed 0 | data +0x28 = 0, +0x2C = 10; trails aimed at offsets (0, 10) and (0, −10) | synthetic, §18 |
 | holybolt on a hostile non-undead monster | 4 (passes) | live row, §17 |
+| fire_disc r = 1, open floor, h = 100 | 5 pieces at (X − 1, Y), (X, Y − 1), (X, Y), (X, Y + 1), (X + 1, Y), in that order, range 100 | synthetic, §25 |
+| fire_disc r = 2 | 13 cells (a² + b² ≤ 4) | synthetic, §25 |
+| fingermagespider at (10, 10), target (25, 5), both size 1, frames left 75 | d = (2 × 15 + 5) / 2 = 17 ≤ 20 → path target (12, 8) | synthetic, §29 |
+| howl, O level 10, L 3, `Param2` 2, monster level 15 | 15 ≤ 15 → return 0, no terror | synthetic, §28 |
 | bladefury1 hit at (100, 100) | 8 class-0 missiles aimed at (116, 100), (116, 116), (100, 116), (84, 116), (84, 100), (84, 84), (100, 84), (116, 84) | live row, §16 |
 
 ## Provenance
@@ -766,7 +906,9 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
   `0x005AF620`, `0x00648A00` (path +0x10), `0x005AC480`, `0x005AC0A0`,
   `0x0056D4E0` (callers: only these two, `disasm.py xref`),
   `0x005AC040`, `0x005AF790`, `0x005AF980`, `0x005B01F0`,
-  `0x005ACC50`; table
+  `0x005ACC50`, `0x005AA180`, `0x005AA250`, `0x005A9530`,
+  `0x005AE940`, `0x005AAD40`, `0x005AAFB0`, `0x004EFC20`, `0x004EFCB0`,
+  `0x005AEB60`, `0x005AB110`; table
   pointers checked (`disasm.py xref`: server-hit table `0x0073C840` +
   4 × index, server-do `0x0073C768` + 4 × index); offset tables dumped
   from `Game.exe` (`0x006E1488`–`0x006E151F`, `0x006E24D0`–`0x006E25DF`, `0x006E2A38`–`0x006E2A77`). Live rows listed per
