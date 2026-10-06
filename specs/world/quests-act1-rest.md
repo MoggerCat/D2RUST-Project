@@ -23,19 +23,19 @@
 | Inputs | 52–62 |
 | Outputs / state changes | 63–70 |
 | Rules | 71–72 |
-|   1. A1Q4 gibbet (Cain's cage, object class 26) | 73–141 |
-|   2. Cairn stones (object classes 17–21) | 142–189 |
-|   3. Town-Cain marker (object class 385, `InitFn` 54) | 190–202 |
-|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 203–241 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 242–259 |
-|   6. Party list as read by the quest code | 260–285 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 286–295 |
-| Constants & data dependencies | 296–309 |
-| Randomness | 310–316 |
-| Edge cases & original bugs | 317–333 |
-| Test vectors | 334–352 |
-| Provenance | 353–369 |
-| Open questions | 370–382 |
+|   1. A1Q4 gibbet (Cain's cage, object class 26) | 73–143 |
+|   2. Cairn stones (object classes 17–21) | 144–191 |
+|   3. Town-Cain marker (object class 385, `InitFn` 54) | 192–218 |
+|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 219–257 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 258–275 |
+|   6. Party list as read by the quest code | 276–301 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 302–311 |
+| Constants & data dependencies | 312–325 |
+| Randomness | 326–332 |
+| Edge cases & original bugs | 333–349 |
+| Test vectors | 350–368 |
+| Provenance | 369–388 |
+| Open questions | 389–400 |
 <!-- /index -->
 
 ## Summary
@@ -89,7 +89,9 @@ New chain 4 extra fields (the rest are in `quests.md` §10.6):
 | +0x66 | u8 | town portal out of Tristram created by §1.2 |
 | +0x74 | u32 | scratch: player unit found in Tristram (§1.2 step 4) |
 | +0x84, +0x88 | i32 × 2 | position of the town-Cain marker object (§3) |
-| +0x91 | u8 | set by `0x005944F0` (§3; Open question 1) |
+| +0x91 | u8 | set to 1 by `0x005944F0` (§3); no reader in this chain's code |
+| +0x96 | u8 | Cain portal object created by `0x005944F0` (§3) |
+| +0xA4 | u32 | GUID of that portal object (§3) |
 
 #### 1.1 Operate `0x00593480` (args: game, object, player, …, class; returns 0)
 
@@ -195,10 +197,24 @@ class-60 portal (`missiles/bodies.md`).
 init args x, y. If X +0x52 = 1 and X +0x51 = 0: town Cain spawn
 (`quests.md` §10.6 step 15) at (x, y) in the init args' room. The
 event-3 spawn of `quests.md` §10.6 step 3.3 looks X +0x6C up as an
-object (type 2). `0x005944F0` (pointers in code at `0x005E77F3` and
-`0x005E7943`) also reads X +0x6C / +0x70, sets X +0x91 and X +0x52 := 1
-and calls this init with the marker's room and position; its caller is
-not traced (Open question 1).
+object (type 2).
+
+**Cain leaves Tristram** `0x005944F0(game, unit)` is the "spawn the town
+portal" call of the NpcOutOfTown AI for class 146 `cain1`
+(`monsters/ai.md` §9.32, `0x005E7880` / portal set-up `0x005E77A0`;
+the code pointers at `0x005E77F3` and `0x005E7943` select it by class):
+
+1. Chain 4's record must exist (`0x00543640`), else nothing; X = its
+   extra. X +0x91 := 1, X +0x52 := 1.
+2. Only when X +0x70 = 1 (the marker registered): the marker object
+   (type 2, GUID X +0x6C, `0x00552F60`) must exist; this init runs
+   again with {game, marker, its room, its x, its y}, so with X +0x52 =
+   1 the town Cain spawns when X +0x51 = 0.
+3. Then (still under step 2's condition), when X +0x51 = 1: the Cain
+   monster (type 1, GUID X +0x68) must exist; at its position (`0x00620870`), in the room containing it
+   (cell lookup `0x00463740` from its room), object 189 `cain portal` is
+   allocated (`0x00555230(type 2, class 189, …, mode 1)`); on success X
+   +0x96 := 1 and X +0xA4 := the object's GUID.
 
 ### 4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`)
 
@@ -366,12 +382,14 @@ from their own seeds as their owners state (`monsters/init.md`,
   (client save flags, progression bits 8–12; same formula), the inventory
   magic and owner field, `D2MissileDataStrc` +0x28/+0x2C, party lookup
   by owner. Each was matched to the 1.14d code above.
+Ghidra backlog (2026-10-06): `0x005944F0` read in full; its selectors
+at `0x005E77F3` (in `0x005E77A0`) and `0x005E7943` (in `0x005E7880`);
+object row 189 from live `objects.txt`.
 
 ## Open questions
 
-1. `0x005944F0` (sets chain 4 extra +0x91, +0x52 and calls the marker
-   init, §3): who calls it (code pointers at `0x005E77F3`, `0x005E7943`,
-   in monster code) and its full rules. Settle with a disassembly read.
+1. ~~`0x005944F0`~~: answered in §3 (caller: the `cain1`
+   NpcOutOfTown AI, `monsters/ai.md` §9.32).
 2. Object modes set here (gibbet 1 / 3, stones 0 / 2, `quests.md` §10.6)
    and object events 1 / 7 belong to the objects spec (not written).
 3. A recording of a Cain rescue (gibbet operate → event 7 17 frames

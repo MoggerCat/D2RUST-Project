@@ -22,17 +22,17 @@
 | Inputs | 55–61 |
 | Outputs / state changes | 62–66 |
 | Rules | 67–68 |
-|   1. Unit add | 69–157 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 158–164 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 165–196 |
-|   4. Queued movement and action messages | 197–231 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 232–253 |
-| Constants & data dependencies | 254–265 |
-| Randomness | 266–271 |
-| Edge cases & original bugs | 272–286 |
-| Test vectors | 287–316 |
-| Provenance | 317–334 |
-| Open questions | 335–350 |
+|   1. Unit add | 69–201 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 202–208 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 209–240 |
+|   4. Queued movement and action messages | 241–275 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 276–297 |
+| Constants & data dependencies | 298–309 |
+| Randomness | 310–315 |
+| Edge cases & original bugs | 316–330 |
+| Test vectors | 331–360 |
+| Provenance | 361–381 |
+| Open questions | 382–397 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -126,7 +126,11 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    hireling class with mode 1: flag +0xC8 bit 0x40000 cleared. Stat 328
    (0x148) := (x + y) & 0xFFFF.
 4. Then from the same stream: 1 bit; set → 31 bits v, `0x00621CC0(unit,
-   0, v)` (open question 3). 1 bit; set → a stat list: 9-bit stat id s
+   0, v)`: the source-unit link (`skills/bodies.md` §6.20, `0x00621C30`)
+   with owner type 0 (player) and GUID v: unit `+0x94` := 0, `+0x98` :=
+   v, state 98 `sourceunit` with stats 353 := 0, 354 := v when the unit
+   has a stat holder, and flag-ex (`+0xC8`) |= 0x400 (the linked-unit
+   bit read by `0x004639D0`, `render/unit-composite.md` §1.1). 1 bit; set → a stat list: 9-bit stat id s
    until s ≥ 0x1FF, s < 0, s ≥ `itemstatcost` row count, or the row's
    send bits are 0 (each ends the list); param := `send param bits`
    bits (0 when 0); value := `send bits` bits, signed when send bits <
@@ -134,11 +138,51 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    stat gets the unit a stat list with flag 0x40 (an existing one is
    reused, `0x006257D0`; else `0x006251F0` + attach `0x00626E10`); set
    (s, value, param) on that list (`0x00627150`).
-5. Model: `class`, `position` (x, y), `mode` (the 4-bit mode, open
-   question 2), stats {6:
+5. Model: `class`, `position` (x, y), `mode` (the 4-bit mode, rule 6),
+   stats {6:
    life << 8, 7: 0x8000, 328: (x + y) & 0xFFFF} plus the table stats of
-   rule 2 (open question 2), kind data {name seed, flags, hcIdx, umods,
-   components, value, v31}, the 0x40 stat list.
+   rule 6, kind data {name seed, flags, hcIdx, umods, components, value,
+   v31}, the 0x40 stat list.
+6. Monster set-up `0x004AE8D0(unit, room, x, y, class, mode)` (`d` =
+   difficulty `[0x007A060C]`), in order:
+   1. A new stat list (`0x00626D40`); base stats (`0x00627260`): 12
+      `level` := `monstats` Level[`d`] (`+0xAA + 2d`); 68 `attackrate`
+      := 100; 67 `velocitypercent` := 75; 69 `other_animrate` := 100;
+      36, 37, 39, 41, 43, 45 (damage, magic, fire, light, cold, poison
+      resist) := `ResDm`, `ResMa`, `ResFi`, `ResLi`, `ResCo`, `ResPo`
+      [`d`] (`+0x144`, `+0x14A`, `+0x150`, `+0x156`, `+0x15C`, `+0x162`
+      + 2d); classic scaling `0x0063EEF0(unit, expansion, d)`
+      (`monsters/init.md` §13); 7 `maxhp` := 0x6400; 6 `hitpoints` :=
+      0x6400 (rule 3 later overwrites 6 and 7).
+   2. Path: `0x00649D00(…, room, x, y, unit, 1)` places the dynamic path;
+      velocity := `monstats` `Velocity` (`+0x32`) << 8 (`0x00648690`).
+   3. Inventory (`0x0063ABD0`) when the unit has none and `monstats`
+      `interact` is set or the class is 291 `irongolem`, 357
+      `valkyrie`, 417 `deathsentry` or 418 `shadowwarrior`.
+   4. Mode := the `mode` argument (`0x00624690`: the 4-bit mode of rule
+      1's stream). When `0x0063EA40(unit)` holds and `monstats2` `deadCol`
+      (byte `+0x06` bit 3) is clear: path settings `0x00649560(unit, 1)`,
+      `0x00649190(unit, 5)`, `0x00648C30(path, 0x8000)`.
+   5. Current frame `+0x44` := rnd(`+0x48`) from the unit seed `+0x20`
+      (`0x0045C3E0`, `sim/rng.md` range rule).
+   6. Unit flags (`+0xC4`): 0x2 := `monstats2` `isSel` (byte `+4`
+      bit 3); 0x20 := not `shadow` (byte `+5` bit 6); 0x8 set; 0x4 :=
+      `isAtt` (byte `+5` bit 1).
+   7. `0x004AE0A0(unit, 0)`, `0x004AE4F0(unit, class)`, light
+      (`0x004AE210`, `render/lighting.md` §8), `+0xA8` :=
+      `0x006438B0(0)`, umod hooks (`0x004AD020`, `render/lighting.md` §8
+      r2).
+   8. Skills: for `i` = 0…7, `monstats` Skill`i` (`+0x170 + 2i`) ≥ 0
+      with level byte (`+0x198 + i`) > 0: add the skill at level byte +
+      the act level bonus (`0x00611D30(d)` `+0x10`) (`0x00647280`), then
+      `0x00644340(0x006439F0(unit, skill), mode byte +0x180 + i)`. Then
+      `0x0063EBC0(unit, bonus)`.
+   9. Unless `monstats` byte `+0x0D` bit 0 (`npc`): initial direction
+      byte `b` := 0, or `low 6 bits` of one RNG step of the unit seed
+      when `0x0046C140(unit, 2)`; base class 96 (`mummy1` family) → 7;
+      base 301 (`vilechild` family) → `0x0046C570(unit, 0, 0x004AE7B0)`;
+      class 351 → 0x18, 353 → 0x28, 352, 357, 344 → 0; then
+      `0x006488A0(path, b)`.
 
 #### 1.3 0x51 AssignObject (`0x0045CBD0` → `0x00466300`)
 
@@ -331,16 +375,19 @@ layouts (every decoded position lies next to the player's recorded
 positions; 0x96 stamina tracks walking). The server-side meaning of the
 `code` bytes belongs to the sim specs (`sim/pathing.md` §10 rule 2, the
 monster update spec).
+Ghidra backlog (2026-10-06): monster set-up `0x004AE8D0` (field offsets
+from `specs/data/fields.tsv`, stat names from `itemstatcost`); source
+link `0x00621CC0` → `0x00621C30`.
 
 ## Open questions
 
 1. Meaning of each mode-request code per unit kind: Phase 6 unit-modes
    spec (`client/model.md` open question 1).
-2. Monster creation's table stats and placement (`0x004AE8D0`: about
-   twelve stat sets from `monstats`, path, mode): needed for the model's
-   monster stats beyond 6, 7, 328.
-3. `0x00621CC0(unit, 0, v)` of 0xAC's optional 31-bit value: which field
-   it sets (owner GUID?).
+2. ~~Monster creation's table stats and placement~~: answered in §1.2
+   rule 6. Open inside it: `0x004AE0A0`, `0x004AE4F0`, `0x0046C140`,
+   `0x0046C570` (client monster AI / animation set-up, Phase 6).
+3. ~~`0x00621CC0(unit, 0, v)`~~: answered in §1.2 rule 4 (source-unit
+   link to player GUID v).
 4. The party roster (0x5B, `0x0047A6F0`) that 0x0D's life percent
    updates: owner spec of 0x5B.
 5. `0x0063EA40` (0x15 rule 2) and `0x00621B00` / `0x004BD6B0` (0x51

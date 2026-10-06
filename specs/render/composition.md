@@ -22,16 +22,16 @@
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
 |   3. Frame cycle | 114–151 |
-|   4. Palette (one per presented frame) | 152–182 |
-|   5. One pixel write (index domain) | 183–221 |
-|   6. d2rs answers | 222–235 |
-|   7. DirectDraw (display type 3) differences | 236–247 |
-| Constants & data dependencies | 248–253 |
-| Randomness | 254–257 |
-| Edge cases & original bugs | 258–267 |
-| Test vectors | 268–279 |
-| Provenance | 280–301 |
-| Open questions | 302–331 |
+|   4. Palette (one per presented frame) | 152–198 |
+|   5. One pixel write (index domain) | 199–237 |
+|   6. d2rs answers | 238–251 |
+|   7. DirectDraw (display type 3) differences | 252–263 |
+| Constants & data dependencies | 264–269 |
+| Randomness | 270–273 |
+| Edge cases & original bugs | 274–283 |
+| Test vectors | 284–295 |
+| Provenance | 296–322 |
+| Open questions | 323–353 |
 <!-- /index -->
 
 ## Summary
@@ -177,8 +177,24 @@ room's level differs from the old room's (`0x00465603`–`0x0046562A`),
 with `a` = the new level's act; the first placement (no old room) does
 not switch. So while playing, the presented palette is that of the act of
 the local player's current room's level, switched on the room change that
-crosses acts. Which call sets it for a game that starts outside act 1
-(callers `0x0044D100`, `0x00482EF0`): Open question 5.
+crosses acts. A game that starts in another act gets its act palette
+from the act load: S→C 0x03 (`0x0044E100`, `client/model.md`) stores the
+act byte in `[0x007A288C]` (`0x00454790`) and draws the loading screen
+(`0x004565E0` → `0x00456550`, which loads the loading-screen cel into
+`[0x007A2888]`). The next client frame `0x0044C990` first calls
+`0x004547B0`: when a loading-screen cel is held it is freed and
+`0x004FB480([0x007A288C])` loads that act's palette, then the act
+set-ups run. So the first in-game frame is drawn with the loaded act's
+palette, and the later first room placement (no old room) needs no
+switch. The other two callers are not game start: `0x0044D100` is the
+out-of-game "betascreens" slideshow (`DATA\GLOBAL\ui\betascreens\screen01`
+… `screen10`, 13-byte entries at `0x0070F238`, count `[0x0070F024]` = 10,
+each shown 10,000 ms with its entry's act byte, 0 = act 1 for all ten);
+`0x00482EF0` plays a video (`%s\video\%s`, 640 × 292 or 640 × 146) and
+then loads act 5's palette (`a` = 4 at `0x00483283`); the state loop
+`0x0044F360` calls it with video 5 when `[0x007A0604]` ≠ 0 (set by
+`0x0044EC80`) and with video 7 when `[0x007A0628]` ≠ 0, and S→C 0x61
+(`0x0045E660` → `0x004B9320`) calls it with the video id u8@1.
 
 ### 5. One pixel write (index domain)
 
@@ -298,6 +314,11 @@ read at `0x0044CA8F`–`0x0044CAD5`; act palette loader `0x004FB480`
 (format `%s\palette\act%d\%s`), callers `0x0044F2DC`, `0x0046562A`
 (room change in `0x004654C0`: old room `0x00620BB0`, new room
 `0x00465420`), `0x0044D1A5`, `0x00483293`.
+Ghidra backlog (2026-10-06): act palette at game start from
+`0x0044E100` → `0x00454790`, `0x004565E0`/`0x00456550`, frame
+`0x0044C990` → `0x004547B0`; the other `0x004FB480` callers
+`0x0044D100` (betascreens table `0x0070F238` read from the file),
+`0x00482EF0`, `0x004F8FE0`.
 
 ## Open questions
 
@@ -319,10 +340,11 @@ read at `0x0044CA8F`–`0x0044CAD5`; act palette loader `0x004FB480`
    `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
-5. Act palette at game start outside act 1 (§4): what `0x0044D100` (act
-   table at `0x0070F238` + 13 × `[0x007A060D]`) and `0x00482EF0` load and
-   when, relative to the first in-game frame. Ghidra read; a capture of
-   the first frames after loading a character saved in act 2.
+5. ~~Act palette at game start outside act 1~~: answered in §4 (the act
+   load's `[0x007A288C]`, applied by `0x004547B0` at the first frame;
+   `0x0044D100` and `0x00482EF0` are not game start). Capture
+   confirmation: the first frames after loading a character saved in
+   act 2.
 6. d2rs input for §3 step 2 and §4: the local player's current room and
    its level come from the client unit model fed by the S→C unit and
    room messages; their owner spec (client unit model / S→C messages)

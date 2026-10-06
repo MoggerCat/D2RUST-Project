@@ -32,20 +32,20 @@
 |   3. Ambient fill (`0x00474610`) | 112–143 |
 |   4. Blocks-light flags (`0x004756D0`) | 144–152 |
 |   5. Light quality and the draw rate | 153–178 |
-|   6. Light records | 179–245 |
-|   7. Contribution of one record | 246–325 |
-|   8. Light sources | 326–353 |
-|   9. Environment (day and night) | 354–428 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 429–464 |
-|   11. Light values handed to the draws | 465–495 |
-|   12. Captures (answers `capture.md` Open question 5) | 496–533 |
-|   13. d2rs answers | 534–544 |
-| Constants & data dependencies | 545–556 |
-| Randomness | 557–563 |
-| Edge cases & original bugs | 564–578 |
-| Test vectors | 579–611 |
-| Provenance | 612–643 |
-| Open questions | 644–676 |
+|   6. Light records | 179–261 |
+|   7. Contribution of one record | 262–341 |
+|   8. Light sources | 342–406 |
+|   9. Environment (day and night) | 407–488 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 489–542 |
+|   11. Light values handed to the draws | 543–573 |
+|   12. Captures (answers `capture.md` Open question 5) | 574–611 |
+|   13. d2rs answers | 612–622 |
+| Constants & data dependencies | 623–634 |
+| Randomness | 635–641 |
+| Edge cases & original bugs | 642–656 |
+| Test vectors | 657–689 |
+| Provenance | 690–732 |
+| Open questions | 733–764 |
 <!-- /index -->
 
 ## Summary
@@ -230,7 +230,14 @@ order.
 
 1. Not dying and owner type ≠ 6: look the owner up by type and GUID
    (`0x004639B0` when the lookup flag is set, else `0x00463990`); found →
-   x, y := its position (§6.1).
+   x, y := its position (§6.1). The lookups are the client unit hash
+   sets of `client/model.md` §2: `0x00463990` searches set S (server
+   units, `0x007A5E70`), `0x004639B0` set C (client-only units,
+   `0x007A5270`); each is 128 buckets per unit type (`type << 9`),
+   bucket `GUID & 0x7F`, chain `+0xE4`, matched on GUID `+0x0C` (a match
+   of another type is fatal 0x5A). Unit flag `+0xC4` bit 21 (0x200000)
+   is the client-only mark, so the record looks in the set its owner
+   lives in.
 2. Radius ≠ target: kind 2 → cache invalid and freed; radius += 8 toward
    the target.
 3. Radius > 255 → 248.
@@ -239,9 +246,18 @@ order.
    cached contribution (§7.4, building the cache first when invalid);
    else the plain contribution with `q` (§7.2).
 
-A room leaving the client (`0x00475930`, registered by `0x00475B40`
-through `0x0061AF60`) invalidates the cache of kind-2 records whose
-radius window reaches that room (test points: Open question 2).
+A room leaving the client (`0x00475930`, ECX = the room, registered by
+`0x00475B40` through `0x0061AF60`) walks the list; for each kind-2
+record: owner type 6 or owner not found (§6.4 r1 lookup) is fatal
+0x591. With `R` = the owner's room (`0x00620BB0`): `R` = the leaving
+room → nothing. Else, with `(ux, uy)` the owner's sub-tile (objects,
+items and tiles, types 2, 4, 5: static path `+0x0C`, `+0x10`; types 0,
+1, 3: dynamic path `0x006488C0` / `0x00648900`, 0 without a path) and
+`m` = radius (`+0x18`) `>> 3`, the cell lookup `0x00463740(R, x, y)`
+(`client/model.md` §2) is run on `(ux + m, uy)`, `(ux − m, uy)`,
+`(ux, uy + m)`, `(ux, uy − m)` in this order; the first that returns the
+leaving room sets cache valid (`+0x2C`) := 0 (the cache memory is kept)
+and ends the record's tests.
 
 ### 7. Contribution of one record
 
@@ -330,14 +346,14 @@ its shadow get partial `S` (soft edge); the blocking cell itself is lit.
 | Source | Site | Kind | Radius | R, G, B | Changes |
 |---|---|---|---|---|---|
 | Player (every player unit, client init `0x00460BF0`) | `0x00460CF0` | 0 for the local player (or when no local player exists yet), 1 for others | 13 (unit `+0x68`) | 255, 255, 255 | stat callback `0x004609F0` (`sim/stat-lists.md` §7): stat 89 `item_lightradius` → set radius (§6.2 r2) to 13 + new value (`0x00460930`); stat 90 `item_lightcolor` → R, G, B = bits 16–23, 8–15, 0–7 of the new value, 0 → white (`0x004609A0`) |
-| Monster (`0x004AE210`; callers `0x00478C75`, `0x004AEB82`, `0x004AF058`, `0x004AFFAF`) | `0x004AE2EE` | 0 | `max(L_c, monstats2 Light)`, `L_c` = `0x0063EBD0` (Open question 3); in level 8 with client quest byte 1 set, unit flag 0x200000 clear and monstats `+0x4C` ∉ {1, 2}: 3; none when 0 | `light-r`, `light-g`, `light-b` | replaces the unit's previous light |
-| Monster class hook `0x004ACC70` (table `0x00724D84`) | `0x004ACCEF`, `0x004ACD2C` | 0 | 7 | drawn from the unit's seed, or monstats2 colors | Open question 3 |
+| Monster (`0x004AE210`; callers `0x00478C75`, `0x004AEB82`, `0x004AF058`, `0x004AFFAF`) | `0x004AE2EE` | 0 | `max(L_c, monstats2 Light)`, `L_c` = `0x0063EBD0` (§8 r1); in level 8 with client quest byte 1 set, the unit not client-only (flag 0x200000, §6.4 r1) and monstats `Align` (`+0x4C`) ∉ {1, 2}: 3; none when 0 | `light-r`, `light-g`, `light-b` | replaces the unit's previous light |
+| Monster umod 3 `light` hook `0x004ACC70` (umod table `0x00724D78`, §8 r2) | `0x004ACCEF`, `0x004ACD2C` | 0 | 7 | §8 r2 | replaces the unit's light |
 | Overlay (`0x00470390`) | `0x00470555` | 1 | `InitRadius`, then target `Radius` when different; none when `Radius` = 0 | overlay `Red`, `Green`, `Blue` | — |
 | Missile (client create `0x004CD540`) | `0x004CDAC5` | 1 | `Light` (missiles +0x130) | missiles `Red`, `Green`, `Blue` | only when `[0x0072A348]` ≠ 0 (high quality), creation flags without 0x4000 and `Light` ≠ 0 or creation `+0x50` ≠ 0; flicker below; ends by dying (`0x004CD3EE`, `0x004D301D` → §6.2 r6) |
-| Missile, other path (`0x004C5680`) | `0x004C56D7` | 1 | 1, then target `Light` | missiles colors | Open question 4 |
+| Skill cast light (`0x004C5680`, §8 r3) | `0x004C56D7` | 1 | 1, then target `Light` of the skill's `cltmissile` | missiles colors | replaces the unit's light (`0x00643A00`) |
 | Object (`0x004BC580` from `0x004BC5E0`, `0x004BC720`, `0x004BCBB0`, `0x004BCF60`) | `0x004BC5BC` | 2 | `Lit<mode>` / 2 (objects +0x110 + mode; `0x004BCBB0` uses `Lit2`) | objects `Red`, `Green`, `Blue` | `Lit` = 0 → light removed; a later mode with a light sets the target |
 | Overlay 182 `horadric_light` event (`0x004D6D40`) | `0x004D6F85` | 2 | 60 → 18 | 255, 255, 255 | — |
-| Missile 191 (`0x004F3530`) | `0x004F3630` | 1 | 1 | 255, 0, 0 | Open question 4 |
+| Missile 191 `cursecenter` (`0x004F3530`, §8 r4) | `0x004F3630` | 1 | 1, then target `max(2, aurarangecalc)` | 255, 0, 0 | missile's light (`+0x64`) |
 | Den of Evil lights | §10 r1 | missile 287 `denofevillight`, `Light` 10 | | | |
 
 **Missile flicker** (`0x004CD1C0`, from the client missile update
@@ -346,6 +362,43 @@ missile's flags `+0x44` & 0x300 = 0, it has a light, and its radius ≥
 `Light`: target := `Light` + rnd(`Flicker`) drawn from the missile unit's
 seed `+0x20` with the range rule of `sim/rng.md` (`0x0045C3E0`). The radius
 then walks there by 8 per drawn frame (§6.4 r2).
+
+Rules behind the table:
+
+1. `L_c` (`0x0063EBD0`): for components 0–15 of the monster, the
+   `monstats2` choice code (`0x00664860`, choice byte monster data
+   `+0x04 + i`); codes none, `lit`, `med`, `hvy` are skipped; else the
+   item of that code (`0x00633640`) gives its `lightradius` (`+0x12F`);
+   `L_c` = the largest (0 when none).
+2. Umod hooks (`0x004AD020`, from the monster set-ups `0x0045E47A`,
+   `0x004AEB96`, `0x004AF05F`): for a monster with a non-zero first umod
+   byte (monster data `+0x1C`), the hooks of umods 1, 2, 3, 4 (list
+   `0x006DA4C8`) and then of each of the 9 umod bytes are called through
+   `0x00724D78 + 4·umod` with argument `u` = the unique type flag (0x8).
+   Umod 3 `light` (`0x004ACC70`): `u` = 0 → nothing. Else the unit's
+   light is removed, then: a champion (type flag 0x4) takes three D2 RNG
+   steps of its seed (`+0x20`) and creates radius 7, `I` 255 with R, G, B
+   = the low bytes of the third, second and first new low words; any
+   other monster creates radius 7 with `monstats2` `light-r/g/b`. The
+   light becomes unit `+0x64`. Since `u` requires the unique flag, the
+   random colors need both flags (umod 3 on a unique that is also a
+   champion).
+3. `0x004C5680(unit, missile)`: called by the client skill start
+   `0x004C6140` (callers `0x004C6660`, `0x004C6EB0`, `0x004C6F40`) after
+   a successful start when `skills` `cltmissile` (`+0xE8`) > 0, with that
+   missile; nothing when its `Light` is 0; the new light replaces the
+   unit's (the old one is removed).
+4. `0x004F3530` is `cltdofunc` 30 (table `0x00727BA8`; the curse skills
+   and `MonCurseCast`): it creates client missile 191 `cursecenter`
+   (`0x004CD540`) and gives it a red light whose target is the skill's
+   `aurarangecalc` (`+0x64`, `0x00646CA0`) at least 2.
+5. Missile create (`0x004CD540`): the radius is always `Light`; a
+   creation record byte `+0x50` ≠ 0 with `Light` = 0 only makes the create
+   call with radius 0, which creates nothing (§6.2 r1) after the old
+   light was removed.
+6. Flicker runs only when the missile's current frame (unit `+0x44`, 8.8
+   fixed point, `sim/units.md`) has bits 0x300 clear: on frames whose
+   number is a multiple of 4.
 
 Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 5, color 230, 168, 255; `andariel` 8); 288 `missiles` rows have `Light`
@@ -371,8 +424,10 @@ Measured: 100 `monstats2` rows have `Light` > 0 (e.g. `fallenshaman1`–`5`:
 Period tables `render/env-periods.tsv` (`0x007443F0` normal, `0x00744438`
 act 4, `0x00744480` eclipse; 12-byte entries: start degree, type, color
 `0x00BBGGRR`). Creation: index 2, type and ticks (= start × speed = 0)
-from the normal entry 2, then §9.3 and §9.4 (their register inputs at
-creation: Open question 6).
+from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
+(`0x0061BE40` zeroes EDI and ECX before the calls) and the eclipse flag
+0: so ticks 0, `I` = 128 (`s` = 0) and R, G, B = entry 2's color
+(255, 255, 255).
 
 #### 9.2 Updates
 
@@ -390,7 +445,12 @@ creation: Open question 6).
    sends it when its own cycle (same advance code, `sim/tick.md` §3 step
    1) changes period.
 3. `0x0044C83B` and `0x0044E16C` call the same setter with index 5, ticks
-   0, eclipse 1 (when: Open question 5).
+   0, eclipse 1: S→C 0x5D (`0x0045E540` → `0x004A2CB0`) with quest byte
+   @1 = 10 (Tainted Sun) and flag byte @2 bit 0 jumps to `0x0044C820`;
+   with a client act it sets the eclipse at once, else it sets the
+   pending flag `[0x007A060E]`, which the act load (S→C 0x03,
+   `0x0044E142`) turns into the eclipse when the loaded act is act 2
+   (byte 1).
 
 #### 9.3 Advance and intensity (`0x0061BEE0`, `0x0061BB80`)
 
@@ -448,19 +508,37 @@ By the room's level id:
    test with mask 5 is 0, as client missile 287 `denofevillight` (§8).
 2. **Levels 107, 108**: when `[0x007A7460]` ≠ 0 and `[0x007129D0]` = −1:
    R, G, B = 255, 64, 48, `I` = 160; else 0, 0, 0. `0x0046B290` (event
-   table `0x00712A08`) sets the flag; `0x0046B390` sets the counter 0;
+   table `0x00712A08`) sets the flag; `0x0046B3A0` sets the counter 0;
    the counter then rises per update and at > 29 resets flag and counter
-   (`0x0046BEB0`). Triggers: Open question 5.
+   (`0x0046BEB0`). Triggers: r4.
 3. **Other levels** — darkness event: `I` = `[0x007A7430]`, R, G, B =
    `[0x007A7434..36]`, all 0 when no event runs. An event
    (`0x0046AE50(in, hold, out, level)`, callers `0x004D8893`,
-   `0x0046AF5F`; `out` = 0 → 25; total = in + hold + out) runs per client
+   `0x0046AF5F`, r4; `out` = 0 → 25; total = in + hold + out) runs per client
    update (`0x0046AD10`): R, G, B, `I0` := the room ambient without
    override (§3.1 r2–r3); with counter `c` and angle `a` (both from 0):
    `c` < in → `I = trunc(W[(a + 128) & 511] · I0)`, then `a := c · 128 /
    in`; `c` < total − out → `I` = 0; else `I` as in the first case, then
    `a := 128 − (c − total + out) · 128 / out`; `c` += 1; `c` > total or a
    level other than the event's → event cleared.
+4. **Triggers.** S→C 0x89 UniqueEvent (`0x0045EA30` → `0x0046B630`, id =
+   u8@1): id ≥ 32 is fatal 0x1D9, id ≥ 20 fatal 0x1DA; else bit `id` of
+   `[0x007A7458]` is set and the id's handler (`0x007129D8 + 4·id`) runs:
+   0 → `0x0046B0C0` (Den counter := 0; the server sends it on the Den of
+   Evil clear, `world/quests.md` §6.5); 1 → `0x0046AEE0` (near object
+   17 `StoneAlpha` of the local player's room: client missile 288
+   `cairnstones` and the darkness event of r3 from missile 288's
+   fields); 12 → `0x0046B290` (levels 107/108 flag := 1; in level 108
+   also client missile 372 at the local player and
+   `0x0046F870(243, 1)`); 13 → `0x0046B3A0` (counter `[0x007129D0]` :=
+   0, `[0x007A7464]` := a draw from `0x00410A80` + 90); 3, 6, 14, 16, 17,
+   19 have other client effects (`0x0046B100`, `0x0046B1E0`,
+   `0x0046B300`, `0x0046B440`, `0x0046B4A0`, `0x0046B520`); the rest
+   none. Server senders of ids 12 / 13: `0x005B5230` / `0x005B52E0` (A4Q2
+   Terror's End; `0x005B52E0` is its callback 8 in `world/quests.tsv`;
+   owner `world/quests.md`). The second darkness caller `0x004D8893` is state
+   setfunc 2 (table `0x0072A690`, `states` `setfunc` +0x1A):
+   state 153 `cloak_of_shadows`.
 
 ### 11. Light values handed to the draws
 
@@ -628,7 +706,7 @@ contributions `0x004748D0`, `0x004740D0`, `0x00474080`, `0x004747C0`,
 `sin` `0x00688590` / `cos` `0x006886C0` (x87 `fsin` / `fcos` paths),
 `0x00682FD0` (truncating conversion); overrides `0x0046BEB0`,
 `0x0046AD10`, `0x0046AE50`, `0x0046B0C0`, `0x0046B0D0`, `0x0046AF70`,
-`0x0046BE60`, `0x0046BF90`, `0x0046B290`, `0x0046B390`, sine table
+`0x0046BE60`, `0x0046BF90`, `0x0046B290`, `0x0046B3A0`, sine table
 `0x00707800` (`0x0040B330`); draws `0x00475AA0`, `0x004DF1C0`,
 `0x004DD180`, `0x004DD600`, `0x004DE410`, `0x004DDEF0`, `0x004DEA70`,
 `0x006C94B0`, `0x006C93A0`. Tables read from the file:
@@ -640,28 +718,38 @@ Capture analysis: run 1b raw JSONL and PNGs, decoded with a stdlib PNG
 reader, same-key pairs diffed and grouped into 8-connected blobs (gap 3),
 palette and light maps from act 1 `pal.pl2`. D2MOO not used; riiablo not
 needed.
+Ghidra backlog (2026-10-06): lookups `0x00463990`/`0x004639B0`/
+`0x00463940`; room unload `0x00475930`; monster light `0x004AE210`,
+`0x0063EBD0`, umod hooks `0x004AD020`/`0x004ACC70` (tables `0x00724D78`,
+`0x006DA4C8` read from the file); cast light `0x004C5680` (caller
+`0x004C6140`), `cltdofunc` table `0x00727BA8` entry 30 = `0x004F3530`;
+missile create `0x004CDA6F`–`0x004CDACD`; flicker `0x004CD1C0`; S→C 0x89
+`0x0046B630` with handler table `0x007129D8`; S→C 0x5D `0x004A2CB0`
+(jump table `0x004A2F74`/`0x004A2F94`); S→C 0x5E `0x004B92B0`; states
+setfunc table `0x0072A690`; environment creation `0x0061BE40`. Live
+data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
+`skills` cltdofunc / cltstfunc, `monumod` rows 1–4.
 
 ## Open questions
 
-1. Which unit tables `0x00463990` and `0x004639B0` search (record `+0x08`,
-   unit flag bit 21): Ghidra read.
-2. The room-unload test of `0x00475930` (which sub-tiles it checks
-   against the unloaded room): read its register arguments.
-3. Monster light inputs: what `0x0063EBD0` returns (the largest light of
-   the monster's components?), the meaning of unit flag 0x200000 and
-   monstats `+0x4C` in the Den rule, and the classes and seed draws of the
-   `0x004ACC70` hook (table `0x00724D84`): Ghidra read.
-4. Which missiles take the radius-1 paths `0x004C5680` and `0x004F3530`,
-   the creation field `+0x50` of `0x004CD540` and the missile flags 0x300
-   that stop flicker: Ghidra read with `missiles/missiles.md`.
-5. Triggers of the scripted events: Den counter start `0x0046B0C0` and
-   levels 107/108 `0x0046B290` / `0x0046B390` (event tables `0x007129D8`,
-   `0x00712A08`), the darkness event callers `0x004D8893`, `0x0046AF5F`,
-   the eclipse set at `0x0044C83B` / `0x0044E16C`, and what client quest
-   byte 1 holds: Ghidra read plus a trace of the Den of Evil clear.
-6. Environment state before the first S→C 0x53: `0x0061BE40` runs §9.3 r4
-   and §9.4 with whatever is in the registers; does 0x53 always arrive
-   before the first world draw? Trace of a game join.
+1. ~~Which unit tables `0x00463990` / `0x004639B0` search~~: answered in
+   §6.4 r1 (sets S and C).
+2. ~~The room-unload test of `0x00475930`~~: answered in §6.4.
+3. ~~Monster light inputs~~: answered in §8 r1–r2 and the monster row
+   (`Align`, client-only flag, umod 3 hook).
+4. ~~Radius-1 missile light paths, `+0x50`, flags 0x300~~: answered in
+   §8 r3–r6.
+5. Triggers of the scripted events: answered in §9.2 r3 (eclipse) and
+   §10 r4 (S→C 0x89 ids, Cloak of Shadows); client quest byte 1 is byte
+   1 of the last S→C 0x5E (`0x0045E570` → `0x004B92B0` copies 37 bytes
+   to `0x007C0EA4`: the not-intro byte of the Den of Evil quest,
+   `world/quests.md` step 5). Open: the server conditions of 0x89 ids 12
+   and 13 (`0x005B5230`, `0x005B52E0`) belong to `world/quests.md`; a
+   trace of the Den of Evil clear confirms id 0.
+6. Environment state before the first S→C 0x53: the creation values are
+   answered in §9.1 (`A` = 0, `L` = 0: `I` 128, white). Open: whether
+   0x53 always arrives before the first world draw (trace of a game
+   join).
 7. Whether `sin` / `cos` of the CRT (SSE2 path `0x00699E30` / `0x0069A000`
    or x87 `fsin`) give the correctly rounded value for every θ of §9.3, so
    `trunc` matches: compare a recorded env `+0x0C` per tick over one day

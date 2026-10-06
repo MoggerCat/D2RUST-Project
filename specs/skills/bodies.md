@@ -31,19 +31,19 @@
 | Outputs / state changes | 73–80 |
 | Rules | 81–82 |
 |   1. Conventions | 83–114 |
-|   2. Shared helpers | 115–428 |
-|   3. Start functions (srvst) | 429–518 |
-|   4. Do functions (srvdo) | 519–702 |
-|   5. `srvmissile` path | 703–718 |
-|   6. Shared helpers, batch 2 | 719–1057 |
-|   7. Start functions (srvst), batch 2 | 1058–1124 |
-|   8. Do functions (srvdo), batch 2 | 1125–1523 |
-| Constants & data dependencies | 1524–1570 |
-| Randomness | 1571–1589 |
-| Edge cases & original bugs | 1590–1638 |
-| Test vectors | 1639–1659 |
-| Provenance | 1660–1686 |
-| Open questions | 1687–1713 |
+|   2. Shared helpers | 115–504 |
+|   3. Start functions (srvst) | 505–594 |
+|   4. Do functions (srvdo) | 595–778 |
+|   5. `srvmissile` path | 779–794 |
+|   6. Shared helpers, batch 2 | 795–1133 |
+|   7. Start functions (srvst), batch 2 | 1134–1200 |
+|   8. Do functions (srvdo), batch 2 | 1201–1599 |
+| Constants & data dependencies | 1600–1646 |
+| Randomness | 1647–1665 |
+| Edge cases & original bugs | 1666–1714 |
+| Test vectors | 1715–1735 |
+| Provenance | 1736–1766 |
+| Open questions | 1767–1791 |
 <!-- /index -->
 
 ## Summary
@@ -201,7 +201,7 @@ record)` (the missile, or none).
 (`0x005531C0`, then `0x0053D130(client, I, 1, 70, q, 0)`). m = maximum
 durability (`0x00625E00`); m ≠ `durability(72)` → set 72 := m and send
 0x3E for stat 72. Attack-mode cleanup `0x00580310(game, player)`
-(`units.md` §4.5; Open question 4). Return 0 when empty, else q + 1.
+(`units.md` §4.5; §2.16). Return 0 when empty, else q + 1.
 
 #### 2.6 Stat fills `0x005C6CC0`, `0x005C6DC0`
 
@@ -256,7 +256,7 @@ stack list.
   handlers of (1, state) (§2.13). If the unit is alive (`0x005541B0` = 0)
   or the state is not "stay on death" for it (`0x0063A4A0`): state off;
   anim refresh; passive refresh `0x00646F20(unit)`; a player also gets
-  the skill resync `0x00575900(game, unit)` (Open question 5).
+  the pet-maximum resync `0x00575900(game, unit)` (§2.17).
 - **Self aura** `0x005CEC50`: state off; has 85 (`nomanaregen`) → 85
   off; re-enable passive states `0x0056DFA0` (for each skill entry with
   a `passivestate` > 0: state on, `0x00646D60(unit, entry)`); clamp
@@ -363,8 +363,7 @@ Handler record (0x20 bytes, list head unit +0x90): +0x00 event (u8),
   this type and key, in list order: flags bit 0 set (running) → flags
   |= 2; else unlink and free it.
 
-The iteration by `0x005C0C30` (`combat/damage.md` §5.4) is not covered
-here (Open question 6).
+The iteration by `0x005C0C30` (`combat/damage.md` §5.4): §2.18.
 
 #### 2.14 Progressive charges
 
@@ -426,6 +425,83 @@ L)` (`levels.md` §5; L is the Attack level, not k's); k's `SrcDam`
 unit, T, bonus, 0)`; hit class 1; `start_combat(game, unit, T, record,
 s)`. Return 1.
 
+#### 2.16 Attack-mode cleanup `0x00580310`, `0x00580380`
+
+Both take ECX game, EDX unit and do nothing for a non-player or a player
+without an inventory.
+
+**Empty-hand refill** `0x00580310`:
+
+1. Save the right and left skills as (skill id `0x00643CE0`, owner GUID
+   `0x00643AD0`; id 0 and GUID −1 when none) (`0x005801E0`).
+2. For the item at body location 4, then at 5 (`0x0063BDE0`), when
+   present, `0x00580030(game, item)` (player in EBX):
+   - an item that is neither a stack (`stackable` `0x006289F0`,
+     `throwable` type `0x0062BA80`) nor has stat 125 `item_throwable` does
+     nothing; one whose quantity (stat 70) > 0 does nothing; with stat
+     125: stat 70 := 0, stop;
+   - a weapon (item type 45) with `0x0062A0F0` true and not broken
+     (item flag 0x100) is broken (`0x0055F850`, below), stop;
+   - else (an empty stack): keep its class code (`0x0062E7E0`),
+     `0x0062B400`, its body location (`0x00627D40`) and `0x0062E830`;
+     the player's mode := 1; the item is removed (`0x00560CD0`) and
+     `0x00628170(item, 1, 1)`. When the code is non-zero, the player's
+     inventory is searched in order (`0x0063CD80`) for the first item
+     of that code that is not broken and has the same class
+     (`0x00451F60` vs item `+4`); if one exists, and the emptied body
+     location is now free, it is equipped there (`0x00562A30(game,
+     player, its GUID, location)`). When that does not happen and the
+     `0x0062E830` value was non-zero: `0x0057FF70(game, location)`.
+3. Restore the saved skills, right then left: a saved skill that still
+   exists (`0x006439B0(player, id, owner)`), differs from the current
+   one of that side and whose `0x00647960` kind is neither 2 nor 7 is
+   selected again (`0x005701B0(player, side 1 right / 0 left, id,
+   owner)`).
+
+**Break zero-durability weapons** `0x00580380`: walk the item list from
+its head; an item with node kind 3 (equipped, `0x0063E020`), item type
+45, breakable (`0x00629930`: `nodurability` = 0, `durability` > 0, max
+durability ≠ 0, stat 152 `item_indesctructible` ≤ 0), durability (stat 72) ≤
+0 and not broken: the first time, the player's mode := 1; the item is
+broken (`0x0055F850`) and the walk restarts from the head.
+
+**Break** `0x0055F850(game, unit, item)`: item flag 0x100 set
+(`0x006280D0`); stats unlinked (`0x0063D2B0`); an item in mode 1 is
+deactivated (`0x0055C730`); inventory pass (`items/inventory.md` §5.7,
+send 0); `0x0063CC70`; unit update flag (`0x00621000`); stat 72 := 0
+and message 0x3E (stat 72 = 0) to the owner's client; then
+`0x00663CC0`, `0x00553380` (client refresh).
+
+#### 2.17 Pet-maximum resync `0x00575900`
+
+ECX game, EDX unit; only a player with a pet list (player data `+0x44`)
+and a skill list (unit `+0xA8`):
+
+1. A table `m[t]` per pet type (zeroed). For each skill of the list in
+   list order (`0x00643910`, next `0x006438F0`): `0x006442A0(unit,
+   skill, 1)`; when its `skills` `pettype` (`+0xBE`) is a valid pet
+   type `t` > 0: `v = max(1, eval(petmax, skill, level))` (`+0xC0`,
+   `0x00646CA0`); if `v > m[t]`: `m[t] := v` and `set_max(t, v)`.
+2. Then for every pet type `t` (0 … count − 1) with `m[t] ≤ 0` and a
+   `pettype` row: `set_max(t, basemax)` (`+0x0A`).
+
+`set_max(t, v)` = `0x00575850(game, player, t, v)`: for `t` = 1 only
+`v` = 1 is applied. The pet list entry `t` (12 bytes: count `+4`,
+maximum `+8`) gets maximum := `v`; then, unless `t` = 7, while count >
+`v` and count > 0, one pet of type `t` (`0x005747B0(player, t, 1)`) is
+removed (`0x005750E0`). No message is sent by the resync itself.
+
+#### 2.18 Event iteration `0x005C0C30`
+
+`run(ECX game, EDX event, unit, a, b)`: nothing when the unit is null.
+Walk the handler list (§2.13) from its head; for each record whose event
+byte equals `event`: flags |= 1 (running); `r = func(ECX game, unit, a,
+b, skill, level)`; flags &= ~1; the next record is read **after** the
+call; then, when flags bit 2 is set (unregistered while running) **or**
+the key type (`+0x04`) is 0, the record is unlinked and freed (so
+key-type-0 handlers run once). Returns the `r` of the last matching
+handler, 0 when none matched.
+
 ### 3. Start functions (srvst)
 
 #### 3.1 1 Attack, Left Hand Swing `0x0056CA40`
@@ -435,7 +511,7 @@ s)`. Return 1.
 2. Group 38 (`meleeonly`: states 139 wolf, 140 bear) → return
    `shape_start(game, unit, L)` (§2.15).
 3. `is_bow` and not `has_ammo` → attack-mode cleanup `0x00580310(game,
-   unit)`, `0x00580380(game, unit)`; return 0.
+   unit)`, `0x00580380(game, unit)` (§2.16); return 0.
 4. Return 1.
 
 #### 3.2 2 Kick `0x0056CAF0`
@@ -1683,6 +1759,10 @@ per ring, n per Multiple Shot) takes one game-seed step
   matches D2MOO in the steps above except: §6.5 step 6 skips summon
   skill 0 (k must be ≥ 1). Also compared: `SrvSt12/17/37/56`,
   `SrvDo010/023/049/118/120/124`, `UNITS_StoreOwner`.
+Ghidra backlog (2026-10-06): `0x00580310` (`0x005801E0`, `0x00580030`,
+`0x00580280`), `0x00580380`, break `0x0055F850`, breakable test
+`0x00629930`; `0x00575900` with `0x00575850`; `0x005C0C30`. Stat names
+from live `itemstatcost`.
 
 ## Open questions
 
@@ -1694,13 +1774,11 @@ per ring, n per Multiple Shot) takes one game-seed step
    §3.8, §4.1.
 3. Recording: Amplify Damage on an immune monster (stat 36 value in the
    list) and Dim Vision in Nightmare (expiry − F).
-4. Items spec: bodies of the attack-mode cleanup `0x00580310` (hand
-   refill after a stack empties) and `0x00580380` (zero-durability
-   weapons), and who removes Bash's flag-4 attack-rate list.
-5. `0x00575900` (player skill resync after a state list is removed):
-   messages sent.
-6. Unit event handler iteration (`0x005C0C30`) and the deferred-free
-   flag 2: owner `sim/units.md` (`combat/damage.md` Open question 4).
+4. ~~Attack-mode cleanup bodies~~: answered in §2.16. Open: who
+   removes Bash's flag-4 attack-rate list; the helpers `0x0062A0F0`,
+   `0x0062E830`, `0x0057FF70` (items spec).
+5. ~~`0x00575900`~~: answered in §2.17 (pet maxima; no message).
+6. ~~Unit event handler iteration~~: answered in §2.18.
 7. `0x005B0DA0` second argument (monstats) and AI kinds 10–12
    (`monsters/ai.md` special states): confirm which classes Terror and
    Dim Vision can switch.

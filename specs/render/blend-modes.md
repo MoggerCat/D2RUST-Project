@@ -22,17 +22,17 @@
 | Rules | 64–65 |
 |   1. Draw modes | 66–90 |
 |   2. Blend-table orientation (per drawer) | 91–115 |
-|   3. Draw mode of a composite unit component | 116–157 |
-|   4. Single-cel units and overlays | 158–169 |
-|   5. Shadows (the darkening blend) | 170–201 |
-|   6. Translucent walls and roofs | 202–219 |
-|   7. d2rs answers | 220–230 |
-| Constants & data dependencies | 231–239 |
-| Randomness | 240–243 |
-| Edge cases & original bugs | 244–254 |
-| Test vectors | 255–282 |
-| Provenance | 283–300 |
-| Open questions | 301–319 |
+|   3. Draw mode of a composite unit component | 116–161 |
+|   4. Single-cel units and overlays | 162–173 |
+|   5. Shadows (the darkening blend) | 174–236 |
+|   6. Translucent walls and roofs | 237–254 |
+|   7. d2rs answers | 255–265 |
+| Constants & data dependencies | 266–274 |
+| Randomness | 275–278 |
+| Edge cases & original bugs | 279–289 |
+| Test vectors | 290–317 |
+| Provenance | 318–339 |
+| Open questions | 340–358 |
 <!-- /index -->
 
 ## Summary
@@ -126,7 +126,11 @@ component `c` (not 14) a mode. Inputs:
   1. player: stat 181 `fade` ≠ 0 → mode 1;
      monster: `fade` in 1…15 → mode 1; `fade` > 15 → mode 1 if some
      item in the monster's inventory list has item flag 0x400000
-     (ethereal), otherwise **no override and stop**;
+     (ethereal), otherwise **no override and stop**. The list is the
+     client monster's inventory (`+0x60`) item list in link order (first
+     `0x0063B2C0` = inventory `+0x0C`, next `0x0063DFA0` = item data
+     `+0x64`, `items/inventory.md` layout), every item whatever its
+     location; no inventory or an empty list → no override and stop;
   2. the component's item (the request's item record) has `transparent`
      (items `+300`) ≠ 0 → mode = `transtbl` (`+301`);
   3. player only, the item on component 5 (RH) or 6 (LH) is ethereal →
@@ -172,8 +176,7 @@ A hovered missile or item also has its light byte doubled (same clamp as
 **Unit shadows** (shadow pass kind 2, `draw-order.md` §6 r3; `0x00471620`):
 every COF layer of the unit whose shadow byte (byte 1, `0x004DB090`) is
 non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
-`0x00601730` → `0x00608D60`) at the unit's shadow position (Open
-question 1):
+`0x00601730` → `0x00608D60`) at the unit's shadow position (r3):
 
 1. Pixel: for every opaque source pixel, `d' = A0[256·d + 0]` when
    Blended Shadows is on, else `d' = 0`. The source index and all maps
@@ -186,6 +189,38 @@ question 1):
    `⌊h / 2⌋` rows; rows below `H − 1` are skipped (with their sheared
    column offset), drawing stops at row 0, columns are clipped to the cel
    clip `[L, R)`.
+3. Position and skips (`0x00471620`, GDI path: `0x004F51D0` = 0). No
+   shadow when unit flags `+0xC4` bit 5 are set or the unit has state
+   146 `invis` (`0x00639DF0`). Units of type 3 and up (not composite,
+   `0x004DB180`) go to the single-cel shadow `0x00471450` (r4). For
+   types 0–2, with `(px, py)` the unit's client position, `(ox, oy, oz)`
+   its motion-record offsets (`unit-composite.md` §8; `0x004DA0B0`,
+   `0x004DA0D0`, `0x004DA0F0`) and `h = oz / 2` (C division):
+   `X = px + h + ox − (cx_u − shiftX) − 2`,
+   `Y = py + h + oy − (cy_u − 8)` (origin getters `0x0045AFC0`,
+   `0x0045AFD0`, `camera.md` §4); objects (type 2) add `objects`
+   Xoffset / Yoffset (`+0x148` / `+0x14C`) to X / Y with no `Draw` test.
+   Compared with the unit draw (`camera.md` §4) the shadow is 2 pixels
+   left and moves by half the height `oz` in both x and y instead of
+   taking `oz` in y. Then the COF box pre-test `0x004709A0` (as
+   `unit-composite.md` §4) and the same draw identity, COF, direction
+   and frame as the unit (`0x00645270`, `0x0064F380`,
+   `unit-composite.md` §2–§3; the linked-unit inventory rule of
+   `unit-composite.md` §1.1 applies); every layer `i` of the COF
+   (`0x004DB110` order) with shadow byte ≠ 0 and component `< 16` builds
+   its request (`0x004DBB50`) and is drawn at (X, Y); a failed request
+   skips the layer. Perspective mode only (not GDI): the position comes
+   from `0x004F6760`, `Y − 8` for the local player when the camera
+   follows it, and `±W/4` per open mode.
+4. Single-cel shadow (`0x00471450`, types ≥ 3): same skips; objects need
+   `Draw` (`+0x150`) ≠ 0 and `BlocksLight` of the object's mode
+   (`+0x118 + mode`) ≠ 0, then add Xoffset / Yoffset;
+   `X = px + (mx >> 11) − (cx_u − shiftX)` (+ Xoffset),
+   `Y = py + (my >> 11) − (cy_u − 8)` (+ Yoffset), with `mx`, `my` the
+   motion record's raw x, y (`0x004DA110`, `0x004DA130`; 0 without a
+   record): no −2 and no `oz`. The cel is the unit's single cel
+   (`0x004DBB50` with the unit's mode and direction), drawn through the
+   same slot `+0x90`.
 
 Blended Shadows is the settings word `[0x0072DA5C]` (settings struct
 `0x0072DA48` `+0x14`), default 1, set by `0x004F5200` from the registry
@@ -297,12 +332,16 @@ measurements: scratch scripts over the act PL2 files, the COFs (`mpq-tool
 extract "*.cof"`), `patch_d2` excel tables, and run 2 of the frame
 captures (gitignored; PNG `PLTE` equal to the act 1 PL2 palette). D2MOO
 draw-mode names were a hint only.
+Ghidra backlog (2026-10-06): unit shadow `0x00471620` (composite) and
+`0x00471450` (single cel), offset getters `0x004DA0B0`/`0x004DA0D0`/
+`0x004DA0F0`/`0x004DA110`/`0x004DA130`; monster fade inventory walk
+`0x004DB360` → `0x0063B2C0`/`0x0063DFD0`/`0x0063DFA0`.
 
 ## Open questions
 
-1. Unit shadow position (`0x00471620`: unit screen position, `−2` in x,
-   motion offsets, objects `Xoffset` / `Yoffset`, perspective branch):
-   Ghidra read; a capture of the player's shadow on a flat floor.
+1. ~~Unit shadow position~~: answered in §5 r3–r4 (`0x00471620`,
+   `0x00471450`). A capture of the player's shadow on a flat floor
+   confirms.
 2. Capture check of the orientation on an asymmetric table: a blended
    unit shadow or a ghostly / Fade / ethereal unit over a known
    background with a static camera (the Town Portal is additive and
@@ -310,8 +349,8 @@ draw-mode names were a hint only.
    behind it.
 3. What the Blended Shadows registry value was on the recording machine
    (default 1): read `[0x0072DA5C]` in the recorder.
-4. Monster inventory test of §3 r1 (`0x0063B2C0`, `0x0063DFD0`,
-   `0x0063DFA0`): which list it walks. Ghidra read.
+4. ~~Monster inventory test of §3 r1~~: answered in §3 r1 (the
+   monster's own inventory item list).
 5. Cross-spec: `draw-order.md` §6 r3 says shadow tiles use "draw mode 4";
    GDI ignores that argument (§5). `unit-composite.md` §7 r1 says
    "shift table row +0x6C"; the row is `+0x6C − 1` (`shading.md` §6 r1).
