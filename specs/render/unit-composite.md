@@ -26,18 +26,18 @@
 |   2. COF file | 87–134 |
 |   3. Direction and frame | 135–179 |
 |   4. Pre-test: COF box culling | 180–189 |
-|   5. The slot loop (`0x00470EC0`) | 190–256 |
-|   6. Component file and cel | 257–288 |
-|   7. Colormap source per component | 289–311 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 312–359 |
-|   9. Single-cel units (missiles, items) | 360–374 |
-|   10. d2rs mapping | 375–385 |
-| Constants & data dependencies | 386–399 |
-| Randomness | 400–403 |
-| Edge cases & original bugs | 404–418 |
-| Test vectors | 419–439 |
-| Provenance | 440–464 |
-| Open questions | 465–499 |
+|   5. The slot loop (`0x00470EC0`) | 190–261 |
+|   6. Component file and cel | 262–295 |
+|   7. Colormap source per component | 296–320 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 321–370 |
+|   9. Single-cel units (missiles, items) | 371–385 |
+|   10. d2rs mapping | 386–400 |
+| Constants & data dependencies | 401–414 |
+| Randomness | 415–418 |
+| Edge cases & original bugs | 419–433 |
+| Test vectors | 434–454 |
+| Provenance | 455–483 |
+| Open questions | 484–518 |
 <!-- /index -->
 
 ## Summary
@@ -253,6 +253,11 @@ empty; the armor class ends up 0 (r3: an `armtype` index above 2).
    and item codes for HD, RH, LH, SH (e.g. `cap`, `hax`, `hsh`).
 4. Every code is space-padded to 4 bytes; the name parts of §6 stop at
    the first space.
+5. **Layer walk** (`0x004DB7B0`, same walk in `0x004DB050` /
+   `0x004DB090` / `0x004DB140` for the layer fields): records in file
+   order; the first record whose component byte equals `c` is used, so a
+   later duplicate record for `c` is never read. A duplicate is not an
+   error in 1.14d.
 
 ### 6. Component file and cel
 
@@ -269,7 +274,9 @@ empty; the armor class ends up 0 (r3: an `armtype` index above 2).
    Chamber`; in mode 0 (DT) only for monsters 243 `diablo`, 284
    `maggotqueen1`, 333 `diabloclone`, 544 `baalcrab`, 559
    `baalcrabstairs`, 570 `baalclone`, 705 `uberdiablo`, 709 `uberbaal`
-   (row indices of the loaded tables); and the name `OYTRlitTNhth`. All
+   (row indices of the loaded tables); and the name `OYTRlitTNhth`
+   (compared ASCII case-insensitively over the whole name: `0x00413590`
+   → `_strnicmp` with length 0x7FFFFFFF, only while `CompressedData` ≠ 0). All
    DCC otherwise, given the registry value `CompressedData` (default 1,
    `0x005FE280`; Open question 12). Survey: the archives hold 55 monster
    and 13 object `.dc6` composite parts, all under tokens MP, TX, TY, DI,
@@ -297,8 +304,10 @@ shading.md` owns the maps; `0` = none). Selection (`0x00470EC0`):
 | S7 (14) | none (inline unit, §5 r1) |
 | others | the unit map `U`, replaced for players by the item map of r2 |
 
-1. `U`: unit +0x6C (palette index) ≠ 0 → shift table row +0x6C
-   (`0x004FB0C0`, 256 bytes at `0x007D6468 + 256 × i`); else monsters'
+1. `U`: unit +0x6C (palette index) `p` ≠ 0 → shift table row `p − 1`
+   (the caller passes `p − 1`: `0x00471000` here, `0x0047200F` for §9;
+   `0x004FB0C0` returns the 256 bytes at `0x007D6468 + 256 × i`; the
+   table's meaning is `render/shading.md` §6 r1); else monsters'
    palette shift (`0x00477530`, `palshift.dat`), else none.
 2. Item map (`0x004DB570`): used when `0x0063A790(unit)` = 0, or the
    unit is the local player and `0x00477750` ≠ 0; never for a player
@@ -341,7 +350,9 @@ per-unit client tick, before the type update); nothing when flag 1 is set:
 2. Flag 2: if ticks left = 0: set flag 1, x := 0, y := 0; else decrement.
 3. Flag 4 (bounce): if `z >> 11` ≤ limit z: vz := −trunc(factor × vz /
    100) (32-bit product), z := limit z (unshifted, as 1.14d writes it);
-   then if bounces left ≠ 0 decrement it, else set flag 1.
+   then, still inside this hit branch, if bounces left ≠ 0 decrement it,
+   else set flag 1. When `z >> 11` > limit z nothing of r3 happens (and
+   r4, r5 are skipped: flag 4 excludes them).
 4. Else flag 0x10: offsets follow the linked unit (`0x004706E0` plus that
    unit's own ox, oz; missiles +10 on oz): Open question 7.
 5. Else: stop when (flag 0x20 clear and `x>>11` ≤ lx, `y>>11` ≤ ly,
@@ -382,6 +393,10 @@ overlays are drawn (after the cel).
 | `ComponentResolver::shade` | the source of §7 (map contents: `render/shading.md`) |
 | `ViewSource::unit_offset` | `(ox, oy + oz)` of §8 plus the object / missile offsets of §8 |
 | `UnitParams.sub` | slot index; back overlays share sub 0 and are built before slot 0, front overlays sub 255, an inline unit (§5 r1) the host's slot (stable sort keeps build order) |
+| duplicate layer records | first match (§5.1 r5); not an error |
+| `armtype` index above 2 (Edge cases) | the request fails (slot not drawn) and d2rs reports it: the original reads unrelated memory, unreproducible; no 1.14d armor row reaches it |
+| inputs of an open question (OQ1, OQ2, OQ3, OQ4, OQ5, OQ7) | refused as unresolved, never guessed; OQ1 override pairs and the OQ4 direction table may be supplied by the caller |
+| §3 r5 write-back | applied once per drawn frame (`camera.md` §9), to the client unit state |
 
 ## Constants & data dependencies
 
@@ -460,7 +475,11 @@ missiles xoffset +0xA2, Trans +0x18D, NumDirections +0x1A0, LocalBlood
 all death modes except `bta2hth`), the row-smoothness count of §3, 20,941
 composite DCC/DC6 names. D2MOO (1.10f) `D2Win/D2Comp.cpp` (character
 screen composite) and Riiablo `Entity.java` were hints for the name
-pattern only.
+pattern only. Implementation follow-ups (2026-10-06): palette row `p − 1`
+at `0x00471000` / `0x0047200F`; layer walks `0x004DB7B0`, `0x004DB050`,
+`0x004DB090`, `0x004DB140` (first match); `OYTRlitTNhth` compare
+`0x005FE610` → `0x00413590` (`_strnicmp`); bounce branch of `0x004DA350`
+re-read.
 
 ## Open questions
 

@@ -26,16 +26,16 @@
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
 |   6. Tiles | 159–182 |
-|   7. View culling | 183–212 |
-|   8. Screen shake | 213–244 |
-|   9. Time base: no interpolation | 245–260 |
-|   10. What d2rs hooks get | 261–269 |
-| Constants & data dependencies | 270–276 |
-| Randomness | 277–282 |
-| Edge cases & original bugs | 283–292 |
-| Test vectors | 293–314 |
-| Provenance | 315–333 |
-| Open questions | 334–367 |
+|   7. View culling | 183–216 |
+|   8. Screen shake | 217–248 |
+|   9. Time base: no interpolation | 249–275 |
+|   10. What d2rs hooks get | 276–284 |
+| Constants & data dependencies | 285–291 |
+| Randomness | 292–297 |
+| Edge cases & original bugs | 298–307 |
+| Test vectors | 308–329 |
+| Provenance | 330–348 |
+| Open questions | 349–382 |
 <!-- /index -->
 
 ## Summary
@@ -209,6 +209,10 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   (`0x00471EC0`). Pixels outside the frame are cut by the cel clip
   (`sprite-placement.md` §5), whose pre-test only rejects cels with no
   visible pixel.
+- DT1 shadow tiles (shadow pass kind 1, `draw-order.md` §6 r3; slot
+  `+0xA4`, GDI `0x006C9290`, `0x006C9318`–`0x006C932A`): the same
+  per-block test as the wall blocks above, with the same bounds and the
+  same mode argument (the drawer's last argument). No whole-tile test.
 
 ### 8. Screen shake
 
@@ -257,6 +261,17 @@ For d2rs: one frame per presented tick, positions from the snapshot of
 that tick, no interpolation. The shake envelope uses `t = 40 × (ticks since
 start)` (the original's frame spacing); pixel checks of shaking frames
 take the recorded `(dx, dy)` as input (`capture.md` §4).
+
+Dropped ticks (frame-cycle FC3): when several ticks run before one draw,
+the original draws only the state after the last of them; which ticks
+are dropped depends on wall-clock load, in 1.14d and in d2rs alike, so it
+is not a fidelity rule. A d2rs loop that waits for the previous frame
+(e.g. a GPU read-back of the index framebuffer) and then draws only the
+latest tick matches this. What must hold: the framebuffer a drawn frame
+starts from is the previous **drawn** frame's (`composition.md` §3), and
+the draw-time writes (`draw-order.md` Outputs, `unit-composite.md` §3 r5)
+happen once per drawn frame, never for a dropped tick. Checks select
+frames by the recorded `seq` and tick (`capture.md` §4), never by count.
 
 ### 10. What d2rs hooks get
 
