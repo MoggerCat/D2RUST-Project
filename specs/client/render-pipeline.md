@@ -262,7 +262,7 @@ leave a hook that panics or a `TODO(spec: …)`, never a guess.
 | B5 | Blend modes: COF translucency override, missiles, overlays, shadows (the darkening blend), formulas | **written:** `render/blend-modes.md` (draft; modes 0–7 → PL2 tables, row = destination except lit translucent walls) | blend path; captures | identical pixels |
 | B6 | Draw order: floors, shadows, walls vs units (the isometric rules, `map-preview.md` OQ 2), roofs, missiles, overlays, UI | **written:** `render/draw-order.md` (draft; per-frame draw-cell grid, 10 world passes) | client sort and passes | identical pixels on scenes with occlusion |
 | B7 | Camera: world (subtile) → screen, view size and centering, interpolation between ticks (if any), screen shake | **written:** `render/camera.md` (draft; no interpolation) | client view path; captures while walking | identical pixels per tick (`camera-0001`) |
-| B8 | Lighting: light radius, light sources, day/night, per-tile or per-pixel light level | `render/lighting.md` | client lighting path; captures at night/with torches | identical pixels |
+| B8 | Lighting: light radius, light sources, day/night, per-tile or per-pixel light level | **written:** `render/lighting.md` (draft; 48 × 48 sub-tile light map per drawn frame, octagonal falloff, shadows at quality 2, day/night environment) | client lighting path; captures at night/with torches | identical pixels |
 | B9 | Frame capture of 1.14d: which surface, at which point in the frame, how frames are tied to ticks | **written:** `render/capture.md` (draft), `tools/trace-recorder/record_frames.py`, `traces/FORMAT.md` §Render captures | debugger hook on the present call | capture of a static scene repeats identically (`stability-0001`, first) |
 | B10 | Tile variants by rarity and the invisible-collision-tile skip (`map-preview.md` OQ 3) | `drlg/rooms.md` §9.4 (variants) + **written:** `render/draw-order.md` §7 (no draw-path skip; OQ7) | DRLG; tile draw path | identical pixels on town captures |
 
@@ -311,8 +311,8 @@ compute availability checked in the pinned `bevy_render 0.19.1` source.
 
 ## Open questions
 
-1. §B8 (an owner spec to write locally); §B1–§B7, §B9, §B10 written as
-   drafts.
+1. ~~§B8 (an owner spec to write locally).~~ All of §B1–§B10 are
+   written as drafts.
 2. Whether the compute compositor reaches 60 frames per second at
    800×600 with a full town scene on the developer GPU: measure once
    implemented; if not, bins per item list may be culled by item bounding

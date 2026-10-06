@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 382–393 |
 | Test vectors | 394–404 |
 | Provenance | 405–424 |
-| Open questions | 425–473 |
+| Open questions | 425–461 |
 <!-- /index -->
 
 ## Summary
@@ -186,7 +186,7 @@ draw per tick (draws are more than 16 ms apart) the loop is 64 ticks.
 
 | Item | Where | Notes |
 |---|---|---|
-| light quality | `[0x007B567C]` (0–2) | chosen by `0x00475780` from the measured draw rate (Open question 5) |
+| light quality | `[0x007B567C]` (0–2) | chosen by `0x00475780` from the measured draw rate (`render/lighting.md` §5) |
 | measured draw rate | `[0x007A04A8]` | 25 at game start (`0x0044F100`); recomputed by `0x0044CCE0` |
 | quality options | `[0x0072DA50]`, `[0x0072A348]` | raw |
 | render kind | `[0x00712CCC]` (`0x00477730`) | wall / roof fade is instant below 4 |
@@ -349,7 +349,7 @@ pixel lies in the 33 × 30 box x 579–611, y 250–279, which is the cursor's
 player: frames 13,200 and 13,216 (same key) differ in 332 pixels, all on
 the cursor. The "±1 step on the dark ramp on and around the player" first
 read as a light flicker is the cursor's own shading; no light-map change
-was found (Open question 5).
+was found there (run 1b's left-floor changes: `render/lighting.md` §12).
 
 ### 8. Capture cases
 
@@ -437,24 +437,11 @@ re-hashing and diffing the PNG indices. Recorder design follows
 4. Where unit component cel files load (not through `0x004788B0`): the
    composite path `0x004DB7B0` → `0x004DA720` (`unit-composite.md`); a
    `celfile`-style hook there names the DCC files.
-5. (for `render/lighting.md`, partial rules found) The light map is
-   rebuilt every drawn frame (`0x00475800`, from the world draw
-   `0x00476BC0`): 48 × 48 cells of 8 bytes at `0x007B0E6C` (intensity, R,
-   G, B), one per subtile, origin `[0x007B0A54]`, `[0x007B0A58]` = player
-   position (`0x006488C0` / `0x00648900`) − 24; sources in the list
-   `[0x007B5668]` (record: unit type, GUID, kind `+0x0C` 0–2, position
-   `+0x10/+0x14` = (`0x006203B0` / `0x00620410` value >> 13) + 4, radius ×
-   8 `+0x18` stepping by 8 per drawn frame toward `+0x1C`, intensity `+0x24`, R, G, B `+0x25..+0x27`); the local
-   player's light is kind 0, radius 13 (`0x00460CF0`). No random draw and
-   no clock read was found in the build (`0x00475800`, `0x004748D0`,
-   `0x00474D70`, `0x004747C0`, `0x00474B50`, `0x00474C00`) except the
-   quality: `0x00475780` picks 2 (kind-0 sources by `0x00474D70`) or less
-   (`0x004748D0`) from the measured draw rate (≤ 9: 0; ≤ 12: 1; ≤ 15: keep
-   ≥ 1 else 1; above: 2; options `[0x0072DA50]`, `[0x0072A348]` lower it),
-   changing at most once per 2,000 ms. Open: the exact rate formula
-   (`0x0044CCE0`: a counter divided by 3 every 3,000 ms; what it counts),
-   and whether the debugger's draw rate puts captures in a lower quality
-   than play. `render/lighting.md` owns these once written.
+5. ~~Light-map rules and the light flicker of run 1b.~~ Answered in
+   `render/lighting.md`: build and sources §1–§8, quality and draw rate §5,
+   what a capture must record §12 r1–r3 (light-map digest at frame end, not
+   the quality alone); run 1b's first still segment §12 r4 (cursor, UI and
+   a moving off-screen light; that source is `lighting.md` Open question 9).
 6. Weather is not modelled: rain particles (`0x00473090`, three draws of
    the player seed per new drop) and lightning (`0x00473910`: countdown
    500 + rnd(1,500), a flash rectangle of index 255, draw mode 5) advance
@@ -464,8 +451,9 @@ re-hashing and diffing the PNG indices. Recorder design follows
    needs either the weather rules (owner to name: a weather spec) or a
    mask; until then town frames do not count for §7.
 7. Unexplained small changes in run 1 f 13,486–14,636 (black ↔ index 172
-   at x 0–125, y 125–275 and x 150–200, y 575–600): rerun with
-   `--draws-every` and read the draw log at those pixels.
+   at x 0–125, y 125–275 — lighting, `render/lighting.md` §12 r5 — and
+   x 150–200, y 575–600): rerun with `--draws-every` and read the draw log
+   at those pixels.
 8. Draws with no server tick between (118 frames of run 1, 19 of run 2)
    while not paused contradict `camera.md` §9 ("passes without a tick do
    not draw"); the `frames-raw-2` `client_update` counter shows whether a
