@@ -203,7 +203,11 @@ pub struct PanelEnv {
 
 impl PanelEnv {
     /// A [`CondEnv`] with the pressed flag and the panel's own words.
-    pub fn cond<'a>(&self, pressed: bool, extra: &'a dyn Fn(super::layout::Cond) -> bool) -> CondEnv<'a> {
+    pub fn cond<'a>(
+        &self,
+        pressed: bool,
+        extra: &'a dyn Fn(super::layout::Cond) -> bool,
+    ) -> CondEnv<'a> {
         CondEnv {
             screen: self.screen,
             open_mode: self.open_mode,

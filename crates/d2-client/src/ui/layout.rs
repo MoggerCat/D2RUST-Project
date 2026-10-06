@@ -270,9 +270,7 @@ pub fn parse_ui_states(text: &str) -> Result<Vec<UiStateRow>, LayoutError> {
         text,
         &["id", "name", "flag", "slot", "exp_only", "conflicts"],
     )? {
-        let id = c[0]
-            .parse::<u8>()
-            .map_err(|_| row_err(T, line, "id"))?;
+        let id = c[0].parse::<u8>().map_err(|_| row_err(T, line, "id"))?;
         if usize::from(id) != out.len() {
             return Err(row_err(T, line, "ids not 0, 1, 2, …"));
         }
@@ -497,7 +495,12 @@ impl LayoutRow {
         } else {
             self.h?
         };
-        Some(Rect::new(x, y, u16::try_from(w).ok()?, u16::try_from(h).ok()?))
+        Some(Rect::new(
+            x,
+            y,
+            u16::try_from(w).ok()?,
+            u16::try_from(h).ok()?,
+        ))
     }
 }
 
@@ -583,7 +586,8 @@ pub fn parse_panel_layout(text: &str) -> Result<Vec<LayoutRow>, LayoutError> {
         let addr = parse_int(c[12])
             .and_then(|v| u32::try_from(v).ok())
             .ok_or_else(|| e("addr"))?;
-        if kind == RowKind::Hit && (w.is_none() || (h.is_none() && !cond.contains(&Cond::Tab1Bottom)))
+        if kind == RowKind::Hit
+            && (w.is_none() || (h.is_none() && !cond.contains(&Cond::Tab1Bottom)))
         {
             return Err(e("hit without size"));
         }

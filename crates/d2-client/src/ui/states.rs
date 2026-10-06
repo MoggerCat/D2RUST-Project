@@ -10,7 +10,9 @@
 //! the bridge.
 
 use super::geom::Point;
-use super::layout::{ui_states, Conflict, LayoutError, Screen, SlotKind, UiStateRow, UI_STATE_COUNT};
+use super::layout::{
+    ui_states, Conflict, LayoutError, Screen, SlotKind, UiStateRow, UI_STATE_COUNT,
+};
 use crate::rules::camera::OpenMode;
 
 /// Ids of the states the rules below name (§2, §4; D2MOO `D2C_UIvars`).
