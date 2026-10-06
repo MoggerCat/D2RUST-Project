@@ -12,6 +12,7 @@ pub mod game;
 pub mod rng;
 pub mod tick;
 pub mod units;
+pub mod world;
 
 /// Simulation ticks per second, matching the original game.
 pub const TICKS_PER_SECOND: u32 = 25;
