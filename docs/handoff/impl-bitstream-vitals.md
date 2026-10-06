@@ -199,3 +199,17 @@ files this session touched:
 
 This branch's own tests all pass (2,754 of 2,809 pass in the d2-sim +
 conformance + d2-client run, the 55 above failing; d2-server and d2-proto clean).
+
+### 7.1 After merging the base `bcd6591` (coordinator request)
+
+Merge conflict in `d2-server/src/adapters/handlers/walk/tests.rs` (both
+sides appended tests): both kept. With the base's bridge fix the e2e
+tests run again; `e2e_single_player` pinned empty 0x9C / 0x9D streams,
+so it now decodes each stream with `d2-proto`'s reader (exact length,
+item code) and cuts it off before comparing the §11 headers (`streams`).
+Gate on the merge: everything PASS except test d2-sim + conformance and
+test d2-client, whose remaining failures (10) all fail on `bcd6591`
+itself (checked in a worktree): d2-sim's 7 skill / missile catalogue
+checks, and `e2e_full_loop` ×3 (`Walk(Fatal("path type without a
+function"))`, path wiring, not this branch's). 2,975 of 2,985 pass in
+the d2-sim + conformance + d2-client run; d2-server, d2-proto clean.
