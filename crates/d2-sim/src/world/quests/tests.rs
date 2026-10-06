@@ -241,6 +241,63 @@ pub(super) struct Fake {
     pub(super) distances: BTreeMap<(UnitId, UnitId), i32>,
     /// `living_player_within` answer.
     pub(super) living_near: bool,
+    // -- Act IV q1/q3 fake fields.
+    /// `room_in_act_at`'s answer.
+    pub(super) a4_room: Option<RoomId>,
+    /// `unit_distance` by the first unit (a player); missing: `None`.
+    pub(super) a4_dist: BTreeMap<UnitId, i32>,
+    /// `wielded_weapon_code` by player.
+    pub(super) a4_wield: BTreeMap<UnitId, [u8; 4]>,
+    // -- end Act IV q1/q3 fake fields.
+
+    // -- Act IV q2 fake fields.
+    /// `FrameCnt1` of every object.
+    pub(super) q2_fc1: i32,
+    /// `spawn_superunique` results in order (empty: fails).
+    pub(super) q2_superuniques: Vec<Option<UnitId>>,
+    /// `level_monsters` answer.
+    pub(super) q2_level_monsters: Vec<UnitId>,
+    /// Dead units.
+    pub(super) q2_dead: Vec<UnitId>,
+    /// Non-zero alignments.
+    pub(super) q2_align: BTreeMap<UnitId, u32>,
+    /// Players whose client is busy (`client_idle` false).
+    pub(super) q2_busy: Vec<UnitId>,
+    // -- end Act IV q2 fake fields.
+
+    // -- Act V part 1 fake fields.
+    /// `adjacent_units` answers by room.
+    pub(super) a5_adjacent: BTreeMap<RoomId, Vec<UnitId>>,
+    /// `unit_mode` answers (default 0).
+    pub(super) a5_modes: BTreeMap<UnitId, i32>,
+    /// `unit_distance` answers by (a, b) (default 100).
+    pub(super) a5_dist: BTreeMap<(UnitId, UnitId), i32>,
+    /// `place_object` results in order (empty: fails).
+    pub(super) a5_places: Vec<Option<UnitId>>,
+    /// `critical_spawn` / `preset_superunique_spawn` results in order
+    /// (empty: fails).
+    pub(super) a5_crits: Vec<Option<UnitId>>,
+    /// `apply_map_ai` answer.
+    pub(super) a5_map_ai: bool,
+    /// `quest_item_level` and `item_drop_sound` answers.
+    pub(super) a5_item_level: i32,
+    pub(super) a5_drop_sound: i32,
+    // -- end Act V part 1 fake fields.
+
+    // -- Act V part 2 fake fields.
+    /// Active waypoints (player, level).
+    pub(super) a5_waypoints: Vec<(UnitId, u32)>,
+    /// `spawn_superunique` results in order (empty: fails).
+    pub(super) a5_superuniques: Vec<Option<UnitId>>,
+    /// `max_level` answer; `experience_threshold` table by level.
+    pub(super) a5_max_level: i32,
+    pub(super) a5_thresholds: BTreeMap<i32, u32>,
+    /// `create_object_at` / `create_missile_at` answer.
+    pub(super) a5_created: Option<UnitId>,
+    /// `monstats_rows` answer; zoo-eligible classes.
+    pub(super) a5_monstats_rows: u32,
+    pub(super) a5_zoo: Vec<u32>,
+    // -- end Act V part 2 fake fields.
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -760,6 +817,218 @@ impl QuestWorld for Fake {
         self.log.push(format!("progression {} {flags:#06x}", p.0));
         self.client_flags.insert(p, flags);
     }
+
+    // -- Act IV q1/q3 seam fakes.
+    fn room_in_act_at(&mut self, act: u8, x: i32, y: i32) -> Option<RoomId> {
+        self.log.push(format!("room act {act} {x} {y}"));
+        self.a4_room
+    }
+    fn distance_between(&mut self, a: UnitId, b: UnitId) -> Option<i32> {
+        self.a5_dist
+            .get(&(a, b))
+            .or_else(|| self.a4_dist.get(&a))
+            .copied()
+    }
+    fn wielded_weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        self.a4_wield.get(&player).copied()
+    }
+    // -- end Act IV q1/q3 seam fakes.
+
+    // -- Act IV q2 seam fakes.
+    fn object_frame_count1(&mut self, _: UnitId) -> i32 {
+        self.q2_fc1
+    }
+    fn superunique_id(&mut self, n: u8) -> u16 {
+        // The loader fills the array by hcIdx (open question 8).
+        u16::from(n)
+    }
+    fn spawn_superunique(
+        &mut self,
+        d: UnitId,
+        x: i32,
+        y: i32,
+        arg: u32,
+        id: u16,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("superunique {id} {x} {y} at {} arg {arg}", d.0));
+        if self.q2_superuniques.is_empty() {
+            None
+        } else {
+            self.q2_superuniques.remove(0)
+        }
+    }
+    fn level_monsters(&mut self, level: u32) -> Vec<UnitId> {
+        self.log.push(format!("level monsters {level}"));
+        self.q2_level_monsters.clone()
+    }
+    fn unit_dead(&mut self, u: UnitId) -> bool {
+        self.q2_dead.contains(&u)
+    }
+    fn alignment(&mut self, u: UnitId) -> u32 {
+        self.q2_align.get(&u).copied().unwrap_or(0)
+    }
+    fn end_interaction(&mut self, p: UnitId) {
+        self.log.push(format!("end interaction {}", p.0));
+    }
+    fn warp_to_level(&mut self, p: UnitId, level: u32, arg: u32) {
+        self.log.push(format!("warp {} {level} {arg}", p.0));
+    }
+    fn end_game(&mut self) {
+        self.log.push("end game".into());
+    }
+    fn save_pass(&mut self) {
+        self.log.push("save pass".into());
+    }
+    fn client_idle(&mut self, p: UnitId) -> bool {
+        !self.q2_busy.contains(&p)
+    }
+    fn act_change(&mut self, p: UnitId, level: u32, arg: u32) {
+        self.log.push(format!("act change {} {level} {arg}", p.0));
+    }
+    fn activate_waypoint(&mut self, p: UnitId, level: u32, d: u8) {
+        self.log.push(format!("waypoint {} {level} {d}", p.0));
+    }
+    // -- end Act IV q2 seam fakes.
+
+    // -- Act V part 1 seam fakes.
+    fn place_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        flags: [u8; 3],
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("place {class} {x} {y} room {} {flags:?}", room.0));
+        if self.a5_places.is_empty() {
+            None
+        } else {
+            self.a5_places.remove(0)
+        }
+    }
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        self.a5_adjacent.get(&room).cloned().unwrap_or_default()
+    }
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        self.a5_modes.get(&unit).copied().unwrap_or(0)
+    }
+    fn critical_spawn(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.log
+            .push(format!("critical {class} {x} {y} room {}", room.0));
+        if self.a5_crits.is_empty() {
+            None
+        } else {
+            self.a5_crits.remove(0)
+        }
+    }
+    fn kill_in_place(&mut self, unit: UnitId) {
+        self.log.push(format!("kill {}", unit.0));
+    }
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        self.log.push(format!("map ai {} {map_ai:#x}", unit.0));
+        self.a5_map_ai
+    }
+    fn npc_leave_town(&mut self, unit: UnitId) {
+        self.log.push(format!("leave town {}", unit.0));
+    }
+    fn kill_in_town(&mut self, unit: UnitId) {
+        self.log.push(format!("kill in town {}", unit.0));
+    }
+    fn object_leave_room(&mut self, object: UnitId) {
+        self.log.push(format!("leave room {}", object.0));
+    }
+    fn quest_item_level(&mut self, _: UnitId) -> i32 {
+        self.a5_item_level
+    }
+    fn item_drop_sound(&mut self, _: UnitId) -> i32 {
+        self.a5_drop_sound
+    }
+    fn add_resist_list(&mut self, player: UnitId, v: i32) {
+        self.log.push(format!("resist {} {v}", player.0));
+    }
+    fn preset_superunique_spawn(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        superunique: u16,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("superunique {superunique} {x} {y} room {}", room.0));
+        if self.a5_crits.is_empty() {
+            None
+        } else {
+            self.a5_crits.remove(0)
+        }
+    }
+    // -- end Act V part 1 seam fakes.
+
+    // -- Act V part 2 seam fakes.
+    fn waypoint_active(&mut self, player: UnitId, level: u32) -> bool {
+        self.log.push(format!("waypoint {} {level}", player.0));
+        self.a5_waypoints.contains(&(player, level))
+    }
+    fn spawn_superunique_at_unit(&mut self, at: UnitId, superunique: u16) -> Option<UnitId> {
+        self.log.push(format!("superunique {} {superunique}", at.0));
+        if self.a5_superuniques.is_empty() {
+            None
+        } else {
+            self.a5_superuniques.remove(0)
+        }
+    }
+    fn quest_missile(&mut self, from: UnitId, to: UnitId, missile: u16, flags: u32, level: u8) {
+        self.log.push(format!(
+            "missile {missile} {} -> {} {flags:#x} {level}",
+            from.0, to.0
+        ));
+    }
+    fn remove_ancient(&mut self, monster: UnitId) {
+        self.log.push(format!("remove ancient {}", monster.0));
+    }
+    fn max_level(&mut self, _: UnitId) -> i32 {
+        self.a5_max_level
+    }
+    fn experience_threshold(&mut self, _: UnitId, level: i32) -> u32 {
+        self.a5_thresholds.get(&level).copied().unwrap_or(0)
+    }
+    fn level_up(&mut self, player: UnitId) {
+        self.log.push(format!("level up {}", player.0));
+        let l = self.stat(player, 12) + 1;
+        let next = self.a5_thresholds.get(&(l + 1)).copied().unwrap_or(0);
+        let p = self.p(player);
+        p.stats.insert(12, l);
+        p.stats.insert(30, next as i32);
+    }
+    fn close_town_portal(&mut self, player: UnitId, level: u32) {
+        self.log.push(format!("close portal {} {level}", player.0));
+    }
+    fn object_stairs_warp(&mut self, player: UnitId, object: UnitId) {
+        self.log.push(format!("stairs {} {}", player.0, object.0));
+    }
+    fn create_object_at(&mut self, at: UnitId, class: u16, flags: u32) -> Option<UnitId> {
+        self.log.push(format!("object at {} {class} {flags}", at.0));
+        self.a5_created
+    }
+    fn create_missile_at(&mut self, at: UnitId, class: u16) -> Option<UnitId> {
+        self.log.push(format!("missile at {} {class}", at.0));
+        self.a5_created
+    }
+    fn character_progression(&mut self, player: UnitId, act: u8, difficulty: u8) {
+        self.log
+            .push(format!("progression {} {act} {difficulty}", player.0));
+    }
+    fn drop_gold_amount(&mut self, at: UnitId, amount: u32) {
+        self.log.push(format!("gold {} {amount}", at.0));
+    }
+    fn monstats_rows(&mut self) -> u32 {
+        self.a5_monstats_rows
+    }
+    fn zoo_eligible(&mut self, class: u32) -> bool {
+        self.a5_zoo.contains(&class)
+    }
+    // -- end Act V part 2 seam fakes.
 }
 
 pub(super) fn control() -> (QuestControl, Seed) {
@@ -811,20 +1080,19 @@ fn fresh_game_entry() {
     // chain 2 stays at 0.
     assert_eq!(ctl.record(1).unwrap().state, 1);
     assert_eq!(ctl.record(2).unwrap().state, 0);
+    // Chain 22 holds at its init state 1 and chain 31 at 0 (act4 §1.3,
+    // act5 §1.3: state ≠ 5 and not-intro → 1), so neither walk moves on.
+    assert_eq!(ctl.record(22).unwrap().state, 1);
+    assert_eq!(ctl.record(24).unwrap().state, 0);
+    assert_eq!(ctl.record(31).unwrap().state, 0);
+    assert_eq!(ctl.record(32).unwrap().state, 0);
+    // Chain 8's is `act2::sequence` (state 1, not-intro → 1, chain 13
+    // stays 0); chain 18's is `quests-act3.md` §1.3 (state 0 ≠ 5 → 1,
+    // nothing moves).
     assert_eq!(ctl.record(13).unwrap().state, 0);
     assert_eq!(ctl.record(18).unwrap().state, 0);
     assert_eq!(ctl.record(16).unwrap().state, 0);
-    assert_eq!(
-        f.log,
-        [
-            // Sequence functions of chains 22, 31 (chain 8's is
-            // `act2::sequence`: state 1, not-intro → 1, chain 13 stays 0;
-            // chain 18's is `quests-act3.md` §1.3: state 0 ≠ 5 → 1,
-            // nothing moves).
-            "unhandled 22 0x5b38e0",
-            "unhandled 31 0x587560"
-        ]
-    );
+    assert!(f.log.is_empty(), "{:?}", f.log);
     // A second entry: callback 14 only, same messages.
     f.sent.clear();
     f.log.clear();

@@ -153,7 +153,10 @@ fn quest_data_reads_barbarians_only_for_list_36() {
     let mut f = Fake::new();
     ctl.record_mut(1).unwrap().status = 1;
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert!(f.sent_ids().contains(&0x50));
+    let m = f.sent.iter().find(|m| m.1[0] == 0x50).unwrap();
+    // Barbarians left would be 15 (no cage spawned, quests-act5.md
+    // §4.1); not read, the field stays 0.
+    assert_eq!(m.1[7..9], [0, 0]);
     assert!(!f.log.iter().any(|l| l.starts_with("unhandled 32")));
 }
 
@@ -161,13 +164,15 @@ fn quest_data_reads_barbarians_only_for_list_36() {
 // left.
 #[test]
 fn status_message_filter_36_reads_barbarians() {
-    let (ctl, _) = control();
+    let (mut ctl, _) = control();
     let mut f = Fake::new();
     let r = ctl.records.iter().find(|r| r.filter == 36).unwrap();
     let (chain, act) = (r.chain, r.act);
     f.p(P1).act = Some(act);
+    ctl.record_mut(chain).unwrap().extra.a5.q2.cage_spawned[0] = true;
     ctl.send_status(&mut f, P1, chain).unwrap();
-    assert!(f.log.iter().any(|l| l == "unhandled 32 0x588c50"));
+    // `0x00588C50`: 5 per cage group not spawned (two here).
+    assert_eq!(f.sent.last().unwrap().1[4..6], [10, 0]);
 }
 
 // From specs/world/quests.md §8.1, §10.8: Warriv calls chain 6's callback
@@ -547,26 +552,31 @@ fn cow_king_kill() {
     );
 }
 
-// From specs/world/quests.md §6.1 and §6.2 r2: a status function other
-// than A1Q0's and the intros' is not specified (reported, nothing
-// written).
+// From specs/world/quests.md §6.1 and §6.2 r2: of the status functions
+// `quests.tsv` registers, only Act II's chains 27 and 26 still have no
+// body (reported, nothing written); a function with no body on any
+// chain takes the same fallback.
 #[test]
 fn unspecified_status_function_is_reported() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
-    let (chain, func) = ctl
-        .records
-        .iter()
-        .find_map(|r| match r.status_fn {
-            Some(func) if !matches!(r.chain, 0 | 37..=40) => Some((r.chain, func)),
-            _ => None,
-        })
-        .unwrap();
     for r in &mut ctl.records {
-        r.status = u8::from(r.chain == chain);
+        r.status = u8::from(r.status_fn.is_some());
     }
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert_eq!(f.log, [format!("unhandled {chain} {func:#x}")]);
+    assert_eq!(f.log, ["unhandled 27 0x59e4a0", "unhandled 26 0x59e2b0"]);
+    let list = &f.sent.last().unwrap().1;
+    assert_eq!((list[1 + 30], list[1 + 31]), (0, 0));
+    // Chain 1 has no status function in 1.14d; one with no body is
+    // reported (the fallback arm) and nothing is written for it.
+    let (mut ctl, _) = control();
+    let mut f = Fake::new();
+    for r in &mut ctl.records {
+        r.status = u8::from(r.chain == 1);
+    }
+    ctl.record_mut(1).unwrap().status_fn = Some(0xDEAD);
+    ctl.request_quest_data(&mut f, P1).unwrap();
+    assert_eq!(f.log, ["unhandled 1 0xdead"]);
     let list = &f.sent.last().unwrap().1;
     assert!(list[1..].iter().all(|&b| b == 0));
 }
