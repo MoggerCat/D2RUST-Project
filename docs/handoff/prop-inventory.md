@@ -112,5 +112,8 @@ overlap the unit-tier claims; a docs session may add them).
 
 ## 5. Gate
 
-`sh tools/gate.sh all` on this branch: see the commit (GATE line recorded
-below).
+`sh tools/gate.sh all` on this branch: **GATE: PASS** (spec_index,
+methods, coverage check and selftest, trace checkers, hook selftest, fmt,
+depcheck, workspace clippy, d2-sim + conformance tests, the rest, d2-client
+tests, doc-tests). The test code allows `clippy::if_same_then_else` (the
+§7 oracle keeps each step a branch) and one `too_many_arguments`.
