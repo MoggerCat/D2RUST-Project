@@ -14,6 +14,8 @@ pub mod act1;
 pub mod tables;
 
 #[cfg(test)]
+mod act1_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
@@ -94,6 +96,10 @@ pub enum QuestError {
     Table(#[from] crate::world::TsvError),
     #[error("quests.tsv: {0}")]
     TableShape(&'static str),
+    /// A fatal assert inside a quest callback (`quests.md` §10): the
+    /// function's 1.14d address.
+    #[error("quest callback {0:#x}: fatal assert")]
+    Fatal(u32),
 }
 
 // ------------------------------------------------------------------ §1
@@ -261,6 +267,8 @@ impl QuestRecord {
 pub enum TimerFn {
     /// `0x00590230`: Den of Evil status 5 while state 4; returns 1.
     DenOfEvilStatus,
+    /// `0x00590BF0`: Burial Grounds status 3; returns 1 (§10.5).
+    BurialStatus,
     /// Test probe: logs through `unhandled(chain, tick)`, never removed.
     #[cfg(test)]
     Probe,
@@ -294,6 +302,9 @@ pub struct QuestControl {
     pub rows: Vec<QuestRow>,
     /// NPC message tables.
     pub messages: Vec<MessageEntry>,
+    /// Fatal asserts the callbacks reached ([`QuestError::Fatal`]), in
+    /// order; the original aborts at the first.
+    pub faults: Vec<QuestError>,
 }
 
 /// The seam to the rest of the game. Expected providers in brackets.
@@ -326,6 +337,8 @@ pub trait QuestWorld {
     /// The unit seed (+0x20).
     fn unit_seed(&mut self, unit: UnitId) -> &mut Seed;
     fn stat(&self, unit: UnitId, stat: u16) -> i32;
+    /// `0x006253B0`: the unit's base stat, layer 0 (A1Q3's level test).
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32;
     /// `0x006272B0`: add to a stat.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32);
     /// `0x00553380`.
@@ -341,9 +354,16 @@ pub trait QuestWorld {
     fn monster_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// A monster unit's class id (NPC class), if it is a monster.
     fn monster_class(&self, unit: UnitId) -> Option<u16>;
-    /// Players in the unit's room or an adjacent room (A1Q2, D2MOO
-    /// `ACT1Q2_UnitIterate_SetRewardPending`).
+    /// The players P with a room for which A1Q2's J3 test holds
+    /// (§10.5): P's room is the unit's room, or the unit's room is in
+    /// P's room's room list (`0x00619790`, `drlg/rooms.md` §10.4). Empty
+    /// when the unit has no room.
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// `0x00554630` and the party list at game +0x1D2C (§10.4 I3): the
+    /// members of the player's party in list order, GUID lookups that
+    /// fail skipped; `None` when the party id is 0xFFFF (no party; a
+    /// single player is in none, open question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
 
     // Messages (server transport).
     fn send(&mut self, player: UnitId, msg: &[u8]);
@@ -388,8 +408,12 @@ pub trait QuestWorld {
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    /// Set a quest object "opened" (objects).
-    fn set_object_opened(&mut self, object: UnitId);
+    /// An object's mode (+0x10); 0 when there is no object (§10.5).
+    fn object_mode(&self, object: UnitId) -> i32;
+    /// `0x00624690`: set an object's mode (objects).
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
+    /// `0x00552F60` with type 2: the object with this GUID and its class.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// `0x00579180(npc)`: the mercenary reward (NPC spec).
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
 
@@ -483,6 +507,7 @@ impl QuestControl {
             fx: 0,
             rows: tables.rows.clone(),
             messages: tables.messages.clone(),
+            faults: Vec::new(),
         })
     }
 

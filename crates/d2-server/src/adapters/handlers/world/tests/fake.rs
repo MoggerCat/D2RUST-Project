@@ -544,6 +544,9 @@ impl QuestWorld for Fake {
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         NpcWorld::stat(self, unit, stat) as i32
     }
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        NpcWorld::base_stat(self, unit, stat) as i32
+    }
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         let v = QuestWorld::stat(self, unit, stat).wrapping_add(delta);
         NpcWorld::set_stat(self, unit, stat, v as u32);
@@ -581,6 +584,9 @@ impl QuestWorld for Fake {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         NpcWorld::send(self, player, msg);
     }
@@ -617,7 +623,13 @@ impl QuestWorld for Fake {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, _: UnitId, _: i32) {}
+    fn object_by_guid(&self, _: u32) -> Option<(UnitId, u16)> {
+        None
+    }
     fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));

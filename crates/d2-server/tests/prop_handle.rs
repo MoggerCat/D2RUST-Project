@@ -1738,6 +1738,9 @@ mod trade {
         fn players_near(&self, _: UnitId) -> Vec<UnitId> {
             Vec::new()
         }
+        fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+            None
+        }
         fn attach_sound(&mut self, _: UnitId, _: u16) {}
         fn send(&mut self, player: UnitId, msg: &[u8]) {
             self.sent.push((player, msg.to_vec()));
@@ -1766,7 +1769,10 @@ mod trade {
             false
         }
         fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-        fn set_object_opened(&mut self, _: UnitId) {}
+        fn object_mode(&self, _: UnitId) -> i32 {
+            0
+        }
+        fn set_object_mode(&mut self, _: UnitId, _: i32) {}
         fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
         fn unhandled(&mut self, _: u8, _: u32) {}
     }

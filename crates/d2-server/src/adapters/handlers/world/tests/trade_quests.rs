@@ -80,6 +80,17 @@ pub struct Rest {
     pub guids: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
+    /// Staged quest-side seams (`quests_act1`): unit quest chains, level
+    /// 8's monster region, J3's near players, parties, room levels (1
+    /// when absent), object modes, inventories, the drop result.
+    pub chains: BTreeMap<UnitId, QuestChain>,
+    pub den: (u32, u32, u32, u32),
+    pub near: Vec<UnitId>,
+    pub party: BTreeMap<UnitId, Vec<UnitId>>,
+    pub levels: BTreeMap<UnitId, u32>,
+    pub object_modes: BTreeMap<UnitId, i32>,
+    pub inventory: BTreeMap<UnitId, Vec<UnitId>>,
+    pub drop_ok: bool,
 }
 
 impl Outbox for Rest {
@@ -297,20 +308,28 @@ impl QuestRest for Rest {
         0
     }
     fn set_player_byte_4c(&mut self, _: UnitId, _: u8) {}
-    fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
-        None
+    fn quest_chain(&mut self, u: UnitId) -> Option<&mut QuestChain> {
+        self.chains.get_mut(&u)
     }
     fn unit_act(&self, _: UnitId) -> Option<u8> {
         Some(0)
     }
-    fn unit_level(&self, _: UnitId) -> Option<u32> {
-        Some(1)
+    fn unit_level(&self, u: UnitId) -> Option<u32> {
+        Some(self.levels.get(&u).copied().unwrap_or(1))
     }
-    fn unit_kind(&self, _: UnitId) -> UnitKind {
-        UnitKind::Other
+    /// Players are the units with quest records; the rest is `Other`.
+    fn unit_kind(&self, u: UnitId) -> UnitKind {
+        if self.quests.contains_key(&u) {
+            UnitKind::Player
+        } else {
+            UnitKind::Other
+        }
     }
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
+        self.near.clone()
+    }
+    fn party_members(&self, p: UnitId) -> Option<Vec<UnitId>> {
+        self.party.get(&p).cloned()
     }
     fn attach_sound(&mut self, u: UnitId, sound: u16) {
         self.log.push(format!("sound {} {sound}", u.0));
@@ -328,18 +347,28 @@ impl QuestRest for Rest {
         m.extend_from_slice(&[0; 34]);
         self.sent.push((player, m));
     }
-    fn inventory(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
+    fn inventory(&self, p: UnitId) -> Vec<UnitId> {
+        self.inventory.get(&p).cloned().unwrap_or_default()
     }
-    fn delete_item(&mut self, _: UnitId, _: [u8; 4]) {}
+    /// Logged; the staged inventory is emptied.
+    fn delete_item(&mut self, p: UnitId, code: [u8; 4]) {
+        self.log
+            .push(format!("delete {} {}", p.0, String::from_utf8_lossy(&code)));
+        self.inventory.remove(&p);
+    }
     fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
         None
     }
-    fn drop_item_at(&mut self, _: UnitId, _: [u8; 4], _: u8) -> bool {
-        false
+    fn drop_item_at(&mut self, u: UnitId, code: [u8; 4], quality: u8) -> bool {
+        self.log.push(format!(
+            "drop {} {} {quality}",
+            u.0,
+            String::from_utf8_lossy(&code)
+        ));
+        self.drop_ok
     }
     fn den_region(&self) -> (u32, u32, u32, u32) {
-        (0, 0, 0, 0)
+        self.den
     }
     fn true_tomb_level(&self) -> u32 {
         0
@@ -351,7 +380,12 @@ impl QuestRest for Rest {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, o: UnitId) -> i32 {
+        self.object_modes.get(&o).copied().unwrap_or(0)
+    }
+    fn set_object_mode(&mut self, o: UnitId, mode: i32) {
+        self.object_modes.insert(o, mode);
+    }
     /// Reached only when a reward is not routed to the NPC control
     /// block: the tests assert it never is.
     fn mercenary_reward(&mut self, p: UnitId, npc: u16) {
@@ -592,16 +626,14 @@ fn quest_message(guid: u32, msg: u16) -> Vec<u8> {
 /// The event-0 callbacks of Act I that `quests.md` §10 does not write
 /// (reached by the text refresh's activation, §7.2), and chain 37's
 /// event-11 function `0x0058F870` first: the `unhandled` list of one
-/// Akara message 64 (Acts II–V raise nothing in Act I).
-const AKARA_64_UNHANDLED: [&str; 8] = [
+/// Akara message 64 (Acts II–V raise nothing in Act I; chains 1–3 have
+/// bodies, §10.4, §10.5).
+const AKARA_64_UNHANDLED: [&str; 5] = [
     "unhandled 37 0x58f870",
     "unhandled 37 0x58f8f0",
     "unhandled 6 0x595e20",
     "unhandled 5 0x594c50",
     "unhandled 4 0x592580",
-    "unhandled 3 0x5916a0",
-    "unhandled 2 0x590b10",
-    "unhandled 1 0x58ff90",
 ];
 
 /// The first offered, not hired, slot of Kashya's hire list.
@@ -634,8 +666,10 @@ fn akara_message_64_starts_den_of_evil_then_chat_end() {
     want[2] |= 1 << STARTED;
     assert_eq!(f.record(), want);
     assert_eq!(f.world().quests.record(1).unwrap().state, 2);
+    // The refresh at state 2: A1Q1's event 0 adds message state 1's
+    // Akara line (`quests.md` §10.4 r4: state 2 → 1; `quest-messages.tsv`).
     let mut log = AKARA_64_UNHANDLED.map(String::from).to_vec();
-    log.push(format!("text list {} []", f.akara.0));
+    log.push(format!("text list {} [(65, 2)]", f.akara.0));
     assert_eq!(f.take_log(), log);
 
     // Chat end through the NPC module (`npc.md` §3, `quests.md` §6.3).
@@ -654,17 +688,24 @@ fn akara_message_64_starts_den_of_evil_then_chat_end() {
 /// the module's tests).
 #[test]
 fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
-    let mut f = Fx::new(|q| q.flags[0].set(2, REWARD_PENDING));
+    // Blood Raven's kill gave 2.13 and 2.1 (`quests.md` §10.5).
+    let mut f = Fx::new(|q| {
+        q.flags[0].set(2, 13);
+        q.flags[0].set(2, REWARD_PENDING);
+    });
     let g = f.guid(f.kashya);
     let name = first_offer(&mut f);
     let before = f.record();
     let (code, got) = send(&mut f.h, &quest_message(g, 92));
     assert_eq!(code, ResultCode::Done);
-    // S→C 0x50 (15 bytes): u16 2, the slot's name, zeros (§7.5).
+    // 0x28 and the text refresh (`quests.md` §10.5 r7), then S→C 0x50
+    // (15 bytes): u16 2, the slot's name, zeros (§7.5).
     let mut m50 = vec![0x50, 2, 0];
     m50.extend_from_slice(&name.to_le_bytes());
     m50.extend_from_slice(&[0; 10]);
-    assert_eq!(got, vec![m50]);
+    assert_eq!(got.len(), 4);
+    assert_eq!((got[0][0], got[1][0], got[2][0]), (0x28, 0x27, 0x29));
+    assert_eq!(got[3], m50);
     let mut want = before;
     want[4] = (want[4] | 1 << REWARD_GRANTED) & !(1 << REWARD_PENDING);
     assert_eq!(f.record(), want);
@@ -678,18 +719,15 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
         .unwrap()
         .slots;
     assert!(slots.iter().any(|s| s.name == name && s.hired));
-    // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12),
-    // never on `QuestRest::mercenary_reward`; chain 37's event-11
-    // function is the only callback without a body.
-    assert_eq!(
-        f.take_log(),
-        [
-            "unhandled 37 0x58f870",
-            "spawn merc 271 4",
-            "spawn merc 271 6",
-            "spawn merc 271 12",
-        ]
-    );
+    // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12)
+    // after the quest call, never on `QuestRest::mercenary_reward`; the
+    // callbacks without a body are chain 37's event-11 function and the
+    // text refresh's event-0 functions (as for Akara's 64), then Kashya's
+    // refreshed line (message state 4: 92, `quest-messages.tsv`).
+    let mut log = AKARA_64_UNHANDLED.map(String::from).to_vec();
+    log.push(format!("text list {} [(92, 2)]", f.kashya.0));
+    log.extend(["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"].map(String::from));
+    assert_eq!(f.take_log(), log);
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 

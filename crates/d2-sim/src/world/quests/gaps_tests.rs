@@ -295,6 +295,9 @@ impl QuestWorld for Leaving {
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.f.stat(unit, stat)
     }
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.f.base_stat(unit, stat)
+    }
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         self.f.add_stat(unit, stat, delta)
     }
@@ -321,6 +324,9 @@ impl QuestWorld for Leaving {
     }
     fn players_near(&self, unit: UnitId) -> Vec<UnitId> {
         self.f.players_near(unit)
+    }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.f.party_members(player)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.f.send(player, msg)
@@ -372,8 +378,14 @@ impl QuestWorld for Leaving {
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.f.schedule_quest_event(object, frame)
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.f.set_object_opened(object)
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.f.object_mode(object)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.f.set_object_mode(object, mode)
+    }
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        self.f.object_by_guid(guid)
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
         self.f.mercenary_reward(player, npc)
@@ -394,6 +406,10 @@ fn player_leaving_with_quest_items() {
         // quest 4 → chain 3 (callback 9 `0x00591A20`); quest 99 → no record.
         items: vec![(UnitId(0x80), 4), (UnitId(0x81), 99)],
     };
+    // Chains 1–3 have bodies (§10.4, §10.5): their GUID lists lose P1.
+    ctl.record_mut(1).unwrap().guids.add(1);
+    ctl.record_mut(2).unwrap().guids.add(1);
+    ctl.record_mut(3).unwrap().extra.guids.add(1);
     ctl.player_leaves(&mut w, P1);
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
@@ -403,9 +419,14 @@ fn player_leaving_with_quest_items() {
             .unwrap()
             .1
     };
-    let mut want = vec![format!("unhandled 3 {:#x}", fn_of(3, 9))];
+    // Chain 3's callback 9 (`0x00591A20`) ran first: one Malus fewer.
+    assert_eq!(ctl.record(3).unwrap().extra.malus_items, -1);
+    assert!(!ctl.record(1).unwrap().guids.contains(1));
+    assert!(!ctl.record(2).unwrap().guids.contains(1));
+    assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
+    let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) {
+        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=3).contains(&r.chain) {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
@@ -421,9 +442,10 @@ fn player_leaving_with_quest_items() {
 #[test]
 fn pick_up_and_drop_reach_only_active_records() {
     let item = UnitId(0x80);
-    // Chain 3 has callback 4 (`0x00591960`); chain 9 callback 5.
+    // Chain 4 has callback 4 (`0x00592E20`, no body: the probe); chain 9
+    // callback 5.
     for (ev, chain, fun) in [
-        (event::ITEM_PICKED_UP, 3, "0x591960"),
+        (event::ITEM_PICKED_UP, 4, "0x592e20"),
         (event::ITEM_DROPPED, 9, "0x599b30"),
     ] {
         let (mut ctl, _) = control();

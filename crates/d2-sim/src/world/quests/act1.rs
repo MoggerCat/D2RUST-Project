@@ -1,11 +1,19 @@
-// Spec: specs/world/quests.md §10 (Act I), §10.1 (common pattern)
-//! Act I quest callbacks, as far as §10 specifies them. Every callback,
-//! status, active or sequence function that `quests.tsv` registers but §10
-//! does not describe is reported through `QuestWorld::unhandled` with its
-//! 1.14d address (open questions 7, 8).
+// Spec: specs/world/quests.md §10 (Act I), §10.1 (common pattern, sequence functions)
+//! Act I quest callbacks, as far as §10 specifies them. A1Q1–A1Q3 are
+//! callback by callback ([`q1`], [`q2`], [`q3`]); the shared shorthands
+//! of §10.1 (broadcast, every player, add state, the sequence walk) are
+//! here. Every callback, status, active or sequence function that
+//! `quests.tsv` registers but §10 does not describe is reported through
+//! `QuestWorld::unhandled` with its 1.14d address (open questions 7, 8).
+
+pub mod q1;
+pub mod q2;
+pub mod q3;
+
+pub use q3::{imbue_granted, malus_init, malus_operate};
 
 use super::{
-    bit, event, flags_of, grant_pending, npc, send_player_flags, EventArgs, GuidList, QuestControl,
+    bit, event, flags_of, npc, send_player_flags, EventArgs, GuidList, QuestControl, QuestError,
     QuestFlags, QuestRecord, QuestWorld, TextList, TimerFn,
 };
 use crate::rng::Seed;
@@ -23,58 +31,130 @@ pub const NORMAL_GEMS: [[u8; 4]; 7] = [
     *b"gsv ", *b"gsr ", *b"gsb ", *b"gsy ", *b"gsg ", *b"gsw ", *b"sku ",
 ];
 
-/// Per-quest extra data (record +0x18), the fields §10 names.
+/// Per-quest extra data (record +0x18), the fields §10 names. One
+/// struct for every Act I record; each quest uses its own fields.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Extra {
-    /// A1Q1 +0x84: Den of Evil cleared.
+    /// A1Q1 +0x84: Den of Evil cleared (written, never read).
     pub done: bool,
-    /// A1Q1 +0x86: the start message was given (consumed by event 2).
+    /// A1Q1 +0x85: level 8 entered (written, never read).
+    pub entered: bool,
+    /// The start message was given, chat end not yet handled (A1Q1
+    /// +0x86, A1Q2 +3, A1Q3 +0x02).
     pub talked: bool,
-    /// A1Q1 +0x87: the status timer exists.
+    /// A1Q1 +0x87: the status timer is pending.
     pub timer: bool,
-    /// A1Q1: monsters left in level 8 (0x50 / 0x5D extra).
-    pub monsters_left: u16,
-    /// Player GUIDs (A1Q1 killers, A1Q6 lists).
+    /// A1Q1 +0x88: monsters left in level 8 (0x50 / 0x5D extra).
+    pub monsters_left: i32,
+    /// Player GUIDs: A1Q1 killers (+0x00), A1Q3 players who brought the
+    /// Malus (+0x14), A1Q6 lists.
     pub guids: GuidList,
+    /// A1Q2 +0: Blood Raven killed.
+    pub killed: bool,
+    /// A1Q2 +1 and +2 (both set on the kill; +2 gates J3).
+    pub kill_b1: bool,
+    pub kill_b2: bool,
+    /// A1Q2 +4 (set to 1 on the kill, never read by chain 2).
+    pub kill_d4: u32,
+    /// A1Q2 +8: the victim's GUID.
+    pub victim: u32,
+    /// A1Q3 +0x01: the Malus object is known.
+    pub malus_known: bool,
+    /// A1Q3 +0x03: message 163 finished the quest, chat end not yet
+    /// handled.
+    pub rewarded: bool,
+    /// A1Q3 +0x04: the Malus object's GUID.
+    pub malus_guid: u32,
+    /// A1Q3 +0x08 (cleared by the reset).
+    pub b08: u8,
+    /// A1Q3 +0x98: the Malus object mode to restore (2: taken).
+    pub malus_mode: i32,
+    /// A1Q3 +0x9C: Malus items in the game.
+    pub malus_items: i32,
+    /// A1Q3 +0xA1: a player started the game carrying `hdm `.
+    pub started_with_malus: bool,
     /// A1Q4: Cairn stone order, once computed.
     pub stone_order: Option<[u8; 5]>,
     /// A1Q4: gold piles left on Wirt's body.
     pub wirt_piles: Option<i32>,
-    /// A1Q3: Malus drops counted.
-    pub malus_count: u8,
 }
 
-/// Per-record init beyond the `quests.tsv` columns (§10.4).
+/// Per-record init beyond the `quests.tsv` columns (§10.4, §10.5).
 pub fn init(r: &mut QuestRecord) {
-    // TODO(quests §2.3): the active / state bytes the other init functions
-    // store are not in `quests.tsv` or §10; they stay 0.
-    if r.chain == 1 {
-        r.active = true;
-        r.state = 1;
-    }
-}
-
-/// `0x005901E0`: Den of Evil monsters left.
-pub fn den_monsters_left(r: &QuestRecord) -> u16 {
-    r.extra.monsters_left
-}
-
-/// Sequence function of `chain` (§3 step 3, §10.1 "1"): the quest named
-/// by its `seq_id` reaches state 1.
-pub fn sequence<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, chain: u8) {
-    let Some(r) = ctl.record(chain) else { return };
-    let (seq_fn, seq_id) = (r.seq_fn, r.seq_id);
-    if !(1..=6).contains(&chain) {
-        w.unhandled(chain, seq_fn.unwrap_or(0));
-        return;
-    }
-    // TODO(quests §10.1): the guard is not specified; d2rs only raises a
-    // state 0 to 1, never lowers one.
-    if let Some(next) = seq_id.and_then(|s| ctl.record_mut(s)) {
-        if next.state == 0 {
-            next.state = 1;
+    // TODO(quests §2.3): the active / state bytes the init functions of
+    // chains 4–6 store are not in `quests.tsv` or §10; they stay 0.
+    match r.chain {
+        1 => {
+            r.active = true;
+            r.state = 1;
         }
+        2 | 3 => {
+            r.active = true;
+            r.state = 0;
+        }
+        _ => {}
     }
+}
+
+/// `0x005901E0`: Den of Evil monsters left (the u16 field of 0x50 and
+/// 0x5D carries its low 16 bits).
+pub fn den_monsters_left(r: &QuestRecord) -> u16 {
+    r.extra.monsters_left as u16
+}
+
+/// The sequence function of `chain` (record +0xF0, §10.1), called
+/// with its own record: the own step, then the pass test, then the walk
+/// to the `seq_id` record. Returns the function's result (1 = true).
+pub fn sequence<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, chain: u8) -> bool {
+    let Some(i) = ctl.find(chain) else {
+        return false;
+    };
+    let r = &ctl.records[i];
+    let (state, not_intro, seq_fn) = (r.state, r.not_intro, r.seq_fn);
+    let pass = match chain {
+        1 => 5,
+        2..=4 => {
+            if state == 0 && not_intro {
+                ctl.records[i].state = 1;
+                return true;
+            }
+            if chain == 4 {
+                6
+            } else {
+                5
+            }
+        }
+        5 => {
+            if state < 2 && not_intro {
+                return true;
+            }
+            5
+        }
+        6 => {
+            if state == 0 && not_intro {
+                // TODO(quests §10.8): the timer callback `0x00596580`
+                // (period 20) is not specified; no timer is made.
+                w.unhandled(6, 0x0059_6580);
+            }
+            return true;
+        }
+        _ => {
+            w.unhandled(chain, seq_fn.unwrap_or(0));
+            return false;
+        }
+    };
+    if state != pass && not_intro {
+        return true;
+    }
+    let Some(next) = ctl.records[i].seq_id.and_then(|s| ctl.find(s)) else {
+        return false;
+    };
+    let next_chain = ctl.records[next].chain;
+    if ctl.records[next].seq_fn.is_none() {
+        ctl.faults.push(QuestError::NoSequenceFn(next_chain));
+        return false;
+    }
+    sequence(ctl, w, next_chain)
 }
 
 fn player_flags<W: QuestWorld>(w: &mut W, p: UnitId) -> QuestFlags {
@@ -132,36 +212,102 @@ fn chat_end<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
     }
 }
 
-/// Event 3 for the area quests (§10.4; A1Q2 uses the same shape with
-/// D2MOO's area level 17).
-fn area_event<W: QuestWorld>(
-    ctl: &mut QuestControl,
-    w: &mut W,
+/// R: the event player's current-difficulty record (zero when there is
+/// no player record, §10.1).
+fn rec<W: QuestWorld>(w: &mut W, p: Option<UnitId>) -> QuestFlags {
+    p.map_or_else(QuestFlags::default, |p| player_flags(w, p))
+}
+
+/// "add state k" (§10.1, §7.1) for the NPC `target`, if it has a class.
+fn add_state<W: QuestWorld>(
+    ctl: &QuestControl,
+    w: &W,
     i: usize,
-    args: EventArgs,
-    area: u32,
+    list: Option<&mut TextList>,
+    target: Option<UnitId>,
+    k: u8,
 ) {
-    let Some(p) = args.player else { return };
-    let slot = ctl.records[i].filter;
-    let state = ctl.records[i].state;
-    // TODO(quests §10.1): which players get bits 3/4 is not specified;
-    // d2rs sets them on the moving player when it has started the quest.
-    let mark = |w: &mut W, b: u8| {
-        if let Some(f) = flags_of(w, p) {
-            if f.get(slot, bit::STARTED)
-                && !f.get(slot, bit::REWARD_GRANTED)
-                && !f.get(slot, bit::REWARD_PENDING)
-            {
-                f.set(slot, b);
-            }
+    let class = target.and_then(|n| w.monster_class(n));
+    if let (Some(t), Some(list), Some(c)) = (ctl.records[i].msgs, list, class) {
+        ctl.add_messages(t, list, c, k);
+    }
+}
+
+/// The status iterate of chains 1–3 (I1, J1, K1, §10.4): 0x5D to `p` if
+/// it has neither bit 0 nor 15 of the record's slot, or has 13 or 14.
+fn status_iterate<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: UnitId) {
+    let (chain, slot) = (ctl.records[i].chain, ctl.records[i].filter);
+    let f = player_flags(w, p);
+    if (!f.get(slot, bit::REWARD_GRANTED) && !f.get(slot, bit::COMPLETED_BEFORE))
+        || f.get(slot, bit::PRIMARY_GOAL_DONE)
+        || f.get(slot, bit::COMPLETED_NOW)
+    {
+        if let Err(e) = ctl.send_status(w, p, chain) {
+            ctl.faults.push(e);
         }
+    }
+}
+
+/// status(S) with the status iterate for every player (`0x00544300`
+/// with iterate 1), flags as they are.
+fn status_all<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, status: u8) {
+    ctl.records[i].status = status;
+    for p in w.players() {
+        status_iterate(ctl, w, i, p);
+    }
+}
+
+/// broadcast(S, f) (§10.1) for chains 1–3.
+fn broadcast<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, status: u8, flags: u8) {
+    ctl.records[i].flags = flags;
+    status_all(ctl, w, i, status);
+}
+
+/// `0x00545920(player, chain, act)` (§6.3): `5D chain 00 0C 0000` when
+/// the player has no room, or its room's level is ≠ 0 and in an act ≥
+/// `act`.
+fn send_completed_now<W: QuestWorld>(w: &mut W, p: UnitId, chain: u8, act: u8) {
+    let send = match w.unit_level(p) {
+        None => true,
+        Some(0) => false,
+        Some(_) => w.unit_act(p).is_none_or(|a| a >= act),
     };
-    if args.b == area && (state == 1 || state == 2) {
-        ctl.records[i].state = 3;
-        mark(w, bit::ENTER_AREA);
-    } else if args.a == 1 && state == 2 {
-        ctl.records[i].state = 3;
-        mark(w, bit::LEAVE_TOWN);
+    if send {
+        w.send(p, &[0x5D, chain, 0, 12, 0, 0]);
+    }
+}
+
+/// `0x00590120` (I3's member step) and A1Q2's J4 (§10.4, §10.5): a
+/// member with neither bit 0 nor 1 of `slot` and a room whose level is ≠
+/// 0 and in Act I gets 13, then 1 (no 0x28).
+fn member_goal<W: QuestWorld>(w: &mut W, m: UnitId, slot: u8) {
+    let in_act1 = w.unit_level(m).is_some_and(|l| l != 0) && w.unit_act(m) == Some(0);
+    let Some(f) = flags_of(w, m) else { return };
+    if !f.get(slot, bit::REWARD_GRANTED) && !f.get(slot, bit::REWARD_PENDING) && in_act1 {
+        f.set(slot, bit::PRIMARY_GOAL_DONE);
+        f.set(slot, bit::REWARD_PENDING);
+    }
+}
+
+/// I3 / J7 (§10.4, §10.5): if `p` has bit 13 of `slot` and a party, the
+/// member step for each member.
+fn party_goal<W: QuestWorld>(w: &mut W, p: UnitId, slot: u8) {
+    if !player_flags(w, p).get(slot, bit::PRIMARY_GOAL_DONE) {
+        return;
+    }
+    if let Some(members) = w.party_members(p) {
+        for m in members {
+            member_goal(w, m, slot);
+        }
+    }
+}
+
+/// The value `m` of a state's message-state table (§10.4, §10.5):
+/// `None` for −1 or a state past the table.
+fn table_state(table: &[i8], state: u8) -> Option<u8> {
+    match table.get(usize::from(state)) {
+        Some(&m) if m >= 0 => Some(m as u8),
+        _ => None,
     }
 }
 
@@ -189,31 +335,17 @@ pub fn callback<W: QuestWorld>(
         (25 | 30, event::NPC_ACTIVATE) => flavie_text(ctl, w, i, args, list),
         // A bare `ret` (`0x00596BA0`).
         (25 | 30, event::MONSTER_KILLED) => true,
-        (1 | 2 | 5 | 6, event::PLAYER_STARTED_GAME) => {
+        (1, _) => q1::callback(ctl, w, i, args, list),
+        (2, _) => q2::callback(ctl, w, i, args, list),
+        (3, _) => q3::callback(ctl, w, i, args, list),
+        (5 | 6, event::PLAYER_STARTED_GAME) => {
             if let Some(p) = args.player {
                 restore(ctl, w, i, p);
             }
             true
         }
-        (1 | 2 | 3 | 4 | 6, event::NPC_DEACTIVATE) => {
+        (4 | 6, event::NPC_DEACTIVATE) => {
             chat_end(ctl, w, i);
-            true
-        }
-        (1, event::CHANGED_LEVEL) => {
-            area_event(ctl, w, i, args, 8);
-            true
-        }
-        (2, event::CHANGED_LEVEL) => {
-            // TODO(quests §10.5): area level 17 is D2MOO's.
-            area_event(ctl, w, i, args, 17);
-            true
-        }
-        (1, event::MONSTER_KILLED) => {
-            den_kill(ctl, w, i, args);
-            true
-        }
-        (2, event::MONSTER_KILLED) => {
-            blood_raven_kill(ctl, w, i, args);
             true
         }
         (4, event::MONSTER_KILLED) => {
@@ -224,7 +356,7 @@ pub fn callback<W: QuestWorld>(
             andariel_kill(ctl, w, i, args);
             true
         }
-        (_, event::SCROLL_MESSAGE) if (1..=6).contains(&chain) => scroll(ctl, w, i, args),
+        (_, event::SCROLL_MESSAGE) if (4..=6).contains(&chain) => scroll(ctl, w, i, args),
         _ => false,
     };
     let _ = force;
@@ -309,6 +441,9 @@ pub fn active_fn<W: QuestWorld>(
     match ctl.records[i].chain {
         0 => npc_class == npc::WARRIV1 && !player_flags(w, player).get(0, bit::REWARD_GRANTED),
         25 | 30 => npc_class == npc::NAVI && flavie_open(ctl, w, player),
+        1 => q1::active(ctl, w, i, player, npc_class),
+        2 => q2::active(ctl, w, i, player, npc_class),
+        3 => q3::active(ctl, w, i, player, npc_class),
         c => {
             w.unhandled(c, f);
             false
@@ -322,12 +457,13 @@ pub fn status_fn<W: QuestWorld>(
     ctl: &QuestControl,
     w: &mut W,
     i: usize,
-    _player: UnitId,
-    _pf: &QuestFlags,
+    player: UnitId,
+    pf: &QuestFlags,
     f: u32,
 ) -> Option<u8> {
     match ctl.records[i].chain {
         0 | 37..=40 => None,
+        3 => Some(q3::status(ctl, w, i, player, pf)),
         c => {
             w.unhandled(c, f);
             None
@@ -344,8 +480,14 @@ pub fn run_timer<W: QuestWorld>(
 ) -> bool {
     match func {
         TimerFn::DenOfEvilStatus => {
-            if ctl.record(chain).is_some_and(|r| r.state == 4) {
-                let _ = ctl.set_status_all(w, chain, 5);
+            if let Some(i) = ctl.find(chain) {
+                q1::timer(ctl, w, i);
+            }
+            true
+        }
+        TimerFn::BurialStatus => {
+            if let Some(i) = ctl.find(chain) {
+                broadcast(ctl, w, i, 3, 0);
             }
             true
         }
@@ -359,7 +501,7 @@ pub fn run_timer<W: QuestWorld>(
 
 // ----------------------------------------------------------- event 11
 
-/// Scroll messages of chains 1–6. Returns false when unhandled.
+/// Scroll messages of chains 4–6. Returns false when unhandled.
 fn scroll<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) -> bool {
     let Some(p) = args.player else { return true };
     let chain = ctl.records[i].chain;
@@ -367,30 +509,6 @@ fn scroll<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     let n = args.target;
     let f = player_flags(w, p);
     match (chain, msg) {
-        (1, 64) if npc_class == npc::AKARA => start(ctl, w, i, p, n),
-        (1, 76) if f.get(1, bit::REWARD_PENDING) => den_reward(ctl, w, i, p, n),
-        (2, 81) if npc_class == npc::KASHYA => start(ctl, w, i, p, n),
-        (2, 92) if npc_class == npc::KASHYA && f.get(2, bit::REWARD_PENDING) => {
-            if let Some(fl) = flags_of(w, p) {
-                fl.set(2, bit::REWARD_GRANTED);
-                fl.clear(2, bit::REWARD_PENDING);
-            }
-            ctl.records[i].state = 5;
-            w.mercenary_reward(p, npc::KASHYA);
-        }
-        (3, 146) if npc_class == npc::CHARSI => start(ctl, w, i, p, n),
-        (3, 163) if w.has_item(p, *b"hdm ") => {
-            if let Some(fl) = flags_of(w, p) {
-                fl.set(3, bit::PRIMARY_GOAL_DONE);
-                fl.set(3, bit::REWARD_PENDING);
-            }
-            w.delete_item(p, *b"hdm ");
-            // Party members' bits (OQ7).
-            w.unhandled(3, 0x0059_1490);
-            ctl.records[i].state = 5;
-            ctl.game.set(3, bit::PRIMARY_GOAL_DONE);
-            sequence(ctl, w, 3);
-        }
         (4, 97) if npc_class == npc::AKARA => start(ctl, w, i, p, n),
         (4, 112) if w.has_item(p, *b"bks ") => {
             w.delete_item(p, *b"bks ");
@@ -440,95 +558,7 @@ fn scroll<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     true
 }
 
-/// A1Q1 message 76 (§10.4).
-fn den_reward<W: QuestWorld>(
-    ctl: &mut QuestControl,
-    w: &mut W,
-    i: usize,
-    p: UnitId,
-    n: Option<UnitId>,
-) {
-    let f = player_flags(w, p);
-    if f.get(1, bit::PRIMARY_GOAL_DONE) && ctl.records[i].state != 5 {
-        ctl.records[i].state = 5;
-        sequence(ctl, w, 1);
-        let r = &mut ctl.records[i];
-        r.flags = 0;
-        r.status = 13;
-        r.clear_callback(event::NPC_DEACTIVATE);
-    }
-    if let Some(fl) = flags_of(w, p) {
-        fl.set(1, bit::REWARD_GRANTED);
-        fl.clear(1, bit::REWARD_PENDING);
-        fl.set(41, bit::PRIMARY_GOAL_DONE);
-        fl.set(41, bit::REWARD_PENDING);
-        fl.reset_progress(1);
-    }
-    w.add_stat(p, 5, 1);
-    let g = w.guid(p);
-    ctl.records[i].guids.add(g);
-    if let Some(n) = n {
-        ctl.refresh_text(w, p, n);
-    }
-}
-
 // ------------------------------------------------------------ event 8
-
-/// A1Q1 event 8 (`0x00590260`, §10.4).
-fn den_kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
-    if !ctl.records[i].not_intro {
-        return;
-    }
-    let (spawn, kills, rooms, populated) = w.den_region();
-    let left = spawn.saturating_sub(kills) as u16;
-    ctl.records[i].extra.monsters_left = left;
-    if let Some(p) = args.player {
-        let g = w.guid(p);
-        ctl.records[i].extra.guids.add(g);
-    }
-    if populated <= rooms && kills == spawn {
-        let r = &mut ctl.records[i];
-        r.extra.done = true;
-        r.clear_callback(event::NPC_DEACTIVATE);
-        r.clear_callback(event::MONSTER_KILLED);
-        r.state = 4;
-        ctl.game.set(1, bit::PRIMARY_GOAL_DONE);
-        let list = ctl.records[i].extra.guids.clone();
-        grant_pending(w, &list, 1, 0);
-        // TODO(quests OQ7): party goal `0x00590190`, COMPLETEDNOW + log
-        // update `0x00590080` and the sound `0x005900E0` per player.
-        for _ in w.players() {
-            w.unhandled(1, 0x0059_0190);
-            w.unhandled(1, 0x0059_0080);
-            w.unhandled(1, 0x0059_00E0);
-        }
-        ctl.unique_event(w, 0);
-        if !ctl.records[i].extra.timer {
-            ctl.records[i].extra.timer = true;
-            let _ = ctl.add_timer(1, TimerFn::DenOfEvilStatus, 8);
-        }
-    } else if (populated <= rooms && left < 6) || (ctl.records[i].status == 4 && left > 5) {
-        ctl.records[i].flags = 0x20;
-        let _ = ctl.set_status_all(w, 1, 4);
-    }
-}
-
-/// A1Q2 event 8 (§10.5): Blood Raven's kill.
-fn blood_raven_kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
-    let Some(victim) = args.target else { return };
-    for p in w.players_near(victim) {
-        if let Some(f) = flags_of(w, p) {
-            if !f.get(2, bit::REWARD_GRANTED) && !f.get(2, bit::REWARD_PENDING) {
-                f.set(2, bit::PRIMARY_GOAL_DONE);
-                f.set(2, bit::REWARD_PENDING);
-                w.attach_sound(p, 34);
-            }
-        }
-    }
-    ctl.records[i].state = 4;
-    // TODO(quests §10.5): timer 15's callback is not specified; no timer.
-    w.unhandled(2, 0x0059_0EC0);
-}
 
 /// A1Q4 event 8 (`0x00593E70`, §10.6): the Cow King.
 fn cow_king_kill<W: QuestWorld>(_ctl: &mut QuestControl, w: &mut W, args: EventArgs) {
@@ -623,38 +653,6 @@ pub fn wirt_body<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitI
         }
     }
     ctl.records[i].extra.wirt_piles = Some(piles);
-}
-
-/// The Malus object (operate `0x00591AC0`, §10.5).
-pub fn malus_operate<W: QuestWorld>(
-    ctl: &mut QuestControl,
-    w: &mut W,
-    object: UnitId,
-    player: UnitId,
-) {
-    let Some(i) = ctl.find(3) else { return };
-    let f = player_flags(w, player);
-    if !ctl.records[i].not_intro || f.get(3, bit::REWARD_GRANTED) || f.get(3, bit::REWARD_PENDING) {
-        return;
-    }
-    if w.stat(player, 12) >= 8 {
-        w.drop_item_at(object, *b"hdm ", 2);
-        w.set_object_opened(object);
-        let r = &mut ctl.records[i];
-        r.extra.malus_count = r.extra.malus_count.wrapping_add(1);
-        r.state = 4;
-    } else {
-        // TODO(quests §10.5): the sound id is not specified.
-        w.unhandled(3, 0x0059_1AC0);
-    }
-}
-
-/// `0x00591790`: the imbue was granted (set 3.0, clear 3.1).
-pub fn imbue_granted<W: QuestWorld>(w: &mut W, player: UnitId) {
-    if let Some(f) = flags_of(w, player) {
-        f.set(3, bit::REWARD_GRANTED);
-        f.clear(3, bit::REWARD_PENDING);
-    }
 }
 
 /// `0x0058FD20`: offer the respec (set 41.13, 41.1).

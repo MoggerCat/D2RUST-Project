@@ -60,6 +60,9 @@ impl QuestRest for Rest {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn attach_sound(&mut self, _: UnitId, sound: u16) {
         self.log.push(format!("sound {sound}"));
     }
@@ -95,8 +98,11 @@ impl QuestRest for Rest {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.log.push(format!("opened {}", object.0));
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.log.push(format!("mode {} {mode}", object.0));
     }
     fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
     fn unhandled(&mut self, chain: u8, function: u32) {
@@ -108,29 +114,37 @@ fn control(w: &mut World) -> QuestControl {
     QuestControl::new(&QuestTables::load().unwrap(), &mut w.fields.seed).unwrap()
 }
 
-/// C→S 0x31 with no NPC (GUID −1) and message `index`.
-fn message(index: u16) -> Vec<u8> {
+/// C→S 0x31 to the NPC with `guid` and message `index`.
+fn message(guid: u32, index: u16) -> Vec<u8> {
     let mut m = vec![0x31];
-    m.extend_from_slice(&u32::MAX.to_le_bytes());
+    m.extend_from_slice(&guid.to_le_bytes());
     m.extend_from_slice(&index.to_le_bytes());
     m.extend_from_slice(&[0, 0]);
     m
 }
 
-/// §10.1 Tools of the Trade, message 163: the Horadric Malus is found in
-/// the player's inventory through the real item data (`has_item`).
+/// §10.5 Tools of the Trade, Charsi's message 163 at state 4 (the Malus
+/// taken): the Horadric Malus is found in the player's inventory through
+/// the real item data (`has_item`).
 #[test]
 fn tools_of_the_trade_reads_real_items() {
     let mut w = World::new();
+    w.data.monsters[usize::from(crate::world::quests::npc::CHARSI)].enabled = true;
     let p = w.spawn(UnitType::Player, 0);
+    let charsi = w.spawn(
+        UnitType::Monster,
+        u32::from(crate::world::quests::npc::CHARSI),
+    );
+    let g = w.units.get(charsi).unwrap().guid;
     let mut ctl = control(&mut w);
+    ctl.record_mut(3).unwrap().state = 4;
     let mut rest = Rest::new(p);
     // Without the malus: no state change.
     {
         let mut e = w.econ();
         let mut qw = EconomyQuests::new(&mut e, &mut rest);
         assert!(!qw.has_item(p, *b"hdm "));
-        ctl.quest_message(&mut qw, p, &message(163));
+        ctl.quest_message(&mut qw, p, &message(g, 163));
     }
     assert_ne!(ctl.record(3).unwrap().state, 5);
     let mut rq = ItemRequest {
@@ -152,7 +166,7 @@ fn tools_of_the_trade_reads_real_items() {
         let mut qw = EconomyQuests::new(&mut e, &mut rest);
         assert!(qw.has_item(p, *b"hdm "));
         assert_eq!(qw.quest_items(p), [(malus, 3)]);
-        ctl.quest_message(&mut qw, p, &message(163));
+        ctl.quest_message(&mut qw, p, &message(g, 163));
     }
     assert_eq!(ctl.record(3).unwrap().state, 5);
     assert!(rest.log.contains(&"delete hdm ".to_string()));
@@ -160,13 +174,18 @@ fn tools_of_the_trade_reads_real_items() {
     assert!(rest.quests.flags[0].get(3, bit::REWARD_PENDING));
 }
 
-/// §10.1 Den of Evil reward (message 76 with the reward pending): the
-/// skill point is added to the player's real stat 5 and the player's
-/// real GUID enters the record's list.
+/// §10.4 Den of Evil reward (Akara's message 76 with the reward
+/// pending): the skill point is added to the player's real stat 5 and
+/// the player's real GUID enters the record's list.
 #[test]
 fn den_reward_writes_real_stats() {
     let mut w = World::new();
     let p = w.spawn(UnitType::Player, 0);
+    let akara = w.spawn(
+        UnitType::Monster,
+        u32::from(crate::world::quests::npc::AKARA),
+    );
+    let g = w.units.get(akara).unwrap().guid;
     w.set_stat(p, 5, 2);
     let mut ctl = control(&mut w);
     let mut rest = Rest::new(p);
@@ -174,7 +193,7 @@ fn den_reward_writes_real_stats() {
     {
         let mut e = w.econ();
         let mut qw = EconomyQuests::new(&mut e, &mut rest);
-        ctl.quest_message(&mut qw, p, &message(76));
+        ctl.quest_message(&mut qw, p, &message(g, 76));
     }
     assert_eq!(w.stats.unit_base(p, 5, 0), 3);
     assert!(rest.quests.flags[0].get(1, bit::REWARD_GRANTED));
@@ -183,7 +202,7 @@ fn den_reward_writes_real_stats() {
     assert!(ctl.record(1).unwrap().guids.contains(guid));
 }
 
-/// §10.2 Malus: the level gate reads the real stat 12.
+/// §10.5 Malus: the level gate reads the real base stat 12.
 #[test]
 fn malus_level_gate_reads_real_stats() {
     let mut w = World::new();
@@ -197,7 +216,8 @@ fn malus_level_gate_reads_real_stats() {
         let mut qw = EconomyQuests::new(&mut e, &mut rest);
         act1::malus_operate(&mut ctl, &mut qw, malus, p);
     }
-    assert_eq!(rest.log, ["unhandled 3 0x591ac0"]);
+    // Level 7: sound event 19, nothing drops.
+    assert_eq!(rest.log, ["sound 19"]);
     rest.log.clear();
     w.set_stat(p, 12, 8);
     {
@@ -207,7 +227,7 @@ fn malus_level_gate_reads_real_stats() {
     }
     assert_eq!(
         rest.log,
-        ["drop hdm  2".to_string(), format!("opened {}", malus.0)]
+        ["drop hdm  2".to_string(), format!("mode {} 2", malus.0)]
     );
     assert_eq!(ctl.record(3).unwrap().state, 4);
 }

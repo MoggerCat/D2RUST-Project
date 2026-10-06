@@ -32,7 +32,11 @@ pub trait QuestRest {
     fn unit_level(&self, unit: UnitId) -> Option<u32>;
     /// Superunique hcIdx and minion owner (monsters spec).
     fn unit_kind(&self, unit: UnitId) -> UnitKind;
+    /// `quests.md` §10.5 J3's room test (DRLG rooms).
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// The party list at game +0x1D2C (no party spec; `quests.md` open
+    /// question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
     fn attach_sound(&mut self, player: UnitId, sound: u16);
     fn send(&mut self, player: UnitId, msg: &[u8]);
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
@@ -67,7 +71,9 @@ pub trait QuestRest {
     ) -> Option<(i32, i32)>;
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    fn set_object_opened(&mut self, object: UnitId);
+    /// Object mode (+0x10) and `0x00624690` (objects spec).
+    fn object_mode(&self, object: UnitId) -> i32;
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
     fn unhandled(&mut self, chain: u8, function: u32);
 }
@@ -169,6 +175,10 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.econ.stats.unit_total(unit, stat, 0)
     }
+    /// `0x006253B0`, layer 0.
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.econ.stats.unit_base(unit, stat, 0)
+    }
     /// `0x006272B0`, layer 0.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         let e = &mut *self.econ;
@@ -199,6 +209,9 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     }
     fn players_near(&self, unit: UnitId) -> Vec<UnitId> {
         self.rest.players_near(unit)
+    }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.rest.party_members(player)
     }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {
@@ -267,8 +280,16 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.rest.schedule_quest_event(object, frame)
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.rest.set_object_opened(object)
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.rest.object_mode(object)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.rest.set_object_mode(object, mode)
+    }
+    /// `0x00552F60` type 2: the game's unit lists, class from the record.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        let u = self.econ.game.lists.find_unit(UnitType::Object, guid)?;
+        Some((u, self.of_type(u, UnitType::Object)?.class as u16))
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
         match self.mercenaries.as_mut() {

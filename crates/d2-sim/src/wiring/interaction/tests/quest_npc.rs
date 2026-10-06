@@ -38,12 +38,16 @@ fn kashya_reward_hires_from_the_real_hire_list() {
         .find(|s| s.offered && !s.hired)
         .copied()
         .expect("an offered slot");
-    w.rest.quests.get_mut(&player).unwrap().flags[0].set(2, bit::REWARD_PENDING);
+    // Blood Raven's kill gave 2.13 and 2.1 (`quests.md` §10.5).
+    let f = &mut w.rest.quests.get_mut(&player).unwrap().flags[0];
+    f.set(2, bit::PRIMARY_GOAL_DONE);
+    f.set(2, bit::REWARD_PENDING);
     w.rest.sent.clear();
     w.rest.log.clear();
     let m = quest_msg(w.guid(npc), 92);
     assert_eq!(w.desk(|d, ctl| d.quest_message(ctl, player, &m)), 0);
-    // The quest side: reward granted, pending cleared, record state 5.
+    // The quest side: reward granted, pending cleared, record state 5
+    // (2.13 held).
     let f = &w.rest.quests[&player].flags[0];
     assert!(f.get(2, bit::REWARD_GRANTED) && !f.get(2, bit::REWARD_PENDING));
     assert_eq!(w.quests.record(2).unwrap().state, 5);
@@ -58,11 +62,13 @@ fn kashya_reward_hires_from_the_real_hire_list() {
     assert!(sent.contains(&want));
     // Chain 37's event-11 function `0x0058F870` (Act I intro, no body)
     // is reached by the same list dispatch and logged first; then the
-    // deferred reward.
-    assert_eq!(
-        w.rest.log[..2],
-        ["unhandled 37 0x58f870", "spawn merc 271 4"]
-    );
+    // text refresh's event-0 functions without a body (`quests.md`
+    // §10.5 r7: refresh after the reward); then the deferred reward.
+    let merc_at = w.rest.log.iter().position(|l| l == "spawn merc 271 4");
+    assert_eq!(w.rest.log[0], "unhandled 37 0x58f870");
+    assert!(w.rest.log[1..merc_at.unwrap()]
+        .iter()
+        .all(|l| l.starts_with("unhandled ")));
     assert!(w.rest.log.contains(&format!(
         "init merc {} row 0 name {} price None",
         merc.0, offered.name

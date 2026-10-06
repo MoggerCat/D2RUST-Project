@@ -346,6 +346,7 @@ fn reward_messages_need_their_condition() {
         let mut f = Fake::new();
         if pending {
             f.p(P1).quests.flags[0].set(2, bit::REWARD_PENDING);
+            f.p(P1).quests.flags[0].set(2, bit::PRIMARY_GOAL_DONE);
         }
         scroll(&mut ctl, &mut f, 2, npc_class, 92);
         assert_eq!(f.log.iter().any(|l| l == "merc 150"), merc);
@@ -427,27 +428,30 @@ fn area(chain: u8, state: u8, bits: &[u8], old: u32, new: u32) -> (u8, QuestFlag
     (ctl.record(chain).unwrap().state, f.flags(P1))
 }
 
-// From specs/world/quests.md §10.1, §10.4: entering the area from state 1
-// or 2 → state 3 and bit 4; leaving level 1 in state 2 → state 3 and bit
-// 3; bits only for a player who started and has neither 0 nor 1.
+// From specs/world/quests.md §10.4, §10.5: entering the area from state 1
+// or 2 → state 3 and, through I2 after status 2, bit 4 for every player
+// with neither 0 nor 1; leaving level 1 in state 2 while the status is
+// still 0 → state 3 and bit 4 (I2 before the status, bug kept).
 #[test]
 fn area_event_states_and_bits() {
     use bit::{ENTER_AREA as EA, LEAVE_TOWN as LT, REWARD_GRANTED as G, STARTED as S};
     let (s, fl) = area(1, 1, &[S], 2, 8);
     assert!(s == 3 && fl.get(1, EA));
     let (s, fl) = area(1, 1, &[], 2, 8);
-    assert!(s == 3 && !fl.get(1, EA));
+    assert!(s == 3 && fl.get(1, EA));
     let (_, fl) = area(1, 1, &[S, G], 2, 8);
     assert!(!fl.get(1, EA));
     let (_, fl) = area(1, 1, &[S, bit::REWARD_PENDING], 2, 8);
     assert!(!fl.get(1, EA));
     let (s, fl) = area(1, 2, &[S], 1, 2);
-    assert!(s == 3 && fl.get(1, LT) && !fl.get(1, EA));
+    assert!(s == 3 && fl.get(1, EA) && !fl.get(1, LT));
     assert_eq!(area(1, 4, &[S], 2, 8).0, 4);
     assert_eq!(area(1, 1, &[S], 1, 2).0, 1);
     assert_eq!(area(1, 2, &[S], 5, 2).0, 2);
-    // Chain 2's area (D2MOO level 17).
+    // Chain 2's area: the Burial Grounds (17), from state 0 too.
     assert_eq!(area(2, 1, &[S], 2, 17).0, 3);
+    assert_eq!(area(2, 0, &[], 2, 17).0, 3);
+    assert_eq!(area(2, 3, &[], 2, 17).0, 3);
 }
 
 // From specs/world/quests.md §10.3: chain 25's callback 8 is a bare `ret`.
@@ -472,6 +476,12 @@ fn blood_raven_kill() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
     f.near = vec![P1];
+    let kind = UnitKind::Monster {
+        class: 267,
+        superunique: Some(0),
+        owner: None,
+    };
+    f.monsters.insert(UnitId(0x40), (0x40, 267, kind));
     let args = EventArgs {
         event: event::MONSTER_KILLED,
         player: Some(P1),
@@ -635,9 +645,10 @@ fn malus_skips_rewarded_players() {
 // From specs/world/quests.md §10.5: the imbue grant sets 3.0, clears 3.1.
 #[test]
 fn imbue_grant_bits() {
+    let (mut ctl, _) = control();
     let mut f = Fake::new();
     f.p(P1).quests.flags[0].set(3, bit::REWARD_PENDING);
-    act1::imbue_granted(&mut f, P1);
+    act1::imbue_granted(&mut ctl, &mut f, P1);
     let fl = f.flags(P1);
     assert!(fl.get(3, bit::REWARD_GRANTED) && !fl.get(3, bit::REWARD_PENDING));
 }

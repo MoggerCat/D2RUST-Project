@@ -193,6 +193,9 @@ impl QuestRest for Probe {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn attach_sound(&mut self, u: UnitId, sound: u16) {
         self.log.push(format!("sound {} {sound}", u.0));
     }
@@ -232,7 +235,10 @@ impl QuestRest for Probe {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, _: UnitId, _: i32) {}
     /// Reached only when a reward is not routed to the NPC control
     /// block: the tests assert it never is.
     fn mercenary_reward(&mut self, p: UnitId, npc: u16) {

@@ -325,6 +325,9 @@ impl QuestRest for Rest {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
+    fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     fn attach_sound(&mut self, u: UnitId, sound: u16) {
         self.log.push(format!("sound {} {sound}", u.0));
     }
@@ -355,7 +358,10 @@ impl QuestRest for Rest {
         false
     }
     fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-    fn set_object_opened(&mut self, _: UnitId) {}
+    fn object_mode(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_object_mode(&mut self, _: UnitId, _: i32) {}
     fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));

@@ -11,6 +11,7 @@ mod gaps;
 mod ids;
 mod npc;
 mod quests;
+mod quests_act1;
 pub(crate) mod trade_quests;
 mod vendors;
 pub(crate) mod waypoints;
