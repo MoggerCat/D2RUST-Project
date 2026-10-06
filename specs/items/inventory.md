@@ -34,21 +34,21 @@
 | Rules | 87–88 |
 |   1. Inventory model | 89–172 |
 |   2. Grid placement | 173–251 |
-|   3. Belt | 252–283 |
-|   4. Equipping | 284–437 |
-|   5. Shared checks | 438–562 |
-|   6. Deferred item messages | 563–612 |
-|   7. Intents | 613–900 |
-|   8. Pickup from the ground | 901–977 |
-|   9. Drop to the ground | 978–1020 |
-|   10. Gold | 1021–1051 |
-|   11. Message layouts | 1052–1077 |
-| Constants & data dependencies | 1078–1100 |
-| Randomness | 1101–1113 |
-| Edge cases & original bugs | 1114–1129 |
-| Test vectors | 1130–1177 |
-| Provenance | 1178–1213 |
-| Open questions | 1214–1251 |
+|   3. Belt | 252–306 |
+|   4. Equipping | 307–460 |
+|   5. Shared checks | 461–585 |
+|   6. Deferred item messages | 586–654 |
+|   7. Intents | 655–950 |
+|   8. Pickup from the ground | 951–1027 |
+|   9. Drop to the ground | 1028–1070 |
+|   10. Gold | 1071–1101 |
+|   11. Message layouts | 1102–1127 |
+| Constants & data dependencies | 1128–1150 |
+| Randomness | 1151–1163 |
+| Edge cases & original bugs | 1164–1179 |
+| Test vectors | 1180–1227 |
+| Provenance | 1228–1263 |
+| Open questions | 1264–1296 |
 <!-- /index -->
 
 ## Summary
@@ -280,6 +280,29 @@ quests.
    the lowest free row of the column (re-placed with §3.7), gets item
    flags 0x400 and 0x1, item flag 0x4000 cleared, owner refresh, update
    list += item. The "remove from slot" helper `0x0063C550` is empty.
+9. **Belt change** (`0x005608C0(game, unit U, new belt N or none)`, run
+   when a belt leaves location 8 or a new one replaces it): n :=
+   `numboxes` of N's belt type (`0x00621ED0`), or of record 2 (4 boxes)
+   when N is none (`0x00660CB0(type, 0)`: the 640 × 480 set). For slots
+   s = 0..15 in order, an item P in slot s (`0x0063C7F0`) with s ≥ n:
+   1. S→C 0x9C action 0xF for P with bit-stream flag 0x20, direct to U's
+      client (`0x0053EED0`).
+   2. P leaves grid 1 (`0x0063AD90`; not found → fatal), mode 4,
+      item-skill unlink (§5.5), page := 0.
+   3. With a game: P (found by GUID, mode 4) goes to page 0 as §2.4 with
+      find-free (record by page, `0x0063B950`), item-skill link, unit
+      flag 0x2 cleared, cursor := none, mode 0, command flag 0x2, item
+      flag 0x1 when socket-filled, 0x4000 cleared, owner refresh, update
+      list, inventory pass when active; success → next slot.
+   4. Else (no game, or no free position): free-spot search at U's
+      position in U's room (`0x00555DA0`, size 1, flag 1); found →
+      `0x0055C730(U, 0, 1)` and ground placement `0x00558AA0(P, room, x,
+      y)`. Not found → P stays detached in mode 4 (neither cursor nor
+      grid; original bug, reproduce).
+10. **Belt removal gate** (`0x00567840(U)`): refused (0) only when U has
+   an interaction (`0x00554100`) of unit type 0 (another player: trade)
+   and any item has node kind 2 (in the belt); else allowed. Used by
+   0x1C and 0x1D for location 8.
 
 ### 4. Equipping
 
@@ -576,10 +599,29 @@ hirelings). U without an inventory → nothing (after step 1).
    if that item has its own inventory (unit +0xC8 bit 0), run the
    dispatcher for each node of the item's update list. Then for a
    hireling owner (`0x0063EE90`) an inventory pass and `0x0055F4F0(1)`.
-4. Clearing: the room update clean-up (`tick.md` §3 step 6, `0x00553220`)
-   clears per-unit flags; the per-item reset of command flags and the
-   freeing of update lists happen in the same step (D2MOO
-   `D2GAME_INVMODE_Last`; the 1.14d address is open question 9).
+4. Clearing: the room update clean-up (`tick.md` §3 step 6,
+   `0x00553220(game, unit)`) clears unit +0xC4 bits 0x1, 0x10, 0x400,
+   0x8000 and +0xC8 bits 0x800, 0x1000, 0x10000, 0x200000, then calls
+   the update-list reset `0x00597B00(game, unit)` (D2MOO
+   `D2GAME_INVMODE_Last`). Unit without an inventory → nothing. Else:
+   owner refresh with 0 (`0x00621000(unit, 0)`: clears +0xC8 bit 0 only;
+   bit 1 stays set). For each node of the update list, in order, the
+   item looked up by GUID (type 4; missing → skip):
+   1. command flag 0x10 or 0x4000 → body location := 0 (`0x00627D70`);
+      command flag 0x20 with item flag 0x80 → body location := 0.
+   2. Per-item reset (`0x005979B0`): item +0xC8 bits 0x4 and 0x10
+      cleared; command flags 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
+      0x100, 0x40000, 0x400, 0x800, 0x1000, 0x2000, 0x200, 0x4000, 0x8000,
+      0x10000, 0x20000, 0x80000, 0x100000, 0x200000 cleared (table
+      `0x00738C70`, 21 entries; command flag 0x1 is **not** cleared);
+      item flags 0x20, 0x2, 0x8, 0x80, 0x40, 0x1, 0x200, 0x40000 cleared
+      (table `0x00738C4C`, 8 entries).
+   3. The item has +0xC8 bit 0 (own inventory changed): its refresh with
+      0, the per-item reset on every item of its update list (found by
+      GUID), its update list freed (`0x0063CBD0`).
+   4. Command flag 0x1 still set → unit removal `0x00557FD0(game,
+      item)`.
+   Then the unit's update list is freed (`0x0063CBD0`).
 
 #### 6.2 Dispatcher (`0x005973F0`)
 
@@ -621,8 +663,16 @@ Every handler checks its exact size first (→ 3, `intents-events.md`
 
 1. Type (u32 @1) > 5 → 2. Type 0 and GUID = the player's own → 3.
 2. `0x00548B00(GUID, cursor flag u32 @9)` by type: 1 `world/npc.md` §2,
-   2 `world/waypoints.md` (object), 0 and 5 not specified here (open
-   question 10); type 4 (item):
+   2 `world/waypoints.md` (object). Type 0 (player P): P missing or
+   distance > 50 → 1; distance > 8 → walk to P (`0x00548A50`, as below)
+   → 0; P in mode 17 (dead) and the player passes the busy test
+   `0x005678A0(1)` = 0 → corpse pickup `0x0057FB70(game, player, P)`
+   (needs P's state 7 `playerbody`; corpse spec, not specified here) →
+   0; else `0x00566E60` (player-to-player interaction, wall-clock
+   throttled with `GetTickCount`; multiplayer, out of scope) → 0. Type 5
+   (tile): missing or distance > 50 → 1; distance < 5 → warp
+   `0x005550B0` (`sim/path-placement.md` §12.2) → 0; else walk to it →
+   0. Type 3 → 1. Type 4 (item):
    1. Item missing or mode ≠ 3, or distance (`0x00641530`, unit to unit;
       `sim/path-placement.md`) > 50 → 1.
    2. Distance ≥ 5, or a collision between player and item
@@ -683,18 +733,18 @@ Cursor item check; location ∉ 1..10 → 2. `0x00563D20`: location must be
 must give 2 (else out 1); requirements (not equipping) fail → stat
 refresh, sound, 0 (out 0). Then X leaves the body (`0x0062A360`,
 `0x0063D2B0`, unlink, slot cleared `0x0063BE30`; X of type 19 (belt) →
-`0x005608C0`, open question 13) and becomes the cursor item (mode 4, unit
+`0x005608C0`, §3 rule 9, with no new belt) and becomes the cursor item (mode 4, unit
 flag 0x2 cleared); N goes to the location as §4.6 step 5 with command
 flag 0x10000 (0x9D action 7) instead of 0x8. Result 0 or 3.
 
 #### 7.7 0x1C RemoveBodyItem (`0x0054AEC0` → `0x00560CD0`)
 
 Location u16 @1 ∉ 1..10 → 2. Item-move gate for the item at the location
-refuses → 0. Location 8 (belt) needs `0x00567840` (open question 13),
+refuses → 0. Location 8 (belt) needs `0x00567840` (§3 rule 10),
 else 0. `0x00560CD0`: cursor present → 0; empty location → 0; §4.3 (N
 absent) must give 3 or 4, else out 1; `0x0063E490` picks the item to
 remove (for 4: the two-handed item in the other hand); remove from body
-as in §7.6; type 19 → `0x005608C0`; cursor := item; stat refresh; unit
+as in §7.6; type 19 → `0x005608C0` (§3 rule 9, no new belt); cursor := item; stat refresh; unit
 flag 0x2 cleared; mode 4; command flag 0x10 (0x9D action 8); item flag
 0x1 when socket-filled; 0x4000 cleared; update list; refresh; weapon
 bookkeeping; inventory pass. Result 0 or 3.
@@ -706,7 +756,7 @@ needs `0x00567840`; item-move gate on the equipped item. `0x00560F00`:
 §4.3 must give 5 (else out 0, result 0); weapon-in-use update; the
 equipped item E (via `0x0063E490`) must be in mode 1; stat refresh;
 requirements of N (not equipping) fail → stat refresh, sound, 0. N of type
-19 → `0x005608C0(N)`. E: removed, cursor := E, mode 4, item flag 0x80,
+19 → `0x005608C0(N)` (§3 rule 9). E: removed, cursor := E, mode 4, item flag 0x80,
 command flag 0x20, item flag 0x1, update list. N: placed at the location,
 body location set, stat link, mode 1, page 0xFF, item flags 0x40 and 0x1,
 command flag 0x20; update list; weapon bookkeeping; inventory pass. Both
@@ -1225,17 +1275,12 @@ dual-wield monster classes are 1.14d constants.
    recount `0x0055FA40`), §5.6, §5.7 (inventory pass).
 7. Answered: §4.5.
 8. Answered: §4.7.
-9. 1.14d address of the per-item reset after the update pass (D2MOO
-   `INVMODE_Last`: command flags cleared, body location 0 for flags
-   0x10/0x4000, items with command flag 0x1 removed from all players).
-   Settle: Ghidra xrefs of `0x0063CC70`'s list free.
-10. 0x16 with unit types 0 and 5 (players, tiles). Settle: Ghidra
-    `0x00548B00` cases 0 and 5 (owner: this spec or the movement spec).
+9. Answered: §6.1 rule 4 (`0x00597B00`, per-item reset `0x005979B0`).
+10. Answered: §7.1 step 2 (types 0, 3, 5).
 11. Answered: §7.4 step 2 (`0x00549A60` = "can't do that" 0x5A).
 12. 0x19 for a busy player lifting from page 3/4 (allowed?). Settle:
     R2 (stash and cube use while the panels are open).
-13. Belt unequip with potions inside (`0x005608C0`, `0x00567840`).
-    Settle: Ghidra and a recording removing a belt with potions.
+13. Answered: §3 rules 9–10 (from the binary; a recording removing a belt with potions in rows 2–4 would confirm the 0x9C order: R3).
 14. Bodies of `0x00561220` (0x1E), `0x00561ED0` (0x27), `0x0055E170`
     (0x20), `0x0055FFA0`/`0x0055D370`/`0x0055D0D0` (pickup specials).
     Settle: Ghidra; item-use spec for 0x20/0x27.
