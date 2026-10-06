@@ -19,6 +19,8 @@ pub mod item;
 pub mod order;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod tests;
 
 pub use bins::{bin, Bins};

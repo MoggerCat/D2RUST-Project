@@ -28,6 +28,8 @@ mod map;
 mod room;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
