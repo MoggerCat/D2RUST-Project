@@ -36,7 +36,7 @@ import time
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import record_rng as rr  # noqa: E402  (the shared Win32 debugger definitions)
 
-TOOL = "trace-recorder record_tick 0.1.0"
+TOOL = "trace-recorder record_tick 0.2.0"
 FORMAT = "tick-raw-1"
 
 # Game record offsets (tick.md, unit-order.md)
@@ -44,7 +44,9 @@ G_FRAME, G_CLIENTS, G_ACTS = 0xA8, 0x88, 0xBC
 HASH_BASE = 0x1120
 HASH_OFFSETS = {0: 0x000, 1: 0x200, 2: 0x400, 4: 0x600, 3: 0x800}  # unit type -> offset
 TILE_LIST = 0x1B20
-U_TYPE, U_CLASS, U_GUID, U_FLAGS2 = 0x00, 0x04, 0x0C, 0xC8
+U_TYPE, U_CLASS, U_GUID, U_MODE, U_FLAGS2 = 0x00, 0x04, 0x0C, 0x10, 0xC8
+# animation fields read by the mode schedulers (units.md §4)
+U_SEQ, U_SEQ_FC, U_SEQ_SPEED, U_CUR, U_FC, U_SPEED, U_ANIMDATA = 0x30, 0x34, 0x3C, 0x44, 0x48, 0x4C, 0x50
 U_HASH_NEXT, U_ROOM_NEXT, U_UPD_NEXT = 0xE4, 0xE8, 0xE0
 SERVER_UNIT = 0x04000000
 ACT_ROOMS, ROOM_NEXT, ROOM_UNITS, ROOM_UPD, ROOM_ACT = 0x10, 0x7C, 0x74, 0x1C, 0x2C
@@ -79,6 +81,12 @@ UPD_OUT = 0x64C1B0     # [esp+4] unit (§5.3)
 UPD_CLEAR = 0x64C160   # [esp+4] room (§6.4)
 ROOM_ACTIVATE = 0x619925  # after the prepend: EBX room, EDI act (§4.2)
 ROOM_DEACTIVATE = 0x61A910  # [esp+4] act, [esp+8] room (§4.3)
+# mode animation schedulers (units.md §4): after the frame-bonus call in 0x5539B0
+# (EAX bonus, ESI unit, EDI game), and the entries of the three variants
+# (ECX game, EDX unit, [esp+4] argument)
+ANIM_MAIN = 0x5539CC
+ANIM_VARIANTS = {0x553B10: "0x553b10", 0x553C70: "0x553c70", 0x553DC0: "0x553dc0"}
+SCHED_WRAPPERS = (0x5416B0, 0x541830)  # 0x5416B0 .. end of 0x541800: not a caller
 
 EXPECT = {  # first bytes at each hook: refuses any other executable layout
     TICK: b"\x53\x56\x57", SET_ENTRY: b"\x55\x8B\xEC", CANCEL: b"\x0F\xB7\x46\x02",
@@ -87,7 +95,8 @@ EXPECT = {  # first bytes at each hook: refuses any other executable layout
     SET_TIMED: b"\x83\xFE\xFF", SET_EVERY: b"\x8B\x4D\x0C", ROOM_ACTIVATE: b"\xC7\x47\x54",
     ROOM_DEACTIVATE: b"\x55\x8B\xEC", UPD_OUT: b"\x55\x8B\xEC",
     **{a: b"\x66\x83\x4E\x02\x01" for a in RUNS}, **{a: b"\xE8" for a in STEPS if a != 0x52D971},
-    0x52D971: b"\x5F\x5E\x5B",
+    0x52D971: b"\x5F\x5E\x5B", ANIM_MAIN: b"\xC1\xE0\x08",
+    **{a: b"\x55\x8B\xEC" for a in ANIM_VARIANTS},
 }
 
 
@@ -137,6 +146,46 @@ class TickRecorder:
         if not self.u32(u + U_FLAGS2) & SERVER_UNIT:
             return None
         return self.u32(u + U_TYPE), self.u32(u + U_GUID), self.u32(u + U_CLASS)
+
+    def site_of(self, ebp):
+        """Call site of the public scheduling wrapper (units.md, Test vectors):
+        the caller's return address two frames up, minus the 5-byte call."""
+        fp = self.u32(ebp)
+        ret = self.u32(fp + 4)
+        if SCHED_WRAPPERS[0] <= ret < SCHED_WRAPPERS[1]:  # every-tick via 0x5416B0
+            ret = self.u32(self.u32(fp) + 4)
+        return f"{ret - 5:#x}"
+
+    def unit_more(self, u):
+        """(class, mode) of a server unit at schedule time, or (None, None)."""
+        if not u or not self.u32(u + U_FLAGS2) & SERVER_UNIT:
+            return None, None
+        return self.u32(u + U_CLASS), self.u32(u + U_MODE)
+
+    def anim(self, fn, unit, bonus=None, arg=None):
+        """The unit fields a mode animation schedule reads (units.md §4)."""
+        uid = self.unit_id(unit)
+        if not uid:
+            return
+        seq = self.u32(unit + U_SEQ)
+        ad = self.u32(unit + U_ANIMDATA)
+        rec = {"k": "anim", "fn": fn, "f": self.frame, "ut": uid[0], "g": uid[1], "cl": uid[2],
+               "m": self.u32(unit + U_MODE), "seq": seq != 0, "cur": self.i32(unit + U_CUR)}
+        if seq:
+            rec["fc"], rec["sp"] = self.i32(unit + U_SEQ_FC), self.i32(unit + U_SEQ_SPEED)
+        else:
+            rec["fc"] = self.i32(unit + U_FC)
+            rec["sp"] = struct.unpack("<h", self.read(unit + U_SPEED, 2))[0]
+        if bonus is not None:
+            rec["b"] = bonus
+        if arg is not None:
+            rec["arg"] = arg
+        if ad:
+            raw = self.read(ad, 0xA0)
+            rec["ad"] = raw[:8].split(b"\0")[0].decode("latin-1")
+            rec["ad_frames"], rec["ad_speed"] = struct.unpack_from("<II", raw, 8)
+            rec["ev"] = [[i, b] for i, b in enumerate(raw[0x10:0xA0]) if b]
+        self.emit(rec)
 
     def acts(self):
         return [self.u32(self.game + G_ACTS + 4 * i) for i in range(5)]
@@ -250,22 +299,33 @@ class TickRecorder:
             ebp = ctx.Ebp
             unit, cb, a1, a2 = struct.unpack("<4I", self.read(ebp + 8, 16))
             uid = self.unit_id(unit) or (None, None, None)
+            cl, mode = self.unit_more(unit)
             req = self.set_req.pop(ebp + 4, None)
             self.emit({"k": "set", "l": "d", "tm": f"{ctx.Eax:#x}", "ty": ctx.Ebx & 0xFF,
                        "x": C.c_int32(ctx.Esi).value, "req": None if req is None
                        else C.c_int32(req).value, "ut": uid[0], "g": uid[1],
                        "c": CLASS_OF_TYPE.get(uid[0]), "a1": C.c_int32(a1).value,
-                       "a2": C.c_int32(a2).value, "cb": f"{cb:#x}"})
+                       "a2": C.c_int32(a2).value, "cb": f"{cb:#x}", "site": self.site_of(ebp),
+                       "cl": cl, "m": mode})
         elif addr == SET_EVERY:
             if ctx.Edi != self.game:
                 return
             ebp = ctx.Ebp
             cb, a1, a2 = struct.unpack("<3I", self.read(ebp + 8, 12))
             uid = self.unit_id(ctx.Esi) or (None, None, None)
+            cl, mode = self.unit_more(ctx.Esi)
             self.emit({"k": "set", "l": "i", "tm": f"{ctx.Eax:#x}", "ty": ctx.Ebx & 0xFF,
                        "x": -1, "req": -1, "ut": uid[0], "g": uid[1],
                        "c": CLASS_OF_TYPE.get(uid[0]), "a1": C.c_int32(a1).value,
-                       "a2": C.c_int32(a2).value, "cb": f"{cb:#x}"})
+                       "a2": C.c_int32(a2).value, "cb": f"{cb:#x}", "site": self.site_of(ebp),
+                       "cl": cl, "m": mode})
+        elif addr == ANIM_MAIN:
+            if ctx.Edi == self.game:
+                self.anim("0x5539b0", ctx.Esi, bonus=C.c_int32(ctx.Eax).value)
+        elif addr in ANIM_VARIANTS:
+            if ctx.Ecx == self.game:
+                self.anim(ANIM_VARIANTS[addr], ctx.Edx,
+                          arg=C.c_int32(self.u32(ctx.Esp + 4)).value)
         elif addr == CANCEL:
             if ctx.Edi != self.game:
                 return

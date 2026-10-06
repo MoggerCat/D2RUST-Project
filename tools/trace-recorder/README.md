@@ -17,6 +17,9 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
 | `record_tick.py` | Launches `game/Game.exe` under the debugger, logs each server tick and its step markers, every timer event scheduled, cancelled and run, every unit/room/update-queue list change, and list snapshots every 25 frames; writes `traces/raw/<time>-tick.jsonl` (gitignored). Specs: `specs/sim/tick.md`, `specs/sim/unit-order.md` |
 | `check_tick.py` | Replays a tick recording through a model of those specs: must predict every timer run and reproduce every snapshot; `--perturb-ex N`, `--perturb-snap N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors |
+| `record_stats.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick and step hooks only): logs every base write, attach, detach, free, dynamic toggle, by-time refresh, state toggle, expiry and value-change callback on server stat lists, the regeneration entry points, and snapshots of the players' and monsters' list trees; writes `traces/raw/<time>-stats.jsonl` (gitignored). Specs: `specs/sim/stats.md`, `specs/sim/stat-lists.md` |
+| `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
+| `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -162,13 +165,16 @@ py tools/trace-recorder/record_tick.py --seconds 200          # Game.exe -w -ns;
 py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl
 py tools/trace-recorder/check_tick.py traces/raw/<time>-tick.jsonl --perturb-ex 500
 py tools/trace-recorder/check_tick.py --selftest
+py tools/trace-recorder/check_units.py traces/raw/<time>-tick.jsonl [--tables traces/raw/<time>-tables]
+py tools/trace-recorder/check_units.py --selftest
 ```
 
 Same reference-hash check, kill guarantees and Win32 code as
-`record_rng.py`. 35 persistent INT3s (each stepped over and re-armed);
+`record_rng.py`. 39 persistent INT3s (each stepped over and re-armed);
 the expected bytes of every hook are checked before arming. Hooks and
 offsets: the constants block at the top of the script, each naming its
-spec section (`tick.md` §3, §5; `unit-order.md` §2, §4–§6). Only the
+spec section (`tick.md` §3, §5; `unit-order.md` §2, §4–§6; `units.md`
+§4). Only the
 first game that ticks is recorded; client-side calls of the shared room
 code are dropped (server-unit flag, act membership). Options:
 `--seconds`, `--ticks N`, `--snap-every N` (default 25; 0 = none),
@@ -183,3 +189,63 @@ deferred), `ex` (timer run: class, list, type, expire, unit, args),
 unit type and GUID; rooms by address with their adjacent-room arrays),
 `footer`. The game runs near full speed under the recorder (4,902 ticks
 in a 200 s run, start-up included).
+
+Version 0.2.0 (same format name; both additions are optional, so
+`check_tick.py` reads old and new files alike):
+
+- `set` gains `site` (address of the call to the public scheduling
+  function: the return address two frames above the scheduler, minus 5;
+  one more frame for an every-tick event made through the timed API),
+  `cl` (unit class id) and `m` (unit mode, +0x10) at schedule time.
+- New record `anim`, written when a mode animation schedule starts
+  (`units.md` §4.2): after the frame-bonus call in `0x5539B0`
+  (`0x5539CC`) and at the entries of `0x553B10`, `0x553C70`,
+  `0x553DC0`. Fields: `fn` (scheduler), `f`, `ut`, `g`, `cl`, `m`, `seq`
+  (sequence animation), `cur` (+0x44), `fc` and `sp` (frame count and
+  speed: +0x34/+0x3C with a sequence, else +0x48/+0x4C), `b` (frame
+  bonus, main form) or `arg` (variants), and from the AnimData record
+  (+0x50): `ad` (name), `ad_frames`, `ad_speed`, `ev` (non-zero event
+  bytes as `[index, value]`).
+
+## record_stats.py: stat lists
+
+```
+py tools/trace-recorder/record_stats.py --seconds 240        # Game.exe -w -ns; play by hand
+py tools/trace-recorder/check_stats.py traces/raw/<time>-stats.jsonl
+py tools/trace-recorder/check_stats.py traces/raw/<time>-stats.jsonl --perturb-snap 3
+py tools/trace-recorder/check_stats.py --selftest
+py tools/trace-recorder/check_stats.py --files game
+```
+
+Imports `record_tick.py` unchanged and subclasses `TickRecorder`; keeps
+only its tick and step hooks and adds 25 (addresses and registers: the
+constants block of the script, each naming its section of
+`specs/sim/stat-lists.md`). The expected bytes of every hook are checked
+before arming (37 in all). Recording starts at the first server tick
+(the tables are read then). A list is recorded only when it belongs to
+the tree of a server unit's list; the first time a tree is touched it is
+dumped whole before the operation runs. Options: `--seconds`, `--ticks`,
+`--snap-every N` (default 25 frames; 0 = none), `--snap-monsters N`
+(default 24), `--out`.
+
+Raw format `stats-raw-1` (JSON lines, key `k`; lists by address `L`,
+units as `"type:guid"`; stat keys are `(stat << 16) + layer`, signed):
+`header` (format, tool, date, `Game.exe` SHA-256), `tick` and `step`
+(as `tick-raw-1`), `stab` (runtime itemstatcost rows: flags, valshift,
+minaccr, keepzero, op, param, base, op stats, +0x51/+0x52/+0x53, op
+entries, op-base dependants; charstats per class [ManaRegen,
+LifePerVitality, StaminaPerVitality, ManaPerMagic]; `life` group states),
+`senv` (per act: environment time / period, after the tick's environment
+step), `ssd` (seed: list dumps and unit info), `ssn` (snapshot, same
+dumps), `sax` (extended list allocated), `ss`/`sa`/`sr` (set, add,
+remove-all at entry, with the list's flags), `sat` (attach, after its own
+detach), `sdt` (detach), `sfr` (free, after its own detach), `sdy`
+(dynamic toggle), `sbt` (by-time refresh), `stg` (state toggle), `sxp`
+(expiry start: the chain's flags and expire frames), `sxf` (a free the
+expiry decides), `sxe` (expiry end), `scb`/`scx` (value-change callback
+and its return; records between them happened inside it), `sgl`, `sgs`,
+`sgm`, `sgx` (player life, stamina, mana and monster regeneration
+entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
+`u`, `par`, `prev`, `next`, `b` (base `[stat, layer, value]`), and for
+extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
+`sb` (state bits).

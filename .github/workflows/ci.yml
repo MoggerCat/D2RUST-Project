@@ -22,6 +22,14 @@ jobs:
       - name: Methods collection
         run: python3 tools/methods.py check
 
+      # The tick traces (specs/sim/tick.md) replay through the spec model;
+      # the checkers' selftests include their perturbations (METHODS M08).
+      - name: Trace checkers
+        run: |
+          python3 tools/trace-recorder/check_tick.py --selftest
+          python3 tools/trace-recorder/convert_tick.py --selftest
+          python3 tools/trace-recorder/convert_tick.py --check traces/sim/tick/*.json
+
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries
         run: |
