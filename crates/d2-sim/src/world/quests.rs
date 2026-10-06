@@ -14,6 +14,10 @@ pub mod act1;
 pub mod tables;
 
 #[cfg(test)]
+mod act1_rest_misc_tests;
+#[cfg(test)]
+mod act1_rest_q4_tests;
+#[cfg(test)]
 mod act1_tests;
 #[cfg(test)]
 mod gaps_tests;
@@ -271,6 +275,9 @@ pub enum TimerFn {
     BurialStatus,
     /// `0x00593260`: the Tristram Cain removal walk; returns 1 (§10.6).
     CainRemoval,
+    /// `0x00592D50`: the Tristram portal at the class-17 stone; kept
+    /// until created or the stone is gone (`quests-act1-rest.md` §2.3).
+    TristramPortal,
     /// `0x005954C0`: Forgotten Tower status 13; returns 1 (§10.7).
     TowerStatus,
     /// `0x00596500`: Andariel's portals and status 3 (§10.8).
@@ -329,7 +336,9 @@ pub trait QuestWorld {
     fn has_act2(&self) -> bool;
 
     // Players and units (units group).
-    /// Every player, in `unit-order.md` §7 order.
+    /// Every player in the walk order of `0x005537D0`
+    /// (`quests-act1-rest.md` §8 item 9: hash buckets 0–127, each from its
+    /// head; players with state 7 skipped).
     fn players(&self) -> Vec<UnitId>;
     /// `0x00539070` / `0x00537860`: the first client's player.
     fn first_client_player(&self) -> Option<UnitId>;
@@ -483,6 +492,65 @@ pub trait QuestWorld {
     fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32);
     /// `0x005456A0(player, object, msg)`: open quest message `msg`.
     fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16);
+
+    // Act I remainder seams (`quests-act1-rest.md`).
+    /// `0x005B2F20(game, room, x, y, class, mode, spread, flags)`: spawn a
+    /// monster with spawn flags (`monsters/init.md`).
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster_flags(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId>;
+    /// `0x0056D130(game, owner, room, x, y, level, 0, class, exact)`: a
+    /// portal object of `class` to `level`; `exact` = at (x, y) only,
+    /// else a free spot is searched (`quests-act1-rest.md` §1.2, §2.3).
+    #[allow(clippy::too_many_arguments)]
+    fn open_portal(
+        &mut self,
+        owner: Option<UnitId>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        level: u32,
+        class: u16,
+        exact: bool,
+    ) -> Option<UnitId>;
+    /// `0x0056EDE0(game, owner, skill, level, class, x, y)`
+    /// (`quests-act1-rest.md` §4.1): create a missile.
+    #[allow(clippy::too_many_arguments)]
+    fn create_missile(
+        &mut self,
+        owner: UnitId,
+        skill: u16,
+        level: u8,
+        class: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId>;
+    /// `0x0064A710` / `0x0064A760`: missile data +0x28 and +0x2C.
+    fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32);
+    /// `0x0061AED0(room, 0)` on the unit's room.
+    fn refresh_room(&mut self, unit: UnitId);
+    /// `0x00555230(game, 2, class, …, mode)`: allocate an object of
+    /// `class` at (x, y) in `room` with `mode`.
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: i32,
+    ) -> Option<UnitId>;
+    /// The save flags (client +0x0A) of the player's client
+    /// (`0x005531C0`); `None`: no client.
+    fn client_save_flags(&self, player: UnitId) -> Option<u16>;
+    fn set_client_save_flags(&mut self, player: UnitId, flags: u16);
 
     /// A function the spec names but does not specify was reached; the
     /// host logs it (open questions 6–8).
@@ -1276,6 +1344,28 @@ pub fn send_player_flags<W: QuestWorld>(w: &mut W, player: UnitId, unit_type: u8
     w.send(player, &m);
 }
 
+/// `0x00538680(client, step, difficulty)` on save flags (client +0x0A;
+/// `quests-act1-rest.md` §5): bits 8–12 hold the progression p; n = m ·
+/// difficulty + step with m = 5 for an expansion character (bit 5), else
+/// 4; p is raised to n, never lowered. n is or-ed in unmasked.
+pub fn progression(flags: u16, step: u8, difficulty: u8) -> u16 {
+    let m = ((u32::from(flags) & 0x20) | 0x80) >> 5;
+    let n = m * u32::from(difficulty) + u32::from(step);
+    let p = (u32::from(flags) >> 8) & 0x1F;
+    if n < p {
+        return flags;
+    }
+    ((u32::from(flags) & 0xE0FF) | (n << 8)) as u16
+}
+
+/// [`progression`] on the player's client (`0x005531C0`); nothing when
+/// the host has no client for it.
+pub fn raise_progression<W: QuestWorld>(w: &mut W, player: UnitId, step: u8, difficulty: u8) {
+    if let Some(f) = w.client_save_flags(player) {
+        w.set_client_save_flags(player, progression(f, step, difficulty));
+    }
+}
+
 /// Player data +0x4C ≠ 1 → set it and send `61 act` (§8.1).
 fn can_go_to_act<W: QuestWorld>(w: &mut W, player: UnitId, act: u8) {
     if w.player_byte_4c(player) != 1 {
@@ -1440,8 +1530,8 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
         }
     };
     match class {
-        // Cain's gibbet (open question 11).
-        0x1A => w.unhandled(4, 0x0059_3290),
+        // Cain's gibbet (`quests-act1-rest.md` §1.2).
+        0x1A => act1::q4::gibbet_event(ctl, w, object),
         0x7A => record(ctl, w, 11, 0x0059_B710),
         0x83 => {
             let Some(level) = w.unit_level(object) else {

@@ -208,6 +208,12 @@ pub(super) struct Fake {
     pub(super) near_object: Option<UnitId>,
     pub(super) sent: Vec<(UnitId, Vec<u8>)>,
     pub(super) log: Vec<String>,
+    /// `open_portal` results in order (empty: fails).
+    pub(super) portals: Vec<Option<UnitId>>,
+    /// Missiles created so far (ids 0x9001, 0x9002, …).
+    pub(super) next_missile: u32,
+    /// Client save flags by player (absent: no client).
+    pub(super) client_flags: BTreeMap<UnitId, u16>,
 }
 
 pub(super) const P1: UnitId = UnitId(1);
@@ -519,6 +525,92 @@ impl QuestWorld for Fake {
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
+    }
+    fn spawn_monster_flags(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "spawn {class} {x} {y} room {} mode {mode} spread {spread} flags {flags:#x}",
+            room.0
+        ));
+        if self.spawns.is_empty() {
+            None
+        } else {
+            self.spawns.remove(0)
+        }
+    }
+    fn open_portal(
+        &mut self,
+        owner: Option<UnitId>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        level: u32,
+        class: u16,
+        exact: bool,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "portal {:?} room {} {x} {y} {class} {level} exact {exact}",
+            owner.map(|o| o.0),
+            room.0
+        ));
+        if self.portals.is_empty() {
+            None
+        } else {
+            self.portals.remove(0)
+        }
+    }
+    fn create_missile(
+        &mut self,
+        owner: UnitId,
+        skill: u16,
+        level: u8,
+        class: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "missile {class} owner {} skill {skill} level {level} {x} {y}",
+            owner.0
+        ));
+        self.next_missile += 1;
+        Some(UnitId(0x9000 + self.next_missile))
+    }
+    fn set_missile_target(&mut self, m: UnitId, a: u32, b: u32) {
+        self.log.push(format!("missile data {} {a:#x} {b}", m.0));
+    }
+    fn refresh_room(&mut self, u: UnitId) {
+        self.log.push(format!("refresh {}", u.0));
+    }
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: i32,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "object {class} {x} {y} room {} mode {mode}",
+            room.0
+        ));
+        let u = UnitId(0xA000 + self.objects.len() as u32);
+        self.objects.insert(u, (u.0, class, mode));
+        Some(u)
+    }
+    fn client_save_flags(&self, p: UnitId) -> Option<u16> {
+        self.client_flags.get(&p).copied()
+    }
+    fn set_client_save_flags(&mut self, p: UnitId, flags: u16) {
+        self.log.push(format!("progression {} {flags:#06x}", p.0));
+        self.client_flags.insert(p, flags);
     }
 }
 

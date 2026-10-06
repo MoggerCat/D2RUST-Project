@@ -45,7 +45,7 @@ pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
-pub use quest_items::{EconomyQuests, QuestRest};
+pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};
 pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
 

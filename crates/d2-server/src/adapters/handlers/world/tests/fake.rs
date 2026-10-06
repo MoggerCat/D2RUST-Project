@@ -695,6 +695,57 @@ impl QuestWorld for Fake {
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
     }
+    fn spawn_monster_flags(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: u8,
+        _: i32,
+        _: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn open_portal(
+        &mut self,
+        _: Option<UnitId>,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u32,
+        _: u16,
+        _: bool,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn create_missile(
+        &mut self,
+        _: UnitId,
+        _: u16,
+        _: u8,
+        _: u16,
+        _: i32,
+        _: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn set_missile_target(&mut self, _: UnitId, _: u32, _: u32) {}
+    fn refresh_room(&mut self, _: UnitId) {}
+    fn spawn_object(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn client_save_flags(&self, _: UnitId) -> Option<u16> {
+        None
+    }
+    fn set_client_save_flags(&mut self, _: UnitId, _: u16) {}
 }
 
 /// The world host of the tests: the real `NpcControl`, vendor records and

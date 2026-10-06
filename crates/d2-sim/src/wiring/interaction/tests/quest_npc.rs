@@ -70,6 +70,31 @@ fn kashya_reward_hires_from_the_real_hire_list() {
     w.assert_clean();
 }
 
+// Covers: specs/world/quests-act1-rest.md §8 r8
+#[test]
+fn kashya_reward_messages_precede_the_text_refresh() {
+    let mut w = World::new(false);
+    let player = w.spawn(UnitType::Player, 0);
+    let npc = w.npc(class::KASHYA);
+    w.rest.merc = Some(w.spawn(UnitType::Monster, 271));
+    let m = msg(0x13, &[1, w.guid(npc)]);
+    assert_eq!(w.desk(|d, ctl| ctl.interact(d, player, &m)), Ok(Some(0)));
+    let f = &mut w.rest.quests.get_mut(&player).unwrap().flags[0];
+    f.set(2, bit::PRIMARY_GOAL_DONE);
+    f.set(2, bit::REWARD_PENDING);
+    w.rest.trace.clear();
+    let m = quest_msg(w.guid(npc), 92);
+    assert_eq!(w.desk(|d, ctl| d.quest_message(ctl, player, &m)), 0);
+    // `0x00590980`: 0x28, the GUID, the mercenary `0x00579180` (its 0x50,
+    // then the hireling's creation: spawn mode 4, init), then the text
+    // refresh `0x00545780` (0x27, 0x29).
+    assert_eq!(
+        w.rest.trace,
+        ["0x28", "0x50", "spawn merc 4", "init merc", "0x27", "0x29"]
+    );
+    w.assert_clean();
+}
+
 // Covers: specs/world/quests.md §7.3
 #[test]
 fn quest_message_without_the_reward_hires_nobody() {

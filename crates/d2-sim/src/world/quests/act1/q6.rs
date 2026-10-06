@@ -1,4 +1,5 @@
 // Spec: specs/world/quests.md §10.8 (A1Q6 Sisters to the Slaughter, chain 6), §8.1
+// Spec: specs/world/quests-act1-rest.md §5, §8 items 6, 7
 //! A1Q6 callback by callback: events 0, 2, 3, 8 (Andariel), 10, 11, 13,
 //! the portal timer `0x00596500`, the active function and the credit,
 //! with the iterate functions O2–O7 (O1 is the shared status iterate).
@@ -7,8 +8,8 @@
 use super::{add_state, broadcast, player_flags, rec, restore, send_completed_now, table_state};
 use crate::units::UnitId;
 use crate::world::quests::{
-    bit, event, flags_of, npc, send_player_flags, EventArgs, GuidList, QuestControl, QuestWorld,
-    TextList, TimerFn,
+    bit, event, flags_of, npc, raise_progression, send_player_flags, EventArgs, GuidList,
+    QuestControl, QuestWorld, TextList, TimerFn,
 };
 
 const SLOT: u8 = 6;
@@ -22,8 +23,6 @@ const TOWN: u32 = 1;
 const PORTAL: u16 = 59;
 /// `0x007382C4`: message state by quest state 0–5.
 const MSG_STATE: [i8; 6] = [-1, 0, 1, 2, 3, 4];
-/// `0x00538680` (open question 13).
-const ACT_ACCESS: u32 = 0x0053_8680;
 
 /// Chipped gems (`0x007361DC`) and normal gems (`0x00736444`).
 pub const CHIPPED_GEMS: [[u8; 4]; 7] = [
@@ -116,14 +115,15 @@ fn iterate_progress<W: QuestWorld>(ctl: &QuestControl, w: &mut W, i: usize) {
     }
 }
 
-/// Credit `0x00596210`: 6.13, 6.1, then `0x00538680` (open question 13:
-/// reported).
+/// Credit `0x00596210`: 6.13, 6.1, then the character progression
+/// `0x00538680(P's client, 1, difficulty)` (`quests-act1-rest.md` §5).
 fn credit<W: QuestWorld>(w: &mut W, p: UnitId) {
     if let Some(f) = flags_of(w, p) {
         f.set(SLOT, bit::PRIMARY_GOAL_DONE);
         f.set(SLOT, bit::REWARD_PENDING);
     }
-    w.unhandled(CHAIN, ACT_ACCESS);
+    let d = w.difficulty();
+    raise_progression(w, p, 1, d);
 }
 
 /// Adds the player to the three lists and credits it (O3, O4).
@@ -191,8 +191,11 @@ pub(super) fn changed_level<W: QuestWorld>(
     args: EventArgs,
 ) {
     if CATACOMBS.contains(&args.b) && ctl.records[i].not_intro {
+        // State 3, 4 or 5 is kept (`quests-act1-rest.md` §8 item 6).
         let changed = ctl.records[i].state < 3;
-        ctl.records[i].state = 3;
+        if changed {
+            ctl.records[i].state = 3;
+        }
         let status = ctl.records[i].status;
         if args.b == CATACOMBS_4 {
             if status < 2 {
@@ -306,7 +309,9 @@ pub(super) fn portal_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: 
     match x.counter {
         10 => {
             for p in w.players() {
-                // O7 `0x00596490` (stops the walk at the first portal).
+                // O7 `0x00596490`: returns 1 for the first player in
+                // Catacombs 4 whether or not the portal was created
+                // (`quests-act1-rest.md` §8 item 7).
                 if w.unit_level(p) != Some(CATACOMBS_4) {
                     continue;
                 }

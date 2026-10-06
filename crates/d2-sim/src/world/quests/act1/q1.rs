@@ -152,8 +152,9 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
     if !ctl.records[i].not_intro {
         return;
     }
-    // TODO(quests §10.4): "no monster region of level 8 → fatal" has no
-    // representation in `QuestWorld::den_region`.
+    // No region of level 8 is fatal (`0x00590293`); with 1.14d data the
+    // region always exists (`quests-act1-rest.md` §8 item 4), so
+    // `QuestWorld::den_region` has no "none" form.
     let (spawned, killed, visited, populated) = w.den_region();
     let left = (spawned as i32).wrapping_sub(killed as i32);
     ctl.records[i].extra.monsters_left = left;
