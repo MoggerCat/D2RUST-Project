@@ -56,7 +56,9 @@ use crate::scene::{
     ShadeChain,
 };
 
-pub use feed::{blank_screen, build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
+pub use feed::{
+    blank_screen, build_frame, frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
+};
 pub use model_feed::ModelFeed;
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{

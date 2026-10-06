@@ -29,7 +29,7 @@ fn table(k: u32) -> Vec<[u8; 256]> {
         .collect()
 }
 
-fn pl2() -> Pl2 {
+pub(crate) fn pl2() -> Pl2 {
     let mut colors = [Rgb::default(); 256];
     for (i, c) in colors.iter_mut().enumerate() {
         *c = Rgb {

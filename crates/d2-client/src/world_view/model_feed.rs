@@ -117,6 +117,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
     fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError> {
         self.inner.blank_screen(world)
     }
+
+    fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
+        self.inner.light(world)
+    }
 }
 
 #[cfg(test)]

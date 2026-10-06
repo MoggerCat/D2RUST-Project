@@ -33,7 +33,7 @@ mod draws_tests;
 pub mod view;
 
 #[cfg(test)]
-mod view_tests;
+pub(crate) mod view_tests;
 
 pub use map::{LightCell, LightMap};
 #[cfg(test)]
