@@ -4,6 +4,8 @@
 
 pub mod anim;
 pub mod dispatch;
+#[cfg(test)]
+mod gap_tests;
 pub mod hooks;
 pub mod lifecycle;
 pub mod lists;

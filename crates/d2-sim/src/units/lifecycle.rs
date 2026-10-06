@@ -111,7 +111,10 @@ pub fn allocate<H: LifecycleHooks>(
     if sim.data.expansion {
         rec.flags2 |= flags2::EXPANSION;
     }
-    if req.ty != UnitType::Player {
+    // Step 7 (§1 table): mode := argument for monsters, objects, missiles
+    // and items; the tile init (`0x00623520`, flags |= 0x2) sets no mode
+    // (units.md §3.1 r7).
+    if !matches!(req.ty, UnitType::Player | UnitType::Tile) {
         rec.mode = req.mode;
     }
     sim.units.insert(unit, rec);
