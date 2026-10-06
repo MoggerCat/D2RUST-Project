@@ -8,7 +8,7 @@
 use crate::units::{RoomId, UnitId, UnitType};
 
 use super::collision::{masks, CollisionRooms};
-use super::coords::{client_from_precise, client_from_subtile, subtile_of, to_fp16_center};
+use super::coords::{client_from_precise, client_from_subtile, subtile_of, to_fp16_center, Point};
 use super::footprint::stamp_pattern;
 use super::tables::PathTables;
 use super::PathError;
@@ -29,6 +29,21 @@ pub mod flags {
     pub const ACTIVE: u32 = 0x20;
     /// Face away (−32 on the computed direction).
     pub const FACE_AWAY: u32 = 0x200;
+    /// Remove the target unit's footprint while computing (`pathing.md`
+    /// §3 step 6).
+    pub const REMOVE_TARGET_FOOTPRINT: u32 = 0x800;
+    /// Prepare a blocked target (`pathing.md` §4).
+    pub const PREPARE_TARGET: u32 = 0x1000;
+    /// A type set stores the previous type (`pathing.md` §2).
+    pub const SAVE_PREV_TYPE: u32 = 0x2000;
+    /// The previous type is already stored.
+    pub const PREV_TYPE_KEPT: u32 = 0x4000;
+    /// A type set stores the velocity (`pathing.md` §2).
+    pub const SAVE_VELOCITY: u32 = 0x8000;
+    /// The velocity is already stored.
+    pub const VELOCITY_KEPT: u32 = 0x10000;
+    /// Store saved steps (`pathing.md` §9.4).
+    pub const SAVE_STEPS: u32 = 0x20000;
     /// Path-type flags 0x800..0x20000 (`pathing.md` §2), cleared by a type set.
     pub const PATH_TYPE_BITS: u32 = 0x7FF00;
     /// Missile path.
@@ -37,11 +52,16 @@ pub mod flags {
 
 /// Path type numbers used here (`pathing.md` §2).
 pub mod path_types {
+    pub const ASTAR: u32 = 1;
     pub const TOWARD: u32 = 2;
     pub const MISSILE: u32 = 4;
     pub const STRAIGHT: u32 = 7;
     pub const KNOCKBACK_SERVER: u32 = 8;
     pub const KNOCKBACK_CLIENT: u32 = 11;
+    /// Toward, finishing on a target unit (`pathing.md` §9.10).
+    pub const TOWARD_FINISH: u32 = 13;
+    /// Wall follow (`pathing.md` §9.10).
+    pub const WALL_FOLLOW: u32 = 15;
 }
 
 /// Path slots (+0x9C: 78 × {x, y}).
@@ -63,6 +83,30 @@ pub const WRAITH_BASE_ID: u32 = 38;
 pub struct PathPoint {
     pub x: u16,
     pub y: u16,
+}
+
+impl PathPoint {
+    /// Store a point: each coordinate cut to its u16 word.
+    pub fn from_point(p: Point) -> Self {
+        Self {
+            x: p.x as u16,
+            y: p.y as u16,
+        }
+    }
+
+    /// Read a point: each word zero-extended.
+    pub fn point(self) -> Point {
+        Point::new(i32::from(self.x), i32::from(self.y))
+    }
+}
+
+/// The target unit of a dynamic path (+0x58 unit, +0x5C type, +0x60
+/// GUID).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TargetUnit {
+    pub unit: UnitId,
+    pub ty: UnitType,
+    pub guid: u32,
 }
 
 /// Which path record a unit type has (§2.1).
@@ -156,10 +200,8 @@ pub struct DynamicPath {
     pub move_mask: u16,
     /// +0x54.
     pub collided_mask: u16,
-    /// +0x58, +0x5C, +0x60.
-    pub target_unit: Option<UnitId>,
-    pub target_type: u32,
-    pub target_guid: u32,
+    /// +0x58 unit, +0x5C type, +0x60 GUID.
+    pub target_unit: Option<TargetUnit>,
     /// +0x64, +0x65, +0x66.
     pub direction: u8,
     pub new_direction: u8,
@@ -221,8 +263,6 @@ impl Default for DynamicPath {
             move_mask: 0,
             collided_mask: 0,
             target_unit: None,
-            target_type: 0,
-            target_guid: 0,
             direction: 0,
             new_direction: 0,
             turn_step: 0,
@@ -259,6 +299,69 @@ impl DynamicPath {
         subtile_of(self.precise_y)
     }
 
+    /// The current sub-tile (high words of the precise position).
+    pub fn cell(&self) -> Point {
+        Point::new(self.x(), self.y())
+    }
+
+    /// Target point (+0x10, +0x12), zero-extended.
+    pub fn target(&self) -> Point {
+        PathPoint {
+            x: self.target_x,
+            y: self.target_y,
+        }
+        .point()
+    }
+
+    /// Writes +0x10/+0x12 only (cut to u16); the target unit is kept
+    /// (unlike [`DynamicPath::set_target_point`]).
+    pub fn put_target(&mut self, p: Point) {
+        let q = PathPoint::from_point(p);
+        (self.target_x, self.target_y) = (q.x, q.y);
+    }
+
+    /// Previous target (+0x14, +0x16).
+    pub fn prev_target(&self) -> Point {
+        PathPoint {
+            x: self.prev_target_x,
+            y: self.prev_target_y,
+        }
+        .point()
+    }
+
+    /// Writes +0x14/+0x16 (cut to u16).
+    pub fn put_prev_target(&mut self, p: Point) {
+        let q = PathPoint::from_point(p);
+        (self.prev_target_x, self.prev_target_y) = (q.x, q.y);
+    }
+
+    /// Final target (+0x18, +0x1A).
+    pub fn final_target(&self) -> Point {
+        PathPoint {
+            x: self.final_target_x,
+            y: self.final_target_y,
+        }
+        .point()
+    }
+
+    /// Writes +0x18/+0x1A (cut to u16).
+    pub fn put_final_target(&mut self, p: Point) {
+        let q = PathPoint::from_point(p);
+        (self.final_target_x, self.final_target_y) = (q.x, q.y);
+    }
+
+    /// Path point `i` (+0x9C + 4·i), zero-extended.
+    pub fn point(&self, i: usize) -> Point {
+        self.points[i].point()
+    }
+
+    /// The live points `points[0..point_count]`, the count read signed
+    /// and clamped to 0..=78.
+    pub fn live_points(&self) -> Vec<Point> {
+        let n = (self.point_count as i32).clamp(0, PATH_POINTS as i32) as usize;
+        self.points[..n].iter().map(|p| p.point()).collect()
+    }
+
     /// Client coordinates from the precise position (§1 rule 3).
     pub fn update_client(&mut self) {
         (self.client_x, self.client_y) = client_from_precise(self.precise_x, self.precise_y);
@@ -289,10 +392,10 @@ impl DynamicPath {
         if is_player && t == path_types::TOWARD {
             return Err(PathError::PathType(t));
         }
-        if tf & 0x2000 != 0 && self.flags & 0x4000 == 0 {
+        if tf & flags::SAVE_PREV_TYPE != 0 && self.flags & flags::PREV_TYPE_KEPT == 0 {
             self.prev_path_type = self.path_type;
         }
-        if tf & 0x8000 != 0 && self.flags & 0x10000 == 0 {
+        if tf & flags::SAVE_VELOCITY != 0 && self.flags & flags::VELOCITY_KEPT == 0 {
             self.saved_velocity = self.velocity;
         }
         self.flags = (self.flags & !flags::PATH_TYPE_BITS) | tf;
