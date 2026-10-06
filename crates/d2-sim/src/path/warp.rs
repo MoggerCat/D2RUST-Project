@@ -47,14 +47,15 @@ pub fn warp_tile_preset<W: WarpTileView>(
     if lx == r.w || ly == r.h {
         return Ok(false);
     }
-    // Rule 3.
+    // Rule 3. 32-bit adds with the table's offsets: wrap, never trap
+    // (the original's integer arithmetic; lvlwarp values are data).
     w.add_preset_unit(
         room,
         TILE_UNIT_TYPE,
         rec.id,
         0,
-        5 * lx + rec.offset_x,
-        5 * ly + rec.offset_y,
+        lx.wrapping_mul(5).wrapping_add(rec.offset_x),
+        ly.wrapping_mul(5).wrapping_add(rec.offset_y),
     );
     Ok(true)
 }
@@ -119,7 +120,11 @@ where
         return Ok(WarpOutcome::NotPlaced);
     }
     // Rule 5.
-    let (tx, ty) = (p.x + dest.exit_walk_x, p.y + dest.exit_walk_y);
+    // 32-bit adds with lvlwarp `ExitWalkX/Y` (data): wrap, never trap.
+    let (tx, ty) = (
+        p.x.wrapping_add(dest.exit_walk_x),
+        p.y.wrapping_add(dest.exit_walk_y),
+    );
     host.request_walk(player, tx, ty);
     // Rule 6.
     let life_pct = host.life_percent(player);
