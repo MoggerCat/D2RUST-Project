@@ -708,8 +708,8 @@ Preset rooms with lvlprest Animate only.
 | `0x006706D7` | `0x006706A0` (from outdoor room alloc `0x0067D540`) | DRLG room seed **before** the reset (R@ label) | sub-theme pick; owner `drlg/outdoor.md` |
 
 The labelling script's attributions are correct: `0x0066F690` loads
-`[level + 0x1C4]` (esi = the level), so `rng.md` §7's "room seed tiles:
-`0x66F690`" is wrong (it is the level seed); `0x0066D820` and `0x00670170`
+`[level + 0x1C4]` (esi = the level), so it draws from the level seed (`rng.md` §7 lists
+it so); `0x0066D820` and `0x00670170`
 use room +0x14/+0x18. Of these, only `0x0066D820` and `0x0066D9E0` are in
 the RoomTile object; `0x0066F1A0`–`0x006704E0`+ is DrlgTileSub
 (D2MOO order: RoomTile then TileSub).
