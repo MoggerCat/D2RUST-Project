@@ -22,23 +22,23 @@
 | Inputs | 58–66 |
 | Outputs / state changes | 67–73 |
 | Rules | 74–75 |
-|   1. Records | 76–116 |
-|   2. Flags (+0x10) | 117–133 |
-|   3. Stat arrays | 134–149 |
-|   4. Allocation and ownership | 150–173 |
-|   5. Base writes | 174–198 |
-|   6. Full values | 199–257 |
-|   7. Value-change notification | 258–286 |
-|   8. Chain operations | 287–386 |
-|   9. States | 387–418 |
-|   10. Timer event handlers | 419–494 |
-|   11. Mod array and stat messages | 495–512 |
-| Constants & data dependencies | 513–524 |
-| Randomness | 525–528 |
-| Edge cases & original bugs | 529–547 |
-| Test vectors | 548–584 |
-| Provenance | 585–608 |
-| Open questions | 609–624 |
+|   1. Records | 76–124 |
+|   2. Flags (+0x10) | 125–141 |
+|   3. Stat arrays | 142–157 |
+|   4. Allocation and ownership | 158–181 |
+|   5. Base writes | 182–206 |
+|   6. Full values | 207–265 |
+|   7. Value-change notification | 266–294 |
+|   8. Chain operations | 295–394 |
+|   9. States | 395–426 |
+|   10. Timer event handlers | 427–502 |
+|   11. Mod array and stat messages | 503–520 |
+| Constants & data dependencies | 521–532 |
+| Randomness | 533–536 |
+| Edge cases & original bugs | 537–555 |
+| Test vectors | 556–592 |
+| Provenance | 593–616 |
+| Open questions | 617–632 |
 <!-- /index -->
 
 ## Summary
@@ -108,6 +108,14 @@ the fields above, plus
 
 Array entry: 8 bytes, u16 layer, u16 stat, i32 value, so the first dword
 is the key (`stats.md` §1.3).
+
+The base array of an extended list is the common field at +0x24 (i16
+count +0x28, capacity +0x2A): a unit's own base stats (unit +0x5C) live
+there, and the base reader `0x006253B0` searches it through
+`0x00624ED0` (list +0x24) for plain and extended lists alike. The full
+array (+0x48) is separate and holds the totals (§6). A tool that records
+a unit's base stats reads +0x24 / +0x28 (`tools/original-hooks.md` §4
+rule 5).
 
 Chains: a parent's +0x3C (or +0x40) points at its newest child; each
 child links to the older one through prev (+0x2C) and to the newer one

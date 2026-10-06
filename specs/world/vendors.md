@@ -28,21 +28,21 @@
 | Inputs | 63–73 |
 | Outputs / state changes | 74–82 |
 | Rules | 83–84 |
-|   1. Vendor columns and per-NPC store lists | 85–115 |
-|   2. Store item level | 116–121 |
-|   3. Store generation (`0x00576980(npc, player, record)`) | 122–218 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 219–243 |
-|   5. Gambling | 244–299 |
-|   6. Refresh | 300–331 |
-|   7. Buying and selling | 332–507 |
-|   8. Repair | 508–544 |
-|   9. Prices | 545–696 |
-| Constants & data dependencies | 697–716 |
-| Randomness | 717–732 |
-| Edge cases & original bugs | 733–762 |
-| Test vectors | 763–785 |
-| Provenance | 786–824 |
-| Open questions | 825–855 |
+|   1. Vendor columns and per-NPC store lists | 85–125 |
+|   2. Store item level | 126–131 |
+|   3. Store generation (`0x00576980(npc, player, record)`) | 132–228 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
+|   5. Gambling | 254–309 |
+|   6. Refresh | 310–341 |
+|   7. Buying and selling | 342–517 |
+|   8. Repair | 518–554 |
+|   9. Prices | 555–706 |
+| Constants & data dependencies | 707–726 |
+| Randomness | 727–742 |
+| Edge cases & original bugs | 743–772 |
+| Test vectors | 773–795 |
+| Provenance | 796–834 |
+| Open questions | 835–865 |
 <!-- /index -->
 
 ## Summary
@@ -89,7 +89,17 @@ spec; recorded action 11 = shown in a store, 12 = taken out of a store,
    Drognan 5, Hratli 6, Alkor 7, Ormus 8, Elzix 9, Asheara 10, Cain 11,
    Halbu 12, Jamella 13, Malah 14, Larzuk 15, Drehya 16. Fields at
    326+i (Min), 343+i (Max), 360+i (MagicMin), 377+i (MagicMax), 394+i
-   (MagicLvl), u8 each (`fields.tsv`).
+   (MagicLvl), u8 each (`fields.tsv`). Column names: Hratli's (index 6)
+   are spelled `HraltiMin`, `HraltiMax`, `HraltiMagicMin`,
+   `HraltiMagicMax`, `HraltiMagicLvl` in the `Game.exe` field tables of
+   weapons, armor and misc (Blizzard's typo, offsets 332 / 349 / 366 /
+   383 / 400); look columns up by these names (or by offset), never by
+   the NPC's name. The 1.14d `weapons.txt` and `armor.txt` headers spell
+   the last one `HratliMagicLvl`, so it does not bind (`data/schema.md`
+   absent list) and offset 400 holds the missing-column value 0 in every
+   row of the live `weapons.bin` (306 rows) and `armor.bin` (202 rows),
+   although the `.txt` cells hold 1, 20 or 255; `misc.txt` spells it
+   `HraltiMagicLvl` and its 151 rows load 255.
 2. **Global lists** (`0x00536F80` → `0x00536D50(i)`, once per server
    start from `0x00530690`, freed by `0x00537120`): for every
    `interact` monstats row whose class has a column (switch at
