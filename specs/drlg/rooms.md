@@ -34,15 +34,15 @@
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 280–302 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 303–318 |
 |   7. Room clients and the inactivity counter | 319–339 |
-|   8. Deactivation (tick step 9) | 340–359 |
-|   9. Room tile grid | 360–821 |
-|   10. Collision map from tiles | 822–900 |
-| Constants & data dependencies | 901–913 |
-| Randomness | 914–931 |
-| Edge cases & original bugs | 932–949 |
-| Test vectors | 950–997 |
-| Provenance | 998–1017 |
-| Open questions | 1018–1048 |
+|   8. Deactivation (tick step 9) | 340–375 |
+|   9. Room tile grid | 376–837 |
+|   10. Collision map from tiles | 838–916 |
+| Constants & data dependencies | 917–929 |
+| Randomness | 930–947 |
+| Edge cases & original bugs | 948–965 |
+| Test vectors | 966–1013 |
+| Provenance | 1014–1038 |
+| Open questions | 1039–1074 |
 <!-- /index -->
 
 ## Summary
@@ -350,12 +350,28 @@ A populated room that is removed and built again starts with flag bit 0:
    search; fatal error if absent), fix neighbours' adjacency arrays
    (§6.3), then `0x0066B4C0`: DRLG room +0x30 := 0, other flags := active
    flags & 1, and if flag 0x100000: free the room's tiles (`0x0066F1A0`,
-   §9); then free the active room (`0x0061A840`: every remaining unit
-   gets flag 0x800000 and its path updated, non-client units flag-ex
-   0x20; collision grid freed `0x0064CA10`; removal records freed
-   `0x0061A2C0`; client array and adjacency array freed).
+   §9); then free the active room (`0x0061A840`: rule 4 for every
+   remaining unit; collision grid freed `0x0064CA10`; removal records
+   freed `0x0061A2C0`; client array and adjacency array freed).
 3. The DRLG room keeps its seeds, statuses, rooms-near array and preset
    data; a later build (§4.4) re-derives the same room seed.
+4. Units still in a freed room (`0x0061A840`, 1.14d-confirmed): while
+   the room's first unit (active room +0x74) is not null, for that unit
+   U: if U's flags (unit +0xC4, `sim/units.md` §2) lack 0x400000
+   (D2MOO name `UNITFLAG_ISCLIENTUNIT`), U's flags 2 (+0xC8) |= 0x20; then U's flags |= 0x800000; then
+   U leaves the room (`0x0064C450`), which unlinks it so the next head
+   is the next unit (room list order, `sim/unit-order.md` §5):
+   - player, monster, missile (dynamic path): precise and client x, y
+     := 0 (the constants at `0x006EB7C8` / `0x006EB7CC` are 0 and never
+     written), point count (+0x28) := 0; if the path has a room: previous
+     room (+0x20) := room, room-list remove (`0x0064C370`,
+     `sim/unit-order.md` §5 rule 3), path flag 0x2 (room changed). The
+     path room (+0x1C) itself is not cleared.
+   - object, item, tile (static path): if its room (static +0x00) is
+     set: room-list remove (`0x0064C370`); static room := null.
+   The units are not freed; who reads bits 0x800000 / flags-2 0x20
+   afterwards is open question 12. On the server this only runs for
+   units step 2's compression left behind.
 
 ### 9. Room tile grid
 
@@ -1014,6 +1030,11 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
   update (§4.6); handler tables at the addresses above.
 - **Tiles and collision (§9, §10)**: 1.14d: `0x0066D820` (tile choice; draw sites read room +0x14/+0x18), `0x0066E9B0` (cell), `0x0066EC10` (grid walk), `0x0066DC50`/`0x0066DB20`/ `0x0066DDE0`/`0x0066DF40` (records, flags), `0x0066E580`/`0x0066E4C0`/ `0x0066E620`/`0x0066E740`/`0x0066E940` (linking; tables `0x006EF620`, `0x006EF578` read with rd.py), `0x0066E1C0`/`0x0066E260`/`0x0066E360` (warps), `0x0066D9E0` (doors), `0x0066D290`/`0x0066D440`/`0x0066D700`/ `0x0066D3B0`/`0x0066D410`/`0x0066D750` (anim), `0x0066EE40`/`0x0066EE70`/ `0x0066EEA0`/`0x0066EEE0`/`0x0066F050`/`0x0066F0B0`/`0x0066F1A0`/ `0x0066F240` (lifecycle, library), `0x0061B190`/`0x0061B730` (build sequence), `0x00604A40`/`0x00604AE0`/`0x0060D040`/`0x0060CFA0`/ `0x0060CEA0`/`0x0060CF00`/`0x0060A440` (DT1 library), `0x0064C4C0`/ `0x0064C580`/`0x0064C700`/`0x0064C790`/`0x0064C860`/`0x0064C900`/ `0x0064CA10` (collision). D2MOO `DrlgRoomTile.cpp`, `DrlgDrlgAnim.cpp`, `D2Collision.cpp` used as a map; 1.14d differences noted: per-cell function split from the loop, no draw on zero total rarity, fatal missing animation frames, level-133 exclusion of wall warp tiles, all three linked cases through one find-or-add routine. Measurements: `LvlTypes`, `LvlPrest`, `Levels` (patch_d2), Act 1 DT1s and Town DS1s from d2data.mpq. Recording `20261005-232125-rng.jsonl`: per-room counts, first-room vector reproduced by simulation (scratchpad `dt1/simtown.py`).
 - **Recorded**: §Test vectors.
+- **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
+  (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
+  `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
+  `0x006EB7C8` / `0x006EB7CC` read from `Game.exe` (both 0, only
+  readers in `all.asm`). Flag name from D2MOO `Units.h` (hint only).
 
 ## Open questions
 
@@ -1045,3 +1066,8 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 11. Collision build (§10.4) reads each listed room's grid header: confirm
     the new room's own header is allocated before the loop
     (`0x0064C900`).
+12. §8.2 rule 4: which code reads unit flag 0x800000 and flags-2 0x20
+    after a room free, whether any server unit has flag 0x400000, and
+    whether step 2's compression (`0x005433F0`) can leave a unit in the
+    room at all. Settle: xref bit tests of unit +0xC4 / +0xC8 (byte
+    forms `+0xC6` & 0x80, `+0xC8` & 0x20) and of `0x005433F0`'s exits.

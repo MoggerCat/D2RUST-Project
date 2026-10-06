@@ -42,23 +42,23 @@
 |   14. Normal mods and boss mods | 355–389 |
 |   15. Party minions | 390–394 |
 |   16. Boss spawns | 395–430 |
-|   17. Choosing umods (`0x005A0760`) | 431–466 |
-|   18. Boss minions and umod init (`0x005A2120`) | 467–484 |
-|   19. Umod init functions | 485–564 |
-|   20. Superuniques (`0x005A49B0`) | 565–588 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 589–603 |
-|   22. Umod callbacks and the type-7 event | 604–645 |
-|   23. Unique names (client) | 646–655 |
-|   24. Monster assign message | 656–668 |
-| Constants & data dependencies | 669–690 |
-| Randomness | 691–726 |
-| Edge cases & original bugs | 727–752 |
-| Test vectors | 753–754 |
-|   Synthetic (CI-safe) | 755–774 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 775–805 |
-|   Recorded checks (monster assign 0xAC) | 806–818 |
-| Provenance | 819–856 |
-| Open questions | 857–880 |
+|   17. Choosing umods (`0x005A0760`) | 431–474 |
+|   18. Boss minions and umod init (`0x005A2120`) | 475–492 |
+|   19. Umod init functions | 493–572 |
+|   20. Superuniques (`0x005A49B0`) | 573–596 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 597–611 |
+|   22. Umod callbacks and the type-7 event | 612–653 |
+|   23. Unique names (client) | 654–663 |
+|   24. Monster assign message | 664–676 |
+| Constants & data dependencies | 677–698 |
+| Randomness | 699–734 |
+| Edge cases & original bugs | 735–760 |
+| Test vectors | 761–762 |
+|   Synthetic (CI-safe) | 763–785 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 786–816 |
+|   Recorded checks (monster assign 0xAC) | 817–829 |
+| Provenance | 830–875 |
+| Open questions | 876–899 |
 <!-- /index -->
 
 ## Summary
@@ -459,8 +459,16 @@ an inline `roll(total)`; total ≤ 0 → no step, result 0.
 #### 17.3 Eligibility (`0x005A03E0`)
 
 1. `enabled` = 0 → no. Not expansion and `version` ≥ 100 → no.
-2. `exclude1`, `exclude2` (> 0): the class's MonType is that type or
-   nested in it (`0x005A0070`) → no.
+2. `exclude1`, `exclude2` (> 0): `0x005A0070(unit, exclude)` set → no.
+   It reads the montype equivalence matrix (`data/runtime-maps.md` §2)
+   at row = the exclude type, column = the class's monstats `MonType`
+   (+0x1C, i16): set when the exclude type **is the class's MonType or
+   a sub-type of it** (MonType reachable from the exclude type by its
+   `equiv` links). Unit null or not a monster, class outside 0 … rows
+   − 1 of monstats, or MonType / exclude outside 0 … montype rows − 1 →
+   not set. The provider answers from the matrix itself (same bits, so
+   the walk's depth limit and bad links come out as the matrix has
+   them).
 3. `fPick` 1: class must have mode A1 in monstats2; 2: no if `isMelee` or
    `nomultishot`; 3: class must have mode WL. Else yes.
 
@@ -771,6 +779,9 @@ Then, for bosses:
 | umod count, unique, d = 0/1/2, no umods | 1 / 2 / 3 | §17 step 2 |
 | aura, level 5, roll index 3 | holyfreeze level max(5 / 7, 1) = 1 | §19.5 |
 | aura, level 40, index 6 | holyshock level 5 | §19.5 |
+| montype rows 1 `a`, 2 `b` (equiv1 `a`); class MonType 1, exclude 2 | excluded (2 is a sub-type of 1) | §17.3 r2 |
+| same, class MonType 2, exclude 1 | not excluded (1 is not of type 2) | §17.3 r2 |
+| class MonType 0, any exclude | not excluded (montype column 0 never set) | §17.3 r2 |
 
 ### Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`)
 
@@ -853,6 +864,14 @@ Bosses, Normal, Blood Moor (L-flag 1):
   bonus stub, uber cases in boss mods, the always-present unique flag on
   `0x005A09E0` bosses (as in D2MOO), umod 41 handler details. Rows marked
   "D2MOO" in `umods.tsv` were not re-read.
+- §17.3 rule 2: asm of `0x005A0070` (unit in ECX, exclude in EDX; row
+  = EDX, column = monstats +0x1C; matrix count / words / width at data
+  tables +0xC40 / +0xC44 / +0xC48, filled by `0x006C2110`). 1.14d live
+  data: one `monumod.txt` row has an exclude (`lightning`, id 17:
+  `exclude1` `sandleaper`, montype row 22, no `equiv` links and no
+  sub-types), so the matrix direction does not change a live answer:
+  exactly the 7 classes with MonType `sandleaper` (sandleaper1–7) are
+  excluded.
 
 ## Open questions
 
