@@ -36,19 +36,19 @@
 |   5. Boss or pack (`0x005BE020(region, room)`) | 318–335 |
 |   6. Random boss (champion or unique) | 336–408 |
 |   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 409–432 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 433–464 |
-|   9. Placement search and creation call (`0x005B2A00`) | 465–579 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 580–623 |
-|   11. Preset monsters (DS1 presets) | 624–755 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 756–779 |
-|   13. Region bookkeeping | 780–812 |
-|   14. Other table-driven and AI spawns | 813–837 |
-| Constants & data dependencies | 838–891 |
-| Randomness | 892–935 |
-| Edge cases & original bugs | 936–976 |
-| Test vectors | 977–1048 |
-| Provenance | 1049–1071 |
-| Open questions | 1072–1095 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 433–468 |
+|   9. Placement search and creation call (`0x005B2A00`) | 469–583 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 584–627 |
+|   11. Preset monsters (DS1 presets) | 628–759 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 760–783 |
+|   13. Region bookkeeping | 784–816 |
+|   14. Other table-driven and AI spawns | 817–841 |
+| Constants & data dependencies | 842–912 |
+| Randomness | 913–956 |
+| Edge cases & original bugs | 957–997 |
+| Test vectors | 998–1069 |
+| Provenance | 1070–1092 |
+| Open questions | 1093–1116 |
 <!-- /index -->
 
 ## Summary
@@ -74,7 +74,7 @@ wandering monster to any active room.
 |---|---|---|
 | game | game record | difficulty u8 game +0x6D, expansion flag game +0x70, game seed +0xD0, region array +0xF0, superunique flags +0x1D30 |
 | room | active room | active room seed +0x6C, client count +0x78, populated bits +0x34 (`sim/tick.md` §4), DRLG room +0x10 |
-| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; clipped rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (`drlg/levels.md` §11) |
+| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; clipped rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (`drlg/levels.md` §11; every DRLG read of this spec: §11.6 there) |
 | preset units | DS1 preset list of the room | `0x00619FD0(room)` (DRLG spec) |
 | tables | levels, monstats, monstats2, superuniques, monumod | Constants & data dependencies |
 | monster-region seed | seed | derived at game creation (§2.1, `rng.md` §5.2) |
@@ -451,7 +451,11 @@ Draws use the active room seed of `room`.
       `0x006427F0`; tile coordinates × 5), when that location has x > 0
       and y > 0. That query is the spawn-room choice of `drlg/levels.md`
       §11.5 item 4: it is made again on every such try, can draw on the
-      **level seed** and streams the chosen room. 1.14d Act 1 WarpDist is 2025 (45 subtiles).
+      **level seed** and streams the chosen room. `WarpDist` is the
+      row of the room's own level (`0x0061A1B0`: level id with no
+      flag-0x800000 test, then the levels record `0x0061DB70`); the
+      same row serves both tests. 1.14d values in Constants (most rows
+      2025 = 45²).
    3. With cl: reject if the coordinate index at (x, y)
       (`0x0061B130`) ≠ cl index.
    4. Probe placement: §9 at (x, y), mode 1, r = −1, flags 1 (test only,
@@ -889,6 +893,23 @@ and `SetBoss` both use 0x10, on bytes +0x0F and +0x0C.
 | ambient gate | `lo' & 0x7FFF` = 0, then `lo' mod 100` < 3, max 3 per level | §12 |
 | wanderer table | `0x00731B2C` = {270}; act table `0x00731B30` | §12 |
 
+`WarpDist` in 1.14d (patch_d2 `levels.txt`, column `WarpDist`; the
+live `levels.bin` agrees for level 15 = 3800, `game_monsters::
+real_levels_rows`). 2025 for every row not listed:
+
+| Value | Levels |
+|---|---|
+| 0 | 0 (Null), 120 Rocky Summit, 132 Worldstone Chamber |
+| 100 | 20, 21, 23, 25 (Forgotten Tower, Tower Cellar 1, 3, 5); 47 Sewers 1; 94–99 (Kurast temples) |
+| 1000 | 55–61 (Stony Tomb, Halls of the Dead, Claw Viper Temple); 86–91 (Swampy Pit, Flayer Dungeon); 124 Halls of Vaught; 131 Throne of Destruction |
+| 3000 | 122 Halls of Anguish |
+| 3700 | 101 Durance of Hate 2 |
+| 3800 | 15 Hole Level 2; 44 Lost City; 46 Canyon of the Magi; 74 Arcane Sanctuary; 100, 102 Durance of Hate 1, 3; 107 River of Flame; 125–127 (Hell1–3); 134, 135 (Pandemonium Run 2, 3) |
+| 3900 | 104 Outer Steppes; 111 Rigid Highlands |
+
+Act I (0): 2025 except 15 (3800) and 20, 21, 23, 25 (100). With 0 no
+point is ever rejected (dx² + dy² < 0 never holds).
+
 ## Randomness
 
 Draws in order. "Room seed" = active room seed of the room being
@@ -1015,7 +1036,7 @@ Real (1.14d tables, `game/extracted/patch_d2`; `#[ignore]`, needs
 | levels 8 Den of Evil | MonDen 600; U 0/0 all difficulties; Quest 1; MonWndr 0 | levels.txt |
 | levels 18/19 Crypt / Mausoleum | MonDen 1056 | levels.txt |
 | levels 1 Act 1 town | MonDen 0 → guard stops population (rooms visited still +1) | §3.1 |
-| Act 1 WarpDist | 2025 | levels.txt |
+| Act 1 WarpDist | 2025 for levels 1–14, 16–19, 22, 24, 26–39; 3800 for 15; 100 for 20, 21, 23, 25 (full table: Constants) | levels.txt |
 | monstats Rarity | zombie1 2, fallen1 2, quillrat1 2, brute1 1, cr_lancer1 1, corruptrogue1 2, fallenshaman1 2 → Blood Moor list total 6 | monstats.txt |
 | monstats groups | zombie1 1/2, fallen1 2/3 (forced 1/1), quillrat1 1/2, brute1 1/1, fallenshaman1 1/1, cr_lancer1 1/2, corruptrogue1 2/3 | monstats.txt |
 | monstats parties | fallen1: minion1 fallen1, Party 2/3, SetBoss, BossXfer; fallenshaman1: fallen1, 2/6, SetBoss | monstats.txt |
