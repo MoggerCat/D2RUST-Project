@@ -9,9 +9,17 @@
 //!
 //! One unit world: the economy ([`Economy`]) is built per call from the
 //! action wiring's own unit records, stat lists, unit data and hooks
-//! (`ActionSim::sys`), so the player, the NPCs, the store items and the
-//! cube's items are the same units the rest of the game sees, in one
-//! item store ([`WiredWorld::items`]).
+//! (`ActionSim::sys`), so the player, the NPCs, the store items, the
+//! cube's items and the monsters' drops are the same units the rest of
+//! the game sees, in the game's one item store (`ActionHooks::items`,
+//! lent to the economy for the call).
+//!
+//! One inventory per unit: the inventory model of the item moves
+//! ([`WiredWorld::inventory`], `d2_sim::wiring::inventory`) is also the
+//! vendors' ([`InvVendors`]: ownership, cursor, placement, removal of the
+//! player's items) and the cube's (item list, checks, placement,
+//! removal), so an item placed by C→S 0x18 can be sold and cubed, and an
+//! item bought or transmuted lands where the moves see it.
 //!
 //! One home per game field: the game seed and the creation fields
 //! (difficulty, expansion, game type, ladder; the item format follows
@@ -29,15 +37,16 @@
 //! the cube asks it through [`Interact`], the waypoints through
 //! [`HostWaypoints`] (instead of the action wiring's `Pending`).
 //!
-//! What no written spec provides (inventories, player data, the item
-//! copy `0x0055A2A0`, the transport of the rests' messages) is the rest
-//! `R` ([`TradeRest`]); its messages leave through [`Outbox`].
+//! What no written spec provides (player data, the item copy
+//! `0x0055A2A0`, the item routines of `vendors.md` without a written body,
+//! the transport of the rests' messages) is the rest `R` ([`TradeRest`]);
+//! its messages leave through [`Outbox`].
 
 use d2_sim::game::Game;
 use d2_sim::items::{ItemTables, UniqueBits};
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::ActionHooks;
-use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, ItemStore, QuestRest};
+use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, QuestRest};
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
 };
@@ -49,7 +58,7 @@ use d2_sim::world::waypoints::{
 };
 
 use super::super::items::moves::{InvParts, MoveCall};
-use super::super::items::{CubeCall, CubeParts, Interact};
+use super::super::items::{CubeCall, CubeParts, Interact, InvVendors};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::{
     ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
@@ -69,22 +78,22 @@ impl<R: NpcRest + VendorRest + QuestRest + PlayerQuestsRef + Outbox> TradeRest f
 
 /// The wired host of a game on `ActionSim` (or `WorldSim`): the action
 /// systems ([`ActionWorld`], with the skill slot `S`), the economy's own
-/// parts (item tables, item store, unique bits), the cube's parts, the
-/// quests, the NPC control block, the vendor tables and the interaction
-/// state (one vendor record per NPC record, the NPCs' interaction
-/// lists), and the rest.
+/// parts (item tables, unique bits; the item store is the action
+/// wiring's `ActionHooks::items`), the cube's parts, the inventory
+/// model, the quests, the NPC control block, the vendor tables and the
+/// interaction state (one vendor record per NPC record, the NPCs'
+/// interaction lists), and the rest.
 pub struct WiredWorld<R, S = NoSkills> {
     /// Waypoints, arrivals, the skill slot and the handlers' faults.
     pub action: ActionWorld<S>,
     /// Game +0x1B24 (`quality.md` §8.1).
     pub uniques: UniqueBits,
     pub tables: ItemTables,
-    /// The game's one item store (store, players', cube items).
-    pub items: ItemStore,
     /// The cube (`None`: 0x2A, 0x4F stay stubs).
     pub cube: Option<CubeParts>,
-    /// The inventories and the item-move seams (`None`: the item-move
-    /// ids stay stubs, `handlers::items::moves`).
+    /// The game's one inventory model and the item-move seams (`None`:
+    /// the item-move ids stay stubs, `handlers::items::moves`; the
+    /// vendors and the cube see empty inventories).
     pub inventory: Option<InvParts>,
     pub quests: QuestControl,
     pub npc: NpcControl,
@@ -95,6 +104,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// and refresh (`vendors.md` edge case 10); the caller keeps it
     /// current.
     pub now: u32,
+    /// What the inventory rules queued during vendor calls (receiving
+    /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
+    inv_sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl<R, S> WiredWorld<R, S> {
@@ -116,7 +128,6 @@ impl<R, S> WiredWorld<R, S> {
             action,
             uniques: UniqueBits::default(),
             tables,
-            items: ItemStore::new(),
             cube: None,
             inventory: None,
             quests,
@@ -125,15 +136,18 @@ impl<R, S> WiredWorld<R, S> {
             state,
             rest,
             now,
+            inv_sent: Vec::new(),
         }
     }
 
     /// Runs `f` on the economy over the action wiring's unit side
-    /// (units, stat lists, unit data, hooks) and this world's item parts,
-    /// with the game fields built from their home (game seed, creation
-    /// fields) and the seed and unique bits written back after the call.
-    /// Item creation outside a handler (a fixture, a later drop path)
-    /// goes through it.
+    /// (units, stat lists, unit data, hooks, the game's item store, lent
+    /// out of the hooks for the call) and this world's item parts, with
+    /// the game fields built from their home (game seed, creation fields)
+    /// and the seed, the store and the unique bits written back after the
+    /// call. Item creation outside a handler (a fixture) goes through it;
+    /// the inventory model is in [`Parts::inventory`] (`InvParts::desk`
+    /// on the same economy).
     pub fn with_economy<D: ActionEvents, T>(
         &mut self,
         game: &mut Game,
@@ -147,6 +161,7 @@ impl<R, S> WiredWorld<R, S> {
             s.data.expansion,
             std::mem::take(&mut self.uniques),
         );
+        let mut items = std::mem::take(&mut s.hooks.items);
         let out = {
             let mut econ = Economy {
                 game,
@@ -156,7 +171,7 @@ impl<R, S> WiredWorld<R, S> {
                 hooks: &mut s.hooks,
                 fields: &mut fields,
                 tables: &self.tables,
-                items: &mut self.items,
+                items: &mut items,
             };
             let mut parts = Parts {
                 quests: &mut self.quests,
@@ -164,23 +179,29 @@ impl<R, S> WiredWorld<R, S> {
                 vendor_tables: &self.vendor_tables,
                 state: &mut self.state,
                 cube: self.cube.as_mut(),
+                inventory: self.inventory.as_mut(),
                 rest: &mut self.rest,
                 now: self.now,
             };
             f(&mut econ, &mut parts)
         };
+        s.hooks.items = items;
         s.hooks.game_seed = fields.seed;
         self.uniques = fields.uniques;
         out
     }
 
     /// Runs `f` on the desk over [`Self::with_economy`]'s economy and
-    /// this world, with the NPC control block.
+    /// this world, with the NPC control block and the inventory model.
     fn desk<D: ActionEvents, T>(
         &mut self,
         game: &mut Game,
         events: &mut D,
-        f: impl FnOnce(&mut Desk<'_, '_, ActionHooks<D::X>, R>, &mut NpcControl) -> T,
+        f: impl FnOnce(
+            &mut Desk<'_, '_, ActionHooks<D::X>, R>,
+            &mut NpcControl,
+            Option<&mut InvParts>,
+        ) -> T,
     ) -> T {
         self.with_economy(game, events, |econ, p| {
             let mut desk = Desk {
@@ -191,7 +212,7 @@ impl<R, S> WiredWorld<R, S> {
                 rest: &mut *p.rest,
                 now: p.now,
             };
-            f(&mut desk, &mut *p.npc)
+            f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
         })
     }
 }
@@ -204,6 +225,8 @@ pub struct Parts<'p, R> {
     pub vendor_tables: &'p VendorTables,
     pub state: &'p mut InteractionState,
     pub cube: Option<&'p mut CubeParts>,
+    /// The inventory model (`InvParts::desk` on the call's economy).
+    pub inventory: Option<&'p mut InvParts>,
     pub rest: &'p mut R,
     pub now: u32,
 }
@@ -322,27 +345,33 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl| call.call(ctl, desk)))
+        Some(self.desk(game, events, |desk, ctl, _| call.call(ctl, desk)))
     }
 
     /// The vendor records are lent out of the interaction state for the
     /// call (the module holds them while it calls the world, as
     /// `VendorDesk`'s own entry points do); the world is [`VendorDesk`]
-    /// with the NPC control block (`NpcLink`).
+    /// with the NPC control block (`NpcLink`), its player inventories
+    /// answered by the inventory model ([`InvVendors`]).
     fn vendors<C: VendorCall>(
         &mut self,
         game: &mut Game,
         events: &mut D,
         call: C,
     ) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl| {
+        let (out, sent) = self.desk(game, events, |desk, ctl, inv| {
             let mut records = std::mem::take(&mut desk.state.vendors);
             let tables = desk.vendor_tables;
-            let mut w: VendorDesk<'_, '_, '_, _, _> = desk.vendors(Some(ctl));
+            let inner: VendorDesk<'_, '_, '_, _, _> = desk.vendors(Some(ctl));
+            let mut w = InvVendors::new(inner, inv);
             let out = call.call(tables, &mut records, &mut w);
+            let sent = std::mem::take(&mut w.sent);
+            drop(w);
             desk.state.vendors = records;
-            out
-        }))
+            (out, sent)
+        });
+        self.inv_sent.extend(sent);
+        Some(out)
     }
 
     /// The action wiring's waypoints, with the interaction of the host's
@@ -371,7 +400,7 @@ where
     /// `Desk::quest_message`, here for every quest call. A reward's NPC
     /// error goes to the interaction state's errors, as there.
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl| {
+        Some(self.desk(game, events, |desk, ctl, _| {
             let mut rewards = Vec::new();
             let out = {
                 let mut w = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
@@ -387,13 +416,14 @@ where
         }))
     }
 
-    /// The cube on this world's economy, with the rest as the
-    /// interaction owner.
+    /// The cube on this world's economy and inventory model, with the
+    /// rest as the interaction owner.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         self.cube.as_ref()?;
         Some(self.with_economy(game, events, |econ, p| {
             let parts = p.cube.as_deref_mut().expect("checked above");
-            call.call(econ, parts, &mut RestInteract(&mut *p.rest))
+            let inv = p.inventory.as_deref_mut();
+            call.call(econ, parts, inv, &mut RestInteract(&mut *p.rest))
         }))
     }
 
@@ -411,11 +441,17 @@ where
     }
 
     /// The action wiring's sends (waypoints, tick paths), then the rest's
-    /// (NPC, vendor and quest messages); one system runs per message, so
-    /// the two never interleave.
+    /// (NPC, vendor and quest messages), then what the inventory rules
+    /// queued in vendor calls; one system runs per message, so the
+    /// systems never interleave.
+    ///
+    /// TODO(spec: vendors.md §7): the order of a vendor call's inventory
+    /// messages (a targeting reset's 0x3F) against its 0x2A is not
+    /// written; they follow it.
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         let mut sent = events.action().hooks().x.take_sent();
         sent.extend(self.rest.take_sent());
+        sent.append(&mut self.inv_sent);
         sent
     }
 
