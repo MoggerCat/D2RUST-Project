@@ -14,7 +14,7 @@ use crate::units::lifecycle::LifecycleHooks;
 /// Stat 152 `item_indesctructible` (`generation.md` §1.3).
 const STAT_INDESTRUCTIBLE: u16 = 152;
 
-impl<H: LifecycleHooks, R: InvRest> MovePending for InvDesk<'_, '_, H, R> {
+impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, R> {
     /// Room list removal `0x0064C370` (a unit in no room is left as is).
     fn remove_from_room(&mut self, item: Guid) {
         if let Some(u) = self.item_unit(item) {

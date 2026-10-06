@@ -199,14 +199,14 @@ pub trait InvRest: MovePending {
 /// records and lists, stat lists, hooks, game fields, item store), the
 /// inventory tables, the inventory state and the seams without a provider
 /// (`R`).
-pub struct InvDesk<'d, 'a, H, R> {
+pub struct InvDesk<'d, 'a, H, R: ?Sized> {
     pub econ: &'d mut Economy<'a, H>,
     pub tables: &'d InvTables,
     pub state: &'d mut InvState,
     pub rest: &'d mut R,
 }
 
-impl<'d, 'a, H: LifecycleHooks, R: InvRest> InvDesk<'d, 'a, H, R> {
+impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
     /// A desk for one call; the item data copies are filled from their
     /// owners.
     pub fn new(

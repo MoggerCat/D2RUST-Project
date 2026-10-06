@@ -45,6 +45,7 @@ use d2_sim::world::vendors::{VendorRecord, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, WaypointWorld};
 
 use super::super::SimGame;
+use super::items::moves::MoveCall;
 use super::items::CubeCall;
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
 use crate::buffers::QueueError;
@@ -170,6 +171,8 @@ pub enum WorldError {
     Quest(#[from] QuestError),
     #[error(transparent)]
     Price(#[from] PriceFatal),
+    #[error(transparent)]
+    Move(#[from] d2_sim::items::moves::MoveFatal),
     #[error("sink: {0}")]
     Sink(String),
 }
@@ -260,6 +263,11 @@ pub trait WorldHost<D> {
     }
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        None
+    }
+    /// The item moves and the deferred item messages
+    /// (`handlers::items::moves`) on the host's economy and inventories.
+    fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
     }
     /// The skill handlers (`handlers::skills`).

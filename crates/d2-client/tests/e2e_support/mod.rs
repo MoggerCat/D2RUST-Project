@@ -3,19 +3,24 @@
 //! `WiredWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`): the rest of
 //! the NPC / vendor / quest wiring no written spec provides (staged
 //! answers and a call log, never behaviour), and the synthetic item,
-//! vendor and NPC tables. Each test crate uses a part of it.
+//! vendor and NPC tables, and the item-move seams no d2-sim module
+//! provides ([`InvFx`]). Each test crate uses a part of it.
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::{Itemratio, Itemtypes, Monstats, Record};
+use d2_server::adapters::handlers::items::moves::MoveRest;
 use d2_server::adapters::handlers::world::Outbox;
+use d2_sim::items::inventory::InteractionTarget;
+use d2_sim::items::moves::{Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::wiring::inventory::InvRest;
 use d2_sim::world::npc::{self, class, ImbueMods, InvEntry, ItemFacts, MercInit};
 use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
@@ -484,4 +489,138 @@ pub fn tx(kind: u8, code: u8, guid: u32, gold: i32) -> Vec<u8> {
     m.extend_from_slice(&guid.to_le_bytes());
     m.extend_from_slice(&gold.to_le_bytes());
     m
+}
+
+/// The item-move seams no d2-sim module provides
+/// (`d2_sim::wiring::inventory::InvRest` with its `MovePending` part,
+/// `wire-inventory-sim.md` §5): staged answers, never behaviour. The
+/// player-to-item distance is a fixed staged value (the path spec's
+/// `0x00641530`); there is no room at the drop's offset start, and the
+/// free-spot search (`0x0064E810`, collision spec) answers the start
+/// spot as is in the player's room (as the drop fixture's search does);
+/// non-item positions are staged; requirements, hands and auto-equip
+/// answer the narrowest readings (no level requirement, nothing
+/// two-handed, every location allowed). Every state-changing call is
+/// logged; sends are collected for the host.
+#[derive(Clone, Default)]
+pub struct InvFx(pub std::sync::Arc<std::sync::Mutex<InvFxState>>);
+
+#[derive(Default)]
+pub struct InvFxState {
+    pub distance: i32,
+    pub room: Option<d2_sim::units::RoomId>,
+    pub pos: BTreeMap<Owner, (i32, i32)>,
+    pub log: Vec<String>,
+    pub sent: Vec<(Owner, Vec<u8>)>,
+}
+
+impl InvFx {
+    pub fn with<T>(&self, f: impl FnOnce(&mut InvFxState) -> T) -> T {
+        f(&mut self.0.lock().unwrap())
+    }
+    fn log(&self, s: String) {
+        self.with(|r| r.log.push(s));
+    }
+}
+
+impl MovePending for InvFx {
+    fn distance(&self, _: Owner, _: Owner) -> i32 {
+        self.with(|r| r.distance)
+    }
+    fn free_spot(
+        &self,
+        start: (i32, i32),
+        _: (i32, i32),
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<Spot> {
+        self.with(|r| {
+            r.room.map(|room| Spot {
+                room,
+                x: start.0,
+                y: start.1,
+            })
+        })
+    }
+    fn sound(&mut self, u: Owner, id: u32) {
+        self.log(format!("sound {} {id:#x}", u.guid));
+    }
+    fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        self.log(format!("pickup_sound {} {item}", player.guid));
+    }
+    fn quest_item_picked(&mut self, _: Owner, item: Guid) {
+        self.log(format!("quest_item_picked {item}"));
+    }
+    fn quest_item_dropped(&mut self, item: Guid) {
+        self.log(format!("quest_item_dropped {item}"));
+    }
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.with(|r| r.sent.push((player, bytes)));
+    }
+}
+
+impl InvRest for InvFx {
+    fn pos(&self, u: Owner) -> (i32, i32) {
+        self.with(|r| r.pos.get(&u).copied().unwrap_or((0, 0)))
+    }
+    fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
+        self.with(|r| r.pos.insert(u, (x, y)));
+    }
+    fn percent_of(&self, value: i32, p: i32) -> i32 {
+        value * p / 100
+    }
+    fn item_active_on(&self, _: Guid, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: Guid, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn level_requirement(&self, _: Guid, _: Owner) -> i32 {
+        -1
+    }
+    fn two_handed(&self, _: Guid) -> bool {
+        false
+    }
+    fn one_or_two_handed(&self, _: Owner, _: Guid) -> bool {
+        false
+    }
+    fn ammo_type(&self, _: Guid) -> Option<i16> {
+        None
+    }
+    fn stack_quality_ok(&self, _: Guid) -> bool {
+        true
+    }
+    fn has_allowed_location(&self, _: Guid) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: Guid) -> bool {
+        false
+    }
+    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
+        true
+    }
+    fn interaction(&self, _: Owner) -> InteractionTarget {
+        InteractionTarget::None
+    }
+    fn clear_interaction(&mut self, _: Owner) {}
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for InvFx {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        self.with(|r| std::mem::take(&mut r.sent))
+    }
 }

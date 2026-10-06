@@ -48,6 +48,7 @@ use d2_sim::world::waypoints::{
     ObjectFacts, PlayerFacts, RoomRect, WaypointRecords, WaypointWorld,
 };
 
+use super::super::items::moves::{InvParts, MoveCall};
 use super::super::items::{CubeCall, CubeParts, Interact};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::{
@@ -82,6 +83,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     pub items: ItemStore,
     /// The cube (`None`: 0x2A, 0x4F stay stubs).
     pub cube: Option<CubeParts>,
+    /// The inventories and the item-move seams (`None`: the item-move
+    /// ids stay stubs, `handlers::items::moves`).
+    pub inventory: Option<InvParts>,
     pub quests: QuestControl,
     pub npc: NpcControl,
     pub vendor_tables: VendorTables,
@@ -114,6 +118,7 @@ impl<R, S> WiredWorld<R, S> {
             tables,
             items: ItemStore::new(),
             cube: None,
+            inventory: None,
             quests,
             npc,
             vendor_tables,
@@ -390,6 +395,15 @@ where
             let parts = p.cube.as_deref_mut().expect("checked above");
             call.call(econ, parts, &mut RestInteract(&mut *p.rest))
         }))
+    }
+
+    /// The item moves on this world's economy and inventory parts (lent
+    /// out of the world for the call).
+    fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        let mut inv = self.inventory.take()?;
+        let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        self.inventory = Some(inv);
+        Some(out)
     }
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
