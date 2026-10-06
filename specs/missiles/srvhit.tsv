@@ -57,7 +57,7 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 55	0x005ACB60	MISSMODE_SrvHit55_Baalnferno	1	baal inferno(554)	sHitPar1	-	Baal inferno effect	D2MOO-only
 56	0x005ACC50	MISSMODE_SrvHit56_ArmageddonControl	2	armageddoncontrol(577) diablogeddoncontrol(670)	sHitPar1;HitSubMissile1	damage rolls	drops HitSubMissile1 meteors on nearby targets	D2MOO-only
 57	0x005AD970	MISSMODE_SrvHit57_BaalFxControl	1	baalfx control(625)	-	-	Baal effects	D2MOO-only
-58	0x005ACDF0	MISSMODE_SrvHit58_BaalTauntLightningControl	1	baal taunt lightning control(654)	sHitPar1;HitSubMissile1	init_low(missile x) then rolls on the missile seed	random HitSubMissile1 lightning around the missile	summarized
+58	0x005ACDF0	MISSMODE_SrvHit58_BaalTauntLightningControl	1	baal taunt lightning control(654)	sHitPar1;HitSubMissile1	init_low(missile x) then rolls on the missile seed	re-seeds from x and creates HitSubMissile1 at a random point within sHitPar1 of the missile; returns 1 (bodies.md §5)	spec'd-here
 59	0x005ACF20	MISSMODE_SrvHit59_BaalTauntPoisonControl	1	baal taunt poison control(655)	sHitPar1;HitSubMissile1	-	poison-cloud HitSubMissile1 ring	D2MOO-only
 60	-	-	0	-	-	-	null entry	spec'd-here
 61	-	-	0	-	-	-	null entry	spec'd-here
