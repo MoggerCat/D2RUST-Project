@@ -1942,6 +1942,8 @@ fn real_level_stats() {
 
 // Tests written against surviving mutants (METHODS M08); a child module so
 // they share this module's fakes.
+#[path = "../mutant_tests/init_seams.rs"]
+mod mutant_seams;
 #[path = "../mutant_tests/init.rs"]
 mod mutant_tests;
 #[path = "../mutant_tests/umods.rs"]
