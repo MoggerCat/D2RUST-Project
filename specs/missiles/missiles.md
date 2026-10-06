@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 483–536 |
 |   R7. Lifetime and expiry | 537–560 |
 |   R8. Pierce | 561–586 |
-|   R9. Server-do and server-hit catalogues | 587–804 |
-|   R10. Behaviour of the recorded missiles | 805–838 |
-|   R11. `missiles.txt` columns and their server use | 839–873 |
-| Constants & data dependencies | 874–900 |
-| Randomness | 901–933 |
-| Edge cases & original bugs | 934–957 |
-| Test vectors | 958–1037 |
-| Provenance | 1038–1080 |
-| Open questions | 1081–1126 |
+|   R9. Server-do and server-hit catalogues | 587–805 |
+|   R10. Behaviour of the recorded missiles | 806–839 |
+|   R11. `missiles.txt` columns and their server use | 840–874 |
+| Constants & data dependencies | 875–901 |
+| Randomness | 902–934 |
+| Edge cases & original bugs | 935–958 |
+| Test vectors | 959–1038 |
+| Provenance | 1039–1081 |
+| Open questions | 1082–1127 |
 <!-- /index -->
 
 ## Summary
@@ -643,6 +643,7 @@ mask. Used by server-do 8, 10, 17, 25.
 | `0x005B04A0` | server-do 34 (Baal taunt control) | path first point x (path +0x0C) |
 | `0x005B0640` | server-do 35 (royal strike chaos ice) | missile data +0x28; low word stored back |
 | `0x005AC040` | init callback of server-hit 38 / 45 sub-missiles (`bodies.md` §19) | path target x (path +0x10) |
+| `0x005D5BF0` | target scatter (server-hit 40, `bodies-2.md` §48; also a skill caller) | target x |
 | `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | init callbacks (§R2.3 step 21) | path geometry; skills spec |
 
 Every re-seed sets `{value, 666}` on unit +0x20. Missiles never

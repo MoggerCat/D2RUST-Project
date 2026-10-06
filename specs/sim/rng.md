@@ -183,7 +183,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
 | item seed from a save | `0x0062CBE0` (`0x0062A970` sets 0) | 32 bits from the item bit stream |
 | client unit seeds | `0x00465FD0`, `0x00466200`, `0x00466360` | derived from the client room seed (+0x6C); stays `{1, 666}` without a room |
-| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005AC040`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
+| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005AC040`, `0x005D5BF0`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
 
 #### 5.4 DRLG
 

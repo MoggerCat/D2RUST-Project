@@ -34,20 +34,20 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 32	0x005ABE50	MISSMODE_SrvHit32_CairnStones	1	cairnstones(288)	Param4	none	no unit and portal not yet opened: opens the Tristram portal (Param4); returns 0 (bodies-2.md §42)	spec'd-here
 33	0x005ABEB0	MISSMODE_SrvHit33_TowerChestSpawner	1	towerchestspawner(332)	-	none	no unit: refreshes the missile's room; returns 0 (bodies-2.md §43)	spec'd-here
 34	-	-	0	-	-	-	null entry	spec'd-here
-35	0x005ABEE0	MISSMODE_SrvHit35_OrbMist	1	orbmist(368)	-	-	no effect on hit	D2MOO-only
+35	0x005ABEE0	MISSMODE_SrvHit35_OrbMist	1	orbmist(368)	-	none	no unit: object GUID data +0x28 refreshes its room and, in mode 0, goes to mode 1 with an end-animation timer; returns 1 (bodies-2.md §45)	spec'd-here
 36	0x005ABF70	MISSMODE_SrvHit36_MissileInAir	4	bomb in air(385) shock field in air(388) catapult spike in air(412) sentryspikeinair(496)	HitSubMissile1	none	no unit: creates HitSubMissile1 at the missile via 0x0056EDE0 and copies data +0x28; with a unit: 0 (bodies.md §10)	spec'd-here
-37	0x005AC020	MISSMODE_SrvHit37_BladeCreeper	1	blade creeper(392)	-	-	keeps the missile	D2MOO-only
+37	0x005AC020	MISSMODE_SrvHit37_BladeCreeper	1	blade creeper(392)	-	none	unit: 2; else 0 (bodies-2.md §46)	spec'd-here
 38	0x005AC0A0	MISSMODE_SrvHit38_CatapultChargedBall	1	catapultchargedball(407)	sHitPar1;sHitPar2;HitSubMissile1;skill calc4	zigzag callback re-seeds each sub-missile	nova of sHitPar1+(lvl-1)*sHitPar2 (<=0: max(calc4,1)) HitSubMissile1 with the zigzag callback; returns 1 (bodies.md §19)	spec'd-here
-39	0x005AC1D0	MISSMODE_SrvHit39_ImpSpawnMonsters	1	imp spawn monsters(409)	-	-	spawns monsters at the missile	D2MOO-only
-40	0x005AC250	MISSMODE_SrvHit40_CatapultSpikeBall	1	catapult spike ball(411)	sHitPar1;sHitPar2;HitSubMissile1	-	spike HitSubMissile1 burst	D2MOO-only
+39	0x005AC1D0	MISSMODE_SrvHit39_ImpSpawnMonsters	1	imp spawn monsters(409)	-	roll(n) on the room seed	spawns a random isSpawn monster of the level's mon list at the missile (room seed draw); returns 1 (bodies-2.md §47)	spec'd-here
+40	0x005AC250	MISSMODE_SrvHit40_CatapultSpikeBall	1	catapult spike ball(411)	sHitPar1;sHitPar2;HitSubMissile1;skill calc4	re-seed init_low(target x); roll(2r) x2 per target	scatter at the missile's target: n = sHitPar1+(lvl-1)*sHitPar2 (<=0: calc4) HitSubMissile1 within n/4, re-seeding the missile from the target x; returns 1 (bodies-2.md §48)	spec'd-here
 41	-	-	0	-	-	-	null entry	spec'd-here
 42	-	-	0	-	-	-	null entry	spec'd-here
-43	0x005AC350	MISSMODE_SrvHit43_HealingVortex	1	healing vortex(425)	- (skill damage)	roll on the missile seed	heals by a random amount	D2MOO-only
+43	0x005AC350	MISSMODE_SrvHit43_HealingVortex	1	healing vortex(425)	- (skill damage)	roll(hi-lo) (missile seed)	heals the unit by phys_min..phys_max of the skill (missile seed roll), ProgOverlay when hurt; returns CollideKill != 0 (bodies-2.md §49)	spec'd-here
 44	0x005A9E10	MISSMODE_SrvHit44_ExplodingJavelin	2	explodingjavalin(429) icejavalin(434)	sHitPar1	damage rolls (missile seed)	full damage roll 0x005A89A0 + area damage radius sHitPar1 (0: aurarangecalc); always returns 1 (bodies.md §8)	spec'd-here
 45	0x005AC480	MISSMODE_SrvHit45_LightningTrailingJavelin	2	lightingtrailingjavalin(431) advlighttrailingjav(438)	sHitPar1;sHitPar2;HitSubMissile1	zigzag callback re-seeds each sub-missile	nova 0x0056D4E0 of sHitPar1 HitSubMissile1 at the missile, zigzag init callback when sHitPar2; returns 1 (bodies.md §19)	spec'd-here
 46	-	-	0	-	-	-	null entry	spec'd-here
-47	0x005AC550	MISSMODE_SrvHit47_MoltenBoulder	1	moltenboulder(452)	sHitPar1;sHitPar2;HitSubMissile1	damage rolls	damage plus fire HitSubMissile1	D2MOO-only
-48	0x005AC6D0	MISSMODE_SrvHit48_MoltenBoulderEmerge	1	moltenboulderemerge(453)	HitSubMissile1	-	creates HitSubMissile1	D2MOO-only
+47	0x005AC550	MISSMODE_SrvHit47_MoltenBoulder	1	moltenboulder(452)	sHitPar1;sHitPar2;HitSubMissile1	damage rolls (missile seed)	small monster: 2; large monster or expiry: full damage roll, area damage, 18-point scatter of HitSubMissile1 (range = radius); returns 1 (bodies-2.md §50)	spec'd-here
+48	0x005AC6D0	MISSMODE_SrvHit48_MoltenBoulderEmerge	1	moltenboulderemerge(453)	HitSubMissile1	none	creates HitSubMissile1 at the missile aimed at its path target; returns 1 (bodies-2.md §51)	spec'd-here
 49	-	-	0	-	-	-	null entry	spec'd-here
 50	0x005AC800	MISSMODE_SrvHit50_PlagueVinesTrail	1	plague vines trail(475)	sHitPar1	-	applies the vine effect	D2MOO-only
 51	0x005AC870	MISSMODE_SrvHit51_VolcanoDebris	1	volcano debris 2(481)	HitSubMissile1-3	-	creates debris HitSubMissiles	D2MOO-only

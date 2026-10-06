@@ -17,29 +17,37 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–58 |
-| Inputs | 59–66 |
-| Outputs / state changes | 67–72 |
-| Rules | 73–74 |
-|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 75–85 |
-|   32. Server-hit 20 Lightning Fury `0x005AB370` | 86–111 |
-|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 112–138 |
-|   34. Server-hit 21 Battle Cry `0x005AB500` | 139–157 |
-|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 158–185 |
-|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 186–197 |
-|   37. Server-hit 25 panther pot green `0x005AB820` | 198–221 |
-|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 222–240 |
-|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 241–279 |
-|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 280–296 |
-|   41. Server-hit 31 fire head `0x005ABD70` | 297–312 |
-|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 313–323 |
-|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 324–358 |
-| Constants & data dependencies | 359–375 |
-| Randomness | 376–387 |
-| Edge cases & original bugs | 388–403 |
-| Test vectors | 404–416 |
-| Provenance | 417–432 |
-| Open questions | 433–440 |
+| Summary | 53–66 |
+| Inputs | 67–74 |
+| Outputs / state changes | 75–80 |
+| Rules | 81–82 |
+|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 83–93 |
+|   32. Server-hit 20 Lightning Fury `0x005AB370` | 94–119 |
+|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 120–146 |
+|   34. Server-hit 21 Battle Cry `0x005AB500` | 147–165 |
+|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 166–193 |
+|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 194–205 |
+|   37. Server-hit 25 panther pot green `0x005AB820` | 206–229 |
+|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 230–248 |
+|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 249–287 |
+|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 288–304 |
+|   41. Server-hit 31 fire head `0x005ABD70` | 305–320 |
+|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 321–331 |
+|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 332–366 |
+|   44. Server-do 19 Radament death `0x005B0940` | 367–394 |
+|   45. Server-hit 35 orb mist `0x005ABEE0` | 395–409 |
+|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 410–437 |
+|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 438–457 |
+|   48. Server-hit 40 catapult spike ball `0x005AC250` | 458–486 |
+|   49. Server-hit 43 Healing Vortex `0x005AC350` | 487–501 |
+|   50. Server-hit 47 Molten Boulder `0x005AC550` | 502–523 |
+|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 524–532 |
+| Constants & data dependencies | 533–554 |
+| Randomness | 555–571 |
+| Edge cases & original bugs | 572–593 |
+| Test vectors | 594–609 |
+| Provenance | 610–629 |
+| Open questions | 630–643 |
 <!-- /index -->
 
 ## Summary
@@ -356,6 +364,172 @@ Server-hit 33: no unit and the missile has a room → refresh the room
 Live: the chest pops open with 250 frames left, then a gold pile within
 ±5 sub-tiles every 8 frames.
 
+### 44. Server-do 19 Radament death `0x005B0940`
+
+Row: radamentdeath (347); `Range` 400.
+
+1. f = frames left. 2 ≤ f ≤ 24: `corpse_effect(game, 0x3002, x, y,
+   missile, skill 124, level 1, cb 0x005AD8F0)`. f = 1: the same with cb
+   `0x005AD910`. (No record check.)
+2. Return flight (tail jump).
+
+`corpse_effect(game, flags, x, y, unit, skill, level, cb)` = `0x0056DDE0`
+(ECX game, EDX flags; D2MOO `sub_6FD14BD0`) builds a request {flags,
+unit, skill, x, y, radius 0, level, 0, cb} and runs `0x0056DCC0`:
+
+1. Request or cb null → fatal assertion.
+2. r = radius, or (0) skill `Param1` + (level − 1) × `Param2`
+   (`0x004E6CA0`). Redemption (124): `Param1` 16 → r = 16.
+3. Room = the room containing (x, y), searched from the unit's room
+   (`0x00463740`); none → nothing.
+4. Unit find around (x, y) with radius r and flags `flags` over that
+   room's neighbourhood (`0x0065A950` init, `0x0065AC70` collect,
+   `0x0065AA00` free; the finder no spec owns yet, Open question 3).
+5. For each found unit U in found order: `cb(ECX game, EDX unit, U,
+   level, 0)`.
+
+Both callbacks call `0x005D0C40(game, missile, U, 124, level, last)`
+(D2MOO `SKILLS_ApplyRedemptionEffect`; skills spec, not yet written,
+Open question 4) with last = 0 for `0x005AD8F0` and 1 for `0x005AD910`.
+
+### 45. Server-hit 35 orb mist `0x005ABEE0`
+
+Row: orbmist (368). Data +0x28 = GUID of an object (set by its
+creator).
+
+1. Unit given → return 0.
+2. B = the object with GUID data +0x28 (`0x00552F60(game, 2, GUID)`);
+   none → return 0.
+3. B's room → refresh it (`0x0061AED0(room, 1)`).
+4. B's mode (unit +0x10) = 0: mode := 1 (`0x00624690(B, 1)`); B's
+   objects record (`0x00640E90(class)`) → timer type 1 (end of
+   animation) on B at F + (`FrameCnt1` (+0xDC) >> 8) (`0x005417D0(game,
+   B, 1, ·, 0, 0)`).
+5. Return 1.
+
+### 46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020`
+
+Rows: blade creeper (392, server-do 20, server-hit 37), distraction
+(393, server-do 21; `SubMissile1` distraction fog).
+
+Server-do 20:
+
+1. O = owner. O none or dead (`0x005541B0` ≠ 0) → hit handler
+   `0x005ADF10(game, missile, no unit, a4 = 1)` (`missiles.md` §R5;
+   result ignored); return 2.
+2. `0x005A99E0` (EBX missile): O and the missile's path exist →
+   teleport the path to O's position in O's room (`0x00650BE0(path,
+   missile, O room, O.x, O.y)`, `sim/path-placement.md` §6).
+3. Frames left := 10 (`0x0064A330`).
+4. Flight, result ignored. Return 1.
+
+The missile sits on its owner and never expires while the owner lives;
+flight still runs its collision on the owner's spot every frame.
+
+Server-do 21:
+
+1. Missile none or no record → return 2.
+2. `SubMissile1` ≠ 0 and the new-step flag: `0x0056EDE0(game, owner,
+   skill, level, SubMissile1, x, y)` (`skills/bodies.md` §6.13).
+3. Continue as server-do 20 (tail jump).
+
+Server-hit 37: unit given → 2 (damage, keep), else 0.
+
+### 47. Server-hit 39 imp spawn monsters `0x005AC1D0`
+
+Row: imp spawn monsters (409).
+
+1. `spawn_for_level(game, missile room, x, y)` = `0x005B3570`. Return 1
+   whatever it did.
+
+`spawn_for_level` (ECX game, EDX room, stack x, y):
+
+1. L = levels record of the room's level (`0x0061DB70(0x0061A1B0(room))`).
+   n = `mon` count (+0x33); n = 0 → fatal assertion.
+2. i = `roll(n)` on the **room seed** (room +0x6C, `0x0045C3E0`).
+3. For up to n steps: i := i + 1, 0 when it reaches n; c = mon[i]
+   (+0x36 + 2i, i16); c's monstats record (an invalid c reads through a
+   null record: fatal) has `isSpawn` (flags +0x0C bit 0) → stop.
+4. c = −1 → return 0. All n entries without `isSpawn` → fatal assertion.
+5. Create request (`monsters/init.md` §2) {game, room, coord list 0,
+   class c, mode 1, GUID 0, x, y, spread 5, flags 0} → `0x005B2A00`;
+   return 1 when created, else 0.
+
+### 48. Server-hit 40 catapult spike ball `0x005AC250`
+
+Row: catapult spike ball (411); `sHitPar1` 0, `sHitPar2` 0,
+`HitSubMissile1` catapult spike in air.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. L = level. n = `sHitPar1` + (L − 1) × `sHitPar2`; n ≤ 0: k's record
+   (`0x0045C4B0`) none → return 1; n = max(`eval(O, k.calc4, k, L)`, 1).
+3. `scatter_at_target(game, missile, O, HitSubMissile1, n, n / 4, k, L)`
+   (`0x005D5BF0`; n / 4 signed, truncating; owner fetched again). Return
+   1.
+
+`scatter_at_target(game, U, owner, class, n, r, skill, level)` =
+`0x005D5BF0` (ECX game, EDX U; also used by a skill function at
+`0x005D5DF4`):
+
+1. (tx, ty) = U's target position (`0x0056D2C0`, `skills/bodies.md`
+   §2.4: the target unit's position, else the path target point); fails
+   → return.
+2. **Re-seed U's seed**: `init_low(tx)` (`0x00650E40`).
+3. Zeroed record, flags 0x420 (target absolute, frames from distance):
+   owner, origin U, class, skill, level.
+4. n ≤ 1 or r < 2: target (tx, ty); create once.
+5. Else n times: px = tx − r + `roll(2r)`, then py = ty − r + `roll(2r)`
+   (`0x0045C3E0`, U's seed); squared distance from U's position to (px,
+   py) (`0x006492A0`) ≥ 4 → target (px, py), create; else nothing for
+   this one.
+
+### 49. Server-hit 43 Healing Vortex `0x005AC350`
+
+Row: healing vortex (425).
+
+1. Missile none, no record or no unit → return 1. k = skill, L =
+   level; k invalid → return 1.
+2. O = owner (may be none). lo = `phys_min(O, k, L, 1)`, hi =
+   `phys_max(O, k, L, 1)` (`0x00647BC0`, `0x00647D00`,
+   `skills/levels.md` §3.3; lo first).
+3. v = lo + `roll(hi − lo)` (`0x0045C3E0`, missile seed).
+4. life = unit stat 6, max = max life (`0x00625D10`). life ≠ max and
+   `ProgOverlay` > 0 → overlay on the unit (`0x00621E40`).
+5. Unit life := min(life + v, max).
+6. Return 1 when `CollideKill` ≠ 0, else 0.
+
+### 50. Server-hit 47 Molten Boulder `0x005AC550`
+
+Row: moltenboulder (452); `sHitPar1` 0, `sHitPar2` 1, `HitSubMissile1`
+moltenboulderfirepath.
+
+1. Missile none or no record → return 1. O = owner; none → return 1.
+2. Unit given: not a monster → return 2; a monster whose class lacks
+   the monstats2 `large` flag (`0x004638A0(class, 11)`) → return 2. (No
+   unit, i.e. the expiry, goes on; D2MOO 1.10f returns 2 there.)
+3. (x, y) = position; c = 1. Zeroed 0x70 record; `0x005A89A0(missile,
+   unit, record)`.
+4. r = `sHitPar1`; ≤ 0: k invalid → return 1; r = max(`eval(O,
+   k.aurarangecalc, k, L)`, 1).
+5. Flags as `bodies.md` §8 step 4; `area_damage(game, O, x, y, r,
+   record, 0)` = 0 → c = 3 (never).
+6. `scatter(game, missile, HitSubMissile1, r, max(sHitPar2, 1))`
+   (`bodies.md` §9: 18 points, range field r).
+7. Return c.
+
+So the boulder rolls through small monsters (damage, keep) and bursts
+on large ones and at its end.
+
+### 51. Server-hit 48 Molten Boulder emerge `0x005AC6D0`
+
+Row: moltenboulderemerge (453); `HitSubMissile1` moltenboulder.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1.
+2. Zeroed record, flags 0x21: owner (may be none), start = the
+   missile's position, skill, level, class `HitSubMissile1`, target =
+   the path target point (path +0x10, +0x12). Create. Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -368,6 +542,11 @@ Live: the chest pops open with 250 frames left, then a gold pile within
 | frozen orb circle | C64 / S64, radius 30, 64 steps | `0x006E2B78` / `0x006E2A78` (do 15), `0x006E2738` / `0x006E2638` (hit 29) |
 | tower chest | sound 0x5C at f = 1; chest drop Q 4 at f = `Range` − `Param1`; gold every 4 × `Param2` frames within ±`Param3` | `0x005AF300` |
 | grim ward scare | radius `Param1` + (L − 1) × `Param2`; terror `Param5`, `Param6` | `0x005ABA10` |
+| radament corpse effect | flags 0x3002, skill 124 (Redemption), level 1, radius `Param1` 16 | `0x005B0940`, `0x0056DCC0` |
+| creeper / distraction hold | frames left := 10 every run | `0x005AF540` |
+| imp spawn request | mode 1, spread 5, flags 0 | `0x005B3570` |
+| spike scatter | n targets within ±n/4, kept when d² ≥ 4 | `0x005D5BF0` |
+| molten boulder burst | monstats2 `large` (flag 11) or expiry | `0x005AC550` |
 | missiles.txt | `sHitPar1..2`, `HitSubMissile1`, `SubMissile1`, `HitFlags`, `ResultFlags` | `data/fields.tsv` |
 | skills.txt | `aurarangecalc`, `auralencalc` +0x60, `aurafilter` +0x50, `auratargetstate` +0x82, `calc1`, `calc4`, `pettype` +0xBE | `data/fields.tsv` |
 
@@ -380,6 +559,11 @@ Use counts and order: `bodies.md` Constants.
 | do 12, hit 20, do 13, hit 21, hit 25 | — | none of their own (summon and state helpers: skills / monsters specs) |
 | hit 28, do 15, hit 29, do 16, hit 32, hit 33 | — | none of their own |
 | hit 31 | — | `elem_roll` (missile seed) |
+| do 19, hit 35, do 20, do 21, hit 37, hit 48 | — | none of their own (do 19's corpse callbacks: skills spec) |
+| hit 39 | — | `roll(n)` on the **room** seed (room +0x6C), then monster creation's own draws |
+| hit 40 | missile seed := `init_low(target x)` | `roll(2r)` × 2 per target (x first), only when n > 1 and r ≥ 2 |
+| hit 43 | — | `roll(hi − lo)` on the missile seed |
+| hit 47 | — | §R6.2 rolls; `area_damage` per unit |
 | do 18 | — | `roll(2r + 1)` × 2 on the missile seed (x first) per gold pile; then the item pipeline's own draws |
 | hit 22, hit 24 | — | `missiles.md` §R6.2 rolls on the missile seed; then the damage tail (hit 22) or `area_damage`'s per-unit draws |
 
@@ -400,6 +584,12 @@ Created missiles and monsters draw on their own seeds.
 6. Server-hit 29 returns 2 (no nova) for any expiry with frames left.
 7. Server-do 18 sets data +0x2C := 1 even when the chest is gone, so
    gold still drops.
+8. Server-do 20 / 21 ignore the flight result and return 1: the missile
+   is never removed by flight while its owner lives.
+9. `spawn_for_level` (§47) dies on a level with no `mon` entries or none
+   with `isSpawn`, and on an invalid class in the list.
+10. Server-hit 47 bursts at expiry in 1.14d (D2MOO 1.10f: returns 2
+    without a burst).
 
 ## Test vectors
 
@@ -412,6 +602,9 @@ Created missiles and monsters draw on their own seeds.
 | frozenorb, data +0x28 = 60, elapsed 5 | bolt at offset (C64[60], S64[60]) = (27, −11); data +0x28 := 15 | live row, §39 |
 | frozenorb, data +0x28 = −70 | i = |−70 mod 64| = 6 | synthetic, §39 |
 | frozenorbnova (a, b) = (30, 0), elapsed 0, 2, 4 | (15, 15), (0, 15), (−7, 7) | synthetic, §40 |
+| scatter_at_target n = 8, r = 2, target (50, 50) | `init_low(50)`; 8 × two draws `roll(4)`; points in 48…51 × 48…51 | synthetic, §48 |
+| catapult spike ball, `calc4` 5 | n = 5, r = 1 → one spike at the target, no draw | synthetic, §48 |
+| healing vortex, lo = hi | v = lo, no draw | synthetic, §49 |
 | towerchestspawner, frames left 250 | chest drop; data +0x2C := 1; 250 mod 8 ≠ 0, no gold | live row, §43 |
 
 ## Provenance
@@ -423,7 +616,11 @@ Created missiles and monsters draw on their own seeds.
   `0x004E6C70`, `0x004F4110`, `0x005AF030`, `0x005ABB00`, `0x005AF170`,
   `0x005ABD70`, `0x005ABE50`, `0x005AF300`, `0x005ABEB0`; tables
   `0x006E25F8`–`0x006E2637`, `0x006E2638`–`0x006E2837`,
-  `0x006E2A78`–`0x006E2C77` dumped.
+  `0x006E2A78`–`0x006E2C77` dumped; `0x005B0940`, `0x0056DDE0`,
+  `0x0056DCC0`, `0x005AD8F0`, `0x005AD910`, `0x005ABEE0`, `0x005AF540`,
+  `0x005A99E0`, `0x005AF590`, `0x005AC020`, `0x005AC1D0`, `0x005B3570`,
+  `0x005AC250`, `0x005D5BF0` (callers `0x005AC32F`, `0x005D5DF4`),
+  `0x005AC350`, `0x005AC550`, `0x004638A0`, `0x005AC6D0`.
   Table entries checked against `0x0073C768` / `0x0073C840`.
 - Live `patch_d2` missiles.txt rows per section; skills.txt Lightning
   Fury, Fist of the Heavens, Battle Cry, Bone Wall; monumod.txt row 15.
@@ -437,3 +634,9 @@ Created missiles and monsters draw on their own seeds.
 2. `0x005B1990(game, P, 0, 9)` on a bone-wall piece: the meaning of
    mode 9 (`monsters/population.md` Open question 7 asks the same for
    mode 8).
+3. The unit finder `0x0065A950` / `0x0065AC70` used by `corpse_effect`
+   (§44) with flags 0x3002: which units and in which order
+   (`monsters/ai-bodies-3.md` Open question 3 asks the same).
+4. `0x005D0C40` (D2MOO `SKILLS_ApplyRedemptionEffect`) has no spec: the
+   skills spec should own it (Redemption's per-corpse effect; called
+   with last = 1 on the final frame).
