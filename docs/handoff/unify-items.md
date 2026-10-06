@@ -175,3 +175,7 @@ methods, coverage + selftest, trace checkers, hook selftest, fmt,
 depcheck + determinism, clippy workspace, tests d2-sim + conformance,
 rest, d2-client, doc-tests). d2-server 163 tests pass; d2-sim's inventory
 wiring 31; `e2e_single_player` 3 and `e2e_vendor` 4.
+
+Update: merged `origin/claude/tender-meitner-mphas3` at `ad23c70` (the
+mutant-test, path-server and nightly-props sessions; no conflict). `sh
+tools/gate.sh all` on the merge: **GATE: PASS**, every step.
