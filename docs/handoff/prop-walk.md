@@ -134,7 +134,12 @@ with every property kept; `prop_path_core.rs` needed no change.
 
 ## 6. Gate
 
-`sh tools/gate.sh all` on this branch (2026-10-06, at `eb20a75`):
+`sh tools/gate.sh all` after the port (2026-10-06, on the merged base
+`5413b24` with the clippy fix below): **GATE: PASS** (all 13 steps).
+The first run after the port failed only workspace clippy
+(`unnecessary_mut_passed`: `astar` takes `&Finder`), fixed in the test.
+
+Earlier, before the port, at `eb20a75`:
 **GATE: PASS**. spec_index, methods, coverage `--check` / `--selftest`,
 trace checkers, pre-commit selftest, fmt, depcheck (+determinism),
 workspace clippy, `d2-sim` + conformance tests, the other crates' tests,

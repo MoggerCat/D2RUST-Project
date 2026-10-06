@@ -727,8 +727,8 @@ proptest! {
             move_mask: 0x1C09,
         };
         let reference = world.clone();
-        let mut f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
-        let n = astar(&mut f, &mut path, &info).unwrap();
+        let f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
+        let n = astar(&f, &mut path, &info).unwrap();
         let world = reference;
         prop_assert!((0..=77).contains(&n));
         let pts: Vec<Point> = path.points[..n as usize].iter().map(|p| p.point()).collect();
@@ -828,8 +828,8 @@ proptest! {
             pattern: 0,
             move_mask: 0x1C09,
         };
-        let mut f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
-        let n = astar(&mut f, &mut path, &info).unwrap();
+        let f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
+        let n = astar(&f, &mut path, &info).unwrap();
         let (reach, comp) = bfs(&|p| world.free(p, 0), start, target, 10_000);
         prop_assert!(reach && comp <= 200);
         // Corners: two per row change, within the 77 outputs while h ≤ 30.
