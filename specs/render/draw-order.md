@@ -218,7 +218,7 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    §6 floors) passes `camera.md` §7 and its DT1 orientation is 0; drawer
    `0x004F68E0` with a filter flag set only for `ℓ` = 1 in levels whose
    `FloorFilter` (+0x214) ≠ 0 (`render/shading.md`), light grid per
-   `0x00477730` (`render/lighting.md`). After a draw: DT1 material bit
+   `render/lighting.md` §11 (`0x00477730` only returns the render kind). After a draw: DT1 material bit
    0x2 tiles may start client water effects (`0x00472DA0` / `0x00472EC0`)
    with a draw `0x00472280(1000)` (Open question 11); `0x004DDE80` records
    the drawn extents. Levels with `DrawEdges` (+9) at open mode 0 and
