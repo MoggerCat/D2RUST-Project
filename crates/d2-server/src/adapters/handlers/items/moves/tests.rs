@@ -7,9 +7,10 @@
 //! real field room. Only [`MoveRest`] (the seams no d2-sim module
 //! provides) is a fake: it answers what the test sets and logs.
 //!
-//! The bytes are exact: the 0x9C / 0x9D headers of §11 (the item bit
-//! stream is the open seam `item_bits`, empty here: inventory.md OQ1),
-//! 0x47 / 0x48 after each update pass, and the direct sends.
+//! The bytes are exact: the 0x9C / 0x9D headers of §11 (each item bit
+//! stream is decoded with `d2-proto`'s reader and checked against the
+//! item, then cut off: `T::streams`), 0x47 / 0x48 after each update
+//! pass, and the direct sends.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -43,10 +44,12 @@ use crate::adapters::handlers::items::ITEM_IDS;
 use crate::adapters::handlers::world::tests::trade_quests::{ActionRest, Rest};
 use crate::adapters::handlers::world::tests::waypoints::{field_drlg, field_room};
 use crate::adapters::handlers::world::{ActionEvents, ActionWorld, WiredWorld};
+use crate::adapters::item_bits::TablesLookup;
 use crate::adapters::{PlayerData, PlayerFields, ProtoSizes};
 use crate::dispatch::Outcome;
 use crate::host::{Handled, Host};
 use crate::seams::{Clock, PlayerGate, SessionHandler};
+use d2_proto::item_bits::decode;
 
 const N_STATS: usize = 359;
 const N_TYPES: usize = 80;
@@ -644,7 +647,53 @@ impl T {
         let Handled::Game(Outcome::Dispatched(code)) = r.messages[0].handled else {
             panic!("{:?}", r.messages[0]);
         };
-        (code, self.host.receive(0))
+        let got = self.host.receive(0);
+        (code, self.streams(got))
+    }
+
+    /// Checks the item bit stream of each 0x9C / 0x9D
+    /// (`items/bitstream.md`) and returns the messages with it cut off
+    /// (size byte = header size), so the tests state the headers of §11.
+    /// The stream must decode to its exact length with `d2-proto`'s
+    /// reader on the host's tables (`adapters::item_bits`), carry the
+    /// item's code and, for an item still in the game, its mode in the
+    /// item's last message of the batch (a message sent "now", §6.4,
+    /// carries the mode of its moment).
+    fn streams(&mut self, msgs: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        let guid_of = |m: &[u8]| u32::from_le_bytes(m[4..8].try_into().unwrap());
+        let last: BTreeMap<Guid, usize> = msgs
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m[0] == 0x9C || m[0] == 0x9D)
+            .map(|(i, m)| (guid_of(m), i))
+            .collect();
+        msgs.into_iter()
+            .enumerate()
+            .map(|(i, mut m)| {
+                let head = match m[0] {
+                    0x9C => 8,
+                    0x9D => 13,
+                    _ => return m,
+                };
+                assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+                let guid = guid_of(&m);
+                let bits = {
+                    let tables = &self.sim().world.tables;
+                    decode(&m[head..], &TablesLookup(tables))
+                        .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"))
+                };
+                if let Some(u) = self.unit(guid) {
+                    let record = self.sim().events.sys.hooks.items.get(u).unwrap().record;
+                    assert_eq!(bits.code, ROWS[record].0, "code of {guid}");
+                    if last[&guid] == i {
+                        assert_eq!(u32::from(bits.mode), self.mode(guid), "mode of {guid}");
+                    }
+                }
+                m.truncate(head);
+                m[2] = head as u8;
+                m
+            })
+            .collect()
     }
 
     /// A frame without a message (the next tick's update pass).
@@ -653,7 +702,8 @@ impl T {
         let r = self.host.frame().unwrap();
         assert!(r.ticked);
         self.no_errors();
-        self.host.receive(0)
+        let got = self.host.receive(0);
+        self.streams(got)
     }
 
     fn no_errors(&mut self) {
@@ -691,15 +741,16 @@ impl T {
     }
 }
 
-/// 0x9C with an empty bit stream (§11): [id, action, size 8, category 0,
-/// GUID].
+/// 0x9C header (§11; stream cut off by `T::streams`): [id, action,
+/// size 8, category 0, GUID].
 fn x9c(action: u8, item: Guid) -> Vec<u8> {
     let mut b = vec![0x9C, action, 8, 0];
     b.extend_from_slice(&item.to_le_bytes());
     b
 }
 
-/// 0x9D with an empty bit stream (§11): size 13, category 0, owner.
+/// 0x9D header (§11; stream cut off by `T::streams`): size 13,
+/// category 0, owner.
 fn x9d(action: u8, item: Guid, owner_type: u8, owner: Guid) -> Vec<u8> {
     let mut b = vec![0x9D, action, 13, 0];
     b.extend_from_slice(&item.to_le_bytes());

@@ -28,6 +28,7 @@ pub mod pending;
 pub mod reaction;
 pub mod rooms;
 pub mod units;
+pub mod vitals_sync;
 pub mod waypoints;
 
 #[cfg(any(test, feature = "bench-fixtures"))]
@@ -155,6 +156,10 @@ pub struct ActionHooks<X> {
     /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
     /// head.
     pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
+    /// The client vitals sync's caches ([`vitals_sync`], `vitals.md` §5).
+    /// `None` (the default): the sync is off;
+    /// [`ActionHooks::enable_vitals_sync`] turns it on.
+    pub sync: Option<vitals_sync::SyncState>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -184,6 +189,7 @@ impl<X> ActionHooks<X> {
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),
+            sync: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

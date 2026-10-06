@@ -14,10 +14,13 @@
 //!   the fixed layouts ([`wire::FixedMessage`]).
 //! - [`s2c`]: typed S→C builders, the client-side parser and the audit
 //!   of every S→C id (which layouts the specs give).
+//! - [`item_bits`]: reader of the 0x9C / 0x9D item bit stream
+//!   (`specs/items/bitstream.md`).
 //! - [`tsv`]: strict TSV parser and the TSV-vs-code check; [`codegen`]: the
 //!   generator.
 
 pub mod codegen;
+pub mod item_bits;
 // Generated layout (one row per line); `cargo fmt` leaves it alone.
 #[rustfmt::skip]
 pub mod generated;

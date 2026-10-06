@@ -5,6 +5,7 @@
 //! `d2-server` (depcheck), so the adapters live here.
 
 pub mod handlers;
+pub mod item_bits;
 mod sim;
 mod sizes;
 

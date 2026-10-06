@@ -1629,6 +1629,42 @@ struct Transcript {
 }
 
 /// A recording bridge frame.
+/// A frame's received messages with each 0x9C / 0x9D item bit stream
+/// (`items/bitstream.md`) checked and cut off (size byte = header size),
+/// so the steps state the §11 headers: the stream must decode to its
+/// exact length with `d2-proto`'s reader on the game's item tables and
+/// carry the item's code when the item is still in the game.
+fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    use d2_server::adapters::item_bits::TablesLookup;
+    let sim = fx.sim_ref();
+    msgs.iter()
+        .map(|m| {
+            let head = match m[0] {
+                0x9C => 8,
+                0x9D => 13,
+                _ => return m.clone(),
+            };
+            assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+            let bits = d2_proto::item_bits::decode(&m[head..], &TablesLookup(&sim.world.tables))
+                .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"));
+            let guid = u32::from_le_bytes(m[4..8].try_into().unwrap());
+            let unit = sim
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid);
+            if let Some(it) = unit.and_then(|u| sim.events.action.sys.hooks.items.get(u)) {
+                assert_eq!(
+                    bits.code, sim.world.tables.items[it.record].code,
+                    "code of {guid}"
+                );
+            }
+            let mut h = m[..head].to_vec();
+            h[2] = head as u8;
+            h
+        })
+        .collect()
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
     let step = fx.step(&msgs);
     // Each received message is accounted once (`bridge.md` §6,
@@ -1904,7 +1940,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
-    assert_eq!(frames.last().unwrap().2, none);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
     assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
     let gold_picked = PLAYER_GOLD + amount;
     assert_eq!(fx.stat(player, GOLD), gold_picked);
@@ -2008,7 +2044,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
-    assert_eq!(frames.last().unwrap().2, pass(x9c(0x01, cg)));
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), pass(x9c(0x01, cg)));
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.room(cap), None);
     // Placed at (8, 0) of page 0 (C→S 0x18, §7.3 → §2.4): 0x9C action 4.
@@ -2023,10 +2059,11 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x18, done)]);
-    assert_eq!(frames.last().unwrap().2, pass(x9c(0x04, cg)));
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), pass(x9c(0x04, cg)));
     // The client model (`client/msg-stats-items.md` §2 rule 4): the two
-    // 0x9C made one item unit, holding the last message (the stream is
-    // empty; placement waits for the item stream spec). 0x47 / 0x48 name
+    // 0x9C made one item unit, holding the last message with its item bit
+    // stream (`items/bitstream.md`; placement from the stream is not
+    // wired in the model yet). 0x47 / 0x48 name
     // the player, which the model does not hold (no 0x59): no change.
     {
         use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM};
@@ -2045,7 +2082,14 @@ fn run_with(game_seed: u32) -> Transcript {
                     action: 4,
                     category: 0,
                     owner: None,
-                    stream: Vec::new(),
+                    stream: frames
+                        .last()
+                        .unwrap()
+                        .2
+                        .iter()
+                        .find(|m| m[0] == 0x9C)
+                        .unwrap()[8..]
+                        .to_vec(),
                 }),
                 flags4: false,
             })
@@ -2117,7 +2161,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x38, done)]);
-    assert_eq!(frames.last().unwrap().2, none);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
     let store = {
         let w = &fx.sim_ref().world;
         let rec = &w.state.vendors[w.state.vendor_index(class::AKARA).unwrap()];
@@ -2152,7 +2196,10 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
     let gold_now = gold_picked + sold;
-    assert_eq!(frames.last().unwrap().2, [tx(3, 1, cg, gold_now)]);
+    assert_eq!(
+        streams(&fx, &frames.last().unwrap().2),
+        [tx(3, 1, cg, gold_now)]
+    );
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert!(!fx.inventory().contains(&cap));
     assert!(fx.sim_ref().game.lists.unit(cap).is_none(), "freed");
@@ -2176,7 +2223,10 @@ fn run_with(game_seed: u32) -> Transcript {
         frames.last().unwrap().1.codes,
         [(0x32, Some(ResultCode::Refused))]
     );
-    assert_eq!(frames.last().unwrap().2, [tx(0, 9, u32::MAX, gold_now)]);
+    assert_eq!(
+        streams(&fx, &frames.last().unwrap().2),
+        [tx(0, 9, u32::MAX, gold_now)]
+    );
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap]);
 
@@ -2240,7 +2290,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // The next tick: no 0x15 (`docs/handoff/wire-path-server.md` §4
     // finding 1; §8 rule 3's room messages are the unit-update spec's).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames.last().unwrap().2, none);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
 
     // The run logs no error (the missile path of step 5 flies, §11).
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());

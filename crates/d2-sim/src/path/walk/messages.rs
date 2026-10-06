@@ -1,9 +1,9 @@
 // Spec: specs/sim/pathing.md §10 (messages); layouts: specs/sim/server-messages.tsv rows 0x0D, 0x0F, 0x10, 0x15, 0x96
 //! Byte builders of the S→C messages walking touches, and the choice of
 //! message in the update pass (§10 rules 2–3). Who sends them and when is
-//! the update pass's (`sim/tick.md` §6 step 5); the status routine
-//! `0x00548760` that sends 0x96 has no owner spec yet (open question 6),
-//! so only its byte layout is here.
+//! the update pass's (`sim/tick.md` §6 step 5); 0x96's sender is the
+//! client vitals sync `0x00548760` (`combat/vitals.md` §5, owner;
+//! `combat::vitals::sync`), which builds it with [`walk_verify`].
 
 use crate::path::record::DynamicPath;
 
