@@ -35,20 +35,20 @@
 |   1. Inventory model | 89–181 |
 |   2. Grid placement | 182–276 |
 |   3. Belt | 277–334 |
-|   4. Equipping | 335–512 |
-|   5. Shared checks | 513–637 |
-|   6. Deferred item messages | 638–731 |
-|   7. Intents | 732–1142 |
-|   8. Pickup from the ground | 1143–1249 |
-|   9. Drop to the ground | 1250–1297 |
-|   10. Gold | 1298–1337 |
-|   11. Message layouts | 1338–1367 |
-| Constants & data dependencies | 1368–1390 |
-| Randomness | 1391–1403 |
-| Edge cases & original bugs | 1404–1448 |
-| Test vectors | 1449–1497 |
-| Provenance | 1498–1554 |
-| Open questions | 1555–1644 |
+|   4. Equipping | 335–519 |
+|   5. Shared checks | 520–644 |
+|   6. Deferred item messages | 645–738 |
+|   7. Intents | 739–1149 |
+|   8. Pickup from the ground | 1150–1256 |
+|   9. Drop to the ground | 1257–1304 |
+|   10. Gold | 1305–1344 |
+|   11. Message layouts | 1345–1374 |
+| Constants & data dependencies | 1375–1397 |
+| Randomness | 1398–1410 |
+| Edge cases & original bugs | 1411–1455 |
+| Test vectors | 1456–1504 |
+| Provenance | 1505–1561 |
+| Open questions | 1562–1651 |
 <!-- /index -->
 
 ## Summary
@@ -509,6 +509,13 @@ Differences from §4.6: no mode test and no §4.3 (the caller's), no
 weapon-in-use update `0x006233A0`, command flag 0x200 instead of 0x8, no
 item flag 0x1, item flag 0x4000 not cleared, no inventory pass, no out
 argument.
+
+Re-read in full (handoff A6, `prop-unified-items` Q3): the steps above
+are the whole routine. Neither game nor U's inventory (unit +0x60) is
+tested for none; L is written into the skip argument's slot after step
+1. When each caller tries it: §8.1 step 5 (after §4.3), `world/vendors.md`
+§7.1.1 (buy), and `0x00562F30` (the corpse take-back of `0x0057FB70`,
+§7.1 step 2; corpse spec, not specified here).
 
 ### 5. Shared checks
 
@@ -1106,7 +1113,7 @@ without an inventory, or location ∉ 1..10 → 3 (`0x0054D141`–`0x0054D15E`);
 the hireling's item at the location must exist in mode 1 and its unlink
 must return it, else 2; unlink, slot cleared, hireling
 stat refresh `0x0055C730(merc, 0, 0)`, command flag 0x10 on it, update
-list of the hireling, hireling refresh; a **copy** (`0x0055A2A0`,
+list of the hireling, hireling refresh; a **copy** (`world/vendors.md` §7.3, `0x0055A2A0`,
 `items/generation.md` duplicate) becomes the player's cursor item
 (`0x0063C180`, then `0x0055FB10`: mode 4, command flag 0x100000 = 0x9C
 action 0x12, update list, owner refresh), the original gets item flag

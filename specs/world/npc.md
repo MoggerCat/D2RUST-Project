@@ -407,7 +407,7 @@ Gate bit clear or predicate false → refuse.
   `vendors.md` §8.2), `0x0055FE00`, inventory page 0, name restored,
   place in the inventory or drop at a free spot near the player; quest
   reward hook `0x00591790` (`quests.md`); result 6.
-- **Socket**: duplicate the input into the player (`0x0055A2A0`) and
+- **Socket**: duplicate the input into the player (`0x0055A2A0`, `vendors.md` §7.3) and
   remove the input from the cursor (`0x0055EEA0`); either fails →
   refuse. Flag 0x800; s = max sockets (`0x0062BC20`); quality 4: s :=
   roll(item seed of the duplicate, min(s, 2)) + 1 (`rng.md` §7); quality
