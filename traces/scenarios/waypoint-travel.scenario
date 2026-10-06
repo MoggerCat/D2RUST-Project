@@ -4,11 +4,12 @@ scenario 1
 name waypoint-travel
 game 1.14d
 seed 0x00001234
-map 644409375        # the test character's map ID (specs/sim/rng.md §5.4)
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
 difficulty normal
 expansion yes
 end 150
 
+char save ScnSor     # the save the original side loads (handoff §3)
 char class 1
 char area 0 1
 char at default

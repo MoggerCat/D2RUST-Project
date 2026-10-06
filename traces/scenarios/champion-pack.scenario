@@ -9,11 +9,12 @@ scenario 1
 name champion-pack
 game 1.14d
 seed 0x00001234
-map 644409375          # the test character's map ID (specs/sim/rng.md §5.4)
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
 difficulty hell
 expansion yes
 end 200
 
+char save ScnSorNinety     # the save the original side loads (handoff §3)
 char class 1
 char level 90
 char area 0 1

@@ -382,7 +382,7 @@ pub fn compare_with(
             hb.scenario_sha256.clone(),
         ),
         ("seed", ha.seed.to_string(), hb.seed.to_string()),
-        ("map", ha.map.to_string(), hb.map.to_string()),
+        ("init", ha.init.to_string(), hb.init.to_string()),
         ("end", ha.end.to_string(), hb.end.to_string()),
     ];
     for (k, x, y) in same {
@@ -501,7 +501,7 @@ mod tests {
                 scenario: "t".into(),
                 scenario_sha256: "ab".into(),
                 seed: 9,
-                map: 4,
+                init: 4,
                 end: 3,
                 streams: ["c2s", "rng", "s2c", "stats", "units"]
                     .map(String::from)
@@ -792,10 +792,19 @@ mod tests {
             v
         };
         let a = trace("original", with(Ok(Some(5))));
-        assert!(compare(&a, &trace("d2rs", with(Ok(Some(5))))).unwrap().first.is_none());
+        assert!(compare(&a, &trace("d2rs", with(Ok(Some(5)))))
+            .unwrap()
+            .first
+            .is_none());
         for other in [Ok(Some(6)), Ok(None), Err("@1".to_owned())] {
-            let d = compare(&a, &trace("d2rs", with(other))).unwrap().first.unwrap();
-            assert_eq!((d.tick, d.stream.as_str(), d.index, d.at.as_str()), (0, "spawn", 0, "spawned"));
+            let d = compare(&a, &trace("d2rs", with(other)))
+                .unwrap()
+                .first
+                .unwrap();
+            assert_eq!(
+                (d.tick, d.stream.as_str(), d.index, d.at.as_str()),
+                (0, "spawn", 0, "spawned")
+            );
         }
     }
 

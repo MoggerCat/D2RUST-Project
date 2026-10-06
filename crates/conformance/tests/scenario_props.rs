@@ -77,7 +77,7 @@ fn body() -> impl Strategy<Value = String> {
 fn script() -> impl Strategy<Value = String> {
     (
         (
-            any::<u32>(),
+            0u32..0x8000_0000,
             0usize..3,
             any::<bool>(),
             0u32..500,
@@ -113,13 +113,15 @@ fn script() -> impl Strategy<Value = String> {
                     "name prop".to_owned(),
                     "game 1.14d".to_owned(),
                     format!("seed {seed}"),
-                    format!("map {map}"),
+                    format!("init {map}"),
                     format!("difficulty {}", ["normal", "nightmare", "hell"][diff]),
                     format!("expansion {}", if exp { "yes" } else { "no" }),
                     format!("end {end}"),
                     format!("char class {class}"),
                     format!("char level {level}"),
                     "char area 0 1".to_owned(),
+                    "char save Prop_char".to_owned(),
+                    format!("char map {map}"),
                 ];
                 if let Some((x, y)) = at {
                     head.push(format!("char at {x} {y}   # a comment"));

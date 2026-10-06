@@ -27,7 +27,7 @@ use std::sync::Arc;
 
 use conformance::packets::{DispatchServer, PacketServer};
 use conformance::scenario::script::{
-    encode, spawn_position, Character, Spawn, SpawnKind, Start, StepMsg, Stream, UnitRef, World,
+    encode, spawn_position, Spawn, SpawnKind, Start, StepMsg, Stream, UnitRef, World,
 };
 use conformance::scenario::trace::{Header, Record, TraceFile};
 use conformance::scenario::Scenario;
@@ -264,13 +264,12 @@ impl World for View<'_> {
 }
 
 fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
-    let c = match &s.character {
-        Character::Save(p) => {
-            return Err(RunError::Unsupported(format!(
-                "char save {p}: no save loader yet, TODO(spec: formats/d2s.md)"
-            )))
-        }
-        Character::Inline(c) => c,
+    // The inline character; a save alone needs the loader.
+    let Some(c) = &s.character else {
+        return Err(RunError::Unsupported(format!(
+            "char save {}: no save loader yet and no inline character, TODO(spec: formats/d2s.md)",
+            s.save.as_deref().unwrap_or("")
+        )));
     };
     if (c.act, c.area) != (0, ACT1_TOWN) {
         return Err(RunError::Unsupported(format!(
@@ -287,6 +286,13 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     // map seed, the action hooks on the game seed, the creation fields, then
     // the population regions (as `GameData::world_sim`, with the
     // scenario's difficulty and expansion set before the regions).
+    // Seeds (`tools/original-hooks.md` §2 rule 1–2): the game seed starts
+    // at {T, 666} and is stepped once (`0x0052C2C6`, the step that fed
+    // the overridden +0x7C); the DRLG seed is the save's map ID when the
+    // character has one, else the init value I.
+    let mut game_seed = Seed::init_low(s.seed);
+    game_seed.step();
+    let drlg_seed = c.map.unwrap_or(s.init);
     let (drlg_data, types) = d.level_types();
     let creation = match data.kind {
         DataKind::Synthetic => ActCreation::TownOnly,
@@ -297,7 +303,7 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             drlg_data,
             &types,
             creation,
-            s.map,
+            drlg_seed,
             s.difficulty.index(),
             c.area,
         )
@@ -305,7 +311,7 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     let mut hooks = ActionHooks::new(
         Arc::new(d.action_tables().map_err(b)?),
         world,
-        Seed::init_low(s.seed),
+        game_seed,
         ScenarioSeams::default(),
     );
     hooks.anim_data = Some(Arc::new(d.anim.clone()));
@@ -325,8 +331,11 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
         hooks,
         state,
     );
-    let mut fields = GameFields::new(Seed::init_low(s.seed), s.expansion);
+    let mut fields = GameFields::new(game_seed, s.expansion);
     fields.difficulty = s.difficulty.index();
+    // Single player: 0x67 byte +0x11 = 3 → game +0x6A (original-hooks
+    // §5.2).
+    fields.game_type = 3;
     sim.create_game(&fields);
     sim.create_regions();
 
@@ -554,9 +563,12 @@ fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
     let ev = &mut sim.events;
     // The active room that holds the point.
     let room = game.lists.active_rooms(0).into_iter().find(|&r| {
-        ev.action.sys.hooks.drlg.subtiles(game, r).is_some_and(|s| {
-            x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h
-        })
+        ev.action
+            .sys
+            .hooks
+            .drlg
+            .subtiles(game, r)
+            .is_some_and(|s| x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h)
     })?;
     let class = i32::try_from(sp.class).ok()?;
     let unit = match sp.kind {
@@ -586,11 +598,24 @@ fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
                     h.monsters().entry(b).push_umod(u);
                 }
             });
-            ev.population(game, |cx| pop_spawn::boss_minions_and_init(cx, b, 3, 6, None));
+            ev.population(game, |cx| {
+                pop_spawn::boss_minions_and_init(cx, b, 3, 6, None)
+            });
             b
         }
     };
     game.lists.unit(unit).map(|e| e.guid)
+}
+
+/// The raw value of (stat, layer 0) in the unit's full stat array, 0
+/// when absent or without a list (`tools/original-hooks.md` §4 rule 3:
+/// not the unit-total reader).
+fn full_value(stats: &d2_sim::stats::StatLists, unit: UnitId, stat: i32) -> i32 {
+    stats
+        .unit_list(unit)
+        .map(|l| stats.full_entries(l))
+        .and_then(|e| e.into_iter().find(|&(k, _)| k == stat << 16))
+        .map_or(0, |(_, v)| v)
 }
 
 /// Every unit's facts from the sim: act and path position.
@@ -662,7 +687,10 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                     Ok((x, y)) => {
                         let g = spawn(&mut server.game, sp, x, y);
                         if g.is_none() {
-                            notes.push(format!("tick {t} step {i}: spawn of {} placed nothing", sp.class));
+                            notes.push(format!(
+                                "tick {t} step {i}: spawn of {} placed nothing",
+                                sp.class
+                            ));
                         }
                         Ok(g)
                     }
@@ -767,8 +795,8 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                             .map_or(0, |u| u.mode),
                         x,
                         y,
-                        life: stats.unit_total(id, 6, 0),
-                        mana: stats.unit_total(id, 8, 0),
+                        life: full_value(stats, id, 6),
+                        mana: full_value(stats, id, 8),
                     });
                 }
             }
@@ -818,7 +846,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                 scenario: s.name.clone(),
                 scenario_sha256: s.sha256(),
                 seed: s.seed,
-                map: s.map,
+                init: s.init,
                 end: s.end,
                 streams,
                 gaps,

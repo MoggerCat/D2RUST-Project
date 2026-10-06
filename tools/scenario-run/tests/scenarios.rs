@@ -93,7 +93,7 @@ fn every_starter_runs_twice_identically() {
         let c2s = a
             .records
             .iter()
-            .filter(|r| matches!(r, Record::C2s { .. }))
+            .filter(|r| matches!(r, Record::C2s { .. } | Record::Spawn { .. }))
             .count();
         assert_eq!(c2s, s.steps.len(), "{stem}");
         let snap: std::collections::BTreeSet<u32> = a
@@ -151,7 +151,8 @@ fn perturb(r: &mut Record) -> bool {
             let k = b.len() - 1;
             b[k] ^= 0x01;
         }
-        Record::C2s { bytes: Err(u), .. } => u.push('x'),
+        Record::C2s { bytes: Err(u), .. } | Record::Spawn { guid: Err(u), .. } => u.push('x'),
+        Record::Spawn { guid: Ok(g), .. } => *g = g.map_or(Some(0), |g| Some(g ^ 1)),
         Record::Rng { after, .. } => after[1] ^= 1,
         Record::Draw { before, .. } => before[0] ^= 1,
         Record::Unit { life, .. } => *life += 1,
@@ -212,8 +213,17 @@ fn champion_pack() -> Scenario {
 #[test]
 fn a_spawned_champion_pack_is_recorded() {
     let t = trace_of(&champion_pack(), data());
-    let spawned: Vec<&Record> = t.records.iter().filter(|r| matches!(r, Record::Spawn { .. })).collect();
-    let [Record::Spawn { t: 5, i: 0, guid: Ok(Some(leader)) }] = spawned.as_slice() else {
+    let spawned: Vec<&Record> = t
+        .records
+        .iter()
+        .filter(|r| matches!(r, Record::Spawn { .. }))
+        .collect();
+    let [Record::Spawn {
+        t: 5,
+        i: 0,
+        guid: Ok(Some(leader)),
+    }] = spawned.as_slice()
+    else {
         panic!("{spawned:?}")
     };
     // The leader and its 1–3 minions are monsters of class 1 at the next
@@ -222,7 +232,13 @@ fn a_spawned_champion_pack_is_recorded() {
         .records
         .iter()
         .filter_map(|r| match r {
-            Record::Unit { t: 10, ty: 1, class: 1, guid, .. } => Some(*guid),
+            Record::Unit {
+                t: 10,
+                ty: 1,
+                class: 1,
+                guid,
+                ..
+            } => Some(*guid),
             _ => None,
         })
         .collect();
@@ -230,7 +246,11 @@ fn a_spawned_champion_pack_is_recorded() {
     assert!((2..=4).contains(&pack.len()), "{pack:?}");
     // The spawn drew from the game seed before the drain of tick 5.
     let rng5 = t.records.iter().find_map(|r| match r {
-        Record::Rng { t: 5, before, after } => Some((*before, *after)),
+        Record::Rng {
+            t: 5,
+            before,
+            after,
+        } => Some((*before, *after)),
         _ => None,
     });
     let (before, after) = rng5.expect("rng at tick 5");
@@ -242,8 +262,8 @@ fn a_spawned_champion_pack_is_recorded() {
 #[test]
 fn what_the_runner_cannot_run_is_an_error() {
     let base =
-        "scenario 1\nname x\ngame 1.14d\nseed 1\nmap 2\ndifficulty normal\nexpansion yes\nend 1\n";
-    let s = Scenario::parse(&format!("{base}char save some.d2s\n")).unwrap();
+        "scenario 1\nname x\ngame 1.14d\nseed 1\ninit 2\ndifficulty normal\nexpansion yes\nend 1\n";
+    let s = Scenario::parse(&format!("{base}char save Some_char\n")).unwrap();
     assert!(matches!(run(&s, data()), Err(RunError::Unsupported(m)) if m.contains("d2s")));
     let s = Scenario::parse(&format!("{base}char class 1\nchar area 0 3\n")).unwrap();
     assert!(matches!(run(&s, data()), Err(RunError::Unsupported(_))));

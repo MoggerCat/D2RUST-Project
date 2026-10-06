@@ -160,7 +160,7 @@ Header (`k` = `"header"`):
 | `data` | string | what the game ran on: `"1.14d"` (original), `"live"` or `"synthetic"` (d2rs) |
 | `scenario` | string | the script's `name` |
 | `scenario_sha256` | string | SHA-256 (hex) of the script's canonical text (`scenario.md` §2 rule 6) |
-| `seed`, `map`, `end` | int | the script's `seed`, `map` and `end` |
+| `seed`, `init`, `end` | int | the script's `seed`, `init` and `end` |
 | `streams` | array of strings | streams this trace holds, sorted: `c2s` always; `s2c`, `rng`, `rng-draws`, `units`, `stats`, `frames` as produced |
 | `gaps` | array of strings | what this runner could not apply or record (`scenario.md` §4); empty when none |
 

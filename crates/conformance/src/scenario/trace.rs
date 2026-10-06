@@ -31,7 +31,7 @@ pub struct Header {
     pub scenario: String,
     pub scenario_sha256: String,
     pub seed: u32,
-    pub map: u32,
+    pub init: u32,
     pub end: u32,
     /// Sorted, unique.
     pub streams: Vec<String>,
@@ -216,7 +216,11 @@ impl Record {
                         Err(u.as_str().ok_or("unresolved: not a string")?.to_owned()),
                         "unresolved",
                     ),
-                    _ => return Err("spawn needs exactly one of guid, failed: true, unresolved".into()),
+                    _ => {
+                        return Err(
+                            "spawn needs exactly one of guid, failed: true, unresolved".into()
+                        )
+                    }
                 };
                 let keys: &[&str] = match key {
                     "guid" => &["k", "t", "i", "guid"],
@@ -379,7 +383,7 @@ impl Header {
             "scenario": self.scenario,
             "scenario_sha256": self.scenario_sha256,
             "seed": self.seed,
-            "map": self.map,
+            "init": self.init,
             "end": self.end,
             "streams": self.streams,
             "gaps": self.gaps,
@@ -440,7 +444,7 @@ impl Header {
             "scenario",
             "scenario_sha256",
             "seed",
-            "map",
+            "init",
             "end",
             "streams",
             "gaps",
@@ -455,7 +459,7 @@ impl Header {
             scenario: r.str("scenario")?,
             scenario_sha256: r.str("scenario_sha256")?,
             seed: r.u32("seed")?,
-            map: r.u32("map")?,
+            init: r.u32("init")?,
             end: r.u32("end")?,
             streams,
             gaps: strings("gaps")?,
@@ -553,7 +557,7 @@ mod tests {
                 scenario: "t".into(),
                 scenario_sha256: "00".into(),
                 seed: 1,
-                map: 7,
+                init: 7,
                 end: 2,
                 streams: vec!["c2s".into(), "rng".into(), "s2c".into(), "units".into()],
                 gaps: vec![],

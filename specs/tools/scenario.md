@@ -24,15 +24,15 @@
 | Outputs / state changes | 63–69 |
 | Rules | 70–71 |
 |   1. Files | 72–81 |
-|   2. Script syntax | 82–169 |
-|   3. Typed messages and references | 170–225 |
-|   4. Run model | 226–277 |
-|   5. Comparison | 278–308 |
-|   6. Masks | 309–329 |
-| Edge cases & original bugs | 330–341 |
-| Test vectors | 342–357 |
-| Provenance | 358–367 |
-| Open questions | 368–391 |
+|   2. Script syntax | 82–175 |
+|   3. Typed messages and references | 176–231 |
+|   4. Run model | 232–290 |
+|   5. Comparison | 291–321 |
+|   6. Masks | 322–342 |
+| Edge cases & original bugs | 343–354 |
+| Test vectors | 355–370 |
+| Provenance | 371–380 |
+| Open questions | 381–397 |
 <!-- /index -->
 
 ## Summary
@@ -110,20 +110,26 @@ Header (each line once, all required):
 |---|---|
 | `name <name>` | as §1 rule 1 |
 | `game 1.14d` | only value accepted |
-| `seed <u32>` | the game seed: game +0xD0 = `init_low(seed)` at game creation, in place of the time value (`sim/rng.md` §5.2; §4 rule 1) |
-| `map <u32>` | the character's map ID: the DRLG seed of every act, `init_low(map)` (`sim/rng.md` §5.4) |
+| `seed <0..2^31−1>` | T: the time value of game creation, in place of the clock's (`tools/original-hooks.md` §2 rule 1; §4 rule 1) |
+| `init <u32>` | I: the init value written to game +0x7C (original-hooks §2 rule 1); the DRLG seed unless the character has a map ID (§4 rule 1) |
 | `difficulty normal\|nightmare\|hell` | game difficulty |
 | `expansion yes\|no` | LoD game |
 | `end <tick>` | last tick run, 0 ≤ tick ≤ 1,000,000 |
 
-Character: either `char save <path>` (a save file, path relative to
-the game directory; exclusive with every other `char` line) or inline:
+Character: `char save <name>` and/or inline `char` lines; at least
+one. `<name>` is a character name (2–15 letters, `_` or `-`, starting
+with a letter): the save `<save dir><name>.d2s` the original side loads
+(original-hooks §5.3–§5.4). Inline lines describe the same character
+for a runner without a save loader (d2rs, until `formats/d2s.md`
+exists); that they match the save is the script author's claim, which
+a run checks only through the comparison.
 
 | Line | Once | Default | Meaning |
 |---|---|---|---|
 | `char class <0..6>` | yes | required | character class (charstats row) |
 | `char level <1..99>` | yes | 1 | character level: stat 12 only (experience is `char stat 13`) |
 | `char area <act 0..4> <level id>` | yes | required | the level the character starts in |
+| `char map <u32>` | yes | none | the save's map ID (`.d2s` +0xAB) when it applies (original-hooks §2: the save has reached the difficulty) |
 | `char at default` / `char at <x> <y>` | yes | `default` | start position in sub-tiles (absolute); `default`: where the game puts a character entering `area` (§4 rule 3) |
 | `char stat <stat id> <i32>` | per id | — | base value (layer 0) of an itemstatcost row, set after creation; overrides the creation value |
 | `char skill <skill id> <1..255>` | per id | — | hard skill points |
@@ -228,15 +234,21 @@ Steps:
 Both runners follow these rules; a runner that cannot follow one says
 so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 
-1. **Game.** A single-player game created with `difficulty` and
-   `expansion`, one client, the scenario's character joined in `area`.
-   The game seed is `init_low(seed)` (1.14d takes it from the clock,
-   `sim/rng.md` §5.2: the original-side runner overrides it, open
-   question 1); every seed game creation derives from it follows
-   (§5.2: regions, objects, NPCs, quests, then units). Each act's DRLG
-   seed is `init_low(map)` (§5.4).
-2. **Ticks.** Tick 0 is the first server tick after the character's
-   client is in the game (open question 2). For each tick t = 0 …
+1. **Game.** A single-player game (game type +0x6A = 3,
+   original-hooks §5.2) created with `difficulty` and `expansion`, one
+   client (id 0), the scenario's character joined in `area`. The game
+   seed is `{seed, 666}`, then stepped once (`0x0052C2C6`); game +0x7C
+   is `init` (original-hooks §2 rule 1: the original-side runner sets
+   both at `0x0052C2BB` and `0x0052C2E3`). Every seed game creation
+   derives from the game seed follows (`sim/rng.md` §5.2). Each act's
+   DRLG seed is `init_low` of `char map` when given, else of `init`
+   (original-hooks §2 rule 2).
+2. **Ticks.** Tick 0 is the first server tick after the tick in which
+   client 0 first reaches state 4 (in game; original-hooks §1 rule 5,
+   §3 rule 2): on 1.14d the frame F0 + 1, where F0 is that tick's
+   frame (game +0xA8); tick t is frame F0 + 1 + t. Steps of tick t are
+   injected at the first stop at `0x0044F136` after the return of
+   frame F0 + t (original-hooks §3 rule 1). For each tick t = 0 …
    `end`, in order: (a) resolve the steps of tick t and inject them,
    in script order, at the net send (`sim/intents-events.md` §2.1
    rules 3–4: the classifier and the server queues apply), after the
@@ -246,7 +258,7 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    (c) the tick (`sim/tick.md` §3); (d) the records of tick t.
 3. **Start position.** `char at default` is the position the game
    gives a character entering `area` (`drlg/levels.md` §10; open
-   question 3). d2rs does not place a joining character yet and stands
+   question 1). d2rs does not place a joining character yet and stands
    it 5 sub-tiles right of and below the area's first waypoint object
    (`test-fixtures` staging), and writes that as a gap.
 4. **c2s.** Every message step of tick t, in order: its bytes as
@@ -261,9 +273,10 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    them and do not list `rng-draws` in `streams`.
 7. **units.** At a snapshot tick, after (c): every unit of the game's
    unit lists, ordered by (unit type, GUID): type, GUID, class, mode,
-   position (§3 rule 4), life and mana (stats 6 and 8, layer 0, the
-   unit's stat value as stored, fixed point × 256; 0 for a unit
-   without a stat list).
+   position (§3 rule 4), life and mana (stats 6 and 8, layer 0: the
+   raw value in the unit's full stat array, fixed point × 256, not the
+   unit-total reader; 0 when absent or without a stat list;
+   original-hooks §4 rule 3).
 8. **stats.** At a snapshot tick, after (c): for each player unit, the
    base entries of its stat list (stat, layer, value), ordered by
    (stat, layer).
@@ -279,7 +292,7 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 
 1. **Same scenario.** The two headers must agree on `format`,
    `version`, `game_version`, `scenario`, `scenario_sha256`, `seed`,
-   `map` and `end`, and both traces must end with their `end` record; otherwise
+   `init` and `end`, and both traces must end with their `end` record; otherwise
    the comparison is an error, not a divergence.
 2. **Streams.** `c2s` is always compared. A stream the scenario
    records is compared when both headers list it in `streams`;
@@ -367,24 +380,17 @@ All synthetic (CI): `tools/scenario-run/tests/`,
 
 ## Open questions
 
-Questions for the spec writer on the Windows PC (the original-side
-runner needs them; `docs/handoff/scenario-harness.md` §4 has the full
-list with what each answer must state):
+Answered by `tools/original-hooks.md` (on `claude/specs-staging`):
+seed override and DRLG seed (§2), tick 0 and the injection stop (§1
+rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
 
-1. Where to override the game seed (`0x0052C280`, `sim/rng.md` §5.2)
-   with `init_low(seed)` before its first derived draw, and where the
-   joining character's map ID is read (`.d2s` 0xAB, §5.4) so a runner
-   can set `map`.
-2. Which tick is tick 0: the first server tick after the joining
-   client's state becomes "in game"; how to detect it on 1.14d.
-3. Where 1.14d places a character entering a level (`levels.md` §10),
-   so `char at default` means the same on both sides.
-4. Game type +0x6A of a single-player game (d2rs creates it with 0;
-   `GameFields::game_type` notes 3).
-5. Whether `dwInitSeed` (game +0x7C, `sim/rng.md` §5.2) reaches any
-   outcome in single player (d2rs does not model it).
-6. The conventions of the §3.1 spawn calls outside room population and
+1. Where 1.14d places a character entering a level (`levels.md` §10),
+   so `char at default` means the same on both sides (a save loads at
+   its town start; `char at <x> <y>` needs a placement write).
+2. The conventions of the §3.1 spawn calls outside room population and
    the monster data field of the umod list (handoff §4 Q12–Q14).
-7. How a joining character gets items of a given quality, affixes,
+3. How a joining character gets items of a given quality, affixes,
    unique / set / runeword id and sockets, and quest flags (handoff §4
    Q3), for the original side and for `char save`.
+4. The base stat array of an extended stat list (for `stats` records;
+   original-hooks §4 gives the full array only).

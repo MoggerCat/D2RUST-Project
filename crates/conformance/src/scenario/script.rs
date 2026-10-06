@@ -215,13 +215,9 @@ pub struct Inline {
     /// (quest index, quest flags) on the game's difficulty, unique.
     pub quests: Vec<(u8, u16)>,
     pub items: Vec<Item>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Character {
-    /// `char save <path>`.
-    Save(String),
-    Inline(Inline),
+    /// The save's map ID (`.d2s` +0xAB), when the character has one
+    /// for this difficulty: the DRLG seed in place of `init` (§4 rule 1).
+    pub map: Option<u32>,
 }
 
 /// A reference (§3 rule 3).
@@ -306,14 +302,18 @@ pub struct Step {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Scenario {
     pub name: String,
-    /// The game seed's `init_low` value (`sim/rng.md` §5.2).
+    /// The time value T of game creation (< 2^31; `tools/original-hooks.md`
+    /// §2 rule 1): the game seed starts at `{T, 666}`.
     pub seed: u32,
-    /// The character's map ID: the DRLG seed (`sim/rng.md` §5.4).
-    pub map: u32,
+    /// The init value I written to game +0x7C (original-hooks §2 rule 1).
+    pub init: u32,
     pub difficulty: Difficulty,
     pub expansion: bool,
     pub end: u32,
-    pub character: Character,
+    /// `char save <name>`: the save the original side loads.
+    pub save: Option<String>,
+    /// The inline character (what d2rs builds until a save loader exists).
+    pub character: Option<Inline>,
     /// Sorted, unique.
     pub record: Vec<Stream>,
     pub snapshot_every: Option<u32>,
@@ -353,19 +353,25 @@ impl Scenario {
         line(format!("name {}", self.name));
         line("game 1.14d".into());
         line(format!("seed 0x{:08x}", self.seed));
-        line(format!("map 0x{:08x}", self.map));
+        line(format!("init 0x{:08x}", self.init));
         line(format!("difficulty {}", self.difficulty.name()));
         line(format!(
             "expansion {}",
             if self.expansion { "yes" } else { "no" }
         ));
         line(format!("end {}", self.end));
+        if let Some(n) = &self.save {
+            line(format!("char save {n}"));
+        }
         match &self.character {
-            Character::Save(p) => line(format!("char save {p}")),
-            Character::Inline(c) => {
+            None => {}
+            Some(c) => {
                 line(format!("char class {}", c.class));
                 line(format!("char level {}", c.level));
                 line(format!("char area {} {}", c.act, c.area));
+                if let Some(m) = c.map {
+                    line(format!("char map 0x{m:08x}"));
+                }
                 line(match c.at {
                     Start::Default => "char at default".into(),
                     Start::At(x, y) => format!("char at {x} {y}"),
@@ -404,7 +410,11 @@ impl Scenario {
                     for v in &i.suffixes {
                         let _ = write!(l, " suffix {v}");
                     }
-                    for (k, v) in [("unique", i.unique), ("set", i.set), ("runeword", i.runeword)] {
+                    for (k, v) in [
+                        ("unique", i.unique),
+                        ("set", i.set),
+                        ("runeword", i.runeword),
+                    ] {
                         if let Some(v) = v {
                             let _ = write!(l, " {k} {v}");
                         }
@@ -686,7 +696,8 @@ struct Parser {
     name: Option<String>,
     game: bool,
     seed: Option<u32>,
-    map: Option<u32>,
+    init: Option<u32>,
+    char_map: Option<u32>,
     difficulty: Option<Difficulty>,
     expansion: Option<bool>,
     end: Option<u32>,
@@ -861,11 +872,15 @@ impl Parser {
             }
             "seed" => {
                 want(1)?;
-                once(&mut self.seed, num(rest[0])?, "seed")
+                once(
+                    &mut self.seed,
+                    ranged(rest[0], 0, 0x7FFF_FFFF, "seed")?,
+                    "seed",
+                )
             }
-            "map" => {
+            "init" => {
                 want(1)?;
-                once(&mut self.map, num(rest[0])?, "map")
+                once(&mut self.init, num(rest[0])?, "init")
             }
             "difficulty" => {
                 want(1)?;
@@ -979,13 +994,24 @@ impl Parser {
             return Err("`char` needs a field".into());
         };
         if kw == "save" {
-            if args.len() != 1 {
-                return Err("`char save <path>`".into());
+            let [name] = args else {
+                return Err("`char save <name>`".into());
+            };
+            let ok = name.len() >= 2
+                && name.len() <= 15
+                && name.as_bytes()[0].is_ascii_alphabetic()
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphabetic() || b == b'_' || b == b'-');
+            if !ok {
+                return Err(format!(
+                    "save {name:?}: a character name, 2-15 letters, `_` or `-`, starting with a letter"
+                ));
             }
             if self.save.is_some() {
                 return Err("`char save` given twice".into());
             }
-            self.save = Some(args[0].to_owned());
+            self.save = Some((*name).to_owned());
             return Ok(());
         }
         self.inline_lines.get_or_insert(line);
@@ -1014,6 +1040,10 @@ impl Parser {
             "level" => {
                 want(1)?;
                 once(&mut self.level, ranged(args[0], 1, 99, "level")?, "level")
+            }
+            "map" => {
+                want(1)?;
+                once(&mut self.char_map, num(args[0])?, "map")
             }
             "area" => {
                 want(2)?;
@@ -1062,7 +1092,8 @@ impl Parser {
                 if self.quests.iter().any(|e| e.0 == q) {
                     return Err(format!("quest {q} given twice"));
                 }
-                self.quests.push((q, ranged(args[1], 0, 0xFFFF, "quest flags")?));
+                self.quests
+                    .push((q, ranged(args[1], 0, 0xFFFF, "quest flags")?));
                 Ok(())
             }
             "item" => {
@@ -1090,21 +1121,20 @@ impl Parser {
             return Err(missing("game"));
         }
         let seed = self.seed.ok_or_else(|| missing("seed"))?;
-        let map = self.map.ok_or_else(|| missing("map"))?;
+        let init = self.init.ok_or_else(|| missing("init"))?;
         let difficulty = self.difficulty.ok_or_else(|| missing("difficulty"))?;
         let expansion = self.expansion.ok_or_else(|| missing("expansion"))?;
         let end = self.end.ok_or_else(|| missing("end"))?;
-        let character = match (self.save, self.inline_lines) {
-            (Some(_), Some(line)) => {
-                return Err(ScriptError {
-                    line,
-                    message: "`char save` excludes inline character lines".into(),
-                })
+        let character = match (self.inline_lines, self.save.is_some()) {
+            (None, false) => {
+                return Err(whole(
+                    "no character: `char save` or inline `char` lines".into(),
+                ))
             }
-            (Some(p), None) => Character::Save(p),
-            (None, _) => {
+            (None, true) => None,
+            (Some(_), _) => {
                 let (act, area) = self.area.ok_or_else(|| missing("char area"))?;
-                Character::Inline(Inline {
+                Some(Inline {
                     class: self.class.ok_or_else(|| missing("char class"))?,
                     level: self.level.unwrap_or(1),
                     act,
@@ -1115,6 +1145,7 @@ impl Parser {
                     waypoints: self.waypoints,
                     quests: self.quests,
                     items: self.items,
+                    map: self.char_map,
                 })
             }
         };
@@ -1142,10 +1173,11 @@ impl Parser {
         Ok(Scenario {
             name,
             seed,
-            map,
+            init,
             difficulty,
             expansion,
             end,
+            save: self.save,
             character,
             record,
             snapshot_every: self.every,
@@ -1249,7 +1281,9 @@ fn spawn(toks: &[&str]) -> Result<StepMsg, String> {
     let kind = SpawnKind::ALL
         .into_iter()
         .find(|k| k.name() == *kind)
-        .ok_or_else(|| format!("unknown spawn kind {kind:?}: normal, random-boss, champion or unique"))?;
+        .ok_or_else(|| {
+            format!("unknown spawn kind {kind:?}: normal, random-boss, champion or unique")
+        })?;
     let umods = match rest {
         [] => Vec::new(),
         ["umod", ids @ ..] if !ids.is_empty() => ids
@@ -1345,7 +1379,7 @@ mod tests {
         }
     }
 
-    const BASE: &str = "scenario 1\nname t\ngame 1.14d\nseed 1\nmap 2\ndifficulty normal\nexpansion yes\nend 10\nchar class 1\nchar area 0 1\n";
+    const BASE: &str = "scenario 1\nname t\ngame 1.14d\nseed 1\ninit 2\ndifficulty normal\nexpansion yes\nend 10\nchar class 1\nchar area 0 1\n";
 
     fn steps(extra: &str) -> Result<Scenario, ScriptError> {
         Scenario::parse(&format!("{BASE}{extra}"))
@@ -1448,7 +1482,12 @@ mod tests {
         let e = steps("snapshot every 5\n").unwrap_err();
         assert!(e.message.contains("need `units` or `stats`"), "{e}");
         let e = steps("char save x.d2s\n").unwrap_err();
-        assert!(e.message.contains("excludes"), "{e}");
+        assert!(e.message.contains("character name"), "{e}");
+        let s = steps("char save Scn_Sor\n").unwrap();
+        assert_eq!(s.save.as_deref(), Some("Scn_Sor"));
+        assert!(s.character.is_some());
+        let e = Scenario::parse("scenario 1\nname t\ngame 1.14d\nseed 0x80000000\n").unwrap_err();
+        assert!(e.message.contains("seed"), "{e}");
     }
 
     // Covers: specs/tools/scenario.md §3.1 r1, §3.1 r2, §3.1 r3
@@ -1471,22 +1510,26 @@ mod tests {
             text.contains("char item 7cr body 4 quality normal runeword 42 sockets 2\n"),
             "{text}"
         );
-        assert!(text.contains("at 1 spawn 19 @x+10 @y champion umod 16\n"), "{text}");
+        assert!(
+            text.contains("at 1 spawn 19 @x+10 @y champion umod 16\n"),
+            "{text}"
+        );
         let StepMsg::Spawn(sp) = &s.steps[0].msg else {
             panic!()
         };
         assert_eq!(spawn_position(sp, &W), Ok((110, 200)));
         assert!(encode(&s.steps[0].msg, &W).is_err());
-        let Character::Inline(c) = &s.character else {
-            panic!()
-        };
+        let c = s.character.as_ref().unwrap();
         assert_eq!(c.quests, [(3, 0x1001)]);
         assert_eq!(c.items[1].place, Place::Socket(0));
         for (bad, needle) in [
             ("at 1 spawn 19 1 2 champion\n", "one for champion"),
             ("at 1 spawn 19 1 2 normal umod 3\n", "none for normal"),
             ("at 1 spawn 19 1 2 elite\n", "unknown spawn kind"),
-            ("char item rin1 inv 0 0 prefix 3\n", "magic, rare or crafted"),
+            (
+                "char item rin1 inv 0 0 prefix 3\n",
+                "magic, rare or crafted",
+            ),
             ("char item rin1 inv 0 0 quality unique\n", "go together"),
             ("char item 7cr inv 0 0 runeword 3\n", "needs `sockets`"),
             ("char item ber socket 0\n", "earlier item"),
