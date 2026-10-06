@@ -27,13 +27,13 @@
 |   4. Setting and reading seeds | 127–143 |
 |   5. Where seeds come from | 144–214 |
 |   6. Inlined draws | 215–235 |
-|   7. Which systems draw from which seed | 236–260 |
-| Constants & data dependencies | 261–271 |
-| Randomness | 272–276 |
-| Edge cases & original bugs | 277–289 |
-| Test vectors | 290–338 |
-| Provenance | 339–371 |
-| Open questions | 372–386 |
+|   7. Which systems draw from which seed | 236–261 |
+| Constants & data dependencies | 262–272 |
+| Randomness | 273–277 |
+| Edge cases & original bugs | 278–290 |
+| Test vectors | 291–339 |
+| Provenance | 340–372 |
+| Open questions | 373–387 |
 <!-- /index -->
 
 ## Summary
@@ -244,6 +244,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | ambient spawns, spawn positions | active room seed | `0x0054F060`, `0x005B2A00` |
 | region monster lists | monster-region seed | `0x005475E0`, `0x005BDB20` (sim-0004) |
 | AI decisions (largest group: 314 inline sites) | monster's unit seed | `0x005E0490`, `0x005E6320`, `0x005F1800` |
+| client position resync lock (C→S 0x5F, `sim/pathing.md` §1.6) | player's unit seed | `0x0054CC40` |
 | combat: damage, crit, deadly strike | attacker or defender unit seed | `0x0057B7D0`, `0x0057D760`, `0x0057DD60`, `0x0064A850` |
 | skills | caster's unit seed | `0x005BE3F0`–`0x005DFBF0` |
 | unique monster names | unit seed | `0x00653ED0`–`0x00653F50` |
