@@ -316,3 +316,287 @@ fn fill_event_needs_events() {
     fill(&mut f, &s, &c, a, d, &mut rec, false, 128);
     assert_eq!(f.log, ["event 3 1 0"]);
 }
+
+// §3.1 step 11: a monster attacker sends event 3 only when it is a
+// hireling.
+#[test]
+fn fill_event_monster_needs_hireling() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Monster, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    fill_flags(&mut f, a, d, 0);
+    assert!(f.log.is_empty(), "{:?}", f.log);
+    f.units[a].hireling = true;
+    fill_flags(&mut f, a, d, 0);
+    assert_eq!(f.log, ["event 3 1 0"]);
+}
+
+/// Fills a player's record with physical 1000 preset (hit flag 1),
+/// conversion `elem` at 50 %.
+fn convert(f: &mut Fake, a: usize, d: usize, elem: i8) -> DamageRecord {
+    let (s, c) = (st(), ct());
+    let mut rec = DamageRecord {
+        hit_flags: hitflag::SKIP_PHYSICAL,
+        physical: 1000,
+        conv_elem: elem,
+        conv_pct: 50,
+        ..DamageRecord::default()
+    };
+    fill(f, &s, &c, a, d, &mut rec, false, 128);
+    rec
+}
+
+// §3.1 step 12: conversion only when +0x65 > 0; c = 500 goes to the
+// element's field; poison gets c / 8; burn and freeze set their length
+// to at least 50.
+#[test]
+fn fill_conversion_elements() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    let r = convert(&mut f, a, d, 0);
+    assert_eq!(r.physical, 1000);
+    let r = convert(&mut f, a, d, 1);
+    assert_eq!((r.physical, r.fire), (500, 500));
+    let r = convert(&mut f, a, d, 2);
+    assert_eq!((r.physical, r.lightning), (500, 500));
+    let r = convert(&mut f, a, d, 3);
+    assert_eq!((r.physical, r.magic), (500, 500));
+    let r = convert(&mut f, a, d, 5);
+    assert_eq!((r.physical, r.poison, r.poison_len), (500, 62, 50));
+    let r = convert(&mut f, a, d, 11);
+    assert_eq!((r.physical, r.fire, r.burn_len), (500, 500, 50));
+    let r = convert(&mut f, a, d, 12);
+    assert_eq!((r.physical, r.cold, r.freeze_len), (500, 500, 50));
+    for e in 6..=9 {
+        let r = convert(&mut f, a, d, e);
+        assert_eq!(
+            (r.physical, r.fire, r.lightning, r.magic, r.cold, r.poison),
+            (500, 0, 0, 0, 0, 0),
+            "{e}"
+        );
+    }
+}
+
+// §3.1 step 12: element 10 is `roll(5) + 1` on the attacker seed, drawn
+// after the burn roll(1). roll(5) = 1 → lightning.
+#[test]
+fn fill_conversion_random_element() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    let seed = (1u32..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|&s| stepped(s, 1).step() % 5 == 1)
+        .unwrap();
+    f.units[a].seed = seed;
+    let r = convert(&mut f, a, d, 10);
+    assert_eq!((r.fire, r.lightning), (0, 500));
+    assert_eq!(f.units[a].seed, stepped(seed, 2));
+}
+
+// §3.1 step 13: the monster crit draws only when `Crit ≠ 0` and doubles
+// on `r < Crit`. Draws: burn roll(1), then the crit step.
+#[test]
+fn fill_monster_crit_threshold() {
+    let (seed, r) = crit_seed();
+    let s = st();
+    for (crit, doubled, draws) in [(0, false, 1), (r, false, 2), (r + 1, true, 2)] {
+        let mut m = monster_rec();
+        m.crit = crit as u8;
+        let c = combat_tables(vec![m]);
+        let mut f = world();
+        let a = f.add(FUnit::new(UnitType::Monster, 0));
+        let d = f.add(FUnit::new(UnitType::Player, 0));
+        f.units[a].seed = seed;
+        let mut rec = DamageRecord {
+            hit_flags: hitflag::SKIP_PHYSICAL,
+            physical: 1000,
+            ..DamageRecord::default()
+        };
+        fill(&mut f, &s, &c, a, d, &mut rec, false, 128);
+        let want = if doubled { 2000 } else { 1000 };
+        assert_eq!(rec.physical, want, "crit {crit}");
+        assert_eq!(f.units[a].seed, stepped(seed, draws), "crit {crit}");
+    }
+}
+
+// ---------------------------------------------------------------- §3
+
+/// `start_combat` with a preset record (hit flags `hf`, result `res`,
+/// physical `phys`) from `a` on `d`.
+fn start(f: &mut Fake, a: usize, d: usize, hf: u32, res: u16, phys: i32) -> DamageRecord {
+    let (s, c) = (st(), ct());
+    let mut rec = DamageRecord {
+        hit_flags: hf,
+        result: res,
+        physical: phys,
+        ..DamageRecord::default()
+    };
+    start_combat(f, &s, &c, Some(a), Some(d), &mut rec, 128);
+    rec
+}
+
+// Step 2: no roll when the result has dodge, avoid, evade or weapon
+// block (mask 0x8380).
+#[test]
+fn start_combat_avoided_results() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(6, 1));
+    let r = start(&mut f, a, d, 0, result::HIT, 0x1_0000);
+    assert_ne!(r.hit_flags & hitflag::ROLLED, 0);
+    assert_ne!(r.result & result::WILL_DIE, 0);
+    for flag in [
+        result::DODGE,
+        result::AVOID,
+        result::EVADE,
+        result::WEAPON_BLOCK,
+    ] {
+        let r = start(&mut f, a, d, 0, result::HIT | flag, 0x1_0000);
+        assert_eq!(r.hit_flags & hitflag::ROLLED, 0, "{flag:#x}");
+        assert_eq!(r.result & result::WILL_DIE, 0, "{flag:#x}");
+    }
+}
+
+// Step 2.3: the comparison drops the low byte of both sides and is
+// strict; a monster attacker adds its life leech.
+#[test]
+fn start_combat_will_die_compare() {
+    let mut f = world();
+    let p = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(6, 0x1C0));
+    let hf = hitflag::SKIP_ROLL;
+    // 0x180 & ~0xFF = 0x100 = 0x1C0 & ~0xFF: not greater.
+    let r = start(&mut f, p, d, hf, result::HIT, 0x180);
+    assert_eq!(r.result & result::WILL_DIE, 0);
+    let r = start(&mut f, p, d, hf, result::HIT, 0x200);
+    assert_ne!(r.result & result::WILL_DIE, 0);
+    // Life leech counts for a monster attacker only.
+    let m = f.add(FUnit::new(UnitType::Monster, 0));
+    let pd = f.add(FUnit::new(UnitType::Player, 0).with(6, 0x100));
+    let (s, c) = (st(), ct());
+    for (a, dies) in [(m, true), (p, false)] {
+        let mut rec = DamageRecord {
+            hit_flags: hf,
+            result: result::HIT,
+            life_leech: 0x200,
+            ..DamageRecord::default()
+        };
+        start_combat(&mut f, &s, &c, Some(a), Some(pd), &mut rec, 128);
+        assert_eq!(rec.result & result::WILL_DIE != 0, dies, "{a}");
+    }
+}
+
+// ---------------------------------------------------------------- §4
+
+// §4.2: the first matching row wins.
+#[test]
+fn damage_percent_rows() {
+    let c = ct();
+    let mut f = world();
+    let p = f.add(FUnit::new(UnitType::Player, 0));
+    let mut hire = FUnit::new(UnitType::Monster, 0);
+    hire.hireling = true;
+    let h = f.add(hire);
+    let m = f.add(FUnit::new(UnitType::Monster, 0));
+    let mut b = FUnit::new(UnitType::Monster, 0);
+    b.boss = true;
+    let boss = f.add(b);
+    assert_eq!(damage_percent(&f, &c, Some(h), p), 17);
+    assert_eq!(damage_percent(&f, &c, Some(m), p), 100);
+    assert_eq!(damage_percent(&f, &c, Some(h), boss), 50);
+    assert_eq!(damage_percent(&f, &c, Some(m), boss), 100);
+    assert_eq!(damage_percent(&f, &c, Some(p), boss), 100);
+}
+
+/// `totals` of `rec` from `a` on `d`.
+fn totals_of(f: &mut Fake, a: usize, d: usize, rec: DamageRecord) -> DamageRecord {
+    let c = ct();
+    let mut rec = rec;
+    totals(f, &c, Some(a), d, &mut rec);
+    rec
+}
+
+fn fire(v: i32) -> DamageRecord {
+    DamageRecord {
+        fire: v,
+        ..DamageRecord::default()
+    }
+}
+
+// §4.1: magic damage reduction is pierced only when the pierce percent
+// is > 0: 5 << 8 = 1280 × 512 / 1024 = 640.
+#[test]
+fn totals_magic_dr_pierce() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(35, 5));
+    let r = totals_of(
+        &mut f,
+        a,
+        d,
+        DamageRecord {
+            pierce_pct: 512,
+            ..fire(2560)
+        },
+    );
+    assert_eq!(r.fire, 1920);
+    let r = totals_of(&mut f, a, d, fire(2560));
+    assert_eq!(r.fire, 1280);
+}
+
+// §4.5 step 2: a monster at 100 % is not pierced (`r < 100`).
+#[test]
+fn resist_monster_immunity_not_pierced() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(333, 20));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(39, 100));
+    assert_eq!(totals_of(&mut f, a, d, fire(1000)).fire, 0);
+    f.set(d, 39, 99);
+    // 99 − 20 = 79: 1000 × 21 / 100.
+    assert_eq!(totals_of(&mut f, a, d, fire(1000)).fire, 210);
+}
+
+// §4.5 step 3: classic game, difficulty 1 → −20, difficulty 2 → −50.
+#[test]
+fn resist_classic_penalty() {
+    let mut f = world();
+    f.expansion = false;
+    let a = f.add(FUnit::new(UnitType::Monster, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0).with(39, 60));
+    f.difficulty = 1;
+    assert_eq!(totals_of(&mut f, a, d, fire(1000)).fire, 600);
+    f.difficulty = 2;
+    assert_eq!(totals_of(&mut f, a, d, fire(1000)).fire, 900);
+}
+
+// §4.5 step 4: the cap applies to `r > 0` only; r = 0 stays 0 even with
+// a max stat below −75.
+#[test]
+fn resist_cap_only_positive() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Monster, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0).with(40, -100));
+    assert_eq!(totals_of(&mut f, a, d, fire(1000)).fire, 1000);
+}
+
+// §4.5 step 4: sanctuary zeroes the physical resist (stat 36) of an
+// undead defender only.
+#[test]
+fn resist_sanctuary() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    f.units[a].states.push(47);
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(36, 50).with(39, 50));
+    let rec = DamageRecord {
+        physical: 1000,
+        fire: 1000,
+        ..DamageRecord::default()
+    };
+    let r = totals_of(&mut f, a, d, rec);
+    assert_eq!((r.physical, r.fire), (500, 500));
+    f.units[d].undead = true;
+    let r = totals_of(&mut f, a, d, rec);
+    assert_eq!((r.physical, r.fire), (1000, 500));
+}
