@@ -244,11 +244,15 @@ fn forward_pending(flag: bool) {
             (),
             "send_item_stat 1:55 58 59".to_string()
         );
-        fwd!(
-            d.item_bits(60, 61, 62),
-            a.bits,
-            "item_bits 60 61 62".to_string()
-        );
+        // The item bit stream is the desk's own (`items/bitstream.md`,
+        // `wiring::inventory::bits`): the rest is not asked, and a GUID
+        // without an item unit has no stream.
+        {
+            let before = d.rest.last();
+            assert_eq!(d.item_bits(60, 61, 62), Vec::<u8>::new());
+            assert_eq!(d.rest.last(), before, "item_bits is not forwarded");
+            let _ = &a.bits;
+        }
         fwd!(
             d.store_messages(m, 63),
             a.msgs,

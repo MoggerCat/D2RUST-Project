@@ -206,5 +206,11 @@ fn pickup_position_follows_the_grid_record() {
     let (cut, d1, m1) = run(t);
     assert_eq!(base, (9, 3));
     assert_eq!(cut, (8, 3));
-    assert_eq!((d0, m0), (d1, m1));
+    assert_eq!(d0, d1);
+    // The 0x9C item stream carries the grid x (`bitstream.md` §4.1 rule
+    // 3: 4 bits at stream bit 49, message bit 113): 9 → 8 flips its bit
+    // 0, byte 14 bit 1; nothing else differs.
+    let mut m1 = m1;
+    m1[0][14] ^= 0x02;
+    assert_eq!(m0, m1);
 }
