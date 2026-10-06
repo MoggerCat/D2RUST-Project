@@ -12,8 +12,8 @@
   before a tick and flushed after it contain); `sim/unit-order.md` (the
   unit, room and client lists this spec iterates, GUIDs); `sim/rng.md`
   (the generator; draws happen inside the steps below, in this order);
-  unit, monster, missile, object and item specs (Phase 3, not written)
-  own what each timer event does.
+  `sim/units.md` (who schedules each timer event and what it does;
+  AI, skill, missile, object and item internals in their later specs).
 
 <!-- index -->
 | Section | Lines |
@@ -26,16 +26,16 @@
 |   2. Frame counter | 118–131 |
 |   3. Tick steps in order | 132–162 |
 |   4. Room pass (step 3) | 163–185 |
-|   5. Timer events (step 4) | 186–355 |
-|   6. Client pass (step 5) | 356–385 |
-|   7. Periodic steps, summary | 386–395 |
-|   8. Wall-clock and host-only parts | 396–408 |
-| Constants & data dependencies | 409–422 |
-| Randomness | 423–430 |
-| Edge cases & original bugs | 431–448 |
-| Test vectors | 449–499 |
-| Provenance | 500–524 |
-| Open questions | 525–540 |
+|   5. Timer events (step 4) | 186–338 |
+|   6. Client pass (step 5) | 339–368 |
+|   7. Periodic steps, summary | 369–378 |
+|   8. Wall-clock and host-only parts | 379–391 |
+| Constants & data dependencies | 392–405 |
+| Randomness | 406–413 |
+| Edge cases & original bugs | 414–431 |
+| Test vectors | 432–517 |
+| Provenance | 518–542 |
+| Open questions | 543–559 |
 <!-- /index -->
 
 ## Summary
@@ -314,44 +314,27 @@ Consequences (all follow from the rules; reproduce them):
 | object | `0x00586AD0` | table `0x006E19B0` by type (no null check) |
 | item | `0x00562DA0` | table `0x006E117C` by type (no null check) |
 
-Handlers present (non-null) in 1.14d:
-
-| Type | D2MOO name | Player | Monster |
-|---|---|---|---|
-| 0 | MODECHANGE | `0x005811D0` | `0x005A7BA0` |
-| 1 | ENDANIM | `0x00581020` | `0x005A7BE0` |
-| 2 | AITHINK | — | `0x005B1740` |
-| 3 | STATREGEN | `0x00580810` | `0x005A6920` |
-| 4 | TRAP | — | — |
-| 5 | ACTIVESTATE / RESET | `0x0056D790` | `0x0056D790` |
-| 6 | FREEHOVER | `0x00580B70` | `0x005A7F00` |
-| 7 | MONUMOD / QUESTFN | — | `0x005A4370` |
-| 8 | PERIODICSKILLS | `0x0056FCB0` | `0x0056FCB0` |
-| 9 | PERIODICSTATS | `0x0056FE40` | `0x0056FE40` |
-| 10 | AIRESET | — | `0x005A7F70` |
-| 11 | DELAYEDPORTAL | `0x00580BE0` | — |
-| 12 | REMOVESTATE | `0x00580800` | `0x005A7EF0` |
-| 13 | UPDATETRADE / REFRESHVENDOR | `0x005689D0` | — |
-| 14 | REMOVESKILLCOOLDOWN | — | — |
-
-What each handler does belongs to the unit, monster, missile, object and
-item specs. Names are D2MOO's (1.10f); the 1.14d tables have the same
-null pattern as D2MOO's player table.
+Event type names (D2MOO, 1.10f): 0 MODECHANGE, 1 ENDANIM, 2 AITHINK,
+3 STATREGEN, 4 TRAP, 5 ACTIVESTATE, 6 FREEHOVER, 7 MONUMOD / QUESTFN,
+8 PERIODICSKILLS, 9 PERIODICSTATS, 10 AIRESET, 11 DELAYEDPORTAL,
+12 REMOVESTATE, 13 UPDATETRADE, 14 REMOVESKILLCOOLDOWN. The handler of
+each (class, type) and what it does: `units.md` §5–§6 and
+`unit-handlers.tsv`.
 
 #### 5.7 Where the usual "update" work happens
 
-| Work | Mechanism |
-|---|---|
-| walking, running, knockback (players, monsters) | every-tick type-0 event scheduled by `0x00553F00` while the unit is in a moving mode |
-| animation frames, attack/cast action frames, mode end | timed type-0 events at the action frames and a type-1 event at the end frame (D2MOO `SUNIT` mode setup) |
-| missile flight, collision, hits, expiry | the missile's every-tick event (server-do function) |
-| monster AI | timed type-2 events |
-| life/mana/stamina regeneration | type-3 events |
-| state expiry | type-12 events |
+Owned by `units.md`; confirmed on the recordings by `check_units.py`
+(rules U1–U10):
 
-These attributions are D2MOO-derived (1.10f) and consistent with the
-1.14d tables above; each unit spec must confirm its own with a trace
-(open question 3).
+| Work | Mechanism | Owner |
+|---|---|---|
+| walking, running, knockback (players, monsters) | every-tick event 0 | `units.md` §4.4–§4.6 |
+| animation action frames, mode end | timed events 0 and event 1 from the animation | `units.md` §4.2 |
+| missile flight, collision, hits, expiry | the missile's every-tick event 0 | `units.md` §6.3 |
+| monster AI | event 2 | `units.md` §4.6, §6.2 |
+| life regeneration | event 3 (players every frame) | `units.md` §6.1, §6.2 |
+| object and item timers | events 0–11 (objects), 3 and 12 (items) | `units.md` §6.4, §6.5 |
+| state expiry, periodic skills and stats | events 5, 8, 9, 12 | `sim/stat-lists.md` (scheduling: `units.md` §6) |
 
 ### 6. Client pass (step 5)
 
@@ -493,9 +476,44 @@ expire, arg1, arg2)` equal the ones `d2-sim` produces from the same start
 state and the same messages. Until `d2-sim` has units, the recorded run
 is checked against a model of §5 (`tools/trace-recorder/check_tick.py`:
 it replays every recorded schedule and cancel in order and must predict
-every recorded execution and nothing else). The committed format-1
-trace (`tick-0001`) is written by a converter once `d2-sim` can replay a
-game; a combat-heavy recording is queued (`docs/HANDOFF.md` §5).
+every recorded execution and nothing else).
+
+**Trace sim/tick (format 1).** `traces/sim/tick/sim-0006`, `-0007`,
+`-0008` are the three recordings above (frames 1–4901, 1–1572,
+1–4632; a tick cut by the time limit is dropped), written by
+`tools/trace-recorder/convert_tick.py`. CI runs `convert_tick.py --check
+traces/sim/tick/*.json`: it rebuilds a recording from each trace, replays
+it through the `check_tick.py` model (0 errors on all three) and converts
+it back to the same trace; `--perturb-run N` and `--perturb-lists N` are
+reported at exactly the changed event (M08). `setup`: `start_frame` 0,
+`frames` (complete ticks), `source`, `game_args`, `snap_every`. Every
+event has `tick` = the frame it belongs to and `data.seq` (one count
+1..N over `inputs` and `expected` together: the recorded order) and
+`data.step`: `pre` (before step 1: message handling, and the snapshot)
+or the §3 step it happened in (`env`, `rooms`, `events`, `clients`,
+`updq`, `dels`, `quests`, `deact`, `inactive`, `items`). Ids: unit =
+`[type, GUID]`; timer = its schedule number (1, 2, … in `timer_set`
+order); room = `R<n>`, n = activation number; act = index 0–4; client =
+join number.
+
+| Kind | Array | `data` |
+|---|---|---|
+| `timer_set` | inputs | `timer`, `type`, `unit`, `req` (requested expire; −1 = every-tick, §5.3), `expire` (after §5.2 rule 3), `a1`, `a2`; `cb` (1.14d callback address, informational) only when not null |
+| `timer_cancel` | inputs | `timer`, `deferred` (cancelled while executing, §5.4 rule 1) |
+| `timer_run` | expected | `timer`; class, list, type, unit, expire and args are those of its `timer_set` (the converter checks every recorded run against them) |
+| `hash_add`, `hash_remove` | inputs | `unit` (+ `class_id` on add); `unit-order.md` §2 |
+| `room_add`, `room_remove` | inputs | `unit` (+ `room` on add); §5 |
+| `queue_add`, `queue_remove` | inputs | `unit` (+ `room` on add); §6 |
+| `queue_clear` | inputs | `room`: a clear outside step 6 (none recorded). Step 6's clears are not stored: they are exactly §3 step 6 (acts with the pending-update flag, set by `queue_add`, in act order; every active room in list order), which held in all 11,105 recorded ticks |
+| `room_activate`, `room_deactivate` | inputs | `room`, `act`; §4 |
+| `lists` | expected | state at the start of the tick (step `pre`), at frame 1 and every `snap_every` frames: `hash` {type: [[bucket, [GUID…]]]}, `tiles` [GUID], `acts` (5 × null or [{`room`, `units`, `queue`, `adj`}], `adj` = room ids, `?` for an inactive one), `clients` [id] |
+
+Replay (timer queue and lists without unit behaviour): walk both arrays
+merged by `seq`; apply each input; at the `events` step, drive the §5.5
+iterator: before each `timer_run`, apply the inputs with a smaller `seq`,
+then the iterator's next timer must be that run's; after the tick's last
+`events` input the iterator must be exhausted. Each `lists` event must
+equal the implementation's lists (`unit-order.md`, Test vectors).
 
 ## Provenance
 
@@ -529,8 +547,9 @@ game; a combat-heavy recording is queued (`docs/HANDOFF.md` §5).
 2. Timers without a unit (edge case 3): does any 1.14d path schedule one?
    Search callers of `0x005417D0` / `0x00541800` passing unit 0. None in
    the recordings.
-3. §5.7 attributions per unit kind (D2MOO-derived): each unit spec
-   confirms its events with a trace.
+3. Settled for the observed combinations by `units.md` (U1–U10 on the
+   three recordings); per-site confirmation needs a `record_tick.py`
+   0.2.0 recording (`units.md` open question 1).
 4. Room deactivation counter (`0x0061A790`, room +0x0C, forced 0 when room
    +0x78 ≠ 0): what increments it (DRLG / room lifecycle spec).
 5. Does the character save every 8192 frames write the `.d2s` in single
