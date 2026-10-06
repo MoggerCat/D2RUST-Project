@@ -1673,6 +1673,19 @@ incl. 1,580 missile, 186 snapshots) and melee `...-021854-tick.jsonl`:
 
 ### A. Needs the player (record_*.py, Windows, `game/`)
 
+**Draw order 2 (`impl-draw-order-2`, 2026-10-06;
+`docs/handoff/impl-draw-order-2.md`).** (1) `weather-0001`: Rogue
+Encampment in rain, record two frames with the player seed per frame and
+the three weather pools (`capture.md` §3.4 + pools); compare pass 4 / 9
+pixels and count the player-seed draws per frame against the drawn water
+floors (`draw-order-2.md` §11.5: one `roll_range(0, 1000)` each). Also
+note whether splashes appear while int(intensity) is 0 (question W5).
+(2) Walk past the walls of a `Logicals` preset room (Crypt / Mausoleum,
+levels 18, 19) with the frame lists recorded: the group-mode fade
+(`draw-order.md` §8, OQ6) on pixels. (3) Arcane Sanctuary and Arreat
+Summit captures with `[0x00712C4C]` / `[0x00712C50]` recorded
+(`draw-order-2.md` §12).
+
 **RT-R1 (fifth fold, `wire-routing` §7 check 2):** a recording of a unique
 monster with a mode-1 umod dying (e.g. fire enchanted, umod 9), group A:
 `record_tick.py` with the timer hooks. Look for the type-7 timer's frame
@@ -1994,6 +2007,14 @@ ones, but they need `traces/raw/`, so local):
   killed **0** of the 149 `d2-sim` mutant survivors today.
 
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**`impl-draw-order-2` questions** (owner `render/draw-order-2.md`, also
+`unit-composite.md`): W1–W7 (weather state, snow spawn draws, snow line
+table, colour ramps, the intensity scale vs observed splashes, flash /
+particle order, initial values), §12 seed width / star tick / palette /
+summit build order, §14 extents and edge-floor keys, §16 missing grid
+cell and r1 stop cell; listed in `docs/handoff/impl-draw-order-2.md`
+"Questions for the spec owner".
 
 **From the 2026-10-06 captures:** the cursor
 draw call and its animation counter (owner `render/capture.md` /
