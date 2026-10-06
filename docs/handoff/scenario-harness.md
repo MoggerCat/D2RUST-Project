@@ -263,4 +263,11 @@ the comparator reports it not compared when the original has it).
 
 ## 8. Gate
 
-See the commit message of this branch's last commit for the gate result.
+`sh tools/gate.sh` (nextest, after `tools/cloud-setup.sh`): every step
+passes except the tests already red on the base, owned by other
+sessions (this branch changes no d2-sim or d2-client code):
+`d2-sim monsters::ai::tests::implemented_matches_catalogue`,
+`missiles::tests_bodies::bodies_match_catalogue_status`,
+`missiles::tests_bodies::bodies_check_catches_perturbations`,
+`d2-client scene::gaps_numbered_tests::world_is_skipped_in_open_mode_3_and_the_ui_still_drawn`.
+No new failure.
