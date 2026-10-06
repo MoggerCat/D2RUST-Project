@@ -253,7 +253,6 @@ fn host(s: &Setup) -> Host {
         t.combat.charstats[0].runvelocity = 9;
         let ex = usize::from(t.combat.monstats[0].monstatsex);
         t.combat.monstats2[ex].sizex = s.monster_size;
-        h.x.populate = true;
     }
     let (_, drlg_rooms) = fx.generate(ISLE).expect("ISLE");
     let rooms = fx.stream(&drlg_rooms).expect("streamed");

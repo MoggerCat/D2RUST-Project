@@ -6,6 +6,7 @@ use super::ds1::unit_type;
 use super::map::{style, sub};
 use super::{PresetCtx, PresetError, PresetUnit, Presets};
 use crate::drlg::level::Drlg;
+use crate::drlg::logic::LogicGrids;
 use crate::drlg::tiles::{CellGrid, GridPass, RoomGrids};
 use crate::drlg::{DrlgRoomId, SUBTILES};
 
@@ -40,8 +41,10 @@ impl Presets {
     /// the map's units inside the room to the room's list, and (level 17,
     /// once) collect tombstones. No draws.
     ///
-    /// `Logicals` (§10) is not part of [`RoomGrids`]: the logical
-    /// coordinate lists are not modelled by the tile code.
+    /// With lvlprest `Logicals` ≠ 0 (§10), [`RoomGrids::logicals`] carries
+    /// wall layer 0's orientation grid, floor layer 0 and wall layer 0 for
+    /// the logical-room build (`levels.md` §11.2 step 1); an absent layer
+    /// is an empty (zero) grid.
     pub fn room_grids(
         &mut self,
         drlg: &Drlg,
@@ -135,8 +138,22 @@ impl Presets {
                 fill_blanks: false,
             });
         }
+        let logicals = if def.logicals != 0 {
+            let first = |layers: &[Vec<u32>]| match layers.first() {
+                Some(l) => cut(l),
+                None => Ok(CellGrid::new(gw, gh)),
+            };
+            Some(LogicGrids {
+                orientation: first(&file.orientations)?,
+                floor: first(&file.floors)?,
+                wall: first(&file.walls)?,
+            })
+        } else {
+            None
+        };
         let kill = def.kill_edge != 0;
         let grids = RoomGrids {
+            logicals,
             kill_edge_x: kill && rect.x + rect.w == m_rect.x + m_rect.w,
             kill_edge_y: kill && rect.y + rect.h == m_rect.y + m_rect.h,
             animate: def.animate != 0,

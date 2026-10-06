@@ -148,23 +148,22 @@ fn preset_monster_is_created_through_monster_init() {
 /// Monsters with their positions and seeds.
 type Spawned = Vec<(UnitId, (i32, i32), Seed)>;
 
-/// A room population run (§3) on room A with one coordinate rectangle
-/// covering it; the monsters, the region's spawned and rooms-with-spawns
-/// counts.
+/// A room population run (§3) on room A, whose real coordinate list is
+/// one record covering it (`levels.md` §11.2 step 2); the monsters, the
+/// region's spawned and rooms-with-spawns counts.
 fn populate() -> (Spawned, i32, i32) {
     let mut fx = Fx::new(isle_ds1s());
     let (a, _) = isle(&mut fx);
-    let x = &mut fx.sim.action.sys.hooks.x;
-    x.populate = true;
-    x.room_count = 1;
-    x.coords.insert(
-        a,
-        vec![CoordRect {
-            rect: [8000, 8000, 8008, 8008],
-            node_flag: 0,
-            index: 1,
-        }],
-    );
+    fx.sim.host(&mut fx.game, |h| {
+        assert_eq!(
+            h.coord_list(a),
+            [CoordRect {
+                rect: [8000, 8000, 8008, 8008],
+                node_flag: 0,
+                index: 1,
+            }]
+        );
+    });
     fx.sim.create_regions();
     fx.sim
         .population(&mut fx.game, |cx| room::populate_room(cx, a));

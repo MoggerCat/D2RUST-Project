@@ -86,44 +86,15 @@ pub enum WorldgenError {
 }
 
 /// Seams of population and init whose provider is not written or not
-/// implemented yet (DRLG coordinate lists, warp points, objects, quests,
-/// owner data, alignment). Every default is the narrowest reading:
+/// implemented yet (objects, quests, owner data, alignment; the free
+/// point without the path provider). The DRLG data population reads are
+/// answered by the act DRLG (`drlg/levels.md` §11.6, [`population`]). Every default is the narrowest reading:
 /// nothing happens, or the value that makes the caller do nothing. A host
 /// (or a test) overrides what it can provide.
 #[allow(unused_variables)]
 pub trait WorldPending: Pending {
-    // ---- DRLG data population reads; not in the DRLG specs -------------
+    // ---- path provider ---------------------------------------------------
 
-    /// `0x0061A1F0`: level id of the populated room (0 = none).
-    /// `level` is the room's level id.
-    fn populated_level(&self, room: RoomId, level: i32) -> i32 {
-        0
-    }
-    /// `0x0061ABF0(act, level)`: the level's populated-room count.
-    fn populated_room_count(&self, act: u8, level: i32) -> i32 {
-        0
-    }
-    /// `0x0061AD50`: the room's coordinate records (D2MOO
-    /// `D2RoomCoordListStrc`), in `next` order.
-    fn coord_list(&self, room: RoomId) -> Vec<CoordRect> {
-        Vec::new()
-    }
-    /// `0x0061AD30(room, x, y)`.
-    fn coord_at(&self, room: RoomId, x: i32, y: i32) -> Option<CoordRect> {
-        None
-    }
-    /// `0x0061B130`.
-    fn coord_index_at(&self, room: RoomId, x: i32, y: i32) -> i32 {
-        0
-    }
-    /// `0x0061AC10`: the room's warp points (subtiles).
-    fn warp_points(&self, room: RoomId) -> Vec<(i32, i32)> {
-        Vec::new()
-    }
-    /// The level's spawn location of `kind` (tiles) for the room's level.
-    fn spawn_location(&self, room: RoomId, kind: u8) -> Option<(i32, i32)> {
-        None
-    }
     /// `0x0064E840`: the nearest free point.
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
         None

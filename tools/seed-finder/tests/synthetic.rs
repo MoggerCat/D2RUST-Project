@@ -1,21 +1,15 @@
 // Spec: specs/drlg/levels.md §3–§5; specs/monsters/population.md §2.1, §3; specs/monsters/init.md; specs/sim/tick.md §4 (the seed finder on synthetic data)
-//! The seed finder on the synthetic install (`test_fixtures`), in CI.
-//! The live host has no coordinate-list provider, so room population
-//! (`population.md` §3) places nothing there; these tests give the
-//! search a host whose coordinate list is one record covering each
-//! streamed room (index 1), the fake the worldgen tests use, so packs,
-//! champions and uniques appear and depend on the seed.
+//! The seed finder on the synthetic install (`test_fixtures`), in CI, on
+//! the live host (`test_fixtures::game::Seams`): room population
+//! (`population.md` §3) reads the act DRLG's coordinate lists and
+//! population queries (`levels.md` §11.6), so packs, champions and
+//! uniques appear and depend on the seed.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use d2_sim::monsters::population::CoordRect;
-use d2_sim::units::RoomId;
-use d2_sim::wiring::action::Pending;
-use d2_sim::wiring::worldgen::WorldPending;
 use seed_finder::query::{parse_args, Kind, Query};
-use seed_finder::world::{FinderHost, Prepared, StreamedRoom};
+use seed_finder::world::Prepared;
 use seed_finder::{check_seed, describe, search, Outcome};
 use test_fixtures::game::{ActCreation, GameData, Seams};
 use test_fixtures::{install, synth};
@@ -45,54 +39,6 @@ fn prepared() -> &'static Prepared {
     })
 }
 
-/// Coordinate lists: one record per streamed room, its whole rectangle.
-#[derive(Default)]
-struct Coords {
-    rooms: BTreeMap<RoomId, (i32, CoordRect)>,
-}
-
-impl Pending for Coords {}
-
-impl WorldPending for Coords {
-    fn populated_level(&self, room: RoomId, _: i32) -> i32 {
-        self.rooms.get(&room).map_or(0, |r| r.0)
-    }
-    fn populated_room_count(&self, _: u8, _: i32) -> i32 {
-        self.rooms.len() as i32
-    }
-    fn coord_list(&self, room: RoomId) -> Vec<CoordRect> {
-        self.rooms.get(&room).map(|r| vec![r.1]).unwrap_or_default()
-    }
-    fn coord_at(&self, room: RoomId, x: i32, y: i32) -> Option<CoordRect> {
-        let c = self.rooms.get(&room)?.1;
-        let [l, t, r, b] = c.subtiles();
-        (l <= x && x < r && t <= y && y < b).then_some(c)
-    }
-    fn coord_index_at(&self, room: RoomId, x: i32, y: i32) -> i32 {
-        self.coord_at(room, x, y).map_or(0, |c| c.index)
-    }
-}
-
-impl FinderHost for Coords {
-    const ROOM_POPULATION: bool = true;
-    fn rooms_streamed(&mut self, rooms: &[StreamedRoom]) {
-        for r in rooms {
-            let t = r.rect;
-            self.rooms.insert(
-                r.room,
-                (
-                    r.level as i32,
-                    CoordRect {
-                        rect: [t.x, t.y, t.x + t.w, t.y + t.h],
-                        node_flag: 0,
-                        index: 1,
-                    },
-                ),
-            );
-        }
-    }
-}
-
 fn query(args: &str) -> Query {
     let a: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
     parse_args(&a).unwrap_or_else(|e| panic!("{e}")).query
@@ -112,7 +58,7 @@ fn seeds(o: &Outcome) -> Vec<u32> {
 #[test]
 fn known_seed_matches_and_others_do_not() {
     let q = query(&format!("{NEAR} --threads 4"));
-    let o = search(prepared(), &q, Coords::default).unwrap();
+    let o = search(prepared(), &q, Seams::default).unwrap();
     assert_eq!(o.unsupported, None);
     assert_eq!(o.checked, 100);
     assert_eq!(seeds(&o), [NEAR_SEED]);
@@ -130,7 +76,7 @@ fn known_seed_matches_and_others_do_not() {
 
     // Without the distance every unique seed matches.
     let q = query("--level 2 --seeds 1-100 --monster kind=unique --threads 3");
-    let o = search(prepared(), &q, Coords::default).unwrap();
+    let o = search(prepared(), &q, Seams::default).unwrap();
     assert_eq!(seeds(&o), UNIQUE_SEEDS);
 }
 
@@ -143,18 +89,18 @@ fn perturbed_queries_lose_the_match() {
     let p = prepared();
     let q = query("--level 2 --from 1 --seeds 1-100 --monster kind=unique --near entrance:1");
     assert_eq!(
-        seeds(&search(p, &q, Coords::default).unwrap()),
+        seeds(&search(p, &q, Seams::default).unwrap()),
         [] as [u32; 0]
     );
     for fixed in ["--init-seed 7", "--game-seed 7"] {
         let q = query(&format!("{NEAR} {fixed}"));
-        let o = search(p, &q, Coords::default).unwrap();
+        let o = search(p, &q, Seams::default).unwrap();
         assert!(!seeds(&o).contains(&NEAR_SEED), "{fixed}");
         assert_eq!(o.checked, 100);
     }
     let q = query("--level 2 --seeds 1-100 --monster kind=unique,count=2");
     assert_eq!(
-        seeds(&search(p, &q, Coords::default).unwrap()),
+        seeds(&search(p, &q, Seams::default).unwrap()),
         [] as [u32; 0]
     );
 }
@@ -164,8 +110,8 @@ fn same_seed_same_result_twice() {
     let p = prepared();
     let q = query("--level 2 --from 1");
     for seed in 1..=40 {
-        let a = check_seed(p, &q, seed, Coords::default()).unwrap();
-        let b = check_seed(p, &q, seed, Coords::default()).unwrap();
+        let a = check_seed(p, &q, seed, Seams::default()).unwrap();
+        let b = check_seed(p, &q, seed, Seams::default()).unwrap();
         assert_eq!(a, b, "seed {seed}");
     }
     // Thread count does not change the outcome.
@@ -174,15 +120,15 @@ fn same_seed_same_result_twice() {
         threads: 8,
         ..q1.clone()
     };
-    let a = search(p, &q1, Coords::default).unwrap();
-    assert_eq!(a, search(p, &q8, Coords::default).unwrap());
+    let a = search(p, &q1, Seams::default).unwrap();
+    assert_eq!(a, search(p, &q8, Seams::default).unwrap());
     assert!(!a.hits.is_empty());
 }
 
 #[test]
 fn limit_keeps_the_lowest_seeds() {
     let q = query("--level 2 --seeds 1-100 --monster kind=unique --limit 2 --threads 4");
-    let o = search(prepared(), &q, Coords::default).unwrap();
+    let o = search(prepared(), &q, Seams::default).unwrap();
     assert_eq!(seeds(&o), UNIQUE_SEEDS[..2]);
     assert_eq!(o.checked, UNIQUE_SEEDS[1]);
 }
@@ -193,13 +139,13 @@ fn a_level_d2rs_cannot_build_is_unsupported() {
     // lvlmaze-backed generator on this data: the first seed stops the
     // search.
     let q = query("--level 3 --seeds 5-50 --threads 2");
-    let o = search(prepared(), &q, Coords::default).unwrap();
+    let o = search(prepared(), &q, Seams::default).unwrap();
     assert!(o.hits.is_empty());
     let (seed, e) = o.unsupported.expect("unsupported");
     assert_eq!(seed, 5);
     assert!(e.contains("LevelType"), "{e}");
     // A level without a levels.txt row.
-    let e = check_seed(prepared(), &query("--level 99"), 1, Coords::default()).unwrap_err();
+    let e = check_seed(prepared(), &query("--level 99"), 1, Seams::default()).unwrap_err();
     assert!(e.to_string().contains("no levels.txt row"), "{e}");
 }
 
