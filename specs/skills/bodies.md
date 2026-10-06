@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 1590–1638 |
 | Test vectors | 1639–1659 |
 | Provenance | 1660–1686 |
-| Open questions | 1687–1713 |
+| Open questions | 1687–1715 |
 <!-- /index -->
 
 ## Summary
@@ -1710,3 +1710,5 @@ per ring, n per Multiple Shot) takes one game-seed step
    `sim/pets.md` from 1.14d and link §3.3 and §6.2 to it.
 9. Recording: Raise a Druid summon and a Clay Golem: confirm stats 12,
    31, 19, 7, 6 on the summon (§6.4, §6.5) and the AI think at F + 25.
+
+Batch 3 (the 85 slots used by one class skill, Constants "count 1") is in `skills/bodies-2.md`.
