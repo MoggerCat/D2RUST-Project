@@ -9,7 +9,15 @@
 //!
 //! Struct field names: the layout name; `type` → `type_`; an unnamed
 //! field → `f<offset>`; a name used twice in one layout → `<name>_<offset>`
-//! for each use (offsets in decimal).
+//! for each use (offsets in decimal; a packed field uses its bit offset).
+//!
+//! `bits:` layouts (S→C, [`FieldType::Packed`]) get a typed struct too:
+//! fields read and written with [`crate::schema::packed_get`] /
+//! [`crate::schema::packed_put`]. Their bits start at bit 0 of byte 0, so
+//! an `id:8` field at bit 0 is the message id: the struct leaves it out
+//! (decode checks it, encode writes it, as for every typed message). A
+//! `bits:` layout with any other field over bits 0..8 gets no struct (the
+//! id byte cannot hold a free value).
 
 use std::fmt::Write;
 
@@ -74,6 +82,9 @@ fn field_type(t: FieldType) -> String {
         FieldType::Bits(n) => format!("FieldType::Bits({n})"),
         FieldType::Bit(n) => format!("FieldType::Bit({n})"),
         FieldType::Tail => "FieldType::Tail".into(),
+        FieldType::Packed { bit, width } => {
+            format!("FieldType::Packed {{ bit: {bit}, width: {width} }}")
+        }
     }
 }
 
@@ -109,6 +120,9 @@ fn rust_type(t: FieldType) -> &'static str {
         FieldType::Bits(n) if n <= 16 => "u16",
         FieldType::Bits(_) => "u32",
         FieldType::Bit(_) => "bool",
+        FieldType::Packed { width, .. } if width <= 8 => "u8",
+        FieldType::Packed { width, .. } if width <= 16 => "u16",
+        FieldType::Packed { .. } => "u32",
         FieldType::Cstr | FieldType::Tail => unreachable!("not a fixed field"),
     }
 }
@@ -118,7 +132,7 @@ fn idents(fields: &[Field]) -> Vec<String> {
     fields
         .iter()
         .map(|f| {
-            let off = f.offset.expect("fixed field");
+            let off = key(f);
             if f.name.is_empty() {
                 format!("f{off}")
             } else if fields.iter().filter(|g| g.name == f.name).count() > 1 {
@@ -132,13 +146,34 @@ fn idents(fields: &[Field]) -> Vec<String> {
         .collect()
 }
 
-/// Whether a row gets a typed struct; its fixed size if so.
-fn typed(name: &str, size: &SizeRule, fields: &[Field]) -> Option<usize> {
+/// Byte offset of a fixed field, bit offset of a packed one.
+fn key(f: &Field) -> u16 {
+    match f.ty {
+        FieldType::Packed { bit, .. } => bit,
+        _ => f.offset.expect("fixed field"),
+    }
+}
+
+/// The `id:8` field of a `bits:` layout (module doc).
+fn is_packed_id(f: &Field) -> bool {
+    f.name == "id" && f.ty == (FieldType::Packed { bit: 0, width: 8 })
+}
+
+/// Whether a row gets a typed struct: its fixed size and struct fields if
+/// so.
+fn typed<'a>(name: &str, size: &SizeRule, fields: &[Field<'a>]) -> Option<(usize, Vec<Field<'a>>)> {
     let n = size.fixed()?;
-    let fixed = fields
+    let fixed = fields.iter().all(|f| match f.ty {
+        FieldType::Packed { bit, .. } => bit >= 8 || is_packed_id(f),
+        FieldType::Cstr | FieldType::Tail => false,
+        _ => f.offset.is_some(),
+    });
+    let own: Vec<Field> = fields
         .iter()
-        .all(|f| f.offset.is_some() && !matches!(f.ty, FieldType::Cstr | FieldType::Tail));
-    (name != "-" && fixed && (!fields.is_empty() || n == 1)).then_some(n)
+        .filter(|f| !is_packed_id(f))
+        .copied()
+        .collect();
+    (name != "-" && fixed && (!fields.is_empty() || n == 1)).then_some((n, own))
 }
 
 fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fields: &[Field]) {
@@ -151,12 +186,11 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
     } else {
         let _ = writeln!(out, "    pub struct {name} {{");
         for (f, ident) in fields.iter().zip(&ids) {
-            let _ = writeln!(
-                out,
-                "        /// `{}` at {}.",
-                field_type_word(f.ty),
-                f.offset.expect("fixed field")
-            );
+            let at = match f.ty {
+                FieldType::Packed { bit, .. } => format!("bit {bit}"),
+                _ => key(f).to_string(),
+            };
+            let _ = writeln!(out, "        /// `{}` at {at}.", field_type_word(f.ty));
             let _ = writeln!(out, "        pub {ident}: {},", rust_type(f.ty));
         }
         out.push_str("    }\n");
@@ -171,7 +205,7 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
     } else {
         out.push_str("            Ok(Self {\n");
         for (f, ident) in fields.iter().zip(&ids) {
-            let o = f.offset.expect("fixed field");
+            let o = key(f);
             let expr = match f.ty {
                 FieldType::U8 => format!("u8_at(b, {o})"),
                 FieldType::U16 => format!("u16_at(b, {o})"),
@@ -182,6 +216,13 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
                 }
                 FieldType::Bits(n) => format!("bits_at(b, {o}, {n})"),
                 FieldType::Bit(n) => format!("bit_at(b, {o}, {n})"),
+                FieldType::Packed { width, .. } if width <= 16 => format!(
+                    "crate::schema::packed_get(b, {o}, {width}) as {}",
+                    rust_type(f.ty)
+                ),
+                FieldType::Packed { width, .. } => {
+                    format!("crate::schema::packed_get(b, {o}, {width})")
+                }
                 FieldType::Cstr | FieldType::Tail => unreachable!(),
             };
             let _ = writeln!(out, "                {ident}: {expr},");
@@ -192,7 +233,7 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
     out.push_str("        fn write(&self, out: &mut [u8]) {\n");
     out.push_str("            start(out, Self::ID, Self::SIZE);\n");
     for (f, ident) in fields.iter().zip(&ids) {
-        let o = f.offset.expect("fixed field");
+        let o = key(f);
         let stmt = match f.ty {
             FieldType::U8 => format!("put_u8(out, {o}, self.{ident})"),
             FieldType::U16 => format!("put_u16(out, {o}, self.{ident})"),
@@ -203,6 +244,12 @@ fn struct_code(out: &mut String, id: u8, name: &str, doc: &str, size: usize, fie
             }
             FieldType::Bits(n) => format!("put_bits(out, {o}, {n}, self.{ident})"),
             FieldType::Bit(n) => format!("put_bit(out, {o}, {n}, self.{ident})"),
+            FieldType::Packed { width, .. } if width <= 16 => {
+                format!("crate::schema::packed_put(out, {o}, {width}, u32::from(self.{ident}))")
+            }
+            FieldType::Packed { width, .. } => {
+                format!("crate::schema::packed_put(out, {o}, {width}, self.{ident})")
+            }
             FieldType::Cstr | FieldType::Tail => unreachable!(),
         };
         let _ = writeln!(out, "            {stmt};");
@@ -225,6 +272,7 @@ fn field_type_word(t: FieldType) -> String {
         FieldType::Bits(n) => format!("u{n}"),
         FieldType::Bit(n) => format!("bit{n}"),
         FieldType::Tail => "bytes".into(),
+        FieldType::Packed { width, .. } => format!("u{width}"),
     }
 }
 
@@ -264,9 +312,9 @@ fn client_code(out: &mut String, rows: &[ClientRow]) {
     );
     out.push_str(MODULE_USE);
     for r in rows {
-        if let Some(n) = typed(r.name, &r.transport_size, &r.layout) {
+        if let Some((n, fields)) = typed(r.name, &r.transport_size, &r.layout) {
             let doc = format!(": {}", r.request);
-            struct_code(out, r.id, r.name, &doc, n, &r.layout);
+            struct_code(out, r.id, r.name, &doc, n, &fields);
         }
     }
     out.push_str("}\n");
@@ -305,8 +353,8 @@ fn server_code(out: &mut String, rows: &[ServerRow]) {
     );
     out.push_str(MODULE_USE);
     for r in rows {
-        if let Some(n) = typed(r.name, &r.size, &r.layout) {
-            struct_code(out, r.id, r.name, "", n, &r.layout);
+        if let Some((n, fields)) = typed(r.name, &r.size, &r.layout) {
+            struct_code(out, r.id, r.name, "", n, &fields);
         }
     }
     out.push_str("}\n");
@@ -371,5 +419,22 @@ mod tests {
             idents(&[f("type", 1), f("", 2), f("unk", 3), f("unk", 4)]),
             ["type_", "f2", "unk_3", "unk_4"]
         );
+    }
+
+    /// `bits:` layouts: the `id:8` field is the message id and stays out
+    /// of the struct; any other field over bits 0..8 means no struct.
+    #[test]
+    fn packed_struct_fields() {
+        let p = |name, bit, width| Field {
+            name,
+            ty: FieldType::Packed { bit, width },
+            offset: None,
+        };
+        let size = SizeRule::Fixed(3);
+        let (n, own) = typed("M", &size, &[p("id", 0, 8), p("a", 8, 16)]).unwrap();
+        assert_eq!((n, own), (3, vec![p("a", 8, 16)]));
+        assert!(typed("M", &size, &[p("op", 0, 8), p("a", 8, 16)]).is_none());
+        assert!(typed("M", &size, &[p("id", 0, 4), p("a", 4, 20)]).is_none());
+        assert_eq!(idents(&[p("a", 8, 4), p("a", 12, 4)]), ["a_8", "a_12"]);
     }
 }

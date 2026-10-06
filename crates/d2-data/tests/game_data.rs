@@ -629,6 +629,7 @@ fn compile_only_lookup_tables() {
     );
     const P: &str = "patch_d2.mpq";
     const X: &str = "d2exp.mpq";
+    const D: &str = "d2data.mpq";
     let rows: [Row; 18] = [
         ("playerclass", "code", 10, 4, Some((X, 7)), &[(X, 7)]),
         ("bodylocs", "code", 10, 4, Some((X, 11)), &[(X, 11)]),
@@ -644,16 +645,37 @@ fn compile_only_lookup_tables() {
         ("hitclass", "code", 10, 4, Some((X, 14)), &[(X, 14)]),
         ("colors", "code", 10, 4, Some((X, 21)), &[(X, 21)]),
         ("hiredesc", "code", 10, 4, Some((X, 9)), &[(X, 9)]),
-        ("monmode", "code", 10, 4, None, &[(P, 16)]),
-        ("plrmode", "code", 10, 4, None, &[(P, 20)]),
+        ("monmode", "code", 10, 4, None, &[(P, 16), (X, 16), (D, 16)]),
+        ("plrmode", "code", 10, 4, None, &[(P, 20), (X, 20), (D, 20)]),
         ("monai", "AI", 17, 2, Some((P, 148)), &[(P, 148)]),
         ("monplace", "code", 17, 2, Some((P, 37)), &[(P, 37)]),
         ("skillcalc", "code", 10, 4, Some((P, 73)), &[(P, 73)]),
         ("misscalc", "code", 10, 4, Some((P, 43)), &[(P, 43)]),
-        ("skills", "skill", 17, 2, None, &[(P, 357)]),
+        (
+            "skills",
+            "skill",
+            17,
+            2,
+            None,
+            &[(P, 357), (X, 319), (D, 221)],
+        ),
         ("events", "event", 17, 2, Some((P, 13)), &[(P, 13)]),
-        ("sounds", "Sound", 17, 2, Some((P, 4_699)), &[(P, 4_699)]),
-        ("monstats", "Id", 17, 2, None, &[(P, 734)]),
+        (
+            "sounds",
+            "Sound",
+            17,
+            2,
+            Some((P, 4_699)),
+            &[(P, 4_699), (X, 4_698), (D, 3_587)],
+        ),
+        (
+            "monstats",
+            "Id",
+            17,
+            2,
+            None,
+            &[(P, 734), (X, 575), (D, 410)],
+        ),
         ("skilldesc", "skilldesc", 17, 2, None, &[(P, 221)]),
     ];
     for (name, key, type_id, size, live, txts) in rows {
@@ -662,7 +684,12 @@ fn compile_only_lookup_tables() {
             .table(&lookup)
             .or_else(|| schema().table(name))
             .unwrap();
-        assert!(def.live_source.is_none() && def.is_called(), "{name}");
+        // hitclass.bin is also read by the client composite loader
+        // (tables.tsv live_source, loading.md §3.5).
+        assert!(
+            (def.live_source.is_none() || name == "hitclass") && def.is_called(),
+            "{name}"
+        );
         let step = def.load_step.as_deref().unwrap();
         let group = match name {
             "sounds" => "3.",
@@ -731,13 +758,11 @@ fn loading_edge_cases() {
     }
     assert_eq!(r, want.as_slice());
     let links = &compiled().linkers;
-    for l in ["colors.code", "properties.code"] {
-        let c = links.code(l).unwrap();
-        assert!(
-            c.find(u32::from_le_bytes(*b"    ")).is_none() && c.find(0).is_none(),
-            "{l}"
-        );
-    }
+    // colors is keyed by a 4-byte code, properties by a name16 key.
+    let c = links.code("colors.code").unwrap();
+    assert!(c.find(u32::from_le_bytes(*b"    ")).is_none() && c.find(0).is_none());
+    let n = links.name("properties.code").unwrap();
+    assert!(n.find(b"").is_none() && n.find(b"    ").is_none());
     // P → X fallback: 17 runtime tables (and hitclass) live only in X;
     // P has newer .txt for inventory and plrmode.
     let x_only: Vec<&str> = schema()

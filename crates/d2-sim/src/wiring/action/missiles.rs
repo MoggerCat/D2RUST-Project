@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`)
+// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6; specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`)
 //! Missiles ↔ units, DRLG and combat: [`View`] implements
 //! [`crate::missiles::MissileWorld`]. Real providers: unit allocation and
 //! removal (`units.md` §3), seeds, stats, states and state lists
@@ -15,10 +15,12 @@ use crate::missiles::{
 };
 use crate::rng::Seed;
 use crate::tick::events::event;
+use crate::units::hooks::Sim;
 use crate::units::lifecycle::AllocRequest;
 use crate::units::{RoomId, UnitId, UnitType};
 
 use super::combat::CombatView;
+use super::monsters::umod_mode;
 use super::units::STATE_JUSTHIT;
 use super::{Pending, View};
 
@@ -77,10 +79,10 @@ impl<X: Pending> MissileUnits for View<'_, X> {
         View::seed(self, unit)
     }
     fn position(&self, unit: UnitId) -> (i32, i32) {
-        self.h.x.position(unit)
+        self.h.path_position(unit)
     }
     fn size(&self, unit: UnitId) -> i32 {
-        self.h.x.size(unit)
+        self.path_size(unit)
     }
     fn stat(&self, unit: UnitId, s: u16) -> i32 {
         View::stat(self, unit, s)
@@ -140,57 +142,75 @@ impl<X: Pending> MissileUnits for View<'_, X> {
 
 impl<X: Pending> MissilePath for View<'_, X> {
     fn has_path(&self, unit: UnitId) -> bool {
-        self.h.x.has_path(unit)
+        self.h.path_has(unit)
     }
     fn set_velocity(&mut self, unit: UnitId, v: i32) {
-        self.h.x.set_velocity(unit, v);
+        self.h.path_set_velocity(unit, v);
     }
     fn velocity(&self, unit: UnitId) -> i32 {
-        self.h.x.velocity(unit)
+        self.h.path_velocity(unit)
     }
     fn set_target_unit(&mut self, unit: UnitId, target: UnitId) {
-        self.h.x.set_target_unit(unit, target);
+        self.path_set_target_unit(unit, target);
     }
     fn set_target_point(&mut self, unit: UnitId, x: i32, y: i32) {
-        self.h.x.set_target_point(unit, x, y);
+        self.h.path_set_target_point(unit, x, y);
     }
     fn set_footprint_mask(&mut self, unit: UnitId, mask: u16) {
-        self.h.x.set_footprint_mask(unit, mask);
+        self.path_set_foot_mask(unit, mask);
     }
     fn set_move_mask(&mut self, unit: UnitId, mask: u16) {
-        self.h.x.set_move_mask(unit, mask);
+        self.h.path_set_move_mask(unit, mask);
     }
+    /// `0x00649970` (`pathing.md` §3).
     fn build(&mut self, game: &mut Game, unit: UnitId) {
-        self.h.x.build_path(game, unit);
+        if self.h.paths.is_some() {
+            crate::wiring::path::walk::build_path(self, game, unit);
+        } else {
+            self.h.x.build_path(game, unit);
+        }
     }
     fn set_acceleration(&mut self, unit: UnitId, accel: i32, max_velocity: i32) {
-        self.h.x.set_acceleration(unit, accel, max_velocity);
+        self.h.path_set_acceleration(unit, accel, max_velocity);
     }
+    /// `0x006417F0`: not specified (stays [`Pending`]).
     fn target_distance(&self, unit: UnitId) -> i32 {
         self.h.x.target_distance(unit)
     }
+    /// Unit step `0x00554CA0` (`pathing.md` §9.3): false when it returns 2.
     fn step(&mut self, game: &mut Game, unit: UnitId) -> bool {
-        self.h.x.step(game, unit)
+        if self.h.paths.is_some() {
+            crate::wiring::path::walk::unit_step(self, game, unit)
+        } else {
+            self.h.x.step(game, unit)
+        }
     }
     /// `0x00648EB0` (`missiles.md` §R4 step 6): recomputed at the current
-    /// position when the path velocity is 0 (the room's grid), otherwise
-    /// the word the last step cached in the path.
+    /// position when the path velocity is 0 (the room's collision mask
+    /// with the missile's size, all bits), otherwise the word the last
+    /// step cached in the path (+0x54).
     fn collision_word(&self, game: &Game, unit: UnitId) -> u16 {
-        let cached = self.h.x.cached_collision_word(unit);
+        let cached = self.h.path_cached_word(unit);
+        let (x, y) = self.h.path_position(unit);
         match cached {
-            Some(w) if self.h.x.velocity(unit) != 0 => w,
+            Some(w) if self.h.path_velocity(unit) != 0 => w,
+            _ if self.h.paths.is_some() => crate::path::collision::size_value(
+                &self.h.drlg,
+                Self::unit_room(game, unit),
+                x,
+                y,
+                self.path_size(unit),
+                0xFFFF,
+            ),
             // TODO(units.md path): without a path provider caching the
             // word, it is read from the grid at the current position.
-            _ => {
-                let (x, y) = self.h.x.position(unit);
-                Self::unit_room(game, unit)
-                    .and_then(|r| self.h.drlg.collision(game, r, x, y))
-                    .unwrap_or(0)
-            }
+            _ => Self::unit_room(game, unit)
+                .and_then(|r| self.h.drlg.collision(game, r, x, y))
+                .unwrap_or(0),
         }
     }
     fn crossed_subtiles(&self, unit: UnitId) -> Vec<(i32, i32)> {
-        self.h.x.crossed_subtiles(unit)
+        self.h.path_crossed(unit)
     }
 }
 
@@ -201,32 +221,54 @@ impl<X: Pending> MissileRooms for View<'_, X> {
     fn in_town(&self, game: &Game, room: RoomId) -> bool {
         self.h.drlg.in_town(game, room)
     }
-    /// `0x0064D9B0`.
+    /// `0x0064D9B0` (`path-placement.md` §4 rules 3–5 with the path
+    /// provider).
     ///
-    /// TODO(missiles.md §R4 step 9, rooms.md §10): the footprint a size
-    /// covers is not specified; the sub-tile at (x, y) is read for every
-    /// size.
+    /// TODO(missiles.md §R4 step 9, rooms.md §10): without the path
+    /// provider the sub-tile at (x, y) is read for every size.
     fn collision_mask(
         &self,
         game: &Game,
         room: RoomId,
         x: i32,
         y: i32,
-        _size: i32,
+        size: i32,
         mask: u16,
     ) -> u16 {
+        if self.h.paths.is_some() {
+            return crate::path::collision::size_value(&self.h.drlg, Some(room), x, y, size, mask);
+        }
         self.h.drlg.collision(game, room, x, y).unwrap_or(0) & mask
     }
-    /// `0x0064CB30`.
+    /// `0x0064CB30` (`path-placement.md` §4 rule 2 with the path
+    /// provider).
     fn collision_at(&self, game: &Game, room: RoomId, x: i32, y: i32, mask: u16) -> u16 {
+        if self.h.paths.is_some() {
+            return crate::path::collision::point_value(&self.h.drlg, Some(room), x, y, mask);
+        }
         self.h.drlg.collision(game, room, x, y).unwrap_or(0) & mask
     }
-    /// `0x0064EBA0`: clear bit 0x40 under the unit.
+    /// `0x0064EBA0`: clear bit 0x40 under the unit (with the path
+    /// provider: the size clear of `path-placement.md` §5.1 at the path
+    /// position, the unit's size).
     ///
-    /// TODO(rooms.md §10): the size footprint is not specified; the unit's
-    /// sub-tile only.
+    /// TODO(rooms.md §10): without the path provider the unit's sub-tile
+    /// only.
     fn clear_footprint(&mut self, game: &mut Game, unit: UnitId) {
-        let (x, y) = self.h.x.position(unit);
+        let (x, y) = self.h.path_position(unit);
+        if self.h.paths.is_some() {
+            let size = self.path_size(unit);
+            let room = Self::unit_room(game, unit);
+            crate::path::footprint::clear_size(
+                &mut self.h.drlg,
+                room,
+                x,
+                y,
+                size,
+                crate::drlg::collision::bits::MISSILE,
+            );
+            return;
+        }
         if let Some(r) = Self::unit_room(game, unit) {
             if let Some(m) = self.h.drlg.collision_mut(game, r, x, y) {
                 *m &= !crate::drlg::collision::bits::MISSILE;
@@ -247,7 +289,7 @@ impl<X: Pending> MissileRooms for View<'_, X> {
         std::iter::once(room)
             .chain(adjacent.into_iter().filter(|&r| r != room))
             .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.x.position(u) == (x, y))
+            .filter(|&u| self.h.path_position(u) == (x, y))
             .collect()
     }
 }
@@ -417,7 +459,22 @@ impl<X: Pending> MissileHooks for View<'_, X> {
     fn init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
         self.h.x.missile_init_callback(game, missile, callback, arg);
     }
+    /// `0x005A43B0(game, owner, missile)` (`missiles.md` rule 28): the
+    /// umod dispatcher in mode 5 (`init.md` §22, the callbacks get the
+    /// missile) on the lent monster world; without one,
+    /// [`Pending::unique_mod_missile`].
     fn unique_mod_missile(&mut self, game: &mut Game, owner: UnitId, missile: UnitId) {
-        self.h.x.unique_mod_missile(game, owner, missile);
+        let mut sim = Sim {
+            game: &mut *game,
+            units: &mut *self.units,
+            stats: &mut *self.stats,
+            data: self.data,
+        };
+        if !self
+            .h
+            .run_umods(&mut sim, owner, Some(missile), umod_mode::MISSILE)
+        {
+            self.h.x.unique_mod_missile(game, owner, missile);
+        }
     }
 }

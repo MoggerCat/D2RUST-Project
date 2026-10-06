@@ -12,7 +12,7 @@ use crate::stats::ValueCallback;
 use super::hooks::{Sim, UnitHooks};
 use super::modes::{self, UnitError};
 use super::record::{flags, flags2, UnitRecord};
-use super::{RoomId, UnitId, UnitType};
+use super::{ListError, RoomId, UnitId, UnitType};
 
 /// Player classes (`0x00555230` step 1: class < 7).
 pub const PLAYER_CLASSES: u32 = 7;
@@ -50,7 +50,8 @@ pub trait LifecycleHooks: UnitHooks {
 
 /// `0x00555230` (§3.1). Returns `None` when the class is rejected
 /// (nothing allocated, no RNG draw). `game_seed` is the game seed of
-/// `rng.md` §5.3.
+/// `rng.md` §5.3. An error (unknown room, duplicate GUID) leaves the
+/// game, the seed and the GUID counter as they were.
 pub fn allocate<H: LifecycleHooks>(
     sim: &mut Sim<'_>,
     hooks: &mut H,
@@ -68,11 +69,22 @@ pub fn allocate<H: LifecycleHooks>(
     if !req.add {
         return Err(UnitError::NotAdded);
     }
-    // Step 3: the act of the allocation room's level.
-    let act = req
-        .room
-        .and_then(|r| sim.game.lists.room(r))
-        .map_or(0, |r| r.act);
+    // Step 3: the act of the allocation room's level. An unknown room
+    // is refused here, before any draw.
+    let act = match req.room {
+        Some(r) => {
+            sim.game
+                .lists
+                .room(r)
+                .ok_or(ListError::UnknownRoom(r))
+                .map_err(GameError::from)?
+                .act
+        }
+        None => 0,
+    };
+    // A refused `SUNIT_Add` (the fatal duplicate GUID of
+    // `unit-order.md` §2.1) undoes the draws of steps 4 and 6.
+    let undo = (*game_seed, sim.game.lists.guids.get(req.ty));
     // Step 4 (rng.md §5.3).
     let mut seed = Seed::init();
     let mut init_seed = 0;
@@ -92,11 +104,14 @@ pub fn allocate<H: LifecycleHooks>(
     };
     // Step 8 (SUNIT_Add) precedes the per-kind init here: d2rs needs the
     // list entry to own timers; neither step reads what the other writes.
-    let unit = sim
-        .game
-        .lists
-        .add_unit(req.ty, guid, req.room, req.allied)
-        .map_err(GameError::from)?;
+    let unit = match sim.game.lists.add_unit(req.ty, guid, req.room, req.allied) {
+        Ok(unit) => unit,
+        Err(e) => {
+            *game_seed = undo.0;
+            sim.game.lists.guids.set(req.ty, undo.1);
+            return Err(GameError::from(e).into());
+        }
+    };
     // Steps 2 and 5.
     let mut rec = UnitRecord::new(req.ty, req.class, guid);
     rec.act = act;

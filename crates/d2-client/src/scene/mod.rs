@@ -1,4 +1,5 @@
 // Spec: specs/client/render-pipeline.md
+// Spec: specs/render/composition.md
 //! Scene: the draw list and the CPU reference compositor (§A3–A8, bins of
 //! §A9). Plain Rust, no Bevy types, integer math only: the GPU compositor
 //! (`render`) and the verify harness consume exactly these types.
@@ -13,6 +14,7 @@
 
 pub mod bins;
 pub mod cpu;
+pub mod frame;
 pub mod item;
 pub mod order;
 
@@ -20,7 +22,10 @@ pub mod order;
 mod tests;
 
 pub use bins::{bin, Bins};
-pub use cpu::{compose, compose_binned, compose_rgba, to_rgba};
+pub use cpu::{
+    compose, compose_binned, compose_binned_frame, compose_frame, compose_rgba, to_rgba,
+};
+pub use frame::{present_palette, FrameCycle, FramePlan, PL2_PALETTE_BYTES, UNCLEARED_ROWS};
 pub use item::{
     BlendOp, DrawItem, FrameId, FrameImage, FrameSource, FrameView, ItemTag, MapId, MapTable,
     ShadeChain,
@@ -94,6 +99,16 @@ impl Rect {
     pub fn contains(&self, x: i64, y: i64) -> bool {
         x >= i64::from(self.x) && x < self.right() && y >= i64::from(self.y) && y < self.bottom()
     }
+
+    /// A view's pixels must be screen points (i32): items are placed in
+    /// i32, and bin rectangles ([`Bins::rect`]) are `Rect`s.
+    pub(crate) fn check_view(&self) -> Result<(), SceneError> {
+        let end = i64::from(i32::MAX) + 1;
+        if self.right() > end || self.bottom() > end {
+            return Err(SceneError::View(*self));
+        }
+        Ok(())
+    }
 }
 
 /// Errors of draw-list construction and composition. Inputs are strict
@@ -119,10 +134,22 @@ pub enum SceneError {
     BlendTable(MapId),
     #[error("flip_x is reserved until an owner spec defines it")]
     FlipX,
+    #[error("view {0:?} has pixels past the i32 screen range")]
+    View(Rect),
     #[error("bins were built for {built:?}, composing {view:?}")]
     BinsView { built: Rect, view: Rect },
     #[error("bins were built for {built} items, composing {items}")]
     BinsItems { built: usize, items: usize },
+    #[error("base framebuffer has {len} bytes, the view {pixels} pixels")]
+    BaseSize { len: usize, pixels: u64 },
+    #[error(
+        "framebuffer height {height} leaves no rows for the frame clear (more than 47 needed)"
+    )]
+    FramebufferHeight { height: u32 },
+    #[error("frame plan {0:?} does not fit the framebuffer or the frame cycle")]
+    FramePlan(frame::FramePlan),
+    #[error("PL2 data of {len} bytes has no 1,024-byte palette")]
+    Pl2Size { len: usize },
     #[error("draw item {index}: {error}")]
     Item {
         index: usize,

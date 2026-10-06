@@ -1,0 +1,551 @@
+// Spec: specs/sim/intents-events.md (§2.1–§2.4, §3.2, §3.3)
+//! Robustness properties (METHODS M07, `CLAUDE.md` hard rule 7): any
+//! bytes a client sends go through the local transport (duplicate
+//! filter, classifier, queues, drain), the game-message entry and the
+//! dispatcher with its gate, size check and parsers, without a panic, and
+//! with the result code §2.3–§2.4 give. Any S→C buffer goes through local
+//! delivery. The game behind the seams is a fake whose answers are drawn
+//! by the test; the wired sim is `prop_handle.rs`.
+//!
+//! Default case counts are small so `cargo test` stays fast; set
+//! `PROPTEST_CASES` to hunt harder (it overrides every default here).
+
+use std::collections::BTreeMap;
+
+use d2_proto::schema::{Gate as TsvGate, HandlerSize, Kind as TsvKind};
+use d2_proto::transport::{classify_client, Classified as ProtoClassified, ClientQueue};
+use d2_proto::CLIENT_MESSAGES;
+use d2_server::adapters::ProtoSizes;
+use d2_server::buffers::{ClientBuffers, Inbox, QueueError, BUFFER_SIZE};
+use d2_server::dispatch::{dispatch, process_game_message, ClientRecord, Outcome};
+use d2_server::host::{Handled, Host};
+use d2_server::seams::{
+    ClientId, Clock, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode,
+    SessionHandler, Tick, UnitTarget,
+};
+use d2_server::transport::{
+    classify, Classified, DuplicateFilter, Queue, SendError, ServerQueues, DRAIN_COPY,
+    MAX_GAME_SEND, MAX_MESSAGE,
+};
+use proptest::prelude::*;
+use proptest::test_runner::Config;
+
+/// Proptest config with `default` cases, or `PROPTEST_CASES` when set.
+fn config(default: u32) -> Config {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(default);
+    Config {
+        cases,
+        failure_persistence: None,
+        ..Config::default()
+    }
+}
+
+/// Bytes biased to the values size fields, strings and unit types react
+/// to.
+fn byte() -> impl Strategy<Value = u8> {
+    prop_oneof![
+        4 => any::<u8>(),
+        2 => Just(0u8),
+        1 => Just(0xFFu8),
+        1 => Just(0x80u8),
+        1 => 0u8..8,
+    ]
+}
+
+/// A C→S message: any id (often a game id), then `0..max` bytes, or a
+/// message of exactly its id's fixed size.
+fn message(max: usize) -> impl Strategy<Value = Vec<u8>> {
+    let id = prop_oneof![3 => 0u8..0x71, 1 => any::<u8>()];
+    (id, prop::collection::vec(byte(), 0..max), any::<bool>()).prop_map(|(id, rest, exact)| {
+        let mut m = vec![id];
+        m.extend(rest);
+        if exact {
+            if let Some(n) =
+                d2_proto::transport::client_message(id).and_then(|r| r.transport_size.fixed())
+            {
+                m.resize(n, 0);
+            }
+        }
+        m
+    })
+}
+
+// ---- the fake game ---------------------------------------------------------------------
+
+/// What the fake game answers; drawn per case.
+#[derive(Clone, Copy, Debug)]
+struct Answers {
+    lookup: u8,
+    gate: PlayerGate,
+    point: Option<PointState>,
+    frame: i32,
+    target: u8,
+    player: Pos,
+    other: Pos,
+}
+
+fn pos() -> impl Strategy<Value = Pos> {
+    // Subtile coordinates: what a u16 target field can name, and a margin.
+    (-0x100i32..0x10100, -0x100i32..0x10100).prop_map(|(x, y)| Pos { x, y })
+}
+
+fn answers() -> impl Strategy<Value = Answers> {
+    (
+        0u8..8,
+        (
+            prop_oneof![Just(0u32), Just(1), Just(0x11), any::<u32>()],
+            any::<bool>(),
+        ),
+        prop::option::weighted(0.9, (pos(), any::<i32>())),
+        any::<i32>(),
+        0u8..4,
+        pos(),
+        pos(),
+    )
+        .prop_map(
+            |(lookup, (mode, un), point, frame, target, player, other)| Answers {
+                lookup,
+                gate: PlayerGate {
+                    mode,
+                    uninterruptable: un,
+                },
+                point: point.map(|(player, last_accept)| PointState {
+                    player,
+                    last_accept,
+                }),
+                frame,
+                target,
+                player,
+                other,
+            },
+        )
+}
+
+/// A game behind the seams that answers from [`Answers`] and logs every
+/// call that changes something.
+#[derive(Debug)]
+struct Fake {
+    a: Answers,
+    handled: Vec<(ClientId, Vec<u8>, usize)>,
+    accepts: Vec<i32>,
+    resyncs: usize,
+    ticks: usize,
+}
+
+impl Fake {
+    fn new(a: Answers) -> Self {
+        Self {
+            a,
+            handled: Vec::new(),
+            accepts: Vec::new(),
+            resyncs: 0,
+            ticks: 0,
+        }
+    }
+}
+
+impl Intents for Fake {
+    fn player(&self, _: ClientId) -> PlayerLookup {
+        match self.a.lookup {
+            0 => PlayerLookup::NotInGame,
+            1 => PlayerLookup::NoPlayer,
+            _ => PlayerLookup::Player(self.a.gate),
+        }
+    }
+    fn frame(&self) -> i32 {
+        self.a.frame
+    }
+    fn point_state(&self, _: ClientId) -> Option<PointState> {
+        self.a.point
+    }
+    fn set_point_accept(&mut self, _: ClientId, frame: i32) {
+        self.accepts.push(frame);
+    }
+    fn queue_resync(&mut self, _: ClientId, _: &mut dyn MessageSink) {
+        self.resyncs += 1;
+    }
+    fn unit_target(&self, _: ClientId, unit_type: u32, _: u32) -> UnitTarget {
+        assert!(unit_type < 6, "unit type {unit_type} reached the lookup");
+        match self.a.target {
+            0 => UnitTarget::Missing,
+            1 => UnitTarget::OwnedItem,
+            2 => UnitTarget::OtherAct,
+            _ => UnitTarget::At {
+                player: self.a.player,
+                target: self.a.other,
+            },
+        }
+    }
+    fn handle(
+        &mut self,
+        client: ClientId,
+        msg: &[u8],
+        size: usize,
+        _: &mut dyn MessageSink,
+    ) -> ResultCode {
+        self.handled.push((client, msg.to_vec(), size));
+        ResultCode::Done
+    }
+    fn clients(&self) -> Vec<ClientId> {
+        vec![0]
+    }
+}
+
+impl Tick for Fake {
+    fn tick(&mut self, _: &mut dyn MessageSink) {
+        self.ticks += 1;
+    }
+}
+
+/// The spec's dispatch result (§2.3, §2.4 rules 1–4, 6) from the TSV
+/// columns, independent of `d2_server::dispatch`'s own tables; `None`
+/// when the message reaches the handler.
+fn expected(a: &Answers, msg: &[u8], size: usize) -> Option<ResultCode> {
+    use ResultCode::*;
+    let id = msg[0];
+    if id == 0 || id >= 0x67 {
+        return Some(Malformed);
+    }
+    let row = &CLIENT_MESSAGES[id as usize];
+    if row.kind == TsvKind::None {
+        return Some(Malformed);
+    }
+    let alive = !(a.gate.uninterruptable || a.gate.mode == 0 || a.gate.mode == 0x11);
+    let open = match row.gate {
+        TsvGate::None => true,
+        TsvGate::Dead => a.gate.mode == 0x11,
+        _ => alive,
+    };
+    if !open {
+        return Some(Done);
+    }
+    match row.kind {
+        TsvKind::Stub0 => return Some(Done),
+        TsvKind::Stub3 => return Some(Malformed),
+        _ => {}
+    }
+    let size_ok = match row.handler_size {
+        HandlerSize::Exact(n) => size == n as usize,
+        HandlerSize::Range(lo, hi) => (lo as usize..=hi as usize).contains(&size),
+        HandlerSize::Chat | HandlerSize::Any | HandlerSize::None => true,
+    };
+    if !size_ok {
+        return Some(Malformed);
+    }
+    let u16_at = |o: usize| u16::from_le_bytes([msg[o], msg[o + 1]]) as i32;
+    let u32_at = |o: usize| u32::from_le_bytes([msg[o], msg[o + 1], msg[o + 2], msg[o + 3]]);
+    let near = |p: Pos, t: Pos| (t.x - p.x).abs() <= 50 && (t.y - p.y).abs() <= 50;
+    match id {
+        0x01 | 0x03 | 0x05 | 0x08 | 0x0C | 0x0F => {
+            let Some(p) = a.point else {
+                return Some(Invalid);
+            };
+            if !near(
+                p.player,
+                Pos {
+                    x: u16_at(1),
+                    y: u16_at(3),
+                },
+            ) {
+                return Some(Refused);
+            }
+        }
+        0x02 | 0x04 | 0x06 | 0x07 | 0x09 | 0x0A | 0x0D | 0x0E | 0x10 | 0x11 => {
+            if u32_at(1) >= 6 {
+                return Some(Invalid);
+            }
+            match a.target {
+                0 => return Some(Refused),
+                1 => {}
+                2 => return Some(Invalid),
+                _ if !near(a.player, a.other) => return Some(Refused),
+                _ => {}
+            }
+        }
+        0x14 => match msg[3..].iter().position(|&c| c == 0) {
+            Some(n) if (1..256).contains(&n) => {}
+            _ => return Some(Invalid),
+        },
+        _ => {}
+    }
+    None
+}
+
+proptest! {
+    #![proptest_config(config(256))]
+
+    /// The server classifier on `d2-proto`'s sizes agrees with
+    /// `d2-proto`'s classifier (§2.1 rule 4), and 0xFF with the gate
+    /// closed is invalid.
+    #[test]
+    fn classifiers_agree(m in message(0x240), gate in any::<bool>()) {
+        for k in 0..=m.len() {
+            let b = &m[..k];
+            let ours = classify(&ProtoSizes, b, gate);
+            let theirs = classify_client(b);
+            let want = match theirs {
+                ProtoClassified::Queue(ClientQueue::Game) => Classified::Queued(Queue::Game),
+                ProtoClassified::Queue(ClientQueue::System) => Classified::Queued(Queue::System),
+                ProtoClassified::Queue(ClientQueue::Admin) if gate => Classified::Queued(Queue::Admin),
+                ProtoClassified::Queue(ClientQueue::Admin) => Classified::Invalid,
+                ProtoClassified::Incomplete => Classified::Incomplete,
+                ProtoClassified::Invalid => Classified::Invalid,
+                ProtoClassified::NegativeSize(n) => Classified::NegativeSize(n),
+            };
+            prop_assert_eq!(ours, want, "{:02X?}", b);
+        }
+    }
+
+    /// Sends and drains (§2.1 rules 3, 4, 6, 7): over 0x204 bytes is the
+    /// sender's assert; queued messages come back system queue first,
+    /// FIFO within a queue, truncated to 0x1FC bytes with their full size.
+    #[test]
+    fn queues_send_and_drain(msgs in prop::collection::vec(message(0x240), 0..24)) {
+        let mut q = ServerQueues::new();
+        let mut want: [Vec<(u32, Vec<u8>)>; 3] = Default::default();
+        for (i, m) in msgs.iter().enumerate() {
+            let client = i as u32 % 3;
+            match q.send(&ProtoSizes, client, m) {
+                Err(e) => {
+                    prop_assert!(m.len() > MAX_MESSAGE);
+                    prop_assert_eq!(e, SendError::TooLarge(m.len()));
+                }
+                Ok(c) => {
+                    prop_assert!(m.len() <= MAX_MESSAGE);
+                    prop_assert_eq!(c, classify(&ProtoSizes, m, true));
+                    if let Classified::Queued(queue) = c {
+                        want[queue as usize].push((client, m.clone()));
+                    }
+                }
+            }
+        }
+        let drained = q.drain();
+        prop_assert!(q.is_empty());
+        let mut it = drained.iter();
+        for queue in [Queue::System, Queue::Game, Queue::Admin] {
+            for (client, m) in &want[queue as usize] {
+                let d = it.next().expect("drained");
+                prop_assert_eq!(d.queue, queue);
+                prop_assert_eq!(d.client, *client);
+                prop_assert_eq!(d.size, m.len());
+                prop_assert_eq!(&d.msg[..], &m[..m.len().min(DRAIN_COPY)]);
+            }
+        }
+        prop_assert!(it.next().is_none());
+    }
+
+    /// The client's duplicate filter (§2.1 rule 1) on any message and
+    /// time: 0x200 bytes or more is the sender's assert; a message is
+    /// dropped only when it repeats the last sent one inside its window.
+    #[test]
+    fn duplicate_filter_any(sends in prop::collection::vec((message(0x220), 0u32..400), 0..24)) {
+        let mut f = DuplicateFilter::default();
+        let mut last: Option<(Vec<u8>, u32)> = None;
+        let mut now = 0u32;
+        for (m, dt) in sends {
+            now = now.wrapping_add(dt);
+            match f.pass(&m, now) {
+                Err(e) => {
+                    prop_assert!(m.len() >= MAX_GAME_SEND);
+                    prop_assert_eq!(e, SendError::GameTooLarge(m.len()));
+                }
+                Ok(false) => {
+                    let (l, at) = last.as_ref().expect("a filtered message repeats one");
+                    prop_assert!(l.starts_with(&m), "{:02X?}", m);
+                    prop_assert!(now.wrapping_sub(*at) < 200);
+                }
+                Ok(true) => last = Some((m.clone(), now)),
+            }
+        }
+    }
+
+    /// Per-client buffers (§3.2 rules 1–2): messages over 0x200 bytes are
+    /// refused, buffers hold whole messages, never more than 0x200 bytes,
+    /// and concatenate back to the queued messages in order; unknown
+    /// clients are ignored.
+    #[test]
+    fn client_buffers_any(msgs in prop::collection::vec(prop::collection::vec(any::<u8>(), 0..0x240), 0..24)) {
+        let mut b = ClientBuffers::new();
+        b.add_client(7);
+        let mut want = Vec::new();
+        for m in &msgs {
+            prop_assert_eq!(b.queue(9, m), Ok(()));
+            match b.queue(7, m) {
+                Ok(()) => want.extend_from_slice(m),
+                Err(e) => {
+                    prop_assert!(m.len() > BUFFER_SIZE);
+                    prop_assert_eq!(e, QueueError::TooLarge(m.len()));
+                }
+            }
+        }
+        let mut got = Vec::new();
+        for buf in b.buffers(7).unwrap() {
+            prop_assert!(buf.len() <= BUFFER_SIZE);
+            got.extend_from_slice(buf);
+        }
+        prop_assert_eq!(got, want);
+        prop_assert!(b.buffers(9).is_none());
+    }
+
+    /// Local delivery (§3.3 rules 1–3) of any buffer and any direct send:
+    /// what lands in the lists plus what is discarded is the buffer; the
+    /// lists hold ids by range; a bad id or size is an error, never a
+    /// panic.
+    #[test]
+    fn inbox_any(buf in prop::collection::vec(any::<u8>(), 0..0x240), direct in prop::collection::vec(any::<u8>(), 0..0x240)) {
+        let mut inbox = Inbox::default();
+        match inbox.deliver(&ProtoSizes, &buf) {
+            Ok(discarded) => {
+                prop_assert!(discarded <= buf.len());
+                let got: Vec<u8> = inbox.game.iter().chain(inbox.system.iter()).flatten().copied().collect();
+                prop_assert_eq!(got.len() + discarded, buf.len());
+            }
+            Err(QueueError::BadId(id)) => prop_assert!(id >= 0xB5),
+            Err(e) => return Err(TestCaseError::fail(format!("{e:?}"))),
+        }
+        for m in inbox.game.iter() {
+            prop_assert!(m[0] < 0xAF);
+        }
+        for m in inbox.system.iter() {
+            prop_assert!((0xAF..0xB5).contains(&m[0]));
+        }
+        let before = inbox.game.len() + inbox.system.len();
+        match inbox.push(&direct) {
+            Ok(()) => prop_assert_eq!(inbox.game.len() + inbox.system.len(), before + 1),
+            Err(QueueError::BadSize(n)) => prop_assert!(n == 0 || n > MAX_MESSAGE),
+            Err(QueueError::BadId(id)) => prop_assert!(id >= 0xB5),
+            Err(e) => return Err(TestCaseError::fail(format!("{e:?}"))),
+        }
+    }
+
+    /// The dispatcher (§2.3, §2.4) on any drained message and any game
+    /// answers: the result code is the spec's, the handler runs exactly
+    /// when everything before it passed and sees the drained bytes, a
+    /// point target is recorded only when accepted.
+    #[test]
+    fn dispatch_any(m in message(0x240), a in answers()) {
+        let mut game = Fake::new(a);
+        let mut out = ClientBuffers::new();
+        let size = m.len();
+        let drained = &m[..size.min(DRAIN_COPY)];
+        let code = dispatch(&mut game, &ProtoSizes, &mut out, 0, a.gate, drained, size);
+        let want = expected(&a, drained, size);
+        match want {
+            Some(w) => {
+                prop_assert_eq!(code, w);
+                prop_assert!(game.handled.is_empty());
+            }
+            None => {
+                prop_assert_eq!(code, ResultCode::Done);
+                prop_assert_eq!(&game.handled, &vec![(0, drained.to_vec(), size)]);
+            }
+        }
+        let point = matches!(m[0], 0x01 | 0x03 | 0x05 | 0x08 | 0x0C | 0x0F);
+        if point && want.is_none() {
+            prop_assert_eq!(&game.accepts, &vec![a.frame]);
+        } else {
+            prop_assert!(game.accepts.is_empty());
+        }
+        prop_assert!(game.resyncs <= 1);
+    }
+
+    /// Game-message entry (§2.2): not in game and no player drop the
+    /// message before the dispatcher; a missing client record is the
+    /// original's fatal assert (an error); otherwise the record's time is
+    /// set and the dispatcher runs.
+    #[test]
+    fn process_any(m in message(0x40), a in answers(), has_record in any::<bool>(), now in any::<u32>()) {
+        let mut game = Fake::new(a);
+        let mut out = ClientBuffers::new();
+        let mut records = BTreeMap::new();
+        if has_record {
+            records.insert(0, ClientRecord::default());
+        }
+        let r = process_game_message(&mut game, &ProtoSizes, &mut records, &mut out, 0, &m, m.len(), now);
+        match (a.lookup, has_record) {
+            (0, _) => prop_assert_eq!(r, Ok(Outcome::NotInGame)),
+            (_, false) => prop_assert!(r.is_err()),
+            (1, true) => prop_assert_eq!(r, Ok(Outcome::NoPlayer)),
+            _ => prop_assert!(matches!(r, Ok(Outcome::Dispatched(_)))),
+        }
+        if a.lookup != 0 && has_record {
+            prop_assert_eq!(records[&0].last_message_ms, now);
+        }
+    }
+}
+
+// ---- the host loop ---------------------------------------------------------------------
+
+#[derive(Default)]
+struct Session(Vec<(Vec<u8>, usize)>);
+
+impl SessionHandler for Session {
+    fn system_message(&mut self, _: ClientId, msg: &[u8], size: usize, _: &mut dyn MessageSink) {
+        self.0.push((msg.to_vec(), size));
+    }
+}
+
+struct Ms(u32);
+
+impl Clock for Ms {
+    fn now_ms(&mut self) -> u32 {
+        self.0
+    }
+}
+
+proptest! {
+    #![proptest_config(config(64))]
+
+    /// The host frame (`tick.md` §1, §2.1–§3.3) over any client sends on
+    /// both senders and any S→C direct sends: frames never fail for a
+    /// connected client, every queued message is handled once in drain
+    /// order, and what the client receives is well-formed.
+    #[test]
+    fn host_frames_any(
+        a in answers(),
+        frames in prop::collection::vec(
+            (prop::collection::vec((any::<bool>(), message(0x240)), 0..6), 0u32..100,
+             prop::option::of(prop::collection::vec(any::<u8>(), 0..0x220))),
+            1..8,
+        ),
+    ) {
+        let mut a = a;
+        a.lookup = a.lookup.max(1);
+        let mut host = Host::new(Fake::new(a), ProtoSizes, Session::default(), Ms(1000));
+        host.connect(0);
+        for (sends, dt, direct) in frames {
+            let mut queued = 0;
+            for (system, m) in sends {
+                let r = if system {
+                    host.send_system(0, &m).map(Some)
+                } else {
+                    host.send_game(0, &m)
+                };
+                match r {
+                    Ok(Some(Classified::Queued(_))) => queued += 1,
+                    Ok(_) => {}
+                    Err(SendError::TooLarge(n)) => prop_assert!(n > MAX_MESSAGE),
+                    Err(SendError::GameTooLarge(n)) => prop_assert!(n >= MAX_GAME_SEND),
+                }
+            }
+            if let Some(d) = direct {
+                let _ = host.send_direct(0, &d);
+            }
+            host.clock.0 = host.clock.0.wrapping_add(dt);
+            let report = host.frame().expect("a connected client's frame");
+            prop_assert_eq!(report.messages.len(), queued);
+            for h in &report.messages {
+                if let Handled::Game(Outcome::Dispatched(_)) = h.handled {
+                    prop_assert!(h.id < 0x67);
+                }
+            }
+            for msg in host.receive(0) {
+                prop_assert!(!msg.is_empty() && msg.len() <= MAX_MESSAGE);
+                prop_assert!(msg[0] < 0xB5);
+            }
+        }
+    }
+}

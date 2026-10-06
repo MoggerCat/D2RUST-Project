@@ -1,0 +1,627 @@
+// Spec: specs/items/inventory.md
+//! The inventory model and its placement, belt, equip and shared checks
+//! (§1–§5): records and fields ([`Inventory`], [`Grid`], [`InvItem`]),
+//! grids and the grid record by page ([`grid_record`]), the item list and
+//! update list, the fit test, place at a position, the free-position
+//! search and page placement ([`grid`]), the belt ([`belt`]),
+//! body-location compatibility, requirements, the equip check, hands
+//! compatible, the stack test, equip from the cursor and auto-equip
+//! ([`equip`]), the item checks, busy / trading, the targeting reset and
+//! the item-move gate ([`checks`]). Table data is a projection of `d2-data`
+//! typed records ([`tables::InvTables`]).
+//!
+//! Status: implemented, unverified (the spec is a draft; T1–T9, B1–B5 and
+//! E1–E4 are synthetic; D1–D3 are queued in `docs/handoff/impl-inventory.md`).
+//!
+//! Randomness: none. No draw happens in the grid, belt, equip or
+//! requirement code (spec "Randomness"); the systems these paths call
+//! (stat refresh, socketing) are reached through [`InvWorld`].
+//!
+//! Item units, their stats and every routine owned by another spec are
+//! reached through the seam [`InvWorld`]. Points the spec leaves open stop
+//! at a seam method (each names its open question or address).
+
+pub mod belt;
+pub mod checks;
+pub mod equip;
+pub mod grid;
+pub mod tables;
+
+#[cfg(test)]
+mod tests;
+
+use crate::units::UnitId;
+
+pub use belt::{
+    auto_belt_gate, belt_numboxes, belt_type, beltable, compact_belt, free_belt_slot,
+    place_in_belt_slot, similar,
+};
+pub use checks::{
+    belt_item_check, busy, cursor_item_check, ground_or_owned_check, item_move_gate,
+    owned_item_check, stored_item_check, stored_or_equipped_check, targeting_reset, trading,
+    Interaction,
+};
+pub use equip::{
+    auto_equip_location, body_location_allowed, equip_check, equip_from_cursor, hands_compatible,
+    requirements_met, stack_test, EquipOutcome,
+};
+pub use grid::{
+    find_free_position, grid_record, page_grid_size, place_at_body, place_at_page, place_in_grid,
+    place_in_page, place_in_page_from_cursor, search, weight,
+};
+pub use tables::InvTables;
+
+/// Inventory signature (inventory +0x00). Every accessor of the original
+/// checks it; in d2rs the type system guarantees it, so it is kept as a
+/// documented constant only.
+pub const SIGNATURE: u32 = 0x0102_0304;
+
+/// "None" GUID (−1): weapon GUID, item owner.
+pub const NO_GUID: u32 = u32::MAX;
+
+/// Item unit modes (`sim/units.md`; spec Outputs).
+pub mod mode {
+    pub const STORED: u8 = 0;
+    pub const EQUIPPED: u8 = 1;
+    pub const BELT: u8 = 2;
+    pub const GROUND: u8 = 3;
+    pub const CURSOR: u8 = 4;
+    pub const SOCKETED: u8 = 6;
+}
+
+/// Inventory pages (§1.2).
+pub mod page {
+    pub const INVENTORY: u8 = 0;
+    pub const TRADE1: u8 = 1;
+    pub const TRADE2: u8 = 2;
+    pub const CUBE: u8 = 3;
+    pub const STASH: u8 = 4;
+    pub const NONE: u8 = 0xFF;
+}
+
+/// Grid numbers (§1.2): 0 body locations, 1 belt, 2 + page.
+pub mod grid_id {
+    pub const BODY: usize = 0;
+    pub const BELT: usize = 1;
+    /// Grid of page `p` is `PAGE + p`.
+    pub const PAGE: usize = 2;
+}
+
+/// Constant grid sizes (§1.2: `0x0074479C`, `0x007447B4`).
+pub const BODY_GRID: (u8, u8) = (13, 1);
+pub const BELT_GRID: (u8, u8) = (16, 1);
+
+/// Body locations (§1.2, `bodylocs` codes; the intents accept 1–10).
+pub mod body {
+    pub const NONE: u8 = 0;
+    pub const HEAD: u8 = 1;
+    pub const NECK: u8 = 2;
+    pub const TORSO: u8 = 3;
+    pub const RIGHT_HAND: u8 = 4;
+    pub const LEFT_HAND: u8 = 5;
+    pub const RIGHT_RING: u8 = 6;
+    pub const LEFT_RING: u8 = 7;
+    pub const BELT: u8 = 8;
+    pub const FEET: u8 = 9;
+    pub const GLOVES: u8 = 10;
+    pub const SWAP_RIGHT: u8 = 11;
+    pub const SWAP_LEFT: u8 = 12;
+}
+
+/// Node kinds (item data +0x69, §1.1).
+pub mod node {
+    pub const NONE: u8 = 0;
+    pub const PAGE: u8 = 1;
+    pub const BELT: u8 = 2;
+    pub const BODY: u8 = 3;
+    pub const SWAP: u8 = 4;
+}
+
+/// Command flags (item data +0x14; `items/item-actions.tsv`).
+pub mod cmd {
+    pub const PUT_IN_CONTAINER: u32 = 0x2;
+    pub const REMOVE_FROM_CONTAINER: u32 = 0x4;
+    pub const EQUIP: u32 = 0x8;
+    pub const UNEQUIP: u32 = 0x10;
+    pub const SWAP_BODY: u32 = 0x20;
+    pub const GROUND_TO_CURSOR: u32 = 0x40;
+    pub const PUT_IN_CONTAINER2: u32 = 0x80;
+    pub const ADD_QUANTITY: u32 = 0x100;
+    pub const EQUIP2: u32 = 0x200;
+    pub const PUT_IN_BELT: u32 = 0x400;
+    pub const REMOVE_FROM_BELT: u32 = 0x800;
+    pub const SWAP_IN_BELT: u32 = 0x1000;
+    pub const PUT_IN_BELT2: u32 = 0x2000;
+    pub const AUTO_UNEQUIP: u32 = 0x4000;
+    pub const UNKNOWN_14: u32 = 0x8000;
+    pub const INDIRECT_SWAP_BODY: u32 = 0x10000;
+    pub const SWAP_IN_CONTAINER: u32 = 0x40000;
+    pub const UNKNOWN_16: u32 = 0x80000;
+    pub const TO_CURSOR: u32 = 0x10_0000;
+    pub const WEAPON_SWITCH: u32 = 0x20_0000;
+}
+
+/// Item flags (item data +0x18; `items/generation.md` §1.4 and §1.1).
+pub mod iflag {
+    pub const CHANGED: u32 = 0x1;
+    pub const TARGETING: u32 = 0x4;
+    pub const IDENTIFIED: u32 = 0x10;
+    pub const F20: u32 = 0x20;
+    pub const F40: u32 = 0x40;
+    pub const F80: u32 = 0x80;
+    pub const BROKEN: u32 = 0x100;
+    pub const REPAIRED: u32 = 0x200;
+    pub const F400: u32 = 0x400;
+    pub const F4000: u32 = 0x4000;
+    pub const F40000: u32 = 0x4_0000;
+    pub const ETHEREAL: u32 = 0x40_0000;
+}
+
+/// Unit flag cleared on placement: targetable (unit +0xC4 bit 0x2).
+pub const UNIT_FLAG_TARGETABLE: u32 = 0x2;
+
+/// Itemtypes rows used here (D3).
+pub mod ty {
+    pub const BOOK: i16 = 18;
+    pub const BELT: i16 = 19;
+    pub const TPOT: i16 = 38;
+    pub const WEAP: i16 = 45;
+    pub const H2H: i16 = 67;
+}
+
+/// Stat ids read here (spec Inputs).
+pub mod stat {
+    pub const STRENGTH: u16 = 0;
+    pub const DEXTERITY: u16 = 2;
+    pub const LEVEL: u16 = 12;
+    pub const MINDAMAGE: u16 = 21;
+    pub const MAXDAMAGE: u16 = 22;
+    pub const SECONDARY_MINDAMAGE: u16 = 23;
+    pub const SECONDARY_MAXDAMAGE: u16 = 24;
+    pub const QUANTITY: u16 = 70;
+    pub const ITEM_REQ_PERCENT: u16 = 91;
+    pub const THROW_MINDAMAGE: u16 = 159;
+    pub const THROW_MAXDAMAGE: u16 = 160;
+}
+
+/// The kind of a unit, as the inventory rules distinguish it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnitKind {
+    /// Player, with its class (0–6).
+    Player { class: u8 },
+    /// Monster (NPCs, hirelings), with its class (monstats row).
+    Monster { class: u32 },
+    /// Object, with its class.
+    Object { class: u32 },
+    /// An item (an item with sockets owns an inventory).
+    Item,
+    /// Missiles, tiles.
+    Other,
+}
+
+impl UnitKind {
+    pub fn is_player(self) -> bool {
+        matches!(self, UnitKind::Player { .. })
+    }
+}
+
+/// The item data fields this spec reads and writes (§1.1), held by the
+/// item unit's owner (the wiring keeps one per item unit).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InvItem {
+    /// The item unit's GUID.
+    pub guid: u32,
+    /// Item class: combined items index.
+    pub record: usize,
+    /// Unit mode ([`mode`]).
+    pub mode: u8,
+    /// Command flags (+0x14).
+    pub cmd_flags: u32,
+    /// Item flags (+0x18).
+    pub flags: u32,
+    /// Body location (+0x44).
+    pub body_loc: u8,
+    /// Page (+0x45; 0xFF none).
+    pub page: u8,
+    /// Stored page (+0x47).
+    pub stored_page: u8,
+    /// Position: grid cell (x, y).
+    pub x: i32,
+    pub y: i32,
+    /// Item owner: the owning player's GUID, [`NO_GUID`] otherwise.
+    pub owner_guid: u32,
+    /// Owning inventory (+0x5C), by the inventory's owner unit.
+    pub inv: Option<UnitId>,
+    /// Grid + 1 (+0x68; 0 = not in a grid).
+    pub node_grid: u8,
+    /// Node kind (+0x69, [`node`]).
+    pub node_kind: u8,
+}
+
+impl InvItem {
+    /// A fresh item record: mode 3 (ground), page none, not linked.
+    pub fn new(guid: u32, record: usize) -> Self {
+        Self {
+            guid,
+            record,
+            mode: mode::GROUND,
+            cmd_flags: 0,
+            flags: 0,
+            body_loc: body::NONE,
+            page: page::NONE,
+            stored_page: 0,
+            x: 0,
+            y: 0,
+            owner_guid: NO_GUID,
+            inv: None,
+            node_grid: 0,
+            node_kind: node::NONE,
+        }
+    }
+}
+
+/// One grid (§1.1): its own item list and its cells.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Grid {
+    pub width: u8,
+    pub height: u8,
+    /// The grid's own item list, in link order.
+    pub items: Vec<UnitId>,
+    /// Cells, row-major: cell (x, y) = y × width + x.
+    pub cells: Vec<Option<UnitId>>,
+}
+
+impl Grid {
+    /// A grid with zeroed cells (`0x0063ADD0`).
+    pub fn new(width: u8, height: u8) -> Self {
+        Self {
+            width,
+            height,
+            items: Vec::new(),
+            cells: vec![None; usize::from(width) * usize::from(height)],
+        }
+    }
+
+    /// The item in cell (x, y); out of bounds → none.
+    pub fn cell(&self, x: i32, y: i32) -> Option<UnitId> {
+        if x < 0 || y < 0 || x >= i32::from(self.width) || y >= i32::from(self.height) {
+            return None;
+        }
+        self.cells[y as usize * usize::from(self.width) + x as usize]
+    }
+
+    fn set_rect(&mut self, x: i32, y: i32, w: u8, h: u8, v: Option<UnitId>) {
+        for yy in y..y + i32::from(h) {
+            for xx in x..x + i32::from(w) {
+                if xx >= 0 && yy >= 0 && xx < i32::from(self.width) && yy < i32::from(self.height) {
+                    self.cells[yy as usize * usize::from(self.width) + xx as usize] = v;
+                }
+            }
+        }
+    }
+
+    /// Clears every cell holding `item`.
+    fn clear_item(&mut self, item: UnitId) {
+        for c in &mut self.cells {
+            if *c == Some(item) {
+                *c = None;
+            }
+        }
+    }
+}
+
+/// The inventory record (§1.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Inventory {
+    /// Owner unit (+0x08).
+    pub owner: UnitId,
+    pub owner_kind: UnitKind,
+    /// The owner's GUID (written as item owner when the owner is a player).
+    pub owner_guid: u32,
+    /// Item list (+0x0C / +0x10), in link order.
+    items: Vec<UnitId>,
+    /// Grid array (+0x14 / +0x18), indexed by grid number.
+    grids: Vec<Option<Grid>>,
+    /// GUID of the weapon in use (+0x1C; [`NO_GUID`] none).
+    pub weapon_guid: u32,
+    /// Cursor item (+0x20).
+    cursor: Option<UnitId>,
+    /// Count of linked items (+0x28).
+    pub count: u32,
+    /// Update list (+0x2C / +0x30): GUIDs in append order.
+    updates: Vec<u32>,
+}
+
+impl Inventory {
+    pub fn new(owner: UnitId, owner_kind: UnitKind, owner_guid: u32) -> Self {
+        Self {
+            owner,
+            owner_kind,
+            owner_guid,
+            items: Vec::new(),
+            grids: Vec::new(),
+            weapon_guid: NO_GUID,
+            cursor: None,
+            count: 0,
+            updates: Vec::new(),
+        }
+    }
+
+    /// The item list, in link order (§1.4 rule 1).
+    pub fn items(&self) -> &[UnitId] {
+        &self.items
+    }
+
+    /// Whether `item` is in the item list.
+    pub fn contains(&self, item: UnitId) -> bool {
+        self.items.contains(&item)
+    }
+
+    /// Grid `g`, when created.
+    pub fn grid(&self, g: usize) -> Option<&Grid> {
+        self.grids.get(g).and_then(Option::as_ref)
+    }
+
+    /// Grid count (+0x18).
+    pub fn grid_count(&self) -> usize {
+        self.grids.len()
+    }
+
+    /// Grid `g`, created on first use with the size given (`0x0063ADD0`);
+    /// a later use with a different size fails (§1.2).
+    pub fn grid_or_create(&mut self, g: usize, width: u8, height: u8) -> Option<&mut Grid> {
+        if self.grids.len() <= g {
+            self.grids.resize(g + 1, None);
+        }
+        let slot = &mut self.grids[g];
+        match slot {
+            Some(gr) if gr.width != width || gr.height != height => None,
+            Some(gr) => Some(gr),
+            None => Some(slot.insert(Grid::new(width, height))),
+        }
+    }
+
+    /// The item in cell (x, y) of grid `g`.
+    pub fn item_at(&self, g: usize, x: i32, y: i32) -> Option<UnitId> {
+        self.grid(g).and_then(|gr| gr.cell(x, y))
+    }
+
+    /// The item at body location `loc` (`0x0063DD90`): grid 0, x = loc.
+    pub fn body_item(&self, loc: u8) -> Option<UnitId> {
+        self.item_at(grid_id::BODY, i32::from(loc), 0)
+    }
+
+    /// The item in belt slot `slot`: grid 1, x = slot.
+    pub fn belt_item(&self, slot: u8) -> Option<UnitId> {
+        self.item_at(grid_id::BELT, i32::from(slot), 0)
+    }
+
+    /// Cursor item (`0x0063C1E0`).
+    pub fn cursor(&self) -> Option<UnitId> {
+        self.cursor
+    }
+
+    /// Sets the cursor item (`0x0063C180`; §1.4 rule 3: one item, not in
+    /// any grid). Only the field is written.
+    // TODO(spec: whether `0x0063C180` also links the item into the item list)
+    pub fn set_cursor(&mut self, item: Option<UnitId>) {
+        self.cursor = item;
+    }
+
+    /// The update list (GUIDs, append order).
+    pub fn update_list(&self) -> &[u32] {
+        &self.updates
+    }
+
+    /// Whether a GUID is on the update list (`0x0063CC30`).
+    pub fn is_listed(&self, guid: u32) -> bool {
+        self.updates.contains(&guid)
+    }
+
+    /// Appends a GUID to the update list unless already listed
+    /// (`0x0063CC70`, §1.4 rule 2).
+    pub fn push_update(&mut self, guid: u32) {
+        if !self.is_listed(guid) {
+            self.updates.push(guid);
+        }
+    }
+
+    /// Takes the update list, leaving it empty (the free after the update
+    /// pass, §6.1 rule 4; its exact address is open question 9).
+    pub fn take_updates(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.updates)
+    }
+
+    /// Links an item (`0x0063AF20`): appends it at the tail of the item
+    /// list and, for an item placed in grid `grid`, to that grid's list
+    /// (`0x0063AF70`). Sets the item's owning inventory.
+    pub fn link<W: InvWorld + ?Sized>(&mut self, w: &mut W, item: UnitId, grid: Option<usize>) {
+        self.items.push(item);
+        if let Some(Some(g)) = grid.and_then(|g| self.grids.get_mut(g)) {
+            g.items.push(item);
+        }
+        if let Some(d) = w.item_mut(item) {
+            d.inv = Some(self.owner);
+        }
+    }
+
+    /// Unlinks an item (`0x0063AAF0`): clears its cells (if it has a grid),
+    /// clears the cursor if it was the cursor item (else the count drops
+    /// by 1), clears the weapon GUID if it matches, zeroes the node fields.
+    /// Returns false when the item is not in this inventory (the callers
+    /// treat that as fatal).
+    pub fn unlink<W: InvWorld + ?Sized>(&mut self, w: &mut W, item: UnitId) -> bool {
+        let Some(pos) = self.items.iter().position(|&i| i == item) else {
+            return false;
+        };
+        self.items.remove(pos);
+        let Some(d) = w.item_mut(item) else {
+            return false;
+        };
+        if d.node_grid > 0 {
+            if let Some(Some(g)) = self.grids.get_mut(usize::from(d.node_grid - 1)) {
+                g.clear_item(item);
+                g.items.retain(|&i| i != item);
+            }
+        }
+        if self.cursor == Some(item) {
+            self.cursor = None;
+        } else {
+            self.count = self.count.wrapping_sub(1);
+        }
+        if self.weapon_guid == d.guid {
+            self.weapon_guid = NO_GUID;
+        }
+        d.node_grid = 0;
+        d.node_kind = node::NONE;
+        d.inv = None;
+        true
+    }
+}
+
+/// Interaction of a player (`0x00554100`; `world/npc.md` §2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InteractionTarget {
+    None,
+    /// The interaction's unit no longer exists.
+    Missing,
+    /// A unit of this type (0 player, 1 monster, …).
+    Unit {
+        ty: u8,
+        unit: UnitId,
+    },
+}
+
+/// Seam: item units, unit stats and the routines of other specs that the
+/// inventory paths call. Expected provider: the wiring of item units
+/// (`sim/units.md`) with stats (`sim/stats.md`, `sim/stat-lists.md`).
+pub trait InvWorld {
+    // --- Game.
+    /// Expansion game (game +0x70, §1.3).
+    fn expansion(&self) -> bool;
+
+    // --- Item units.
+    /// The item data of an item unit (none: not an item / missing).
+    fn item(&self, item: UnitId) -> Option<&InvItem>;
+    fn item_mut(&mut self, item: UnitId) -> Option<&mut InvItem>;
+    /// Unit lookup type 4 by GUID (`sim/unit-order.md` §2).
+    fn item_by_guid(&self, guid: u32) -> Option<UnitId>;
+    /// An item stat total (`sim/stats.md`).
+    fn item_stat(&self, item: UnitId, stat: u16) -> i32;
+    /// Unlinks `item` from the inventory of `owner` (an inventory other
+    /// than the one placing it; §2.2).
+    fn unlink_from(&mut self, owner: UnitId, item: UnitId);
+    /// Removes an item in mode 3 from its room (§2.2: room delete notice
+    /// `0x0061A270`, collision freed `0x00623830`, room list `0x0064C370`).
+    fn remove_from_room(&mut self, item: UnitId);
+    /// Clears unit flag 0x2 (targetable, unit +0xC4) of the item.
+    fn clear_targetable(&mut self, item: UnitId);
+
+    // --- Owner-side routines.
+    /// Link check `0x0063B210(inv, item, kind)`: sockets an item when the
+    /// inventory belongs to an item, else succeeds.
+    fn link_check(&mut self, owner: UnitId, item: UnitId, kind: u8) -> bool;
+    /// Charm re-link `0x0055C270` (open question 6).
+    fn charm_relink(&mut self, owner: UnitId, item: UnitId);
+    /// "Active inventory item for its owner" (`0x0062FF70`).
+    fn active_item(&self, owner: UnitId, item: UnitId) -> bool;
+    /// Stat refresh `0x0055C2C0(owner, 0)`.
+    fn stat_refresh(&mut self, owner: UnitId);
+    /// Socketed with fillers (`0x0055F590`).
+    fn socket_filled(&self, item: UnitId) -> bool;
+    /// Owner refresh `0x00621000(unit, 1)` (§6.1 rule 1).
+    fn owner_refresh(&mut self, owner: UnitId);
+    /// Inventory pass `0x0055DBC0(0)` (open question 6).
+    fn inventory_pass(&mut self, owner: UnitId);
+    /// Trade hook `0x00568770` (page 2; multiplayer trade, out of scope).
+    fn trade_hook(&mut self, owner: UnitId, item: UnitId);
+    /// Weapon-in-use update `0x006233A0` (§4.6 step 4).
+    fn weapon_in_use_update(&mut self, unit: UnitId);
+    /// Stat link `0x0063D1D0` (§4.6 step 5).
+    fn stat_link(&mut self, unit: UnitId, item: UnitId);
+    /// Weapon bookkeeping `0x0055C5C0` (§4.6 step 5).
+    fn weapon_bookkeeping(&mut self, unit: UnitId, item: UnitId);
+
+    // --- Units (requirements, hands, checks).
+    /// Kind of a unit; none when it does not exist.
+    fn unit_kind(&self, unit: UnitId) -> Option<UnitKind>;
+    /// A unit stat total (strength 0, dexterity 2, level 12).
+    fn unit_stat(&self, unit: UnitId, stat: u16) -> i32;
+
+    // --- Requirements (§4.2).
+    /// Item stat 91 `item_req_percent`, item or skill stat (`0x00625500`).
+    fn req_percent(&self, item: UnitId) -> i32;
+    /// `value × p / 100` (`0x00483360`; exact rounding: open question 4).
+    fn percent_of(&self, value: i32, p: i32) -> i32;
+    /// The item is active on the unit (`0x00625820`).
+    fn item_active_on(&self, item: UnitId, unit: UnitId) -> bool;
+    /// The item's own contribution to a unit stat (`0x0062B450(stat)`).
+    fn own_contribution(&self, item: UnitId, unit: UnitId, stat: u16) -> i32;
+    /// Level requirement (`0x0062B5B0`; −1 none; open question 5).
+    fn level_requirement(&self, item: UnitId, unit: UnitId) -> i32;
+
+    // --- Hands (§4.3, §4.4).
+    /// Two-handed (`0x006289C0`).
+    fn two_handed(&self, item: UnitId) -> bool;
+    /// One-or-two-handed for the unit (`0x0062A1E0`).
+    fn one_or_two_handed(&self, unit: UnitId, item: UnitId) -> bool;
+    /// Ammo type of an item (`0x0062E6F0`): an itemtypes row, none.
+    fn ammo_type(&self, item: UnitId) -> Option<i16>;
+    /// Quiver type (`0x0062E740`, `items/generation.md` §1.3: itemtype
+    /// `quiver` ≠ 0); a default from the tables is given.
+    fn quiver_type(&self, t: &InvTables, item: UnitId) -> bool {
+        self.item(item)
+            .and_then(|d| t.itype_of(d.record))
+            .is_some_and(|r| r.quiver != 0)
+    }
+    /// "X fits a free position of page 0" (`0x0063CB00`, §4.3).
+    fn fits_free_page0(&self, inv: &Inventory, item: UnitId) -> bool;
+
+    // --- Stack test (§4.5; open question 7).
+    /// Quality (item data +0, `0x00627E70`).
+    fn quality(&self, item: UnitId) -> u8;
+    /// Unique/set file index (`0x00629DA0`).
+    fn stack_file_index(&self, item: UnitId) -> i32;
+    /// `0x0062A8D0` value.
+    fn stack_value(&self, item: UnitId) -> i32;
+    /// `0x0062A2F0` quality test.
+    fn stack_quality_ok(&self, item: UnitId) -> bool;
+    /// Has sockets (`0x006299B0` ≠ 0).
+    fn has_sockets(&self, item: UnitId) -> bool;
+
+    // --- Auto-equip (§4.7).
+    /// Allowed location (`0x0062FDF0`).
+    fn has_allowed_location(&self, item: UnitId) -> bool;
+    /// Quiver-type item (`0x00628480` ≠ 0).
+    fn quiver_kind(&self, item: UnitId) -> bool;
+    /// Weapon/shield comparison (`0x0055D560` / `0x0055D670`, open
+    /// question 8): may `item` go to `loc`, with the other allowed
+    /// location used.
+    fn auto_equip_allows(&self, unit: UnitId, item: UnitId, loc: u8) -> bool;
+
+    // --- Targeting reset (§5.3).
+    /// `0x0044BE50` of the item (0 → queue 0x3F).
+    fn targeting_probe(&self, item: UnitId) -> u32;
+    /// Queue S→C 0x3F (code 0xFF, the item's GUID, 0xFFFF; §11).
+    fn queue_untarget(&mut self, player: UnitId, item_guid: u32);
+
+    // --- Players (§5).
+    /// The player's interaction (`0x00554100`).
+    fn interaction(&self, player: UnitId) -> InteractionTarget;
+    /// Clears the interaction (`0x00554190`).
+    fn clear_interaction(&mut self, player: UnitId);
+    /// Player data +0x4C.
+    fn player_data_4c(&self, player: UnitId) -> u32;
+    /// Player data +0x50.
+    fn player_data_50(&self, player: UnitId) -> u32;
+    /// The player is in the NPC's interaction list with state 0
+    /// (talking; `world/npc.md` §2).
+    fn npc_talking(&self, npc: UnitId, player: UnitId) -> bool;
+    /// The player-trade part of `0x00567620` (multiplayer, out of scope):
+    /// `Some(allowed)` when a player trade decides, `None` otherwise.
+    fn player_trade_gate(&self, player: UnitId) -> Option<bool>;
+    /// The item and the player are in the same act.
+    fn same_act(&self, player: UnitId, item: UnitId) -> bool;
+    /// `0x00548EF0(player, item, range)`: within `range` subtiles per axis.
+    fn within_range(&self, player: UnitId, item: UnitId, range: i32) -> bool;
+}

@@ -1,20 +1,32 @@
 //! d2-client entry point.
 //!
 //! Usage:
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
 //!
+//! `play` (the default) opens a window running the local single-player game: the
+//! in-process server (`d2-server` host over the wired `d2-sim`) pumped
+//! once per frame through the bridge, the world view composed by the GPU
+//! compositor's render-graph node. With $D2_GAME_DIR set it reads the
+//! game's `levels` and `objects` tables and generates its levels from the
+//! user's DS1 / DT1 files (unless `--synthetic`); otherwise it uses
+//! synthetic tables and levels.
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
 //! for byte; exit code 0 = all pass, 1 = a failure or error, 2 = none
-//! failed but a GPU half is incomplete (no adapter). With a map flag (`--ds1`,
+//! failed but a GPU half is incomplete (no adapter) or a scene case stops
+//! at a seam (the recording lacks what the world view needs; the recorded
+//! camera is still checked). `verify --cases crates/d2-client/capture-cases` runs
+//! the 1.14d capture cases (`render/capture.md`). With a map flag (`--ds1`,
 //! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
 //! instead (default view: the whole map; exit 0 means identical).
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
-//! exactly N. `cpu-render` writes the CPU reference image only.
+//! exactly N. Every case (map and synthetic) runs on one headless compute
+//! compositor. `cpu-render` writes the CPU reference image only.
 //!
 //! Game files are read from $D2_GAME_DIR. Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
@@ -49,8 +61,12 @@ struct Options {
     case_dir: Option<PathBuf>,
     /// `verify`: run only these cases (file stems); default all.
     cases: Vec<String>,
-    /// `view`: close after this many frames (smoke test).
+    /// `view`, `play`: close after this many frames (smoke test).
     frames: Option<u32>,
+    /// `play`: game seed.
+    seed: u32,
+    /// `play`: synthetic tables even with $D2_GAME_DIR set.
+    synthetic: bool,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -82,6 +98,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
         case_dir: None,
         cases: Vec::new(),
         frames: None,
+        seed: d2_client::app::single_player::DEFAULT_SEED,
+        synthetic: false,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -98,6 +116,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--out" => o.out = Some(PathBuf::from(value()?)),
             "--perturb" => o.perturb = value()?.parse().context("--perturb")?,
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
+            "--seed" => o.seed = value()?.parse().context("--seed")?,
+            "--synthetic" => o.synthetic = true,
             "--probe" => {
                 let v = value()?;
                 let (x, y) = v.split_once(',').context("--probe expects X,Y")?;
@@ -223,13 +243,18 @@ fn verify(o: Options) -> Result<()> {
             wall_base: o.wall_base,
             view: o.view.map(|v| (v.left, v.top, v.width, v.height)),
         };
-        let report = verify::map::run("map", &case, o.out, o.perturb);
+        let mut gpu = verify::gpu::Wgpu::new();
+        let report = verify::map::run_with("map", &case, o.out, o.perturb, &mut gpu);
+        verify::print_report(&report);
         return match report.status {
             verify::Status::Pass => Ok(()),
             verify::Status::Fail(why) => bail!(why),
             verify::Status::Error(e) => bail!(e),
-            verify::Status::GpuNotWired | verify::Status::NoAdapter(_) => {
-                unreachable!("map cases run their GPU half in the Bevy app")
+            verify::Status::GpuNotWired => bail!("map case: GPU half not wired"),
+            verify::Status::SceneNotWired => bail!("map case: scene source not wired"),
+            verify::Status::NoAdapter(why) => {
+                eprintln!("map case: no GPU adapter: {why}");
+                std::process::exit(2)
             }
         };
     }
@@ -246,21 +271,39 @@ fn verify(o: Options) -> Result<()> {
         cases.retain(|c| o.cases.contains(&c.name));
     }
     println!("verify: {} cases from {}", cases.len(), dir.display());
-    // The compute compositor on a headless adapter, opened at the first
-    // synthetic case (after the map case's Bevy app, which sorts first).
+    // One compute compositor on a headless adapter for every case (map and
+    // synthetic alike), so the process opens one device; opened at the
+    // first case.
     let mut gpu = verify::gpu::Wgpu::new();
     let mut announced = false;
     let mut summary = verify::Summary::default();
     for case in &cases {
         println!("case {} ({})", case.name, case.kind.name());
+        if !std::mem::replace(&mut announced, true) {
+            println!("GPU compositor: {}", gpu.open());
+        }
         let report = match &case.kind {
             verify::CaseKind::Synthetic(s) => {
-                if !std::mem::replace(&mut announced, true) {
-                    println!("GPU compositor: {}", gpu.open());
-                }
                 verify::run_synthetic(&case.name, s, o.perturb, &mut gpu)
             }
-            verify::CaseKind::Map(m) => verify::map::run(&case.name, m, None, o.perturb),
+            verify::CaseKind::Map(m) => {
+                verify::map::run_with(&case.name, m, None, o.perturb, &mut gpu)
+            }
+            // render/capture.md: the recorded camera is checked against
+            // camera.md §1, §3, then the frame goes through the world view
+            // and `rules::OriginalView`; the recording holds no units, map
+            // or UI yet, so compare cases stop at that seam
+            // (`scene_source::RECORDER_GAP`).
+            verify::CaseKind::Scene(sc) => verify::capture_case::run_capture(
+                &case.name,
+                sc,
+                &verify::capture_case::repo_root(),
+                o.perturb,
+                &mut verify::capture_case::scene_source::WorldScene::new(
+                    verify::capture_case::scene_source::NotRecorded,
+                ),
+                &mut gpu,
+            ),
         };
         verify::print_report(&report);
         summary.add(&report.status);
@@ -290,13 +333,41 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
+fn play(o: Options) -> Result<()> {
+    use d2_client::app::{play, single_player};
+    let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
+    let data = single_player::GameData::select(dir.as_deref(), o.synthetic)?;
+    match &data {
+        single_player::GameData::Live(d) => println!(
+            "play: game data from D2_GAME_DIR ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
+            d.waypoints.levels.len(),
+            d.waypoints.objects.len(),
+            d.waypoints.object_class,
+            d.files.ds1.0.len(),
+            d.files.subs.0.len(),
+            d.files.dt1.0.len()
+        ),
+        single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
+    }
+    let result = play::run(play::PlayConfig {
+        data,
+        seed: o.seed,
+        exit_after: o.frames,
+    })?;
+    match result {
+        bevy::app::AppExit::Success => Ok(()),
+        bevy::app::AppExit::Error(code) => bail!("play exited with code {code}"),
+    }
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
-        Some("view") | None => view(parse_options(args.get(1..).unwrap_or(&[]))?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N]"),
+        Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
+        Some("view") => view(parse_options(&args[1..])?),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic]"),
     }
 }
 

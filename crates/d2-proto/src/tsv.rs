@@ -8,8 +8,9 @@
 //! 0x00, 0x01, ... without gaps), an unknown size-rule, handler-size or
 //! layout syntax, an unknown enum word, a repeated message name, a layout
 //! field outside a fixed size or over the id byte, two fields sharing a
-//! bit, and a `==N` handler size that differs from the fixed transport
-//! size.
+//! bit, a `==N` handler size that differs from the fixed transport
+//! size, and a `bits:` layout (S→C only) with a width outside 1..=32, an
+//! `@` offset, a non-fixed size or more bits than the size holds.
 
 use crate::generated::{CLIENT_MESSAGES, SERVER_MESSAGES};
 use crate::schema::*;
@@ -253,14 +254,15 @@ fn field_type(s: &str) -> Result<FieldType, String> {
     })
 }
 
-/// Bytes a fixed-offset field spans (bit fields span their u32).
+/// Bytes a fixed-offset field spans (bit fields span their u32; a packed
+/// field has no byte offset: `None`).
 pub fn field_bytes(ty: FieldType) -> Option<usize> {
     match ty {
         FieldType::U8 => Some(1),
         FieldType::U16 => Some(2),
         FieldType::U32 | FieldType::Bits(_) | FieldType::Bit(_) => Some(4),
         FieldType::Cstr16 => Some(16),
-        FieldType::Cstr | FieldType::Tail => None,
+        FieldType::Cstr | FieldType::Tail | FieldType::Packed { .. } => None,
     }
 }
 
@@ -274,11 +276,64 @@ fn bit_range(ty: FieldType, off: usize) -> Option<(usize, usize)> {
     })
 }
 
-/// Layout cell (§2.4 rule 10), checked against the size rule.
+/// `bits:` layout cell (§5, server-messages.tsv `layout`): fields
+/// `name:width` packed LSB-first from bit 0 of byte 0, each starting where
+/// the previous one ends. Widths are 1..=32; the message has a fixed size
+/// and the fields fit in its bits; `@` offsets are not allowed.
+fn bits_layout<'a>(s: &'a str, size: &SizeRule) -> Result<Vec<Field<'a>>, String> {
+    let Some(n) = size.fixed() else {
+        return Err("`bits:` layout needs a fixed size".into());
+    };
+    let mut out = Vec::new();
+    let mut bit = 0usize;
+    for tok in s.split(' ') {
+        if tok.contains('@') {
+            return Err(format!("`@` offset in a `bits:` layout: `{tok}`"));
+        }
+        let Some((name, w)) = tok.split_once(':') else {
+            return Err(format!("bad layout field `{tok}`"));
+        };
+        let name = field_name(name)?;
+        // Decimal, no leading zero.
+        let width: u8 =
+            match w.bytes().all(|c| c.is_ascii_digit()) && !(w.starts_with('0') && w != "0") {
+                true => w.parse().map_err(|_| format!("bad bit width `{tok}`"))?,
+                false => return Err(format!("bad bit width `{tok}`")),
+            };
+        if !(1..=PACKED_MAX_WIDTH).contains(&width) {
+            return Err(format!("bit width out of range `{tok}`"));
+        }
+        if bit + width as usize > 8 * n {
+            return Err(format!(
+                "`{tok}` ends past bit {} of the fixed size {n}",
+                8 * n
+            ));
+        }
+        out.push(Field {
+            name,
+            ty: FieldType::Packed {
+                bit: bit as u16,
+                width,
+            },
+            offset: None,
+        });
+        bit += width as usize;
+    }
+    Ok(out)
+}
+
+/// Layout cell (§2.4 rule 10; `bits:` form §5), checked against the size
+/// rule.
 pub fn layout<'a>(s: &'a str, size: &SizeRule) -> Result<Vec<Field<'a>>, String> {
     let mut out: Vec<Field<'a>> = Vec::new();
     if s.is_empty() {
         return Ok(out);
+    }
+    if let Some(rest) = s.strip_prefix("bits:") {
+        return match rest.strip_prefix(' ') {
+            Some(rest) if !rest.is_empty() => bits_layout(rest, size),
+            _ => Err(format!("bad `bits:` layout `{s}`")),
+        };
     }
     for tok in s.split(' ') {
         if out.last().is_some_and(|f| f.ty == FieldType::Tail) {
@@ -424,7 +479,12 @@ pub fn parse_client(text: &str) -> Result<Vec<ClientRow<'_>>, TsvError> {
             name,
             transport_size,
             handler_size,
-            layout: layout(c[4], &transport_size)?,
+            layout: match layout(c[4], &transport_size)? {
+                l if l.iter().any(|f| matches!(f.ty, FieldType::Packed { .. })) => {
+                    return Err(format!("`bits:` layout is S→C only: `{}`", c[4]))
+                }
+                l => l,
+            },
             handler: addr(c[5])?,
             kind: match c[6] {
                 "handler" => Kind::Handler,
@@ -646,5 +706,130 @@ mod tests {
         assert_eq!(parse_client(&t).unwrap_err().line, 1);
         let t = replace_line(CLIENT_TSV, "0x01\t", "alive", "living");
         assert_eq!(parse_client(&t).unwrap_err().line, 3);
+    }
+
+    // Covers: specs/sim/intents-events.md §5
+    #[test]
+    fn bits_layout_0x96_bit_ranges() {
+        let s = parse_server(SERVER_TSV).unwrap();
+        let ranges: Vec<(&str, u16, u8)> = s[0x96]
+            .layout
+            .iter()
+            .map(|f| match f.ty {
+                FieldType::Packed { bit, width } => {
+                    assert_eq!(f.offset, None);
+                    (f.name, bit, width)
+                }
+                t => panic!("not packed: {t:?}"),
+            })
+            .collect();
+        assert_eq!(
+            ranges,
+            [
+                ("id", 0, 8),
+                ("stamina", 8, 15),
+                ("x", 23, 16),
+                ("y", 39, 16),
+                ("dx", 55, 8),
+                ("dy", 63, 8),
+            ]
+        );
+    }
+
+    fn server_err(text: &str) -> String {
+        parse_server(text).unwrap_err().msg
+    }
+
+    /// M08: each `bits:` rule rejects exactly its perturbation.
+    #[test]
+    fn bits_layout_strict_errors() {
+        let row = "0x96\t";
+        // Width sum past 8 × size: 71 bits of 72, then 73.
+        let t = replace_line(SERVER_TSV, row, "dy:8", "dy:10");
+        assert!(server_err(&t).contains("past bit 72 of the fixed size 9"));
+        let t = replace_line(SERVER_TSV, row, "dy:8", "dy:9");
+        assert_eq!(parse_server(&t).unwrap()[0x96].layout.len(), 6);
+        // Size shrunk under the fields.
+        let t = replace_line(SERVER_TSV, row, "\t9\t", "\t8\t");
+        assert!(server_err(&t).contains("past bit 64"));
+        // Widths 1..=32.
+        let t = replace_line(SERVER_TSV, row, "dx:8", "dx:0");
+        assert!(server_err(&t).contains("bit width out of range"));
+        let t = replace_line(SERVER_TSV, row, "\t9\t", "\t16\t");
+        let t = replace_line(&t, row, "dy:8", "dy:33");
+        assert!(server_err(&t).contains("bit width out of range"));
+        let t = replace_line(SERVER_TSV, row, "dx:8", "dx:08");
+        assert!(server_err(&t).contains("bad bit width"));
+        // No `@` offsets or byte types mixed in.
+        let t = replace_line(SERVER_TSV, row, "dx:8", "dx:u8@7");
+        assert!(server_err(&t).contains("`@` offset"));
+        let t = replace_line(SERVER_TSV, row, "dx:8", "dx");
+        assert!(server_err(&t).contains("bad layout field"));
+        let t = replace_line(SERVER_TSV, row, "bits: ", "bits:");
+        assert!(server_err(&t).contains("bad `bits:` layout"));
+        // Fixed size only.
+        let t = replace_line(SERVER_TSV, row, "\t9\t", "\tu8@1+2\t");
+        assert!(server_err(&t).contains("needs a fixed size"));
+        // S→C only.
+        let t = replace_line(
+            CLIENT_TSV,
+            "0x01\t",
+            "x:u16@1 y:u16@3",
+            "bits: id:8 x:16 y:16",
+        );
+        assert!(client_err(&t).contains("S→C only"));
+    }
+
+    /// The pack/unpack helpers and the typed struct agree with a 0x96
+    /// message built by hand from the rule (LSB-first from bit 0 of byte
+    /// 0, fields in layout order).
+    #[test]
+    fn bits_0x96_round_trip() {
+        use crate::server::WalkVerify;
+        use crate::FixedMessage;
+        let (stamina, x, y, dx, dy) = (0x5ABCu128, 0x1234u128, 0xBEEFu128, 0x7Fu128, 0x80u128);
+        let v = 0x96 | stamina << 8 | x << 23 | y << 39 | dx << 55 | dy << 63;
+        let hand = &v.to_le_bytes()[..9];
+        assert_eq!(hand, [0x96, 0xBC, 0x5A, 0x1A, 0x89, 0x77, 0xDF, 0x3F, 0x40]);
+
+        let row = &crate::SERVER_MESSAGES[0x96];
+        let want = [0x96, 0x5ABC, 0x1234, 0xBEEF, 0x7F, 0x80];
+        let mut packed = [0u8; 9];
+        for (f, &w) in row.layout.iter().zip(&want) {
+            let FieldType::Packed { bit, width } = f.ty else {
+                panic!("not packed")
+            };
+            assert_eq!(
+                packed_get(hand, bit as usize, width as u32),
+                w,
+                "{}",
+                f.name
+            );
+            packed_put(&mut packed, bit as usize, width as u32, w);
+        }
+        assert_eq!(packed, hand);
+
+        let m = WalkVerify::decode(hand).unwrap();
+        assert_eq!(
+            m,
+            WalkVerify {
+                stamina: 0x5ABC,
+                x: 0x1234,
+                y: 0xBEEF,
+                dx: 0x7F,
+                dy: 0x80
+            }
+        );
+        assert_eq!(m.encode(), hand);
+        // The unused top bit (71) decodes to nothing and encodes as 0.
+        let mut top = hand.to_vec();
+        top[8] |= 0x80;
+        assert_eq!(WalkVerify::decode(&top), Ok(m));
+    }
+
+    #[test]
+    #[should_panic(expected = "does not fit in 15 bits")]
+    fn packed_put_rejects_wide_values() {
+        packed_put(&mut [0; 9], 8, 15, 0x8000);
     }
 }

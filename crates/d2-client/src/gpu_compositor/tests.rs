@@ -16,7 +16,7 @@ fn module() -> naga::Module {
 }
 
 fn cpu(case: &Case) -> Vec<u8> {
-    scene::compose(&case.items, &case.frames, &case.maps, case.view).expect("valid case")
+    case.reference().expect("valid case")
 }
 
 fn case_named(name: &str) -> Case {
@@ -95,7 +95,11 @@ fn shader_struct_layouts_match_packing() {
                 ("item_count", 16),
                 ("map_rows", 20),
                 ("pages", 24),
-                ("pad", 28)
+                ("clear_rows", 28),
+                ("clear_after", 32),
+                ("pad0", 36),
+                ("pad1", 40),
+                ("pad2", 44)
             ])
         )
     );
@@ -132,6 +136,7 @@ fn shader_bindings() {
             (0, 6, "indices"),
             (0, 7, "palette"),
             (0, 8, "rgba"),
+            (0, 9, "base"),
         ]
     );
 }
@@ -168,13 +173,15 @@ fn item_and_params_bytes_are_little_endian() {
         item_count: 3,
         map_rows: 513,
         pages: 2,
+        clear_rows: 553,
+        clear_after: 1,
     };
     let b = params.to_le_bytes();
     assert_eq!(
         b,
         [
             0x20, 3, 0, 0, 0x58, 2, 0, 0, 25, 0, 0, 0, 19, 0, 0, 0, 3, 0, 0, 0, 1, 2, 0, 0, 2, 0,
-            0, 0, 0, 0, 0, 0
+            0, 0, 0x29, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ]
     );
     assert_eq!(Params::from_le_bytes(&b), params);
@@ -229,6 +236,53 @@ fn pack_vector() {
     assert_eq!(p.params.map_rows, 1);
     assert_eq!(p.items_bytes().len(), 2 * ITEM_SIZE);
     assert_eq!(p.bin_ranges_bytes().len(), 5 * 4);
+    // No frame given: a zero base of the view, no clears.
+    assert_eq!(p.base, vec![0; 64 * 40]);
+    assert_eq!(p.plan(), scene::FramePlan::NONE);
+}
+
+/// The base is one byte per view pixel, four per word, little-endian,
+/// zero-padded; the plan goes into the params; bad sizes are rejected.
+// Covers: specs/render/composition.md §3 text, §6
+#[test]
+fn pack_frame_base_and_plan() {
+    let frames = vec![FrameImage {
+        width: 1,
+        height: 1,
+        pixels: vec![1],
+    }];
+    let items = vec![DrawItem::new(scene::FrameId(0), 0, 0)];
+    let maps = MapTable::new();
+    let view = Rect::new(0, 0, 3, 2);
+    let slots = vec![AtlasSlot {
+        page: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+    }];
+    let bins = scene::bin(&items, &frames, &maps, view).unwrap();
+    let p = pack(&items, &bins, &frames, &slots, &maps, 1).unwrap();
+    let plan = scene::FramePlan {
+        clear_rows: 1,
+        clear_after: true,
+    };
+    let p = p.with_frame(&[1, 2, 3, 4, 5, 6], plan).unwrap();
+    assert_eq!(p.base_bytes(), [1, 2, 3, 4, 5, 6, 0, 0]);
+    assert_eq!((p.params.clear_rows, p.params.clear_after), (1, 1));
+    assert_eq!(p.plan(), plan);
+    assert!(matches!(
+        p.clone().with_frame(&[0; 5], plan),
+        Err(GpuError::Scene(scene::SceneError::BaseSize { .. }))
+    ));
+    let rows = scene::FramePlan {
+        clear_rows: 3,
+        clear_after: false,
+    };
+    assert!(matches!(
+        p.with_frame(&[0; 6], rows),
+        Err(GpuError::Scene(scene::SceneError::FramePlan(_)))
+    ));
 }
 
 /// Storage buffers are never empty.
@@ -241,22 +295,33 @@ fn empty_list_pads_buffers() {
     assert_eq!(p.items_bytes(), vec![0; ITEM_SIZE]);
     assert_eq!(p.bin_items_bytes(), vec![0; 4]);
     assert_eq!(p.maps_bytes(), vec![0; 256]);
+    assert_eq!(p.base_bytes(), vec![0; 800 * 600]);
     assert_eq!(p.bin_ranges, vec![0; 25 * 19 + 1]);
     assert_eq!(emulate(&p, atlas.pages()).unwrap(), vec![0; 800 * 600]);
 }
 
 /// The shader's algorithm on the packed bytes equals the CPU reference
-/// (and the binned CPU model) on every synthetic case.
+/// (and the binned CPU model) on every synthetic case, the frame-cycle and
+/// blend-op cases of `composition.md` included.
 // Covers: specs/client/render-pipeline.md §a9-gpu-compute-compositor, §a8-cpu-reference-compositor
+// Covers: specs/render/composition.md §3 text, §5
 #[test]
 fn emulated_shader_matches_cpu_on_all_cases() {
     let all = cases();
-    assert_eq!(all.len(), 12);
+    assert_eq!(all.len(), 18);
     for case in &all {
         let reference = cpu(case);
         let bins = scene::bin(&case.items, &case.frames, &case.maps, case.view).unwrap();
-        let binned =
-            scene::compose_binned(&case.items, &bins, &case.frames, &case.maps, case.view).unwrap();
+        let binned = scene::compose_binned_frame(
+            &case.items,
+            &bins,
+            &case.frames,
+            &case.maps,
+            case.view,
+            &case.base(),
+            case.plan,
+        )
+        .unwrap();
         assert_eq!(binned, reference, "{}", case.name);
         let (atlas, packed) = prepare(case).unwrap();
         let out = emulate(&packed, atlas.pages()).unwrap();
@@ -271,8 +336,15 @@ fn emulated_shader_matches_cpu_on_all_cases() {
 fn cases_are_not_trivial() {
     for case in cases() {
         let drawn = cpu(&case).iter().filter(|&&i| i != 0).count();
-        assert_eq!(drawn == 0, case.name == "empty", "{}", case.name);
+        let black = matches!(case.name, "empty" | "frame-post-clear");
+        assert_eq!(drawn == 0, black, "{}", case.name);
     }
+    // The frame cases start from a non-zero base, and use both clears.
+    let frame = |n| case_named(n).plan;
+    assert!(frame("frame-blank-screen").clear_rows == 553);
+    assert!(frame("frame-no-clear") == scene::FramePlan::NONE);
+    assert!(frame("frame-post-clear").clear_after);
+    assert!(case_named("frame-stress").base.is_some());
     assert_eq!(prepare(&case_named("two-pages")).unwrap().0.page_count(), 2);
     let stress = case_named("stress");
     let (_, p) = prepare(&stress).unwrap();

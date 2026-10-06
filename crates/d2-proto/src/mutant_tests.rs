@@ -9,10 +9,18 @@ use crate::{CLIENT_MESSAGES, SERVER_MESSAGES};
 
 /// Mask of the bits a layout lists (§2.4 rule 10): `u8` / `u16` / `u32` /
 /// `cstr16` whole bytes, `uN@k` bits `0..N` and `bitN@k` bit `N` of the
-/// u32 at `k`.
+/// u32 at `k`; a packed field its bits, LSB-first from bit 0 of byte 0
+/// (§5, `bits:` layouts).
 fn layout_mask(layout: &[Field], size: usize) -> Vec<u8> {
     let mut mask = vec![0u8; size];
     for f in layout {
+        if let FieldType::Packed { bit, width } = f.ty {
+            // LSB-first from bit 0 of byte 0 (§5, `bits:` layouts).
+            for i in usize::from(bit)..usize::from(bit) + usize::from(width) {
+                mask[i / 8] |= 1 << (i % 8);
+            }
+            continue;
+        }
         let off = usize::from(f.offset.expect("fixed message field has an offset"));
         let bits: &[u8] = match f.ty {
             FieldType::U8 => &[0xFF],
@@ -21,6 +29,7 @@ fn layout_mask(layout: &[Field], size: usize) -> Vec<u8> {
             FieldType::Cstr16 => &[0xFF; 16],
             FieldType::Bits(n) => &((1u32 << n) - 1).to_le_bytes(),
             FieldType::Bit(n) => &(1u32 << n).to_le_bytes(),
+            FieldType::Packed { .. } => unreachable!("handled above"),
             FieldType::Cstr | FieldType::Tail => panic!("not a fixed field: {f:?}"),
         };
         for (m, b) in mask[off..off + bits.len()].iter_mut().zip(bits) {
@@ -134,10 +143,13 @@ fn every_typed_message_follows_its_layout() {
     );
     all!(SERVER_MESSAGES, server:
         GameLoading, GameFlags, LoadSuccessful, LoadAct, LoadComplete,
-        UnloadComplete, GameExit, MapReveal, MonsterHit, AddExpByte,
-        AddExpWord, AddExpDword, SetStatByte, SetStatWord, SetStatDword,
+        UnloadComplete, GameExit, MapReveal, MonsterHit, PlayerStop,
+        PlayerMove, PlayerToTarget, ReassignPlayer, SmallGoldPickup,
+        AddExpByte, AddExpWord, AddExpDword, SetStatByte, SetStatWord,
+        SetStatDword, UseStackableItem, ClearCursor, Relator1, Relator2,
         StartMercList, PortalFlags, Unknown6E, Unknown6F, Unknown70,
-        Unknown71, Unknown72, WeaponSwitch, ConnectionTerminated,
+        Unknown71, Unknown72, SetItemState, WalkVerify, WeaponSwitch,
+        ConnectionTerminated,
     );
 }
 
@@ -207,5 +219,52 @@ fn split_keeps_messages_up_to_the_limits() {
     assert_eq!(
         split_server_buffer(&m16),
         Err(SplitError::TooLarge { at: 0, size: 0x205 })
+    );
+}
+
+/// Typed S→C decode (§3.1): an empty buffer and a wrong id are their own
+/// errors; `parse` takes only a message exactly as long as its size rule
+/// gives.
+#[test]
+fn server_msg_decode_and_parse_errors() {
+    use crate::s2c::{parse, ParseError, PlayerStop, ServerMsg};
+    assert_eq!(PlayerStop::decode(&[]), Err(ParseError::Empty));
+    let mut b = [0u8; 13];
+    b[0] = 0x0E;
+    assert_eq!(
+        PlayerStop::decode(&b),
+        Err(ParseError::WrongId {
+            expected: 0x0D,
+            found: 0x0E
+        })
+    );
+    b[0] = 0x0D;
+    assert!(PlayerStop::decode(&b).is_ok());
+    assert!(parse(&b).is_ok());
+    let mut long = b.to_vec();
+    long.push(0);
+    assert_eq!(
+        parse(&long).unwrap_err(),
+        ParseError::WrongSize {
+            id: 0x0D,
+            expected: 13,
+            found: 14
+        }
+    );
+}
+
+/// A variable-size S→C message longer than its size rule (0xAE: u16 at
+/// +1, + 3) is a wrong size (§3.1).
+#[test]
+fn parse_rejects_bytes_past_a_variable_size() {
+    use crate::s2c::{parse, ParseError};
+    assert!(parse(&[0xAE, 1, 0, 7]).is_ok());
+    assert_eq!(
+        parse(&[0xAE, 1, 0, 7, 9]).unwrap_err(),
+        ParseError::WrongSize {
+            id: 0xAE,
+            expected: 4,
+            found: 5
+        }
     );
 }

@@ -1,7 +1,10 @@
 // Spec: specs/client/render-pipeline.md (A9, A10, Test vectors)
+// Spec: specs/render/composition.md (Test vectors)
 //! CPU = GPU comparison on synthetic cases (repo only, no game data): the
 //! spec's test vectors, an off-center view, two atlas pages and a stress
-//! list. C6's verify runner can call [`compare`] with its own cases; the
+//! list; the frame-cycle and pixel-write vectors of `composition.md` (a
+//! persistent base, the BlankScreen and post-draw clears, `L[P[s]]` and
+//! `T[256 × d + P[s]]`) and every blend op with an asymmetric table. C6's verify runner can call [`compare`] with its own cases; the
 //! `gpu_compare` example and an ignored test run [`cases`].
 //!
 //! `--perturb N` (M08): N bytes of the CPU reference are changed before the
@@ -12,7 +15,8 @@ use d2_formats::palette::{Palette, Rgb};
 use super::pack::{pack, AtlasFrames};
 use super::{Gpu, GpuError};
 use crate::scene::{
-    self, order, BlendOp, DrawItem, DrawKey, FrameId, FrameImage, MapId, MapTable, Rect, ShadeChain,
+    self, order, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, FrameImage, FramePlan, MapId,
+    MapTable, Rect, ShadeChain,
 };
 
 /// Atlas pages a case may use.
@@ -28,6 +32,31 @@ pub struct Case {
     pub items: Vec<DrawItem>,
     pub view: Rect,
     pub palette: Palette,
+    /// The previous frame (view sized); `None`: all index 0.
+    pub base: Option<Vec<u8>>,
+    /// The frame's clears (`composition.md` §3).
+    pub plan: FramePlan,
+}
+
+impl Case {
+    /// The start framebuffer of the frame.
+    pub fn base(&self) -> Vec<u8> {
+        self.base
+            .clone()
+            .unwrap_or_else(|| vec![0; self.view.width as usize * self.view.height as usize])
+    }
+
+    /// The CPU reference of the case (`scene::compose_frame`).
+    pub fn reference(&self) -> Result<Vec<u8>, scene::SceneError> {
+        scene::compose_frame(
+            &self.items,
+            &self.frames,
+            &self.maps,
+            self.view,
+            &self.base(),
+            self.plan,
+        )
+    }
 }
 
 /// Byte differences between two equal-length buffers.
@@ -81,7 +110,7 @@ impl std::fmt::Display for Report {
 /// Runs `case` on the CPU reference and on `gpu` and diffs both images,
 /// after changing `perturb` bytes of the CPU reference.
 pub fn compare(gpu: &Gpu, case: &Case, perturb_count: usize) -> Result<Report, GpuError> {
-    let mut cpu = scene::compose(&case.items, &case.frames, &case.maps, case.view)?;
+    let mut cpu = case.reference()?;
     let perturbed = perturb(&mut cpu, perturb_count);
     let cpu_rgba = scene::to_rgba(&cpu, &case.palette);
     let (atlas, packed) = prepare(case)?;
@@ -108,7 +137,8 @@ pub fn prepare(case: &Case) -> Result<(AtlasFrames, super::Packed), GpuError> {
         &atlas.slots,
         &case.maps,
         atlas.page_count(),
-    )?;
+    )?
+    .with_frame(&case.base(), case.plan)?;
     Ok((atlas, packed))
 }
 
@@ -215,6 +245,8 @@ fn case(
         items,
         view,
         palette: distinct_palette(),
+        base: None,
+        plan: FramePlan::NONE,
     }
 }
 
@@ -368,6 +400,113 @@ pub fn cases() -> Vec<Case> {
 
     out.push(stress("offset-view", 7, 120, Rect::new(-37, 13, 333, 250)));
     out.push(stress("stress", 1, 400, Rect::FRAME));
+    out.extend(composition_cases());
+    out
+}
+
+/// `composition.md` Test vectors and every blend op, as frames of the
+/// frame cycle on the 800 × 600 framebuffer.
+fn composition_cases() -> Vec<Case> {
+    let mut out = Vec::new();
+    let all_5 = vec![5u8; (scene::FRAME_WIDTH * scene::FRAME_HEIGHT) as usize];
+    let cycle = |blank: bool, post_clear: u32| {
+        let mut c = FrameCycle::with_pixels(scene::FRAME_WIDTH, scene::FRAME_HEIGHT, all_5.clone())
+            .expect("800 × 600");
+        c.set_post_clear(post_clear);
+        c.plan(blank)
+    };
+    // §3 vectors: all 5, nothing drawn; BlankScreen 1, BlankScreen 0, the
+    // post-draw counter at 1. A drawn item across the cleared edge (rows
+    // 550..556) shows what the clear does under draws.
+    let edge = || vec![DrawItem::new(FrameId(0), 390, 550)];
+    for (name, blank, post_clear) in [
+        ("frame-blank-screen", true, 0),
+        ("frame-no-clear", false, 0),
+        ("frame-post-clear", true, 1),
+    ] {
+        let mut c = case(
+            name,
+            vec![solid(20, 6, 9)],
+            MapTable::new(),
+            edge(),
+            Rect::FRAME,
+        );
+        c.base = Some(all_5.clone());
+        c.plan = cycle(blank, post_clear);
+        out.push(c);
+    }
+
+    // §5 vectors: s = 7, P[7] = 9, L[9] = 3, no T → 3; s = 7, P[7] = 9,
+    // T, d = 200 → T[256 × 200 + 9]. One pixel each over a base of 200.
+    let mut maps = MapTable::new();
+    let p = maps.push(map_with(&[(7, 9)]));
+    let l = maps.push(map_with(&[(9, 3)]));
+    let t = maps.push_table(&blend_table(4));
+    let one = FrameImage {
+        width: 1,
+        height: 1,
+        pixels: vec![7],
+    };
+    let mut pl = DrawItem::new(FrameId(0), 10, 10);
+    pl.shade = ShadeChain::new(&[p, l]).expect("chain");
+    let mut pt = DrawItem::new(FrameId(0), 11, 10);
+    pt.shade = ShadeChain::new(&[p]).expect("chain");
+    pt.blend = BlendOp::IndexTable(t);
+    let mut c = case(
+        "pixel-write",
+        vec![one],
+        maps,
+        vec![pl, pt],
+        Rect::new(0, 0, 32, 32),
+    );
+    c.base = Some(vec![200; 32 * 32]);
+    out.push(c);
+
+    // Every blend op over every (dest, src) pair: dest row y = y, source
+    // column x = x (column 0 transparent), an asymmetric table, so a
+    // swapped row / column shows.
+    let mut maps = MapTable::new();
+    let t = maps.push_table(&blend_table(5));
+    let dest = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256u32).map(|p| (p / 256) as u8).collect(),
+    };
+    let src = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256u32).map(|p| (p % 256) as u8).collect(),
+    };
+    let mut table = DrawItem::new(FrameId(1), 0, 0);
+    table.blend = BlendOp::IndexTable(t);
+    let opaque = DrawItem::new(FrameId(1), 0, 256);
+    let mut c = case(
+        "blend-ops",
+        vec![dest, src],
+        maps,
+        vec![
+            DrawItem::new(FrameId(0), 0, 0),
+            DrawItem::new(FrameId(0), 0, 256),
+            table,
+            opaque,
+        ],
+        Rect::new(0, 0, 256, 512),
+    );
+    c.base = Some((0..256 * 512u32).map(|i| (i * 13 % 251) as u8).collect());
+    out.push(c);
+
+    // The stress list as one frame of a running cycle: a random previous
+    // frame, BlankScreen clear, draws over both the cleared and the kept
+    // rows.
+    let mut c = stress("frame-stress", 3, 300, Rect::FRAME);
+    let mut rng = Lcg(99);
+    c.base = Some(
+        (0..scene::FRAME_WIDTH * scene::FRAME_HEIGHT)
+            .map(|_| rng.below(256) as u8)
+            .collect(),
+    );
+    c.plan = cycle(true, 0);
+    out.push(c);
     out
 }
 

@@ -1,12 +1,15 @@
 // Spec: specs/sim/tick.md §3, §4 (room pass), §5; specs/monsters/population.md §1.1
 //! [`WorldSim`]: the action systems ([`ActionSim`]) plus the world state,
 //! as one [`EventDispatch`] and [`TickHooks`] for [`crate::tick::tick`].
-//! Timer events run the unit dispatch with the action hooks plus the
-//! world state ([`super::events`]: monster event 7, the world state's
-//! part of a unit free). Every tick hook goes to the action systems,
-//! except the room-pass hooks of step 3 (`tick.md` §4), which run
-//! population (`population.md` §1.1): ambient spawns, presets, inactive
-//! restore, objects, monster population.
+//! Timer events run the action systems' unit dispatch with the world
+//! state lent to the action hooks ([`super::monster_world`]: monster
+//! event 7, monster init on allocation, the world state's part of a unit
+//! free, the umod callbacks, monster-data queries). Every tick hook goes
+//! to the action systems, with the world state lent too, except the
+//! room-pass hooks of step 3 (`tick.md` §4), which run population
+//! (`population.md` §1.1) on a [`WorldHost`] holding the world state:
+//! ambient spawns, presets, inactive restore, objects, monster
+//! population.
 
 use std::sync::Arc;
 
@@ -105,22 +108,28 @@ impl<X: WorldPending> WorldSim<X> {
 }
 
 impl<X: WorldPending> EventDispatch for WorldSim<X> {
-    /// The unit dispatch with the action hooks and the world state
-    /// ([`super::events::WorldHooks`]: monster event 7, the world state's
-    /// part of a unit free).
+    /// The unit dispatch of the action systems with the world state lent
+    /// to the action hooks ([`super::events`]: monster event 7, the world
+    /// state's part of a unit free, the monster routes of the action
+    /// adapters).
     fn run_event(&mut self, game: &mut Game, run: &TimerRun) {
-        self.run_world_event(game, run);
+        self.lend(|a| a.run_event(game, run));
     }
 }
 
-impl<X: WorldPending> TickHooks for WorldSim<X> {
-    fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
-        self.action.advance_environment(game, act)
-    }
-    fn environment_changed(&mut self, game: &mut Game, act: u8, client: ClientId) {
-        self.action.environment_changed(game, act, client)
-    }
+/// Tick hooks forwarded to the action systems with the world state lent.
+macro_rules! lent {
+    ($( $(#[$m:meta])* fn $name:ident(&mut self, game: &mut Game $(, $a:ident: $t:ty)*) $(-> $r:ty)?; )*) => {
+        $(
+            $(#[$m])*
+            fn $name(&mut self, game: &mut Game $(, $a: $t)*) $(-> $r)? {
+                self.lend(|s| s.$name(game $(, $a)*))
+            }
+        )*
+    };
+}
 
+impl<X: WorldPending> TickHooks for WorldSim<X> {
     /// Step 3 `0x0054F060` (`population.md` §12).
     fn ambient_spawns(&mut self, game: &mut Game, r: RoomId) {
         self.population(game, |cx| room::ambient(cx, r));
@@ -142,64 +151,28 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         self.population(game, |cx| room::populate_room(cx, r));
     }
 
-    fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool {
-        self.action.client_room_ready(game, client)
-    }
-    fn send_load_complete(&mut self, game: &mut Game, client: ClientId) {
-        self.action.send_load_complete(game, client)
-    }
-    fn refresh_inventory(&mut self, game: &mut Game, client: ClientId) {
-        self.action.refresh_inventory(game, client)
-    }
-    fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
-        self.action.join_sequence(game, client)
-    }
-    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
-        self.action.send_removed_units(game, client)
-    }
-    fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
-        self.action.send_unit_update(game, client, unit)
-    }
-    fn client_update_messages(&mut self, game: &mut Game, client: ClientId) {
-        self.action.client_update_messages(game, client)
-    }
-    fn client_level_change(&mut self, game: &mut Game, client: ClientId) {
-        self.action.client_level_change(game, client)
-    }
-    fn arena_sync(&mut self, game: &mut Game, client: ClientId) {
-        self.action.arena_sync(game, client)
-    }
-    fn unit_update(&mut self, game: &mut Game, unit: UnitId) {
-        self.action.unit_update(game, unit)
-    }
-    fn clear_arena_flag(&mut self, game: &mut Game) {
-        self.action.clear_arena_flag(game)
-    }
-    fn free_removal_records(&mut self, game: &mut Game, r: RoomId) {
-        self.action.free_removal_records(game, r)
-    }
-    fn update_quests(&mut self, game: &mut Game) {
-        self.action.update_quests(game)
-    }
-    fn room_inactivity(&mut self, game: &mut Game, r: RoomId) -> u32 {
-        self.action.room_inactivity(game, r)
-    }
-    fn act_allows_room_removal(&mut self, game: &mut Game, act: u8, r: RoomId) -> bool {
-        self.action.act_allows_room_removal(game, act, r)
-    }
-    fn compress_unit(&mut self, game: &mut Game, unit: UnitId) {
-        self.action.compress_unit(game, unit)
-    }
-    fn room_deactivated(&mut self, game: &mut Game, act: u8, r: RoomId) {
-        self.action.room_deactivated(game, act, r)
-    }
-    fn free_inactive_rooms(&mut self, game: &mut Game, act: u8) {
-        self.action.free_inactive_rooms(game, act)
-    }
-    fn delete_inactive_items(&mut self, game: &mut Game, act: u8) {
-        self.action.delete_inactive_items(game, act)
-    }
-    fn expire_inactive_unit_items(&mut self, game: &mut Game, act: u8) {
-        self.action.expire_inactive_unit_items(game, act)
+    lent! {
+        fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool;
+        fn environment_changed(&mut self, game: &mut Game, act: u8, client: ClientId);
+        fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool;
+        fn send_load_complete(&mut self, game: &mut Game, client: ClientId);
+        fn refresh_inventory(&mut self, game: &mut Game, client: ClientId);
+        fn join_sequence(&mut self, game: &mut Game, client: ClientId);
+        fn send_removed_units(&mut self, game: &mut Game, client: ClientId);
+        fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId);
+        fn client_update_messages(&mut self, game: &mut Game, client: ClientId);
+        fn client_level_change(&mut self, game: &mut Game, client: ClientId);
+        fn arena_sync(&mut self, game: &mut Game, client: ClientId);
+        fn unit_update(&mut self, game: &mut Game, unit: UnitId);
+        fn clear_arena_flag(&mut self, game: &mut Game);
+        fn free_removal_records(&mut self, game: &mut Game, r: RoomId);
+        fn update_quests(&mut self, game: &mut Game);
+        fn room_inactivity(&mut self, game: &mut Game, r: RoomId) -> u32;
+        fn act_allows_room_removal(&mut self, game: &mut Game, act: u8, r: RoomId) -> bool;
+        fn compress_unit(&mut self, game: &mut Game, unit: UnitId);
+        fn room_deactivated(&mut self, game: &mut Game, act: u8, r: RoomId);
+        fn free_inactive_rooms(&mut self, game: &mut Game, act: u8);
+        fn delete_inactive_items(&mut self, game: &mut Game, act: u8);
+        fn expire_inactive_unit_items(&mut self, game: &mut Game, act: u8);
     }
 }

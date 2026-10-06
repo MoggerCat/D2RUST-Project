@@ -99,7 +99,11 @@ None.
 
 ## Edge cases & original bugs
 
-- Zero-size frames (width or height 0) occur and decode to empty images.
+- Zero-size frames (width or height 0) decode to empty images (d2rs
+  rule). None occurs in the 1.14d files: 0 in the 1,651 DC6 listed by
+  `d2exp.mpq` (367) and `d2data.mpq` (1,284) (ignored game test
+  `dc6_zero_size_frames`, 2026-10-06; `patch_d2.mpq` has no `(listfile)`
+  and is not enumerated). The earlier "they occur" was unmeasured.
 
 ## Test vectors
 
@@ -118,10 +122,9 @@ Riiablo (Apache-2.0) `file/Dc6.java`, `file/Dc6Decoder.java`,
 
 ## Open questions
 
-1. Exact screen placement: Riiablo's two codecs disagree by one row on the
-   vertical extent (`[offset_y − height, offset_y)` vs
-   `[offset_y − height + 1, offset_y]`). Decide in the Phase 1b rendering
-   spec against the original game.
+1. ~~Exact screen placement~~ (Riiablo's codecs disagree by one row).
+   1.14d draws `[offset_y − height + 1, offset_y]`: owner
+   `render/sprite-placement.md` §2.
 2. ~~Orientation of `flip = 1` frames.~~ Confirmed visually: the 140
    flipped frames (all in `data\global\items\inv1x1/1x2/2x2/2x3.dc6`)
    render upright when decoded top-down (`mpq-tool render`).

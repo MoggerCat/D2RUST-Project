@@ -1,0 +1,326 @@
+// Spec: specs/items/inventory.md §6–§10; specs/sim/unit-order.md §5–§6; specs/sim/units.md §2, §3.2; specs/items/generation.md §3
+//! [`MovePending`] on [`InvDesk`]. Wired: the room list (`0x0064C2C0`
+//! insert, `0x0064C370` remove, `unit-order.md` §5), the update queue
+//! (`0x0064C040`, §6), "alive" (`0x005541B0`, `units.md` §2), "has
+//! durability" (`0x00629930`, `generation.md` §1.3), item
+//! freeing (`units.md` §3.2 through the economy) and the creation of gold
+//! piles (`generation.md` §3 through the economy, request from the rest).
+//! Every other call goes to [`InvRest`] unchanged.
+
+use super::{InvDesk, InvError, InvRest};
+use crate::items::moves::{Guid, MovePending, Owner, Spot};
+use crate::units::lifecycle::LifecycleHooks;
+
+/// Stat 152 `item_indesctructible` (`generation.md` §1.3).
+const STAT_INDESTRUCTIBLE: u16 = 152;
+
+impl<H: LifecycleHooks, R: InvRest> MovePending for InvDesk<'_, '_, H, R> {
+    /// Room list removal `0x0064C370` (a unit in no room is left as is).
+    fn remove_from_room(&mut self, item: Guid) {
+        if let Some(u) = self.item_unit(item) {
+            let r = self.econ.game.lists.room_remove(u);
+            self.note_list(r);
+        }
+    }
+    /// Ground placement's "room added" (`0x00558AA0`): the room list
+    /// insert `0x0064C2C0`. An item already in the spot's room (the
+    /// allocator added it) is left as is; one in another room is logged
+    /// ([`InvError::OtherRoom`]).
+    fn add_to_room(&mut self, item: Guid, spot: Spot) {
+        let Some(u) = self.item_unit(item) else {
+            return;
+        };
+        match self.econ.game.lists.unit(u).and_then(|e| e.room()) {
+            None => {
+                let r = self.econ.game.lists.room_insert(u, spot.room);
+                self.note_list(r);
+            }
+            Some(r) if r == spot.room => {}
+            Some(_) => self.state.errors.push(InvError::OtherRoom(u)),
+        }
+    }
+    fn in_room(&self, item: Guid) -> bool {
+        self.item_unit(item)
+            .and_then(|u| self.econ.game.lists.unit(u))
+            .is_some_and(|e| e.room().is_some())
+    }
+    /// `0x0064C040` (`unit-order.md` §6.2).
+    fn queue_update(&mut self, u: Owner) {
+        if let Some(id) = self.unit_of(u) {
+            let r = self.econ.game.lists.queue_update(id);
+            self.note_list(r);
+        }
+    }
+    /// `0x00557FD0`: its body is not written; the unit removal
+    /// `0x00555600` (`units.md` §3.2) frees the unit and its item data.
+    /// An item still linked in an inventory is logged
+    /// ([`InvError::FreedWhileLinked`]) and freed.
+    // TODO(spec: inventory.md §7.12 / §10.1): what `0x00557FD0` does
+    // besides the unit removal (unlink, room, messages).
+    fn free_item(&mut self, item: Guid) {
+        let Some(u) = self.item_unit(item) else {
+            return;
+        };
+        if self.state.items.get(&u).is_some_and(|d| d.inv.is_some()) {
+            self.state.errors.push(InvError::FreedWhileLinked(u));
+        }
+        if let Err(e) = self.econ.free_item(u) {
+            self.state.errors.push(InvError::Economy(e));
+        }
+        self.state.inventories.remove(&u);
+        self.state.expiry.remove(&u);
+        self.sync_in();
+    }
+    /// `0x00559CE0` for code `gld` (`0x00633640`): the request comes from
+    /// [`InvRest::gold_request`] (layout unwritten), the item from
+    /// [`crate::wiring::economy::Economy::create_item`].
+    fn create_gold(&mut self, unit: Owner, _spot: Spot) -> Option<Guid> {
+        let gld = self.tables.items.iter().position(|r| &r.code == b"gld ")?;
+        let (mut rq, spawn) = self.rest.gold_request(unit, gld)?;
+        match self.econ.create_item(&mut rq, false, spawn) {
+            Ok(u) => {
+                self.sync_in();
+                Some(self.guid_of(u))
+            }
+            Err(e) => {
+                self.state.errors.push(InvError::Economy(e));
+                None
+            }
+        }
+    }
+    /// `0x00629930` "has durability" (`generation.md` §1.3): items
+    /// `nodurability` = 0, `durability` ≠ 0, the item has a stat list and
+    /// stat 152 (`item_indesctructible`) < 1.
+    fn merge_allowed(&self, src: Guid) -> bool {
+        let Some(u) = self.item_unit(src) else {
+            return false;
+        };
+        let Some(r) = self
+            .state
+            .items
+            .get(&u)
+            .and_then(|d| self.econ.tables.item(d.record))
+        else {
+            return false;
+        };
+        r.nodurability == 0
+            && r.durability != 0
+            && self.econ.units.get(u).is_some_and(|x| x.stats.is_some())
+            && self.econ.stats.unit_total(u, STAT_INDESTRUCTIBLE, 0) < 1
+    }
+    /// Not dead (`0x005541B0`, `units.md` §2).
+    fn alive(&self, u: Owner) -> bool {
+        self.unit_of(u)
+            .and_then(|id| self.econ.units.get(id))
+            .is_some_and(|r| !r.is_dead())
+    }
+
+    // ---- no provider: the rest ------------------------------------------
+
+    fn distance(&self, a: Owner, b: Owner) -> i32 {
+        self.rest.distance(a, b)
+    }
+    fn collides(&self, a: Owner, b: Owner, mask: u32) -> bool {
+        self.rest.collides(a, b, mask)
+    }
+    fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {
+        self.rest.walk_to_item(player, item, cursor)
+    }
+    fn room_at(&self, x: i32, y: i32) -> bool {
+        self.rest.room_at(x, y)
+    }
+    fn free_spot(
+        &self,
+        start: (i32, i32),
+        origin: (i32, i32),
+        size: u32,
+        mask: u32,
+        mask2: u32,
+        last: u32,
+    ) -> Option<Spot> {
+        self.rest.free_spot(start, origin, size, mask, mask2, last)
+    }
+    fn in_town(&self, player: Owner) -> bool {
+        self.rest.in_town(player)
+    }
+    fn room_delete_notice(&mut self, item: Guid) {
+        self.rest.room_delete_notice(item)
+    }
+    fn free_collision(&mut self, item: Guid) {
+        self.rest.free_collision(item)
+    }
+    fn room_change_notice(&mut self, item: Guid, x: i32, y: i32) {
+        self.rest.room_change_notice(item, x, y)
+    }
+    fn stat_refresh(&mut self, u: Owner) {
+        self.rest.stat_refresh(u)
+    }
+    fn stat_refresh_unlink(&mut self, u: Owner, b: u32) {
+        self.rest.stat_refresh_unlink(u, b)
+    }
+    fn stat_link(&mut self, owner: Owner, item: Guid) {
+        self.rest.stat_link(owner, item)
+    }
+    fn charm_relink(&mut self, owner: Owner, item: Guid) {
+        self.rest.charm_relink(owner, item)
+    }
+    fn charm_unlink(&mut self, owner: Owner, item: Guid) {
+        self.rest.charm_unlink(owner, item)
+    }
+    fn is_active(&self, owner: Owner, item: Guid) -> bool {
+        self.rest.is_active(owner, item)
+    }
+    fn inventory_pass(&mut self, owner: Owner) {
+        self.rest.inventory_pass(owner)
+    }
+    fn weapon_in_use_update(&mut self, owner: Owner) {
+        self.rest.weapon_in_use_update(owner)
+    }
+    fn weapon_bookkeeping(&mut self, owner: Owner) {
+        self.rest.weapon_bookkeeping(owner)
+    }
+    fn body_leave_effects(&mut self, owner: Owner, item: Guid) {
+        self.rest.body_leave_effects(owner, item)
+    }
+    fn hireling_owner_pass(&mut self, owner: Owner) {
+        self.rest.hireling_owner_pass(owner)
+    }
+    fn belt_unequip(&mut self, owner: Owner, item: Guid) {
+        self.rest.belt_unequip(owner, item)
+    }
+    fn belt_remove_allowed(&self, player: Owner) -> bool {
+        self.rest.belt_remove_allowed(player)
+    }
+    fn sound(&mut self, u: Owner, id: u32) {
+        self.rest.sound(u, id)
+    }
+    fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        self.rest.pickup_sound(player, item)
+    }
+    fn requirement_sound(&mut self, player: Owner) {
+        self.rest.requirement_sound(player)
+    }
+    fn merc_sound(&mut self, player: Owner) {
+        self.rest.merc_sound(player)
+    }
+    fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
+        self.rest.quest_flag(player, quest, flag)
+    }
+    fn quest_item_picked(&mut self, player: Owner, item: Guid) {
+        self.rest.quest_item_picked(player, item)
+    }
+    fn quest_item_dropped(&mut self, item: Guid) {
+        self.rest.quest_item_dropped(item)
+    }
+    fn carry_one(&self, item: Guid) -> bool {
+        self.rest.carry_one(item)
+    }
+    fn held_test_units(&self, player: Owner) -> Vec<Owner> {
+        self.rest.held_test_units(player)
+    }
+    fn copy_item(&mut self, item: Guid) -> Option<Guid> {
+        self.rest.copy_item(item)
+    }
+    fn give_cursor_item(&mut self, player: Owner, item: Guid) {
+        self.rest.give_cursor_item(player, item)
+    }
+    fn consume_one(&mut self, item: Guid) -> bool {
+        self.rest.consume_one(item)
+    }
+    fn set_owner(&mut self, item: Guid, owner: Owner) {
+        self.rest.set_owner(item, owner)
+    }
+    fn pile_owner(&self, item: Guid) -> Option<Owner> {
+        self.rest.pile_owner(item)
+    }
+    fn query_0044be50(&self) -> bool {
+        self.rest.query_0044be50()
+    }
+    fn party_share_id(&self, player: Owner) -> i32 {
+        self.rest.party_share_id(player)
+    }
+    fn party_share(&mut self, player: Owner, take: i32) {
+        self.rest.party_share(player, take)
+    }
+    fn owned_gold_pickup(&mut self, player: Owner, pile: Guid, take: i32) {
+        self.rest.owned_gold_pickup(player, pile, take)
+    }
+    fn rest_pile(&mut self, player: Owner, rest: i32) {
+        self.rest.rest_pile(player, rest)
+    }
+    fn book_count_changed(&mut self, player: Owner, n: i32) {
+        self.rest.book_count_changed(player, n)
+    }
+    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
+        self.rest.use_grid_item(player, item, x, y)
+    }
+    fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        self.rest.use_item(player, target, item)
+    }
+    fn charge_update(&mut self, player: Owner, item: Guid) {
+        self.rest.charge_update(player, item)
+    }
+    fn remove_used(&mut self, player: Owner, item: Guid) {
+        self.rest.remove_used(player, item)
+    }
+    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
+        self.rest.use_item_action(player, target, used)
+    }
+    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
+        self.rest.swap_1h_with_2h(player, item, loc)
+    }
+    fn pickup_special(&mut self, player: Owner, item: Guid) -> bool {
+        self.rest.pickup_special(player, item)
+    }
+    fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
+        self.rest.equip_picked(player, item)
+    }
+    fn filler_linked(&mut self, filler: Guid, target: Guid) {
+        self.rest.filler_linked(filler, target)
+    }
+    fn runeword(&mut self, player: Owner, target: Guid) -> bool {
+        self.rest.runeword(player, target)
+    }
+    fn hireling(&self, player: Owner) -> Option<Owner> {
+        self.rest.hireling(player)
+    }
+    fn not_dead(&self, player: Owner) -> bool {
+        self.rest.not_dead(player)
+    }
+    fn owns_hireling(&self, player: Owner, merc: Owner) -> bool {
+        self.rest.owns_hireling(player, merc)
+    }
+    fn equip_on_merc(&mut self, merc: Owner, item: Guid) {
+        self.rest.equip_on_merc(merc, item)
+    }
+    fn merc_after_take(&mut self, merc: Owner) {
+        self.rest.merc_after_take(merc)
+    }
+    fn pick_npc(&mut self, player: Owner, guid: Guid, cursor: u32) -> u32 {
+        self.rest.pick_npc(player, guid, cursor)
+    }
+    fn pick_object(&mut self, player: Owner, guid: Guid, cursor: u32) -> u32 {
+        self.rest.pick_object(player, guid, cursor)
+    }
+    fn pick_other(&mut self, player: Owner, ty: u32, guid: Guid, cursor: u32) -> u32 {
+        self.rest.pick_other(player, ty, guid, cursor)
+    }
+    fn resync(&mut self, player: Owner) {
+        self.rest.resync(player)
+    }
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.rest.send(player, bytes)
+    }
+    fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
+        self.rest.send_item_stat(player, item, stat)
+    }
+    fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
+        self.rest.item_bits(item, flags, page)
+    }
+    fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
+        self.rest.store_messages(client, item)
+    }
+    fn filler_owner(&self, parent: Guid) -> Owner {
+        self.rest.filler_owner(parent)
+    }
+}

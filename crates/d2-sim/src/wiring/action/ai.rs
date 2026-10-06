@@ -1,11 +1,12 @@
-// Spec: specs/monsters/ai.md §1–§9 (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`)
+// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7 (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`)
 //! Monster AI ↔ units, modes, timer events and the DRLG: [`View`]
 //! implements [`crate::monsters::ai::AiHost`]. Real providers: seeds,
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
 //! `0x005544B0`, the dead test, act, level of the room (DRLG), life and
 //! life writes (`stats.md`), mode changes (`units.md` §4.6), the attack
 //! flag 0x40, the town test and collision grids (`rooms.md` §10). Path,
-//! targets, skills, monster data and sounds go to [`Pending`].
+//! targets, skills, sounds and the monster data the lent monster world
+//! ([`super::monsters`]) does not answer go to [`Pending`].
 
 use crate::game::Game;
 use crate::monsters::ai::{AiModes, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget};
@@ -40,10 +41,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.units.is_dead(unit)
     }
     fn position(&self, unit: UnitId) -> (i32, i32) {
-        self.h.x.position(unit)
+        self.h.path_position(unit)
     }
     fn size(&self, unit: UnitId) -> i32 {
-        self.h.x.size(unit)
+        self.path_size(unit)
     }
     fn act(&self, unit: UnitId) -> u8 {
         self.units.get(unit).map_or(0, |r| r.act)
@@ -56,8 +57,17 @@ impl<X: Pending> AiUnits for View<'_, X> {
             .and_then(|r| self.h.drlg.level_id(game, r))
             .map_or(0, |l| l as i32)
     }
+    /// The monster level: stat 12 (`level`, `init.md` §7 rule 4) of a
+    /// monster with monster data in the lent monster world; else
+    /// [`Pending::monster_level`].
+    ///
+    /// TODO(ai.md §2.4 step 2): the getter of "level" is not named; the
+    /// unit total (`0x00625480`, layer 0) is read.
     fn monster_level(&self, unit: UnitId) -> i32 {
-        self.h.x.monster_level(unit)
+        match self.h.monster_data(unit) {
+            Some(_) => self.stats.unit_total(unit, stat::LEVEL, 0),
+            None => self.h.x.monster_level(unit),
+        }
     }
     /// Life in percent of max life.
     ///
@@ -87,11 +97,13 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
     }
+    /// `0x005A0180(unit, 8)` ([`super::ActionHooks::monster_flag`]).
     fn is_unique(&self, unit: UnitId) -> bool {
-        self.h.x.monster_flag(unit, 8)
+        self.h.monster_flag(unit, 8)
     }
+    /// `0x005A0180(unit, 4)`.
     fn is_champion(&self, unit: UnitId) -> bool {
-        self.h.x.monster_flag(unit, 4)
+        self.h.monster_flag(unit, 4)
     }
     fn is_boss(&self, unit: UnitId) -> bool {
         self.h.x.is_boss(unit)
@@ -184,9 +196,21 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn los_draw(&self, game: &Game, room: RoomId) -> bool {
         self.h.x.los_draw(game, room)
     }
-    /// `0x0064D910`: the grid at the unit's position has a `mask` bit.
+    /// `0x0064D910`: the grid at the unit's position has a `mask` bit
+    /// (with the path provider: the pattern test of
+    /// `path-placement.md` §4 rule 5 with the path's pattern and room).
     fn collides(&self, game: &Game, unit: UnitId, mask: u16) -> bool {
-        let (x, y) = self.h.x.position(unit);
+        if let Some(d) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) {
+            return crate::path::collision::pattern_collides(
+                &self.h.drlg,
+                d.room,
+                d.x(),
+                d.y(),
+                d.pattern,
+                mask,
+            );
+        }
+        let (x, y) = self.h.path_position(unit);
         game.lists
             .unit(unit)
             .and_then(|e| e.room())

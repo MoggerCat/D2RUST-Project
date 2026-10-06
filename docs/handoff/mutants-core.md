@@ -33,6 +33,7 @@ survivors only.
 | `d2-sim` tick, units, stats | 1342 | 100 | 1063 + 30 | 149 | **47** |
 | `d2-sim` rng.rs, game.rs | 48 | 7 | 41 + 0 | 0 | 0 |
 | `d2-proto` (src/**) | 844 | 16 | 796 + 0 | 32 | **9** |
+| `d2-proto` after merging the base again (`5413b24`: `Packed` fields, `s2c`) | 993 | 25 | — | 17 (with the tests above) | **14** |
 
 The conformance tick/RNG replay killed **0** of the 149 sim survivors (all
 149 survive d2-sim + conformance on the base commit): the traces exercise
@@ -49,9 +50,9 @@ was found wrong against its spec; no fix was made.
 |---|---|
 | `crates/d2-sim/src/stats/mutant_tests.rs` (31 tests) | MulDiv branch boundaries and truncation (`stats.md` §5.2–5.3); by-time fold above 180 (§8); life fraction outside the ratio branch (§9.3); table size / ValShift (§1.1, §2.2); charstats columns; x87 rescale of 0 and its signs; minimum rule at v = MinAccr (§4.3); `unit_pm`, `owner_player`, `owner_item_base` guards (§6.2); set-full / set of 0 on absent (stat-lists §6.3, §5.1); damage-related propagation through a static list (§6.1); op-2 recompute block with strength 0 (§6.4); item events and skill-stat handler calls, max-life rescale conditions, stat 74 only for monster max life (§7.2); mod insert only for players (§5.1); TEMPONLY → NEWLENGTH (§8.1.4); `unit_detach`, `free_plain` (§8.2, §8.3); equip on an attached list (§8.4); make static/dynamic on an unattached list (§8.6); state list owner, list by flags (§9.3); expiry needs NEWLENGTH (§10.4); state flag bounds; `set_state_changed` (§9.2); `set_flags` |
 | `crates/d2-sim/src/units/mutant_tests.rs` (10 tests) | variant start index c − 1 (`units.md` §4.2); player life bounds and healthpot, stamina mode 2, manapot release (`stat-lists.md` §10.1); monster life bounds, heal to max keeps regen, no death above 0, uninterruptable death sets disguise (§10.1, §9.2); neutral start pending test (`units.md` §4.6); `RoomEntry::is_active`, `unit_mut` |
-| `crates/d2-proto/src/mutant_tests.rs` (5 tests) | every one of the 115 typed messages decodes/encodes exactly its layout's bits, and its decode errors (§2.4 rules 1, 10); size-rule field bytes (§5 grammar); `Fixed(0)` is not a size; chat negative size reaches the caller; S→C split at the 0x204 limit and at the buffer end (§3.3) |
-| `crates/d2-proto/src/tsv/mutant_tests.rs` (8 tests) | perturbation tests of the strict TSV parser (M07/M08): numbers, addresses, names, repeated size options, one-value handler ranges, bit-field widths, one-bit overlaps, offsetless non-cstr fields |
-| `crates/d2-proto/src/codegen/mutant_tests.rs` (1 test) | a `cstr`/tail field makes a fixed row untyped (generator rule, module doc) |
+| `crates/d2-proto/src/mutant_tests.rs` (7 tests) | every one of the 126 typed messages (packed `bits:` layouts included) decodes/encodes exactly its layout's bits, and its decode errors (§2.4 rules 1, 10; §5); size-rule field bytes (§5 grammar); `Fixed(0)` is not a size; chat negative size reaches the caller; S→C split at the 0x204 limit and at the buffer end (§3.3); `s2c` decode errors (empty, wrong id) and `parse` of a message longer than its size rule (§3.1) |
+| `crates/d2-proto/src/tsv/mutant_tests.rs` (9 tests) | perturbation tests of the strict TSV parser (M07/M08): numbers, addresses, names, repeated size options, one-value handler ranges, bit-field widths, one-bit overlaps, offsetless non-cstr fields, empty `bits:` layouts |
+| `crates/d2-proto/src/codegen/mutant_tests.rs` (2 tests) | a `cstr`/tail field makes a fixed row untyped; a `bits:` row drops its `id:8` field and any other field over bits 0..8 makes it untyped (generator rules, module doc) |
 
 Coverage claims (`docs/COVERAGE.md`, only where the assertions check the
 whole outcome): `stats.md` §2 r2, §5 r2, §5 r3, §8 r2, §8 r3, §9 r3;
@@ -80,7 +81,7 @@ d2-sim (47):
 | `monster_regen` disguise else-branch (2) | unreachable: the toggle is always "on", so `disguise` is `Some(true)` |
 | `first_from_bucket` `from == 0` guard → true | unreachable: `next_of_type` returns before calling it with `from > 0` for a type without hash list |
 
-d2-proto (9):
+d2-proto (14 on the merged base: the 9 below, plus `rust_type` / `struct_code` `Packed { width } if width <= 16` → true (3: no packed field wider than 16 bits in the TSVs; generated-file check), `packed_get` `|`→`^` (equivalent: each field bit is ORed into a distinct bit), `tsv::layout` `bits:` non-empty guard → true (equivalent: `bits_layout("")` is an error too)):
 
 | Mutants | Why |
 |---|---|
@@ -92,12 +93,24 @@ d2-proto (9):
 
 ## Gate (this branch)
 
-`cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`
+`sh tools/gate.sh` on the merged tree: all 13 steps PASS. Earlier, before the merge: `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`
 (after `sh tools/cloud-setup.sh`); `cargo test -p d2-sim -p d2-proto -p
 conformance` (d2-sim 1273 passed, 5 ignored; d2-proto 25 + 8; conformance
 7 + 2 + 2); `cargo run -p depcheck`; `python3 tools/spec_index.py
 --check`; `python3 tools/methods.py check`; `python3 tools/coverage.py
 --check` and `--selftest`: all pass.
+
+The d2-sim counts above are from the first base (`4b5b0bf`). After
+merging `5413b24` (which changed `stats/{mod,states,lists}.rs`,
+`units/{anim,lifecycle,lists}.rs`), two checks on the merged tree: the
+survivor names re-run (d2-sim tests) leave **46** (the base's own new
+tests now kill `detach` `&`→`|` and the `player_request_check` default;
+the base's new `if a < frame_count` endless-loop guard in `anim::schedule`
+adds `<`→`<=`, equivalent: a = F gives 0 iterations); the 41 mutants on
+the lines the base changed (`--in-diff`, d2-sim + conformance): 33
+caught, 1 timeout, 5 unviable, 2 missed (that same `anim` guard, and
+`try_ext_mut`'s generation guard: the stale-handle class of `lm`). So
+**47** sim survivors on the merged base, all category b.
 
 ## Notes for the coordinator
 

@@ -532,7 +532,7 @@ point:
          noted). Other classes pass;
       4. collision: `0x0064D9B0(room, x, y, SizeX, mask)` = 0, where SizeX
          is the monstats2 byte +0x08, sign-extended. It is skipped when
-         flags & 0x80. The collision test belongs to `sim/units.md`.
+         flags & 0x80. The collision test is `sim/path-placement.md` §4.
    3. Accept: the point is kept and the ring loop ends.
 4. With an inconsistent start direction (on the left or bottom edge), the
    walk goes the wrong way to the next corner and then turns back, so

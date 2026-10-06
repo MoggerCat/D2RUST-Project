@@ -11,6 +11,7 @@ pub mod dispatch;
 pub mod host;
 pub mod seams;
 pub mod transport;
+pub mod world_data;
 
 #[cfg(test)]
 mod tests;

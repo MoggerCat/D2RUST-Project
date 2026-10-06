@@ -74,3 +74,12 @@ fn only_cstr_may_omit_its_offset() {
     let e = layout("a:cstr@3 b:u8", &SizeRule::Chat).unwrap_err();
     assert!(e.contains("bad layout field"), "{e}");
 }
+
+#[test]
+fn bits_layout_needs_fields() {
+    let fixed = SizeRule::Fixed(4);
+    assert!(layout("bits: id:8 a:12", &fixed).is_ok());
+    for bad in ["bits: ", "bits:", "bits:id:8"] {
+        assert!(layout(bad, &fixed).is_err(), "{bad:?}");
+    }
+}

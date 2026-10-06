@@ -23,6 +23,7 @@ pub mod ai;
 pub mod combat;
 pub mod dispatch;
 pub mod missiles;
+pub mod monsters;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
@@ -30,7 +31,7 @@ pub mod units;
 pub mod waypoints;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -54,6 +55,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
+pub use monsters::MonsterWorld;
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -90,6 +92,12 @@ pub enum WiringError {
     /// The AnimData name lookup failed (`animdata.md` §4: a name longer
     /// than 8 characters, fatal 0xD9 / 0xDA in 1.14d).
     AnimData(d2_formats::FormatError),
+    /// A path-core fatal assert (`sim/path-placement.md` §2–§6).
+    Path(crate::path::PathError),
+    /// A walk fatal assert (`sim/pathing.md`).
+    Walk(crate::path::walk::WalkError),
+    /// A placement fatal assert (`sim/path-placement.md` §7–§12).
+    Place(crate::path::place_seams::PlaceError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -123,6 +131,17 @@ pub struct ActionHooks<X> {
     /// argument of `0x005A7C20`, `units.md` §4.6); set by the kill's
     /// death mode change only (`damage.md` §7.2).
     pub mode_target: Option<UnitId>,
+    /// The monster state (monster data, umods, monster init) lent by the
+    /// host that owns it ([`monsters`]: `WorldSim` lends its world state
+    /// around its timer events and tick hooks). `None`: the monster
+    /// routes keep their [`Pending`] answers.
+    pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
+    /// The monster world is taken out for a call.
+    monster_world_out: bool,
+    /// The unit path records and tables ([`crate::wiring::path`]).
+    /// `None` (the default): the path seams keep their [`Pending`]
+    /// answers; [`ActionHooks::enable_paths`] turns the provider on.
+    pub paths: Option<Box<crate::wiring::path::PathState>>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -146,10 +165,22 @@ impl<X> ActionHooks<X> {
             anim_data: None,
             vitals: None,
             mode_target: None,
+            monster_world: None,
+            monster_world_out: false,
+            paths: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),
         }
+    }
+
+    /// Turns the path provider on ([`crate::wiring::path`]): from now on
+    /// the path seams are answered by `d2_sim::path` instead of
+    /// [`Pending`]. Call before any unit is allocated (units allocated
+    /// earlier have no path record).
+    pub fn enable_paths(&mut self) -> Result<(), crate::path::PathError> {
+        self.paths = Some(Box::new(crate::wiring::path::PathState::new()?));
+        Ok(())
     }
 
     /// The missile store (outside a missile call).

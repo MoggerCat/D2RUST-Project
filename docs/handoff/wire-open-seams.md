@@ -1,5 +1,7 @@
 # Handoff: open wiring seams, second pass (`d2_sim::wiring`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, task class: integration from
 clear specs, medium (METHODS M14). Branch `claude/wire-open-seams`, from
 `main` at `fd37fba`. Repo only. Scope of every claim: this branch,
