@@ -855,7 +855,7 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
    state-108 lock and table `0x006E1064`: `sim/pathing.md` §1.6 (a
    recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
-   mercenary spec.
+   mercenary spec (`world/hirelings.md` §6).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 
