@@ -444,7 +444,9 @@ fn forgotten_tower_through_every_state() {
     assert_eq!(word(&f, 5), 0x2015);
     let log = f.take_log();
     assert!(log.contains(&format!("sound {} 37", p.0)));
-    assert!(log.contains(&"unhandled 5 0x5954f0".to_string()));
+    // The trap step runs (`quests-act1-rest.md` §4): no chest listed, so
+    // nothing is spawned and nothing of chain 5 is reported.
+    assert!(!log.iter().any(|l| l.starts_with("unhandled 5")));
     assert!(ticks(&mut f, 7).is_empty());
     assert_eq!(ticks(&mut f, 1), [hex("5d 05 00 0d 0000")]);
     // The report to Kashya (142): the sequence opens chain 3; the player
