@@ -1,8 +1,40 @@
-// Spec: specs/world/quests-act2.md §6 (A2Q4 Arcane Sanctuary, chain 11, slot 12)
-//! A2Q4 callback by callback. STUB: filled by the A2Q4 task.
+// Spec: specs/world/quests-act2.md §6 (A2Q4 Arcane Sanctuary, chain 11, slot 12), §10 (chain 11 hooks), §4.9 (Arcane hook)
+//! A2Q4 callback by callback: opening the palace (§6.2), the flag
+//! iterate (§6.3), chat with Kaelan's quest-seed draw (§6.4), messages
+//! and chat end (§6.5), level changes (§6.6), Horazon's journal (§6.7),
+//! the harem blocker (§6.8), the Sanctuary portal (§6.9), Jerhyn's
+//! start-side handling (§6.10), game start (§6.11) and the hooks other
+//! systems call (§10, §4.9).
 
+use super::{
+    add_guid, add_state, completion_flag, guid_listed, in_act2, party, pf, quick_remove, rec,
+    remove_guid, set_bit, status_all, status_silent, table_state, TOWN,
+};
 use crate::units::{RoomId, UnitId};
-use crate::world::quests::{EventArgs, QuestControl, QuestWorld, TextList};
+use crate::world::quests::{bit, event, EventArgs, QuestControl, QuestWorld, TextList};
+
+/// Chain id.
+pub const CHAIN: u8 = 11;
+/// Flag slot.
+pub const SLOT: u8 = 12;
+/// act2guard2 (Kaelan).
+const KAELAN: u16 = 331;
+const DROGNAN: u16 = 177;
+const JERHYN: u16 = 201;
+/// Arcane Sanctuary.
+const SANCTUARY: u32 = 74;
+/// Harem Level 1.
+const HAREM1: u32 = 50;
+/// Palace Cellar 3.
+const CELLAR3: u32 = 54;
+/// Canyon of the Magi.
+const CANYON: u32 = 46;
+/// Horazon's journal message (§6.7).
+const MSG_TOME: u16 = 396;
+/// The harem blocker (objects.txt row 318 `eunuch`).
+const BLOCKER_CLASS: u16 = 318;
+/// `0x00738D44`: table state by record state 0–6 (§6.4).
+const MSG_STATE: [i8; 7] = [-1, 0, 1, 2, 3, 4, 0];
 
 /// Extra data (§6.1).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -11,49 +43,587 @@ pub struct Extra {
     pub drognan_started: bool,
     /// +0x08 the tome's room.
     pub tome_room: Option<RoomId>,
+    /// +0x0C Jerhyn spawned at the start position.
+    pub jerhyn_start: bool,
+    /// +0x0D Jerhyn spawned at the palace.
+    pub jerhyn_palace: bool,
     /// +0x0E the palace is open.
     pub palace_open: bool,
+    /// +0x0F guard-moved flag (first).
+    pub guard_moved: bool,
+    /// +0x10 guard-moved flag (second, set by `0x0059B6E0`).
+    pub guard_moved2: bool,
     /// +0x11 the harem blocker exists.
     pub blocker_made: bool,
+    /// +0x15 Jerhyn's position stored.
+    pub jerhyn_pos_stored: bool,
+    /// +0x16 the portal to the Canyon is open.
+    pub canyon_portal: bool,
+    /// +0x18 guard position flag (first).
+    pub guard_pos: bool,
+    /// +0x19 guard position flag (second).
+    pub guard_pos2: bool,
+    /// +0x1A a player is near the blocker.
+    pub near_blocker: bool,
+    /// +0x1C that player's GUID.
+    pub near_guid: u32,
+    /// +0x20 / +0x24 the blocker position.
+    pub blocker_x: i32,
+    pub blocker_y: i32,
+    /// +0x28 / +0x2C Jerhyn's position.
+    pub jerhyn_x: i32,
+    pub jerhyn_y: i32,
+    /// +0x30 / +0x34 the guard position.
+    pub guard_x: i32,
+    pub guard_y: i32,
     /// +0x38 the blocker's GUID.
     pub blocker_guid: u32,
+    /// +0x3C Jerhyn's GUID.
+    pub jerhyn_guid: u32,
     /// u16 +0x40 the blocker mode.
     pub blocker_mode: u16,
+    /// u16 +0x42 the portal mode in the Arcane Sanctuary.
+    pub portal_mode_sanctuary: u16,
+    /// u16 +0x44 the portal mode in Palace Cellar 3.
+    pub portal_mode_cellar: u16,
     /// +0x46 the blocker was neutral when opened.
     pub blocker_was_neutral: bool,
 }
 
-pub(super) fn callback<W: QuestWorld>(
-    _ctl: &mut QuestControl,
-    _w: &mut W,
-    _i: usize,
-    _args: EventArgs,
-    _list: Option<&mut TextList>,
-) -> bool {
-    false
+fn x4(ctl: &mut QuestControl, i: usize) -> &mut Extra {
+    &mut ctl.records[i].extra.a2.q4
 }
 
-pub(super) fn active<W: QuestWorld>(
-    _ctl: &QuestControl,
-    _w: &mut W,
-    _i: usize,
-    _player: UnitId,
-    _npc: u16,
+/// Dispatches chain 11's callbacks; false = no body (unhandled).
+pub(super) fn callback<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+    args: EventArgs,
+    list: Option<&mut TextList>,
 ) -> bool {
-    false
+    match args.event {
+        event::NPC_ACTIVATE => chat(ctl, w, i, args, list),
+        event::NPC_DEACTIVATE => chat_end(ctl, w, i, args),
+        event::CHANGED_LEVEL => changed_level(ctl, w, i, args),
+        // `0x0059AD40`.
+        event::PLAYER_LEAVES_GAME => remove_guid(ctl, w, i, args.player),
+        event::SCROLL_MESSAGE => messages(ctl, w, i, args),
+        event::PLAYER_STARTED_GAME => game_start(ctl, w, i, args),
+        _ => return false,
+    }
+    true
 }
+
+// ------------------------------------------------------------ §6.2, §6.3
+
+/// Opening the palace `0x0059AEF0` (§6.2).
+fn open_palace<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
+    let x = x4(ctl, i);
+    x.palace_open = true;
+    if x.blocker_mode == 0 {
+        x.blocker_was_neutral = true;
+    }
+    x.blocker_mode = 2;
+    flag_iterate(ctl, w, i);
+    let x = &ctl.records[i].extra.a2.q4;
+    if x.blocker_made {
+        if let Some((o, _)) = w.object_by_guid(x.blocker_guid) {
+            w.set_object_mode(o, 2);
+            w.free_object_collision(o);
+        }
+    }
+}
+
+/// Flag iterate `0x0059ADB0` (§6.3).
+fn flag_iterate<W: QuestWorld>(ctl: &QuestControl, w: &mut W, i: usize) {
+    let (state, status) = (ctl.records[i].state, ctl.records[i].status);
+    for p in w.players() {
+        let f = pf(w, p);
+        if f.get(SLOT, bit::REWARD_GRANTED) || f.get(SLOT, bit::REWARD_PENDING) {
+            continue;
+        }
+        match (state, status) {
+            (2, _) => set_bit(w, p, SLOT, 2),
+            (3, _) => set_bit(w, p, SLOT, 3),
+            (4, 2 | 3) => set_bit(w, p, SLOT, 4),
+            (4, 4) => set_bit(w, p, SLOT, 5),
+            _ => {}
+        }
+    }
+}
+
+// ------------------------------------------------------------ §6.4
+
+/// Event 0 `0x0059B1C0`.
+fn chat<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+    args: EventArgs,
+    list: Option<&mut TextList>,
+) {
+    if args.target.and_then(|n| w.monster_class(n)) == Some(KAELAN) {
+        let k = if ctl.records[i].extra.a2.q4.palace_open {
+            // One quest-seed step on every chat open (msgs 187–189).
+            8 + (ctl.seed.step() % 3) as u8
+        } else {
+            7
+        };
+        return add_state(ctl, w, i, list, args.target, k);
+    }
+    let r = rec(w, args.player);
+    if r.get(SLOT, bit::REWARD_PENDING) {
+        return add_state(ctl, w, i, list, args.target, 4);
+    }
+    if guid_listed(ctl, w, i, args.player) {
+        return add_state(ctl, w, i, list, args.target, 5);
+    }
+    let rd = &ctl.records[i];
+    if rd.state != 0
+        && rd.not_intro
+        && !r.get(SLOT, bit::REWARD_GRANTED)
+        && (rd.state <= 4 || r.get(SLOT, bit::PRIMARY_GOAL_DONE))
+    {
+        if let Some(m) = table_state(&MSG_STATE, rd.state).filter(|&m| m <= 11) {
+            add_state(ctl, w, i, list, args.target, m);
+        }
+    }
+}
+
+/// Active `0x0059ACA0` (§6.4).
+pub(super) fn active<W: QuestWorld>(
+    ctl: &QuestControl,
+    w: &mut W,
+    i: usize,
+    player: UnitId,
+    npc: u16,
+) -> bool {
+    let f = pf(w, player);
+    let (r, x) = (&ctl.records[i], &ctl.records[i].extra.a2.q4);
+    if f.get(SLOT, bit::REWARD_GRANTED) {
+        return false;
+    }
+    let idle = !f.get(SLOT, bit::REWARD_PENDING);
+    match npc {
+        KAELAN => {
+            idle && ((x.blocker_mode == 0 && !f.get(SLOT, 7))
+                || (x.blocker_mode == 2 && x.blocker_was_neutral && !f.get(SLOT, 8)))
+        }
+        DROGNAN => idle && r.state == 1,
+        JERHYN => idle && r.state == 2,
+        _ => false,
+    }
+}
+
+// ------------------------------------------------------------ §6.5
+
+/// Event 11 `0x0059AF50` (a = NPC class, b = message).
+fn messages<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
+    let Some(p) = args.player else { return };
+    if args.a == u32::from(KAELAN) {
+        match args.b {
+            186 => set_bit(w, p, SLOT, 7),
+            187..=189 => set_bit(w, p, SLOT, 8),
+            _ => {}
+        }
+        return;
+    }
+    match (args.a, args.b) {
+        (_, 397..=407) => {
+            refresh(ctl, w, p, args.target);
+            if pf(w, p).get(SLOT, bit::REWARD_PENDING) {
+                super::clear_bit(w, p, SLOT, bit::REWARD_PENDING);
+                add_guid(ctl, w, i, p);
+            }
+        }
+        (_, 396) => {
+            let r = &ctl.records[i];
+            if r.not_intro && r.status < 5 {
+                status_silent(ctl, i, 5);
+            }
+            let x = &ctl.records[i].extra.a2.q4;
+            let room = w.unit_position(p).map(|q| q.2);
+            if !x.canyon_portal && room.is_some() && room == x.tome_room {
+                if let Some((sx, sy)) = w.free_spot(p, 2, 0xBE11, 8, 100) {
+                    if w.create_portal(p, sx, sy, 60, CANYON) {
+                        x4(ctl, i).canyon_portal = true;
+                        ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
+                    }
+                }
+            }
+        }
+        (a, 373) if a == u32::from(DROGNAN) => {
+            ctl.records[i].state = 2;
+            x4(ctl, i).drognan_started = true;
+            open_palace(ctl, w, i);
+            refresh(ctl, w, p, args.target);
+        }
+        (a, 377) if a == u32::from(JERHYN) => {
+            ctl.records[i].state = 3;
+            refresh(ctl, w, p, args.target);
+            status_all(ctl, w, i, 3);
+            flag_iterate(ctl, w, i);
+        }
+        _ => {}
+    }
+}
+
+/// "refresh" (`quests.md` §7.2) with the message's NPC.
+fn refresh<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: UnitId, npc: Option<UnitId>) {
+    if let Some(n) = npc {
+        ctl.refresh_text(w, p, n);
+    }
+}
+
+/// Event 2 `0x0059AE60`.
+fn chat_end<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
+    let drognan = args.target.and_then(|n| w.monster_class(n)) == Some(DROGNAN);
+    if drognan && ctl.records[i].extra.a2.q4.drognan_started {
+        status_all(ctl, w, i, 2);
+        x4(ctl, i).drognan_started = false;
+        ctl.records[i].clear_callback(event::NPC_DEACTIVATE);
+        flag_iterate(ctl, w, i);
+    }
+}
+
+// ------------------------------------------------------------ §6.6
+
+/// Event 3 `0x0059F0C0` (a = old level, b = new level).
+fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
+    if args.b == SANCTUARY {
+        let was = ctl.records[i].state;
+        if was < 4 {
+            ctl.records[i].state = 4;
+        }
+        if ctl.records[i].status < 4 {
+            status_all(ctl, w, i, 4);
+            flag_iterate(ctl, w, i);
+        } else if was < 4 {
+            flag_iterate(ctl, w, i);
+        }
+    }
+    if args.b == HAREM1 {
+        if let Some(p) = args.player {
+            set_bit(w, p, SLOT, 8);
+            set_bit(w, p, SLOT, 7);
+        }
+    }
+    if args.a == TOWN {
+        jerhyn(ctl, w);
+        quick_remove(ctl, w, i, args.player);
+        let f = rec(w, args.player);
+        if args.player.is_some()
+            && !f.get(SLOT, bit::REWARD_GRANTED)
+            && !f.get(SLOT, bit::REWARD_PENDING)
+            && ctl.records[i].state == 3
+        {
+            ctl.records[i].state = 4;
+            flag_iterate(ctl, w, i);
+        }
+    }
+}
+
+// ------------------------------------------------------------ §6.7
+
+/// Horazon's journal, operate 42 `0x0059B970` (§6.7, objects.txt row
+/// 357): `player` reads `object`.
+pub fn tome_operate<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    object: UnitId,
+    player: UnitId,
+) {
+    if w.object_mode(object) == 0 {
+        w.set_object_mode(object, 1);
+        let at = w.frame() + (w.object_anim_length(object) >> 8);
+        w.schedule_object_event(object, 1, at);
+    }
+    let Some(i) = ctl.find(CHAIN) else { return };
+    // TODO(quests-act2 OQ4): the 0x27 type-2 bytes belong to the seam.
+    w.open_quest_message(player, object, MSG_TOME);
+    let room = w.unit_position(object).map(|p| p.2);
+    x4(ctl, i).tome_room = room;
+    let r = &mut ctl.records[i];
+    if r.not_intro && r.state != 5 {
+        r.state = 5;
+    }
+    // TODO(quests-act2 §6.7): the grants, the completion flag and
+    // `0x0059B940` are read as following the state test (the spec's ";"),
+    // not nested in it.
+    // `0x0059B3F0`.
+    for p in w.players() {
+        if w.unit_level(p) == Some(SANCTUARY) && idle(w, p) {
+            grant(w, p);
+            // `0x0059B360`.
+            for m in party(w, p) {
+                if in_act2(w, m) && idle(w, m) {
+                    grant(w, m);
+                }
+            }
+        }
+    }
+    // `0x0059B320`; `0x0059B940` only reads 12.13.
+    completion_flag(w, CHAIN, SLOT);
+}
+
+/// Lacks 12.0 and 12.1.
+fn idle<W: QuestWorld>(w: &mut W, p: UnitId) -> bool {
+    let f = pf(w, p);
+    !f.get(SLOT, bit::REWARD_GRANTED) && !f.get(SLOT, bit::REWARD_PENDING)
+}
+
+/// §6.7's six changes: set 12.13, 12.1, 12.0; clear bits 2–11; set
+/// 12.8, 12.7.
+fn grant<W: QuestWorld>(w: &mut W, p: UnitId) {
+    set_bit(w, p, SLOT, bit::PRIMARY_GOAL_DONE);
+    set_bit(w, p, SLOT, bit::REWARD_PENDING);
+    set_bit(w, p, SLOT, bit::REWARD_GRANTED);
+    if let Some(f) = super::super::flags_of(w, p) {
+        f.reset_progress(SLOT);
+    }
+    set_bit(w, p, SLOT, 8);
+    set_bit(w, p, SLOT, 7);
+}
+
+// ------------------------------------------------------------ §6.8
 
 /// `0x0059B710` (§6.8), object event 7 of class 0x7A: record 11 (no
 /// record → nothing).
-pub fn harem_blocker<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, _object: UnitId) {
-    if ctl.find(11).is_some() {
-        w.unhandled(11, 0x0059_B710);
+pub fn harem_blocker<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let x = &ctl.records[i].extra.a2.q4;
+    if x.palace_open || x.blocker_made {
+        return;
+    }
+    x4(ctl, i).blocker_mode = 0;
+    let Some((ux, uy, room)) = w.unit_position(object) else {
+        return;
+    };
+    let made = w
+        .spawn_object(room, ux - 2, uy - 1, BLOCKER_CLASS)
+        .or_else(|| w.spawn_object(room, ux - 2, uy, BLOCKER_CLASS));
+    if let Some(o) = made {
+        w.or_unit_flags(o, 0x0300_0000);
+        let g = w.guid(o);
+        let x = x4(ctl, i);
+        x.blocker_made = true;
+        x.blocker_guid = g;
     }
 }
 
-/// `0x0059B660` (§4.9): the Arcane hook after the staff is assembled.
-pub(crate) fn arcane_hook<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
-    if ctl.find(11).is_some() {
-        w.unhandled(11, 0x0059_B660);
+/// Harem blocker init 30 `0x0059B7D0` (§6.8, objects.txt row 318).
+pub fn blocker_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let mode = ctl.records[i].extra.a2.q4.blocker_mode;
+    w.set_object_mode(object, i32::from(mode));
+    x4(ctl, i).blocker_guid = w.guid(object);
+    if mode == 2 {
+        w.free_object_collision(object);
     }
 }
+
+// ------------------------------------------------------------ §6.9
+
+/// Sanctuary portal init 29 `0x0059BA40` (§6.9, objects.txt row 298).
+pub fn portal_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let level = w.unit_level(object);
+    let x = x4(ctl, i);
+    let slot = match level {
+        Some(SANCTUARY) => &mut x.portal_mode_sanctuary,
+        Some(CELLAR3) => &mut x.portal_mode_cellar,
+        _ => return,
+    };
+    // TODO(quests-act2 §6.9): "that value … becomes 2" is read as the
+    // stored mode and the object's mode both becoming 2.
+    let was = *slot;
+    if was == 1 {
+        *slot = 2;
+    }
+    let mode = *slot;
+    w.set_object_mode(object, i32::from(mode));
+    if was == 1 {
+        let at = w.frame() + (w.object_anim_length(object) >> 8) + 1;
+        w.schedule_object_event(object, 1, at);
+    }
+}
+
+/// `0x0059BAF0(level)` (§6.9): called by the portal's operate 34
+/// (`0x005846B0`) with the level it is in.
+pub fn portal_operate<W: QuestWorld>(ctl: &mut QuestControl, _w: &mut W, level: u32) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let x = x4(ctl, i);
+    match level {
+        SANCTUARY if x.portal_mode_cellar == 0 => {
+            x.portal_mode_cellar = 1;
+            x.portal_mode_sanctuary = 2;
+        }
+        CELLAR3 if x.portal_mode_sanctuary == 0 => {
+            x.portal_mode_sanctuary = 1;
+            x.portal_mode_cellar = 2;
+        }
+        _ => {}
+    }
+}
+
+// ------------------------------------------------------------ §6.10
+
+/// `0x0059EF70` (§6.10, from event 3 and the palace init `0x0059F510`):
+/// Jerhyn's start-side handling.
+pub fn jerhyn<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let x = &ctl.records[i].extra.a2.q4;
+    if x.jerhyn_start {
+        if let Some((j, _)) = w.monster_by_guid(x.jerhyn_guid) {
+            if w.npc_hold_chat(j) {
+                return;
+            }
+            w.remove_unit(j);
+            x4(ctl, i).jerhyn_start = false;
+        }
+    }
+    if !ctl.records[i].extra.a2.q4.jerhyn_palace {
+        // TODO(quests-act2 §6.10): the point the offsets (x + 15, or − 10
+        // when chain 13 is not-intro with state < 2; y − 3) apply to, the
+        // spawn's `r` argument and who stores +0x3C are not specified;
+        // the palace spawn is reported instead of guessed.
+        w.unhandled(CHAIN, 0x0059_EF70);
+    }
+}
+
+// ------------------------------------------------------------ §6.11
+
+/// Event 13 `0x0059B530`.
+fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventArgs) {
+    let Some(p) = args.player else { return };
+    let f = pf(w, p);
+    let open = |ctl: &mut QuestControl| {
+        let x = x4(ctl, i);
+        x.palace_open = true;
+        x.blocker_mode = 2;
+    };
+    if f.get(11, bit::REWARD_GRANTED) {
+        open(ctl);
+    }
+    if f.get(SLOT, bit::REWARD_GRANTED) || f.get(SLOT, bit::REWARD_PENDING) {
+        ctl.game.set(SLOT, bit::PRIMARY_GOAL_DONE);
+        open(ctl);
+        return;
+    }
+    // "status n, state m": the record bytes only (as Act I's restore).
+    if w.has_item(p, *b"hst ") {
+        let r = &mut ctl.records[i];
+        (r.status, r.state) = (1, 1);
+    }
+    let restored = if f.get(SLOT, 5) {
+        Some((4, 4))
+    } else if f.get(SLOT, 4) {
+        Some((3, 4))
+    } else if f.get(SLOT, 3) {
+        Some((3, 3))
+    } else if f.get(SLOT, 2) {
+        Some((2, 2))
+    } else {
+        None
+    };
+    if let Some((status, state)) = restored {
+        let r = &mut ctl.records[i];
+        (r.status, r.state) = (status, state);
+        open(ctl);
+    }
+    if f.get(10, bit::REWARD_GRANTED) {
+        open(ctl);
+    }
+}
+
+// ------------------------------------------------------------ §4.9, §10
+
+/// `0x0059B660` (§4.9): the Arcane hook after the staff is assembled.
+pub(crate) fn arcane_hook<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    if !ctl.records[i].not_intro {
+        return open_palace(ctl, w, i);
+    }
+    // TODO(quests-act2 §4.9): the state and status tests are read as
+    // independent.
+    if ctl.records[i].state == 0 {
+        ctl.records[i].state = 1;
+    }
+    if ctl.records[i].status == 0 {
+        status_all(ctl, w, i, 1);
+    }
+}
+
+/// Palace guard AI hook `0x0059B6E0` (from `0x005E7130`, §10): +0x0F
+/// set and +0x10 clear → +0x10 := 1, true.
+pub fn guard_moved(ctl: &mut QuestControl) -> bool {
+    let Some(i) = ctl.find(CHAIN) else {
+        return false;
+    };
+    let x = x4(ctl, i);
+    if x.guard_moved && !x.guard_moved2 {
+        x.guard_moved2 = true;
+        return true;
+    }
+    false
+}
+
+/// Palace guard AI hook `0x0059B8B0` (from `0x005E7590`, §10): the guard
+/// is at its end position (+0x18 and +0x19 clear, +0x40 = 2); true
+/// without chain 11.
+pub fn guard_at_end(ctl: &QuestControl) -> bool {
+    let Some(r) = ctl.record(CHAIN) else {
+        return true;
+    };
+    let x = &r.extra.a2.q4;
+    !x.guard_pos && !x.guard_pos2 && x.blocker_mode == 2
+}
+
+/// Palace guard AI hook `0x0059B8F0` (§10): the guard's target (+0x30,
+/// +0x34; y − 4 with +0x19). `None` without chain 11 (not specified).
+pub fn guard_target(ctl: &QuestControl) -> Option<(i32, i32)> {
+    let x = &ctl.record(CHAIN)?.extra.a2.q4;
+    let dy = if x.guard_pos2 { 4 } else { 0 };
+    Some((x.guard_x, x.guard_y - dy))
+}
+
+/// Palace guard AI hook `0x0059AEC0` (§10): the blocker is open (+0x40
+/// = 2). False without chain 11 (not specified).
+pub fn blocker_open(ctl: &QuestControl) -> bool {
+    ctl.record(CHAIN)
+        .is_some_and(|r| r.extra.a2.q4.blocker_mode == 2)
+}
+
+/// Jerhyn / palace NPC hook `0x0059B820` (from `0x0059F580`, §10): a
+/// player without 14.0 and 14.1 within 30 of the blocker (`0x005DC5C0`
+/// < 31) → +0x1A := 1, +0x1C := its GUID.
+pub fn jerhyn_near_blocker<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let guid = ctl.records[i].extra.a2.q4.blocker_guid;
+    let Some((blocker, _)) = w.object_by_guid(guid) else {
+        return;
+    };
+    // TODO(quests-act2 §10): with several players in range, every one is
+    // read as writing +0x1C in iteration order (the last one stays).
+    for p in w.players() {
+        let f = pf(w, p);
+        if f.get(14, bit::REWARD_GRANTED) || f.get(14, bit::REWARD_PENDING) {
+            continue;
+        }
+        if w.unit_distance(p, blocker) < 31 {
+            let g = w.guid(p);
+            let x = x4(ctl, i);
+            x.near_blocker = true;
+            x.near_guid = g;
+        }
+    }
+}
+
+/// Monster class hook `0x0059B6C0` (jerhyn, from `0x005447A0`): a bare
+/// `ret`.
+pub fn jerhyn_class_hook() {}
+
+/// Monster class hook `0x0059B6D0` (act2guard2, from `0x005447A0`): a
+/// bare `ret`.
+pub fn guard_class_hook() {}
