@@ -150,7 +150,7 @@ fn types_fit(t: &ItemTables, item: usize, row: &AffixRec) -> bool {
 
 /// `affixes.md` §1 rule 1: magic suffixes 0–746, prefixes 747–1,415,
 /// automagic 1,416–1,451 in 1.14d.
-// Covers: specs/items/affixes.md §1 r1
+// Claim once the first local run passes (note §1): specs/items/affixes.md §1 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_affix_parts() {
@@ -175,7 +175,7 @@ fn live_qualityitems_count() {
 /// `quality.md` edge case 4: the unique rarity is read as 32 bits at
 /// +0x30; the two bytes above the u16 `rarity` are 0 in 1.14d, so the
 /// value read equals the column.
-// Covers: specs/items/quality.md §edge-cases-original-bugs r4
+// Claim once the first local run passes (note §1): specs/items/quality.md §edge-cases-original-bugs r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_unique_rarity_32_bits() {
@@ -349,7 +349,7 @@ fn check_item(t: &ItemTables, it: &Item<Stats>, expansion: bool) -> Result<(), S
 /// other creation succeeds (the downgrade chain ends in normal, which
 /// cannot fail, `quality.md` §4) and keeps the invariants of
 /// [`check_item`].
-// Covers: specs/items/generation.md §3 r1
+// Claim once the first local run passes (note §1): specs/items/generation.md §3 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn sweep_create_every_item_every_quality() {

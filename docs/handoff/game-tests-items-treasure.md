@@ -3,7 +3,9 @@
 > To be folded into `docs/HANDOFF.md` (§1, §4, §5) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
 
 Cloud test session, repo only (no `game/`), medium effort, from
-`claude/tender-meitner-mphas3` at `4b5b0bf`. Read: `specs/items/*.md`,
+`claude/tender-meitner-mphas3` at `4b5b0bf`, then merged with it at
+`5edceb8` (the local group C run: §5 Done, the treasure memory dump, the
+§8 lesson on blind-written game assertions). Read: `specs/items/*.md`,
 `docs/`, `crates/`. No spec, `d2-sim` source, `HANDOFF.md` or `PLAN.md`
 edit; only the files below.
 
@@ -22,9 +24,9 @@ states, or an invariant a spec rule implies (named per test below).
 
 ### game_treasure.rs
 
-| Test | Checks (spec source) | Claim (game tier) |
+| Test | Checks (spec source) | Claim after the first local run |
 |---|---|---|
-| `live_tc_counts_and_kinds` | vector "TC count, kinds": 1,013 TCs (array count, TC 0 included: OQ4 "1,013 × 0x2C"), no load note (0 misses, no forward reference §1.2); §1.3: 160 automatic TCs, 763 entries, 85 with classic total 0, 44 with expansion total 0; §1.5 over the `treasureclassex` TCs (index ≥ 161): 2,742 TC / 660 item / 2 unique / 0 set entries, 81 `mul` all in {1280, 1536, 2048}, no entry mods (no other key), 184 negative picks, 300 nonzero NoDrop, 240 nonzero mods | §1.3 text, §1.5 text |
+| `live_tc_counts_and_kinds` | vector "TC count, kinds": 1,013 TCs (array count, TC 0 included: OQ4 "1,013 × 0x2C", and equal to `d2_data::bin::tc_count`, `loading.md` §10.6), no load note (0 misses, no forward reference §1.2); §1.3: 160 automatic TCs, 763 entries, 85 with classic total 0, 44 with expansion total 0; §1.5 over the `treasureclassex` TCs (index ≥ 161): 2,742 TC / 660 item / 2 unique / 0 set entries, 81 `mul` all in {1280, 1536, 2048}, no entry mods (no other key), 184 negative picks, 300 nonzero NoDrop, 240 nonzero mods | §1.3 text, §1.5 text |
 | `live_automatic_tcs` | §1.3: itemtypes with `treasureclass` ≠ 0 are exactly 27 `bow`, 45 `weap`, 46 `mele`, 50 `armo`, 85 `abow`; 38 is `tpot`; `A` = 5; TCs 1–160 are `<code><Lv>`, group 0, level `Lv` − 3, picks 1, nodrop 0, mods 0 | §1.3 text |
 | `live_act1_h2h_a` | vector `Act 1 H2H A`: TC 430, group 12, picks 1, nodrop 100, `gld` (item 523) 21, TCs 218 / 203 / 370 (by name) 16 / 21 / 2, starts 0, 21, 37, 58, totals 60 / 60 | §1.4 |
 | `live_rop_n` | vector `ROP (N)`: TC 855 `Diablo (N)` prob 4, `Annihilus` flags 0x11 row 381 prob 1 (id = item index of its code), totals 4 / 5 | §1.5 r4 |
@@ -43,7 +45,7 @@ states, or an invariant a spec rule implies (named per test below).
 
 ### game_items.rs
 
-| Test | Checks (spec source) | Claim (game tier) |
+| Test | Checks (spec source) | Claim after the first local run |
 |---|---|---|
 | `live_affix_parts` | `affixes.md` §1 r1: suffixes 0–746, prefixes 747–1,415, automagic 1,416–1,451 (747 / 669 / 36 rows); id = combined index + 1 | `affixes.md` §1 r1 |
 | `live_qualityitems_count` | `quality.md` §7 r1, edge case 5: 8 qualityitems rows | — |
@@ -54,18 +56,44 @@ states, or an invariant a spec rule implies (named per test below).
 | `sweep_preferred_every_set_item` | `quality.md` §9 r1–r2: preferring every setitems row (index row + 1, ilvl 99, flags2 0x01) picks it (or §4 r3 overrides: `normal` → 2, items `unique` → 7) | — |
 | `sweep_every_affix_pick` | `affixes.md` §3 on every item (format 101, quality magic) × prefix / suffix / automagic (when the base has `auto prefix`) × each distinct (alvl, sockets allowed) over ilvl 1–99, forced past the coin: a pick is an id of its part passing every step 4 test (spawnable, level window, socket clause §4.1 r2, fit, group, frequency, class); 0 only when no row passes (step 5) | — |
 
-Claims: 13 rule units at the game tier (`treasure.md` 10: §1.3 text,
+**No claim is written yet.** Every assertion here was written without
+game files, so per `docs/HANDOFF.md` §8 (blind-written game assertions,
+2026-10-06) the tests carry a plain comment `// Claim once the first local
+run passes (note §1): <spec> §<ids>` above them instead of `// Covers:`.
+After the run passes, the local session turns each such line into
+`// Covers:` (same ids): 13 rule units (`treasure.md` 10: §1.3 text,
 §1.4, §1.5 text, §1.5 r4, §1.6, §2, §4 r2, §4 r4, §5.4 r5, §6 r2;
-`affixes.md` §1 r1; `quality.md` edge r4; `generation.md` §3 r1), each
-on a test that checks the rule's outcome on the live data. Sweeps checking
+`affixes.md` §1 r1; `quality.md` edge r4; `generation.md` §3 r1), each on
+a test that checks the rule's outcome on the live data. Sweeps checking
 invariants only, and table-fact tests whose rule is wider than the fact,
-claim nothing. `py tools/coverage.py --summary` total: game 187 → 200
-units, verified 217 → 230, any 2,459 → 2,460 (`treasure.md` game 0 → 10,
-`affixes.md` / `generation.md` / `quality.md` 0 → 1 each). Per
-`docs/COVERAGE.md` §3 these count as verified only once the local run
-below passes; until then read them as queued.
+get none. Measured on this branch with the 13 claims written: game 187 →
+200 units, verified 217 → 230, any 2,459 → 2,460; as committed: unchanged
+(187 / 217 / 2,459).
+
+**Expected values: confirmed vs unconfirmed.** The local memory dump
+(`HANDOFF.md` §5 Done, `traces/raw/20261006-115547-tables`,
+`check_treasure.py`) already observed in 1.14d memory: 1,013 TCs, 763
+entries in the 160 automatic TCs, 2,742 TC / 660 `treasureclassex` item
+(81 `mul`) / 2 unique / 0 set entries, TC 430 (group 12, picks 1, nodrop
+100, ids 523 / 218 / 203 / 370, starts 0 / 21 / 37 / 58, totals 60 / 60),
+45 chest TCs, `Act 1 Chest A` = 385. These tests expect exactly those
+values, and the interpretation points in §2 match the dump (1,013
+includes TC 0; 660 is the `treasureclassex` scope). **Unconfirmed**
+(spec-stated, not yet observed): 85 / 44 zero totals; 184 / 300 / 240;
+the `mul` values; `ROP (N)`, `Act 1 Champ A`, the `get` vectors (445, 471
+and the levels 38 / 40 / 41), the chest tier area levels, the 23 / 15
+NoDrop pairs, the Version 1 ratio rows, the slot 5/6 bytes, the affix part
+sizes 747 / 669 / 36, 8 qualityitems, the uniqueitems bytes +0x32, the 24
+itemtypes codes; and every sweep invariant.
 
 ## 2. Local run queue (for `docs/HANDOFF.md` §5 C)
+
+These tests are the code for queue entries **C3** (items on the live set:
+magic 747 + 669 + 36, 8 qualityitems; the item and rare-suffix counts and
+the 30 skills per class are not asserted: no spec states them) and **C4**
+(treasure on the live set: every listed vector, incl. `tc_count`); the
+fold can point C3 / C4 at the commands below. C20 (byte compare with the
+dump) is not done here: it reads `traces/raw/`, which is local only.
 
 ```
 D2_GAME_DIR=<install> cargo test -p d2-sim --test game_treasure -- --ignored
@@ -96,6 +124,9 @@ to look at first if one fails:
   nodrop 0, mods 0, so the scope does not change them).
 - `live_nodrop_pairs`: pairs with a total of 0 are excluded (they never
   reach §5.4 step 5); if the counts differ by one, check that scope first.
+- After a pass: turn the 13 `// Claim once the first local run passes`
+  lines into `// Covers:` lines (ids unchanged) and record the result
+  (`docs/COVERAGE.md` §3).
 - The sweeps print the first 20 failures with item / TC, quality, level,
   difficulty and mode: each is a spec question (§7 of `HANDOFF.md`) unless
   the d2rs code contradicts its spec.
@@ -106,7 +137,7 @@ to look at first if one fails:
 warnings`; `cargo test -p d2-sim` (the 24 new tests are ignored; the rest
 unchanged); `cargo run -p depcheck`; `python3 tools/spec_index.py
 --check`; `python3 tools/methods.py check`; `python3 tools/coverage.py
---check` (3,274 claims, 0 errors) and `--selftest` (ok). M08 is not
+--check` (3,259 claims after the merge, 0 errors) and `--selftest` (ok). M08 is not
 shown: the tests cannot run without game files; the local run is their
 first execution.
 
