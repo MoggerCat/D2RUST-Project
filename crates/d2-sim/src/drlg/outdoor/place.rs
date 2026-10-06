@@ -486,12 +486,12 @@ impl Outdoor {
             0 => {
                 self.drive(drlg, data, types, &A1W, Check::A1W, true)?;
                 self.drive(drlg, data, types, &A1M, Check::A1M, true)?;
-                self.neighbours(drlg, data, 1, 17)?;
+                self.neighbours(drlg, data, types, 1, 17)?;
             }
             1 => {
                 self.drive(drlg, data, types, &A2, Check::Simple, false)?;
                 self.drive(drlg, data, types, &A2C, Check::Simple, false)?;
-                self.neighbours(drlg, data, 40, 46)?;
+                self.neighbours(drlg, data, types, 40, 46)?;
             }
             2 => {
                 let l = drlg.get_or_alloc_level(data, types, 75)?;
@@ -501,7 +501,7 @@ impl Outdoor {
                 self.jungles(drlg, data, types)?;
                 self.kurast_chain(drlg, data, types)?;
                 self.adjacency(drlg, data, 75, 83)?;
-                self.neighbours(drlg, data, 75, 83)?;
+                self.neighbours(drlg, data, types, 75, 83)?;
             }
             3 => {
                 let t1 = self.drive(drlg, data, types, &A4, Check::Simple, false)?;
@@ -510,13 +510,13 @@ impl Outdoor {
                 if let Some(l) = drlg.find_level(104) {
                     self.info_mut(l).flags |= t1.transition;
                 }
-                self.neighbours(drlg, data, 103, 106)?;
+                self.neighbours(drlg, data, types, 103, 106)?;
             }
             4 => {
                 self.drive(drlg, data, types, &A5, Check::None, false)?;
                 self.drive(drlg, data, types, &A5T, Check::None, false)?;
                 self.adjacency(drlg, data, 111, 112)?;
-                self.neighbours(drlg, data, 111, 112)?;
+                self.neighbours(drlg, data, types, 111, 112)?;
                 self.adjacency(drlg, data, 110, 111)?;
                 self.adjacency(drlg, data, 109, 110)?;
                 self.drive(drlg, data, types, &A5U, Check::Simple, false)?;
@@ -649,18 +649,21 @@ impl Outdoor {
         &mut self,
         drlg: &mut Drlg,
         data: &DrlgData,
+        types: &mut dyn LevelTypes,
         a: u32,
         b: u32,
     ) -> Result<(), OutdoorError> {
         for id in a..=b {
-            if data.level(id)?.drlg_type != DRLG_OUTDOOR {
+            // Each id is looked up by get-or-allocate before its type is
+            // tested (`levels.md` §4.2: every lookup by id allocates). The
+            // recorded Act I creation (`levels.md` Test vectors, seq
+            // 2425–2452) allocates 8, 9, …, 16 here, after the A1M row 5
+            // and before the town: the levels of 1..17 no driver row
+            // allocated, in ascending order.
+            let l = drlg.get_or_alloc_level(data, types, id)?;
+            if drlg.level(l).drlg_type != DRLG_OUTDOOR {
                 continue;
             }
-            // TODO(outdoor.md §2.7): an unallocated outdoor level or
-            // neighbour is not described; skipped.
-            let Some(l) = drlg.find_level(id) else {
-                continue;
-            };
             let vis = drlg.vis_array(data, id)?;
             let warp = drlg.warp_array(data, id)?;
             for j in 0..8 {

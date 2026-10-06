@@ -36,8 +36,7 @@ use d2_sim::drlg::{DrlgData, LevelDef, TileInfo, TileSource};
 use d2_sim::game::Game;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
-use d2_sim::missiles::{param_flags, MissileParams};
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::SkillEntry;
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
@@ -88,8 +87,9 @@ pub const ISLE_MONSTER: (u32, u32) = (12, 10);
 pub const PLAYER_AT: (i32, i32) = (40_020, 40_020);
 /// The waypoint object's position.
 pub const WP_AT: (i32, i32) = (40_024, 40_020);
-/// Skills of the synthetic table: attack, and a right skill (srvst 4,
-/// mana 4 + 1 per level, shift 8; `use.md`'s Multiple Shot vector).
+/// Skills of the synthetic table: attack, and a right skill (srvst 6
+/// standing in for Multiple Shot's 4, mana 4 + 1 per level, shift 8;
+/// `use.md`'s Multiple Shot vector).
 pub const ATTACK: i32 = 0;
 
 // ---- seams without a provider --------------------------------------------------
@@ -369,7 +369,6 @@ impl UseRest for TestPending {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -411,12 +410,6 @@ impl UseRest for TestPending {
         true
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aimed at the cast's
-    /// target point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
         self.book.srvst(index, u, skill, lvl)
     }

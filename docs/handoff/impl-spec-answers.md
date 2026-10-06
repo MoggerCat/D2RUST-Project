@@ -98,3 +98,49 @@ Full runs with `--no-fail-fast`:
   step 5 still expects the missile path build to fail and the monster to
   survive, which the new §11 missile paths may change. Re-run it once the
   bridge has the 0xAC handler.
+
+## 6. Third round: `e2e_full_loop` kill step (coordinator request)
+
+Base merged again (`bcd6591`). The path answers (missile paths §11) made
+the old STOP at step 5 (`Walk(Fatal("path type without a function"))`)
+obsolete. Step 5 now runs the kill on the wired host with the path
+provider. A probe found three **fixture** gaps; I fixed each in
+synthetic test data, not in a spec rule:
+
+1. The arrow row had `Vel` 1. After the spec's 75 % (§R2.2 step 5) that
+   is velocity 192, about 1/30 of a sub-tile per frame, and range 50
+   expired 2 sub-tiles short. Now `Vel` / `MaxVel` 16, velocity 3072.
+   The old comment "one sub-tile per frame" was wrong in spec units.
+2. The monster's monstats2 row was blank: size 0 → pattern 0, which
+   stamps no footprint (PC2), so the missile flew through it. The new
+   monstats2 row 1 has `SizeX` 1 (the monster's `MonStatsEx` = 1; the
+   NPC rows keep row 0). `PopTables` and `components` get the second
+   row too.
+3. Max stamina (stat 11) was unset, so the kill's level-up refill
+   (`vitals.md` §3 step 5: stamina = max stamina) set stamina 0 and the
+   later run became a walk. Max stamina is now set equal to stamina.
+
+New assertions:
+- Missile path flags 0x60000, type 4, velocity 3072, and its flight
+  sub-tiles.
+- The hit on frame f0 + 10, life 0, death mode 0, the kill seam order,
+  100 experience and level 2, the death-animation timer, and the gold
+  drop at (x + 2, y + 3) in mode 3.
+- Step 5b picks up the gold (0x16 cursor 0): result 0, no S→C, gold
+  += amount, the pile freed.
+- Later steps carry the new gold. The final error list is empty, and
+  the transcript has 123 frames (was 119) and 1 drop.
+
+The cap pick-up and placement stay, because gold has no cursor form.
+Still not sent: S→C for the missile, death and drop. That needs the
+per-unit update `0x0053A500` (IS2).
+
+`cargo nextest run -p d2-client --test e2e_full_loop`: 3 passed.
+
+Gate after the third round: everything passes except d2-sim. d2-client:
+all tests pass (the bridge table mismatch is fixed on the base). d2-sim +
+conformance: 2,388 of 2,395 pass. The 7 failures are the base's catalogue
+checks from `spec-skill-bodies`: `missiles::tests_bodies` ×2 (spec'd-here
+1, 2, 3, 5, 7, 8, 10, 25; implemented 1), and `skills::use_` /
+`skills::mutant_tests` ×5. This branch touches no `missiles/` or
+`skills/` code.

@@ -61,9 +61,8 @@ use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind
 use d2_sim::items::moves::{Guid, MovePending, Owner};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ty, ItemRequest, ItemTables};
-use d2_sim::missiles::MissileParams;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
 use d2_sim::tick::EventDispatch;
@@ -192,14 +191,18 @@ fn skill_rec() -> Skills {
     s
 }
 
-/// Attack (0), Multiple Shot (1: srvst 4, mana), Might (2: aura), a
+/// Attack (0), Multiple Shot (1: srvst 6, mana), Might (2: aura), a
 /// learnable skill (3: max level 3).
+/// Start slot of the synthetic start skills: srvst 6 (status `mapped`)
+/// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
+/// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
+/// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[1];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
     let m = &mut v[2];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 65, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 66, 33);
     v[3].maxlvl = 3;
     SkillTables {
         skills: v,
@@ -378,7 +381,6 @@ impl UseRest for Book {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -420,7 +422,6 @@ impl UseRest for Book {
         false
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, _: &mut MissileParams) {}
     fn srvst(&mut self, _: u16, _: UnitId, _: i32, _: i32) -> i32 {
         1
     }

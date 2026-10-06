@@ -169,13 +169,123 @@ pub trait MissileHooks {
     fn unique_mod_missile(&mut self, game: &mut Game, owner: UnitId, missile: UnitId);
 }
 
+/// The skills formula a server body evaluates (`skills/levels.md`
+/// `eval(owner, k.<field>, k, level)`, §R9.5 / §R9.6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillCalc {
+    Calc1,
+    Calc2,
+    AuraRange,
+    AuraLen,
+}
+
+/// What the server-do and server-hit bodies (§R9.5, §R9.6) need beyond
+/// the other seams. Providers: skills (formulas, the area scan of
+/// `skills/bodies.md` §2.12), path (new-step flag, target), DRLG
+/// (collision writes), units (animation frame, alive), combat (the area
+/// hit). Every default is the narrowest reading: nothing happens, or the
+/// value that makes the caller do nothing.
+#[allow(unused_variables)]
+pub trait MissileBodies {
+    /// `0x0064B7C0(missile, owner, field, class, level)`: a missiles
+    /// formula (`data/calc-expressions.md`).
+    fn missile_calc(
+        &mut self,
+        game: &mut Game,
+        missile: UnitId,
+        owner: Option<UnitId>,
+        field: u32,
+        class: i32,
+        level: i32,
+    ) -> i32 {
+        0
+    }
+    /// The skills record of `skill` exists.
+    fn skill_exists(&self, skill: i32) -> bool {
+        false
+    }
+    /// `eval(owner, k.<calc>, k, level)` (`skills/levels.md` §2; the
+    /// owner may be none).
+    fn skill_calc(
+        &mut self,
+        game: &mut Game,
+        owner: Option<UnitId>,
+        skill: i32,
+        calc: SkillCalc,
+        level: i32,
+    ) -> i32 {
+        0
+    }
+    /// `0x006505C0`: the path's new-step flag (path +0x34 bit 3).
+    fn path_new_step(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The unit's path target, after the refresh of `skills/bodies.md`
+    /// §2.1.
+    fn path_target(&mut self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x0064CB90(room, x, y, bits)`: OR `bits` into the one collision
+    /// cell at (x, y) of the room containing it, searched from `room`.
+    fn or_collision(&mut self, game: &mut Game, room: RoomId, x: i32, y: i32, bits: u16) {}
+    /// `0x0064EA00`: stamp `bits` with the unit's size at its position
+    /// (`sim/path-placement.md` §5.1).
+    fn stamp_collision(&mut self, game: &mut Game, unit: UnitId, bits: u16) {}
+    /// Unit +0x44 (animation frame, 8.8).
+    fn anim_frame(&self, unit: UnitId) -> i32 {
+        0
+    }
+    fn set_anim_frame(&mut self, unit: UnitId, v: i32) {}
+    /// `0x005541B0`: the unit is dead.
+    fn is_dead(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0063E940` demon.
+    fn is_demon(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0063E990` undead.
+    fn is_undead(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The units `scan_unit(game, owner, x, y, r, f, …, noaura 0)`
+    /// (`skills/bodies.md` §2.12) hands its callback, in order.
+    fn area_units(
+        &mut self,
+        game: &Game,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// `0x0056B9C0(game, owner, U, record)` on a copy of the record
+    /// (§R9.6 `area_damage`).
+    fn area_hit(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        unit: UnitId,
+        record: &crate::combat::DamageRecord,
+    ) {
+    }
+}
+
 /// Everything missile code needs.
 pub trait MissileWorld:
-    MissileUnits + MissilePath + MissileRooms + MissileCombat + MissileHooks
+    MissileUnits + MissilePath + MissileRooms + MissileCombat + MissileHooks + MissileBodies
 {
 }
 
-impl<T: MissileUnits + MissilePath + MissileRooms + MissileCombat + MissileHooks + ?Sized>
-    MissileWorld for T
+impl<
+        T: MissileUnits
+            + MissilePath
+            + MissileRooms
+            + MissileCombat
+            + MissileHooks
+            + MissileBodies
+            + ?Sized,
+    > MissileWorld for T
 {
 }

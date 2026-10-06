@@ -2,7 +2,8 @@
 //! Vitals: player creation values (§1), spending stat points and the
 //! stat reset (§2), level-up (§3), the experience table lookups (§4.1),
 //! the experience-on-kill level factor (§4.2) and the add-experience path
-//! the creation uses (§4.3, partly confirmed).
+//! the creation uses (§4.3, partly confirmed) and the client vitals sync
+//! (§5, [`sync`]).
 //!
 //! Status: implemented, unverified (the spec is a draft; its checks are
 //! queued in `docs/handoff/impl-skilluse-vitals.md`). No randomness.
@@ -11,6 +12,7 @@
 //! units/stats, `sim/stats.md` §4.2 getters and setters); table data
 //! comes from `d2_data` typed records ([`VitalsTables`]).
 
+pub mod sync;
 #[cfg(test)]
 mod tests;
 

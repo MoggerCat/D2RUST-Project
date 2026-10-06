@@ -39,8 +39,9 @@
 //!    cursor (0x16), placed in the grid (0x18), lifted (0x19), equipped
 //!    (0x1A), unequipped (0x1C), dropped (0x17), picked and placed
 //!    again; each frame's tick sends the deferred item messages (§6,
-//!    §11: 0x9C / 0x9D with an empty item bit stream, OQ1) and 0x47,
-//!    0x48;
+//!    §11: 0x9C / 0x9D with the item bit stream, `items/bitstream.md`:
+//!    decoded with `d2-proto`'s reader and cut off by `streams`) and
+//!    0x47, 0x48;
 //! 10. (steps 19–22) the vendor on the same inventory: the cap placed by
 //!     0x18 is sold (0x33: removed, freed, the price received: S→C 0x2A
 //!     kind 3), a buy (0x32) **stops at the item copy** `0x0055A2A0`
@@ -912,6 +913,42 @@ fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
     frames.push((msgs, step, chunks));
 }
 
+/// A frame's received messages with each 0x9C / 0x9D item bit stream
+/// (`items/bitstream.md`) checked and cut off (size byte = header size),
+/// so the steps state the §11 headers: the stream must decode to its
+/// exact length with `d2-proto`'s reader on the game's item tables and
+/// carry the item's code when the item is still in the game.
+fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    use d2_server::adapters::item_bits::TablesLookup;
+    let sim = fx.sim_ref();
+    msgs.iter()
+        .map(|m| {
+            let head = match m[0] {
+                0x9C => 8,
+                0x9D => 13,
+                _ => return m.clone(),
+            };
+            assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+            let bits = d2_proto::item_bits::decode(&m[head..], &TablesLookup(&sim.world.tables))
+                .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"));
+            let guid = u32::from_le_bytes(m[4..8].try_into().unwrap());
+            let unit = sim
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid);
+            if let Some(it) = unit.and_then(|u| sim.events.action.sys.hooks.items.get(u)) {
+                assert_eq!(
+                    bits.code, sim.world.tables.items[it.record].code,
+                    "code of {guid}"
+                );
+            }
+            let mut h = m[..head].to_vec();
+            h[2] = head as u8;
+            h
+        })
+        .collect()
+}
+
 fn run() -> Transcript {
     run_with(GAME_SEED)
 }
@@ -973,7 +1010,7 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 4 1 10"]);
+    assert_eq!(fx.book.get().log, ["srvst 6 1 10"]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
@@ -992,7 +1029,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 6 1 10", "srvdo 8 1 10 true false false"]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();
@@ -1247,7 +1284,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![pick_cap.clone()]);
     assert_eq!(frames[20].1.codes, [(0x16, done)]);
-    assert_eq!(frames[20].2, pass(vec![x9c(0x01, cg)]));
+    assert_eq!(streams(&fx, &frames[20].2), pass(vec![x9c(0x01, cg)]));
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), None);
 
@@ -1264,7 +1301,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![insert.clone()]);
     assert_eq!(frames[21].1.codes, [(0x18, done)]);
-    assert_eq!(frames[21].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(streams(&fx, &frames[21].2), pass(vec![x9c(0x04, cg)]));
     assert_eq!(fx.mode(cap), 0);
     assert_eq!(fx.items().get(cap).unwrap().inv_page, 0);
 
@@ -1273,7 +1310,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let lift = bytes(&RemoveItemFromBuffer { item: cg });
     record(&mut fx, &mut frames, vec![lift]);
     assert_eq!(frames[22].1.codes, [(0x19, done)]);
-    assert_eq!(frames[22].2, pass(vec![x9d(0x05, cg)]));
+    assert_eq!(streams(&fx, &frames[22].2), pass(vec![x9d(0x05, cg)]));
     assert_eq!(fx.mode(cap), 4);
 
     // 14. Equip on the head (C→S 0x1A location 1, §7.5 → §4.6): mode 1
@@ -1284,7 +1321,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![equip]);
     assert_eq!(frames[23].1.codes, [(0x1A, done)]);
-    assert_eq!(frames[23].2, pass(vec![x9d(0x06, cg)]));
+    assert_eq!(streams(&fx, &frames[23].2), pass(vec![x9d(0x06, cg)]));
     assert_eq!(fx.mode(cap), 1);
 
     // 15. Unequip (C→S 0x1C location 1, §7.7): to the cursor → 0x9D
@@ -1292,7 +1329,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let unequip = bytes(&RemoveBodyItem { bodyloc: 1 });
     record(&mut fx, &mut frames, vec![unequip]);
     assert_eq!(frames[24].1.codes, [(0x1C, done)]);
-    assert_eq!(frames[24].2, pass(vec![x9d(0x08, cg)]));
+    assert_eq!(streams(&fx, &frames[24].2), pass(vec![x9d(0x08, cg)]));
     assert_eq!(fx.mode(cap), 4);
 
     // 16. Drop (C→S 0x17, §7.2 → §9.1): no room at (x + 2, y + 3) (the
@@ -1322,10 +1359,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // inventory model, as the vendor sees it next.
     record(&mut fx, &mut frames, vec![pick_cap]);
     assert_eq!(frames[26].1.codes, [(0x16, done)]);
-    assert_eq!(frames[26].2, pass(vec![x9c(0x01, cg)]));
+    assert_eq!(streams(&fx, &frames[26].2), pass(vec![x9c(0x01, cg)]));
     record(&mut fx, &mut frames, vec![insert]);
     assert_eq!(frames[27].1.codes, [(0x18, done)]);
-    assert_eq!(frames[27].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(streams(&fx, &frames[27].2), pass(vec![x9c(0x04, cg)]));
     assert_eq!(fx.mode(cap), 0);
     assert!(fx.inventory().contains(&cap));
     assert!(fx.inv.with(|r| r.log.len()) == 2);
@@ -1418,7 +1455,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames[32].1.codes, [(0x16, done)]);
-    assert_eq!(frames[32].2, pass(vec![x9c(0x01, rg)]));
+    assert_eq!(streams(&fx, &frames[32].2), pass(vec![x9c(0x01, rg)]));
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
     assert_eq!(
@@ -1447,7 +1484,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     record(&mut fx, &mut frames, vec![put]);
     assert_eq!(frames[33].1.codes, [(0x2A, done)]);
-    assert_eq!(frames[33].2, pass(vec![x9c(0x04, rg)]));
+    assert_eq!(streams(&fx, &frames[33].2), pass(vec![x9c(0x04, rg)]));
     assert_eq!(fx.items().get(ring).unwrap().inv_page, CUBE_PAGE);
     assert_eq!(fx.mode(ring), 0);
     assert_eq!(fx.inventory(), [fx.buckler, cube, ring]);
@@ -1476,7 +1513,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let ag = fx.guid(amulet);
     let mut want = vec![x9d(0x05, rg)];
     want.extend(pass(vec![x9c(0x04, ag)]));
-    assert_eq!(frames[34].2, want);
+    assert_eq!(streams(&fx, &frames[34].2), want);
     assert!(!fx.items().contains(ring));
     assert!(fx.sim_ref().game.lists.unit(ring).is_none(), "freed");
     let it = fx.items().get(amulet).unwrap().clone();

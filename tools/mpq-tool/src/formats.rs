@@ -23,6 +23,29 @@ const EXTRA_NAMES: &[&str] = &[
     r"data\local\lng\eng\expansionstring.tbl",
 ];
 
+/// The archive's name key (`specs/formats/mpq.md` §3 `normalize`: `a`–`z`
+/// → `A`–`Z`, `/` → `\`, every other byte unchanged). Two names with one
+/// key hash alike, so they name the same file of an archive.
+fn name_key(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '/' => '\\',
+            c => c.to_ascii_uppercase(),
+        })
+        .collect()
+}
+
+/// The distinct file names of `lists`, keyed by [`name_key`]; the first
+/// spelling met is kept. Listfiles of different archives spell some names
+/// in different case, and a case-sensitive set counted those files twice.
+fn name_set(lists: impl IntoIterator<Item = Vec<String>>) -> BTreeMap<String, String> {
+    let mut names = BTreeMap::new();
+    for name in lists.into_iter().flatten() {
+        names.entry(name_key(&name)).or_insert(name);
+    }
+    names
+}
+
 /// Files known to be unusable leftovers, with the spec that documents each.
 /// They're still parsed: a failure is expected, a success means this list
 /// is stale.
@@ -236,12 +259,13 @@ pub fn run(dir: &Path) -> Result<()> {
     paths.sort();
     let archives: Vec<Archive> = paths.iter().map(Archive::open).collect::<Result<_, _>>()?;
 
-    let mut names: BTreeSet<String> = EXTRA_NAMES.iter().map(|s| s.to_string()).collect();
+    let mut lists = vec![EXTRA_NAMES.iter().map(|s| s.to_string()).collect()];
     for a in &archives {
         if let Some(list) = a.listfile()? {
-            names.extend(list);
+            lists.push(list);
         }
     }
+    let names = name_set(lists);
 
     // (kind) -> tally; parse every copy of every name in every archive.
     let mut tallies: BTreeMap<String, Tally> = BTreeMap::new();
@@ -254,7 +278,7 @@ pub fn run(dir: &Path) -> Result<()> {
             .to_string_lossy()
             .to_lowercase();
         let mut named_blocks = BTreeSet::new();
-        for name in &names {
+        for name in names.values() {
             let Some(index) = a.find(name) else { continue };
             named_blocks.insert(index);
             let read = a.read(name);
@@ -323,4 +347,37 @@ pub fn run(dir: &Path) -> Result<()> {
         bail!("{failures} files failed to parse");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn list(names: &[&str]) -> Vec<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+
+    // Two listfiles spelling one file in different case (or with `/`) give
+    // one name: the archive lookup normalizes case and separators.
+    #[test]
+    fn name_set_is_case_and_separator_insensitive() {
+        let names = name_set([
+            list(&[r"data\global\ui\panel\invchar6.DC6", r"data\global\a.dt1"]),
+            list(&[r"DATA\GLOBAL\UI\PANEL\INVCHAR6.dc6", "data/global/a.dt1"]),
+            list(&[r"data\global\b.dt1"]),
+        ]);
+        let kept: Vec<&str> = names.values().map(String::as_str).collect();
+        assert_eq!(
+            kept,
+            [
+                r"data\global\a.dt1",
+                r"data\global\b.dt1",
+                r"data\global\ui\panel\invchar6.DC6",
+            ]
+        );
+        assert_eq!(
+            name_key("data/global/ui/Panel.dc6"),
+            r"DATA\GLOBAL\UI\PANEL.DC6"
+        );
+    }
 }

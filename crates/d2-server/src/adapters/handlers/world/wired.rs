@@ -445,6 +445,17 @@ where
         WorldHost::<D>::walk(&mut self.action, game, events, call)
     }
 
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: d2_sim::units::ClientId,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
+        WorldHost::<D>::vitals_sync(&mut self.action, game, events, client, staged, queued)
+    }
+
     /// The action wiring's sends (waypoints, tick paths), then the rest's
     /// (NPC, vendor and quest messages), then what the inventory rules
     /// queued in vendor calls; one system runs per message, so the

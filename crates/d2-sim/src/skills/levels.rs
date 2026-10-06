@@ -1057,23 +1057,123 @@ pub fn roll_physical<W: SkillUnits>(
 
 /// `roll_elemental(unit, record, skill, lvl)` = `0x0056E0C0` (§3.6):
 /// evaluates `elem_len`, `elem_min`, `elem_max` (mastery on) in that
-/// order and draws `roll(b − a)`. Returns `(EType, v, len)`.
-// TODO(levels.md OQ4): `0x0056C8E0` places `v` and `len` into the damage
-// record by `EType`; its field map is unspecified, so the caller places
-// them.
+/// order, draws `roll(b − a)` and puts `v` and `len` into the record by
+/// `EType` ([`add_element`]). Returns `v`.
 pub fn roll_elemental<W: SkillUnits>(
     w: &mut W,
     t: &SkillTables,
     unit: W::Unit,
+    record: &mut crate::combat::DamageRecord,
     skill: i32,
     lvl: i32,
-) -> (u8, i32, i32) {
+) -> i32 {
     let len = elem_len(w, t, Some(unit), skill, lvl);
     let a = elem_min(w, t, Some(unit), skill, lvl, true);
     let b = elem_max(w, t, Some(unit), skill, lvl, true);
     let v = a.wrapping_add(w.seed(unit).roll(b.wrapping_sub(a)) as i32);
-    let etype = t.skill(skill).map_or(0, |r| r.etype);
-    (etype, v, len)
+    let etype = t.skill(skill).map_or(0, |r| i32::from(r.etype));
+    add_element(w, unit, record, etype, v, len);
+    v
+}
+
+/// What [`add_element`] reports through its two out arguments (`&res`,
+/// `&e_out`), plus the element's hit class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ElementAdded {
+    /// The element after the random remap (`e_out`).
+    pub element: i32,
+    /// The resist stat of the element, −1 for leech, stun, burn and
+    /// physical (`res`).
+    pub resist: i32,
+    /// The hit class the element names (0x20 fire, 0x40 lightning, 0x30
+    /// cold and freeze, 0x50 poison, 0x60 stun; 0 otherwise).
+    // TODO(spec: levels.md §3.6): how `add_element` writes the hit class
+    // (record +0x60 set, or-ed, or only its high nibble) is not stated;
+    // the record's hit class is left unchanged and the value returned.
+    pub hit_class: u32,
+}
+
+/// `add_element(unit, record, e, v, len, &res, &e_out)` = `0x0056C8E0`
+/// (§3.6, jump table `0x0056CA0C`): adds `v` (and sets `len`) in the
+/// record field of element `e`; `e = 10` is one random element of {1, 2,
+/// 4, 5} (one step of the unit seed, `lo' & 3`) with `len ≤ 0` → 50.
+pub fn add_element<W: SkillUnits>(
+    w: &mut W,
+    unit: W::Unit,
+    record: &mut crate::combat::DamageRecord,
+    e: i32,
+    v: i32,
+    len: i32,
+) -> ElementAdded {
+    let (mut e, mut len) = (e, len);
+    if e == 10 {
+        // Table `0x006E1278`.
+        const RANDOM: [i32; 4] = [1, 2, 4, 5];
+        e = RANDOM[(w.seed(unit).step() & 3) as usize];
+        if len <= 0 {
+            len = 50;
+        }
+    }
+    let r = record;
+    let (resist, hit_class) = match e {
+        1 => {
+            r.fire = r.fire.wrapping_add(v);
+            (39, 0x20)
+        }
+        2 => {
+            r.lightning = r.lightning.wrapping_add(v);
+            (41, 0x40)
+        }
+        3 => {
+            r.magic = r.magic.wrapping_add(v);
+            (37, 0)
+        }
+        4 => {
+            r.cold = r.cold.wrapping_add(v);
+            r.cold_len = len;
+            (43, 0x30)
+        }
+        5 => {
+            r.poison = r.poison.wrapping_add(v);
+            r.poison_len = len;
+            (45, 0x50)
+        }
+        6 => {
+            r.life_leech = r.life_leech.wrapping_add(v);
+            (-1, 0)
+        }
+        7 => {
+            r.mana_leech = r.mana_leech.wrapping_add(v);
+            (-1, 0)
+        }
+        8 => {
+            r.stamina_leech = r.stamina_leech.wrapping_add(v);
+            (-1, 0)
+        }
+        9 => {
+            r.stun_len = r.stun_len.wrapping_add(v.wrapping_add(len));
+            (-1, 0x60)
+        }
+        11 => {
+            r.burn = r.burn.wrapping_add(v);
+            r.burn_len = len;
+            (-1, 0)
+        }
+        12 => {
+            r.cold = r.cold.wrapping_add(v);
+            r.freeze_len = len;
+            (43, 0x30)
+        }
+        _ => {
+            r.physical = r.physical.wrapping_add(v);
+            (-1, 0)
+        }
+    };
+    ElementAdded {
+        element: e,
+        resist,
+        hit_class,
+    }
 }
 
 // ---------------------------------------------------------------- §4

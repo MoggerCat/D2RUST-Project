@@ -265,7 +265,10 @@ fn act_placer_inits_only_non_outdoor_levels() {
     let want: Vec<u32> = levels
         .iter()
         .map(|&l| drlg.level(l))
-        .filter(|l| l.drlg_type != 3)
+        // Types 1 and 2 get a type init; outdoor (3) and 0 (`levels.md`
+        // §4.4, e.g. the neighbour-entry allocations 8..16 left at 0 in
+        // this data) none.
+        .filter(|l| matches!(l.drlg_type, 1 | 2))
         .map(|l| l.id)
         .collect();
     assert!(!want.is_empty());

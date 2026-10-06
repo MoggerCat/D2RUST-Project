@@ -222,9 +222,14 @@ fn lvlprest_measurements() {
         [(1, 1), (301, 40), (529, 75), (797, 103), (863, 109)]
     );
     assert_eq!(n(&|d| d.populate == 0), 62);
+    // A slot "names a file" when it has more than one character:
+    // `data/fixups.md` §12, the 0/1-character strings are the 5,321 `0`
+    // placeholders (the server's `world_data::names_file` rule). Counting
+    // non-empty slots counted the placeholders (1,079 = every row with
+    // `Files` < 6).
     let beyond = n(&|d| {
         let k = d.files.max(0) as usize;
-        d.file.iter().skip(k).any(|f| !f.is_empty())
+        d.file.iter().skip(k).any(|f| f.len() > 1)
     });
     assert_eq!(beyond, 82);
     for &id in &PRESET_LEVELS {

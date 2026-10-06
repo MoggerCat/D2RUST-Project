@@ -450,7 +450,11 @@ fn sweep_drop_quality_every_item() {
                     if q == 6 {
                         assert_ne!(ty.rare, 0, "{at}: rare gate");
                     }
-                    if ty.magic != 0 {
+                    // The magic gate is ladder step 4 (`treasure-quality.tsv`),
+                    // run in §6 step 6; `M` ≤ −100 skips straight to step 7
+                    // (§6 step 5), past the gate, so a `magic` type (item
+                    // 520, first live failure 2026-10-06) can come out ≤ 3.
+                    if ty.magic != 0 && mf > -100 {
                         assert!(q >= 4, "{at}: magic gate");
                     }
                     if mf <= -100 {

@@ -541,13 +541,24 @@ fn function_table_check_reports_perturbations() {
     assert_eq!(m[0].line, 3);
     // A filled slot marked null.
     let bad = FUNCTIONS_TSV.replacen(
-        "srvst\t2\t0x0056CAF0\tSrvSt02_Kick\tmapped",
+        "srvst\t2\t0x0056CAF0\tSrvSt02_Kick\tspec'd-here",
         "srvst\t2\tnull\t-\tnull",
         1,
     );
     let m = check_tsv(&bad);
     assert_eq!(m.len(), 1, "{m:?}");
     assert_eq!(m[0].line, 4);
+    // A status changed (srvdo 65 spec'd-here → mapped): one mismatch on
+    // its line.
+    let bad = FUNCTIONS_TSV.replacen(
+        "SrvDo065_BasicAura\tspec'd-here",
+        "SrvDo065_BasicAura\tmapped",
+        1,
+    );
+    assert_ne!(bad, FUNCTIONS_TSV);
+    let m = check_tsv(&bad);
+    assert_eq!(m.len(), 1, "{m:?}");
+    assert!(m[0].what.starts_with("srvdo 65"), "{m:?}");
     // A dropped row: the slot is reported missing.
     let bad: String = FUNCTIONS_TSV
         .lines()

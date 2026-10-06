@@ -435,6 +435,7 @@ fn missing_assets_and_text_are_errors() {
         text: vec![u16::from(b'a')],
         at: Point::new(0, 0),
         style: TextStyle::default(),
+        opts: crate::ui::TextOpts::default(),
         clip: crate::ui::Rect::new(0, 0, 800, 600),
     });
     assert!(matches!(

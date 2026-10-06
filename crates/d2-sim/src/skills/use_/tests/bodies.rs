@@ -1,7 +1,7 @@
-//! The per-skill bodies of `bodies` (`functions.tsv` notes), run through
-//! the start core on the `tests` fake.
+//! The per-skill bodies of `bodies` (`functions.tsv` notes and status
+//! `spec'd-here`), run through the start core on the `tests` fake.
 
-use super::super::bodies::{self, DO_BODIES, START_BODIES};
+use super::super::bodies::{self, DO_BODIES, PURE_START, START_BODIES};
 use super::*;
 
 /// The `functions.tsv` note that states each body here, by (kind, index).
@@ -19,7 +19,7 @@ fn bodies_mismatches(tsv: &str) -> Vec<String> {
         };
         let has = match *kind {
             "srvst" => bodies::start(index).is_some(),
-            "srvdo" => bodies::do_(index).is_some(),
+            "srvdo" => false,
             _ => continue,
         };
         let notes = c.get(6).copied().unwrap_or("");
@@ -40,20 +40,59 @@ fn bodies_mismatches(tsv: &str) -> Vec<String> {
     out
 }
 
+/// Every `spec'd-here` row must name its section ("body: bodies.md §")
+/// and be in [`START_BODIES`] / [`DO_BODIES`]; every slot there must be
+/// such a row. Returns the mismatches.
+fn specd_mismatches(tsv: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = Vec::new();
+    for l in tsv.lines().skip(1) {
+        let c: Vec<&str> = l.split('\t').collect();
+        let (Some(kind), Some(Ok(index))) = (c.first(), c.get(1).map(|i| i.parse::<u16>())) else {
+            continue;
+        };
+        let listed = match *kind {
+            "srvst" => START_BODIES.contains(&index),
+            "srvdo" => DO_BODIES.contains(&index),
+            _ => continue,
+        };
+        let specd = c.get(4) == Some(&"spec'd-here");
+        let noted = c.get(6).is_some_and(|n| n.contains("body: bodies.md §"));
+        if listed != specd || specd != noted {
+            out.push(format!("{kind} {index}"));
+        }
+        if specd {
+            seen.push((*kind, index));
+        }
+    }
+    for &i in START_BODIES {
+        if !seen.contains(&("srvst", i)) {
+            out.push(format!("srvst {i} missing"));
+        }
+    }
+    for &i in DO_BODIES {
+        if !seen.contains(&("srvdo", i)) {
+            out.push(format!("srvdo {i} missing"));
+        }
+    }
+    out
+}
+
 // Covers: specs/skills/use.md §8
 #[test]
 fn bodies_match_tsv_notes() {
     assert_eq!(bodies_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
-    assert_eq!(START_BODIES, [18]);
-    assert!(DO_BODIES.is_empty());
-    for &i in START_BODIES {
+    assert_eq!(specd_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
+    assert_eq!(PURE_START, [18]);
+    assert_eq!(START_BODIES.len() + DO_BODIES.len(), 16);
+    for &i in PURE_START.iter().chain(START_BODIES) {
         assert!(table::lookup(Kind::Start, i).is_some());
     }
-    for i in 0..table::START_SLOTS {
-        assert_eq!(bodies::start(i).is_some(), START_BODIES.contains(&i));
+    for &i in DO_BODIES {
+        assert!(table::lookup(Kind::Do, i).is_some());
     }
-    for i in 0..table::DO_SLOTS {
-        assert_eq!(bodies::do_(i).is_some(), DO_BODIES.contains(&i));
+    for i in 0..table::START_SLOTS {
+        assert_eq!(bodies::start(i).is_some(), PURE_START.contains(&i));
     }
 }
 
@@ -66,12 +105,28 @@ fn bodies_check_reports_perturbations() {
     assert_eq!(bodies_mismatches(&bad), ["srvst 18"]);
     // A slot that states a body the code lacks.
     let bad = FUNCTIONS_TSV.replacen(
-        "SrvSt02_Kick\tmapped\tKick\t",
-        "SrvSt02_Kick\tmapped\tKick\t1.14d body is \"return 1\"",
+        "SrvSt06_PowerStrike_ChargedStrike\tmapped\tPower Strike,Charged Strike,MonPowerStrike,MonIceSpear\t",
+        "SrvSt06_PowerStrike_ChargedStrike\tmapped\tPower Strike,Charged Strike,MonPowerStrike,MonIceSpear\t1.14d body is \"return 1\"",
         1,
     );
     assert_ne!(bad, FUNCTIONS_TSV);
-    assert_eq!(bodies_mismatches(&bad), ["srvst 2"]);
+    assert_eq!(bodies_mismatches(&bad), ["srvst 6"]);
+    // A spec'd-here row demoted to mapped: the body list disagrees.
+    let bad = FUNCTIONS_TSV.replacen("SrvSt02_Kick\tspec'd-here", "SrvSt02_Kick\tmapped", 1);
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvst 2", "srvst 2 missing"]);
+    // A spec'd-here row without its section note.
+    let bad = FUNCTIONS_TSV.replacen("body: bodies.md §4.4", "body: elsewhere", 1);
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvdo 30"]);
+    // A mapped row promoted: no body for it.
+    let bad = FUNCTIONS_TSV.replacen(
+        "SrvDo003_Throw\tmapped\tThrow\t",
+        "SrvDo003_Throw\tspec'd-here\tThrow\tbody: bodies.md §9",
+        1,
+    );
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvdo 3"]);
 }
 
 // Covers: specs/skills/use.md §5.3 r6
