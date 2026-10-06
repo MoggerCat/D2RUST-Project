@@ -10,6 +10,7 @@
 
 pub mod game;
 pub mod rng;
+pub mod stats;
 pub mod tick;
 pub mod units;
 
