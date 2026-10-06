@@ -34,6 +34,8 @@ wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12
 # The local-server end-to-end test builds a wired sim from synthetic tables.
 d2-sim.workspace = true
 d2-data.workspace = true
+# Property tests on the untrusted-input paths (`tests/prop_*.rs`, M07).
+proptest.workspace = true
 
 [lints]
 workspace = true

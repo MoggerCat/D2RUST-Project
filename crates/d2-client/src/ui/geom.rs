@@ -41,18 +41,21 @@ impl Rect {
         Point::new(self.x, self.y)
     }
 
-    /// Exclusive right edge.
-    pub const fn right(&self) -> i32 {
-        self.x + self.w as i32
+    /// Exclusive right edge, in `i64`: a rect may end past `i32::MAX`.
+    pub const fn right(&self) -> i64 {
+        self.x as i64 + self.w as i64
     }
 
-    /// Exclusive bottom edge.
-    pub const fn bottom(&self) -> i32 {
-        self.y + self.h as i32
+    /// Exclusive bottom edge, in `i64` (as [`Self::right`]).
+    pub const fn bottom(&self) -> i64 {
+        self.y as i64 + self.h as i64
     }
 
     /// Half-open containment; an empty rect contains nothing.
     pub const fn contains(&self, p: Point) -> bool {
-        p.x >= self.x && p.x < self.right() && p.y >= self.y && p.y < self.bottom()
+        p.x >= self.x
+            && (p.x as i64) < self.right()
+            && p.y >= self.y
+            && (p.y as i64) < self.bottom()
     }
 }
