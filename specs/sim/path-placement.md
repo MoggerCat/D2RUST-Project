@@ -42,13 +42,13 @@
 |   9. Floor drop placement (`0x00555DA0`) | 430–448 |
 |   10. Placing a unit at a point (`0x00554EA0`) | 449–483 |
 |   11. Level spawn point (`0x0061B060`) and game entry | 484–506 |
-|   12. Warp tiles and warp arrival | 507–543 |
-| Constants & data dependencies | 544–562 |
-| Randomness | 563–572 |
-| Edge cases & original bugs | 573–599 |
-| Test vectors | 600–632 |
-| Provenance | 633–661 |
-| Open questions | 662–686 |
+|   12. Warp tiles and warp arrival | 507–545 |
+| Constants & data dependencies | 546–564 |
+| Randomness | 565–574 |
+| Edge cases & original bugs | 575–601 |
+| Test vectors | 602–634 |
+| Provenance | 635–663 |
+| Open questions | 664–688 |
 <!-- /index -->
 
 ## Summary
@@ -512,7 +512,9 @@ Called by the tile grid fill (`drlg/rooms.md` §9.5.1 step 3) for a
 hidden exit cell of type t (10 or 11) at world tile (wx, wy) with packed
 value v, DRLG room R:
 
-1. Direction letter: t = 11 → 'l', else 'r'. Warp slot = main index
+1. Direction letter: t = 11 → 'r', else (10) 'l' (read at
+   `0x0066E1C4`–`0x0066E1D5`; D2MOO `DRLGROOMTILE_AddWarp` agrees: the
+   right exit type takes 'r'). Earlier text had the letters swapped. Warp slot = main index
    (v bits 20–25). lvlwarp record: `drlg/levels.md` §7 rule 4 for R's
    level, that slot and letter (no record → fatal).
 2. Local tile (lx, ly) = (wx − R tile x, wy − R tile y). If lx = R tile

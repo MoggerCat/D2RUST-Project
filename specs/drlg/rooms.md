@@ -27,22 +27,22 @@
 | Inputs | 63–71 |
 | Outputs / state changes | 72–77 |
 | Rules | 78–79 |
-|   1. Structures (1.14d layout, for recorders and checks) | 80–116 |
-|   2. DRLG room creation and seeds (`0x0066B3E0`) | 117–134 |
-|   3. Rooms-near arrays (`0x0066C370`) | 135–178 |
-|   4. Status and activation | 179–277 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 278–300 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 301–316 |
-|   7. Room clients and the inactivity counter | 317–337 |
-|   8. Deactivation (tick step 9) | 338–357 |
-|   9. Room tile grid | 358–819 |
-|   10. Collision map from tiles | 820–898 |
-| Constants & data dependencies | 899–911 |
-| Randomness | 912–929 |
-| Edge cases & original bugs | 930–947 |
-| Test vectors | 948–995 |
-| Provenance | 996–1015 |
-| Open questions | 1016–1046 |
+|   1. Structures (1.14d layout, for recorders and checks) | 80–117 |
+|   2. DRLG room creation and seeds (`0x0066B3E0`) | 118–135 |
+|   3. Rooms-near arrays (`0x0066C370`) | 136–179 |
+|   4. Status and activation | 180–278 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 279–301 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 302–317 |
+|   7. Room clients and the inactivity counter | 318–338 |
+|   8. Deactivation (tick step 9) | 339–358 |
+|   9. Room tile grid | 359–849 |
+|   10. Collision map from tiles | 850–928 |
+| Constants & data dependencies | 929–941 |
+| Randomness | 942–959 |
+| Edge cases & original bugs | 960–977 |
+| Test vectors | 978–1025 |
+| Provenance | 1026–1045 |
+| Open questions | 1046–1076 |
 <!-- /index -->
 
 ## Summary
@@ -99,6 +99,7 @@ DRLG room (0xEC bytes):
 | +0x58 | level |
 | +0x5C | preset units |
 | +0x60 | other flags (bit 0: was populated) |
+| +0x64 | logical-room info: coordinate lists (`drlg/levels.md` §11) |
 
 Room flags (+0x28; D2MOO names): 0x10 << i warp toward vis slot i (i =
 0..7); 0x1000–0x8000 sub-shrine rows; 0x10000 waypoint; 0x20000 small
@@ -412,8 +413,32 @@ increment the DRLG freed-room counter (drlg +0x468), free the tile grid
 record and its frame array, the grid header), free type data (type 1
 `0x0067D680`, type 2 `0x00666610`), clear the two tile-record list heads
 (+0x0C, +0x14) of every warp entry on room +0x4C; if keep, set flag
-`0x200000`. The only caller is `0x0066B4C0` (server, room leaves the
-active set). The DT1 library (flag `0x1000000`) is **not** released.
+`0x200000`. The DT1 library (flag `0x1000000`) is **not** released.
+
+Callers and the keep argument:
+
+1. `0x0066B4C0(room, client flag, populated)`, called once, from the
+   active-room removal `0x0061A910` (§8) with the act's client flag (act
+   +0x50) and the active room's flags (+0x34): room +0x30 := 0; room
+   "other flags" (+0x60) := populated & 1 (the whole field is
+   overwritten); if flag `0x100000` is set, `0x0066F1A0` with **keep =
+   1 when the act's client flag is 0** (the server), else 0. Because
+   +0x30 is already 0, the "remove from the act" step never runs on this
+   path; keep only decides flag `0x200000` (set on the server).
+2. `0x0061B560` (status-3 unset handler, §4): keep = 0, client copies
+   only.
+
+Type-2 type data free (`0x00666610` → `0x00666520`, no draws): if the
+room has preset room data (+0x20) whose preset map has a DS1 file, it
+releases the room's grid views over the DS1 layers: for each wall layer
+(file wall-layer count) the orientation grid (data +0x60 + 0x14·i) and
+the wall grid (+0x10 + 0x14·i), for each floor layer (file floor-layer
+count) the floor grid (+0xB0 + 0x14·i), then the shadow grid (+0xD8).
+A grid free (`0x0067CD90`) releases the grid's own row-offset array if
+it has one and clears the grid. The DS1 data itself and the preset room
+data stay; the next build's grid init (§9.2 step 3c) makes new views.
+Nothing in the simulation reads these grids between a free and the
+next build.
 
 #### 9.3 Tile library of a room
 
@@ -450,7 +475,12 @@ dropped). The result order is: slot order, then reverse file order.
 A library entry is the DT1 tile header (`formats/dt1.md`): material flags
 at +0x06, orientation +0x14, main +0x18, sub +0x1C, rarity/frame +0x20,
 sub-tile flags +0x28 (accessors `0x00604BC0`, `0x00604B60`, `0x00604B90`,
-`0x00604C50`, `0x00604C20`, `0x00604CE0`).
+`0x00604C50`, `0x00604C20`, `0x00604CE0`, in that order: `0x00604BC0`
+returns the u16 material flags at +0x06, then the u32 fields +0x14,
++0x18, +0x1C, +0x20, and `0x00604CE0` the address of +0x28; each is
+fatal on a null entry). The monster population's water-point search
+tests material bit 0x2: `0x00604BC0(entry) & 2`
+(`0x005B2789`, `monsters/population.md` §9.2).
 
 #### 9.4 Packed cell and tile choice
 
