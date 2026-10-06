@@ -20,22 +20,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–50 |
-| Inputs | 51–55 |
-| Outputs / state changes | 56–61 |
-| Rules | 62–63 |
-|   1. Conventions | 64–75 |
-|   2. Shared helpers, batch 3 | 76–517 |
-|   3. Bodies, required level 1 | 518–693 |
-|   4. Bodies, required level 6 | 694–903 |
-|   5. Bodies, required level 12 | 904–1077 |
-|   6. Bodies, required level 18 | 1078–1376 |
-| Constants & data dependencies | 1377–1411 |
-| Randomness | 1412–1440 |
-| Edge cases & original bugs | 1441–1490 |
-| Test vectors | 1491–1520 |
-| Provenance | 1521–1536 |
-| Open questions | 1537–1552 |
+| Summary | 42–51 |
+| Inputs | 52–56 |
+| Outputs / state changes | 57–62 |
+| Rules | 63–64 |
+|   1. Conventions | 65–76 |
+|   2. Shared helpers, batch 3 | 77–603 |
+|   3. Bodies, required level 1 | 604–779 |
+|   4. Bodies, required level 6 | 780–989 |
+|   5. Bodies, required level 12 | 990–1163 |
+|   6. Bodies, required level 18 | 1164–1462 |
+|   7. Bodies, required level 24 | 1463–1748 |
+| Constants & data dependencies | 1749–1783 |
+| Randomness | 1784–1816 |
+| Edge cases & original bugs | 1817–1877 |
+| Test vectors | 1878–1911 |
+| Provenance | 1912–1927 |
+| Open questions | 1928–1949 |
 <!-- /index -->
 
 ## Summary
@@ -514,6 +515,91 @@ max(`mindamage(21)`, 1), mx = max(`maxdamage(22)`, 2). Weapon: wield type
 (`0x0063D340`) 2 → stats 23 / 24, else 21 / 22. mn <<= 8, mx <<= 8; mn
 < 1 → 256; mx ≤ mn → mx = mn + 256. Return mn + `roll(mx − mn)` (one
 draw on the unit's seed; none when mx − mn < 1).
+
+#### 2.21 Unit counts and the 0xA3 message
+
+- `next_unit(game, source, x, y, r, f, g, &count)` (`0x0056BD10`,
+  `missiles.md` §R9.6): the optional last argument receives the number of
+  units the scan accepted (every accepted unit adds 1, whichever of the
+  two kept slots it updates).
+- `count_units(game, source, x, y, r, f)` = `0x0056BC80`: `scan_unit`
+  with f | 0xA783, noaura 0; returns the number of accepted units.
+- `msg_a3(unit, T, skill, L, x, y, v)` = `0x00571AA0`: queue a 0x28-byte
+  record on the unit's message list (+0xEC / +0xF0) and queue the unit
+  for update: +0x04 0xA3, +0x08 v (u8), +0x0A skill (u16), +0x0C L
+  (u16), +0x10 / +0x14 the unit's type / GUID (6 / −1 without one),
+  +0x18 / +0x1C T's type / GUID (GUID −1 without T), +0x20 x, +0x24 y
+  (S→C 0xA3, `sim/server-messages.tsv`).
+
+#### 2.22 Pack and alignment helpers
+
+- **Leave pack** `0x0056E580(T)`: T's minion owner (`0x0058F0D0`) is a
+  monster: T itself → `0x0058F260(T)` (the pack is dissolved: every
+  minion of T's list is released); another unit → `0x0058F160(T)` (T is
+  removed from its leader's minion list). `monsters/ai.md` §8.
+- **Alignment** `0x005543B0(U, a, v)`: a > 2 → fatal assertion; else U's
+  state 105 list gets `alignment(172)` := a (`monsters/init.md`);
+  0 evil, 1 neutral (confused, attracted), 2 good (converted).
+- **Target list** `0x005B1990(game, U, 0, slot)` (slot 8 or 9): U in no
+  list (+0xD0 = 11), a player or monster → a node {U, 0} is **prepended**
+  to game list `slot` and U +0xD0 := slot (`bodies.md` §6.3 inserts after
+  the head instead). `0x005B1A90(game, U)` unlinks U and sets +0xD0 :=
+  11.
+
+#### 2.23 Conversion
+
+Used by srvdo 79 (§7.13) and srvdo 51 (§7.19) with (T, caster, state s,
+expiry e, remove callback c):
+
+1. T's list of s, or a new one (game pool, flags 0x802, expire e, owner
+   the caster; failure → return 0), state set, callback c, attached, s
+   on.
+2. Expiry := e; timer 12 at e on T.
+3. Leave pack (§2.22); alignment := 2; `node_insert(game, T, 0, caster
+   +0xD0)` (`bodies.md` §6.3); the caster's path target := none; every
+   list of T with flag 8 (auras) detached and freed (repeat
+   `0x00625760(T, 8)` until none). (Mind Blast clears the lists before
+   the path target; no draws either way.)
+4. tl = T's `level(12)`, cl = the caster's. tl ≠ 0, cl < tl and T has
+   no list of state 109 (`conversion_save`): alloc (game pool, flags 0,
+   expire 0, T's type / GUID; failure → skip), state 109 set, attached
+   (state 109 not turned on). M = T's maximum life >> 8; h = T's
+   `hitpoints(6)` >> 8. List set 176 (`conversion_level`) := tl, 177
+   (`conversion_maxhp`) := M. M' = pct(M, cl, tl) << 8, at least 1; h' =
+   pct(h, cl, tl) << 8 clamped to 1…M'. T base level := cl, stat 6 :=
+   h', stat 7 := M'.
+5. Return 1.
+
+Remove callbacks (ECX T, EDX state):
+
+- Conversion `0x005D01A0`: state off; alignment := 0; target list remove
+  (§2.22). T's list of 109 present: lvl = list[176], M = list[177]; m =
+  T's maximum life >> 8, h = life >> 8; v = pct(M, h, m) when m ≠ 0, else
+  1. T base level := lvl; stat 6 := v << 8; stat 7 := **M** (not shifted:
+  Edge case 22); list 109 detached and freed; every flag-8 list detached
+  and freed.
+- Mind Blast `0x005D7310`: the same, except v is clamped to 1…M and
+  stat 7 := M << 8.
+
+#### 2.24 Frenzy helpers
+
+- **Charge** `0x005D8C70(game, unit, skill, L)`: R invalid, E (used
+  entry) none, or E param 1 = 0 (the last swing missed) → 0. `aurastate`
+  valid: e = F + `eval(auralencalc)`; the unit's list of it, or a new
+  one (game pool, flags 2, expire e, owner the unit, state set, callback
+  `0x0056E900`, `skill_frenzy(169)` := 0, attached, state on; failure →
+  0); expiry := e; timer 12 at e; mark changed; n = min(list[169] + 1,
+  L); list set 169 := n; `aura_fill(unit, list, R, skill, n)`
+  (`bodies.md` §2.6; formulas use the charge count as the level). Return
+  1.
+- **Swing** `0x005D8B10(game, unit, T, skill, L)`: R invalid or T none →
+  0. Path target := T (`0x00620C10`). Zeroed record; result =
+  `melee_result(game, unit, T, to_hit(unit, skill, L), 0)`. Hit: result
+  |= `ResultFlags`; hit flags |= `HitFlags`; `HitClass` ≠ 0 → hit class
+  := it; enhanced damage % := `eval(calc1)`; `EType` conversion as §3.1;
+  `roll_elemental`. `start_combat(game, unit, T, record, SrcDam or
+  128)`; `apply_melee(game, unit, T)`. E param 1 := 1 on a hit, else 0
+  (when E exists). Return 1.
 
 ### 3. Bodies, required level 1
 
@@ -1374,6 +1460,292 @@ The do is srvdo 2.
    unit, T x, T y, eval(aurarangecalc), D, 0)` (`missiles.md`, filter
    0x8583). Return 1.
 
+### 7. Bodies, required level 24
+
+#### 7.1 srvst 8 Strafe `0x005DACD0`
+
+1. R invalid → 0. E none → 0.
+2. `has_ammo(unit)` (`bodies.md` §2.3) = 0 → attack-mode cleanup
+   (`0x00580310`, `0x00580380`); return 0.
+3. r = `eval(aurarangecalc)`. T = target. T none → T = `next_unit(game,
+   unit, 0, 0, r, 3, −1, &count)` (§2.21); T present → count =
+   `count_units(game, unit, 0, 0, r, 3)`.
+4. lo = min(`eval(calc3)`, `eval(calc1)`) (calc3 evaluated first); n =
+   count clamped to lo…`calc1` (count < lo → lo; count > calc1 → calc1).
+5. E param 1 := n. T → param 2 := T type, param 3 := T GUID; no T →
+   param 2 := 1, param 3 := −1.
+6. `dec_quantity(game, unit)` (`bodies.md` §2.5). Return 1.
+
+#### 7.2 srvdo 12 Strafe `0x005DBA40`
+
+1. R invalid → 0. E none → 0.
+2. r = `eval(aurarangecalc)`. n = E param 1; 0 → 0.
+3. K = the unit of (E param 2, E param 3); none → K = `next_unit(game,
+   unit, 0, 0, r, 3, E param 3, null)`; none → **return 1**.
+4. Path target := K (`0x00620C10`). (tx, ty) := (0, 0), then target
+   position (`bodies.md` §2.4; result not tested).
+5. m = `srvmissilea`; hand class (`0x00623C60`) ≠ 1 and `srvmissileb` ≥
+   0 → m = `srvmissileb`. Not 0 ≤ m < missiles count → 0.
+6. a = `eval(calc2)`. Record (zeroed): flags 0x21, owner the unit,
+   position the unit's, target (tx, ty), class m, skill, L, init callback
+   `0x005DB6A0` with argument a (a ≠ 0 → the arrow's
+   `damagepercent(25)` := its value + a). Create.
+7. E param 1 := n − 1. n − 1 ≤ 0 → return 0.
+8. K2 = `next_unit(game, unit, 0, 0, r, 3, K's GUID (−1 without K),
+   null)`; K2 → E param 2 := K2 type, param 3 := K2 GUID; rewind(`Param6`)
+   (§1; `0x004F4110`, skills +0x15C). Return 1.
+
+The last arrow returns 0, so the do core ends the skill (`use.md` §5.4).
+
+#### 7.3 srvdo 15 Dopplezon `0x005DC000`
+
+1. R invalid → 0. c = `summon_class(unit, skill, L, &mode)`; < 0 → 0.
+   pt = `pettype` unsigned; ≥ pettype count → pt = 0 (no refusal).
+2. Unit flags |= 0x40.
+3. m = spawn (`bodies.md` §6.2) {flags 0, owner unit, class c, AI 0,
+   mode, x = y = 0, pt, pet max `eval(petmax)`}; none → 0.
+4. `link_source(m, unit)` (`bodies.md` §6.20).
+5. h = pct(the unit's maximum life, `eval(calc3)`, 100); m stats 6 and 7
+   := h. m base `level(12)` := the unit's `level(12)`.
+6. `base_stats(game, unit, m, 0, L)`; `skill_stats(game, unit, m, skill,
+   L, 0)` (`bodies.md` §6.4, §6.5).
+7. Type-7 timer on m at F + `eval(calc2)`; umod 21 on m
+   (`0x005A4850(game, m, 21, 0)`, temporary summon); overlay 171 on m
+   (`0x00621E40(m, 171, 0)`); `node_insert(game, m, 0, unit +0xD0)`.
+   Return 1.
+
+#### 7.4 srvst 9 Fend `0x005DAE30`
+
+1. R invalid → 0. E none → 0.
+2. r = melee range (`0x00622870`) + 4 (`0x0056E510`). T = target. T
+   none → T = `next_unit(game, unit, 0, 0, r, 0x20003, −1, &count)`;
+   none → E param 1 := 0, return 1. T present → count =
+   `count_units(game, unit, 0, 0, r, 0x20003)`.
+3. E param 1 := min(count, `eval(calc1)`); param 2 := T type; param 3 :=
+   T GUID. Return 1.
+
+The do is srvdo 13 (`bodies.md` §8.11).
+
+#### 7.5 srvst 13 Thunder Storm `0x005C91C0`
+
+R invalid → 0. E = the unit's entry of the skill (`0x006439F0`); none →
+0. E param 1 := −1, param 2 := 1. Return 1.
+
+#### 7.6 srvdo 29 Thunder Storm `0x005CA4D0`
+
+1. R invalid, `srvmissilea` invalid, or `aurastate` invalid → 0. E = the
+   unit's entry of the skill; none → 0.
+2. The unit lacks `aurastate`, or E param 2 ≠ 0 (first run after the
+   start): `apply_state` {source = target = the unit, skill, L, duration
+   `eval(auralencalc)`, stat −1, value 0, state `aurastate`, default
+   callback}; list → set 350 := skill, 351 := L.
+3. Otherwise (a strike): K = `next_unit(game, unit, 0, 0, Param7
+   (+0x160, 0x005C8BC0), 3, E param 1, null)`. None → E param 1 := −1.
+   K: `0x005CA470` — both the unit's and K's rooms not in town → M =
+   `missile_at(game, unit, skill, L, srvmissilea, K x, K y)` (`bodies.md`
+   §6.13); M made → hit handler `0x005ADF10(game, M, K, 1)`
+   (`missiles.md` §R5), remove M (`0x00555600`), `msg_a3(unit, K, skill,
+   L, 0, 0, 0)` (§2.21). E param 1 := K's GUID.
+4. E param 2 := 0. Return 1.
+
+The state run is the timer the storm repeats on (`use.md` §7); each
+strike moves on to the next unit in GUID order (`next_unit`).
+
+#### 7.7 srvst 18 Attract `0x005C3260`
+
+Return 1 (no test).
+
+#### 7.8 srvdo 59 Attract `0x005C3B90`
+
+1. R invalid → 0.
+2. T = target. Attract test `0x005C31F0(game, unit, T)`: T present,
+   alignment 0, `can_switch(T, 19)` (`bodies.md` §4.4), alive, T's room
+   not in town, hostile to the unit. Fails → 0.
+3. `aurastat1` < −1 or ≥ itemstatcost count, or `auratargetstate`
+   invalid → 0.
+4. Unit flags |= 0x40.
+5. T: alignment := 1; target list 9 (§2.22); leave pack (§2.22).
+6. r = `eval(aurarangecalc)`; d = `eval(auralencalc)` /
+   `AiCurseDivisor` (`0x005C37A0`).
+7. `scan_point(game, aurafilter, unit, r, 0x005C3B30, context {game,
+   unit, skill, L, T type, T GUID, d})` (`bodies.md` §2.12). Callback
+   (ECX U, EDX context): attract test (game, caster, U) fails → 0; target
+   override `0x00573090(U, 1 when T is a player (type 0) else 2, T GUID)`
+   (§6.6 step 6); type-10 timer on U at F + d. Return 1.
+8. `apply_state` {source the unit, target T, skill, L, d, stat −1, value
+   0, state `auratargetstate`, callback `0x005C3B00`} (result unused).
+   Return 1.
+
+Remove callback `0x005C3B00` (ECX T, EDX state): alignment := 0; state
+off; target list remove (§2.22).
+
+#### 7.9 srvst 19 Bone Prison `0x005C3270`
+
+T none → 0. Return 1 when T's room is not in town, else 0.
+
+#### 7.10 srvdo 62 Bone Prison `0x005C5D00`
+
+1. Target position (tx, ty) fails → 0.
+2. Unit flags |= 0x40.
+3. For k = 0…11 (offset tables `0x006E304C` X = −1, 1, 3, 4, 4, 3, −1,
+   1, −3, −4, −4, −3; `0x006E307C` Y = −4, −4, −3, −1, 1, 3, 4, 4, 3, −1,
+   1, −3): m = segment `0x005C5BC0(game, tx + X[k], ty + Y[k], L)`
+   (unit in EAX, skill in EBX). m made:
+   - no leader yet: leader := m; owner data `0x0058F030(game, m, unit
+     GUID (0x00451F50), unit type, 0, 1)`;
+   - else: owner data `0x0058F030(game, m, leader GUID, leader type, 0,
+     0)`; add m to the leader's minion list (`0x0058F100(game, leader,
+     m)`: m's GUID prepended to AI control +0x34);
+   - `link_source(m, unit)`; m faces (tx, ty) (direction `0x0064FDC0(m
+     x, m y, tx, ty)` set on its path, `0x006488A0`).
+4. Return 1.
+
+Segment `0x005C5BC0`: skill = 0 → none. c = `summon_class`; < 0 →
+none. pt = `pettype` unsigned, ≥ count → 0. A room at (x, y) in town →
+none. m = spawn {flags 9, owner unit, class c, AI 0, mode, x, y, pt, pet
+max `eval(petmax)`}; none → none. `skill_stats(game, unit, m, skill, L,
+0)`; umod 15 on m; target list 9 (§2.22). Return m.
+
+#### 7.11 srvst 20 Iron Golem `0x005C32A0`
+
+Return 1 when T is an item (type 4) in mode 3 (on the ground), its item
+class has `bitfield1` bit 1 (items +0xDC, `0x00629CC0`), item flag 0x10
+is set (`0x006280A0`, `items/generation.md` §1.4), and the item is not
+active on a unit (`0x00625820(T, 0)` = 0). Else 0.
+
+#### 7.12 srvdo 57 Iron Golem `0x005C5250`
+
+1. The start test (§7.11) fails → 0.
+2. Unit flags |= 0x40.
+3. skill = 0 → 0. c = `summon_class`; < 0 → 0. pt = `pettype` unsigned,
+   ≥ count → 0.
+4. Spawn request {flags 1, owner unit, class c, AI 0, mode, position =
+   T's position (the unit's when T is gone), pt, pet max
+   `eval(petmax)`}; m none → 0.
+5. T present: T leaves its room (`0x0061A270(room, T type, T GUID)`,
+   `0x00623830`, `0x0064C370`; `items/inventory.md` §8); L = T's first
+   allowed body location (`0x0062EA80`); T mode := 4 (`0x00624690`);
+   equip T on m at L (`0x005606B0(game, m, T GUID, L, skip 1, out none)`,
+   `items/inventory.md` §4.6).
+6. `golem_stats(game, unit, m, skill, L)` (`bodies.md` §6.11); message
+   0x7F about m to the unit's client (`0x005531C0`, `0x0053CDF0`, as
+   `bodies.md` §8.9 step 7); `node_insert(game, m, 0, unit +0xD0)`.
+   Return 1.
+
+#### 7.13 srvdo 79 Conversion `0x005D0350`
+
+1. R invalid → 0. Unit flags |= 0x40. T none → 0.
+2. ok = 0. `pair_record(unit, T)` exists (the start, srvst 32, stored a
+   hit) → ok = chance `0x005D02B0(unit, L, 1)` (skill in EAX, T in EBX):
+   R valid, T not a hireling, a monster, alignment 0, `can_switch(T, 11)`;
+   p = `eval(calc1)`; one draw on the unit's seed, `roll(100)` ≥ p → 0;
+   else 1.
+3. `auratargetstate` invalid or ok = 0 → `apply_melee(game, unit, T)`;
+   return 1.
+4. e = max(F + `eval(auralencalc)`, F + 1).
+5. Conversion (§2.23) of T by the unit, state `auratargetstate`, expiry
+   e, callback `0x005D01A0`. Return 1 (the stored hit is not applied).
+
+#### 7.14 srvst 36 Holy Shield `0x005D0180`
+
+Return 1 when the unit has an inventory and a shield equipped
+(`0x0063C8F0(inventory, null)`, `combat/hit.md`), else 0.
+
+#### 7.15 srvdo 9 Frenzy `0x005D8E00`
+
+1. T none → 0.
+2. Frame event index even: `apply_melee(game, unit, T)`; free the unit's
+   combat records for T (`0x0057C9F0`, `combat/damage.md` §5.1);
+   attack-mode cleanup (`0x00580310`, `0x00580380`); Charge (§2.24);
+   return Swing (§2.24) on T.
+3. Odd: unit flags |= 0x40; `apply_melee(game, unit, T)`; cleanup;
+   Charge; T' = `next_unit(game, unit, 0, 0, melee range + 4, 0x20003,
+   T's GUID, null)`; return Swing on T' (0 when none).
+
+#### 7.16 srvdo 75 Grim Ward `0x005D89B0`
+
+1. R invalid → 0. T none → 0. `0x00645590(T)` (corpse test, `bodies.md`
+   §3.9) = 0 → 0.
+2. (x, y) = T's position. T's room none, or no room at (x, y) → 0. Free
+   point `0x0064E7B0(room, &(x, y), size 2, mask 0x1000, fallback 1)`;
+   none → 0. T not a monster → 0.
+3. m = `srvmissilea`; T's monstats2 record (`0x00451FE0`) none → 0.
+   `large` (+0x04 bit 11) → m = `srvmissilec`; else `small` (bit 10) → m
+   = `srvmissileb`. Invalid → 0.
+4. Record (zeroed): flags 1, owner the unit, class m, position (x, y),
+   skill, L; create (result not read).
+5. T: state 104 (`corpse_nodraw`) on, state 118 (`corpse_noselect`) on;
+   queue for update. Return 1.
+
+#### 7.17 srvdo 122 Hunger `0x005C7F10`
+
+1. R invalid → 0. T none → 0.
+2. Unit flags |= 0x40.
+3. Zeroed record; `skill_result(game, unit, T, R, skill, L, record, 0)`
+   (§2.17).
+4. Hit: hit flags |= 2 | `HitFlags`; result |= `ResultFlags`; `HitClass`
+   ≠ 0 → hit class := it; `fill(game, unit, T, record, 0, SrcDam)`;
+   `roll_elemental`; physical += pct(physical, `eval(calc1)`, 100); life
+   leech (+0x38) += `eval(calc2)`; mana leech (+0x3C) += `eval(calc3)`;
+   `start_combat(game, unit, T, record, 128)`; `apply_melee(game, unit,
+   T)`.
+5. Return 1.
+
+#### 7.18 srvdo 123 Volcano `0x005C8080`
+
+1. R invalid → 0. m = `prog_missile(unit, skill)`; m ≤ 0 → 0.
+2. Target position (tx, ty) fails → 0. `point_free(game, unit, m)` = 0 →
+   0.
+3. Unit flags |= 0x40.
+4. s = `roll(256)` on the unit's seed (one step, `lo' & 0xFF`).
+5. Record (zeroed): flags 1, owner the unit, class m, position (tx, ty),
+   skill, L. Create; none → 0.
+6. M data +0x28 := s (the seed word read by server-do 28,
+   `missiles/bodies.md` §2). `msg_a3(unit, none, skill, L, tx, ty, s)`.
+   Return 1.
+
+#### 7.19 srvdo 51 Mind Blast `0x005D76E0`
+
+1. R invalid → 0. Target position (cx, cy) fails → 0.
+2. r = `prog_count(unit, skill, L)` (§2.11); 0 → r =
+   `eval(aurarangecalc)`.
+3. Zeroed record D; `roll_physical`, `roll_elemental` (`levels.md` §3.6);
+   result |= `ResultFlags`; hit flags |= `HitFlags`.
+4. Context {&D, chance = `DM(L, Param5, Param6)` (`0x00645C10`,
+   `levels.md` §2; 0 when L ≤ 0), `Param3`, `Param4`}.
+5. `scan_unit(game, unit, cx, cy, r, aurafilter, 0x005D7680, context,
+   noaura 0)`. Return 1.
+
+Callback `0x005D7680` (ECX scan context, EDX unit U): convert
+`0x005D7430` = 0 → copy D; `apply(game, source, U, 1, copy)`; reaction.
+Return 1.
+
+Convert `0x005D7430` (U in ECX, context in EAX; game, source): test
+`0x005D72B0`: U a monster, not a hireling, alignment 0, `can_switch(U,
+11)`, and one draw on the **source's** seed, `roll(100)` ≤ chance; fails
+→ 0. e = `roll(Param4)` (source's seed) + F + `Param3`. Conversion
+(§2.23) of U by the source, state 53 (`conversion`), expiry e, callback
+`0x005D7310`. Return 1 (no damage to a converted unit).
+
+#### 7.20 srvdo 52 Dragon Flight `0x005D7850`
+
+1. R invalid → 0. T none → 0.
+2. Frame event index even (the flight): the unit's room none → 0. Unit
+   flags &= ~0x40. Target position (x, y) fails → 0. Level record of the
+   room's level none, or its `Teleport` = 0 → 0; `Teleport` = 2 and the
+   line from the unit to (x, y) blocked (`0x006229F0`, mask 0x804) → 0.
+   `0x00554EA0(game, unit, room none, x, y, 0, 0)` (result not read).
+   Return 1.
+3. Odd (the kick): zeroed record; result = `melee_result(game, unit, T,
+   to_hit(unit, skill, L) + progressive_tohit(325), 0)`. Hit: enhanced
+   damage % := `ln12` (`0x004E6CA0`: `Param1` + (L − 1)·`Param2`, 0 for L
+   ≤ 0); `kick_damage(game, record, T, skill, L)` (§2.5).
+   `start_combat(game, unit, T, record, SrcDam or 128)`; p =
+   `pair_record(unit, T)`; finisher `0x005D5220(game, unit, p)`;
+   `apply_melee(game, unit, T)`. Return 1.
+
+The start is srvst 12 (`bodies.md` §7.4).
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -1437,6 +1809,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | §6.10 callback | **U** | `lo' mod 100` per scanned unit (shatter), after the aura's own draws |
 | §6.14 | unit | `shape_start` (`melee_result`, `start_combat`), then the second hit's `melee_result` unless `ResultFlags` bit 1, then `roll_elemental` |
 | §6.15 | unit | `skill_result`, `fill`, `roll_elemental` |
+| §7.13 | unit | `roll(100)` when a stored hit exists |
+| §7.18 | unit | `roll(256)` before the missile is made |
+| §7.19 | unit, then **source** per scanned unit | `roll_physical`, `roll_elemental`; per unit `roll(100)`, and on success `roll(Param4)` |
+| §7.15, §7.20 | unit | Swing / kick draws (`melee_result`, `roll_elemental`, `kick_damage`) |
 
 ## Edge cases & original bugs
 
@@ -1487,6 +1863,17 @@ steps call them (`bodies.md` Randomness). Draws named here:
 20. Rabies' start evaluates `calc1` / `calc4` and discards them, and
     refuses (0) on a miss (§6.13).
 21. Teleport does not test R or the target-position result (§6.5).
+22. Conversion's remove callback restores `maxhp(7)` from the saved
+    whole-point value without the << 8 the setter used, while Mind
+    Blast's callback shifts it (§2.23). As read; a recording should
+    confirm the converted monster's maximum life after expiry (Open
+    question 7).
+23. The Mind Blast conversion test passes on `roll(100)` ≤ chance (not
+    <); Conversion's on `roll(100)` < `calc1` (§7.13, §7.19).
+24. Strafe's last arrow returns 0, ending the skill without the do
+    core's charge step for it (§7.2 step 7).
+25. Dopplezon keeps an out-of-range `pettype` as 0 instead of refusing;
+    Raven refuses (§3.6, §7.3).
 
 ## Test vectors
 
@@ -1517,6 +1904,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | Vengeance hit classes over 4 hits from E param 1 = 0 | 0x20, 0x30, 0x40, 0x20 |
 | Blade Fury n = 3 at F = 100 (synthetic) | blade at 100, E param 1 = 102; next blade at F = 103 |
 | Leap Attack aim, unit (0, 0), T (10, 0) out of range | (12, 0) before the collision test |
+| Strafe count 7, calc3 2, calc1 5 (synthetic) | n = 5; count 1 → 2 |
+| Fend count 3, calc1 5 (synthetic) | E param 1 = 3 |
+| Conversion of a level-40 monster (M 400, h 200) by a level-20 caster (synthetic) | list 109: 176 = 40, 177 = 400; stats 12 = 20, 7 = 200·256, 6 = 100·256 |
+| Bone Prison around (50, 50) | first segment at (49, 46), last at (47, 47) |
 
 ## Provenance
 
@@ -1549,3 +1940,9 @@ steps call them (`bodies.md` Randomness). Draws named here:
    target x, §2.10).
 6. `0x00553010` (the killer looked up by `set_uninterruptable`) and
    message 0xA5 layout: owner `sim/server-messages.tsv`.
+7. Recording: Conversion on a higher-level monster: stats 12, 6, 7 while
+   converted and after the state expires (Edge case 22).
+8. Recording: Holy Freeze on cold-affected monsters: state 107 per pulse
+   (draw on the target seed, §6.10).
+9. `items` `bitfield1` bit 1 (Iron Golem start, §7.11) and item flag 0x10:
+   name both from the items specs.
