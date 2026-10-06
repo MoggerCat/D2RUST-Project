@@ -66,6 +66,8 @@ They do not decide those questions.
 
 `cargo test -p d2-sim --test prop_path_place` (default 256 / 128 / 512
 cases; `PROPTEST_CASES=2000` passes in about 70 s, debug). Gate: `sh
-tools/gate.sh all` PASS on `3a5cf4e` (all 13 steps: spec_index, methods,
+tools/gate.sh all` PASS on `3a5cf4e`, and again on `2693d79` after merging
+`claude/tender-meitner-mphas3` at `41b7686` (tests ported to
+`path::Point` / `drlg::TileRect`, `wire-path-sim.md` §3) (all 13 steps: spec_index, methods,
 coverage, trace checkers, hook selftest, fmt, depcheck, clippy workspace,
 tests d2-sim + conformance / rest / d2-client, doc-tests).
