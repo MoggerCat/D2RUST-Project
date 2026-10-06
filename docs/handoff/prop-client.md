@@ -1,6 +1,6 @@
 # Handoff: client property tests (`d2-client` untrusted-input and state paths) — `claude/prop-client`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, medium (METHODS M14). Base
 `claude/tender-meitner-mphas3` at `9b49081`. Repo only, no game files, no

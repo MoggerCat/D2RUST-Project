@@ -355,7 +355,9 @@ pub fn missile_move<R: CollisionRooms + ?Sized>(
 }
 
 /// What teleport needs from `sim/pathing.md` (provider: the wiring,
-/// with `path::walk`).
+/// with `path::walk`). Teleport takes one context that is both the
+/// rooms and the motion: set position's room recache reads the rooms
+/// the footprint move just wrote.
 pub trait PathMotion {
     /// Set position (`0x0064FB90(Q, hint)`, pathing §9.6 rule 8) to the
     /// cell centre of (x, y), with the room recache (rule 9) when flag
@@ -371,9 +373,8 @@ pub trait PathMotion {
 // TODO(spec: path-placement.md §6 r4): the room the clears and queries
 // use is not stated; the path's room is used, as §6 rule 1 says for
 // moves. "flags 0x8 := moved" is read as "the cell changed".
-pub fn teleport<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
-    rooms: &mut R,
-    motion: &mut M,
+pub fn teleport<C: CollisionRooms + PathMotion + ?Sized>(
+    c: &mut C,
     path: &mut DynamicPath,
     is_missile: bool,
     room: Option<RoomId>,
@@ -387,28 +388,13 @@ pub fn teleport<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
     let zero = (x, y) == (0, 0);
     if is_missile {
         if zero {
-            clear_size(
-                rooms,
-                path.room,
-                old.0,
-                old.1,
-                path.unit_size,
-                path.foot_mask,
-            );
+            clear_size(c, path.room, old.0, old.1, path.unit_size, path.foot_mask);
         } else {
             let moved = old != (x, y);
             path.flags = (path.flags & !flags::MOVED) | if moved { flags::MOVED } else { 0 };
-            path.collided_mask =
-                size_value(&*rooms, path.room, x, y, path.unit_size, path.move_mask);
-            clear_size(
-                rooms,
-                path.room,
-                old.0,
-                old.1,
-                path.unit_size,
-                path.foot_mask,
-            );
-            stamp_size(rooms, path.room, x, y, path.unit_size, path.foot_mask);
+            path.collided_mask = size_value(&*c, path.room, x, y, path.unit_size, path.move_mask);
+            clear_size(c, path.room, old.0, old.1, path.unit_size, path.foot_mask);
+            stamp_size(c, path.room, x, y, path.unit_size, path.foot_mask);
             path.saved_count = 1;
             path.saved_steps[0] = PathPoint {
                 x: x as u16,
@@ -416,29 +402,28 @@ pub fn teleport<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
             };
         }
     } else if zero {
-        clear_pattern(rooms, path.room, old.0, old.1, path.pattern, path.foot_mask);
+        clear_pattern(c, path.room, old.0, old.1, path.pattern, path.foot_mask);
     } else {
-        forced_move(rooms, path.room, old, (x, y), path.pattern, path.foot_mask);
+        forced_move(c, path.room, old, (x, y), path.pattern, path.foot_mask);
     }
     if room != path.room {
         path.flags |= flags::OUTSIDE_ROOM;
     }
-    motion.set_position(path, x, y, room);
-    motion.reset(path);
+    c.set_position(path, x, y, room);
+    c.reset(path);
     Ok(())
 }
 
 /// `0x00650BE0`: teleport, then point count := 0.
-pub fn teleport_and_clear<R: CollisionRooms + ?Sized, M: PathMotion + ?Sized>(
-    rooms: &mut R,
-    motion: &mut M,
+pub fn teleport_and_clear<C: CollisionRooms + PathMotion + ?Sized>(
+    c: &mut C,
     path: &mut DynamicPath,
     is_missile: bool,
     room: Option<RoomId>,
     x: i32,
     y: i32,
 ) -> Result<(), PathError> {
-    teleport(rooms, motion, path, is_missile, room, x, y)?;
+    teleport(c, path, is_missile, room, x, y)?;
     path.point_count = 0;
     Ok(())
 }

@@ -404,9 +404,8 @@ proptest! {
                 prop_assert_eq!(got.len() + discarded, buf.len());
             }
             Err(QueueError::BadId(id)) => prop_assert!(id >= 0xB5),
-            // §3.3 rule 2: a split message over 0x204 bytes is the
-            // receiver's assert (the size rule can give one from any
-            // bytes; size 0 ends the split instead).
+            // §3.3 rule 2: a size rule above 0x204 is the original's fatal
+            // assert (found on a CI-only seed: id 0x94 sized 537).
             Err(QueueError::BadSize(n)) => prop_assert!(n > MAX_MESSAGE),
             Err(e) => return Err(TestCaseError::fail(format!("{e:?}"))),
         }

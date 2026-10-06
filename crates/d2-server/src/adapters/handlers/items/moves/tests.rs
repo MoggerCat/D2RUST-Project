@@ -1,0 +1,1324 @@
+//! The item-move handlers through the real host frame (drain → handle →
+//! tick → flush) on the wired host: `SimGame<ActionSim, WiredWorld>`
+//! whose [`InvParts`] hold the inventory model on synthetic tables (the
+//! inventory wiring's fixture shape: a barbarian, record 4, 10 × 4), the
+//! real `d2-proto` sizes, real item units from `Economy::create_item` on
+//! the action sim's own unit records, stat lists and item store, in a
+//! real field room. Only [`MoveRest`] (the seams no d2-sim module
+//! provides) is a fake: it answers what the test sets and logs.
+//!
+//! The bytes are exact: the 0x9C / 0x9D headers of §11 (the item bit
+//! stream is the open seam `item_bits`, empty here: inventory.md OQ1),
+//! 0x47 / 0x48 after each update pass, and the direct sends.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Mutex};
+
+use d2_data::bin::BinTable;
+use d2_data::fixup::maps::{EquivMatrix, StateMaps};
+use d2_data::fixup::records::stat_ops;
+use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record, States};
+use d2_sim::combat::CombatTables;
+use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use d2_sim::items::inventory::{InteractionTarget, InvItem, UnitKind};
+use d2_sim::items::moves::{stat, ty, Guid, MovePending, Spot};
+use d2_sim::items::tables::ItemRec;
+use d2_sim::items::{q, ItemRequest, ItemTables};
+use d2_sim::rng::Seed;
+use d2_sim::skills::SkillTables;
+use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
+use d2_sim::units::hooks::UnitData;
+use d2_sim::units::lifecycle::AllocRequest;
+use d2_sim::units::lists::client_state;
+use d2_sim::units::{RoomId, UnitType};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables};
+use d2_sim::wiring::economy::{GameFields, ItemSpawn};
+use d2_sim::world::npc::NpcControl;
+use d2_sim::world::quests::{QuestControl, QuestTables};
+use d2_sim::world::vendors::VendorTables;
+
+use super::*;
+use crate::adapters::handlers::items::ITEM_IDS;
+use crate::adapters::handlers::world::tests::trade_quests::{ActionRest, Rest};
+use crate::adapters::handlers::world::tests::waypoints::{field_drlg, field_room};
+use crate::adapters::handlers::world::{ActionEvents, ActionWorld, WiredWorld};
+use crate::adapters::{PlayerData, PlayerFields, ProtoSizes};
+use crate::dispatch::Outcome;
+use crate::host::{Handled, Host};
+use crate::seams::{Clock, PlayerGate, SessionHandler};
+
+const N_STATS: usize = 359;
+const N_TYPES: usize = 80;
+const GAME_SEED: u32 = 0x1A7E;
+/// Barbarian: inventory record 4 (10 × 4, §1.3).
+const CLASS: u32 = 4;
+
+// Item records (combined index).
+const CAP: usize = 0;
+const GOLD: usize = 1;
+const SWORD: usize = 2;
+const TWO_HANDER: usize = 3;
+const SHIELD: usize = 4;
+const HP1: usize = 5;
+const KEY: usize = 6;
+const SCROLL: usize = 7;
+const BOOK: usize = 8;
+
+const T_SWOR: u16 = ty::SWOR;
+const T_SHIE: u16 = ty::SHIE;
+const T_HELM: u16 = ty::HELM;
+const T_HPOT: u16 = ty::HPOT;
+const T_GOLD: u16 = ty::GOLD;
+const T_KEY: u16 = 41;
+const T_WEAP: u16 = 45;
+const T_ARMO: u16 = 50;
+const T_MISC: u16 = 52;
+
+/// (code, type, invwidth, invheight, autobelt, useable, stackable,
+/// maxstack, durability) per record.
+type Row = ([u8; 4], u16, u8, u8, u8, u8, u8, u32, u8);
+const ROWS: [Row; 9] = [
+    (*b"cap ", T_HELM, 2, 2, 0, 0, 0, 0, 12),
+    (*b"gld ", T_GOLD, 1, 1, 0, 0, 0, 0, 0),
+    (*b"ssd ", T_SWOR, 1, 3, 0, 0, 0, 0, 24),
+    (*b"2hs ", T_SWOR, 2, 4, 0, 0, 0, 0, 44),
+    (*b"buc ", T_SHIE, 2, 2, 0, 0, 0, 0, 12),
+    (*b"hp1 ", T_HPOT, 1, 1, 1, 1, 0, 0, 0),
+    (*b"key ", T_KEY, 1, 1, 0, 0, 1, 12, 0),
+    (*b"tsc ", ty::SCRO, 1, 1, 0, 1, 0, 0, 0),
+    (*b"tbk ", ty::BOOK, 1, 2, 0, 1, 1, 20, 0),
+];
+
+fn set_u16(r: &mut [u8], o: usize, v: u16) {
+    r[o..o + 2].copy_from_slice(&v.to_le_bytes());
+}
+
+fn stat_data() -> Arc<StatData> {
+    let size = Itemstatcost::SIZE;
+    let mut records = vec![0u8; N_STATS * size];
+    for s in 0..N_STATS {
+        let r = &mut records[s * size..(s + 1) * size];
+        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
+            set_u16(r, o, 0xFFFF);
+        }
+        set_u16(r, 0, s as u16);
+    }
+    let mut t = BinTable {
+        name: "itemstatcost".into(),
+        source: "synthetic".into(),
+        count: N_STATS,
+        record_size: size,
+        records,
+    };
+    stat_ops(&mut t);
+    let states = BinTable {
+        name: "states".into(),
+        source: "synthetic".into(),
+        count: 0,
+        record_size: States::SIZE,
+        records: Vec::new(),
+    };
+    Arc::new(StatData {
+        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
+        classes: vec![ClassStats::default(); 7],
+        states: StateTable::new(&states, &StateMaps::default()).expect("states"),
+        damage_regen: vec![0; 8],
+        aurastate: vec![0; 8],
+        rescale_precision: d2_sim::stats::DEFAULT_RESCALE_PRECISION,
+    })
+}
+
+fn equiv() -> EquivMatrix {
+    let n = N_TYPES;
+    let words = n.div_ceil(32);
+    let mut m = EquivMatrix {
+        n,
+        words,
+        bits: vec![0; n * words],
+    };
+    let mut set = |i: usize, j: usize| m.bits[i * words + j / 32] |= 1 << (j % 32);
+    for i in 1..n {
+        set(i, 0);
+        set(i, i);
+    }
+    for (c, p) in [
+        (T_HELM, T_ARMO),
+        (T_SHIE, T_ARMO),
+        (T_SWOR, T_WEAP),
+        (T_GOLD, T_MISC),
+        (T_HPOT, T_MISC),
+        (T_KEY, T_MISC),
+        (ty::SCRO, T_MISC),
+        (ty::BOOK, T_MISC),
+    ] {
+        set(usize::from(c), usize::from(p));
+    }
+    m
+}
+
+fn item_tables() -> ItemTables {
+    let mut ratio = Itemratio::decode(&[0u8; Itemratio::SIZE]);
+    ratio.version = 1;
+    let itemtypes = (0..N_TYPES)
+        .map(|_| {
+            let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
+            t.class = 0xFF;
+            t.staffmods = 0xFF;
+            t.rare = 1;
+            t
+        })
+        .collect();
+    ItemTables {
+        items: ROWS
+            .iter()
+            .map(|r| ItemRec {
+                code: r.0,
+                type_: r.1 as i16,
+                level: 1,
+                invwidth: r.2,
+                invheight: r.3,
+                stackable: r.6,
+                maxstack: r.7,
+                durability: r.8,
+                ..ItemRec::default()
+            })
+            .collect(),
+        itemtypes,
+        equiv: equiv(),
+        itemratio: vec![ratio],
+        valshift: vec![0; N_STATS],
+        stat_shift: 6,
+        stat_mask: 0x3F,
+        ..ItemTables::default()
+    }
+}
+
+/// The measured grid records of §1.3 (0–15) and the belt boxes.
+fn inv_tables() -> InvTables {
+    let g = |x, y| GridRec {
+        grid_x: x,
+        grid_y: y,
+    };
+    let mut grids = vec![g(10, 4); 16];
+    grids[5] = g(10, 10);
+    grids[8] = g(6, 4);
+    grids[9] = g(3, 4);
+    grids[12] = g(6, 8);
+    grids[13] = g(0, 0);
+    let mut itemtypes = vec![
+        InvTypeRec {
+            class: 7,
+            ..InvTypeRec::default()
+        };
+        N_TYPES
+    ];
+    for (t, loc1, loc2) in [(T_HELM, 1, 1), (T_SWOR, 4, 5), (T_SHIE, 5, 4)] {
+        let r = &mut itemtypes[usize::from(t)];
+        r.body = 1;
+        r.bodyloc1 = loc1;
+        r.bodyloc2 = loc2;
+    }
+    itemtypes[usize::from(T_HPOT)].beltable = 1;
+    InvTables {
+        grids,
+        belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
+        items: ROWS
+            .iter()
+            .map(|r| InvItemRec {
+                code: r.0,
+                type_: r.1 as i16,
+                invwidth: r.2,
+                invheight: r.3,
+                autobelt: r.4,
+                useable: r.5,
+                stackable: r.6,
+                maxstack: r.7,
+                ..InvItemRec::default()
+            })
+            .collect(),
+        itemtypes,
+        equiv: equiv(),
+    }
+}
+
+/// A normal-quality request for a record, never ethereal.
+fn plain(record: usize) -> ItemRequest {
+    ItemRequest {
+        item: record as i32,
+        format: 101,
+        ilvl: 1,
+        quality: q::NORMAL,
+        flags2: 0x2,
+        ..ItemRequest::default()
+    }
+}
+
+/// The answers of the [`MoveRest`] fake and its call log.
+#[derive(Default)]
+pub(crate) struct RestState {
+    pub(crate) log: Vec<String>,
+    pub(crate) pos: BTreeMap<Owner, (i32, i32)>,
+    pub(crate) distance: i32,
+    pub(crate) spot: Option<Spot>,
+    pub(crate) room_at: bool,
+    pub(crate) in_town: bool,
+    pub(crate) two_handed: BTreeSet<Guid>,
+    pub(crate) use_ok: bool,
+    pub(crate) gold: bool,
+    pub(crate) spells: BTreeMap<Guid, i32>,
+    pub(crate) sent: Vec<(Owner, Vec<u8>)>,
+}
+
+/// [`MoveRest`] fake, shared with the test (and the cube and vendor
+/// tests, whose inventories are the same model).
+#[derive(Clone, Default)]
+pub(crate) struct MRest(Arc<Mutex<RestState>>);
+
+impl MRest {
+    pub(crate) fn with<T>(&self, f: impl FnOnce(&mut RestState) -> T) -> T {
+        f(&mut self.0.lock().unwrap())
+    }
+    fn log(&self, s: String) {
+        self.with(|r| r.log.push(s));
+    }
+    pub(crate) fn take_log(&self) -> Vec<String> {
+        self.with(|r| std::mem::take(&mut r.log))
+    }
+}
+
+impl MovePending for MRest {
+    fn distance(&self, _: Owner, _: Owner) -> i32 {
+        self.with(|r| r.distance)
+    }
+    fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {
+        self.log(format!("walk_to_item {} {item} {cursor}", player.guid));
+    }
+    fn room_at(&self, _: i32, _: i32) -> bool {
+        self.with(|r| r.room_at)
+    }
+    fn free_spot(
+        &self,
+        _: (i32, i32),
+        _: (i32, i32),
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<Spot> {
+        self.with(|r| r.spot)
+    }
+    fn in_town(&self, _: Owner) -> bool {
+        self.with(|r| r.in_town)
+    }
+    fn sound(&mut self, u: Owner, id: u32) {
+        self.log(format!("sound {} {id:#x}", u.guid));
+    }
+    fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        self.log(format!("pickup_sound {} {item}", player.guid));
+    }
+    fn quest_item_dropped(&mut self, item: Guid) {
+        self.log(format!("quest_item_dropped {item}"));
+    }
+    fn set_owner(&mut self, item: Guid, owner: Owner) {
+        self.log(format!("set_owner {item} {}", owner.guid));
+    }
+    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
+        self.log(format!("use_grid_item {} {item} {x} {y}", player.guid));
+        (false, false)
+    }
+    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
+        self.log(format!("use_item_action {} {target} {used}", player.guid));
+        (false, false)
+    }
+    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
+        self.log(format!("swap_1h_with_2h {} {item} {loc}", player.guid));
+        (false, false)
+    }
+    fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        self.log(format!("use_item {} {} {item}", player.guid, target.guid));
+        self.with(|r| r.use_ok)
+    }
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.with(|r| r.sent.push((player, bytes)));
+    }
+    fn send_item_stat(&mut self, _: Owner, item: Guid, stat: u16) {
+        self.log(format!("send_item_stat {item} {stat}"));
+    }
+}
+
+impl InvRest for MRest {
+    fn pos(&self, u: Owner) -> (i32, i32) {
+        self.with(|r| r.pos.get(&u).copied().unwrap_or((0, 0)))
+    }
+    fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
+        self.with(|r| r.pos.insert(u, (x, y)));
+    }
+    fn gold_request(&self, _: Owner, gld: usize) -> Option<(ItemRequest, ItemSpawn)> {
+        self.with(|r| r.gold).then(|| {
+            (
+                plain(gld),
+                ItemSpawn {
+                    room: None,
+                    mode: 3,
+                    init_flags: 1,
+                },
+            )
+        })
+    }
+    fn spell(&self, item: Guid) -> i32 {
+        self.with(|r| r.spells.get(&item).copied().unwrap_or(0))
+    }
+    fn percent_of(&self, value: i32, p: i32) -> i32 {
+        value * p / 100
+    }
+    fn item_active_on(&self, _: Guid, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: Guid, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn level_requirement(&self, _: Guid, _: Owner) -> i32 {
+        -1
+    }
+    fn two_handed(&self, item: Guid) -> bool {
+        self.with(|r| r.two_handed.contains(&item))
+    }
+    fn one_or_two_handed(&self, _: Owner, _: Guid) -> bool {
+        false
+    }
+    fn ammo_type(&self, _: Guid) -> Option<i16> {
+        None
+    }
+    fn stack_quality_ok(&self, _: Guid) -> bool {
+        true
+    }
+    fn has_allowed_location(&self, _: Guid) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: Guid) -> bool {
+        false
+    }
+    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
+        true
+    }
+    fn interaction(&self, _: Owner) -> InteractionTarget {
+        InteractionTarget::None
+    }
+    fn clear_interaction(&mut self, _: Owner) {}
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for MRest {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        self.with(|r| std::mem::take(&mut r.sent))
+    }
+}
+
+#[derive(Default)]
+struct Session;
+
+impl SessionHandler for Session {
+    fn system_message(&mut self, _: ClientId, _: &[u8], _: usize, _: &mut dyn MessageSink) {}
+}
+
+struct Manual(u32);
+
+impl Clock for Manual {
+    fn now_ms(&mut self) -> u32 {
+        self.0
+    }
+}
+
+type Sim = SimGame<ActionSim<ActionRest>, WiredWorld<Rest>>;
+type TestHost = Host<Sim, ProtoSizes, Session, Manual>;
+
+const ALIVE: PlayerFields = PlayerFields {
+    gate: PlayerGate {
+        mode: 1,
+        uninterruptable: false,
+    },
+    data: Some(PlayerData { last_accept: 0 }),
+};
+
+fn action_tables() -> ActionTables {
+    ActionTables {
+        missiles: Vec::new(),
+        skills: SkillTables {
+            skills: Vec::new(),
+            skilldesc: Vec::new(),
+            missiles: Vec::new(),
+            skills_code: Vec::new(),
+            miss_code: Vec::new(),
+            level_cap: 0,
+            stat_count: 0,
+        },
+        combat: CombatTables {
+            charstats: Vec::new(),
+            difficultylevels: Vec::new(),
+            monstats: Vec::new(),
+            monstats2: Vec::new(),
+            hitclass: Vec::new(),
+        },
+        levels: Vec::new(),
+        skill_modes: Vec::new(),
+    }
+}
+
+/// A host for client 0: game creation on the action sim (`expansion`,
+/// the game seed), the wired host with the inventory parts, a barbarian
+/// in a generated field room with an inventory, level 1, strength and
+/// dexterity 10, at (10, 10); the client joined in the player's room.
+/// One frame has run.
+struct T {
+    host: TestHost,
+    player: UnitId,
+    room: RoomId,
+    rest: MRest,
+}
+
+fn setup() -> T {
+    setup_with(true)
+}
+
+fn setup_with(expansion: bool) -> T {
+    let rest = MRest::default();
+    rest.with(|r| r.distance = 1);
+    let hooks = ActionHooks::new(
+        Arc::new(action_tables()),
+        field_drlg(),
+        Seed::init(),
+        ActionRest::default(),
+    );
+    let data = UnitData {
+        expansion,
+        ..UnitData::default()
+    };
+    let mut events = ActionSim::new(stat_data(), data, hooks);
+    events.create_game(&GameFields::new(Seed::init_low(GAME_SEED), expansion));
+    let mut game = Game::new();
+    let room = field_room(&mut events, &mut game);
+    let mut seed = events.hooks().game_seed;
+    let npc = NpcControl::new(&[], Vec::new(), expansion, 0, &mut seed).unwrap();
+    let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
+    events.hooks().game_seed = seed;
+    let mut world = WiredWorld::new(
+        ActionWorld::default(),
+        item_tables(),
+        quests,
+        npc,
+        VendorTables::default(),
+        Rest::default(),
+        1000,
+    );
+    world.inventory = Some(InvParts::new(inv_tables(), Box::new(rest.clone())));
+    let req = AllocRequest {
+        ty: UnitType::Player,
+        class: CLASS,
+        room: Some(room),
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let player = events
+        .with(&mut game, |g, v| v.allocate(g, &req, 10, 10))
+        .unwrap();
+    let mut sim: Sim = SimGame::with_world(game, events, world);
+    let guid = sim.events.sys.units.get(player).unwrap().guid;
+    let inv = sim.world.inventory.as_mut().unwrap();
+    inv.state
+        .add_inventory(player, UnitKind::Player { class: CLASS as u8 }, guid);
+    rest.with(|r| r.pos.insert(Owner::player(guid), (10, 10)));
+    sim.join(0, Some(player), Some(room), client_state::IN_GAME)
+        .unwrap();
+    sim.set_player(player, ALIVE);
+    let mut host = Host::new(sim, ProtoSizes, Session, Manual(1000));
+    host.connect(0);
+    host.frame().unwrap();
+    let mut t = T {
+        host,
+        player,
+        room,
+        rest,
+    };
+    t.set_stat(player, stat::LEVEL, 1);
+    t.set_stat(player, 0, 10);
+    t.set_stat(player, 2, 10);
+    t
+}
+
+impl T {
+    fn sim(&mut self) -> &mut Sim {
+        &mut self.host.game
+    }
+    fn inv(&mut self) -> &mut InvParts {
+        self.sim().world.inventory.as_mut().unwrap()
+    }
+    fn set_stat(&mut self, u: UnitId, s: u16, v: i32) {
+        let sys = &mut self.sim().events.sys;
+        sys.stats.unit_set(&mut sys.hooks, u, s, v, 0);
+    }
+    fn stat(&mut self, u: UnitId, s: u16) -> i32 {
+        self.sim().events.sys.stats.unit_total(u, s, 0)
+    }
+    fn pguid(&mut self) -> Guid {
+        let p = self.player;
+        self.sim().events.sys.units.get(p).unwrap().guid
+    }
+    fn unit(&mut self, g: Guid) -> Option<UnitId> {
+        self.sim().game.lists.find_unit(UnitType::Item, g)
+    }
+    fn mode(&mut self, g: Guid) -> u32 {
+        let u = self.unit(g).unwrap();
+        self.sim().events.sys.units.get(u).unwrap().mode
+    }
+    fn data(&mut self, g: Guid) -> InvItem {
+        let u = self.unit(g).unwrap();
+        self.inv().state.items[&u]
+    }
+    fn inventory(&mut self) -> &d2_sim::items::inventory::Inventory {
+        let p = self.player;
+        &self.inv().state.inventories[&p]
+    }
+    fn in_room(&mut self, g: Guid) -> bool {
+        let u = self.unit(g).unwrap();
+        self.sim().game.lists.unit(u).unwrap().room().is_some()
+    }
+
+    /// A normal item of `record` created on the action sim's units into
+    /// the host's item store, on the ground of the room at (x, y),
+    /// identified (callers set 0x10, `generation.md` §1.4).
+    fn ground_item(&mut self, record: usize, x: i32, y: i32) -> Guid {
+        let room = self.room;
+        let sim = &mut self.host.game;
+        let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+        let u = world
+            .with_economy(game, events, |econ, _| {
+                econ.create_item(
+                    &mut plain(record),
+                    false,
+                    ItemSpawn {
+                        room: Some(room),
+                        mode: 3,
+                        init_flags: 1,
+                    },
+                )
+            })
+            .unwrap();
+        events.sys.hooks.items.get_mut(u).unwrap().flags |= 0x10;
+        let guid = events.sys.units.get(u).unwrap().guid;
+        // The item's position is its item data's (§2.2, §9.1 step 3).
+        let inv = world.inventory.as_mut().unwrap();
+        inv.state.items.insert(
+            u,
+            InvItem {
+                x,
+                y,
+                ..InvItem::new(guid, record)
+            },
+        );
+        guid
+    }
+
+    /// A ground item picked to the cursor through 0x16 (one frame).
+    fn cursor_item(&mut self, record: usize) -> Guid {
+        let g = self.ground_item(record, 11, 11);
+        assert_eq!(self.frame(&pick(g, 1)).0, ResultCode::Done);
+        g
+    }
+
+    /// A ground item auto-picked through 0x16 (one frame).
+    fn picked(&mut self, record: usize) -> Guid {
+        let g = self.ground_item(record, 11, 11);
+        assert_eq!(self.frame(&pick(g, 0)).0, ResultCode::Done);
+        g
+    }
+
+    /// One frame (drain → handle → tick → flush) with `msg` sent: the
+    /// dispatch result and the bytes client 0 receives, in order. Frames
+    /// are 240 ms apart, past the client's 200 ms duplicate filter.
+    fn frame(&mut self, msg: &[u8]) -> (ResultCode, Vec<Vec<u8>>) {
+        let r = self.frame_raw(msg);
+        self.no_errors();
+        r
+    }
+
+    /// [`Self::frame`] without the error checks.
+    fn frame_raw(&mut self, msg: &[u8]) -> (ResultCode, Vec<Vec<u8>>) {
+        self.host.clock.0 += 240;
+        self.host.send_game(0, msg).unwrap();
+        let r = self.host.frame().unwrap();
+        assert!(r.ticked);
+        assert_eq!(r.messages.len(), 1, "{:?}", r.messages);
+        let Handled::Game(Outcome::Dispatched(code)) = r.messages[0].handled else {
+            panic!("{:?}", r.messages[0]);
+        };
+        (code, self.host.receive(0))
+    }
+
+    /// A frame without a message (the next tick's update pass).
+    fn idle(&mut self) -> Vec<Vec<u8>> {
+        self.host.clock.0 += 240;
+        let r = self.host.frame().unwrap();
+        assert!(r.ticked);
+        self.no_errors();
+        self.host.receive(0)
+    }
+
+    fn no_errors(&mut self) {
+        let sim = self.sim();
+        if let Some(inv) = &sim.world.inventory {
+            assert_eq!(inv.state.errors, Vec::new());
+        }
+        assert!(sim.events.sys.hooks.errors.is_empty());
+        assert_eq!(sim.tick_faults, Vec::new());
+        assert_eq!(sim.world.action.faults, Vec::new());
+    }
+
+    /// The update pass's 0x47 and 0x48 for the player (§11).
+    fn relators(&mut self) -> [Vec<u8>; 2] {
+        let g = self.pguid();
+        let mut a = vec![0x47, 0, 0];
+        a.extend_from_slice(&g.to_le_bytes());
+        a.extend_from_slice(&[0; 4]);
+        let mut b = a.clone();
+        b[0] = 0x48;
+        [a, b]
+    }
+
+    /// An update pass's bytes: the item messages, then 0x47, 0x48.
+    fn pass(&mut self, items: &[Vec<u8>]) -> Vec<Vec<u8>> {
+        let mut v = items.to_vec();
+        v.extend(self.relators());
+        v
+    }
+
+    /// 0x9D for an item the player owns (§11: owner type 0).
+    fn owned(&mut self, action: u8, item: Guid) -> Vec<u8> {
+        let p = self.pguid();
+        x9d(action, item, 0, p)
+    }
+}
+
+/// 0x9C with an empty bit stream (§11): [id, action, size 8, category 0,
+/// GUID].
+fn x9c(action: u8, item: Guid) -> Vec<u8> {
+    let mut b = vec![0x9C, action, 8, 0];
+    b.extend_from_slice(&item.to_le_bytes());
+    b
+}
+
+/// 0x9D with an empty bit stream (§11): size 13, category 0, owner.
+fn x9d(action: u8, item: Guid, owner_type: u8, owner: Guid) -> Vec<u8> {
+    let mut b = vec![0x9D, action, 13, 0];
+    b.extend_from_slice(&item.to_le_bytes());
+    b.push(owner_type);
+    b.extend_from_slice(&owner.to_le_bytes());
+    b
+}
+
+// ---- C→S messages (`client-messages.tsv` layouts) ------------------------
+
+fn msg(id: u8, fields: &[u32]) -> Vec<u8> {
+    let mut m = vec![id];
+    for f in fields {
+        m.extend_from_slice(&f.to_le_bytes());
+    }
+    m
+}
+/// 0x16 [type 4][GUID][cursor].
+fn pick(item: Guid, cursor: u32) -> Vec<u8> {
+    msg(0x16, &[4, item, cursor])
+}
+/// 0x1A / 0x1B / 0x1D / 0x1E: [item u32][location u8], 9 bytes.
+fn body(id: u8, item: Guid, loc: u32) -> Vec<u8> {
+    msg(id, &[item, loc])
+}
+/// 0x1C / 0x61: [location u16].
+fn loc16(id: u8, loc: u16) -> Vec<u8> {
+    let mut m = vec![id];
+    m.extend_from_slice(&loc.to_le_bytes());
+    m
+}
+
+const NO_BYTES: Vec<Vec<u8>> = Vec::new();
+use ResultCode::{Done, Invalid, Malformed, Refused};
+
+// ---- the id tables ----------------------------------------------------------------------
+
+const CLIENT_TSV: &str = include_str!("../../../../../../../specs/sim/client-messages.tsv");
+
+/// Rows of [`MOVE_IDS`] that disagree with `client-messages.tsv` (name,
+/// `transport_size`, kind `handler`) or with `items::moves::HANDLED` (the
+/// size), and the `HANDLED` ids missing from the table (M05).
+fn ids_vs_tsv(tsv: &str) -> Vec<String> {
+    let rows: BTreeMap<u8, Vec<String>> = tsv
+        .lines()
+        .skip(1)
+        .filter_map(|l| {
+            let c: Vec<String> = l.split('\t').map(str::to_string).collect();
+            let id = u8::from_str_radix(c.first()?.trim_start_matches("0x"), 16).ok()?;
+            Some((id, c))
+        })
+        .collect();
+    let mut bad = Vec::new();
+    for &(id, name, _) in MOVE_IDS {
+        let size = HANDLED.iter().find(|&&(i, _)| i == id).map(|&(_, s)| s);
+        match rows.get(&id) {
+            Some(c)
+                if c[1] == name
+                    && c[6] == "handler"
+                    && size.is_some_and(|s| c[2] == s.to_string()) => {}
+            other => bad.push(format!("{id:#04x} {name}: {other:?} size {size:?}")),
+        }
+    }
+    for &(id, _) in &HANDLED {
+        if !MOVE_IDS.iter().any(|&(i, _, _)| i == id) {
+            bad.push(format!("{id:#04x}: handled, not in MOVE_IDS"));
+        }
+    }
+    bad
+}
+
+// Covers: specs/sim/intents-events.md §4 r1
+#[test]
+fn move_ids_match_client_tsv_and_the_module() {
+    assert_eq!(ids_vs_tsv(CLIENT_TSV), Vec::<String>::new());
+    assert!(MOVE_IDS.windows(2).all(|w| w[0].0 < w[1].0));
+    // `handlers::items::ITEM_IDS` names the same owner for each, and
+    // keeps 0x4C (`cube.md` §10) unowned.
+    for &(id, _, spec) in MOVE_IDS {
+        assert_eq!(
+            ITEM_IDS.iter().find(|&&(i, _)| i == id),
+            Some(&(id, Some(spec)))
+        );
+    }
+    assert_eq!(
+        ITEM_IDS.iter().find(|&&(i, _)| i == 0x4C),
+        Some(&(0x4C, None))
+    );
+}
+
+/// M08: a renamed row, a row whose kind is no longer `handler` and a
+/// changed size are each reported, and nothing else.
+#[test]
+fn move_ids_check_reports_perturbations() {
+    let renamed = CLIENT_TSV.replace("\tUnstackItems\t", "\tUnstackItemsX\t");
+    let bad = ids_vs_tsv(&renamed);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].starts_with("0x22 UnstackItems"));
+    let stubbed = CLIENT_TSV.replace("0x0054D520\thandler", "0x0054D520\tstub0");
+    let bad = ids_vs_tsv(&stubbed);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].starts_with("0x63 ItemToBeltShift"));
+    let resized = CLIENT_TSV.replace("0x50\tDropGold\t9\t", "0x50\tDropGold\t10\t");
+    let bad = ids_vs_tsv(&resized);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].starts_with("0x50 DropGold"));
+}
+
+// ---- 0x16, 0x17: ground ----------------------------------------------------------------
+
+/// 0x16 to the cursor (§7.1, §8.2): result 0; mode 4, the cursor item,
+/// out of the room list. The same frame's tick sends the update pass:
+/// 0x9C action 1 (row 1), then 0x47, 0x48. The clean-up (§6.1 rule 4)
+/// leaves nothing for the next tick.
+// Covers: specs/items/inventory.md §6.1 r2, §6.1 r4, §7.1 r2, §11
+#[test]
+fn pick_item_to_the_cursor() {
+    let mut t = setup();
+    let k = t.ground_item(KEY, 12, 11);
+    assert!(t.in_room(k));
+    let (code, bytes) = t.frame(&pick(k, 1));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 4);
+    let u = t.unit(k);
+    assert_eq!(t.inventory().cursor(), u);
+    assert!(!t.in_room(k));
+    assert_eq!(bytes, t.pass(&[x9c(0x01, k)]));
+    assert_eq!(t.data(k).cmd_flags, 0, "clean-up");
+    let p = t.player;
+    assert_eq!(t.sim().events.sys.units.get(p).unwrap().flags2 & 3, 0);
+    assert_eq!(t.idle(), NO_BYTES);
+    let me = t.pguid();
+    assert_eq!(t.rest.take_log(), [format!("pickup_sound {me} {k}")]);
+}
+
+/// 0x16 auto pickup (§8.1 step 7): the first free page-0 position of
+/// the 10 × 4 grid, (9, 3); 0x9C action 4. Refusals: distance > 50 → 1;
+/// distance ≥ 5 → walk, 0; type > 5 → 2; the own player → 3.
+// Covers: specs/items/inventory.md §7.1 r1, §7.1 r2
+#[test]
+fn pick_item_auto_and_refusals() {
+    let mut t = setup();
+    let k = t.ground_item(KEY, 12, 11);
+    t.rest.with(|r| r.distance = 51);
+    assert_eq!(t.frame(&pick(k, 0)), (Refused, NO_BYTES));
+    t.rest.with(|r| r.distance = 5);
+    assert_eq!(t.frame(&pick(k, 0)), (Done, NO_BYTES));
+    let me = t.pguid();
+    assert_eq!(t.rest.take_log(), [format!("walk_to_item {me} {k} false")]);
+    assert_eq!(t.frame(&msg(0x16, &[6, k, 0])), (Invalid, NO_BYTES));
+    assert_eq!(t.frame(&msg(0x16, &[0, me, 0])), (Malformed, NO_BYTES));
+    t.rest.with(|r| r.distance = 1);
+    let (code, bytes) = t.frame(&pick(k, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 0);
+    let d = t.data(k);
+    assert_eq!((d.page, d.x, d.y), (0, 9, 3));
+    assert_eq!(bytes, t.pass(&[x9c(0x04, k)]));
+}
+
+/// 0x17 (§7.2, §9.1): the cursor item dropped at the free spot: mode 3,
+/// in the room, at the spot, expiry frame + 15000. §9.1 runs no owner
+/// refresh and no update list, so the tick sends nothing to the owner;
+/// the ground message (§6.3) is not built on real units (WV1). An item
+/// that is not the cursor item → 1.
+// Covers: specs/items/inventory.md §7.2 r1, §9.1
+#[test]
+fn drop_item_to_the_ground() {
+    let mut t = setup();
+    let k = t.cursor_item(KEY);
+    let room = t.room;
+    t.rest.with(|r| {
+        r.room_at = true;
+        r.spot = Some(Spot { room, x: 13, y: 12 });
+    });
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x17, &[k + 77])), (Refused, NO_BYTES));
+    let (code, bytes) = t.frame(&msg(0x17, &[k]));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 3);
+    assert!(t.in_room(k));
+    let d = t.data(k);
+    assert_eq!((d.x, d.y, d.page), (13, 12, 0xFF));
+    assert_eq!(t.inventory().cursor(), None);
+    let u = t.unit(k).unwrap();
+    let frame = t.sim().game.frame;
+    assert_eq!(t.inv().state.expiry[&u], frame - 1 + 15000);
+    assert_eq!(bytes, NO_BYTES);
+    assert_eq!(t.rest.take_log(), [format!("quest_item_dropped {k}")]);
+}
+
+// ---- 0x18, 0x19: grid ------------------------------------------------------------------
+
+/// 0x19 (§7.4): a stored key to the cursor: mode 4, stored page 0 →
+/// 0x9D action 5 with the player as owner (row 4). 0x18 (§7.3) back at
+/// (0, 0) of page 0: mode 0 → 0x9C action 4 (row 3). Page 1 → 2; a cell
+/// outside the cube page → 3; lifting with a cursor item → 2.
+// Covers: specs/items/inventory.md §7.3 r1, §7.4 r1
+#[test]
+fn lift_and_insert() {
+    let mut t = setup();
+    let k = t.picked(KEY);
+    let (code, bytes) = t.frame(&msg(0x19, &[k]));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 4);
+    assert_eq!(t.data(k).stored_page, 0);
+    let m = t.owned(0x05, k);
+    assert_eq!(bytes, t.pass(&[m]));
+    assert_eq!(t.frame(&msg(0x18, &[k, 0, 0, 1])), (Invalid, NO_BYTES));
+    assert_eq!(t.frame(&msg(0x18, &[k, 3, 0, 3])), (Malformed, NO_BYTES));
+    let (code, bytes) = t.frame(&msg(0x18, &[k, 0, 0, 0]));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 0);
+    let d = t.data(k);
+    assert_eq!((d.page, d.x, d.y), (0, 0, 0));
+    assert_eq!(bytes, t.pass(&[x9c(0x04, k)]));
+    let _c = t.cursor_item(KEY);
+    assert_eq!(t.frame(&msg(0x19, &[k])), (Invalid, NO_BYTES));
+    assert_eq!(t.mode(k), 0);
+}
+
+/// 0x1F (§7.10): the cursor key C and the stored key T change places: T
+/// to the cursor (stored page 0), C stored at the message's position
+/// (2, 1); both command flag 0x40000 → 0x9C action 0xD (row 10, owner)
+/// in update-list order.
+// Covers: specs/items/inventory.md §7.10 r1, §7.10 r2, §7.10 r3
+#[test]
+fn swap_cursor_buffer_item() {
+    let mut t = setup();
+    let tk = t.picked(KEY);
+    let c = t.cursor_item(KEY);
+    let (code, bytes) = t.frame(&msg(0x1F, &[c, tk, 2, 1]));
+    assert_eq!(code, Done);
+    let tu = t.unit(tk);
+    assert_eq!(t.inventory().cursor(), tu);
+    assert_eq!((t.mode(tk), t.mode(c)), (4, 0));
+    let d = t.data(c);
+    assert_eq!((d.page, d.x, d.y), (0, 2, 1));
+    assert_eq!(bytes, t.pass(&[x9c(0x0D, tk), x9c(0x0D, c)]));
+}
+
+// ---- 0x1A–0x1E: body -------------------------------------------------------------------
+
+/// 0x1A (§7.5, §4.6): a cap to the head: mode 1, body location 1 → 0x9D
+/// action 6 (row 5). 0x1C (§7.7): off again → cursor, 0x9D action 8 (row
+/// 7). Location 11 → 2; 0x1C with a cursor item does nothing.
+// Covers: specs/items/inventory.md §7.5, §7.7
+#[test]
+fn equip_and_remove_body_item() {
+    let mut t = setup();
+    let c = t.cursor_item(CAP);
+    assert_eq!(t.frame(&body(0x1A, c, 11)), (Invalid, NO_BYTES));
+    let (code, bytes) = t.frame(&body(0x1A, c, 1));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(c), 1);
+    let u = t.unit(c);
+    assert_eq!(t.inventory().body_item(1), u);
+    let m = t.owned(0x06, c);
+    assert_eq!(bytes, t.pass(&[m]));
+    let (code, bytes) = t.frame(&loc16(0x1C, 1));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(c), 4);
+    assert_eq!(t.inventory().cursor(), u);
+    let m = t.owned(0x08, c);
+    assert_eq!(bytes, t.pass(&[m]));
+    assert_eq!(t.frame(&loc16(0x1C, 1)), (Done, NO_BYTES));
+}
+
+/// 0x1B (§7.6): a two-handed sword onto the right hand over a shield in
+/// the left: the shield leaves the body (mode 4, not linked; WV2), the
+/// sword goes to location 4 → 0x9D action 7 (row 6). Location 3 → 3.
+// Covers: specs/items/inventory.md §7.6
+#[test]
+fn swap_two_handed_item() {
+    let mut t = setup();
+    let s = t.cursor_item(SHIELD);
+    assert_eq!(t.frame(&body(0x1A, s, 5)).0, Done);
+    let w = t.cursor_item(TWO_HANDER);
+    t.rest.with(|r| r.two_handed.insert(w));
+    assert_eq!(t.frame(&body(0x1B, w, 3)), (Malformed, NO_BYTES));
+    let (code, bytes) = t.frame(&body(0x1B, w, 4));
+    assert_eq!(code, Done);
+    let wu = t.unit(w);
+    assert_eq!(t.inventory().body_item(4), wu);
+    assert_eq!(t.inventory().body_item(5), None);
+    assert_eq!((t.mode(w), t.mode(s)), (1, 4));
+    let m = t.owned(0x07, w);
+    assert_eq!(bytes, t.pass(&[m]));
+}
+
+/// 0x1D (§7.8): a cap on the cursor over an equipped cap: E to the
+/// cursor, N to the head; both command flag 0x20 → 0x9D action 9 (row 8)
+/// in update-list order. An empty location → 1.
+// Covers: specs/items/inventory.md §7.8
+#[test]
+fn swap_cursor_with_body() {
+    let mut t = setup();
+    let e = t.cursor_item(CAP);
+    assert_eq!(t.frame(&body(0x1A, e, 1)).0, Done);
+    let n = t.cursor_item(CAP);
+    assert_eq!(t.frame(&body(0x1D, n, 9)), (Refused, NO_BYTES));
+    let (code, bytes) = t.frame(&body(0x1D, n, 1));
+    assert_eq!(code, Done);
+    let (eu, nu) = (t.unit(e), t.unit(n));
+    assert_eq!(t.inventory().body_item(1), nu);
+    assert_eq!(t.inventory().cursor(), eu);
+    let m = [t.owned(0x09, e), t.owned(0x09, n)];
+    assert_eq!(bytes, t.pass(&m));
+}
+
+/// 0x1E (§7.9): the swap itself is the item-use spec's (`MovePending`
+/// seam `swap_1h_with_2h`, logged; its default "nothing" → 0). Location
+/// 3 → 3; an empty location 4 → 1.
+// Covers: specs/items/inventory.md §7.9
+#[test]
+fn swap_one_handed_with_two_handed() {
+    let mut t = setup();
+    let n = t.cursor_item(SWORD);
+    assert_eq!(t.frame(&body(0x1E, n, 3)), (Malformed, NO_BYTES));
+    assert_eq!(t.frame(&body(0x1E, n, 4)), (Refused, NO_BYTES));
+    assert_eq!(t.frame(&body(0x1A, n, 4)).0, Done);
+    assert_eq!(t.mode(n), 1);
+    let n2 = t.cursor_item(TWO_HANDER);
+    t.rest.take_log();
+    assert_eq!(t.frame(&body(0x1E, n2, 4)), (Done, NO_BYTES));
+    let me = t.pguid();
+    assert_eq!(t.rest.take_log(), [format!("swap_1h_with_2h {me} {n2} 4")]);
+    assert_eq!((t.mode(n), t.mode(n2)), (1, 4));
+}
+
+// ---- 0x20–0x22: use, stack -------------------------------------------------------------
+
+/// 0x20 (§7.11): a stored item used at a point in range: the use is the
+/// item-use spec's (seam, logged; "nothing" → 0). A ground item → 1.
+// Covers: specs/items/inventory.md §7.11
+#[test]
+fn use_grid_item() {
+    let mut t = setup();
+    let k = t.picked(KEY);
+    let g = t.ground_item(KEY, 12, 12);
+    assert_eq!(t.frame(&msg(0x20, &[g, 10, 10])), (Refused, NO_BYTES));
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Done, NO_BYTES));
+    let me = t.pguid();
+    assert_eq!(t.rest.take_log(), [format!("use_grid_item {me} {k} 11 10")]);
+}
+
+/// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
+/// announced (0x3E seam, logged), dst 0x9C action 0xA (row 9). 0x22
+/// (§7.13) on an owned item → 3 (X1).
+// Covers: specs/items/inventory.md §7.12, §7.13
+#[test]
+fn stack_and_unstack_items() {
+    let mut t = setup();
+    let dst = t.picked(KEY);
+    let src = t.cursor_item(KEY);
+    let (du, su) = (t.unit(dst).unwrap(), t.unit(src).unwrap());
+    t.set_stat(du, stat::QUANTITY, 8);
+    t.set_stat(su, stat::QUANTITY, 7);
+    t.rest.take_log();
+    let (code, bytes) = t.frame(&msg(0x21, &[src, dst]));
+    assert_eq!(code, Done);
+    assert_eq!(
+        (t.stat(du, stat::QUANTITY), t.stat(su, stat::QUANTITY)),
+        (12, 3)
+    );
+    assert_eq!(
+        t.rest.take_log(),
+        [
+            format!("send_item_stat {dst} 70"),
+            format!("send_item_stat {src} 70")
+        ]
+    );
+    assert_eq!(bytes, t.pass(&[x9c(0x0A, dst)]));
+    assert_eq!(t.frame(&msg(0x21, &[src, src])), (Malformed, NO_BYTES));
+    assert_eq!(t.frame(&msg(0x22, &[dst])), (Malformed, NO_BYTES));
+}
+
+// ---- 0x23–0x26, 0x63: belt -------------------------------------------------------------
+
+/// Auto pickup of a potion (§8.1 step 6) → slot 0, 0x9C action 0xE. 0x23
+/// (§7.14) the cursor potion to slot 4 → 0x9C action 0xE. 0x24 (§7.15)
+/// slot 0 back to the cursor → 0x9C action 0xF, and the compaction moves
+/// slot 4 to 0 → 0x9D action 0x15 (row 20). 0x25 (§7.16) the cursor
+/// potion and the belt potion change places → 0x9C action 0x10 twice.
+// Covers: specs/items/inventory.md §7.14, §7.15, §7.16
+#[test]
+fn belt_moves() {
+    let mut t = setup();
+    let a = t.ground_item(HP1, 12, 11);
+    let (code, bytes) = t.frame(&pick(a, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(a), 2);
+    assert_eq!(bytes, t.pass(&[x9c(0x0E, a)]));
+    let b = t.cursor_item(HP1);
+    let (code, bytes) = t.frame(&msg(0x23, &[b, 4]));
+    assert_eq!(code, Done);
+    assert_eq!((t.mode(b), t.data(b).x), (2, 4));
+    assert_eq!(bytes, t.pass(&[x9c(0x0E, b)]));
+    let (code, bytes) = t.frame(&msg(0x24, &[a]));
+    assert_eq!(code, Done);
+    assert_eq!((t.mode(a), t.data(b).x), (4, 0));
+    let m = [x9c(0x0F, a), t.owned(0x15, b)];
+    assert_eq!(bytes, t.pass(&m));
+    let (code, bytes) = t.frame(&msg(0x25, &[a, b]));
+    assert_eq!(code, Done);
+    let bu = t.unit(b);
+    assert_eq!(t.inventory().cursor(), bu);
+    assert_eq!((t.mode(a), t.mode(b)), (2, 4));
+    assert_eq!(bytes, t.pass(&[x9c(0x10, b), x9c(0x10, a)]));
+}
+
+/// 0x26 (§7.17): a belt potion used on the player (seam `use_item`,
+/// logged); not used → nothing more, 0. Used → charge update and removal
+/// (seams), 0.
+// Covers: specs/items/inventory.md §7.17
+#[test]
+fn use_belt_item() {
+    let mut t = setup();
+    let a = t.picked(HP1);
+    let me = t.pguid();
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])), (Done, NO_BYTES));
+    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
+    t.rest.with(|r| r.use_ok = true);
+    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])).0, Done);
+    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
+    assert_eq!(t.mode(a), 2, "the removal is the item-use spec's");
+}
+
+/// 0x63 (§7.24): a stored potion to the first free belt slot. The two
+/// messages go out **in the handler** (§6.4): 0x9D action 5 (page shown
+/// as the stored page 0) and 0x9C action 0xE, then the tick's pass (owner
+/// refresh, no update list): 0x47, 0x48. A cursor item → 2.
+// Covers: specs/items/inventory.md §6.4, §7.24 r1, §7.24 r2, §7.24 r3, §7.24 r4
+#[test]
+fn item_to_belt_shift_sends_now() {
+    let mut t = setup();
+    let a = t.cursor_item(HP1);
+    assert_eq!(t.frame(&msg(0x18, &[a, 0, 0, 0])).0, Done);
+    let (code, bytes) = t.frame(&msg(0x63, &[a]));
+    assert_eq!(code, Done);
+    assert_eq!((t.mode(a), t.data(a).x), (2, 0));
+    let mut want = vec![t.owned(0x05, a), x9c(0x0E, a)];
+    want.extend(t.relators());
+    assert_eq!(bytes, want);
+    let _c = t.cursor_item(KEY);
+    assert_eq!(t.frame(&msg(0x63, &[a])), (Refused, NO_BYTES));
+}
+
+// ---- 0x27–0x29: item use, sockets, tomes -----------------------------------------------
+
+/// 0x27 (§7.18): both items owned → the item-use seam (logged; "nothing"
+/// → 0). A ground target → 1.
+// Covers: specs/items/inventory.md §7.18
+#[test]
+fn use_item_action() {
+    let mut t = setup();
+    let k = t.picked(KEY);
+    let u = t.cursor_item(KEY);
+    let g = t.ground_item(KEY, 12, 12);
+    assert_eq!(t.frame(&msg(0x27, &[g, u])), (Refused, NO_BYTES));
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x27, &[k, u])), (Done, NO_BYTES));
+    let me = t.pguid();
+    assert_eq!(t.rest.take_log(), [format!("use_item_action {me} {k} {u}")]);
+}
+
+/// 0x28 (§7.19): the filler is not a socket filler (seam
+/// `socket_filler`, default no) → nothing, 0; a filler not on the cursor
+/// → the cursor check's result.
+// Covers: specs/items/inventory.md §7.19 r1, §7.19 r2
+#[test]
+fn socket_item() {
+    let mut t = setup();
+    let target = t.picked(KEY);
+    let g = t.ground_item(KEY, 12, 12);
+    assert_eq!(t.frame(&msg(0x28, &[g, target])), (Refused, NO_BYTES));
+    let f = t.cursor_item(KEY);
+    assert_eq!(t.frame(&msg(0x28, &[f, target])), (Done, NO_BYTES));
+    assert_eq!((t.mode(f), t.mode(target)), (4, 0));
+}
+
+/// 0x29 (§7.20): a cursor scroll into a stored tome of the same spell:
+/// tome quantity +1, announced (0x3E seam), the scroll freed (not
+/// consumed one by one: seam default) and the cursor cleared; nothing is
+/// sent. A second scroll of another spell → the original's fatal assert
+/// (line 0x149C): result 3 and a recorded fault.
+// Covers: specs/items/inventory.md §7.20
+#[test]
+fn scroll_to_book_and_its_fatal() {
+    let mut t = setup();
+    let book = t.cursor_item(BOOK);
+    assert_eq!(t.frame(&msg(0x18, &[book, 0, 0, 0])).0, Done);
+    let bu = t.unit(book).unwrap();
+    let q0 = t.stat(bu, stat::QUANTITY);
+    let s = t.cursor_item(SCROLL);
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x29, &[s, book])), (Done, NO_BYTES));
+    assert_eq!(t.stat(bu, stat::QUANTITY), q0 + 1);
+    assert_eq!(t.unit(s), None, "freed");
+    assert_eq!(t.inventory().cursor(), None);
+    assert_eq!(t.rest.take_log(), [format!("send_item_stat {book} 70")]);
+
+    let s2 = t.cursor_item(SCROLL);
+    t.rest.with(|r| r.spells.insert(s2, 7));
+    assert_eq!(t.frame_raw(&msg(0x29, &[s2, book])), (Malformed, NO_BYTES));
+    let faults = std::mem::take(&mut t.sim().world.action.faults);
+    assert_eq!(
+        faults,
+        [WorldFault {
+            client: 0,
+            id: 0x29,
+            error: WorldError::Move(MoveFatal::SpellMismatch),
+        }]
+    );
+    assert_eq!(t.stat(bu, stat::QUANTITY), q0 + 1);
+    t.no_errors();
+}
+
+// ---- 0x50, 0x61 ---------------------------------------------------------------------------
+
+/// 0x50 (§7.22, §10.2): 1500 of 5000 gold: one `gld` pile made through
+/// the real item creation on the host's economy, on the ground at the
+/// spot, its gold 1500; the player's gold 3500; nothing sent. More than
+/// the gold → 3; another unit's GUID → 3.
+// Covers: specs/items/inventory.md §7.22, §10.2
+#[test]
+fn drop_gold_makes_a_pile() {
+    let mut t = setup();
+    let p = t.player;
+    t.set_stat(p, stat::GOLD, 5000);
+    let room = t.room;
+    t.rest.with(|r| {
+        r.gold = true;
+        r.spot = Some(Spot { room, x: 10, y: 10 });
+    });
+    let me = t.pguid();
+    assert_eq!(t.frame(&msg(0x50, &[me, 5001])), (Malformed, NO_BYTES));
+    assert_eq!(t.frame(&msg(0x50, &[me + 1, 10])), (Malformed, NO_BYTES));
+    let before = t.sim().game.lists.units_of_type(UnitType::Item);
+    t.rest.take_log();
+    assert_eq!(t.frame(&msg(0x50, &[me, 1500])), (Done, NO_BYTES));
+    let piles: Vec<UnitId> = t
+        .sim()
+        .game
+        .lists
+        .units_of_type(UnitType::Item)
+        .into_iter()
+        .filter(|u| !before.contains(u))
+        .collect();
+    assert_eq!(piles.len(), 1);
+    let pile = piles[0];
+    let g = t.sim().events.sys.units.get(pile).unwrap().guid;
+    assert_eq!(
+        t.sim().events.sys.units.get(pile).unwrap().class,
+        GOLD as u32
+    );
+    assert_eq!(t.stat(pile, stat::GOLD), 1500);
+    assert_eq!(t.mode(g), 3);
+    assert!(t.in_room(g));
+    assert_eq!(t.stat(p, stat::GOLD), 3500);
+    assert_eq!(
+        t.rest.take_log(),
+        [
+            format!("quest_item_dropped {g}"),
+            format!("set_owner {g} {me}")
+        ]
+    );
+}
+
+/// 0x61 (§7.23): a classic game → 3; an expansion game without a
+/// hireling (seam default) → 0, nothing changed.
+// Covers: specs/items/inventory.md §7.23 r1, §7.23 r2
+#[test]
+fn merc_item() {
+    let mut t = setup_with(false);
+    assert_eq!(t.frame(&loc16(0x61, 1)), (Malformed, NO_BYTES));
+    let mut t = setup();
+    let c = t.cursor_item(CAP);
+    assert_eq!(t.frame(&loc16(0x61, 1)), (Done, NO_BYTES));
+    assert_eq!(t.mode(c), 4);
+}
+
+// ---- host wiring ------------------------------------------------------------------------
+
+/// A host without the inventory parts keeps every item-move id a stub
+/// (result 0, recorded unhandled); with them, nothing is recorded.
+// Covers: specs/sim/intents-events.md §4 r1
+#[test]
+fn without_inventory_parts_the_ids_stay_stubs() {
+    let mut t = setup();
+    let k = t.ground_item(KEY, 12, 11);
+    let parts = t.sim().world.inventory.take();
+    assert_eq!(t.frame(&pick(k, 1)), (Done, NO_BYTES));
+    assert_eq!(t.mode(k), 3);
+    assert_eq!(t.sim().unhandled, [(0, 0x16, 13)]);
+    t.sim().world.inventory = parts;
+    assert_eq!(t.frame(&msg(0x17, &[k])).0, Refused);
+    assert_eq!(t.sim().unhandled.len(), 1);
+}

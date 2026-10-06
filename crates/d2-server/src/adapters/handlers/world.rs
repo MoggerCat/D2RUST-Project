@@ -45,8 +45,10 @@ use d2_sim::world::vendors::{VendorRecord, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, WaypointWorld};
 
 use super::super::SimGame;
+use super::items::moves::MoveCall;
 use super::items::CubeCall;
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
+use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
 
@@ -170,6 +172,8 @@ pub enum WorldError {
     Quest(#[from] QuestError),
     #[error(transparent)]
     Price(#[from] PriceFatal),
+    #[error(transparent)]
+    Move(#[from] d2_sim::items::moves::MoveFatal),
     #[error("sink: {0}")]
     Sink(String),
 }
@@ -262,8 +266,17 @@ pub trait WorldHost<D> {
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
     }
+    /// The item moves and the deferred item messages
+    /// (`handlers::items::moves`) on the host's economy and inventories.
+    fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        None
+    }
     /// The skill handlers (`handlers::skills`).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
+        None
+    }
+    /// The walk / run handlers (`handlers::walk`) on the path provider.
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
     /// The messages the seams sent since the last take, in send order:

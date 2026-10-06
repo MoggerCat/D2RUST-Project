@@ -170,7 +170,10 @@ fn type_pick_draws_on_the_game_seed() {
     a.sim.events.sys.hooks.game_seed = before;
     assert!(a.transmute());
     let amu = a.output();
-    assert_eq!(a.sim.world.items.get(amu).unwrap().record, AMULET);
+    assert_eq!(
+        a.sim.events.sys.hooks.items.get(amu).unwrap().record,
+        AMULET
+    );
 
     // The draws: N records; one candidate.
     let mut s = before;
@@ -253,7 +256,7 @@ fn ear_gets_the_players_name() {
         );
         assert!(fx.transmute());
         let ear = fx.output();
-        let it = fx.sim.world.items.get(ear).unwrap();
+        let it = fx.sim.events.sys.hooks.items.get(ear).unwrap();
         assert_eq!((it.record, it.quality), (EAR, q::NORMAL));
         assert_eq!(it.name, name);
         assert_eq!(it.flags & flag::NAMED != 0, hardcore);
@@ -302,7 +305,7 @@ fn input_item_tests() {
     };
     let file_index_6 = |fx: &mut CubeFx| {
         let r = fx.ring;
-        fx.sim.world.items.get_mut(r).unwrap().file_index = 6;
+        fx.sim.events.sys.hooks.items.get_mut(r).unwrap().file_index = 6;
     };
     assert!(run(special(7), file_index_6));
     assert!(!run(special(3), file_index_6));
@@ -319,7 +322,7 @@ fn input_item_tests() {
 
     let ethereal = |fx: &mut CubeFx| {
         let r = fx.ring;
-        fx.sim.world.items.get_mut(r).unwrap().flags |= flag::ETHEREAL;
+        fx.sim.events.sys.hooks.items.get_mut(r).unwrap().flags |= flag::ETHEREAL;
     };
     assert!(run(sockets(f::ETH), ethereal));
     assert!(!run(sockets(f::ETH), |_| {}));
@@ -338,7 +341,7 @@ fn file_index_op() {
     };
     let file_index_6 = |fx: &mut CubeFx| {
         let r = fx.ring;
-        fx.sim.world.items.get_mut(r).unwrap().file_index = 6;
+        fx.sim.events.sys.hooks.items.get_mut(r).unwrap().file_index = 6;
     };
     assert!(!run(op(6), file_index_6));
     assert!(run(op(5), file_index_6));
@@ -363,19 +366,19 @@ fn captured_level() {
     };
     let mut fx = CubeFx::new(2, fields(true), vec![r.clone()]);
     let ring = fx.ring;
-    fx.sim.world.items.get_mut(ring).unwrap().ilvl = 7;
+    fx.sim.events.sys.hooks.items.get_mut(ring).unwrap().ilvl = 7;
     assert!(fx.transmute());
     let amu = fx.output();
-    assert_eq!(fx.sim.world.items.get(amu).unwrap().ilvl, 7);
+    assert_eq!(fx.sim.events.sys.hooks.items.get(amu).unwrap().ilvl, 7);
 
     // Level 0, and an output that cannot be created: the ring stays,
     // raised to level 1.
     let mut bad = r;
     bad.outputs[0].item = 99;
     let mut fx = CubeFx::new(2, fields(true), vec![bad]);
-    fx.sim.world.items.get_mut(ring).unwrap().ilvl = 0;
+    fx.sim.events.sys.hooks.items.get_mut(ring).unwrap().ilvl = 0;
     assert!(!fx.transmute());
-    assert_eq!(fx.sim.world.items.get(ring).unwrap().ilvl, 1);
+    assert_eq!(fx.sim.events.sys.hooks.items.get(ring).unwrap().ilvl, 1);
 }
 
 // ---- §7 outputs ---------------------------------------------------------------------------
@@ -414,7 +417,10 @@ fn mod_copy_takes_the_output_class() {
     fx.log.script().copies.push_back(copy);
     assert!(fx.transmute());
     assert_eq!(fx.output(), copy);
-    assert_eq!(fx.sim.world.items.get(copy).unwrap().record, AMULET);
+    assert_eq!(
+        fx.sim.events.sys.hooks.items.get(copy).unwrap().record,
+        AMULET
+    );
     let log = fx.log.take();
     assert!(
         log.contains(&format!("duplicate {} true", fx.ring.0)),
@@ -422,8 +428,9 @@ fn mod_copy_takes_the_output_class() {
     );
 }
 
-/// §7.3 `useitem` with quality 9: the copy is the output (mode 4); both
-/// tempered rolls non-zero → quality 9 with that prefix and suffix.
+/// §7.3 `useitem` with quality 9: the copy is the output (mode 4, then
+/// stored by the §8 placement: mode 0, linked); both tempered rolls
+/// non-zero → quality 9 with that prefix and suffix.
 // Covers: specs/world/cube.md §7.3
 #[test]
 fn useitem_tempered() {
@@ -434,46 +441,41 @@ fn useitem_tempered() {
     });
     let (mut fx, copy) = with_copy(r);
     fx.log.script().tempered = (21, 34);
-    fx.sim.events.sys.units.get_mut(copy).unwrap().mode = 0;
+    // On the ground before: only the output's mode 4 makes it placeable.
+    fx.sim.events.sys.units.get_mut(copy).unwrap().mode = 3;
     assert!(fx.transmute());
     assert_eq!(fx.output(), copy);
-    let it = fx.sim.world.items.get(copy).unwrap();
+    let it = fx.sim.events.sys.hooks.items.get(copy).unwrap();
     assert_eq!(
         (it.quality, it.rare_prefix, it.rare_suffix),
         (q::TEMPERED, 21, 34)
     );
-    assert_eq!(fx.sim.events.sys.units.get(copy).unwrap().mode, 4);
+    assert_eq!(fx.sim.events.sys.units.get(copy).unwrap().mode, 0);
+    assert!(fx.items_of().contains(&copy));
 }
 
-/// §7.6 step 2 and §7.3: `rem` drops the output's runeword stats and
-/// duplicates the source's socketed items as fillers (placed after the
-/// outputs, §8).
-// Covers: specs/world/cube.md §7.6 r2, §8 text
+/// §7.6 step 2: `rem` drops the output's runeword stats, then duplicates
+/// each item socketed in the source (the inventory model's fillers of the
+/// ring: none here, so the copy is the only duplicate). A socketed source
+/// cannot be staged: linking into an item is the move rest's
+/// `link_into_item`, which no spec provides (`unify-items.md`).
+// Covers: specs/world/cube.md §7.6 r2
 #[test]
-fn rem_keeps_the_socketed_items() {
+fn rem_drops_the_runeword_stats() {
     let r = output(OutputSlot {
         kind: kind::USEITEM,
         flags: output_flags::REM,
         ..amulet_out()
     });
     let (mut fx, copy) = with_copy(r);
-    let gem = mutants_handlers_fx::new_item(&mut fx.sim, RING, 0);
-    let filler = mutants_handlers_fx::new_item(&mut fx.sim, RING, 0);
-    {
-        let mut s = fx.log.script();
-        s.socketed = vec![gem];
-        s.copies.push_back(filler);
-    }
+    let ring = fx.ring;
+    assert!(fx.inv().state.fillers(ring).is_empty());
     assert!(fx.transmute());
     let log = fx.log.take();
-    let at = |s: String| log.iter().position(|l| *l == s);
-    assert!(at(format!("runeword {}", copy.0)).is_some(), "{log:?}");
-    assert!(at(format!("duplicate {} true", gem.0)).is_some(), "{log:?}");
-    let (p1, p2) = (
-        at(format!("place {}", copy.0)),
-        at(format!("place {}", filler.0)),
-    );
-    assert!(p1.is_some() && p1 < p2, "{log:?}");
+    assert!(log.contains(&format!("runeword {}", copy.0)), "{log:?}");
+    let dups: Vec<_> = log.iter().filter(|l| l.starts_with("duplicate")).collect();
+    assert_eq!(dups, [&format!("duplicate {} false", ring.0)], "{log:?}");
+    assert!(fx.items_of().contains(&copy));
 }
 
 /// §7.6 step 4: `rep` repairs a broken output; `rch` recharges.
@@ -486,7 +488,7 @@ fn rep_and_rch() {
         ..amulet_out()
     });
     let (mut fx, copy) = with_copy(r);
-    fx.sim.world.items.get_mut(copy).unwrap().flags |= flag::BROKEN;
+    fx.sim.events.sys.hooks.items.get_mut(copy).unwrap().flags |= flag::BROKEN;
     assert!(fx.transmute());
     let log = fx.log.take();
     assert!(log.contains(&format!("repair {}", copy.0)), "{log:?}");
@@ -503,9 +505,10 @@ fn placement_outcomes() {
         ..amulet_out()
     });
     let (mut fx, copy) = with_copy(r);
-    fx.log.script().no_room.insert(copy);
+    // The copy (an amulet) is wider than the cube's 3 × 4 grid.
+    fx.inv().tables.items[AMULET].invwidth = 4;
     assert!(fx.transmute());
-    assert!(!fx.sim.world.items.contains(copy));
+    assert!(!fx.sim.events.sys.hooks.items.contains(copy));
 
     let r = output(OutputSlot {
         item: HST as u16,
@@ -564,15 +567,21 @@ fn put_item_mode_above_cursor() {
 fn put_while_trading() {
     let setup = |interaction: fn(u32, u32) -> (u8, u32)| {
         let mut fx = CubeFx::new(2, fields(true), vec![]);
-        let (p, c, r) = (fx.player, fx.cube, fx.ring);
+        let (p, c) = (fx.player, fx.cube);
         let pg = fx.guid(p);
-        fx.sim.world.items.get_mut(c).unwrap().inv_page = 4;
-        fx.sim.events.sys.units.get_mut(r).unwrap().mode = 4;
-        fx.sim.world.items.get_mut(r).unwrap().inv_page = 0;
-        fx.parts().staged.inventories.get_mut(&p).unwrap().cursor = Some(r);
+        fx.sim.events.sys.hooks.items.get_mut(c).unwrap().inv_page = 4;
+        // A second ring on the player's cursor (mode 4, not stored).
+        let r = mutants_handlers_fx::new_item(&mut fx.sim, RING, 4);
+        fx.sim.events.sys.hooks.items.get_mut(r).unwrap().inv_page = 0;
+        fx.inv()
+            .state
+            .inventories
+            .get_mut(&p)
+            .unwrap()
+            .set_cursor(Some(r));
         fx.sim.world.rest.interact.insert(p, interaction(pg, 9999));
         let out = put(&mut fx, r);
-        let page = fx.sim.world.items.get(r).unwrap().inv_page;
+        let page = fx.sim.events.sys.hooks.items.get(r).unwrap().inv_page;
         (out, page)
     };
     assert_eq!(setup(|p, _| (0, p)), ((ResultCode::Done, 1), 0));
@@ -598,7 +607,7 @@ fn sock_output() {
     assert!(fx.transmute());
     let amu = fx.output();
     assert_ne!(
-        fx.sim.world.items.get(amu).unwrap().flags & flag::SOCKETED,
+        fx.sim.events.sys.hooks.items.get(amu).unwrap().flags & flag::SOCKETED,
         0
     );
     let g = &mut fx.sim;

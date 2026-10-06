@@ -14,7 +14,8 @@ use d2_data::bin::BinTable;
 use d2_data::fixup::maps::{states as state_maps, EquivMatrix};
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Monstats, Record, States};
-use d2_server::adapters::handlers::items::{CubeParts, Inventory, ItemPending};
+use d2_server::adapters::handlers::items::moves::{InvParts, MoveRest};
+use d2_server::adapters::handlers::items::{CubeParts, ItemPending};
 use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts};
 use d2_server::buffers::ClientBuffers;
@@ -23,6 +24,9 @@ use d2_sim::combat::CombatTables;
 use d2_sim::drlg::data::DrlgData;
 use d2_sim::drlg::{Dungeon, NoLevelTypes, TileInfo, TileSource};
 use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::moves::{Guid, MovePending, Owner};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ty, ItemRequest, ItemTables};
 use d2_sim::rng::Seed;
@@ -35,6 +39,7 @@ use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
 use d2_sim::wiring::economy::{GameFields, ItemSpawn, QuestRest};
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::wiring::inventory::InvRest;
 use d2_sim::world::cube::{
     input_flags, kind as cube_kind, CraftMod, CubeData, InputSlot, ItemRecord, OutputSlot, Recipe,
     CUBE_PAGE,
@@ -551,6 +556,18 @@ pub fn cube_item_tables() -> ItemTables {
     }
 }
 
+/// The inventory records of [`cube_item_tables`]' items (code, type,
+/// invwidth, invheight).
+pub fn cube_inv_items() -> Vec<([u8; 4], u16, u8, u8)> {
+    vec![
+        (*b"box ", T_BOX, 2, 2),
+        (*b"rin ", T_RING, 1, 1),
+        (*b"amu ", T_AMULET, 1, 1),
+        (*b"ear ", ty::PLAY, 1, 1),
+        (*b"hst ", 60, 1, 1),
+    ]
+}
+
 /// `cube.md` V12 recipe shape without mods: one ring → a normal amulet.
 pub fn ring_to_amulet() -> Recipe {
     let mut inputs = [InputSlot::default(); 7];
@@ -603,18 +620,15 @@ pub fn cube_data(t: &ItemTables, recipes: Vec<Recipe>) -> CubeData {
 pub struct Script {
     /// `duplicate` hands these out in order (then `None`).
     pub copies: VecDeque<UnitId>,
-    pub socketed: Vec<UnitId>,
     /// `tempered_affix` (prefix, suffix).
     pub tempered: (u16, u16),
-    /// Items whose placement fails.
-    pub no_room: BTreeSet<UnitId>,
     pub cow: bool,
     pub log: Vec<String>,
 }
 
-/// [`ItemPending`] stand-in: placement appends to the list (unless the
-/// item is in `no_room`), removal drops from it; the rest answers from
-/// the [`Script`]; every call is logged.
+/// [`ItemPending`] stand-in: answers from the [`Script`]; every call is
+/// logged. Placement, removal and the socketed items are the inventory
+/// model's (`InvParts`).
 #[derive(Clone, Default)]
 pub struct ItemLog(pub Arc<Mutex<Script>>);
 
@@ -633,36 +647,6 @@ impl ItemLog {
 impl ItemPending for ItemLog {
     fn inventory_pass(&mut self, _: UnitId, _: &mut Vec<Vec<u8>>) {
         self.log("pass".into());
-    }
-    fn place(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) -> bool {
-        self.log(format!("place {}", item.0));
-        if self.script().no_room.contains(&item) {
-            return false;
-        }
-        inv.items.push(item);
-        if inv.cursor == Some(item) {
-            inv.cursor = None;
-        }
-        true
-    }
-    fn remove_cube_item(
-        &mut self,
-        inv: &mut Inventory,
-        _: UnitId,
-        item: UnitId,
-        _: &mut Vec<Vec<u8>>,
-    ) {
-        self.log(format!("remove {}", item.0));
-        inv.items.retain(|&i| i != item);
-    }
-    fn socketed(&self, _: UnitId) -> Vec<UnitId> {
-        self.script().socketed.clone()
     }
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId> {
         self.log(format!("duplicate {} {fillers}", item.0));
@@ -693,6 +677,143 @@ impl ItemPending for ItemLog {
         self.log("cow".into());
         self.script().cow
     }
+}
+
+/// The item-move seams no d2-sim module provides, answered narrowest
+/// (`InvRest` / `MovePending` defaults: distance 0, no free spot, no
+/// interaction); the sends are collected for the host.
+#[derive(Default)]
+pub struct InvStandIn {
+    sent: Vec<(Owner, Vec<u8>)>,
+}
+
+impl MovePending for InvStandIn {
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.sent.push((player, bytes));
+    }
+}
+
+impl InvRest for InvStandIn {
+    fn percent_of(&self, value: i32, p: i32) -> i32 {
+        value.wrapping_mul(p) / 100
+    }
+    fn item_active_on(&self, _: Guid, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: Guid, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn level_requirement(&self, _: Guid, _: Owner) -> i32 {
+        -1
+    }
+    fn two_handed(&self, _: Guid) -> bool {
+        false
+    }
+    fn one_or_two_handed(&self, _: Owner, _: Guid) -> bool {
+        false
+    }
+    fn ammo_type(&self, _: Guid) -> Option<i16> {
+        None
+    }
+    fn stack_quality_ok(&self, _: Guid) -> bool {
+        true
+    }
+    fn has_allowed_location(&self, _: Guid) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: Guid) -> bool {
+        false
+    }
+    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
+        true
+    }
+    fn interaction(&self, _: Owner) -> InteractionTarget {
+        InteractionTarget::None
+    }
+    fn clear_interaction(&mut self, _: Owner) {}
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for InvStandIn {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+/// Inventory tables (`inventory.md` §1.3 grid records) over items of
+/// (code, type, invwidth, invheight), in record order.
+pub fn inv_tables(
+    items: &[([u8; 4], u16, u8, u8)],
+    n_types: usize,
+    equiv: EquivMatrix,
+) -> InvTables {
+    let g = |x, y| GridRec {
+        grid_x: x,
+        grid_y: y,
+    };
+    let mut grids = vec![g(10, 4); 16];
+    grids[5] = g(10, 10);
+    grids[8] = g(6, 4);
+    grids[9] = g(3, 4);
+    grids[12] = g(6, 8);
+    grids[13] = g(0, 0);
+    InvTables {
+        grids,
+        belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
+        items: items
+            .iter()
+            .map(|&(code, t, w, h)| InvItemRec {
+                code,
+                type_: t as i16,
+                invwidth: w,
+                invheight: h,
+                ..InvItemRec::default()
+            })
+            .collect(),
+        itemtypes: vec![
+            InvTypeRec {
+                class: 7,
+                ..InvTypeRec::default()
+            };
+            n_types
+        ],
+        equiv,
+    }
+}
+
+/// The inventory parts of a wired host, with the player's inventory
+/// (`0x0063ABD0` at player creation).
+pub fn inv_parts(tables: InvTables, player: UnitId, class: u8, guid: u32) -> InvParts {
+    let mut parts = InvParts::new(tables, Box::new(InvStandIn::default()));
+    parts
+        .state
+        .add_inventory(player, InvKind::Player { class }, guid);
+    parts
+}
+
+/// Places `item` (put on the cursor, page `page`) into the player's
+/// inventory through `inventory.md` §2.4 (free position, no "send"): a
+/// fixture's stored item.
+pub fn store_item(sim: &mut WiredGame, player: UnitId, item: UnitId, page: u8) {
+    sim.events.sys.units.get_mut(item).unwrap().mode = 4;
+    sim.events.sys.hooks.items.get_mut(item).unwrap().inv_page = page;
+    let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+    let placed = world.with_economy(game, events, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory parts");
+        inv.desk(econ).place(player, item, (0, 0), true, false)
+    });
+    assert!(placed);
 }
 
 /// The wired host with the cube's parts: game creation on the action
@@ -750,18 +871,18 @@ impl CubeFx {
         let player = events
             .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
             .unwrap();
-        let mut sim: WiredGame = SimGame::with_world(game, events, world);
-        let cube = new_item(&mut sim, CUBE, 0);
-        let ring = new_item(&mut sim, RING, 0);
-        sim.world.items.get_mut(cube).unwrap().inv_page = 0;
-        sim.world.items.get_mut(ring).unwrap().inv_page = CUBE_PAGE;
-        sim.world.cube.as_mut().unwrap().staged.inventories.insert(
+        let pg = events.sys.units.get(player).unwrap().guid;
+        world.inventory = Some(inv_parts(
+            inv_tables(&cube_inv_items(), N_TYPES, cube_equiv()),
             player,
-            Inventory {
-                items: vec![cube, ring],
-                cursor: None,
-            },
-        );
+            class as u8,
+            pg,
+        ));
+        let mut sim: WiredGame = SimGame::with_world(game, events, world);
+        let cube = new_item(&mut sim, CUBE, 4);
+        store_item(&mut sim, player, cube, 0);
+        let ring = new_item(&mut sim, RING, 4);
+        store_item(&mut sim, player, ring, CUBE_PAGE);
         sim.join(0, Some(player), None, client_state::IN_GAME)
             .unwrap();
         sim.set_player(
@@ -804,21 +925,30 @@ impl CubeFx {
         let (r, _) = handle(&mut self.sim, 0, &[0x4F, 0x18, 0, 0, 0, 0, 0]);
         assert_eq!(r, ResultCode::Done);
         let ring = self.ring;
-        let gone = !self.sim.world.items.contains(ring);
-        let log = self.log.take();
-        if gone {
-            assert!(log.contains(&format!("remove {}", ring.0)), "{log:?}");
-        } else {
-            assert!(!log.iter().any(|l| l.starts_with("remove")), "{log:?}");
-        }
-        self.log.script().log = log;
+        let gone = !self.sim.events.sys.hooks.items.contains(ring);
+        // §8 step 1: removed from the inventory and freed (unit and data).
+        let listed = self.items_of().contains(&ring);
+        assert_eq!(
+            (listed, self.sim.game.lists.unit(ring).is_some()),
+            (!gone, !gone)
+        );
         gone
     }
 
-    /// The amulet the last transmute placed.
+    /// The player's item list (the inventory model, link order).
+    pub fn items_of(&self) -> Vec<UnitId> {
+        let inv = self.sim.world.inventory.as_ref().unwrap();
+        inv.state.items_of(self.player)
+    }
+
+    /// The output the last transmute placed (the last item linked).
     pub fn output(&mut self) -> UnitId {
-        let p = self.player;
-        *self.parts().staged.inventories[&p].items.last().unwrap()
+        *self.items_of().last().unwrap()
+    }
+
+    /// The inventory model's parts.
+    pub fn inv(&mut self) -> &mut InvParts {
+        self.sim.world.inventory.as_mut().unwrap()
     }
 
     pub fn set_stat(&mut self, u: UnitId, s: u16, v: i32) {
@@ -1059,15 +1189,22 @@ impl TradeFx {
                 };
                 let spawn = ItemSpawn {
                     room: None,
-                    mode: 0,
+                    mode: 4,
                     init_flags: 1,
                 };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
             (make(BUC), make(CAP))
         });
-        world.rest.inventory.extend([buckler, cap]);
+        let pg = events.sys.units.get(player).unwrap().guid;
+        let items = [(*b"cap ", ty::HELM, 2, 2), (*b"buc ", ty::SHIE, 2, 2)];
+        let tables = inv_tables(&items, N_TYPES, trade_equiv());
+        world.inventory = Some(inv_parts(tables, player, 1, pg));
         let mut sim: WiredGame = SimGame::with_world(game, events, world);
+        // The player's buckler and cap, stored (mode 0) in its inventory
+        // (the one inventory the vendor calls read, `unify-items.md`).
+        store_item(&mut sim, player, buckler, 0);
+        store_item(&mut sim, player, cap, 0);
         sim.join(client, Some(player), None, client_state::IN_GAME)
             .unwrap();
         sim.set_player(

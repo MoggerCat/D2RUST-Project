@@ -34,7 +34,7 @@
 | Test vectors | 209–241 |
 | expfield.d2 | 242–277 |
 | Provenance | 278–303 |
-| Open questions | 304–318 |
+| Open questions | 304–319 |
 <!-- /index -->
 
 ## Summary
@@ -185,7 +185,7 @@ None.
 
 ## Edge cases & original bugs
 
-- **Duplicates:** 29 names occur twice in the X file, always in the same
+1. **Duplicates:** 29 names occur twice in the X file, always in the same
   bucket. 20 pairs are identical. 9 differ: `VMS1HTH`, `VMGHHTH`,
   `MINUHTH`, `VMWLHTH`, `VMNUHTH`, `64A1HTH`, `64NUHTH`, `VMA1HTH`,
   `3DNUHTH`. The game uses the **first** copy. The `.cof` found by the
@@ -198,12 +198,12 @@ None.
   `monsters` (16 frames, 176) = second copy, `objects` (1 frame, 256) =
   first copy (ignored game test `animdata_edge_cases`, 2026-10-06; the
   earlier "second copy in all 9" was wrong). Reproduce: first copy wins.
-- **Frames above 144:** `42DTHTH` has 200 frames; only 144 event bytes
+2. **Frames above 144:** `42DTHTH` has 200 frames; only 144 event bytes
   exist, so the first-event scan stops at 144.
-- **Speed 0:** 4 records have speed 0 (kept as read).
-- **Names of exactly 8 characters** would need a 9-byte query buffer; the
+3. **Speed 0:** 4 records have speed 0 (kept as read).
+4. **Names of exactly 8 characters** would need a 9-byte query buffer; the
   1.14d callers have 8. No 1.14d record name is longer than 7.
-- **Signed counts:** a negative count would make the loader step
+5. **Signed counts:** a negative count would make the loader step
   backwards; the 1.14d file has none (d2rs rejects them).
 
 ## Test vectors
@@ -310,7 +310,8 @@ raw disassembly where Ghidra lost register arguments):
 2. The full COF-name composer `0x0064F5B0` / weapon-class resolver
    `0x0064F060` for players, objects and units with an inventory (which
    weapon class, the `gh` mode override table at `0x00745900`–
-   `0x0074591F`): owned by a future animation/composite spec.
+   `0x0074591F`): answered in `render/unit-composite.md` §2 (table
+   contents: its OQ1).
 3. Whether any 1.14d code path looks up a name of 8 characters (would
    overflow the 8-byte buffers into the stack cookie).
 4. Whether `expfield.d2`'s unread u16 (266) is a version, and what the

@@ -28,13 +28,16 @@ pub mod walk;
 pub mod warp;
 
 #[cfg(test)]
+mod gap_tests;
+#[cfg(test)]
 mod tests;
 
 pub use collision::CollisionRooms;
+pub use coords::Point;
 pub use footprint::{FootShape, Footprint, PathMotion, RemoveRule};
 pub use record::{
-    DynamicKind, DynamicPath, MonsterShape, ObjectShape, PathKind, PathPoint, StaticPath, UnitPath,
-    UnitShape,
+    DynamicKind, DynamicPath, MonsterShape, ObjectShape, PathKind, PathPoint, StaticPath,
+    TargetUnit, UnitPath, UnitShape,
 };
 pub use tables::PathTables;
 

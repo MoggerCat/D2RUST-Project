@@ -69,8 +69,11 @@ impl ActRooms for UnitLists {
         let Some(r) = self.room(room) else { return 0 };
         let flags =
             u32::from(r.populated) | u32::from(r.units_active) << 1 | u32::from(r.no_update) << 2;
-        // TODO(rooms.md §8.2): remaining units get flag 0x800000 and a path
-        // update (unit specs); they keep their room link here.
+        // Units still in the room (tick step 9 compresses them first) are
+        // unlinked from it by `free_room` (unit-order.md §5.3).
+        // TODO(rooms.md §8.2): `0x0061A840` also gives each flag 0x800000
+        // (non-client units flag-ex 0x20) and a path update; the fields and
+        // the update belong to the unit specs (handoff `prop-fixes` Q3).
         let _ = self.free_room(room);
         flags
     }
@@ -95,6 +98,12 @@ impl Drlg {
     /// draws on it (`monsters/population.md` §3.2, §9.3).
     pub fn active_room_seed_mut(&mut self, id: DrlgRoomId) -> Option<&mut crate::rng::Seed> {
         self.active_mut(id).map(|a| &mut a.seed)
+    }
+
+    /// The collision grid (§10) of a DRLG room's active room, mutable:
+    /// unit footprints (`sim/path-placement.md` §5) write it.
+    pub fn active_grid_mut(&mut self, id: DrlgRoomId) -> Option<&mut CollisionGrid> {
+        self.active_mut(id).map(|a| &mut a.collision)
     }
 
     /// Active room creation `0x006422A0` / `0x00619890` (§5). Nothing if

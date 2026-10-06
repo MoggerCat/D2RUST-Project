@@ -1330,3 +1330,6 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod mutant_tests;

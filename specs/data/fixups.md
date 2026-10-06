@@ -397,21 +397,21 @@ None.
 ## Edge cases & original bugs
 
 Reproduced:
-- gems +0x2C looks up the item index bytes, not the gem code (§5).
-- gems loop 2 resets items 0 … gem count − 1, whatever they are (§5).
-- Set attachment silently skips a 7th item; its +0x2E = 0 looks like slot 0
+1. gems +0x2C looks up the item index bytes, not the gem code (§5).
+2. gems loop 2 resets items 0 … gem count − 1, whatever they are (§5).
+3. Set attachment silently skips a 7th item; its +0x2E = 0 looks like slot 0
   (§6).
-- monstats: the run base for rows < 410 reads +0x36 of a later BaseId row
+4. monstats: the run base for rows < 410 reads +0x36 of a later BaseId row
   as 0 (§8).
-- monstats: no lower clamp; negative products become 32,767 (§8).
-- The miss text drops its last character and is cut to the field (§1, §11).
-- levels counts stop at the first negative entry (§11).
+5. monstats: no lower clamp; negative products become 32,767 (§8).
+6. The miss text drops its last character and is cut to the field (§1, §11).
+7. levels counts stop at the first negative entry (§11).
 
 Out-of-range data, where 1.14d reads or writes outside an array. No 1.14d
 row reaches any of them; d2rs reports a load error (`FixupError`) instead:
-- monstats pass A: BaseId < 0 or ≥ n, or NextInClass ≥ n (§8);
-- gems: an item index j ≥ item count (§5);
-- a tile path longer than 41 characters (the result passes the 60-byte
+8. monstats pass A: BaseId < 0 or ≥ n, or NextInClass ≥ n (§8);
+9. gems: an item index j ≥ item count (§5);
+10. a tile path longer than 41 characters (the result passes the 60-byte
   field; above 45 it also passes the 64-byte buffer) (§12).
 
 ## Test vectors

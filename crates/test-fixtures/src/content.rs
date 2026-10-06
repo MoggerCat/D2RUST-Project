@@ -55,6 +55,21 @@ pub fn exp_for_level(l: u32) -> u32 {
 pub const MAX_LEVEL: u32 = 99;
 /// Superunique rows: one per hcIdx 0..=65 (`loading.md` §8).
 pub const SUPERUNIQUES: usize = 66;
+/// The DT1 files the lvltypes rows name (`File 1` of rows 0 and 1, `File
+/// 2` of both), as table strings; [`crate::drlg`] writes them.
+pub const FLOOR_DT1: [&str; 2] = ["Synth1\\Floor.dt1", "Synth2\\Floor.dt1"];
+pub const WALL_DT1: &str = "Synth\\Wall.dt1";
+/// The DS1 files of the four lvlprest rows (Defs 0–3: town, keep, cave,
+/// field) and the lvlsub row, as table strings.
+pub const PRESET_DS1: [&str; 4] = [
+    "Synth\\Town.ds1",
+    "Synth\\Keep.ds1",
+    "Synth\\Cave.ds1",
+    "Synth\\Field.ds1",
+];
+pub const SUB_DS1: &str = "Synth\\Sub.ds1";
+/// `SizeX` / `SizeY` of every lvlprest row: the stored DS1 size.
+pub const PRESET_SIZE: u32 = 8;
 
 fn n(v: impl ToString) -> String {
     v.to_string()
@@ -946,22 +961,21 @@ fn world(t: &mut TableSet) {
             ],
         );
     }
-    for (i, act) in [(1, "0"), (2, "1")] {
-        let file = format!("Tiles\\Synth{i}\\Floor.dt1");
+    for (file, act) in [(FLOOR_DT1[0], "0"), (FLOOR_DT1[1], "1")] {
         t.row(
             "lvltypes",
-            &[
-                ("File 1", &file),
-                ("File 2", "Tiles\\Synth\\Wall.dt1"),
-                ("Act", act),
-            ],
+            &[("File 1", file), ("File 2", WALL_DT1), ("Act", act)],
         );
     }
     t.row("lvltypes", &[("Act", "0")]);
+    let size = n(PRESET_SIZE);
     for (def, level, file) in [
-        ("0", "1", "Tiles\\Synth\\Town.ds1"),
-        ("1", "4", "Tiles\\Synth\\Keep.ds1"),
-        ("2", "3", "Tiles\\Synth\\Cave.ds1"),
+        ("0", "1", PRESET_DS1[0]),
+        ("1", "4", PRESET_DS1[1]),
+        ("2", "3", PRESET_DS1[2]),
+        // The field (level 2, a preset level the town's Vis0 links) has
+        // a def so the town's neighbour can be built.
+        ("3", "2", PRESET_DS1[3]),
     ] {
         t.row(
             "lvlprest",
@@ -969,8 +983,8 @@ fn world(t: &mut TableSet) {
                 ("Def", def),
                 ("LevelId", level),
                 ("Populate", "1"),
-                ("SizeX", "8"),
-                ("SizeY", "8"),
+                ("SizeX", &size),
+                ("SizeY", &size),
                 ("Files", "1"),
                 ("File1", file),
                 ("Dt1Mask", "1"),
@@ -1006,7 +1020,7 @@ fn world(t: &mut TableSet) {
         "lvlsub",
         &[
             ("Type", "0"),
-            ("File", "Tiles\\Synth\\Sub.ds1"),
+            ("File", SUB_DS1),
             ("BordType", "1"),
             ("GridSize", "2"),
             ("Dt1Mask", "1"),

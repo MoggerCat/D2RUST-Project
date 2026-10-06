@@ -3,19 +3,26 @@
 //! `WiredWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`): the rest of
 //! the NPC / vendor / quest wiring no written spec provides (staged
 //! answers and a call log, never behaviour), and the synthetic item,
-//! vendor and NPC tables. Each test crate uses a part of it.
+//! vendor and NPC tables, and the item-move seams no d2-sim module
+//! provides ([`InvFx`]). Each test crate uses a part of it.
 #![allow(dead_code)]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::{Itemratio, Itemtypes, Monstats, Record};
-use d2_server::adapters::handlers::world::Outbox;
+use d2_server::adapters::handlers::items::moves::{InvParts, MoveRest};
+use d2_server::adapters::handlers::world::{ActionEvents, Outbox, WiredWorld};
+use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
+use d2_sim::items::moves::{Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::wiring::inventory::InvRest;
 use d2_sim::world::npc::{self, class, ImbueMods, InvEntry, ItemFacts, MercInit};
 use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
@@ -35,18 +42,22 @@ pub fn blank<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
+/// The vendors' player-inventory calls the server's `WiredWorld` answers
+/// from its inventory model (`handlers::items::InvVendors`) before they
+/// reach a rest.
+const MODEL: &str = "WiredWorld answers from the inventory model";
+
 /// The interaction seams no written spec provides
 /// (`wire-interaction.md` §6): staged answers (positions as a fixed
-/// distance, the player's interact unit, the player's quest records and
-/// inventory, the NPC grid always having room, the carried-gold caps)
-/// and a log of every call that would change state outside `d2-sim`.
-/// The item copy `0x0055A2A0` answers null: no spec writes it.
+/// distance, the player's interact unit, the player's quest records,
+/// the NPC grid always having room, the carried-gold caps) and a log of
+/// every call that would change state outside `d2-sim`. The item copy
+/// `0x0055A2A0` answers null: no spec writes it. The player's inventory
+/// is the host's inventory model, not this rest's.
 #[derive(Default)]
 pub struct Rest {
     pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
-    /// The player's items (inventory spec): what `owns_item` answers.
-    pub inventory: BTreeSet<UnitId>,
     pub last_bought: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
@@ -191,7 +202,7 @@ impl VendorRest for Rest {
         self.last_bought.insert(p, guid);
     }
     fn has_cursor_item(&self, _: UnitId) -> bool {
-        false
+        unreachable!("{MODEL}")
     }
     /// `0x0055A2A0`: no items spec writes the copy. Null: the vendor
     /// code's own refusal runs (`vendors.md` §7.1 rule 9.2, §7.2 rule 8).
@@ -242,14 +253,14 @@ impl VendorRest for Rest {
     fn add_trade_inventory(&mut self, class: u16, item: UnitId) {
         self.log.push(format!("trade inv {class} {}", item.0));
     }
-    fn owns_item(&self, _: UnitId, item: UnitId) -> bool {
-        self.inventory.contains(&item)
+    fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
-    fn in_inventory(&self, _: UnitId, item: UnitId) -> bool {
-        self.inventory.contains(&item)
+    fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
+        unreachable!("{MODEL}")
     }
     fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
@@ -267,18 +278,15 @@ impl VendorRest for Rest {
     fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
-    fn place_in_backpack(&mut self, _: UnitId, item: UnitId) -> bool {
-        self.log.push(format!("backpack {}", item.0));
-        false
+    fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
     fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
-    /// `0x0055DF10` (inventory spec): the staged inventory forgets it.
-    fn remove_stored(&mut self, _: UnitId, item: UnitId) {
-        self.log.push(format!("remove stored {}", item.0));
-        self.inventory.remove(&item);
+    fn remove_stored(&mut self, _: UnitId, _: UnitId) {
+        unreachable!("{MODEL}")
     }
     fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
         false
@@ -484,4 +492,217 @@ pub fn tx(kind: u8, code: u8, guid: u32, gold: i32) -> Vec<u8> {
     m.extend_from_slice(&guid.to_le_bytes());
     m.extend_from_slice(&gold.to_le_bytes());
     m
+}
+
+/// The item-move seams no d2-sim module provides
+/// (`d2_sim::wiring::inventory::InvRest` with its `MovePending` part,
+/// `wire-inventory-sim.md` §5): staged answers, never behaviour. The
+/// player-to-item distance is a fixed staged value (the path spec's
+/// `0x00641530`); there is no room at the drop's offset start, and the
+/// free-spot search (`0x0064E810`, collision spec) answers the start
+/// spot as is in the player's room (as the drop fixture's search does);
+/// non-item positions are staged; requirements, hands and auto-equip
+/// answer the narrowest readings (no level requirement, nothing
+/// two-handed, every location allowed). Every state-changing call is
+/// logged; sends are collected for the host.
+#[derive(Clone, Default)]
+pub struct InvFx(pub std::sync::Arc<std::sync::Mutex<InvFxState>>);
+
+#[derive(Default)]
+pub struct InvFxState {
+    pub distance: i32,
+    pub room: Option<d2_sim::units::RoomId>,
+    pub pos: BTreeMap<Owner, (i32, i32)>,
+    pub log: Vec<String>,
+    pub sent: Vec<(Owner, Vec<u8>)>,
+}
+
+impl InvFx {
+    pub fn with<T>(&self, f: impl FnOnce(&mut InvFxState) -> T) -> T {
+        f(&mut self.0.lock().unwrap())
+    }
+    fn log(&self, s: String) {
+        self.with(|r| r.log.push(s));
+    }
+}
+
+impl MovePending for InvFx {
+    fn distance(&self, _: Owner, _: Owner) -> i32 {
+        self.with(|r| r.distance)
+    }
+    fn free_spot(
+        &self,
+        start: (i32, i32),
+        _: (i32, i32),
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<Spot> {
+        self.with(|r| {
+            r.room.map(|room| Spot {
+                room,
+                x: start.0,
+                y: start.1,
+            })
+        })
+    }
+    fn sound(&mut self, u: Owner, id: u32) {
+        self.log(format!("sound {} {id:#x}", u.guid));
+    }
+    fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        self.log(format!("pickup_sound {} {item}", player.guid));
+    }
+    fn quest_item_picked(&mut self, _: Owner, item: Guid) {
+        self.log(format!("quest_item_picked {item}"));
+    }
+    fn quest_item_dropped(&mut self, item: Guid) {
+        self.log(format!("quest_item_dropped {item}"));
+    }
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.with(|r| r.sent.push((player, bytes)));
+    }
+}
+
+impl InvRest for InvFx {
+    fn pos(&self, u: Owner) -> (i32, i32) {
+        self.with(|r| r.pos.get(&u).copied().unwrap_or((0, 0)))
+    }
+    fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
+        self.with(|r| r.pos.insert(u, (x, y)));
+    }
+    fn percent_of(&self, value: i32, p: i32) -> i32 {
+        value * p / 100
+    }
+    fn item_active_on(&self, _: Guid, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: Guid, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn level_requirement(&self, _: Guid, _: Owner) -> i32 {
+        -1
+    }
+    fn two_handed(&self, _: Guid) -> bool {
+        false
+    }
+    fn one_or_two_handed(&self, _: Owner, _: Guid) -> bool {
+        false
+    }
+    fn ammo_type(&self, _: Guid) -> Option<i16> {
+        None
+    }
+    fn stack_quality_ok(&self, _: Guid) -> bool {
+        true
+    }
+    fn has_allowed_location(&self, _: Guid) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: Guid) -> bool {
+        false
+    }
+    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
+        true
+    }
+    fn interaction(&self, _: Owner) -> InteractionTarget {
+        InteractionTarget::None
+    }
+    fn clear_interaction(&mut self, _: Owner) {}
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for InvFx {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        self.with(|r| std::mem::take(&mut r.sent))
+    }
+}
+
+/// Inventory tables (`inventory.md` §1.3 grid records: player classes
+/// 10 × 4, the cube 3 × 4, ...) over the item tables' records with the
+/// given (invwidth, invheight); helms on the head, shields in either
+/// hand (§4).
+pub fn inv_tables(t: &ItemTables, sizes: &[(u8, u8)]) -> InvTables {
+    let g = |x, y| GridRec {
+        grid_x: x,
+        grid_y: y,
+    };
+    let mut grids = vec![g(10, 4); 16];
+    grids[5] = g(10, 10);
+    grids[8] = g(6, 4);
+    grids[9] = g(3, 4);
+    grids[12] = g(6, 8);
+    grids[13] = g(0, 0);
+    let mut itemtypes = vec![
+        InvTypeRec {
+            class: 7,
+            ..InvTypeRec::default()
+        };
+        t.itemtypes.len()
+    ];
+    for (ty, loc1, loc2) in [(ty::HELM, 1, 1), (ty::SHIE, 5, 4)] {
+        let r = &mut itemtypes[usize::from(ty)];
+        r.body = 1;
+        r.bodyloc1 = loc1;
+        r.bodyloc2 = loc2;
+    }
+    InvTables {
+        grids,
+        belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
+        items: t
+            .items
+            .iter()
+            .zip(sizes)
+            .map(|(r, &(w, h))| InvItemRec {
+                code: r.code,
+                type_: r.type_,
+                invwidth: w,
+                invheight: h,
+                ..InvItemRec::default()
+            })
+            .collect(),
+        itemtypes,
+        equiv: t.equiv.clone(),
+    }
+}
+
+/// The server host's inventory model over `tables` with the item-move
+/// seams of `inv`, and the player's inventory (`0x0063ABD0` at player
+/// creation: the unit spec's, done here).
+pub fn inv_parts(tables: InvTables, inv: InvFx, player: UnitId, class: u8, guid: u32) -> InvParts {
+    let mut parts = InvParts::new(tables, Box::new(inv));
+    parts
+        .state
+        .add_inventory(player, InvKind::Player { class }, guid);
+    parts
+}
+
+/// Puts `item` on page `page` of the player's inventory through
+/// `inventory.md` §2.4 (from the cursor, a free position, no "send"): a
+/// fixture's stored item, as a loaded character's would be.
+pub fn store<D: ActionEvents, R, S>(
+    world: &mut WiredWorld<R, S>,
+    game: &mut Game,
+    events: &mut D,
+    (player, item): (UnitId, UnitId),
+    page: u8,
+) {
+    let sys = &mut events.action().sys;
+    sys.units.get_mut(item).expect("item unit").mode = 4;
+    sys.hooks.items.get_mut(item).expect("item").inv_page = page;
+    let placed = world.with_economy(game, events, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory parts");
+        inv.desk(econ).place(player, item, (0, 0), true, false)
+    });
+    assert!(placed, "stored");
 }

@@ -329,10 +329,16 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         if let Some(r) = handlers::items::handle(self, client, msg, out) {
             return r;
         }
+        if let Some(r) = handlers::items::moves::handle(self, client, msg, size, out) {
+            return r;
+        }
         if let Some(code) = world_handlers::handle(self, client, msg, size, out) {
             return code;
         }
         if let Some(code) = super::handlers::skills::handle(self, client, msg, out) {
+            return code;
+        }
+        if let Some(code) = handlers::walk::handle(self, client, msg, out) {
             return code;
         }
         self.unhandled.push((client, msg[0], size));
@@ -358,7 +364,8 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// sent during the tick ([`WorldHost::take_sent`]) is queued to the
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
-    /// [`SimGame::tick_faults`].
+    /// [`SimGame::tick_faults`]. Then the deferred item messages
+    /// (`handlers::items::moves::update_pass`, `inventory.md` §6.1).
     fn tick(&mut self, out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut self.events);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
@@ -368,5 +375,6 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
                 }
             }
         }
+        handlers::items::moves::update_pass(self, out);
     }
 }

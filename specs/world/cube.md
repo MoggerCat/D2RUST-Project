@@ -453,31 +453,31 @@ the cube's own draws are record 19's two game-seed rolls.
 
 All reproduced by default.
 
-- First matching record wins even if all its outputs fail; later records
+1. First matching record wins even if all its outputs fail; later records
   are not tried (§3).
-- A portal slot overwrites `success` (§7.2): an item made in an earlier
+2. A portal slot overwrites `success` (§7.2): an item made in an earlier
   slot followed by a failing portal consumes nothing and is discarded.
-- Failed transmutes discard already-made outputs without freeing them
+3. Failed transmutes discard already-made outputs without freeing them
   (§8).
-- Outputs that cannot be placed are destroyed after the inputs are gone
+4. Outputs that cannot be placed are destroyed after the inputs are gone
   (§8 step 3).
-- Capture uses output a's kind and flags for all three entries (§6.4): a
+5. Capture uses output a's kind and flags for all three entries (§6.4): a
   `usetype` in output b with another kind in a gets class 0.
-- `useitem` without `mod` ignores the `exc`/`eli` upgrade (§7.3);
+6. `useitem` without `mod` ignores the `exc`/`eli` upgrade (§7.3);
   `useitem,mod` without a valid upgrade gets class 0 (`hax`).
-- Quantity counts items, not stack sizes; with any stackable match the
+7. Quantity counts items, not stack sizes; with any stackable match the
   test is "at least" (§6.1). A slot marks **all** matching items used,
   so a later slot asking for the same item finds none (vector V4).
-- Type pick never considers the item just before its random start and
+8. Type pick never considers the item just before its random start and
   returns item 0 when nothing qualifies (§7.5).
-- Mod chance passes when lo′ mod 100 ≤ chance: chance c gives (c+1)%
+9. Mod chance passes when lo′ mod 100 ≤ chance: chance c gives (c+1)%
   (§7.6).
-- Stat ops: `param` = record count fails, `param` > count passes (§5).
-- Input quality 9 mismatch calls a getter with no effect (§6.2 #2).
-- `reg` keeps the source item's level unclamped (§7.4).
-- `rep` with `qty` refills stackables; rows 137–140 use `qty=255`, so a
+10. Stat ops: `param` = record count fails, `param` > count passes (§5).
+11. Input quality 9 mismatch calls a getter with no effect (§6.2 #2).
+12. `reg` keeps the source item's level unclamped (§7.4).
+13. `rep` with `qty` refills stackables; rows 137–140 use `qty=255`, so a
   repaired throwing weapon gets its full stack.
-- 0x2A ignores the placement result (§2 step 3.5).
+14. 0x2A ignores the placement result (§2 step 3.5).
 
 ## Test vectors
 

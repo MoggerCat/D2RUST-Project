@@ -476,6 +476,7 @@ fn sale_uses_the_npcs_own_record_and_client() {
     let now = fx.gold();
     assert!(now > gold, "{now} {gold}");
     assert_eq!(got, vec![transaction(3, 1, eg, now as u32).to_vec()]);
-    assert!(!fx.sim.world.rest.inventory.contains(&cap));
+    let inv = fx.sim.world.inventory.as_ref().unwrap();
+    assert!(!inv.state.items_of(fx.player).contains(&cap));
     let _ = fx.gheed;
 }

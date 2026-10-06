@@ -2,8 +2,9 @@
 //! field offset of the rows 0x0D, 0x0F, 0x10, 0x15, 0x96).
 
 use super::super::messages::*;
-use super::super::seams::{Point, TargetUnit, WalkPath};
-use crate::path::walk::geom::centre;
+use super::super::seams::{Point, TargetUnit};
+use crate::path::coords::to_fp16_center as centre;
+use crate::path::record::DynamicPath;
 use crate::units::{UnitId, UnitType};
 
 const SERVER_TSV: &str = include_str!("../../../../../../specs/sim/server-messages.tsv");
@@ -143,11 +144,14 @@ fn walk_verify_bits_match_tsv() {
     assert_eq!(diff, 1);
 }
 
-fn moving_path(target_unit: Option<TargetUnit>) -> WalkPath {
-    let mut p = WalkPath::zeroed(UnitId(1));
+fn moving_path(target_unit: Option<TargetUnit>) -> DynamicPath {
+    let mut p = DynamicPath {
+        owner: Some(UnitId(1)),
+        ..DynamicPath::default()
+    };
     p.precise_x = centre(290);
     p.precise_y = centre(291);
-    p.target = Point::new(300, 301);
+    p.put_target(Point::new(300, 301));
     p.target_unit = target_unit;
     p
 }

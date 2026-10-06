@@ -6,6 +6,8 @@ use crate::world::vendors::trade::{
     buy, pay, receive, repair, repair_item, sell, BuyMsg, RepairMsg, SellMsg,
 };
 
+mod mutant_tests;
+
 /// The NPC GUID of the recording.
 const NPC6: u32 = 6;
 
