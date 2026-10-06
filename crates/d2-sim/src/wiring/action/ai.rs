@@ -41,10 +41,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.units.is_dead(unit)
     }
     fn position(&self, unit: UnitId) -> (i32, i32) {
-        self.h.x.position(unit)
+        self.h.path_position(unit)
     }
     fn size(&self, unit: UnitId) -> i32 {
-        self.h.x.size(unit)
+        self.path_size(unit)
     }
     fn act(&self, unit: UnitId) -> u8 {
         self.units.get(unit).map_or(0, |r| r.act)
@@ -196,9 +196,21 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn los_draw(&self, game: &Game, room: RoomId) -> bool {
         self.h.x.los_draw(game, room)
     }
-    /// `0x0064D910`: the grid at the unit's position has a `mask` bit.
+    /// `0x0064D910`: the grid at the unit's position has a `mask` bit
+    /// (with the path provider: the pattern test of
+    /// `path-placement.md` §4 rule 5 with the path's pattern and room).
     fn collides(&self, game: &Game, unit: UnitId, mask: u16) -> bool {
-        let (x, y) = self.h.x.position(unit);
+        if let Some(d) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) {
+            return crate::path::collision::pattern_collides(
+                &self.h.drlg,
+                d.room,
+                d.x(),
+                d.y(),
+                d.pattern,
+                mask,
+            );
+        }
+        let (x, y) = self.h.path_position(unit);
         game.lists
             .unit(unit)
             .and_then(|e| e.room())

@@ -17,4 +17,5 @@
 pub mod action;
 pub mod economy;
 pub mod interaction;
+pub mod path;
 pub mod worldgen;

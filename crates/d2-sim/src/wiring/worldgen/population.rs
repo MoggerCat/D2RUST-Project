@@ -187,7 +187,7 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
     }
 
     fn unit_position(&self, unit: UnitId) -> (i32, i32) {
-        self.v.h.x.position(unit)
+        self.v.h.path_position(unit)
     }
 
     fn quest_flag(&self, flag: u8) -> bool {
@@ -198,7 +198,22 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         self.v.h.x.chaos_blocks_population()
     }
 
+    /// `0x0064E840` (`path-placement.md` §8) with the path provider:
+    /// the coarse free-box search with the arguments of its population
+    /// caller (`population.md` §6.3 rule 4: mask 0x3C01, size 1);
+    /// without it [`WorldPending::nearest_free_point`].
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
-        self.v.h.x.nearest_free_point(room, x, y)
+        if self.v.h.paths.is_none() {
+            return self.v.h.x.nearest_free_point(room, x, y);
+        }
+        let mut p = crate::path::coords::Point::new(x, y);
+        let r = crate::wiring::path::place::coarse_free_box(
+            &self.v.h.drlg,
+            room,
+            &mut p,
+            1,
+            u32::from(crate::path::collision::masks::MONSTER_MOVE),
+        )?;
+        Some((r, p.x, p.y))
     }
 }

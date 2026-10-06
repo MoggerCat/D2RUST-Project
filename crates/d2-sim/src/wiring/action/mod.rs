@@ -31,7 +31,7 @@ pub mod units;
 pub mod waypoints;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -92,6 +92,12 @@ pub enum WiringError {
     /// The AnimData name lookup failed (`animdata.md` §4: a name longer
     /// than 8 characters, fatal 0xD9 / 0xDA in 1.14d).
     AnimData(d2_formats::FormatError),
+    /// A path-core fatal assert (`sim/path-placement.md` §2–§6).
+    Path(crate::path::PathError),
+    /// A walk fatal assert (`sim/pathing.md`).
+    Walk(crate::path::walk::WalkError),
+    /// A placement fatal assert (`sim/path-placement.md` §7–§12).
+    Place(crate::path::place_seams::PlaceError),
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
@@ -132,6 +138,10 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// The unit path records and tables ([`crate::wiring::path`]).
+    /// `None` (the default): the path seams keep their [`Pending`]
+    /// answers; [`ActionHooks::enable_paths`] turns the provider on.
+    pub paths: Option<Box<crate::wiring::path::PathState>>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -157,10 +167,20 @@ impl<X> ActionHooks<X> {
             mode_target: None,
             monster_world: None,
             monster_world_out: false,
+            paths: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),
         }
+    }
+
+    /// Turns the path provider on ([`crate::wiring::path`]): from now on
+    /// the path seams are answered by `d2_sim::path` instead of
+    /// [`Pending`]. Call before any unit is allocated (units allocated
+    /// earlier have no path record).
+    pub fn enable_paths(&mut self) -> Result<(), crate::path::PathError> {
+        self.paths = Some(Box::new(crate::wiring::path::PathState::new()?));
+        Ok(())
     }
 
     /// The missile store (outside a missile call).
