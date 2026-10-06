@@ -116,4 +116,10 @@ per file). Default counts in debug: all three files under a second.
 
 ## 6. Gate
 
-GATE-RESULT
+`sh tools/gate.sh --no-client` on `d53c4fb`'s tree: **GATE: PASS** (11
+steps; d2-sim + conformance 1,885 tests, the rest 599; coverage 4,143
+claims, 0 errors). The full `sh tools/gate.sh` fails only its three
+`d2-client` steps, which cannot build here: `wayland-sys`'s build script
+finds no `wayland-client` through pkg-config in this container (an
+environment gap, no client file is touched). The coordinator's full gate
+with the client should pass unchanged.
