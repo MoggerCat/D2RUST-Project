@@ -35,15 +35,15 @@
 |   3. Start functions (srvst) | 429–518 |
 |   4. Do functions (srvdo) | 519–702 |
 |   5. `srvmissile` path | 703–718 |
-|   6. Shared helpers, batch 2 | 719–1017 |
-|   7. Start functions (srvst), batch 2 | 1018–1045 |
-|   8. Do functions (srvdo), batch 2 | 1046–1342 |
-| Constants & data dependencies | 1343–1387 |
-| Randomness | 1388–1406 |
-| Edge cases & original bugs | 1407–1450 |
-| Test vectors | 1451–1471 |
-| Provenance | 1472–1497 |
-| Open questions | 1498–1524 |
+|   6. Shared helpers, batch 2 | 719–1057 |
+|   7. Start functions (srvst), batch 2 | 1058–1124 |
+|   8. Do functions (srvdo), batch 2 | 1125–1523 |
+| Constants & data dependencies | 1524–1570 |
+| Randomness | 1571–1589 |
+| Edge cases & original bugs | 1590–1638 |
+| Test vectors | 1639–1659 |
+| Provenance | 1660–1686 |
+| Open questions | 1687–1713 |
 <!-- /index -->
 
 ## Summary
@@ -1015,6 +1015,46 @@ later one creates one missile. Step 5 overwrites the monster timeout of
 §6.16 step 2, so a monster always takes the "else" branch of step 7
 (Edge case 16).
 
+#### 6.18 Missile fan at the target `0x005C7040`
+
+`fan(game, unit, n, m, skill, L, first)` (ECX game, EDX unit; `ret
+0x14`):
+
+1. first ≠ 0: `skill_missile(game, m, unit, skill, L, 0, 0, 0, 0, 0)`
+   (§2.4, straight); n −= 1; n ≤ 0 → return 1.
+2. Record (§R2.1, zeroed): flags 0x21 (position given, target
+   absolute), owner the unit, position = the unit's (§1), class m,
+   skill, L, init callback (+0x54) `0x005C9290` (re-seeds each missile,
+   `missiles.md` §R2.3 step 21).
+3. Target position (§2.4) into the record; failure → return 1.
+4. For i = 0…n − 1: callback argument (+0x58) := i; create. Return 1.
+
+#### 6.19 Shadow stats `0x005D6CF0`
+
+`shadow_stats(game, R, skill, L)` (m in ESI; `ret 0x10`). Formulas are
+evaluated on the **shadow** m.
+
+1. L ≤ 1 → nothing.
+2. p = `Param1` (+0x148; 0 for an invalid skill); h = m's maximum life;
+   h' = h + `pct(h, (L − 1)·p, 100)`; m stat 7 := h', stat 6 := h'.
+3. Alloc (game pool, flags 0, expire 0, m type / GUID; failure → stop),
+   attach to m.
+4. For i = 1…6: `aurastat_i` valid → list set it := `eval(m,
+   aurastatcalc2)`. For i = 1…5: `passivestat_i` valid → list set it :=
+   `eval(m, passivecalc2)`. (Always the second formula: Edge case 18.)
+5. `sumumod` in 1…42 → `0x005A4850(game, m, sumumod, 1)`.
+
+#### 6.20 Source-unit link `0x00621CE0`
+
+`link_source(m, owner)`: owner given → m +0x94 := owner type, +0x98 :=
+owner GUID (`0x00621C30`); if m has a stat holder (+0x5C): state 98
+(`sourceunit`) on, its list (or a new one: m's pool, flags 0, expire 0,
+m type / GUID; state 98, attached; failure → stop before the flag) gets
+stat 353 (`source_unit_type`) := type and 354 (`source_unit_id`) :=
+GUID; then m +0xC8 |= 0x400 (also without a holder). Owner none → both
+fields 0; with a holder: state 98 off, its list detached and freed;
+then +0xC8 &= ~0x400.
+
 ### 7. Start functions (srvst), batch 2
 
 #### 7.1 23 Tiger Strike, Fists of Fire, Cobra Strike, Claws of Thunder, Blades of Ice, Royal Strike `0x005D32F0`
@@ -1042,6 +1082,45 @@ Also MonPowerStrike, MonIceSpear.
    (+0x184) << 8 → 0.
 3. m = `srvmissilea`; not 0 ≤ m < missiles count → 0.
 4. Return `inferno_start(game, unit, skill, L, m)` (§6.16).
+
+#### 7.4 12 Telekinesis, Dragon Flight `0x005C9030`
+
+1. T none → 0. R invalid → 0.
+2. r = `eval(aurarangecalc)`; d² = squared distance of the unit's and
+   T's positions (`0x006492A0`); d² > r² (signed) → 0.
+3. T a player or monster: hostile (`0x00554200(game, unit, T)`) and
+   neither T's room nor the unit's room in town, else 0. Other T types
+   (objects, items, missiles) skip these tests.
+4. Return 1.
+
+#### 7.5 17 Corpse Explosion, Poison Explosion `0x005C31C0`
+
+Also NihlathakCorpseExplosion. T none → 0; T's room in town → 0. Return
+`0x00645680(T)`: T a monster in mode 12, no `udead`-group state
+(`0x0063A770`, as §3.6), monstats2 `corpseSel` (`0x004638A0(class, 7)`)
+→ 1; else 0 (no `Velocity` test, unlike §3.6).
+
+#### 7.6 37 Zeal, Fury `0x005DAF40`
+
+Also BloodLordFrenzy.
+
+1. R invalid → 0. E = used skill entry; none → 0.
+2. r = melee range (`0x00622870`) + 4. T = target; none → T =
+   `next_unit(game, unit, 0, 0, r, 0x20003, −1, null)` (§8.11 step 3;
+   g = −1: the smallest GUID wins); none → E param 1 := 0, return 0.
+3. E param 1 := `eval(calc1)` (the hit count for §8.11); param 2 := T
+   type; param 3 := T GUID. Return 1.
+
+#### 7.7 56 Feral Rage, Maul `0x005C7690`
+
+1. R invalid → 0. E = used skill entry; none → 0. T none → 0.
+2. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+3. Hit: `EType` ≠ 0: c = `eval(calc4)`; conversion % := c; c > 0 →
+   conversion element := `EType`. Enhanced damage % := `eval(calc1)`. (No
+   `roll_elemental`.)
+4. `start_combat(game, unit, T, record, SrcDam or 128)`.
+5. E param 1 := 1 if the result has hit, else 0. Return 1.
 
 ### 8. Do functions (srvdo), batch 2
 
@@ -1234,7 +1313,7 @@ calling it).
 
 Uses the used skill entry E (`0x00620250`): param 1 (+0x18) hits left,
 param 2 (+0x1C) target type, param 3 (+0x20) target GUID (set by the
-start functions srvst 9 / 37, not in this spec).
+start functions srvst 37, §7.6, and srvst 9, not yet specified).
 
 1. R invalid → 0. E none → 0.
 2. r = melee range of the unit (`0x00622870`, `combat/hit.md`) + 4.
@@ -1340,6 +1419,108 @@ here.
 R invalid, or m = `srvmissilea` not 0 ≤ m < missiles count → 0. Return
 `inferno_do(game, unit, skill, L, m)` (§6.17).
 
+#### 8.17 23 Blaze, Energy Shield `0x005C9C10`
+
+Also SpiderLay, PrimeBlaze.
+
+1. R invalid, `aurastat1` < −1 or ≥ itemstatcost count (validated, not
+   used), or `aurastate` not in 0…states count − 1 → 0. (Unit flag 0x40
+   is not set; no same-group removal.)
+2. `apply_state` (§2.7) {source = target = the unit, skill, L, duration
+   `eval(auralencalc)`, stat −1, value 0, state `aurastate`, default
+   callback} → none → 0.
+3. `passive_fill(unit, list, R, skill, L)` (§2.6); list set 350 :=
+   skill, 351 := L.
+4. `auraevent1` ≥ 0: unregister (1, `aurastate`); for i = 1…3 while
+   `auraevent_i` ≥ 0: register (`auraevent_i`, skill, L,
+   `auraeventfunc_i`, 1, `aurastate`) (§2.13). Return 1.
+
+#### 8.18 120 Feral Rage, Maul `0x005C77C0`
+
+1. R invalid or `aurastate` not in 0…count − 1 → 0. E = used skill
+   entry; none, or its skill (`0x00643CE0`) ≠ skill → 0.
+2. Unit flags |= 0x40.
+3. T exists → `apply_melee(game, unit, T)`.
+4. E param 1 = 0 (the start missed) → return 1.
+5. e = F + `eval(auralencalc)`. The unit's list of `aurastate`, or a new
+   one (game pool, flags 2, expire e, owner the unit, state set, callback
+   `0x0056E900`, attached, state on; failure → return 1).
+6. Expiry := e; timer 12 at e; mark the state changed.
+7. n = min(`eval(calc2)`, list[169 `skill_frenzy`] + 1); list set 169 :=
+   n; 350 := skill; 351 := L.
+8. `aura_fill(unit, list, R, skill, n)`: the aura formulas see the
+   **charge count n as the level**. Return 1.
+
+#### 8.19 10 Guided Arrow, Bone Spirit `0x005DB6D0`
+
+Also MonBoneSpirit.
+
+1. Unit flags |= 0x40. R invalid → 0.
+2. T = target (may be none). Target position (§2.4) → (tx, ty); failure
+   → 0.
+3. v = `eval(calc1)`.
+4. m = `srvmissilea`; hand class ≠ 1 and `srvmissileb` ≥ 0 →
+   `srvmissileb` (as §8.6 step 7); invalid → 0.
+5. Record (§R2.1, zeroed): flags 0x20, owner = origin = the unit, target
+   unit T, class m, target (tx, ty), skill, L; v ≠ 0 → init callback
+   `0x005DB6A0` (adds v to the missile's `damagepercent(25)`), argument
+   v. T none → flags := 0x420 (frames from distance).
+6. Create; none → return 1.
+7. Missile data +0x28 := 1 with T, 2 without (`0x0064A710`; homing bit,
+   `missiles.md` §R9.5 item 4); data +0x2C := (ty − uy) << 16 + (tx −
+   ux), each 16-bit signed, from the unit's position (`0x0064A760`).
+   Return 1.
+
+#### 8.20 118 Twister, Tornado `0x005C72F0`
+
+1. R invalid → 0. m = `prog_missile(unit, skill)` (§6.6); invalid → 0.
+2. Unit flags |= 0x40.
+3. n = `eval(calc1)`; n ≤ 0 → 0.
+4. Return `fan(game, unit, n, m, skill, L, 0)` (§6.18).
+
+#### 8.21 49 Shadow Warrior, Shadow Master `0x005D6E70`
+
+1. Unit flags |= 0x40. R invalid → 0.
+2. c = `summon_class(unit, skill, L, &mode)`; < 0 → 0.
+3. pt = `pettype` read unsigned; ≥ pettype count → 0.
+4. m = spawn (§6.2) {flags 0, owner unit, class c, AI state 0, mode, x =
+   y = 0, pt, pet max `eval(petmax)`}; none → 0.
+5. m `level(12)` := the unit's `level(12)`.
+6. `shadow_stats(game, R, skill, L)` on m (§6.19).
+7. ilvl = `Param5` + (L − 1)·`Param6` (0 when L ≤ 0; `0x004EFCB0`);
+   < 1 → 1; > the maximum level of class 0 (`0x00611830(0)`) → it.
+   Equipment `0x005D6B60(game, unit, m, skill, L, ilvl, 0)` (§6.5 step
+   9 notes).
+8. Delete m's type-2 timers; type-2 timer at F + 20.
+9. `aurastate` in 1…count − 1 → m state on.
+10. `link_source(m, unit)` (§6.20).
+11. d = `eval(auralencalc)` > 0 → type-7 timer at F + d on m and umod
+    21 (`0x005A4850(game, m, 21, 0)`, temporary summon,
+    `monsters/init.md`).
+12. `node_insert(game, m, 0, unit +0xD0)`. Return 1.
+
+No `base_stats` / `skill_stats` here.
+
+#### 8.22 124 Armageddon, Hurricane `0x005C8190`
+
+Also Diablogeddon.
+
+1. R invalid or `aurastate` not in 0…count − 1 → 0. E = used skill
+   entry; none, or its skill ≠ skill → 0.
+2. Unit flags |= 0x40.
+3. r = `roll(0x10000)` on the unit's seed (`rng.md` §3; one draw: `lo'
+   & 0xFFFF`).
+4. e = F + max(`eval(auralencalc)`, 1). The unit's list of `aurastate`,
+   or a new one (game pool, flags 2, expire e, owner the unit, state set,
+   callback `0x0056E900`, attached, state on; failure → 0).
+5. Expiry := e; timer 12 at e; `aura_fill(unit, list, R, skill, L)`;
+   list set 350 := skill, 351 := L.
+6. t = F + `Param4` (+0x154, `0x004EFC80`). Delete the unit's type-5
+   timers with argument skill (`0x00540E60(game, unit, 5, skill)`);
+   type-5 timer at t with arguments (skill, L) (runs the state's
+   `srvactivefunc`, `use.md` §7: srvdo 145 / 146).
+7. E param 1 := r. Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -1357,7 +1538,9 @@ R invalid, or m = `srvmissilea` not 0 ≤ m < missiles count → 0. Return
 | skills columns (batch 2) | srvmissilea–c +0x48–+0x4C, summon +0xBC, pettype +0xBE (i8), summode +0xBF (i8), petmax +0xC0, sumskill1–5 +0xC4, sumsk1–5calc +0xD0, sumumod +0xE4, sumoverlay +0xE6, Param2 +0x14C; flags +0x04 bits 2 `progressive`, 5 `aura`, 8 `InTown` | `fields.tsv` |
 | summon request flags | 1 position given, 2 replace linked unit, 4 no second spawn try, 8 no unit flag 0x80000000 | §6.2 |
 | missile ring | 64 offsets, radius 30, tables `0x006E1288` (x) / `0x006E1388` (y) | §6.7 |
-| state ids (batch 2) | 54 uninterruptable (fatal on a fresh summon), 150 vine_beast | §6.2, §8 |
+| state ids (batch 2) | 12 inferno, 54 uninterruptable (fatal on a fresh summon), 97 skel_mastery, 98 sourceunit, 150 vine_beast | §6, §8 |
+| stat ids (batch 2) | 6 hitpoints, 7 maxhp, 12 level, 19 tohit, 25 damagepercent, 31 armorclass, 142 / 144 / 148 absorb %, 169 skill_frenzy, 349 passive_summon_resist, 353 source_unit_type, 354 source_unit_id | §6, §8 |
+| component table | `0x00741940`, 11 rows × 9 bytes | §6.15 |
 
 Batch 2 order: class skills (`charclass` one of the 7 classes) of the
 1.14d `patch_d2` `skills.txt` per `srvstfunc` / `srvdofunc` slot not
@@ -1447,6 +1630,11 @@ per ring, n per Multiple Shot) takes one game-seed step
 17. A Paladin who casts Raise Skeleton / Skeletal Mage (item charges)
     takes max life / 8 physical damage before the record test, even when
     the raise then fails (§8.14 step 2).
+18. Shadow stats (§6.19 step 4) evaluate `aurastatcalc2` for every
+    `aurastat_i` and `passivecalc2` for every `passivestat_i` (as
+    D2MOO 1.10f).
+19. Feral Rage / Maul (§8.18 step 8) evaluate the aura formulas with the
+    charge count as the skill level.
 
 ## Test vectors
 
@@ -1493,7 +1681,8 @@ per ring, n per Multiple Shot) takes one game-seed step
   `D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10`,
   `D2GAME_SetSummonResistance_6FD0C2E0`, `sub_6FCF9580`. 1.14d
   matches D2MOO in the steps above except: §6.5 step 6 skips summon
-  skill 0 (k must be ≥ 1).
+  skill 0 (k must be ≥ 1). Also compared: `SrvSt12/17/37/56`,
+  `SrvDo010/023/049/118/120/124`, `UNITS_StoreOwner`.
 
 ## Open questions
 
