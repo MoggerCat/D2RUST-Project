@@ -13,40 +13,8 @@
 
 use std::fmt::Debug;
 
-/// A sub-tile position (§1 rule 1: 5 sub-tiles per tile).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SubPoint {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl SubPoint {
-    pub const fn new(x: i32, y: i32) -> SubPoint {
-        SubPoint { x, y }
-    }
-}
-
-/// A room's sub-tile rect (room +0x4C x, +0x50 y, +0x54 w, +0x58 h;
-/// §4 rule 1).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RoomRect {
-    pub x: i32,
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
-}
-
-impl RoomRect {
-    /// `y` inside the rect's rows: `y0 ≤ y < y0 + h` (half-open, as the
-    /// containment test `drlg/levels.md` §8 rule 2).
-    pub fn has_row(&self, y: i32) -> bool {
-        self.y <= y && y < self.y + self.h
-    }
-    /// `x` inside the rect's columns (half-open).
-    pub fn has_column(&self, x: i32) -> bool {
-        self.x <= x && x < self.x + self.w
-    }
-}
+use super::coords::Point;
+use crate::drlg::TileRect;
 
 /// Collision masks of §3 used by §7–§12.
 pub mod mask {
@@ -77,7 +45,7 @@ pub trait CollisionView {
     /// array containing it, else none; a null hint gives none.
     fn cell_room(&self, hint: Option<Self::Room>, x: i32, y: i32) -> Option<Self::Room>;
     /// The sub-tile rect of a room (§4 rule 1, room +0x4C..+0x58).
-    fn room_rect(&self, room: Self::Room) -> RoomRect;
+    fn room_rect(&self, room: Self::Room) -> TileRect;
     /// §4 rule 2, cell value: the grid value of the cell looked up from
     /// `room`, unmasked; no room or no grid → [`MISSING_ROOM_VALUE`].
     fn cell_value(&self, room: Self::Room, x: i32, y: i32) -> u32;
@@ -195,7 +163,7 @@ pub struct WarpDestination<R> {
     /// The destination tile's room.
     pub room: R,
     /// The destination tile's position.
-    pub point: SubPoint,
+    pub point: Point,
     /// lvlwarp `ExitWalkX`, `ExitWalkY` (+0x14, +0x18).
     pub exit_walk_x: i32,
     pub exit_walk_y: i32,
@@ -238,20 +206,11 @@ pub struct LvlWarp {
     pub offset_y: i32,
 }
 
-/// A DRLG room's tile rect (tile x, y, width, height).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TileRect {
-    pub x: i32,
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
-}
-
 /// DRLG side of the warp tile preset (§12.1, `0x0066E1C0`).
 pub trait WarpTileView {
     /// A DRLG room.
     type DrlgRoom: Copy + Debug;
-    /// The room's tile rect.
+    /// The room's tile rect (tile x, y, width, height).
     fn tile_rect(&self, room: Self::DrlgRoom) -> TileRect;
     /// lvlwarp record of warp slot `slot` of the room's level for
     /// direction letter `letter` (`drlg/levels.md` §7 rule 4,

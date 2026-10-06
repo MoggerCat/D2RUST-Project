@@ -15,9 +15,12 @@
 //!   and combat; vitals ↔ stats and the tick.
 //! - [`inventory`]: the inventory model and item-move intents ↔ units,
 //!   unit lists, stats and the item store.
+//! - [`path`]: positions, collision, placement, warps and walk / run
+//!   movement ↔ units, rooms and the tick.
 
 pub mod action;
 pub mod economy;
 pub mod interaction;
 pub mod inventory;
+pub mod path;
 pub mod worldgen;

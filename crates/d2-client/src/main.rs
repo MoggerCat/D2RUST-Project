@@ -18,8 +18,9 @@
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
 //! for byte; exit code 0 = all pass, 1 = a failure or error, 2 = none
-//! failed but a GPU half is incomplete (no adapter) or a scene case has
-//! no scene source. `verify --cases crates/d2-client/capture-cases` runs
+//! failed but a GPU half is incomplete (no adapter) or a scene case stops
+//! at a seam (the recording lacks what the world view needs; the recorded
+//! camera is still checked). `verify --cases crates/d2-client/capture-cases` runs
 //! the 1.14d capture cases (`render/capture.md`). With a map flag (`--ds1`,
 //! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
 //! instead (default view: the whole map; exit 0 means identical).
@@ -288,14 +289,19 @@ fn verify(o: Options) -> Result<()> {
             verify::CaseKind::Map(m) => {
                 verify::map::run_with(&case.name, m, None, o.perturb, &mut gpu)
             }
-            // render/capture.md: no scene source is wired yet (the world
-            // view's rules); the capture's own checks run.
+            // render/capture.md: the recorded camera is checked against
+            // camera.md §1, §3, then the frame goes through the world view
+            // and `rules::OriginalView`; the recording holds no units, map
+            // or UI yet, so compare cases stop at that seam
+            // (`scene_source::RECORDER_GAP`).
             verify::CaseKind::Scene(sc) => verify::capture_case::run_capture(
                 &case.name,
                 sc,
                 &verify::capture_case::repo_root(),
                 o.perturb,
-                &mut verify::capture_case::SceneNotWired,
+                &mut verify::capture_case::scene_source::WorldScene::new(
+                    verify::capture_case::scene_source::NotRecorded,
+                ),
                 &mut gpu,
             ),
         };

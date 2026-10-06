@@ -1,8 +1,13 @@
-// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4)
+// Spec: specs/client/render-pipeline.md (A1 stages 4–5, A9 presentation), specs/client/ui.md (A4), specs/render/camera.md (§3, §9)
 //! Bevy edge of the world view: after the bridge frame (`PreUpdate`,
-//! `bridge.md` §8), one `Update` system runs UI → [`super::build`] →
-//! compose → the 800×600 image shown by a sprite, scaled by the integer
-//! presentation factor (§A9, outside the verify boundary). Compose is the
+//! `bridge.md` §8), one `Update` system runs UI → [`super::build_frame`]
+//! (the frame's camera from the [`super::ViewFeed`], then the original's
+//! view rules, `rules::OriginalView`) → compose → the 800×600 image shown
+//! by a sprite, scaled by the integer presentation factor (§A9, outside
+//! the verify boundary). Time base (camera §9): one frame per presented
+//! server tick, from the model as it stands after that tick; a Bevy frame
+//! whose bridge frame ran no tick draws nothing and keeps the presented
+//! image (no interpolation). Compose is the
 //! GPU compute compositor when [`WorldViewGpu`] exists (the frame is
 //! packed here and composed by the render-graph node, [`super::node`],
 //! straight into the image's texture), else the CPU reference written
@@ -27,9 +32,10 @@ use crate::bridge::BridgeResource;
 use crate::frames::atlas::AtlasPage;
 use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 
+use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob};
 use super::ui_bind::{run_ui, UiQueue, UiRules};
-use super::{build, compose_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use super::{compose_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 
 /// Render layer of the presented frame and its camera, so the world view
 /// never mixes with other sprites of the app.
@@ -42,20 +48,30 @@ pub const GPU_ATLAS_PAGES: u32 = 64;
 pub trait WorldRules: ViewRules + UiRules {}
 impl<T: ViewRules + UiRules + ?Sized> WorldRules for T {}
 
-/// The world view's inputs besides the bridge.
+/// The world view's inputs besides the bridge: the assets, the hooks of
+/// other owner specs (`rules`: pose, component frames, draw keys,
+/// shading, blend, UI) and the camera feed (`feed`: player, open mode,
+/// shake, unit positions, map tiles). Placement is the original's
+/// (`rules::OriginalView`), not a hook.
 #[derive(Resource)]
 pub struct WorldViewState {
     pub assets: ViewAssets,
     pub rules: Box<dyn WorldRules + Send + Sync>,
+    pub feed: Box<dyn ViewFeed + Send + Sync>,
     /// Counts of the last frame, for logs and tests.
     pub last: Option<FrameStats>,
 }
 
 impl WorldViewState {
-    pub fn new(assets: ViewAssets, rules: Box<dyn WorldRules + Send + Sync>) -> Self {
+    pub fn new(
+        assets: ViewAssets,
+        rules: Box<dyn WorldRules + Send + Sync>,
+        feed: Box<dyn ViewFeed + Send + Sync>,
+    ) -> Self {
         WorldViewState {
             assets,
             rules,
+            feed,
             last: None,
         }
     }
@@ -65,6 +81,8 @@ impl WorldViewState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameStats {
     pub bridge_frame: u64,
+    /// The server tick the frame shows (`ClientWorld::server_ticks`).
+    pub server_tick: u64,
     pub items: usize,
     pub units_drawn: usize,
     pub units_hidden: usize,
@@ -224,7 +242,10 @@ fn rgba_image(rgba: Vec<u8>) -> Image {
     image
 }
 
-/// UI frame, draw list, composition, image update.
+/// UI frame, draw list, composition, image update: once per presented
+/// server tick (camera §9). Before the first tick, and on Bevy frames
+/// whose bridge frame ran no tick, nothing is drawn and pending UI input
+/// waits for the next drawn frame.
 #[allow(clippy::too_many_arguments)]
 fn world_view_frame(
     mut commands: Commands,
@@ -235,6 +256,10 @@ fn world_view_frame(
     target: Option<Res<WorldViewTarget>>,
     mut images: ResMut<Assets<Image>>,
 ) -> Result {
+    let tick = bridge.0.world().server_ticks;
+    if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
+        return Ok(());
+    }
     let ui_frame = match ui {
         Some(mut ui) => {
             let ui = &mut *ui;
@@ -249,11 +274,18 @@ fn world_view_frame(
     };
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     let state = &mut *state;
-    let frame = build(bridge.0.world(), draws, state.rules.as_ref(), &state.assets)?;
+    let frame = build_frame(
+        bridge.0.world(),
+        draws,
+        state.rules.as_ref(),
+        state.feed.as_mut(),
+        &state.assets,
+    )?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
     state.last = Some(FrameStats {
         bridge_frame,
+        server_tick: tick,
         items: frame.items.len(),
         units_drawn: frame.units_drawn,
         units_hidden: frame.units_hidden,
