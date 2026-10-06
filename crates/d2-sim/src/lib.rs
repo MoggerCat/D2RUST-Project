@@ -11,6 +11,7 @@
 pub mod game;
 pub mod rng;
 pub mod tick;
+pub mod treasure;
 pub mod units;
 
 /// Simulation ticks per second, matching the original game.
