@@ -1413,7 +1413,7 @@ Act III bodies (Mosquito, ThornHulk, ZakarumZealot, ZakarumPriest, FrogDemon, Fe
 
 Act IV bodies (VileMother, VileDog, FingerMage, Regurgitator, Megademon, Diablo with its alternate and the boss target pick and score, Izual, DoomKnight, AbyssKnight, OblivionKnight): `monsters/ai-bodies-4.md`.
 
-Act V bodies (Minion, Imp, Succubus, BloodLord, SuccubusWitch, Overseer, ReanimatedHorde, ClawViperEx, DeathMauler, PutridDefiler, Ancient, AncientStatue, FrozenHorror, SiegeBeast, SuicideMinion, BaalMinion, BaalTaunt, BaalToStairs, BaalThrone): `monsters/ai-bodies-5.md`.
+Act V bodies (Minion, Imp, Succubus, BloodLord, SuccubusWitch, Overseer, ReanimatedHorde, ClawViperEx, DeathMauler, PutridDefiler, Ancient, AncientStatue, FrozenHorror, SiegeBeast, SuicideMinion, BaalMinion, BaalTaunt, BaalToStairs, BaalThrone, BaalCrab, BaalCrabClone, Nihlathak): `monsters/ai-bodies-5.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 

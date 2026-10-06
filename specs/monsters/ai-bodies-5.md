@@ -1,8 +1,9 @@
 # Spec: Monsters — AI think bodies, Act V
 
-- **Status:** draft: the AI functions used by Act V monsters that were
-  still unread (§1 lists which are written here and which remain), with
-  their init functions and the scan callbacks they use, read from the
+- **Status:** draft: the 22 AI functions used by Act V monsters that
+  were still unread, with their init and alternate functions, the Baal
+  target pick, score, choice and execution, and the scan callbacks they
+  use, read from the
   1.14d `Game.exe` disassembly (addresses per section; register
   arguments checked in `all.asm`). No recording covers these bodies yet
   (Open question 1).
@@ -22,36 +23,39 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–79 |
-| Inputs | 80–89 |
-| Outputs / state changes | 90–96 |
-| Rules | 97–98 |
-|   1. Scope and order | 99–135 |
-|   2. Minion (116) `0x005E1B60` | 136–152 |
-|   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 153–183 |
-|   4. Succubus (118) `0x005E1E00` | 184–203 |
-|   5. BloodLord (125) `0x005E36F0` | 204–214 |
-|   6. SuccubusWitch (119) `0x005E2120` | 215–239 |
-|   7. Overseer (120) `0x005E27A0` | 240–274 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 275–288 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 289–306 |
-|   10. DeathMauler (130) `0x005EE260` | 307–317 |
-|   11. PutridDefiler (137) `0x005EFA90` | 318–335 |
-|   12. Ancient (133) `0x005EF1A0` | 336–389 |
-|   13. AncientStatue (132) `0x005EEAA0` | 390–397 |
-|   14. FrozenHorror (124) `0x005E3530` | 398–412 |
-|   15. SiegeBeast (115) `0x005E1900` | 413–438 |
-|   16. SuicideMinion (117) `0x005E1D30` | 439–450 |
-|   17. BaalMinion (141) `0x005EF910` | 451–462 |
-|   18. BaalTaunt (136) `0x005EF710` | 463–479 |
-|   19. BaalToStairs (138) `0x005EF620` | 480–495 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 496–535 |
-| Constants & data dependencies | 536–552 |
-| Randomness | 553–561 |
-| Edge cases & original bugs | 562–576 |
-| Test vectors | 577–591 |
-| Provenance | 592–612 |
-| Open questions | 613–625 |
+| Summary | 61–83 |
+| Inputs | 84–93 |
+| Outputs / state changes | 94–100 |
+| Rules | 101–102 |
+|   1. Scope and order | 103–139 |
+|   2. Minion (116) `0x005E1B60` | 140–156 |
+|   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–187 |
+|   4. Succubus (118) `0x005E1E00` | 188–207 |
+|   5. BloodLord (125) `0x005E36F0` | 208–218 |
+|   6. SuccubusWitch (119) `0x005E2120` | 219–243 |
+|   7. Overseer (120) `0x005E27A0` | 244–278 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 279–292 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 293–310 |
+|   10. DeathMauler (130) `0x005EE260` | 311–321 |
+|   11. PutridDefiler (137) `0x005EFA90` | 322–339 |
+|   12. Ancient (133) `0x005EF1A0` | 340–393 |
+|   13. AncientStatue (132) `0x005EEAA0` | 394–401 |
+|   14. FrozenHorror (124) `0x005E3530` | 402–416 |
+|   15. SiegeBeast (115) `0x005E1900` | 417–442 |
+|   16. SuicideMinion (117) `0x005E1D30` | 443–454 |
+|   17. BaalMinion (141) `0x005EF910` | 455–466 |
+|   18. BaalTaunt (136) `0x005EF710` | 467–483 |
+|   19. BaalToStairs (138) `0x005EF620` | 484–499 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 500–539 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 540–643 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 644–654 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 655–692 |
+| Constants & data dependencies | 693–711 |
+| Randomness | 712–720 |
+| Edge cases & original bugs | 721–735 |
+| Test vectors | 736–750 |
+| Provenance | 751–776 |
+| Open questions | 777–787 |
 <!-- /index -->
 
 ## Summary
@@ -124,8 +128,8 @@ baalcrabstairs, ancientstatue1–3, closed over `minion1`, `minion2`,
 | BaalTaunt (136) | 1 | §18 |
 | BaalToStairs (138) | 1 | §19 |
 | BaalThrone (134), init `0x005EF310` | 1 | §20 |
-| BaalCrab (135), BaalCrabClone (140), alternate `0x005FCF30` | 1 each | not yet (Open question 2) |
-| Nihlathak (128), init `0x005EE5C0`, alternate `0x005E5280` | 1 | not yet (Open question 2) |
+| BaalCrab (135), BaalCrabClone (140), alternate `0x005FCF30` | 1 each | §21, §22 |
+| Nihlathak (128), init `0x005EE5C0`, alternate `0x005E5280` | 1 | §23 |
 
 Ties are listed by index. 179 of the 200 rows have `switchai`
 (`ai-bodies-2.md` §16). SuicideMinion's think is also the
@@ -533,6 +537,159 @@ q. Waves are superuniques 61..65 (Baal Subject 1..5, table
 
 1.14d-confirmed; same as D2MOO.
 
+### 21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30`
+
+Target mode 0. Skills used by id: 315 Baal Tentacle, 316 Baal Nova, 317
+Baal Inferno, 318 Baal Cold Missiles; from monstats `Skill5` Baal
+Teleport, `Skill6` Defense Curse, `Skill7` Blood Mana. AI param 1 =
+clones made c. No aip is read.
+
+1. X, M, n := Baal pick (§21.1).
+2. H := the command of type 10 (`0x0058EEF0(10, 0)`); none → copy {10,
+   own x, own y} and look again (the home point).
+3. k := Baal choice (§21.2).
+4. Execute k (§21.3); then wait 25 (it replaces any think the execution
+   scheduled).
+
+**Alternate** `0x005FCF30` (also BaalCrabClone's): the same as the
+Diablo alternate (`ai-bodies-4.md` §7): keep the type-10 command's
+point across the re-install, state 12 off, re-install the control's
+state, idle 1.
+
+#### 21.1 Baal pick `0x005FBDD0`
+
+The boss pick of `ai-bodies-4.md` §7.1 with the Diablo cull
+(`0x005FC000`: same act, distance < 1020) and the Baal score
+`0x005FBB00` instead of §7.2, called without a command (so B = 0). The
+Baal score is §7.2 except that r43 `coldresist` is read whether or not
+the boss is in melee range.
+
+#### 21.2 Baal choice `0x005FC630(game, unit, control, X, M, n, H)`
+
+1. Param 0 ≠ 0 → return it.
+2. X = 0: own position collides with mask 0x40 over pattern 2
+   (`0x0064D910`) → 4. Else one draw: < 8 → 9, else 1.
+3. close := X is a player whose portal object (`0x00552F60(game, 2,
+   0x005353F0(X))`) lies in level 132 (The Worldstone Chamber) and (no
+   H, or `0x006417F0(portal, H.x, H.y)` < 75). medium := H and the
+   half-size distance X→(H.x, H.y) > 75; far := > 100. c := X's left or
+   right skill is Blizzard or Meteor, or Fire Wall at level > 3, or
+   Immolation Arrow at level > 7 (`0x005FC0C0`, as `ai-bodies-4.md` §7.3
+   step 3). m := melee range unit→X; clear := `0x005DD290(unit, X)`.
+4. Weights W0..W15 (b is the W1 base; L = own life percent):
+   - m (`0x005FC1C0`): {0, b + 100 − L, 0, 0, 0, 0, 0, 0, 20, 30, 150,
+     10, 10, 70, 40, 0}, b = 50; on Normal b = 75 and W13 = 45. X's life
+     percent < 33 → W10 := 200. X has state 11 → W8, W13, W11 := 0. Not
+     clear → W11, W13, W12 := 0.
+   - Not m, clear (`0x005FC450`): {0, b + 100 − L, 5, 5, 5, 0, 5, 0, 40,
+     40, 0, 70, 80, 60, 20, W15}, b = 100; on Normal b = 125 and W13 =
+     40; W15 := 10 × (2 − c), 0 if negative. Full-size distance d
+     (`0x005DC380`): d > 35 → W6 := 15, W13 := 0; d > 25 → W14 := 30,
+     W11 := 0. n < 2 → W11 −= 10; n > 3 → W13 += 25. M > 60 → W8 := 70.
+     Player-count record of the unit (`0x00573930`): n < 2 and its
+     difficulty field (+0xC) < 2 → W8 := 0. medium → W6 += 25, W14 +=
+     35, W2 := 0, W3 := 25; else c → W6 += 30, W11 += 10, W14 += 15. far
+     → W5 := 60. close → W7 := 0.
+   - Not m, not clear (`0x005FC300`): {0, b + 100 − L, 20, 20, 20, 0, 20,
+     0, 80, 70, 0, 0, 0, 0, 0, 0}, b = 100 (125 on Normal). n < 2 → W2
+     := 45, W10 := 25. medium → W13 := 25, W2 := 0, W6 := 0, W3 := 35,
+     W11 := 25; else c → W13 := 50, W14 := 50. far → W5 := 60.
+5. Σ := sum; Σ > 0: one step, r := `lo' & (Σ − 1)` for a power of two,
+   else `lo' % Σ` (unsigned); Σ ≤ 0: r := 0, no draw. Return the first k
+   with r < W0 + … + Wk; none → 1.
+
+#### 21.3 Baal execution `0x005FCB60(game, unit, control, X, k, H)`
+
+The unit's monstats row must exist (else nothing). By k:
+
+- 1: idle 35 on Normal, 15 on Nightmare, 5 on Hell.
+- 2, 6: walk in radius of X (`0x005DE6D0(X, 12, 0)`).
+- 3: circle 6 at X with think delete.
+- 4: wander 16.
+- 5: H → walk to (H.x, H.y) (`0x005DED90`); else idle 5.
+- 8: no X → idle 5. `Skill6` > 0 and (X's max mana < its max life, or X
+  not a player) → `Skill6` at X. Else `Skill7` > 0 and X a player →
+  `Skill7` at X. Else nothing.
+- 9: `0x005DEAD0(9, 315, X, 0, 0)`.
+- 10: A2 at X.
+- 11: assign skill 316 at level 1 (`0x00647280`); `0x005DEAD0(10, 316,
+  X, 0, 0)`.
+- 12: `0x005DEAD0(8, 317, X, 0, 0)`.
+- 13: `0x005DEAD0(4, 318, X, 0, 0)`.
+- 14: no X → idle 5. d := `0x006416D0(unit, X)`, 0 → 1; P := own
+  position + 25 × (own − X's position) / d per axis (signed). Class 709
+  (uberbaal) → `Skill5` with no target at X's position. Else a free
+  point near P in the unit's room for its class (`0x0054DC40(…, room,
+  class, &P.x, &P.y, 0)`, `ai.md` §2.4) → `Skill5` with no target at P;
+  none → idle 5.
+- 15: clone (below); then idle 5.
+- Any other (0, 7): idle 5.
+
+**Clone** `0x005FC860`: nothing when the unit's minions include a
+living one (`0x0058F380` with callback `0x005FC830`) or the unit has a
+living owner (`0x00552FD0`). Class := 570 (baalclone; −1 when monstats
+has ≤ 570 rows), mode 1, through the spawn info `0x0063EFA0(unit,
+&class, &x, &y, &mode, difficulty, 0)` (`monsters/population.md`).
+Base := the position of the unit's path target unit (`0x00553540`),
+else its own. x := base.x + `lo' % 24` − 12, then y := base.y + `lo' %
+24` − 12 (two steps, x first). Room at (x, y) (`0x00463740`); found →
+spawn `0x005B2F20(room, x, y, class, mode, −1, 0)` (`monsters/init.md`
+§1); spawned clone C: unit flags +0xC4 |= 0x04020000; wait 15 on C; the
+unit's owner data := itself (`0x0058F030`), C joins its minion list
+(`0x0058F100`) and C's owner := the unit; C stat 7 (`maxhp`) := the
+unit's max life / 3, stat 6 (`hitpoints`) := its life / 3, stat 74
+(`hpregen`) := 0 (`0x00627260`); each stores the other as owner
+(`0x00621CE0`); sound 16 on the unit; c += 1.
+
+### 22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30`
+
+1. The unit's minion owner (`0x0058F0D0`) exists and is dead → kill the
+   unit (`0x0057CCB0(game, unit, 0, 1)`, `combat/damage.md` §7.2). End.
+2. Its owner (`0x00552FD0`) is missing or dead → kill it. End.
+3. X, M, n := Baal pick (§21.1); H as §21 step 2; k := Baal choice; k
+   ∈ {7, 9, 14, 15} → 2.
+4. X → execute k (§21.3), wait 25. No X → idle 15.
+
+1.14d-confirmed (§21, §22); same as D2MOO (1.10f cull 55).
+
+### 23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280`
+
+Target mode 2. Brackets: nihlathakboss [30, 20, 80, 75, 8]; `Skill1` Imp
+Teleport, `Skill2` Overseer Whip, `Skill3` NihlathakCorpseExplosion,
+`Skill4` Horror Arctic Blast (`seq_nihlathakarctic`), `Skill5`
+MinionSpawner. E1 := the unit's highest `Skill1` entry (`0x006439F0`).
+"Blink" = teleport in range aip2 [20] with E1's skill id
+(`0x00643CE0`) and E1's mode (entry +0x08, `0x00644360`). The init does
+nothing.
+
+1. Quest seam `0x0058BC40(game, unit)` (`world/quests.md`).
+2. State 12 set → off.
+3. T = 0: E1 and AI state 3/19 → blink; else idle 25. End.
+4. E1, C and draw < aip1 [30] → blink. End.
+5. D < aip5 [8], draw < 40 and escape from T by 5 with think delete
+   started → end.
+6. `Skill3` > 0 and its entry E3 exists: draw < aip3 [80] → K := corpse
+   search `0x0056E390(unit, T, Skill3, level of E3 with bonus)`
+   (skills spec; a unit find of size 10, flags 0x1002, around T's
+   position); K and
+   `Skill3` at K succeeds → end.
+7. `Skill4` > 0 and its entry exists: draw < 60 and D < 14 → `Skill4` at
+   T. End.
+8. `Skill2` > 0: draw < aip4 [75] and has `Skill2` (`0x005DD2D0`): whip
+   scan (§7 step 5's callback, arg {0, 625, 50, 0, 0, 0}: only the whip
+   slot fills — a non-unique minion1 within squared distance 625);
+   found → `Skill2` at it, end. Else `Skill5` > 0 and the footprint test
+   `0x005FD350(528, room, own x, own y, 0)` passes (class 528 evilhut;
+   −1 when monstats has ≤ 528 rows; `monsters/population.md` §9) →
+   control +0x3C (minion spawn class) := `0x0063EC70(room, 453)`
+   (`population.md` §11.6), `Skill5` at T, end. Else wander 6. End.
+9. `Skill4` > 0, its entry exists and D ≤ 13 → `Skill4` at T. End.
+10. Draw < 60 → walk to T; then idle 5 (both).
+
+**Alternate** `0x005E5280` (also the Hireable alternate, `ai.md` §3.2):
+state 12 off; re-install the control's current state; idle 1. No
+draws. 1.14d-confirmed.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -549,6 +706,8 @@ q. Waves are superuniques 61..65 (Baal Subject 1..5, table
 | Baal taunt | skill 284 mode 4; counter aip2 | `0x005EF710` |
 | Baal stairs | object 563; vanish at < aip1 | `0x005EF620` |
 | Baal throne | waves superuniques 61–65; skills 285, 286; delays 250 / 100; spawn point (x, y + 13); class 559, state 142, stat 355 | `0x005EF320`, `0x005EF210` |
+| Baal | skills 315–318; teleport 25 away; weights §21.2; idles 35 / 15 / 5; clone class 570 at ±12, a third of life, flags 0x04020000 | `0x005FC630`, `0x005FCB60`, `0x005FC860` |
+| Nihlathak | blink range aip2; corpse search size 10 at T; spawner footprint class 528, spawn class 453 for level | `0x005EE5D0` |
 
 ## Randomness
 
@@ -600,7 +759,11 @@ Game-file vectors: Open question 1.
   `0x005EEB10`, `0x0058CF90`, `0x005EEAA0`, `0x005E3530`, `0x005E1900`,
   `0x005E1720`, `0x005E17E0`, `0x004E6C70`, `0x005E1D30`, `0x005EF910`,
   `0x005EF710`, `0x005EF620`, `0x005EF5E0`, `0x005EF320`, `0x005EF310`,
-  `0x005EF210`, `0x005DC870`, `0x00571C00`, `0x005DE080`. Ghidra
+  `0x005EF210`, `0x005DC870`, `0x00571C00`, `0x005DE080`,
+  `0x005FCFE0`, `0x005FCF30`, `0x005FD210`, `0x005FBDD0`, `0x005FC000`,
+  `0x005FBB00`, `0x005FC630`, `0x005FC1C0`, `0x005FC300`, `0x005FC450`,
+  `0x005FC0C0`, `0x005FCB60`, `0x005FC860`, `0x005EE5D0`, `0x005EE5C0`,
+  `0x005E5280`, `0x0056E390` (entry only). Ghidra
   decompile read first; register and stack arguments checked in the
   disassembly; table `0x006E3528` read from the file.
 - Live data (`patch_d2`): monstats.txt, levels.txt (Act 4 rows),
@@ -608,17 +771,16 @@ Game-file vectors: Open question 1.
   states.txt (110, 141, 142, 146), objects.txt (563) — counted by the
   throwaway script of `ai-bodies-3.md`.
 - D2MOO 1.10f `AiThink.cpp`: names and param meanings; compared for
-  every body here: same rules except Ancient B step 5.
+  every body here: same rules except Ancient B step 5; `AiBaal.cpp`
+  for §21–§22 (same, with the 1.10f cull 55).
 
 ## Open questions
 
 1. No recording of any Act V AI: record a Bloody Foothills / Arreat
    Summit / Worldstone Chamber run (tick recorder) and compare think
-   schedules and draws with §2–§20.
-2. Not yet written: BaalCrab (135) `0x005FCFE0`, BaalCrabClone (140)
-   `0x005FD210` with their alternate `0x005FCF30` and the Baal helpers
-   `0x005FBDD0`, `0x005FC000`, `0x005FC630`, `0x005FCB60`; Nihlathak
-   (128) `0x005EE5D0` with init `0x005EE5C0` and alternate
-   `0x005E5280`.
+   schedules and draws with §2–§23.
+2. Baal §21.3: the draws of the free-point search `0x0054DC40` (case
+   14, `ai.md` open question 4) and of the spawn info `0x0063EFA0` for
+   the clone (owner `monsters/population.md`).
 3. Who sets the Imp mount (§3 AI param 0) besides SiegeBeast §15, and
    the client side of message 0xA4 (§20).
