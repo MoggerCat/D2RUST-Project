@@ -298,6 +298,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             m.remove(unit);
         }
         self.combat_lists.remove(&unit);
+        self.handlers.remove(&unit);
         self.with_monster_world(|w, _| w.forget(unit));
     }
 }

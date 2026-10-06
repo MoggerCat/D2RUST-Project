@@ -1,9 +1,9 @@
 // Spec: specs/skills/use.md §8, specs/skills/functions.tsv
 //! The start (`srvst`, `0x00732140`) and do (`srvdo`, `0x007322B0`)
 //! function tables as data (§8): which slots are filled, with the 1.14d
-//! address and the D2MOO name of each. Bodies are not specified
-//! (`functions.tsv` status `mapped`); they run behind
-//! [`super::SkillFunctions`]. [`check_tsv`] compares [`FUNCS`] with
+//! address and the D2MOO name of each. Bodies of status `spec'd-here`
+//! are in [`super::bodies`] (`skills/bodies.md`); the rest (`mapped`)
+//! run behind [`super::SkillFunctions`]. [`check_tsv`] compares [`FUNCS`] with
 //! `functions.tsv` row by row (METHODS M05).
 
 /// Which table.
@@ -36,6 +36,8 @@ impl Kind {
 /// The `status` column of a filled slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
+    /// Body specified in `skills/bodies.md` (run by [`super::bodies`]).
+    SpecdHere,
     /// 1.14d table entry identified; body not specified.
     Mapped,
     /// Filled, but no 1.14d data uses it.
@@ -45,6 +47,7 @@ pub enum Status {
 impl Status {
     fn code(self) -> &'static str {
         match self {
+            Status::SpecdHere => "spec'd-here",
             Status::Mapped => "mapped",
             Status::Unreferenced => "unreferenced",
         }
@@ -76,11 +79,11 @@ pub fn lookup(kind: Kind, index: u16) -> Option<&'static Func> {
 
 /// Every filled slot of both tables, in `functions.tsv` order.
 pub const FUNCS: &[Func] = &[
-    Func { kind: Kind::Start, index: 1, address: 0x0056CA40, name: "SrvSt01_Attack_LeftHandSwing", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 2, address: 0x0056CAF0, name: "SrvSt02_Kick", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 3, address: 0x0056CBA0, name: "SrvSt03_Unsummon", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 4, address: 0x005DA8B0, name: "SrvSt04_Arrow_Bolt", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 5, address: 0x005DA8F0, name: "SrvSt05_Jab", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 1, address: 0x0056CA40, name: "SrvSt01_Attack_LeftHandSwing", status: Status::SpecdHere },
+    Func { kind: Kind::Start, index: 2, address: 0x0056CAF0, name: "SrvSt02_Kick", status: Status::SpecdHere },
+    Func { kind: Kind::Start, index: 3, address: 0x0056CBA0, name: "SrvSt03_Unsummon", status: Status::SpecdHere },
+    Func { kind: Kind::Start, index: 4, address: 0x005DA8B0, name: "SrvSt04_Arrow_Bolt", status: Status::SpecdHere },
+    Func { kind: Kind::Start, index: 5, address: 0x005DA8F0, name: "SrvSt05_Jab", status: Status::SpecdHere },
     Func { kind: Kind::Start, index: 6, address: 0x005DA940, name: "SrvSt06_PowerStrike_ChargedStrike", status: Status::Mapped },
     Func { kind: Kind::Start, index: 7, address: 0x005DAB40, name: "SrvSt07_Impale", status: Status::Mapped },
     Func { kind: Kind::Start, index: 8, address: 0x005DACD0, name: "SrvSt08_Strafe", status: Status::Mapped },
@@ -90,7 +93,7 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Start, index: 12, address: 0x005C9030, name: "SrvSt12_Telekinesis_DragonFlight", status: Status::Mapped },
     Func { kind: Kind::Start, index: 13, address: 0x005C91C0, name: "SrvSt13_ThunderStorm", status: Status::Mapped },
     Func { kind: Kind::Start, index: 14, address: 0x005C9220, name: "SrvSt14_Hydra", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 15, address: 0x005C3070, name: "SrvSt15_RaiseSkeleton_Mage", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 15, address: 0x005C3070, name: "SrvSt15_RaiseSkeleton_Mage", status: Status::SpecdHere },
     Func { kind: Kind::Start, index: 16, address: 0x005C30A0, name: "SrvSt16_PoisonDagger", status: Status::Mapped },
     Func { kind: Kind::Start, index: 17, address: 0x005C31C0, name: "SrvSt17_Poison_CorpseExplosion", status: Status::Mapped },
     Func { kind: Kind::Start, index: 18, address: 0x005C3260, name: "SrvSt18_Attract", status: Status::Mapped },
@@ -104,10 +107,10 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Start, index: 26, address: 0x005D69D0, name: "SrvSt26_BladeFury", status: Status::Mapped },
     Func { kind: Kind::Start, index: 27, address: 0x005D7090, name: "SrvSt27_DragonTail", status: Status::Mapped },
     Func { kind: Kind::Start, index: 28, address: 0x005D7A00, name: "SrvSt28_BladeShield", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 29, address: 0x005CE790, name: "SrvSt29_Sacrifice", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 29, address: 0x005CE790, name: "SrvSt29_Sacrifice", status: Status::SpecdHere },
     Func { kind: Kind::Start, index: 31, address: 0x005CF6B0, name: "SrvSt31_Charge", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 32, address: 0x005D7EA0, name: "SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 33, address: 0x005D80C0, name: "SrvSt33_FindPotion_GrimWard", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 32, address: 0x005D7EA0, name: "SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite", status: Status::SpecdHere },
+    Func { kind: Kind::Start, index: 33, address: 0x005D80C0, name: "SrvSt33_FindPotion_GrimWard", status: Status::SpecdHere },
     Func { kind: Kind::Start, index: 34, address: 0x005D8760, name: "SrvSt34_FindItem", status: Status::Mapped },
     Func { kind: Kind::Start, index: 35, address: 0x005CFE10, name: "SrvSt35_Vengeance", status: Status::Mapped },
     Func { kind: Kind::Start, index: 36, address: 0x005D0180, name: "SrvSt36_HolyShield", status: Status::Mapped },
@@ -120,7 +123,7 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Start, index: 43, address: 0x005CAF80, name: "SrvSt43_MaggotEgg", status: Status::Mapped },
     Func { kind: Kind::Start, index: 44, address: 0x005CB170, name: "SrvSt44_MaggotUp", status: Status::Mapped },
     Func { kind: Kind::Start, index: 45, address: 0x005CB270, name: "SrvSt45_MaggotDown", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 46, address: 0x005CB4D0, name: "SrvSt46_AndrialSpray", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 46, address: 0x005CB4D0, name: "SrvSt46_AndrialSpray", status: Status::SpecdHere },
     Func { kind: Kind::Start, index: 47, address: 0x005CB730, name: "SrvSt47_Jump", status: Status::Mapped },
     Func { kind: Kind::Start, index: 48, address: 0x005CBBF0, name: "SrvSt48_SwarmMove", status: Status::Mapped },
     Func { kind: Kind::Start, index: 49, address: 0x005CBD10, name: "SrvSt49_Nest_EvilHutSpawner", status: Status::Mapped },
@@ -139,9 +142,9 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Start, index: 62, address: 0x005D2420, name: "SrvSt62_MinionSpawner", status: Status::Mapped },
     Func { kind: Kind::Start, index: 63, address: 0x005D2A10, name: "SrvSt63_Corpse_VineCycler", status: Status::Mapped },
     Func { kind: Kind::Start, index: 64, address: 0x005CDF00, name: "SrvSt25_64_DragonClaw_MonFrenzy", status: Status::Mapped },
-    Func { kind: Kind::Start, index: 65, address: 0x0056CAB0, name: "SrvSt65_Throw_LeftHandThrow", status: Status::Mapped },
-    Func { kind: Kind::Do, index: 1, address: 0x0056F070, name: "SrvDo001_Attack_LeftHandSwing", status: Status::Mapped },
-    Func { kind: Kind::Do, index: 2, address: 0x0056F1F0, name: "SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun_Concentrate_BearSmite_Vengeance_Berserk_FireClaws", status: Status::Mapped },
+    Func { kind: Kind::Start, index: 65, address: 0x0056CAB0, name: "SrvSt65_Throw_LeftHandThrow", status: Status::SpecdHere },
+    Func { kind: Kind::Do, index: 1, address: 0x0056F070, name: "SrvDo001_Attack_LeftHandSwing", status: Status::SpecdHere },
+    Func { kind: Kind::Do, index: 2, address: 0x0056F1F0, name: "SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun_Concentrate_BearSmite_Vengeance_Berserk_FireClaws", status: Status::SpecdHere },
     Func { kind: Kind::Do, index: 3, address: 0x0056F460, name: "SrvDo003_Throw", status: Status::Mapped },
     Func { kind: Kind::Do, index: 4, address: 0x0056CC20, name: "SrvDo004_Unsummon", status: Status::Mapped },
     Func { kind: Kind::Do, index: 5, address: 0x0056F550, name: "SrvDo005_LeftHandThrow", status: Status::Mapped },
@@ -157,7 +160,7 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Do, index: 15, address: 0x005DC000, name: "SrvDo015_Dopplezon", status: Status::Mapped },
     Func { kind: Kind::Do, index: 16, address: 0x005DC1E0, name: "SrvDo016_Valkyrie", status: Status::Mapped },
     Func { kind: Kind::Do, index: 17, address: 0x005C9300, name: "SrvDo017_ChargedBolt_BoltSentry", status: Status::Mapped },
-    Func { kind: Kind::Do, index: 18, address: 0x005C9480, name: "SrvDo018_DefensiveBuff", status: Status::Mapped },
+    Func { kind: Kind::Do, index: 18, address: 0x005C9480, name: "SrvDo018_DefensiveBuff", status: Status::SpecdHere },
     Func { kind: Kind::Do, index: 19, address: 0x005C9640, name: "SrvDo019_Inferno_ArcticBlast", status: Status::Mapped },
     Func { kind: Kind::Do, index: 20, address: 0x005C9800, name: "SrvDo020_StaticField", status: Status::Mapped },
     Func { kind: Kind::Do, index: 21, address: 0x005C98F0, name: "SrvDo021_Telekinesis", status: Status::Mapped },
@@ -169,7 +172,7 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Do, index: 27, address: 0x005CA360, name: "SrvDo027_Teleport", status: Status::Mapped },
     Func { kind: Kind::Do, index: 28, address: 0x005CA3E0, name: "SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult", status: Status::Mapped },
     Func { kind: Kind::Do, index: 29, address: 0x005CA4D0, name: "SrvDo029_ThunderStorm", status: Status::Mapped },
-    Func { kind: Kind::Do, index: 30, address: 0x005C37C0, name: "SrvDo030_Curse", status: Status::Mapped },
+    Func { kind: Kind::Do, index: 30, address: 0x005C37C0, name: "SrvDo030_Curse", status: Status::SpecdHere },
     Func { kind: Kind::Do, index: 31, address: 0x005C4B00, name: "SrvDo031_RaiseSkeleton_Mage", status: Status::Mapped },
     Func { kind: Kind::Do, index: 32, address: 0x005C4CD0, name: "SrvDo032_PoisonDagger", status: Status::Mapped },
     Func { kind: Kind::Do, index: 33, address: 0x005D3140, name: "SrvDo033_PsychicHammer", status: Status::Mapped },
@@ -204,7 +207,7 @@ pub const FUNCS: &[Func] = &[
     Func { kind: Kind::Do, index: 62, address: 0x005C5D00, name: "SrvDo062_BonePrison", status: Status::Mapped },
     Func { kind: Kind::Do, index: 63, address: 0x005C5E60, name: "SrvDo063_PoisonExplosion", status: Status::Mapped },
     Func { kind: Kind::Do, index: 64, address: 0x005CE8E0, name: "SrvDo064_Sacrifice", status: Status::Mapped },
-    Func { kind: Kind::Do, index: 65, address: 0x005CF010, name: "SrvDo065_BasicAura", status: Status::Mapped },
+    Func { kind: Kind::Do, index: 65, address: 0x005CF010, name: "SrvDo065_BasicAura", status: Status::SpecdHere },
     Func { kind: Kind::Do, index: 66, address: 0x005CF3A0, name: "SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction", status: Status::Mapped },
     Func { kind: Kind::Do, index: 67, address: 0x005CF900, name: "SrvDo067_Charge", status: Status::Mapped },
     Func { kind: Kind::Do, index: 68, address: 0x005D83E0, name: "SrvDo068_BasicShout", status: Status::Mapped },

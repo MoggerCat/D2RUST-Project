@@ -8,6 +8,7 @@
 mod npc;
 mod quest_npc;
 mod regen;
+mod skill_bodies;
 mod skill_events;
 mod skill_use;
 mod vendors;
