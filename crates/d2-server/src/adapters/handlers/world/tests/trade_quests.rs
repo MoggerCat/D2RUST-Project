@@ -1,0 +1,793 @@
+// Spec: specs/world/quests.md §1.5, §1.7, §6.2, §7.2, §7.3, §10.2; specs/world/npc.md §7.5
+//! C→S 0x31, 0x40 and 0x58 on the wired host: `SimGame<ActionSim,
+//! TradeWorld>` (`TradeWorld::quests`: the real `QuestControl` on
+//! `wiring::economy::EconomyQuests` over the action sim's own units, on
+//! the interaction `Desk`), through the real host frame. Only the seams
+//! no written spec provides are staged (`Rest`).
+//!
+//! Act II–V callbacks stay `QuestRest::unhandled` (spec gaps,
+//! `quests.md` §11): every test asserts the exact list they reach.
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use d2_data::tables::{Monstats, Record};
+use d2_sim::combat::CombatTables;
+use d2_sim::drlg::{DrlgData, Dungeon, LevelTypes, TileInfo, TileSource};
+use d2_sim::game::Game;
+use d2_sim::items::ItemTables;
+use d2_sim::rng::Seed;
+use d2_sim::skills::SkillTables;
+use d2_sim::stats::StatData;
+use d2_sim::units::hooks::{MonsterInfo, UnitData};
+use d2_sim::units::lifecycle::AllocRequest;
+use d2_sim::units::lists::client_state;
+use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::economy::{EconomyQuests, GameFields, QuestRest};
+use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
+use d2_sim::world::quests::{
+    PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
+};
+use d2_sim::world::vendors::price::Bonus;
+use d2_sim::world::vendors::{Transaction, VendorTables};
+
+use super::*;
+use crate::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use crate::adapters::{PlayerData, PlayerFields, SimGame};
+use crate::seams::PlayerGate;
+
+const N_MONSTATS: usize = 400;
+const GAME_SEED: u32 = 1234;
+/// Quest flag bits (`quests.md` §1.2).
+const REWARD_GRANTED: u8 = 0;
+const REWARD_PENDING: u8 = 1;
+const STARTED: u8 = 2;
+const UPDATE_QUEST_LOG: u8 = 12;
+/// Kashya's hire names (synthetic `hireling` row).
+const NAME_FIRST: u16 = 100;
+const NAME_LAST: u16 = 104;
+
+// ---- seams without a provider -----------------------------------------------------------
+
+/// The action wiring's seams: `Pending`'s defaults; sends kept.
+#[derive(Default)]
+pub struct ActionRest {
+    sent: Vec<(UnitId, Vec<u8>)>,
+}
+
+impl Pending for ActionRest {
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.sent.push((player, msg.to_vec()));
+    }
+}
+
+impl Outbox for ActionRest {
+    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+/// The interaction and quest seams no written spec provides
+/// (`wire-interaction.md` §6): staged answers and a log of every call
+/// that would change state outside `d2-sim`.
+#[derive(Default)]
+pub struct Rest {
+    interact: BTreeMap<UnitId, (u8, u32)>,
+    quests: BTreeMap<UnitId, PlayerQuests>,
+    /// GUID of each NPC unit (for the staged 0x27).
+    guids: BTreeMap<UnitId, u32>,
+    sent: Vec<(UnitId, Vec<u8>)>,
+    log: Vec<String>,
+}
+
+impl Outbox for Rest {
+    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+impl PlayerQuestsRef for Rest {
+    fn quests_ref(&self, player: UnitId) -> Option<&PlayerQuests> {
+        self.quests.get(&player)
+    }
+}
+
+impl NpcRest for Rest {
+    fn item_format(&self) -> u16 {
+        1
+    }
+    fn distance(&self, _: UnitId, _: UnitId) -> i32 {
+        3
+    }
+    fn axis_check(&self, _: UnitId, _: UnitId) -> u32 {
+        0
+    }
+    fn unit_check(&self, _: UnitId, _: u32) -> u32 {
+        0
+    }
+    fn clear_path(&mut self, _: UnitId) {}
+    fn approach(&mut self, _: UnitId, _: UnitId) {}
+    fn player_busy(&self, _: UnitId) -> u32 {
+        0
+    }
+    fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
+        true
+    }
+    fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
+        self.interact.get(&player).copied()
+    }
+    fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
+        self.interact.insert(player, (t, guid));
+    }
+    fn reset_interact(&mut self, player: UnitId) {
+        self.interact.remove(&player);
+    }
+    /// No hireling: the quest mercenary is granted (`npc.md` §7.5).
+    fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
+        None
+    }
+    fn pets(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn player_name(&self, _: UnitId) -> Vec<u8> {
+        b"tester".to_vec()
+    }
+    fn reset_stats(&mut self, _: UnitId) {}
+    fn reset_skills(&mut self, _: UnitId) {}
+    fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
+    fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
+    fn npc_ai_param(&mut self, npc: UnitId, p: u32) {
+        self.log.push(format!("ai param {} {p:#x}", npc.0));
+    }
+    fn stat_sent(&mut self, _: UnitId, stat: u16, value: u32) {
+        self.log.push(format!("setstat {stat} {value}"));
+    }
+    fn respec_sound(&mut self, _: UnitId) {}
+    fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
+        [0; 34]
+    }
+    fn socket_granted(&mut self, _: UnitId) {}
+    fn personalize_granted(&mut self, _: UnitId) {}
+    fn inventory_entries(&self, _: UnitId) -> Vec<InvEntry> {
+        Vec::new()
+    }
+    fn identify(&mut self, _: UnitId) {}
+    fn cursor_item(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn item_facts(&self, _: UnitId) -> ItemFacts {
+        ItemFacts::default()
+    }
+    fn put_back(&mut self, _: UnitId, _: UnitId) {}
+    fn remove_cursor_item(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn duplicate(&mut self, _: UnitId, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn create_imbued(&mut self, _: UnitId, _: UnitId, _: &ImbueMods) -> Option<UnitId> {
+        None
+    }
+    fn item_refresh(&mut self, _: UnitId) {}
+    fn personal_name(&self, _: UnitId) -> Vec<u8> {
+        Vec::new()
+    }
+    fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
+    fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
+    fn set_mode(&mut self, u: UnitId, mode: u8) {
+        self.log.push(format!("mode {} {mode}", u.0));
+    }
+    /// The monster spawn (monster spec): none, so the quest mercenary
+    /// stops after S→C 0x50 (`npc.md` §7.5).
+    fn spawn_mercenary(&mut self, _: UnitId, class: u32, mode: u8) -> Option<UnitId> {
+        self.log.push(format!("spawn merc {class} {mode}"));
+        None
+    }
+    fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
+    fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
+}
+
+/// No vendor path runs in these tests.
+impl VendorRest for Rest {
+    fn players_in_level(&self, _: u16) -> i32 {
+        1
+    }
+    fn player_level_id(&self, _: UnitId) -> u16 {
+        1
+    }
+    fn gold_cap(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn stash_cap(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn drop_gold(&mut self, _: UnitId, _: i32) {}
+    fn last_bought(&self, _: UnitId) -> u32 {
+        u32::MAX
+    }
+    fn set_last_bought(&mut self, _: UnitId, _: u32) {}
+    fn has_cursor_item(&self, _: UnitId) -> bool {
+        false
+    }
+    fn copy_item(&mut self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn has_filled_sockets(&self, _: UnitId) -> bool {
+        false
+    }
+    fn socketed(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn price_bonuses(&self, _: UnitId) -> Vec<Bonus> {
+        Vec::new()
+    }
+    fn recharge(&mut self, _: UnitId) {}
+    fn repair_broken(&mut self, _: UnitId) {}
+    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
+    fn send_transaction(&mut self, _: UnitId, _: Transaction) {}
+    fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
+    fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
+        true
+    }
+    fn remove_store_item(&mut self, _: u16, _: UnitId) {}
+    fn take_from_store(&mut self, _: u16, _: UnitId) {}
+    fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
+        true
+    }
+    fn remove_gamble_item(&mut self, _: u16, _: u32, _: UnitId) {}
+    fn refresh_npc_inventory(&mut self, _: UnitId) {}
+    fn add_trade_inventory(&mut self, _: u16, _: UnitId) {}
+    fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+        None
+    }
+    fn add_to_tome(&mut self, _: UnitId, _: i32) {}
+    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+        None
+    }
+    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
+    fn remove_stored(&mut self, _: UnitId, _: UnitId) {}
+    fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+}
+
+impl QuestRest for Rest {
+    fn has_act2(&self) -> bool {
+        false
+    }
+    fn players(&self) -> Vec<UnitId> {
+        self.quests.keys().copied().collect()
+    }
+    fn first_client_player(&self) -> Option<UnitId> {
+        self.quests.keys().next().copied()
+    }
+    fn quests(&mut self, player: UnitId) -> Option<&mut PlayerQuests> {
+        self.quests.get_mut(&player)
+    }
+    fn player_byte_4c(&self, _: UnitId) -> u8 {
+        0
+    }
+    fn set_player_byte_4c(&mut self, _: UnitId, _: u8) {}
+    fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
+        None
+    }
+    fn unit_act(&self, _: UnitId) -> Option<u8> {
+        Some(0)
+    }
+    fn unit_level(&self, _: UnitId) -> Option<u32> {
+        Some(1)
+    }
+    fn unit_kind(&self, _: UnitId) -> UnitKind {
+        UnitKind::Other
+    }
+    fn players_near(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn attach_sound(&mut self, u: UnitId, sound: u16) {
+        self.log.push(format!("sound {} {sound}", u.0));
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.sent.push((player, msg.to_vec()));
+    }
+    /// S→C 0x27 (`npc.md` §2): type 1, the NPC's GUID, then the 34
+    /// bytes of `0x00661480` (`server-messages.tsv` 0x27 `partial`:
+    /// staged zero). The entries are logged.
+    fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]) {
+        self.log.push(format!("text list {} {list:?}", npc.0));
+        let mut m = vec![0x27, 1];
+        m.extend_from_slice(&self.guids[&npc].to_le_bytes());
+        m.extend_from_slice(&[0; 34]);
+        self.sent.push((player, m));
+    }
+    fn inventory(&self, _: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn delete_item(&mut self, _: UnitId, _: [u8; 4]) {}
+    fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
+        None
+    }
+    fn drop_item_at(&mut self, _: UnitId, _: [u8; 4], _: u8) -> bool {
+        false
+    }
+    fn den_region(&self) -> (u32, u32, u32, u32) {
+        (0, 0, 0, 0)
+    }
+    fn true_tomb_level(&self) -> u32 {
+        0
+    }
+    fn free_spot(&mut self, _: UnitId, _: u32, _: u32, _: u32, _: u32) -> Option<(i32, i32)> {
+        None
+    }
+    fn create_portal(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: u32) -> bool {
+        false
+    }
+    fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
+    fn set_object_opened(&mut self, _: UnitId) {}
+    /// Reached only when a reward is not routed to the NPC control
+    /// block: the tests assert it never is.
+    fn mercenary_reward(&mut self, p: UnitId, npc: u16) {
+        self.log.push(format!("rest merc reward {} {npc}", p.0));
+    }
+    fn unhandled(&mut self, chain: u8, function: u32) {
+        self.log.push(format!("unhandled {chain} {function:#x}"));
+    }
+}
+
+struct NoTiles;
+
+impl TileSource for NoTiles {
+    fn dt1(&self, _: &[u8]) -> Option<&[TileInfo]> {
+        None
+    }
+}
+
+struct NoLevelTypes;
+
+impl LevelTypes for NoLevelTypes {}
+
+// ---- the game ---------------------------------------------------------------------------
+
+pub type World = TradeWorld<Rest>;
+pub type Sim = SimGame<ActionSim<ActionRest>, World>;
+
+fn monstats() -> Vec<Monstats> {
+    let mut v: Vec<Monstats> = (0..N_MONSTATS)
+        .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
+        .collect();
+    for c in [class::AKARA, class::KASHYA] {
+        v[usize::from(c)].npc = true;
+        v[usize::from(c)].interact = true;
+    }
+    v
+}
+
+/// Kashya's Normal row (version 0: classic), five names.
+fn hirelings() -> Vec<HireRow> {
+    vec![HireRow {
+        version: 0,
+        class: 271,
+        act: 1,
+        difficulty: 1,
+        seller: u32::from(class::KASHYA),
+        gold: 100,
+        level: 1,
+        name_first: NAME_FIRST,
+        name_last: NAME_LAST,
+    }]
+}
+
+pub struct Fx {
+    pub h: TestHost<Sim>,
+    pub player: UnitId,
+    pub akara: UnitId,
+    pub kashya: UnitId,
+}
+
+impl Fx {
+    /// Game creation: the action sim, the NPC control and the quests on
+    /// the game seed, Akara, Kashya and the player allocated (real unit
+    /// records), Kashya's hire list made; the player enters (`quests.md`
+    /// §3, mode 0) with `flags` as their current record, then joins.
+    pub fn new(flags: impl FnOnce(&mut PlayerQuests)) -> Self {
+        let tables = ActionTables {
+            missiles: Vec::new(),
+            skills: SkillTables {
+                skills: Vec::new(),
+                skilldesc: Vec::new(),
+                missiles: Vec::new(),
+                skills_code: Vec::new(),
+                miss_code: Vec::new(),
+                level_cap: 0,
+                stat_count: 0,
+            },
+            combat: CombatTables {
+                charstats: Vec::new(),
+                difficultylevels: Vec::new(),
+                monstats: Vec::new(),
+                monstats2: Vec::new(),
+                hitclass: Vec::new(),
+            },
+            levels: Vec::new(),
+            skill_modes: Vec::new(),
+        };
+        let drlg = DrlgWorld {
+            dungeon: Dungeon::default(),
+            data: Arc::new(DrlgData::default()),
+            tiles: Box::new(NoTiles),
+            types: Box::new(NoLevelTypes),
+        };
+        let hooks = ActionHooks::new(
+            Arc::new(tables),
+            drlg,
+            Seed::init_low(GAME_SEED),
+            ActionRest::default(),
+        );
+        let data = UnitData {
+            monsters: vec![
+                MonsterInfo {
+                    enabled: true,
+                    aidel: [15; 3],
+                    moves: 0,
+                };
+                N_MONSTATS
+            ],
+            ..UnitData::default()
+        };
+        let mut events = ActionSim::new(Arc::new(StatData::default()), data, hooks);
+        let mut game = Game::new();
+        game.lists.ensure_act(0).unwrap();
+
+        let mut seed = events.hooks().game_seed;
+        let mut ctl = NpcControl::new(&monstats(), hirelings(), false, 0, &mut seed).unwrap();
+        let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
+        events.hooks().game_seed = seed;
+        ctl.make_hire_list(class::KASHYA).unwrap();
+
+        let mut alloc = |ty, class| {
+            let req = AllocRequest {
+                ty,
+                class,
+                room: None,
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: ty == UnitType::Player,
+            };
+            events
+                .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+                .unwrap()
+        };
+        let akara = alloc(UnitType::Monster, u32::from(class::AKARA));
+        let kashya = alloc(UnitType::Monster, u32::from(class::KASHYA));
+        let player = alloc(UnitType::Player, 1);
+        events.sys.units.get_mut(player).unwrap().mode = 1;
+
+        let mut rest = Rest::default();
+        for u in [akara, kashya] {
+            rest.guids.insert(u, game.lists.unit(u).unwrap().guid);
+        }
+        let mut pq = PlayerQuests::default();
+        flags(&mut pq);
+        rest.quests.insert(player, pq);
+        let mut world: World = TradeWorld::new(
+            ActionWorld::default(),
+            GameFields::new(Seed::init_low(GAME_SEED), false),
+            ItemTables::default(),
+            quests,
+            ctl,
+            VendorTables::default(),
+            rest,
+            1000,
+        );
+        world.state.add_npc(akara);
+        world.state.add_npc(kashya);
+        world.with_economy(&mut game, &mut events, |econ, p| {
+            let mut w = EconomyQuests::new(econ, &mut *p.rest);
+            p.quests.player_enters(&mut w, player, 0).unwrap();
+        });
+        world.rest.sent.clear();
+        world.rest.log.clear();
+
+        let mut s: Sim = SimGame::with_world(game, events, world);
+        s.join(0, Some(player), None, client_state::IN_GAME)
+            .unwrap();
+        s.set_player(
+            player,
+            PlayerFields {
+                gate: PlayerGate {
+                    mode: 1,
+                    uninterruptable: false,
+                },
+                data: Some(PlayerData { last_accept: 0 }),
+            },
+        );
+        Fx {
+            h: host(s),
+            player,
+            akara,
+            kashya,
+        }
+    }
+
+    pub fn world(&mut self) -> &mut World {
+        &mut self.h.game.world
+    }
+
+    pub fn guid(&self, u: UnitId) -> u32 {
+        self.h.game.game.lists.unit(u).unwrap().guid
+    }
+
+    /// The player's current (Normal) record.
+    pub fn record(&self) -> [u8; 96] {
+        self.h.game.world.rest.quests[&self.player].flags[0].0
+    }
+
+    /// The game record (`quests.md` §1.4).
+    pub fn game_record(&self) -> [u8; 96] {
+        self.h.game.world.quests.game.0
+    }
+
+    /// Every error: action adapters, unit dispatch, interaction state,
+    /// handler faults.
+    pub fn errors(&self) -> Vec<String> {
+        let s = &self.h.game;
+        let mut e: Vec<String> = s
+            .events
+            .sys
+            .hooks
+            .errors
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect();
+        e.extend(s.events.sys.errors.iter().map(|e| format!("{e:?}")));
+        e.extend(s.world.state.errors.iter().map(|e| format!("{e:?}")));
+        e.extend(s.world.action.faults.iter().map(|f| format!("{f:?}")));
+        e
+    }
+
+    pub fn take_log(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.world().rest.log)
+    }
+}
+
+/// C→S 0x31 (9 bytes): NPC GUID, message, pad.
+fn quest_message(guid: u32, msg: u16) -> Vec<u8> {
+    let mut m = vec![0x31];
+    m.extend_from_slice(&guid.to_le_bytes());
+    m.extend_from_slice(&msg.to_le_bytes());
+    m.extend_from_slice(&[0, 0]);
+    m
+}
+
+// ---- tests ------------------------------------------------------------------------------
+
+/// The event-0 callbacks of Act I that `quests.md` §10 does not write
+/// (reached by the text refresh's activation, §7.2), and chain 37's
+/// event-11 function `0x0058F870` first: the `unhandled` list of one
+/// Akara message 64 (Acts II–V raise nothing in Act I).
+const AKARA_64_UNHANDLED: [&str; 8] = [
+    "unhandled 37 0x58f870",
+    "unhandled 37 0x58f8f0",
+    "unhandled 6 0x595e20",
+    "unhandled 5 0x594c50",
+    "unhandled 4 0x592580",
+    "unhandled 3 0x5916a0",
+    "unhandled 2 0x590b10",
+    "unhandled 1 0x58ff90",
+];
+
+/// The first offered, not hired, slot of Kashya's hire list.
+fn first_offer(f: &mut Fx) -> u16 {
+    let h = f.world().npc.record(class::KASHYA).unwrap().hire.as_ref();
+    let slot = h.unwrap().slots.iter().find(|s| s.offered && !s.hired);
+    slot.unwrap().name
+}
+
+fn get(r: &[u8; 96], q: usize, b: u8) -> bool {
+    u16::from_le_bytes([r[2 * q], r[2 * q + 1]]) & (1 << b) != 0
+}
+
+// Covers: specs/world/quests.md §7.3
+#[test]
+fn akara_message_64_starts_den_of_evil_then_chat_end() {
+    // `015956` frames 1729–1751: 0x31 (Akara, message 64) → 0x27, 0x29;
+    // the chat end → `5d 01 00 01 0000`; slot 1 = `04 00`.
+    let mut f = Fx::new(|_| {});
+    let g = f.guid(f.akara);
+    let before = f.record();
+    let (code, got) = send(&mut f.h, &quest_message(g, 64));
+    assert_eq!(code, ResultCode::Done);
+    let mut m27 = vec![0x27, 1];
+    m27.extend_from_slice(&g.to_le_bytes());
+    m27.extend_from_slice(&[0; 34]);
+    let m29 = [&[0x29u8][..], &f.game_record()[..]].concat();
+    assert_eq!(got, vec![m27, m29]);
+    let mut want = before;
+    want[2] |= 1 << STARTED;
+    assert_eq!(f.record(), want);
+    assert_eq!(f.world().quests.record(1).unwrap().state, 2);
+    let mut log = AKARA_64_UNHANDLED.map(String::from).to_vec();
+    log.push(format!("text list {} []", f.akara.0));
+    assert_eq!(f.take_log(), log);
+
+    // Chat end through the NPC module (`npc.md` §3, `quests.md` §6.3).
+    let mut end = vec![0x30, 1, 0, 0, 0];
+    end.extend_from_slice(&g.to_le_bytes());
+    let (code, got) = send(&mut f.h, &end);
+    assert_eq!(
+        (code, got),
+        (ResultCode::Done, vec![hex("5d 01 00 01 0000")])
+    );
+    assert_eq!(f.record()[2..4], [0x04, 0x00]);
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+/// Routing (no claim: `npc.md` §7.5's expansion and refill branches are
+/// the module's tests).
+#[test]
+fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
+    let mut f = Fx::new(|q| q.flags[0].set(2, REWARD_PENDING));
+    let g = f.guid(f.kashya);
+    let name = first_offer(&mut f);
+    let before = f.record();
+    let (code, got) = send(&mut f.h, &quest_message(g, 92));
+    assert_eq!(code, ResultCode::Done);
+    // S→C 0x50 (15 bytes): u16 2, the slot's name, zeros (§7.5).
+    let mut m50 = vec![0x50, 2, 0];
+    m50.extend_from_slice(&name.to_le_bytes());
+    m50.extend_from_slice(&[0; 10]);
+    assert_eq!(got, vec![m50]);
+    let mut want = before;
+    want[4] = (want[4] | 1 << REWARD_GRANTED) & !(1 << REWARD_PENDING);
+    assert_eq!(f.record(), want);
+    assert_eq!(f.world().quests.record(2).unwrap().state, 5);
+    let ctl = &f.world().npc;
+    let slots = &ctl
+        .record(class::KASHYA)
+        .unwrap()
+        .hire
+        .as_ref()
+        .unwrap()
+        .slots;
+    assert!(slots.iter().any(|s| s.name == name && s.hired));
+    // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12),
+    // never on `QuestRest::mercenary_reward`; chain 37's event-11
+    // function is the only callback without a body.
+    assert_eq!(
+        f.take_log(),
+        [
+            "unhandled 37 0x58f870",
+            "spawn merc 271 4",
+            "spawn merc 271 6",
+            "spawn merc 271 12",
+        ]
+    );
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+#[test]
+fn kashya_message_92_without_reward_pending_does_nothing() {
+    let mut f = Fx::new(|_| {});
+    let g = f.guid(f.kashya);
+    let before = f.record();
+    let (code, got) = send(&mut f.h, &quest_message(g, 92));
+    assert_eq!((code, got), (ResultCode::Done, vec![]));
+    assert_eq!(f.record(), before);
+    assert_eq!(f.take_log(), ["unhandled 37 0x58f870"]);
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+// Covers: specs/world/quests.md §6.2 r1, §6.2 r2, §6.2 r4
+#[test]
+fn request_quest_data() {
+    let mut f = Fx::new(|_| {});
+    let (code, got) = send(&mut f.h, &[0x40]);
+    assert_eq!(code, ResultCode::Done);
+    assert_eq!(
+        got,
+        vec![
+            [&hex("28 06 00000000 00")[..], &f.record()[..]].concat(),
+            [&[0x52u8][..], &[0u8; 41][..]].concat(),
+        ]
+    );
+    assert_eq!(f.take_log(), Vec::<String>::new());
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+// Covers: specs/world/quests.md §6.2 r1
+#[test]
+fn one_flag_bit_changes_one_byte_of_the_0x28() {
+    // M08: slot 3 bit 2 set in the player's record → exactly byte 7 + 6
+    // of the 0x28 differs (bit 2), nothing else in the frame.
+    let run = |perturb: bool| {
+        let mut f = Fx::new(|_| {});
+        if perturb {
+            let p = f.player;
+            f.world().rest.quests.get_mut(&p).unwrap().flags[0].set(3, STARTED);
+        }
+        send(&mut f.h, &[0x40])
+    };
+    let (a, b) = (run(false), run(true));
+    assert_eq!(a.0, b.0);
+    assert_eq!(a.1.len(), b.1.len());
+    let diffs: Vec<(usize, usize, u8)> =
+        a.1.iter()
+            .zip(&b.1)
+            .enumerate()
+            .flat_map(|(m, (x, y))| {
+                assert_eq!(x.len(), y.len());
+                x.iter()
+                    .zip(y)
+                    .enumerate()
+                    .filter(|(_, (p, q))| p != q)
+                    .map(move |(i, (p, q))| (m, i, p ^ q))
+            })
+            .collect();
+    assert_eq!(diffs, [(0, 7 + 6, 1 << STARTED)]);
+}
+
+// Covers: specs/world/quests.md §1.7
+#[test]
+fn quest_completed_sets_the_log_bit() {
+    let mut f = Fx::new(|_| {});
+    let before = f.record();
+    let (code, got) = send(&mut f.h, &hex("58 0500"));
+    assert_eq!((code, got), (ResultCode::Done, vec![]));
+    let mut want = before;
+    want[11] |= 1 << (UPDATE_QUEST_LOG - 8);
+    assert_eq!(f.record(), want);
+    assert!(get(&f.record(), 5, UPDATE_QUEST_LOG));
+    // Slot 41 is the last below 0x2A; 0x2A is result 2, nothing set.
+    let (code, got) = send(&mut f.h, &hex("58 2900"));
+    assert_eq!((code, got), (ResultCode::Done, vec![]));
+    want[83] |= 1 << (UPDATE_QUEST_LOG - 8);
+    assert_eq!(f.record(), want);
+    let (code, got) = send(&mut f.h, &hex("58 2a00"));
+    assert_eq!((code, got), (ResultCode::Invalid, vec![]));
+    assert_eq!(f.record(), want);
+    assert_eq!(f.take_log(), Vec::<String>::new());
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+#[test]
+fn same_seed_same_run() {
+    let run = || {
+        let mut f = Fx::new(|q| q.flags[0].set(2, REWARD_PENDING));
+        let (a, k) = (f.guid(f.akara), f.guid(f.kashya));
+        let mut out = Vec::new();
+        for m in [quest_message(a, 64), quest_message(k, 92), vec![0x40]] {
+            out.push(send(&mut f.h, &m));
+        }
+        (out, f.record(), f.game_record(), f.take_log())
+    };
+    assert_eq!(run(), run());
+}

@@ -99,7 +99,11 @@ None.
 
 ## Edge cases & original bugs
 
-- Zero-size frames (width or height 0) occur and decode to empty images.
+- Zero-size frames (width or height 0) decode to empty images (d2rs
+  rule). None occurs in the 1.14d files: 0 in the 1,651 DC6 listed by
+  `d2exp.mpq` (367) and `d2data.mpq` (1,284) (ignored game test
+  `dc6_zero_size_frames`, 2026-10-06; `patch_d2.mpq` has no `(listfile)`
+  and is not enumerated). The earlier "they occur" was unmeasured.
 
 ## Test vectors
 

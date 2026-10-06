@@ -38,7 +38,7 @@ HEAD = re.compile(r"^(#{2,4}) (.+?)\s*$")
 NUMBERED = re.compile(r"^((?:\d+\.)*\d+)\.?\s")  # "5.2 Title", "1. Title"
 ITEM = re.compile(r"^(\d+)\. ")
 CLAIM = re.compile(r"^\s*(?://|#) Covers:(.*)$")
-RULE_REF = re.compile(r"^§[0-9a-z][0-9a-z.\-]*(?: text|(?: l[2-9][0-9]*)? r[1-9][0-9]*)?$")
+RULE_REF = re.compile(r"^§[0-9a-z][0-9a-z.\-]*(?: text|(?: l[2-9][0-9]*)? r(?:0|[1-9][0-9]*))?$")  # r0: a list numbered from 0
 TIERS = ("unit", "game", "trace")
 
 
@@ -304,6 +304,21 @@ def selftest():
             src.write_text(test.format(rule=rule), encoding="utf-8")
             claims, errors = scan(root, specs, [src])
             assert errors == want, (rule, errors)
+        # A list numbered from 0: item 0 is §<s> r0 (claimable), the "1." after it
+        # starts list 2 (docs/COVERAGE.md §1); r00 / r01 stay malformed.
+        (root / "specs/x/z.md").write_text("# Z\n\n## Rules\n\n### 1. Zero\n\n0. a\n1. b\n", encoding="utf-8")
+        specs = load_specs(root)
+        assert specs["specs/x/z.md"].leaves == ["§1 r0", "§1 l2 r1"], specs["specs/x/z.md"].leaves
+        zero = {
+            "§1 r0": [],
+            "§1 r0, §1 l2 r1": [],
+            "§1 r00": [bad + "malformed rule '§1 r00' (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)"],
+            "§1 r01": [bad + "malformed rule '§1 r01' (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)"],
+            "§1 l2 r0": [bad + "dangling claim: specs/x/z.md has no rule §1 l2 r0"],
+        }
+        for rule, want in zero.items():
+            src.write_text(test.format(rule=rule).replace("s.md", "z.md", 1), encoding="utf-8")
+            assert scan(root, specs, [src])[1] == want, (rule, scan(root, specs, [src])[1])
         src.write_text(test.format(rule="§1").replace("s.md §1", "t.md §1", 1), encoding="utf-8")
         assert scan(root, specs, [src])[1] == [bad + "dangling claim: no spec specs/x/t.md"]
         src.write_text(test.format(rule="§1").replace("#[test]\n    fn t", "fn t", 1), encoding="utf-8")

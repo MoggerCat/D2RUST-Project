@@ -342,6 +342,101 @@ mod tests {
         assert_eq!((b.x0, b.y0, b.x1, b.y1), (0, 0, 112, 135));
     }
 
+    /// 2×2 map with every wall-layer piece of `orientations` (per layer,
+    /// row-major) and two floor layers: layer 0 full, layer 1 at (1,0) and
+    /// (0,1).
+    fn depth_map(orientations: Vec<Vec<u32>>) -> (Ds1, TileLibrary) {
+        let cell = |sub: u32| 0x01 | (sub << 8);
+        let walls = orientations
+            .iter()
+            .map(|l| {
+                l.iter()
+                    .map(|&o| if o == 0 { 0 } else { cell(1) })
+                    .collect()
+            })
+            .collect();
+        let ds1 = Ds1 {
+            version: 18,
+            width: 2,
+            height: 2,
+            act: 0,
+            tag_type: 0,
+            files: vec![],
+            unknown_header: None,
+            walls,
+            orientations,
+            floors: vec![vec![cell(1); 4], vec![0, cell(2), cell(2), 0]],
+            shadow: vec![0; 4],
+            tags: None,
+            objects: vec![],
+            unknown_groups: None,
+            groups: vec![],
+            groups_truncated: false,
+            paths: vec![],
+            trailing: vec![],
+        };
+        let dt1 = Dt1 {
+            version: 7,
+            minor_version: 6,
+            tiles: [(0, 1), (0, 2), (1, 1), (2, 1), (3, 1), (4, 1)]
+                .map(|(o, sub)| tile(o, sub, 0))
+                .to_vec(),
+        };
+        let mut lib = TileLibrary::new();
+        lib.add_dt1(&dt1);
+        (ds1, lib)
+    }
+
+    // Covers: specs/render/map-preview.md §draw-order r1
+    #[test]
+    fn floors_layer_by_layer_row_major() {
+        let (ds1, lib) = depth_map(vec![vec![0; 4]]);
+        let layout = build(&ds1, &lib, 80);
+        let floors: Vec<_> = layout.items.iter().map(|it| (it.source, it.cell)).collect();
+        assert_eq!(
+            floors,
+            [
+                (Source::Floor(0), (0, 0)),
+                (Source::Floor(0), (1, 0)),
+                (Source::Floor(0), (0, 1)),
+                (Source::Floor(0), (1, 1)),
+                (Source::Floor(1), (1, 0)),
+                (Source::Floor(1), (0, 1)),
+            ]
+        );
+    }
+
+    // Covers: specs/render/map-preview.md §draw-order r3
+    #[test]
+    fn walls_sorted_by_depth_x_layer_piece() {
+        // Layer 0: (0,0) wall 1, (1,0) corner 3, (0,1) wall 2, (1,1) wall 1.
+        // Layer 1: (0,0) wall 2, (1,0) wall 1.
+        let (ds1, lib) = depth_map(vec![vec![1, 3, 2, 1], vec![2, 1, 0, 0]]);
+        let layout = build(&ds1, &lib, 80);
+        let walls: Vec<_> = layout
+            .items
+            .iter()
+            .filter(|it| matches!(it.source, Source::Wall(_)))
+            .map(|it| (it.cell, it.source, it.key.orientation))
+            .collect();
+        assert_eq!(
+            walls,
+            [
+                ((0, 0), Source::Wall(0), 1),
+                ((0, 0), Source::Wall(1), 2),
+                // x + y = 1: x 0 before x 1, although (1,0) comes first in
+                // cell order.
+                ((0, 1), Source::Wall(0), 2),
+                // Same cell: layer 0's corner, main piece then its
+                // orientation-4 half, before layer 1.
+                ((1, 0), Source::Wall(0), 3),
+                ((1, 0), Source::Wall(0), 4),
+                ((1, 0), Source::Wall(1), 1),
+                ((1, 1), Source::Wall(0), 1),
+            ]
+        );
+    }
+
     // Covers: specs/render/map-preview.md §sprites-demo
     #[test]
     fn sprites_go_on_top() {

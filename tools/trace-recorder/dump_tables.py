@@ -126,7 +126,13 @@ MAPS = {
     "leveldefs_portals": (0x96C9F4, None, 4, ("g", 0x96C9F8)),
     "monseq_index": (0x96C7B4, None, 12, ("g", 0x96C7B8)),
     "lvlsub_type_first": (0x96CA18, None, 4, 13),  # max lvlsub Type + 1 (12 in 1.14d)
+    # Treasure classes (specs/items/treasure.md §1.1, §1.6); the entry
+    # lists the records point to are dumped as map-tc_entries.bin.
+    "tc_records": (0x96C5EC, None, 0x2C, ("g", 0x96C5F0)),
+    "tc_chest": (None, 0x96C5F4, 4, 45),
 }
+
+TC_ENTRY_SIZE = 0x1C
 
 
 class Dumper:
@@ -273,6 +279,8 @@ class Dumper:
             self.save(f"map-{name}.bin", data)
             maps[name] = {"address": f"{addr:#x}", "pointer_global": pg and f"{pg:#x}",
                           "element_size": esize, "count": n, "bytes": len(data)}
+            if name == "tc_records":
+                maps["tc_entries"] = self.dump_tc_entries(data, addr)
         self.manifest = {"format": FORMAT, "tool": TOOL,
                          "date": datetime.date.today().isoformat(),
                          "game_exe_sha256": self.sha, "args": self.args,
@@ -282,6 +290,22 @@ class Dumper:
                                     "count_global": ld["count_global"]
                                     and f"{ld['count_global']:#x}"} for ld in self.loads],
                          "tables": tables, "maps": maps}
+
+    def dump_tc_entries(self, records, base):
+        """Entry lists of every TC record, concatenated in record order;
+        `tc_chest` pointers become record indices via `tc_base`."""
+        out, total = bytearray(), 0
+        for i in range(len(records) // 0x2C):
+            rec = records[i * 0x2C:(i + 1) * 0x2C]
+            count = int.from_bytes(rec[4:8], "little", signed=True)
+            ptr = int.from_bytes(rec[0x28:0x2C], "little")
+            if count > 0 and ptr:
+                out += self.read(ptr, count * TC_ENTRY_SIZE)
+                total += count
+        self.save("map-tc_entries.bin", bytes(out))
+        return {"address": "lists of tc_records +0x28", "tc_base": f"{base:#x}",
+                "pointer_global": None, "element_size": TC_ENTRY_SIZE,
+                "count": total, "bytes": len(out)}
 
     # --- process control --------------------------------------------------
 

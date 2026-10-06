@@ -727,6 +727,51 @@ mod tests {
         file
     }
 
+    /// Three 1×1 frames, top-down, palette {0, 10, 20}: frame 0 at x 0
+    /// (direction cell 0), frame 1 at x 4 (direction cell 1, so cell 0 is
+    /// skipped), frame 2 at x 0 again as an equal cell.
+    fn skipped_cell_file() -> Vec<u8> {
+        let mut w = BitWriter::default();
+        w.put(0, 32); // outsize coded
+        w.put(2, 2); // flags: equal-cells stream present
+        for code in [0, 15, 15, 15, 15, 0, 0] {
+            w.put(code, 4);
+        }
+        for x in [0u32, 4, 0] {
+            for v in [1, 1, x, 0] {
+                w.put(v, 32); // width, height, x, y
+            }
+            w.put(0, 1); // top-down
+        }
+        w.put(1, 20); // equal-cells stream: 1 bit
+        w.put(0, 20); // pixel-mask stream: none (first touches use 0xF)
+        for i in 0..256u32 {
+            w.put(u32::from(i == 0 || i == 10 || i == 20), 1);
+        }
+        w.put(1, 1); // frame 2, cell 0: equal
+                     // Stage 1 PCD: frame 0 pushes code 1, frame 1 pushes code 2.
+        for disp in [1, 0, 2, 0] {
+            w.put(disp, 4);
+        }
+        // Stage 2: v = [c, 0, 0, 0], 1 bit per pixel, index 0.
+        w.put(0, 1);
+        w.put(0, 1);
+        dcc_file(3, &[w.bytes])
+    }
+
+    // Covers: specs/formats/dcc.md §edge-cases-original-bugs
+    #[test]
+    fn equal_cell_copies_from_last_draw_of_its_cell() {
+        let dcc = Dcc::parse(&skipped_cell_file()).unwrap();
+        let frames = &dcc.directions[0].frames;
+        assert_eq!(frames[0].pixels, [10]);
+        assert_eq!(frames[1].pixels, [20]);
+        // Frame 1 never drew direction cell 0 (its output there is 0); the
+        // equal cell of frame 2 copies what frame 0 drew into the
+        // persistent buffer, not frame 1's output.
+        assert_eq!(frames[2].pixels, [10]);
+    }
+
     // Covers: specs/formats/dcc.md §boxes
     #[test]
     fn regress_sparse_boxes_bounded() {

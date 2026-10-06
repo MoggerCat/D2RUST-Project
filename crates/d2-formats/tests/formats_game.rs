@@ -100,6 +100,45 @@ fn all_ds1_and_dt1_in_d2exp() {
     });
 }
 
+// Covers: specs/formats/ds1.md §edge-cases-original-bugs
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn ds1_layer_limits_and_truncated_trees_groups() {
+    // Up to 4 walls and 2 floors, and exactly one shadow layer (synthetic
+    // v18, 1×1 grid, tag_type 0, no files, objects or paths).
+    let mut d = Vec::new();
+    let mut put = |x: u32| d.extend_from_slice(&x.to_le_bytes());
+    for x in [18, 0, 0, 0, 0, 0, 4, 2] {
+        put(x); // version, width-1, height-1, act, tag_type, files, walls, floors
+    }
+    for l in 0..11 {
+        put(if l < 8 && l % 2 == 1 { 1 } else { 100 + l }); // 4×(wall, orientation), 2 floors, shadow
+    }
+    put(0); // objects
+    put(0); // paths
+    let ds1 = Ds1::parse(&d).unwrap();
+    assert_eq!((ds1.walls.len(), ds1.orientations.len()), (4, 4));
+    assert_eq!(ds1.floors.len(), 2);
+    assert_eq!(ds1.floors[1], [109]);
+    assert_eq!(ds1.shadow, [110]);
+    assert!(ds1.tags.is_none());
+
+    // trees.ds1 declares 14 groups and ends 4 bytes into the 14th.
+    let (exp, data) = (archive("d2exp.mpq"), archive("d2data.mpq"));
+    let name = r"data\global\tiles\ACT1\OUTDOORS\trees.ds1";
+    let bytes = read_first(&[&exp, &data], name).expect("trees.ds1 present");
+    let trees = Ds1::parse(&bytes).unwrap();
+    assert_eq!((trees.version, trees.tag_type), (12, 1));
+    assert_eq!(trees.groups.len(), 14);
+    assert!(trees.groups_truncated);
+    let last = &trees.groups[13];
+    assert_eq!((last.y, last.width, last.height), (0, 0, 0));
+    assert!(trees
+        .files
+        .iter()
+        .any(|f| f.eq_ignore_ascii_case(br"C:\D2\DATA\GLOBAL\TILES\ACT1\TOWN\trees.tg1")));
+}
+
 // Covers: specs/formats/dcc.md §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -116,18 +155,21 @@ fn sample_dcc() {
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dc6_zero_size_frames() {
     let mut zero = 0;
-    parse_all("d2data.mpq", ".dc6", |name, b| {
-        for f in Dc6::parse(b)
-            .unwrap_or_else(|e| panic!("{name}: {e}"))
-            .frames
-        {
-            if f.width == 0 || f.height == 0 {
-                assert!(f.pixels.is_empty(), "{name}");
-                zero += 1;
+    // patch_d2.mpq has no (listfile); X and D list 367 + 1,284 DC6.
+    for a in ["d2exp.mpq", "d2data.mpq"] {
+        parse_all(a, ".dc6", |name, b| {
+            for f in Dc6::parse(b)
+                .unwrap_or_else(|e| panic!("{name}: {e}"))
+                .frames
+            {
+                if f.width == 0 || f.height == 0 {
+                    assert!(f.pixels.is_empty(), "{name}");
+                    zero += 1;
+                }
             }
-        }
-    });
-    assert!(zero > 0, "zero-size frames occur");
+        });
+    }
+    assert_eq!(zero, 0, "no live DC6 frame has width or height 0");
 }
 
 /// Reads `name` from the first of `archives` that has it.
@@ -317,15 +359,19 @@ fn animdata_edge_cases() {
     ];
     want.sort();
     assert_eq!(differ, want);
-    // In all 9 the second copy matches the .cof.
+    // The .cof matches the second copy in 6 and the first copy in 3.
     for name in want {
-        let second = by_name[name][1].1;
+        let copy = match name {
+            "64A1HTH" | "64NUHTH" | "MINUHTH" => 0,
+            _ => 1,
+        };
+        let matching = by_name[name][copy].1;
         let cof = cof_for(name).unwrap_or_else(|| panic!("{name}: no .cof"));
         let mut events = cof.events.clone();
         events.resize(144, 0);
-        assert_eq!(second.frames, u32::from(cof.frames), "{name}");
-        assert_eq!(second.speed, cof.animation_rate, "{name}");
-        assert_eq!(second.events[..], events[..], "{name}");
+        assert_eq!(matching.frames, u32::from(cof.frames), "{name}");
+        assert_eq!(matching.speed, cof.animation_rate, "{name}");
+        assert_eq!(matching.events[..], events[..], "{name}");
     }
     let vms1 = &by_name["VMS1HTH"];
     assert_eq!((vms1[0].1.speed, vms1[1].1.speed), (200, 160));

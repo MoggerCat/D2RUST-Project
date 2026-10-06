@@ -3,7 +3,10 @@
 //!
 //! Usage: `cargo run -p depcheck`. Exits non-zero on any violation.
 
+mod determinism;
+
 use anyhow::{bail, Context, Result};
+use std::path::Path;
 use std::process::Command;
 
 /// Crates that must never pull in Bevy, directly or transitively.
@@ -25,6 +28,9 @@ const FORBIDDEN: &[(&str, &str)] = &[
     ("d2-sim", "d2-server"),
     ("d2-sim", "d2-client"),
     ("d2-sim", "d2-proto"),
+    // No ambient randomness in the sim (rule 6): only the seeded RNG.
+    ("d2-sim", "rand"),
+    ("d2-sim", "getrandom"),
     // The server never depends on the client.
     ("d2-server", "d2-client"),
 ];
@@ -73,8 +79,19 @@ fn main() -> Result<()> {
         }
     }
 
+    // Hard rule 6: determinism lint over d2-sim's non-test sources.
+    let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = here.join("../..");
+    violations.extend(determinism::check(
+        &root,
+        &here.join("determinism-allow.txt"),
+    )?);
+
     if violations.is_empty() {
-        println!("depcheck: OK ({} crates checked)", NO_BEVY.len());
+        println!(
+            "depcheck: OK ({} crates checked, d2-sim determinism lint clean)",
+            NO_BEVY.len()
+        );
         Ok(())
     } else {
         for v in &violations {

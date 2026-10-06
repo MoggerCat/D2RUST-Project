@@ -16,23 +16,23 @@ use crate::rng::Seed;
 
 // ---------------------------------------------------------------- fixtures
 
-fn zeroed<T: Record>() -> T {
+pub(super) fn zeroed<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
-fn code(s: &str) -> [u8; 4] {
+pub(super) fn code(s: &str) -> [u8; 4] {
     let mut c = [b' '; 4];
     c[..s.len()].copy_from_slice(s.as_bytes());
     c
 }
 
-fn cell<const N: usize>(s: &str) -> [u8; N] {
+pub(super) fn cell<const N: usize>(s: &str) -> [u8; N] {
     let mut c = [0u8; N];
     c[..s.len()].copy_from_slice(s.as_bytes());
     c
 }
 
-fn item(c: &str, ty: u16, level: u8) -> ItemData {
+pub(super) fn item(c: &str, ty: u16, level: u8) -> ItemData {
     ItemData {
         code: code(c),
         ubercode: code("xxx"),
@@ -49,7 +49,7 @@ fn item(c: &str, ty: u16, level: u8) -> ItemData {
 
 /// itemtypes rows 0..=n: plain types with class 0xFF (not class
 /// specific), rarity 3.
-fn itemtypes(n: usize) -> Vec<Itemtypes> {
+pub(super) fn itemtypes(n: usize) -> Vec<Itemtypes> {
     (0..n)
         .map(|_| {
             let mut t: Itemtypes = zeroed();
@@ -62,7 +62,7 @@ fn itemtypes(n: usize) -> Vec<Itemtypes> {
 
 /// Equivalence: identity plus column 0 (itemtypes rule) plus `extra`
 /// pairs (i is of type j).
-fn equiv(n: usize, extra: &[(usize, usize)]) -> EquivMatrix {
+pub(super) fn equiv(n: usize, extra: &[(usize, usize)]) -> EquivMatrix {
     let words = n.div_ceil(32);
     let mut m = EquivMatrix {
         n,
@@ -83,7 +83,7 @@ fn equiv(n: usize, extra: &[(usize, usize)]) -> EquivMatrix {
 }
 
 /// The spec's quality vector row.
-fn ratio_row() -> Itemratio {
+pub(super) fn ratio_row() -> Itemratio {
     let mut r: Itemratio = zeroed();
     r.version = 1;
     (r.unique, r.uniquedivisor, r.uniquemin) = (400, 1, 6400);
@@ -96,7 +96,7 @@ fn ratio_row() -> Itemratio {
 }
 
 /// A TC from (id, prob, flags) entries, starts computed as §1.1.
-fn tc(picks: i32, nodrop: i32, entries: &[(u16, i32, u8)]) -> TreasureClass {
+pub(super) fn tc(picks: i32, nodrop: i32, entries: &[(u16, i32, u8)]) -> TreasureClass {
     let mut t = TreasureClass {
         name: b"t".to_vec(),
         group: 0,
@@ -125,7 +125,7 @@ fn tc(picks: i32, nodrop: i32, entries: &[(u16, i32, u8)]) -> TreasureClass {
     t
 }
 
-fn classes(tcs: Vec<TreasureClass>) -> TreasureClasses {
+pub(super) fn classes(tcs: Vec<TreasureClass>) -> TreasureClasses {
     let mut all = vec![tc(1, 0, &[])];
     all.extend(tcs);
     TreasureClasses {
@@ -136,16 +136,16 @@ fn classes(tcs: Vec<TreasureClass>) -> TreasureClasses {
     }
 }
 
-struct World {
-    tcs: TreasureClasses,
-    items: Vec<ItemData>,
-    itemtypes: Vec<Itemtypes>,
-    equiv: EquivMatrix,
-    ratio: Vec<Itemratio>,
+pub(super) struct World {
+    pub(super) tcs: TreasureClasses,
+    pub(super) items: Vec<ItemData>,
+    pub(super) itemtypes: Vec<Itemtypes>,
+    pub(super) equiv: EquivMatrix,
+    pub(super) ratio: Vec<Itemratio>,
 }
 
 impl World {
-    fn new(tcs: Vec<TreasureClass>, items: Vec<ItemData>) -> Self {
+    pub(super) fn new(tcs: Vec<TreasureClass>, items: Vec<ItemData>) -> Self {
         World {
             tcs: classes(tcs),
             items,
@@ -155,7 +155,7 @@ impl World {
         }
     }
 
-    fn data(&self) -> TreasureData<'_> {
+    pub(super) fn data(&self) -> TreasureData<'_> {
         TreasureData {
             tcs: &self.tcs,
             items: &self.items,
@@ -167,7 +167,7 @@ impl World {
 }
 
 /// Items `a`–`d` (ids 0–3) of type 10.
-fn abcd() -> Vec<ItemData> {
+pub(super) fn abcd() -> Vec<ItemData> {
     ["a", "b", "c", "d"]
         .iter()
         .map(|c| item(c, 10, 1))
@@ -175,12 +175,12 @@ fn abcd() -> Vec<ItemData> {
 }
 
 #[derive(Default)]
-struct Sink {
-    reqs: Vec<DropRequest<()>>,
-    gold: Vec<i32>,
+pub(super) struct Sink {
+    pub(super) reqs: Vec<DropRequest<()>>,
+    pub(super) gold: Vec<i32>,
     /// Gold base given to every created item.
-    base_gold: i32,
-    no_spot: bool,
+    pub(super) base_gold: i32,
+    pub(super) no_spot: bool,
 }
 
 impl DropSink for Sink {
@@ -202,7 +202,7 @@ impl DropSink for Sink {
     }
 }
 
-fn game(expansion: bool, players: i32) -> GameFacts {
+pub(super) fn game(expansion: bool, players: i32) -> GameFacts {
     GameFacts {
         expansion,
         difficulty: 0,
@@ -213,13 +213,13 @@ fn game(expansion: bool, players: i32) -> GameFacts {
     }
 }
 
-const OBJECT: Dropper = Dropper {
+pub(super) const OBJECT: Dropper = Dropper {
     kind: DropperKind::Other { area_level: 5 },
     x: 10,
     y: 20,
 };
 
-fn args(tc: u16, quality: u8) -> WalkArgs {
+pub(super) fn args(tc: u16, quality: u8) -> WalkArgs {
     WalkArgs {
         tc: Some(tc),
         quality,
@@ -230,7 +230,7 @@ fn args(tc: u16, quality: u8) -> WalkArgs {
     }
 }
 
-fn h2h() -> TreasureClass {
+pub(super) fn h2h() -> TreasureClass {
     // `Act 1 H2H A` shape: picks 2, nodrop 100, a 21, b 16, c 21, d 2.
     tc(2, 100, &[(0, 21, 0), (1, 16, 0), (2, 21, 0), (3, 2, 0)])
 }
@@ -1098,17 +1098,17 @@ fn tsv_checks_catch_perturbations() {
 
 // --------------------------------------------------------- runtime (§1)
 
-struct Src {
-    tcx: Vec<Treasureclassex>,
-    itemtypes: Vec<Itemtypes>,
-    items: Vec<ItemData>,
-    equiv: EquivMatrix,
-    uniques: Vec<Uniqueitems>,
-    sets: Vec<Setitems>,
+pub(super) struct Src {
+    pub(super) tcx: Vec<Treasureclassex>,
+    pub(super) itemtypes: Vec<Itemtypes>,
+    pub(super) items: Vec<ItemData>,
+    pub(super) equiv: EquivMatrix,
+    pub(super) uniques: Vec<Uniqueitems>,
+    pub(super) sets: Vec<Setitems>,
 }
 
 impl Src {
-    fn build(&self) -> Result<TreasureClasses, TreasureError> {
+    pub(super) fn build(&self) -> Result<TreasureClasses, TreasureError> {
         TreasureClasses::build(&TcSources {
             treasureclassex: &self.tcx,
             itemtypes: &self.itemtypes,
@@ -1120,7 +1120,7 @@ impl Src {
     }
 }
 
-fn tcx(name: &str, picks: u32, nodrop: u32, items: &[(&str, u32)]) -> Treasureclassex {
+pub(super) fn tcx(name: &str, picks: u32, nodrop: u32, items: &[(&str, u32)]) -> Treasureclassex {
     let mut r: Treasureclassex = zeroed();
     r.treasure_class = cell(name);
     r.picks = picks;
@@ -1148,7 +1148,7 @@ fn tcx(name: &str, picks: u32, nodrop: u32, items: &[(&str, u32)]) -> Treasurecl
 /// 39 a potion type equivalent to 38. Items: `gld` (classic),
 /// `sbw` (bow, level 2), `hbw` (bow, level 5, expansion), `qbw` (quest
 /// bow), `pot` (type 39, level 2).
-fn src() -> Src {
+pub(super) fn src() -> Src {
     let mut itemtypes = itemtypes(60);
     itemtypes[10].code = code("bow");
     itemtypes[10].treasureclass = 1;
@@ -1287,7 +1287,7 @@ fn item_string_parameters_stop_at_unknown_key() {
     assert_eq!(e[2].row, 0xFFFE);
 }
 
-fn grouped() -> TreasureClasses {
+pub(super) fn grouped() -> TreasureClasses {
     let mk = |group, level| {
         let mut t = tc(1, 0, &[(0, 1, 0)]);
         t.group = group;
@@ -1500,7 +1500,7 @@ fn monster_drop_walks_the_upgraded_tc() {
     assert!(out.is_empty());
 }
 
-fn levels() -> Vec<Levels> {
+pub(super) fn levels() -> Vec<Levels> {
     // Act 1 range: level 2 area 1, level 37 area 12; level 8 area 1.
     let mut ls: Vec<Levels> = (0..137).map(|_| zeroed()).collect();
     ls[2].monlvl1ex = 1;

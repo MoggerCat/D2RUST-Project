@@ -20,6 +20,8 @@ pub mod seams;
 pub mod spawn;
 
 #[cfg(test)]
+mod gap_tests;
+#[cfg(test)]
 mod tests;
 
 pub use data::{LevelPop, Mon2Pop, MonPop, PopTables, SuperPop};
