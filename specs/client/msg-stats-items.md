@@ -24,14 +24,14 @@
 | Outputs / state changes | 60–64 |
 | Rules | 65–66 |
 |   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 67–96 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 97–148 |
-|   3. Other item messages | 149–178 |
-| Constants & data dependencies | 179–187 |
-| Randomness | 188–191 |
-| Edge cases & original bugs | 192–201 |
-| Test vectors | 202–226 |
-| Provenance | 227–239 |
-| Open questions | 240–256 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 97–167 |
+|   3. Other item messages | 168–197 |
+| Constants & data dependencies | 198–206 |
+| Randomness | 207–210 |
+| Edge cases & original bugs | 211–220 |
+| Test vectors | 221–248 |
+| Provenance | 249–263 |
+| Open questions | 264–284 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -145,6 +145,25 @@ of the cursor item (0x42), item flag 4 (0x3F).
    `position` none) and its kind data records the last {message id,
    action, category, owner key (0x9D), stream bytes}. A fatal action is
    a handler error; an action > 0x17 changes nothing.
+5. **Cursor item** (the local player's `cursor_item`, cleared by 0x42,
+   §3 rule 1). Two 0x9C actions set it; both use the **local player's**
+   inventory (`0x00463DD0` +0x60), whoever the stream names:
+   1. 0x12 ToCursor (`0x004C20B0`): no local player → fatal 0xB0C. An
+      existing (4, GUID) is removed (`client/model.md` §2 rule 5); the
+      item is created from the stream (`0x004C0F20`); no inventory →
+      fatal 0xB13; cursor item := the new item (`0x0063C180(inventory,
+      item)`, `0x004C2137`), UI refresh (`0x00468070`).
+   2. 0x01 GroundToCursor (`0x004C2650`): only when the stream header's
+      byte +8 is 4 (else nothing); (4, GUID) already in S → fatal
+      0x3A0; created from the stream (none → fatal 0x3A2); cursor item
+      := it (`0x004C26CC`); UI refresh; `0x004C2180(item)`.
+   Model: `cursor_item` := (4, GUID) of the created item. The other
+   action handlers that call `0x0063C180` (`0x004C2340`, `0x004C26F0`,
+   `0x004C2970`, `0x004C2C80`, `0x004C2E90`, `0x004C3070`,
+   `0x004C3380`, `0x004C3760`, `0x004C3B30`, `0x004C3F60`,
+   `0x004C4130`, `0x004C42A0`, `0x004C44D0`, `0x004C4740`,
+   `0x004C4990`, `0x004C4C70`) set or clear it as part of their
+   placement rule: open question 6.
 
 ### 3. Other item messages
 
@@ -220,6 +239,9 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | 0x9C action 0x20 | no change | synthetic |
 | `42 00 01 00 00 00` with a cursor item (4, 9) | cursor none, (4, 9) removed | A 77949 (cursor state synthetic) |
 | `42 00 01 00 00 00` without a cursor item | no change | synthetic |
+| 0x9C action 0x12 for item (4, 9), local player placed | (4, 9) re-created; `cursor_item` = (4, 9) | synthetic, §2 rule 5.1 |
+| 0x9C action 0x12 with no local player | fatal 0xB0C → handler error | synthetic |
+| 0x9C action 0x01 for (4, 9) already in S, header byte +8 = 4 | fatal 0x3A0 → handler error | synthetic, §2 rule 5.2 |
 | `3f ff 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 0; use cursor none | synthetic |
 | `3f 04 05 00 00 00 ff ff` with item (4, 5) | item flag 4 := 1; use cursor {(4, 5), 4} | synthetic |
 | `47 00 00 01 00 00 00 00 00 00 00` | (0, 1) found → requirement refresh | A 76132 |
@@ -235,7 +257,9 @@ in §2, `0x0062E410`, `0x004C0F20`, `0x004C0FF0`; `0x004C2050`,
 from the image with `tools/ghidra/disasm.py`'s loader. Action labels
 from `items/item-actions.tsv` (server side). Recorded stat bytes from
 both recordings (join: 0x1D / 0x1E for stats 0, 1, 2, 3, 7, 9, 11, 12;
-0x1B experience).
+0x1B experience). Cursor (join-update session, 2026-10-06): `0x004C20B0`,
+`0x004C2650`, `0x0063C180` (callers listed in §2 rule 5, found by a
+scan for calls to it).
 
 ## Open questions
 
@@ -253,3 +277,7 @@ both recordings (join: 0x1D / 0x1E for stats 0, 1, 2, 3, 7, 9, 11, 12;
    locations and the grid, tests requirements `0x004C10E0`, sets item
    flag 0x4000).
 5. 0x21, 0x22, 0x23, 0x94 (skills; seen at join) are not owned here.
+6. `cursor_item` in the other item actions (§2 rule 5's list): per
+   handler, whether it passes the action's item, a swapped-out item or
+   0 to `0x0063C180`; with the header byte +8 of the GroundToCursor
+   test named (open question 3's header spec).
