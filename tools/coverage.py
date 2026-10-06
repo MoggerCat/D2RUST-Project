@@ -38,7 +38,10 @@ HEAD = re.compile(r"^(#{2,4}) (.+?)\s*$")
 NUMBERED = re.compile(r"^((?:\d+\.)*\d+)\.?\s")  # "5.2 Title", "1. Title"
 ITEM = re.compile(r"^(\d+)\. ")
 CLAIM = re.compile(r"^\s*(?://|#) Covers:(.*)$")
-RULE_REF = re.compile(r"^§[0-9a-z][0-9a-z.\-]*(?: text|(?: l[2-9][0-9]*)? r(?:0|[1-9][0-9]*))?$")  # r0: a list numbered from 0
+RULE_REF = re.compile(
+    r"^§[0-9a-z][0-9a-z.\-]*(?: text|(?: l[2-9][0-9]*)? r(?:0|[1-9][0-9]*)|(?: t[2-9][0-9]*)? row[1-9][0-9]*)?$"
+)
+ROWS_MARK = re.compile(r"^<!-- rows -->\s*$")  # opt-in marker directly above a table  # r0: a list numbered from 0
 TIERS = ("unit", "game", "trace")
 
 
@@ -69,6 +72,9 @@ class Spec:
         lines = text.replace("\r\n", "\n").split("\n")
         stack = []  # [(level, id)]; id None inside a section without rules
         lists = {}  # section id -> (list number, items seen)
+        tables = {}  # section id -> row tables seen
+        marked = None  # line of a `<!-- rows -->` marker awaiting its table
+        tbl = None  # [section, table number, lines seen] inside a row table
         fence = False
         for no, line in enumerate(lines, 1):
             sec = stack[-1][1] if stack else None
@@ -81,6 +87,10 @@ class Spec:
                 continue
             h = HEAD.match(line)
             if h:
+                if marked:
+                    self.errors.append(f"{self.path}:{marked}: row marker is not directly above a table")
+                    marked = None
+                tbl = None
                 level, title = len(h.group(1)), h.group(2)
                 while stack and stack[-1][0] >= level:
                     stack.pop()
@@ -95,6 +105,27 @@ class Spec:
                 continue
             if not sec:
                 continue
+            if ROWS_MARK.match(line):
+                if marked:
+                    self.errors.append(f"{self.path}:{marked}: row marker is not directly above a table")
+                marked = no
+                tbl = None
+                continue
+            if tbl is not None and line.startswith("|"):
+                tbl[2] += 1
+                if tbl[2] > 2:  # line 1 is the header, line 2 the separator
+                    k, n = tbl[1], tbl[2] - 2
+                    self._add(f"{sec} row{n}" if k == 1 else f"{sec} t{k} row{n}", no, [s[1] for s in stack])
+                continue
+            tbl = None
+            if marked:
+                if line.startswith("|"):
+                    tables[sec] = tables.get(sec, 0) + 1
+                    tbl = [sec, tables[sec], 1]
+                    marked = None
+                    continue
+                self.errors.append(f"{self.path}:{marked}: row marker is not directly above a table")
+                marked = None
             m = ITEM.match(line)
             if m:
                 n = int(m.group(1))
@@ -106,6 +137,8 @@ class Spec:
                 self._add(f"{sec}{lst} r{n}", no, [s[1] for s in stack])
             elif line.strip() and not line[0].isspace():
                 self.rules[sec]["own"] = True
+        if marked:
+            self.errors.append(f"{self.path}:{marked}: row marker is not directly above a table")
         parents = {p for r in self.rules.values() for p in r["anc"]}
         for rid, r in list(self.rules.items()):
             if rid not in parents:
@@ -187,7 +220,7 @@ def parse_claim(body):
         for ref in refs.split(","):
             ref = " ".join(ref.split())
             if not RULE_REF.match(ref):
-                raise ValueError(f"malformed rule {ref!r} (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)")
+                raise ValueError(f"malformed rule {ref!r} (want §<anchor>, §<anchor> text, §<anchor>[ l<K>] r<N> or §<anchor>[ t<K>] row<N>)")
             out.append((path, ref))
     return out
 
@@ -298,7 +331,7 @@ def selftest():
             "§open-questions r1": [bad + "dangling claim: specs/x/s.md has no rule §open-questions r1"],
             "§2 text": [bad + "dangling claim: specs/x/s.md has no rule §2 text"],
             "§header-4-bytes l3 r1": [bad + "dangling claim: specs/x/s.md has no rule §header-4-bytes l3 r1"],
-            "1 r1": [bad + "malformed rule '1 r1' (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)"],
+            "1 r1": [bad + "malformed rule '1 r1' (want §<anchor>, §<anchor> text, §<anchor>[ l<K>] r<N> or §<anchor>[ t<K>] row<N>)"],
         }
         for rule, want in cases.items():
             src.write_text(test.format(rule=rule), encoding="utf-8")
@@ -312,8 +345,8 @@ def selftest():
         zero = {
             "§1 r0": [],
             "§1 r0, §1 l2 r1": [],
-            "§1 r00": [bad + "malformed rule '§1 r00' (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)"],
-            "§1 r01": [bad + "malformed rule '§1 r01' (want §<anchor>, §<anchor> text or §<anchor>[ l<K>] r<N>)"],
+            "§1 r00": [bad + "malformed rule '§1 r00' (want §<anchor>, §<anchor> text, §<anchor>[ l<K>] r<N> or §<anchor>[ t<K>] row<N>)"],
+            "§1 r01": [bad + "malformed rule '§1 r01' (want §<anchor>, §<anchor> text, §<anchor>[ l<K>] r<N> or §<anchor>[ t<K>] row<N>)"],
             "§1 l2 r0": [bad + "dangling claim: specs/x/z.md has no rule §1 l2 r0"],
         }
         for rule, want in zero.items():
@@ -335,6 +368,35 @@ def selftest():
         assert load_specs(root)["specs/x/s.md"].errors == [
             "specs/x/s.md:35: rule id §1 repeats line 9 (renumber the list or the heading)"
         ], load_specs(root)["specs/x/s.md"].errors
+        # Table rows (opt-in `<!-- rows -->` marker): a plain table stays text,
+        # a marked one gives `row<N>` units (`t<K> row<N>` from the 2nd marked
+        # table); the section id still covers them all.
+        rows = (
+            "# R\n\n## Rules\n\n### 1. Plain\n\n| a |\n|---|\n| x |\n\n"
+            "### 2. Marked\n\n<!-- rows -->\n| a | b |\n|---|---|\n| x | y |\n| z | w |\n\nafter\n\n"
+            "<!-- rows -->\n| c |\n|---|\n| q |\n"
+        )
+        (root / "specs/x/r.md").write_text(rows, encoding="utf-8")
+        specs = load_specs(root)
+        r = specs["specs/x/r.md"]
+        assert not r.errors, r.errors
+        assert r.leaves == ["§1", "§2 text", "§2 row1", "§2 row2", "§2 t2 row1"], r.leaves
+        assert r.rules["§2"]["leaves"] == r.leaves[1:]
+        for rule, want in {
+            "§2 row2": [],
+            "§2 t2 row1": [],
+            "§2": [],
+            "§2 row3": [bad + "dangling claim: specs/x/r.md has no rule §2 row3"],
+            "§2 t3 row1": [bad + "dangling claim: specs/x/r.md has no rule §2 t3 row1"],
+            "§1 row1": [bad + "dangling claim: specs/x/r.md has no rule §1 row1"],
+            "§2 row0": [bad + "malformed rule '§2 row0' (want §<anchor>, §<anchor> text, §<anchor>[ l<K>] r<N> or §<anchor>[ t<K>] row<N>)"],
+        }.items():
+            src.write_text(test.format(rule=rule).replace("s.md", "r.md", 1), encoding="utf-8")
+            assert scan(root, specs, [src])[1] == want, (rule, scan(root, specs, [src])[1])
+        (root / "specs/x/r.md").write_text("# R\n\n## Rules\n\n### 1. A\n\n<!-- rows -->\ntext\n", encoding="utf-8")
+        assert load_specs(root)["specs/x/r.md"].errors == [
+            "specs/x/r.md:7: row marker is not directly above a table"
+        ]
     # The real repository: rename one claimed rule; exactly that claim is reported.
     specs = load_specs(ROOT)
     claims, errors = scan(ROOT, specs)

@@ -47,3 +47,22 @@ More sections remain one large unit (`py tools/coverage.py --rules`):
 The remaining `§edge-cases-original-bugs` claims in `crates/` on other
 specs (palette, cof, dcc, ds1, dt1, tbl, font-tbl, calc, audio,
 render-pipeline, capture, schema, assets) were not touched.
+
+## Round 2: table-row units (coordinator decision)
+
+- Grammar extension in `tools/coverage.py` + `docs/COVERAGE.md` §1:
+  a table directly under a `<!-- rows -->` line gives units
+  `§<s> row<N>` (`§<s> t<K> row<N>` for the K-th marked table, K ≥ 2).
+  Opt-in per table, so no existing unit or claim id changes; the marker
+  line is not rule text; a stray marker is an error. Selftest extended
+  (units, covering by the section id, dangling/malformed row claims,
+  stray marker).
+- `specs/sim/rng.md` §5.2–§7 tables marked: §5.2 row1–2, §5.3 row1–7,
+  §5.4 row1–5, §5.5 row1–2, §6 row1–8, §7 row1–13 (39 units).
+- Claims: no test claimed anything in §5.2–§7 before. One narrowing/add:
+  `setters_and_derive` (sim-0003 #1: `init_low(map seed)` then first step
+  = dwStartSeed 4014346869) now also claims `§5.4 row1, §5.4 row2`.
+  The rest of §5.2–§7 stays uncovered (it is trace/RE material: needs
+  conformance checks, queue in HANDOFF §5).
+- Gate: d2-client steps fail here (no wayland system libs for
+  `wayland-sys`); all other steps run.
