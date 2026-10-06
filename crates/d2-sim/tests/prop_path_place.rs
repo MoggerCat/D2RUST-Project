@@ -31,17 +31,19 @@
 //! Spec readings the code marks `TODO(spec)` are followed as the code
 //! reads them (§7.3 walk-back room = candidate's room; §8 half-open rect).
 
+use d2_sim::drlg::TileRect;
 use d2_sim::path::place::{
     floor_drop, game_entry, level_spawn_point, level_warp_place, place_unit,
 };
 use d2_sim::path::place_seams::{
-    CollisionView, LevelView, LvlWarp, PlaceError, PlaceHost, PlaceMessage, RoomRect, RoomReveal,
-    SubPoint, TileRect, WarpDestination, WarpTileView,
+    CollisionView, LevelView, LvlWarp, PlaceError, PlaceHost, PlaceMessage, RoomReveal,
+    WarpDestination, WarpTileView,
 };
 use d2_sim::path::search::{
     coarse_free_box, free_point, nearest_free_point, ExpField, FieldTest, FreeSearch,
 };
 use d2_sim::path::warp::{warp_player, warp_slot, warp_tile_preset, WarpOutcome};
+use d2_sim::path::Point;
 use d2_sim::rng::Seed;
 use proptest::prelude::*;
 
@@ -89,7 +91,7 @@ const BITS: [u32; 10] = [
 
 #[derive(Clone, Debug, PartialEq)]
 struct Room {
-    rect: RoomRect,
+    rect: TileRect,
     grid: Option<Vec<u32>>,
     /// Adjacency array (`drlg/rooms.md` §6 order).
     adj: Vec<usize>,
@@ -98,7 +100,7 @@ struct Room {
 #[derive(Clone, Debug, PartialEq)]
 struct FakeUnit {
     room: Option<usize>,
-    pos: SubPoint,
+    pos: Point,
     size: i32,
     has_path: bool,
 }
@@ -114,7 +116,7 @@ struct World {
 impl World {
     fn holds(&self, r: usize, x: i32, y: i32) -> bool {
         let rc = self.rooms[r].rect;
-        rc.has_column(x) && rc.has_row(y)
+        rc.contains(x, y)
     }
 
     /// §4 rule 2 from a looked-up room: unmasked value, 0x27 for no room
@@ -154,7 +156,7 @@ impl World {
                 };
                 for rm in &mut self.rooms {
                     let rc = rm.rect;
-                    if let (true, Some(g)) = (rc.has_column(x) && rc.has_row(y), rm.grid.as_mut()) {
+                    if let (true, Some(g)) = (rc.contains(x, y), rm.grid.as_mut()) {
                         g[((y - rc.y) * rc.w + (x - rc.x)) as usize] |= bits;
                     }
                 }
@@ -168,7 +170,7 @@ impl World {
         (0..self.rooms.len()).find(|&r| self.holds(r, x, y))
     }
 
-    fn gen_grid(m: &mut Mix, rect: RoomRect, density: u64) -> Option<Vec<u32>> {
+    fn gen_grid(m: &mut Mix, rect: TileRect, density: u64) -> Option<Vec<u32>> {
         if m.below(10) == 0 {
             return None;
         }
@@ -194,7 +196,7 @@ impl World {
         let mut m = Mix(seed);
         let mut rooms: Vec<Room> = Vec::new();
         for _ in 0..1 + m.below(3) {
-            let rect = RoomRect {
+            let rect = TileRect {
                 x: m.range(-10, 30),
                 y: m.range(-10, 30),
                 w: m.range(1, 26),
@@ -242,7 +244,7 @@ impl World {
         for i in 0..n {
             let (bx, by) = ((i as i32 % 2) * 20, (i as i32 / 2) * 20);
             let (w, h) = (m.range(1, 21), m.range(1, 21));
-            let rect = RoomRect {
+            let rect = TileRect {
                 x: bx + m.range(0, 21 - w + 1).min(20 - w),
                 y: by + m.range(0, 21 - h + 1).min(20 - h),
                 w,
@@ -277,7 +279,7 @@ impl CollisionView for World {
             .copied()
             .find(|&r| self.holds(r, x, y))
     }
-    fn room_rect(&self, room: usize) -> RoomRect {
+    fn room_rect(&self, room: usize) -> TileRect {
         self.rooms[room].rect
     }
     fn cell_value(&self, room: usize, x: i32, y: i32) -> u32 {
@@ -337,13 +339,13 @@ impl CollisionView for World {
         self.teleports.push((unit, room, x, y));
         let u = &mut self.units[unit];
         u.room = Some(room);
-        u.pos = SubPoint::new(x, y);
+        u.pos = Point::new(x, y);
     }
     fn add_player_to_world(&mut self, unit: usize, room: usize, x: i32, y: i32) {
         self.added.push((unit, room, x, y));
         let u = &mut self.units[unit];
         u.room = Some(room);
-        u.pos = SubPoint::new(x, y);
+        u.pos = Point::new(x, y);
     }
 }
 
@@ -391,7 +393,7 @@ fn gen_field(seed: u64) -> Vec<u8> {
 
 struct RefField<'a> {
     cells: &'a [u8],
-    origin: SubPoint,
+    origin: Point,
     fmask: u32,
 }
 
@@ -472,17 +474,12 @@ fn ring(x0: i32, y0: i32, r: i32, k: i32) -> Vec<(i32, i32)> {
 }
 
 /// §7.2: (result room, point after the call).
-fn ref_nearest(
-    w: &World,
-    room: Option<usize>,
-    p: SubPoint,
-    a: &RefArgs,
-) -> (Option<usize>, SubPoint) {
+fn ref_nearest(w: &World, room: Option<usize>, p: Point, a: &RefArgs) -> (Option<usize>, Point) {
     let mut hint = room;
     if ref_free(w, &mut hint, p.x, p.y, a) {
         return (w.cell_room(hint, p.x, p.y), p);
     }
-    let mut kept: Option<(SubPoint, i32)> = None;
+    let mut kept: Option<(Point, i32)> = None;
     if a.d > 1 {
         let mut r = 1;
         loop {
@@ -490,7 +487,7 @@ fn ref_nearest(
                 if ref_free(w, &mut hint, x, y, a) {
                     let d = (x - p.x).abs() + (y - p.y).abs();
                     if kept.is_none_or(|(_, kd)| d < kd) {
-                        kept = Some((SubPoint::new(x, y), d));
+                        kept = Some((Point::new(x, y), d));
                     }
                 }
             }
@@ -518,9 +515,9 @@ fn free_static(w: &World, x: i32, y: i32, size: i32, mask: u32) -> bool {
 type RingKey = (i32, (u8, i32, bool));
 
 /// Step 1, max distance 50, independent key form (module docs).
-fn ref_k1(w: &World, x0: i32, y0: i32, size: i32, mask: u32) -> Option<SubPoint> {
+fn ref_k1(w: &World, x0: i32, y0: i32, size: i32, mask: u32) -> Option<Point> {
     for r in 1..=49 {
-        let mut best: Option<(RingKey, SubPoint)> = None;
+        let mut best: Option<(RingKey, Point)> = None;
         for y in y0 - r..=y0 + r {
             for x in x0 - r..=x0 + r {
                 let (ax, ay) = ((x - x0).abs(), (y - y0).abs());
@@ -536,7 +533,7 @@ fn ref_k1(w: &World, x0: i32, y0: i32, size: i32, mask: u32) -> Option<SubPoint>
                 };
                 let key = (ax + ay, order);
                 if best.as_ref().is_none_or(|(bk, _)| key < *bk) {
-                    best = Some((key, SubPoint::new(x, y)));
+                    best = Some((key, Point::new(x, y)));
                 }
             }
         }
@@ -549,7 +546,17 @@ fn ref_k1(w: &World, x0: i32, y0: i32, size: i32, mask: u32) -> Option<SubPoint>
 
 // ---- §8 reference --------------------------------------------------------
 
-fn ref_coarse(w: &World, room: usize, p: SubPoint, n: i32, mask: u32) -> (Option<usize>, SubPoint) {
+/// §8 "inside the rect's rows / columns", half-open (the code's reading,
+/// `impl-path-place.md` §4 question 3).
+fn has_row(r: &TileRect, y: i32) -> bool {
+    r.y <= y && y < r.y + r.h
+}
+
+fn has_column(r: &TileRect, x: i32) -> bool {
+    r.x <= x && x < r.x + r.w
+}
+
+fn ref_coarse(w: &World, room: usize, p: Point, n: i32, mask: u32) -> (Option<usize>, Point) {
     let (x0, y0) = (p.x, p.y);
     let mut pt = p;
     let mut rect = w.room_rect(room);
@@ -558,7 +565,7 @@ fn ref_coarse(w: &World, room: usize, p: SubPoint, n: i32, mask: u32) -> (Option
         while dy < j {
             let y = y0 + dy;
             pt.y = y;
-            let row = if rect.has_row(y) {
+            let row = if has_row(&rect, y) {
                 Some(room)
             } else {
                 w.cell_room(Some(room), pt.x, y)
@@ -569,7 +576,7 @@ fn ref_coarse(w: &World, room: usize, p: SubPoint, n: i32, mask: u32) -> (Option
                     let x = x0 + dx;
                     pt.x = x;
                     rect = w.room_rect(row);
-                    let cell = if rect.has_column(x) {
+                    let cell = if has_column(&rect, x) {
                         Some(row)
                     } else {
                         w.cell_room(Some(row), x, y)
@@ -750,7 +757,7 @@ fn reveal_msg(room: usize) -> PlaceMessage<usize> {
 }
 
 /// Host calls of §10 rules 5–6 for a placed unit.
-fn place_events(player: bool, u: usize, room: usize, p: SubPoint, alt: bool) -> Vec<Ev> {
+fn place_events(player: bool, u: usize, room: usize, p: Point, alt: bool) -> Vec<Ev> {
     let bits = if alt { 0x800 } else { 0x10000 };
     if !player {
         return vec![Ev::Queue(u), Ev::Flags(u, bits), Ev::RoomChange(u)];
@@ -788,10 +795,10 @@ proptest! {
         let w = World::any(seed, density, true).crowd(seed, px, py);
         let room = (room_none != 0).then(|| (seed % w.rooms.len() as u64) as usize);
         let a = RefArgs { size, mask: MASKS[mask_i], field: None, fallback, d, k };
-        let mut p = SubPoint::new(px, py);
+        let mut p = Point::new(px, py);
         let args = FreeSearch { size, mask: MASKS[mask_i], field: None, fallback, max_distance: d, step: k };
         let got = nearest_free_point(&w, room, &mut p, &args).unwrap();
-        prop_assert_eq!((got, p), ref_nearest(&w, room, SubPoint::new(px, py), &a));
+        prop_assert_eq!((got, p), ref_nearest(&w, room, Point::new(px, py), &a));
     }
 
     /// §7.2 + §7.3 with random walk-back fields and origins.
@@ -809,7 +816,7 @@ proptest! {
         let w = World::any(seed, density, true).crowd(seed, px, py);
         let cells = gen_field(fseed);
         let field = ExpField::from_cells(256, 256, cells.clone()).unwrap();
-        let origin = SubPoint::new(ox, oy);
+        let origin = Point::new(ox, oy);
         let room = Some((seed % w.rooms.len() as u64) as usize);
         let args = FreeSearch {
             size, mask: 0x3E01,
@@ -821,9 +828,9 @@ proptest! {
             field: Some(RefField { cells: &cells, origin, fmask: 0x801 }),
             fallback, d, k: 1,
         };
-        let mut p = SubPoint::new(px, py);
+        let mut p = Point::new(px, py);
         let got = nearest_free_point(&w, room, &mut p, &args).unwrap();
-        prop_assert_eq!((got, p), ref_nearest(&w, room, SubPoint::new(px, py), &a));
+        prop_assert_eq!((got, p), ref_nearest(&w, room, Point::new(px, py), &a));
     }
 
     /// `0x0064E7B0` (step 1, max distance 50): a free point is returned
@@ -840,11 +847,11 @@ proptest! {
     ) {
         let w = World::tiled(seed, density).crowd(seed, px, py);
         let room = Some((seed % w.rooms.len() as u64) as usize);
-        let mut p = SubPoint::new(px, py);
+        let mut p = Point::new(px, py);
         let mask = MASKS[mask_i];
         let got = free_point(&w, room, &mut p, size, mask, fallback).unwrap();
         if free_static(&w, px, py, size, mask) {
-            prop_assert_eq!(p, SubPoint::new(px, py));
+            prop_assert_eq!(p, Point::new(px, py));
             prop_assert_eq!(got, w.room_at(px, py));
             return Ok(());
         }
@@ -855,7 +862,7 @@ proptest! {
                 prop_assert!(free_static(&w, p.x, p.y, size, mask));
             }
             None => {
-                prop_assert_eq!(p, SubPoint::new(px, py));
+                prop_assert_eq!(p, Point::new(px, py));
                 let want = if fallback { w.room_at(px, py) } else { None };
                 prop_assert_eq!(got, want);
             }
@@ -879,9 +886,9 @@ proptest! {
     ) {
         let w = World::any(seed, density, true).crowd(seed, px, py);
         let room = (seed % w.rooms.len() as u64) as usize;
-        let mut p = SubPoint::new(px, py);
+        let mut p = Point::new(px, py);
         let got = coarse_free_box(&w, room, &mut p, n, MASKS[mask_i]);
-        prop_assert_eq!((got, p), ref_coarse(&w, room, SubPoint::new(px, py), n, MASKS[mask_i]));
+        prop_assert_eq!((got, p), ref_coarse(&w, room, Point::new(px, py), n, MASKS[mask_i]));
     }
 
     /// One room: found iff a free cell with dx ≡ dy (mod 2) and both in
@@ -898,7 +905,7 @@ proptest! {
         w.rooms.truncate(1);
         w.rooms[0].adj.clear();
         let mask = MASKS[mask_i];
-        let mut best: Option<((i32, i32, i32), SubPoint)> = None;
+        let mut best: Option<((i32, i32, i32), Point)> = None;
         for dy in -49..=47 {
             for dx in -49..=47 {
                 if (dx - dy) % 2 != 0 {
@@ -914,11 +921,11 @@ proptest! {
                 }
                 let key = (j, dy, dx);
                 if best.as_ref().is_none_or(|(bk, _)| key < *bk) {
-                    best = Some((key, SubPoint::new(x, y)));
+                    best = Some((key, Point::new(x, y)));
                 }
             }
         }
-        let mut p = SubPoint::new(px, py);
+        let mut p = Point::new(px, py);
         let got = coarse_free_box(&w, 0, &mut p, n, mask);
         match best {
             Some((_, q)) => {
@@ -955,12 +962,12 @@ proptest! {
         let cells = gen_field(fseed);
         let field = ExpField::from_cells(256, 256, cells.clone()).unwrap();
         let room = Some((seed % w.rooms.len() as u64) as usize);
-        let from = SubPoint::new(fx, fy);
+        let from = Point::new(fx, fy);
         let before = w.clone();
         let got = floor_drop(&w, &field, room, from, size, fallback).unwrap();
         prop_assert_eq!(&w, &before, "a drop changes nothing");
         // Rule 1.
-        let shifted = SubPoint::new(fx + 2, fy + 3);
+        let shifted = Point::new(fx + 2, fy + 3);
         let start = if w.cell_room(room, shifted.x, shifted.y).is_some() { shifted } else { from };
         let a = RefArgs {
             size, mask: 0x3E01,
@@ -1010,7 +1017,7 @@ proptest! {
         let pick = |s: u8| (s != 0).then(|| (s as usize + seed as usize) % nr);
         w.units.push(FakeUnit {
             room: pick(unit_room_sel),
-            pos: SubPoint::new(0, 0),
+            pos: Point::new(0, 0),
             size,
             has_path,
         });
@@ -1045,10 +1052,10 @@ proptest! {
         };
         // Rule 3.
         let (room_at, p) = if exact {
-            (Some(r0), SubPoint::new(x, y))
+            (Some(r0), Point::new(x, y))
         } else {
             let a = RefArgs { size, mask: 0x1C09, field: None, fallback: false, d: 50, k: 1 };
-            ref_nearest(&w0, Some(r0), SubPoint::new(x, y), &a)
+            ref_nearest(&w0, Some(r0), Point::new(x, y), &a)
         };
         match room_at {
             None => {
@@ -1091,7 +1098,7 @@ proptest! {
         let mut w = World::any(seed, density, false).crowd(seed, tx * 5 + 3, ty * 5 + 3);
         let nr = w.rooms.len();
         let sroom = (seed % nr as u64) as usize;
-        w.units.push(FakeUnit { room: None, pos: SubPoint::new(0, 0), size, has_path: true });
+        w.units.push(FakeUnit { room: None, pos: Point::new(0, 0), size, has_path: true });
         let u = 0;
         let mut levels = Levels::new((seed >> 32) as u32);
         levels.spawn = has_spawn.then_some((sroom, tx, ty));
@@ -1118,7 +1125,7 @@ proptest! {
         prop_assert_eq!(&levels.rng.draws, &first_draws((seed >> 32) as u32, draws as usize));
 
         let a = RefArgs { size, mask: 0x1C09, field: None, fallback: false, d: 50, k: 1 };
-        let start = SubPoint::new(tx * 5 + 3, ty * 5 + 3);
+        let start = Point::new(tx * 5 + 3, ty * 5 + 3);
         let spawn = has_spawn.then(|| ref_nearest(&w0, Some(sroom), start, &a));
         match spawn {
             None => {
@@ -1272,12 +1279,12 @@ proptest! {
         let mut w = World::any(seed, density, false).crowd(seed, px, py);
         let nr = w.rooms.len();
         let droom = (seed % nr as u64) as usize;
-        w.units.push(FakeUnit { room: Some(0), pos: SubPoint::new(0, 0), size, has_path });
+        w.units.push(FakeUnit { room: Some(0), pos: Point::new(0, 0), size, has_path });
         let u = 0;
         let mut levels = Levels::new(seed as u32);
         levels.warp = has_dest.then_some(WarpDestination {
             room: droom,
-            point: SubPoint::new(px, py),
+            point: Point::new(px, py),
             exit_walk_x: ewx,
             exit_walk_y: ewy,
             source_level: src,
@@ -1295,7 +1302,7 @@ proptest! {
         let want = if !has_dest {
             Ok(WarpOutcome::NoDestination)
         } else {
-            match ref_nearest(&w0, Some(droom), SubPoint::new(px, py), &a) {
+            match ref_nearest(&w0, Some(droom), Point::new(px, py), &a) {
                 (None, _) => Ok(WarpOutcome::NoFreePoint),
                 _ if gated => Ok(WarpOutcome::QuestGate),
                 _ if !has_path => Err(PlaceError::NoPath),
