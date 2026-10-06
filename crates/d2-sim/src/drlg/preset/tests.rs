@@ -16,7 +16,7 @@ const M: u32 = 734;
 const S: u32 = 66;
 
 #[derive(Default)]
-struct Files(BTreeMap<Vec<u8>, Ds1Input>);
+pub(super) struct Files(pub(super) BTreeMap<Vec<u8>, Ds1Input>);
 
 impl Ds1Source for Files {
     fn ds1(&self, path: &[u8]) -> Option<&Ds1Input> {
@@ -37,7 +37,7 @@ fn drlg_data() -> DrlgData {
     d
 }
 
-fn preset_data() -> PresetData {
+pub(super) fn preset_data() -> PresetData {
     let defs = (0..302)
         .map(|i| PresetDef {
             def: i,
@@ -57,7 +57,7 @@ fn preset_data() -> PresetData {
 }
 
 /// A v18 DS1 of `w × h` tiles: one wall layer, one floor layer, all 0.
-fn ds1(w: u32, h: u32) -> Ds1Input {
+pub(super) fn ds1(w: u32, h: u32) -> Ds1Input {
     let n = ((w + 1) * (h + 1)) as usize;
     Ds1Input {
         version: 18,
@@ -71,7 +71,7 @@ fn ds1(w: u32, h: u32) -> Ds1Input {
     }
 }
 
-fn cell(main: u32, sub: u32) -> u32 {
+pub(super) fn cell(main: u32, sub: u32) -> u32 {
     (main << 20) | (sub << 8)
 }
 
@@ -85,17 +85,17 @@ fn obj(kind: u32, id: u32, x: u32, y: u32) -> Ds1ObjectInput {
     }
 }
 
-struct World {
-    dd: DrlgData,
-    pd: PresetData,
-    files: Files,
-    cache: Ds1Cache,
-    drlg: Drlg,
-    p: Presets,
+pub(super) struct World {
+    pub(super) dd: DrlgData,
+    pub(super) pd: PresetData,
+    pub(super) files: Files,
+    pub(super) cache: Ds1Cache,
+    pub(super) drlg: Drlg,
+    pub(super) p: Presets,
 }
 
 impl World {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let dd = drlg_data();
         let mut drlg = Drlg::create(0, 1, 0, 0, false, &dd, &mut NoLevelTypes).unwrap();
         drlg.start_seed = START;
@@ -110,7 +110,7 @@ impl World {
     }
 
     /// Makes level `id` a DrlgType 2 level of `w × h` claimed by `def`.
-    fn level(&mut self, id: u32, def: u32, w: i32, h: i32) -> LevelIdx {
+    pub(super) fn level(&mut self, id: u32, def: u32, w: i32, h: i32) -> LevelIdx {
         let l = &mut self.dd.levels[id as usize];
         l.drlg_type = 2;
         l.size = [(w, h); 3];
@@ -120,14 +120,17 @@ impl World {
             .unwrap()
     }
 
-    fn file(&mut self, def: u32, path: &[u8], f: Ds1Input) {
+    pub(super) fn file(&mut self, def: u32, path: &[u8], f: Ds1Input) {
         let d = &mut self.pd.defs[def as usize];
         d.files = 1;
         d.file[0] = path.to_vec();
         self.files.0.insert(path.to_vec(), f);
     }
 
-    fn run<T>(&mut self, f: impl FnOnce(&mut Presets, &mut Drlg, &mut PresetCtx<'_>) -> T) -> T {
+    pub(super) fn run<T>(
+        &mut self,
+        f: impl FnOnce(&mut Presets, &mut Drlg, &mut PresetCtx<'_>) -> T,
+    ) -> T {
         let mut ctx = PresetCtx {
             drlg: &self.dd,
             data: &self.pd,
@@ -137,11 +140,11 @@ impl World {
         f(&mut self.p, &mut self.drlg, &mut ctx)
     }
 
-    fn init(&mut self, l: LevelIdx) {
+    pub(super) fn init(&mut self, l: LevelIdx) {
         self.run(|p, d, c| p.init_level(d, c, l)).unwrap();
     }
 
-    fn generate(&mut self, l: LevelIdx) -> Result<Option<DrlgRoomId>, PresetError> {
+    pub(super) fn generate(&mut self, l: LevelIdx) -> Result<Option<DrlgRoomId>, PresetError> {
         let id = self.drlg.level(l).id;
         self.drlg.level_mut(l).seed = Seed::init_low(START.wrapping_add(id));
         self.run(|p, d, c| p.generate(d, c, l))

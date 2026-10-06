@@ -574,7 +574,7 @@ fn no_mana_records_cant_do_and_counts() {
 
 /// Hold forms (§1 rule 6) and the left skill (0x05): 0 whatever the use
 /// did; one `pierce_idx` per message. 0x0B does nothing.
-// Covers: specs/skills/use.md §1 r6, §edge-cases-original-bugs r1
+// Covers: specs/skills/use.md §1 r6, §edge-cases-original-bugs r1; specs/sim/intents-events.md §2.4 r5
 #[test]
 fn hold_and_left_forms() {
     let mut fx = caster();

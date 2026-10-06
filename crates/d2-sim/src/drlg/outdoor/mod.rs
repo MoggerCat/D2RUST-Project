@@ -37,6 +37,8 @@ pub mod vertex;
 pub mod wild;
 
 #[cfg(test)]
+mod gaps_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeMap;

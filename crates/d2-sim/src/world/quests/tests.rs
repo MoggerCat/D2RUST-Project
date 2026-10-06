@@ -9,7 +9,7 @@ use crate::world::TsvError;
 
 // ------------------------------------------------------------ §1 flags
 
-fn hex(s: &str) -> Vec<u8> {
+pub(super) fn hex(s: &str) -> Vec<u8> {
     let s: String = s.split_whitespace().collect();
     (0..s.len())
         .step_by(2)
@@ -163,43 +163,43 @@ fn tables_check_catches_perturbations() {
 // ------------------------------------------------------- fake world
 
 #[derive(Default, Clone)]
-struct Player {
-    guid: u32,
-    quests: PlayerQuests,
-    act: Option<u8>,
-    level: Option<u32>,
-    class: u8,
-    seed: Seed,
-    stats: BTreeMap<u16, i32>,
-    byte4c: u8,
-    items: Vec<[u8; 4]>,
+pub(super) struct Player {
+    pub(super) guid: u32,
+    pub(super) quests: PlayerQuests,
+    pub(super) act: Option<u8>,
+    pub(super) level: Option<u32>,
+    pub(super) class: u8,
+    pub(super) seed: Seed,
+    pub(super) stats: BTreeMap<u16, i32>,
+    pub(super) byte4c: u8,
+    pub(super) items: Vec<[u8; 4]>,
 }
 
 #[derive(Default)]
-struct Fake {
-    frame: i32,
-    difficulty: u8,
-    expansion: bool,
-    game_type: u8,
-    players: BTreeMap<UnitId, Player>,
+pub(super) struct Fake {
+    pub(super) frame: i32,
+    pub(super) difficulty: u8,
+    pub(super) expansion: bool,
+    pub(super) game_type: u8,
+    pub(super) players: BTreeMap<UnitId, Player>,
     /// Monsters: (guid, class, kind).
-    monsters: BTreeMap<UnitId, (u32, u16, UnitKind)>,
-    chains: BTreeMap<UnitId, QuestChain>,
-    den: (u32, u32, u32, u32),
-    spot: Option<(i32, i32)>,
-    near: Vec<UnitId>,
-    sent: Vec<(UnitId, Vec<u8>)>,
-    log: Vec<String>,
+    pub(super) monsters: BTreeMap<UnitId, (u32, u16, UnitKind)>,
+    pub(super) chains: BTreeMap<UnitId, QuestChain>,
+    pub(super) den: (u32, u32, u32, u32),
+    pub(super) spot: Option<(i32, i32)>,
+    pub(super) near: Vec<UnitId>,
+    pub(super) sent: Vec<(UnitId, Vec<u8>)>,
+    pub(super) log: Vec<String>,
 }
 
-const P1: UnitId = UnitId(1);
-const P2: UnitId = UnitId(2);
-const AKARA_U: UnitId = UnitId(0x10);
-const NAVI_U: UnitId = UnitId(0x11);
-const WARRIV_U: UnitId = UnitId(0x12);
+pub(super) const P1: UnitId = UnitId(1);
+pub(super) const P2: UnitId = UnitId(2);
+pub(super) const AKARA_U: UnitId = UnitId(0x10);
+pub(super) const NAVI_U: UnitId = UnitId(0x11);
+pub(super) const WARRIV_U: UnitId = UnitId(0x12);
 
 impl Fake {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut f = Fake {
             expansion: true,
             ..Fake::default()
@@ -235,15 +235,15 @@ impl Fake {
         f
     }
 
-    fn p(&mut self, u: UnitId) -> &mut Player {
+    pub(super) fn p(&mut self, u: UnitId) -> &mut Player {
         self.players.get_mut(&u).unwrap()
     }
 
-    fn flags(&self, u: UnitId) -> QuestFlags {
+    pub(super) fn flags(&self, u: UnitId) -> QuestFlags {
         self.players[&u].quests.flags[usize::from(self.difficulty)]
     }
 
-    fn sent_ids(&self) -> Vec<u8> {
+    pub(super) fn sent_ids(&self) -> Vec<u8> {
         self.sent.iter().map(|m| m.1[0]).collect()
     }
 }
@@ -406,7 +406,7 @@ impl QuestWorld for Fake {
     }
 }
 
-fn control() -> (QuestControl, Seed) {
+pub(super) fn control() -> (QuestControl, Seed) {
     let mut game = Seed::init_low(0x1234);
     let ctl = QuestControl::new(&QuestTables::load().unwrap(), &mut game).unwrap();
     (ctl, game)
@@ -545,7 +545,7 @@ fn timer_wrap() {
 
 // ------------------------------------------------------------ §6
 
-fn rec_with(chain: u8, state: u8, init_no: u8, status: u8) -> QuestRecord {
+pub(super) fn rec_with(chain: u8, state: u8, init_no: u8, status: u8) -> QuestRecord {
     let (ctl, _) = control();
     let mut r = ctl.record(chain).unwrap().clone();
     (r.state, r.init_no, r.status) = (state, init_no, status);

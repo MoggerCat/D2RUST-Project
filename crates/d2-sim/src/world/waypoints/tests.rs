@@ -4,13 +4,13 @@ use std::collections::BTreeMap;
 use super::*;
 use crate::world::{tsv_num, tsv_rows, TsvError};
 
-const WAYPOINTS_TSV: &str = include_str!("../../../../../specs/world/waypoints.tsv");
+pub(super) const WAYPOINTS_TSV: &str = include_str!("../../../../../specs/world/waypoints.tsv");
 const HEADER: &[&str] = &["wp", "level", "act", "town", "tile_calc", "level_name"];
 
 /// (wp, level, act, town, tile_calc) per row.
 type Row = (u8, u32, u8, bool, u8);
 
-fn parse_tsv(text: &str) -> Result<Vec<Row>, TsvError> {
+pub(super) fn parse_tsv(text: &str) -> Result<Vec<Row>, TsvError> {
     let t = "waypoints.tsv";
     tsv_rows(t, text, HEADER)?
         .into_iter()
@@ -28,7 +28,7 @@ fn parse_tsv(text: &str) -> Result<Vec<Row>, TsvError> {
 
 /// A levels table holding exactly the TSV's waypoint levels (act from the
 /// TSV, 255 elsewhere).
-fn map_from_rows(rows: &[Row]) -> WaypointMap {
+pub(super) fn map_from_rows(rows: &[Row]) -> WaypointMap {
     let n = rows.iter().map(|r| r.1).max().unwrap() as usize + 1;
     let mut levels = vec![(NO_WAYPOINT, 0u8); n.max(150)];
     for r in rows {
@@ -116,7 +116,7 @@ fn index_mapping() {
     assert_eq!(tile_code(3), 0);
 }
 
-fn hex(s: &str) -> Vec<u8> {
+pub(super) fn hex(s: &str) -> Vec<u8> {
     let s: String = s.split_whitespace().collect();
     (0..s.len())
         .step_by(2)
@@ -124,7 +124,7 @@ fn hex(s: &str) -> Vec<u8> {
         .collect()
 }
 
-fn rec(s: &str) -> [u8; 16] {
+pub(super) fn rec(s: &str) -> [u8; 16] {
     hex(s).try_into().unwrap()
 }
 
@@ -216,27 +216,27 @@ fn menu_message_vector() {
 
 // ----------------------------------------------------------- fake world
 
-const P: UnitId = UnitId(1);
-const WP_UNIT: UnitId = UnitId(50);
-const WP_CLASS: u16 = 119;
-const ROOM_A: RoomId = RoomId(7);
-const ROOM_DEST: RoomId = RoomId(9);
+pub(super) const P: UnitId = UnitId(1);
+pub(super) const WP_UNIT: UnitId = UnitId(50);
+pub(super) const WP_CLASS: u16 = 119;
+pub(super) const ROOM_A: RoomId = RoomId(7);
+pub(super) const ROOM_DEST: RoomId = RoomId(9);
 
 #[derive(Default)]
-struct Fake {
-    frame: i32,
-    difficulty: u8,
-    records: BTreeMap<UnitId, WaypointRecords>,
-    objects: Vec<(UnitId, ObjectFacts)>,
-    player: Option<PlayerFacts>,
-    busy: bool,
-    interact: Option<(u8, u32)>,
-    hostile: bool,
+pub(super) struct Fake {
+    pub(super) frame: i32,
+    pub(super) difficulty: u8,
+    pub(super) records: BTreeMap<UnitId, WaypointRecords>,
+    pub(super) objects: Vec<(UnitId, ObjectFacts)>,
+    pub(super) player: Option<PlayerFacts>,
+    pub(super) busy: bool,
+    pub(super) interact: Option<(u8, u32)>,
+    pub(super) hostile: bool,
     /// Where `warp` places the player.
-    land: Option<(Option<RoomId>, i32, i32, u32)>,
-    spawn: Option<RoomId>,
-    log: Vec<String>,
-    sent: Vec<Vec<u8>>,
+    pub(super) land: Option<(Option<RoomId>, i32, i32, u32)>,
+    pub(super) spawn: Option<RoomId>,
+    pub(super) log: Vec<String>,
+    pub(super) sent: Vec<Vec<u8>>,
 }
 
 impl WaypointWorld for Fake {
@@ -309,7 +309,7 @@ impl WaypointWorld for Fake {
     }
 }
 
-fn data() -> WaypointData {
+pub(super) fn data() -> WaypointData {
     let rows = parse_tsv(WAYPOINTS_TSV).unwrap();
     let mut objects = vec![
         ObjectClass {
@@ -342,7 +342,7 @@ fn data() -> WaypointData {
 }
 
 /// Player (amazon) and a waypoint object in Rogue Encampment (level 1).
-fn fake() -> Fake {
+pub(super) fn fake() -> Fake {
     let mut f = Fake {
         frame: 100,
         ..Fake::default()
@@ -371,7 +371,7 @@ fn fake() -> Fake {
     f
 }
 
-fn msg49(wp: u32, level: u16) -> Vec<u8> {
+pub(super) fn msg49(wp: u32, level: u16) -> Vec<u8> {
     let mut m = vec![0x49];
     m.extend(wp.to_le_bytes());
     m.extend(level.to_le_bytes());
