@@ -55,9 +55,11 @@
 //!     pass);
 //! 12. (step 6) a waypoint travel (C→S 0x49) runs through the
 //!     handler, the warp seam and the destination's spawn search, **then
-//!     stops**: the same-act placement belongs to the unwritten path
-//!     spec, so the player is not moved and `waypoints.md` §7 rule 7
-//!     sends no S→C 0x0D.
+//!     stops**: this run keeps the path provider off (step 4's missile
+//!     would get no path points with it on, blocker WP1), so the warp's
+//!     placement stays `Pending`, the player is not moved and
+//!     `waypoints.md` §7 rule 7 sends no S→C 0x0D. With the provider on
+//!     the step holds: `e2e_walk.rs` (placement, 0x07 then 0x0D).
 //!
 //! The S→C messages the specs lay out (0x27, 0x29, 0x28, 0x2A, 0x9C,
 //! 0x9D, 0x47, 0x48) are asserted byte for byte; every other frame's
@@ -2415,9 +2417,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // 3), tile code 0 (rule 4), the warp called (rule 5), the spawn
     // search streamed the destination's room (rule 7's `0x00619E50`: 5
     // active rooms), the arrival node prepended (rule 8). STOP: the
-    // warp's same-act placement `0x00554EA0` belongs to the unwritten
-    // path / placement spec (`Pending::warp`), so the player stays in
-    // the ISLE room and rule 7's room test sends no S→C 0x0D.
+    // warp's same-act placement `0x00554EA0` (`path-placement.md` §11)
+    // is the path provider's, off in this run (WP1), so `Pending::warp`
+    // logs it, the player stays in the ISLE room and rule 7's room test
+    // sends no S→C 0x0D (provider on: `e2e_walk.rs`).
     fx.sim().world.rest.interact.insert(player, (2, wp));
     let travel = bytes(&TakeOrCloseWp {
         wp,
