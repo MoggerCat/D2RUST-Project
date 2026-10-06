@@ -28,9 +28,13 @@ use crate::tick::timer::{TimerClass, TimerRun};
 use crate::tick::EventDispatch;
 use crate::units::{UnitId, UnitType};
 
-pub use create::{create_missile, creation_velocity, frames_from_distance, pierce_count};
+pub use create::{
+    create_missile, creation_velocity, frames_from_distance, pierce_count, MissileParams,
+};
 pub use flight::{default_flight, PathVelocity};
-pub use hit::{damage_roll, fill_damage, hit_handler, pct, result_flags, Damage, ELEMENTS};
+pub use hit::{
+    damage_roll, fill_damage, hit_handler, pct, result_flag, result_flags, Damage, ELEMENTS,
+};
 pub use seams::{
     MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits, MissileWorld,
 };
@@ -312,6 +316,13 @@ impl MissileStore {
 
     pub fn get_mut(&mut self, m: UnitId) -> Option<&mut MissileData> {
         self.data.get_mut(&m)
+    }
+
+    /// Drops a missile's data when the unit is removed by code other
+    /// than the missile handler (unit removal `0x00555600` frees it with
+    /// the missile free `0x0059F8E0`, §R3.8).
+    pub fn remove(&mut self, m: UnitId) -> Option<MissileData> {
+        self.data.remove(&m)
     }
 
     /// Missiles with data, in unit-slot order.

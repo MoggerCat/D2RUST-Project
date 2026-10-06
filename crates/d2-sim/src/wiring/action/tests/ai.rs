@@ -1,0 +1,132 @@
+// Spec: specs/monsters/ai.md §1.1, §2, §3.3, §9 (Idle); specs/sim/tick.md §5.2 rule 4, §5.6; specs/sim/units.md §4.6
+//! Monster AI ↔ units (modes, timer events): the think run by the unit
+//! dispatch, the freeze drop, mode changes through the real monster mode
+//! set, the state-54 rule before a think is scheduled.
+
+use super::*;
+use crate::monsters::ai::{install, mode, AiControl, AiModes, ModeTarget};
+use crate::stats::states::state;
+use crate::tick::events::event;
+
+/// A monster of class 0 (AI 1, Idle) in room A with its AI installed.
+fn monster(fx: &mut Fx) -> UnitId {
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
+    fx.sim
+        .ai(&mut fx.game, |g, cx| {
+            cx.store.entry(m).control = Some(AiControl::default());
+            install(g, cx, m, 0);
+        })
+        .unwrap();
+    m
+}
+
+fn thinks(fx: &Fx, m: UnitId) -> Vec<i32> {
+    fx.timers(m)
+        .into_iter()
+        .filter(|t| t.0 == event::AI_THINK)
+        .map(|t| t.1)
+        .collect()
+}
+
+#[test]
+fn think_runs_through_the_unit_dispatch_and_reschedules() {
+    // `ai.md` §9 Idle: the next think 200 frames later (vector "idle AI
+    // thinks every 200"), scheduled through the real timer queue.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.game
+        .schedule_event(m, u32::from(event::AI_THINK), 1, None, 0, 0)
+        .unwrap();
+    fx.frame();
+    assert_eq!(thinks(&fx, m), [201]);
+    // Nothing runs until then; at 201 it thinks again.
+    for _ in 0..199 {
+        fx.frame();
+    }
+    assert_eq!(thinks(&fx, m), [201]);
+    fx.frame();
+    assert_eq!(thinks(&fx, m), [401]);
+    assert!(fx.sim.hooks().ai_store().unhandled.is_empty());
+    fx.assert_clean();
+}
+
+#[test]
+fn frozen_monster_drops_think_and_reset() {
+    // `tick.md` §5.6: types 2 and 10 are dropped while the monster has
+    // state 1 and is alive; a dropped think is not rescheduled
+    // (`ai.md` §1.1).
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.set_state(m, state::FREEZE as u16, true)
+    });
+    for ev in [event::AI_THINK, event::AI_RESET] {
+        fx.game
+            .schedule_event(m, u32::from(ev), 1, None, 0, 0)
+            .unwrap();
+    }
+    fx.frame();
+    assert!(thinks(&fx, m).is_empty());
+    assert!(fx.timers(m).is_empty());
+    // Unfrozen: the think runs.
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.set_state(m, state::FREEZE as u16, false)
+    });
+    fx.game
+        .schedule_event(m, u32::from(event::AI_THINK), 2, None, 0, 0)
+        .unwrap();
+    fx.frame();
+    assert_eq!(thinks(&fx, m), [202]);
+    fx.assert_clean();
+}
+
+#[test]
+fn ai_mode_change_runs_the_monster_mode_set() {
+    // `units.md` §4.6: neutral start `0x005A73E0` = mode 1 and a think at
+    // f + aidel (15) unless one is pending later.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::WALK);
+    fx.game.frame = 30;
+    let ok = fx.sim.with(&mut fx.game, |g, v| {
+        v.change_mode(g, m, mode::NEUTRAL, ModeTarget::Unit(m))
+    });
+    assert!(ok);
+    assert_eq!(
+        fx.sim.sys.units.get(m).unwrap().mode,
+        u32::from(mode::NEUTRAL)
+    );
+    assert_eq!(thinks(&fx, m), [45]);
+    // State 54: the mode set is a fatal assertion in 1.14d → refused.
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.set_state(m, state::UNINTERRUPTABLE as u16, true)
+    });
+    let ok = fx.sim.with(&mut fx.game, |g, v| {
+        v.change_mode(g, m, mode::WALK, ModeTarget::Point(12, 10))
+    });
+    assert!(!ok);
+    assert_eq!(fx.sim.hooks().errors.len(), 1);
+}
+
+#[test]
+fn think_scheduled_with_state_54_clears_it_first() {
+    // `tick.md` §5.2 rule 4 / `ai.md` §1.1: `0x005544B0(unit, 0)` clears
+    // state 54 and cancels the monster's type-2 events before the new
+    // think is scheduled (here by the neutral start of `units.md` §4.6).
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.game
+        .schedule_event(m, u32::from(event::AI_THINK), 5, None, 0, 0)
+        .unwrap();
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.set_state(m, state::UNINTERRUPTABLE as u16, true)
+    });
+    fx.game.frame = 10;
+    let r = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::modes::monster_neutral(sim, hooks, m)
+    });
+    assert_eq!(r, Ok(()));
+    assert!(!fx.sim.sys.stats.has_state(m, state::UNINTERRUPTABLE));
+    assert_eq!(thinks(&fx, m), [25]);
+    fx.assert_clean();
+}

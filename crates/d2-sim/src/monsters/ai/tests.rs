@@ -71,7 +71,7 @@ impl AiUnits for Fake {
     fn act(&self, _: UnitId) -> u8 {
         0
     }
-    fn level_id(&self, _: UnitId) -> i32 {
+    fn level_id(&self, _: &Game, _: UnitId) -> i32 {
         self.level
     }
     fn monster_level(&self, _: UnitId) -> i32 {
