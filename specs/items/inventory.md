@@ -34,21 +34,21 @@
 | Rules | 87–88 |
 |   1. Inventory model | 89–172 |
 |   2. Grid placement | 173–251 |
-|   3. Belt | 252–281 |
-|   4. Equipping | 282–381 |
-|   5. Shared checks | 382–425 |
-|   6. Deferred item messages | 426–475 |
-|   7. Intents | 476–762 |
-|   8. Pickup from the ground | 763–828 |
-|   9. Drop to the ground | 829–863 |
-|   10. Gold | 864–894 |
-|   11. Message layouts | 895–919 |
-| Constants & data dependencies | 920–942 |
-| Randomness | 943–955 |
-| Edge cases & original bugs | 956–971 |
-| Test vectors | 972–1019 |
-| Provenance | 1020–1055 |
-| Open questions | 1056–1106 |
+|   3. Belt | 252–283 |
+|   4. Equipping | 284–437 |
+|   5. Shared checks | 438–562 |
+|   6. Deferred item messages | 563–612 |
+|   7. Intents | 613–899 |
+|   8. Pickup from the ground | 900–965 |
+|   9. Drop to the ground | 966–1000 |
+|   10. Gold | 1001–1031 |
+|   11. Message layouts | 1032–1057 |
+| Constants & data dependencies | 1058–1080 |
+| Randomness | 1081–1093 |
+| Edge cases & original bugs | 1094–1109 |
+| Test vectors | 1110–1157 |
+| Provenance | 1158–1193 |
+| Open questions | 1194–1236 |
 <!-- /index -->
 
 ## Summary
@@ -237,16 +237,16 @@ quests.
    Failure → 0, nothing changed.
 5. Link check `0x0063B210(inv, item, 1)` (sockets an item when the
    inventory belongs to an item; else succeeds).
-6. Page ≠ 4 → charm re-link (`0x0055C270`: for a player owner
-   `0x0055C110(1)`; charm stat lists, open question 6). Unit flag 0x2
+6. Page ≠ 4 → item-skill link (§5.5; `0x0055C270`: for a player owner
+   `0x0055C110(1)`). Unit flag 0x2
    (targetable, unit +0xC4) cleared. If the item counts as an active
-   inventory item for its owner (`0x0062FF70`) → stat refresh
+   inventory item for its owner (§5.6, `0x0062FF70`) → stat refresh
    `0x0055C2C0(owner, 0)`.
 7. Cursor := none (unless step 3 said not), mode := 0 (stored).
 8. "Send" set: command flag 0x2; item flag 0x1 when the item is socketed
    with fillers (`0x0055F590`); item flag 0x4000 cleared; owner refresh
    (`0x00621000`, §6.1); update list += item.
-9. Step 6's active-item test again → inventory pass `0x0055DBC0(0)` and
+9. Step 6's active-item test again → inventory pass (§5.7) `0x0055DBC0(0)` and
    owner refresh. Result 1.
 
 ### 3. Belt
@@ -270,9 +270,11 @@ quests.
    calls the "similar item in the bottom row" test `0x0063C560` (which
    skips codes `isc`, `tsc`) but only rejects on −1, which that test never
    returns (original bug; reproduce).
-7. **Place in a slot** (`0x0063C4F0`): beltable, 1 × 1, slot < 16 →
-   §2.2 on grid 1 at (slot, 0). No `numboxes` check here (the intents
-   check nothing more; open question 3).
+7. **Place in a slot** (`0x0063C4F0`): beltable, 1 × 1, slot ≤ 15
+   (unsigned, `0x0063C4D0`) → §2.2 on grid 1 at (slot, 0). No `numboxes`
+   check here, and none in 0x23's `0x0055E9B0` (with find 0) or 0x25's
+   `0x0055EB30` (neither calls the belt-type lookup `0x00621ED0`): a
+   crafted 0x23 / 0x25 fills any empty slot 0–15 whatever the belt.
 8. **Compaction** after a slot s is emptied (`0x0055EDC0`): column c =
    min(s & 3, 3); walking rows 0..3, each item found in c moves down to
    the lowest free row of the column (re-placed with §3.7), gets item
@@ -292,15 +294,16 @@ The item's allowed locations are itemtypes `bodyloc1`/`bodyloc2`
 1. Item missing or no items record → fail.
 2. p = item stat 91 (`item_req_percent`, item or skill stat
    `0x00625500`). p ≠ 0 → bonus_str = reqstr × p / 100, bonus_dex =
-   reqdex × p / 100 (`0x00483360`; exact rounding: open question 4).
+   reqdex × p / 100, each `pct(req, p, 100)` (`0x00483360`, signed and
+   truncating, `combat/damage.md` §0; ECX = req, EDX = p at `0x0062EB86`).
    Ethereal (item flag 0x400000) → both bonuses −10.
 3. Strength: unit stat 0 < 1 → fail; < reqstr + bonus_str → fail;
    "equipping" and the item is active on the unit (`0x00625820`) →
    subtract the item's own strength contribution (`0x0062B450(0)`) and
    test again (< 1 or < requirement → fail).
 4. Dexterity: the same with stat 2, reqdex, `0x0062B450(2)`.
-5. Level: requirement from `0x0062B5B0` (−1 = none; owner: open question
-   5); unit stat 12 < requirement → fail.
+5. Level: requirement R from §4.8 (never negative, so the caller's "R =
+   −1 → skip" test at `0x0062EC8A` never fires); unit stat 12 < R → fail.
 6. Pass needs 3–5 and **identified** (item flag 0x10). Then: type 18
    (book) needs item stat 70 > 0. Class: itemtypes `class` 7 (none) →
    pass; a player whose class equals it → pass; a monster of class 0x230
@@ -345,11 +348,11 @@ Result codes; N absent means "may L be emptied":
 #### 4.5 Stack test (`0x0062C850`, A, B)
 
 Same item class, same quality (item data +0, `0x00627E70`), same
-unique/set file index (`0x00629DA0`), stackable (`0x006289F0`), equal
-`0x0062A8D0` values, both qualities pass `0x0062A2F0`, equal stats 21,
-22, 23, 24, 159, 160 (damage ranges), and neither has sockets
-(`0x006299B0` = 0). Used by 0x21 and hand result 6; `0x0062A8D0` and
-`0x0062A2F0` are open question 7.
+unique/set file index (item data +0x28, `0x00629DA0`), stackable
+(`0x006289F0`), equal ethereal bits (item flag 0x400000, `0x0062A8D0`),
+both qualities in 1–3 (low, normal, superior; `0x0062A2F0` passes q ≠ 0
+and q ∉ 4–9), equal stats 21, 22, 23, 24, 159, 160 (damage ranges), and
+neither has sockets (`0x006299B0` = 0). Used by 0x21 and hand result 6.
 
 #### 4.6 Equip from the cursor (`0x005606B0`, game, player, item, L, skip, out)
 
@@ -364,20 +367,73 @@ unique/set file index (`0x00629DA0`), stackable (`0x006289F0`), equal
    {11, 12} → stat link `0x0063D1D0` and stat refresh. Cursor := none,
    unit flag 0x2 cleared, mode 1, page 0xFF, command flag 0x8, item flag
    0x1, item flag 0x4000 cleared, update list += item, refresh, weapon
-   bookkeeping `0x0055C5C0`, inventory pass `0x0055DBC0(0)`. Result 1.
+   bookkeeping `0x0055C5C0`, inventory pass (§5.7) `0x0055DBC0(0)`. Result 1.
 
 #### 4.7 Auto-equip on pickup (`0x0055D710`, unit, item, &L, skip)
 
-1. skip = 0: §4.2 (not equipping) must pass. Then: itemtypes `body` ≠ 0
-   with an allowed location (`0x0062FDF0`), identified, not broken and no
-   item flag 0x4000 (`0x0062A4E0`), type ≠ 38 (`tpot`).
-2. Quiver-type items (`0x00628480` ≠ 0) need an equipped hand weapon whose
-   ammo type the item is.
+1. skip = 0: §4.2 (not equipping) must pass. Then, for either skip:
+   itemtypes `body` ≠ 0 with an allowed location (`0x0062FDF0`),
+   identified, not broken and no item flag 0x4000 (`0x0062A4E0`),
+   **primary** type (`0x0062B400`, not the equivalence test) ≠ 38
+   (`tpot`).
+2. Quiver-type items (`0x00628480` ≠ 0) need a hand weapon whose primary
+   type's itemtypes `shoots` (`0x0062E6F0`) the item is (equivalence
+   test): the right hand (location 4) first, then the left hand (5);
+   no match → no.
 3. bodyloc1 = bodyloc2: L := it if empty, else no.
-4. Else (`0x0055D560` / `0x0055D670`, weapon/shield comparison; open
-   question 8): loc1 and loc2 empty → loc1; loc1 empty, loc2 used →
-   loc1 if the comparison allows; loc1 used, loc2 empty → loc2 if
-   allowed; both used → no.
+4. Else: loc1 and loc2 empty → loc1; loc1 empty, loc2 used → loc1 if the
+   new item N and the loc2 item are compatible; loc1 used, loc2 empty →
+   loc2 if N and the loc1 item are compatible; both used → no.
+
+Compatibility (`0x0055D670`, calls at `0x0055D8CC` / `0x0055D8FE`) reads a
+ten-flag profile of each item X for the unit U (`0x0055D560`; ECX = U,
+EBX = X, ESI = out; "type T" is the equivalence test):
+
+| Flag | Set when |
+|---|---|
+| bow / xbow | X is type 27 (`bow`) / 35 (`xbow`) |
+| bowq / xboq | X is type 5 (`bowq`) / 6 (`xboq`) |
+| shield | X is type 51 (`shld`) |
+| weapon | X is type 45 (`weap`) |
+| 2h | items `2handed` ≠ 0 (`0x006289C0`) |
+| dual | U is a player of class 4 (barbarian), or of class 6 (assassin) and X is type 67 (`h2h`) |
+| throw | itemtype `throwable` ≠ 0 or item stat 125 ≠ 0 (computed; the comparison never reads it) |
+| ring | X is type 10 (`ring`) |
+
+N and E are compatible iff any of: N bow and E bowq; N bowq and E bow;
+N xbow and E xboq; N xboq and E xbow; N a one-hand weapon (weapon and
+not 2h) and E shield; E a one-hand weapon and N shield; both one-hand
+weapons and both dual; both rings.
+
+#### 4.8 Level requirement (`0x0062B5B0`, item, unit or none)
+
+The unit only selects class-specific values; "affix value" of a magic
+affix row A is A `classlevelreq` when A `class` ≠ 0xFF, a unit is given
+and its class (unit +4) equals A `class`, else A `levelreq`. Affix ids
+are item data +0x36 (automagic), +0x38 + 2i (prefix i), +0x3E + 2i
+(suffix i), i = 0–2; id 0 or an unknown id is skipped (`0x00633EE0`).
+R starts at 0; quality (item data +0; no item data → 2):
+
+| Quality | R |
+|---|---|
+| 4 magic | max affix value of prefix 0, suffix 0 and the automagic affix |
+| 5 set | setitems `lvl req` (i16) of the file index (`0x00483440`); negative → 0 |
+| 6 rare | max affix value of the six prefixes/suffixes and the automagic affix |
+| 7 unique | uniqueitems `lvl req` (i16) of the file index (`0x00483470`; file index < 0 or no row → 0); with a unit given that lacks unit flag 0x2000000 (expansion, `0x00463720`) on an item whose version (item data +0x30, `0x0062A670`) is 0 → 0; negative → 0 |
+| 8 crafted | min(max affix value of the six prefixes/suffixes + 10 + 3 × (present affixes among the six), max level(0) − 1 = 98) (`0x00611830`); the automagic affix is ignored |
+| other | 0 |
+
+Then, in order, R := max(R, x) for: items `levelreq` of the item class
+(`0x006335F0`); §4.8 of every item in the item's own inventory (socket
+fillers, recursive, same unit; `0x0062B901`); for each entry of stat 107
+(`item_singleskill`) in the item's stat list, skills `reqlevel` of the
+entry's layer (skill id); for each entry of stat 97
+(`item_nonclassskill`), skills `reqlevel` + 6, or `reqlevel` alone when a
+unit is given, it is a player (`0x0044BE50` = 0) and the skill's
+`charclass` (0–6) equals its class (`0x00451F60`). Entries are read only
+from an extended stat list (flag bit 31; `0x006261D0`, at most 64 per
+stat; skill ids ≥ the skills count are skipped). Last, R := R + item
+stat 92 (`item_levelreq`); a sum < 1 returns 0.
 
 ### 5. Shared checks
 
@@ -422,6 +478,87 @@ interaction list with state 0 (talking; `world/npc.md` §2: allowed when
 absent or state > 0); other types → `0x00567620`. `0x00567620` without a
 player trade allows when player data +0x50 < 5; the player-trade part is
 out of scope.
+
+#### 5.5 Item-skill link (`0x0055C110`, unit U, item I, add)
+
+Scrolls and tomes add their charges to a skill of the player (the
+town-portal / identify counts). Called as "item-skill link"
+(`0x0055C270`, ECX = owner, EDX = item: add = 1) and "item-skill unlink"
+(`0x0055C6E0`: add = 0); both act only for a player owner (unit type 0)
+and do nothing for others. Not related to charms.
+
+1. Skill S (`0x0055BFF0`): I not of type 22 (`scro`) or 18 (`book`) →
+   none, return 0. Books row = item suffix 0 (item data +0x3E, the spell
+   index; `0x006374B0`, 0x20 bytes per row): scroll → books
+   `scrollskill`, book → books `bookskill`; no row → none.
+2. q = item stat 70 (`quantity`); q = 0: a book → return 0, a scroll →
+   q := 1.
+3. U's skill S (`0x006439B0`, owner −1). add = 1: present → new :=
+   current quantity (skill +0x30, `0x006450F0`) + q; absent → stat 5
+   (`newskills`) += q (`0x006272B0`), learn S (`0x00570080`, skills
+   owner), fetch again (absent → fatal), new := q. add = 0: absent →
+   fatal; new := max(current − q, 0).
+4. Skill quantity := new (`0x00645120`); S→C 0x22 to U's client
+   (`0x0053C520`; §11).
+5. new = 0: if S is U's left skill (`0x00620190`) → select skill 0 with
+   owner −1 on the left (`0x005701B0`, EDX = 1); if S is U's right skill
+   (`0x006201D0`) → the same on the right (EDX = 0). Return 1.
+
+**Recount on cube open/close** (`0x0055FA40`, unit U; callers
+`world/cube.md` §3): for every item of U's item list in mode 0 (stored,
+any page): skill S as step 1 (none → skip), S's quantity := 0 (absent →
+fatal) and S→C 0x22 with quantity 0 (`0x0055F9C0`); count those on page 0.
+Then the page-0 stored items, in list order, get the item-skill link
+(add = 1) until the count is used up. Stash (page 4) and cube (page 3)
+scrolls and tomes therefore stop counting after the first cube use.
+
+#### 5.6 Active inventory item and usable equipment
+
+- **Active inventory item** (`0x0062FF70`, item, unit): not broken (item
+  flag 0x100), item flag 0x4000 clear, type 13 (`char`, equivalence
+  test), page 0, and §4.2 (not equipping) passes. These are the charms
+  whose stats count.
+- **Usable** (`0x0055DB00`, ECX = unit, EDX = item): §4.2 (not
+  equipping) passes, and an item whose itemtype `quiver` (`0x0062E740`)
+  is set also needs the other hand's item (location 4, or 5 when the
+  item itself is at 4) to be of that type.
+- **Item flag 0x4000** marks an equipped item or charm whose stats are
+  switched off because it is not usable.
+
+#### 5.7 Inventory pass (`0x0055DBC0`, ECX = game, EDX = unit U, send)
+
+Runs only for a player or a unit with unit flag 0x200 (+0xC4 bit 9;
+hirelings). U without an inventory → nothing (after step 1).
+
+1. Save U's left and right skill as (skill id, owner GUID at skill
+   +0x34; id 0 when none) and stats 6, 8, 10 (`0x0055D9D0`; the stats are
+   not read again by this pass).
+2. Charms: each item of the item list with node kind 1 (+0x69,
+   `0x0063E020`) that is an active inventory item (§5.6), whose stat list
+   is not linked to U (`0x00625820` = 0) and is usable → item flag 0x4000
+   cleared, then `0x0055D970`: stat link (`0x0063D1D0`, skipped for
+   body locations 11 / 12), and when the item is in mode 1, or in mode 0
+   and an active inventory item, stat refresh `0x0055C2C0(item, U, 1)`.
+3. Switch off: body locations 1–10 in order, each item X that is (not
+   broken or linked) and (flag 0x4000 clear or linked) and **not**
+   usable → flag 0x4000 set, stat unlink (`0x0063D2B0`), X in mode 1 →
+   deactivation `0x0055C730(X, U, 1, 1)`.
+4. Switch on, repeated until a sweep changes nothing: locations 1–10,
+   each X not broken with (flag 0x4000 set or not linked) and usable →
+   flag 0x4000 cleared, stat link (not for 11 / 12), and when X is in
+   mode 1, or in mode 0 and an active inventory item, stat refresh
+   `0x0055C2C0(X, U, 1)`.
+5. Set items: locations 1–10, each X of quality 5, not broken, flag
+   0x4000 clear → `0x0055C730(X, U, 1, 1)` then `0x0055C2C0(X, U, 1)`
+   (set bonuses re-applied).
+6. Restore the step-1 skills (`0x0055DA70`), left then right: saved id
+   ≠ 0, U still has the skill (id, owner) (`0x006439B0`), it is not the
+   one now selected, and `0x00647960` returns neither 2 nor 7 → select it
+   again (`0x005701B0`, EDX = 1 left / 0 right, id, owner; skills owner).
+7. Owner refresh (`0x00621000(U, 1)`, §6.1).
+8. send ≠ 0: S→C 0x48 (type U, arg 0, U's GUID; `0x0053D3C0`) to U's
+   client, or for a non-player to its owner's (`0x0058F0D0`) client when
+   that owner is a player.
 
 ### 6. Deferred item messages
 
@@ -528,7 +665,7 @@ missing → out 1. Player, not busy, page ≠ 0 → out 1 (players may lift
 only page-0 items when idle; open question 12 for the busy case). Mode ≠ 0
 → out 1. Targeting reset; unit flag 0x2 cleared; unlink (missing or
 mismatch → fatal); stat refresh `0x0055C730(player, 0, 1)`; inventory
-pass if active; charm unlink `0x0055C6E0`; room-change notice
+pass if active; item-skill unlink `0x0055C6E0`; room-change notice
 `0x0063BCF0` with the item's old cell; stored page := page; page := 0xFF;
 cursor := item (except page 1 for players); mode 4; command flag 0x4,
 item flag 0x1 when socket-filled, item flag 0x4000 cleared; update list
@@ -590,11 +727,11 @@ Fields: cursor u32 @1, target u32 @5, x u32 @9, y u32 @13.
 3. `0x00561B00`: target page 3 and the cursor item is the cube (`box `,
    class cached at `0x0088C6FC`) → 0 (no cube in a cube); target page 2
    → out 1. Target mode must be 0. Target T: unlink, stat refresh,
-   room-change notice, page := 0xFF, cursor := T, charm unlink, stored
+   room-change notice, page := 0xFF, cursor := T, item-skill unlink, stored
    page := page, unit flag 0x2 cleared, mode 4, command flag 0x40000,
    item flag 0x1 if socket-filled, update list. Cursor item C: §2.2 at
    (x, y) on the same page (fail → out 1); stored page 0, page := page,
-   x, y set; link; charm re-link; stat refresh if active; mode 0; command
+   x, y set; link; item-skill link; stat refresh if active; mode 0; command
    flag 0x40000; update list; refresh; inventory pass if T was active.
    Both send 0x9C action 0xD.
 
@@ -629,7 +766,7 @@ for every owned item (original quirk; reproduce).
 Cursor item check; `0x0055E9B0(item, slot u32 @5, find 0)`: targeting
 reset; item missing or mode ≠ 4 → out 1; not beltable → 0; §3.7 into the
 given slot (fail → 0, page := 0xFF); link kind 2 (fail → out 1); cursor
-:= none; charm re-link; unit flag 0x2 cleared; stat refresh if active;
+:= none; item-skill link; unit flag 0x2 cleared; stat refresh if active;
 mode 2; page 0xFF; command flag 0x400 (0x9C action 0xE); refresh; update
 list. Result 0 or 3. (With find ≠ 0, used by other callers, §3.5
 chooses the slot.)
@@ -638,7 +775,7 @@ chooses the slot.)
 
 Belt item check; item-move gate (with no item) refuses → 0; a cursor
 item → 2. `0x00562250`: item missing → out 1; mode ≠ 2 → out 1;
-targeting reset; slot := item x; unlink; cursor := item; charm unlink;
+targeting reset; slot := item x; unlink; cursor := item; item-skill unlink;
 unit flag 0x2 cleared; stat refresh; mode 4; command flag 0x800 (0x9C
 action 0xF); refresh; update list; compaction §3.8 of the slot.
 
@@ -776,12 +913,12 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
    out 1; leave the room; `0x00562E00(item, 0)` equips; success → quest
    hook ITEMPICKEDUP (`0x00543D80`, `world/quests.md`).
 6. Else beltable, §3.6 (always) and §3.5 + §3.7 succeed → leave the room,
-   link kind 2 (failure fatal), cursor := none, charm re-link, stat
+   link kind 2 (failure fatal), cursor := none, item-skill link, stat
    refresh if active, unit flag 0x2 cleared, mode 2, page 0xFF, command
    flag 0x2000 (0x9C action 0xE), unit flag 0x2000000 cleared, update
    list, refresh, inventory pass if active.
 7. Else page-0 free position (`0x005600A0(game, 1, page 0)`: §2.3 + §2.2,
-   leave the room, link, cursor := none, charm re-link, stat refresh,
+   leave the room, link, cursor := none, item-skill link, stat refresh,
    unit flag 0x2 cleared, mode 0, command flag 0x80 (0x9C action 4),
    update list, refresh, unit flag 0x2000000 cleared, page := 0, quest
    hook ITEMPICKEDUP, inventory pass if active). No room → refused
@@ -894,8 +1031,8 @@ then the cache := new.
 
 ### 11. Message layouts
 
-Machine copy: `server-messages.tsv` `layout` column (rows 0x19, 0x3F,
-0x42, 0x47, 0x48, 0x7D, 0x9C, 0x9D). Little-endian.
+Machine copy: `server-messages.tsv` `layout` column (rows 0x19, 0x22,
+0x3F, 0x42, 0x47, 0x48, 0x7D, 0x9C, 0x9D). Little-endian.
 
 | Id | Bytes |
 |---|---|
@@ -905,6 +1042,7 @@ Machine copy: `server-messages.tsv` `layout` column (rows 0x19, 0x3F,
 | 0x47 / 0x48 | [1] unit type (6 none), [2] 0 (0x47) or the argument (0x48; 0 from `0x00580860`), [3..6] unit GUID, [7..10] 0 |
 | 0x42 | [1] unit type (6 none), [2..5] GUID |
 | 0x3F | [1] code (0xFF when the "reset" argument ≠ 0), [2..5] item GUID (0 when no item), [6..7] u16 argument |
+| 0x22 | 12 bytes (`0x0053C520`; ECX = client, DL = unit type, stack GUID, skill, quantity): [1] unit type (6 none), [2] unwritten, [3..6] unit GUID (−1 none), [7..8] skill id, [9] quantity (low byte), [10] unwritten, [11] 1 when the unit found by (type, GUID) in the client's game has state 7 (`playerbody`, `0x00639DF0`), else 0 |
 
 Bit stream: written by `0x006313E0(item, buffer, 0xF4, …)` before the
 command flags are restored: the item's item flags are temporarily OR-ed
@@ -1060,21 +1198,13 @@ dual-wield monster classes are 1.14d constants.
    against R1–R5 bytes.
 2. Order of 0x9C/0x9D relative to other per-player update messages in
    one client pass (life, stats, 0x47/0x48). Settle: R1–R3 packet order.
-3. Whether a belt slot ≥ `numboxes` can be filled by 0x23 or 0x25 with a
-   crafted message (no check found). Settle: Ghidra on the client-side
-   send or a crafted-message test.
-4. Rounding of the requirement percent (`0x00483360`, 64-bit or 32-bit,
-   sign). Settle: Ghidra `0x00483360` with register arguments.
-5. Level requirement `0x0062B5B0` (items, affixes, set, unique). Settle:
-   Ghidra; owner `items/quality.md` or this spec.
-6. Charm re-link `0x0055C110` / unlink `0x0055C6E0` and the inventory
-   pass `0x0055DBC0`, `0x0055FA40` (`world/cube.md` OQ8: on cube
-   open/close `0x0055FA40` unlinks every stored item's effects and
-   re-links those on page 0). Settle: Ghidra; owner `sim/stat-lists.md`.
-7. Meaning of `0x00629DA0`, `0x0062A8D0`, `0x0062A2F0` in the stack test.
-   Settle: Ghidra.
-8. Auto-equip weapon/shield comparison `0x0055D560` / `0x0055D670`.
-   Settle: Ghidra.
+3. Answered: §3 rule 7 (no `numboxes` check server-side; slot ≤ 15).
+4. Answered: §4.2 step 2 (`pct`, `combat/damage.md` §0).
+5. Answered: §4.8.
+6. Answered: §5.5 (item-skill quantity of scrolls/tomes, not charms; cube
+   recount `0x0055FA40`), §5.6, §5.7 (inventory pass).
+7. Answered: §4.5.
+8. Answered: §4.7.
 9. 1.14d address of the per-item reset after the update pass (D2MOO
    `INVMODE_Last`: command flags cleared, body location 0 for flags
    0x10/0x4000, items with command flag 0x1 removed from all players).
