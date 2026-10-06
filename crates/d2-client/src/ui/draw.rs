@@ -9,6 +9,7 @@
 //! emission order (draw order is list order; equal keys keep build order).
 
 use super::geom::{Point, Rect};
+use super::text::TextOpts;
 
 /// A UI image: a frame of a file the panel registry names. Both are
 /// opaque ids here; which DC6 files and frames each panel draws is
@@ -19,8 +20,8 @@ pub struct ImageRef {
     pub frame: u32,
 }
 
-/// Opaque font and text-color ids; their meaning (font file, PL2 text
-/// color map) is `TODO(spec: ui/text.md §B3)`.
+/// Font id 0–13 (`ui/text.md` §1, `text-fonts.tsv`) and the caller's
+/// text color `k` (§5: 0 = no remap, else PL2 text-color map `k`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TextStyle {
     pub font: u16,
@@ -37,14 +38,17 @@ pub struct ImageRequest {
 }
 
 /// Text as UTF-16 code units, the way the string tables hold them
-/// (spec §A3); layout (advance, wrap, alignment, color codes) is done by
-/// the sink through [`super::text::layout_text`] (§A3; its rules are
-/// `TODO(spec: ui/text.md §B3)`).
+/// (spec §A3); layout is done by the sink through
+/// [`super::text::layout_text`] (`ui/text.md` §5–§9). `at` is the pen: the
+/// bottom row of the first-drawn line (`ui/text.md` §4.2). `opts` is the
+/// text call and its arguments (§7–§9). The original's text calls take no
+/// clip rectangle (`ui/text.md` §12, decision CG2): `clip` is the frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextRequest {
     pub text: Vec<u16>,
     pub at: Point,
     pub style: TextStyle,
+    pub opts: TextOpts,
     pub clip: Rect,
 }
 

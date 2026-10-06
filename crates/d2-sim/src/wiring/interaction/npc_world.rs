@@ -323,8 +323,8 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         act1::respec_done(ctl, &mut w, player);
     }
     fn imbue_granted(&mut self, player: UnitId) {
-        let (_, mut w) = self.quest_world();
-        act1::imbue_granted(&mut w, player);
+        let (ctl, mut w) = self.quest_world();
+        act1::imbue_granted(ctl, &mut w, player);
     }
     fn socket_granted(&mut self, player: UnitId) {
         self.rest.socket_granted(player);

@@ -142,7 +142,8 @@ fn checks_and_targeting_reset() {
 /// The direct 0x9D action 5 (§6.4) of the cube's removal: the stored
 /// page set to the shown page first, queued now through
 /// `MovePending::send` to the owner: [0x9D, 5, 13, category 0, GUID,
-/// owner type 0, the player's GUID] (empty bit stream, OQ1).
+/// owner type 0, the player's GUID, the item bit stream with the flag
+/// argument 0x20 and page 3 (`bitstream.md`)].
 #[test]
 fn send_item_page_queues_0x9d_now() {
     let mut w = World::new();
@@ -151,11 +152,17 @@ fn send_item_page_queues_0x9d_now() {
     assert_eq!(w.handle(&insert(k, 0, 0, 0)), Ok(0));
     w.drain();
     let u = w.unit(k).unwrap();
+    let stream = w.desk(|d| d.item_stream(k, 0x20, 3));
+    assert!(!stream.is_empty());
+    // Page 3 is sent as page + 1 = 4 (3 bits at stream bit 57).
+    let page1 = (u32::from_le_bytes(stream[4..8].try_into().unwrap()) >> 25) & 7;
+    assert_eq!(page1, 4);
     assert_eq!(w.desk(|d| d.send_item_page(p, u, 0x20, 3)), Ok(()));
-    let mut want = vec![0x9D, 5, 13, 0];
+    let mut want = vec![0x9D, 5, 13 + stream.len() as u8, 0];
     want.extend_from_slice(&k.to_le_bytes());
     want.push(0);
     want.extend_from_slice(&w.pguid().to_le_bytes());
+    want.extend_from_slice(&stream);
     assert_eq!(w.rest.sent, [(w.me(), want)]);
     assert_eq!(w.desk(|d| d.stored_page(k)), 3);
     let _: InvItem = w.data(k);

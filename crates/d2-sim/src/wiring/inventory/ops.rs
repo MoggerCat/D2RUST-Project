@@ -8,7 +8,7 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     auto_belt_gate, auto_equip_location, belt, belt_item_check, busy, compact_belt,
     cursor_item_check, equip, equip_check, equip_from_cursor, find_free_position, free_belt_slot,
-    ground_or_owned_check, item_move_gate, owned_item_check, place_at_body, place_at_page,
+    grid_id, ground_or_owned_check, item_move_gate, owned_item_check, place_at_body, place_at_page,
     place_in_belt_slot, place_in_page_from_cursor, requirements_met, stack_test, stored_item_check,
     stored_or_equipped_check, targeting_reset, trading, InvWorld, NO_GUID,
 };
@@ -32,6 +32,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     }
 }
 
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
+    /// The grid item list of grid `g` (grid list order).
+    fn grid_items(&self, owner: Owner, g: usize) -> Vec<Guid> {
+        self.inventory(owner)
+            .and_then(|i| i.grid(g))
+            .map(|gr| gr.items.iter().map(|&u| self.guid_of(u)).collect())
+            .unwrap_or_default()
+    }
+}
+
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H, R> {
     // ---- §1.4 ----------------------------------------------------------
 
@@ -44,11 +54,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H,
     }
     fn set_cursor(&mut self, owner: Owner, item: Option<Guid>) {
         let unit = item.and_then(|g| self.iu(g));
-        if let Some(u) = self.unit_of(owner) {
-            if let Some(inv) = self.state.inventories.get_mut(&u) {
-                inv.set_cursor(unit);
-            }
-        }
+        self.with_inv(owner, |inv, d| inv.put_cursor(d, unit));
     }
     fn items(&self, owner: Owner) -> Vec<Guid> {
         self.inventory(owner)
@@ -71,6 +77,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H,
         if let Some(u) = self.unit_of(owner) {
             if let Some(inv) = self.state.inventories.get_mut(&u) {
                 inv.push_update(item);
+            }
+        }
+    }
+    fn update_list_free(&mut self, owner: Owner) {
+        if let Some(u) = self.unit_of(owner) {
+            if let Some(inv) = self.state.inventories.get_mut(&u) {
+                inv.take_updates();
             }
         }
     }
@@ -150,6 +163,20 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H,
         self.with_inv(owner, |inv, d| {
             compact_belt(inv, d, t, slot);
         });
+    }
+
+    fn belt_item(&self, owner: Owner, slot: u8) -> Option<Guid> {
+        let u = self.inventory(owner)?.belt_item(slot)?;
+        Some(self.guid_of(u))
+    }
+    fn belt_boxes(&self, belt: Option<Guid>) -> u8 {
+        belt::belt_boxes_of(self, self.tables, belt.and_then(|g| self.iu(g)))
+    }
+    fn page_items(&self, owner: Owner, page: u8) -> Vec<Guid> {
+        self.grid_items(owner, grid_id::PAGE + usize::from(page))
+    }
+    fn body_items(&self, owner: Owner) -> Vec<Guid> {
+        self.grid_items(owner, grid_id::BODY)
     }
 
     // ---- §4 ------------------------------------------------------------

@@ -1,0 +1,27 @@
+# Walk, then run out of the Act I town towards the Cold Plains.
+# The targets are relative: the town layout depends on the seed, so the
+# exit's position is read from the first original run of this seed and
+# written here then (docs/handoff/scenario-harness.md §5).
+scenario 1
+name run-cold-plains
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 250
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+
+record s2c rng units
+snapshot every 25
+
+at 2 msg Walk x=@x+10 y=@y
+at 30 msg Run x=@x+30 y=@y
+at 70 msg Run x=@x+30 y=@y+10
+at 110 msg Run x=@x+30 y=@y+10
+at 150 msg Run x=@x+30 y=@y
+at 190 msg Run x=@x+30 y=@y

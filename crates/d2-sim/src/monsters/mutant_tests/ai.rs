@@ -183,12 +183,13 @@ fn install_ignores_state_18_and_non_monsters() {
     assert!(w.store.unhandled.is_empty());
 }
 
-/// The first AI table index whose record has an init function, and one
-/// without.
+/// The first AI table index whose record has an init function without a
+/// body here (a logged stub: FoulCrowNest's and BloodRaven's run, §9.17,
+/// §9.18), and one without an init function.
 fn ai_with_init(has: bool) -> u16 {
     table::AI_TABLE
         .iter()
-        .position(|r| (r.init != 0) == has && r.think != 0)
+        .position(|r| (r.init != 0) == has && r.think != 0 && !INIT_IMPLEMENTED.contains(&r.init))
         .expect("an AI") as u16
 }
 

@@ -127,13 +127,14 @@ pub(super) fn box_corners(x: i32, y: i32, sx: u32, sy: u32) -> (i32, i32, i32, i
     )
 }
 
-/// Box walk (§4 rule 4): the room of (left, bottom) from `room`; the box
-/// clipped at that room's right and top edges; `inside` runs on the
-/// inside box's room; the strip right of the room (full height) and the
-/// strip above (the inside box's width) are walked again from that room.
-/// Returns false when a (sub-)box's lower-left cell has no room.
-// TODO(spec: path-placement.md open question 2): the strip shapes are
-// D2MOO's reading, not traced in 1.14d.
+/// Box walk (§4 rule 4, split `0x0064CDF0`): the room of (left, bottom)
+/// from `room`; an empty box (bottom > top or left > right) or a
+/// lower-left cell without a room gives no boxes (`missing`: the query
+/// reads 0x27). Box 1 is the box clipped at that room's right and top
+/// edges; `inside` runs on it; the right strip {R, bottom, right, top}
+/// (full height: it takes the corner beyond both edges) and the top
+/// strip {left, T, box 1 right, top} follow, in that order, each walked
+/// again with that room as the lookup start.
 fn walk_box<R: CollisionRooms + ?Sized, A>(
     rooms: &mut R,
     room: Option<RoomId>,
@@ -143,6 +144,7 @@ fn walk_box<R: CollisionRooms + ?Sized, A>(
     missing: &mut impl FnMut(&mut A),
 ) {
     if left > right || bottom > top {
+        missing(acc);
         return;
     }
     let Some(r) = find_room(&*rooms, room, left, bottom) else {
@@ -311,4 +313,102 @@ pub fn pattern_collides<R: CollisionRooms + ?Sized>(
         0..=5 => pattern_value(rooms, room, x, y, pattern, mask) != 0,
         _ => true,
     }
+}
+
+/// What the unit search `0x00641CB0` reads besides the rooms (§4 rule 6).
+pub trait UnitsAtPoint: CollisionRooms {
+    /// A unit.
+    type Unit: Copy;
+    /// The room's unit list from its head (+0x74) along unit +0xE8
+    /// (`sim/unit-order.md` §5 order); `None`: no list head.
+    fn room_units(&self, room: RoomId) -> Option<Vec<Self::Unit>>;
+    /// Unit type (unit +0x00).
+    fn unit_type(&self, unit: Self::Unit) -> crate::units::UnitType;
+    /// Current mode (unit +0x10).
+    fn unit_mode(&self, unit: Self::Unit) -> u32;
+    /// Unit size (`0x00620510`, §3).
+    fn unit_size(&self, unit: Self::Unit) -> i32;
+    /// The dynamic path's sub-tile position (path null → (0, 0)).
+    fn unit_point(&self, unit: Self::Unit) -> (i32, i32);
+}
+
+/// Hit test of §4 rule 6 step 5 (jump table `0x00641EF8`): the query
+/// shape of size `r` overlaps the unit shape of size `s` (both 1..=3) at
+/// distance (dx, dy).
+pub fn shapes_overlap(r: i32, s: i32, dx: i32, dy: i32) -> bool {
+    let plus_box = (dx <= 2 && dy <= 1) || (dx <= 1 && dy <= 2);
+    match (r, s) {
+        (1, 1) => dx == 0 && dy == 0,
+        (1, 2) | (2, 1) => dx + dy <= 1,
+        (1, 3) | (3, 1) => dx <= 1 && dy <= 1,
+        (2, 2) => dx + dy <= 2,
+        (2, 3) | (3, 2) => plus_box,
+        (3, 3) => dx <= 2 && dy <= 2,
+        _ => false,
+    }
+}
+
+/// Unit at a point `0x00641CB0(room, x, y, accept, arg, r)` (§4 rule 6):
+/// the first unit, over the room's adjacency array (which holds the
+/// room itself) in index order and each room's unit list in order, whose
+/// shape overlaps the query shape of size `r` at (x, y) and that
+/// `accept` takes. Players in mode 0 / 17, monsters in mode 0 / 12,
+/// objects, items and tiles are skipped; missiles are candidates.
+pub fn unit_at_point<V: UnitsAtPoint + ?Sized>(
+    v: &V,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
+    r: i32,
+    mut accept: impl FnMut(V::Unit) -> bool,
+) -> Option<V::Unit> {
+    use crate::units::UnitType;
+    // Step 1.
+    let room = room?;
+    if !(1..=3).contains(&r) {
+        return None;
+    }
+    // Step 2.
+    for i in 0..v.adjacent_count(room) {
+        let Some(adj) = v.adjacent(room, i) else {
+            continue;
+        };
+        // Near-rect test `0x00641930` (margin 2), as written: rejects only
+        // when both sides fail on one axis.
+        if let Some(rect) = v.subtile_rect(adj) {
+            let (right, top) = (rect.x + rect.w, rect.y + rect.h);
+            if (x + 2 < rect.x && x - 2 > right) || (y + 2 < rect.y && y - 2 > top) {
+                continue;
+            }
+        }
+        let Some(units) = v.room_units(adj) else {
+            continue;
+        };
+        // Step 3.
+        for u in units {
+            let mode = v.unit_mode(u);
+            match v.unit_type(u) {
+                UnitType::Player if mode == 0 || mode == 17 => continue,
+                UnitType::Monster if mode == 0 || mode == 12 => continue,
+                UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                _ => continue,
+            }
+            // Step 4.
+            let s = v.unit_size(u);
+            if s <= 0 {
+                continue;
+            }
+            let s = s.min(3);
+            let (ux, uy) = v.unit_point(u);
+            // Step 5.
+            if !shapes_overlap(r, s, (x - ux).abs(), (y - uy).abs()) {
+                continue;
+            }
+            // Step 6.
+            if accept(u) {
+                return Some(u);
+            }
+        }
+    }
+    None
 }

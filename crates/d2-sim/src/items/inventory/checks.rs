@@ -1,8 +1,10 @@
 // Spec: specs/items/inventory.md §5
 //! Shared checks: the item checks (§5.1), busy and trading (§5.2), the
-//! targeting reset (§5.3) and the item-move gate (§5.4).
+//! targeting reset (§5.3), the item-move gate (§5.4) and the active
+//! inventory item / usable tests (§5.6).
 
-use super::{iflag, mode, InteractionTarget, InvWorld, Inventory};
+use super::equip::requirements_met;
+use super::{body, iflag, mode, page, InteractionTarget, InvTables, InvWorld, Inventory};
 use crate::units::UnitId;
 
 /// Ground range of the "ground or owned" check (§5.1; Constants: 10 per
@@ -139,4 +141,49 @@ pub fn item_move_gate<W: InvWorld + ?Sized>(inv: &Inventory, w: &mut W) -> bool 
         InteractionTarget::Unit { ty: 1, unit } => !w.npc_talking(unit, player),
         InteractionTarget::Unit { .. } => gate_trade(w, player),
     }
+}
+
+/// Itemtypes row 13 (`char`, §5.6).
+pub const TYPE_CHARM: i16 = 13;
+
+/// Active inventory item (`0x0062FF70`, §5.6): not broken, item flag
+/// 0x4000 clear, type 13 (`char`, equivalence test), page 0 and §4.2
+/// (not equipping) passes: the charms whose stats count.
+pub fn active_inventory_item<W: InvWorld + ?Sized>(
+    w: &W,
+    t: &InvTables,
+    item: UnitId,
+    unit: UnitId,
+) -> bool {
+    let Some(d) = w.item(item) else {
+        return false;
+    };
+    d.flags & (iflag::BROKEN | iflag::F4000) == 0
+        && t.is_type(d.record, TYPE_CHARM)
+        && d.page == page::INVENTORY
+        && requirements_met(w, t, Some(item), unit, false)
+}
+
+/// Usable (`0x0055DB00`, §5.6): §4.2 (not equipping) passes, and an item
+/// whose itemtype `quiver` is set also needs the other hand's item
+/// (location 4, or 5 when the item itself is at 4) to be of that type.
+pub fn usable<W: InvWorld + ?Sized>(inv: &Inventory, w: &W, t: &InvTables, item: UnitId) -> bool {
+    if !requirements_met(w, t, Some(item), inv.owner, false) {
+        return false;
+    }
+    let Some(d) = w.item(item) else {
+        return false;
+    };
+    let q = t.itype_of(d.record).map_or(0, |r| r.quiver);
+    if q == 0 {
+        return true;
+    }
+    let other = if d.body_loc == body::RIGHT_HAND {
+        body::LEFT_HAND
+    } else {
+        body::RIGHT_HAND
+    };
+    inv.body_item(other)
+        .and_then(|o| w.item(o))
+        .is_some_and(|o| t.is_type(o.record, q as i16))
 }

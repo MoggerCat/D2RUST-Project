@@ -7,18 +7,20 @@
 //! client world model, composed by the GPU compositor's render-graph node,
 //! presented at the integer scale, render-pipeline §A1, §A9).
 //!
-//! What the window shows is what the specs allow: no S→C message has an
-//! owner spec (`bridge-dispatch.tsv`), so the client world model stays
-//! empty, and every rule of how a unit, tile or panel looks is a
-//! `TODO(spec: …)` hook answered by `world_view::Unspecified` (draw
+//! What the window shows is what the specs allow: the S→C handlers of
+//! `client/model.md`, `msg-units.md` and `msg-stats-items.md` fill the
+//! client world model, and every rule of how a unit, tile or panel looks
+//! is a `TODO(spec: …)` hook answered by `world_view::Unspecified` (draw
 //! nothing). Placement is the original's: the world view builds each
 //! frame through `rules::OriginalView` with the camera of
-//! `render/camera.md` §3, fed by `world_view::NoFeed` until the owner
-//! specs state the local player's position, the open mode, the shake,
-//! unit positions and the map (no player: no camera, nothing placeable).
+//! `render/camera.md` §3, fed by `world_view::ModelFeed` (the local
+//! player's position and unit positions from the model; the open mode,
+//! the shake and the map stay `NoFeed`'s until their owners land). No
+//! player in the model: no camera, nothing placeable.
 //! One frame per server tick (§9). The frame is the composed empty list: palette index 0 over
-//! the whole view. The frame palette is a hook too (`ViewAssets::palette`,
-//! TODO(spec: render/shading.md) §B3): all zeros until it is specified.
+//! the whole view. The frame palette is the act's `pal.pl2`
+//! (`render/composition.md` §4, `ViewAssets::from_pl2`); the model states
+//! no level, so no act: all zeros until it does.
 //!
 //! Frames come from the frame store (`ViewAssets::frames`, the store of
 //! verify-map; empty until a rule names a frame set to load), UI text goes
@@ -36,13 +38,17 @@ use super::sound::{self, AudioParts, GameAudio};
 use crate::bridge::mirror::DynLink;
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
-use crate::world_view::{NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState};
+use crate::world_view::{
+    ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
+};
 
 /// Frames between two progress lines in the log.
 const LOG_EVERY: u64 = 250;
 
-/// The frame palette until `render/shading.md` (§B3) says which one: all
-/// zeros (black).
+/// The frame palette while the model states no level for the player:
+/// all zeros (black). TODO(spec: the S→C owner spec of the player's
+/// level): then the act's `pal.pl2` (`render/composition.md` §4,
+/// `ViewAssets::from_pl2`).
 pub fn unspecified_palette() -> Palette {
     Palette {
         colors: [Rgb { r: 0, g: 0, b: 0 }; 256],
@@ -62,7 +68,7 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
         .insert_resource(WorldViewState::new(
             ViewAssets::new(unspecified_palette()),
             Box::new(Unspecified),
-            Box::new(NoFeed),
+            Box::new(ModelFeed::<NoFeed>::default()),
         ))
         .add_systems(Last, log_progress);
     sound::add_audio(app, AudioParts::empty());

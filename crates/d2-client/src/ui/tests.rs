@@ -556,6 +556,7 @@ fn widgets_emit_requests_and_hit_by_rect() {
                 text: vec![0x48, 0x69],
                 at: Point::new(0, 50),
                 style,
+                opts: TextOpts::default(),
                 clip: FRAME
             }),
         ]
@@ -678,82 +679,493 @@ fn one_logical_frame_of_800_by_600() {
 // --- Text (§A3) --------------------------------------------------------------
 
 mod text {
-    use std::cell::RefCell;
-
     use d2_formats::font::{FontTable, Glyph};
 
     use super::super::text::*;
     use super::*;
 
-    fn glyph(code: u16, width: u8, frame: u8) -> Glyph {
-        Glyph {
-            code,
-            unknown1: 0,
-            width,
-            height: 10,
-            unknown2: 1,
-            unknown3: 0,
-            frame,
-            unknown4: 0,
-            unknown5: 0,
-        }
+    const TSV: &str = include_str!("../../../../specs/ui/text-fonts.tsv");
+
+    fn u(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
     }
 
-    /// Records are deliberately not in code order: lookup goes by the
-    /// `code` field, not by index.
-    fn font() -> FontTable {
+    fn s(units: &[u16]) -> String {
+        String::from_utf16(units).unwrap()
+    }
+
+    /// A 256-record Latin font (record `i`: `frame = i`), every advance
+    /// `default` except `advs`. The record `code` fields are scrambled:
+    /// the lookup is by position and never reads them (§3).
+    fn font(height: u8, default: u8, advs: &[(char, u8)]) -> FontTable {
+        let glyphs = (0..256u16)
+            .map(|i| Glyph {
+                code: 255 - i,
+                unknown1: 0,
+                width: advs
+                    .iter()
+                    .find(|(c, _)| *c as u16 == i)
+                    .map_or(default, |&(_, w)| w),
+                height,
+                unknown2: 1,
+                unknown3: 0,
+                frame: i,
+                unknown5: 0,
+            })
+            .collect();
         FontTable {
             version: 1,
-            unknown: [0; 4],
-            height: 10,
-            width: 8,
-            glyphs: vec![glyph(0x42, 7, 9), glyph(0x41, 5, 3), glyph(0x00ff, 4, 200)],
+            unknown: 0,
+            count: 256,
+            height,
+            width: 0,
+            glyphs,
         }
     }
 
-    /// Test-only rules (not the original's): one glyph per code unit,
-    /// advancing by the record's `width`; records the text it was given.
-    #[derive(Default)]
-    struct Advance {
-        seen: RefCell<Vec<Vec<u16>>>,
+    /// Font16 advances the test vectors use (`A` 12, `B` 7, `a`, `ÿ`, `x`
+    /// 10; `Stash` = 7, 9, 10, 7, 7), height 10.
+    fn font16() -> FontTable {
+        let advs = [
+            ('A', 12),
+            ('B', 7),
+            ('C', 9),
+            ('a', 10),
+            ('ÿ', 10),
+            ('x', 10),
+            ('b', 10),
+            ('S', 7),
+            ('t', 9),
+            ('s', 7),
+            ('h', 7),
+        ];
+        font(10, 6, &advs)
     }
 
-    impl TextRules for Advance {
-        fn place(
-            &self,
-            glyphs: &GlyphLookup<'_>,
-            text: &[u16],
-            origin: Point,
-            style: TextStyle,
-            _: &TextOpts,
-        ) -> Result<Vec<GlyphPlacement>, TextError> {
-            self.seen.borrow_mut().push(text.to_vec());
-            let mut x = origin.x;
-            text.iter()
-                .map(|&code| {
-                    let at = Point::new(x, origin.y);
-                    x += i32::from(glyphs.font().glyphs[glyphs.record(code)?].width);
-                    Ok(GlyphPlacement {
-                        code,
-                        at,
-                        color: style.color,
-                    })
-                })
-                .collect()
+    /// Font8 advances meeting the §6 vectors (`Gold` 28, `Rare` 29,
+    /// `ÿc4` = `ÿc9` = 21, `m` 12), height 14.
+    fn font8() -> FontTable {
+        let advs = [
+            ('G', 8),
+            ('o', 7),
+            ('l', 5),
+            ('d', 8),
+            ('R', 8),
+            ('a', 7),
+            ('r', 6),
+            ('e', 8),
+            ('ÿ', 7),
+            ('c', 7),
+            ('4', 7),
+            ('9', 7),
+            ('m', 12),
+            ('X', 9),
+        ];
+        font(14, 6, &advs)
+    }
+
+    /// Every advance 5, height 10.
+    fn five() -> FontTable {
+        font(10, 5, &[])
+    }
+
+    fn place(
+        f: &FontTable,
+        text: &str,
+        at: Point,
+        color: u16,
+        opts: TextOpts,
+    ) -> Vec<(char, i32, i32, i32)> {
+        let style = TextStyle { font: 1, color };
+        OriginalText
+            .place(&GlyphLookup::new(f), &u(text), at, style, &opts)
+            .unwrap()
+            .into_iter()
+            .map(|p| {
+                (
+                    char::from_u32(u32::from(p.code)).unwrap(),
+                    p.at.x,
+                    p.at.y,
+                    p.color,
+                )
+            })
+            .collect()
+    }
+
+    // Covers: specs/ui/text.md §1 r3
+    #[test]
+    fn font_table_matches_text_fonts_tsv() {
+        let mut rows = TSV.lines();
+        assert_eq!(
+            rows.next().unwrap(),
+            "id\tname\ttbl_path\tdc6_path\tdc6_archive\theight\tline_step\tframe_w\tframe_h"
+        );
+        let mut n = 0;
+        for (row, f) in rows.zip(FONTS.iter()) {
+            let c: Vec<&str> = row.split('\t').collect();
+            let got = [
+                f.id.to_string(),
+                f.name.into(),
+                f.tbl_path.into(),
+                f.dc6_path.into(),
+                f.dc6_archive.into(),
+                f.height.to_string(),
+                f.line_step.to_string(),
+                f.frame_w.to_string(),
+                f.frame_h.to_string(),
+            ];
+            assert_eq!(c, got, "row {n}");
+            // line_step = trunc(height × 16 / 10) (§6).
+            assert_eq!(f.line_step, i32::from(f.height) * 16 / 10, "row {n}");
+            assert_eq!(font_info(f.id), Some(f));
+            n += 1;
         }
+        assert_eq!((n, TSV.lines().count()), (14, 15));
+        assert_eq!(font_info(14), None);
+    }
+
+    // Covers: specs/ui/text.md §3
+    #[test]
+    fn latin_lookup_is_by_position() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        assert_eq!(g.record(0x20AC), Ok(0));
+        assert_eq!(g.record(0x0041), Ok(65));
+        assert_eq!(g.record(0x00FF), Ok(255));
+        // The record's `code` field (here 255 − i) is not read.
+        assert_eq!(f.glyphs[65].code, 190);
+        assert_eq!(g.adv(u16::from(b'A')), Ok(12));
+        // A font with fewer records than the position: malformed input.
+        let mut short = five();
+        short.glyphs.truncate(65);
+        assert_eq!(
+            GlyphLookup::new(&short).record(0x41),
+            Err(TextError::MissingGlyph {
+                code: 0x41,
+                record: 65
+            })
+        );
+        assert_eq!(GlyphLookup::new(&short).record(0x20AC), Ok(0));
+    }
+
+    // Covers: specs/ui/text.md §6
+    #[test]
+    fn measures_follow_their_own_code_rules() {
+        let f16 = font16();
+        let g = GlyphLookup::new(&f16);
+        assert_eq!(width_a(&g, &u("Stash")), Ok(40));
+
+        let f8 = font8();
+        let g = GlyphLookup::new(&f8);
+        let gold = u("ÿc4Gold");
+        assert_eq!(width_a(&g, &gold), Ok(49));
+        assert_eq!(width_c(&g, &gold, 0, 7), Ok(28));
+        assert_eq!(line_width(&g, &gold, 0), Ok(28));
+        assert_eq!(max_width(&g, &gold), Ok(28));
+        // Width C skips only codes 0–6 ...
+        let rare = u("ÿc9Rare");
+        assert_eq!(width_c(&g, &rare, 0, 7), Ok(50));
+        assert_eq!(line_width(&g, &rare, 0), Ok(29));
+        // ... and only when the code starts at i with i + 3 < n.
+        assert_eq!(width_c(&g, &gold, 0, 3), Ok(21));
+        assert_eq!(width_c(&g, &gold, 0, 4), Ok(8));
+        // `ÿm` / `ÿM`: zero for the three units plus adv('m').
+        assert_eq!(line_width(&g, &u("ÿmX"), 0), Ok(12));
+        assert_eq!(line_width(&g, &u("ÿMX"), 0), Ok(12));
+        // Width B: the first n units, codes counted; LF is 0.
+        assert_eq!(width_b(&g, &gold, 3), Ok(21));
+        assert_eq!(width_b(&g, &u("G\nG"), 3), Ok(16));
+        // Max width: the widest LF line; line width from a start.
+        let two = u("Gold\nRare");
+        assert_eq!(max_width(&g, &two), Ok(29));
+        assert_eq!(line_width(&g, &two, 5), Ok(29));
+        // A NUL ends the string.
+        assert_eq!(width_a(&g, &[u16::from(b'G'), 0, u16::from(b'G')]), Ok(8));
+    }
+
+    // Covers: specs/ui/text.md §6
+    #[test]
+    fn text_height_and_line_step() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        assert_eq!(text_height(&g, &u("AB\nC")), 32);
+        assert_eq!(text_height(&g, &u("AB")), 16);
+        assert_eq!(g.line_step(), 16);
+        let f8 = font8();
+        // trunc(14 × 16 / 10) = 22, trunc(14 × 16 × 3 / 10) = 67.
+        let g8 = GlyphLookup::new(&f8);
+        assert_eq!((g8.line_step(), text_height(&g8, &u("a\nb\nc"))), (22, 67));
+    }
+
+    // Covers: specs/ui/text.md §7 text, §7 r1, §7 r2, §7 r3, §4 r2
+    #[test]
+    fn draw_centered_lines_go_up() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        assert_eq!(max_width(&g, &u("AB\nC")), Ok(19));
+        assert_eq!(
+            place(&f, "AB\nC", Point::new(100, 200), 0, TextOpts::centered()),
+            [('A', 104, 200, 0), ('B', 116, 200, 0), ('C', 109, 184, 0)]
+        );
+        // A one-line string is drawn at x + 4.
+        assert_eq!(
+            place(&f, "A", Point::new(0, 0), 0, TextOpts::centered()),
+            [('A', 4, 0, 0)]
+        );
+        // An explicit block width replaces max width + 8.
+        let opts = TextOpts::Draw {
+            centered: true,
+            block_w: Some(20),
+            mode: 5,
+        };
+        assert_eq!(place(&f, "A", Point::new(0, 0), 0, opts), [('A', 4, 0, 0)]);
+    }
+
+    // Covers: specs/ui/text.md §5 r1, §5 r4, §7 r3, §7 r4
+    #[test]
+    fn color_codes_switch_color_across_line_feeds() {
+        let f = font16();
+        assert_eq!(
+            place(&f, "Aÿc1B\nC", Point::new(10, 50), 0, TextOpts::default()),
+            [('A', 10, 50, 0), ('B', 22, 50, 1), ('C', 10, 34, 1)]
+        );
+        // Each call starts with the caller's color; `ÿcB` is a code
+        // (k = 18 ≥ 13 → 0) taking three units, so nothing follows `A`.
+        assert_eq!(
+            place(&f, "AÿcB", Point::new(0, 0), 7, TextOpts::default()),
+            [('A', 0, 0, 7)]
+        );
+        // Synthetic advance 5, height 10 (line step 16).
+        assert_eq!(
+            place(
+                &five(),
+                "ab\ncd",
+                Point::new(0, 100),
+                0,
+                TextOpts::default()
+            ),
+            [
+                ('a', 0, 100, 0),
+                ('b', 5, 100, 0),
+                ('c', 0, 84, 0),
+                ('d', 5, 84, 0)
+            ]
+        );
+    }
+
+    // Covers: specs/ui/text.md §5 text, §5 r1, §5 r2, §5 r3
+    #[test]
+    fn color_code_values_and_ends() {
+        let f = five();
+        let k = |t: &str| place(&f, t, Point::new(0, 0), 9, TextOpts::default())[0].3;
+        assert_eq!(k("ÿc=a"), 0);
+        assert_eq!(k("ÿc<a"), 12);
+        assert_eq!(k("ÿc0a"), 0);
+        assert_eq!(k("ÿc;a"), 11);
+        // Below `0`: a negative k is kept (§Edge cases).
+        assert_eq!(k("ÿc/a"), -1);
+        // `ÿ` + anything else is the glyph of record 255.
+        assert_eq!(
+            place(&font16(), "aÿxb", Point::new(0, 20), 0, TextOpts::default()),
+            [
+                ('a', 0, 20, 0),
+                ('ÿ', 10, 20, 0),
+                ('x', 20, 20, 0),
+                ('b', 30, 20, 0)
+            ]
+        );
+        // Case-sensitive: `ÿC` is a glyph.
+        assert_eq!(
+            place(&f, "ÿC1", Point::new(0, 0), 0, TextOpts::default()).len(),
+            3
+        );
+        // `ÿ` or `ÿc` at the end: nothing drawn, drawing ends.
+        assert_eq!(
+            place(&f, "aÿ", Point::new(0, 0), 0, TextOpts::default()).len(),
+            1
+        );
+        assert_eq!(
+            place(&f, "aÿc", Point::new(0, 0), 0, TextOpts::default()).len(),
+            1
+        );
+    }
+
+    // Covers: specs/ui/text.md §7 text
+    #[test]
+    fn centered_span_counts_codes() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        // span 100, width A 40: x = 1 + 30.
+        assert_eq!(centered_span_x(&g, &u("Stash"), 1, 100), Ok(31));
+        // Wider than the span: x1.
+        assert_eq!(centered_span_x(&g, &u("Stash"), 1, 30), Ok(1));
+        let f8 = font8();
+        let g8 = GlyphLookup::new(&f8);
+        // `ÿc4Gold`: width A 49 (codes counted), not the visible 28.
+        assert_eq!(centered_span_x(&g8, &u("ÿc4Gold"), 0, 99), Ok(25));
+    }
+
+    // Covers: specs/ui/text.md §8 text, §8 r1, §8 r2, §8 r3, §8 r4, §8 r5
+    #[test]
+    fn framed_hover_box() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        let text = u("AB\nC");
+        let fr = framed_text(&g, &text, Point::new(790, 100), (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(773, 70), Point::new(800, 102)));
+        assert_eq!(fr.pen, Point::new(773, 99));
+        assert_eq!(
+            place(&f, "AB\nC", fr.pen, 0, fr.opts),
+            [('A', 777, 99, 0), ('B', 789, 99, 0), ('C', 782, 83, 0)]
+        );
+        // Left of the screen: x' = 0; low on the screen: bottom Sh − 31.
+        let fr = framed_text(&g, &text, Point::new(-5, 590), (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(0, 537), Point::new(27, 569)));
+        // Near the top: bottom = text height.
+        let fr = framed_text(&g, &text, Point::new(0, 0), (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(0, 0), Point::new(27, 32)));
+    }
+
+    // Covers: specs/ui/text.md §8 text
+    #[test]
+    fn framed_tight_variant() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        let text = u("AB\nC");
+        let fr = framed_text_tight(&g, &text, Point::new(790, 100), (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(781, 92), Point::new(800, 102)));
+        assert_eq!(fr.pen, Point::new(781, 100));
+        assert_eq!(
+            place(&f, "AB\nC", fr.pen, 0, fr.opts)[0],
+            ('A', 781, 100, 0)
+        );
+        // Box above row 0: y' doubles (an original bug).
+        let fr = framed_text_tight(&g, &text, Point::new(0, -5), (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(0, -16), Point::new(19, -6)));
+        let fr = framed_text_tight(&g, &text, Point::new(0, 700), (800, 600)).unwrap();
+        assert_eq!(fr.rect.1, Point::new(19, 569));
+    }
+
+    // Covers: specs/ui/text.md §9
+    #[test]
+    fn horizontal_window() {
+        let f = five();
+        let opts = TextOpts::Horizontal { s: -7, w: 12 };
+        // Pen starts at 3; a glyph is drawn only if pen x > 10 before it;
+        // the call stops once pen x > 22.
+        assert_eq!(
+            place(&f, "abcdef", Point::new(10, 0), 2, opts),
+            [('c', 13, 0, 2), ('d', 18, 0, 2)]
+        );
+        // LF resets pen x to x (not x + s): a glyph at x is not drawn.
+        assert_eq!(
+            place(
+                &f,
+                "a\nbc",
+                Point::new(10, 50),
+                0,
+                TextOpts::Horizontal { s: 5, w: 50 }
+            ),
+            [('a', 15, 50, 0), ('c', 15, 34, 0)]
+        );
+        assert_eq!(opts.mode(), 5);
+    }
+
+    // Covers: specs/ui/text.md §9
+    #[test]
+    fn vertical_window_and_no_color_variants() {
+        let f = five();
+        let g = GlyphLookup::new(&f);
+        let at = Point::new(0, 100);
+        let style = TextStyle::default();
+        let v = |skip| {
+            OriginalText.place(
+                &g,
+                &u("ab"),
+                at,
+                style,
+                &TextOpts::Vertical { skip, lines: 4 },
+            )
+        };
+        assert_eq!(v(-1), Ok(Vec::new()));
+        assert!(matches!(v(0), Err(TextError::Unspecified(_))));
+        // No color: every `ÿ` skips 3 units, color 0, step trunc(−15 × h / 10).
+        assert_eq!(
+            place(&f, "aÿc1b\nc", at, 4, TextOpts::NoColor),
+            [('a', 0, 100, 0), ('b', 5, 100, 0), ('c', 0, 115, 0)]
+        );
+        let mode = TextOpts::Draw {
+            centered: false,
+            block_w: None,
+            mode: 3,
+        };
+        assert_eq!(mode.mode(), 3);
+        assert_eq!(TextOpts::default().mode(), 5);
+    }
+
+    fn wrapped(f: &FontTable, text: &str, max: i32) -> Vec<String> {
+        let t = u(text);
+        wrap(&GlyphLookup::new(f), &t, max)
+            .unwrap()
+            .into_iter()
+            .map(s)
+            .collect()
+    }
+
+    // Covers: specs/ui/text.md §10 text, §10 r1, §10 r2, §10 r3
+    #[test]
+    fn word_wrap() {
+        let f = five();
+        assert_eq!(wrapped(&f, "aa bb", 15), ["aa ", "bb"]);
+        // Fits: one line, LF kept (no forced break).
+        assert_eq!(wrapped(&f, "a\nb", 15), ["a\nb"]);
+        // Trailing white space stays; the last span counts the NUL.
+        assert_eq!(wrapped(&f, "ab cd ef", 30), ["ab cd ", "ef"]);
+        // A leading white-space unit is dropped (the NUL does not fit
+        // with `cd`: a last, empty line, see below).
+        assert_eq!(wrapped(&f, "ab  cd", 15), ["ab ", "cd", ""]);
+        // Hard break inside a word; a unit wider than M stays alone. When
+        // the NUL does not fit with the last unit, the NUL forms a last,
+        // empty line (§10.2 read literally; queued with the capture).
+        assert_eq!(wrapped(&f, "abcdefgh", 12), ["ab", "cd", "ef", "gh", ""]);
+        assert_eq!(wrapped(&f, "abc", 3), ["a", "b", "c", ""]);
+        // Width C skips `ÿc0`–`ÿc6` when deciding the fit.
+        assert_eq!(wrapped(&f, "ÿc1ab", 10), ["ÿc1ab"]);
+        assert_eq!(wrapped(&f, "ÿc9ab", 10), ["ÿc", "9a", "b"]);
+    }
+
+    // Covers: specs/ui/text.md §12, §13
+    #[test]
+    fn text_call_carries_no_clip() {
+        // CG2: the options are the call kind and its arguments only.
+        assert_eq!(
+            TextOpts::default(),
+            TextOpts::Draw {
+                centered: false,
+                block_w: None,
+                mode: 5
+            }
+        );
+        // A pen far outside the frame still places every glyph: pixel
+        // clipping is the cel draw's (the item clip, the frame).
+        assert_eq!(
+            place(&five(), "ab", Point::new(-400, 900), 0, TextOpts::default()),
+            [('a', -400, 900, 0), ('b', -395, 900, 0)]
+        );
     }
 
     // Covers: specs/client/ui.md §a3-text
     #[test]
     fn glyphs_resolve_code_to_record_to_frame() {
-        let style = TextStyle { font: 1, color: 4 };
+        let mut f = font16();
+        f.glyphs[0x41].frame = 3;
         let out = layout_text(
-            &font(),
-            &[0x41, 0x42, 0x41],
+            &f,
+            &[0x41, 0x20AC],
             Point::new(10, 20),
-            style,
+            TextStyle { font: 1, color: 4 },
             &TextOpts::default(),
-            &Advance::default(),
+            &OriginalText,
         )
         .unwrap();
         assert_eq!(
@@ -761,22 +1173,15 @@ mod text {
             [
                 GlyphDraw {
                     code: 0x41,
-                    record: 1,
+                    record: 0x41,
                     frame: 3,
                     at: Point::new(10, 20),
                     color: 4
                 },
                 GlyphDraw {
-                    code: 0x42,
+                    code: 0x20AC,
                     record: 0,
-                    frame: 9,
-                    at: Point::new(15, 20),
-                    color: 4
-                },
-                GlyphDraw {
-                    code: 0x41,
-                    record: 1,
-                    frame: 3,
+                    frame: 0,
                     at: Point::new(22, 20),
                     color: 4
                 },
@@ -784,135 +1189,26 @@ mod text {
         );
     }
 
-    /// Records the options `layout_text` hands the rules (decision CG2).
-    #[derive(Default)]
-    struct SeeOpts {
-        seen: RefCell<Vec<TextOpts>>,
-    }
-
-    impl TextRules for SeeOpts {
-        fn place(
-            &self,
-            _: &GlyphLookup<'_>,
-            _: &[u16],
-            _: Point,
-            _: TextStyle,
-            opts: &TextOpts,
-        ) -> Result<Vec<GlyphPlacement>, TextError> {
-            self.seen.borrow_mut().push(*opts);
-            Ok(Vec::new())
-        }
-    }
-
-    #[test]
-    fn layout_hands_the_clip_to_the_rules_unchanged() {
-        let rules = SeeOpts::default();
-        let clip = Rect::new(-3, 7, 120, 40);
-        for opts in [TextOpts { clip: Some(clip) }, TextOpts::default()] {
-            let out = layout_text(
-                &font(),
-                &[0x41],
-                Point::new(0, 0),
-                TextStyle::default(),
-                &opts,
-                &rules,
-            )
-            .unwrap();
-            assert!(out.is_empty());
-        }
-        assert_eq!(
-            *rules.seen.borrow(),
-            [TextOpts { clip: Some(clip) }, TextOpts { clip: None }]
-        );
-    }
-
     // Covers: specs/client/ui.md §a3-text
     #[test]
-    fn missing_code_is_an_error_not_a_fallback_glyph() {
+    fn missing_record_is_an_error_not_a_fallback_glyph() {
+        let mut f = five();
+        f.glyphs.truncate(0x43);
         let err = layout_text(
-            &font(),
+            &f,
             &[0x41, 0x43],
             Point::new(0, 0),
             TextStyle::default(),
             &TextOpts::default(),
-            &Advance::default(),
+            &OriginalText,
         )
         .unwrap_err();
-        assert_eq!(err, TextError::MissingGlyph(0x43));
-
-        // A placement naming a code the font lacks fails at resolution too.
-        struct Stray;
-        impl TextRules for Stray {
-            fn place(
-                &self,
-                _: &GlyphLookup<'_>,
-                _: &[u16],
-                origin: Point,
-                _: TextStyle,
-                _: &TextOpts,
-            ) -> Result<Vec<GlyphPlacement>, TextError> {
-                Ok(vec![GlyphPlacement {
-                    code: 0x7a,
-                    at: origin,
-                    color: 0,
-                }])
-            }
-        }
-        let err = layout_text(
-            &font(),
-            &[0x41],
-            Point::new(0, 0),
-            TextStyle::default(),
-            &TextOpts::default(),
-            &Stray,
-        )
-        .unwrap_err();
-        assert_eq!(err, TextError::MissingGlyph(0x7a));
-
-        let mut dup = font();
-        dup.glyphs.push(glyph(0x41, 1, 1));
         assert_eq!(
-            GlyphLookup::new(&dup).record(0x41),
-            Err(TextError::AmbiguousGlyph {
-                code: 0x41,
-                count: 2
-            })
+            err,
+            TextError::MissingGlyph {
+                code: 0x43,
+                record: 0x43
+            }
         );
-    }
-
-    // Covers: specs/client/ui.md §a3-text
-    #[test]
-    fn text_reaches_the_rules_as_utf16_units_unchanged() {
-        // `ÿ` (0x00ff, the color-code lead) and a lone surrogate: the
-        // units are passed as given, never re-encoded.
-        let text = [0x00ff, 0x41, 0xd800];
-        let rules = Advance::default();
-        let err = layout_text(
-            &font(),
-            &text,
-            Point::new(0, 0),
-            TextStyle::default(),
-            &TextOpts::default(),
-            &rules,
-        )
-        .unwrap_err();
-        assert_eq!(*rules.seen.borrow(), [text.to_vec()]);
-        assert_eq!(err, TextError::MissingGlyph(0xd800));
-    }
-
-    // Covers: specs/client/ui.md §a3-text
-    #[test]
-    fn layout_rules_are_unspecified_until_ui_text_md() {
-        let err = layout_text(
-            &font(),
-            &[0x41],
-            Point::new(0, 0),
-            TextStyle::default(),
-            &TextOpts::default(),
-            &NoTextRules,
-        )
-        .unwrap_err();
-        assert_eq!(err, TextError::Unspecified("ui/text.md §B3"));
-        assert!(err.to_string().contains("TODO(spec: ui/text.md §B3)"));
     }
 }

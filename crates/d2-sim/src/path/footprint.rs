@@ -46,10 +46,9 @@ fn pattern_marker(pattern: u32) -> Option<(u16, &'static [(i32, i32)])> {
 }
 
 /// OR (set) or AND out (clear) `mask` on each cell (dx, dy) around
-/// (x, y). Cells are looked up from the centre's room, or from `room`
-/// when the centre has none; cells without a room are skipped (§5.1).
-// TODO(spec: path-placement.md §5.1): the room each stamped cell is
-// looked up from is not stated; this follows the queries (§4 rule 3).
+/// (x, y). Every cell is looked up separately from the room argument
+/// (§4 rule 1), not from the centre's room; cells without a room are
+/// skipped (§5.1).
 fn apply_cells<R: CollisionRooms + ?Sized>(
     rooms: &mut R,
     room: Option<RoomId>,
@@ -59,10 +58,9 @@ fn apply_cells<R: CollisionRooms + ?Sized>(
     mask: u16,
     set: bool,
 ) {
-    let base = find_room(&*rooms, room, x, y).or(room);
     for &(dx, dy) in cells {
         let (cx, cy) = (x.wrapping_add(dx), y.wrapping_add(dy));
-        let Some(r) = find_room(&*rooms, base, cx, cy) else {
+        let Some(r) = find_room(&*rooms, room, cx, cy) else {
             continue;
         };
         if let Some(m) = rooms.grid_mut(r).and_then(|g| g.get_mut(cx, cy)) {
@@ -87,8 +85,12 @@ fn pattern_apply<R: CollisionRooms + ?Sized>(
     if room.is_none() {
         return;
     }
-    // TODO(spec: path-placement.md §5.1): a pattern outside 0..5 (jump
-    // tables `0x0064EB88` / `0x0064ED00`) is not specified; nothing here.
+    // Pattern 0 stamps and clears nothing (its jump-table entry is
+    // empty; the pattern query still tests the point); patterns above 5
+    // do nothing (§5.1).
+    if pattern == 0 {
+        return;
+    }
     let Some(cells) = pattern_cells(pattern) else {
         return;
     };
@@ -318,8 +320,8 @@ pub fn try_move<R: CollisionRooms + ?Sized>(
     }
 }
 
-/// Forced move `0x0064EFA0` (§6 rule 2): clear at old, stamp at new, no
-/// test; a null room does nothing.
+/// Forced move `0x0064EFA0` with one room for both points, as the
+/// footprint move of `sim/pathing.md` §9.6 passes it (§6 rule 2).
 pub fn forced_move<R: CollisionRooms + ?Sized>(
     rooms: &mut R,
     room: Option<RoomId>,
@@ -328,11 +330,26 @@ pub fn forced_move<R: CollisionRooms + ?Sized>(
     pattern: u32,
     foot: u16,
 ) {
-    if room.is_none() {
+    forced_move_rooms(rooms, room, old, room, new, pattern, foot);
+}
+
+/// Forced move `0x0064EFA0(room1, old, room2, new, pattern, foot)` (§6
+/// rule 2): clear at old looked up from `room1`, stamp at new looked up
+/// from `room2`, no test; `room1` null → nothing (no stamp either).
+pub fn forced_move_rooms<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    room1: Option<RoomId>,
+    old: (i32, i32),
+    room2: Option<RoomId>,
+    new: (i32, i32),
+    pattern: u32,
+    foot: u16,
+) {
+    if room1.is_none() {
         return;
     }
-    clear_pattern(rooms, room, old.0, old.1, pattern, foot);
-    stamp_pattern(rooms, room, new.0, new.1, pattern, foot);
+    clear_pattern(rooms, room1, old.0, old.1, pattern, foot);
+    stamp_pattern(rooms, room2, new.0, new.1, pattern, foot);
 }
 
 /// Missile move `0x0064ED20` (§6 rule 3, size shapes): clear at old,
@@ -369,10 +386,8 @@ pub trait PathMotion {
 
 /// Teleport `0x00650910(path, room, x, y)` (§6 rule 4), always succeeds;
 /// a non-zero point without a room is the original's fatal assert,
-/// returned as an error before any change.
-// TODO(spec: path-placement.md §6 r4): the room the clears and queries
-// use is not stated; the path's room is used, as §6 rule 1 says for
-// moves. "flags 0x8 := moved" is read as "the cell changed".
+/// returned as an error before any change. Clears use the path's room;
+/// the destination's query and stamp use the destination room `room`.
 pub fn teleport<C: CollisionRooms + PathMotion + ?Sized>(
     c: &mut C,
     path: &mut DynamicPath,
@@ -389,12 +404,16 @@ pub fn teleport<C: CollisionRooms + PathMotion + ?Sized>(
     if is_missile {
         if zero {
             clear_size(c, path.room, old.0, old.1, path.unit_size, path.foot_mask);
+            path.collided_mask = 0;
         } else {
+            // Flag 0x8 := the cell changed.
             let moved = old != (x, y);
             path.flags = (path.flags & !flags::MOVED) | if moved { flags::MOVED } else { 0 };
-            path.collided_mask = size_value(&*c, path.room, x, y, path.unit_size, path.move_mask);
+            // `0x0064EE70`: clear at old (path room), query and stamp at
+            // new (destination room).
             clear_size(c, path.room, old.0, old.1, path.unit_size, path.foot_mask);
-            stamp_size(c, path.room, x, y, path.unit_size, path.foot_mask);
+            path.collided_mask = size_value(&*c, room, x, y, path.unit_size, path.move_mask);
+            stamp_size(c, room, x, y, path.unit_size, path.foot_mask);
             path.saved_count = 1;
             path.saved_steps[0] = PathPoint {
                 x: x as u16,
@@ -404,7 +423,17 @@ pub fn teleport<C: CollisionRooms + PathMotion + ?Sized>(
     } else if zero {
         clear_pattern(c, path.room, old.0, old.1, path.pattern, path.foot_mask);
     } else {
-        forced_move(c, path.room, old, (x, y), path.pattern, path.foot_mask);
+        // A warp to a room not adjacent to the old one still stamps at
+        // the destination.
+        forced_move_rooms(
+            c,
+            path.room,
+            old,
+            room,
+            (x, y),
+            path.pattern,
+            path.foot_mask,
+        );
     }
     if room != path.room {
         path.flags |= flags::OUTSIDE_ROOM;

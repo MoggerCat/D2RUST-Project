@@ -17,9 +17,10 @@
 //!    the camera: the client world (units), their positions and offsets
 //!    and the map tiles ([`ViewSource`]), the other owners' hooks
 //!    ([`WorldRules`]), the UI requests and the assets (frames, maps,
-//!    palette). The recorder holds none of these today: [`NotRecorded`]
-//!    stops there and names what `record_frames.py` must add
-//!    ([`RECORDER_GAP`]);
+//!    palette). A frame needs its draw log and its initial framebuffer
+//!    (capture.md §6); d2rs does not yet read the draw log into these
+//!    inputs: [`NotRecorded`] stops there and names the first missing
+//!    one ([`NO_DRAW_LOG`], [`NO_INITIAL_FRAME`], [`RECORDER_GAP`]);
 //! 4. builds the frame with [`world_view::build`] through
 //!    [`OriginalView`] and hands the draw list, frames, maps and palette
 //!    to the comparison (`capture_case::compare_one`).
@@ -59,26 +60,44 @@ pub trait CaptureWorld {
     fn scene(&mut self, job: &SceneJob<'_>, camera: &Camera) -> WorldAnswer<'_>;
 }
 
-/// What `record_frames.py` (format `frames-raw-1`, capture.md §3, §5) must
-/// add before a recorded frame can be drawn by d2rs. The camera inputs are
-/// recorded; these are not.
-pub const RECORDER_GAP: &str = "the recording holds the camera only (capture.md §3); \
-     to draw the frame, record_frames.py must add per frame: \
-     (1) the act and level of the player (palette pal.pl2 of the act, render/composition.md §4; level tile files); \
-     (2) the map tiles drawn: per tile its cell (tx, ty), list (floor / wall / roof with the DT1 roof height, camera.md §6), \
-     DT1 file, orientation, main and sub index (the DT1 tile image and its blocks); \
-     (3) the client units drawn: type, GUID, position (moving: path 16.16 x, y; static: subtiles, camera.md §2), \
-     the extra offsets of 0x004DA0B0/0x004DA0D0/0x004DA0F0 (camera.md open question 3), \
-     mode, COF direction and frame and the component tokens (render/unit-composite.md); \
-     (4) the UI drawn (control panel and open panels: image file and frame, position; text). \
+/// What a recorded frame lacks before d2rs can draw it (capture.md §6):
+/// a frame without a draw log cannot be composed.
+pub const NO_DRAW_LOG: &str = "the frame has no draw log (capture.md §3.5, §6: \
+     a frame without one cannot be composed; record with --draws-every 1, \
+     or select frames the draw log covers)";
+
+/// The initial framebuffer of capture.md §6 is missing.
+pub const NO_INITIAL_FRAME: &str = "no initial framebuffer (capture.md §6: \
+     the previous captured frame seq − 1 of a recording made with --every 1; \
+     the bottom 47 rows and unwritten pixels keep older content, composition.md §3)";
+
+/// What stands between a `frames-raw-2` frame with a draw log and the
+/// d2rs scene. The camera, level, act and draw calls are recorded; these
+/// are not, or not yet read.
+pub const RECORDER_GAP: &str = "the draw log is recorded (capture.md §3.5) but not yet \
+     turned into world-view inputs: \
+     (1) the DT1 file of each drawn tile header (capture.md open question 3); \
+     (2) the unit component cel files, loaded outside 0x004788B0 (capture.md open question 4); \
+     (3) the units' positions as camera.md §2 inputs and the extra offsets \
+     (camera.md open question 3), the COF pose and component tokens (render/unit-composite.md); \
+     (4) the UI draws named through the celfile records (§3.6). \
      The world-view hooks of draw order, shading and blend stay TODO(spec) after that";
 
-/// The [`CaptureWorld`] of today's recordings: stops at the seam.
+/// The [`CaptureWorld`] of today's recordings: stops at the seam, naming
+/// the first missing input (§6 draw log, §6 initial framebuffer, then
+/// [`RECORDER_GAP`]).
 pub struct NotRecorded;
 
 impl CaptureWorld for NotRecorded {
-    fn scene(&mut self, _: &SceneJob<'_>, _: &Camera) -> WorldAnswer<'_> {
-        WorldAnswer::Seam(RECORDER_GAP.into())
+    fn scene(&mut self, job: &SceneJob<'_>, _: &Camera) -> WorldAnswer<'_> {
+        let gap = if job.captured.draws.is_none() {
+            NO_DRAW_LOG
+        } else if job.previous.is_none() {
+            NO_INITIAL_FRAME
+        } else {
+            RECORDER_GAP
+        };
+        WorldAnswer::Seam(gap.into())
     }
 }
 

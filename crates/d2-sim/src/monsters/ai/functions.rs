@@ -1,39 +1,78 @@
 // Spec: specs/monsters/ai.md §9 (per-AI behaviours), §10 (catalogue)
 //! The AI functions, dispatched by their 1.14d address (the control
 //! stores the address, as the original stores the pointer). Functions
-//! with status `spec'd-here` in `ai-functions.tsv` are implemented, except
-//! Npc (32, `summarized`): every other address, the special-state thinks
-//! and all init / alternate functions are stubs that log
+//! with status `spec'd-here` in `ai-functions.tsv` are implemented here,
+//! in [`super::bodies`] or in [`super::npc`], with the init functions
+//! [`INIT_IMPLEMENTED`] and SandMaggot's alternate; every other address,
+//! the special-state thinks other than state 5 (GoodNpcRanged) and the
+//! other init / alternate functions are stubs that log
 //! [`Unhandled::Function`] and do nothing (TODO(ai.md open question 10)).
 
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
+use super::bodies;
 use super::tactics::*;
 use super::{idle, mode, AiCommand, AiHost, Ctx, ModeTarget, TickParam, Unhandled};
 
 /// Think functions implemented here, by address (AI table index in the
 /// comment). Checked against the catalogue's `spec'd-here` rows by
 /// `tests::implemented_matches_catalogue`.
-pub const IMPLEMENTED: [(u32, u8); 17] = [
+pub const IMPLEMENTED: [(u32, u8); 37] = [
     (0x005B_0CC0, 0),   // None
     (0x005B_0CD0, 1),   // Idle
     (0x005E_FCF0, 2),   // Skeleton
     (0x005E_FE20, 3),   // Zombie
+    (0x005E_FF50, 4),   // Bighead
+    (0x005F_00E0, 5),   // BloodHawk
     (0x005F_02C0, 6),   // Fallen
     (0x005E_FB80, 7),   // Brute
+    (0x005F_0700, 8),   // SandRaider
     (0x005F_0A20, 9),   // Wraith
+    (0x005F_0B00, 10),  // CorruptRogue
+    (0x005F_0CD0, 11),  // Baboon
     (0x005F_12A0, 12),  // Goatman
     (0x005F_1440, 13),  // FallenShaman
     (0x005F_1140, 14),  // QuillRat
+    (0x005F_1800, 15),  // SandMaggot
     (0x005F_2460, 19),  // Swarm
+    (0x005F_2540, 20),  // Scarab
+    (0x005F_4510, 26),  // Arach
+    (0x005F_4A70, 28),  // Vampire
+    (0x005F_53E0, 30),  // Fetish
+    (0x005E_7880, 31),  // NpcOutOfTown
+    (0x005E_7130, 32),  // Npc
+    (0x005F_56D0, 33),  // HellMeteor
     (0x005F_5830, 34),  // Andariel
     (0x005F_5A20, 35),  // CorruptArcher
     (0x005F_5D50, 36),  // CorruptLancer
+    (0x005F_6070, 37),  // SkeletonBow
+    (0x005F_6650, 43),  // FoulCrowNest
     (0x005E_7E20, 58),  // Navi
+    (0x005E_6320, 59),  // BloodRaven
+    (0x005E_7AC0, 60),  // GoodNpcRanged
     (0x005E_7D60, 62),  // TownRogue
+    (0x005F_96C0, 64),  // SkeletonMage
+    (0x005E_5AC0, 90),  // Griswold
+    (0x005E_3890, 98),  // Smith
     (0x005E_7F50, 100), // Buffy
 ];
+
+/// Init functions implemented here (`ai.md` §9.17, §9.18).
+pub const INIT_IMPLEMENTED: [u32; 2] = [0x005F_6630, 0x005E_6300];
+
+/// Runs the init function at `addr` (§3.3 step 4); a stub logs
+/// [`Unhandled::Function`].
+pub fn run_init<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, addr: u32, u: UnitId) {
+    match addr {
+        0x005F_6630 => bodies::nest_init(game, cx, u),
+        0x005E_6300 => bodies::blood_raven_init(cx, u),
+        _ => cx
+            .store
+            .unhandled
+            .push(Unhandled::Function { addr, unit: u }),
+    }
+}
 
 /// Whether `addr` has a body here.
 pub fn implemented(addr: u32) -> bool {
@@ -64,6 +103,27 @@ pub fn run_function<W: AiHost + ?Sized>(
         0x005F_5D50 => corrupt_lancer(game, cx, u, p),
         0x005E_7E20 => navi(game, cx, u, p),
         0x005E_7D60 => town_rogue(game, cx, u),
+        0x005E_7AC0 => super::npc::good_npc_ranged(game, cx, u, p),
+        0x005E_7880 => super::npc::npc_out_of_town(game, cx, u, p),
+        0x005E_7130 => super::npc::npc(game, cx, u, p),
+        0x005E_FF50 => bodies::bighead(game, cx, u, p),
+        0x005F_00E0 => bodies::blood_hawk(game, cx, u, p),
+        0x005F_0700 => bodies::sand_raider(game, cx, u, p),
+        0x005F_0B00 => bodies::corrupt_rogue(game, cx, u, p),
+        0x005F_0CD0 => bodies::baboon(game, cx, u, p),
+        0x005F_1800 => bodies::sand_maggot(game, cx, u, p),
+        0x005F_1750 => bodies::sand_maggot_alt(game, cx, u, p),
+        0x005F_2540 => bodies::scarab(game, cx, u, p),
+        0x005F_4510 => bodies::arach(game, cx, u, p),
+        0x005F_4A70 => bodies::vampire(game, cx, u, p),
+        0x005F_53E0 => bodies::fetish(game, cx, u, p),
+        0x005F_56D0 => bodies::hell_meteor(game, cx, u, p),
+        0x005F_6070 => bodies::skeleton_bow(game, cx, u, p),
+        0x005F_6650 => bodies::foul_crow_nest(game, cx, u, p),
+        0x005E_6320 => bodies::blood_raven(game, cx, u, p),
+        0x005F_96C0 => bodies::skeleton_mage(game, cx, u, p),
+        0x005E_3890 => smith(game, cx, u, p),
+        0x005E_5AC0 => griswold(game, cx, u, p),
         _ => cx
             .store
             .unhandled
@@ -595,5 +655,33 @@ fn town_rogue<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
     match s {
         Some(s) if e < 25 => a1(game, cx, u, Some(s)),
         _ => idle(game, cx, u, 50),
+    }
+}
+
+/// §9.30 Smith (the Smith, hephasto): no draws.
+fn smith<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
+    let t = p.target;
+    if p.combat {
+        a1(game, cx, u, t);
+        return;
+    }
+    let l = cx.world.life_percent(u).clamp(0, 100);
+    set_velocity(cx, u, 0, (100 - l) >> 1, 0);
+    walk_to(game, cx, u, t, 7);
+}
+
+/// §9.30 Griswold.
+fn griswold<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
+    let t = p.target;
+    if p.combat {
+        if cx.chance(u, 80) {
+            a1(game, cx, u, t);
+        } else {
+            idle(game, cx, u, 10);
+        }
+    } else if cx.chance(u, 50) {
+        walk_to(game, cx, u, t, 7);
+    } else {
+        idle(game, cx, u, 10);
     }
 }

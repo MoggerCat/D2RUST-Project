@@ -505,11 +505,19 @@ fn type_init_every_class() {
                     "{c}"
                 );
                 assert!(h.calls("combat_mode").is_empty(), "{c}");
-                assert_eq!(
-                    h.s(u, init::stat::HITPOINTS),
-                    h.s(u, init::stat::MAXHP),
-                    "{c}"
-                );
+                // §6 step 8: maxhp = hitpoints. §13 / Edge cases 11: in a
+                // classic game at d > 0 (hirelings have d = 0, §6 step 4)
+                // with `Align` != 1, maxhp alone is scaled by (1, 2) for
+                // both NM and Hell; hitpoints keep the unscaled value.
+                let m = &t.monstats[class as usize];
+                let d_eff = if HIRELINGS.contains(&class) { 0 } else { d };
+                let hp = h.s(u, init::stat::HITPOINTS);
+                let want_max = if !expansion && d_eff > 0 && m.align != 1 {
+                    init::pct(hp, 1, 2)
+                } else {
+                    hp
+                };
+                assert_eq!(h.s(u, init::stat::MAXHP), want_max, "{c}");
             }
         }
     }
@@ -937,17 +945,39 @@ fn ai_index_of_every_row() {
     }
     let tsv = tsv_rows(d2_sim::monsters::ai::table::AI_FUNCTIONS_TSV);
     assert_eq!(tsv.len(), AI_TABLE.len());
+    // Every mismatch is gathered before failing, so one local run prints
+    // the whole set (the row numbering of `monstats_rows` is the suspect:
+    // triage-game-findings, `528 drehyaiced` live AI 129).
+    let mut bad_counts = Vec::new();
+    let mut bad_rows = Vec::new();
     for row in tsv {
         let index: usize = row[0].parse().unwrap();
         let mut parts = row[7].splitn(2, ':');
         let n: usize = parts.next().unwrap().trim().parse().unwrap();
-        assert_eq!(count[index], n, "AI {index} ({})", row[1]);
+        if count[index] != n {
+            bad_counts.push(format!("AI {index} ({}): {} != {n}", row[1], count[index]));
+        }
         let pairs: Vec<&str> = parts.next().unwrap_or("").split_whitespace().collect();
         for pair in pairs.chunks(2) {
             let r: usize = pair[0].parse().unwrap();
-            assert_eq!(usize::from(t.monstats[r].ai), index, "row {r} {}", pair[1]);
+            let live = usize::from(t.monstats[r].ai);
+            if live != index {
+                bad_rows.push(format!(
+                    "row {r} {}: live AI {live}, tsv AI {index}",
+                    pair[1]
+                ));
+            }
         }
     }
+    for s in bad_counts.iter().chain(&bad_rows) {
+        eprintln!("{s}");
+    }
+    assert!(
+        bad_counts.is_empty(),
+        "{} AI counts differ",
+        bad_counts.len()
+    );
+    assert!(bad_rows.is_empty(), "{} row pairs differ", bad_rows.len());
 }
 
 /// The recorded classes' AI index, Normal aip1..aip5 and `aidel` (`ai.md`
@@ -1031,13 +1061,21 @@ fn real_levels_rows() {
     assert_eq!(level(1).mon_den[0], 0);
     let t = tables();
     let mut act1 = 0;
+    let mut other = Vec::new();
     for (id, l) in t.pop.levels.iter().enumerate().skip(1) {
         if l.act == 0 {
             act1 += 1;
-            assert_eq!(l.warp_dist, 2025, "level {id}");
+            if l.warp_dist != 2025 {
+                other.push((id, l.warp_dist));
+            }
         }
     }
     assert!(act1 > 0);
+    // "Act 1 WarpDist is 2025" (§8) is read as every Act 0 row; the first
+    // local run found level 15 = 3800. Print every Act 0 row that differs
+    // so the spec can name the rows it means (triage-game-findings).
+    eprintln!("act 0 levels with WarpDist != 2025: {other:?}");
+    assert!(other.is_empty(), "act 0 WarpDist != 2025: {other:?}");
 }
 
 /// monstats.txt values (`population.md` Real): Rarity, groups, parties,

@@ -37,6 +37,7 @@ mod tests;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::path::history::PositionHistory;
 use crate::path::search::ExpField;
 use crate::path::{PathTables, UnitPath};
 use crate::units::UnitId;
@@ -53,6 +54,10 @@ pub struct PathState {
     /// loaded by the host: the floor drop's walk-back field. `None`: the
     /// floor-drop seams keep their pending answers.
     pub field: Option<Arc<ExpField>>,
+    /// The players' position history (player data +0xA0..+0x14C,
+    /// `path-placement.md` §10 rule 7), written by the placement and the
+    /// walk step; read by monster AI (`monsters/ai.md`).
+    pub history: BTreeMap<UnitId, PositionHistory>,
 }
 
 impl PathState {
@@ -62,6 +67,7 @@ impl PathState {
             tables: Arc::new(PathTables::spec()?),
             records: BTreeMap::new(),
             field: None,
+            history: BTreeMap::new(),
         })
     }
 

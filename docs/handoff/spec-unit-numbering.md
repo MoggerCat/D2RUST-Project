@@ -1,5 +1,7 @@
 # spec-unit-numbering (cloud docs session)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Spec markup and `// Covers:` lines only; no behaviour text or code changed.
 
 ## What was done

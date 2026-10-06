@@ -38,15 +38,19 @@ fn bodies_match_catalogue_status() {
 
 #[test]
 fn bodies_check_catches_perturbations() {
-    // M08: promoting server-do 2 without a body is reported.
+    // M08: promoting the first D2MOO-only server-do row (6) without a
+    // body is reported.
     let bad = SRVDO_TSV.replacen("\tD2MOO-only\n", "\tspec'd-here\n", 1);
     assert_eq!(
         check(&bad, &SRV_DO_IMPLEMENTED),
-        Err("spec'd-here [1, 2], implemented [1]".into())
+        Err(
+            "spec'd-here [1, 2, 3, 5, 6, 7, 8, 10, 25], implemented [1, 2, 3, 5, 7, 8, 10, 25]"
+                .into()
+        )
     );
     // A body without a spec'd-here row is reported.
     assert_eq!(
-        check(SRVHIT_TSV, &[1]),
-        Err("spec'd-here [], implemented [1]".into())
+        check(SRVHIT_TSV, &[1, 2, 4, 12, 13]),
+        Err("spec'd-here [1, 4, 12, 13], implemented [1, 2, 4, 12, 13]".into())
     );
 }

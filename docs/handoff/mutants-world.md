@@ -1,6 +1,6 @@
 # Handoff: mutation testing of `d2-sim::world` — `claude/mutants-world`
 
-> Not yet folded into `docs/HANDOFF.md` (§1, §3, §8) and `docs/PLAN.md`; a docs session folds it, then this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, medium effort (METHODS M08, M14). Base:
 `claude/tender-meitner-mphas3` at `4b5b0bf`. Repo only, synthetic data,

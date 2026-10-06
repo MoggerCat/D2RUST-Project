@@ -1,5 +1,7 @@
 # Handoff: use the S→C builders (HANDOFF §2 step 7k) — `claude/s2c-use`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, medium (METHODS M14). Branch
 `claude/s2c-use` from `claude/tender-meitner-mphas3` at `01dff69`. Repo
 only, no game files. Scope of every claim: this branch, synthetic inputs

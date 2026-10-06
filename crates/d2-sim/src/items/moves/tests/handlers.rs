@@ -126,10 +126,50 @@ fn pick_item_to_cursor_only_when_asked() {
 #[test]
 fn pick_other_unit_types() {
     let mut f = Fake::new();
-    // NPC, object, others: the pending seams answer 0.
-    for t in [0, 1, 2, 3, 5] {
+    // NPC, object: the pending seams answer 0. Type 3 (missile) → 1.
+    for t in [1, 2] {
         assert_eq!(run(&mut f, &m32(0x16, &[t, 77, 0])), res::OK);
     }
+    assert_eq!(run(&mut f, &m32(0x16, &[3, 77, 0])), res::RANGE);
+    // Types 0 and 5: a missing unit → 1.
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 0])), res::RANGE);
+    assert_eq!(run(&mut f, &m32(0x16, &[5, 77, 0])), res::RANGE);
+}
+
+// Covers: specs/items/inventory.md §7.1 r2
+#[test]
+fn pick_player_and_tile() {
+    let other = Owner::player(77);
+    let tile = Owner { ty: 5, guid: 78 };
+    let mut f = Fake::new();
+    f.unit(other);
+    f.unit(tile);
+    // Player: > 50 → 1; > 8 → walk; dead and not trading → corpse
+    // pickup; else the player interaction.
+    f.k.distance = 51;
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 1])), res::RANGE);
+    f.k.distance = 9;
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 1])), res::OK);
+    assert!(f.logged("walk_unit 0:77 true"));
+    f.k.distance = 8;
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 0])), res::OK);
+    assert!(f.logged("interact 77"));
+    f.unit(other).mode = 17;
+    f.k.trading = true;
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 0])), res::OK);
+    assert!(!f.logged("corpse 77"));
+    f.k.trading = false;
+    assert_eq!(run(&mut f, &m32(0x16, &[0, 77, 0])), res::OK);
+    assert!(f.logged("corpse 77"));
+    // Tile: > 50 → 1; < 5 → warp; else walk.
+    f.k.distance = 51;
+    assert_eq!(run(&mut f, &m32(0x16, &[5, 78, 0])), res::RANGE);
+    f.k.distance = 4;
+    assert_eq!(run(&mut f, &m32(0x16, &[5, 78, 0])), res::OK);
+    assert!(f.logged("warp 78"));
+    f.k.distance = 5;
+    assert_eq!(run(&mut f, &m32(0x16, &[5, 78, 0])), res::OK);
+    assert!(f.logged("walk_unit 5:78 false"));
 }
 
 // ---- 0x17
@@ -214,7 +254,11 @@ fn remove_from_buffer() {
     f.item(10, mode::STORED);
     f.item(11, mode::CURSOR);
     assert_eq!(run(&mut f, &m32(0x19, &[10])), res::BAD);
-    assert!(f.logged("resync"));
+    // "Can't do that" (§7.4 step 2): 0x5A, 40 bytes.
+    assert_eq!(
+        f.sent.last().map(|m| (m[0], m[1], m[2], m.len())),
+        Some((0x5A, 0x0E, 1, 40))
+    );
     f.inv_mut().cursor = None;
     f.items.get_mut(&10).unwrap().page = 1;
     assert_eq!(run(&mut f, &m32(0x19, &[10])), res::REFUSED);
@@ -279,7 +323,8 @@ fn swap_two_handed() {
     assert_eq!(f.inv().cursor, Some(10));
     f.k.requirements = true;
     assert_eq!(run(&mut f, &mloc(0x1B, 10, 4)), res::OK);
-    assert_eq!(f.inv().cursor, None);
+    // X stays the cursor item (WN2: no "cursor := none" in `0x00563D20`).
+    assert_eq!(f.inv().cursor, Some(11));
     assert_eq!(f.it(11).mode, mode::CURSOR);
     let n = f.it(10);
     assert_eq!(
@@ -322,7 +367,9 @@ fn remove_body_item() {
     let it = f.it(10);
     assert_eq!((it.mode, it.cmd), (mode::CURSOR, 0x10));
     assert_eq!(f.inv().cursor, Some(10));
-    assert!(f.logged("belt_unequip 10"));
+    // A belt leaving the body runs the belt change (§3 rule 9): no belt
+    // items, nothing sent.
+    assert!(f.sent.is_empty());
     assert!(f.logged("clear_slot 1"));
 }
 
@@ -365,8 +412,9 @@ fn swap_1h_with_2h() {
     assert_eq!(run(&mut f, &mloc(0x1E, 10, 4)), res::RANGE);
     f.item(11, mode::EQUIPPED);
     f.inv_mut().body.insert(4, 11);
-    // The body is OQ14: the pending default does nothing.
+    // §4.3 does not give 7: nothing (§7.9 step 2).
     assert_eq!(run(&mut f, &mloc(0x1E, 10, 4)), res::OK);
+    assert_eq!(f.inv().cursor, Some(10));
 }
 
 // ---- 0x1F
@@ -422,7 +470,7 @@ fn swap_cursor_buffer_placement_fails() {
 #[test]
 fn use_grid_item_range() {
     let mut f = Fake::new();
-    f.item(10, mode::STORED);
+    f.item(10, mode::STORED).useable = true;
     assert_eq!(run(&mut f, &m32(0x20, &[10, 151, 100])), res::RANGE);
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 49])), res::RANGE);
     assert_eq!(run(&mut f, &m32(0x20, &[10, 150, 50])), res::OK);
@@ -727,9 +775,9 @@ fn merc_item_gates() {
     // No hireling → 0.
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::OK);
     f.k.hireling = Some(Owner::monster(60));
-    f.k.not_dead = false;
+    f.k.used_skill = true;
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::OK);
-    f.k.not_dead = true;
+    f.k.used_skill = false;
     f.k.owns = false;
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::OK);
     f.k.owns = true;
@@ -846,6 +894,8 @@ fn item_to_belt_shift() {
     f.items.get_mut(&10).unwrap().page = 0;
     f.item(11, mode::CURSOR);
     assert_eq!(run(&mut f, &m32(0x63, &[10])), res::BAD);
+    // "Can't do that" (§7.24 step 1 → §7.4): 0x5A.
+    assert_eq!(f.sent.remove(0)[..3], [0x5A, 0x0E, 0x01]);
     f.inv_mut().cursor = None;
     assert_eq!(run(&mut f, &m32(0x63, &[10])), res::OK);
     let it = f.it(10);

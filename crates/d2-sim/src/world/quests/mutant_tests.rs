@@ -170,8 +170,9 @@ fn status_message_filter_36_reads_barbarians() {
     assert!(f.log.iter().any(|l| l == "unhandled 32 0x588c50"));
 }
 
-// From specs/world/quests.md §8.1: Warriv calls chain 6's callback 3 only
-// when slot 6 bits 13 and 0 are set and the record is not-intro.
+// From specs/world/quests.md §8.1, §10.8: Warriv calls chain 6's callback
+// 3 (a = 1, b = 40: state 4 → 5) only when slot 6 bits 13 and 0 are set
+// and the record is not-intro.
 #[test]
 fn warriv_chain6_callback_needs_all_three() {
     let call = |bits: &[u8], not_intro: bool| {
@@ -181,8 +182,9 @@ fn warriv_chain6_callback_needs_all_three() {
             f.p(P1).quests.flags[0].set(6, b);
         }
         ctl.record_mut(6).unwrap().not_intro = not_intro;
+        ctl.record_mut(6).unwrap().state = 4;
         ctl.act_completion(&mut f, P1, npc::WARRIV1).unwrap();
-        f.log.iter().any(|l| l == "unhandled 6 0x596010")
+        ctl.record(6).unwrap().state == 5
     };
     assert!(call(&[0, 13], true));
     assert!(!call(&[], true));
@@ -191,7 +193,7 @@ fn warriv_chain6_callback_needs_all_three() {
 }
 
 // From specs/world/quests.md §8.1: Tyrael (expansion) sets 28.0 and 28.13;
-// the 0x5D / 0x61 step only when +0x4C ≠ 1.
+// `5D 17 02 00 0000` then `61 05` only when +0x4C ≠ 1.
 #[test]
 fn tyrael_act_completion() {
     for (byte4c, step) in [(0, true), (1, false)] {
@@ -201,11 +203,14 @@ fn tyrael_act_completion() {
         ctl.act_completion(&mut f, P1, npc::TYRAEL2).unwrap();
         let fl = f.flags(P1);
         assert!(fl.get(28, 0) && fl.get(28, 13));
-        assert_eq!(
-            f.log.iter().any(|l| l == "unhandled 28 0x5467e0"),
-            step,
-            "+0x4C {byte4c}"
-        );
+        let want: Vec<Vec<u8>> = if step {
+            vec![hex("5d 17 02 00 0000"), hex("61 05")]
+        } else {
+            vec![]
+        };
+        let got: Vec<Vec<u8>> = f.sent[1..].iter().map(|m| m.1.clone()).collect();
+        assert_eq!(f.sent[0].1[0], 0x28);
+        assert_eq!(got, want, "+0x4C {byte4c}");
     }
 }
 
@@ -232,19 +237,21 @@ fn warp_check_100_and_132() {
 }
 
 // From specs/world/quests.md §9.4: `bkd ` sends the stone order, `trs `
-// goes to A2Q6.
+// the true tomb (level 68 − 66 = 2, kept at chain 13's extra +0x34).
 #[test]
 fn read_clue_by_code() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
     read_clue(&mut ctl, &mut f, P1, *b"trs ");
-    assert_eq!(f.log, ["unhandled 13 0x59d6a0"]);
-    f.log.clear();
+    assert_eq!(f.sent, [(P1, hex("50 0d00 0200 00000000000000000000"))]);
+    assert_eq!(ctl.record(13).unwrap().extra.tomb_level, 68);
+    f.sent.clear();
     read_clue(&mut ctl, &mut f, P1, *b"bkd ");
-    assert_eq!(f.log, ["unhandled 4 0x593cb0"]);
-    f.log.clear();
+    assert_eq!(f.sent.len(), 1);
+    assert_eq!(f.sent[0].1[..3], [0x50, 4, 0]);
+    f.sent.clear();
     read_clue(&mut ctl, &mut f, P1, *b"xyz ");
-    assert!(f.log.is_empty());
+    assert!(f.sent.is_empty() && f.log.is_empty());
 }
 
 // ------------------------------------------------------------ Act I (§10)
@@ -346,6 +353,7 @@ fn reward_messages_need_their_condition() {
         let mut f = Fake::new();
         if pending {
             f.p(P1).quests.flags[0].set(2, bit::REWARD_PENDING);
+            f.p(P1).quests.flags[0].set(2, bit::PRIMARY_GOAL_DONE);
         }
         scroll(&mut ctl, &mut f, 2, npc_class, 92);
         assert_eq!(f.log.iter().any(|l| l == "merc 150"), merc);
@@ -377,35 +385,58 @@ fn reward_messages_need_their_condition() {
 }
 
 // From specs/world/quests.md §10.8: Akara 179, Kashya 181, Cain 184 remove
-// the player from the extra list; other NPCs do not.
+// the player from that NPC's list; other NPCs do not.
 #[test]
 fn chain6_list_removal_by_npc() {
-    for (msg, right, wrong) in [
-        (179, npc::AKARA, npc::KASHYA),
-        (181, npc::KASHYA, npc::AKARA),
-        (184, npc::CAIN5, npc::AKARA),
+    let lists = |ctl: &QuestControl| {
+        let x = &ctl.record(6).unwrap().extra.q6;
+        [
+            x.akara.contains(1),
+            x.kashya.contains(1),
+            x.cain.contains(1),
+        ]
+    };
+    for (k, msg, right, wrong) in [
+        (0, 179, npc::AKARA, npc::KASHYA),
+        (1, 181, npc::KASHYA, npc::AKARA),
+        (2, 184, npc::CAIN5, npc::AKARA),
     ] {
         let (mut ctl, _) = control();
         let mut f = Fake::new();
-        ctl.record_mut(6).unwrap().extra.guids.add(1);
+        let x = &mut ctl.record_mut(6).unwrap().extra.q6;
+        x.akara.add(1);
+        x.kashya.add(1);
+        x.cain.add(1);
         scroll(&mut ctl, &mut f, 6, wrong, msg);
-        assert!(ctl.record(6).unwrap().extra.guids.contains(1), "{msg}");
+        assert_eq!(lists(&ctl), [true; 3], "{msg}");
         scroll(&mut ctl, &mut f, 6, right, msg);
-        assert!(!ctl.record(6).unwrap().extra.guids.contains(1), "{msg}");
+        let mut want = [true; 3];
+        want[k] = false;
+        assert_eq!(lists(&ctl), want, "{msg}");
     }
 }
 
-// From specs/world/quests.md §10.7: town messages 140–145 move a
-// completed tower quest to state 5.
+// From specs/world/quests.md §10.7: town messages 140–145 finish the
+// tower quest (state 5) once, for a player with 5.13 after the kill.
 #[test]
 fn tower_town_messages_complete() {
     for msg in [140, 145] {
         let (mut ctl, _) = control();
         let mut f = Fake::new();
         ctl.record_mut(5).unwrap().state = 4;
+        ctl.record_mut(5).unwrap().extra.q5.report_due = true;
+        f.p(P1).quests.flags[0].set(5, bit::PRIMARY_GOAL_DONE);
         scroll(&mut ctl, &mut f, 5, npc::AKARA, msg);
         assert_eq!(ctl.record(5).unwrap().state, 5);
+        assert!(!ctl.record(5).unwrap().extra.q5.report_due);
     }
+    // Without 5.13: nothing.
+    let (mut ctl, _) = control();
+    let mut f = Fake::new();
+    ctl.record_mut(5).unwrap().state = 4;
+    ctl.record_mut(5).unwrap().extra.q5.report_due = true;
+    scroll(&mut ctl, &mut f, 5, npc::AKARA, 140);
+    assert_eq!(ctl.record(5).unwrap().state, 4);
 }
 
 /// Event 3 to chain `chain` in `state` with the player's slot bits.
@@ -427,27 +458,30 @@ fn area(chain: u8, state: u8, bits: &[u8], old: u32, new: u32) -> (u8, QuestFlag
     (ctl.record(chain).unwrap().state, f.flags(P1))
 }
 
-// From specs/world/quests.md §10.1, §10.4: entering the area from state 1
-// or 2 → state 3 and bit 4; leaving level 1 in state 2 → state 3 and bit
-// 3; bits only for a player who started and has neither 0 nor 1.
+// From specs/world/quests.md §10.4, §10.5: entering the area from state 1
+// or 2 → state 3 and, through I2 after status 2, bit 4 for every player
+// with neither 0 nor 1; leaving level 1 in state 2 while the status is
+// still 0 → state 3 and bit 4 (I2 before the status, bug kept).
 #[test]
 fn area_event_states_and_bits() {
     use bit::{ENTER_AREA as EA, LEAVE_TOWN as LT, REWARD_GRANTED as G, STARTED as S};
     let (s, fl) = area(1, 1, &[S], 2, 8);
     assert!(s == 3 && fl.get(1, EA));
     let (s, fl) = area(1, 1, &[], 2, 8);
-    assert!(s == 3 && !fl.get(1, EA));
+    assert!(s == 3 && fl.get(1, EA));
     let (_, fl) = area(1, 1, &[S, G], 2, 8);
     assert!(!fl.get(1, EA));
     let (_, fl) = area(1, 1, &[S, bit::REWARD_PENDING], 2, 8);
     assert!(!fl.get(1, EA));
     let (s, fl) = area(1, 2, &[S], 1, 2);
-    assert!(s == 3 && fl.get(1, LT) && !fl.get(1, EA));
+    assert!(s == 3 && fl.get(1, EA) && !fl.get(1, LT));
     assert_eq!(area(1, 4, &[S], 2, 8).0, 4);
     assert_eq!(area(1, 1, &[S], 1, 2).0, 1);
     assert_eq!(area(1, 2, &[S], 5, 2).0, 2);
-    // Chain 2's area (D2MOO level 17).
+    // Chain 2's area: the Burial Grounds (17), from state 0 too.
     assert_eq!(area(2, 1, &[S], 2, 17).0, 3);
+    assert_eq!(area(2, 0, &[], 2, 17).0, 3);
+    assert_eq!(area(2, 3, &[], 2, 17).0, 3);
 }
 
 // From specs/world/quests.md §10.3: chain 25's callback 8 is a bare `ret`.
@@ -472,6 +506,12 @@ fn blood_raven_kill() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
     f.near = vec![P1];
+    let kind = UnitKind::Monster {
+        class: 267,
+        superunique: Some(0),
+        owner: None,
+    };
+    f.monsters.insert(UnitId(0x40), (0x40, 267, kind));
     let args = EventArgs {
         event: event::MONSTER_KILLED,
         player: Some(P1),
@@ -484,13 +524,15 @@ fn blood_raven_kill() {
     assert_eq!(ctl.record(2).unwrap().state, 4);
 }
 
-// From specs/world/quests.md §10.6: the Cow King's death sets 4.10 for
-// players in level 39 and drops 8 `vps `.
+// From specs/world/quests.md §10.6: the Cow King's death (killer with
+// 40.0 in an expansion game) sets 4.10 for players in level 39 and drops 8
+// `vps `.
 #[test]
 fn cow_king_kill() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
     f.p(P1).level = Some(39);
+    f.p(P1).quests.flags[0].set(40, bit::REWARD_GRANTED);
     let args = EventArgs {
         event: event::MONSTER_KILLED,
         player: Some(P1),
@@ -635,9 +677,10 @@ fn malus_skips_rewarded_players() {
 // From specs/world/quests.md §10.5: the imbue grant sets 3.0, clears 3.1.
 #[test]
 fn imbue_grant_bits() {
+    let (mut ctl, _) = control();
     let mut f = Fake::new();
     f.p(P1).quests.flags[0].set(3, bit::REWARD_PENDING);
-    act1::imbue_granted(&mut f, P1);
+    act1::imbue_granted(&mut ctl, &mut f, P1);
     let fl = f.flags(P1);
     assert!(fl.get(3, bit::REWARD_GRANTED) && !fl.get(3, bit::REWARD_PENDING));
 }

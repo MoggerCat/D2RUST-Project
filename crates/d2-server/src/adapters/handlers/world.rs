@@ -35,7 +35,7 @@ pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::UnitId;
+use d2_sim::units::{ClientId as SimClient, UnitId};
 use d2_sim::world::npc::{NpcControl, NpcError, NpcVendors, NpcWorld};
 use d2_sim::world::quests::{QuestControl, QuestError, QuestWorld};
 use d2_sim::world::vendors::gamble::identify_gamble;
@@ -277,6 +277,21 @@ pub trait WorldHost<D> {
     }
     /// The walk / run handlers (`handlers::walk`) on the path provider.
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        None
+    }
+    /// The client vitals sync (`combat/vitals.md` §5) for one client at
+    /// the end of a flush: the messages to send it, in order. `None`:
+    /// the host has no sync (or it is off), nothing runs. `staged`: the
+    /// host's position of a player without a path record; `queued`: the
+    /// client has a queued buffer (§5.1 rule 2).
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: SimClient,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
         None
     }
     /// The messages the seams sent since the last take, in send order:

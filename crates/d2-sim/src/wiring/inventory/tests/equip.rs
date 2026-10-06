@@ -77,10 +77,9 @@ fn two_handed_swap_and_removal_from_the_other_hand() {
     assert_eq!(w.handle(&body(0x1B, t, 4)), Ok(0));
     assert_eq!(w.inventory().body_item(4), Some(tu));
     assert_eq!(w.inventory().body_item(5), None);
-    // As written, §4.6 step 5 ("cursor := none") runs after X became the
-    // cursor item: X ends in mode 4, unlinked and not the cursor item
-    // (open question WV2 of the handoff note).
-    assert_eq!(w.inventory().cursor(), None);
+    // X stays the cursor item: `0x00563D20` does not clear the cursor
+    // (§7.6, WN2).
+    assert_eq!(w.inventory().cursor(), Some(su));
     assert_eq!(w.mode(s), 4);
     assert!(!w.inventory().contains(su));
     assert_eq!(w.mode(t), 1);
@@ -92,6 +91,9 @@ fn two_handed_swap_and_removal_from_the_other_hand() {
     // the two-handed sword of the other hand.
     let me = w.me();
     use crate::items::moves::InventoryOps;
+    // 0x1C needs an empty cursor: the shield leaves it (§1.4 rule 3).
+    w.desk(|d| d.set_cursor(me, None));
+    assert_eq!(w.inventory().cursor(), None);
     assert_eq!(w.desk(|d| d.equip_check(me, 5, None, false)), 4);
     assert_eq!(w.desk(|d| d.item_to_remove(me, 5)), Some(t));
     // §7.7: the empty left hand is refused before §4.3 ("empty location

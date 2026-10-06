@@ -19,8 +19,8 @@ use d2_sim::items::affixes::{affix, alvl, roll_affix};
 use d2_sim::items::create::max_sockets;
 use d2_sim::items::tables::AffixRec;
 use d2_sim::items::{
-    create_item, flag, q, req, stat, ty, CreateError, Item, ItemGame, ItemRequest, ItemStats,
-    ItemTables, ListKey, UniqueBits,
+    create_item, flag, q, req, stat, ty, CreateError, Fatal, Item, ItemGame, ItemRequest,
+    ItemStats, ItemTables, ListKey, UniqueBits,
 };
 use d2_sim::rng::Seed;
 use items_treasure_live::{code, fixed, typed};
@@ -348,7 +348,14 @@ fn check_item(t: &ItemTables, it: &Item<Stats>, expansion: bool) -> Result<(), S
 /// game refuses exactly the items with `version` ≥ 100 (§3 step 1); every
 /// other creation succeeds (the downgrade chain ends in normal, which
 /// cannot fail, `quality.md` §4) and keeps the invariants of
-/// [`check_item`].
+/// [`check_item`]. One exception the spec states: a crafted request
+/// (quality 8) may end in `Fatal::NullAffixGroup`, `affixes.md` §8 step 3.2
+/// and Edge case 3 (the roller returns 0 while a same-kind slot is filled;
+/// the original reads the group of record 0 at 0x5C and crashes). The
+/// first local run (2026-10-06) reported 570 failures, the listed ones all
+/// this crash on crafted ilvl-1 requests. Those are counted and printed,
+/// not failed; whether 1.14d really crashes there
+/// is a spec question (`docs/handoff/triage-game-findings.md`).
 // Claim once the first local run passes (note §1): specs/items/generation.md §3 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -356,6 +363,8 @@ fn sweep_create_every_item_every_quality() {
     let t = tables();
     let mut failures = Vec::new();
     let mut created = 0usize;
+    // affixes.md Edge case 3 crashes, by (expansion, difficulty, ilvl).
+    let mut null_group: BTreeMap<(bool, u8, i32), usize> = BTreeMap::new();
     let mut s = 0u32;
     for (i, rec) in t.items.iter().enumerate() {
         for expansion in [true, false] {
@@ -371,6 +380,13 @@ fn sweep_create_every_item_every_quality() {
                         );
                         match create_item(t, &mut game, &mut rq, false, Stats::default(), 0) {
                             Err(CreateError::Classic) if !expansion && rec.version >= 100 => {}
+                            // affixes.md §8 step 3.2, Edge case 3: only the
+                            // crafted routine raises it.
+                            Err(CreateError::Fatal(Fatal::NullAffixGroup))
+                                if quality == q::CRAFTED =>
+                            {
+                                *null_group.entry((expansion, difficulty, ilvl)).or_default() += 1;
+                            }
                             Err(e) => failures.push(format!("{at}: {e}")),
                             Ok(_) if !expansion && rec.version >= 100 => {
                                 failures.push(format!("{at}: created in a classic game"))
@@ -387,6 +403,10 @@ fn sweep_create_every_item_every_quality() {
             }
         }
     }
+    eprintln!(
+        "crafted requests ending in affixes.md Edge case 3 (expansion, difficulty, ilvl) → count: {} total {null_group:?}",
+        null_group.values().sum::<usize>()
+    );
     assert!(created > 0);
     assert!(
         failures.is_empty(),

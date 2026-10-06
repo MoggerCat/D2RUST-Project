@@ -30,19 +30,19 @@
 |   1. Structures (1.14d layout, for recorders and checks) | 80–116 |
 |   2. DRLG room creation and seeds (`0x0066B3E0`) | 117–134 |
 |   3. Rooms-near arrays (`0x0066C370`) | 135–178 |
-|   4. Status and activation | 179–277 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 278–300 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 301–316 |
-|   7. Room clients and the inactivity counter | 317–337 |
-|   8. Deactivation (tick step 9) | 338–357 |
-|   9. Room tile grid | 358–819 |
-|   10. Collision map from tiles | 820–898 |
-| Constants & data dependencies | 899–911 |
-| Randomness | 912–929 |
-| Edge cases & original bugs | 930–947 |
-| Test vectors | 948–995 |
-| Provenance | 996–1015 |
-| Open questions | 1016–1046 |
+|   4. Status and activation | 179–279 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 280–302 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 303–318 |
+|   7. Room clients and the inactivity counter | 319–339 |
+|   8. Deactivation (tick step 9) | 340–359 |
+|   9. Room tile grid | 360–821 |
+|   10. Collision map from tiles | 822–900 |
+| Constants & data dependencies | 901–913 |
+| Randomness | 914–931 |
+| Edge cases & original bugs | 932–949 |
+| Test vectors | 950–997 |
+| Provenance | 998–1017 |
+| Open questions | 1018–1048 |
 <!-- /index -->
 
 ## Summary
@@ -241,7 +241,9 @@ the new loses it (`0x0053A9B0` → `0x0061A700`).
 
 `0x0061B640` / `0x0061B690` (D2MOO `DRLGACTIVATE_Set/UnsetClientIsInSight`)
 look a room up by coordinates and set/unset status 1 with propagation.
-Their only callers `0x0061A070` / `0x0061A0C0` have no callers in 1.14d.
+Their only callers `0x0061A070` / `0x0061A0C0` have no direct calls in
+1.14d; they run on the client from the receive-table handlers of S→C
+0x07 / 0x08 (`client/model.md` §9).
 
 #### 4.3 Stream a room (`0x0061B730`, via `0x0061A140`)
 

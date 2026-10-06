@@ -21,7 +21,8 @@ every record must fit the rules below, or nothing is written. Step 6's
 queue clears are not stored: the converter checks that each tick's clears
 are exactly what tick.md §3 step 6 gives (acts with the pending-update
 flag, act order, every active room in list order) and the checker
-regenerates them.
+regenerates them. `anim` records (record_tick.py 0.2.0, units.md §4) are
+skipped: the units harness reads them from the raw file.
 
 --check rebuilds a tick-raw-1 record stream from a trace, runs the
 check_tick.py model on it (it must predict every run and reproduce every
@@ -138,6 +139,11 @@ def convert(records, source="", note=""):
     for i, r in enumerate(records):
         k = r["k"]
         if k in ("header", "game", "footer"):
+            continue
+        if k == "anim":
+            # record_tick.py 0.2.0: mode animation schedules (units.md §4), read
+            # by the units harness from the raw file; not part of a sim/tick
+            # trace (tick.md, Test vectors), so not converted.
             continue
         if k == "tick":
             frame, step = r["f"], "pre"
@@ -477,11 +483,48 @@ def synthetic():
     return out
 
 
+def synthetic_v02(raw):
+    """`raw` as record_tick.py 0.2.0 writes it: `set` with its optional
+    `site`, `cl` and `m`, and an `anim` record after each schedule (the
+    fields of README.md "Version 0.2.0", values made up)."""
+    out = []
+    for r in raw:
+        if r["k"] == "set":
+            r = dict(r, site="0x5539c7", cl=0, m=1)
+        out.append(r)
+        if r["k"] == "set":
+            out.append({"k": "anim", "fn": "0x5539b0", "f": 1, "ut": r["ut"], "g": r["g"],
+                        "cl": 0, "m": 1, "seq": False, "cur": 0, "fc": 8, "sp": 256, "b": 0,
+                        "ad": "M0NUHTH", "ad_frames": 8, "ad_speed": 256, "ev": [[4, 1]]})
+    return out
+
+
 def selftest():
     ok = True
     raw = synthetic()
     setup, inputs, expected, header = convert(raw)
     trace = make_trace("sim-9999", setup, inputs, expected, header, "selftest")
+    # a 0.2.0 recording converts to the same trace (anim skipped, CH2)
+    v02 = synthetic_v02(raw)
+    if not any(r["k"] == "anim" for r in v02):
+        print("selftest: the 0.2.0 synthetic recording has no anim record")
+        ok = False
+    try:
+        if convert(v02)[:3] != (setup, inputs, expected):
+            print("selftest: a 0.2.0 recording converts to another trace")
+            ok = False
+    except ConvertError as e:
+        print("selftest: a 0.2.0 recording is refused:", e)
+        ok = False
+    # any other unknown record kind is still refused (M07)
+    odd = json.loads(json.dumps(v02))
+    odd.insert(next(i for i, r in enumerate(odd) if r["k"] == "anim"), {"k": "anym"})
+    try:
+        convert(odd)
+        print("selftest: an unknown record kind was accepted")
+        ok = False
+    except ConvertError:
+        pass
     if check_trace(trace, quiet=True):
         print("selftest: the converted synthetic recording fails:", check_trace(trace, True))
         ok = False
