@@ -131,7 +131,7 @@ fn b5_superior_socketed() {
     assert_eq!(b5.bits, 176);
 }
 
-// Covers: specs/items/bitstream.md §4.2, §4.3 r3, §4.6 r4.3
+// Covers: specs/items/bitstream.md §4.2, §4.3 r3, §4.6 r4
 #[test]
 fn b6_b8_b9_magic() {
     let b6 = dec("9c0b210511000000102080006500063437d6060203a18b5b5858b010801140e03f");
@@ -158,7 +158,7 @@ fn b6_b8_b9_magic() {
     assert_eq!(b9.bits, 184);
 }
 
-// Covers: specs/items/bitstream.md §4.5 r4, §4.6 r4.5
+// Covers: specs/items/bitstream.md §4.5 r4, §4.6 r4
 #[test]
 fn b7_b10_quantity_and_param() {
     let b7 = dec("9c0b1a05140000001020800065000048b766060283404000d47f");

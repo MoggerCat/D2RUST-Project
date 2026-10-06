@@ -84,6 +84,10 @@ impl MessageSink for ClientBuffers {
         }
         Ok(())
     }
+
+    fn has_queued(&self, client: ClientId) -> bool {
+        self.clients.get(&client).is_some_and(|l| !l.is_empty())
+    }
 }
 
 /// The client's two receive lists (spec §3.3 rule 1): one message per

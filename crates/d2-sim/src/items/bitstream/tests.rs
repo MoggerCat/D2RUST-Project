@@ -172,7 +172,7 @@ fn b5_superior_socketed_with_list() {
     );
 }
 
-// Covers: specs/items/bitstream.md §4.2, §4.3 r3, §4.6 r4.3
+// Covers: specs/items/bitstream.md §4.2, §4.3 r3, §4.6 r4
 #[test]
 fn b6_magic_with_fire_damage_group() {
     let mut i = full(0x2010, 0, (0, 3, 0, 1), b"scm ", 6);
@@ -206,7 +206,7 @@ fn b7_stackable_quantity() {
     );
 }
 
-// Covers: specs/items/bitstream.md §4.6 r4.1, §4.6 r4.3
+// Covers: specs/items/bitstream.md §4.6 r4
 #[test]
 fn b8_grouped_damage_percent_skips_equal_partner() {
     let mut i = full(0x2010, 0, (0, 8, 3, 1), b"sbw ", 6);
@@ -224,7 +224,7 @@ fn b8_grouped_damage_percent_skips_equal_partner() {
     );
 }
 
-// Covers: specs/items/bitstream.md §4.6 r4.5
+// Covers: specs/items/bitstream.md §4.6 r4
 #[test]
 fn b9_valshift_and_save_add() {
     let mut i = full(0x2010, 0, (0, 0, 2, 0), b"cap ", 6);
@@ -242,7 +242,7 @@ fn b9_valshift_and_save_add() {
     );
 }
 
-// Covers: specs/items/bitstream.md §4.6 r4.5
+// Covers: specs/items/bitstream.md §4.6 r4
 #[test]
 fn b10_param_bits() {
     let mut i = full(0x20011, 1, (4, 4, 0, 0xFF), b"sst ", 1);

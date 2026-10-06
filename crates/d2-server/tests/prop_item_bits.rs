@@ -471,7 +471,7 @@ proptest! {
 /// The grouped stats (§4.6 rule 4.3): the partners travel with their
 /// head, a partner equal to the recorded value is not repeated, a
 /// different one is.
-// Covers: specs/items/bitstream.md §4.6 r4.3
+// Covers: specs/items/bitstream.md §4.6 r4
 #[test]
 fn grouped_partners_round_trip() {
     let t = isc_table();

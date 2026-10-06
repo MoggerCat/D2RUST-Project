@@ -28,6 +28,7 @@ pub mod pending;
 pub mod reaction;
 pub mod rooms;
 pub mod units;
+pub mod vitals_sync;
 pub mod waypoints;
 
 #[cfg(any(test, feature = "bench-fixtures"))]
@@ -147,6 +148,10 @@ pub struct ActionHooks<X> {
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
     pub paths: Option<Box<crate::wiring::path::PathState>>,
+    /// The client vitals sync's caches ([`vitals_sync`], `vitals.md` §5).
+    /// `None` (the default): the sync is off;
+    /// [`ActionHooks::enable_vitals_sync`] turns it on.
+    pub sync: Option<vitals_sync::SyncState>,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -174,6 +179,7 @@ impl<X> ActionHooks<X> {
             monster_world: None,
             monster_world_out: false,
             paths: None,
+            sync: None,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),
