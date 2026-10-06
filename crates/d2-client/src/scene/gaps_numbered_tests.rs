@@ -203,7 +203,7 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
         unit_type: 1,
         guid: 7,
     };
-    w.units.insert(key, ClientUnit { key });
+    w.units.insert(key, ClientUnit::new(key));
     let frame = build_frame(&w, &[], &Unspecified, &mut Feed::new(3, 1, None), &assets()).unwrap();
     assert!(frame.items.is_empty());
     assert_eq!((frame.units_drawn, frame.units_hidden), (0, 1));

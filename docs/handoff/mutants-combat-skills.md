@@ -1,6 +1,6 @@
 # Mutation testing: combat and skills (`d2-sim`)
 
-> To be folded into `docs/HANDOFF.md` (§1, §3, §7) and `docs/PLAN.md` by the docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Branch `claude/mutants-combat-skills`, from `claude/tender-meitner-mphas3`
 at `4b5b0bf`. Cloud session (repo only, no game files). Task class:

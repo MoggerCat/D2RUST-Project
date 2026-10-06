@@ -22,6 +22,7 @@
 //! reads the model.
 
 pub mod feed;
+pub mod model_feed;
 pub mod node;
 pub mod present;
 pub mod ui_bind;
@@ -48,6 +49,7 @@ use crate::scene::{
 };
 
 pub use feed::{build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
+pub use model_feed::ModelFeed;
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
 
@@ -220,6 +222,19 @@ pub trait ViewRules {
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError>;
 
+    /// The component's frame, or `None` when the slot draws nothing
+    /// (`render/unit-composite.md` §5 r2, §6 r4: failed component request,
+    /// missing file). The default draws every slot with
+    /// [`ViewRules::component_frame`].
+    fn component_slot_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.component_frame(unit, pose, req).map(Some)
+    }
+
     /// TODO(spec: render/sprite-placement.md, render/camera.md) (§B1,
     /// §B7): screen top-left of the component image from the unit's
     /// position and the frame's own offsets (`image.x_off/y_off`).
@@ -349,6 +364,13 @@ fn not_resident(req: &ComponentRequest<'_>, what: &'static str, e: ViewError) ->
 impl<R: ViewRules + ?Sized> composite::ComponentResolver for UnitResolver<'_, R> {
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
         self.rules.component_frame(self.unit, self.pose, req)
+    }
+
+    fn slot_frame(
+        &self,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.rules.component_slot_frame(self.unit, self.pose, req)
     }
 
     fn place(

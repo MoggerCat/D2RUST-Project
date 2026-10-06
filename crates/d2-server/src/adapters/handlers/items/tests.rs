@@ -806,3 +806,6 @@ fn unowned_item_ids_stay_stubs() {
     assert_eq!(t.frame(&click(0x18)), (ResultCode::Done, NO_BYTES));
     assert_eq!(t.host.game.unhandled.last(), Some(&(0, CLICK_BUTTON, 7)));
 }
+
+#[path = "mutant_tests.rs"]
+mod mutant_tests;

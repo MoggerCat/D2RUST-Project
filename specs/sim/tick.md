@@ -26,20 +26,20 @@
 | Inputs | 59–66 |
 | Outputs / state changes | 67–72 |
 | Rules | 73–74 |
-|   1. Tick rate and host schedule | 75–121 |
-|   2. Frame counter | 122–135 |
-|   3. Tick steps in order | 136–166 |
-|   4. Room pass (step 3) | 167–189 |
-|   5. Timer events (step 4) | 190–342 |
-|   6. Client pass (step 5) | 343–372 |
-|   7. Periodic steps, summary | 373–382 |
-|   8. Wall-clock and host-only parts | 383–395 |
-| Constants & data dependencies | 396–409 |
-| Randomness | 410–417 |
-| Edge cases & original bugs | 418–435 |
-| Test vectors | 436–521 |
-| Provenance | 522–546 |
-| Open questions | 547–563 |
+|   1. Tick rate and host schedule | 75–128 |
+|   2. Frame counter | 129–142 |
+|   3. Tick steps in order | 143–173 |
+|   4. Room pass (step 3) | 174–209 |
+|   5. Timer events (step 4) | 210–376 |
+|   6. Client pass (step 5) | 377–406 |
+|   7. Periodic steps, summary | 407–416 |
+|   8. Wall-clock and host-only parts | 417–429 |
+| Constants & data dependencies | 430–443 |
+| Randomness | 444–451 |
+| Edge cases & original bugs | 452–483 |
+| Test vectors | 484–572 |
+| Provenance | 573–597 |
+| Open questions | 598–615 |
 <!-- /index -->
 
 ## Summary
@@ -87,7 +87,14 @@ a tick runs (§1) and drives host-only bookkeeping (§8).
    (`0x0052D870`) for every live game (slot table `0x00882D38`, 1024
    slots; 0 and −1 are empty), each under that game's lock, in slot
    order. Return value: a QueryPerformanceCounter delta, or 0 when no
-   game ran.
+   game ran. Exact arithmetic (`0x0052FC46`–`0x0052FC83`): only `now`
+   is masked; `last` is never masked but is only ever written from the
+   masked `now` (`now` on first use, `now − excess` after a tick), so it
+   stays in 0 .. 2^31 − 1. First use is the test `last == 0` (no
+   separate flag). `now − last` is a wrapping 32-bit subtraction compared
+   **signed** with 40 (`jge`); the catch-up clamp compares `excess` with
+   40 unsigned (`jb`), which is the same since `excess ≥ 0` there. Wrap
+   behaviour: edge case 7.
 3. Consequence of rule 2: one call runs at most one tick per game; after
    a stall the next call is due at once, so the host catches up by at
    most one extra tick, then drops the rest of the lag. No tick is ever
@@ -149,7 +156,7 @@ confirmed):
 | 6 | room update queues | `0x0053B000` | always | per act 0..4 with pending updates (act +0x00 ≠ 0): for each active room (act room-list order), for each unit in the room's update queue (queue order, `sim/unit-order.md` §6) call `0x00553220`, then clear the queue (`0x0064C160`); reset the act flag. Then `0x0053FAE0` (clears an arena flag bit) |
 | 7 | removal records | `0x0053A820` | always | per act 0..4 with pending room deletions (act +0x58 ≠ 0): for each active room (act room-list order) free its unit-removal records (`0x0061A2C0`; D2MOO `LEVEL_FreeDrlgDeletes`, the records step 5 turned into removal messages); reset the flag |
 | 8 | quests | `0x00543E10` | frame % 20 == 0 | quest updater |
-| 9 | room deactivation | `0x0052D240` | frame % 12 == 0 | per act 0..4, each active room (next saved before the body): if the room's inactivity counter (`0x0061A790`) > 10 and the act allows it (`0x0061A3F0`), compress every unit in the room to inactive storage (`0x005433F0`, room-list order, next saved first) and remove the room (`0x0061A910`) |
+| 9 | room deactivation | `0x0052D240` | frame % 12 == 0 | per act 0..4, each active room (next saved before the body): if the room's inactivity counter (`0x0061A790`, `drlg/rooms.md` §7) > 10 and the act allows it (`0x0061A3F0`, `drlg/rooms.md` §8), compress every unit in the room to inactive storage (`0x005433F0`, room-list order, next saved first) and remove the room (`0x0061A910`) |
 | 10 | free inactive rooms | `0x0061AA20` | frame % 11 == 0 | per act 0..4 (D2MOO `DUNGEON_UpdateAndFreeInactiveRooms`) |
 | 11 | expired items | `0x0052D310` | frame % 1500 == 0 | per act 0..4: delete inactive items (`0x00558B90`), then expired inactive-unit item nodes (`0x00542AC0`) |
 
@@ -183,7 +190,20 @@ room +0x7C):
 4. After the act's list: clear act +0x54.
 
 A room activated during a tick (e.g. by a player moving in step 4) is
-populated at the start of the **next** tick's step 3. Since activation
+populated at the start of the **next** tick's step 3, unless one of the
+off-tick paths below populates it at once.
+
+5. **Off-tick population** `0x0052D0F0(game, room)`: the same body as
+   rules 1–3 for one room (ambient spawns `0x0054F060` first, then the
+   bit-0 / bit-1 branches), without the act flag test and without
+   clearing act +0x54. Its callers and triggers (portal destinations,
+   portal objects, the A2Q6 arrival) are owned by
+   `monsters/population.md` §1 r2; they run inside whichever step runs
+   the caller (timer events, message handling before the tick), so that
+   room's population draws happen there, not in step 3. The room stays
+   in the act list with act +0x54 set, so the next step 3 visits it
+   again: one more `0x0054F060` (one more room-seed draw), then nothing
+   (bits 0 and 1 already set). Since activation
 prepends (`unit-order.md` §4), rooms activated together are populated
 newest first, and their game-seed draws happen in that order.
 
@@ -228,7 +248,11 @@ Timer record (D2MOO `D2EventTimerStrc`; 1.14d offsets):
 form `0x005417D0` (no callback) and `0x00541800` (with callback):
 
 1. Event type ≥ 15: nothing happens.
-2. expire = −1: handled as an every-tick event (§5.3).
+2. expire = −1: handled as an every-tick event (§5.3) through
+   `0x005415E0` with the same type, unit and arguments but a **null
+   callback** (`0x005416D5` pushes 0): the caller's callback is lost and
+   the class default handler (§5.6) runs instead. Rule 4's state-54
+   check is skipped on this path. (`units.md` §5 r4 relies on this rule.)
 3. If expire ≤ current frame: expire = frame + 1.
 4. If the unit is a monster (type 1), the event is AI-think (2) and the
    monster has state 54 (D2MOO `STATE_UNINTERRUPTABLE`): `0x005544B0
@@ -317,6 +341,16 @@ Consequences (all follow from the rules; reproduce them):
 | monster | `0x005A7F80` | type ≤ 14: table `0x006E2490`; for types 0, 1, 2, 6, 7, 9, 10, 11, 13, 14 the event is dropped when the monster has state 1 (D2MOO `STATE_FREEZE`) and `0x005541B0` is false; types 3, 4, 5, 8, 12 always dispatch |
 | object | `0x00586AD0` | table `0x006E19B0` by type (no null check) |
 | item | `0x00562DA0` | table `0x006E117C` by type (no null check) |
+
+The monster gate (`0x005A7F80`; jump table `0x005A7FE0` indexed by byte
+table `0x005A7FE8` for types 3–12) only skips the call: the runner
+(`0x00541060`) then treats the timer as run. A gated **due** timer
+(e.g. an AI think, type 2) is freed like any run bucket timer
+(`0x005410CF`) and nothing reschedules it: neither the dispatcher nor the
+runner schedules anything (who re-thinks after a freeze:
+`monsters/ai.md` §1.1). A gated **every-tick** timer (type 0) stays in
+its list and is simply skipped each tick while the gate holds, then
+dispatches again.
 
 Event type names (D2MOO, 1.10f): 0 MODECHANGE, 1 ENDANIM, 2 AITHINK,
 3 STATREGEN, 4 TRAP, 5 ACTIVESTATE, 6 FREEHOVER, 7 MONUMOD / QUESTFN,
@@ -432,6 +466,20 @@ step the order is the list order this spec and `unit-order.md` define.
    frame + 1 (§5.2 rule 3); it never runs in the same tick.
 6. Catch-up is limited to one extra tick (§1.3): the simulation runs
    slower than real time under load instead of skipping frames.
+7. 31-bit wrap of the tick clock (§1.2, `0x0052FC20`): `now` =
+   `timeGetTime() & 0x7FFFFFFF` returns to 0 every 2^31 ms (≈ 24.86
+   days of Windows uptime). After the wrap `now − last` is negative (both
+   operands are in 0 .. 2^31 − 1, so the signed difference never
+   overflows) and no tick runs until `now ≥ last + 40` again. If `last`
+   ended in 2^31 − 40 .. 2^31 − 1 (the usual case when the driver is
+   called every frame: every pre-wrap tick that was possible ran), that
+   never happens and the games stop ticking for good; otherwise they stall
+   for ≈ 24.86 days until `now` climbs back past `last + 40`. Reproduced
+   (the host is not `d2-sim`; `d2-server` keeps the literal rule).
+8. `last == 0` is the first-use test (§1.2): if the masked clock reads
+   exactly 0 on first use, `last` stays 0 and the next call initialises
+   it again. After a tick `last ≥ 40` (it only grows by ≥ 40 from a
+   non-negative value), so the re-initialisation cannot happen later.
 
 ## Test vectors
 
@@ -444,6 +492,9 @@ Synthetic (from the rules; CI-safe):
 | driver: last = 1000, now = 1040, catch-up 1 | tick, last = 1040 | §1.2 |
 | driver: last = 1000, now = 1150, catch-up 1 | tick, excess 110 → 40, last = 1110 (next call at ≥ 1150 ticks again) | §1.2 |
 | driver: last = 1000, now = 1150, catch-up 0 | tick, last = 1040 | §1.2 |
+| driver: last = 0 (first use), now = 5000 | last = 5000; 0 < 40: no tick | §1.2 |
+| driver: last = 2147483620, now = 5 (clock wrapped) | 5 − 2147483620 = −2147483615 < 40: no tick, last unchanged; no later `now` < 2^31 ticks | edge case 7 |
+| driver: last = 2147483000, now = 100 (wrapped) | no tick; ticks again first at now = 2147483040 | edge case 7 |
 | frame 0 → tick | frame 1; bucket 1 | §2, §5.5 |
 | frames 660 | steps 8 (660 % 20 = 0), 9 (% 12 = 0), 10 (% 11 = 0) run; 11 not | §3 |
 | frame 1500 | step 11 and step 8 (1500 % 20 = 0) run; 9 (1500 % 12 = 0) runs; 10 (1500 % 11 = 4) not | §3 |
@@ -554,8 +605,9 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
 3. Settled for the observed combinations by `units.md` (U1–U10 on the
    three recordings); per-site confirmation needs a `record_tick.py`
    0.2.0 recording (`units.md` open question 1).
-4. Room deactivation counter (`0x0061A790`, room +0x0C, forced 0 when room
-   +0x78 ≠ 0): what increments it (DRLG / room lifecycle spec).
+4. Answered: the inactivity counter (`0x0061A790`) is owned by
+   `drlg/rooms.md` §7 r2 (0 while the room has a client, else +1 per
+   step-9 pass; its only caller is step 9).
 5. Does the character save every 8192 frames write the `.d2s` in single
    player (host callbacks `0x00883D50` absent)? Observe a save timestamp.
 6. `0x0055F4F0` in the per-client update: what it does (no D2MOO 1.10f

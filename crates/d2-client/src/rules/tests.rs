@@ -539,7 +539,7 @@ fn golden_scene_with(object: FrameSet) -> (ClientWorld, ViewAssets, Scene) {
     let mut world = ClientWorld::default();
     for (unit_type, guid) in [(0, PLAYER), (2, OBJECT)] {
         let key = UnitKey { unit_type, guid };
-        world.units.insert(key, ClientUnit { key });
+        world.units.insert(key, ClientUnit::new(key));
     }
     let mut assets = ViewAssets::new(palette());
     assets.cofs.insert(CanonicalPath::new(COF).unwrap(), cof());
