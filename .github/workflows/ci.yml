@@ -36,6 +36,8 @@ jobs:
           python3 tools/trace-recorder/check_tick.py --selftest
           python3 tools/trace-recorder/convert_tick.py --selftest
           python3 tools/trace-recorder/convert_tick.py --check traces/sim/tick/*.json
+          python3 tools/trace-recorder/check_rooms.py --selftest
+          python3 tools/trace-recorder/check_rooms.py traces/sim/tick/*.json
 
       # Bevy's native dependencies (audio, input, windowing) on Linux.
       - name: Install system libraries

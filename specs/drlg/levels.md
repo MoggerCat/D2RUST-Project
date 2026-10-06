@@ -24,20 +24,20 @@
 | Rules | 75–76 |
 |   1. Structures (1.14d layout, for recorders and checks) | 77–100 |
 |   2. Act creation (server) | 101–115 |
-|   3. DRLG creation (`0x00642DA0`) | 116–147 |
-|   4. Level list, get-or-allocate | 148–165 |
-|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 166–189 |
-|   6. Level position, size, act number | 190–206 |
-|   7. Vis and warp records | 207–230 |
-|   8. Coordinates to rooms | 231–244 |
-|   9. Level lifecycle: activity and freeing | 245–275 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 276–303 |
-| Constants & data dependencies | 304–320 |
-| Randomness | 321–337 |
-| Edge cases & original bugs | 338–352 |
-| Test vectors | 353–385 |
-| Provenance | 386–405 |
-| Open questions | 406–422 |
+|   3. DRLG creation (`0x00642DA0`) | 116–150 |
+|   4. Level list, get-or-allocate | 151–168 |
+|   5. Level generation (`0x006424A0`, D2MOO `DRLG_InitLevel`) | 169–192 |
+|   6. Level position, size, act number | 193–209 |
+|   7. Vis and warp records | 210–233 |
+|   8. Coordinates to rooms | 234–247 |
+|   9. Level lifecycle: activity and freeing | 248–278 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 279–306 |
+| Constants & data dependencies | 307–323 |
+| Randomness | 324–341 |
+| Edge cases & original bugs | 342–356 |
+| Test vectors | 357–389 |
+| Provenance | 390–409 |
+| Open questions | 410–426 |
 <!-- /index -->
 
 ## Summary
@@ -136,9 +136,12 @@ In order:
    §5).
 7. Create and place the act's levels: `0x00678AD0(drlg, act)`
    (D2MOO `DRLGOUTPLACE_CreateLevelConnections`, owner `drlg/outdoor.md`).
-   It allocates levels (§4, each allocation seeds the level) and draws
-   from the DRLG seed (Act 1: sites `0x00676165`, `0x00676469`,
-   `0x0067649F`, `0x00676669`, `0x0067669F`, `0x006774DB`).
+   It allocates levels (§4, each allocation seeds the level). Its link
+   checks draw from a **copy** of the DRLG seed (Act 1 sites `0x00676165`,
+   `0x00676469`, `0x0067649F`, `0x00676669`, `0x0067669F`: the copy
+   restarts from the current DRLG seed, so seq 2430–2431 repeat 2419–2420);
+   only `0x006774C0`/`0x006774DB` (Act 1) and the Act III jungle placer
+   advance the DRLG seed itself (`drlg/outdoor.md`).
 8. Server only (town id ≠ 0): get-or-allocate the town level (§4) and
    generate it (§5).
 
@@ -325,7 +328,8 @@ Per act creation, in order (DRLG seed unless noted):
 1. Step → `dwStartSeed`.
 2. Act II: pairs of `lo' mod 7` until different. Act III: one step,
    `lo' & 1`.
-3. The outdoor placer's draws (`drlg/outdoor.md`) and the draws of
+3. The outdoor placer's draws (`drlg/outdoor.md`; most on a copy, see
+   §3.7) and the draws of
    level allocations it triggers (preset file choice on each preset
    level's seed, `drlg/preset.md`).
 4. Town generation (server): level seed and room seeds of the town.
@@ -370,8 +374,8 @@ chaining):
 |---|---|---|
 | 2417 | DRLG seed `init_low(644409375)` at `0x00642E02` | §3.2 |
 | 2418 | step at `0x00642E09`, `lo'` 4014346869 | §3.3 |
-| 2419–2424 | six DRLG-seed steps in the Act 1 placer (`0x00676165`…) | §3.7 |
-| 2425–2452 | level seeds set in this order: 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16 (each `start + id`), with 2 more placer steps after 17, one `0x006774DB` step after 27 and preset-file rolls on 26, 27, 13, 14, 15, 16 | §4.3 |
+| 2419–2424 | six steps on a copy of the DRLG seed in the Act 1 placer (`0x00676165`…); 2439 the one real DRLG-seed step (`0x006774DB`, `lo'` 1406222081) | §3.7 |
+| 2425–2452 | level seeds set in this order: 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16 (each `start + id`), with 2 more copy steps after 17, one real DRLG-seed step (`0x006774DB`) after 27 and preset-file rolls on 26, 27, 13, 14, 15, 16 | §4.3 |
 | 2454 | town (level 1) generation re-seeds {4014346870, 666} at `0x006424BF` | §3.8, §5.1 |
 | 2561, 6896 | levels 2 and 3 generated on demand (warp links) | §5.5 |
 | 13366–13403 | the client's DRLG copy: same seeds, same level order | §2.3 |
