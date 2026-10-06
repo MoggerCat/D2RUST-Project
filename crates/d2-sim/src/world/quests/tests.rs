@@ -571,12 +571,14 @@ fn fresh_game_entry() {
     // chain 2 stays at 0.
     assert_eq!(ctl.record(1).unwrap().state, 1);
     assert_eq!(ctl.record(2).unwrap().state, 0);
+    assert_eq!(ctl.record(18).unwrap().state, 0);
+    assert_eq!(ctl.record(16).unwrap().state, 0);
     assert_eq!(
         f.log,
         [
-            // Sequence functions of chains 8, 18, 22, 31.
+            // Sequence functions of chains 8, 22, 31 (chain 18's is
+            // `quests-act3.md` §1.3: state 0 ≠ 5 → 1, nothing moves).
             "unhandled 8 0x5991c0",
-            "unhandled 18 0x5ba7b0",
             "unhandled 22 0x5b38e0",
             "unhandled 31 0x587560"
         ]

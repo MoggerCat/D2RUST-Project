@@ -679,12 +679,12 @@ fn object_quest_functions_by_class() {
     assert!(f.log[0].starts_with("drop gld"));
     // Each class's function (the record's chain, or 255 without one);
     // the object has no room here: 0x83 does nothing, 0xBD is not in Act I.
+    // Classes 0x16F (lever) and 0x155 (bridge) run Act III code, tested in
+    // `act3_tests` (`lever_event`, `bridge_event`).
     for (class, want) in [
-        (0x16F, "unhandled 16 0x5b85e0"),
         (0xBD, "unhandled 32 0x588ca0"),
         (0x1A, "unhandled 4 0x593290"),
         (0x7A, "unhandled 11 0x59b710"),
-        (0x155, "unhandled 20 0x5bcac0"),
         (0x173, "unhandled 5 0x5954f0"),
         (0x178, "unhandled 24 0x5b6710"),
         (0x1CB, "unhandled 255 0x58b940"),
