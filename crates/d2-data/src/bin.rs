@@ -187,6 +187,20 @@ fn server_files(table: &str) -> &'static [&'static str] {
     }
 }
 
+/// The §3.3 check made before `table` loads: any of its server-only files
+/// present in the archive set is fatal.
+fn check_server_files(set: &ArchiveSet, table: &str) -> Result<(), LoadError> {
+    for file in server_files(table) {
+        if set.contains(&excel_path(file)) {
+            return Err(LoadError::ServerFile {
+                file: excel_path(file),
+                table: table.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Everything 1.14d reads at startup (d2-data policy 1), validated.
 #[derive(Debug, Clone)]
 pub struct BinSet {
@@ -232,14 +246,7 @@ pub fn load(set: &ArchiveSet, language: &str) -> Result<BinSet, LoadError> {
     let mut tables: Vec<BinTable> = Vec::new();
     let mut code = BTreeMap::new();
     for def in schema().runtime() {
-        for file in server_files(&def.name) {
-            if set.contains(&excel_path(file)) {
-                return Err(LoadError::ServerFile {
-                    file: excel_path(file),
-                    table: def.name.clone(),
-                });
-            }
-        }
+        check_server_files(set, &def.name)?;
         let table = load_bin(set, def)?;
         post_load_check(&table, &tables, &strings, lod)?;
         tables.push(table);
@@ -653,6 +660,321 @@ mod tests {
         assert_eq!(f("itemtypes", "treasureclass"), 0x1D);
         assert_eq!(f("weapons", "code"), 0x80);
         assert_eq!(f("gamble", "code"), 0);
+    }
+
+    /// Encrypts `plain` so that `crypto::decrypt(_, key)` gives it back:
+    /// word by word, the key stream word is what decrypting a zero word
+    /// after the already-encrypted prefix yields.
+    fn encrypt(plain: &[u8], key: u32) -> Vec<u8> {
+        use d2_formats::mpq::crypto::decrypt;
+        let mut cipher = vec![0u8; plain.len()];
+        for w in (0..plain.len()).step_by(4) {
+            let mut probe = cipher[..w + 4].to_vec();
+            decrypt(&mut probe, key);
+            for k in 0..4 {
+                cipher[w + k] = probe[w + k] ^ plain[w + k];
+            }
+        }
+        cipher
+    }
+
+    /// A minimal format-0 MPQ: stored (uncompressed, single-unit) files.
+    fn mpq_bytes(files: &[(&str, &[u8])]) -> Vec<u8> {
+        use d2_formats::mpq::crypto::{hash, HashType, BLOCK_TABLE_KEY, HASH_TABLE_KEY};
+        use d2_formats::mpq::flags;
+        let n = (files.len() * 2).next_power_of_two().max(4);
+        let mut out = vec![0u8; 32];
+        let mut blocks = Vec::new();
+        let mut hashes = vec![[u32::MAX; 4]; n];
+        for (i, (name, bytes)) in files.iter().enumerate() {
+            let len = bytes.len() as u32;
+            blocks.push([
+                out.len() as u32,
+                len,
+                len,
+                flags::EXISTS | flags::SINGLE_UNIT,
+            ]);
+            out.extend_from_slice(bytes);
+            let mut at = hash(name.as_bytes(), HashType::TableOffset) as usize & (n - 1);
+            while hashes[at][3] != u32::MAX {
+                at = (at + 1) & (n - 1);
+            }
+            hashes[at] = [
+                hash(name.as_bytes(), HashType::NameA),
+                hash(name.as_bytes(), HashType::NameB),
+                0,
+                i as u32,
+            ];
+        }
+        let words = |t: &[[u32; 4]]| -> Vec<u8> {
+            t.iter().flatten().flat_map(|w| w.to_le_bytes()).collect()
+        };
+        let hash_pos = out.len() as u32;
+        out.extend(encrypt(&words(&hashes), HASH_TABLE_KEY));
+        let block_pos = out.len() as u32;
+        out.extend(encrypt(&words(&blocks), BLOCK_TABLE_KEY));
+        let mut h = Vec::with_capacity(32);
+        h.extend_from_slice(b"MPQ\x1A");
+        for v in [32, out.len() as u32] {
+            h.extend_from_slice(&v.to_le_bytes());
+        }
+        h.extend_from_slice(&0u16.to_le_bytes()); // format version
+        h.extend_from_slice(&3u16.to_le_bytes()); // sector size shift
+        for v in [hash_pos, block_pos, n as u32, files.len() as u32] {
+            h.extend_from_slice(&v.to_le_bytes());
+        }
+        out[..32].copy_from_slice(&h);
+        out
+    }
+
+    /// An archive's files: (path, bytes).
+    type Files<'a> = &'a [(&'a str, &'a [u8])];
+
+    /// A temporary install: `archives` = (archive file name, files).
+    struct Install(std::path::PathBuf);
+
+    impl Install {
+        fn new(tag: &str, archives: &[(&str, Files)]) -> Install {
+            let dir =
+                std::env::temp_dir().join(format!("d2-data-bin-test-{}-{tag}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            for (name, files) in archives {
+                std::fs::write(dir.join(name), mpq_bytes(files)).unwrap();
+            }
+            Install(dir)
+        }
+
+        fn set(&self) -> ArchiveSet {
+            ArchiveSet::open_dir(&self.0).unwrap()
+        }
+    }
+
+    impl Drop for Install {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// An empty `.tbl` (21-byte header, no elements, no slots).
+    fn empty_tbl() -> Vec<u8> {
+        let mut t = vec![0u8; 21];
+        t[8] = 0; // version
+        t[9..13].copy_from_slice(&21u32.to_le_bytes()); // data start
+        t[17..21].copy_from_slice(&21u32.to_le_bytes()); // file size
+        t
+    }
+
+    // Covers: specs/data/loading.md §1 r1
+    #[test]
+    fn excel_path_rule() {
+        assert_eq!(excel_path("armor.bin"), "data\\global\\excel\\armor.bin");
+        assert!(excel_path("armor.txt").eq_ignore_ascii_case(r"DATA\GLOBAL\EXCEL\armor.txt"));
+        // Every called table's files are its name + `.bin` / `.txt`
+        // (`_lookup` lists read the table they name; leveldefs reads
+        // levels.txt, §10.2).
+        for def in schema().called() {
+            let base = def.name.strip_suffix("_lookup").unwrap_or(&def.name);
+            assert_eq!(def.bin_name, format!("{base}.bin"), "{}", def.name);
+            let txt = if base == "leveldefs" { "levels" } else { base };
+            assert_eq!(def.txt_name, format!("{txt}.txt"), "{}", def.name);
+        }
+    }
+
+    // Covers: specs/data/loading.md §1 r2
+    #[test]
+    fn table_names_lowercase_lookup_case_insensitive() {
+        for def in schema().runtime() {
+            assert_eq!(def.name, def.name.to_ascii_lowercase());
+        }
+        let txt: &[u8] = b"code\r\nx\r\n";
+        let bin: &[u8] = &[0, 0, 0, 0];
+        let files: &[(&str, &[u8])] = &[
+            (r"data\global\excel\PlrMode.txt", txt),
+            (r"data\global\excel\plrmode.bin", bin),
+        ];
+        let install = Install::new("case", &[("d2exp.mpq", files)]);
+        let set = install.set();
+        assert_eq!(
+            read_excel(&set, "plrmode.txt").unwrap(),
+            Some(("d2exp.mpq".into(), txt.to_vec()))
+        );
+        assert_eq!(read_excel(&set, "PLRMODE.BIN").unwrap().unwrap().1, bin);
+    }
+
+    // Covers: specs/data/loading.md §3.1
+    #[test]
+    fn normal_play_reads_bin_only() {
+        let def = schema().table("compcode").unwrap();
+        // Only the .txt: no fallback, the missing .bin is fatal.
+        let txt: &[u8] = b"code\r\nnil\r\n";
+        let only_txt: &[(&str, &[u8])] = &[(r"data\global\excel\compcode.txt", txt)];
+        let install = Install::new("txt-only", &[("patch_d2.mpq", only_txt)]);
+        match load_bin(&install.set(), def) {
+            Err(LoadError::Missing { file }) => {
+                assert_eq!(file, r"data\global\excel\compcode.bin")
+            }
+            other => panic!("{other:?}"),
+        }
+        // The .bin: count = u32 at 0, records from offset 4.
+        let mut bin = 2u32.to_le_bytes().to_vec();
+        bin.extend_from_slice(b"nil lit ");
+        let both: &[(&str, &[u8])] = &[
+            (r"data\global\excel\compcode.txt", txt),
+            (r"data\global\excel\compcode.bin", &bin),
+        ];
+        let install = Install::new("bin", &[("patch_d2.mpq", both)]);
+        let t = load_bin(&install.set(), def).unwrap();
+        assert_eq!((t.source.as_str(), t.count), ("patch_d2.mpq", 2));
+        assert_eq!((t.record(0), t.record(1)), (&b"nil "[..], &b"lit "[..]));
+    }
+
+    // Covers: specs/data/loading.md §3.3
+    #[test]
+    fn server_only_files_are_fatal() {
+        let empty = Install::new("no-server", &[("patch_d2.mpq", &[])]);
+        assert!(check_server_files(&empty.set(), "runes").is_ok());
+        assert!(check_server_files(&empty.set(), "cubemain").is_ok());
+        let cases = [
+            ("runes", "runessrv.txt"),
+            ("runes", "runessrv.bin"),
+            ("runes", "runessrv.xls"),
+            ("cubemain", "cubeserver.bin"),
+            ("cubemain", "cubeserver.txt"),
+        ];
+        for (i, (table, file)) in cases.into_iter().enumerate() {
+            let path = excel_path(file);
+            let files: &[(&str, &[u8])] = &[(&path, b"x")];
+            let install = Install::new(&format!("server-{i}"), &[("d2exp.mpq", files)]);
+            let set = install.set();
+            match check_server_files(&set, table) {
+                Err(LoadError::ServerFile { file: f, table: t }) => {
+                    assert_eq!((f, t.as_str()), (path.clone(), table))
+                }
+                other => panic!("{file}: {other:?}"),
+            }
+            // Only the table the file belongs to checks it.
+            let other = if table == "runes" {
+                "cubemain"
+            } else {
+                "runes"
+            };
+            assert!(check_server_files(&set, other).is_ok());
+            assert!(check_server_files(&set, "armor").is_ok());
+        }
+    }
+
+    // Covers: specs/data/loading.md §4.1
+    #[test]
+    fn bin_container_layout() {
+        // count 0x0102 = 258, little-endian, then 258 one-byte records.
+        let mut data = vec![0x02, 0x01, 0x00, 0x00];
+        data.extend((0..258u32).map(|i| i as u8));
+        let t = BinTable::parse("t", "p", "t.bin", &data, 1).unwrap();
+        assert_eq!(t.count, 258);
+        assert_eq!(t.records, &data[4..]);
+        // Records packed back to back, no padding or trailer.
+        let mut data = 3u32.to_le_bytes().to_vec();
+        data.extend_from_slice(b"aaabbbccc");
+        let t = BinTable::parse("t", "p", "t.bin", &data, 3).unwrap();
+        assert_eq!(t.iter().collect::<Vec<_>>(), [b"aaa", b"bbb", b"ccc"]);
+        // No magic: any count bytes are the count; count 0 is 4 bytes.
+        let t = BinTable::parse("t", "p", "t.bin", &[0; 4], 52).unwrap();
+        assert_eq!((t.count, t.records.len()), (0, 0));
+    }
+
+    // Covers: specs/data/loading.md §10 r1
+    #[test]
+    fn string_tables_load_first() {
+        let tbl = empty_tbl();
+        let lng = |n: &str| format!(r"data\local\lng\eng\{n}");
+        let (s, p, x) = (
+            lng("string.tbl"),
+            lng("patchstring.tbl"),
+            lng("expansionstring.tbl"),
+        );
+        let two: &[(&str, &[u8])] = &[(&s, &tbl), (&p, &tbl)];
+        let classic = Install::new("strings-classic", &[("patch_d2.mpq", two)]);
+        let set = classic.set();
+        let t = StringTables::load(&set, "eng", false).unwrap();
+        assert!(t.base.is_some() && t.patch.is_some() && t.expansion.is_none());
+        // expansionstring.tbl is needed only when d2exp.mpq exists.
+        assert!(matches!(
+            StringTables::load(&set, "eng", true),
+            Err(StringsError::Mpq { file, .. }) if file == x
+        ));
+        // The string tables load before the first excel table: with no
+        // compcode.bin, load fails on compcode only once they loaded.
+        match load(&set, "eng") {
+            Err(LoadError::Missing { file }) => assert_eq!(file, excel_path("compcode.bin")),
+            other => panic!("{other:?}"),
+        }
+        // Without them, load fails on string.tbl although compcode.bin is
+        // present.
+        let bin = 0u32.to_le_bytes();
+        let only_bin: &[(&str, &[u8])] = &[(r"data\global\excel\compcode.bin", &bin)];
+        let none = Install::new("strings-none", &[("patch_d2.mpq", only_bin)]);
+        assert!(matches!(
+            load(&none.set(), "eng"),
+            Err(LoadError::Strings(StringsError::Mpq { file, .. })) if file == s
+        ));
+        // With d2exp.mpq present, expansionstring.tbl is required.
+        let lod = Install::new("strings-lod", &[("patch_d2.mpq", two), ("d2exp.mpq", &[])]);
+        assert!(matches!(
+            load(&lod.set(), "eng"),
+            Err(LoadError::Strings(StringsError::Mpq { file, .. })) if file == x
+        ));
+    }
+
+    // Covers: specs/data/loading.md §10 r2
+    #[test]
+    fn levels_and_leveldefs() {
+        let s = schema();
+        let (levels, defs) = (s.table("levels").unwrap(), s.table("leveldefs").unwrap());
+        assert_eq!(
+            (levels.txt_name.as_str(), levels.record_size),
+            ("levels.txt", 544)
+        );
+        assert_eq!(
+            (defs.txt_name.as_str(), defs.record_size),
+            ("levels.txt", 156)
+        );
+        // Normal play reads leveldefs.bin.
+        assert_eq!(defs.bin_name, "leveldefs.bin");
+        assert!(defs.is_runtime());
+        // Different columns of the same rows.
+        let cols = |t: &TableDef| {
+            t.fields
+                .iter()
+                .map(|f| f.column.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_ne!(cols(levels), cols(defs));
+        // Its count is not kept: row i belongs to levels row i, so the
+        // counts must agree.
+        let st = StringTables::default();
+        let lv = table("levels", 137, 544);
+        assert!(post_load_check(
+            &table("leveldefs", 137, 156),
+            std::slice::from_ref(&lv),
+            &st,
+            true
+        )
+        .is_ok());
+        assert!(post_load_check(&table("leveldefs", 138, 156), &[lv], &st, true).is_err());
+    }
+
+    // Covers: specs/data/loading.md §10 r4
+    #[test]
+    fn sounds_is_compile_only() {
+        let t = schema().table("sounds").unwrap();
+        assert_eq!(t.load_step.as_deref(), Some("3.01"));
+        assert!(t.live_source.is_none() && !t.is_runtime());
+        assert_eq!((t.record_size, t.key_column.as_str()), (2, "Sound"));
+        let key = t.field("Sound").unwrap();
+        // A name link (key(name16), 2-byte records).
+        assert_eq!((key.field_type.id(), key.offset), (17, 0));
+        assert!(schema().runtime().all(|d| d.name != "sounds"));
     }
 
     fn game_set() -> ArchiveSet {
