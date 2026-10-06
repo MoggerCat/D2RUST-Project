@@ -1,5 +1,7 @@
 # Handoff: vendors (`d2_sim::world::vendors`) — `claude/impl-vendors`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14). Branched from
 `claude/bold-ptolemy-jvyvxy` at `a5b323a`. Spec: `specs/world/vendors.md`

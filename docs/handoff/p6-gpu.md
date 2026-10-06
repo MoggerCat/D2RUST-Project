@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C5 — GPU compute compositor (`d2_client::gpu_compositor`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/p6-gpu`, from `claude/bold-ptolemy-jvyvxy` at
 `ed7236e` (2026-10-06, cloud). Spec: `specs/client/render-pipeline.md`
 §A9 (+ the §A10 diff/perturb pieces the harness needs), d2rs-own design

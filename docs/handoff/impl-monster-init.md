@@ -1,5 +1,7 @@
 # Handoff: monster creation and initialization (`claude/impl-monster-init`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Session: cloud implementation (METHODS M14, medium), 2026-10-06. Base:
 `claude/bold-ptolemy-jvyvxy` at `a5b323a` (PR #13). Input:
 `specs/monsters/init.md` (+ `specs/monsters/umods.tsv`). Scope of every

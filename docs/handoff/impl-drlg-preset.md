@@ -1,5 +1,7 @@
 # Handoff: DRLG preset implementation (`d2_sim::drlg::preset`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/impl-drlg-preset`, from `claude/bold-ptolemy-jvyvxy` at
 a5b323a (cloud, 2026-10-06). Spec: `specs/drlg/preset.md` (draft) +
 `specs/drlg/preset-tables.tsv`.

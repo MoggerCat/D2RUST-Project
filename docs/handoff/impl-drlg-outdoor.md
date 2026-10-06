@@ -1,5 +1,7 @@
 # Handoff: DRLG outdoor levels (`d2_sim::drlg::outdoor`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/impl-drlg-outdoor`, from `claude/bold-ptolemy-jvyvxy` at
 a5b323a (cloud, 2026-10-06). Specs: `specs/drlg/outdoor.md`,
 `specs/drlg/outdoor-tilesub.md`. Implementation session (M14: medium).

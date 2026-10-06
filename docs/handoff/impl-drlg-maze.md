@@ -1,5 +1,7 @@
 # Handoff: maze level generation (`d2_sim::drlg::maze`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/impl-drlg-maze`, from `claude/bold-ptolemy-jvyvxy` at
 a5b323a (cloud, 2026-10-06). Spec: `specs/drlg/maze.md` +
 `specs/drlg/maze-specials.tsv`.
