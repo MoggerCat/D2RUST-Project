@@ -1,6 +1,7 @@
-# Spec: Combat — Vitals: creation values, stat points, level-up, experience
+# Spec: Combat — Vitals: creation values, stat points, level-up, experience, client sync
 
-- **Status:** draft: creation (§1), stat points (§2), level-up (§3) and
+- **Status:** draft: creation (§1), stat points (§2), level-up (§3), the
+  client vitals sync (§5) and
   the experience table lookups (§4.1) read in full from the 1.14d
   `Game.exe`; the experience-on-kill level factor (§4.2) read in full;
   the rest of §4 (experience ratio, party share, hireling experience) is
@@ -22,20 +23,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–55 |
-| Inputs | 56–64 |
-| Outputs / state changes | 65–68 |
-| Rules | 69–70 |
-|   1. Creation values | 71–93 |
-|   2. Spending stat points (message 0x3A) | 94–131 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 132–153 |
-|   4. Experience | 154–193 |
-| Constants & data dependencies | 194–210 |
-| Randomness | 211–214 |
-| Edge cases & original bugs | 215–226 |
-| Test vectors | 227–247 |
-| Provenance | 248–259 |
-| Open questions | 260–280 |
+| Summary | 43–57 |
+| Inputs | 58–66 |
+| Outputs / state changes | 67–70 |
+| Rules | 71–72 |
+|   1. Creation values | 73–95 |
+|   2. Spending stat points (message 0x3A) | 96–133 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 134–155 |
+|   4. Experience | 156–195 |
+|   5. Client vitals sync (`0x00548760`) | 196–288 |
+| Constants & data dependencies | 289–305 |
+| Randomness | 306–309 |
+| Edge cases & original bugs | 310–321 |
+| Test vectors | 322–342 |
+| Provenance | 343–358 |
+| Open questions | 359–387 |
 <!-- /index -->
 
 ## Summary
@@ -191,6 +193,99 @@ using floating point) and the add function (D2MOO
 are not yet confirmed in 1.14d (Open question 2). The party share's
 float arithmetic must be reproduced exactly once confirmed.
 
+### 5. Client vitals sync (`0x00548760`)
+
+Sends a player's own client its life, mana, stamina, position, gold and
+experience (S→C 0x18, 0x95, 0x96, 0x19–0x1F). Owner of these messages;
+`items/inventory.md` §10.3 (gold bytes) and `sim/pathing.md` §10 rule 5
+link here.
+
+#### 5.1 When it runs
+
+1. Caller `0x0052D980` (ESI = client), from the flush routine
+   `0x0052E320` when its second argument is 1 and the client state
+   (client +4) is 4 (in game): every flush of `0x0052FD90` (single
+   player: once after each tick that ran, `sim/intents-events.md` §1
+   rule 1), before the client's buffers are sent, so these messages end
+   the tick's batch. The leave flush `0x005303D0` passes 0 (no sync).
+2. force := 1 when client +0x1B0 ≥ 20, or when client +0x1B0 ≥ 10 and
+   the client has a queued buffer (head, client +0x1B8 ≠ 0); else 0.
+   Client +0x1B0 counts per-client updates (`sim/tick.md` §6 rule 5,
+   +1 per tick) and is reset to 0 when the routine returns 1.
+3. The client's player must be a player unit (fatal assert otherwise);
+   the routine runs with ECX = EDX = that player.
+4. Before it, when the host setting at `0x00883D4C` (read at server
+   start by `0x00530690`) is non-zero, `0x0052DA00` runs (open question
+   7).
+
+#### 5.2 Values
+
+Per-client cache record at client +0x48C (`0x00539330`):
+
+| Offset | Field |
+|---|---|
+| +0x00 | quiet counter (u32) |
+| +0x04 / +0x06 / +0x08 | life / mana / stamina sent (u16) |
+| +0x0A / +0x0B | life / mana prediction sent (u8) |
+| +0x0C / +0x0E | x / y sent (u16) |
+| +0x10 / +0x12 | dx / dy sent (u16, zero-extended bytes) |
+| +0x14 | gold sent (stat 14) |
+| +0x18 | experience sent (stat 13) |
+
+Current values (stat totals, `0x00625480`; `>>` arithmetic):
+
+- L = total(6) >> 8; M = max life (`0x00625D10`) >> 8; mana =
+  total(8) >> 8; stamina = total(10) >> 8.
+- X, Y = the unit's sub-tile position (`0x0045ADF0` / `0x0045AE20`);
+  with a path: dx = (X − path target x, path +0x10) & 0xFF, dy = (Y −
+  path target y, +0x12) & 0xFF; without a path dx = dy = 0.
+- Life prediction lp (`0x005485B0`): with a state 100 (`healthpot`) list
+  and M ≠ 0: q = (total_list(74) · (list expire frame − game frame) +
+  total(6)) >> 8; v = q · 100 / M (signed, truncated); lp = the **low
+  byte** of v, then 100 if that byte is above 100. Else lp = 0.
+- Mana prediction mp (`0x00548640`): with a state 106 (`manapot`) list,
+  max mana m (`0x00625D60`, 8.8) ≠ 0 and a valid class row: per-frame
+  regen i as `sim/stat-lists.md` §10.1 rule 5 (q = charstats `ManaRegen`
+  · 25, 7500 if 0; i = max(m / q, 1)), except that the stat 27 scaling
+  is truncated, i = trunc(i · (total(27) + 100) / 100) + total(26), and
+  state 85 is not tested; v = ((list expire − frame) · i + total(8)) ·
+  100 / m; mp = low byte of v, 100 if above 100. Else mp = 0.
+
+#### 5.3 Steps
+
+1. Client or unit missing, or M ≤ 0 → return 0 (nothing changes).
+2. force = 0: d = |cache life − L|; d · 100 / M < 10 → return 0. Else if
+   L = 0 and cache life ≠ 0 → return 0 (a drop to zero life is not
+   sent here).
+3. Pick at most one message:
+   1. lp or mp differs from the cache → 0x18 (life L, mana, stamina,
+      lp, mp, X, Y, dx, dy; `0x0053C230`).
+   2. Else L or mana differs → 0x95 (L, mana, stamina, X, Y, dx, dy;
+      `0x0053C320`).
+   3. Else stamina differs → 0x96 (stamina, X, Y, dx, dy; `0x0053C3F0`).
+   4. Else, quiet counter > 3 and |cache x − X| ≥ 2 or |cache y − Y| ≥ 2
+      → 0x96.
+   5. Else nothing: quiet counter += 1.
+   After a message: cache x, y, dx, dy := X, Y, dx, dy; quiet counter :=
+   0.
+4. Gold: total(14) ≠ cache → `0x0053E9B0(new, old)` (`items/inventory.md`
+   §10.3 bytes); cache := new.
+5. Experience: total(13) ≠ cache → `0x0053BDD0(new, old)`: δ = new − old
+   (32-bit): δ unsigned > 0xFFFE → 0x1C [new u32]; δ ≥ 0xFF → 0x1B [δ
+   u16]; else 0x1A [δ u8]. Cache := new.
+6. Cache life, mana, stamina, lp, mp := current; return 1.
+
+#### 5.4 Layouts
+
+Bit-packed, LSB first from bit 0 of byte 0 (writer `0x00410EB0`; a value
+is cut to its width); `sim/server-messages.tsv` holds the machine copy.
+
+| Id | Size | Fields (bits) |
+|---|---|---|
+| 0x18 | 15 | id 8, life 15, mana 15, stamina 15, lp 7, mp 7, x 16, y 16, dx 8, dy 8 (115 bits) |
+| 0x95 | 13 | id 8, life 15, mana 15, stamina 15, x 16, y 16, dx 8, dy 8 (101 bits) |
+| 0x96 | 9 | id 8, stamina 15, x 16, y 16, dx 8, dy 8 (71 bits) |
+
 ## Constants & data dependencies
 
 1.14d `charstats.txt` (fourths for the per-level / per-point columns):
@@ -256,6 +351,10 @@ stat points: three spends succeed, the fourth fails, result 2.
   §4.2 agree with it. Answers `skills/levels.md` Open question 2:
   `[0x0096C8A8]` is the experience table and entry 0 is `MaxLvl`.
 - 1.14d `charstats.txt`, `experience.txt` (`patch_d2`).
+- §5 (sync): `0x00548760`, `0x005485B0`, `0x00548640`, `0x0052D980`,
+  `0x0052E320`, `0x00539330`, `0x005392E0`, builders `0x0053C230`,
+  `0x0053C320`, `0x0053C3F0`, `0x0053BDD0`, bit writer `0x00410E40`,
+  `0x00410EB0`, `0x00410E90`, counter `0x005380D0`.
 
 ## Open questions
 
@@ -277,3 +376,11 @@ stat points: three spends succeed, the fourth fails, result 2.
    owner is the monsters spec; not specified here.
 6. Player death penalties (`DeathExpPenalty`, gold loss) and the stat
    reset callers: not specified.
+7. §5.1 rule 4: the host setting `0x00883D4C` (`0x00414F10` read at
+   `0x00530690`) and `0x0052DA00` (with a queued buffer and client
+   +0x1B0 ≥ 10: n = (499 − head buffer size) / 9, then `0x00537FD0(n)`
+   and `0x0053E130`). Settle: Ghidra on `0x00414F10`, `0x00537FD0`, or a
+   memory read of `0x00883D4C` in single player.
+8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
+   any recording with damage, potions and running: every 0x18 / 0x95 /
+   0x96 / 0x1A–0x1C byte and its tick.

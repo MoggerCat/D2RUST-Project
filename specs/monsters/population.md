@@ -386,7 +386,7 @@ Arguments: game, room, cl, x, y, GUID, class, warp check.
 4. Without cl, with a GUID (restore paths, not population): flags 0x62,
    r = −1, then r = 5. Then a §8 search without warp check and r = −1.
    Last, the nearest free point from `0x0064E840` (mask 0x3C01, size 1;
-   `sim/units.md`) with r = −1.
+   `sim/path-placement.md` §8) with r = −1.
 5. On success, `0x005A0320(boss, game)`: if the boss has no type flag 8,
    bosses spawned (+0x2C8) of the region of the boss's level id
    (`0x00573520`) += 1. Then type flag 8 is set, and `0x005A09E0` sets

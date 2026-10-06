@@ -41,16 +41,16 @@
 |   5. Quest updater and timers (tick step 8) | 406–427 |
 |   6. Status reporting | 428–517 |
 |   7. NPC dialog hooks | 518–550 |
-|   8. Act transitions, warps and portals | 551–607 |
-|   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1074 |
-|   11. Acts II–V | 1075–1080 |
-| Constants & data dependencies | 1081–1095 |
-| Randomness | 1096–1114 |
-| Edge cases & original bugs | 1115–1133 |
-| Test vectors | 1134–1159 |
-| Provenance | 1160–1181 |
-| Open questions | 1182–1208 |
+|   8. Act transitions, warps and portals | 551–620 |
+|   9. Quest items, rewards and helpers | 621–664 |
+|   10. Act I quests | 665–1087 |
+|   11. Acts II–V | 1088–1093 |
+| Constants & data dependencies | 1094–1108 |
+| Randomness | 1109–1127 |
+| Edge cases & original bugs | 1128–1146 |
+| Test vectors | 1147–1172 |
+| Provenance | 1173–1194 |
+| Open questions | 1195–1221 |
 <!-- /index -->
 
 ## Summary
@@ -585,6 +585,19 @@ Called by the warp code (`0x005550B0`); nonzero = closed:
 | 118, 128 | only when coming from 120: `0x0058D090` (else open) |
 | 132 Worldstone Chamber | `0x0058E640` |
 | other | open |
+
+The checks read the quest record found by chain id (`0x00543640`, §2.3)
+and its extra data X (record +0x18):
+
+| Check | Chain id | Closed when |
+|---|---|---|
+| `0x0059DB20` | 13 | record found, not-intro (+0x09) ≠ 0 and X +0x0B = 0 |
+| `0x005BBFA0` | 19 | the player's room is not in level 101, the record is found and X +0x0C = 0 (in level 101: open) |
+| `0x0058D090` | 35 | not-intro ≠ 0 and X +0x00 = 0 (no null check on the record) |
+| `0x0058E640` | 36 | record not found, or X +0x86 ≠ 1 |
+
+(Dispatch: `to` − 73 indexes byte table `0x00545BE8` into jump table
+`0x00545BD4`; the extra-data fields belong to each quest's section.)
 
 #### 8.3 Portal check
 
