@@ -147,7 +147,7 @@ fn floor_wall_and_roof_positions() {
     );
 }
 
-// Covers: specs/render/camera.md §6, §edge-cases-original-bugs
+// Covers: specs/render/camera.md §6, §edge-cases-original-bugs r1
 #[test]
 fn units_sit_12_rows_below_the_floor_vertex() {
     let c = camera(0, pos(1000, 2000));
@@ -188,7 +188,7 @@ fn view_culling() {
 
 // ---- camera.md §8, §9: shake and time base ----------------------------
 
-// Covers: specs/render/camera.md §8, §9, §edge-cases-original-bugs
+// Covers: specs/render/camera.md §8, §9, §edge-cases-original-bugs r2
 #[test]
 fn shake_envelope_and_offsets() {
     assert_eq!(Shake::start(10, 100, 0, 100), None);
@@ -308,7 +308,7 @@ fn row_clipping() {
     assert_eq!((placed.y, placed.clip), (-2, Some(Rect::FRAME)));
 }
 
-// Covers: specs/render/sprite-placement.md §edge-cases-original-bugs, §4, §5
+// Covers: specs/render/sprite-placement.md §edge-cases-original-bugs r1, §4, §5
 #[test]
 fn top_down_cels_clip_as_bottom_up() {
     let f = IndexFrame::new(2, 10, 0, 0, vec![1; 20])

@@ -17,12 +17,20 @@
 use d2_formats::font::FontTable;
 
 use super::draw::TextStyle;
-use super::geom::Point;
+use super::geom::{Point, Rect};
 
 /// Layout options. Which options the original's text drawing takes
-/// (wrap width, alignment, …) is TODO(spec: ui/text.md §B3); none yet.
+/// (wrap width, alignment, …) is TODO(spec: ui/text.md §B3).
+///
+/// `clip` is the request's clip rect ([`super::draw::TextRequest::clip`]),
+/// handed to the rules now so the field exists before the spec (decision
+/// CG2, 2026-10-06). Nothing reads it yet: whether and how the original's
+/// text call clips is the spec's to say, and the rules decide; until then
+/// it changes no placement. `None` is "no clip given".
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TextOpts {}
+pub struct TextOpts {
+    pub clip: Option<Rect>,
+}
 
 /// One glyph the rules place: the code unit to draw, where and with which
 /// text color. The rules decide which code units are drawn (color codes

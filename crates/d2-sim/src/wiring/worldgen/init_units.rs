@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §5, §6, §10, §16, §18 (the InitHost seam); specs/sim/stat-lists.md §8; specs/monsters/ai.md §3.3; specs/monsters/population.md §2.5, §6.3 step 5
+// Spec: specs/monsters/init.md §5, §6, §10, §16, §17.3, §18 (the InitHost seam); specs/sim/stat-lists.md §8; specs/monsters/ai.md §3.3; specs/monsters/population.md §2.5, §6.3 step 5; specs/data/runtime-maps.md §2
 //! Init → units, stats, AI and population: [`InitHost`] on
 //! [`WorldHost`]. Unit records and base stats (layer 0) are the action
 //! systems' ([`crate::units::record::Units`], [`crate::stats::StatLists`]);
@@ -6,7 +6,9 @@
 //! ([`crate::monsters::ai::install`]); the level id is the unit's room's
 //! DRLG level; region appearance entries and the boss count are the
 //! game's population regions (`population.md` §2.5, §6.3 step 5); minion
-//! lists are [`super::WorldState::minions`].
+//! lists are [`super::WorldState::minions`]; montype nesting is the
+//! montype equivalence matrix ([`super::WorldTables::montype_equiv`],
+//! `runtime-maps.md` §2).
 //!
 //! Creation seams (`place`, `allocate`, `boss_spawn`, `spawn_boss_minion`,
 //! `spawn_with_guid`, `party_minions`, `register_spawn`) keep their
@@ -17,6 +19,9 @@
 //! The items, skills, quests and states calls keep their defaults too
 //! (their providers are other groups), as does `set_combat_mode`
 //! (`0x00553570`: the mode it sets for a dead monster is not stated).
+//! `has_inventory` and `has_item_at` (unit +0x60, `init.md` §6 step 13,
+//! §12) keep theirs with `new_inventory`: no monster inventory exists in
+//! this wiring, so "no inventory" is what the wired world holds.
 
 use crate::game::Game;
 use crate::monsters::ai::{self, AiControl};
@@ -191,6 +196,20 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.unique_minion_owner_data(boss, minion);
         self.w.minions.entry(boss).or_default().push(minion);
         self.w.owners.insert(minion, boss);
+    }
+
+    /// `0x005A0070` (`init.md` §17.3): the class's MonType is `ty` or
+    /// nested in it, bit (montype, ty) of the montype matrix
+    /// (`runtime-maps.md` §2; out-of-range rows and columns are 0).
+    // TODO(spec: init.md §17.3): `0x005A0070` is not listed among the
+    // matrix readers (`runtime-maps.md` §2 names `0x00629B50`); that it
+    // reads the matrix rather than walking the links itself is to be
+    // confirmed (same answers except the walk's depth / bad-link cases).
+    fn montype_is(&mut self, montype: u16, ty: u16) -> bool {
+        self.w
+            .tables
+            .montype_equiv
+            .get(usize::from(montype), usize::from(ty))
     }
 
     /// `0x0058F380`.

@@ -108,15 +108,33 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
         self.v.h.drlg.find_room(self.game, room, x, y)
     }
 
-    /// `0x0064D9B0` on the act's collision grids (`rooms.md` §10).
-    // TODO(rooms.md §10, wire-action W5): the footprint a size covers is
-    // not specified; the sub-tile at (x, y) is read for every size.
-    fn collides(&self, room: RoomId, x: i32, y: i32, _size: i32, mask: u16) -> bool {
+    /// `0x0064D9B0` on the act's collision grids (`rooms.md` §10;
+    /// `path-placement.md` §4 rules 1–5 with the path provider, as the
+    /// missile adapter: size 0, 1 point, 2 plus, 3 box, other 0xFFFF; a
+    /// cell without a room reads 0x27).
+    // TODO(wire-action W5): without the path provider the sub-tile at
+    // (x, y) is read for every size.
+    fn collides(&self, room: RoomId, x: i32, y: i32, size: i32, mask: u16) -> bool {
+        if self.v.h.paths.is_some() {
+            return crate::path::collision::size_value(
+                &self.v.h.drlg,
+                Some(room),
+                x,
+                y,
+                size,
+                mask,
+            ) != 0;
+        }
         self.v.h.drlg.collision(self.game, room, x, y).unwrap_or(0) & mask != 0
     }
 
-    /// `0x0064CB30`.
+    /// `0x0064CB30` (`path-placement.md` §4 rules 1, 2 with the path
+    /// provider).
     fn mask_at(&self, room: RoomId, x: i32, y: i32, mask: u16) -> bool {
+        if self.v.h.paths.is_some() {
+            return crate::path::collision::point_value(&self.v.h.drlg, Some(room), x, y, mask)
+                != 0;
+        }
         self.v.h.drlg.collision(self.game, room, x, y).unwrap_or(0) & mask != 0
     }
 

@@ -784,6 +784,48 @@ mod text {
         );
     }
 
+    /// Records the options `layout_text` hands the rules (decision CG2).
+    #[derive(Default)]
+    struct SeeOpts {
+        seen: RefCell<Vec<TextOpts>>,
+    }
+
+    impl TextRules for SeeOpts {
+        fn place(
+            &self,
+            _: &GlyphLookup<'_>,
+            _: &[u16],
+            _: Point,
+            _: TextStyle,
+            opts: &TextOpts,
+        ) -> Result<Vec<GlyphPlacement>, TextError> {
+            self.seen.borrow_mut().push(*opts);
+            Ok(Vec::new())
+        }
+    }
+
+    #[test]
+    fn layout_hands_the_clip_to_the_rules_unchanged() {
+        let rules = SeeOpts::default();
+        let clip = Rect::new(-3, 7, 120, 40);
+        for opts in [TextOpts { clip: Some(clip) }, TextOpts::default()] {
+            let out = layout_text(
+                &font(),
+                &[0x41],
+                Point::new(0, 0),
+                TextStyle::default(),
+                &opts,
+                &rules,
+            )
+            .unwrap();
+            assert!(out.is_empty());
+        }
+        assert_eq!(
+            *rules.seen.borrow(),
+            [TextOpts { clip: Some(clip) }, TextOpts { clip: None }]
+        );
+    }
+
     // Covers: specs/client/ui.md §a3-text
     #[test]
     fn missing_code_is_an_error_not_a_fallback_glyph() {

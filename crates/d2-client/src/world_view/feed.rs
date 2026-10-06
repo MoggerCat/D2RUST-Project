@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/client/render-pipeline.md (A1 stage 1), specs/render/composition.md (§3 step 2)
+// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/render/composition.md (§3 steps 1–3), specs/client/render-pipeline.md (A1 stage 1)
 //! The camera of a drawn frame, fed from the client world, and the frame
 //! built through the original's view rules ([`rules::OriginalView`]).
 //!
@@ -173,22 +173,34 @@ pub fn frame_camera<F: ViewFeed + ?Sized>(
     world: &ClientWorld,
     feed: &mut F,
 ) -> Result<Option<Camera>, ViewError> {
+    Ok(camera_and_mode(world, feed)?.map(|(camera, _)| camera))
+}
+
+/// [`frame_camera`] and the open mode it was computed with.
+fn camera_and_mode<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &mut F,
+) -> Result<Option<(Camera, OpenMode)>, ViewError> {
     let Some(player) = feed.player(world)? else {
         return Ok(None);
     };
     let mode = feed.open_mode(world)?;
     let shake = frame_shake(world, feed)?;
-    Ok(Some(Camera::new(
-        FrameSize::D2RS,
+    Ok(Some((
+        Camera::new(FrameSize::D2RS, mode, player.client(), shake),
         mode,
-        player.client(),
-        shake,
     )))
 }
 
+/// The open mode whose frames draw no world (`render/composition.md` §3
+/// step 3: `0x00476BC0` is skipped in screen open mode 3).
+const NO_WORLD_MODE: u8 = 3;
+
 /// Builds the frame through the original's view rules: the camera once
 /// (§3), then [`OriginalView`] over `rules` and `feed`; without a local
-/// player, through [`NoCamera`].
+/// player, through [`NoCamera`]. In screen open mode 3 the camera (and its
+/// shake draws) is still computed, but the world is skipped and only the
+/// UI is built ([`NoWorld`], `render/composition.md` §3 steps 1 and 3).
 pub fn build_frame<R, F>(
     world: &ClientWorld,
     ui: &[UiDraw],
@@ -200,8 +212,16 @@ where
     R: ViewRules + UiRules + ?Sized,
     F: ViewFeed + ?Sized,
 {
-    match frame_camera(world, feed)? {
-        Some(camera) => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
+    match camera_and_mode(world, feed)? {
+        Some((camera, mode)) if mode.get() == NO_WORLD_MODE => build(
+            world,
+            ui,
+            &NoWorld {
+                view: &OriginalView::new(camera, rules, &*feed),
+            },
+            assets,
+        ),
+        Some((camera, _)) => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
         None => build(
             world,
             ui,
@@ -313,6 +333,82 @@ impl<R: UiRules + ?Sized, S: ?Sized> UiRules for NoCamera<'_, R, S> {
 
     fn ui_pass(&self) -> Result<u32, ViewError> {
         self.rules.ui_pass()
+    }
+}
+
+/// A frame without its world (`render/composition.md` §3 step 3, screen
+/// open mode 3): no map tile and no unit is drawn (every unit counts as
+/// hidden); the UI goes to the wrapped view.
+#[derive(Debug, Clone, Copy)]
+pub struct NoWorld<'a, V: ?Sized> {
+    pub view: &'a V,
+}
+
+impl<V: ViewRules + ?Sized> ViewRules for NoWorld<'_, V> {
+    fn tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
+        Ok(Vec::new())
+    }
+
+    fn unit_pose(&self, _: &ClientWorld, _: &ClientUnit) -> Result<Option<UnitPose>, ViewError> {
+        Ok(None)
+    }
+
+    fn unit_params(
+        &self,
+        world: &ClientWorld,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+    ) -> Result<UnitParams, ViewError> {
+        self.view.unit_params(world, unit, pose)
+    }
+
+    fn component_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<ComponentFrame, CompositeError> {
+        self.view.component_frame(unit, pose, req)
+    }
+
+    fn place(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+        image: &IndexFrame,
+    ) -> Result<(i32, i32), CompositeError> {
+        self.view.place(unit, pose, req, image)
+    }
+
+    fn shade(
+        &self,
+        unit: &ClientUnit,
+        req: &ComponentRequest<'_>,
+    ) -> Result<ShadeChain, CompositeError> {
+        self.view.shade(unit, req)
+    }
+
+    fn blend(
+        &self,
+        unit: &ClientUnit,
+        req: &ComponentRequest<'_>,
+    ) -> Result<BlendOp, CompositeError> {
+        self.view.blend(unit, req)
+    }
+}
+
+impl<V: UiRules + ?Sized> UiRules for NoWorld<'_, V> {
+    fn ui_image(&self, req: &ImageRequest, assets: &ViewAssets) -> Result<UiSprite, ViewError> {
+        self.view.ui_image(req, assets)
+    }
+
+    fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
+        self.view.ui_text(req, assets)
+    }
+
+    fn ui_pass(&self) -> Result<u32, ViewError> {
+        self.view.ui_pass()
     }
 }
 

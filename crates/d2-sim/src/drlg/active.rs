@@ -69,8 +69,11 @@ impl ActRooms for UnitLists {
         let Some(r) = self.room(room) else { return 0 };
         let flags =
             u32::from(r.populated) | u32::from(r.units_active) << 1 | u32::from(r.no_update) << 2;
-        // TODO(rooms.md §8.2): remaining units get flag 0x800000 and a path
-        // update (unit specs); they keep their room link here.
+        // Units still in the room (tick step 9 compresses them first) are
+        // unlinked from it by `free_room` (unit-order.md §5.3).
+        // TODO(rooms.md §8.2): `0x0061A840` also gives each flag 0x800000
+        // (non-client units flag-ex 0x20) and a path update; the fields and
+        // the update belong to the unit specs (handoff `prop-fixes` Q3).
         let _ = self.free_room(room);
         flags
     }
