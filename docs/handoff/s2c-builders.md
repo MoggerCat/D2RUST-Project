@@ -4,7 +4,8 @@
 
 Cloud implementation session, 2026-10-06, task class: implementation
 from written specs, medium (METHODS M14). Branch `claude/s2c-builders`
-from `claude/tender-meitner-mphas3` at `9b49081`. Repo only, no game
+from `claude/tender-meitner-mphas3` at `9b49081`, then merged with it at
+`93b37c8`. Repo only, no game
 files. Scope of every claim: this branch, synthetic and spec-quoted
 bytes (M09).
 
@@ -24,8 +25,8 @@ of a recording.
   `layout` cells for 0x19, 0x3F, 0x42, 0x47, 0x48, 0x7D without
   regenerating; `generated_file_is_current`, `tables_match_tsv` and
   `check_reports_exactly_a_changed_row` failed on `9b49081`). The output
-  is deterministic, so a parallel branch that regenerates gives the same
-  file. M21 escape: a TSV edit in a spec session did not run the
+  is deterministic: the coordinator's fix on the base (`e909c15`) is
+  byte-identical, so the merge of `93b37c8` left no diff in this file. M21 escape: a TSV edit in a spec session did not run the
   generator; caught by `cargo test -p d2-proto` at the start of this
   session; the existing staleness test is the check (it was not run by
   the spec commit).
@@ -325,3 +326,5 @@ Gate (this branch): `cargo fmt --all -- --check`; `cargo clippy
 - `python3 tools/spec_index.py --check`, `python3 tools/methods.py
   check` (21 methods), `python3 tools/coverage.py --check` (3259 claims,
   0 errors), `--selftest`: OK.
+- Re-run after merging the base at `93b37c8`: all of the above pass
+  (coverage 3285 claims, 0 errors).
