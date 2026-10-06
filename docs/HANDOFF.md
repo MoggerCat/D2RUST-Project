@@ -1175,6 +1175,8 @@ print `skipped: no GPU adapter` and pass.
 
 ## 5. Local run queue
 
+Ordered, copy-pasteable guide to running this queue: `docs/LOCAL-RUN.md`.
+
 Cloud sessions add checks here (command + what to look for); a local
 session runs them, records the result, and removes the entry. Merged
 2026-10-06 from the 13 notes in `docs/handoff/`, then from the 15 notes
