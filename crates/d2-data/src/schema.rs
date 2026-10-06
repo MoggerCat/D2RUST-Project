@@ -423,6 +423,7 @@ pub fn schema() -> &'static Schema {
 mod tests {
     use super::*;
 
+    // Covers: specs/data/schema.md §1, §2
     #[test]
     fn embedded_schema_parses() {
         let s = schema();
@@ -441,6 +442,7 @@ mod tests {
     }
 
     /// `loading.md` §6 record sizes and first/last steps.
+    // Covers: specs/data/schema.md §2; specs/data/loading.md §6
     #[test]
     fn runtime_tables_follow_loading_md() {
         let s = schema();
@@ -459,6 +461,7 @@ mod tests {
     }
 
     /// schema.md test vectors.
+    // Covers: specs/data/schema.md §1
     #[test]
     fn schema_vectors() {
         let s = schema();
@@ -476,6 +479,7 @@ mod tests {
     /// schema.md §5: bytes no field writes, as listed in the `tables.tsv`
     /// notes (`unwritten: a-b,c`), equal the bytes outside every field
     /// footprint.
+    // Covers: specs/data/schema.md §5
     #[test]
     fn footprints_match_unwritten_notes() {
         let mut total = 0;
@@ -511,6 +515,7 @@ mod tests {
         assert_eq!((total, tables), (1_702, 55));
     }
 
+    // Covers: specs/data/field-types.md §3
     #[test]
     fn type_ids_round_trip() {
         for id in 1..=26 {

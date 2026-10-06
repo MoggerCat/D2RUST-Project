@@ -162,6 +162,7 @@ impl Pl2 {
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/palette.md §dat-palette
     #[test]
     fn dat_is_bgr() {
         let mut data = vec![0u8; 768];
@@ -177,6 +178,7 @@ mod tests {
         );
     }
 
+    // Covers: specs/formats/palette.md §dat-palette
     #[test]
     fn dat_length_is_checked() {
         assert!(Palette::parse(&[0; 767]).is_err());
@@ -194,6 +196,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/palette.md §pl2-palette-transform
     #[test]
     fn pl2_layout() {
         let p = Pl2::parse(&pl2(13, 0)).unwrap();
@@ -206,11 +209,13 @@ mod tests {
         assert_eq!(p.hue_variations.len(), 111);
     }
 
+    // Covers: specs/formats/palette.md §pl2-palette-transform, §edge-cases-original-bugs
     #[test]
     fn pl2_twelve_text_colors() {
         assert_eq!(Pl2::parse(&pl2(12, 0)).unwrap().text_colors.len(), 12);
     }
 
+    // Covers: specs/formats/palette.md §pl2-palette-transform
     #[test]
     fn pl2_bad_tail() {
         assert!(Pl2::parse(&pl2(0, 100)).is_err());

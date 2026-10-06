@@ -572,6 +572,7 @@ fn copy_rect(
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/dcc.md §cells
     #[test]
     fn cell_sizes() {
         assert_eq!(axis_cells(0, 1), [1]);
@@ -592,6 +593,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/formats/dcc.md §bit-reading
     #[test]
     fn signed_fields() {
         // 0b1111 as a 4-bit signed field is -1; 0b0111 is 7.
@@ -663,6 +665,7 @@ mod tests {
         file
     }
 
+    // Covers: specs/formats/dcc.md §direction-header-bits, §boxes, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
     #[test]
     fn decodes_synthetic_frame() {
         let dcc = Dcc::parse(&one_frame_file()).unwrap();
@@ -673,6 +676,7 @@ mod tests {
         assert!(dcc.directions[0].pcd_leftover_bits < 8);
     }
 
+    // Covers: specs/formats/dcc.md §file-header-little-endian-bytes
     #[test]
     fn rejects_bad_signature() {
         let mut data = one_frame_file();
@@ -723,6 +727,7 @@ mod tests {
         file
     }
 
+    // Covers: specs/formats/dcc.md §boxes
     #[test]
     fn regress_sparse_boxes_bounded() {
         // Two 1×1 frames at opposite corners of a 4000×4000 box: ~80 bytes
@@ -736,6 +741,7 @@ mod tests {
         assert!(err.to_string().contains("direction 4:"), "{err}");
     }
 
+    // Covers: specs/formats/dcc.md §boxes
     #[test]
     fn regress_box_area_overflow() {
         // Corners i32::MIN and i32::MAX + u32::MAX: the box is ~2^33 on each
@@ -751,6 +757,7 @@ mod tests {
         assert!(err.to_string().contains("direction box"), "{err}");
     }
 
+    // Covers: specs/formats/dcc.md §boxes
     #[test]
     fn regress_box_corner_outside_i32() {
         // Top-down frame at y_offset i32::MIN, height 2: y_min is

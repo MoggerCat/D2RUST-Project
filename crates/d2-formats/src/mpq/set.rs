@@ -190,6 +190,7 @@ pub fn archive_file_name(a: &Archive) -> &str {
 mod tests {
     use super::*;
 
+    // Covers: specs/data/loading.md §2
     #[test]
     fn priority_order() {
         assert_eq!(priority("Patch_D2.mpq"), 0);
@@ -199,6 +200,7 @@ mod tests {
     }
 
     /// `loading.md` §2: excel files resolve P → X → D.
+    // Covers: specs/data/loading.md §2
     #[test]
     fn excel_order_is_patch_exp_data() {
         assert!(priority("patch_d2.mpq") < priority("d2exp.mpq"));
@@ -206,6 +208,7 @@ mod tests {
     }
 
     /// `loading.md` §2: priority descending, ties newest first.
+    // Covers: specs/data/loading.md §2; specs/formats/mpq.md §archive-set-d2-specific
     #[test]
     fn priority_table_matches_open_order() {
         let order: Vec<&str> = search_order(&OPEN_ORDER).iter().map(|a| a.name).collect();
@@ -214,6 +217,7 @@ mod tests {
         assert_eq!(PRIORITY[PRIORITY.len() - 1], "d2data.mpq");
     }
 
+    // Covers: specs/data/loading.md §2
     #[test]
     fn ties_put_later_archives_first() {
         let a = ArchiveSpec {

@@ -98,6 +98,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
     #[test]
     fn parses_records() {
         let a = [b'A', 0, 0, 7, 16, 1, 0, 0, 33, 0, 0, 0, 0, 0];
@@ -112,6 +113,7 @@ mod tests {
         assert_eq!(f.glyphs[1].frame, 200);
     }
 
+    // Covers: specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
     #[test]
     fn errors() {
         let mut bad = file(&[]);

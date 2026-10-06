@@ -212,6 +212,7 @@ mod tests {
         out
     }
 
+    // Covers: specs/formats/animdata.md §4 r1, §4 r2
     #[test]
     fn hash_vectors() {
         assert_eq!(hash(b""), 0);
@@ -223,6 +224,7 @@ mod tests {
         assert_eq!(hash(&n), 13);
     }
 
+    // Covers: specs/formats/animdata.md §3, §6
     #[test]
     fn empty_file_gives_default() {
         let a = AnimData::parse(&vec![0; 1024]).unwrap();
@@ -238,6 +240,7 @@ mod tests {
         );
     }
 
+    // Covers: specs/formats/animdata.md §4 r1, §6
     #[test]
     fn first_event_frame() {
         let a = AnimData::parse(&file(&[
@@ -255,6 +258,7 @@ mod tests {
         assert_eq!(a.info(b"CCDTHTH").unwrap().first_event, 144);
     }
 
+    // Covers: specs/formats/animdata.md §4 r4
     #[test]
     fn first_duplicate_wins() {
         let a = AnimData::parse(&file(&[
@@ -265,6 +269,7 @@ mod tests {
         assert_eq!(a.record(b"VMS1HTH").unwrap().speed, 200);
     }
 
+    // Covers: specs/formats/animdata.md §2
     #[test]
     fn strict_layout() {
         assert!(AnimData::parse(&[0; 1023]).is_err());
@@ -274,6 +279,7 @@ mod tests {
         assert!(AnimData::parse(&f).is_err());
     }
 
+    // Covers: specs/formats/animdata.md §4 r3
     #[test]
     fn long_query_in_used_bucket_is_an_error() {
         let a = AnimData::parse(&file(&[(b"A", 1, 1, &[])])).unwrap();

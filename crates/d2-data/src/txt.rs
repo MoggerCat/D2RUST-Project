@@ -316,6 +316,7 @@ mod tests {
         assert_eq!((e.code, e.line), (code, line), "input {data:?}");
     }
 
+    // Covers: specs/data/txt-format.md §2, §4, §5 r2, §5 r5
     #[test]
     fn reader_vectors() {
         let t = parse(b"a\tb\r\n1\t2\r\n").unwrap();
@@ -359,6 +360,7 @@ mod tests {
         assert_eq!(cells(&t, 0), [b"\x85\x92"]);
     }
 
+    // Covers: specs/data/txt-format.md §2, §3, §5 r4, §5 r6, §9
     #[test]
     fn reader_errors() {
         fails(b"a\tb\r\n\r\n", ErrorCode::E8, Some(2));
@@ -383,6 +385,7 @@ mod tests {
         fails(b"a\tb\r1\t2\r\n", ErrorCode::E4, Some(1));
     }
 
+    // Covers: specs/data/txt-format.md §4
     #[test]
     fn column_limit() {
         let mut ok = vec![b'c'; 1];
@@ -406,6 +409,7 @@ mod tests {
         names.iter().map(|n| n.to_vec()).collect()
     }
 
+    // Covers: specs/data/txt-format.md §6 r2, §6 r3
     #[test]
     fn binding_vectors() {
         let b = bind(&header(&[b"Name", b"LEVEL", b"name"]), &["name", "level"]);

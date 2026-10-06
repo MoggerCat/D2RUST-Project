@@ -730,6 +730,7 @@ fn decompress_masked(mask: u8, payload: &[u8], expected: usize) -> Result<Vec<u8
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/mpq.md §9
     #[test]
     fn masked_pkware_sector() {
         let mut sector = vec![compression::PKWARE];
@@ -744,6 +745,7 @@ mod tests {
         assert_eq!(out, b"AIAIAIAIAIAIA");
     }
 
+    // Covers: specs/formats/mpq.md §9
     #[test]
     fn size_mismatch_is_an_error() {
         let mut sector = vec![compression::PKWARE];
@@ -757,6 +759,7 @@ mod tests {
         assert!(decompress_sector(&block, &sector, 20, None).is_err());
     }
 
+    // Covers: specs/formats/mpq.md §9
     #[test]
     fn rejects_unknown_masks() {
         for mask in [0x04, 0x12, 0x20, 0xC0] {

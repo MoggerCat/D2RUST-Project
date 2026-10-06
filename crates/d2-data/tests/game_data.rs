@@ -59,6 +59,7 @@ fn txt(archive_name: &str, file: &str) -> TxtTable {
 /// `txt-format.md` survey: every excel `.txt` parses except `Aiparms.txt`
 /// (E8, line 13), and record counts equal the same-archive `.bin` count
 /// (128 pairs).
+// Covers: specs/data/txt-format.md §5 r3, §5 r4; specs/data/loading.md §11
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn txt_survey() {
@@ -111,6 +112,7 @@ fn txt_survey() {
     assert_eq!(pairs, 128);
 }
 
+// Covers: specs/data/txt-format.md §5 r5, §6 r3; specs/data/loading.md §10 r5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn txt_binding_vectors() {
