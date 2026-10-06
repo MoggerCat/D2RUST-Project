@@ -10,6 +10,10 @@ use super::CodecError;
 const SYM_END: u16 = 0x100;
 const SYM_ESCAPE: u16 = 0x101;
 
+/// Output bytes per input byte, at most: every symbol takes at least one
+/// bit. Bounds the preallocation, since `max_out` is untrusted.
+const MAX_RATIO: usize = 8;
+
 fn err(reason: &'static str) -> CodecError {
     CodecError {
         codec: "huffman",
@@ -164,9 +168,13 @@ impl Tree {
     fn increment(&mut self, mut n: usize) -> Result<(), CodecError> {
         loop {
             let w = self.nodes[n].weight;
+            let w1 = w.checked_add(1).ok_or(err("weight overflow"))?;
             let lead = *self.leader.get(&w).ok_or(err("inconsistent tree"))?;
             if lead != n {
-                if self.nodes[lead].parent.is_none() || self.nodes[n].parent == Some(lead) {
+                if self.nodes[lead].parent.is_none()
+                    || self.nodes[n].parent.is_none()
+                    || self.nodes[n].parent == Some(lead)
+                {
                     return Err(err("swap with an ancestor"));
                 }
                 self.swap_list(n, lead);
@@ -182,8 +190,8 @@ impl Tree {
                     self.leader.remove(&w);
                 }
             }
-            self.nodes[n].weight = w + 1;
-            self.leader.entry(w + 1).or_insert(n);
+            self.nodes[n].weight = w1;
+            self.leader.entry(w1).or_insert(n);
             match self.nodes[n].parent {
                 Some(p) => n = p,
                 None => return Ok(()),
@@ -312,7 +320,7 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
     let adaptive = table == 0;
     let mut tree = template(table).clone();
 
-    let mut out = Vec::with_capacity(max_out);
+    let mut out = Vec::with_capacity(max_out.min(input.len().saturating_mul(MAX_RATIO)));
     while out.len() < max_out {
         let mut n = tree.root();
         while tree.nodes[n].symbol.is_none() {
@@ -341,9 +349,74 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
     Ok(out)
 }
 
+/// Encodes `data` with weight table `table`, mirroring [`decompress`]'s
+/// tree updates, and appends the end symbol. Test helper for building
+/// valid streams.
+#[cfg(test)]
+pub(crate) fn compress(table: u8, data: &[u8]) -> Vec<u8> {
+    use super::bits::BitWriter;
+
+    fn leaf(tree: &Tree, sym: u16) -> Option<usize> {
+        (0..tree.nodes.len()).find(|&i| tree.nodes[i].symbol == Some(sym))
+    }
+    fn emit(tree: &Tree, w: &mut BitWriter, mut n: usize) {
+        let mut path = Vec::new();
+        while let Some(p) = tree.nodes[n].parent {
+            path.push(u32::from(tree.nodes[p].child[1] == n));
+            n = p;
+        }
+        for &bit in path.iter().rev() {
+            w.write(bit, 1);
+        }
+    }
+
+    let mut w = BitWriter::default();
+    w.write(u32::from(table), 8);
+    let adaptive = table == 0;
+    let mut tree = template(usize::from(table)).clone();
+    for &b in data {
+        let n = match leaf(&tree, u16::from(b)) {
+            Some(n) => {
+                emit(&tree, &mut w, n);
+                n
+            }
+            None => {
+                let esc = leaf(&tree, SYM_ESCAPE).expect("escape leaf");
+                emit(&tree, &mut w, esc);
+                w.write(u32::from(b), 8);
+                let n = tree.add_value(b);
+                tree.increment(n).expect("valid tree");
+                if !adaptive {
+                    tree.increment(n).expect("valid tree");
+                }
+                n
+            }
+        };
+        if adaptive {
+            tree.increment(n).expect("valid tree");
+        }
+    }
+    let end = leaf(&tree, SYM_END).expect("end leaf");
+    emit(&tree, &mut w, end);
+    w.bytes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compress_round_trip() {
+        let data: Vec<u8> = b"the quick brown fox \x00\xff jumps over the lazy dog"
+            .iter()
+            .copied()
+            .chain((0..=255u8).step_by(7))
+            .collect();
+        for t in 0..HUFFMAN_WEIGHTS.len() as u8 {
+            let stream = compress(t, &data);
+            assert_eq!(decompress(&stream, 4096).unwrap(), data, "table {t}");
+        }
+    }
 
     /// Checks the invariants every tree must keep: the list is non-increasing
     /// in weight, branches weigh the sum of their children, parent links
@@ -400,6 +473,19 @@ mod tests {
             }
             check(&tree);
         }
+    }
+
+    /// Weights are u32 and grow with every decoded symbol; past u32::MAX
+    /// (only reachable with a multi-GiB stream) `w + 1` overflowed.
+    #[test]
+    fn regress_weight_overflow_is_an_error() {
+        let mut tree = template(0).clone();
+        let root = tree.root();
+        let w = tree.nodes[root].weight;
+        tree.leader.remove(&w);
+        tree.nodes[root].weight = u32::MAX;
+        tree.leader.insert(u32::MAX, root);
+        assert!(tree.increment(root).is_err());
     }
 
     #[test]

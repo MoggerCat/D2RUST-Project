@@ -5,11 +5,15 @@ use super::tables::{ADPCM_CHANGE_TABLE, ADPCM_STEP_SIZE};
 const INITIAL_INDEX: i32 = 44;
 const MAX_INDEX: i32 = 88;
 
+/// Output bytes per input byte, at most: each input byte yields at most one
+/// 2-byte sample. Bounds the preallocation, since `max_out` is untrusted.
+const MAX_RATIO: usize = 2;
+
 /// Decodes `channels` (1 or 2) interleaved ADPCM channels into i16 LE
 /// samples, at most `max_out` bytes. Malformed input just ends the output
 /// early; the caller checks the final length.
 pub(crate) fn decompress(input: &[u8], channels: usize, max_out: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(max_out);
+    let mut out = Vec::with_capacity(max_out.min(input.len().saturating_mul(MAX_RATIO)));
     if input.len() < 2 {
         return out;
     }
