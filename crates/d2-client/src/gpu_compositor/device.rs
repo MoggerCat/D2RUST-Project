@@ -189,6 +189,7 @@ impl Gpu {
         let ranges = init("bin ranges", &packed.bin_ranges_bytes(), storage);
         let bin_items = init("bin items", &packed.bin_items_bytes(), storage);
         let maps = init("maps", &packed.maps_bytes(), storage);
+        let base = init("base", &packed.base_bytes(), storage);
         let out_size = packed.pixel_count() as u64 * 4;
         let output = |label| {
             d.create_buffer(&wgpu::BufferDescriptor {
@@ -218,6 +219,7 @@ impl Gpu {
                 entry(4, maps.as_entire_binding()),
                 entry(5, wgpu::BindingResource::TextureView(&atlas_view)),
                 entry(6, indices.as_entire_binding()),
+                entry(9, base.as_entire_binding()),
             ],
         });
         let groups = (
@@ -266,6 +268,7 @@ impl Gpu {
             ("bin item buffer", packed.bin_items.len() as u64 * 4),
             ("map table buffer", packed.maps.len() as u64),
             ("framebuffer", packed.pixel_count() as u64 * 4),
+            ("base buffer", packed.base_bytes().len() as u64),
         ];
         for (what, needed) in sizes {
             if needed > storage {

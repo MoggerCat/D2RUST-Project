@@ -1,11 +1,12 @@
 // Spec: specs/client/render-pipeline.md (A9)
+// Spec: specs/render/composition.md (§3 frame cycle, §5 one pixel write)
 //! Packing the draw list for the GPU: plain Rust, explicit little-endian.
 //!
 //! Buffers (WGSL bindings of group 0, `compositor.wgsl`):
 //!
 //! | Binding | Buffer | Layout |
 //! |---|---|---|
-//! | 0 | params (uniform) | 8 × u32: view width, height, bin cols, rows, item count, map rows, atlas pages, 0 |
+//! | 0 | params (uniform) | 12 × u32: view width, height, bin cols, rows, item count, map rows, atlas pages, clear rows, clear after (0/1), 0, 0, 0 |
 //! | 1 | items | [`ITEM_SIZE`] bytes per item, list order ([`GpuItem`]) |
 //! | 2 | bin ranges | `cols × rows + 1` u32 prefix sums: bin `b` (row-major) owns `bin_items[ranges[b]..ranges[b+1]]` |
 //! | 3 | bin items | u32 item indices, bins concatenated, each in list order |
@@ -14,6 +15,7 @@
 //! | 6 | indices (out) | one u32 per view pixel, row-major, value 0..=255 |
 //! | 7 | palette | 256 u32: bytes r, g, b, 255 |
 //! | 8 | rgba (out) | one u32 per view pixel: bytes r, g, b, a |
+//! | 9 | base | the frame's start framebuffer, one byte per view pixel, row-major, four per word (little-endian), zero-padded to a whole word |
 //!
 //! Storage buffers cannot be empty, so an empty item list, bin-item list or
 //! map table is padded with one zeroed record that nothing references.
@@ -21,13 +23,14 @@
 use crate::frames::atlas::AtlasPage;
 use crate::frames::{Atlas, AtlasSlot, IndexFrame, PAGE_SIZE};
 use crate::scene::{
-    self, Bins, BlendOp, DrawItem, FrameId, FrameImage, FrameSource, MapTable, Rect, BIN_SIZE,
+    self, Bins, BlendOp, DrawItem, FrameId, FrameImage, FramePlan, FrameSource, MapTable, Rect,
+    SceneError, BIN_SIZE,
 };
 
 use super::GpuError;
 
 /// Size of the params uniform in bytes.
-pub const PARAMS_SIZE: usize = 32;
+pub const PARAMS_SIZE: usize = 48;
 /// Size of one packed item in bytes (four `vec4<u32>`).
 pub const ITEM_SIZE: usize = 64;
 /// Bytes per map-table row.
@@ -135,6 +138,10 @@ pub struct Params {
     pub item_count: u32,
     pub map_rows: u32,
     pub pages: u32,
+    /// [`FramePlan::clear_rows`].
+    pub clear_rows: u32,
+    /// [`FramePlan::clear_after`] as 0 / 1.
+    pub clear_after: u32,
 }
 
 impl Params {
@@ -147,6 +154,10 @@ impl Params {
             self.item_count,
             self.map_rows,
             self.pages,
+            self.clear_rows,
+            self.clear_after,
+            0,
+            0,
             0,
         ];
         let mut out = [0u8; PARAMS_SIZE];
@@ -166,6 +177,8 @@ impl Params {
             item_count: w[4],
             map_rows: w[5],
             pages: w[6],
+            clear_rows: w[7],
+            clear_after: w[8],
         }
     }
 }
@@ -181,6 +194,9 @@ pub struct Packed {
     pub bin_items: Vec<u32>,
     /// Map table rows, concatenated.
     pub maps: Vec<u8>,
+    /// The frame's start framebuffer, one byte per view pixel (all 0 from
+    /// [`pack`]; set by [`Packed::with_frame`]).
+    pub base: Vec<u8>,
 }
 
 impl Packed {
@@ -209,6 +225,41 @@ impl Packed {
             return vec![0; 4];
         }
         u32s_le(&self.bin_items)
+    }
+
+    /// The base, zero-padded to a whole word (at least one).
+    pub fn base_bytes(&self) -> Vec<u8> {
+        let mut out = self.base.clone();
+        out.resize(self.base.len().div_ceil(4).max(1) * 4, 0);
+        out
+    }
+
+    /// The clears of the frame, as packed.
+    pub fn plan(&self) -> FramePlan {
+        FramePlan {
+            clear_rows: self.params.clear_rows,
+            clear_after: self.params.clear_after != 0,
+        }
+    }
+
+    /// One frame of the frame cycle (`composition.md` §3) instead of a
+    /// single frame from 0: `base` is the previous frame (view sized) and
+    /// `plan` its clears, the same inputs as `scene::compose_frame`.
+    pub fn with_frame(mut self, base: &[u8], plan: FramePlan) -> Result<Self, GpuError> {
+        if base.len() != self.pixel_count() {
+            return Err(SceneError::BaseSize {
+                len: base.len(),
+                pixels: self.pixel_count() as u64,
+            }
+            .into());
+        }
+        if plan.clear_rows > self.params.height {
+            return Err(SceneError::FramePlan(plan).into());
+        }
+        self.base = base.to_vec();
+        self.params.clear_rows = plan.clear_rows;
+        self.params.clear_after = u32::from(plan.clear_after);
+        Ok(self)
     }
 
     pub fn maps_bytes(&self) -> Vec<u8> {
@@ -262,6 +313,8 @@ where
         item_count: items.len() as u32,
         map_rows: maps.len() as u32,
         pages,
+        clear_rows: 0,
+        clear_after: 0,
     };
     Ok(Packed {
         view,
@@ -270,6 +323,7 @@ where
         bin_ranges,
         bin_items,
         maps: maps.rows().iter().flatten().copied().collect(),
+        base: vec![0; view.width as usize * view.height as usize],
     })
 }
 
@@ -361,12 +415,18 @@ pub fn emulate(packed: &Packed, pages: &[AtlasPage]) -> Result<Vec<u8>, GpuError
     let ranges = words(&packed.bin_ranges_bytes());
     let bin_items = words(&packed.bin_items_bytes());
     let maps = words(&packed.maps_bytes());
+    let base = words(&packed.base_bytes());
     let map_byte = |row: u32, b: u32| (maps[(row * 64 + b / 4) as usize] >> ((b % 4) * 8)) & 0xFF;
+    let base_byte = |i: u32| (base[(i / 4) as usize] >> ((i % 4) * 8)) & 0xFF;
     let mut out = Vec::with_capacity(packed.pixel_count());
     for py in 0..params.height {
         for px in 0..params.width {
             let bin = (py / BIN_SIZE) * params.cols + px / BIN_SIZE;
-            let mut value = 0u32;
+            let mut value = if py >= params.clear_rows {
+                base_byte(py * params.width + px)
+            } else {
+                0
+            };
             for k in ranges[bin as usize]..ranges[bin as usize + 1] {
                 let it = &items[bin_items[k as usize] as usize];
                 let [x0, y0, x1, y1] = it.area;
@@ -387,8 +447,11 @@ pub fn emulate(packed: &Packed, pages: &[AtlasPage]) -> Result<Vec<u8>, GpuError
                 value = if it.blend == BLEND_OPAQUE {
                     s
                 } else {
-                    map_byte(it.blend_base + s, value)
+                    map_byte(it.blend_base + value, s)
                 };
+            }
+            if params.clear_after != 0 {
+                value = 0;
             }
             out.push(value as u8);
         }

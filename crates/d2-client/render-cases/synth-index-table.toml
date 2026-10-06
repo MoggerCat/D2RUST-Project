@@ -1,5 +1,6 @@
 # render-pipeline.md Test vectors row 6 (§A5): IndexTable(base),
-# dest = table[src][dest], over an opaque underlay.
+# dest = table[dest][src] (row = destination, composition.md §5), over an
+# opaque underlay.
 version = 1
 kind = "synthetic"
 description = "IndexTable with a synthetic 256x256 add table"
@@ -51,7 +52,7 @@ x = 2
 y = 2
 index = 44
 
-# Outside the blended item, on the background: table[src][0] = src.
+# Outside the blended item, on the background: table[0][src] = src.
 [[expect]]
 x = 5
 y = 5
