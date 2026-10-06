@@ -686,3 +686,340 @@ fn totals_no_absorb_matrix() {
     );
     assert_eq!((r.fire, r.absorbed), (1000, 0));
 }
+
+// §4.6 step 5: the flat absorb needs `f > 0`; a field left negative by
+// damage reduction stays negative (step 6).
+#[test]
+fn totals_negative_field_kept() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(35, 5));
+    let r = totals_of(&mut f, a, d, fire(100));
+    assert_eq!((r.fire, r.absorbed), (100 - 1280, 0));
+}
+
+// ---------------------------------------------------------------- §5.3
+
+/// A leech case: attacker life 0 / max 100000, mana 0 / max 100000.
+fn leecher(kind: UnitType) -> FUnit {
+    FUnit::new(kind, 0)
+        .with(6, 0)
+        .with(7, 100_000)
+        .with(8, 0)
+        .with(9, 100_000)
+}
+
+fn leech_rec(life: i32, mana: i32, physical: i32) -> DamageRecord {
+    DamageRecord {
+        life_leech: life,
+        mana_leech: mana,
+        physical,
+        ..DamageRecord::default()
+    }
+}
+
+// Step 1 (Nightmare drain column) and step 3 (player divisors):
+// 10 << 6 = 640 / 2 = 320; 1000 × 320 % = 3200; drain 50 → 1600; / 64
+// = 25.
+#[test]
+fn leech_nightmare_drain() {
+    let mut m = monster_rec();
+    m.drain_n = 50;
+    let c = combat_tables(vec![m]);
+    let mut f = world();
+    f.difficulty = 1;
+    let a = f.add(leecher(UnitType::Player));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    let mut rec = leech_rec(10, 0, 1000);
+    leech(&mut f, &c, Some(a), d, &mut rec);
+    assert_eq!(f.get(a, 6), 25);
+}
+
+// Step 3: a hireling takes the player rule without divisors: 640 % of
+// 1000 = 6400 / 64 = 100 life (the monster rule would give 10).
+#[test]
+fn leech_hireling_player_rule() {
+    let c = ct();
+    let mut f = world();
+    f.difficulty = 1;
+    let mut h = leecher(UnitType::Monster);
+    h.hireling = true;
+    let a = f.add(h);
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    let mut rec = leech_rec(10, 0, 1000);
+    leech(&mut f, &c, Some(a), d, &mut rec);
+    assert_eq!(f.get(a, 6), 100);
+}
+
+// Step 4: life only → overlay 151, no draw; mana only → overlay 152.
+#[test]
+fn leech_player_overlays() {
+    let c = ct();
+    let mut f = world();
+    let a = f.add(leecher(UnitType::Player));
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    let before = f.units[a].seed;
+    leech(&mut f, &c, Some(a), d, &mut leech_rec(10, 0, 1000));
+    assert_eq!((f.get(a, 6), f.get(a, 8)), (100, 0));
+    assert_eq!(f.log.last().unwrap(), "overlay 0 151");
+    assert_eq!(f.units[a].seed, before);
+    f.log.clear();
+    leech(&mut f, &c, Some(a), d, &mut leech_rec(0, 10, 1000));
+    assert_eq!((f.get(a, 6), f.get(a, 8)), (100, 100));
+    assert_eq!(f.log.last().unwrap(), "overlay 0 152");
+    assert_eq!(f.units[a].seed, before);
+}
+
+// Step 5, monster rule: T = 10 is added with overlay 151; at full life
+// T = 0 after the cap: nothing.
+#[test]
+fn leech_monster_rule() {
+    let c = ct();
+    let mut f = world();
+    let a = f.add(leecher(UnitType::Monster).with(6, 100).with(7, 1000));
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    leech(&mut f, &c, Some(a), d, &mut leech_rec(10, 0, 1000));
+    assert_eq!(f.get(a, 6), 110);
+    assert_eq!(f.log, ["set 0 6 110", "overlay 0 151"]);
+    f.log.clear();
+    f.set(a, 6, 1000);
+    leech(&mut f, &c, Some(a), d, &mut leech_rec(10, 0, 1000));
+    assert!(f.log.is_empty(), "{:?}", f.log);
+}
+
+// ---------------------------------------------------------------- §5.6 / §5.7
+
+// §5.6 step 2: the Nightmare column of ColdEffect.
+#[test]
+fn cold_effect_nightmare() {
+    let mut m = monster_rec();
+    m.coldeffect_n = (-30i8) as u8;
+    let c = combat_tables(vec![m]);
+    let mut f = world();
+    f.difficulty = 1;
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    cold(&mut f, &c, a, d, 40);
+    assert!(
+        f.log.contains(&"liststat 1 11 67 -30".to_string()),
+        "{:?}",
+        f.log
+    );
+}
+
+// §5.6 step 3: only a monster's length is divided (Hell divisor 4).
+#[test]
+fn cold_divisor_monsters_only() {
+    let c = ct();
+    let mut f = world();
+    f.difficulty = 2;
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    cold(&mut f, &c, a, d, 40);
+    assert_eq!(f.log[1], "list 1 11 0 40");
+}
+
+// §5.6 step 5: an existing list is extended only when its expiry < e.
+#[test]
+fn cold_existing_list_expiry() {
+    let c = ct();
+    for (x, extended) in [(39, true), (40, false), (41, false)] {
+        let mut f = world();
+        let a = f.add(FUnit::new(UnitType::Player, 0));
+        let d = f.add(FUnit::new(UnitType::Player, 0));
+        f.units[d].state_expiry.insert(11, x);
+        cold(&mut f, &c, a, d, 40);
+        let want: Vec<String> = if extended {
+            vec!["expiry 1 11 40".into(), "timer 1 12 40".into()]
+        } else {
+            vec![]
+        };
+        assert_eq!(f.log[..f.log.len() - 1], want[..], "{x}");
+    }
+}
+
+// §5.6 step 6: r = lo′ mod 100, shatter on r < 20.
+#[test]
+fn cold_shatter_draw() {
+    let mut m = monster_rec();
+    m.coldeffect = (-30i8) as u8;
+    let c = combat_tables(vec![m]);
+    for (x, on) in [(2019, true), (20, false), (19, true)] {
+        let mut f = world();
+        let a = f.add(FUnit::new(UnitType::Player, 0));
+        let d = f.add(FUnit::new(UnitType::Monster, 0));
+        f.units[d].seed = seed_giving(x);
+        cold(&mut f, &c, a, d, 40);
+        assert_eq!(f.log.last().unwrap(), &format!("state 1 107 {on}"), "{x}");
+    }
+}
+
+// §5.7: a player defender gets cold; a boss, unique or hireling monster
+// gets cold; another monster's length is divided by the Hell freeze
+// divisor (4).
+#[test]
+fn freeze_targets() {
+    let mut m = monster_rec();
+    m.coldeffect_h = (-50i8) as u8;
+    let c = combat_tables(vec![m]);
+    let cold_log = |f: &Fake| f.log.first().cloned();
+    let mut f = world();
+    f.difficulty = 2;
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let p = f.add(FUnit::new(UnitType::Player, 0));
+    freeze(&mut f, &c, p, a, 40);
+    assert_eq!(cold_log(&f).as_deref(), Some("state 1 11 true"));
+    for kind in 0..3 {
+        let mut u = FUnit::new(UnitType::Monster, 0);
+        match kind {
+            0 => u.boss = true,
+            1 => u.flags = 8,
+            _ => u.hireling = true,
+        }
+        let mut f = world();
+        f.difficulty = 2;
+        let a = f.add(FUnit::new(UnitType::Player, 0));
+        let d = f.add(u);
+        freeze(&mut f, &c, d, a, 40);
+        assert_eq!(cold_log(&f).as_deref(), Some("state 1 11 true"), "{kind}");
+    }
+    let mut f = world();
+    f.difficulty = 2;
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    freeze(&mut f, &c, d, a, 40);
+    assert_eq!(f.log[..2], ["state 1 1 true", "list 1 1 0 10"]);
+}
+
+// ---------------------------------------------------------------- §5.2
+
+/// `apply` of a melee hit record with `total` on a defender with life
+/// 1000.
+fn apply_case(
+    f: &mut Fake,
+    c: &CombatTables,
+    a: usize,
+    d: usize,
+    rec: DamageRecord,
+) -> DamageRecord {
+    let mut rec = rec;
+    apply(f, c, a, d, false, &mut rec);
+    rec
+}
+
+// Step 2: no room clears result 1 and 2 only; town returns unless the
+// attacker is a monster with `inTown`.
+#[test]
+fn apply_room_rules() {
+    let mut m = monster_rec();
+    m.intown = true;
+    let c = combat_tables(vec![m.clone(), monster_rec()]);
+    let rec = DamageRecord {
+        result: result::HIT | result::WILL_DIE | result::BLOCK,
+        total: 100,
+        ..DamageRecord::default()
+    };
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0).with(6, 1000));
+    f.units[d].room = RoomKind::None;
+    assert_eq!(apply_case(&mut f, &c, a, d, rec).result, result::BLOCK);
+    f.units[d].room = RoomKind::Town;
+    let mon_in_town = f.add(FUnit::new(UnitType::Monster, 0));
+    let mon_out = f.add(FUnit::new(UnitType::Monster, 1));
+    // Player (class 0 is an inTown monster class): returns.
+    let r = apply_case(&mut f, &c, a, d, rec);
+    assert_eq!((r.result, f.get(d, 6)), (result::HIT | result::BLOCK, 1000));
+    let r = apply_case(&mut f, &c, mon_out, d, rec);
+    assert_eq!((r.result, f.get(d, 6)), (result::HIT | result::BLOCK, 1000));
+    apply_case(&mut f, &c, mon_in_town, d, rec);
+    assert_eq!(f.get(d, 6), 900);
+}
+
+// Steps 11–12: only totals / leeches > 0 subtract; the result is zeroed
+// below 256 (256 itself stays).
+#[test]
+fn apply_subtract_bounds() {
+    let c = ct();
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(
+        FUnit::new(UnitType::Player, 0)
+            .with(6, 100)
+            .with(8, 100)
+            .with(10, 100),
+    );
+    let r = apply_case(&mut f, &c, a, d, DamageRecord::default());
+    assert_eq!((f.get(d, 6), f.get(d, 8), f.get(d, 10)), (100, 100, 100));
+    assert_eq!(r.result & result::WILL_DIE, 0);
+    // The mana leech is shifted by leech (§5.3 step 6): 16 << 6 = 1024.
+    f.set(d, 6, 1256);
+    f.set(d, 8, 1280);
+    f.set(d, 10, 1256);
+    let rec = DamageRecord {
+        total: 1000,
+        mana_leech: 16,
+        stamina_leech: 1000,
+        ..DamageRecord::default()
+    };
+    apply_case(&mut f, &c, a, d, rec);
+    assert_eq!((f.get(d, 6), f.get(d, 8), f.get(d, 10)), (256, 256, 256));
+}
+
+// Step 14: the monster-damaged hook only for a monster defender.
+#[test]
+fn apply_damaged_hook_monsters_only() {
+    let c = ct();
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0).with(6, 10_000));
+    let rec = DamageRecord {
+        total: 1000,
+        ..DamageRecord::default()
+    };
+    apply_case(&mut f, &c, a, d, rec);
+    assert!(
+        !f.log.iter().any(|l| l.starts_with("mondamaged")),
+        "{:?}",
+        f.log
+    );
+}
+
+// ---------------------------------------------------------------- §5.1
+
+/// Stores a hit record from `a` on `d` and runs `apply_melee`.
+fn melee(f: &mut Fake, a: usize, d: usize, rec: DamageRecord) {
+    let c = ct();
+    let entry = CombatEntry {
+        attacker: f.ident(a),
+        defender: f.ident(d),
+        record: rec,
+    };
+    f.units[a].combat.push(entry);
+    apply_melee(f, &c, a, d);
+}
+
+// Step 4.3: overlay only when +0x6C > 0. Step 6: a non-player
+// non-monster attacker in mode 0 still gets thorns.
+#[test]
+fn apply_melee_overlay_and_thorns() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(6, 10_000));
+    let hit = DamageRecord {
+        result: result::HIT,
+        ..DamageRecord::default()
+    };
+    melee(&mut f, a, d, hit);
+    assert!(
+        !f.log.iter().any(|l| l.starts_with("overlay")),
+        "{:?}",
+        f.log
+    );
+    let mut ms = FUnit::new(UnitType::Missile, 0);
+    ms.mode = 0;
+    let m = f.add(ms);
+    f.log.clear();
+    melee(&mut f, m, d, hit);
+    assert!(f.log.contains(&"thorns 2 1".to_string()), "{:?}", f.log);
+}
