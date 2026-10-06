@@ -10,6 +10,7 @@
 
 pub mod cube;
 pub mod quests;
+pub mod vendors;
 pub mod waypoints;
 
 /// Strict parsing of the machine tables in `specs/world/` (METHODS M05,
