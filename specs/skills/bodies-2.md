@@ -20,20 +20,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–48 |
-| Inputs | 49–53 |
-| Outputs / state changes | 54–59 |
-| Rules | 60–61 |
-|   1. Conventions | 62–73 |
-|   2. Shared helpers, batch 3 | 74–397 |
-|   3. Bodies, required level 1 | 398–573 |
-|   4. Bodies, required level 6 | 574–783 |
-| Constants & data dependencies | 784–813 |
-| Randomness | 814–833 |
-| Edge cases & original bugs | 834–861 |
-| Test vectors | 862–881 |
-| Provenance | 882–895 |
-| Open questions | 896–911 |
+| Summary | 40–49 |
+| Inputs | 50–54 |
+| Outputs / state changes | 55–60 |
+| Rules | 61–62 |
+|   1. Conventions | 63–74 |
+|   2. Shared helpers, batch 3 | 75–427 |
+|   3. Bodies, required level 1 | 428–603 |
+|   4. Bodies, required level 6 | 604–813 |
+|   5. Bodies, required level 12 | 814–987 |
+| Constants & data dependencies | 988–1017 |
+| Randomness | 1018–1041 |
+| Edge cases & original bugs | 1042–1081 |
+| Test vectors | 1082–1105 |
+| Provenance | 1106–1119 |
+| Open questions | 1120–1135 |
 <!-- /index -->
 
 ## Summary
@@ -394,6 +395,35 @@ set, `0x006446A0` get) carry the phase: 0x80 launch, 0x1101 in flight
   (`0x00648B90`). Point (3x − 2·ux, 3y − 2·uy) (ux, uy the unit's
   position): a room there in town → 0. P target point := it; path type
   := 8; `0x00648E40(P, 5)`; compute the path. Return 1.
+
+#### 2.14 Weapon wear `0x005DAA40`
+
+`wear(game, chance, amount)` (W in EBX, unit in ESI; `ret 0xC`):
+
+1. W not of item type 45 (`weap`) → nothing.
+2. W a stack (`0x006289F0`): its `quantity(70)` > 0 → one draw on the
+   unit's seed, r = `lo' mod 100`; r < chance → `dec_quantity(game,
+   unit)` (`bodies.md` §2.5).
+3. Else W has durability (`0x00629930`): one draw as above; r < chance:
+   d = W's `durability(72)` − amount. d > 0 → set 72 := d; message 0x3E
+   for stat 72 to the unit's client (`0x005531C0`, `0x0053D130(client,
+   W, 1, 72, d, 0)`). d ≤ 0 → `0x0055F850(game, unit, W)` (zero
+   durability, items spec).
+
+#### 2.15 Charge helpers
+
+- **Swing** `0x0056E230(game, unit, T)` (all three non-null, else a
+  fatal assertion): mode := 1 (`0x00553570(game, unit, 1)`); used skill
+  := none (`0x00620210`); E0 = the unit's entry of skill 0 (Attack,
+  `0x006439B0(unit, 0, −1)`). Player: mode request, unit form
+  (`0x00580A70`, `sim/pathing.md` §1.2) with E0, mode 7 (A1), T's type /
+  GUID, re-entry 1. Monster: mode request 4 at T (`0x005A7E60`,
+  `0x005A7C20(game, &req, 1)`). Return 1.
+- **Hit frame** `0x005CF8C0(unit)`: the used skill's sequence
+  (`0x006633B0` frame list of 6-byte records, `0x006633F0` count;
+  `sim/units.md` §4.2 sequences); none or count ≤ 0 → 7. The loop tests
+  the event byte (+5) of **record 0** at every step: 0 → −1; non-zero →
+  7 (Edge case 12). Charge (`seqnum` 4) has event 1 in record 0: 7.
 
 ### 3. Bodies, required level 1
 
@@ -781,6 +811,180 @@ Return 1 if T exists, else 0.
 4. Frame event index even → unit flags &= ~0x40 (the do runs again for
    the second claw); odd → unit flags |= 0x40. Return 1.
 
+### 5. Bodies, required level 12
+
+#### 5.1 srvst 7 Impale `0x005DAB40`
+
+1. R invalid → 0. T none → 0. Not hostile (`0x00554200(game, unit, T)`)
+   → 0.
+2. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+3. Hit:
+   1. Physical := `bonuses(unit, get 1, item none (current weapon), 0, 0,
+      eval(calc1), 0, SrcDam)` (`combat/damage.md` §3.2; the raw
+      `SrcDam`, 0 included).
+   2. `EType` ≠ 0: c = `eval(calc4)`; conversion % := c; c > 0 →
+      conversion element := `EType`. `roll_elemental(unit, record,
+      skill, L)`.
+   3. Hit flags := 1 (skip the physical roll in `fill`).
+   4. W = the weapon (`0x00535BC0`); W with durability (`0x00629930`) →
+      `wear(game, eval(calc2), eval(calc3))` (§2.14; calc2 evaluated
+      first).
+4. `start_combat(game, unit, T, record, 128)`. Return 1.
+
+The do is srvdo 2 (`bodies.md` §4.2).
+
+#### 5.2 srvdo 60 Bone Wall `0x005C58B0`
+
+1. Target position (tx, ty) fails → 0. Room at (tx, ty) (from the
+   unit's room) none or in town → 0.
+2. Unit flags |= 0x40.
+3. skill = 0 → 0. c = `summon_class(unit, skill, L, &mode)`; < 0 → 0.
+   pt = `pettype` read unsigned; ≥ pettype count → 0.
+4. m = spawn (`bodies.md` §6.2) {flags 9 (position given, keep unit flag
+   0x80000000 clear), owner unit, class c, AI state 0, mode, tx, ty, pt,
+   pet max `eval(petmax)`}; none → 0.
+5. Owner data `0x0058F030(game, m, unit GUID, unit type, 0, 1)` (no unit:
+   −1, 6). Umod 15 on m (`0x005A4850(game, m, 15, 0)`,
+   `monsters/init.md`). `skill_stats(game, unit, m, skill, L, 0)`
+   (`bodies.md` §6.5). `0x005B1990(game, m, 0, 9)` (alignment,
+   `monsters/population.md`).
+6. (mx, my) = m's position. n = `eval(calc2)` / 2 (signed, truncating);
+   n ≤ 1, or `srvmissilea` not 0 ≤ s < missiles count → return 1.
+7. (dx, dy) = the unit's position − (mx, my); both 0 → dx = 1.
+8. Record (`missiles.md` §R2.1, zeroed): flags 0x21, owner the unit,
+   class `srvmissilea`, position (mx, my), skill, L. Target (mx − dy, my
+   + dx): create; a missile M → M data +0x28 := m's GUID (`0x0064A710`),
+   data +0x2C := n (`0x0064A760`). Target (mx + dy, my − dx): the same.
+   Return 1.
+
+The two wall-maker missiles run perpendicular to the caster's line of
+sight and carry the first segment's GUID and the remaining count
+(`missiles/bodies.md` conventions for data +0x28 / +0x2C).
+
+#### 5.3 srvst 31 Charge `0x005CF6B0`
+
+1. R invalid → 0. E none → 0. Path P (unit +0x2C) none → 0.
+2. T = target. T present and in melee range (`0x00622C40(unit, T,
+   0)`):
+   - Player: return Swing (§2.15).
+   - Monster: mode := 1 (`0x00553570(game, unit, 1)`); used skill :=
+     none; mode request m at T with m = 5 for class (`BaseId`, checked by
+     `0x00463900`) 73 (`clawviper1`) or 211 (`duriel`), else 4; return
+     `0x005A7C20(game, &req, 1)`.
+3. T present, out of range, without state 54 → E param 1 := T type,
+   param 2 := T GUID. Otherwise (no T, or T has state 54) → E param 1 :=
+   6, param 2 := 0.
+4. E param 4 := 7 (the hit mode).
+5. v = 0x100. Player: charstats `RunVelocity` (+0x41) << 8 (record
+   found). Monster: monstats `Run` (+0x34) << 8 (record found); class 211
+   → E param 4 := 15; P +0x14 and +0x16 := 0 (`0x00649050`); P step
+   counts := 20 (`0x00648E70`).
+6. vp = max(the unit's `velocitypercent(67)`, 50). P velocity :=
+   pct(v, `Param1` + vp, 100) (`0x00648690`); compute the path
+   (`0x00649970(P, unit, 0)`).
+7. E flags := 0x1001 (moving, `use.md` §5.2). State 18 (`skill_move`)
+   on. Return 1.
+
+#### 5.4 srvdo 67 Charge `0x005CF900`
+
+1. R invalid → 0. E none → 0.
+2. f = hit frame (§2.15; the sequence getters are also called once
+   before it, results unused).
+3. K = the unit of (E param 1, E param 2) (`0x00552F60`) unless param 1
+   = 6; else none.
+4. **E flags & 1 = 0** (the hit):
+   1. E flags := 0; params 1, 2 := 0; landing message `0x00571B70(unit,
+      skill)` (§2.13: state 18 off, message 0xA5).
+   2. Animation from frame f (`0x00553DC0(game, unit, f)`); unit flags
+      |= 0x40.
+   3. K none → K = `next_unit(game, unit, 0, 0, 3, 3, −1, null)`; none
+      → delete type-1 timers, type-1 timer at F + 1, return 0.
+   4. K in melee range (`0x00622C40(unit, K, 3 for a monster, else 0)`)
+      and the unit alive: zeroed record; a player: result =
+      `melee_result(game, unit, K, to_hit(unit, skill, L), 0)` | 8
+      (knockback); others: result := 9. Enhanced damage % :=
+      `eval(calc1)`; `EType` ≠ 0: c = `eval(calc4)`, conversion as §3.1;
+      `roll_elemental(unit, record, skill, L)` (on a miss too). A
+      monster: `mode_damage(unit, m)` with m = 8 for class 73, 5 for 211
+      or 436, else 4. Hit class := 0x70; `start_combat(game, unit, K,
+      record, SrcDam)` (raw); `apply_melee(game, unit, K)`; overlay 147
+      on K (`0x00621E40(K, 147, 0)`).
+   5. Return 1.
+5. **E flags & 1** (moving): r = 3 for a monster whose E flags have
+   0x2 (path finished, `use.md` §5.2), else 0.
+   1. K present and in melee range (r): E flags := 0; animation from
+      frame f + 1; landing message. Return 1.
+   2. Flags & 2 = 0 (still moving): F − (unit +0x44 >> 8) ≥ f →
+      animation from frame 0 and E flags := 1. Delete type-0 timers;
+      type-0 timer at F + 1 with arguments (1, 0); unit flags &= ~0x40.
+      Return 1.
+   3. Flags & 2 (arrived without a target in range): E flags := 0;
+      landing message; K' = `next_unit(game, unit, 0, 0, 3, 3, E param
+      2, null)`; K' in melee range (0) → E params 1, 2 := K' type, GUID;
+      return 1. Else delete type-1 timers, type-1 timer at F + 1; return
+      0 (the monster `BaseId` 436-and-441 test never exits early, Edge
+      case 13).
+
+#### 5.5 srvdo 74 Double Throw `0x005D88B0`
+
+1. R invalid → 0. W = the weapon (`0x00535BC0`); none → 0.
+2. m = `missiletype` of W's item class (weapons +0xFA, `0x006288A0`);
+   not 0 < m < missiles count → 0.
+3. W of item type 38 (missile potion) → lob `skill_missile`
+   (`0x0056EE90`), else straight (`0x0056ECB0`), with (m, unit, skill,
+   L, 0, 0, 0, 0, quant 1) (`bodies.md` §2.4).
+4. Missile M made: M stat 19 (`tohit`) += `to_hit(unit, skill, L)`; M
+   stat 25 (`damagepercent`) += `eval(calc1)` (`0x006272B0`). Return 1
+   (also when none was made).
+
+#### 5.6 srvst 34 Find Item `0x005D8760`
+
+T none → 0. Return 1 when `0x006455E0(T)`: T a monster in mode 12, no
+`udead`-group state (`0x0063A770`), monstats2 `corpseSel`
+(`0x004638A0`); else 0. (No `soft` test, unlike `bodies.md` §3.9.)
+
+#### 5.7 srvdo 72 Find Item `0x005D8780`
+
+1. R invalid → 0. T none → 0. The start test (§5.6) fails → 0. T has
+   state 118 → 0.
+2. State 118 on for T; queue T for update.
+3. p = `eval(calc1)`. One draw on the **unit's** seed, r = `roll(100)`;
+   r ≥ p → **return 0** (the corpse is still used up).
+4. Second draw r2 = `roll(100)` (unit's seed). q = 1; `Param1` ≤ r2 <
+   `Param1` + `Param2` → 2; next `Param3` band → 3; next `Param4` band →
+   4.
+5. `0x005A8000(game, T, unit, q)` (`items/treasure.md` §3.6; q is not
+   read). Return 1.
+
+#### 5.8 srvdo 47 Cloak of Shadows `0x005D6630`
+
+1. R invalid, or `aurastate` not in 0…states count − 1 → 0.
+2. The unit already has `aurastate` → 0.
+3. d = `eval(auralencalc)`. `apply_state` (`bodies.md` §2.7) {source =
+   target = the unit, skill, L, d, stat `passivestat1`, value
+   `eval(passivecalc1)`, state `aurastate`, callback `0x0056E900`};
+   none → 0.
+4. For i = 2…5: `passivestat_i` ≥ 0 and v = `eval(passivecalc_i)` ≠ 0 →
+   list set. List set 350 := skill, 351 := L. Mark `aurastate` changed.
+5. `auratargetstate` not in 0…count − 1 → **return 0** (the caster keeps
+   its state).
+6. Context: skill, L, d, state `auratargetstate`, stats[i] =
+   `aurastat_i`, values[i] = `eval(aurastatcalc_i)` for stats ≥ 0 (else
+   0), i = 1…6.
+7. `scan_unit(game, unit, 0, 0, eval(aurarangecalc), aurafilter,
+   0x005D6520, context, noaura 1)`. Return 1.
+
+Callback `0x005D6520` (ECX scan context, EDX unit U):
+
+1. U dead (`0x005541B0`) → 0.
+2. `apply_state` {source = the caster, target U, skill, L, d, stat =
+   stats[1] when > 0 else −1, value values[1], state, callback
+   `0x005C3370` (AI curse, `bodies.md` §2.8)}; none → 0.
+3. Stats 2…6 ≥ 0 → list set := value (also 0).
+4. U a monster and `can_switch(U, 10)` (`bodies.md` §4.4) → AI special
+   state 10 (`0x005B0E00(game, U, U's AI control, 10)`). Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -830,6 +1034,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | §4.1 callback | source | one step only for a random `EType` (first `add_element`) |
 | §4.2 | unit | `roll(100)` for the knockback, then `roll_physical`, `roll_elemental` |
 | §4.5 | **T** | `roll(hi − lo)` |
+| §2.14 `wear` | unit | `lo' mod 100` (one step) when reached |
+| §5.1 | unit | `melee_result`, then `bonuses`, `roll_elemental`, `wear` |
+| §5.4 hit | unit | player `melee_result`, then `roll_elemental` |
+| §5.7 | unit | `roll(100)`, then a second `roll(100)` on success, then the treasure walk |
 
 ## Edge cases & original bugs
 
@@ -858,6 +1066,18 @@ steps call them (`bodies.md` Randomness). Draws named here:
     srvdo 30; srvdo 71 uses it.
 11. A monster's Leap first attacks its target (A1 damage through
     `mode_damage(unit, 4)`) and then lands behind it (§2.13 pre-hit).
+12. Charge's hit frame loop (§2.15) re-reads the event byte of sequence
+    record 0 instead of record i: the result is 7 or −1, never another
+    frame.
+13. Charge do: the early exit for a monster of `BaseId` 436 that is also
+    441 can never be taken (§5.4 step 5.3).
+14. Find Item returns 0 when its chance roll fails, Find Potion 1; both
+    mark the corpse used first (§3.5, §5.7).
+15. Cloak of Shadows with an invalid `auratargetstate` returns 0 after
+    applying the caster's state (§5.8 step 5); its target callback treats
+    `aurastat1` = 0 (strength) as "no stat".
+16. Impale passes the raw `SrcDam` to `bonuses` (0 gives no physical
+    damage) but 128 to `start_combat` (§5.1).
 
 ## Test vectors
 
@@ -878,6 +1098,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | Shock Field n = 1 or r = 1 | one missile at the target |
 | Leap clamp, unit (0, 0), target (20, 0), r = 10 | (10, 0) before the free-point search |
 | Leap candidates around (10, 0) from (0, 0) | (10, 0), (10, −2), (10, 2) |
+| Charge velocity: Paladin `RunVelocity` 9, `velocitypercent` 100, `Param1` 150 (1.14d) | pct(9·256, 250, 100) = 5760 |
+| Charge hit frame, `seqnum` 4 (record 0 event 1) | 7 |
+| Bone Wall from (0, 0) at (10, 0), calc2 = 8 (synthetic) | n = 4; makers aimed at (10, −10) and (10, 10), data +0x2C = 4 |
+| Find Item r2 with `Param1` 5, `Param2` 60, `Param3` 30, `Param4` 5 (1.14d) | r2 < 5 → 1; 5…64 → 2; 65…94 → 3; 95…99 → 4 |
 
 ## Provenance
 
