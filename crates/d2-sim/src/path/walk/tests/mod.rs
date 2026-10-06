@@ -2,6 +2,7 @@
 //! fakes of [`fake`].
 
 mod fake;
+mod gaps;
 mod messages;
 
 use fake::{FakeUnits, FakeWorld, ROOM};
