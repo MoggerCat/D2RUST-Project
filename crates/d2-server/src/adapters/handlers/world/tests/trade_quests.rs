@@ -1,6 +1,6 @@
 // Spec: specs/world/quests.md §1.5, §1.7, §6.2, §7.2, §7.3, §10.2; specs/world/npc.md §7.5
 //! C→S 0x31, 0x40 and 0x58 on the wired host: `SimGame<ActionSim,
-//! TradeWorld>` (`TradeWorld::quests`: the real `QuestControl` on
+//! WiredWorld>` (`WiredWorld::quests`: the real `QuestControl` on
 //! `wiring::economy::EconomyQuests` over the action sim's own units, on
 //! the interaction `Desk`), through the real host frame. Only the seams
 //! no written spec provides are staged (`Rest`).
@@ -24,7 +24,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-use d2_sim::wiring::economy::{EconomyQuests, GameFields, QuestRest};
+use d2_sim::wiring::economy::{EconomyQuests, QuestRest};
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
 use d2_sim::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
 use d2_sim::world::quests::{
@@ -34,7 +34,7 @@ use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::{Transaction, VendorTables};
 
 use super::*;
-use crate::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use crate::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use crate::adapters::{PlayerData, PlayerFields, SimGame};
 use crate::seams::PlayerGate;
 
@@ -54,7 +54,7 @@ const NAME_LAST: u16 = 104;
 /// The action wiring's seams: `Pending`'s defaults; sends kept.
 #[derive(Default)]
 pub struct ActionRest {
-    sent: Vec<(UnitId, Vec<u8>)>,
+    pub sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Pending for ActionRest {
@@ -74,12 +74,12 @@ impl Outbox for ActionRest {
 /// that would change state outside `d2-sim`.
 #[derive(Default)]
 pub struct Rest {
-    interact: BTreeMap<UnitId, (u8, u32)>,
-    quests: BTreeMap<UnitId, PlayerQuests>,
+    pub interact: BTreeMap<UnitId, (u8, u32)>,
+    pub quests: BTreeMap<UnitId, PlayerQuests>,
     /// GUID of each NPC unit (for the staged 0x27).
-    guids: BTreeMap<UnitId, u32>,
-    sent: Vec<(UnitId, Vec<u8>)>,
-    log: Vec<String>,
+    pub guids: BTreeMap<UnitId, u32>,
+    pub sent: Vec<(UnitId, Vec<u8>)>,
+    pub log: Vec<String>,
 }
 
 impl Outbox for Rest {
@@ -376,7 +376,7 @@ impl LevelTypes for NoLevelTypes {}
 
 // ---- the game ---------------------------------------------------------------------------
 
-pub type World = TradeWorld<Rest>;
+pub type World = WiredWorld<Rest>;
 pub type Sim = SimGame<ActionSim<ActionRest>, World>;
 
 fn monstats() -> Vec<Monstats> {
@@ -498,9 +498,8 @@ impl Fx {
         let mut pq = PlayerQuests::default();
         flags(&mut pq);
         rest.quests.insert(player, pq);
-        let mut world: World = TradeWorld::new(
+        let mut world: World = WiredWorld::new(
             ActionWorld::default(),
-            GameFields::new(Seed::init_low(GAME_SEED), false),
             ItemTables::default(),
             quests,
             ctl,

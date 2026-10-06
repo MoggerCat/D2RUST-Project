@@ -1,32 +1,43 @@
 //! The item handlers through the real host frame (drain → tick →
-//! flush) on the wired sim: `SimGame` with an [`ItemWorld`] built from
-//! synthetic tables (the economy wiring's fixture shape), the real
-//! `d2-proto` sizes, real item units from `Economy::create_item`. Only
-//! [`ItemPending`] (no owner spec) is a fake: it logs.
+//! flush) on the wired host: `SimGame<ActionSim, WiredWorld>` whose
+//! [`CubeParts`] come from synthetic tables (the economy wiring's
+//! fixture shape), the real `d2-proto` sizes, real item units from
+//! `Economy::create_item` on the action sim's own unit records and stat
+//! lists (one unit world). The player's interaction is the wired host's
+//! one owner (the quest tests' staged `Rest`). Only [`ItemPending`] (no
+//! owner spec) is a fake: it logs.
 
-use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use d2_data::bin::BinTable;
 use d2_data::fixup::maps::{EquivMatrix, StateMaps};
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record, States};
+use d2_sim::combat::CombatTables;
 use d2_sim::game::Game;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, q, ty, ItemRequest, ItemTables};
 use d2_sim::rng::Seed;
-use d2_sim::stats::{ClassStats, StatData, StatLists, StatTable, StateTable};
-use d2_sim::units::hooks::{Sim, UnitData};
-use d2_sim::units::lifecycle::{allocate, AllocRequest};
+use d2_sim::skills::SkillTables;
+use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
+use d2_sim::units::hooks::UnitData;
+use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::record::Units;
 use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables};
 use d2_sim::wiring::economy::{GameFields, ItemSpawn, ItemStore};
 use d2_sim::world::cube::{
     input_flags, kind, CraftMod, CubeData, InputSlot, ItemRecord, OutputSlot, Recipe, CUBE_PAGE,
 };
+use d2_sim::world::npc::NpcControl;
+use d2_sim::world::quests::{QuestControl, QuestTables};
+use d2_sim::world::vendors::VendorTables;
 
 use super::*;
+use crate::adapters::handlers::world::tests::trade_quests::{ActionRest, Rest};
+use crate::adapters::handlers::world::tests::waypoints::field_drlg;
+use crate::adapters::handlers::world::{ActionEvents, ActionWorld, WiredWorld};
 use crate::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use crate::dispatch::Outcome;
 use crate::host::{Handled, Host};
@@ -261,7 +272,8 @@ impl Clock for Manual {
     }
 }
 
-type TestHost = Host<SimGame, ProtoSizes, Session, Manual>;
+type Sim = SimGame<ActionSim<ActionRest>, WiredWorld<Rest>>;
+type TestHost = Host<Sim, ProtoSizes, Session, Manual>;
 
 /// A host for client 0 with a player (class 2), a cube and a ring in
 /// mode `ring_mode`; the cube is stored (mode 0) in the player's
@@ -282,7 +294,7 @@ const ALIVE: PlayerFields = PlayerFields {
     data: Some(PlayerData { last_accept: 0 }),
 };
 
-fn item(w: &mut ItemWorld, game: &mut Game, class: usize, mode: u32) -> UnitId {
+fn item(sim: &mut Sim, class: usize, mode: u32) -> UnitId {
     let mut rq = ItemRequest {
         item: class as i32,
         format: 101,
@@ -295,33 +307,72 @@ fn item(w: &mut ItemWorld, game: &mut Game, class: usize, mode: u32) -> UnitId {
         mode,
         init_flags: 1,
     };
-    w.economy(game).create_item(&mut rq, false, spawn).unwrap()
+    let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+    world
+        .with_economy(game, events, |econ, _| {
+            econ.create_item(&mut rq, false, spawn)
+        })
+        .unwrap()
 }
 
+fn action_tables() -> ActionTables {
+    ActionTables {
+        missiles: Vec::new(),
+        skills: SkillTables {
+            skills: Vec::new(),
+            skilldesc: Vec::new(),
+            missiles: Vec::new(),
+            skills_code: Vec::new(),
+            miss_code: Vec::new(),
+            level_cap: 0,
+            stat_count: 0,
+        },
+        combat: CombatTables {
+            charstats: Vec::new(),
+            difficultylevels: Vec::new(),
+            monstats: Vec::new(),
+            monstats2: Vec::new(),
+            hitclass: Vec::new(),
+        },
+        levels: Vec::new(),
+        skill_modes: Vec::new(),
+    }
+}
+
+/// Game creation on the action sim (expansion, the game seed), the
+/// NPC control and the quests on the game seed, the wired host with the
+/// cube's parts; a player (class 2), a cube and a ring in mode
+/// `ring_mode`, real units of the action sim; the cube is stored (mode
+/// 0) in the player's inventory list.
 fn setup(ring_mode: u32) -> T {
     let pending = Pending::default();
     let tables = tables();
-    let mut world = ItemWorld {
-        units: Units::new(),
-        stats: StatLists::new(stat_data()),
-        data: UnitData {
-            expansion: true,
-            ..UnitData::default()
-        },
-        hooks: ItemHooks,
-        fields: GameFields::new(Seed::init_low(GAME_SEED), true),
-        cube: cube_data(&tables),
-        tables,
-        items: ItemStore::new(),
-        staged: Staged {
-            local_date: (15, 3),
-            ..Staged::default()
-        },
-        creation: BTreeMap::new(),
-        pending: Box::new(pending.clone()),
-        errors: Vec::new(),
-    };
+    let hooks = ActionHooks::new(
+        Arc::new(action_tables()),
+        field_drlg(),
+        Seed::init(),
+        ActionRest::default(),
+    );
+    let mut events = ActionSim::new(stat_data(), UnitData::default(), hooks);
+    events.create_game(&GameFields::new(Seed::init_low(GAME_SEED), true));
     let mut game = Game::new();
+    game.lists.ensure_act(0).unwrap();
+    let mut seed = events.hooks().game_seed;
+    let npc = NpcControl::new(&[], Vec::new(), true, 0, &mut seed).unwrap();
+    let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
+    events.hooks().game_seed = seed;
+    let mut world = WiredWorld::new(
+        ActionWorld::default(),
+        tables,
+        quests,
+        npc,
+        VendorTables::default(),
+        Rest::default(),
+        1000,
+    );
+    let mut parts = CubeParts::new(cube_data(&world.tables), Box::new(pending.clone()));
+    parts.staged.local_date = (15, 3);
+    world.cube = Some(parts);
     let req = AllocRequest {
         ty: UnitType::Player,
         class: 2,
@@ -331,29 +382,21 @@ fn setup(ring_mode: u32) -> T {
         mode: 1,
         allied: false,
     };
-    let player = {
-        let mut sim = Sim {
-            game: &mut game,
-            units: &mut world.units,
-            stats: &mut world.stats,
-            data: &world.data,
-        };
-        allocate(&mut sim, &mut world.hooks, &mut world.fields.seed, &req)
-            .unwrap()
-            .unwrap()
-    };
-    let cube = item(&mut world, &mut game, CUBE, 0);
-    let ring = item(&mut world, &mut game, RING, ring_mode);
-    world.items.get_mut(cube).unwrap().inv_page = 0;
-    world.items.get_mut(ring).unwrap().inv_page = 0;
-    world.staged.inventories.insert(
+    let player = events
+        .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    let mut sim: Sim = SimGame::with_world(game, events, world);
+    let cube = item(&mut sim, CUBE, 0);
+    let ring = item(&mut sim, RING, ring_mode);
+    sim.world.items.get_mut(cube).unwrap().inv_page = 0;
+    sim.world.items.get_mut(ring).unwrap().inv_page = 0;
+    sim.world.cube.as_mut().unwrap().staged.inventories.insert(
         player,
         Inventory {
             items: vec![cube],
             cursor: None,
         },
     );
-    let mut sim = SimGame::new(game);
     sim.join(0, Some(player), None, client_state::IN_GAME)
         .unwrap();
     sim.set_player(player, ALIVE);
@@ -364,7 +407,6 @@ fn setup(ring_mode: u32) -> T {
     };
     sim.set_unit(player, at(100, 100));
     sim.set_unit(ring, at(100, 100));
-    sim.items = Some(world);
     let mut host = Host::new(sim, ProtoSizes, Session, Manual(1000));
     host.connect(0);
     host.frame().unwrap();
@@ -378,26 +420,32 @@ fn setup(ring_mode: u32) -> T {
 }
 
 impl T {
-    fn world(&mut self) -> &mut ItemWorld {
-        self.host.game.items.as_mut().unwrap()
+    fn world(&mut self) -> &mut WiredWorld<Rest> {
+        &mut self.host.game.world
+    }
+    /// The cube's parts of the host.
+    fn cube(&mut self) -> &mut CubeParts {
+        self.world().cube.as_mut().unwrap()
+    }
+    /// The game's one item store.
+    fn items(&mut self) -> &mut ItemStore {
+        &mut self.world().items
+    }
+    /// The action sim's unit records (the game's one unit store).
+    fn units(&mut self) -> &mut Units {
+        &mut self.host.game.events.sys.units
     }
     fn guid(&mut self, u: UnitId) -> u32 {
-        self.world().units.get(u).unwrap().guid
+        self.units().get(u).unwrap().guid
     }
     fn inventory(&mut self) -> &mut Inventory {
         let p = self.player;
-        self.world().staged.inventories.get_mut(&p).unwrap()
+        self.cube().staged.inventories.get_mut(&p).unwrap()
     }
+    /// The player's interaction, at its one owner.
     fn interact(&mut self, unit_type: u8, guid: u32) {
         let p = self.player;
-        self.world().staged.interactions.insert(
-            p,
-            Interaction {
-                guid,
-                unit_type,
-                active: true,
-            },
-        );
+        self.world().rest.interact.insert(p, (unit_type, guid));
     }
     /// 0x2A with the ring and the cube.
     fn put_msg(&mut self) -> Vec<u8> {
@@ -420,13 +468,14 @@ impl T {
         let Handled::Game(Outcome::Dispatched(code)) = r.messages[0].handled else {
             panic!("{:?}", r.messages[0]);
         };
-        if let Some(w) = &self.host.game.items {
-            assert_eq!(w.errors, Vec::new());
+        if let Some(c) = &self.host.game.world.cube {
+            assert_eq!(c.errors, Vec::new());
         }
+        assert!(self.host.game.events.sys.hooks.errors.is_empty());
         (code, self.host.receive(0))
     }
     fn page(&mut self, u: UnitId) -> u8 {
-        self.world().items.get(u).unwrap().inv_page
+        self.items().get(u).unwrap().inv_page
     }
 }
 
@@ -446,16 +495,13 @@ fn item_to_cube_puts_the_cursor_item_in() {
     let mut t = setup(4);
     let (ring, cube, player) = (t.ring, t.cube, t.player);
     t.inventory().cursor = Some(ring);
-    t.world().items.get_mut(cube).unwrap().flags |= 0x4 | flag::IDENTIFIED;
+    t.items().get_mut(cube).unwrap().flags |= 0x4 | flag::IDENTIFIED;
     let m = t.put_msg();
     assert_eq!(t.frame(&m), (ResultCode::Done, NO_BYTES));
     assert_eq!(t.page(ring), CUBE_PAGE);
-    assert_eq!(
-        t.world().items.get(cube).unwrap().flags & 0x14,
-        flag::IDENTIFIED
-    );
+    assert_eq!(t.items().get(cube).unwrap().flags & 0x14, flag::IDENTIFIED);
     assert_eq!(t.pending.take(), [format!("place {}", ring.0)]);
-    assert_eq!(t.world().staged.targeting_resets, [player]);
+    assert_eq!(t.cube().staged.targeting_resets, [player]);
     assert_eq!(t.inventory().items, [cube, ring]);
     assert!(t.host.game.unhandled.is_empty());
 }
@@ -472,7 +518,7 @@ fn item_to_cube_stored_item_is_refused() {
     assert_eq!(t.frame(&m), (ResultCode::Malformed, NO_BYTES));
     assert_eq!(t.page(ring), 0);
     assert!(t.pending.take().is_empty());
-    assert_eq!(t.world().staged.targeting_resets.len(), 1);
+    assert_eq!(t.cube().staged.targeting_resets.len(), 1);
 }
 
 /// Step 1 and 2 refusals, before the targeting reset.
@@ -489,19 +535,19 @@ fn item_to_cube_checks() {
     assert_eq!(t.frame(&m).0, ResultCode::Refused);
     // Mode > 4 → 1.
     let ring = t.ring;
-    t.world().units.get_mut(ring).unwrap().mode = 5;
+    t.units().get_mut(ring).unwrap().mode = 5;
     assert_eq!(t.frame(&m).0, ResultCode::Refused);
     // Cube not in the inventory → 1.
-    t.world().units.get_mut(ring).unwrap().mode = 4;
+    t.units().get_mut(ring).unwrap().mode = 4;
     t.inventory().cursor = Some(ring);
     t.inventory().items.clear();
     assert_eq!(t.frame(&m).0, ResultCode::Refused);
     // Cube not stored → 1.
     let cube = t.cube;
     t.inventory().items.push(cube);
-    t.world().units.get_mut(cube).unwrap().mode = 4;
+    t.units().get_mut(cube).unwrap().mode = 4;
     assert_eq!(t.frame(&m).0, ResultCode::Refused);
-    assert!(t.world().staged.targeting_resets.is_empty());
+    assert!(t.cube().staged.targeting_resets.is_empty());
     assert!(t.pending.take().is_empty());
 }
 
@@ -541,14 +587,14 @@ fn item_to_cube_while_trading() {
     t.inventory().cursor = Some(ring);
     let g = t.guid(player);
     t.interact(0, g);
-    t.world().items.get_mut(cube).unwrap().inv_page = 1;
+    t.items().get_mut(cube).unwrap().inv_page = 1;
     let m = t.put_msg();
     assert_eq!(t.frame(&m), (ResultCode::Done, NO_BYTES));
-    assert_eq!(t.world().staged.sounds, [(player, 19)]);
+    assert_eq!(t.cube().staged.sounds, [(player, 19)]);
     assert_eq!(t.page(ring), 0);
     assert!(t.pending.take().is_empty());
     // Page 0: not refused.
-    t.world().items.get_mut(cube).unwrap().inv_page = 0;
+    t.items().get_mut(cube).unwrap().inv_page = 0;
     assert_eq!(t.frame(&m).0, ResultCode::Done);
     assert_eq!(t.page(ring), CUBE_PAGE);
 }
@@ -593,10 +639,8 @@ fn click_button_closes_the_cube() {
     let g = t.guid(cube);
     t.interact(4, g);
     assert_eq!(t.frame(&click(0x17)), (ResultCode::Done, NO_BYTES));
-    assert_eq!(
-        t.world().staged.interactions.get(&player),
-        Some(&Interaction::RESET)
-    );
+    // Reset (GUID −1, type 6, inactive) at the owner: no interaction.
+    assert_eq!(t.world().rest.interact.get(&player), None);
     assert_eq!(t.pending.take(), ["inventory_pass"]);
     // Closed: the next click has no interaction.
     assert_eq!(
@@ -617,24 +661,24 @@ fn click_button_transmutes() {
     t.interact(4, 12345);
     assert_eq!(t.frame(&click(0x18)), (ResultCode::Done, NO_BYTES));
     assert!(t.pending.take().is_empty());
-    assert!(t.world().staged.sounds.is_empty());
+    assert!(t.cube().staged.sounds.is_empty());
 
     t.inventory().items.push(ring);
-    t.world().items.get_mut(ring).unwrap().inv_page = CUBE_PAGE;
+    t.items().get_mut(ring).unwrap().inv_page = CUBE_PAGE;
     assert_eq!(t.frame(&click(0x18)), (ResultCode::Done, NO_BYTES));
     let log = t.pending.take();
     assert_eq!(log.len(), 2, "{log:?}");
     assert_eq!(log[0], format!("remove {}", ring.0));
-    assert!(!t.world().items.contains(ring));
+    assert!(!t.items().contains(ring));
     let amu = *t.inventory().items.last().unwrap();
     assert_eq!(log[1], format!("place {}", amu.0));
-    let it = t.world().items.get(amu).unwrap().clone();
+    let it = t.items().get(amu).unwrap().clone();
     assert_eq!(
         (it.record, it.quality, it.inv_page),
         (AMULET, q::NORMAL, CUBE_PAGE)
     );
     assert_ne!(it.flags & flag::IDENTIFIED, 0);
-    assert_eq!(t.world().staged.sounds, [(player, 4)]);
+    assert_eq!(t.cube().staged.sounds, [(player, 4)]);
 }
 
 /// Item ids no written spec owns stay stubs (recorded, result 0); the
@@ -659,8 +703,8 @@ fn unowned_item_ids_stay_stubs() {
     assert_eq!(owned, [ITEM_TO_CUBE, CLICK_BUTTON]);
     assert!(ITEM_IDS.windows(2).all(|w| w[0].0 < w[1].0));
 
-    // Without an item world the owned ids are stubs too.
-    t.host.game.items = None;
+    // Without the cube on the host the owned ids are stubs too.
+    t.host.game.world.cube = None;
     assert_eq!(t.frame(&click(0x18)), (ResultCode::Done, NO_BYTES));
     assert_eq!(t.host.game.unhandled.last(), Some(&(0, CLICK_BUTTON, 7)));
 }
