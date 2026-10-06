@@ -179,4 +179,21 @@ and real-GPU halves are queued below (unverified, M02).**
 
 ## Gate results
 
-See the commit message (sh tools/gate.sh on this branch's head).
+`sh tools/gate.sh` on this branch after merging the base at `93b37c8`
+(which carries the d2-proto regeneration `e909c15`; before that merge
+the gate failed only on d2-proto's stale `generated.rs`, not this
+branch's change): all 13 steps PASS, `GATE: PASS`.
+
+Measured here (cloud, Mesa llvmpipe 25.2.8 / LLVM 20.1.2 from `apt-get
+install mesa-vulkan-drivers libvulkan1 libxkbcommon-x11-0`, not part of
+`tools/cloud-setup.sh`): `cargo test -p d2-client --test app_frame_loop
+-- --nocapture` printed `adapter: llvmpipe (LLVM 20.1.2, 256 bits)
+(Vulkan, llvmpipe)`, 4 pass, 1 ignored (the GPU node test ran on the
+store-backed assets, 0 differing pixels). `xvfb-run cargo run -p
+d2-client -- play --synthetic --frames 600`: `play: synthetic tables and
+levels`, log at frames 250 / 500 with 118 / 232 server ticks, `gpu:
+true`, node frames 249 / 499, `audio Some(AudioStats { …, decodes: 0,
+load_errors: 0, engine_errors: 0 })`; Bevy warned `No audio device
+found` (no sound device in the container, so the output edge did not
+play); exit 0. Without a device the mixer stream is never pulled; the
+audio core still runs each frame.
