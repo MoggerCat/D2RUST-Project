@@ -174,3 +174,13 @@ pub fn send_flags<W: QuestWorld>(w: &mut W, p: UnitId) {
 pub fn refresh<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: UnitId, npc: UnitId) {
     ctl.refresh_text(w, p, npc);
 }
+
+/// `0x0061AED0(room, flag)` on the unit's room: flag 0 is
+/// `refresh_room`; flag 1 finds the room (nothing when it has none).
+pub fn unit_room_portal<W: QuestWorld>(w: &mut W, unit: UnitId, on: bool) {
+    if !on {
+        w.refresh_room(unit);
+    } else if let Some((_, _, room)) = w.unit_position(unit) {
+        w.set_room_portal(room, true);
+    }
+}

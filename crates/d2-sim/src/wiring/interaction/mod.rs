@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md; specs/world/vendors.md; specs/skills/use.md; specs/combat/vitals.md (wiring of the interaction seams)
+// Spec: specs/world/npc.md; specs/world/vendors.md; specs/world/hirelings.md; specs/skills/use.md; specs/combat/vitals.md (wiring of the interaction seams)
 //! The interaction seams on their real providers:
 //!
 //! - [`npc_vendors`]: `world::npc` ↔ `world::vendors` in both directions
@@ -22,6 +22,9 @@
 //! - [`skill_events`]: timer events 5, 8 and 9 of the unit dispatch on
 //!   the same pipeline (the action hooks hand them over through
 //!   [`crate::wiring::action::Pending::skill_event`]).
+//! - [`hirelings`]: [`crate::world::hirelings::HirelingWorld`] on the
+//!   desk's providers ([`HireView`]); the mercenary calls of `NpcWorld`
+//!   run the hireling rules; the rest is [`HirelingRest`].
 //! - [`vitals`]: [`crate::combat::vitals::VitalsUnits`] on unit records
 //!   and stat lists ([`VitalsView`]); experience on a kill from the parts
 //!   the specs write ([`vitals::kill_experience`]).
@@ -38,6 +41,7 @@
 //! here decides game behaviour: rules stay in the modules; an adapter maps
 //! a seam call to a provider call.
 
+pub mod hirelings;
 pub mod npc_vendors;
 pub mod npc_world;
 pub mod quest_npc;
@@ -51,6 +55,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
+pub use hirelings::{HireView, HirelingRest};
 pub use npc_vendors::VendorDesk;
 pub use npc_world::NpcRest;
 pub use skill_use::{UseRest, UseView};
@@ -59,6 +64,7 @@ pub use vitals::{VitalsRest, VitalsView};
 
 use super::economy::{Economy, EconomyError, QuestRest};
 use crate::units::UnitId;
+use crate::world::hirelings::{HirelingError, HirelingState, HirelingTables};
 use crate::world::npc::{InteractionList, NpcControl, NpcError};
 use crate::world::quests::{PlayerQuests, QuestControl, QuestError};
 use crate::world::vendors::price::PriceFatal;
@@ -74,6 +80,10 @@ pub enum InteractionError {
     Price(PriceFatal),
     /// The NPC class has no NPC record (and so no vendor record).
     NoRecord(u16),
+    /// A mercenary call without hireling tables
+    /// ([`InteractionState::hireling_tables`]).
+    NoHirelingTables,
+    Hireling(HirelingError),
 }
 
 /// The interaction state of a game beside the NPC control block: the
@@ -85,6 +95,11 @@ pub struct InteractionState {
     pub vendors: Vec<VendorRecord>,
     pub lists: BTreeMap<UnitId, InteractionList>,
     pub errors: Vec<InteractionError>,
+    /// The players' hireling lists (`hirelings.md` §5).
+    pub hirelings: HirelingState,
+    /// The hireling tables (`hirelings.md` §1, `pettype` row 7); `None`:
+    /// the mercenary calls only report [`InteractionError::NoHirelingTables`].
+    pub hireling_tables: Option<HirelingTables>,
 }
 
 impl InteractionState {
@@ -100,6 +115,8 @@ impl InteractionState {
                 .collect(),
             lists: BTreeMap::new(),
             errors: Vec::new(),
+            hirelings: HirelingState::default(),
+            hireling_tables: None,
         }
     }
 

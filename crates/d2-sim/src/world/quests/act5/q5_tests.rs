@@ -230,17 +230,17 @@ fn the_fight() {
     assert_eq!(
         f.log,
         [
-            "room portal 82 0",
-            "room portal 80 0",
-            "room portal 81 0",
+            "refresh 82",
+            "refresh 80",
+            "refresh 81",
             "mode 82 3",
-            "collision 82",
+            "free collision 82",
             "event7 82 120",
             "mode 80 3",
-            "collision 80",
+            "free collision 80",
             "event7 80 120",
             "mode 81 3",
-            "collision 81",
+            "free collision 81",
             "event7 81 120",
         ]
     );
@@ -557,14 +557,15 @@ fn statues_doors_and_the_invisible_ancient() {
     ctl.records[i].not_intro = false;
     f.log.clear();
     super::keep_door_operate(&ctl, &mut f, DOOR_U, P1);
-    assert_eq!(f.log, ["mode 84 1", "event1 84 16", "room portal 84 0"]);
+    assert_eq!(f.log, ["mode 84 1", "event1 84 16", "refresh 84"]);
     // Defeated, mode 2: the warp.
     ctl.records[i].not_intro = true;
     ctl.records[i].extra.a5.q5.defeated = true;
     f.objects.get_mut(&DOOR_U).unwrap().2 = 2;
+    f.pos.insert(DOOR_U, (10, 20, crate::units::RoomId(7)));
     f.log.clear();
     super::keep_door_operate(&ctl, &mut f, DOOR_U, P1);
-    assert_eq!(f.log, ["stairs 1 84", "room portal 84 1"]);
+    assert_eq!(f.log, ["stairs 1 84", "room portal RoomId(7) true"]);
     // Object 561: 39.0 and not 39.4 → message 20169; 20169 sets 39.4.
     f.log.clear();
     super::invisible_ancient_operate(&mut f, UnitId(0x70), P1);

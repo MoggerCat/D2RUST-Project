@@ -402,7 +402,7 @@ pub fn spawn_point<H: PopHost + ?Sized>(
 /// §8 step 2.2 `0x0054DB50`: inside `WarpDist` (squared) of a warp point
 /// or of the level's kind-11 spawn location.
 fn near_warp<H: PopHost + ?Sized>(
-    cx: &Ctx<'_, H>,
+    cx: &mut Ctx<'_, H>,
     room: RoomId,
     x: i32,
     y: i32,

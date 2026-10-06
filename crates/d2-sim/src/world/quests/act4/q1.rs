@@ -407,7 +407,9 @@ pub fn ghost_may_leave<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, ghost: 
     e.unit = Some(ghost);
     // `0x005538D0`: every player.
     for p in w.players() {
-        if w.unit_distance(p, ghost).is_some_and(|d| d < GHOST_RANGE) {
+        if w.distance_between(p, ghost)
+            .is_some_and(|d| d < GHOST_RANGE)
+        {
             x(ctl, i).near = true;
         }
     }

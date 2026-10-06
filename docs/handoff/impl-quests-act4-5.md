@@ -74,6 +74,13 @@ providers do.
   - `create_object_at` / `create_missile_at` (`0x0056EDE0`).
   - `kill_in_place` overlaps the existing `remove_monster` (`0x005A7E60`).
   - Identical duplicates (`unit_distance`, `unit_mode`, `free_object_collision`, `quest_warp`, `player_not_busy`, `reset_interaction`, `game_hook_52e2a0`) were merged at merge time.
+- Staging merge (`62e4668`: Act I rest, II, III). The Act IV / V seams were folded into the shared seams where they reach the same function:
+  - `spawn_quest_object` (`0x00555230` with flags 1, 0, 0) and `set_room_portal` / `refresh_room` (`0x0061AED0`; `late::unit_room_portal` for "the unit's room").
+  - `set_interact_unit(p, None)` (`0x00554190`) and Act II's `free_object_collision`.
+  - The Act IV / V `0x006416D0` distance seam is renamed `distance_between`, because staging's `unit_distance` is `0x005DC5C0`. Staging also binds `0x006416D0` as `living_player_within(unit, radius)`. Which reading is right is a spec question (act4 §3.6, act5 §4.6 against quests-act2).
+  - `drop_gold_amount` (`0x0055B030`) is distinct from Act II's `drop_gold` (`0x00585970`).
+  - `client_idle` (client exists and not busy) stays beside Act II's `player_busy`.
+  - `place_object` keeps the general flag form of `0x00555230`.
 - Cross-quest links wired after merge:
   - Hadriel reads Terror's End +0x14 (`act4::gossip::diablo_killed`).
   - Dummy 459's init schedules event 7 at frame + 12 while chain 34's +0x87 is set (act5 §5.9).

@@ -145,7 +145,7 @@ fn baal_gold_hell() {
             &format!("gold 69 {}", 13500 + r2),
             "save pass",
             "missile at 69 625",
-            "room portal 153 0",
+            "refresh 153",
         ]
     );
     // FX 19 first, then status 4, S5D(36, 2, 0) to each credited player.
@@ -506,7 +506,7 @@ fn last_portal() {
     f.q2_busy.clear();
     f.log.clear();
     super::last_portal_operate(&ctl, &mut f, P1);
-    assert_eq!(f.log, ["warp 1 109 0", "save pass", "clear interaction 1"]);
+    assert_eq!(f.log, ["warp 1 109 0", "save pass", "interact 1 None"]);
     assert_eq!(f.players[&P1].byte4c, 1);
     assert_eq!(f.sent, [(P1, vec![0x61, 0x07])]);
     assert!(f.flags(P1).get(40, 10));

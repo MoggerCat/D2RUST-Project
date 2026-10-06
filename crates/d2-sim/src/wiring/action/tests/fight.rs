@@ -239,7 +239,7 @@ impl Fight {
             skills: skills(),
             combat: combat_tables(),
             levels: vec![blank::<Levels>(); 150],
-            skill_modes: vec![[0; 4]],
+            skill_modes: vec![[0; 8]],
         });
         h.anim_data = Some(Arc::new(anim_data()));
         h.vitals = Some(Arc::new(vitals()));

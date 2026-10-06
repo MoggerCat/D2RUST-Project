@@ -3,7 +3,8 @@
 - **Status:** draft: every body here read from the 1.14d `Game.exe`
   disassembly (addresses per section, register and stack arguments
   checked with `tools/ghidra/disasm.py fn`). No recording covers them
-  (Open question 1).
+  (Open question 1); implemented 2026-10-06 in
+  `d2-sim::missiles::bodies_ext2`, unverified.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::missiles` (server-do / server-hit bodies)
 - **Related specs:** `missiles/bodies.md` (part 2: conventions, the use-count table that
@@ -17,48 +18,48 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 64–77 |
-| Inputs | 78–85 |
-| Outputs / state changes | 86–91 |
-| Rules | 92–93 |
-|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 94–104 |
-|   32. Server-hit 20 Lightning Fury `0x005AB370` | 105–130 |
-|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 131–157 |
-|   34. Server-hit 21 Battle Cry `0x005AB500` | 158–176 |
-|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 177–204 |
-|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 205–216 |
-|   37. Server-hit 25 panther pot green `0x005AB820` | 217–240 |
-|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 241–259 |
-|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 260–298 |
-|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 299–315 |
-|   41. Server-hit 31 fire head `0x005ABD70` | 316–331 |
-|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 332–342 |
-|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 343–377 |
-|   44. Server-do 19 Radament death `0x005B0940` | 378–405 |
-|   45. Server-hit 35 orb mist `0x005ABEE0` | 406–420 |
-|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 421–448 |
-|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 449–468 |
-|   48. Server-hit 40 catapult spike ball `0x005AC250` | 469–497 |
-|   49. Server-hit 43 Healing Vortex `0x005AC350` | 498–512 |
-|   50. Server-hit 47 Molten Boulder `0x005AC550` | 513–534 |
-|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 535–543 |
-|   52. Server-hit 50 plague vines trail `0x005AC800` | 544–554 |
-|   53. Server-do 27 Tornado `0x005AFA30` | 555–573 |
-|   54. Server-hit 51 volcano debris `0x005AC870` | 574–584 |
-|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 585–601 |
-|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 602–637 |
-|   57. Server-do 32 Tiger Fury `0x005B03E0` | 638–650 |
-|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 651–662 |
-|   59. Server-hit 55 Baal inferno `0x005ACB60` | 663–673 |
-|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 674–688 |
-|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 689–700 |
-|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 701–727 |
-| Constants & data dependencies | 728–753 |
-| Randomness | 754–773 |
-| Edge cases & original bugs | 774–800 |
-| Test vectors | 801–820 |
-| Provenance | 821–845 |
-| Open questions | 846–865 |
+| Summary | 65–78 |
+| Inputs | 79–86 |
+| Outputs / state changes | 87–92 |
+| Rules | 93–94 |
+|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 95–105 |
+|   32. Server-hit 20 Lightning Fury `0x005AB370` | 106–131 |
+|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 132–158 |
+|   34. Server-hit 21 Battle Cry `0x005AB500` | 159–177 |
+|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 178–205 |
+|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 206–217 |
+|   37. Server-hit 25 panther pot green `0x005AB820` | 218–241 |
+|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 242–260 |
+|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 261–299 |
+|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 300–316 |
+|   41. Server-hit 31 fire head `0x005ABD70` | 317–332 |
+|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 333–343 |
+|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 344–378 |
+|   44. Server-do 19 Radament death `0x005B0940` | 379–406 |
+|   45. Server-hit 35 orb mist `0x005ABEE0` | 407–421 |
+|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 422–449 |
+|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 450–469 |
+|   48. Server-hit 40 catapult spike ball `0x005AC250` | 470–498 |
+|   49. Server-hit 43 Healing Vortex `0x005AC350` | 499–513 |
+|   50. Server-hit 47 Molten Boulder `0x005AC550` | 514–535 |
+|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 536–544 |
+|   52. Server-hit 50 plague vines trail `0x005AC800` | 545–555 |
+|   53. Server-do 27 Tornado `0x005AFA30` | 556–574 |
+|   54. Server-hit 51 volcano debris `0x005AC870` | 575–585 |
+|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 586–602 |
+|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 603–638 |
+|   57. Server-do 32 Tiger Fury `0x005B03E0` | 639–651 |
+|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 652–663 |
+|   59. Server-hit 55 Baal inferno `0x005ACB60` | 664–674 |
+|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 675–689 |
+|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 690–701 |
+|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 702–728 |
+| Constants & data dependencies | 729–754 |
+| Randomness | 755–774 |
+| Edge cases & original bugs | 775–801 |
+| Test vectors | 802–821 |
+| Provenance | 822–846 |
+| Open questions | 847–866 |
 <!-- /index -->
 
 ## Summary

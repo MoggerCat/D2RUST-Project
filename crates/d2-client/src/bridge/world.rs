@@ -198,6 +198,55 @@ pub struct RoomSight {
     pub y: u16,
 }
 
+/// One active room of the client act (§12 rule 2): its sub-tile
+/// rectangle (active room +0x4C, +0x50, +0x54, +0x58) and the id of its
+/// level (§11 rule 3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ActiveRoom {
+    pub x0: i32,
+    pub y0: i32,
+    pub w: i32,
+    pub h: i32,
+    pub level: u16,
+}
+
+impl ActiveRoom {
+    /// x0 ≤ x < x0 + w and y0 ≤ y < y0 + h (signed compares).
+    pub fn contains(&self, x: i32, y: i32) -> bool {
+        self.x0 <= x && x < self.x0 + self.w && self.y0 <= y && y < self.y0 + self.h
+    }
+}
+
+/// The act lookup `0x00619DA0` (§12 rule 2 b): the first active room in
+/// list order whose rectangle contains (x, y).
+pub fn room_of_point(rooms: &[ActiveRoom], x: i32, y: i32) -> Option<&ActiveRoom> {
+    rooms.iter().find(|r| r.contains(x, y))
+}
+
+/// One record of the pet list `[0x007BB5BC]` (§14 rule 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PetRecord {
+    /// +0x00.
+    pub class: u16,
+    /// +0x04.
+    pub pet_type: u8,
+    /// +0x08.
+    pub pet: u32,
+    /// +0x0C.
+    pub owner: u32,
+    /// +0x1C: 100 at creation (§14 rule 1).
+    pub f1c: u32,
+    /// +0x20.
+    pub gone: bool,
+    /// +0x24…: the three values of 0x81 (§14 rule 3); `None` until a 0x81
+    /// sets them. TODO(spec: model.md open question 10): the fields past
+    /// +0x24 and who reads them.
+    pub extra: Option<[u32; 3]>,
+}
+
+/// The pet type of a hireling (§14 rule 4).
+pub const PET_HIRELING: u8 = 7;
+
 /// The use-item cursor of 0x3F (`msg-stats-items.md` §3 rule 2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UseCursor {
@@ -230,6 +279,17 @@ pub struct ClientWorld {
     pub outgoing: Vec<Vec<u8>>,
     /// 0x3F's use-item cursor.
     pub use_cursor: Option<UseCursor>,
+    /// The pet list, newest first (§14 rule 5).
+    pub pets: Vec<PetRecord>,
+    /// The act whose palette is loaded (§11 rules 2, 4): the act of 0x03,
+    /// replaced by the Levels `Act` of the new level on a room change.
+    pub palette_act: Option<u8>,
+    /// The active rooms of the client act in list order (§12 rules 1–2).
+    /// `None`: the client DRLG is not built (TODO(spec: model.md §12 rule
+    /// 1): the `d2-sim` DRLG act from the 0x03 seed is not wired into the
+    /// bridge yet), so a placement is taken as in a room and the level is
+    /// unknown.
+    pub active_rooms: Option<Vec<ActiveRoom>>,
 }
 
 impl ClientWorld {
@@ -255,6 +315,32 @@ impl ClientWorld {
             self.local_player = None;
         }
         Some(unit)
+    }
+
+    /// The hireling GUID of `player` (§14 rule 4, `0x00478F20(player, 7,
+    /// 1)`): the first pet record in list order with type 7 and owner
+    /// `player` (gone records included); none → −1.
+    pub fn hireling_guid(&self, player: Option<UnitKey>) -> u32 {
+        let Some(p) = player else {
+            return u32::MAX;
+        };
+        self.pets
+            .iter()
+            .find(|r| r.pet_type == PET_HIRELING && r.owner == p.guid)
+            .map_or(u32::MAX, |r| r.pet)
+    }
+
+    /// The local player's room (§12 rule 2 on its position); `None` with
+    /// no client DRLG, no local player or an unplaced one.
+    pub fn local_room(&self) -> Option<&ActiveRoom> {
+        let (x, y) = self.local()?.position?;
+        room_of_point(self.active_rooms.as_deref()?, i32::from(x), i32::from(y))
+    }
+
+    /// The local player's level (§11 rules 3, 5): the level id of its
+    /// room; none while it has no room.
+    pub fn player_level(&self) -> Option<u16> {
+        self.local_room().map(|r| r.level)
     }
 }
 
@@ -332,6 +418,17 @@ pub struct ClientTables {
     pub monsters: Vec<Option<MonsterClass>>,
     /// One entry per `itemstatcost` row.
     pub stats: Vec<StatSend>,
+    /// One entry per `Levels.txt` row, by level id (§11 rule 4).
+    pub levels: Vec<LevelRow>,
+}
+
+/// The `Levels.txt` fields the model reads (§11 rules 3–4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LevelRow {
+    /// `Act`.
+    pub act: u8,
+    /// `BlankScreen` (record +0x218, `render/composition.md` §3 step 2).
+    pub blank_screen: bool,
 }
 
 /// Inputs of the message rules that are not model state.

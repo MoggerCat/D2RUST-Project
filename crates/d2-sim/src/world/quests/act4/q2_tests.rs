@@ -357,14 +357,14 @@ fn seal_392_spawns_its_boss() {
     let (mut ctl, _) = control();
     let mut f = seal_fake(392);
     f.spot = Some((0, 0));
-    f.q2_objects = vec![Some(DUMMY_U)];
+    f.object_spawns = vec![Some(DUMMY_U)];
     infector_seal_operate(&mut ctl, &mut f, SEAL, P1, 392);
     assert_eq!(
         f.log,
         [
             "spot at 988 948 3 0x3f11 13 100",
-            "spawn object 131 988 948 flags 1 0 0",
-            "refresh room 1",
+            "spawn object 131 988 948",
+            "room portal RoomId(1) false",
             "mode 64 1",
             "event1 64 140",
         ]
@@ -442,7 +442,7 @@ fn boss_seals_offsets_and_failures() {
         assert_eq!(xd(&ctl).bosses[k], moved);
         assert_eq!(f.object_mode(SEAL), 0);
         // Created: refresh and the activation; its dummy spawns `su`.
-        f.q2_objects = vec![Some(DUMMY_U)];
+        f.object_spawns = vec![Some(DUMMY_U)];
         op(&mut ctl, &mut f, SEAL, P1, class);
         assert_eq!(f.object_mode(SEAL), 1);
         assert!(xd(&ctl).seals[usize::from(class - 392)]);
@@ -825,14 +825,14 @@ fn tyrael_20000_opens_the_portal() {
     let mut f = fake();
     f.pos.insert(TYRAEL_U, (500, 600, ROOM));
     f.spot = Some((1, 2));
-    f.q2_objects = vec![Some(PORTAL_U)];
+    f.a5_places = vec![Some(PORTAL_U)];
     say(&mut ctl, &mut f, P1, TYRAEL_U, 20000);
     assert!(f.flags(P1).get(SLOT, 9));
     assert_eq!(
         f.log,
         [
             "spot at 505 600 2 0x400 12 100",
-            "spawn object 566 506 602 flags 1 1 0",
+            "place 566 506 602 room 1 [1, 1, 0]",
             "flags 112 0x3000000",
         ]
     );
@@ -850,7 +850,7 @@ fn tyrael_20000_opens_the_portal() {
     f.spot = Some((0, 0));
     say(&mut ctl, &mut f, P1, TYRAEL_U, 20000);
     assert!(!xd(&ctl).portal_spawned); // no object
-    f.q2_objects = vec![Some(PORTAL_U)];
+    f.a5_places = vec![Some(PORTAL_U)];
     say(&mut ctl, &mut f, P1, TYRAEL_U, 20000);
     assert!(xd(&ctl).portal_spawned);
 }
@@ -901,11 +901,7 @@ fn portal_operate_moves_to_harrogath() {
     assert_eq!(f.players[&P1].byte4c, 1);
     assert_eq!(
         f.log,
-        [
-            "clear interaction 1",
-            "act change 1 109 5",
-            "waypoint 1 109 1"
-        ]
+        ["interact 1 None", "act change 1 109 5", "waypoint 1 109 1"]
     );
     assert_eq!(f.sent_ids(), [0x5D, 0x61, 0x28]);
     assert_eq!(f.sent[0].1, hex("5D 17 02 00 0000"));

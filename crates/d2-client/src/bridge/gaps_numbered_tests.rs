@@ -194,7 +194,12 @@ fn client_world_holds_only_stated_fields() {
         rooms_in_sight,
         outgoing,
         use_cursor,
+        // `client/model.md` §14 rule 5, §11 rules 2 and 4, §12 rules 1–2.
+        pets,
+        palette_act,
+        active_rooms,
     } = ClientWorld::default();
+    assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));

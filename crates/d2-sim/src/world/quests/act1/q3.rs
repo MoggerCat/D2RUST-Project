@@ -1,4 +1,5 @@
 // Spec: specs/world/quests.md §10.5 (A1Q3 Tools of the Trade, chain 3)
+// Spec: specs/world/quests-act1-rest.md §8 item 5
 //! A1Q3 callback by callback: the Malus object's init and operate
 //! functions, events 0, 2, 3, 4, 6, 9, 10, 11, 13, 14, the status and
 //! active functions, the reset `0x005918D0` and the imbue grant
@@ -149,13 +150,15 @@ fn npc_text<W: QuestWorld>(
     args: EventArgs,
     list: Option<&mut TextList>,
 ) {
-    let r = rec(w, args.player);
+    // `quests-act1-rest.md` §8 item 5: the player's data is read first
+    // (`0x006221A0` at `0x005916B3`), an internal error without one.
+    let Some(p) = args.player else {
+        return ctl.faults.push(QuestError::Fatal(0x0059_16B3));
+    };
+    let r = player_flags(w, p);
     if r.get(SLOT, bit::REWARD_GRANTED) && !r.get(SLOT, bit::PRIMARY_GOAL_DONE) {
         return;
     }
-    // TODO(quests §10.5): event 0 without a player is not described; NPC
-    // chat always has one.
-    let Some(p) = args.player else { return };
     if w.has_item(p, MALUS) {
         if level(w, p) >= 8 && !r.get(SLOT, bit::REWARD_GRANTED) {
             add_state(ctl, w, i, list, args.target, 3);

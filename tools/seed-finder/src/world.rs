@@ -10,10 +10,14 @@
 //! every new active room. What is left is read back: monsters (monster
 //! data, path position), preset units, anchors.
 //!
-//! Seams without a provider keep their defaults ([`FinderHost`] on
-//! `test_fixtures::game::Seams`): no coordinate lists, so on the live
-//! host room population (`population.md` §3) places nothing and only
-//! presets put monsters in a level.
+//! Room population (`population.md` §3) reads the act DRLG's own
+//! coordinate lists, populated level and room count, warp points and
+//! kind-11 location (`levels.md` §11.6), so random monsters, packs,
+//! champions and uniques come from the live host. The seams without a
+//! provider keep their [`WorldPending`] defaults
+//! (`test_fixtures::game::Seams`). Streaming every room in level-list
+//! order and populating them in one room pass is the finder's own build
+//! order, not one the original produces (`levels.md` §11.6 rule 4).
 
 use std::sync::Arc;
 
@@ -36,41 +40,22 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::stats::StatData;
 use d2_sim::units::hooks::UnitData;
-use d2_sim::units::{RoomId, UnitType};
+use d2_sim::units::UnitType;
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld};
 use d2_sim::wiring::worldgen::{
     SharedTypes, WorldPending, WorldSim, WorldState, WorldTables, WorldTypes,
 };
-use test_fixtures::game::{ActCreation, GameData, Seams};
+use test_fixtures::game::{ActCreation, GameData};
 
 use crate::query::Kind;
 
 /// Sub-tiles per tile (`rooms.md` §9.2).
 pub const SUB: i32 = 5;
 
-/// A room streamed for the search: the active room, its level id and
-/// its tile rectangle.
-#[derive(Clone, Copy, Debug)]
-pub struct StreamedRoom {
-    pub room: RoomId,
-    pub level: u32,
-    pub rect: TileRect,
-}
+/// The seams of a search game: any [`WorldPending`] host.
+pub trait FinderHost: WorldPending {}
 
-/// The seams of a search game. The live host keeps every
-/// [`WorldPending`] default; a host that provides room population's
-/// DRLG reads (coordinate lists) says so with
-/// [`FinderHost::ROOM_POPULATION`] and learns the streamed rooms before
-/// the room pass.
-pub trait FinderHost: WorldPending {
-    /// Whether `population.md` §3 can place monsters on this host.
-    const ROOM_POPULATION: bool = false;
-    fn rooms_streamed(&mut self, rooms: &[StreamedRoom]) {
-        let _ = rooms;
-    }
-}
-
-impl FinderHost for Seams {}
+impl<X: WorldPending> FinderHost for X {}
 
 /// A shared file map (one copy for every seed and thread).
 struct Shared<T>(Arc<T>);
@@ -336,7 +321,7 @@ pub fn build_level<X: FinderHost>(
     game.lists
         .ensure_act(act)
         .map_err(|e| anyhow!("act list: {e:?}"))?;
-    type Built = (usize, Anchors, Vec<Preset>, Vec<StreamedRoom>);
+    type Built = (usize, Anchors, Vec<Preset>);
     let built: Built = sim
         .action
         .sys
@@ -348,15 +333,8 @@ pub fn build_level<X: FinderHost>(
                 d.generate_level(svc.data, svc.types, l)?;
             }
             let rooms: Vec<DrlgRoomId> = d.level_rooms(l);
-            let mut streamed = Vec::new();
             for &r in &rooms {
-                if let Some(a) = d.stream_room(svc, r)? {
-                    streamed.push(StreamedRoom {
-                        room: a,
-                        level,
-                        rect: d.room(r).rect,
-                    });
-                }
+                d.stream_room(svc, r)?;
             }
             let mut presets = Vec::new();
             for &r in &rooms {
@@ -371,12 +349,11 @@ pub fn build_level<X: FinderHost>(
                 }
             }
             let a = anchors(d, svc, l, level, from)?;
-            Ok::<_, d2_sim::drlg::DrlgError>((rooms.len(), a, presets, streamed))
+            Ok::<_, d2_sim::drlg::DrlgError>((rooms.len(), a, presets))
         })
         .ok_or_else(|| anyhow!("act {act} has no DRLG"))?
         .map_err(|e| anyhow!("level {level}: {e:?}"))?;
-    let (rooms, anchors, presets, streamed) = built;
-    sim.action.sys.hooks.x.rooms_streamed(&streamed);
+    let (rooms, anchors, presets) = built;
     // The room pass of the first tick populates every new active room.
     d2_sim::tick::tick(&mut game, &mut sim);
     let errors = sim.errors();

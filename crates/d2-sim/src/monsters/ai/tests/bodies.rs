@@ -168,7 +168,7 @@ fn foul_crow_nest_vectors() {
     // to the install frame (0).
     let mut w = setup();
     w.monstats[0].skill1 = 9;
-    w.modes[0] = [10, 0, 0, 0];
+    w.modes[0] = [10, 0, 0, 0, 0, 0, 0, 0];
     w.fake.footprint = true;
     w.game.frame = 100;
     w.think_with(Some(w.player), 10, false);
@@ -194,7 +194,7 @@ fn foul_crow_nest_vectors() {
 fn raven() -> World {
     let mut w = World::new(row(59, &[]));
     w.monstats[0].skill1 = 9;
-    w.modes[0] = [14, 0, 0, 0];
+    w.modes[0] = [14, 0, 0, 0, 0, 0, 0, 0];
     w
 }
 
@@ -371,7 +371,7 @@ fn arach_retreat_and_combat() {
     let lo = seed_with(1, |v| v[0] >= 45);
     let mut w = setup();
     w.monstats[0].skill1 = 9;
-    w.modes[0] = [5, 0, 0, 0];
+    w.modes[0] = [5, 0, 0, 0, 0, 0, 0, 0];
     w.fake.life = 20;
     w.seed(lo);
     w.think_with(Some(w.player), 1, true);
@@ -504,7 +504,7 @@ fn vampire_bolts_upgrades_and_flight() {
         w.monstats[0].skill1 = 11;
         w.monstats[0].skill2 = 12;
         w.monstats[0].skill4 = 0xFFFF; // −1: not tested (edge 15)
-        w.modes[0] = [8, 9, 10, 11];
+        w.modes[0] = [8, 9, 10, 11, 0, 0, 0, 0];
         w
     };
     // Cooldown counts down.
@@ -665,7 +665,7 @@ fn hell_meteor_vectors() {
     let setup = || {
         let mut w = World::new(row(33, &[50, 50, 10]));
         w.monstats[0].skill1 = 9;
-        w.modes[0] = [4, 0, 0, 0];
+        w.modes[0] = [4, 0, 0, 0, 0, 0, 0, 0];
         w
     };
     let ws = per_seed(setup, |w| w.think_with(None, 0, false));
@@ -689,7 +689,7 @@ fn hell_meteor_vectors() {
 fn raider() -> World {
     let mut w = World::new(row(8, &[40, 70, 75, 70, 18, 0, 50]));
     w.monstats[0].skill1 = 9;
-    w.modes[0] = [8, 0, 0, 0];
+    w.modes[0] = [8, 0, 0, 0, 0, 0, 0, 0];
     w
 }
 
@@ -880,7 +880,7 @@ fn maggot() -> World {
         w.monstats[0].skill2,
         w.monstats[0].skill3,
     ) = (21, 22, 23);
-    w.modes[0] = [8, 9, 10, 0];
+    w.modes[0] = [8, 9, 10, 0, 0, 0, 0, 0];
     w
 }
 
@@ -1003,7 +1003,7 @@ fn scarab_vectors() {
     let setup = || {
         let mut w = World::new(row(20, &[75, 50, 15, 35, 20]));
         w.monstats[0].skill1 = 9;
-        w.modes[0] = [10, 0, 0, 0];
+        w.modes[0] = [10, 0, 0, 0, 0, 0, 0, 0];
         w
     };
     let ws = per_seed(setup, |w| w.think_with(Some(w.player), 25, true));

@@ -552,31 +552,31 @@ fn cow_king_kill() {
     );
 }
 
-// From specs/world/quests.md §6.1 and §6.2 r2: a status function other
-// than A1Q0's and the intros' is not specified (reported, nothing
-// written).
+// From specs/world/quests.md §6.1 and §6.2 r2: of the status functions
+// `quests.tsv` registers, only Act II's chains 27 and 26 still have no
+// body (reported, nothing written); a function with no body on any
+// chain takes the same fallback.
 #[test]
 fn unspecified_status_function_is_reported() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
-    let (chain, func) = ctl
-        .records
-        .iter()
-        .find_map(|r| match r.status_fn {
-            // Flavie (25, 30: quests.md §10.3), chains 21 and 29
-            // (quests-act4.md §6), 31, 33 (quests-act5.md
-            // §3.10, §5.11) and 34 (quests-act5-2.md §6.9) are specified.
-            Some(func) if !matches!(r.chain, 0 | 21 | 25 | 29..=31 | 33 | 34 | 37..=40) => {
-                Some((r.chain, func))
-            }
-            _ => None,
-        })
-        .unwrap();
     for r in &mut ctl.records {
-        r.status = u8::from(r.chain == chain);
+        r.status = u8::from(r.status_fn.is_some());
     }
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert_eq!(f.log, [format!("unhandled {chain} {func:#x}")]);
+    assert_eq!(f.log, ["unhandled 27 0x59e4a0", "unhandled 26 0x59e2b0"]);
+    let list = &f.sent.last().unwrap().1;
+    assert_eq!((list[1 + 30], list[1 + 31]), (0, 0));
+    // Chain 1 has no status function in 1.14d; one with no body is
+    // reported (the fallback arm) and nothing is written for it.
+    let (mut ctl, _) = control();
+    let mut f = Fake::new();
+    for r in &mut ctl.records {
+        r.status = u8::from(r.chain == 1);
+    }
+    ctl.record_mut(1).unwrap().status_fn = Some(0xDEAD);
+    ctl.request_quest_data(&mut f, P1).unwrap();
+    assert_eq!(f.log, ["unhandled 1 0xdead"]);
     let list = &f.sent.last().unwrap().1;
     assert!(list[1..].iter().all(|&b| b == 0));
 }

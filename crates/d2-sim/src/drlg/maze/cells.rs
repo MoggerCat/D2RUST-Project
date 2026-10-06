@@ -10,16 +10,15 @@ use crate::drlg::level::Drlg;
 use crate::drlg::room::{LinkAt, RoomKind};
 use crate::drlg::{DrlgRoomId, LevelIdx, TileRect};
 
-/// What a cell link points at.
+/// What a cell link points at (link node +0x00, `rooms.md` §1). The
+/// node's box (+0x10) is the target's rect: the room's, or the level's
+/// (level +0x1C) for a cross-level link; it is read live.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LinkTarget {
-    /// A cell (room) of the same level.
+    /// A room of the same level: a cell, or (§9 step 4) a room a cell was
+    /// built into.
     Cell(DrlgRoomId),
-    /// Another level (cross-level link `0x0066B790`, §7).
-    // TODO(spec: maze.md §7.1, rooms.md): the cross-level link's target
-    // is named as the level; its box (for a place test from this cell)
-    // is taken as the level rect. Never read in 1.14d paths: the cells
-    // carrying such links are locked, so nothing grows from them.
+    /// Another level (cross-level link `0x0066B790`, §7.1).
     Level(LevelIdx),
 }
 
@@ -40,10 +39,9 @@ pub struct Cell {
     pub file: i32,
     /// Lock flag (preset-room flag bit 1, D2MOO `HAS_MAP_DS1`).
     pub lock: bool,
-    /// Links in the order they were made.
-    // TODO(spec: maze.md §2.4): the order of a room's link list
-    // (prepend or append) is not stated; it only reaches the preset
-    // builder (§9 step 4).
+    /// The room's link list (+0x00), head first: init links are
+    /// prepended (§2.4, newest first); cross-level links are inserted
+    /// in order (§7.1).
     pub links: Vec<MazeLink>,
 }
 
@@ -264,8 +262,23 @@ impl<'a> Gen<'a> {
         self.drlg.link_room(c, LinkAt::Head);
     }
 
-    /// Free a cell that is not in the list (`0x0066C100`).
+    /// Free a cell that is not in the list (`0x0066C100`, `rooms.md`
+    /// §2.1, link part): for each link of the cell (list order) with the
+    /// init flag and target N, remove from the cell's list, then from
+    /// N's, the first init link whose target is the other room; the
+    /// remaining links (cross-level, no init flag) are dropped with the
+    /// cell only.
     pub fn free_unlisted(&mut self, c: DrlgRoomId) {
+        let links = self.cell(c).links.clone();
+        for l in links.iter().filter(|l| l.init) {
+            let LinkTarget::Cell(n) = l.target else {
+                continue;
+            };
+            remove_first_init(&mut self.cell_mut(c).links, LinkTarget::Cell(n));
+            if let Some(nc) = self.cells.get_mut(&n) {
+                remove_first_init(&mut nc.links, LinkTarget::Cell(c));
+            }
+        }
         self.cells.remove(&c);
         self.drlg.free_room(c);
     }
@@ -291,31 +304,69 @@ impl<'a> Gen<'a> {
     // ---- §2.4 links ---------------------------------------------------------
 
     /// `0x0066B5E0` (§2.4): P gets (N, d), N gets (P, (d+2) mod 4), each
-    /// only if it has no link to the other yet. Lock is not touched.
+    /// only if it has no link to the other yet, prepended (`0x0066B560`;
+    /// P's first, then N's). Lock is not touched.
     pub fn link(&mut self, p: DrlgRoomId, n: DrlgRoomId, d: u8) {
         if !self.cell(p).linked_to(n) {
-            self.cell_mut(p).links.push(MazeLink {
-                target: LinkTarget::Cell(n),
-                dir: d,
-                init: true,
-            });
+            self.cell_mut(p).links.insert(
+                0,
+                MazeLink {
+                    target: LinkTarget::Cell(n),
+                    dir: d,
+                    init: true,
+                },
+            );
         }
         if !self.cell(n).linked_to(p) {
-            self.cell_mut(n).links.push(MazeLink {
-                target: LinkTarget::Cell(p),
-                dir: (d + 2) % 4,
-                init: true,
-            });
+            self.cell_mut(n).links.insert(
+                0,
+                MazeLink {
+                    target: LinkTarget::Cell(p),
+                    dir: (d + 2) % 4,
+                    init: true,
+                },
+            );
         }
     }
 
-    /// Cross-level link `0x0066B790` (§7): no init flag, one side only.
+    /// Cross-level link `0x0066B790` (§7.1): target the level `l`, box
+    /// its rect, no init flag, on this cell only. Inserted in order
+    /// (`0x0066B720`, comparator `0x0066B6A0`, [`Gen::precedes`]): an
+    /// empty list takes it as head; with one record it goes before or
+    /// after the head by the comparator; with more, before the first
+    /// record from the second on that it precedes (the head is never
+    /// displaced), else at the tail.
     pub fn link_level(&mut self, c: DrlgRoomId, l: LevelIdx, d: u8) {
-        self.cell_mut(c).links.push(MazeLink {
+        let new = MazeLink {
             target: LinkTarget::Level(l),
             dir: d,
             init: false,
-        });
+        };
+        let links = &self.cell(c).links;
+        let at = match links.len() {
+            0 => 0,
+            1 => usize::from(!self.precedes(&new, &links[0])),
+            n => (1..n)
+                .find(|&i| self.precedes(&new, &links[i]))
+                .unwrap_or(n),
+        };
+        self.cell_mut(c).links.insert(at, new);
+    }
+
+    /// Comparator `0x0066B6A0` (§7.1): a precedes b when a.dir < b.dir,
+    /// or the directions are equal and by box: dir 0 a.y < b.y, dir 1
+    /// a.x > b.x, dir 2 a.y > b.y, dir 3 a.x < b.x.
+    pub fn precedes(&self, a: &MazeLink, b: &MazeLink) -> bool {
+        if a.dir != b.dir {
+            return a.dir < b.dir;
+        }
+        let (ra, rb) = (self.target_rect(a.target), self.target_rect(b.target));
+        match a.dir {
+            0 => ra.y < rb.y,
+            1 => ra.x > rb.x,
+            2 => ra.y > rb.y,
+            _ => ra.x < rb.x,
+        }
     }
 
     // ---- §3.2 place test ----------------------------------------------------
@@ -512,13 +563,7 @@ impl<'a> Gen<'a> {
         self.link(p, n, d);
         self.add(n);
         self.pick(n)?;
-        // "net: P unchanged": the freed cell's link leaves P.
-        // TODO(spec: maze.md §3.7, rooms.md): what `0x0066C100` does to
-        // the neighbour's link list is not described; removal is read
-        // from "net: P unchanged".
-        self.cell_mut(p)
-            .links
-            .retain(|l| l.target != LinkTarget::Cell(n));
+        // The free removes P's just-gained link (`rooms.md` §2.1).
         self.free_listed(n);
         Ok(true)
     }
@@ -584,6 +629,13 @@ impl<'a> Gen<'a> {
             r.x += dx;
             r.y += dy;
         }
+    }
+}
+
+/// `0x0066B610` on one list: remove the first init link to `t`.
+fn remove_first_init(links: &mut Vec<MazeLink>, t: LinkTarget) {
+    if let Some(i) = links.iter().position(|l| l.init && l.target == t) {
+        links.remove(i);
     }
 }
 

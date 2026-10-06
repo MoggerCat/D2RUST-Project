@@ -125,6 +125,7 @@ passed yet. Run in this order (cheapest and most basic first).
 | 2.15 | `cargo test -p d2-client --lib frames::tests::all_live_frame_sets_build_and_pack -- --ignored --nocapture` | passed in the last Done run (C8: 23,595 files, 6 parse errors, 288,702 frame sets, 3,345,171 frames, largest 96×960 ≤ 2046); regression only | none new |
 | 2.16 | `cargo test -p d2-formats -- --ignored` then `cargo run --release -p mpq-tool -- formats` (C61, eighth fold) | everything that passed before still passes; all **5,008 Huffman + ADPCM `.wav` files** decode to their exact RIFF size (`mpq.md` Observations): the Huffman decoder was sped up (`mpq-huffman`) and no game-file sector has run through the new code |
 | 2.17 | `GameData::load` with `ActCreation::Full` on the live set (C60, optional, after 2.13) and the `VendorTables::from_fixed` rows (C63; test home needed, `mutants-world` §4) | C60: the same level ids, seeds and digests as `game_wired_host`; C63: a Charsi `npc.txt` row's multipliers, `difficultylevels` gamble odds and an `itemtypes` row equal `vendors.md` §9.3 / Constants |
+| 2.18 | `cargo build --release -p d2s-tool`; `$env:D2_SAVE_DIR = "$env:USERPROFILE\Saved Games\Diablo II"`; `cargo test --release -p d2s-tool --test real_saves -- --ignored --nocapture`; for one save also `target\release\d2s-tool check "<save dir>\<Char>.d2s" --game-dir $env:D2_GAME_DIR` and `… dump …` (C66, `docs/handoff/impl-d2s.md` §4) | `real_saves_round_trip` passes: every `.d2s` parses in `d2s.md` §1 order to the file end and rewrites **byte for byte**; `check` prints OK. A failure names the first differing offset or the internal code: an item entry that does not size is an item-bitstream save-format finding (trailer, unit +0x28, children). Record the first save's header +0x10..+0x37, +0x88..+0xA7, the stats bytes at 0x2FD and `jf`/`kf` bytes (d2s OQ3). | `d2s.md` real-save check (§3, §2.2 r2, §1 r1); add the claim on `real_saves_round_trip` after the pass |
 
 Order note: 2.12, 2.14 and 2.15 build `d2-client` (Bevy); do them once, after
 the cheaper rows, in one `d2-client` target directory.
@@ -312,6 +313,26 @@ umod dying (e.g. fire enchanted, umod 9), group A. Look for the type-7
 timer's frame (death frame + 4) and its position among the death
 animation's timers in the queue; it settles RT1. No `check_*` command
 named: **NOT FOUND** (hand analysis).
+
+### 6.7 Generated characters load in the game (`d2s-tool`, C66 part 2)
+
+```powershell
+cargo build --release -p d2s-tool
+$t = "target\release\d2s-tool"
+& $t new --game-dir $env:D2_GAME_DIR --name TestAma --class ama -o TestAma.d2s
+& $t new --game-dir $env:D2_GAME_DIR --name TestSor --class sor --level 30 --expansion --difficulty-unlocked hell --waypoints all --quests acts=4 --all-skills 1 --gold 100000 --item hp1 --item lsd@0,0 -o TestSor.d2s
+& $t new-stub --name TestStub --class nec -o TestStub.d2s
+```
+
+Copy the three files into the save folder (back the folder up first;
+never commit saves). Expect: all three appear at character select with
+the right class and level, each enters a single-player game, the items
+sit where `dump` says, the waypoints and acts are open. Then exit (the
+game re-saves) and run `& $t check <file> --game-dir $env:D2_GAME_DIR` on
+each re-saved file and `dump` ours vs the game's: differences in the
+stats at 0x2FD, item records (trailer bit, flags such as 0x2000),
++0x88..+0xA7 or the quest words are findings for `formats/d2s.md` /
+`items/bitstream.md` (record them in HANDOFF C66).
 
 ### 6.6 Other recordings (each needs the recorder extensions of M10 first)
 

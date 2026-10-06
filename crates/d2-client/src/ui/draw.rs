@@ -12,8 +12,8 @@ use super::geom::{Point, Rect};
 use super::text::TextOpts;
 
 /// A UI image: a frame of a file the panel registry names. Both are
-/// opaque ids here; which DC6 files and frames each panel draws is
-/// `TODO(spec: ui/panels.md §B1)`.
+/// opaque ids here; the original panels' files and frames are
+/// `ui/panels.md` §16.2, named by [`super::panels::UiFiles`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ImageRef {
     pub file: u32,
@@ -31,8 +31,9 @@ pub struct TextStyle {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ImageRequest {
     pub image: ImageRef,
-    /// The widget's placement point. How a frame's own offsets combine with
-    /// it is `TODO(spec: ui/panels.md §B1)`; the sink resolves it.
+    /// The cel draw position (X, Y) (`ui/panels.md` §1.3): the frame covers
+    /// columns `X … X + w − 1`, rows `Y − h + 1 … Y`
+    /// (`sprite-placement.md` §2); the sink resolves it.
     pub at: Point,
     pub clip: Rect,
 }

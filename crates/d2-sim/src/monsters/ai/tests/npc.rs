@@ -220,7 +220,7 @@ fn good_npc_ranged_out_of_town() {
     // roguehire (271): `Skill1` in `Sk1mode` at S.
     let mut w = ranged_world();
     w.monstats[0].skill1 = 7;
-    w.modes[0] = [10, 0, 0, 0];
+    w.modes[0] = [10, 0, 0, 0, 0, 0, 0, 0];
     w.fake.class.insert(w.mon, 271);
     let s = w.add_unit(UnitType::Monster, (110, 100));
     w.fake.secondary = Some((s, 19));

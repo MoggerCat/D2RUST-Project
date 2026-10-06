@@ -9,7 +9,7 @@
 use crate::drlg::maze::{MapId, MazeLink, MazePresets};
 use crate::drlg::outdoor::Outdoor;
 use crate::drlg::preset::{self, Ds1Cache, Ds1Source, PresetCtx, PresetData, Presets};
-use crate::drlg::{Drlg, DrlgData, DrlgError, LevelIdx, TileRect};
+use crate::drlg::{Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, TileRect};
 
 use super::levels::{preset_err, AllocView};
 use super::WorldgenError;
@@ -81,13 +81,12 @@ impl MazePresets for MazeToPreset<'_> {
         }
     }
 
-    /// `0x00667ED0` (`preset.md` §6) with no extra room flags, single-room
-    /// mode when `small`.
-    // TODO(maze.md §9 step 3, preset.md §6): the room flags F the maze
-    // passes are not stated; 0 (no flags) is used.
-    // TODO(maze.md §9 step 4, maze handoff open question 4): DRLG rooms
-    // have no orth links (`drlg::room`); the cell's init-flag links are
-    // not carried to the built rooms. No draw depends on them.
+    /// `0x00667ED0` (`preset.md` §6) with room flags F = 0
+    /// (`maze.md` §9 step 3), single-room mode when `small`; returns the
+    /// last room built, which the maze links to the cell's links.
+    // TODO(maze.md §9 step 4, rooms.md §1): DRLG rooms have no orth link
+    // list (`drlg::room`); the built rooms' links live in the maze
+    // generation state only and are not kept past generation.
     fn build_map(
         &mut self,
         drlg: &mut Drlg,
@@ -96,7 +95,7 @@ impl MazePresets for MazeToPreset<'_> {
         map: MapId,
         small: bool,
         _links: &[MazeLink],
-    ) -> Result<(), DrlgError> {
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
         let id = drlg.level(level).id;
         let mut ctx = PresetCtx {
             drlg: data,
@@ -106,7 +105,6 @@ impl MazePresets for MazeToPreset<'_> {
         };
         self.presets
             .build_area(drlg, &mut ctx, level, preset::MapId(map.0), 0, small)
-            .map(|_| ())
             .map_err(|e| preset_err(self.errors, id, e))
     }
 }

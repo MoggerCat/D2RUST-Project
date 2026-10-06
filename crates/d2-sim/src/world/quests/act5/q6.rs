@@ -303,7 +303,7 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     }
     // Step 2 (always).
     if let Some(m) = w.create_missile_at(victim, MISSILE) {
-        w.unit_room_portal_flag(m, false);
+        late::unit_room_portal(w, m, false);
     }
 }
 
@@ -368,7 +368,7 @@ fn baal_credits<W: QuestWorld>(
             for _ in 0..xr(ctl, i).credited {
                 // `0x00545990` is a `ret 4` stub.
                 let amount = min + ctl.seed.roll((max - min) as i32);
-                w.drop_gold(victim, amount);
+                w.drop_gold_amount(victim, amount);
             }
         }
     }
@@ -500,7 +500,7 @@ pub fn last_portal_operate<W: QuestWorld>(ctl: &QuestControl, w: &mut W, player:
     w.warp_to_level(player, HARROGATH, 0);
     w.save_pass();
     if w.client_idle(player) {
-        w.clear_interaction(player);
+        w.set_interact_unit(player, None);
         w.set_player_byte_4c(player, 1);
         // `0x0053D940`.
         w.send(player, &[0x61, 0x07]);

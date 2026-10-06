@@ -318,7 +318,7 @@ fn kills_doors_and_barbarians() {
     f.a5_dist.insert((barb(0, 3), DOOR_U), 3);
     f.a5_dist.insert((QUAL_U, DOOR_U), 3);
     kill(&mut ctl, &mut f, DOOR_U);
-    assert_eq!(f.log, ["portal flag 9"]);
+    assert_eq!(f.log, ["room portal RoomId(9) false"]);
     assert_eq!(x(&mut ctl).freed_guids, [barb(0, 0).0]);
     assert_eq!((x(&mut ctl).freed, x(&mut ctl).killed), (1, 0));
     // A freed barbarian dying counts only toward its group (edge case 2).
@@ -476,7 +476,7 @@ fn rescue_portal_and_completion() {
             "place 189 32 40 room 5 [1, 1, 0]",
             "place 189 30 40 room 5 [1, 1, 0]",
             "event7 97 1025",
-            "portal flag 5",
+            "room portal RoomId(5) false",
         ]
     );
     let e = &ctl.record(CHAIN).unwrap().extra.a5.q2;

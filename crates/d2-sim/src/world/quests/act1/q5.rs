@@ -1,9 +1,10 @@
 // Spec: specs/world/quests.md §10.7 (A1Q5 The Forgotten Tower, chain 5)
+// Spec: specs/world/quests-act1-rest.md §4 (the chest trap step)
 //! A1Q5 callback by callback: events 0, 3, 8 (the Countess), 10, 11, 13,
 //! the timer `0x005954C0`, the active function, the tome operate, the
-//! chest init and event 7 and the object init `0x00595A00`, with the
-//! iterate functions M1–M6. Slot 5 is a constant in each. The trap step
-//! `0x005954F0` is open question 12: reported, never guessed.
+//! chest init and event 7, the trap step `0x005954F0` and the object
+//! init `0x00595A00`, with the iterate functions M1–M6. Slot 5 is a
+//! constant in each.
 
 use super::{add_state, player_flags, rec, send_completed_now, sequence, table_state};
 use crate::units::UnitId;
@@ -22,8 +23,10 @@ const TOWN: u32 = 1;
 const TOME: u32 = 127;
 /// `0x007382AC`: message state by quest state 0–5.
 const MSG_STATE: [i8; 6] = [-1, -1, 0, 1, 2, 3];
-/// The trap step (open question 12).
-const TRAP_STEP: u32 = 0x0059_54F0;
+/// The trap monster (trap-firebolt) and the missile each chest gets
+/// (towerchestspawner).
+const TRAP_MONSTER: u16 = 326;
+const CHEST_MISSILE: u16 = 332;
 /// Town NPCs whose messages 140–145 report the kill.
 const REPORT_NPCS: [u16; 6] = [
     npc::CHARSI,
@@ -326,11 +329,58 @@ fn credit_in_cellar<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, 
     }
 }
 
-/// The trap step `0x005954F0` (open question 12: reported), then event
-/// 7 on `unit` at frame + 10 while no trap was spawned.
+/// The trap step `0x005954F0(record, extra)` (`quests-act1-rest.md` §4):
+/// one trap-firebolt per game, then a towerchestspawner missile per
+/// listed chest, owned by it.
+fn trap<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
+    {
+        let x = x5(ctl, i);
+        if !x.killed || x.trap_spawned || x.chests.is_empty() {
+            return;
+        }
+    }
+    let mut trap: Option<UnitId> = None;
+    let mut k = 0;
+    // The count is re-read every iteration.
+    while k < x5(ctl, i).chests.len() {
+        let g = x5(ctl, i).chests[k];
+        k += 1;
+        let Some((c, _)) = w.object_by_guid(g) else {
+            continue;
+        };
+        let Some((cx, cy, croom)) = w.unit_position(c) else {
+            // An object always has a room (its static path); one without
+            // is an invariant violation, reported as fatal.
+            ctl.faults.push(QuestError::Fatal(0x0059_54F0));
+            continue;
+        };
+        if trap.is_none() {
+            let (x, y) = x5(ctl, i).death_pos;
+            trap = w
+                .room_at(croom, x, y)
+                .and_then(|room| w.spawn_monster_flags(room, x, y, TRAP_MONSTER, 12, -1, 8));
+            if trap.is_none() {
+                // The retry's room is not tested by the original; no
+                // room here means no spawn.
+                let (x, y) = (cx + 5, cy + 5);
+                trap = w
+                    .room_at(croom, x, y)
+                    .and_then(|room| w.spawn_monster_flags(room, x, y, TRAP_MONSTER, 12, -1, 8));
+            }
+        }
+        let Some(t) = trap else { continue };
+        x5(ctl, i).trap_spawned = true;
+        if let Some(m) = w.create_missile(t, 0, 1, CHEST_MISSILE, cx, cy) {
+            w.set_missile_target(m, g, 0);
+            w.refresh_room(m);
+        }
+    }
+}
+
+/// The trap step, then event 7 on `unit` at frame + 10 while no trap
+/// was spawned.
 fn trap_step<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, unit: UnitId) {
-    // TODO(quests OQ12): the trap step's spawns are not stated as rules.
-    w.unhandled(CHAIN, TRAP_STEP);
+    trap(ctl, w, i);
     if !x5(ctl, i).trap_spawned {
         let at = w.frame() + 10;
         w.schedule_quest_event(unit, at);
@@ -441,7 +491,7 @@ pub fn chest_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Unit
 /// spawned.
 pub fn chest_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
     let Some(i) = ctl.find(CHAIN) else { return };
-    w.unhandled(CHAIN, TRAP_STEP);
+    trap(ctl, w, i);
     let x = x5(ctl, i);
     if x.killed && !x.trap_spawned {
         let at = w.frame() + 10;

@@ -8,6 +8,7 @@ use crate::rng::Seed;
 use super::active::ActiveRoom;
 use super::data::DrlgData;
 use super::level::Drlg;
+use super::logic::LogicInfo;
 use super::seams::{LevelTypes, Services};
 use super::tiles::RoomTiles;
 use super::{is_town, room_flags, DrlgError, DrlgRoomId, LevelIdx, TileRect};
@@ -80,6 +81,8 @@ pub struct DrlgRoom {
     pub(super) library: Vec<u32>,
     pub(super) tiles: Option<RoomTiles>,
     pub(super) active: Option<ActiveRoom>,
+    /// Logical-room info (+0x64, `levels.md` §11.1), built with the tiles.
+    pub(super) logic: Option<LogicInfo>,
 }
 
 impl DrlgRoom {
@@ -96,6 +99,11 @@ impl DrlgRoom {
     /// The active room, if any.
     pub fn active(&self) -> Option<&ActiveRoom> {
         self.active.as_ref()
+    }
+
+    /// The logical-room info (coordinate lists), if built.
+    pub fn logic(&self) -> Option<&LogicInfo> {
+        self.logic.as_ref()
     }
 }
 
@@ -184,6 +192,7 @@ impl Drlg {
             library: Vec::new(),
             tiles: None,
             active: None,
+            logic: None,
         };
         room.init_seed = room.seed.step();
         if self.level(level).flags & super::level::LEVEL_FLAG_CLIENT != 0 {

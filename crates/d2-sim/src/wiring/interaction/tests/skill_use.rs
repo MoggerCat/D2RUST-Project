@@ -438,7 +438,7 @@ impl Fx {
             skills: skills.clone(),
             combat: combat_tables(vec![monster_class()]),
             levels: vec![blank::<Levels>(); 150],
-            skill_modes: vec![[0; 4]],
+            skill_modes: vec![[0; 8]],
         };
         let hooks = ActionHooks::new(
             Arc::new(tables),

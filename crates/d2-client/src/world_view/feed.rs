@@ -30,8 +30,9 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
-use crate::rules::draw_order::source::{ordered_source, TileArt};
+use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile};
+use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
@@ -80,6 +81,17 @@ pub trait ViewFeed: ViewSource {
         Ok(None)
     }
 
+    /// The weather state of the frame (`draw-order-2.md` §11; pools,
+    /// floor context, the local player's seed, update count, `Mud`).
+    /// `None` (the default): no weather state; a frame that draws a water
+    /// floor then fails (§11.5 draws the player's seed per such floor).
+    fn weather_frame(
+        &mut self,
+        _world: &ClientWorld,
+    ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
+        Ok(None)
+    }
+
     /// TODO(spec: render/blend-modes.md, render/lighting.md)
     /// (`draw-order.md` §8): the fade clock of the frame.
     fn fade_clock(&self, _world: &ClientWorld) -> Result<FadeClock, ViewError> {
@@ -104,6 +116,22 @@ pub trait ViewFeed: ViewSource {
     /// level, i.e. [`blank_screen`] of its `Levels.txt` row; it decides
     /// the frame's start-of-frame clear ([`crate::scene::FrameCycle::plan`]).
     fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError>;
+
+    /// TODO(spec: client/model.md light records, `render/lighting.md` §8):
+    /// the frame's light (`lighting.md` §1 r3: the light map rebuilt per
+    /// drawn frame, the act's shade tables) and the per-unit look inputs.
+    /// `Some` makes [`build_frame`] answer unit `shade` / `blend` through
+    /// [`LitRules`]; `None` (the default) leaves them to the rules.
+    fn light(&self, _world: &ClientWorld) -> Result<Option<FeedLight<'_>>, ViewError> {
+        Ok(None)
+    }
+}
+
+/// What [`ViewFeed::light`] hands the frame build.
+#[derive(Clone, Copy)]
+pub struct FeedLight<'a> {
+    pub light: &'a FrameLight,
+    pub look: &'a dyn LookFeed,
 }
 
 /// BlankScreen of a `Levels.txt` row (record `+0x218`, `composition.md`
@@ -251,13 +279,8 @@ where
             assets,
         ),
         Some((camera, mode)) => match ordered_source(world, &camera, mode, feed, assets)? {
-            Some(source) => build(
-                world,
-                ui,
-                &OriginalView::new(camera, rules, &source),
-                assets,
-            ),
-            None => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
+            Some(source) => build_lit(world, ui, rules, camera, &source, source.source, assets),
+            None => build_lit(world, ui, rules, camera, &*feed, &*feed, assets),
         },
         None => build(
             world,
@@ -268,6 +291,35 @@ where
             },
             assets,
         ),
+    }
+}
+
+/// [`build`] through [`OriginalView`], with unit `shade` / `blend` from
+/// the feed's light ([`LitRules`]) when it states one.
+fn build_lit<R, S, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    camera: Camera,
+    source: &S,
+    feed: &F,
+    assets: &ViewAssets,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    S: ViewSource + ?Sized,
+    F: ViewFeed + ?Sized,
+{
+    match feed.light(world)? {
+        Some(l) => {
+            let lit = LitRules {
+                rules,
+                feed: l.look,
+                light: l.light,
+            };
+            build(world, ui, &OriginalView::new(camera, &lit, source), assets)
+        }
+        None => build(world, ui, &OriginalView::new(camera, rules, source), assets),
     }
 }
 

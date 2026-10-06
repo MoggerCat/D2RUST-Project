@@ -182,8 +182,20 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.group_spawn(boss, class, a, b, c, flags);
     }
 
+    /// `0x00555230(type 2, class, …)` with the object init
+    /// (`objects.md` §3, §6) on the action wiring's object state
+    /// ([`crate::wiring::action::View::create_object`]); a game without
+    /// one: [`WorldPending::create_object`].
+    ///
+    /// TODO(population.md §7 step 6, objects.md §3): the allocation
+    /// mode of this creation is not stated; mode 0 is used.
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32) {
-        self.v.h.x.create_object(room, class, x, y);
+        match u32::try_from(class) {
+            Ok(c) if self.v.h.objects.is_some() => {
+                self.v.create_object(self.game, room, c, x, y, 0);
+            }
+            _ => self.v.h.x.create_object(room, class, x, y),
+        }
     }
 
     fn barricade_object(&mut self, unit: UnitId, class: i32) {

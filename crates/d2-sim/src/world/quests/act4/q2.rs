@@ -474,10 +474,10 @@ fn boss_seal<W: QuestWorld>(
         return;
     };
     x2(ctl, i).bosses[k] = (fx, fy);
-    if w.spawn_object(room, fx, fy, DUMMY, 1, 0, 0).is_none() {
+    if w.spawn_quest_object(room, fx, fy, DUMMY).is_none() {
         return;
     }
-    w.refresh_room(room);
+    w.set_room_portal(room, false);
     seal_activate(ctl, w, object, class);
 }
 
@@ -754,7 +754,7 @@ fn portal_spawn<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, tyra
     let Some((x, y, room)) = w.free_spot_at(room, tx + 5, ty, 2, 0x400, 12, 100) else {
         return;
     };
-    let Some(o) = w.spawn_object(room, x, y, PORTAL, 1, 1, 0) else {
+    let Some(o) = w.place_object(room, x, y, PORTAL, [1, 1, 0]) else {
         return;
     };
     let x = x2(ctl, i);
@@ -798,7 +798,7 @@ pub fn portal_operate<W: QuestWorld>(
         late::set(w, player, ACT5_SLOT, bit::REWARD_GRANTED);
         late::set(w, player, ACT5_SLOT, bit::PRIMARY_GOAL_DONE);
         if w.client_idle(player) {
-            w.clear_interaction(player);
+            w.set_interact_unit(player, None);
             w.set_player_byte_4c(player, 1);
             late::s5d(w, player, CHAIN, 2, 0);
             w.send(player, &[0x61, 5]);

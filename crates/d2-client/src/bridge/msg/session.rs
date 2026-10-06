@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 rule 1, §7, §9)
+// Spec: specs/client/model.md (§3 rule 1, §7, §9, §11 rule 2)
 //! Session messages (0x00–0x06), the local player message (0x0B) and the
 //! room-in-sight messages (0x07, 0x08). The UI, automap, sound and
 //! client-DRLG set-ups these handlers also run in 1.14d are Phase 6
@@ -52,6 +52,9 @@ pub fn load_act(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
         town_level: m.f6,
         f8: m.f8,
     });
+    // §11 rule 2: the act of 0x03 is the palette act. u16@6 is the act's
+    // town, never the player's level (§11 rules 1, 5).
+    w.palette_act = Some(m.act);
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md, specs/render/shading.md, specs/render/blend-modes.md
+// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md, specs/render/shading.md, specs/render/blend-modes.md, specs/render/lighting.md
 //! Original-behavior answers to the world-view hooks, one owner spec per
 //! module. Plain Rust, integer math, no Bevy types.
 //!
@@ -24,22 +24,30 @@
 //! - [`blend`]: draw mode → blend table and the pixel ops of a cel
 //!   (through `scene::PixelTables`), component, missile, item and overlay
 //!   draw modes, shadows, translucent walls (`render/blend-modes.md`).
+//! - [`lighting`]: the light map, light records and sources, the day /
+//!   night environment and the light value of each draw
+//!   (`render/lighting.md`).
 
 pub mod blend;
 pub mod camera;
 pub mod draw_order;
+pub mod lighting;
 pub mod placement;
 pub mod shading;
 pub mod unit_composite;
 pub mod view;
 
 #[cfg(test)]
+mod blend_gdi_tests;
+#[cfg(test)]
 mod gaps_numbered_tests;
 #[cfg(test)]
 mod shading_blend_tests;
+#[cfg(test)]
+mod shading_shift_tests;
 #[cfg(test)]
 mod tests;
 
 pub use camera::{Camera, ClientPos, FrameSize, OpenMode, Shake, TileList, UnitPosition, ViewRect};
 pub use placement::{Cel, Placed, RowPlan};
-pub use view::{BlockRect, MapTile, OriginalView, ViewSource};
+pub use view::{BlockRect, BlockShade, MapTile, OriginalView, ViewSource};

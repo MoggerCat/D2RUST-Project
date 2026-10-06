@@ -608,7 +608,7 @@ fn operate_and_thaw() {
     f.p(P1).items.push(ICE);
     x(&mut ctl).potions = 1;
     frozen_anya_operate(&mut ctl, &mut f, FANA_U, P1);
-    assert_eq!(f.log, ["delete ice ", "portal flag 3"]);
+    assert_eq!(f.log, ["delete ice ", "room portal RoomId(3) false"]);
     let r = ctl.record(CHAIN).unwrap();
     assert_eq!((r.state, r.status), (5, 5));
     let e = &r.extra.a5.q3;
@@ -630,7 +630,7 @@ fn operate_and_thaw() {
     x(&mut ctl).anya_map_ai = 0x99;
     ctl.update(&mut f);
     ctl.update(&mut f);
-    assert_eq!(f.log, ["mode 97 2", "collision 97"]);
+    assert_eq!(f.log, ["mode 97 2", "free collision 97"]);
     assert_eq!(x(&mut ctl).thaw_step, 1);
     // Period 1: due once tick passes due (every second update).
     ctl.update(&mut f);

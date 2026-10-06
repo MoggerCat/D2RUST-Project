@@ -25,8 +25,9 @@ pub trait PopWorld {
     fn room_level(&self, room: RoomId) -> i32;
     /// `0x0061A1F0`: level id of the populated room (0 = none).
     fn populated_level(&self, room: RoomId) -> i32;
-    /// `0x0061ABF0(act, level)`: the level's populated-room count.
-    fn populated_room_count(&self, act: u8, level: i32) -> i32;
+    /// `0x0061ABF0(act, level)`: the level's populated-room count. Allocates
+    /// the level when absent (`drlg/levels.md` §11.5 item 2).
+    fn populated_room_count(&mut self, act: u8, level: i32) -> i32;
     /// `0x0061AD50`: the room's coordinate records, in `next` order.
     fn coord_list(&self, room: RoomId) -> Vec<CoordRect>;
     /// `0x0061AD30(room, x, y)`: the coordinate record at a point.
@@ -37,9 +38,10 @@ pub trait PopWorld {
     fn room_box(&self, room: RoomId) -> RoomBox;
     /// `0x0061AC10`: the room's warp points (subtiles).
     fn warp_points(&self, room: RoomId) -> Vec<(i32, i32)>;
-    /// `0x006427F0`: the level's spawn location of `kind` (tiles), for the
-    /// room's level.
-    fn spawn_location(&self, room: RoomId, kind: u8) -> Option<(i32, i32)>;
+    /// `0x00619E50(act, level, kind)`: the level's spawn location of
+    /// `kind` (tiles; −1 when none), for the room's level. Runs the
+    /// spawn-room choice with its effects (`drlg/levels.md` §11.5 item 4).
+    fn spawn_location(&mut self, room: RoomId, kind: u8) -> Option<(i32, i32)>;
     /// `0x00463740(room, x, y)`: the room holding a point.
     fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
     /// `0x0064D9B0(room, x, y, size, mask) ≠ 0` (`sim/units.md`).

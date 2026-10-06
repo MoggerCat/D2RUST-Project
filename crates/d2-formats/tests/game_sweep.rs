@@ -290,7 +290,8 @@ fn ds1_every_file_parses() {
 // cof.md Status: all 3,605 live `.cof` files parse, every version byte is
 // 20; Edge cases: 3 files of 42 bytes, 1 layer, 1 frame, 1 direction (K =
 // 4: 3 padding bytes); `chars\am\cof\amblxbow.cof` (d2char.mpq) is 72
-// bytes of junk and the only failure, while `amblxbw.cof` parses.
+// bytes of junk and the only failure. There is no `amblxbw.cof` in 1.14d:
+// the Amazon block COFs are `ambl1hs`, `ambl1ht` and `amblhth`.
 // Intended claim (unconfirmed until the first local run): specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
@@ -325,17 +326,29 @@ fn cof_every_live_file_parses() {
         }
     }
     println!("cof: {parsed} parse, failed {failed:?}, 42-byte padded {padded}");
-    // Live: `amblxbw.cof` is in no archive (G1). For the spec writer:
-    // every listed Amazon block (`ambl*`) COF and its holders.
-    for n in listed(&set)
-        .iter()
+    // cof.md Test vectors: the listed Amazon block (`ambl*`) COFs are
+    // `ambl1hs`, `ambl1ht`, `amblhth` (which parse) and the junk file.
+    let ambl: Vec<String> = listed(&set)
+        .into_iter()
         .filter(|n| n.starts_with(r"data\global\chars\am\cof\ambl"))
-    {
+        .collect();
+    for n in &ambl {
         println!("  {n}: {:?}", holders(&set, n));
     }
     assert_eq!(parsed, 3_605);
     assert_eq!(failed, [(format!("d2char.mpq:{junk}"), 72)]);
-    Cof::parse(&read(&set, r"data\global\chars\am\cof\amblxbw.cof")).unwrap();
+    assert_eq!(
+        ambl,
+        [
+            r"data\global\chars\am\cof\ambl1hs.cof",
+            r"data\global\chars\am\cof\ambl1ht.cof",
+            r"data\global\chars\am\cof\amblhth.cof",
+            junk,
+        ]
+    );
+    for n in &ambl[..3] {
+        Cof::parse(&read(&set, n)).unwrap_or_else(|e| panic!("{n}: {e}"));
+    }
     assert_eq!(padded, 3);
 }
 
@@ -412,28 +425,36 @@ fn font_tables_every_file_parses() {
     assert_eq!(fonts.len(), 14);
 }
 
-// Counted by the case-sensitive `mpq-tool formats`; before EXTRA_NAMES
-// were added here this sweep printed 29 tables in 10 languages on two PCs.
-// Not changed until the fixed `mpq-tool formats` re-derives the count, and
-// `tbl.md` names the 11th language.
-// tbl.md Status: all 33 string tables (11 languages) parse, every key
-// resolves to its own slot, all keys are ASCII, every version byte is 1.
-// Test vector: a key may instead resolve to an earlier slot holding the
-// same key (a duplicate first in the probe sequence).
-// Intended claim (unconfirmed until the first local run): specs/formats/tbl.md §header-21-bytes, §strings, §key-lookup
+// tbl.md Status / §Live tables: 29 string-table copies (20 distinct
+// paths, 10 language folders plus ENG\BETA, names case-insensitive) in
+// d2data, d2exp and Patch_D2; every key is ASCII, every version byte is 1,
+// used entries equal `num_elements`, the header file size equals the file
+// length. §Strings / Test vectors: 63,167 used entries, 16,786 values hold
+// a byte >= 0x80 and all decode as strict UTF-8, none holds a raw `FF`,
+// 130 hold `C3 BF`. Test vector (eng tables): every key resolves to its
+// own slot, or to an earlier slot holding the same key (a duplicate first
+// in the probe sequence).
+// Intended claim (unconfirmed until the first local run): specs/formats/tbl.md §header-21-bytes, §strings, §live-tables-1-14d, §key-lookup
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn string_tables_every_key_resolves() {
     let (_, strings) = tables(&set());
     let mut languages = BTreeSet::new();
+    let mut paths = BTreeSet::new();
     let (mut keys, mut to_duplicate) = (0usize, 0usize);
+    let (mut non_ascii, mut raw_ff, mut c3bf) = (0usize, 0usize, 0usize);
     for (name, b) in &strings {
         let t = StringTable::parse(b).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(t.header.version, 1, "{name}");
+        assert_eq!(t.header.file_size as usize, b.len(), "{name}");
         let path = name.split_once(':').unwrap().1;
-        if let Some(rest) = path.strip_prefix(r"data\local\lng\") {
-            languages.insert(rest.split('\\').next().unwrap().to_string());
-        }
+        paths.insert(path.to_string());
+        let rest = path
+            .strip_prefix(r"data\local\lng\")
+            .unwrap_or_else(|| panic!("{name}: string table outside data\\local\\lng"));
+        languages.insert(rest.split('\\').next().unwrap().to_string());
+        let used = t.entries.iter().filter(|e| e.used).count();
+        assert_eq!(used, usize::from(t.header.num_elements), "{name}");
         for (slot, e) in t.entries.iter().enumerate().filter(|(_, e)| e.used) {
             assert!(e.key.is_ascii(), "{name} slot {slot}");
             let found = t
@@ -444,15 +465,48 @@ fn string_tables_every_key_resolves() {
                 to_duplicate += 1;
             }
             keys += 1;
+            if !e.value.is_ascii() {
+                non_ascii += 1;
+                std::str::from_utf8(&e.value)
+                    .unwrap_or_else(|err| panic!("{name} slot {slot}: not UTF-8: {err}"));
+            }
+            // A valid UTF-8 string never holds an `FF` byte; counted
+            // separately so a failure names the spec's own count.
+            if e.value.contains(&0xFF) {
+                raw_ff += 1;
+            }
+            if e.value.windows(2).any(|w| w == [0xC3, 0xBF]) {
+                c3bf += 1;
+            }
         }
     }
     println!(
-        "string tables: {} ({} languages {languages:?}), {keys} keys, {to_duplicate} resolve to an earlier duplicate",
+        "string tables: {} ({} paths, {} languages {languages:?}), {keys} used entries, \
+         {to_duplicate} resolve to an earlier duplicate, {non_ascii} non-ASCII values, \
+         {raw_ff} raw FF, {c3bf} with C3 BF",
         strings.len(),
+        paths.len(),
         languages.len()
     );
-    assert_eq!(strings.len(), 33);
-    assert_eq!(languages.len(), 11);
+    assert_eq!(strings.len(), 29);
+    assert_eq!(paths.len(), 20);
+    let expected: BTreeSet<String> = [
+        "chi", "deu", "eng", "esp", "fra", "ita", "jpn", "kor", "pol", "por",
+    ]
+    .iter()
+    .map(|l| l.to_string())
+    .collect();
+    assert_eq!(languages, expected);
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.starts_with(r"data\local\lng\eng\beta\")),
+        "ENG\\BETA"
+    );
+    assert_eq!(keys, 63_167);
+    assert_eq!(non_ascii, 16_786);
+    assert_eq!(raw_ff, 0);
+    assert_eq!(c3bf, 130);
 }
 
 fn name_of(r: &AnimRecord) -> String {

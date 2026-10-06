@@ -785,7 +785,7 @@ pub fn frozen_anya_operate<W: QuestWorld>(
             ctl.faults.push(e);
         }
         if let Some((_, _, room)) = pos {
-            w.clear_room_portal_flag(room);
+            w.set_room_portal(room, false);
         }
     }
     0

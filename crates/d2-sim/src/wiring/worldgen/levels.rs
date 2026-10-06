@@ -402,7 +402,8 @@ impl LevelTypes for WorldTypes {
     /// A door cell's preset unit `0x0066D9E0` (`preset.md` §11) in a
     /// preset room.
     // TODO(preset.md §11, rooms.md §9.5.1): the door record's flag 0x20
-    // (`DoorOutcome::Placed`) is the tile code's; the seam returns
+    // (`DoorOutcome::sets_record_flag`: a unit placed or `roll(3)` = 0)
+    // is the tile code's; the seam returns
     // nothing, so it is not set. The call sites create new records (flag
     // clear) or no record, so no call is skipped by it today.
     fn door_unit(

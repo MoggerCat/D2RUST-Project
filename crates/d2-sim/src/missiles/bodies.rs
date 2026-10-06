@@ -21,17 +21,17 @@ use super::seams::SkillCalc;
 use super::{param_flags, stat, Ctx, MissileWorld};
 
 /// i32 view of a 16-bit row field.
-fn i16v(v: u16) -> i32 {
+pub(super) fn i16v(v: u16) -> i32 {
     i32::from(v as i16)
 }
 
 /// The missile's position (path x / y).
-fn pos<W: MissileWorld + ?Sized>(cx: &Ctx<'_, W>, m: UnitId) -> (i32, i32) {
+pub(super) fn pos<W: MissileWorld + ?Sized>(cx: &Ctx<'_, W>, m: UnitId) -> (i32, i32) {
     cx.world.position(m)
 }
 
 /// (skill, level) of the missile (data +0x0A / +0x0C).
-fn skill_level<W: MissileWorld + ?Sized>(cx: &Ctx<'_, W>, m: UnitId) -> (i32, i32) {
+pub(super) fn skill_level<W: MissileWorld + ?Sized>(cx: &Ctx<'_, W>, m: UnitId) -> (i32, i32) {
     cx.store
         .get(m)
         .map_or((0, 0), |d| (i32::from(d.skill), i32::from(d.level)))
@@ -436,7 +436,7 @@ pub fn next_unit<W: MissileWorld + ?Sized>(
 
 /// The radius / length of server-hit 1, 12, 13: the row value when > 0,
 /// else `max(eval(skill calc), 1)` (`None`: no skill record).
-fn row_or_skill<W: MissileWorld + ?Sized>(
+pub(super) fn row_or_skill<W: MissileWorld + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
     m: UnitId,

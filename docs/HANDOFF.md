@@ -1673,6 +1673,19 @@ incl. 1,580 missile, 186 snapshots) and melee `...-021854-tick.jsonl`:
 
 ### A. Needs the player (record_*.py, Windows, `game/`)
 
+**Draw order 2 (`impl-draw-order-2`, 2026-10-06;
+`docs/handoff/impl-draw-order-2.md`).** (1) `weather-0001`: Rogue
+Encampment in rain, record two frames with the player seed per frame and
+the three weather pools (`capture.md` §3.4 + pools); compare pass 4 / 9
+pixels and count the player-seed draws per frame against the drawn water
+floors (`draw-order-2.md` §11.5: one `roll_range(0, 1000)` each). Also
+note whether splashes appear while int(intensity) is 0 (question W5).
+(2) Walk past the walls of a `Logicals` preset room (Crypt / Mausoleum,
+levels 18, 19) with the frame lists recorded: the group-mode fade
+(`draw-order.md` §8, OQ6) on pixels. (3) Arcane Sanctuary and Arreat
+Summit captures with `[0x00712C4C]` / `[0x00712C50]` recorded
+(`draw-order-2.md` §12).
+
 **RT-R1 (fifth fold, `wire-routing` §7 check 2):** a recording of a unique
 monster with a mode-1 umod dying (e.g. fire enchanted, umod 9), group A:
 `record_tick.py` with the timer hooks. Look for the type-7 timer's frame
@@ -1994,6 +2007,14 @@ ones, but they need `traces/raw/`, so local):
   killed **0** of the 149 `d2-sim` mutant survivors today.
 
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**`impl-draw-order-2` questions** (owner `render/draw-order-2.md`, also
+`unit-composite.md`): W1–W7 (weather state, snow spawn draws, snow line
+table, colour ramps, the intensity scale vs observed splashes, flash /
+particle order, initial values), §12 seed width / star tick / palette /
+summit build order, §14 extents and edge-floor keys, §16 missing grid
+cell and r1 stop cell; listed in `docs/handoff/impl-draw-order-2.md`
+"Questions for the spec owner".
 
 **From the 2026-10-06 captures:** the cursor
 draw call and its animation counter (owner `render/capture.md` /
@@ -2723,6 +2744,87 @@ the dev-dependency) and record results here.
     'crates/d2-sim/src/items/**' -- --lib -- items:: --iterate` with
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
+65. Act III / Act V on live tables (`impl-drlg-act3-5`): `D2_GAME_DIR=<install>
+    cargo test -p d2-sim --test game_drlg_tables act3_act5 -- --ignored`.
+    Expect `act3_act5_table_values` (the leveldefs / lvlprest values of
+    `outdoor-act3-act5.md` Test vectors "Real 1.14d values") and
+    `act3_act5_placement_on_live_tables` (the derived Act III placement:
+    DRLG seed after {4015082244, 577631236}, rects and block ids of 76..78,
+    Kurast chain; Act V rects of 110, 111, 112, 117) to pass. A mismatch is
+    a finding for `outdoor-act3-act5.md`. Recordings of Act 3 creation and
+    of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
+66. **C66 Character saves** (`claude/impl-d2s`, note
+    `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
+    (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
+    d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
+    `.d2s` parses in `formats/d2s.md` §1 order and rewrites byte for
+    byte; record header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD,
+    `jf`/`kf` bytes (d2s OQ3). (2) The three `d2s-tool new` / `new-stub`
+    characters of LOCAL-RUN 6.7 load in 1.14d; after the game re-saves
+    them, `d2s-tool check` passes and `dump` of ours vs the game's shows
+    no difference outside the save time. A difference in an item record
+    is an `items/bitstream.md` §5 finding.
+67. Lighting tables against `Game.exe` (`impl-lighting-blend`; Ghidra or a
+    hex read of the 1.14d `Game.exe`, no run): `specs/render/env-periods.tsv`
+    = the 18 × 12-byte entries at `0x007443F0`, `0x00744438`, `0x00744480`
+    (start degree, type, color `0x00BBGGRR`), and
+    `specs/render/wall-light-points.tsv` = `0x0072A9E8` / `0x0072ABC8` (9
+    directions × 6 points × 2 tables). Expect identical rows; the repo
+    tests only hold the TSVs to the spec text.
+68. Monster colormap file sizes (`impl-lighting-blend`, `shading.md` §6):
+    `mpq-tool extract` `Data\Global\Monsters\RandTransforms.dat` (expect
+    7,680 bytes = 30 headerless maps), `GreenBlood.dat` (expect 256) and one
+    class's `palshift.dat` (expect 2,048). Another size means
+    `rules::shading::{rand_transforms_map, blood_map}` read the wrong bytes.
+69. Environment per tick (`lighting.md` OQ7, `impl-lighting-blend`): record
+    env `+0x0C` (and R, G, B `+0x18..+0x1A`) every client update over one
+    in-game day and replay `rules::lighting::environment::Environment::update`
+    from the same start; expect equal on every tick. Add the light-map
+    SHA-256 (`LightMap::digest`, 18,432 bytes at `0x007B0E68`) and `q` to the
+    capture key (§12 r3, OQ9).
+70. Captures for the GDI and shadow rules (`impl-lighting-blend`): a weather
+    line or Arcane Sanctuary star (static camera) compared with
+    `rules::blend::gdi_line_pixels` — settles `blend-modes.md` §8 r1's
+    |dx| = |dy| major axis (now `BlendError::LineMajorAxisTie`) and whether
+    the line reaches (x1, y1); the player's shadow on a flat floor against
+    `unit_shadow_position` (blend-modes OQ1).
+
+71. Panel files (`impl-ui-panels` §4): `D2_GAME_DIR=<install> cargo test -p
+    d2-client --test game_panels -- --ignored`. Expect both tests to pass:
+    every quad set of `panel-layout.tsv` (`art0` rows, the seven
+    `skltree_?_back`) has frames f … f + 3 of 256 × 256, 64 × 256, 256 × 176,
+    64 × 176 with offsets 0; the frame counts / sizes of `ui/panels.md`
+    §Constants (`buysellbtn` 23 from `d2exp`, `buyselltabs` 8 × 79 × 31, …).
+    A different count is a finding for the spec (archive order,
+    `client/assets.md`), not a reason to change the test.
+72. WAV on game files (`impl-audio`, `formats/wav.md` Test vectors):
+    `cargo test -p d2-formats --test wav_game -- --ignored`. Expect both
+    tests to pass: the 8 spec files match (source archive, channels, frames,
+    sum, first 8 samples, CRC-32 of `data`), and every `sounds.txt` row whose
+    file exists parses playable: 4,508 resolved, 4,434 mono, 74 stereo. A
+    mismatch is a finding for `wav.md` or `mpq.md` §12.
+73. Sound table on game files (`impl-audio`, `audio/sound-table.md` Test
+    vectors): `cargo test -p d2-client --lib sound_table::tests::game --
+    --ignored`. Expect 4,699 records, song range 4,657–4,684; id 1 →
+    `DATA\GLOBAL\SFX\cursor\pass.wav` (d2sfx, Volume 255, Priority 100);
+    ids 202–204 base 202 (size 3); 309 size 5 compound 4; 314 opens a group
+    of 3; 2934 in d2speech; 4657 `DATA\GLOBAL\MUSIC\act1\caves.wav` (Loop,
+    Stream, 1 block); 4679 2 blocks; 4698 in d2xmusic; 1595 Volume 0 and
+    missing; 4640 missing; 4,508 resolve, 157 `none.wav`, 34 missing, 698
+    group openers, 7 nested. Then write the environment / triggers real-data
+    tests on `SoundTableData::from_txt` (`impl-audio` note §2 step 2).
+74. Sound request log (player; `triggers.md` / `environment.md` "Checks",
+    `record_sound.py` hooks `0x004B9A00`, `0x004B9B50`, `0x004E40A0`,
+    `0x004DCAA0`, `0x004DCD40`, `0x004E42E0`, `0x004B99A0`, `0x004CC270`):
+    town walk, a fight, an NPC talk, item moves, town → wilderness → cave and
+    back, a day change, Blood Raven's death. Expect the d2rs rule functions,
+    fed the same inputs, to give the identical `(C, id, unit, delay, flags,
+    offset)` sequence, volume sets and roll order; then the voice log
+    `(tick, kind, file, vol, pan, looped)` (`client/audio.md` §A5).
+75. Decoded samples (`wav.md` OQ 1–2, `client/audio.md` §B1): dump the
+    DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
+    `music\act1\crypt.wav`) for the C65 files; expect byte equality with
+    our `data`.
 
 Kept entries (unchanged):
 

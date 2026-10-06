@@ -353,7 +353,7 @@ fn arm<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
         }
     }
     for &(_, o) in &units {
-        w.unit_room_portal_flag(o, false);
+        late::unit_room_portal(w, o, false);
     }
     let at = w.frame() + ARM_DELAY;
     for &(k, o) in &units {
@@ -763,11 +763,11 @@ pub fn keep_door_operate<W: QuestWorld>(
             w.set_object_mode(object, 1);
             let at = w.frame() + (w.object_anim_length(object) >> 8);
             w.schedule_object_event(object, 1, at);
-            w.unit_room_portal_flag(object, false);
+            late::unit_room_portal(w, object, false);
         }
         2 => {
             w.object_stairs_warp(player, object);
-            w.unit_room_portal_flag(object, true);
+            late::unit_room_portal(w, object, true);
         }
         _ => {}
     }

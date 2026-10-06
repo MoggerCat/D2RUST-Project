@@ -21,11 +21,9 @@ use d2_sim::units::hooks::MonsterInfo;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::ActionHooks;
 use d2_sim::wiring::economy::{EconomyCube, GameFields, QuestRest};
-use d2_sim::wiring::interaction::{Desk, NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::wiring::interaction::{Desk, HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
 use d2_sim::world::cube::{CraftProperty, CubeWorld, StatRead};
-use d2_sim::world::npc::{
-    HireList, ImbueMods, InteractionList, InvEntry, ItemFacts, MercInit, NpcRecord,
-};
+use d2_sim::world::npc::{HireList, ImbueMods, InteractionList, InvEntry, ItemFacts, NpcRecord};
 use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::{NpcLink, Transaction, VendorWorld};
@@ -148,17 +146,39 @@ impl NpcRest for Probe {
     }
     fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
     fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
-    fn set_mode(&mut self, u: UnitId, mode: u8) {
-        self.log.push(format!("mode {} {mode}", u.0));
-    }
     /// The monster spawn (monster spec): none, so the quest mercenary
     /// stops after S→C 0x50 (`npc.md` §7.5).
     fn spawn_mercenary(&mut self, _: UnitId, class: u32, mode: u8) -> Option<UnitId> {
         self.log.push(format!("spawn merc {class} {mode}"));
         None
     }
-    fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
-    fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
+}
+
+impl HirelingRest for Probe {
+    fn set_mode(&mut self, u: UnitId, mode: u8) {
+        self.log.push(format!("mode {} {mode}", u.0));
+    }
+    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
+    fn skill_count(&self) -> u32 {
+        0
+    }
+    fn skill_reqlevel(&self, _: u32) -> Option<i16> {
+        None
+    }
+    fn set_skill_level(&mut self, _: UnitId, _: u32, _: i32) {}
+    fn set_owner(&mut self, _: UnitId, _: u32, _: u8) {}
+    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
+        None
+    }
+    fn join_team(&mut self, _: UnitId, _: UnitId) {}
+    fn hireling_ai(&mut self, _: UnitId) {}
+    fn free_unit(&mut self, _: UnitId) {}
+    fn queue_room_removal(&mut self, _: UnitId) {}
+    fn death_event(&mut self, _: UnitId) {}
+    fn dismiss(&mut self, _: UnitId) {}
+    fn warp_to(&mut self, _: UnitId, _: UnitId) {}
+    fn level_events(&mut self, _: UnitId, _: UnitId) {}
+    fn reapply_item_stats(&mut self, _: UnitId) {}
 }
 
 impl QuestRest for Probe {

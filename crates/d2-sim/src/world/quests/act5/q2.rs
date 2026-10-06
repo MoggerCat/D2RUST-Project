@@ -340,13 +340,16 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     if w.monster_class(victim) == Some(PRISON_DOOR) {
         // Step 1.
         if let Some((_, _, room)) = w.unit_position(victim) {
-            w.clear_room_portal_flag(room);
+            w.set_room_portal(room, false);
             for u in w.adjacent_units(room) {
                 if w.monster_class(u) != Some(BARBARIAN) {
                     continue;
                 }
                 let mode = w.unit_mode(u);
-                if mode == DEAD || mode == 0 || w.unit_distance(u, victim).is_none_or(|d| d >= 15) {
+                if mode == DEAD
+                    || mode == 0
+                    || w.distance_between(u, victim).is_none_or(|d| d >= 15)
+                {
                     continue;
                 }
                 let g = w.guid(u);
@@ -496,7 +499,7 @@ pub fn rescue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: UnitId, b: Un
     for u in w.adjacent_units(proom) {
         if w.monster_class(u) == Some(PRISON_DOOR)
             && w.unit_mode(u) == DEAD
-            && w.unit_distance(u, b).is_some_and(|d| d < 15)
+            && w.distance_between(u, b).is_some_and(|d| d < 15)
         {
             door = Some(u);
             break;
@@ -529,7 +532,7 @@ pub fn rescue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, p: UnitId, b: Un
         e.portal_guid[g] = og;
         let frame = w.frame() + PORTAL_DELAY;
         w.schedule_quest_event(o, frame);
-        w.clear_room_portal_flag(oroom);
+        w.set_room_portal(oroom, false);
     }
     completion_check(ctl, w, i, p);
 }
