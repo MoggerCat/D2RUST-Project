@@ -20,46 +20,46 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 65–84 |
-| Inputs | 85–92 |
-| Outputs / state changes | 93–97 |
-| Rules | 98–99 |
-|   1. Server-do 17 Cairn Stones `0x005AF240` | 100–119 |
-|   2. Server-do 28 Volcano `0x005AFB80` | 120–142 |
-|   3. Server-do 34 Baal taunt control `0x005B04A0` | 143–165 |
-|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 166–186 |
-|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 187–201 |
-|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 202–239 |
-|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 240–257 |
-|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 258–288 |
-|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 289–330 |
-|   10. Server-hit 36 missile in air `0x005ABF70` | 331–347 |
-|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 348–390 |
-|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 391–419 |
-|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 420–434 |
-|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 435–449 |
-|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 450–469 |
-|   16. Server-hit 52 Blade Fury `0x005AC940` | 470–488 |
-|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 489–517 |
-|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 518–534 |
-|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 535–591 |
-|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 592–604 |
-|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 605–615 |
-|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 616–635 |
-|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 636–652 |
-|   24. Server-hit 8 Blaze `0x005AA180` | 653–664 |
-|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 665–702 |
-|   26. Server-do 9 bat lightning bolt `0x005AE940` | 703–714 |
-|   27. Server-hit 15 spider goo lay `0x005AAD40` | 715–724 |
-|   28. Server-hit 17 Howl `0x005AAFB0` | 725–741 |
-|   29. Server-do 11 finger mage spider `0x005AEB60` | 742–761 |
-|   30. Server-hit 19 finger mage spider `0x005AB110` | 762–771 |
-| Constants & data dependencies | 772–813 |
-| Randomness | 814–832 |
-| Edge cases & original bugs | 833–862 |
-| Test vectors | 863–890 |
-| Provenance | 891–920 |
-| Open questions | 921–937 |
+| Summary | 65–85 |
+| Inputs | 86–93 |
+| Outputs / state changes | 94–98 |
+| Rules | 99–100 |
+|   1. Server-do 17 Cairn Stones `0x005AF240` | 101–120 |
+|   2. Server-do 28 Volcano `0x005AFB80` | 121–143 |
+|   3. Server-do 34 Baal taunt control `0x005B04A0` | 144–166 |
+|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 167–187 |
+|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 188–202 |
+|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 203–240 |
+|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 241–258 |
+|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 259–289 |
+|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 290–331 |
+|   10. Server-hit 36 missile in air `0x005ABF70` | 332–348 |
+|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 349–391 |
+|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 392–420 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 421–435 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 436–450 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 451–470 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 471–489 |
+|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 490–518 |
+|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 519–535 |
+|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 536–592 |
+|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 593–605 |
+|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 606–616 |
+|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 617–636 |
+|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 637–653 |
+|   24. Server-hit 8 Blaze `0x005AA180` | 654–665 |
+|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 666–703 |
+|   26. Server-do 9 bat lightning bolt `0x005AE940` | 704–715 |
+|   27. Server-hit 15 spider goo lay `0x005AAD40` | 716–725 |
+|   28. Server-hit 17 Howl `0x005AAFB0` | 726–742 |
+|   29. Server-do 11 finger mage spider `0x005AEB60` | 743–762 |
+|   30. Server-hit 19 finger mage spider `0x005AB110` | 763–772 |
+| Constants & data dependencies | 773–817 |
+| Randomness | 818–836 |
+| Edge cases & original bugs | 837–866 |
+| Test vectors | 867–894 |
+| Provenance | 895–924 |
+| Open questions | 925–941 |
 <!-- /index -->
 
 ## Summary
@@ -80,7 +80,8 @@ on the missile's own unit seed (unit +0x20) after the re-seed named.
 
 From §6 on, the bodies that were still `summarized` or `D2MOO-only` in
 the catalogues follow, ordered by how many live `missiles.txt` rows use
-them (table under Constants), ties by the lowest row.
+them (table under Constants), ties by the lowest row; from §31 on they
+continue in `missiles/bodies-2.md`.
 
 ## Inputs
 
@@ -802,13 +803,16 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 ≤ 0, so it counts for nothing). These are the functions that were
 `summarized` or `D2MOO-only` before this spec, in writing order:
 
+Section numbers prefixed "2:" are in `missiles/bodies-2.md` (this
+spec's continuation past 60 KB).
+
 | Rows | Functions (lowest row) → section |
 |---|---|
 | 6 | hit 2 (43) §6 |
 | 4 | hit 3 (44) §8, do 6 (68) §7, hit 14 (101) §9, hit 36 (385) §10 |
 | 3 | hit 10 (86) §11, hit 16 (146) §12, hit 18 (149) §13, hit 26 (249) §14, do 14 (250) §15, hit 27 (250) §15, hit 52 (505) §16 |
 | 2 | hit 7 (55) §17, hit 44 (429) §8, do 22 (431) §18, hit 45 (431) §19, do 23 (441) §20, do 26 (471) §21, do 31 (517) §22, hit 56 (577) §23 |
-| 1 | hit 8 (67) §24, hit 9 (85) §25, do 9 (123) §26, hit 15 (143) §27, hit 17 (148) §28, do 11 (177) §29, hit 19 (177) §30, do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407) §19, hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
+| 1 | hit 8 (67) §24, hit 9 (85) §25, do 9 (123) §26, hit 15 (143) §27, hit 17 (148) §28, do 11 (177) §29, hit 19 (177) §30, do 12 (179) 2:§31, hit 20 (206) 2:§32, do 13 (207) 2:§33, hit 21 (219) 2:§34, hit 22 (233) 2:§35, hit 24 (238) 2:§36, hit 25 (239) 2:§37, hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407) §19, hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
 | 0 | do 24 (shares do 23's address) §20, do 37, hit 5, hit 6, hit 11, hit 23 |
 
 ## Randomness

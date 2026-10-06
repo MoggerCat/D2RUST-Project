@@ -19,12 +19,12 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 17	0x005AAFB0	MISSMODE_SrvHit17_Howl	1	howl(148)	- (skill params)	none	monster without auratargetstate and with level < owner level + lvl + Param2: terror install 0x005DDD00 (Param3/4, Param5/6); returns 0 (bodies.md §28)	spec'd-here
 18	0x005AB0B0	MISSMODE_SrvHit18_Shout_BattleCommand_BattleOrders	3	shout(149) battlecommand(236) battleorders(237)	-	none	ally unit: shout_state 0x005D8290 (skills/bodies.md §6.8); returns 0 (bodies.md §13)	spec'd-here
 19	0x005AB110	MISSMODE_SrvHit19_FingerMageSpider	1	fingermagespider(177)	- (skill calcs)	none	as server-hit 16 with auralencalc, no unit -> 1, result 3 (bodies.md §30)	spec'd-here
-20	0x005AB370	MISSMODE_SrvHit20_LightningFury	1	lightningfury(206)	sHitPar1;sHitPar2;HitSubMissile1	-	fires HitSubMissile1 bolts at nearby targets	D2MOO-only
-21	0x005AB500	MISSMODE_SrvHit21_BattleCry	1	battlecry(219)	- (skill calcs)	-	applies the Battle Cry curse	D2MOO-only
-22	0x005ADD20	MISSMODE_SrvHit22_FistOfTheHeavensDelay	1	fistoftheheavensdelay(233)	sHitPar1;sHitPar2;HitSubMissile1	damage rolls	delayed holy bolts/damage to nearby targets	D2MOO-only
+20	0x005AB370	MISSMODE_SrvHit20_LightningFury	1	lightningfury(206)	sHitPar1;sHitPar2;HitSubMissile1;skill aurarangecalc,calc1,aurafilter	none	scan_unit radius sHitPar1 (<=0: aurarangecalc), filter aurafilter or 0xA783: HitSubMissile1 at each of the first sHitPar2 (<=0: calc1) units; returns 3 (bodies-2.md §32)	spec'd-here
+21	0x005AB500	MISSMODE_SrvHit21_BattleCry	1	battlecry(219)	- (skill calcs)	none	accepted unit: apply_state auratargetstate for auralencalc frames, aura_fill; returns 0 (bodies-2.md §34)	spec'd-here
+22	0x005ADD20	MISSMODE_SrvHit22_FistOfTheHeavensDelay	1	fistoftheheavensdelay(233)	sHitPar1;sHitPar2;HitSubMissile1;skill aurarangecalc,calc4,aurafilter	damage rolls (missile seed)	full damage on the stored unit, then HitSubMissile1 at up to sHitPar2 (<=0: calc4) units within sHitPar1 (<=0: aurarangecalc); returns 1 (bodies-2.md §35)	spec'd-here
 23	0x005ACFC0	MISSMODE_SrvHit23_Unused	0	-	sHitPar1	-	no live row	D2MOO-only
-24	0x005A9BF0	MISSMODE_SrvHit24_PantherPotOrange	1	pantherpotorange(238)	sHitPar1	damage rolls	area damage radius sHitPar1	D2MOO-only
-25	0x005AB820	MISSMODE_SrvHit25_PantherPotGreen	1	pantherpotgreen(239)	sHitPar1;HitSubMissile1	-	ring of HitSubMissile1	D2MOO-only
+24	0x005A9BF0	MISSMODE_SrvHit24_PantherPotOrange	1	pantherpotorange(238)	sHitPar1	damage rolls (missile seed)	full damage roll, area damage radius sHitPar1 (<=0: calc1); returns 1 (bodies-2.md §36)	spec'd-here
+25	0x005AB820	MISSMODE_SrvHit25_PantherPotGreen	1	pantherpotgreen(239)	sHitPar1;HitSubMissile1	none	8-direction radius-2 ring (step sHitPar1) of HitSubMissile1 at the hit unit or missile, velocity Param1<<7, loops lvl-1; returns 3 (bodies-2.md §37)	spec'd-here
 26	0x005AB8D0	MISSMODE_SrvHit26_GrimWardStart	3	grimwardsmallstart(249) grimwardmediumstart(252) grimwardlargestart(255)	sHitPar1;HitSubMissile1;skill calc1	none	creates HitSubMissile1 at the missile with range sHitPar1 or max(calc1,5); returns 1 (bodies.md §14)	spec'd-here
 27	0x005ABA00	MISSMODE_SrvHit27_GrimWard	3	grimwardsmall(250) grimwardmedium(253) grimwardlarge(256)	-	none	returns 1 (bodies.md §15)	spec'd-here
 28	0x005ABA10	MISSMODE_SrvHit28_GrimWardScare	1	grimwardscare(259)	- (skill params)	-	scares the hit monster	D2MOO-only
