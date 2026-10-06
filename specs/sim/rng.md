@@ -27,13 +27,13 @@
 |   4. Setting and reading seeds | 127–143 |
 |   5. Where seeds come from | 144–214 |
 |   6. Inlined draws | 215–235 |
-|   7. Which systems draw from which seed | 236–260 |
-| Constants & data dependencies | 261–271 |
-| Randomness | 272–276 |
-| Edge cases & original bugs | 277–289 |
-| Test vectors | 290–338 |
-| Provenance | 339–371 |
-| Open questions | 372–386 |
+|   7. Which systems draw from which seed | 236–261 |
+| Constants & data dependencies | 262–272 |
+| Randomness | 273–277 |
+| Edge cases & original bugs | 278–290 |
+| Test vectors | 291–339 |
+| Provenance | 340–372 |
+| Open questions | 373–387 |
 <!-- /index -->
 
 ## Summary
@@ -251,6 +251,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | DRLG layouts, mazes, outdoor presets | level seed | `0x006714D0`–`0x006735F0`, `0x006744F0`–`0x00674E40`, `0x0067EED0`–`0x00681240` |
 | DRLG tiles | DRLG room seed | `0x0066D820`, `0x0066F690`, `0x00670170` |
 | client weather, particles, missiles, light colour | client seeds (§5.3, §5.5) | `0x00473090`, `0x00476190`, `0x004CDDB0`–`0x004D8260`, `0x004ACC70` |
+| sound variants, environment sound cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590`; owner `audio/sound-table.md` §4 |
 
 Helper call sites: `roll` 476 (mostly AI, skills, items, missiles),
 `roll_range` 37, `mask` 14 (server AI/skills), `step` 1, `mask_range` 0.
