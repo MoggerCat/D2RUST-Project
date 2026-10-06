@@ -38,17 +38,17 @@
 |   4. Equipping | 284–437 |
 |   5. Shared checks | 438–562 |
 |   6. Deferred item messages | 563–612 |
-|   7. Intents | 613–899 |
-|   8. Pickup from the ground | 900–965 |
-|   9. Drop to the ground | 966–1000 |
-|   10. Gold | 1001–1031 |
-|   11. Message layouts | 1032–1057 |
-| Constants & data dependencies | 1058–1080 |
-| Randomness | 1081–1093 |
-| Edge cases & original bugs | 1094–1109 |
-| Test vectors | 1110–1157 |
-| Provenance | 1158–1193 |
-| Open questions | 1194–1236 |
+|   7. Intents | 613–900 |
+|   8. Pickup from the ground | 901–977 |
+|   9. Drop to the ground | 978–1020 |
+|   10. Gold | 1021–1051 |
+|   11. Message layouts | 1052–1077 |
+| Constants & data dependencies | 1078–1100 |
+| Randomness | 1101–1113 |
+| Edge cases & original bugs | 1114–1129 |
+| Test vectors | 1130–1177 |
+| Provenance | 1178–1213 |
+| Open questions | 1214–1251 |
 <!-- /index -->
 
 ## Summary
@@ -656,7 +656,7 @@ Fields: item u32 @1, x u32 @5, y u32 @9, page u32 @13.
 #### 7.4 0x19 RemoveItemFromBuffer (`0x0054ACD0`)
 
 1. Stored item check ≠ 0 → that result.
-2. A cursor item exists → `0x00549A60` (resync, open question 11), 2.
+2. A cursor item exists → `0x00549A60` ("can't do that": S→C 0x5A, 40 bytes `5A 0E 01` then 37 zero bytes, to the player's client; same message as `skills/use.md` skill-start state 1), 2.
 3. Item missing → 2. Page 1 → 3. Item-move gate refuses → 0.
 4. `0x00560420` (to cursor, below); refused with out → 3; else 0.
 
@@ -749,8 +749,9 @@ Owned item check on src (u32 @1) and dst (u32 @5); src = dst → 3.
 quantities and m the max stack (`0x006295B0`, `items/generation.md`
 §1.3): q_s + q_d > m → dst := m, src := q_s + q_d − m (each announced by
 S→C 0x3E, `0x0053D130`), both books (type 18) → `0x0055C070(m − q_d)`,
-dst item flag 0x8; else (when `0x00629930(src)`) dst stat 72 lowered to
-src's if src's is lower (0x3E; open question 15), dst := q_s + q_d
+dst item flag 0x8; else (when `0x00629930(src)`) dst stat 72 (`durability`, live `itemstatcost` row 72) lowered
+to src's if src's is lower (0x3E; throwing weapons keep the worse
+durability), dst := q_s + q_d
 (0x3E), both books → `0x0055C070(q_s)`, cursor := none, S→C 0x42 for
 src, src freed (`0x00557FD0`). Then dst command flag 0x100 (0x9C action
 0xA), update list, refresh. (Different classes never pass §4.5.)
@@ -855,8 +856,8 @@ gold − pile gold (`0x00530EA0`). Result 0.
 #### 7.23 0x61 MercItem (`0x0054D430`), expansion only
 
 1. Classic game → 3. Busy and trading → 3.
-2. Ends with 0 (no effect) unless: the player is not dead (`0x00620250`,
-   open question 16), the player is alive (`0x005541B0` = 0), a hireling
+2. Ends with 0 (no effect) unless: the player has no used skill (`0x00620250`(player): skill list +0x10,
+   `skills/levels.md`; register argument pushed at `0x0054D47A`), the player is alive (`0x005541B0` = 0), a hireling
    exists (`0x00574EC0(7, 0)`), it is alive, and it belongs to the player
    (`0x0065A590`).
 3. No player inventory → 3. Cursor item C present: C's items `quest` = 0
@@ -885,7 +886,7 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
 
 #### 7.24 0x63 ItemToBeltShift (`0x0054D520`)
 
-1. Stored item check ≠ 0 → that result. A cursor item → `0x00549A60`, 2.
+1. Stored item check ≠ 0 → that result. A cursor item → `0x00549A60` (§7.4), 2.
 2. Item missing or not beltable → 2; page ≠ 0 → 3. §3.5 slot (none, or
    < 0) → 0; item-move gate refuses → 0.
 3. No player inventory → fatal; item page ≠ 0 → 2; item mode ≠ 0 → 2;
@@ -956,12 +957,23 @@ player.
    (4, 0) clear unless the code is `leg`; table `0x00731FEC` pairs
    (quest 3, value 4), (0x12, 0x11), (0x13, 0x12), (0x1B, 0x19): the
    quest's flag 0 must be clear.
-6. Held test (`0x0055CA40`): walking the player's item list (and then
-   the item lists of the units in `0x0063D570`'s list), an item not on
-   page 1 that is the same carry-one unique, or a quest item with the
-   same `quest` value and the same code or an equivalent pair (`j34`/
-   `g34`, `bks`/`bkd`, `d33`/`g33`, `hst`/`msf`, more pairs not read:
-   open question 19) → no. Else yes.
+6. Held test (`0x0055CA40`; EAX = list start, EBX = the picked item's
+   items row, stack = the picked item P), run on the player's item list,
+   then on the item list of every unit in the inventory's +0x34 list
+   (`0x0063D570`; nodes linked at +0xC, `0x0063D610`; each node's GUID
+   `0x0063D630` looked up as a player unit, type 0: the player's corpses,
+   D2MOO corpse list). The walk stops at P itself (returns "not held"
+   for the rest of that list). An item X (unit type 4) before P means
+   held → no, when:
+   - P is a unique (quality 7) whose uniqueitems row has `carry1`
+     (flag bit 0x4 at +0x2C, mask `0x006CE270` = 4) and X is not on page
+     1, of quality 7, with the same file index (the row's id at +0); or
+   - X's items `quest` ≠ 0, X not on page 1, X's `quest` equals P's, and
+     the codes are equal or one of the pairs, both orders: `j34`/`g34`,
+     `bks`/`bkd`, `d33`/`g33`, `hst`/`msf`, `hst`/`vip`, and `qf2` with
+     each of `qf1`, `qhr`, `qey`, `qbr` (`0x0055CA00`). This is the full
+     list.
+   Else yes.
 
 ### 9. Drop to the ground
 
@@ -987,7 +999,15 @@ Frame (game +0xA8) plus: quest items (items `quest` ≠ 0) → 0 (never);
 quality (item data +0) 4 (magic) → 30000; quality 5–9 → 45000; gold
 (type 4) with more than 10000 → 45000; other items for which
 `0x0062BEB0` is true (the socket-filler test of §7.19) → 30000; else
-15000. Who reads +0x24: open question 17.
+15000. Stored in item data +0x24 by the drop paths (`0x00554C04`,
+`0x00558B19`). Reader: `0x00558B90(game, act)`, run every 1,500 frames
+for acts 0–4 (`sim/tick.md` §3 step 11): for each room of the act
+(`0x0061A180` first, room +0x7C next), each unit of the room's unit list
+(+0x74, unit +0xE8 next, saved before the body): an item with expiry ≠ 0
+and expiry ≤ game frame (read once at entry) is removed: if it has a room
+(`0x00620BB0`), room unit removal `0x0061A270`, `0x00623830`,
+`0x0064C370`; then unit flag 0x2 cleared, `0x005538D0`, unit free
+`0x00555600`. Quest items (expiry 0) never expire.
 
 #### 9.3 Cube spill (`0x00563840`)
 
@@ -1211,7 +1231,7 @@ dual-wield monster classes are 1.14d constants.
    Settle: Ghidra xrefs of `0x0063CC70`'s list free.
 10. 0x16 with unit types 0 and 5 (players, tiles). Settle: Ghidra
     `0x00548B00` cases 0 and 5 (owner: this spec or the movement spec).
-11. `0x00549A60` (resync after a refused 0x19/0x63). Settle: Ghidra.
+11. Answered: §7.4 step 2 (`0x00549A60` = "can't do that" 0x5A).
 12. 0x19 for a busy player lifting from page 3/4 (allowed?). Settle:
     R2 (stash and cube use while the panels are open).
 13. Belt unequip with potions inside (`0x005608C0`, `0x00567840`).
@@ -1219,17 +1239,12 @@ dual-wield monster classes are 1.14d constants.
 14. Bodies of `0x00561220` (0x1E), `0x00561ED0` (0x27), `0x0055E170`
     (0x20), `0x0055FFA0`/`0x0055D370`/`0x0055D0D0` (pickup specials).
     Settle: Ghidra; item-use spec for 0x20/0x27.
-15. Stat 72 in the stack merge (lowered to the smaller value). Settle:
-    `sim/stats.md` id table.
-16. `0x00620250` in 0x61 (decompile lost its register argument).
-    Settle: Ghidra disassembly.
-17. Reader of the ground expiry (item data +0x24). Settle: Ghidra xrefs;
-    owner `sim/units.md` §6.5.
+15. Answered: §7.12 (stat 72 = `durability`).
+16. Answered: §7.23 step 2 (used skill).
+17. Answered: §9.2 (reader `0x00558B90`).
 18. Owner of the per-client vitals sync `0x00548760` (life/mana 0x18,
     0x95, 0x96; experience 0x1A–0x1C; gold §10.3), including when it
     reaches the gold compare (its early returns depend on a life change
     of ≥ 10 % unless forced). Settle: coordinator names an owner spec;
     R5 confirms the gold bytes and timing.
-19. Full code-equivalence list and the second list walked by the held
-    test `0x0055CA40` (`0x0063D570` / `0x0063D610`). Settle: Ghidra
-    disassembly of `0x0055CA40`.
+19. Answered: §8.4 step 6 (full pair list; second list = corpses).
