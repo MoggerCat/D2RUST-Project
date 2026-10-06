@@ -2630,4 +2630,5 @@ fn null_table_entries_are_flagged() {
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
 
+mod ext;
 mod r9;
