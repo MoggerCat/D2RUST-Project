@@ -9,7 +9,7 @@ use super::tests::{act1_data, data, od, Presets, Rec};
 use super::*;
 use crate::drlg::room::LinkAt;
 use crate::drlg::tiles::RoomGrids;
-use crate::drlg::{DrlgError, NoLevelTypes, PresetUnit, RoomKind, TileRect};
+use crate::drlg::{DrlgError, DrlgRoomId, LevelIdx, NoLevelTypes, PresetUnit, RoomKind, TileRect};
 use crate::rng::Seed;
 
 fn u32s(b: &mut [u8], at: usize, v: u32) {
@@ -601,5 +601,421 @@ fn shrines_cycle_their_bits() {
     assert_eq!(bits.len(), 5);
     for b in [0x1000, 0x2000, 0x4000, 0x8000] {
         assert!(bits.contains(&b), "{b:#x}");
+    }
+}
+
+// ---- place.rs: checks (§2.6, §2.7) -------------------------------------------
+
+/// `outdoor.md` §2.7: shares an edge (margin −1) when one gap is 0 and the
+/// other ≤ −1.
+#[test]
+fn shares_edge_needs_one_zero_gap_and_one_overlap() {
+    use super::place::shares_edge;
+    let a = TileRect::new(0, 0, 8, 8);
+    // East, overlapping in y.
+    assert!(shares_edge(&a, &TileRect::new(8, 4, 8, 8)));
+    // South, overlapping in x.
+    assert!(shares_edge(&a, &TileRect::new(4, 8, 8, 8)));
+    // Corner only: both gaps 0.
+    assert!(!shares_edge(&a, &TileRect::new(8, 8, 8, 8)));
+    // Gap 0 on x, gap 1 on y: apart.
+    assert!(!shares_edge(&a, &TileRect::new(8, 9, 8, 8)));
+    assert!(!shares_edge(&a, &TileRect::new(9, 8, 8, 8)));
+}
+
+/// `outdoor.md` §2.7 / `maze.md` §2 r6: the direction needs both
+/// conditions (W: B.x < A.x and A.x = B.x + B.w).
+#[test]
+fn place_direction_needs_both_conditions() {
+    use super::place::direction;
+    let a = TileRect::new(8, 8, 8, 8);
+    assert_eq!(direction(&a, &TileRect::new(4, 0, 8, 8)), 1);
+    assert_eq!(direction(&a, &TileRect::new(0, 4, 8, 8)), 0);
+    assert_eq!(direction(&a, &TileRect::new(0, 20, 4, 4)), -1);
+    assert_eq!(direction(&a, &TileRect::new(20, 0, 4, 4)), -1);
+    assert_eq!(direction(&a, &TileRect::new(20, 4, 4, 4)), 1);
+    assert_eq!(direction(&a, &TileRect::new(16, 4, 4, 4)), 2);
+    assert_eq!(direction(&a, &TileRect::new(8, 16, 4, 4)), 3);
+}
+
+// ---- place.rs: act-wide placement (§2) ---------------------------------------
+
+/// DRLG creation of act index `act` through the outdoor adapter.
+fn create_act(act: u8, seed: u32, data: &DrlgData) -> Result<(Drlg, Outdoor), DrlgError> {
+    let od = od();
+    let mut outdoor = Outdoor::default();
+    let mut rec = Rec::default();
+    let mut presets = Presets::default();
+    let subs = SubFileMap::default();
+    let mut types = OutdoorTypes {
+        outdoor: &mut outdoor,
+        od: &od,
+        subs: &subs,
+        presets: &mut presets,
+        others: &mut rec,
+        last_error: None,
+    };
+    let drlg = Drlg::create(act, seed, 0, 0, false, data, &mut types)?;
+    Ok((drlg, outdoor))
+}
+
+fn rect_of(drlg: &Drlg, id: u32) -> TileRect {
+    drlg.level(drlg.find_level(id).unwrap()).rect
+}
+
+/// `outdoor.md` §2.3 step 4 (driver): each linked row pair gets a warp
+/// slot toward the other level with warp id −1 (`0x00642920`, slot −1,
+/// warp −1).
+#[test]
+fn act1_linked_levels_get_warp_minus_one() {
+    let data = act1_data();
+    let (drlg, _) = create_act(0, 644_409_375, &data).unwrap();
+    for (a, b) in [(3, 4), (2, 3), (1, 2), (17, 3), (7, 26), (6, 7), (5, 6)] {
+        for (x, y) in [(a, b), (b, a)] {
+            let vis = drlg.vis_array(&data, x).unwrap();
+            let warp = drlg.warp_array(&data, x).unwrap();
+            let slot = vis.iter().position(|&v| v == y);
+            assert!(slot.is_some(), "{x} → {y}");
+            assert_eq!(warp[slot.unwrap()], -1, "{x} → {y}");
+        }
+    }
+}
+
+/// `outdoor.md` §2.6 A1M: for i > 0 the row-0 rect extended 200 upward
+/// (y − 200, h + 200) must not overlap row i; a level far above that
+/// band (and above row 0) is placed.
+#[test]
+fn a1m_row_zero_extension_is_200_tiles() {
+    let mut data = act1_data();
+    // Row 0: 39 at (5000, 1148, 64, 64) → band y 948..1212. Row 1: 26 at
+    // y 100..118, same columns.
+    data.levels[26].offset = (5000, 100);
+    let (drlg, _) = create_act(0, 644_409_375, &data).unwrap();
+    assert_eq!(rect_of(&drlg, 26), TileRect::new(5000, 100, 40, 18));
+}
+
+/// `outdoor.md` §2.3 step 4: after level 6, R0 = 1 → preset direction of
+/// 27 := 2 − (lo' & 1), R0 = 3 → 1 − (lo' & 1), one step of the DRLG
+/// seed itself (the only DRLG-seed draw of Act I placement here).
+#[test]
+fn level_27_preset_direction_from_level_6() {
+    let data = act1_data();
+    let mut seen_r3 = false;
+    for k in 0..40u32 {
+        let init = 644_409_375u32.wrapping_add(k.wrapping_mul(7919));
+        let (_, o) = create_act(0, init, &data).unwrap();
+        let mut s = Seed::init_low(init);
+        s.step();
+        let bit = (s.step() & 1) as i32;
+        match o.preset_direction.get(&27) {
+            None => {}
+            Some(&v) => {
+                // R0 = 1 gives 2 − bit, R0 = 3 gives 1 − bit.
+                assert!(v == 2 - bit || v == 1 - bit, "init {init}: {v}");
+                if v == 0 || (bit == 0 && v == 1) {
+                    seen_r3 = true;
+                }
+            }
+        }
+    }
+    assert!(seen_r3, "some seed has R0 = 3 for level 6");
+}
+
+/// `outdoor.md` §9.1: block 0 at Kurast Docks (x, y − SY); for k = 1, 2:
+/// base := roll(k), case := lo' mod 5; offsets (0, −SY), (−SX, y1),
+/// (SX, y1), (−SX, y3), (SX, y3); an overlapping block redoes k; levels
+/// 76..78 by y descending. The DRLG seed itself, after the start seed
+/// and the jungle-link step.
+#[test]
+fn jungle_blocks_by_the_rule() {
+    let mut data = data();
+    let set = |d: &mut DrlgData, id: usize, ty: u32, size: (i32, i32), off: (i32, i32)| {
+        d.levels[id].drlg_type = ty;
+        d.levels[id].size = [size; 3];
+        d.levels[id].offset = off;
+    };
+    set(&mut data, 75, 2, (400, 100), (2000, 5000));
+    for id in 76..=78 {
+        set(&mut data, id, 3, (64, 192), (0, 0));
+    }
+    let sizes = [(80, 40), (80, 48), (80, 56), (40, 40), (120, 80)];
+    for (k, id) in (79..=83).enumerate() {
+        set(&mut data, id, 3, sizes[k], (0, 0));
+    }
+    let (sx, sy) = (64, 192);
+    let (y1, y3) = super::place::jungle_offsets(sy);
+    for init in [99u32, 7, 12345, 4_000_000_000, 31337, 2024] {
+        let (drlg, _) = create_act(2, init, &data).unwrap();
+        let mut s = Seed::init_low(init);
+        s.step();
+        s.step();
+        let mut blocks = vec![TileRect::new(2000, 5000 - sy, sx, sy)];
+        for k in 1..=2i32 {
+            loop {
+                let base = s.roll(k) as usize;
+                let (ox, oy) = match s.step() % 5 {
+                    0 => (0, -sy),
+                    1 => (-sx, y1),
+                    2 => (sx, y1),
+                    3 => (-sx, y3),
+                    _ => (sx, y3),
+                };
+                let b = blocks[base];
+                let nb = TileRect::new(b.x + ox, b.y + oy, sx, sy);
+                if blocks.iter().any(|e| super::place::overlaps(e, &nb)) {
+                    continue;
+                }
+                blocks.push(nb);
+                break;
+            }
+        }
+        blocks.sort_by_key(|b| std::cmp::Reverse(b.y));
+        for (n, b) in blocks.iter().enumerate() {
+            assert_eq!(
+                rect_of(&drlg, 76 + n as u32),
+                *b,
+                "init {init} level {}",
+                76 + n
+            );
+        }
+    }
+}
+
+/// `outdoor.md` §2.7 neighbour entries: only vis slots with warp id −1
+/// make entries; a slot with a warp id does not.
+#[test]
+fn neighbour_entries_skip_warp_slots() {
+    let mut data = act1_data();
+    data.levels[2].vis = [1, 3, 17, 0, 0, 0, 0, 0];
+    data.levels[2].warp = [-1, -1, 9, -1, -1, -1, -1, -1];
+    let (drlg, o) = create_act(0, 644_409_375, &data).unwrap();
+    let l2 = drlg.find_level(2).unwrap();
+    let ids: Vec<u32> = o
+        .level(l2)
+        .unwrap()
+        .orth
+        .iter()
+        .map(|e| e.level_id)
+        .collect();
+    assert!(ids.contains(&1) && ids.contains(&3), "{ids:?}");
+    assert!(!ids.contains(&17), "{ids:?}");
+}
+
+/// `outdoor.md` §2.3 step 4 with `levels.md` §7 r3: the driver's set
+/// warp passes slot −1, so a level without the vis entry gets it in its
+/// first free slot (vis 0 and warp −1).
+#[test]
+fn driver_warps_take_the_first_free_slot() {
+    let mut data = act1_data();
+    data.levels[4].vis = [0; 8];
+    data.levels[17].vis = [0; 8];
+    let (drlg, _) = create_act(0, 644_409_375, &data).unwrap();
+    assert_eq!(drlg.vis_array(&data, 4).unwrap()[0], 3);
+    assert_eq!(drlg.vis_array(&data, 17).unwrap()[0], 3);
+    // Cold Plains (vis [2, 4, 17, ...]) keeps its slots.
+    assert_eq!(drlg.vis_array(&data, 3).unwrap()[..3], [2, 4, 17]);
+}
+
+// ---- rooms.rs: generation dispatch and cells to rooms (§3, §12) ------------
+
+/// `outdoor.md` §12.1: the DT1 mask by level type.
+#[test]
+fn dt1_mask_by_level_type() {
+    use super::rooms::dt1_mask;
+    for t in 0..40 {
+        let want = match t {
+            2 => 0x44103,
+            16 | 22 | 27 | 28 => 0x1,
+            21 => 0x4,
+            30 | 31 => 0x11,
+            _ => 0,
+        };
+        assert_eq!(dt1_mask(t), want, "type {t}");
+    }
+}
+
+/// `outdoor.md` §12.2: floor flags by level type (31 only for level 117).
+#[test]
+fn floor_flags_by_level_type() {
+    use super::rooms::floor_flags;
+    for t in 0..40 {
+        let want = match t {
+            16 => 0x100,
+            21 => 0x12_0000,
+            22 => 0x10_0000,
+            27 => 0xA0_0000,
+            28 => 0x160_0000,
+            _ => 0,
+        };
+        assert_eq!(floor_flags(t, 1), want, "type {t}");
+    }
+    assert_eq!(floor_flags(31, 117), 0x60_0000);
+    assert_eq!(floor_flags(31, 118), 0);
+}
+
+/// One outdoor level `id` at (800, 800) of `w` × `h` tiles, generated
+/// directly; returns the DRLG, the level, the level seed before
+/// generation and the preset calls.
+#[allow(clippy::type_complexity)]
+fn generate_one(
+    id: u32,
+    w: i32,
+    h: i32,
+    od: &OutdoorData,
+    subs: &SubFileMap,
+) -> Result<(Drlg, LevelIdx, Seed, Vec<(u32, i32, i32, u32, u32)>), OutdoorError> {
+    let mut data = data();
+    data.levels[id as usize].drlg_type = 3;
+    let mut drlg = Drlg::create(0, 1, 0, 0, false, &data, &mut NoLevelTypes).unwrap();
+    let l = drlg
+        .get_or_alloc_level(&data, &mut NoLevelTypes, id)
+        .unwrap();
+    drlg.level_mut(l).rect = TileRect::new(800, 800, w, h);
+    let before = drlg.level(l).seed;
+    let mut o = Outdoor::default();
+    let mut presets = Presets::default();
+    o.generate(&mut drlg, &data, od, subs, &mut presets, l)?;
+    Ok((drlg, l, before, presets.calls))
+}
+
+/// `outdoor.md` §3 step 3: Act IV dispatch (Chaos Sanctum's 25 stamps,
+/// §10), Act III dispatch (levels 76..78 draw roll(14), §9.3) and Act II
+/// dispatch (level 134 stamps 394 at (4, 4), §8).
+#[test]
+fn generation_dispatches_by_act() {
+    let subs = SubFileMap::default();
+    // Act IV, 108: 25 preset cells, the heart once.
+    let (_, _, _, calls) = generate_one(108, 120, 120, &od(), &subs).unwrap();
+    assert_eq!(calls.len(), 25);
+    assert_eq!(calls.iter().filter(|c| c.0 == 862).count(), 1);
+    assert_eq!(calls.iter().filter(|c| c.0 == 836).count(), 19);
+    // Act III, 76 (one cell): roll(14), then the room's allocation step.
+    let (drlg, l, mut s, calls) = generate_one(76, 8, 8, &od(), &subs).unwrap();
+    assert!(calls.is_empty());
+    s.roll(14);
+    s.step();
+    assert_eq!(drlg.level(l).seed, s);
+    // Act II, 134: with inert lvlsub rows for PB.
+    let mut od = od();
+    let mut subs = SubFileMap::default();
+    for t in [1, 2, 3] {
+        let name = format!("inert{t}").into_bytes();
+        od.subs.push(SubRow {
+            type_: t,
+            file: name.clone(),
+            bord_type: 1,
+            grid_size: 1,
+            ..SubRow::default()
+        });
+        subs.0
+            .insert(name, super::tests::one_cell_file(0, (200 << 8) | 1, 1));
+    }
+    let (_, _, _, calls) = generate_one(134, 80, 80, &od, &subs).unwrap();
+    assert!(
+        calls.iter().any(|c| (c.0, c.1, c.2) == (394, 832, 832)),
+        "{calls:?}"
+    );
+}
+
+/// One-cell outdoor level `id` of level type `lt` (one outdoor room),
+/// generated directly; returns the DRLG, the outdoor state and the room.
+fn one_room_level(id: u32, lt: u32, od: &OutdoorData) -> (Drlg, Outdoor, DrlgRoomId) {
+    let mut data = data();
+    data.levels[id as usize].drlg_type = 3;
+    data.levels[id as usize].level_type = lt;
+    let mut drlg = Drlg::create(0, 1, 0, 0, false, &data, &mut NoLevelTypes).unwrap();
+    let l = drlg
+        .get_or_alloc_level(&data, &mut NoLevelTypes, id)
+        .unwrap();
+    drlg.level_mut(l).rect = TileRect::new(800, 800, 8, 8);
+    let mut o = Outdoor::default();
+    let mut presets = Presets::default();
+    o.generate(
+        &mut drlg,
+        &data,
+        od,
+        &SubFileMap::default(),
+        &mut presets,
+        l,
+    )
+    .unwrap();
+    let r = drlg.level_rooms(l)[0];
+    (drlg, o, r)
+}
+
+/// `outdoor.md` §12.2: the room's outdoor data takes leveldefs `SubType`,
+/// `SubTheme` and the sub-theme pick (`outdoor-tilesub.md` §3: bit k when
+/// lo' mod 100 < Prob[theme] of row k).
+#[test]
+fn outdoor_room_takes_sub_type_theme_and_pick() {
+    let mut od = od();
+    od.levels[79].sub_type = 5;
+    od.levels[79].sub_theme = 1;
+    for p in [100, 0, 100] {
+        od.subs.push(SubRow {
+            type_: 5,
+            prob: [p; 5],
+            ..SubRow::default()
+        });
+    }
+    let (_, o, r) = one_room_level(79, 0, &od);
+    let room = o.room(r).unwrap();
+    assert_eq!((room.sub_type, room.sub_theme, room.picked), (5, 1, 0b101));
+}
+
+/// `outdoor.md` §12.2 grids: floor cells (0..7) := 0x40002; floor flags
+/// by level type OR into floor cells without bits 0x3F0FF80; wall and
+/// floor grid edges |= 0x4.
+#[test]
+fn outdoor_room_grids_floor_and_edges() {
+    let od = od();
+    let (mut drlg, mut o, r) = one_room_level(79, 16, &od);
+    let g = o
+        .room_grids(&mut drlg, &od, &SubFileMap::default(), r)
+        .unwrap();
+    let (wall, floor) = (&g.passes[0].cells, &g.passes[1].cells);
+    for y in 0..9 {
+        for x in 0..9 {
+            let edge = if x == 0 || y == 0 || x == 8 || y == 8 {
+                0x4
+            } else {
+                0
+            };
+            let base = if x < 8 && y < 8 { 0x40002 } else { 0 };
+            assert_eq!(floor.get(x, y), base | 0x100 | edge, "floor ({x}, {y})");
+            assert_eq!(wall.get(x, y), edge, "wall ({x}, {y})");
+        }
+    }
+}
+
+/// `outdoor.md` §12.2: the waypoint rows run when room flags bits 16..17
+/// are set, the shrine rows when bits 12..15 are (picked := those bits;
+/// bit 0 = row 0 here); a scattered row draws `Max[0]` group rolls on the
+/// room seed (`outdoor-tilesub.md` §4.2).
+#[test]
+fn outdoor_room_waypoint_and_shrine_rows() {
+    let mut od = od();
+    od.levels[79].sub_waypoint = 7;
+    od.levels[79].sub_shrine = 8;
+    let mut subs = SubFileMap::default();
+    for (t, max) in [(7, 3), (8, 5)] {
+        let name = format!("s{t}").into_bytes();
+        od.subs.push(SubRow {
+            type_: t,
+            file: name.clone(),
+            max: [max; 5],
+            ..SubRow::default()
+        });
+        subs.0.insert(name, super::tests::one_cell_file(0, 0, 1));
+    }
+    for (flags, steps) in [(0, 0), (0x1_0000, 3), (0x1000, 5), (0x1_1000, 8)] {
+        let (mut drlg, mut o, r) = one_room_level(79, 0, &od);
+        drlg.room_mut(r).flags |= flags;
+        let mut s = drlg.room(r).seed;
+        o.room_grids(&mut drlg, &od, &subs, r).unwrap();
+        for _ in 0..steps {
+            s.step();
+        }
+        assert_eq!(drlg.room(r).seed, s, "flags {flags:#x}");
     }
 }
