@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4; specs/world/waypoints.md §6, §7 (end to end)
+// Spec: specs/client/bridge.md §3; specs/sim/intents-events.md §1–§3; specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/drlg/rooms.md §4.1; specs/monsters/population.md §11.1; specs/skills/use.md §1, §4, §5.2, §5.4; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §4.2, §4.3; specs/items/treasure.md §3, §7, §8; specs/world/waypoints.md §6, §7 (end to end)
 //! End-to-end single player: the bridge (`d2_client::bridge`) on its
 //! local link (`bridge::local::LocalLink`) over the in-process
 //! `d2-server` host, whose game is `SimGame` on the fully wired `d2-sim`
@@ -16,20 +16,29 @@
 //! 3. the player joins; the first host tick runs the client room change
 //!    (`rooms.md` §4.1: rooms near the player become active) and the room
 //!    pass (`population.md` §11.1: the DS1's preset monster is created);
-//! 4. a right-skill cast at the monster (C→S 0x0C): the handler runs and
-//!    the mode starts, **then stops**: no AnimData record is routed
-//!    (`units.md` §4.1), so no skill event, missile, hit, kill,
-//!    experience or drop follows;
-//! 5. pick-up (C→S 0x16), buy (0x32) and sell (0x33) reach the server
-//!    and **stop at the stubs** (no inventory spec; no vendor provider on
-//!    the server's world host);
+//! 4. a right-skill cast at the monster (C→S 0x0C): the handler runs, the
+//!    mode starts and its animation schedule (`units.md` §4.1–§4.2)
+//!    reads the AnimData record of the unit's composed COF name
+//!    (`animdata.md` §5); the action frame (event 0) runs the do
+//!    function and the real missile creation; the missile flies, hits,
+//!    kills (`damage.md` §5.2, §7.1, §7.2): the death mode with its
+//!    target and the player's experience (`vitals.md` §4);
+//! 5. (a) the death start drops gold through the treasure walk as a real
+//!    item unit in the monster's room (`treasure.md` §3, §7, §8);
+//!    (b, c) pick-up (C→S 0x16), buy (0x32) and sell (0x33) reach the
+//!    server and **stop at the stubs** (no inventory spec; no vendor
+//!    provider on the server's world host);
 //! 6. a waypoint travel (C→S 0x49) runs through the handler, the warp
 //!    seam and the destination's spawn search, **then stops**: the
 //!    same-act placement belongs to the unwritten path spec, so the
 //!    player is not moved and `waypoints.md` §7 rule 7 sends no S→C 0x0D.
 //!
-//! No S→C message with a spec layout fires on these paths, so the bytes
-//! the client receives are asserted empty in every frame.
+//! The wiring sends no S→C message on these paths (no written spec ties
+//! a mode, missile, death or item message to them yet), so the bytes the client receives are asserted empty in every
+//! frame. Where a step needs behaviour no written spec owns (the COF-name
+//! composer, the animation rate, the missile's path and damage setup, the
+//! death start's body, the free-spot search), the fixture answers the
+//! seam and says so at the answer.
 //!
 //! The whole run is repeated: same seed → byte-identical transcript.
 
@@ -41,11 +50,13 @@ use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::{Bridge, FrameReport};
 use d2_data::bin::BinTable;
+use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{
-    Charstats, Difficultylevels, Itemstatcost, Levels, Monlvl, Monstats, Monstats2, Objects,
-    Record, Skilldesc, Skills,
+    Charstats, Difficultylevels, Experience, Itemratio, Itemstatcost, Itemtypes, Levels,
+    Missiles as MissileRow, Monlvl, Monstats, Monstats2, Objects, Record, Skilldesc, Skills,
 };
+use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_proto::client::{BuyItem, PickItem, RightSkill, SellItem, TakeOrCloseWp};
 use d2_server::adapters::handlers::skills::seams::SkillSeams;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
@@ -56,6 +67,7 @@ use d2_server::host::{Handled, Host};
 use d2_server::seams::{Clock, PlayerGate, Pos, ResultCode};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::combat::{CombatTables, RoomKind};
+use d2_sim::drlg::collision::bits;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs, SubFileMap};
 use d2_sim::drlg::preset::{
@@ -64,17 +76,26 @@ use d2_sim::drlg::preset::{
 use d2_sim::drlg::tiles::{cell, FIXED_LIBRARY};
 use d2_sim::drlg::{Drlg, DrlgData, DrlgRoomId, Dungeon, LevelDef, TileInfo, TileSource};
 use d2_sim::game::Game;
+use d2_sim::items::tables::ItemRec;
+use d2_sim::items::{ty, ItemTables};
+use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, UseState};
+use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StatTable};
-use d2_sim::units::hooks::{MonsterInfo, UnitData};
+use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
+use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
+use d2_sim::units::modes;
 use d2_sim::units::{RoomId, UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
+use d2_sim::wiring::economy::{
+    monster_death_drop, DeathDrops, DropSpot, DropTables, FreeSpot, GameFields,
+};
+use d2_sim::wiring::interaction::{skill_events, UseRest};
 use d2_sim::wiring::worldgen::{
     SharedTypes, WorldPending, WorldSim, WorldState, WorldTables, WorldTypes,
 };
@@ -116,27 +137,115 @@ const MULTI: i32 = 1;
 // ---- seams without a provider --------------------------------------------------
 
 /// The action and world-generation seams no written spec provides yet
-/// (positions, interaction, warp, arrival mode, transport, the DRLG
-/// population reads), and a log of the calls that change something.
-/// The answers are the narrowest ones (`Pending`'s defaults) except the
-/// positions and the interaction record, which the test stages.
+/// (positions and a straight-line path, interaction, warp, arrival mode,
+/// transport, the DRLG population reads, the COF-name composer and the
+/// animation rate, the monster death start's body), the skill use
+/// pipeline's rest ([`UseRest`]: the player's skill state, shared with
+/// the server's skill seams through [`Book`]), the drop state, and a log
+/// of the calls that change something. The answers are the narrowest
+/// ones (`Pending`'s defaults) except those the test stages (see each).
 #[derive(Default)]
 struct TestPending {
     pos: BTreeMap<UnitId, (i32, i32)>,
     interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     log: Vec<String>,
+    /// Missile target points (`0x00648AD0`) and the sub-tiles each step
+    /// crossed.
+    aim: BTreeMap<UnitId, (i32, i32)>,
+    crossed: BTreeMap<UnitId, Vec<(i32, i32)>>,
+    velocity: BTreeMap<UnitId, i32>,
+    /// The point the cast aims its missile at (the skill missile
+    /// helpers' record fill, `use.md` §5.4 step 7, is not specified).
+    aim_at: (i32, i32),
+    book: Book,
+    /// The game's drop state (`treasure.md` §3), lent out during a drop.
+    drops: Option<DeathDrops>,
 }
 
+/// The fixture's COF names (the composer `0x0064F5B0` for units with a
+/// unit is `animdata.md` Open question 2): the sorceress casting (SC)
+/// and the monster dying (DT). Other modes get no name.
+const PLAYER_SC: &[u8; 8] = b"SOSCHTH\0";
+const MONSTER_DT: &[u8; 8] = b"M0DTHTH\0";
+
 impl Pending for TestPending {
+    fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
+        match (ty, mode) {
+            (UnitType::Player, 10) => Some(*PLAYER_SC),
+            (UnitType::Monster, 0) => Some(*MONSTER_DT),
+            _ => None,
+        }
+    }
+    /// The rate formula `0x00623F50` is not written: the AnimData speed
+    /// as is (no rate stats in this game).
+    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
+        speed.map_or(0, |s| s as i16)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
     }
+    fn size(&self, _: UnitId) -> i32 {
+        1
+    }
+    fn has_path(&self, _: UnitId) -> bool {
+        true
+    }
+    fn set_velocity(&mut self, unit: UnitId, v: i32) {
+        self.velocity.insert(unit, v);
+    }
+    fn velocity(&self, unit: UnitId) -> i32 {
+        self.velocity.get(&unit).copied().unwrap_or(0)
+    }
+    fn set_target_point(&mut self, unit: UnitId, x: i32, y: i32) {
+        self.aim.insert(unit, (x, y));
+    }
+    fn target_distance(&self, _: UnitId) -> i32 {
+        10
+    }
+    /// One sub-tile toward the target point on each axis.
+    fn step(&mut self, _: &mut Game, unit: UnitId) -> bool {
+        let (x, y) = self.position(unit);
+        let (tx, ty) = self.aim.get(&unit).copied().unwrap_or((x + 1, y));
+        let p = (x + (tx - x).signum(), y + (ty - y).signum());
+        self.pos.insert(unit, p);
+        self.crossed.insert(unit, vec![p]);
+        true
+    }
+    fn crossed_subtiles(&self, unit: UnitId) -> Vec<(i32, i32)> {
+        self.crossed.get(&unit).cloned().unwrap_or_default()
+    }
+    fn may_attack(&self, a: UnitId, d: UnitId) -> bool {
+        a != d
+    }
     fn class_has_mode(&self, _: i32, _: u8) -> bool {
         true
+    }
+    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
+        self.book.get().list.clone()
+    }
+    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        self.book.get().used
+    }
+    fn unit_event(
+        &mut self,
+        event: u8,
+        unit: Option<UnitId>,
+        _: Option<UnitId>,
+        _: Option<&mut d2_sim::combat::DamageRecord>,
+    ) {
+        self.log
+            .push(format!("event {event} {:?}", unit.map(|u| u.0)));
+    }
+    fn reaction(&mut self, a: UnitId, d: UnitId, r: &mut d2_sim::combat::DamageRecord) {
+        self.log
+            .push(format!("reaction {} {} {:#x}", a.0, d.0, r.result));
+    }
+    fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
+        self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
     }
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
         self.interact.entry(player).or_insert((unit_type, guid));
@@ -157,6 +266,62 @@ impl Pending for TestPending {
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
     }
+    fn level_up_event(&mut self, unit: UnitId) {
+        self.log.push(format!("level up {}", unit.0));
+    }
+    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, ev: SkillEvent) {
+        skill_events::route(h, sim, ev);
+    }
+    fn action_frame(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        u: UnitId,
+        a1: u32,
+        a2: u32,
+    ) -> u32 {
+        h.x.log.push(format!("action frame {} {a1} {a2}", u.0));
+        skill_events::action_frame(h, sim, u, a1, a2)
+    }
+    /// The death start's body is not written: the fixture sets mode DT
+    /// (a start function sets its mode, monster spec) and runs the drop
+    /// gate and drop it is known to call (`treasure.md` §3.1).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool {
+        h.x.log.push(format!(
+            "death start {} target {:?}",
+            unit.0,
+            target.map(|t| t.0)
+        ));
+        modes::set_mode(sim, h, unit, 0).expect("mode DT");
+        if let Some(mut d) = h.x.drops.take() {
+            monster_death_drop(h, sim, &mut d, &mut Spot, unit, target);
+            h.x.drops = Some(d);
+        }
+        true
+    }
+}
+
+/// The free-spot search `0x0064E810` (collision spec, not written): the
+/// start spot as is.
+struct Spot;
+
+impl FreeSpot for Spot {
+    fn free_spot(
+        &mut self,
+        room: Option<RoomId>,
+        start: (i32, i32),
+        _: (i32, i32),
+    ) -> Option<DropSpot> {
+        Some(DropSpot {
+            room,
+            x: start.0,
+            y: start.1,
+        })
+    }
 }
 
 impl WorldPending for TestPending {
@@ -171,6 +336,130 @@ impl WorldPending for TestPending {
 impl Outbox for TestPending {
     fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
         std::mem::take(&mut self.sent)
+    }
+}
+
+/// The skill use pipeline's rest on the timer path (the action frame):
+/// the player's skill state from [`Book`] (the same state the server's
+/// skill seams use for the message path), the rest narrowest.
+impl UseRest for TestPending {
+    fn send(&mut self, u: UnitId, msg: ServerMsg) {
+        self.log.push(format!("send {} {msg:?}", u.0));
+    }
+    fn has_player_data(&self, _: UnitId) -> bool {
+        true
+    }
+    fn last_point_frame(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_last_point_frame(&mut self, _: UnitId, _: i32) {}
+    fn cursor_item(&self, _: UnitId) -> bool {
+        false
+    }
+    fn in_own_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn within_reach(&self, _: UnitId, _: UnitId) -> bool {
+        true
+    }
+    fn owner(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn is_pet(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn is_ally(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        None
+    }
+    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
+        self.book.get().right
+    }
+    fn set_left_skill(&mut self, _: UnitId, _: SkillEntry) {}
+    fn set_right_skill(&mut self, _: UnitId, e: SkillEntry) {
+        self.book.get().right = Some(e);
+    }
+    fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
+        self.book.find_entry(u, skill)
+    }
+    fn find_entry_owned(&self, _: UnitId, _: i32, _: i32) -> Option<SkillEntry> {
+        None
+    }
+    fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
+        self.book.find_entry(u, skill).is_some()
+    }
+    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
+        self.book.get().used = e;
+    }
+    fn used_skill_flags(&self, _: UnitId) -> u32 {
+        0
+    }
+    fn set_used_skill_flags(&mut self, _: UnitId, _: u32) {}
+    fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
+        self.book.entry_mode(u, e)
+    }
+    fn attack_param4(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_attack_param4(&mut self, _: UnitId, _: i32) {}
+    fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
+        UseState::Usable
+    }
+    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
+    fn shapeshifted(&self, _: UnitId) -> bool {
+        false
+    }
+    fn consume_charges(&mut self, _: UnitId, _: &SkillEntry) -> bool {
+        true
+    }
+    fn pay_life(&mut self, _: UnitId, _: i32) -> bool {
+        true
+    }
+    fn can_dual_wield(&self, _: UnitId) -> bool {
+        false
+    }
+    fn equippable(&self, _: UnitId) -> bool {
+        false
+    }
+    fn bow_equipped(&self, _: UnitId) -> bool {
+        false
+    }
+    fn state_mask(&self, _: UnitId, _: u32) -> bool {
+        false
+    }
+    fn start_mode(&mut self, _: &mut Game, _: UnitId, _: u32, _: ModeTarget<UnitId>) {}
+    fn run_to(&mut self, _: UnitId, _: UnitId, _: SkillEntry) {}
+    fn target(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn clear_target(&mut self, _: UnitId) {}
+    fn event_arg(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_event_arg(&mut self, _: UnitId, _: i32) {}
+    fn step_path(&mut self, _: UnitId) -> i32 {
+        0
+    }
+    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
+        Some(self.aim_at)
+    }
+    fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
+        true
+    }
+    fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
+    /// The helpers' record fill is not specified: aimed at the cast's
+    /// target point, absolute.
+    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
+        p.flags |= param_flags::TARGET_ABSOLUTE;
+        (p.target_x, p.target_y) = self.aim_at;
+    }
+    fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
+        self.book.clone().srvst(index, u, skill, lvl)
+    }
+    fn srvdo(&mut self, i: u16, u: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
+        self.book.clone().srvdo(i, u, s, l, c, it, a)
     }
 }
 
@@ -226,11 +515,13 @@ impl SkillSeams for Book {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
     }
+    /// The do bodies are catalogued only (`use.md` OQ10): logged, result
+    /// 0 (the generic `srvmissile` creation of §5.4 step 7 still runs).
     fn srvdo(&mut self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
         self.get()
             .log
             .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
-        1
+        0
     }
     fn create_skill_missile(&mut self, _: UnitId, s: i32, l: i32, m: u16, _: bool, _: MissileAim) {
         self.get().log.push(format!("missile {s} {l} {m}"));
@@ -459,10 +750,16 @@ fn maze_data() -> MazeData {
     }
 }
 
-/// Monster class 0: killable, AI 1 (Idle), no skills, no minions.
+/// Monster class 0: killable, AI 1 (Idle), no skills, no minions; level
+/// 1, 5 life, 100 experience (`noRatio`: the monstats values as they
+/// are, `monsters/init.md` §8.1); treasure class 1 (Normal).
 fn monster_class() -> Monstats {
     let mut m: Monstats = blank();
     m.killable = true;
+    m.noratio = true;
+    m.level = 1;
+    (m.minhp, m.maxhp, m.exp) = (5, 5, 100);
+    m.treasureclass1 = 1;
     m.velocity = 1;
     (m.drain, m.drain_n, m.drain_h) = (100, 100, 100);
     m.montype = 0xFFFF;
@@ -581,14 +878,35 @@ fn skill_rec() -> Skills {
     s
 }
 
+/// Missile 0: an arrow-like row (default flight, one sub-tile per frame,
+/// collide type 3, kill on collision, to-hit), as the action wiring's
+/// tests use.
+fn arrow() -> MissileRow {
+    let mut r: MissileRow = blank();
+    r.psrvdofunc = 1;
+    r.vel = 1;
+    r.maxvel = 1;
+    r.range = 50;
+    r.collidetype = 3;
+    r.collidekill = 1;
+    r.lastcollide = true;
+    r.tohit = 1;
+    r.size = 1;
+    r
+}
+
+/// The right skill: start function 4, do function 8 (the Multiple Shot
+/// slot, body catalogued only), `srvmissile` 0 (the generic missile of
+/// `use.md` §5.4 step 7).
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
     (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile) = (8, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
-        missiles: Vec::new(),
+        missiles: vec![arrow()],
         skills_code: Vec::new(),
         miss_code: Vec::new(),
         level_cap: LEVEL_CAP_114D,
@@ -609,10 +927,138 @@ fn combat_tables() -> CombatTables {
     }
 }
 
+/// experience.txt: max level 3, thresholds 0, 500, 1500 for every class.
 fn vitals() -> VitalsTables {
+    let row = |v: u32| Experience {
+        amazon: v,
+        sorceress: v,
+        necromancer: v,
+        paladin: v,
+        barbarian: v,
+        druid: v,
+        assassin: v,
+        ..blank()
+    };
     VitalsTables {
         charstats: vec![blank::<Charstats>(); 7],
-        experience: vec![blank()],
+        experience: vec![row(3), row(0), row(500), row(1500)],
+    }
+}
+
+/// AnimData with the fixture's two names (`animdata.md` §2): the
+/// sorceress' cast, 8 frames at speed 256 with a missile event (2) on
+/// frame 4; the monster's death, 4 frames at speed 256, no events.
+fn anim_data() -> AnimData {
+    let mut a = AnimData {
+        buckets: vec![Vec::new(); animdata::BUCKETS],
+    };
+    let mut put = |name: &[u8; 8], frames, event: Option<usize>| {
+        let mut events = [0u8; animdata::EVENTS];
+        if let Some(i) = event {
+            events[i] = 2;
+        }
+        let len = name.iter().position(|&b| b == 0).unwrap();
+        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
+            name: *name,
+            frames,
+            speed: 256,
+            events,
+        });
+    };
+    put(PLAYER_SC, 8, Some(4));
+    put(MONSTER_DT, 4, None);
+    a
+}
+
+/// Items: gold only (`ty::GOLD`, a child of `ty::MISC`); treasure class
+/// 1: one pick of gold.
+fn drop_tables() -> DropTables {
+    let n: usize = 40;
+    let words = n.div_ceil(32);
+    let mut equiv = EquivMatrix {
+        n,
+        words,
+        bits: vec![0; n * words],
+    };
+    for i in 1..n {
+        equiv.bits[i * words] |= 1;
+        equiv.bits[i * words + i / 32] |= 1 << (i % 32);
+    }
+    let (g, m) = (usize::from(ty::GOLD), usize::from(ty::MISC));
+    equiv.bits[g * words + m / 32] |= 1 << (m % 32);
+    let mut itemtypes: Vec<Itemtypes> = (0..n)
+        .map(|_| {
+            let mut t: Itemtypes = blank();
+            (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
+            t
+        })
+        .collect();
+    // Gold is always normal quality (itemtypes `Normal`, `treasure.md`
+    // §6 step 1).
+    itemtypes[g].normal = 1;
+    let mut ratio: Itemratio = blank();
+    ratio.version = 1;
+    let gold = ItemRec {
+        code: *b"gld ",
+        type_: ty::GOLD as i16,
+        level: 1,
+        ..ItemRec::default()
+    };
+    let items = ItemTables {
+        items: vec![gold],
+        itemtypes,
+        equiv,
+        itemratio: vec![ratio],
+        valshift: vec![0; 359],
+        stat_shift: 6,
+        stat_mask: 0x3F,
+        ..ItemTables::default()
+    };
+    let treasure_items = items
+        .items
+        .iter()
+        .map(|r| ItemData {
+            code: r.code,
+            ubercode: r.ubercode,
+            ultracode: r.ultracode,
+            version: r.version,
+            level: r.level,
+            type_: r.type_ as u16,
+            type2: r.type2 as u16,
+            unique: r.unique,
+            quest: r.quest,
+            spawnable: 1,
+        })
+        .collect();
+    let tc = |name: &[u8], entries: Vec<TcEntry>, total| TreasureClass {
+        name: name.to_vec(),
+        group: 0,
+        level: 0,
+        total_classic: total,
+        total_expansion: total,
+        picks: 1,
+        nodrop: 0,
+        mods: [0; 6],
+        entries,
+    };
+    let gold_entry = TcEntry {
+        start_classic: 0,
+        start_expansion: 0,
+        id: 0,
+        row: 0,
+        flags: 0,
+        mods: [0; 6],
+    };
+    DropTables {
+        items,
+        tcs: TreasureClasses {
+            tcs: vec![tc(b"none", Vec::new(), 0), tc(b"gold", vec![gold_entry], 1)],
+            group_offset: 0,
+            chest: [None; 45],
+            notes: Vec::new(),
+        },
+        treasure_items,
+        superuniques: Vec::new(),
     }
 }
 
@@ -706,18 +1152,28 @@ impl Fx {
             types: Box::new(handle),
         };
         let tables = ActionTables {
-            missiles: Vec::new(),
+            missiles: vec![arrow()],
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
             skill_modes: vec![[0; 3]],
         };
-        let hooks = ActionHooks::new(
+        let book = Book::default();
+        let mut hooks = ActionHooks::new(
             Arc::new(tables),
             world,
             Seed::init_low(game_seed),
-            TestPending::default(),
+            TestPending {
+                book: book.clone(),
+                drops: Some(DeathDrops::new(
+                    Arc::new(drop_tables()),
+                    GameFields::new(Seed::init_low(game_seed), false),
+                )),
+                ..TestPending::default()
+            },
         );
+        hooks.anim_data = Some(Arc::new(anim_data()));
+        hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
             pop: PopTables::from_records(&levels(), &[monster_class()], &[blank()], &[]),
             monstats: vec![monster_class()],
@@ -809,7 +1265,6 @@ impl Fx {
             owner_guid: -1,
             ..SkillEntry::default()
         };
-        let book = Book::default();
         {
             let mut b = book.get();
             b.list = vec![
@@ -845,6 +1300,76 @@ impl Fx {
         }
     }
 
+    /// What the unwritten kind init and movement specs would set for the
+    /// monster: its target flags (`missiles.md` §R4.2) and its run-time
+    /// collision bit at its position (`rooms.md` §10.6). The player's to-hit
+    /// inputs: attack rating 100, level 1 (`hit.md` §3).
+    fn stage_combat(&mut self, monster: UnitId) {
+        let player = self.player;
+        let sim = self.sim();
+        sim.events.action.sys.units.get_mut(monster).unwrap().flags |=
+            unit_flag::IS_VALID_TARGET | unit_flag::CAN_BE_ATTACKED;
+        let (x, y) = sim.events.action.hooks().x.position(monster);
+        let room = sim.game.lists.unit(monster).unwrap().room().unwrap();
+        let game = &sim.game;
+        *sim.events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .collision_mut(game, room, x, y)
+            .expect("in a grid") |= bits::MONSTER;
+        sim.events.action.hooks().x.aim_at = (x, y);
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(player, 19, 100);
+            v.set_base(player, 12, 1);
+        });
+    }
+
+    /// The missile units of the game, in id order.
+    fn missiles(&self) -> Vec<UnitId> {
+        let mut v = self.sim_ref().game.lists.units_of_type(UnitType::Missile);
+        v.sort();
+        v
+    }
+
+    /// The damage setup `0x0059F900` is the skills spec's (`Pending`):
+    /// the missile's damage stats (21, 22, 1/256 points) are set here.
+    fn set_missile_damage(&mut self, m: UnitId, d: i32) {
+        let sim = self.sim();
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(m, 21, d);
+            v.set_base(m, 22, d);
+        });
+    }
+
+    /// The unit's timer events (type, expiry), sorted.
+    fn timers(&self, u: UnitId) -> Vec<(u8, i32)> {
+        let t = &self.sim_ref().game.timers;
+        let mut v: Vec<_> = t
+            .unit_timers(u)
+            .into_iter()
+            .filter_map(|i| Some((t.event(i)?.0, t.expire(i)?)))
+            .collect();
+        v.sort();
+        v
+    }
+
+    /// The drops so far: item and spot.
+    fn drops(&self) -> Vec<(UnitId, DropSpot)> {
+        self.sim_ref()
+            .events
+            .action
+            .sys
+            .hooks
+            .x
+            .drops
+            .as_ref()
+            .unwrap()
+            .placed
+            .clone()
+    }
+
     fn sim(&mut self) -> &mut Sim {
         &mut self.bridge.link_mut().inner.host_mut().game
     }
@@ -873,11 +1398,7 @@ impl Fx {
 
     /// The player's timer events (type, expiry).
     fn player_timers(&self) -> Vec<(u8, i32)> {
-        let t = &self.sim_ref().game.timers;
-        t.unit_timers(self.player)
-            .into_iter()
-            .filter_map(|i| Some((t.event(i)?.0, t.expire(i)?)))
-            .collect()
+        self.timers(self.player)
     }
 
     fn monsters(&self) -> Vec<UnitId> {
@@ -964,6 +1485,10 @@ struct Transcript {
     active_rooms: Vec<RoomId>,
     player_mode: u32,
     player_mana: i32,
+    player_exp: i32,
+    /// Dropped items: GUID, unit seed, position, mode; their gold.
+    drops: Vec<(u32, Seed, i32, i32, u32)>,
+    gold: Vec<i32>,
     pending_log: Vec<String>,
     skill_log: Vec<String>,
     unhandled: Vec<(u32, u8, usize)>,
@@ -1025,44 +1550,125 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 4. Right skill at the monster (C→S 0x0C, `use.md` §1): accepted
     // (0), mana charged at start (the Multiple Shot vector: 3,328 of
-    // 4,000 in 1/256 units), srvst 4 run, mode SC (10) set. STOP: the
-    // mode start's animation schedule (`units.md` §4.1–§4.2) needs the
-    // AnimData record `0x00620F00`, which the action wiring does not
-    // route (`UnitHooks::anim_record` default) → `AnimError::NoRecord`;
-    // no event 0 / 1 is scheduled, so no srvdo, no missile
-    // (`SkillSeams::create_skill_missile`), no hit, kill, experience or
-    // drop.
+    // 4,000 in 1/256 units), srvst 4 run, mode SC (10) set. The mode
+    // start's animation schedule (`units.md` §4.1–§4.2) reads the
+    // AnimData record of the composed name (`animdata.md` §5): 8 frames
+    // at speed 256, event byte 2 on frame 4 → event 0 at f + 4 = 5 with
+    // args (2, 0), the end (event 1) at f + 8 = 9.
+    fx.stage_combat(monster);
     let cast = bytes(&RightSkill {
         x: mpos.0 as u16,
         y: mpos.1 as u16,
     });
     assert_eq!(cast, [0x0C, 0x4C, 0x9C, 0x4A, 0x9C]);
     record(&mut fx, &mut frames, vec![cast]);
+    assert_eq!(fx.sim_ref().game.frame, 2);
     assert_eq!(frames[1].1.codes, [(0x0C, Some(ResultCode::Done))]);
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
     assert_eq!(fx.book.get().log, ["srvst 4 1 10"]);
-    assert_eq!(fx.errors(), ["Unit(Anim(NoRecord))"]);
-    assert!(fx.player_timers().is_empty(), "no animation events");
-    assert_eq!(fx.mode(monster), 1, "the monster is untouched");
-    let missiles = fx
-        .sim_ref()
-        .events
-        .action
-        .sys
-        .hooks
-        .missile_store()
-        .missiles()
-        .count();
-    assert_eq!(missiles, 0);
+    assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
-    // 5. Pick-up (0x16), buy (0x32), sell (0x33). STOP: 0x16 has no
+    // Frames 3–5. On frame 5 the action frame `0x00580460` runs the used
+    // skill's do function (`use.md` §5.2, §5.4): srvdo 8 (body
+    // catalogued only, `use.md` OQ10: the seam), then the generic
+    // `srvmissile` 0 through the real missile creation (`missiles.md`
+    // §R2) at the player, aimed at the cast point.
+    for _ in 3..=5 {
+        record(&mut fx, &mut frames, vec![]);
+    }
+    assert_eq!(fx.sim_ref().game.frame, 5);
+    assert_eq!(
+        fx.pending().log[1..],
+        [format!("action frame {} 2 0", player.0)]
+    );
+    assert_eq!(
+        fx.book.get().log,
+        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+    );
+    assert_eq!(fx.player_timers(), [(1, 9)]);
+    let shot = fx.missiles();
+    assert_eq!(shot.len(), 1);
+    let shot = shot[0];
+    assert_eq!(fx.pending().pos[&shot], PLAYER_AT);
+    // The damage setup `0x0059F900` is the skills spec's: 10 points.
+    fx.set_missile_damage(shot, 2560);
+
+    // Frames 6–15: the missile flies one sub-tile a frame (the fixture's
+    // path) and enters the monster's sub-tile on frame 15: hit
+    // (`missiles.md` §R5, to-hit on the player's seed), damage 10 points
+    // ≥ the monster's 5 → life 0, result 3 (`damage.md` §5.2 steps
+    // 11–15: events 10, 9), the missile removed (collide-kill). The
+    // reaction (§7.1) kills the monster (§7.2): its seam steps in order,
+    // the death mode change with the player as target (mode DT 0, the
+    // death start `0x005A6FF0`), the player's experience (`vitals.md`
+    // §4.2: equal levels → 100).
+    for _ in 6..=15 {
+        record(&mut fx, &mut frames, vec![]);
+    }
+    assert_eq!(fx.sim_ref().game.frame, 15);
+    assert_eq!(fx.mode(player), 1, "event 1 on frame 9 → neutral");
+    assert!(fx.missiles().is_empty());
+    assert_eq!(fx.stat(monster, 6), 0);
+    assert_eq!(fx.mode(monster), 0);
+    let (p, m) = (player.0, monster.0);
+    assert_eq!(
+        fx.pending().log[2..],
+        [
+            format!("event 0 Some({m})"),
+            format!("event 11 Some({m})"),
+            format!("event 2 Some({m})"),
+            format!("event 10 Some({m})"),
+            format!("event 9 Some({p})"),
+            format!("reaction {p} {m} 0x3"),
+            format!("kill PetCredit {m} {p}"),
+            format!("kill AttackerBookkeeping {m} {p}"),
+            format!("kill FaceAttacker {m} {p}"),
+            format!("death start {m} target Some({p})"),
+            format!("kill QuestKill {m} {p}"),
+            format!("kill BarricadeDoors {m} {p}"),
+        ]
+    );
+    assert_eq!(fx.stat(player, 13), 100);
+    // The death animation: 4 frames → event 1 at 19.
+    assert_eq!(fx.timers(monster), [(1, 19)]);
+
+    // 5a. The drop (`treasure.md` §3): the death start's gate passes
+    // (no flag 0x20000, no wall / door at the monster's sub-tile); TC 1
+    // picks gold on the monster's seed; the item is created on the game
+    // seed (`generation.md` §3), placed at the start spot (x + 2, y + 3,
+    // §7 step 2) and added to that room's units in mode 3, its gold
+    // amount (§8) in stat 14.
+    let drops = fx.drops();
+    assert_eq!(drops.len(), 1);
+    let (gold, spot) = drops[0];
+    let room = fx.sim_ref().game.lists.unit(monster).unwrap().room();
+    assert_eq!(
+        spot,
+        DropSpot {
+            room,
+            x: mpos.0 + 2,
+            y: mpos.1 + 3
+        }
+    );
+    assert_eq!(fx.sim_ref().game.lists.unit(gold).unwrap().room(), room);
+    let rec = fx.sim_ref().events.action.sys.units.get(gold).unwrap();
+    assert_eq!((rec.ty, rec.class, rec.mode), (UnitType::Item, 0, 3));
+    let amount = fx.stat(gold, 14);
+    assert!((1..=6).contains(&amount), "roll(5 · 1) + 1: {amount}");
+    for f in &frames[2..] {
+        assert_eq!(f.2, none);
+    }
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+
+    // 5b, 5c. Pick-up (0x16), buy (0x32), sell (0x33). STOP: 0x16 has no
     // owner spec (inventory spec not written, `server-items.md` §2);
     // the vendor ids have handlers (`world/vendors.md` §7) but the
     // server's `ActionWorld` has no vendor provider
     // (`server-world.md` §6): all three are stubs (result 0, recorded).
-    // (No item exists to pick up or sell: the kill above never ran.)
+    // (The dropped gold exists, but 0x16 has no handler to pick it up.)
     let pick = bytes(&PickItem {
         type_: 4,
         id: 0x7777,
@@ -1083,10 +1689,10 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![pick, buy, sell]);
     let done = Some(ResultCode::Done);
     assert_eq!(
-        frames[2].1.codes,
+        frames[15].1.codes,
         [(0x16, done), (0x32, done), (0x33, done)]
     );
-    assert_eq!(frames[2].2, none);
+    assert_eq!(frames[15].2, none);
     assert_eq!(
         fx.sim_ref().unhandled,
         [
@@ -1114,31 +1720,37 @@ fn run_with(game_seed: u32) -> Transcript {
     want.extend_from_slice(&[GATE as u8, 0, 0, 0]);
     assert_eq!(travel, want);
     record(&mut fx, &mut frames, vec![travel]);
-    assert_eq!(frames[3].1.codes, [(0x49, done)]);
-    assert_eq!(frames[3].2, none);
+    assert_eq!(frames[16].1.codes, [(0x49, done)]);
+    assert_eq!(frames[16].2, none);
     assert!(fx.pending().interact.is_empty());
-    assert_eq!(
-        fx.pending().log,
-        [
-            "preset 2 class 0 at 12,10".to_string(),
-            format!("warp {} {GATE} 0", player.0)
-        ]
-    );
+    let log = fx.pending().log.clone();
+    assert_eq!(log.len(), 15);
+    assert_eq!(log[14], format!("warp {} {GATE} 0", player.0));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);
     let arrivals = &fx.sim_ref().world.arrivals.0;
     assert_eq!(arrivals.len(), 1);
     assert_eq!((arrivals[0].x, arrivals[0].y), PLAYER_AT);
-    assert_eq!(fx.errors(), ["Unit(Anim(NoRecord))"]);
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
-    // The client: 5 frames, 4 server ticks, no message received, so no
-    // unit in the model and nothing unowned, rejected or discarded.
+    // The client: 18 frames, 17 server ticks, no message received, so
+    // no unit in the model and nothing unowned, rejected or discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (5, 4, 0));
+    assert_eq!(client, (18, 17, 0));
     let log = fx.bridge.log();
     assert!(log.unowned.is_empty() && log.rejected.is_empty() && log.discarded.is_empty());
 
     let player_mana = fx.stat(player, 8);
+    let player_exp = fx.stat(player, 13);
+    let drops = fx
+        .drops()
+        .into_iter()
+        .map(|(u, spot)| {
+            let r = fx.sim_ref().events.action.sys.units.get(u).unwrap();
+            (fx.guid(u), r.seed, spot.x, spot.y, r.mode)
+        })
+        .collect::<Vec<_>>();
+    let gold = fx.drops().iter().map(|&(u, _)| fx.stat(u, 14)).collect();
     let skill_log = fx.book.get().log.clone();
     let s = fx.sim_ref();
     let x = &s.events.action.sys;
@@ -1160,6 +1772,9 @@ fn run_with(game_seed: u32) -> Transcript {
         active_rooms: s.game.lists.active_rooms(0),
         player_mode: fx.mode(player),
         player_mana,
+        player_exp,
+        drops,
+        gold,
         pending_log: x.hooks.x.log.clone(),
         skill_log,
         unhandled: s.unhandled.clone(),
@@ -1173,8 +1788,10 @@ fn run_with(game_seed: u32) -> Transcript {
 #[test]
 fn single_player_end_to_end() {
     let t = run();
-    assert_eq!(t.game_frame, 4);
-    assert_eq!(t.frames.len(), 4);
+    assert_eq!(t.game_frame, 17);
+    assert_eq!(t.frames.len(), 17);
+    assert_eq!(t.player_exp, 100);
+    assert_eq!(t.drops.len(), 1);
 }
 
 /// Same seeds → the same run: every C→S byte, result code, S→C chunk,

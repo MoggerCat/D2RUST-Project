@@ -15,7 +15,7 @@
 use crate::game::Game;
 use crate::monsters::ai::ModeTarget;
 use crate::units::hooks::Sim;
-use crate::units::{RoomId, UnitId};
+use crate::units::{RoomId, UnitId, UnitType};
 
 use super::ActionHooks;
 
@@ -44,10 +44,50 @@ pub enum SkillEvent {
     },
 }
 
+/// A step of the kill `0x0057CCB0` with no written body (`damage.md`
+/// §7.2 lists them at call level only), in the order the spec lists
+/// them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KillStep {
+    /// Pet kill credit to a player owner.
+    PetCredit,
+    /// Attacker bookkeeping and the arena kill event.
+    AttackerBookkeeping,
+    /// The death mode faces the attacker (path direction, path spec).
+    FaceAttacker,
+    /// Quest kill parse (not run for a revived monster).
+    QuestKill,
+    /// The act 5 barricade doors (`objCol` monsters open object 571 /
+    /// 572 at the same spot).
+    BarricadeDoors,
+}
+
 /// Seams without a provider (see the module doc). Grouped by the spec
 /// that will own them.
 #[allow(unused_variables)]
 pub trait Pending {
+    // ---- animation (`formats/animdata.md` OQ2, `units.md` §4.3) -------
+
+    /// The COF name the composer `0x0064F5B0` builds for a unit in a
+    /// mode (token + mode + weapon class, NUL-padded to 8 bytes) for
+    /// the AnimData lookup `0x0066A9B0` (`animdata.md` §5). The composer
+    /// for players, objects and units with an inventory is
+    /// `animdata.md` Open question 2. `None`: no name (no record).
+    fn anim_name(&self, unit: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        None
+    }
+    /// The animation rate `0x00623F50` (unit +0x4C) from the AnimData
+    /// speed (`None` when the unit has no record) and the rate stats and
+    /// states (`units.md` §4.3; animation-rate spec, not written).
+    fn anim_rate(&self, unit: UnitId, speed: Option<u32>) -> i16 {
+        0
+    }
+    /// The frame bonus `0x00623B10` (table `0x006E8E60` by class and
+    /// weapon type, `units.md` §4.3; animation-rate spec, not written).
+    fn frame_bonus(&self, unit: UnitId) -> i32 {
+        0
+    }
+
     // ---- path and position (`units.md` path; not written) -------------
 
     /// Position in subtiles (path +0x2C).
@@ -464,6 +504,61 @@ pub trait Pending {
     /// `0x005809D0(game, player, no skill, 2, x, y, 0)` (player path modes).
     fn set_player_mode_arrival(&mut self, game: &mut Game, player: UnitId) {}
 
+    // ---- the kill and the death (`damage.md` §7.2, `treasure.md` §3) ---
+
+    /// A step of the kill with no written body ([`KillStep`]).
+    fn kill_step(&mut self, game: &mut Game, step: KillStep, defender: UnitId, attacker: UnitId) {}
+    /// `0x005A03A0`: the monster's superunique index (hcIdx ≠ −1).
+    /// Monster data (`monsters/init.md`).
+    fn superunique(&self, unit: UnitId) -> Option<u16> {
+        None
+    }
+    /// `0x0058F0D0`: the unit's minion owner (units spec, not written).
+    fn minion_owner(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x005408E0`: the party count the drop walk reads for `unit`
+    /// (party, not written).
+    fn party_size(&self, unit: UnitId) -> Option<i32> {
+        None
+    }
+    /// `treasure.md` §3.3 for recipient `r`: the quest owner `P` is a
+    /// player whose quest flags for the difficulty have none of 15, 1 and
+    /// `cp` (quests and owner resolution `0x0058F0D0`, `0x0063A690`,
+    /// `0x00552F60`). False: no quest TC.
+    fn quest_tc_open(&self, r: UnitId, cp: u8) -> bool {
+        false
+    }
+
+    // ---- vitals (`combat/vitals.md` §3; the rest of `VitalsRest`) ------
+
+    /// `0x0064C040` after a strength / dexterity change (not specified).
+    fn stats_refresh(&mut self, unit: UnitId) {}
+    /// `vitals.md` §3 step 7 (party roster, sound, broadcast, callbacks).
+    fn level_up_notify(&mut self, unit: UnitId) {}
+    /// Unit event 12 `levelup` (`0x005C0C30`, event registry).
+    fn level_up_event(&mut self, unit: UnitId) {}
+
+    /// The monster death start `0x005A6FF0` (mode table, `units.md`
+    /// §4.6) run by the monster mode set with the mode change's
+    /// `target` (`ActionHooks::mode_target`). Its body is not written
+    /// beyond two callees: the drop gate and drop (`treasure.md` §3.1,
+    /// `crate::wiring::economy::monster_death_drop`) and the evil-killed
+    /// count `0x00547E50` (`population.md` §13 item 3). A host that holds the
+    /// economy state overrides this. Returns whether the mode started;
+    /// default: started, nothing done (as every other start function).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool
+    where
+        Self: Sized,
+    {
+        true
+    }
+
     // ---- skill timer events (`stat-lists.md` §10.2, §10.3; `use.md` §7) --
 
     /// Routes timer events 5, 8 and 9 to the skill use pipeline. The
@@ -475,6 +570,26 @@ pub trait Pending {
     where
         Self: Sized,
     {
+    }
+
+    /// Player event 0 in an attack, cast or skill mode: the action frame
+    /// `0x00580460` (`units.md` §4.5) with the event's (a1, a2); returns
+    /// the action result (2 runs the ENDANIM handler at once). A seam
+    /// value that also implements
+    /// [`crate::wiring::interaction::UseRest`] routes it to
+    /// [`crate::wiring::interaction::skill_events::action_frame`]
+    /// (`use.md` §5.2). Default: 1, nothing done.
+    fn action_frame(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        a1: u32,
+        a2: u32,
+    ) -> u32
+    where
+        Self: Sized,
+    {
+        1
     }
 }
 

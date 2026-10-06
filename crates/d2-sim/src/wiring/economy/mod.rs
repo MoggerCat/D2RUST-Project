@@ -1,4 +1,4 @@
-// Spec: specs/items/generation.md; specs/items/properties.md §2, §4.2; specs/sim/stat-lists.md §4, §8.1, §9.3; specs/sim/units.md §3; specs/items/treasure.md §7, §8; specs/world/cube.md §7; specs/world/quests.md §9
+// Spec: specs/items/generation.md; specs/items/treasure.md §3; specs/items/properties.md §2, §4.2; specs/sim/stat-lists.md §4, §8.1, §9.3; specs/sim/units.md §3; specs/items/treasure.md §7, §8; specs/world/cube.md §7; specs/world/quests.md §9
 //! The economy seams on their real providers:
 //!
 //! - [`game_fields`]: [`crate::items::ItemGame`] on [`GameFields`], the
@@ -17,12 +17,17 @@
 //!   units ([`EconomyCube`]); the rest stays a seam ([`CubeRest`]).
 //! - [`quest_items`]: [`crate::world::quests::QuestWorld`] likewise
 //!   ([`EconomyQuests`], [`QuestRest`]).
+//! - [`death`]: a dead monster's drop (`treasure.md` §3) on the action
+//!   wiring's units and DRLG, through [`ItemDrops`] ([`DeathDrops`],
+//!   [`monster_death_drop`]); the free-spot search stays a seam
+//!   ([`FreeSpot`]).
 //! - [`quest_tick`]: tick step 8, the quest updater, on the same quest
 //!   world, wrapped around a game's tick hooks ([`QuestTick`]).
 //!
 //! Status: wired, unverified (every spec involved is a draft).
 
 pub mod cube_items;
+pub mod death;
 pub mod game_fields;
 pub mod item_stats;
 pub mod item_units;
@@ -34,6 +39,7 @@ pub mod treasure_items;
 mod tests;
 
 pub use cube_items::{CubeRest, EconomyCube};
+pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};

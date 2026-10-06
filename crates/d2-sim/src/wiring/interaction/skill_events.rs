@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §5, §6.1
+// Spec: specs/skills/use.md §5.2, §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §5, §6.1
 //! The skill timer events of the unit dispatch on the skill use
 //! pipeline: event 5 (active state), 8 (periodic skills and auras) and 9
 //! (item auras) reach [`crate::skills::use_`] through [`UseView`].
@@ -15,11 +15,19 @@
 //! }
 //! ```
 //!
+//! Player event 0 in an attack, cast or skill mode (the action frame
+//! `0x00580460`, `units.md` §4.5) reaches
+//! [`crate::skills::use_::attack_frame_event`] the same way, through
+//! [`Pending::action_frame`] and [`action_frame`].
+//!
 //! Event 14 (callback `0x00554570`) is not routed: `use.md` §6 states it
 //! is never scheduled in 1.14d and its body is not specified.
 
-use crate::skills::use_::{active_state_event, item_aura_event, periodic_event};
+use crate::skills::use_::{
+    active_state_event, attack_frame_event, item_aura_event, periodic_event,
+};
 use crate::units::hooks::Sim;
+use crate::units::UnitId;
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionHooks, Pending, SkillEvent, View};
 
@@ -62,4 +70,24 @@ pub fn route<X: Pending + UseRest>(h: &mut ActionHooks<X>, sim: &mut Sim<'_>, ev
             item_aura_event(&mut w, &t.skills, unit, skill as i32, level);
         }
     }
+}
+
+/// The player action frame `0x00580460` (`use.md` §5.2) on the skill use
+/// pipeline: the used skill's do function on an action event (a1 1 or
+/// 2); returns 1, or 2 when the unit died.
+pub fn action_frame<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    a1: u32,
+    a2: u32,
+) -> u32 {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    attack_frame_event(&mut w, &t.skills, unit, a1 as i32, a2 as i32) as u32
 }
