@@ -403,7 +403,10 @@ Cloud (repo only):
    `ui::text::TextOpts` carry the clip rect now (it is on `TextRequest`) or
    wait for `ui/text.md` to say what the original's text call takes? Until
    answered the code keeps the current reading (previous-frame rank; no
-   fields in `TextOpts`).
+   fields in `TextOpts`). **Answered 2026-10-06** (`docs/PLAN.md`
+   decisions log): CG1 keep the previous-frame rank; CG2 both,
+   `TextOpts::clip` now carries the request's clip rect (unused until
+   `ui/text.md` §B3 says what the original takes).
 7h. **Spec questions of the fifth fold** (spec writing / Ghidra, §7 fifth
    set): RT1–RT6 (where the umod mode 0 / 1 calls sit in `0x005A7C20`,
    the monster-level getter, umod mode 4, `dwAiState`, the boss /
@@ -1172,6 +1175,8 @@ print `skipped: no GPU adapter` and pass.
 
 ## 5. Local run queue
 
+Ordered, copy-pasteable guide to running this queue: `docs/LOCAL-RUN.md`.
+
 Cloud sessions add checks here (command + what to look for); a local
 session runs them, records the result, and removes the entry. Merged
 2026-10-06 from the 13 notes in `docs/handoff/`, then from the 15 notes
@@ -1258,6 +1263,15 @@ replays on the existing recordings, C57 the recordings list) and C58
 Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Blocked.
 
 ### Done (kept for the record)
+
+Done 2026-10-06 (local, captures with the player): render captures with
+`record_frames.py` (branch `claude/spec-render-placement`), 800×600 GDI:
+run 1b Den of Evil (14,823 frames, 15,711 ticks; still segment 1,151
+frames, 140 distinct images: cursor + light flicker, §7 "first 1.14d frame
+captures") and run 2 Rogue Encampment (1,111 frames: walk, run, stop, Town
+Portal). Run 1 (automap open) kept as a record. `stability-0001` therefore
+**does not pass as specified**; the comparison rule needs the §7 changes
+before placement / camera / composition cases can be judged.
 
 Done 2026-10-06 (local, branch `claude/local-2026-10-06` from `edad871`;
 group C on game files and the real GPU; entries C1, C8, C9, C15, C16,
@@ -1641,6 +1655,13 @@ ones, but they need `traces/raw/`, so local):
   WN1–WN3, IS1 and MV1.
 
 ### B. Ghidra / spec edits only (no game run, no player)
+
+**From the 2026-10-06 captures:** the player light flicker (find the
+per-frame light-level source of the player's light in the 1.14d client
+light pass; client RNG or time; owner `render/lighting.md`); the cursor
+draw call and its animation counter (owner `render/capture.md` /
+`ui/controls.md`); the weather (rain) particle RNG (owner
+`render/draw-order.md` or a weather spec).
 
 For the next local spec session. Apply each fix on the owning spec with
 evidence.
@@ -3781,6 +3802,40 @@ frames before the repeated buy in `e2e_vendor`). Replace `SimGame::join`
 before the link with the 0x67..0x70 flow through `PendingSession` once the
 session spec exists.
 
+From the first 1.14d frame captures (2026-10-06, local, `record_frames.py`
+of branch `claude/spec-render-placement`; raw files gitignored:
+`traces/raw/20261006-140102-frames-run1b.jsonl` +
+`game/captures/20261006-140102/`, `traces/raw/20261006-141725-frames-run2.jsonl`
++ `game/captures/20261006-141726/`, kept in that branch's worktree), by owner:
+
+- **`render/capture.md`** (stability, §5 A): the capture is stable (scene,
+  UI and palette identical frame to frame), but no 1.14d scene is fully
+  static: (1) the **mouse cursor** is drawn into the framebuffer and
+  animates (black ↔ index 172 pixels where it rests); log its position and
+  frame per capture, or mask it; (2) see lighting below; (3) run 1 (with the
+  automap open, mana regenerating, Quest Log button flashing) showed those
+  UI animations too. Stability must be defined as "equal outside the
+  listed animated sources", or each source must be modelled. Frame pacing
+  under the debugger: of 1,111 town frames, 625 follow 1 tick, 466 follow 2
+  ticks, 19 follow 0 ticks (frames dropped, never duplicated): every frame
+  carries its tick, so per-tick comparisons stay possible.
+- **`render/lighting.md`** (not written; §B8): in an empty Den of Evil
+  dead end, standing still, comparing the same idle animation frame 16
+  ticks apart, 82 of 84 pairs differ by ~30–300 pixels, all **±1 step on
+  the dark palette ramp** (30↔29, 22↔21, …), mostly on and around the
+  player sprite (x 350–450, y 200–300) and dim floor at the left: the
+  player's light level flickers over time. The spec must state the flicker
+  rule and its source (client RNG or time); Ghidra request in §5 B.
+- **`render/composition.md`, `blend-modes.md`**: `composition-0001` exists
+  (run 2: Town Portal open beside the player, 800×600 GDI, video type 1):
+  the input for settling the blend-table orientation (row = destination per
+  `composition.md` vs `palette.md` / `render-pipeline.md` §A5) and the
+  `pal.pl2` vs `pal.dat` palette question. Rain and torch flames animate in
+  town: town comparisons must mask them or model the weather RNG.
+- `placement-0001` (inventory open / close) and `camera-0001` (walk, run,
+  stop: modes 6 / 2 / 3 / 1) are in the same two runs; no comparison has
+  run yet (needs the d2rs side of each case).
+
 From the Phase 6 infrastructure (notes `docs/handoff/p6-*.md`), by owner:
 
 - **Integration (disagreement between notes):** the scene note's
@@ -4149,6 +4204,7 @@ neighbouring wording point).
 | A coverage claim on a test that checks only part of a rule overstates the unit tier (10 claims dropped on review, 2026-10-06; rules that are one unit make this easy to repeat) | claim a rule only when the assertions check its outcome, with the narrowest ID that is fully true; consistency checks against a TSV and M08 perturbation tests get no claim (`docs/handoff/coverage-claims.md` §1) |
 | A software Vulkan adapter (Mesa llvmpipe) passes every GPU case, which says nothing about a real driver's integer and texture paths (2026-10-06) | the GPU half of every Phase 6 check stays "unverified" until the local run on a real adapter records its name, backend and driver (§5 C15, C16; METHODS M02) |
 | Five game-file assertions written without game files (`gaps-data-formats`, 2026-10-06) and two spec facts stated without a measurement (`animdata.md` "second copy in all 9", `dc6.md` "zero-size frames occur") failed on the first local run of C17 | a blind-written game assertion is marked "expected value unconfirmed" in its handoff and is not claimed (`COVERAGE.md` §3) until its first local run; a spec fact names its measurement or is an open question (`specs/README.md` bar 1; METHODS M21) |
+| Both spec branches of 2026-10-06 would have failed a merge gate: `spec-inventory` edited `server-messages.tsv` without `gen-proto`; `spec-path-placement` repeated two rule ids (`coverage.py --check`) and added a `bits:` layout syntax the d2-proto parser rejects (caught by the cloud coordinator) | `specs/README.md` Process: the pre-push checks and the TSV-grammar rule; the local coordinator runs them on every writer branch before reporting it (fixed on `claude/spec-path-placement` `3fe068b`: 0x96 layout moved to `pathing.md` prose; METHODS M21) |
 | Three parallel d2-server handler branches each added `[dev-dependencies] d2-data` and a field/generic to `SimGame`; git merged the two `Cargo.toml` sections silently into a duplicate key and the `SimGame` generics conflicted (2026-10-06, caught by the coordinator's build before the gate) | parallel sessions that extend a shared struct get one named owner per field in their prompts; the coordinator builds the touched crate after each merge, not only after the last (METHODS M21) |
 | `wire-interaction` added a seed parameter to the `NpcLink::make_hire_list` seam while `server-world` (in parallel) wrote a test fake against the old signature; each branch was green alone (2026-10-06, caught by the coordinator's workspace clippy on the combined branch) | sessions that change a seam signature name it in their notes under "signature changes"; the coordinator greps other branches for implementors before merging, and always runs clippy/tests on the whole workspace after combining (METHODS M21) |
 | A spec branch (`claude/spec-inventory`, 2026-10-06) changed `specs/sim/server-messages.tsv` layouts without regenerating `crates/d2-proto/src/generated.rs`; three d2-proto tests failed after the merge (caught by the coordinator's full gate, not by `cargo check`) | after merging any branch that touches `specs/sim/*-messages.tsv`, run `cargo run -p data-tool -- gen-proto` and commit the result in the merge; spec sessions that edit the TSVs regenerate in the same commit (METHODS M21) |
@@ -4157,5 +4213,6 @@ neighbouring wording point).
 | The coordinator's merge script committed each merge before its `cargo check`; on a failed check the follow-up `git merge --abort` was a no-op, so a branch that did not build stayed in the history and was pushed (`prop-path-place` against `wire-path-sim`'s seam cleanup, 2026-10-06; reset and force-pushed within minutes, no PR open) | merge with `--no-commit --no-ff`, build, and commit only when `cargo check --workspace --all-targets` passes, else `git merge --abort` (METHODS M21) |
 | A property test passed locally twice and failed only on CI's random seed (`stat_lists_match_the_model`, PR #24); a green run merged the PR with the bug still live | a property's counterexample is a real bug, never a flake: reproduce it as a fixed regression test and fix the wrong side per the spec (`fix-statlist-prop`) |
 | PR #27 (a fix branch opened from an older main) was green on every job, `check` included, yet GitHub refused the merge ("Required status check `check` is expected"): main's branch protection requires the PR branch to be up to date with main (2026-10-06) | before opening a PR from any branch, merge the latest `origin/main` into it (a merge commit, never a rebase) and let CI run on that head; the coordinator's branch always is, a session's fix branch usually is not (METHODS M21) |
+| `prop_transport::inbox_any` failed on one random seed in the coordinator's gate (2026-10-06): `Inbox::deliver` returned `BadSize(537)` for an id 0x94 split whose size rule exceeded 0x204, which is the original's assert (`intents-events.md` §3.3 r2); the property's model allowed only `BadId` | the model was the wrong side again (as `fix-statlist-prop`): before writing a property's error arms, list every error the spec's rules can raise on that input range; a seed-only counterexample becomes a deterministic regression test (`delivery_asserts_on_an_oversized_split`) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 

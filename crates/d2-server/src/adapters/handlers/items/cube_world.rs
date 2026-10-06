@@ -1,32 +1,30 @@
-// Spec: specs/world/cube.md §1, §2, §8; specs/sim/intents-events.md §2.4
+// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3, §6.4; specs/sim/intents-events.md §2.4
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
 //! for items, stats, unit records and creation; the player's
-//! interaction owner ([`Interact`]); the staged state for inventory
-//! lists, the date and sounds; the checks
-//! `cube.md` §2 writes (`0x00549350`, `0x00549150`, `0x0055BF50`'s flag
-//! part); and [`ItemPending`] for the calls no written spec owns.
+//! interaction owner ([`Interact`]); the game's one inventory model
+//! ([`InvParts`], `d2_sim::wiring::inventory`) for the item list, the
+//! checks (`0x00549350`, `0x00549150`: `inventory.md` §5.1), the
+//! targeting reset (`0x0055BF50`, §5.3), placement (`0x00560200`, §2.4)
+//! and removal (§8 step 1: the direct 0x9D of §6.4, the §1.4 unlink, the
+//! free); the staged date and sounds; and [`ItemPending`] for the calls
+//! no written spec owns.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+use d2_sim::items::moves::{iflag, page};
 use d2_sim::rng::Seed;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::economy::{CubeRest, EconomyCube};
+use d2_sim::wiring::inventory::InvDesk;
 use d2_sim::world::cube::{CraftProperty, CubeWorld, ItemRequest, StatRead};
 
+use super::moves::{take_sent, InvParts, MoveRest};
 use super::{CubeHooks, Interact, ItemError, ItemPending, Staged};
-use crate::adapters::UnitFacts;
 
-/// Item flag the targeting reset clears (`cube.md` §2 step 3.1).
-const FLAG_TARGETED: u32 = 0x4;
-/// Range argument of the ground-item distance test (`cube.md` §2 step 1).
-const PUT_RANGE: i32 = 10;
 /// Interaction "stash" (`cube.md` §1: type 2, object class 0x10B).
 const STASH_TYPE: u8 = 2;
 const STASH_CLASS: u32 = 0x10B;
-/// Item modes (`cube.md` §2 step 1).
-const MODE_STORED: u8 = 0;
-const MODE_GROUND: u8 = 3;
-const MODE_CURSOR: u8 = 4;
 
 /// The player data item creation reads (`generation.md` §9 step 5): the
 /// name and the client's hardcore flag.
@@ -119,32 +117,39 @@ impl CubeRest for InfoRest<'_> {
 }
 
 /// The cube's world on the server, for one handler call by `player`.
+///
+/// The economy and the inventory parts sit in cells: the §5.1 checks the
+/// cube asks through `&self` run on an inventory desk, which borrows the
+/// economy mutably (it fills its item data copies).
 pub(super) struct ServerCube<'e, 'a, 'r, H> {
-    econ: EconomyCube<'e, 'a, H, InfoRest<'r>>,
+    econ: RefCell<EconomyCube<'e, 'a, H, InfoRest<'r>>>,
+    inv: RefCell<Option<&'e mut InvParts>>,
     staged: &'e mut Staged,
     pending: &'e mut dyn ItemPending,
     interact: &'e mut dyn Interact,
-    facts: &'e BTreeMap<UnitId, UnitFacts>,
     player: UnitId,
     sent: Vec<Vec<u8>>,
     errors: Vec<ItemError>,
 }
+
+/// The inventory desk of one cube call.
+type CubeDesk<'d, 'a, H> = InvDesk<'d, 'a, H, dyn MoveRest + Send + Sync>;
 
 impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
     pub(super) fn new(
         econ: EconomyCube<'e, 'a, H, InfoRest<'r>>,
         staged: &'e mut Staged,
         pending: &'e mut dyn ItemPending,
+        inv: Option<&'e mut InvParts>,
         interact: &'e mut dyn Interact,
-        facts: &'e BTreeMap<UnitId, UnitFacts>,
         player: UnitId,
     ) -> Self {
         Self {
-            econ,
+            econ: RefCell::new(econ),
+            inv: RefCell::new(inv),
             staged,
             pending,
             interact,
-            facts,
             player,
             sent: Vec::new(),
             errors: Vec::new(),
@@ -155,6 +160,7 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
     pub(super) fn finish(self) -> (Vec<Vec<u8>>, Vec<ItemError>) {
         let mut errors: Vec<_> = self
             .econ
+            .into_inner()
             .errors
             .into_iter()
             .map(ItemError::Economy)
@@ -163,62 +169,87 @@ impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
         (self.sent, errors)
     }
 
+    /// The economy cube (reads).
+    fn ec(&self) -> std::cell::Ref<'_, EconomyCube<'e, 'a, H, InfoRest<'r>>> {
+        self.econ.borrow()
+    }
+
+    /// The economy cube (writes).
+    fn ec_mut(&mut self) -> &mut EconomyCube<'e, 'a, H, InfoRest<'r>> {
+        self.econ.get_mut()
+    }
+
     /// The active interaction: (unit type, GUID).
     fn active(&self, player: UnitId) -> Option<(u8, u32)> {
         self.interact.interact_unit(player)
     }
 
-    fn inventory_of(&self, player: UnitId) -> &[UnitId] {
-        self.staged
-            .inventories
-            .get(&player)
-            .map_or(&[][..], |i| &i.items[..])
+    /// Runs `f` on the inventory desk over this call's economy (`None`:
+    /// a host without inventory parts).
+    fn read_desk<T>(&self, f: impl FnOnce(&CubeDesk<'_, 'a, H>) -> T) -> Option<T> {
+        let mut inv = self.inv.borrow_mut();
+        let parts = inv.as_deref_mut()?;
+        let mut ec = self.econ.borrow_mut();
+        let d = parts.desk(&mut *ec.econ);
+        Some(f(&d))
     }
 
-    fn is_cursor(&self, player: UnitId, item: UnitId) -> bool {
-        self.staged
-            .inventories
-            .get(&player)
-            .is_some_and(|i| i.cursor == Some(item))
+    /// Runs `f` on the inventory desk; the messages it queued go to the
+    /// acting client in order (another receiver is an error, as for
+    /// [`CubeWorld::send`]).
+    fn with_desk<T>(&mut self, f: impl FnOnce(&mut CubeDesk<'_, 'a, H>) -> T) -> Option<T> {
+        let parts = self.inv.get_mut().as_deref_mut()?;
+        let mut d = parts.desk(&mut *self.econ.get_mut().econ);
+        let out = f(&mut d);
+        let sent = take_sent(&mut d);
+        for (unit, bytes) in sent {
+            match unit {
+                Some(u) if u == self.player => self.sent.push(bytes),
+                Some(u) => self.errors.push(ItemError::OtherPlayer(u)),
+                None => {}
+            }
+        }
+        Some(out)
     }
 
     fn unit_class(&self, ty: UnitType, guid: u32) -> Option<u32> {
-        let u = self.econ.econ.game.lists.find_unit(ty, guid)?;
-        self.econ.econ.units.get(u).map(|r| r.class)
+        let ec = self.ec();
+        let u = ec.econ.game.lists.find_unit(ty, guid)?;
+        ec.econ.units.get(u).map(|r| r.class)
     }
 }
 
 impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     fn expansion(&self) -> bool {
-        self.econ.expansion()
+        self.ec().expansion()
     }
     fn game_type(&self) -> u8 {
-        self.econ.game_type()
+        self.ec().game_type()
     }
     fn ladder(&self) -> bool {
-        self.econ.ladder()
+        self.ec().ladder()
     }
     fn difficulty(&self) -> u8 {
-        self.econ.difficulty()
+        self.ec().difficulty()
     }
     fn item_format(&self) -> u16 {
-        self.econ.item_format()
+        self.ec().item_format()
     }
     fn local_date(&self) -> (u8, u8) {
         self.staged.local_date
     }
     fn game_seed(&mut self) -> &mut Seed {
-        self.econ.game_seed()
+        self.ec_mut().game_seed()
     }
 
     fn player_class(&self, player: UnitId) -> u8 {
-        self.econ.player_class(player)
+        self.ec().player_class(player)
     }
     fn stat(&self, unit: UnitId, read: StatRead, stat: u16) -> i32 {
-        self.econ.stat(unit, read, stat)
+        self.ec().stat(unit, read, stat)
     }
     fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
-        self.econ.set_stat(unit, stat, value)
+        self.ec_mut().set_stat(unit, stat, value)
     }
     fn attach_sound(&mut self, player: UnitId, event: u8) {
         self.staged.sounds.push((player, event));
@@ -259,7 +290,7 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
         self.active(player).is_some_and(|(ty, guid)| {
             ty == 0
                 && self
-                    .econ
+                    .ec()
                     .econ
                     .game
                     .lists
@@ -268,95 +299,104 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
         })
     }
 
+    /// The player's item list in link order (`inventory.md` §1.4 rule 1,
+    /// `cube.md` OQ 5).
     fn inventory(&self, player: UnitId) -> Vec<UnitId> {
-        self.inventory_of(player).to_vec()
+        self.inv
+            .borrow()
+            .as_deref()
+            .map_or_else(Vec::new, |p| p.state.items_of(player))
     }
     fn item_by_guid(&self, guid: u32) -> Option<UnitId> {
-        self.econ.item_by_guid(guid)
+        self.ec().item_by_guid(guid)
     }
     fn item_guid(&self, item: UnitId) -> u32 {
-        self.econ.item_guid(item)
+        self.ec().item_guid(item)
     }
     fn item_page(&self, item: UnitId) -> u8 {
-        self.econ.item_page(item)
+        self.ec().item_page(item)
     }
     fn set_item_page(&mut self, item: UnitId, page: u8) {
-        self.econ.set_item_page(item, page)
+        self.ec_mut().set_item_page(item, page)
     }
     fn item_mode(&self, item: UnitId) -> u8 {
-        self.econ.item_mode(item)
+        self.ec().item_mode(item)
     }
     fn set_item_mode(&mut self, item: UnitId, mode: u8) {
-        self.econ.set_item_mode(item, mode)
+        self.ec_mut().set_item_mode(item, mode)
     }
     fn item_class(&self, item: UnitId) -> Option<u32> {
-        self.econ.item_class(item)
+        self.ec().item_class(item)
     }
     fn set_item_class(&mut self, item: UnitId, class: u32) {
-        self.econ.set_item_class(item, class)
+        self.ec_mut().set_item_class(item, class)
     }
     fn class_is_type(&self, class: u32, ty: u16) -> bool {
-        self.econ.class_is_type(class, ty)
+        self.ec().class_is_type(class, ty)
     }
     fn item_quality(&self, item: UnitId) -> u8 {
-        self.econ.item_quality(item)
+        self.ec().item_quality(item)
     }
     fn item_file_index(&self, item: UnitId) -> u32 {
-        self.econ.item_file_index(item)
+        self.ec().item_file_index(item)
     }
     fn item_level(&self, item: UnitId) -> i32 {
-        self.econ.item_level(item)
+        self.ec().item_level(item)
     }
     fn set_item_level(&mut self, item: UnitId, level: i32) {
-        self.econ.set_item_level(item, level)
+        self.ec_mut().set_item_level(item, level)
     }
     fn item_flags(&self, item: UnitId) -> u32 {
-        self.econ.item_flags(item)
+        self.ec().item_flags(item)
     }
     fn set_item_flag(&mut self, item: UnitId, flag: u32) {
-        self.econ.set_item_flag(item, flag)
+        self.ec_mut().set_item_flag(item, flag)
     }
     fn item_sockets(&self, item: UnitId) -> i32 {
-        self.econ.item_sockets(item)
+        self.ec().item_sockets(item)
     }
     fn max_sockets(&self, item: UnitId) -> i32 {
-        self.econ.max_sockets(item)
+        self.ec().max_sockets(item)
     }
     fn add_sockets(&mut self, item: UnitId, n: i32) {
-        self.econ.add_sockets(item, n)
+        self.ec_mut().add_sockets(item, n)
     }
     fn item_seed(&mut self, item: UnitId) -> &mut Seed {
-        self.econ.item_seed(item)
+        self.ec_mut().item_seed(item)
     }
+    /// The item's own inventory, in link order (its socket fillers).
     fn socketed(&self, item: UnitId) -> Vec<UnitId> {
-        self.pending.socketed(item)
+        self.inv
+            .borrow()
+            .as_deref()
+            .map_or_else(Vec::new, |p| p.state.fillers(item))
     }
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId> {
         self.pending.duplicate(item, fillers)
     }
     fn item_init(&mut self, item: UnitId) -> Option<UnitId> {
-        self.econ.item_init(item)
+        self.ec_mut().item_init(item)
     }
     fn create_item(&mut self, request: &ItemRequest) -> Option<UnitId> {
-        self.econ.create_item(request)
+        self.ec_mut().create_item(request)
     }
     fn tempered_affix(&mut self, item: UnitId, prefix: bool) -> u16 {
         self.pending.tempered_affix(item, prefix)
     }
     fn set_tempered(&mut self, item: UnitId, prefix: u16, suffix: u16) {
-        self.econ.set_tempered(item, prefix, suffix)
+        self.ec_mut().set_tempered(item, prefix, suffix)
     }
     fn unique_found(&self, index: u32) -> bool {
-        self.econ.unique_found(index)
+        self.ec().unique_found(index)
     }
     fn set_unique_found(&mut self, index: u32, found: bool) {
-        self.econ.set_unique_found(index, found)
+        self.ec_mut().set_unique_found(index, found)
     }
     fn drop_runeword_stats(&mut self, item: UnitId) {
         self.pending.drop_runeword_stats(item)
     }
     fn add_craft_property(&mut self, item: UnitId, prop: &CraftProperty) {
-        self.econ.add_craft_property(item, prop)
+        self.ec_mut().add_craft_property(item, prop)
     }
     fn repair(&mut self, item: UnitId) {
         self.pending.repair(item)
@@ -364,68 +404,51 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     fn recharge(&mut self, item: UnitId) {
         self.pending.recharge(item)
     }
+    /// `0x00560200(game, player, id, 0, 0, 1, 1, 0)` (`cube.md` §2 step
+    /// 3.5, §8 steps 3–4): `inventory.md` §2.4 with a free position and
+    /// "send", on the player's inventory.
     fn place(&mut self, player: UnitId, item: UnitId) -> bool {
-        let inv = self.staged.inventories.entry(player).or_default();
-        self.pending.place(inv, player, item, &mut self.sent)
+        self.with_desk(|d| d.place(player, item, (0, 0), true, true))
+            .unwrap_or(false)
     }
     fn free_item(&mut self, item: UnitId) {
-        self.econ.free_item(item)
+        self.ec_mut().free_item(item)
     }
-    /// `cube.md` §8 step 1 for one item: the pending part (0x9D, the
-    /// inventory removal), then the free.
+    /// `cube.md` §8 step 1 for one item: S→C 0x9D action 5 now
+    /// (`0x0053D010`, `inventory.md` §6.4: item flags | 0x20, the stored
+    /// page set to 3 and shown), then removed from the inventory and freed
+    /// (`0x0055DF10` → `0x00557FD0`: the §1.4 unlink, then the inventory
+    /// wiring's free).
     ///
-    /// TODO(cube.md §8 step 1): the spec frees through `0x0055DF10` →
-    /// `0x00557FD0`; read here as the unit free `0x00555600`
-    /// (`units.md` §3.2) the economy wiring runs. Confirm the two agree.
+    /// TODO(cube.md §8 step 1): an unlink failure is not written (the
+    /// item is in the list: the caller walks it); ignored, the free runs.
     fn remove_cube_item(&mut self, player: UnitId, item: UnitId) {
-        let inv = self.staged.inventories.entry(player).or_default();
-        self.pending
-            .remove_cube_item(inv, player, item, &mut self.sent);
-        self.econ.free_item(item);
+        let fatal = self.with_desk(|d| {
+            let r = d.send_item_page(player, item, iflag::COPIED, page::CUBE);
+            d.remove(player, item);
+            d.free(item);
+            r
+        });
+        if let Some(Err(e)) = fatal {
+            self.errors.push(ItemError::Move(e));
+        }
     }
-    /// `0x0055BF50`: every inventory item with item flag 0x4 gets it
-    /// cleared. The 0x3F it may queue is recorded, not sent
-    /// ([`Staged::targeting_resets`]).
+    /// `0x0055BF50` (`inventory.md` §5.3) on the player's item list: flag
+    /// 0x4 cleared, S→C 0x3F queued when `0x0044BE50` returns 0.
     fn targeting_reset(&mut self, player: UnitId) {
-        for item in self.inventory_of(player).to_vec() {
-            if let Some(i) = self.econ.econ.items.get_mut(item) {
-                i.flags &= !FLAG_TARGETED;
-            }
-        }
-        self.staged.targeting_resets.push(player);
+        self.with_desk(|d| d.reset_targeting(player));
     }
-    /// `0x00549350` (`cube.md` §2 step 1). Act and positions are the
-    /// staged [`UnitFacts`]; a ground item or player without them counts
-    /// as missing (as in the unit-target lookup).
+    /// `0x00549350` (`cube.md` §2 step 1 = `inventory.md` §5.1 ground or
+    /// owned) on the inventory model. Without inventory parts: 1.
     fn put_item_check(&self, player: UnitId, item: u32) -> u32 {
-        let Some(it) = self.item_by_guid(item) else {
-            return 1;
-        };
-        match self.item_mode(it) {
-            m if m > MODE_CURSOR => 1,
-            MODE_GROUND => {
-                let (Some(t), Some(p)) = (self.facts.get(&it), self.facts.get(&player)) else {
-                    return 1;
-                };
-                if t.act != p.act {
-                    return 2;
-                }
-                // TODO(cube.md §2 step 1): the failed distance test's
-                // value is written as "non-zero"; 1 is the "out of
-                // range" code of `intents-events.md` §2.3.
-                let near = (t.pos.x - p.pos.x).abs() <= PUT_RANGE
-                    && (t.pos.y - p.pos.y).abs() <= PUT_RANGE;
-                u32::from(!near)
-            }
-            _ if self.inventory_of(player).contains(&it) || self.is_cursor(player, it) => 0,
-            _ => 1,
-        }
+        self.read_desk(|d| u32::from(d.check_ground_or_owned(player, item)))
+            .unwrap_or(1)
     }
-    /// `0x00549150` (`cube.md` §2 step 2).
+    /// `0x00549150` (`cube.md` §2 step 2 = `inventory.md` §5.1 stored
+    /// item).
     fn cube_check(&self, player: UnitId, cube: u32) -> bool {
-        self.item_by_guid(cube).is_some_and(|c| {
-            self.item_mode(c) == MODE_STORED && self.inventory_of(player).contains(&c)
-        })
+        self.read_desk(|d| d.check_stored(player, cube) == 0)
+            .unwrap_or(false)
     }
     fn quest_item_hook(&mut self, player: UnitId, item: UnitId, code: [u8; 4]) {
         self.pending.quest_item_hook(player, item, code)

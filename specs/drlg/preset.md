@@ -542,20 +542,20 @@ In order, for one preset map:
 
 ## Edge cases & original bugs
 
-- DS1 size ≠ map size is fatal only when the DS1 is loaded at build
+1. DS1 size ≠ map size is fatal only when the DS1 is loaded at build
   (`Scan` or `Pops`); the lazy load of §8 does not check it.
-- A pop style seen once gets a rectangle from the DS1 origin (§6 step 8):
+2. A pop style seen once gets a rectangle from the DS1 origin (§6 step 8):
   `Act3/Kurast/MetroTemple2.ds1` (Def 647) style 9, and
   `Act3/Kurast/Metro08x16_2.ds1` (Def 649) style 8.
-- The DS1 parser has no bounds checks (§5.2); groups and paths can read
+3. The DS1 parser has no bounds checks (§5.2); groups and paths can read
   the 0x320 slack bytes after the file (contents not cleared).
-- The level tile-info list and pop arrays have no capacity checks.
-- Units outside the map's rooms are never transferred (§9).
-- Path points stay absolute while unit x, y become room-relative (§9).
-- v < 4 DS1s lose their floor layer (floor count 0).
-- Item units with DS1 id ≥ 1 would read beyond the one-entry code table
+4. The level tile-info list and pop arrays have no capacity checks.
+5. Units outside the map's rooms are never transferred (§9).
+6. Path points stay absolute while unit x, y become room-relative (§9).
+7. v < 4 DS1s lose their floor layer (floor count 0).
+8. Item units with DS1 id ≥ 1 would read beyond the one-entry code table
   (no lvlprest DS1 has item units).
-- The navi unit requires picked file 3, which `roll(3)` never gives:
+9. The navi unit requires picked file 3, which `roll(3)` never gives:
   only the outdoor code's explicit choice reaches it.
 
 ## Test vectors

@@ -11,19 +11,23 @@
 //! (`d2_sim::wiring::economy::EconomyCube`: items, stats, unit records,
 //! item creation) over the game's one unit world: the world host builds
 //! the economy from the action wiring's unit records, stat lists and
-//! hooks ([`super::world::WorldHost::cube`]). What the cube asks for
-//! that no written spec provides is either staged in the host's
-//! [`CubeParts`] ([`Staged`]: inventory lists, the local date, sound
-//! events; the caller fills them, as with [`super::super::UnitFacts`]),
+//! hooks ([`super::world::WorldHost::cube`]). The player's inventory is
+//! the game's one inventory model ([`moves::InvParts`],
+//! `d2_sim::wiring::inventory`: the item lists, the cursor, placement
+//! §2.4, removal §1.4, the §5.1 checks, the §5.3 targeting reset), the
+//! same one the item moves and the vendors ([`InvVendors`]) use. What the
+//! cube asks for that no written spec provides is either staged in the
+//! host's [`CubeParts`] ([`Staged`]: the local date, sound events),
 //! asked of the player's interaction owner ([`Interact`]: the host's
 //! player-data rest), or goes to [`ItemPending`], whose provider is the
-//! unwritten owner spec (placement, removal, sockets, the item routines
-//! no items spec writes, quest hooks).
+//! unwritten owner spec (the inventory pass, the item routines no items
+//! spec writes, quest hooks).
 
 mod cube_world;
 pub mod moves;
 #[cfg(test)]
 mod tests;
+mod vendor_inv;
 
 use std::collections::BTreeMap;
 
@@ -34,12 +38,14 @@ use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::{Economy, EconomyCube, EconomyError};
 use d2_sim::world::cube::CubeData;
 
-use super::super::{SimGame, UnitFacts};
+use super::super::SimGame;
 use super::world::WorldHost;
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
 
 pub use cube_world::CreationInfo;
+pub use moves::InvParts;
+pub use vendor_inv::InvVendors;
 
 /// C→S 0x2A ItemToCube (`cube.md` §2).
 pub const ITEM_TO_CUBE: u8 = 0x2A;
@@ -90,6 +96,9 @@ pub enum ItemError {
     Sink(QueueError),
     /// A module asked to send to a player other than the acting one.
     OtherPlayer(UnitId),
+    /// A fatal assert of the original inside an inventory routine the
+    /// cube calls (`items::moves::MoveFatal`).
+    Move(d2_sim::items::moves::MoveFatal),
 }
 
 /// The player's interaction state (`cube.md` Inputs: player unit +0x64
@@ -105,60 +114,26 @@ pub trait Interact {
     fn reset_interact(&mut self, player: UnitId);
 }
 
-/// A player's inventory as the cube reads it: the item list in list
-/// order (`cube.md` OQ 5: the order is the inventory spec's) and the
-/// cursor item.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Inventory {
-    pub items: Vec<UnitId>,
-    pub cursor: Option<UnitId>,
-}
-
 /// State no `d2-sim` module holds yet, staged by the caller until its
 /// owner spec moves it into `d2-sim`; and what the handlers record for
 /// it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Staged {
-    pub inventories: BTreeMap<UnitId, Inventory>,
     /// `GetLocalTime` (day of month, day of week + 1): host input.
     pub local_date: (u8, u8),
     /// Sound events attached to players (`0x00553380`, `cube.md`
     /// Outputs), in order. Which message carries them is open (`cube.md`
     /// OQ 2), so none is queued.
     pub sounds: Vec<(UnitId, u8)>,
-    /// Targeting resets (`0x0055BF50`, `cube.md` §2 step 3.1), in order.
-    /// TODO(server-messages.tsv layout of 0x3F; the argument of
-    /// `0x0044BE50`): the reset's 0x3F is not queued.
-    pub targeting_resets: Vec<UnitId>,
 }
 
 /// The cube's calls whose owner spec is not written; the provider is
 /// that spec's code. Messages they queue go to `out` (the acting
-/// client's, in call order).
+/// client's, in call order). Placement, removal and the socketed items
+/// are the inventory model's ([`moves::InvParts`]).
 pub trait ItemPending {
     /// `0x0055FA40` (inventory / UI owner, `cube.md` OQ 8).
     fn inventory_pass(&mut self, player: UnitId, out: &mut Vec<Vec<u8>>);
-    /// `0x00560200(game, player, id, 0, 0, 1, 1, 0)` (inventory spec);
-    /// true when placed.
-    fn place(
-        &mut self,
-        inv: &mut Inventory,
-        player: UnitId,
-        item: UnitId,
-        out: &mut Vec<Vec<u8>>,
-    ) -> bool;
-    /// `cube.md` §8 step 1 for one item before the free: queue 0x9D
-    /// (action 5, flags 0x20, page 3; bytes open, `cube.md` OQ 1) and
-    /// remove it from the inventory (`0x0055DF10`, inventory spec).
-    fn remove_cube_item(
-        &mut self,
-        inv: &mut Inventory,
-        player: UnitId,
-        item: UnitId,
-        out: &mut Vec<Vec<u8>>,
-    );
-    /// Items socketed into `item`, in order (inventory spec).
-    fn socketed(&self, item: UnitId) -> Vec<UnitId>;
     /// `0x0055A2A0` (no items spec writes it).
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId>;
     /// `0x005C1BC0(item, prefix)` (open question WE6 of the economy
@@ -179,7 +154,8 @@ pub trait ItemPending {
 /// The cube's part of a game's world host: the cube tables, the staged
 /// state, the player data item creation reads, the pending provider and
 /// the errors. The items, stats and unit records are the host's economy
-/// (the action wiring's unit world).
+/// (the action wiring's unit world); the inventories are the host's
+/// inventory model ([`moves::InvParts`]).
 pub struct CubeParts {
     pub cube: CubeData,
     pub staged: Staged,
@@ -208,14 +184,16 @@ pub trait CubeHooks: LifecycleHooks + StatHost {}
 
 impl<H: LifecycleHooks + StatHost> CubeHooks for H {}
 
-/// One call into the cube on the host's economy, its cube parts and the
-/// player's interaction owner.
+/// One call into the cube on the host's economy, its cube parts, the
+/// host's inventory model (`None`: every player's inventory is empty)
+/// and the player's interaction owner.
 pub trait CubeCall {
     type Out;
     fn call<H: CubeHooks>(
         self,
         econ: &mut Economy<'_, H>,
         parts: &mut CubeParts,
+        inv: Option<&mut InvParts>,
         interact: &mut dyn Interact,
     ) -> Self::Out;
 }
@@ -252,7 +230,6 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             player,
             client,
             msg,
-            facts: p.facts,
             out,
         },
     )?
@@ -264,7 +241,6 @@ struct CubeRun<'m> {
     player: UnitId,
     client: ClientId,
     msg: &'m [u8],
-    facts: &'m BTreeMap<UnitId, UnitFacts>,
     out: &'m mut dyn MessageSink,
 }
 
@@ -274,6 +250,7 @@ impl CubeCall for CubeRun<'_> {
         self,
         econ: &mut Economy<'_, H>,
         parts: &mut CubeParts,
+        inv: Option<&mut InvParts>,
         interact: &mut dyn Interact,
     ) -> Option<ResultCode> {
         let CubeParts {
@@ -288,8 +265,8 @@ impl CubeCall for CubeRun<'_> {
             EconomyCube::new(econ, &mut info),
             staged,
             pending.as_mut(),
+            inv,
             interact,
-            self.facts,
             self.player,
         );
         let code = if self.msg[0] == ITEM_TO_CUBE {
