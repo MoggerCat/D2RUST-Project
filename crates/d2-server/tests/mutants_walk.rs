@@ -41,7 +41,9 @@ use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pe
 use d2_sim::wiring::economy::QuestRest;
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
 use d2_sim::world::npc::{ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
-use d2_sim::world::quests::{PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind};
+use d2_sim::world::quests::{
+    PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
+};
 use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::{Transaction, VendorTables};
 

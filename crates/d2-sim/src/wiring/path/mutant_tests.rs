@@ -268,7 +268,15 @@ fn floor_drop_starts_below_right_and_walks_back() {
     let a = fx.a;
     let f = field();
     let drop = |fx: &mut Fx| {
-        floor_drop(&fx.sim.hooks().drlg, &f, Some(a), Point::new(10, 10), 1, false).unwrap()
+        floor_drop(
+            &fx.sim.hooks().drlg,
+            &f,
+            Some(a),
+            Point::new(10, 10),
+            1,
+            false,
+        )
+        .unwrap()
     };
     assert_eq!(drop(&mut fx), (Some(a), Point::new(12, 13)));
     // A wall (field mask 0x801) on the start's walk back, at (11, 12):
@@ -354,9 +362,9 @@ fn a_warp_tile_without_a_destination_does_nothing() {
     let mut fx = fx();
     let a = fx.a;
     let p = player(&mut fx, 26, 10);
-    let r = fx.sim.with(&mut fx.game, |g, v| {
-        warp_player(PathCtx::of(v, g), p, a, 0)
-    });
+    let r = fx
+        .sim
+        .with(&mut fx.game, |g, v| warp_player(PathCtx::of(v, g), p, a, 0));
     assert_eq!(r, Some(WarpOutcome::NoDestination));
     assert_eq!(pos(&mut fx, p), (26, 10, Some(a)));
     assert_eq!(sent(&mut fx), vec![]);
@@ -389,7 +397,7 @@ fn remove(fx: &mut Fx, u: UnitId) {
     fx.sim.with(&mut fx.game, |g, v| v.remove(g, u));
 }
 
-// Covers: specs/missiles/missiles.md §R2.3 step 15, §R2.3 step 18, §R4 step 2, §R4 step 3; specs/sim/path-placement.md §5.3 r1, §5.3 r4
+// Covers: specs/sim/path-placement.md §5.3 r1, §5.3 r4
 #[test]
 fn a_missile_path_takes_its_set_up_and_a_still_missile_stays_put() {
     // Missile 0 with `Vel` 0, `Accel` 3, `MaxVel` 2, `Collision` 1 from
@@ -448,7 +456,10 @@ fn a_missile_path_takes_its_set_up_and_a_still_missile_stays_put() {
     let n = fire(&mut fx, Some(target));
     let d = fx.sim.hooks().paths.as_ref().unwrap().dynamic(n).unwrap();
     let t = d.target_unit.expect("target unit");
-    assert_eq!((t.unit, t.ty, t.guid), (target, UnitType::Player, guid(&fx, target)));
+    assert_eq!(
+        (t.unit, t.ty, t.guid),
+        (target, UnitType::Player, guid(&fx, target))
+    );
     // §5.3 rule 4: removal clears the footprint (size, mask 0x40); the
     // second missile on the same cell keeps its own.
     remove(&mut fx, n);
