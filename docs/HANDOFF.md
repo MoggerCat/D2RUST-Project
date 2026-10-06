@@ -149,6 +149,33 @@ one session, batched with the topic writers' requests):
    `0x0055A6D0`–`0x0055AF80` and from `0x00558640` must match
    `treasure.md` §Randomness in order and count.
 
+**Phase 3 topic recordings** (player; one session, batched; recorder
+extensions per M10 first; exact hooks in each spec's open questions):
+items R1 (item creation: seed sets `0x00552DF0`/`0x00552E90`, every draw
+on the item's unit and item seed until `0x00558D90` returns, dump of the
+result); skills (hit/block `0x0057DB61`, `0x0057E04B`; damage
+`0x0057DBF0`, `0x0057C6C0`; leech `0x0057C420`; mana `0x0056BFE0`;
+start/do on an ally `0x0056FAF0`, `0x0056F7F0`; Strafe/Zeal frame codes);
+monsters (new Normal game, Blood Moor and Cold Plains incl. a champion
+pack, seed-step hooks listed in `population.md`/`init.md`, monster x/y
+and type flags; Nightmare melee, freeze, knockback, Fallen Shaman
+resurrect; missile exits `0x005AE1F0`, `0x005ADF10`); world (Flavie chat
+RNG + packets; game start mode at `0x00546270`; act transitions via
+Warriv/Meshif, 0x61; Inifuss scroll 0x50; waypoint to another act and an
+undiscovered waypoint twice).
+
+**Cross-spec fixes reported by writers** (apply on the owning spec with
+evidence): `rng.md` §5.3 (item seed re-init after a failed quality
+routine; four missile seed sites are missile init callbacks), §7 (item
+base stats and low-quality durability use the item's unit seed; monster
+population draws mostly from the active room seed, only density/sparse
+rolls from the game seed); `calc-expressions.md` §3.5 (`skill(s,c)`
+without an entry returns the level-0 special value; OQ5/OQ8 answered by
+`skills/levels.md`); `server-messages.tsv` (0x63, 0x28, 0x5D, 0x50, 0x91
+per `world/quests.md`; 0xAC per `monsters/init.md` §24); `tick.md` §4
+(`0x0052D0F0`), §5.6 (thinks dropped by the freeze gate are never
+rescheduled); `units.md` (pointers from the skills and monsters specs).
+
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
 single-player game, kill a few monsters and pick up a drop. Recording
@@ -183,7 +210,19 @@ what each timer event does per kind; `unit-events.tsv`,
 `stat-ops.tsv`), `sim/stat-lists.md` (lists, modifiers, states, regen).
 These are on `claude/phase3-units` until merged. Treasure classes and
 drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
-`treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
+`treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Items:
+`specs/items/generation.md`, `quality.md`, `affixes.md`, `properties.md`
+(+ `property-functions.tsv`; `claude/phase3-items`). Combat and skills:
+`specs/combat/hit.md`, `damage.md`, `specs/skills/levels.md` (+
+`skillcalc.tsv`, `misscalc.tsv`), `use.md` (+ `functions.tsv`;
+`claude/phase3-skills`; `combat/vitals.md` in progress). Monsters and
+missiles: `specs/monsters/population.md` (+ `preset-monsters.tsv`),
+`init.md` (+ `umods.tsv`), `ai.md` (+ `ai-functions.tsv`),
+`specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`;
+`claude/phase3-monsters`). World: `specs/world/quests.md` (+
+`quests.tsv`, `quest-messages.tsv`), `waypoints.md` (+ `waypoints.tsv`;
+`claude/phase3-world`; cube, NPC, vendors in progress). All draft: rules
+from the 1.14d disassembly, RNG draw order not yet checked on a trace. Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
 `specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
 Carried-over open questions not yet in a spec's list:
