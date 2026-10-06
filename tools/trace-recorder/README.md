@@ -277,6 +277,25 @@ context and lets the game run `--after-ticks` more frames. Options:
 hand), `--seconds`. Same reference-hash check and kill guarantees as
 `record_rng.py`.
 
+Version 0.2.0 adds (all optional; without them the run is as before):
+`--level ID` (spawn only while the server player is in that level, e.g. 2
+Blood Moor: towns forbid attacks, so a kill needs a field level; level id
+through path +0x1C → room +0x10 → +0x58 → +0x1D0), `--trigger FILE`
+(spawn each time the file appears, deleted on use; an optional JSON object
+in it overrides `class`, `kind`, `superunique`, `dx`, `dy`; the run then
+lasts until `--seconds`, so a person or script can walk somewhere, spawn,
+fight and spawn again), `--status FILE` (every 10 server frames a JSON
+snapshot: player subtile position, level id, life, experience, character
+level, the monsters within 40 subtiles with GUID / class / mode / hp, and
+the rects of the act's levels from level +0x1C..+0x28), and `--packets
+[FILE]` (the 13 `record_packets.py` hooks armed from the start, written
+to a `packets-raw-1` side file, default `<out>-packets.jsonl`, that
+`check_packets.py` reads; a run of `drain` records is cut to its first,
+the footer counts the rest as `drain_repeats_dropped`). Game arguments go
+after `--` (e.g. `-- -w -ns -name bdBar -bar` to keep the save).
+`d2ui.py` has a one-action CLI for driving that window from a shell
+(`shot`, `click`, `rclick`, `hold`, `key`, `move`, `close`).
+
 Raw format `spawn-raw-1` (JSON lines): `header` (with the request),
 `first_tick`, `spawn_start` (frame, player and target position, room and
 its box), `call` / `call_return` (entry, ECX, EDX, stack arguments, EAX,

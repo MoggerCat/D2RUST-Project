@@ -35,8 +35,9 @@ from ctypes import wintypes as W
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import record_rng as rr  # noqa: E402  (the Win32 debugger and the RNG hooks)
+import record_packets as rp  # noqa: E402  (message hooks for --packets)
 
-TOOL = "trace-recorder spawn 0.1.0"
+TOOL = "trace-recorder spawn 0.2.0"
 RAW_FORMAT = "spawn-raw-1"
 
 # specs/tools/original-hooks-spawn.md §1 / §2 / §5
@@ -66,6 +67,40 @@ class SpawnError(RuntimeError):
     pass
 
 
+class PacketLog:
+    """--packets: the record_packets.py hooks, written to a packets-raw-1 side file
+    (check_packets.py reads it). Borrows PacketRecorder's record builder unchanged."""
+    blob = rp.PacketRecorder.blob
+    on_hook = rp.PacketRecorder.on_hook
+
+    def __init__(self, rec, path):
+        self.rec, self.path = rec, path
+        self.frame, self.phase, self.last_kind = None, "start", None
+        self.seq, self.counts, self.out, self.last_logged = 0, {}, None, None
+
+    def read(self, a, n):
+        return self.rec.read(a, n)
+
+    def read_u32(self, a):
+        return self.rec.read_u32(a)
+
+    def call_site(self, ret):
+        return self.rec.call_site(ret)
+
+    def emit(self, rec):
+        # the drain hook fires in the server's idle loop (~4,000 times a second): keep
+        # only the first of a run of drains (phase "input" is unchanged by the rest)
+        if rec["type"] == "drain" and self.last_logged == "drain":
+            self.counts["drain_repeats_dropped"] = self.counts.get("drain_repeats_dropped", 0) + 1
+            return
+        self.last_logged = rec["type"]
+        rec["seq"] = self.seq
+        rec["ms"] = round((time.perf_counter() - self.rec.t0) * 1000, 1)
+        self.seq += 1
+        self.counts[rec["type"]] = self.counts.get(rec["type"], 0) + 1
+        self.out.write(json.dumps(rec, separators=(",", ":")) + "\n")
+
+
 class SpawnRecorder(rr.Recorder):
     def __init__(self, exe, args, out, a):
         super().__init__(exe, args, out, a.seconds, not a.no_inline, 0)
@@ -84,6 +119,8 @@ class SpawnRecorder(rr.Recorder):
         self.result = {}
         self.draws_in_call = 0
         self.draws_other = 0
+        self.summaries = []      # one per spawn (--trigger allows several)
+        self.pkt = PacketLog(self, a.packets) if a.packets else None
 
     # --- helpers ----------------------------------------------------------
     def u16(self, a):
@@ -186,8 +223,97 @@ class SpawnRecorder(rr.Recorder):
         self.scratch = p
         self.write(p, rr.INT3)
         self.add_role(TICK_RET, "ctl")
+        if self.pkt:
+            for addr, (_, first) in rp.HOOKS.items():
+                want = bytes.fromhex(first)
+                if self.orig_code(addr, len(want)) != want:  # TICK_RET already holds our INT3
+                    raise RuntimeError(f"unexpected code at {addr:#x}: not the 1.14d Game.exe?")
+            for addr in rp.HOOKS:
+                self.add_role(addr, "pkt")
+            self.notes.append(f"{len(rp.HOOKS)} message hooks armed (--packets)")
         self.state = "waiting"
         return 0
+
+    def player_level(self, pl):
+        """Level id of the server player: path +0x1C room, +0x10 DRLG room, +0x58 level,
+        +0x1D0 id (the chain record_frames.py reads on the client player)."""
+        path = self.read_u32(pl + U_PATH) if pl else 0
+        room = self.read_u32(path + 0x1C) if path else 0
+        drlg = self.read_u32(room + 0x10) if room else 0
+        level = self.read_u32(drlg + 0x58) if drlg else 0
+        return self.read_u32(level + 0x1D0) if level else None
+
+    def triggered(self):
+        """--trigger: a spawn is requested by creating the file; a JSON object in it
+        may override class, kind, superunique, dx, dy (consumed on read)."""
+        t = self.a.trigger
+        if not t or not os.path.exists(t):
+            return False
+        try:
+            txt = open(t, encoding="utf-8").read().strip()
+            os.remove(t)
+        except OSError:
+            return False
+        if txt:
+            try:
+                req = json.loads(txt)
+            except ValueError:
+                self.notes.append(f"trigger content ignored (not JSON): {txt[:40]!r}")
+                req = {}
+            for k_in, k_attr in (("class", "cls"), ("kind", "kind"), ("superunique", "superunique"),
+                                 ("dx", "dx"), ("dy", "dy")):
+                if k_in in req:
+                    setattr(self.a, k_attr, req[k_in])
+        return True
+
+    def write_status(self, game, frame):
+        """--status: a small JSON snapshot for whoever drives the game by hand or script:
+        player subtile position, level id, life; monsters within 40 subtiles."""
+        pl = self.player(game)
+        st = {"frame": frame, "state": self.state, "spawns": len(self.summaries)}
+        if pl:
+            path = self.read_u32(pl + U_PATH)
+            px, py = (self.u16(path + 2), self.u16(path + 6)) if path else (0, 0)
+            v = self.stat_values(pl)
+            st.update({"x": px, "y": py, "level": self.player_level(pl), "mode": self.read_u32(pl + 0x10),
+                       "life": v.get("hitpoints", 0) >> 8, "maxlife": v.get("maxhp", 0) >> 8,
+                       "xp": v.get("experience"), "clvl": v.get("level")})
+            mons = []
+            for g, u in self.monsters(game).items():
+                mp = self.read_u32(u + U_PATH)
+                if not mp:
+                    continue
+                mx, my = self.u16(mp + 2), self.u16(mp + 6)
+                if abs(mx - px) <= 40 and abs(my - py) <= 40:
+                    mv = self.stat_values(u)
+                    mons.append({"guid": g, "class": self.read_u32(u + 4),
+                                 "mode": self.read_u32(u + 0x10), "x": mx, "y": my,
+                                 "hp": mv.get("hitpoints", 0) >> 8})
+            st["monsters"] = mons
+            # level rects in tiles (specs/drlg/maze.md: level +0x1C..+0x28 x/y/w/h, id
+            # +0x1D0, next level +0x1AC), following the chain from the player's level
+            room = self.read_u32(path + 0x1C) if path else 0
+            drlg = self.read_u32(room + 0x10) if room else 0
+            lv = self.read_u32(drlg + 0x58) if drlg else 0
+            levels, n = {}, 0
+            while lv and n < 200:
+                levels[self.read_u32(lv + 0x1D0)] = list(struct.unpack("<4i", self.read(lv + 0x1C, 16)))
+                lv, n = self.read_u32(lv + 0x1AC), n + 1
+            st["levels"] = levels
+        tmp = self.a.status + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(st, f)
+        os.replace(tmp, self.a.status)
+
+    def ready_for_spawn(self, game, frame):
+        if frame < self.a.tick:
+            return False
+        pl = self.player(game)
+        if not (pl and self.client_ready(game)):
+            return False
+        if self.a.level is not None and self.player_level(pl) != self.a.level:
+            return False
+        return True
 
     def arm_rng(self):
         for a in rr.HELPERS:
@@ -210,6 +336,8 @@ class SpawnRecorder(rr.Recorder):
     # --- the spawn --------------------------------------------------------
     def plan(self, tid, ctx, game):
         a = self.a
+        self.result = {}
+        self.draws_in_call = self.draws_other = 0
         pl = self.player(game)
         path = self.read_u32(pl + U_PATH)
         px, py, room = self.u16(path + 2), self.u16(path + 6), self.read_u32(path + 0x1C)
@@ -232,6 +360,8 @@ class SpawnRecorder(rr.Recorder):
         self.state = "calling"
         self.spawn_frame = self.read_u32(game + G_FRAME)
         self.log({"type": "spawn_start", "frame": self.spawn_frame, "tid": tid,
+                  "level": self.player_level(pl), "class": a.cls, "kind": a.kind,
+                  "superunique": a.superunique,
                   "player": [px, py], "target": [x, y], "room": f"{room:#x}",
                   "room_box": box, "inside_player_room": inside,
                   "monsters_before": len(self.before_guids)})
@@ -325,6 +455,7 @@ class SpawnRecorder(rr.Recorder):
             summary["r_after"] = list(struct.unpack("<II", self.read(r + R_SEED, 8)))
         self.log(summary)
         self.result["summary"] = summary
+        self.summaries.append(summary)
         # restore the thread and step over the hooked instruction (spec §5 step 6)
         self.set_ctx(tid, self.saved)
         self.state = "after"
@@ -333,6 +464,8 @@ class SpawnRecorder(rr.Recorder):
 
     # --- events -------------------------------------------------------------
     def on_breakpoint(self, tid, addr):
+        if self.pkt and "pkt" in self.roles.get(addr, ()):
+            self.pkt.on_hook(tid, addr, self.get_ctx(tid))
         if addr == TICK_RET and self.state in ("waiting", "after") and tid not in self.stepping:
             ctx = self.get_ctx(tid)
             ctx.Eip = addr
@@ -343,19 +476,34 @@ class SpawnRecorder(rr.Recorder):
                 self.log({"type": "first_tick", "frame": frame, "game": f"{game:#x}",
                           "tid": tid})
             if game == self.game:
+                if self.a.status and frame % 10 == 0:
+                    try:
+                        self.write_status(game, frame)
+                    except OSError as e:
+                        if not getattr(self, "_status_err", False):
+                            self._status_err = True
+                            self.notes.append(f"status write failed: {e}")
+                trig = self.a.trigger
                 if self.state == "waiting" and frame >= self.a.tick:
-                    if self.player(game) and self.client_ready(game):
-                        if frame > self.a.tick and not self.result.get("late_noted"):
-                            self.notes.append(f"player ready only at frame {frame}")
+                    if self.ready_for_spawn(game, frame) and (not trig or self.triggered()):
                         try:
                             self.plan(tid, ctx, game)
                             return
                         except SpawnError as e:
                             self.notes.append(f"spawn refused: {e}")
-                            self.state = "done"
-                    elif not self.result.get("late_noted"):
-                        self.result["late_noted"] = True
-                        self.notes.append(f"frame {frame}: player not ready, waiting")
+                            self.state = "after" if trig else "done"
+                    elif not self.ready_for_spawn(game, frame) and \
+                            not getattr(self, "_late_noted", False):
+                        self._late_noted = True
+                        self.notes.append(f"frame {frame}: player not ready (or not in "
+                                          f"level {self.a.level}), waiting")
+                elif self.state == "after" and trig:
+                    if self.ready_for_spawn(game, frame) and self.triggered():
+                        try:
+                            self.plan(tid, ctx, game)
+                            return
+                        except SpawnError as e:
+                            self.notes.append(f"spawn refused: {e}")
                 elif self.state == "after" and frame >= self.spawn_frame + self.a.after_ticks:
                     self.state = "done"
         super().on_breakpoint(tid, addr)
@@ -417,17 +565,28 @@ class SpawnRecorder(rr.Recorder):
                               "spread": a.spread, "flags": a.flags,
                               "after_ticks": a.after_ticks}}
         self.out.write(json.dumps(header) + "\n")
+        if self.pkt:
+            self.pkt.out = open(self.pkt.path, "w", encoding="utf-8", newline="\n")
+            self.pkt.out.write(json.dumps({"type": "header", "format": rp.RAW_FORMAT,
+                                           "tool": TOOL + " --packets (" + rp.TOOL + " hooks)",
+                                           "date": header["date"], "game_exe_sha256": sha,
+                                           "args": self.args, "pid": self.pid,
+                                           "spawn_file": os.path.basename(self.out_path)}) + "\n")
         try:
             self.loop(self.t0 + self.seconds)
         finally:
             self.kill()
+            if self.pkt:
+                self.pkt.out.write(json.dumps({"type": "footer", "events": self.pkt.seq,
+                                               "counts": self.pkt.counts}) + "\n")
+                self.pkt.out.close()
             self.out.write(json.dumps({"type": "footer", "events": self.seq,
                                        "counts": self.counts, "notes": self.notes,
                                        "debug_events": self.dbg,
                                        "foreign_exceptions": self.exc}) + "\n")
             self.out.close()
             rr.CloseHandle(pi.hThread)
-        return self.result.get("summary")
+        return self.summaries[-1] if self.summaries else None
 
     def loop(self, deadline):
         ev = rr.DEBUG_EVENT()
@@ -504,6 +663,18 @@ def main():
     ap.add_argument("--no-force", "--manual", dest="no_force", action="store_true",
                     help="do not force the menu; start the game by hand")
     ap.add_argument("--no-inline", action="store_true", help="helpers and setters only")
+    ap.add_argument("--level", type=int, default=None,
+                    help="spawn only while the player is in this level id (e.g. 2 Blood Moor; "
+                         "towns forbid attacks, so a kill needs a field level)")
+    ap.add_argument("--trigger", default=None,
+                    help="spawn each time this file appears (deleted on use; optional JSON "
+                         "{class, kind, superunique, dx, dy}); runs until --seconds")
+    ap.add_argument("--packets", nargs="?", const="auto", default=None,
+                    help="also record the record_packets.py message hooks from the start into a "
+                         "packets-raw-1 file (default <out>-packets.jsonl; check_packets.py)")
+    ap.add_argument("--status", default=None,
+                    help="write a JSON snapshot (player position, level, life; monsters within "
+                         "40 subtiles) to this file every 10 server frames")
     ap.add_argument("--out", default=None, help="output .jsonl (default traces/raw/<time>-spawn.jsonl)")
     ap.add_argument("game_args", nargs="*", default=None,
                     help="Game.exe arguments (default: -w -ns -nosave -name <name> -<class>)")
@@ -511,6 +682,8 @@ def main():
     args = a.game_args or ["-w", "-ns", "-nosave", "-name", a.name, f"-{a.char_class}"]
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-spawn.jsonl")
+    if a.packets == "auto":
+        a.packets = (out[:-6] if out.endswith(".jsonl") else out) + "-packets.jsonl"
     r = SpawnRecorder(os.path.abspath(a.game), args, out, a)
     summary = None
     try:
@@ -518,13 +691,16 @@ def main():
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
     print(f"wrote {out}")
+    if a.packets:
+        print(f"wrote {a.packets} ({r.pkt.seq} message events)")
     for n in r.notes:
         print("note:", n)
     if not summary:
         print("FAIL: no spawn recorded", file=sys.stderr)
         sys.exit(1)
-    print("spawn: " + json.dumps(summary))
-    sys.exit(0 if summary["created"] else 1)
+    for s in r.summaries:
+        print("spawn: " + json.dumps(s))
+    sys.exit(0 if all(s["created"] for s in r.summaries) else 1)
 
 
 if __name__ == "__main__":
