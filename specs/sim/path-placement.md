@@ -32,23 +32,23 @@
 | Outputs / state changes | 78–83 |
 | Rules | 84–85 |
 |   1. Coordinates | 86–99 |
-|   2. Path records | 100–200 |
-|   3. Size, collision pattern, footprint mask | 201–241 |
-|   4. Collision queries | 242–322 |
-|   5. Footprints | 323–370 |
-|   6. Moving a footprint | 371–394 |
-|   7. Nearest free point (`0x0064DEA0`) | 395–457 |
-|   8. Coarse free-box search (`0x0064E840`) | 458–486 |
-|   9. Floor drop placement (`0x00555DA0`) | 487–505 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 506–555 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 556–578 |
-|   12. Warp tiles and warp arrival | 579–629 |
-| Constants & data dependencies | 630–648 |
-| Randomness | 649–658 |
-| Edge cases & original bugs | 659–685 |
-| Test vectors | 686–718 |
-| Provenance | 719–747 |
-| Open questions | 748–769 |
+|   2. Path records | 100–201 |
+|   3. Size, collision pattern, footprint mask | 202–242 |
+|   4. Collision queries | 243–323 |
+|   5. Footprints | 324–371 |
+|   6. Moving a footprint | 372–395 |
+|   7. Nearest free point (`0x0064DEA0`) | 396–458 |
+|   8. Coarse free-box search (`0x0064E840`) | 459–487 |
+|   9. Floor drop placement (`0x00555DA0`) | 488–506 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 507–556 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 557–579 |
+|   12. Warp tiles and warp arrival | 580–630 |
+| Constants & data dependencies | 631–649 |
+| Randomness | 650–659 |
+| Edge cases & original bugs | 660–686 |
+| Test vectors | 687–719 |
+| Provenance | 720–748 |
+| Open questions | 749–770 |
 <!-- /index -->
 
 ## Summary
@@ -153,6 +153,7 @@ names; every offset read in the 1.14d functions named):
 | +0x72, +0x76 | velocity vector x, y (i32, 16.16 per tick) | pathing §8 |
 | +0x7C, +0x80, +0x84, +0x88, +0x8C | velocity, saved velocity, max velocity, acceleration, acceleration counter | pathing §7 |
 | +0x90, +0x91, +0x92, +0x93 | distance budget, max path distance, IDA* start score, stop distance (u8) | pathing |
+| +0x94 | monster re-path budget (u8) | pathing §9.10 |
 | +0x98 | direction offset of the path type | pathing §2 |
 | +0x9C | points: 78 × {u16 x, u16 y} | pathing |
 | +0x1D4, +0x1D8 | saved-step count, 10 × {u16 x, u16 y} | §6, pathing §9 |

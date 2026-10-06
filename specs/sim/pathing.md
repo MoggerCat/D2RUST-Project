@@ -36,14 +36,14 @@
 |   6. Straight (type 7, `0x00679ED0`) | 390–399 |
 |   7. A* (type 1, `0x0067B850`) | 400–437 |
 |   8. Velocity, direction vector, facing | 438–503 |
-|   9. Per-tick movement | 504–654 |
-|   10. Messages | 655–677 |
-| Constants & data dependencies | 678–714 |
-| Randomness | 715–725 |
-| Edge cases & original bugs | 726–756 |
-| Test vectors | 757–792 |
-| Provenance | 793–828 |
-| Open questions | 829–858 |
+|   9. Per-tick movement | 504–660 |
+|   10. Messages | 661–683 |
+| Constants & data dependencies | 684–720 |
+| Randomness | 721–731 |
+| Edge cases & original bugs | 732–762 |
+| Test vectors | 763–798 |
+| Provenance | 799–834 |
+| Open questions | 835–865 |
 <!-- /index -->
 
 ## Summary
@@ -646,9 +646,15 @@ add/remove messages.
 
 #### 9.10 Re-path (`0x00650350(unit, finish)`)
 
-No path → 0. Unless flag 0x10: player or monster for which `0x00649120`
-(monster: distance budget) is 0 → 0; else queue for update, unit flags
-|= 1, distance budget −= index. Types 2, 13, 15: finish → type 13; else
+No path → 0. Unless flag 0x10: a monster (type 1) whose re-path
+budget (path +0x94, u8, read by `0x00649120`) is 0 → 0 (players skip
+this test); else queue for update, unit flags (+0xC4) |= 1, and the
+budget += −(current point index +0x24), clamped to 0..255
+(`0x00649140`). The only setter is `0x006490E0` (value > 255 → fatal),
+called with 20 by the monster movement start `0x005A7C20` (after the
+target is set; that function belongs to `monsters/ai.md`), so a monster
+re-paths until it has advanced 20 points in total since that start.
+Types 2, 13, 15: finish → type 13; else
 type 2 and target := final target; compute (§3); non-zero → result;
 else type 15 and compute again. Other types: compute (§3).
 
@@ -853,5 +859,6 @@ Real (recordings; message side):
    moved ≥ 2): vitals spec or a client-update spec.
 7. Monster movement messages 0x67 / 0x68 and the unit-update pass
    (`0x00598220`, `0x00571600`, `0x00571F90`): the unit-update spec.
-8. `0x00649120` (monster re-path budget) and `0x00649140`: read only in
-   §9.10; confirm with the AI spec.
+8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
+   re-path budget at path +0x94 (not the distance budget +0x90); set to
+   20 by `0x005A7C20` (§9.10).
