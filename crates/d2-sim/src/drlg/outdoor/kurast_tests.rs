@@ -89,9 +89,9 @@ fn skip_row(p: u32, q: u32) -> Vec<(i32, u32)> {
         .collect()
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn lower_kurast_border_rows() {
-    // Covers: specs/drlg/outdoor.md §9.4
     for j in [false, true] {
         let mut e = env(79, 10, 8, j);
         e.od.presets[614].size_x = 16; // the wide piece covers the skipped cell
@@ -112,9 +112,9 @@ fn lower_kurast_border_rows() {
     }
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn kurast_bazaar_border_rows() {
-    // Covers: specs/drlg/outdoor.md §9.4
     for j in [false, true] {
         let mut e = env(80, 10, 8, j);
         e.gen().kurast_border().unwrap();
@@ -138,9 +138,9 @@ fn kurast_bazaar_border_rows() {
     }
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn upper_kurast_border_rows() {
-    // Covers: specs/drlg/outdoor.md §9.4
     for j in [false, true] {
         let mut e = env(81, 10, 8, j);
         e.od.presets[644].size_x = 16;
@@ -164,9 +164,9 @@ fn upper_kurast_border_rows() {
     }
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn skip_row_half_truncates() {
-    // Covers: specs/drlg/outdoor.md §9.4
     // gw 9: (gw−1)/2 = 4; i runs 1..7: 1, 2, 3, 4 (wide), 6, 7.
     let mut e = env(81, 9, 8, false);
     e.gen().kurast_border().unwrap();
@@ -223,23 +223,23 @@ fn fixed_presets(id: u32, wide: u32, wide_cells: [(i32, i32); 2], s: u32, rnd: [
     }
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn kurast_bazaar_fixed_presets() {
-    // Covers: specs/drlg/outdoor.md §9.4
     // 629 at (3, 3) F 0 and (X = 6, 3) F 1.
     fixed_presets(80, 629, [(3, 3), (6, 3)], 630, [635, 633, 634, 632]);
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn upper_kurast_fixed_presets() {
-    // Covers: specs/drlg/outdoor.md §9.4
     // 646 at (3, Y = 4) F 0 and (X = 6, 4) F 1.
     fixed_presets(81, 646, [(3, 4), (6, 4)], 647, [651, 649, 650, 648]);
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn lower_kurast_presets() {
-    // Covers: specs/drlg/outdoor.md §9.4
     let mut e = env(79, 10, 8, false);
     e.od.presets[614].size_x = 16; // the wide bottom piece
     e.gen().kurast().unwrap();
@@ -249,9 +249,9 @@ fn lower_kurast_presets() {
     assert!(census(&e, 615).is_empty());
 }
 
+// Covers: specs/drlg/outdoor.md §9.4; specs/drlg/outdoor-act3-act5.md §4 r1
 #[test]
 fn causeway_one_fixed_stamp() {
-    // Covers: specs/drlg/outdoor.md §9.4, specs/drlg/outdoor-act3-act5.md §4 r1
     // Level 82 is 48×16: 6×2 cells.
     let mut e = env(82, 6, 2, false);
     e.od.presets[652].size_x = 48;
@@ -273,9 +273,9 @@ fn causeway_one_fixed_stamp() {
     assert_eq!(e.seed(), Seed::init_low(SEED));
 }
 
+// Covers: specs/drlg/outdoor.md §9.4; specs/drlg/outdoor-act3-act5.md §4 r1
 #[test]
 fn travincal_six_stamps() {
-    // Covers: specs/drlg/outdoor.md §9.4, specs/drlg/outdoor-act3-act5.md §4 r1
     // Level 83 is 64×64: 8×8 cells; lvlprest Files 1.
     let mut e = env(83, 8, 8, false);
     for (p, w) in [(653, 2), (654, 4), (655, 2), (656, 2), (657, 4), (658, 2)] {
@@ -306,9 +306,9 @@ fn travincal_six_stamps() {
     assert_eq!(e.seed(), stepped(6));
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn other_levels_untouched() {
-    // Covers: specs/drlg/outdoor.md §9.4
     for id in [76, 77, 78, 83] {
         let mut e = env(id, 8, 8, true);
         e.gen().kurast().unwrap();
@@ -396,17 +396,17 @@ fn run_placer(lo: u32, hi: u32, max: i32) {
     }
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn random_placer_draw_order() {
-    // Covers: specs/drlg/outdoor.md §9.4
     run_placer(616, 617, 0); // no limit: fills the 9 free cells
     run_placer(618, 618, 4); // n = 1 still draws; stops at 4
     run_placer(649, 650, 2);
 }
 
+// Covers: specs/drlg/outdoor.md §9.4
 #[test]
 fn random_placer_n1_steps_per_entry() {
-    // Covers: specs/drlg/outdoor.md §9.4
     // 2×1 grid, nothing busy, max 0: A = 2 → 2 pairs of swaps (4 steps),
     // then one roll(1) per entry (2) and one build-list roll(1): 7 steps.
     let mut e = env(79, 2, 1, false);

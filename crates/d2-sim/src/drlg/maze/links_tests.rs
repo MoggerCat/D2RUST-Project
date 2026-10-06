@@ -73,7 +73,7 @@ fn links_are_prepended() {
     assert!(g.cell(p).links.iter().all(|k| k.init));
 }
 
-// Covers: specs/drlg/maze.md §3 r7; specs/drlg/rooms.md §2.1
+// Covers: specs/drlg/maze.md §3 text; specs/drlg/rooms.md §2.1
 #[test]
 fn free_removes_the_neighbours_links_back() {
     let md = MazeData::default();
