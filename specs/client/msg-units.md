@@ -24,15 +24,15 @@
 | Rules | 67–68 |
 |   1. Unit add | 69–201 |
 |   2. 0x0A RemoveUnit (`0x0045CC10`) | 202–208 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 209–240 |
-|   4. Queued movement and action messages | 241–275 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 276–297 |
-| Constants & data dependencies | 298–309 |
-| Randomness | 310–315 |
-| Edge cases & original bugs | 316–330 |
-| Test vectors | 331–360 |
-| Provenance | 361–381 |
-| Open questions | 382–397 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 209–245 |
+|   4. Queued movement and action messages | 246–280 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 281–302 |
+| Constants & data dependencies | 303–314 |
+| Randomness | 315–320 |
+| Edge cases & original bugs | 321–335 |
+| Test vectors | 336–365 |
+| Provenance | 366–386 |
+| Open questions | 387–402 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -237,6 +237,11 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
       (`0x00650C20`), whose failure is fatal 0x1A9.
    6. `0x00459140`; local player: `0x00472C20(flag)`; `0x00463B80`.
 5. Model: `position` := (x, y) (or the free point of rule 4.5).
+6. For the local player this placement is how the client learns its
+   level: the room of rule 4.2 and its level (`client/model.md` §11
+   rule 3); at a join 0x15 is the first message that gives the player
+   a room. Room of a point, the fatal asserts 0x168 / 0x538 / 0x1A9 and
+   the free-point fallback in d2rs: `client/model.md` §12.
 
 ### 4. Queued movement and action messages
 
