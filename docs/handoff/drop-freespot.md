@@ -108,4 +108,7 @@ item's (x, y) with the recording.
 
 ## 6. Gate
 
-See the commit: `sh tools/gate.sh` result recorded below.
+`sh tools/gate.sh` on this branch: **GATE: PASS**, every step (after
+`tools/cloud-setup.sh` for the client's wayland libraries). d2-sim +
+conformance 2,038 tests, rest 599, d2-client 363; coverage 4,139
+claims, 0 errors.
