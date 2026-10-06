@@ -185,9 +185,9 @@ pub fn nearest_free_point<C: CollisionView>(
             return Ok(false);
         }
         match args.field {
-            // TODO(spec: path-placement.md §7.3 rule 3 "the room the
-            // search passed": read here as the candidate's room, the
-            // current hint; one room in every vector).
+            // §7.3 rule 3: the candidate cell's room (the room rule 1's
+            // lookup just found, also the new hint; `0x0064DEA0` →
+            // `0x0066A670`).
             Some(f) => walk_back(cv, f.field, Some(r), x, y, f.origin, f.mask),
             None => Ok(true),
         }
@@ -376,10 +376,11 @@ pub fn coarse_free_box<C: CollisionView>(
                     if let Some(c) = cell_room {
                         let side = n + 2;
                         let v = if side < 2 {
-                            // TODO(spec: path-placement.md §8 rule 3 "the
-                            // cell's grid value": read as the unmasked
-                            // value of §4 rule 2).
-                            cv.cell_value(c, x, y)
+                            // §8 rule 3: n + 2 ≤ 1 reads the cell's grid
+                            // value masked with `mask`, from the room the
+                            // cell lookup finds from the cell room (no
+                            // room or grid → 0x27 unmasked).
+                            cv.point_query(c, x, y, mask)
                         } else {
                             cv.box_query(c, x, y, side as u32, side as u32, mask)
                         };

@@ -937,6 +937,12 @@ impl ViewFeed for MapFeed {
         Ok(&mut self.seed)
     }
 
+    /// Every live `Levels.txt` row has BlankScreen 1 (`composition.md` §3
+    /// step 2); the order tests do not depend on it.
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+
     fn near_rooms(&mut self, _: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
         Ok(Some(&mut self.near))
     }
@@ -972,7 +978,7 @@ fn ordered_source_wraps_the_feed() {
         guid: 2,
     };
     for key in [player, stray] {
-        world.units.insert(key, ClientUnit { key });
+        world.units.insert(key, ClientUnit::new(key));
     }
     // The wall at the player's tile (37, 12) = room origin + (17, 2).
     assert_eq!(tile_of(2000, 1992), (37, 12));
@@ -994,13 +1000,13 @@ fn ordered_source_wraps_the_feed() {
     assert_eq!(tiles.len(), 1);
     assert_eq!(tiles[0].key.pass(), pass::WALLS_UNITS);
     assert_eq!(tiles[0].cell, (37, 12));
-    let slot = source.unit_slot(&ClientUnit { key: player });
+    let slot = source.unit_slot(&ClientUnit::new(player));
     let UnitSlot::Drawn(k) = slot else {
         panic!("{slot:?}")
     };
     assert_eq!(k.pass, pass::WALLS_UNITS);
     assert_eq!(
-        source.unit_slot(&ClientUnit { key: stray }),
+        source.unit_slot(&ClientUnit::new(stray)),
         UnitSlot::NotDrawn
     );
     // The frame's writes land in the feed.

@@ -49,7 +49,7 @@ impl ServerLink for OtherLink {
 /// A synthetic handler: inserts the addressed unit (mechanism only).
 fn insert_unit(world: &mut ClientWorld, m: &Message<'_>) -> Result<(), HandlerError> {
     if let Some(key) = m.unit {
-        world.units.insert(key, ClientUnit { key });
+        world.units.insert(key, ClientUnit::new(key));
     }
     Ok(())
 }
@@ -177,18 +177,51 @@ impl OtherLink {
 fn client_world_holds_only_stated_fields() {
     // Exhaustive destructuring: a new field fails to compile here until
     // an owner spec states it and this test names it.
+    // The fields of `client/model.md` §1 rule 1 and `bridge.md` §5 rule 3.
     let ClientWorld {
         frames,
         server_ticks,
         units,
+        local_player,
+        difficulty,
+        expansion,
+        ladder,
+        game_flags,
+        act,
+        in_game,
+        unloaded,
+        exit_requested,
+        rooms_in_sight,
+        outgoing,
+        use_cursor,
     } = ClientWorld::default();
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
+    assert_eq!((local_player, act, use_cursor), (None, None, None));
+    assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
+    assert!(!in_game && !unloaded && !exit_requested);
+    assert!(rooms_in_sight.is_empty() && outgoing.is_empty());
     let key = UnitKey {
         unit_type: 1,
         guid: 2,
     };
-    let ClientUnit { key: k } = ClientUnit { key };
+    // `client/model.md` §1 rule 2.
+    let ClientUnit {
+        key: k,
+        class,
+        mode,
+        position,
+        server_point,
+        stats,
+        seed,
+        queue,
+        last_mode_request,
+        kind,
+    } = ClientUnit::new(key);
     assert_eq!(k, key);
+    assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));
+    assert_eq!(seed, Some((1, 666)));
+    assert!(stats.is_empty() && queue.is_empty() && last_mode_request.is_none());
+    assert_eq!(kind, super::world::KindData::None);
     // Not game state: the model's module does not use the simulation.
     let world = std::fs::read_to_string(src_dir().join("bridge/world.rs")).unwrap();
     assert!(!world.contains("d2_sim"));

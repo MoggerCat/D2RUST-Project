@@ -9,6 +9,7 @@
 //! Every other call goes to [`InvRest`] unchanged.
 
 use super::{InvDesk, InvError, InvRest};
+use crate::items::inventory::{active_inventory_item, belt_removal_allowed};
 use crate::items::moves::{Guid, MovePending, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 
@@ -62,7 +63,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         let Some(u) = self.item_unit(item) else {
             return;
         };
-        if self.state.items.get(&u).is_some_and(|d| d.inv.is_some()) {
+        // The cursor item is not in the item list (§1.4 rule 3): freeing
+        // it before "cursor := none" (§7.20) is no linked free.
+        let linked = self
+            .state
+            .items
+            .get(&u)
+            .and_then(|d| d.inv)
+            .and_then(|o| self.state.inventories.get(&o))
+            .is_some_and(|inv| inv.contains(u));
+        if linked {
             self.state.errors.push(InvError::FreedWhileLinked(u));
         }
         if let Err(e) = self.econ.free_item(u) {
@@ -127,6 +137,48 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {
         self.rest.walk_to_item(player, item, cursor)
     }
+    fn walk_to_unit(&mut self, player: Owner, target: Owner, cursor: bool) {
+        self.rest.walk_to_unit(player, target, cursor)
+    }
+    fn tile_warp(&mut self, player: Owner, tile: Owner) {
+        self.rest.tile_warp(player, tile)
+    }
+    fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
+        self.rest.use_item_at(player, item, x, y)
+    }
+    fn consume_item(&mut self, player: Owner, item: Guid) {
+        self.rest.consume_item(player, item)
+    }
+    fn item_skill(&self, item: Guid) -> i32 {
+        self.rest.item_skill(item)
+    }
+    fn has_skill(&self, player: Owner, skill: i32) -> bool {
+        self.rest.has_skill(player, skill)
+    }
+    fn skill_decrement(&mut self, player: Owner, skill: i32) {
+        self.rest.skill_decrement(player, skill)
+    }
+    fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {
+        self.rest.set_quest_flag(player, quest, flag, on)
+    }
+    fn quest_item_used(&mut self, player: Owner) {
+        self.rest.quest_item_used(player)
+    }
+    fn quest_tr2_used(&mut self, player: Owner) {
+        self.rest.quest_tr2_used(player)
+    }
+    fn reset_skills_stats(&mut self, player: Owner) {
+        self.rest.reset_skills_stats(player)
+    }
+    fn has_used_skill(&self, player: Owner) -> bool {
+        self.rest.has_used_skill(player)
+    }
+    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {
+        self.rest.corpse_pickup(player, corpse)
+    }
+    fn player_interact(&mut self, player: Owner, other: Owner) {
+        self.rest.player_interact(player, other)
+    }
     fn room_at(&self, x: i32, y: i32) -> bool {
         self.rest.room_at(x, y)
     }
@@ -168,8 +220,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn charm_unlink(&mut self, owner: Owner, item: Guid) {
         self.rest.charm_unlink(owner, item)
     }
+    /// §5.6 (`0x0062FF70`).
     fn is_active(&self, owner: Owner, item: Guid) -> bool {
-        self.rest.is_active(owner, item)
+        match (self.unit_of(owner), self.item_unit(item)) {
+            (Some(o), Some(i)) => active_inventory_item(self, self.tables, i, o),
+            _ => false,
+        }
     }
     fn inventory_pass(&mut self, owner: Owner) {
         self.rest.inventory_pass(owner)
@@ -186,11 +242,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn hireling_owner_pass(&mut self, owner: Owner) {
         self.rest.hireling_owner_pass(owner)
     }
-    fn belt_unequip(&mut self, owner: Owner, item: Guid) {
-        self.rest.belt_unequip(owner, item)
-    }
+    /// §3 rule 10 (`0x00567840`) on the player's inventory.
     fn belt_remove_allowed(&self, player: Owner) -> bool {
-        self.rest.belt_remove_allowed(player)
+        belt_removal_allowed(&self.inv_or_empty(player), self)
     }
     fn sound(&mut self, u: Owner, id: u32) {
         self.rest.sound(u, id)
@@ -252,9 +306,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn book_count_changed(&mut self, player: Owner, n: i32) {
         self.rest.book_count_changed(player, n)
     }
-    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
-        self.rest.use_grid_item(player, item, x, y)
-    }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         self.rest.use_item(player, target, item)
     }
@@ -263,15 +314,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     }
     fn remove_used(&mut self, player: Owner, item: Guid) {
         self.rest.remove_used(player, item)
-    }
-    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
-        self.rest.use_item_action(player, target, used)
-    }
-    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
-        self.rest.swap_1h_with_2h(player, item, loc)
-    }
-    fn pickup_special(&mut self, player: Owner, item: Guid) -> bool {
-        self.rest.pickup_special(player, item)
     }
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
         self.rest.equip_picked(player, item)
@@ -284,9 +326,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     }
     fn hireling(&self, player: Owner) -> Option<Owner> {
         self.rest.hireling(player)
-    }
-    fn not_dead(&self, player: Owner) -> bool {
-        self.rest.not_dead(player)
     }
     fn owns_hireling(&self, player: Owner, merc: Owner) -> bool {
         self.rest.owns_hireling(player, merc)
@@ -303,12 +342,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn pick_object(&mut self, player: Owner, guid: Guid, cursor: u32) -> u32 {
         self.rest.pick_object(player, guid, cursor)
     }
-    fn pick_other(&mut self, player: Owner, ty: u32, guid: Guid, cursor: u32) -> u32 {
-        self.rest.pick_other(player, ty, guid, cursor)
-    }
-    fn resync(&mut self, player: Owner) {
-        self.rest.resync(player)
-    }
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.rest.send(player, bytes)
     }
@@ -322,8 +355,5 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     }
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
         self.rest.store_messages(client, item)
-    }
-    fn filler_owner(&self, parent: Guid) -> Owner {
-        self.rest.filler_owner(parent)
     }
 }

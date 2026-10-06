@@ -1,6 +1,7 @@
 //! Unit tests from pathing.md's test vectors and edge cases, on the
 //! fakes of [`fake`].
 
+mod answers;
 mod fake;
 mod gaps;
 mod messages;
@@ -346,32 +347,33 @@ fn d_direction_vectors() {
     assert_eq!(dv(3, 1), ((3888, 1286), 59));
 }
 
-// ---- velocity V1–V3 -------------------------------------------------
+// ---- velocity V1–V4 -------------------------------------------------
 
-// V1–V3 state stat 67 as the modifier on top of its base: players start
-// with velocitypercent 100 (`combat/vitals.md` §1 table), so the formula
-// p = f + stat 67 gives V1 and V2 with stat 67 = 100 and 150. V3's
-// printed result (p = 67, 1029) drops that base; the formula gives
-// p = 17 + 150 = 167 (spec question, docs/handoff/impl-walk.md).
+// Stat 67 is the unit total (`0x00625480`); a player's base is 100 from
+// creation (`combat/vitals.md` §1), so V1–V3 state stat 67 = 100 / 150 /
+// 150 and V3 gives p = 17 + 150 = 167 → 2565; V4 is the floor of 25
+// (pathing.md PQ1, answered).
 // Covers: specs/sim/pathing.md §8.1 r1, §8.1 r2, §8.2
 #[test]
 fn v_velocities() {
     let t = tables();
     let mut c = units_only();
+    // V1.
     assert_eq!(c.u.units[&P].stats[&67], 100);
     assert_eq!(mode_velocity(&t, &c, P, 2), Some(0x600));
     assert_eq!(mode_velocity(&t, &c, P, 19), Some(0x1000));
     assert_eq!(run_velocity_bonus(6, 9), Some(50));
     assert_eq!(run_velocity_bonus(0, 9), None);
+    // V2.
     c.u.unit(P).stats.insert(67, 150);
     assert_eq!(mode_velocity(&t, &c, P, 3), Some(0x900));
+    // V3: f = 150·20/170 = 17.
     c.u.unit(P).item_stats.insert(96, 20);
-    // f = 150·20/170 = 17.
-    assert_eq!(mode_velocity(&t, &c, P, 3), Some(0x600 * 167 / 100));
-    // Floor 25 %.
+    assert_eq!(mode_velocity(&t, &c, P, 3), Some(2565));
+    // V4: floor 25 %.
     c.u.unit(P).item_stats.clear();
     c.u.unit(P).stats.insert(67, 10);
-    assert_eq!(mode_velocity(&t, &c, P, 2), Some(0x600 * 25 / 100));
+    assert_eq!(mode_velocity(&t, &c, P, 2), Some(384));
     // Neutral has no modifier: no rule (seam).
     assert_eq!(mode_velocity(&t, &c, P, 1), None);
 }
@@ -738,24 +740,75 @@ fn room_change_sends_merge_of_client_arrays() {
     assert_eq!(msgs, vec!["add 1 to 3"]);
 }
 
+// Covers: specs/sim/pathing.md §9.8
+#[test]
+fn room_change_without_previous_room_only_adds() {
+    // `0x005545C0`: a previous room that is no longer a room of the unit's
+    // act counts as none, so no client gets a removal; every client of
+    // the new room but the unit's own gets the add messages (`0x00571F90`).
+    let t = tables();
+    let mut c = units_only();
+    let (r0, r1) = (RoomId(0), RoomId(1));
+    c.w.clients.insert(r0, vec![ClientId(2)]);
+    c.w.clients.insert(r1, vec![ClientId(1), ClientId(3)]);
+    c.u.client_players.insert(ClientId(1), P);
+    let mut p = DynamicPath {
+        owner: Some(P),
+        room: Some(r1),
+        prev_room: Some(r0),
+        flags: flags::ROOM_CHANGED,
+        ..DynamicPath::default()
+    };
+    let msgs = |c: &Ctx| -> Vec<String> {
+        c.u.log
+            .iter()
+            .filter(|l| l.starts_with("add") || l.starts_with("remove"))
+            .cloned()
+            .collect()
+    };
+    let mut q = p.clone();
+    Walk { t: &t, c: &mut c }.room_change_messages(P, &mut q);
+    assert_eq!(msgs(&c), ["remove 1 to 2", "add 1 to 3"]);
+    c.u.log.clear();
+    c.w.other_act.push(r0);
+    Walk { t: &t, c: &mut c }.room_change_messages(P, &mut p);
+    assert_eq!(msgs(&c), ["add 1 to 3"]);
+    assert_eq!(p.flags & flags::ROOM_CHANGED, 0);
+}
+
 // ---- re-path §9.10 --------------------------------------------------
 
 // Covers: specs/sim/pathing.md §9.10, §9.5 r2
 #[test]
 fn repath_without_budget_stops() {
+    // §9.10: only a monster tests the re-path budget (path +0x94).
     let (t, mut c) = setup(40, 40, 10, 10);
+    c.u.unit(P).ty = UnitType::Monster;
     let mut p = c.w.paths[&P].clone();
-    c.u.repath_budget = 0;
+    p.set_path_type(&t, false, 2).unwrap();
+    p.repath_budget = 0;
     let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
     assert_eq!(r, 0);
-    // With budget: queue, unit flag, budget −= index, compute.
-    c.u.repath_budget = 1;
+    assert!(c.w.log.is_empty());
+    // With budget: queue, unit flag, budget −= index (clamped at 0), the
+    // distance budget (+0x90) untouched, compute.
+    p.repath_budget = 1;
     p.put_target(Point::new(20, 10));
+    p.put_final_target(Point::new(20, 10));
     p.dist_budget = 5;
     p.cur_point = 2;
     let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
     assert_eq!(r, 1);
-    assert_eq!(p.dist_budget, 3);
+    assert_eq!(p.repath_budget, 0);
+    assert_eq!(p.dist_budget, 5);
+    assert!(c.w.log.contains(&"queue 1".to_string()));
+    // A player skips the budget test: budget 0 still re-paths.
+    let (t, mut c) = setup(40, 40, 10, 10);
+    let mut p = c.w.paths[&P].clone();
+    p.put_target(Point::new(20, 10));
+    assert_eq!(p.repath_budget, 0);
+    let r = Walk { t: &t, c: &mut c }.repath(P, &mut p, false).unwrap();
+    assert_eq!(r, 1);
     assert!(c.w.log.contains(&"queue 1".to_string()));
 }
 

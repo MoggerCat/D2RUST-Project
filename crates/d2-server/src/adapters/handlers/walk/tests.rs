@@ -1094,3 +1094,46 @@ fn vitals_sync_on_the_host_tick() {
     );
     fx.assert_clean();
 }
+
+impl Fx {
+    /// Everything a walk request could touch, as text: the game, units,
+    /// stats, the path state, the interactions, the player fields, the
+    /// stubs and the errors.
+    fn digest(&self, p: UnitId) -> String {
+        let s = &self.sim.events.sys;
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}|{:?}{:?}",
+            self.sim.game,
+            s.units,
+            s.stats,
+            s.hooks.paths,
+            s.hooks.x.interact,
+            self.sim.player_fields(p),
+            self.sim.unhandled,
+            s.hooks.errors,
+            s.errors,
+        )
+    }
+}
+
+/// The refusals `pathing.md` §1.2 orders before the rule 4 write (the
+/// target lookup, rule 1; the mode check, rule 2 and §1.3) change
+/// nothing and queue nothing, though they return 0 (§1.1;
+/// `docs/HANDOFF.md` PK1).
+// Covers: specs/sim/pathing.md §1.2 r1, §1.3 r3
+#[test]
+fn early_refusals_change_nothing() {
+    let (mut fx, p, _, _) = two_players();
+    for m in [unit_msg(0x02, 2, 999), unit_msg(0x04, 1, 999)] {
+        let before = fx.digest(p);
+        assert_eq!(fx.handle(0, &m), (ResultCode::Done, vec![]), "{m:02X?}");
+        assert_eq!(fx.digest(p), before, "§1.2 rule 1: {m:02X?}");
+    }
+    fx.sim.events.sys.units.get_mut(p).unwrap().mode = 0;
+    for m in [point(0x01, 31, 10), point(0x03, 31, 10)] {
+        let before = fx.digest(p);
+        assert_eq!(fx.handle(0, &m), (ResultCode::Done, vec![]), "{m:02X?}");
+        assert_eq!(fx.digest(p), before, "§1.3 mode DT: {m:02X?}");
+    }
+    assert!(fx.sim.events.sys.hooks.x.sent.is_empty());
+}

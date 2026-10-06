@@ -1,6 +1,6 @@
 // Spec: specs/render/capture.md (§5–§8, Test vectors)
 //! The `scene` case kind on synthetic captures generated here (never game
-//! pixels): the `frames-raw-1` reader, the PNG reader against the
+//! pixels): the `frames-raw-2` and `frames-raw-1` reader, the PNG reader against the
 //! recorder's own bytes, the comparison of §6 with its perturbation, and
 //! the stability rule of §7 with its perturbation.
 
@@ -36,11 +36,14 @@ fn fixture_built(c: &capture::Captured) -> Built {
         .as_ref()
         .expect("fixture frames have a player");
     let [px, py] = p.client.expect("fixture player has a path");
-    let [ox, oy] = c.state.unit_origin;
+    fixture_at((px, py), c.state.unit_origin, p.cur)
+}
+
+fn fixture_at((px, py): (i32, i32), [ox, oy]: [i32; 2], cur: i32) -> Built {
     let frames = vec![FrameImage {
         width: 4,
         height: 4,
-        pixels: vec![p.cur as u8; 16],
+        pixels: vec![cur as u8; 16],
     }];
     let items = vec![DrawItem::new(FrameId(0), px - ox, py - oy)];
     Built {
@@ -111,8 +114,30 @@ fn png(width: u32, height: u32, pixels: &[u8], palette: &[u8]) -> Vec<u8> {
     out
 }
 
-fn frame_record(s: &Shot, pixels: &[u8], palette: &[u8]) -> Value {
-    json!({
+/// How a fixture recording is written: the raw format and `--every`.
+#[derive(Clone, Copy)]
+struct Opts {
+    raw2: bool,
+    every: u32,
+}
+
+const RAW2: Opts = Opts {
+    raw2: true,
+    every: 1,
+};
+const RAW1: Opts = Opts {
+    raw2: false,
+    every: 1,
+};
+
+/// The image name: by `seq` in `frames-raw-2`, by the draw counter in
+/// `frames-raw-1` (capture.md §5).
+fn image_name(o: Opts, seq: u32, s: &Shot) -> String {
+    format!("frame-{:07}.png", if o.raw2 { seq } else { s.draw })
+}
+
+fn frame_record(o: Opts, seq: u32, s: &Shot, pixels: &[u8], palette: &[u8]) -> Value {
+    let mut v = json!({
         "k": "frame", "f": s.tick, "video_type": 1, "w": W, "h": H,
         "index_sha256": capture::sha256_hex(pixels),
         "palette_sha256": capture::sha256_hex(palette),
@@ -123,42 +148,79 @@ fn frame_record(s: &Shot, pixels: &[u8], palette: &[u8]) -> Value {
         "player": {"type": 0, "mode": 1, "cur": s.cur,
                    "fixed": [s.pos.0 as u32 * 65536, s.pos.1 as u32 * 65536],
                    "client": [s.pos.0, s.pos.1]},
-        "image": format!("frame-{:07}.png", s.draw),
-    })
+        "image": image_name(o, seq, s),
+    });
+    if o.raw2 {
+        let more = json!({
+            "seq": seq, "client_update": 1000 + s.draw,
+            "level": {"level_id": 8, "act": 0, "env": [255, 1, 2, 3]},
+            "cursor": {"visible": 1, "state": 4, "type": 3, "frame": 0x260, "x": 580,
+                       "y": 250, "adj": 0, "item": false, "last_step": 7, "idle_since": 5},
+            "cursor_key": [1, 3, 2, 580, 250, 0, false],
+            "seed_start": [s.draw, 666], "seed_end": [s.draw + 1, 666],
+            "light": {"quality": 2, "draw_rate": 25, "opt_a": 1, "opt_b": 0, "render_kind": 1},
+            "light_key": 2,
+            "weather": {"rain": 0, "snow": 0, "lightning": 0, "flash": 0, "update": 999},
+        });
+        for (k, val) in more.as_object().unwrap() {
+            v[k] = val.clone();
+        }
+    }
+    v
 }
 
 /// Writes `<dir>/<stamp>-frames.jsonl` (header, game, ticks, frames,
 /// footer, as the recorder emits them) and the PNGs to `<images>/`, each
 /// image composed by [`fixture_built`] unless the shot overrides it.
 fn record(dir: &Path, stamp: &str, images: &Path, shots: &[Shot], refused: usize) -> PathBuf {
+    record_with(dir, stamp, images, shots, refused, RAW2)
+}
+
+fn record_with(
+    dir: &Path,
+    stamp: &str,
+    images: &Path,
+    shots: &[Shot],
+    refused: usize,
+    o: Opts,
+) -> PathBuf {
     std::fs::create_dir_all(images).unwrap();
     let palette = capture::palette_bytes(&synthetic_palette());
+    let format = if o.raw2 {
+        "frames-raw-2"
+    } else {
+        "frames-raw-1"
+    };
     let mut lines = vec![
-        json!({"k": "header", "format": "frames-raw-1", "tool": "trace-recorder record_frames 0.1.0",
+        json!({"k": "header", "format": format, "tool": "trace-recorder record_frames 0.2.0",
                "date": "2026-10-06", "game_exe_sha256": "0".repeat(64), "args": ["-w", "-ns"],
                "snap_every": 0}),
-        json!({"k": "game", "g": "0x1234", "frame_before": 0}),
     ];
-    let mut ticks = Vec::new();
-    for _ in 0..refused {
+    if o.raw2 {
         lines.push(
-            json!({"k": "frame", "f": null, "video_type": 3, "w": 640, "h": 480,
-                          "refused": "needs GDI (-w) at 800x600 (capture.md §1)"}),
+            json!({"k": "capture", "images": "captures", "every": o.every,
+                          "draws_every": 0, "state_key": ["player", "cursor_key"]}),
         );
+        lines.push(json!({"k": "celfile", "ptr": "0x5000",
+                          "path": "DATA\\GLOBAL\\UI\\CURSOR\\orotate.DC6"}));
     }
-    for s in shots {
+    lines.push(json!({"k": "game", "g": "0x1234", "frame_before": 0}));
+    let mut ticks = Vec::new();
+    for i in 0..refused {
+        let mut rec = json!({"k": "frame", "f": null, "video_type": 3, "w": 640, "h": 480,
+                             "refused": "needs GDI (-w) at 800x600 (capture.md §1)"});
+        if o.raw2 {
+            rec["seq"] = json!(i + 1);
+        }
+        lines.push(rec);
+    }
+    for (i, s) in shots.iter().enumerate() {
+        let seq = (refused + i + 1) as u32;
         if ticks.last() != Some(&s.tick) {
             ticks.push(s.tick);
             lines.push(json!({"k": "tick", "f": s.tick}));
         }
-        let rec = frame_record(s, &[], &palette);
-        let c = capture::parse_raw(&raw_text(&[
-            lines[0].clone(),
-            rec,
-            json!({"k": "footer", "ticks": 0, "counts": {"frame": 1}, "notes": []}),
-        ]))
-        .unwrap();
-        let built = fixture_built(c.frames[0].captured().unwrap());
+        let built = fixture_at(s.pos, [0, 0], s.cur);
         let mut pixels =
             scene::compose(&built.items, &built.frames, &built.maps, built.view).unwrap();
         if s.clear_counter > 0 {
@@ -168,16 +230,22 @@ fn record(dir: &Path, stamp: &str, images: &Path, shots: &[Shot], refused: usize
             pixels = p.clone();
         }
         std::fs::write(
-            images.join(format!("frame-{:07}.png", s.draw)),
+            images.join(image_name(o, seq, s)),
             png(W, H, &pixels, &palette),
         )
         .unwrap();
-        lines.push(frame_record(s, &pixels, &palette));
+        lines.push(frame_record(o, seq, s, &pixels, &palette));
     }
     let n_frames = shots.len() + refused;
-    lines.push(json!({"k": "footer", "ticks": ticks.len(),
-                      "counts": {"game": 1, "tick": ticks.len(), "frame": n_frames},
-                      "notes": ["time limit 5.0s reached"]}));
+    let mut counts = json!({"game": 1, "tick": ticks.len(), "frame": n_frames});
+    if o.raw2 {
+        counts["capture"] = json!(1);
+        counts["celfile"] = json!(1);
+    }
+    lines.push(
+        json!({"k": "footer", "ticks": ticks.len(), "counts": counts,
+                      "notes": ["time limit 5.0s reached"]}),
+    );
     let path = dir.join(format!("{stamp}-frames.jsonl"));
     std::fs::write(&path, raw_text(&lines)).unwrap();
     path
@@ -188,8 +256,13 @@ fn raw_text(lines: &[Value]) -> String {
 }
 
 /// A standard recording: two state keys seen three times each (stable),
-/// a moving player in between.
+/// a moving player in between; one refused frame first, so the shots are
+/// frames (seq) 2–8.
 fn standard(dir: &Path) -> (PathBuf, PathBuf) {
+    standard_with(dir, RAW2)
+}
+
+fn standard_with(dir: &Path, o: Opts) -> (PathBuf, PathBuf) {
     let images = dir.join("captures");
     let shots = vec![
         shot(100, 500, (3, 4), 9),
@@ -200,7 +273,10 @@ fn standard(dir: &Path) -> (PathBuf, PathBuf) {
         shot(105, 505, (10, 8), 12),
         shot(106, 506, (10, 8), 12),
     ];
-    (record(dir, "20261006-120000", &images, &shots, 1), images)
+    (
+        record_with(dir, "20261006-120000", &images, &shots, 1, o),
+        images,
+    )
 }
 
 fn scene_case(raw: &Path, images: &Path, check: CaptureCheck) -> SceneCase {
@@ -208,7 +284,7 @@ fn scene_case(raw: &Path, images: &Path, check: CaptureCheck) -> SceneCase {
         raw: RawRef::Path(raw.display().to_string()),
         images: Some(images.display().to_string()),
         check,
-        draws: Vec::new(),
+        seqs: Vec::new(),
     }
 }
 
@@ -286,18 +362,31 @@ fn raw_reader_reads_every_field() {
     let dir = tmp("fields");
     let (raw, _) = standard(&dir);
     let r = capture::read_raw(&raw).unwrap();
+    assert_eq!(r.format, capture::RawFormat::Raw2);
     assert_eq!(r.header.args, ["-w", "-ns"]);
+    let meta = r.capture.as_ref().unwrap();
+    assert_eq!(
+        (meta.images.as_deref(), meta.every, meta.draws_every),
+        (Some("captures"), 1, 0)
+    );
+    assert!(meta.every_draw());
+    assert_eq!(r.celfiles.len(), 1);
+    assert_eq!(r.celfiles[0].path, "DATA\\GLOBAL\\UI\\CURSOR\\orotate.DC6");
     assert_eq!(r.games, ["0x1234"]);
     assert_eq!(r.ticks, (100..=106).collect::<Vec<_>>());
     assert_eq!(r.frames.len(), 8);
     assert_eq!(r.footer.notes, ["time limit 5.0s reached"]);
     assert!(matches!(&r.frames[0].body, FrameBody::Refused(_)));
     assert_eq!(r.frames[0].tick, None);
+    assert_eq!(
+        r.frames.iter().map(|f| f.seq).collect::<Vec<_>>(),
+        (1..=8).collect::<Vec<_>>()
+    );
     let f = &r.frames[5];
     let c = f.captured().unwrap();
     assert_eq!(
-        (f.tick, f.w, f.h, c.draw),
-        (Some(104), W as i32, H as i32, 504)
+        (f.seq, f.tick, f.w, f.h, c.draw),
+        (6, Some(104), W as i32, H as i32, 504)
     );
     let p = c.state.player.as_ref().unwrap();
     assert_eq!(
@@ -305,7 +394,45 @@ fn raw_reader_reads_every_field() {
         (1, 12, Some([10, 8]), Some([655360, 524288]))
     );
     assert_eq!(c.state.view_rect, Some([0, 0, W as i32, H as i32]));
+    // Images are named by seq (capture.md §5).
+    assert_eq!(c.image.as_deref(), Some("frame-0000006.png"));
+    assert_eq!(c.draws, None);
+    let m = c.state.more.as_deref().unwrap();
+    assert_eq!(m.client_update, 1504);
+    assert_eq!(
+        m.level,
+        capture::Level {
+            level_id: Some(8),
+            act: Some(0),
+            env: Some([255, 1, 2, 3])
+        }
+    );
+    let cur = m.cursor.unwrap();
+    assert_eq!(
+        (cur.cursor_type, cur.frame, cur.x, cur.y),
+        (3, 0x260, 580, 250)
+    );
+    assert_eq!(cur.key().frame, 2);
+    assert_eq!(
+        (m.seed_start, m.seed_end),
+        (Some([504, 666]), Some([505, 666]))
+    );
+    assert_eq!((m.light.quality, m.light.draw_rate), (2, 25));
+    assert_eq!(m.weather.update, 999);
+
+    // frames-raw-1: no capture record, seq by position, images by draw.
+    let dir = tmp("fields-1");
+    let (raw, _) = standard_with(&dir, RAW1);
+    let r = capture::read_raw(&raw).unwrap();
+    assert_eq!(
+        (r.format, &r.capture, r.celfiles.len()),
+        (capture::RawFormat::Raw1, &None, 0)
+    );
+    let f = &r.frames[5];
+    let c = f.captured().unwrap();
+    assert_eq!((f.seq, c.draw), (6, 504));
     assert_eq!(c.image.as_deref(), Some("frame-0000504.png"));
+    assert_eq!(c.state.more, None);
 }
 
 // Covers: specs/render/capture.md §5
@@ -317,8 +444,20 @@ fn raw_reader_is_strict() {
     assert!(capture::parse_raw(&ok).is_ok());
     let cases = [
         (
-            header.replace("frames-raw-1", "frames-raw-2"),
+            header.replace("frames-raw-1", "frames-raw-3"),
             "not supported",
+        ),
+        // A frames-raw-2 record or field in a frames-raw-1 file.
+        (
+            format!("{header}\n{{\"k\":\"celfile\",\"ptr\":\"0x1\",\"path\":\"a\"}}\n{footer}\n"),
+            "frames-raw-2 \"celfile\" record in a frames-raw-1 file",
+        ),
+        (
+            format!(
+                "{header}\n{}\n{footer}\n",
+                r#"{"k":"frame","seq":1,"f":1,"video_type":3,"w":4,"h":4,"refused":"x"}"#
+            ),
+            "seq: a frames-raw-2 field",
         ),
         (
             format!("{header}\n{{\"k\":\"snap\"}}\n{footer}\n"),
@@ -371,6 +510,44 @@ fn raw_reader_is_strict() {
         e.contains("shift_x: missing") && e.starts_with("line "),
         "{e}"
     );
+
+    // frames-raw-2: the capture record second, seq in order, the keys equal
+    // the state they are built from, raw-2 fields required.
+    let text = std::fs::read_to_string(&raw).unwrap();
+    assert!(capture::parse_raw(&text).is_ok());
+    let lines: Vec<&str> = text.lines().collect();
+    let without = |i: usize| {
+        let mut l = lines.clone();
+        l.remove(i);
+        l.join("\n")
+    };
+    let cases = [
+        (without(1), "not the frames-raw-2 capture record"),
+        (
+            text.replacen("\"seq\":3,", "\"seq\":4,", 1),
+            "seq 4: frame records are numbered",
+        ),
+        (
+            text.replacen("\"cursor_key\":[1,3,2,", "\"cursor_key\":[1,3,3,", 1),
+            "cursor_key: expected",
+        ),
+        (
+            text.replacen("\"light_key\":2", "\"light_key\":1", 1),
+            "light_key: expected 2",
+        ),
+        (
+            text.replacen("\"client_update\":1500,", "", 1),
+            "client_update: missing",
+        ),
+        (
+            text.replacen("\"weather\":", "\"weather_\":", 1),
+            "weather: missing",
+        ),
+    ];
+    for (text, want) in cases {
+        let e = capture::parse_raw(&text).unwrap_err().to_string();
+        assert!(e.contains(want), "{want:?} not in {e:?}");
+    }
 }
 
 // Covers: specs/render/capture.md §6
@@ -444,7 +621,8 @@ fn a_different_scene_or_palette_fails_with_its_first_difference() {
     let dir = tmp("differ");
     let (raw, images) = standard(&dir);
     let mut c = scene_case(&raw, &images, CaptureCheck::Compare);
-    c.draws = vec![501];
+    // Draw 501 is frame 3.
+    c.seqs = vec![3];
     let r = run(&c, 0, &mut Shifted, &mut NotWired);
     // A 4-wide sprite moved right by one: columns 3 and 7 change, 4 rows.
     assert!(matches!(r.status, Status::Fail(_)));
@@ -486,8 +664,9 @@ fn a_png_that_disagrees_with_its_record_is_an_error() {
     let palette = capture::palette_bytes(&synthetic_palette());
     let mut pixels = vec![0u8; (W * H) as usize];
     pixels[5] = 1;
+    // Draw 502 is frame 4.
     std::fs::write(
-        images.join("frame-0000502.png"),
+        images.join("frame-0000004.png"),
         png(W, H, &pixels, &palette),
     )
     .unwrap();
@@ -495,40 +674,62 @@ fn a_png_that_disagrees_with_its_record_is_an_error() {
     // Checked before the scene source is asked.
     let r = run(&c, 0, &mut SceneNotWired, &mut NotWired);
     match &r.status {
-        Status::Error(e) => assert!(e.contains("draw 502") && e.contains("index hash"), "{e}"),
+        Status::Error(e) => assert!(e.contains("frame 4") && e.contains("index hash"), "{e}"),
         s => panic!("{s:?}"),
     }
     // A selected draw that was not captured is an error.
     let mut c = scene_case(&raw, &images, CaptureCheck::Compare);
-    c.draws = vec![999];
+    c.seqs = vec![999];
     assert!(matches!(
         run(&c, 0, &mut Fixture, &mut NotWired).status,
         Status::Error(_)
     ));
 }
 
+// The initial framebuffer is frame seq − 1 of an --every 1 recording;
+// otherwise there is none.
 // Covers: specs/render/capture.md §6
 #[test]
-fn the_source_gets_the_previous_draw_when_it_was_captured() {
+fn the_source_gets_frame_seq_minus_1_of_an_every_draw_recording() {
     struct Seen(Vec<(u32, Option<u8>)>);
     impl SceneSource for Seen {
         fn scene(&mut self, job: &SceneJob<'_>) -> SceneOutcome {
             self.0.push((
-                job.captured.draw,
+                job.frame.seq,
                 job.previous.map(|p| p.indices[4 * W as usize + 3]),
             ));
             SceneOutcome::NotWired
         }
     }
-    let dir = tmp("previous");
-    let (raw, images) = standard(&dir);
-    let mut c = scene_case(&raw, &images, CaptureCheck::Compare);
-    c.draws = vec![501, 503, 506];
-    let mut seen = Seen(Vec::new());
-    run(&c, 0, &mut seen, &mut NotWired);
+    let seen = |o: Opts, test: &str| {
+        let dir = tmp(test);
+        let (raw, images) = standard_with(&dir, o);
+        let mut c = scene_case(&raw, &images, CaptureCheck::Compare);
+        // Draws 501, 503, 506.
+        c.seqs = vec![3, 5, 8];
+        let mut seen = Seen(Vec::new());
+        let r = run(&c, 0, &mut seen, &mut NotWired);
+        (seen.0, r)
+    };
     // Pixel (3, 4) is the sprite of draws 500–502 (index 9), outside the
     // sprite at (7, 4) of 503 and at (10, 8) of 504–506.
-    assert_eq!(seen.0, [(501, Some(9)), (503, Some(9)), (506, Some(0))]);
+    let (got, r) = seen(RAW2, "previous");
+    assert_eq!(got, [(3, Some(9)), (5, Some(9)), (8, Some(0))]);
+    assert!(!has(&r, "initial framebuffer: none"));
+    for (o, test) in [
+        (
+            Opts {
+                raw2: true,
+                every: 2,
+            },
+            "previous-every-2",
+        ),
+        (RAW1, "previous-raw-1"),
+    ] {
+        let (got, r) = seen(o, test);
+        assert_eq!(got, [(3, None), (5, None), (8, None)], "{test}");
+        assert!(has(&r, "initial framebuffer: none"), "{test}");
+    }
 }
 
 // Covers: specs/render/capture.md §4
@@ -553,7 +754,7 @@ fn frames_sharing_a_tick_are_flagged() {
         "{:?}",
         r.lines
     );
-    assert!(has(&r, "tick 7: draws [1, 2]"));
+    assert!(has(&r, "tick 7: frames [1, 2]"));
 }
 
 // Covers: specs/render/capture.md §7
@@ -596,14 +797,15 @@ fn stability_perturb_changes_exactly_n_rehashes() {
     ));
     // One byte of one saved PNG changed on disk: exactly that frame.
     let palette = capture::palette_bytes(&synthetic_palette());
+    // Draw 505 is frame 7.
     let img =
-        capture::decode_png(&std::fs::read(images.join("frame-0000505.png")).unwrap()).unwrap();
+        capture::decode_png(&std::fs::read(images.join("frame-0000007.png")).unwrap()).unwrap();
     let mut px = img.indices;
     px[100] ^= 1;
-    std::fs::write(images.join("frame-0000505.png"), png(W, H, &px, &palette)).unwrap();
+    std::fs::write(images.join("frame-0000007.png"), png(W, H, &px, &palette)).unwrap();
     let r = run(&c, 0, &mut SceneNotWired, &mut NotWired);
     assert!(has(&r, "re-hash: 1 of 7 frames differ"), "{:?}", r.lines);
-    assert!(has(&r, "draw 505: PNG index hash differs"));
+    assert!(has(&r, "frame 7: PNG index hash differs"));
 }
 
 // Covers: specs/render/capture.md §7
@@ -635,7 +837,7 @@ fn stability_fails_on_differing_frames_and_too_few_repeats() {
         r
     );
     assert!(
-        has(&r, "3 frames, 2 different images, draws [500, 501, 502]"),
+        has(&r, "3 frames, 2 different images, frames [1, 2, 3]"),
         "{:?}",
         r.lines
     );
@@ -662,6 +864,40 @@ fn stability_fails_on_differing_frames_and_too_few_repeats() {
     );
 }
 
+// The frames-raw-2 key: the cursor's drawn state, the light quality and
+// the level are part of it (the timers are not).
+// Covers: specs/render/capture.md §7
+#[test]
+fn the_state_key_holds_cursor_light_and_level() {
+    let dir = tmp("key");
+    let (raw, _) = standard(&dir);
+    let text = std::fs::read_to_string(&raw).unwrap();
+    let base = capture::parse_raw(&text).unwrap();
+    let c = base.frames[1].captured().unwrap();
+    let key = capture::StateKey::of(c);
+    assert_eq!(key.light_key, Some(2));
+    assert_eq!(key.cursor_key.unwrap().frame, 2);
+    assert_eq!(key.level.as_ref().unwrap().level_id, Some(8));
+    let with = |from: &str, to: &str| {
+        let r = capture::parse_raw(&text.replacen(from, to, 1)).unwrap();
+        capture::StateKey::of(r.frames[1].captured().unwrap())
+    };
+    // The cursor frame 0x260 → 0x2FF keeps frame >> 8; 0x300 changes it.
+    assert_eq!(
+        with("\"frame\":608,", "\"frame\":767,").cursor_key,
+        key.cursor_key
+    );
+    let moved = with(
+        "\"frame\":608,\"idle_since\":5,\"item\":false,\"last_step\":7,\"state\":4,\"type\":3,\"visible\":1,\"x\":580,\"y\":250},\"cursor_key\":[1,3,2,",
+        "\"frame\":768,\"idle_since\":5,\"item\":false,\"last_step\":7,\"state\":4,\"type\":3,\"visible\":1,\"x\":580,\"y\":250},\"cursor_key\":[1,3,3,",
+    );
+    assert_ne!(moved, key);
+    // Timers are not in the key.
+    assert_eq!(with("\"last_step\":7,", "\"last_step\":9,"), key);
+    // Another level is another key.
+    assert_ne!(with("\"level_id\":8", "\"level_id\":9"), key);
+}
+
 // Covers: specs/render/capture.md §edge-cases-original-bugs
 #[test]
 fn a_cleared_frame_must_be_all_index_0() {
@@ -683,7 +919,7 @@ fn a_cleared_frame_must_be_all_index_0() {
     assert!(
         has(
             &r,
-            "clear: 1 frames with clear_counter > 0 are not all index 0, draws [4]"
+            "clear: 1 frames with clear_counter > 0 are not all index 0, frames [4]"
         ),
         "{:?}",
         r.lines
@@ -707,7 +943,7 @@ fn latest_raw_and_its_image_directory_resolve() {
         raw: RawRef::Latest,
         images: None,
         check: CaptureCheck::Stability,
-        draws: Vec::new(),
+        seqs: Vec::new(),
     };
     let (raw, images) = capture_case::resolve(&root, &c).unwrap();
     assert_eq!(raw, raw_dir.join("20261007-080000-frames.jsonl"));
@@ -754,15 +990,14 @@ fn the_capture_cases_parse() {
 #[test]
 fn scene_case_files_are_strict() {
     let parse = |body: &str| case::parse("x", &format!("version = 1\nkind = \"scene\"\n{body}"));
-    let ok =
-        parse("raw = \"latest\"\ncheck = \"compare\"\ndraws = [3, 4]\nimages = 'a/b'").unwrap();
+    let ok = parse("raw = \"latest\"\ncheck = \"compare\"\nseqs = [3, 4]\nimages = 'a/b'").unwrap();
     assert_eq!(
         ok.kind,
         CaseKind::Scene(SceneCase {
             raw: RawRef::Latest,
             images: Some("a/b".into()),
             check: CaptureCheck::Compare,
-            draws: vec![3, 4],
+            seqs: vec![3, 4],
         })
     );
     for (body, at) in [
@@ -770,14 +1005,19 @@ fn scene_case_files_are_strict() {
         ("raw = \"latest\"", "check"),
         ("raw = \"latest\"\ncheck = \"look\"", "check"),
         (
-            "raw = \"latest\"\ncheck = \"stability\"\ndraws = [1]",
-            "draws",
+            "raw = \"latest\"\ncheck = \"stability\"\nseqs = [1]",
+            "seqs",
         ),
         (
-            "raw = \"latest\"\ncheck = \"compare\"\ndraws = [1, 1]",
-            "draws[1]",
+            "raw = \"latest\"\ncheck = \"compare\"\nseqs = [1, 1]",
+            "seqs[1]",
         ),
-        ("raw = \"latest\"\ncheck = \"compare\"\ndraws = []", "draws"),
+        ("raw = \"latest\"\ncheck = \"compare\"\nseqs = []", "seqs"),
+        // The draw counter is not a frame number (capture.md §4).
+        (
+            "raw = \"latest\"\ncheck = \"compare\"\ndraws = [1]",
+            "draws",
+        ),
         (
             "raw = \"latest\"\ncheck = \"compare\"\nview = [0, 0, 1, 1]",
             "view",

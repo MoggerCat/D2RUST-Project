@@ -36,7 +36,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
-use d2_client::bridge::{Bridge, FrameReport};
+use d2_client::bridge::{Bridge, FrameReport, UnitKey};
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{
@@ -1133,7 +1133,7 @@ impl Fx {
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
-            skill_modes: vec![[0; 3]],
+            skill_modes: vec![[0; 4]],
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1604,13 +1604,18 @@ struct Transcript {
 
 /// A recording bridge frame.
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
-    let before = fx.bridge.log().unowned.values().sum::<u64>();
     let step = fx.step(&msgs);
-    // The bridge has no S→C handler yet (`bridge-dispatch.tsv`: every id
-    // TBD), so each received message is counted unowned.
+    // Each received message is accounted once (`bridge.md` §6,
+    // `client/model.md` §4 rule 1): applied, queued on its unit, dropped
+    // (unit-handler message for a unit the model does not hold), unowned
+    // or rejected. No 0x04 arrives, so no update pass runs.
     let chunks = std::mem::take(&mut fx.bridge.link_mut().chunks);
-    let after = fx.bridge.log().unowned.values().sum::<u64>();
-    assert_eq!(after - before, step.report.messages as u64);
+    let r = &step.report;
+    assert_eq!(
+        r.handled + r.queued + r.dropped + r.unowned + r.rejected,
+        r.messages
+    );
+    assert_eq!(r.drained, 0);
     frames.push((msgs, step, chunks));
 }
 
@@ -1898,6 +1903,33 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x18, done)]);
     assert_eq!(frames.last().unwrap().2, pass(x9c(0x04, cg)));
+    // The client model (`client/msg-stats-items.md` §2 rule 4): the two
+    // 0x9C made one item unit, holding the last message (the stream is
+    // empty; placement waits for the item stream spec). 0x47 / 0x48 name
+    // the player, which the model does not hold (no 0x59): no change.
+    {
+        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM};
+        let w = fx.bridge.world();
+        assert_eq!(
+            w.units.keys().copied().collect::<Vec<_>>(),
+            [UnitKey::new(ITEM, cg)]
+        );
+        let item = &w.units[&UnitKey::new(ITEM, cg)];
+        assert_eq!(item.position, None);
+        assert_eq!(
+            item.kind,
+            KindData::Item(ItemData {
+                last: Some(ItemRecord {
+                    id: 0x9C,
+                    action: 4,
+                    category: 0,
+                    owner: None,
+                    stream: Vec::new(),
+                }),
+                flags4: false,
+            })
+        );
+    }
     assert_eq!(fx.mode(cap), 0);
     assert!(fx.inventory().contains(&cap));
     assert_eq!(
@@ -2098,21 +2130,29 @@ fn run_with(game_seed: u32) -> Transcript {
     let client = (w.frames, w.server_ticks, w.units.len());
     assert_eq!(client.0, frames.len() as u64 + 1);
     let log = fx.bridge.log();
+    // The S→C stream drove the client model (`client/model.md`,
+    // `msg-units.md`, `msg-stats-items.md`): 0x9C ×2, 0x47 ×2, 0x48 ×2
+    // applied; 0x0D dropped (the player was never announced: the server
+    // sends no 0x59 / 0x0B yet); 0x07 rejected (no client act: the server
+    // sends no 0x03 yet, fatal 0x58A); the NPC / quest / trade ids have no
+    // owner spec yet.
     assert_eq!(
         log.unowned,
-        BTreeMap::from([
-            (0x07, 1),
-            (0x0D, 1),
-            (0x27, 1),
-            (0x28, 1),
-            (0x29, 1),
-            (0x2A, 2),
-            (0x47, 2),
-            (0x48, 2),
-            (0x9C, 2),
-        ])
+        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
     );
-    assert!(log.rejected.is_empty() && log.discarded.is_empty());
+    assert_eq!(log.handled, 6);
+    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1)]));
+    assert_eq!((log.queued, log.drained), (0, 0));
+    let rejected: Vec<(u8, String)> = log
+        .rejected
+        .iter()
+        .map(|r| (r.id, r.error.to_string()))
+        .collect();
+    assert_eq!(rejected, [(0x07, "fatal assert 0x58A".to_owned())]);
+    assert!(log.discarded.is_empty());
+    // No local player: the world view has no camera (`model.md` §3 rule 3).
+    assert_eq!(w.local_player, None);
+    assert!(w.rooms_in_sight.is_empty() && w.act.is_none());
 
     let drops = fx
         .drops()

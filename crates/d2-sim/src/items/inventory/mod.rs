@@ -25,6 +25,7 @@ pub mod belt;
 pub mod checks;
 pub mod equip;
 pub mod grid;
+pub mod levelreq;
 pub mod tables;
 
 #[cfg(test)]
@@ -33,22 +34,24 @@ mod tests;
 use crate::units::UnitId;
 
 pub use belt::{
-    auto_belt_gate, belt_numboxes, belt_type, beltable, compact_belt, free_belt_slot,
-    place_in_belt_slot, similar,
+    auto_belt_gate, belt_boxes_of, belt_numboxes, belt_removal_allowed, belt_type, beltable,
+    compact_belt, free_belt_slot, place_in_belt_slot, similar,
 };
 pub use checks::{
-    belt_item_check, busy, cursor_item_check, ground_or_owned_check, item_move_gate,
-    owned_item_check, stored_item_check, stored_or_equipped_check, targeting_reset, trading,
-    Interaction,
+    active_inventory_item, belt_item_check, busy, cursor_item_check, ground_or_owned_check,
+    item_move_gate, owned_item_check, stored_item_check, stored_or_equipped_check, targeting_reset,
+    trading, usable, Interaction,
 };
 pub use equip::{
-    auto_equip_location, body_location_allowed, equip_check, equip_from_cursor, hands_compatible,
-    requirements_met, stack_test, EquipOutcome,
+    auto_equip_compatible, auto_equip_location, body_location_allowed, equip_check,
+    equip_from_cursor, equip_profile, hands_compatible, requirements_met, stack_quality_ok,
+    stack_test, EquipOutcome, EquipProfile,
 };
 pub use grid::{
     find_free_position, grid_record, page_grid_size, place_at_body, place_at_page, place_in_grid,
     place_in_page, place_in_page_from_cursor, search, weight,
 };
+pub use levelreq::{level_requirement, AffixReq, LevelReqItem, LevelReqUnit};
 pub use tables::InvTables;
 
 /// Inventory signature (inventory +0x00). Every accessor of the original
@@ -291,8 +294,9 @@ impl Grid {
     }
 
     fn set_rect(&mut self, x: i32, y: i32, w: u8, h: u8, v: Option<UnitId>) {
-        for yy in y..y + i32::from(h) {
-            for xx in x..x + i32::from(w) {
+        // Signed loops with a wrapping end, as the fit test (§2.2).
+        for yy in y..y.wrapping_add(i32::from(h)) {
+            for xx in x..x.wrapping_add(i32::from(w)) {
                 if xx >= 0 && yy >= 0 && xx < i32::from(self.width) && yy < i32::from(self.height) {
                     self.cells[yy as usize * usize::from(self.width) + xx as usize] = v;
                 }
@@ -401,11 +405,34 @@ impl Inventory {
         self.cursor
     }
 
-    /// Sets the cursor item (`0x0063C180`; §1.4 rule 3: one item, not in
-    /// any grid). Only the field is written.
-    // TODO(spec: whether `0x0063C180` also links the item into the item list)
+    /// Writes the cursor field (inventory +0x20) only. Fixtures use it to
+    /// stage a state; the rule of `0x0063C180` is [`Inventory::put_cursor`].
     pub fn set_cursor(&mut self, item: Option<UnitId>) {
         self.cursor = item;
+    }
+
+    /// Set the cursor (`0x0063C180`, §1.4 rule 3). With an item: inventory
+    /// +0x20 := item, item data +0x5C := this inventory; no list link, no
+    /// count change. With none: the current cursor item, if any, is
+    /// unlinked (§1.4 rule 1 on the cursor item: only the cursor field is
+    /// cleared, then its node fields, owning inventory and a matching
+    /// weapon GUID).
+    pub fn put_cursor<W: InvWorld + ?Sized>(&mut self, w: &mut W, item: Option<UnitId>) {
+        match item {
+            Some(i) => {
+                let Some(d) = w.item_mut(i) else {
+                    return;
+                };
+                d.inv = Some(self.owner);
+                self.cursor = Some(i);
+            }
+            None => {
+                if let Some(c) = self.cursor {
+                    self.unlink(w, c);
+                }
+                self.cursor = None;
+            }
+        }
     }
 
     /// The update list (GUIDs, append order).
@@ -426,8 +453,8 @@ impl Inventory {
         }
     }
 
-    /// Takes the update list, leaving it empty (the free after the update
-    /// pass, §6.1 rule 4; its exact address is open question 9).
+    /// Takes the update list, leaving it empty (the list free `0x0063CBD0`
+    /// of the update-list reset `0x00597B00`, §6.1 rule 4).
     pub fn take_updates(&mut self) -> Vec<u32> {
         std::mem::take(&mut self.updates)
     }
@@ -450,11 +477,17 @@ impl Inventory {
     /// by 1), clears the weapon GUID if it matches, zeroes the node fields.
     /// Returns false when the item is not in this inventory (the callers
     /// treat that as fatal).
+    ///
+    /// The cursor item is not in the item list (§1.4 rule 3): its unlink
+    /// clears the cursor field and its node fields only.
     pub fn unlink<W: InvWorld + ?Sized>(&mut self, w: &mut W, item: UnitId) -> bool {
-        let Some(pos) = self.items.iter().position(|&i| i == item) else {
-            return false;
-        };
-        self.items.remove(pos);
+        match self.items.iter().position(|&i| i == item) {
+            Some(pos) => {
+                self.items.remove(pos);
+            }
+            None if self.cursor == Some(item) => {}
+            None => return false,
+        }
         let Some(d) = w.item_mut(item) else {
             return false;
         };
@@ -521,9 +554,10 @@ pub trait InvWorld {
     /// Link check `0x0063B210(inv, item, kind)`: sockets an item when the
     /// inventory belongs to an item, else succeeds.
     fn link_check(&mut self, owner: UnitId, item: UnitId, kind: u8) -> bool;
-    /// Charm re-link `0x0055C270` (open question 6).
+    /// Item-skill link `0x0055C270` (§5.5: scroll / tome charges into the
+    /// player's skill quantity; not charms).
     fn charm_relink(&mut self, owner: UnitId, item: UnitId);
-    /// "Active inventory item for its owner" (`0x0062FF70`).
+    /// "Active inventory item for its owner" (`0x0062FF70`, §5.6).
     fn active_item(&self, owner: UnitId, item: UnitId) -> bool;
     /// Stat refresh `0x0055C2C0(owner, 0)`.
     fn stat_refresh(&mut self, owner: UnitId);
@@ -531,7 +565,7 @@ pub trait InvWorld {
     fn socket_filled(&self, item: UnitId) -> bool;
     /// Owner refresh `0x00621000(unit, 1)` (§6.1 rule 1).
     fn owner_refresh(&mut self, owner: UnitId);
-    /// Inventory pass `0x0055DBC0(0)` (open question 6).
+    /// Inventory pass `0x0055DBC0(0)` (§5.7).
     fn inventory_pass(&mut self, owner: UnitId);
     /// Trade hook `0x00568770` (page 2; multiplayer trade, out of scope).
     fn trade_hook(&mut self, owner: UnitId, item: UnitId);
@@ -551,13 +585,12 @@ pub trait InvWorld {
     // --- Requirements (§4.2).
     /// Item stat 91 `item_req_percent`, item or skill stat (`0x00625500`).
     fn req_percent(&self, item: UnitId) -> i32;
-    /// `value × p / 100` (`0x00483360`; exact rounding: open question 4).
-    fn percent_of(&self, value: i32, p: i32) -> i32;
     /// The item is active on the unit (`0x00625820`).
     fn item_active_on(&self, item: UnitId, unit: UnitId) -> bool;
     /// The item's own contribution to a unit stat (`0x0062B450(stat)`).
     fn own_contribution(&self, item: UnitId, unit: UnitId, stat: u16) -> i32;
-    /// Level requirement (`0x0062B5B0`; −1 none; open question 5).
+    /// Level requirement (`0x0062B5B0`, §4.8: [`levelreq::level_requirement`]
+    /// on the values the provider reads; never negative).
     fn level_requirement(&self, item: UnitId, unit: UnitId) -> i32;
 
     // --- Hands (§4.3, §4.4).
@@ -577,15 +610,11 @@ pub trait InvWorld {
     /// "X fits a free position of page 0" (`0x0063CB00`, §4.3).
     fn fits_free_page0(&self, inv: &Inventory, item: UnitId) -> bool;
 
-    // --- Stack test (§4.5; open question 7).
+    // --- Stack test (§4.5).
     /// Quality (item data +0, `0x00627E70`).
     fn quality(&self, item: UnitId) -> u8;
-    /// Unique/set file index (`0x00629DA0`).
+    /// Unique/set file index (item data +0x28, `0x00629DA0`).
     fn stack_file_index(&self, item: UnitId) -> i32;
-    /// `0x0062A8D0` value.
-    fn stack_value(&self, item: UnitId) -> i32;
-    /// `0x0062A2F0` quality test.
-    fn stack_quality_ok(&self, item: UnitId) -> bool;
     /// Has sockets (`0x006299B0` ≠ 0).
     fn has_sockets(&self, item: UnitId) -> bool;
 
@@ -594,10 +623,6 @@ pub trait InvWorld {
     fn has_allowed_location(&self, item: UnitId) -> bool;
     /// Quiver-type item (`0x00628480` ≠ 0).
     fn quiver_kind(&self, item: UnitId) -> bool;
-    /// Weapon/shield comparison (`0x0055D560` / `0x0055D670`, open
-    /// question 8): may `item` go to `loc`, with the other allowed
-    /// location used.
-    fn auto_equip_allows(&self, unit: UnitId, item: UnitId, loc: u8) -> bool;
 
     // --- Targeting reset (§5.3).
     /// `0x0044BE50` of the item (0 → queue 0x3F).
