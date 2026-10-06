@@ -8,6 +8,7 @@
 //! RNG, no unordered iteration affecting outcomes, no floating point. Some
 //! of these are enforced by `clippy.toml` and `[lints]` in this crate.
 
+pub mod drlg;
 pub mod game;
 pub mod rng;
 pub mod tick;

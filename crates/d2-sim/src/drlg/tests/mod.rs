@@ -1,0 +1,8 @@
+// Spec: specs/drlg/levels.md, specs/drlg/rooms.md (test vectors)
+//! Tests from the two specs' synthetic vectors and rules, on fakes of
+//! the seams (`fakes`).
+
+mod fakes;
+mod levels;
+mod rooms;
+mod tiles;
