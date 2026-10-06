@@ -3,6 +3,7 @@
 //! the seams (`fakes`).
 
 mod fakes;
+mod gaps;
 mod levels;
 mod rooms;
 mod tiles;

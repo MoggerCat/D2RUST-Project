@@ -16,13 +16,19 @@ use crate::units::UnitId;
 
 pub(crate) const N: usize = 359;
 
-fn set_u16(r: &mut [u8], o: usize, v: u16) {
+pub(super) fn set_u16(r: &mut [u8], o: usize, v: u16) {
     r[o..o + 2].copy_from_slice(&v.to_le_bytes());
 }
 
 /// A synthetic itemstatcost with the 1.14d columns the test vectors use,
 /// fixed up by `d2_data::fixup::records::stat_ops`.
 pub(crate) fn itemstatcost() -> BinTable {
+    itemstatcost_with(|_| {})
+}
+
+/// [`itemstatcost`] with `edit` applied to the records (0x144 bytes
+/// each) before the load fix-up.
+pub(crate) fn itemstatcost_with(edit: impl FnOnce(&mut [u8])) -> BinTable {
     let size = Itemstatcost::SIZE;
     let mut records = vec![0u8; N * size];
     {
@@ -78,6 +84,7 @@ pub(crate) fn itemstatcost() -> BinTable {
         op(270, 6, 0, 0xFFFF, &[7]);
         op(269, 7, 0, 0xFFFF, &[9]);
     }
+    edit(&mut records[..]);
     let mut t = BinTable {
         name: "itemstatcost".into(),
         source: "synthetic".into(),
@@ -133,10 +140,10 @@ impl StatHost for Log {
     }
 }
 
-const P: UnitId = UnitId(1);
-const ITEM: UnitId = UnitId(2);
+pub(super) const P: UnitId = UnitId(1);
+pub(super) const ITEM: UnitId = UnitId(2);
 
-fn full(lists: &StatLists, l: ListId) -> Vec<(u16, i32)> {
+pub(super) fn full(lists: &StatLists, l: ListId) -> Vec<(u16, i32)> {
     lists
         .full_entries(l)
         .into_iter()
@@ -161,7 +168,7 @@ pub(crate) fn player(lists: &mut StatLists, log: &mut Log) -> ListId {
     l
 }
 
-fn item_list(lists: &mut StatLists, log: &mut Log, stats: &[(u16, i32)]) -> ListId {
+pub(super) fn item_list(lists: &mut StatLists, log: &mut Log, stats: &[(u16, i32)]) -> ListId {
     let l = lists.alloc_extended(log, ITEM, crate::units::UnitType::Item, 7, 0, 0, None);
     for &(s, v) in stats {
         lists.set(log, l, s, v, 0, None);

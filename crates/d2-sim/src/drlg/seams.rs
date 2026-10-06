@@ -93,6 +93,9 @@ pub trait LevelTypes {
     /// step 3 and door records). The door tables are not transcribed
     /// (open question 10); the `roll(3)` for objects 91–92 is drawn from
     /// the room seed (`drlg.room_mut(room).seed`) by the provider.
+    /// `orientation` is the cell's tile type (`preset.md` §11: 9 = right
+    /// door).
+    #[allow(clippy::too_many_arguments)]
     fn door_unit(
         &mut self,
         drlg: &mut Drlg,
@@ -101,6 +104,7 @@ pub trait LevelTypes {
         wx: i32,
         wy: i32,
         cell: u32,
+        orientation: u32,
     ) {
     }
 

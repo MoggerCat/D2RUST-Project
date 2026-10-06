@@ -458,7 +458,7 @@ pub fn superunique<H: PopHost + ?Sized>(
         62 => cx.host.group_spawn(boss, 381, 1, 20, 10, flags::NO_PARTY),
         _ => {}
     }
-    cx.host.add_modifier(boss, 22);
+    cx.host.add_modifier(boss, 22, cx.state);
     Some(boss)
 }
 
@@ -511,7 +511,7 @@ fn special_spawn<H: PopHost + ?Sized>(
         R::Once if row.class == C::Pick => {
             // Rule 2: a champion at the preset point.
             let u = place_at(cx, room, None, x, y, class, mode, -1, 0).unit()?;
-            cx.host.add_modifier(u, 16);
+            cx.host.add_modifier(u, 16, cx.state);
             champion_minions(cx, None, u, class);
             Some(u)
         }

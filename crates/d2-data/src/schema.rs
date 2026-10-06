@@ -515,6 +515,188 @@ mod tests {
         assert_eq!((total, tables), (1_702, 55));
     }
 
+    /// `(S, NN)` of a `load_step` (`S` or `S.NN`).
+    fn step(s: &str) -> (u32, u32) {
+        let (a, b) = s.split_once('.').unwrap_or((s, "0"));
+        (a.parse().unwrap(), b.parse().unwrap())
+    }
+
+    /// 92 loader calls; the 91 reachable ones are in `loading.md` §6 order
+    /// and the one at `0x653DFF` is never called.
+    // Covers: specs/data/schema.md §3 r4
+    #[test]
+    fn execution_order() {
+        let s = schema();
+        assert_eq!(s.tables.len(), 92);
+        let steps: Vec<(u32, u32)> = s
+            .called()
+            .map(|t| step(t.load_step.as_deref().unwrap()))
+            .collect();
+        assert_eq!(steps.len(), 91);
+        assert!(steps.windows(2).all(|w| w[0] < w[1]), "rows in step order");
+        let runtime: Vec<u32> = steps.iter().filter(|s| s.1 == 0).map(|s| s.0).collect();
+        assert_eq!(runtime, (1..=73).collect::<Vec<_>>());
+        let uncalled: Vec<&TableDef> = s.tables.iter().filter(|t| !t.is_called()).collect();
+        assert_eq!(uncalled.len(), 1);
+        assert_eq!(uncalled[0].name, "unused_653db0");
+        assert!(uncalled[0].notes.starts_with("call 0x653DFF;"));
+        // Every row is one call site.
+        let mut sites: Vec<&str> = s
+            .tables
+            .iter()
+            .map(|t| t.notes.split(';').next().unwrap())
+            .collect();
+        assert!(sites.iter().all(|c| c.starts_with("call 0x")));
+        sites.sort();
+        sites.dedup();
+        assert_eq!(sites.len(), 92);
+    }
+
+    /// Names, linker names and callbacks as §4 derives them.
+    // Covers: specs/data/schema.md §4
+    #[test]
+    fn provenance_of_names_and_links() {
+        let s = schema();
+        // 3,499 entries plus one terminator per list = 3,591 (the
+        // independent extraction's count); no terminator is a row.
+        let fields: usize = s.tables.iter().map(|t| t.fields.len()).sum();
+        assert_eq!(fields + s.tables.len(), 3_591);
+        // Linker names: `table.column` of the key entry filling it.
+        for t in &s.tables {
+            for f in &t.fields {
+                let Link::Linker(l) = &f.link else { continue };
+                if l.starts_with('@') {
+                    assert!(l == "@range" || l == "@treasureclass", "{l}");
+                    continue;
+                }
+                let (owner, column) = l.split_once('.').unwrap();
+                let owners: &[&str] = if l == "items.code" {
+                    &["weapons", "armor", "misc"]
+                } else {
+                    &[owner]
+                };
+                for o in owners {
+                    let o = s.table(o).unwrap_or_else(|| panic!("{l}"));
+                    let key = o.field(&o.key_column).unwrap();
+                    assert!(key.field_type.is_own_key(), "{l}");
+                    if l != "items.code" {
+                        assert_eq!(o.key_column, column, "{l}");
+                        assert_eq!(key.link, Link::Linker(l.clone()), "{l}");
+                    }
+                }
+            }
+        }
+        // Callbacks by name.
+        let mut cbs: Vec<String> = s
+            .tables
+            .iter()
+            .flat_map(|t| &t.fields)
+            .filter_map(|f| match &f.link {
+                Link::Calc(b) => Some(format!("calc({})", b.name())),
+                Link::Param => Some("param".into()),
+                Link::Table(t) => Some(format!("cb({t})")),
+                _ => None,
+            })
+            .collect();
+        cbs.sort();
+        cbs.dedup();
+        assert_eq!(
+            cbs,
+            [
+                "calc(itemscode)",
+                "calc(misscode)",
+                "calc(skilldesccode)",
+                "calc(skillscode)",
+                "cb(cubemain.input)",
+                "cb(cubemain.output)",
+                "cb(cubemain.param)",
+                "cb(monpreset.place)",
+                "cb(monstats.skillmode)",
+                "cb(monstats2.composit)",
+                "param",
+            ]
+        );
+        // The 7 type differences from D2MOO 1.10f keep the 1.14d types.
+        let id = |t: &str, c: &str| s.table(t).unwrap().field(c).unwrap().field_type.id();
+        assert_eq!(id("monplace", "code"), 17);
+        assert_eq!(id("gamble", "code"), 9);
+        for t in [
+            "uniquetitle",
+            "uniqueprefix",
+            "uniquesuffix",
+            "uniqueappellation",
+            "unused_653db0",
+        ] {
+            assert_eq!(id(t, "Name"), 22, "{t}");
+        }
+    }
+
+    // Covers: specs/data/schema.md §edge-cases-original-bugs
+    #[test]
+    fn list_edge_cases() {
+        let s = schema();
+        for t in &s.tables {
+            let names: Vec<Vec<u8>> = t
+                .fields
+                .iter()
+                .map(|f| f.column.to_ascii_lowercase())
+                .collect();
+            let mut unique = names.clone();
+            unique.sort();
+            unique.dedup();
+            assert_eq!(unique.len(), names.len(), "{}: duplicate column", t.name);
+        }
+        let longest = s.tables.iter().max_by_key(|t| t.fields.len()).unwrap();
+        assert_eq!(
+            (longest.name.as_str(), longest.fields.len()),
+            ("monstats", 253)
+        );
+        // The camt overlap and a NUL spill are kept as in 1.14d.
+        let levels = s.table("levels").unwrap();
+        for c in ["camt1", "camt2", "camt3", "camt4"] {
+            assert_eq!(levels.field(c).unwrap().offset, 220, "{c}");
+        }
+        let pet = s.table("pettype").unwrap();
+        let base = pet.field("baseicon").unwrap();
+        assert_eq!(
+            base.footprint().end,
+            pet.field("micon1").unwrap().offset as usize + 1
+        );
+    }
+
+    /// `loading.md` §7.1: a table compiles only after every table whose
+    /// link it reads (or is that table); hand-built linkers exist first.
+    // Covers: specs/data/loading.md §7.1
+    #[test]
+    fn links_point_to_earlier_tables() {
+        let s = schema();
+        let order: Vec<&str> = s.called().map(|t| t.name.as_str()).collect();
+        let pos = |n: &str| {
+            order
+                .iter()
+                .position(|&o| o == n)
+                .unwrap_or_else(|| panic!("{n}"))
+        };
+        for t in s.called() {
+            let me = pos(&t.name);
+            for f in &t.fields {
+                let Link::Linker(l) = &f.link else { continue };
+                let owner = match l.as_str() {
+                    "@range" => "skills", // built inside step 10, before skills compiles
+                    "@treasureclass" => "treasureclassex",
+                    "items.code" => "weapons",
+                    _ => l.split_once('.').unwrap().0,
+                };
+                let at = pos(owner);
+                if l.starts_with('@') && l != "@range" {
+                    assert!(at < me, "{}: {l}", t.name);
+                } else {
+                    assert!(at <= me, "{}: {l}", t.name);
+                }
+            }
+        }
+    }
+
     // Covers: specs/data/field-types.md §3
     #[test]
     fn type_ids_round_trip() {

@@ -310,6 +310,30 @@ mod tests {
         assert_eq!(&b.pixels[1..3], &[7, 8]);
     }
 
+    // Covers: specs/formats/dt1.md §rules text
+    #[test]
+    fn integers_are_little_endian() {
+        let mut data = file();
+        data[4..8].copy_from_slice(&[0x04, 0x03, 0x02, 0x01]); // minor version
+        data[276..280].copy_from_slice(&[0x78, 0x56, 0x34, 0x12]); // light direction
+        data[276 + 4..276 + 6].copy_from_slice(&[0x22, 0x11]); // roof height
+        let dt1 = Dt1::parse(&data).unwrap();
+        assert_eq!(dt1.minor_version, 0x0102_0304);
+        let t = &dt1.tiles[0];
+        assert_eq!(t.light_direction, 0x1234_5678);
+        assert_eq!(t.roof_height, 0x1122);
+        assert_eq!(t.blocks[0].format, 0x1001);
+        assert_eq!(t.blocks[0].y, -3);
+    }
+
+    #[test]
+    fn tile_without_blocks() {
+        let mut data = file();
+        data[276 + 0x50..276 + 0x54].copy_from_slice(&0u32.to_le_bytes());
+        let dt1 = Dt1::parse(&data).unwrap();
+        assert!(dt1.tiles[0].blocks.is_empty());
+    }
+
     // Covers: specs/formats/dt1.md §block-header-20-bytes-each-at-the-tile-s-block-headers-offset
     #[test]
     fn bad_block_offset() {

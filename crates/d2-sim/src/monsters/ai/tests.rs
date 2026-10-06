@@ -31,6 +31,31 @@ struct Fake {
     nodes: Vec<Vec<UnitId>>,
     secondary: Option<(UnitId, i32)>,
     log: Vec<String>,
+    // Knobs added for the rule tests below (defaults keep the behaviour
+    // the older tests rely on).
+    align: u8,
+    champion: bool,
+    vision: Option<u32>,
+    interacting: bool,
+    busy: BTreeSet<UnitId>,
+    /// Modes whose start fails.
+    fail_modes: BTreeSet<u8>,
+    /// A failed mode start falls into the neutral start (§1.3), which
+    /// adds a think at frame + this when none is pending later.
+    fail_think: Option<i32>,
+    blocked_path: bool,
+    door: Option<(UnitId, bool)>,
+    no_los_draw: bool,
+    line_blocked: BTreeSet<UnitId>,
+    reach_fails: bool,
+    spot: Option<(i32, i32, RoomId)>,
+    last_dead: BTreeMap<RoomId, [Option<UnitId>; 4]>,
+    forced: Option<(UnitId, i32)>,
+    good: Option<(UnitId, i32)>,
+    nearest: Option<(UnitId, bool)>,
+    special_walk: Option<(UnitId, i32)>,
+    corpses: (Option<UnitId>, u32),
+    skill_unusable: bool,
 }
 
 impl Fake {
@@ -87,36 +112,43 @@ impl AiUnits for Fake {
         self.ai_state
     }
     fn alignment(&self, _: UnitId) -> u8 {
-        0
+        self.align
     }
     fn is_unique(&self, _: UnitId) -> bool {
         self.unique
     }
     fn is_champion(&self, _: UnitId) -> bool {
-        false
+        self.champion
     }
     fn is_boss(&self, _: UnitId) -> bool {
         false
     }
     fn vision_seen(&self, _: UnitId) -> Option<u32> {
-        None
+        self.vision
     }
     fn mark_seen(&mut self, _: UnitId) {}
     fn ai_reset(&mut self, unit: UnitId) {
         self.log.push(format!("reset {}", unit.0));
     }
     fn interacting(&self, _: UnitId) -> bool {
-        false
+        self.interacting
     }
-    fn busy(&self, _: UnitId) -> bool {
-        false
+    fn busy(&self, unit: UnitId) -> bool {
+        self.busy.contains(&unit)
     }
 }
 
 impl AiModes for Fake {
-    fn change_mode(&mut self, _: &mut Game, unit: UnitId, m: u8, target: ModeTarget) -> bool {
+    fn change_mode(&mut self, game: &mut Game, unit: UnitId, m: u8, target: ModeTarget) -> bool {
         self.log.push(format!("mode {m} {target:?}"));
-        if self.walk_fails && matches!(m, mode::WALK | mode::RUN) {
+        if (self.walk_fails && matches!(m, mode::WALK | mode::RUN)) || self.fail_modes.contains(&m)
+        {
+            if let Some(n) = self.fail_think {
+                if pending_think(game, unit) <= game.frame {
+                    let at = game.frame + n;
+                    game.schedule_event(unit, 2, at, None, 0, 0).unwrap();
+                }
+            }
             return false;
         }
         self.anim.insert(unit, m);
@@ -129,19 +161,24 @@ impl AiModes for Fake {
         self.log.push(format!("steps {steps}"));
     }
     fn path_blocked(&self, _: UnitId) -> bool {
-        false
+        self.blocked_path
     }
     fn stop_path(&mut self, _: UnitId) {}
     fn set_current_skill(&mut self, _: UnitId, skill: i32) -> bool {
         self.log.push(format!("skill {skill}"));
         skill >= 0
     }
-    fn set_skill_flag(&mut self, _: UnitId) {}
+    fn set_skill_flag(&mut self, _: UnitId) {
+        self.log.push("skillflag".into());
+    }
     fn class_has_mode(&self, _: i32, m: u8) -> bool {
         !(self.can_walk_off && m == mode::WALK)
     }
-    fn play_sound(&mut self, _: &mut Game, _: UnitId, sound: u32, _: Option<UnitId>) {
+    fn play_sound(&mut self, _: &mut Game, _: UnitId, sound: u32, to: Option<UnitId>) {
         self.log.push(format!("sound {sound}"));
+        if let Some(to) = to {
+            self.log.push(format!("sound-to {to:?}"));
+        }
     }
     fn knockback_to_gethit(&mut self, _: &mut Game, _: UnitId) {
         self.log.push("gethit".into());
@@ -150,7 +187,9 @@ impl AiModes for Fake {
         self.log.push(format!("radius {a} {b}"));
         true
     }
-    fn operate_door(&mut self, _: &mut Game, _: UnitId, _: UnitId) {}
+    fn operate_door(&mut self, _: &mut Game, _: UnitId, door: UnitId) {
+        self.log.push(format!("door {door:?}"));
+    }
 }
 
 impl AiWorld for Fake {
@@ -158,25 +197,26 @@ impl AiWorld for Fake {
         self.town.contains(&room)
     }
     fn los_draw(&self, _: &Game, _: RoomId) -> bool {
-        true
+        !self.no_los_draw
     }
-    fn collides(&self, _: &Game, _: UnitId, _: u16) -> bool {
-        self.collides
+    fn collides(&self, _: &Game, _: UnitId, mask: u16) -> bool {
+        self.collides && mask == 0x40
     }
-    fn line_blocked(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
-        false
+    fn line_blocked(&self, _: &Game, _: UnitId, b: UnitId) -> bool {
+        self.line_blocked.contains(&b)
     }
     fn in_melee_range(&self, _: &Game, _: UnitId, b: UnitId) -> bool {
         self.melee.contains(&b)
     }
     fn can_reach_directly(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
-        true
+        !self.reach_fails
     }
     fn find_spot(&mut self, _: &mut Game, _: UnitId) -> Option<(i32, i32, RoomId)> {
-        None
+        self.log.push("find_spot".into());
+        self.spot
     }
-    fn last_dead(&self, _: &Game, _: RoomId) -> [Option<UnitId>; 4] {
-        [None; 4]
+    fn last_dead(&self, _: &Game, room: RoomId) -> [Option<UnitId>; 4] {
+        self.last_dead.get(&room).copied().unwrap_or([None; 4])
     }
 }
 
@@ -189,10 +229,11 @@ impl AiTargets for Fake {
         out
     }
     fn forced_target(&mut self, _: &mut Game, _: UnitId) -> Option<(UnitId, i32)> {
-        None
+        self.forced
     }
-    fn good_target_search(&mut self, _: &mut Game, _: UnitId, _: bool) -> Option<(UnitId, i32)> {
-        None
+    fn good_target_search(&mut self, _: &mut Game, _: UnitId, los: bool) -> Option<(UnitId, i32)> {
+        self.log.push(format!("good {los}"));
+        self.good
     }
     fn choose_alternative(
         &mut self,
@@ -210,31 +251,34 @@ impl AiTargets for Fake {
         }
     }
     fn nearest_player(&mut self, _: &mut Game, unit: UnitId) -> (UnitId, bool) {
-        (unit, false)
+        self.nearest.unwrap_or((unit, false))
     }
     fn find_door(&mut self, _: &mut Game, _: UnitId) -> Option<UnitId> {
-        None
+        self.door.map(|(d, _)| d)
     }
-    fn door_monster_ok(&self, _: UnitId) -> bool {
-        false
+    fn door_monster_ok(&self, door: UnitId) -> bool {
+        self.door == Some((door, true))
     }
     fn special_walk_target(&mut self, _: &mut Game, _: UnitId) -> Option<(UnitId, i32)> {
-        None
+        self.log.push("scan 11".into());
+        self.special_walk
     }
     fn shaman_corpses(
         &mut self,
         _: &mut Game,
         _: UnitId,
-        _: i32,
-        _: bool,
+        max_sq: i32,
+        own: bool,
     ) -> (Option<UnitId>, u32) {
-        (None, 0)
+        self.log.push(format!("corpses {max_sq} {own}"));
+        self.corpses
     }
 }
 
 impl AiSkills for Fake {
-    fn skill_usable(&mut self, _: &mut Game, _: UnitId, _: i32, _: UnitId) -> bool {
-        true
+    fn skill_usable(&mut self, _: &mut Game, _: UnitId, skill: i32, _: UnitId) -> bool {
+        self.log.push(format!("usable {skill}"));
+        !self.skill_unusable
     }
 }
 
@@ -1044,3 +1088,4 @@ fn implemented_matches_catalogue() {
         assert!(implemented(addr));
     }
 }
+mod rules;

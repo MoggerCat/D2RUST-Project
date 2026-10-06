@@ -13,6 +13,9 @@ bevy.workspace = true
 d2-formats.workspace = true
 d2-proto.workspace = true
 d2-net.workspace = true
+# The in-process server of single player (`bridge::local`). Never the
+# reverse (tools/depcheck).
+d2-server.workspace = true
 d2-verify.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
@@ -26,6 +29,11 @@ toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 # Bevy already builds (same version and backends), used directly so the
 # compositor runs headless for verify; `wgpu::naga` validates its WGSL in CI.
 wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan", "naga-ir"] }
+
+[dev-dependencies]
+# The local-server end-to-end test builds a wired sim from synthetic tables.
+d2-sim.workspace = true
+d2-data.workspace = true
 
 [lints]
 workspace = true

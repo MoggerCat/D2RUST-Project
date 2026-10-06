@@ -261,14 +261,17 @@ fn create<H: PopHost + ?Sized>(
 ) -> Option<UnitId> {
     let t = cx.tables;
     let mon = t.mon(req.class)?;
-    let unit = cx.host.allocate_monster(Alloc {
-        class: req.class,
-        x,
-        y,
-        room,
-        mode: req.mode,
-        guid: req.guid.filter(|_| req.flags & flags::GUID != 0),
-    })?;
+    let unit = cx.host.allocate_monster(
+        Alloc {
+            class: req.class,
+            x,
+            y,
+            room,
+            mode: req.mode,
+            guid: req.guid.filter(|_| req.flags & flags::GUID != 0),
+        },
+        cx.state,
+    )?;
     let nc = req.flags & flags::NO_COUNT != 0 || mon.never_count;
     let level = cx.host.room_level(room);
     if cx.state.regions.count_spawn(level, nc) {

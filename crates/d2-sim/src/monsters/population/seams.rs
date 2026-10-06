@@ -7,7 +7,7 @@
 //! (`monsters/init.md`, implemented in a parallel session): allocation,
 //! alignment, init, boss modifiers and monster data writes.
 
-use super::{CoordRect, PresetUnit, RoomBox, TileRec};
+use super::{CoordRect, PopState, PresetUnit, RoomBox, TileRec};
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 
@@ -90,7 +90,10 @@ pub struct Alloc {
 /// `monsters/ai.md` (owner data), objects and quests specs.
 pub trait MonsterInit {
     /// `0x00555230(type 1, …)`: one game-seed step, a GUID, the unit.
-    fn allocate_monster(&mut self, a: Alloc) -> Option<UnitId>;
+    /// The allocator's monster type init (`monsters/init.md` §5 step 4)
+    /// reads and extends the game's regions (§2.5 `0x00547BC0`), so they
+    /// come with the call.
+    fn allocate_monster(&mut self, a: Alloc, state: &mut PopState) -> Option<UnitId>;
     /// `0x00573570(unit, flag, 1)`.
     fn set_monster_flag(&mut self, unit: UnitId, flag: u32);
     /// `0x00552D60`: the coordinate record: `rect`, or with `None` the one
@@ -125,7 +128,9 @@ pub trait MonsterInit {
     /// boss's own modifiers.
     fn boss_modifier_init(&mut self, boss: UnitId);
     /// `0x005A48C0` (modifier 16) / `0x005A4850(…, m, 1)` (modifier 22).
-    fn add_modifier(&mut self, unit: UnitId, m: u8);
+    /// `0x005A48C0` counts the unit in its region (`monsters/init.md`
+    /// §16.2, `0x005A0320`), so the regions come with the call.
+    fn add_modifier(&mut self, unit: UnitId, m: u8, state: &mut PopState);
     /// `0x005A0930`: transfer the boss modifiers with `xfer`.
     fn transfer_modifiers(&mut self, boss: UnitId, minion: UnitId);
     /// `0x0058F030(game, unit, owner, a, b, c)`.

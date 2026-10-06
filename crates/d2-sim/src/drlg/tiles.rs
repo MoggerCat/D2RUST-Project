@@ -491,7 +491,7 @@ impl Drlg {
         if is_door(t) {
             // New record: flag 0x20 is clear.
             svc.types
-                .door_unit(self, svc.data, id, rect.x + x, rect.y + y, v);
+                .door_unit(self, svc.data, id, rect.x + x, rect.y + y, v, t);
         }
         let flags = record_flags(0, t, v, self.material(tile), false);
         let tl = self.tiles_mut(id);
@@ -609,7 +609,7 @@ impl Drlg {
         // 3.
         if v & cell::HIDDEN != 0 {
             if is_door(t) && !matches!(level_id, 111 | 112 | 117) {
-                svc.types.door_unit(self, svc.data, id, wx, wy, v);
+                svc.types.door_unit(self, svc.data, id, wx, wy, v, t);
                 return Ok(());
             }
             if is_exit(t) {

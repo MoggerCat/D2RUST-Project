@@ -283,3 +283,69 @@ pub(crate) const ADPCM_CHANGE_TABLE: [i32; 32] = [
     -1, 1, -1, 5, -1, 3, -1, 7,
     -1, 2, -1, 4, -1, 6, -1, 8,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The appendix itself: the tables are compared against the spec text.
+    const SPEC: &str = include_str!("../../../../specs/formats/mpq-tables.md");
+
+    /// Every integer literal (hex or decimal, optionally negative) in the
+    /// array that follows `decl` in the spec, up to its closing bracket.
+    /// `// ...` comments are skipped.
+    fn spec_array(decl: &str) -> Vec<i64> {
+        let start = SPEC.find(decl).expect("declaration in spec") + decl.len();
+        let mut depth = 1;
+        let mut body = String::new();
+        for line in SPEC[start..].lines() {
+            let line = line.split("//").next().unwrap_or("");
+            for c in line.chars() {
+                match c {
+                    '[' => depth += 1,
+                    ']' => depth -= 1,
+                    _ => {}
+                }
+                if depth == 0 {
+                    break;
+                }
+                body.push(c);
+            }
+            body.push(' ');
+            if depth == 0 {
+                break;
+            }
+        }
+        body.split(|c: char| matches!(c, ',' | '[' | ']') || c.is_whitespace())
+            .filter(|t| !t.is_empty())
+            .map(|t| match t.strip_prefix("0x") {
+                Some(h) => i64::from_str_radix(h, 16).expect("hex"),
+                None => t.parse().expect("decimal"),
+            })
+            .collect()
+    }
+
+    // Covers: specs/formats/mpq-tables.md §c-huffman-weight-tables
+    #[test]
+    fn huffman_weights_match_spec() {
+        let want = spec_array("HUFFMAN_WEIGHTS: [[u8; 256]; 9] = [");
+        assert_eq!(want.len(), 9 * 256);
+        let got: Vec<i64> = HUFFMAN_WEIGHTS
+            .iter()
+            .flatten()
+            .map(|&w| i64::from(w))
+            .collect();
+        assert_eq!(got, want);
+    }
+
+    // Covers: specs/formats/mpq-tables.md §d-ima-adpcm-tables
+    #[test]
+    fn adpcm_tables_match_spec() {
+        let step = spec_array("ADPCM_STEP_SIZE: [i32; 89] = [");
+        let change = spec_array("ADPCM_CHANGE_TABLE: [i32; 32] = [");
+        let got: Vec<i64> = ADPCM_STEP_SIZE.iter().map(|&v| i64::from(v)).collect();
+        assert_eq!(got, step);
+        let got: Vec<i64> = ADPCM_CHANGE_TABLE.iter().map(|&v| i64::from(v)).collect();
+        assert_eq!(got, change);
+    }
+}

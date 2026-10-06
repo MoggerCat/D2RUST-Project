@@ -289,6 +289,41 @@ mod tests {
         assert!(a.find(b"A        ").is_err());
     }
 
+    // Covers: specs/formats/animdata.md §rules text
+    #[test]
+    fn integers_are_little_endian() {
+        let mut f = file(&[(b"A", 0x0102_0304, 0x0A0B_0C0D, &[])]);
+        let a = AnimData::parse(&f).unwrap();
+        let r = a.record(b"A").unwrap();
+        assert_eq!((r.frames, r.speed), (0x0102_0304, 0x0A0B_0C0D));
+        // Bucket 65's count is the LE i32 1; as big-endian it would be
+        // 0x0100_0000 records and the file would not parse.
+        let at = 65 * 4;
+        assert_eq!(f[at..at + 4], 1i32.to_le_bytes());
+        f[at..at + 4].copy_from_slice(&1i32.to_be_bytes());
+        assert!(AnimData::parse(&f).is_err());
+    }
+
+    // Covers: specs/formats/animdata.md §4 text
+    #[test]
+    fn fatal_checks_only_in_non_empty_buckets() {
+        // Empty bucket: no checks, just "not found".
+        let a = AnimData::parse(&file(&[(b"A", 1, 1, &[])])).unwrap();
+        assert!(a.find(b"AAAAAAAAA").unwrap().is_none());
+        // Non-empty bucket: an over-long query is an error (0xD9) ...
+        assert!(a.find(b"A        ").is_err());
+        assert!(a.info(b"A        ").is_err());
+        // ... and a record name with no NUL in its 8 bytes (0xDA) is
+        // reported as an error (d2rs: at load).
+        let mut f = file(&[(b"ABCDEFG", 1, 1, &[])]);
+        // The only record sits after the counts of buckets 0..=b.
+        let b = hash(b"ABCDEFG");
+        let name_at = 4 * (b + 1);
+        assert_eq!(&f[name_at..name_at + 7], b"ABCDEFG");
+        f[name_at + 7] = b'H';
+        assert!(AnimData::parse(&f).is_err());
+    }
+
     #[test]
     fn regress_huge_bucket_count() {
         // A count of i32::MAX reserved ~350 GB before reading a record

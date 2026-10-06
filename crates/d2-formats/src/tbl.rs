@@ -313,6 +313,43 @@ mod tests {
         assert!(err.to_string().contains("more than the file size"), "{err}");
     }
 
+    // Covers: specs/formats/tbl.md §rules text
+    #[test]
+    fn integers_are_little_endian() {
+        let mut data = build(&[("A", "xyz")], 4);
+        data[0..2].copy_from_slice(&[0x34, 0x12]);
+        let t = StringTable::parse(&data).unwrap();
+        assert_eq!(t.header.crc, 0x1234);
+        assert_eq!(t.header.num_elements, 1);
+        assert_eq!(t.header.hash_table_size, 4);
+        assert_eq!(t.header.file_size as usize, data.len());
+        let e = t.element(0).unwrap();
+        assert_eq!(e.hash, key_hash(b"A"));
+        assert_eq!(e.value, b"xyz");
+        // The same bytes read big-endian would give 0x0400_0000 slots.
+        assert_eq!(u32::from_le_bytes(data[4..8].try_into().unwrap()), 4);
+    }
+
+    #[test]
+    fn crc_is_not_verified_and_magic_tells_fonts_apart() {
+        let data = build(&[("A", "first"), ("Q", "second")], 8);
+        let t = StringTable::parse(&data).unwrap();
+        for crc in [0x0000u16, 0x1234, 0xFFFF] {
+            let mut d = data.clone();
+            d[0..2].copy_from_slice(&crc.to_le_bytes());
+            let u = StringTable::parse(&d).unwrap();
+            assert_eq!(u.entries, t.entries);
+            assert_eq!(u.header.crc, crc);
+        }
+        // Classification by content: "Woo!" is a font table, not a string
+        // table; a string table never starts with it here.
+        assert!(!crate::font::FontTable::is_font_table(&data));
+        let mut font = b"Woo!".to_vec();
+        font.extend_from_slice(&[1, 0, 0, 0, 0, 0, 16, 12]);
+        assert!(crate::font::FontTable::is_font_table(&font));
+        assert!(crate::font::FontTable::parse(&font).is_ok());
+    }
+
     mod robust {
         use super::*;
         use crate::robust::{bounded, bytes, mutated};

@@ -163,4 +163,8 @@ pub enum DrlgError {
     ClientCopyRemoval,
     #[error("not an active room of this DRLG")]
     NotActive,
+    /// A level-type generator (`drlg/preset.md`, `maze.md`, `outdoor.md`)
+    /// failed on this level id; the provider keeps its own error.
+    #[error("level type generator failed on level {0} (error kept by the provider)")]
+    LevelType(u32),
 }

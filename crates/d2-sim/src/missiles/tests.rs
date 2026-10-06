@@ -56,6 +56,23 @@ struct Fake {
     log: Vec<String>,
     /// Step-9 searches (calls of `crossed_subtiles`).
     probes: std::cell::Cell<u32>,
+    /// Allocation fails.
+    alloc_fail: bool,
+    /// Unit flags a new missile starts with.
+    alloc_flags: u32,
+    /// Modes handed to allocation.
+    alloc_modes: Vec<u8>,
+    /// `find_room` finds nothing.
+    no_room: bool,
+    /// The start room of the last `find_room`.
+    room_near: std::cell::Cell<Option<RoomId>>,
+    /// Path set-up, stat list, init callback and damage setup calls, in
+    /// order.
+    calls: Vec<String>,
+    /// Sizes handed to `collision_mask`.
+    sizes: std::cell::RefCell<Vec<i32>>,
+    /// Damage setup sets unit flag bit 3 on the missile.
+    setup_sets_valid: bool,
 }
 
 impl Fake {
@@ -76,9 +93,16 @@ impl MissileUnits for Fake {
         x: i32,
         y: i32,
         room: RoomId,
-        _mode: u8,
+        mode: u8,
     ) -> Option<UnitId> {
+        if self.alloc_fail {
+            return None;
+        }
         let m = game.spawn_unit(UnitType::Missile, Some(room), false).ok()?;
+        self.alloc_modes.push(mode);
+        if self.alloc_flags != 0 {
+            self.flags.insert(m, self.alloc_flags);
+        }
         self.next_seed += 1;
         self.seeds.insert(m, Seed::init_low(self.next_seed));
         self.pos.insert(m, (x, y));
@@ -113,7 +137,9 @@ impl MissileUnits for Fake {
     fn state_stat(&self, unit: UnitId, state: u16, stat: u16) -> Option<i32> {
         self.has_state(unit, state).then(|| self.stat(unit, stat))
     }
-    fn alloc_stat_list(&mut self, _: UnitId) {}
+    fn alloc_stat_list(&mut self, _: UnitId) {
+        self.calls.push("statlist".into());
+    }
     fn unit_flag(&self, unit: UnitId, bit: u32) -> bool {
         self.flags.get(&unit).copied().unwrap_or(0) & bit != 0
     }
@@ -148,21 +174,32 @@ impl MissilePath for Fake {
         !self.no_path
     }
     fn set_velocity(&mut self, unit: UnitId, v: i32) {
+        self.calls.push(format!("vel {v}"));
         self.paths.entry(unit).or_default().velocity = v;
     }
     fn velocity(&self, unit: UnitId) -> i32 {
         self.paths.get(&unit).map_or(0, |p| p.velocity)
     }
     fn set_target_unit(&mut self, unit: UnitId, target: UnitId) {
+        self.calls.push(format!("tunit {}", target.0));
         self.paths.entry(unit).or_default().target_unit = Some(target);
     }
     fn set_target_point(&mut self, unit: UnitId, x: i32, y: i32) {
+        self.calls.push(format!("tpoint {x} {y}"));
         self.paths.entry(unit).or_default().target_point = Some((x, y));
     }
-    fn set_footprint_mask(&mut self, _: UnitId, _: u16) {}
-    fn set_move_mask(&mut self, _: UnitId, _: u16) {}
-    fn build(&mut self, _: &mut Game, _: UnitId) {}
-    fn set_acceleration(&mut self, _: UnitId, _: i32, _: i32) {}
+    fn set_footprint_mask(&mut self, _: UnitId, mask: u16) {
+        self.calls.push(format!("foot {mask:#x}"));
+    }
+    fn set_move_mask(&mut self, _: UnitId, mask: u16) {
+        self.calls.push(format!("move {mask:#x}"));
+    }
+    fn build(&mut self, _: &mut Game, _: UnitId) {
+        self.calls.push("build".into());
+    }
+    fn set_acceleration(&mut self, _: UnitId, accel: i32, max: i32) {
+        self.calls.push(format!("accel {accel} {max}"));
+    }
     fn target_distance(&self, _: UnitId) -> i32 {
         10
     }
@@ -180,12 +217,14 @@ impl MissilePath for Fake {
 
 impl MissileRooms for Fake {
     fn find_room(&self, _: &Game, near: RoomId, _: i32, _: i32) -> Option<RoomId> {
-        Some(near)
+        self.room_near.set(Some(near));
+        (!self.no_room).then_some(near)
     }
     fn in_town(&self, _: &Game, room: RoomId) -> bool {
         self.town.contains(&room)
     }
-    fn collision_mask(&self, _: &Game, _: RoomId, x: i32, y: i32, _: i32, mask: u16) -> u16 {
+    fn collision_mask(&self, _: &Game, _: RoomId, x: i32, y: i32, size: i32, mask: u16) -> u16 {
+        self.sizes.borrow_mut().push(size);
         self.masks.get(&(x, y)).copied().unwrap_or(0) & mask
     }
     fn collision_at(&self, _: &Game, _: RoomId, x: i32, y: i32, mask: u16) -> u16 {
@@ -200,14 +239,29 @@ impl MissileRooms for Fake {
 }
 
 impl MissileCombat for Fake {
-    fn damage_setup(&mut self, _: &mut Game, _: UnitId, _: Option<UnitId>, _: UnitId, _: i32) {
+    fn damage_setup(
+        &mut self,
+        _: &mut Game,
+        owner: UnitId,
+        origin: Option<UnitId>,
+        missile: UnitId,
+        level: i32,
+    ) {
         self.log.push("setup".into());
+        let origin = origin.map(|o| o.0);
+        self.calls.push(format!(
+            "setup {} {origin:?} {} {level}",
+            owner.0, missile.0
+        ));
+        if self.setup_sets_valid {
+            self.set_unit_flag(missile, unit_flag::IS_VALID_TARGET, true);
+        }
     }
     fn hit_test(&mut self, _: &mut Game, _: UnitId, _: UnitId, _: i32) -> bool {
         self.hits.pop_front().unwrap_or(true)
     }
-    fn srv_dmg(&mut self, _: &mut Game, i: i16, _: UnitId, _: UnitId, _: &mut Damage) {
-        self.log.push(format!("srvdmg {i}"));
+    fn srv_dmg(&mut self, _: &mut Game, i: i16, _: UnitId, _: UnitId, d: &mut Damage) {
+        self.log.push(format!("srvdmg {i} {}", d.phys));
     }
     fn apply_damage(
         &mut self,
@@ -229,7 +283,9 @@ impl MissileCombat for Fake {
 }
 
 impl MissileHooks for Fake {
-    fn init_callback(&mut self, _: &mut Game, _: UnitId, _: u32, _: u32) {}
+    fn init_callback(&mut self, _: &mut Game, _: UnitId, cb: u32, arg: u32) {
+        self.calls.push(format!("init {cb} {arg}"));
+    }
     fn unique_mod_missile(&mut self, _: &mut Game, _: UnitId, _: UnitId) {
         self.log.push("umod".into());
     }
@@ -1141,4 +1197,1039 @@ fn collide_mode_table() {
     let masks: Vec<u16> = COLLIDE_MODES.iter().map(|c| c.mask).collect();
     assert_eq!(masks, [0, 0x84, 0x104, 0x184, 0, 0x104, 0x4, 0x40, 0x185]);
     assert_eq!(collide_mode(9), None);
+}
+
+// ---- Coverage of the remaining units -------------------------------
+
+/// A [`Ctx`] over a [`World`]'s fields (leaves `w.game` free).
+macro_rules! cx {
+    ($w:expr) => {
+        Ctx {
+            tables: &$w.tables,
+            store: &mut $w.store,
+            world: &mut $w.fake,
+        }
+    };
+}
+
+impl World {
+    /// Parameters with the monster as owner and origin, aiming at the
+    /// player.
+    fn monster_params(&self) -> MissileParams {
+        let mut p = self.params();
+        p.owner = Some(self.monster);
+        p.origin = Some(self.monster);
+        p.target_x = 100;
+        p
+    }
+
+    fn room(&self) -> RoomId {
+        self.fake.room.unwrap()
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r2
+#[test]
+fn flags_dword_bit_n_is_its_column() {
+    let fields = |r: &MissileRow| {
+        [
+            r.lastcollide,
+            r.explosion,
+            r.pierce,
+            r.canslow,
+            r.candestroy,
+            r.clientsend,
+            r.gethit,
+            r.softhit,
+            r.applymastery,
+            r.returnfire,
+            r.town,
+            r.srctown,
+            r.nomultishot,
+            r.nouniquemod,
+            r.half2hsrc,
+            r.missileskill,
+        ]
+    };
+    for n in 0..16 {
+        let mut buf = [0u8; 420];
+        buf[4..8].copy_from_slice(&(1u32 << n).to_le_bytes());
+        let got = fields(&MissileRow::decode(&buf));
+        for (i, &b) in got.iter().enumerate() {
+            assert_eq!(b, i == n, "bit {n}, column {i}");
+        }
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile text, §r1-data-the-server-keeps-per-missile r4, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r27
+#[test]
+fn missile_data_fields_and_clamps() {
+    assert_eq!(clamp_frame(40_000), 0x7FFF);
+    assert_eq!(clamp_frame(-40_000), -0x8000);
+    assert_eq!(clamp_frame(-5), -5);
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.flags |= param_flags::RANGE | param_flags::DATA_FLAG_2;
+    p.range = 40_000;
+    p.skill = 0x9000;
+    p.level = -1;
+    let m = w.create(&p).unwrap();
+    let d = w.store.get(m).unwrap().clone();
+    // Frame setters clamp; skill clamps to 0…0x7FFF; level is unclamped.
+    assert_eq!((d.total, d.current, d.activate), (0x7FFF, 0x7FFF, 0x7FFF));
+    assert_eq!((d.skill, d.level), (0x7FFF, -1));
+    // Flag 0x10000 → missile data flag bit 1; target fields start at 0.
+    assert_eq!(d.flags, 2);
+    assert_eq!(d.target, (0, 0));
+    let mut p = w.params();
+    p.flags |= param_flags::RANGE;
+    p.range = -40_000;
+    let m2 = w.create(&p).unwrap();
+    let d2 = w.store.get(m2).unwrap();
+    assert_eq!((d2.total, d2.current, d2.flags), (-0x8000, -0x8000, 0));
+    // Elapsed frames = total − current.
+    w.store.get_mut(m).unwrap().current = 10;
+    assert_eq!(w.store.get(m).unwrap().elapsed(), 0x7FFF - 10);
+    // The last-collided unit is kept only with `LastCollide`.
+    let mut r = row();
+    r.lastcollide = false;
+    let mut w = World::new(r);
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.store.get(m).unwrap().last_collided, None);
+}
+
+// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r5
+#[test]
+fn unit_fields_mode_flags_and_size() {
+    let mut r = row();
+    r.collidetype = 8;
+    r.candestroy = true;
+    r.size = 3;
+    let mut w = World::new(r);
+    w.fake.alloc_flags = unit_flag::BIT1 | unit_flag::IS_VALID_TARGET;
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.alloc_modes, [8]);
+    assert_eq!(w.store.get(m).unwrap().mode, 8);
+    assert!(w.fake.unit_flag(m, unit_flag::CAN_BE_ATTACKED));
+    assert!(!w.fake.unit_flag(m, unit_flag::IS_VALID_TARGET));
+    assert!(!w.fake.unit_flag(m, unit_flag::BIT1));
+    // Without `CanDestroy` bit 2 stays clear.
+    let mut w2 = World::new(row());
+    let m2 = w2.create(&w2.params()).unwrap();
+    assert!(!w2.fake.unit_flag(m2, unit_flag::CAN_BE_ATTACKED));
+    // Collision on crossed subtiles uses the row's `Size`.
+    w.fake.word = coll::MONSTER;
+    w.fake.crossed = vec![(105, 100)];
+    w.frame();
+    assert_eq!(*w.fake.sizes.borrow(), [3]);
+}
+
+/// Everything creation left behind, for comparing two creations.
+fn creation_snapshot(w: &World, m: UnitId) -> String {
+    let stats: Vec<_> = w.fake.stats.iter().filter(|((u, _), _)| *u == m).collect();
+    format!(
+        "{:?} {:?} {:?} {:?} {:?}",
+        w.store.get(m),
+        w.fake.pos.get(&m),
+        w.fake.calls,
+        stats,
+        w.fake.flags.get(&m)
+    )
+}
+
+// Covers: specs/missiles/missiles.md §r2-1-parameter-record-d2moo-d2missilestrc-0x5c-bytes
+#[test]
+fn parameter_record_fields_read_only_with_their_flags() {
+    let mut r = row();
+    r.subloop = 1;
+    r.substart = 2;
+    r.substop = 6;
+    let base = |w: &World| MissileParams {
+        x: 104,
+        y: 100,
+        velocity: 9,
+        loops: 3,
+        start_frame: 5,
+        activate: 7,
+        attack_bonus: 33,
+        range: 20,
+        skill: 11,
+        level: 2,
+        ..w.params()
+    };
+    let create = |flags: u32| {
+        let mut w = World::new(r.clone());
+        let mut p = base(&w);
+        p.flags |= flags;
+        let m = w.create(&p).unwrap();
+        (creation_snapshot(&w, m), w, m)
+    };
+    // Bits not read by creation are ignored.
+    let (plain, w, m) = create(0);
+    let ignored = 0x40 | 0x80 | 0x100 | 0x2000 | 0x4000 | 0xFFFE_0000;
+    assert_eq!(create(ignored).0, plain);
+    // Without their flags the fields are not used: origin position, table
+    // velocity, frames = Range, Activate from the table, no tohit stat.
+    let d = w.store.get(m).unwrap();
+    assert_eq!(w.fake.position(m), (100, 100));
+    assert_eq!(w.fake.velocity(m), 3840);
+    assert_eq!((d.total, d.activate, d.skill, d.level), (50, 50, 11, 2));
+    assert_eq!(w.fake.stats.get(&(m, stat::TOHIT)), None);
+    // Each flag reads its field.
+    let (_, w, m) = create(param_flags::POSITION);
+    assert_eq!(w.fake.position(m), (104, 100));
+    let (_, w, m) = create(param_flags::VELOCITY);
+    assert_eq!(w.fake.velocity(m), (9 << 8) * 75 / 100);
+    let (_, w, m) = create(param_flags::LOOPS);
+    assert_eq!(w.store.get(m).unwrap().total, 50 + 3 * 4);
+    let (_, w, m) = create(param_flags::START_FRAME);
+    assert_eq!(w.store.get(m).unwrap().total, 45);
+    let (_, w, m) = create(param_flags::ACTIVATE);
+    assert_eq!(w.store.get(m).unwrap().activate, 43);
+    let (_, w, m) = create(param_flags::ATTACK_BONUS);
+    assert_eq!(w.fake.stat(m, stat::TOHIT), 33);
+    let (_, w, m) = create(param_flags::RANGE);
+    assert_eq!(w.store.get(m).unwrap().total, 20);
+    let (_, w, m) = create(param_flags::DATA_FLAG_2);
+    assert_eq!(w.store.get(m).unwrap().flags, 2);
+    let (_, w, m) = create(param_flags::FRAMES_FROM_DISTANCE);
+    let d = w.store.get(m).unwrap();
+    assert_eq!(
+        (d.total, i32::from(d.current)),
+        (50, frames_from_distance(10, 3840) as i32)
+    );
+    // Target relative (2) wins over absolute (0x20); the init callback
+    // runs once with its argument.
+    let mut w = World::new(r.clone());
+    let mut p = base(&w);
+    p.flags = param_flags::TARGET_RELATIVE | param_flags::TARGET_ABSOLUTE;
+    p.target_x = 3;
+    p.target_y = 0;
+    p.init = Some((7, 9));
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.fake.paths[&m].target_point, Some((103, 100)));
+    assert_eq!(
+        w.fake
+            .calls
+            .iter()
+            .filter(|c| c.starts_with("init"))
+            .count(),
+        1
+    );
+    assert!(w.fake.calls.contains(&"init 7 9".to_string()));
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r2
+#[test]
+fn creation_start_position() {
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.flags |= param_flags::POSITION;
+    p.x = 104;
+    p.y = 101;
+    p.origin = Some(w.monster);
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.fake.position(m), (104, 101));
+    // Flag 1 clear: the origin's position.
+    let mut p = w.params();
+    p.origin = Some(w.monster);
+    p.target_x = 100;
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.fake.position(m), (110, 100));
+    // No origin → fail before allocation.
+    let mut p = w.params();
+    p.origin = None;
+    let allocs = w.fake.logged("alloc");
+    assert_eq!(w.create(&p), None);
+    assert_eq!(w.fake.logged("alloc"), allocs);
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r3
+#[test]
+fn creation_room_search_from_owner_room() {
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.room_near.get(), Some(w.room()));
+    assert_eq!(w.game.lists.unit(m).unwrap().room(), Some(w.room()));
+    w.fake.no_room = true;
+    assert_eq!(w.create(&w.params()), None);
+    assert_eq!(w.fake.logged("alloc"), 1);
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r15
+#[test]
+fn creation_path_setup() {
+    let mut r = row();
+    r.collision = 1;
+    r.collidetype = 8;
+    let mut w = World::new(r);
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(
+        &w.fake.calls[..4],
+        ["vel 0", "tpoint 110 100", "foot 0x40", "move 0x185"]
+    );
+    assert!(!w.fake.unit_flag(m, unit_flag::CAN_BE_ATTACKED));
+    // Target unit instead of a point; Collision 0 → footprint 0;
+    // `CanDestroy` sets unit flag bit 2.
+    let mut r = row();
+    r.candestroy = true;
+    let mut w = World::new(r);
+    let mut p = w.params();
+    p.target = Some(w.monster);
+    let mon = w.monster.0;
+    let m = w.create(&p).unwrap();
+    assert_eq!(
+        &w.fake.calls[..4],
+        [
+            "vel 0".to_string(),
+            format!("tunit {mon}"),
+            "foot 0x0".into(),
+            "move 0x184".into()
+        ]
+    );
+    assert!(w.fake.unit_flag(m, unit_flag::CAN_BE_ATTACKED));
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r16, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r18, §r4-1-movement-in-fixed-point r1
+#[test]
+fn creation_velocity_build_and_acceleration() {
+    let mut r = row();
+    r.vel = 20;
+    r.maxvel = 30;
+    r.accel = 0xFFF6; // −10 as i16
+    let mut w = World::new(r);
+    let _ = w.create(&w.params()).unwrap();
+    assert_eq!(&w.fake.calls[4..7], ["vel 3840", "build", "accel -10 7680"]);
+    // v = 0: no velocity, no build.
+    let mut r = row();
+    r.vel = 0;
+    let mut w = World::new(r);
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.velocity(m), 0);
+    assert!(!w.fake.calls.iter().any(|c| c == "build"));
+    assert_eq!(
+        w.fake.calls.iter().filter(|c| c.starts_with("vel")).count(),
+        1
+    );
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r20, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r21, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r23
+#[test]
+fn creation_stat_list_callback_then_damage_setup() {
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.origin = Some(w.monster);
+    p.target_x = 100;
+    p.level = 4;
+    p.init = Some((3, 5));
+    let m = w.create(&p).unwrap();
+    let n = w.fake.calls.len();
+    let setup = format!("setup {} Some({}) {} 4", w.owner.0, w.monster.0, m.0);
+    assert_eq!(
+        w.fake.calls[n - 3..],
+        ["statlist".to_string(), "init 3 5".into(), setup]
+    );
+    // No callback: none called.
+    let mut w = World::new(row());
+    let _ = w.create(&w.params()).unwrap();
+    assert!(!w.fake.calls.iter().any(|c| c.starts_with("init")));
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r24
+#[test]
+fn creation_stores_owner_and_clears_bit_3_after_setup() {
+    let mut w = World::new(row());
+    w.fake.setup_sets_valid = true;
+    let m = w.create(&w.params()).unwrap();
+    let guid = w.game.lists.unit(w.owner).unwrap().guid;
+    assert_eq!(
+        w.store.get(m).unwrap().owner,
+        Some(UnitRef {
+            ty: UnitType::Player,
+            guid
+        })
+    );
+    assert!(!w.fake.unit_flag(m, unit_flag::IS_VALID_TARGET));
+}
+
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r26, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r29, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r30
+#[test]
+fn creation_tohit_damage_rate_and_result() {
+    let mut r = row();
+    r.damagerate = 25;
+    let mut w = World::new(r);
+    let mut p = w.params();
+    p.flags |= param_flags::ATTACK_BONUS;
+    p.attack_bonus = 70;
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.game.lists.units_of_type(UnitType::Missile), [m]);
+    assert_eq!(w.fake.stat(m, stat::TOHIT), 70);
+    assert_eq!(w.fake.stat(m, stat::DAMAGE_FRAMERATE), 25);
+    let m2 = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.stats.get(&(m2, stat::TOHIT)), None);
+}
+
+/// A dispatcher after the missile one that records what reaches it.
+#[derive(Default)]
+struct Next(Vec<(TimerClass, u8)>);
+
+impl EventDispatch for Next {
+    fn run_event(&mut self, _: &mut Game, run: &TimerRun) {
+        self.0.push((run.class, run.event));
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch text
+#[test]
+fn class_handler_ignores_event_type_and_args() {
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    let frame = w.game.frame;
+    w.game.schedule_event(m, 5, frame + 1, None, 7, 8).unwrap();
+    let mon = w.monster;
+    w.game
+        .schedule_event(mon, 5, frame + 1, None, 0, 0)
+        .unwrap();
+    w.game.frame += 1;
+    let mut next = Next::default();
+    let mut d = MissileDispatch {
+        cx: Ctx {
+            tables: &w.tables,
+            store: &mut w.store,
+            world: &mut w.fake,
+        },
+        next: &mut next,
+    };
+    run_timer_events(&mut w.game, &mut d);
+    // The every-tick run and the type-5 event both ran the handler.
+    assert_eq!(w.store.get(m).unwrap().current, 48);
+    // The monster's event went to the next dispatcher.
+    assert_eq!(next.0, [(TimerClass::Monster, 5)]);
+}
+
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r2, §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r5, §edge-cases-original-bugs r5
+#[test]
+fn missile_without_room_passes_town_tests() {
+    // Mode 0: the flight never reaches the room test, so only §R3 acts.
+    for in_room in [true, false] {
+        let mut r = row();
+        r.collidetype = 0;
+        let mut w = World::new(r);
+        let p = w.monster_params();
+        let m = w.create(&p).unwrap();
+        let room = w.room();
+        w.fake.town.insert(room);
+        // Keep the owner out of town (no owner room).
+        let mon = w.monster;
+        w.game.lists.room_remove(mon).unwrap();
+        if !in_room {
+            w.game.lists.room_remove(m).unwrap();
+        }
+        w.frame();
+        assert_eq!(w.alive(m), !in_room, "in room: {in_room}");
+    }
+    // A collision mode: removed by §R4 step 5 on run 1, without a hit.
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    w.game.lists.room_remove(m).unwrap();
+    w.frame();
+    assert!(!w.alive(m));
+    assert_eq!(w.fake.logged("event0"), 0);
+    assert_eq!(w.fake.logged("clear"), 0);
+    // No path: the same.
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    w.fake.no_path = true;
+    w.frame();
+    assert!(!w.alive(m));
+    assert_eq!(w.fake.logged("event0"), 0);
+}
+
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r3
+#[test]
+fn owner_that_no_longer_exists_is_none() {
+    for owner_alive in [true, false] {
+        let mut r = row();
+        r.town = true;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        let room = w.room();
+        w.fake.town.insert(room);
+        if !owner_alive {
+            let o = w.owner;
+            w.game.remove_unit(o).unwrap();
+            let cx = cx!(w);
+            assert_eq!(cx.owner(&w.game, m), None);
+        }
+        w.frame();
+        // A player owner in town removes it (§R3.5) only while it exists.
+        assert_eq!(w.alive(m), !owner_alive);
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r4
+#[test]
+fn src_town_removes_when_owner_room_is_in_town() {
+    // Monster owner (not §R3.5), `Town` row (not §R3.6).
+    let case = |src_town: bool, owner_room: bool, owner_alive: bool| {
+        let mut r = row();
+        r.town = true;
+        r.srctown = src_town;
+        r.collidetype = 0;
+        let mut w = World::new(r);
+        let p = w.monster_params();
+        let m = w.create(&p).unwrap();
+        let room = w.room();
+        w.fake.town.insert(room);
+        let mon = w.monster;
+        if !owner_room {
+            w.game.lists.room_remove(mon).unwrap();
+        }
+        if !owner_alive {
+            w.game.remove_unit(mon).unwrap();
+        }
+        w.frame();
+        w.alive(m)
+    };
+    assert!(!case(true, true, true));
+    assert!(case(false, true, true));
+    assert!(case(true, false, true));
+    assert!(case(true, true, false));
+}
+
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r7, §r3-per-tick-dispatch r8
+#[test]
+fn server_do_result_two_removes() {
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    w.frame();
+    assert!(w.alive(m));
+    assert_eq!(w.fake.logged("remove"), 0);
+    // Result 2 (blocking word): "remove" frees the unit, its timers and
+    // its data.
+    w.fake.word = coll::WALL;
+    w.frame();
+    assert_eq!(w.fake.log.last().unwrap(), &format!("remove {}", m.0));
+    assert!(!w.alive(m));
+    assert!(w.game.lists.unit(m).is_none());
+    assert!(w.game.timers.unit_timers(m).is_empty());
+    w.frame();
+    assert_eq!(w.fake.logged("remove"), 1);
+}
+
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r1
+#[test]
+fn flight_without_record_is_an_expiry_hit() {
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    w.store.get_mut(m).unwrap().class = 5; // past the table
+    let want = w.hit(m, None, true);
+    let mut cx = cx!(w);
+    let got = default_flight(&mut w.game, &mut cx, m);
+    assert_eq!(got, want);
+    // Returned before moving or counting down.
+    assert_eq!(w.store.get(m).unwrap().current, 50);
+}
+
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r3
+#[test]
+fn count_down_then_expiry_below_one() {
+    let mut r = row();
+    r.range = 3;
+    let mut w = World::new(r);
+    let m = w.create(&w.params()).unwrap();
+    w.frame();
+    assert_eq!(w.store.get(m).unwrap().current, 2);
+    w.frame();
+    assert_eq!(w.store.get(m).unwrap().current, 1);
+    assert_eq!(w.fake.logged("event0"), 0);
+    w.frame();
+    assert!(!w.alive(m));
+    assert_eq!(w.fake.logged("event0 None"), 1);
+}
+
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r10
+#[test]
+fn no_subtile_hit_keeps_flying() {
+    let mut w = World::new(row());
+    let m = w.create(&w.params()).unwrap();
+    w.fake.word = coll::MONSTER;
+    // A clear subtile, then one with a matching mask but only the owner
+    // (rejected: last collided) and no barrier bit.
+    w.fake.crossed = vec![(104, 100), (100, 100)];
+    w.fake.masks.insert((100, 100), coll::PLAYER);
+    w.fake.units.insert((100, 100), vec![w.owner]);
+    let mut cx = cx!(w);
+    assert_eq!(default_flight(&mut w.game, &mut cx, m), 1);
+    assert!(w.alive(m));
+    assert_eq!(w.fake.logged("event0"), 0);
+}
+
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point text, §r4-1-movement-in-fixed-point r4, §edge-cases-original-bugs r6
+#[test]
+fn max_vel_caps_only_acceleration() {
+    // Created at 3840 with MaxVel 4 (1024): the path keeps 3840.
+    let mut r = row();
+    r.maxvel = 4;
+    let mut w = World::new(r);
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.velocity(m), 3840);
+    assert!(w.fake.calls.contains(&"accel 0 1024".to_string()));
+    let mut v = PathVelocity {
+        velocity: 3840,
+        max: 1024,
+        accel: 0,
+        counter: 0,
+    };
+    for _ in 0..10 {
+        v.advance();
+    }
+    assert_eq!(v.velocity, 3840);
+    // Step vector with base 0x400 at that speed.
+    assert_eq!(v.step_component(4096), (((3840 * 0x400) >> 6) * 4096) >> 12);
+    // Once it accelerates, the cap applies.
+    v.accel = 10;
+    for _ in 0..4 {
+        v.advance();
+    }
+    assert_eq!(v.velocity, 3840);
+    v.advance();
+    assert_eq!((v.velocity, v.accel), (1024, 0));
+}
+
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r3
+#[test]
+fn collide_kill_sets_result_bit_one() {
+    for (explosion, kill, want) in [(false, 1, 2), (false, 0, 1), (true, 1, 2), (true, 0, 1)] {
+        let mut r = row();
+        r.explosion = explosion;
+        r.collidekill = kill;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        let mon = w.monster;
+        assert_eq!(w.hit(m, Some(mon), false), want, "{explosion} {kill}");
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r4
+#[test]
+fn no_unit_no_a4_skips_to_exit_unless_always_explode() {
+    for (always, kill) in [(0, 1), (0, 0), (1, 1)] {
+        let mut r = row();
+        r.psrvhitfunc = 1;
+        r.alwaysexplode = always;
+        r.collidekill = kill;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        let res = w.hit(m, None, false);
+        assert_eq!(res, if kill == 1 { 2 } else { 1 });
+        let ran = always == 1;
+        assert_eq!(w.fake.logged("event0 None"), usize::from(ran));
+        assert_eq!(w.store.unhandled.len(), usize::from(ran));
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 r1, §r6-1-order-1-14d-0x005adf10-step-7 r2
+#[test]
+fn damage_stage_fills_then_server_damage() {
+    let cases = [
+        (5u16, true),
+        (14, true),
+        (15, false),
+        (30, false),
+        (31, false),
+        (0, false),
+        (0xFFFF, false),
+    ];
+    for (f, call) in cases {
+        let mut r = row();
+        r.psrvdmgfunc = f;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        w.fake.stats.insert((m, stat::MINDAMAGE), 0x100);
+        w.fake.stats.insert((m, stat::MAXDAMAGE), 0x100);
+        let mon = w.monster;
+        w.hit(m, Some(mon), false);
+        let i = f as i16;
+        // The server-damage function sees the filled record.
+        assert_eq!(
+            w.fake.logged(&format!("srvdmg {i} 256")),
+            usize::from(call),
+            "{f}"
+        );
+        assert_eq!(w.fake.logged("srvdmg"), usize::from(call));
+        let null = (15..=30).contains(&i);
+        let want = if null {
+            vec![Unhandled::NullSrvDmg {
+                index: i,
+                missile: m,
+            }]
+        } else {
+            vec![]
+        };
+        assert_eq!(w.store.unhandled, want);
+        assert_eq!(w.fake.logged(&format!("damage {} 256", mon.0)), 1);
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r7-lifetime-and-expiry r4
+#[test]
+fn earlier_removals() {
+    let run1 = |r: MissileRow, set: &dyn Fn(&mut World)| {
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        set(&mut w);
+        w.frame();
+        !w.alive(m)
+    };
+    // Control: nothing set → alive after run 1 of 50.
+    assert!(!run1(row(), &|_| {}));
+    assert!(run1(row(), &|w| w.fake.stop_moving = true));
+    assert!(run1(row(), &|w| w.fake.word = coll::WALL));
+    let mut r4 = row();
+    r4.collidetype = 4;
+    assert!(run1(r4, &|w| w.fake.word = coll::MONSTER));
+    assert!(run1(row(), &|w| {
+        w.fake.word = coll::MONSTER;
+        w.fake.crossed = vec![(105, 100)];
+        w.fake.masks.insert((105, 100), coll::MISSILE_BARRIER);
+    }));
+    assert!(run1(row(), &contact));
+    let mut miss = row();
+    miss.tohit = 1;
+    miss.collidekill = 0;
+    assert!(run1(miss, &|w| {
+        contact(w);
+        w.fake.hits.push_back(false);
+    }));
+    assert!(run1(row(), &|w| {
+        let room = w.room();
+        w.fake.town.insert(room);
+    }));
+}
+
+// Covers: specs/missiles/missiles.md §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed text
+#[test]
+fn pierce_test_only_for_pierce_rows() {
+    // Player and monster owners run the test with `Pierce`; without it
+    // nothing is set even with a pierce stat.
+    for pierce in [true, false] {
+        let mut r = row();
+        r.pierce = pierce;
+        let mut w = World::new(r);
+        w.fake.stats.insert((w.owner, stat::ITEM_PIERCE), 67);
+        w.fake.stats.insert((w.monster, stat::SKILL_PIERCE), 67);
+        let m = w.create(&w.params()).unwrap();
+        let p = w.monster_params();
+        let mm = w.create(&p).unwrap();
+        let want = pierce.then_some(4);
+        assert_eq!(w.fake.stats.get(&(m, stat::PIERCE_IDX)).copied(), want);
+        assert_eq!(w.fake.stats.get(&(mm, stat::PIERCE_IDX)).copied(), want);
+    }
+}
+
+/// Checks the column layout of a catalogue (§R9.2). Returns the first
+/// disagreement.
+fn check_tsv_columns(tsv: &str, rows_want: usize) -> Result<(), String> {
+    let mut lines = tsv.lines().filter(|l| !l.is_empty());
+    let header = lines.next().ok_or("empty")?;
+    let want = [
+        "index",
+        "addr_114d",
+        "d2moo_name",
+        "rows",
+        "examples",
+        "params",
+        "rng",
+        "behaviour",
+        "status",
+    ];
+    if header.split('\t').collect::<Vec<_>>() != want {
+        return Err(format!("header {header:?}"));
+    }
+    let rows: Vec<&str> = lines.collect();
+    if rows.len() != rows_want {
+        return Err(format!("{} rows", rows.len()));
+    }
+    let is_id = |t: &str| {
+        t.split(')')
+            .next()
+            .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+    };
+    for (i, line) in rows.iter().enumerate() {
+        let c: Vec<&str> = line.split('\t').collect();
+        if c.len() != 9 || c[0] != i.to_string() {
+            return Err(format!("row {i}: {line:?}"));
+        }
+        if c[1] != "-" && !c[1].starts_with("0x") {
+            return Err(format!("row {i}: addr {:?}", c[1]));
+        }
+        let n: usize = c[3]
+            .parse()
+            .map_err(|_| format!("row {i}: rows {:?}", c[3]))?;
+        // `name(id)` items: count the "(digits)" groups.
+        let examples = c[4].split('(').skip(1).filter(|t| is_id(t)).count();
+        if examples > 4 || examples > n || (c[4] != "-" && examples == 0) {
+            return Err(format!("row {i}: examples {:?}", c[4]));
+        }
+        if !["spec'd-here", "summarized", "D2MOO-only", "unread"].contains(&c[8]) {
+            return Err(format!("row {i}: status {:?}", c[8]));
+        }
+    }
+    Ok(())
+}
+
+// Covers: specs/missiles/missiles.md §r9-2-tsv-columns-srvdo-tsv-srvhit-tsv
+#[test]
+fn catalogue_tsv_columns() {
+    check_tsv_columns(SRVDO_TSV, 53).unwrap();
+    check_tsv_columns(SRVHIT_TSV, 71).unwrap();
+    // M08: perturbations are reported.
+    let bad = SRVDO_TSV.replacen("\tspec'd-here", "\tdone", 1);
+    assert_eq!(
+        check_tsv_columns(&bad, 53),
+        Err("row 0: status \"done\"".into())
+    );
+    assert!(check_tsv_columns(SRVDO_TSV, 52).is_err());
+    let bad = SRVDO_TSV.replacen("index\t", "idx\t", 1);
+    assert!(check_tsv_columns(&bad, 53).is_err());
+}
+
+/// A parent missile at (5000, 100) with 8 elapsed frames, skill 7,
+/// level 3.
+fn helper_world() -> (World, UnitId) {
+    let mut w = World::new(row());
+    let mut p = w.params();
+    p.skill = 7;
+    p.level = 3;
+    let m = w.create(&p).unwrap();
+    w.fake.pos.insert(m, (5000, 100));
+    let d = w.store.get_mut(m).unwrap();
+    d.total = 50;
+    d.current = 42;
+    (w, m)
+}
+
+fn run_helper(w: &mut World, m: UnitId, interval: i32, mask: u16) -> Option<UnitId> {
+    let mut cx = cx!(w);
+    catalogue::create_with_collision_check(&mut w.game, &mut cx, m, 4, interval, 0, mask)
+}
+
+// Covers: specs/missiles/missiles.md §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed r1, §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed r2
+#[test]
+fn sub_missile_helper_preconditions() {
+    let (mut w, m) = helper_world();
+    let seed = *w.fake.seed(m);
+    // i = 0, or 8 not a multiple of 3: nothing, no re-seed.
+    assert_eq!(run_helper(&mut w, m, 0, 0), None);
+    assert_eq!(run_helper(&mut w, m, 3, 0), None);
+    assert_eq!(*w.fake.seed(m), seed);
+    // Signed remainder: elapsed −10, i = 5 → 0 (unsigned would be 1).
+    let d = w.store.get_mut(m).unwrap();
+    d.total = 0;
+    d.current = 10;
+    assert!(run_helper(&mut w, m, 5, 0).is_some());
+    // No room / no owner: nothing, no re-seed.
+    let (mut w, m) = helper_world();
+    let seed = *w.fake.seed(m);
+    w.game.lists.room_remove(m).unwrap();
+    assert_eq!(run_helper(&mut w, m, 4, 0), None);
+    assert_eq!(*w.fake.seed(m), seed);
+    let (mut w, m) = helper_world();
+    let seed = *w.fake.seed(m);
+    let o = w.owner;
+    w.game.remove_unit(o).unwrap();
+    assert_eq!(run_helper(&mut w, m, 4, 0), None);
+    assert_eq!(*w.fake.seed(m), seed);
+}
+
+// Covers: specs/missiles/missiles.md §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed r3, §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed r5
+#[test]
+fn sub_missile_helper_reseeds_and_creates() {
+    let (mut w, m) = helper_world();
+    let sub = run_helper(&mut w, m, 4, coll::WALL).unwrap();
+    // Re-seeded with x + elapsed = 5008, then two rolls of 6.
+    let mut s = Seed::init_low(5008);
+    s.roll(6);
+    s.roll(6);
+    assert_eq!(*w.fake.seed(m), s);
+    // At (x − 3, y + 1) (test vector), owner, skill and level of the parent.
+    assert_eq!(w.fake.position(sub), (4997, 101));
+    let (pd, sd) = (w.store.get(m).unwrap(), w.store.get(sub).unwrap());
+    assert_eq!((sd.owner, sd.skill, sd.level), (pd.owner, 7, 3));
+    // Collision there & mask ≠ 0 → nothing (the re-seed still happened).
+    let (mut w, m) = helper_world();
+    w.fake.masks.insert((4997, 101), coll::WALL);
+    let allocs = w.fake.logged("alloc");
+    assert_eq!(run_helper(&mut w, m, 4, coll::WALL), None);
+    assert_eq!(w.fake.logged("alloc"), allocs);
+    assert_eq!(*w.fake.seed(m), s);
+    // Other bits there do not block.
+    assert!(run_helper(&mut w, m, 4, coll::MISSILE_BARRIER).is_some());
+}
+
+/// A recorded-missile row (§R10): server-do 1, server-hit 0, CollideType
+/// 3, CollideKill 1, LastCollide 1, Size 1, Activate 0, Accel 0, LevRange
+/// 0; flags 0x249 (+ Pierce).
+fn recorded_row(vel: u8, vellev: u8, range: u16, tohit: u8, pierce: bool) -> MissileRow {
+    let mut r = row();
+    r.vel = vel;
+    r.vellev = vellev;
+    r.maxvel = vel;
+    r.range = range;
+    r.tohit = tohit;
+    r.pierce = pierce;
+    r.canslow = true;
+    r.gethit = true;
+    r.returnfire = true;
+    r
+}
+
+// Covers: specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles r1
+#[test]
+fn recorded_arrow_path() {
+    let rogue1 = || {
+        let mut r = recorded_row(24, 0, 40, 1, true);
+        r.alwaysexplode = 1;
+        r
+    };
+    // Owner first on the path, then the monster: the owner is skipped and
+    // the monster is hit; to-hit hit → damage and removal.
+    let mut w = World::new(rogue1());
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.velocity(m), 4608);
+    contact(&mut w);
+    w.fake.crossed = vec![(100, 100), (110, 100)];
+    w.fake.masks.insert((100, 100), coll::PLAYER);
+    w.fake.units.insert((100, 100), vec![w.owner]);
+    w.fake.hits.push_back(true);
+    w.frame();
+    assert!(!w.alive(m));
+    assert_eq!(w.fake.logged(&format!("damage {}", w.monster.0)), 1);
+    assert!(w.fake.hits.is_empty());
+    // Miss → removed without damage.
+    let mut w = World::new(rogue1());
+    let m = w.create(&w.params()).unwrap();
+    contact(&mut w);
+    w.fake.hits.push_back(false);
+    w.frame();
+    assert!(!w.alive(m));
+    assert_eq!(w.fake.logged("damage"), 0);
+    // Pierce count left → flies on after a hit.
+    let mut w = World::new(rogue1());
+    w.fake.stats.insert((w.owner, stat::SKILL_PIERCE), 67);
+    let m = w.create(&w.params()).unwrap();
+    contact(&mut w);
+    w.frame();
+    assert!(w.alive(m));
+    assert_eq!(w.fake.logged("damage"), 1);
+    // No contact: expires after `Range` runs.
+    let mut w = World::new(rogue1());
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.lifetime(m), 40);
+}
+
+// Covers: specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles r2
+#[test]
+fn recorded_spike1() {
+    let mut w = World::new(recorded_row(10, 8, 40, 1, false));
+    let mut p = w.monster_params();
+    p.level = 2;
+    w.fake.stats.insert((w.monster, stat::SKILL_PIERCE), 67);
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.fake.velocity(m), ((10 + 2 * 8 / 8) << 8) * 75 / 100);
+    assert_eq!(w.fake.stats.get(&(m, stat::PIERCE_IDX)), None);
+    // To-hit rolled: a miss removes it without damage.
+    w.fake.hits.push_back(false);
+    let o = w.owner;
+    assert_eq!(w.hit(m, Some(o), false), 2);
+    assert_eq!(w.fake.logged("damage"), 0);
+}
+
+// Covers: specs/missiles/missiles.md §r10-behaviour-of-the-recorded-missiles r3, §r10-behaviour-of-the-recorded-missiles r4
+#[test]
+fn recorded_shafire1_and_firebolt() {
+    // shafire1: monster owner without pierce stats, no to-hit test.
+    let mut w = World::new(recorded_row(8, 0, 40, 0, true));
+    let p = w.monster_params();
+    let m = w.create(&p).unwrap();
+    assert_eq!(w.fake.velocity(m), 1536);
+    assert_eq!(w.fake.stats.get(&(m, stat::PIERCE_IDX)), None);
+    w.fake.hits.push_back(false);
+    let o = w.owner;
+    assert_eq!(w.hit(m, Some(o), false), 2);
+    assert_eq!(w.fake.logged(&format!("damage {}", o.0)), 1);
+    assert_eq!(w.fake.hits.len(), 1, "no to-hit draw");
+    // firebolt: no `Pierce`, so a player's pierce stat does nothing.
+    let mut w = World::new(recorded_row(20, 0, 50, 0, false));
+    w.fake.stats.insert((w.owner, stat::SKILL_PIERCE), 67);
+    let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.velocity(m), 3840);
+    assert_eq!(w.fake.stats.get(&(m, stat::PIERCE_IDX)), None);
+    w.fake.hits.push_back(false);
+    let mon = w.monster;
+    assert_eq!(w.hit(m, Some(mon), false), 2);
+    assert_eq!(w.fake.logged("damage"), 1);
+}
+
+// Covers: specs/missiles/missiles.md §edge-cases-original-bugs r8
+#[test]
+fn damage_roll_never_reaches_max() {
+    let mut seen = BTreeSet::new();
+    for lo in 0..500u32 {
+        let mut s = Seed::init_low(lo);
+        assert_eq!(damage_roll(&mut s, 0x100, 0x101, 0), 0x100);
+        let mut s = Seed::init_low(lo);
+        seen.insert(damage_roll(&mut s, 1, 3, 0));
+    }
+    assert_eq!(seen.into_iter().collect::<Vec<_>>(), [1, 2]);
+}
+
+// Not a claim on missiles.md §edge-cases-original-bugs r10: the original
+// crashes on these entries, d2rs logs them (a deliberate difference).
+#[test]
+fn null_table_entries_are_flagged() {
+    // The original would call a null entry and crash; d2rs logs it.
+    let mut do_null: Vec<i16> = vec![4];
+    do_null.extend(38..53);
+    for i in do_null {
+        let mut r = row();
+        r.psrvdofunc = i as u16;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        w.frame();
+        let want = Unhandled::NullSrvDo {
+            index: i,
+            missile: m,
+        };
+        assert_eq!(w.store.unhandled, [want]);
+    }
+    let mut hit_null: Vec<i16> = vec![30, 34, 41, 42, 46, 49];
+    hit_null.extend(60..71);
+    for i in hit_null {
+        let mut r = row();
+        r.psrvhitfunc = i as u16;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        w.hit(m, None, true);
+        let want = Unhandled::NullSrvHit {
+            index: i,
+            missile: m,
+        };
+        assert_eq!(w.store.unhandled, [want]);
+    }
+    for i in 15..31i16 {
+        let mut r = row();
+        r.psrvdmgfunc = i as u16;
+        let mut w = World::new(r);
+        let m = w.create(&w.params()).unwrap();
+        let mon = w.monster;
+        w.hit(m, Some(mon), false);
+        let want = Unhandled::NullSrvDmg {
+            index: i,
+            missile: m,
+        };
+        assert_eq!(w.store.unhandled, [want]);
+        assert_eq!(w.fake.logged("srvdmg"), 0);
+    }
 }

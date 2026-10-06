@@ -13,6 +13,8 @@ use d2_data::tables::{Levels, Objects};
 use crate::units::{RoomId, UnitId};
 
 #[cfg(test)]
+mod gaps_tests;
+#[cfg(test)]
 mod tests;
 
 /// No waypoint (§1 rule 1).

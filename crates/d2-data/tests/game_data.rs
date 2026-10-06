@@ -460,3 +460,331 @@ fn typed_tables_decode() {
     assert_eq!(text(&u[122].index), b"The Stone of Jordan");
     assert_eq!((&u[122].code, u[122].lvl), (b"rin ", 39));
 }
+
+fn data() -> &'static bin::BinSet {
+    static D: OnceLock<bin::BinSet> = OnceLock::new();
+    D.get_or_init(|| bin::load(set(), bin::DEFAULT_LANGUAGE).expect("live set loads"))
+}
+
+/// The archive of `file` among P → X → D, by direct lookup.
+fn first_archive(file: &str) -> Option<&'static str> {
+    ["patch_d2.mpq", "d2exp.mpq", "d2data.mpq"]
+        .into_iter()
+        .find(|a| archive(a).contains(&excel_path(file)))
+}
+
+/// The sound system's two runtime `.txt` tables.
+// Covers: specs/data/loading.md §3.4
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn sound_tables_are_runtime_txt() {
+    for (file, bytes, lines, columns, parsed) in [
+        ("sounds.txt", 505_304, 4_699, 25, &data().sounds),
+        ("soundenviron.txt", 5_741, 50, 24, &data().soundenviron),
+    ] {
+        let (source, raw) = read_excel(set(), file).unwrap().unwrap();
+        assert_eq!(
+            (source.as_str(), raw.len()),
+            ("patch_d2.mpq", bytes),
+            "{file}"
+        );
+        // Same strict parser as every other .txt.
+        assert_eq!(parsed, &TxtTable::parse(&excel_path(file), &raw).unwrap());
+        assert_eq!((parsed.records.len(), parsed.columns()), (lines, columns));
+    }
+    // No .bin path for soundenviron; sounds.bin is only a by-product
+    // (P, 4,699 × 2).
+    assert!(read_excel(set(), "soundenviron.bin").unwrap().is_none());
+    let (source, b) = read_excel(set(), "sounds.bin").unwrap().unwrap();
+    assert_eq!((source.as_str(), b.len()), ("patch_d2.mpq", 4 + 4_699 * 2));
+}
+
+/// The tables the client composite loader reads.
+// Covers: specs/data/loading.md §3.5
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn client_composite_tables() {
+    let d = data();
+    assert_eq!(
+        (
+            d.hitclass.source.as_str(),
+            d.hitclass.count,
+            d.hitclass.record_size
+        ),
+        ("d2exp.mpq", 14, 4)
+    );
+    let size = |t: &str| schema().table(t).unwrap().record_size;
+    assert_eq!(size("itemtypes"), 228);
+    assert_eq!(size("hitclass"), 4);
+    for t in ["weapons", "armor", "misc"] {
+        assert_eq!(size(t), 424, "{t}");
+    }
+    // Concatenated weapons, armor, misc.
+    let map = bin::item_code_map(&d.tables);
+    assert_eq!(map.len(), 306 + 202 + 151);
+    let first = |t: &str| u32_at(d.table(t).unwrap().record(0), 0x80);
+    assert_eq!(map.find(first("weapons")), Some(0));
+    assert_eq!(map.find(first("armor")), Some(306));
+    assert_eq!(map.find(first("misc")), Some(508));
+}
+
+/// Live records: every one passes the size rule (the set loads) and
+/// holds 0 in every byte no field writes. In `monstats`, `monstats2`,
+/// `monpreset` and `cubemain` the table callbacks write bytes outside the
+/// field footprints (`schema.md` §5), so those four are left out.
+// Covers: specs/data/loading.md §4.2 text
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn live_records_zero_outside_fields() {
+    let callback_written = ["monstats", "monstats2", "monpreset", "cubemain"];
+    let mut checked = 0;
+    for t in &data().tables {
+        let def = schema().table(&t.name).unwrap();
+        assert_eq!(t.records.len(), t.count * def.record_size, "{}", t.name);
+        if callback_written.contains(&t.name.as_str()) {
+            continue;
+        }
+        let mut written = vec![false; def.record_size];
+        for f in &def.fields {
+            for o in f.footprint() {
+                written[o] = true;
+            }
+        }
+        for (i, r) in t.iter().enumerate() {
+            for (o, &b) in r.iter().enumerate() {
+                assert!(written[o] || b == 0, "{} record {i} byte {o} = {b}", t.name);
+            }
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 69);
+}
+
+/// `.txt` observations: CR LF lines ending in CR LF, widest `skills.txt`
+/// (P, 256 columns); the sound tables use the same strict reader.
+// Covers: specs/data/loading.md §5
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn txt_line_observations() {
+    let mut names: Vec<String> = schema()
+        .tables
+        .iter()
+        .filter(|t| !t.txt_name.is_empty())
+        .map(|t| t.txt_name.clone())
+        .collect();
+    for a in ["d2exp.mpq", "d2data.mpq"] {
+        for n in archive(a).listfile().unwrap().unwrap() {
+            let lower = n.to_ascii_lowercase();
+            if let Some(f) = lower.strip_prefix(bin::EXCEL_DIR) {
+                if f.ends_with(".txt") {
+                    names.push(f.to_owned());
+                }
+            }
+        }
+    }
+    names.push("soundenviron.txt".into());
+    names.sort();
+    names.dedup();
+    let mut widest = (0, String::new());
+    let mut files = std::collections::BTreeMap::new();
+    for a in ["patch_d2.mpq", "d2exp.mpq", "d2data.mpq"] {
+        for n in &names {
+            let Ok(b) = archive(a).read(&excel_path(n)) else {
+                continue;
+            };
+            *files.entry(a).or_insert(0) += 1;
+            assert!(b.ends_with(b"\r\n"), "{a} {n}");
+            for (i, &c) in b.iter().enumerate() {
+                assert!(
+                    c != b'\n' || (i > 0 && b[i - 1] == b'\r'),
+                    "{a} {n}: LF-only"
+                );
+            }
+            let header = b.split(|&c| c == b'\r').next().unwrap();
+            let columns = header.split(|&c| c == b'\t').count();
+            if columns > widest.0 {
+                widest = (columns, format!("{a} {n}"));
+            }
+        }
+    }
+    // X and D in full (their listfiles); P: every name probed here.
+    assert_eq!((files["d2exp.mpq"], files["d2data.mpq"]), (75, 56));
+    assert_eq!(widest, (256, "patch_d2.mpq skills.txt".into()));
+}
+
+/// The compile-only lookup tables of §7.2: key, kind, size and the
+/// shipped files.
+// Covers: specs/data/loading.md §7.2
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn compile_only_lookup_tables() {
+    // (table, key, type id, size, live .bin (archive, count), .txt copies)
+    type Row = (
+        &'static str,
+        &'static str,
+        u8,
+        usize,
+        Option<(&'static str, usize)>,
+        &'static [(&'static str, usize)],
+    );
+    const P: &str = "patch_d2.mpq";
+    const X: &str = "d2exp.mpq";
+    let rows: [Row; 18] = [
+        ("playerclass", "code", 10, 4, Some((X, 7)), &[(X, 7)]),
+        ("bodylocs", "code", 10, 4, Some((X, 11)), &[(X, 11)]),
+        ("storepage", "code", 10, 4, Some((X, 4)), &[(X, 4)]),
+        (
+            "elemtypes",
+            "code",
+            10,
+            4,
+            Some((P, 13)),
+            &[(P, 13), (X, 12)],
+        ),
+        ("hitclass", "code", 10, 4, Some((X, 14)), &[(X, 14)]),
+        ("colors", "code", 10, 4, Some((X, 21)), &[(X, 21)]),
+        ("hiredesc", "code", 10, 4, Some((X, 9)), &[(X, 9)]),
+        ("monmode", "code", 10, 4, None, &[(P, 16)]),
+        ("plrmode", "code", 10, 4, None, &[(P, 20)]),
+        ("monai", "AI", 17, 2, Some((P, 148)), &[(P, 148)]),
+        ("monplace", "code", 17, 2, Some((P, 37)), &[(P, 37)]),
+        ("skillcalc", "code", 10, 4, Some((P, 73)), &[(P, 73)]),
+        ("misscalc", "code", 10, 4, Some((P, 43)), &[(P, 43)]),
+        ("skills", "skill", 17, 2, None, &[(P, 357)]),
+        ("events", "event", 17, 2, Some((P, 13)), &[(P, 13)]),
+        ("sounds", "Sound", 17, 2, Some((P, 4_699)), &[(P, 4_699)]),
+        ("monstats", "Id", 17, 2, None, &[(P, 734)]),
+        ("skilldesc", "skilldesc", 17, 2, None, &[(P, 221)]),
+    ];
+    for (name, key, type_id, size, live, txts) in rows {
+        let lookup = format!("{name}_lookup");
+        let def = schema()
+            .table(&lookup)
+            .or_else(|| schema().table(name))
+            .unwrap();
+        assert!(def.live_source.is_none() && def.is_called(), "{name}");
+        let step = def.load_step.as_deref().unwrap();
+        let group = match name {
+            "sounds" => "3.",
+            "monstats" | "skilldesc" => "9.",
+            _ => "1.",
+        };
+        assert!(step.starts_with(group), "{name}: step {step}");
+        assert_eq!(
+            (def.key_column.as_str(), def.record_size),
+            (key, size),
+            "{name}"
+        );
+        let f = def.field(key).unwrap();
+        assert_eq!((f.field_type.id(), f.offset), (type_id, 0), "{name}");
+        match live {
+            Some((a, n)) => {
+                let (src, b) = read_excel(set(), &def.bin_name).unwrap().unwrap();
+                assert_eq!(src, a, "{name}");
+                let t = bin::BinTable::parse(name, a, name, &b, size).unwrap();
+                assert_eq!(t.count, n, "{name}");
+            }
+            // Overwritten by the runtime table of the same name.
+            None => assert!(schema().table(name).unwrap().is_runtime(), "{name}"),
+        }
+        let mut present = Vec::new();
+        for a in ["patch_d2.mpq", "d2exp.mpq", "d2data.mpq"] {
+            if archive(a).contains(&excel_path(&def.txt_name)) {
+                present.push((a, txt(a, &def.txt_name).records.len()));
+            }
+        }
+        assert_eq!(present, txts, "{name}");
+    }
+    // elemtypes: X keeps an older 12-record copy.
+    let x = archive("d2exp.mpq")
+        .read(&excel_path("elemtypes.bin"))
+        .unwrap();
+    assert_eq!(u32_at(&x, 0), 12);
+    // compcode uses the same code-key mechanism and is always loaded.
+    assert_eq!(data().table("compcode").unwrap().record(1), b"lit ");
+}
+
+// Covers: specs/data/loading.md §edge-cases-original-bugs
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn loading_edge_cases() {
+    // A short or long .bin is rejected (1.14d does not check).
+    let armor = archive("d2exp.mpq").read(&excel_path("armor.bin")).unwrap();
+    assert_eq!(armor.len(), 119_588);
+    assert!(bin::BinTable::parse("armor", "x", "armor.bin", &armor, 424).is_err());
+    let live = read_excel(set(), "armor.bin").unwrap().unwrap().1;
+    assert!(bin::BinTable::parse("armor", "p", "a", &live[..live.len() - 1], 424).is_err());
+    let mut long = live.clone();
+    long.push(0);
+    assert!(bin::BinTable::parse("armor", "p", "a", &long, 424).is_err());
+    // P uniqueitems.txt record 401: all cells empty, a real record.
+    let u = txt("patch_d2.mpq", "uniqueitems.txt");
+    assert_eq!(u.records.len(), 402);
+    assert!(u.records[401].cells.iter().all(|c| c.is_empty()));
+    let r = record("uniqueitems", 401);
+    assert_eq!(r, data().table("uniqueitems").unwrap().record(401));
+    let mut want = vec![0u8; r.len()];
+    want[40..44].copy_from_slice(b"    ");
+    want[56..58].copy_from_slice(&[0xFF; 2]);
+    for k in 0..12 {
+        want[140 + 16 * k..144 + 16 * k].copy_from_slice(&[0xFF; 4]);
+    }
+    assert_eq!(r, want.as_slice());
+    let links = &compiled().linkers;
+    for l in ["colors.code", "properties.code"] {
+        let c = links.code(l).unwrap();
+        assert!(
+            c.find(u32::from_le_bytes(*b"    ")).is_none() && c.find(0).is_none(),
+            "{l}"
+        );
+    }
+    // P → X fallback: 17 runtime tables (and hitclass) live only in X;
+    // P has newer .txt for inventory and plrmode.
+    let x_only: Vec<&str> = schema()
+        .runtime()
+        .filter(|d| first_archive(&d.bin_name) == Some("d2exp.mpq"))
+        .map(|d| d.name.as_str())
+        .collect();
+    assert_eq!(x_only.len(), 17);
+    assert_eq!(first_archive("hitclass.bin"), Some("d2exp.mpq"));
+    for t in ["inventory", "plrmode"] {
+        assert!(x_only.contains(&t));
+        assert_eq!(first_archive(&format!("{t}.txt")), Some("patch_d2.mpq"));
+    }
+}
+
+/// Game truth: the 73 tables, 4 code buffers and hitclass, resolved
+/// P → X → D, validated and fixed up, plus the two sound `.txt`.
+// Covers: specs/data/loading.md §d2-data-policy r1
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn game_truth_set() {
+    let d = data();
+    assert_eq!(d.tables.len(), 73);
+    for t in &d.tables {
+        let def = schema().table(&t.name).unwrap();
+        assert_eq!(
+            Some(t.source.as_str()),
+            first_archive(&def.bin_name),
+            "{}",
+            t.name
+        );
+    }
+    assert_eq!(d.code.len(), 4);
+    for b in CalcBuffer::ALL {
+        let file = format!("{}.bin", b.name());
+        assert_eq!(Some(d.code[&b].source.as_str()), first_archive(&file));
+    }
+    assert_eq!(
+        Some(d.hitclass.source.as_str()),
+        first_archive("hitclass.bin")
+    );
+    assert_eq!(
+        (d.sounds.records.len(), d.soundenviron.records.len()),
+        (4_699, 50)
+    );
+    let anim = d2_data::fixup::read_animdata(set()).unwrap();
+    let fixed = d2_data::fixup::apply(d, &anim).unwrap();
+    assert_eq!(fixed.tables.len(), 73);
+    assert!(d2_data::fixup::PENDING.is_empty());
+}

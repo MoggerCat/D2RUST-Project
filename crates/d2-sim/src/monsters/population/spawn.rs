@@ -148,7 +148,7 @@ pub fn champion_minions<H: PopHost + ?Sized>(
     let count = cx.host.unit_seed(boss).step() % 3 + 1;
     for _ in 0..count {
         if let Some(m) = place_near(cx, cl, boss, class, 1, 4, 0).unit() {
-            cx.host.add_modifier(m, 16);
+            cx.host.add_modifier(m, 16, cx.state);
         }
     }
 }

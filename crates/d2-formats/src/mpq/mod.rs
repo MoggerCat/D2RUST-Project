@@ -769,4 +769,22 @@ mod tests {
             );
         }
     }
+
+    // Covers: specs/formats/mpq.md §12 text
+    #[test]
+    fn adpcm_mask_selects_channel_count() {
+        // C = 1 for mask 0x40, 2 for mask 0x80; samples are i16 LE.
+        let payload = [0x00, 0x00, 0x34, 0x12, 0xCC, 0xED, 0x80, 0x80, 0x07];
+        let mono = decompress_masked(compression::ADPCM_MONO, &payload, 64).unwrap();
+        assert_eq!(mono, adpcm::decompress(&payload, 1, 64));
+        let stereo = decompress_masked(compression::ADPCM_STEREO, &payload, 64).unwrap();
+        assert_eq!(stereo, adpcm::decompress(&payload, 2, 64));
+        assert_ne!(mono, stereo);
+        // Mono: 0x1234, then 0xEDCC read as an op stream; stereo: both
+        // initial samples first.
+        assert_eq!(mono[..2], 0x1234i16.to_le_bytes());
+        assert_eq!(stereo[..4], [0x34, 0x12, 0xCC, 0xED]);
+        // Stereo repeats: channel 0 then channel 1.
+        assert_eq!(stereo[4..8], [0x34, 0x12, 0xCC, 0xED]);
+    }
 }

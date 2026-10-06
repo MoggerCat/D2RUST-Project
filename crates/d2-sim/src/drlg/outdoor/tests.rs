@@ -18,7 +18,7 @@ use crate::rng::Seed;
 
 // ---- fakes ------------------------------------------------------------------
 
-fn data() -> DrlgData {
+pub(super) fn data() -> DrlgData {
     let mut d = DrlgData {
         levels: vec![LevelDef::default(); 140],
         ..DrlgData::default()
@@ -29,7 +29,7 @@ fn data() -> DrlgData {
     d
 }
 
-fn od() -> OutdoorData {
+pub(super) fn od() -> OutdoorData {
     OutdoorData {
         levels: vec![
             SubDefs {
@@ -54,8 +54,8 @@ fn od() -> OutdoorData {
 
 /// Records non-outdoor inits (allocation order).
 #[derive(Default)]
-struct Rec {
-    inits: Vec<u32>,
+pub(super) struct Rec {
+    pub(super) inits: Vec<u32>,
 }
 
 impl LevelTypes for Rec {
@@ -68,9 +68,9 @@ impl LevelTypes for Rec {
 /// Preset cells: records the calls and draws `roll(Files)` on the level
 /// seed as `preset.md` §4 does.
 #[derive(Default)]
-struct Presets {
-    calls: Vec<(u32, i32, i32, u32, u32)>,
-    files: BTreeMap<u32, i32>,
+pub(super) struct Presets {
+    pub(super) calls: Vec<(u32, i32, i32, u32, u32)>,
+    pub(super) files: BTreeMap<u32, i32>,
 }
 
 impl OutdoorPresets for Presets {
@@ -94,18 +94,18 @@ impl OutdoorPresets for Presets {
 
 /// A level of `gw × gh` cells at (800, 800) with zeroed grids; the
 /// level is DrlgType 0 so allocation runs no type init.
-struct Env {
-    drlg: Drlg,
-    data: DrlgData,
-    od: OutdoorData,
-    subs: SubFileMap,
-    info: OutdoorLevel,
-    l: LevelIdx,
-    id: u32,
+pub(super) struct Env {
+    pub(super) drlg: Drlg,
+    pub(super) data: DrlgData,
+    pub(super) od: OutdoorData,
+    pub(super) subs: SubFileMap,
+    pub(super) info: OutdoorLevel,
+    pub(super) l: LevelIdx,
+    pub(super) id: u32,
 }
 
 impl Env {
-    fn new(id: u32, gw: i32, gh: i32) -> Self {
+    pub(super) fn new(id: u32, gw: i32, gh: i32) -> Self {
         let mut data = data();
         data.levels[id as usize].level_type = 2;
         let mut drlg = Drlg::create(0, 1, 0, 0, false, &data, &mut NoLevelTypes).unwrap();
@@ -133,7 +133,7 @@ impl Env {
         }
     }
 
-    fn gen(&mut self) -> Gen<'_> {
+    pub(super) fn gen(&mut self) -> Gen<'_> {
         let rect = self.drlg.level(self.l).rect;
         Gen {
             drlg: &mut self.drlg,
@@ -147,13 +147,13 @@ impl Env {
         }
     }
 
-    fn seed(&self) -> Seed {
+    pub(super) fn seed(&self) -> Seed {
         self.drlg.level(self.l).seed
     }
 }
 
 /// `seed` advanced by `n` steps.
-fn stepped(mut seed: Seed, n: usize) -> Seed {
+pub(super) fn stepped(mut seed: Seed, n: usize) -> Seed {
     for _ in 0..n {
         seed.step();
     }
@@ -164,7 +164,7 @@ fn stepped(mut seed: Seed, n: usize) -> Seed {
 
 /// The Act I tables of the recording (sizes and offsets of the derived
 /// rects; Blood Moor's size comes from its linker).
-fn act1_data() -> DrlgData {
+pub(super) fn act1_data() -> DrlgData {
     let mut d = data();
     let set = |d: &mut DrlgData, id: usize, ty: u32, size: (i32, i32), off: (i32, i32)| {
         d.levels[id].drlg_type = ty;
@@ -486,7 +486,7 @@ fn waypoint_cold_plains_link() {
 
 // ---- polygon and borders -----------------------------------------------------
 
-fn orth(dir: i32, rect: TileRect) -> Orth {
+pub(super) fn orth(dir: i32, rect: TileRect) -> Orth {
     Orth {
         level_id: 9,
         direction: dir,
@@ -929,7 +929,7 @@ fn cells_to_rooms() {
 }
 
 /// A sub file with one 1×1 group at (0, 0), variants `n`.
-fn one_cell_file(floor: u32, wall: u32, n: i32) -> SubFile {
+pub(super) fn one_cell_file(floor: u32, wall: u32, n: i32) -> SubFile {
     let mut f = CellGrid::new(8, 2);
     f.set(0, 0, floor);
     let mut w = CellGrid::new(8, 2);

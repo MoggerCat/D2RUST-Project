@@ -847,8 +847,10 @@ pub trait NpcLink {
     /// Record +0x21 "hire list made" of the class's record.
     fn hire_list_made(&self, class: u16) -> bool;
     fn set_hire_list_made(&mut self, class: u16);
-    /// Makes the class's hire list (`npc.md` §7.1).
-    fn make_hire_list(&mut self, class: u16);
+    /// Makes the class's hire list (`npc.md` §7.1). The list draws from
+    /// the NPC-control seed, which the trade open holds for store
+    /// generation (§4 rule 2): it is lent here as `seed`.
+    fn make_hire_list(&mut self, class: u16, seed: &mut crate::rng::Seed);
 }
 
 /// Seam: everything else vendors reach (game fields, units, stats,
