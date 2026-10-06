@@ -3,7 +3,10 @@
 > Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md`; this file is the detailed record until a docs session folds it.
 
 Scope: branch `claude/gaps-path-render`, based on
-`claude/tender-meitner-mphas3` at `002b244`. Cloud, repo only, synthetic
+`claude/tender-meitner-mphas3` at `002b244`, then merged with its later
+head (main `5cc2cfb` + render-wire, incl. `wire-path-sim`'s reshaped
+`path::walk`); the tests were ported to that API with every assertion
+and claim kept. Cloud, repo only, synthetic
 grids (M09). Unit-tier tests only, so no rule became "verified"
 (CLAUDE.md rule 10). Each claim names only what its test asserts.
 `path-placement.md` §7–§12 belong to `gaps-new-specs` and were not
@@ -13,11 +16,14 @@ touched.
 
 | Spec | Before | After |
 |---|---|---|
-| specs/sim/path-placement.md | 76/84 | 76/84 |
-| specs/sim/pathing.md | 105/125 (84.0%) | 113/125 (90.4%) |
+| specs/sim/path-placement.md | 77/84 | 77/84 |
+| specs/sim/pathing.md | 106/125 (84.8%) | 114/125 (91.2%) |
 | specs/render/camera.md | 11/11 | 11/11 |
 | specs/render/sprite-placement.md | 7/9 | 7/9 |
-| repository total (any) | 2816/3106 (90.7%) | 2824/3106 (90.9%) |
+| repository total (any) | 2819/3106 (90.8%) | 2827/3106 (91.0%) |
+
+"Before" is the merged base without this branch's file (the base itself
+gained path-placement §2.5 and pathing §9.1 from `wire-path-sim`).
 
 ## Tests
 
@@ -47,8 +53,7 @@ unambiguously.
 
 ## Not claimed, with reasons
 
-- **path-placement §2.5** (`SUNIT_Add` per type): a wiring step, not in
-  `d2_sim::path` (`impl-path-core.md` "Seams"); `wire-path-sim` owns it.
+- **path-placement §2.5**: claimed by `wire-path-sim` on the merged base.
   **§edge-cases text**: "Reproduced by default." only.
 - **pathing §1.3 text**: the mode table is asserted by
   `tests/mod.rs::mode_check_rules`, but E (smallest positive type-1
@@ -57,8 +62,8 @@ unambiguously.
 - **pathing §8.1 text, §8.3 text**: callers of `0x00623F50` (integration)
   and the `tan` table's "x² + y² ≈ 4096²" (not an exact rule; the rows are
   checked by `path_tables.py`).
-- **pathing §9.1, §9.2 r5, §10 r4, §10 r5**: monster mode functions,
-  host-only history, owners elsewhere (as `impl-walk.md`).
+- **pathing §9.2 r5, §10 r4, §10 r5** (§9.1 now claimed by
+  `wire-path-sim`): host-only history, owners elsewhere (as `impl-walk.md`).
 - **pathing §9.2 r2**: the state-13 call is a seam; whether the step
   continues after it is `impl-walk.md` question 5, so a test could only
   assert half the rule.
@@ -83,4 +88,4 @@ unambiguously.
 
 ## Gate
 
-`sh tools/gate.sh` (all steps, nextest), 2026-10-06 on this branch: GATE: PASS (d2-sim + conformance 1508 passed, rest 567, d2-client 350; coverage 3,781 claims, 0 errors).
+`sh tools/gate.sh` (all steps, nextest), 2026-10-06 on this branch after the base merge: GATE: PASS (d2-sim + conformance 1556 passed, rest 567, d2-client 360; coverage 3,869 claims, 0 errors); `cargo check --workspace --all-targets --keep-going` clean.

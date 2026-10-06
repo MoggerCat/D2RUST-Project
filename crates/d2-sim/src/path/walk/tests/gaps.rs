@@ -4,21 +4,27 @@
 
 use std::collections::BTreeMap;
 
-use super::fake::{FakeUnit, FakeUnits, FakeWorld, ROOM};
-use super::{setup, P};
-use crate::game::Game;
-use crate::path::walk::find::{compute, set_type, toward, Finder};
-use crate::path::walk::geom::{centre, unit_distance};
-use crate::path::walk::seams::{flag, PathInfo, Point, TargetUnit, WalkPath, WalkUnits};
+use super::fake::{Ctx, FakeUnit, FakeWorld, ROOM};
+use super::{setup, tables, P};
+use crate::drlg::{CollisionGrid, TileRect};
+use crate::path::collision::CollisionRooms;
+use crate::path::coords::to_fp16_center as centre;
+use crate::path::footprint::{self, FootShape, Footprint, RemoveRule};
+use crate::path::record::{flags, DynamicPath, PathPoint};
+use crate::path::tables::PathTables;
+use crate::path::walk::find::{compute, toward, Finder};
+use crate::path::walk::geom::unit_distance;
+use crate::path::walk::seams::{PathInfo, PathWorld, Point, TargetUnit, WalkUnits};
 use crate::path::walk::step::{Walk, STEP_BASE};
-use crate::path::walk::tables::PathTables;
 use crate::path::walk::velocity::set_velocity;
 use crate::rng::Seed;
-use crate::units::{UnitId, UnitType};
+use crate::units::{ClientId, RoomId, UnitId, UnitType};
 
-/// A unit side that records what the path functions receive and
-/// answers a fixed count (`0x00679B30` and the other path functions).
+/// A context that records what the unit-side path functions receive
+/// and answers a fixed count (`0x00679B30` and the other path
+/// functions); the world is [`FakeWorld`].
 struct Recorder {
+    w: FakeWorld,
     units: BTreeMap<UnitId, (UnitType, Point)>,
     seed: Seed,
     infos: Vec<PathInfo>,
@@ -26,8 +32,9 @@ struct Recorder {
 }
 
 impl Recorder {
-    fn new(answer: i32) -> Recorder {
+    fn new(w: FakeWorld, answer: i32) -> Recorder {
         Recorder {
+            w,
             units: BTreeMap::from([(P, (UnitType::Player, Point::new(0, 0)))]),
             seed: Seed::default(),
             infos: Vec::new(),
@@ -36,9 +43,69 @@ impl Recorder {
     }
 }
 
+fn footprint_of(p: &DynamicPath) -> Footprint {
+    Footprint {
+        room: p.room,
+        x: p.x(),
+        y: p.y(),
+        shape: FootShape::Pattern(p.pattern),
+        mask: p.foot_mask,
+    }
+}
+
+impl CollisionRooms for Recorder {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        self.w.subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.w.adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        self.w.adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        self.w.grid(room)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut CollisionGrid> {
+        self.w.grid_mut(room)
+    }
+}
+
+impl PathWorld for Recorder {
+    fn load_path(&self, unit: UnitId) -> Option<DynamicPath> {
+        self.w.paths.get(&unit).cloned()
+    }
+    fn store_path(&mut self, unit: UnitId, path: &DynamicPath) {
+        self.w.paths.insert(unit, path.clone());
+    }
+    fn room_in_town(&self, _room: RoomId) -> bool {
+        false
+    }
+    fn remove_footprint(&mut self, unit: UnitId, force: bool) -> bool {
+        let Some(fp) = self.w.paths.get(&unit).map(footprint_of) else {
+            return false;
+        };
+        footprint::remove_footprint(&mut self.w, &fp, RemoveRule::Other, force)
+    }
+    fn add_footprint(&mut self, unit: UnitId) {
+        if let Some(fp) = self.w.paths.get(&unit).map(footprint_of) {
+            footprint::add_footprint(&mut self.w, &fp);
+        }
+    }
+    fn room_list_remove(&mut self, _unit: UnitId, _room: RoomId) {}
+    fn room_list_insert(&mut self, _unit: UnitId, _room: RoomId) {}
+    fn queue_for_update(&mut self, _unit: UnitId) {}
+    fn room_clients(&self, _room: RoomId) -> Vec<ClientId> {
+        Vec::new()
+    }
+}
+
 impl WalkUnits for Recorder {
     fn unit_type(&self, unit: UnitId) -> UnitType {
         self.units[&unit].0
+    }
+    fn frame(&self) -> i32 {
+        0
     }
     fn mode(&self, _unit: UnitId) -> u32 {
         1
@@ -49,7 +116,7 @@ impl WalkUnits for Recorder {
     fn seed(&mut self, _unit: UnitId) -> &mut Seed {
         &mut self.seed
     }
-    fn other_path_function(&mut self, _path: &mut WalkPath, info: &PathInfo) -> i32 {
+    fn other_path_function(&mut self, _path: &mut DynamicPath, info: &PathInfo) -> i32 {
         self.infos.push(*info);
         self.answer
     }
@@ -58,15 +125,15 @@ impl WalkUnits for Recorder {
 // Covers: specs/sim/pathing.md §3 text
 #[test]
 fn path_functions_receive_the_path_info_record() {
-    let t = PathTables::embedded();
+    let t = tables();
     let mut w = FakeWorld::new(40, 40);
     w.add_player(&t, P, 10, 10);
     let mut path = w.paths[&P].clone();
     // Type 0 (IDA*) runs a function of the unit side (§2).
-    set_type(&t, &mut path, UnitType::Player, 0).unwrap();
-    path.target = Point::new(20, 15);
-    let mut u = Recorder::new(0);
-    assert_eq!(compute(&t, &mut w, &mut u, &mut path, P, false).unwrap(), 0);
+    path.set_path_type(&t, true, 0).unwrap();
+    path.put_target(Point::new(20, 15));
+    let mut c = Recorder::new(w, 0);
+    assert_eq!(compute(&t, &mut c, &mut path, P, false).unwrap(), 0);
     let expect = PathInfo {
         start: Point::new(10, 10),
         target: Point::new(20, 15),
@@ -80,20 +147,20 @@ fn path_functions_receive_the_path_info_record() {
         pattern: t.pattern_of_size[2],
         move_mask: 0x1C09,
     };
-    assert_eq!(u.infos, vec![expect]);
+    assert_eq!(c.infos, vec![expect]);
 
     // An item target: target := its position, slack r = 2 (§3 step 4).
     let item = UnitId(5);
-    u.units.insert(item, (UnitType::Item, Point::new(18, 12)));
+    c.units.insert(item, (UnitType::Item, Point::new(18, 12)));
     path.target_unit = Some(TargetUnit {
         unit: item,
         ty: UnitType::Item,
         guid: 5,
     });
-    u.infos.clear();
-    compute(&t, &mut w, &mut u, &mut path, P, false).unwrap();
+    c.infos.clear();
+    compute(&t, &mut c, &mut path, P, false).unwrap();
     assert_eq!(
-        u.infos,
+        c.infos,
         vec![PathInfo {
             target: Point::new(18, 12),
             slack: 2,
@@ -105,15 +172,18 @@ fn path_functions_receive_the_path_info_record() {
 // Covers: specs/sim/pathing.md §5.2 text
 #[test]
 fn toward_with_a_direction_offset_runs_the_circling_function() {
-    let t = PathTables::embedded();
-    let w = FakeWorld::new(40, 40);
-    let mut base = WalkPath::zeroed(P);
-    base.precise_x = centre(10);
-    base.precise_y = centre(10);
-    base.velocity = 0x800;
-    base.room = Some(ROOM);
-    base.pattern = t.pattern_of_size[2];
-    base.move_mask = 0x1C09;
+    let t = tables();
+    let mut base = DynamicPath {
+        precise_x: centre(10),
+        precise_y: centre(10),
+        velocity: 0x800,
+        room: Some(ROOM),
+        pattern: t.pattern_of_size[2],
+        move_mask: 0x1C09,
+        owner: Some(P),
+        ..DynamicPath::default()
+    };
+    base.update_client();
     let info = PathInfo {
         start: Point::new(10, 10),
         target: Point::new(20, 10),
@@ -127,17 +197,16 @@ fn toward_with_a_direction_offset_runs_the_circling_function() {
         pattern: base.pattern,
         move_mask: 0x1C09,
     };
-    for (ty, off) in [(5u8, 2), (6, -2), (12, -4)] {
+    for (ty, off) in [(5u32, 2), (6, -2), (12, -4)] {
         let mut path = base.clone();
-        set_type(&t, &mut path, UnitType::Monster, ty).unwrap();
+        path.set_path_type(&t, false, ty).unwrap();
         assert_eq!(path.dir_offset, off);
-        path.index = 3;
-        path.count = 5;
-        let mut u = Recorder::new(4);
+        path.cur_point = 3;
+        path.point_count = 5;
+        let mut c = Recorder::new(FakeWorld::new(40, 40), 4);
         let mut f = Finder {
             t: &t,
-            w: &w,
-            u: &mut u,
+            c: &mut c,
             owner_ty: UnitType::Monster,
         };
         let info = PathInfo {
@@ -146,19 +215,18 @@ fn toward_with_a_direction_offset_runs_the_circling_function() {
         };
         // The result is the circling function's; index and count are 0.
         assert_eq!(toward(&mut f, &mut path, &info).unwrap(), 4);
-        assert_eq!((path.index, path.count), (0, 0));
-        assert_eq!(u.infos, vec![info]);
+        assert_eq!((path.cur_point, path.point_count), (0, 0));
+        assert_eq!(c.infos, vec![info]);
     }
     // Offset 0 (type 2): no circling call; index and count still 0.
     let mut path = base.clone();
-    set_type(&t, &mut path, UnitType::Monster, 2).unwrap();
-    path.index = 3;
-    path.count = 5;
-    let mut u = Recorder::new(4);
+    path.set_path_type(&t, false, 2).unwrap();
+    path.cur_point = 3;
+    path.point_count = 5;
+    let mut c = Recorder::new(FakeWorld::new(40, 40), 4);
     let mut f = Finder {
         t: &t,
-        w: &w,
-        u: &mut u,
+        c: &mut c,
         owner_ty: UnitType::Monster,
     };
     let info = PathInfo {
@@ -166,29 +234,29 @@ fn toward_with_a_direction_offset_runs_the_circling_function() {
         ..info
     };
     assert_eq!(toward(&mut f, &mut path, &info).unwrap(), 1);
-    assert_eq!((path.index, path.count), (0, 0));
-    assert_eq!(path.points[0], Point::new(20, 10));
-    assert!(u.infos.is_empty());
+    assert_eq!((path.cur_point, path.point_count), (0, 0));
+    assert_eq!(path.point(0), Point::new(20, 10));
+    assert!(c.infos.is_empty());
 }
+
+const M: UnitId = UnitId(2);
 
 /// A player at (10, 20) with a type-1 (A*) path; walls at the given
 /// cells; a monster `M` at (20, 20).
-fn astar_setup(walls: &[(i32, i32)]) -> (PathTables, FakeWorld, FakeUnits, WalkPath) {
-    let (t, mut w, mut u) = setup(40, 40, 10, 20);
+fn astar_setup(walls: &[(i32, i32)]) -> (PathTables, Ctx, DynamicPath) {
+    let (t, mut c) = setup(40, 40, 10, 20);
     for &(x, y) in walls {
-        w.wall(x, y);
+        c.w.wall(x, y);
     }
     let mut monster = FakeUnit::player();
     monster.ty = UnitType::Monster;
     monster.guid = 7;
     monster.pos = Point::new(20, 20);
-    u.units.insert(M, monster);
-    let mut path = w.paths[&P].clone();
-    set_type(&t, &mut path, UnitType::Player, 1).unwrap();
-    (t, w, u, path)
+    c.u.units.insert(M, monster);
+    let mut path = c.w.paths[&P].clone();
+    path.set_path_type(&t, true, 1).unwrap();
+    (t, c, path)
 }
-
-const M: UnitId = UnitId(2);
 
 /// The eight probe cells of §7 rule 1 around (20, 20).
 const PROBES: [(i32, i32); 8] = [
@@ -211,26 +279,28 @@ fn astar_target_room_check_needs_a_free_probe_cell() {
         guid: 7,
     });
     // Every probe cell blocked, with a target unit: A* returns 0.
-    let (t, mut w, mut u, mut path) = astar_setup(&PROBES);
+    let (t, mut c, mut path) = astar_setup(&PROBES);
     path.target_unit = target_unit;
-    assert_eq!(compute(&t, &mut w, &mut u, &mut path, P, false).unwrap(), 0);
-    assert_eq!(path.count, 0);
+    assert_eq!(compute(&t, &mut c, &mut path, P, false).unwrap(), 0);
+    assert_eq!(path.point_count, 0);
     // The same grid with a point target: the check does not run.
-    let (t, mut w, mut u, mut path) = astar_setup(&PROBES);
-    path.target = Point::new(20, 20);
-    assert!(compute(&t, &mut w, &mut u, &mut path, P, false).unwrap() > 0);
+    let (t, mut c, mut path) = astar_setup(&PROBES);
+    path.put_target(Point::new(20, 20));
+    assert!(compute(&t, &mut c, &mut path, P, false).unwrap() > 0);
     // One probe cell free (the last tested, (0, +2)): A* runs.
-    let (t, mut w, mut u, mut path) = astar_setup(&PROBES[..7]);
+    let (t, mut c, mut path) = astar_setup(&PROBES[..7]);
     path.target_unit = target_unit;
-    assert!(compute(&t, &mut w, &mut u, &mut path, P, false).unwrap() > 0);
+    assert!(compute(&t, &mut c, &mut path, P, false).unwrap() > 0);
 }
 
 // Covers: specs/sim/pathing.md §8.1 r3
 #[test]
 fn velocity_setter_marks_a_change_and_sets_the_max() {
-    let mut p = WalkPath::zeroed(P);
-    p.velocity = 0x600;
-    p.max_velocity = 0x600;
+    let mut p = DynamicPath {
+        velocity: 0x600,
+        max_velocity: 0x600,
+        ..DynamicPath::default()
+    };
     set_velocity(&mut p, 0x900);
     assert_eq!((p.field_38, p.velocity, p.max_velocity), (15, 0x900, 0x900));
     // The same value again: +0x38 is not set.
@@ -242,7 +312,7 @@ fn velocity_setter_marks_a_change_and_sets_the_max() {
 // Covers: specs/sim/pathing.md §9.5 text
 #[test]
 fn unit_distance_table_and_formula() {
-    let t = PathTables::embedded();
+    let t = tables();
     let d = |dx: i32, dy: i32, sa: i32, sb: i32| {
         unit_distance(&t, Point::new(50 + dx, 50 + dy), sa, Point::new(50, 50), sb)
     };
@@ -265,62 +335,62 @@ fn unit_distance_table_and_formula() {
 
 /// A unit at (10, 10) moving toward (14, 10): one point, velocity
 /// vector along +x from `velocity` (§9.4 rule 2.1).
-fn moving(w: &mut FakeWorld, velocity: i32) -> WalkPath {
-    let mut p = w.paths[&P].clone();
-    p.points[0] = Point::new(14, 10);
-    p.final_target = Point::new(14, 10);
-    p.count = 1;
-    p.index = 0;
+fn moving(c: &Ctx, velocity: i32) -> DynamicPath {
+    let mut p = c.w.paths[&P].clone();
+    p.points[0] = PathPoint::from_point(Point::new(14, 10));
+    p.put_final_target(Point::new(14, 10));
+    p.point_count = 1;
+    p.cur_point = 0;
     p.velocity = velocity;
-    p.dir_vec = (4096, 0);
-    p.flags |= flag::ACTIVE;
+    p.dir_vec_x = 4096;
+    p.dir_vec_y = 0;
+    p.flags |= flags::ACTIVE;
     p
 }
 
-fn movement(t: &PathTables, w: &mut FakeWorld, u: &mut FakeUnits, p: &mut WalkPath) -> bool {
-    let mut g = Game::new();
-    Walk { t, w, u }.movement(&mut g, P, p, STEP_BASE).unwrap()
+fn movement(t: &PathTables, c: &mut Ctx, p: &mut DynamicPath) -> bool {
+    Walk { t, c }.movement(P, p, STEP_BASE).unwrap()
 }
 
 // Covers: specs/sim/pathing.md §9.6 r1
 #[test]
 fn one_step_clears_collided_and_only_a_monster_with_flag_0x10_repaths() {
     // Collided mask := 0 (not a missile: §9.4 rule 1 does not clear it).
-    let (t, mut w, mut u) = setup(40, 40, 10, 10);
-    let mut p = moving(&mut w, 0x400); // 0x4000 per tick: stays in the cell
-    p.collided = 0x55;
-    assert!(movement(&t, &mut w, &mut u, &mut p));
-    assert_eq!(p.collided, 0);
+    let (t, mut c) = setup(40, 40, 10, 10);
+    let mut p = moving(&c, 0x400); // 0x4000 per tick: stays in the cell
+    p.collided_mask = 0x55;
+    assert!(movement(&t, &mut c, &mut p));
+    assert_eq!(p.collided_mask, 0);
 
     // A wall at (12, 10) blocks the first cell crossed (pattern 1).
     // 0x800 → 0x8000 per tick: from the centre into cell 11.
     let blocked = |ty: UnitType, keep: bool| {
-        let (t, mut w, mut u) = setup(40, 40, 10, 10);
-        w.wall(12, 10);
-        u.unit(P).ty = ty;
-        u.repath_budget = 5;
-        let mut p = moving(&mut w, 0x800);
+        let (t, mut c) = setup(40, 40, 10, 10);
+        c.w.wall(12, 10);
+        c.u.unit(P).ty = ty;
+        c.u.repath_budget = 5;
+        let mut p = moving(&c, 0x800);
         if ty == UnitType::Monster {
-            set_type(&t, &mut p, ty, 2).unwrap();
+            p.set_path_type(&t, false, 2).unwrap();
         }
         if keep {
-            p.flags |= flag::KEEP_TARGET;
+            p.flags |= flags::KEEP_TARGET;
         }
-        w.paths.insert(P, p.clone());
-        let r = movement(&t, &mut w, &mut u, &mut p);
-        (r, p, w.log)
+        c.w.paths.insert(P, p.clone());
+        let r = movement(&t, &mut c, &mut p);
+        (r, p, c.w.log)
     };
     // Monster with flag 0x10: re-path; its new points drive the movement.
     let (r, p, _) = blocked(UnitType::Monster, true);
     assert!(r);
-    assert!(p.count > 0 && p.index < p.count);
+    assert!(p.point_count > 0 && p.cur_point < p.point_count);
     assert_eq!(p.precise_x, centre(10));
     // Monster without the flag, player with it: the movement ends at the
     // last free cell's centre, no re-path.
     for (ty, keep) in [(UnitType::Monster, false), (UnitType::Player, true)] {
         let (r, p, log) = blocked(ty, keep);
         assert!(!r);
-        assert_eq!((p.count, p.index), (0, 0));
+        assert_eq!((p.point_count, p.cur_point), (0, 0));
         assert_eq!(p.precise_x, centre(10));
         assert!(!log.iter().any(|l| l.starts_with("queue")));
     }
@@ -331,49 +401,46 @@ fn one_step_clears_collided_and_only_a_monster_with_flag_0x10_repaths() {
 fn arrival_passes_for_circling_types_past_the_last_point() {
     // No target unit, index ≥ count, position ≠ final target: types 5, 6
     // pass (no re-path); type 2 re-paths (rule 2: the queue for update).
-    for (ty, repaths) in [(5u8, false), (6, false), (2, true)] {
-        let (t, mut w, mut u) = setup(40, 40, 10, 10);
-        u.unit(P).ty = UnitType::Monster;
-        u.repath_budget = 5;
-        let mut p = moving(&mut w, 0x800);
-        set_type(&t, &mut p, UnitType::Monster, ty).unwrap();
-        p.index = 1;
-        w.paths.insert(P, p.clone());
-        movement(&t, &mut w, &mut u, &mut p);
-        assert_eq!(w.log.contains(&"queue 1".to_string()), repaths, "type {ty}");
+    for (ty, repaths) in [(5u32, false), (6, false), (2, true)] {
+        let (t, mut c) = setup(40, 40, 10, 10);
+        c.u.unit(P).ty = UnitType::Monster;
+        c.u.repath_budget = 5;
+        let mut p = moving(&c, 0x800);
+        p.set_path_type(&t, false, ty).unwrap();
+        p.cur_point = 1;
+        c.w.paths.insert(P, p.clone());
+        movement(&t, &mut c, &mut p);
+        assert_eq!(
+            c.w.log.contains(&"queue 1".to_string()),
+            repaths,
+            "type {ty}"
+        );
     }
 }
 
 // Covers: specs/sim/pathing.md §edge-cases-original-bugs r11
 #[test]
 fn room_recache_can_leave_a_non_missile_without_a_room() {
-    let (t, mut w, mut u) = setup(40, 40, 18, 10);
-    w.room0 = (0, 0, 20, 40); // no room holds x ≥ 20
-    let mut p = w.paths[&P].clone();
-    p.flags |= flag::OUTSIDE_ROOM;
+    let (t, mut c) = setup(40, 40, 18, 10);
+    c.w.room0 = TileRect::new(0, 0, 20, 40); // no room holds x ≥ 20
+    let mut p = c.w.paths[&P].clone();
+    p.flags |= flags::OUTSIDE_ROOM;
     let q = (centre(25), centre(10));
-    Walk {
-        t: &t,
-        w: &mut w,
-        u: &mut u,
-    }
-    .set_position(P, &mut p, q, None);
+    Walk { t: &t, c: &mut c }.set_position(P, &mut p, q, None);
     assert_eq!((p.precise_x, p.precise_y), q);
     assert_eq!(p.room, None);
     assert_eq!(p.prev_room, Some(ROOM));
-    assert_ne!(p.flags & flag::ROOM_CHANGED, 0);
-    assert_eq!(w.log, vec!["leave 1 0".to_string()]);
+    assert_ne!(p.flags & flags::ROOM_CHANGED, 0);
+    assert_eq!(c.w.log, vec!["leave 1 0".to_string()]);
     // A missile in the same place keeps its position and room, count 0.
-    u.unit(P).ty = UnitType::Missile;
-    let mut m = w.paths[&P].clone();
-    m.flags |= flag::OUTSIDE_ROOM;
-    m.count = 3;
+    c.u.unit(P).ty = UnitType::Missile;
+    let mut m = c.w.paths[&P].clone();
+    m.flags |= flags::OUTSIDE_ROOM;
+    m.point_count = 3;
     let before = (m.precise_x, m.room);
-    Walk {
-        t: &t,
-        w: &mut w,
-        u: &mut u,
-    }
-    .set_position(P, &mut m, q, None);
-    assert_eq!((m.precise_x, m.room, m.count), (before.0, before.1, 0));
+    Walk { t: &t, c: &mut c }.set_position(P, &mut m, q, None);
+    assert_eq!(
+        (m.precise_x, m.room, m.point_count),
+        (before.0, before.1, 0)
+    );
 }
