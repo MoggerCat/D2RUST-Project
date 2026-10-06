@@ -215,6 +215,22 @@ pub(super) struct Fake {
     // -- end Act IV q2 fake fields.
 
     // -- Act V part 1 fake fields.
+    /// `adjacent_units` answers by room.
+    pub(super) a5_adjacent: BTreeMap<RoomId, Vec<UnitId>>,
+    /// `unit_mode` answers (default 0).
+    pub(super) a5_modes: BTreeMap<UnitId, i32>,
+    /// `unit_distance` answers by (a, b) (default 100).
+    pub(super) a5_dist: BTreeMap<(UnitId, UnitId), i32>,
+    /// `place_object` results in order (empty: fails).
+    pub(super) a5_places: Vec<Option<UnitId>>,
+    /// `critical_spawn` / `preset_superunique_spawn` results in order
+    /// (empty: fails).
+    pub(super) a5_crits: Vec<Option<UnitId>>,
+    /// `apply_map_ai` answer.
+    pub(super) a5_map_ai: bool,
+    /// `quest_item_level` and `item_drop_sound` answers.
+    pub(super) a5_item_level: i32,
+    pub(super) a5_drop_sound: i32,
     // -- end Act V part 1 fake fields.
 
     // -- Act V part 2 fake fields.
@@ -539,6 +555,86 @@ impl QuestWorld for Fake {
     // -- end Act IV q2 seam fakes.
 
     // -- Act V part 1 seam fakes.
+    fn place_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        flags: [u8; 3],
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("place {class} {x} {y} room {} {flags:?}", room.0));
+        if self.a5_places.is_empty() {
+            None
+        } else {
+            self.a5_places.remove(0)
+        }
+    }
+    fn clear_room_portal_flag(&mut self, room: RoomId) {
+        self.log.push(format!("portal flag {}", room.0));
+    }
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        self.a5_adjacent.get(&room).cloned().unwrap_or_default()
+    }
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        self.a5_modes.get(&unit).copied().unwrap_or(0)
+    }
+    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
+        self.a5_dist.get(&(a, b)).copied().unwrap_or(100)
+    }
+    fn critical_spawn(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.log
+            .push(format!("critical {class} {x} {y} room {}", room.0));
+        if self.a5_crits.is_empty() {
+            None
+        } else {
+            self.a5_crits.remove(0)
+        }
+    }
+    fn kill_in_place(&mut self, unit: UnitId) {
+        self.log.push(format!("kill {}", unit.0));
+    }
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        self.log.push(format!("map ai {} {map_ai:#x}", unit.0));
+        self.a5_map_ai
+    }
+    fn npc_leave_town(&mut self, unit: UnitId) {
+        self.log.push(format!("leave town {}", unit.0));
+    }
+    fn kill_in_town(&mut self, unit: UnitId) {
+        self.log.push(format!("kill in town {}", unit.0));
+    }
+    fn free_object_collision(&mut self, object: UnitId) {
+        self.log.push(format!("collision {}", object.0));
+    }
+    fn object_leave_room(&mut self, object: UnitId) {
+        self.log.push(format!("leave room {}", object.0));
+    }
+    fn quest_item_level(&mut self, _: UnitId) -> i32 {
+        self.a5_item_level
+    }
+    fn item_drop_sound(&mut self, _: UnitId) -> i32 {
+        self.a5_drop_sound
+    }
+    fn add_resist_list(&mut self, player: UnitId, v: i32) {
+        self.log.push(format!("resist {} {v}", player.0));
+    }
+    fn preset_superunique_spawn(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        superunique: u16,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("superunique {superunique} {x} {y} room {}", room.0));
+        if self.a5_crits.is_empty() {
+            None
+        } else {
+            self.a5_crits.remove(0)
+        }
+    }
     // -- end Act V part 1 seam fakes.
 
     // -- Act V part 2 seam fakes.
