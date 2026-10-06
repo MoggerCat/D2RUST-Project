@@ -1,14 +1,17 @@
 // Spec: specs/world/quests.md §10.6 (A1Q4 The Search for Cain, chain 4), §9.4, §4.6
+// Spec: specs/world/quests-act1-rest.md §1–§3, §6, §7, §8 items 1–3, 5
 //! A1Q4 callback by callback: events 0, 2, 3, 4, 6, 8 (the Cow King), 9,
 //! 10, 11, 13, 14, the active function, the tree reset, the Cain cleanup
 //! and its timer, the town Cain spawn, the act-change hook, the class-61
-//! link, the Cairn stone order and its 0x50, Wirt's body, and the tree
-//! and stone operate functions, with the iterate functions L2, L3, L5
-//! (L1 is the shared status iterate). Slot 4 is a constant in each.
+//! link, the Cairn stone order and its 0x50, Wirt's body, the tree and
+//! stone operate functions, the gibbet operate and quest function, the
+//! stone init and its Tristram-portal timer, the town-Cain marker init
+//! and "Cain leaves Tristram", with the iterate functions L2–L5 (L1 is
+//! the shared status iterate). Slot 4 is a constant in each.
 
 use super::{add_state, broadcast, player_flags, rec, send_completed_now, sequence};
 use crate::rng::Seed;
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 use crate::world::quests::{
     bit, event, flags_of, npc, send_player_flags, EventArgs, GuidList, QuestControl, QuestError,
     QuestWorld, TextList, TimerFn,
@@ -29,7 +32,15 @@ const GIBBET: u16 = 26;
 const TREE: u16 = 30;
 const STONE_21: u16 = 21;
 pub const LINKED_OBJECT: u16 = 61;
-const TRISTRAM_PORTAL: u16 = 288;
+/// The cairnstones missile that opens the Tristram portal.
+const CAIRN_MISSILE: u16 = 288;
+/// Cain in Tristram leaves through this object (`cain portal`).
+const CAIN_PORTAL: u16 = 189;
+/// Portal objects: to town, to Tristram.
+const PORTAL_TO_TOWN: u16 = 59;
+const PORTAL_TO_TRISTRAM: u16 = 60;
+/// The first Cairn stone class (`StoneAlpha`); the stones are 17–21.
+const STONE_17: u16 = 17;
 const SCROLL: [u8; 4] = *b"bks ";
 const DECIPHERED: [u8; 4] = *b"bkd ";
 /// `0x00737648`: message state by quest state 1–5.
@@ -52,6 +63,14 @@ pub struct Extra4 {
     /// +0x34, +0x48: Cain's gibbet.
     pub gibbet_guid: u32,
     pub gibbet_known: bool,
+    /// +0x3C: the player who opened the gibbet (−1 when none).
+    pub gibbet_player: u32,
+    /// +0x40: the class-17 stone that carries the Tristram portal.
+    pub portal_stone: u32,
+    /// +0x44: the Tristram-portal timer is pending; +0x45: the portal
+    /// was created.
+    pub portal_timer: bool,
+    pub portal_made: bool,
     /// +0x38: the scroll made by message 112.
     pub scroll_guid: u32,
     /// +0x46: the Cain-removal timer is pending.
@@ -70,17 +89,33 @@ pub struct Extra4 {
     /// +0x54: 3 when the gibbet is open; +0x58: progress marker.
     pub gibbet_open: i32,
     pub progress: i32,
+    /// +0x5C–+0x60: per-stone reset bytes (index = class − 17; zeroed
+    /// at init, never set).
+    pub stone_reset: [bool; 5],
     /// +0x61: the Tristram Cain was removed.
     pub cain_removed: bool,
+    /// +0x62: Cain could not be spawned in Tristram.
+    pub cain_failed: bool,
     /// +0x63: the reward message sets game 4.13.
     pub game_done_due: bool,
     /// +0x64: scroll deciphered, chat end not yet handled.
     pub deciphered: bool,
+    /// +0x66: the town portal out of Tristram made by the gibbet.
+    pub out_portal: bool,
     /// +0x68: the town Cain's GUID.
     pub town_cain_guid: u32,
-    /// +0x6C, +0x70: the town monster Cain spawns beside.
-    pub beside_guid: u32,
-    pub beside_known: bool,
+    /// +0x6C, +0x70: the town-Cain marker object (class 385).
+    pub marker_guid: u32,
+    pub marker_known: bool,
+    /// +0x74: scratch, the player found in Tristram (§1.2 step 4).
+    pub found_player: Option<UnitId>,
+    /// +0x84, +0x88: the marker's position.
+    pub marker_pos: (i32, i32),
+    /// +0x91 (set by "Cain leaves Tristram"; never read).
+    pub b91: bool,
+    /// +0x96, +0xA4: the Cain portal object and its GUID.
+    pub cain_portal: bool,
+    pub cain_portal_guid: u32,
     /// +0x78.
     pub b78: bool,
     /// +0x7C: `bks ` / `bkd ` items in the game.
@@ -198,9 +233,38 @@ fn iterate_credit<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) {
     }
 }
 
-/// L5 `0x005931C0` for one player (the rescue at the gibbet;
-/// TODO(quests OQ11): its caller, the gibbet function `0x00593290`, is
-/// not specified, so nothing calls it yet).
+/// L4 `0x00593130` for one player: the rescue credit in Tristram, then
+/// the party step `0x005930B0` for each member.
+fn rescued<W: QuestWorld>(w: &mut W, p: UnitId) {
+    let level = w.unit_level(p);
+    let Some(f) = flags_of(w, p) else { return };
+    if f.get(SLOT, bit::REWARD_GRANTED)
+        || f.get(SLOT, bit::REWARD_PENDING)
+        || level != Some(TRISTRAM)
+    {
+        return;
+    }
+    f.set(SLOT, bit::PRIMARY_GOAL_DONE);
+    f.set(SLOT, bit::REWARD_PENDING);
+    send_player_flags(w, p, 6, 0);
+    party_rescued(w, p);
+}
+
+/// For each member of the player's party (`quests-act1-rest.md` §6):
+/// `0x005930B0`.
+fn party_rescued<W: QuestWorld>(w: &mut W, p: UnitId) {
+    for m in w.party_members(p).unwrap_or_default() {
+        let in_act1 = w.unit_level(m).is_some_and(|l| l != 0) && w.unit_act(m) == Some(0);
+        let Some(f) = flags_of(w, m) else { continue };
+        if !f.get(SLOT, bit::REWARD_GRANTED) && !f.get(SLOT, bit::REWARD_PENDING) && in_act1 {
+            f.set(SLOT, bit::PRIMARY_GOAL_DONE);
+            f.set(SLOT, bit::REWARD_PENDING);
+            send_player_flags(w, m, 6, 0);
+        }
+    }
+}
+
+/// L5 `0x005931C0` for one player (after L4 in the gibbet function).
 pub fn completed_now<W: QuestWorld>(w: &mut W, p: UnitId) {
     let Some(f) = flags_of(w, p) else { return };
     if !f.get(SLOT, bit::REWARD_GRANTED) && !f.get(SLOT, bit::REWARD_PENDING) {
@@ -217,6 +281,11 @@ fn npc_text<W: QuestWorld>(
     args: EventArgs,
     mut list: Option<&mut TextList>,
 ) {
+    // `quests-act1-rest.md` §8 item 5: the player's data is read first
+    // (`0x006221A0` at `0x005925BB`), an internal error without one.
+    let Some(p) = args.player else {
+        return ctl.faults.push(QuestError::Fatal(0x0059_25BB));
+    };
     let c = args.target.and_then(|n| w.monster_class(n));
     let mut add = |ctl: &QuestControl, w: &W, k: u8| {
         add_state(ctl, w, i, list.as_deref_mut(), args.target, k)
@@ -224,9 +293,6 @@ fn npc_text<W: QuestWorld>(
     if c == Some(CAIN_TRISTRAM) {
         add(ctl, w, 9);
     }
-    // TODO(quests §10.6): event 0 without a player is not described; NPC
-    // chat always has one.
-    let Some(p) = args.player else { return };
     if x4(ctl, i).b4f && w.has_item(p, DECIPHERED) {
         w.delete_item(p, DECIPHERED);
         x4(ctl, i).scrolls -= 1;
@@ -317,9 +383,9 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
     }
     if args.b == TOWN {
         let x = &ctl.records[i].extra.q4;
-        if x.beside_known && x.town_cain_due && !x.town_cain {
-            if let Some((m, _)) = w.monster_by_guid(x.beside_guid) {
-                spawn_town_cain(ctl, w, i, m);
+        if x.marker_known && x.town_cain_due && !x.town_cain {
+            if let Some((m, _)) = w.object_by_guid(x.marker_guid) {
+                spawn_town_cain_at_marker(ctl, w, i, m);
             }
         }
         return;
@@ -626,15 +692,33 @@ pub(super) fn removal_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i:
     x4(ctl, i).removal_timer = false;
 }
 
-/// Town Cain spawn `0x00592960` beside the monster `m` (its position x,
-/// y in room R0).
-fn spawn_town_cain<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, m: UnitId) {
-    // TODO(quests §10.6 step 15): a monster without a room has no (x, y,
-    // R0); the step is not described for it.
-    let Some((x, y, r0)) = w.unit_position(m) else {
-        return;
-    };
-    let (mut px, mut py) = (0..20)
+/// The town Cain spawn at the marker object `m` (§10.6 step 3.3;
+/// `quests-act1-rest.md` §8 item 3: (x, y) and R0 are the object's). A
+/// marker found by GUID always has a room in 1.14d; one without is an
+/// invariant violation, reported as fatal.
+fn spawn_town_cain_at_marker<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+    m: UnitId,
+) {
+    match w.unit_position(m) {
+        Some((x, y, r0)) => spawn_town_cain(ctl, w, i, x, y, r0),
+        None => ctl.faults.push(QuestError::Fatal(0x0059_2960)),
+    }
+}
+
+/// Town Cain spawn `0x00592960(game, x, y)` in room R0 (§10.6 step 15).
+fn spawn_town_cain<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+    x: i32,
+    y: i32,
+    r0: RoomId,
+) {
+    // 21 points, i = 0 through 20 (`quests-act1-rest.md` §8 item 3).
+    let (mut px, mut py) = (0..=20)
         .map(|k| (x + k, y + k))
         .find(|&(a, b)| w.room_contains(r0, a, b))
         .unwrap_or((y, y + 21)); // bug kept
@@ -777,8 +861,9 @@ pub fn tree_operate<W: QuestWorld>(
         broadcast(ctl, w, i, 2, 0);
         let x = x4(ctl, i);
         x.b4b = true;
-        // TODO(quests §10.6): +0x38 := the scroll's GUID; the drop seam
-        // (`0x00559A30`) does not return the item. +0x38 is never read.
+        // +0x38 := the scroll's GUID in 1.14d (`quests-act1-rest.md` §8
+        // item 1); it has no reader, so it is not kept here and the drop
+        // seam returns no item.
         x.scrolls += 1;
         x.progress = 1;
         x.b78 = true;
@@ -791,7 +876,8 @@ pub fn tree_operate<W: QuestWorld>(
 }
 
 /// Stone operate `0x00593710` (operate pointer `0x00732D3C`): `value` is
-/// the stone's value (17–21, object data at args +0x10).
+/// the stone's value, the operated object's class 17–21 (args +0x10,
+/// `quests-act1-rest.md` §2.1).
 pub fn stone_operate<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
@@ -869,8 +955,12 @@ pub fn stone_operate<W: QuestWorld>(
         .filter(|o| o.1 == STONE_21)
         .map(|o| o.0)
         .or_else(|| w.find_object_near(object, STONE_21));
-    if let Some((sx, sy, room)) = last.and_then(|s| w.unit_position(s)) {
-        w.create_object(room, sx + 6, sy - 3, TRISTRAM_PORTAL);
+    if let Some((sx, sy, _)) = last.and_then(|s| w.unit_position(s)) {
+        // The cairnstones missile (owner the player, skill 0, level 1)
+        // opens the Tristram portal (`quests-act1-rest.md` §2.3, §4.1).
+        if let Some(m) = w.create_missile(player, 0, 1, CAIRN_MISSILE, sx + 6, sy - 3) {
+            w.refresh_room(m);
+        }
     }
     if ctl.records[i].status < 4 {
         broadcast(ctl, w, i, 4, 0);
@@ -890,4 +980,233 @@ pub fn stone_operate<W: QuestWorld>(
         }
     }
     ctl.unique_event(w, 1);
+}
+
+// ------------------------------------- gibbet, stone init, town-Cain marker
+
+/// Gibbet operate `0x00593480` (operate pointer `0x00732D40`,
+/// `quests-act1-rest.md` §1.1).
+pub fn gibbet_operate<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    object: UnitId,
+    player: UnitId,
+) {
+    let i = ctl.find(CHAIN);
+    if let Some(i) = i {
+        let r = &ctl.records[i];
+        if !r.not_intro || r.extra.q4.cain_gone || r.state >= 6 {
+            return;
+        }
+    }
+    let r = player_flags(w, player);
+    if r.get(SLOT, bit::REWARD_PENDING) || r.get(SLOT, bit::REWARD_GRANTED) {
+        return w.attach_sound(player, 19);
+    }
+    if w.object_mode(object) != 0 {
+        return;
+    }
+    w.set_object_mode(object, 1);
+    let at = w.frame() + (w.object_anim_length(object) >> 8);
+    w.schedule_object_event(object, 1, at);
+    if let Some(i) = i {
+        let g = w.guid(player);
+        let x = x4(ctl, i);
+        x.gibbet_open = 3;
+        x.gibbet_player = g;
+    }
+    // Event 7 runs `gibbet_event` (§9.5).
+    let at = w.frame() + 17;
+    w.schedule_quest_event(object, at);
+    w.refresh_room(object);
+    if let Some(f) = flags_of(w, player) {
+        f.set(SLOT, bit::PRIMARY_GOAL_DONE);
+        f.set(SLOT, bit::REWARD_PENDING);
+    }
+    send_player_flags(w, player, 6, 0);
+    party_rescued(w, player);
+}
+
+/// Gibbet quest function `0x00593290(game, object)`, object event 7
+/// (§9.5 class 26, `quests-act1-rest.md` §1.2).
+pub fn gibbet_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+    let Some(i) = ctl.find(CHAIN) else {
+        return ctl.faults.push(QuestError::Fatal(0x0059_3290));
+    };
+    if !ctl.records[i].not_intro || x4(ctl, i).cain_gone {
+        return;
+    }
+    x4(ctl, i).gibbet_open = 3;
+    w.set_object_mode(object, 3);
+    // An object always has a room (its static path); one without is an
+    // invariant violation, reported as fatal.
+    let Some((ox, oy, room)) = w.unit_position(object) else {
+        return ctl.faults.push(QuestError::Fatal(0x0059_3290));
+    };
+    let (x, y) = (ox + 3, oy + 3);
+    let cain = w
+        .spawn_monster(room, x, y, CAIN_TRISTRAM, 1, u32::MAX)
+        .or_else(|| {
+            let (fx, fy, fr) = w.free_spot_at(room, x, y, 2, 0x100, 3, 100)?;
+            w.spawn_monster(fr, fx, fy, CAIN_TRISTRAM, 1, u32::MAX)
+        });
+    match cain {
+        None => {
+            // `0x00593220` over every player: the first in Tristram.
+            let found = w
+                .players()
+                .into_iter()
+                .find(|&p| w.unit_level(p) == Some(TRISTRAM));
+            x4(ctl, i).found_player = found;
+            if let Some(p) = found {
+                if !x4(ctl, i).out_portal
+                    && w.open_portal(Some(p), room, x + 3, y + 3, TOWN, PORTAL_TO_TOWN, false)
+                        .is_some()
+                {
+                    x4(ctl, i).out_portal = true;
+                }
+            }
+            let x = x4(ctl, i);
+            if !x.town_cain {
+                x.town_cain_due = true;
+            }
+            x.cain_failed = true;
+        }
+        Some(c) => {
+            w.or_unit_flags(c, 0x0300_0000);
+            let g = x4(ctl, i).gibbet_player;
+            if let Some(p) = w.player_by_guid(g) {
+                w.attach_sound(p, 48);
+            }
+        }
+    }
+    for p in w.players() {
+        rescued(w, p);
+    }
+    for p in w.players() {
+        completed_now(w, p);
+    }
+    ctl.records[i].flags = 0;
+    broadcast(ctl, w, i, 6, 0);
+}
+
+/// Cairn stone init `0x005935E0` (init pointer `0x00731BD8`, objects
+/// 17–21; `quests-act1-rest.md` §2.2).
+pub fn stone_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
+    let Some(i) = ctl.find(CHAIN) else {
+        if w.object_mode(object) != 2 {
+            w.set_object_mode(object, 2);
+        }
+        return;
+    };
+    if ctl.records[i].not_intro && !x4(ctl, i).b4c {
+        let x = x4(ctl, i);
+        if x.b4d || x.cain_gone {
+            return w.set_object_mode(object, 2);
+        }
+        // The byte +0x4B + c: +0x5C–+0x60 for the stones (never set).
+        let k = usize::from(class.wrapping_sub(STONE_17));
+        if let Some(b) = x.stone_reset.get_mut(k) {
+            if *b {
+                *b = false;
+                w.set_object_mode(object, 0);
+            }
+        }
+        return;
+    }
+    x4(ctl, i).b4c = false;
+    if !x4(ctl, i).portal_made && class == STONE_17 {
+        let g = w.guid(object);
+        x4(ctl, i).portal_stone = g;
+        if !x4(ctl, i).portal_timer {
+            x4(ctl, i).portal_timer = true;
+            if let Err(e) = ctl.add_timer(CHAIN, TimerFn::TristramPortal, 1) {
+                ctl.faults.push(e);
+            }
+        }
+    }
+    w.set_object_mode(object, 2);
+}
+
+/// Tristram-portal timer `0x00592D50` (`quests-act1-rest.md` §2.3); true
+/// = remove it.
+pub(super) fn tristram_portal_timer<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    i: usize,
+) -> bool {
+    let stone = w
+        .object_by_guid(x4(ctl, i).portal_stone)
+        .and_then(|(s, _)| w.unit_position(s));
+    let Some((x, y, room)) = stone else {
+        x4(ctl, i).portal_timer = false;
+        return true;
+    };
+    if w.open_portal(None, room, x + 4, y + 4, TRISTRAM, PORTAL_TO_TRISTRAM, true)
+        .is_none()
+    {
+        return false;
+    }
+    let x = x4(ctl, i);
+    x.portal_made = true;
+    x.portal_timer = false;
+    true
+}
+
+/// Town-Cain marker init `0x005940E0` (object 385, `InitFn` 54;
+/// `quests-act1-rest.md` §3) with the init args' room and position.
+pub fn marker_init<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    object: UnitId,
+    room: RoomId,
+    x: i32,
+    y: i32,
+) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let g = w.guid(object);
+    let xd = x4(ctl, i);
+    xd.marker_guid = g;
+    xd.marker_known = true;
+    xd.marker_pos = (x, y);
+    if xd.town_cain_due && !xd.town_cain {
+        spawn_town_cain(ctl, w, i, x, y, room);
+    }
+}
+
+/// Cain leaves Tristram `0x005944F0(game, unit)`, the town-portal call of
+/// `cain1`'s NpcOutOfTown AI (`quests-act1-rest.md` §3).
+pub fn cain_leaves_tristram<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let x = x4(ctl, i);
+    x.b91 = true;
+    x.town_cain_due = true;
+    if !x.marker_known {
+        return;
+    }
+    let Some((m, _)) = w.object_by_guid(x.marker_guid) else {
+        return;
+    };
+    match w.unit_position(m) {
+        Some((mx, my, room)) => marker_init(ctl, w, m, room, mx, my),
+        None => return ctl.faults.push(QuestError::Fatal(0x0059_44F0)),
+    }
+    if !x4(ctl, i).town_cain {
+        return;
+    }
+    let Some((c, _)) = w.monster_by_guid(x4(ctl, i).town_cain_guid) else {
+        return;
+    };
+    let Some((cx, cy, croom)) = w.unit_position(c) else {
+        return;
+    };
+    let Some(room) = w.room_at(croom, cx, cy) else {
+        return;
+    };
+    if let Some(o) = w.spawn_object(room, cx, cy, CAIN_PORTAL, 1) {
+        let g = w.guid(o);
+        let x = x4(ctl, i);
+        x.cain_portal = true;
+        x.cain_portal_guid = g;
+    }
 }

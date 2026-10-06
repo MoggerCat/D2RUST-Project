@@ -456,6 +456,9 @@ pub fn run_timer<W: QuestWorld>(
             }
             true
         }
+        TimerFn::TristramPortal => ctl
+            .find(chain)
+            .is_none_or(|i| q4::tristram_portal_timer(ctl, w, i)),
         TimerFn::TowerStatus => {
             if let Some(i) = ctl.find(chain) {
                 q5::timer(ctl, w, i);

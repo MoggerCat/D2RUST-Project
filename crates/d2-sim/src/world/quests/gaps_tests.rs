@@ -458,6 +458,63 @@ impl QuestWorld for Leaving {
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.f.unhandled(chain, function)
     }
+    fn spawn_monster_flags(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        c: u16,
+        m: u8,
+        s: i32,
+        fl: u32,
+    ) -> Option<UnitId> {
+        self.f.spawn_monster_flags(r, x, y, c, m, s, fl)
+    }
+    fn open_portal(
+        &mut self,
+        o: Option<UnitId>,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        l: u32,
+        c: u16,
+        e: bool,
+    ) -> Option<UnitId> {
+        self.f.open_portal(o, r, x, y, l, c, e)
+    }
+    fn create_missile(
+        &mut self,
+        o: UnitId,
+        s: u16,
+        l: u8,
+        c: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.f.create_missile(o, s, l, c, x, y)
+    }
+    fn set_missile_target(&mut self, m: UnitId, a: u32, b: u32) {
+        self.f.set_missile_target(m, a, b)
+    }
+    fn refresh_room(&mut self, u: UnitId) {
+        self.f.refresh_room(u)
+    }
+    fn spawn_object(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        c: u16,
+        m: i32,
+    ) -> Option<UnitId> {
+        self.f.spawn_object(r, x, y, c, m)
+    }
+    fn client_save_flags(&self, p: UnitId) -> Option<u16> {
+        self.f.client_save_flags(p)
+    }
+    fn set_client_save_flags(&mut self, p: UnitId, fl: u16) {
+        self.f.set_client_save_flags(p, fl)
+    }
 }
 
 // Covers: specs/world/quests.md §4.5
@@ -682,10 +739,8 @@ fn object_quest_functions_by_class() {
     for (class, want) in [
         (0x16F, "unhandled 16 0x5b85e0"),
         (0xBD, "unhandled 32 0x588ca0"),
-        (0x1A, "unhandled 4 0x593290"),
         (0x7A, "unhandled 11 0x59b710"),
         (0x155, "unhandled 20 0x5bcac0"),
-        (0x173, "unhandled 5 0x5954f0"),
         (0x178, "unhandled 24 0x5b6710"),
         (0x1CB, "unhandled 255 0x58b940"),
         (0x1CC, "unhandled 255 0x58a500"),

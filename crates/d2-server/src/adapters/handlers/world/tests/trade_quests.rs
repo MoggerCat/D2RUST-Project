@@ -759,14 +759,15 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
     let before = f.record();
     let (code, got) = send(&mut f.h, &quest_message(g, 92));
     assert_eq!(code, ResultCode::Done);
-    // 0x28 and the text refresh (`quests.md` §10.5 r7), then S→C 0x50
-    // (15 bytes): u16 2, the slot's name, zeros (§7.5).
+    // 0x28, S→C 0x50 (15 bytes): u16 2, the slot's name, zeros (§7.5),
+    // then the text refresh (`quests.md` §10.5 r7, `quests-act1-rest.md`
+    // §8 item 8).
     let mut m50 = vec![0x50, 2, 0];
     m50.extend_from_slice(&name.to_le_bytes());
     m50.extend_from_slice(&[0; 10]);
     assert_eq!(got.len(), 4);
-    assert_eq!((got[0][0], got[1][0], got[2][0]), (0x28, 0x27, 0x29));
-    assert_eq!(got[3], m50);
+    assert_eq!((got[0][0], got[2][0], got[3][0]), (0x28, 0x27, 0x29));
+    assert_eq!(got[1], m50);
     let mut want = before;
     want[4] = (want[4] | 1 << REWARD_GRANTED) & !(1 << REWARD_PENDING);
     assert_eq!(f.record(), want);
@@ -781,11 +782,14 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
         .slots;
     assert!(slots.iter().any(|s| s.name == name && s.hired));
     // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12)
-    // after the quest call, never on `QuestRest::mercenary_reward`; the
-    // refreshed Kashya lines: the Act I intro's (`quests.md` §10.3, 24)
-    // and A1Q2's message state 4 (92, `quest-messages.tsv`).
-    let mut log = vec![format!("text list {} [(24, 0), (92, 2)]", f.kashya.0)];
-    log.extend(["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"].map(String::from));
+    // after the quest call, never on `QuestRest::mercenary_reward`, and
+    // before the refresh; the refreshed Kashya lines: the Act I intro's
+    // (`quests.md` §10.3, 24) and A1Q2's message state 4 (92,
+    // `quest-messages.tsv`).
+    let mut log: Vec<String> = ["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"]
+        .map(String::from)
+        .into();
+    log.push(format!("text list {} [(24, 0), (92, 2)]", f.kashya.0));
     assert_eq!(f.take_log(), log);
     assert_eq!(f.errors(), Vec::<String>::new());
 }

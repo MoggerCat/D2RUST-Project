@@ -1035,6 +1035,7 @@ fn cain_removal_waits_for_an_open_chat() {
 }
 
 // Covers: specs/world/quests.md §10.6 r15
+// Covers: specs/world/quests-act1-rest.md §8 r3
 #[test]
 fn town_cain_spawn() {
     let room = RoomIdT(1);
@@ -1042,13 +1043,14 @@ fn town_cain_spawn() {
     let setup = |pos: (i32, i32), spawns: Vec<Option<UnitId>>, spot| {
         let (mut ctl, _) = control();
         let mut f = cain_fake();
-        f.monsters.insert(beside, (0x30, 150, npc_kind(150)));
+        // The anchor is the town-Cain marker object (class 385).
+        f.objects.insert(beside, (0x30, 385, 0));
         f.pos.insert(beside, (pos.0, pos.1, room));
         f.rooms.insert(room, (0, 0, 12, 12));
         f.spawns = spawns;
         f.spot = spot;
         let x = q4_mut(&mut ctl);
-        (x.beside_known, x.beside_guid, x.town_cain_due) = (true, 0x30, true);
+        (x.marker_known, x.marker_guid, x.town_cain_due) = (true, 0x30, true);
         ctl.changed_level(&mut f, P1, 2, 1);
         f.log.retain(|l| !l.starts_with("unhandled")); // Acts II–V event 3
         (ctl, f)
@@ -1293,7 +1295,13 @@ fn stone_order_tree_and_stones() {
     assert_eq!(f.objects[&linked].2, 6);
     assert!(f.log.contains(&"delete bkd ".to_string()));
     // The portal beside the stone of value 21, status 4, 4.4, `89 01`.
-    assert!(f.log.contains(&"object 288 106 97".to_string()));
+    // The cairnstones missile (owner the player, skill 0, level 1), its
+    // room refreshed.
+    let at = f
+        .log
+        .iter()
+        .position(|l| l == "missile 288 owner 1 skill 0 level 1 106 97");
+    assert_eq!(f.log[at.unwrap() + 1], "refresh 36865");
     assert!(f.flags(P1).get(4, bit::ENTER_AREA));
     assert_eq!(f.sent[0], (P1, hex("5d 04 00 04 0000")));
     assert_eq!(f.sent.last().unwrap().1, [0x89, 1]);
@@ -1408,10 +1416,8 @@ fn countess_kill_and_timer() {
     assert_eq!(f.flags(P3).word(5), 0x6001);
     assert_eq!(f.flags(P2).word(5), 0x4000);
     assert_eq!(sent(&f), [(P2, hex("5d 05 00 0c 0000"))]);
-    assert_eq!(
-        f.log,
-        ["sound 1 37", "unhandled 5 0x5954f0", "event7 64 10"]
-    );
+    // The trap step: no chest listed, no trap; the victim's event 7.
+    assert_eq!(f.log, ["sound 1 37", "event7 64 10"]);
     // Timer 7: status 13 at tick 28 (M1: everyone here).
     f.sent.clear();
     for _ in 0..7 {
@@ -1467,11 +1473,13 @@ fn tower_restore_and_objects() {
     let chest = UnitId(0x72);
     act1::q5::chest_init(&mut ctl, &mut f, chest);
     assert_eq!(q5(&ctl).chests, [0x72]);
-    assert_eq!(f.log, ["unhandled 5 0x5954f0"]);
+    // Not killed: the trap step does nothing.
+    assert!(f.log.is_empty());
     ctl.record_mut(5).unwrap().extra.q5.killed = true;
     f.log.clear();
+    // Killed, the chest is gone: no trap, the reschedule.
     object_event(&mut ctl, &mut f, chest, 0x173);
-    assert_eq!(f.log, ["unhandled 5 0x5954f0", "event7 114 10"]);
+    assert_eq!(f.log, ["event7 114 10"]);
     // Object init `0x00595A00`: switched off → mode 3.
     ctl.record_mut(5).unwrap().not_intro = false;
     f.log.clear();
@@ -1565,10 +1573,14 @@ fn slaughter_start_catacombs_and_reward() {
 }
 
 // Covers: specs/world/quests.md §10.8 r4, §10.8 r5, §10.8 r6, §10.8 text, §5 text
+// Covers: specs/world/quests-act1-rest.md §5 r1, §5 r2, §5 r3
 #[test]
 fn andariel_kill_and_portal_timer() {
     let (mut ctl, _) = control();
     let mut f = cain_fake();
+    // Expansion characters at progression 0 (save flags bit 5).
+    f.client_flags.insert(P1, 0x0020);
+    f.client_flags.insert(P2, 0x0020);
     f.p(P1).level = Some(37);
     f.pos.insert(P1, (30, 40, RoomIdT(2)));
     f.players.insert(P2, player(2, Some(37)));
@@ -1593,11 +1605,11 @@ fn andariel_kill_and_portal_timer() {
     assert!(x.cain.contains(1) && x.akara.contains(2) && x.kashya.contains(1));
     assert_eq!(f.flags(P1).word(6), 0x2002);
     assert_eq!(f.flags(P2).word(6), 0x2002);
-    // The killer's credit, the gem draws, O3 credits both (the `0x00538680`
-    // call is reported), O6 sound 33.
-    let mut want = vec!["unhandled 6 0x538680".to_string()];
+    // The killer's credit, the gem draws, O3 credits both (each credit
+    // raises the progression to 5 · 0 + 1), O6 sound 33.
+    let mut want = vec!["progression 1 0x0120".to_string()];
     want.extend(gems);
-    want.extend(["unhandled 6 0x538680", "unhandled 6 0x538680"].map(String::from));
+    want.extend(["progression 1 0x0120", "progression 2 0x0120"].map(String::from));
     want.extend(["sound 1 33", "sound 2 33"].map(String::from));
     assert_eq!(f.log, want);
     assert!(f.sent.is_empty());

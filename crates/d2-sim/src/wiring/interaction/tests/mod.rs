@@ -312,6 +312,9 @@ pub struct Rest {
     pub store: Vec<(u16, UnitId)>,
     pub last_bought: BTreeMap<UnitId, u32>,
     pub log: Vec<String>,
+    /// The quest sends (first byte; 0x27 for a text list) and the
+    /// mercenary spawn / init, in call order.
+    pub trace: Vec<String>,
 }
 
 impl Rest {
@@ -425,9 +428,11 @@ impl NpcRest for Rest {
     }
     fn spawn_mercenary(&mut self, _: UnitId, class: u32, mode: u8) -> Option<UnitId> {
         self.log.push(format!("spawn merc {class} {mode}"));
+        self.trace.push(format!("spawn merc {mode}"));
         self.merc
     }
     fn init_mercenary(&mut self, _: UnitId, merc: UnitId, init: &MercInit) {
+        self.trace.push("init merc".into());
         self.log.push(format!(
             "init merc {} row {} name {} price {:?}",
             merc.0,
@@ -578,9 +583,12 @@ impl QuestRest for Rest {
         self.log.push(format!("sound {} {sound}", u.0));
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.trace.push(format!("{:#04x}", msg[0]));
         self.sent.push((player, msg.to_vec()));
     }
-    fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
+    fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {
+        self.trace.push("0x27".into());
+    }
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
