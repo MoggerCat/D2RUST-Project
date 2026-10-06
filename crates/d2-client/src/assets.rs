@@ -9,6 +9,7 @@
 
 pub mod cache;
 pub mod path;
+pub mod prefetch;
 pub mod size;
 pub mod tbl;
 

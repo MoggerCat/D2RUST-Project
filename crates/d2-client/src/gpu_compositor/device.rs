@@ -86,6 +86,39 @@ impl Gpu {
         Ok((indices, rgba.unwrap_or_default()))
     }
 
+    /// The atlas pages as the compositor's texture array (layer = page,
+    /// bytes unchanged), for a caller that keeps it across frames (the
+    /// in-app render node, `app::compose_node`).
+    pub fn atlas_texture(&self, pages: &[AtlasPage]) -> wgpu::Texture {
+        self.upload_pages(pages)
+    }
+
+    /// Records both dispatches of `packed` into `encoder` over a resident
+    /// atlas (from [`Gpu::atlas_texture`] of `pages` pages) and returns
+    /// the RGBA8 buffer: one RGBA8 word per pixel, rows of `width × 4`
+    /// bytes, usable as a copy source. Nothing is submitted or read back;
+    /// `None` for an empty view.
+    pub fn encode_rgba(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        packed: &Packed,
+        atlas: &wgpu::Texture,
+        pages: u32,
+        palette: &Palette,
+    ) -> Result<Option<wgpu::Buffer>, GpuError> {
+        if pages != packed.params.pages {
+            return Err(GpuError::PageCount {
+                pages: pages as usize,
+                packed: packed.params.pages,
+            });
+        }
+        if packed.pixel_count() == 0 {
+            return Ok(None);
+        }
+        self.check_limits(packed, u64::from(pages))?;
+        Ok(self.encode(encoder, packed, atlas, Some(palette)).1)
+    }
+
     fn run(
         &self,
         packed: &Packed,
@@ -103,6 +136,41 @@ impl Gpu {
             return Ok((Vec::new(), palette.map(|_| Vec::new())));
         }
         self.check_limits(packed, pages.len() as u64)?;
+        let out_size = pixels * 4;
+        let atlas = self.upload_pages(pages);
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let (indices, rgba) = self.encode(&mut encoder, packed, &atlas, palette);
+        let read_index = self.staging(&mut encoder, &indices, out_size);
+        let read_rgba = rgba
+            .as_ref()
+            .map(|b| self.staging(&mut encoder, b, out_size));
+        self.queue.submit([encoder.finish()]);
+
+        // One u32 per pixel holding 0..=255: keep the low byte.
+        let index_bytes = self.read(&read_index)?;
+        let out: Vec<u8> = index_bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|w| w[0])
+            .collect();
+        let rgba = match read_rgba {
+            Some(b) => Some(self.read(&b)?),
+            None => None,
+        };
+        Ok((out, rgba))
+    }
+
+    /// Records the compose dispatch (and the RGBA one with a palette);
+    /// returns the index and RGBA output buffers. Limits are checked by
+    /// the caller.
+    fn encode(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        packed: &Packed,
+        atlas: &wgpu::Texture,
+        palette: Option<&Palette>,
+    ) -> (wgpu::Buffer, Option<wgpu::Buffer>) {
         let d = &self.device;
         let init = |label, contents: &[u8], usage| {
             d.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -121,7 +189,7 @@ impl Gpu {
         let ranges = init("bin ranges", &packed.bin_ranges_bytes(), storage);
         let bin_items = init("bin items", &packed.bin_items_bytes(), storage);
         let maps = init("maps", &packed.maps_bytes(), storage);
-        let out_size = pixels * 4;
+        let out_size = packed.pixel_count() as u64 * 4;
         let output = |label| {
             d.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
@@ -131,7 +199,6 @@ impl Gpu {
             })
         };
         let indices = output("indices");
-        let atlas = self.upload_pages(pages);
         let atlas_view = atlas.create_view(&wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2Array),
             ..Default::default()
@@ -157,7 +224,6 @@ impl Gpu {
             packed.params.width.div_ceil(WORKGROUP),
             packed.params.height.div_ceil(WORKGROUP),
         );
-        let mut encoder = d.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_compute_pass(&Default::default());
             pass.set_pipeline(&self.compose);
@@ -189,25 +255,7 @@ impl Gpu {
             drop(pass);
             rgba
         });
-        let read_index = self.staging(&mut encoder, &indices, out_size);
-        let read_rgba = rgba
-            .as_ref()
-            .map(|b| self.staging(&mut encoder, b, out_size));
-        self.queue.submit([encoder.finish()]);
-
-        // One u32 per pixel holding 0..=255: keep the low byte.
-        let index_bytes = self.read(&read_index)?;
-        let out: Vec<u8> = index_bytes
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|w| w[0])
-            .collect();
-        let rgba = match read_rgba {
-            Some(b) => Some(self.read(&b)?),
-            None => None,
-        };
-        Ok((out, rgba))
+        (indices, rgba)
     }
 
     fn check_limits(&self, packed: &Packed, pages: u64) -> Result<(), GpuError> {

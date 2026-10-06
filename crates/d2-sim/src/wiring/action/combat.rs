@@ -1,4 +1,4 @@
-// Spec: specs/combat/hit.md, specs/combat/damage.md, specs/skills/levels.md (seams `CombatWorld`, `SkillUnits`)
+// Spec: specs/combat/hit.md, specs/combat/damage.md, specs/skills/levels.md, specs/monsters/init.md §22 (seams `CombatWorld`, `SkillUnits`)
 //! Combat ↔ stats and unit fields: [`CombatView`] implements
 //! [`CombatWorld`] and [`SkillUnits`] on the unit records
 //! ([`crate::units::record`]), the stat lists ([`crate::stats`]), the
@@ -11,8 +11,10 @@ use crate::game::Game;
 use crate::rng::Seed;
 use crate::skills::{SkillEntry, SkillUnits};
 use crate::stats::key_layer;
+use crate::units::hooks::Sim;
 use crate::units::{UnitId, UnitType};
 
+use super::monsters::umod_mode;
 use super::{Pending, View};
 
 /// Hireling monster classes (`0x0063EE90`, `monsters/init.md` §6 step 4).
@@ -158,8 +160,10 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn moving_mode(&self, u: UnitId) -> bool {
         self.v.h.x.moving_mode(u)
     }
+    /// `0x005A0180`: the lent monster world's type flags
+    /// ([`super::ActionHooks::monster_flag`]).
     fn monster_flag(&self, u: UnitId, mask: u32) -> bool {
-        self.v.h.x.monster_flag(u, mask)
+        self.v.h.monster_flag(u, mask)
     }
     fn is_boss(&self, u: UnitId) -> bool {
         self.v.h.x.is_boss(u)
@@ -301,8 +305,19 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn set_last_attacker(&mut self, d: UnitId, a: UnitId) {
         self.v.h.x.set_last_attacker(d, a);
     }
+    /// `0x005A4390(game, attacker)` (`damage.md` §5.2 step 9): the umod
+    /// dispatcher in mode 3 (`init.md` §22) on the lent monster world;
+    /// without one, [`Pending::monster_hit_hook`].
     fn monster_hit_hook(&mut self, a: UnitId) {
-        self.v.h.x.monster_hit_hook(a);
+        let mut sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
+        };
+        if !self.v.h.run_umods(&mut sim, a, None, umod_mode::HIT) {
+            self.v.h.x.monster_hit_hook(a);
+        }
     }
     fn monster_damaged_hook(&mut self, d: UnitId) {
         self.v.h.x.monster_damaged_hook(d);

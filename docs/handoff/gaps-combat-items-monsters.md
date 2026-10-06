@@ -1,6 +1,6 @@
 # Gap tests: treasure, combat/hit, skills/levels, monsters/population
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by the docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/gaps-combat-items-monsters`, from `main` at `edad871`.
 Cloud session, tests from specs only (M14 medium, M08). Test code only;
