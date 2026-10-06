@@ -1,6 +1,6 @@
 # Handoff: gap tests for the newly implemented specs — `claude/gaps-new-specs`
 
-> Not yet folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md`; this file is the detailed record until a docs session folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, task class: tests from specs, medium
 (M14). Base: `claude/tender-meitner-mphas3` at `edd9925`. Repo only, no

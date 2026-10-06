@@ -1,6 +1,6 @@
 # Mutation testing: monsters, missiles
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/mutants-monsters-missiles`, from `claude/tender-meitner-mphas3`
 at `4b5b0bf`. Cloud test session, medium effort, METHODS M08 (prove the
