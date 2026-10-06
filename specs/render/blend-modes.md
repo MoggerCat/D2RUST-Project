@@ -21,18 +21,18 @@
 | Outputs / state changes | 60–63 |
 | Rules | 64–65 |
 |   1. Draw modes | 66–90 |
-|   2. Blend-table orientation (per drawer) | 91–115 |
-|   3. Draw mode of a composite unit component | 116–161 |
-|   4. Single-cel units and overlays | 162–173 |
-|   5. Shadows (the darkening blend) | 174–236 |
-|   6. Translucent walls and roofs | 237–254 |
-|   7. d2rs answers | 255–265 |
-| Constants & data dependencies | 266–274 |
-| Randomness | 275–278 |
-| Edge cases & original bugs | 279–289 |
-| Test vectors | 290–317 |
-| Provenance | 318–339 |
-| Open questions | 340–358 |
+|   2. Blend-table orientation (per drawer) | 91–126 |
+|   3. Draw mode of a composite unit component | 127–172 |
+|   4. Single-cel units and overlays | 173–184 |
+|   5. Shadows (the darkening blend) | 185–247 |
+|   6. Translucent walls and roofs | 248–265 |
+|   7. d2rs answers | 266–276 |
+| Constants & data dependencies | 277–285 |
+| Randomness | 286–289 |
+| Edge cases & original bugs | 290–300 |
+| Test vectors | 301–328 |
+| Provenance | 329–350 |
+| Open questions | 351–369 |
 <!-- /index -->
 
 ## Summary
@@ -112,6 +112,17 @@ symmetric in all five act PL2 files (0 of 65,536 entries differ from their
 transpose), so additive and multiplicative draws cannot show the
 orientation; the three alpha tables and `MAX` can (act 1 `A0`: 65,066
 asymmetric entries).
+
+**Additive and multiplicative order (frame-cycle FC2).** `ADD` and `MUL`
+are stored like the alpha tables (`formats/palette.md` layout: byte
+`256·i + j`) and every drawer above reads them with the same row as
+for alpha (row = destination for cels and shadows, row = source for the
+lit translucent wall). Code shall index them exactly as the drawer does
+(`T[256·d + s']`, or the wall's transpose), not as "[level][source]";
+because both tables are symmetric in all five act files, either order
+gives identical pixels on 1.14d data, so no capture can distinguish
+them and none is queued. A `d2-formats` doc comment that names an
+order states the storage order only (`formats/palette.md` OQ2).
 
 ### 3. Draw mode of a composite unit component
 
