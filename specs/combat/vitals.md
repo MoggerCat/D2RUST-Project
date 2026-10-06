@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 215–226 |
 | Test vectors | 227–247 |
 | Provenance | 248–259 |
-| Open questions | 260–280 |
+| Open questions | 260–281 |
 <!-- /index -->
 
 ## Summary
@@ -265,7 +265,8 @@ stat points: three spends succeed, the fourth fails, result 2.
 2. Ghidra request: read `0x0057E480` (experience gain: `ExpRatio`, stat
    85, hireling cap) and its callers `0x0057E6C0` / `0x0057E990`
    (distribution, party share with its float math, add function and
-   event 12) against §4.3.
+   event 12) against §4.3. The hireling part (86/256 share, 1/64-level
+   cap, 1.14d adds 2·gain) is confirmed in `world/hirelings.md` §7.
 3. §4.2 branch for `dlvl > alvl`: confirm the operand roles of the
    `pct(exp, alvl, dlvl)` call (the read gives EAX = defender level,
    EDX = attacker level, ECX = experience).

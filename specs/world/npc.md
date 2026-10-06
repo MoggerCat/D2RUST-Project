@@ -40,10 +40,10 @@
 |   10. Dead code in 1.14d (no caller, no pointer reference) | 453–464 |
 | Constants & data dependencies | 465–477 |
 | Randomness | 478–490 |
-| Edge cases & original bugs | 491–517 |
-| Test vectors | 518–536 |
-| Provenance | 537–563 |
-| Open questions | 564–577 |
+| Edge cases & original bugs | 491–524 |
+| Test vectors | 525–543 |
+| Provenance | 544–570 |
+| Open questions | 571–584 |
 <!-- /index -->
 
 ## Summary
@@ -514,6 +514,13 @@ Reproduced by default.
 9. Nihlathak (514) owns a store but no trade action; he can still be
    sold to while gambling (`vendors.md` §7.2).
 10. 0x58 byte 6 is not written (stack), like 0x2A bytes 3–6.
+11. §7.4 step 2 uses `0x00574EC0(7, 1)`, which returns the first
+    hireling node whether dead or alive: a crafted 0x62 with a living
+    hireling is charged and reaches the revive (`world/hirelings.md`
+    §9, edge case 5).
+12. The §7.3 step 1 cap (12, 20, 28, 36, 45) only feeds the Kashya
+    `lvl < 8` gate; the offer level and price use the uncapped player
+    level (`world/hirelings.md` §2).
 
 ## Test vectors
 

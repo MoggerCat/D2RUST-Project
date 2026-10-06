@@ -682,4 +682,4 @@ the recorded game is regenerated from its seeds):
    its `roll(100)` table `0x006E1064` are not specified (owner: a client
    resync spec). Settle: Ghidra `0x0054CD50`; record a 0x5F.
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
-   mercenary spec.
+   mercenary spec (`world/hirelings.md` §6).
