@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md (§4–§7, §10), specs/render/sprite-placement.md (§5, §7, §8)
+// Spec: specs/render/camera.md (§4–§7, §10), specs/render/sprite-placement.md (§5, §7, §8), specs/render/draw-order.md (§5, §10)
 //! [`OriginalView`]: the world view's placement hooks answered by the
 //! original's rules. `tiles` places map tiles (camera §6, culled by §7,
 //! DT1 images by placement §7/§8), `unit_params` sets the frame clip
@@ -18,6 +18,7 @@ use crate::ui::{ImageRequest, TextRequest};
 use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
 use super::camera::{Camera, TileList, UnitPosition};
+use super::draw_order::UnitSlot;
 use super::placement;
 
 /// One DT1 block's rectangle in tile coordinates (`b.x`, `b.y`, size),
@@ -64,7 +65,7 @@ pub struct MapTile {
     pub shade: ShadeChain,
     /// TODO(spec: render/blend-modes.md) (roof fade, translucent walls).
     pub blend: BlendOp,
-    /// TODO(spec: render/draw-order.md).
+    /// `draw-order.md` §10 (`rules::draw_order::source`).
     pub key: DrawKey,
 }
 
@@ -80,13 +81,22 @@ pub trait ViewSource {
     /// the per-unit extra offsets `(ox, oy)`.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String>;
 
-    /// TODO(spec: render/draw-order.md, DRLG): the tiles of the frame, in
-    /// draw order, each with its list.
+    /// The tiles of the frame, each with its list and draw key. A feed
+    /// with the §9 map-tile feed of `draw-order.md` is wrapped in
+    /// `draw_order::source::OrderedSource`, which answers this; a source
+    /// without one states its tiles directly.
     fn map_tiles(
         &self,
         world: &ClientWorld,
         assets: &ViewAssets,
     ) -> Result<Vec<MapTile>, ViewError>;
+
+    /// The unit's slot in the frame's draw order (`draw-order.md` §3 r4,
+    /// §5, §10). [`UnitSlot::Unordered`] (the default) leaves the unit and
+    /// its keys to the wrapped rules.
+    fn unit_slot(&self, _unit: &ClientUnit) -> UnitSlot {
+        UnitSlot::Unordered
+    }
 }
 
 /// The original's camera and placement over wrapped rules `R` (pose,
@@ -252,11 +262,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         world: &ClientWorld,
         unit: &ClientUnit,
     ) -> Result<Option<UnitPose>, ViewError> {
+        if self.source.unit_slot(unit) == UnitSlot::NotDrawn {
+            return Ok(None);
+        }
         self.rules.unit_pose(world, unit)
     }
 
-    /// Draw keys from the wrapped rules (`draw-order.md`); the clip is the
-    /// frame (camera §10: the play area is not a clip).
+    /// Draw keys from the draw order (`draw-order.md` §10) when the
+    /// source has one, else from the wrapped rules; the clip is the frame
+    /// (camera §10: the play area is not a clip).
     fn unit_params(
         &self,
         world: &ClientWorld,
@@ -264,6 +278,11 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         pose: &UnitPose,
     ) -> Result<UnitParams, ViewError> {
         let mut params = self.rules.unit_params(world, unit, pose)?;
+        if let UnitSlot::Drawn(at) = self.source.unit_slot(unit) {
+            params.pass = at.pass;
+            params.major = at.major;
+            params.minor = at.minor;
+        }
         params.clip = self.camera.size.rect();
         Ok(params)
     }
@@ -338,7 +357,8 @@ impl<R: UiRules + ?Sized, S: ?Sized> UiRules for OriginalView<'_, R, S> {
         self.rules.ui_text(req, assets)
     }
 
+    /// Pass 11: everything after the world draw (`draw-order.md` §10).
     fn ui_pass(&self) -> Result<u32, ViewError> {
-        self.rules.ui_pass()
+        Ok(crate::scene::order::pass::UI)
     }
 }
