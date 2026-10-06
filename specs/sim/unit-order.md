@@ -1,6 +1,10 @@
 # Spec: Simulation — Unit ordering
 
-- **Status:** draft (implemented in `d2-sim`; synthetic vectors pass, trace replay pending); rules read from the 1.14d
+- **Status:** conformance-passing: `cargo test -p conformance --test
+  tick_replay` reproduces all 446 list snapshots of
+  `traces/sim/tick/sim-0006..0008` in `d2-sim` with 0 mismatches
+  (2026-10-06; the client list §7 has one client and no recorded joins,
+  the adjacent-room arrays §9 are not compared). Rules read from the 1.14d
   `Game.exe` code; §2, §4, §5, §6 confirmed on the running game:
   `check_tick.py` reproduces all 197 list snapshots of
   `traces/raw/20261006-015554-tick.jsonl` (4,902 ticks, hand-played)
@@ -19,26 +23,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–57 |
-| Inputs | 58–66 |
-| Outputs / state changes | 67–71 |
-| Rules | 72–73 |
-|   1. Unit identity and GUIDs | 74–95 |
-|   2. Game unit hash lists | 96–134 |
-|   3. Unit placement and removal (list bookkeeping) | 135–146 |
-|   4. Act room lists (active rooms) | 147–157 |
-|   5. Room unit lists | 158–175 |
-|   6. Room update queues | 176–195 |
-|   7. Client list | 196–204 |
-|   8. Unit timer lists | 205–212 |
-|   9. Adjacent-room arrays (dependency) | 213–221 |
-|   10. Iteration and modification | 222–238 |
-| Constants & data dependencies | 239–249 |
-| Randomness | 250–256 |
-| Edge cases & original bugs | 257–267 |
-| Test vectors | 268–299 |
-| Provenance | 300–317 |
-| Open questions | 318–329 |
+| Summary | 48–61 |
+| Inputs | 62–70 |
+| Outputs / state changes | 71–75 |
+| Rules | 76–77 |
+|   1. Unit identity and GUIDs | 78–99 |
+|   2. Game unit hash lists | 100–138 |
+|   3. Unit placement and removal (list bookkeeping) | 139–150 |
+|   4. Act room lists (active rooms) | 151–161 |
+|   5. Room unit lists | 162–179 |
+|   6. Room update queues | 180–199 |
+|   7. Client list | 200–208 |
+|   8. Unit timer lists | 209–216 |
+|   9. Adjacent-room arrays (dependency) | 217–225 |
+|   10. Iteration and modification | 226–242 |
+| Constants & data dependencies | 243–253 |
+| Randomness | 254–260 |
+| Edge cases & original bugs | 261–271 |
+| Test vectors | 272–303 |
+| Provenance | 304–321 |
+| Open questions | 322–333 |
 <!-- /index -->
 
 ## Summary
