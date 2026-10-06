@@ -9,7 +9,12 @@
 //!   cube and quests → items and unit fields.
 //! - [`action`]: combat, missiles, monster AI, DRLG and waypoints ↔ units,
 //!   stats and rooms; the combined timer-event dispatcher the tick runs.
+//! - [`worldgen`]: DRLG level types (maze, outdoor, preset), population
+//!   and monster init ↔ DRLG rooms, units and stats.
+//! - [`interaction`]: NPCs ↔ vendors, quests, items; skill use ↔ missiles
+//!   and combat; vitals ↔ stats and the tick.
 
 pub mod action;
 pub mod economy;
+pub mod interaction;
 pub mod worldgen;

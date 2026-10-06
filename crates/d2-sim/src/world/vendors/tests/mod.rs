@@ -521,7 +521,7 @@ impl NpcLink for Fake {
     fn set_hire_list_made(&mut self, class: u16) {
         self.hire_made.push(class);
     }
-    fn make_hire_list(&mut self, class: u16) {
+    fn make_hire_list(&mut self, class: u16, _: &mut crate::rng::Seed) {
         self.log.push(format!("hire list {class}"));
     }
 }
