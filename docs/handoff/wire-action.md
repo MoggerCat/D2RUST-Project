@@ -1,5 +1,7 @@
 # Handoff: wiring of the action seams (`d2_sim::wiring::action`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/wire-action`, from `claude/bold-ptolemy-jvyvxy` at
 `ed7236e` (cloud session, 2026-10-06). Task class: integration from
 clear specs, medium (METHODS M14). Scope of every claim: this branch,

@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C6 × C5 — verify harness GPU half + COF cases
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/p6-verify-gpu`, from `claude/bold-ptolemy-jvyvxy`
 at `a5b323a` (2026-10-06, cloud, repo only: no game files). Spec:
 `specs/client/render-pipeline.md` §A7, §A9, §A10, Test vectors.

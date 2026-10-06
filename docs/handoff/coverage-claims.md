@@ -1,5 +1,7 @@
 # Handoff: coverage claims on existing tests (branch `claude/coverage-claims`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: `// Covers:` claims (`docs/COVERAGE.md` §2) added to tests that had
 none, in `crates/conformance`, `d2-proto`, `d2-server`, `d2-sim` and
 `d2-client`. The branch starts from `claude/bold-ptolemy-jvyvxy` at `ed7236e`

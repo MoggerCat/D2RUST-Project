@@ -1,5 +1,7 @@
 # Handoff: skill use pipeline and vitals (branch `claude/impl-skilluse-vitals`, 2026-10-06)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: implementation of `specs/skills/use.md` (+ `specs/skills/functions.tsv`)
 and `specs/combat/vitals.md` in `d2-sim`, started from
 `claude/bold-ptolemy-jvyvxy` at `a5b323a` (cloud session, repo only). Files

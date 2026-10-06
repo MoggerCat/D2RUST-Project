@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C6 — verify harness (`d2_client::verify`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/p6-verify`, from `claude/bold-ptolemy-jvyvxy` at `ed7236e`
 (2026-10-06, cloud, repo only: no game files, no GPU). Spec:
 `specs/client/render-pipeline.md` §A10 and Test vectors (d2rs-own design

@@ -1,5 +1,7 @@
 # Handoff: Phase 6 C7 — `d2-client::composite` (COF composite mechanics)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/p6-cof`, from `claude/bold-ptolemy-jvyvxy` at
 `ed7236e` (2026-10-06, cloud, repo only). Spec:
 `specs/client/render-pipeline.md` §A7 (d2rs-own design draft), on top of
