@@ -156,7 +156,7 @@ fixed GUID):
    (`unit-order.md` §3.1). Then a player in mode 0 or 17, or a monster
    for which `0x0063EA40` holds and `0x004638A0(class, 0x13)` does not,
    gets path settings (`0x00649560(1)`, `0x00649190(5)`,
-   `0x00648C30(0x8000)`; owned by the path spec).
+   `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3).
 
 Events scheduled by a per-kind init are listed in §6 (missile: §6.3;
 objects: their init functions, §6.4).
@@ -246,7 +246,7 @@ types 0 and 1 first (`0x00553990`).
 #### 4.5 Player mode starts
 
 `0x005809D0` (to a position) and `0x00580A70` (to a unit, by GUID) check
-the request (`0x0057EDD0`, `0x0057EEC0`), set the target and call the
+the request (`0x0057EDD0`, `0x0057EEC0`; rules: `sim/pathing.md` §1.3–§1.4), set the target and call the
 mode's function from table `0x006E1740` (20 rows × {position form, unit
 form}; null forms fatal):
 
