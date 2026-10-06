@@ -2805,3 +2805,76 @@ fn cliff_marking_by_the_rules() {
     assert_eq!(g.info.flags & 0x20, 0);
     assert_eq!(cliff_model(&vs), (vec![0; 6], false));
 }
+
+/// `outdoor.md` §7.2 steps 2–3: with flags 0x20 (no 0x40) one step, bit
+/// := lo' & 1; bit 0 scans rows then columns, bit 1 uses (outer over gh,
+/// inner over gw) as (x, y); the first grid-0 cell 16 → stamp 25, 17 →
+/// 24, flags |= 0x40. With flags & 0x1C (no 0x40): y := gh − 4, x := gw −
+/// 4 if 0x10 else gw − 5; r := lo' & 3: odd → x := 3, ≥ 2 → y := 3;
+/// stamp 52 in level 2 else 51; flags |= 0x40.
+#[test]
+fn river_caves_cliff_and_side_cave() {
+    let mut seen = [false; 2];
+    for k in 0..12u32 {
+        let mut e = Env::new(4, 7, 9);
+        e.drlg.level_mut(e.l).seed = Seed::init_low(100 + 7919 * k);
+        e.info.flags = 0x20;
+        e.info.grids[0].op(4, 1, Op::Set, 16);
+        e.info.grids[0].op(1, 3, Op::Set, 17);
+        let mut s = e.seed();
+        let bit = s.step() & 1;
+        seen[bit as usize] = true;
+        let mut g = e.gen();
+        g.river_caves().unwrap();
+        let (x, y, p) = if bit == 0 { (4, 1, 25) } else { (1, 3, 24) };
+        assert_eq!(g.g(0, x, y), p, "k {k}");
+        assert_eq!(g.info.flags & 0x40, 0x40);
+        // F = −1: the build list's first roll(Files = 1), file 0.
+        s.step();
+        assert_eq!(*g.seed(), s);
+        assert_eq!(super::grid::file_of(g.g(2, x, y)), 0);
+    }
+    assert_eq!(seen, [true, true]);
+    let mut seen = [false; 4];
+    for (id, flags) in [(2, 0x10), (4, 0x10), (4, 0x4), (4, 0x8)] {
+        for k in 0..10u32 {
+            let (gw, gh) = (9, 8);
+            let mut e = Env::new(id, gw, gh);
+            e.drlg.level_mut(e.l).seed = Seed::init_low(300 + 7919 * k);
+            e.info.flags = flags;
+            // A direction bit in column gw − 2: no river (step 1).
+            e.info.grids[2].op(gw - 2, 0, Op::Set, cell::DIRECTION);
+            let mut s = e.seed();
+            let r = s.step() & 3;
+            seen[r as usize] = true;
+            let mut x = if flags & 0x10 != 0 { gw - 4 } else { gw - 5 };
+            let mut y = gh - 4;
+            if r & 1 != 0 {
+                x = 3;
+            }
+            if r >= 2 {
+                y = 3;
+            }
+            let mut g = e.gen();
+            g.river_caves().unwrap();
+            let p = if id == 2 { 52 } else { 51 };
+            assert_eq!(g.g(0, x, y), p, "level {id} flags {flags:#x} k {k}");
+            assert_eq!(g.info.flags & 0x40, 0x40);
+            s.step();
+            assert_eq!(*g.seed(), s);
+            assert_eq!(super::grid::file_of(g.g(2, x, y)), 0);
+        }
+    }
+    assert_eq!(seen, [true; 4]);
+    // Step 1: a row with the direction bit in both columns gw − 2 and
+    // gw − 1 also blocks the river (OR, not XOR).
+    let mut e = Env::new(4, 9, 8);
+    e.info.flags = 0x4 | 0x40;
+    e.info.grids[2].op(7, 2, Op::Set, cell::DIRECTION);
+    e.info.grids[2].op(8, 2, Op::Set, cell::DIRECTION);
+    let s = e.seed();
+    let mut g = e.gen();
+    g.river_caves().unwrap();
+    assert!(g.info.grids[0].cells.iter().all(|&c| c != 26 && c != 27));
+    assert_eq!(*g.seed(), s);
+}
