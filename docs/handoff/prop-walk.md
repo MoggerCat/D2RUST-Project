@@ -106,5 +106,8 @@ default case count:
 
 ## 5. Gate
 
-`sh tools/gate.sh all` on this branch: see the commit message for the
-summary.
+`sh tools/gate.sh all` on this branch (2026-10-06, at `eb20a75`):
+**GATE: PASS**. spec_index, methods, coverage `--check` / `--selftest`,
+trace checkers, pre-commit selftest, fmt, depcheck (+determinism),
+workspace clippy, `d2-sim` + conformance tests, the other crates' tests,
+`d2-client` tests (322 / 322), doc-tests: all PASS.
