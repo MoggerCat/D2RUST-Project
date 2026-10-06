@@ -922,6 +922,8 @@ fn generation_dispatches_by_act() {
 
 /// One-cell outdoor level `id` of level type `lt` (one outdoor room),
 /// generated directly; returns the DRLG, the outdoor state and the room.
+/// The callers use level 107, whose act build stamps nothing (Kurast 79,
+/// used before, now stamps its border rows, `outdoor.md` §9.4).
 fn one_room_level(id: u32, lt: u32, od: &OutdoorData) -> (Drlg, Outdoor, DrlgRoomId) {
     let mut data = data();
     data.levels[id as usize].drlg_type = 3;
@@ -952,8 +954,8 @@ fn one_room_level(id: u32, lt: u32, od: &OutdoorData) -> (Drlg, Outdoor, DrlgRoo
 #[test]
 fn outdoor_room_takes_sub_type_theme_and_pick() {
     let mut od = od();
-    od.levels[79].sub_type = 5;
-    od.levels[79].sub_theme = 1;
+    od.levels[107].sub_type = 5;
+    od.levels[107].sub_theme = 1;
     for p in [100, 0, 100] {
         od.subs.push(SubRow {
             type_: 5,
@@ -961,7 +963,7 @@ fn outdoor_room_takes_sub_type_theme_and_pick() {
             ..SubRow::default()
         });
     }
-    let (_, o, r) = one_room_level(79, 0, &od);
+    let (_, o, r) = one_room_level(107, 0, &od);
     let room = o.room(r).unwrap();
     assert_eq!((room.sub_type, room.sub_theme, room.picked), (5, 1, 0b101));
 }
@@ -972,7 +974,7 @@ fn outdoor_room_takes_sub_type_theme_and_pick() {
 #[test]
 fn outdoor_room_grids_floor_and_edges() {
     let od = od();
-    let (mut drlg, mut o, r) = one_room_level(79, 16, &od);
+    let (mut drlg, mut o, r) = one_room_level(107, 16, &od);
     let g = o
         .room_grids(&mut drlg, &od, &SubFileMap::default(), r)
         .unwrap();
@@ -998,8 +1000,8 @@ fn outdoor_room_grids_floor_and_edges() {
 #[test]
 fn outdoor_room_waypoint_and_shrine_rows() {
     let mut od = od();
-    od.levels[79].sub_waypoint = 7;
-    od.levels[79].sub_shrine = 8;
+    od.levels[107].sub_waypoint = 7;
+    od.levels[107].sub_shrine = 8;
     let mut subs = SubFileMap::default();
     for (t, max) in [(7, 3), (8, 5)] {
         let name = format!("s{t}").into_bytes();
@@ -1012,7 +1014,7 @@ fn outdoor_room_waypoint_and_shrine_rows() {
         subs.0.insert(name, super::tests::one_cell_file(0, 0, 1));
     }
     for (flags, steps) in [(0, 0), (0x1_0000, 3), (0x1000, 5), (0x1_1000, 8)] {
-        let (mut drlg, mut o, r) = one_room_level(79, 0, &od);
+        let (mut drlg, mut o, r) = one_room_level(107, 0, &od);
         drlg.room_mut(r).flags |= flags;
         let mut s = drlg.room(r).seed;
         o.room_grids(&mut drlg, &od, &subs, r).unwrap();
