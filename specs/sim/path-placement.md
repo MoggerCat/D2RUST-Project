@@ -40,15 +40,15 @@
 |   7. Nearest free point (`0x0064DEA0`) | 395–457 |
 |   8. Coarse free-box search (`0x0064E840`) | 458–486 |
 |   9. Floor drop placement (`0x00555DA0`) | 487–505 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 506–540 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 541–563 |
-|   12. Warp tiles and warp arrival | 564–614 |
-| Constants & data dependencies | 615–633 |
-| Randomness | 634–643 |
-| Edge cases & original bugs | 644–670 |
-| Test vectors | 671–703 |
-| Provenance | 704–732 |
-| Open questions | 733–753 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 506–555 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 556–578 |
+|   12. Warp tiles and warp arrival | 579–629 |
+| Constants & data dependencies | 630–648 |
+| Randomness | 649–658 |
+| Edge cases & original bugs | 659–685 |
+| Test vectors | 686–718 |
+| Provenance | 719–747 |
+| Open questions | 748–769 |
 <!-- /index -->
 
 ## Summary
@@ -520,14 +520,29 @@ query is a single cell against 0x3E01.
 6. Player: client of the player (`0x005531C0`); S→C 0x07 (MapReveal:
    tile x, tile y of the destination room, its level id; builder
    `0x0053BC50`); queue for update; flags 2 as in rule 5; room-change
-   messages; player data +0x148 / +0x14C := x, y; host-only position
-   history (rule 7); timer event 14 at frame + 50 with callback
+   messages; player data +0x148 / +0x14C := x, y; position history
+   (rule 7); timer event 14 at frame + 50 with callback
    `0x00554570` (`sim/units.md` §6); pets follow (`0x005754B0`, the
    pet/mercenary spec); result 1.
-7. Position history (player data +0xA0 index u8, +0xA4 `GetTickCount`,
-   +0xA8 + 8·i: 20 × {x, y}): written here and in the walk step
-   (`sim/pathing.md` §9.2) from wall-clock time; nothing in the
-   simulation reads it (open question 4). d2rs keeps it out of `d2-sim`.
+7. Position history (player data +0xA0 next index u8, +0xA4 time of the
+   last write (`GetTickCount`), +0xA8 + 8·i: 20 × {u32 x, u32 y}, a
+   ring; `0x006221A0` gives the player data):
+   - here (`0x00554FD0`): entry[index] := (x, y) unconditionally, +0xA4
+     := now, index := index + 1, 20 → 0;
+   - walk step (`0x00580C20`, `sim/pathing.md` §9.2, after the step):
+     only when now > +0xA4 + 25 ms (unsigned); with p := index − 1 (0
+     → 19), when the squared distance (`0x006492A0`: dx² + dy²) from
+     the player's sub-tile position to entry[p] is > 45: entry[index]
+     := position, index + 1 (20 → 0), +0xA4 := now.
+   **It is read by the simulation**: monster AI helpers `0x005E3930`
+   and `0x005E3EA0` (called from many AI functions) walk the target
+   player's ring backwards from the newest entry to pick a past
+   position as a move target (owner: `monsters/ai.md`). So the ring
+   belongs in `d2-sim`. The only wall-clock input is the 25 ms gate of
+   the walk-step write; the walk step runs at most once per player per
+   tick and ticks are 40 ms apart at normal speed, so d2rs reads the
+   gate as always open (deviation only when the original server
+   catches up several ticks within 25 ms; not recorded).
 
 The unit's +0xC8 flags drive S→C 0x15 in the update pass
 (`sim/pathing.md` §10.3). Callers: level warp `0x0053AEC0` (§11), warp
@@ -636,8 +651,8 @@ lvlwarp `Id`, `ExitWalkX/Y`, `OffsetX/Y`, `Direction`.
 No function of this spec draws. Draws on the paths that use it belong
 to their owners: the spawn tile pick of `drlg/levels.md` §10 (level
 seed), the mode request of `sim/pathing.md` §1.3 (unit seed, state 42),
-the 0x5F handler `0x0054CC40` (`roll(100)` on the player's seed for its
-state-108 timer; owner: the C→S 0x5F spec, open question 6). Ring order
+the 0x5F handler `0x0054CC40` (`lo' % 100` on the player's seed for
+its state-108 lock; owner: `sim/pathing.md` §1.6). Ring order
 (§7.2) and the scan order (§8) are deterministic and must be followed
 exactly: they decide which free cell wins.
 
@@ -741,12 +756,13 @@ the recorded game is regenerated from its seeds):
    corner.
 3. *Answered:* `0x006195A0` (destination warp tile and lvlwarp record)
    is §12.2 rule 1.
-4. Player position history (§10 rule 7): which code reads player data
-   +0xA0..+0x14C (anti-cheat, C→S 0x5F?). Settle: xref the readers.
+4. *Answered:* the position history (§10 rule 7) is read by the AI
+   helpers `0x005E3930` / `0x005E3EA0`, not by the 0x5F handler.
+   Their use of it is `monsters/ai.md`'s to specify.
 5. `0x00545B80` quest warp gate (§12.2 rule 3): owner is the quests
    spec; its result for each level pair is not specified.
-6. C→S 0x5F handler `0x0054CD50` → `0x0054CC40`: the state-108 timer and
-   its `roll(100)` table `0x006E1064` are not specified (owner: a client
-   resync spec). Settle: Ghidra `0x0054CD50`; record a 0x5F.
+6. *Answered:* C→S 0x5F handler `0x0054CD50` → `0x0054CC40`, its
+   state-108 lock and table `0x006E1064`: `sim/pathing.md` §1.6 (a
+   recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
    mercenary spec.

@@ -28,22 +28,22 @@
 | Inputs | 65–74 |
 | Outputs / state changes | 75–81 |
 | Rules | 82–83 |
-|   1. Walk and run requests | 84–176 |
-|   2. Path types | 177–215 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 216–261 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 262–278 |
-|   5. Toward (type 2, `0x00679C80`) | 279–338 |
-|   6. Straight (type 7, `0x00679ED0`) | 339–348 |
-|   7. A* (type 1, `0x0067B850`) | 349–386 |
-|   8. Velocity, direction vector, facing | 387–452 |
-|   9. Per-tick movement | 453–603 |
-|   10. Messages | 604–626 |
-| Constants & data dependencies | 627–663 |
-| Randomness | 664–674 |
-| Edge cases & original bugs | 675–705 |
-| Test vectors | 706–741 |
-| Provenance | 742–777 |
-| Open questions | 778–807 |
+|   1. Walk and run requests | 84–227 |
+|   2. Path types | 228–266 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 267–312 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 313–329 |
+|   5. Toward (type 2, `0x00679C80`) | 330–389 |
+|   6. Straight (type 7, `0x00679ED0`) | 390–399 |
+|   7. A* (type 1, `0x0067B850`) | 400–437 |
+|   8. Velocity, direction vector, facing | 438–503 |
+|   9. Per-tick movement | 504–654 |
+|   10. Messages | 655–677 |
+| Constants & data dependencies | 678–714 |
+| Randomness | 715–725 |
+| Edge cases & original bugs | 726–756 |
+| Test vectors | 757–792 |
+| Provenance | 793–828 |
+| Open questions | 829–858 |
 <!-- /index -->
 
 ## Summary
@@ -173,6 +173,57 @@ none; `0x005415A0`); frame = game +0xA8.
 
 A new request while moving recomputes the path from the current
 precise position (§3); the fraction is kept.
+
+#### 1.6 Client position resync (C→S 0x5F, `0x0054CD50`)
+
+The message (5 bytes: id, x u16, y u16; `sim/client-messages.tsv`)
+carries the position the client believes its player is at. Handler
+`0x0054CD50(game, player, msg, len)`:
+
+1. len ≠ 5 → result 3. The player's client (`0x005531C0`: player data
+   +0x9C) is required (null → fatal).
+2. Ignored (result 0) when a used skill is set (`0x00620250`), the
+   player is dead (`0x005541B0`), or d < 5, where d =
+   `0x006417F0(player, x, y)` = max(|dx|, |dy|) + ⌊min(|dx|, |dy|)/2⌋
+   between the player's sub-tile position and (x, y).
+3. **Walk branch**, when the player has state 108 or d < 15 or d > 45:
+   if the path has a target unit other than the player (`0x00553540`,
+   after its validity check `0x00553490`) → result 0; else the mode
+   request of §1.2–§1.5 (`0x005809D0(no skill, m, x, y, 0)`) with m = 3 if
+   the player's mode is 3 (run), else 2.
+4. **Snap branch**, 15 ≤ d ≤ 45 without state 108:
+   1. Reachability test (`0x0054CB10`): (x, y) must have a room by the
+      cell lookup from the player's room (`sim/path-placement.md` §4
+      rule 1) and the player must have neither state 54 nor 108; else
+      not reachable. Save the path's move-test mask (+0x50), path type
+      (+0x3C), max path distance (+0x91) and target (unit, else point);
+      set mask 0x409, type 15, +0x90 = +0x91 = 77, target := (x, y);
+      compute (§3, `0x00649970` with town access 0). Reachable iff the
+      compute returns non-zero and the last path point (index count −
+      1) equals (x, y). Restore mask, type, the target, and +0x90 =
+      +0x91 := the saved +0x91. The computed points and count are
+      **not** restored.
+   2. Reachable → placement (`0x0054CC40`): `0x00554EA0(room 0, x, y,
+      exact 0, alt 1)` (`sim/path-placement.md` §10); failure → step 3.
+      Success: record the game frame (game +0xA8) in the client's
+      5-slot resync ring (+0x3C0, `0x00539360`: the first slot that is
+      0 or more than 2250 frames old; none → nothing recorded). Delay
+      := 125 frames, unless the ring is full (`0x005393F0`: all five
+      slots non-zero and at most 2250 frames old) and the game type
+      byte (game +0x6A) is 0: then r = `lo' % 100` (one inlined step
+      of the player's unit seed, unit +0x20, `sim/rng.md` §6) picks
+      from table `0x006E1064`
+      (r < 50 → 1500, r < 75 → 3000, else 4500 frames). Set state 108;
+      attach a stat list (`0x006251F0` flags 2, expire = frame +
+      delay; state 108; remove callback `0x0054CC30` clears state 108)
+      and schedule event 12 at frame + delay (`0x005417D0`,
+      `sim/stat-lists.md` §10.4). Result 0.
+   3. Not reachable, or placement failed → S→C 0x15 to the client
+      (`0x00548010(player, client, 0)`, §10). Result 0.
+
+So a player whose client keeps snapping (five snaps within 2250
+frames) is locked to the walk branch for 1500–4500 frames, otherwise
+for 125.
 
 ### 2. Path types
 
