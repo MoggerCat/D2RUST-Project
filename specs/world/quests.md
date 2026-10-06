@@ -44,14 +44,14 @@
 |   7. NPC dialog hooks | 523–555 |
 |   8. Act transitions, warps and portals | 556–637 |
 |   9. Quest items, rewards and helpers | 638–703 |
-|   10. Act I quests | 704–1497 |
-|   11. Acts II–V | 1498–1503 |
-| Constants & data dependencies | 1504–1518 |
-| Randomness | 1519–1537 |
-| Edge cases & original bugs | 1538–1556 |
-| Test vectors | 1557–1588 |
-| Provenance | 1589–1610 |
-| Open questions | 1611–1643 |
+|   10. Act I quests | 704–1498 |
+|   11. Acts II–V | 1499–1504 |
+| Constants & data dependencies | 1505–1519 |
+| Randomness | 1520–1538 |
+| Edge cases & original bugs | 1539–1557 |
+| Test vectors | 1558–1589 |
+| Provenance | 1590–1611 |
+| Open questions | 1612–1644 |
 <!-- /index -->
 
 ## Summary
@@ -1237,7 +1237,7 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
     buf, 1)`, `monsters/init.md`) and +0x61 := 1. Returns 1 for class
     146, else 0.
 15. **Town Cain spawn** `0x00592960(game, x, y)` in room R0: find a
-    point: for i = 0..20 test (x + i, y + i) inside R0's tile rectangle
+    point: for i = 0 through 20 (21 points) test (x + i, y + i) inside R0's tile rectangle
     (`0x00619730`, excluding the last row and column); found → that
     point; not found → (y, y + 21) (bug kept). Free spot
     (`0x00545340`, args 2, 0x100, 1, 100); none → (x, y, R0). Spawn
@@ -1444,8 +1444,9 @@ Credit `0x00596210(game, P)`: set 6.13, 6.1 in P's record; then
 2. **Event 2** `0x00595B80`: target class 265 and talked = 1:
    broadcast(1, 0); talked := 0; callback 2 := null.
 3. **Event 3** `0x00596010` (old a, new b):
-   1. b in 34–37 (Catacombs 1–4) and not-intro ≠ 0: changed := state <
-      3, then state := 3. b = 37: status < 2 → broadcast(2, 0) and every
+   1. b in 34–37 (Catacombs 1–4) and not-intro ≠ 0: if state < 3,
+      state := 3 and changed := 1; else the state is kept and changed :=
+      0 (`quests-act1-rest.md` §8 item 6). b = 37: status < 2 → broadcast(2, 0) and every
       player O2; else if changed, every player O2. b ≠ 37: status 0 →
       flags := 0, status(1) (nothing sent), every player O2; else if
       changed, every player O2. End.

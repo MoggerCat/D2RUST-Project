@@ -19,23 +19,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–51 |
-| Inputs | 52–62 |
-| Outputs / state changes | 63–70 |
-| Rules | 71–72 |
-|   1. A1Q4 gibbet (Cain's cage, object class 26) | 73–143 |
-|   2. Cairn stones (object classes 17–21) | 144–191 |
-|   3. Town-Cain marker (object class 385, `InitFn` 54) | 192–218 |
-|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 219–257 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 258–275 |
-|   6. Party list as read by the quest code | 276–301 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 302–311 |
-| Constants & data dependencies | 312–325 |
-| Randomness | 326–332 |
-| Edge cases & original bugs | 333–349 |
-| Test vectors | 350–368 |
-| Provenance | 369–388 |
-| Open questions | 389–400 |
+| Summary | 42–52 |
+| Inputs | 53–63 |
+| Outputs / state changes | 64–71 |
+| Rules | 72–73 |
+|   1. A1Q4 gibbet (Cain's cage, object class 26) | 74–144 |
+|   2. Cairn stones (object classes 17–21) | 145–192 |
+|   3. Town-Cain marker (object class 385, `InitFn` 54) | 193–219 |
+|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 220–258 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 259–282 |
+|   6. Party list as read by the quest code | 283–308 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 309–318 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 319–389 |
+| Constants & data dependencies | 390–403 |
+| Randomness | 404–410 |
+| Edge cases & original bugs | 411–427 |
+| Test vectors | 428–450 |
+| Provenance | 451–475 |
+| Open questions | 476–490 |
 <!-- /index -->
 
 ## Summary
@@ -47,7 +48,7 @@ the town-Cain marker object init, the A1Q5 Countess chest trap step, the
 character progression update called by the A1Q6 credit, the unwritten
 bytes of the Cairn stone-order 0x50, and the party list as the quest code
 reads it. Each section answers one `quests.md` open question (5, 7, 11,
-12, 13).
+12, 13); §8 settles the Act I implementation's reading questions.
 
 ## Inputs
 
@@ -269,6 +270,12 @@ Client +0x0A is a u16 of save flags: bit 5 = expansion character, bits
 2. n = m · difficulty + step.
 3. If p ≤ n: bits 8–12 := n (bits 0–7 and 13–15 kept). Else nothing.
 
+Registers (re-read 2026-10-06; `quests.md` open question 13 stays
+closed): client in ecx, step in edx, difficulty on the stack (`ret 4`);
+m = ((flags & 0x20) | 0x80) >> 5, and step 3 is a signed "n < p → skip"
+(`0x005386AA`). n is written unmasked (n << 8 or-ed into the kept bits);
+every caller keeps n below 32.
+
 The field is never lowered. Nothing is sent here; the save code writes
 the flags (future owner: the character save spec, header progression;
 not written).
@@ -308,6 +315,77 @@ sends them. The original therefore sends leftover stack there. d2rs
 writes 0; exact-match comparison (`sim/intents-events.md` §6) masks
 bytes 13–14 of this message (and bytes 5–14 of the `trs ` form,
 `quests.md` §9.4).
+
+### 8. Act I clarifications (implementation questions, 2026-10-06)
+
+Each item settles a reading of `quests.md` §10 that the Act I
+implementation left open (`impl-quests-act1` note, items 4–10). Read
+from the 1.14d disassembly at the addresses given.
+
+1. **Tree operate drop result (§10.6 tree operate `0x00593AF0`).** The
+   drop helper `0x00559A30` returns the item it created (null when
+   nothing dropped): its return value is the result of the item-creation
+   call `0x00558D90` (`0x00559C96`); the `&out` argument only receives a
+   copy of the 0x84-byte creation request. The tree operate tests that
+   return (`0x00593C16`) and stores the item's GUID (item +0x0C) at extra
+   +0x38 (`0x00593C4C`). Extra +0x38 has exactly three writers in the
+   chain-4 code (init `0x005972C2` := 0, message 112 `0x00592330`, tree
+   operate) and no reader, so the value is never observable; d2rs keeps
+   it for record parity only.
+2. **Tree operate order.** State := 4 (`0x00593BFB`) runs before the drop
+   (`0x00593C11`). A failed drop keeps state 4 and skips the broadcast,
+   the extra flags and the object mode (the object stays mode 0), but
+   still sets +0x47 := 1 and +0x30 := the object's GUID (`0x00593C67`).
+   The call `0x00592860` between the drop code and the state change only
+   writes a debug log. The literal reading is correct.
+3. **Town Cain spawn anchor (§10.6 step 15, `0x00592960`).** The anchor
+   is the town-Cain marker **object** (unit type 2: `0x00552F60` with
+   type 1 + 1 at `0x00596F19`), not a monster. (x, y) are its position
+   (`0x0045ADF0` / `0x0045AE20`) and R0 its room (`0x00620BB0`), which
+   for an object is the first dword of its static path, read without a
+   null test. A marker found by GUID is in its room's unit list, so R0 is
+   never null on a 1.14d path; d2rs treats a marker without a room as an
+   invariant violation. The point search tests **21** points, i = 0
+   through 20 inclusive (`cmp edx, 0x14; jle`, `0x005929D4`).
+4. **Den of Evil region (§10.4 event 8 step 2).** The region array at
+   game +0xF0 holds one region per level id 1 … count − 1, built at game
+   creation (`monsters/population.md` §2.1), so level 8's region exists
+   whenever `levels.txt` has more than 8 rows (1.14d: always). The null
+   test at `0x0059028E` leads to the internal-error exit (`0x00408A60`,
+   line 0x1E4, then `0x00681E09(−1)`); d2rs reports it as a fatal error
+   (`QuestError::Fatal(0x00590293)`), not reachable with 1.14d data.
+5. **Event 0 without a player (A1Q3 `0x005916A0`, A1Q4 `0x00592580`).**
+   Both read the player's data record through `0x006221A0` before any
+   test (`0x005916B3`, `0x005925BB`); that helper exits with an internal
+   error on a null unit (line 0xFB4) or a non-player (0xFB6). Event 0 is
+   raised only by the NPC text builders (`quests.md` §7.1, §7.2), which
+   always pass the player, so the case cannot happen; d2rs reports it as
+   fatal, not as a silent return. ("−1 when none" in §10.6 step 1 is the
+   NPC's class, not the player.)
+6. **A1Q6 event 3 (§10.8 step 3.1, `0x00596010`).** The state is
+   written only when it is below 3 (`cmp [record+0x0C], 3; jae` at
+   `0x00596035`): state 0–2 → state := 3, changed := 1; state 3, 4 or 5
+   is kept and changed := 0. Entering Catacombs after the kill does not
+   reset state 4 or 5.
+7. **A1Q6 O7 (`0x00596490`).** O7 returns 1 for the first player in walk
+   order (item 9) whose room's level is 37, whether or not the portal
+   creation `0x0056D130` succeeded; that stops the walk, so at most one
+   portal per timer firing. A player without a room, or in another
+   level, returns 0.
+8. **Kashya's mercenary order (§10.5 A1Q2 event 11, message 92).** Call
+   order in `0x00590980`: 0x28 to the player (`0x005455B0`, at
+   `0x00590ACD`), GUID added to the record list (`0x00545200`,
+   `0x00590AE6`), mercenary (`0x00579180`, `0x00590AF6`: its 0x50 and
+   the hireling's creation messages), then the text refresh
+   (`0x00545780`, `0x00590B04`: 0x27, 0x29). The mercenary's messages
+   precede 0x27 / 0x29.
+9. **"Every player" order (§10.1).** `0x005537D0(game, 0, arg, fn)`
+   walks the player hash (game +0x1120) bucket 0 … 127, each bucket from
+   its head (`sim/unit-order.md` §2 r4), skips a player with state 7
+   (`0x00639DF0(unit, 7)`), reads the next link (unit +0xE4) after the
+   call, and stops at the first call returning 1. It exits with an
+   internal error when `fn` fails `IsBadCodePtr`. A host's player list
+   must yield exactly this order.
 
 ## Constants & data dependencies
 
@@ -363,6 +441,10 @@ from their own seeds as their owners state (`monsters/init.md`,
 | same, a second player Q in Act I outside Tristram | Q: 4.14, `5d 04 00 0c 0000` (L5), then `5d 04 00 0c 0000` (L1, now → 12) | §1.2, `quests.md` §6.1 |
 | trap step, 2 chests, killed 1, trapped 0, first spawn at the death position succeeds | 1 monster 326; 2 missiles 332 (one per chest, data +0x28 = chest GUID); E +0x119 = 1 | §4 |
 | trap step again | nothing | §4 step 1 |
+| A1Q6 event 3, b = 34, not-intro 1, state 4, status 2 | state stays 4; no O2 walk, nothing sent | §8 item 6 |
+| A1Q6 event 3, b = 37, state 1, status 2 | state 3; every player O2; nothing broadcast | §8 item 6, `quests.md` §10.8 |
+| tree operate, drop fails, state 3 | state 4; no 0x5D; object mode 0; +0x47 1; +0x30 = object GUID | §8 item 2 |
+| A1Q2 message 92 with 2.1, no hireling | 0x28, then 0x50 (u16 2) and the hireling's messages, then 0x27, 0x29 | §8 item 8 |
 | stone init, not-intro 1, X +0x4C 0, +0x4D 0, +0x50 0 | mode unchanged | §2.2 |
 | stone 17 init, X +0x4C 1, +0x45 0, +0x44 0 | +0x4C 0; +0x40 = GUID; +0x44 1; timer period 1; mode 2 | §2.2 |
 
@@ -376,6 +458,11 @@ from their own seeds as their owners state (`monsters/init.md`,
   `0x00554630`, `0x00540710`, `0x0063D450`, `0x00540510`, `0x00593CB0`,
   `0x0053D7E0`, dispatchers `0x0054F5D0` and `0x00584420`. Register
   arguments are taken from the disassembly (the decompile drops them).
+- §8 (2026-10-06): `0x00593AF0`, `0x00559A30` (return path to
+  `0x00558D90`), the +0x38 writers found by an `all.asm` scan of
+  0x00592000–0x00597FFF, `0x00596DE0`, `0x00592960`, `0x00620BB0`,
+  `0x00619730`, `0x00590260`, `0x00547BB0`, `0x005916A0`, `0x00592580`,
+  `0x006221A0`, `0x00596010`, `0x00596490`, `0x00590980`, `0x005537D0`.
 - `objects.txt`, `missiles.txt`, `monstats.txt` rows from
   `game/extracted/patch_d2` (1.14d).
 - D2MOO 1.10f gave names only: `CLIENTS_UpdateCharacterProgression`
@@ -397,3 +484,6 @@ object row 189 from live `objects.txt`.
    chest missiles) would confirm §1 and §4.
 4. The progression's readers (difficulty unlock, character title) belong
    to the save spec; confirm in 1.14d when it is written.
+5. A recording that enters Catacombs 1 after Andariel's kill (state 4)
+   would confirm §8 item 6 (no 0x5D, state kept), and one Kashya reward
+   with a free hireling slot the §8 item 8 message order.
