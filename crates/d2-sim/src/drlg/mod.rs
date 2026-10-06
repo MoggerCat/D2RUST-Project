@@ -28,6 +28,7 @@ pub mod active;
 pub mod collision;
 pub mod data;
 pub mod level;
+pub mod preset;
 pub mod room;
 pub mod seams;
 pub mod tiles;
