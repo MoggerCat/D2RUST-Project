@@ -19,7 +19,9 @@
 //!   3 (a plain DYNAMIC child's damage-related base change), minus a
 //!   parked extended list's own base changes (§6.1 r1), and a
 //!   dynamic toggle (§8.6) of a list that is not in E's active chain
-//!   (parked, or left with its unit set by a refused attach, §8.4);
+//!   (parked, or left with its unit set by a refused attach, §8.4), and
+//!   the reverse for E holding the toggled list in its active chain when
+//!   E is not the toggling unit's list (the flag flips, E's full stays);
 //! - the mod array (§11.1) of player lists: exactly the keys of base
 //!   writes (and unit sets, §5.2) of saved stats outside 6, 8, 10, 13, 14.
 //!
@@ -218,8 +220,11 @@ impl Machine {
         out
     }
 
-    /// §8.6 toggle of `il` on `unit`: drift when il does not count in
-    /// the unit's list (module docs).
+    /// §8.6 toggle of `il` on `unit`: the values go to the unit's list
+    /// r only, while the DYNAMIC flip changes how il counts in the list
+    /// whose active chain holds it (module docs). Drift on r when il does
+    /// not count there; drift on il's parent p ≠ r, which keeps its full
+    /// value although il now counts the other way (§6.1 sum).
     fn toggle_drift(&mut self, unit: UnitId, il: ListId, dynamic: bool) {
         let Some(r) = self.lists.unit_list(unit) else {
             return;
@@ -227,14 +232,23 @@ impl Machine {
         if self.dyn_(il) == dynamic {
             return;
         }
-        if self.lists.active_chain(r).contains(&il) {
-            return;
-        }
+        let in_r = self.lists.active_chain(r).contains(&il);
+        let p = self
+            .lists
+            .parent(il)
+            .filter(|&p| p != r && self.lists.is_live(p))
+            .filter(|&p| self.lists.active_chain(p).contains(&il));
         for (k, v) in self.values(il) {
             if self.damagerelated(k) {
                 let d = if dynamic { v.wrapping_neg() } else { v };
-                let e = self.drift.entry((r, k)).or_insert(0);
-                *e = e.wrapping_add(d);
+                if !in_r {
+                    let e = self.drift.entry((r, k)).or_insert(0);
+                    *e = e.wrapping_add(d);
+                }
+                if let Some(p) = p {
+                    let e = self.drift.entry((p, k)).or_insert(0);
+                    *e = e.wrapping_sub(d);
+                }
             }
         }
     }
@@ -627,6 +641,44 @@ fn regress_parked_child_outlives_its_parent() {
     assert_eq!(lists.next(b), None);
     lists.free(&mut host, b);
     assert!(!lists.is_live(b));
+}
+
+/// Regression (CI, nextest random seed): proptest's minimal input for
+/// `stat_lists_match_the_model`. See `docs/handoff/fix-statlist-prop.md`.
+#[test]
+fn regress_full_after_free_and_toggle() {
+    run(
+        false,
+        vec![
+            Op::Free(7306593420852098055),
+            Op::Set(9636650453837638358, 2407644361622197065, -1, 0),
+            Op::Attach(17415746941517033564, 7661639184940325630, true),
+            Op::AllocPlain {
+                owner: 0,
+                state: 0,
+                flags: 0,
+            },
+            Op::AllocPlain {
+                owner: 0,
+                state: 0,
+                flags: 0,
+            },
+            Op::Free(7669981465254258163),
+            Op::Toggle(18125049263891989335, 6524073951232642306, false),
+            Op::AllocExt(15362796750465878983),
+            Op::AllocPlain {
+                owner: 0,
+                state: 0,
+                flags: 0,
+            },
+            Op::AllocPlain {
+                owner: 0,
+                state: 0,
+                flags: 0,
+            },
+            Op::Equip(7168547649646239135, 8265621924537273655, false, false),
+        ],
+    );
 }
 
 // ---- stats.md §5, §8, §9.3 helpers; stat-lists.md §10.1 regeneration ----
