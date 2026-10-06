@@ -361,7 +361,7 @@ pub fn open<W: VendorWorld>(
             }
             if !w.hire_list_made(rec.class) {
                 if HIRE_CLASSES.contains(&rec.class) {
-                    w.make_hire_list(rec.class);
+                    w.make_hire_list(rec.class, c.seed);
                 }
                 w.set_hire_list_made(rec.class);
             }
