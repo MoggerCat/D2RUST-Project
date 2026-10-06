@@ -216,4 +216,31 @@ mod tests {
         assert!(Pl2::parse(&pl2(0, 100)).is_err());
         assert!(Pl2::parse(&[0; 1000]).is_err());
     }
+
+    mod robust {
+        use super::*;
+        use crate::robust::mutated;
+        use crate::robust_tests::{check, config};
+        use proptest::prelude::*;
+
+        #[test]
+        fn builders_are_valid() {
+            assert!(Palette::parse(&[7; 768]).is_ok());
+            assert!(Pl2::parse(&pl2(13, 0)).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(32))]
+
+            #[test]
+            fn mutated_palette(data in mutated(vec![7; 768])) {
+                check(data, Palette::parse);
+            }
+
+            #[test]
+            fn mutated_pl2(data in mutated(pl2(13, 0))) {
+                check(data, Pl2::parse);
+            }
+        }
+    }
 }

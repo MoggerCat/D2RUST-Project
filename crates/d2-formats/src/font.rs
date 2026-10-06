@@ -122,4 +122,29 @@ mod tests {
         assert!(FontTable::parse(&partial).is_err(), "partial record");
         assert!(FontTable::is_font_table(&file(&[])));
     }
+
+    mod robust {
+        use super::*;
+        use crate::robust::mutated;
+        use crate::robust_tests::{check, config};
+        use proptest::prelude::*;
+
+        fn valid() -> Vec<u8> {
+            file(&[[b'A', 0, 0, 7, 16, 1, 0, 0, 33, 0, 0, 0, 0, 0]; 2])
+        }
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(FontTable::parse(&valid()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in mutated(valid())) {
+                check(data, FontTable::parse);
+            }
+        }
+    }
 }

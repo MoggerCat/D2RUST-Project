@@ -66,7 +66,7 @@ pub fn uppercase(name: &mut [u8]) {
 pub fn hash(name: &[u8]) -> usize {
     name.iter()
         .take_while(|&&b| b != 0)
-        .fold(0u32, |s, &b| s + u32::from(b)) as usize
+        .fold(0u32, |s, &b| s.wrapping_add(u32::from(b))) as usize
         % BUCKETS
 }
 
@@ -81,6 +81,16 @@ impl AnimData {
             let count = c.i32()?;
             if count < 0 {
                 return Err(invalid(FORMAT, format!("bucket {b}: count {count}")));
+            }
+            // Checked against the bytes left before allocating.
+            let fits = (count as usize)
+                .checked_mul(RECORD_SIZE)
+                .is_some_and(|n| n <= data.len() - c.pos());
+            if !fits {
+                return Err(invalid(
+                    FORMAT,
+                    format!("bucket {b}: {count} records cannot fit in the file"),
+                ));
             }
             let mut records = Vec::with_capacity(count as usize);
             for _ in 0..count {
@@ -271,5 +281,57 @@ mod tests {
         assert!(a.find(b"AAAAAAAAA").unwrap().is_none());
         // 9 bytes summing to 65 mod 256: "A" + eight 0x20 → 65 + 256.
         assert!(a.find(b"A        ").is_err());
+    }
+
+    #[test]
+    fn regress_huge_bucket_count() {
+        // A count of i32::MAX reserved ~350 GB before reading a record
+        // (allocation failure aborts the process).
+        let mut f = vec![0u8; 1024];
+        f[..4].copy_from_slice(&i32::MAX.to_le_bytes());
+        let err = AnimData::parse(&f).unwrap_err();
+        assert!(err.to_string().contains("cannot fit"), "{err}");
+    }
+
+    #[test]
+    fn regress_hash_of_long_name() {
+        // 0xFF × 16,843,010 sums past u32::MAX (overflow panic in debug
+        // builds); the bucket is the true sum mod 256.
+        let n = 0x0101_0102usize;
+        let name = vec![0xFFu8; n];
+        assert_eq!(hash(&name), (255 * n as u64 % 256) as usize);
+        let a = AnimData::parse(&vec![0; 1024]).unwrap();
+        assert!(a.find(&name).unwrap().is_none());
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::{bounded, bytes, mutated};
+        use crate::robust_tests::config;
+        use proptest::prelude::*;
+
+        fn valid() -> Vec<u8> {
+            file(&[(b"AAWL1HS", 4, 128, &[(2, 2)]), (b"A", 300, 1, &[(143, 1)])])
+        }
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(AnimData::parse(&valid()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(32))]
+
+            #[test]
+            fn mutated_file(data in mutated(valid()), name in bytes(24)) {
+                bounded(move || {
+                    if let Ok(a) = AnimData::parse(&data) {
+                        let _ = a.info(&name);
+                        let _ = a.record(&name);
+                        let _ = a.info(b"AAWL1HS");
+                    }
+                });
+            }
+        }
     }
 }

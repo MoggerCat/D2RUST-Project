@@ -17,6 +17,8 @@ pub mod tbl;
 
 #[cfg(test)]
 mod robust;
+#[cfg(test)]
+mod robust_tests;
 
 pub use cursor::FormatError;
 
