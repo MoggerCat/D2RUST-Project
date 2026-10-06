@@ -1,4 +1,4 @@
-// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
+// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
@@ -6,7 +6,10 @@
 //! skill events 5 / 8 / 9 through [`Pending::skill_event`], the player
 //! action frame through [`Pending::action_frame`], the AnimData record
 //! of a unit's mode (`formats/animdata.md` §5) and the monster death
-//! start through [`Pending::monster_death_start`]), and
+//! start through [`Pending::monster_death_start`]; with a lent monster
+//! world ([`super::monsters`]): the monster type init of the allocator,
+//! the monster state's part of a free, event 7 and the mode change's
+//! umod callbacks), and
 //! the unit-field helpers of [`View`] the other adapters share (stats,
 //! states, state lists, seeds).
 
@@ -25,6 +28,7 @@ use crate::units::record::{flags2, AnimRecord, ANIM_EVENTS};
 use crate::units::{UnitId, UnitType};
 
 use super::combat::HIRELING_CLASSES;
+use super::monsters::umod_mode;
 use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
@@ -170,6 +174,14 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.ai = Some(store);
     }
 
+    /// Event 7 `0x005A4370` → the umod dispatcher in mode 2 (`init.md`
+    /// §22) on the lent monster world ([`super::monsters`]); without one,
+    /// nothing (the trait default). The unit dispatch already ran the
+    /// handler-table checks and the frozen-monster drop (`tick.md` §5.6).
+    fn monster_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, _: u32, _: u32) {
+        self.run_umods(sim, unit, None, umod_mode::EVENT7);
+    }
+
     /// Event 10 `0x005A7F70` → `0x00573120` (`ai.md` §1; monster data).
     fn ai_reset(&mut self, _: &mut Sim<'_>, unit: UnitId, _: u32, _: u32) {
         self.x.ai_reset(unit);
@@ -246,8 +258,20 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 }
 
 impl<X: Pending> LifecycleHooks for ActionHooks<X> {
+    /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
+    /// table: the allocator's per-kind init of a monster) on the lent
+    /// monster world ([`super::monsters`]); other kinds and a game without
+    /// a lent world keep the default (nothing).
+    fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
+        if req.ty == UnitType::Monster {
+            self.with_monster_world(|w, h| w.type_init(sim, h, unit));
+        }
+    }
+
     /// The per-kind state of the action modules leaves with the unit:
-    /// AI control (`AiStore::remove`), missile data, combat list.
+    /// AI control (`AiStore::remove`), missile data, combat list; then
+    /// the lent monster world's part (monster data, minion list, owner
+    /// link).
     fn free_kind(&mut self, _: &mut Sim<'_>, unit: UnitId) {
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
@@ -256,6 +280,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             m.remove(unit);
         }
         self.combat_lists.remove(&unit);
+        self.with_monster_world(|w, _| w.forget(unit));
     }
 }
 
@@ -408,19 +433,31 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
-    /// A monster mode change (`units.md` §4.6, `0x005A7C20`).
+    /// A monster mode change (`units.md` §4.6, `0x005A7C20`), then its
+    /// umod callbacks: the dispatcher in mode 0 (`0x005A4350`) and mode
+    /// 1 (`0x005A4360`) on the lent monster world (`init.md` §22).
+    ///
+    /// TODO(init.md §22, units.md §4.6): where in `0x005A7C20` the two
+    /// dispatcher calls sit is not stated (the mode-1 callbacks read the
+    /// new mode, so they follow the start function). Both run here after
+    /// the whole mode set (start, animation, schedule), mode 0 first: a
+    /// type-7 event they schedule follows the mode's animation events in
+    /// the timer queue.
     pub fn monster_set_mode(&mut self, game: &mut Game, u: UnitId, mode: u32) -> bool {
-        let r = {
-            let mut sim = Sim {
-                game,
-                units: self.units,
-                stats: self.stats,
-                data: self.data,
-            };
-            crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode)
+        let mut sim = Sim {
+            game,
+            units: self.units,
+            stats: self.stats,
+            data: self.data,
         };
+        let r = crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode);
         match r {
-            Ok(()) => true,
+            Ok(()) => {
+                for m in [umod_mode::MODE_CHANGE, umod_mode::MODE_SET] {
+                    self.h.run_umods(&mut sim, u, None, m);
+                }
+                true
+            }
             Err(e) => {
                 self.unit_error(e);
                 false
