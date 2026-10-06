@@ -21,6 +21,7 @@ CLASSES = [("bdAma", "Amazon", 150), ("bdAss", "Assassin", 300), ("bdNec", "Necr
            ("bdBar", "Barbarian", 600), ("bdPal", "Paladin", 790), ("bdSor", "Sorceress", 920),
            ("bdDru", "Druid", 1080)]
 CLASS_X = {n: x for _, n, x in CLASSES}
+SCN = [("ScnSor", "Sorceress"), ("ScnAma", "Amazon")]   # names the .scenario files load
 
 
 def have(name):
@@ -139,9 +140,17 @@ def run_classes(g):
         print(name, "done")
 
 
+def run_scn(g):
+    for name, cls in SCN:
+        if have(name):
+            print(name, "exists, skipped"); continue
+        g.create(name, cls); g.save_exit(name)
+        print(name, "done")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["classes", "merc", "dead", "all"])
+    ap.add_argument("what", choices=["classes", "merc", "dead", "all", "scn"])
     ap.add_argument("--game", default=GAME_DIR)
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
@@ -151,6 +160,7 @@ def main():
         g.start()
         try:
             if a.what in ("classes", "all"): run_classes(g)
+            if a.what == "scn": run_scn(g)
             if a.what in ("merc", "all") and not have("bdMerc"): probe_kashya(g)
             if a.what in ("dead", "all") and not have("bdDead"): run_dead(g)
         finally:
