@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md, specs/drlg/preset.md, specs/drlg/maze.md, specs/drlg/outdoor.md, specs/drlg/outdoor-tilesub.md (table-level game-file checks)
+// Spec: specs/drlg/levels.md, specs/drlg/preset.md, specs/drlg/maze.md, specs/drlg/outdoor.md, specs/drlg/outdoor-tilesub.md, specs/drlg/outdoor-act3-act5.md (table-level game-file checks)
 //! Game-file tests of the DRLG table views: they need the 1.14d install in
 //! `D2_GAME_DIR` (the MPQ set, loaded and fixed up as the server loads it).
 //! Every expected value is a fact or a recorded vector of the specs above;
@@ -401,4 +401,93 @@ fn preset_file_choice_derived_vectors() {
         assert!(name.ends_with(file), "level {id} file {name}");
     }
     assert!(types.errors.is_empty(), "{:?}", types.errors);
+}
+
+// ---- Act III and Act V (`outdoor-act3-act5.md`) --------------------------------------
+
+/// `outdoor-act3-act5.md` Test vectors, "Real 1.14d values": the
+/// leveldefs and lvlprest rows the jungle placer, the jungle stamping and
+/// the Act V build read.
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn act3_act5_table_values() {
+    let data = drlg_data();
+    for id in 76..=78 {
+        let d = &data.levels[id];
+        assert_eq!(d.size, [(64, 192); 3], "size of level {id}");
+        assert_eq!(d.offset, (-1, -1), "offset of level {id}");
+    }
+    for id in [111, 112] {
+        assert_eq!(data.levels[id].size, [(-1, -1); 3], "size of level {id}");
+    }
+    assert_eq!(data.levels[110].size, [(240, 48); 3]);
+    assert_eq!(data.levels[110].offset, (760, 1000));
+    assert_eq!(data.levels[117].size, [(128, 80); 3]);
+    let pd = preset_data();
+    let def = |p: u32| pd.def(p).expect("lvlprest row");
+    for p in [573, 574] {
+        let d = def(p);
+        assert_eq!((d.size_x, d.size_y, d.files), (64, 32, 0), "lvlprest {p}");
+    }
+    for p in (530..=572).chain(575..=604) {
+        let d = def(p);
+        let files = match p {
+            541 => 5,
+            530..=544 => 3,
+            _ => 1,
+        };
+        assert_eq!((d.size_x, d.size_y, d.files), (32, 32, files), "lvlprest {p}");
+    }
+    assert_eq!(def(865).size_x, 16);
+    assert_eq!((def(652).size_x, def(652).size_y), (48, 16));
+    for p in 653..=658 {
+        assert_eq!(def(p).files, 1, "lvlprest {p}");
+    }
+}
+
+/// `outdoor-act3-act5.md` Test vectors (derived): Act III and Act V
+/// placement from the recorded init seed on the live tables.
+// Covers: specs/drlg/outdoor-act3-act5.md §2.8 r1, §2.8 r3; specs/drlg/outdoor.md §9.2
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn act3_act5_placement_on_live_tables() {
+    let data = Arc::new(drlg_data());
+    let mut types = world_types(&data);
+    let drlg = Drlg::create(2, INIT, 0, 0, false, &data, &mut types).expect("act 2 creates");
+    assert!(types.errors.is_empty(), "{:?}", types.errors);
+    assert_eq!(drlg.seed, Seed::new(4_015_082_244, 577_631_236));
+    let rect = |d: &Drlg, id: u32| d.level(d.find_level(id).unwrap()).rect;
+    assert_eq!(rect(&drlg, 76), TileRect::new(1000, 808, 64, 192));
+    assert_eq!(rect(&drlg, 77), TileRect::new(936, 744, 64, 192));
+    assert_eq!(rect(&drlg, 78), TileRect::new(1000, 616, 64, 192));
+    assert_eq!(rect(&drlg, 79), TileRect::new(992, 552, 80, 64));
+    assert_eq!(rect(&drlg, 80), TileRect::new(992, 488, 80, 64));
+    assert_eq!(rect(&drlg, 81), TileRect::new(992, 424, 80, 64));
+    assert_eq!(rect(&drlg, 82), TileRect::new(1008, 408, 48, 16));
+    assert_eq!(rect(&drlg, 83), TileRect::new(1000, 344, 64, 64));
+    let od = types.act_outdoor(2).expect("act 2 outdoor state");
+    let ids = |id: u32| {
+        let info = od.level(drlg.find_level(id).unwrap()).expect("outdoor info");
+        (info.jungle_ids.clone().expect("jungle ids"), info.jungle_clearings)
+    };
+    assert_eq!(
+        ids(76),
+        (vec![541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0], 3)
+    );
+    assert_eq!(
+        ids(77),
+        (vec![554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566], 3)
+    );
+    assert_eq!(
+        ids(78),
+        (vec![0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581], 2)
+    );
+
+    let mut types = world_types(&data);
+    let drlg = Drlg::create(4, INIT, 0, 0, false, &data, &mut types).expect("act 4 creates");
+    assert!(types.errors.is_empty(), "{:?}", types.errors);
+    assert_eq!(rect(&drlg, 110), TileRect::new(760, 1000, 240, 48));
+    assert_eq!(rect(&drlg, 111), TileRect::new(600, 968, 160, 64));
+    assert_eq!(rect(&drlg, 112), TileRect::new(440, 968, 160, 64));
+    assert_eq!(rect(&drlg, 117), TileRect::new(2000, 1896, 160, 64));
 }
