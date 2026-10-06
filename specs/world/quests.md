@@ -596,8 +596,8 @@ the Cow King); or (classic game) the player lacks slot 26 bit 0, or
 Encampment). Else free spot near the player (`0x00545340`, size 3,
 collision mask 0x400, radius 4, limit 100); if found and a portal object
 of class 60 to level 39 is created (`0x0056D130`), set game slot 4 bit 11
-and return 1. In the 1.14d exports this function has no caller and no
-stored pointer (Open question 3). The Pandemonium portal functions
+and return 1. Its only route is the cube output-kind table `0x006E11C8`
+through `jmp` thunks (`world/cube.md` §9). The Pandemonium portal functions
 `0x00594270` and `0x00594280` are `xor eax, eax; ret` stubs in 1.14d:
 they create nothing.
 
@@ -907,9 +907,9 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    from the client's quest log code (`0x0045CC00` 0x52 handler).
 2. Does Flavie's chat really draw twice from the player seed and list
    two lines? Settle with an RNG + packets recording of one Flavie chat.
-3. Who calls the cow portal `0x00594140` (no reference in the exports)?
-   Settle with Ghidra cross-references including computed calls, or a
-   recording of a cow-portal transmute (`world/cube.md`).
+3. (Settled: the cow portal is reached through the cube's thunk table,
+   `world/cube.md` §9.) A recording of a cow-portal transmute would still
+   confirm its draws (`world/cube.md` open question 4).
 4. Which game-entry path (mode 0 or 1, §3) single player takes: record a
    game start with a breakpoint on `0x00546270`.
 5. Layout of the stone-order 0x50 (`0x00593CB0`): bytes before the five
