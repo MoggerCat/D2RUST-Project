@@ -7,6 +7,10 @@
 //! its binned walk and (GPU test) the compute compositor compared to it
 //! the way `verify` compares synthetic cases.
 //!
+//! Expected values unconfirmed: written without game files, so no test
+//! here carries a `Covers` claim until its first local run passes
+//! (`docs/HANDOFF.md` §8).
+//!
 //! Ignored by default. Run:
 //! `D2_GAME_DIR=<install> cargo test --release -p d2-client --test game_assets -- --ignored --nocapture --test-threads 1`
 
@@ -79,7 +83,7 @@ fn is_text(b: &[u8]) -> bool {
 // canonicalizes (expect 0 refused), and reading the canonical path through
 // the `mpq://` reader gives the bytes the archive set gives for the listed
 // spelling.
-// Covers: specs/client/assets.md §a1-paths-and-identity
+// Intended claim (unconfirmed until the first local run): specs/client/assets.md §a1-paths-and-identity
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn every_listed_name_canonicalizes_and_reads_back() {
@@ -179,7 +183,7 @@ fn first_parsing<T>(
 
 // §A2: one real file per loader through the AssetServer equals the
 // d2-formats parse of the same bytes (the loaders add no logic).
-// Covers: specs/client/assets.md §a2-loaders
+// Intended claim (unconfirmed until the first local run): specs/client/assets.md §a2-loaders
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn each_loader_loads_a_real_file() {
@@ -281,7 +285,7 @@ fn each_loader_loads_a_real_file() {
 // is `Strings`. The two plain-text `.tbl` files (`tbl.md` §Edge cases)
 // are not a font or a string table and no spec says what the loader does
 // with them: their outcome is printed, not asserted.
-// Covers: specs/client/assets.md §a2-loaders, §edge-cases-original-bugs
+// Intended claim (unconfirmed until the first local run): specs/client/assets.md §a2-loaders, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn every_pl2_cof_and_tbl_loads() {
@@ -384,7 +388,7 @@ fn dcc_with_dirs(set: &ArchiveSet, names: &[String], dirs: usize) -> (String, Dc
 // residency on them: missing keys load synchronously and count as stalls,
 // resident keys do not reload, LRU by last frame used with ties by key
 // order, and a frame over budget keeps every key it uses (overrun logged).
-// Covers: specs/client/assets.md §a3-derived-assets, §a4-residency r2
+// Intended claim (unconfirmed until the first local run): specs/client/assets.md §a3-derived-assets, §a4-residency r2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn frame_sets_and_residency_on_a_real_dcc() {
@@ -629,7 +633,7 @@ fn evaluate(s: &RealScene, view: Rect) -> Vec<u8> {
 // evaluation of §A4 / §A5 byte for byte; the binned walk equals it under
 // the verify comparison (0 of N bytes, 0 RGBA pixels through the act 1
 // palette); `--perturb 7` on the reference reports exactly 7 (M08).
-// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+// Intended claim (unconfirmed until the first local run): specs/client/render-pipeline.md §a8-cpu-reference-compositor
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn cpu_compositor_on_real_frames() {

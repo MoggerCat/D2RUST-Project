@@ -1,16 +1,22 @@
 //! Whole-install sweeps of the formats against the user's 1.14d archives:
-//! every file of a format, over the union of all archives' listfiles
-//! (names folded to lowercase, each read once through `ArchiveSet` in
-//! search order), decodes, and the counts and header values the specs'
-//! Status lines and Test vectors record hold.
+//! every file of a format decodes, and the counts and header values the
+//! specs' Status lines and Test vectors record hold.
 //!
 //! Ignored by default. Run (release: the DCC sweep decodes ~22k files):
 //! `D2_GAME_DIR=<install> cargo test --release -p d2-formats --test game_sweep -- --ignored --nocapture`
 //!
-//! Counting scope: the spec counts were measured with `mpq-tool formats`;
-//! this file counts distinct listed names over the whole archive set. A
-//! count that differs while every file decodes is a scope difference to
-//! record against the spec, not a decoder failure.
+//! Counting scope: the spec counts were measured with `mpq-tool formats`,
+//! which counts files per archive (`cof.md`'s 3,605 counts files, not
+//! distinct names; `docs/HANDOFF.md` §5) and finds the 6 DC6 of
+//! `patch_d2.mpq`, which has no `(listfile)`. This file rebuilds that
+//! scope: every name of the union of all listfiles, in every archive that
+//! holds it. A count that differs while every file decodes is a scope
+//! difference to record, not a decoder failure.
+//!
+//! Expected values unconfirmed: written without game files, so no test
+//! here carries a `Covers` claim until its first local run passes
+//! (`docs/HANDOFF.md` §8; the intended claims are in
+//! `docs/handoff/game-tests-client-assets.md`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -42,9 +48,38 @@ fn listed(set: &ArchiveSet) -> BTreeSet<String> {
     names
 }
 
-/// Listed names ending with `ext` (lowercase, with the dot).
-fn with_ext(names: &BTreeSet<String>, ext: &str) -> Vec<String> {
-    names.iter().filter(|n| n.ends_with(ext)).cloned().collect()
+/// One file: an archive (index in `set.archives()`) and a name it holds.
+type FileRef = (usize, String);
+
+/// Every file whose name ends with `ext` and passes `keep`: each name of
+/// the union of listfiles, once per archive that holds it.
+fn files_where(set: &ArchiveSet, ext: &str, keep: impl Fn(&str) -> bool) -> Vec<FileRef> {
+    let names = listed(set);
+    let mut out = Vec::new();
+    for (i, a) in set.archives().iter().enumerate() {
+        for n in names.iter().filter(|n| n.ends_with(ext) && keep(n)) {
+            if a.contains(n) {
+                out.push((i, n.clone()));
+            }
+        }
+    }
+    out
+}
+
+fn files(set: &ArchiveSet, ext: &str) -> Vec<FileRef> {
+    files_where(set, ext, |_| true)
+}
+
+/// `archive:name`, for messages.
+fn label(set: &ArchiveSet, f: &FileRef) -> String {
+    format!("{}:{}", archive_file(&set.archives()[f.0]), f.1)
+}
+
+/// The bytes of one file, from its own archive.
+fn bytes(set: &ArchiveSet, f: &FileRef) -> Vec<u8> {
+    set.archives()[f.0]
+        .read(&f.1)
+        .unwrap_or_else(|e| panic!("{}: {e}", label(set, f)))
 }
 
 /// Reads a listed name; a listed name that does not read is a failure.
@@ -75,16 +110,17 @@ fn holders(set: &ArchiveSet, name: &str) -> Vec<String> {
 
 // dc6.md Status: all 1,657 `.dc6` files (29,117 frames) decode; 140 frames
 // have flip = 1; termination EE×4 in 1,195 files, CD×4 in 400, 00×4 in 62.
-// Covers: specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
+// Intended claim (unconfirmed until the first local run): specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dc6_every_file_decodes() {
     let set = set();
-    let names = with_ext(&listed(&set), ".dc6");
+    let names = files(&set, ".dc6");
     let (mut frames, mut flipped) = (0usize, 0usize);
     let mut termination: BTreeMap<[u8; 4], usize> = BTreeMap::new();
-    for name in &names {
-        let dc6 = Dc6::parse(&read(&set, name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    for f in &names {
+        let name = &label(&set, f);
+        let dc6 = Dc6::parse(&bytes(&set, f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(dc6.header.version, 6, "{name}");
         let per = dc6.header.directions as usize * dc6.header.frames_per_direction as usize;
         assert_eq!(dc6.frames.len(), per, "{name}: D × F frames");
@@ -114,15 +150,16 @@ fn dc6_every_file_decodes() {
 // dcc.md Status: all 21,717 `.dcc` files decode with every sub-stream
 // exactly consumed (the parser's end checks) and fewer than 8 leftover PCD
 // bits per direction; version 6 throughout; no frame has bottom-up = 1.
-// Covers: specs/formats/dcc.md §bit-reading, §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
+// Intended claim (unconfirmed until the first local run): specs/formats/dcc.md §bit-reading, §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dcc_every_file_decodes() {
     let set = set();
-    let names = with_ext(&listed(&set), ".dcc");
+    let names = files(&set, ".dcc");
     let (mut directions, mut frames) = (0usize, 0usize);
-    for name in &names {
-        let dcc = Dcc::parse(&read(&set, name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    for f in &names {
+        let name = &label(&set, f);
+        let dcc = Dcc::parse(&bytes(&set, f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(dcc.version, 6, "{name}");
         assert!(dcc.frames_per_direction <= 256, "{name}");
         for (d, dir) in dcc.directions.iter().enumerate() {
@@ -154,17 +191,18 @@ fn dcc_every_file_decodes() {
 // dt1.md Status: all 254 live `.dt1` files parse and decode (the 6
 // version-4 leftovers excepted); block formats 0x0001 (226,996), 0x1001
 // (110,259), 0x2005 (15,712). Header: minor version 6 in 1.14d.
-// Covers: specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
+// Intended claim (unconfirmed until the first local run): specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dt1_every_live_file_decodes() {
     let set = set();
-    let names = with_ext(&listed(&set), ".dt1");
+    let names = files(&set, ".dt1");
     let mut formats: BTreeMap<u16, usize> = BTreeMap::new();
     let (mut live, mut tiles) = (0usize, 0usize);
     let mut v4 = Vec::new();
-    for name in &names {
-        let bytes = read(&set, name);
+    for f in &names {
+        let name = &label(&set, f);
+        let bytes = bytes(&set, f);
         let major = i32::from_le_bytes(bytes[..4].try_into().unwrap());
         if major == 4 {
             assert!(Dt1::parse(&bytes).is_err(), "{name}: version 4 is refused");
@@ -195,15 +233,16 @@ fn dt1_every_live_file_decodes() {
 
 // ds1.md Status: all 2,456 `.ds1` files parse; versions seen 3, 8, 12, 13,
 // 15, 16, 17, 18 (1,997 at v18).
-// Covers: specs/formats/ds1.md §rules
+// Intended claim (unconfirmed until the first local run): specs/formats/ds1.md §rules
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn ds1_every_file_parses() {
     let set = set();
-    let names = with_ext(&listed(&set), ".ds1");
+    let names = files(&set, ".ds1");
     let mut versions: BTreeMap<u32, usize> = BTreeMap::new();
-    for name in &names {
-        let ds1 = Ds1::parse(&read(&set, name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    for f in &names {
+        let name = &label(&set, f);
+        let ds1 = Ds1::parse(&bytes(&set, f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         let cells = ds1.width as usize * ds1.height as usize;
         for layer in ds1.walls.iter().chain(&ds1.floors) {
             assert_eq!(layer.len(), cells, "{name}");
@@ -223,17 +262,18 @@ fn ds1_every_file_parses() {
 // 20; Edge cases: 3 files of 42 bytes, 1 layer, 1 frame, 1 direction (K =
 // 4: 3 padding bytes); `chars\am\cof\amblxbow.cof` (d2char.mpq) is 72
 // bytes of junk and the only failure, while `amblxbw.cof` parses.
-// Covers: specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order, §edge-cases-original-bugs
+// Intended claim (unconfirmed until the first local run): specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn cof_every_live_file_parses() {
     let set = set();
-    let names = with_ext(&listed(&set), ".cof");
+    let names = files(&set, ".cof");
     let junk = r"data\global\chars\am\cof\amblxbow.cof";
     let (mut parsed, mut padded) = (0usize, 0usize);
     let mut failed = Vec::new();
-    for name in &names {
-        let bytes = read(&set, name);
+    for f in &names {
+        let name = &label(&set, f);
+        let bytes = bytes(&set, f);
         match Cof::parse(&bytes) {
             Ok(cof) => {
                 assert_eq!(cof.version, 20, "{name}");
@@ -257,8 +297,7 @@ fn cof_every_live_file_parses() {
     }
     println!("cof: {parsed} parse, failed {failed:?}, 42-byte padded {padded}");
     assert_eq!(parsed, 3_605);
-    assert_eq!(failed, [(junk.to_string(), 72)]);
-    assert_eq!(holders(&set, junk), ["d2char.mpq"]);
+    assert_eq!(failed, [(format!("d2char.mpq:{junk}"), 72)]);
     Cof::parse(&read(&set, r"data\global\chars\am\cof\amblxbw.cof")).unwrap();
     assert_eq!(padded, 3);
 }
@@ -266,27 +305,25 @@ fn cof_every_live_file_parses() {
 // palette.md Status: all 19 `pal.dat` and 17 `.pl2` files parse; one PL2
 // has 12 text colors, the rest 13. Test vectors: every `.dat` under
 // `data\global\palette` parses.
-// Covers: specs/formats/palette.md §dat-palette, §pl2-palette-transform, §edge-cases-original-bugs
+// Intended claim (unconfirmed until the first local run): specs/formats/palette.md §dat-palette, §pl2-palette-transform, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn palettes_every_file_parses() {
     let set = set();
-    let names = listed(&set);
-    let dats: Vec<&String> = names
-        .iter()
-        .filter(|n| n.starts_with(r"data\global\palette\") && n.ends_with(".dat"))
-        .collect();
+    let dats = files_where(&set, ".dat", |n| n.starts_with(r"data\global\palette\"));
     let mut pal_dat = 0;
-    for name in &dats {
-        Palette::parse(&read(&set, name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    for f in &dats {
+        let name = label(&set, f);
+        Palette::parse(&bytes(&set, f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         if name.ends_with(r"\pal.dat") {
             pal_dat += 1;
         }
     }
     let mut text_colors: BTreeMap<usize, usize> = BTreeMap::new();
-    let pl2s = with_ext(&names, ".pl2");
-    for name in &pl2s {
-        let pl2 = Pl2::parse(&read(&set, name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    let pl2s = files(&set, ".pl2");
+    for f in &pl2s {
+        let name = label(&set, f);
+        let pl2 = Pl2::parse(&bytes(&set, f)).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(pl2.text_color_shifts.len(), pl2.text_colors.len(), "{name}");
         *text_colors.entry(pl2.text_colors.len()).or_default() += 1;
     }
@@ -311,8 +348,8 @@ fn tables(set: &ArchiveSet) -> (Files, Files) {
             .all(|&c| c == b'\t' || c == b'\r' || c == b'\n' || (0x20..0x7F).contains(&c))
     };
     let (mut fonts, mut strings) = (Vec::new(), Vec::new());
-    for name in with_ext(&listed(set), ".tbl") {
-        let b = read(set, &name);
+    for f in files(set, ".tbl") {
+        let (name, b) = (label(set, &f), bytes(set, &f));
         if FontTable::is_font_table(&b) {
             fonts.push((name, b));
         } else if !is_text(&b) {
@@ -323,7 +360,7 @@ fn tables(set: &ArchiveSet) -> (Files, Files) {
 }
 
 // font-tbl.md Status: all 14 font tables parse, each with 256 records.
-// Covers: specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
+// Intended claim (unconfirmed until the first local run): specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn font_tables_every_file_parses() {
@@ -342,7 +379,7 @@ fn font_tables_every_file_parses() {
 // resolves to its own slot, all keys are ASCII, every version byte is 1.
 // Test vector: a key may instead resolve to an earlier slot holding the
 // same key (a duplicate first in the probe sequence).
-// Covers: specs/formats/tbl.md §header-21-bytes, §strings, §key-lookup
+// Intended claim (unconfirmed until the first local run): specs/formats/tbl.md §header-21-bytes, §strings, §key-lookup
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn string_tables_every_key_resolves() {
@@ -352,7 +389,8 @@ fn string_tables_every_key_resolves() {
     for (name, b) in &strings {
         let t = StringTable::parse(b).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(t.header.version, 1, "{name}");
-        if let Some(rest) = name.strip_prefix(r"data\local\lng\") {
+        let path = name.split_once(':').unwrap().1;
+        if let Some(rest) = path.strip_prefix(r"data\local\lng\") {
             languages.insert(rest.split('\\').next().unwrap().to_string());
         }
         for (slot, e) in t.entries.iter().enumerate().filter(|(_, e)| e.used) {
@@ -401,7 +439,7 @@ fn events(r: &AnimRecord) -> Vec<(usize, u8)> {
 }
 
 // animdata.md Test vectors "Real 1.14d" and §1 (the copies in the archives).
-// Covers: specs/formats/animdata.md §1, §2, §3, §4 r1, §4 r2, §4 r4, §6
+// Intended claim (unconfirmed until the first local run): specs/formats/animdata.md §1, §2, §3, §4 r1, §4 r2, §4 r4, §6
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn animdata_real_vectors() {
@@ -545,9 +583,10 @@ fn cof_for(set: &ArchiveSet, name: &str) -> Option<Cof> {
 
 // animdata.md Test vectors "COF cross-check": 3,529 of 3,558 names have a
 // `.cof`; for each, frames = COF frames, speed = COF animation rate,
-// events = COF events zero-filled to 144, except the first copies of the 9
-// differing duplicates (`animdata.md` §Edge cases).
-// Covers: specs/formats/animdata.md §2
+// events = COF events zero-filled to 144, except, for each of the 9
+// differing duplicates, the copy that does not match: the second copy for
+// 64A1HTH, 64NUHTH, MINUHTH, the first for the other 6 (§Edge cases).
+// Intended claim (unconfirmed until the first local run): specs/formats/animdata.md §2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn animdata_matches_every_cof() {
@@ -557,6 +596,7 @@ fn animdata_matches_every_cof() {
         "VMS1HTH", "VMGHHTH", "MINUHTH", "VMWLHTH", "VMNUHTH", "64A1HTH", "64NUHTH", "VMA1HTH",
         "3DNUHTH",
     ];
+    let first_matches = ["64A1HTH", "64NUHTH", "MINUHTH"];
     let (mut records, mut with_cof, mut skipped) = (0usize, 0usize, 0usize);
     let mut names_with_cof = BTreeSet::new();
     let mut first_seen = BTreeSet::new();
@@ -570,7 +610,12 @@ fn animdata_matches_every_cof() {
         };
         with_cof += 1;
         names_with_cof.insert(name.clone());
-        if first && differing.contains(&name.as_str()) {
+        let mismatching_copy = if first_matches.contains(&name.as_str()) {
+            !first
+        } else {
+            first
+        };
+        if mismatching_copy && differing.contains(&name.as_str()) {
             skipped += 1;
             continue;
         }
@@ -584,7 +629,7 @@ fn animdata_matches_every_cof() {
         }
     }
     println!(
-        "animdata: {records} records, {with_cof} with a .cof ({} distinct names), {skipped} first copies skipped",
+        "animdata: {records} records, {with_cof} with a .cof ({} distinct names), {skipped} non-matching copies skipped",
         names_with_cof.len()
     );
     assert_eq!(records, 3_558);
