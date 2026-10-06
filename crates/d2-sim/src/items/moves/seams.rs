@@ -14,7 +14,7 @@
 
 use crate::units::RoomId;
 
-use super::{Guid, Owner, NONE_GUID};
+use super::{Guid, Owner};
 
 /// A ground position found by the free-spot search (`sim/path-placement.md`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +44,8 @@ pub trait InventoryOps {
     fn update_list(&self, owner: Owner) -> Vec<Guid>;
     /// Append to the update list unless listed (`0x0063CC70`).
     fn update_list_add(&mut self, owner: Owner, item: Guid);
+    /// Free the update list (`0x0063CBD0`, §6.1 rule 4).
+    fn update_list_free(&mut self, owner: Owner);
     /// GUID of the weapon in use (inventory +0x1C, `0x0063BEF0`).
     fn weapon_in_use(&self, owner: Owner) -> Option<Guid>;
 
@@ -83,6 +85,17 @@ pub trait InventoryOps {
     fn belt_place(&mut self, owner: Owner, item: Guid, slot: u32) -> bool;
     /// Compaction after a slot is emptied (§3.8).
     fn belt_compact(&mut self, owner: Owner, slot: u8);
+    /// The item in a belt slot (`0x0063C7F0`, grid 1).
+    fn belt_item(&self, owner: Owner, slot: u8) -> Option<Guid>;
+    /// `numboxes` of the belt type of `belt` (`0x00621ED0`), or of record
+    /// 2 without one (§3 rule 9).
+    fn belt_boxes(&self, belt: Option<Guid>) -> u8;
+    /// The grid item list of page `page` (grid page + 2), in grid list
+    /// order (item data +0x70 next; §8.1 step 4).
+    fn page_items(&self, owner: Owner, page: u8) -> Vec<Guid>;
+    /// The body-location grid's item list (grid 0, `0x0063C2F0`), in grid
+    /// list order.
+    fn body_items(&self, owner: Owner) -> Vec<Guid>;
 
     // ---- §4 equipping ---------------------------------------------------
 
@@ -139,6 +152,8 @@ pub trait MoveUnits {
     fn unit_exists(&self, u: Owner) -> bool;
     /// Unit class (player class, monster class id).
     fn unit_class(&self, u: Owner) -> u32;
+    /// Unit mode (unit +0x10; 17 = dead for a player).
+    fn unit_mode(&self, u: Owner) -> u32;
     /// Position (subtiles).
     fn pos(&self, u: Owner) -> (i32, i32);
     fn set_pos(&mut self, u: Owner, x: i32, y: i32);
@@ -177,6 +192,14 @@ pub trait MoveUnits {
     fn item_owner(&self, item: Guid) -> Option<Owner>;
     /// Itemtypes test with equivalence (`0x00629BB0`).
     fn is_type(&self, item: Guid, ty: u16) -> bool;
+    /// Primary type (`0x0062B400`: items `type`, no equivalence).
+    fn primary_type(&self, item: Guid) -> u16;
+    /// Stackable (`0x006289F0`).
+    fn stackable(&self, item: Guid) -> bool;
+    /// Itemtypes `autostack` of the primary type (`0x0062E790`).
+    fn autostack(&self, item: Guid) -> bool;
+    /// Itemtypes `quiver` of the primary type ≠ 0 (`0x0062E740`).
+    fn quiver(&self, item: Guid) -> bool;
     /// Items code.
     fn code(&self, item: Guid) -> [u8; 4];
     /// Quality (item data +0).
@@ -218,6 +241,11 @@ pub trait MovePending {
     }
     /// Walk to an item (`0x00548A50`; arrival is the movement spec's).
     fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {}
+    /// Walk to a player or tile unit (`0x00548A50`, §7.1 types 0 and 5).
+    fn walk_to_unit(&mut self, player: Owner, target: Owner, cursor: bool) {}
+    /// Warp through a tile (`0x005550B0`, `sim/path-placement.md` §12.2;
+    /// §7.1 type 5).
+    fn tile_warp(&mut self, player: Owner, tile: Owner) {}
     /// Whether a room exists at (x, y) (`0x00463740`).
     fn room_at(&self, x: i32, y: i32) -> bool {
         false
@@ -258,7 +286,7 @@ pub trait MovePending {
     /// Queue the unit for update (`unit-order.md` §6).
     fn queue_update(&mut self, u: Owner) {}
 
-    // ---- stat lists and inventory passes (`sim/stat-lists.md`, OQ6) -----
+    // ---- stat lists, item-skill link, inventory pass (§5.5–§5.7) ---------
 
     /// Stat refresh `0x0055C2C0(owner, 0)`.
     fn stat_refresh(&mut self, u: Owner) {}
@@ -266,15 +294,15 @@ pub trait MovePending {
     fn stat_refresh_unlink(&mut self, u: Owner, b: u32) {}
     /// Stat link `0x0063D1D0`.
     fn stat_link(&mut self, owner: Owner, item: Guid) {}
-    /// Charm re-link `0x0055C270`.
+    /// Item-skill link `0x0055C270` (§5.5).
     fn charm_relink(&mut self, owner: Owner, item: Guid) {}
-    /// Charm unlink `0x0055C6E0`.
+    /// Item-skill unlink `0x0055C6E0` (§5.5).
     fn charm_unlink(&mut self, owner: Owner, item: Guid) {}
-    /// Active inventory item for its owner (`0x0062FF70`).
+    /// Active inventory item for its owner (`0x0062FF70`, §5.6).
     fn is_active(&self, owner: Owner, item: Guid) -> bool {
         false
     }
-    /// Inventory pass `0x0055DBC0(0)`.
+    /// Inventory pass `0x0055DBC0(0)` (§5.7).
     fn inventory_pass(&mut self, owner: Owner) {}
     /// Weapon-in-use update `0x006233A0`.
     fn weapon_in_use_update(&mut self, owner: Owner) {}
@@ -286,11 +314,9 @@ pub trait MovePending {
     /// `0x0055F4F0(1)`).
     fn hireling_owner_pass(&mut self, owner: Owner) {}
 
-    // ---- belt with potions (OQ13) ---------------------------------------
+    // ---- belt removal gate (§3 rule 10) -----------------------------------
 
-    /// `0x005608C0` on a belt leaving the body.
-    fn belt_unequip(&mut self, owner: Owner, item: Guid) {}
-    /// `0x00567840`: may the belt be removed. Default: no.
+    /// `0x00567840` (§3 rule 10): may the belt be removed. Default: no.
     fn belt_remove_allowed(&self, player: Owner) -> bool {
         false
     }
@@ -321,8 +347,9 @@ pub trait MovePending {
     fn carry_one(&self, item: Guid) -> bool {
         false
     }
-    /// The units of `0x0063D570`'s list whose items the held test also
-    /// walks (OQ19). Default: none.
+    /// The player's corpses (the inventory's +0x34 list, `0x0063D570`,
+    /// each node's GUID looked up as a player unit; §8.4 rule 6), whose
+    /// item lists the held test also walks. Default: none.
     fn held_test_units(&self, player: Owner) -> Vec<Owner> {
         Vec::new()
     }
@@ -374,11 +401,12 @@ pub trait MovePending {
     /// Book count change `0x0055C070(n)`.
     fn book_count_changed(&mut self, player: Owner, n: i32) {}
 
-    // ---- item use (item-use spec, unwritten; OQ14) -----------------------
+    // ---- item use (`0x005BF240`: item-use spec, unwritten) ----------------
 
-    /// 0x20 body `0x0055E170`: (result 1, out).
-    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
-        (false, false)
+    /// Use `0x005BF240(I, I, x, y)` of an item at a position (§7.11 step
+    /// 3); true = used.
+    fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
+        false
     }
     /// Use `0x005BF240` on a target; true = used.
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
@@ -386,21 +414,33 @@ pub trait MovePending {
     }
     /// Tome / skill charge update (`0x0055E050`, `0x006439B0`, S→C 0x22).
     fn charge_update(&mut self, player: Owner, item: Guid) {}
-    /// Removal of a used item `0x00561E70`.
+    /// Removal of a used item from the belt `0x00561E70`.
     fn remove_used(&mut self, player: Owner, item: Guid) {}
-    /// 0x27 body `0x00561ED0`: (result 1, out).
-    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
-        (false, false)
+    /// Consume an item (`0x0055E000`: S→C via `0x0053D010` with flag
+    /// 0x20, then `0x0055DF10(item, 0)`; §7.11, §7.18 step 9).
+    fn consume_item(&mut self, player: Owner, item: Guid) {}
+    /// Item skill of a scroll or tome (`0x0055E050`, §7.18 step 6: book →
+    /// books `bookskill`, scroll → `scrollskill`, else −1). Default: −1.
+    fn item_skill(&self, item: Guid) -> i32 {
+        -1
     }
-    /// 0x1E body `0x00561220`: (result 1, out).
-    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
-        (false, false)
-    }
-    /// Pickup specials `0x00560020` (scroll to tome, book, auto-stack):
-    /// true = handled.
-    fn pickup_special(&mut self, player: Owner, item: Guid) -> bool {
+    /// The player has skill `skill` (`0x006439B0`). Default: no.
+    fn has_skill(&self, player: Owner, skill: i32) -> bool {
         false
     }
+    /// Skill decrement `0x0055E0D0(S)` (§7.18 step 6): quantity − 1, < 1 →
+    /// 0 and skill 0 on the right when S is the right skill, S→C 0x22.
+    fn skill_decrement(&mut self, player: Owner, skill: i32) {}
+    /// Set or clear a quest flag of the player's record for the current
+    /// difficulty (`0x0065C360` / `0x0065C3A0`; §7.11 step 4).
+    fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {}
+    /// `0x005458E0` after a quest item use (§7.11 step 4).
+    fn quest_item_used(&mut self, player: Owner) {}
+    /// `0x0058A0A0` (§7.11 step 4, `tr2`).
+    fn quest_tr2_used(&mut self, player: Owner) {}
+    /// Skills and stats reset `0x00570360`, `0x00570C80` (§7.11 step 4,
+    /// `toa`).
+    fn reset_skills_stats(&mut self, player: Owner) {}
     /// Equip a picked-up item `0x00562E00(item, 0)`; true = success.
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
         false
@@ -421,9 +461,11 @@ pub trait MovePending {
     fn hireling(&self, player: Owner) -> Option<Owner> {
         None
     }
-    /// `0x00620250` (OQ16). Default: dead (0x61 does nothing).
-    fn not_dead(&self, player: Owner) -> bool {
-        false
+    /// The player has a used skill (`0x00620250`(player): skill list
+    /// +0x10, `skills/levels.md`; §7.23 step 2). Default: yes (0x61 does
+    /// nothing).
+    fn has_used_skill(&self, player: Owner) -> bool {
+        true
     }
     /// Alive (`0x005541B0` = 0 for players; hireling alive).
     fn alive(&self, u: Owner) -> bool {
@@ -448,12 +490,12 @@ pub trait MovePending {
     fn pick_object(&mut self, player: Owner, guid: Guid, cursor: u32) -> u32 {
         0
     }
-    /// 0x16 types 0, 3, 5 (OQ10).
-    fn pick_other(&mut self, player: Owner, ty: u32, guid: Guid, cursor: u32) -> u32 {
-        0
-    }
-    /// Resync after a refused 0x19 / 0x63 (`0x00549A60`, OQ11).
-    fn resync(&mut self, player: Owner) {}
+    /// Corpse pickup `0x0057FB70(game, player, P)` (§7.1 type 0; corpse
+    /// spec).
+    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {}
+    /// Player-to-player interaction `0x00566E60` (§7.1 type 0;
+    /// multiplayer).
+    fn player_interact(&mut self, player: Owner, other: Owner) {}
 
     // ---- transport -------------------------------------------------------
 
@@ -470,14 +512,6 @@ pub trait MovePending {
     /// (`world/vendors.md`). Default: none.
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
         Vec::new()
-    }
-    /// Owner fields of a filler's 0x9D action 0x13 (`0x0053EA50`; not
-    /// written). Default: none (6, −1).
-    fn filler_owner(&self, parent: Guid) -> Owner {
-        Owner {
-            ty: Owner::NONE,
-            guid: NONE_GUID,
-        }
     }
 }
 

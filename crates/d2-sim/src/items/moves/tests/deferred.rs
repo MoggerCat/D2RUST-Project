@@ -100,6 +100,8 @@ fn fillers_follow_their_parent() {
     f.k.bits = vec![0xEE];
     let it = f.item(10, mode::STORED);
     it.cmd = 0x80;
+    // Socketed (`0x00629900`): the fillers follow with flag argument 0x8.
+    it.iflags = 0x800;
     it.fillers = vec![11, 12];
     f.item(11, mode::SOCKETED).page = 0xFF;
     f.item(12, mode::SOCKETED).page = 0xFF;
@@ -108,7 +110,7 @@ fn fillers_follow_their_parent() {
     assert_eq!(m[0], layouts::item_world(4, 0, 10, &[0xEE, 0, 0]).unwrap());
     assert_eq!(
         m[1],
-        layouts::item_owned(0x13, 0, 11, 4, 10, &[0xEE, 0, 0xFF]).unwrap()
+        layouts::item_owned(0x13, 0, 11, 4, 10, &[0xEE, 0x8, 0xFF]).unwrap()
     );
     assert_eq!(m[2][..5], [0x9D, 0x13, 16, 0, 12]);
 }

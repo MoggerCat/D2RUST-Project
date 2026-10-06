@@ -45,7 +45,7 @@ fn stack_over_the_max_fills_dst() {
 
 /// §7.12 merge branch: throwing knives have durability (`0x00629930`:
 /// durability 20, a stat list, stat 152 < 1): src's lower stat 72 lowers
-/// dst's (OQ15), dst := q_s + q_d, cursor cleared, S→C 0x42 for src, src
+/// dst's (stat 72 `durability`), dst := q_s + q_d, cursor cleared, S→C 0x42 for src, src
 /// freed (its unit is gone); dst 0x9C action 0xA.
 #[test]
 fn stack_merge_frees_the_source() {

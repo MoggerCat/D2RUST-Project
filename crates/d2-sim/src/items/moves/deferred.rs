@@ -351,8 +351,16 @@ pub fn category<W: MoveWorld>(w: &W, item: Guid) -> u8 {
     }
 }
 
-/// Builds a 0x9C / 0x9D for `item` and, for an item with sockets, one 0x9D
-/// action 0x13 per filler after it (§11 "Bit stream").
+/// Sender flag argument without the fillers' 0x9D action 0x13 (§11; the
+/// cube spill's).
+pub const NO_FILLERS: u32 = 0x20;
+/// Added to a filler's flag argument (`0x0053EA50`, §11).
+pub const FILLER_FLAG: u32 = 0x8;
+
+/// Builds a 0x9C / 0x9D for `item` with the sender's flag argument
+/// `flags` and, for a socketed item when `flags` lacks 0x20, one 0x9D
+/// action 0x13 per filler after it (§11 "Bit stream", `0x0053EA50`:
+/// owner = the parent item, flag argument `flags` | 0x8).
 fn item_message<W: MoveWorld>(
     w: &W,
     message: u8,
@@ -370,17 +378,17 @@ fn item_message<W: MoveWorld>(
         layouts::item_owned(action, cat, item, owner.ty, owner.guid, &bits)?
     };
     let mut out = vec![first];
-    // TODO(spec: inventory.md §11): the owner fields of a filler's 0x9D
-    // action 0x13 and the flag argument of its bit stream are not written.
+    if flags & NO_FILLERS != 0 || w.item_flags(item) & iflag::SOCKETED == 0 {
+        return Ok(out);
+    }
     for f in w.fillers(item) {
-        let fo = w.filler_owner(item);
-        let fb = w.item_bits(f, 0, w.page(f));
+        let fb = w.item_bits(f, flags | FILLER_FLAG, w.page(f));
         out.push(layouts::item_owned(
             0x13,
             category(w, f),
             f,
-            fo.ty,
-            fo.guid,
+            Owner::ITEM,
+            item,
             &fb,
         )?);
     }
@@ -422,41 +430,45 @@ pub fn dispatch<W: MoveWorld>(
         if !cond {
             continue;
         }
-        // TODO(spec: inventory.md §6.2): a row whose flags match but whose
-        // `to` excludes this client is read as ending the walk (nothing
-        // sent, later rows skipped).
+        // A row matches only when its `to` test passes too; a row whose
+        // `to` excludes this client lets the walk go on, except the
+        // item-flag rows 18 and 19, which end it with nothing sent
+        // (`0x0059775B`–`0x00597767`, `0x005977B4`–`0x005977C1`).
         let to = match r.to {
             To::Owner => is_owner,
             To::All => true,
             To::OwnerOrMode1 => is_owner || m == mode::EQUIPPED,
         };
-        if to {
+        if !to {
             if r.message == 0x7D {
-                out.push(layouts::item_state(
-                    inv.ty,
-                    inv.guid,
-                    item,
-                    r.action,
-                    itf & r.action,
-                ));
-            } else {
-                if r.order == 1 {
-                    // 0x9C action 1 first sets the item's x, y to 0 (§8.2).
-                    w.set_pos(Owner::item(item), 0, 0);
-                }
-                // TODO(spec: inventory.md §11): the sender's flag argument
-                // for the dispatcher's sends is not written; 0 is used.
-                let page = w.page(item);
-                out.extend(item_message(
-                    w,
-                    r.message,
-                    r.action as u8,
-                    inv,
-                    item,
-                    0,
-                    page,
-                )?);
+                break;
             }
+            continue;
+        }
+        if r.message == 0x7D {
+            out.push(layouts::item_state(
+                inv.ty,
+                inv.guid,
+                item,
+                r.action,
+                itf & r.action,
+            ));
+        } else {
+            if r.order == 1 {
+                // 0x9C action 1 first sets the item's x, y to 0 (§8.2).
+                w.set_pos(Owner::item(item), 0, 0);
+            }
+            // The dispatcher's sends pass the flag argument 0 (§6.2).
+            let page = w.page(item);
+            out.extend(item_message(
+                w,
+                r.message,
+                r.action as u8,
+                inv,
+                item,
+                0,
+                page,
+            )?);
         }
         break;
     }
@@ -491,9 +503,95 @@ pub fn player_update<W: MoveWorld>(
     w.hireling_owner_pass(p);
     out.push(layouts::relator1(Owner::PLAYER, player));
     out.push(layouts::relator2(Owner::PLAYER, 0, player));
-    // TODO(spec: inventory.md §6.1 rule 4, OQ9): the per-item reset of
-    // command flags and the freeing of update lists after the pass.
+    // The per-item reset and the list free are the room clean-up's
+    // ([`room_cleanup`], §6.1 rule 4).
     Ok(out)
+}
+
+/// Command flags the per-item reset clears (table `0x00738C70`, 21
+/// entries; 0x1 is not among them, §6.1 rule 4).
+pub const RESET_CMD_FLAGS: [u32; 21] = [
+    0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x40000, 0x400, 0x800, 0x1000, 0x2000, 0x200,
+    0x4000, 0x8000, 0x10000, 0x20000, 0x80000, 0x100000, 0x200000,
+];
+/// Item flags the per-item reset clears (table `0x00738C4C`, 8 entries).
+pub const RESET_ITEM_FLAGS: [u32; 8] = [0x20, 0x2, 0x8, 0x80, 0x40, 0x1, 0x200, 0x40000];
+/// Unit flags (+0xC4) the room clean-up clears (`0x00553220`).
+pub const CLEANUP_UNIT_FLAGS: u32 = 0x1 | 0x10 | 0x400 | 0x8000;
+/// Update bits (+0xC8) the room clean-up clears (`0x00553220`).
+pub const CLEANUP_UPDATE_BITS: u32 = 0x800 | 0x1000 | 0x10000 | 0x200000;
+/// Update bits (+0xC8) the per-item reset clears (`0x005979B0`).
+pub const RESET_ITEM_BITS: u32 = 0x4 | 0x10;
+/// Command flag 0x1: the item is removed by the reset (§6.1 rule 4.4).
+pub const CMD_REMOVE: u32 = 0x1;
+
+fn mask(flags: &[u32]) -> u32 {
+    flags.iter().fold(0, |a, &f| a | f)
+}
+
+/// Per-item reset `0x005979B0` (§6.1 rule 4.2).
+pub fn item_reset<W: MoveWorld>(w: &mut W, item: Guid) {
+    let io = Owner::item(item);
+    let b = w.update_bits(io);
+    w.set_update_bits(io, b & !RESET_ITEM_BITS);
+    let c = w.cmd_flags(item);
+    w.set_cmd_flags(item, c & !mask(&RESET_CMD_FLAGS));
+    let f = w.item_flags(item);
+    w.set_item_flags(item, f & !mask(&RESET_ITEM_FLAGS));
+}
+
+/// Update-list reset `0x00597B00(game, unit)` (§6.1 rule 4, D2MOO
+/// `D2GAME_INVMODE_Last`): a unit without an inventory → nothing; else
+/// the owner refresh with 0 (+0xC8 bit 0 cleared; bit 1, "save pending",
+/// stays), then for each listed item found by GUID: body location 0 for
+/// command flags 0x10 / 0x4000 (or 0x20 with item flag 0x80), the
+/// per-item reset, the item's own update list (+0xC8 bit 0) reset and
+/// freed, and the removal of an item with command flag 0x1. Last the
+/// unit's update list is freed.
+pub fn update_list_reset<W: MoveWorld>(w: &mut W, unit: Owner) {
+    if !w.has_inventory(unit) {
+        return;
+    }
+    let b = w.update_bits(unit);
+    w.set_update_bits(unit, b & !1);
+    for g in w.update_list(unit) {
+        if !w.unit_exists(Owner::item(g)) {
+            continue;
+        }
+        let c = w.cmd_flags(g);
+        if c & (super::cmd::UNEQUIP | super::cmd::AUTO_UNEQUIP) != 0
+            || (c & super::cmd::SWAP_BODY != 0 && w.item_flags(g) & iflag::SWAP_OUT != 0)
+        {
+            w.set_body_loc(g, 0);
+        }
+        item_reset(w, g);
+        let io = Owner::item(g);
+        let ib = w.update_bits(io);
+        if ib & 1 != 0 {
+            w.set_update_bits(io, ib & !1);
+            for h in w.update_list(io) {
+                if w.unit_exists(Owner::item(h)) {
+                    item_reset(w, h);
+                }
+            }
+            w.update_list_free(io);
+        }
+        if w.cmd_flags(g) & CMD_REMOVE != 0 {
+            w.free_item(g);
+        }
+    }
+    w.update_list_free(unit);
+}
+
+/// Room update clean-up `0x00553220(game, unit)` (`tick.md` §3 step 6,
+/// §6.1 rule 4): unit flags 0x1, 0x10, 0x400, 0x8000 and update bits
+/// 0x800, 0x1000, 0x10000, 0x200000 cleared, then [`update_list_reset`].
+pub fn room_cleanup<W: MoveWorld>(w: &mut W, unit: Owner) {
+    let f = w.unit_flags(unit);
+    w.set_unit_flags(unit, f & !CLEANUP_UNIT_FLAGS);
+    let b = w.update_bits(unit);
+    w.set_update_bits(unit, b & !CLEANUP_UPDATE_BITS);
+    update_list_reset(w, unit);
 }
 
 /// Item part of the per-unit update `0x0053A500` (§6.3, `tick.md` §6
@@ -565,6 +663,23 @@ pub fn send_item_page<W: MoveWorld>(
 pub fn send_to_belt<W: MoveWorld>(w: &mut W, player: Owner, item: Guid) -> Result<(), MoveFatal> {
     let page = w.page(item);
     for m in item_message(w, 0x9C, 0x0E, player, item, 0, page)? {
+        w.send(player, m);
+    }
+    Ok(())
+}
+
+/// A direct 0x9C with action `action` and the sender flag argument
+/// `flags`, queued to the player's client now (e.g. 0x9C action 0xF of the
+/// belt change, §3 rule 9, `0x0053EED0` with flag 0x20).
+pub fn send_item_world<W: MoveWorld>(
+    w: &mut W,
+    player: Owner,
+    item: Guid,
+    action: u8,
+    flags: u32,
+) -> Result<(), MoveFatal> {
+    let page = w.page(item);
+    for m in item_message(w, 0x9C, action, player, item, flags, page)? {
         w.send(player, m);
     }
     Ok(())

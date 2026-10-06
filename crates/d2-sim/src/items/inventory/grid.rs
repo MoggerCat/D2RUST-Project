@@ -36,7 +36,8 @@ pub fn grid_record(owner: UnitKind, pg: u8, expansion: bool) -> Option<usize> {
             .iter()
             .find(|&&(c, _)| c == class)
             .map(|&(_, r)| r),
-        // TODO(spec: grid record of an item-owned or other inventory; §1.3 lists players, monsters, objects)
+        // Missiles, items, tiles (types 3–5): no record (§1.3; socket
+        // fillers join an item's inventory through `0x0063B210`).
         UnitKind::Item | UnitKind::Other => None,
     }
 }
@@ -48,20 +49,23 @@ pub fn page_grid_size(t: &InvTables, owner: UnitKind, pg: u8, expansion: bool) -
 }
 
 /// Fit test (`0x0063A8A0`, §2.1): every cell of the w × h rectangle at
-/// (x, y) is empty. Callers check the bounds first.
+/// (x, y) is empty. Callers check the bounds first. The loops run from x
+/// to x + w with a signed 32-bit `<` and a wrapping end (§2.2): an end
+/// that wraps past 2^31 makes them run zero times (the item fits).
 pub fn fits(g: &Grid, x: i32, y: i32, w: u8, h: u8) -> bool {
-    (y..y + i32::from(h)).all(|yy| (x..x + i32::from(w)).all(|xx| g.cell(xx, yy).is_none()))
+    (y..y.wrapping_add(i32::from(h)))
+        .all(|yy| (x..x.wrapping_add(i32::from(w))).all(|xx| g.cell(xx, yy).is_none()))
 }
 
-/// Bounds of §2.1: x ≥ 0, y ≥ 0, x + w ≤ width, y + h ≤ height. The sums
-/// are taken in i64: x and y can come from a payload (0x18 x, y near
-/// `i32::MAX`), where an i32 sum overflows.
-// TODO(spec: §2.1 does not say how the original's 32-bit x + w behaves near 2^31)
+/// Bounds of §2.1 / §2.2 (`0x0063B05D`–`0x0063B08C`): x < 0 or x + w >
+/// width fails, the same for y, in signed 32-bit arithmetic with wrap: an
+/// x + w (or y + h) that wraps past 2^31 is negative and passes (§2.2,
+/// reproduced: 0x18 with x = 0x7FFFFFFF places a 1-wide item).
 pub fn in_bounds(g: &Grid, x: i32, y: i32, w: u8, h: u8) -> bool {
     x >= 0
         && y >= 0
-        && i64::from(x) + i64::from(w) <= i64::from(g.width)
-        && i64::from(y) + i64::from(h) <= i64::from(g.height)
+        && x.wrapping_add(i32::from(w)) <= i32::from(g.width)
+        && y.wrapping_add(i32::from(h)) <= i32::from(g.height)
 }
 
 /// Weight of a fitting candidate (`0x0063B340`, §2.3): occupied cells just
@@ -176,7 +180,8 @@ pub fn place_in_grid<W: InvWorld + ?Sized>(
     let Some(grid) = inv.grid_or_create(g, gw, gh) else {
         return false;
     };
-    if !in_bounds(grid, x, y, iw, ih) || !fits(grid, x, y, iw, ih) {
+    // Grids 0 and 1 skip the bound test (1 × 1; callers check the slot).
+    if (g >= grid_id::PAGE && !in_bounds(grid, x, y, iw, ih)) || !fits(grid, x, y, iw, ih) {
         return false;
     }
     let Some(d) = w.item(item).copied() else {
@@ -186,6 +191,11 @@ pub fn place_in_grid<W: InvWorld + ?Sized>(
         w.remove_from_room(item);
     }
     match d.inv {
+        // The cursor item belongs to this inventory (§1.4 rule 3; a state
+        // whose +0x5C was not written is treated alike).
+        _ if inv.cursor() == Some(item) => {
+            inv.unlink(w, item);
+        }
         Some(o) if o == inv.owner => {
             inv.unlink(w, item);
         }
@@ -344,13 +354,10 @@ pub fn place_in_page_from_cursor<W: InvWorld + ?Sized>(
     if !placed {
         return false;
     }
-    if player && pg == page::TRADE2 {
-        // TODO(spec: where in §2.4 the page-2 trade hook runs; "afterwards")
-        w.trade_hook(inv.owner, item);
-    }
-    // Step 5.
+    // Step 5. A failure returns 0 with nothing undone: the item stays
+    // placed by step 4 (the placement's unlink cleared the cursor) in
+    // mode 4 (original bug, reproduced).
     if !w.link_check(inv.owner, item, 1) {
-        // TODO(spec: §2.4 step 5 does not say what a failed link check returns)
         return false;
     }
     // Step 6.
@@ -363,7 +370,7 @@ pub fn place_in_page_from_cursor<W: InvWorld + ?Sized>(
     }
     // Step 7.
     if !keep_cursor {
-        inv.set_cursor(None);
+        inv.put_cursor(w, None);
     }
     let filled = w.socket_filled(item);
     let mut guid = d.guid;
@@ -382,6 +389,10 @@ pub fn place_in_page_from_cursor<W: InvWorld + ?Sized>(
     if send {
         w.owner_refresh(inv.owner);
         inv.push_update(guid);
+    }
+    // Page-2 trade hook: after step 8, before step 9 (§2.4 step 3).
+    if player && pg == page::TRADE2 {
+        w.trade_hook(inv.owner, item);
     }
     // Step 9.
     if w.active_item(inv.owner, item) {

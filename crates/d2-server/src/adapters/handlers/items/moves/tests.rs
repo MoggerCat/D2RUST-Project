@@ -323,18 +323,6 @@ impl MovePending for MRest {
     fn set_owner(&mut self, item: Guid, owner: Owner) {
         self.log(format!("set_owner {item} {}", owner.guid));
     }
-    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
-        self.log(format!("use_grid_item {} {item} {x} {y}", player.guid));
-        (false, false)
-    }
-    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
-        self.log(format!("use_item_action {} {target} {used}", player.guid));
-        (false, false)
-    }
-    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
-        self.log(format!("swap_1h_with_2h {} {item} {loc}", player.guid));
-        (false, false)
-    }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         self.log(format!("use_item {} {} {item}", player.guid, target.guid));
         self.with(|r| r.use_ok)
@@ -369,9 +357,6 @@ impl InvRest for MRest {
     fn spell(&self, item: Guid) -> i32 {
         self.with(|r| r.spells.get(&item).copied().unwrap_or(0))
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value * p / 100
-    }
     fn item_active_on(&self, _: Guid, _: Owner) -> bool {
         false
     }
@@ -390,17 +375,11 @@ impl InvRest for MRest {
     fn ammo_type(&self, _: Guid) -> Option<i16> {
         None
     }
-    fn stack_quality_ok(&self, _: Guid) -> bool {
-        true
-    }
     fn has_allowed_location(&self, _: Guid) -> bool {
         true
     }
     fn quiver_kind(&self, _: Guid) -> bool {
         false
-    }
-    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
-        true
     }
     fn interaction(&self, _: Owner) -> InteractionTarget {
         InteractionTarget::None
@@ -850,7 +829,8 @@ fn pick_item_to_the_cursor() {
     assert_eq!(bytes, t.pass(&[x9c(0x01, k)]));
     assert_eq!(t.data(k).cmd_flags, 0, "clean-up");
     let p = t.player;
-    assert_eq!(t.sim().events.sys.units.get(p).unwrap().flags2 & 3, 0);
+    // The reset clears +0xC8 bit 0; bit 1 ("save pending") stays (IS1).
+    assert_eq!(t.sim().events.sys.units.get(p).unwrap().flags2 & 3, 2);
     assert_eq!(t.idle(), NO_BYTES);
     let me = t.pguid();
     assert_eq!(t.rest.take_log(), [format!("pickup_sound {me} {k}")]);
@@ -939,7 +919,10 @@ fn lift_and_insert() {
     assert_eq!((d.page, d.x, d.y), (0, 0, 0));
     assert_eq!(bytes, t.pass(&[x9c(0x04, k)]));
     let _c = t.cursor_item(KEY);
-    assert_eq!(t.frame(&msg(0x19, &[k])), (Invalid, NO_BYTES));
+    // A cursor item: "can't do that" (S→C 0x5A, §7.4 step 2), 2.
+    let (code, bytes) = t.frame(&msg(0x19, &[k]));
+    assert_eq!(code, Invalid);
+    assert_eq!(bytes, [d2_sim::items::moves::layouts::cant_do_that()]);
     assert_eq!(t.mode(k), 0);
 }
 
@@ -1032,9 +1015,9 @@ fn swap_cursor_with_body() {
     assert_eq!(bytes, t.pass(&m));
 }
 
-/// 0x1E (§7.9): the swap itself is the item-use spec's (`MovePending`
-/// seam `swap_1h_with_2h`, logged; its default "nothing" → 0). Location
-/// 3 → 3; an empty location 4 → 1.
+/// 0x1E (§7.9): location 3 → 3; an empty location 4 → 1; a two-hander
+/// onto a sword with the other hand empty: §4.3 gives 0, not 7 → 0 with
+/// nothing moved.
 // Covers: specs/items/inventory.md §7.9
 #[test]
 fn swap_one_handed_with_two_handed() {
@@ -1045,17 +1028,14 @@ fn swap_one_handed_with_two_handed() {
     assert_eq!(t.frame(&body(0x1A, n, 4)).0, Done);
     assert_eq!(t.mode(n), 1);
     let n2 = t.cursor_item(TWO_HANDER);
-    t.rest.take_log();
     assert_eq!(t.frame(&body(0x1E, n2, 4)), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("swap_1h_with_2h {me} {n2} 4")]);
     assert_eq!((t.mode(n), t.mode(n2)), (1, 4));
 }
 
 // ---- 0x20–0x22: use, stack -------------------------------------------------------------
 
-/// 0x20 (§7.11): a stored item used at a point in range: the use is the
-/// item-use spec's (seam, logged; "nothing" → 0). A ground item → 1.
+/// 0x20 (§7.11): a key is not `useable` → out 1 (step 1) → 3. A ground
+/// item → 1.
 // Covers: specs/items/inventory.md §7.11
 #[test]
 fn use_grid_item() {
@@ -1063,10 +1043,7 @@ fn use_grid_item() {
     let k = t.picked(KEY);
     let g = t.ground_item(KEY, 12, 12);
     assert_eq!(t.frame(&msg(0x20, &[g, 10, 10])), (Refused, NO_BYTES));
-    t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("use_grid_item {me} {k} 11 10")]);
+    assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Malformed, NO_BYTES));
 }
 
 /// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
@@ -1174,8 +1151,8 @@ fn item_to_belt_shift_sends_now() {
 
 // ---- 0x27–0x29: item use, sockets, tomes -----------------------------------------------
 
-/// 0x27 (§7.18): both items owned → the item-use seam (logged; "nothing"
-/// → 0). A ground target → 1.
+/// 0x27 (§7.18): both items owned, but a cursor item exists → 0 (step
+/// 2). A ground target → 1.
 // Covers: specs/items/inventory.md §7.18
 #[test]
 fn use_item_action() {
@@ -1184,10 +1161,7 @@ fn use_item_action() {
     let u = t.cursor_item(KEY);
     let g = t.ground_item(KEY, 12, 12);
     assert_eq!(t.frame(&msg(0x27, &[g, u])), (Refused, NO_BYTES));
-    t.rest.take_log();
     assert_eq!(t.frame(&msg(0x27, &[k, u])), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("use_item_action {me} {k} {u}")]);
 }
 
 /// 0x28 (§7.19): the filler is not a socket filler (seam

@@ -47,11 +47,17 @@ fn auto_pickup_gold_specials_equip() {
     assert_eq!(f.stat(me(), 14), 300);
     assert!(f.logged("pickup_sound") && f.logged("free 10"));
 
+    // An auto-stack item merges into a page-0 stack (§8.1 step 4): handled.
     let mut f = Fake::new();
-    ground(&mut f, 10);
-    f.k.special = true;
+    let p = ground(&mut f, 10);
+    (p.stackable, p.autostack, p.max_stack) = (true, true, 20);
+    f.item(11, mode::STORED).max_stack = 20;
+    f.set_stat(Owner::item(10), 70, 5);
+    f.set_stat(Owner::item(11), 70, 3);
     assert_eq!(pickup_auto(&mut f, me(), 10), Ok(Outcome::DONE));
     assert_eq!(f.it(10).mode, mode::GROUND);
+    assert_eq!(f.stat(Owner::item(11), 70), 8);
+    assert!(f.logged("free 10"));
 
     let mut f = Fake::new();
     ground(&mut f, 10);

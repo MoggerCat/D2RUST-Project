@@ -240,12 +240,12 @@ impl MoveCall for UpdateRun {
                 }
             }
         }
-        // The room clean-up (`tick.md` §3 step 6, `0x00553220`; §6.1 rule
-        // 4): command flags reset and update lists freed
-        // (`InvDesk::update_done`), and the per-unit flags cleared.
-        // TODO(spec: inventory.md §6.1 r4, unit-order.md §6 r4): which
-        // +0xC8 bits `0x00553220` clears is not written; read as the two
-        // the owner refresh sets (§6.1 rule 1: bit 0, bit 1 for players).
+        // The update-list reset of the room clean-up (`tick.md` §3 step 6,
+        // `0x00553220` → `0x00597B00`; §6.1 rule 4, `InvDesk::update_done`):
+        // +0xC8 bit 0 cleared (bit 1, "save pending", stays: IS1), the
+        // per-item resets, the update lists freed. The unit-flag part of
+        // `0x00553220` (`items::moves::room_cleanup`) belongs to the tick
+        // wiring, which does not run it yet (IS2).
         for &p in &self.players {
             let Some(o) = d.owner_of(p) else {
                 continue;
@@ -254,8 +254,6 @@ impl MoveCall for UpdateRun {
                 continue;
             }
             d.update_done(o);
-            let bits = d.update_bits(o);
-            d.set_update_bits(o, bits & !3);
         }
         (sent, fatal)
     }
