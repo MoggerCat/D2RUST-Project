@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-06, branch `claude/docs-fold-3`, main at `fd37fba`: the server handler, second wiring, gap-test and local-server notes folded in)
+# Handoff (updated 2026-10-06, branch `claude/local-2026-10-06` from main `edad871`: group C game-file and real-GPU run recorded in §5 Done)
 
 Start here in a fresh session, after `CLAUDE.md` and `docs/METHODS.md`.
 This file holds state, the next steps, the code and command map, and the
@@ -49,7 +49,7 @@ merged tree (the coordinator's gate runs it).
 | 3 not implemented | object operate / init, the per-skill function bodies (`use.md` OQ10), kill experience (`kill_experience` in `wiring::interaction` applies `vitals.md` §4.2 and §4.3's add only; nothing calls it, the kill has no provider, §7 WI10), path / position / movement (`units.md` path spec not written; wiring `Pending`), inventory and player data (the item-use C→S ids 0x16–0x29, 0x4C, 0x50, 0x61, 0x63 have no owner spec), message 0x73 (`missiles.md` R2.4, needs a protocol seam outside `missiles/`), Act II–V quests, the other 131 AI functions, server-do / server-hit bodies, mercenary spawn / init (spec not written) | specs exist as drafts or are unwritten |
 | 4 Conformance | recording proven feasible; coverage tool done | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at this commit: 3,164 claims over 2,704 rule units: unit 2,342 (86.6%), game-file 186 (6.9%), trace 30 (1.1%), verified 216 (8.0%), any 2,396 (88.6%) — tested (any tier) 88.6%, verified 8.0%; the 28 game-tier claims the `gaps-data-formats` session added sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before them), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 216 as an upper bound until §5 C17 is run (`py tools/coverage.py --summary` total line on main at `fd37fba`; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases, are not additive). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity |
 | 5 Local server + bridge | bridge design `specs/client/bridge.md` and skeleton `d2-client::bridge` done; `bridge::local::LocalLink` implements `ServerLink` on `d2_server::host::Host` (`claude/p5-local-server`, synthetic data only, unverified; `d2-client` now depends on `d2-server`); every S→C id still unowned (`bridge-dispatch.tsv` all `TBD`); session code is the placeholder `PendingSession`; the app builds no single-player game yet | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, the dispatch TSV check with its perturbation test, a windowless Bevy `App` mirror test; `bridge/local_tests.rs` headless end to end on the real host, `ProtoSizes` and `SimGame<ActionSim, ActionWorld>` (two-act synthetic DRLG, seed 1234, a sorceress at (42, 20) beside a Cold Plains waypoint): C→S 0x49 drained, dispatched (result 0), ticked, flushed, and the exact S→C `0D 00 <guid> 01 2D00 1700 0000` reaches a synthetic 0x0D handler that adds unit (0, guid) to `ClientWorld`; duplicate filter, protocol version check (a wrapper reporting version + 1 refused), unknown / unowned ids |
-| 6 Client | design drafts `specs/client/{render-pipeline,assets,ui,audio}.md` (d2rs-own). Cloud tasks implemented (plain-Rust infrastructure, no original behavior): **C1** paths + loaders, **C2** residency cache, **C3** frames + atlas, **C4** scene + CPU compositor, **C5** GPU compute compositor (`gpu_compositor`: WGSL, integer math, no sampler, 16×16 workgroups), **C6** verify harness (`verify`: case files version 1, `--perturb`, `GpuCompositor` seam), **C6×C5** GPU half of the synthetic cases wired (`verify::gpu::Wgpu`, `[[unit]]` COF cases), **C7** COF composite mechanics (`composite`), **C8** UI core, **C9** controls file, **C10** audio core. Nothing original-behavior is reproduced: every §B point is a `TODO(spec: …)` hook or a `ComponentResolver` method. GPU byte-exactness is **unverified** on a real GPU (proven only on Mesa llvmpipe 25.2.8, Vulkan, a software adapter) | CI unit tests from each spec's vectors (`d2-client` per branch: frames 53 pass + 1 ignored, scene 20 tests, ui 20, controls 16, audio 25; `gpu_compositor` 11 + 2 ignored, `composite` 11 + 1 ignored, `verify` 191 lib tests pass, 5 ignored on the `p6-verify-gpu` branch); llvmpipe: all 12 `gpu_compare` cases and all 10 synthetic verify cases 0 differing, `--perturb 7` reports exactly 7 on every half; game-file and real-GPU halves queued (§5) |
+| 6 Client | design drafts `specs/client/{render-pipeline,assets,ui,audio}.md` (d2rs-own). Cloud tasks implemented (plain-Rust infrastructure, no original behavior): **C1** paths + loaders, **C2** residency cache, **C3** frames + atlas, **C4** scene + CPU compositor, **C5** GPU compute compositor (`gpu_compositor`: WGSL, integer math, no sampler, 16×16 workgroups), **C6** verify harness (`verify`: case files version 1, `--perturb`, `GpuCompositor` seam), **C6×C5** GPU half of the synthetic cases wired (`verify::gpu::Wgpu`, `[[unit]]` COF cases), **C7** COF composite mechanics (`composite`), **C8** UI core, **C9** controls file, **C10** audio core. Nothing original-behavior is reproduced: every §B point is a `TODO(spec: …)` hook or a `ComponentResolver` method. GPU byte-exactness **proven on a real GPU** (Intel HD Graphics 630, Vulkan: `gpu_compare` 12/12, `d2-client verify` 11/11, perturbations exact, §5 Done 2026-10-06) and on Mesa llvmpipe 25.2.8 | CI unit tests from each spec's vectors (`d2-client` per branch: frames 53 pass + 1 ignored, scene 20 tests, ui 20, controls 16, audio 25; `gpu_compositor` 11 + 2 ignored, `composite` 11 + 1 ignored, `verify` 191 lib tests pass, 5 ignored on the `p6-verify-gpu` branch); llvmpipe: all 12 `gpu_compare` cases and all 10 synthetic verify cases 0 differing, `--perturb 7` reports exactly 7 on every half; game-file and real-GPU halves queued (§5) |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
@@ -423,6 +423,64 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local, branch `claude/local-2026-10-06` from `edad871`;
+group C on game files and the real GPU; entries C1, C8, C9, C15, C16,
+C17, parser robustness and treasure memory dump removed below):
+- `data-tool tables`: 73 runtime tables, 72 identical, 1 explained,
+  code buffers 4/4 identical (unchanged; the behavior-neutral changes of
+  `gaps-data-formats` moved nothing).
+- `cargo test -p d2-data -p d2-formats -- --ignored`: 50 pass after 5
+  blind-written assertions were corrected from the observations (§8):
+  `calc::tests::game::text_compile_reproduces_code_files` (record-major
+  order, as `bin::formula_fields`); `game_data::compile_only_lookup_tables`
+  (hitclass has a live source; monmode / plrmode `.txt` also in X and D,
+  16 / 20 records; skills P 357 / X 319 / D 221; sounds 4,699 / 4,698 /
+  3,587; monstats 734 / 575 / 410); `loading_edge_cases` (`properties.code`
+  is a name linker); `formats_game::animdata_edge_cases` (spec corrected:
+  the `.cof` matches the first copy for `64A1HTH`, `64NUHTH`, `MINUHTH`,
+  the second for the other 6, `animdata.md` Duplicates);
+  `dc6_zero_size_frames` (spec corrected: 0 zero-size frames in the 1,651
+  DC6 listed by X and D, `dc6.md`; `patch_d2.mpq` has no `(listfile)`, the
+  6 patch DC6 `mpq-tool formats` finds are not in that count).
+- `mpq-tool check`: all blocks decoded; `mpq-tool formats`: 0 errors
+  (cof 3,606 files, 3,605 parsed + `amblxbow.cof`; dc6 1,657).
+- C1 `cargo test -p d2-sim -- --ignored`: 5 pass (`codes_match_game_tables`,
+  `real_skill_vectors`, `real_table_constants`, `real_level_stats`,
+  `live_monstats_records`); an ```` ```ignore ```` doc snippet that
+  `--ignored` compiled (`wiring/interaction/skill_events.rs`) is now
+  ```` ```text ````.
+- C2 (part) `check_stats.py --files game`: pass (359 stats, 84 ops, 42
+  op targets). The `StatData` live-row test is still unwritten (C2 kept).
+- C8 frames: pass; 23,595 files (6 parse errors), 288,702 frame sets,
+  3,345,171 frames, largest 96×960 (`expansionaallair\worldstone.dt1`
+  tile 50) ≤ 2046.
+- C9 COFs: pass; 3,511 distinct names + `amblxbow.cof` (the test
+  deduplicates names across archives; `cof.md`'s 3,605 counts files),
+  242,300 frames, 0 failures: `composite` OQ1 needs no rule.
+- C15 real GPU **Intel(R) HD Graphics 630, Vulkan, IntegratedGpu** (driver
+  string not reported by wgpu): `gpu_compare` 12/12 `0 differing bytes`,
+  `--perturb 7` 12 × `7 differing … 7 perturbed`, `Error: 12 of 12 cases
+  differ`, exit 1; `gpu_compositor::tests::gpu` 2 pass;
+  `verify::tests::gpu_half` pass.
+- C16 `d2-client verify` (release): 11 cases; map `townN1.ds1` 2,697
+  draw items, view 7840×4112 at −3200,−192, PASS; synthetic 10 × 0 of P
+  differ, PASS; `summary: 11 pass, 0 fail …`, exit 0. `--perturb 7`: every
+  case 7 (CPU binned, GPU indices, GPU), map 7 of 32,238,080 (stable
+  render on the third capture), `0 pass, 11 fail`, exit 1. `--case map
+  --perturb 5`: 5 pixels, exit 1. No panic or hang with two wgpu
+  instances in one process. GPU byte-exactness is now proven on one real
+  adapter.
+- Treasure memory dump (`dump_tables.py` now also writes `tc_records`,
+  `tc_entries`, `tc_chest`; new `check_treasure.py`):
+  `traces/raw/20261006-115547-tables` (raw dump, not committed): 1,013
+  TCs, 4,167 entries (763 in the 160 automatic TCs), 2,742 TC / 660
+  `treasureclassex` item (81 `mul`) / 2 unique / 0 set entries, TC 430
+  (group 12, picks 1, nodrop 100, ids 523 / 218 / 203 / 370, starts 0 /
+  21 / 37 / 58, totals 60 / 60), chest table 45 found, `Act 1 Chest A` =
+  TC 385: 0 failures; `--perturb 430` reports exactly TC 430 (M08). Not
+  yet done: a byte compare of the whole dump with d2rs's built
+  `TreasureClasses` (new C20).
+
 Done 2026-10-06 (local): fix-ups (`dump-compare
 traces/raw/20261006-021210-tables`: 70/70 tables, every map with a d2rs
 counterpart identical, nothing pending; `fixups_on_live_set` ok) and
@@ -791,25 +849,6 @@ Live-table checks for the new modules need a **home**: `d2-sim` has no
 Until decided, run them as ignored tests in `crates/conformance` (or add
 the dev-dependency) and record results here.
 
-1. `cargo test -p d2-sim -- --ignored` (5 tests: 3 combat,
-   `real_level_stats`, `live_monstats_records`): extract the
-   tables first (`mpq-tool extract` to
-   `game/extracted/patch_d2/data/global/excel/`; the tests read `.bin`
-   files of `patch_d2` through `skills::tests_game`). Expect 5 passes:
-   `codes_match_game_tables` (skillcalc / misscalc `code` columns equal
-   `SKILLCALC_CODES` / `MISSCALC_CODES`; filters an `Expansion`
-   separator), `real_skill_vectors` (Fire Bolt 36, Fire Ball 47, Frozen
-   Orb 64, Teleport 54, `levels.md`), `real_table_constants` (`charstats`
-   ToHitFactor / BlockFactor, `difficultylevels`), `real_level_stats`
-   (`init.md` "Real 1.14d values": level, min / max HP, AC and XP of six
-   Act 1 classes at Normal, Nightmare Blood Moor, Hell Blood Moor and Hell
-   Cold Plains; the L-flag 0 `zombie1` row), `live_monstats_records` (47
-   records from live `monstats`, each of the 43 `vendors.tsv` entries
-   attached with its act / trader / byte 6, a Normal expansion `hireling`
-   row for each seller; also check that the `hireling` name ids at +0x114 /
-   +0x116 are present in the loaded table (fix-up) before `make_hire_list`
-   runs on live data). A missing-file failure means the table lives in
-   `d2exp` / `d2data`: adjust the path, not the numbers.
 2. Stats on the live set: build `StatData` from `d2_data::fixup::apply`
    and assert the real-data rows of `stats.md` Test vectors: entries(7),
    deps(12) = 214…250, the A53 set on 214 / 215 / 218 / 219. Also `py tools/trace-recorder/check_stats.py
@@ -848,22 +887,6 @@ the dev-dependency) and record results here.
    `data\local\font\**` `.tbl` → `Font`, every `data\local\lng\**` `.tbl`
    → `Strings`. A refused non-ASCII name means the strict check needs a
    rule (`assets.md` OQ2).
-8. Frames: `D2_GAME_DIR=<game> cargo test -p d2-client --lib
-   frames::tests::all_live_frame_sets_build_and_pack -- --ignored
-   --nocapture`. Expect pass; the printed line gives parse errors (the 7
-   known leftovers of `mpq-tool formats`, 6 of them DT1), frame-set and
-   frame counts, largest frame ≤ 2046 (above that `render-pipeline.md`
-   §A2 needs an oversized-frame rule).
-
-9. COF slot orders: `D2_GAME_DIR=<game> cargo test -p d2-client --lib
-   composite::tests::all_live_cofs_give_slot_orders -- --ignored
-   --nocapture`. Expect pass; the printed line gives the COF count (3,604
-   plus the junk `amblxbow.cof` as the one parse error, `cof.md` §Edge
-   cases), the frame count and failures 0 (a failure lists file,
-   direction, frame and error). Also answers `composite` OQ1: if a live COF
-   lists a draw-order component without a layer record, or two records for
-   one component (the module refuses both), `render/unit-composite.md`
-   §B4 must state the rule.
 10. Skill use and vitals on the live set (test not written; needs a
     `D2_GAME_DIR` loader for `charstats` / `experience`, see I1): build
     `VitalsTables` and `SkillTables` from the live `.bin` set and rerun the
@@ -906,78 +929,6 @@ the dev-dependency) and record results here.
     rows with `Charsi*` values (`aqv`, `cqv` permanent; `axe` Min 1 Max 1
     MagicMin 1 MagicMax 1 MagicLvl 1); `npc` rows equal `vendors.md` §9.3;
     `difficultylevels` odds 10000 / 100 / 50 / 90 / 33.
-15. Real GPU, no game files (record adapter name, backend and driver; the
-    cloud result is Mesa llvmpipe only):
-    - `cargo run -p d2-client --example gpu_compare`. Expect an `adapter:`
-      line naming the real GPU, then 12 lines `PASS case …: 0 differing
-      bytes (indices), 0 differing pixels (rgba)` (`vector-opaque`,
-      `vector-chain1`, `vector-chain2`, `vector-key-order`,
-      `vector-equal-keys`, `vector-index-table`, `vector-clip`,
-      `vector-four-bins`, `empty`, `two-pages`, `offset-view`, `stress`),
-      last line `all 12 cases: 0 differing bytes`, exit 0.
-    - `cargo run -p d2-client --example gpu_compare -- --perturb 7`.
-      Expect (M08) 12 lines `FAIL case …: 7 differing bytes (indices), 7
-      differing pixels (rgba), 7 perturbed; first at (0,0): …`, then
-      `Error: 12 of 12 cases differ`, exit 1. Any count other than 7 is a
-      failure of the check.
-    - `cargo test -p d2-client --lib gpu_compositor::tests::gpu --
-      --ignored --nocapture --test-threads 1`. Expect `gpu_matches_cpu` and
-      `gpu_perturb_reports_exactly_n` pass.
-    - `cargo test -p d2-client --lib verify::tests::gpu_half -- --ignored
-      --nocapture`. Expect the first line `adapter: <real GPU>`, pass.
-16. Verify harness on the developer PC (`D2_GAME_DIR` set, GPU):
-    `cargo run --release -p d2-client -- verify`. Expect `verify: 11 cases
-    from …/render-cases`; the `map` case lines as in the last recorded
-    `d2-client verify` (same K draw items, W×H, L,T; `PASS: GPU render
-    matches the CPU reference exactly`); then `GPU compositor: adapter:
-    <real GPU name> (<backend>, DiscreteGpu|IntegratedGpu, …)`; then for
-    each of `synth-bins-span`, `synth-clip`, `synth-cof-frames`,
-    `synth-cof-units`, `synth-index-table`, `synth-opaque`,
-    `synth-order-keys`, `synth-order-stable`, `synth-shade-chain`,
-    `synth-shade-one`: `CPU binned: 0 of P pixels differ`, `GPU indices: 0
-    of P bytes differ`, `GPU: 0 of P pixels differ`, `PASS`; last line
-    `summary: 11 pass, 0 fail, 0 error, 0 GPU not wired, 0 no adapter`, exit
-    0. Then `verify --perturb 7`: every synthetic case `CPU binned: 7 of …`,
-    `GPU indices: 7 of … bytes differ`, `GPU: 7 of … pixels differ`, `FAIL …
-    CPU and GPU halves`; the map case FAILs with 7 (its app log); exit 1;
-    any count other than 7 fails the check (M08). Then `verify --case map
-    --perturb 5`: map FAILs (app log reports 5 pixels differ), exit 1. If
-    the process panics or hangs after the map case's Bevy app (two wgpu
-    instances in one process), record it; workaround: run `verify --case
-    map` and the synthetic cases separately.
-
-17. Gap-test game-file tests (`gaps-data-formats.md` §3; 28 game-tier
-    claims on `#[ignore]` tests that have never run, written without game
-    files). Commands, with `D2_GAME_DIR=<install>`:
-    `cargo test -p d2-data --test gaps_fields_game -- --ignored`;
-    `cargo test -p d2-data calc::tests::game -- --ignored`;
-    `cargo test -p d2-data --test game_data -- --ignored
-    sound_tables_are_runtime_txt client_composite_tables
-    live_records_zero_outside_fields txt_line_observations
-    compile_only_lookup_tables loading_edge_cases game_truth_set`;
-    `cargo test -p d2-formats --test formats_game -- --ignored`; then the
-    two re-run commands of the parser-robustness entry below,
-    `cargo test -p d2-data -p d2-formats -- --ignored` and
-    `cargo run --release -p data-tool -- tables`, which also confirm that
-    the two behavior-neutral code changes of that session (`bin::
-    check_server_files` moved out of `load()`, `rng::Seed` `#[repr(C)]`)
-    moved nothing (expect 72/73 tables identical as before). Expect: all
-    pass. A failure means fix the expected value from the observation, or
-    remove its claim in the same session (`COVERAGE.md` §3). Assertions
-    written blind that most likely need adjusting: in `gaps_fields_game` the
-    `txt_source` / `bin_source` strings (lower-case archive names assumed),
-    the table names `levels` and `monstats2`, the lower bound of 69 tables
-    in the zero-bytes check; `calc::tests::game::calc_cells` (assumes the
-    parser keeps skilldesc's single-space cell as `" "` and that it is the
-    one 1.14d Fail, `strictness_counts`); `game_data::txt_line_observations`
-    (75 excel `.txt` files in X, 56 in D); `loading_edge_cases` ("no empty
-    key" read as neither `"    "` nor 0 in the `colors.code` or
-    `properties.code` linkers); `live_records_zero_outside_fields` (skips
-    `monstats`, `monstats2`, `monpreset`, `cubemain`, whose callbacks write
-    outside field footprints); in `formats_game` the animdata duplicate set
-    (29 duplicates, 9 differing), `42DTHTH` as the only record over 144
-    frames, the six version-4 DT1 names, `DEFAULT.TBL` and `FONTER.TBL` as
-    the only text `.tbl` files.
 18. Combat / AI / missile gap rules on live data (`gaps-combat-ai.md`; no
     test written, home per §7 I1): `monsters/ai.md` §9.1 (values from the
     live `monstats.txt`), `missiles/missiles.md` R1 r1 (684 records × 420
@@ -986,30 +937,16 @@ the dev-dependency) and record results here.
 19. `world/quests.md` §7.1 (`gaps-drlg-world.md`; no test written): every
     NPC id of the quest tables is a valid `monstats` row. Expect all
     found; the unit test covers lookup and table shape only.
+20. Treasure dump vs d2rs (test to write, local: reads `traces/raw/
+    <time>-tables`, which is not committed): build `TreasureClasses` from the
+    live `.bin` set and compare every TC record and entry byte for byte
+    with `map-tc_records.bin` / `map-tc_entries.bin` (`tc_chest` as record
+    indices via `manifest.json` `tc_base`). Expect identical.
 
 Kept entries (unchanged):
 
-Parser robustness (branch `claude/parser-robustness`, 2026-10-06): parser
-code changed in `d2-formats` (mpq decoders, animdata, dc6, dcc, dt1, ds1,
-tbl, cof) and `d2-data` (`bin.rs`, `patch/apply.rs`). Run
-`cargo test -p d2-data -p d2-formats -- --ignored`,
-`cargo run --release -p data-tool -- tables` and
-`cargo run --release -p mpq-tool -- check` / `formats`: expect the same
-results as before (every block and format file decodes, 72/73 tables
-identical). New whole-file limits that are implementation limits, not
-observed 1.14d behavior (each an Open question in its spec): DC6 frames
-and DCC direction boxes ≤ 64M pixels per file, DT1 block counts over all
-tiles ≤ file length / 20, TBL key+value bytes ≤ file length. Any
-`formats` failure naming one of these limits means 1.14d files exceed or
-share data, and the limit must be redesigned (not raised by guess). The same two re-run commands
-are part of C17 (after the later behavior-neutral changes).
-
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
-Memory dump (no player needed; extend `dump_tables.py` per M10): the TC
-   array `[0x96C5EC]` (count `[0x96C5F0]`, 0x2C bytes each, entry list at
-   +0x28 with count × 0x1C) and the chest table `0x96C5F4` (45 dwords);
-   compare with `treasure.md` §1.
-2. Recording (player): `record_rng.py` extended with hooks at `0x0055A6D0`
+Recording (player): `record_rng.py` extended with hooks at `0x0055A6D0`
 
 Phase 6 asset budgets (from `specs/client/assets.md` OQ 1, design
 only, no code yet): measure the decoded size (`Σ width × height`) of
@@ -1973,6 +1910,7 @@ From the Phase 6 infrastructure (notes `docs/handoff/p6-*.md`), by owner:
 | The coordinator's union merge of `pub mod` conflicts interleaved two branches' module doc comments (`d2-client/src/lib.rs`, `d2-sim/src/wiring/mod.rs`; 2026-10-06), once leaving a `//!` after an item; caught reading the merged file before the gate | after any union resolve, read the whole resolved file, not only the `mod` lines; inner docs (`//!`) must precede every item (METHODS M21) |
 | A coverage claim on a test that checks only part of a rule overstates the unit tier (10 claims dropped on review, 2026-10-06; rules that are one unit make this easy to repeat) | claim a rule only when the assertions check its outcome, with the narrowest ID that is fully true; consistency checks against a TSV and M08 perturbation tests get no claim (`docs/handoff/coverage-claims.md` §1) |
 | A software Vulkan adapter (Mesa llvmpipe) passes every GPU case, which says nothing about a real driver's integer and texture paths (2026-10-06) | the GPU half of every Phase 6 check stays "unverified" until the local run on a real adapter records its name, backend and driver (§5 C15, C16; METHODS M02) |
+| Five game-file assertions written without game files (`gaps-data-formats`, 2026-10-06) and two spec facts stated without a measurement (`animdata.md` "second copy in all 9", `dc6.md` "zero-size frames occur") failed on the first local run of C17 | a blind-written game assertion is marked "expected value unconfirmed" in its handoff and is not claimed (`COVERAGE.md` §3) until its first local run; a spec fact names its measurement or is an open question (`specs/README.md` bar 1; METHODS M21) |
 | Three parallel d2-server handler branches each added `[dev-dependencies] d2-data` and a field/generic to `SimGame`; git merged the two `Cargo.toml` sections silently into a duplicate key and the `SimGame` generics conflicted (2026-10-06, caught by the coordinator's build before the gate) | parallel sessions that extend a shared struct get one named owner per field in their prompts; the coordinator builds the touched crate after each merge, not only after the last (METHODS M21) |
 | `wire-interaction` added a seed parameter to the `NpcLink::make_hire_list` seam while `server-world` (in parallel) wrote a test fake against the old signature; each branch was green alone (2026-10-06, caught by the coordinator's workspace clippy on the combined branch) | sessions that change a seam signature name it in their notes under "signature changes"; the coordinator greps other branches for implementors before merging, and always runs clippy/tests on the whole workspace after combining (METHODS M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
