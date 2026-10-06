@@ -15,6 +15,7 @@ members = [
     "tools/hash-manifest",
     "tools/mpq-tool",
     "tools/data-tool",
+    "tools/seed-finder",
 ]
 
 [workspace.package]
