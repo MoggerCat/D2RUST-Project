@@ -11,6 +11,7 @@ pub mod audio;
 pub mod bridge;
 pub mod controls;
 pub mod frames;
+pub mod gpu_compositor;
 pub mod map;
 pub mod render;
 pub mod scene;
