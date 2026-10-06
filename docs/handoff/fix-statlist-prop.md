@@ -67,8 +67,22 @@ assertion as before, the drift is the amount the spec rule leaves in P).
 - `PROPTEST_CASES=20000 cargo nextest run -p d2-sim
   stat_lists_match_the_model`, 3 runs: all pass.
 - No further counterexample.
-- `sh tools/gate.sh all`: see the commit (§5).
+- `sh tools/gate.sh all`: see §6.
 
-## 5. Gate
+## 5. CI case counts (coordinator question)
+
+Recommendation: do not set one fixed `PROPTEST_CASES` in CI. Depth was not
+the cause: local runs and CI both draw a fresh random seed, so "passed
+locally twice" means those seeds missed the input, and an equal case count
+would not make local and CI explore the same inputs. The variable also
+overrides every property's own default in the crate (`ci.yml` keeps it
+unset for that reason; the helpers default to 2048 and a lower global
+value would cut them). Depth is still worth buying where it is cheap: the
+stat-list property at 20,000 cases takes ~60 s per run in a debug build,
+so a scheduled (nightly) job running `PROPTEST_CASES=20000` on the
+state-machine properties alone would catch this class before a PR does,
+without slowing PR CI. Proposal only; `ci.yml` is not changed here.
+
+## 6. Gate
 
 `sh tools/gate.sh all` on this branch: all PASS (2026-10-06).
