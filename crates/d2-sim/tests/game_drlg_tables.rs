@@ -436,7 +436,11 @@ fn act3_act5_table_values() {
             530..=544 => 3,
             _ => 1,
         };
-        assert_eq!((d.size_x, d.size_y, d.files), (32, 32, files), "lvlprest {p}");
+        assert_eq!(
+            (d.size_x, d.size_y, d.files),
+            (32, 32, files),
+            "lvlprest {p}"
+        );
     }
     assert_eq!(def(865).size_x, 16);
     assert_eq!((def(652).size_x, def(652).size_y), (48, 16));
@@ -467,20 +471,34 @@ fn act3_act5_placement_on_live_tables() {
     assert_eq!(rect(&drlg, 83), TileRect::new(1000, 344, 64, 64));
     let od = types.act_outdoor(2).expect("act 2 outdoor state");
     let ids = |id: u32| {
-        let info = od.level(drlg.find_level(id).unwrap()).expect("outdoor info");
-        (info.jungle_ids.clone().expect("jungle ids"), info.jungle_clearings)
+        let info = od
+            .level(drlg.find_level(id).unwrap())
+            .expect("outdoor info");
+        (
+            info.jungle_ids.clone().expect("jungle ids"),
+            info.jungle_clearings,
+        )
     };
     assert_eq!(
         ids(76),
-        (vec![541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0], 3)
+        (
+            vec![541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0],
+            3
+        )
     );
     assert_eq!(
         ids(77),
-        (vec![554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566], 3)
+        (
+            vec![554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566],
+            3
+        )
     );
     assert_eq!(
         ids(78),
-        (vec![0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581], 2)
+        (
+            vec![0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581],
+            2
+        )
     );
 
     let mut types = world_types(&data);
