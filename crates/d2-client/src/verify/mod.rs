@@ -11,11 +11,17 @@
 //! game files and a GPU).
 //!
 //! The GPU half of `synthetic` cases goes through the narrow
-//! [`GpuCompositor`] trait; the compute compositor (C5, `render`)
-//! implements it. Until it is wired, [`NotWired`] reports
-//! [`Status::GpuNotWired`]: an explicit status, never a pass.
+//! [`GpuCompositor`] trait; [`gpu::Wgpu`] runs the compute compositor (C5,
+//! [`crate::gpu_compositor`]) on a headless adapter. Without an adapter it
+//! reports [`Status::NoAdapter`]; [`NotWired`] reports
+//! [`Status::GpuNotWired`]. Both are explicit statuses, never a pass.
+//!
+//! A synthetic case may draw COF composites (`[[unit]]`, §A7): the COF
+//! bytes go through `d2_formats::cof` and [`crate::composite::build`], so
+//! the case covers COF bytes → composite → scene → CPU and GPU.
 
 pub mod case;
+pub mod gpu;
 pub mod map;
 
 #[cfg(test)]
@@ -26,9 +32,13 @@ use std::path::{Path, PathBuf};
 
 use d2_formats::palette::{Palette, Rgb};
 
+use crate::composite::{
+    self, ComponentFrame, ComponentRequest, ComponentResolver, CompositeError, UnitParams,
+};
+use crate::frames::{FramePart, FrameSetKey};
 use crate::scene::{
-    self, Bins, BlendOp, DrawItem, DrawKey, FrameId, FrameImage, MapId, MapTable, Rect, SceneError,
-    ShadeChain,
+    self, Bins, BlendOp, DrawItem, DrawKey, FrameId, FrameImage, ItemTag, MapId, MapTable, Rect,
+    SceneError, ShadeChain,
 };
 pub use case::{Case, CaseError, CaseKind};
 
@@ -53,11 +63,14 @@ pub struct GpuJob<'a> {
 /// What the GPU half returned.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GpuOutcome {
-    /// RGBA8, `view.width × view.height`, row-major, alpha 255: the
-    /// 800×600-domain image read back before presentation (§A9).
-    Image(Vec<u8>),
+    /// The images read back before presentation (§A9), both
+    /// `view.width × view.height`, row-major: `indices` one byte per pixel
+    /// (the index framebuffer), `rgba` RGBA8 with alpha 255.
+    Image { indices: Vec<u8>, rgba: Vec<u8> },
     /// No GPU compositor is wired into this build.
     NotWired,
+    /// A compositor is wired but the machine has no usable adapter.
+    NoAdapter(String),
     /// The GPU half ran and failed (device, pipeline, readback).
     Error(String),
 }
@@ -117,6 +130,97 @@ pub enum BuildError {
     Scene { item: usize, error: SceneError },
     #[error(transparent)]
     Compose(#[from] SceneError),
+    #[error(
+        "unit[{unit}].component[{component}]: {what} {index} is not defined ({count} defined)"
+    )]
+    UnitUndefined {
+        unit: usize,
+        component: usize,
+        what: &'static str,
+        index: u32,
+        count: usize,
+    },
+    #[error("unit[{unit}].component[{component}]: {error}")]
+    UnitScene {
+        unit: usize,
+        component: usize,
+        error: SceneError,
+    },
+    #[error("unit[{unit}]: COF: {message}")]
+    Cof { unit: usize, message: String },
+    #[error("unit[{unit}]: {error}")]
+    Composite { unit: usize, error: CompositeError },
+}
+
+/// The case's fixture answers for one unit, resolved to scene values: per
+/// COF component, the frame drawn, the top-left, the shade chain and the
+/// blend. A component the COF draws without an answer is an error
+/// (`Unresolved`), never a default.
+struct UnitFixture {
+    /// Indexed by component id.
+    components: [Option<Answer>; 16],
+}
+
+/// One component's answer: frame, top-left x and y, shade chain, blend.
+type Answer = (FrameId, i32, i32, ShadeChain, BlendOp);
+
+impl UnitFixture {
+    fn get(
+        &self,
+        req: &ComponentRequest<'_>,
+        what: &'static str,
+    ) -> Result<&Answer, CompositeError> {
+        self.components
+            .get(usize::from(req.slot.component))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| CompositeError::Unresolved {
+                slot: req.slot.slot,
+                component: req.slot.component,
+                what,
+                message: "the case gives no [[unit.component]] for it".into(),
+            })
+    }
+}
+
+impl ComponentResolver for UnitFixture {
+    fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
+        self.get(req, "frame")?;
+        let dir = u8::try_from(req.dir).expect("COF directions are a u8");
+        let set = FrameSetKey::new(
+            format!("synthetic/c{}.dcc", req.slot.component),
+            FramePart::Dir(dir),
+        )
+        .expect("canonical synthetic path");
+        Ok(ComponentFrame {
+            set,
+            index: req.frame,
+        })
+    }
+
+    fn frame_id(
+        &self,
+        req: &ComponentRequest<'_>,
+        _: &ComponentFrame,
+    ) -> Result<FrameId, CompositeError> {
+        Ok(self.get(req, "frame_id")?.0)
+    }
+
+    fn place(
+        &self,
+        req: &ComponentRequest<'_>,
+        _: &ComponentFrame,
+    ) -> Result<(i32, i32), CompositeError> {
+        let c = self.get(req, "place")?;
+        Ok((c.1, c.2))
+    }
+
+    fn shade(&self, req: &ComponentRequest<'_>) -> Result<ShadeChain, CompositeError> {
+        Ok(self.get(req, "shade")?.3)
+    }
+
+    fn blend(&self, req: &ComponentRequest<'_>) -> Result<BlendOp, CompositeError> {
+        Ok(self.get(req, "blend")?.4)
+    }
 }
 
 /// Builds the ordered draw list of a synthetic case (`scene::order`
@@ -196,6 +300,67 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         }
         item.flip_x = spec.flip_x;
         items.push(item);
+    }
+    for (u, spec) in s.units.iter().enumerate() {
+        let mut fixture = UnitFixture {
+            components: Default::default(),
+        };
+        for (c, cs) in spec.components.iter().enumerate() {
+            let undefined = |what, index: u32, count| BuildError::UnitUndefined {
+                unit: u,
+                component: c,
+                what,
+                index,
+                count,
+            };
+            if cs.frame as usize >= frames.len() {
+                return Err(undefined("frame", cs.frame, frames.len()));
+            }
+            let lookup = |what, ids: &[MapId], index: u32| {
+                ids.get(index as usize)
+                    .copied()
+                    .ok_or_else(|| undefined(what, index, ids.len()))
+            };
+            let chain: Vec<MapId> = cs
+                .shade
+                .iter()
+                .map(|&m| lookup("map", &map_ids, m))
+                .collect::<Result<_, _>>()?;
+            let shade = ShadeChain::new(&chain).map_err(|error| BuildError::UnitScene {
+                unit: u,
+                component: c,
+                error,
+            })?;
+            let blend = match cs.table {
+                Some(t) => BlendOp::IndexTable(lookup("table", &table_ids, t)?),
+                None => BlendOp::Opaque,
+            };
+            fixture.components[usize::from(cs.component)] =
+                Some((FrameId(cs.frame), cs.x, cs.y, shade, blend));
+        }
+        let cof = d2_formats::cof::Cof::parse(&spec.cof).map_err(|e| BuildError::Cof {
+            unit: u,
+            message: e.to_string(),
+        })?;
+        let [pass, major, minor] = spec.key;
+        let unit = UnitParams {
+            pass,
+            major,
+            minor,
+            clip: spec
+                .clip
+                .map_or(Rect::FRAME, |(x, y, w, h)| Rect::new(x, y, w, h)),
+            tag: ItemTag::Unit(u as u32),
+        };
+        let draws = composite::build(
+            &cof,
+            spec.dir as usize,
+            spec.frame as usize,
+            &unit,
+            &fixture,
+        )
+        .map_err(|error| BuildError::Composite { unit: u, error })?;
+        items.extend(draws.into_iter().map(|d| d.item));
     }
     scene::order(&mut items);
     let view = s
@@ -281,16 +446,78 @@ pub fn compare(actual: &[u8], expected: &[u8], view: Rect) -> Result<Mismatch, S
 /// the pixel count is an error, so the corrupted count is always exactly
 /// `n`.
 pub fn perturb(rgba: &mut [u8], n: usize) -> Result<(), String> {
-    let pixels = rgba.len() / 4;
+    perturb_bytes(rgba, 4, n)
+}
+
+/// [`perturb`] on an index framebuffer: the same pixels, index top bit
+/// flipped. Under [`synthetic_palette`] (red = index) the RGBA image of
+/// the result differs from the clean one in exactly those `n` pixels.
+pub fn perturb_indices(indices: &mut [u8], n: usize) -> Result<(), String> {
+    perturb_bytes(indices, 1, n)
+}
+
+fn perturb_bytes(image: &mut [u8], bpp: usize, n: usize) -> Result<(), String> {
+    let pixels = image.len() / bpp;
     if n > pixels {
         return Err(format!("--perturb {n} exceeds the {pixels} pixels"));
     }
     if let Some(step) = pixels.checked_div(n) {
         for i in (0..pixels).step_by(step.max(1)).take(n) {
-            rgba[i * 4] ^= 0x80;
+            image[i * bpp] ^= 0x80;
         }
     }
     Ok(())
+}
+
+/// Byte-for-byte comparison of two index framebuffers of one view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ByteMismatch {
+    pub bytes: usize,
+    pub mismatched: usize,
+    /// `(x, y, expected, actual)` in screen coordinates.
+    pub first: Option<(i64, i64, u8, u8)>,
+}
+
+impl fmt::Display for ByteMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} of {} bytes differ", self.mismatched, self.bytes)?;
+        if let Some((x, y, e, a)) = self.first {
+            write!(f, ", first at ({x}, {y}): expected {e}, got {a}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Compares `actual` with `expected` (both index framebuffers of `view`).
+/// A size difference is an error, not a count.
+pub fn compare_indices(actual: &[u8], expected: &[u8], view: Rect) -> Result<ByteMismatch, String> {
+    let len = view.width as usize * view.height as usize;
+    if actual.len() != len || expected.len() != len {
+        return Err(format!(
+            "index buffers {} and {} bytes, view {}x{} needs {len}",
+            actual.len(),
+            expected.len(),
+            view.width,
+            view.height
+        ));
+    }
+    let mut m = ByteMismatch {
+        bytes: len,
+        mismatched: 0,
+        first: None,
+    };
+    for (i, (&a, &e)) in actual.iter().zip(expected).enumerate() {
+        if a != e {
+            m.mismatched += 1;
+            m.first.get_or_insert((
+                i64::from(view.x) + (i % view.width as usize) as i64,
+                i64::from(view.y) + (i / view.width as usize) as i64,
+                e,
+                a,
+            ));
+        }
+    }
+    Ok(m)
 }
 
 /// The verdict of one case.
@@ -300,6 +527,8 @@ pub enum Status {
     Pass,
     /// The CPU half passed; no GPU compositor is wired. Not a pass.
     GpuNotWired,
+    /// The CPU half passed; the GPU half found no adapter. Not a pass.
+    NoAdapter(String),
     /// A comparison or expectation failed.
     Fail(String),
     /// The case could not be built or run.
@@ -311,6 +540,7 @@ impl Status {
         match self {
             Status::Pass => "PASS",
             Status::GpuNotWired => "GPU NOT WIRED",
+            Status::NoAdapter(_) => "NO ADAPTER",
             Status::Fail(_) => "FAIL",
             Status::Error(_) => "ERROR",
         }
@@ -340,13 +570,24 @@ pub struct CaseReport {
     pub status: Status,
 }
 
+/// The CPU reference of a case after `--perturb`: what both halves are
+/// compared with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+    /// Index framebuffer, `view.width × view.height` bytes.
+    pub indices: Vec<u8>,
+    /// `indices` through the case palette.
+    pub rgba: Vec<u8>,
+}
+
 /// Runs the CPU half of a synthetic case: compose (reference), check the
-/// expectations, perturb the reference by `perturb_n`, compose binned and
-/// compare with it. Returns the report and the reference RGBA.
+/// expectations, perturb the reference by `perturb_n` ([`perturb_indices`]),
+/// compose binned and compare with it. Returns the report and the
+/// reference.
 pub fn run_cpu(
     s: &case::Synthetic,
     perturb_n: usize,
-) -> Result<(Built, Bins, CpuReport, Vec<u8>), String> {
+) -> Result<(Built, Bins, CpuReport, Reference), String> {
     let built = build(s).map_err(|e| e.to_string())?;
     let indexed = scene::compose(&built.items, &built.frames, &built.maps, built.view)
         .map_err(|e| e.to_string())?;
@@ -366,15 +607,19 @@ pub fn run_cpu(
             ));
         }
     }
-    let mut reference = scene::to_rgba(&indexed, &built.palette);
-    perturb(&mut reference, perturb_n)?;
+    let mut indexed = indexed;
+    perturb_indices(&mut indexed, perturb_n)?;
+    let reference = Reference {
+        rgba: scene::to_rgba(&indexed, &built.palette),
+        indices: indexed,
+    };
     let bins = scene::bin(&built.items, &built.frames, &built.maps, built.view)
         .map_err(|e| e.to_string())?;
     let binned = scene::compose_binned(&built.items, &bins, &built.frames, &built.maps, built.view)
         .map_err(|e| e.to_string())?;
     let binned = compare(
         &scene::to_rgba(&binned, &built.palette),
-        &reference,
+        &reference.rgba,
         built.view,
     )?;
     let report = CpuReport {
@@ -387,7 +632,9 @@ pub fn run_cpu(
     Ok((built, bins, report, reference))
 }
 
-/// Runs a synthetic case: CPU half, then the GPU half through `gpu`.
+/// Runs a synthetic case: CPU half, then the GPU half through `gpu`. The
+/// GPU half runs even when the CPU half failed, so `--perturb N` shows N
+/// on both (M08); a failed half fails the case.
 pub fn run_synthetic(
     name: &str,
     s: &case::Synthetic,
@@ -421,10 +668,7 @@ pub fn run_synthetic(
         report.lines.push(format!("CPU: {f}"));
     }
     report.lines.push(format!("CPU binned: {}", cpu.binned));
-    if !cpu.expect_failures.is_empty() || cpu.binned.mismatched > 0 {
-        report.status = Status::Fail("CPU half".into());
-        return report;
-    }
+    let cpu_failed = !cpu.expect_failures.is_empty() || cpu.binned.mismatched > 0;
     let job = GpuJob {
         case: name,
         items: &built.items,
@@ -434,20 +678,35 @@ pub fn run_synthetic(
         palette: &built.palette,
         view: built.view,
     };
-    report.status = match gpu.compose(&job) {
+    let gpu_status = match gpu.compose(&job) {
         GpuOutcome::NotWired => Status::GpuNotWired,
+        GpuOutcome::NoAdapter(e) => {
+            report.lines.push(format!("GPU: no adapter: {e}"));
+            Status::NoAdapter(e)
+        }
         GpuOutcome::Error(e) => Status::Error(format!("GPU: {e}")),
-        GpuOutcome::Image(image) => match compare(&image, &reference, built.view) {
-            Err(e) => Status::Error(format!("GPU: {e}")),
-            Ok(m) => {
-                report.lines.push(format!("GPU: {m}"));
-                if m.mismatched == 0 {
-                    Status::Pass
-                } else {
-                    Status::Fail("GPU half".into())
+        GpuOutcome::Image { indices, rgba } => {
+            let compared = compare_indices(&indices, &reference.indices, built.view)
+                .and_then(|i| Ok((i, compare(&rgba, &reference.rgba, built.view)?)));
+            match compared {
+                Err(e) => Status::Error(format!("GPU: {e}")),
+                Ok((i, m)) => {
+                    report.lines.push(format!("GPU indices: {i}"));
+                    report.lines.push(format!("GPU: {m}"));
+                    if i.mismatched == 0 && m.mismatched == 0 {
+                        Status::Pass
+                    } else {
+                        Status::Fail("GPU half".into())
+                    }
                 }
             }
-        },
+        }
+    };
+    report.status = match (cpu_failed, gpu_status) {
+        (_, Status::Error(e)) => Status::Error(e),
+        (true, Status::Fail(_)) => Status::Fail("CPU and GPU halves".into()),
+        (true, _) => Status::Fail("CPU half".into()),
+        (false, s) => s,
     };
     report
 }
@@ -486,6 +745,7 @@ pub fn load_file(path: &Path) -> Result<Case, String> {
 pub struct Summary {
     pub pass: usize,
     pub not_wired: usize,
+    pub no_adapter: usize,
     pub fail: usize,
     pub error: usize,
 }
@@ -495,17 +755,19 @@ impl Summary {
         match status {
             Status::Pass => self.pass += 1,
             Status::GpuNotWired => self.not_wired += 1,
+            Status::NoAdapter(_) => self.no_adapter += 1,
             Status::Fail(_) => self.fail += 1,
             Status::Error(_) => self.error += 1,
         }
     }
 
     /// Process exit code: 0 all passed, 1 any failure or error, 2 none
-    /// failed but some GPU halves are not wired (incomplete, not a pass).
+    /// failed but some GPU halves are not wired or found no adapter
+    /// (incomplete, not a pass).
     pub fn exit_code(&self) -> i32 {
         if self.fail + self.error > 0 {
             1
-        } else if self.not_wired > 0 {
+        } else if self.not_wired + self.no_adapter > 0 {
             2
         } else {
             0
@@ -517,8 +779,8 @@ impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} pass, {} fail, {} error, {} GPU not wired",
-            self.pass, self.fail, self.error, self.not_wired
+            "{} pass, {} fail, {} error, {} GPU not wired, {} no adapter",
+            self.pass, self.fail, self.error, self.not_wired, self.no_adapter
         )
     }
 }
@@ -529,7 +791,7 @@ pub fn print_report(r: &CaseReport) {
         println!("  {line}");
     }
     match &r.status {
-        Status::Fail(why) | Status::Error(why) => {
+        Status::Fail(why) | Status::Error(why) | Status::NoAdapter(why) => {
             println!("{} {} ({}): {why}", r.status.label(), r.name, r.kind)
         }
         s => println!("{} {} ({})", s.label(), r.name, r.kind),

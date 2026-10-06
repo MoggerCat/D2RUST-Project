@@ -90,9 +90,10 @@ struct Echo {
 impl GpuCompositor for Echo {
     fn compose(&mut self, job: &GpuJob<'_>) -> GpuOutcome {
         let indexed = scene::compose_binned(job.items, job.bins, job.frames, job.maps, job.view);
-        let mut rgba = scene::to_rgba(&indexed.unwrap(), job.palette);
-        perturb(&mut rgba, self.corrupt).unwrap();
-        GpuOutcome::Image(rgba)
+        let mut indices = indexed.unwrap();
+        perturb_indices(&mut indices, self.corrupt).unwrap();
+        let rgba = scene::to_rgba(&indices, job.palette);
+        GpuOutcome::Image { indices, rgba }
     }
 }
 
@@ -100,7 +101,15 @@ struct Broken;
 
 impl GpuCompositor for Broken {
     fn compose(&mut self, _job: &GpuJob<'_>) -> GpuOutcome {
-        GpuOutcome::Error("no adapter".into())
+        GpuOutcome::Error("device lost".into())
+    }
+}
+
+struct Adapterless;
+
+impl GpuCompositor for Adapterless {
+    fn compose(&mut self, _job: &GpuJob<'_>) -> GpuOutcome {
+        GpuOutcome::NoAdapter("none found".into())
     }
 }
 
@@ -118,8 +127,32 @@ fn gpu_seam_statuses() {
         .lines
         .iter()
         .any(|l| l.starts_with("GPU: 3 of 1024 pixels differ")));
+    assert!(r
+        .lines
+        .iter()
+        .any(|l| l.starts_with("GPU indices: 3 of 1024 bytes differ")));
     let r = run_synthetic(&c.name, s, 0, &mut Broken);
     assert!(matches!(r.status, Status::Error(_)));
+    // No adapter is reported as such: never a pass, never a GPU failure.
+    let r = run_synthetic(&c.name, s, 0, &mut Adapterless);
+    assert_eq!(r.status, Status::NoAdapter("none found".into()));
+    assert_eq!(r.status.label(), "NO ADAPTER");
+    let mut sum = Summary::default();
+    sum.add(&r.status);
+    assert_eq!((sum.no_adapter, sum.exit_code()), (1, 2));
+    // --perturb with a stand-in GPU that matches: both halves report
+    // exactly N, so the perturbation proves the GPU comparison too (M08).
+    let r = run_synthetic(&c.name, s, 5, &mut Echo { corrupt: 0 });
+    assert_eq!(r.status, Status::Fail("CPU and GPU halves".into()));
+    assert!(r
+        .lines
+        .iter()
+        .any(|l| l.starts_with("CPU binned: 5 of 1024")));
+    assert!(r
+        .lines
+        .iter()
+        .any(|l| l.starts_with("GPU indices: 5 of 1024")));
+    assert!(r.lines.iter().any(|l| l.starts_with("GPU: 5 of 1024")));
     // Not wired is never a pass, and it changes the exit code.
     let mut sum = Summary::default();
     sum.add(&Status::Pass);
@@ -293,4 +326,159 @@ fn a_wrong_expectation_fails_the_cpu_half() {
         r.lines.iter().any(|l| l == "CPU: expect (0, 0) = 4, got 3"),
         "{r:?}"
     );
+}
+
+// Covers: specs/client/render-pipeline.md §a7-composite-units-cof r2, §a10-verify-harness-extension
+#[test]
+fn cof_cases_compose_units_from_cof_bytes() {
+    let cases = cases();
+    for name in ["synth-cof-units", "synth-cof-frames"] {
+        let c = cases.iter().find(|c| c.name == name).expect(name);
+        let s = synthetic(c).unwrap();
+        assert!(!s.units.is_empty(), "{name}");
+        let built = build(s).unwrap();
+        // One item per COF layer (3) per unit, plus the plain items.
+        assert_eq!(built.items.len(), s.items.len() + 3 * s.units.len());
+        // Units keep their slot order as key `sub`.
+        let units: Vec<_> = built
+            .items
+            .iter()
+            .filter(|i| matches!(i.tag, ItemTag::Unit(_)))
+            .collect();
+        for w in units.windows(2) {
+            if w[0].tag == w[1].tag {
+                assert!(w[0].key.sub() < w[1].key.sub(), "{name}");
+            }
+        }
+    }
+    // Cross-unit order: unit 1 (major 50) is listed second but drawn first.
+    let c = cases.iter().find(|c| c.name == "synth-cof-units").unwrap();
+    let built = build(synthetic(c).unwrap()).unwrap();
+    let tags: Vec<ItemTag> = built.items.iter().map(|i| i.tag).collect();
+    assert_eq!(
+        tags,
+        [
+            ItemTag::None,
+            ItemTag::Unit(1),
+            ItemTag::Unit(1),
+            ItemTag::Unit(1),
+            ItemTag::Unit(0),
+            ItemTag::Unit(0),
+            ItemTag::Unit(0),
+        ]
+    );
+}
+
+const UNIT: &str = "version = 1\nkind = \"synthetic\"\n\
+    [[frame]]\nwidth = 1\nheight = 1\nfill = 3\n\
+    [[unit]]\ncof = \"01 01 01 14 00000000 00000000 00000000 00000000 00000000 19000000 \
+    01 00 01 00 00 68746800 00 01\"\ndir = 0\nframe = 0\nkey = [0, 0, 0]\n";
+
+fn unit_case(extra: &str) -> case::Synthetic {
+    let c = case::parse("t", &format!("{UNIT}{extra}")).unwrap();
+    let CaseKind::Synthetic(s) = c.kind else {
+        unreachable!()
+    };
+    s
+}
+
+#[test]
+fn unit_parsing_and_building_are_strict() {
+    // A minimal one-layer COF (TR) with its component: one item.
+    let s = unit_case("[[unit.component]]\ncomponent = 1\nframe = 0\nx = 2\ny = 3\n");
+    assert_eq!(s.units[0].cof.len(), 28 + 9 + 1 + 1);
+    let built = build(&s).unwrap();
+    assert_eq!(built.items.len(), 1);
+    assert_eq!((built.items[0].x, built.items[0].y), (2, 3));
+    // The COF draws component 1 and the case does not answer for it.
+    let s = unit_case("[[unit.component]]\ncomponent = 0\nframe = 0\nx = 0\ny = 0\n");
+    assert!(matches!(
+        build(&s),
+        Err(BuildError::Composite {
+            unit: 0,
+            error: CompositeError::Unresolved { component: 1, .. }
+        })
+    ));
+    // Undefined frame / map in a component answer.
+    let s = unit_case("[[unit.component]]\ncomponent = 1\nframe = 1\nx = 0\ny = 0\n");
+    assert!(matches!(
+        build(&s),
+        Err(BuildError::UnitUndefined { what: "frame", .. })
+    ));
+    let s = unit_case("[[unit.component]]\ncomponent = 1\nframe = 0\nx = 0\ny = 0\nshade = [0]\n");
+    assert!(matches!(
+        build(&s),
+        Err(BuildError::UnitUndefined { what: "map", .. })
+    ));
+    // COF direction out of range, and COF bytes the parser refuses.
+    let mut s = unit_case("[[unit.component]]\ncomponent = 1\nframe = 0\nx = 0\ny = 0\n");
+    s.units[0].dir = 1;
+    assert!(matches!(
+        build(&s),
+        Err(BuildError::Composite {
+            error: CompositeError::Direction { .. },
+            ..
+        })
+    ));
+    s.units[0].dir = 0;
+    s.units[0].cof.truncate(20);
+    assert!(matches!(build(&s), Err(BuildError::Cof { unit: 0, .. })));
+    // Parse errors: bad hex, duplicate component, unknown key.
+    for (extra, at) in [
+        (
+            "[[unit.component]]\ncomponent = 1\nframe = 0\nx = 0\ny = 0\ncolour = 1\n",
+            "unit[0].component[0].colour",
+        ),
+        (
+            "[[unit.component]]\ncomponent = 1\nframe = 0\nx = 0\ny = 0\n\
+             [[unit.component]]\ncomponent = 1\nframe = 0\nx = 0\ny = 0\n",
+            "unit[0].component[1].component",
+        ),
+        (
+            "[[unit.component]]\ncomponent = 16\nframe = 0\nx = 0\ny = 0\n",
+            "unit[0].component[0].component",
+        ),
+    ] {
+        let e = case::parse("t", &format!("{UNIT}{extra}")).unwrap_err();
+        assert_eq!(e.at, at, "{e}");
+    }
+    let bad_hex = UNIT.replace("19000000", "19 0g 0000");
+    let e = case::parse("t", &bad_hex).unwrap_err();
+    assert_eq!(e.at, "unit[0].cof", "{e}");
+    let odd_hex = UNIT.replace("19000000", "190000 0");
+    assert_eq!(case::parse("t", &odd_hex).unwrap_err().at, "unit[0].cof");
+}
+
+// Covers: specs/client/render-pipeline.md §a9-gpu-compute-compositor, §a10-verify-harness-extension
+/// The GPU half on this machine's adapter (`gpu::Wgpu`): every synthetic
+/// case 0 differing bytes, and `--perturb 7` exactly 7 on both images. No
+/// adapter is reported and fails the test: it is not a pass.
+#[test]
+#[ignore = "needs a GPU adapter (a software one such as lavapipe will do)"]
+fn gpu_half_matches_cpu_on_every_synthetic_case() {
+    let mut gpu = gpu::Wgpu::new();
+    let line = gpu.open();
+    println!("{line}");
+    assert!(line.starts_with("adapter: "), "{line}");
+    for c in cases() {
+        let Some(s) = synthetic(&c) else { continue };
+        let r = run_synthetic(&c.name, s, 0, &mut gpu);
+        println!("{} {}: {:?}", r.status.label(), c.name, r.lines);
+        assert_eq!(r.status, Status::Pass, "{}: {:?}", c.name, r.lines);
+        let r = run_synthetic(&c.name, s, 7, &mut gpu);
+        assert_eq!(
+            r.status,
+            Status::Fail("CPU and GPU halves".into()),
+            "{}",
+            c.name
+        );
+        for prefix in ["CPU binned: 7 of", "GPU indices: 7 of", "GPU: 7 of"] {
+            assert!(
+                r.lines.iter().any(|l| l.starts_with(prefix)),
+                "{}: {prefix} {:?}",
+                c.name,
+                r.lines
+            );
+        }
+    }
 }
