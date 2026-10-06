@@ -33,16 +33,16 @@
 |   7. The draw call | 245–270 |
 |   8. Framed text (hover boxes) | 271–291 |
 |   9. Variants of the draw call | 292–331 |
-|   10. Word wrap | 332–359 |
-|   11. Alignment | 360–367 |
-|   12. Clipping (decision CG2) | 368–378 |
-|   13. d2rs answers (hooks in `d2-client`) | 379–393 |
-| Constants & data dependencies | 394–409 |
-| Randomness | 410–413 |
-| Edge cases & original bugs | 414–436 |
-| Test vectors | 437–466 |
-| Provenance | 467–494 |
-| Open questions | 495–523 |
+|   10. Word wrap | 332–369 |
+|   11. Alignment | 370–377 |
+|   12. Clipping (decision CG2) | 378–388 |
+|   13. d2rs answers (hooks in `d2-client`) | 389–403 |
+| Constants & data dependencies | 404–419 |
+| Randomness | 420–423 |
+| Edge cases & original bugs | 424–446 |
+| Test vectors | 447–482 |
+| Provenance | 483–513 |
+| Open questions | 514–542 |
 <!-- /index -->
 
 ## Summary
@@ -230,10 +230,10 @@ treatment of codes (reproduce each as is):
 | Measure | Address | Range | `LF` | `ÿ` |
 |---|---|---|---|---|
 | width A | `0x00501820` (= B over the whole string) | whole string | 0 | counted as a glyph, and so are the two units after it |
-| width B (n units) | `0x005017D0` | first `n` units | 0 | counted as glyphs |
-| width C (n units) | `0x00501730` | first `n` units | 0 | `ÿ`,`c`,`0`–`6` skipped (0) only if the code starts at index `i` with `i + 3 < n`; every other `ÿ` counted as a glyph |
-| line width | `0x00501910` | from a start to the first `LF` or the end | ends the line | `ÿ` and the next two units: 0, plus `adv('m')` if the unit after `ÿ` is `m` or `M` |
-| max width | `0x00501840` | whole string, per `LF` line | splits lines | as line width; result = the widest line |
+| width B (n units) | `0x005017D0` | first `n` units, stopping at a NUL unit (the NUL adds nothing) | 0 (skipped, not record 10) | counted as glyphs |
+| width C (n units) | `0x00501730` | first `n` units, stopping at a NUL unit (so `n` past the end adds nothing) | 0 (skipped) | `ÿ`,`c`,`0`–`6` skipped (0) only if the code starts at index `i` with `i + 3 < n`; every other `ÿ` counted as a glyph |
+| line width | `0x00501910` | from a start to the first `LF` or the end (index < length) | ends the line | `ÿ` and the next two units: 0, plus `adv('m')` if the unit after `ÿ` is `m` or `M`; the two units are passed over unread, so an `LF` among them does not end the line, and a skip past the end ends the walk |
+| max width | `0x00501840` | whole string, per `LF` line (index < length; also stops at a NUL unit) | splits lines | as line width (an `LF` among the two skipped units splits nothing); result = the widest line |
 | text height | `0x005019C0` | whole string | counts lines | — |
 | font height | `0x00501A40` | — | — | returns header `height` |
 
@@ -294,7 +294,7 @@ text at y `y' − 2`, block width `W`, centered.
 | Call | Address | Differs from §7 |
 |---|---|---|
 | draw with mode | `0x00502360` → `0x00501C30` | draw mode is a 6th argument instead of 5 |
-| horizontal window | `0x00501FE0` (text ECX, x EDX, y, k, s, w; caller: text-box control `0x004FBF30`) | pen starts at `x + s`; a glyph is drawn only if pen x > `x` before it (the pen still advances); the call stops when pen x > `x + w`; `LF` resets pen x to `x` |
+| horizontal window | `0x00501FE0` (text ECX, x EDX, y, k, s, w; caller: text-box control `0x004FBF30`) | pen starts at `x + s`; before **every** unit (glyph, `ÿ` code or `LF`) the call stops when pen x > `x + w`; a glyph (and a `ÿ` not followed by `c`, drawn as record 255) is drawn only if pen x > `x` before it (the pen still advances); `ÿc` + unit sets `k` as §5 (`k` > 12 → 0, negative kept), `ÿc` at the end sets `k` 0 and ends; `LF` resets pen x to `x` (not `x + s`) and moves y up by `trunc(16 · h / 10)` (`h` = the font's line-height byte, as §9 details r3) |
 | vertical window | `0x00501DF0` (text ECX, x EDX, y, unused, skip, lines; callers in `0x0049D5A0`) | returns at once if `skip < 0`; `ÿc` + 1 unit skipped (no color: glyphs drawn with `0x004F64E0`, draw mode 5, no remap), `ÿ` + any other unit except `m` skips those 2 units; per glyph: if `skip + lines ≤` the cel height, rows `skip`, `lines`, else rows 0, cel height; nothing drawn on display type 6; `ÿm`: details below |
 | no color | `0x00502190` (via `0x005023A0`) | every `ÿ` skips 3 units; line step `trunc(−15 × height / 10)`; color 0. Dead code: nothing in `Game.exe` calls, jumps to or holds the address of `0x005023A0` (no rel32, absolute or RVA reference; not among the 24 exports), so d2rs needs no counterpart |
 
@@ -352,6 +352,16 @@ the NUL at the end). `L` = length.
    5. `s = e + 1`; stop when `s > L`.
 3. `LF` is white space here and does not force a break; a line may hold a
    `LF` and is then drawn as two lines by §7.
+4. **Empty lines.** Because width C stops at the NUL, a span ending at
+   `e = L` measures the same as one ending at `L − 1` (or less, when a
+   final `ÿc0`–`ÿc6` is skipped only with the NUL counted), so a fit
+   (r2.1) or a break (r2.2) never ends a line at `L − 1`. An empty line
+   (an output string of length 0) is produced only when (a) the rest of
+   the string is one white-space unit (r2.4 drops it: e.g. `ab ` with
+   `M` = width of `ab` gives `ab`, then ``), or (b) a hard break (r2.3)
+   leaves `s = L` — the last unit alone is wider than `M` — and the next
+   round copies just the NUL. The caller receives the empty line in the
+   count and the list (`0x00502970` builds every line before returning).
 
 Languages 6, 8, 9 use a different break test (break before a CJK unit
 unless it is one of 11 listed punctuation units or Latin / full-width
@@ -454,6 +464,12 @@ Metrics from the 1.14d font files (`text-fonts.tsv`; probe of
 | same, M 60 | `The quick `, `brown fox `, `jumps `, `over the `, `lazy dog` | §10 |
 | FontFormal10 `Supercalifragilistic`, M 50 | `Supercal` (49), `ifragilisti` (50), `c` | §10.2.3 |
 | synthetic font, every advance 5: `aa bb`, M 15 | `aa `, `bb` | §10 |
+| synthetic, every advance 5: `ab  cd`, M 15 | `ab `, `cd` (no empty third line: width C(4, 6) = 10 counts no NUL) | §10 r4 |
+| synthetic, every advance 5: `ab `, M 10 | `ab`, `` | §10 r4 (a) |
+| synthetic, advance 5, `W` 20: `abW`, M 15 | `ab`, `W`, `` | §10 r4 (b) |
+| synthetic, every advance 5: `ab cd`, M 10 | `ab`, `c`, `d` (the break after `ab ` leaves `e = s`: hard break `␣c` minus its first unit) | §10 r2.3 |
+| synthetic, every advance 5: line width of `xÿ⏎yz` / max width | 5 + 0 + 5 = 10 (the `LF` inside the skip is passed over) / 10 | §6 |
+| horizontal window, advance 5, x 0, s 0, w 7: `abc` | `a` not drawn (pen 0 is not > x = 0), `b` drawn at 5, stop before `c` (pen 10 > 7) | §9 |
 | synthetic, every advance 5, height 10: `ab⏎cd` at (0, 100) | `a` (0, 100), `b` (5, 100), `c` (0, 84), `d` (5, 84) | §7 |
 | `ÿc=` / `ÿc<` | k 0 / k 12 | §5 |
 | Latin lookup of U+20AC / U+0041 | record 0 / record 65 | §3 |
@@ -473,7 +489,10 @@ lookups `0x00501650`, `0x00501690`, measures `0x00501730`, `0x005017D0`,
 `0x00501820`, `0x00501840`, `0x00501910`, `0x005019C0`, `0x00501A40`,
 draw `0x00502320` → `0x00501A80`, `0x00502360` → `0x00501C30`, windows
 `0x00501FE0`, `0x00501DF0`, `0x00502190`, framed `0x005023B0`,
-`0x00502480`, wrap `0x00502970` (`0x005028E0`, break test `0x00526D30`),
+`0x00502480`, wrap `0x00502970` (`0x005028E0`, break test `0x00526D30`;
+copy `0x00526790` = bounded copy from the unit after a leading white
+space), implementation questions UT1–UT5 (2026-10-06): UT1 §10 r4, UT2
+and UT3 §6 table, UT4 §9 horizontal window, UT5 §9 no color (dead code),
 string compares `0x00526540`, `0x00526610` (case table `0x00730578`:
 `m` and `M` both map to `M`), `"c"` / `"m"` built at `0x00502E9D`;
 D2Client `0x004A7080`; GDI colored cel draw `0x006C85A0` (slot `+0x88`
