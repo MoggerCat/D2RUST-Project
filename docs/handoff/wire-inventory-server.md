@@ -154,3 +154,10 @@ recorded: replay their C→S messages through `Host` with this host
 methods, coverage 3,813 claims 0 errors + selftest, trace checkers, hook
 selftest, fmt, depcheck + determinism, clippy workspace, tests d2-sim +
 conformance, rest, d2-client, doc-tests).
+
+Update: merged `origin/claude/tender-meitner-mphas3` at `5413b24` (it
+carries `wire-inventory-sim` as `60a4998`, `wire-path-sim`, `render-wire`,
+`prop-path-place`; no conflict). `sh tools/gate.sh` on the merge: every
+step PASS except `test d2-sim + conformance`, which failed only on the
+known seed-dependent `stats::prop_tests::stat_lists_match_the_model`;
+rerun of that step: 1,548 passed, 0 failed.
