@@ -29,6 +29,19 @@
 //! table = 0                   # optional: IndexTable blend; absent = Opaque
 //! key = [0, 0, 0, 0]          # optional: pass, major, minor, sub
 //! flip_x = false              # optional (reserved; true is a scene error)
+//! [[unit]]                    # a COF composite (§A7): COF bytes → items
+//! cof = "03 02 02 14 ..."     # the COF file bytes in hex (cof.md layout)
+//! dir = 0                     # COF direction
+//! frame = 1                   # COF frame
+//! key = [0, 5, 0]             # pass, major, minor; sub = slot
+//! clip = [0, 0, 800, 600]     # optional, default the frame
+//! [[unit.component]]          # the resolver's answer for one component
+//! component = 0               # COF component id 0..=15, each at most once
+//! frame = 0                   # [[frame]] index it draws
+//! x = 10                      # screen top-left
+//! y = 10
+//! shade = [0]                 # optional, as for [[item]]
+//! table = 0                   # optional, as for [[item]]
 //! [[expect]]                  # index framebuffer value at a screen pixel
 //! x = 11
 //! y = 10
@@ -81,6 +94,9 @@ pub struct Synthetic {
     pub maps: Vec<MapSpec>,
     pub tables: Vec<TableRule>,
     pub items: Vec<ItemSpec>,
+    /// COF composites; their items follow `items` in the list before
+    /// `scene::order` (equal keys keep that order).
+    pub units: Vec<UnitSpec>,
     pub expects: Vec<Expect>,
 }
 
@@ -126,6 +142,31 @@ pub struct ItemSpec {
     pub table: Option<u32>,
     pub key: Option<[u32; 4]>,
     pub flip_x: bool,
+}
+
+/// One COF composite (`[[unit]]`). The COF is given as file bytes so the
+/// case runs the real parser (`d2_formats::cof`); everything a §B owner spec
+/// decides (frame, position, shade, blend) is the case's fixture answer per
+/// component, never a rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitSpec {
+    pub cof: Vec<u8>,
+    pub dir: u32,
+    pub frame: u32,
+    pub key: [u32; 3],
+    pub clip: Option<ViewRect>,
+    pub components: Vec<ComponentSpec>,
+}
+
+/// The fixture answer for one COF component of a unit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentSpec {
+    pub component: u8,
+    pub frame: u32,
+    pub x: i32,
+    pub y: i32,
+    pub shade: Vec<u32>,
+    pub table: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -216,7 +257,7 @@ pub fn parse(name: &str, text: &str) -> Result<Case, CaseError> {
                 "",
                 &[
                     &common[..],
-                    &["view", "frame", "map", "table", "item", "expect"],
+                    &["view", "frame", "map", "table", "item", "unit", "expect"],
                 ]
                 .concat(),
             )?;
@@ -273,10 +314,16 @@ fn synthetic(root: &Table) -> Result<Synthetic, CaseError> {
         .into_iter()
         .map(|(at, t)| item(&at, t))
         .collect::<Result<_, _>>()?;
-    if items.is_empty() {
+    let units: Vec<UnitSpec> = tables(root, "unit")?
+        .into_iter()
+        .map(|(at, t)| unit(&at, t))
+        .collect::<Result<_, _>>()?;
+    if items.is_empty() && units.is_empty() {
         return Err(err(
             "item",
-            CaseErrorKind::Invalid("a synthetic case needs at least one [[item]]".into()),
+            CaseErrorKind::Invalid(
+                "a synthetic case needs at least one [[item]] or [[unit]]".into(),
+            ),
         ));
     }
     let expects = tables(root, "expect")?
@@ -296,6 +343,7 @@ fn synthetic(root: &Table) -> Result<Synthetic, CaseError> {
         maps,
         tables: tables_,
         items,
+        units,
         expects,
     })
 }
@@ -380,20 +428,7 @@ fn item(at: &str, t: &Table) -> Result<ItemSpec, CaseError> {
         at,
         &["frame", "x", "y", "clip", "shade", "table", "key", "flip_x"],
     )?;
-    let shade = match t.get("shade") {
-        None => Vec::new(),
-        Some(item) => {
-            let key = path(at, "shade");
-            let arr = item
-                .as_array()
-                .ok_or_else(|| err(&key, CaseErrorKind::WrongType("an array of integers")))?;
-            arr.iter()
-                .enumerate()
-                .map(|(i, v)| value_int(v, &format!("{key}[{i}]"), 0, u32::MAX.into()))
-                .map(|r| r.map(|v| v as u32))
-                .collect::<Result<_, _>>()?
-        }
-    };
+    let shade = shade(t, at)?;
     let key = match t.get("key") {
         None => None,
         Some(item) => {
@@ -421,7 +456,90 @@ fn item(at: &str, t: &Table) -> Result<ItemSpec, CaseError> {
     })
 }
 
+fn unit(at: &str, t: &Table) -> Result<UnitSpec, CaseError> {
+    only_keys(t, at, &["cof", "dir", "frame", "key", "clip", "component"])?;
+    let cof = hex(t, at, "cof")?.ok_or_else(|| err(path(at, "cof"), CaseErrorKind::Missing))?;
+    let key_at = path(at, "key");
+    let key = t
+        .get("key")
+        .ok_or_else(|| err(&key_at, CaseErrorKind::Missing))?
+        .as_value()
+        .ok_or_else(|| err(&key_at, CaseErrorKind::WrongType("an array")))?;
+    let key = int_array::<3>(key, &key_at, 0, u32::MAX.into())?.map(|v| v as u32);
+    let mut components: Vec<ComponentSpec> = Vec::new();
+    for (cat, c) in tables(t, "component")? {
+        let cat = path(at, &cat);
+        only_keys(c, &cat, &["component", "frame", "x", "y", "shade", "table"])?;
+        let component = req_int(c, &cat, "component", 0, 15)? as u8;
+        if components.iter().any(|o| o.component == component) {
+            return Err(err(
+                path(&cat, "component"),
+                CaseErrorKind::Invalid(format!("component {component} is given twice")),
+            ));
+        }
+        components.push(ComponentSpec {
+            component,
+            frame: req_int(c, &cat, "frame", 0, u32::MAX.into())? as u32,
+            x: req_int(c, &cat, "x", i32::MIN.into(), i32::MAX.into())? as i32,
+            y: req_int(c, &cat, "y", i32::MIN.into(), i32::MAX.into())? as i32,
+            shade: shade(c, &cat)?,
+            table: int(c, &cat, "table", 0, u32::MAX.into())?.map(|v| v as u32),
+        });
+    }
+    Ok(UnitSpec {
+        cof,
+        dir: req_int(t, at, "dir", 0, 255)? as u32,
+        frame: req_int(t, at, "frame", 0, 255)? as u32,
+        key,
+        clip: rect(t, at, "clip")?,
+        components,
+    })
+}
+
 // --- strict readers ---------------------------------------------------------
+
+/// `shade = [..]`: map indices, empty when absent.
+fn shade(t: &Table, at: &str) -> Result<Vec<u32>, CaseError> {
+    let Some(item) = t.get("shade") else {
+        return Ok(Vec::new());
+    };
+    let key = path(at, "shade");
+    let arr = item
+        .as_array()
+        .ok_or_else(|| err(&key, CaseErrorKind::WrongType("an array of integers")))?;
+    arr.iter()
+        .enumerate()
+        .map(|(i, v)| value_int(v, &format!("{key}[{i}]"), 0, u32::MAX.into()))
+        .map(|r| r.map(|v| v as u32))
+        .collect()
+}
+
+/// A byte string in hex, two digits per byte; ASCII whitespace between
+/// bytes is ignored. Anything else is an error.
+fn hex(t: &Table, at: &str, key: &str) -> Result<Option<Vec<u8>>, CaseError> {
+    let Some(text) = string(t, at, key)? else {
+        return Ok(None);
+    };
+    let k = path(at, key);
+    let mut out = Vec::new();
+    for word in text.split_ascii_whitespace() {
+        if word.len() % 2 != 0 {
+            return Err(err(
+                &k,
+                CaseErrorKind::Invalid(format!("{word:?} is not whole hex bytes")),
+            ));
+        }
+        for pair in word.as_bytes().chunks(2) {
+            let digits = std::str::from_utf8(pair).unwrap_or("");
+            let byte = u8::from_str_radix(digits, 16)
+                .ok()
+                .filter(|_| pair.iter().all(u8::is_ascii_hexdigit))
+                .ok_or_else(|| err(&k, CaseErrorKind::Invalid(format!("{word:?} is not hex"))))?;
+            out.push(byte);
+        }
+    }
+    Ok(Some(out))
+}
 
 fn path(at: &str, key: &str) -> String {
     if at.is_empty() {

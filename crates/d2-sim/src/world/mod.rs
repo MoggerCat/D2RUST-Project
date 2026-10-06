@@ -9,7 +9,9 @@
 //! because `d2-sim` may not depend on `d2-proto`.
 
 pub mod cube;
+pub mod npc;
 pub mod quests;
+pub mod vendors;
 pub mod waypoints;
 
 /// Strict parsing of the machine tables in `specs/world/` (METHODS M05,

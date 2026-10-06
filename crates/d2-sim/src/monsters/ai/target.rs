@@ -372,7 +372,7 @@ pub fn precheck_c<W: AiHost + ?Sized>(
     // 3. Special walk.
     let is_melee = cx.tables.monstats.get(p.class).is_some_and(|r| r.ismelee);
     if is_melee && cx.can_walk(unit) && game.lists.unit(unit).and_then(|e| e.room()).is_some() {
-        let lvl = cx.world.level_id(unit);
+        let lvl = cx.world.level_id(game, unit);
         let spc = usize::try_from(lvl)
             .ok()
             .and_then(|l| cx.tables.levels.get(l))

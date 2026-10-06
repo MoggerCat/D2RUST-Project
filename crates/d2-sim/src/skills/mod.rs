@@ -15,6 +15,7 @@
 pub mod calc;
 pub mod levels;
 pub mod special;
+pub mod use_;
 
 use crate::rng::Seed;
 use crate::units::UnitType;

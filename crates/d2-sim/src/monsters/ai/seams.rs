@@ -36,8 +36,9 @@ pub trait AiUnits {
     fn size(&self, unit: UnitId) -> i32;
     /// Act (unit +0x18).
     fn act(&self, unit: UnitId) -> u8;
-    /// `levels.txt` row of the unit's level.
-    fn level_id(&self, unit: UnitId) -> i32;
+    /// `levels.txt` row of the unit's level (the level of its room in
+    /// the game's lists).
+    fn level_id(&self, game: &Game, unit: UnitId) -> i32;
     /// Monster level (teleport heal, §2.4).
     fn monster_level(&self, unit: UnitId) -> i32;
     /// Life in percent of max life.

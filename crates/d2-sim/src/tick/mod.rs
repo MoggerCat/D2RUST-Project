@@ -142,6 +142,11 @@ pub trait TickHooks: EventDispatch {
     /// Step 9 (`0x005433F0`): compress a unit to inactive storage.
     fn compress_unit(&mut self, game: &mut Game, unit: UnitId) {}
 
+    /// Step 9, after `0x0061A910` unlinked the room from the act list:
+    /// the rest of that function, owned by the DRLG spec (`rooms.md`
+    /// §8.2: neighbours' adjacency arrays, record free, tiles).
+    fn room_deactivated(&mut self, game: &mut Game, act: u8, room: RoomId) {}
+
     /// Step 10 (`0x0061AA20`): free inactive rooms of an act.
     fn free_inactive_rooms(&mut self, game: &mut Game, act: u8) {}
 
@@ -390,6 +395,7 @@ fn room_deactivation<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
                 // `0x0061A910` removes the room from the act list; what
                 // else it frees belongs to the DRLG spec.
                 let _ = game.lists.deactivate_room(room);
+                hooks.room_deactivated(game, act, room);
             }
         }
     }

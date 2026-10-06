@@ -2,3 +2,5 @@
 //! Monsters. Phase 3 so far: the AI think ([`ai`]).
 
 pub mod ai;
+pub mod init;
+pub mod population;
