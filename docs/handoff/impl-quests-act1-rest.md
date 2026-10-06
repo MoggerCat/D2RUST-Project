@@ -67,6 +67,15 @@ operate's 288 is a missile); it stays in the trait for now.
 | A1Q3 / A1Q4 event 0 without a player | silent return | `QuestError::Fatal` |
 | `Extra4` | `beside_guid`, `beside_known` | `marker_guid`, `marker_known` plus the new §1 fields |
 
+## Gate
+
+`cargo test -p d2-sim -p d2-server --no-fail-fast`: every test passes
+except the 10 known base failures (`missiles::tests_bodies` 2,
+`monsters::ai::tests::specd_here_*` 2, `skills::mutant_tests::
+table_check_mutants` 2, `skills::use_::tests` 4); clippy `-D warnings`
+(d2-sim, d2-server, all targets), `cargo fmt --check`, `coverage.py
+--check` (5307 claims, 0 errors) and `spec_index.py --check` pass.
+
 ## Tests
 
 - `world/quests/act1_rest_q4_tests.rs`: gibbet operate / event 7, stone

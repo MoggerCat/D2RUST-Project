@@ -793,7 +793,8 @@ pub fn stone_order(ctl: &mut QuestControl) -> [u8; 5] {
 }
 
 /// `0x00593CB0` (§9.4): the stone order's 0x50 (15 bytes). Bytes 13–14
-/// are uninitialized stack in the original (open question 5); 0 here.
+/// are never written by the original (`quests-act1-rest.md` §7: stack
+/// leftovers, masked by the comparison); 0 here.
 pub fn send_stone_order<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId) {
     if ctl.find(CHAIN).is_none() {
         return;
