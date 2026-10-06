@@ -85,6 +85,8 @@ pub struct Extra {
     pub q6: q6::Extra6,
     /// The Act II records' fields (`world/quests-act2.md`).
     pub a2: super::act2::Extra,
+    /// The Act III records' fields (`quests-act3.md`).
+    pub act3: super::act3::Extra3,
 }
 
 /// Per-record init beyond the `quests.tsv` columns (§10.4, §10.5).
@@ -145,6 +147,7 @@ pub fn sequence<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, chain: u8) -> 
             return true;
         }
         8 | 10 | 11 | 13 => return super::act2::sequence(ctl, w, chain),
+        15..=20 => return super::act3::sequence(ctl, w, chain),
         _ => {
             w.unhandled(chain, seq_fn.unwrap_or(0));
             return false;
@@ -316,6 +319,7 @@ pub fn callback<W: QuestWorld>(
         (6, _) => q6::callback(ctl, w, i, args, list),
         (37, _) => intro::callback(ctl, w, i, args, list),
         (7..=13 | 26 | 27 | 38, _) => super::act2::callback(ctl, w, i, args, list),
+        (14..=20 | 28 | 39, _) => super::act3::callback(ctl, w, i, args, list),
         _ => false,
     };
     let _ = force;
@@ -408,6 +412,7 @@ pub fn active_fn<W: QuestWorld>(
         6 => q6::active(ctl, w, i, player, npc_class),
         37 => intro::active(w, player, npc_class),
         7..=13 | 26 | 27 | 38 => super::act2::active_fn(ctl, w, i, player, npc_class, f),
+        14..=20 | 28 | 39 => super::act3::active(ctl, w, i, player, npc_class),
         c => {
             w.unhandled(c, f);
             false
@@ -429,6 +434,7 @@ pub fn status_fn<W: QuestWorld>(
         0 | 25 | 30 | 37..=40 => None,
         3 => Some(q3::status(ctl, w, i, player, pf)),
         7..=13 | 26 | 27 => super::act2::status_fn(ctl, w, i, player, pf, f),
+        14..=18 | 28 => super::act3::status(ctl, w, i, player, pf),
         c => {
             w.unhandled(c, f);
             None
@@ -481,6 +487,7 @@ pub fn run_timer<W: QuestWorld>(
             true
         }
         TimerFn::Act2(t) => super::act2::run_timer(ctl, w, t, chain),
+        TimerFn::Act3(t) => super::act3::run_timer(ctl, w, t, chain),
         #[cfg(test)]
         TimerFn::Probe => {
             w.unhandled(chain, ctl.tick);

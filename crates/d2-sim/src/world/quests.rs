@@ -12,6 +12,7 @@
 
 pub mod act1;
 pub mod act2;
+pub mod act3;
 pub mod tables;
 
 #[cfg(test)]
@@ -20,6 +21,8 @@ mod act1_rest_misc_tests;
 mod act1_rest_q4_tests;
 #[cfg(test)]
 mod act1_tests;
+#[cfg(test)]
+mod act3_tests;
 #[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
@@ -287,6 +290,8 @@ pub enum TimerFn {
     SlaughterOpen,
     /// An Act II timer (`world/quests-act2.md`).
     Act2(act2::Timer),
+    /// An Act III timer (`quests-act3.md`).
+    Act3(act3::Timer),
     /// Test probe: logs through `unhandled(chain, tick)`, never removed.
     #[cfg(test)]
     Probe,
@@ -555,6 +560,76 @@ pub trait QuestWorld {
     fn client_save_flags(&self, player: UnitId) -> Option<u16>;
     fn set_client_save_flags(&mut self, player: UnitId, flags: u16);
 
+    // Act III quest seams (`quests-act3.md`; the Act II seams below are
+    // shared with it). The default bodies report the function through
+    // `unhandled` (chain 0xFF) and do nothing, until a host provides them.
+    /// Game +0xC4: the game has an Act III (DRLG).
+    fn has_act3(&mut self) -> bool {
+        self.unhandled(0xFF, 0x005B_9A30);
+        false
+    }
+    /// `0x005A43E0(game, room, 0, class, 1, 0, 0, 1)` (monster spec).
+    fn spawn_monster_in_room(&mut self, room: RoomId, class: u16) -> Option<UnitId> {
+        let _ = (room, class);
+        self.unhandled(0xFF, 0x005A_43E0);
+        None
+    }
+    /// `0x005B3090`: spawn a monster at a unit in `mode`.
+    fn spawn_monster_at_unit(&mut self, unit: UnitId, class: u16, mode: u8) -> Option<UnitId> {
+        let _ = (unit, class, mode);
+        self.unhandled(0xFF, 0x005B_3090);
+        None
+    }
+    /// `0x005DDFC0` then `0x005DFEE0`: kill a monster (monster spec).
+    fn kill_monster(&mut self, monster: UnitId) {
+        let _ = monster;
+        self.unhandled(0xFF, 0x005D_DFC0);
+    }
+    /// `0x00619DA0`: the room covering (x, y).
+    fn room_covering(&mut self, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (x, y);
+        self.unhandled(0xFF, 0x0061_9DA0);
+        None
+    }
+    /// A unit of type 0 (player) in `room` or a room of its room list
+    /// (`0x00619790`), scanned in list order.
+    fn player_in_rooms(&mut self, room: RoomId) -> bool {
+        let _ = room;
+        self.unhandled(0xFF, 0x0061_9790);
+        false
+    }
+    /// `0x0059D9D0`: the sewer stairs' warp (object spec).
+    fn stairs_warp(&mut self, object: UnitId, player: UnitId) {
+        let _ = (object, player);
+        self.unhandled(0xFF, 0x0059_D9D0);
+    }
+    /// The first player in the object's room unit list closer than
+    /// `dist` (`0x00641530`).
+    fn player_near_object(&mut self, object: UnitId, dist: i32) -> Option<UnitId> {
+        let _ = (object, dist);
+        self.unhandled(0xFF, 0x0064_1530);
+        None
+    }
+    /// `0x005A0180(victim)` or `0x0063E9F0(0, victim)` (unique /
+    /// champion / boss tests, monster spec).
+    fn special_monster(&mut self, victim: UnitId) -> bool {
+        let _ = victim;
+        self.unhandled(0xFF, 0x005A_0180);
+        false
+    }
+    /// `0x006229F0(room, x, y, mask)`: nonzero = blocked.
+    fn blocked(&mut self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        let _ = (room, x, y, mask);
+        self.unhandled(0xFF, 0x0062_29F0);
+        false
+    }
+    /// `0x0063BEF0` on the inventory: the code of the player's weapon.
+    fn weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        let _ = player;
+        self.unhandled(0xFF, 0x0063_BEF0);
+        None
+    }
+
     /// A function the spec names but does not specify was reached; the
     /// host logs it (open questions 6–8).
     fn unhandled(&mut self, chain: u8, function: u32);
@@ -798,6 +873,7 @@ impl QuestControl {
             };
             act1::init(&mut r);
             act2::init(&mut r);
+            act3::init(&mut r);
             made.push(r);
         }
         made.reverse();
@@ -1479,7 +1555,7 @@ impl QuestControl {
     /// Durance; others go to `0x005BCFD0` (A3Q6, unspecified).
     pub fn object_warp<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, level: u32) {
         if level != 102 {
-            w.unhandled(20, 0x005B_CFD0);
+            act3::durance_warp(self, w);
             return;
         }
         let Some(f) = flags_of(w, player) else { return };
@@ -1722,8 +1798,8 @@ pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
             _ => record(ctl, w, 32, 0x0058_8CA0),
         },
         act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
-        0x155 => record(ctl, w, 20, 0x005B_CAC0),
-        0x16F => record(ctl, w, 16, 0x005B_85E0),
+        0x155 => act3::bridge_event(ctl, w, object),
+        0x16F => act3::lever_event(ctl, w, object),
         0x173 => act1::q5::chest_event(ctl, w, object),
         0x178 => record(ctl, w, 24, 0x005B_6710),
         0x1CB => w.unhandled(0xFF, 0x0058_B940),

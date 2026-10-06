@@ -542,7 +542,16 @@ fn player_leaving_with_quest_items() {
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
+    // Act III chains 15, 18, 19, 20 remove P1 from their lists
+    // (`quests-act3.md` §1.1); chain 16's event 10 is a bare `ret`.
+    for c in [15, 16, 18, 19, 20] {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
     ctl.player_leaves(&mut w, P1);
+    for c in [15, 18, 19, 20] {
+        assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
+    }
+    assert!(ctl.record(16).unwrap().guids.contains(1));
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
             .iter()
@@ -565,6 +574,7 @@ fn player_leaving_with_quest_items() {
         if r.has_callback(event::PLAYER_LEAVES_GAME)
             && !(1..=6).contains(&r.chain)
             && !BODIES.contains(&r.chain)
+            && !(14..=20).contains(&r.chain)
         {
             want.push(format!(
                 "unhandled {} {:#x}",
@@ -767,10 +777,10 @@ fn object_quest_functions_by_class() {
     assert!(f.log[0].starts_with("drop gld"));
     // Each class's function (the record's chain, or 255 without one);
     // the object has no room here: 0x83 does nothing, 0xBD is not in Act I.
+    // Classes 0x16F (lever) and 0x155 (bridge) run Act III code, tested in
+    // `act3_tests` (`lever_event`, `bridge_event`).
     for (class, want) in [
-        (0x16F, "unhandled 16 0x5b85e0"),
         (0xBD, "unhandled 32 0x588ca0"),
-        (0x155, "unhandled 20 0x5bcac0"),
         (0x178, "unhandled 24 0x5b6710"),
         (0x1CB, "unhandled 255 0x58b940"),
         (0x1CC, "unhandled 255 0x58a500"),
