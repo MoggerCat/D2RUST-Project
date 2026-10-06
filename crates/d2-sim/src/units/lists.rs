@@ -465,11 +465,11 @@ impl UnitLists {
     }
 
     /// The GUIDs in hash bucket `bucket` of `ty`, head first (tiles: the
-    /// single list, `bucket` ignored).
+    /// single list, `bucket` ignored). A bucket past 127 is empty.
     pub fn hash_bucket(&self, ty: UnitType, bucket: usize) -> Vec<UnitId> {
         let mut out = Vec::new();
         let mut cur = match ty.hash_list() {
-            Some(l) => self.hash[l][bucket],
+            Some(l) => self.hash[l].get(bucket).copied().flatten(),
             None => self.tiles,
         };
         while let Some(id) = cur {
@@ -570,11 +570,17 @@ impl UnitLists {
         })))
     }
 
-    /// Frees an inactive room record (DRLG; `tick.md` step 10). Its units
-    /// must be gone.
+    /// Frees a room record (DRLG; `tick.md` step 10), deactivating it
+    /// first if active. Units still in it are unlinked from it (§5.3, in
+    /// list order) so no unit keeps the id of a freed (and later reused)
+    /// room slot. TODO(rooms.md §8.2): the original also gives each such
+    /// unit flag 0x800000 and a path update (unit specs).
     pub fn free_room(&mut self, id: RoomId) -> Result<RoomEntry, ListError> {
         if self.room(id).ok_or(ListError::UnknownRoom(id))?.active {
             self.deactivate_room(id)?;
+        }
+        while let Some(u) = self.room_unit_first(id) {
+            self.room_remove(u)?;
         }
         Ok(self.rooms.remove(id.0).expect("checked above"))
     }

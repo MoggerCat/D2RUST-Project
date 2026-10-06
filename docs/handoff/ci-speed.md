@@ -1,6 +1,6 @@
 # Handoff: CI speed and the local gate — `claude/ci-speed`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud tooling session, 2026-10-06, base `claude/tender-meitner-mphas3`. Repo only.
 

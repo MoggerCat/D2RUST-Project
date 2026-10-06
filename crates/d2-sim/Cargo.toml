@@ -12,6 +12,9 @@ d2-data.workspace = true
 d2-formats.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 # Cargo can't extend workspace lints, so this repeats them with additions.
 # Keep in sync with [workspace.lints] in the root Cargo.toml.
 [lints.rust]
@@ -21,6 +24,3 @@ unsafe_code = "forbid"
 all = { level = "warn", priority = -1 }
 # Determinism (CLAUDE.md rule 6): no floats in game logic.
 float_arithmetic = "deny"
-
-[dev-dependencies]
-proptest.workspace = true

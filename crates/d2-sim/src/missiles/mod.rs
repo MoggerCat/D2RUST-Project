@@ -18,6 +18,8 @@ mod hit;
 pub mod seams;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_bodies;
 
 use std::collections::BTreeMap;
 

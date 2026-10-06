@@ -1,6 +1,6 @@
 # Handoff: game-file tests for the item and treasure specs (branch `claude/game-tests-items-treasure`, 2026-10-06)
 
-> To be folded into `docs/HANDOFF.md` (§1, §4, §5) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, repo only (no `game/`), medium effort, from
 `claude/tender-meitner-mphas3` at `4b5b0bf`, then merged with it at

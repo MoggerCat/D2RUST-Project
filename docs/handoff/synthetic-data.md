@@ -1,6 +1,6 @@
 # Handoff: synthetic game data for CI — `claude/synthetic-data`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, base `claude/tender-meitner-mphas3`
 at `4b5b0bf`. Repo only, no game files (M09, M16). Task class: test

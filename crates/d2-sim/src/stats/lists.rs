@@ -250,6 +250,14 @@ impl StatLists {
         self.lm(id).ext.as_mut()
     }
 
+    /// [`Self::ext_mut`] that answers `None` for a freed list.
+    fn try_ext_mut(&mut self, id: ListId) -> Option<&mut Extended> {
+        match self.slots.get_mut(id.index as usize) {
+            Some((g, Some(l))) if *g == id.generation => l.ext.as_mut(),
+            _ => None,
+        }
+    }
+
     fn insert(&mut self, list: List) -> ListId {
         if let Some(index) = self.free.pop() {
             let slot = &mut self.slots[index as usize];
@@ -1144,7 +1152,8 @@ impl StatLists {
             if x == l {
                 return;
             }
-            a = self.l(x).parent;
+            // A freed parent (edge case 6) ends the ancestor walk.
+            a = self.try_l(x).and_then(|x| x.parent);
         }
         if self.l(l).flags & flag::TEMPONLY != 0 {
             self.lm(r).flags |= flag::NEWLENGTH;
@@ -1193,12 +1202,14 @@ impl StatLists {
         }
     }
 
-    /// Detach `0x006269F0`(L) (§8.2).
+    /// Detach `0x006269F0`(L) (§8.2). A parked child of a freed parent
+    /// (edge case 6) has no live parent whose heads could name it: only
+    /// its own links are cleared.
     pub fn detach(&mut self, host: &mut dyn StatHost, l: ListId) {
         let p = self.l(l).parent;
         if let Some(p) = p {
             let prev = self.l(l).prev;
-            if let Some(e) = self.ext_mut(p) {
+            if let Some(e) = self.try_ext_mut(p) {
                 if e.active == Some(l) {
                     e.active = prev;
                 }

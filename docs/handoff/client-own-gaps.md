@@ -1,6 +1,6 @@
 # Client d2rs-own gaps: sound pool, prefetch, text layout
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/client-own-gaps`, based on `claude/tender-meitner-mphas3`
 at `4b5b0bf`. Cloud session (repo only, no game files). Task class:

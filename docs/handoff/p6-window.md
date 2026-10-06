@@ -1,6 +1,6 @@
 # Handoff: the client on a real window (`claude/p6-window`, 2026-10-06)
 
-> Not folded into `docs/HANDOFF.md` and `docs/PLAN.md` yet (a docs session folds it); this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Scope: HANDOFF §2 steps 4–5 (in-app wiring of the single-player game and
 the GPU compositor). Cloud implementation session, task class:
