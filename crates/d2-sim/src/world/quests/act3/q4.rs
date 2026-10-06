@@ -324,7 +324,7 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
         }
     }
     let Some(victim) = args.target else { return };
-    if w.drop_quest_item(victim, FIGURINE, 2, false) {
+    if w.quest_drop(victim, FIGURINE, 2, None, false).is_some() {
         ctl.records[i].clear_callback(event::MONSTER_KILLED);
         let e = x(ctl, i);
         e.held += 1;

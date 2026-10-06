@@ -17,6 +17,7 @@ members = [
     "tools/data-tool",
     "tools/scenario-run",
     "tools/seed-finder",
+    "tools/d2s-tool",
 ]
 
 [workspace.package]

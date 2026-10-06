@@ -372,7 +372,7 @@ pub fn chest_operate<W: QuestWorld>(
     }
     let piles = ctl.seed.step() % 5 + 5;
     for _ in 0..piles {
-        w.drop_gold_pile(object);
+        w.drop_gold(object);
     }
     let code = match chest {
         KhalimChest::Heart => HEART,
@@ -389,7 +389,7 @@ pub fn chest_operate<W: QuestWorld>(
             }
         }
         for _ in 0..ctl.records[i].extra.act3.q2.drop_count {
-            if w.drop_quest_item(object, code, 2, true) {
+            if w.quest_drop(object, code, 2, None, true).is_some() {
                 let x = &mut ctl.records[i].extra.act3.q2;
                 match chest {
                     KhalimChest::Heart => {
@@ -408,7 +408,7 @@ pub fn chest_operate<W: QuestWorld>(
             }
         }
     }
-    w.chest_treasure(object, player);
+    w.object_treasure(object, 4);
 }
 
 /// The end-animation event `0x005417D0` type 1 at frame +

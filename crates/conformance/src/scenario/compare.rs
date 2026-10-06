@@ -560,26 +560,23 @@ mod tests {
         ]
     }
 
-    // Covers: specs/tools/scenario.md §6 r3, §6 row1, §6 row2, §6 row3, §6 row4
+    // Covers: specs/tools/scenario.md §6 r3, §6 row1, §6 row2, §6 row3, §6 row4, §6 row5, §6 row6, §6 row7, §6 row8
     #[test]
     fn mask_table_parses_and_is_strict() {
-        let m = masks();
-        assert_eq!(m.len(), 4);
+        let m = |id, offset, len| Mask { id, offset, len };
         assert_eq!(
-            m[0],
-            Mask {
-                id: 0x2A,
-                offset: 3,
-                len: Some(4)
-            }
-        );
-        assert_eq!(
-            m[3],
-            Mask {
-                id: 0x8F,
-                offset: 1,
-                len: None
-            }
+            masks(),
+            [
+                m(0x21, 11, Some(1)),
+                m(0x22, 2, Some(1)),
+                m(0x22, 10, Some(1)),
+                m(0x2A, 3, Some(4)),
+                m(0x50, 13, Some(2)),
+                m(0x58, 6, Some(1)),
+                m(0x62, 6, Some(1)),
+                m(0x7E, 1, Some(4)),
+                m(0x8F, 1, None),
+            ]
         );
         for bad in [
             "id\toffset\tlength\n",
@@ -608,6 +605,33 @@ mod tests {
             compare(&a, &trace("d2rs", b)).unwrap().verdict,
             Verdict::Match
         );
+    }
+
+    // Covers: specs/tools/scenario.md §6 r1, §6 row1, §6 row2, §6 row6, §6 row7
+    #[test]
+    fn unwritten_builder_bytes_are_masked_and_only_those() {
+        // (id, size, masked offsets) per `tools/original-hooks.md` §6.2.
+        let cases: &[(u8, usize, &[usize])] = &[
+            (0x21, 12, &[11]),
+            (0x22, 12, &[2, 10]),
+            (0x62, 7, &[6]),
+            (0x7E, 5, &[1, 2, 3, 4]),
+        ];
+        let m = masks();
+        for &(id, size, masked) in cases {
+            let a: Vec<u8> = std::iter::once(id).chain(1..size as u8).collect();
+            for k in 0..size {
+                let mut b = a.clone();
+                b[k] ^= 0xFF;
+                let got = compare_bytes(&a, &b, &m);
+                if masked.contains(&k) {
+                    assert_eq!(got, Ok(masked.len()), "0x{id:02X} byte {k}");
+                } else {
+                    let before = masked.iter().filter(|&&o| o < k).count();
+                    assert_eq!(got, Err((k, before)), "0x{id:02X} byte {k}");
+                }
+            }
+        }
     }
 
     // Covers: specs/tools/scenario.md §5 r3, §5 r4, §5 r5

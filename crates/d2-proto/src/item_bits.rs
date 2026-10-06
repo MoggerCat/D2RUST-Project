@@ -1,4 +1,5 @@
 // Spec: specs/items/bitstream.md
+// Spec: specs/formats/d2s.md
 //! Reader of the item bit stream carried by S→C 0x9C (from byte 8) and
 //! 0x9D (from byte 13): the client's and the conformance harness's side of
 //! `d2_sim::items::bitstream` (the server's writer).
@@ -8,6 +9,10 @@
 //! (items / itemtypes facts by code, itemstatcost save columns by stat).
 //! Values are returned as written, `Save Add` removed ([`Stat::value`]);
 //! `ValShift`'s low bits are not on the wire.
+//!
+//! The same reader decodes the save format (`.d2s` item entries,
+//! `bitstream.md` §5, `d2s.md` §8.1 rule 2): [`decode_save_record`] and
+//! [`save_entry_len`].
 
 /// Header flag bits the reader branches on (§2).
 pub mod hflag {
@@ -19,6 +24,9 @@ pub mod hflag {
     pub const ALT_CODE: u32 = 0x2000000;
     pub const RUNEWORD: u32 = 0x4000000;
 }
+
+/// Save-format marker "JM" (§2 rule 2), read as 16 bits.
+pub const SAVE_MARKER: u32 = 0x4D4A;
 
 /// List terminator (§4.6 rule 5).
 pub const TERMINATOR: u32 = 0x1FF;
@@ -78,6 +86,12 @@ pub enum ItemBitsError {
     Trailing(usize),
     #[error("padding bit {0} is set")]
     Padding(usize),
+    /// Save format: the 16 bits before the flags are not 0x4D4A (§2 rule 2).
+    #[error("save marker is {0:#06x}, not 0x4D4A (\"JM\")")]
+    BadMarker(u32),
+    /// Save format: the trailer's third 32-bit value is not 0 (§5 rule 2).
+    #[error("save trailer ends with {0:#x}, not 0")]
+    TrailerTail(u32),
 }
 
 /// LSB-first bit reader (§1 rule 1).
@@ -201,12 +215,30 @@ pub struct ItemBits {
     pub lists: Vec<Option<Vec<Stat>>>,
     /// Bits used (the stream is these, padded to whole bytes).
     pub bits: usize,
+    // ---- save format (§5)
+    /// Decoded from a save stream (`bitstream.md` §5): "shown" always.
+    pub save: bool,
+    /// Full record, save format: unit +0x28 (§4.1 rule 7).
+    pub save_unit28: Option<u32>,
+    /// Trailer (§5 rule 2) when its bit is 1: the two 32-bit values (the
+    /// third must be 0). `None`: bit 0, or no trailer (network, alt-code).
+    pub save_trailer: Option<(u32, u32)>,
+}
+
+/// One save-format item entry (`d2s.md` §8.1 rule 2, §8.2 rule 4).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SaveEntry {
+    /// Bytes used: the item's padded stream plus its children's entries.
+    pub len: usize,
+    pub item: ItemBits,
+    /// The socketed children, `item.filled` of them, in stream order.
+    pub children: Vec<SaveEntry>,
 }
 
 impl ItemBits {
-    /// Identified ("shown", §4.3 network case).
+    /// "Shown" (§4.3): save format, or identified.
     pub fn shown(&self) -> bool {
-        self.flags & hflag::IDENTIFIED != 0
+        self.save || self.flags & hflag::IDENTIFIED != 0
     }
 }
 
@@ -338,8 +370,83 @@ pub fn decode(stream: &[u8], t: &dyn ItemLookup) -> Result<ItemBits, ItemBitsErr
 
 /// Decodes one record from `r` (no padding check).
 pub fn decode_record(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<ItemBits, ItemBitsError> {
+    read_record(r, t, false)
+}
+
+/// Decodes one save-format record from `r`: the "JM" marker (§2 rule 2),
+/// the flags as written, unit +0x28 (§4.1 rule 7) and the trailer (§5
+/// rule 2), "shown" always (§4.3). No padding, no children.
+pub fn decode_save_record(
+    r: &mut BitReader<'_>,
+    t: &dyn ItemLookup,
+) -> Result<ItemBits, ItemBitsError> {
+    read_record(r, t, true)
+}
+
+/// Decodes one save item entry at `buf[0..]` (`d2s.md` §8.1 rule 2): the
+/// item's save record, zero padding to a whole byte, then `filled` children
+/// (§8.2 rule 4; 0 for compact and alt-code records), each an entry of its
+/// own read the same way (§2 rule 5).
+pub fn save_entry_len(buf: &[u8], t: &dyn ItemLookup) -> Result<SaveEntry, ItemBitsError> {
+    let mut r = BitReader::new(buf);
+    let item = decode_save_record(&mut r, t)?;
+    let used = r.pos();
+    let len = used.div_ceil(8);
+    for at in used..len * 8 {
+        if (buf[at / 8] >> (at % 8)) & 1 != 0 {
+            return Err(ItemBitsError::Padding(at));
+        }
+    }
+    let mut entry = SaveEntry {
+        len,
+        children: Vec::with_capacity(usize::from(item.filled)),
+        item,
+    };
+    for _ in 0..entry.item.filled {
+        let child = save_entry_len(&buf[entry.len..], t).map_err(|e| shift(e, entry.len))?;
+        entry.len += child.len;
+        entry.children.push(child);
+    }
+    Ok(entry)
+}
+
+/// Bit positions in a child's error are made relative to the parent's start.
+fn shift(e: ItemBitsError, bytes: usize) -> ItemBitsError {
+    match e {
+        ItemBitsError::Short(b) => ItemBitsError::Short(b + bytes * 8),
+        ItemBitsError::Padding(b) => ItemBitsError::Padding(b + bytes * 8),
+        e => e,
+    }
+}
+
+/// Save trailer (§5 rule 2).
+fn read_trailer(r: &mut BitReader<'_>, it: &mut ItemBits) -> Result<(), ItemBitsError> {
+    if r.read(1)? == 1 {
+        let a = r.read(32)?;
+        let b = r.read(32)?;
+        let z = r.read(32)?;
+        if z != 0 {
+            return Err(ItemBitsError::TrailerTail(z));
+        }
+        it.save_trailer = Some((a, b));
+    }
+    Ok(())
+}
+
+fn read_record(
+    r: &mut BitReader<'_>,
+    t: &dyn ItemLookup,
+    save: bool,
+) -> Result<ItemBits, ItemBitsError> {
+    if save {
+        let m = r.read(16)?;
+        if m != SAVE_MARKER {
+            return Err(ItemBitsError::BadMarker(m));
+        }
+    }
     let mut it = ItemBits {
         flags: r.read(32)?,
+        save,
         ..ItemBits::default()
     };
     let f = it.flags;
@@ -359,6 +466,9 @@ pub fn decode_record(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<ItemBi
         if f & hflag::EAR == 0 && t.code(it.code).is_some_and(|c| c.quest_diff) {
             it.quest_diff = Some(read_isc(r, t, 356, 0)?);
         }
+        if save {
+            read_trailer(r, &mut it)?;
+        }
         it.bits = r.pos();
         return Ok(it);
     }
@@ -370,6 +480,9 @@ pub fn decode_record(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<ItemBi
     it.code = read_code(r)?;
     let facts = t.code(it.code).ok_or(ItemBitsError::UnknownCode(it.code))?;
     it.filled = r.read(3)? as u8;
+    if save {
+        it.save_unit28 = Some(r.read(32)?);
+    }
     it.ilvl = r.read(7)? as u8;
     it.quality = r.read(4)? as u8;
     if r.read(1)? == 1 {
@@ -378,7 +491,7 @@ pub fn decode_record(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<ItemBi
     if r.read(1)? == 1 {
         it.auto_affix = Some(r.read(11)? as u16);
     }
-    let shown = f & hflag::IDENTIFIED != 0;
+    let shown = it.shown();
     let q = &mut it.quality_fields;
     match it.quality {
         1 | 3 => q.file_index = Some(r.read(3)?),
@@ -436,6 +549,9 @@ pub fn decode_record(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<ItemBi
         it.ear = Some(read_ear(r)?);
     } else if f & hflag::PERSONALIZED != 0 {
         it.name = Some(read_name(r)?);
+    }
+    if save {
+        read_trailer(r, &mut it)?;
     }
     if facts.armor {
         it.defense = Some(read_isc(r, t, 31, 0)?);
@@ -501,5 +617,7 @@ fn read_durability(
     Ok(())
 }
 
+#[cfg(test)]
+mod save_tests;
 #[cfg(test)]
 mod tests;

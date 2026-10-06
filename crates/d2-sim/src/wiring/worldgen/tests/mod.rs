@@ -66,16 +66,12 @@ pub const ISLE_MONSTER: (u32, u32) = (12, 10);
 
 // ---- seams without a provider -----------------------------------------------
 
-/// Positions (allocation places the unit), coordinate lists per room, a
-/// populated-level switch and a log of the pending calls that matter.
+/// Positions (allocation places the unit) and a log of the pending calls
+/// that matter. The DRLG data population reads come from the real act
+/// DRLG (`drlg/levels.md` §11.6).
 #[derive(Default)]
 pub struct TestPending {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
-    /// `0x0061AD50` per room.
-    pub coords: BTreeMap<RoomId, Vec<CoordRect>>,
-    /// `0x0061A1F0` answers the room's level when set.
-    pub populate: bool,
-    pub room_count: i32,
     pub log: Vec<String>,
 }
 
@@ -92,28 +88,6 @@ impl Pending for TestPending {
 }
 
 impl WorldPending for TestPending {
-    fn populated_level(&self, _: RoomId, level: i32) -> i32 {
-        if self.populate {
-            level
-        } else {
-            0
-        }
-    }
-    fn populated_room_count(&self, _: u8, _: i32) -> i32 {
-        self.room_count
-    }
-    fn coord_list(&self, room: RoomId) -> Vec<CoordRect> {
-        self.coords.get(&room).cloned().unwrap_or_default()
-    }
-    fn coord_at(&self, room: RoomId, x: i32, y: i32) -> Option<CoordRect> {
-        self.coords.get(&room)?.iter().copied().find(|c| {
-            let [l, t, r, b] = c.subtiles();
-            l <= x && x < r && t <= y && y < b
-        })
-    }
-    fn coord_index_at(&self, room: RoomId, x: i32, y: i32) -> i32 {
-        self.coord_at(room, x, y).map_or(0, |c| c.index)
-    }
     fn set_alignment(&mut self, unit: UnitId, align: u8) {
         self.log.push(format!("align {} {align}", unit.0));
     }

@@ -85,14 +85,48 @@ struct Fake {
 struct Bodies {
     /// `missile_calc` result.
     calc: i32,
-    /// Skills that exist, with (calc1, calc2, aurarange, auralen).
-    skills: BTreeMap<i32, [i32; 4]>,
+    /// Skills that exist, with (calc1, calc2, aurarange, auralen, calc4).
+    skills: BTreeMap<i32, [i32; 5]>,
     new_step: bool,
     target: Option<UnitId>,
     frames: BTreeMap<UnitId, i32>,
     dead: BTreeSet<UnitId>,
     /// `area_units` answer.
     area: Vec<UnitId>,
+    /// Raw skills columns by (skill, code): `Param(n)` = n, aura filter
+    /// 20, aura target state 21, pet type 22.
+    fields: BTreeMap<(i32, u8), i32>,
+    states_count: i32,
+    overlay_count: i32,
+    pet_types: i32,
+    max_life: BTreeMap<UnitId, i32>,
+    max_mana: BTreeMap<UnitId, i32>,
+    pets: BTreeSet<UnitId>,
+    allies: BTreeSet<UnitId>,
+    demons: BTreeSet<UnitId>,
+    undead: BTreeSet<UnitId>,
+    large: BTreeSet<UnitId>,
+    target_pos: Option<(i32, i32)>,
+    /// Line tests that hit, by (from, to).
+    walls: BTreeSet<((i32, i32), (i32, i32))>,
+    room_seed: Option<Seed>,
+    phys: (i32, i32),
+    elem_len: i32,
+    entry_param1: Option<i32>,
+    /// State lists by (unit, state) → expiry.
+    lists: BTreeMap<(UnitId, i32), i32>,
+    summon: Option<SummonClass>,
+    summoned: Option<UnitId>,
+    floor: bool,
+    mon_list: Vec<i32>,
+    spawnable: BTreeMap<i32, bool>,
+    monstats: i32,
+    modes: BTreeMap<UnitId, i32>,
+    frame_cnt1: Option<i32>,
+    corpses: Vec<UnitId>,
+    quest_open: bool,
+    accept: bool,
+    apply_ok: bool,
 }
 
 impl Fake {
@@ -377,6 +411,272 @@ impl MissileBodies for Fake {
             "areahit {} {} {} {:#x}",
             unit.0, rec.fire, rec.cold_len, rec.result
         ));
+    }
+    fn scan_units(
+        &mut self,
+        _: &Game,
+        _: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+        noaura: bool,
+    ) -> Vec<UnitId> {
+        self.log.push(format!("scan {at:?} {r} {f:#x} {noaura}"));
+        self.mb.area.clone()
+    }
+    fn skill_field(&self, skill: i32, field: SkillField) -> i32 {
+        let code = match field {
+            SkillField::Param(n) => n,
+            SkillField::AuraFilter => 20,
+            SkillField::AuraTargetState => 21,
+            SkillField::PetType => 22,
+        };
+        self.mb.fields.get(&(skill, code)).copied().unwrap_or(0)
+    }
+    fn states_count(&self) -> i32 {
+        self.mb.states_count
+    }
+    fn overlay_count(&self) -> i32 {
+        self.mb.overlay_count
+    }
+    fn pet_type_count(&self) -> i32 {
+        self.mb.pet_types
+    }
+    fn skill_phys(&mut self, _: &mut Game, _: Option<UnitId>, _: i32, _: i32) -> (i32, i32) {
+        self.mb.phys
+    }
+    fn skill_elem_len(&mut self, _: &mut Game, _: UnitId, _: i32, _: i32) -> i32 {
+        self.mb.elem_len
+    }
+    fn skill_entry_param1(&self, _: UnitId, _: i32) -> Option<i32> {
+        self.mb.entry_param1
+    }
+    fn max_life(&self, unit: UnitId) -> i32 {
+        self.mb.max_life.get(&unit).copied().unwrap_or(0)
+    }
+    fn max_mana(&self, unit: UnitId) -> i32 {
+        self.mb.max_mana.get(&unit).copied().unwrap_or(0)
+    }
+    fn overlay(&mut self, _: &mut Game, unit: UnitId, overlay: i32) {
+        self.log.push(format!("overlay {} {overlay}", unit.0));
+    }
+    fn is_large_monster(&self, unit: UnitId) -> bool {
+        self.mb.large.contains(&unit)
+    }
+    fn is_demon(&self, unit: UnitId) -> bool {
+        self.mb.demons.contains(&unit)
+    }
+    fn is_undead(&self, unit: UnitId) -> bool {
+        self.mb.undead.contains(&unit)
+    }
+    fn is_pet(&self, _: &Game, _: UnitId, unit: UnitId, _: i32) -> bool {
+        self.mb.pets.contains(&unit)
+    }
+    fn is_ally(&self, _: &Game, _: UnitId, unit: UnitId, _: i32) -> bool {
+        self.mb.allies.contains(&unit)
+    }
+    fn ally_test(&self, _: &Game, _: UnitId, unit: UnitId) -> bool {
+        self.mb.allies.contains(&unit)
+    }
+    fn accepts(&self, _: &Game, _: UnitId, _: UnitId, _: u32) -> bool {
+        self.mb.accept
+    }
+    fn target_position(&mut self, _: &Game, _: UnitId) -> Option<(i32, i32)> {
+        self.mb.target_pos
+    }
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        self.paths
+            .get(&unit)
+            .and_then(|p| p.target_point)
+            .unwrap_or((0, 0))
+    }
+    fn set_path_type(&mut self, unit: UnitId, ty: i32) {
+        self.log.push(format!("ptype {} {ty}", unit.0));
+    }
+    fn set_path_distance(&mut self, unit: UnitId, d: i32) {
+        self.log.push(format!("pdist {} {d}", unit.0));
+    }
+    fn path_teleport(&mut self, _: &mut Game, unit: UnitId, _: Option<RoomId>, x: i32, y: i32) {
+        self.log.push(format!("teleport {} {x} {y}", unit.0));
+        self.pos.insert(unit, (x, y));
+    }
+    fn refresh_room(&mut self, _: &mut Game, _: RoomId) {
+        self.log.push("refresh".into());
+    }
+    fn line_hits(&self, _: &Game, _: RoomId, from: (i32, i32), to: (i32, i32), _: u16) -> bool {
+        self.mb.walls.contains(&(from, to))
+    }
+    fn room_seed(&mut self, _: &mut Game, _: RoomId) -> Option<&mut Seed> {
+        self.mb.room_seed.as_mut()
+    }
+    fn skill_srv_do(&mut self, _: &mut Game, caster: UnitId, index: i32, skill: i32, level: i32) {
+        self.log
+            .push(format!("skilldo {} {index} {skill} {level}", caster.0));
+    }
+    fn shout_state(&mut self, _: &mut Game, unit: UnitId, _: UnitId, _: i32, _: i32) {
+        self.log.push(format!("shout {}", unit.0));
+    }
+    fn state_list_expiry(&self, unit: UnitId, s: i32) -> Option<i32> {
+        self.mb.lists.get(&(unit, s)).copied()
+    }
+    fn new_state_list(
+        &mut self,
+        _: &mut Game,
+        unit: UnitId,
+        s: i32,
+        expire: i32,
+        _: UnitId,
+    ) -> bool {
+        self.log.push(format!("newlist {} {s} {expire}", unit.0));
+        self.mb.lists.insert((unit, s), expire);
+        true
+    }
+    fn aura_fill(&mut self, _: &mut Game, unit: UnitId, s: i32, _: i32, _: i32) {
+        self.log.push(format!("aurafill {} {s}", unit.0));
+    }
+    fn mark_state_changed(&mut self, unit: UnitId, s: i32) {
+        self.log.push(format!("changed {} {s}", unit.0));
+    }
+    fn set_state_list_expiry(&mut self, unit: UnitId, s: i32, expire: i32) {
+        self.log.push(format!("expiry {} {s} {expire}", unit.0));
+        self.mb.lists.insert((unit, s), expire);
+    }
+    fn apply_state(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        unit: UnitId,
+        _: i32,
+        _: i32,
+        duration: i32,
+        s: i32,
+    ) -> bool {
+        self.log
+            .push(format!("applystate {} {s} {duration}", unit.0));
+        self.mb.apply_ok
+    }
+    fn terror(&mut self, _: &mut Game, source: UnitId, unit: UnitId, _: i32, a: i32, b: i32) {
+        self.log
+            .push(format!("terror {} {} {a} {b}", source.0, unit.0));
+    }
+    fn summon_class(&mut self, _: &mut Game, _: UnitId, _: i32, _: i32) -> SummonClass {
+        self.mb.summon.unwrap_or(SummonClass { class: -1, mode: 0 })
+    }
+    fn summon_spawn(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("summon {class} {mode} {at:?} {pet_type}"));
+        self.mb.summoned
+    }
+    fn bind_bone_wall_piece(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        _: i32,
+        _: i32,
+    ) {
+        self.log.push(format!("bind {} {}", anchor.0, piece.0));
+    }
+    fn create_portal(
+        &mut self,
+        _: &mut Game,
+        _: Option<UnitId>,
+        _: Option<RoomId>,
+        at: (i32, i32),
+        level: i32,
+        class: i32,
+    ) {
+        self.log.push(format!("portal {at:?} {level} {class}"));
+    }
+    fn unit_sound(&mut self, _: &mut Game, unit: UnitId, id: i32) {
+        self.log.push(format!("sound {} {id:#x}", unit.0));
+    }
+    fn chest_drop(&mut self, _: &mut Game, chest: UnitId) {
+        self.log.push(format!("chest {}", chest.0));
+    }
+    fn floor_drop_spot(
+        &mut self,
+        _: &Game,
+        room: RoomId,
+        at: (i32, i32),
+    ) -> Option<(RoomId, i32, i32)> {
+        self.mb.floor.then_some((room, at.0, at.1))
+    }
+    fn create_gold(&mut self, _: &mut Game, _: UnitId, _: RoomId, at: (i32, i32)) {
+        self.log.push(format!("gold {at:?}"));
+    }
+    fn unit_mode(&self, unit: UnitId) -> i32 {
+        self.mb.modes.get(&unit).copied().unwrap_or(0)
+    }
+    fn set_unit_mode(&mut self, unit: UnitId, mode: i32) {
+        self.mb.modes.insert(unit, mode);
+    }
+    fn object_frame_cnt1(&self, _: UnitId) -> Option<i32> {
+        self.mb.frame_cnt1
+    }
+    fn corpse_units(
+        &mut self,
+        _: &Game,
+        _: RoomId,
+        at: (i32, i32),
+        r: i32,
+        flags: u32,
+    ) -> Vec<UnitId> {
+        self.log.push(format!("corpses {at:?} {r} {flags:#x}"));
+        self.mb.corpses.clone()
+    }
+    fn redemption_effect(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+        last: bool,
+    ) {
+        self.log
+            .push(format!("redeem {} {skill} {level} {last}", unit.0));
+    }
+    fn level_mon_list(&self, _: &Game, _: RoomId) -> Vec<i32> {
+        self.mb.mon_list.clone()
+    }
+    fn monster_is_spawn(&self, class: i32) -> Option<bool> {
+        self.mb.spawnable.get(&class).copied()
+    }
+    fn create_monster(&mut self, _: &mut Game, _: RoomId, class: i32, at: (i32, i32)) -> bool {
+        self.log.push(format!("monster {class} {at:?}"));
+        true
+    }
+    fn monstats_count(&self) -> i32 {
+        self.mb.monstats
+    }
+    fn spawn_monster(
+        &mut self,
+        _: &mut Game,
+        _: Option<RoomId>,
+        class: i32,
+        at: (i32, i32),
+        mode: i32,
+    ) {
+        self.log.push(format!("spawn {class} {at:?} {mode}"));
+    }
+    fn rabies_poison(&mut self, _: &mut Game, _: UnitId, unit: UnitId, t: i32, _: i32, _: i32) {
+        self.log.push(format!("rabies {} {t}", unit.0));
+    }
+    fn quest_test(&self, _: &Game, id: i32) -> bool {
+        id == 36 && self.mb.quest_open
+    }
+    fn spawn_tyrael(&mut self, _: &mut Game, _: Option<RoomId>, _: UnitId) {
+        self.log.push("tyrael".into());
     }
 }
 
@@ -1006,22 +1306,20 @@ fn explosion_rows_skip_direct_damage() {
 
 // Covers: specs/missiles/missiles.md §r7-lifetime-and-expiry r5
 #[test]
-fn server_hit_stub_logged_on_expiry() {
+fn server_hit_runs_on_expiry() {
     let mut r = row();
-    // Server-hit 2: a stub (body not specified).
-    r.psrvhitfunc = 2;
+    // Server-hit 36 (missile in air, `bodies.md` §10): with no unit it
+    // creates `HitSubMissile1` (class 0 here) at the missile, observable
+    // as a second allocation.
+    r.psrvhitfunc = 36;
     r.range = 1;
     let mut w = World::new(r);
     let m = w.create(&w.params()).unwrap();
+    assert_eq!(w.fake.logged("alloc"), 1);
     w.frame();
     assert!(!w.alive(m));
-    assert_eq!(
-        w.store.unhandled,
-        [Unhandled::SrvHit {
-            index: 2,
-            missile: m
-        }]
-    );
+    assert_eq!(w.fake.logged("alloc"), 2);
+    assert!(w.store.unhandled.is_empty());
 }
 
 // Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r3, §r3-per-tick-dispatch r1
@@ -1040,25 +1338,25 @@ fn server_do_dispatch_limits() {
         assert!(w.alive(m));
         assert!(w.store.unhandled.is_empty());
     }
-    // A stub (6: body not specified) and a null entry are logged.
-    for (f, want) in [(6u16, false), (4, true)] {
+    // A body runs (36, Baal FX control `bodies-2.md` §60: frames left
+    // ≤ 100 refreshes the room); a null entry is logged.
+    for (f, null) in [(36u16, false), (4, true)] {
         let mut r = row();
         r.psrvdofunc = f;
         let mut w = World::new(r);
         let m = w.create(&w.params()).unwrap();
         w.frame();
-        let u = if want {
-            Unhandled::NullSrvDo {
+        if null {
+            let u = Unhandled::NullSrvDo {
                 index: 4,
                 missile: m,
-            }
+            };
+            assert_eq!(w.store.unhandled, [u]);
+            assert_eq!(w.fake.logged("refresh"), 0);
         } else {
-            Unhandled::SrvDo {
-                index: 6,
-                missile: m,
-            }
-        };
-        assert_eq!(w.store.unhandled, [u]);
+            assert!(w.store.unhandled.is_empty());
+            assert_eq!(w.fake.logged("refresh"), 1);
+        }
     }
 }
 
@@ -1906,9 +2204,9 @@ fn collide_kill_sets_result_bit_one() {
 fn no_unit_no_a4_skips_to_exit_unless_always_explode() {
     for (always, kill) in [(0, 1), (0, 0), (1, 1)] {
         let mut r = row();
-        // Server-hit 2: a stub (body not specified), observable in
-        // `unhandled`.
-        r.psrvhitfunc = 2;
+        // Server-hit 36 (`bodies.md` §10): with no unit it creates a
+        // class-0 missile and returns 1, observable as an allocation.
+        r.psrvhitfunc = 36;
         r.alwaysexplode = always;
         r.collidekill = kill;
         let mut w = World::new(r);
@@ -1917,7 +2215,8 @@ fn no_unit_no_a4_skips_to_exit_unless_always_explode() {
         assert_eq!(res, if kill == 1 { 2 } else { 1 });
         let ran = always == 1;
         assert_eq!(w.fake.logged("event0 None"), usize::from(ran));
-        assert_eq!(w.store.unhandled.len(), usize::from(ran));
+        assert_eq!(w.fake.logged("alloc"), 1 + usize::from(ran));
+        assert!(w.store.unhandled.is_empty());
     }
 }
 
@@ -2331,4 +2630,5 @@ fn null_table_entries_are_flagged() {
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
 
+mod ext;
 mod r9;

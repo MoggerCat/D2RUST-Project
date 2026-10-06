@@ -474,7 +474,7 @@ fn chest_vector() {
     let mut want = vec![format!("gold {}", CHEST_U.0); 7];
     want.push(format!("qdrop {} qhr  2 true", CHEST_U.0));
     want.push(format!("qdrop {} qhr  2 true", CHEST_U.0));
-    want.push(format!("treasure {} {}", CHEST_U.0, P1.0));
+    want.push(format!("treasure {} 4", CHEST_U.0));
     assert_eq!(f.log(), want);
     let q = x(&ctl);
     assert_eq!((q.drop_count, q.hearts), (2, 2));

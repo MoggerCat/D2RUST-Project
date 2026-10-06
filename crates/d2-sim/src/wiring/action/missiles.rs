@@ -510,6 +510,23 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     fn skill_exists(&self, skill: i32) -> bool {
         self.h.tables.skills.skill(skill).is_some()
     }
+    /// The raw skills columns (`missiles/bodies.md`, `bodies-2.md`).
+    fn skill_field(&self, skill: i32, field: crate::missiles::SkillField) -> i32 {
+        use crate::missiles::SkillField as F;
+        let Some(r) = self.h.tables.skills.skill(skill) else {
+            return 0;
+        };
+        match field {
+            F::Param(n) => [
+                r.param1, r.param2, r.param3, r.param4, r.param5, r.param6, r.param7, r.param8,
+            ]
+            .get(usize::from(n).wrapping_sub(1))
+            .map_or(0, |&v| v as i32),
+            F::AuraFilter => r.aurafilter as i32,
+            F::AuraTargetState => i32::from(r.auratargetstate as i16),
+            F::PetType => i32::from(r.pettype),
+        }
+    }
     fn skill_calc(
         &mut self,
         game: &mut Game,
@@ -528,6 +545,7 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
             C::Calc2 => r.calc2,
             C::AuraRange => r.aurarangecalc,
             C::AuraLen => r.auralencalc,
+            C::Calc4 => r.calc4,
         };
         let mut cv = self.combat(game);
         crate::skills::eval_skill(&mut cv, &t.skills, owner, field, skill, level)

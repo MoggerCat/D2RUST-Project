@@ -49,15 +49,19 @@ impl MazePresets for Log {
 
     fn build_map(
         &mut self,
-        _: &mut Drlg,
+        drlg: &mut Drlg,
         _: &DrlgData,
-        _: LevelIdx,
+        level: LevelIdx,
         _: MapId,
         small: bool,
         _: &[MazeLink],
-    ) -> Result<(), DrlgError> {
+    ) -> Result<Option<DrlgRoomId>, DrlgError> {
         self.small.push(small);
-        Ok(())
+        Ok(Some(super::tests::fake_room(
+            drlg,
+            level,
+            TileRect::default(),
+        )))
     }
 }
 

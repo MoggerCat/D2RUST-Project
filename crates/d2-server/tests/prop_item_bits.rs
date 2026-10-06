@@ -252,6 +252,7 @@ prop_compose! {
             main,
             sets,
             runeword_list: rw_list,
+            ..Default::default()
         }
     }
 }

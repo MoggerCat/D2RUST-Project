@@ -194,7 +194,7 @@ pub(super) fn minion_timer<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: 
     };
     for &(dx, dy) in &MINION_OFFSETS[(lo & 1) as usize..] {
         if let Some((sx, sy, sr)) = w.free_spot_at(room, x + dx, y + dy, 3, 0x3F11, 11, 100) {
-            w.spawn_object(sr, sx, sy, MINION_DUMMY);
+            w.spawn_quest_object(sr, sx, sy, MINION_DUMMY);
         }
     }
     true

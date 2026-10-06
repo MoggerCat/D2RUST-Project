@@ -2,6 +2,8 @@
 //! The item bit stream of S→C 0x9C / 0x9D (`0x006313E0`, network case:
 //! save off, children off): the header (§2), the compact record (§3) and
 //! the full record (§4) written LSB first into a 0xF4-byte buffer (§1).
+//! The same writer produces the save format ([`write_save`]: save on,
+//! children on; §5, `formats/d2s.md` §8.1 rule 2).
 //!
 //! The writer reads one resolved view of the item ([`StreamItem`]: the
 //! item data fields, the items / itemtypes facts and the stat values the
@@ -11,14 +13,24 @@
 //!
 //! Status: implemented, unverified against a live game (the spec is a
 //! draft); the ten recorded streams B1–B10 are re-encoded byte for byte
-//! in the tests. The save format (§5) is not written: the network never
-//! carries it.
+//! in the tests. The save format (§5) is tested on hand-computed
+//! synthetic vectors only.
 
+#[cfg(test)]
+mod save_tests;
 #[cfg(test)]
 mod tests;
 
 /// Buffer size of the senders (§1 rule 2, `0x0053EAE0`, `0x0053CEF0`).
 pub const BUFFER: usize = 0xF4;
+/// Capacity of the save writer ([`write_save`]): the d2s writer's file
+/// buffer of 0x2000 bytes (`formats/d2s.md` §1 rule 3). One item entry
+/// (item plus children) never exceeds the whole file, so this is an upper
+/// bound, not the space the d2s writer has left (owner: `formats/d2s.md`
+/// §8.1 rule 5).
+pub const SAVE_BUFFER: usize = 0x2000;
+/// Save-format marker "JM" (§2 rule 2).
+pub const SAVE_MARKER: u32 = 0x4D4A;
 /// List terminator (§4.6 rule 5).
 pub const TERMINATOR: u32 = 0x1FF;
 /// Prefix part's first combined index in 1.14d (§4.2, `0x00633ED0`).
@@ -173,6 +185,17 @@ pub struct StreamItem {
     pub sets: [Option<Vec<StatEntry>>; 5],
     /// The runeword list (state 171, flag 0x40).
     pub runeword_list: Option<Vec<StatEntry>>,
+    /// Save format only (§4.1 rule 7): unit +0x28, written as is in 32
+    /// bits. Its meaning is not named by the spec.
+    pub unit28: u32,
+    /// Save format only (§5 rule 2): `None` → 1 bit 0; `Some((a, b))` →
+    /// 1 bit 1, 32 bits a, 32 bits b, 32 bits 0. The values are not named
+    /// by the spec (Open question 3).
+    pub save_trailer: Option<(u32, u32)>,
+    /// Save format with children (§2 rule 5): the items of the item's own
+    /// inventory in list order, each written as a complete stream after
+    /// the item. Never on the wire.
+    pub children: Vec<StreamItem>,
 }
 
 /// The item fields the writer changes while serializing (§4.1 rule 8,
@@ -185,7 +208,7 @@ pub struct WriteBack {
 
 /// The buffer filled up (§1 rule 2): the message carries no stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("item bit stream passes the {BUFFER}-byte buffer")]
+#[error("item bit stream passes the end of its buffer")]
 pub struct Overflow;
 
 /// LSB-first bit writer (§1, `0x00410E40` / `0x00410EB0` / `0x00410E90`).
@@ -240,6 +263,12 @@ impl BitWriter {
         self.overflow
     }
 
+    /// Pads the stream to a whole byte with zero bits (a partial byte
+    /// counts as written, §1 rule 1).
+    pub fn pad_to_byte(&mut self) {
+        self.bits = self.bits.div_ceil(8) * 8;
+    }
+
     /// The whole bytes written (§1 rule 1: a partial byte counts).
     pub fn finish(self) -> Result<Vec<u8>, Overflow> {
         if self.overflow {
@@ -277,6 +306,12 @@ pub fn prefix_id(p: u16) -> u16 {
 
 /// The header flags F (§2 rules 1–2, network).
 pub fn header_flags(item: &StreamItem) -> u32 {
+    header_flags_in(item, false)
+}
+
+/// The header flags F (§2 rules 1–2); the socketed bit is cleared for an
+/// unidentified item on the network only.
+fn header_flags_in(item: &StreamItem, save: bool) -> u32 {
     let mut f = (item.flags & !hflag::INIT) | hflag::FORCED;
     if item.compact {
         f |= hflag::COMPACT;
@@ -284,7 +319,7 @@ pub fn header_flags(item: &StreamItem) -> u32 {
     if item.alt {
         f = (f & !hflag::ETHEREAL) | hflag::ALT_CODE;
     }
-    if f & hflag::IDENTIFIED == 0 {
+    if !save && f & hflag::IDENTIFIED == 0 {
         f &= !hflag::SOCKETED;
     }
     f
@@ -352,22 +387,65 @@ pub fn write(item: &StreamItem, t: &dyn IscTable) -> Result<(Vec<u8>, WriteBack)
 
 /// [`write`] on a caller's writer.
 pub fn write_into(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) -> WriteBack {
-    let mut wb = WriteBack {
-        ilvl: item.ilvl,
-        quality: item.quality,
-    };
-    let f = header_flags(item);
-    w.raw(32, f);
-    if f & hflag::COMPACT != 0 {
-        compact(w, item, f, t);
-    } else {
-        full(w, item, f, t, &mut wb);
+    write_mode(w, item, t, false)
+}
+
+/// Writes the save-format entry of `item` (save on, children on; §2 rules
+/// 2 and 5, §5; `formats/d2s.md` §8.1 rule 2): the item's own stream
+/// starting with "JM", padded to a whole byte, then each child of
+/// [`StreamItem::children`] as a complete entry of its own (recursively),
+/// each padded to a whole byte. The [`WriteBack`] is the top item's; the
+/// children's write-backs are not returned. Capacity: [`SAVE_BUFFER`].
+pub fn write_save(item: &StreamItem, t: &dyn IscTable) -> Result<(Vec<u8>, WriteBack), Overflow> {
+    let mut w = BitWriter::new(SAVE_BUFFER);
+    let wb = write_save_into(&mut w, item, t);
+    Ok((w.finish()?, wb))
+}
+
+/// [`write_save`] on a caller's writer.
+pub fn write_save_into(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) -> WriteBack {
+    let wb = write_mode(w, item, t, true);
+    w.pad_to_byte();
+    for child in &item.children {
+        write_save_into(w, child, t);
     }
     wb
 }
 
+/// One item's own stream (§2 rules 1–4), network or save format.
+fn write_mode(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable, save: bool) -> WriteBack {
+    let mut wb = WriteBack {
+        ilvl: item.ilvl,
+        quality: item.quality,
+    };
+    let f = header_flags_in(item, save);
+    if save {
+        w.raw(16, SAVE_MARKER);
+    }
+    w.raw(32, f);
+    if f & hflag::COMPACT != 0 {
+        compact(w, item, f, t, save);
+    } else {
+        full(w, item, f, t, &mut wb, save);
+    }
+    wb
+}
+
+/// Trailer (§5 rule 2, `0x00629E40`).
+fn put_trailer(w: &mut BitWriter, item: &StreamItem) {
+    match item.save_trailer {
+        None => w.raw(1, 0),
+        Some((a, b)) => {
+            w.raw(1, 1);
+            w.raw(32, a);
+            w.raw(32, b);
+            w.raw(32, 0);
+        }
+    }
+}
+
 /// §3.
-fn compact(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable) {
+fn compact(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable, save: bool) {
     w.put(10, i32::from(item.version));
     put_location(w, item);
     if f & hflag::EAR != 0 {
@@ -381,6 +459,9 @@ fn compact(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable) {
     if item.quest_diff {
         put_quest_diff(w, item, t);
     }
+    if save {
+        put_trailer(w, item);
+    }
 }
 
 fn put_quest_diff(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) {
@@ -389,7 +470,14 @@ fn put_quest_diff(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) {
 }
 
 /// §4.
-fn full(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable, wb: &mut WriteBack) {
+fn full(
+    w: &mut BitWriter,
+    item: &StreamItem,
+    f: u32,
+    t: &dyn IscTable,
+    wb: &mut WriteBack,
+    save: bool,
+) {
     use crate::items::stat;
     // 4.1 head
     w.put(10, i32::from(item.version));
@@ -405,6 +493,9 @@ fn full(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable, wb: &mut
     }
     w.raw(32, code_u32(item.code));
     w.put(3, item.filled as i32);
+    if save {
+        w.raw(32, item.unit28);
+    }
     if wb.ilvl < 1 {
         wb.ilvl = 1;
     }
@@ -424,8 +515,8 @@ fn full(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable, wb: &mut
         w.put(11, i32::from(a));
     }
 
-    // 4.3 by quality
-    let shown = f & hflag::IDENTIFIED != 0;
+    // 4.3 by quality ("shown" = save format, or identified)
+    let shown = save || f & hflag::IDENTIFIED != 0;
     let mut skip_lists = false;
     match item.quality {
         1 | 3 => w.put(3, item.file_index),
@@ -487,6 +578,9 @@ fn full(w: &mut BitWriter, item: &StreamItem, f: u32, t: &dyn IscTable, wb: &mut
         put_ear(w, item);
     } else if f & hflag::PERSONALIZED != 0 {
         put_name(w, &item.name);
+    }
+    if save {
+        put_trailer(w, item);
     }
 
     // 4.5 type-specific values

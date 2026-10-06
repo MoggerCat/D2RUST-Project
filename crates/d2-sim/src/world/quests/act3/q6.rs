@@ -324,7 +324,7 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
     x(ctl, i).gate_mode = 2;
     if let Some(victim) = args.target {
         for _ in 0..x(ctl, i).stones_to_drop {
-            if w.drop_quest_item(victim, SOULSTONE, 2, false) {
+            if w.quest_drop(victim, SOULSTONE, 2, None, false).is_some() {
                 let e = x(ctl, i);
                 e.stones_dropped += 1;
                 e.stone_dropped = true;
@@ -416,7 +416,7 @@ pub fn bridge_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Un
             1 => {
                 x(ctl, i).bridge_mode = 2;
                 w.set_object_mode(object, 2);
-                w.free_collision(object);
+                w.free_object_collision(object);
             }
             _ => {}
         }

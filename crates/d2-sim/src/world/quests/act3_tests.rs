@@ -23,7 +23,7 @@ pub(super) struct Fake3 {
     /// Level and act of non-player units (objects, monsters).
     pub(super) levels: BTreeMap<UnitId, u32>,
     pub(super) acts: BTreeMap<UnitId, u8>,
-    /// Results of `drop_quest_item` in order (empty: created).
+    /// Results of `quest_drop` in order (empty: created).
     pub(super) drops: Vec<bool>,
     pub(super) act3: bool,
     pub(super) chest_gate: bool,
@@ -169,6 +169,67 @@ pub(super) fn code(c: &[u8; 4]) -> String {
 }
 
 impl QuestWorld for Fake3 {
+    // The Act I remainder seams: the shared fake's.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster_flags(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        self.f
+            .spawn_monster_flags(room, x, y, class, mode, spread, flags)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn open_portal(
+        &mut self,
+        owner: Option<UnitId>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        level: u32,
+        class: u16,
+        exact: bool,
+    ) -> Option<UnitId> {
+        self.f.open_portal(owner, room, x, y, level, class, exact)
+    }
+    fn create_missile(
+        &mut self,
+        owner: UnitId,
+        skill: u16,
+        level: u8,
+        class: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.f.create_missile(owner, skill, level, class, x, y)
+    }
+    fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32) {
+        self.f.set_missile_target(missile, a, b)
+    }
+    fn refresh_room(&mut self, unit: UnitId) {
+        self.f.refresh_room(unit)
+    }
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: i32,
+    ) -> Option<UnitId> {
+        self.f.spawn_object(room, x, y, class, mode)
+    }
+    fn client_save_flags(&self, player: UnitId) -> Option<u16> {
+        self.f.client_save_flags(player)
+    }
+    fn set_client_save_flags(&mut self, player: UnitId, flags: u16) {
+        self.f.set_client_save_flags(player, flags)
+    }
     fn frame(&self) -> i32 {
         self.f.frame()
     }
@@ -382,17 +443,25 @@ impl QuestWorld for Fake3 {
             .unit_act(unit)
             .or_else(|| self.acts.get(&unit).copied())
     }
-    fn drop_quest_item(&mut self, unit: UnitId, c: [u8; 4], quality: u8, droppable: bool) -> bool {
+    fn quest_drop(
+        &mut self,
+        unit: UnitId,
+        c: [u8; 4],
+        quality: u8,
+        _: Option<i32>,
+        droppable: bool,
+    ) -> Option<UnitId> {
         self.f.log.push(format!(
             "qdrop {} {} {quality} {droppable}",
             unit.0,
             code(&c)
         ));
-        if self.drops.is_empty() {
+        let made = if self.drops.is_empty() {
             true
         } else {
             self.drops.remove(0)
-        }
+        };
+        made.then_some(UnitId(700))
     }
     fn has_act3(&mut self) -> bool {
         self.act3
@@ -400,13 +469,11 @@ impl QuestWorld for Fake3 {
     fn quest_chest_gate(&mut self, _: UnitId, _: UnitId) -> bool {
         self.chest_gate
     }
-    fn drop_gold_pile(&mut self, object: UnitId) {
+    fn drop_gold(&mut self, object: UnitId) {
         self.f.log.push(format!("gold {}", object.0));
     }
-    fn chest_treasure(&mut self, object: UnitId, player: UnitId) {
-        self.f
-            .log
-            .push(format!("treasure {} {}", object.0, player.0));
+    fn object_treasure(&mut self, object: UnitId, kind: u8) {
+        self.f.log.push(format!("treasure {} {kind}", object.0));
     }
     fn spawn_monster_in_room(&mut self, room: RoomId, class: u16) -> Option<UnitId> {
         self.f.log.push(format!("spawn in room {} {class}", room.0));
@@ -445,7 +512,7 @@ impl QuestWorld for Fake3 {
         self.f.log.push(format!("near {} {dist}", object.0));
         self.player_near
     }
-    fn free_collision(&mut self, object: UnitId) {
+    fn free_object_collision(&mut self, object: UnitId) {
         self.f.log.push(format!("free collision {}", object.0));
     }
     fn special_monster(&mut self, _: UnitId) -> bool {
@@ -455,13 +522,13 @@ impl QuestWorld for Fake3 {
         self.f.log.push(format!("blocked? {x} {y} {mask:#x}"));
         self.blocked.contains(&(x, y))
     }
-    fn spawn_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+    fn spawn_quest_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
         self.f
             .log
             .push(format!("spawn object {class} {x} {y} room {}", room.0));
         Some(UnitId(900))
     }
-    fn trading(&mut self, player: UnitId) -> bool {
+    fn is_trading(&mut self, player: UnitId) -> bool {
         self.trading.contains(&player)
     }
     fn weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {

@@ -18,8 +18,11 @@ pub mod draw;
 pub mod edge;
 pub mod frame;
 pub mod geom;
+pub mod layout;
 pub mod panel;
+pub mod panels;
 pub mod root;
+pub mod states;
 pub mod text;
 pub mod widget;
 

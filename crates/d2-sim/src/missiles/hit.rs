@@ -195,11 +195,23 @@ fn damage_stage<W: MissileWorld + ?Sized>(
             });
         }
     }
+    damage_tail(game, cx, m, unit, &mut dmg);
+}
+
+/// `0x005ADCD0` (§R6.1 step 3): result flags, the damage application,
+/// then target armor for a non-hireling monster.
+pub fn damage_tail<W: MissileWorld + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    m: UnitId,
+    unit: UnitId,
+    dmg: &mut Damage,
+) {
     dmg.result = result_flags(game, cx, m, unit);
     let owner = cx.owner(game, m);
     // TODO(skills spec): whether the damage application runs without an
     // owner (`0x005AD730` does nothing then) is the skills spec's.
-    cx.world.apply_damage(game, owner, m, unit, &mut dmg);
+    cx.world.apply_damage(game, owner, m, unit, dmg);
     if game
         .lists
         .unit(unit)

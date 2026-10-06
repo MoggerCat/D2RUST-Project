@@ -213,7 +213,11 @@ fn dispatch_to_all_records() {
         let chain: u8 = l.split(' ').nth(1).unwrap().parse().unwrap();
         ctl.record(chain).unwrap().act == 1
     }));
-    assert!(!f.log.is_empty());
+    // An Act II record is reached: chain 13's message 444 (any NPC) sets
+    // 14.9 (quests-act2.md §8.11); chain 1 still sees nothing.
+    ctl.quest_message(&mut f, P1, &hex("31 10000000 bc01 0000")[..9]);
+    assert!(f.flags(P1).get(14, 9));
+    assert_eq!(ctl.record(1).unwrap().state, 1);
     // No room: act = −1, every record.
     let (mut ctl, _) = control();
     let mut f = Fake::new();
@@ -458,6 +462,63 @@ impl QuestWorld for Leaving {
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.f.unhandled(chain, function)
     }
+    fn spawn_monster_flags(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        c: u16,
+        m: u8,
+        s: i32,
+        fl: u32,
+    ) -> Option<UnitId> {
+        self.f.spawn_monster_flags(r, x, y, c, m, s, fl)
+    }
+    fn open_portal(
+        &mut self,
+        o: Option<UnitId>,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        l: u32,
+        c: u16,
+        e: bool,
+    ) -> Option<UnitId> {
+        self.f.open_portal(o, r, x, y, l, c, e)
+    }
+    fn create_missile(
+        &mut self,
+        o: UnitId,
+        s: u16,
+        l: u8,
+        c: u16,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.f.create_missile(o, s, l, c, x, y)
+    }
+    fn set_missile_target(&mut self, m: UnitId, a: u32, b: u32) {
+        self.f.set_missile_target(m, a, b)
+    }
+    fn refresh_room(&mut self, u: UnitId) {
+        self.f.refresh_room(u)
+    }
+    fn spawn_object(
+        &mut self,
+        r: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        c: u16,
+        m: i32,
+    ) -> Option<UnitId> {
+        self.f.spawn_object(r, x, y, c, m)
+    }
+    fn client_save_flags(&self, p: UnitId) -> Option<u16> {
+        self.f.client_save_flags(p)
+    }
+    fn set_client_save_flags(&mut self, p: UnitId, fl: u16) {
+        self.f.set_client_save_flags(p, fl)
+    }
 }
 
 // Covers: specs/world/quests.md §4.5
@@ -472,6 +533,12 @@ fn player_leaving_with_quest_items() {
         items: vec![(UnitId(0x80), 4), (UnitId(0x81), 99)],
     };
     // Chains 1–6 have bodies (§10.4–§10.8): the chain 1–3 lists lose P1.
+    // So do the Act II chains with bodies (quests-act2.md §1.1 event 10).
+    const BODIES: [u8; 7] = [7, 8, 9, 10, 11, 12, 13];
+    ctl.record_mut(7).unwrap().extra.a2.q0.add(1);
+    for c in [8, 9, 10, 11, 12, 13] {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
@@ -498,10 +565,15 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(1).unwrap().guids.contains(1));
     assert!(!ctl.record(2).unwrap().guids.contains(1));
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
+    assert!(!ctl.record(7).unwrap().extra.a2.q0.contains(1));
+    for c in [8, 9, 10, 11, 12, 13] {
+        assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
+    }
     let mut want = Vec::new();
     for r in &ctl.records {
         if r.has_callback(event::PLAYER_LEAVES_GAME)
             && !(1..=6).contains(&r.chain)
+            && !BODIES.contains(&r.chain)
             && !(14..=20).contains(&r.chain)
         {
             want.push(format!(
@@ -519,21 +591,35 @@ fn player_leaving_with_quest_items() {
 #[test]
 fn pick_up_and_drop_reach_only_active_records() {
     let item = UnitId(0x80);
-    // Chain 9 (Act II, inactive at creation) has callback 4
-    // (`0x00599A30`, no body: the probe) and callback 5.
-    for (ev, chain, fun) in [
-        (event::ITEM_PICKED_UP, 9, "0x599a30"),
-        (event::ITEM_DROPPED, 9, "0x599b30"),
+    // Chain 9 (Act II) has callbacks 4 (`0x00599A30`: a `tr1 ` with 10.3
+    // clear sets the record status to 1) and 5 (`0x00599B30`: a `vip `
+    // clears 10.4), quests-act2.md §4.8.
+    for (ev, code) in [
+        (event::ITEM_PICKED_UP, *b"tr1 "),
+        (event::ITEM_DROPPED, *b"vip "),
     ] {
         let (mut ctl, _) = control();
         let mut f = Fake::new();
-        f.chains.insert(item, QuestChain(vec![chain]));
-        assert!(!ctl.record(chain).unwrap().active);
+        f.chains.insert(item, QuestChain(vec![9]));
+        f.item_codes.insert(item, code);
+        f.p(P1).quests.flags[0].set(10, 4);
+        // Chain 9 is active from its init (quests-act2.md §2); switch it
+        // off to test the gate.
+        ctl.record_mut(9).unwrap().active = false;
         ctl.item_event(&mut f, ev, P1, item);
         assert!(f.log.is_empty());
-        ctl.record_mut(chain).unwrap().active = true;
+        assert_eq!(ctl.record(9).unwrap().status, 13);
+        assert!(f.flags(P1).get(10, 4));
+        ctl.record_mut(9).unwrap().active = true;
         ctl.item_event(&mut f, ev, P1, item);
-        assert_eq!(f.log, [format!("unhandled {chain} {fun}")]);
+        assert!(f.log.is_empty());
+        if ev == event::ITEM_PICKED_UP {
+            assert_eq!(ctl.record(9).unwrap().status, 1);
+            assert!(f.flags(P1).get(10, 4));
+        } else {
+            assert_eq!(ctl.record(9).unwrap().status, 13);
+            assert!(!f.flags(P1).get(10, 4));
+        }
     }
 }
 
@@ -695,9 +781,6 @@ fn object_quest_functions_by_class() {
     // `act3_tests` (`lever_event`, `bridge_event`).
     for (class, want) in [
         (0xBD, "unhandled 32 0x588ca0"),
-        (0x1A, "unhandled 4 0x593290"),
-        (0x7A, "unhandled 11 0x59b710"),
-        (0x173, "unhandled 5 0x5954f0"),
         (0x178, "unhandled 24 0x5b6710"),
         (0x1CB, "unhandled 255 0x58b940"),
         (0x1CC, "unhandled 255 0x58a500"),

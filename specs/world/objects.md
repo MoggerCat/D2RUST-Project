@@ -6,7 +6,8 @@
   gave names only. No recording of an object interaction exists yet (open
   questions 1–3). Object population (`0x00552610`, objects.txt
   `PopulateFn`, objgroup) and the operate functions marked `todo` in
-  `object-functions.tsv` are not covered yet (§15).
+  `object-functions.tsv` are not covered yet (§15). Implemented 2026-10-06,
+  unverified (`d2_sim::world::objects`, `docs/handoff/impl-objects.md`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::objects` (init and operate dispatch,
   per-function behavior, object events); message layouts in `d2-proto`
@@ -27,31 +28,31 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–68 |
-| Inputs | 69–80 |
-| Outputs / state changes | 81–87 |
-| Rules | 88–89 |
-|   1. Object data and unit fields | 90–118 |
-|   2. Object control (game +0x10F0) | 119–141 |
-|   3. Creation and init dispatch (`0x0054F5D0`) | 142–166 |
-|   4. Object animation at a mode change | 167–179 |
-|   5. Init functions | 180–247 |
-|   6. Preset object classes 574–582 (`0x0054F490`) | 248–267 |
-|   7. Operate dispatch | 268–297 |
-|   8. Chests and breakables | 298–389 |
-|   9. Shrines | 390–467 |
-|   10. Doors, operate 8 (`0x00581D40`) | 468–485 |
-|   11. Wells, operate 22 (`0x005858A0`) | 486–503 |
-|   12. Portals, operate 15 (`0x00584870`) | 504–520 |
-|   13. Torch, operate 11 (`0x005843D0`) | 521–525 |
-|   14. Client messages | 526–543 |
-|   15. Not covered yet | 544–552 |
-| Constants & data dependencies | 553–588 |
-| Randomness | 589–615 |
-| Edge cases & original bugs | 616–648 |
-| Test vectors | 649–669 |
-| Provenance | 670–700 |
-| Open questions | 701–722 |
+| Summary | 58–69 |
+| Inputs | 70–81 |
+| Outputs / state changes | 82–88 |
+| Rules | 89–90 |
+|   1. Object data and unit fields | 91–119 |
+|   2. Object control (game +0x10F0) | 120–142 |
+|   3. Creation and init dispatch (`0x0054F5D0`) | 143–167 |
+|   4. Object animation at a mode change | 168–180 |
+|   5. Init functions | 181–248 |
+|   6. Preset object classes 574–582 (`0x0054F490`) | 249–268 |
+|   7. Operate dispatch | 269–298 |
+|   8. Chests and breakables | 299–390 |
+|   9. Shrines | 391–468 |
+|   10. Doors, operate 8 (`0x00581D40`) | 469–486 |
+|   11. Wells, operate 22 (`0x005858A0`) | 487–504 |
+|   12. Portals, operate 15 (`0x00584870`) | 505–521 |
+|   13. Torch, operate 11 (`0x005843D0`) | 522–526 |
+|   14. Client messages | 527–544 |
+|   15. Not covered yet | 545–553 |
+| Constants & data dependencies | 554–589 |
+| Randomness | 590–616 |
+| Edge cases & original bugs | 617–649 |
+| Test vectors | 650–670 |
+| Provenance | 671–701 |
+| Open questions | 702–723 |
 <!-- /index -->
 
 ## Summary

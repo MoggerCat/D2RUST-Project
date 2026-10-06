@@ -318,10 +318,11 @@ fn empty_list_pads_buffers() {
 // Covers: specs/client/render-pipeline.md §a9-gpu-compute-compositor, §a8-cpu-reference-compositor
 // Covers: specs/render/composition.md §3 text, §5
 // Covers: specs/render/shading.md §4 r4; specs/render/blend-modes.md §2; specs/client/render-pipeline.md §a5-blend-ops
+// Covers: specs/render/blend-modes.md §8 r1, §8 r2
 #[test]
 fn emulated_shader_matches_cpu_on_all_cases() {
     let all = cases();
-    assert_eq!(all.len(), 20);
+    assert_eq!(all.len(), 21);
     for case in &all {
         let reference = cpu(case);
         let bins = scene::bin(&case.items, &case.frames, &case.maps, case.view).unwrap();

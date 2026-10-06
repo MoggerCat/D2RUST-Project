@@ -28,11 +28,11 @@
 |   3. Typed messages and references | 176–231 |
 |   4. Run model | 232–290 |
 |   5. Comparison | 291–321 |
-|   6. Masks | 322–342 |
-| Edge cases & original bugs | 343–354 |
-| Test vectors | 355–370 |
-| Provenance | 371–380 |
-| Open questions | 381–397 |
+|   6. Masks | 322–346 |
+| Edge cases & original bugs | 347–358 |
+| Test vectors | 359–374 |
+| Provenance | 375–384 |
+| Open questions | 385–401 |
 <!-- /index -->
 
 ## Summary
@@ -335,9 +335,13 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 <!-- rows -->
 | id | bytes | why |
 |---|---|---|
+| 0x21 | 11 | not written by the builder (`tools/original-hooks.md` §6.2) |
+| 0x22 | 2, 10 | not written by the builder (`tools/original-hooks.md` §6.2) |
 | 0x2A | 3–6 | not written by the builder (`world/npc.md` §9, edge case 1) |
 | 0x50 | 13–14 | uninitialized stack in the sender (`world/quests.md` open question 5) |
 | 0x58 | 6 | not written (`world/npc.md` §8.1, edge case 10) |
+| 0x62 | 6 | not written by the builder (`tools/original-hooks.md` §6.2) |
+| 0x7E | 1–4 | only the id is written (`tools/original-hooks.md` §6.2) |
 | 0x8F | 1–end | Pong: clock values, a transport row (`sim/intents-events.md` §6 rule 3) |
 
 ## Edge cases & original bugs

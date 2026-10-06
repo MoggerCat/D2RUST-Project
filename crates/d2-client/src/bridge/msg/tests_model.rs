@@ -4,8 +4,8 @@
 
 use super::super::check::{check, Checked};
 use super::super::world::{
-    update_order, ActLoad, ClientUnit, ClientWorld, ModelInputs, MonsterClass, RoomSight, UnitKey,
-    MISSILE, MONSTER, OBJECT, PLAYER,
+    room_of_point, update_order, ActLoad, ActiveRoom, ClientUnit, ClientWorld, LevelRow,
+    ModelInputs, MonsterClass, PetRecord, RoomSight, UnitKey, MISSILE, MONSTER, OBJECT, PLAYER,
 };
 use super::support::{hex, Model};
 
@@ -399,4 +399,224 @@ fn creation_common_fields() {
     // A monster at (0, 0): {0, 666}.
     m.hex("ac 07 00 00 00 9a 00 00 00 00 00 80 0e 01");
     assert_eq!(m.unit(UnitKey::new(MONSTER, 7)).seed, Some((0, 666)));
+}
+
+const PET_SET: &str = "7a 01 07 4f 01 05 00 00 00 21 00 00 00";
+const PET_REMOVE: &str = "7a 00 07 4f 01 05 00 00 00 21 00 00 00";
+
+fn pet(pet_type: u8, pet: u32, owner: u32) -> PetRecord {
+    PetRecord {
+        class: 0x14F,
+        pet_type,
+        pet,
+        owner,
+        f1c: 100,
+        gone: false,
+        extra: None,
+    }
+}
+
+// Covers: specs/client/model.md §14 r1, §14 r2, §14 r4, §14 r5
+#[test]
+fn pet_action_sets_and_keeps_the_local_hireling() {
+    let mut m = Model::default();
+    // Empty list: −1.
+    assert_eq!(m.w.hireling_guid(Some(UnitKey::new(PLAYER, 5))), u32::MAX);
+    assert_eq!(m.w.hireling_guid(None), u32::MAX);
+    m.hex(PET_SET);
+    assert_eq!(m.w.pets, [pet(7, 0x21, 5)]);
+    // The local player is GUID 5: the remove keeps the record, gone 1.
+    m.w.local_player = Some(UnitKey::new(PLAYER, 5));
+    m.hex(PET_REMOVE);
+    assert_eq!(
+        m.w.pets,
+        [PetRecord {
+            gone: true,
+            ..pet(7, 0x21, 5)
+        }]
+    );
+    assert_eq!(m.w.hireling_guid(m.w.local_player), 0x21);
+    // Set again: the type-7 record is freed and a fresh one prepended.
+    m.hex(PET_SET);
+    assert_eq!(m.w.pets, [pet(7, 0x21, 5)]);
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/model.md §14 r2
+#[test]
+fn pet_action_list_order_update_and_remove() {
+    let mut m = Model::default();
+    // Type 3 pet 0x30 of owner 9, then type 7 pet 0x21 of owner 5.
+    m.hex("7a 01 03 10 00 09 00 00 00 30 00 00 00").hex(PET_SET);
+    assert_eq!(m.w.pets[0].pet, 0x21);
+    assert_eq!(m.w.pets[1].pet, 0x30);
+    // A set for an existing non-hireling GUID updates it in place.
+    m.w.pets[1].f1c = 7;
+    m.hex("7a 01 04 11 00 0a 00 00 00 30 00 00 00");
+    assert_eq!(
+        m.w.pets[1],
+        PetRecord {
+            class: 0x11,
+            pet_type: 4,
+            pet: 0x30,
+            owner: 10,
+            f1c: 7,
+            gone: false,
+            extra: None,
+        }
+    );
+    // No local player: the hireling's remove frees it.
+    m.hex(PET_REMOVE);
+    assert_eq!(m.w.pets.len(), 1);
+    // Remove of the other pet frees it; an unknown GUID: nothing.
+    m.hex("7a 00 00 00 00 00 00 00 00 30 00 00 00")
+        .hex("7a 00 00 00 00 00 00 00 00 99 00 00 00");
+    assert!(m.w.pets.is_empty());
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/model.md §14 r3
+#[test]
+fn assign_merc_sets_with_extra_values() {
+    let mut m = Model::default();
+    m.hex("81 07 4f 01 05 00 00 00 21 00 00 00 aa bb cc dd 11 22 33 44");
+    assert_eq!(
+        m.w.pets,
+        [PetRecord {
+            extra: Some([0xDDCC_BBAA, 0x4433_2211, 0]),
+            ..pet(7, 0x21, 5)
+        }]
+    );
+    assert_eq!(m.w.hireling_guid(Some(UnitKey::new(PLAYER, 5))), 0x21);
+    assert!(m.log.rejected.is_empty());
+}
+
+// Covers: specs/client/msg-units.md §2 r2, §2 r3
+#[test]
+fn remove_unit_keeps_the_local_hireling() {
+    let mut m = Model::default();
+    let hireling = UnitKey::new(MONSTER, 0x21);
+    m.put(hireling);
+    m.put(P1);
+    m.w.local_player = Some(P1);
+    m.hex("7a 01 07 4f 01 01 00 00 00 21 00 00 00");
+    m.hex("0a 01 21 00 00 00");
+    assert!(m.w.units.contains_key(&hireling));
+    // Another player's hireling is removed.
+    m.w.pets[0].owner = 2;
+    m.hex("0a 01 21 00 00 00");
+    assert!(!m.w.units.contains_key(&hireling));
+}
+
+/// Level 1 (act 0, BlankScreen 1) and level 2 (act 0, BlankScreen 0);
+/// level 40 is act 1.
+fn levels() -> Vec<LevelRow> {
+    let mut v = vec![LevelRow::default(); 41];
+    v[1] = LevelRow {
+        act: 0,
+        blank_screen: true,
+    };
+    v[40].act = 1;
+    v
+}
+
+fn room(x0: i32, y0: i32, w: i32, h: i32, level: u16) -> ActiveRoom {
+    ActiveRoom {
+        x0,
+        y0,
+        w,
+        h,
+        level,
+    }
+}
+
+// Covers: specs/client/model.md §12 r2
+#[test]
+fn act_lookup_first_room_containing_the_point() {
+    let rooms = [room(100, 200, 40, 40, 1), room(140, 200, 40, 40, 2)];
+    assert_eq!(room_of_point(&rooms, 139, 239), Some(&rooms[0]));
+    assert_eq!(room_of_point(&rooms, 140, 200), Some(&rooms[1]));
+    assert_eq!(room_of_point(&rooms, 180, 200), None);
+    assert_eq!(room_of_point(&rooms, 99, 200), None);
+    // List order decides between overlapping rooms.
+    let both = [room(0, 0, 10, 10, 3), room(0, 0, 10, 10, 4)];
+    assert_eq!(room_of_point(&both, 5, 5).unwrap().level, 3);
+}
+
+// Covers: specs/client/model.md §11 r1, §11 r2, §11 r3, §11 r5, §12 r3
+// Covers: specs/client/msg-units.md §3 r4, §3 r6
+#[test]
+fn join_level_comes_from_the_room_of_the_0x15_placement() {
+    use crate::world_view::{ModelFeed, NoFeed, ViewFeed};
+    let mut m = Model::default();
+    m.inputs.tables.levels = levels();
+    let feed = ModelFeed {
+        inner: NoFeed,
+        levels: Some(levels()),
+    };
+    m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
+    // 0x03 seq 142: palette act 0; u16@6 (town level 1) is not the level.
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    assert_eq!(m.w.palette_act, Some(0));
+    // The level-1 room of origin tile (928, 904) brought in sight by 0x07
+    // seq 144: sub-tiles from (4640, 4520); a 40 × 40 fixture rectangle.
+    m.w.active_rooms = Some(vec![room(4640, 4520, 40, 40, 1)]);
+    // Before 0x15: no room, no level, BlankScreen 0.
+    assert_eq!(m.w.player_level(), None);
+    assert!(!feed.blank_screen(&m.w).unwrap());
+    // 0x15 seq 154: the player at (4673, 4548), level 1, BlankScreen 1.
+    m.hex("15 00 01 00 00 00 41 12 c4 11 01");
+    assert_eq!(m.unit(P1).position, Some((4673, 4548)));
+    assert_eq!(m.w.player_level(), Some(1));
+    assert!(feed.blank_screen(&m.w).unwrap());
+    assert_eq!(m.w.palette_act, Some(0));
+    // A non-zero point in no active room: fatal 0x168, not moved.
+    m.hex("15 00 01 00 00 00 00 10 00 10 00");
+    assert_eq!(m.rejected(), [(0x15, "fatal assert 0x168".to_owned())]);
+    assert_eq!(m.unit(P1).position, Some((4673, 4548)));
+    // A unit not in S: nothing, even at a point with no room.
+    m.hex("15 00 09 00 00 00 00 10 00 10 00");
+    assert_eq!(m.log.rejected.len(), 1);
+}
+
+// Covers: specs/client/model.md §11 r5
+#[test]
+fn level_is_the_rooms_not_the_town_of_0x03() {
+    let mut m = Model::default();
+    m.inputs.tables.levels = levels();
+    m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.w.active_rooms = Some(vec![room(100, 100, 40, 40, 2)]);
+    m.hex("15 00 01 00 00 00 6e 00 6e 00 00");
+    assert_eq!(m.w.act.unwrap().town_level, 1);
+    assert_eq!(m.w.player_level(), Some(2));
+}
+
+// Covers: specs/client/model.md §11 r4
+#[test]
+fn room_change_to_another_act_switches_the_palette() {
+    let mut m = Model::default();
+    m.inputs.tables.levels = levels();
+    m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.w.active_rooms = Some(vec![
+        room(100, 100, 40, 40, 1),
+        room(140, 100, 40, 40, 2),
+        room(300, 300, 40, 40, 40),
+    ]);
+    // First placement (no old room): no switch, even into act 1.
+    m.hex("15 00 01 00 00 00 2c 01 2c 01 00");
+    assert_eq!(m.w.palette_act, Some(0));
+    // Act 1 → act 0 (level 40 → 1): switch.
+    m.w.palette_act = Some(9);
+    m.hex("15 00 01 00 00 00 6e 00 6e 00 00");
+    assert_eq!(m.w.palette_act, Some(0));
+    m.w.palette_act = Some(3);
+    // Level 1 → 2, same act: no switch.
+    m.hex("15 00 01 00 00 00 96 00 6e 00 00");
+    assert_eq!(m.w.palette_act, Some(3));
+    // Level 2 → 40: act 1.
+    m.hex("15 00 01 00 00 00 2c 01 2c 01 00");
+    assert_eq!(m.w.palette_act, Some(1));
+    assert!(m.log.rejected.is_empty());
 }

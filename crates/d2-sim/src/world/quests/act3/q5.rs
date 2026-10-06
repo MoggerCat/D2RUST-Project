@@ -306,7 +306,7 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
     if !x(ctl, i).flail_dropped {
         let mut created = 0;
         for _ in 0..x(ctl, i).flails_to_drop {
-            if w.drop_quest_item(victim, FLAIL, 7, false) {
+            if w.quest_drop(victim, FLAIL, 7, None, false).is_some() {
                 created += 1;
             }
         }
@@ -320,7 +320,7 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
     } else if !x(ctl, i).cube_dropped {
         x(ctl, i).cube_dropped = true;
         for _ in 0..x(ctl, i).cubes_to_drop {
-            w.drop_quest_item(victim, CUBE, 2, false);
+            w.quest_drop(victim, CUBE, 2, None, false);
         }
     }
     // 3. The council count.
@@ -447,7 +447,7 @@ pub fn orb_operate<W: QuestWorld>(
             }
         } else if in_act3(w, m) {
             set(w, m, 18, &[bit::REWARD_GRANTED, bit::PRIMARY_GOAL_DONE]);
-            if !w.trading(m) {
+            if !w.is_trading(m) {
                 for c in KHALIM_ITEMS {
                     w.delete_item(m, c);
                 }

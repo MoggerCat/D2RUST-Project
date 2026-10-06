@@ -678,8 +678,8 @@ fn owned_rows_are_exactly_the_registered_handlers() {
         .collect();
     let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
     assert_eq!(owned, registered);
-    // The three client model specs own 51 ids.
-    assert_eq!(owned.len(), 51);
+    // The three client model specs own 53 ids (0x7A, 0x81: model §14).
+    assert_eq!(owned.len(), 53);
     for (_, o) in &owned {
         assert!(
             [

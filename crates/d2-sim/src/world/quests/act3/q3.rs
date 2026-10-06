@@ -348,7 +348,7 @@ fn killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Even
     if !w.special_monster(victim) {
         return;
     }
-    if w.drop_quest_item(victim, GIDBINN, 2, false) {
+    if w.quest_drop(victim, GIDBINN, 2, None, false).is_some() {
         x(ctl, i).gidbinn_dropped = true;
         flag_iterate_all(ctl, w, i);
         ctl.records[i].clear_callback(event::MONSTER_KILLED);

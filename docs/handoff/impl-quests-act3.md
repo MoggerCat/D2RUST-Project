@@ -39,7 +39,7 @@ against this code).
 | Where | Change |
 |---|---|
 | `quests.rs` | `pub mod act3`; `TimerFn::Act3(act3::Timer)`; `act3::init` after `act1::init`; object event 7 of class 0x155 → `act3::bridge_event`, 0x16F → `act3::lever_event`; `object_warp` to a level ≠ 102 → `act3::durance_warp` (`0x005BCFD0`, `quests.md` §8.1) |
-| `QuestWorld` | 18 Act III seams with **default bodies** that report the function through `unhandled(0xFF, addr)` and return the neutral value (no implementor had to change): `drop_quest_item` (defaults to `drop_item_at`), `has_act3`, `quest_chest_gate`, `drop_gold_pile`, `chest_treasure`, `spawn_monster_in_room`, `spawn_monster_at_unit`, `kill_monster`, `room_covering`, `player_in_rooms`, `stairs_warp`, `player_near_object`, `free_collision`, `special_monster`, `blocked`, `spawn_object`, `trading`, `weapon_code` |
+| `QuestWorld` | 11 Act III seams with **default bodies** that report the function through `unhandled(0xFF, addr)` and return the neutral value (no implementor had to change): `has_act3`, `spawn_monster_in_room`, `spawn_monster_at_unit`, `kill_monster`, `room_covering`, `player_in_rooms`, `stairs_warp`, `player_near_object`, `special_monster`, `blocked`, `weapon_code`. After merging staging, the Act III code uses the Act II seams for the same functions: `quest_chest_gate`, `quest_drop` (level `None`), `drop_gold`, `object_treasure(object, 4)`, `spawn_quest_object`, `free_object_collision`, `is_trading` |
 | `act1.rs` | dispatch arms for chains 14–20, 28, 39 in `callback`, `active_fn`, `status_fn`, `sequence` (15–20), `run_timer`; `Extra::act3` |
 | tests | `fresh_game_entry` no longer expects chain 18's sequence function reported; `object_quest_functions_by_class` drops classes 0x155 / 0x16F (now Act III code, tested in `act3_tests`); `player_leaving_with_quest_items` expects the Act III event-10 bodies (list remove; chain 16's bare `ret`) |
 
@@ -111,7 +111,7 @@ Each is the literal reading of the spec text; a trace settles them.
 5. Missing positions (decoy / altar / Hratli dummies / wanderer without
    a room): `TODO(quests-act3 …)` + `unhandled` where the spec gives no
    form.
-6. Host providers for the 18 new `QuestWorld` seams (wired host
+6. Host providers for the 11 new `QuestWorld` seams (wired host
    `EconomyQuests` / `QuestRest`) and the callers of the §10 hooks
    (monster creation, NPC map AI, cube `qf2 `, item use `xyz `, object
    operate / init tables, the 0x64 warp check) are not wired.

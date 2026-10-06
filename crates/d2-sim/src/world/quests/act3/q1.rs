@@ -392,7 +392,7 @@ pub fn tome_operate<W: QuestWorld>(
         w.attach_sound(player, sound::REFUSED);
         return;
     }
-    if !w.drop_quest_item(object, TOME, 2, false) {
+    if w.quest_drop(object, TOME, 2, None, false).is_none() {
         return;
     }
     w.set_object_mode(object, 2);

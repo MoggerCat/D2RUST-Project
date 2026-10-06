@@ -210,7 +210,8 @@ pub enum GradientKind {
     /// Walls and roofs (lit wall and translucent wall drawers): 32 rows,
     /// `a_r = (32·c0 + r·(c3 − c0)) >> 8`.
     Wall,
-    /// RLE floor blocks: 15 rows, `a_r = (16·c0 + r·(c3 − c0)) >> 7`.
+    /// Floor blocks, RLE and isometric alike (`shading.md` §4 floors r3,
+    /// r4): 15 rows, `a_r = (16·c0 + r·(c3 − c0)) >> 7`.
     RleFloor,
 }
 
