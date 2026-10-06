@@ -159,6 +159,7 @@ mod tests {
     use super::*;
     use d2_formats::font::Glyph;
 
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
     #[test]
     fn font_size_grows_with_glyphs() {
         let mut v = b"Woo!".to_vec();

@@ -87,6 +87,7 @@ mod tests {
         lib
     }
 
+    // Covers: specs/render/map-preview.md §draw-order text, §palette-shading
     #[test]
     fn later_items_paint_over_and_zero_is_transparent() {
         let lib = lib();
@@ -138,6 +139,7 @@ mod tests {
         assert_eq!(hits.iter().map(|h| h.0).collect::<Vec<_>>(), [1, 0]);
     }
 
+    // Covers: specs/render/map-preview.md §palette-shading
     #[test]
     fn rgba_mapping() {
         let mut palette = Palette {
