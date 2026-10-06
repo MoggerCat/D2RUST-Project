@@ -4,7 +4,8 @@
 
 Cloud implementation session, 2026-10-06, task class: implementation from
 a clear spec, medium (METHODS M14). Branched from
-`claude/tender-meitner-mphas3` at `9b49081`. Spec: `specs/items/inventory.md`
+`claude/tender-meitner-mphas3` at `9b49081`, then merged with it at
+`93b37c8` (includes the d2-proto regeneration `e909c15`). Spec: `specs/items/inventory.md`
 §1–§5 (draft). Repo only (M09): every claim below holds on this branch.
 The parallel session `impl-moves` owns §6–§11 (`items::moves`).
 
@@ -18,7 +19,8 @@ are synthetic; D1–D3 are queued, §6).
   other change: the line `pub mod inventory;` in `items/mod.rs`. No
   dependency, spec, `moves`, `wiring` or `d2-server` change.
 - Tests: 33 new (32 run, 1 `#[ignore]` game-file test):
-  `cargo test -p d2-sim`: 1262 pass, 6 ignored.
+  `cargo test -p d2-sim` after the base merge: 1269 pass, 6 ignored;
+  `cargo test -p d2-proto` passes.
 - Coverage: `specs/items/inventory.md` 55 / 148 units claimed, unit tier;
   every §1–§5 unit except `§1.1` (the field table), `§1.4 r3` (cursor
   set: see Q1), `§2.4 text`, `§2.4 r5` (failed link check: Q2), `§4.3
