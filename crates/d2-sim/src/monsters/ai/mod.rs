@@ -10,6 +10,11 @@
 //! [`MonsterDispatch`].
 
 mod bodies;
+mod bodies2;
+mod bodies3;
+mod bodies4;
+mod bodies5;
+mod common;
 mod functions;
 mod npc;
 pub mod seams;
@@ -21,7 +26,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use d2_data::tables::{Levels, Monstats, Monstats2};
+use d2_data::tables::{Levels, Missiles, Monstats, Monstats2, Skills};
 
 use crate::game::Game;
 use crate::tick::timer::{TimerClass, TimerRun};
@@ -30,7 +35,8 @@ use crate::units::{UnitId, UnitType};
 
 pub use functions::{implemented, run_function, run_init, INIT_IMPLEMENTED};
 pub use seams::{
-    AiHost, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
+    AiActs, AiHost, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget,
+    PortalNpc, QuestCall,
 };
 pub use table::{AiRecord, AI_TABLE, SPECIAL_TABLE};
 pub use tactics::*;
@@ -111,6 +117,9 @@ pub struct AiControl {
     /// +0x38: the Npc map-AI nodes (§9.9); `None` = no record. Who builds
     /// it is open question 8.
     pub map_ai: Option<Vec<MapNode>>,
+    /// +0x3C: the minion spawn class (Nihlathak, `ai-bodies-5.md` §23
+    /// step 8).
+    pub spawn_class: i32,
 }
 
 /// A map-AI node (12 bytes: action, x, y; §9.9).
@@ -200,24 +209,29 @@ pub struct GameInfo {
 }
 
 /// The data tables the AI reads, typed `d2-data` records. `skill_modes`
-/// are the compiled `Sk1mode..Sk3mode` bytes per monstats row (record
-/// +0x180..+0x182; a callback column, so not in the typed record).
+/// are the compiled `Sk1mode..Sk8mode` bytes per monstats row (record
+/// +0x180..+0x187; a callback column, so not in the typed record).
+/// `skills` (`aurastate`, `auratargetstate`, `attackrank`, `Param5`) and
+/// `missiles` (`Range`) are read by the Act II–V bodies.
 #[derive(Clone, Copy)]
 pub struct AiTables<'a> {
     pub monstats: &'a [Monstats],
     pub monstats2: &'a [Monstats2],
     pub levels: &'a [Levels],
-    pub skill_modes: &'a [[u8; 4]],
+    pub skill_modes: &'a [[u8; 8]],
+    pub skills: &'a [Skills],
+    pub missiles: &'a [Missiles],
 }
 
-/// The `Sk1mode..Sk4mode` bytes of every `monstats.bin` record (+0x180;
-/// `Sk4mode` at +0x183 is read by Vampire, §9.22).
-pub fn skill_modes(t: &d2_data::bin::BinTable) -> Vec<[u8; 4]> {
+/// The `Sk1mode..Sk8mode` bytes of every `monstats.bin` record (+0x180;
+/// `Sk4mode` at +0x183 is read by Vampire, §9.22, `Sk5mode`..`Sk8mode`
+/// by the Act II–V bodies).
+pub fn skill_modes(t: &d2_data::bin::BinTable) -> Vec<[u8; 8]> {
     t.iter()
         .map(|r| {
-            r.get(0x180..0x184)
+            r.get(0x180..0x188)
                 .and_then(|b| b.try_into().ok())
-                .unwrap_or([0; 4])
+                .unwrap_or([0; 8])
         })
         .collect()
 }
@@ -329,19 +343,50 @@ impl<W: AiHost + ?Sized> Ctx<'_, W> {
             .map_or(-1, |r| i32::from(r.baseid as i16))
     }
 
-    /// Skill `n` (1…4) of the row as a signed id (< 0 = none) and its mode.
+    /// Skill `n` (1…8) of the row as a signed id (< 0 = none) and its mode.
     pub fn skill(&self, p: &TickParam, n: usize) -> (i32, u8) {
-        let Some(r) = self.tables.monstats.get(p.class) else {
+        self.class_skill(p.class as i32, n)
+    }
+
+    /// Skill `n` (1…8) of monstats row `class`, signed, and its mode;
+    /// (−1, 0) without a row.
+    pub fn class_skill(&self, class: i32, n: usize) -> (i32, u8) {
+        let Some(r) = self.monstats(class) else {
             return (-1, 0);
         };
         let s = match n {
             1 => r.skill1,
             2 => r.skill2,
             3 => r.skill3,
-            _ => r.skill4,
+            4 => r.skill4,
+            5 => r.skill5,
+            6 => r.skill6,
+            7 => r.skill7,
+            _ => r.skill8,
         };
-        let m = self.tables.skill_modes.get(p.class).map_or(0, |m| m[n - 1]);
+        let m = usize::try_from(class)
+            .ok()
+            .and_then(|c| self.tables.skill_modes.get(c))
+            .map_or(0, |m| m[(n - 1).min(7)]);
         (i32::from(s as i16), m)
+    }
+
+    /// `aipN` (1…8) of monstats row `class` for the difficulty (§4); 0
+    /// without a row.
+    pub fn class_aip(&self, class: i32, n: usize) -> i32 {
+        match usize::try_from(class) {
+            Ok(c) if c < self.tables.monstats.len() => self.aip(
+                &TickParam {
+                    target: None,
+                    distance: 0,
+                    combat: false,
+                    class: c,
+                    class2: 0,
+                },
+                n,
+            ),
+            _ => 0,
+        }
     }
 
     /// "P(v)": one step of the unit seed, `lo' % 100 < v` signed (§4).

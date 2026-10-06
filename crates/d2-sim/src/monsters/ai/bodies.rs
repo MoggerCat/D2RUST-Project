@@ -13,43 +13,53 @@ use super::{
     TickParam,
 };
 
-fn param<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, n: usize) -> i32 {
+pub(super) fn param<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, n: usize) -> i32 {
     cx.store.control(u).map_or(0, |c| c.params[n])
 }
 
-fn set_param<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId, n: usize, v: i32) {
+pub(super) fn set_param<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId, n: usize, v: i32) {
     if let Some(c) = cx.store.control_mut(u) {
         c.params[n] = v;
     }
 }
 
-fn at(t: Option<UnitId>) -> ModeTarget {
+pub(super) fn at(t: Option<UnitId>) -> ModeTarget {
     match t {
         Some(t) => ModeTarget::Unit(t),
         None => ModeTarget::Point(0, 0),
     }
 }
 
-fn a1<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, t: Option<UnitId>) {
+pub(super) fn a1<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    t: Option<UnitId>,
+) {
     mode_at(game, cx, u, mode::ATTACK1, t);
 }
 
-fn a2<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, t: Option<UnitId>) {
+pub(super) fn a2<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    t: Option<UnitId>,
+) {
     mode_at(game, cx, u, mode::ATTACK2, t);
 }
 
 /// `roll(n)` on the unit seed as a signed value.
-fn roll<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId, n: i32) -> i32 {
+pub(super) fn roll<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId, n: i32) -> i32 {
     cx.world.seed(u).roll(n) as i32
 }
 
 /// One raw step, `lo' % 100`.
-fn pct<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId) -> i32 {
+pub(super) fn pct<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId) -> i32 {
     (cx.world.seed(u).step() % 100) as i32
 }
 
 /// Skill `n` of the row in its `Sk*mode` at `target` (`0x005DEAD0`).
-fn skill_at<W: AiHost + ?Sized>(
+pub(super) fn skill_at<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
     u: UnitId,
@@ -71,7 +81,7 @@ fn life_of<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, t: Option<UnitId>) -> i32 {
 
 /// `Run` × 100 / `Velocity` − 100 (monstats +52, +50, signed,
 /// truncating), clamped to 0..120; 0 when `Velocity` ≤ 0 (§9.22, §9.27).
-fn run_bonus<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, p: &TickParam) -> i32 {
+pub(super) fn run_bonus<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, p: &TickParam) -> i32 {
     let Some(r) = cx.tables.monstats.get(p.class) else {
         return 0;
     };
@@ -84,7 +94,7 @@ fn run_bonus<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, p: &TickParam) -> i32 {
 
 /// The unit a command names by type (param 1) and GUID (param 2),
 /// `0x00552F60`.
-fn commanded_unit(game: &Game, cmd: &AiCommand) -> Option<UnitId> {
+pub(super) fn commanded_unit(game: &Game, cmd: &AiCommand) -> Option<UnitId> {
     let ty = UnitType::ALL
         .get(usize::try_from(cmd.params[1]).ok()?)
         .copied()?;

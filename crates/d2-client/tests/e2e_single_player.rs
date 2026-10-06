@@ -357,7 +357,7 @@ impl Fx {
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
-            skill_modes: vec![[0; 4]],
+            skill_modes: vec![[0; 8]],
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(

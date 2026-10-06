@@ -73,8 +73,8 @@ pub struct ActionTables {
     pub combat: CombatTables,
     /// `levels.txt` rows (AI).
     pub levels: Vec<Levels>,
-    /// `Sk1mode..Sk3mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
-    pub skill_modes: Vec<[u8; 4]>,
+    /// `Sk1mode..Sk8mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
+    pub skill_modes: Vec<[u8; 8]>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
