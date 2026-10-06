@@ -12,7 +12,7 @@ use crate::transport::*;
 
 /// Size-rule vectors (Test vectors, §2.1 rule 5 and §3.1). Generic over
 /// the seam so the same vectors run on `d2-proto` once it is wired.
-fn size_vectors(s: &impl MessageSizes) {
+pub(super) fn size_vectors(s: &impl MessageSizes) {
     let chat = |last: u8| {
         let mut m = vec![0x15, 0x01, 0x00, b'h', b'i', 0, b'b', b'o', b'b', 0, last];
         m.resize(20, 0);

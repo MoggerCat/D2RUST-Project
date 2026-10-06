@@ -11,7 +11,9 @@
   62 ids, 4,239 flushes). `d2-server` implements §1–§3 (transport,
   queues, drain, dispatch gate, size check, point/unit parse, buffers,
   flush, local delivery) against seams for `d2-proto` and `d2-sim`
-  (branch `claude/phase3-server`); the synthetic vectors pass as unit
+  (branch `claude/phase3-server`), wired to `d2-proto` and `d2-sim`
+  through adapters (`claude/phase3-wiring`; intent handlers are stubs
+  until their system specs exist); the synthetic vectors pass as unit
   tests; not yet run on a recording.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-proto` (message ids, sizes, layouts: the two TSVs);
@@ -27,22 +29,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–64 |
-| Inputs | 65–73 |
-| Outputs / state changes | 74–80 |
-| Rules | 81–82 |
-|   1. Loop order (single player) | 83–104 |
-|   2. Client → server | 105–271 |
-|   3. Server → client | 272–371 |
-|   4. d2rs mapping and scope | 372–399 |
-|   5. Machine-readable tables | 400–436 |
-|   6. Exact-match comparison | 437–474 |
-| Constants & data dependencies | 475–493 |
-| Randomness | 494–499 |
-| Edge cases & original bugs | 500–522 |
-| Test vectors | 523–568 |
-| Provenance | 569–608 |
-| Open questions | 609–632 |
+| Summary | 50–66 |
+| Inputs | 67–75 |
+| Outputs / state changes | 76–82 |
+| Rules | 83–84 |
+|   1. Loop order (single player) | 85–106 |
+|   2. Client → server | 107–273 |
+|   3. Server → client | 274–373 |
+|   4. d2rs mapping and scope | 374–401 |
+|   5. Machine-readable tables | 402–438 |
+|   6. Exact-match comparison | 439–476 |
+| Constants & data dependencies | 477–495 |
+| Randomness | 496–501 |
+| Edge cases & original bugs | 502–524 |
+| Test vectors | 525–570 |
+| Provenance | 571–610 |
+| Open questions | 611–634 |
 <!-- /index -->
 
 ## Summary

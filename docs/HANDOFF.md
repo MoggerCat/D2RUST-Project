@@ -13,7 +13,7 @@ rather than restating them.
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
-| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented against seams (unwired, unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 34 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
+| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
@@ -49,25 +49,31 @@ rather than restating them.
    (generation/quality/affixes/properties), treasure, combat + skill
    levels, DRLG, missiles + monster AI, quests/waypoints/cube. Draft
    specs stay unverified until their §5 checks pass.
-5. **Wire the `d2-server` seams** (implementation; all three branches are merged):
-   `d2-server` reaches other crates only through
-   `crates/d2-server/src/seams.rs`. Public signatures to implement:
-
-   | Seam | Signature | Provider |
-   |---|---|---|
-   | `MessageSizes` | `client_size(&self, msg: &[u8]) -> Result<usize, SizeError>` (ids 0x00..=0x70; 0xFF and 0x71..=0xFE are handled by the classifier), `server_size(&self, msg: &[u8]) -> Result<usize, SizeError>` (ids ≥ 0xB5 → `Invalid`); `SizeError::{Invalid, Incomplete}` | `d2-proto` (TSV size rules) |
-   | `Intents` | `player(&self, ClientId) -> PlayerLookup`, `frame(&self) -> i32`, `point_state(&self, ClientId) -> Option<PointState>`, `set_point_accept(&mut self, ClientId, i32)`, `queue_resync(&mut self, ClientId, &mut dyn MessageSink)` (builds S→C 0x15), `unit_target(&self, ClientId, u32, u32) -> UnitTarget`, `handle(&mut self, ClientId, &[u8], usize, &mut dyn MessageSink) -> ResultCode` (kind `handler` ids only; owes the skill `pierce_idx` += 1), `clients(&self) -> Vec<ClientId>` (client list order, `unit-order.md` §7) | `d2-sim` |
-   | `Tick` | `tick(&mut self, &mut dyn MessageSink)` | `d2-sim::tick` |
-   | `SessionHandler` | `system_message(&mut self, ClientId, &[u8], usize, &mut dyn MessageSink)` | `d2-server` session code (Phase 5) |
-   | `Clock` | `now_ms(&mut self) -> u32` | `host::SystemClock`; tests a manual clock |
-   | `MessageSink` (implemented by `buffers::ClientBuffers`) | `queue(&mut self, ClientId, &[u8]) -> Result<(), QueueError>` | used by `d2-sim` handlers and tick |
-
-   `d2-sim` may not depend on `d2-server` (depcheck), so the adapter
-   implementing `Intents`/`Tick` and taking `&mut dyn MessageSink` lives
-   in `d2-server` (or `d2-sim` exposes byte-level hooks the adapter
-   calls). Then run the size vectors of
-   `crates/d2-server/src/tests/messages.rs` (`size_vectors`, generic over
-   the seam) on the `d2-proto` implementation.
+5. **Wire the `d2-server` seams**: done on `claude/phase3-wiring`
+   (2026-10-06, cloud). `crates/d2-server/src/adapters/`: `ProtoSizes`
+   (`MessageSizes` on `d2_proto::transport::{client_size,
+   server_size}`), `SimGame<D: EventDispatch>` (`Intents` + `Tick` on
+   `d2_sim::game::Game`; `tick` runs `d2_sim::tick::tick` with every
+   `TickHooks` default and timer events to `D`; `clients()` is
+   `UnitLists::clients` mapped to transport ids; `join`/`leave` map
+   transport ids to sim client records). Fields no written spec puts in
+   `d2-sim` (unit mode, state 54, player data +0x168, positions, item
+   owners, unit acts) are staged by the caller (`PlayerFields`,
+   `UnitFacts`); every intent handler is a stub returning 0 and logging
+   (`SimGame::unhandled`); the skill `pierce_idx` += 1 waits for the
+   stats spec; `queue_resync` logs (`SimGame::resyncs`) and queues
+   nothing because S→C 0x15 has no layout (§7 question 8). Each moves
+   into `d2-sim` with its spec (units, path, items, stats).
+   Changes outside `d2-server`: none (d2-sim and d2-proto untouched).
+   Seam change inside `d2-server`: `SizeError::Negative(i32)` and
+   `transport::Classified::NegativeSize(i32)` (a negative chat size is
+   not queued and not called incomplete; §7 question 6); the test fake
+   `TsvSizes` returns `Invalid` for a rule giving 0, as `d2-proto` does.
+6. **Next for `d2-server`** (implementation, after the unit specs): move
+   the staged fields into `d2-sim`, give `TickHooks` a way to send
+   messages (the adapter's `tick` has the sink; the hooks don't), and
+   replace handler stubs per system spec. The host-schedule vectors of
+   `tick.md` §1 are covered by `tests/host.rs`.
 
 ## 3. Code map
 
@@ -98,12 +104,13 @@ rather than restating them.
 | `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
 | `crates/d2-proto/src/{schema,transport,wire}.rs` | message descriptors and size rules; size lookup per direction, C→S classifier, S→C buffer split; LE reads/writes, `FixedMessage` | `sim/intents-events.md` §2–3 |
 | `crates/d2-proto/src/{tsv,codegen}.rs`, `generated.rs` | strict TSV parser + TSV-vs-code check (`tsv::check`); generator; generated `CLIENT_MESSAGES` / `SERVER_MESSAGES` and typed `client::*` / `server::*` (don't edit; `data-tool gen-proto`) | `sim/intents-events.md` §5 |
-| `crates/d2-server/src/seams.rs` | the traits `d2-server` needs from `d2-proto` / `d2-sim` / session code (§2 step 3) | `sim/intents-events.md` |
+| `crates/d2-server/src/seams.rs` | the traits `d2-server` needs from `d2-proto` / `d2-sim` / session code (§2 step 4) | `sim/intents-events.md` |
+| `crates/d2-server/src/adapters/{sizes,sim}.rs` | the seams on the real crates: `ProtoSizes` (`d2-proto` size lookup), `SimGame` (`Intents` + `Tick` on `d2_sim::game::Game`; staged `PlayerFields` / `UnitFacts`; stub handlers) | `sim/intents-events.md` §2–§4, `sim/tick.md` §3, `sim/unit-order.md` §7 |
 | `crates/d2-server/src/transport.rs` | client duplicate filter, classifier, three server queues, drain (truncating copy) | `sim/intents-events.md` §2.1 |
 | `crates/d2-server/src/dispatch.rs` | game message entry, dispatcher, gate, stubs, exact size, point/unit parse, chat check, 0x3C/0x51 decode | `sim/intents-events.md` §2.2–2.4 |
 | `crates/d2-server/src/buffers.rs` | per-client 0x200-byte buffers, local delivery split, receive lists | `sim/intents-events.md` §3 |
 | `crates/d2-server/src/host.rs` | tick driver, `Host::frame` (drain → tick → flush), flush, injectable `Clock` | `sim/tick.md` §1, §8; `sim/intents-events.md` §1 |
-| `crates/d2-server/src/tests/` | vectors; `fakes.rs`: TSV-driven size fake, fake game | |
+| `crates/d2-server/src/tests/` | vectors; `fakes.rs`: TSV-driven size fake, fake game; `adapters.rs`: the adapters, fake agreement, end-to-end host frame | |
 | `d2-proto`, `d2-net`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
 | `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set; `gen-tables`: regenerate typed structs; `gen-proto`: regenerate `d2-proto`'s message tables from the TSVs; `dump-compare`: fix-ups vs a 1.14d memory dump; `patch check/render/diff`: mod stacks | `data/field-types.md` §6.7, `data/fixups.md`, `data/runtime-maps.md`, `data/patch-layers.md` §10 |
@@ -271,10 +278,16 @@ Carried-over open questions not yet in a spec's list:
    byte, e.g. `15 01 00 'hi' 00 'bob' 00 80` → −117). What the
    classifier `0x0052B100` does with a negative size is not in the spec;
    `d2-proto` returns `Size::Negative` / `Classified::NegativeSize`
-   instead of guessing.
+   instead of guessing; `d2-server` carries it through the seam
+   (`SizeError::Negative`, `Classified::NegativeSize`: not queued).
 7. S→C buffer split (§3.3) when a message's size runs past the buffer's
    end: not in the spec; `split_server_buffer` returns an error (buffers
    hold whole messages, §3.2 rule 2).
+8. S→C 0x15 (ReassignPlayer, 11 bytes) has no `layout` in
+   `server-messages.tsv`, so the point parser's resync (§2.4 rule 3)
+   cannot be built; `SimGame::queue_resync` logs the request instead
+   (from `claude/phase3-wiring`). A spec session should read the sender
+   `0x0053BC10` and fill the layout.
 
 From the tick-core implementation (`claude/phase3-tick`; each has a
 `TODO` in code naming it):

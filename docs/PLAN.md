@@ -21,6 +21,7 @@ behaviors the engine reproduces exactly.
 | GPU correctness | CPU reference renderer + byte-exact GPU comparison (`d2-client verify`) | Headless offscreen render at 1:1. Exactness requires: R8Uint indices + sRGB palette via `textureLoad`, sRGB target, `Msaa::Off`, `Tonemapping::None`, quads on pixel boundaries. A capture is judged only once identical to the previous one (stable render), with a capped number of retries. |
 | Map draw rules (1b) | `WALL_BASE` 80, hidden cells skipped, first-match tiles | Wall base and hidden rule decided from evidence (renders, probes); see `specs/render/map-preview.md`. |
 | `d2-proto` message tables | Generated from `specs/sim/*-messages.tsv` by `data-tool gen-proto` into `crates/d2-proto/src/generated.rs` (METHODS M17, same pattern as `gen-tables`) | Strict TSV parser (M07); tests: staleness, TSV-vs-code with a perturbation test (M08). Typed structs only for fixed sizes with fixed-field layouts; variable messages (chat, warden, save chunks) keep descriptors only. 2026-10-06. |
+| `d2-server` seam adapters | Adapters in `d2-server` (`adapters/`), not in `d2-sim` | `d2-sim` may not depend on `d2-server` (depcheck). Fields the seams read that no written spec puts in `d2-sim` (unit mode, state 54, player data, positions, owners, acts) are staged by the caller (`PlayerFields`, `UnitFacts`), never defaulted; they move into `d2-sim` with their specs. Unwritten intent handlers return 0 and record the intent. A negative C→S chat size stays its own result through the seam (`SizeError::Negative`, `Classified::NegativeSize`), as in `d2-proto`. 2026-10-06. |
 | Reference sources | `../refs/<project>/`, outside the repo | Spec sessions only. GPL projects are read only. |
 | Language | Rust | Toolchain pinned in `rust-toolchain.toml`. |
 | Fidelity scope | Exact match everywhere, no "close enough" tier (`CLAUDE.md` rule 10) | Decided 2026-10-05. No boundary between "must be exact" and "may be approximate" can be drawn reliably, and one slipped area costs more debugging than loosening saves. Each area defines its comparison (bytes, pixels, decoded samples, ticks); unchecked features stay "unverified". |
@@ -168,7 +169,12 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       the two TSVs (`data-tool gen-proto`), size lookup, classifier, S→C
       split, typed fixed layouts. `d2-server` local transport and host loop (queues, drain, gate, size
       check, point/unit parse, buffers, flush, delivery, tick driver) done
-      against seams (34 unit tests); wiring to `d2-proto` / `d2-sim` pending.*
+      against seams (34 unit tests). Seams wired 2026-10-06
+      (`claude/phase3-wiring`): `d2-server::adapters::ProtoSizes` on
+      `d2-proto`, `SimGame` on `d2-sim::game::Game` / `tick`; size vectors
+      and a TSV-fake agreement check run on `d2-proto`; one single-player
+      host frame runs end to end. Intent handlers are stubs until their
+      system specs exist; S→C 0x15 (resync) has no layout yet.*
 - [ ] Units, stats, stat lists, modifiers. *Specs written (2026-10-06,
       branch `claude/phase3-units`): `specs/sim/units.md` (+ TSVs; per-kind
       event rules 0 errors on the three recordings, `check_units.py`),

@@ -4,7 +4,7 @@
 
 use std::collections::VecDeque;
 
-use crate::seams::{ClientId, MessageSizes};
+use crate::seams::{ClientId, MessageSizes, SizeError};
 
 /// Largest message the transport accepts (spec Constants: 0x204).
 pub const MAX_MESSAGE: usize = 0x204;
@@ -41,6 +41,9 @@ pub enum Classified {
     Incomplete,
     /// Result 4: invalid id (0x71..=0xFE, or 0xFF with the gate closed).
     Invalid,
+    /// The chat size rule came out negative ([`crate::seams::SizeError::Negative`]):
+    /// the original's result is not in the spec; not queued.
+    NegativeSize(i32),
 }
 
 /// A send the original would fail with a fatal assert.
@@ -68,6 +71,7 @@ pub fn classify(sizes: &impl MessageSizes, msg: &[u8], admin_gate: bool) -> Clas
     };
     match rule {
         Ok(n) if n != 0 && n <= MAX_MESSAGE && n <= msg.len() => {}
+        Err(SizeError::Negative(n)) => return Classified::NegativeSize(n),
         _ => return Classified::Incomplete,
     }
     match id {
