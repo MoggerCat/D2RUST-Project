@@ -15,9 +15,9 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 13	0x005AA8B0	MISSMODE_SrvHit13_GlacialSpike_HellMeteorDown	3	glacialspike(96) monglacialspike(271) hellmeteordown(336)	sHitPar1;sHitPar2 (or skill aurarangecalc/auralencalc)	element roll then area damage draws	single-element roll with element length sHitPar2, area damage radius sHitPar1; always returns 1 (R9.6)	spec'd-here
 14	0x005AABB0	MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMeteor	4	meteorcenter(101) vampiremeteorcenter(133) catapult meteor ball(422) royalstrikemeteor(563)	sHitPar1;sHitPar2;HitSubMissile1;skill Param3-4	damage rolls (missile seed)	area damage radius sHitPar1 (<=0: aurarangecalc); 18-point scatter of HitSubMissile1, step sHitPar2, range skill Param3+(lvl-1)*Param4; returns 1 (bodies.md §9)	spec'd-here
 15	0x005AAD40	MISSMODE_SrvHit15_SpiderGooLay	1	spidergoolay(143)	HitSubMissile1	-	creates HitSubMissile1 in place	D2MOO-only
-16	0x005AAE10	MISSMODE_SrvHit16_SpiderGoo_VinesTrail_VinesWither	3	spidergoo(146) vines trail(472) vines wither(473)	- (skill calcs)	-	applies the skill state/curse to the unit	D2MOO-only
+16	0x005AAE10	MISSMODE_SrvHit16_SpiderGoo_VinesTrail_VinesWither	3	spidergoo(146) vines trail(472) vines wither(473)	- (skill calcs)	none	with a unit: auratargetstate list for max(calc4,5) frames (first contact without its aurastat values); returns 0; no unit: 0 (bodies.md §12)	spec'd-here
 17	0x005AAFB0	MISSMODE_SrvHit17_Howl	1	howl(148)	- (skill params)	-	makes the hit monster flee (Howl)	D2MOO-only
-18	0x005AB0B0	MISSMODE_SrvHit18_Shout_BattleCommand_BattleOrders	3	shout(149) battlecommand(236) battleorders(237)	-	-	applies warcry stats to the unit	D2MOO-only
+18	0x005AB0B0	MISSMODE_SrvHit18_Shout_BattleCommand_BattleOrders	3	shout(149) battlecommand(236) battleorders(237)	-	none	ally unit: shout_state 0x005D8290 (skills/bodies.md §6.8); returns 0 (bodies.md §13)	spec'd-here
 19	0x005AB110	MISSMODE_SrvHit19_FingerMageSpider	1	fingermagespider(177)	- (skill calcs)	-	applies the skill effect on hit	D2MOO-only
 20	0x005AB370	MISSMODE_SrvHit20_LightningFury	1	lightningfury(206)	sHitPar1;sHitPar2;HitSubMissile1	-	fires HitSubMissile1 bolts at nearby targets	D2MOO-only
 21	0x005AB500	MISSMODE_SrvHit21_BattleCry	1	battlecry(219)	- (skill calcs)	-	applies the Battle Cry curse	D2MOO-only
@@ -25,8 +25,8 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 23	0x005ACFC0	MISSMODE_SrvHit23_Unused	0	-	sHitPar1	-	no live row	D2MOO-only
 24	0x005A9BF0	MISSMODE_SrvHit24_PantherPotOrange	1	pantherpotorange(238)	sHitPar1	damage rolls	area damage radius sHitPar1	D2MOO-only
 25	0x005AB820	MISSMODE_SrvHit25_PantherPotGreen	1	pantherpotgreen(239)	sHitPar1;HitSubMissile1	-	ring of HitSubMissile1	D2MOO-only
-26	0x005AB8D0	MISSMODE_SrvHit26_GrimWardStart	3	grimwardsmallstart(249) grimwardmediumstart(252) grimwardlargestart(255)	sHitPar1;HitSubMissile1	-	creates the grim ward HitSubMissile1	D2MOO-only
-27	0x005ABA00	MISSMODE_SrvHit27_GrimWard	3	grimwardsmall(250) grimwardmedium(253) grimwardlarge(256)	-	-	no effect (returns a constant)	D2MOO-only
+26	0x005AB8D0	MISSMODE_SrvHit26_GrimWardStart	3	grimwardsmallstart(249) grimwardmediumstart(252) grimwardlargestart(255)	sHitPar1;HitSubMissile1;skill calc1	none	creates HitSubMissile1 at the missile with range sHitPar1 or max(calc1,5); returns 1 (bodies.md §14)	spec'd-here
+27	0x005ABA00	MISSMODE_SrvHit27_GrimWard	3	grimwardsmall(250) grimwardmedium(253) grimwardlarge(256)	-	none	returns 1 (bodies.md §15)	spec'd-here
 28	0x005ABA10	MISSMODE_SrvHit28_GrimWardScare	1	grimwardscare(259)	- (skill params)	-	scares the hit monster	D2MOO-only
 29	0x005ABB00	MISSMODE_SrvHit29_FrozenOrb	1	frozenorb(260)	sHitPar1;HitSubMissile1	-	final nova HitSubMissile1 burst	D2MOO-only
 30	-	-	0	-	-	-	null entry	spec'd-here
@@ -51,7 +51,7 @@ index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
 49	-	-	0	-	-	-	null entry	spec'd-here
 50	0x005AC800	MISSMODE_SrvHit50_PlagueVinesTrail	1	plague vines trail(475)	sHitPar1	-	applies the vine effect	D2MOO-only
 51	0x005AC870	MISSMODE_SrvHit51_VolcanoDebris	1	volcano debris 2(481)	HitSubMissile1-3	-	creates debris HitSubMissiles	D2MOO-only
-52	0x005AC940	MISSMODE_SrvHit52_BladeFury	3	bladefury1(505) bladefury2(507) bladefury3(509)	sHitPar1;HitSubMissile1	-	creates HitSubMissile1	D2MOO-only
+52	0x005AC940	MISSMODE_SrvHit52_BladeFury	3	bladefury1(505) bladefury2(507) bladefury3(509)	sHitPar1;HitSubMissile1	none	8-direction ring (step sHitPar1) of class-0 missiles (class never set; HitSubMissile1 only tested), offset stored in data +0x28/+0x2C; returns 1 (bodies.md §16)	spec'd-here
 53	0x005ACA50	MISSMODE_SrvHit53_RabiesContagion	1	rabiescontagion(516)	-	-	spreads rabies to the unit	D2MOO-only
 54	0x005ACAF0	MISSMODE_SrvHit54_BaalSpawnMonsters	1	baal spawn monsters(550)	-	-	spawns monsters (Baal)	D2MOO-only
 55	0x005ACB60	MISSMODE_SrvHit55_Baalnferno	1	baal inferno(554)	sHitPar1	-	Baal inferno effect	D2MOO-only

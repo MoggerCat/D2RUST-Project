@@ -20,27 +20,32 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–65 |
-| Inputs | 66–73 |
-| Outputs / state changes | 74–78 |
-| Rules | 79–80 |
-|   1. Server-do 17 Cairn Stones `0x005AF240` | 81–100 |
-|   2. Server-do 28 Volcano `0x005AFB80` | 101–123 |
-|   3. Server-do 34 Baal taunt control `0x005B04A0` | 124–146 |
-|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 147–167 |
-|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 168–182 |
-|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 183–220 |
-|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 221–238 |
-|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 239–269 |
-|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 270–311 |
-|   10. Server-hit 36 missile in air `0x005ABF70` | 312–328 |
-|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 329–371 |
-| Constants & data dependencies | 372–402 |
-| Randomness | 403–416 |
-| Edge cases & original bugs | 417–431 |
-| Test vectors | 432–447 |
-| Provenance | 448–468 |
-| Open questions | 469–479 |
+| Summary | 51–70 |
+| Inputs | 71–78 |
+| Outputs / state changes | 79–83 |
+| Rules | 84–85 |
+|   1. Server-do 17 Cairn Stones `0x005AF240` | 86–105 |
+|   2. Server-do 28 Volcano `0x005AFB80` | 106–128 |
+|   3. Server-do 34 Baal taunt control `0x005B04A0` | 129–151 |
+|   4. Server-do 35 Royal Strike chaos ice `0x005B0640` | 152–172 |
+|   5. Server-hit 58 Baal taunt lightning control `0x005ACDF0` | 173–187 |
+|   6. Server-hit 2 Plague Javelin, gas potions `0x005A9D80` | 188–225 |
+|   7. Server-do 6 Fire Wall maker, Molten Boulder `0x005AE680` | 226–243 |
+|   8. Server-hit 3 potions, bomb on ground `0x005A9F90` and server-hit 44 Exploding / Ice Javelin `0x005A9E10` | 244–274 |
+|   9. Server-hit 14 Meteor center, catapult meteor, royal strike meteor `0x005AABB0` | 275–316 |
+|   10. Server-hit 36 missile in air `0x005ABF70` | 317–333 |
+|   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 334–376 |
+|   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 377–405 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 406–420 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 421–435 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 436–455 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 456–474 |
+| Constants & data dependencies | 475–509 |
+| Randomness | 510–523 |
+| Edge cases & original bugs | 524–542 |
+| Test vectors | 543–561 |
+| Provenance | 562–585 |
+| Open questions | 586–599 |
 <!-- /index -->
 
 ## Summary
@@ -369,6 +374,104 @@ re-targeted once (below).
 The spirit lives a second full lifetime after its first expiry, then
 dies at the second (s bit 2 set → step 2 returns 1). No draws.
 
+### 12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10`
+
+Rows: spidergoo (146), vines trail (472), vines wither (473; no
+`CollideType`, so only its expiry runs this). No missile column is
+read; the skill k is the one stored at creation. F = game frame (game
++0xA8).
+
+1. k = missile skill, L = level. k invalid → return 1. O = owner; none
+   → return 1.
+2. No unit → return 0.
+3. s = k.`auratargetstate` (+0x82, i16); s < 0 or ≥ states count (data
+   tables +0xC4) → return 1.
+4. len = max(`eval(O, k.calc4, k, L)`, 5).
+5. Lst = the unit's list of s (`0x006256B0(unit, s)`).
+6. Lst none: alloc (game pool +0x1C, flags 2, expiry F + len, O type,
+   O GUID) (`0x006251F0`); failure → return 1. Set state id s, remove
+   callback `0x0056E900`, attach to the unit (`0x00626E10(unit, new,
+   1)`), state s on (`0x00639DB0(unit, s, 1)`). **Lst stays none.**
+7. `aura_fill(unit, Lst, k record, k, L)` (`skills/bodies.md` §2.6;
+   formulas evaluated on the hit unit; nothing when Lst is none).
+8. Mark s changed on the unit (`0x00639E30(unit, s, 1)`).
+9. Lst expiry := F + len (`0x006260B0`; nothing when none).
+10. Timer 12 at F + len on the unit (`0x005417D0(game, unit, 12, F +
+    len, 0, 0)`).
+11. Return 0 (no damage stage, no exit: the goo stays).
+
+So the first contact puts the state on without its `aurastat` values;
+a later contact, finding the list, fills them and pushes the expiry.
+
+### 13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0`
+
+Rows: shout (149), battlecommand (236), battleorders (237).
+
+1. O = owner; none → return 1.
+2. Unit given and the ally test `0x00554DE0(game, O, unit)` passes
+   (`skills/bodies.md` §2.11 flag 0x10000) → `shout_state(game, unit, O,
+   skill, level)` (`0x005D8290`, `skills/bodies.md` §6.8).
+3. Return 0.
+
+Result 0: the missile flies on through every unit (`CollideFriend` 1 on
+all three). shout has no `LastCollide`, so a unit standing in its path
+is met on every step; battlecommand and battleorders (`LastCollide`,
+`NextHit`, `NextDelay` 4) skip the unit just met (`missiles.md` §R5).
+
+### 14. Server-hit 26 Grim Ward start `0x005AB8D0`
+
+Rows: grimwardsmallstart (249), grimwardmediumstart (252),
+grimwardlargestart (255); `sHitPar1` 0; `HitSubMissile1` grimwardsmall,
+grimwardmedium, grimwardlarge.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. k = missile skill, L = level; k invalid → return 1.
+3. r = `sHitPar1`; r ≤ 0 → r = max(`eval(O, k.calc1, k, L)`, 5).
+4. Zeroed record: flags 0x8001 (position given, range given); owner O;
+   class `HitSubMissile1`; range r; skill k, level L; start = target =
+   the missile's position. Create; result ignored.
+5. Return 1.
+
+### 15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00`
+
+Rows: grimwardsmall (250), grimwardmedium (253), grimwardlarge (256);
+`Param1` 6, `Param2` 30.
+
+Server-do 14:
+
+1. Missile none or no record → return 2.
+2. n = max(`Param1`, 1). Elapsed mod n ≠ 0 (signed) → return flight.
+3. k = skill, L = level; k ≤ 0 or L ≤ 0 → return 2.
+4. Skill server-do `Param2` with the **missile as the caster**:
+   `0x0056D810(game, missile, Param2, k, L)` calls entry `Param2` of
+   the skill server-do table `0x007322B0` (`skills/use.md`; index ≤ 190
+   unsigned and entry non-null, else nothing) as (game, missile, k, L);
+   its result is ignored. Live: entry 30, Curse (`skills/bodies.md`
+   §4.4), every 6 frames.
+5. Return flight.
+
+Server-hit 27 returns 1 and does nothing else.
+
+### 16. Server-hit 52 Blade Fury `0x005AC940`
+
+Rows: bladefury1 (505), bladefury2 (507), bladefury3 (509); `sHitPar1`
+1; `HitSubMissile1` bladefragment1–3.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. Zeroed record: flags 2 (target relative; start = the origin's
+   position); owner O; origin = the missile; skill, level of the
+   missile. **The class field is never written: the created class is 0
+   (arrow)**; `HitSubMissile1` is only tested.
+3. s = max(`sHitPar1`, 1). For i = 0, s, 2s, … while i < 8: target
+   offset (BX[i], BY[i]); create; created → its data +0x28 := BX[i],
+   data +0x2C := BY[i] (`0x0064A710`, `0x0064A760`).
+4. Return 1.
+
+BX (`0x006E2A58`) = 16, 16, 0, −16, −16, −16, 0, 16; BY (`0x006E2A38`) =
+0, 16, 16, 16, 0, −16, −16, −16: eight directions, 16 sub-tiles out.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -384,6 +487,10 @@ dies at the second (s bit 2 set → step 2 returns 1). No draws.
 | plague ring velocity | created row `Param1` / `Param2` << 7, flag 4 | `0x005A9370` |
 | damage record | 0x70 bytes, hit flags +0x00, result flags +0x04 | `0x005A9E10`, `0x005AABB0` |
 | bone spirit re-aim | `Range` + `LevRange` × (L − 1); rebuild when d < 25 | `0x005AA460` |
+| goo state length | max(`calc4`, 5) frames | `0x005AAE10` |
+| grim ward range | `sHitPar1`, else max(`calc1`, 5) | `0x005AB8D0` |
+| skill server-do table | `0x007322B0`, index ≤ 190 | `0x0056D810` |
+| blade fury BX / BY | 8 entries each, ±16 (§16) | `0x006E2A58` / `0x006E2A38` |
 
 Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 `pSrvHitFunc` cells holding that index; royalstrikechainlightning's
@@ -395,7 +502,7 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 |---|---|
 | 6 | hit 2 (43) §6 |
 | 4 | hit 3 (44) §8, do 6 (68) §7, hit 14 (101) §9, hit 36 (385) §10 |
-| 3 | hit 10 (86) §11, hit 16 (146), hit 18 (149), hit 26 (249), do 14 (250), hit 27 (250), hit 52 (505) |
+| 3 | hit 10 (86) §11, hit 16 (146) §12, hit 18 (149) §13, hit 26 (249) §14, do 14 (250) §15, hit 27 (250) §15, hit 52 (505) §16 |
 | 2 | hit 7 (55), hit 44 (429) §8, do 22 (431), hit 45 (431), do 23 (441), do 26 (471), do 31 (517), hit 56 (577) |
 | 1 | hit 8 (67), hit 9 (85), do 9 (123), hit 15 (143), hit 17 (148), do 11 (177), hit 19 (177), do 12 (179), hit 20 (206), do 13 (207), hit 21 (219), hit 22 (233), hit 24 (238), hit 25 (239), hit 28 (259), do 15 (260), hit 29 (260), do 16 (262), hit 31 (277), hit 32 (288), do 18 (332), hit 33 (332), do 19 (347), hit 35 (368), do 20 (392), hit 37 (392), do 21 (393), hit 38 (407), hit 39 (409), hit 40 (411), hit 43 (425), hit 47 (452), hit 48 (453), hit 50 (475), do 27 (478), hit 51 (481), do 29 (498), do 30 (515), hit 53 (516), do 32 (520), do 33 (540), hit 54 (550), hit 55 (554), do 36 (625), hit 57 (625), hit 59 (655) |
 | 0 | do 24 (shares do 23's address), do 37, hit 5, hit 6, hit 11, hit 23 |
@@ -409,7 +516,7 @@ Use counts (live `patch_d2` `missiles.txt`, 684 rows; `pSrvDoFunc` /
 | 34 | missile x | `roll(n)` (one step) |
 | 35 | data +0x28 | one step, bit 0; low word saved |
 | 58 | missile x | `roll(2r + 1)` × 2 (x first) |
-| hit 2, do 6, hit 36, hit 10 | — | none of their own |
+| hit 2, do 6, hit 36, hit 10, hit 16, hit 18, hit 26, do 14, hit 27, hit 52 | — | none of their own (do 14's skill function may draw: skills spec) |
 | hit 44, hit 14 | — (allocation seed) | `missiles.md` §R6.2 rolls in element order; then `area_damage`'s per-unit draws (not on the missile seed) |
 
 Created missiles draw on their own seeds (`missiles.md` §R2.3).
@@ -428,6 +535,10 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 6. Server-do 6 asks for the owner before checking the missile pointer.
 7. Server-hit 3 and 36 return 0 for a unit contact (no damage, no
    death); their rows have `CollideType` 6 and never touch units.
+8. Server-hit 16 keeps the fresh list out of its own fill (§12 step 6):
+   the first contact gives the state with no stat values.
+9. Server-hit 52 never sets the class: Blade Fury contacts create class
+   0 (arrow) missiles, with the Blade Fury skill and level.
 
 ## Test vectors
 
@@ -444,6 +555,9 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 | catapult meteor ball (`sHitPar2` 0) | step 1: 18 pieces | live row, §9 |
 | bonespirit, s = 2, frames left 0, no target in range 15 | total = left = 128 (`LevRange` 0); data +0x28 = 6; return 4 | live row, §11 |
 | skill_range(Meteor, 0) | 0 (range field not set; table range) | §9 |
+| grimwardsmallstart expiry, `calc1` 3 | grimwardsmall with range 5 | synthetic, §14 |
+| grimwardsmall, elapsed 12, k > 0, L > 0 | skill server-do 30 runs with the missile as caster | live row, §15 |
+| bladefury1 hit at (100, 100) | 8 class-0 missiles aimed at (116, 100), (116, 116), (100, 116), (84, 116), (84, 100), (84, 84), (100, 84), (116, 84) | live row, §16 |
 
 ## Provenance
 
@@ -456,10 +570,13 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 - Live `patch_d2` missiles.txt rows 288, 479, 546, 569, 654.
 - §6–§11: `0x005A9D80`, `0x005A9370`, `0x005AE680`, `0x005A9F90`,
   `0x005A9E10`, `0x005AABB0`, `0x004CC7C0`, `0x005AAA90`, `0x005ABF70`,
-  `0x005AA650`, `0x005AA5B0`, `0x005AA460`, `0x0056BD10`; table
+  `0x005AA650`, `0x005AA5B0`, `0x005AA460`, `0x0056BD10`, `0x005AAE10`,
+  `0x006260B0` (null-safe), `0x005C6CC0` (null-safe), `0x005AB0B0`,
+  `0x005AB8D0`, `0x005AEF70`, `0x0056D810` (table entry 30 =
+  `0x005C37C0`, dumped), `0x005ABA00`, `0x005AC940`; table
   pointers checked (`disasm.py xref`: server-hit table `0x0073C840` +
   4 × index, server-do `0x0073C768` + 4 × index); offset tables dumped
-  from `Game.exe` (`0x006E24D0`–`0x006E25DF`). Live rows listed per
+  from `Game.exe` (`0x006E24D0`–`0x006E25DF`, `0x006E2A38`–`0x006E2A77`). Live rows listed per
   section; use counts from `patch_d2` `missiles.txt`, the `*12` cell
   from `missiles.bin` row 568. The D2MOO 1.10f bodies of the same names
   agree step for step (hints only; every step above is a 1.14d read).
@@ -476,3 +593,6 @@ Created missiles draw on their own seeds (`missiles.md` §R2.3).
 3. Plague ring clouds get velocity `Param1` << 7 << 8 before the 75 %
    cut (49 152 for `Param1` 2; a `Vel` 24 javelin flies at 4 608): record Plague
    Javelin and compare the cloud positions per tick.
+4. Blade Fury contacts create class-0 (arrow) missiles (§16): record a
+   Blade Fury hit and check for the eight extra missiles and their
+   damage.
