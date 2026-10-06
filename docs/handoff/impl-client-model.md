@@ -170,3 +170,20 @@ passes, clippy and fmt pass.
   (`TODO(spec)`).
 - `PlayerData::cursor_item` is cleared by 0x42 but set by no rule until
   the item stream spec (msg-stats-items OQ3).
+
+## 7. After merging `claude/tender-meitner-mphas3` @ `b1cc0b6`
+
+The base now carries the updated `bridge-dispatch.tsv` (51 owners); this
+branch registers exactly those handlers and the four tests the
+coordinator named pass (`local_tests::unknown_and_unowned_ids`,
+`protocol_version_check`, `tests::bridge_modules_except_mirror_have_no_bevy_type`;
+`spec_table_records_the_server_message_as_unowned` became
+`spec_table_drops_a_unit_message_for_an_unknown_unit`: `model.md` §4 rule 1
+drops a unit-handler message whose unit is not in the set).
+`dispatch_check_catches_perturbations` uses TBD ids 0x61 / 0x5F and adds a
+handler-kind perturbation. The merged `rules/draw_order/tests.rs` now builds
+units with `ClientUnit::new`. `cargo nextest run -p d2-client`: 524 of 525
+pass; the one failure,
+`scene::gaps_numbered_tests::world_is_skipped_in_open_mode_3_and_the_ui_still_drawn`
+("UI image (TODO(spec: ui/panels.md))"), fails identically on the base
+`b1cc0b6` alone (checked in a worktree): the render/UI side, not this branch.
