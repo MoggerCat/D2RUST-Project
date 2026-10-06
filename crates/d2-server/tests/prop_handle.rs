@@ -191,18 +191,18 @@ fn skill_rec() -> Skills {
     s
 }
 
-/// Attack (0), Multiple Shot (1: srvst 6, mana), Might (2: aura), a
+/// Attack (0), Multiple Shot (1: srvst 42, mana), Might (2: aura), a
 /// learnable skill (3: max level 3).
-/// Start slot of the synthetic start skills: srvst 6 (status `mapped`)
+/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
 /// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
 /// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
 /// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[1];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
     let m = &mut v[2];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 66, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 111, 33);
     v[3].maxlvl = 3;
     SkillTables {
         skills: v,

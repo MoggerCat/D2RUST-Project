@@ -187,6 +187,7 @@ fn body_tables() -> BodyTables {
         state_group: g,
         state_aura: vec![false; N_STATES],
         overlay_count: 0,
+        ..BodyTables::default()
     }
 }
 

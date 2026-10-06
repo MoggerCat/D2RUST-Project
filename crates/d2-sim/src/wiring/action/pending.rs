@@ -702,6 +702,207 @@ pub trait Pending {
     ) {
     }
 
+    // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`) --
+
+    /// A call of the bodies into a system with no provider here
+    /// ([`crate::skills::use_::bodies::BodyEffect`]). Default: nothing.
+    fn body_effect(&mut self, e: crate::skills::use_::bodies::BodyEffect<UnitId, UnitId, RoomId>) {}
+    /// A path operation ([`crate::skills::use_::bodies::PathOp`]; paths of
+    /// skill moves are not provided). Default: nothing, compute 0.
+    fn body_path_op(
+        &mut self,
+        unit: UnitId,
+        op: crate::skills::use_::bodies::PathOp<UnitId>,
+    ) -> i32 {
+        0
+    }
+    /// The L-flag (game +0x6A or +0x74 ≠ 0, `monsters/init.md` §8.1).
+    /// Default: false.
+    fn l_flag(&self) -> bool {
+        false
+    }
+    /// Frame event index (unit +0x38 bits 8+). Default: 0.
+    fn frame_event_index(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// Frame event index set (`0x006212C0`).
+    fn set_frame_event_index(&mut self, unit: UnitId, i: i32) {}
+    /// `0x0058F710`: a monster AI control's spawn class. Default: none.
+    fn minion_spawn_class(&self, unit: UnitId) -> Option<i32> {
+        None
+    }
+    /// The owner's linked unit (`0x00554070`). Default: none.
+    fn linked_unit(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x00553010`: the death delay's killer. Default: none.
+    fn killer_of(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x0058F090`: the minion owner record (GUID, type). Default: none.
+    fn minion_owner_ident(&self, unit: UnitId) -> Option<(u32, u32)> {
+        None
+    }
+    /// `0x005C0BE0`: a handler with this key and skill field. Default:
+    /// none.
+    fn has_handler(&self, unit: UnitId, key_type: i32, key: i32, skill: i32) -> bool {
+        false
+    }
+    /// Param `i` (1…4) of the unit's skill entry. Default: 0.
+    fn entry_param(&self, unit: UnitId, e: &crate::skills::SkillEntry, i: u8) -> i32 {
+        0
+    }
+    /// Param `i` of the unit's skill entry set.
+    fn set_entry_param_of(&mut self, unit: UnitId, e: &crate::skills::SkillEntry, i: u8, v: i32) {}
+    /// Entry flags +0x0C. Default: 0.
+    fn entry_flags(&self, unit: UnitId, e: &crate::skills::SkillEntry) -> u32 {
+        0
+    }
+    /// Entry flags set.
+    fn set_entry_flags(&mut self, unit: UnitId, e: &crate::skills::SkillEntry, f: u32) {}
+    /// Entry mode set (`0x00644340`).
+    fn set_entry_mode(&mut self, unit: UnitId, e: &crate::skills::SkillEntry, m: u32) {}
+    /// `0x00645270`: the disguise remap. Default: the mode unchanged.
+    fn disguise_mode(&self, unit: UnitId, m: u32) -> u32 {
+        m
+    }
+    /// The used skill's sequence records. Default: none.
+    fn skill_sequence(&self, unit: UnitId) -> Option<Vec<[u8; 6]>> {
+        None
+    }
+    /// `0x0056E210` → `0x00553B10(game, unit, p)`.
+    fn anim_rewind(&mut self, unit: UnitId, p: i32) {}
+    /// `0x00553C70(game, unit, v)`.
+    fn anim_restart(&mut self, unit: UnitId, v: i32) {}
+    /// `0x00553DC0(game, unit, f)`.
+    fn anim_from(&mut self, unit: UnitId, f: i32) {}
+    /// The room level's act (`0x0061A1B0`, `0x006427F0`). Default: 0.
+    fn room_act(&self, room: RoomId) -> i32 {
+        0
+    }
+    /// The room level's `Teleport`. Default: no level record.
+    fn room_teleport(&self, room: RoomId) -> Option<i32> {
+        None
+    }
+    /// `0x0064E7B0`: the free point. Default: none.
+    fn free_point(
+        &mut self,
+        room: RoomId,
+        at: (i32, i32),
+        size: i32,
+        mask: u32,
+        fallback: bool,
+    ) -> Option<(RoomId, (i32, i32))> {
+        None
+    }
+    /// `0x0064D910` ≠ 0. Default: collides.
+    fn pattern_collides(&self, room: RoomId, at: (i32, i32), unit: UnitId, mask: u32) -> bool {
+        true
+    }
+    /// `0x0064D800` ≠ 0. Default: collides.
+    fn box_collides(&self, room: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
+        true
+    }
+    /// `0x0064E260` ≠ 0. Default: blocked.
+    fn body_line_blocked(&self, room: RoomId, from: (i32, i32), to: (i32, i32), mask: u32) -> bool {
+        true
+    }
+    /// `0x00554EA0(game, unit, room, x, y, 0, 0)`. Default: not placed.
+    fn place_unit(&mut self, unit: UnitId, room: Option<RoomId>, at: (i32, i32)) -> bool {
+        false
+    }
+    /// `0x006487D0`. Default: 0.
+    fn path_point_count(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// The path's last point. Default: (0, 0).
+    fn path_last_point(&self, unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// The path's target point. Default: (0, 0).
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+    /// `0x005B2F20(game, room, x, y, class, mode, spread, 0x42)`.
+    /// Default: none.
+    fn create_monster(
+        &mut self,
+        room: RoomId,
+        at: (i32, i32),
+        class: i32,
+        mode: i32,
+        spread: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    /// Monster mode request (`0x005A7E60`, `0x005A7C20`). Default: 0.
+    fn mode_request(&mut self, unit: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
+        0
+    }
+    /// `0x00535060`: busy. Default: false.
+    fn inventory_busy(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The unit has an inventory. Default: none.
+    fn has_inventory(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0063BEF0`. Default: none.
+    fn weapon_in_use(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x00627D40`. Default: 0.
+    fn body_loc(&self, item: UnitId) -> i32 {
+        0
+    }
+    /// `0x0062A4E0`. Default: false.
+    fn item_usable(&self, item: UnitId) -> bool {
+        false
+    }
+    /// `0x00625820(item, 0)`. Default: false.
+    fn item_active(&self, item: UnitId) -> bool {
+        false
+    }
+    /// `0x00629930`. Default: false.
+    fn item_breakable(&self, item: UnitId) -> bool {
+        false
+    }
+    /// `0x0063C8F0`: the shield. Default: none.
+    fn shield(&self, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// armor `mindam` / `maxdam`. Default: no record.
+    fn shield_damage(&self, item: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    /// weapons `missiletype`. Default: 0.
+    fn item_missile_type(&self, item: UnitId) -> i32 {
+        0
+    }
+    /// The Iron Golem item test (`bodies-2.md` §7.11). Default: false.
+    fn golem_item(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0062EA80`. Default: 0.
+    fn item_first_loc(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x0063C050(inventory, 6 / 5)` both `mele`. Default: false.
+    fn two_melee_weapons(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x0062A710`: attack frames. Default: none (fatal).
+    fn attack_frames(&self, unit: UnitId, item: UnitId) -> Option<i32> {
+        None
+    }
+    /// `0x00627910` for the kick damage: weapon lists off / back on
+    /// (`levels.md` §3.5).
+    fn toggle_weapon_lists(&mut self, unit: UnitId, on: bool) {}
+    /// Items record bytes +0xFE / +0xFF of the boots. Default: (0, 0).
+    fn boots_damage(&self, item: UnitId) -> (i32, i32) {
+        (0, 0)
+    }
+
     /// The units `scan_unit(game, owner, x, y, r, f, …, noaura 0)`
     /// (`skills/bodies.md` §2.12) accepts, in order, for the missile
     /// area bodies (`missiles.md` §R9.6). The scan runs on the skill use
