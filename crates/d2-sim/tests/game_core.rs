@@ -270,7 +270,7 @@ fn itemstatcost_ops_as_stated() {
 /// `fixups.md` §2 step 3, rebuilt from the typed op columns of every
 /// stat: A51, A52, A53, deps and entries of the fixed-up records; and
 /// `stats.md` edge case 5: the op graph has no cycle.
-// Intended claim (unconfirmed until the first local run): specs/data/fixups.md §2 r3 (game tier).
+// Covers: specs/data/fixups.md §2 r3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn op_tables_rebuild_from_the_columns() {
@@ -351,7 +351,7 @@ fn op_tables_rebuild_from_the_columns() {
 /// `vitals.md` Constants: the charstats columns of the 7 classes and the
 /// experience table facts; `levels.md` OQ2 / §1 step 3: the skill-level
 /// cap is experience row 0 of class 0.
-// Intended claim (unconfirmed until the first local run): specs/combat/vitals.md §4.1 (game tier: max_level, threshold, level_from_exp on the live table).
+// Covers: specs/combat/vitals.md §4.1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn charstats_and_experience_as_stated() {
@@ -464,7 +464,7 @@ impl Player {
 /// `vitals.md` §1 for all 7 classes on the live charstats and
 /// experience, through the real stat lists (`VitalsView`); the
 /// Sorceress and Barbarian vectors.
-// Intended claim (unconfirmed until the first local run): specs/combat/vitals.md §1 (act 0).
+// Covers: specs/combat/vitals.md §1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn player_creation_every_class() {
@@ -516,7 +516,7 @@ fn player_creation_every_class() {
 /// `vitals.md` Test vectors: level 1 → 10 for the Sorceress and the
 /// Barbarian (§3, §4.1), +10 vitality (Barbarian) and +10 energy
 /// (Sorceress) spent (§2).
-// Intended claim (unconfirmed until the first local run): specs/combat/vitals.md §2, §3 (game tier).
+// Covers: specs/combat/vitals.md §2, §3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn level_up_and_stat_point_vectors() {
@@ -694,7 +694,7 @@ fn stat_list_vector_on_live_records() {
 /// `stat-lists.md` §7.2 rule 2 on every live monstats row: setting a
 /// monster's max life sets stat 74 to ((new >> 8) · DamageRegen) >> 4
 /// when `DamageRegen` ≠ 0, and leaves it 0 otherwise.
-// Intended claim (unconfirmed until the first local run): specs/sim/stat-lists.md §7.2 r2 (game tier).
+// Covers: specs/sim/stat-lists.md §7.2 r2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn monster_damage_regen_every_class() {
@@ -739,7 +739,7 @@ fn monster_damage_regen_every_class() {
 /// (action events in frame order, a1 ∈ 1–4, numbered a2, exactly one
 /// event 1, last) and the end frame f + max(⌈F / s⌉, 2); with s ≤ 256
 /// every frame index below min(frames, 144) is read.
-// Intended claim (unconfirmed until the first local run): specs/sim/units.md §4.2 (game tier: main form on the live records).
+// Covers: specs/sim/units.md §4.2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn anim_schedule_every_record() {
@@ -1017,7 +1017,7 @@ fn skills_table_facts() {
 /// dm12 / dm56 / ln34 / ln12 special values, the linear to-hit and the
 /// Teleport mana past zero. Each skill is identified by its id and then
 /// checked to hold the parameters the vector names.
-// Intended claim (unconfirmed until the first local run): specs/skills/levels.md §2 (game tier: dm / ln special values), §4, §5.
+// Covers: specs/skills/levels.md §2, §4, §5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn special_value_vectors() {

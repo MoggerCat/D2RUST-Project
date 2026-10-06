@@ -30,7 +30,7 @@ pub use cpu::{
 pub use frame::{present_palette, FrameCycle, FramePlan, PL2_PALETTE_BYTES, UNCLEARED_ROWS};
 pub use item::{
     BlendOp, DrawItem, FrameId, FrameImage, FrameSource, FrameView, ItemTag, MapId, MapTable,
-    ShadeChain,
+    PixelTables, ShadeChain,
 };
 pub use order::{order, DrawKey};
 

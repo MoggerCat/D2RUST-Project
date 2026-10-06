@@ -302,9 +302,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn set_last_point_frame(&mut self, u: UnitId, frame: i32) {
         self.xm().set_last_point_frame(u, frame);
     }
-    /// The path position (the action wiring's [`Pending::position`]).
+    /// The path position (`ActionHooks::path_position`: the path
+    /// provider's, else [`Pending::position`]).
     fn position(&self, u: UnitId) -> (i32, i32) {
-        self.x().position(u)
+        self.cv.v.h.path_position(u)
     }
     /// `0x00552F60` on the type's hash (`unit-order.md` §2.3).
     fn find_unit(&self, ty: u32, guid: u32) -> Option<UnitId> {

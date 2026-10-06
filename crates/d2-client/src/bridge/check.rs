@@ -1,0 +1,156 @@
+// Spec: specs/client/model.md (§6)
+//! The position check `0x004804E0`: compares a point the server states
+//! with the unit's own position and, when they disagree beyond the
+//! tolerance (or the unit would be drawn off-screen), corrects it: the
+//! local player asks the server with C→S 0x5F, other units are moved.
+
+use crate::rules::camera::{moving_to_client, static_to_client};
+
+use super::dispatch::HandlerError;
+use super::world::{ClientUnit, ClientWorld, ModelInputs, UnitKey, ITEM, MONSTER, OBJECT, TILE};
+
+/// What the check did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Checked {
+    /// x or y is 0, or the unit is dead (rules 1–2), or the unit is not in
+    /// the model.
+    Skipped,
+    /// Within tolerance (or accepted by rule 5) and visible: no change.
+    Kept,
+    /// The local player: C→S 0x5F appended to `outgoing` (rule 8).
+    Asked,
+    /// Another unit moved to (x, y) (rule 8).
+    Moved,
+}
+
+/// `L` of rule 4: `([0x007A04A4] + 0x32) >> 7` with the global 0
+/// (open question 3).
+const L: u32 = 0;
+
+/// Static-path kinds (rule 3): objects, items, tiles.
+fn is_static(unit_type: u8) -> bool {
+    matches!(unit_type, OBJECT | ITEM | TILE)
+}
+
+/// Tolerance T (rule 4).
+fn tolerance(world: &ClientWorld, unit: &ClientUnit, kind: u8) -> u32 {
+    match kind {
+        1 => 10,
+        2 => 0,
+        _ if world.local_player == Some(unit.key) => match unit.mode {
+            1 => 3 + L,
+            3 => 7 + L,
+            _ => 5 + L,
+        },
+        _ if unit.key.unit_type == MONSTER && (3..=5).contains(&unit.mode) => 5,
+        _ if unit.key.unit_type == MONSTER && (6..=11).contains(&unit.mode) => 7,
+        _ => 15,
+    }
+}
+
+/// The unit's client pixel point (rule 6: `0x00620650` / `0x006206B0`):
+/// the static path's point, or the dynamic path's precise position (the
+/// cell centre, model §3 rule 3) projected by `render/camera.md` §2.
+fn client_point(unit: &ClientUnit) -> (i32, i32) {
+    let (cx, cy) = unit.cell();
+    let p = if is_static(unit.key.unit_type) {
+        static_to_client(i32::from(cx), i32::from(cy))
+    } else {
+        moving_to_client(
+            (u32::from(cx) << 16) | 0x8000,
+            (u32::from(cy) << 16) | 0x8000,
+        )
+    };
+    (p.x, p.y)
+}
+
+fn sq(d: i32) -> i64 {
+    i64::from(d) * i64::from(d)
+}
+
+/// `check(U, x, y, kind, tx, ty)` (§6). `tx`, `ty` are signed as in
+/// 1.14d (rule 5 tests `tx > 0`).
+#[allow(clippy::too_many_arguments)]
+pub fn check(
+    world: &mut ClientWorld,
+    inputs: &ModelInputs,
+    key: UnitKey,
+    x: u16,
+    y: u16,
+    kind: u8,
+    tx: i32,
+    ty: i32,
+) -> Result<Checked, HandlerError> {
+    // Rule 1.
+    if x == 0 || y == 0 {
+        return Ok(Checked::Skipped);
+    }
+    let Some(unit) = world.units.get_mut(&key) else {
+        return Ok(Checked::Skipped);
+    };
+    // Rule 2.
+    if unit.is_dead() {
+        return Ok(Checked::Skipped);
+    }
+    // Rule 3.
+    unit.server_point = (x, y);
+    let unit = &world.units[&key];
+    let (cx, cy) = unit.cell();
+    let (xi, yi, cxi, cyi) = (i32::from(x), i32::from(y), i32::from(cx), i32::from(cy));
+    // Rule 4.
+    let t = tolerance(world, unit, kind);
+    // Rule 5.
+    let mut far = xi.abs_diff(cxi) > t;
+    if far || yi.abs_diff(cyi) > t {
+        if kind != 0 || tx <= 0 {
+            return Ok(correct(world, key, x, y));
+        }
+        let d1 = sq(cxi - xi) + sq(cyi - yi);
+        if d1 >= 100 {
+            return Ok(correct(world, key, x, y));
+        }
+        let d2 = sq(cxi - tx) + sq(cyi - ty);
+        if d2 >= d1 {
+            return Ok(correct(world, key, x, y));
+        }
+        far = false;
+    }
+    // Rule 6.
+    let visible = if x == cx || y == cy {
+        true
+    } else {
+        let pred = inputs.visible.ok_or(HandlerError::Unspecified(
+            "model.md open question 7: the visibility predicate 0x004DBF20",
+        ))?;
+        let (a, b) = client_point(unit);
+        let p = static_to_client(xi, yi);
+        pred(unit, a, b) || pred(unit, p.x, p.y)
+    };
+    // Rule 7.
+    if visible && !far {
+        Ok(Checked::Kept)
+    } else {
+        Ok(correct(world, key, x, y))
+    }
+}
+
+/// Rule 8. TODO(spec: model.md open question 5): the room lookup (none →
+/// nothing) needs the client DRLG; the model takes the room as found.
+fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
+    if world.local_player == Some(key) {
+        // C→S 0x5F with the unit's own position.
+        let (cx, cy) = world.units[&key].cell();
+        let mut m = vec![0x5F];
+        m.extend_from_slice(&cx.to_le_bytes());
+        m.extend_from_slice(&cy.to_le_bytes());
+        world.outgoing.push(m);
+        return Checked::Asked;
+    }
+    // Another player (`0x00463180`: re-placed, walking modes restarted,
+    // Phase 6) or a teleport (`sim/path-placement.md` §6 rule 4): the
+    // model's position is (x, y) either way.
+    if let Some(u) = world.units.get_mut(&key) {
+        u.position = Some((x, y));
+    }
+    Checked::Moved
+}

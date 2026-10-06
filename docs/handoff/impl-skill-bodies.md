@@ -127,6 +127,17 @@ with the 16 skill slots) have bodies.
   `"decquant 2"` log of the removed `UseRest::dec_quantity` is gone (the
   body runs; the core's call stays covered by the `use_` fake's log).
 
+## Second merge (`f6cadb9`, test-support-fold)
+
+The e2e fixture moved to `d2-client/tests/e2e_support/world.rs` and the
+shared skill table to `d2-sim` `wiring/action/tests/fight.rs`: the
+`UseRest` removals and the srvst 4 → 6 swap are ported there.
+`UseView::position` now reads `ActionHooks::path_position` (the path
+provider's position, `Pending::position` without one): the §2.4 missile
+record gives the position, which was (0, 0) on hosts with the path
+provider. After this merge `cargo nextest run -p d2-client` passes in
+full (536); d2-sim / d2-server fail only the two AI catalogue tests.
+
 ## Gate
 
 `sh tools/gate.sh` at `18c188f` (after the merge with `7f684ad`): every
