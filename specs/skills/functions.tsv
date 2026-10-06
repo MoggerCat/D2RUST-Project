@@ -25,21 +25,21 @@ srvst	22	0x005D30F0	SrvSt22_PsychicHammer	spec'd-here	Psychic Hammer	body: bodie
 srvst	23	0x005D32F0	SrvSt23_AssasinChargeStrikes	spec'd-here	Tiger Strike,Fists of Fire,Cobra Strike,Claws of Thunder,Blades of Ice,Royal Strike	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §7.1
 srvst	24	0x005D5970	SrvSt24_DragonTalon	spec'd-here	Dragon Talon	body: bodies-2.md §3.10
 srvst	25	0x005D6330	SrvSt25_64_DragonClaw_MonFrenzy	spec'd-here	Dragon Claw	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §4.12
-srvst	26	0x005D69D0	SrvSt26_BladeFury	mapped	Blade Fury	
-srvst	27	0x005D7090	SrvSt27_DragonTail	mapped	Dragon Tail	
+srvst	26	0x005D69D0	SrvSt26_BladeFury	spec'd-here	Blade Fury	body: bodies-2.md §6.16
+srvst	27	0x005D7090	SrvSt27_DragonTail	spec'd-here	Dragon Tail	body: bodies-2.md §6.18
 srvst	28	0x005D7A00	SrvSt28_BladeShield	mapped	Blade Shield	
 srvst	29	0x005CE790	SrvSt29_Sacrifice	spec'd-here	Sacrifice	body: bodies.md §3.7
 srvst	31	0x005CF6B0	SrvSt31_Charge	spec'd-here	Charge,SerpentCharge	body: bodies-2.md §5.3
 srvst	32	0x005D7EA0	SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite	spec'd-here	Conversion,Bash,Stun,Concentrate,BearSmite	body: bodies.md §3.8
 srvst	33	0x005D80C0	SrvSt33_FindPotion_GrimWard	spec'd-here	Find Potion,Grim Ward	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.9
 srvst	34	0x005D8760	SrvSt34_FindItem	spec'd-here	Find Item	no function at this entry in the Ghidra export (data-only xref); body: bodies-2.md §5.6
-srvst	35	0x005CFE10	SrvSt35_Vengeance	mapped	Vengeance	
+srvst	35	0x005CFE10	SrvSt35_Vengeance	spec'd-here	Vengeance	body: bodies-2.md §6.8
 srvst	36	0x005D0180	SrvSt36_HolyShield	mapped	Holy Shield	no function at this entry in the Ghidra export (data-only xref)
 srvst	37	0x005DAF40	SrvSt37_Zeal_Fury_BloodLordFrenzy	spec'd-here	Zeal,Fury,BloodLordFrenzy	body: bodies.md §7.6
 srvst	38	0x005D8F50	SrvSt38_Whirlwind	mapped	Whirlwind	
 srvst	39	0x005D97F0	SrvSt39_Berserk	mapped	Berserk	
 srvst	40	0x005D9D50	SrvSt40_Leap	spec'd-here	Leap	body: bodies-2.md §4.6
-srvst	41	0x005DA540	SrvSt41_LeapAttack	mapped	Leap Attack	
+srvst	41	0x005DA540	SrvSt41_LeapAttack	spec'd-here	Leap Attack	body: bodies-2.md §6.11
 srvst	42	0x005CAE40	SrvSt42_FireHit	mapped	Fire Hit	
 srvst	43	0x005CAF80	SrvSt43_MaggotEgg	mapped	MaggotEgg	no function at this entry in the Ghidra export (data-only xref)
 srvst	44	0x005CB170	SrvSt44_MaggotUp	mapped	MagottUp	
@@ -55,8 +55,8 @@ srvst	53	0x005CC240	SrvSt53_MonInferno	mapped	FetishInferno,DiabLight,mon infern
 srvst	54	0x005CD2C0	SrvSt54_DiabRun	mapped	DiabRun	
 srvst	55	0x005CD910	SrvSt55_Mosquito	mapped	Mosquito	
 srvst	56	0x005C7690	SrvSt56_FeralRage_Maul	spec'd-here	Feral Rage,Maul	body: bodies.md §7.7
-srvst	57	0x005C79E0	SrvSt57_Rabies	mapped	Rabies	
-srvst	58	0x005C7E00	SrvSt58_FireClaws	mapped	Fire Claws	
+srvst	57	0x005C79E0	SrvSt57_Rabies	spec'd-here	Rabies	body: bodies-2.md §6.13
+srvst	58	0x005C7E00	SrvSt58_FireClaws	spec'd-here	Fire Claws	body: bodies-2.md §6.15
 srvst	59	0x005D1280	SrvSt59_ImpInferno	mapped	Imp Inferno	
 srvst	60	0x005D1570	SrvSt60_SuckBlood	mapped	Suck Blood	
 srvst	61	0x005D1BF0	SrvSt61_SelfResurrect	mapped	Self-resurrect	no function at this entry in the Ghidra export (data-only xref)
@@ -77,7 +77,7 @@ srvdo	7	0x005DB2D0	SrvDo007_Jab	spec'd-here	Jab	body: bodies-2.md §3.1
 srvdo	8	0x005DB410	SrvDo008_MultipleShot_Teeth_ShockWave	spec'd-here	Multiple Shot,Teeth,PrimePoisonball,Shock Wave	body: bodies.md §8.6
 srvdo	9	0x005D8E00	SrvDo009_Frenzy	mapped	Frenzy	
 srvdo	10	0x005DB6D0	SrvDo010_GuidedArrow_BoneSpirit	spec'd-here	Guided Arrow,Bone Spirit,MonBoneSpirit	body: bodies.md §8.19
-srvdo	11	0x005DB850	SrvDo011_ChargedStrike	mapped	Charged Strike	
+srvdo	11	0x005DB850	SrvDo011_ChargedStrike	spec'd-here	Charged Strike	body: bodies-2.md §6.1
 srvdo	12	0x005DBA40	SrvDo012_Strafe	mapped	Strafe	
 srvdo	13	0x005DBC60	SrvDo013_Fend_Zeal_Fury	spec'd-here	Fend,Zeal,Fury	body: bodies.md §8.11
 srvdo	14	0x005DBE50	SrvDo014_LightningStrike	mapped	Lightning Strike	
@@ -90,10 +90,10 @@ srvdo	20	0x005C9800	SrvDo020_StaticField	spec'd-here	Static Field	body: bodies-2
 srvdo	21	0x005C98F0	SrvDo021_Telekinesis	spec'd-here	Telekinesis	body: bodies-2.md §4.2
 srvdo	22	0x005C9B50	SrvDo022_NovaAttack	spec'd-here	9 skills (e.g. Frost Nova,Nova,Poison Nova,Howl)	body: bodies.md §8.4
 srvdo	23	0x005C9C10	SrvDo023_Blaze_EnergyShield_SpiderLay	spec'd-here	Blaze,Energy Shield,SpiderLay,PrimeBlaze	body: bodies.md §8.17
-srvdo	24	0x005C9EA0	SrvDo024_FireWall	mapped	Fire Wall,VampireFirewall,PrimeFirewall,CountessFirewall	
-srvdo	25	0x005CA030	SrvDo025_Enchant	mapped	Enchant	
-srvdo	26	0x005CA1B0	SrvDo026_ChainLightning	mapped	Chain Lightning	
-srvdo	27	0x005CA360	SrvDo027_Teleport	mapped	Teleport	
+srvdo	24	0x005C9EA0	SrvDo024_FireWall	spec'd-here	Fire Wall,VampireFirewall,PrimeFirewall,CountessFirewall	body: bodies-2.md §6.2
+srvdo	25	0x005CA030	SrvDo025_Enchant	spec'd-here	Enchant	body: bodies-2.md §6.3
+srvdo	26	0x005CA1B0	SrvDo026_ChainLightning	spec'd-here	Chain Lightning	body: bodies-2.md §6.4
+srvdo	27	0x005CA360	SrvDo027_Teleport	spec'd-here	Teleport	body: bodies-2.md §6.5
 srvdo	28	0x005CA3E0	SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult	spec'd-here	12 skills (e.g. Meteor,Blizzard,VampireMeteor,MonBlizzard)	body: bodies.md §8.12
 srvdo	29	0x005CA4D0	SrvDo029_ThunderStorm	mapped	Thunder Storm	
 srvdo	30	0x005C37C0	SrvDo030_Curse	spec'd-here	10 skills (e.g. Amplify Damage,Dim Vision,Weaken,Iron Maiden)	body: bodies.md §4.4
@@ -114,9 +114,9 @@ srvdo	44	0x005D6020	SrvDo044_BladeSentinel	spec'd-here	Blade Sentinel	body: bodi
 srvdo	45	0x005D6170	SrvDo045_Sentry	spec'd-here	Charged Bolt Sentry,Wake of Fire Sentry,Lightning Sentry,Inferno Sentry,Death Sentry	body: bodies.md §8.3
 srvdo	46	0x005D6340	SrvDo046_DragonClaw	spec'd-here	Dragon Claw	body: bodies-2.md §4.13
 srvdo	47	0x005D6630	SrvDo047_CloakOfShadows	spec'd-here	Cloak of Shadows	body: bodies-2.md §5.8
-srvdo	48	0x005D68A0	SrvDo048_BladeFury	mapped	Blade Fury	
+srvdo	48	0x005D68A0	SrvDo048_BladeFury	spec'd-here	Blade Fury	body: bodies-2.md §6.17
 srvdo	49	0x005D6E70	SrvDo049_ShadowWarrior_Master	spec'd-here	Shadow Warrior,Shadow Master	body: bodies.md §8.21
-srvdo	50	0x005D7180	SrvDo050_DragonTail	mapped	Dragon Tail	
+srvdo	50	0x005D7180	SrvDo050_DragonTail	spec'd-here	Dragon Tail	body: bodies-2.md §6.19
 srvdo	51	0x005D76E0	SrvDo051_MindBlast	mapped	Mind Blast	
 srvdo	52	0x005D7850	SrvDo052_DragonFlight	mapped	Dragon Flight	
 srvdo	53	0x005D7B60	SrvDo053_Unused	unreferenced	(none)	no 1.14d data row references it
@@ -127,9 +127,9 @@ srvdo	57	0x005C5250	SrvDo057_IronGolem	mapped	IronGolem
 srvdo	58	0x005C56C0	SrvDo058_Revive	mapped	Revive	
 srvdo	59	0x005C3B90	SrvDo059_Attract	mapped	Attract	
 srvdo	60	0x005C58B0	SrvDo060_BoneWall	spec'd-here	Bone Wall	body: bodies-2.md §5.2
-srvdo	61	0x005C3F20	SrvDo061_Confuse	mapped	Confuse	
+srvdo	61	0x005C3F20	SrvDo061_Confuse	spec'd-here	Confuse	body: bodies-2.md §6.6
 srvdo	62	0x005C5D00	SrvDo062_BonePrison	mapped	Bone Prison	
-srvdo	63	0x005C5E60	SrvDo063_PoisonExplosion	mapped	Poison Explosion	
+srvdo	63	0x005C5E60	SrvDo063_PoisonExplosion	spec'd-here	Poison Explosion	body: bodies-2.md §6.7
 srvdo	64	0x005CE8E0	SrvDo064_Sacrifice	spec'd-here	Sacrifice	body: bodies-2.md §3.3
 srvdo	65	0x005CF010	SrvDo065_BasicAura	spec'd-here	17 skills (e.g. Might,Prayer,Resist Fire,Thorns)	aura tick: statlist on self/targets, mana via 0x0056C110; body: bodies.md §4.5
 srvdo	66	0x005CF3A0	SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction	spec'd-here	Holy Fire,Holy Shock,Sanctuary,Conviction	body: bodies.md §8.5
@@ -139,15 +139,15 @@ srvdo	69	0x005D81C0	SrvDo069_FindPotion	spec'd-here	Find Potion	body: bodies-2.m
 srvdo	70	0x005D8470	SrvDo070_DoubleSwing	spec'd-here	Double Swing	body: bodies-2.md §4.8
 srvdo	71	0x005D8570	SrvDo071_Taunt	spec'd-here	Taunt	body: bodies-2.md §4.9
 srvdo	72	0x005D8780	SrvDo072_FindItem	spec'd-here	Find Item	body: bodies-2.md §5.7
-srvdo	73	0x005D0040	SrvDo073_BlessedHammer	mapped	Blessed Hammer	
+srvdo	73	0x005D0040	SrvDo073_BlessedHammer	spec'd-here	Blessed Hammer	body: bodies-2.md §6.9
 srvdo	74	0x005D88B0	SrvDo074_DoubleThrow	spec'd-here	Double Throw	body: bodies-2.md §5.5
 srvdo	75	0x005D89B0	SrvDo075_GrimWard	mapped	Grim Ward	
 srvdo	76	0x005D9580	SrvDo076_Whirlwind	mapped	Whirlwind	hard-coded in 0x0057EEC0: re-requesting the same skill is always allowed
 srvdo	77	0x005DA370	SrvDo077_Leap	spec'd-here	Leap	body: bodies-2.md §4.7
-srvdo	78	0x005DA7E0	SrvDo078_LeapAttack	mapped	Leap Attack	
+srvdo	78	0x005DA7E0	SrvDo078_LeapAttack	spec'd-here	Leap Attack	body: bodies-2.md §6.12
 srvdo	79	0x005D0350	SrvDo079_Conversion	mapped	Conversion	
 srvdo	80	0x005D0670	SrvDo080_FistOfTheHeavens	mapped	Fist of the Heavens	
-srvdo	81	0x005D0920	SrvDo081_HolyFreeze	mapped	Holy Freeze	
+srvdo	81	0x005D0920	SrvDo081_HolyFreeze	spec'd-here	Holy Freeze	body: bodies-2.md §6.10
 srvdo	82	0x005D0E90	SrvDo082_Redemption	mapped	Redemption	
 srvdo	83	0x005CAF30	SrvDo083_FireHit	mapped	Fire Hit	
 srvdo	84	0x005CAFA0	SrvDo084_MaggotEgg	mapped	MaggotEgg	
@@ -187,7 +187,7 @@ srvdo	117	0x005C7160	SrvDo117_Firestorm	spec'd-here	Firestorm	body: bodies-2.md 
 srvdo	118	0x005C72F0	SrvDo118_Twister_Tornado	spec'd-here	Twister,Tornado	body: bodies.md §8.20
 srvdo	119	0x005C7390	SrvDo119_DruidSummon	spec'd-here	Oak Sage,Summon Spirit Wolf,Heart of Wolverine,Summon Fenris,Spirit of Barbs,Summon Grizzly	body: bodies.md §8.1
 srvdo	120	0x005C77C0	SrvDo120_FeralRage_Maul	spec'd-here	Feral Rage,Maul	body: bodies.md §8.18
-srvdo	121	0x005C8AD0	SrvDo121_Rabies	mapped	Rabies	only entry whose 1.14d address breaks the D2MOO source-file order (identified by index only)
+srvdo	121	0x005C8AD0	SrvDo121_Rabies	spec'd-here	Rabies	only entry whose 1.14d address breaks the D2MOO source-file order (identified by index only); body: bodies-2.md §6.14
 srvdo	122	0x005C7F10	SrvDo122_Hunger	mapped	Hunger	
 srvdo	123	0x005C8080	SrvDo123_Volcano	mapped	Volcano	
 srvdo	124	0x005C8190	SrvDo124_Armageddon_Hurricane	spec'd-here	Armageddon,Hurricane,Diablogeddon	body: bodies.md §8.22
