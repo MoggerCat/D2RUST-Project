@@ -37,6 +37,9 @@ pub struct TestPending {
     pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
+    /// Operators are in interact range of objects (`objects.md` §7.1
+    /// rule 3; [`super::objects`]).
+    pub in_range: bool,
 }
 
 impl Pending for TestPending {
@@ -64,6 +67,12 @@ impl Pending for TestPending {
     }
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
+    }
+    fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
+        self.in_range
+    }
+    fn object_route(&mut self, _: &mut Game, route: d2_sim::wiring::action::ObjectRoute) {
+        self.log.push(format!("object route {route:?}"));
     }
 }
 
@@ -150,7 +159,7 @@ fn tiles() -> Tiles {
     Tiles(t)
 }
 
-fn blank<T: Record>() -> T {
+pub(crate) fn blank<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
@@ -200,7 +209,7 @@ pub(crate) fn field_room<X: Pending>(sim: &mut ActionSim<X>, game: &mut Game) ->
 
 /// Cold Plains (act 0, waypoint index 1), Burial Grounds-like level 4
 /// (index 2), Blood Moor 2 (no waypoint), Lut Gholein 40 (act 1, index 9).
-const COLD_PLAINS: u32 = 3;
+pub(crate) const COLD_PLAINS: u32 = 3;
 const LEVEL4: u32 = 4;
 const BLOOD_MOOR: u32 = 2;
 const ACT2_TOWN: u32 = 40;

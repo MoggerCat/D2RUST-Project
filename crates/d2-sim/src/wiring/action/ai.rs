@@ -4,7 +4,8 @@
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
 //! `0x005544B0`, the dead test, act, level of the room (DRLG), life and
 //! life writes (`stats.md`), mode changes (`units.md` §4.6), the attack
-//! flag 0x40, the town test and collision grids (`rooms.md` §10). Path,
+//! flag 0x40, the town test and collision grids (`rooms.md` §10), the
+//! door operate and `MonsterOK` on the object state (`objects.md` §7.1). Path,
 //! targets, skills, sounds and the monster data the lent monster world
 //! ([`super::monsters`]) does not answer go to [`Pending`].
 
@@ -17,8 +18,10 @@ use crate::stats::stat;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId};
 
+use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
 use super::{Pending, View};
+use crate::world::objects::Dispatch;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
@@ -218,8 +221,23 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         self.h.x.walk_in_radius(game, unit, target, a, b)
     }
+    /// The operate entry `0x00584540` (`objects.md` §7.1) with the monster
+    /// as operator on the object state ([`super::objects`]); a quest,
+    /// waypoint or `todo` route goes to [`Pending::object_route`]. A game
+    /// without an object state: [`Pending::operate_door`].
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {
-        self.h.x.operate_door(game, unit, door);
+        if self.h.objects.is_none() {
+            self.h.x.operate_door(game, unit, door);
+            return;
+        }
+        let Some(guid) = game.lists.unit(door).map(|e| e.guid) else {
+            return;
+        };
+        if let Some((_, Some(d))) = self.operate_object(game, Some(unit), guid) {
+            if !matches!(d, Dispatch::Done(_)) {
+                self.h.x.object_route(game, ObjectRoute::Operate(d));
+            }
+        }
     }
     /// Overlay `0x00621E40` ([`Pending::overlay`]).
     fn start_overlay(&mut self, unit: UnitId, overlay: i32) {
@@ -311,8 +329,11 @@ impl<X: Pending> AiTargets for View<'_, X> {
     fn find_door(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.find_door(game, unit)
     }
+    /// objects.txt `MonsterOK` from the object state; without one (or
+    /// without object data for `door`) [`Pending::door_monster_ok`].
     fn door_monster_ok(&self, door: UnitId) -> bool {
-        self.h.x.door_monster_ok(door)
+        self.object_monster_ok(door)
+            .unwrap_or_else(|| self.h.x.door_monster_ok(door))
     }
     fn special_walk_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.special_walk_target(game, unit)
