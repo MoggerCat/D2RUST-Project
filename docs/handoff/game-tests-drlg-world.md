@@ -1,6 +1,6 @@
 # Handoff: game-file tests for the world and DRLG tables (branch `claude/game-tests-drlg-world`, 2026-10-06)
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (this session did not edit them); fold the local run queue below into §5 C and the results into §1. This file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Scope: `#[ignore]` game-file tests (`D2_GAME_DIR`) for `specs/world/*.md`
 and the table-level parts of `specs/drlg/*.md`, in two new integration
