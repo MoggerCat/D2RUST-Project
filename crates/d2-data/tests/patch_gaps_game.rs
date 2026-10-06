@@ -10,7 +10,7 @@ use d2_formats::mpq::ArchiveSet;
 /// `automap` repeats `Type2`, `chartemplate` repeats `SkillName` (no
 /// list binds either); the leftmost copy binds, so a `set` on `name@2` is N02 (and on `name@1`
 /// is not). `weapons` column 18 has an empty name.
-/// No claim yet: it has not run against 1.14d (queued in the report).
+// Covers: specs/data/patch-layers.md §edge-cases-original-bugs r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn edge_duplicate_columns_in_1_14d_headers() {
