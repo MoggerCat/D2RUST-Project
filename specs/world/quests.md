@@ -25,32 +25,33 @@
   item, monster, object and save specs (Phase 3, not written: they own
   item creation, monster spawning, object modes and the save header).
   Machine tables: `world/quests.tsv` (§2.4), `world/quest-messages.tsv`
-  (§7.1).
+  (§7.1). `world/quests-act1-rest.md` (A1Q4 gibbet, Cairn stone init,
+  A1Q5 chest trap, act progression, party reads).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–69 |
-| Inputs | 70–81 |
-| Outputs / state changes | 82–88 |
-| Rules | 89–90 |
-|   1. Quest flag records | 91–193 |
-|   2. Quest control and quest records | 194–289 |
-|   3. Game entry: picking the quest set | 290–322 |
-|   4. Events and dispatch | 323–407 |
-|   5. Quest updater and timers (tick step 8) | 408–429 |
-|   6. Status reporting | 430–521 |
-|   7. NPC dialog hooks | 522–554 |
-|   8. Act transitions, warps and portals | 555–636 |
-|   9. Quest items, rewards and helpers | 637–702 |
-|   10. Act I quests | 703–1492 |
-|   11. Acts II–V | 1493–1498 |
-| Constants & data dependencies | 1499–1513 |
-| Randomness | 1514–1532 |
-| Edge cases & original bugs | 1533–1551 |
-| Test vectors | 1552–1583 |
-| Provenance | 1584–1605 |
-| Open questions | 1606–1645 |
+| Summary | 57–70 |
+| Inputs | 71–82 |
+| Outputs / state changes | 83–89 |
+| Rules | 90–91 |
+|   1. Quest flag records | 92–194 |
+|   2. Quest control and quest records | 195–290 |
+|   3. Game entry: picking the quest set | 291–323 |
+|   4. Events and dispatch | 324–408 |
+|   5. Quest updater and timers (tick step 8) | 409–430 |
+|   6. Status reporting | 431–522 |
+|   7. NPC dialog hooks | 523–555 |
+|   8. Act transitions, warps and portals | 556–637 |
+|   9. Quest items, rewards and helpers | 638–703 |
+|   10. Act I quests | 704–1497 |
+|   11. Acts II–V | 1498–1503 |
+| Constants & data dependencies | 1504–1518 |
+| Randomness | 1519–1537 |
+| Edge cases & original bugs | 1538–1556 |
+| Test vectors | 1557–1588 |
+| Provenance | 1589–1610 |
+| Open questions | 1611–1643 |
 <!-- /index -->
 
 ## Summary
@@ -685,7 +686,7 @@ nothing.
 
 | Class | Case | Function |
 |---|---|---|
-| 0x1A (26) | Cain's gibbet | `0x00593290` (§10.6, Open question 11) |
+| 0x1A (26) | Cain's gibbet | `0x00593290` (`quests-act1-rest.md` §1.2) |
 | 0x7A (122) | record 11 | `0x0059B710` |
 | 0x83 (131) | needs a room; mode 1 → mode 2; room level 76 → `0x005B23C0(game, object, 301, 1, −1, 0)`; level 108 → `0x005B5750` | — |
 | 0xBD (189) | room level in Act I → record 4, `0x005942C0`; level 109 or ≥ 113 → record 33, `0x0058A730`; other → record 32, `0x00588CA0` | — |
@@ -1119,7 +1120,7 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
 | +0x63 | u8 | the reward message must set game 4.13 |
 | +0x64 | u8 | scroll deciphered, chat end not yet handled |
 | +0x68 | u32 | GUID of the spawned town Cain |
-| +0x6C, +0x70 | u32, u8 | GUID of the town monster Cain spawns beside, and "known" |
+| +0x6C, +0x70 | u32, u8 | GUID of the town-Cain marker object (class 385; `quests-act1-rest.md` §3), and "known" |
 | +0x78 | u8 | set with the scroll states |
 | +0x7C | i32 | `bks ` / `bkd ` items in the game |
 | +0x93 | u8 | set at chat end with class 146 |
@@ -1158,7 +1159,7 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
    2. a = 1: remove the player's GUID from a non-empty record list and
       from the +0xB4 list. If R has 4.0 or 4.1: end. If state = 2: state
       := 3.
-   3. b = 1: if +0x70 ≠ 0, the monster with GUID +0x6C exists, +0x52 = 1
+   3. b = 1: if +0x70 ≠ 0, the object with GUID +0x6C exists, +0x52 = 1
       and +0x51 = 0: spawn the town Cain beside it (step 15). End.
    4. b = 40 (Lut Gholein): if R lacks 4.0 and 4.1, +0x50 = 0 and state
       < 6: Cain cleanup (step 14, arguments 0, 1); state := 7; broadcast(5,
@@ -1260,7 +1261,7 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
 - Stone order message `0x00593CB0(game, player)` (§9.4): compute the
   order if +0x4A = 0 (+0x4A := 1); send 0x50 (15 bytes, `0x0053D7E0`):
   u8 0x50, u16 4, then order[k] − 17 as u16 for k = 0..4 (each must be
-  < 5, else fatal); bytes 13–14 are never written (stack bytes, Open
+  < 5, else fatal); bytes 13–14 are never written (stack bytes; `quests-act1-rest.md` §7, Open
   question 5).
 - Wirt's body (object class 268, event 7): the first time, piles =
   roll_range(quest seed, 10, 10) (one step, lo' mod 10 + 10) and the
@@ -1294,18 +1295,22 @@ seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
   8. n = 5: object mode := 1; P mode := 6; +0x4F := 1; delete the
      player's `bkd `; +0x7C −= 1. Position: the stored stone whose order
      value is 21 if it is an object of class 21, else the first class-21
-     object in the rooms of the operated object's room list. Found: an
-     object of class 288 at (x + 6, y − 3) (`0x0056EDE0`), its room
+     object in the rooms of the operated object's room list. Found: a
+     missile of class 288 (cairnstones, owner the player, skill 0,
+     level 1; it opens the Tristram portal, `missiles/bodies.md`) at
+     (x + 6, y − 3) (`0x0056EDE0`, `quests-act1-rest.md` §4.1), its room
      refreshed (`0x0061AED0`). If status < 4: broadcast(4, 0); with a
      party, members lacking 4.0 and 4.1 in an Act I level get 4.4
      (`0x005936B0`); set R 4.4. Finally `0x00545760(game, 1)` (0x28 and
      `89 01` to every player).
-  Stone values come from the object (args +0x10), 17–21 as in the
+  Stone values come from the object (args +0x10: the object's class,
+  `quests-act1-rest.md` §2.1), 17–21 as in the
   order.
-- Not read for this spec: the gibbet function `0x00593290` (§9.5 class
-  26), the operate function `0x00593480` (pointer `0x00732D40`), the
-  object init `0x005935E0` (pointer `0x00731BD8`) and the portal helper
-  `0x00592D50` (Open question 11).
+- The gibbet operate `0x00593480` (pointer `0x00732D40`), the gibbet
+  quest function `0x00593290` (§9.5 class 26), the stone init
+  `0x005935E0` (pointer `0x00731BD8`), the Tristram-portal timer
+  `0x00592D50` and the town-Cain marker init `0x005940E0` are in
+  `quests-act1-rest.md` §1–§3.
 
 #### 10.7 A1Q5 The Forgotten Tower (chain 5)
 
@@ -1399,9 +1404,9 @@ with 0 = A, else B, returns whether found).
     object mode 3.
 11. **Sequence** `0x00595240`: §10.1.
 
-No quest-seed draws. The trap step's spawns (monster class 326 near each
-chest, then an object of class 332 per chest, `0x0056EDE0`) are Open
-question 12.
+No quest-seed draws. The trap step `0x005954F0` (one trap-firebolt
+monster 326, then a towerchestspawner missile 332 per chest) is
+`quests-act1-rest.md` §4.
 `0x00595160` and `0x00594DB0` have no direct caller in the exports.
 
 #### 10.8 A1Q6 Sisters to the Slaughter (chain 6)
@@ -1424,8 +1429,8 @@ timer counter, +0x194 u8 killed, +0x195 u8 talked, all 0.
 | O7 | `0x00596490` (arg = the victim) | if P's room's level is 37: a portal object of class 59 to level 1 at P's position, owner P (`0x0056D130(game, P, room, x, y, 1, 0, 59, 0)`); returns 1 (stops the walk) |
 
 Credit `0x00596210(game, P)`: set 6.13, 6.1 in P's record; then
-`0x00538680(P's client, 1, difficulty)` (client-side act access; owner
-not specced, Open question 13).
+`0x00538680(P's client, 1, difficulty)` (character progression,
+`quests-act1-rest.md` §5).
 
 1. **Event 0** `0x00595E20` (NPC class c):
    1. c = 265 and the player is in the Cain list, c = 148 and in the
@@ -1614,31 +1619,24 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    confirm its draws (`world/cube.md` open question 4).
 4. Which game-entry path (mode 0 or 1, §3) single player takes: record a
    game start with a breakpoint on `0x00546270`.
-5. Stone-order 0x50 (`0x00593CB0`, §10.6): bytes 0–12 are known; bytes
-   13–14 are uninitialized stack in the sender. Record one stone-order
-   0x50 to see what the original sends there.
+5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
+   written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
+   masks them.)
 6. Act V intro init `0x0058EA50` (not disassembled): callbacks and table.
-7. Exact party/area membership tests of the per-quest iterate functions
-   beyond what §10 states (chain 1 settled, §10.4; A1Q2's reward-pending
-   iterate open). The party list at game +0x1D2C and the party id
-   (`0x00554630`, `0x00540710`) have no owner spec; a single player is
-   in no party (0xFFFF), so I3 does nothing there. Settle with a party
-   spec.
+7. (Answered: `quests-act1-rest.md` §6 states what the quest code reads
+   of the party list at game +0x1D2C (`0x00554630`, `0x00540710`,
+   `0x00540510`); future owner `world/party.md`. The Act I iterate tests
+   are in §10.4–§10.8 (A1Q2's J3 and J7 in §10.5).)
 8. Acts II–V state machines (later spec).
 9. Event 1, 6, 7, 12 raisers: none found; confirm no indirect calls.
 10. (Settled: §8.1 table, read from the call sites.) A recording of
     each act change would still confirm the 0x61 bytes.
-11. A1Q4 object functions not yet stated: the gibbet quest function
-    `0x00593290` (object class 26), the operate function `0x00593480`,
-    the object init `0x005935E0`, the portal helper `0x00592D50`, who
-    sets extra +0x6C/+0x70, and what the stone value at operate args
-    +0x10 is (object data). Settle with a disassembly read of those
-    functions.
-12. A1Q5 trap step `0x005954F0` (Countess death, object list +0x68):
-    the spawn arguments (monster 326 mode 12 flags 8, retry at +5, +5;
-    object 332 via `0x0056EDE0`, then `0x0064A710`, `0x0064A760`,
-    `0x0061AED0`) are read but not yet stated as rules. Settle with a
-    disassembly read and a Countess-kill recording.
-13. `0x00538680(client, 1, difficulty)` in the A1Q6 credit (§10.8):
-    what it changes for the client (D2MOO: allows Act II travel). Owner
-    spec missing; settle with a disassembly read.
+11. (Answered: `quests-act1-rest.md` §1 gibbet operate `0x00593480` and
+    quest function `0x00593290`; §2 stone init `0x005935E0`, portal
+    timer `0x00592D50` and the stone value (= the object's class); §3
+    the +0x6C/+0x70 marker object (init `0x005940E0`). `0x005944F0`
+    stays open there, its Open question 1.)
+12. (Answered: `quests-act1-rest.md` §4; a Countess-kill recording would
+    still confirm it, its Open question 3.)
+13. (Answered: `quests-act1-rest.md` §5: it raises the character
+    progression in the client save flags; future owner the save spec.)
