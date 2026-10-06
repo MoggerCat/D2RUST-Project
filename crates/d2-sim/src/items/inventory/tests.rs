@@ -196,6 +196,8 @@ struct Fake {
     in_range: bool,
     link_ok: bool,
     allows: bool,
+    /// `0x0063CB00` answers "no free position on page 0".
+    no_free_page0: bool,
     log: Vec<String>,
 }
 
@@ -339,7 +341,7 @@ impl InvWorld for Fake {
         self.props[&item].ammo
     }
     fn fits_free_page0(&self, _inv: &Inventory, _item: UnitId) -> bool {
-        true
+        !self.no_free_page0
     }
     fn quality(&self, item: UnitId) -> u8 {
         self.props[&item].quality
@@ -1584,3 +1586,6 @@ fn real_grid_belt_and_type_tables() {
         assert_eq!(&types[i].code, code, "itemtypes row {i}");
     }
 }
+
+#[path = "gap_tests.rs"]
+mod gap_tests;
