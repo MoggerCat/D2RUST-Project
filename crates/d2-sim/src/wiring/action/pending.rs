@@ -13,7 +13,7 @@
 //! adapter that wires it.
 
 use crate::game::Game;
-use crate::monsters::ai::{ModeTarget, PortalNpc};
+use crate::monsters::ai::{ModeTarget, PortalNpc, QuestCall};
 use crate::units::hooks::Sim;
 use crate::units::{RoomId, UnitId, UnitType};
 
@@ -293,6 +293,239 @@ pub trait Pending {
     /// SandRaider's help search (scan 1, `ai.md` §9.26 step 4).
     fn nearest_evil_monster(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         None
+    }
+
+    // ---- the Act II–V AI bodies (`monsters/ai-bodies-2.md`..`-5.md`;
+    // [`crate::monsters::ai::AiActs`]) -------------------------------------
+
+    /// Max mana `0x00625D60`.
+    fn ai_max_mana(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x00625760(unit, flags)`: an active stat list with the flags.
+    fn ai_has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
+        false
+    }
+    /// `0x00554200(game, a, b)`: b hostile to a (`combat/hit.md`).
+    fn ai_hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
+        false
+    }
+    /// `0x00552FD0`: the unit's owner.
+    fn ai_owner(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x0058F090`: a monster's owner record (type, GUID).
+    fn ai_owner_record(&self, unit: UnitId) -> Option<(i32, u32)> {
+        None
+    }
+    /// `0x0065C310` on the player's quest record of the difficulty.
+    fn ai_quest_flag(&self, player: UnitId, difficulty: u8, quest: i32, flag: i32) -> bool {
+        false
+    }
+    /// `0x005353F0`: the player's portal GUID.
+    fn ai_portal_guid(&self, player: UnitId) -> Option<u32> {
+        None
+    }
+    /// Monster data `nComponent[i]`.
+    fn ai_component(&self, unit: UnitId, i: usize) -> u8 {
+        0
+    }
+    /// `0x00553010`: the unit's target unit.
+    fn ai_target_unit(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `0x00573090`: target override.
+    fn ai_set_target_override(&mut self, unit: UnitId, kind: i32, guid: u32) {}
+    /// `0x006510C0(class, 0, 0)`: the monstats chain byte +0x4B.
+    fn ai_chain_index(&self, class: i32) -> i32 {
+        0
+    }
+    /// `0x0063EC70(room, class)`; `class` itself by default.
+    fn ai_class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
+        class
+    }
+    /// Skill level with bonus of the unit's (highest) entry.
+    fn ai_skill_level(&self, unit: UnitId, skill: i32, highest: bool) -> Option<i32> {
+        None
+    }
+    /// The unit's highest skill entry: id and mode.
+    fn ai_skill_entry(&self, unit: UnitId, skill: i32) -> Option<(i32, u8)> {
+        None
+    }
+    /// Left / right skill: id and level.
+    fn ai_hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x0056DEB0` + `0x005701B0`.
+    fn ai_add_right_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {}
+    /// `0x00647280`.
+    fn ai_assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {}
+    /// `0x00644560`; false (no entry) by default.
+    fn ai_set_skill_param(&mut self, unit: UnitId, skill: i32, value: i32) -> bool {
+        false
+    }
+    /// `0x005FD470(skill, target, x, y)`.
+    fn ai_skill_check(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        skill: i32,
+        target: Option<UnitId>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        false
+    }
+    /// `0x0056E390`.
+    fn ai_corpse_search(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        target: Option<UnitId>,
+        skill: i32,
+        level: i32,
+    ) -> Option<UnitId> {
+        None
+    }
+    /// Path pattern (path +0x48).
+    fn ai_path_pattern(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x00649190`.
+    fn ai_set_path_pattern(&mut self, unit: UnitId, pattern: i32) {}
+    /// `0x00554EA0`; false by default.
+    fn ai_place_unit(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+    ) -> bool {
+        false
+    }
+    /// `0x0064EA90`.
+    fn ai_stamp_pattern(
+        &mut self,
+        game: &mut Game,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+        pattern: i32,
+        mask: u16,
+    ) {
+    }
+    /// `0x0064CBE0`.
+    fn ai_clear_cell(&mut self, game: &mut Game, room: Option<RoomId>, x: i32, y: i32, bits: u16) {}
+    /// `0x0064CB30`.
+    fn ai_point_collides(
+        &self,
+        game: &Game,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+        mask: u16,
+    ) -> bool {
+        false
+    }
+    /// `0x0064D910` with a given pattern at the unit's position.
+    fn ai_pattern_collides(&self, game: &Game, unit: UnitId, pattern: i32, mask: u16) -> bool {
+        false
+    }
+    /// `0x0064E7B0`.
+    fn ai_free_point(
+        &mut self,
+        game: &mut Game,
+        room: Option<RoomId>,
+        x: i32,
+        y: i32,
+        size: i32,
+    ) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x0054DC40` with a class and a start point.
+    fn ai_free_spot_for(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        class: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x00463740`.
+    fn ai_room_at(&self, game: &Game, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
+        None
+    }
+    /// `0x005DE4E0(target, mode, a, b)`.
+    fn ai_move_in_radius(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        target: UnitId,
+        mode: u8,
+        a: i32,
+        b: i32,
+    ) -> bool {
+        false
+    }
+    /// `0x00620C10`.
+    fn ai_set_path_target(&mut self, unit: UnitId, target: UnitId) {}
+    /// Path type 2 and compute toward the target; whether it has points.
+    fn ai_path_has_points(&mut self, game: &mut Game, unit: UnitId, target: UnitId) -> bool {
+        false
+    }
+    /// `0x00621DC0`.
+    fn ai_direction64(&self, unit: UnitId, target: UnitId) -> i32 {
+        0
+    }
+    /// `0x005B2F20`; nothing spawned by default.
+    #[allow(clippy::too_many_arguments)]
+    fn ai_spawn_monster(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    /// SandMaggotQueen's spawn class (`ai-bodies-2.md` OQ4); −1.
+    fn ai_queen_spawn_class(&self, unit: UnitId) -> i32 {
+        -1
+    }
+    /// `0x0057CCB0(game, unit, killer, 1)`.
+    fn ai_kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {}
+    /// The unit leaves its room and is removed.
+    fn ai_remove_unit(&mut self, game: &mut Game, unit: UnitId) {}
+    /// Baal clone owner links.
+    fn ai_link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {}
+    /// `0x00574370`.
+    fn ai_reinit_class(&mut self, game: &mut Game, unit: UnitId, class: i32, mode: u8) {}
+    /// BaalThrone's change-class stat list.
+    fn ai_change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {}
+    /// WillOWisp's magic-find stat list.
+    fn ai_wisp_buff(&mut self, game: &mut Game, target: UnitId, value: i32, expire: i32) {}
+    /// S→C 0xA4.
+    fn ai_preload_class(&mut self, game: &mut Game, unit: UnitId, class: i32) {}
+    /// WillOWisp's unit find; nothing found by default.
+    fn ai_wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
+        Vec::new()
+    }
+    /// BaalThrone wave record: (mapped superunique, class).
+    fn ai_wave(&self, w: i32) -> Option<(i32, i32)> {
+        None
+    }
+    /// `0x0061AED0(room, 0)`.
+    fn ai_clear_room_portal_flag(&mut self, game: &mut Game, room: Option<RoomId>) {}
+    /// A quest call of the Act II–V bodies; false by default.
+    fn ai_quest_call(&mut self, game: &mut Game, unit: UnitId, call: QuestCall) -> bool {
+        false
     }
     /// The unit's last attacker (`0x00621D50`; unit field not described).
     fn set_last_attacker(&mut self, defender: UnitId, attacker: UnitId) {}

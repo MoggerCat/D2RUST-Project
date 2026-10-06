@@ -245,7 +245,7 @@ fn apply(p: &mut TickParam, s: Search) {
 }
 
 /// `0x005DE890` (§2.3), target mode 1: true when a target was found.
-fn find_mode1<W: AiHost + ?Sized>(
+pub(super) fn find_mode1<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
     unit: UnitId,

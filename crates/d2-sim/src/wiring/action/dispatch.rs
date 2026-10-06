@@ -94,6 +94,8 @@ impl<X: Pending> ActionSim<X> {
                     monstats2: &t.combat.monstats2,
                     levels: &t.levels,
                     skill_modes: &t.skill_modes,
+                    skills: &t.skills.skills,
+                    missiles: &t.skills.missiles,
                 },
                 info,
                 store: &mut store,

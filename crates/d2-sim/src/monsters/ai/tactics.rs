@@ -84,7 +84,9 @@ pub fn mode_at<W: AiHost + ?Sized>(
 }
 
 /// `0x005DEAD0` `AITACTICS_UseSkill` (§7.1): mode < 16: current skill,
-/// unit flag 0x40, path step 1, mode change; on failure idle 10.
+/// unit flag 0x40, path step 1, mode change; on failure idle 10. True
+/// when the mode change succeeded (the result Diablo's aura and the
+/// Ancients test, `ai-bodies-4.md` §7, `ai-bodies-5.md` §12).
 pub fn use_skill<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -92,16 +94,18 @@ pub fn use_skill<W: AiHost + ?Sized>(
     m: u8,
     skill: i32,
     target: ModeTarget,
-) {
+) -> bool {
     if m >= 16 {
-        return;
+        return false;
     }
     cx.world.set_current_skill(unit, skill);
     cx.world.set_skill_flag(unit);
     cx.world.set_path_steps(unit, 1);
     if !cx.world.change_mode(game, unit, m, target) {
         idle(game, cx, unit, 10);
+        return false;
     }
+    true
 }
 
 /// `0x005DE000` `AITACTICS_UseSequenceSkill` (§7.1): skill id in range:

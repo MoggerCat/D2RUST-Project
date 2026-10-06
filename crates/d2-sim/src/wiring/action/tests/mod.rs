@@ -300,7 +300,7 @@ fn tables() -> ActionTables {
         skills: skill_tables(vec![skill_rec()]),
         combat: combat_tables(vec![monster_class()]),
         levels: vec![blank::<Levels>(); 150],
-        skill_modes: vec![[0; 4]],
+        skill_modes: vec![[0; 8]],
     }
 }
 
