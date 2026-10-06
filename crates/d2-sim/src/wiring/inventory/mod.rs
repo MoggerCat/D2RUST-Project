@@ -10,6 +10,9 @@
 //!   [`crate::items::moves::MovePending`] ([`pending`]): every move
 //!   handler (`items::moves::handle`) and the per-client update pass
 //!   (`items::moves::player_update`) run on it.
+//! - [`host`]: the model for the other item systems (vendors, the cube):
+//!   reads on [`InvState`], placement / removal / checks on [`InvDesk`],
+//!   keyed by unit, so one inventory per owner serves every system.
 //! - [`InvRest`]: the calls without a d2-sim provider (positions and the
 //!   free-spot search of `sim/path-placement.md`, player data, NPC
 //!   interaction, item use, sockets, hirelings, sounds, transport, and
@@ -31,6 +34,7 @@
 //! R1–R6 exists). Nothing here decides behaviour: rules stay in the
 //! modules; an adapter maps a seam call to a provider call.
 
+pub mod host;
 pub mod inv_world;
 pub mod ops;
 pub mod pending;

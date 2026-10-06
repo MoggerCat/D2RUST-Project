@@ -117,6 +117,10 @@ pub struct ActionHooks<X> {
     pub hit_class: u8,
     /// The game seed of `rng.md` §5.3 (unit allocation).
     pub game_seed: Seed,
+    /// The game's one item store (the item data of every item unit:
+    /// drops, stores, inventories, the cube; `crate::wiring::economy`).
+    /// Lent to an economy for a call (empty then).
+    pub items: crate::wiring::economy::ItemStore,
     /// Waypoint records per player (player data +0x1C, `waypoints.md` §2).
     pub waypoints: BTreeMap<UnitId, WaypointRecords>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
@@ -161,6 +165,7 @@ impl<X> ActionHooks<X> {
             combat_lists: BTreeMap::new(),
             hit_class: 0,
             game_seed,
+            items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
             anim_data: None,
             vitals: None,
