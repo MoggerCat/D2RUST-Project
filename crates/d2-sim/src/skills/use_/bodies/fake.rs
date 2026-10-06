@@ -22,6 +22,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct FList {
     pub flags: u32,
     pub expire: i32,
+    /// The owner the list was allocated with.
+    #[allow(dead_code)]
     pub owner: Option<usize>,
     pub state: i32,
     pub skill: i32,
@@ -85,7 +87,6 @@ pub struct BodyFake {
     pub allies: BTreeSet<(usize, usize)>,
     pub sequence: Option<Vec<[u8; 6]>>,
     pub frames: Option<i32>,
-    pub players: i32,
 }
 
 impl BodyFake {
@@ -226,7 +227,15 @@ impl KickItems for BodyFake {
 }
 
 impl UseMissiles for BodyFake {
-    fn create_skill_missile(&mut self, u: usize, skill: i32, l: i32, m: u16, lob: bool, _: MissileAim) {
+    fn create_skill_missile(
+        &mut self,
+        u: usize,
+        skill: i32,
+        l: i32,
+        m: u16,
+        lob: bool,
+        _: MissileAim,
+    ) {
         self.log(format!("skillmissile {u} {skill} {l} {m} {lob}"));
     }
 }
@@ -236,7 +245,16 @@ impl SkillFunctions for BodyFake {
         self.log(format!("srvst {index} {u} {skill} {lvl}"));
         0
     }
-    fn srvdo(&mut self, index: u16, u: usize, skill: i32, lvl: i32, _: bool, _: bool, _: bool) -> i32 {
+    fn srvdo(
+        &mut self,
+        index: u16,
+        u: usize,
+        skill: i32,
+        lvl: i32,
+        _: bool,
+        _: bool,
+        _: bool,
+    ) -> i32 {
         self.log(format!("srvdo {index} {u} {skill} {lvl}"));
         0
     }
@@ -286,7 +304,11 @@ impl UseWorld for BodyFake {
     fn set_left_skill(&mut self, _: usize, _: SkillEntry) {}
     fn set_right_skill(&mut self, _: usize, _: SkillEntry) {}
     fn find_entry(&self, u: usize, skill: i32) -> Option<SkillEntry> {
-        self.c.units[u].skills.iter().find(|e| e.skill == skill).copied()
+        self.c.units[u]
+            .skills
+            .iter()
+            .find(|e| e.skill == skill)
+            .copied()
     }
     fn find_entry_owned(&self, u: usize, skill: i32, owner: i32) -> Option<SkillEntry> {
         self.c.units[u]
@@ -686,9 +708,10 @@ impl BodyWorld for BodyFake {
         self.lists[l].stats.clear();
     }
     fn has_handler(&self, u: usize, kt: i32, key: i32, skill: i32) -> bool {
-        self.handlers
-            .get(&u)
-            .is_some_and(|v| v.iter().any(|h| h.key_type == kt && h.key == key && h.skill == skill))
+        self.handlers.get(&u).is_some_and(|v| {
+            v.iter()
+                .any(|h| h.key_type == kt && h.key == key && h.skill == skill)
+        })
     }
     fn entry_param(&self, u: usize, e: &SkillEntry, i: u8) -> i32 {
         self.entries.get(&(u, e.skill, i)).copied().unwrap_or(0)
@@ -738,7 +761,14 @@ impl BodyWorld for BodyFake {
     fn room_teleport(&self, _: usize) -> Option<i32> {
         self.teleport
     }
-    fn free_point(&mut self, r: usize, (x, y): (i32, i32), _: i32, _: u32, _: bool) -> Option<(usize, (i32, i32))> {
+    fn free_point(
+        &mut self,
+        r: usize,
+        (x, y): (i32, i32),
+        _: i32,
+        _: u32,
+        _: bool,
+    ) -> Option<(usize, (i32, i32))> {
         let (dx, dy) = self.free_shift?;
         Some((r, (x + dx, y + dy)))
     }
@@ -768,7 +798,14 @@ impl BodyWorld for BodyFake {
     fn path_target_point(&self, _: usize) -> (i32, i32) {
         self.path_target
     }
-    fn create_monster(&mut self, r: usize, at: (i32, i32), class: i32, mode: i32, spread: i32) -> Option<usize> {
+    fn create_monster(
+        &mut self,
+        r: usize,
+        at: (i32, i32),
+        class: i32,
+        mode: i32,
+        spread: i32,
+    ) -> Option<usize> {
         self.log(format!("monster {r} {at:?} {class} {mode} {spread}"));
         if self.no_monsters {
             return None;
