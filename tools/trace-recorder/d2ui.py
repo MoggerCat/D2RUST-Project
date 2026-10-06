@@ -136,3 +136,49 @@ def getpixel(h, x, y):
     ox, oy = client_origin(h)
     sdc = u32.GetDC(0); c = g32.GetPixel(sdc, ox + x, oy + y); u32.ReleaseDC(0, sdc)
     return c & 255, (c >> 8) & 255, (c >> 16) & 255
+
+
+def _cli(argv):
+    """Drive a running game window from a shell, one action per call (own code):
+      py d2ui.py shot FILE.png | click X Y | rclick X Y | hold X Y SECONDS | key NAME|VK
+      | shiftclick X Y | move X Y | close
+    Coordinates are client-area screenshot pixels (as pclick)."""
+    import sys
+    h = find_window(None, 10)
+    if not h:
+        sys.exit("no Diablo II window")
+    cmd, a = argv[0], argv[1:]
+    if cmd == "shot":
+        print(screenshot(h, a[0]))
+    elif cmd in ("click", "rclick"):
+        pclick(h, int(a[0]), int(a[1]), right=cmd == "rclick")
+    elif cmd == "shiftclick":
+        lp = (int(a[1]) << 16) | int(a[0])
+        u32.PostMessageW(h, 0x100, 0x10, 1); time.sleep(0.05)
+        u32.PostMessageW(h, 0x200, 4, lp); time.sleep(0.1)
+        u32.PostMessageW(h, 0x201, 5, lp); time.sleep(0.1)
+        u32.PostMessageW(h, 0x202, 4, lp); time.sleep(0.1)
+        u32.PostMessageW(h, 0x101, 0x10, 1 | (3 << 30))
+    elif cmd == "hold":
+        lp = (int(a[1]) << 16) | int(a[0])
+        u32.PostMessageW(h, 0x200, 0, lp); time.sleep(0.1)
+        u32.PostMessageW(h, 0x201, 1, lp)
+        t_end = time.time() + float(a[2])
+        while time.time() < t_end:
+            u32.PostMessageW(h, 0x200, 1, lp); time.sleep(0.1)
+        u32.PostMessageW(h, 0x202, 0, lp)
+    elif cmd == "move":
+        u32.PostMessageW(h, 0x200, 0, (int(a[1]) << 16) | int(a[0]))
+    elif cmd == "key":
+        k = a[0]
+        vk = VK.get(k.upper()) or (ord(k.upper()) if len(k) == 1 else int(k, 0))
+        pkey(h, vk)
+    elif cmd == "close":
+        u32.PostMessageW(h, 0x10, 0, 0)
+    else:
+        sys.exit("unknown command " + cmd)
+
+
+if __name__ == "__main__":
+    import sys
+    _cli(sys.argv[1:])
