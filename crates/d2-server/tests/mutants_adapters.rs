@@ -6,18 +6,32 @@
 use std::sync::{Arc, Mutex};
 
 use d2_server::adapters::handlers::skills::{self, Call, Handled, SkillHost};
+use d2_server::adapters::handlers::world::{WorldFault, WorldHost};
 use d2_server::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts, Unspecified};
 use d2_server::buffers::ClientBuffers;
 use d2_server::seams::*;
 use d2_sim::game::Game;
-use d2_sim::skills::use_::ServerMsg;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
+
+/// A world host whose only system is the skill slot (`WorldHost::skill`);
+/// `None`: no skill handlers.
+#[derive(Default)]
+struct SkillSlot(Option<Recorder>);
+
+impl WorldHost<Unspecified> for SkillSlot {
+    fn skill(&mut self, call: Call<'_, Unspecified>) -> Option<Handled> {
+        self.0.as_mut()?.handle(call)
+    }
+    fn fault(&mut self, _: WorldFault) {}
+}
+
+type Sim = SimGame<Unspecified, SkillSlot>;
 
 /// Act 0 with one active room: a player at (100, 100) for client 0, a
 /// monster and an item, both in act 1 unless staged otherwise.
 struct World {
-    sim: SimGame,
+    sim: Sim,
     player: UnitId,
     monster: UnitId,
     item: UnitId,
@@ -33,7 +47,7 @@ fn world() -> World {
         .spawn_unit(UnitType::Monster, Some(room), false)
         .unwrap();
     let item = game.spawn_unit(UnitType::Item, None, false).unwrap();
-    let mut sim = SimGame::new(game);
+    let mut sim: Sim = SimGame::with_events(game, Unspecified);
     sim.join(0, Some(player), Some(room), client_state::IN_GAME)
         .unwrap();
     sim.set_player(
@@ -63,7 +77,7 @@ fn facts(act: u8, owner: Option<UnitId>) -> UnitFacts {
     }
 }
 
-fn guid(sim: &SimGame, u: UnitId) -> u32 {
+fn guid(sim: &Sim, u: UnitId) -> u32 {
     sim.game.lists.unit(u).unwrap().guid
 }
 
@@ -95,16 +109,13 @@ fn handler_codes() {
 struct Recorder(Arc<Mutex<Vec<u8>>>);
 
 impl SkillHost<Unspecified> for Recorder {
-    fn handle(&mut self, call: Call<'_, Unspecified>) -> Handled {
+    fn handle(&mut self, call: Call<'_, Unspecified>) -> Option<Handled> {
         self.0.lock().unwrap().push(call.msg[0]);
-        Handled {
+        Some(Handled {
             code: ResultCode::Refused,
             point_accept: None,
             resync: false,
-        }
-    }
-    fn unsent(&self) -> &[(ClientId, ServerMsg)] {
-        &[]
+        })
     }
 }
 
@@ -115,7 +126,7 @@ impl SkillHost<Unspecified> for Recorder {
 fn skill_routing() {
     let mut w = world();
     let calls = Arc::new(Mutex::new(Vec::new()));
-    w.sim.skills = Some(Box::new(Recorder(calls.clone())));
+    w.sim.world.0 = Some(Recorder(calls.clone()));
     let mut out = ClientBuffers::new();
     for id in [0x01, 0x41, 0x51] {
         assert!(!skills::handled(id));
@@ -131,6 +142,6 @@ fn skill_routing() {
     );
     assert_eq!(*calls.lock().unwrap(), vec![0x3C]);
     // Without a host the handled id stays a stub too.
-    w.sim.skills = None;
+    w.sim.world.0 = None;
     assert_eq!(skills::handle(&mut w.sim, 0, &select, &mut out), None);
 }

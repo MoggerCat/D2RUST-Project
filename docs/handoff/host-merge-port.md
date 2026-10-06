@@ -96,3 +96,20 @@ Runs: `cargo test -p d2-client --test prop_worldsim` 4 pass (≈ 11 s);
 `PROPTEST_CASES=200`: 4 pass (287 s), no failure.
 `cargo check --workspace --all-targets --keep-going`: clean.
 Gate after the second port: `sh tools/gate.sh` GATE PASS (every step).
+
+## 5. Third port: `claude/tender-meitner-mphas3` 002b244 merged in
+
+Merged `origin/claude/tender-meitner-mphas3` at `002b244` (bench-baselines,
+prop-client, mutants-server, conformance-path-render, docs-fold-6) into
+`claude/host-merge-integration` (no conflict). Only
+`crates/d2-server/tests/mutants_adapters.rs` broke: it set
+`sim.skills = Some(Box::new(Recorder))` and implemented the old
+`SkillHost` (`handle -> Handled`, `unsent`). Ported: the test's game is
+`SimGame<Unspecified, SkillSlot>`, where `SkillSlot(Option<Recorder>)`
+is a minimal `WorldHost<Unspecified>` whose `skill` slot forwards to
+the recorder (`None`: no skill handlers, the "stays a stub" check);
+`Recorder::handle` returns `Some(Handled)`. The three tests and their
+assertions are unchanged (routing of 0x01 / 0x41 / 0x51 vs 0x3C, codes,
+the owned-item act skip). Every other new test built and passed as is.
+`cargo check --workspace --all-targets --keep-going`: clean;
+`sh tools/gate.sh`: GATE PASS.
