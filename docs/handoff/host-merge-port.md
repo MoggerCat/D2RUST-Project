@@ -65,3 +65,34 @@ overflow or recorded fatal path in the merged host.
 5 pass, ≈ 0.7 s. Hunts: `PROPTEST_CASES=3000` all (20 s),
 `PROPTEST_CASES=6000` trade host alone (36 s): no failure. Gate:
 `sh tools/gate.sh`: GATE PASS (every step, d2-client included).
+
+## 4. Second port: `crates/d2-client/tests/prop_worldsim.rs`
+
+Base: `claude/host-merge-integration` at `64ed44b` (the coordinator's
+merge of `claude/tender-meitner-mphas3` 729c76e, which added
+`prop_worldsim.rs` against the pre-merge API: `SkillSeams`,
+`TradeWorld`). Ported as `e2e_single_player.rs` already is on the merged
+host; no `src/` change.
+
+- Host: `SimGame<WorldSim<TestPending>, WiredWorld<Rest, WiredSkills>>`
+  (was `TradeWorld<Rest>` + `sim.skills = WiredSkills::new(vitals,
+  book)`); the skill handlers sit in `ActionWorld::skills`; the vitals
+  were already on `ActionHooks::vitals`; `WiredWorld::new` without the
+  `GameFields` argument (the seed is the action wiring's).
+- Skill seams: `Book`'s `SkillSeams` impl becomes inherent helpers
+  (`find_entry`, `entry_mode`, `srvst`, `srvdo`) that `TestPending`'s
+  `UseRest` already called; the message path now reads the same
+  `TestPending` (one provider, `host-merge.md` J4). `LearnRest` added
+  with the pre-merge `SkillSeams` defaults (`is_class_skill` false).
+  Gone with `SkillSeams`: `Book::room` (`Field`; now the units' real room
+  through `UseView`, they stand in the generated level) and
+  `Book::create_skill_missile` (a log line no assertion read; the
+  message path now creates the missile through the action wiring, as
+  the timer path did).
+- Properties, assertions (same count) and case count (8) unchanged;
+  `errors()` now also reads `SimGame::tick_faults`.
+
+Runs: `cargo test -p d2-client --test prop_worldsim` 4 pass (≈ 11 s);
+`PROPTEST_CASES=200`: 4 pass (287 s), no failure.
+`cargo check --workspace --all-targets --keep-going`: clean.
+Gate after the second port: `sh tools/gate.sh` GATE PASS (every step).
