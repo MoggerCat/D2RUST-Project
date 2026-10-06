@@ -42,8 +42,8 @@
 | Randomness | 878–891 |
 | Edge cases & original bugs | 892–930 |
 | Test vectors | 931–948 |
-| Provenance | 949–970 |
-| Open questions | 971–992 |
+| Provenance | 949–974 |
+| Open questions | 975–996 |
 <!-- /index -->
 
 ## Summary
@@ -748,7 +748,7 @@ state := 6; callback 10 := list remove.
 #### 8.6 Hellgate and Mephisto's bridge
 
 - Hellgate init 44 (`0x005BCBF0`, object 342): in level 104
-  (Pandemonium Fortress) → mode 2. Else with chain 20: +0x01 := 1,
+  (Outer Steppes, `levels.txt` Act 4 - Mesa 1) → mode 2. Else with chain 20: +0x01 := 1,
   +0x04 := GUID, mode := +0x0C.
 - Bridge init 45 (`0x005BCB90`, object 341): +0x02 := 1, +0x08 := GUID,
   mode := +0x10; +0x10 ≠ 2 → object event 7 at frame + 20.
@@ -865,7 +865,7 @@ called.
 | message-state index tables | chain 15 `0x0073F188`, 17 `0x007401B8`, 19 `0x00740ED8`, 20 `0x00741518` | image (§3–§8) |
 | Dark Wanderer minion offsets | 8 pairs (§9.2) | `0x00741538` |
 | intro jump table | NPC − 245 → case, 0x35 bytes | `0x005B6CF4`, `0x005B6CD8` |
-| levels | 75 Kurast Docks, 76 Spider Forest, 77 Great Marsh, 78 Flayer Jungle, 79 Lower Kurast, 82 Kurast Causeway, 98 Ruined Fane, 100–102 Durance of Hate 1–3, 104 Pandemonium Fortress | `levels.txt` |
+| levels | 75 Kurast Docks, 76 Spider Forest, 77 Great Marsh, 78 Flayer Jungle, 79 Lower Kurast, 82 Kurast Causeway, 98 Ruined Fane, 100–102 Durance of Hate 1–3, 104 Outer Steppes | `levels.txt` |
 | objects | 131, 193, 251, 252, 341, 342, 366–368, 378, 379, 382, 386, 404–407 | `objects.txt` |
 | NPCs / monsters | 242 mephisto, 245 cain3, 252 asheara, 253 hratli, 254 alkor, 255 ormus, 264 meshif2, 297 natalya, 301 vilechild1, 366 compellingorb, 368 darkwanderer, 407 fetish11 | `monstats.txt` |
 | superuniques | 26 Ismail Vilehand, 27 Geleb Flamefinger, 29 Toorc Icefist | `superuniques.txt` |
@@ -967,6 +967,10 @@ quest code draws.
   orb's two hits, the ≥ Ruined Fane start, the 22.2 / 22.3 start order,
   the global Lam Esen test in A3Q5 / A3Q6.
 - No packet or RNG recording of Act III exists yet.
+- corrected: level id vs Levels.txt (Act IV writer finding). Init 44 tests
+  the room's level id (`0x0061A1B0`) against 104; the `levels.txt` Id
+  column is that runtime id (row 0 Null, no offset), so 104 is Outer
+  Steppes (Act 4 - Mesa 1), not Pandemonium Fortress (103).
 
 ## Open questions
 
