@@ -57,6 +57,8 @@ pub struct Fake {
     pub log: Vec<String>,
     /// Every collision test (x, y, size, mask).
     pub collide_calls: std::cell::RefCell<Vec<(i32, i32, i32, u16)>>,
+    /// The nearest free point, if set; else the asked point.
+    pub nearest: Option<(i32, i32)>,
 }
 
 impl Fake {
@@ -182,6 +184,7 @@ impl PopWorld for Fake {
         self.chaos
     }
     fn nearest_free_point(&self, room: RoomId, x: i32, y: i32) -> Option<(RoomId, i32, i32)> {
+        let (x, y) = self.nearest.unwrap_or((x, y));
         Some((room, x, y))
     }
 }
