@@ -9,7 +9,7 @@
 //! which hand the event to [`Pending::skill_event`]. A seam value that
 //! also implements [`UseRest`] routes it here:
 //!
-//! ```ignore
+//! ```text
 //! fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
 //!     d2_sim::wiring::interaction::skill_events::route(h, sim, ev)
 //! }
