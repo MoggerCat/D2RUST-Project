@@ -10,7 +10,7 @@
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
 //! for byte; exit code 0 = all pass, 1 = a failure or error, 2 = none
-//! failed but a GPU half is not wired yet. With a map flag (`--ds1`,
+//! failed but a GPU half is incomplete (no adapter). With a map flag (`--ds1`,
 //! `--wall-base`, `--view`, `--out`) it runs today's single-map verify
 //! instead (default view: the whole map; exit 0 means identical).
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
@@ -228,7 +228,9 @@ fn verify(o: Options) -> Result<()> {
             verify::Status::Pass => Ok(()),
             verify::Status::Fail(why) => bail!(why),
             verify::Status::Error(e) => bail!(e),
-            verify::Status::GpuNotWired => unreachable!("map cases have a GPU half"),
+            verify::Status::GpuNotWired | verify::Status::NoAdapter(_) => {
+                unreachable!("map cases run their GPU half in the Bevy app")
+            }
         };
     }
     let dir = o.case_dir.unwrap_or_else(verify::default_case_dir);
@@ -244,13 +246,18 @@ fn verify(o: Options) -> Result<()> {
         cases.retain(|c| o.cases.contains(&c.name));
     }
     println!("verify: {} cases from {}", cases.len(), dir.display());
-    // TODO(C5): replace with the compute compositor's `GpuCompositor`.
-    let mut gpu = verify::NotWired;
+    // The compute compositor on a headless adapter, opened at the first
+    // synthetic case (after the map case's Bevy app, which sorts first).
+    let mut gpu = verify::gpu::Wgpu::new();
+    let mut announced = false;
     let mut summary = verify::Summary::default();
     for case in &cases {
         println!("case {} ({})", case.name, case.kind.name());
         let report = match &case.kind {
             verify::CaseKind::Synthetic(s) => {
+                if !std::mem::replace(&mut announced, true) {
+                    println!("GPU compositor: {}", gpu.open());
+                }
                 verify::run_synthetic(&case.name, s, o.perturb, &mut gpu)
             }
             verify::CaseKind::Map(m) => verify::map::run(&case.name, m, None, o.perturb),
