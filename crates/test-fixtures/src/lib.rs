@@ -10,22 +10,28 @@
 //! - [`tbl`], [`animdata`], [`ds1`], [`dt1`]: format writers.
 //! - [`drlg`]: the DS1 / DT1 files of the synthetic levels (a one-room
 //!   preset town).
+//! - [`act1`]: an Act I-shaped variant of the set (the act placer's
+//!   levels and the lvlprest ids the Act I generator stamps).
 //! - [`synth`]: the `.txt` table model (schema headers, rows).
 //! - [`content`]: the made-up rows, strings and animation records.
 //! - [`install`]: archives on disk, the text compile, the `.bin` pack and
 //!   the load through `d2-data`.
+//! - [`host`]: a joined single-player host over a [`game::GameData`]
+//!   (creation, join, frames, walk legs).
 //! - [`game`]: a game from a loaded set: the table views, the DRLG
 //!   providers and a `WorldSim` (what the server builds a game from).
 //!
 //! Never a dependency of a game crate's normal build: use it from
 //! `[dev-dependencies]`.
 
+pub mod act1;
 pub mod animdata;
 pub mod content;
 pub mod drlg;
 pub mod ds1;
 pub mod dt1;
 pub mod game;
+pub mod host;
 pub mod install;
 pub mod synth;
 pub mod tbl;

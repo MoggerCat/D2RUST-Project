@@ -20,3 +20,5 @@ workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+# The game constructor and the wired-host session (`tests/game_wired_host.rs`).
+test-fixtures.workspace = true
