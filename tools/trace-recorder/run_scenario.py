@@ -156,6 +156,43 @@ def parse_scenario(text):
             "streams": list(streams), "steps": steps}
 
 
+def scenario_run_exe():
+    """`scenario-run` binary: $SCENARIO_RUN, else the cargo target dir's debug build."""
+    env = os.environ.get("SCENARIO_RUN")
+    if env:
+        return env
+    tgt = os.environ.get("CARGO_TARGET_DIR", os.path.join(REPO, "target"))
+    return os.path.join(tgt, "debug", "scenario-run.exe" if os.name == "nt" else "scenario-run")
+
+
+def load_script(path, save_override=None):
+    """A `.scenario` script (specs/tools/scenario.md) through `scenario-run export`
+    (the one strict parser and canonical writer; handoff scenario-harness §3 change 1).
+    Returns (sc, sha256 of the canonical text, export dict). Times are relative
+    (`rel`): tick t is frame F0 + 1 + t (scenario.md §4 rule 2)."""
+    import subprocess
+    r = subprocess.run([scenario_run_exe(), "export", path], capture_output=True, text=True)
+    if r.returncode:
+        raise ScenarioError(f"{path}: scenario-run export failed: {(r.stderr or r.stdout).strip()}")
+    ex = json.loads(r.stdout)
+    save = save_override or ex["save"]
+    if not save:
+        raise ScenarioError(f"{path}: no `char save`: the original side needs a save (handoff §3)")
+    if ex["class"] is None:
+        raise ScenarioError(f"{path}: no `char class`: needed to start the game")
+    cls = ex["class"]
+    if not 0 <= cls <= 6:
+        raise ScenarioError(f"{path}: class {cls}")
+    streams = ["packets", "units"]            # raw hooks the trace is built from
+    steps = []
+    for s in ex["steps"]:
+        steps.append(s)
+    return ({"seed": ex["seed"], "init_seed": ex["init"], "save": save, "class": cls,
+             "difficulty": ex["difficulty"], "ticks": ex["end"], "streams": streams,
+             "steps": steps, "rel": True, "export": ex, "save_overridden": bool(save_override)},
+            ex["sha256"], ex)
+
+
 def load_scenario(path):
     with open(path, "rb") as f:
         raw = f.read()
@@ -288,6 +325,76 @@ def stat_value(entries, count, stat, layer=0):
     return 0
 
 
+G_SEED = 0xD0             # handoff scenario-harness §3 change 4: game seed (lo, hi) at game +0xD0
+TRACE_FORMAT, TRACE_VERSION = "scenario-trace", 1      # traces/FORMAT.md §Scenario traces
+RANK = {"c2s": 0, "spawn": 0, "s2c": 2, "rng": 3, "draw": 4, "unit": 5, "stats": 6, "end": 9}
+
+
+class Unresolved(Exception):
+    """A reference that does not resolve (scenario.md §3 rule 5): `ref` is the text."""
+
+    def __init__(self, ref, why):
+        super().__init__(f"{ref}: {why}")
+        self.ref, self.why = ref, why
+
+
+def resolve_ref(a, units, player):
+    """Value of an exported reference (scenario.md §3 rule 3) on `units`: dicts with
+    t (type), cl (class), id (GUID), x, y; `player` is the type-0 unit or None."""
+    k = a["kind"]
+    if k == "player":
+        if not player:
+            raise Unresolved(a["ref"], "no player")
+        return player["id"]
+    if k in ("x", "y"):
+        if not player:
+            raise Unresolved(a["ref"], "no player")
+        return player[k] + a["d"]
+    if k == "wp":
+        raise Unresolved(a["ref"], "waypoint objects are not resolved by this tool "
+                                   "(the objects table is not read)")
+    guids = sorted(u["id"] for u in units if u["t"] == a["ty"]
+                   and (a["class"] is None or u["cl"] == a["class"]))
+    if a["n"] >= len(guids):
+        raise Unresolved(a["ref"], "no such unit")
+    return guids[a["n"]]
+
+
+def encode_step(step, units, player):
+    """Bytes of an exported step (scenario.md §3 rule 2): the row's size, byte 0 the
+    id, fields little endian at their offsets, `bits` fields OR-ed into the u32."""
+    if "hex" in step:
+        return bytes.fromhex(step["hex"])
+    msg = bytearray(step["size"])
+    msg[0] = step["id"]
+    for f in step["fields"]:
+        a = f["arg"]
+        v = a["num"] if "num" in a else resolve_ref(a, units, player)
+        top = 0xFFFFFFFF if f["bits"] == 32 else (1 << f["bits"]) - 1
+        if not 0 <= v <= top:
+            raise Unresolved(a.get("ref", str(v)), f"value {v} does not fit field {f['name']}")
+        off = f["offset"]
+        if f["ty"] == "u8":
+            msg[off] = v
+        elif f["ty"] == "u16":
+            msg[off:off + 2] = v.to_bytes(2, "little")
+        elif f["ty"] == "u32":
+            msg[off:off + 4] = v.to_bytes(4, "little")
+        else:
+            old = int.from_bytes(msg[off:off + 4], "little")
+            msg[off:off + 4] = (old | (v << f["shift"])).to_bytes(4, "little")
+    return bytes(msg)
+
+
+def trace_lines(header, recs):
+    """scenario-trace lines: header, records by (tick, stream rank, order), `end` last."""
+    order = sorted(recs, key=lambda r: (r[0], r[1], r[2]))
+
+    def dump(o):
+        return json.dumps(o, sort_keys=True, separators=(",", ":")) + "\n"
+    return [dump(header)] + [dump(r[3]) for r in order]
+
+
 # --- the recorder --------------------------------------------------------------
 
 class ScenarioRecorder(rp.PacketRecorder):
@@ -318,10 +425,26 @@ class ScenarioRecorder(rp.PacketRecorder):
         self.auto_start, self.force_after = auto_start, force_after
         self.forced = False
         self.stopping = False
+        # scenario-trace mode (`.scenario` scripts): relative ticks, records in memory
+        self.rel = bool(scenario.get("rel"))
+        self.f0 = None                 # frame of the tick in which the client first is in state 4
+        self.open_t = None             # tick whose stop has been handled
+        self.win = False               # between that stop and the tick's return (s2c window)
+        self.tr = []                   # (t, rank, order, record)
+        self.rng_before = None
+        self.queue_i = []
+        self.cur_i = None
+        self.ended = False
 
     # --- output: deterministic (no wall-clock ms, no thread ids) -----------
 
+    def trace_add(self, rec):
+        self.tr.append((rec["t"], RANK[rec["k"]], len(self.tr), rec))
+
     def emit(self, rec):
+        if self.rel and rec["type"] == "s2c" and self.win and rec.get("client") == 0:
+            # scenario.md §4 rule 5: messages queued for client 0 in this tick's window
+            self.trace_add({"k": "s2c", "t": self.open_t, "c": 0, "b": rec["bytes"]})
         stream = STREAM_OF.get(rec["type"])
         if (stream is not None and stream not in self.want) or not self.recording:
             return
@@ -458,6 +581,8 @@ class ScenarioRecorder(rp.PacketRecorder):
 
     def inject_stop(self, tid):
         """At the drain call. True = a message call was started (thread redirected)."""
+        if self.rel:
+            return self.inject_stop_rel(tid)
         if self.game is None or self.last_frame is None:
             return False
         due = steps_due(self.todo, self.last_frame)
@@ -477,6 +602,96 @@ class ScenarioRecorder(rp.PacketRecorder):
         self.start_call(tid)
         return True
 
+    def game_seed(self):
+        lo, hi = struct.unpack("<II", self.read(self.game + G_SEED, 8))
+        return [lo, hi]
+
+    def inject_stop_rel(self, tid):
+        """Relative-tick stop (scenario.md §4 rule 2): the first stop after frame F0 + t
+        returned handles tick t: rng before, resolve and inject the steps of tick t."""
+        if self.game is None or self.last_frame is None or self.f0 is None:
+            return False
+        t = self.last_frame - self.f0
+        if t > self.sc["ticks"]:
+            return False
+        if self.open_t != t:
+            self.open_t, self.win = t, True
+            self.rng_before = self.game_seed()
+            due = [s for s in self.todo if s["tick"] == t]
+            for s in due:
+                self.todo.remove(s)
+            units = [self.unit_record(u) for u in self.server_units()]
+            player = next((u for u in sorted(units, key=lambda r: r["id"]) if u["t"] == 0), None)
+            self.queue, self.queue_i = [], []
+            for i, s in enumerate(due):
+                if s.get("spawn"):      # handoff §3 change 5: not in the tool
+                    self.trace_add({"k": "spawn", "t": t, "i": i, "failed": True})
+                    continue
+                try:
+                    self.queue.append(encode_step(s, units, player))
+                    self.queue_i.append(i)
+                except Unresolved as e:
+                    self.trace_add({"k": "c2s", "t": t, "i": i, "unresolved": e.ref})
+                    self.notes.append(f"tick {t} step {i}: unresolved: {e.why}")
+        if not self.queue:
+            return False
+        ctx = self.get_ctx(tid)
+        ctx.Eip = INJECT_POINT
+        self.saved, self.inj_tid, self.inj_tick = ctx, tid, t
+        self.start_call(tid)
+        return True
+
+    def rel_tick_done(self, frame):
+        """Tick return (§3): find F0, then the records of tick t = frame - F0 - 1."""
+        if self.f0 is None:
+            if self.client_state() == CLIENT_STATE_OK:
+                self.f0 = frame
+            return
+        t = frame - self.f0 - 1
+        self.win = False
+        if t < 0:
+            return
+        ex = self.sc["export"]
+        if "rng" in ex["streams"] and self.rng_before is not None:
+            self.trace_add({"k": "rng", "t": t, "before": self.rng_before,
+                            "after": self.game_seed()})
+        if "units" in ex["streams"] and t in ex["snapshot_ticks"]:
+            for u in sorted((self.unit_record(u) for u in self.server_units()),
+                            key=lambda r: (r["t"], r["id"])):
+                self.trace_add({"k": "unit", "t": t, "type": u["t"], "guid": u["id"],
+                                "class": u["cl"], "mode": u["m"], "x": u["x"], "y": u["y"],
+                                "life": u["life"] or 0, "mana": u["mana"] or 0})
+        late = [s for s in self.todo if s["tick"] <= t]
+        if late:
+            self.stop(f"step at tick {late[0]['tick']} was not injected (tick {t} already ran)", True)
+            return
+        if t >= ex["end"]:
+            self.trace_add({"k": "end", "t": t})
+            self.ended = True
+            self.stop(f"tick {t} recorded (end)")
+
+    def trace_header(self):
+        ex = self.sc["export"]
+        gaps = []
+        if ex["inline_lines"]:
+            gaps.append(f"char lines are not applied: the save {self.sc['save']} is loaded")
+        if self.sc.get("save_overridden"):
+            gaps.append(f"save {self.sc['save']} stands in for the script's {ex['save']}")
+        if any(s.get("spawn") for s in ex["steps"]):
+            gaps.append("spawn: not supported")
+        if any((f["arg"] or {}).get("kind") == "wp" for s in ex["steps"] for f in s.get("fields", [])):
+            gaps.append("@wp references are not resolved (objects table not read)")
+        for st, why in (("stats", "base array of the extended stat list not specified"),
+                        ("frames", "not recorded")):
+            if st in ex["streams"]:
+                gaps.append(f"{st}: {why}")
+        streams = ["c2s"] + [x for x in ex["streams"] if x in ("s2c", "rng", "units")]
+        return {"k": "header", "format": TRACE_FORMAT, "version": TRACE_VERSION,
+                "game_version": "1.14d", "side": "original", "tool": TOOL, "data": "1.14d",
+                "scenario": ex["name"], "scenario_sha256": ex["sha256"], "seed": ex["seed"],
+                "init": ex["init"], "end": ex["end"], "streams": sorted(streams),
+                "gaps": sorted(gaps)}
+
     def poke(self, addr, data):
         """Write without changing page protection (the stack)."""
         buf = (C.c_ubyte * len(data)).from_buffer_copy(data)
@@ -489,6 +704,7 @@ class ScenarioRecorder(rp.PacketRecorder):
             self.scratch = need_alloc(self.h_process, SCRATCH_SIZE)
             self.write(self.scratch, rr.INT3)
         msg = self.queue.pop(0)
+        self.cur_i = self.queue_i.pop(0) if self.queue_i else None
         self.cur_msg = msg
         self.write(self.scratch + SCRATCH_MSG, msg)
         ctx = type(self.saved).from_buffer_copy(self.saved)
@@ -508,6 +724,9 @@ class ScenarioRecorder(rp.PacketRecorder):
                       f"message {self.cur_msg.hex()}", True)
         else:
             self.injected += 1
+            if self.rel:
+                self.trace_add({"k": "c2s", "t": self.inj_tick, "i": self.cur_i,
+                                "b": self.cur_msg.hex()})
         if self.queue and ok:
             self.start_call(tid)
             return
@@ -519,6 +738,9 @@ class ScenarioRecorder(rp.PacketRecorder):
 
     def tick_done(self, frame):
         self.last_frame = frame
+        if self.rel:
+            self.rel_tick_done(frame)
+            return
         self.snapshot_units(frame)
         for s in self.todo:
             if s["tick"] <= frame:
@@ -959,6 +1181,43 @@ def selftest():
     check(sc_cls["class"] == 3, "class parsed")
     bad(json.dumps(dict(base, **{"class": "mage"})), "class")
 
+    # .scenario encoding (scenario.md §3, test vectors: Walk x=10 y=20 -> 01 0a 00 14 00)
+    walk = {"tick": 1, "id": 1, "size": 5, "name": "Walk", "fields": [
+        {"name": "x", "ty": "u16", "bits": 16, "shift": 0, "offset": 1,
+         "arg": {"ref": "@x+8", "kind": "x", "d": 8, "ty": 0, "class": None, "n": 0}},
+        {"name": "y", "ty": "u16", "bits": 16, "shift": 0, "offset": 3, "arg": {"num": 20}}]}
+    pl = {"id": 1, "t": 0, "cl": 1, "x": 2, "y": 9}
+    check(encode_step(walk, [pl], pl) == bytes.fromhex("010a001400"), "typed walk encoding")
+    try:
+        encode_step(walk, [], None)
+    except Unresolved as e:
+        check(e.ref == "@x+8", "unresolved reference text")
+    else:
+        fails.append("walk without a player resolved")
+    sk = {"tick": 1, "id": 0x3C, "size": 9, "name": "SelectSkill", "fields": [
+        {"name": "skill", "ty": "bits", "bits": 31, "shift": 0, "offset": 1, "arg": {"num": 36}},
+        {"name": "left", "ty": "bits", "bits": 1, "shift": 31, "offset": 1, "arg": {"num": 0}},
+        {"name": "item", "ty": "u32", "bits": 32, "shift": 0, "offset": 5,
+         "arg": {"num": 0xFFFFFFFF}}]}
+    check(encode_step(sk, [], None) == bytes.fromhex("3c24000000ffffffff"), "SelectSkill encoding")
+    mon = [{"id": 9, "t": 1, "cl": 19, "x": 0, "y": 0}, {"id": 4, "t": 1, "cl": 19, "x": 0, "y": 0},
+           {"id": 5, "t": 1, "cl": 7, "x": 0, "y": 0}]
+
+    def ref(n, c):
+        return {"ref": "@1", "kind": "unit", "d": 0, "ty": 1, "class": c, "n": n}
+    check(resolve_ref(ref(0, 19), mon, pl) == 4 and resolve_ref(ref(1, 19), mon, pl) == 9
+          and resolve_ref(ref(0, None), mon, pl) == 4, "unit references: ascending GUID")
+    try:
+        resolve_ref(ref(2, 19), mon, pl)
+    except Unresolved:
+        pass
+    else:
+        fails.append("missing unit resolved")
+    tl = trace_lines({"k": "header"}, [(1, RANK["unit"], 0, {"k": "unit", "t": 1}),
+                                       (1, RANK["c2s"], 1, {"k": "c2s", "t": 1, "i": 0}),
+                                       (0, RANK["end"], 2, {"k": "end", "t": 0})])
+    check([json.loads(x)["k"] for x in tl] == ["header", "end", "c2s", "unit"], "trace order")
+
     if fails:
         for f in fails:
             print("FAIL:", f)
@@ -986,6 +1245,10 @@ def main():
     ap.add_argument("--difficulty", type=int, default=0, choices=(0, 1, 2), help="probes")
     ap.add_argument("--probe-frame", type=int, default=30,
                     help="probes inject / unit_fields: the tick to act at (default 30)")
+    ap.add_argument("--save-as", metavar="NAME", default=None,
+                    help=".scenario: load this save instead of the script's `char save`")
+    ap.add_argument("--trace-out", default=None, help=".scenario: scenario-trace output "
+                    "(default traces/raw/<name>.original.trace.jsonl)")
     ap.add_argument("--probe", metavar="NAME", help="print what the coordinator needs "
                     "to settle an open question of original-hooks.md")
     a = ap.parse_args()
@@ -999,7 +1262,10 @@ def main():
     if not a.scenario:
         ap.error("scenario file required")
     try:
-        sc, sha = load_scenario(a.scenario)
+        if a.scenario.endswith(".scenario"):
+            sc, sha, _ = load_script(a.scenario, a.save_as)
+        else:
+            sc, sha = load_scenario(a.scenario)
     except (ScenarioError, OSError) as e:
         print("error:", e, file=sys.stderr)
         return 2
@@ -1008,7 +1274,9 @@ def main():
         else a.scenario
     rel = rel.replace("\\", "/")
     if a.dry_run:
-        print(plan_text(sc, rel, sha, game))
+        print(plan_text(sc, rel, sha, game) if not sc.get("rel") else
+              f"scenario {rel} sha256 {sha[:16]}.. save {sc['save']} class {sc['class']} "
+              f"end {sc['ticks']} steps {len(sc['steps'])} (relative ticks, F0 + 1 + t)")
         return 0
     try:
         with open(game, "rb") as f:
@@ -1035,6 +1303,14 @@ def main():
         writer.footer({"counts": r.counts, "notes": r.notes, "ticks": r.last_frame,
                        "injected": r.injected, "failed": r.failed})
         writer.close()
+    if sc.get("rel"):
+        tout = a.trace_out or os.path.join(REPO, "traces", "raw",
+                                           sc["export"]["name"] + ".original.trace.jsonl")
+        os.makedirs(os.path.dirname(os.path.abspath(tout)), exist_ok=True)
+        lines = trace_lines(r.trace_header(), r.tr)     # no `end` record unless the run reached it
+        with open(tout, "w", encoding="utf-8", newline="\n") as f:
+            f.writelines(lines)
+        print(f"trace {tout}: {len(lines) - 1} records, end record {r.ended}")
     for n in r.notes:
         print("note:", n)
     print(f"wrote {out}: {r.last_frame} ticks, {r.injected} injected, {r.counts}")
