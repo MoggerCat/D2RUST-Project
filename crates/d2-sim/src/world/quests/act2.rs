@@ -17,6 +17,8 @@ pub mod q5;
 pub mod q6;
 
 #[cfg(test)]
+mod tests_common;
+#[cfg(test)]
 mod tests_gossip;
 #[cfg(test)]
 mod tests_q1;
