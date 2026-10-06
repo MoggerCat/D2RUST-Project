@@ -120,23 +120,23 @@ fn skill_rec() -> Skills {
 
 /// Skill ids of the synthetic table.
 const ATTACK: i32 = 0;
-/// Multiple Shot as `use.md` gives it: srvst 6; mana 4, +1, shift 8.
+/// Multiple Shot as `use.md` gives it: srvst 42; mana 4, +1, shift 8.
 const MULTI: i32 = 1;
-/// Might: aura, immediate, perdelay 50, srvdo 66.
+/// Might: aura, immediate, perdelay 50, srvdo 111.
 const MIGHT: i32 = 2;
 /// A learnable skill: max level 3.
 const LEARN: i32 = 3;
 
-/// Start slot of the synthetic start skills: srvst 6 (status `mapped`)
+/// Start slot of the synthetic start skills: srvst 42 (status `mapped`)
 /// stands in for Multiple Shot's srvst 4, whose body (`skills/bodies.md`
 /// §3.4, ammunition) now runs on the wired host; the do slot 66 stands
 /// in for Might's 65 (§4.5) the same way, so the fake's seam answers.
 fn skills() -> SkillTables {
     let mut v: Vec<Skills> = (0..4).map(|_| skill_rec()).collect();
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
     let m = &mut v[MIGHT as usize];
-    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 66, 33);
+    (m.aura, m.immediate, m.perdelay, m.srvdofunc, m.aurastate) = (true, true, 0, 111, 33);
     v[LEARN as usize].maxlvl = 3;
     SkillTables {
         skills: v,
@@ -615,7 +615,7 @@ fn right_skill_at_point_starts_and_charges_at_start() {
     assert_eq!(fx.take_errors(), [no_anim_record()]);
     assert_eq!(fx.stat(8), 4000 - 3328);
     assert_eq!(fx.book().used, Some(entry(MULTI, 10)));
-    assert_eq!(fx.book().log, ["srvst 6 1 10"]);
+    assert_eq!(fx.book().log, ["srvst 42 1 10"]);
     // The point validator stored the frame (player data +0x168).
     let p = fx.player;
     let data = fx.host.game.player_fields(p).unwrap().data;
@@ -745,7 +745,7 @@ fn select_skill_might_and_refusals() {
     );
     assert_eq!(
         fx.book().log,
-        ["right 2", "srvdo 66 2 1 true false false", "left 0"]
+        ["right 2", "srvdo 111 2 1 true false false", "left 0"]
     );
     let g = &fx.host.game.game;
     let timers: Vec<_> = g

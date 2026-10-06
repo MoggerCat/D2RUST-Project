@@ -223,34 +223,48 @@ pub fn skill_missile<W: BodyWorld>(
     u: W::Unit,
     skill: i32,
     lvl: i32,
+    d: (i32, i32),
+    at: (i32, i32),
+    quant: bool,
+    lob: bool,
+) -> bool {
+    skill_missile_unit(w, missile, u, skill, lvl, d, at, quant, lob).is_some()
+}
+
+/// [`skill_missile`] returning the missile made.
+#[allow(clippy::too_many_arguments)]
+pub fn skill_missile_unit<W: BodyWorld>(
+    w: &mut W,
+    missile: i32,
+    u: W::Unit,
+    skill: i32,
+    lvl: i32,
     (dx, dy): (i32, i32),
     (tx, ty): (i32, i32),
     quant: bool,
     lob: bool,
-) -> bool {
+) -> Option<W::Unit> {
     let (mut tx, mut ty) = (tx, ty);
     if tx == 0 || ty == 0 {
         match w.target_position(u) {
             Some((a, b)) if a != 0 && b != 0 => (tx, ty) = (a, b),
-            _ => return false,
+            _ => return None,
         }
     }
     if quant && w.unit_type(u) == UnitType::Player && dec_quantity(w, u) < 1 {
-        return false;
+        return None;
     }
     let (ux, uy) = w.position(u);
     let mut req = MissileRequest {
         flags: if lob { 0x420 } else { 0x21 },
-        owner: u,
         origin: lob.then_some(u),
-        class: missile,
         x: ux.wrapping_add(dx),
         y: uy.wrapping_add(dy),
         target_x: tx,
         target_y: ty,
         skill,
         level: lvl,
-        attack_bonus: 0,
+        ..MissileRequest::new(u, missile)
     };
     if !lob && w.unit_type(u) == UnitType::Monster {
         let b = w.stat(u, stat::TOHIT, 0);

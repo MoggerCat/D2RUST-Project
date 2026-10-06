@@ -862,8 +862,8 @@ fn arrow() -> MissileRow {
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (8, 0);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (42, 4, 1, 8);
+    (m.srvdofunc, m.srvmissile) = (3, 0);
     SkillTables {
         skills: v,
         skilldesc: vec![blank::<Skilldesc>()],
@@ -1801,7 +1801,7 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 5. Right skill at the monster (C→S 0x0C, `use.md` §1) from there:
     // accepted, mana charged at start (3,328 of 4,000), srvst 4, mode SC
-    // (10); the action frame (event 0, 3 frames on) runs srvdo 8 and the
+    // (10); the action frame (event 0, 3 frames on) runs srvdo 3 and the
     // generic `srvmissile` 0 through the real missile creation
     // (`missiles.md` §R2.3) at the player, aimed at the monster.
     fx.stage_combat(monster);
@@ -1820,7 +1820,7 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(
         fx.book.get().log,
-        ["srvst 6 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
     );
     let shot = fx.missiles();
     assert_eq!(shot.len(), 1);
