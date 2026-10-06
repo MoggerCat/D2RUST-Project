@@ -13,9 +13,9 @@
   `data/txt-format.md` §5–§7 and `data/field-types.md` §3 (parsing and
   cell types), `data/fields.tsv` row `sounds` (the compile-only name
   linker other tables link through), `formats/wav.md` (WAV decoding; to
-  be written), `audio/triggers.md` (when sounds are requested; to be
-  written), `audio/environment.md` (`soundenviron` meaning, ambience,
-  music; to be written), `formats/mpq.md` §11 (archive order),
+  be written), `audio/triggers.md` (when sounds are requested),
+  `audio/environment.md` (`soundenviron` meaning, ambience, music),
+  `formats/mpq.md` §11 (archive order),
   `sim/rng.md` §2–§3 (generator), `render/camera.md` §9 (client tick).
 
 <!-- index -->
@@ -28,22 +28,22 @@
 |   1. Loading the table | 85–147 |
 |   2. Sound environment table (load only) | 148–159 |
 |   3. File path | 160–176 |
-|   4. Groups and variants | 177–211 |
-|   5. Requests | 212–247 |
-|   6. Sound tick | 248–333 |
-|   7. Starting on a channel | 334–363 |
-|   8. Volume and pan | 364–425 |
-|   9. Settings | 426–445 |
-|   10. Sample cache | 446–471 |
-|   11. Live data (1.14d) | 472–488 |
-|   12. Edge cases kept | 489–497 |
-|   13. d2rs mapping | 498–508 |
-| Constants & data dependencies | 509–516 |
-| Randomness | 517–524 |
-| Edge cases & original bugs | 525–529 |
-| Test vectors | 530–565 |
-| Provenance | 566–584 |
-| Open questions | 585–609 |
+|   4. Groups and variants | 177–212 |
+|   5. Requests | 213–252 |
+|   6. Sound tick | 253–338 |
+|   7. Starting on a channel | 339–368 |
+|   8. Volume and pan | 369–430 |
+|   9. Settings | 431–450 |
+|   10. Sample cache | 451–476 |
+|   11. Live data (1.14d) | 477–493 |
+|   12. Edge cases kept | 494–502 |
+|   13. d2rs mapping | 503–513 |
+| Constants & data dependencies | 514–521 |
+| Randomness | 522–529 |
+| Edge cases & original bugs | 530–534 |
+| Test vectors | 535–570 |
+| Provenance | 571–589 |
+| Open questions | 590–614 |
 <!-- /index -->
 
 ## Summary
@@ -67,7 +67,7 @@ meaning are other specs.
 |---|---|---|
 | `sounds.txt` | 4,699 data lines, 25 columns | P (`patch_d2.mpq`), `data/loading.md` §3.4 |
 | `soundenviron.txt` | 50 data lines, 24 columns | P, same |
-| sound request | id, unit or none, delay, flags, start offset | `audio/triggers.md` (callers of `0x004B9A00`, 132 call sites) |
+| sound request | id, unit or none, delay, flags, start offset | `audio/triggers.md` (callers of `0x004B9A00`, 222 call sites in 132 functions) |
 | listener | local player unit `[0x007A6A70]` (position, client seed at +0x20) | `render/camera.md` §2 |
 | settings | Sound Mixer, Master Volume, Music Volume, Positional Bias | §9 |
 | sound tick | counter `0x007BC9BC` | §6.1 |
@@ -205,9 +205,10 @@ case-insensitive).
    unsigned mod). It steps the seed at **local player unit + 0x20**
    (`[0x007A6A70]`, `0x00463DD0`): the player's client unit seed, which
    client particle and effect code also use (`sim/rng.md` §5.3, §7). The
-   same picker is used by the environment cue code `0x004E0590`
-   (`audio/environment.md`), which retries up to 20 times while the
-   pick equals its last cue.
+   same picker is used by the NPC greeting code `0x004E0590`
+   (`audio/triggers.md` §10 r1), which retries up to 20 times while the
+   pick equals that NPC's last greeting; ambience cues use the same
+   seed through their own draws (`audio/environment.md` §7).
 
 ### 5. Requests
 
@@ -243,7 +244,11 @@ end volume, +0x51 / +0x55 fade start / end tick.
    0` raises it to at least `Fade Out`. `len > 0` sets a fade from the
    current volume to `target` from `now + delay` to `now + delay + len`;
    a fade to 0 also sets the stop flag. `len = 0` with `delay ≠ 0` is
-   fatal (`0x25C`); `len = 0`, `delay = 0` stops at once (`0x004B9B50`).
+   fatal (`0x25C`); `len = 0`, `delay = 0` sets the volume to `target`
+   at once (`0x004B9B50`, which only writes +0x1C; a target of 0 has
+   already set the stop flag, so the next update stops it). Nothing
+   happens when the request has more than one unit attached
+   (`audio/triggers.md` §1 r3).
 
 ### 6. Sound tick
 
