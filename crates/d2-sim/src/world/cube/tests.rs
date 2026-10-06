@@ -159,54 +159,54 @@ fn ratio_rule() {
 
 // ------------------------------------------------------- fake world
 
-const P: UnitId = UnitId(1);
+pub(super) const P: UnitId = UnitId(1);
 
 #[derive(Clone, Debug, Default)]
-struct Item {
-    guid: u32,
-    class: Option<u32>,
-    page: u8,
-    mode: u8,
-    quality: u8,
-    file_index: u32,
-    level: i32,
-    flags: u32,
-    sockets: i32,
-    max_sockets: i32,
-    stats: BTreeMap<u16, i32>,
-    seed: Seed,
-    socketed: Vec<UnitId>,
+pub(super) struct Item {
+    pub(super) guid: u32,
+    pub(super) class: Option<u32>,
+    pub(super) page: u8,
+    pub(super) mode: u8,
+    pub(super) quality: u8,
+    pub(super) file_index: u32,
+    pub(super) level: i32,
+    pub(super) flags: u32,
+    pub(super) sockets: i32,
+    pub(super) max_sockets: i32,
+    pub(super) stats: BTreeMap<u16, i32>,
+    pub(super) seed: Seed,
+    pub(super) socketed: Vec<UnitId>,
 }
 
 #[derive(Default)]
-struct Fake {
-    expansion: bool,
-    game_type: u8,
-    ladder: bool,
-    difficulty: u8,
-    date: (u8, u8),
-    seed: Seed,
-    class: u8,
-    player_stats: BTreeMap<u16, i32>,
-    interaction: Option<(u8, u32)>,
-    stash: bool,
-    trading: bool,
-    inventory: Vec<UnitId>,
-    items: BTreeMap<UnitId, Item>,
-    next: u32,
+pub(super) struct Fake {
+    pub(super) expansion: bool,
+    pub(super) game_type: u8,
+    pub(super) ladder: bool,
+    pub(super) difficulty: u8,
+    pub(super) date: (u8, u8),
+    pub(super) seed: Seed,
+    pub(super) class: u8,
+    pub(super) player_stats: BTreeMap<u16, i32>,
+    pub(super) interaction: Option<(u8, u32)>,
+    pub(super) stash: bool,
+    pub(super) trading: bool,
+    pub(super) inventory: Vec<UnitId>,
+    pub(super) items: BTreeMap<UnitId, Item>,
+    pub(super) next: u32,
     /// Item types: (class, type) pairs that match.
-    types: Vec<(u32, u16)>,
-    uniques: BTreeMap<u32, bool>,
-    place_ok: bool,
-    cow: bool,
-    tempered: (u16, u16),
-    requests: Vec<ItemRequest>,
-    log: Vec<String>,
-    sent: Vec<Vec<u8>>,
+    pub(super) types: Vec<(u32, u16)>,
+    pub(super) uniques: BTreeMap<u32, bool>,
+    pub(super) place_ok: bool,
+    pub(super) cow: bool,
+    pub(super) tempered: (u16, u16),
+    pub(super) requests: Vec<ItemRequest>,
+    pub(super) log: Vec<String>,
+    pub(super) sent: Vec<Vec<u8>>,
 }
 
 impl Fake {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Fake {
             expansion: true,
             place_ok: true,
@@ -216,7 +216,7 @@ impl Fake {
         }
     }
 
-    fn add(&mut self, class: u32, quality: u8) -> UnitId {
+    pub(super) fn add(&mut self, class: u32, quality: u8) -> UnitId {
         let id = UnitId(self.next);
         self.next += 1;
         self.items.insert(
@@ -234,7 +234,7 @@ impl Fake {
         id
     }
 
-    fn new_item(&mut self, mut it: Item) -> UnitId {
+    pub(super) fn new_item(&mut self, mut it: Item) -> UnitId {
         let id = UnitId(self.next);
         self.next += 1;
         it.guid = id.0;
@@ -242,11 +242,11 @@ impl Fake {
         id
     }
 
-    fn it(&mut self, id: UnitId) -> &mut Item {
+    pub(super) fn it(&mut self, id: UnitId) -> &mut Item {
         self.items.get_mut(&id).unwrap()
     }
 
-    fn cube_contents(&self) -> Vec<Option<u32>> {
+    pub(super) fn cube_contents(&self) -> Vec<Option<u32>> {
         self.inventory
             .iter()
             .filter(|i| self.items[i].page == CUBE_PAGE)
@@ -498,30 +498,30 @@ impl CubeWorld for Fake {
 
 // ----------------------------------------------------- item table
 
-const HAX: u32 = 0;
-const FHL: u32 = 1;
-const XHL: u32 = 2;
-const UHL: u32 = 3;
-const GCV: u32 = 4;
-const GFV: u32 = 5;
-const AQV: u32 = 6;
-const CQV: u32 = 7;
-const RIN: u32 = 8;
-const JEW: u32 = 9;
-const BOX: u32 = 10;
-const MSF: u32 = 11;
-const VIP: u32 = 12;
-const HST: u32 = 13;
-const HLM: u32 = 14;
-const GCR: u32 = 15;
-const LEG: u32 = 16;
-const TBK: u32 = 17;
-const PK1: u32 = 18;
-const PK2: u32 = 19;
-const PK3: u32 = 20;
-const AMU: u32 = 21;
+pub(super) const HAX: u32 = 0;
+pub(super) const FHL: u32 = 1;
+pub(super) const XHL: u32 = 2;
+pub(super) const UHL: u32 = 3;
+pub(super) const GCV: u32 = 4;
+pub(super) const GFV: u32 = 5;
+pub(super) const AQV: u32 = 6;
+pub(super) const CQV: u32 = 7;
+pub(super) const RIN: u32 = 8;
+pub(super) const JEW: u32 = 9;
+pub(super) const BOX: u32 = 10;
+pub(super) const MSF: u32 = 11;
+pub(super) const VIP: u32 = 12;
+pub(super) const HST: u32 = 13;
+pub(super) const HLM: u32 = 14;
+pub(super) const GCR: u32 = 15;
+pub(super) const LEG: u32 = 16;
+pub(super) const TBK: u32 = 17;
+pub(super) const PK1: u32 = 18;
+pub(super) const PK2: u32 = 19;
+pub(super) const PK3: u32 = 20;
+pub(super) const AMU: u32 = 21;
 
-fn rec(code: &[u8; 4]) -> ItemRecord {
+pub(super) fn rec(code: &[u8; 4]) -> ItemRecord {
     ItemRecord {
         code: *code,
         level: 1,
@@ -530,7 +530,7 @@ fn rec(code: &[u8; 4]) -> ItemRecord {
     }
 }
 
-fn items() -> Vec<ItemRecord> {
+pub(super) fn items() -> Vec<ItemRecord> {
     let tiered = |c: &[u8; 4]| ItemRecord {
         normcode: *b"fhl ",
         ubercode: *b"xhl ",
@@ -590,7 +590,7 @@ fn items() -> Vec<ItemRecord> {
     v
 }
 
-fn data(recipes: Vec<Recipe>) -> CubeData {
+pub(super) fn data(recipes: Vec<Recipe>) -> CubeData {
     CubeData {
         recipes,
         items: items(),
@@ -599,7 +599,7 @@ fn data(recipes: Vec<Recipe>) -> CubeData {
     }
 }
 
-fn input(flags: u16, item: u32, qty: u8) -> InputSlot {
+pub(super) fn input(flags: u16, item: u32, qty: u8) -> InputSlot {
     InputSlot {
         flags,
         item: item as u16,
@@ -608,11 +608,11 @@ fn input(flags: u16, item: u32, qty: u8) -> InputSlot {
     }
 }
 
-fn code_in(item: u32) -> InputSlot {
+pub(super) fn code_in(item: u32) -> InputSlot {
     input(input_flags::USEANY, item, 0)
 }
 
-fn out(kind: u8, item: u32) -> OutputSlot {
+pub(super) fn out(kind: u8, item: u32) -> OutputSlot {
     OutputSlot {
         kind,
         item: item as u16,
@@ -624,7 +624,7 @@ fn out(kind: u8, item: u32) -> OutputSlot {
     }
 }
 
-fn recipe(n: u8, ins: &[InputSlot], a: OutputSlot) -> Recipe {
+pub(super) fn recipe(n: u8, ins: &[InputSlot], a: OutputSlot) -> Recipe {
     let mut inputs = [InputSlot::default(); 7];
     inputs[..ins.len()].copy_from_slice(ins);
     Recipe {
@@ -638,17 +638,17 @@ fn recipe(n: u8, ins: &[InputSlot], a: OutputSlot) -> Recipe {
 }
 
 /// Stand-ins for the live records the vectors name.
-fn gem_recipe() -> Recipe {
+pub(super) fn gem_recipe() -> Recipe {
     // record 23: "gcv,qty=3" → gfv
     recipe(3, &[input(1, GCV, 3)], out(kind::ITEMCODE, GFV))
 }
 
-fn arrows_recipe() -> Recipe {
+pub(super) fn arrows_recipe() -> Recipe {
     // record 21: "aqv,qty=2" → cqv
     recipe(2, &[input(1, AQV, 2)], out(kind::ITEMCODE, CQV))
 }
 
-fn ring_recipe() -> Recipe {
+pub(super) fn ring_recipe() -> Recipe {
     // record 13: "rin,mag,qty=3" → usetype rin, plvl 75
     let mut i = input(1, RIN, 3);
     i.quality = 4;

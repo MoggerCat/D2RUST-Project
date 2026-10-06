@@ -888,4 +888,6 @@ impl UnitLists {
 }
 
 #[cfg(test)]
+mod gaps_tests;
+#[cfg(test)]
 mod tests;

@@ -4,21 +4,21 @@ use super::*;
 use crate::units::lists::client_state;
 use crate::units::{UnitId, UnitType};
 
-type OnRun = Box<dyn FnMut(&mut Game, &TimerRun)>;
+pub(super) type OnRun = Box<dyn FnMut(&mut Game, &TimerRun)>;
 
 /// Logs every hook call and timer run; optional per-run action.
 #[derive(Default)]
-struct Rec {
-    log: Vec<String>,
-    names: Vec<(UnitId, &'static str)>,
-    on_run: Option<OnRun>,
-    room_ready: bool,
-    inactivity: u32,
-    allow_removal: bool,
+pub(super) struct Rec {
+    pub(super) log: Vec<String>,
+    pub(super) names: Vec<(UnitId, &'static str)>,
+    pub(super) on_run: Option<OnRun>,
+    pub(super) room_ready: bool,
+    pub(super) inactivity: u32,
+    pub(super) allow_removal: bool,
 }
 
 impl Rec {
-    fn name(&self, u: UnitId) -> &'static str {
+    pub(super) fn name(&self, u: UnitId) -> &'static str {
         self.names
             .iter()
             .find(|(id, _)| *id == u)
@@ -26,7 +26,7 @@ impl Rec {
             .unwrap_or("?")
     }
 
-    fn runs(&self) -> Vec<String> {
+    pub(super) fn runs(&self) -> Vec<String> {
         self.log
             .iter()
             .filter(|s| s.starts_with("run "))
@@ -34,7 +34,7 @@ impl Rec {
             .collect()
     }
 
-    fn take(&mut self) -> Vec<String> {
+    pub(super) fn take(&mut self) -> Vec<String> {
         std::mem::take(&mut self.log)
     }
 }
@@ -142,7 +142,7 @@ impl TickHooks for Rec {
 }
 
 /// A game with act 0, one active room, and named units in it.
-fn setup(units: &[(&'static str, UnitType)]) -> (Game, Rec, RoomId) {
+pub(super) fn setup(units: &[(&'static str, UnitType)]) -> (Game, Rec, RoomId) {
     let mut g = Game::new();
     g.lists.ensure_act(0).unwrap();
     let room = g.lists.create_room(0).unwrap();
@@ -155,17 +155,17 @@ fn setup(units: &[(&'static str, UnitType)]) -> (Game, Rec, RoomId) {
     (g, rec, room)
 }
 
-fn id(rec: &Rec, n: &str) -> UnitId {
+pub(super) fn id(rec: &Rec, n: &str) -> UnitId {
     rec.names.iter().find(|(_, m)| *m == n).unwrap().0
 }
 
-fn sched(g: &mut Game, rec: &Rec, n: &str, expire: i32) -> Option<timer::TimerId> {
+pub(super) fn sched(g: &mut Game, rec: &Rec, n: &str, expire: i32) -> Option<timer::TimerId> {
     g.schedule_event(id(rec, n), 0, expire, None, 0, 0).unwrap()
 }
 
 /// Runs ticks until the frame counter equals `frame`, returning the runs
 /// of the last tick.
-fn tick_to(g: &mut Game, rec: &mut Rec, frame: i32) -> Vec<String> {
+pub(super) fn tick_to(g: &mut Game, rec: &mut Rec, frame: i32) -> Vec<String> {
     while g.frame < frame {
         rec.log.clear();
         tick(g, rec);

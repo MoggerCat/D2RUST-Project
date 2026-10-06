@@ -14,6 +14,8 @@ pub mod act1;
 pub mod tables;
 
 #[cfg(test)]
+mod gaps_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeSet;

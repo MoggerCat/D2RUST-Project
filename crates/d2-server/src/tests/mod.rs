@@ -4,5 +4,6 @@
 
 mod adapters;
 mod fakes;
+mod gaps;
 mod host;
 mod messages;
