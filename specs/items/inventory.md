@@ -33,22 +33,22 @@
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
 |   1. Inventory model | 89–181 |
-|   2. Grid placement | 182–276 |
-|   3. Belt | 277–334 |
-|   4. Equipping | 335–519 |
-|   5. Shared checks | 520–644 |
-|   6. Deferred item messages | 645–738 |
-|   7. Intents | 739–1149 |
-|   8. Pickup from the ground | 1150–1256 |
-|   9. Drop to the ground | 1257–1304 |
-|   10. Gold | 1305–1344 |
-|   11. Message layouts | 1345–1374 |
-| Constants & data dependencies | 1375–1397 |
-| Randomness | 1398–1410 |
-| Edge cases & original bugs | 1411–1455 |
-| Test vectors | 1456–1504 |
-| Provenance | 1505–1561 |
-| Open questions | 1562–1651 |
+|   2. Grid placement | 182–277 |
+|   3. Belt | 278–335 |
+|   4. Equipping | 336–520 |
+|   5. Shared checks | 521–645 |
+|   6. Deferred item messages | 646–739 |
+|   7. Intents | 740–1150 |
+|   8. Pickup from the ground | 1151–1257 |
+|   9. Drop to the ground | 1258–1305 |
+|   10. Gold | 1306–1345 |
+|   11. Message layouts | 1346–1375 |
+| Constants & data dependencies | 1376–1398 |
+| Randomness | 1399–1411 |
+| Edge cases & original bugs | 1412–1456 |
+| Test vectors | 1457–1505 |
+| Provenance | 1506–1562 |
+| Open questions | 1563–1652 |
 <!-- /index -->
 
 ## Summary
@@ -265,7 +265,8 @@ quests.
    `0x0055C2C0(owner, 0)`.
 7. Cursor := none (unless step 3 said not), mode := 0 (stored). The
    clear (`0x0063C180(inventory, none)`, §1.4 rule 3) does not test what
-   the cursor holds: only step 3's page-1 flag gates it (`0x00560200`).
+   the cursor holds: only step 3's page-1 flag gates it (`0x00560200`;
+   the call at `0x0056035C` follows only the flag test at `0x00560353`).
    A caller placing a mode-4 item that is not the cursor item while the
    player holds one orphans the held item (edge case 12).
 8. "Send" set: command flag 0x2; item flag 0x1 when the item is socketed
