@@ -9,12 +9,16 @@
 //! The handlers run the `d2-sim` modules on their real providers: the
 //! cube (`d2_sim::world::cube`) through the economy wiring
 //! (`d2_sim::wiring::economy::EconomyCube`: items, stats, unit records,
-//! item creation). What the cube asks for that no written spec provides
-//! is either staged here ([`Staged`]: interaction state, inventory lists,
-//! the local date, sound events; the caller fills them, as with
-//! [`super::super::UnitFacts`]) or goes to [`ItemPending`], whose
-//! provider is the unwritten owner spec (placement, removal, sockets, the
-//! item routines no items spec writes, quest hooks).
+//! item creation) over the game's one unit world: the world host builds
+//! the economy from the action wiring's unit records, stat lists and
+//! hooks ([`super::world::WorldHost::cube`]). What the cube asks for
+//! that no written spec provides is either staged in the host's
+//! [`CubeParts`] ([`Staged`]: inventory lists, the local date, sound
+//! events; the caller fills them, as with [`super::super::UnitFacts`]),
+//! asked of the player's interaction owner ([`Interact`]: the host's
+//! player-data rest), or goes to [`ItemPending`], whose provider is the
+//! unwritten owner spec (placement, removal, sockets, the item routines
+//! no items spec writes, quest hooks).
 
 mod cube_world;
 #[cfg(test)]
@@ -22,17 +26,15 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use d2_sim::game::Game;
-use d2_sim::items::ItemTables;
-use d2_sim::stats::{StatHost, StatLists};
-use d2_sim::units::hooks::{UnitData, UnitHooks};
+use d2_sim::stats::StatHost;
+use d2_sim::tick::EventDispatch;
 use d2_sim::units::lifecycle::LifecycleHooks;
-use d2_sim::units::record::Units;
 use d2_sim::units::UnitId;
-use d2_sim::wiring::economy::{Economy, EconomyCube, EconomyError, GameFields, ItemStore};
+use d2_sim::wiring::economy::{Economy, EconomyCube, EconomyError};
 use d2_sim::world::cube::CubeData;
 
-use super::super::UnitFacts;
+use super::super::{SimGame, UnitFacts};
+use super::world::WorldHost;
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
 
@@ -88,32 +90,17 @@ pub enum ItemError {
     OtherPlayer(UnitId),
 }
 
-/// The unit hooks of the item world: every hook keeps its `d2-sim`
-/// default (the unit, stat-list and lifecycle bodies their specs own).
-#[derive(Clone, Copy, Debug, Default)]
-pub struct ItemHooks;
-
-impl StatHost for ItemHooks {}
-impl UnitHooks for ItemHooks {}
-impl LifecycleHooks for ItemHooks {}
-
-/// A player's interaction state (`cube.md` Inputs: player unit +0x64
-/// GUID, +0x68 unit type, +0x6C active byte).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Interaction {
-    pub guid: u32,
-    pub unit_type: u8,
-    pub active: bool,
-}
-
-impl Interaction {
-    /// After `0x00554190` (`cube.md` §1 row 0x17: GUID −1, type 6,
-    /// active 0).
-    pub const RESET: Self = Self {
-        guid: u32::MAX,
-        unit_type: 6,
-        active: false,
-    };
+/// The player's interaction state (`cube.md` Inputs: player unit +0x64
+/// GUID, +0x68 unit type, +0x6C active byte) as its owner holds it:
+/// `Some((unit type, GUID))` while active. The reset `0x00554190`
+/// (`cube.md` §1 row 0x17: GUID −1, type 6, inactive) reads back as
+/// `None`. In a wired host the owner is the player-data rest of the NPC
+/// wiring (`d2_sim::wiring::interaction::NpcRest`), so the NPC, waypoint
+/// and cube paths share one value.
+pub trait Interact {
+    fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)>;
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32);
+    fn reset_interact(&mut self, player: UnitId);
 }
 
 /// A player's inventory as the cube reads it: the item list in list
@@ -130,7 +117,6 @@ pub struct Inventory {
 /// it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Staged {
-    pub interactions: BTreeMap<UnitId, Interaction>,
     pub inventories: BTreeMap<UnitId, Inventory>,
     /// `GetLocalTime` (day of month, day of week + 1): host input.
     pub local_date: (u8, u8),
@@ -188,20 +174,11 @@ pub trait ItemPending {
     fn cow_portal(&mut self, player: UnitId) -> bool;
 }
 
-/// One game's item state behind the server: what the economy wiring
-/// works on, the cube tables, the staged state and the pending provider.
-///
-/// TODO(wired single-player host, `docs/HANDOFF.md` §2 step 4): the
-/// unit records and stat lists here are the item world's own; the
-/// action wiring's `ActionSim` holds another pair. One game needs one.
-pub struct ItemWorld {
-    pub units: Units,
-    pub stats: StatLists,
-    pub data: UnitData,
-    pub hooks: ItemHooks,
-    pub fields: GameFields,
-    pub tables: ItemTables,
-    pub items: ItemStore,
+/// The cube's part of a game's world host: the cube tables, the staged
+/// state, the player data item creation reads, the pending provider and
+/// the errors. The items, stats and unit records are the host's economy
+/// (the action wiring's unit world).
+pub struct CubeParts {
     pub cube: CubeData,
     pub staged: Staged,
     /// Player data item creation reads, by player unit (`generation.md`
@@ -211,30 +188,34 @@ pub struct ItemWorld {
     pub errors: Vec<ItemError>,
 }
 
-impl ItemWorld {
-    /// The economy over this world and `game`.
-    pub fn economy<'a>(&'a mut self, game: &'a mut Game) -> Economy<'a, ItemHooks> {
-        Economy {
-            game,
-            units: &mut self.units,
-            stats: &mut self.stats,
-            data: &self.data,
-            hooks: &mut self.hooks,
-            fields: &mut self.fields,
-            tables: &self.tables,
-            items: &mut self.items,
+impl CubeParts {
+    pub fn new(cube: CubeData, pending: Box<dyn ItemPending + Send + Sync>) -> Self {
+        Self {
+            cube,
+            staged: Staged::default(),
+            creation: BTreeMap::new(),
+            pending,
+            errors: Vec::new(),
         }
     }
 }
 
-/// What a handler borrows from [`super::super::SimGame`].
-pub struct ItemView<'a> {
-    /// The acting client's player unit.
-    pub player: UnitId,
-    pub game: &'a mut Game,
-    pub world: &'a mut ItemWorld,
-    /// The staged unit facts (act, position, owner).
-    pub facts: &'a BTreeMap<UnitId, UnitFacts>,
+/// The hooks an economy needs for the cube: the unit lifecycle hooks and
+/// the stat host (the action wiring's `ActionHooks`).
+pub trait CubeHooks: LifecycleHooks + StatHost {}
+
+impl<H: LifecycleHooks + StatHost> CubeHooks for H {}
+
+/// One call into the cube on the host's economy, its cube parts and the
+/// player's interaction owner.
+pub trait CubeCall {
+    type Out;
+    fn call<H: CubeHooks>(
+        self,
+        econ: &mut Economy<'_, H>,
+        parts: &mut CubeParts,
+        interact: &mut dyn Interact,
+    ) -> Self::Out;
 }
 
 fn result_code(r: u32) -> ResultCode {
@@ -248,10 +229,10 @@ fn result_code(r: u32) -> ResultCode {
 
 /// The handler of an item id this module owns, after the dispatcher's
 /// gate and size check (`intents-events.md` §2.3–§2.4). `None`: not an
-/// id with a handler here (or a 0x4F button the cube does not own), so
-/// the caller keeps its stub.
-pub fn handle(
-    view: Option<ItemView<'_>>,
+/// id with a handler here, no player, a host without the cube (or a 0x4F
+/// button the cube does not own), so the caller keeps its stub.
+pub fn handle<D: EventDispatch, W: WorldHost<D>>(
+    sim: &mut SimGame<D, W>,
     client: ClientId,
     msg: &[u8],
     out: &mut dyn MessageSink,
@@ -260,57 +241,69 @@ pub fn handle(
     if id != ITEM_TO_CUBE && id != CLICK_BUTTON {
         return None;
     }
-    let ItemView {
-        player,
-        game,
-        world,
-        facts,
-    } = view?;
-    let ItemWorld {
-        units,
-        stats,
-        data,
-        hooks,
-        fields,
-        tables,
-        items,
-        cube,
-        staged,
-        creation,
-        pending,
-        errors,
-    } = world;
-    let mut econ = Economy {
-        game,
-        units,
-        stats,
-        data,
-        hooks,
-        fields,
-        tables,
-        items,
-    };
-    let mut info = cube_world::InfoRest(creation);
-    let mut w = cube_world::ServerCube::new(
-        EconomyCube::new(&mut econ, &mut info),
-        staged,
-        pending.as_mut(),
-        facts,
-        player,
-    );
-    let code = if id == ITEM_TO_CUBE {
-        Some(cube.put_in(&mut w, player, msg))
-    } else {
-        // 0x4F: button u16 at +1 (size 7 already checked).
-        let button = u16::from_le_bytes([msg[1], msg[2]]);
-        cube.click_button(&mut w, player, button)
-    };
-    let (sent, errs) = w.finish();
-    errors.extend(errs);
-    for m in sent {
-        if let Err(e) = out.queue(client, &m) {
-            errors.push(ItemError::Sink(e));
+    let player = sim.player_of(client)?;
+    let p = sim.parts();
+    p.world.cube(
+        p.game,
+        p.events,
+        CubeRun {
+            player,
+            client,
+            msg,
+            facts: p.facts,
+            out,
+        },
+    )?
+}
+
+/// One cube message: the module call, then the messages for the acting
+/// client in order.
+struct CubeRun<'m> {
+    player: UnitId,
+    client: ClientId,
+    msg: &'m [u8],
+    facts: &'m BTreeMap<UnitId, UnitFacts>,
+    out: &'m mut dyn MessageSink,
+}
+
+impl CubeCall for CubeRun<'_> {
+    type Out = Option<ResultCode>;
+    fn call<H: CubeHooks>(
+        self,
+        econ: &mut Economy<'_, H>,
+        parts: &mut CubeParts,
+        interact: &mut dyn Interact,
+    ) -> Option<ResultCode> {
+        let CubeParts {
+            cube,
+            staged,
+            creation,
+            pending,
+            errors,
+        } = parts;
+        let mut info = cube_world::InfoRest(creation);
+        let mut w = cube_world::ServerCube::new(
+            EconomyCube::new(econ, &mut info),
+            staged,
+            pending.as_mut(),
+            interact,
+            self.facts,
+            self.player,
+        );
+        let code = if self.msg[0] == ITEM_TO_CUBE {
+            Some(cube.put_in(&mut w, self.player, self.msg))
+        } else {
+            // 0x4F: button u16 at +1 (size 7 already checked).
+            let button = u16::from_le_bytes([self.msg[1], self.msg[2]]);
+            cube.click_button(&mut w, self.player, button)
+        };
+        let (sent, errs) = w.finish();
+        errors.extend(errs);
+        for m in sent {
+            if let Err(e) = self.out.queue(self.client, &m) {
+                errors.push(ItemError::Sink(e));
+            }
         }
+        code.map(result_code)
     }
-    code.map(result_code)
 }

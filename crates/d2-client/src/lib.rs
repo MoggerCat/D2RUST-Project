@@ -19,6 +19,7 @@ pub mod frames;
 pub mod gpu_compositor;
 pub mod map;
 pub mod render;
+pub mod rules;
 pub mod scene;
 pub mod ui;
 pub mod verify;

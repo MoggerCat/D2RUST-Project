@@ -40,8 +40,9 @@ pub mod population_init;
 #[cfg(test)]
 #[path = "tests/routing.rs"]
 mod routing_tests;
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
+pub(crate) mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

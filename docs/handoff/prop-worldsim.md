@@ -1,6 +1,6 @@
 # Handoff: property tests of the wired game over time — `claude/prop-worldsim`
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, task class: property tests from clear
 specs, medium (METHODS M14). Base: `claude/tender-meitner-mphas3` at

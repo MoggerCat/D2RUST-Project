@@ -1,8 +1,9 @@
 // Spec: specs/skills/use.md, specs/skills/levels.md §6.4, specs/combat/vitals.md §2
 //! The skill handlers through the real host frame (drain → tick →
-//! flush) on the wired sim (`ActionSim`): each handled id with the
-//! spec's vectors, accepted and refused, and the exact bytes the client
-//! receives.
+//! flush) on the wired sim (`ActionSim`, the skill use pipeline's
+//! `UseView`): each handled id with the spec's vectors, accepted and
+//! refused, and the exact bytes the client receives. The units stand in
+//! a real field room (Cold Plains of the waypoint tests' DRLG).
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -11,13 +12,11 @@ use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Charstats, Experience, Itemstatcost, Record, Skilldesc, Skills};
 use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::{CombatTables, RoomKind};
-use d2_sim::drlg::data::DrlgData;
-use d2_sim::drlg::Dungeon;
-use d2_sim::drlg::{NoLevelTypes, TileInfo, TileSource};
+use d2_sim::combat::CombatTables;
 use d2_sim::game::Game;
+use d2_sim::missiles::MissileParams;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ServerMsg, UseState};
+use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::units::anim::AnimError;
@@ -26,25 +25,19 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::modes::UnitError;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::{
-    ActionHooks, ActionSim, ActionTables, DrlgWorld, NoPending, WiringError,
-};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, Pending, WiringError};
+use d2_sim::wiring::interaction::UseRest;
 
-use super::seams::SkillSeams;
 use super::wired::WiredSkills;
+use super::LearnRest;
+use crate::adapters::handlers::world::tests::waypoints::{field_drlg, field_room};
+use crate::adapters::handlers::world::{ActionWorld, Outbox};
 use crate::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use crate::dispatch::Outcome;
 use crate::host::{Handled, Host};
 use crate::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, ResultCode, SessionHandler};
 
 // ---- fixture -----------------------------------------------------------------------------
-
-struct NoTiles;
-impl TileSource for NoTiles {
-    fn dt1(&self, _: &[u8]) -> Option<&[TileInfo]> {
-        None
-    }
-}
 
 #[derive(Default)]
 struct NoSession;
@@ -201,7 +194,9 @@ struct Inner {
     log: Vec<String>,
 }
 
-/// The test's handle on the seams the host owns.
+/// The action wiring's `Pending` value: the seams without a provider
+/// (`Pending`'s defaults, the skill use pipeline's `UseRest`, the
+/// skill-point calls), answered from [`Inner`]; the test keeps a handle.
 #[derive(Clone, Default)]
 struct Book(Arc<Mutex<Inner>>);
 
@@ -214,15 +209,53 @@ impl Book {
     }
 }
 
-impl SkillSeams for Book {
+impl Pending for Book {
     fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
         self.get().list.clone()
     }
     fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
         self.get().used
     }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.get().used = e;
+    fn stats_refresh(&mut self, _: UnitId) {
+        self.get().log.push("refresh".into());
+    }
+}
+
+impl Outbox for Book {
+    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
+}
+
+/// The narrowest answer wherever the test stages nothing. The message
+/// path's player data, positions, reach and sends are the server's
+/// (`skills::world::World`), so those calls are never reached here.
+impl UseRest for Book {
+    fn send(&mut self, _: UnitId, _: ServerMsg) {}
+    fn has_player_data(&self, _: UnitId) -> bool {
+        false
+    }
+    fn last_point_frame(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_last_point_frame(&mut self, _: UnitId, _: i32) {}
+    fn cursor_item(&self, _: UnitId) -> bool {
+        false
+    }
+    fn in_own_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn within_reach(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn owner(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn is_pet(&self, _: UnitId, _: UnitId) -> bool {
+        false
+    }
+    fn is_ally(&self, _: UnitId, _: UnitId) -> bool {
+        false
     }
     fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
         self.get().left
@@ -248,9 +281,23 @@ impl SkillSeams for Book {
             .copied()
             .find(|e| e.skill == skill && e.owner_guid == owner)
     }
+    fn owns_skill(&self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
+        self.get().used = e;
+    }
+    fn used_skill_flags(&self, _: UnitId) -> u32 {
+        0
+    }
+    fn set_used_skill_flags(&mut self, _: UnitId, _: u32) {}
     fn entry_mode(&self, _: UnitId, e: &SkillEntry) -> u32 {
         self.get().modes.get(&e.skill).copied().unwrap_or(0)
     }
+    fn attack_param4(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_attack_param4(&mut self, _: UnitId, _: i32) {}
     fn use_state(&mut self, _: UnitId, e: &SkillEntry) -> UseState {
         self.get()
             .states
@@ -258,6 +305,49 @@ impl SkillSeams for Book {
             .copied()
             .unwrap_or(UseState::Usable)
     }
+    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
+    fn shapeshifted(&self, _: UnitId) -> bool {
+        false
+    }
+    fn consume_charges(&mut self, _: UnitId, _: &SkillEntry) -> bool {
+        false
+    }
+    fn pay_life(&mut self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn can_dual_wield(&self, _: UnitId) -> bool {
+        false
+    }
+    fn equippable(&self, _: UnitId) -> bool {
+        false
+    }
+    fn bow_equipped(&self, _: UnitId) -> bool {
+        false
+    }
+    fn state_mask(&self, _: UnitId, _: u32) -> bool {
+        false
+    }
+    fn start_mode(&mut self, _: &mut Game, _: UnitId, _: u32, _: ModeTarget<UnitId>) {}
+    fn run_to(&mut self, _: UnitId, _: UnitId, _: SkillEntry) {}
+    fn target(&self, _: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn clear_target(&mut self, _: UnitId) {}
+    fn event_arg(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn set_event_arg(&mut self, _: UnitId, _: i32) {}
+    fn step_path(&mut self, _: UnitId) -> i32 {
+        0
+    }
+    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+    fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
+        false
+    }
+    fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
+    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, _: &mut MissileParams) {}
     fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
@@ -268,7 +358,9 @@ impl SkillSeams for Book {
             .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
         1
     }
-    fn create_skill_missile(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: bool, _: MissileAim) {}
+}
+
+impl LearnRest for Book {
     fn is_class_skill(&self, _: UnitId, skill: i32) -> bool {
         self.get().class_skills.contains(&skill)
     }
@@ -278,12 +370,6 @@ impl SkillSeams for Book {
     fn after_skill_point(&mut self, _: UnitId) {
         self.get().log.push("after".into());
     }
-    fn room(&self, _: UnitId) -> RoomKind {
-        RoomKind::Field
-    }
-    fn refresh(&mut self, _: UnitId) {
-        self.get().log.push("refresh".into());
-    }
 }
 
 const ALIVE: PlayerGate = PlayerGate {
@@ -291,11 +377,12 @@ const ALIVE: PlayerGate = PlayerGate {
     uninterruptable: false,
 };
 
-type Wired = SimGame<ActionSim<NoPending>>;
+type Wired = SimGame<ActionSim<Book>, ActionWorld<WiredSkills>>;
 
 /// A host with a player (class `class`, mode NU, at (100, 100)) for
 /// client 0, a monster at (120, 100) and an item on the ground at
-/// (101, 100), on the wired sim with [`Book`] as the unspecified seams.
+/// (101, 100), all in one field room, on the wired sim with [`Book`] as
+/// the unspecified seams.
 struct Fx {
     host: Host<Wired, ProtoSizes, NoSession, Clock0>,
     player: UnitId,
@@ -321,13 +408,13 @@ impl Fx {
             levels: Vec::new(),
             skill_modes: Vec::new(),
         };
-        let drlg = DrlgWorld {
-            dungeon: Dungeon::default(),
-            data: Arc::new(DrlgData::default()),
-            tiles: Box::new(NoTiles),
-            types: Box::new(NoLevelTypes),
-        };
-        let hooks = ActionHooks::new(Arc::new(tables), drlg, Seed::init_low(1234), NoPending);
+        let mut hooks = ActionHooks::new(
+            Arc::new(tables),
+            field_drlg(),
+            Seed::init_low(1234),
+            book.clone(),
+        );
+        hooks.vitals = Some(Arc::new(vitals()));
         let data = UnitData {
             monsters: vec![MonsterInfo {
                 enabled: true,
@@ -338,19 +425,19 @@ impl Fx {
         };
         let mut events = ActionSim::new(stat_data(), data, hooks);
         let mut game = Game::new();
-        game.lists.ensure_act(0).unwrap();
+        let room = field_room(&mut events, &mut game);
         let mut alloc = |ty, class| {
             let req = AllocRequest {
                 ty,
                 class,
-                room: None,
+                room: Some(room),
                 add: true,
                 fixed_guid: None,
                 mode: 1,
                 allied: ty == UnitType::Player,
             };
             events
-                .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+                .with(&mut game, |g, v| v.allocate(g, &req, 20, 20))
                 .expect("allocated")
         };
         let player = alloc(UnitType::Player, class);
@@ -358,8 +445,12 @@ impl Fx {
         let item = alloc(UnitType::Item, 0);
         // Players are allocated in mode 0; neutral (`units.md` §2).
         events.sys.units.get_mut(player).unwrap().mode = 1;
-        let mut sim = SimGame::with_events(game, events);
-        sim.join(0, Some(player), None, client_state::IN_GAME)
+        let world = ActionWorld {
+            skills: WiredSkills::default(),
+            ..ActionWorld::default()
+        };
+        let mut sim = SimGame::with_world(game, events, world);
+        sim.join(0, Some(player), Some(room), client_state::IN_GAME)
             .unwrap();
         sim.set_player(
             player,
@@ -376,7 +467,6 @@ impl Fx {
         sim.set_unit(player, at(100, 100));
         sim.set_unit(monster, at(120, 100));
         sim.set_unit(item, at(101, 100));
-        sim.skills = Some(Box::new(WiredSkills::new(vitals(), book.clone())));
         let mut host = Host::new(sim, ProtoSizes, NoSession, Clock0(1000));
         host.connect(0);
         Fx {
@@ -394,7 +484,7 @@ impl Fx {
     }
 
     fn unsent(&self) -> Vec<(ClientId, ServerMsg)> {
-        self.host.game.skills.as_ref().unwrap().unsent().to_vec()
+        self.host.game.world.skills.unsent.clone()
     }
 
     fn guid(&self, u: UnitId) -> u32 {

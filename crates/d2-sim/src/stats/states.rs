@@ -183,7 +183,8 @@ impl StatLists {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(dead_code))]
 impl StateTable {
     /// A synthetic table: `count` states, `flags` (state, group) pairs.
     pub(crate) fn synthetic(count: usize, flags: &[(u32, usize)]) -> Self {
