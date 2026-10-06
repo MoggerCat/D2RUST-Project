@@ -1,0 +1,26 @@
+{"format": "packets-raw-1", "tool": "hand-built fixture", "type": "header"}
+{"frame": 0, "ms": 1000, "phase": "input", "seq": 0, "tid": 1, "type": "drain"}
+{"bytes": "130100000002000000", "client": 0, "frame": 0, "ms": 1001, "phase": "input", "seq": 1, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 0, "game_frame": 0, "id": 19, "ms": 1002, "phase": "input", "seq": 2, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"bytes": "1d1300", "caller": "0x53b330", "client": 0, "frame": 0, "ms": 1003, "phase": "input", "seq": 3, "size": 3, "tid": 1, "type": "s2c"}
+{"code": 0, "dispatched": true, "frame": 0, "ms": 1004, "phase": "input", "seq": 4, "tid": 1, "type": "result"}
+{"bytes": "3c06000000ffffffff", "client": 0, "frame": 0, "ms": 1005, "phase": "input", "seq": 5, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 0, "game_frame": 0, "id": 60, "ms": 1006, "phase": "input", "seq": 6, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"bytes": "1d3c00", "caller": "0x53b330", "client": 0, "frame": 0, "ms": 1007, "phase": "input", "seq": 7, "size": 3, "tid": 1, "type": "s2c"}
+{"code": 0, "dispatched": true, "frame": 0, "ms": 1008, "phase": "input", "seq": 8, "tid": 1, "type": "result"}
+{"frame": 1, "game": "0x1000", "game_type": 0, "ms": 1009, "phase": "tick", "seq": 9, "tid": 1, "type": "tick"}
+{"bytes": "1a01", "caller": "0x53b330", "client": 0, "frame": 1, "ms": 1010, "phase": "tick", "seq": 10, "size": 2, "tid": 1, "type": "s2c"}
+{"frame": 1, "ms": 1011, "phase": "post", "seq": 11, "tid": 1, "type": "tick_end"}
+{"frame": 1, "ms": 1012, "phase": "input", "seq": 12, "tid": 1, "type": "drain"}
+{"bytes": "130100000002000000", "client": 0, "frame": 1, "ms": 1013, "phase": "input", "seq": 13, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 1, "game_frame": 1, "id": 19, "ms": 1014, "phase": "input", "seq": 14, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"bytes": "1d1300", "caller": "0x53b330", "client": 0, "frame": 1, "ms": 1015, "phase": "input", "seq": 15, "size": 3, "tid": 1, "type": "s2c"}
+{"code": 0, "dispatched": true, "frame": 1, "ms": 1016, "phase": "input", "seq": 16, "tid": 1, "type": "result"}
+{"bytes": "3c06000000ffffffff", "client": 0, "frame": 1, "ms": 1017, "phase": "input", "seq": 17, "size": 9, "tid": 1, "type": "c2s"}
+{"frame": 1, "game_frame": 1, "id": 60, "ms": 1018, "phase": "input", "seq": 18, "size": 9, "tid": 1, "type": "dispatch", "unit": 1}
+{"bytes": "1d3c00", "caller": "0x53b330", "client": 0, "frame": 1, "ms": 1019, "phase": "input", "seq": 19, "size": 3, "tid": 1, "type": "s2c"}
+{"code": 0, "dispatched": true, "frame": 1, "ms": 1020, "phase": "input", "seq": 20, "tid": 1, "type": "result"}
+{"frame": 2, "game": "0x1000", "game_type": 0, "ms": 1021, "phase": "tick", "seq": 21, "tid": 1, "type": "tick"}
+{"bytes": "1a02", "caller": "0x53b330", "client": 0, "frame": 2, "ms": 1022, "phase": "tick", "seq": 22, "size": 2, "tid": 1, "type": "s2c"}
+{"frame": 2, "ms": 1023, "phase": "post", "seq": 23, "tid": 1, "type": "tick_end"}
+{"events": 24, "type": "footer"}
