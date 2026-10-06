@@ -1,4 +1,4 @@
-# Handoff (updated 2026-10-06, branch `claude/phase3-specs`)
+# Handoff (updated 2026-10-06, branch `claude/parser-robustness` on main 91450fd)
 
 Start here in a fresh session, after `CLAUDE.md`. This file holds state,
 the next steps, the code and command map, and the local run queue. Rules
@@ -53,6 +53,7 @@ rather than restating them.
 | `crates/d2-data/src/bin.rs` | `.bin` container, live-file resolution, load checks | `data/loading.md` §3–4, §8 |
 | `crates/d2-data/src/crosscheck.rs` | txt → bin byte comparison | `data/loading.md` §11 |
 | `crates/d2-data/src/patch.rs` (+ `patch/{syntax,apply,diff,check,tests}.rs`) | mod patch layers: parse, apply, render/digests, diff, patched compile (branch `claude/patch-layers`) | `data/patch-layers.md` |
+| `crates/d2-formats/src/robust.rs`, `crates/d2-data/src/robust.rs` (copy) | robustness test harness: `bounded` (deadline + panic capture), `mutated` / `bytes` strategies; properties in `d2-formats/src/{robust_tests.rs,mpq/robust_tests.rs}`, per-parser `robust` test modules, `d2-data/src/{robust_tests.rs,calc/robust_tests.rs,patch/robust_tests.rs}` | METHODS M07 |
 | `crates/d2-data/src/strings.rs` | string tables, `strkey` | `field-types.md` §7 |
 | `crates/d2-client/src/map/` | DS1+DT1 map assembly, CPU reference renderer | `render/map-preview.md` |
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
@@ -76,6 +77,7 @@ rather than restating them.
 | `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo fmt --all` | lint/format gate | repo |
 | `cargo run -p depcheck` | crate dependency rules | repo |
 | `py tools/spec_index.py --check` | spec indexes current | repo |
+| `PROPTEST_CASES=20000 cargo test -p d2-formats -p d2-data robust` | parsers return Ok/Err on malformed input: no panic, hang or huge allocation (default case counts run in `cargo test`, <1 s) | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |
 | `cargo run --release -p data-tool -- links` | no broken link in the live `.bin` set | `game/` |
@@ -102,6 +104,20 @@ counterpart identical, nothing pending; `fixups_on_live_set` ok) and
 patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
 game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
 `66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
+
+Parser robustness (branch `claude/parser-robustness`, 2026-10-06): parser
+code changed in `d2-formats` (mpq decoders, animdata, dc6, dcc, dt1, ds1,
+tbl, cof) and `d2-data` (`bin.rs`, `patch/apply.rs`). Run
+`cargo test -p d2-data -p d2-formats -- --ignored`,
+`cargo run --release -p data-tool -- tables` and
+`cargo run --release -p mpq-tool -- check` / `formats`: expect the same
+results as before (every block and format file decodes, 72/73 tables
+identical). New whole-file limits that are implementation limits, not
+observed 1.14d behavior (each an Open question in its spec): DC6 frames
+and DCC direction boxes ≤ 64M pixels per file, DT1 block counts over all
+tiles ≤ file length / 20, TBL key+value bytes ≤ file length. Any
+`formats` failure naming one of these limits means 1.14d files exceed or
+share data, and the limit must be redesigned (not raised by guess).
 
 Phase 3 recordings: done 2026-10-06 (first skipped at the user's
 request, then recorded when the user asked). Combat with missiles
@@ -148,6 +164,13 @@ Carried-over open questions not yet in a spec's list:
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
 3. DC6/DCC vertical placement (one-row disagreement between sources).
 4. Meaning of the PL2 rendering tables (Phase 6).
+5. PKWARE explode: input ending inside the end marker's extra length
+   bits. `mpq.md` §10 reads as "still the end marker"; `explode.rs`
+   returns an error. Same outcome for a lone PKWARE sector, differs for
+   PKWARE→Huffman chains. Confirm on 1.14d (from `claude/parser-robustness`).
+6. Patch layers P09: does a `table` line that fails P08 count as the
+   section's first `table`? Today it does (the layer is an error either
+   way; only the finding list differs). `patch-layers.md` §3.
 
 ## 8. Lessons (problems met, fixes)
 
@@ -163,4 +186,5 @@ Carried-over open questions not yet in a spec's list:
 | The Ghidra decompile drops register arguments (fastcall ECX/EDX, custom conventions) | read register use from the disassembly: `tools/ghidra/disasm.py` |
 | Recording a game needs a player: the game never enters a game by itself | ask the user to play during the recording (~3 min) or queue it |
 | A local session reported a push as done; the push had been rejected (local and remote branch names differ) and the command's last output line hid the error (2026-10-06, caught by the coordinator reading the remote) | push with an explicit remote branch (`git push origin HEAD:claude/<name>`) and verify by reading the remote (`git status` not ahead, or `git ls-remote`), never by the command's output (METHODS M09, M21) |
+| Property tests on the strict parsers (2026-10-06) found 16 bugs that valid files never hit: process aborts from `Vec::with_capacity` on untrusted sizes (MPQ explode/huffman/adpcm and `read_block`, animdata bucket count), debug-build overflow panics (ds1 and dcc size products, animdata `hash`, huffman weights, `.bin` size check, dc6 `frame` / cof `component_at` indices), quadratic or huge work from shared offsets (dt1 block headers, tbl strings, dc6/dcc frame boxes, tbl probes up to `max_tries`), a wrapped DCC i32 corner, and a `patch::apply_stack` `expect` reachable through the public API after a failed `table` line | every size, count and offset from a file is checked or bounded by the input length before it drives an allocation, a product or a loop; `cargo test` runs the properties (M07) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
