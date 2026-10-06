@@ -162,7 +162,9 @@ and type flags; Nightmare melee, freeze, knockback, Fallen Shaman
 resurrect; missile exits `0x005AE1F0`, `0x005ADF10`); world (Flavie chat
 RNG + packets; game start mode at `0x00546270`; act transitions via
 Warriv/Meshif, 0x61; Inifuss scroll 0x50; waypoint to another act and an
-undiscovered waypoint twice); vitals (hook `0x00570880` entry/exit and
+undiscovered waypoint twice; cube transmutes of records 23, 2, 19, 104;
+hire, resurrect, Akara heal, Cain identify; repair one and all; gamble
+open, buy, 0x37; leave town and trade with Charsi again); vitals (hook `0x00570880` entry/exit and
 `0x00570D60`, stats 4–13 before/after, one level-up and stat spending);
 DRLG (full RNG hook: Den of Evil, Cave 1, Acts 2–4 with drlg +0x94,
 +0x484, +0x474; entry returned by `0x0066D820`; `record_tick` extended
@@ -177,10 +179,16 @@ population draws mostly from the active room seed, only density/sparse
 rolls from the game seed); `calc-expressions.md` §3.5 (`skill(s,c)`
 without an entry returns the level-0 special value; OQ5/OQ8 answered by
 `skills/levels.md`); `server-messages.tsv` (0x63, 0x28, 0x5D, 0x50, 0x91
-per `world/quests.md`; 0xAC per `monsters/init.md` §24); `tick.md` §4
+per `world/quests.md`; 0x77 is sent in single player; 0x2A per
+`world/npc.md` §9, bytes 3–6 never written: mask them; 0xAC per `monsters/init.md` §24); `tick.md` §4
 (`0x0052D0F0`), §5.6 (thinks dropped by the freeze gate are never
 rescheduled); `units.md` (pointers from the skills and monsters specs);
-`client-messages.tsv` 0x3A (byte +1 stat id ≤ 15, byte +2 count − 1 ≤ 99,
+`combat/vitals.md`: merge the vitals helper's findings
+(`re/exports/requests/skills/vitals-findings.md`, local only: regeneration
+details to reconcile with `stat-lists.md` §10.1, experience on kill,
+monster vitals at spawn to `monsters/init.md`);
+`client-messages.tsv` 0x4C (body-part transmogrify, not the cube; the
+cube transmute is 0x4F button 0x18, `world/cube.md`), 0x3A (byte +1 stat id ≤ 15, byte +2 count − 1 ≤ 99,
 not `stat:u16@1`, `combat/vitals.md`); `rng.md` §7 DRLG rows (level seed
 for `0x0066F690`/`0x0066F990`, room-seed sites `0x0066D820`, `0x00670170`,
 `0x006706D7`, maze draws `0x006711A0`–`0x00673EC9`, `drlg/rooms.md`);
@@ -235,8 +243,9 @@ missiles: `specs/monsters/population.md` (+ `preset-monsters.tsv`),
 `init.md` (+ `umods.tsv`), `ai.md` (+ `ai-functions.tsv`),
 `specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`;
 `claude/phase3-monsters`). World: `specs/world/quests.md` (+
-`quests.tsv`, `quest-messages.tsv`), `waypoints.md` (+ `waypoints.tsv`;
-`claude/phase3-world`; cube, NPC, vendors in progress). Level generation:
+`quests.tsv`, `quest-messages.tsv`), `waypoints.md` (+ `waypoints.tsv`), `cube.md` (+ `cube-ops.tsv`), `npc.md`,
+`vendors.md` (+ `vendors.tsv`; store generation reproduces the two
+recorded stores item for item; `claude/phase3-world`). Level generation:
 `specs/drlg/levels.md`, `rooms.md` (rooms-near order, adjacency arrays,
 the deactivation counter = `tick.md` OQ4), `preset.md` (+
 `preset-tables.tsv`), `maze.md` (+ `maze-specials.tsv`), `outdoor.md`,
@@ -266,4 +275,5 @@ Carried-over open questions not yet in a spec's list:
 | The Ghidra decompile drops register arguments (fastcall ECX/EDX, custom conventions) | read register use from the disassembly: `tools/ghidra/disasm.py` |
 | Recording a game needs a player: the game never enters a game by itself | ask the user to play during the recording (~3 min) or queue it |
 | A local session reported a push as done; the push had been rejected (local and remote branch names differ) and the command's last output line hid the error (2026-10-06, caught by the coordinator reading the remote) | push with an explicit remote branch (`git push origin HEAD:claude/<name>`) and verify by reading the remote (`git status` not ahead, or `git ls-remote`), never by the command's output (METHODS M09, M21) |
+| A coordinator removed a writer's worktree right after the writer reported, while the writer's own helper agent was still running in it; the helper lost its shell and its findings arrived only as a message (2026-10-06) | remove a worktree only when `git worktree list` shows it unlocked and no notification of that writer's helpers is pending; findings saved to `re/exports/requests/skills/vitals-findings.md` for a follow-up (METHODS M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |

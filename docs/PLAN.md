@@ -169,7 +169,7 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 - [ ] *Specs for the items below (2026-10-06), one writer per topic, all
       draft (rules from the 1.14d disassembly; recordings queued, HANDOFF
       §5): items, treasure, skills/combat, monsters/missiles pushed;
-      world (quests, waypoints) partly; DRLG pushed. Branches
+      world (quests, waypoints, cube, NPC, vendors), DRLG pushed. Branches
       `claude/phase3-{items,treasure,skills,drlg,monsters,world}`.*
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops
