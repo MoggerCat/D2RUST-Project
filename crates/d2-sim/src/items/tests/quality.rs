@@ -85,7 +85,7 @@ fn no_hit_fallback_and_divisor_zero() {
 }
 
 /// §5 vector: a downgrade replays the item seed from the saved value.
-// Covers: specs/items/quality.md §4 text, §5 r2, §5 r4
+// Covers: specs/items/quality.md §5 r2, §5 r4
 #[test]
 fn downgrade_restores_saved_seed() {
     let mut t = tables();

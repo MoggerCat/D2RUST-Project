@@ -441,7 +441,7 @@ fn zombie_vectors() {
     assert_eq!(w.fake.seeds[&w.mon], Seed::init_low(1));
 }
 
-// Covers: specs/monsters/ai.md §9.4 r1, §9.4 r5
+// Covers: specs/monsters/ai.md §9.4 r1
 #[test]
 fn fallen_vectors() {
     let want = [None, None, None, Some(5)];
@@ -462,7 +462,7 @@ fn fallen_vectors() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.5 r1, §9.5 r2
+// Covers: specs/monsters/ai.md §9.5 r2
 #[test]
 fn brute_vectors() {
     for (s, m) in SEEDS.iter().zip([4, 5, 5, 4]) {

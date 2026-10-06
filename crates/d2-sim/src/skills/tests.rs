@@ -15,6 +15,7 @@ fn player(f: &mut Fake) -> usize {
 
 // ------------------------------------------------------------ §2 blocks
 
+// Covers: specs/skills/levels.md §2
 #[test]
 fn dm_vectors() {
     // levels.md §2 and Test vectors (1.14d operand order).
@@ -30,12 +31,14 @@ fn dm_vectors() {
     assert_eq!(dm(0, 7, 9), 7);
 }
 
+// Covers: specs/skills/levels.md §edge-cases-original-bugs r3
 #[test]
 #[should_panic(expected = "divides by zero")]
 fn dm_minus_six_is_fatal() {
     dm(-6, 1, 2);
 }
 
+// Covers: specs/skills/levels.md §3 text
 #[test]
 fn bracket_vectors() {
     assert_eq!(bracket(29, [1, 2, 3, 4, 5]), 70);
@@ -46,6 +49,7 @@ fn bracket_vectors() {
     assert_eq!(bracket(23, [1, 1, 1, 1, 0]), 22);
 }
 
+// Covers: specs/skills/levels.md §2, §5
 #[test]
 fn linear_specials() {
     let mut r = skill_rec();
@@ -87,6 +91,7 @@ fn fire_bolt() -> Skills {
     r
 }
 
+// Covers: specs/skills/levels.md §2, §3.1 r1, §3.1 r2, §3.1 r3, §4
 #[test]
 fn fire_bolt_vectors() {
     let t = tables_with(fire_bolt());
@@ -115,6 +120,7 @@ fn fire_bolt_vectors() {
     assert_eq!(special(&mut f, &t, None, 21, 0, 1), 2);
 }
 
+// Covers: specs/skills/levels.md §3.1 r3, §edge-cases-original-bugs r1
 #[test]
 fn elemental_min_synergy_gate() {
     // Lightning: EMin 1, EMinLev1 0, HitShift 8: L20 min with p = 64 stays
@@ -128,6 +134,7 @@ fn elemental_min_synergy_gate() {
     assert_eq!(elem_max(&mut f, &t, None, 0, 1, false), 10_240 + 6_553);
 }
 
+// Covers: specs/skills/levels.md §2, §3.1 r4
 #[test]
 fn elemental_mastery() {
     let t = tables_with(fire_bolt());
@@ -144,6 +151,7 @@ fn elemental_mastery() {
     assert_eq!(elem_mastery_stat(3), None);
 }
 
+// Covers: specs/skills/levels.md §3.2, §4
 #[test]
 fn frozen_orb_length_and_mana() {
     let mut r = skill_rec();
@@ -164,6 +172,7 @@ fn frozen_orb_length_and_mana() {
     );
 }
 
+// Covers: specs/skills/levels.md §4
 #[test]
 fn teleport_mana() {
     let mut r = skill_rec();
@@ -194,6 +203,7 @@ fn teleport_mana() {
     assert_eq!(f.get(u, 8), 255);
 }
 
+// Covers: specs/skills/levels.md §2, §4, §edge-cases-original-bugs r5
 #[test]
 fn mana_rules() {
     let mut r = skill_rec();
@@ -247,6 +257,7 @@ fn mana_rules() {
     assert_eq!(f.log.last().unwrap(), "charges");
 }
 
+// Covers: specs/skills/levels.md §3.1 r1, §3.3 r1, §3.3 r3, §edge-cases-original-bugs r8
 #[test]
 fn tornado_physical_synergy_before_shift() {
     let mut r = skill_rec();
@@ -278,6 +289,7 @@ fn tornado_physical_synergy_before_shift() {
     assert_eq!(elem_min(&mut f, &t, None, 9, 1, false), 0);
 }
 
+// Covers: specs/skills/levels.md §3.3 r2, §3.3 r3
 #[test]
 fn kick_and_srcdam() {
     let mut r = skill_rec();
@@ -309,6 +321,7 @@ fn kick_and_srcdam() {
     assert_eq!(phys_max(&mut f, &t, Some(u), 1, 1, true), (40 + 2) << 8);
 }
 
+// Covers: specs/skills/levels.md §3.5, §edge-cases-original-bugs r6
 #[test]
 fn kick_damage_helper() {
     let mut f = Fake::default();
@@ -333,6 +346,7 @@ fn kick_damage_helper() {
     assert_eq!(f.log, ["weaponlists false", "weaponlists true"]);
 }
 
+// Covers: specs/skills/levels.md §3.6
 #[test]
 fn rolls_step_unit_seed() {
     let mut r = fire_bolt();
@@ -374,6 +388,7 @@ fn entry(skill: i32, base: i32, owner: i32) -> SkillEntry {
     }
 }
 
+// Covers: specs/skills/levels.md §1 r1, §1 r2, §1 r3, §1 l2 r2, §1 l2 r3, §1 l2 r4, §1 l2 r5, §1 l2 r6, §1 l2 r7
 #[test]
 fn skill_level_and_bonuses() {
     let mut r = skill_rec();
@@ -423,6 +438,7 @@ fn skill_level_and_bonuses() {
     assert_eq!(bonus_level(&f, &t, m, &entry(0, 1, -1)), -7);
 }
 
+// Covers: specs/skills/levels.md §edge-cases-original-bugs r4
 #[test]
 #[should_panic(expected = "skilldesc")]
 fn class_skill_without_skilldesc_is_fatal() {
@@ -434,6 +450,7 @@ fn class_skill_without_skilldesc_is_fatal() {
     bonus_level(&f, &t, u, &entry(0, 1, -1));
 }
 
+// Covers: specs/skills/levels.md §1 text
 #[test]
 fn highest_entry_rules() {
     let charged = SkillEntry {
@@ -455,6 +472,7 @@ fn highest_entry_rules() {
     assert_eq!(highest_entry(&list, 6), None);
 }
 
+// Covers: specs/skills/levels.md §2; specs/data/calc-expressions.md §3.5
 #[test]
 fn formula_functions() {
     // skill 0: Param8 = 42, calc1 = skill(1, par1) + sklvl(1, lvl, par2)
@@ -490,6 +508,7 @@ fn formula_functions() {
     assert_eq!(special(&mut f, &t, Some(u), 56, 0, 9), 0);
 }
 
+// Covers: specs/skills/levels.md §2; specs/data/calc-expressions.md §3.5
 #[test]
 fn formula_rand_draws_on_caster_seed() {
     let mut a = skill_rec();
@@ -502,6 +521,7 @@ fn formula_rand_draws_on_caster_seed() {
     assert_eq!(f.units[u].seed, Seed::new(0x6AC6_90C5, 0));
 }
 
+// Covers: specs/skills/levels.md §2
 #[test]
 fn mastery_special() {
     let mut r = skill_rec();
@@ -515,6 +535,7 @@ fn mastery_special() {
     assert_eq!(special(&mut f, &t, None, 23, 0, 1), 0);
 }
 
+// Covers: specs/skills/levels.md §3.5
 #[test]
 fn weapon_mastery_layers_and_throw() {
     let mut s = skill_rec();
@@ -544,6 +565,7 @@ fn weapon_mastery_layers_and_throw() {
     assert_eq!(weapon_mastery(&f, &t, Some(u), Some(sword), Some(0), 1), 0);
 }
 
+// Covers: specs/skills/levels.md §3.5
 #[test]
 fn concentration_helper() {
     let mut r = skill_rec();
@@ -559,6 +581,7 @@ fn concentration_helper() {
 
 // ------------------------------------------------------------ missiles
 
+// Covers: specs/skills/levels.md §2, §3.4
 #[test]
 fn missile_specials() {
     let mut m = missile_rec();
@@ -589,6 +612,7 @@ fn missile_specials() {
     assert_eq!(miss_special(&mut f, &t, Some(u), None, 0, 0, 1), 0);
 }
 
+// Covers: specs/skills/levels.md §3.4
 #[test]
 fn missile_synergy_before_shift() {
     let mut m = missile_rec();
@@ -602,6 +626,7 @@ fn missile_synergy_before_shift() {
     assert_eq!(miss_elem_min(&mut f, &t, None, None, 0, 1), 1_024);
 }
 
+// Covers: specs/skills/levels.md §2, §edge-cases-original-bugs r2
 #[test]
 fn skill_descmissile_specials() {
     let mut r = skill_rec();
@@ -626,6 +651,7 @@ fn skill_descmissile_specials() {
 
 // ------------------------------------------------------------ §6 learning
 
+// Covers: specs/skills/levels.md §6 r1, §6 r2, §6 r3, §6.4 r2, §6.4 r3
 #[test]
 fn learning_rules() {
     let mut a = skill_rec();
@@ -665,6 +691,7 @@ fn learning_rules() {
 /// Real 1.14d `skills.txt` vectors (levels.md "Test vectors"). Needs the
 /// extracted `.bin` tables (`mpq-tool extract`) under
 /// `D2_GAME_DIR/extracted/patch_d2/data/global/excel/`.
+// Covers: specs/skills/levels.md §3.1 r2, §3.2, §4
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn real_skill_vectors() {

@@ -20,7 +20,6 @@ fn armor(t: &mut ItemTables) -> usize {
     push_item(t, r)
 }
 
-// Covers: specs/items/generation.md §4 r3
 #[test]
 fn armor_durability_and_defense_vector() {
     let mut t = tables();
@@ -205,7 +204,7 @@ fn no_stat_list_no_durability() {
 
 /// Staffmods (§6.2) and edge case 5: after 6 rejected tries the last
 /// tried skill is used.
-// Covers: specs/items/generation.md §6.2 r3, §6.2 r4, §6.2 r5, §edge-cases-original-bugs r5
+// Covers: specs/items/generation.md §6.2 r3, §6.2 r4, §edge-cases-original-bugs r5
 #[test]
 fn staffmods_last_rejected_skill() {
     let mut t = tables();

@@ -543,7 +543,7 @@ fn delivery_splits_and_routes() {
     assert_eq!(ids, [0xB4, 0xAF, 0x0C, 0x01]);
 }
 
-// Covers: specs/sim/intents-events.md §3.3 r3, §edge-cases-original-bugs r7, §edge-cases-original-bugs r8
+// Covers: specs/sim/intents-events.md §3.3 r3, §edge-cases-original-bugs r7
 #[test]
 fn delivery_split_ends_at_a_size_zero_id() {
     // Edge case 7: 0x83 (size 0) ends the split; the rest is lost.

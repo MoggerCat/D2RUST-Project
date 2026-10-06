@@ -134,7 +134,7 @@ fn roller_candidate_cap() {
     assert_eq!(roll_affix(&t, &mut it, true, true, false, false, 0, 0), 511);
 }
 
-// Covers: specs/items/affixes.md §3 r4, §4.2
+// Covers: specs/items/affixes.md §4.2
 #[test]
 fn roller_filters() {
     let mut rows: Vec<_> = (0..6).map(|k| affix_row(RING, k + 1)).collect();

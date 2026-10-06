@@ -178,7 +178,6 @@ fn duplicate_filter_on_the_host() {
     assert_eq!(h.queues.len(crate::transport::Queue::System), 2);
 }
 
-// Covers: specs/sim/intents-events.md §3.2 r3
 #[test]
 fn flush_follows_the_client_list() {
     let mut h = host();
@@ -218,7 +217,6 @@ fn direct_sends_overtake_buffered_messages() {
     assert_eq!(got, [0xB0, 0x06, 0x0C]);
 }
 
-// Covers: specs/sim/intents-events.md §3.2 r3
 #[test]
 fn flush_throttle_unless_forced() {
     let mut h = host();

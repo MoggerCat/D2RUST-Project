@@ -339,6 +339,7 @@ impl World {
 
 // ---- R2: creation ---------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r5, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r7, §r10-behaviour-of-the-recorded-missiles r5
 #[test]
 fn creation_velocity_vectors() {
     let p = |level| MissileParams {
@@ -374,6 +375,7 @@ fn creation_velocity_vectors() {
     assert_eq!(creation_velocity(&r, &q, None), 768);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r6
 #[test]
 fn creation_slow_uses_state_87_stat_161() {
     let mut r = row();
@@ -386,6 +388,7 @@ fn creation_slow_uses_state_87_stat_161() {
     assert_eq!(w.fake.velocity(m), 2304);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r4, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r8
 #[test]
 fn creation_target_at_start_moves_one_subtile() {
     let mut w = World::new(row());
@@ -395,6 +398,7 @@ fn creation_target_at_start_moves_one_subtile() {
     assert_eq!(w.fake.paths[&m].target_point, Some((101, 101)));
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r8
 #[test]
 fn creation_target_on_owner_subtile_is_dropped() {
     let mut w = World::new(row());
@@ -406,6 +410,7 @@ fn creation_target_on_owner_subtile_is_dropped() {
     assert_eq!(w.fake.paths[&m].target_point, Some((111, 101)));
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r8
 #[test]
 fn creation_fails_100_subtiles_away() {
     let mut w = World::new(row());
@@ -417,6 +422,7 @@ fn creation_fails_100_subtiles_away() {
     assert!(w.create(&p).is_some());
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r1
 #[test]
 fn creation_fails_without_owner_or_bad_class() {
     let mut w = World::new(row());
@@ -430,6 +436,7 @@ fn creation_fails_without_owner_or_bad_class() {
     assert_eq!(w.create(&p), None);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r14, §edge-cases-original-bugs r4
 #[test]
 fn creation_without_path_leaves_the_unit_with_its_event() {
     // Edge case 4.
@@ -441,6 +448,7 @@ fn creation_without_path_leaves_the_unit_with_its_event() {
     assert_eq!(w.game.timers.unit_timers(ms[0]).len(), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r10, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r12, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r13, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r17, §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r22
 #[test]
 fn creation_frames_activate_and_order() {
     let mut r = row();
@@ -465,6 +473,7 @@ fn creation_frames_activate_and_order() {
     assert_eq!(w.fake.stat(m, stat::DAMAGE_FRAMERATE), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r19, §edge-cases-original-bugs r11
 #[test]
 fn creation_frames_from_distance() {
     assert_eq!(frames_from_distance(10, 3840), (10u32 << 16) / (3840 << 4));
@@ -474,6 +483,7 @@ fn creation_frames_from_distance() {
     assert_eq!(frames_from_distance(10, -1), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r28
 #[test]
 fn creation_monster_owner_runs_unique_mod_hook() {
     let mut w = World::new(row());
@@ -487,6 +497,7 @@ fn creation_monster_owner_runs_unique_mod_hook() {
 
 // ---- R8: pierce -----------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed r2, §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed r3, §edge-cases-original-bugs r7
 #[test]
 fn pierce_vectors() {
     assert_eq!(pierce_count(67, 0), 4);
@@ -495,6 +506,7 @@ fn pierce_vectors() {
     assert_eq!(pierce_count(80, 5), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r25, §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed r1, §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed r4, §r8-2-pierce-at-a-hit-0x005ada80
 #[test]
 fn pierce_set_at_creation_and_used_at_hits() {
     let mut r = row();
@@ -513,6 +525,7 @@ fn pierce_set_at_creation_and_used_at_hits() {
     assert_eq!(w.hit(m, Some(mon), false), 2);
 }
 
+// Covers: specs/missiles/missiles.md §r8-1-pierce-test-at-creation-0x0059f940-1-14d-confirmed r1
 #[test]
 fn pierce_not_set_without_owner_stat() {
     let mut r = row();
@@ -524,6 +537,7 @@ fn pierce_not_set_without_owner_stat() {
 
 // ---- R4.1: velocity -------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point r2, §r4-1-movement-in-fixed-point r3
 #[test]
 fn acceleration_vector() {
     let mut v = PathVelocity {
@@ -563,6 +577,7 @@ fn acceleration_vector() {
 
 // ---- R7: lifetime ---------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r10, §r7-lifetime-and-expiry r1, §r7-lifetime-and-expiry r2, §r7-lifetime-and-expiry r5
 #[test]
 fn lifetime_is_range_plus_levrange_runs() {
     let mut r = row();
@@ -582,6 +597,7 @@ fn lifetime_is_range_plus_levrange_runs() {
     assert_eq!(w.fake.logged("damage"), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r7-lifetime-and-expiry r2
 #[test]
 fn recorded_full_lifetimes() {
     // Firebolt 50, shafire1 40, rogue1 40 runs (R7.2, recordings).
@@ -594,6 +610,7 @@ fn recorded_full_lifetimes() {
     }
 }
 
+// Covers: specs/missiles/missiles.md §r7-lifetime-and-expiry r2
 #[test]
 fn lifetime_one_frame_or_less() {
     for range in [0, 1] {
@@ -605,6 +622,7 @@ fn lifetime_one_frame_or_less() {
     }
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r7, §r7-lifetime-and-expiry r3
 #[test]
 fn collision_tested_from_activate_run() {
     let mut r = row();
@@ -629,6 +647,7 @@ fn collision_tested_from_activate_run() {
     assert_eq!(k, 50);
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r2
 #[test]
 fn stopped_movement_is_an_expiry_hit() {
     let mut w = World::new(row());
@@ -640,6 +659,7 @@ fn stopped_movement_is_an_expiry_hit() {
     assert_eq!(w.fake.logged("clear"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r6, §edge-cases-original-bugs r3
 #[test]
 fn blocking_word_removes_without_hit() {
     // Edge case 3.
@@ -654,6 +674,7 @@ fn blocking_word_removes_without_hit() {
     }
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r4, §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r7
 #[test]
 fn mode_zero_and_six_never_collide() {
     for mode in [0, 6] {
@@ -671,6 +692,7 @@ fn mode_zero_and_six_never_collide() {
     }
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r8
 #[test]
 fn mode_four_removed_on_any_word() {
     let mut r = row();
@@ -691,6 +713,7 @@ fn contact(w: &mut World) {
     w.fake.units.insert((110, 100), vec![w.monster]);
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r9, §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r7, §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r8
 #[test]
 fn unit_hit_damages_and_kills() {
     let mut r = row();
@@ -708,6 +731,7 @@ fn unit_hit_damages_and_kills() {
     assert_eq!(w.fake.logged("clear"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r5, §edge-cases-original-bugs r2
 #[test]
 fn missed_to_hit_always_removes() {
     // Edge case 2: even with pierce left and CollideKill 0.
@@ -725,6 +749,7 @@ fn missed_to_hit_always_removes() {
     assert_eq!(w.fake.logged("event0"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r2, §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r8
 #[test]
 fn no_collidekill_flies_on() {
     let mut r = row();
@@ -739,6 +764,7 @@ fn no_collidekill_flies_on() {
     assert_eq!(w.fake.logged("damage"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r17
 #[test]
 fn last_collide_skips_owner_first() {
     let mut w = World::new(row());
@@ -752,6 +778,7 @@ fn last_collide_skips_owner_first() {
     assert_eq!(w.fake.logged("event0"), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r2
 #[test]
 fn friendly_units_ignored_unless_collide_friend() {
     let mut w = World::new(row());
@@ -770,6 +797,7 @@ fn friendly_units_ignored_unless_collide_friend() {
     assert!(!w.alive(m));
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r2, §edge-cases-original-bugs r9
 #[test]
 fn mode_one_ignores_good_monsters_after_finding_them() {
     // Edge case 9.
@@ -785,6 +813,7 @@ fn mode_one_ignores_good_monsters_after_finding_them() {
     assert_eq!(w.fake.logged("event0"), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r9
 #[test]
 fn barrier_on_crossed_subtile_is_expiry_hit() {
     let mut w = World::new(row());
@@ -797,6 +826,7 @@ fn barrier_on_crossed_subtile_is_expiry_hit() {
     assert_eq!(w.fake.logged("event0 None"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r2, §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r6
 #[test]
 fn justhit_with_next_hit() {
     let mut r = row();
@@ -816,6 +846,7 @@ fn justhit_with_next_hit() {
     assert_eq!(w.fake.logged("damage"), 1);
 }
 
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r1, §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler r8
 #[test]
 fn explosion_rows_skip_direct_damage() {
     let mut r = row();
@@ -828,6 +859,7 @@ fn explosion_rows_skip_direct_damage() {
     assert_eq!(w.fake.logged("damage"), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r7-lifetime-and-expiry r5
 #[test]
 fn server_hit_stub_logged_on_expiry() {
     let mut r = row();
@@ -846,6 +878,7 @@ fn server_hit_stub_logged_on_expiry() {
     );
 }
 
+// Covers: specs/missiles/missiles.md §r1-data-the-server-keeps-per-missile r3, §r3-per-tick-dispatch r1
 #[test]
 fn server_do_dispatch_limits() {
     // pSrvDoFunc 0 or negative: nothing happens (R3.1).
@@ -883,6 +916,7 @@ fn server_do_dispatch_limits() {
     }
 }
 
+// Covers: specs/missiles/missiles.md §r3-per-tick-dispatch r5, §r3-per-tick-dispatch r6, §edge-cases-original-bugs r1
 #[test]
 fn town_rules() {
     // R3.5: a player owner in town removes even `Town` missiles.
@@ -922,6 +956,7 @@ fn town_rules() {
 
 // ---- R6: damage -----------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r6-2-damage-rolls-0x005a89a0-1-14d-confirmed
 #[test]
 fn damage_roll_vectors() {
     let mut s = Seed::init();
@@ -946,6 +981,7 @@ fn damage_roll_vectors() {
     assert_eq!(pct(3_000_000, 100_000), 3_000_000_000_i64 as i32);
 }
 
+// Covers: specs/missiles/missiles.md §r6-2-damage-rolls-0x005a89a0-1-14d-confirmed
 #[test]
 fn damage_rolls_use_missile_seed_in_order() {
     let mut w = World::new(row());
@@ -971,6 +1007,7 @@ fn damage_rolls_use_missile_seed_in_order() {
     assert_eq!(*w.fake.seed(m), s);
 }
 
+// Covers: specs/missiles/missiles.md §r6-2-damage-rolls-0x005a89a0-1-14d-confirmed
 #[test]
 fn damage_percent_and_deadly_strike() {
     let mut w = World::new(row());
@@ -994,6 +1031,7 @@ fn damage_percent_and_deadly_strike() {
     assert_eq!(fill_damage(&mut cx, m, None).poison_length, 33);
 }
 
+// Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text
 #[test]
 fn knockback_roll_on_missile_seed() {
     let mut r = row();
@@ -1022,6 +1060,7 @@ fn knockback_roll_on_missile_seed() {
 
 // ---- R9: catalogues -------------------------------------------------
 
+// Covers: specs/missiles/missiles.md §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed r4
 #[test]
 fn seeded_offset_vector() {
     let mut s = Seed::default();
@@ -1057,6 +1096,7 @@ fn check_catalogue(tsv: &str, table: &[Option<u32>]) -> Result<(), String> {
     Ok(())
 }
 
+// Covers: specs/missiles/missiles.md §r9-1-tables-dumped-from-game-exe-1-14d-confirmed
 #[test]
 fn catalogues_match_tsv() {
     check_catalogue(SRVDO_TSV, &SRV_DO).unwrap();
@@ -1095,6 +1135,7 @@ fn catalogue_check_catches_perturbations() {
     assert!(check_catalogue(SRVHIT_TSV, &short).is_err());
 }
 
+// Covers: specs/missiles/missiles.md §r4-2-collide-types-missile-modes
 #[test]
 fn collide_mode_table() {
     let masks: Vec<u16> = COLLIDE_MODES.iter().map(|c| c.mask).collect();
