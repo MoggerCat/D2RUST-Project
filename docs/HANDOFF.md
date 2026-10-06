@@ -498,6 +498,37 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
+install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
+clean). `cargo test --workspace --no-fail-fast -- --ignored`: 112 pass,
+**13 fail** (findings for the owners; expected values not changed, rerun
+on the current main before fixing):
+- `d2-formats/tests/game_sweep.rs` (5): `dc6_every_file_decodes` 1,653 vs
+  1,657, `dt1_every_live_file_decodes` 250 vs 254, `ds1_every_file_parses`
+  2,372 vs 2,456, `string_tables_every_key_resolves` 29 vs 33 tables: the
+  sweep enumerates `(listfile)` names only and `patch_d2.mpq` has none; the
+  expected counts are `mpq-tool formats`' (listfile ∪ its known-names list
+  in `tools/mpq-tool/src/formats.rs`). Fix the enumeration, not the
+  numbers. `cof_every_live_file_parses`: asks for
+  `data\global\charsm\cofmblxbw.cof` (not found; the junk file is
+  `amblxbow.cof`).
+- `d2-sim/tests/game_drlg_tables.rs`: `act1_placement_on_live_tables`
+  gives `[5, 27, 6, 7, 26, 39, 17, 1, 2, 3, 4]` (the recorded allocation
+  order 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5 reversed); expected has
+  16, 15, …, 8 in front. `lvlprest_measurements`: 1,079 vs 82.
+- `d2-sim/tests/game_world.rs`: `waypoint_objects` FrameCnt1 of object 119
+  = 3,840 vs 15 (= 15 × 256: an 8.8 value read raw);
+  `cubemain_vector_records` 129 vs 130; `vendor_columns_from_live_items`
+  panics on column `weapons.HratliMin`.
+- `d2-sim/tests/game_items.rs` `sweep_create_every_item_every_quality`:
+  570 failures, first "item 39 dgr q 8 ilvl 1: crafted affix 0 with a
+  filled slot (read at 0x5C)" (possible code / spec finding, `quality.md`
+  crafted).
+- `d2-sim/tests/game_treasure.rs` `sweep_drop_quality_every_item`: item
+  520, L 0, M −100: "magic gate".
+- `d2-server` `world_data::tests::game::outdoor_levels_generate_through_the_dispatcher`:
+  97 vs 98.
+
 Done 2026-10-06 (local, captures with the player): render captures with
 `record_frames.py` (branch `claude/spec-render-placement`), 800×600 GDI:
 run 1b Den of Evil (14,823 frames, 15,711 ticks; still segment 1,151
