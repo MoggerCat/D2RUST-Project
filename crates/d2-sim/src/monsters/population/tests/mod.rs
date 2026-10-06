@@ -2,7 +2,7 @@
 //! `specs/monsters/population.md`, the edge cases, and the
 //! `preset-monsters.tsv` check with a perturbation test (M05, M08).
 
-mod fake;
+pub(super) mod fake;
 
 use fake::{ctx, seed_for, state_with, tables, Fake, R0};
 
