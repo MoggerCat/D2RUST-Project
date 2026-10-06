@@ -1,11 +1,13 @@
-// Spec: specs/world/quests.md §3, §5, §10.1, §10.4, §10.5
-//! A1Q1–A1Q3 through every state on the wired host (`WiredWorld`: the
-//! real `QuestControl` on `EconomyQuests` over the action sim's own
+// Spec: specs/world/quests.md §3, §5, §10.1, §10.4–§10.8
+//! Every Act I quest chain (A1Q1–A1Q6) through its states on the wired
+//! host (`WiredWorld`: the real `QuestControl` on `EconomyQuests` over the action sim's own
 //! units and stat lists). Messages go through the real host frame
 //! (C→S 0x31, 0x30); the events without a message path here (level
-//! changes, kills, the updater, the Malus object) are raised on the
-//! wired quest world directly, as their callers would. The seams no
-//! written spec provides are staged in `trade_quests::Rest`.
+//! changes, kills, the updater, the object functions) are raised on the
+//! wired quest world directly, as their callers would; quest objects are
+//! stood in for by monster units (only their GUIDs are read, their modes
+//! are staged). The seams no written spec provides are staged in
+//! `trade_quests::Rest`.
 
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{q, ItemRequest, ItemTables};
@@ -242,18 +244,41 @@ fn burial_grounds_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-/// Item tables with the Horadric Malus only.
-fn malus_tables() -> ItemTables {
-    let malus = ItemRec {
-        code: *b"hdm ",
+/// Item tables with the Act I quest items: 0 Horadric Malus, 1 the
+/// Inifuss scroll, 2 the deciphered scroll.
+fn quest_tables() -> ItemTables {
+    let rec = |code: &[u8; 4], quest| ItemRec {
+        code: *code,
         level: 1,
-        quest: 4,
+        quest,
         ..ItemRec::default()
     };
     ItemTables {
-        items: vec![malus],
+        items: vec![rec(b"hdm ", 4), rec(b"bks ", 5), rec(b"bkd ", 5)],
         ..ItemTables::default()
     }
+}
+
+/// A real item of `quest_tables` row `index` (inventory mode).
+fn quest_item(f: &mut Fx, index: i32) -> UnitId {
+    f.world().tables = quest_tables();
+    let mut rq = ItemRequest {
+        item: index,
+        format: 101,
+        quality: q::NORMAL,
+        ..ItemRequest::default()
+    };
+    let spawn = ItemSpawn {
+        room: None,
+        mode: 4,
+        init_flags: 1,
+    };
+    let s = &mut f.h.game;
+    s.world
+        .with_economy(&mut s.game, &mut s.events, |econ, _| {
+            econ.create_item(&mut rq, false, spawn)
+        })
+        .unwrap()
 }
 
 // Covers: specs/world/quests.md §10.1 r1, §10.5 l2 r1, §10.5 l2 r2, §10.5 l2 r4, §10.5 l2 r5, §10.5 l2 r10, §10.5 l2 r13, §10.5 l2 r16
@@ -284,25 +309,7 @@ fn tools_of_the_trade_through_every_state() {
     assert_eq!(f.world().rest.object_modes[&malus], 2);
     assert_eq!(state(&mut f, 3), (4, 1));
     // The player carries a real `hdm ` item: Charsi's 163 finishes it.
-    f.world().tables = malus_tables();
-    let mut rq = ItemRequest {
-        item: 0,
-        format: 101,
-        quality: q::NORMAL,
-        ..ItemRequest::default()
-    };
-    let spawn = ItemSpawn {
-        room: None,
-        mode: 4,
-        init_flags: 1,
-    };
-    let s = &mut f.h.game;
-    let item = s
-        .world
-        .with_economy(&mut s.game, &mut s.events, |econ, _| {
-            econ.create_item(&mut rq, false, spawn)
-        })
-        .unwrap();
+    let item = quest_item(&mut f, 0);
     f.world().rest.inventory.insert(p, vec![item]);
     let got = say(&mut f, charsi, 163);
     assert_eq!(
@@ -315,8 +322,9 @@ fn tools_of_the_trade_through_every_state() {
     assert!(f.game_record()[7] & 0x20 != 0);
     let log = f.take_log();
     assert!(log.contains(&format!("delete {} hdm ", p.0)));
-    // The sequence passed to chain 6, whose state-0 timer is open.
-    assert!(log.contains(&"unhandled 6 0x596580".to_string()));
+    // The sequence passed to chain 6: its opening timer (period 20).
+    let timers = &f.world().quests.timers;
+    assert_eq!(timers.last().map(|t| (t.chain, t.period)), Some((6, 20)));
     // The chat end: status 13 set; the status function reports 10 (3.1).
     assert_eq!(chat_end(&mut f, charsi), [hex("5d 03 00 0a 0000")]);
     assert_eq!(state(&mut f, 3), (5, 13));
@@ -324,6 +332,174 @@ fn tools_of_the_trade_through_every_state() {
     quests!(f, |ctl, w| act1::imbue_granted(ctl, &mut w, p));
     assert_eq!(word(&f, 3), 0x200D);
     assert!(!f.world().quests.record(3).unwrap().active);
+    assert!(f.world().quests.faults.is_empty());
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+// Covers: specs/world/quests.md §10.6 r1, §10.6 r2, §10.6 r9, §10.6 r18, §10.6 text
+#[test]
+fn search_for_cain_through_every_state() {
+    // Quests 1 and 2 done: the walk 1 → 2 → 4 opens chain 4.
+    let mut f = Fx::new(done(&[1, 2]));
+    let (akara, p) = (f.akara, f.player);
+    assert_eq!(state(&mut f, 4), (1, 0));
+    say(&mut f, akara, 97);
+    assert_eq!(state(&mut f, 4).0, 2);
+    assert_eq!(chat_end(&mut f, akara), [hex("5d 04 00 01 0000")]);
+    assert_eq!(word(&f, 4), 0x0004);
+    assert!(level_change(&mut f, 1, 2).is_empty());
+    assert_eq!(state(&mut f, 4).0, 3);
+    // The Inifuss tree (a unit standing in for the object; modes staged):
+    // the scroll drops, state 4, status 2.
+    let tree = alloc(&mut f, UnitType::Monster, 2);
+    f.world().rest.drop_ok = true;
+    f.take_log();
+    quests!(f, |ctl, w| act1::q4::tree_operate(ctl, &mut w, tree, p));
+    assert_eq!(
+        f.take_log(),
+        [
+            format!("sound {} 45", p.0),
+            format!("drop {} bks  2", tree.0)
+        ]
+    );
+    assert_eq!(taken(&mut f), [hex("5d 04 00 02 0000")]);
+    assert_eq!(state(&mut f, 4), (4, 2));
+    // Akara deciphers the real `bks `: the staged `bkd ` comes back,
+    // state 5, status 3 (sent at the chat end).
+    let bks = quest_item(&mut f, 1);
+    let bkd = quest_item(&mut f, 2);
+    f.world().rest.inventory.insert(p, vec![bks]);
+    f.world().rest.reward = Some(bkd);
+    say(&mut f, akara, 112);
+    assert_eq!(state(&mut f, 4), (5, 3));
+    assert_eq!(f.world().rest.inventory[&p], [bkd]);
+    assert_eq!(chat_end(&mut f, akara), [hex("5d 04 00 03 0000")]);
+    assert_eq!(word(&f, 4), 0x000C);
+    // The stones in the quest seed's order: status 4, 4.4, `89 01`.
+    let order = quests!(f, |ctl, _w| act1::stone_order(ctl));
+    let stones: Vec<UnitId> = (0..5)
+        .map(|_| alloc(&mut f, UnitType::Monster, 2))
+        .collect();
+    // The k-th touch must be the stone of value order[k].
+    for (k, &s) in stones.iter().enumerate() {
+        let v = u16::from(order[k]);
+        quests!(f, |ctl, w| act1::q4::stone_operate(ctl, &mut w, s, p, v));
+    }
+    let got = taken(&mut f);
+    assert_eq!(got[0], hex("5d 04 00 04 0000"));
+    assert_eq!((got[1][0], &got[2][..]), (0x28, &[0x89u8, 1][..]));
+    assert!(f.world().quests.record(4).unwrap().extra.q4.b4f);
+    assert_eq!(word(&f, 4), 0x001C);
+    // Cain freed at the gibbet (`0x00593290`, open question 11: its bits
+    // are staged), then Akara's reward: state 6, status 13, the ring, the
+    // sequence opens chain 3.
+    f.world().rest.quests.get_mut(&p).unwrap().flags[0].set(4, 13);
+    f.world().rest.quests.get_mut(&p).unwrap().flags[0].set(4, 1);
+    f.take_log();
+    let got = say(&mut f, akara, 118);
+    assert_eq!(
+        got.iter().map(|m| m[0]).collect::<Vec<_>>(),
+        [0x28, 0x5D, 0x27, 0x29]
+    );
+    assert_eq!(got[1], hex("5d 04 02 00 0000"));
+    assert_eq!(state(&mut f, 4), (6, 13));
+    assert_eq!(state(&mut f, 3).0, 1);
+    assert!(f.take_log().contains(&"reward rin  7 4".to_string()));
+    assert_eq!(word(&f, 4) & 0x2003, 0x2001);
+    assert!(f.world().quests.faults.is_empty());
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+// Covers: specs/world/quests.md §10.7 r2, §10.7 r3, §10.7 r4, §10.7 r6, §10.7 r9
+#[test]
+fn forgotten_tower_through_every_state() {
+    let mut f = Fx::new(|_| {});
+    let (kashya, p) = (f.kashya, f.player);
+    assert_eq!(state(&mut f, 5), (0, 0));
+    // The tome (a unit standing in for the object): state 2, read before
+    // any status; message 127 then sends status 1.
+    let tome = alloc(&mut f, UnitType::Monster, 2);
+    quests!(f, |ctl, w| act1::q5::tome_operate(ctl, &mut w, tome, p));
+    assert_eq!(f.world().rest.object_modes[&tome], 1);
+    assert_eq!(state(&mut f, 5).0, 2);
+    let mut m = vec![0x31];
+    m.extend_from_slice(&u32::MAX.to_le_bytes());
+    m.extend_from_slice(&127u16.to_le_bytes());
+    m.extend_from_slice(&[0, 0]);
+    let (_, got) = send(&mut f.h, &m);
+    assert_eq!(got, [hex("5d 05 00 01 0000")]);
+    assert_eq!(word(&f, 5), 0x0004);
+    // The tower (status 1 → 4), Tower Cellar 5 (state 3, status 2).
+    assert_eq!(level_change(&mut f, 3, 20), [hex("5d 05 00 04 0000")]);
+    assert_eq!(level_change(&mut f, 24, 25), [hex("5d 05 00 02 0000")]);
+    assert_eq!((state(&mut f, 5), word(&f, 5)), ((3, 2), 0x0014));
+    // The Countess dies with the player in the cellar: 5.13 and 5.0 at
+    // once, sound 37, state 5, timer 7 → status 13.
+    f.world().rest.levels.insert(p, 25);
+    let countess = alloc(&mut f, UnitType::Monster, 45);
+    f.take_log();
+    assert!(kill(&mut f, 5, countess).is_empty());
+    assert_eq!(state(&mut f, 5).0, 5);
+    assert_eq!(word(&f, 5), 0x2015);
+    let log = f.take_log();
+    assert!(log.contains(&format!("sound {} 37", p.0)));
+    assert!(log.contains(&"unhandled 5 0x5954f0".to_string()));
+    assert!(ticks(&mut f, 7).is_empty());
+    assert_eq!(ticks(&mut f, 1), [hex("5d 05 00 0d 0000")]);
+    // The report to Kashya (142): the sequence opens chain 3; the player
+    // moves from list B to list A.
+    say(&mut f, kashya, 142);
+    assert_eq!(state(&mut f, 3).0, 1);
+    let x = &f.world().quests.record(5).unwrap().extra.q5;
+    assert!(x.credited.is_empty() && x.reported.len() == 1);
+    assert!(f.world().quests.faults.is_empty());
+    assert_eq!(f.errors(), Vec::<String>::new());
+}
+
+// Covers: specs/world/quests.md §10.1 r1, §10.8 r2, §10.8 r3, §10.8 r4, §10.8 r5, §10.8 r7, §10.8 r10
+#[test]
+fn sisters_to_the_slaughter_through_every_state() {
+    // Quests 1–4 done: the walk reaches chain 6, whose timer (period 20)
+    // opens it 21 updater ticks later.
+    let mut f = Fx::new(done(&[1, 2, 3, 4]));
+    let p = f.player;
+    assert_eq!(state(&mut f, 6), (0, 0));
+    ticks(&mut f, 20);
+    assert_eq!(state(&mut f, 6).0, 0);
+    ticks(&mut f, 1);
+    assert_eq!(state(&mut f, 6).0, 1);
+    let cain = npc(&mut f, class::CAIN5);
+    let warriv = npc(&mut f, class::WARRIV1);
+    say(&mut f, cain, 166);
+    assert_eq!((state(&mut f, 6).0, word(&f, 6)), (2, 0x0004));
+    assert_eq!(chat_end(&mut f, cain), [hex("5d 06 00 01 0000")]);
+    assert!(level_change(&mut f, 1, 34).is_empty());
+    assert_eq!(state(&mut f, 6).0, 3);
+    assert_eq!(level_change(&mut f, 36, 37), [hex("5d 06 00 02 0000")]);
+    // Andariel dies, killed by the player in Catacombs 4: the credit, the
+    // three gem drops, state 4, the portal timer.
+    f.world().rest.levels.insert(p, 37);
+    let andariel = alloc(&mut f, UnitType::Monster, 156);
+    f.take_log();
+    assert!(kill(&mut f, 6, andariel).is_empty());
+    assert_eq!(state(&mut f, 6).0, 4);
+    assert_eq!(word(&f, 6), 0x201E);
+    let log = f.take_log();
+    assert_eq!(log.iter().filter(|l| l.starts_with("drop ")).count(), 3);
+    assert!(log.contains(&format!("sound {} 33", p.0)));
+    // Status 3 at the 11th firing (22 updater ticks); the portal step
+    // (counter 10) needs the player's position (no path seam here).
+    assert!(ticks(&mut f, 21).is_empty());
+    assert_eq!(ticks(&mut f, 1), [hex("5d 06 00 03 0000")]);
+    // Warriv 183: status 13, state 5, game 6.13, 6.0.
+    let got = say(&mut f, warriv, 183);
+    assert_eq!(
+        got.iter().map(|m| m[0]).collect::<Vec<_>>(),
+        [0x27, 0x29, 0x28]
+    );
+    assert_eq!(state(&mut f, 6), (5, 13));
+    assert_eq!(word(&f, 6), 0x201D);
+    assert!(f.game_record()[13] & 0x20 != 0);
     assert!(f.world().quests.faults.is_empty());
     assert_eq!(f.errors(), Vec::<String>::new());
 }

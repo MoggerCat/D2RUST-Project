@@ -1,9 +1,11 @@
-// Spec: specs/world/quests.md §10.1, §10.4, §10.5 (Test vectors)
-//! A1Q1–A1Q3 callback by callback and the sequence walk, from the spec's
-//! test vectors and rules, on the quests' fake world.
+// Spec: specs/world/quests.md §8.1, §9.4, §10.1, §10.3–§10.8 (Test vectors)
+//! The Act I quests callback by callback, the sequence walk, the intro
+//! record and the act transitions, from the spec's test vectors and
+//! rules, on the quests' fake world.
 
 use super::tests::*;
 use super::*;
+use crate::units::RoomId as RoomIdT;
 
 const KASHYA_U: UnitId = UnitId(0x13);
 const CHARSI_U: UnitId = UnitId(0x14);
@@ -101,12 +103,20 @@ fn sequence_walk() {
     assert!(act1::sequence(&mut ctl, &mut f, 1));
     assert_eq!(ctl.record(4).unwrap().state, 0);
     // Chain 5 below state 2: returns 1 without passing on; chain 6 never
-    // passes on (its state-0 timer `0x00596580` is not specified).
+    // passes on: at state 0 it makes its timer `0x00596580` (period 20),
+    // which opens it (state 1) at its first firing and is removed.
     let (mut ctl, _) = control();
     ctl.record_mut(3).unwrap().state = 5;
-    f.log.clear();
     assert!(act1::sequence(&mut ctl, &mut f, 3));
-    assert_eq!(f.log, ["unhandled 6 0x596580"]);
+    assert_eq!(ctl.timers.len(), 1);
+    assert_eq!(ctl.timers[0].func, TimerFn::SlaughterOpen);
+    for _ in 0..20 {
+        ctl.update(&mut f);
+    }
+    assert_eq!(ctl.record(6).unwrap().state, 0);
+    ctl.update(&mut f);
+    assert_eq!(ctl.record(6).unwrap().state, 1);
+    assert!(ctl.timers.is_empty());
     assert!(act1::sequence(&mut ctl, &mut f, 5));
     assert!(ctl.faults.is_empty());
 }
@@ -702,8 +712,8 @@ fn malus_brought_to_charsi() {
     assert_eq!(f.flags(P3).word(3) & 0x2002, 0);
     assert!(!f.players[&P1].items.contains(b"hdm "));
     assert_eq!(f.sent_ids(), [0x28, 0x27, 0x29]);
-    // Sequence: chain 3 at 5 passes to chain 6 (its timer unspecified).
-    assert!(f.log.contains(&"unhandled 6 0x596580".to_string()));
+    // Sequence: chain 3 at 5 passes to chain 6: its opening timer.
+    assert_eq!(ctl.timers.last().unwrap().func, TimerFn::SlaughterOpen);
     // Without the Malus: listed, text refreshed, nothing else.
     let (mut ctl, mut f, _) = malus_fake();
     say(&mut ctl, &mut f, CHARSI_U, 163);
@@ -722,7 +732,7 @@ fn malus_brought_to_charsi() {
     ctl.record_mut(3).unwrap().extra.started_with_malus = true;
     say(&mut ctl, &mut f, CHARSI_U, 163);
     assert_eq!(ctl.record(3).unwrap().state, 2);
-    assert!(f.log.contains(&"unhandled 6 0x596580".to_string()));
+    assert_eq!(ctl.timers.last().unwrap().func, TimerFn::SlaughterOpen);
 }
 
 // Covers: specs/world/quests.md §10.5 l2 r7, §10.5 l2 r8, §10.5 l2 r11, §10.5 l2 r12, §10.5 l2 r15
@@ -847,4 +857,824 @@ fn malus_imbue_granted() {
     f.p(P1).quests.flags[0].set(3, bit::COMPLETED_BEFORE);
     act1::imbue_granted(&mut ctl, &mut f, P1);
     assert!(ctl.record(3).unwrap().active);
+}
+
+// ------------------------------------------------------------ §10.6 A1Q4
+
+const CAIN_T: UnitId = UnitId(0x15);
+const CAIN5_U: UnitId = UnitId(0x16);
+
+/// The fake with the Tristram Cain (146) and Cain in town (cain5).
+fn cain_fake() -> Fake {
+    let mut f = fake();
+    for (u, class) in [(CAIN_T, 146), (CAIN5_U, npc::CAIN5)] {
+        f.monsters.insert(u, (u.0, class, npc_kind(class)));
+    }
+    f
+}
+
+fn q4(ctl: &QuestControl) -> &act1::q4::Extra4 {
+    &ctl.record(4).unwrap().extra.q4
+}
+
+fn q4_mut(ctl: &mut QuestControl) -> &mut act1::q4::Extra4 {
+    &mut ctl.record_mut(4).unwrap().extra.q4
+}
+
+fn flags_mut(f: &mut Fake, p: UnitId) -> &mut QuestFlags {
+    &mut f.p(p).quests.flags[0]
+}
+
+/// Calls one callback of `chain` directly.
+fn call(ctl: &mut QuestControl, f: &mut Fake, chain: u8, args: EventArgs) {
+    let i = ctl.find(chain).unwrap();
+    act1::callback(ctl, f, i, args, None, false);
+}
+
+// Covers: specs/world/quests.md §10.6 r1
+#[test]
+fn cain_npc_text() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    assert!(text(&mut ctl, &mut f, 4, AKARA_U).is_empty());
+    ctl.record_mut(4).unwrap().state = 1;
+    assert_eq!(text(&mut ctl, &mut f, 4, AKARA_U), [(97, 0)]);
+    // The scroll in the inventory → message state 3.
+    f.p(P1).items.push(*b"bks ");
+    assert_eq!(text(&mut ctl, &mut f, 4, AKARA_U), [(112, 0)]);
+    f.p(P1).items.clear();
+    // State 4 without the scroll → message state 2.
+    ctl.record_mut(4).unwrap().state = 4;
+    assert_eq!(text(&mut ctl, &mut f, 4, AKARA_U), [(104, 2)]);
+    // The Tristram Cain: state 9 first, then the rest (state 4: nothing
+    // for class 146).
+    assert_eq!(text(&mut ctl, &mut f, 4, CAIN_T), [(124, 0)]);
+    // 4.13 and Cain not heard → 5; heard with 4.1 → 7; 4.1 → 5.
+    flags_mut(&mut f, P1).set(4, bit::PRIMARY_GOAL_DONE);
+    assert_eq!(text(&mut ctl, &mut f, 4, CAIN5_U), [(123, 0)]);
+    flags_mut(&mut f, P1).set(4, bit::REWARD_PENDING);
+    q4_mut(&mut ctl).heard.add(1);
+    assert_eq!(text(&mut ctl, &mut f, 4, CAIN5_U), [(123, 2)]);
+    assert_eq!(text(&mut ctl, &mut f, 4, AKARA_U), [(118, 0)]);
+    // Credited (+0xB4) → 6.
+    *flags_mut(&mut f, P1) = QuestFlags::default();
+    q4_mut(&mut ctl).credited.add(1);
+    assert_eq!(text(&mut ctl, &mut f, 4, CAIN5_U), [(125, 0)]);
+    // In the record list: heard Cain with 4.14 → 8.
+    q4_mut(&mut ctl).credited.remove(1);
+    ctl.record_mut(4).unwrap().guids.add(1);
+    flags_mut(&mut f, P1).set(4, bit::COMPLETED_NOW);
+    assert_eq!(text(&mut ctl, &mut f, 4, CAIN5_U), [(125, 2)]);
+    // +0x4F with `bkd `: the scroll is deleted, one fewer in the game.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    q4_mut(&mut ctl).b4f = true;
+    q4_mut(&mut ctl).scrolls = 1;
+    f.p(P1).items.push(*b"bkd ");
+    text(&mut ctl, &mut f, 4, AKARA_U);
+    assert_eq!(f.log, ["delete bkd "]);
+    assert_eq!(q4(&ctl).scrolls, 0);
+}
+
+// Covers: specs/world/quests.md §10.6 r2, §10.6 r3, §10.6 r9, §10.6 r14, §10.6 r18
+#[test]
+fn cain_through_akara_and_act2() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.record_mut(4).unwrap().state = 1;
+    say(&mut ctl, &mut f, AKARA_U, 97);
+    assert!(ctl.record(4).unwrap().state == 2 && ctl.record(4).unwrap().extra.talked);
+    f.sent.clear();
+    ctl.npc_deactivate(&mut f, P1, AKARA_U);
+    assert_eq!(sent(&f), [(P1, hex("5d 04 00 01 0000"))]);
+    assert_eq!(f.flags(P1).word(4), 0x0004);
+    ctl.changed_level(&mut f, P1, 1, 2);
+    assert_eq!(ctl.record(4).unwrap().state, 3);
+    // The scroll deciphered (112): state 5, status 3, then the chat end
+    // sends status 3 and L2 gives bit 3.
+    f.p(P1).items.push(*b"bks ");
+    f.sent.clear();
+    say(&mut ctl, &mut f, AKARA_U, 112);
+    let r = ctl.record(4).unwrap();
+    assert_eq!((r.state, r.status, r.flags), (5, 3, 0));
+    assert!(r.extra.q4.deciphered && r.extra.q4.b4b && r.extra.q4.b4e);
+    assert_eq!(r.extra.q4.scroll_guid, 500);
+    f.sent.clear();
+    ctl.npc_deactivate(&mut f, P1, AKARA_U);
+    assert_eq!(sent(&f), [(P1, hex("5d 04 00 03 0000"))]);
+    assert_eq!(f.flags(P1).word(4), 0x000C);
+    assert!(!q4(&ctl).deciphered);
+    // Lut Gholein before freeing Cain: the cleanup (gibbet mode 3, tree
+    // mode 1, the Tristram Cain removed), state 7, status 5, game 4.13,
+    // L3 (4.14, credited).
+    let (gibbet, tree) = (UnitId(0x60), UnitId(0x61));
+    f.objects.insert(gibbet, (0x60, 26, 0));
+    f.objects.insert(tree, (0x61, 30, 0));
+    {
+        let x = q4_mut(&mut ctl);
+        (x.gibbet_known, x.gibbet_guid) = (true, 0x60);
+        (x.tree_known, x.tree_guid) = (true, 0x61);
+    }
+    f.sent.clear();
+    f.log.clear();
+    ctl.changed_level(&mut f, P1, 2, 40);
+    f.log.retain(|l| !l.starts_with("unhandled")); // Acts II–V event 3
+    let r = ctl.record(4).unwrap();
+    assert_eq!((r.state, r.status), (7, 5));
+    let x = &r.extra.q4;
+    assert!(x.cain_gone && x.cain_removed && x.town_cain_due && x.progress == 1);
+    assert_eq!(x.gibbet_open, 3);
+    assert!(x.credited.contains(1));
+    assert!(ctl.game.get(4, bit::PRIMARY_GOAL_DONE));
+    assert_eq!((f.objects[&gibbet].2, f.objects[&tree].2), (3, 1));
+    assert_eq!(f.log, ["mode 96 3", "mode 97 1", "remove 21"]);
+    assert_eq!(sent(&f), [(P1, hex("5d 04 00 0c 0000"))]);
+    assert!(f.flags(P1).get(4, bit::COMPLETED_NOW));
+    // Reward (118) with 4.1 and 4.13: state 6, status 13, the sequence
+    // opens chain 3 (chain 4's pass state is 6).
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    flags_mut(&mut f, P1).set(4, bit::REWARD_PENDING);
+    flags_mut(&mut f, P1).set(4, bit::PRIMARY_GOAL_DONE);
+    ctl.record_mut(4).unwrap().state = 5;
+    say(&mut ctl, &mut f, AKARA_U, 118);
+    let r = ctl.record(4).unwrap();
+    assert_eq!((r.state, r.status), (6, 13));
+    assert!(r.guids.contains(1) && ctl.game.get(4, bit::PRIMARY_GOAL_DONE));
+    assert_eq!(ctl.record(3).unwrap().state, 1);
+    assert_eq!(f.sent_ids(), [0x28, 0x5D, 0x27, 0x29]);
+    // Cain 125 and 123: the record list, the heard list.
+    q4_mut(&mut ctl).credited.add(1);
+    say(&mut ctl, &mut f, CAIN5_U, 125);
+    assert!(!q4(&ctl).credited.contains(1));
+    say(&mut ctl, &mut f, CAIN5_U, 123);
+    assert!(q4(&ctl).heard.contains(1));
+    // Back in Tristram after state 6 with Cain still there: state 5,
+    // status 4, nothing sent.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.record_mut(4).unwrap().state = 6;
+    ctl.changed_level(&mut f, P1, 4, 38);
+    let r = ctl.record(4).unwrap();
+    assert_eq!((r.state, r.status), (5, 4));
+    assert!(f.sent.is_empty());
+}
+
+// Covers: specs/world/quests.md §10.6 r14
+#[test]
+fn cain_removal_waits_for_an_open_chat() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.chats.insert(CAIN_T, vec![P1]);
+    ctl.changed_level(&mut f, P1, 2, 40);
+    // The chat stays: `5D 04 01 00 0000` to its client, the stored preset
+    // dropped (Cain not removed).
+    assert_eq!(f.sent[0], (P1, hex("5d 04 01 00 0000")));
+    assert!(f.log.contains(&"preset 0 146".to_string()));
+    assert!(!q4(&ctl).cain_removed && q4(&ctl).cain_gone);
+}
+
+// Covers: specs/world/quests.md §10.6 r15
+#[test]
+fn town_cain_spawn() {
+    let room = RoomIdT(1);
+    let beside = UnitId(0x30);
+    let setup = |pos: (i32, i32), spawns: Vec<Option<UnitId>>, spot| {
+        let (mut ctl, _) = control();
+        let mut f = cain_fake();
+        f.monsters.insert(beside, (0x30, 150, npc_kind(150)));
+        f.pos.insert(beside, (pos.0, pos.1, room));
+        f.rooms.insert(room, (0, 0, 12, 12));
+        f.spawns = spawns;
+        f.spot = spot;
+        let x = q4_mut(&mut ctl);
+        (x.beside_known, x.beside_guid, x.town_cain_due) = (true, 0x30, true);
+        ctl.changed_level(&mut f, P1, 2, 1);
+        f.log.retain(|l| !l.starts_with("unhandled")); // Acts II–V event 3
+        (ctl, f)
+    };
+    // The first spawn fails: one retry one tile on, r 10.
+    let (ctl, f) = setup((10, 10), vec![None, Some(UnitId(0x50))], None);
+    assert_eq!(
+        f.log,
+        [
+            "spot at 10 10 2 0x100 1 100",
+            "spawn 265 10 10 mode 1 r 5",
+            "spot at 11 11 2 0x100 2 100",
+            "spawn 265 10 10 mode 1 r 10",
+            "flags 80 0x3000000",
+        ]
+    );
+    let x = q4(&ctl);
+    assert!(x.town_cain && !x.town_cain_due && x.town_cain_guid == 0x50);
+    // No point inside the room: (y, y + 21) (bug kept), then the spot.
+    let (_, f) = setup((50, 7), vec![Some(UnitId(0x50))], Some((1, 1)));
+    assert_eq!(
+        f.log[..2],
+        ["spot at 7 28 2 0x100 1 100", "spawn 265 8 29 mode 1 r 5"]
+    );
+    // Every try fails: 20 retries, then (x, y, R0) with r 15.
+    let (ctl, f) = setup((10, 10), vec![], None);
+    assert_eq!(f.log.iter().filter(|l| l.starts_with("spawn")).count(), 22);
+    assert_eq!(f.log.last().unwrap(), "spawn 265 10 10 mode 1 r 15");
+    assert!(!q4(&ctl).town_cain);
+}
+
+// Covers: specs/world/quests.md §10.6 r4, §10.6 r5, §10.6 r7, §10.6 r8, §10.6 r13
+#[test]
+fn cain_items_and_leaving() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    // Event 4 (active record): L2.
+    ctl.record_mut(4).unwrap().state = 2;
+    let item = UnitId(0x80);
+    f.chains.insert(item, QuestChain(vec![4]));
+    ctl.item_event(&mut f, event::ITEM_PICKED_UP, P1, item);
+    assert_eq!(f.flags(P1).word(4), 0x0004);
+    // Event 9: the last scroll leaves with its carrier: tree reset.
+    let tree = UnitId(0x61);
+    f.objects.insert(tree, (0x61, 30, 1));
+    f.item_codes.insert(item, *b"bks ");
+    {
+        let x = q4_mut(&mut ctl);
+        (x.tree_known, x.tree_guid, x.scrolls) = (true, 0x61, 1);
+    }
+    ctl.record_mut(4).unwrap().state = 4;
+    f.sent.clear();
+    let args = EventArgs {
+        event: event::PLAYER_DROPPED_WITH_QUEST_ITEM,
+        target: Some(item),
+        player: Some(P1),
+        ..EventArgs::default()
+    };
+    call(&mut ctl, &mut f, 4, args);
+    assert_eq!(q4(&ctl).scrolls, 0);
+    assert_eq!(ctl.record(4).unwrap().state, 3);
+    assert_eq!(f.objects[&tree].2, 0);
+    assert_eq!(sent(&f), [(P1, hex("5d 04 00 01 0000"))]);
+    // Event 6: the same reset unless +0x4F.
+    ctl.record_mut(4).unwrap().state = 5;
+    q4_mut(&mut ctl).b4f = true;
+    call(
+        &mut ctl,
+        &mut f,
+        4,
+        EventArgs {
+            event: event::EVENT6,
+            ..EventArgs::default()
+        },
+    );
+    assert_eq!(ctl.record(4).unwrap().state, 5);
+    // Event 10: with 4.0 and 4.1 the record list loses the player; the
+    // +0xB4 and +0x138 lists always.
+    flags_mut(&mut f, P1).set(4, bit::REWARD_GRANTED);
+    flags_mut(&mut f, P1).set(4, bit::REWARD_PENDING);
+    ctl.record_mut(4).unwrap().guids.add(1);
+    q4_mut(&mut ctl).credited.add(1);
+    q4_mut(&mut ctl).heard.add(1);
+    ctl.player_leaves(&mut f, P1);
+    let r = ctl.record(4).unwrap();
+    assert!(!r.guids.contains(1) && !r.extra.q4.credited.contains(1));
+    assert!(!r.extra.q4.heard.contains(1));
+}
+
+// Covers: specs/world/quests.md §10.6 r6
+#[test]
+fn cow_king_needs_the_cow_level_access() {
+    // Vector: killed by a classic-game player lacking 26.0 → nothing.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.expansion = false;
+    f.p(P1).level = Some(39);
+    let args = EventArgs {
+        event: event::MONSTER_KILLED,
+        target: Some(UnitId(0x40)),
+        player: Some(P1),
+        ..EventArgs::default()
+    };
+    call(&mut ctl, &mut f, 4, args);
+    assert!(f.log.is_empty() && f.flags(P1) == QuestFlags::default());
+    // With 26.0: 4.10 for the killer and every player in level 39; 8 `vps `
+    // drops (quality argument 0).
+    flags_mut(&mut f, P1).set(26, bit::REWARD_GRANTED);
+    f.players.insert(P2, player(2, Some(39)));
+    call(&mut ctl, &mut f, 4, args);
+    assert!(f.flags(P1).get(4, 10) && f.flags(P2).get(4, 10));
+    assert_eq!(f.log, vec!["drop vps  0"; 8]);
+    // Already 4.10: nothing.
+    f.log.clear();
+    call(&mut ctl, &mut f, 4, args);
+    assert!(f.log.is_empty());
+}
+
+// Covers: specs/world/quests.md §10.6 r10, §10.6 r11, §10.6 r12
+#[test]
+fn cain_start_join_and_active() {
+    let state = |bits: &[u8], items: &[[u8; 4]]| {
+        let (mut ctl, _) = control();
+        let mut f = cain_fake();
+        for &b in bits {
+            flags_mut(&mut f, P1).set(4, b);
+        }
+        f.p(P1).items = items.to_vec();
+        let args = EventArgs {
+            event: event::PLAYER_STARTED_GAME,
+            player: Some(P1),
+            ..EventArgs::default()
+        };
+        call(&mut ctl, &mut f, 4, args);
+        let r = ctl.record(4).unwrap().clone();
+        (r, ctl.game.get(4, bit::PRIMARY_GOAL_DONE))
+    };
+    let (r, game) = state(&[bit::REWARD_GRANTED], &[]);
+    assert!(game && r.extra.q4.town_cain_due && r.extra.q4.gibbet_open == 3);
+    let (r, game) = state(&[bit::COMPLETED_BEFORE], &[]);
+    assert!(!game && r.extra.q4.game_done_due);
+    let (r, _) = state(&[bit::ENTER_AREA], &[]);
+    assert_eq!((r.state, r.status, r.extra.q4.progress), (5, 4, 1));
+    let (r, _) = state(&[bit::STARTED], &[]);
+    assert_eq!((r.state, r.status), (2, 1));
+    let (r, _) = state(&[], &[*b"bkd "]);
+    assert_eq!((r.state, r.status, r.extra.q4.scrolls), (5, 3, 1));
+    let (r, _) = state(&[], &[*b"bks "]);
+    assert_eq!((r.state, r.status, r.extra.q4.scrolls), (4, 2, 1));
+    // Event 14: counted.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.p(P1).items = vec![*b"bks ", *b"bkd "];
+    call(
+        &mut ctl,
+        &mut f,
+        4,
+        EventArgs {
+            event: event::PLAYER_JOINED_GAME,
+            player: Some(P1),
+            ..EventArgs::default()
+        },
+    );
+    assert_eq!(q4(&ctl).scrolls, 2);
+    // Active.
+    let i = ctl.find(4).unwrap();
+    let f0 = ctl.records[i].active_fn.unwrap();
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    ctl.records[i].state = 4;
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    flags_mut(&mut f, P1).set(4, bit::PRIMARY_GOAL_DONE);
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::CAIN5, f0));
+    ctl.records[i].extra.q4.heard.add(1);
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::CAIN5, f0));
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::KASHYA, f0));
+}
+
+// Covers: specs/world/quests.md §10.6 text, §10.6 r17, §9.4
+#[test]
+fn stone_order_tree_and_stones() {
+    // Vector: order [18, 20, 17, 21, 19] → `50 0400 0100 0300 0000 0400
+    // 0200` (+ two bytes never written; 0 here).
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.record_mut(4).unwrap().extra.stone_order = Some([18, 20, 17, 21, 19]);
+    act1::send_stone_order(&mut ctl, &mut f, P1);
+    assert_eq!(
+        sent(&f),
+        [(P1, hex("50 0400 0100 0300 0000 0400 0200 0000"))]
+    );
+    // The tree: the scroll drops, state 4, status 2, callback 9.
+    let tree = UnitId(0x61);
+    f.objects.insert(tree, (0x61, 30, 0));
+    ctl.record_mut(4).unwrap().state = 1;
+    ctl.record_mut(4)
+        .unwrap()
+        .clear_callback(event::PLAYER_DROPPED_WITH_QUEST_ITEM);
+    f.sent.clear();
+    act1::q4::tree_operate(&mut ctl, &mut f, tree, P1);
+    assert_eq!(f.log, ["sound 1 45", "drop bks  2", "mode 97 1"]);
+    let r = ctl.record(4).unwrap();
+    assert_eq!((r.state, r.status), (4, 2));
+    assert!(r.has_callback(event::PLAYER_DROPPED_WITH_QUEST_ITEM));
+    assert!(r.extra.q4.tree_known && r.extra.q4.scrolls == 1);
+    assert_eq!(sent(&f), [(P1, hex("5d 04 00 02 0000"))]);
+    // Operated again (mode 1): nothing.
+    f.log.clear();
+    act1::q4::tree_operate(&mut ctl, &mut f, tree, P1);
+    assert!(f.log.is_empty());
+    // The linked class-61 object (§4.6).
+    let linked = UnitId(0x62);
+    f.objects.insert(linked, (0x62, 61, 0));
+    f.chains.insert(linked, QuestChain::default());
+    assert!(ctl.add_link(&mut f, linked, 4, Some(0x0059_2F80)));
+    assert!(q4(&ctl).linked && q4(&ctl).linked_guid == 0x62);
+    // Stones without `bkd `: sound 39 on every 64th touch.
+    let stones: Vec<UnitId> = (0..5).map(|k| UnitId(0x70 + k)).collect();
+    for (k, &s) in stones.iter().enumerate() {
+        let class = if k == 3 { 21 } else { 17 };
+        f.objects.insert(s, (s.0, class, 0));
+    }
+    f.pos.insert(stones[3], (100, 100, RoomIdT(1)));
+    f.log.clear();
+    act1::q4::stone_operate(&mut ctl, &mut f, stones[0], P1, 18);
+    act1::q4::stone_operate(&mut ctl, &mut f, stones[0], P1, 18);
+    assert_eq!(f.log, ["sound 1 39"]);
+    // With `bkd `: the order 18, 20, 17, 21, 19 (a wrong value does
+    // nothing); the linked object's mode follows the count.
+    f.p(P1).items.push(*b"bkd ");
+    f.sent.clear();
+    f.log.clear();
+    act1::q4::stone_operate(&mut ctl, &mut f, stones[1], P1, 20);
+    assert_eq!(q4(&ctl).stones, 0);
+    for (k, v) in [(0, 18), (1, 20), (2, 17), (3, 21)] {
+        act1::q4::stone_operate(&mut ctl, &mut f, stones[k], P1, v);
+        assert_eq!(f.objects[&linked].2, k as i32 + 2);
+    }
+    assert_eq!(ctl.record(4).unwrap().state, 5);
+    act1::q4::stone_operate(&mut ctl, &mut f, stones[4], P1, 19);
+    let x = q4(&ctl);
+    assert!(x.b4f && x.stones == 5 && x.scrolls == 0);
+    assert_eq!(f.objects[&linked].2, 6);
+    assert!(f.log.contains(&"delete bkd ".to_string()));
+    // The portal beside the stone of value 21, status 4, 4.4, `89 01`.
+    assert!(f.log.contains(&"object 288 106 97".to_string()));
+    assert!(f.flags(P1).get(4, bit::ENTER_AREA));
+    assert_eq!(f.sent[0], (P1, hex("5d 04 00 04 0000")));
+    assert_eq!(f.sent.last().unwrap().1, [0x89, 1]);
+}
+
+// ------------------------------------------------------------ §10.7 A1Q5
+
+fn q5(ctl: &QuestControl) -> &act1::q5::Extra5 {
+    &ctl.record(5).unwrap().extra.q5
+}
+
+// Covers: specs/world/quests.md §10.7 r1, §10.7 r8
+#[test]
+fn tower_npc_text_and_active() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    assert!(text(&mut ctl, &mut f, 5, AKARA_U).is_empty());
+    ctl.record_mut(5).unwrap().state = 2;
+    assert_eq!(text(&mut ctl, &mut f, 5, AKARA_U), [(130, 2)]);
+    ctl.record_mut(5).unwrap().state = 4;
+    assert!(text(&mut ctl, &mut f, 5, AKARA_U).is_empty());
+    ctl.record_mut(5).unwrap().extra.q5.credited.push(1);
+    assert_eq!(text(&mut ctl, &mut f, 5, AKARA_U), [(143, 0)]);
+    let i = ctl.find(5).unwrap();
+    let f0 = ctl.records[i].active_fn.unwrap();
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::WARRIV1, f0));
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, 147, f0));
+    // Reported (A) with 5.0 and 5.13 → message state 3.
+    ctl.records[i].extra.q5.credited.clear();
+    ctl.records[i].extra.q5.reported.push(1);
+    flags_mut(&mut f, P1).set(5, bit::REWARD_GRANTED);
+    flags_mut(&mut f, P1).set(5, bit::PRIMARY_GOAL_DONE);
+    assert_eq!(text(&mut ctl, &mut f, 5, AKARA_U), [(143, 2)]);
+}
+
+// Covers: specs/world/quests.md §10.7 r2, §10.7 r6, §10.7 r9, §10.7 r11
+#[test]
+fn tower_tome_levels_and_report() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    // The tome before any status: mode 1, event 1 at frame + 16, message
+    // 127 opened, state 2, +0x11B.
+    let tome = UnitId(0x71);
+    f.objects.insert(tome, (0x71, 0x9F, 0));
+    act1::q5::tome_operate(&mut ctl, &mut f, tome, P1);
+    assert_eq!(f.log, ["mode 113 1", "event1 113 16", "message 1 113 127"]);
+    assert!(ctl.record(5).unwrap().state == 2 && q5(&ctl).tome_early);
+    // Message 127: status 1, M2 (bit 2).
+    say(&mut ctl, &mut f, AKARA_U, 127);
+    assert_eq!(f.sent[0], (P1, hex("5d 05 00 01 0000")));
+    assert_eq!(f.flags(P1).word(5), 0x0004);
+    // The Forgotten Tower with status 1: status 4, M2 (state 2: bit 2).
+    f.sent.clear();
+    ctl.changed_level(&mut f, P1, 3, 20);
+    assert_eq!(sent(&f), [(P1, hex("5d 05 00 04 0000"))]);
+    // Tower Cellar 5: state 3, status 2, M2 → bit 4 (status 2).
+    f.sent.clear();
+    ctl.changed_level(&mut f, P1, 24, 25);
+    let r = ctl.record(5).unwrap();
+    assert_eq!((r.state, r.status), (3, 2));
+    assert_eq!(sent(&f), [(P1, hex("5d 05 00 02 0000"))]);
+    assert_eq!(f.flags(P1).word(5), 0x0014);
+    // From state 0, the tower: state 2, status 3.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.changed_level(&mut f, P1, 3, 20);
+    let r = ctl.record(5).unwrap();
+    assert_eq!((r.state, r.status), (2, 3));
+    // The report (140–145) after the kill: state 5, the sequence (chain
+    // 5 → chain 3 opens), B → A.
+    ctl.record_mut(5).unwrap().extra.q5.report_due = true;
+    ctl.record_mut(5).unwrap().extra.q5.credited.push(1);
+    flags_mut(&mut f, P1).set(5, bit::PRIMARY_GOAL_DONE);
+    say(&mut ctl, &mut f, KASHYA_U, 142);
+    assert_eq!(ctl.record(5).unwrap().state, 5);
+    assert_eq!(ctl.record(3).unwrap().state, 1);
+    assert_eq!(
+        (q5(&ctl).credited.len(), q5(&ctl).reported.clone()),
+        (0, vec![1])
+    );
+    // Leaving town at state 5 from A with B empty: inactive.
+    ctl.changed_level(&mut f, P1, 1, 2);
+    assert!(!ctl.record(5).unwrap().active);
+}
+
+// Covers: specs/world/quests.md §10.7 r3, §10.7 r4, §10.7 r5
+#[test]
+fn countess_kill_and_timer() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.p(P1).level = Some(25);
+    f.players.insert(P2, player(2, Some(20)));
+    f.players.insert(P3, player(3, Some(3)));
+    f.party.insert(P1, vec![P1, P3]);
+    let countess = UnitId(0x40);
+    f.pos.insert(countess, (7, 8, RoomIdT(1)));
+    ctl.record_mut(5).unwrap().state = 3;
+    ctl.tick = 20;
+    kill(&mut ctl, &mut f, 5, countess, P1);
+    let r = ctl.record(5).unwrap();
+    assert_eq!(r.state, 5);
+    assert!(!r.has_callback(event::MONSTER_KILLED) && r.active);
+    let x = &r.extra.q5;
+    assert!(x.killed && x.report_due && x.death_pos == (7, 8));
+    assert_eq!(x.credited, [1]);
+    assert!(ctl.game.get(5, bit::PRIMARY_GOAL_DONE));
+    // M4: the cellar player 13, 0; the other 14. M5: the party member
+    // 13, 0. M6: 14 and `5D 05 00 0C` to the one lacking 5.0.
+    assert_eq!(f.flags(P1).word(5), 0x2001);
+    // P3 is out of the cellar: M4's 14 first, then M5's 13, 0.
+    assert_eq!(f.flags(P3).word(5), 0x6001);
+    assert_eq!(f.flags(P2).word(5), 0x4000);
+    assert_eq!(sent(&f), [(P2, hex("5d 05 00 0c 0000"))]);
+    assert_eq!(
+        f.log,
+        ["sound 1 37", "unhandled 5 0x5954f0", "event7 64 10"]
+    );
+    // Timer 7: status 13 at tick 28 (M1: everyone here).
+    f.sent.clear();
+    for _ in 0..7 {
+        ctl.update(&mut f);
+    }
+    assert!(f.sent.is_empty());
+    ctl.update(&mut f);
+    assert_eq!(
+        sent(&f),
+        [
+            (P1, hex("5d 05 00 0d 0000")),
+            (P2, hex("5d 05 00 0c 0000")),
+            (P3, hex("5d 05 00 0d 0000")),
+        ]
+    );
+    // Event 10 (kept by the kill): out of the lists.
+    ctl.player_leaves(&mut f, P1);
+    assert!(q5(&ctl).credited.is_empty());
+}
+
+// Covers: specs/world/quests.md §10.7 r7, §10.7 r10, §9.5
+#[test]
+fn tower_restore_and_objects() {
+    for (bits, want) in [
+        (vec![4u8], (3, 1)),
+        (vec![6], (3, 4)),
+        (vec![5], (2, 3)),
+        (vec![3], (3, 1)),
+        (vec![2], (2, 1)),
+        (vec![2, 0], (0, 0)),
+    ] {
+        let (mut ctl, _) = control();
+        let mut f = cain_fake();
+        for b in bits {
+            flags_mut(&mut f, P1).set(5, b);
+        }
+        call(
+            &mut ctl,
+            &mut f,
+            5,
+            EventArgs {
+                event: event::PLAYER_STARTED_GAME,
+                player: Some(P1),
+                ..EventArgs::default()
+            },
+        );
+        let r = ctl.record(5).unwrap();
+        assert_eq!((r.state, r.status), want);
+    }
+    // Chests: listed (8 at most); after the kill each run reschedules.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    let chest = UnitId(0x72);
+    act1::q5::chest_init(&mut ctl, &mut f, chest);
+    assert_eq!(q5(&ctl).chests, [0x72]);
+    assert_eq!(f.log, ["unhandled 5 0x5954f0"]);
+    ctl.record_mut(5).unwrap().extra.q5.killed = true;
+    f.log.clear();
+    object_event(&mut ctl, &mut f, chest, 0x173);
+    assert_eq!(f.log, ["unhandled 5 0x5954f0", "event7 114 10"]);
+    // Object init `0x00595A00`: switched off → mode 3.
+    ctl.record_mut(5).unwrap().not_intro = false;
+    f.log.clear();
+    act1::q5::object_init(&mut ctl, &mut f, chest);
+    assert_eq!(f.log, ["mode 114 3"]);
+}
+
+// ------------------------------------------------------------ §10.8 A1Q6
+
+fn q6(ctl: &QuestControl) -> &act1::q6::Extra6 {
+    &ctl.record(6).unwrap().extra.q6
+}
+
+// Covers: specs/world/quests.md §10.8 r1, §10.8 r9
+#[test]
+fn slaughter_npc_text_and_active() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    let i = ctl.find(6).unwrap();
+    let f0 = ctl.records[i].active_fn.unwrap();
+    assert!(text(&mut ctl, &mut f, 6, CAIN5_U).is_empty());
+    ctl.records[i].state = 1;
+    assert_eq!(text(&mut ctl, &mut f, 6, CAIN5_U), [(166, 0)]);
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::CAIN5, f0));
+    // Message state 0 has Cain's line only.
+    assert!(text(&mut ctl, &mut f, 6, AKARA_U).is_empty());
+    ctl.records[i].state = 2;
+    assert_eq!(text(&mut ctl, &mut f, 6, AKARA_U), [(168, 2)]);
+    // Listed for Akara → message state 3.
+    ctl.records[i].extra.q6.akara.add(1);
+    assert_eq!(text(&mut ctl, &mut f, 6, AKARA_U), [(179, 0)]);
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    // 6.1: Cain → 4, Warriv → 3; Warriv active.
+    flags_mut(&mut f, P1).set(6, bit::REWARD_PENDING);
+    assert_eq!(text(&mut ctl, &mut f, 6, CAIN5_U), [(184, 2)]);
+    assert_eq!(text(&mut ctl, &mut f, 6, WARRIV_U), [(183, 0)]);
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::WARRIV1, f0));
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::CAIN5, f0));
+}
+
+// Covers: specs/world/quests.md §10.8 r2, §10.8 r3, §10.8 r7, §10.8 r8
+#[test]
+fn slaughter_start_catacombs_and_reward() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.record_mut(6).unwrap().state = 1;
+    say(&mut ctl, &mut f, CAIN5_U, 166);
+    assert_eq!(f.flags(P1).word(6), 0x0004);
+    f.sent.clear();
+    ctl.npc_deactivate(&mut f, P1, CAIN5_U);
+    assert_eq!(sent(&f), [(P1, hex("5d 06 00 01 0000"))]);
+    assert!(!ctl.record(6).unwrap().has_callback(event::NPC_DEACTIVATE));
+    // Catacombs 1 with status 1: state 3, O2 → bit 3.
+    f.sent.clear();
+    ctl.changed_level(&mut f, P1, 33, 34);
+    assert_eq!(ctl.record(6).unwrap().state, 3);
+    assert_eq!(f.flags(P1).word(6), 0x000C);
+    // Catacombs 4: status 2 sent, O2 → bit 4.
+    ctl.changed_level(&mut f, P1, 36, 37);
+    assert_eq!(sent(&f), [(P1, hex("5d 06 00 02 0000"))]);
+    assert_eq!(f.flags(P1).word(6), 0x001C);
+    // Catacombs 2 from state 1 with status 0: status 1, nothing sent.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.record_mut(6).unwrap().state = 1;
+    ctl.changed_level(&mut f, P1, 34, 35);
+    let r = ctl.record(6).unwrap();
+    assert_eq!((r.state, r.status), (3, 1));
+    assert!(f.sent.is_empty());
+    // Warriv 183 with 6.1 and 6.13: refresh first, then status 13, state
+    // 5, game 6.13, 6.0, the record list, 0x28.
+    flags_mut(&mut f, P1).set(6, bit::REWARD_PENDING);
+    flags_mut(&mut f, P1).set(6, bit::PRIMARY_GOAL_DONE);
+    say(&mut ctl, &mut f, WARRIV_U, 183);
+    let r = ctl.record(6).unwrap();
+    assert_eq!((r.state, r.status), (5, 13));
+    assert!(r.guids.contains(1) && ctl.game.get(6, bit::PRIMARY_GOAL_DONE));
+    assert_eq!(f.flags(P1).word(6), 0x2009);
+    assert_eq!(f.sent_ids(), [0x27, 0x29, 0x28]);
+    // Lut Gholein at state 4 → 5.
+    ctl.record_mut(6).unwrap().state = 4;
+    ctl.changed_level(&mut f, P1, 1, 40);
+    assert_eq!(ctl.record(6).unwrap().state, 5);
+    // Event 13: §10.1 restore.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    flags_mut(&mut f, P1).set(6, bit::LEAVE_TOWN);
+    ctl.player_enters(&mut f, P1, 0).unwrap();
+    let r = ctl.record(6).unwrap();
+    assert_eq!((r.state, r.status), (3, 1));
+}
+
+// Covers: specs/world/quests.md §10.8 r4, §10.8 r5, §10.8 r6, §10.8 text, §5 text
+#[test]
+fn andariel_kill_and_portal_timer() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.p(P1).level = Some(37);
+    f.pos.insert(P1, (30, 40, RoomIdT(2)));
+    f.players.insert(P2, player(2, Some(37)));
+    let andariel = UnitId(0x40);
+    f.monsters.insert(andariel, (0x40, 156, npc_kind(156)));
+    ctl.record_mut(6).unwrap().state = 3;
+    ctl.tick = 50;
+    let mut s = ctl.seed;
+    let gems: Vec<String> = [&act1::CHIPPED_GEMS, &act1::CHIPPED_GEMS, &act1::NORMAL_GEMS]
+        .iter()
+        .map(|l| {
+            let c = act1::gem_code(l, s.step());
+            format!("drop {} 2", String::from_utf8_lossy(&c))
+        })
+        .collect();
+    kill(&mut ctl, &mut f, 6, andariel, P1);
+    let r = ctl.record(6).unwrap();
+    assert_eq!(r.state, 4);
+    assert!(r.has_callback(event::PLAYER_LEAVES_GAME) && !r.has_callback(event::MONSTER_KILLED));
+    let x = &r.extra.q6;
+    assert!(x.killed && x.victim == 0x40 && x.counter == 1);
+    assert!(x.cain.contains(1) && x.akara.contains(2) && x.kashya.contains(1));
+    assert_eq!(f.flags(P1).word(6), 0x2002);
+    assert_eq!(f.flags(P2).word(6), 0x2002);
+    // The killer's credit, the gem draws, O3 credits both (the `0x00538680`
+    // call is reported), O6 sound 33.
+    let mut want = vec!["unhandled 6 0x538680".to_string()];
+    want.extend(gems);
+    want.extend(["unhandled 6 0x538680", "unhandled 6 0x538680"].map(String::from));
+    want.extend(["sound 1 33", "sound 2 33"].map(String::from));
+    assert_eq!(f.log, want);
+    assert!(f.sent.is_empty());
+    // Vector: firings at T + 2, T + 4, …; the 9th (counter 10, T + 18)
+    // opens the portal at the first player in Catacombs 4; the 11th
+    // (counter 12, T + 22) sends status 3 and removes the timer.
+    f.log.clear();
+    while ctl.tick < 67 {
+        ctl.update(&mut f);
+    }
+    assert!(f.log.is_empty());
+    ctl.update(&mut f);
+    assert_eq!(ctl.tick, 68);
+    assert_eq!(f.log, ["portal 30 40 59 1"]);
+    assert_eq!(q6(&ctl).counter, 10);
+    while ctl.tick < 71 {
+        ctl.update(&mut f);
+    }
+    assert!(f.sent.is_empty());
+    ctl.update(&mut f);
+    assert_eq!(ctl.tick, 72);
+    assert_eq!(
+        sent(&f),
+        [(P1, hex("5d 06 00 03 0000")), (P2, hex("5d 06 00 03 0000"))]
+    );
+    assert!(ctl.timers.is_empty());
+    // Event 10 after the kill: out of every list.
+    ctl.player_leaves(&mut f, P1);
+    let x = q6(&ctl);
+    assert!(!x.cain.contains(1) && !x.akara.contains(1) && !x.kashya.contains(1));
+    assert!(act1::q6::killed(&ctl));
+}
+
+// ------------------------------------------------------------ §10.3, §8.1
+
+// Covers: specs/world/quests.md §10.3
+#[test]
+fn act1_intro_first_talk() {
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    f.p(P1).class = 1; // sorceress: Akara's special text
+    assert_eq!(text(&mut ctl, &mut f, 37, AKARA_U), [(12, 0)]);
+    assert_eq!(text(&mut ctl, &mut f, 37, KASHYA_U), [(24, 0)]);
+    assert!(text(&mut ctl, &mut f, 37, WARRIV_U).is_empty());
+    let i = ctl.find(37).unwrap();
+    let f0 = ctl.records[i].active_fn.unwrap();
+    assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    // Message 11 (or 12) from Akara sets the intro bit; no refresh.
+    say(&mut ctl, &mut f, AKARA_U, 11);
+    assert!(f.players[&P1].quests.intro[0].contains(&npc::AKARA));
+    assert!(f.sent.is_empty());
+    assert!(text(&mut ctl, &mut f, 37, AKARA_U).is_empty());
+    assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
+    // Kashya's 11 is not hers.
+    say(&mut ctl, &mut f, KASHYA_U, 11);
+    assert!(!f.players[&P1].quests.intro[0].contains(&npc::KASHYA));
+}
+
+// Covers: specs/world/quests.md §8.1
+#[test]
+fn act_transition_send_order() {
+    // Meshif: intro flags (Act II list), 0x28, `61 03`.
+    let (mut ctl, _) = control();
+    let mut f = cain_fake();
+    ctl.act_completion(&mut f, P1, npc::MESHIF1).unwrap();
+    assert_eq!(f.sent_ids(), [0x28, 0x61]);
+    assert_eq!(f.sent[1].1, [0x61, 3]);
+    assert!(f.players[&P1].quests.intro[0].contains(&INTRO_NPCS[1][0]));
+    // The Durance: intro flags (Act III list), 0x28, `61 04`.
+    let mut f = cain_fake();
+    ctl.object_warp(&mut f, P1, 102);
+    assert_eq!(f.sent_ids(), [0x28, 0x61]);
+    assert_eq!(f.sent[1].1, [0x61, 4]);
+    assert!(f.players[&P1].quests.intro[0].contains(&INTRO_NPCS[2][0]));
+    // +0x4C already 1: no 0x61.
+    let mut f = cain_fake();
+    f.p(P1).byte4c = 1;
+    ctl.act_completion(&mut f, P1, npc::MESHIF1).unwrap();
+    assert_eq!(f.sent_ids(), [0x28]);
 }

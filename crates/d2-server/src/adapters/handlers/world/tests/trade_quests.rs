@@ -91,6 +91,9 @@ pub struct Rest {
     pub object_modes: BTreeMap<UnitId, i32>,
     pub inventory: BTreeMap<UnitId, Vec<UnitId>>,
     pub drop_ok: bool,
+    /// The item the next `reward_item` creates (placed in the player's
+    /// staged inventory).
+    pub reward: Option<UnitId>,
 }
 
 impl Outbox for Rest {
@@ -356,8 +359,21 @@ impl QuestRest for Rest {
             .push(format!("delete {} {}", p.0, String::from_utf8_lossy(&code)));
         self.inventory.remove(&p);
     }
-    fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
-        None
+    fn reward_item(
+        &mut self,
+        p: UnitId,
+        code: [u8; 4],
+        level: i32,
+        quality: u8,
+        _: bool,
+    ) -> Option<UnitId> {
+        self.log.push(format!(
+            "reward {} {level} {quality}",
+            String::from_utf8_lossy(&code)
+        ));
+        let item = self.reward.take()?;
+        self.inventory.entry(p).or_default().push(item);
+        Some(item)
     }
     fn drop_item_at(&mut self, u: UnitId, code: [u8; 4], quality: u8) -> bool {
         self.log.push(format!(
@@ -391,6 +407,64 @@ impl QuestRest for Rest {
     fn mercenary_reward(&mut self, p: UnitId, npc: u16) {
         self.log.push(format!("rest merc reward {} {npc}", p.0));
     }
+    fn unit_position(&self, _: UnitId) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn room_contains(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> bool {
+        false
+    }
+    fn room_at(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> Option<d2_sim::units::RoomId> {
+        None
+    }
+    fn free_spot_at(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<(i32, i32, d2_sim::units::RoomId)> {
+        None
+    }
+    fn spawn_monster(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+        _: u8,
+        _: u32,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn or_unit_flags(&mut self, _: UnitId, _: u32) {}
+    fn monsters(&self) -> Vec<UnitId> {
+        Vec::new()
+    }
+    fn npc_chat_clients(&self, _: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
+    fn remove_monster(&mut self, _: UnitId) {}
+    fn drop_preset_monster(&mut self, _: u8, _: u16) {}
+    fn find_object_near(&self, _: UnitId, _: u16) -> Option<UnitId> {
+        None
+    }
+    fn create_object(
+        &mut self,
+        _: d2_sim::units::RoomId,
+        _: i32,
+        _: i32,
+        _: u16,
+    ) -> Option<UnitId> {
+        None
+    }
+    fn object_anim_length(&self, _: UnitId) -> i32 {
+        0
+    }
+    fn schedule_object_event(&mut self, _: UnitId, _: u8, _: i32) {}
+    fn open_quest_message(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
     }
@@ -623,19 +697,6 @@ fn quest_message(guid: u32, msg: u16) -> Vec<u8> {
 
 // ---- tests ------------------------------------------------------------------------------
 
-/// The event-0 callbacks of Act I that `quests.md` §10 does not write
-/// (reached by the text refresh's activation, §7.2), and chain 37's
-/// event-11 function `0x0058F870` first: the `unhandled` list of one
-/// Akara message 64 (Acts II–V raise nothing in Act I; chains 1–3 have
-/// bodies, §10.4, §10.5).
-const AKARA_64_UNHANDLED: [&str; 5] = [
-    "unhandled 37 0x58f870",
-    "unhandled 37 0x58f8f0",
-    "unhandled 6 0x595e20",
-    "unhandled 5 0x594c50",
-    "unhandled 4 0x592580",
-];
-
 /// The first offered, not hired, slot of Kashya's hire list.
 fn first_offer(f: &mut Fx) -> u16 {
     let h = f.world().npc.record(class::KASHYA).unwrap().hire.as_ref();
@@ -666,10 +727,10 @@ fn akara_message_64_starts_den_of_evil_then_chat_end() {
     want[2] |= 1 << STARTED;
     assert_eq!(f.record(), want);
     assert_eq!(f.world().quests.record(1).unwrap().state, 2);
-    // The refresh at state 2: A1Q1's event 0 adds message state 1's
-    // Akara line (`quests.md` §10.4 r4: state 2 → 1; `quest-messages.tsv`).
-    let mut log = AKARA_64_UNHANDLED.map(String::from).to_vec();
-    log.push(format!("text list {} [(65, 2)]", f.akara.0));
+    // The refresh at state 2 (records newest first): the Act I intro's
+    // first-talk line for a sorceress (`quests.md` §10.3: state 1, 12),
+    // then A1Q1's message state 1 line (§10.4 r4: state 2 → 1, 65).
+    let log = vec![format!("text list {} [(12, 0), (65, 2)]", f.akara.0)];
     assert_eq!(f.take_log(), log);
 
     // Chat end through the NPC module (`npc.md` §3, `quests.md` §6.3).
@@ -721,11 +782,9 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
     assert!(slots.iter().any(|s| s.name == name && s.hired));
     // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12)
     // after the quest call, never on `QuestRest::mercenary_reward`; the
-    // callbacks without a body are chain 37's event-11 function and the
-    // text refresh's event-0 functions (as for Akara's 64), then Kashya's
-    // refreshed line (message state 4: 92, `quest-messages.tsv`).
-    let mut log = AKARA_64_UNHANDLED.map(String::from).to_vec();
-    log.push(format!("text list {} [(92, 2)]", f.kashya.0));
+    // refreshed Kashya lines: the Act I intro's (`quests.md` §10.3, 24)
+    // and A1Q2's message state 4 (92, `quest-messages.tsv`).
+    let mut log = vec![format!("text list {} [(24, 0), (92, 2)]", f.kashya.0)];
     log.extend(["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"].map(String::from));
     assert_eq!(f.take_log(), log);
     assert_eq!(f.errors(), Vec::<String>::new());
@@ -739,7 +798,7 @@ fn kashya_message_92_without_reward_pending_does_nothing() {
     let (code, got) = send(&mut f.h, &quest_message(g, 92));
     assert_eq!((code, got), (ResultCode::Done, vec![]));
     assert_eq!(f.record(), before);
-    assert_eq!(f.take_log(), ["unhandled 37 0x58f870"]);
+    assert_eq!(f.take_log(), Vec::<String>::new());
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
