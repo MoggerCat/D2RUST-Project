@@ -21,6 +21,7 @@ pub mod stats;
 pub mod tick;
 pub mod treasure;
 pub mod units;
+pub mod world;
 
 /// Simulation ticks per second, matching the original game.
 pub const TICKS_PER_SECOND: u32 = 25;
