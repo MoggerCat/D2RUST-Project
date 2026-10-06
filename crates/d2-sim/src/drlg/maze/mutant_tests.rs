@@ -18,6 +18,7 @@ const START: u32 = 4014346869;
 struct Log {
     direction: u32,
     maps: Vec<(u32, Option<i32>)>,
+    small: Vec<bool>,
 }
 
 impl MazePresets for Log {
@@ -52,9 +53,10 @@ impl MazePresets for Log {
         _: &DrlgData,
         _: LevelIdx,
         _: MapId,
-        _: bool,
+        small: bool,
         _: &[MazeLink],
     ) -> Result<(), DrlgError> {
+        self.small.push(small);
         Ok(())
     }
 }
@@ -794,7 +796,7 @@ fn barracks_stamp_order_by_parity() {
             l,
             Log {
                 direction: q,
-                maps: Vec::new(),
+                ..Log::default()
             },
         )
     };
@@ -848,4 +850,72 @@ fn barracks_stamp_order_by_parity() {
         }
     }
     assert_eq!(seen, [true, true]);
+}
+
+/// `maze.md` §8 r4: a theme cell gets def target + 15 with file −1, so
+/// its map keeps the default file (theme defs lie above the rotation
+/// range, §9 r2).
+#[test]
+fn theme_cells_keep_the_default_file() {
+    let maps = run(0, 9, 3, 12, 10).unwrap();
+    let themed: Vec<_> = maps.iter().filter(|m| (68..=81).contains(&m.0)).collect();
+    assert!(themed.len() >= 2, "need = max(2, count / 5 + 1)");
+    assert!(themed.iter().all(|m| m.1.is_none()));
+}
+
+/// `maze.md` §9 r2: the rotation base B' by level type; other types none.
+#[test]
+fn rotation_base_table() {
+    let want = [
+        (3, 52),
+        (4, 108),
+        (7, 167),
+        (8, 205),
+        (10, 257),
+        (13, 301),
+        (17, 413),
+        (18, 481),
+        (22, 753),
+        (24, 664),
+        (25, 704),
+        (28, 836),
+        (33, 1002),
+        (34, 1058),
+        (35, 1052),
+    ];
+    for t in 0..40 {
+        let base = want.iter().find(|w| w.0 == t).map(|w| w.1);
+        assert_eq!(layout::rotation_base(t), base, "type {t}");
+    }
+}
+
+/// `maze.md` §9 r3: "small" when the cell's w ≤ 12 **and** h ≤ 12.
+#[test]
+fn build_small_flag_needs_both_sides() {
+    let md = MazeData {
+        prest_files: (0..1200).map(|d| (d, 1)).collect(),
+        ..MazeData::default()
+    };
+    let data = DrlgData {
+        levels: vec![LevelDef::default(); 140],
+        ..DrlgData::default()
+    };
+    let (mut d, l, _) = env(3);
+    let mut g = Gen::new(&mut d, l, mrow(10, 0), &md).unwrap();
+    let c = cells(&mut g, &[(0, 0), (100, 0), (200, 0)]);
+    for (c, (w, h)) in c.into_iter().zip([(12, 12), (10, 14), (14, 10)]) {
+        g.drlg.room_mut(c).rect.w = w;
+        g.drlg.room_mut(c).rect.h = h;
+        g.cell_mut(c).def = 999;
+    }
+    let mut log = Log::default();
+    layout::build(&mut g, &data, &mut log, &mut Vec::new()).unwrap();
+    assert_eq!(log.small, [true, false, false]);
+}
+
+/// `Specials::is_empty`: the shipped tables are not empty; no tables is.
+#[test]
+fn specials_is_empty() {
+    assert!(!Specials::shipped().is_empty());
+    assert!(Specials::default().is_empty());
 }

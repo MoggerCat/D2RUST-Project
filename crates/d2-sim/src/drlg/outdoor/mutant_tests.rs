@@ -10,6 +10,7 @@ use super::*;
 use crate::drlg::room::LinkAt;
 use crate::drlg::tiles::RoomGrids;
 use crate::drlg::{DrlgError, NoLevelTypes, PresetUnit, RoomKind, TileRect};
+use crate::rng::Seed;
 
 fn u32s(b: &mut [u8], at: usize, v: u32) {
     b[at..at + 4].copy_from_slice(&v.to_le_bytes());
@@ -299,4 +300,306 @@ fn outdoor_room_tiles_freed() {
             ..OutdoorRoom::default()
         })
     );
+}
+
+// ---- acts.rs ------------------------------------------------------------------
+
+/// `outdoor.md` §8.3: the five (P, F, x, y) entries of each cliff row
+/// (compared as a set: the spec does not order the middle entries).
+#[test]
+fn desert_cliff_rows() {
+    use super::acts::desert_cliff_row;
+    let sorted = |mut v: Vec<(u32, i32, i32, i32)>| {
+        v.sort();
+        v
+    };
+    for r in 0..8u32 {
+        let want = match r {
+            0..=2 => {
+                let mut v = vec![(376, 1, 0, 4), (376, 2, 8, 4)];
+                for x in [2, 4, 6] {
+                    let p = if x == 2 + 2 * r as i32 { 378 } else { 377 };
+                    v.push((p, -1, x, 4));
+                }
+                v
+            }
+            3 => vec![
+                (376, 2, 8, 4),
+                (377, -1, 6, 4),
+                (382, -1, 4, 4),
+                (381, -1, 4, 6),
+                (379, 2, 4, 8),
+            ],
+            4 => vec![
+                (376, 2, 8, 4),
+                (378, -1, 6, 4),
+                (382, -1, 4, 4),
+                (380, -1, 4, 6),
+                (379, 2, 4, 8),
+            ],
+            _ => {
+                let mut v = vec![(379, 1, 4, 0), (379, 2, 4, 8)];
+                for y in [2, 4, 6] {
+                    let p = if y == 2 + 2 * (r as i32 - 5) {
+                        381
+                    } else {
+                        380
+                    };
+                    v.push((p, -1, 4, y));
+                }
+                v
+            }
+        };
+        assert_eq!(
+            sorted(desert_cliff_row(r).to_vec()),
+            sorted(want),
+            "row {r}"
+        );
+    }
+}
+
+// ---- grid.rs: grids and preset primitives (§1.2, §5) ------------------------
+
+use super::grid::{cell, shuffle_cells, Op};
+use super::tests::Env;
+
+/// `outdoor.md` §1.2: the grid ops of `0x0067C4F0` on an in-grid cell;
+/// outside the grid nothing happens.
+#[test]
+fn grid_ops() {
+    let mut g = Grid::new(2, 2);
+    let apply = |g: &mut Grid, start: u32, op: Op, v: u32| {
+        g.op(1, 1, Op::Set, start);
+        g.op(1, 1, op, v);
+        g.get(1, 1)
+    };
+    assert_eq!(apply(&mut g, 0b1100, Op::Or, 0b1010), 0b1110);
+    assert_eq!(apply(&mut g, 0b1100, Op::And, 0b1010), 0b1000);
+    assert_eq!(apply(&mut g, 0b1100, Op::Xor, 0b1010), 0b0110);
+    assert_eq!(apply(&mut g, 0b1100, Op::Set, 0b1010), 0b1010);
+    assert_eq!(apply(&mut g, 0b1100, Op::SetIfZero, 0b1010), 0b1100);
+    assert_eq!(apply(&mut g, 0, Op::SetIfZero, 0b1010), 0b1010);
+    assert_eq!(apply(&mut g, 0b1100, Op::AndNot, 0b1010), 0b0100);
+    g.op(2, 0, Op::Set, 7);
+    g.op(-1, 0, Op::Set, 7);
+    assert_eq!(g.cells, [0, 0, 0, 0b0100]);
+}
+
+/// `outdoor.md` §5.1 r2, r3: every covered cell of a multi-cell preset
+/// gets the preset bit, the file in bits 16..19 and (border presets with
+/// the flag) bit 0x1; grid 0 is cleared and (x, y) := P.
+#[test]
+fn stamp_covers_every_cell() {
+    let mut e = Env::new(2, 8, 8);
+    e.od.presets[5] = PresetDef {
+        size_x: 16,
+        size_y: 24,
+        files: 1,
+    };
+    e.info.grids[2].op(3, 4, Op::Set, 0x7_0000);
+    e.info.grids[0].op(3, 3, Op::Set, 9);
+    let mut g = e.gen();
+    g.stamp(2, 3, 5, 6, true).unwrap();
+    for y in 0..8 {
+        for x in 0..8 {
+            let inside = (2..4).contains(&x) && (3..6).contains(&y);
+            let want = if inside {
+                cell::PRESET | 6 << 16 | cell::BORDER
+            } else {
+                0
+            };
+            assert_eq!(g.g(2, x, y), want, "({x}, {y})");
+            let p = if (x, y) == (2, 3) { 5 } else { 0 };
+            assert_eq!(g.g(0, x, y), p, "({x}, {y})");
+        }
+    }
+}
+
+/// `outdoor.md` §5.2: margin m with flag bits 1 (y − m, h + m), 2 (w + m),
+/// 4 (h + m), 8 (x − m, w + m); every cell must be spawn valid.
+#[test]
+fn fits_margins_by_flag() {
+    for (flags, blocked, free) in [
+        (1, (5, 3), (5, 7)),
+        (2, (7, 5), (3, 5)),
+        (4, (5, 7), (5, 3)),
+        (8, (3, 5), (7, 5)),
+    ] {
+        for (at, want) in [(blocked, false), (free, true)] {
+            let mut e = Env::new(2, 10, 10);
+            e.info.grids[2].op(at.0, at.1, Op::Set, cell::NOT_SPAWN);
+            let g = e.gen();
+            assert_eq!(g.fits(5, 5, 0, 2, flags), Ok(want), "flags {flags} {at:?}");
+            // Without a margin the flags do nothing.
+            assert_eq!(g.fits(5, 5, 0, 0, flags), Ok(true));
+        }
+    }
+}
+
+/// `outdoor.md` §5.3: candidate cell of entry k is (x + 1, y + 1).
+#[test]
+fn shuffle_candidates_are_offset_by_one() {
+    let mut e = Env::new(2, 6, 5);
+    let mut s = e.seed();
+    let want: Vec<_> = shuffle_cells(&mut s, 4, 3)
+        .into_iter()
+        .map(|(x, y)| (x + 1, y + 1))
+        .collect();
+    let mut g = e.gen();
+    assert_eq!(g.shuffle(), want);
+}
+
+/// `outdoor.md` §5.4 SpawnRandomDS1: around the (only) path cell, the
+/// neighbours are tried in the order dx = [−1, 0, 0, 1, −1, 1, 1, −1],
+/// dy = [0, −1, 1, 0, −1, 1, −1, 1]; the first that fits is stamped.
+#[test]
+fn random_ds1_neighbour_order() {
+    const DX: [i32; 8] = [-1, 0, 0, 1, -1, 1, 1, -1];
+    const DY: [i32; 8] = [0, -1, 1, 0, -1, 1, -1, 1];
+    for k in 0..8 {
+        let mut e = Env::new(2, 9, 9);
+        for y in 0..9 {
+            for x in 0..9 {
+                e.info.grids[2].op(x, y, Op::Set, cell::BLANK);
+            }
+        }
+        e.info.grids[2].op(4, 4, Op::Set, cell::PATH);
+        // Neighbours k.. are free; the earlier ones blocked.
+        for (j, (dx, dy)) in DX.iter().zip(DY).enumerate().skip(k) {
+            let _ = j;
+            e.info.grids[2].op(4 + dx, 4 + dy, Op::Set, 0);
+        }
+        // One shuffle only: no fallback to SpawnOutdoorLevelPreset.
+        let mut s = e.seed();
+        shuffle_cells(&mut s, 7, 7);
+        let mut g = e.gen();
+        g.random_ds1(7, 0).unwrap();
+        assert_eq!(g.g(0, 4 + DX[k], 4 + DY[k]), 7, "k {k}");
+        assert_eq!(*g.seed(), s, "k {k}");
+    }
+}
+
+/// `outdoor.md` §5.4 FarAway, computed from the rule text: rx := roll(gw
+/// − 2), ry := roll(gh − 2); W, H := gw − 2, gh − 2; centre (rect.x +
+/// rect.w/2, rect.y + rect.h/2); i in 0..=H, j in 0..=W: cell ((j + rx)
+/// mod W + 1, (i + ry) mod H + 1); ax := |8x − cx + level.x + 4|, ay
+/// likewise; d := (ax > ay ? ay + 2ax : ax + 2ay) / 2; the first strictly
+/// larger d wins.
+#[test]
+fn far_away_by_the_rule() {
+    // Rects around the level and a symmetric one (the level's centre:
+    // corner ties decided by the scan start).
+    let mut rects: Vec<TileRect> = (0..300)
+        .map(|k| {
+            TileRect::new(
+                780 + 7 * k % 90,
+                790 + 13 * k % 80,
+                1 + 5 * k % 23,
+                1 + 3 * k % 17,
+            )
+        })
+        .collect();
+    rects.extend([TileRect::new(800, 800, 72, 64); 40]);
+    for (k, rect) in rects.into_iter().enumerate() {
+        let blocked: Vec<(i32, i32)> = (0..k as i32 % 4)
+            .map(|b| (1 + (3 * b + k as i32) % 7, 1 + (5 * b + k as i32) % 6))
+            .collect();
+        far_away_case(rect, 1000 + 7919 * k as u32, &blocked);
+    }
+    // Only (1, 2) and (2, 1) fit, with raw values 80 and 81 (d 40 both):
+    // the first visited wins.
+    let mut blocked = Vec::new();
+    for y in 1..7 {
+        for x in 1..8 {
+            if (x, y) != (1, 2) && (x, y) != (2, 1) {
+                blocked.push((x, y));
+            }
+        }
+    }
+    for k in 0..20 {
+        far_away_case(TileRect::new(790, 791, 1, 1), 7919 * k, &blocked);
+    }
+}
+
+/// FarAway on a 9 × 8 grid at (800, 800) against the rule text.
+fn far_away_case(rect: TileRect, seed: u32, blocked: &[(i32, i32)]) {
+    let (gw, gh) = (9, 8);
+    let mut e = Env::new(2, gw, gh);
+    e.drlg.level_mut(e.l).seed = Seed::init_low(seed);
+    for &(x, y) in blocked {
+        e.info.grids[2].op(x, y, Op::Set, cell::NOT_SPAWN);
+    }
+    let level = e.drlg.level(e.l).rect;
+    let mut s = e.seed();
+    let rx = s.roll(gw - 2) as i32;
+    let ry = s.roll(gh - 2) as i32;
+    let (w, h) = (gw - 2, gh - 2);
+    let (cx, cy) = (rect.x + rect.w / 2, rect.y + rect.h / 2);
+    let mut best: Option<(i32, i32, i32)> = None;
+    for i in 0..=h {
+        for j in 0..=w {
+            let x = (j + rx) % w + 1;
+            let y = (i + ry) % h + 1;
+            if blocked.contains(&(x, y)) {
+                continue;
+            }
+            let ax = (8 * x - cx + level.x + 4).abs();
+            let ay = (8 * y - cy + level.y + 4).abs();
+            let d = if ax > ay { ay + 2 * ax } else { ax + 2 * ay } / 2;
+            if best.map_or(true, |b| d > b.2) {
+                best = Some((x, y, d));
+            }
+        }
+    }
+    let (bx, by, _) = best.unwrap();
+    let mut g = e.gen();
+    assert_eq!(g.far_away(rect, 9, 0, 0, 15), Ok(true));
+    assert_eq!(g.g(0, bx, by), 9, "{rect:?} seed {seed}");
+    assert_eq!(*g.seed(), s, "two draws");
+}
+
+/// `outdoor.md` §5.4 Waypoint, level 3: i := first vis slot of level 3
+/// holding 2, mask := 1 << (i + 4); the first cell (rows, then columns)
+/// with grid-1 & mask **and** grid-2 & 0x400, clamped to 1..gw−2,
+/// 1..gh−2, gets grid 1 |= 0x20000, grid 2 |= 0x800.
+#[test]
+fn waypoint_on_the_cold_plains_link() {
+    for (at, clamped) in [((0, 3), (1, 3)), ((7, 2), (6, 2)), ((4, 7), (4, 6))] {
+        let mut e = Env::new(3, 8, 8);
+        e.data.levels[3].vis = [17, 2, 0, 0, 0, 0, 0, 0];
+        let mask = 1 << (1 + 4);
+        // Decoys earlier in scan order: mask only, link only.
+        e.info.grids[1].op(1, 0, Op::Set, mask);
+        e.info.grids[2].op(2, 0, Op::Set, cell::LINK);
+        e.info.grids[1].op(at.0, at.1, Op::Set, mask);
+        e.info.grids[2].op(at.0, at.1, Op::Set, cell::LINK);
+        let mut g = e.gen();
+        g.waypoint().unwrap();
+        let (x, y) = clamped;
+        assert_eq!(g.g(1, x, y) & 0x20000, 0x20000, "{at:?}");
+        assert_eq!(g.g(2, x, y) & cell::WAYPOINT, cell::WAYPOINT, "{at:?}");
+    }
+}
+
+/// `outdoor.md` §5.4 Shrines(n): k := lo' & 3, then each placed shrine
+/// takes bit [0x1000, 0x2000, 0x4000, 0x8000][k] and k := (k + 1) mod 4.
+#[test]
+fn shrines_cycle_their_bits() {
+    let mut e = Env::new(2, 8, 8);
+    let mut g = e.gen();
+    g.shrines(5);
+    let mut bits: Vec<u32> = Vec::new();
+    for y in 0..8 {
+        for x in 0..8 {
+            if g.g(2, x, y) & cell::SHRINE != 0 {
+                bits.push(g.g(1, x, y));
+            }
+        }
+    }
+    bits.sort();
+    // Five shrines: one bit twice, the other three once.
+    assert_eq!(bits.len(), 5);
+    for b in [0x1000, 0x2000, 0x4000, 0x8000] {
+        assert!(bits.contains(&b), "{b:#x}");
+    }
 }
