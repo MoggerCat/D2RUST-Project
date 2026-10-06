@@ -746,4 +746,20 @@ mod use_mutants {
         assert_eq!(do_core(&mut f, &t, p, 4, 1, false, false, false), 0);
         assert!(f.take_log().iter().all(|l| !l.starts_with("missile")));
     }
+
+    // §5.4 step 7: the missile sets flag 0x40 (kept when already set);
+    // the aimed position needs both `item` and `aim`.
+    #[test]
+    fn do_core_missile_flag_and_aim() {
+        let t = tables(2, &[(1, &|r: &mut Skills| r.srvmissile = 0)]);
+        let mut f = F::new();
+        let p = caster(&mut f, 1, 1, 0);
+        let m = f.add(U::new(UnitType::Monster, 0));
+        f.units[p].target = Some(m);
+        f.units[p].flags |= FLAG_MISSILE_FIRED;
+        f.take_log();
+        assert_eq!(do_core(&mut f, &t, p, 1, 1, false, false, true), 1);
+        assert_ne!(f.units[p].flags & FLAG_MISSILE_FIRED, 0);
+        assert_eq!(f.take_log(), ["missile 0 1 1 0 false None"]);
+    }
 }
