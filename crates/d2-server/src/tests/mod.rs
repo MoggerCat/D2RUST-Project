@@ -2,6 +2,7 @@
 //! Synthetic vectors and edge cases of `intents-events.md` §1–§3 and
 //! `tick.md` §1, run against the seam fakes in [`fakes`].
 
+mod adapters;
 mod fakes;
 mod host;
 mod messages;

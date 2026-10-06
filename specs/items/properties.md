@@ -1,0 +1,344 @@
+# Spec: Items — Properties to stats, uniques, sets, runewords, socket fillers
+
+- **Status:** draft: every rule read from the 1.14d `Game.exe` code
+  (addresses per rule; the function table read from the 1.14d data at
+  `0x007462F8`); no recording yet; test vectors are synthetic.
+- **Target version:** 1.14d
+- **Crate/module:** `d2-sim::items::props` (dispatcher, property
+  functions, modes); `property-functions.tsv` (this folder) is the
+  machine-readable function list (one row per function id)
+- **Related specs:** `items/generation.md` (§1 conventions, §8.2
+  ethereal apply); `items/quality.md` (§7 superior → mode 1, §8 unique →
+  mode 3, §9 set → mode 4); `items/affixes.md` (mode 0); `sim/stats.md`,
+  `sim/stat-lists.md` (stat lists, states, flags, set/add, how an item's
+  lists reach its owner); `data/fields.tsv` (`properties`, `itemstatcost`,
+  `uniqueitems`, `setitems`, `sets`, `runes`, `gems` layouts);
+  `data/fixups.md` §5–§6 (gem offsets, set slots and counts).
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 45–56 |
+| Inputs | 57–64 |
+| Outputs / state changes | 65–70 |
+| Rules | 71–72 |
+|   1. Property record and slots | 73–81 |
+|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 82–100 |
+|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 101–110 |
+|   4. Shared helpers | 111–143 |
+|   5. Property functions | 144–198 |
+|   6. Superior (mode 1) and affixes (mode 0) | 199–203 |
+|   7. Uniques (mode 3) | 204–207 |
+|   8. Set items | 208–218 |
+|   9. Socket fillers (`0x0055C2C0`) | 219–234 |
+|   10. Runewords | 235–255 |
+|   11. Set bonuses (`0x00660120`) | 256–268 |
+|   12. Craft property lists (`0x00660240`) | 269–274 |
+| Constants & data dependencies | 275–284 |
+| Randomness | 285–290 |
+| Edge cases & original bugs | 291–300 |
+| Test vectors | 301–319 |
+| Provenance | 320–338 |
+| Open questions | 339–345 |
+<!-- /index -->
+
+## Summary
+
+Every magic effect on an item is a property row (properties.txt) applied
+with a parameter, a min and a max. A property has up to seven slots;
+each slot names a function (1–24, 36), a stat, a "set" flag and a value.
+The dispatcher runs the slots in order; the functions roll values from
+the item seed and write stats into a stat list of the item. This spec
+owns the property record, the modes that list which properties a
+source (affix, quality row, gem, unique, set, runeword, craft list)
+contributes, the dispatcher, every property function, runeword matching
+and activation, socket-filler properties and set bonuses.
+
+## Inputs
+
+| Name | Source |
+|---|---|
+| property record `{code i32, param i32, min i32, max i32}` | a row of an affix, quality, unique, set, runes, gems or craft table |
+| item, owner unit (may be none), state, stat-list flags | the caller |
+| properties, itemstatcost, skills tables | `data/fields.tsv` |
+
+## Outputs / state changes
+
+Stats in the target stat list (created on demand), item flags (socketed,
+ethereal, runeword), item seed draws, the return value of each function
+(passed between slots).
+
+## Rules
+
+### 1. Property record and slots
+
+1. A property record is 16 bytes: `code` (properties row; < 0 = none),
+   `param`, `min`, `max`. Affix `modN*`, quality `modN*`, unique
+   `propN/parN/minN/maxN`, set `propN…`/`apropNx…`, sets `pcode*/fcode*`,
+   runes `t1code*`, gems `*mod*` columns all use this shape.
+2. A properties row has slots k = 0…6 with `funcK+1`, `statK+1`, `setK+1`,
+   `valK+1` (`data/fields.tsv` `properties`).
+
+### 2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`)
+
+Arguments: mode, extra unit, item, source row, property set, apply type.
+
+| Mode | Source | Records | Stop rule |
+|---|---|---|---|
+| 0 | magic affix row | `mod1`–`mod3` (+0x24, 16 apart) | first `code` < 0 ends |
+| 1 | qualityitems row | `mod1`, `mod2` (+0x0C) | first `code` < 0 ends |
+| 2 | gems row (gem) | block by property set: 0 weapon (+0x30), 1 helm (+0x60), 2 shield (+0x90); 3 records | first `code` < 0 ends |
+| 5 | gems row (rune) | as mode 2 | as mode 2 |
+| 3 | uniqueitems row = file index | `prop1`–`prop12` (+0x8C) | all 12 run; `code` < 0 skipped |
+| 4 | setitems row = file index | `prop1`–`prop9` (+0x88), then `aprop1a`–`aprop5b` (+0x118, 10 records) | all run; `code` < 0 skipped |
+
+Mode 3/4 do nothing when the file index is outside the table. Every
+mode targets the item's own stat list with state 0 and flags 0x40
+(owner none), except the set partial records (§8.1). Mode 4 on a format-0
+item runs only `prop1`–`prop2` (not specified further). Modes 6
+(runeword, §10) and 7 (craft list, §12) call the dispatcher directly.
+
+### 3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1)
+
+For one property record: look up the properties row (`code` < 0 or out
+of range → nothing). prev := 0. For slot k = 0…6: f := `funcK+1`; f ≥ 37
+or table entry `0x007462F8`[f] empty (f = 0, 25–35) → stop. Call f with
+(mode, owner, item, record, `setK+1`, `statK+1`, `valK+1`, prev, state,
+flags, extra). After slot 0 only, prev := its return value. So every
+later slot of the property reuses slot 0's value when its function reads
+prev (functions marked prev in the TSV).
+
+### 4. Shared helpers
+
+#### 4.1 Value roll (`0x0065E9E0`)
+
+roll(min..max): max = min → min (no draw). Swap if max < min. Then min +
+roll(max − min + 1) on the **item seed** when the target is an item (else
+the unit's seed).
+
+#### 4.2 Add to the stat list (`0x0065EA50`)
+
+Arguments: owner, record, set, stat, layer, value, state, flags. Nothing
+(return 0) if the record is none, value = 0, or the stat is out of
+itemstatcost. List: the owner's list with this state and flags if an
+owner is given, else the item's; created if missing (`sim/stat-lists.md`).
+v := value << itemstatcost `valshift`. set ≠ 0 → **set** stat (layer) :=
+v; and for stat 58 (`poisonmaxdam`): if stat 326 (`poison_count`) is 0,
+set it to 1. set = 0 → **add** v; for stat 58 also add 1 to stat 326.
+Return value (unshifted).
+
+#### 4.3 Base reset (`0x0065CCC0`)
+
+Called with the slot's stat by functions marked "reset" (mode 1 = only in
+mode 1). Uses the items row found by the item's code:
+
+| Stat | Effect |
+|---|---|
+| 16 (`item_armor_percent`), 31 | armor with `maxac` ≠ 0: stat 31 := max(base 31 + 1, `maxac` + 1) |
+| 17 (`item_maxdamage_percent`), 22 | weapon: stat 22 := `maxdam`, 24 := `2handmaxdam`, 160 := `maxmisdam` if throwable (each only when ≠ 0) |
+| 18 (`item_mindamage_percent`), 21 | weapon: 21 := `mindam`, 23 := `2handmindam`, 159 := `minmisdam` if throwable |
+
+This makes superior and enhanced-defense items take the top of their
+base defense range plus one.
+
+### 5. Property functions
+
+`property-functions.tsv` lists every function: id, 1.14d address, value
+source, draws, base reset, stats written, layer, return. Columns:
+`value` prev_or_roll = prev if ≠ 0 else §4.1; `layer` param = the
+record's `param`, val = the slot's `val`; `returns` added = §4.2's
+return. Functions not in the table (0, 25–35, ≥ 37) end the slot loop.
+Rules beyond the table:
+
+1. **5 (min damage):** items row = the owner's if the owner is an item,
+   else the item's. v := prev or roll. Add to stat 21 unless (weapon and
+   `mindam` = 0 and `2handmindam` ≠ 0); add to 23 unless (weapon and
+   `2handmindam` = 0 and `mindam` ≠ 0); add to 159 unless (weapon and not
+   throwable). For each, if the column ≠ 0 and column + v < 1, the
+   amount is 1 − column; amount 0 is skipped. Return v.
+2. **6 (max damage):** the same with stats 22 / 24 / 160 and columns
+   `maxdam` / `2handmaxdam` / `maxmisdam`; the floor amount is −column.
+3. **7 (enhanced damage %):** v := prev or roll. Item target: base reset
+   of the min and max damage stats (§4.3 rows 17 and 18); b :=
+   max(`maxdam`, `2handmaxdam`); if weapon and b × v / 100 (64-bit,
+   toward zero) ≤ 0 → run function 6 with prev 1 and return its result;
+   else add stat 18 then stat 17 with v, return v. Non-item target: add
+   18 and 17, return 1.
+4. **11 (skill on event):** skill := `param` (out of skills → 0).
+   chance := `min`, < 1 → 5. level := `max` when > 0; when 0: ((item level
+   − skill `reqlevel`) / 4 toward zero) + 1, at least 1, at most the
+   skill's `maxlvl` (20 when < 1); when < 0: s := max(99 − reqlevel, 1);
+   d := max(−(s / `max`), 1); level := (item level − reqlevel) / d, ≤ 0 → 1.
+   Add the stat with layer skill × 64 + (level & 63), value chance.
+5. **13 (durability):** after a non-zero add, m := the item's max
+   durability (`0x00625E00`); m > 0 → stat 72 := m.
+6. **14 (sockets):** cap := min(`invwidth` × `invheight`, 6) (0 → return
+   0), then min(cap, max sockets, `items/generation.md` §7.2). n := prev
+   if ≥ 1, else roll; n < 1 → `param`. Result := min(max(n, 1), cap) (cap
+   < 1 → 0). Set flag 0x800 and **set** stat 194 := result directly on
+   the item. Return result. (No quality caps, unlike generation §7.3.)
+7. **15 / 16 / 17:** value `min` / `max` / (`param`, or roll when 0;
+   0 → return 0). Stat 21 (for 15) → function 5 with prev := value; stat
+   22 (for 16, 17) → function 6; other stats → add. Return the value.
+8. **18 (by time):** p := clamp(`param`, 0, 3); a := clamp(`min` + 256, 0,
+   1023); b := clamp(`max` + 256, 0, 1023); **set** the stat := p + (b ×
+   1024 + a) × 4, layer 0. Return b.
+9. **19 (charges):** skill := `param` (invalid → 0). level from `max` as
+   in rule 4. c := `min`: 0 → 5; < 0 → −min + (−min × level) / 8 (toward
+   zero); then c ≤ 1 → 1, c > 254 → 255. r := roll(c − c / 8) (item
+   seed). **Set** the stat := c × 256 + ((r + c / 8 + 1) & 0xFF), layer
+   (skill << shift) + (level & mask) with the global shift and mask at
+   table +0xC6C / +0xC70 (the itemstatcost layer split,
+   `sim/stats.md`). Return c.
+10. **20:** add stat 152 := 1 (when itemstatcost has > 152 rows). Return 1.
+11. **23:** item not yet ethereal and has durability → apply ethereal
+    (`items/generation.md` §8.2), return 1; else 0.
+12. **12 / 36:** layer := roll(min..max); value := `param` (12) or the
+    slot's `val` (36).
+
+### 6. Superior (mode 1) and affixes (mode 0)
+
+No extra rules: the routine that picks the row calls mode 0 or 1 once
+per row (`items/quality.md` §7, `items/affixes.md` §3, §7, §8, §11).
+
+### 7. Uniques (mode 3)
+
+`items/quality.md` §8 picks the row; mode 3 runs its 12 records in order.
+
+### 8. Set items
+
+#### 8.1 Item properties (mode 4)
+
+`prop1`–`prop9` go to the item's list (state 0, flags 0x40). The ten
+partial records `aprop1a`, `aprop1b`, …, `aprop5b` (k = 0…9): if the
+setitems `add func` ≠ 0 → state 165 + k / 2 (`itemset1`–`itemset5`,
+table `0x006EDB40`) with flags 0x2040 (`0x006EDB5C`); else state 0 and
+flags 0x40. Which state lists are active is decided by the set-bonus
+update (§11) and the stat-list rules (`sim/stat-lists.md`).
+
+### 9. Socket fillers (`0x0055C2C0`)
+
+Run when a filler is inserted (the insertion intent is owned by the
+inventory spec; `0x00562660`):
+
+1. Filler of type `gem` (20): gems row := items `gemoffset` of the filler
+   (`data/fixups.md` §5); mode 2 with property set := the socketed
+   item's apply type (`0x00629A40`: items `gemapplytype`, 0 weapon, 1
+   helm, 2 shield).
+2. Filler of type `rune` (74): the same with mode 5 (extra unit = the
+   socketed item).
+3. Otherwise, a filler of quality 5: `0x00663CC0` (not specified, open
+   question 2).
+4. The properties land in the filler's own list; they reach the socketed
+   item through stat-list linking (`sim/stat-lists.md`).
+
+### 10. Runewords
+
+#### 10.1 Match (`0x0062BED0`)
+
+No runeword for: quality 4–9, quest items, items without an inventory.
+Fillers: the socketed items' records in insertion order (≤ 6). The
+socket count (stat 194) must equal the filler count. Runes rows in
+order: `complete` ≠ 0; `rune1`… (stop at the first < 1) must equal the
+fillers in order and cover at least the socket count; none of `etype1`–
+`etype3` (stop at 0) may match the item; any of `itype1`–`itype6` (stop
+at 0) must match. First matching row wins.
+
+#### 10.2 Activation (`0x00562660` → `0x006600A0`)
+
+After a filler is inserted and its properties applied (§9): row := §10.1.
+A row with `server` ≠ 0 is skipped unless game +0x74 (ladder) ≠ 0. Else,
+if the item has no list with state 171 (`runeword`) and flags 0x40: set
+flag 0x4000000; dispatcher mode 6 for `t1code1`… (stop at the first < 0,
+max 7), owner = the item, state 171, flags 0x40. Then the replenish
+timers (`items/generation.md` §9 step 6).
+
+### 11. Set bonuses (`0x00660120`)
+
+For an equipped set item (quality 5) with state s (given by the caller,
+the equip logic of `sim/units.md`): mask := the set slots
+(setitems +0x2E) of the owner's equipped set items of the same set,
+including this one, excluding items flagged no-equip (0x4000) or broken
+(0x100) (`0x0062A370`). c := popcount(mask) (table `0x006EDA40`, masks ≥
+64 → 0). n := min(c, set item count − 1) (count: sets +0x0C,
+`data/fixups.md` §6). Records `pcode2a`, `pcode2b`, … the first 2n − 2
+(code < 0 skipped): mode 4 through the dispatcher with owner = the
+player, state s. If c ≥ the set item count: `fcode1`–`fcode8` (stop at the
+first < 0).
+
+### 12. Craft property lists (`0x00660240`)
+
+Mode 7 for one record list (owner none, flags 0x40); then, if the item
+is flagged ethereal (0x400000), re-apply ethereal (`items/generation.md`
+§8.2). The list and when it runs belong to the cube spec.
+
+## Constants & data dependencies
+
+| Constant | Value | Where |
+|---|---|---|
+| function table | 37 entries at `0x007462F8`, count `0x00745B54` | §3 |
+| set partial states | 165–169, flags 0x2040 | §8.1 |
+| runeword state | 171 | §10.2 |
+| popcount table | `0x006EDA40` | §11 |
+| poison count stat | 326, with stat 58 | §4.2 |
+
+## Randomness
+
+Item seed only (§4.1; function 19's charge roll). Draw order = record
+order, slot order inside a record (only slots whose function rolls), so
+for an affix: mod1's rolls, mod2's, mod3's.
+
+## Edge cases & original bugs
+
+1. Only slot 0's return is passed on; functions 3, 4, 5, 6 … in later
+   slots reuse it (e.g. min/max damage pairs share one roll).
+2. A value of 0 adds nothing (§4.2), so a 0 roll leaves no stat.
+3. Function 14 ignores the quality caps that generation sockets use.
+4. Function 7 on a weapon whose bonus rounds to ≤ 0 adds +1 max damage
+   instead of the percentages.
+5. A function id 0 in slot 0 makes the whole property do nothing.
+
+## Test vectors
+
+Synthetic, from the rules:
+
+| Input | Expected | Source |
+|---|---|---|
+| §4.1 min 5, max 5 | 5, no draw | synthetic |
+| §4.1 min 15, max 5, item seed `{1, 666}` | 5 + (lo′ mod 11) | synthetic |
+| func 19: min 0, level 1, item seed `{4242, 666}` | c 5, roll(5) → value 1283 | synthetic |
+| func 19: min −3, level 10 | c 6, value 1541 (seed `{4242, 666}`) | synthetic |
+| func 19: min −12, level 20 | c 42, roll(37), value 10771 | synthetic |
+| func 19: min 300 | c 255, roll(224), value 65524 | synthetic |
+| func 18: param 1, min −50, max 50 | 1254201 | synthetic |
+| func 18: param 5, min −300, max 900 | 4190211 (p 3, a 0, b 1023) | synthetic |
+| func 10: param 7 | layer 1 + 2 × 8 = 17 | synthetic |
+| func 5: weapon `mindam` 3, v −5 | stat 21 += −2 | synthetic |
+| func 6: weapon `maxdam` 3, v −5 | stat 22 += −3 | synthetic |
+| §11 mask 0b1011, 6-item set | c 3, n 3, records 1–4 | synthetic |
+
+## Provenance
+
+- 1.14d `Game.exe`: modes `0x0065FEC0` (jump table `0x00660084`,
+  per-mode accessor `0x0065C730`, `0x0065C660`, `0x0065C6D0`), dispatcher
+  `0x0065FD70`, wrapper `0x0065FE10`, function table `0x007462F8` (count
+  37 at `0x00745B54`), value roll `0x0065E9E0`, add `0x0065EA50`, list
+  `0x0065CBF0`, base reset `0x0065CCC0`, functions per the TSV, skills
+  `reqlevel` `0x00644710`, `maxlvl` `0x004AA8B0`, socket fill
+  `0x0055C2C0`, insertion `0x00562660`, runeword match `0x0062BED0`,
+  activation `0x006600A0`, set bonuses `0x00660120`, set mask
+  `0x0062A370`, craft list `0x00660240`, ethereal `0x0065E4D0`; state and
+  flag tables `0x006EDB40`, `0x006EDB5C`, popcount `0x006EDA40`.
+- D2MOO 1.10f `D2Common/src/Items/ItemMods.cpp` (property functions,
+  `ITEMMODS_AssignProperty`, `ITEMMODS_UpdateRuneword`,
+  `ITEMMODS_UpdateFullSetBoni`, `sub_6FD92CF0`) was the map; every
+  function was re-read on 1.14d. Differences: 1.14d has function 36
+  (D2MOO: 1.11+ only); 1.14d function 14 re-reads `param` when the roll
+  is < 1; runeword `server` rows need the ladder flag in 1.14d.
+
+## Open questions
+
+1. No recording confirms any rule (request R1 in the session report).
+2. The quality-5 socket-filler branch `0x00663CC0` is not specified.
+3. The owner-vs-item list choice in §4.2 is read from `0x0065CBF0`'s two
+   branches and D2MOO; confirm the register mapping (Ghidra request G1).

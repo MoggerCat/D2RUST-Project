@@ -1,0 +1,54 @@
+index	addr_114d	d2moo_name	rows	examples	params	rng	behaviour	status
+0	-	-	53	blood1(18) blood2(19) bigblood1(20) bigblood2(21)	-	-	no function: every caller skips an index <= 0 (signed 16-bit read)	spec'd-here
+1	0x005B0BC0	MISSMODE_SrvDo01_BasicMissile	551	arrow(0) javelin(1) bighead1(2) bighead2(3)	-	none of its own; hit path draws (missiles.md R5-R6)	default flight: the collision/expiry routine 0x005AE1F0 only (missiles.md R4)	spec'd-here
+2	0x005AE400	MISSMODE_SrvDo02_PlagueJavelin_PoisonJavelin_PoisonTrap	4	poisonjav(38) trap poison ball right(245) trap poison ball left(246) viper_poisjav(648)	SrvCalc1;SubMissile1	-	when the path reaches a new step (path step flag), creates SubMissile1 at the missile with loops = SrvCalc1; then default flight	D2MOO-only
+3	0x005AE480	MISSMODE_SrvDo03_PoisonCloud_Blizzard_ThunderStorm_HandOfGod	26	poisonjavcloud(39) plaguejavelin(43) monbliz1(107) monbliz2(108)	-	-	without velocity marks collision bit 0x40 under the missile; then default flight	D2MOO-only
+4	-	-	0	-	-	-	null entry	spec'd-here
+5	0x005AE520	MISSMODE_SrvDo05_FireWall_ImmolationFire_MeteorFire_MoltenBoulderFirePath	9	blaze(67) firewall(69) vampirefirewall(131) immolationfire(230)	SubStart;SubStop	roll(SubStop-SubStart) on the missile seed when the animation frame reaches SubStart-1	marks collision 0x40 under the missile (Size); loops its animation frame between SubStart and SubStop; then default flight	D2MOO-only
+6	0x005AE680	MISSMODE_SrvDo06_MoltenBoulder_FireWallMaker	4	firewallmaker(68) vampirefirewallmaker(130) moltenboulder(452) countessfirewallmaker(653)	SubMissile1	-	at each new path step creates SubMissile1 at its position; no owner -> removed; then default flight	D2MOO-only
+7	0x005AE780	MISSMODE_SrvDo07_GuidedArrow_BoneSpirit	3	guidedarrow(86) bonespirit(193) monbonespirit(329)	Param1	-	removed if owner dead or missile in town; while homing, re-aims the path at the target every Param1 frames (default 5) when 3 < distance < 25; then default flight	D2MOO-only
+8	0x005AE8A0	MISSMODE_SrvDo08_MonBlizzCenter	1	monblizcenter(106)	Param1;Param2;Param3;SubMissile1	via 0x005A9820: seed reset + 2 rolls	every max(Param2-lvl/Param3,3) elapsed frames spawns SubMissile1 at a random offset within Param1+max(lvl/Param3,2) (helper 0x005A9820, collision mask 5); then default flight	summarized
+9	0x005AE940	MISSMODE_SrvDo09_BatLightningBolt	1	bat lightning bolt(123)	SubMissile1	-	at each new path step creates SubMissile1 at its position; then default flight	D2MOO-only
+10	0x005AEA60	MISSMODE_SrvDo10_BlizzardCenter	1	blizzardcenter(158)	SubMissile1 (+skills Calc1/Calc2)	via 0x005A9820: seed reset + 2 rolls	spawns SubMissile1 via helper 0x005A9820 with range = skill Calc1, interval = skill Calc2, mask 5; then default flight	summarized
+11	0x005AEB60	MISSMODE_SrvDo11_FingerMageSpider	1	fingermagespider(177)	Param1;Param2;Param3	-	every Param1 frames (default 5), if target within Param2, re-aims one Param3-subtile step toward it; then default flight	D2MOO-only
+12	0x005AECA0	MISSMODE_SrvDo12_DiabWallMaker	1	diabwallmaker(179)	SubMissile1	-	at each new path step creates SubMissile1 in place; then default flight	D2MOO-only
+13	0x005AEDA0	MISSMODE_SrvDo13_BoneWallMaker	1	bonewallmaker(207)	- (skills PetType)	-	at each new path step summons a bone-wall pet (skill summon) while its counter lasts; then default flight	D2MOO-only
+14	0x005AEF70	MISSMODE_SrvDo14_GrimWard	3	grimwardsmall(250) grimwardmedium(253) grimwardlarge(256)	Param1;Param2	-	every Param1 elapsed frames runs the grim-ward effect with Param2; skill/level 0 -> removed; then default flight	D2MOO-only
+15	0x005AF030	MISSMODE_SrvDo15_FrozenOrb	1	frozenorb(260)	Param1;Param2;SubMissile1	-	every Param1 elapsed frames fires SubMissile1 toward the next of 64 fixed circle offsets (index advances by Param2); then default flight	D2MOO-only
+16	0x005AF170	MISSMODE_SrvDo16_FrozenOrbNova	1	frozenorbnova(262)	Param1;Param2	-	below Param1 elapsed frames, every Param2 frames rotates its direction 45 degrees; then default flight	D2MOO-only
+17	0x005AF240	MISSMODE_SrvDo17_CairnStones	1	cairnstones(288)	Param1-Param5;SubMissile1	via 0x005A9820: seed reset + 2 rolls	spawns SubMissile1 sparks (helper 0x005A9820) mid-life; opens portal object Param4 once near the end; then default flight	summarized
+18	0x005AF300	MISSMODE_SrvDo18_TowerChestSpawner	1	towerchestspawner(332)	Param1;Param2;Param3	2 x roll(2*Param3+1) on the missile seed per gold drop	operates the tower chest at frame Range-Param1, then drops gold piles at random offsets every 4*Param2 frames; then default flight	D2MOO-only
+19	0x005B0940	MISSMODE_SrvDo19_RadamentDeath	1	radamentdeath(347)	-	-	area effect on corpses (Radament death), then default flight	D2MOO-only
+20	0x005AF540	MISSMODE_SrvDo20_BladeCreeper	1	blade creeper(392)	-	-	owner dead/missing -> expiry hit and removal; else re-paths around the owner, pins frames left at 10, runs default flight, always keeps (1)	D2MOO-only
+21	0x005AF590	MISSMODE_SrvDo21_Distraction	1	distraction(393)	SubMissile1	-	like 20 plus SubMissile1 at each new path step	D2MOO-only
+22	0x005AF620	MISSMODE_SrvDo22_LightningTrailingJavelin	2	lightingtrailingjavalin(431) advlighttrailingjav(438)	Param1;SubMissile1	-	at each new path step fires two SubMissile1 sideways (loops Param1); then default flight	D2MOO-only
+23	0x005AF790	MISSMODE_SrvDo23_24_SuccFireBall_FirestormMaker	2	sucfireball(441) firestormmaker(458)	Param1;SubMissile1	-	at each new path step creates SubMissile1 in place (loops Param1 when > 0); then default flight	D2MOO-only
+24	0x005AF790	MISSMODE_SrvDo23_24_SuccFireBall_FirestormMaker	0	-	Param1;SubMissile1	-	same function as 23 (same 1.14d address)	D2MOO-only
+25	0x005AF880	MISSMODE_SrvDo25_EruptionCenter	1	erruption center(461)	SubMissile1 (+skills Calc1/Calc2)	via 0x005A9820: seed reset + 2 rolls	spawns SubMissile1 via helper 0x005A9820 (range skill Calc1, interval skill Calc2, mask 0x45); then default flight	summarized
+26	0x005AF980	MISSMODE_SrvDo26_Vines_PlagueVines	2	vines(471) plague vines(474)	Param1;SubMissile1	-	every Param1 elapsed frames creates SubMissile1 at its position; then default flight	D2MOO-only
+27	0x005AFA30	MISSMODE_SrvDo27_Tornado	1	tornado(478)	Param1;Param2	damage rolls on the missile seed (R6.2) per pulse	every Param1 (or skill Calc4) elapsed frames deals area damage within Param2 (or aura range); then default flight	D2MOO-only
+28	0x005AFB80	MISSMODE_SrvDo28_Volcano	1	volcano(479)	Param1-Param5;SubMissile1	init_low(target x field) then 2 x roll(2r+1) on the missile seed; low word saved back	between Param3 and Param4 elapsed frames, every Param1 frames throws SubMissile1 at a random offset within Param2; then default flight	summarized
+29	0x005AFD70	MISSMODE_SrvDo29_RecyclerDelay	1	recycler delay(498)	Param1	-	at elapsed frame Param1 heals the owner by a skill percentage (ProgOverlay shown); then default flight	D2MOO-only
+30	0x005B0010	MISSMODE_SrvDo30_RabiesPlague	1	rabiesplague(515)	Param1;Param2;SubMissile1	2 x roll(2*Param2+1) on the carried unit's seed	follows its owner; every Param1 frames spreads SubMissile1 to a random offset; always keeps (1)	D2MOO-only
+31	0x005B01F0	MISSMODE_SrvDo31_WakeOfDestructionMaker_BaalColdMaker	2	wake of destruction maker(517) baal cold maker(589)	SubMissile1	-	at each new path step fires SubMissile1 to both sides; no owner -> hit with a4=0; then default flight	D2MOO-only
+32	0x005B03E0	MISSMODE_SrvDo32_TigerFury	1	tigerfury(520)	SubMissile1	-	creates SubMissile1 at each new path step, then runs SrvDo 7	D2MOO-only
+33	0x005AFEC0	MISSMODE_SrvDo33_VineRecyclerDelay	1	vine recycler delay(540)	Param1	-	like 29 but restores mana	D2MOO-only
+34	0x005B04A0	MISSMODE_SrvDo34_BaalTauntControl	1	baal taunt control(546)	Param1-Param4;SubMissile1-3	init_low(path first point x) then roll(count) on the missile seed	after Param1 elapsed frames picks one of up to 3 SubMissiles at random and fires it on its interval; then default flight	summarized
+35	0x005B0640	MISSMODE_SrvDo35_RoyalStrikeChaosIce	1	royalstrikechaosice(569)	Param1	init_low(target x field), one step, bit 0 decides the turn side; low word saved back	every Param1 elapsed frames turns left or right at random; then default flight	summarized
+36	0x005B0A40	MISSMODE_SrvDo36_BaalFxControl	1	baalfx control(625)	-	-	Baal effects control; default flight	D2MOO-only
+37	0x005B0AA0	MISSMODE_SrvDo37_Unused	0	-	Param1-3;SubMissile1-3	-	at elapsed frame ParamN creates SubMissileN in place; then default flight (no live row)	D2MOO-only
+38	-	-	0	-	-	-	null entry	spec'd-here
+39	-	-	0	-	-	-	null entry	spec'd-here
+40	-	-	0	-	-	-	null entry	spec'd-here
+41	-	-	0	-	-	-	null entry	spec'd-here
+42	-	-	0	-	-	-	null entry	spec'd-here
+43	-	-	0	-	-	-	null entry	spec'd-here
+44	-	-	0	-	-	-	null entry	spec'd-here
+45	-	-	0	-	-	-	null entry	spec'd-here
+46	-	-	0	-	-	-	null entry	spec'd-here
+47	-	-	0	-	-	-	null entry	spec'd-here
+48	-	-	0	-	-	-	null entry	spec'd-here
+49	-	-	0	-	-	-	null entry	spec'd-here
+50	-	-	0	-	-	-	null entry	spec'd-here
+51	-	-	0	-	-	-	null entry	spec'd-here
+52	-	-	0	-	-	-	null entry	spec'd-here
