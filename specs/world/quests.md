@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 518–550 |
 |   8. Act transitions, warps and portals | 551–607 |
 |   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1309 |
-|   11. Acts II–V | 1310–1315 |
-| Constants & data dependencies | 1316–1330 |
-| Randomness | 1331–1349 |
-| Edge cases & original bugs | 1350–1368 |
-| Test vectors | 1369–1399 |
-| Provenance | 1400–1421 |
-| Open questions | 1422–1460 |
+|   10. Act I quests | 652–1387 |
+|   11. Acts II–V | 1388–1393 |
+| Constants & data dependencies | 1394–1408 |
+| Randomness | 1409–1427 |
+| Edge cases & original bugs | 1428–1446 |
+| Test vectors | 1447–1478 |
+| Provenance | 1479–1500 |
+| Open questions | 1501–1541 |
 <!-- /index -->
 
 ## Summary
@@ -1286,7 +1286,14 @@ with 0 = A, else B, returns whether found).
    record exists with not-intro ≠ 0: `0x005456A0(player, object, 127)`
    (opens message 127); if state ≤ 1: state := 2 and, if status < 1,
    +0x11B := 1.
-10. **Sequence** `0x00595240`: §10.1.
+10. **Chest** (object class 0x173, quest function from `0x005449E0`,
+    `0x00595A50`; args game, object): chain 5's record must exist
+    (else nothing). Add the object's GUID (−1 when none) to the +0x68
+    list unless present or the list holds 8; trap step; if killed and no
+    trap spawned yet, object event 7 at frame + 10. Chest init
+    `0x00595A00`: chain 5's record must exist (else fatal); not-intro =
+    0 → object mode 3.
+11. **Sequence** `0x00595240`: §10.1.
 
 No quest-seed draws. The trap step's spawns (monster class 326 near each
 chest, then a missile 332 per chest, `0x0056EDE0`) are Open question 12.
@@ -1294,18 +1301,89 @@ chest, then a missile 332 per chest, `0x0056EDE0`) are Open question 12.
 
 #### 10.8 A1Q6 Sisters to the Slaughter (chain 6)
 
-- Cain (265) message 166 starts (state 2); entering Catacombs 1–4
-  advances; Andariel's death (event 8, `0x005965A0`): clear callback 2;
-  if the killing player has neither 6.0 nor 6.1: player bookkeeping
-  (`0x00596210`), then the gem drops: twice {step the quest seed;
-  drop code = chipped[lo' mod 7]; drop (`0x00559A30`, normal)}, then once
-  {step; drop code = normal[lo' mod 7]; drop}; drop code = 0. chipped =
-  `gcv gcr gcb gcy gcg gcw skc` (`0x007361DC`), normal = `gsv gsr gsb gsy
-  gsg gsw sku` (`0x00736444`). Then per-player iterates, a timer of
-  period 1, state 4.
-- Warriv message 183 with 6.1: if 6.13: status 13, state 5, game 6.13;
-  clear 6.1, set 6.0, 0x28. Akara 179, Kashya 181, Cain 184 remove the
-  player from the extra lists.
+Init `0x00596990`: callbacks per `quests.tsv` (event 10 is added at the
+kill); active 1, status 0, state 0, init_no 4, seq_id 37 (unused),
+filter 6, status fn none, active fn `0x005967F0`, seq fn `0x005968E0`;
+extra 0x198 bytes: three §9.3 GUID lists at +0x00 (Cain), +0x84 (Akara),
++0x108 (Kashya), emptied; +0x18C u32 victim GUID, +0x190 u16, +0x192 u16
+timer counter, +0x194 u8 killed, +0x195 u8 talked, all 0.
+
+| Id | Function | Effect on one player P (slot 6) |
+|---|---|---|
+| O1 | `0x00595B20` | broadcast iterate: as I1 for slot 6, 0x5D for chain 6 |
+| O2 | `0x00595BD0` | as I2 for slot 6 and chain 6's state / status |
+| O3 | `0x00596260` | if P has neither 6.0 nor 6.15 and P's room's level is 37 (Catacombs 4): add P's GUID to the three lists; credit P (below) |
+| O4 | `0x00596440` | if P has 6.13 and a party: each member with neither 6.0 nor 6.1 whose room's level is ≠ 0 and in Act I is added to the three lists and credited (`0x00596320`) |
+| O5 | `0x005963E0` | if P has neither 6.0 nor 6.1: set 6.14; `5D 06 00 0C 0000` (act 0) |
+| O6 | `0x00596170` | if P has 6.1 and 6.13: sound event 33 on P |
+| O7 | `0x00596490` (arg = the victim) | if P's room's level is 37: a portal object of class 59 to level 1 at P's position, owner P (`0x0056D130(game, P, room, x, y, 1, 0, 59, 0)`); returns 1 (stops the walk) |
+
+Credit `0x00596210(game, P)`: set 6.13, 6.1 in P's record; then
+`0x00538680(P's client, 1, difficulty)` (client-side act access; owner
+not specced, Open question 13).
+
+1. **Event 0** `0x00595E20` (NPC class c):
+   1. c = 265 and the player is in the Cain list, c = 148 and in the
+      Akara list, or c = 150 and in the Kashya list: add state 3 (with
+      that NPC). End.
+   2. R has 6.1: add state 4 if c is 265, 148 or 150, else state 3. End.
+   3. Player in the record's GUID list: add state 4. End.
+   4. state = 1, c = 265 and R lacks 6.0: add state 0. End.
+   5. End if state = 0, R has 6.0, or state ≥ 4 and R lacks 6.13. m =
+      `0x007382C4`[state] (−1, 0, 1, 2, 3, 4); add state m.
+2. **Event 2** `0x00595B80`: target class 265 and talked = 1:
+   broadcast(1, 0); talked := 0; callback 2 := null.
+3. **Event 3** `0x00596010` (old a, new b):
+   1. b in 34–37 (Catacombs 1–4) and not-intro ≠ 0: changed := state <
+      3, then state := 3. b = 37: status < 2 → broadcast(2, 0) and every
+      player O2; else if changed, every player O2. b ≠ 37: status 0 →
+      flags := 0, status(1) (nothing sent), every player O2; else if
+      changed, every player O2. End.
+   2. Else state = 4 and b = 40: state := 5. End.
+   3. Else a = 1: remove the player's GUID from a non-empty record list
+      (`0x00545310`); if state = 2 and R lacks 6.0 and 6.1: state := 3,
+      every player O2.
+4. **Event 8** `0x005965A0` (Andariel's death; victim = target):
+   1. callback 2 := null.
+   2. not-intro ≠ 0: if there is a killer player lacking 6.0 and 6.1:
+      credit it; then twice {step the quest seed; victim drop code
+      (+0xB8) := chipped[lo' mod 7]; drop (`0x00559A30(game, victim, 2,
+      &out, 0, −1, 0)`)}, then once with normal[lo' mod 7]; drop code
+      := 0. With or without a killer: every player O3, then O4, then O5.
+   3. +0x18C := the victim's GUID (−1 when none); +0x192 := 1.
+   4. not-intro ≠ 0: timer (record, `0x00596500`, period 1); every
+      player O6.
+   5. killed := 1; state := 4; callback 10 := `0x005961C0`; callback 8 :=
+      null.
+   chipped = `gcv gcr gcb gcy gcg gcw skc` (`0x007361DC`), normal = `gsv
+   gsr gsb gsy gsg gsw sku` (`0x00736444`).
+5. Timer `0x00596500` (every 2 updater ticks): +0x192 += 1. At 10: every
+   player O7 with the monster of GUID +0x18C as argument; return 0. At
+   12: unless status is 3 or 13, broadcast(3, 0); return 1. Otherwise
+   return 0.
+6. **Event 10** `0x005961C0` (after the kill): `0x00545530` (§10.6 step
+   8); remove the player's GUID from the three lists.
+7. **Event 11** `0x00595C60` (class c, message m):
+   1. Cain 166: state := 2 (no guard); talked := 1; every player O2;
+      refresh text. Cain 184: remove the player from the Cain list.
+   2. Warriv 183: refresh text first. Then, if R has 6.1: if R has 6.13,
+      flags := 0, status(13), state := 5, game record 6.13. Clear 6.1,
+      set 6.0, add the player's GUID to the record's list, 0x28.
+   3. Akara 179: remove from the Akara list. Kashya 181: remove from the
+      Kashya list.
+8. **Event 13** `0x00596900`: §10.1 restore, slot 6.
+9. **Active** `0x005967F0`: Cain: in the Cain list, or R lacks 6.0 and
+   6.1 and state = 1. Warriv: R lacks 6.0 and has 6.1. Akara / Kashya:
+   in their list. Others false.
+10. **Sequence** `0x005968E0` (§10.1): its timer `0x00596580` (period
+    20) sets state := 1 if it is 0 and returns 1.
+11. `0x005968C0` (no direct caller found): returns killed (+0x194) when
+    not-intro ≠ 0, else 1.
+
+The Warriv travel hook (§8.1, `0x005467E0`) calls this record's event 3
+with args (game, 3, target and the fifth dword unset, player, a = 1, b =
+40): step 3.2, so a state-4 record goes to 5. `0x00597310` runs after
+it whether or not chain 6's record exists.
 
 ### 11. Acts II–V
 
@@ -1394,6 +1472,7 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 | A1Q2 event 3 a = 1, b = 17: state 0, not-intro 1, status 0 | state 3, flags 0, status 2: `5d 02 00 02 0000` to qualifying players; then J2 (state 3, status 2 → 2.4 for players lacking 2.0, 2.1) | §10.5 |
 | A1Q3 status fn, R slot 3 = 0x0002 | returns 1, out 10 | §10.5 |
 | A1Q3 Malus operate, level 7, not-intro 1, R slot 3 = 0 | sound event 19 on the player; no drop; state unchanged | §10.5 |
+| A1Q6 Andariel killed, timer made at updater tick T | firings at T + 2, T + 4, …; the 9th (counter 10) opens the portals (O7), the 11th (counter 12, tick T + 22) sends status 3 and removes the timer | §10.8, §5 |
 | A1Q4 stone 0x50 with order [18, 20, 17, 21, 19] | `50 0400 0100 0300 0000 0400 0200` + 2 unwritten bytes | §10.6 |
 | Cow King killed by a classic-game player lacking 26.0 | nothing (no bits, no `vps ` drops) | §10.6 |
 
@@ -1454,6 +1533,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 12. A1Q5 trap step `0x005954F0` (Countess death, object list +0x68):
     the spawn arguments (monster 326 mode 12 flags 8, retry at +5, +5;
     missile 332 via `0x0056EDE0`, then `0x0064A710`, `0x0064A760`,
-    `0x0061AED0`) are read but not yet stated as rules, and who fills
-    the +0x68 list is not found (the chest object 0x173 handler, §9.5).
-    Settle with a disassembly read and a Countess-kill recording.
+    `0x0061AED0`) are read but not yet stated as rules. Settle with a
+    disassembly read and a Countess-kill recording.
+13. `0x00538680(client, 1, difficulty)` in the A1Q6 credit (§10.8):
+    what it changes for the client (D2MOO: allows Act II travel). Owner
+    spec missing; settle with a disassembly read.
