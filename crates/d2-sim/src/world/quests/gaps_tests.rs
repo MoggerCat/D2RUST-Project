@@ -507,23 +507,35 @@ fn player_leaving_with_quest_items() {
 #[test]
 fn pick_up_and_drop_reach_only_active_records() {
     let item = UnitId(0x80);
-    // Chain 9 (Act II, inactive at creation) has callback 4
-    // (`0x00599A30`, no body: the probe) and callback 5.
-    for (ev, chain, fun) in [
-        (event::ITEM_PICKED_UP, 9, "0x599a30"),
-        (event::ITEM_DROPPED, 9, "0x599b30"),
+    // Chain 9 (Act II) has callbacks 4 (`0x00599A30`: a `tr1 ` with 10.3
+    // clear sets the record status to 1) and 5 (`0x00599B30`: a `vip `
+    // clears 10.4), quests-act2.md §4.8.
+    for (ev, code) in [
+        (event::ITEM_PICKED_UP, *b"tr1 "),
+        (event::ITEM_DROPPED, *b"vip "),
     ] {
         let (mut ctl, _) = control();
         let mut f = Fake::new();
-        f.chains.insert(item, QuestChain(vec![chain]));
+        f.chains.insert(item, QuestChain(vec![9]));
+        f.item_codes.insert(item, code);
+        f.p(P1).quests.flags[0].set(10, 4);
         // Chain 9 is active from its init (quests-act2.md §2); switch it
         // off to test the gate.
-        ctl.record_mut(chain).unwrap().active = false;
+        ctl.record_mut(9).unwrap().active = false;
         ctl.item_event(&mut f, ev, P1, item);
         assert!(f.log.is_empty());
-        ctl.record_mut(chain).unwrap().active = true;
+        assert_eq!(ctl.record(9).unwrap().status, 13);
+        assert!(f.flags(P1).get(10, 4));
+        ctl.record_mut(9).unwrap().active = true;
         ctl.item_event(&mut f, ev, P1, item);
-        assert_eq!(f.log, [format!("unhandled {chain} {fun}")]);
+        assert!(f.log.is_empty());
+        if ev == event::ITEM_PICKED_UP {
+            assert_eq!(ctl.record(9).unwrap().status, 1);
+            assert!(f.flags(P1).get(10, 4));
+        } else {
+            assert_eq!(ctl.record(9).unwrap().status, 13);
+            assert!(!f.flags(P1).get(10, 4));
+        }
     }
 }
 
