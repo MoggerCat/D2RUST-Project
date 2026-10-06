@@ -110,6 +110,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             main: list(ListKey::ITEM.state, ListKey::ITEM.flags),
             sets,
             runeword_list: list(bitstream::RUNEWORD_STATE as u16, ListKey::ITEM.flags),
+            ..Default::default()
         })
     }
 
