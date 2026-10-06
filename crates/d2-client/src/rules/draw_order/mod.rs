@@ -254,10 +254,10 @@ pub struct UnitFacts {
     pub playerbody: bool,
     pub attached: bool,
     pub invis: bool,
-    /// TODO(spec: draw-order open question 9): the answer of the sight
-    /// test (`0x00642840` level predicate, then `0x00622AA0(local player,
-    /// unit, 2)`), `true` = hidden. `None` until its owner spec exists: an
-    /// error for a unit the test applies to.
+    /// The answer of the sight test (`draw-order-2.md` §15:
+    /// [`sight::sight_hidden`] over the client DRLG's collision rooms),
+    /// `true` = hidden. The feed fills it; `None` (the feed has no
+    /// collision rooms yet) is an error for a unit the test applies to.
     pub sight_hidden: Option<bool>,
 }
 
@@ -661,8 +661,12 @@ pub fn unit_draws(u: &mut UnitFacts) -> Result<bool, OrderError> {
         return Ok(false);
     }
     let hidden = if sight_tested(u) {
-        u.sight_hidden
-            .ok_or_else(|| open(9, "the sight test 0x00622AA0 has no owner spec yet"))?
+        u.sight_hidden.ok_or_else(|| {
+            open(
+                9,
+                "no sight answer (draw-order-2.md §15) for a sight-tested unit",
+            )
+        })?
     } else {
         false
     };
