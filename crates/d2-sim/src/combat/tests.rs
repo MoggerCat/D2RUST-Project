@@ -36,6 +36,7 @@ fn world() -> Fake {
 
 // ================================================================ pct
 
+// Covers: specs/combat/damage.md §0 r1, §0 r2, §0 r3, §0 r4, §edge-cases-original-bugs r1
 #[test]
 fn pct_vectors() {
     assert_eq!(pct(0x20_0000, 50, 100), 1_048_550);
@@ -52,6 +53,7 @@ fn pct_vectors() {
 
 // ================================================================ hit.md
 
+// Covers: specs/combat/hit.md §3.3
 #[test]
 fn hit_chance_vectors() {
     let c = |ar, pct_ar, def, alvl, dlvl| {
@@ -73,6 +75,7 @@ fn hit_chance_vectors() {
     assert_eq!(c(100, 50, 150, 1, 9), 10);
 }
 
+// Covers: specs/combat/hit.md §edge-cases-original-bugs r2
 #[test]
 #[should_panic(expected = "alvl + dlvl = 0")]
 fn hit_chance_zero_levels_is_fatal() {
@@ -85,6 +88,7 @@ fn hit_chance_zero_levels_is_fatal() {
     });
 }
 
+// Covers: specs/combat/hit.md §2 r1, §2 r2, §2 r4, §2 r5
 #[test]
 fn defense_vectors() {
     let mut f = world();
@@ -107,6 +111,7 @@ fn defense_vectors() {
     assert_eq!(defense(&mut f, &s, u), 112 + 112);
 }
 
+// Covers: specs/combat/hit.md §2 r3
 #[test]
 fn defense_holy_shield() {
     let mut r = skill_rec();
@@ -124,6 +129,7 @@ fn defense_holy_shield() {
     assert_eq!(defense(&mut f, &s, u), 200);
 }
 
+// Covers: specs/combat/hit.md §1
 #[test]
 fn attack_rating_player() {
     let mut f = world();
@@ -132,6 +138,7 @@ fn attack_rating_player() {
     assert_eq!(attack_rating(&f, &ct(), u), 220);
 }
 
+// Covers: specs/combat/hit.md §1
 #[test]
 #[should_panic(expected = "non-player")]
 fn attack_rating_monster_is_fatal() {
@@ -147,6 +154,7 @@ fn duel(f: &mut Fake) -> (usize, usize) {
     (a, d)
 }
 
+// Covers: specs/combat/hit.md §3 text, §3.2 text, §3.4, §edge-cases-original-bugs r4
 #[test]
 fn hit_test_draw() {
     let (s, c) = (st(), ct());
@@ -170,6 +178,7 @@ fn hit_test_draw() {
     assert_eq!(f.units[a].seed, before);
 }
 
+// Covers: specs/combat/hit.md §3.1, §3.2 r1, §3.2 r2, §3.2 r4, §3.2 r5
 #[test]
 fn hit_terms_player_adjustments() {
     let (s, c) = (st(), ct());
@@ -213,6 +222,7 @@ fn hit_terms_player_adjustments() {
     assert_eq!((t.ar, t.pct_ar), (112, 11));
 }
 
+// Covers: specs/combat/hit.md §5 r1, §5 r2, §5 r3, §5 r4, §5 l2 r1, §5 l2 r2
 #[test]
 fn block_chance_vectors() {
     let c = ct();
@@ -253,6 +263,7 @@ fn block_chance_vectors() {
     assert_eq!(block_chance(&f, &c2, mo, true), 75);
 }
 
+// Covers: specs/combat/hit.md §6.1 r3, §6.1 r4
 #[test]
 fn block_running_divides_by_three() {
     let c = ct();
@@ -286,6 +297,7 @@ fn block_running_divides_by_three() {
     );
 }
 
+// Covers: specs/combat/hit.md §6.1 r2, §edge-cases-original-bugs r1, §edge-cases-original-bugs r3
 #[test]
 fn block_edge_cases() {
     let c = ct();
@@ -324,6 +336,7 @@ fn block_edge_cases() {
     assert_eq!(f.units[sor].seed, s0);
 }
 
+// Covers: specs/combat/hit.md §6.2 r1, §6.2 r2, §6.4
 #[test]
 fn dodge_avoid_evade_weapon_block() {
     let mut f = world();
@@ -371,6 +384,7 @@ fn dodge_avoid_evade_weapon_block() {
     assert_eq!(f.units[d].seed, s);
 }
 
+// Covers: specs/combat/hit.md §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r7, §6.3, §edge-cases-original-bugs r5, §edge-cases-original-bugs r7
 #[test]
 fn melee_result_flow() {
     let (s, c) = (st(), ct());
@@ -414,6 +428,7 @@ fn melee_result_flow() {
     assert_eq!(melee_result(&mut f, &s, &c, Some(a), Some(d), 0, 0), 0);
 }
 
+// Covers: specs/combat/hit.md §3.5
 #[test]
 fn prevent_heal_on_hit() {
     let (s, c) = (st(), ct());
@@ -432,6 +447,7 @@ fn prevent_heal_on_hit() {
 
 // ================================================================ damage.md
 
+// Covers: specs/combat/damage.md §3.2 r1, §3.2 r4, §3.2 r5, §3.2 r6, §3.2 r7
 #[test]
 fn bonuses_vectors() {
     let s = st();
@@ -467,6 +483,7 @@ fn bonuses_vectors() {
     assert_eq!(v, (26 + seed.roll(26) as i32) / 2);
 }
 
+// Covers: specs/combat/damage.md §3.3
 #[test]
 fn element_vectors() {
     let mut f = world();
@@ -493,6 +510,7 @@ fn fill_case(f: &mut Fake) -> (usize, usize) {
     (a, d)
 }
 
+// Covers: specs/combat/damage.md §3.1 r2, §3.1 r5, §3.1 r10, §3.1 r11, §edge-cases-original-bugs r5
 #[test]
 fn fill_draw_order_plain() {
     let (s, c) = (st(), ct());
@@ -518,6 +536,7 @@ fn fill_draw_order_plain() {
     assert_eq!(f.log, ["event 3 1 0"]);
 }
 
+// Covers: specs/combat/damage.md §3.1 r4
 #[test]
 fn fill_crit_chain() {
     let (s, c) = (st(), ct());
@@ -538,6 +557,7 @@ fn fill_crit_chain() {
     assert_eq!(f.units[a].seed, seed);
 }
 
+// Covers: specs/combat/damage.md §3.1 r6, §3.1 r13, §edge-cases-original-bugs r4
 #[test]
 fn fill_monster_drains_and_crit() {
     let s = st();
@@ -563,6 +583,7 @@ fn fill_monster_drains_and_crit() {
     assert!(!f.log.iter().any(|l| l.starts_with("event")));
 }
 
+// Covers: specs/combat/damage.md §3.1 r7, §3.1 r9, §3.1 r12, §3.2 r2
 #[test]
 fn fill_conversion_and_lengths() {
     let (s, c) = (st(), ct());
@@ -592,6 +613,7 @@ fn fill_conversion_and_lengths() {
     assert_eq!(rec.stun_len, 10);
 }
 
+// Covers: specs/combat/damage.md §4.5 r1, §4.5 r2, §4.5 r3, §4.5 r4, §4.6 r4
 #[test]
 fn resist_vectors() {
     let c = ct();
@@ -653,6 +675,7 @@ fn resist_vectors() {
     assert_eq!(rec.fire, 2_000);
 }
 
+// Covers: specs/combat/damage.md §4.1, §4.4 r2, §4.4 r6, §4.6 r3, §4.6 r5
 #[test]
 fn damage_reduction_and_absorb() {
     let c = ct();
@@ -695,6 +718,7 @@ fn damage_reduction_and_absorb() {
     assert_eq!(rec.physical, 500);
 }
 
+// Covers: specs/combat/damage.md §4.2, §4.4 r1, §4.4 r4, §4.6 r3
 #[test]
 fn damage_percent_and_bypass() {
     let c = ct();
@@ -739,6 +763,7 @@ fn damage_percent_and_bypass() {
     assert_eq!((rec.physical, rec.fire, rec.absorbed), (1_000, 1_000, 0));
 }
 
+// Covers: specs/combat/damage.md §4.4 r3
 #[test]
 fn freeze_and_poison_length_rules() {
     let c = ct();
@@ -764,6 +789,7 @@ fn freeze_and_poison_length_rules() {
     assert_eq!(rec.cold_len, 0);
 }
 
+// Covers: specs/combat/damage.md §5.3 r1, §5.3 r2, §5.3 r3, §5.3 r4, §5.3 r6, §edge-cases-original-bugs r10
 #[test]
 fn leech_vectors() {
     let c = ct();
@@ -827,6 +853,7 @@ fn leech_vectors() {
     assert_eq!(rec.life_leech, 5);
 }
 
+// Covers: specs/combat/damage.md §5.3 r5
 #[test]
 fn leech_monster_rule() {
     let c = ct();
@@ -850,6 +877,7 @@ fn leech_monster_rule() {
     assert_eq!((rec.life_leech, rec.mana_leech), (400, 80));
 }
 
+// Covers: specs/combat/damage.md §5.3 text
 #[test]
 fn heal_and_mana_rules() {
     let mut f = world();
@@ -868,6 +896,7 @@ fn heal_and_mana_rules() {
     assert_eq!(heal(&mut f, u, 5), 0);
 }
 
+// Covers: specs/combat/damage.md §5.5 r1, §5.5 r2
 #[test]
 fn stun_rules() {
     let c = ct();
@@ -896,6 +925,7 @@ fn stun_rules() {
     assert_eq!(f.log[0], "list 2 21 0 1013");
 }
 
+// Covers: specs/combat/damage.md §5.6 r2, §5.6 r3, §5.6 r4, §5.6 r5, §5.6 r6
 #[test]
 fn cold_and_shatter() {
     let c = ct();
@@ -937,6 +967,7 @@ fn cold_and_shatter() {
     assert_eq!(f.units[mo].seed, before);
 }
 
+// Covers: specs/combat/damage.md §5.7
 #[test]
 fn freeze_rules() {
     let mut m = monster_rec();
@@ -968,6 +999,7 @@ fn freeze_rules() {
     assert!(f.log.is_empty());
 }
 
+// Covers: specs/combat/damage.md §5.8
 #[test]
 fn poison_strength_rule() {
     let mut f = world();
@@ -995,6 +1027,7 @@ fn poison_strength_rule() {
     assert!(f.log.is_empty());
 }
 
+// Covers: specs/combat/damage.md §6.2 r2, §6.2 r3, §6.2 r4, §6.2 r6, §edge-cases-original-bugs r8
 #[test]
 fn hit_recovery_vectors() {
     let c = ct();
@@ -1029,6 +1062,7 @@ fn hit_recovery_vectors() {
     assert!(no_get_hit(&mut f, &c.hitclass, u, &rec, 1));
 }
 
+// Covers: specs/combat/damage.md §6.1
 #[test]
 fn element_hit_class_rotation() {
     let rec = DamageRecord {
@@ -1092,6 +1126,7 @@ fn open_wounds_vectors() {
     assert_eq!(open_wounds(&mut f, 6, a, p, 135 << 16), Some(228));
 }
 
+// Covers: specs/combat/damage.md §9 r2
 #[test]
 fn durability_selection() {
     let mut f = world();
@@ -1138,6 +1173,7 @@ fn durability_selection() {
     assert_eq!(f.units[d2].seed, before);
 }
 
+// Covers: specs/combat/damage.md §9 text
 #[test]
 fn durability_hit_chances() {
     let mut f = world();
@@ -1163,6 +1199,7 @@ fn durability_hit_chances() {
     assert_eq!(f.log.len(), 1);
 }
 
+// Covers: specs/combat/damage.md §3 r2, §3 r3, §5.1 r1, §5.1 r7, §5.1 r8, §edge-cases-original-bugs r9
 #[test]
 fn start_combat_and_apply_melee() {
     let (s, c) = (st(), ct());
@@ -1200,6 +1237,7 @@ fn start_combat_and_apply_melee() {
     assert_eq!(f.get(d, 6), 1_000);
 }
 
+// Covers: specs/combat/damage.md §5.2 r1, §5.2 r2, §5.2 r11, §5.2 r14, §5.2 r15
 #[test]
 fn apply_kills_and_town_rule() {
     let c = ct();
