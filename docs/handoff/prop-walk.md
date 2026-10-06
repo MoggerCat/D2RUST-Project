@@ -104,7 +104,35 @@ default case count:
 - `set_foot_mask`, `make_corpse_footprint`, `teleport` (§5.3, §6 r4) have
   no property.
 
-## 5. Gate
+## 5. Port to the `wire-path-sim` walk API
+
+`claude/tender-meitner-mphas3` at `5413b24` (main `5cc2cfb` +
+`render-wire`) reshaped `path::walk` (`docs/handoff/wire-path-sim.md`
+§3–§4). The base is merged into this branch, and `prop_walk.rs` is ported
+with every property kept; `prop_path_core.rs` needed no change.
+
+- One context `World` implements `CollisionRooms` (one room, a
+  `CollisionGrid`), `PathWorld` and `WalkUnits`. The walk code now calls
+  the core's `find_room`, `pattern_collides` and `try_move`, so the room
+  grid is a real `CollisionGrid`. The reference `query` / `free` /
+  `stamp` stay the test's own, written from the spec.
+- Records are `record::DynamicPath`; the target goes through
+  `put_target` / `final_target()`. `set_path_type`, `PathTables::spec()`
+  and `Finder { t, c }` replace the old helpers.
+- The fake no longer sees footprint moves (the core's `try_move` does
+  them), so `movement_stays_free_and_stops` checks each tick's crossings
+  through the path's saved steps (type 7 has flag 0x20000): flag 0x8 is
+  set iff the cell changed; each saved step is 8-adjacent to the one
+  before and free; the unit ends in the last one. A refusal (collided
+  mask ≠ 0) must stop the movement in the same tick (§9.6 r4, edge
+  case 7). Without a refusal the unit still has to stop on the last
+  point.
+- M08 re-run on the new code: the same mutants are caught (footprint
+  move accepted unless 0x1000, A* neighbour skip, storage 120, greedy +1,
+  ray err ≥ 0, floor 20, mode 13 class, footprint not restored). The
+  open-list tie order still survives, as before.
+
+## 6. Gate
 
 `sh tools/gate.sh all` on this branch (2026-10-06, at `eb20a75`):
 **GATE: PASS**. spec_index, methods, coverage `--check` / `--selftest`,

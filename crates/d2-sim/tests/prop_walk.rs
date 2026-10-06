@@ -21,12 +21,15 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use d2_sim::game::Game;
-use d2_sim::path::walk::find::{astar, compute, set_type, Finder};
-use d2_sim::path::walk::geom::centre;
+use d2_sim::drlg::{CollisionGrid, TileRect};
+use d2_sim::path::collision::{find_room, CollisionRooms};
+use d2_sim::path::coords::to_fp16_center;
+use d2_sim::path::record::{flags, DynamicPath, PathPoint};
+use d2_sim::path::walk::find::{astar, compute, Finder};
 use d2_sim::path::walk::request::{handle_message, Outcome};
-use d2_sim::path::walk::seams::{PathInfo, PathWorld, Point, UsedSkill, WalkPath, WalkUnits};
-use d2_sim::path::walk::{PathTables, Step, Walk};
+use d2_sim::path::walk::seams::{PathInfo, PathWorld, Point, UsedSkill, WalkUnits};
+use d2_sim::path::walk::{Step, Walk};
+use d2_sim::path::PathTables;
 use d2_sim::rng::Seed;
 use d2_sim::units::{ClientId, RoomId, UnitId, UnitType};
 use proptest::prelude::*;
@@ -54,17 +57,18 @@ const WALL: u16 = 0x1;
 // ---- the world fake ---------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// The walk context: one room's grid, the path store and the units
+/// (`PathWorld` + `WalkUnits` on one object, as the walk code takes it).
 struct World {
     w: i32,
     h: i32,
-    grid: Vec<u16>,
+    g: CollisionGrid,
     town: bool,
-    paths: BTreeMap<UnitId, WalkPath>,
-    /// Every try move: (old, new, result).
-    moves: Vec<(Point, Point, u16)>,
+    paths: BTreeMap<UnitId, DynamicPath>,
+    units: Units,
 }
 
-fn pattern_cells(pattern: u8) -> Option<&'static [(i32, i32)]> {
+fn pattern_cells(pattern: u32) -> Option<&'static [(i32, i32)]> {
     const POINT: [(i32, i32); 1] = [(0, 0)];
     const PLUS: [(i32, i32); 5] = [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)];
     const BOX: [(i32, i32); 9] = [
@@ -88,16 +92,17 @@ fn pattern_cells(pattern: u8) -> Option<&'static [(i32, i32)]> {
 
 impl World {
     fn new(w: i32, h: i32, walls: &[bool]) -> World {
-        let grid = (0..(w * h) as usize)
-            .map(|i| if walls[i % walls.len()] { WALL } else { 0 })
-            .collect();
+        let mut g = CollisionGrid::new(TileRect::new(OX, OY, w, h));
+        for (i, m) in g.masks.iter_mut().enumerate() {
+            *m = if walls[i % walls.len()] { WALL } else { 0 };
+        }
         World {
             w,
             h,
-            grid,
+            g,
             town: false,
             paths: BTreeMap::new(),
-            moves: Vec::new(),
+            units: player_units(),
         }
     }
 
@@ -112,7 +117,7 @@ impl World {
     /// `path-placement.md` §4 rule 5 pattern query in one room: OR of
     /// masked values, 0x27 unmasked for a cell outside; other patterns
     /// 0xFFFF.
-    fn query(&self, room: Option<RoomId>, at: Point, pattern: u8, mask: u16) -> u16 {
+    fn query(&self, room: Option<RoomId>, at: Point, pattern: u32, mask: u16) -> u16 {
         if room != Some(ROOM) || !self.inside(at) {
             return 0x27;
         }
@@ -122,7 +127,7 @@ impl World {
         cs.iter().fold(0, |a, &(dx, dy)| {
             let c = Point::new(at.x + dx, at.y + dy);
             a | if self.inside(c) {
-                self.grid[self.idx(c)] & mask
+                self.g.masks[self.idx(c)] & mask
             } else {
                 0x27
             }
@@ -130,7 +135,7 @@ impl World {
     }
 
     /// §5.1 pattern stamp / clear with the §3 markers.
-    fn stamp(&mut self, at: Point, pattern: u8, mask: u16, set: bool) {
+    fn stamp(&mut self, at: Point, pattern: u32, mask: u16, set: bool) {
         let Some(cs) = pattern_cells(pattern) else {
             return;
         };
@@ -147,9 +152,9 @@ impl World {
                 if self.inside(c) {
                     let i = self.idx(c);
                     if set {
-                        self.grid[i] |= m;
+                        self.g.masks[i] |= m;
                     } else {
-                        self.grid[i] &= !m;
+                        self.g.masks[i] &= !m;
                     }
                 }
             }
@@ -165,115 +170,80 @@ impl World {
     /// The walls-only view: free iff the pattern at `p` meets no wall and
     /// lies in the room (the unit's own footprint never blocks it: its
     /// bits are outside the move masks once removed, §3 step 6).
-    fn free(&self, p: Point, pattern: u8) -> bool {
+    fn free(&self, p: Point, pattern: u32) -> bool {
         self.query(Some(ROOM), p, pattern, WALL) == 0
     }
 
     fn add_unit(&mut self, unit: UnitId, x: i32, y: i32, player: bool, t: &PathTables) {
         // `path-placement.md` §2.4.
-        let mut p = WalkPath::zeroed(unit);
-        p.size = 2;
-        p.pattern = 1;
-        p.precise_x = centre(x);
-        p.precise_y = centre(y);
-        p.velocity = 0x800;
-        p.room = Some(ROOM);
-        p.saved_count = 1;
-        p.saved_steps[0] = Point::new(x, y);
+        let mut p = DynamicPath {
+            owner: Some(unit),
+            unit_size: 2,
+            pattern: 1,
+            precise_x: to_fp16_center(x),
+            precise_y: to_fp16_center(y),
+            velocity: 0x800,
+            room: Some(ROOM),
+            saved_count: 1,
+            ..DynamicPath::default()
+        };
+        p.saved_steps[0] = PathPoint::from_point(Point::new(x, y));
         if player {
-            p.footprint_mask = 0x80;
+            p.foot_mask = 0x80;
             p.move_mask = 0x1C09;
-            set_type(t, &mut p, UnitType::Player, 7).unwrap();
+            p.set_path_type(t, true, 7).unwrap();
             p.max_distance = 73;
-            p.idastar_score = 70;
+            p.ida_score = 70;
         } else {
-            p.footprint_mask = 0x100;
+            p.foot_mask = 0x100;
             p.move_mask = 0x3C01;
-            set_type(t, &mut p, UnitType::Monster, 2).unwrap();
+            p.set_path_type(t, false, 2).unwrap();
             p.max_distance = 14;
         }
-        self.stamp(Point::new(x, y), p.pattern, p.footprint_mask, true);
+        self.stamp(Point::new(x, y), p.pattern, p.foot_mask, true);
         self.paths.insert(unit, p);
     }
 }
 
+impl CollisionRooms for World {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        (room == ROOM).then_some(self.g.rect)
+    }
+    fn adjacent_count(&self, _room: RoomId) -> usize {
+        0
+    }
+    fn adjacent(&self, _room: RoomId, _i: usize) -> Option<RoomId> {
+        None
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        (room == ROOM).then_some(&self.g)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut CollisionGrid> {
+        (room == ROOM).then_some(&mut self.g)
+    }
+}
+
 impl PathWorld for World {
-    fn load_path(&self, unit: UnitId) -> Option<WalkPath> {
+    fn load_path(&self, unit: UnitId) -> Option<DynamicPath> {
         self.paths.get(&unit).cloned()
     }
-    fn store_path(&mut self, unit: UnitId, path: &WalkPath) {
+    fn store_path(&mut self, unit: UnitId, path: &DynamicPath) {
         self.paths.insert(unit, path.clone());
-    }
-    fn cell_room(&self, room: Option<RoomId>, x: i32, y: i32) -> Option<RoomId> {
-        (room == Some(ROOM) && self.inside(Point::new(x, y))).then_some(ROOM)
-    }
-    fn room_rect(&self, _room: RoomId) -> (i32, i32, i32, i32) {
-        (OX, OY, self.w, self.h)
     }
     fn room_in_town(&self, _room: RoomId) -> bool {
         self.town
-    }
-    fn pattern_collides(
-        &self,
-        room: Option<RoomId>,
-        x: i32,
-        y: i32,
-        pattern: u8,
-        mask: u16,
-    ) -> bool {
-        pattern > 5 || self.query(room, Point::new(x, y), pattern, mask) != 0
     }
     fn remove_footprint(&mut self, unit: UnitId, _force: bool) -> bool {
         let Some(p) = self.paths.get(&unit).cloned() else {
             return false;
         };
-        self.stamp(p.cell(), p.pattern, p.footprint_mask, false);
+        self.stamp(p.cell(), p.pattern, p.foot_mask, false);
         true
     }
     fn add_footprint(&mut self, unit: UnitId) {
         if let Some(p) = self.paths.get(&unit).cloned() {
-            self.stamp(p.cell(), p.pattern, p.footprint_mask, true);
+            self.stamp(p.cell(), p.pattern, p.foot_mask, true);
         }
-    }
-    fn try_move(
-        &mut self,
-        room: Option<RoomId>,
-        old: Point,
-        new: Point,
-        pattern: u8,
-        foot: u16,
-        test: u16,
-    ) -> u16 {
-        // §6 rule 1.
-        self.stamp(old, pattern, foot, false);
-        let r = self.query(room, new, pattern, test);
-        self.stamp(if r != 0 { old } else { new }, pattern, foot, true);
-        self.moves.push((old, new, r));
-        r
-    }
-    fn forced_move(
-        &mut self,
-        room: Option<RoomId>,
-        old: Point,
-        new: Point,
-        pattern: u8,
-        foot: u16,
-    ) {
-        if room.is_some() {
-            self.stamp(old, pattern, foot, false);
-            self.stamp(new, pattern, foot, true);
-        }
-    }
-    fn missile_move(
-        &mut self,
-        _room: Option<RoomId>,
-        _old: Point,
-        _new: Point,
-        _size: i32,
-        _foot: u16,
-        _test: u16,
-    ) -> u16 {
-        unreachable!("no missile here")
     }
     fn room_list_remove(&mut self, _unit: UnitId, _room: RoomId) {}
     fn room_list_insert(&mut self, _unit: UnitId, _room: RoomId) {}
@@ -285,7 +255,7 @@ impl PathWorld for World {
 
 // ---- the unit fake ----------------------------------------------------
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Unit {
     ty: UnitType,
     class: u32,
@@ -322,10 +292,11 @@ impl Unit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Units {
     units: BTreeMap<UnitId, Unit>,
     type1_expire: i32,
+    frame: i32,
     events0: u32,
 }
 
@@ -338,45 +309,49 @@ impl Units {
     }
 }
 
-impl WalkUnits for Units {
+impl WalkUnits for World {
     fn unit_type(&self, unit: UnitId) -> UnitType {
-        self.get(unit).ty
+        self.units.get(unit).ty
     }
     fn class(&self, unit: UnitId) -> u32 {
-        self.get(unit).class
+        self.units.get(unit).class
     }
     fn guid(&self, unit: UnitId) -> u32 {
-        self.get(unit).guid
+        self.units.get(unit).guid
     }
     fn mode(&self, unit: UnitId) -> u32 {
-        self.get(unit).mode
+        self.units.get(unit).mode
     }
     fn find_unit(&self, ty: UnitType, guid: u32) -> Option<UnitId> {
         self.units
+            .units
             .iter()
             .find(|(_, u)| u.ty == ty && u.guid == guid)
             .map(|(&id, _)| id)
     }
     fn position(&self, unit: UnitId) -> Point {
-        self.get(unit).pos
+        self.units.get(unit).pos
     }
     fn unit_size(&self, unit: UnitId) -> i32 {
-        self.get(unit).size
+        self.units.get(unit).size
     }
-    fn first_type1_expire(&self, _game: &Game, _unit: UnitId) -> i32 {
-        self.type1_expire
+    fn frame(&self) -> i32 {
+        self.units.frame
+    }
+    fn first_type1_expire(&self, _unit: UnitId) -> i32 {
+        self.units.type1_expire
     }
     fn has_cursor_item(&self, unit: UnitId) -> bool {
-        self.get(unit).cursor
+        self.units.get(unit).cursor
     }
     fn has_state(&self, unit: UnitId, state: u16) -> bool {
-        self.get(unit).states.contains(&state)
+        self.units.get(unit).states.contains(&state)
     }
     fn state_stat(&self, _unit: UnitId, _state: u16, _stat: u16) -> i32 {
         50
     }
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
-        let u = self.get(unit);
+        let u = self.units.get(unit);
         let base = u.stats.get(&stat).copied().unwrap_or(0);
         if stat == 67 {
             base + u.run_bonus
@@ -385,38 +360,43 @@ impl WalkUnits for Units {
         }
     }
     fn item_stat(&self, unit: UnitId, stat: u16) -> i32 {
-        self.get(unit).item_stats.get(&stat).copied().unwrap_or(0)
+        self.units
+            .get(unit)
+            .item_stats
+            .get(&stat)
+            .copied()
+            .unwrap_or(0)
     }
-    fn add_base_stat(&mut self, _game: &mut Game, unit: UnitId, stat: u16, delta: i32) {
-        *self.get_mut(unit).stats.entry(stat).or_insert(0) += delta;
+    fn add_base_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
+        *self.units.get_mut(unit).stats.entry(stat).or_insert(0) += delta;
     }
-    fn set_base_stat(&mut self, _game: &mut Game, unit: UnitId, stat: u16, value: i32) {
-        self.get_mut(unit).stats.insert(stat, value);
+    fn set_base_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
+        self.units.get_mut(unit).stats.insert(stat, value);
     }
     fn seed(&mut self, unit: UnitId) -> &mut Seed {
-        &mut self.get_mut(unit).seed
+        &mut self.units.get_mut(unit).seed
     }
     fn used_skill(&self, unit: UnitId) -> Option<UsedSkill> {
-        self.get(unit).used_skill
+        self.units.get(unit).used_skill
     }
     fn set_used_skill(&mut self, unit: UnitId, skill: Option<u16>) {
-        let u = self.get_mut(unit);
+        let u = self.units.get_mut(unit);
         u.used_skill = skill.map(|id| UsedSkill {
             id,
             ..UsedSkill::default()
         });
     }
-    fn set_mode(&mut self, _game: &mut Game, unit: UnitId, mode: u32) {
-        let u = self.get_mut(unit);
+    fn set_mode(&mut self, unit: UnitId, mode: u32) {
+        let u = self.units.get_mut(unit);
         u.mode = mode;
         // The run stat list is freed at the next mode set (§8.2).
         u.run_bonus = 0;
     }
-    fn schedule_event0(&mut self, _game: &mut Game, _unit: UnitId) {
-        self.events0 += 1;
+    fn schedule_event0(&mut self, _unit: UnitId) {
+        self.units.events0 += 1;
     }
-    fn attach_run_stats(&mut self, _game: &mut Game, unit: UnitId, value: i32) {
-        self.get_mut(unit).run_bonus = value;
+    fn attach_run_stats(&mut self, unit: UnitId, value: i32) {
+        self.units.get_mut(unit).run_bonus = value;
     }
     fn charstats_velocity(&self, _unit: UnitId) -> (i32, i32, i32) {
         // 1.14d live values (`pathing.md` Constants).
@@ -582,7 +562,7 @@ fn clear_plus(world: &mut World, p: Point) {
         let c = Point::new(p.x + dx, p.y + dy);
         if world.inside(c) {
             let i = world.idx(c);
-            world.grid[i] = 0;
+            world.g.masks[i] = 0;
         }
     }
 }
@@ -593,6 +573,7 @@ fn player_units() -> Units {
     Units {
         units: BTreeMap::from([(P, p)]),
         type1_expire: 0,
+        frame: 0,
         events0: 0,
     }
 }
@@ -603,25 +584,25 @@ fn player_units() -> Units {
 /// property): free points, aligned free runs, the first ray, counts.
 fn check_path(
     world: &World,
-    path: &WalkPath,
+    path: &DynamicPath,
     start: Point,
-    ty: u8,
+    ty: u32,
     n: i32,
 ) -> Result<(), TestCaseError> {
     let pts = path.live_points();
-    prop_assert_eq!(n, path.count);
+    prop_assert_eq!(n, path.point_count as i32);
     prop_assert!((0..=77).contains(&n), "count {}", n);
-    prop_assert_eq!(path.index, 0);
+    prop_assert_eq!(path.cur_point, 0);
     let free = |p: Point| world.free(p, path.pattern);
     if n == 0 {
         return Ok(());
     }
-    let target = path.final_target;
+    let target = path.final_target();
     // §5.1 rule 4 on the (prepared) target: a clear ray is the whole path
     // for toward and straight (§5.2 step 1, §6 step 2).
     let ray = ref_ray(&free, start, target);
     if ty != 1 && ray.is_ok() {
-        prop_assert_eq!(pts, &[target][..]);
+        prop_assert_eq!(&pts[..], &[target][..]);
         return Ok(());
     }
     // Edge case 4: after a minor step with err = 0 the ray does not test
@@ -692,32 +673,31 @@ proptest! {
     #[test]
     fn compute_returns_free_bounded_deterministic_paths(
         (w, h, walls, start, target) in arena(30),
-        ty in prop_oneof![Just(1u8), Just(2u8), Just(7u8)],
+        ty in prop_oneof![Just(1u32), Just(2u32), Just(7u32)],
         velocity in prop_oneof![Just(0i32), Just(0x600), Just(0x800), Just(0x900)],
     ) {
-        let t = PathTables::embedded();
+        let t = PathTables::spec().unwrap();
         let mut world = World::new(w, h, &walls);
         clear_plus(&mut world, start);
         let player = ty != 2;
         world.add_unit(P, start.x, start.y, player, &t);
-        let mut units = player_units();
         if !player {
-            units.get_mut(P).ty = UnitType::Monster;
+            world.units.get_mut(P).ty = UnitType::Monster;
         }
         let mut path = world.paths[&P].clone();
-        set_type(&t, &mut path, if player { UnitType::Player } else { UnitType::Monster }, ty).unwrap();
+        path.set_path_type(&t, player, ty).unwrap();
         path.velocity = velocity;
-        path.target = target;
-        let before = world.grid.clone();
+        path.put_target(target);
+        let before = world.g.clone();
 
-        let (mut w2, mut u2, mut p2) = (world.clone(), units.clone(), path.clone());
-        let n = compute(&t, &mut world, &mut units, &mut path, P, false).unwrap();
-        prop_assert_eq!(&world.grid, &before, "§3 steps 6 and 9 restore the footprint");
+        let (mut w2, mut p2) = (world.clone(), path.clone());
+        let n = compute(&t, &mut world, &mut path, P, false).unwrap();
+        prop_assert_eq!(&world.g, &before, "§3 steps 6 and 9 restore the footprint");
         if velocity != 0 || ty == 1 {
             check_path(&world, &path, start, ty, n)?;
         }
         // Determinism: a second run on copies gives the same record.
-        let n2 = compute(&t, &mut w2, &mut u2, &mut p2, P, false).unwrap();
+        let n2 = compute(&t, &mut w2, &mut p2, P, false).unwrap();
         prop_assert_eq!(n, n2);
         prop_assert_eq!(&path, &p2);
         prop_assert_eq!(&world, &w2);
@@ -727,18 +707,17 @@ proptest! {
     #[test]
     fn astar_reaches_iff_bfs_does(
         (w, h, walls, start, target) in arena(22),
-        pattern in prop_oneof![Just(0u8), Just(1u8), Just(2u8)],
+        pattern in prop_oneof![Just(0u32), Just(1u32), Just(2u32)],
     ) {
-        let t = PathTables::embedded();
+        let t = PathTables::spec().unwrap();
         let mut world = World::new(w, h, &walls);
         clear_plus(&mut world, start);
-        let mut units = player_units();
-        let mut path = WalkPath::zeroed(P);
+        let mut path = DynamicPath { owner: Some(P), ..DynamicPath::default() };
         let info = PathInfo {
             start,
             target,
             start_room: Some(ROOM),
-            target_room: world.cell_room(Some(ROOM), target.x, target.y),
+            target_room: find_room(&world, Some(ROOM), target.x, target.y),
             slack: 1,
             max_distance: 73,
             idastar_score: 70,
@@ -747,14 +726,16 @@ proptest! {
             pattern,
             move_mask: 0x1C09,
         };
-        let f = Finder { t: &t, w: &world, u: &mut units, owner_ty: UnitType::Player };
-        let n = astar(&f, &mut path, &info).unwrap();
+        let reference = world.clone();
+        let mut f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
+        let n = astar(&mut f, &mut path, &info).unwrap();
+        let world = reference;
         prop_assert!((0..=77).contains(&n));
-        let pts = &path.points[..n as usize];
+        let pts: Vec<Point> = path.points[..n as usize].iter().map(|p| p.point()).collect();
         let free = |p: Point| world.free(p, pattern);
         // §7 rule 6: corners of 8-direction runs of free cells from the start.
         let mut from = start;
-        for &p in pts {
+        for &p in &pts {
             let cells = run_cells(from, p);
             prop_assert!(cells.is_some(), "{:?} → {:?}", from, p);
             for c in cells.unwrap() {
@@ -790,7 +771,7 @@ fn serpentine(w: i32, h: i32) -> World {
         for x in 0..w {
             if x != gap {
                 let i = (y * w + x) as usize;
-                world.grid[i] = WALL;
+                world.g.masks[i] = WALL;
             }
         }
     }
@@ -807,7 +788,7 @@ proptest! {
         (w, h) in (3i32..30).prop_flat_map(|w| (Just(w), 3i32..(400 / w).clamp(4, 30))),
         flip in any::<bool>(),
     ) {
-        let world = serpentine(w, h);
+        let mut world = serpentine(w, h);
         let cells: Vec<Point> = (0..h)
             .flat_map(|y| (0..w).map(move |x| Point::new(OX + x, OY + y)))
             .filter(|&p| world.free(p, 0))
@@ -832,9 +813,8 @@ proptest! {
             std::mem::swap(&mut start, &mut target);
         }
         prop_assume!(world.free(start, 0) && world.free(target, 0));
-        let t = PathTables::embedded();
-        let mut units = player_units();
-        let mut path = WalkPath::zeroed(P);
+        let t = PathTables::spec().unwrap();
+        let mut path = DynamicPath { owner: Some(P), ..DynamicPath::default() };
         let info = PathInfo {
             start,
             target,
@@ -848,13 +828,13 @@ proptest! {
             pattern: 0,
             move_mask: 0x1C09,
         };
-        let f = Finder { t: &t, w: &world, u: &mut units, owner_ty: UnitType::Player };
-        let n = astar(&f, &mut path, &info).unwrap();
+        let mut f = Finder { t: &t, c: &mut world, owner_ty: UnitType::Player };
+        let n = astar(&mut f, &mut path, &info).unwrap();
         let (reach, comp) = bfs(&|p| world.free(p, 0), start, target, 10_000);
         prop_assert!(reach && comp <= 200);
         // Corners: two per row change, within the 77 outputs while h ≤ 30.
         prop_assert!(n > 0, "no path on a {}×{} corridor of {} cells", w, h, comp);
-        prop_assert_eq!(path.points[n as usize - 1], target);
+        prop_assert_eq!(path.point(n as usize - 1), target);
     }
 }
 
@@ -871,20 +851,19 @@ proptest! {
         dx in prop_oneof![-60i32..=-20, 20i32..=60],
         dy in -16i32..16,
     ) {
-        let t = PathTables::embedded();
+        let t = PathTables::spec().unwrap();
         let mut world = World::new(130, 40, &[false]);
         let start = Point::new(OX + 65, OY + 20);
         world.add_unit(P, start.x, start.y, false, &t);
-        let mut units = player_units();
-        units.get_mut(P).ty = UnitType::Monster;
+        world.units.get_mut(P).ty = UnitType::Monster;
         let mut path = world.paths[&P].clone();
         path.velocity = 0;
-        path.target = Point::new(start.x + dx, start.y + dy);
-        let n = compute(&t, &mut world, &mut units, &mut path, P, false).unwrap();
+        path.put_target(Point::new(start.x + dx, start.y + dy));
+        let n = compute(&t, &mut world, &mut path, P, false).unwrap();
         prop_assert!(n > 0);
         let mut from = start;
         let mut steps = 0;
-        for &p in path.live_points() {
+        for p in path.live_points() {
             let cells = run_cells(from, p);
             prop_assert!(cells.is_some());
             steps += cells.unwrap().len() as i32;
@@ -909,50 +888,75 @@ proptest! {
         stat96 in prop_oneof![Just(0i32), 1i32..200],
         town in any::<bool>(),
     ) {
-        let t = PathTables::embedded();
+        let t = PathTables::spec().unwrap();
         let mut world = World::new(w, h, &walls);
         world.town = town;
         clear_plus(&mut world, start);
         world.add_unit(P, start.x, start.y, true, &t);
-        let mut units = player_units();
         {
-            let p = units.get_mut(P);
+            let p = world.units.get_mut(P);
             p.stats.insert(10, stamina);
             p.stats.insert(67, stat67);
             p.item_stats.insert(96, stat96);
         }
-        let mut game = Game::new();
         let id = if run { 0x03 } else { 0x01 };
-        let (r, o) = handle_message(&t, &mut world, &mut units, &mut game, P, id, target.x as u32, target.y as u32).unwrap();
+        let (r, o) = handle_message(&t, &mut world, P, id, target.x as u32, target.y as u32).unwrap();
         prop_assert_eq!(r, 0);
         let Some(Outcome::Moving(n)) = o else {
             // Neutral (no path): mode 1 or 5 (§1.5 step 5).
             prop_assert_eq!(o, Some(Outcome::Neutral));
-            prop_assert_eq!(units.get(P).mode, if town { 5 } else { 1 });
+            prop_assert_eq!(world.units.get(P).mode, if town { 5 } else { 1 });
             return Ok(());
         };
         prop_assert!(n > 0);
         // §1.5 step 2 mode, §8.1 / §8.2 velocity.
         let mode = if run && stamina > 0 { 3 } else if town { 6 } else { 2 };
-        prop_assert_eq!(units.get(P).mode, mode);
+        prop_assert_eq!(world.units.get(P).mode, mode);
         let f = if stat96 != 0 { 150 * stat96 / (150 + stat96) } else { 0 };
         let p = (f + stat67 + if mode == 3 { 100 * 9 / 6 - 100 } else { 0 }).max(25);
         let v = 6 * 256 * p / 100;
         let path0 = world.paths[&P].clone();
         prop_assert_eq!(path0.velocity, v);
-        let last = path0.points[(path0.count - 1) as usize];
+        let last = path0.point(path0.point_count as usize - 1);
 
         let mut stopped = false;
+        let mut refused = false;
+        let mut prev = start;
         for _tick in 0..2000 {
-            let s = Walk { t: &t, w: &mut world, u: &mut units }.player_event0(&mut game, P).unwrap();
+            let s = Walk { t: &t, c: &mut world }.player_event0(P).unwrap();
             let path = &world.paths[&P];
             // Integer ranges (§8.3, §8.4, §8.5).
-            prop_assert!(path.dir_vec.0.abs() <= 4096 && path.dir_vec.1.abs() <= 4096, "{:?}", path.dir_vec);
+            prop_assert!(path.dir_vec_x.abs() <= 4096 && path.dir_vec_y.abs() <= 4096, "{:?}", (path.dir_vec_x, path.dir_vec_y));
             prop_assert!(path.direction < 64 && path.new_direction < 64);
             prop_assert!(path.velocity == v || path.velocity == 0, "velocity {}", path.velocity);
             let bound = 16 * path.velocity.abs();
-            prop_assert!(path.vel_vec.0.abs() <= bound && path.vel_vec.1.abs() <= bound, "{:?}", path.vel_vec);
+            prop_assert!(path.vel_vec_x.abs() <= bound && path.vel_vec_y.abs() <= bound, "{:?}", (path.vel_vec_x, path.vel_vec_y));
             prop_assert!(world.free(path.cell(), path.pattern), "unit at blocked {:?}", path.cell());
+            // §9.6 rules 5–6 through the saved steps (type 7 has flag
+            // 0x20000): each accepted footprint move crosses one cell into
+            // a free cell, and the unit ends in the last one; flag 0x8 iff
+            // a cell was crossed.
+            let cell = path.cell();
+            let crossed = path.flags & flags::MOVED != 0;
+            prop_assert_eq!(crossed, cell != prev, "flag 0x8 vs {:?} → {:?}", prev, cell);
+            if crossed {
+                let steps: Vec<Point> = path.saved_steps[..path.saved_count as usize].iter().map(|p| p.point()).collect();
+                prop_assert!(!steps.is_empty());
+                let mut c = prev;
+                for &n in &steps {
+                    prop_assert!((n.x - c.x).abs() <= 1 && (n.y - c.y).abs() <= 1 && n != c, "{:?} → {:?}", c, n);
+                    prop_assert!(world.free(n, 1), "entered blocked {:?}", n);
+                    c = n;
+                }
+                prop_assert_eq!(c, cell);
+            }
+            // A refused move (collided mask ≠ 0) ends the movement in the
+            // same tick (§9.6 rule 4, edge case 7).
+            if path.collided_mask != 0 {
+                refused = true;
+                prop_assert_eq!(s, Step::Stopped, "refused but still moving");
+            }
+            prev = cell;
             if s == Step::Stopped {
                 stopped = true;
                 break;
@@ -963,16 +967,8 @@ proptest! {
         // §9.7 / §9.6 rule 4: at rest on a cell centre.
         prop_assert_eq!(path.precise_x & 0xFFFF, 0x8000);
         prop_assert_eq!(path.precise_y & 0xFFFF, 0x8000);
-        prop_assert_eq!((path.count, path.index), (0, 0));
-        // §9.6 rules 5–6: each accepted move crosses one cell into a free
-        // cell; a refused one met a blocked cell.
-        let mut refused = false;
-        for &(old, new, r) in &world.moves {
-            prop_assert!((new.x - old.x).abs() <= 1 && (new.y - old.y).abs() <= 1 && old != new);
-            prop_assert_eq!(r == 0, world.free(new, 1), "move {:?} → {:?} result {:#x}", old, new, r);
-            refused |= r != 0;
-        }
-        let exhausted = mode == 3 && units.get(P).stats[&10] == 0;
+        prop_assert_eq!((path.point_count, path.cur_point), (0, 0));
+        let exhausted = mode == 3 && world.units.get(P).stats[&10] == 0;
         if !refused && !exhausted {
             // §9.5 / edge case 6: it stops on the last point.
             prop_assert_eq!(path.cell(), last);
@@ -981,7 +977,7 @@ proptest! {
         let mut expect = World::new(w, h, &walls);
         clear_plus(&mut expect, start);
         expect.stamp(path.cell(), 1, 0x80, true);
-        prop_assert_eq!(&world.grid, &expect.grid);
+        prop_assert_eq!(&world.g, &expect.g);
     }
 }
 
@@ -1049,14 +1045,13 @@ proptest! {
         town in any::<bool>(),
         ticks in 0usize..40,
     ) {
-        let t = PathTables::embedded();
+        let t = PathTables::spec().unwrap();
         let mut world = World::new(w, h, &walls);
         world.town = town;
         clear_plus(&mut world, start);
         world.add_unit(P, start.x, start.y, true, &t);
-        let mut units = player_units();
         {
-            let p = units.get_mut(P);
+            let p = world.units.get_mut(P);
             p.mode = mode;
             p.class = class;
             p.cursor = cursor;
@@ -1068,19 +1063,18 @@ proptest! {
         tu.pos = Point::new(OX + target.2, OY + target.3);
         tu.mode = target.4;
         tu.size = target.5;
-        units.units.insert(T, tu);
-        units.type1_expire = expire;
-        let mut game = Game::new();
-        game.frame = frame;
+        world.units.units.insert(T, tu);
+        world.units.type1_expire = expire;
+        world.units.frame = frame;
         let (a, b) = match (matches!(id, 0x02 | 0x04), aim) {
             (true, true) => (target.0, target.1),
             (true, false) => ab,
             (false, true) => (near.x as u32, near.y as u32),
             (false, false) => (xy.0 as u32, xy.1 as u32),
         };
-        let seed0 = units.get(P).seed;
-        let before = units.get(P).clone();
-        let (r, o) = handle_message(&t, &mut world, &mut units, &mut game, P, id, a, b).unwrap();
+        let seed0 = world.units.get(P).seed;
+        let before = world.units.get(P).clone();
+        let (r, o) = handle_message(&t, &mut world, P, id, a, b).unwrap();
         prop_assert_eq!(r, 0);
         if !(1..=4).contains(&id) {
             prop_assert_eq!(o, None);
@@ -1089,33 +1083,33 @@ proptest! {
         let o = o.unwrap();
         let m = if id >= 3 { 3 } else { 2 };
         let found = !matches!(id, 0x02 | 0x04)
-            || (a < 6 && units.find_unit(UnitType::ALL[a as usize], b).is_some());
+            || (a < 6 && world.find_unit(UnitType::ALL[a as usize], b).is_some());
         match o {
             Outcome::NoTargetUnit => prop_assert!(!found),
             Outcome::ModeRefused => prop_assert!(!ref_mode_check(&before, frame, expire, m)),
             Outcome::InterruptRefused => prop_assert!(ref_mode_check(&before, frame, expire, m)),
             Outcome::Moving(n) => {
                 prop_assert!(n > 0 && n <= 77);
-                prop_assert!(matches!(units.get(P).mode, 2 | 3 | 6));
+                prop_assert!(matches!(world.units.get(P).mode, 2 | 3 | 6));
             }
-            Outcome::Neutral => prop_assert!(matches!(units.get(P).mode, 1 | 5)),
+            Outcome::Neutral => prop_assert!(matches!(world.units.get(P).mode, 1 | 5)),
             Outcome::KnockbackIgnored | Outcome::OtherMode => prop_assert!(false, "{:?} for mode {}", o, m),
         }
         if found && !matches!(o, Outcome::ModeRefused) {
             prop_assert!(ref_mode_check(&before, frame, expire, m));
         }
         // Randomness 2: the only draw needs state 42 and an interrupt skill.
-        if units.get(P).seed != seed0 {
+        if world.units.get(P).seed != seed0 {
             prop_assert!(before.states.contains(&42) && before.used_skill.is_some_and(|s| s.interrupt));
         }
         // Then a few ticks of event 0 on whatever was started.
         for _ in 0..ticks {
-            if !matches!(units.get(P).mode, 2 | 3 | 6) {
+            if !matches!(world.units.get(P).mode, 2 | 3 | 6) {
                 break;
             }
-            let s = Walk { t: &t, w: &mut world, u: &mut units }.player_event0(&mut game, P).unwrap();
+            let s = Walk { t: &t, c: &mut world }.player_event0(P).unwrap();
             if s == Step::Stopped {
-                prop_assert!(matches!(units.get(P).mode, 1 | 5));
+                prop_assert!(matches!(world.units.get(P).mode, 1 | 5));
                 break;
             }
         }
@@ -1127,7 +1121,7 @@ fn dump(w: &World) -> String {
     for y in (0..w.h).rev() {
         s += &format!("{:3} ", OY + y);
         for x in 0..w.w {
-            s.push(if w.grid[(y * w.w + x) as usize] & 1 != 0 {
+            s.push(if w.g.masks[(y * w.w + x) as usize] & 1 != 0 {
                 '#'
             } else {
                 '.'
