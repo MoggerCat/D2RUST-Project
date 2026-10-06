@@ -15,7 +15,8 @@ rather than restating them.
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
 | 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) done: `tick.md` / `unit-order.md` `conformance-passing`; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `cargo test -p conformance --test tick_replay`: `traces/sim/tick/sim-0006..0008` (11,105 ticks, 65,754 inputs) replay through `d2_sim::tick::tick` with all 48,316 timer runs in order and all 446 list snapshots equal, 0 mismatches; 4 perturbation tests reported at exactly the changed record. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
 | 4 Conformance | recording proven feasible; coverage report tool done (claims seeded in rng, d2-data, d2-formats) | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly; `py tools/coverage.py --summary` (numbers in §2 step 5) |
-| 5–6 | not started | |
+| 5 Local server + bridge | in progress: bridge design `specs/client/bridge.md` (d2rs-own) and skeleton `d2-client::bridge` (branch `claude/phase5-bridge`): receive split + dispatch by id, intent send path, `ClientWorld`, Bevy mirror; every S→C id unowned (`specs/client/bridge-dispatch.tsv` all `TBD`); server reached through the `ServerLink` trait (no `d2-server` dependency yet) | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, incl. the dispatch TSV check and its perturbation test, and a windowless Bevy `App` mirror test |
+| 6 | not started | |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
@@ -90,6 +91,30 @@ rather than restating them.
    after that: `intents-events.md`, `tick.md`, `unit-order.md`,
    `calc-expressions.md`, `loading.md`.
 
+5. **Bridge ↔ `d2-server` adapter** (implementation, after step 4's
+   wiring merges): add `d2-server` to `d2-client`'s dependencies and
+   implement `d2_client::bridge::link::ServerLink` for the wired host
+   (`specs/client/bridge.md` §3 rule 1): `send(Game|System, b)` →
+   `Host::send_game` (`None` → `Sent::Filtered`) / `Host::send_system`
+   (a classifier refusal is a link error: the bridge already refused
+   those, §4 rule 3); `pump()` → `Host::frame()` (`ticked`); `receive()`
+   → `Host::receive(LOCAL_CLIENT)` (each returned message is one chunk);
+   `protocol_version()` → `d2_proto::PROTOCOL_VERSION`; errors boxed
+   into `LinkError::Server`. Needed from `d2-server` (not edited here):
+   a constructor for a wired single-player host (real `MessageSizes`,
+   `Intents`/`Tick` adapter, a `SessionHandler`, `SystemClock`) that
+   `connect`s client 0, and `Host` + its parts being `Send + Sync`
+   (the Bevy resource holds `Box<dyn ServerLink + Send + Sync>`). Then
+   an end-to-end test: a `Walk` sent through the bridge is drained and
+   handled by the host. A test can use `Dispatch::set` for synthetic
+   handlers; real handlers come with the client-model specs (next).
+6. **Client-model specs** (spec writing, local, high): what each S→C id
+   means for the client (unit add/remove, positions, stats, ...); each
+   spec sets its path as `owner` in `specs/client/bridge-dispatch.tsv`
+   and registers handlers in `bridge::dispatch::HANDLERS` (the test
+   `dispatch_table_matches_spec` enforces both). `bridge.md` open
+   questions 2–5 go to them.
+
 ## 3. Code map
 
 | Path | What | Spec |
@@ -127,7 +152,8 @@ rather than restating them.
 | `crates/d2-server/src/buffers.rs` | per-client 0x200-byte buffers, local delivery split, receive lists | `sim/intents-events.md` §3 |
 | `crates/d2-server/src/host.rs` | tick driver, `Host::frame` (drain → tick → flush), flush, injectable `Clock` | `sim/tick.md` §1, §8; `sim/intents-events.md` §1 |
 | `crates/d2-server/src/tests/` | vectors; `fakes.rs`: TSV-driven size fake, fake game; `adapters.rs`: the adapters, fake agreement, end-to-end host frame | |
-| `d2-proto`, `d2-net`, `d2-verify` | stubs | |
+| `crates/d2-client/src/bridge/` | client↔game boundary: `link` (`ServerLink` trait, `SendQueue`, `Pumped`), `intent` (encode + classifier routing), `receive` (split, dispatch, `ReceiveLog`), `dispatch` (TSV table, `HANDLERS`, `check`), `world` (`ClientWorld`, `UnitKey`, `addressed_unit`), `mirror` (Bevy `BridgePlugin`, `BridgeResource`, `UnitView`), `mod.rs` (`Bridge`: `send`, `send_bytes`, `frame`); tests in `tests.rs` | `client/bridge.md`, `client/bridge-dispatch.tsv` |
+| `d2-net`, `d2-verify` | stubs | |
 | `tools/mpq-tool` | info, list, extract, check, formats, render | |
 | `tools/data-tool` | `tables`: the Phase 2 cross-check; `links`: broken links in the live set; `gen-tables`: regenerate typed structs; `gen-proto`: regenerate `d2-proto`'s message tables from the TSVs; `dump-compare`: fix-ups vs a 1.14d memory dump; `patch check/render/diff`: mod stacks | `data/field-types.md` §6.7, `data/fixups.md`, `data/runtime-maps.md`, `data/patch-layers.md` §10 |
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows); `dump_tables.py`: the excel tables and runtime maps in 1.14d memory after the load; `record_tick.py` + `check_tick.py`: server tick, timer events, unit lists; `record_packets.py` + `check_packets.py`: client↔server messages | `sim/rng.md`, `traces/FORMAT.md`, `data/runtime-maps.md`, `sim/tick.md`, `sim/unit-order.md`, `sim/intents-events.md` |
@@ -281,7 +307,7 @@ These are on `claude/phase3-units` until merged. Treasure classes and
 drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
 `treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
-`specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
+`specs/sim/rng.md`. Client↔game boundary: `specs/client/bridge.md`. Each spec's "Open questions" holds its unknowns.
 Carried-over open questions not yet in a spec's list:
 
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue

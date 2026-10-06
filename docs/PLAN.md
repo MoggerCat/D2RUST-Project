@@ -46,6 +46,7 @@ behaviors the engine reproduces exactly.
 | Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 | Tick trace replay (2026-10-06) | `conformance::tick` runs `d2_sim::tick::tick` once per recorded tick; hooks apply each step's recorded inputs, the dispatch compares every run and applies the recorded handler's work; d2-sim's own work (step 6 clears, step 9 deactivation, freeing timers after their run) is produced, not replayed | The recording logs list primitives, d2-sim's API is coarser: each recorded primitive starts a d2-sim operation and the primitives it performs next must follow in the recording ("owed"). Unit allocation is split from `SUNIT_Add` in `d2-sim` (`alloc_unit`, `add_allocated`), as the spec has it, because a missile's init schedules a timer before the missile is listed. |
+| Client↔game bridge (2026-10-06) | `specs/client/bridge.md` (d2rs design): the bridge carries the 1.14d message bytes both ways; S→C chunks are split with `d2-proto` and dispatched by id into a plain-Rust `ClientWorld`; ids without an owner spec (`specs/client/bridge-dispatch.tsv`, all `TBD` today) are counted, never interpreted; Bevy entities only mirror the model | Server reached through a narrow `ServerLink` trait in `d2-client` (send / pump / receive / protocol version) until `d2-server` is wired; one bridge frame per Bevy frame in `PreUpdate` = the 1.14d client frame (pump: drain → tick → flush, then receive), input later in the frame, so intents of frame k are drained at k+1. No interpolation or prediction in the bridge (supersedes the ARCHITECTURE line): between-tick views are original client behavior, owned by Phase 6 specs. The link must report `d2_proto::PROTOCOL_VERSION`; the bridge persists nothing. Chunks 1.14d asserts on (message > 0x204 or past the chunk end) stop the frame with an error. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 | Spec rule coverage (2026-10-06) | Rule IDs read from spec headings and numbered lists (`§5.2 r4`); tests claim them with `// Covers:` comments; `tools/coverage.py` (Python, like `spec_index.py`) reports unit / game-file / trace coverage per spec; only game-file and trace count as verified | `docs/COVERAGE.md`. Comments over a TSV map: one owner per claim, no sync check needed. `--check` in CI fails on dangling claims, never on low coverage. Rows of spec TSVs are not counted yet. |
 
@@ -203,10 +204,16 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 - [ ] Coverage report (the "99.x%" number). *Tool and claim scheme done 2026-10-06 (`docs/COVERAGE.md`, `py tools/coverage.py`, `--check` in CI); claims seeded in d2-sim rng, d2-data, d2-formats. Open: claims in conformance, d2-server, d2-sim tick, d2-proto, d2-client and the trace checkers; then the number is meaningful.*
 
 ### Phase 5 — Local server + bridge
-- [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); d2rs session/snapshot messages for the bridge still to come.*
+- [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); the bridge carries these 1.14d messages unchanged and needs no d2rs-own message so far (`specs/client/bridge.md` §1 rule 4).*
 - [ ] In-process server running `d2-sim`
-- [ ] `d2-client::bridge`: snapshots → Bevy entities, input → intents,
-      tick interpolation
+- [ ] `d2-client::bridge`: S→C messages → client world model → Bevy
+      mirror entities, input → intents. *Design `specs/client/bridge.md`
+      and skeleton done 2026-10-06 (branch `claude/phase5-bridge`):
+      receive split + dispatch by id (all ids unowned until client-model
+      specs exist), intent send path, `ClientWorld`, `BridgePlugin`
+      mirror; synthetic vectors pass. `ServerLink` adapter over the
+      `d2-server` host waits for its wiring. No tick interpolation
+      (decisions log).*
 **Exit:** walk around Act 1 town via the local server.
 
 ### Phase 6 — Full client
