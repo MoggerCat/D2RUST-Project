@@ -473,6 +473,8 @@ class ScenarioRecorder(rp.PacketRecorder):
             self.add_role(addr, "pkt")
         for addr, want in ((INJECT_POINT, INJECT_BYTES), (SEED_TIME, SEED_TIME_BYTES),
                            (SEED_INIT, SEED_INIT_BYTES), (TICK_RETURN, bytes.fromhex("8b7618"))):
+            if addr in needed:
+                continue   # hooked and checked by the loop above (the INT3 now sits there)
             if self.read(addr, len(want)) != want:
                 raise RuntimeError(f"unexpected code at {addr:#x}: not the 1.14d Game.exe?")
             self.add_role(addr, "pkt")
