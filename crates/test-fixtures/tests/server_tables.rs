@@ -36,7 +36,9 @@ struct Loaded {
 fn loaded() -> &'static Loaded {
     static L: OnceLock<Loaded> = OnceLock::new();
     L.get_or_init(|| {
-        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("synthetic-server");
+        // One directory per test process (nextest runs each test in its own).
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("synthetic-server-{}", std::process::id()));
         let i = install::build(&dir, &synth::synthetic()).unwrap_or_else(|e| panic!("{e}"));
         let anim = fixup::read_animdata(&i.archives).unwrap();
         let fixed = fixup::apply(&i.loaded, &anim).unwrap();
