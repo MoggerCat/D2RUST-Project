@@ -116,8 +116,6 @@ use (see the queue below).
 ## Gate
 
 `sh tools/gate.sh --no-client` passes (fmt, clippy -D warnings, tests: 1876 + 607 run, all pass; coverage --check, depcheck). `d2-client` is not touched and does not use `writer::Method`; the client half of the gate was not run (Bevy build, disk).
-coverage --check, depcheck. Results are in the session summary. No
-`d2-client` change.
 
 ## Local run queue (for the coordinator to fold into HANDOFF §5)
 
