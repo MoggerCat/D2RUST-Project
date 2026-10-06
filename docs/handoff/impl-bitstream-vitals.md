@@ -197,5 +197,5 @@ files this session touched:
   app frame loop, every e2e, the bridge properties); owner:
   `impl-client-model`.
 
-This branch's own tests all pass (d2-sim 2,754 of 2,809 in the three
-crates' run; d2-server and d2-proto clean).
+This branch's own tests all pass (2,754 of 2,809 pass in the d2-sim +
+conformance + d2-client run, the 55 above failing; d2-server and d2-proto clean).
