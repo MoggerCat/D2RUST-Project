@@ -235,7 +235,9 @@ impl HirelingRest for Rest {
     fn queue_room_removal(&mut self, _: UnitId) {}
     fn death_event(&mut self, _: UnitId) {}
     fn dismiss(&mut self, _: UnitId) {}
-    fn warp_to(&mut self, _: UnitId, _: UnitId) {}
+    fn warp_to(&mut self, pet: UnitId, player: UnitId) {
+        self.log.push(format!("warp {} {}", pet.0, player.0));
+    }
     fn level_events(&mut self, _: UnitId, _: UnitId) {}
     fn reapply_item_stats(&mut self, _: UnitId) {}
 }

@@ -263,7 +263,7 @@ mod tests {
         bad
     }
 
-    // Covers: specs/world/object-functions.tsv; specs/world/quests-act2.md §1.5
+    // Covers: specs/world/quests-act2.md §1.5
     #[test]
     fn stated_functions_match_the_table() {
         assert_eq!(check(init_fn, operate_fn), Vec::<String>::new());

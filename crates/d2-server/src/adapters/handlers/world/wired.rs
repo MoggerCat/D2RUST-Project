@@ -53,6 +53,7 @@ use d2_sim::wiring::economy::{
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
 };
+use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::QuestControl;
 use d2_sim::world::vendors::{GlobalLists, VendorTables};
@@ -279,6 +280,39 @@ fn quest_objects<X: Pending, R: TradeRest>(
     }
 }
 
+impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The pet follows `0x005754B0` the placements queued
+    /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
+    /// from the first frame): `hirelings.md` §6 rule 1 on the hireling
+    /// list ([`life::follow`]; the other pet types have no list in
+    /// `d2-sim` yet, `sim/pets.md`). A game without hireling tables has
+    /// no hireling: the queue is dropped.
+    ///
+    /// TODO(path-placement.md §10 r6): in 1.14d the follow runs inside the
+    /// placement; here it runs when the handler or tick that placed the
+    /// player returns (the hireling state is the host's).
+    pub fn pet_follows<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let q = events
+            .action()
+            .sys
+            .hooks
+            .pet_follows
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        if q.is_empty() || self.state.hireling_tables.is_none() {
+            return;
+        }
+        self.desk(game, events, |desk, _, _| {
+            desk.with_hirelings(|w, t, st| {
+                for p in q {
+                    life::follow(w, t, st, p);
+                }
+            })
+        });
+    }
+}
+
 /// The parts of a [`WiredWorld`] beside the economy, borrowed for one
 /// [`WiredWorld::with_economy`] call.
 pub struct Parts<'p, R> {
@@ -450,7 +484,9 @@ where
             rest: &mut self.rest,
             difficulty,
         };
-        WorldHost::<D>::waypoints(&mut self.action, game, events, run)
+        let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        self.pet_follows(game, events);
+        out
     }
 
     /// The action wiring's 0x13 object case ([`ActionWorld`]); a quest
@@ -473,6 +509,7 @@ where
     /// ([`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        self.pet_follows(game, events);
     }
 
     /// The quest control on the desk's economy and rest
@@ -519,12 +556,32 @@ where
         Some(out)
     }
 
+    /// The skill handlers, then the pet follows their placements queued
+    /// ([`WiredWorld::pet_follows`]).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
-        WorldHost::<D>::skill(&mut self.action, call)
+        let SkillCall {
+            game,
+            events,
+            client,
+            msg,
+            staged,
+        } = call;
+        let call = SkillCall {
+            game: &mut *game,
+            events: &mut *events,
+            client,
+            msg,
+            staged,
+        };
+        let out = WorldHost::<D>::skill(&mut self.action, call);
+        self.pet_follows(game, events);
+        out
     }
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
-        WorldHost::<D>::walk(&mut self.action, game, events, call)
+        let out = WorldHost::<D>::walk(&mut self.action, game, events, call);
+        self.pet_follows(game, events);
+        out
     }
 
     fn vitals_sync(
@@ -565,6 +622,8 @@ where
     /// at creation, before the first object).
     fn host_tick(&mut self, events: &mut D, ms: u32) {
         events.action().route_quest_objects();
+        let h = &mut events.action().sys.hooks;
+        h.pet_follows.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 

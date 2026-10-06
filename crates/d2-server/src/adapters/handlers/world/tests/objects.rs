@@ -247,7 +247,7 @@ fn without_object_state_type_2_stays_a_stub() {
     assert_eq!(fx.host.game.unhandled, vec![(0, 0x13, 9)]);
 }
 
-// Covers: specs/world/objects.md edge case 9
+// Covers: specs/world/objects.md §edge-cases-original-bugs r9
 #[test]
 fn the_object_host_tick_is_the_frames_host_clock() {
     let mut fx = fixture(true);

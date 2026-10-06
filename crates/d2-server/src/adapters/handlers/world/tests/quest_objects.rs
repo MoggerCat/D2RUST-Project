@@ -197,3 +197,64 @@ fn host_quests_answer_from_the_owner_and_the_object_state() {
     // The rest's staged modes were not used.
     assert!(fx.world().rest.object_modes.is_empty());
 }
+
+// ---- the hireling's teleport follow ------------------------------------------------------
+
+// Covers: specs/world/hirelings.md §6 r1, §6 r2, §6 r5; specs/sim/path-placement.md §10 r6
+#[test]
+fn a_queued_pet_follow_warps_the_living_hireling_after_the_tick() {
+    use d2_sim::world::hirelings::{flags, HirelingTables, PetNode};
+    let mut fx = fixture();
+    let req = |class| AllocRequest {
+        ty: UnitType::Monster,
+        class,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let s = &mut fx.h.game;
+    let merc = s
+        .events
+        .with(&mut s.game, |g, v| v.allocate(g, &req(0), 0, 0))
+        .unwrap();
+    let dead = s
+        .events
+        .with(&mut s.game, |g, v| v.allocate(g, &req(0), 0, 0))
+        .unwrap();
+    let (gm, gd) = (fx.guid(merc), fx.guid(dead));
+    let p = fx.player;
+    let w = fx.world();
+    w.state.hireling_tables = Some(HirelingTables {
+        rows: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    w.state.hirelings.list_mut(p).nodes = vec![
+        PetNode {
+            guid: gm,
+            ..PetNode::default()
+        },
+        PetNode {
+            guid: gd,
+            dead: true,
+            ..PetNode::default()
+        },
+    ];
+    fx.take_log();
+    // The queue is on from the first frame; a placement of the player
+    // queues it (`prop_wired_path`), here staged.
+    let q = fx.h.game.events.hooks().pet_follows.as_mut().unwrap();
+    assert!(q.is_empty());
+    q.push(p);
+    fx.frames(1);
+    // Rule 2: warp 1 → the living node's unit moves to the player
+    // (rule 5, flags 2 |= 0x10000); the dead one stays.
+    assert_eq!(fx.take_log(), vec![format!("warp {} {}", merc.0, p.0)]);
+    let f2 = |fx: &mut Fx, u: UnitId| fx.h.game.events.sys.units.get(u).unwrap().flags2;
+    assert_eq!(f2(&mut fx, merc) & flags::WARP2, flags::WARP2);
+    assert_eq!(f2(&mut fx, dead) & flags::WARP2, 0);
+    assert_eq!(fx.h.game.events.hooks().pet_follows, Some(vec![]));
+}

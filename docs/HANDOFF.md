@@ -2825,6 +2825,22 @@ the dev-dependency) and record results here.
     DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
     `music\act1\crypt.wav`) for the C65 files; expect byte equality with
     our `data`.
+76. Quest objects on the wired host (`docs/handoff/wire-world-staging.md`
+    §4; player, Act I, `record_packets.py` + `record_rng.py`): operate a
+    Cairn stone, Cain's gibbet and the Forgotten Tower tome. Expect the
+    S→C 0x0E mode messages at the same tick numbers and bytes as
+    `world/tests/quest_objects.rs` derives (gibbet: mode 1 at the
+    operate, event 7 → mode 3 at operate frame + 17).
+77. Quest init order (`wire-world-staging.md` §3 item 1; `rng.md` §5.3
+    draws): record the RNG while the town-Cain marker object (class 385,
+    init 54) is created after Cain left Tristram. Expect Cain's spawn
+    draw right after the marker's allocation; if other objects of the same
+    room are allocated between them in 1.14d, the drained init order is
+    exact, else the quest control must be lent into the action wiring.
+78. Hireling teleport follow (`hirelings.md` §6 r1, `path-placement.md`
+    §10 r6; packets): teleport with a living hireling; record where the
+    hireling's warp messages fall against the player's room / 0x15
+    messages (d2rs runs the follow when the handler returns).
 
 Kept entries (unchanged):
 
