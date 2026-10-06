@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 483–536 |
 |   R7. Lifetime and expiry | 537–560 |
 |   R8. Pierce | 561–586 |
-|   R9. Server-do and server-hit catalogues | 587–803 |
-|   R10. Behaviour of the recorded missiles | 804–837 |
-|   R11. `missiles.txt` columns and their server use | 838–872 |
-| Constants & data dependencies | 873–899 |
-| Randomness | 900–932 |
-| Edge cases & original bugs | 933–956 |
-| Test vectors | 957–1036 |
-| Provenance | 1037–1079 |
-| Open questions | 1080–1125 |
+|   R9. Server-do and server-hit catalogues | 587–807 |
+|   R10. Behaviour of the recorded missiles | 808–841 |
+|   R11. `missiles.txt` columns and their server use | 842–876 |
+| Constants & data dependencies | 877–903 |
+| Randomness | 904–936 |
+| Edge cases & original bugs | 937–960 |
+| Test vectors | 961–1040 |
+| Provenance | 1041–1083 |
+| Open questions | 1084–1129 |
 <!-- /index -->
 
 ## Summary
@@ -642,6 +642,8 @@ mask. Used by server-do 8, 10, 17, 25.
 | `0x005AFB80` | server-do 28 (volcano) | missile data +0x28; the new low word is stored back there |
 | `0x005B04A0` | server-do 34 (Baal taunt control) | path first point x (path +0x0C) |
 | `0x005B0640` | server-do 35 (royal strike chaos ice) | missile data +0x28; low word stored back |
+| `0x005AC040` | init callback of server-hit 38 / 45 sub-missiles (`bodies.md` §19) | path target x (path +0x10) |
+| `0x005D5BF0` | target scatter (server-hit 40, `bodies-2.md` §48; also a skill caller) | target x |
 | `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | init callbacks (§R2.3 step 21) | path geometry; skills spec |
 
 Every re-seed sets `{value, 666}` on unit +0x20. Missiles never
@@ -799,7 +801,9 @@ Bodies:
    from the row as in 1; `area_damage(…, 0)`, which always returns 1, so
    the result is always 1 (the code maps a 0 to 3).
 
-Server-do 17, 28, 34, 35 and server-hit 58: `missiles/bodies.md`.
+Server-do 17, 28, 34, 35 and server-hit 58: `missiles/bodies.md` §1–§5;
+every other body: `missiles/bodies.md` §6–§30 and
+`missiles/bodies-2.md` §31–§62.
 
 ### R10. Behaviour of the recorded missiles
 
