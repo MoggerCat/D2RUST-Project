@@ -22,16 +22,16 @@
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
 |   3. Frame cycle | 114–151 |
-|   4. Palette (one per presented frame) | 152–197 |
-|   5. One pixel write (index domain) | 198–236 |
-|   6. d2rs answers | 237–250 |
-|   7. DirectDraw (display type 3) differences | 251–262 |
-| Constants & data dependencies | 263–268 |
-| Randomness | 269–272 |
-| Edge cases & original bugs | 273–282 |
-| Test vectors | 283–294 |
-| Provenance | 295–321 |
-| Open questions | 322–352 |
+|   4. Palette (one per presented frame) | 152–198 |
+|   5. One pixel write (index domain) | 199–237 |
+|   6. d2rs answers | 238–251 |
+|   7. DirectDraw (display type 3) differences | 252–263 |
+| Constants & data dependencies | 264–269 |
+| Randomness | 270–273 |
+| Edge cases & original bugs | 274–283 |
+| Test vectors | 284–295 |
+| Provenance | 296–322 |
+| Open questions | 323–353 |
 <!-- /index -->
 
 ## Summary
@@ -193,7 +193,8 @@ each shown 10,000 ms with its entry's act byte, 0 = act 1 for all ten);
 `0x00482EF0` plays a video (`%s\video\%s`, 640 × 292 or 640 × 146) and
 then loads act 5's palette (`a` = 4 at `0x00483283`); the state loop
 `0x0044F360` calls it with video 5 when `[0x007A0604]` ≠ 0 (set by
-`0x0044EC80`) and with video 7 when `[0x007A0628]` ≠ 0.
+`0x0044EC80`) and with video 7 when `[0x007A0628]` ≠ 0, and S→C 0x61
+(`0x0045E660` → `0x004B9320`) calls it with the video id u8@1.
 
 ### 5. One pixel write (index domain)
 
