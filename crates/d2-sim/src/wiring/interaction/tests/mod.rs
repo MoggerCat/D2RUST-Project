@@ -33,6 +33,7 @@ use crate::units::lifecycle::{allocate, AllocRequest, LifecycleHooks};
 use crate::units::record::Units;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemStore, QuestRest};
+use crate::world::hirelings::{HirelingRow, HirelingRows, HirelingTables};
 use crate::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, NpcControl, Place};
 use crate::world::quests::{
     PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
@@ -284,6 +285,34 @@ pub fn hirelings(version: u16) -> Vec<HireRow> {
             name_last: 14,
         },
     ]
+}
+
+/// The hireling tables of the same rows (`hirelings.md` §1): Kashya's
+/// row is `Id` 0, Asheara's `Id` 15; the per-level columns are 0;
+/// `pettype` row 7 as in 1.14d (warp, basemax 1), MaxLvl 99.
+pub fn hireling_tables(rows: &[HireRow]) -> HirelingTables {
+    let rows = rows
+        .iter()
+        .map(|r| HirelingRow {
+            version: r.version,
+            id: if r.act == 3 { 15 } else { 0 },
+            class: r.class,
+            act: r.act,
+            difficulty: r.difficulty,
+            seller: r.seller,
+            gold: r.gold as i32,
+            level: r.level as i32,
+            name_first: r.name_first,
+            name_last: r.name_last,
+            ..HirelingRow::default()
+        })
+        .collect();
+    HirelingTables {
+        rows: HirelingRows::new(rows),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    }
 }
 
 /// Hooks with every default.
@@ -718,7 +747,8 @@ impl World {
         .expect("npc control");
         let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut fields.seed).unwrap();
         let vendor_tables = vendor_tables();
-        let state = InteractionState::new(&ctl, &GlobalLists::build(&vendor_tables));
+        let mut state = InteractionState::new(&ctl, &GlobalLists::build(&vendor_tables));
+        state.hireling_tables = Some(hireling_tables(&ctl.hirelings));
         Self {
             game: Game::new(),
             units: Units::default(),

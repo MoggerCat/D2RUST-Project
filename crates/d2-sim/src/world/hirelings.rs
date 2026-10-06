@@ -184,7 +184,7 @@ impl HirelingTables {
         Ok(Self {
             rows: HirelingRows::from_table(hireling)?,
             max_level,
-            pet_flags: u8::from(row.warp) * Self::WARP | u8::from(row.range) * Self::RANGE,
+            pet_flags: (u8::from(row.warp) * Self::WARP) | (u8::from(row.range) * Self::RANGE),
             pet_basemax: i32::from(row.basemax),
         })
     }

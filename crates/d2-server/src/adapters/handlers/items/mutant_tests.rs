@@ -23,9 +23,7 @@ use d2_sim::wiring::action::ActionHooks;
 use d2_sim::wiring::economy::{EconomyCube, GameFields, QuestRest};
 use d2_sim::wiring::interaction::{Desk, HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
 use d2_sim::world::cube::{CraftProperty, CubeWorld, StatRead};
-use d2_sim::world::npc::{
-    HireList, ImbueMods, InteractionList, InvEntry, ItemFacts, NpcRecord,
-};
+use d2_sim::world::npc::{HireList, ImbueMods, InteractionList, InvEntry, ItemFacts, NpcRecord};
 use d2_sim::world::quests::{PlayerQuests, QuestChain, TextList, UnitKind};
 use d2_sim::world::vendors::price::Bonus;
 use d2_sim::world::vendors::{NpcLink, Transaction, VendorWorld};
