@@ -1,11 +1,12 @@
-// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/render/composition.md (§3 steps 1, 3), specs/client/render-pipeline.md (A1 stage 1), specs/render/draw-order.md (§9)
+// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/render/composition.md (§3 steps 1–3), specs/client/render-pipeline.md (A1 stage 1), specs/render/draw-order.md (§9)
 //! The camera of a drawn frame, fed from the client world, and the frame
 //! built through the original's view rules ([`rules::OriginalView`]).
 //!
 //! A [`ViewFeed`] answers what the client world model does not hold yet:
 //! the local player's position (camera §3), the screen open mode (§1),
-//! the running screen shake and the player seed it draws from (§8), and
-//! (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
+//! the running screen shake and the player seed it draws from (§8), the
+//! BlankScreen flag of the player's level (`composition.md` §3 step 2),
+//! and (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
 //! Each is a `TODO(spec: …)` hook of its owner; [`NoFeed`] is the
 //! placeholder: no local player, no map, no shake, and an error for
 //! anything that would need a rule. A feed that states the near rooms
@@ -21,6 +22,7 @@
 //! [`NoCamera`], which refuses every tile and unit (nothing can be placed
 //! without the §3 origins) and passes the UI through.
 
+use d2_data::tables::Levels;
 use d2_sim::rng::Seed;
 
 use crate::bridge::world::ClientWorld;
@@ -96,6 +98,19 @@ pub trait ViewFeed: ViewSource {
             "render/draw-order.md open question 12",
         ))
     }
+
+    /// TODO(spec: the S→C owner spec of the player's current level)
+    /// (`composition.md` §3 step 2): BlankScreen of the player's current
+    /// level, i.e. [`blank_screen`] of its `Levels.txt` row; it decides
+    /// the frame's start-of-frame clear ([`crate::scene::FrameCycle::plan`]).
+    fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError>;
+}
+
+/// BlankScreen of a `Levels.txt` row (record `+0x218`, `composition.md`
+/// §3 step 2): the `bClear` argument of `StartDraw`, which clears when
+/// non-zero.
+pub fn blank_screen(level: &Levels) -> bool {
+    level.blankscreen != 0
 }
 
 /// The placeholder feed: the client world states no local player, no map
@@ -133,6 +148,14 @@ impl ViewFeed for NoFeed {
 
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Err(ViewError::unresolved("local player seed", CAMERA))
+    }
+
+    /// The model states no level for the player. All 137 rows of the live
+    /// `levels.txt` have BlankScreen = 1 (`composition.md` §3 step 2), so
+    /// every level of the original data clears; the placeholder answers
+    /// that until the level is in the model.
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
     }
 }
 

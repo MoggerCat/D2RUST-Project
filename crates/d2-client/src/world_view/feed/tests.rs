@@ -1,8 +1,8 @@
-// Spec: specs/render/camera.md (§3, §8, §9)
+// Spec: specs/render/camera.md (§3, §8, §9), specs/render/composition.md (§3 step 2)
 //! The camera feed: no local player → no camera, and nothing placeable;
 //! the frame camera from the feed (§3); the shake on the tick time base
 //! (§8, §9: `t = 40 × ticks since the start`, two seed draws per drawn
-//! frame while `a ≠ 0`).
+//! frame while `a ≠ 0`); BlankScreen from a `Levels.txt` row.
 
 use d2_sim::rng::Seed;
 
@@ -60,6 +60,9 @@ impl ViewFeed for Feed {
     }
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
+    }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
     }
 }
 
@@ -185,4 +188,20 @@ fn shake_runs_on_the_tick_time_base() {
     };
     let e = frame_shake(&at_tick(1), &mut f).unwrap_err();
     assert!(e.to_string().contains("divides by zero"), "{e}");
+}
+
+// BlankScreen is the Levels record's +0x218 word: `bClear` clears when
+// non-zero; the placeholder feed answers the live data's 1.
+// Covers: specs/render/composition.md §3 r2
+#[test]
+fn blank_screen_from_the_levels_row() {
+    use d2_data::tables::{Levels, Record};
+    let mut bytes = vec![0u8; Levels::SIZE];
+    assert!(!blank_screen(&Levels::decode(&bytes)));
+    bytes[0x218] = 1;
+    assert!(blank_screen(&Levels::decode(&bytes)));
+    bytes[0x218] = 0;
+    bytes[0x21B] = 0x80;
+    assert!(blank_screen(&Levels::decode(&bytes)));
+    assert!(NoFeed.blank_screen(&ClientWorld::default()).unwrap());
 }

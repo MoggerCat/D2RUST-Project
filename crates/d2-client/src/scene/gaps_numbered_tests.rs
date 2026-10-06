@@ -110,6 +110,9 @@ impl ViewFeed for Feed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 fn world(ticks: u64) -> ClientWorld {

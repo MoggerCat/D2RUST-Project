@@ -937,6 +937,12 @@ impl ViewFeed for MapFeed {
         Ok(&mut self.seed)
     }
 
+    /// Every live `Levels.txt` row has BlankScreen 1 (`composition.md` §3
+    /// step 2); the order tests do not depend on it.
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+
     fn near_rooms(&mut self, _: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
         Ok(Some(&mut self.near))
     }

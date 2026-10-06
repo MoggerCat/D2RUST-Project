@@ -1,8 +1,15 @@
-// Spec: specs/client/render-pipeline.md (A1 stages 1–4, A7), specs/client/bridge.md (§5, §7 rule 4), specs/client/ui.md (A2)
+// Spec: specs/client/render-pipeline.md (A1 stages 1–4, A7), specs/client/bridge.md (§5, §7 rule 4), specs/client/ui.md (A2), specs/render/composition.md (§3, §4)
 //! World view: the client's model ([`ClientWorld`]) turned into the scene
 //! draw list each frame (render-pipeline §A1 stage 1), then ordered
 //! (stage 2) and composed (stage 4a CPU, 4b GPU). Plain Rust, no Bevy
 //! types outside [`present`].
+//!
+//! A presented frame is one frame of the 1.14d frame cycle
+//! (`composition.md` §3): a [`FrameCycle`] keeps the index framebuffer
+//! between frames, each frame's clears are `cycle.plan(blank_screen)`
+//! (BlankScreen of the player's level, [`ViewFeed::blank_screen`]), and
+//! the composed indices become the next frame's base
+//! ([`compose_cycle_cpu`], [`GpuAtlas::compose_cycle`]).
 //!
 //! The mechanism is ours: units go through the C7 COF composite
 //! ([`composite::build_with`]) in unit-key order, frames come from the
@@ -45,10 +52,11 @@ use crate::frames::{
 };
 use crate::gpu_compositor::{self, Gpu, GpuError};
 use crate::scene::{
-    self, BlendOp, DrawItem, DrawKey, FrameId, ItemTag, MapTable, Rect, SceneError, ShadeChain,
+    self, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, ItemTag, MapTable, Rect, SceneError,
+    ShadeChain,
 };
 
-pub use feed::{build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
+pub use feed::{blank_screen, build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
 pub use model_feed::ModelFeed;
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
@@ -126,8 +134,9 @@ pub struct ViewAssets {
     /// same numbering for the CPU reference and the GPU atlas).
     pub frames: FrameStore,
     pub maps: MapTable,
-    /// TODO(spec: render/shading.md) (§B3): one palette per frame until
-    /// palettes per screen region are specified.
+    /// The presented palette: one per frame, no per-region palettes
+    /// (`composition.md` §4); the act's `pal.pl2` through
+    /// [`scene::present_palette`] ([`ViewAssets::from_pl2`]).
     pub palette: Palette,
 }
 
@@ -141,6 +150,12 @@ impl ViewAssets {
             maps: MapTable::new(),
             palette,
         }
+    }
+
+    /// [`ViewAssets::new`] with the presented palette of an act's
+    /// `pal.pl2` (`composition.md` §4: its first 1,024 bytes).
+    pub fn from_pl2(pl2: &[u8]) -> Result<Self, ViewError> {
+        Ok(Self::new(scene::present_palette(pl2)?))
     }
 
     /// The scene id of frame `index` of the resident set `key`.
@@ -480,6 +495,35 @@ pub fn compose_cpu(frame: &WorldFrame, assets: &ViewAssets) -> Result<Vec<u8>, V
     )?)
 }
 
+/// One frame of the frame cycle on the CPU reference (`composition.md`
+/// §3): `cycle.compose` with the plan of `blank_screen`, the draws onto
+/// the persistent framebuffer; returns the presented RGBA8 image through
+/// the frame palette (§4). The cycle must be `VIEW` sized. On error the
+/// cycle is unchanged.
+pub fn compose_cycle_cpu(
+    cycle: &mut FrameCycle,
+    blank_screen: bool,
+    frame: &WorldFrame,
+    assets: &ViewAssets,
+) -> Result<Vec<u8>, ViewError> {
+    check_cycle(cycle)?;
+    let indices = cycle.compose(blank_screen, &frame.items, &assets.frames, &assets.maps)?;
+    Ok(scene::to_rgba(indices, &assets.palette))
+}
+
+/// The world view composes `VIEW`; a cycle of another size has no frame
+/// mapping.
+fn check_cycle(cycle: &FrameCycle) -> Result<(), ViewError> {
+    if cycle.view() != VIEW {
+        return Err(SceneError::BaseSize {
+            len: cycle.pixels().len(),
+            pixels: u64::from(VIEW.width) * u64::from(VIEW.height),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 /// The atlas the GPU compositor reads: every frame of the frame store in
 /// id order, so `slots[n]` is the slot of `FrameId(n)` (the
 /// [`FrameStore::atlas`] numbering). The store is append-only, so frames
@@ -563,5 +607,40 @@ impl GpuAtlas {
         Ok(gpu
             .compose_rgba(&packed, self.atlas.pages(), &assets.palette)?
             .1)
+    }
+
+    /// [`GpuAtlas::pack`] as one frame of `cycle` (`composition.md` §3):
+    /// the packed frame starts from `cycle.pixels()` with the clears of
+    /// `cycle.plan(blank_screen)`, returned beside the packed buffers.
+    /// Hand the composed indices to `cycle.commit(plan, indices)`.
+    pub fn pack_cycle(
+        &self,
+        cycle: &FrameCycle,
+        blank_screen: bool,
+        frame: &WorldFrame,
+        assets: &ViewAssets,
+    ) -> Result<(gpu_compositor::Packed, scene::FramePlan), ViewError> {
+        check_cycle(cycle)?;
+        let plan = cycle.plan(blank_screen);
+        let packed = self.pack(frame, assets)?.with_frame(cycle.pixels(), plan)?;
+        Ok((packed, plan))
+    }
+
+    /// GPU image of one frame of `cycle`: [`GpuAtlas::pack_cycle`],
+    /// composed, the indices read back and committed to `cycle`. Equal to
+    /// [`compose_cycle_cpu`] by design. On error the cycle is unchanged.
+    pub fn compose_cycle(
+        &mut self,
+        gpu: &Gpu,
+        cycle: &mut FrameCycle,
+        blank_screen: bool,
+        frame: &WorldFrame,
+        assets: &ViewAssets,
+    ) -> Result<Vec<u8>, ViewError> {
+        self.ensure(&assets.frames)?;
+        let (packed, plan) = self.pack_cycle(cycle, blank_screen, frame, assets)?;
+        let (indices, rgba) = gpu.compose_rgba(&packed, self.atlas.pages(), &assets.palette)?;
+        cycle.commit(plan, indices)?;
+        Ok(rgba)
     }
 }

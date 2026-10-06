@@ -488,6 +488,9 @@ impl ViewFeed for TestFeed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 /// Fixture rules: no tile of their own (the original's placement answers
@@ -646,6 +649,27 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
         .filter(|(g, w)| g != w)
         .count();
     assert_eq!(differ, 0, "pixels differing from the CPU reference");
+
+    // Each next frame waits for the previous frame's indices (the frame
+    // cycle's base, composition.md §3): the node keeps composing only if
+    // the readback reaches the cycle.
+    for _ in 0..120 {
+        if app.world().resource::<NodeRuns>().get() >= 4 {
+            break;
+        }
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+    }
+    assert!(
+        app.world().resource::<NodeRuns>().get() >= 4,
+        "the frame cycle advanced through the index readback"
+    );
+    let cycle = app.world().resource::<WorldViewState>().cycle.clone();
+    assert_eq!(
+        cycle.pixels(),
+        &d2_client::scene::compose(&frame.items, &a.frames, &a.maps, VIEW).unwrap()[..],
+        "a static frame over its own previous frame"
+    );
 }
 
 // ---- integration: frame store, text layout, sound pool (synthetic) ---------------------

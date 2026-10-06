@@ -18,8 +18,9 @@
 //! the shake and the map stay `NoFeed`'s until their owners land). No
 //! player in the model: no camera, nothing placeable.
 //! One frame per server tick (§9). The frame is the composed empty list: palette index 0 over
-//! the whole view. The frame palette is a hook too (`ViewAssets::palette`,
-//! TODO(spec: render/shading.md) §B3): all zeros until it is specified.
+//! the whole view. The frame palette is the act's `pal.pl2`
+//! (`render/composition.md` §4, `ViewAssets::from_pl2`); the model states
+//! no level, so no act: all zeros until it does.
 //!
 //! Frames come from the frame store (`ViewAssets::frames`, the store of
 //! verify-map; empty until a rule names a frame set to load), UI text goes
@@ -44,8 +45,10 @@ use crate::world_view::{
 /// Frames between two progress lines in the log.
 const LOG_EVERY: u64 = 250;
 
-/// The frame palette until `render/shading.md` (§B3) says which one: all
-/// zeros (black).
+/// The frame palette while the model states no level for the player:
+/// all zeros (black). TODO(spec: the S→C owner spec of the player's
+/// level): then the act's `pal.pl2` (`render/composition.md` §4,
+/// `ViewAssets::from_pl2`).
 pub fn unspecified_palette() -> Palette {
     Palette {
         colors: [Rgb { r: 0, g: 0, b: 0 }; 256],
