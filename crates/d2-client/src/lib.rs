@@ -12,3 +12,4 @@ pub mod frames;
 pub mod map;
 pub mod render;
 pub mod scene;
+pub mod ui;
