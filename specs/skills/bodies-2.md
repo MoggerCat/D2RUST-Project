@@ -20,19 +20,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 38–47 |
-| Inputs | 48–52 |
-| Outputs / state changes | 53–58 |
-| Rules | 59–60 |
-|   1. Conventions | 61–72 |
-|   2. Shared helpers, batch 3 | 73–266 |
-|   3. Bodies, required level 1 | 267–442 |
-| Constants & data dependencies | 443–472 |
-| Randomness | 473–488 |
-| Edge cases & original bugs | 489–504 |
-| Test vectors | 505–518 |
-| Provenance | 519–530 |
-| Open questions | 531–540 |
+| Summary | 39–48 |
+| Inputs | 49–53 |
+| Outputs / state changes | 54–59 |
+| Rules | 60–61 |
+|   1. Conventions | 62–73 |
+|   2. Shared helpers, batch 3 | 74–397 |
+|   3. Bodies, required level 1 | 398–573 |
+|   4. Bodies, required level 6 | 574–783 |
+| Constants & data dependencies | 784–813 |
+| Randomness | 814–833 |
+| Edge cases & original bugs | 834–861 |
+| Test vectors | 862–881 |
+| Provenance | 882–895 |
+| Open questions | 896–911 |
 <!-- /index -->
 
 ## Summary
@@ -264,6 +265,136 @@ Both bodies first compute L' = clamp(T `level` + L − T `level`): both
 reads are of T, so L' = L for every L (vestigial; reproduce by passing
 L).
 
+#### 2.8 Uninterruptable `0x005544B0`
+
+`set_uninterruptable(unit, v)` (ECX unit, EDX v): state 54
+(`uninterruptable`) := v (`0x00639DB0`). A null unit is a fatal
+assertion. The unit's game (+0x80) none → done. v = 0 and the unit has
+state 92 (`death_delay`): state 92 off; K = `0x00553010(game, unit)`; K
+→ reaction `0x0057CEE0(game, K, unit, record)` with a zeroed record whose
+result is 2 (will die); no K → kill `0x0057CCB0(game, unit, 0, 1)`
+(`combat/damage.md` §7.2). Then a monster has its type-2 timers deleted
+(`0x00540E60(game, unit, 2, 0)`).
+
+#### 2.9 Nearest accepted unit `0x0056BBC0`
+
+`nearest(game, unit, r, test)` (ECX game, EDX unit; stack r, test):
+`scan_unit(game, unit, 0, 0, r, 0x8783, cb, ctx, noaura 0)`
+(`bodies.md` §2.12) with ctx {best none, best d² 0x7FFFFFFF, the unit's
+position, test}. Per scanned U: `test(game, U)` = 0 → skip; d² from the
+unit's position; d² < best d² (strictly) → best := U. Return best (the
+first of equally near units in scan order).
+
+#### 2.10 Scatter `0x005D5BF0`
+
+`scatter(game, unit, m, n, r, skill, L)` (ECX game, EDX unit; stack
+owner, m, n, r, skill, L; `ret 0x18`; owner = origin = unit):
+
+1. Target position (`bodies.md` §2.4) → (tx, ty); failure → 0.
+2. The **unit's** seed := `init_low(tx)` (`0x00650E40`, `rng.md` §3).
+3. Record (`missiles.md` §R2.1, zeroed): flags 0x420 (target absolute,
+   frames from distance), owner, origin, class m, skill, L.
+4. n ≤ 1 or r < 2: target := (tx, ty); create once. Return 1.
+5. Else n times: x = tx − r + `roll(2r)`, y = ty − r + `roll(2r)` (two
+   draws on the unit's seed, `0x0045C3E0`, x first); target := (x, y);
+   squared distance from the unit's position ≥ 4 → create; else nothing.
+   Return 1.
+
+The re-seed makes the scatter pattern a function of the target x only.
+
+#### 2.11 Progressive count `0x005D3DA0`
+
+`prog_count(unit, skill, L)` (ECX unit, EDX skill; stack L): R invalid →
+0. R `progressive` (flags bit 2), `aurastate` valid, `aurastat1` valid
+and the unit has a list of `aurastate`: n = list[`aurastat1`] clamped to
+1…3 → `eval(prgcalc_n)` (+0x38, +0x3C, +0x40). Every other case:
+`eval(prgcalc1)`.
+
+#### 2.12 Claw hit `0x005D6200`
+
+`claw_hit(game, T, L)` (skill in EBX, unit in ESI; `ret 0xC`):
+
+1. R invalid → nothing.
+2. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L) + progressive_tohit(325), 0)`.
+3. Hit: hit flags |= 2; before-roll charges `0x005D3AC0(unit, record)`;
+   enhanced damage % += `eval(calc1)`; `EType` ≠ 0: c = `eval(calc4)`;
+   conversion % := c; c > 0 → conversion element := `EType`;
+   `roll_elemental(unit, record, skill, L)`. `fill(game, unit, T,
+   record, 0, SrcDam)` (`combat/damage.md` §3.1; 0 is treated as 128);
+   after-roll charges `0x005D3BA0`.
+4. `start_combat(game, unit, T, record, 128)` (also on a miss; hit flag 2
+   skips its own fill).
+
+#### 2.13 Leap helpers
+
+Used by Leap (§4.6, §4.7) and Leap Attack. E flags (+0x0C, `0x00644660`
+set, `0x006446A0` get) carry the phase: 0x80 launch, 0x1101 in flight
+(bit 0x1 = moving skill, `use.md` §5.2), 0x200 landed.
+
+- **Room test** `0x005D9CE0(unit, x, y)` (skill in EAX): R invalid, the
+  unit's room none, or no room at (x, y) (`0x00463740` from the unit's
+  room) → 0. R lacks `InTown` (flags bit 8) and that room is in town →
+  0. Else 1.
+- **Clamp** `0x005D9A10(unit, L, &x, &y)` (skill in EAX): R invalid → 0.
+  (ux, uy) = the unit's position; r = `eval(aurarangecalc)`; d =
+  distance to (x, y) (`0x006417F0`), < 2 → 1. r < d → x := (x − ux)·r / d
+  + ux, y := (y − uy)·r / d + uy (signed, truncating). a = clamp(y − uy,
+  −2, 2), b = clamp(ux − x, −2, 2). Up to three candidates (cx, cy): (x,
+  y), then (x + a, y + b), then (x − a, y − b). For each: free point
+  `0x0064E7B0(room at (cx, cy), &(cx, cy), unit size (0x00620510), mask
+  0x1C09, fallback 1)` (`sim/path-placement.md` §7) gives room R'; R'
+  found, `0x0064D910(R', cx, cy, the unit's path pattern (0x00649180),
+  0x1C09)` = 0 (no cell collides), the line from (ux, uy) to (cx, cy) is
+  clear (`0x00645910` → `0x0064E260(R', from, to, 0x804)` = 0), and the
+  distance to (cx, cy) ≤ r → x, y := cx, cy; return 1. After three
+  failures → 0.
+- **Monster pre-hit** `0x005D9C80(game)` (T in EAX, E in EBX, unit in
+  EDI): `mode_damage(unit, 4)` (§2.1); `0x005A5490(unit, game)`: T' =
+  `target(game, unit)`, zeroed record, result = `melee_result(game, unit,
+  T', 0, 0)`, `start_combat(game, unit, T', record, 128)`;
+  `apply_melee(game, unit, T)`; E param 3 := T type, param 4 := T GUID.
+  Return 1 (0 when T or E is none).
+- **Launch** `0x005D9F70(E)` (unit in EDI): path P (unit +0x2C) none → 0.
+  E flags := 0x1101. P move-test mask := 0 (`0x00648CE0`), footprint mask
+  := 0 (`0x00648C30`). (x, y) = E params 1, 2; either 0 → 0. P target
+  point := (x, y) (`0x00648AD0`); path type := 9 (leap, `sim/pathing.md`
+  §2). v = monstats `Run` (+0x34, i16) of a monster's class (no record →
+  0, nothing more) or charstats `RunVelocity` (+0x41, u8) of a player's
+  class; P velocity := v << 8 (`0x00648690`); compute the path
+  (`0x00649970(P, unit, 0)`). Return 1.
+- **Land** `0x005DA120(game, E)` (unit in EAX): P none or the unit's room
+  none → 0. (x, y) = E params 1, 2. b = the unit's monstats `BaseId`
+  (`0x00463860`; −1 for players or out of range).
+  1. The unit stands at (x, y):
+     - Player: pattern clear `0x0064EC10(room, x, y, pattern, 0x80)`
+       (`sim/path-placement.md` §5.1); footprint mask := 0x80; move-test
+       mask := 0x1C09; path type := 7; E flags := 0x200; delete the
+       unit's type-1 timers; type-1 timer at F + 1.
+     - Monster: pattern clear with mask 0x100; footprint mask := 0x100;
+       move-test mask := 0x3C01; path type := 2. b = 78 (`sandleaper1`
+       family): hop `0x005DA020` below. Else E flags := 0x200; frame
+       count (unit +0x48) −= 0x100.
+     - Both: `set_uninterruptable(unit, 0)` (§2.8); landing message
+       `0x00571B70(unit, E's skill)`: state 18 (`skill_move`) off, queue
+       message 0xA5 {unit type, GUID, skill} on the unit's list (+0xEC /
+       +0xF0, `sim/server-messages.tsv`), queue the unit for update.
+       Return 1.
+  2. Not there yet: player → restart the animation at frame 10
+     (`0x00553DC0(game, unit, 10)`, `sim/units.md` §4.2 variants);
+     return 0. Monster → frame event index (unit +0x38 bits 8+,
+     `0x006212C0`) := 8 for b = 78, for b = 540 (`ancientbarb1` family)
+     12 when the distance to (x, y) < 2 else 10, otherwise 0; frame count
+     += 0x100; return 0.
+- **Sandleaper hop** `0x005DA020(game, x, y)` (E in EAX, unit in EDI): E
+  or P none → 0. K = the unit of (E param 3, E param 4) (`0x00552F60`);
+  none → 0. E flags := 1; frame event index := 12; frame count += 0x100;
+  snap P's position to its sub-tile centre (`0x00650590`); P step counts
+  := 5 (`0x00648E70`); `0x00649070(P, 1)`; P target unit := none
+  (`0x00648B90`). Point (3x − 2·ux, 3y − 2·uy) (ux, uy the unit's
+  position): a room there in town → 0. P target point := it; path type
+  := 8; `0x00648E40(P, 5)`; compute the path. Return 1.
+
 ### 3. Bodies, required level 1
 
 #### 3.1 srvdo 7 Jab `0x005DB2D0`
@@ -440,6 +571,216 @@ The start makes the first kick itself.
 With n kicks the start makes kick 1 and each do one more; every do also
 applies the previous kick's stored record first (step 2).
 
+### 4. Bodies, required level 6
+
+#### 4.1 srvdo 20 Static Field `0x005C9800`
+
+1. R invalid → 0. D = difficultylevels record of the game's difficulty
+   (`0x00611D30`); none → 0.
+2. Context C: C.floor = `eval(calc2)`, C.pct = `eval(calc1)`, C.cap =
+   `StaticFieldMin` (difficultylevels +0x40) in an expansion game (game
+   +0x70 ≠ 0), else 0; C.len = `elem_len(unit, skill, L)` (`levels.md`
+   §3.2); C.e = `EType`.
+3. `scan_unit(game, unit, 0, 0, eval(aurarangecalc), aurafilter,
+   0x005C96A0, C, noaura 0)` (`bodies.md` §2.12). Return 1.
+
+Callback `0x005C96A0` (ECX scan context, EDX unit U; source = the
+caster):
+
+1. h = U's `hitpoints(6)` >> 8; h < 1 → 0.
+2. C.cap ≠ 0 and h ≤ pct(U's maximum life >> 8, C.cap, 100) → 0.
+3. v = pct(h, C.pct, 100); h − v < 1 → v = h − 1. v <<= 8; v < C.floor
+   → v = C.floor.
+4. Zeroed record; `add_element(source, record, C.e, v, C.len, &res,
+   &e)` (`levels.md` §3.6; a random element draws here once and e keeps
+   it). res ≥ 0 and U's stat res (unit getter) r < 0 → v = pct(v, 100,
+   100 − r) (negative resistance does not raise the damage).
+5. Fresh zeroed record; `add_element(source, record, e, v, C.len, 0, 0)`.
+   Hit class (+0x60) |= 0xD; hit class fixed (+0x64) := 1; result :=
+   0x4001 (hit, soft hit).
+6. `apply(game, source, U, 1, record)`; reaction `0x0057CEE0(game,
+   source, U, record)`. Return 1.
+
+#### 4.2 srvdo 21 Telekinesis `0x005C98F0`
+
+1. R invalid → 0. The unit none or not a player → 0. Busy
+   (`0x00535060`, `items/inventory.md` §5.2) → 0. T none → 0.
+2. Unit flags |= 0x40.
+3. By T's type (jump table `0x005C9B34`):
+   - **Player or monster:** not hostile (`0x00554200(game, unit, T)`),
+     T's room in town or the unit's room in town → 0. knock = (one draw
+     on the unit's seed, `roll(100)` < `Param2`). Zeroed record;
+     `roll_physical`, `roll_elemental` (`levels.md` §3.6); result |=
+     `ResultFlags`; hit flags |= `HitFlags`; `HitClass` ≠ 0 → hit class
+     := it; knock → result |= 9 (hit, knockback). `apply(game, unit, T,
+     1, record)`; reaction. Return 1.
+   - **Object:** operate `0x00584420(game, unit, 2, T GUID, &out)`
+     (`world/waypoints.md`). Return 1.
+   - **Item:** of item type 22 (`scro`), 4 (`gold`), 38 (`tpot`), 56,
+     9 (`poti`) or 41 (`key`) (`0x00629BB0`, tested in this order) →
+     auto pickup `0x00563560(game, unit, T GUID, &out)`
+     (`items/inventory.md` §8.1). Else sound event 0x13 on the unit
+     (`0x00553380(unit, 0x13)`, refused pickup). Return 1.
+   - **Missile or other:** return 1.
+
+#### 4.3 srvst 16 Poison Dagger `0x005C30A0`
+
+1. T none → 0. T's room in town → 0. R invalid → 0.
+2. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+3. Hit: enhanced damage % := `eval(calc1)`. `EType` ≠ 0: c =
+   `eval(calc4)`; conversion % := c; c > 0 → conversion element :=
+   `EType`; `roll_elemental(unit, record, skill, L)` (only with an
+   `EType`).
+4. `start_combat(game, unit, T, record, SrcDam or 128)`. Return 1.
+
+#### 4.4 srvdo 32 Poison Dagger `0x005C4CD0`
+
+Unit flags |= 0x40. T none → 0. `apply_melee(game, unit, T)`. Return 1.
+
+#### 4.5 srvdo 55 Corpse Explosion `0x005C4DF0`
+
+Also mon death sentry, NihlathakCorpseExplosion.
+
+1. T none → 0. `0x00645680(T)` (corpse test, `bodies.md` §7.5) = 0 →
+   0.
+2. State 104 (`corpse_nodraw`) on for T; queue T for update.
+3. skill = 0 → 0 (an out-of-range skill reads a null record: fatal).
+4. h = T's base `maxhp(7)` (`0x006253B0`). T a monster: h = (minHP +
+   maxHP) << 7 from stats by level (`monsters/init.md` §8.1, flag 1;
+   class, L-flag, difficulty, T's `level`): the class average.
+5. (x, y) = T's position. r = `eval(aurarangecalc)`; r1 = r / 2, r2 =
+   (r + 1) / 2 (signed, truncating).
+6. lo = pct(h, `eval(calc1)`, 100); hi = pct(h, `eval(calc2)`, 100); v =
+   lo + `roll(hi − lo)` on **T's** seed (`0x0045C3E0`).
+7. tl = T's `level(12)`, ul = the unit's `level(12)`; tl ≠ 0 and ul < tl
+   → v = pct(v, ul, tl).
+8. Zeroed record D. p = `eval(calc3)`; ≤ 0 → 0; ≥ 100 → 100. p > 0 and
+   `EType` ≠ 0: `add_element(unit, D, EType, pct(v, p, 100),
+   elem_len(unit, skill, L), 0, 0)`; v = pct(v, 100 − p, 100).
+9. D physical := v.
+10. `scan_unit(game, unit, x, y, r2, aurafilter, 0x005C4D10, C, noaura
+    0)` with C {&D, x, y, r1²}. Return 1.
+
+Callback `0x005C4D10` (ECX scan context, EDX unit U): C none → 0. Copy
+D; squared distance from (x, y) to U > r1² → copy physical := 0.
+`apply(game, source, U, 1, copy)`; reaction. Return 1.
+
+With an odd range the outer ring (r1 < d ≤ r2) takes only the element
+part. The scan skips the caster (`bodies.md` §2.12) but not T.
+
+#### 4.6 srvst 40 Leap `0x005D9D50`
+
+1. R invalid → 0. E none → 0.
+2. **Player** (not a monster): target position (x, y) (`bodies.md`
+   §2.4) fails → 0. Room test (§2.13) fails → 0. Clamp (§2.13) with L
+   fails → 0.
+3. **Monster:** T = target.
+   - T none: target position (x, y) fails → used skill := none
+     (`0x00620210(unit, 0)`), return 0; else E param 4 := −1.
+   - T present: monster pre-hit (§2.13) on T; the unit is dead
+     (`0x005541B0`) → 0. (x, y) = 2·T position − the unit's position
+     (the point beyond T).
+   - Free point `0x0064E7B0(the unit's room, &(x, y), unit size, mask
+     0x3C01, fallback 0)`; none → used skill := none, return 0.
+4. Reserve the landing: pattern stamp `0x0064EA90(room at (x, y), x, y,
+   the unit's path pattern, 0x80)`.
+5. `set_uninterruptable(unit, 1)` (§2.8). State 18 (`skill_move`) on.
+6. E param 1 := x, param 2 := y. A monster with T: param 3 := T type,
+   param 4 := T GUID. E flags := 0x80. Return 1.
+
+#### 4.7 srvdo 77 Leap `0x005DA370`
+
+1. R invalid → 0. E = the unit's entry of the skill (`0x006439F0`); none
+   → 0.
+2. Delete the unit's type-1 timers (`0x00540E60(game, unit, 1, 0)`).
+3. By E flags:
+   - Bit 0x100 (in flight): landed = Land (§2.13). Landed and the unit
+     is a player: zeroed record, result := 9 (hit, knockback);
+     `area_damage(game, unit, 0, 0, eval(calc1), record, 0)`
+     (`missiles.md`; filter 0x8583, around the unit). Return 1.
+   - Bit 0x80 (launch): return Launch (§2.13).
+   - Otherwise: a player gets E flags := 0. Return 1.
+
+The first do (flags 0x80) starts the flight; the path step finishing
+(`use.md` §5.2) runs the do again with 0x1101 until Land succeeds.
+
+#### 4.8 srvdo 70 Double Swing `0x005D8470`
+
+1. T none → 0.
+2. i = frame event index (unit +0x38 bits 8+). i odd (signed mod 2 ≠
+   0): unit flags |= 0x40; T' = `next_unit(game, unit, 0, 0, melee range
+   (0x00622870) + 4, 0x20003, T's GUID, null)` (`0x0056BD10`,
+   `missiles.md`); none → 0; path target := T' (`0x00620C10`); T := T'.
+3. Run the srvst 32 body (`bodies.md` §3.8, Bash) with (game, unit,
+   skill, L) — it reads the target again.
+4. `apply_melee(game, unit, T)`. Return 1.
+
+Even events leave flag 0x40 as it was; the odd one sets it after
+switching to the next target.
+
+#### 4.9 srvdo 71 Taunt `0x005D8570`
+
+1. R invalid, or `auratargetstate` not in 0…states count − 1 → 0.
+2. T = target. T none, or the taunt test fails, or not hostile
+   (`0x00554200(game, unit, T)`) → T = `nearest(game, unit, 20, taunt
+   test)` (§2.9); none → 0.
+3. d = `eval(auralencalc)`.
+4. Curse context (`bodies.md` §4.4 step 5 layout): game, unit, ai = 1,
+   upd, skill, L, d, stats / values from `aurastat1–6` /
+   `aurastatcalc1–6` (stop at the first invalid stat, stat −1; stop
+   without a record; `updateanimrate` → upd = 1), state =
+   `auratargetstate`.
+5. Run the curse unit callback `0x005C35C0(T, context)` (`bodies.md`
+   §4.4 "Per unit U"; state 27 `taunt` → AI kind 12); its result is not
+   read.
+6. T's AI control (a monster with data: data +0x28, else none): AI
+   params unchanged (`0x005B0D70(control, −666, −666, −666)`); leash
+   owner := none (`0x005DD330(T, none)`: control +0x0C := −1, +0x10 :=
+   1).
+7. Delete T's type-2 timers; type-2 timer at F + 1 on T; T's path target
+   := the unit (`0x00620C10(T, unit)`). Return 1.
+
+Taunt test `0x005D8510(game, U)`: U a monster, `can_switch(U, 12)`
+(`bodies.md` §4.4), alive (`0x005541B0` = 0), and its minion owner
+(`0x0058F090`: AI control +0x2C GUID, +0x30 type) is none (GUID −1) or
+not a player (type ≠ 0).
+
+#### 4.10 srvdo 43 Shock Field `0x005D5D70`
+
+1. R invalid → 0. m = `prog_missile(unit, skill)`; m < 0 → 0.
+2. n = `prog_count(unit, skill, L)` (§2.11); n ≤ 0 → 0.
+3. Return `scatter(game, unit, m, n, eval(aurarangecalc), skill, L)`
+   (§2.10).
+
+#### 4.11 srvdo 44 Blade Sentinel `0x005D6020`
+
+1. R invalid → 0. `summon_class(unit, skill, L, &mode)` < 0 → 0.
+2. Unit flags |= 0x40.
+3. Target position (tx, ty) fails → 0.
+4. m = `sentry(game, unit, 0, 0, R, skill, L)` (`bodies.md` §6.9; at
+   the unit's position); none → 0.
+5. m base `level(12)` := the unit's `level(12)`.
+6. Place m at the unit's position: `0x00554EA0(game, m, the unit's room,
+   ux, uy, 0, 0)` (`sim/path-placement.md` §10).
+7. AI command {type 0, ux, uy, tx, ty} made current on m
+   (`0x0058EF40`, `monsters/ai.md` §8).
+8. Delete m's type-2 timers; type-2 timer at F + 1. m flags (+0xC4) &=
+   ~0x8. Return 1.
+
+#### 4.12 srvst 25 Dragon Claw `0x005D6330`
+
+Return 1 if T exists, else 0.
+
+#### 4.13 srvdo 46 Dragon Claw `0x005D6340`
+
+1. T none → 0.
+2. `claw_hit(game, T, L)` (§2.12).
+3. p = `pair_record(unit, T)`; p → finisher `0x005D5220(game, unit, p)`
+   (`bodies.md` §2.14). `apply_melee(game, unit, T)`.
+4. Frame event index even → unit flags &= ~0x40 (the do runs again for
+   the second claw); odd → unit flags |= 0x40. Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -485,6 +826,10 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | §3.5 | unit | `roll(100)`, then `potion_code` on success |
 | §3.9 step 5 | unit | `lo' mod 100` when k > 0 |
 | §3.11 step 4 | unit | `roll(100)` on the last kick when k ≥ 1 |
+| §2.10 `scatter` | unit | re-initialised from the target x, then `roll(2r)` twice per missile |
+| §4.1 callback | source | one step only for a random `EType` (first `add_element`) |
+| §4.2 | unit | `roll(100)` for the knockback, then `roll_physical`, `roll_elemental` |
+| §4.5 | **T** | `roll(hi − lo)` |
 
 ## Edge cases & original bugs
 
@@ -501,6 +846,18 @@ steps call them (`bodies.md` Randomness). Draws named here:
    a failed roll still consumes it (§3.5).
 6. Charged Bolt returns 1 even when n ≤ 0 or the target position fails;
    Firestorm returns 0 for n ≤ 0 (§3.2, §3.7).
+7. Shock Field re-seeds the caster's own seed from the target x
+   (§2.10 step 2): every later draw on the caster depends on where it
+   aimed.
+8. Corpse Explosion draws on the corpse's seed and, with an odd range,
+   gives the outer ring (r1 < d ≤ r2) element damage only (§4.5).
+9. Double Swing skips the R test and relies on the Bash start body
+   (§4.8).
+10. Taunt runs the curse callback with AI kind 12 (state 27): the
+    `bodies.md` Constants note "27 → 12 coded, unused" holds only for
+    srvdo 30; srvdo 71 uses it.
+11. A monster's Leap first attacks its target (A1 damage through
+    `mode_damage(unit, 4)`) and then lands behind it (§2.13 pre-hit).
 
 ## Test vectors
 
@@ -515,6 +872,12 @@ steps call them (`bodies.md` Randomness). Draws named here:
 | Sacrifice, p physical 2560, T life 1280, calc2 8 (synthetic) | self physical = total = pct(1280, 8, 100) = 102 |
 | Smite, hit class | 0x65 in every record |
 | Jitter callback, total frames 90, argument 3 (synthetic) | frames 77 / 77, seed {target x + 3, 666}, path type 10, steps 77 |
+| Static Field, h = 400, C.pct 25, floor 0 (synthetic) | v = 100 << 8 |
+| Static Field, lightning resist −50 (synthetic) | v = pct(v, 100, 150) = 2v / 3 |
+| Corpse Explosion r = 7 (synthetic) | scan radius 4; physical within d² ≤ 9 |
+| Shock Field n = 1 or r = 1 | one missile at the target |
+| Leap clamp, unit (0, 0), target (20, 0), r = 10 | (10, 0) before the free-point search |
+| Leap candidates around (10, 0) from (0, 0) | (10, 0), (10, −2), (10, 2) |
 
 ## Provenance
 
@@ -522,11 +885,13 @@ steps call them (`bodies.md` Randomness). Draws named here:
   address; table `0x006E21F4` (multiplier) and `0x00741B54` /
   `0x00741B58` (potion codes) read from the image; column offsets from
   `data/fields.tsv`; values from the 1.14d `patch_d2` tables.
-- D2MOO 1.10f compared: `SKILLS_SrvDo007_Jab`, `SrvDo017`, `SrvDo064`,
-  `SrvDo150`, `SrvDo069`, `SrvDo114`, `SrvDo117`, `SrvSt22`, `SrvDo033`,
-  `SrvSt24`, `SrvDo042`, `sub_6FC627B0` (mode damage), `sub_6FD14D20`.
-  1.14d differences: §2.1 mode 6 uses A1; §2.1 step 9 El1 / `noRatio`
-  bugs are in `0x006538A0`.
+- D2MOO 1.10f read as a hint for `SKILLS_SrvDo007_Jab` and
+  `sub_6FC627B0` (mode damage) only; every other body here was read from
+  1.14d alone (slot names from `functions.tsv`). 1.14d differences from
+  D2MOO: §2.1 mode 6 uses A1; the §2.1 step 9 El1 / `noRatio` bugs are
+  in the 1.14d `0x006538A0`.
+- Jump tables read from the image: `0x005A5444` (§2.1 element types),
+  `0x005C9B34` (§4.2 target types).
 
 ## Open questions
 
@@ -537,3 +902,9 @@ steps call them (`bodies.md` Randomness). Draws named here:
    knockback on the last kick, E param 1 per do.
 3. Recording: Find Potion in each act / difficulty (potion codes, unit
    seed draws).
+4. Recording: Leap and a monster Leap (Sand Leaper, Ancient Barbarian):
+   E flags per do, landing frame, area knockback, the 0xA5 message.
+5. Recording: Shock Field: caster seed before / after (re-seed from the
+   target x, §2.10).
+6. `0x00553010` (the killer looked up by `set_uninterruptable`) and
+   message 0xA5 layout: owner `sim/server-messages.tsv`.
