@@ -32,15 +32,15 @@
 |   6. Level position, size, act number | 206–222 |
 |   7. Vis and warp records | 223–246 |
 |   8. Coordinates to rooms | 247–260 |
-|   9. Level lifecycle: activity and freeing | 261–291 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 292–331 |
-|   11. Logical rooms (coordinate lists) and population queries | 332–572 |
-| Constants & data dependencies | 573–593 |
-| Randomness | 594–612 |
-| Edge cases & original bugs | 613–636 |
-| Test vectors | 637–680 |
-| Provenance | 681–713 |
-| Open questions | 714–738 |
+|   9. Level lifecycle: activity and freeing | 261–309 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 310–349 |
+|   11. Logical rooms (coordinate lists) and population queries | 350–590 |
+| Constants & data dependencies | 591–611 |
+| Randomness | 612–630 |
+| Edge cases & original bugs | 631–654 |
+| Test vectors | 655–698 |
+| Provenance | 699–731 |
+| Open questions | 732–756 |
 <!-- /index -->
 
 ## Summary
@@ -279,6 +279,24 @@ status lists; 1.14d moved it to step 5. No outcome differs (no draws).
    bits has a status < 4 or flag 0x100000; else free those rooms' warp
    links (`0x0066B4F0`) and rooms-near arrays (they are rebuilt on next
    use). After all 8 slots: success.
+   - The mask depends only on L's vis ids, never on warp ids: slots
+     with warp −1 (outdoor neighbours) are included. Their border rooms
+     carry those warp-flag bits and are the only rooms of L whose
+     rooms-near arrays can hold rooms of this level (`drlg/rooms.md`
+     §3 rule 3, W = −1 branch), so after a successful test no room of
+     L keeps a near entry or warp link into this level.
+   - Per slot the order is: test every room of L, then free. A refusal
+     at slot k returns after slots < k have already freed their L
+     rooms' warp links and near arrays (the level is not freed; those
+     arrays are rebuilt on next use).
+   - Per freed room: warp links always (`0x0066B4F0`, list +0x4C := 0);
+     the near array only when non-null (pointer +0x08 and count +0x2C
+     := 0).
+   - Only this level's vis slots are walked: a level L that lists this
+     level in its vis array while this level does not list L is not
+     tested and keeps its arrays.
+   - A missing L is allocated (get-or-allocate inlined); L without
+     rooms is skipped.
 4. **Free rooms, keep level** (`0x00642010` with keep = 1): size the
    populated-room memory (+0x22C) to the room count (allocate once),
    store each room's "other flags" bit 0 in list order, free every room

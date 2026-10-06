@@ -26,23 +26,23 @@
 | Outputs / state changes | 76–85 |
 | Rules | 86–91 |
 |   1. Structures (1.14d) | 92–151 |
-|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 152–290 |
-|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 291–304 |
-|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 305–329 |
-|   5. Preset primitives on the grids | 330–387 |
-|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 388–442 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 443–610 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 611–655 |
-|   9. Act III | 656–715 |
-|   10. Act IV (`0x0067E890`) | 716–727 |
-|   11. Act V (`0x0067E600`) | 728–799 |
-|   12. Rooms | 800–835 |
-| Constants & data dependencies | 836–858 |
-| Randomness | 859–880 |
-| Edge cases & original bugs | 881–902 |
-| Test vectors | 903–962 |
-| Provenance | 963–995 |
-| Open questions | 996–1019 |
+|   2. Act-wide placement (`0x00678AD0`, D2MOO `DRLGOUTPLACE_CreateLevelConnections`) | 152–300 |
+|   3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`) | 301–314 |
+|   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 315–339 |
+|   5. Preset primitives on the grids | 340–397 |
+|   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 398–452 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 453–620 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 621–665 |
+|   9. Act III | 666–725 |
+|   10. Act IV (`0x0067E890`) | 726–737 |
+|   11. Act V (`0x0067E600`) | 738–809 |
+|   12. Rooms | 810–845 |
+| Constants & data dependencies | 846–868 |
+| Randomness | 869–890 |
+| Edge cases & original bugs | 891–912 |
+| Test vectors | 913–997 |
+| Provenance | 998–1038 |
+| Open questions | 1039–1066 |
 <!-- /index -->
 
 ## Summary
@@ -277,16 +277,26 @@ nor excl2, R0[row] = r and R0[row + 1] = rNext: outdoor flags |= flags.
 
 #### 2.7 Warps and neighbour entries
 
-- **Adjacency warps** (`0x006775C0`, ids a..b): for each pair i ≠ j in
-  a..b (i outer, j inner, ascending): if the rects share an edge
-  (`0x0066B880`, margin −1: one gap is 0 and the other ≤ −1), set warp in
-  level i's record toward j (`0x00642920`, slot −1, warp −1).
-- **Neighbour entries** (`0x00677680`, ids a..b): for each outdoor level
-  in a..b, for vis slot j = 0..7 with vis ≠ 0 and warp id = −1 (from the
-  level's vis/warp arrays, `levels.md` §7): add a neighbour entry for
-  that level with direction := direction from this level's rect to the
-  neighbour's (`0x00642240`, `levels.md`), preset flag := neighbour is a
-  preset level. These entries drive the vertex polygon (§4).
+- **Adjacency warps** (`0x006775C0`, ids a..b): for i = a..b (outer,
+  ascending): get-or-allocate level i (`levels.md` §4.2) and get or
+  create its warp record (`0x00642860`, `levels.md` §7.2); then for j =
+  a..b (inner, ascending), j ≠ i: get-or-allocate level j; if the rects
+  share an edge (`0x0066B880`, margin −1: one gap is 0 and the other
+  ≤ −1), set warp in level i's record toward j (`0x00642920`, slot −1,
+  warp −1). So an unallocated id in a..b is allocated during i = a, in
+  ascending order (level seeds are observable, `levels.md` §4.3).
+- **Neighbour entries** (`0x00677680`, ids a..b): for each id in a..b
+  (ascending): **get-or-allocate** the level first (`0x00642BB0`), then
+  test its DrlgType (level +0x00) = 3 (outdoor); other types: nothing
+  more. For an outdoor level, for vis slot j = 0..7 with vis ≠ 0 and
+  warp id = −1 (from the DRLG's vis/warp arrays, `levels.md` §7.2):
+  **get-or-allocate** the neighbour level vis[j] (through the level's
+  DRLG, level +0x1B4) and add a neighbour entry to this level's outdoor
+  info (outdoor +0x264, `0x0066B790`) with direction := direction from
+  this level's rect to the neighbour's (`0x00642240`, `maze.md` §2 rule 6),
+  preset flag := the neighbour's DrlgType is 2. These entries drive the
+  vertex polygon (§4). Calls per act: §2.1 (Act I 1..17, Act II
+  40..46, Act III 75..83, Act IV 103..106, Act V 111..112).
 
 ### 3. Level generation (`0x00675360`, D2MOO `DRLGOUTDOORS_GenerateLevel`)
 
@@ -917,7 +927,10 @@ start-seed step {4014346869, 268778232}:
 
 Level seeds set in between (allocation order): 4, 3, 2, 1, 17 (after
 copy-1 draws), 39, 26 (+ preset roll), 7, 6, 27 (+ preset roll), then the
-Black Marsh draw, then 5.
+Black Marsh draw, then 5. The list goes on with 8, 9, …, 16: the Act I
+neighbour entries (§2.7, ids 1..17) get-or-allocate every id in order,
+and 8..16 are the ones not yet allocated (`levels.md` Test vectors, seq
+2425–2452).
 
 Derived from the rules (simulation of §2, not yet recorded): wild chain
 retries Blood Moor (3,0)→(3,1)→(0,0)→(0,1) and Rogue (2,0)→(2,1)→(3,0)→
@@ -955,6 +968,28 @@ FarAway + roll(2); 4465–5800 type 3; 5801–5825 jitter; 5826–5926 shrines;
 6896 seed {4014346872, 666}, …, 9352–9480 cave entrance shuffle +
 roll(2), …, 12010 cells.
 
+**Cold Plains cells, kind and order** (recorded, seq 12010–12586, server
+copy; 98 rooms is the 1.14d count). Each §12.1 cell that makes a room
+leaves `0x00666F33` then the room allocation `0x0066B42E` (preset, P)
+or the allocation alone (outdoor room, o); 6 sub-theme draws
+(`0x006706D7`) follow every o. In draw order (row-major cell order,
+§12.1):
+
+```
+PPPPPPPPPP PoPooooPPP PoooPPPPoP PoooPPPPoP PoPoooPPoP
+PoooPoPPoP PPPooooooP PPPoPPoooP PoooPPoPPP PPPPPPPP
+```
+
+61 P + 37 o = 98 of the 10 × 10 = 100 cells. Every preset cell with
+P ≠ 0 makes exactly one room (no P without an allocation). Laid out
+10 per row, rows 0–7 start and end with P (the border) only if no cell
+before index 79 is skipped; a search over every placement of the 2
+roomless cells (0x100 cells, or 0x200 with P = 0) that keeps the
+border rows and columns P finds them all at cell indexes 79–99 (210
+placements; which two is open question 10). A build that makes 97
+rooms has one more roomless cell: compare its per-cell kind string
+(P / o / none) with this one; the first difference is the cell to dump.
+
 Comparison (exact): for an act creation and each generated outdoor level,
 the sequence of (site, seed state after) of every draw equals the
 recording; level rects and outdoor flags equal a level-coordinate probe
@@ -962,6 +997,14 @@ recording; level rects and outdoor flags equal a level-coordinate probe
 
 ## Provenance
 
+- §2.7 allocation order read from the disassembly of `0x006775C0`
+  (calls `0x00642BB0` for i, `0x00642860`, then `0x00642BB0` for each
+  j ≠ i) and `0x00677680` (`0x00642BB0` for each id before the type
+  test at `0x006776A3`; `0x00642BB0` on level +0x1B4 for vis[j] at
+  `0x006776EB`); callers `0x00677750`, `0x00677790`, `0x006789B0`,
+  `0x00678A20`, `0x00678A70`. Cold Plains cell kinds counted from
+  `20261005-232125-rng.jsonl` seq 12010–12586 (sites `0x00666F33`,
+  `0x0066B42E`, `0x006706D7`).
 - **1.14d `Game.exe`**, `re/exports/all.asm`: `0x00678AD0`, `0x00677750`,
   `0x00677790`, `0x006789B0`, `0x00678A20`, `0x00678A70`, `0x006772C0`,
   `0x00677180`, `0x00676DD0`, `0x00676EB0`, `0x006775C0`, `0x00677680`,
@@ -1016,3 +1059,7 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    levels would confirm them (as for OQ 4).
 9. *Answered:* Act V beyond the siege strip is §11, read from 1.14d.
    A recording of levels 111, 112 and 117 would confirm the draws.
+10. Cold Plains roomless cells (Test vectors, 98 rooms): which two of
+    cells 79–99 make no room (0x100 cell, or 0x200 with grid 0 = 0)?
+    Dump (x, y, grid 0, grid 2) per cell at `0x006750F0` for level 3 of
+    the recorded seed (`20261005-232125-rng.jsonl`).
