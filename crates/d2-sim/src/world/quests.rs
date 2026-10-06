@@ -500,6 +500,32 @@ pub trait QuestWorld {
     // provide it yet keep building.
 
     // -- Act IV, Fallen Angel / Hell's Forge / gossip (quests-act4.md §3, §4, §6).
+
+    /// `0x00619DA0` on the DRLG of act `act` (0-based; Act IV's is game
+    /// +0xC8): the room covering (x, y), if any (act4 §3.6, the ghost's
+    /// spawn room).
+    fn room_in_act_at(&mut self, act: u8, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (act, x, y);
+        self.unhandled(0xFE, 0x0061_9DA0);
+        None
+    }
+
+    /// `0x006416D0`: the distance between two units (`None`: not known;
+    /// act4 §3.6, players within 5 of Izual's ghost).
+    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> Option<i32> {
+        let _ = (a, b);
+        self.unhandled(0xFE, 0x0064_16D0);
+        None
+    }
+
+    /// `0x0063BEF0` and the items record code (+0x80): the code of the
+    /// weapon the player wields; `None` without an inventory or a weapon
+    /// (act4 §4.6, the Hellforge's hammer test).
+    fn wielded_weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        let _ = player;
+        self.unhandled(0xFE, 0x0063_BEF0);
+        None
+    }
     // -- end Act IV q1/q3 seams.
 
     // -- Act IV, Terror's End (quests-act4.md §5).
