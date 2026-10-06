@@ -150,6 +150,7 @@ fn digest16(d: &PatchData, t: &str) -> String {
     d.table(t).unwrap().digest()[..16].to_owned()
 }
 
+// Covers: specs/data/patch-layers.md §9
 #[test]
 fn fixture_digests_and_pins() {
     let d = fixture();
@@ -175,6 +176,7 @@ fn p3(stmt: &str) -> Vec<String> {
     parse_codes(&format!("d2patch 1\ntable items\n{stmt}\n"))
 }
 
+// Covers: specs/data/patch-layers.md §3
 #[test]
 fn parse_vectors() {
     let (l, f) = parse_layer(
@@ -208,6 +210,7 @@ fn parse_vectors() {
     assert_eq!(parse_codes("d2patch 1\nset axe lvl 1 -> 4"), ["P09 2:1"]);
 }
 
+// Covers: specs/data/patch-layers.md §3
 #[test]
 fn parse_more() {
     // `[#5]` is a key; a bare `#5` key in `add` is a key too.
@@ -242,6 +245,7 @@ fn parse_more() {
     assert_eq!(p3(&line), ["P12 3:4097"]);
 }
 
+// Covers: specs/data/patch-layers.md §4, §5
 #[test]
 fn apply_vectors() {
     // V1
@@ -361,6 +365,7 @@ fn apply_vectors() {
     expect("check axe lvl 2", &["A06 a.d2patch:3:15"]);
 }
 
+// Covers: specs/data/patch-layers.md §5, §6
 #[test]
 fn layered_vectors() {
     // V15
@@ -396,6 +401,7 @@ fn layered_vectors() {
     assert!(f[2].detail.contains("b.d2patch"));
 }
 
+// Covers: specs/data/patch-layers.md §5, §6
 #[test]
 fn stack_vector() {
     let stack = "d2stack 1\nlayer one.d2patch\nlayer two.d2patch\n";
@@ -464,6 +470,7 @@ fn diff_items(rows: &[&str]) -> Result<Vec<u8>, DiffError> {
     diff_tables(&[(d.table("items").unwrap(), &e)], false)
 }
 
+// Covers: specs/data/patch-layers.md §9
 #[test]
 fn diff_vector() {
     let rows = [
@@ -664,6 +671,7 @@ fn parser_never_panics() {
     }
 }
 
+// Covers: specs/data/patch-layers.md §9
 #[test]
 fn render_identity() {
     let d = fixture();
@@ -680,6 +688,7 @@ fn render_identity() {
     assert_eq!(t.render(), b"name\tcode\r\nCap\tcap\r\n");
 }
 
+// Covers: specs/data/patch-layers.md §2
 #[test]
 fn schema_rules() {
     let r = rules_from_schema(crate::schema::schema());

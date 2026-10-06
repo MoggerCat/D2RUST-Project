@@ -155,6 +155,7 @@ mod tests {
         v
     }
 
+    // Covers: specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order
     #[test]
     fn parses() {
         let cof = Cof::parse(&file(1, 2, 1, &[1], &[1, 0], &[1, 1])).unwrap();
@@ -166,6 +167,7 @@ mod tests {
         assert_eq!((cof.x_min, cof.y_min), (-10, -20));
     }
 
+    // Covers: specs/formats/cof.md §frame-events-and-draw-order, §edge-cases-original-bugs
     #[test]
     fn padded_events() {
         let data = file(1, 1, 1, &[0], &[3, 0, 0, 0], &[0]);
@@ -175,6 +177,7 @@ mod tests {
         assert_eq!(cof.event_padding, [0, 0, 0]);
     }
 
+    // Covers: specs/formats/cof.md §layer-records-l-9-bytes, §frame-events-and-draw-order
     #[test]
     fn errors() {
         assert!(

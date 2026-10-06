@@ -103,6 +103,7 @@ impl BitWriter {
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/mpq.md §10 text
     #[test]
     fn lsb_first_order() {
         let mut r = BitReader::new(&[0b1010_0001, 0xFF]);

@@ -116,6 +116,7 @@ mod tests {
 
     const START: Seed = Seed::init();
 
+    // Covers: specs/sim/rng.md §2
     #[test]
     fn step_vectors() {
         let cases = [
@@ -131,6 +132,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §2
     #[test]
     fn zero_is_fixed_point() {
         let mut s = Seed::new(0, 0);
@@ -140,6 +142,7 @@ mod tests {
         assert_eq!(s, Seed::new(0, 0));
     }
 
+    // Covers: specs/sim/rng.md §2, §4 text
     #[test]
     fn five_steps_from_default() {
         let lo = [
@@ -157,6 +160,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §2
     #[test]
     fn previous_hi_from_two_low_words() {
         // Spec §2: hi = (lo' − lo·K) mod 2^32.
@@ -168,6 +172,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §3 r1
     #[test]
     fn roll_nonpositive_does_not_step() {
         for n in [0, -5, i32::MIN] {
@@ -177,6 +182,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §3 text, §3 r2
     #[test]
     fn roll_vectors() {
         for (n, want) in [
@@ -192,6 +198,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §3 text
     #[test]
     fn mask_vectors() {
         for (n, want) in [(0, 1_791_398_751), (16, 15), (10, 9)] {
@@ -203,6 +210,7 @@ mod tests {
         assert_eq!(s.mask_range(3, 8), 10);
     }
 
+    // Covers: specs/sim/rng.md §3 text, §3 r1
     #[test]
     fn roll_range_vectors() {
         let mut s = START;
@@ -214,12 +222,14 @@ mod tests {
         }
     }
 
+    // Covers: specs/sim/rng.md §5.1
     #[test]
     fn time_value_vectors() {
         assert_eq!(time_value(0), 1_372_387_049);
         assert_eq!(time_value(12345), 185_352_726);
     }
 
+    // Covers: specs/sim/rng.md §4 text, §4 r1, §5 text
     #[test]
     fn setters_and_derive() {
         let mut s = Seed::new(5, 6);
@@ -232,6 +242,7 @@ mod tests {
         assert_eq!(drlg, Seed::new(4_014_346_869, 268_778_232));
     }
 
+    // Covers: specs/sim/rng.md §2, §3 text
     #[test]
     fn recorded_values() {
         // Spec "Test vectors", values from the recorded traces.

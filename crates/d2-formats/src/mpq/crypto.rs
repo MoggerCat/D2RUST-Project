@@ -109,6 +109,7 @@ pub fn encrypt(data: &mut [u8], mut key: u32) {
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/mpq.md §2; specs/formats/mpq-tables.md §a-crypt-table
     #[test]
     fn crypt_table_spot_values() {
         assert_eq!(CRYPT_TABLE[0x000], 0x55C6_36E2);
@@ -118,12 +119,14 @@ mod tests {
         assert_eq!(CRYPT_TABLE[0x4FF], 0x7303_286C);
     }
 
+    // Covers: specs/formats/mpq.md §4
     #[test]
     fn table_keys() {
         assert_eq!(hash(b"(hash table)", HashType::FileKey), HASH_TABLE_KEY);
         assert_eq!(hash(b"(block table)", HashType::FileKey), BLOCK_TABLE_KEY);
     }
 
+    // Covers: specs/formats/mpq.md §3
     #[test]
     fn hash_is_case_and_separator_insensitive() {
         for kind in [HashType::TableOffset, HashType::NameA, HashType::NameB] {
@@ -134,6 +137,7 @@ mod tests {
         }
     }
 
+    // Covers: specs/formats/mpq.md §4
     #[test]
     fn encrypt_decrypt_round_trip() {
         let original: Vec<u8> = (0..=255u8).cycle().take(1027).collect();

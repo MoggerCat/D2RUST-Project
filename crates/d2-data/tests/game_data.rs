@@ -59,6 +59,7 @@ fn txt(archive_name: &str, file: &str) -> TxtTable {
 /// `txt-format.md` survey: every excel `.txt` parses except `Aiparms.txt`
 /// (E8, line 13), and record counts equal the same-archive `.bin` count
 /// (128 pairs).
+// Covers: specs/data/txt-format.md §5 r3, §5 r4; specs/data/loading.md §11
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn txt_survey() {
@@ -111,6 +112,7 @@ fn txt_survey() {
     assert_eq!(pairs, 128);
 }
 
+// Covers: specs/data/txt-format.md §5 r5, §6 r3; specs/data/loading.md §10 r5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn txt_binding_vectors() {
@@ -351,6 +353,7 @@ fn crosscheck_catches_perturbations() {
 }
 
 /// `callbacks.md` test vectors taken from 1.14d records.
+// Covers: specs/data/callbacks.md §2, §3, §4, §5, §6
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn callback_vectors() {
@@ -370,6 +373,7 @@ fn callback_vectors() {
 }
 
 /// The applied `loading.md` §7.4 fix-ups on the live set.
+// Covers: specs/data/fixups.md §3, §6, §8, §10, §12, §13; specs/data/runtime-maps.md §3, §5, §7, §8, §9, §10
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn fixups_on_live_set() {

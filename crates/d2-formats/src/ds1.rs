@@ -402,6 +402,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/ds1.md §rules r2, §rules r3, §rules r4, §rules r5, §rules r7, §rules r8, §rules r9, §rules r11, §rules r12
     #[test]
     fn v18_without_tags() {
         let ds1 = Ds1::parse(&build(18, 0, 1, 1, 3)).unwrap();
@@ -419,6 +420,7 @@ mod tests {
         assert!(ds1.trailing.is_empty());
     }
 
+    // Covers: specs/formats/ds1.md §rules r7, §rules r8, §rules r10, §rules r12
     #[test]
     fn v18_with_tags_and_groups() {
         let ds1 = Ds1::parse(&build(18, 1, 2, 2, 5)).unwrap();
@@ -429,6 +431,7 @@ mod tests {
         assert!(ds1.trailing.is_empty());
     }
 
+    // Covers: specs/formats/ds1.md §rules r8, §orientation-lookup-v-7
     #[test]
     fn old_version_maps_orientation() {
         let ds1 = Ds1::parse(&build(6, 0, 1, 1, 7)).unwrap();
@@ -439,6 +442,7 @@ mod tests {
         );
     }
 
+    // Covers: specs/formats/ds1.md §rules r7, §rules r8
     #[test]
     fn version_3_layer_order() {
         let ds1 = Ds1::parse(&build(3, 0, 1, 1, 1)).unwrap();
@@ -447,6 +451,7 @@ mod tests {
         assert_eq!(ds1.shadow[0], 400);
     }
 
+    // Covers: specs/formats/ds1.md §rules r1, §rules r7
     #[test]
     fn errors() {
         assert!(
@@ -458,6 +463,7 @@ mod tests {
         assert!(Ds1::parse(&data[..40]).is_err(), "truncated");
     }
 
+    // Covers: specs/formats/ds1.md §rules r10
     #[test]
     fn truncated_groups_read_as_zero() {
         let data = build(13, 1, 1, 1, 0);
@@ -471,6 +477,7 @@ mod tests {
         assert_eq!((cut.groups[0].height, cut.groups[0].unknown), (0, 0));
     }
 
+    // Covers: specs/formats/ds1.md §cell-interpretation-informational-used-by-later-specs
     #[test]
     fn cell_fields() {
         let cell = 0x8150_2A07u32;

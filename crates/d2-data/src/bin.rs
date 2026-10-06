@@ -552,6 +552,7 @@ mod tests {
         BinTable::parse(name, "p", name, &bin(count, size, 0), size).unwrap()
     }
 
+    // Covers: specs/data/loading.md §4.2 r1, §4.2 r2
     #[test]
     fn container_size_rules() {
         assert!(matches!(
@@ -574,6 +575,7 @@ mod tests {
         assert!(BinTable::parse("a", "p", "a", &bin(1, 4, 1), 4).is_err());
     }
 
+    // Covers: specs/data/loading.md §8, §10 r8
     #[test]
     fn count_checks() {
         let s = StringTables::default();
@@ -596,6 +598,7 @@ mod tests {
         assert!(!ok(&table("leveldefs", 136, 156), &[levels]));
     }
 
+    // Covers: specs/data/loading.md §8
     #[test]
     fn chartemplate_levels() {
         let s = StringTables::default();
@@ -607,6 +610,7 @@ mod tests {
         assert!(post_load_check(&t, &[], &s, true).is_ok());
     }
 
+    // Covers: specs/data/loading.md §8
     #[test]
     fn automap_names() {
         let s = StringTables::default();
@@ -621,6 +625,7 @@ mod tests {
         assert!(post_load_check(&t, &[], &s, true).is_err());
     }
 
+    // Covers: specs/data/loading.md §8
     #[test]
     fn superunique_coverage() {
         let s = StringTables::default();
@@ -656,6 +661,7 @@ mod tests {
     }
 
     /// `loading.md` test vectors on the 1.14d install.
+    // Covers: specs/data/loading.md §4.3, §6, §11
     #[test]
     #[ignore = "needs original game files in D2_GAME_DIR"]
     fn live_bin_set_loads() {
@@ -694,6 +700,7 @@ mod tests {
         assert_eq!(tc_count(t("itemtypes"), t("treasureclassex")), 1_013);
     }
 
+    // Covers: specs/data/loading.md §2
     #[test]
     #[ignore = "needs original game files in D2_GAME_DIR"]
     fn excel_lookup_order() {

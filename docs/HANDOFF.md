@@ -14,7 +14,7 @@ rather than restating them.
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
 | 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) done: `tick.md` / `unit-order.md` `conformance-passing`; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `cargo test -p conformance --test tick_replay`: `traces/sim/tick/sim-0006..0008` (11,105 ticks, 65,754 inputs) replay through `d2_sim::tick::tick` with all 48,316 timer runs in order and all 446 list snapshots equal, 0 mismatches; 4 perturbation tests reported at exactly the changed record. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
-| 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
+| 4 Conformance | recording proven feasible; coverage report tool done (claims seeded in rng, d2-data, d2-formats) | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly; `py tools/coverage.py --summary` (numbers in §2 step 5) |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
 
@@ -76,6 +76,20 @@ rather than restating them.
    replace handler stubs per system spec. The host-schedule vectors of
    `tick.md` §1 are covered by `tests/host.rs`.
 
+5. **Coverage claims, part 2** (tools/implementation, medium): the tool
+   and scheme are done (`docs/COVERAGE.md`, `py tools/coverage.py`,
+   2026-10-06, branch `claude/phase4-coverage`): 298 claims; 619 rule
+   units; unit 230 (37.2%), game-file 144 (23.3%), trace 2 (0.3%),
+   verified 146 (23.6%), any 256 (41.4%). Claims exist only in d2-sim
+   `rng.rs`, d2-formats, d2-data and `check_rng.py`. Next, once the
+   sessions working there have merged: claim `crates/conformance`
+   (`rng_traces.rs`, tick replay: trace tier), `d2-server`, d2-sim
+   `tick`/`units`, `d2-proto`, `d2-client` (`verify`: game tier), and the
+   trace checkers `check_tick.py` / `check_packets.py` (trace tier; their
+   docstrings already name the § they check). Gaps to fill with tests
+   after that: `intents-events.md`, `tick.md`, `unit-order.md`,
+   `calc-expressions.md`, `loading.md`.
+
 ## 3. Code map
 
 | Path | What | Spec |
@@ -122,6 +136,7 @@ rather than restating them.
 | `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
 | `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
+| `tools/coverage.py` | spec rule coverage: rule IDs from specs, `Covers:` claims from tests and checks, unit / game-file / trace table, uncovered list; `--check` (CI), `--selftest` | `docs/COVERAGE.md` |
 | `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
 | `tools/ghidra/` | Ghidra scripts (label import, export); `disasm.py`: disassembly, xrefs, whole-binary dump (the decompile drops register arguments) | |
 
@@ -135,6 +150,8 @@ rather than restating them.
 | `cargo run -p depcheck` | crate dependency rules | repo |
 | `cargo run -p data-tool -- gen-proto` then `cargo test -p d2-proto` | `d2-proto` tables regenerated from `specs/sim/*-messages.tsv`; tests `generated_file_is_current`, `tables_match_tsv` (perturbation: `check_reports_exactly_a_changed_row`) | repo |
 | `py tools/spec_index.py --check` | spec indexes current | repo |
+| `py tools/coverage.py --check` / `--selftest` | every `Covers:` claim names an existing spec rule (perturbation: a renamed claim is reported at its file and line) | repo |
+| `py tools/coverage.py [--summary]` | per-spec coverage of spec rules by unit, game-file and trace checks; verified = game-file or trace (`docs/COVERAGE.md` §3) | repo |
 | `PROPTEST_CASES=20000 cargo test -p d2-formats -p d2-data robust` | parsers return Ok/Err on malformed input: no panic, hang or huge allocation (default case counts run in `cargo test`, <1 s) | repo |
 | `cargo test -p d2-data -p d2-formats -- --ignored` | game-file tests | `game/` |
 | `cargo run --release -p data-tool -- tables` | every live table and code buffer reproduced from `.txt` | `game/` |

@@ -98,18 +98,21 @@ pub(crate) fn explode(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecErro
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/mpq.md §10 r1, §10 r2, §10 r3
     #[test]
     fn blast_test_vector() {
         let out = explode(&[0x00, 0x04, 0x82, 0x24, 0x25, 0x8F, 0x80, 0x7F], 64).unwrap();
         assert_eq!(out, b"AIAIAIAIAIAIA");
     }
 
+    // Covers: specs/formats/mpq.md §10 r4
     #[test]
     fn output_is_capped() {
         let out = explode(&[0x00, 0x04, 0x82, 0x24, 0x25, 0x8F, 0x80, 0x7F], 5).unwrap();
         assert_eq!(out, b"AIAIA");
     }
 
+    // Covers: specs/formats/mpq.md §10 text
     #[test]
     fn rejects_bad_headers() {
         assert!(explode(&[0x02, 0x04, 0, 0, 0], 8).is_err(), "mode");
@@ -122,6 +125,7 @@ mod tests {
         assert!(explode(&[0x00, 0x04, 0x82, 0x24, 0x25, 0x8F, 0x80], 64).is_err());
     }
 
+    // Covers: specs/formats/mpq-tables.md §b-pkware-dcl-tables
     #[test]
     fn ascii_codes_are_a_prefix_code() {
         // Every 13-bit pattern must decode to a symbol whose code matches it.

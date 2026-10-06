@@ -197,6 +197,7 @@ fn other_families() {
     i("rand(1,3)", "07 01 07 03 01 02 00");
 }
 
+// Covers: specs/data/calc-expressions.md §4.2
 #[test]
 fn refusals() {
     assert_eq!(
@@ -209,6 +210,7 @@ fn refusals() {
     );
 }
 
+// Covers: specs/data/calc-expressions.md §4.7
 #[test]
 fn diagnostics() {
     let d = |t: &str| {
@@ -224,6 +226,7 @@ fn diagnostics() {
     assert!(d("lvl+1").is_empty());
 }
 
+// Covers: specs/data/calc-expressions.md §3.3
 #[test]
 fn constant_evaluator() {
     let e = |s: &str| eval_const(&hex(s));
@@ -249,6 +252,7 @@ fn constant_evaluator() {
     assert_eq!(eval_const(&many), 1);
 }
 
+// Covers: specs/data/calc-expressions.md §1.5
 #[test]
 fn buffer_validation() {
     let v = |buf: &str, fields: &[u32]| {

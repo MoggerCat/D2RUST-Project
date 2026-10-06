@@ -47,6 +47,7 @@ behaviors the engine reproduces exactly.
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 | Tick trace replay (2026-10-06) | `conformance::tick` runs `d2_sim::tick::tick` once per recorded tick; hooks apply each step's recorded inputs, the dispatch compares every run and applies the recorded handler's work; d2-sim's own work (step 6 clears, step 9 deactivation, freeing timers after their run) is produced, not replayed | The recording logs list primitives, d2-sim's API is coarser: each recorded primitive starts a d2-sim operation and the primitives it performs next must follow in the recording ("owed"). Unit allocation is split from `SUNIT_Add` in `d2-sim` (`alloc_unit`, `add_allocated`), as the spec has it, because a missile's init schedules a timer before the missile is listed. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
+| Spec rule coverage (2026-10-06) | Rule IDs read from spec headings and numbered lists (`§5.2 r4`); tests claim them with `// Covers:` comments; `tools/coverage.py` (Python, like `spec_index.py`) reports unit / game-file / trace coverage per spec; only game-file and trace count as verified | `docs/COVERAGE.md`. Comments over a TSV map: one owner per claim, no sync check needed. `--check` in CI fails on dangling claims, never on low coverage. Rows of spec TSVs are not counted yet. |
 
 ## Phases
 
@@ -199,7 +200,7 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 ### Phase 4 — Conformance (runs alongside Phase 3)
 - [ ] Trace recorder for the original game. *Feasibility proven 2026-10-05: `tools/trace-recorder` records every RNG draw of 1.14d (Python debugger); traces in `traces/sim/rng/`. Other event types not yet.*
 - [ ] Replay harness. *Per-behavior replayers in `crates/conformance`: RNG draws (`conformance::rng`) and the tick (`conformance::tick`: timer runs and unit lists, perturbation-tested).*
-- [ ] Coverage report (the "99.x%" number)
+- [ ] Coverage report (the "99.x%" number). *Tool and claim scheme done 2026-10-06 (`docs/COVERAGE.md`, `py tools/coverage.py`, `--check` in CI); claims seeded in d2-sim rng, d2-data, d2-formats. Open: claims in conformance, d2-server, d2-sim tick, d2-proto, d2-client and the trace checkers; then the number is meaningful.*
 
 ### Phase 5 — Local server + bridge
 - [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); d2rs session/snapshot messages for the bridge still to come.*

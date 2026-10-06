@@ -182,6 +182,7 @@ impl StringTable {
 mod tests {
     use super::*;
 
+    // Covers: specs/formats/tbl.md §key-lookup
     #[test]
     fn hash_vectors() {
         assert_eq!(key_hash(b""), 0);
@@ -245,6 +246,7 @@ mod tests {
         d
     }
 
+    // Covers: specs/formats/tbl.md §strings, §element-access, §key-lookup
     #[test]
     fn round_trip() {
         // "A" and "Q" collide in a table of 16 (65 % 16 == 81 % 16 == 1).
@@ -260,6 +262,7 @@ mod tests {
         assert!(t.element(3).is_none());
     }
 
+    // Covers: specs/formats/tbl.md §header-21-bytes
     #[test]
     fn truncated_is_an_error() {
         let data = build(&[("A", "x")], 4);
