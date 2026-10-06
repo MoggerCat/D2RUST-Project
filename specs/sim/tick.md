@@ -33,9 +33,9 @@
 | Constants & data dependencies | 392–405 |
 | Randomness | 406–413 |
 | Edge cases & original bugs | 414–431 |
-| Test vectors | 432–482 |
-| Provenance | 483–507 |
-| Open questions | 508–524 |
+| Test vectors | 432–517 |
+| Provenance | 518–542 |
+| Open questions | 543–559 |
 <!-- /index -->
 
 ## Summary
@@ -476,9 +476,44 @@ expire, arg1, arg2)` equal the ones `d2-sim` produces from the same start
 state and the same messages. Until `d2-sim` has units, the recorded run
 is checked against a model of §5 (`tools/trace-recorder/check_tick.py`:
 it replays every recorded schedule and cancel in order and must predict
-every recorded execution and nothing else). The committed format-1
-trace (`tick-0001`) is written by a converter once `d2-sim` can replay a
-game; a combat-heavy recording is queued (`docs/HANDOFF.md` §5).
+every recorded execution and nothing else).
+
+**Trace sim/tick (format 1).** `traces/sim/tick/sim-0006`, `-0007`,
+`-0008` are the three recordings above (frames 1–4901, 1–1572,
+1–4632; a tick cut by the time limit is dropped), written by
+`tools/trace-recorder/convert_tick.py`. CI runs `convert_tick.py --check
+traces/sim/tick/*.json`: it rebuilds a recording from each trace, replays
+it through the `check_tick.py` model (0 errors on all three) and converts
+it back to the same trace; `--perturb-run N` and `--perturb-lists N` are
+reported at exactly the changed event (M08). `setup`: `start_frame` 0,
+`frames` (complete ticks), `source`, `game_args`, `snap_every`. Every
+event has `tick` = the frame it belongs to and `data.seq` (one count
+1..N over `inputs` and `expected` together: the recorded order) and
+`data.step`: `pre` (before step 1: message handling, and the snapshot)
+or the §3 step it happened in (`env`, `rooms`, `events`, `clients`,
+`updq`, `dels`, `quests`, `deact`, `inactive`, `items`). Ids: unit =
+`[type, GUID]`; timer = its schedule number (1, 2, … in `timer_set`
+order); room = `R<n>`, n = activation number; act = index 0–4; client =
+join number.
+
+| Kind | Array | `data` |
+|---|---|---|
+| `timer_set` | inputs | `timer`, `type`, `unit`, `req` (requested expire; −1 = every-tick, §5.3), `expire` (after §5.2 rule 3), `a1`, `a2`; `cb` (1.14d callback address, informational) only when not null |
+| `timer_cancel` | inputs | `timer`, `deferred` (cancelled while executing, §5.4 rule 1) |
+| `timer_run` | expected | `timer`; class, list, type, unit, expire and args are those of its `timer_set` (the converter checks every recorded run against them) |
+| `hash_add`, `hash_remove` | inputs | `unit` (+ `class_id` on add); `unit-order.md` §2 |
+| `room_add`, `room_remove` | inputs | `unit` (+ `room` on add); §5 |
+| `queue_add`, `queue_remove` | inputs | `unit` (+ `room` on add); §6 |
+| `queue_clear` | inputs | `room`: a clear outside step 6 (none recorded). Step 6's clears are not stored: they are exactly §3 step 6 (acts with the pending-update flag, set by `queue_add`, in act order; every active room in list order), which held in all 11,105 recorded ticks |
+| `room_activate`, `room_deactivate` | inputs | `room`, `act`; §4 |
+| `lists` | expected | state at the start of the tick (step `pre`), at frame 1 and every `snap_every` frames: `hash` {type: [[bucket, [GUID…]]]}, `tiles` [GUID], `acts` (5 × null or [{`room`, `units`, `queue`, `adj`}], `adj` = room ids, `?` for an inactive one), `clients` [id] |
+
+Replay (timer queue and lists without unit behaviour): walk both arrays
+merged by `seq`; apply each input; at the `events` step, drive the §5.5
+iterator: before each `timer_run`, apply the inputs with a smaller `seq`,
+then the iterator's next timer must be that run's; after the tick's last
+`events` input the iterator must be exhausted. Each `lists` event must
+equal the implementation's lists (`unit-order.md`, Test vectors).
 
 ## Provenance
 
