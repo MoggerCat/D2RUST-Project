@@ -1,7 +1,8 @@
 // Spec: specs/world/cube.md §1, §2, §8; specs/sim/intents-events.md §2.4
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
-//! for items, stats, unit records and creation; the staged state for
-//! interaction, inventory lists, the date and sounds; the checks
+//! for items, stats, unit records and creation; the player's
+//! interaction owner ([`Interact`]); the staged state for inventory
+//! lists, the date and sounds; the checks
 //! `cube.md` §2 writes (`0x00549350`, `0x00549150`, `0x0055BF50`'s flag
 //! part); and [`ItemPending`] for the calls no written spec owns.
 
@@ -12,7 +13,7 @@ use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::economy::{CubeRest, EconomyCube};
 use d2_sim::world::cube::{CraftProperty, CubeWorld, ItemRequest, StatRead};
 
-use super::{Interaction, ItemError, ItemHooks, ItemPending, Staged};
+use super::{CubeHooks, Interact, ItemError, ItemPending, Staged};
 use crate::adapters::UnitFacts;
 
 /// Item flag the targeting reset clears (`cube.md` §2 step 3.1).
@@ -118,21 +119,23 @@ impl CubeRest for InfoRest<'_> {
 }
 
 /// The cube's world on the server, for one handler call by `player`.
-pub(super) struct ServerCube<'e, 'a, 'r> {
-    econ: EconomyCube<'e, 'a, ItemHooks, InfoRest<'r>>,
+pub(super) struct ServerCube<'e, 'a, 'r, H> {
+    econ: EconomyCube<'e, 'a, H, InfoRest<'r>>,
     staged: &'e mut Staged,
     pending: &'e mut dyn ItemPending,
+    interact: &'e mut dyn Interact,
     facts: &'e BTreeMap<UnitId, UnitFacts>,
     player: UnitId,
     sent: Vec<Vec<u8>>,
     errors: Vec<ItemError>,
 }
 
-impl<'e, 'a, 'r> ServerCube<'e, 'a, 'r> {
+impl<'e, 'a, 'r, H: CubeHooks> ServerCube<'e, 'a, 'r, H> {
     pub(super) fn new(
-        econ: EconomyCube<'e, 'a, ItemHooks, InfoRest<'r>>,
+        econ: EconomyCube<'e, 'a, H, InfoRest<'r>>,
         staged: &'e mut Staged,
         pending: &'e mut dyn ItemPending,
+        interact: &'e mut dyn Interact,
         facts: &'e BTreeMap<UnitId, UnitFacts>,
         player: UnitId,
     ) -> Self {
@@ -140,6 +143,7 @@ impl<'e, 'a, 'r> ServerCube<'e, 'a, 'r> {
             econ,
             staged,
             pending,
+            interact,
             facts,
             player,
             sent: Vec::new(),
@@ -159,12 +163,9 @@ impl<'e, 'a, 'r> ServerCube<'e, 'a, 'r> {
         (self.sent, errors)
     }
 
-    fn active(&self, player: UnitId) -> Option<Interaction> {
-        self.staged
-            .interactions
-            .get(&player)
-            .copied()
-            .filter(|i| i.active)
+    /// The active interaction: (unit type, GUID).
+    fn active(&self, player: UnitId) -> Option<(u8, u32)> {
+        self.interact.interact_unit(player)
     }
 
     fn inventory_of(&self, player: UnitId) -> &[UnitId] {
@@ -187,7 +188,7 @@ impl<'e, 'a, 'r> ServerCube<'e, 'a, 'r> {
     }
 }
 
-impl CubeWorld for ServerCube<'_, '_, '_> {
+impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     fn expansion(&self) -> bool {
         self.econ.expansion()
     }
@@ -233,43 +234,36 @@ impl CubeWorld for ServerCube<'_, '_, '_> {
     }
 
     fn interaction(&self, player: UnitId) -> Option<(u8, u32)> {
-        self.active(player).map(|i| (i.unit_type, i.guid))
+        self.active(player)
     }
     /// `0x00554120`: only when no interaction is active.
     fn set_interaction(&mut self, player: UnitId, unit_type: u8, guid: u32) {
         if self.active(player).is_none() {
-            self.staged.interactions.insert(
-                player,
-                Interaction {
-                    guid,
-                    unit_type,
-                    active: true,
-                },
-            );
+            self.interact.set_interact(player, unit_type, guid);
         }
     }
+    /// `0x00554190`: GUID −1, type 6, inactive.
     fn reset_interaction(&mut self, player: UnitId) {
-        self.staged.interactions.insert(player, Interaction::RESET);
+        self.interact.reset_interact(player);
     }
     fn inventory_pass(&mut self, player: UnitId) {
         self.pending.inventory_pass(player, &mut self.sent);
     }
     fn interacting_with_stash(&self, player: UnitId) -> bool {
-        self.active(player).is_some_and(|i| {
-            i.unit_type == STASH_TYPE
-                && self.unit_class(UnitType::Object, i.guid) == Some(STASH_CLASS)
+        self.active(player).is_some_and(|(ty, guid)| {
+            ty == STASH_TYPE && self.unit_class(UnitType::Object, guid) == Some(STASH_CLASS)
         })
     }
     /// `0x005678A0`: interaction type 0 with a live (player) unit.
     fn trading(&self, player: UnitId) -> bool {
-        self.active(player).is_some_and(|i| {
-            i.unit_type == 0
+        self.active(player).is_some_and(|(ty, guid)| {
+            ty == 0
                 && self
                     .econ
                     .econ
                     .game
                     .lists
-                    .find_unit(UnitType::Player, i.guid)
+                    .find_unit(UnitType::Player, guid)
                     .is_some()
         })
     }

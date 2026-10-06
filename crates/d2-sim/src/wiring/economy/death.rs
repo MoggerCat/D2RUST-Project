@@ -55,9 +55,12 @@ pub struct DropTables {
 #[derive(Debug)]
 pub struct DeathDrops {
     pub tables: Arc<DropTables>,
-    /// Game-creation fields; `seed` is replaced by the action wiring's
-    /// game seed for each drop and written back (one game seed,
-    /// `rng.md` §5.3).
+    /// The unique bits (+0x1B24) the drops read and set. The game seed
+    /// and the creation fields of a drop are the action wiring's
+    /// (`ActionHooks::game_seed`, `ActionHooks::ai_info`,
+    /// `UnitData::expansion`, [`GameFields::from_action`]); only
+    /// `uniques` is read here, and the drop's fields are written back
+    /// (the seed to the action wiring).
     pub fields: GameFields,
     pub items: ItemStore,
     /// Living players and the `players` setting (`treasure.md` Inputs).
@@ -180,10 +183,12 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         Some(rm) => (Some(rm), (x + 2, y + 3)),
         None => (room, (x, y)),
     };
-    let mut fields: GameFields = GameFields {
-        seed: h.game_seed,
-        ..d.fields.clone()
-    };
+    let mut fields = GameFields::from_action(
+        h.game_seed,
+        &h.ai_info,
+        sim.data.expansion,
+        d.fields.uniques.clone(),
+    );
     let facts = fields.treasure_facts(d.living_players, d.players_setting);
     let data = TreasureData {
         tcs: &t.tcs,

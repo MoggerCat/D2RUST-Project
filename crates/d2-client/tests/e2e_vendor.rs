@@ -2,7 +2,7 @@
 //! End-to-end vendor path: the bridge (`d2_client::bridge`) on its local
 //! link over the in-process `d2-server` host, whose game is `SimGame` on
 //! the wired `d2-sim` (`wiring::action::ActionSim`) with the server's
-//! [`TradeWorld`] as its world host: the NPC and vendor handlers run on
+//! [`WiredWorld`] as its world host: the NPC and vendor handlers run on
 //! `wiring::interaction` (`Desk`, `VendorDesk`) over the action sim's own
 //! units and stat lists, from synthetic tables (no game files).
 //!
@@ -42,7 +42,7 @@ use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemstatcost, Record};
 use d2_proto::client::{BuyItem, EntityAction, InitEntityChat, InteractWithEntity, SellItem};
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::dispatch::Outcome;
 use d2_server::host::{Handled, Host};
@@ -59,7 +59,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-use d2_sim::wiring::economy::{GameFields, ItemSpawn};
+use d2_sim::wiring::economy::ItemSpawn;
 use d2_sim::world::npc::{class, NpcControl};
 use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 
@@ -145,7 +145,7 @@ fn stat_data() -> Arc<StatData> {
 
 // ---- the game ---------------------------------------------------------------------------
 
-type World = TradeWorld<Rest>;
+type World = WiredWorld<Rest>;
 type Sim = SimGame<ActionSim<ActionRest>, World>;
 
 /// Manual host clock (ms), injected into the host (`tick.md` §8).
@@ -282,9 +282,8 @@ impl Fx {
 
         let mut rest = Rest::default();
         rest.quests.insert(player, PlayerQuests::default());
-        let mut world: World = TradeWorld::new(
+        let mut world: World = WiredWorld::new(
             ActionWorld::default(),
-            GameFields::new(Seed::init_low(game_seed), false),
             item_tables(),
             quests,
             ctl,
