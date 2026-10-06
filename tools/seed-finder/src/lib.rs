@@ -15,7 +15,7 @@ use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use query::{check, Found, Query};
 use world::{build_level, FinderHost, LevelView, Prepared};
@@ -46,26 +46,6 @@ pub struct Outcome {
 /// Seeds per work item: the limit is applied after whole chunks, so the
 /// hits kept are always the lowest seeds of the range.
 const CHUNK: u32 = 16;
-
-/// Rejects queries the host cannot answer: a champion or unique wanted
-/// where room population places nothing.
-pub fn supported<X: FinderHost>(q: &Query) -> Result<()> {
-    if !X::ROOM_POPULATION {
-        if let Some(k) = q
-            .wants
-            .iter()
-            .filter_map(|w| w.kind)
-            .find(|k| k.needs_room_population())
-        {
-            bail!(
-                "unsupported query: kind {k} comes only from room population \
-                 (population.md §3), whose DRLG coordinate lists (0x0061AD50) no \
-                 spec provides yet; on this host only presets place monsters"
-            );
-        }
-    }
-    Ok(())
-}
 
 /// Checks one value.
 pub fn check_seed<X: FinderHost>(
@@ -100,7 +80,6 @@ pub fn search<X: FinderHost>(
     q: &Query,
     host: impl Fn() -> X + Sync,
 ) -> Result<Outcome> {
-    supported::<X>(q)?;
     let span = u64::from(q.last) - u64::from(q.first) + 1;
     let chunks = span.div_ceil(u64::from(CHUNK)) as u32;
     let next = AtomicU32::new(0);

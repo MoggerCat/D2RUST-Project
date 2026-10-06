@@ -22,12 +22,15 @@
 //!   (`rooms.md` §5–§8);
 //! - [`tiles`]: tile library, tile choice, grid fill, linking, animation
 //!   (`rooms.md` §9);
-//! - [`collision`]: collision grids (`rooms.md` §10).
+//! - [`collision`]: collision grids (`rooms.md` §10);
+//! - [`logic`]: logical rooms (coordinate lists) and their lookups
+//!   (`levels.md` §11.1–§11.4).
 
 pub mod active;
 pub mod collision;
 pub mod data;
 pub mod level;
+pub mod logic;
 pub mod maze;
 pub mod outdoor;
 pub mod preset;
@@ -44,6 +47,7 @@ pub use active::ActiveRoom;
 pub use collision::CollisionGrid;
 pub use data::{DoorTables, DrlgData, LevelDef, WallRemap, WarpDef};
 pub use level::{Drlg, Dungeon, Level, SpawnTile, WarpRecord};
+pub use logic::{CoordRec, LogicGrids, LogicInfo};
 pub use room::{DrlgRoom, RoomKind, WarpLink};
 pub use seams::{ActRooms, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource};
 pub use tiles::{CellGrid, GridPass, RoomGrids, RoomTiles, TileRecord, TileRef};
