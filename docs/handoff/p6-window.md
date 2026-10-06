@@ -130,6 +130,11 @@ Question Q1 below for the sim.
   not wired to intents; UI events go to `UiRoot`, none of which exists in
   play mode).
 - Atlas eviction (C2) is not wired: a full atlas is an error.
+- Frame store: this branch builds none. Frame ids come from the existing
+  `world_view::FrameTable` and `composite::ComponentResolver::frame_id`
+  hook. The parallel session `verify-map` owns the frame store
+  ((FrameSetKey, index) → `scene::FrameId`); after that merge, the app's
+  world view should switch to it.
 
 ## Questions
 
