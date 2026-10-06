@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 518–550 |
 |   8. Act transitions, warps and portals | 551–607 |
 |   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1074 |
-|   11. Acts II–V | 1075–1080 |
-| Constants & data dependencies | 1081–1095 |
-| Randomness | 1096–1114 |
-| Edge cases & original bugs | 1115–1133 |
-| Test vectors | 1134–1159 |
-| Provenance | 1160–1181 |
-| Open questions | 1182–1208 |
+|   10. Act I quests | 652–1231 |
+|   11. Acts II–V | 1232–1237 |
+| Constants & data dependencies | 1238–1252 |
+| Randomness | 1253–1271 |
+| Edge cases & original bugs | 1272–1290 |
+| Test vectors | 1291–1321 |
+| Provenance | 1322–1343 |
+| Open questions | 1344–1376 |
 <!-- /index -->
 
 ## Summary
@@ -1026,25 +1026,182 @@ any level).
 
 #### 10.6 A1Q4 The Search for Cain (chain 4)
 
-- Akara 97 starts (state 2); 112 with item `bks ` (Inifuss scroll):
-  delete it, create `bkd ` (§9.1, level 0, quality 2 normal, droppable),
-  state 5. 118 with slot 4 bit 1: set 4.0, clear 4.1, 0x28, ring reward:
-  `rin ` at level 7 quality 4 (magic) in Normal, level 30 quality 6
-  (rare) in Nightmare, level 60 quality 6 in Hell (`0x00592250`), then
-  `5D 04 02 00 0000`.
-- Cairn stone order (`0x00592E90`, run once, when the deciphered scroll
-  is read, §9.4, or a stone is operated, `0x00593710`): order[0..4] = 0;
-  i = 0; while i < 5: step the quest seed, k = lo' mod 5; if order[k] =
-  0: order[k] = 17 + i, i += 1. 0x50 then carries order[k] − 17 for k =
-  0..4 (`0x00593CB0`).
+Init `0x005971B0`: callbacks per `quests.tsv`; active 1, state 0,
+init_no 6, seq_id 3, filter 4, status fn none, active fn `0x00592FB0`,
+seq fn `0x00593D70`; extra 0x1BC zeroed bytes, GUID lists at +0xB4 and
++0x138 emptied. Extra fields read or written by the functions below:
+
+| Extra | Type | Field |
+|---|---|---|
+| +0x00 | 5 × u16 | Cairn stone order (17–21); +0x0C u16 cleared with it |
+| +0x28, +0x49 | u32, u8 | GUID of the object of class 61 linked to chain 4 (§4.6, `0x00592F80`), and "linked" := 1 |
+| +0x30, +0x47 | u32, u8 | GUID of an object of class 30 (Inifuss tree; D2MOO name), and "known" |
+| +0x34, +0x48 | u32, u8 | GUID of an object of class 26 (Cain's gibbet), and "known" |
+| +0x38 | u32 | GUID of the `bkd ` made by message 112 |
+| +0x46 | u8 | Cain-removal timer pending |
+| +0x4A | u8 | stone order computed |
+| +0x4B–+0x4F | u8 | progress flags (+0x4E, +0x4B: scroll deciphered; +0x4F: tested by events 0, 6, 9) |
+| +0x50 | u8 | Cain gone from Tristram (`0x00596CA0`) |
+| +0x51, +0x52 | u8 | Cain spawned in the Rogue Encampment; Cain still to spawn there |
+| +0x53 | u8 | talked: message 97 given, chat end not yet handled |
+| +0x54, +0x58 | i32 | 3 when the gibbet is open; progress marker (1 or 0) |
+| +0x61 | u8 | the Tristram Cain was removed |
+| +0x63 | u8 | the reward message must set game 4.13 |
+| +0x64 | u8 | scroll deciphered, chat end not yet handled |
+| +0x68 | u32 | GUID of the spawned town Cain |
+| +0x6C, +0x70 | u32, u8 | GUID of the town monster Cain spawns beside, and "known" |
+| +0x78 | u8 | set with the scroll states |
+| +0x7C | i32 | `bks ` / `bkd ` items in the game |
+| +0x93 | u8 | set at chat end with class 146 |
+| +0xB4 | GUID list | players credited when Cain reached Act II without them |
+| +0x138 | GUID list | players who heard Cain's message 123 or 126 |
+
+| Id | Function | Effect on one player P (slot 4) |
+|---|---|---|
+| L1 | `0x005920D0` | broadcast iterate: as I1 for slot 4, 0x5D for chain 4 |
+| L2 | `0x00592130` | if P has neither 4.0 nor 4.1: state 2 → set 4.2; state 3–5 → set 4.3 |
+| L3 | `0x00592B10` | if P has neither 4.0 nor 4.1: set 4.14; add P's GUID (−1 when none) to the +0xB4 list |
+| L4 | `0x00593130` | if P has neither 4.0 nor 4.1 and P's room's level is 38 (Tristram): set 4.13, 4.1; 0x28 to P; with a party, each member: if it has neither 4.0 nor 4.1 and its room's level is ≠ 0 and in Act I, set 4.13, 4.1 and send it 0x28 (`0x005930B0`) |
+| L5 | `0x005931C0` | if P has neither 4.0 nor 4.1: set 4.14; `5D 04 00 0C 0000` (act 0) |
+
+1. **Event 0** `0x00592580` (NPC class c, −1 when none):
+   1. c = 146: add state 9 with NPC class 146; continue.
+   2. If +0x4F = 1 and the player has `bkd `: delete it (§9.2), +0x7C −=
+      1.
+   3. c = 265 (cain5), the player is not in the +0x138 list and R has
+      4.13: add state 5. End.
+   4. R has 4.1: add state 7 if c = 265 and the player is in the +0x138
+      list, else state 5. End.
+   5. Player in the +0xB4 list: add state 6. End.
+   6. Player in the record's list: if c = 265 and not in the +0x138
+      list, add state 5; else R has 4.14 → state 8; else R has 4.0 →
+      state 7; else nothing. End.
+   7. End if R has 4.14, state = 0, R has 4.0 or R has 4.15. The player
+      has `bks ` → add state 3. Else state 4 → add state 2. Else m =
+      `0x00737648`[state] for states 1–5 (0, 1, 2, 3, 4); add state m.
+2. **Event 2** `0x005921B0`: c = 148 (akara): if talked = 1:
+   broadcast(1, 0), talked := 0, every player L2. Then, if +0x64 = 1:
+   broadcast(3, 0), every player L2, +0x64 := 0. c = 146: +0x93 := 1.
+3. **Event 3** `0x00596DE0` (old a, new b):
+   1. b = 38, +0x51 = 0, +0x50 = 0 and state ≥ 6: state := 5; flags :=
+      0; status(4); every player L2.
+   2. a = 1: remove the player's GUID from a non-empty record list and
+      from the +0xB4 list. If R has 4.0 or 4.1: end. If state = 2: state
+      := 3.
+   3. b = 1: if +0x70 ≠ 0, the monster with GUID +0x6C exists, +0x52 = 1
+      and +0x51 = 0: spawn the town Cain beside it (step 15). End.
+   4. b = 40 (Lut Gholein): if R lacks 4.0 and 4.1, +0x50 = 0 and state
+      < 6: Cain cleanup (step 14, arguments 0, 1); state := 7; broadcast(5,
+      0); game record 4.13; every player L3; +0x58 := 1.
+4. **Event 4** `0x00592E20` (item picked up; active records only): if
+   not-intro ≠ 0, every player L2.
+5. **Event 6** `0x00592E60` (never raised, §4.1): if +0x4F ≠ 1 and state
+   ≤ 5: state := 3; tree reset (step 13).
+6. **Event 8** `0x00593E70` (the Cow King's death; dispatched with force,
+   §4.4):
+   1. With a killer player: end if R has 4.10; end if the game is
+      expansion (+0x70) and R lacks 40.0, or classic and R lacks 26.0.
+      Set R 4.10.
+   2. Every player whose room's level is 39 (Moo Moo Farm,
+      `0x00593E30`): set 4.10.
+   3. `0x00545990` (a `ret 4` stub).
+   4. Victim drop code (+0xB8) := `vps `; 8 drops at the victim
+      (`0x00559A30(game, victim, 0, &out, 0, −1, 0)`).
+7. **Event 9** `0x00592C80` (a player leaves with a quest item; target =
+   the item): if not-intro ≠ 0 and state ≠ 6: if its code (`0x00628590`)
+   is `bkd ` or `bks `, +0x7C −= 1. Then, if +0x7C = 0, state ≤ 5, +0x4F
+   ≠ 1 and +0x47 = 1: state := 3; tree reset (step 13).
+8. **Event 10** `0x00592CF0`: if R has 4.1 and 4.0 and the record list
+   is not empty, remove the player's GUID from it (`0x00545530`); remove
+   it from the +0xB4 and +0x138 lists.
+9. **Event 11** `0x00592250` (class a, message b):
+   1. Akara, 97: talked := 1; state := 2 (no guard); refresh text.
+   2. Akara, 112, the player has `bks `: delete it; create `bkd ` (§9.1:
+      level 0, quality 2, droppable). Created: +0x64, +0x4B, +0x4E := 1;
+      +0x38 := its GUID; state := 5; flags := 0; status(3). Not created:
+      +0x7C −= 1. Without `bks `: nothing.
+   3. Akara, 118, R has 4.1: set 4.0, clear 4.1; add the GUID to the
+      record list; 0x28; ring `rin ` (§9.1, droppable): Normal level 7
+      quality 4, Nightmare 30 / 6, Hell 60 / 6; `5D 04 02 00 0000`
+      (`0x005458E0`); refresh text. If R has 4.13: status := 13; state
+      := 6 unless it is 6; if the game record lacks 4.13, set it and run
+      the sequence function. Then, if +0x63 = 1, set game 4.13.
+   4. cain5, 125: add the GUID to the record list, remove it from the
+      +0xB4 list, refresh text. cain5, 123 or 126: add the GUID to the
+      +0x138 list, refresh text.
+10. **Event 13** `0x00597030`:
+    1. R has 4.0: +0x52 := 1; game 4.13; +0x54 := 3; +0x4C, +0x4D := 1.
+    2. Else R has 4.15: +0x52 := 1; +0x63 := 1; +0x54 := 3; +0x4C,
+       +0x4D := 1.
+    3. Else R has 4.4: status 4, state 5; +0x4C, +0x4D, +0x4E, +0x78 :=
+       1; +0x58 := 1. Else 4.3 → state 3, status 1; else 4.2 → state 2,
+       status 1.
+    4. Always: +0x7C += (has `bkd `) + (has `bks `). Has `bkd `: state 5,
+       status 3, +0x4E, +0x78 := 1, +0x58 := 1. Else has `bks `: +0x78 :=
+       1, state 4, status 2, +0x58 := 1.
+11. **Event 14** `0x00592B90`: +0x7C += (has `bkd `) + (has `bks `).
+12. **Active** `0x00592FB0`: akara: R has 4.1, or R lacks 4.0 and (state
+    1, or state 4 with `bks `, or state 6 with R 4.13). cain5: the player
+    is in the +0xB4 list, or not in the +0x138 list and R has 4.13.
+    Others false.
+13. **Tree reset** `0x00592BD0`: if +0x47 = 1: the object with GUID +0x30
+    of class 30 gets mode 0; broadcast(1, 0); state := 3; +0x58 := 0;
+    every player L2. If +0x47 ≠ 1: broadcast(1, 0); state := 3; +0x58 :=
+    0.
+14. **Cain cleanup** `0x00596CA0(record, timer, remove)`:
+    1. If +0x48 = 1 and the object with GUID +0x34 is class 26: mode :=
+       3 unless it is 3 (then +0x54 is left). Otherwise and after
+       setting it: +0x54 := 3.
+    2. If +0x47 = 1 and the object with GUID +0x30 exists: mode := 1.
+    3. timer ≠ 0: if +0x46 = 0, +0x46 := 1 and timer (record, `0x00593260`,
+       period 1). timer = 0 and remove ≠ 0: every monster `0x005928C0`.
+    4. remove ≠ 0: if +0x61 = 0, drop act 0's stored preset of monster
+       146 (`0x00543140(game, 1, 146, 0)`); +0x50 := 1; if +0x51 = 0,
+       +0x52 := 1. remove = 0: +0x50 := 1.
+    Timer `0x00593260`: every monster `0x005928C0`; +0x46 := 0; return 1.
+    `0x005928C0` (stops the walk at the first class-146 monster): if
+    an NPC chat is open with it (`0x00572DC0`), send `5D 04 01 00 0000`
+    to its chat clients (`0x00573180` with `0x00592880`); else request
+    its removal mode (`0x005A7E60(monster, 0, buf)`, `0x005A7C20(game,
+    buf, 1)`, `monsters/init.md`) and +0x61 := 1. Returns 1 for class
+    146, else 0.
+15. **Town Cain spawn** `0x00592960(game, x, y)` in room R0: find a
+    point: for i = 0..20 test (x + i, y + i) inside R0's tile rectangle
+    (`0x00619730`, excluding the last row and column); found → that
+    point; not found → (y, y + 21) (bug kept). Free spot
+    (`0x00545340`, args 2, 0x100, 1, 100); none → (x, y, R0). Spawn
+    cain5 (`0x005B2F20(game, room, x, y, 265, mode 1, r 5, 0)`). On
+    failure up to 20 retries, each moving the point by (+1, +1), taking
+    its room (`0x00463740`; none → (x, y, R0)), a free spot (args 2,
+    0x100, 2, 100) and r 10; then one last try at (x, y, R0) with r 15.
+    Spawned: unit +0xC4 |= 0x3000000; +0x51 := 1; +0x52 := 0; +0x68 :=
+    its GUID.
+16. **Act change** `0x00597310(game, player)` (§8.1): if R lacks 4.0
+    and 4.1, +0x50 = 0 and state < 6: Cain cleanup (0, 1); state := 7;
+    broadcast(5, 0); game record 4.13; every player L3.
+17. **add_link** `0x00592F80` (§4.6): +0x49 := 1; +0x28 := the object's
+    GUID (−1 when none).
+18. **Sequence** `0x00593D70`: §10.1.
+
+- Cairn stone order (`0x00592E90`, run once: +0x4A guards it in
+  `0x00593CB0`; also run when a stone is operated, `0x00593710`):
+  order[0..4] = 0; i = 0; while i < 5: step the quest seed, k = lo' mod
+  5; if order[k] = 0: order[k] = 17 + i, i += 1.
+- Stone order message `0x00593CB0(game, player)` (§9.4): compute the
+  order if +0x4A = 0 (+0x4A := 1); send 0x50 (15 bytes, `0x0053D7E0`):
+  u8 0x50, u16 4, then order[k] − 17 as u16 for k = 0..4 (each must be
+  < 5, else fatal); bytes 13–14 are never written (stack bytes, Open
+  question 5).
 - Wirt's body (object class 268, event 7): the first time, piles =
   roll_range(quest seed, 10, 10) (one step, lo' mod 10 + 10) and the
   object's drop code becomes `gld `; each run with piles > 0 drops one
   gold item (`0x00559A30`, normal quality); if a drop succeeded, piles −=
   1 and, if still > 0, schedule event 7 at frame + 10.
-- Cow level hooks: the Cow King's death (event 8, `0x00593E70`) sets
-  slot 4 bit 10 for players in level 39 and drops 8 items `vps `
-  (D2MOO); the portal is §8.4.
+- Not read for this spec: the gibbet object function `0x00593290`
+  (`0x005449E0` class 26: frees Cain, spawns class 146, Tristram
+  portal), the operate functions `0x00593480` (pointer `0x00732D40`) and
+  `0x00593710` (`0x00732D3C`), and the portal helper `0x00592D50` (Open
+  question 11).
 
 #### 10.7 A1Q5 The Forgotten Tower (chain 5)
 
@@ -1156,6 +1313,11 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 | A1Q1 timer made at updater tick 100, state still 4 | tick 109: broadcast(5, 0), timer removed | §10.4, §5 |
 | A1Q1 msg 76 with R slot 1 = 0x2002 (13, 1), state 4, chain 2 state 0 not-intro 1 | chain 1 state 5, status 13; chain 2 state 1; R slot 1 = 0x2001; slot 41 = 0x2002; stat 5 + 1 | §10.4, §10.1 |
 | Sequence from chain 1 (state 5), chain 2 state 5, chain 4 state 0 | chain 4 state 1; walk stops (returns 1) | §10.1 |
+| A1Q2 event 3 a = 1, b = 17: state 0, not-intro 1, status 0 | state 3, flags 0, status 2: `5d 02 00 02 0000` to qualifying players; then J2 (state 3, status 2 → 2.4 for players lacking 2.0, 2.1) | §10.5 |
+| A1Q3 status fn, R slot 3 = 0x0002 | returns 1, out 10 | §10.5 |
+| A1Q3 Malus operate, level 7, not-intro 1, R slot 3 = 0 | sound event 19 on the player; no drop; state unchanged | §10.5 |
+| A1Q4 stone 0x50 with order [18, 20, 17, 21, 19] | `50 0400 0100 0300 0000 0400 0200` + 2 unwritten bytes | §10.6 |
+| Cow King killed by a classic-game player lacking 26.0 | nothing (no bits, no `vps ` drops) | §10.6 |
 
 ## Provenance
 
@@ -1190,8 +1352,9 @@ monster specs). Quest-seed sites outside Act I (for later specs):
    confirm its draws (`world/cube.md` open question 4).
 4. Which game-entry path (mode 0 or 1, §3) single player takes: record a
    game start with a breakpoint on `0x00546270`.
-5. Layout of the stone-order 0x50 (`0x00593CB0`): bytes before the five
-   values.
+5. Stone-order 0x50 (`0x00593CB0`, §10.6): bytes 0–12 are known; bytes
+   13–14 are uninitialized stack in the sender. Record one stone-order
+   0x50 to see what the original sends there.
 6. Act V intro init `0x0058EA50` (not disassembled): callbacks and table.
 7. Exact party/area membership tests of the per-quest iterate functions
    beyond what §10 states (chain 1 settled, §10.4; A1Q2's reward-pending
@@ -1205,3 +1368,8 @@ monster specs). Quest-seed sites outside Act I (for later specs):
     (registers of `0x0053D940` and `0x00544FA0` at their call sites in
     `0x005467E0` and `0x00546AC0`); settle with a disassembly read or a
     recording of an act change (packets).
+11. A1Q4 object functions not yet read: the gibbet quest function
+    `0x00593290` (object class 26), the operate functions `0x00593480`
+    and `0x00593710`, the portal helper `0x00592D50`, and the role of
+    extra +0x4C, +0x4D, +0x4F, +0x6C/+0x70 (who sets them). Settle with a
+    disassembly read of those four functions.
