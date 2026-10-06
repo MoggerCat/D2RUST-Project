@@ -2723,6 +2723,34 @@ the dev-dependency) and record results here.
     'crates/d2-sim/src/items/**' -- --lib -- items:: --iterate` with
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
+65. WAV on game files (`impl-audio`, `formats/wav.md` Test vectors):
+    `cargo test -p d2-formats --test wav_game -- --ignored`. Expect both
+    tests to pass: the 8 spec files match (source archive, channels, frames,
+    sum, first 8 samples, CRC-32 of `data`), and every `sounds.txt` row whose
+    file exists parses playable: 4,508 resolved, 4,434 mono, 74 stereo. A
+    mismatch is a finding for `wav.md` or `mpq.md` §12.
+66. Sound table on game files (`impl-audio`, `audio/sound-table.md` Test
+    vectors): `cargo test -p d2-client --lib sound_table::tests::game --
+    --ignored`. Expect 4,699 records, song range 4,657–4,684; id 1 →
+    `DATA\GLOBAL\SFX\cursor\pass.wav` (d2sfx, Volume 255, Priority 100);
+    ids 202–204 base 202 (size 3); 309 size 5 compound 4; 314 opens a group
+    of 3; 2934 in d2speech; 4657 `DATA\GLOBAL\MUSIC\act1\caves.wav` (Loop,
+    Stream, 1 block); 4679 2 blocks; 4698 in d2xmusic; 1595 Volume 0 and
+    missing; 4640 missing; 4,508 resolve, 157 `none.wav`, 34 missing, 698
+    group openers, 7 nested. Then write the environment / triggers real-data
+    tests on `SoundTableData::from_txt` (`impl-audio` note §2 step 2).
+67. Sound request log (player; `triggers.md` / `environment.md` "Checks",
+    `record_sound.py` hooks `0x004B9A00`, `0x004B9B50`, `0x004E40A0`,
+    `0x004DCAA0`, `0x004DCD40`, `0x004E42E0`, `0x004B99A0`, `0x004CC270`):
+    town walk, a fight, an NPC talk, item moves, town → wilderness → cave and
+    back, a day change, Blood Raven's death. Expect the d2rs rule functions,
+    fed the same inputs, to give the identical `(C, id, unit, delay, flags,
+    offset)` sequence, volume sets and roll order; then the voice log
+    `(tick, kind, file, vol, pan, looped)` (`client/audio.md` §A5).
+68. Decoded samples (`wav.md` OQ 1–2, `client/audio.md` §B1): dump the
+    DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
+    `music\act1\crypt.wav`) for the C65 files; expect byte equality with
+    our `data`.
 
 Kept entries (unchanged):
 
