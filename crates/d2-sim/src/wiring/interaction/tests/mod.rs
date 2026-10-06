@@ -22,7 +22,7 @@ use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Monstats, Record};
 
-use super::{Desk, InteractionState, NpcRest, PlayerQuestsRef, VendorRest};
+use super::{Desk, HirelingRest, InteractionState, NpcRest, PlayerQuestsRef, VendorRest};
 use crate::game::Game;
 use crate::items::tables::ItemRec;
 use crate::items::{ty, ItemTables};
@@ -33,9 +33,8 @@ use crate::units::lifecycle::{allocate, AllocRequest, LifecycleHooks};
 use crate::units::record::Units;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemStore, QuestRest};
-use crate::world::npc::{
-    class, HireRow, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl, Place,
-};
+use crate::world::hirelings::{HirelingRow, HirelingRows, HirelingTables};
+use crate::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, NpcControl, Place};
 use crate::world::quests::{
     PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
 };
@@ -288,6 +287,34 @@ pub fn hirelings(version: u16) -> Vec<HireRow> {
     ]
 }
 
+/// The hireling tables of the same rows (`hirelings.md` §1): Kashya's
+/// row is `Id` 0, Asheara's `Id` 15; the per-level columns are 0;
+/// `pettype` row 7 as in 1.14d (warp, basemax 1), MaxLvl 99.
+pub fn hireling_tables(rows: &[HireRow]) -> HirelingTables {
+    let rows = rows
+        .iter()
+        .map(|r| HirelingRow {
+            version: r.version,
+            id: if r.act == 3 { 15 } else { 0 },
+            class: r.class,
+            act: r.act,
+            difficulty: r.difficulty,
+            seller: r.seller,
+            gold: r.gold as i32,
+            level: r.level as i32,
+            name_first: r.name_first,
+            name_last: r.name_last,
+            ..HirelingRow::default()
+        })
+        .collect();
+    HirelingTables {
+        rows: HirelingRows::new(rows),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    }
+}
+
 /// Hooks with every default.
 #[derive(Default)]
 pub struct Hooks;
@@ -423,27 +450,38 @@ impl NpcRest for Rest {
     }
     fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
     fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
-    fn set_mode(&mut self, u: UnitId, mode: u8) {
-        self.log.push(format!("mode {} {mode}", u.0));
-    }
     fn spawn_mercenary(&mut self, _: UnitId, class: u32, mode: u8) -> Option<UnitId> {
         self.log.push(format!("spawn merc {class} {mode}"));
         self.trace.push(format!("spawn merc {mode}"));
         self.merc
     }
-    fn init_mercenary(&mut self, _: UnitId, merc: UnitId, init: &MercInit) {
-        self.trace.push("init merc".into());
-        self.log.push(format!(
-            "init merc {} row {} name {} price {:?}",
-            merc.0,
-            init.row,
-            init.name,
-            init.offer.map(|o| o.price)
-        ));
+}
+
+impl HirelingRest for Rest {
+    fn set_mode(&mut self, u: UnitId, mode: u8) {
+        self.log.push(format!("mode {} {mode}", u.0));
     }
-    fn revive_mercenary(&mut self, _: UnitId, merc: UnitId) {
-        self.log.push(format!("revive {}", merc.0));
+    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
+    fn skill_count(&self) -> u32 {
+        0
     }
+    fn skill_reqlevel(&self, _: u32) -> Option<i16> {
+        None
+    }
+    fn set_skill_level(&mut self, _: UnitId, _: u32, _: i32) {}
+    fn set_owner(&mut self, _: UnitId, _: u32, _: u8) {}
+    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
+        None
+    }
+    fn join_team(&mut self, _: UnitId, _: UnitId) {}
+    fn hireling_ai(&mut self, _: UnitId) {}
+    fn free_unit(&mut self, _: UnitId) {}
+    fn queue_room_removal(&mut self, _: UnitId) {}
+    fn death_event(&mut self, _: UnitId) {}
+    fn dismiss(&mut self, _: UnitId) {}
+    fn warp_to(&mut self, _: UnitId, _: UnitId) {}
+    fn level_events(&mut self, _: UnitId, _: UnitId) {}
+    fn reapply_item_stats(&mut self, _: UnitId) {}
 }
 
 impl VendorRest for Rest {
@@ -716,7 +754,8 @@ impl World {
         .expect("npc control");
         let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut fields.seed).unwrap();
         let vendor_tables = vendor_tables();
-        let state = InteractionState::new(&ctl, &GlobalLists::build(&vendor_tables));
+        let mut state = InteractionState::new(&ctl, &GlobalLists::build(&vendor_tables));
+        state.hireling_tables = Some(hireling_tables(&ctl.hirelings));
         Self {
             game: Game::new(),
             units: Units::default(),

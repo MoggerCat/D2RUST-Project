@@ -63,10 +63,12 @@ fn kashya_reward_hires_from_the_real_hire_list() {
     // Every Act I callback has a body (`quests.md` §10): only the
     // deferred reward is logged, after the quest call.
     assert_eq!(w.rest.log[0], "spawn merc 271 4");
-    assert!(w.rest.log.contains(&format!(
-        "init merc {} row 0 name {} price None",
-        merc.0, offered.name
-    )));
+    // The init (`hirelings.md` §3.2): Kashya's `Id` 0 node for the slot.
+    let node = w.state.hirelings.list(player).unwrap().nodes[0];
+    assert_eq!(
+        (node.guid, node.name, node.seed, node.id),
+        (w.guid(merc), offered.name, offered.seed, 0)
+    );
     w.assert_clean();
 }
 
@@ -87,11 +89,14 @@ fn kashya_reward_messages_precede_the_text_refresh() {
     assert_eq!(w.desk(|d, ctl| d.quest_message(ctl, player, &m)), 0);
     // `0x00590980`: 0x28, the GUID, the mercenary `0x00579180` (its 0x50,
     // then the hireling's creation: spawn mode 4, init), then the text
-    // refresh `0x00545780` (0x27, 0x29).
-    assert_eq!(
-        w.rest.trace,
-        ["0x28", "0x50", "spawn merc 4", "init merc", "0x27", "0x29"]
-    );
+    // refresh `0x00545780` (0x27, 0x29). The hireling's init
+    // (`world::hirelings::life::init`, its messages from 0x81 on) runs
+    // between the spawn and the refresh.
+    let t = &w.rest.trace;
+    assert_eq!(t[..3], ["0x28", "0x50", "spawn merc 4"]);
+    assert_eq!(t[3], "0x81");
+    assert!(t.len() > 5);
+    assert_eq!(t[t.len() - 2..], ["0x27", "0x29"]);
     w.assert_clean();
 }
 
