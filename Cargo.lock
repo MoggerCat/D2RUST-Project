@@ -2314,6 +2314,7 @@ dependencies = [
  "d2-sim",
  "d2-verify",
  "image",
+ "proptest",
  "thiserror 2.0.21",
  "toml_edit",
  "wgpu",
@@ -2348,6 +2349,7 @@ dependencies = [
 name = "d2-proto"
 version = "0.0.0"
 dependencies = [
+ "proptest",
  "thiserror 2.0.21",
 ]
 
@@ -2360,6 +2362,7 @@ dependencies = [
  "d2-net",
  "d2-proto",
  "d2-sim",
+ "proptest",
  "thiserror 2.0.21",
 ]
 
