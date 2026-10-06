@@ -631,6 +631,22 @@ pub trait Pending {
     ) {
     }
 
+    /// The units `scan_unit(game, owner, x, y, r, f, …, noaura 0)`
+    /// (`skills/bodies.md` §2.12) accepts, in order, for the missile
+    /// area bodies (`missiles.md` §R9.6). The scan runs on the skill use
+    /// view (`UseView`, which needs `UseRest`); the action view has no
+    /// provider. Default: none.
+    fn missile_area_units(
+        &mut self,
+        game: &Game,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
+        Vec::new()
+    }
+
     // ---- skill timer events (`stat-lists.md` §10.2, §10.3; `use.md` §7) --
 
     /// Routes timer events 5, 8 and 9 to the skill use pipeline. The

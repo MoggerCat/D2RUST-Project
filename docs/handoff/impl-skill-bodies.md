@@ -1,7 +1,7 @@
 # impl-skill-bodies — the 1.14d skill start / do bodies in d2-sim
 
 Branch `claude/impl-skill-bodies`, on `claude/tender-meitner-mphas3` at
-`b435f5a`. Spec: `specs/skills/bodies.md` (local session, commit
+`b435f5a`, then merged with `7f684ad` (coordinator request). Spec: `specs/skills/bodies.md` (local session, commit
 `208d2a5`), with its updates to `skills/functions.tsv`, `levels.md`,
 `use.md` and `combat/damage.md`. Implementation only; no spec edited.
 
@@ -67,6 +67,37 @@ Branch `claude/impl-skill-bodies`, on `claude/tender-meitner-mphas3` at
   bodies spec both); their impls removed from the 7 implementors
   (d2-sim, d2-server, d2-client tests).
 - **StatLists**: `remove_callback(l)` getter.
+
+## Missile bodies (second request: `missiles.md` §R9.5 / §R9.6)
+
+After the coordinator's merge of `origin/claude/tender-meitner-mphas3`
+(`7f684ad`, spec branch `claude/spec-skill-bodies` @ `9f50a51`): the 11
+`srvdo.tsv` / `srvhit.tsv` rows flipped to `spec'd-here` (27 rows in all
+with the 16 skill slots) have bodies.
+
+- `crates/d2-sim/src/missiles/bodies.rs`: server-do 2, 3, 5, 7, 8, 10,
+  25 and server-hit 1, 4, 12, 13 with `sub_at_step` (`0x005A9720`),
+  `unit_distance` (`0x006416D0`), `elem_roll` (`0x005A8C70`), `elem_len`
+  (`0x005A8F20`), `area_damage` (`0x0056BAD0`), the per-unit
+  `area_hit` (`0x0056B9C0`, over `CombatWorld`), `next_unit`
+  (`0x0056BD10`). `catalogue::run_srv_do` / `run_srv_hit` dispatch
+  them; `SRV_DO_IMPLEMENTED` / `SRV_HIT_IMPLEMENTED` updated.
+- New seam `missiles::seams::MissileBodies` (part of `MissileWorld`,
+  narrow defaults): missiles / skills formulas, path new-step flag and
+  target, collision OR / stamp, animation frame, alive, demon / undead,
+  the area scan and the area hit. The wired `View`
+  (`wiring/action/missiles.rs`) implements all of them on real parts
+  (eval on the skill tables, path provider flags / target,
+  `drlg` collision, `path::footprint::stamp_size`, unit records, the
+  combat view) except the scan: `Pending::missile_area_units` (default
+  none; the scan of `skills/bodies.md` §2.12 needs `UseRest` for its
+  line test, which the action view lacks; open SB10).
+- `combat::monster_crit` extracted from `fill` step 13 (shared with the
+  area hit; no behaviour change).
+- Tests: `missiles/tests/r9.rs` (rule tests for each body on the missile
+  fake); the stub tests that used server-do 2 / server-hit 1 as
+  observable stubs now use 6 / 2 (still unspecified); the catalogue
+  perturbation test's expectations follow the new rows.
 
 ## Tests
 
@@ -139,6 +170,15 @@ the bridge fail with it).
   overlays.
 - SB9 [bodies.md §2.1] The target refresh (`0x00553490`) is the
   provider's `UseRest::target`.
+- SB10 [wiring] `Pending::missile_area_units`: the missile area bodies
+  (server-hit 1, 12, 13) find no units on the wired host until a
+  provider runs `bodies::scan_unit` for the action view (it needs the
+  line test of `UseRest`).
+- SB11 [missiles.md §R9.6] Evade (`block_or_dodge` result 8) has no
+  listed result bit in the area hit; d2rs only clears the hit bit.
+  Server-hit 13's "len = sHitPar2, or eval(…)": read as the formula
+  when sHitPar2 ≤ 0. Server-do 8 / 10 with no record (fatal in 1.14d):
+  d2rs keeps the missile (1).
 - Spec open questions 1–7 of `bodies.md` stand (recordings, `0x00580310`
   / `0x00580380`, Bash's attack-rate list removal, `0x00575900`, handler
   iteration, `0x005B0DA0`).

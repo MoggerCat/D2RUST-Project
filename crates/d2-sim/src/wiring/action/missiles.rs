@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6; specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`)
+// Spec: specs/missiles/missiles.md §R2, §R4, §R5, §R6, §R9.5, §R9.6; specs/monsters/init.md §22 (seams `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks`, `MissileBodies`)
 //! Missiles ↔ units, DRLG and combat: [`View`] implements
 //! [`crate::missiles::MissileWorld`]. Real providers: unit allocation and
 //! removal (`units.md` §3), seeds, stats, states and state lists
@@ -476,5 +476,126 @@ impl<X: Pending> MissileHooks for View<'_, X> {
         {
             self.h.x.unique_mod_missile(game, owner, missile);
         }
+    }
+}
+
+/// The server-do / server-hit bodies' seams (`missiles.md` §R9.5,
+/// §R9.6) on the wired units: formulas on the skill tables, the path
+/// provider's new-step flag and target, collision writes on the DRLG
+/// grids, unit records, and the area hit on the combat view. The area
+/// scan has no provider here ([`Pending::missile_area_units`]).
+impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
+    /// `0x0064B7C0` (`skills/levels.md` `eval_missile`).
+    fn missile_calc(
+        &mut self,
+        game: &mut Game,
+        missile: UnitId,
+        owner: Option<UnitId>,
+        field: u32,
+        class: i32,
+        level: i32,
+    ) -> i32 {
+        let t = self.h.tables.clone();
+        let mut cv = self.combat(game);
+        crate::skills::eval_missile(
+            &mut cv,
+            &t.skills,
+            Some(missile),
+            owner,
+            field,
+            class,
+            level,
+        )
+    }
+    fn skill_exists(&self, skill: i32) -> bool {
+        self.h.tables.skills.skill(skill).is_some()
+    }
+    fn skill_calc(
+        &mut self,
+        game: &mut Game,
+        owner: Option<UnitId>,
+        skill: i32,
+        calc: crate::missiles::SkillCalc,
+        level: i32,
+    ) -> i32 {
+        use crate::missiles::SkillCalc as C;
+        let t = self.h.tables.clone();
+        let Some(r) = t.skills.skill(skill) else {
+            return 0;
+        };
+        let field = match calc {
+            C::Calc1 => r.calc1,
+            C::Calc2 => r.calc2,
+            C::AuraRange => r.aurarangecalc,
+            C::AuraLen => r.auralencalc,
+        };
+        let mut cv = self.combat(game);
+        crate::skills::eval_skill(&mut cv, &t.skills, owner, field, skill, level)
+    }
+    /// Path +0x34 bit 3 (`path::record::flags::MOVED`) with the path
+    /// provider; false without it.
+    fn path_new_step(&self, unit: UnitId) -> bool {
+        self.h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .is_some_and(|d| d.flags & crate::path::record::flags::MOVED != 0)
+    }
+    /// The dynamic path's target unit when it still resolves to the same
+    /// unit (`skills/bodies.md` §2.1; a stale target reads as none, the
+    /// path field is left to the path code).
+    fn path_target(&mut self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        let t = self.h.paths.as_ref()?.dynamic(unit)?.target_unit?;
+        (game.lists.find_unit(t.ty, t.guid) == Some(t.unit)).then_some(t.unit)
+    }
+    /// `0x0064CB90`: the room containing (x, y) from `room`, one cell.
+    fn or_collision(&mut self, game: &mut Game, room: RoomId, x: i32, y: i32, bits: u16) {
+        let Some(r) = self.h.drlg.find_room(game, room, x, y) else {
+            return;
+        };
+        if let Some(c) = self.h.drlg.collision_mut(game, r, x, y) {
+            *c |= bits;
+        }
+    }
+    /// `0x0064EA00` (`path-placement.md` §5.1) at the path position with
+    /// the unit's size.
+    fn stamp_collision(&mut self, game: &mut Game, unit: UnitId, bits: u16) {
+        let (x, y) = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let room = Self::unit_room(game, unit);
+        crate::path::footprint::stamp_size(&mut self.h.drlg, room, x, y, size, bits);
+    }
+    fn anim_frame(&self, unit: UnitId) -> i32 {
+        self.units.get(unit).map_or(0, |r| r.anim.frame)
+    }
+    fn set_anim_frame(&mut self, unit: UnitId, v: i32) {
+        if let Some(r) = self.units.get_mut(unit) {
+            r.anim.frame = v;
+        }
+    }
+    fn is_dead(&self, unit: UnitId) -> bool {
+        self.units.is_dead(unit)
+    }
+    fn is_demon(&self, unit: UnitId) -> bool {
+        self.h.x.is_demon(unit)
+    }
+    fn is_undead(&self, unit: UnitId) -> bool {
+        self.h.x.is_undead(unit)
+    }
+    fn area_units(
+        &mut self,
+        game: &Game,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
+        self.h.x.missile_area_units(game, owner, at, r, f)
+    }
+    /// `0x0056B9C0` on the combat view.
+    fn area_hit(&mut self, game: &mut Game, owner: UnitId, unit: UnitId, record: &DamageRecord) {
+        let t = self.h.tables.clone();
+        let mut cv = self.combat(game);
+        crate::missiles::bodies::area_hit(&mut cv, &t.combat, owner, unit, record);
     }
 }

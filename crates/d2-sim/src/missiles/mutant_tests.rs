@@ -424,7 +424,8 @@ fn missed_to_hit_runs_server_hit_only_with_always_explode() {
     // A missed to-hit missile calls its server-hit function first only with
     // `AlwaysExplode` and a function in 1…70; without result bit 4 it is
     // removed (2). The stub returns c (2 here), so bit 4 is clear.
-    for (always, srv_hit, called) in [(1, 1, true), (0, 1, false), (1, 0, false)] {
+    // Server-hit 2: a stub (body not specified).
+    for (always, srv_hit, called) in [(1, 2, true), (0, 2, false), (1, 0, false)] {
         let mut r = row();
         r.tohit = 1;
         r.alwaysexplode = always;
@@ -436,7 +437,7 @@ fn missed_to_hit_runs_server_hit_only_with_always_explode() {
         assert_eq!(w.hit(m, Some(mon), false), 2, "{always} {srv_hit}");
         let want: Vec<Unhandled> = if called {
             vec![Unhandled::SrvHit {
-                index: 1,
+                index: 2,
                 missile: m,
             }]
         } else {
