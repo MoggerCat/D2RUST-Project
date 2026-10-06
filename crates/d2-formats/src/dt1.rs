@@ -88,9 +88,14 @@ impl Dt1 {
         }
         let mut c = Cursor::at(data, first, FORMAT);
         let mut tiles = Vec::with_capacity(count);
+        // Blocks the file has room for, over all tiles: one 20-byte header
+        // each. Tiles whose block headers overlap could otherwise decode
+        // the same headers once per tile (quadratic in the file size).
+        let mut block_budget = data.len() / BLOCK_HEADER_LEN;
         for t in 0..count {
             tiles.push(
-                read_tile(data, &mut c).map_err(|e| invalid(FORMAT, format!("tile {t}: {e}")))?,
+                read_tile(data, &mut c, &mut block_budget)
+                    .map_err(|e| invalid(FORMAT, format!("tile {t}: {e}")))?,
             );
         }
         Ok(Dt1 {
@@ -101,7 +106,11 @@ impl Dt1 {
     }
 }
 
-fn read_tile(data: &[u8], c: &mut Cursor<'_>) -> Result<Dt1Tile, FormatError> {
+fn read_tile(
+    data: &[u8],
+    c: &mut Cursor<'_>,
+    block_budget: &mut usize,
+) -> Result<Dt1Tile, FormatError> {
     let light_direction = c.u32()?;
     let roof_height = c.u16()?;
     let material_flags = c.u16()?;
@@ -124,9 +133,9 @@ fn read_tile(data: &[u8], c: &mut Cursor<'_>) -> Result<Dt1Tile, FormatError> {
     let cache_index = c.u16()?;
     let unknown_5c = c.u32()?;
 
-    if block_count.saturating_mul(BLOCK_HEADER_LEN) > data.len() {
-        return Err(invalid(FORMAT, format!("{block_count} blocks cannot fit")));
-    }
+    *block_budget = block_budget
+        .checked_sub(block_count)
+        .ok_or_else(|| invalid(FORMAT, format!("{block_count} blocks cannot fit")))?;
     let mut bc = Cursor::at(data, blocks_offset, FORMAT);
     let mut blocks = Vec::with_capacity(block_count);
     for b in 0..block_count {
@@ -304,5 +313,55 @@ mod tests {
         let at = data.len() - 6 - 4;
         data[at..at + 4].copy_from_slice(&9999u32.to_le_bytes());
         assert!(Dt1::parse(&data).is_err());
+    }
+
+    #[test]
+    fn regress_tiles_sharing_block_headers() {
+        // Four tiles all pointing at one table of 20 block headers: each
+        // header was decoded once per tile (quadratic in the file size).
+        // The 1,060-byte file has room for 53 headers, not 80.
+        let (tiles, blocks) = (4usize, 20usize);
+        let first = 276usize;
+        let blocks_at = first + 96 * tiles;
+        let mut d = Vec::new();
+        d.extend_from_slice(&7i32.to_le_bytes());
+        d.extend_from_slice(&6i32.to_le_bytes());
+        d.extend_from_slice(&[0; 260]);
+        d.extend_from_slice(&(tiles as u32).to_le_bytes());
+        d.extend_from_slice(&(first as u32).to_le_bytes());
+        for _ in 0..tiles {
+            let mut t = vec![0u8; 96];
+            t[0x48..0x4C].copy_from_slice(&(blocks_at as u32).to_le_bytes());
+            t[0x50..0x54].copy_from_slice(&(blocks as u32).to_le_bytes());
+            d.extend(t);
+        }
+        // Empty RLE blocks (length 0).
+        d.extend(std::iter::repeat_n(0u8, 20 * blocks));
+        let err = Dt1::parse(&d).unwrap_err();
+        assert!(err.to_string().contains("cannot fit"), "{err}");
+        // Two tiles fit (40 ≤ 53).
+        d[268..272].copy_from_slice(&2u32.to_le_bytes());
+        assert_eq!(Dt1::parse(&d).unwrap().tiles.len(), 2);
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::mutated;
+        use crate::robust_tests::{check, config};
+        use proptest::prelude::*;
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(Dt1::parse(&file()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in mutated(file())) {
+                check(data, Dt1::parse);
+            }
+        }
     }
 }

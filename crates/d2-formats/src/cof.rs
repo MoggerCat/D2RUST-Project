@@ -131,7 +131,8 @@ impl Cof {
         if slot >= l || f >= fr {
             return None;
         }
-        self.draw_order.get((d * fr + f) * l + slot).copied()
+        let at = d.checked_mul(fr)?.checked_add(f)?.checked_mul(l)?;
+        self.draw_order.get(at.checked_add(slot)?).copied()
     }
 }
 
@@ -188,5 +189,49 @@ mod tests {
             Cof::parse(&file(1, 2, 1, &[0], &[0], &[0, 0])).is_err(),
             "too short"
         );
+    }
+
+    #[test]
+    fn regress_component_at_overflow() {
+        // `(d * frames + f) * layers + slot` overflowed for a huge
+        // direction (panic in debug builds).
+        let cof = Cof::parse(&file(1, 2, 1, &[1], &[1, 0], &[1, 1])).unwrap();
+        assert_eq!(cof.component_at(usize::MAX, 0, 0), None);
+        assert_eq!(cof.component_at(usize::MAX / 2, 1, 0), None);
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::{bounded, mutated};
+        use crate::robust_tests::config;
+        use proptest::prelude::*;
+
+        fn valid() -> Vec<u8> {
+            file(2, 2, 2, &[0, 1], &[1, 0, 0], &[0, 1, 1, 0, 0, 1, 1, 0])
+        }
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(Cof::parse(&valid()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(
+                data in mutated(valid()),
+                d in any::<usize>(),
+                f in any::<usize>(),
+                s in any::<usize>(),
+            ) {
+                bounded(move || {
+                    if let Ok(cof) = Cof::parse(&data) {
+                        let _ = cof.component_at(d, f, s);
+                        let _ = cof.component_at(d % 4, f % 4, s % 4);
+                    }
+                });
+            }
+        }
     }
 }

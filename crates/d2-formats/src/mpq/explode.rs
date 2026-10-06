@@ -13,6 +13,11 @@ const CH_DECODE: [u8; 1 << 13] = build_decode_table(&CH_CODE, &CH_BITS);
 /// Length value that marks the end of the stream.
 const END_MARKER: u32 = 0x205;
 
+/// Output bytes per input byte, at most: the densest code is a 518-byte
+/// copy in 22 bits (under 190 bytes per input byte). Bounds the
+/// preallocation, since `max_out` is untrusted.
+const MAX_RATIO: usize = 256;
+
 fn err(reason: &'static str) -> CodecError {
     CodecError {
         codec: "pkware",
@@ -46,7 +51,7 @@ pub(crate) fn explode(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecErro
     }
 
     let mut r = BitReader::new(&input[2..]);
-    let mut out = Vec::with_capacity(max_out);
+    let mut out = Vec::with_capacity(max_out.min(input.len().saturating_mul(MAX_RATIO)));
     while out.len() < max_out {
         if r.read(1)? == 1 {
             let sym = usize::from(LEN_DECODE[r.peek(8) as usize]);

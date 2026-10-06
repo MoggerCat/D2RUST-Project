@@ -101,7 +101,11 @@ impl BinTable {
             });
         }
         let count = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        let expected = 4 + u64::from(count) * record_size as u64;
+        // Saturating: no .bin is near u64::MAX bytes, so a saturated size
+        // never equals the length and stays a size mismatch.
+        let expected = u64::from(count)
+            .saturating_mul(record_size as u64)
+            .saturating_add(4);
         if data.len() as u64 != expected {
             return Err(LoadError::SizeMismatch {
                 file: file.to_owned(),

@@ -92,6 +92,10 @@ impl StringTable {
         }
 
         let mut entries = Vec::with_capacity(header.hash_table_size as usize);
+        // Key and value bytes copied so far. Slots whose strings overlap
+        // could otherwise copy the same bytes once per slot (quadratic in
+        // the file size); strings that don't overlap never exceed it.
+        let mut copied = 0usize;
         for slot in 0..header.hash_table_size {
             let used = c.u8()? != 0;
             let index = c.u16()?;
@@ -101,18 +105,25 @@ impl StringTable {
             let value_length = usize::from(c.u16()?);
             let (key, value) = if used {
                 let key = cstring(data, key_offset)
-                    .map_err(|e| invalid(FORMAT, format!("slot {slot}: {e}")))?
-                    .to_vec();
-                let value = if value_length == 0 {
-                    Vec::new()
+                    .map_err(|e| invalid(FORMAT, format!("slot {slot}: {e}")))?;
+                let value: &[u8] = if value_length == 0 {
+                    &[]
                 } else {
-                    data.get(value_offset..value_offset + value_length - 1)
+                    value_offset
+                        .checked_add(value_length - 1)
+                        .and_then(|end| data.get(value_offset..end))
                         .ok_or_else(|| {
                             invalid(FORMAT, format!("slot {slot}: value past end of file"))
                         })?
-                        .to_vec()
                 };
-                (key, value)
+                copied += key.len() + value.len();
+                if copied > data.len() {
+                    return Err(invalid(
+                        FORMAT,
+                        format!("slot {slot}: strings add up to more than the file size"),
+                    ));
+                }
+                (key.to_vec(), value.to_vec())
             } else {
                 (Vec::new(), Vec::new())
             };
@@ -144,7 +155,10 @@ impl StringTable {
             return None;
         }
         let mut slot = key_hash(key) as usize % size;
-        for _ in 0..self.header.max_tries {
+        // Probing past `size` slots revisits slots already seen, so the
+        // answer is the same with the count capped at the table size.
+        let tries = (self.header.max_tries as usize).min(size);
+        for _ in 0..tries {
             let e = &self.entries[slot];
             if !e.used {
                 return None;
@@ -251,5 +265,80 @@ mod tests {
         let data = build(&[("A", "x")], 4);
         assert!(StringTable::parse(&data[..data.len() - 4]).is_err());
         assert!(StringTable::parse(&data[..30]).is_err());
+    }
+
+    #[test]
+    fn regress_lookup_with_huge_max_tries() {
+        // A full table and max_tries u32::MAX: a missing key probed 4
+        // billion slots. Probing past the table size revisits slots, so
+        // the capped probe gives the same answer.
+        let mut data = build(&[("A", "x"), ("B", "y"), ("C", "z")], 3);
+        data[0x0D..0x11].copy_from_slice(&u32::MAX.to_le_bytes());
+        let t = StringTable::parse(&data).unwrap();
+        // Under the robustness deadline (the old probe took ~45 s here).
+        let t = crate::robust::bounded(move || {
+            assert_eq!(t.get(b"missing"), None);
+            t
+        });
+        assert_eq!(t.get(b"C"), Some(&b"z"[..]));
+    }
+
+    #[test]
+    fn regress_slots_sharing_one_string() {
+        // 64 used slots whose keys all start at one 200-byte string copied
+        // it 64 times (quadratic in the file size for large tables).
+        let size = 64usize;
+        let strings_at = 21 + 17 * size;
+        let mut d = Vec::new();
+        d.extend_from_slice(&0u16.to_le_bytes());
+        d.extend_from_slice(&0u16.to_le_bytes());
+        d.extend_from_slice(&(size as u32).to_le_bytes());
+        d.push(1);
+        d.extend_from_slice(&(strings_at as u32).to_le_bytes());
+        d.extend_from_slice(&(size as u32).to_le_bytes());
+        d.extend_from_slice(&((strings_at + 201) as u32).to_le_bytes());
+        for _ in 0..size {
+            d.push(1);
+            d.extend_from_slice(&[0; 6]);
+            d.extend_from_slice(&(strings_at as u32).to_le_bytes());
+            d.extend_from_slice(&0u32.to_le_bytes());
+            d.extend_from_slice(&0u16.to_le_bytes());
+        }
+        d.extend_from_slice(&[b'k'; 200]);
+        d.push(0);
+        let err = StringTable::parse(&d).unwrap_err();
+        assert!(err.to_string().contains("more than the file size"), "{err}");
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::{bounded, bytes, mutated};
+        use crate::robust_tests::config;
+        use proptest::prelude::*;
+
+        fn valid() -> Vec<u8> {
+            build(&[("A", "first"), ("Q", "second"), ("Key3", "x")], 8)
+        }
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(StringTable::parse(&valid()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in mutated(valid()), key in bytes(8), i in any::<usize>()) {
+                bounded(move || {
+                    if let Ok(t) = StringTable::parse(&data) {
+                        let _ = t.get(&key);
+                        let _ = t.get(b"Q");
+                        let _ = t.element(i);
+                        let _ = t.element(i % 4);
+                    }
+                });
+            }
+        }
     }
 }

@@ -79,7 +79,10 @@ All integers are little-endian.
 | 0x0E | u16 | unknown |
 | 0x10 | u32 | data offset, **relative to the tile's block headers offset** |
 
-All offsets and lengths must stay inside the file.
+All offsets and lengths must stay inside the file. The block counts of all
+tiles together must not exceed `file length / 20` (one 20-byte header per
+block; tiles sharing block headers could otherwise decode them once per
+tile, quadratic in the file size; see Open questions).
 
 ### Block pixels
 
@@ -148,3 +151,6 @@ consulted.
 1. Meaning of the unknown fields and of each orientation value: map spec.
 2. Sub-tile flag row order relative to screen and world coordinates: map
    spec (Riiablo reverses rows).
+3. Whole-file block limit (`file length / 20`, §Block header) assumes
+   tiles never share block headers: confirm on every 1.14d `.dt1`
+   (`mpq-tool formats`).

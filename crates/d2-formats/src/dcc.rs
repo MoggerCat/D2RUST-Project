@@ -7,6 +7,10 @@ const FORMAT: &str = "dcc";
 const SIGNATURE: u8 = 0x74;
 const MAX_FRAMES: u32 = 256;
 const MAX_DIR_PIXELS: u64 = 0x100_0000;
+/// Implementation limit on the direction boxes of all directions together:
+/// decoding a direction costs time and memory in proportion to its box,
+/// which a few header bits can make large.
+const MAX_TOTAL_DIR_PIXELS: u64 = 0x400_0000;
 const ENCODED_BITS: [u32; 16] = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32];
 
 /// LSB-first bit cursor over `data[.. end_bit]`.
@@ -141,11 +145,13 @@ impl Dcc {
         if offsets[0] < c.pos() || offsets.windows(2).any(|w| w[1] < w[0]) {
             return Err(invalid(FORMAT, "direction offsets out of order"));
         }
+        let mut box_budget = MAX_TOTAL_DIR_PIXELS;
         let dirs = (0..directions)
             .map(|d| {
                 decode_direction(
                     &data[offsets[d]..offsets[d + 1]],
                     frames_per_direction as usize,
+                    &mut box_budget,
                 )
                 .map_err(|e| invalid(FORMAT, format!("direction {d}: {e}")))
             })
@@ -199,7 +205,11 @@ struct Entry {
     v: [u8; 4],
 }
 
-fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, FormatError> {
+fn decode_direction(
+    data: &[u8],
+    frame_count: usize,
+    box_budget: &mut u64,
+) -> Result<DccDirection, FormatError> {
     let mut b = Bits::new(data);
     let outsize_coded = b.read(32)?;
     let compression_flags = b.read(2)? as u8;
@@ -306,8 +316,23 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
     let dx_max = boxes.iter().map(|b| b.0 + b.2).max().unwrap();
     let dy_max = boxes.iter().map(|b| b.1 + b.3).max().unwrap();
     let (dir_w, dir_h) = ((dx_max - dx_min) as u64, (dy_max - dy_min) as u64);
-    if dir_w * dir_h > MAX_DIR_PIXELS {
-        return Err(invalid(FORMAT, format!("direction box {dir_w}x{dir_h}")));
+    let area = dir_w
+        .checked_mul(dir_h)
+        .filter(|&n| n <= MAX_DIR_PIXELS)
+        .ok_or_else(|| invalid(FORMAT, format!("direction box {dir_w}x{dir_h}")))?;
+    *box_budget = box_budget.checked_sub(area).ok_or_else(|| {
+        invalid(
+            FORMAT,
+            format!("direction boxes add up to more than {MAX_TOTAL_DIR_PIXELS} pixels"),
+        )
+    })?;
+    // Box corners are reported as i32 (a bottom-up offset minus the height
+    // can leave that range).
+    if boxes
+        .iter()
+        .any(|b| i32::try_from(b.0).is_err() || i32::try_from(b.1).is_err())
+    {
+        return Err(invalid(FORMAT, "frame box outside the i32 range"));
     }
     let (dir_w, dir_h) = (dir_w as usize, dir_h as usize);
     let cells_w = dir_w.div_ceil(4);
@@ -369,7 +394,8 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
                     let mut code = u32::from(last);
                     loop {
                         let disp = pcd.read(4)?;
-                        code += disp;
+                        // Codes are bytes: only the low 8 bits count.
+                        code = code.wrapping_add(disp);
                         if disp != 15 {
                             break;
                         }
@@ -412,7 +438,15 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
     let mut next = 0;
     let mut frames = Vec::with_capacity(frame_count);
     for (f, cells) in layouts.iter().enumerate() {
-        let mut out = vec![0u8; dir_w * dir_h];
+        // The frame's cells all lie in its box, so only the box is kept.
+        let (bx, by, bw, bh) = boxes[f];
+        let frame_box = Frame {
+            x: (bx - dx_min) as usize,
+            y: (by - dy_min) as usize,
+            w: bw as usize,
+            h: bh as usize,
+        };
+        let mut out = vec![0u8; frame_box.w * frame_box.h];
         for (ci, cell) in cells.iter().enumerate() {
             let rect = (cell.x, cell.y, cell.w, cell.h);
             if next < queue.len() && queue[next].frame == f && queue[next].cell == ci {
@@ -430,7 +464,7 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
                         }
                     }
                 }
-                copy_rect(&buffer, &mut out, dir_w, rect);
+                copy_rect(&buffer, dir_w, &mut out, &frame_box, rect);
             } else {
                 match last_rect[cell.dcell] {
                     Some((lx, ly, lw, lh)) if lw == cell.w && lh == cell.h => {
@@ -443,7 +477,7 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
                             buffer[y * dir_w + cell.x..y * dir_w + cell.x + cell.w]
                                 .copy_from_slice(&tmp[row * lw..(row + 1) * lw]);
                         }
-                        copy_rect(&buffer, &mut out, dir_w, rect);
+                        copy_rect(&buffer, dir_w, &mut out, &frame_box, rect);
                     }
                     _ => {
                         for y in cell.y..cell.y + cell.h {
@@ -455,24 +489,19 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
             last_rect[cell.dcell] = Some(rect);
         }
 
-        // Crop to the frame box and map codes to palette indices.
+        // Map codes to palette indices.
         let h = &headers[f];
-        let (bx, by, bw, bh) = boxes[f];
-        let fx = (bx - dx_min) as usize;
-        let fy = (by - dy_min) as usize;
-        let (bw, bh) = (bw as usize, bh as usize);
-        let mut pixels = Vec::with_capacity(bw * bh);
-        for y in fy..fy + bh {
-            for &code in &out[y * dir_w + fx..y * dir_w + fx + bw] {
-                let idx = *pv.get(usize::from(code)).ok_or_else(|| {
+        let pixels = out
+            .iter()
+            .map(|&code| {
+                pv.get(usize::from(code)).copied().ok_or_else(|| {
                     invalid(
                         FORMAT,
                         format!("pixel code {code} with {} colors", pv.len()),
                     )
-                })?;
-                pixels.push(idx);
-            }
-        }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         frames.push(DccFrame {
             variable0: h.variable0,
             width: h.width,
@@ -513,15 +542,29 @@ fn decode_direction(data: &[u8], frame_count: usize) -> Result<DccDirection, For
     })
 }
 
+/// A frame's box in direction coordinates.
+struct Frame {
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+}
+
+/// Copies `rect` (direction coordinates, inside `frame`) from the direction
+/// buffer `src` to the frame image `dst`.
 fn copy_rect(
     src: &[u8],
+    src_stride: usize,
     dst: &mut [u8],
-    stride: usize,
+    frame: &Frame,
     (x, y, w, h): (usize, usize, usize, usize),
 ) {
+    debug_assert!(x >= frame.x && x + w <= frame.x + frame.w);
+    debug_assert!(y >= frame.y && y + h <= frame.y + frame.h);
     for row in y..y + h {
-        let at = row * stride + x;
-        dst[at..at + w].copy_from_slice(&src[at..at + w]);
+        let from = row * src_stride + x;
+        let to = (row - frame.y) * frame.w + (x - frame.x);
+        dst[to..to + w].copy_from_slice(&src[from..from + w]);
     }
 }
 
@@ -635,5 +678,110 @@ mod tests {
         let mut data = one_frame_file();
         data[0] = 0x75;
         assert!(Dcc::parse(&data).is_err());
+    }
+
+    /// A direction of 1-pixel-or-larger frames `(width, height, x, y,
+    /// bottom_up)` with 32-bit header fields, palette {0}, and every
+    /// first-touch cell code 0 (one 4-bit PCD read each).
+    fn direction(frames: &[(u32, u32, i32, i32, bool)], first_touch_cells: usize) -> Vec<u8> {
+        let mut w = BitWriter::default();
+        w.put(0, 32); // outsize coded
+        w.put(0, 2); // flags
+        for code in [0, 15, 15, 15, 15, 0, 0] {
+            w.put(code, 4);
+        }
+        for &(fw, fh, x, y, up) in frames {
+            w.put(fw, 32);
+            w.put(fh, 32);
+            w.put(x as u32, 32);
+            w.put(y as u32, 32);
+            w.put(u32::from(up), 1);
+        }
+        w.put(0, 20); // pixel mask stream size
+        for i in 0..256u32 {
+            w.put(u32::from(i == 0), 1);
+        }
+        for _ in 0..first_touch_cells {
+            w.put(0, 4);
+        }
+        w.bytes
+    }
+
+    fn dcc_file(frames_per_direction: u32, dirs: &[Vec<u8>]) -> Vec<u8> {
+        let mut file = vec![SIGNATURE, 6, dirs.len() as u8];
+        file.extend_from_slice(&frames_per_direction.to_le_bytes());
+        file.extend_from_slice(&1u32.to_le_bytes());
+        file.extend_from_slice(&0u32.to_le_bytes());
+        let mut at = file.len() + 4 * dirs.len();
+        for d in dirs {
+            file.extend_from_slice(&(at as u32).to_le_bytes());
+            at += d.len();
+        }
+        for d in dirs {
+            file.extend_from_slice(d);
+        }
+        file
+    }
+
+    #[test]
+    fn regress_sparse_boxes_bounded() {
+        // Two 1×1 frames at opposite corners of a 4000×4000 box: ~80 bytes
+        // per direction, 16M pixels of decode work each. 255 of them took
+        // seconds; the whole-file box budget stops at the fifth.
+        let dir = direction(&[(1, 1, 0, 0, true), (1, 1, 3999, 3999, true)], 2);
+        let one = Dcc::parse(&dcc_file(2, std::slice::from_ref(&dir))).unwrap();
+        assert_eq!(one.directions[0].width, 4000);
+        assert_eq!(one.directions[0].frames[1].pixels, [0]);
+        let err = Dcc::parse(&dcc_file(2, &vec![dir; 255])).unwrap_err();
+        assert!(err.to_string().contains("direction 4:"), "{err}");
+    }
+
+    #[test]
+    fn regress_box_area_overflow() {
+        // Corners i32::MIN and i32::MAX + u32::MAX: the box is ~2^33 on each
+        // side, and its area overflowed u64 (panic in debug builds).
+        let dir = direction(
+            &[
+                (1, 1, i32::MIN, i32::MIN, true),
+                (u32::MAX, u32::MAX, i32::MAX, i32::MAX, true),
+            ],
+            0,
+        );
+        let err = Dcc::parse(&dcc_file(2, &[dir])).unwrap_err();
+        assert!(err.to_string().contains("direction box"), "{err}");
+    }
+
+    #[test]
+    fn regress_box_corner_outside_i32() {
+        // Top-down frame at y_offset i32::MIN, height 2: y_min is
+        // i32::MIN - 1, which was reported wrapped to i32::MAX.
+        let dir = direction(&[(1, 2, 0, i32::MIN, false)], 1);
+        let err = Dcc::parse(&dcc_file(1, &[dir])).unwrap_err();
+        assert!(err.to_string().contains("i32"), "{err}");
+        // One row higher is in range and decodes.
+        let dir = direction(&[(1, 2, 0, i32::MIN + 1, false)], 1);
+        let dcc = Dcc::parse(&dcc_file(1, &[dir])).unwrap();
+        assert_eq!(dcc.directions[0].frames[0].y_min, i32::MIN);
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::mutated;
+        use crate::robust_tests::{check, config};
+        use proptest::prelude::*;
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(Dcc::parse(&one_frame_file()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in mutated(one_frame_file())) {
+                check(data, Dcc::parse);
+            }
+        }
     }
 }

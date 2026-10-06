@@ -166,7 +166,7 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       every synthetic vector pass; trace replay open. `d2-proto` part done:
       ids, names, size rules and layouts of both directions generated from
       the two TSVs (`data-tool gen-proto`), size lookup, classifier, S→C
-      split, typed fixed layouts.. `d2-server` local transport and host loop (queues, drain, gate, size
+      split, typed fixed layouts. `d2-server` local transport and host loop (queues, drain, gate, size
       check, point/unit parse, buffers, flush, delivery, tick driver) done
       against seams (34 unit tests); wiring to `d2-proto` / `d2-sim` pending.*
 - [ ] Units, stats, stat lists, modifiers
