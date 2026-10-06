@@ -503,6 +503,125 @@ pub trait QuestWorld {
     // -- end Act IV q1/q3 seams.
 
     // -- Act IV, Terror's End (quests-act4.md §5).
+    /// The object's `objects.txt` `FrameCnt1` column value (record
+    /// +0xDC ÷ 256), read by the seal activation `0x005B5630` for its
+    /// end-animation event at f + 2·fc1 (`sim/units.md` §6.4).
+    fn object_frame_count1(&mut self, object: UnitId) -> i32 {
+        let _ = object;
+        self.unhandled(0xFE, 0x005B_5630);
+        0
+    }
+    /// `0x00555230`: create an object of `class` at (x, y) in `room`
+    /// with the three flag arguments `(a, b, c)` (the seal-boss dummy:
+    /// 1, 0, 0; the Harrogath portal: 1, 1, 0).
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        a: u32,
+        b: u32,
+        c: u32,
+    ) -> Option<UnitId> {
+        let _ = (room, x, y, class, a, b, c);
+        self.unhandled(0xFE, 0x0055_5230);
+        None
+    }
+    /// `0x0061AED0(room, 0)` after a seal-boss dummy is created (open
+    /// question 7).
+    fn refresh_room(&mut self, room: RoomId) {
+        let _ = room;
+        self.unhandled(0xFE, 0x0061_AED0);
+    }
+    /// The u16 entry `n` of the data-tables array at +0xAE0 (read
+    /// elsewhere by `0x00586B30`; entries 36–38 = the seal bosses, open
+    /// question 8).
+    fn superunique_id(&mut self, n: u8) -> u16 {
+        let _ = n;
+        self.unhandled(0xFE, 0x0058_6B30);
+        0
+    }
+    /// `0x00545C30(game, dummy, &(x, y), arg, id)`: spawn superunique
+    /// `id` at (x, y) beside the dummy object (`arg` 2 here).
+    fn spawn_superunique(
+        &mut self,
+        dummy: UnitId,
+        x: i32,
+        y: i32,
+        arg: u32,
+        id: u16,
+    ) -> Option<UnitId> {
+        let _ = (dummy, x, y, arg, id);
+        self.unhandled(0xFE, 0x0054_5C30);
+        None
+    }
+    /// The units of type 1 (monsters) of each active room of the Act IV
+    /// DRLG (`0x0061A180(game +0xC8)`, next room +0x7C) whose level is
+    /// `level`, in room-list then unit-list order (+0x74, next +0xE8,
+    /// read before the unit is handled).
+    fn level_monsters(&mut self, level: u32) -> Vec<UnitId> {
+        let _ = level;
+        self.unhandled(0xFE, 0x0061_A180);
+        Vec::new()
+    }
+    /// `0x005541B0`: the unit is dead (≠ 0).
+    fn unit_dead(&mut self, unit: UnitId) -> bool {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0055_41B0);
+        false
+    }
+    /// `0x006259B0`: the unit's alignment (0 = evil).
+    fn alignment(&mut self, unit: UnitId) -> u32 {
+        let _ = unit;
+        self.unhandled(0xFE, 0x0062_59B0);
+        0
+    }
+    /// `0x005351C0`: end the player's interaction (classic end of game).
+    fn end_interaction(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_51C0);
+    }
+    /// `0x0053AEC0(game, player, level, arg)`: level warp
+    /// (`drlg/levels.md`).
+    fn warp_to_level(&mut self, player: UnitId, level: u32, arg: u32) {
+        let _ = (player, level, arg);
+        self.unhandled(0xFE, 0x0053_AEC0);
+    }
+    /// `0x00530590(game, 0)`: end the game (host, open question 10).
+    fn end_game(&mut self) {
+        self.unhandled(0xFE, 0x0053_0590);
+    }
+    /// `0x0052E2A0(game)`: the host save pass (acts in game types 1 and
+    /// 2 only; host, open question 10).
+    fn save_pass(&mut self) {
+        self.unhandled(0xFE, 0x0052_E2A0);
+    }
+    /// The player's client exists and `0x00535060` (busy) returns 0
+    /// (`items/inventory.md`).
+    fn client_idle(&mut self, player: UnitId) -> bool {
+        let _ = player;
+        self.unhandled(0xFE, 0x0053_5060);
+        false
+    }
+    /// `0x00554190`: clear the player's interaction.
+    fn clear_interaction(&mut self, player: UnitId) {
+        let _ = player;
+        self.unhandled(0xFE, 0x0055_4190);
+    }
+    /// `0x0054B830(game, player, level, arg)`: act change to `level`.
+    fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
+        let _ = (player, level, arg);
+        self.unhandled(0xFE, 0x0054_B830);
+    }
+    /// `0x005B4FF0`: the level's waypoint index (`0x00660E00`) set in
+    /// player data +0x1C + 4·`difficulty` (`0x00660EC0`,
+    /// `world/waypoints.md`).
+    fn activate_waypoint(&mut self, player: UnitId, level: u32, difficulty: u8) {
+        let _ = (player, level, difficulty);
+        self.unhandled(0xFE, 0x005B_4FF0);
+    }
     // -- end Act IV q2 seams.
 
     // -- Act V part 1 (quests-act5.md).

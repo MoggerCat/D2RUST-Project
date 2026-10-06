@@ -212,6 +212,20 @@ pub(super) struct Fake {
     // -- end Act IV q1/q3 fake fields.
 
     // -- Act IV q2 fake fields.
+    /// `FrameCnt1` of every object.
+    pub(super) q2_fc1: i32,
+    /// `spawn_object` results in order (empty: fails).
+    pub(super) q2_objects: Vec<Option<UnitId>>,
+    /// `spawn_superunique` results in order (empty: fails).
+    pub(super) q2_superuniques: Vec<Option<UnitId>>,
+    /// `level_monsters` answer.
+    pub(super) q2_level_monsters: Vec<UnitId>,
+    /// Dead units.
+    pub(super) q2_dead: Vec<UnitId>,
+    /// Non-zero alignments.
+    pub(super) q2_align: BTreeMap<UnitId, u32>,
+    /// Players whose client is busy (`client_idle` false).
+    pub(super) q2_busy: Vec<UnitId>,
     // -- end Act IV q2 fake fields.
 
     // -- Act V part 1 fake fields.
@@ -536,6 +550,84 @@ impl QuestWorld for Fake {
     // -- end Act IV q1/q3 seam fakes.
 
     // -- Act IV q2 seam fakes.
+    fn object_frame_count1(&mut self, _: UnitId) -> i32 {
+        self.q2_fc1
+    }
+    fn spawn_object(
+        &mut self,
+        _: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        a: u32,
+        b: u32,
+        c: u32,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("spawn object {class} {x} {y} flags {a} {b} {c}"));
+        if self.q2_objects.is_empty() {
+            None
+        } else {
+            self.q2_objects.remove(0)
+        }
+    }
+    fn refresh_room(&mut self, room: RoomId) {
+        self.log.push(format!("refresh room {}", room.0));
+    }
+    fn superunique_id(&mut self, n: u8) -> u16 {
+        // The loader fills the array by hcIdx (open question 8).
+        u16::from(n)
+    }
+    fn spawn_superunique(
+        &mut self,
+        d: UnitId,
+        x: i32,
+        y: i32,
+        arg: u32,
+        id: u16,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("superunique {id} {x} {y} at {} arg {arg}", d.0));
+        if self.q2_superuniques.is_empty() {
+            None
+        } else {
+            self.q2_superuniques.remove(0)
+        }
+    }
+    fn level_monsters(&mut self, level: u32) -> Vec<UnitId> {
+        self.log.push(format!("level monsters {level}"));
+        self.q2_level_monsters.clone()
+    }
+    fn unit_dead(&mut self, u: UnitId) -> bool {
+        self.q2_dead.contains(&u)
+    }
+    fn alignment(&mut self, u: UnitId) -> u32 {
+        self.q2_align.get(&u).copied().unwrap_or(0)
+    }
+    fn end_interaction(&mut self, p: UnitId) {
+        self.log.push(format!("end interaction {}", p.0));
+    }
+    fn warp_to_level(&mut self, p: UnitId, level: u32, arg: u32) {
+        self.log.push(format!("warp {} {level} {arg}", p.0));
+    }
+    fn end_game(&mut self) {
+        self.log.push("end game".into());
+    }
+    fn save_pass(&mut self) {
+        self.log.push("save pass".into());
+    }
+    fn client_idle(&mut self, p: UnitId) -> bool {
+        !self.q2_busy.contains(&p)
+    }
+    fn clear_interaction(&mut self, p: UnitId) {
+        self.log.push(format!("clear interaction {}", p.0));
+    }
+    fn act_change(&mut self, p: UnitId, level: u32, arg: u32) {
+        self.log.push(format!("act change {} {level} {arg}", p.0));
+    }
+    fn activate_waypoint(&mut self, p: UnitId, level: u32, d: u8) {
+        self.log.push(format!("waypoint {} {level} {d}", p.0));
+    }
     // -- end Act IV q2 seam fakes.
 
     // -- Act V part 1 seam fakes.
