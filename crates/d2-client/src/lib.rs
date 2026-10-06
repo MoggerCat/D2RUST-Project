@@ -7,6 +7,7 @@
 
 pub mod app;
 pub mod assets;
+pub mod audio;
 pub mod bridge;
 pub mod controls;
 pub mod frames;
