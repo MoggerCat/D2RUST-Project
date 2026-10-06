@@ -95,6 +95,7 @@ behaviors the engine reproduces exactly.
 | Nightly deep property runs (2026-10-06, `ci-nightly-props`) | `.github/workflows/nightly-props.yml` (03:17 UTC and manual) runs `tools/props-deep.sh` groups `sim`, `wire`, `worldsim` at 20,000 / 20,000 / 500 cases with `PROPTEST_MAX_SHRINK_TIME=60000`; PR CI keeps `PROPTEST_CASES` unset | Answers SF1. `sim` measured 670 s; `wire` and `worldsim` are estimates; a counterexample is a real bug, never a flake (HANDOFF §8). |
 | Game from a synthetic install (2026-10-06, `fixedset-game`) | `test-fixtures` builds the install, a one-room town and a `SimGame` in CI (`GameData`, `ActCreation::TownOnly`: the DRLG without the act placer, then the town); `ActCreation::Full` is the 1.14d path on real data | The TownOnly DRLG seed skips the placer's draws (a fixture state); `test-fixtures` depends on `d2-sim` and `d2-server`, still test-only. |
 | MPQ Huffman decoder (2026-10-06, `mpq-huffman`, BB1) | Output and errors unchanged; the leader lookup is a 256-slot cache used only as a hint (a stale or colliding entry costs time, never changes a result) and tables 1–8 take a 1024-entry fast path until the first escape; the encoder exists under `test-support` | 2–3.7× on tables 0–3 (criterion, cloud); decided on the tables the 1.14d `.wav` files use (HANDOFF §5 C62). `specs/formats/mpq.md` unchanged. |
+| Lighting home and hooks (2026-10-06, `impl-lighting-blend`) | `d2-client::rules::lighting` (the spec names `d2-client::lighting`; kept beside the other render rules); the frame's light enters the world view only through `ViewFeed::light` → `LitRules` and per-block tile shade through `ViewSource::tile_blocks` (defaults: none) | The environment's doubles and `sin` (`lighting.md` §9, §10) live in the client only (hard rule 6 binds `d2-sim`); wall-clock time and the draw rate are inputs, never read from the OS, so verify cases can feed `q` from recordings (§13). |
 
 ## Phases
 
@@ -309,7 +310,7 @@ critical path to a first playable scene):
    (+ frame capture in `tools/trace-recorder`, render §B9): unlocks link 1
    (original → CPU reference) at all.
 2. `render/unit-composite.md`, `render/draw-order.md`: units in the town. **Written (eighth fold, draft, no claim yet); implementation sessions `impl-unit-composite` and `impl-draw-order` are running.**
-3. `render/shading.md`, `render/blend-modes.md`, `render/lighting.md`.
+3. `render/shading.md`, `render/blend-modes.md`, `render/lighting.md`. **Implemented, unverified** (`impl-shading-blend`, then `impl-lighting-blend`: the light map, records, sources, environment, overrides and per-draw values; per-block tile shade; unit shade / blend through `LitRules` when a feed states a light; GDI lines / rectangles and unit shadow positions). No feed states a light yet (client model); checks queued (HANDOFF §5 C65–C68).
 4. `formats/wav.md`, `audio/triggers.md`, `audio/sound-table.md`
    (+ `record_sound.py`), then `audio/environment.md`.
 5. `ui/text.md` (**written, eighth fold; `impl-ui-text` running**), `ui/panels.md`, `ui/controls.md`, `ui/inventory.md`,

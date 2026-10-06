@@ -2724,6 +2724,31 @@ the dev-dependency) and record results here.
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
 
+65. Lighting tables against `Game.exe` (`impl-lighting-blend`; Ghidra or a
+    hex read of the 1.14d `Game.exe`, no run): `specs/render/env-periods.tsv`
+    = the 18 × 12-byte entries at `0x007443F0`, `0x00744438`, `0x00744480`
+    (start degree, type, color `0x00BBGGRR`), and
+    `specs/render/wall-light-points.tsv` = `0x0072A9E8` / `0x0072ABC8` (9
+    directions × 6 points × 2 tables). Expect identical rows; the repo
+    tests only hold the TSVs to the spec text.
+66. Monster colormap file sizes (`impl-lighting-blend`, `shading.md` §6):
+    `mpq-tool extract` `Data\Global\Monsters\RandTransforms.dat` (expect
+    7,680 bytes = 30 headerless maps), `GreenBlood.dat` (expect 256) and one
+    class's `palshift.dat` (expect 2,048). Another size means
+    `rules::shading::{rand_transforms_map, blood_map}` read the wrong bytes.
+67. Environment per tick (`lighting.md` OQ7, `impl-lighting-blend`): record
+    env `+0x0C` (and R, G, B `+0x18..+0x1A`) every client update over one
+    in-game day and replay `rules::lighting::environment::Environment::update`
+    from the same start; expect equal on every tick. Add the light-map
+    SHA-256 (`LightMap::digest`, 18,432 bytes at `0x007B0E68`) and `q` to the
+    capture key (§12 r3, OQ9).
+68. Captures for the GDI and shadow rules (`impl-lighting-blend`): a weather
+    line or Arcane Sanctuary star (static camera) compared with
+    `rules::blend::gdi_line_pixels` — settles `blend-modes.md` §8 r1's
+    |dx| = |dy| major axis (now `BlendError::LineMajorAxisTie`) and whether
+    the line reaches (x1, y1); the player's shadow on a flat floor against
+    `unit_shadow_position` (blend-modes OQ1).
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
