@@ -76,7 +76,11 @@ fn forward_pending(flag: bool) {
         let p = format!("0:{}", me.guid);
         fwd!(d.distance(me, m), 77, format!("distance {p} 1:55"));
         fwd!(d.collides(me, m, 3), flag, format!("collides {p} 1:55 3"));
-        fwd!(d.walk_to_item(me, 5, true), (), format!("walk_to_item {p} 5 true"));
+        fwd!(
+            d.walk_to_item(me, 5, true),
+            (),
+            format!("walk_to_item {p} 5 true")
+        );
         fwd!(d.room_at(6, 7), flag, "room_at 6 7".to_string());
         fwd!(
             d.free_spot((1, 2), (3, 4), 5, 6, 7, 8),
@@ -84,20 +88,48 @@ fn forward_pending(flag: bool) {
             "free_spot (1, 2) (3, 4) 5 6 7 8".to_string()
         );
         fwd!(d.in_town(me), flag, format!("in_town {p}"));
-        fwd!(d.room_delete_notice(9), (), "room_delete_notice 9".to_string());
+        fwd!(
+            d.room_delete_notice(9),
+            (),
+            "room_delete_notice 9".to_string()
+        );
         fwd!(d.free_collision(10), (), "free_collision 10".to_string());
         fwd!(
             d.room_change_notice(11, 12, 13),
             (),
             "room_change_notice 11 12 13".to_string()
         );
-        fwd!(MovePending::stat_refresh(d, m), (), "stat_refresh 1:55".to_string());
-        fwd!(d.stat_refresh_unlink(m, 14), (), "stat_refresh_unlink 1:55 14".to_string());
-        fwd!(MovePending::stat_link(d, m, 15), (), "stat_link 1:55 15".to_string());
-        fwd!(MovePending::charm_relink(d, m, 16), (), "charm_relink 1:55 16".to_string());
-        fwd!(d.charm_unlink(m, 17), (), "charm_unlink 1:55 17".to_string());
+        fwd!(
+            MovePending::stat_refresh(d, m),
+            (),
+            "stat_refresh 1:55".to_string()
+        );
+        fwd!(
+            d.stat_refresh_unlink(m, 14),
+            (),
+            "stat_refresh_unlink 1:55 14".to_string()
+        );
+        fwd!(
+            MovePending::stat_link(d, m, 15),
+            (),
+            "stat_link 1:55 15".to_string()
+        );
+        fwd!(
+            MovePending::charm_relink(d, m, 16),
+            (),
+            "charm_relink 1:55 16".to_string()
+        );
+        fwd!(
+            d.charm_unlink(m, 17),
+            (),
+            "charm_unlink 1:55 17".to_string()
+        );
         fwd!(d.is_active(m, 18), flag, "is_active 1:55 18".to_string());
-        fwd!(MovePending::inventory_pass(d, m), (), "inventory_pass 1:55".to_string());
+        fwd!(
+            MovePending::inventory_pass(d, m),
+            (),
+            "inventory_pass 1:55".to_string()
+        );
         fwd!(
             MovePending::weapon_in_use_update(d, m),
             (),
@@ -108,53 +140,161 @@ fn forward_pending(flag: bool) {
             (),
             "weapon_bookkeeping 1:55".to_string()
         );
-        fwd!(d.body_leave_effects(m, 19), (), "body_leave_effects 1:55 19".to_string());
-        fwd!(d.hireling_owner_pass(m), (), "hireling_owner_pass 1:55".to_string());
-        fwd!(d.belt_unequip(m, 20), (), "belt_unequip 1:55 20".to_string());
-        fwd!(d.belt_remove_allowed(m), flag, "belt_remove_allowed 1:55".to_string());
+        fwd!(
+            d.body_leave_effects(m, 19),
+            (),
+            "body_leave_effects 1:55 19".to_string()
+        );
+        fwd!(
+            d.hireling_owner_pass(m),
+            (),
+            "hireling_owner_pass 1:55".to_string()
+        );
+        fwd!(
+            d.belt_unequip(m, 20),
+            (),
+            "belt_unequip 1:55 20".to_string()
+        );
+        fwd!(
+            d.belt_remove_allowed(m),
+            flag,
+            "belt_remove_allowed 1:55".to_string()
+        );
         fwd!(d.sound(m, 21), (), "sound 1:55 21".to_string());
-        fwd!(d.pickup_sound(m, 22), (), "pickup_sound 1:55 22".to_string());
-        fwd!(d.requirement_sound(m), (), "requirement_sound 1:55".to_string());
+        fwd!(
+            d.pickup_sound(m, 22),
+            (),
+            "pickup_sound 1:55 22".to_string()
+        );
+        fwd!(
+            d.requirement_sound(m),
+            (),
+            "requirement_sound 1:55".to_string()
+        );
         fwd!(d.merc_sound(m), (), "merc_sound 1:55".to_string());
-        fwd!(d.quest_flag(m, 23, 24), flag, "quest_flag 1:55 23 24".to_string());
-        fwd!(d.quest_item_picked(m, 25), (), "quest_item_picked 1:55 25".to_string());
-        fwd!(d.quest_item_dropped(26), (), "quest_item_dropped 26".to_string());
+        fwd!(
+            d.quest_flag(m, 23, 24),
+            flag,
+            "quest_flag 1:55 23 24".to_string()
+        );
+        fwd!(
+            d.quest_item_picked(m, 25),
+            (),
+            "quest_item_picked 1:55 25".to_string()
+        );
+        fwd!(
+            d.quest_item_dropped(26),
+            (),
+            "quest_item_dropped 26".to_string()
+        );
         fwd!(d.carry_one(27), flag, "carry_one 27".to_string());
-        fwd!(d.held_test_units(m), a.owners, "held_test_units 1:55".to_string());
+        fwd!(
+            d.held_test_units(m),
+            a.owners,
+            "held_test_units 1:55".to_string()
+        );
         fwd!(d.copy_item(28), Some(902), "copy_item 28".to_string());
-        fwd!(d.give_cursor_item(m, 29), (), "give_cursor_item 1:55 29".to_string());
+        fwd!(
+            d.give_cursor_item(m, 29),
+            (),
+            "give_cursor_item 1:55 29".to_string()
+        );
         fwd!(d.consume_one(30), flag, "consume_one 30".to_string());
         fwd!(d.set_owner(31, m), (), "set_owner 31 1:55".to_string());
         fwd!(d.pile_owner(32), a.owner, "pile_owner 32".to_string());
         fwd!(d.query_0044be50(), flag, "query_0044be50".to_string());
         fwd!(d.party_share_id(m), 904, "party_share_id 1:55".to_string());
         fwd!(d.party_share(m, 33), (), "party_share 1:55 33".to_string());
-        fwd!(d.owned_gold_pickup(m, 34, 35), (), "owned_gold_pickup 1:55 34 35".to_string());
+        fwd!(
+            d.owned_gold_pickup(m, 34, 35),
+            (),
+            "owned_gold_pickup 1:55 34 35".to_string()
+        );
         fwd!(d.rest_pile(m, 36), (), "rest_pile 1:55 36".to_string());
-        fwd!(d.book_count_changed(m, 37), (), "book_count_changed 1:55 37".to_string());
-        fwd!(d.use_grid_item(m, 38, 39, 40), a.pair, "use_grid_item 1:55 38 39 40".to_string());
+        fwd!(
+            d.book_count_changed(m, 37),
+            (),
+            "book_count_changed 1:55 37".to_string()
+        );
+        fwd!(
+            d.use_grid_item(m, 38, 39, 40),
+            a.pair,
+            "use_grid_item 1:55 38 39 40".to_string()
+        );
         fwd!(d.use_item(m, me, 41), flag, format!("use_item 1:55 {p} 41"));
-        fwd!(d.charge_update(m, 42), (), "charge_update 1:55 42".to_string());
+        fwd!(
+            d.charge_update(m, 42),
+            (),
+            "charge_update 1:55 42".to_string()
+        );
         fwd!(d.remove_used(m, 43), (), "remove_used 1:55 43".to_string());
-        fwd!(d.use_item_action(m, 44, 45), a.pair, "use_item_action 1:55 44 45".to_string());
-        fwd!(d.swap_1h_with_2h(m, 46, 47), a.pair, "swap_1h_with_2h 1:55 46 47".to_string());
-        fwd!(d.pickup_special(m, 48), flag, "pickup_special 1:55 48".to_string());
-        fwd!(d.equip_picked(m, 49), flag, "equip_picked 1:55 49".to_string());
-        fwd!(d.filler_linked(50, 51), (), "filler_linked 50 51".to_string());
+        fwd!(
+            d.use_item_action(m, 44, 45),
+            a.pair,
+            "use_item_action 1:55 44 45".to_string()
+        );
+        fwd!(
+            d.swap_1h_with_2h(m, 46, 47),
+            a.pair,
+            "swap_1h_with_2h 1:55 46 47".to_string()
+        );
+        fwd!(
+            d.pickup_special(m, 48),
+            flag,
+            "pickup_special 1:55 48".to_string()
+        );
+        fwd!(
+            d.equip_picked(m, 49),
+            flag,
+            "equip_picked 1:55 49".to_string()
+        );
+        fwd!(
+            d.filler_linked(50, 51),
+            (),
+            "filler_linked 50 51".to_string()
+        );
         fwd!(d.runeword(m, 52), flag, "runeword 1:55 52".to_string());
         fwd!(d.hireling(m), a.owner, "hireling 1:55".to_string());
         fwd!(d.not_dead(m), flag, "not_dead 1:55".to_string());
-        fwd!(d.owns_hireling(me, m), flag, format!("owns_hireling {p} 1:55"));
-        fwd!(d.equip_on_merc(m, 53), (), "equip_on_merc 1:55 53".to_string());
+        fwd!(
+            d.owns_hireling(me, m),
+            flag,
+            format!("owns_hireling {p} 1:55")
+        );
+        fwd!(
+            d.equip_on_merc(m, 53),
+            (),
+            "equip_on_merc 1:55 53".to_string()
+        );
         fwd!(d.merc_after_take(m), (), "merc_after_take 1:55".to_string());
         fwd!(d.pick_npc(m, 54, 1), 905, "pick_npc 1:55 54 1".to_string());
-        fwd!(d.pick_object(m, 56, 1), 905, "pick_object 1:55 56 1".to_string());
-        fwd!(d.pick_other(m, 2, 57, 1), 905, "pick_other 1:55 2 57 1".to_string());
+        fwd!(
+            d.pick_object(m, 56, 1),
+            905,
+            "pick_object 1:55 56 1".to_string()
+        );
+        fwd!(
+            d.pick_other(m, 2, 57, 1),
+            905,
+            "pick_other 1:55 2 57 1".to_string()
+        );
         fwd!(d.resync(m), (), "resync 1:55".to_string());
         fwd!(d.send(m, vec![1, 2]), (), "send 1:55 [1, 2]".to_string());
-        fwd!(d.send_item_stat(m, 58, 59), (), "send_item_stat 1:55 58 59".to_string());
-        fwd!(d.item_bits(60, 61, 62), a.bits, "item_bits 60 61 62".to_string());
-        fwd!(d.store_messages(m, 63), a.msgs, "store_messages 1:55 63".to_string());
+        fwd!(
+            d.send_item_stat(m, 58, 59),
+            (),
+            "send_item_stat 1:55 58 59".to_string()
+        );
+        fwd!(
+            d.item_bits(60, 61, 62),
+            a.bits,
+            "item_bits 60 61 62".to_string()
+        );
+        fwd!(
+            d.store_messages(m, 63),
+            a.msgs,
+            "store_messages 1:55 63".to_string()
+        );
         fwd!(
             d.filler_owner(64),
             Owner::monster(908),
@@ -191,18 +331,46 @@ fn forward_inv_world(flag: bool) {
                 assert_eq!(d.rest.last(), $log);
             }};
         }
-        fwd!(InvWorld::charm_relink(d, pl, item), (), format!("charm_relink {p} {g}"));
-        fwd!(InvWorld::active_item(d, pl, item), flag, format!("is_active {p} {g}"));
-        fwd!(InvWorld::stat_refresh(d, pl), (), format!("stat_refresh {p}"));
-        fwd!(InvWorld::socket_filled(d, item), flag, format!("socket_filled {g}"));
-        fwd!(InvWorld::inventory_pass(d, pl), (), format!("inventory_pass {p}"));
-        fwd!(InvWorld::trade_hook(d, pl, item), (), format!("trade_hook {p} {g}"));
+        fwd!(
+            InvWorld::charm_relink(d, pl, item),
+            (),
+            format!("charm_relink {p} {g}")
+        );
+        fwd!(
+            InvWorld::active_item(d, pl, item),
+            flag,
+            format!("is_active {p} {g}")
+        );
+        fwd!(
+            InvWorld::stat_refresh(d, pl),
+            (),
+            format!("stat_refresh {p}")
+        );
+        fwd!(
+            InvWorld::socket_filled(d, item),
+            flag,
+            format!("socket_filled {g}")
+        );
+        fwd!(
+            InvWorld::inventory_pass(d, pl),
+            (),
+            format!("inventory_pass {p}")
+        );
+        fwd!(
+            InvWorld::trade_hook(d, pl, item),
+            (),
+            format!("trade_hook {p} {g}")
+        );
         fwd!(
             InvWorld::weapon_in_use_update(d, pl),
             (),
             format!("weapon_in_use_update {p}")
         );
-        fwd!(InvWorld::stat_link(d, pl, item), (), format!("stat_link {p} {g}"));
+        fwd!(
+            InvWorld::stat_link(d, pl, item),
+            (),
+            format!("stat_link {p} {g}")
+        );
         fwd!(
             InvWorld::weapon_bookkeeping(d, pl, item),
             (),
@@ -228,7 +396,11 @@ fn forward_inv_world(flag: bool) {
             flag,
             format!("one_or_two_handed {p} {g}")
         );
-        fwd!(InvWorld::ammo_type(d, item), Some(910), format!("ammo_type {g}"));
+        fwd!(
+            InvWorld::ammo_type(d, item),
+            Some(910),
+            format!("ammo_type {g}")
+        );
         fwd!(
             InvWorld::stack_quality_ok(d, item),
             flag,
@@ -239,21 +411,41 @@ fn forward_inv_world(flag: bool) {
             flag,
             format!("has_allowed_location {g}")
         );
-        fwd!(InvWorld::quiver_kind(d, item), flag, format!("quiver_kind {g}"));
+        fwd!(
+            InvWorld::quiver_kind(d, item),
+            flag,
+            format!("quiver_kind {g}")
+        );
         fwd!(
             InvWorld::auto_equip_allows(d, pl, item, 4),
             flag,
             format!("auto_equip_allows {p} {g} 4")
         );
-        fwd!(InvWorld::targeting_probe(d, item), 911, format!("targeting_probe {g}"));
+        fwd!(
+            InvWorld::targeting_probe(d, item),
+            911,
+            format!("targeting_probe {g}")
+        );
         fwd!(
             InvWorld::interaction(d, pl),
             InteractionTarget::Missing,
             format!("interaction {p}")
         );
-        fwd!(InvWorld::clear_interaction(d, pl), (), format!("clear_interaction {p}"));
-        fwd!(InvWorld::player_data_4c(d, pl), 905, format!("player_data_4c {p}"));
-        fwd!(InvWorld::player_data_50(d, pl), 912, format!("player_data_50 {p}"));
+        fwd!(
+            InvWorld::clear_interaction(d, pl),
+            (),
+            format!("clear_interaction {p}")
+        );
+        fwd!(
+            InvWorld::player_data_4c(d, pl),
+            905,
+            format!("player_data_4c {p}")
+        );
+        fwd!(
+            InvWorld::player_data_50(d, pl),
+            912,
+            format!("player_data_50 {p}")
+        );
         fwd!(
             InvWorld::npc_talking(d, item, pl),
             flag,
@@ -380,7 +572,10 @@ fn place_removes_a_ground_item_from_its_room() {
     let i = log.iter().position(|l| *l == notice).expect("notice");
     assert_eq!(log.get(i + 1), Some(&coll), "{log:?}");
     let d = w.data(g);
-    assert_eq!((d.page, d.x, d.y, d.node_grid, d.node_kind), (0, 3, 1, 3, 1));
+    assert_eq!(
+        (d.page, d.x, d.y, d.node_grid, d.node_kind),
+        (0, 3, 1, 3, 1)
+    );
     assert_eq!(w.inventory().items(), [w.unit(g).unwrap()]);
 }
 
@@ -392,8 +587,11 @@ fn place_unlinks_from_the_old_inventory() {
     let mut w = World::new();
     let m = w.alloc(d2_sim::units::UnitType::Player, 0);
     let mg = w.units.get(m).unwrap().guid;
-    w.state
-        .add_inventory(m, d2_sim::items::inventory::UnitKind::Player { class: 0 }, mg);
+    w.state.add_inventory(
+        m,
+        d2_sim::items::inventory::UnitKind::Player { class: 0 },
+        mg,
+    );
     let g = w.ground_item(CAP, 11, 11);
     let me = w.me();
     assert!(w.desk(|d| d.place_at(Owner::player(mg), g, 0, 0, 0)));
@@ -485,7 +683,11 @@ fn stack_test_compares_quality_file_index_ethereal_and_damage() {
         ("quality", |i, b| i.quality = if b { 3 } else { 2 }),
         ("file index", |i, b| i.file_index = if b { 6 } else { 5 }),
         ("ethereal", |i, b| {
-            i.flags = if b { i.flags | 0x40_0000 } else { i.flags & !0x40_0000 }
+            i.flags = if b {
+                i.flags | 0x40_0000
+            } else {
+                i.flags & !0x40_0000
+            }
         }),
     ];
     for (what, f) in edits {
@@ -510,7 +712,10 @@ fn requirement_percent_lowers_the_strength_needed() {
     w.set_stat(u, 91, -50);
     assert!(w.desk(|d| d.requirements(g, me, false)));
     w.set_stat(u, 91, -49);
-    assert!(!w.desk(|d| d.requirements(g, me, false)), "20 − 9 = 11 > 10");
+    assert!(
+        !w.desk(|d| d.requirements(g, me, false)),
+        "20 − 9 = 11 > 10"
+    );
 }
 
 /// §4.3 hand row "N, T present": not stackable, N and X not compatible
@@ -555,9 +760,18 @@ fn ground_check_measures_from_the_item_position() {
     let near = w.ground_item(CAP, 110, 90);
     let far = w.ground_item(CAP, 111, 100);
     let far_y = w.ground_item(CAP, 100, 89);
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, near)), 0);
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, far)), 1);
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, far_y)), 1);
+    assert_eq!(
+        w.desk(|d| InventoryOps::check_ground_or_owned(d, me, near)),
+        0
+    );
+    assert_eq!(
+        w.desk(|d| InventoryOps::check_ground_or_owned(d, me, far)),
+        1
+    );
+    assert_eq!(
+        w.desk(|d| InventoryOps::check_ground_or_owned(d, me, far_y)),
+        1
+    );
 }
 
 /// A cap stored at (0, 0) of page 0 through 0x18, messages drained.
@@ -604,13 +818,13 @@ fn ground_check_other_act_is_2() {
     let mut w = World::new();
     let me = w.me();
     let g = w.ground_item(CAP, 11, 11);
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, g)), 0);
+    assert_eq!(w.desk(|d| InventoryOps::check_ground_or_owned(d, me, g)), 0);
     let u = w.unit(g).unwrap();
     w.units.get_mut(u).unwrap().act = 1;
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, g)), 2);
+    assert_eq!(w.desk(|d| InventoryOps::check_ground_or_owned(d, me, g)), 2);
     let p = w.player;
     w.units.get_mut(p).unwrap().act = 1;
-    assert_eq!(w.desk(|d| d.check_ground_or_owned(me, g)), 0);
+    assert_eq!(w.desk(|d| InventoryOps::check_ground_or_owned(d, me, g)), 0);
 }
 
 /// §4.5: neither item may have sockets (`0x006299B0`: stat 194).
@@ -725,8 +939,11 @@ fn stored_or_equipped_and_belt_checks() {
     let mut w = World::new();
     let other = w.alloc(d2_sim::units::UnitType::Player, 0);
     let og = w.units.get(other).unwrap().guid;
-    w.state
-        .add_inventory(other, d2_sim::items::inventory::UnitKind::Player { class: 0 }, og);
+    w.state.add_inventory(
+        other,
+        d2_sim::items::inventory::UnitKind::Player { class: 0 },
+        og,
+    );
     let me = w.me();
     let mine = stored_cap(&mut w);
     let theirs = w.ground_item(CAP, 11, 11);
@@ -804,7 +1021,9 @@ fn add_to_room_by_room() {
     });
     assert_eq!(
         w.state.errors,
-        [InvError::List(d2_sim::units::lists::ListError::UnknownRoom(bad))]
+        [InvError::List(
+            d2_sim::units::lists::ListError::UnknownRoom(bad)
+        )]
     );
 }
 

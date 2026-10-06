@@ -856,9 +856,6 @@ impl World {
         })
     }
 
-    pub fn mode(&self, item: Guid) -> u32 {
-        self.units.get(self.unit(item).unwrap()).unwrap().mode
-    }
     pub fn data(&self, item: Guid) -> InvItem {
         self.state.items[&self.unit(item).unwrap()]
     }
@@ -888,34 +885,10 @@ pub fn msg(id: u8, fields: &[u32]) -> Vec<u8> {
 pub fn pick(item: Guid, cursor: u32) -> Vec<u8> {
     msg(0x16, &[4, item, cursor])
 }
-pub fn drop_msg(item: Guid) -> Vec<u8> {
-    msg(0x17, &[item])
-}
 pub fn insert(item: Guid, x: u32, y: u32, page: u32) -> Vec<u8> {
     msg(0x18, &[item, x, y, page])
-}
-pub fn lift(item: Guid) -> Vec<u8> {
-    msg(0x19, &[item])
 }
 /// 0x1A / 0x1B / 0x1D [item u32][location u32].
 pub fn body(id: u8, item: Guid, loc: u32) -> Vec<u8> {
     msg(id, &[item, loc])
-}
-pub fn unequip(loc: u16) -> Vec<u8> {
-    let mut m = vec![0x1C];
-    m.extend_from_slice(&loc.to_le_bytes());
-    m
-}
-
-/// A deferred 0x9C / 0x9D: (id, action, item GUID).
-pub fn head(m: &[u8]) -> (u8, u8, Guid) {
-    (m[0], m[1], u32::from_le_bytes([m[4], m[5], m[6], m[7]]))
-}
-
-/// The item messages of an update pass (0x47 / 0x48 dropped).
-pub fn item_msgs(out: &[Vec<u8>]) -> Vec<(u8, u8, Guid)> {
-    out.iter()
-        .filter(|m| m[0] == 0x9C || m[0] == 0x9D)
-        .map(|m| head(m))
-        .collect()
 }
