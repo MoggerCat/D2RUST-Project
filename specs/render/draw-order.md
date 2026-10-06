@@ -26,17 +26,17 @@
 |   3. Filling the grid (`0x004DD7C0` per room) | 130–171 |
 |   4. List insertion | 172–182 |
 |   5. Which units draw | 183–204 |
-|   6. The passes | 205–258 |
-|   7. Tile records that never draw | 259–272 |
-|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 273–314 |
-|   9. Map-tile feed | 315–335 |
-|   10. d2rs mapping | 336–367 |
-| Constants & data dependencies | 368–376 |
-| Randomness | 377–382 |
-| Edge cases & original bugs | 383–400 |
-| Test vectors | 401–427 |
-| Provenance | 428–451 |
-| Open questions | 452–504 |
+|   6. The passes | 205–280 |
+|   7. Tile records that never draw | 281–294 |
+|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 295–337 |
+|   9. Map-tile feed | 338–358 |
+|   10. d2rs mapping | 359–390 |
+| Constants & data dependencies | 391–399 |
+| Randomness | 400–405 |
+| Edge cases & original bugs | 406–423 |
+| Test vectors | 424–452 |
+| Provenance | 453–481 |
+| Open questions | 482–538 |
 <!-- /index -->
 
 ## Summary
@@ -229,8 +229,8 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    `0x004F6980` (slot `+0xA4`) at the wall position; the caller passes
    draw mode 4, which the GDI drawer `0x006C9290` never reads (its blend
    is fixed: blended shadows or an opaque copy, `render/blend-modes.md`
-   §5, branch `claude/spec-shading-blend`; Open question 4); kind 2 → the unit's shadow `0x00471620` (Open
-   question 3). After a cell's list, its wall list is walked once for
+   §5, branch `claude/spec-shading-blend`; Open question 4); kind 2 → the unit's shadow `0x00471620`
+   (position and blend: `render/blend-modes.md` §5). After a cell's list, its wall list is walked once for
    records without layer bits (none exist, §3 r2; the walk still runs the
    §8 fade updates).
 4. **Walls and units** (`0x004DF1C0`, cells in order): the cell's wall
@@ -252,9 +252,31 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    when at least one block passed their block test, 0 when the tile does
    not load (`0x005FDEA0`) or every block was culled. Roofs
    (`0x004DEA70`) set it unconditionally once the record passed the
-   whole-tile view test, whatever the floor drawer did. Shadow tiles,
-   floors (`0x004DE410`) and units never set it; no pass of this spec
-   reads it (Open question 15).
+   whole-tile view test, whatever the floor drawer did. Floors set it
+   too: `0x004DE410` calls `0x004DDE80` after every floor draw (the
+   record passed the whole-tile test of `camera.md` §7), which sets the
+   flag unconditionally and then widens the drawn extents. Shadow tiles
+   and units never set it. No draw pass reads it; the reader is the
+   automap reveal (r7).
+7. **Automap reveal** (`0x00459020`, called by the frame `0x0044C7EB`):
+   skipped while the countdown `[0x007A51A4]` is non-zero (it is
+   decremented instead); otherwise, when the local player's position
+   moved by `d ≥ 0x50` since the last reveal (`|Δx|`, `|Δy|` from the
+   stored `[0x007A51FC]`/`[0x007A51F4]`: `d = (2·max + min) / 2`, C
+   division), it stores the new position and walks the player room's
+   near-room array; for each room of the player's level it calls
+   `0x00458F40(room, 0, cell)`. That function walks the room's wall array
+   (`0x00619660`) and then its floor array (`0x006196A0`) in order and
+   adds to the automap (`0x00457CF0`, owner: the automap spec) every
+   record without flag 0x8 that has flag 0x20000, or any record when
+   `[0x007A51A0]` ≠ 0 (no writer in `Game.exe`: 0) or the second
+   argument is 1; then `0x00458DC0` (room objects). The DRLG room-init
+   callback `0x00459150` (drlg `+0x454`, `client/model.md` S→C 0x03)
+   calls it with 1 for every room of a preset level whose lvlprest
+   `AutoMap` ≠ 0 (`drlg/preset.md` step 4), so those levels are revealed
+   whole. So a wall or floor
+   joins the automap only after one frame drew it (r6) and the player
+   then moved 0x50 or more.
 
 ### 7. Tile records that never draw
 
@@ -310,7 +332,8 @@ player's tile `(px, py)` (`[0x007C8A08]`, `[0x007C8A10]`, set by
   walk, so only the bit-2 compare depends on the clock there. d2rs: the
   `FadeClock` hook gives `now` as a `u32` millisecond count; a capture
   case without recorded `GetTickCount` values must not contain a record
-  with state bit 2 set (Open question 16).
+  with state bit 2 set; no 1.14d code sets that bit (Open question 16,
+  answered), so the bit-2 branch is unreachable from original data.
 
 ### 9. Map-tile feed
 
@@ -360,7 +383,7 @@ rule of `render/blend-modes.md` §5, whatever mode the caller names (§6
 r3). A unit's items keep the order's `pass` / `major` / `minor` and take
 `sub` from the composite; the unit's own position and offsets are
 `camera.md` §4 and `unit-composite.md` §8. An item this order emits whose
-drawing has no spec yet (unit shadows, OQ3; water effects, OQ11; level
+drawing has no spec yet (water effects, OQ11; level
 backgrounds, OQ1; edge floors, OQ10; fade group mode, OQ6; an unanswered
 sight test, OQ9) makes the frame an error, never a silent skip; passes 4,
 8, 9 and 10 emit nothing until their owners exist.
@@ -424,6 +447,8 @@ LCG at `[0x00712C50]` (multiplier 0x6AC690C5). Both: Open questions 1, 11.
 | capture `order-0001`: walk the Rogue Encampment along the palisade and behind a tent, every frame captured with the recorded lists (`capture.md`) | CPU reference with this order equals the capture | capture, queued |
 | capture `order-0002`: walk under a Lut Gholein roof | roof passes and fade equal the capture | capture, queued |
 | capture `order-0003`: stand at `townN1` cells (44, 32) and (51, 32) | settles Open question 7 | capture, queued |
+| floor record `ℓ` 1 passing the whole-tile test | flag 0x20000 set (`0x004DDE80`) | §6 r6 |
+| last reveal at (1000, 2000), countdown 0; player at (1040, 2010) / (1060, 2000) / (1080, 2000) | `d` = 45 / 60 / 80: no reveal / no reveal / reveal (0x50 = 80) | §6 r7 |
 
 ## Provenance
 
@@ -448,6 +473,11 @@ inserters; flag 0x20000 sites `0x004DEDF0`/`0x004DF1C0`/`0x004DEF80`
 compares `end ≤ now` unsigned in the four walkers; shadow-tile slot
 `+0xA4` GDI `0x006C9290` reads only (tile, X, Y, half), not the mode
 argument.
+Ghidra backlog (2026-10-06, disassembly of 1.14d `Game.exe`): every
+`0x20000` test in the export (18 sites) and the record-flag writers
+(`0x004DDE80` floors, the four pass functions); automap reveal
+`0x00459020`/`0x00458F40`/`0x00459150`; all writes of record `+0x24`
+(none sets bit 2).
 
 ## Open questions
 
@@ -457,8 +487,8 @@ argument.
 2. What `0x00473C00` (→ `0x00473A70` on two objects at `[0x007A89FC]`,
    `[0x007A8A00]`), `0x00475B20` and `0x00473910` draw (weather?
    automap?). Ghidra reads.
-3. Unit shadows `0x00471620`: placement and blend (`render/blend-modes.md`,
-   `render/shading.md`). Ghidra read.
+3. ~~Unit shadows `0x00471620`~~: answered in `render/blend-modes.md`
+   §5 (position, layers, skip rules).
 4. DT1 shadow tiles `0x004F6980`: driver slot, block placement and block
    culling (`camera.md` OQ4: the handed (X, Y) is the wall position).
    Partly read: slot `+0xA4`, GDI `0x006C9290`, uses the same per-block
@@ -496,8 +526,12 @@ argument.
 14. Whether any UI or cursor item is drawn between the world passes
     (`0x00456EE0` … `0x00477980` order): `client/ui.md` owner; a capture
     with a panel open.
-15. Who reads record flag 0x20000 (§6 r6): search the export for reads
-    of record `+0x14` bit 17 (automap reveal is the likely reader).
-16. Who sets fade state bit 2 (hide at end time, §8) and with which end
-    time: search writes of record `+0x24` bit 2; until then d2rs captures
-    record `GetTickCount` at frame start or avoid such records.
+15. ~~Who reads record flag 0x20000~~: the automap reveal
+    `0x00458F40` (§6 r7); floors also set it (§6 r6). Search of every
+    `0x20000` test in the export: no other reader of record `+0x14`.
+16. ~~Who sets fade state bit 2~~: nobody. Every write of record
+    `+0x24` in `Game.exe` (`0x004DD180`, `0x004DEA70`, `0x004DEDF0`,
+    `0x004DEF80`, `0x004DF1C0`) sets bits 0–1 or clears bits 1–2, and no
+    instruction ORs or stores an immediate with bit 2 into a `+0x24`
+    field of a tile record; records start zeroed. §8 keeps the rule for
+    completeness; d2rs needs no recorded `GetTickCount` for it.

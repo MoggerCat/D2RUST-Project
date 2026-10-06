@@ -27,22 +27,22 @@
 |   1. Fonts and locale | 78–117 |
 |   2. Strings: decoding and lookup by id | 118–135 |
 |   3. Glyph lookup | 136–150 |
-|   4. Glyph pixels | 151–176 |
-|   5. Color codes | 177–212 |
-|   6. Measuring | 213–232 |
-|   7. The draw call | 233–258 |
-|   8. Framed text (hover boxes) | 259–279 |
-|   9. Variants of the draw call | 280–288 |
-|   10. Word wrap | 289–316 |
-|   11. Alignment | 317–324 |
-|   12. Clipping (decision CG2) | 325–335 |
-|   13. d2rs answers (hooks in `d2-client`) | 336–350 |
-| Constants & data dependencies | 351–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–393 |
-| Test vectors | 394–420 |
-| Provenance | 421–442 |
-| Open questions | 443–472 |
+|   4. Glyph pixels | 151–188 |
+|   5. Color codes | 189–224 |
+|   6. Measuring | 225–244 |
+|   7. The draw call | 245–270 |
+|   8. Framed text (hover boxes) | 271–291 |
+|   9. Variants of the draw call | 292–331 |
+|   10. Word wrap | 332–359 |
+|   11. Alignment | 360–367 |
+|   12. Clipping (decision CG2) | 368–378 |
+|   13. d2rs answers (hooks in `d2-client`) | 379–393 |
+| Constants & data dependencies | 394–409 |
+| Randomness | 410–413 |
+| Edge cases & original bugs | 414–436 |
+| Test vectors | 437–466 |
+| Provenance | 467–494 |
+| Open questions | 495–523 |
 <!-- /index -->
 
 ## Summary
@@ -173,6 +173,18 @@ byte 8** (`formats/font-tbl.md`).
    from offset `0x6B627`). Map 0 is never used for drawing (all zero in
    every 1.14d PL2). The 13 RGB triples before the maps (offset `0x6B600`)
    are copied to `0x007D563C` and not used by glyph drawing.
+5. A `k < 0` (§5 r1 keeps it; units 0x00–0x2F give `k` = −48 … −1)
+   reads pointer `+0xD0 + 4k` of the 0x48-pointer block
+   (`0x004FB010`; GDI copies the block to `0x0098A040`, `0x006C8000`),
+   which stays inside the block: `k` = −1 → the selected-unit shift map
+   (`+0xCC`); −2 … −17 → inventory color variations 15 … 0
+   (`+0xC8` … `+0x8C`); −18 … −48 → light maps 31 … 1 (`+0x88` …
+   `+0x10`) (`render/shading.md` §1). A code's `k ≥ 13` never reaches
+   the block (§5 r1 sets 0); a caller's `k` (§7) is not checked: 13 →
+   additive blend `+0x104`, 14 → `+0x108`, 15 → `+0x10C`, 16 → darkened
+   shift `+0x110`, 17 → the text RGB triples `+0x114`, 18 → `H`, 19 →
+   `R` (each used as a 256-byte map: its first 256 bytes); `k` ≥ 20
+   reads past the block (GDI: driver globals from `0x0098A160`).
 
 ### 5. Color codes
 
@@ -283,8 +295,39 @@ text at y `y' − 2`, block width `W`, centered.
 |---|---|---|
 | draw with mode | `0x00502360` → `0x00501C30` | draw mode is a 6th argument instead of 5 |
 | horizontal window | `0x00501FE0` (text ECX, x EDX, y, k, s, w; caller: text-box control `0x004FBF30`) | pen starts at `x + s`; a glyph is drawn only if pen x > `x` before it (the pen still advances); the call stops when pen x > `x + w`; `LF` resets pen x to `x` |
-| vertical window | `0x00501DF0` (text ECX, x EDX, y, ?, skip, lines; callers in `0x0049D5A0`) | returns at once if `skip < 0`; `ÿc` + 1 unit skipped (no color: glyphs drawn with `0x004F64E0`, draw mode 5, no remap), `ÿ` + any other unit except `m` skips those 2 units; per glyph: if `skip + lines ≤` the cel height, rows `skip`, `lines`, else rows 0, cel height; nothing drawn on display type 6; `ÿm` draws a MonsterIndicators frame (OQ 1) |
-| no color | `0x00502190` (via `0x005023A0`, no static caller) | every `ÿ` skips 3 units; line step `trunc(−15 × height / 10)`; color 0 |
+| vertical window | `0x00501DF0` (text ECX, x EDX, y, unused, skip, lines; callers in `0x0049D5A0`) | returns at once if `skip < 0`; `ÿc` + 1 unit skipped (no color: glyphs drawn with `0x004F64E0`, draw mode 5, no remap), `ÿ` + any other unit except `m` skips those 2 units; per glyph: if `skip + lines ≤` the cel height, rows `skip`, `lines`, else rows 0, cel height; nothing drawn on display type 6; `ÿm`: details below |
+| no color | `0x00502190` (via `0x005023A0`) | every `ÿ` skips 3 units; line step `trunc(−15 × height / 10)`; color 0. Dead code: nothing in `Game.exe` calls, jumps to or holds the address of `0x005023A0` (no rel32, absolute or RVA reference; not among the 24 exports), so d2rs needs no counterpart |
+
+**Vertical window details** (`0x00501DF0`):
+
+1. The fourth argument (`[ebp+0xC]`) is never read.
+2. Row window (`CelDrawEx` `0x004F64E0` → driver slot `+0x8C`, GDI
+   `0x006C86A0` → `0x00601650`): `lines` = 0 draws nothing. Otherwise
+   the same pre-test as the plain cel draw (`render/sprite-placement.md`
+   §5), then, with `B = Y + yoff` the cel's bottom screen row
+   (`sprite-placement.md` §2) and `H` the surface height: `top = B −
+   skip − lines`, `bot = B − skip`; nothing when `bot < 0` or `top ≥ H`;
+   `top := max(top, 0)`, `bot := min(bot, H − 1)`; the screen rows `top
+   + 1 … bot` are drawn, i.e. the encoded rows `skip … skip + lines − 1`
+   counted from the bottom row, cut to the screen. When the window is
+   cut at the top, screen row 0 is never drawn (the `top` bound is
+   exclusive; reproduce). No light, no remap; the blend table of the
+   mode (5: none).
+3. `ÿm`: the unit after `m` is looked up as a glyph record of the
+   current font (`[0x00841DA0]`); its frame (`+0x08`) of the
+   MonsterIndicators cel file (`[0x00841DA4]`) is drawn whole with the
+   plain cel draw (`0x004F6480`, light 0xFF, mode 5, no palette) at the
+   pen; the pen does not move in x, and y += `trunc(16 · h / 10)` with
+   `h` = the font's line-height byte (`+0x0A` of the font record
+   `0x00841DB0 + 20 · [0x0072DFFC]`): one line **down**. `LF` resets x
+   to the start and moves y by `trunc(−16 · h / 10)` (up), as §7.
+4. Caller: `0x0049D5A0` (from `0x004A0770`), a scrolled text panel at
+   (`[0x007BF278]` + 16, `[0x007225FC]` + …) whose scroll position is in
+   1/1024 pixel and whose lines are 18 pixels apart (0x4800): full lines
+   use `DrawText`, the partly visible top line `0x00501DF0(…, skip 0,
+   lines = min(visible, 18))` and the bottom ones `0x00501DF0(…, skip,
+   lines)`. Which panel this is: the panels owner (`ui/panels*.md`).
+
 
 ### 10. Word wrap
 
@@ -380,9 +423,9 @@ Reproduced by default.
   add `adv('m')` for `ÿm` / `ÿM`, while the draw call draws `ÿ`
   followed by a non-`c` as glyphs: such strings are mis-centered.
 - `ÿc` + a unit below `0` gives a negative `k`; the remap pointer is then
-  read from palette-table block `+0xD0 + 4k` (another table, OQ 2).
+  read from palette-table block `+0xD0 + 4k` (another table, §4 r5).
   No English string does this.
-- A caller color ≥ 13 is not range-checked (only codes are) (OQ 2).
+- A caller color ≥ 13 is not range-checked (only codes are) (§4 r5).
 - `ÿ` as the last unit is a color code (the NUL compares equal to `c`):
   color 0, nothing drawn.
 - The `loading` palette PL2 has 12 text colors; the loader still copies 13
@@ -417,6 +460,9 @@ Metrics from the 1.14d font files (`text-fonts.tsv`; probe of
 | string id 20,000, expansion loaded / not loaded | `expansionstring` element 0 / `patchstring` element 1,078 | §2.2 |
 | capture case `text-0001`: main menu (Font30 / FontExocet10 buttons) | CPU reference with this spec equals the captured index frame | capture, queued |
 | capture case `text-0002`: an item hover box with a magic (blue) item and a multi-line description | same | capture, queued |
+| row window: cel bottom row `B` = 100, skip 3, lines 10, `H` = 600 | screen rows 88 … 97 (encoded rows 3 … 12 from the bottom) | §9 details r2 |
+| row window: `B` = 5, skip 0, lines 18 | `top` = −13 → 0, rows 1 … 5 only (row 0 lost) | §9 details r2 |
+| `ÿc!` (`k` = −15) | remap = inventory color variation 2 (`+0x94`) | §4 r5 |
 
 ## Provenance
 
@@ -439,18 +485,23 @@ lookup `0x00524A30`, `0x00524930`. Names `D2Win_*` / `D2Client_*` /
 font `.tbl` / `.dc6` (`d2data.mpq`, `d2exp.mpq`; `Patch_D2.mpq` checked
 by hash lookup), the 17 PL2 files, the English string tables (`d2data`,
 `d2exp`), measured with Python probes. No capture yet.
+Ghidra backlog (2026-10-06): `0x00501DF0`, `0x004F64E0`, GDI slot
+`+0x8C` `0x006C86A0` (vtable `0x0074C52C`) → `0x00601650`; caller
+`0x0049D5A0` / `0x004A0770`; block builder `0x004FB010`, GDI copy
+`0x006C8000`; `0x005023A0` reference search over the whole image
+(rel32, absolute, RVA, export table); `DrawText` call-site scan of the
+pushed `k` (214 sites).
 
 ## Open questions
 
-1. Vertical-window variant `0x00501DF0`: what `CelDrawEx` (`0x004F64E0`,
-   slot `+0x8C`) does with skip / lines (which rows), what its unused
-   third stack argument is, what the `ÿm` MonsterIndicators frame (from
-   `DATA\GLOBAL\UI\Font\MonsterIndicators`) and its downward line step
-   mean, and which UI calls it (`0x0049D5A0`). Ghidra read.
-2. Which palette-table slot a color `k < 0` or `k ≥ 13` reads
-   (`0x004FB010` block layout past `+0x103`), and whether any 1.14d
-   caller passes such a `k`. Ghidra read of `0x004FB010` and a scan of
-   `DrawText` call sites.
+1. ~~Vertical-window variant `0x00501DF0`~~: answered in §9 (row
+   window, unused argument, `ÿm`, caller). Open only: which panel
+   `0x0049D5A0` is (panels owner).
+2. Palette-table slot of `k < 0` / `k ≥ 13`: answered in §4 r5. Partly
+   open: of the `DrawText` call sites whose `k` is a pushed constant (66
+   sites) all pass 0, 1, 3, 4, 6 or 9; the 148 sites passing a register
+   or memory value need a per-site read (or a runtime trace) to exclude
+   `k ≥ 13` or a negative `k`.
 3. Caret and selection drawing of the D2Win edit box (callers of width B
    `0x005017D0` in `0x004FD…`–`0x004FF…`). Ghidra read; owner of the
    control may be `ui/controls.md`.
@@ -460,8 +511,8 @@ by hash lookup), the 17 PL2 files, the English string tables (`d2data`,
 5. Bytes of text-color map 12 under the `loading` palette (12 maps in the
    file): matters only if a loading-screen string uses `ÿc<`. Memory read
    of `0x007D6268` on that screen.
-6. Who reaches `0x005023A0` / `0x00502190` (no static caller; a function
-   pointer?). Ghidra pointer xref.
+6. ~~Who reaches `0x005023A0` / `0x00502190`~~: nothing (§9: dead
+   code).
 7. Does any code outside D2Win read the record fields other than `width`
    and `frame` (e.g. `height`, `unknown*`)? Ghidra scan of uses of the
    record pointer returned by `[0x00841DA0]`.
