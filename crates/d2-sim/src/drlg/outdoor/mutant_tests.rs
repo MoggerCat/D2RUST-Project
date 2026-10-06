@@ -2878,3 +2878,158 @@ fn river_caves_cliff_and_side_cave() {
     assert!(g.info.grids[0].cells.iter().all(|&c| c != 26 && c != 27));
     assert_eq!(*g.seed(), s);
 }
+
+/// `outdoor.md` §7.3 step 2: flags 0x80 → 3 at (0, 0) F 1; 0x100 → 3 at
+/// (gw − 7, 0) F 2; 0x200 → 2 at (0, 1) F 1; 0x400 → 2 at (0, gh − 6)
+/// F 1. Step 3 (no 0x40): level 2 FarAway(level 1 rect, 52, −1, 1, 15),
+/// others SpawnOutdoorLevelPreset(51, −1, 1, 15); flags |= 0x40.
+#[test]
+fn act1_transitions() {
+    use super::grid::file_of;
+    let (gw, gh) = (10, 9);
+    for (flag, (x, y, p, f)) in [
+        (0x80, (0, 0, 3, 1)),
+        (0x100, (gw - 7, 0, 3, 2)),
+        (0x200, (0, 1, 2, 1)),
+        (0x400, (0, gh - 6, 2, 1)),
+    ] {
+        let mut e = Env::new(4, gw, gh);
+        e.info.flags = flag | 0x40;
+        let mut g = e.gen();
+        g.transitions().unwrap();
+        let stamped: Vec<_> = (0..gh)
+            .flat_map(|yy| (0..gw).map(move |xx| (xx, yy)))
+            .filter(|&(xx, yy)| g.g(0, xx, yy) != 0)
+            .map(|(xx, yy)| (xx, yy, g.g(0, xx, yy), file_of(g.g(2, xx, yy))))
+            .collect();
+        assert_eq!(stamped, [(x, y, p, f)], "flag {flag:#x}");
+    }
+    // Step 3, level 4: one 51 (file 0 from the build list), flag 0x40.
+    let mut e = Env::new(4, gw, gh);
+    let mut g = e.gen();
+    g.transitions().unwrap();
+    let cells: Vec<_> = g.info.grids[0].cells.iter().filter(|&&c| c != 0).collect();
+    assert_eq!(cells, [&51]);
+    assert_eq!(g.info.flags & 0x40, 0x40);
+    let at = g.info.grids[0].cells.iter().position(|&c| c == 51).unwrap() as i32;
+    assert_eq!(file_of(g.g(2, at % gw, at / gw)), 0);
+    // Level 2: FarAway from the Rogue Encampment's rect places 52.
+    let mut e = Env::new(2, gw, gh);
+    let l1 = e
+        .drlg
+        .get_or_alloc_level(&e.data, &mut NoLevelTypes, 1)
+        .unwrap();
+    e.drlg.level_mut(l1).rect = TileRect::new(700, 700, 40, 40);
+    let mut g = e.gen();
+    g.transitions().unwrap();
+    let cells: Vec<_> = g.info.grids[0].cells.iter().filter(|&&c| c != 0).collect();
+    assert_eq!(cells, [&52]);
+    assert_eq!(g.info.flags & 0x40, 0x40);
+    let at = g.info.grids[0].cells.iter().position(|&c| c == 52).unwrap() as i32;
+    assert_eq!(file_of(g.g(2, at % gw, at / gw)), 0);
+}
+
+/// `outdoor.md` §7.6 from the rule text: river halves 26 / 27 with files
+/// U[P] / L[P] (P = 7 with file 3 → 3; P = 0: 0 if blank else 3); with
+/// flags & 0x14 a bridge: R := gh − 2, r := roll(R); first y = (r + i)
+/// mod R + 1 with spawn valid at (x − 1, y) and (unless 0x4) (x + 2, y)
+/// and files 3 at (x, y), (x + 1, y): 28 at (x, y) F 1 and (x + 1, y) F 3
+/// if 0x4 else 2.
+#[test]
+fn river_and_bridge_by_the_rules() {
+    use super::grid::file_of;
+    use super::wild::RIVER_FILES;
+    let (gw, gh, x) = (8, 9, 3);
+    let mut bridges = [0; 2];
+    for flags in [0, 0x4, 0x10, 0x14] {
+        for k in 0..24u32 {
+            let mut e = Env::new(4, gw, gh);
+            e.drlg.level_mut(e.l).seed = Seed::init_low(77 + 7919 * k);
+            e.info.flags = flags;
+            // Column contents (P, file, blank) for x and x + 1, by row.
+            let col = |y: i32, side: i32| -> (u32, u32, bool) {
+                match (y + side + k as i32) % 5 {
+                    0 => (0, 0, false),
+                    1 => (0, 0, true),
+                    2 => (7, 3, false),
+                    3 => (4 + ((y + 3 * side) % 12) as u32, 0, false),
+                    _ => (0, 0, false),
+                }
+            };
+            for y in 0..gh {
+                for side in 0..2 {
+                    let (p, f, blank) = col(y, side);
+                    e.info.grids[0].op(x + side, y, Op::Set, p);
+                    let v = f << 16 | if blank { cell::BLANK } else { 0 };
+                    e.info.grids[2].op(x + side, y, Op::Set, v);
+                }
+                // Neighbours: (x − 1, y) not spawn valid on every third row.
+                if (y + k as i32) % 3 == 0 {
+                    e.info.grids[2].op(x - 1, y, Op::Set, cell::NOT_SPAWN);
+                }
+                if (y + (k / 2) as i32) % 2 == 0 {
+                    e.info.grids[2].op(x + 2, y, Op::Set, cell::NOT_SPAWN);
+                }
+            }
+            let files: Vec<(i32, i32)> = (0..gh)
+                .map(|y| {
+                    let half = |side: i32| {
+                        let (p, f, blank) = col(y, side);
+                        match p {
+                            0 if blank => 0,
+                            0 => 3,
+                            7 if f == 3 => 3,
+                            _ => {
+                                let (u, l) = RIVER_FILES[(p - 4) as usize];
+                                if side == 0 {
+                                    u
+                                } else {
+                                    l
+                                }
+                            }
+                        }
+                    };
+                    (half(0), half(1))
+                })
+                .collect();
+            let mut s = e.seed();
+            let mut bridge = None;
+            if flags & 0x14 != 0 {
+                let rn = gh - 2;
+                let r = s.roll(rn) as i32;
+                for i in 0..rn {
+                    let y = (r + i) % rn + 1;
+                    let ok = e.info.grids[2].get(x - 1, y) & cell::NOT_SPAWN == 0
+                        && (flags & 0x4 != 0
+                            || e.info.grids[2].get(x + 2, y) & cell::NOT_SPAWN == 0)
+                        && files[y as usize] == (3, 3);
+                    if ok {
+                        bridge = Some(y);
+                        break;
+                    }
+                }
+            }
+            let mut g = e.gen();
+            g.river(x).unwrap();
+            for y in 0..gh {
+                let got = (
+                    g.g(0, x, y),
+                    file_of(g.g(2, x, y)),
+                    g.g(0, x + 1, y),
+                    file_of(g.g(2, x + 1, y)),
+                );
+                let want = if bridge == Some(y) {
+                    (28, 1, 28, if flags & 0x4 != 0 { 3 } else { 2 })
+                } else {
+                    (26, files[y as usize].0, 27, files[y as usize].1)
+                };
+                assert_eq!(got, want, "flags {flags:#x} k {k} y {y}");
+            }
+            assert_eq!(*g.seed(), s, "flags {flags:#x} k {k}");
+            if bridge.is_some() {
+                bridges[usize::from(flags & 0x4 != 0)] += 1;
+            }
+        }
+    }
+    assert!(bridges[0] > 3 && bridges[1] > 3, "{bridges:?}");
+}
