@@ -162,7 +162,9 @@ fn special_missile_range_slots() {
 }
 
 // skillcalc 23–25: mastery type 0 reads passivestat 342 / 345, type 1
-// 343 / 346, type 2 344 / 347.
+// 343 / 346, type 2 344 / 347. The formulas at offsets 3 and 6 run from
+// their offset to the buffer end (calc-expressions.md §3.1 step 2).
+// Covers: specs/data/calc-expressions.md §3.1 r2
 #[test]
 fn special_mastery_types() {
     let mut r = skill_rec();
