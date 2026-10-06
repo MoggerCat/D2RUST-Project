@@ -11,42 +11,42 @@ use std::collections::BTreeMap;
 // ------------------------------------------------------------ fake
 
 #[derive(Debug, Clone)]
-struct U {
-    kind: UnitType,
-    class: i32,
-    stats: BTreeMap<u16, i32>,
-    states: Vec<u16>,
-    state_stats: BTreeMap<(u16, u16), i32>,
-    state_lists: Vec<u16>,
-    seed: Seed,
-    skills: Vec<SkillEntry>,
-    used: Option<SkillEntry>,
-    used_flags: u32,
-    left: Option<SkillEntry>,
-    right: Option<SkillEntry>,
-    mode: u32,
-    cursor: bool,
-    endanim: i32,
-    target: Option<usize>,
-    flags: u32,
-    event_arg: i32,
-    alive: bool,
-    room: RoomKind,
-    pos: (i32, i32),
-    player_data: bool,
-    last_point: i32,
-    items: BTreeMap<u8, usize>,
-    param4: i32,
-    use_state: BTreeMap<i32, UseState>,
-    entry_mode: BTreeMap<i32, u32>,
-    owner: Option<usize>,
-    path: i32,
-    act: i32,
-    shapeshifted: bool,
+pub(crate) struct U {
+    pub(crate) kind: UnitType,
+    pub(crate) class: i32,
+    pub(crate) stats: BTreeMap<u16, i32>,
+    pub(crate) states: Vec<u16>,
+    pub(crate) state_stats: BTreeMap<(u16, u16), i32>,
+    pub(crate) state_lists: Vec<u16>,
+    pub(crate) seed: Seed,
+    pub(crate) skills: Vec<SkillEntry>,
+    pub(crate) used: Option<SkillEntry>,
+    pub(crate) used_flags: u32,
+    pub(crate) left: Option<SkillEntry>,
+    pub(crate) right: Option<SkillEntry>,
+    pub(crate) mode: u32,
+    pub(crate) cursor: bool,
+    pub(crate) endanim: i32,
+    pub(crate) target: Option<usize>,
+    pub(crate) flags: u32,
+    pub(crate) event_arg: i32,
+    pub(crate) alive: bool,
+    pub(crate) room: RoomKind,
+    pub(crate) pos: (i32, i32),
+    pub(crate) player_data: bool,
+    pub(crate) last_point: i32,
+    pub(crate) items: BTreeMap<u8, usize>,
+    pub(crate) param4: i32,
+    pub(crate) use_state: BTreeMap<i32, UseState>,
+    pub(crate) entry_mode: BTreeMap<i32, u32>,
+    pub(crate) owner: Option<usize>,
+    pub(crate) path: i32,
+    pub(crate) act: i32,
+    pub(crate) shapeshifted: bool,
 }
 
 impl U {
-    fn new(kind: UnitType, class: i32) -> Self {
+    pub(crate) fn new(kind: UnitType, class: i32) -> Self {
         Self {
             kind,
             class,
@@ -84,24 +84,24 @@ impl U {
 }
 
 #[derive(Debug, Clone, Default)]
-struct F {
-    units: Vec<U>,
+pub(crate) struct F {
+    pub(crate) units: Vec<U>,
     /// Item types per item handle.
-    items: Vec<Vec<i32>>,
-    frame: i32,
-    log: Vec<String>,
-    srvst_ret: i32,
-    srvdo_ret: i32,
-    hostile: bool,
-    ally: bool,
-    los: bool,
-    melee: bool,
-    bow: bool,
-    mask: bool,
-    dual: bool,
+    pub(crate) items: Vec<Vec<i32>>,
+    pub(crate) frame: i32,
+    pub(crate) log: Vec<String>,
+    pub(crate) srvst_ret: i32,
+    pub(crate) srvdo_ret: i32,
+    pub(crate) hostile: bool,
+    pub(crate) ally: bool,
+    pub(crate) los: bool,
+    pub(crate) melee: bool,
+    pub(crate) bow: bool,
+    pub(crate) mask: bool,
+    pub(crate) dual: bool,
 }
 
-fn native(skill: i32, base: i32) -> SkillEntry {
+pub(crate) fn native(skill: i32, base: i32) -> SkillEntry {
     SkillEntry {
         skill,
         base,
@@ -111,7 +111,7 @@ fn native(skill: i32, base: i32) -> SkillEntry {
 }
 
 impl F {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             los: true,
             srvst_ret: 1,
@@ -119,19 +119,19 @@ impl F {
             ..Self::default()
         }
     }
-    fn add(&mut self, u: U) -> usize {
+    pub(crate) fn add(&mut self, u: U) -> usize {
         self.units.push(u);
         self.units.len() - 1
     }
-    fn player(&mut self, skills: &[(i32, i32)]) -> usize {
+    pub(crate) fn player(&mut self, skills: &[(i32, i32)]) -> usize {
         let mut u = U::new(UnitType::Player, 1);
         u.skills = skills.iter().map(|&(s, l)| native(s, l)).collect();
         self.add(u)
     }
-    fn get(&self, u: usize, s: u16) -> i32 {
+    pub(crate) fn get(&self, u: usize, s: u16) -> i32 {
         self.units[u].stats.get(&s).copied().unwrap_or(0)
     }
-    fn take_log(&mut self) -> Vec<String> {
+    pub(crate) fn take_log(&mut self) -> Vec<String> {
         std::mem::take(&mut self.log)
     }
 }
@@ -480,7 +480,7 @@ impl UseWorld for F {
 // ------------------------------------------------------------ records
 
 /// A skills record without formulas, missiles or functions.
-fn rec() -> Skills {
+pub(crate) fn rec() -> Skills {
     let mut r = skill_rec();
     r.srvmissile = 0xFFFF;
     r.delay = 0xFFFF_FFFF;
@@ -491,9 +491,9 @@ fn rec() -> Skills {
 
 /// Tables with `n` blank skills and `set` applied to selected ids.
 /// A change to one skills record.
-type Edit<'a> = (i32, &'a dyn Fn(&mut Skills));
+pub(crate) type Edit<'a> = (i32, &'a dyn Fn(&mut Skills));
 
-fn tables(n: usize, set: &[Edit]) -> SkillTables {
+pub(crate) fn tables(n: usize, set: &[Edit]) -> SkillTables {
     let mut v: Vec<Skills> = (0..n).map(|_| rec()).collect();
     for (i, f) in set {
         f(&mut v[*i as usize]);
@@ -501,7 +501,7 @@ fn tables(n: usize, set: &[Edit]) -> SkillTables {
     skill_tables(v)
 }
 
-fn mana(r: &mut Skills, m: i16, lvl: i16, shift: u16, min: i16) {
+pub(crate) fn mana(r: &mut Skills, m: i16, lvl: i16, shift: u16, min: i16) {
     r.mana = m as u16;
     r.lvlmana = lvl as u16;
     r.manashift = shift;
@@ -559,14 +559,14 @@ fn function_table_check_reports_perturbations() {
 
 // ------------------------------------------------------------ §1
 
-fn point(id: u8, x: u16, y: u16) -> Vec<u8> {
+pub(crate) fn point(id: u8, x: u16, y: u16) -> Vec<u8> {
     let mut m = vec![id];
     m.extend(x.to_le_bytes());
     m.extend(y.to_le_bytes());
     m
 }
 
-fn unit_msg(id: u8, ty: u32, guid: u32) -> Vec<u8> {
+pub(crate) fn unit_msg(id: u8, ty: u32, guid: u32) -> Vec<u8> {
     let mut m = vec![id];
     m.extend(ty.to_le_bytes());
     m.extend(guid.to_le_bytes());
@@ -718,7 +718,7 @@ fn hold_handlers_return_zero() {
 
 // ------------------------------------------------------------ §2
 
-fn dual_wielder(f: &mut F) -> usize {
+pub(crate) fn dual_wielder(f: &mut F) -> usize {
     f.dual = true;
     f.items = vec![vec![45], vec![45]];
     let p = f.player(&[(0, 1), (5, 1)]);
@@ -1089,7 +1089,7 @@ fn attack_frame_events() {
 }
 
 /// A player whose used skill is `skill`, in a field room.
-fn caster(f: &mut F, skill: i32, lvl: i32, mana: i32) -> usize {
+pub(crate) fn caster(f: &mut F, skill: i32, lvl: i32, mana: i32) -> usize {
     let p = f.player(&[(skill, lvl)]);
     f.units[p].used = Some(native(skill, lvl));
     f.units[p].stats.insert(stat::MANA, mana);

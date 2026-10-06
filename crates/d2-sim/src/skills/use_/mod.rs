@@ -18,7 +18,7 @@
 pub mod table;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use super::{consume_mana, eval_skill, skill_level, ManaUnits, SkillEntry, SkillTables};
 use crate::combat::RoomKind;

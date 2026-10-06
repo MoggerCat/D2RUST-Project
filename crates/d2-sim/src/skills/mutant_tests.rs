@@ -371,3 +371,293 @@ fn phys_srcdam_weapon_source() {
     assert_eq!(phys_min(&mut f, &t, Some(u), 0, 1, true), 10);
     assert_eq!(phys_max(&mut f, &t, Some(u), 0, 1, true), 20);
 }
+
+// §3.4: a missile unit that is not a missile → 0; missile id < 0 with a
+// unit → the unit's class; `lvl ≤ 0` with a unit → its stored level
+// (the fake's is 0), else `lvl`.
+#[test]
+fn missile_unit_rules() {
+    let mut t = skill_tables(vec![skill_rec()]);
+    let mut m0 = missile_rec();
+    m0.emin = 100;
+    m0.minelev1 = 10;
+    let mut m1 = m0.clone();
+    m1.emin = 300;
+    t.missiles = vec![m0, m1];
+    let mut f = Fake::default();
+    let p = f.add(FUnit::new(UnitType::Player, 1));
+    let m = f.add(FUnit::new(UnitType::Missile, 1));
+    assert_eq!(miss_elem_min(&mut f, &t, Some(p), None, 0, 1), 0);
+    assert_eq!(miss_elem_min(&mut f, &t, Some(m), None, -1, 1), 300);
+    assert_eq!(miss_elem_min(&mut f, &t, Some(m), None, 0, 1), 100);
+    // lvl 3: 100 + 2 × 10.
+    assert_eq!(miss_elem_min(&mut f, &t, Some(m), None, 0, 3), 120);
+}
+
+// §3.5 weapon mastery: the throw path (stats 345–347) needs a throwing
+// item, a skill with range 2 and an `itypea1` that is-a 48; type 1 reads
+// 343 / 346.
+#[test]
+fn weapon_mastery_throw_path() {
+    let throw_skill = |range: u8, itype: u16| {
+        let mut r = skill_rec();
+        r.range = range;
+        r.itypea1 = itype;
+        r
+    };
+    let t = skill_tables(vec![
+        throw_skill(2, 48),
+        throw_skill(0, 48),
+        throw_skill(2, 5),
+    ]);
+    let mut f = Fake::default();
+    let u = f.add(FUnit::new(UnitType::Player, 0));
+    f.units[u].entries.extend([
+        (343, vec![(50, 43)]),
+        (344, vec![(50, 44)]),
+        (346, vec![(50, 46)]),
+    ]);
+    let thrown = f.add_item(FItem {
+        types: vec![50],
+        throw: true,
+        ..FItem::default()
+    });
+    let plain = f.add_item(FItem {
+        types: vec![50],
+        ..FItem::default()
+    });
+    let wm = |f: &Fake, item, skill| weapon_mastery(f, &t, Some(u), Some(item), Some(skill), 1);
+    assert_eq!(wm(&f, thrown, 0), 46);
+    assert_eq!(wm(&f, plain, 0), 43);
+    assert_eq!(wm(&f, thrown, 1), 43);
+    assert_eq!(wm(&f, thrown, 2), 43);
+}
+
+// ---------------------------------------------------------------- §4
+
+// Shifted cost: `max(cost >> 8, 0)`.
+#[test]
+fn mana_cost_shifted_value() {
+    let mut r = skill_rec();
+    r.mana = 512;
+    let t = skill_tables(vec![r]);
+    assert_eq!(mana_cost_shifted(&t, 0, 1), 2);
+}
+
+// `can_afford`: item entries need charges > 0; `srvdofunc` 116 is free
+// only while shapeshifted.
+#[test]
+fn can_afford_rules() {
+    let mut r = skill_rec();
+    r.mana = 10;
+    let mut r116 = r.clone();
+    r116.srvdofunc = 116;
+    let t = skill_tables(vec![r, r116]);
+    let mut f = Fake::default();
+    let u = f.add(FUnit::new(UnitType::Player, 0));
+    let mut item = item_entry(0, 1, 7);
+    item.charges = 3;
+    assert!(can_afford(&f, &t, u, &item));
+    item.charges = 0;
+    assert!(!can_afford(&f, &t, u, &item));
+    let e0 = item_entry(0, 1, -1);
+    let e116 = item_entry(1, 1, -1);
+    assert!(!can_afford(&f, &t, u, &e116));
+    f.shifted = true;
+    assert!(can_afford(&f, &t, u, &e116));
+    assert!(!can_afford(&f, &t, u, &e0));
+}
+
+// ---------------------------------------------------------------- §6
+
+// Step 3: a required skill needs a native entry with base > 0.
+#[test]
+fn skill_reqs_need_base() {
+    let mut r = skill_rec();
+    r.reqskill1 = 0;
+    let t = skill_tables(vec![skill_rec(), r]);
+    let mut f = Fake::default();
+    let u = f.add(FUnit::new(UnitType::Player, 0));
+    f.units[u].skills = vec![item_entry(0, 0, -1)];
+    assert!(!meets_skill_reqs(&f, &t, u, 1));
+    f.units[u].skills = vec![item_entry(0, 1, -1)];
+    assert!(meets_skill_reqs(&f, &t, u, 1));
+}
+
+// ---------------------------------------------------------------- use.md
+
+mod use_mutants {
+    use crate::combat::RoomKind;
+    use crate::skills::use_::tests::*;
+    use crate::skills::use_::*;
+    use crate::units::UnitType;
+    use d2_data::tables::Skills;
+
+    // §1 rule 1: a resync only when more than 25 frames passed.
+    #[test]
+    fn resync_after_more_than_25_frames() {
+        let mut f = F::new();
+        let p = f.player(&[]);
+        f.frame = 35;
+        f.units[p].last_point = 10;
+        assert_eq!(validate_point(&mut f, p, &point(5, 500, 500)), Err(1));
+        assert!(f.take_log().is_empty());
+        f.frame = 36;
+        assert_eq!(validate_point(&mut f, p, &point(5, 500, 500)), Err(1));
+        assert_eq!(f.take_log(), ["send 0 Resync"]);
+    }
+
+    // §1 rule 2: only an item in the unit's own inventory skips the act
+    // and distance tests.
+    #[test]
+    fn unit_validator_own_inventory_items_only() {
+        let mut f = F::new();
+        let p = f.player(&[]);
+        let mut item = U::new(UnitType::Item, 0);
+        item.act = 1;
+        let i = f.add(item);
+        let m = f.add(U::new(UnitType::Monster, 0));
+        f.units[m].act = 1;
+        f.units[m].owner = Some(p);
+        assert_eq!(
+            validate_unit(&f, p, &unit_msg(6, 4, i as u32)),
+            Err(TargetError::OtherAct)
+        );
+        assert_eq!(
+            validate_unit(&f, p, &unit_msg(6, 1, m as u32)),
+            Err(TargetError::OtherAct)
+        );
+        f.units[i].owner = Some(p);
+        assert!(validate_unit(&f, p, &unit_msg(6, 4, i as u32)).is_ok());
+    }
+
+    // §1 rules 3 and 6: 0x07 is a plain handler; every hold id with its
+    // hand's skill returns 0.
+    #[test]
+    fn handlers_shift_and_hold_ids() {
+        let t = tables(1, &[]);
+        let mut f = F::new();
+        let p = f.player(&[(0, 1)]);
+        f.units[p].left = Some(native(0, 1));
+        f.units[p].right = Some(native(0, 1));
+        let m = f.add(U::new(UnitType::Monster, 0));
+        let r = handle_message(&mut f, &t, p, &unit_msg(msg::LEFT_UNIT_SHIFT, 1, m as u32));
+        assert_eq!(r, Some(MsgResult::Code(0)));
+        for id in [
+            msg::LEFT_UNIT_HOLD,
+            msg::LEFT_UNIT_SHIFT_HOLD,
+            msg::RIGHT_UNIT_HOLD,
+            msg::RIGHT_UNIT_SHIFT_HOLD,
+        ] {
+            let r = handle_hold(&mut f, &t, p, &unit_msg(id, 1, m as u32));
+            assert_eq!(r, MsgResult::Code(0), "{id:#x}");
+        }
+        let r = handle_hold(&mut f, &t, p, &point(msg::RIGHT_POINT_HOLD, 100, 100));
+        assert_eq!(r, MsgResult::Code(0));
+        f.units[p].right = None;
+        let r = handle_hold(&mut f, &t, p, &point(msg::RIGHT_POINT_HOLD, 100, 100));
+        assert_eq!(r, MsgResult::Code(3));
+    }
+
+    // §2 step 2: both hands must hold an equippable weapon (type 45) that
+    // is not type 38.
+    #[test]
+    fn dual_wield_needs_two_weapons() {
+        let mut f = F::new();
+        let p = dual_wielder(&mut f);
+        // A non-weapon in the left hand.
+        f.items[1] = vec![50];
+        assert_eq!(dual_wield(&mut f, p, 0), 0);
+        assert_eq!(f.units[p].param4, 0);
+        // A weapon that is also type 38.
+        f.items[1] = vec![45, 38];
+        assert_eq!(dual_wield(&mut f, p, 0), 0);
+        assert_eq!(f.units[p].param4, 0);
+        f.items[1] = vec![45];
+        assert_eq!(dual_wield(&mut f, p, 0), 5);
+    }
+
+    // §5.2: arriving sets the arrived flag (kept when already set).
+    #[test]
+    fn arrived_flag_is_set() {
+        let t = tables(1, &[]);
+        let mut f = F::new();
+        let p = caster(&mut f, 0, 1, 0);
+        f.units[p].used_flags = SKILL_MOVING | SKILL_ARRIVED;
+        f.units[p].path = 2;
+        attack_frame_event(&mut f, &t, p, 1, 0);
+        assert_eq!(f.units[p].used_flags, SKILL_MOVING | SKILL_ARRIVED);
+    }
+
+    // §5.3 step 3: only an item skill with 0 charges stops; a native
+    // entry has no charges.
+    #[test]
+    fn start_native_entry_without_charges() {
+        let t = tables(1, &[]);
+        let mut f = F::new();
+        let p = caster(&mut f, 0, 1, 0);
+        assert_eq!(start(&mut f, &t, p), 1);
+    }
+
+    // §5.3 step 2: TargetableOnly accepts a hostile, pet or ally target.
+    #[test]
+    fn targetable_only_accepts_ally() {
+        let t = tables(
+            1,
+            &[(0, &|r: &mut Skills| {
+                r.targetableonly = true;
+                r.targetally = true;
+            })],
+        );
+        let mut f = F::new();
+        let p = caster(&mut f, 0, 1, 0);
+        let m = f.add(U::new(UnitType::Monster, 0));
+        f.units[p].target = Some(m);
+        f.ally = true;
+        assert_eq!(start(&mut f, &t, p), 1);
+    }
+
+    // §5.3 step 6.2: `srvdofunc` 116 skips the mana check only while
+    // shapeshifted.
+    #[test]
+    fn mana_check_were_form() {
+        let t = tables(
+            2,
+            &[
+                (0, &|r: &mut Skills| r.mana = 10),
+                (1, &|r: &mut Skills| {
+                    r.mana = 10;
+                    r.srvdofunc = 116;
+                }),
+            ],
+        );
+        let mut f = F::new();
+        let p = f.player(&[(0, 1), (1, 1)]);
+        assert!(!mana_check(&f, &t, p, &native(1, 1), 1));
+        f.units[p].shapeshifted = true;
+        assert!(mana_check(&f, &t, p, &native(1, 1), 1));
+        assert!(!mana_check(&f, &t, p, &native(0, 1), 1));
+    }
+
+    // §5.3 step 6.3: only a skill without InTown fails in town; step
+    // 6.4: line of sight 5 uses the fifth mask.
+    #[test]
+    fn start_core_town_and_los() {
+        let t = tables(
+            2,
+            &[
+                (0, &|r: &mut Skills| r.intown = false),
+                (1, &|r: &mut Skills| r.lineofsight = 5),
+            ],
+        );
+        let mut f = F::new();
+        let p = caster(&mut f, 0, 1, 0);
+        assert_eq!(start(&mut f, &t, p), 1);
+        let q = caster(&mut f, 1, 1, 0);
+        f.units[q].room = RoomKind::Town;
+        let m = f.add(U::new(UnitType::Monster, 0));
+        f.units[q].target = Some(m);
+        f.hostile = true;
+        assert_eq!(start(&mut f, &t, q), 1);
+    }
+}

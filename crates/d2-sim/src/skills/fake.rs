@@ -104,6 +104,8 @@ pub struct Fake {
     pub in_range: bool,
     /// `Some(r)`: in melee range only for range argument `r`.
     pub range_needed: Option<i32>,
+    /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
+    pub shifted: bool,
     pub log: Vec<String>,
 }
 
@@ -379,7 +381,7 @@ impl CombatWorld for Fake {
 
 impl ManaUnits for Fake {
     fn shapeshifted(&self, _u: usize) -> bool {
-        false
+        self.shifted
     }
     fn consume_charges(&mut self, _u: usize, _e: &SkillEntry) -> bool {
         self.log.push("charges".into());
