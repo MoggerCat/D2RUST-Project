@@ -1512,4 +1512,51 @@ mod vitals_mutants {
         assert_eq!(v.base_stat((), stat::LEVEL), 1);
         assert!(v.log.is_empty(), "{:?}", v.log);
     }
+
+    /// Amazon-like per-point columns: ManaPerMagic 6, LifePerVitality
+    /// 12, StaminaPerVitality 4.
+    fn point_tables() -> VitalsTables {
+        let mut t = tables();
+        let c = &mut t.charstats[0];
+        c.manapermagic = 6;
+        c.lifepervitality = 12;
+        c.staminapervitality = 4;
+        t
+    }
+
+    // §2: `count − 1 = 99` is accepted (only > 99 is bad).
+    #[test]
+    fn add_stat_point_count_100() {
+        let t = point_tables();
+        let mut v = V::default();
+        v.base.insert(stat::STATPTS, 100);
+        assert_eq!(handle_add_stat_point(&mut v, &t, (), &[0x3A, 0, 99]), 0);
+        assert_eq!(v.base_stat((), stat::STRENGTH), 100);
+        assert_eq!(v.base_stat((), stat::STATPTS), 0);
+    }
+
+    // §2: a negative `n` lowers max mana; the current mana is clamped.
+    #[test]
+    fn gain_energy_negative_clamps() {
+        let t = point_tables();
+        let mut v = V::default();
+        v.base.insert(stat::MANA, 1000);
+        v.base.insert(stat::MAXMANA, 1000);
+        gain_energy(&mut v, &t, (), -2);
+        // (6 × −2) << 6 = −768.
+        assert_eq!(v.base_stat((), stat::MAXMANA), 232);
+        assert_eq!(v.base_stat((), stat::MANA), 232);
+    }
+
+    // §2: a positive `n` adds to the current stamina too.
+    #[test]
+    fn gain_vitality_adds_stamina() {
+        let t = point_tables();
+        let mut v = V::default();
+        v.base.insert(stat::STAMINA, 1000);
+        v.base.insert(stat::MAXSTAMINA, 1000);
+        gain_vitality(&mut v, &t, (), 1);
+        assert_eq!(v.base_stat((), stat::MAXSTAMINA), 1256);
+        assert_eq!(v.base_stat((), stat::STAMINA), 1256);
+    }
 }
