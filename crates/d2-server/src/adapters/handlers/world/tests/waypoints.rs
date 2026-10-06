@@ -154,6 +154,50 @@ fn blank<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
+/// A DRLG world for act 0 whose Cold Plains (a field level) has one
+/// 8×8-tile room (for the handler tests of other modules that need a
+/// unit in a real room).
+pub(crate) fn field_drlg() -> DrlgWorld {
+    let mut data = DrlgData {
+        levels: vec![LevelDef::default(); 150],
+        ..DrlgData::default()
+    };
+    for l in &mut data.levels {
+        l.warp = [-1; 8];
+    }
+    let mut files = vec![Vec::new(); 32];
+    files[0] = b"floor.dt1".to_vec();
+    data.lvltypes = vec![vec![Vec::new(); 32], files];
+    data.levels[COLD_PLAINS as usize].drlg_type = 2;
+    data.levels[COLD_PLAINS as usize].level_type = 1;
+    let mut types = Types(BTreeMap::from([(COLD_PLAINS, TileRect::new(0, 0, 8, 8))]));
+    let mut dungeon = Dungeon::default();
+    dungeon.acts[0] = Some(Drlg::create(0, 1, 0, 0, false, &data, &mut types).unwrap());
+    DrlgWorld {
+        dungeon,
+        data: Arc::new(data),
+        tiles: Box::new(tiles()),
+        types: Box::new(types),
+    }
+}
+
+/// [`field_drlg`]'s Cold Plains room, generated and streamed on `sim`
+/// (act 0 is made in `game`'s lists).
+pub(crate) fn field_room<X: Pending>(sim: &mut ActionSim<X>, game: &mut Game) -> RoomId {
+    game.lists.ensure_act(0).unwrap();
+    sim.hooks()
+        .drlg
+        .with_act(0, &mut game.lists, |d, svc| {
+            let l = d.get_or_alloc_level(svc.data, svc.types, COLD_PLAINS)?;
+            d.generate_level(svc.data, svc.types, l)?;
+            let r = d.level_rooms(l)[0];
+            d.stream_room(svc, r)
+        })
+        .unwrap()
+        .unwrap()
+        .unwrap()
+}
+
 /// Cold Plains (act 0, waypoint index 1), Burial Grounds-like level 4
 /// (index 2), Blood Moor 2 (no waypoint), Lut Gholein 40 (act 1, index 9).
 const COLD_PLAINS: u32 = 3;

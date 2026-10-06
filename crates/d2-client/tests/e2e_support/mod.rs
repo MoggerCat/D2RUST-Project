@@ -1,6 +1,6 @@
 // Spec: specs/world/npc.md §2–§4, §9; specs/world/vendors.md §3, §4, §7, §9 (end-to-end fixtures)
 //! Fixtures shared by the end-to-end tests that run the server's
-//! `TradeWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`): the rest of
+//! `WiredWorld` (`e2e_vendor.rs`, `e2e_single_player.rs`): the rest of
 //! the NPC / vendor / quest wiring no written spec provides (staged
 //! answers and a call log, never behaviour), and the synthetic item,
 //! vendor and NPC tables. Each test crate uses a part of it.

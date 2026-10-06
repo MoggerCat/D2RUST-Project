@@ -29,7 +29,7 @@
 //!    then (step 7) a stat point is spent (C→S 0x3A, `vitals.md` §2);
 //!    (step 5b) pick-up (C→S 0x16) **stops at the stub** (no inventory
 //!    spec);
-//! 8. (steps 8–13) Akara on the server's `TradeWorld` (the same units): talk
+//! 8. (steps 8–13) Akara on the server's `WiredWorld` (the same units): talk
 //!    (C→S 0x13: S→C 0x27, 0x29, 0x28, `npc.md` §2), chat (0x2F), trade
 //!    (0x38: the store generated, `vendors.md` §3, §4), buy (0x32)
 //!    **stops at the item copy** `0x0055A2A0` (§7.1 rule 9.2: S→C 0x2A
@@ -38,7 +38,7 @@
 //!    quests (0x31, 0x40, 0x58) are a marked step for after the
 //!    quest-host merge;
 //! 9. (steps 14–15) the cube (C→S 0x2A, 0x4F, `cube.md` §1, §2, §3,
-//!    §8) on the server's item world, a second unit world (`item_world`);
+//!    §8) on the same host, units and item store;
 //! 10. (step 6) last, a waypoint travel (C→S 0x49) runs through the
 //!     handler, the warp seam and the destination's spawn search, **then
 //!     stops**: the same-act placement belongs to the unwritten path
@@ -76,18 +76,16 @@ use d2_proto::client::{
     AddStatPoint, BuyItem, ClickButton, EntityAction, InitEntityChat, InteractWithEntity,
     ItemToCube, PickItem, RightSkill, SellItem, TakeOrCloseWp,
 };
-use d2_server::adapters::handlers::items::{
-    Interaction, Inventory, ItemHooks, ItemPending, ItemWorld, Staged,
-};
-use d2_server::adapters::handlers::skills::seams::SkillSeams;
+use d2_server::adapters::handlers::items::{CubeParts, Inventory, ItemPending};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+use d2_server::adapters::handlers::skills::LearnRest;
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::dispatch::Outcome;
 use d2_server::host::{Handled, Host};
 use d2_server::seams::{Clock, PlayerGate, Pos, ResultCode};
 use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::{CombatTables, RoomKind};
+use d2_sim::combat::CombatTables;
 use d2_sim::drlg::collision::bits;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs, SubFileMap};
@@ -105,13 +103,12 @@ use d2_sim::monsters::population::PopTables;
 use d2_sim::rng::Seed;
 use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
-use d2_sim::stats::{StatData, StatLists, StatTable};
+use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::modes;
-use d2_sim::units::record::Units;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
 use d2_sim::wiring::economy::{
@@ -181,17 +178,17 @@ const MULTI: i32 = 1;
 // ---- seams without a provider --------------------------------------------------
 
 /// The action and world-generation seams no written spec provides yet
-/// (positions and a straight-line path, interaction, warp, arrival mode,
-/// transport, the DRLG population reads, the COF-name composer and the
-/// animation rate, the monster death start's body), the skill use
-/// pipeline's rest ([`UseRest`]: the player's skill state, shared with
-/// the server's skill seams through [`Book`]), the drop state, and a log
-/// of the calls that change something. The answers are the narrowest
-/// ones (`Pending`'s defaults) except those the test stages (see each).
+/// (positions and a straight-line path, warp, arrival mode, transport,
+/// the DRLG population reads, the COF-name composer and the animation
+/// rate, the monster death start's body), the skill use pipeline's rest
+/// ([`UseRest`]: the player's skill state in [`Book`], for the message
+/// and the timer paths alike), the drop state, and a log of the calls
+/// that change something. The answers are the narrowest ones
+/// (`Pending`'s defaults) except those the test stages (see each). The
+/// player's interaction is the server host's (the NPC rest, `Rest`).
 #[derive(Default)]
 struct TestPending {
     pos: BTreeMap<UnitId, (i32, i32)>,
-    interact: BTreeMap<UnitId, (u8, u32)>,
     sent: Vec<(UnitId, Vec<u8>)>,
     log: Vec<String>,
     /// Missile target points (`0x00648AD0`) and the sub-tiles each step
@@ -291,15 +288,6 @@ impl Pending for TestPending {
     fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
         self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
     }
-    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
-    }
-    fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
-    }
-    fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -383,9 +371,9 @@ impl Outbox for TestPending {
     }
 }
 
-/// The skill use pipeline's rest on the timer path (the action frame):
-/// the player's skill state from [`Book`] (the same state the server's
-/// skill seams use for the message path), the rest narrowest.
+/// The skill use pipeline's rest (the message path through the server's
+/// skill handlers, the action frame on the timer path): the player's
+/// skill state from [`Book`], the rest narrowest.
 impl UseRest for TestPending {
     fn send(&mut self, u: UnitId, msg: ServerMsg) {
         self.log.push(format!("send {} {msg:?}", u.0));
@@ -500,16 +488,25 @@ impl UseRest for TestPending {
         (p.target_x, p.target_y) = self.aim_at;
     }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.book.clone().srvst(index, u, skill, lvl)
+        self.book.srvst(index, u, skill, lvl)
     }
     fn srvdo(&mut self, i: u16, u: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
-        self.book.clone().srvdo(i, u, s, l, c, it, a)
+        self.book.srvdo(i, u, s, l, c, it, a)
     }
 }
 
-/// The skill pipeline's seams without a provider (skill list, skill
-/// bodies, missile creation: `use.md` OQ10, `server-skills.md` §4): the
-/// player's skill list and a call log, shared with the test.
+/// The skill-point calls (`levels.md` §6.4): not reached in this run.
+impl LearnRest for TestPending {
+    fn is_class_skill(&self, _: UnitId, _: i32) -> bool {
+        false
+    }
+    fn add_skill_level(&mut self, _: UnitId, _: i32, _: i32) {}
+    fn after_skill_point(&mut self, _: UnitId) {}
+}
+
+/// The skill pipeline's state without a provider (skill list, skill
+/// bodies: `use.md` OQ10): the player's skill list and a call log,
+/// shared with the test.
 #[derive(Default)]
 struct Inner {
     list: Vec<SkillEntry>,
@@ -525,21 +522,6 @@ impl Book {
     fn get(&self) -> MutexGuard<'_, Inner> {
         self.0.lock().unwrap()
     }
-}
-
-impl SkillSeams for Book {
-    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
-        self.get().list.clone()
-    }
-    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().used
-    }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.get().used = e;
-    }
-    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.get().right
-    }
     fn find_entry(&self, _: UnitId, skill: i32) -> Option<SkillEntry> {
         self.get().list.iter().copied().find(|e| e.skill == skill)
     }
@@ -552,26 +534,18 @@ impl SkillSeams for Book {
             7
         }
     }
-    fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
-        UseState::Usable
-    }
-    fn srvst(&mut self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
+    fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
         self.get().log.push(format!("srvst {index} {skill} {lvl}"));
         1
     }
     /// The do bodies are catalogued only (`use.md` OQ10): logged, result
     /// 0 (the generic `srvmissile` creation of §5.4 step 7 still runs).
-    fn srvdo(&mut self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
+    #[allow(clippy::too_many_arguments)]
+    fn srvdo(&self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
         self.get()
             .log
             .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
         0
-    }
-    fn create_skill_missile(&mut self, _: UnitId, s: i32, l: i32, m: u16, _: bool, _: MissileAim) {
-        self.get().log.push(format!("missile {s} {l} {m}"));
-    }
-    fn room(&self, _: UnitId) -> RoomKind {
-        RoomKind::Field
     }
 }
 
@@ -1118,57 +1092,33 @@ fn waypoint_data() -> WaypointData {
 
 // ---- the cube's item world --------------------------------------------------------------
 
-/// Item types of the cube's tables (`cube.md` V12 shape).
+/// Item types of the cube's items (`cube.md` V12 shape).
 const T_RING: u16 = 10;
 const T_BOX: u16 = 11;
 const T_AMULET: u16 = 12;
-/// Item records of the cube's tables.
-const CUBE_BOX: usize = 0;
-const RING: usize = 1;
-const AMULET: usize = 2;
+/// The cube's item records, after the vendor items (`CAP`, `BUC`) in the
+/// game's one item table.
+const CUBE_BOX: usize = 2;
+const RING: usize = 3;
+const AMULET: usize = 4;
 
-/// The cube's item tables: the cube (`box `), a ring, an amulet; every
-/// type is its own and type 0's.
-fn cube_item_tables() -> ItemTables {
-    let n: usize = 80;
-    let words = n.div_ceil(32);
-    let mut equiv = EquivMatrix {
-        n,
-        words,
-        bits: vec![0; n * words],
-    };
-    for i in 1..n {
-        equiv.bits[i * words] |= 1;
-        equiv.bits[i * words + i / 32] |= 1 << (i % 32);
-    }
-    let mut ratio: Itemratio = blank();
-    ratio.version = 1;
-    let rec = |t: u16, code: &[u8; 4]| ItemRec {
+/// The game's item tables: the vendor items (`e2e_support::item_tables`:
+/// cap, buckler) and the cube's items (`box `, a ring, an amulet; each
+/// type is its own and type 0's).
+fn game_item_tables() -> ItemTables {
+    let mut t = item_tables();
+    let rec = |ty: u16, code: &[u8; 4]| ItemRec {
         code: *code,
-        type_: t as i16,
+        type_: ty as i16,
         level: 1,
         ..ItemRec::default()
     };
-    ItemTables {
-        items: vec![
-            rec(T_BOX, b"box "),
-            rec(T_RING, b"rin "),
-            rec(T_AMULET, b"amu "),
-        ],
-        itemtypes: (0..n)
-            .map(|_| {
-                let mut t: Itemtypes = blank();
-                (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
-                t
-            })
-            .collect(),
-        equiv,
-        itemratio: vec![ratio],
-        valshift: vec![0; 359],
-        stat_shift: 6,
-        stat_mask: 0x3F,
-        ..ItemTables::default()
-    }
+    t.items.extend([
+        rec(T_BOX, b"box "),
+        rec(T_RING, b"rin "),
+        rec(T_AMULET, b"amu "),
+    ]);
+    t
 }
 
 /// One recipe (`cube.md` V12 shape without mods): one ring → a normal
@@ -1273,72 +1223,9 @@ impl ItemPending for CubeRest {
     }
 }
 
-/// The server's item world (`handlers::items::ItemWorld`) for the cube
-/// handlers, with the player's cube (stored, in the staged inventory)
-/// and a ring on the cursor (mode 4). SEAM (`docs/HANDOFF.md` §7 J1):
-/// `ItemWorld` owns its own unit records, stat lists and game fields
-/// (a second game seed); the action wiring's `ActionSim` holds the
-/// game's. Its items share only the game's unit lists (GUIDs) with the
-/// rest of the run.
-fn item_world(
-    game: &mut Game,
-    player: UnitId,
-    game_seed: u32,
-    rest: CubeRest,
-) -> (ItemWorld, UnitId, UnitId) {
-    let tables = cube_item_tables();
-    let mut w = ItemWorld {
-        units: Units::new(),
-        stats: StatLists::new(stat_data()),
-        data: UnitData::default(),
-        hooks: ItemHooks,
-        fields: GameFields::new(Seed::init_low(game_seed), false),
-        cube: cube_data(&tables),
-        tables,
-        items: ItemStore::new(),
-        staged: Staged {
-            local_date: (15, 3),
-            ..Staged::default()
-        },
-        creation: BTreeMap::new(),
-        pending: Box::new(rest),
-        errors: Vec::new(),
-    };
-    let mut make = |w: &mut ItemWorld, record: usize, mode: u32| {
-        let mut rq = ItemRequest {
-            item: record as i32,
-            format: 1,
-            ilvl: 5,
-            quality: q::NORMAL,
-            ..ItemRequest::default()
-        };
-        let spawn = ItemSpawn {
-            room: None,
-            mode,
-            init_flags: 1,
-        };
-        let u = w
-            .economy(game)
-            .create_item(&mut rq, false, spawn)
-            .expect("item");
-        w.items.get_mut(u).unwrap().inv_page = 0;
-        u
-    };
-    let cube = make(&mut w, CUBE_BOX, 0);
-    let ring = make(&mut w, RING, 4);
-    w.staged.inventories.insert(
-        player,
-        Inventory {
-            items: vec![cube],
-            cursor: Some(ring),
-        },
-    );
-    (w, cube, ring)
-}
-
 // ---- the game --------------------------------------------------------------------------
 
-type Sim = SimGame<WorldSim<TestPending>, TradeWorld<Rest>>;
+type Sim = SimGame<WorldSim<TestPending>, WiredWorld<Rest, WiredSkills>>;
 
 /// Manual host clock (ms), injected into the host (`tick.md` §8).
 struct Ms(u32);
@@ -1395,7 +1282,7 @@ struct Fx {
     npc: UnitId,
     buckler: UnitId,
     cap: UnitId,
-    /// The cube and the cursor ring (in the cube's item world).
+    /// The cube and the cursor ring.
     cube: UnitId,
     ring: UnitId,
     cube_rest: CubeRest,
@@ -1540,18 +1427,19 @@ impl Fx {
         });
         let wp = game.lists.unit(object).unwrap().guid;
 
-        // The world host: waypoints (`ActionWorld`) and the NPC / vendor
-        // systems on the same units (`TradeWorld`).
+        // The world host: waypoints and skills (`ActionWorld`), the NPC /
+        // vendor / quest systems and the cube on the same units
+        // (`WiredWorld`).
         let mut rest = Rest::default();
         rest.quests.insert(player, PlayerQuests::default());
         let action = ActionWorld {
             waypoints: Some(waypoint_data()),
+            skills: WiredSkills::default(),
             ..ActionWorld::default()
         };
-        let mut world = TradeWorld::new(
+        let mut world = WiredWorld::new(
             action,
-            GameFields::new(Seed::init_low(game_seed), false),
-            item_tables(),
+            game_item_tables(),
             quests,
             ctl,
             vendor_tables(),
@@ -1560,34 +1448,51 @@ impl Fx {
         );
         // Monster init embeds the NPC's interaction list (`npc.md` §2).
         world.state.add_npc(npc);
-        // The player's buckler and cap, made by the economy wiring on
-        // the game seed (stored, mode 0); the inventory that holds them
-        // is the staged one (no inventory spec).
-        let (buckler, cap) = world.with_economy(&mut game, &mut sim, |econ, _| {
-            let mut make = |record: usize| {
+        // The player's buckler and cap (stored, mode 0), then the cube
+        // (stored) and a ring on the cursor (mode 4), made by the economy
+        // wiring on the game seed into the game's one item store; the
+        // inventories that hold them are staged (no inventory spec).
+        let (buckler, cap, cube, ring) = world.with_economy(&mut game, &mut sim, |econ, _| {
+            let mut make = |record: usize, quality: u8, ilvl: i32, mode: u32| {
                 let mut rq = ItemRequest {
                     item: record as i32,
-                    ilvl: 1,
-                    quality: 2,
+                    ilvl,
+                    quality,
                     format: 1,
                     ..ItemRequest::default()
                 };
                 let spawn = ItemSpawn {
                     room: None,
-                    mode: 0,
+                    mode,
                     init_flags: 1,
                 };
                 econ.create_item(&mut rq, false, spawn).expect("item")
             };
-            (make(BUC), make(CAP))
+            let (buckler, cap) = (make(BUC, 2, 1, 0), make(CAP, 2, 1, 0));
+            let cube = make(CUBE_BOX, q::NORMAL, 5, 0);
+            let ring = make(RING, q::NORMAL, 5, 4);
+            for u in [cube, ring] {
+                econ.items.get_mut(u).unwrap().inv_page = 0;
+            }
+            (buckler, cap, cube, ring)
         });
         world.rest.inventory.extend([buckler, cap]);
-        // The cube's item world (a second unit world, see `item_world`).
+        // The cube's parts: its tables, the staged inventory (the cube
+        // stored, the ring on the cursor), the local date, the pending
+        // inventory calls.
         let cube_rest = CubeRest::default();
-        let (items, cube, ring) = item_world(&mut game, player, game_seed, cube_rest.clone());
+        let mut parts = CubeParts::new(cube_data(&world.tables), Box::new(cube_rest.clone()));
+        parts.staged.local_date = (15, 3);
+        parts.staged.inventories.insert(
+            player,
+            Inventory {
+                items: vec![cube],
+                cursor: Some(ring),
+            },
+        );
+        world.cube = Some(parts);
 
         let mut s: Sim = SimGame::with_world(game, sim, world);
-        s.items = Some(items);
         s.join(LOCAL_CLIENT_ID, Some(player), None, client_state::IN_GAME)
             .unwrap();
         s.set_player(
@@ -1619,7 +1524,6 @@ impl Fx {
             ];
             b.right = Some(multi);
         }
-        s.skills = Some(Box::new(WiredSkills::new(vitals(), book.clone())));
 
         let link = LocalLink::new(Host::new(
             s,
@@ -1729,9 +1633,14 @@ impl Fx {
         &mut self.sim().events.action.hooks().x
     }
 
-    /// The server's item world (the cube's).
-    fn items(&mut self) -> &mut ItemWorld {
-        self.sim().items.as_mut().unwrap()
+    /// The server host's cube parts.
+    fn cube_parts(&mut self) -> &mut CubeParts {
+        self.sim().world.cube.as_mut().unwrap()
+    }
+
+    /// The game's one item store.
+    fn items(&mut self) -> &mut ItemStore {
+        &mut self.sim().world.items
     }
 
     fn guid(&self, u: UnitId) -> u32 {
@@ -1768,9 +1677,10 @@ impl Fx {
         let mut e = s.events.errors();
         e.extend(s.world.action.faults.iter().map(|f| format!("{f:?}")));
         e.extend(s.world.state.errors.iter().map(|f| format!("{f:?}")));
-        if let Some(w) = &s.items {
-            e.extend(w.errors.iter().map(|f| format!("{f:?}")));
+        if let Some(c) = &s.world.cube {
+            e.extend(c.errors.iter().map(|f| format!("{f:?}")));
         }
+        e.extend(s.tick_faults.iter().map(|f| format!("{f:?}")));
         e
     }
 
@@ -2191,13 +2101,13 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(copies.len(), 2, "the two stops at 0x0055A2A0");
 
     // TODO(after the quest-host merge): quest messages 0x31, 0x40, 0x58
-    // on `TradeWorld` (`QuestCall`) are being added in parallel; until
+    // on `WiredWorld` (`QuestCall`) are being added in parallel; until
     // then they stay stubs and this run sends none. The step goes here.
 
     // 14. Cube (C→S 0x2A, `cube.md` §2): the cursor ring into the
     // player's cube: the checks pass, the targeting reset, page 3, the
-    // placement (inventory stub); result 0, no message. (The cube's
-    // item world is the server's `ItemWorld`: see `item_world`.)
+    // placement (inventory stub); result 0, no message. The cube runs on
+    // the same host, units and item store as the rest of the run.
     let (cube, ring) = (fx.cube, fx.ring);
     let mut put = vec![0x2A];
     put.extend_from_slice(&fx.guid(ring).to_le_bytes());
@@ -2212,24 +2122,21 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![put]);
     assert_eq!(frames[23].1.codes, [(0x2A, done)]);
     assert_eq!(frames[23].2, none);
-    assert_eq!(fx.items().items.get(ring).unwrap().inv_page, CUBE_PAGE);
-    assert_eq!(fx.items().staged.targeting_resets, [player]);
-    assert_eq!(fx.items().staged.inventories[&player].items, [cube, ring]);
+    assert_eq!(fx.items().get(ring).unwrap().inv_page, CUBE_PAGE);
+    assert_eq!(fx.cube_parts().staged.targeting_resets, [player]);
+    assert_eq!(
+        fx.cube_parts().staged.inventories[&player].items,
+        [cube, ring]
+    );
 
     // 15. Transmute (C→S 0x4F button 0x18, `cube.md` §1, §3, §8) with
     // the cube open. The cube's opening (item use, `cube.md` §10) has no
-    // spec: the interaction (type 4, the cube's GUID) is staged. The
-    // ring matches the recipe: the amulet is created, the ring removed
-    // and freed, sound 4, the amulet placed on page 3, identified.
+    // spec: the interaction (type 4, the cube's GUID) is staged at the
+    // host's one owner. The ring matches the recipe: the amulet is
+    // created, the ring removed and freed, sound 4, the amulet placed on
+    // page 3, identified.
     let cg = fx.guid(cube);
-    fx.items().staged.interactions.insert(
-        player,
-        Interaction {
-            guid: cg,
-            unit_type: 4,
-            active: true,
-        },
-    );
+    fx.sim().world.rest.interact.insert(player, (4, cg));
     let click = bytes(&ClickButton {
         button: 0x18,
         p1: 0,
@@ -2239,15 +2146,18 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![click]);
     assert_eq!(frames[24].1.codes, [(0x4F, done)]);
     assert_eq!(frames[24].2, none);
-    assert!(!fx.items().items.contains(ring));
-    let amulet = *fx.items().staged.inventories[&player].items.last().unwrap();
-    let it = fx.items().items.get(amulet).unwrap().clone();
+    assert!(!fx.items().contains(ring));
+    let amulet = *fx.cube_parts().staged.inventories[&player]
+        .items
+        .last()
+        .unwrap();
+    let it = fx.items().get(amulet).unwrap().clone();
     assert_eq!(
         (it.record, it.quality, it.inv_page),
         (AMULET, q::NORMAL, CUBE_PAGE)
     );
     assert_ne!(it.flags & flag::IDENTIFIED, 0);
-    assert_eq!(fx.items().staged.sounds, [(player, 4)]);
+    assert_eq!(fx.cube_parts().staged.sounds, [(player, 4)]);
     assert_eq!(
         *fx.cube_rest.0.lock().unwrap(),
         [
@@ -2267,7 +2177,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // warp's same-act placement `0x00554EA0` belongs to the unwritten
     // path / placement spec (`Pending::warp`), so the player stays in
     // the ISLE room and rule 7's room test sends no S→C 0x0D.
-    fx.pending().interact.insert(player, (2, wp));
+    fx.sim().world.rest.interact.insert(player, (2, wp));
     let travel = bytes(&TakeOrCloseWp {
         wp,
         level: GATE as u16,
@@ -2279,7 +2189,7 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![travel]);
     assert_eq!(frames[25].1.codes, [(0x49, done)]);
     assert_eq!(frames[25].2, none);
-    assert!(fx.pending().interact.is_empty());
+    assert!(!fx.sim_ref().world.rest.interact.contains_key(&player));
     let log = fx.pending().log.clone();
     assert_eq!(log.last(), Some(&format!("warp {} {GATE} 0", player.0)));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);

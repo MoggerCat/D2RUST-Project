@@ -5,10 +5,12 @@
 //! The dispatcher (`crate::dispatch`) has already applied the gate, the
 //! exact size and the point / unit parse (§2.2–§2.4) when
 //! [`handle`] runs. The handlers are the `d2-sim` functions their specs
-//! name, run by a [`SkillHost`] installed on the game
-//! ([`SimGame::skills`]); without one, the ids keep the stub behaviour.
-//! [`wired::WiredSkills`] is the host of the wired sim
-//! (`d2_sim::wiring::action::ActionSim`).
+//! name, run by the game's world host ([`WorldHost::skill`], a
+//! [`SkillHost`] slot); a host without one leaves the ids to the stub.
+//! [`wired::WiredSkills`] is the slot of the wired sim
+//! (`d2_sim::wiring::action::ActionSim`): it runs the handlers on the
+//! skill use pipeline's `d2-sim` provider
+//! (`d2_sim::wiring::interaction::UseView`, through [`world::World`]).
 //!
 //! Server messages: the pipeline's 0x15 (resync) goes to
 //! [`SimGame::resyncs`] like the dispatcher's; 0x5A ("can't do that")
@@ -16,7 +18,6 @@
 //! `server-messages.tsv` (`use.md` OQ9), so neither is queued. No other
 //! S→C message is defined for these handlers.
 
-pub mod seams;
 pub mod wired;
 pub mod world;
 
@@ -24,9 +25,10 @@ pub mod world;
 mod tests;
 
 use d2_sim::game::Game;
-use d2_sim::skills::use_::ServerMsg;
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::Pending;
+use d2_sim::wiring::interaction::UseRest;
 
 use super::super::SimGame;
 use super::world::WorldHost;
@@ -182,14 +184,43 @@ pub struct Handled {
     pub resync: bool,
 }
 
-/// Runs the skill handlers on a game whose events are `D`.
+/// The skill handlers of a game whose events are `D`: a slot of the
+/// world host ([`WorldHost::skill`]).
 pub trait SkillHost<D> {
-    /// The handler of `call.msg[0]`, one of the [`Status::Handled`] ids.
-    fn handle(&mut self, call: Call<'_, D>) -> Handled;
-    /// Server messages the handlers sent whose layout is not specified
-    /// (recorded, not queued), in order.
-    fn unsent(&self) -> &[(ClientId, ServerMsg)];
+    /// The handler of `call.msg[0]`, one of the [`Status::Handled`] ids;
+    /// `None`: this slot runs no skill handler, the id stays a stub.
+    fn handle(&mut self, call: Call<'_, D>) -> Option<Handled>;
 }
+
+/// No skill handlers: every skill id stays a stub.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NoSkills;
+
+impl<D> SkillHost<D> for NoSkills {
+    fn handle(&mut self, _call: Call<'_, D>) -> Option<Handled> {
+        None
+    }
+}
+
+/// The skill-point calls no written-and-implemented spec provides
+/// (`levels.md` §6.4), answered by the action wiring's `Pending` value,
+/// the skill list's one owner (`UseRest`).
+pub trait LearnRest {
+    /// `0x0056C700`.
+    fn is_class_skill(&self, u: UnitId, skill: i32) -> bool;
+    /// `0x00570080` after the cost check: spend, add a level, refresh,
+    /// passive state, `0x00646D60`; refund on failure.
+    fn add_skill_level(&mut self, u: UnitId, skill: i32, cost: i32);
+    /// §6.4 step 5: `0x0055F4F0(…, 1)`, then `0x0056DE40(unit)`.
+    fn after_skill_point(&mut self, u: UnitId);
+}
+
+/// What the wired skill handlers need of the action wiring's `Pending`
+/// value: its own seams, the skill use pipeline's rest and the
+/// skill-point calls.
+pub trait SkillRest: Pending + UseRest + LearnRest {}
+
+impl<T: Pending + UseRest + LearnRest> SkillRest for T {}
 
 /// A `d2-sim` handler result as a dispatch result code (§2.3; the
 /// handlers return 0–3).
@@ -202,8 +233,9 @@ pub fn code(c: i32) -> ResultCode {
     }
 }
 
-/// The skill handler of `msg[0]`, if the id is routed here and a host is
-/// installed; `None` leaves the id to the stub.
+/// The skill handler of `msg[0]`, if the id is routed here and the
+/// world host has a skill slot that runs it; `None` leaves the id to the
+/// stub.
 pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     sim: &mut SimGame<D, W>,
     client: ClientId,
@@ -211,22 +243,20 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     out: &mut dyn MessageSink,
 ) -> Option<ResultCode> {
     let id = *msg.first()?;
-    if !handled(id) || sim.skills.is_none() {
+    if !handled(id) {
         return None;
     }
     let player = sim
         .sim_client(client)
         .and_then(|c| sim.game.lists.client(c)?.player)?;
     let staged = staged(sim, client, player, msg);
-    let mut host = sim.skills.take()?;
-    let h = host.handle(Call {
+    let h = sim.world.skill(Call {
         game: &mut sim.game,
         events: &mut sim.events,
         client,
         msg,
         staged,
-    });
-    sim.skills = Some(host);
+    })?;
     if let Some(f) = h.point_accept {
         sim.set_point_accept(client, f);
     }
