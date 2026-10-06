@@ -45,10 +45,10 @@
 |   11. Message layouts | 1338–1367 |
 | Constants & data dependencies | 1368–1390 |
 | Randomness | 1391–1403 |
-| Edge cases & original bugs | 1404–1441 |
-| Test vectors | 1442–1490 |
-| Provenance | 1491–1547 |
-| Open questions | 1548–1638 |
+| Edge cases & original bugs | 1404–1448 |
+| Test vectors | 1449–1497 |
+| Provenance | 1498–1554 |
+| Open questions | 1555–1644 |
 <!-- /index -->
 
 ## Summary
@@ -1427,7 +1427,14 @@ happen only inside the systems these paths call, in handler order:
     `0x00562660`, `0x005697F0`; the socket link `0x0063B210` uses it as
     the filler's x): the ones read (`0x004843E0`, `0x0055F590`,
     `0x00562660`, `0x0063B210`) take an item's own (socket) inventory,
-    where 0x1F never runs; open question 21 for the other two.
+    where 0x1F never runs. `0x0048C060` (client item text) also reads
+    the item's own socket inventory (`item +0x60`, after the socketed
+    flag 0x800). `0x005697F0` (save writer `0x00569AD0`, "JM" corpse
+    section) reads the inventories of the player's corpses (+0x34 list,
+    player-type units) and only tests the count for zero; a corpse
+    inventory is new and filled by links (`0x0057F700`: `0x0063B210`
+    per moved item), so it carries no 0x1F drift. No reader of +0x28
+    sees a player's own inventory: the drift changes no outcome.
 12. §2.4 step 7 clears the cursor whatever it holds. A transmute
     (`world/cube.md` §8 step 3: outputs are created in mode 4) while the
     player holds a cursor item H unlinks H (§1.4 rule 3) and leaves it in
@@ -1575,9 +1582,8 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
 19. Answered: §8.4 step 6 (full pair list; second list = corpses).
 20. Does the 1.14d client send C→S 0x4F button 0x18 (transmute) while
     an item is on the cursor (edge case 12)? Settle: recording R7.
-21. Readers of inventory +0x28 at `0x005697F0` and `0x0048C060`: do
-    they read a player inventory, so that edge case 11's drift changes
-    an outcome? Settle: Ghidra on both.
+21. ~~Readers of inventory +0x28 at `0x005697F0` and `0x0048C060`~~:
+    answered in edge case 11 (socket and corpse inventories only).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 
