@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1415 |
-|   10. The catalogue `ai-functions.tsv` | 1416–1436 |
-| Constants & data dependencies | 1437–1460 |
-| Randomness | 1461–1482 |
-| Edge cases & original bugs | 1483–1524 |
-| Test vectors | 1525–1613 |
-| Provenance | 1614–1653 |
-| Open questions | 1654–1691 |
+|   9. Per-AI behaviours | 633–1417 |
+|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
+| Constants & data dependencies | 1439–1462 |
+| Randomness | 1463–1484 |
+| Edge cases & original bugs | 1485–1526 |
+| Test vectors | 1527–1615 |
+| Provenance | 1616–1655 |
+| Open questions | 1656–1693 |
 <!-- /index -->
 
 ## Summary
@@ -1412,6 +1412,8 @@ Act II bodies (PantherJavelin, GreaterMummy, Mummy, PantherWoman, MaggotLarva, S
 Act III bodies (Mosquito, ThornHulk, ZakarumZealot, ZakarumPriest, FrogDemon, FetishShaman, HighPriest, FetishBlowgun, WillOWisp, Mephisto) with the FrogDemon and FetishShaman alternates: `monsters/ai-bodies-3.md`.
 
 Act IV bodies (VileMother, VileDog, FingerMage, Regurgitator, Megademon, Diablo with its alternate and the boss target pick and score, Izual, DoomKnight, AbyssKnight, OblivionKnight): `monsters/ai-bodies-4.md`.
+
+Act V bodies (Minion, Imp, Succubus, BloodLord, SuccubusWitch, Overseer, ReanimatedHorde, ClawViperEx, DeathMauler, PutridDefiler, Ancient, AncientStatue, FrozenHorror, SiegeBeast, SuicideMinion, BaalMinion, BaalTaunt, BaalToStairs, BaalThrone): `monsters/ai-bodies-5.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 
