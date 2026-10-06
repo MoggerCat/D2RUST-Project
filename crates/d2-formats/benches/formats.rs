@@ -1,8 +1,9 @@
 // Spec: specs/formats/mpq.md §1, §5–§9; specs/formats/dc6.md; specs/formats/dcc.md
 //! Performance baselines of `d2-formats` (criterion;
 //! `docs/handoff/bench-baselines.md`): MPQ open / read / decompress of a
-//! synthetic archive, DC6 and DCC decode of synthetic frames. Not run in
-//! CI; `cargo bench -p d2-formats`.
+//! synthetic archive, DC6 and DCC decode of synthetic frames (the shallow
+//! ones below, and live-shaped files from `test_fixtures::sprites`). Not
+//! run in CI; `cargo bench -p d2-formats`.
 
 use std::hint::black_box;
 
@@ -196,5 +197,56 @@ fn bench_sprites(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, bench_mpq, bench_sprites);
+/// Live-shaped files from `test_fixtures::sprites` (`bench-fight.md`):
+/// many directions and frames at realistic sizes, every DCC sub-stream
+/// in use, per-pixel colours. Throughput in decoded pixels.
+fn bench_live_sprites(c: &mut Criterion) {
+    use test_fixtures::sprites::{
+        dc6_file, dc6_frames, dcc_file, Dc6Shape, DccShape, DC6_PANEL, DC6_SPRITE, DCC_LARGE,
+        DCC_MONSTER,
+    };
+    let mut g = c.benchmark_group("sprites_live");
+    g.sample_size(30);
+    let dc6 = |name: &str, s: Dc6Shape| {
+        let frames = dc6_frames(s, 7);
+        let px: u64 = frames.iter().map(|f| u64::from(f.width * f.height)).sum();
+        let file = dc6_file(&frames, s.directions, s.frames);
+        println!("{name}: {} bytes, {px} pixels", file.len());
+        (file, px)
+    };
+    for (name, s) in [
+        ("dc6_panel_1x4_256", DC6_PANEL),
+        ("dc6_sprite_8x16_96", DC6_SPRITE),
+    ] {
+        let (file, px) = dc6(name, s);
+        g.throughput(Throughput::Elements(px));
+        g.bench_function(name, |b| {
+            b.iter(|| black_box(Dc6::parse(black_box(&file)).expect("dc6")))
+        });
+    }
+    let dcc = |name: &str, s: DccShape| {
+        let out = dcc_file(s, 11);
+        let px: u64 = out
+            .frames
+            .iter()
+            .flatten()
+            .map(|f| u64::from(f.width * f.height))
+            .sum();
+        println!("{name}: {} bytes, {px} pixels", out.file.len());
+        (out.file, px)
+    };
+    for (name, s) in [
+        ("dcc_monster_8x8_70x100", DCC_MONSTER),
+        ("dcc_large_16x24_110x130", DCC_LARGE),
+    ] {
+        let (file, px) = dcc(name, s);
+        g.throughput(Throughput::Elements(px));
+        g.bench_function(name, |b| {
+            b.iter(|| black_box(Dcc::parse(black_box(&file)).expect("dcc")))
+        });
+    }
+    g.finish();
+}
+
+criterion_group!(benches, bench_mpq, bench_sprites, bench_live_sprites);
 criterion_main!(benches);
