@@ -2,7 +2,8 @@
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
-//! scheduled, the town test, the combat list drop, the kind frees), and
+//! scheduled, the town test, the combat list drop, the kind frees, the
+//! skill events 5 / 8 / 9 through [`Pending::skill_event`]), and
 //! the unit-field helpers of [`View`] the other adapters share (stats,
 //! states, state lists, seeds).
 
@@ -20,7 +21,7 @@ use crate::units::record::flags2;
 use crate::units::{UnitId, UnitType};
 
 use super::combat::HIRELING_CLASSES;
-use super::{ActionHooks, Pending, View, WiringError};
+use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -96,6 +97,56 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// Event 10 `0x005A7F70` → `0x00573120` (`ai.md` §1; monster data).
     fn ai_reset(&mut self, _: &mut Sim<'_>, unit: UnitId, _: u32, _: u32) {
         self.x.ai_reset(unit);
+    }
+
+    /// Event 5 `0x0056D790` (`stat-lists.md` §10.2): the skills'
+    /// active-state function, through [`Pending::skill_event`].
+    fn active_state(&mut self, sim: &mut Sim<'_>, unit: UnitId, f: u16, skill: u32, a2: u32) {
+        X::skill_event(
+            self,
+            sim,
+            SkillEvent::ActiveState {
+                unit,
+                f,
+                skill,
+                arg2: a2,
+            },
+        );
+    }
+
+    /// Event 8 `0x0056FCB0` (`use.md` §7), through [`Pending::skill_event`].
+    fn periodic_skills(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) {
+        X::skill_event(
+            self,
+            sim,
+            SkillEvent::Periodic {
+                unit,
+                arg1: a1,
+                arg2: a2,
+            },
+        );
+    }
+
+    /// Event 9 `0x0056FE40` after its checks (`stat-lists.md` §10.3), through
+    /// [`Pending::skill_event`].
+    fn apply_item_aura(
+        &mut self,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        a1: u32,
+        skill: u32,
+        level: i32,
+    ) {
+        X::skill_event(
+            self,
+            sim,
+            SkillEvent::ItemAura {
+                unit,
+                arg1: a1,
+                skill,
+                level,
+            },
+        );
     }
 
     /// Missile events (`0x005ADBB0`, `missiles.md` §R3).

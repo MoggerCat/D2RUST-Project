@@ -14,7 +14,35 @@
 
 use crate::game::Game;
 use crate::monsters::ai::ModeTarget;
+use crate::units::hooks::Sim;
 use crate::units::{RoomId, UnitId};
+
+use super::ActionHooks;
+
+/// A skill timer event the unit dispatch hands to the skills
+/// (`stat-lists.md` §10.2, §10.3; `use.md` §7), with its arguments as the
+/// dispatch passes them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillEvent {
+    /// Event 5 `0x0056D790`: `srvactivefunc` `f` of the skill's aura
+    /// state (already checked < 191), the skill (a1) and a2.
+    ActiveState {
+        unit: UnitId,
+        f: u16,
+        skill: u32,
+        arg2: u32,
+    },
+    /// Event 8 `0x0056FCB0` with its two arguments.
+    Periodic { unit: UnitId, arg1: u32, arg2: u32 },
+    /// Event 9 `0x0056FE40` after its checks: a1, the skill (a2) and the
+    /// level `l` = total(151, layer = skill).
+    ItemAura {
+        unit: UnitId,
+        arg1: u32,
+        skill: u32,
+        level: i32,
+    },
+}
 
 /// Seams without a provider (see the module doc). Grouped by the spec
 /// that will own them.
@@ -435,6 +463,19 @@ pub trait Pending {
     fn warp(&mut self, game: &mut Game, player: UnitId, level: u32, tile_code: u8) {}
     /// `0x005809D0(game, player, no skill, 2, x, y, 0)` (player path modes).
     fn set_player_mode_arrival(&mut self, game: &mut Game, player: UnitId) {}
+
+    // ---- skill timer events (`stat-lists.md` §10.2, §10.3; `use.md` §7) --
+
+    /// Routes timer events 5, 8 and 9 to the skill use pipeline. The
+    /// pipeline's own seams ([`crate::wiring::interaction::UseRest`]) are a
+    /// wider bound than `Pending`, so the route is chosen by the seam
+    /// value: a value that also implements `UseRest` sets this to
+    /// [`crate::wiring::interaction::skill_events::route`]. Default: nothing.
+    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent)
+    where
+        Self: Sized,
+    {
+    }
 }
 
 /// Every default.

@@ -10,6 +10,7 @@
 //! | population `MonsterInit` → monster init, unit allocation | [`population_init`] |
 //! | init `InitHost` → units, stats, AI, population regions | [`init_units`] |
 //! | tick room pass (`tick.md` §4) → population | [`dispatch::WorldSim`] |
+//! | timer event 7 → init umods; unit free → world state | [`events::WorldHooks`] |
 //!
 //! Ownership: [`dispatch::WorldSim`] holds the action systems
 //! ([`ActionSim`]: units, stats, AI, missiles, the act DRLGs) and the
@@ -23,6 +24,7 @@
 //! Nothing here decides game behaviour: every rule stays in its module.
 
 pub mod dispatch;
+pub mod events;
 pub mod init_units;
 pub mod levels;
 pub mod maze_presets;
