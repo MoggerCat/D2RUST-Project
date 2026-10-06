@@ -58,8 +58,8 @@
 |   Synthetic (CI-safe) | 855–877 |
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 878–908 |
 |   Recorded checks (monster assign 0xAC) | 909–921 |
-| Provenance | 922–974 |
-| Open questions | 975–998 |
+| Provenance | 922–984 |
+| Open questions | 985–1008 |
 <!-- /index -->
 
 ## Summary
@@ -971,6 +971,16 @@ Bosses, Normal, Blood Moor (L-flag 1):
   sub-types), so the matrix direction does not change a live answer:
   exactly the 7 classes with MonType `sandleaper` (sandleaper1–7) are
   excluded.
+  Re-read 2026-10-06 (implementation question IH1): `0x005A0070` does
+  no walk of its own; after the bounds tests it loads one word of the
+  built matrix (row = exclude, word = row × width + MonType / 32) and
+  masks it with the bit table at `0x006CE268` (bit MonType mod 32), so
+  an answer from the matrix is exact, including the walk's depth limit
+  and bad links as `0x006C2110` built them. Direction: row = exclude,
+  column = MonType ("is the exclude type of type MonType?"), as in rule
+  2 and its three test vectors; a description as "MonType nested in the
+  exclude type" is the reverse and wrong. The return value is the
+  masked word (non-zero = set), not 1.
 
 ## Open questions
 
