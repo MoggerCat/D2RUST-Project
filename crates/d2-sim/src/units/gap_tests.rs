@@ -41,6 +41,8 @@ struct Probe {
     start_mode: Option<u32>,
     start_fails: bool,
     class_record: Option<MonsterModeRecord>,
+    /// Life fractions sent (`0x00571A10`).
+    fractions: Vec<i32>,
 }
 
 impl Probe {
@@ -150,6 +152,15 @@ impl UnitHooks for Probe {
     }
     fn free_hover(&mut self, _: &mut Sim<'_>, _: UnitId) {
         self.push("hover".into());
+    }
+    fn active_state(&mut self, _: &mut Sim<'_>, _: UnitId, f: u16, skill: u32, a2: u32) {
+        self.push(format!("active {f} {skill} {a2}"));
+    }
+    fn apply_item_aura(&mut self, _: &mut Sim<'_>, _: UnitId, a1: u32, skill: u32, l: i32) {
+        self.push(format!("aura {a1} {skill} {l}"));
+    }
+    fn send_life_fraction(&mut self, _: &mut Sim<'_>, _: UnitId, f: i32) {
+        self.fractions.push(f);
     }
 }
 
@@ -656,7 +667,6 @@ fn set_stamina(game: &mut Game, sys: &mut Sys, p: UnitId, v: i32) {
 
 /// §4.5: the player start table, event 0's action functions and event
 /// 1's end-of-animation rules.
-// Covers: specs/sim/units.md §4.5
 #[test]
 fn player_mode_starts() {
     // Animated starts: GH, BL plain; 7, 8, 10–16, 18 also clear 0x40 and
@@ -1258,4 +1268,276 @@ fn scheduler_inventory() {
     }
     assert_eq!(api, [265, 1, 3]);
     assert_eq!(types, [20, 60, 30, 18, 1, 6, 6, 45, 7, 7, 3, 3, 42, 20, 1]);
+}
+
+// ---- stat-lists.md §10, stats.md §2 (handlers in units/dispatch.rs) -----------
+
+/// A system with 7 skills whose aurastates are 0, 40, 40, 41, 50, 184,
+/// 185 (185 = the states count: invalid), and `srvactivefunc` 5, 7, 191,
+/// 190 for states 0, 40, 41, 50.
+fn system_with_auras() -> Sys {
+    let mut d = (*crate::stats::tests::data()).clone();
+    d.aurastate = vec![0, 40, 40, 41, 50, 184, 185];
+    for (s, f) in [(0, 5), (40, 7), (41, 191), (50, 190)] {
+        d.states.set_srvactivefunc(s, f);
+    }
+    UnitSystem::new(std::sync::Arc::new(d), data(), Probe::default())
+}
+
+/// A player with the stat-lists.md test-vector stats (max life 12800).
+fn vector_player(game: &mut Game, sys: &mut Sys, mode: u32) -> UnitId {
+    let p = spawn(game, sys, UnitType::Player, 0, 0);
+    sys.units.get_mut(p).expect("p").mode = mode;
+    sys.with(game, |sim, h| {
+        let l = sim.stats.unit_list(p).expect("list");
+        for (s, v) in [(0, 30), (12, 10), (3, 25), (7, 12800), (6, 12800)] {
+            sim.stats.set(h, l, s, v, 0, None);
+        }
+    });
+    p
+}
+
+fn set_stat(game: &mut Game, sys: &mut Sys, u: UnitId, s: u16, v: i32) {
+    sys.with(game, |sim, h| sim.stats.unit_set(h, u, s, v, 0));
+}
+
+/// stat-lists.md §10.1: event 3 runs `0x00580810`(game, unit, a1, a2)
+/// for players (rescheduled with its own a1, a2) and `0x005A6920` for
+/// monsters (rescheduled with 0, 0).
+// Covers: specs/sim/stat-lists.md §10.1 text
+#[test]
+fn regeneration_handlers_per_kind() {
+    let mut game = Game::new();
+    let mut sys = system();
+    let p = vector_player(&mut game, &mut sys, player_mode::NU);
+    set_stat(&mut game, &mut sys, p, stat::HITPOINTS, 10000);
+    set_stat(&mut game, &mut sys, p, stat::HPREGEN, 100);
+    let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+    set_stat(&mut game, &mut sys, m, stat::MAXHP, 25600);
+    set_stat(&mut game, &mut sys, m, stat::HITPOINTS, 1000);
+    set_stat(&mut game, &mut sys, m, stat::HPREGEN, 50);
+    at(&mut game, p, event::STAT_REGEN, 1, 6, 7);
+    at(&mut game, m, event::STAT_REGEN, 1, 6, 7);
+    step(&mut game, &mut sys);
+    assert_eq!(sys.stats.unit_total(p, stat::HITPOINTS, 0), 10100);
+    assert_eq!(sys.stats.unit_total(m, stat::HITPOINTS, 0), 1050);
+    assert_eq!(pending(&game, p), [(3, 2, 6, 7)]);
+    assert_eq!(pending(&game, m), [(3, 2, 0, 0)]);
+    assert!(sys.errors.is_empty());
+}
+
+/// stat-lists.md §10.1 monster step 1: with a `life`-group state the
+/// base of stat 74 is taken off the total.
+// Covers: specs/sim/stat-lists.md §10.1 l2 r1
+#[test]
+fn monster_regen_rate_without_base_under_life_state() {
+    // (life-group state on, rate of an attached list, hp after)
+    for (life_state, list_rate, want_hp) in [
+        (false, 30, 1000 + 130),
+        (true, 30, 1000 + 30),
+        // Only the base: r = 0, nothing healed, the regen cancelled.
+        (true, 0, 1000),
+    ] {
+        let mut game = Game::new();
+        let mut sys = system();
+        let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+        set_stat(&mut game, &mut sys, m, stat::MAXHP, 25600);
+        set_stat(&mut game, &mut sys, m, stat::HITPOINTS, 1000);
+        set_stat(&mut game, &mut sys, m, stat::HPREGEN, 100);
+        sys.with(&mut game, |sim, h| {
+            if list_rate != 0 {
+                let l = sim.stats.alloc(0, 0, 0, 1);
+                sim.stats.set(h, l, stat::HPREGEN, list_rate, 0, None);
+                sim.stats.attach(h, m, l, true);
+            }
+            // State 50 is in flag group 32 (`life`) in the synthetic table.
+            sim.stats.toggle_state(m, 50, life_state);
+        });
+        assert_eq!(
+            sys.stats.has_group(m, crate::stats::states::group::LIFE),
+            life_state
+        );
+        at(&mut game, m, event::STAT_REGEN, 1, 0, 0);
+        step(&mut game, &mut sys);
+        let case = format!("{life_state} {list_rate}");
+        assert_eq!(
+            sys.stats.unit_total(m, stat::HITPOINTS, 0),
+            want_hp,
+            "{case}"
+        );
+        let want: Vec<(u8, i32, u32, u32)> = if want_hp == 1000 {
+            vec![]
+        } else {
+            vec![(3, 2, 0, 0)]
+        };
+        assert_eq!(pending(&game, m), want, "{case}");
+    }
+}
+
+/// stat-lists.md §10.1 monster step 4: r < 0 and hp < 256 continue only
+/// in an existing room whose `0x0061AB00` is 0; a stop comes after the
+/// reschedule of step 3.
+// Covers: specs/sim/stat-lists.md §10.1 l2 r4
+#[test]
+fn monster_regen_low_life_needs_a_room() {
+    // (hp, rate, in a room, room flag, hp after)
+    for (hp, r, in_room, flag, want) in [
+        (200, -50, false, false, 200),
+        (200, -50, true, true, 200),
+        (200, -50, true, false, 150),
+        (300, -50, false, false, 250),
+        (200, 50, false, false, 250),
+    ] {
+        let mut game = Game::new();
+        let mut sys = system();
+        sys.hooks.town = flag;
+        let rm = in_room.then(|| room(&mut game, 0));
+        let m = alloc(&mut game, &mut sys, &request(UnitType::Monster, 1, 1, rm));
+        set_stat(&mut game, &mut sys, m, stat::MAXHP, 25600);
+        set_stat(&mut game, &mut sys, m, stat::HITPOINTS, hp);
+        set_stat(&mut game, &mut sys, m, stat::HPREGEN, r);
+        at(&mut game, m, event::STAT_REGEN, 1, 0, 0);
+        step(&mut game, &mut sys);
+        let case = format!("{hp} {r} {in_room} {flag}");
+        assert_eq!(sys.stats.unit_total(m, stat::HITPOINTS, 0), want, "{case}");
+        assert_eq!(pending(&game, m), [(3, 2, 0, 0)], "{case}");
+    }
+}
+
+/// stat-lists.md §10.2: a1 must be 1 … skills count − 1; its
+/// `aurastate`'s `srvactivefunc` f < 191 is called with (skill, a2);
+/// nothing else happens. Players and monsters alike.
+// Covers: specs/sim/stat-lists.md §10.2
+#[test]
+fn active_state_event() {
+    let mut game = Game::new();
+    let mut sys = system_with_auras();
+    let p = vector_player(&mut game, &mut sys, player_mode::NU);
+    let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+    for u in [p, m] {
+        for skill in 0..8u32 {
+            let f = game.frame;
+            at(&mut game, u, event::ACTIVE_STATE, f + 1, skill, 40 + skill);
+            sys.hooks.log.clear();
+            step(&mut game, &mut sys);
+            let want: Vec<String> = match skill {
+                // State 40, f 7.
+                1 | 2 => vec![format!("active 7 {skill} {}", 40 + skill)],
+                // State 50, f 190 (the largest below 191).
+                4 => vec!["active 190 4 44".into()],
+                // State 184, f 0.
+                5 => vec!["active 0 5 45".into()],
+                // 0: skill 0; 3: f 191; 6: state 185 invalid; 7: no skill.
+                _ => vec![],
+            };
+            assert_eq!(sys.hooks.log, want, "{u:?} skill {skill}");
+            assert!(pending(&game, u).is_empty(), "{u:?} skill {skill}");
+        }
+    }
+    assert!(sys.errors.is_empty());
+}
+
+/// stat-lists.md §10.3: a2 is the skill; an invalid skill or aurastate,
+/// a dead unit or item_aura(skill) ≤ 0 cancel the type-9 events whose a1
+/// matches (whatever their skill; all of them for a1 = 0); else the aura
+/// is applied with (a1, skill, l), nothing cancelled or rescheduled.
+// Covers: specs/sim/stat-lists.md §10.3
+#[test]
+fn periodic_stats_cases() {
+    // (kind, mode, skill, item_aura on that skill, applied)
+    for (ty, mode, skill, aura, applied) in [
+        (UnitType::Player, 1, 2, 7, true),
+        (UnitType::Monster, 1, 2, 7, true),
+        (UnitType::Player, 1, 2, 0, false),
+        (UnitType::Player, 1, 2, -1, false),
+        (UnitType::Player, 0, 2, 7, false),
+        (UnitType::Player, 17, 2, 7, false),
+        (UnitType::Monster, 0, 2, 7, false),
+        (UnitType::Monster, 12, 2, 7, false),
+        // Aurastate 185 = the states count; skill 7 ≥ the skills count.
+        (UnitType::Player, 1, 6, 7, false),
+        (UnitType::Player, 1, 7, 7, false),
+    ] {
+        let mut game = Game::new();
+        let mut sys = system_with_auras();
+        let u = match ty {
+            UnitType::Player => vector_player(&mut game, &mut sys, mode),
+            _ => {
+                let m = spawn(&mut game, &mut sys, ty, 1, 1);
+                sys.units.get_mut(m).expect("m").mode = mode;
+                m
+            }
+        };
+        if aura != 0 {
+            sys.with(&mut game, |sim, h| {
+                sim.stats
+                    .unit_set(h, u, stat::ITEM_AURA, aura, skill as u16)
+            });
+        }
+        at(&mut game, u, event::PERIODIC_STATS, 1, 3, skill);
+        at(&mut game, u, event::PERIODIC_STATS, 50, 3, 1);
+        at(&mut game, u, event::PERIODIC_STATS, 50, 4, skill);
+        step(&mut game, &mut sys);
+        let case = format!("{ty:?} {mode} {skill} {aura}");
+        if applied {
+            assert_eq!(sys.hooks.log, [format!("aura 3 {skill} {aura}")], "{case}");
+            assert_eq!(
+                pending(&game, u),
+                [(9, 50, 3, 1), (9, 50, 4, skill)],
+                "{case}"
+            );
+        } else {
+            assert!(sys.hooks.log.is_empty(), "{case}");
+            assert_eq!(pending(&game, u), [(9, 50, 4, skill)], "{case}");
+        }
+    }
+    // a1 = 0: every type-9 event of the unit goes, other types stay.
+    let mut game = Game::new();
+    let mut sys = system_with_auras();
+    let p = vector_player(&mut game, &mut sys, 1);
+    at(&mut game, p, event::PERIODIC_STATS, 1, 0, 7);
+    at(&mut game, p, event::PERIODIC_STATS, 50, 4, 2);
+    at(&mut game, p, event::PERIODIC_STATS, 50, 5, 2);
+    at(&mut game, p, event::STAT_REGEN, 50, 0, 0);
+    step(&mut game, &mut sys);
+    assert_eq!(pending(&game, p), [(3, 50, 0, 0)]);
+    assert!(sys.errors.is_empty());
+}
+
+/// stats.md §2 rule 6: stat 352 holds the life fraction last sent, 0–128:
+/// it becomes each sent fraction and stays when nothing is sent.
+// Covers: specs/sim/stats.md §2 r6
+#[test]
+fn stat_352_is_the_last_sent_fraction() {
+    let mut game = Game::new();
+    let mut sys = system();
+    let p = vector_player(&mut game, &mut sys, player_mode::NU);
+    set_stat(&mut game, &mut sys, p, stat::HPREGEN, 256);
+    let regen = |game: &mut Game, sys: &mut Sys, hp: i32| {
+        set_stat(game, sys, p, stat::HITPOINTS, hp);
+        sys.with(game, |sim, h| {
+            super::dispatch::player_regen(sim, h, p, 0, 0)
+        })
+        .expect("regen");
+        sys.stats.unit_total(p, stat::LAST_SENT_HP_PCT, 0)
+    };
+    // 6400 + 256 → h 26, m 50: (26 << 7) / 50 = 66, sent.
+    assert_eq!(regen(&mut game, &mut sys, 6400), 66);
+    // h 27 → 69: |69 − 66| ≤ 4, not sent; 352 keeps 66.
+    assert_eq!(regen(&mut game, &mut sys, 6656), 66);
+    // Full life → 128.
+    assert_eq!(regen(&mut game, &mut sys, 12800), 128);
+    assert_eq!(sys.hooks.fractions, [66, 128]);
+    // A monster at 0 life → 0.
+    let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+    set_stat(&mut game, &mut sys, m, stat::MAXHP, 25600);
+    set_stat(&mut game, &mut sys, m, stat::HITPOINTS, 300);
+    set_stat(&mut game, &mut sys, m, stat::LAST_SENT_HP_PCT, 100);
+    set_stat(&mut game, &mut sys, m, stat::HPREGEN, -300);
+    sys.with(&mut game, |sim, h| {
+        super::dispatch::monster_regen(sim, h, m)
+    })
+    .expect("regen");
+    assert_eq!(sys.stats.unit_total(m, stat::LAST_SENT_HP_PCT, 0), 0);
+    assert_eq!(sys.hooks.fractions, [66, 128, 0]);
 }
