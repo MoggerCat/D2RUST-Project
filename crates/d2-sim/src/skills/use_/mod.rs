@@ -12,9 +12,11 @@
 //! `d2-server`); missile creation through [`UseMissiles`] (missiles, wired
 //! by the action wiring still in progress on `claude/wire-action`); the
 //! per-skill start / do bodies through [`SkillFunctions`] (not specified:
-//! `functions.tsv` status `mapped`, Open question 10). Mana formulas come
+//! `functions.tsv` status `mapped`, Open question 10), except the few
+//! the spec states in full ([`bodies`]). Mana formulas come
 //! from [`super::levels`] (`skills/levels.md` §4).
 
+pub mod bodies;
 pub mod table;
 
 #[cfg(test)]
@@ -974,7 +976,10 @@ fn start_core<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, e: &SkillEntr
     if table::lookup(table::Kind::Start, r.srvstfunc).is_none() {
         return 1;
     }
-    let res = w.srvst(r.srvstfunc, u, e.skill, l);
+    let res = match bodies::start(r.srvstfunc) {
+        Some(v) => v,
+        None => w.srvst(r.srvstfunc, u, e.skill, l),
+    };
     if res != 0 && !r.usemanaondo {
         consume_mana(w, t, Some(u), e.skill, l);
     }
@@ -1053,7 +1058,10 @@ pub fn do_core<W: UseWorld>(
     }
     let mut res = 0;
     if table::lookup(table::Kind::Do, index).is_some() {
-        res = w.srvdo(index, u, skill, l, charge, item, aim);
+        res = match bodies::do_(index) {
+            Some(v) => v,
+            None => w.srvdo(index, u, skill, l, charge, item, aim),
+        };
     }
     if r.srvmissile != 0xFFFF && t.missile(i32::from(r.srvmissile)).is_some() {
         let f = w.unit_flags(u);
@@ -1221,7 +1229,10 @@ pub fn active_state_event<W: UseWorld>(
     if table::lookup(table::Kind::Do, srvactivefunc).is_none() {
         return 0;
     }
-    w.srvdo(srvactivefunc, u, skill, l, true, false, false)
+    match bodies::do_(srvactivefunc) {
+        Some(v) => v,
+        None => w.srvdo(srvactivefunc, u, skill, l, true, false, false),
+    }
 }
 
 /// 0x3C SelectSkill → `assign(…)` = `0x005701B0` (§7): 0, or 3.
