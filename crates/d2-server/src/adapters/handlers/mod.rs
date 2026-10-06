@@ -6,4 +6,5 @@
 
 pub mod items;
 pub mod skills;
+pub mod walk;
 pub mod world;

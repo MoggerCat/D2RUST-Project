@@ -22,6 +22,7 @@ use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData};
 
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
+use super::super::walk::{WalkCall, WalkResult};
 use super::{WaypointCall, WorldFault, WorldHost};
 
 /// Messages queued by the action wiring's `Pending::send` (the transport
@@ -124,6 +125,11 @@ where
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         self.skills.handle(call)
+    }
+
+    /// `handlers::walk::run` (the path provider of the action wiring).
+    fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        super::super::walk::run(game, events, call)
     }
 
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {

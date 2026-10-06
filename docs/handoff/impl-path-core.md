@@ -1,6 +1,6 @@
 # Handoff: path core (`d2_sim::path`: coordinates, records, collision, footprints)
 
-> Not yet folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md`; this file is the detailed record until a docs session folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec, medium (METHODS M14). Branch `claude/impl-path-core`,

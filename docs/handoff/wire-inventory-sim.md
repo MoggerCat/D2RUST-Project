@@ -1,6 +1,6 @@
 # Handoff: inventory wiring (`d2_sim::wiring::inventory`)
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it (§1 row 3j/3k, §3 code map, §7 questions).
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: integration from
 clear specs, medium (METHODS M14). Branch `claude/wire-inventory-sim`,

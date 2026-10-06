@@ -7,6 +7,7 @@ mod gaps_affixes;
 mod gaps_generation;
 mod gaps_props;
 mod gaps_quality;
+mod mutants;
 mod props;
 mod quality;
 

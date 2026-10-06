@@ -10,6 +10,8 @@ mod store;
 mod trade;
 mod tsv;
 
+mod mutant_tests;
+
 use std::collections::{BTreeMap, VecDeque};
 
 use d2_data::fixup::maps::EquivMatrix;

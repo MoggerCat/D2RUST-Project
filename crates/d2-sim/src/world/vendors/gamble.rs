@@ -174,3 +174,6 @@ pub fn identify_gamble<W: VendorWorld>(w: &mut W, player: UnitId, msg: &[u8]) ->
     }
     0
 }
+
+#[cfg(test)]
+mod mutant_tests;

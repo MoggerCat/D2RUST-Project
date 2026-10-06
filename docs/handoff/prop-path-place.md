@@ -1,6 +1,6 @@
 # Handoff: property tests of free-point searches, placement and warps — `claude/prop-path-place`
 
-> Not yet folded into `docs/HANDOFF.md` (§1, §3, §4, §8) and `docs/PLAN.md`; a docs session folds it, then this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, 2026-10-06. Task class: property tests from a clear
 spec plus root-cause fixes, medium (METHODS M14). Base:
