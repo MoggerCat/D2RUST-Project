@@ -13,6 +13,14 @@ Cloud implementation session, 2026-10-06. Two rounds:
    A1Q4, §10.7 A1Q5, §10.8 A1Q6, six more test vectors, open questions
    10–13).
 
+3. Merged `origin/claude/tender-meitner-mphas3` again (the base folded
+   the fixture copies of `d2-server/tests/prop_handle.rs` into shared
+   test support): the conflict was only this branch's seam stubs inside
+   the removed block; the shared fixture already carries them, so the
+   file is taken as the base's (all 20 of its tests kept). Gate after the
+   merge: every step passes except `test d2-sim + conformance`, whose 9
+   failures are the pre-existing ones below; d2-client now passes.
+
 The coordinator folds this file into `docs/HANDOFF.md` / `docs/PLAN.md`.
 
 ## State
