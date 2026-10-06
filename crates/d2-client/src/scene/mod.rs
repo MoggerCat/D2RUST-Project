@@ -1,5 +1,7 @@
 // Spec: specs/client/render-pipeline.md
 // Spec: specs/render/composition.md
+// Spec: specs/render/shading.md
+// Spec: specs/render/blend-modes.md
 //! Scene: the draw list and the CPU reference compositor (§A3–A8, bins of
 //! §A9). Plain Rust, no Bevy types, integer math only: the GPU compositor
 //! (`render`) and the verify harness consume exactly these types.
@@ -29,8 +31,8 @@ pub use cpu::{
 };
 pub use frame::{present_palette, FrameCycle, FramePlan, PL2_PALETTE_BYTES, UNCLEARED_ROWS};
 pub use item::{
-    BlendOp, DrawItem, FrameId, FrameImage, FrameSource, FrameView, ItemTag, MapId, MapTable,
-    PixelTables, ShadeChain,
+    gradient, BlendOp, DrawItem, FrameId, FrameImage, FrameSource, FrameView, GradientKind,
+    ItemTag, LightGradient, MapId, MapTable, PixelTables, ShadeChain,
 };
 pub use order::{order, DrawKey};
 
@@ -134,6 +136,10 @@ pub enum SceneError {
     MapMissing(MapId),
     #[error("blend table at {0:?} needs 256 rows in the map table")]
     BlendTable(MapId),
+    #[error("light gradient at {0:?} needs 32 light maps in the map table")]
+    LightMaps(MapId),
+    #[error("drawn area {area:?} leaves the gradient block {block:?}")]
+    GradientArea { area: Rect, block: Rect },
     #[error("flip_x is reserved until an owner spec defines it")]
     FlipX,
     #[error("view {0:?} has pixels past the i32 screen range")]

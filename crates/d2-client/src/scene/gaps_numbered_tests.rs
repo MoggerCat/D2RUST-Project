@@ -208,7 +208,8 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
     assert!(frame.items.is_empty());
     assert_eq!((frame.units_drawn, frame.units_hidden), (0, 1));
     // The UI is still built after it: its request reaches the UI rules
-    // (which refuse it here: no UI rule yet), not a tile error.
+    // (the UI pass is answered by `rules::OriginalView`; the image rule
+    // refuses it here: no UI image rule yet), not a tile error.
     let e = build_frame(
         &w,
         &[ui_image()],
@@ -219,11 +220,14 @@ fn world_is_skipped_in_open_mode_3_and_the_ui_still_drawn() {
     .unwrap_err();
     assert!(
         matches!(
-            e,
-            ViewError::Unresolved {
-                what: "UI pass",
-                ..
-            }
+            &e,
+            ViewError::Ui { index: 0, error } if matches!(
+                **error,
+                ViewError::Unresolved {
+                    what: "UI image",
+                    ..
+                }
+            )
         ),
         "{e}"
     );

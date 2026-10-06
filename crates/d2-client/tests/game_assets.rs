@@ -620,6 +620,9 @@ fn evaluate(s: &RealScene, view: Rect) -> Vec<u8> {
                 out[at] = match item.blend {
                     BlendOp::Opaque => i,
                     BlendOp::IndexTable(base) => {
+                        s.maps.get(MapId(base.0 + u32::from(out[at]))).unwrap()[usize::from(i)]
+                    }
+                    BlendOp::IndexTableSrcRow(base) => {
                         s.maps.get(MapId(base.0 + u32::from(i))).unwrap()[usize::from(out[at])]
                     }
                 };

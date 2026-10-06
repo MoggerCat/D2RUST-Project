@@ -1,4 +1,4 @@
-// Spec: specs/client/render-pipeline.md §A3–§A6, §A8, §A9; specs/render/composition.md §5 (robustness, METHODS M07)
+// Spec: specs/client/render-pipeline.md §A3–§A6, §A8, §A9; specs/render/composition.md §5; specs/render/blend-modes.md §2 (robustness, METHODS M07)
 //! Property tests on the scene and the CPU reference compositor: random
 //! frames (transparent pixels, empty frames, wrong pixel counts), random
 //! draw items (positions and clips anywhere in i32, shade chains and
@@ -110,6 +110,11 @@ fn item() -> impl Strategy<Value = DrawItem> {
                 Just(MapId(u32::MAX - 255)),
             ]
             .prop_map(BlendOp::IndexTable),
+            1 => prop_oneof![
+                (0u32..8).prop_map(MapId),
+                any::<u32>().prop_map(MapId),
+            ]
+            .prop_map(BlendOp::IndexTableSrcRow),
         ],
         (0u32..=DrawKey::PASS_MAX, 0u32..4, 0u32..4, any::<u8>()),
         proptest::bool::weighted(0.03),
@@ -155,7 +160,7 @@ fn invalid(item: &DrawItem, frames: &[FrameImage], maps: &MapTable) -> bool {
             .maps()
             .iter()
             .any(|m| (m.0 as usize) >= maps.len())
-        || matches!(item.blend, BlendOp::IndexTable(b) if u64::from(b.0) + 256 > maps.len() as u64)
+        || matches!(item.blend.table(), Some(b) if u64::from(b.0) + 256 > maps.len() as u64)
 }
 
 fn inside(r: &Rect, x: i64, y: i64) -> bool {
@@ -197,6 +202,9 @@ fn model(items: &[DrawItem], frames: &[FrameImage], maps: &MapTable, view: Rect)
                     BlendOp::Opaque => s,
                     BlendOp::IndexTable(b) => {
                         maps.get(MapId(b.0 + u32::from(v))).unwrap()[usize::from(s)]
+                    }
+                    BlendOp::IndexTableSrcRow(b) => {
+                        maps.get(MapId(b.0 + u32::from(s))).unwrap()[usize::from(v)]
                     }
                 };
             }
@@ -291,13 +299,15 @@ proptest! {
                     i.shade.maps().iter().map(|m| MapId(m.0 % rows)).collect()
                 };
                 i.shade = ShadeChain::new(&shade).unwrap();
-                if let BlendOp::IndexTable(b) = i.blend {
-                    i.blend = if rows >= 256 {
+                i.blend = match i.blend {
+                    BlendOp::IndexTable(b) if rows >= 256 => {
                         BlendOp::IndexTable(MapId(b.0 % (rows - 255)))
-                    } else {
-                        BlendOp::Opaque
-                    };
-                }
+                    }
+                    BlendOp::IndexTableSrcRow(b) if rows >= 256 => {
+                        BlendOp::IndexTableSrcRow(MapId(b.0 % (rows - 255)))
+                    }
+                    _ => BlendOp::Opaque,
+                };
                 i
             })
             .collect();
