@@ -159,7 +159,8 @@ impl Ds1 {
 
         let cells = u64::from(width) * u64::from(height);
         let layer_count = 2 * wall_count as u64 + floor_count as u64 + 1 + u64::from(has_tags);
-        if cells * 4 * layer_count > (data.len() - c.pos()) as u64 {
+        let grid_bytes = cells.checked_mul(4 * layer_count);
+        if grid_bytes.is_none_or(|n| n > (data.len() - c.pos()) as u64) {
             return Err(invalid(
                 FORMAT,
                 format!("{width}x{height} grid with {layer_count} layers cannot fit"),
@@ -476,5 +477,54 @@ mod tests {
         assert_eq!(cell::sub_index(cell), 0x2A);
         assert_eq!(cell::main_index(cell), 0x15);
         assert!(cell::hidden(cell));
+    }
+
+    #[test]
+    fn regress_grid_size_overflow() {
+        // Width and height 0xFFFFFFFF: cells × 4 × layers overflowed u64
+        // (panic in debug builds).
+        let mut d = Vec::new();
+        for x in [1u32, 0xFFFF_FFFE, 0xFFFF_FFFE] {
+            d.extend_from_slice(&x.to_le_bytes());
+        }
+        let err = Ds1::parse(&d).unwrap_err();
+        assert!(err.to_string().contains("cannot fit"), "{err}");
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::mutated;
+        use crate::robust_tests::{check, config};
+        use proptest::prelude::*;
+
+        fn valid() -> [Vec<u8>; 4] {
+            [
+                build(18, 1, 2, 2, 5),
+                build(13, 1, 1, 1, 0),
+                build(6, 0, 1, 1, 7),
+                build(3, 0, 1, 1, 1),
+            ]
+        }
+
+        #[test]
+        fn builders_are_valid() {
+            for v in valid() {
+                assert!(Ds1::parse(&v).is_ok());
+            }
+        }
+
+        fn files() -> impl Strategy<Value = Vec<u8>> {
+            let [a, b, c, d] = valid();
+            prop_oneof![mutated(a), mutated(b), mutated(c), mutated(d)]
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in files()) {
+                check(data, Ds1::parse);
+            }
+        }
     }
 }

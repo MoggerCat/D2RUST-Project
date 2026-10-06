@@ -8,7 +8,13 @@
   perturbations reported); rules R1–R7 hold on a hand-played single-player
   game: `check_packets.py` passes `traces/raw/20261006-015956-packets.jsonl`
   (4,239 ticks, 494 client messages of 25 ids, 1,825 server messages of
-  62 ids, 4,239 flushes).
+  62 ids, 4,239 flushes). `d2-server` implements §1–§3 (transport,
+  queues, drain, dispatch gate, size check, point/unit parse, buffers,
+  flush, local delivery) against seams for `d2-proto` and `d2-sim`
+  (branch `claude/phase3-server`), wired to `d2-proto` and `d2-sim`
+  through adapters (`claude/phase3-wiring`; intent handlers are stubs
+  until their system specs exist); the synthetic vectors pass as unit
+  tests; not yet run on a recording.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-proto` (message ids, sizes, layouts: the two TSVs);
   `d2-server` (queues, drain, dispatch gate, per-client buffers, flush);
@@ -23,22 +29,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–60 |
-| Inputs | 61–69 |
-| Outputs / state changes | 70–76 |
-| Rules | 77–78 |
-|   1. Loop order (single player) | 79–100 |
-|   2. Client → server | 101–267 |
-|   3. Server → client | 268–367 |
-|   4. d2rs mapping and scope | 368–395 |
-|   5. Machine-readable tables | 396–432 |
-|   6. Exact-match comparison | 433–470 |
-| Constants & data dependencies | 471–489 |
-| Randomness | 490–495 |
-| Edge cases & original bugs | 496–518 |
-| Test vectors | 519–564 |
-| Provenance | 565–604 |
-| Open questions | 605–628 |
+| Summary | 50–66 |
+| Inputs | 67–75 |
+| Outputs / state changes | 76–82 |
+| Rules | 83–84 |
+|   1. Loop order (single player) | 85–106 |
+|   2. Client → server | 107–273 |
+|   3. Server → client | 274–373 |
+|   4. d2rs mapping and scope | 374–401 |
+|   5. Machine-readable tables | 402–438 |
+|   6. Exact-match comparison | 439–476 |
+| Constants & data dependencies | 477–495 |
+| Randomness | 496–501 |
+| Edge cases & original bugs | 502–524 |
+| Test vectors | 525–570 |
+| Provenance | 571–610 |
+| Open questions | 611–634 |
 <!-- /index -->
 
 ## Summary

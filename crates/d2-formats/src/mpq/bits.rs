@@ -74,6 +74,31 @@ pub(crate) const fn build_decode_table<const N: usize>(codes: &[u16], bits: &[u8
     table
 }
 
+/// LSB-first bit writer, the inverse of [`BitReader`]. Used by tests to
+/// build valid streams.
+#[cfg(test)]
+#[derive(Default)]
+pub(crate) struct BitWriter {
+    pub(crate) bytes: Vec<u8>,
+    bits: u32,
+}
+
+#[cfg(test)]
+impl BitWriter {
+    /// Appends the low `n` bits of `v`, least significant first.
+    pub(crate) fn write(&mut self, v: u32, n: u32) {
+        for k in 0..n {
+            if self.bits.is_multiple_of(8) {
+                self.bytes.push(0);
+            }
+            if v >> k & 1 != 0 {
+                *self.bytes.last_mut().expect("pushed") |= 1 << (self.bits % 8);
+            }
+            self.bits += 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +112,15 @@ mod tests {
         assert_eq!(r.read(8), Ok(0xFF));
         assert_eq!(r.peek(8), 0, "zero-filled past the end");
         assert_eq!(r.read(1), Err(OutOfBits));
+    }
+
+    #[test]
+    fn writer_round_trip() {
+        let mut w = BitWriter::default();
+        w.write(1, 1);
+        w.write(0, 4);
+        w.write(0b101, 3);
+        w.write(0x1FF, 9);
+        assert_eq!(w.bytes, [0b1010_0001, 0xFF, 0x01]);
     }
 }

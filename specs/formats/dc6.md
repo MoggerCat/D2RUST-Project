@@ -61,7 +61,10 @@ At each frame pointer `p` (which must leave room for the 32-byte header):
 
 The encoded data is the `length` bytes after the header, and must lie
 inside the file. Three termination bytes usually follow; they are ignored.
-`width × height` must not exceed 0x100_0000 (16M pixels).
+`width × height` must not exceed 0x100_0000 (16M pixels), and the frames
+of the whole file together must not exceed 0x400_0000 (64M pixels)
+(implementation limits: an empty encoding is a whole transparent frame,
+and frame pointers may repeat; see Open questions).
 
 ### Pixel decoding
 
@@ -122,3 +125,6 @@ Riiablo (Apache-2.0) `file/Dc6.java`, `file/Dc6Decoder.java`,
 2. ~~Orientation of `flip = 1` frames.~~ Confirmed visually: the 140
    flipped frames (all in `data\global\items\inv1x1/1x2/2x2/2x3.dc6`)
    render upright when decoded top-down (`mpq-tool render`).
+3. Whole-file pixel limit (64M, §Frame) is an implementation limit, not
+   observed original behavior: confirm every 1.14d `.dc6` stays under it
+   (`mpq-tool formats`).

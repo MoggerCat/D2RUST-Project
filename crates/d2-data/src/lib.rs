@@ -29,3 +29,8 @@ pub mod schema;
 pub mod strings;
 pub mod tables;
 pub mod txt;
+
+#[cfg(test)]
+mod robust;
+#[cfg(test)]
+mod robust_tests;

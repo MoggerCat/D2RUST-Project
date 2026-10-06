@@ -6,6 +6,10 @@ use crate::cursor::{invalid, Cursor, FormatError};
 const FORMAT: &str = "dc6";
 const MAX_FRAMES: u64 = 0x1_0000;
 const MAX_PIXELS: u64 = 0x100_0000;
+/// Implementation limit on the pixels of all frames together: frame
+/// sizes aren't bounded by the encoded data (an empty encoding is a
+/// transparent frame), and frame pointers may repeat.
+const MAX_TOTAL_PIXELS: u64 = 0x400_0000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dc6Header {
@@ -55,11 +59,12 @@ impl Dc6 {
             return Err(invalid(FORMAT, format!("{total} frames")));
         }
         let pointers = (0..total).map(|_| c.u32()).collect::<Result<Vec<_>, _>>()?;
+        let mut pixel_budget = MAX_TOTAL_PIXELS;
         let frames = pointers
             .iter()
             .enumerate()
             .map(|(i, &p)| {
-                decode_frame(data, p as usize)
+                decode_frame(data, p as usize, &mut pixel_budget)
                     .map_err(|e| invalid(FORMAT, format!("frame {i}: {e}")))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -81,11 +86,12 @@ impl Dc6 {
         if frame >= f {
             return None;
         }
-        self.frames.get(direction * f + frame)
+        self.frames
+            .get(direction.checked_mul(f)?.checked_add(frame)?)
     }
 }
 
-fn decode_frame(data: &[u8], at: usize) -> Result<Dc6Frame, FormatError> {
+fn decode_frame(data: &[u8], at: usize, pixel_budget: &mut u64) -> Result<Dc6Frame, FormatError> {
     let mut c = Cursor::at(data, at, FORMAT);
     let flip = c.u32()?;
     let width = c.u32()?;
@@ -95,9 +101,16 @@ fn decode_frame(data: &[u8], at: usize) -> Result<Dc6Frame, FormatError> {
     let unknown = c.u32()?;
     let next_block = c.u32()?;
     let length = c.u32()? as usize;
-    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+    let size = u64::from(width) * u64::from(height);
+    if size > MAX_PIXELS {
         return Err(invalid(FORMAT, format!("frame size {width}x{height}")));
     }
+    *pixel_budget = pixel_budget.checked_sub(size).ok_or_else(|| {
+        invalid(
+            FORMAT,
+            format!("frames add up to more than {MAX_TOTAL_PIXELS} pixels"),
+        )
+    })?;
     let encoded = c.bytes(length)?;
     let pixels = decode_pixels(encoded, width as usize, height as usize, flip != 0)?;
     Ok(Dc6Frame {
@@ -229,5 +242,73 @@ mod tests {
         let mut data = file(&[(1, 1, &[0x01, 42])]);
         data[0] = 5;
         assert!(Dc6::parse(&data).is_err());
+    }
+
+    #[test]
+    fn regress_frame_overflow() {
+        // `direction * F + frame` overflowed for a huge direction (panic
+        // in debug builds).
+        let dc6 = Dc6::parse(&file(&[(1, 1, &[0x01, 42]), (0, 0, &[])])).unwrap();
+        assert!(dc6.frame(usize::MAX, 0).is_none());
+        assert!(dc6.frame(usize::MAX / 2, 1).is_none());
+    }
+
+    #[test]
+    fn regress_repeated_large_frames() {
+        // Five pointers to one 4096×4096 frame with no encoded data: each
+        // 32-byte header is 16M pixels, and up to 0x10000 pointers could
+        // repeat it (1 TB). The whole-file budget (64M) stops the fifth.
+        let mut data = file(&[(4096, 4096, &[])]);
+        let pointer = data[24..28].to_vec();
+        data[20..24].copy_from_slice(&5u32.to_le_bytes());
+        for _ in 0..4 {
+            data.splice(28..28, pointer.iter().copied());
+        }
+        // The pointer table grew by 16 bytes: move the frame pointers.
+        let at = u32::from_le_bytes(pointer.try_into().unwrap()) + 16;
+        for i in 0..5 {
+            data[24 + 4 * i..28 + 4 * i].copy_from_slice(&at.to_le_bytes());
+        }
+        let err = Dc6::parse(&data).unwrap_err();
+        assert!(err.to_string().contains("frame 4:"), "{err}");
+        data[20..24].copy_from_slice(&4u32.to_le_bytes());
+        data.drain(40..44);
+        for i in 0..4 {
+            data[24 + 4 * i..28 + 4 * i].copy_from_slice(&(at - 4).to_le_bytes());
+        }
+        assert_eq!(Dc6::parse(&data).unwrap().frames.len(), 4);
+    }
+
+    mod robust {
+        use super::*;
+        use crate::robust::{bounded, mutated};
+        use crate::robust_tests::config;
+        use proptest::prelude::*;
+
+        fn valid() -> Vec<u8> {
+            file(&[
+                (1, 1, &[0x01, 42, 0x80]),
+                (3, 2, &[0x02, 5, 6, 0x80, 0x82, 0x01, 7, 0x80]),
+            ])
+        }
+
+        #[test]
+        fn builder_is_valid() {
+            assert!(Dc6::parse(&valid()).is_ok());
+        }
+
+        proptest! {
+            #![proptest_config(config(64))]
+
+            #[test]
+            fn mutated_file(data in mutated(valid()), d in any::<usize>(), f in any::<usize>()) {
+                bounded(move || {
+                    if let Ok(dc6) = Dc6::parse(&data) {
+                        let _ = dc6.frame(d, f);
+                        let _ = dc6.frame(d % 4, f % 4);
+                    }
+                });
+            }
+        }
     }
 }

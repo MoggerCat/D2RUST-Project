@@ -379,9 +379,18 @@ pub fn apply_stack(data: &mut PatchData, layers: &[Layer], stack_file: &str) -> 
         let mut cur: Option<(Vec<u8>, Option<usize>)> = None;
         for s in &layer.statements {
             ctx.line = s.line;
-            let name = match &s.stmt {
-                Stmt::Table { name, .. } => name.text.clone(),
-                _ => cur.as_ref().expect("P09 guarantees a table").0.clone(),
+            let name = match (&s.stmt, &cur) {
+                (Stmt::Table { name, .. }, _) => name.text.clone(),
+                (_, Some((name, _))) => name.clone(),
+                // A layer with P errors can hold a statement with no
+                // `table` before it (a `table` line that failed P08 still
+                // opens the zone): P09 here too, never a panic.
+                (stmt, None) => {
+                    st.findings.push(
+                        Finding::new(Code::P09, &ctx.path, s.line, stmt.kw().col).at_pos(pos + 1),
+                    );
+                    continue;
+                }
             };
             if let Some(skip) = st.failed.get_mut(&name) {
                 let kw = s.stmt.kw();

@@ -1,6 +1,6 @@
 # Spec: Simulation — Unit ordering
 
-- **Status:** draft (no `d2-sim` code yet); rules read from the 1.14d
+- **Status:** draft (implemented in `d2-sim`; synthetic vectors pass, trace replay pending); rules read from the 1.14d
   `Game.exe` code; §2, §4, §5, §6 confirmed on the running game:
   `check_tick.py` reproduces all 197 list snapshots of
   `traces/raw/20261006-015554-tick.jsonl` (4,902 ticks, hand-played)
@@ -36,9 +36,9 @@
 | Constants & data dependencies | 239–249 |
 | Randomness | 250–256 |
 | Edge cases & original bugs | 257–267 |
-| Test vectors | 268–299 |
-| Provenance | 300–317 |
-| Open questions | 318–329 |
+| Test vectors | 268–301 |
+| Provenance | 302–319 |
+| Open questions | 320–331 |
 <!-- /index -->
 
 ## Summary
@@ -295,7 +295,9 @@ Comparison (exact): at chosen ticks, every list of
 activation sequence number) equals the same lists in `d2-sim` after the
 same inputs. Until `d2-sim` has units, `tools/trace-recorder/
 check_tick.py` replays every recorded insert and removal through the
-rules above and must reproduce each recorded snapshot exactly.
+rules above and must reproduce each recorded snapshot exactly; the same
+replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
+(`tick.md`, Test vectors, "Trace sim/tick").
 
 ## Provenance
 
