@@ -60,7 +60,7 @@ fn spec_grid(record: usize) -> (u8, u8) {
     }
 }
 
-// Claim once the first local run passes (note §1): specs/items/inventory.md §1.3
+// Covers: specs/items/inventory.md §1.3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_inventory_records_both_resolutions() {
@@ -91,7 +91,7 @@ fn live_inventory_records_both_resolutions() {
     }
 }
 
-// Claim once the first local run passes (note §1): specs/items/inventory.md §1.2
+// Covers: specs/items/inventory.md §1.2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_page_grids_every_owner() {
@@ -149,7 +149,7 @@ fn live_page_grids_every_owner() {
     assert_eq!(BELT_GRID, (16, 1));
 }
 
-// Claim once the first local run passes (note §1): specs/items/inventory.md §3 r1
+// Covers: specs/items/inventory.md §3 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_belt_capacities() {
@@ -182,7 +182,7 @@ fn live_belt_capacities() {
     println!("{belts} items equip at body location 8");
 }
 
-// Claim once the first local run passes (note §1): specs/items/inventory.md §3 r4
+// Covers: specs/items/inventory.md §3 r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn live_potion_groups_similar() {
