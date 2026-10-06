@@ -201,3 +201,8 @@ stated here.
 2. §B1–§B8.
 3. Text input (chat) IME/clipboard: ours to decide once chat exists;
    no fidelity impact beyond the characters sent.
+4. OQ 1 is answered for the panels by `ui/panels.md` §1: the 800 × 600
+   layout is the 640 × 480 one moved by (80, 60), plus the 800 × 600
+   border and control panel (§6 there). §B1 (panel art) and §B2
+   (open/close, exclusion, view shift) are written in `ui/panels.md`;
+   its §Open questions 1 lists the §B1/§B6 parts still open.
