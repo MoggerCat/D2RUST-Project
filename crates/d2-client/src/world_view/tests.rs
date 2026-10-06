@@ -132,7 +132,7 @@ fn world(keys: &[(u8, u32)]) -> ClientWorld {
     let mut w = ClientWorld::default();
     for &(unit_type, guid) in keys {
         let key = UnitKey { unit_type, guid };
-        w.units.insert(key, ClientUnit { key });
+        w.units.insert(key, ClientUnit::new(key));
     }
     w
 }
@@ -599,7 +599,7 @@ impl ServerLink for RecordingLink {
 
 fn add_unit(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let key = msg.unit.ok_or(HandlerError::Invalid("no unit"))?;
-    world.units.insert(key, ClientUnit { key });
+    world.units.insert(key, ClientUnit::new(key));
     Ok(())
 }
 

@@ -98,7 +98,7 @@ fn no_player_no_camera_and_nothing_placeable() {
         unit_type: 0,
         guid: 1,
     };
-    world.units.insert(key, ClientUnit { key });
+    world.units.insert(key, ClientUnit::new(key));
     let view = NoCamera {
         rules: &Unspecified,
         source: &NoFeed,

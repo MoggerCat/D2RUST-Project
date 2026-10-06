@@ -1655,14 +1655,18 @@ struct Transcript {
 
 /// A recording bridge frame.
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
-    let before = fx.bridge.log().unowned.values().sum::<u64>();
     let step = fx.step(&msgs);
-    // The bridge has no S→C handler yet (`bridge-dispatch.tsv`: every id
-    // TBD), so each received message is counted unowned; the chunks are
-    // taken from the host's flush report.
+    // Each received message is accounted once (`bridge.md` §6,
+    // `client/model.md` §4 rule 1): applied, queued on its unit, dropped
+    // (unit-handler message for a unit the model does not hold), unowned
+    // or rejected. No 0x04 arrives, so no update pass runs.
     let chunks = std::mem::take(&mut fx.bridge.link_mut().chunks);
-    let after = fx.bridge.log().unowned.values().sum::<u64>();
-    assert_eq!(after - before, step.report.messages as u64);
+    let r = &step.report;
+    assert_eq!(
+        r.handled + r.queued + r.dropped + r.unowned + r.rejected,
+        r.messages
+    );
+    assert_eq!(r.drained, 0);
     frames.push((msgs, step, chunks));
 }
 
@@ -2276,31 +2280,33 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
     assert_eq!(fx.inv.with(|r| r.log.clone()), Vec::<String>::new());
 
-    // The client: 37 frames, 36 server ticks. The S→C messages it got
-    // (0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31); 0x9C seven
-    // times (frames 20, 21, 26, 27, 32, 33, 34), 0x9D four times (22, 23,
-    // 24, 34), 0x47 and 0x48 ten times each, one per update pass) have no client owner
-    // yet (`bridge-dispatch.tsv`: every id TBD), so they are counted
-    // unowned and no unit is in the model; nothing rejected or
-    // discarded.
+    // The client: 37 frames, 36 server ticks. The S→C messages it got:
+    // 0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31) have no
+    // client owner yet (unowned); 0x9C seven times (frames 20, 21, 26,
+    // 27, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and 0x48
+    // ten times each are applied (`client/msg-stats-items.md`). The 0x9C
+    // made the three items it names; 0x9D needs the local player, which
+    // the server never announced (no 0x59 / 0x0B yet), so it changes
+    // nothing (§2 rule 3); nothing rejected or discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 0));
+    assert_eq!(client, (37, 36, 3));
+    assert_eq!(w.local_player, None);
+    for (k, u) in &w.units {
+        assert_eq!(k.unit_type, d2_client::bridge::world::ITEM);
+        let d2_client::bridge::world::KindData::Item(d) = &u.kind else {
+            panic!("item data");
+        };
+        assert_eq!(d.last.as_ref().map(|r| r.id), Some(0x9C));
+    }
     let log = fx.bridge.log();
     assert_eq!(
         log.unowned,
-        BTreeMap::from([
-            (0x27, 1),
-            (0x28, 1),
-            (0x29, 1),
-            (0x2A, 4),
-            (0x47, 10),
-            (0x48, 10),
-            (0x9C, 7),
-            (0x9D, 4),
-        ])
+        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
     );
+    assert_eq!(log.handled, 31);
     assert!(log.rejected.is_empty() && log.discarded.is_empty());
+    assert!(log.dropped.is_empty() && log.queued == 0);
 
     let player_mana = fx.stat(player, 8);
     let player_exp = fx.stat(player, 13);

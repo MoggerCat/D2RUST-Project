@@ -131,8 +131,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     );
 
     // An intent sent between frames 1 and 2 is drained by frame 2's pump;
-    // the tick's flush reaches the bridge in the same frame: S→C 0x0D,
-    // which has no owner spec yet, so it is recorded as unowned. The world
+    // the tick's flush reaches the bridge in the same frame: S→C 0x0D, a
+    // unit-handler message (`client/msg-units.md` §4) for a player the
+    // model was never told about (the server sends no 0x59 yet), so it is
+    // dropped at receive (`client/model.md` §4 rule 1). The world
     // view composes the (empty) model of tick 1 on the CPU (no render
     // world).
     let sent = app
@@ -149,7 +151,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    assert_eq!(b.log().unowned.get(&0x0D), Some(&1));
+    assert_eq!(b.log().dropped.get(&0x0D), Some(&1));
+    assert!(b.log().unowned.is_empty());
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
     assert_eq!(
         stats(&app),
@@ -191,7 +194,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         (stats(&app).bridge_frame, stats(&app).server_tick),
         (304, 302)
     );
-    assert_eq!(bridge(&app).0.log().unowned.get(&0x0D), Some(&1));
+    assert_eq!(bridge(&app).0.log().dropped.get(&0x0D), Some(&1));
 
     // The presented image is the CPU reference of the empty list (the
     // app's placeholder feed states no local player: no camera, nothing

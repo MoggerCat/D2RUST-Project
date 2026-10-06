@@ -276,7 +276,7 @@ fn op() -> impl Strategy<Value = Op> {
 fn apply(w: &mut ClientWorld, op: &Op) {
     match *op {
         Op::Add(key) => {
-            w.units.insert(key, ClientUnit { key });
+            w.units.insert(key, ClientUnit::new(key));
         }
         Op::Remove(n) if !w.units.is_empty() => {
             let k = *w.units.keys().nth(n % w.units.len()).unwrap();
@@ -284,7 +284,7 @@ fn apply(w: &mut ClientWorld, op: &Op) {
         }
         Op::Update(n) if !w.units.is_empty() => {
             let k = *w.units.keys().nth(n % w.units.len()).unwrap();
-            w.units.insert(k, ClientUnit { key: k });
+            w.units.insert(k, ClientUnit::new(k));
         }
         _ => {}
     }
@@ -373,7 +373,7 @@ fn units(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError>
         return Err(HandlerError::Invalid("no unit"));
     };
     if msg.id == 0x0E {
-        world.units.insert(key, ClientUnit { key });
+        world.units.insert(key, ClientUnit::new(key));
     } else {
         world.units.remove(&key);
     }
