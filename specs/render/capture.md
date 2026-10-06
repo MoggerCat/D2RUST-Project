@@ -27,18 +27,18 @@
 | Rules | 69–70 |
 |   1. Configuration | 71–77 |
 |   2. Hooks | 78–92 |
-|   3. What is read | 93–256 |
-|   4. Tie to ticks | 257–269 |
-|   5. Raw format `frames-raw-2` | 270–293 |
-|   6. Hashes and the comparison | 294–315 |
-|   7. Stability first | 316–353 |
-|   8. Capture cases | 354–369 |
-| Constants & data dependencies | 370–374 |
-| Randomness | 375–381 |
-| Edge cases & original bugs | 382–393 |
-| Test vectors | 394–404 |
-| Provenance | 405–424 |
-| Open questions | 425–473 |
+|   3. What is read | 93–266 |
+|   4. Tie to ticks | 267–279 |
+|   5. Raw format `frames-raw-2` | 280–303 |
+|   6. Hashes and the comparison | 304–325 |
+|   7. Stability first | 326–363 |
+|   8. Capture cases | 364–379 |
+| Constants & data dependencies | 380–384 |
+| Randomness | 385–391 |
+| Edge cases & original bugs | 392–403 |
+| Test vectors | 404–414 |
+| Provenance | 415–434 |
+| Open questions | 435–484 |
 <!-- /index -->
 
 ## Summary
@@ -187,7 +187,7 @@ draw per tick (draws are more than 16 ms apart) the loop is 64 ticks.
 | Item | Where | Notes |
 |---|---|---|
 | light quality | `[0x007B567C]` (0–2) | chosen by `0x00475780` from the measured draw rate (Open question 5) |
-| measured draw rate | `[0x007A04A8]` | 25 at game start (`0x0044F100`); recomputed by `0x0044CCE0` |
+| measured draw rate | `[0x007A04A8]` | 25 at game start (`0x0044F100`); recomputed by `0x0044CCE0` (called each client-loop pass, `0x0044F0AE`): once the loop clock `[0x007A048C]` (`GetTickCount` of the pass) is more than 3,000 ms past the last recompute `[0x007A04B8]`, rate := `[0x007A04AC]` / 3 (integer: in-game draws per second), `[0x007A04B0]` := `[0x007A04B4]` / 3, both counters := 0. `[0x007A04AC]` is +1 per in-game draw issued (`0x0044F29C`, after the draw call `0x0044F28B`); `[0x007A04B4]` is +1 per loop pass with a due client tick whose draw is skipped (`[0x007A0704]` ≠ 0). Wall clock, so not reproducible: captures record it |
 | quality options | `[0x0072DA50]`, `[0x0072A348]` | raw |
 | render kind | `[0x00712CCC]` (`0x00477730`) | wall / roof fade is instant below 4 |
 | rain, snow on | `[0x007A8A44]`, `[0x007A8A40]` | the level's Levels record `+0x05`, `+0x06` (`0x0061DBA0`, `0x0061DC20`) |
@@ -232,8 +232,18 @@ wrappers (stdcall, all arguments on the stack; slot names from D2MOO
 - **Tile header** (layout `formats/dt1.md` §Tile header; `+0x04` read at
   `0x004DEBA6`, block count `+0x50` and block pointer `+0x54` at
   `0x005131B0`): roof height `+0x04` (u16), orientation `+0x14`, main
-  `+0x18`, sub `+0x1C`, rarity `+0x20`. The DT1 file is not identified
-  (Open question 3). Which tile list each call serves follows from the
+  `+0x18`, sub `+0x1C`, rarity `+0x20`. The DT1 file is found from the
+  loaded-library list: the loader `0x00600790(&out, path)` keeps one
+  0x110-byte record per loaded DT1 (looked up by path first, `0x00600710`)
+  in a list headed by `[0x008ADBB4]`: `+0x000` the path as passed (260
+  bytes, e.g. `data\global\tiles\act1\barracks\warp.dt1` from
+  `0x0044DB60`), `+0x104` the library, `+0x108` the second loader
+  result, `+0x10C` next record. A library keeps the DT1 file header
+  layout with the tile count at `+0x10C` and the tile array pointer at
+  `+0x110`, tiles 0x60 bytes each (`0x00609E90`). So a drawn header `t`
+  belongs to the record whose library satisfies `tiles ≤ t < tiles +
+  0x60 × count`, tile index `(t − tiles) / 0x60` (recorder 0.2.0 does
+  not resolve it yet: Open question 3). Which tile list each call serves follows from the
   call site (`camera.md` §6; order: `draw-order.md`).
 - **Cel context** (0x48 bytes, built by `0x004DBB50` / `0x004DB7B0` for
   units, by the caller for UI): recorded raw, plus frame `+0x00`, cel file
@@ -431,9 +441,9 @@ re-hashing and diffing the PNG indices. Recorder design follows
 2. Whether the debugger makes the client loop skip draws — answered: yes,
    7 % of run 1's frames and 42 % of run 2's follow two ticks (§4);
    `camera-0001` compares per frame with each frame's own tick and state.
-3. Which DT1 file a drawn tile header belongs to: the tile library loader
-   (D2CMP `LoadTileLibrarySlot` in 1.10f) and where 1.14d keeps the file
-   name per tile. Ghidra read of the tile library load path.
+3. ~~Which DT1 file a drawn tile header belongs to~~: answered in §3.5
+   (library list `[0x008ADBB4]`). The recorder does not do the lookup
+   yet (`record_frames.py` change, then a run).
 4. Where unit component cel files load (not through `0x004788B0`): the
    composite path `0x004DB7B0` → `0x004DA720` (`unit-composite.md`); a
    `celfile`-style hook there names the DCC files.
@@ -451,10 +461,11 @@ re-hashing and diffing the PNG indices. Recorder design follows
    quality: `0x00475780` picks 2 (kind-0 sources by `0x00474D70`) or less
    (`0x004748D0`) from the measured draw rate (≤ 9: 0; ≤ 12: 1; ≤ 15: keep
    ≥ 1 else 1; above: 2; options `[0x0072DA50]`, `[0x0072A348]` lower it),
-   changing at most once per 2,000 ms. Open: the exact rate formula
-   (`0x0044CCE0`: a counter divided by 3 every 3,000 ms; what it counts),
-   and whether the debugger's draw rate puts captures in a lower quality
-   than play. `render/lighting.md` owns these once written.
+   changing at most once per 2,000 ms; the rate formula is §3.4
+   (answered). Open: whether the debugger's draw rate puts captures in a
+   lower quality than play: the `light` field of a `frames-raw-2` run
+   (quality and rate per frame) against the same scene played without
+   the debugger settles it. `render/lighting.md` owns these once written.
 6. Weather is not modelled: rain particles (`0x00473090`, three draws of
    the player seed per new drop) and lightning (`0x00473910`: countdown
    500 + rnd(1,500), a flash rectangle of index 255, draw mode 5) advance
