@@ -143,8 +143,12 @@ pub enum PetMsg {
 }
 
 impl PetMsg {
-    /// The 0x7A wire bytes (§8 layout); `None` for 0x81, whose layout the
-    /// hireling spec owns.
+    /// The 0x7A wire bytes; `None` for 0x81, whose layout the hireling
+    /// spec owns.
+    // TODO(spec: pets.md §8): §8 and its test vector place the owner at +5
+    // and the pet at +9; the confirmed `sim/server-messages.tsv` row
+    // (and `hirelings.md` §13) give pet@5, owner@9. The TSV layout is
+    // used (coordinator decision, 2026-10-06).
     pub fn bytes(&self) -> Option<[u8; 13]> {
         match *self {
             PetMsg::PetAction {
@@ -159,8 +163,8 @@ impl PetMsg {
                 b[1] = action;
                 b[2] = pet_type;
                 b[3..5].copy_from_slice(&class.to_le_bytes());
-                b[5..9].copy_from_slice(&owner.to_le_bytes());
-                b[9..13].copy_from_slice(&pet.to_le_bytes());
+                b[5..9].copy_from_slice(&pet.to_le_bytes());
+                b[9..13].copy_from_slice(&owner.to_le_bytes());
                 Some(b)
             }
             PetMsg::AssignMerc { .. } => None,

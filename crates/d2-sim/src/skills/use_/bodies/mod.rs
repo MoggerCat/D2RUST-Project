@@ -28,6 +28,8 @@ pub mod b3_lvl30;
 pub mod dos;
 pub mod dos2;
 pub mod effects;
+#[cfg(test)]
+pub(crate) mod fake;
 pub mod helpers;
 pub mod helpers2;
 pub mod helpers3;
@@ -36,6 +38,10 @@ pub mod starts2;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests2;
+#[cfg(test)]
+mod tests3;
 
 pub use effects::{BodyEffect, PathOp};
 pub use helpers::*;
