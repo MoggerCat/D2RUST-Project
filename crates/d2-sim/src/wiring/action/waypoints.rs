@@ -7,8 +7,10 @@
 //! timer (`tick.md` §5.2), and the spawn search `0x00619E50` →
 //! `0x0066B2B0` (`levels.md` §10); with the path provider
 //! ([`crate::wiring::path`]) the same-act warp (spawn point, free
-//! coordinates, placement) and the arrival mode request. The act change,
-//! object modes, interaction, sounds and messages go to [`Pending`].
+//! coordinates, placement) and the arrival mode request; object modes on
+//! the object state ([`super::objects`]). The act change, the modes of
+//! objects without object data, interaction, sounds and messages go to
+//! [`Pending`].
 
 use crate::drlg::act_of_level;
 use crate::game::Game;
@@ -91,7 +93,12 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
             height: t.h,
         }
     }
+    /// `0x00624690` on the object state (`objects.md` §4) for an object
+    /// with object data; otherwise [`Pending::set_object_mode`].
     fn set_object_mode(&mut self, object: UnitId, mode: u8) {
+        if self.v.object_set_mode(self.game, object, mode) {
+            return;
+        }
         self.v.h.x.set_object_mode(self.game, object, mode);
     }
     /// `0x005417D0`: ENDANIM on the object at `frame`.

@@ -97,7 +97,7 @@ fn interact_distances_and_unit_types() {
     let (code, _) = send(&mut h, &npc_msg(0x13, 6, CHARSI));
     assert_eq!(code, ResultCode::Invalid);
     assert_clean(&h);
-    // Unit type 2 (object): the object-interaction spec, not written: stub.
+    // Unit type 2 (object): this host has no object state: stub.
     let (code, got) = send(&mut h, &npc_msg(0x13, 2, CHARSI));
     assert_eq!((code, got), (ResultCode::Done, vec![]));
     assert_eq!(h.game.unhandled, vec![(0, 0x13, 9)]);

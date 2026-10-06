@@ -45,7 +45,7 @@
 use d2_sim::game::Game;
 use d2_sim::items::{ItemTables, UniqueBits};
 use d2_sim::units::{RoomId, UnitId};
-use d2_sim::wiring::action::ActionHooks;
+use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, QuestRest};
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
@@ -390,6 +390,17 @@ where
             difficulty,
         };
         WorldHost::<D>::waypoints(&mut self.action, game, events, run)
+    }
+
+    /// The action wiring's 0x13 object case ([`ActionWorld`]).
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        WorldHost::<D>::objects(&mut self.action, game, events, player, guid)
     }
 
     /// The quest control on the desk's economy and rest

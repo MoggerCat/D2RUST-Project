@@ -82,6 +82,13 @@ impl<X: WorldPending> WorldSim<X> {
         self.action.sys.hooks.game_seed = seed;
     }
 
+    /// Game creation's object control (`objects.md` §2,
+    /// [`ActionSim::create_objects`]): call right after
+    /// [`WorldSim::create_regions`] (`rng.md` §5.2 order).
+    pub fn create_objects(&mut self, tables: Arc<crate::world::objects::ObjectTables>) {
+        self.action.create_objects(tables);
+    }
+
     /// Every error so far: world adapters, level types, action adapters
     /// and the unit dispatch.
     pub fn errors(&self) -> Vec<String> {
