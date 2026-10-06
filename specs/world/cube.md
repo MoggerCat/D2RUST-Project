@@ -586,4 +586,4 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    a full cube.
 7. Cube-use table base and index (`0x007417CC`, `pSpell` 7?). Owner:
    item-use spec.
-8. Role of `0x0055FA40` on open/close. Owner: inventory/UI spec.
+8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.
