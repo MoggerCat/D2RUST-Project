@@ -21,14 +21,14 @@
 | Inputs | 51–60 |
 | Outputs / state changes | 61–65 |
 | Rules | 66–67 |
-|   A. d2rs design (ours) | 68–247 |
-|   B. Original behavior to reproduce (not specified here) | 248–266 |
-| Constants & data dependencies | 267–273 |
-| Randomness | 274–279 |
-| Edge cases & original bugs | 280–285 |
-| Test vectors | 286–300 |
-| Provenance | 301–308 |
-| Open questions | 309–318 |
+|   A. d2rs design (ours) | 68–248 |
+|   B. Original behavior to reproduce (not specified here) | 249–267 |
+| Constants & data dependencies | 268–274 |
+| Randomness | 275–280 |
+| Edge cases & original bugs | 281–286 |
+| Test vectors | 287–301 |
+| Provenance | 302–309 |
+| Open questions | 310–322 |
 <!-- /index -->
 
 ## Summary
@@ -243,7 +243,8 @@ captured 800×600 frame. The captured images themselves show Blizzard art
 and stay in `game/captures/` (gitignored; CLAUDE.md rule 1). The check
 renders the CPU reference for the recorded state and compares to the
 image in `game/captures/` (local only), then also compares hashes.
-Capturing frames from 1.14d is §B8.
+Capturing frames from 1.14d is §B9 (`render/capture.md`; committed
+format `traces/FORMAT.md` §Render captures).
 
 ### B. Original behavior to reproduce (not specified here)
 
@@ -253,15 +254,15 @@ leave a hook that panics or a `TODO(spec: …)`, never a guess.
 
 | # | Behavior | Owner spec (to write) | Measure | Comparison |
 |---|---|---|---|---|
-| B1 | Sprite placement: DCC/DC6 frame offsets → screen pixel (the one-row question, HANDOFF §7 #3), DT1 tile vs unit anchor | `render/sprite-placement.md` | client draw path; captures of a unit at known coordinates | identical pixels on a `sprite`/`unit` capture |
-| B2 | Composition domain of 1.14d's renderer (indexed with PL2 tables vs RGB) and which video mode is the reference | `render/composition.md` | 1.14d video modes and their draw path | identical pixels of one capture with translucent sprites |
+| B1 | Sprite placement: DCC/DC6 frame offsets → screen pixel (the one-row question, HANDOFF §7 #3), DT1 tile vs unit anchor | **written:** `render/sprite-placement.md` (draft; bottom row = `Y + offset_y` inclusive) | client draw path; captures of a unit at known coordinates | identical pixels on a `sprite`/`unit` capture (`capture.md` case `placement-0001`) |
+| B2 | Composition domain of 1.14d's renderer (indexed with PL2 tables vs RGB) and which video mode is the reference | **written:** `render/composition.md` (draft; indexed, GDI reference) | 1.14d video modes and their draw path | identical pixels of one capture with translucent sprites (`composition-0001`) |
 | B3 | Meaning of each PL2 table (`palette.md` OQ 2); light-level map selection; selected-unit shift; whether mapped index 0 is transparent; palettes per screen region | `render/shading.md` | client shading path; captures at known light levels | identical pixels |
 | B4 | Unit composites: COF/DCC path rules, component variants (armor class letters), colormaps per component, direction mapping (unit dirs → file dirs), frame source (animdata vs COF rate) | `render/unit-composite.md` | client unit draw path; `animdata.md` use | identical pixels on `unit` captures across dirs/frames |
 | B5 | Blend modes: COF translucency override, missiles, overlays, shadows (the darkening blend), formulas | `render/blend-modes.md` | blend path; captures | identical pixels |
 | B6 | Draw order: floors, shadows, walls vs units (the isometric rules, `map-preview.md` OQ 2), roofs, missiles, overlays, UI | `render/draw-order.md` | client sort and passes | identical pixels on scenes with occlusion |
-| B7 | Camera: world (subtile) → screen, view size and centering, interpolation between ticks (if any), screen shake | `render/camera.md` | client view path; captures while walking | identical pixels per tick |
+| B7 | Camera: world (subtile) → screen, view size and centering, interpolation between ticks (if any), screen shake | **written:** `render/camera.md` (draft; no interpolation) | client view path; captures while walking | identical pixels per tick (`camera-0001`) |
 | B8 | Lighting: light radius, light sources, day/night, per-tile or per-pixel light level | `render/lighting.md` | client lighting path; captures at night/with torches | identical pixels |
-| B9 | Frame capture of 1.14d: which surface, at which point in the frame, how frames are tied to ticks | `tools/trace-recorder` + `traces/FORMAT.md` render section | debugger hook on the present call | capture of a static scene repeats identically (stability first) |
+| B9 | Frame capture of 1.14d: which surface, at which point in the frame, how frames are tied to ticks | **written:** `render/capture.md` (draft), `tools/trace-recorder/record_frames.py`, `traces/FORMAT.md` §Render captures | debugger hook on the present call | capture of a static scene repeats identically (`stability-0001`, first) |
 | B10 | Tile variants by rarity and the invisible-collision-tile skip (`map-preview.md` OQ 3) | DRLG spec (sim) + `render/draw-order.md` | DRLG; tile draw path | identical pixels on town captures |
 
 ## Constants & data dependencies
@@ -308,10 +309,13 @@ compute availability checked in the pinned `bevy_render 0.19.1` source.
 
 ## Open questions
 
-1. §B1–§B10 (each an owner spec to write locally).
+1. §B3–§B6, §B8, §B10 (each an owner spec to write locally); §B1, §B2,
+   §B7, §B9 written as drafts.
 2. Whether the compute compositor reaches 60 frames per second at
    800×600 with a full town scene on the developer GPU: measure once
    implemented; if not, bins per item list may be culled by item bounding
    boxes first (same result, verify unchanged).
-3. Whether the original ever draws a sprite at a non-integer or scaled
-   size (e.g. perspective mode): if yes, §A3 gains a scale field via §B7.
+3. ~~Whether the original ever draws a sprite at a non-integer or scaled
+   size.~~ Not in the reference renderer: perspective (scaling) exists only
+   in the Glide/Direct3D drivers (`render/composition.md` §1); §A3 keeps
+   integer positions and no scale.
