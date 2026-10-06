@@ -3,8 +3,15 @@
 //! ([`crate::items::ItemGame`], [`crate::treasure::GameFacts`]). No
 //! written spec places them in [`crate::game::Game`] yet (the
 //! game-creation spec is not written), so the wiring holds them.
+//!
+//! A host that runs the economy on the action wiring keeps the creation
+//! fields in one place, the action wiring's (`ActionHooks::game_seed`,
+//! `ActionHooks::ai_info`, `UnitData::expansion`), and builds a
+//! [`GameFields`] from them for each call ([`GameFields::from_action`]);
+//! [`GameFields::ai_info`] is the inverse for game creation.
 
 use crate::items::{ItemGame, UniqueBits};
+use crate::monsters::ai::GameInfo;
 use crate::rng::Seed;
 use crate::treasure::GameFacts;
 
@@ -36,6 +43,30 @@ impl GameFields {
             game_type: 0,
             ladder: false,
             uniques: UniqueBits::default(),
+        }
+    }
+
+    /// The fields of a game whose game seed is `seed`, whose AI fields
+    /// are `ai` (game +0x6A, +0x74 as `game_type_ex`, +0x6D) and whose
+    /// expansion flag (+0x70) is `expansion`, with the unique bits
+    /// `uniques`. +0x74 is read as a flag (`quality.md` §8: "≠ 0").
+    pub fn from_action(seed: Seed, ai: &GameInfo, expansion: bool, uniques: UniqueBits) -> Self {
+        Self {
+            seed,
+            difficulty: ai.difficulty,
+            expansion,
+            game_type: ai.game_type,
+            ladder: ai.game_type_ex != 0,
+            uniques,
+        }
+    }
+
+    /// The AI's copy of these fields (game +0x6A, +0x74, +0x6D).
+    pub fn ai_info(&self) -> GameInfo {
+        GameInfo {
+            game_type: self.game_type,
+            game_type_ex: u32::from(self.ladder),
+            difficulty: self.difficulty,
         }
     }
 
