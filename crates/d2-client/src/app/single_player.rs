@@ -6,18 +6,21 @@
 //!
 //! What runs is what the wiring has providers for (`docs/HANDOFF.md` §1
 //! rows 3j, 3k): the tick driver, the timer queue, and the intents whose
-//! handler runs on a real provider (0x49 waypoints). The DRLG is the
-//! synthetic two-act one of the bridge's own end-to-end test
-//! (`bridge/local_tests.rs`): one 8×8-tile floor room each in Cold Plains
-//! (act 0) and Lut Gholein (act 1). Generating levels from the live
-//! tables needs the DS1 providers the level types still lack (HANDOFF §2
-//! step 7), so no level is generated from game files here.
+//! handler runs on a real provider (0x49 waypoints). Two acts are created
+//! and one room is streamed in Cold Plains (act 0) and Lut Gholein (act 1).
 //!
-//! [`GameData::Live`] (with `D2_GAME_DIR`) takes the `levels` and
-//! `objects` tables from the user's own files (`d2_data::bin::load`); the
-//! waypoint object is then the first `objects` row with operate function
-//! 23 and init function 17 (`waypoints.md` §5.1 rule 1).
-//! [`GameData::Synthetic`] uses the bridge test's rows instead.
+//! [`GameData::Live`] (with `D2_GAME_DIR`, [`LiveData::load`]) takes
+//! everything from the user's own files: the `levels` and `objects` tables
+//! (`d2_data::bin::load`; the waypoint object is the first `objects` row
+//! with operate function 23 and init function 17, `waypoints.md` §5.1
+//! rule 1), and the level generation data of `d2_server::world_data`
+//! (drlg-data: the level-type table views, every lvlprest / lvlsub DS1
+//! and lvltypes DT1, parsed), so the acts are generated through
+//! `d2_sim::wiring::worldgen::levels::WorldTypes` (the Maze / Presets /
+//! Outdoor dispatcher) with the server's town level ids (`levels.md` §2
+//! step 2: 1, 40). [`GameData::Synthetic`] (no game files) uses the
+//! bridge test's rows and its synthetic two-act DRLG
+//! (`bridge/local_tests.rs`: one 8×8-tile floor room per level).
 //!
 //! Seams without a provider are [`LocalSeams`]: the narrowest answers
 //! (`Pending`'s defaults) plus a store of what the sim itself sets
@@ -35,7 +38,10 @@ use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{Clock, PlayerGate};
+use d2_server::world_data::tables::LevelTables;
+use d2_server::world_data::{archive as world_archive, Dt1Files, WorldFiles};
 use d2_sim::combat::CombatTables;
+use d2_sim::drlg::maze::Maze;
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
@@ -50,6 +56,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
 use super::server_thread::{ThreadLink, ThreadStopped};
@@ -67,9 +74,11 @@ pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
-/// Sub-tile x of the waypoint object and of the player (both at y 20).
+/// Sub-tile x of the waypoint object and of the player, and their y,
+/// from the origin of the first streamed Cold Plains room.
 pub const WAYPOINT_X: i32 = 20;
 pub const PLAYER_X: i32 = 42;
+pub const UNIT_Y: i32 = 20;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 
@@ -82,6 +91,10 @@ pub enum BuildError {
     Setup(String),
     #[error("game tables: {0}")]
     Tables(String),
+    #[error("level data: {0}")]
+    World(#[from] d2_server::world_data::WorldDataError),
+    #[error("archives in {dir}: {message}")]
+    Archives { dir: String, message: String },
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
     #[error(transparent)]
@@ -177,14 +190,6 @@ impl LevelTypes for Types {
     }
 }
 
-struct Tiles(BTreeMap<Vec<u8>, Vec<TileInfo>>);
-
-impl TileSource for Tiles {
-    fn dt1(&self, path: &[u8]) -> Option<&[TileInfo]> {
-        self.0.get(path).map(Vec::as_slice)
-    }
-}
-
 fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
     TileInfo {
         orientation: o,
@@ -197,8 +202,8 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
 }
 
 /// The synthetic tile library: one floor tile, the fixed library's
-/// blank and tile-10 entries.
-fn tiles() -> Tiles {
+/// blank and tile-10 entries (in drlg-data's DT1 provider type).
+fn tiles() -> Dt1Files {
     use d2_sim::drlg::tiles::FIXED_LIBRARY;
     let mut t = BTreeMap::new();
     t.insert(b"floor.dt1".to_vec(), vec![tile(0, 0, 0, 1)]);
@@ -210,7 +215,7 @@ fn tiles() -> Tiles {
     t.insert(FIXED_LIBRARY[0].to_vec(), vec![blank(0), blank(1)]);
     t.insert(FIXED_LIBRARY[1].to_vec(), vec![]);
     t.insert(FIXED_LIBRARY[2].to_vec(), vec![tile(10, 0, 0, 0)]);
-    Tiles(t)
+    Dt1Files(t)
 }
 
 fn blank<T: Record>() -> T {
@@ -282,19 +287,129 @@ impl WaypointTables {
     }
 }
 
-/// Where the game's tables come from.
+/// Everything the game reads from the user's files, loaded up front.
+#[derive(Debug)]
+pub struct LiveData {
+    pub waypoints: WaypointTables,
+    /// drlg-data's level-type table views (`LevelTables::from_fixed`).
+    pub levels: LevelTables,
+    /// Every DS1 / DT1 the level types read, parsed.
+    pub files: WorldFiles,
+    /// The archive set itself (the client's other readers: sounds).
+    pub archives: Arc<ArchiveSet>,
+}
+
+impl LiveData {
+    /// Loads the waypoint tables and the level data (`world_data::archive::
+    /// load`: a named file that is missing or does not parse is an error;
+    /// nothing falls back to synthetic data).
+    pub fn load(archives: Arc<ArchiveSet>) -> Result<Self, BuildError> {
+        let waypoints = WaypointTables::live(&archives)?;
+        let (levels, files) = world_archive::load(&archives)?;
+        Ok(LiveData {
+            waypoints,
+            levels,
+            files,
+            archives,
+        })
+    }
+}
+
+/// Where the game's tables and levels come from.
 #[derive(Debug, Clone)]
 pub enum GameData {
     Synthetic,
-    /// Tables already loaded from the user's files.
-    Live(WaypointTables),
+    /// Tables and level data already loaded from the user's files.
+    Live(Arc<LiveData>),
 }
 
 impl GameData {
+    /// The data of `game_dir` (`$D2_GAME_DIR`): live when a directory is
+    /// given and `synthetic` is not asked, else synthetic. A given
+    /// directory that does not load is an error, not a fallback.
+    pub fn select(game_dir: Option<&std::path::Path>, synthetic: bool) -> Result<Self, BuildError> {
+        match game_dir {
+            Some(dir) if !synthetic => {
+                let archives = ArchiveSet::open_dir(dir).map_err(|e| BuildError::Archives {
+                    dir: dir.display().to_string(),
+                    message: e.to_string(),
+                })?;
+                Ok(GameData::Live(Arc::new(LiveData::load(Arc::new(
+                    archives,
+                ))?)))
+            }
+            _ => Ok(GameData::Synthetic),
+        }
+    }
+
     fn tables(&self) -> WaypointTables {
         match self {
             GameData::Synthetic => WaypointTables::synthetic(),
-            GameData::Live(t) => t.clone(),
+            GameData::Live(d) => d.waypoints.clone(),
+        }
+    }
+}
+
+/// The level generation the game runs on: table view, tile library, level
+/// types, and per act the DRLG init seed and the server's town level id.
+struct LevelSource {
+    data: Arc<DrlgData>,
+    tiles: Box<dyn TileSource>,
+    types: Box<dyn LevelTypes>,
+    /// (act, init seed, town level id) of each created act.
+    acts: [(u8, u32, u32); 2],
+}
+
+impl LevelSource {
+    /// The bridge test's synthetic DRLG: one 8×8-tile floor room per
+    /// level, no town generated at act creation, init seeds 1 and 2.
+    fn synthetic() -> Self {
+        let mut drlg = DrlgData {
+            levels: vec![LevelDef::default(); 150],
+            ..DrlgData::default()
+        };
+        for l in &mut drlg.levels {
+            l.warp = [-1; 8];
+        }
+        let mut files = vec![Vec::new(); 32];
+        files[0] = b"floor.dt1".to_vec();
+        drlg.lvltypes = vec![vec![Vec::new(); 32], files];
+        for id in [COLD_PLAINS, ACT2_TOWN] {
+            drlg.levels[id as usize].drlg_type = 2;
+            drlg.levels[id as usize].level_type = 1;
+        }
+        LevelSource {
+            data: Arc::new(drlg),
+            tiles: Box::new(tiles()),
+            types: Box::new(Types(BTreeMap::from([
+                (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+                (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+            ]))),
+            acts: [(0, 1, 0), (1, 2, 0)],
+        }
+    }
+
+    /// The user's level data through the level-type dispatcher
+    /// (`WorldTypes`, as drlg-data's game-file tests build it). Acts get
+    /// the server's town level ids 1 and 40 (`levels.md` §2 step 2) and
+    /// the game's init seed (game +0x7C, the same for every act). TODO
+    /// (spec: game creation): what sets game +0x7C is not specified; the
+    /// app passes its `--seed`.
+    fn live(d: &LiveData, init_seed: u32) -> Self {
+        let data = Arc::new(d.levels.drlg.clone());
+        let types = SharedTypes::new(WorldTypes::new(
+            data.clone(),
+            Maze::new(d.levels.maze.clone()),
+            d.levels.preset.clone(),
+            d.levels.outdoor.clone(),
+            Box::new(d.files.ds1.clone()),
+            Box::new(d.files.subs.clone()),
+        ));
+        LevelSource {
+            data,
+            tiles: Box::new(d.files.dt1.clone()),
+            types: Box::new(types),
+            acts: [(0, init_seed, 1), (1, init_seed, ACT2_TOWN)],
         }
     }
 }
@@ -314,34 +429,30 @@ pub struct LocalGame {
 /// `tests/e2e_single_player.rs` joins it).
 pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
-    let mut drlg = DrlgData {
-        levels: vec![LevelDef::default(); 150],
-        ..DrlgData::default()
+    let mut levels = match data {
+        GameData::Synthetic => LevelSource::synthetic(),
+        GameData::Live(d) => LevelSource::live(d, seed),
     };
-    for l in &mut drlg.levels {
-        l.warp = [-1; 8];
-    }
-    let mut files = vec![Vec::new(); 32];
-    files[0] = b"floor.dt1".to_vec();
-    drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [COLD_PLAINS, ACT2_TOWN] {
-        drlg.levels[id as usize].drlg_type = 2;
-        drlg.levels[id as usize].level_type = 1;
-    }
-    let mut types = Types(BTreeMap::from([
-        (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
-        (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
-    ]));
     let mut dungeon = Dungeon::default();
-    dungeon.acts[0] =
-        Some(Drlg::create(0, 1, 0, 0, false, &drlg, &mut types).map_err(BuildError::Drlg)?);
-    dungeon.acts[1] =
-        Some(Drlg::create(1, 2, 0, 0, false, &drlg, &mut types).map_err(BuildError::Drlg)?);
+    for (act, init_seed, town) in levels.acts {
+        dungeon.acts[usize::from(act)] = Some(
+            Drlg::create(
+                act,
+                init_seed,
+                0,
+                town,
+                false,
+                &levels.data,
+                levels.types.as_mut(),
+            )
+            .map_err(BuildError::Drlg)?,
+        );
+    }
     let world = DrlgWorld {
         dungeon,
-        data: Arc::new(drlg),
-        tiles: Box::new(tiles()),
-        types: Box::new(types),
+        data: levels.data,
+        tiles: levels.tiles,
+        types: levels.types,
     };
     let tables = ActionTables {
         missiles: Vec::new(),
@@ -382,16 +493,30 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
             .drlg
             .with_act(act, &mut game.lists, |d, svc| {
                 let l = d.get_or_alloc_level(svc.data, svc.types, level)?;
-                d.generate_level(svc.data, svc.types, l)?;
-                let r = d.level_rooms(l)[0];
-                d.stream_room(svc, r)
+                // A town is generated at act creation (`levels.md` §3 step
+                // 8); any other level here once.
+                if d.level_rooms(l).is_empty() {
+                    d.generate_level(svc.data, svc.types, l)?;
+                }
+                let Some(&r) = d.level_rooms(l).first() else {
+                    return Ok(None);
+                };
+                let rect = d.room(r).rect;
+                Ok(d.stream_room(svc, r)?.map(|id| (id, rect)))
             })
             .ok_or_else(|| BuildError::Setup(format!("act {act} has no DRLG")))?
             .map_err(BuildError::Drlg)?
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
         rooms.push(r);
     }
-    let mut spawn = |ty: UnitType, class: u32, room: RoomId, x: i32| {
+    // Staging, as the server tests do: the units stand in the first
+    // streamed room of Cold Plains, at fixed sub-tile offsets from its
+    // origin (subtile = tile × 5, `levels.md` §1). The original places a
+    // joining player in a spawn room (`levels.md` §10) at a position no
+    // spec states yet: not wired, TODO(spec: unit placement).
+    let (room0, rect0) = rooms[0];
+    let (ox, oy) = (rect0.x * 5, rect0.y * 5);
+    let mut spawn = |ty: UnitType, class: u32, room: RoomId, x: i32, y: i32| {
         let req = AllocRequest {
             ty,
             class,
@@ -401,16 +526,23 @@ pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
             mode: 1,
             allied: ty == UnitType::Player,
         };
-        sim.with(&mut game, |g, v| v.allocate(g, &req, x, 20))
+        sim.with(&mut game, |g, v| v.allocate(g, &req, x, y))
             .ok_or_else(|| BuildError::Setup(format!("allocating {ty:?} {class} failed")))
     };
     let waypoint = spawn(
         UnitType::Object,
         wp_tables.object_class,
-        rooms[0],
-        WAYPOINT_X,
+        room0,
+        ox + WAYPOINT_X,
+        oy + UNIT_Y,
     )?;
-    let player = spawn(UnitType::Player, PLAYER_CLASS, rooms[0], PLAYER_X)?;
+    let player = spawn(
+        UnitType::Player,
+        PLAYER_CLASS,
+        room0,
+        ox + PLAYER_X,
+        oy + UNIT_Y,
+    )?;
     if let Some(u) = sim.sys.units.get_mut(player) {
         u.mode = 1;
     }

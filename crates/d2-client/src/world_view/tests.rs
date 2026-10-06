@@ -18,7 +18,7 @@ use super::*;
 use crate::bridge::dispatch::{Dispatch, HandlerError, Message};
 use crate::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use crate::bridge::{Bridge, BridgeResource, UnitKey};
-use crate::frames::FramePart;
+use crate::frames::{FramePart, FrameSet};
 use crate::gpu_compositor::pack::emulate;
 use crate::ui::{
     ClientIntent, ImageRef, ImageRequest, NoPanelRules, NoStrings, Panel, PanelId, Point,
@@ -98,16 +98,34 @@ fn set(width: u32, height: u32, x_off: i32, y_off: i32, pixels: &[u8]) -> FrameS
     }
 }
 
-fn assets() -> ViewAssets {
+/// The resident frame sets, in store insertion order.
+fn sets() -> Vec<(FrameSetKey, FrameSet)> {
+    vec![
+        (set_key(0, 0), set(2, 2, 1, -2, &[0, 5, 7, 0])),
+        (set_key(1, 0), set(3, 1, 0, 0, &[9, 9, 9])),
+        (set_key(0, 1), set(2, 1, 0, 0, &[4, 4])),
+        (set_key(1, 1), set(1, 1, 0, 0, &[6])),
+        (tile_key(), set(4, 2, 0, 0, &[3; 8])),
+    ]
+}
+
+/// Assets whose frame store holds `sets` in order.
+fn assets_from(sets: Vec<(FrameSetKey, FrameSet)>) -> ViewAssets {
     let mut a = ViewAssets::new(palette());
     a.cofs.insert(cof_path(), cof());
-    a.sets
-        .insert(set_key(0, 0), set(2, 2, 1, -2, &[0, 5, 7, 0]));
-    a.sets.insert(set_key(1, 0), set(3, 1, 0, 0, &[9, 9, 9]));
-    a.sets.insert(set_key(0, 1), set(2, 1, 0, 0, &[4, 4]));
-    a.sets.insert(set_key(1, 1), set(1, 1, 0, 0, &[6]));
-    a.sets.insert(tile_key(), set(4, 2, 0, 0, &[3; 8]));
+    for (key, set) in sets {
+        a.frames.insert(key, set).unwrap();
+    }
     a
+}
+
+fn assets() -> ViewAssets {
+    assets_from(sets())
+}
+
+/// [`assets`] without the set `key`.
+fn assets_without(key: &FrameSetKey) -> ViewAssets {
+    assets_from(sets().into_iter().filter(|(k, _)| k != key).collect())
 }
 
 fn world(keys: &[(u8, u32)]) -> ClientWorld {
@@ -230,15 +248,15 @@ fn ui_image(x: i32, y: i32) -> UiDraw {
 }
 
 /// (frame set, frame, x, y, key, tag) of each item, frame resolved
-/// through the table.
+/// through the frame store.
 type Row = (FrameSetKey, usize, i32, i32, (u32, u32, u32, u8), ItemTag);
 
-fn rows(frame: &WorldFrame) -> Vec<Row> {
+fn rows(frame: &WorldFrame, assets: &ViewAssets) -> Vec<Row> {
     frame
         .items
         .iter()
         .map(|i| {
-            let (k, n) = frame.frames.get(i.frame).unwrap();
+            let (k, n) = assets.frames.owner(i.frame).unwrap();
             let key = (i.key.pass(), i.key.major(), i.key.minor(), i.key.sub());
             (k.clone(), n, i.x, i.y, key, i.tag)
         })
@@ -255,7 +273,7 @@ fn scene_frame() -> (WorldFrame, ViewAssets) {
 // Covers: specs/client/render-pipeline.md §a1-layers-of-the-pipeline, §a6-draw-order, §a7-composite-units-cof text, §a7-composite-units-cof r2, §a7-composite-units-cof r4
 #[test]
 fn draw_list_is_ordered_by_key_with_cof_slots() {
-    let (f, _) = scene_frame();
+    let (f, a) = scene_frame();
     assert_eq!(f.units_drawn, 2);
     assert_eq!(f.units_hidden, 1);
     let tile = ItemTag::Tile { x: 1, y: 2 };
@@ -270,21 +288,11 @@ fn draw_list_is_ordered_by_key_with_cof_slots() {
         (set_key(1, 1), 0, 70, 50, (2, 7, 0, 1), ItemTag::Unit(7)),
         (set_key(1, 1), 0, 300, 200, (5, 0, 0, 0), ItemTag::Ui(0)),
     ];
-    assert_eq!(rows(&f), expected);
-    // Ids in build order: tile, unit (0, 7)'s two, unit (1, 4)'s two; the
-    // UI image reuses the id of its frame.
-    let refs: Vec<_> = f.frames.refs().iter().map(|(k, _)| k.clone()).collect();
-    assert_eq!(
-        refs,
-        vec![
-            tile_key(),
-            set_key(0, 1),
-            set_key(1, 1),
-            set_key(1, 0),
-            set_key(0, 0)
-        ]
-    );
-    assert_eq!(f.items[5].frame, f.items[4].frame);
+    assert_eq!(rows(&f, &a), expected);
+    // Ids are the frame store's (insertion order), not build order: the
+    // tile, built first, has the last id; the UI image shares its frame's.
+    let ids: Vec<u32> = f.items.iter().map(|i| i.frame.0).collect();
+    assert_eq!(ids, vec![4, 1, 0, 2, 3, 3]);
 }
 
 #[test]
@@ -379,7 +387,7 @@ fn unspecified_rules_draw_nothing_and_refuse_ui() {
     let a = assets();
     let w = world(&[(0, 7), (1, 4)]);
     let f = build(&w, &[], &Unspecified, &a).unwrap();
-    assert!(f.items.is_empty() && f.frames.is_empty());
+    assert!(f.items.is_empty());
     assert_eq!((f.units_drawn, f.units_hidden), (0, 2));
     // An empty list composes to the cleared frame (index 0 everywhere).
     let rgba = compose_cpu(&f, &a).unwrap();
@@ -402,8 +410,7 @@ fn unspecified_rules_draw_nothing_and_refuse_ui() {
 #[test]
 fn missing_assets_and_text_are_errors() {
     let w = world(&[(1, 4)]);
-    let mut a = assets();
-    a.sets.remove(&set_key(0, 0));
+    let a = assets_without(&set_key(0, 0));
     match build(&w, &[], &TestRules, &a).unwrap_err() {
         ViewError::Unit { guid: 4, error, .. } => {
             assert!(error.to_string().contains("c0.dcc"), "{error}")
@@ -411,8 +418,7 @@ fn missing_assets_and_text_are_errors() {
         e => panic!("{e}"),
     }
 
-    let mut a = assets();
-    a.sets.remove(&tile_key());
+    let a = assets_without(&tile_key());
     assert!(matches!(
         build(&w, &[], &TestRules, &a).unwrap_err(),
         ViewError::Tile { index: 0, .. }
@@ -490,8 +496,9 @@ fn frame_hash_catches_perturbations() {
     let base = compose_cpu(&f, &a).unwrap();
 
     // One source pixel of one frame: exactly that screen pixel changes.
-    let mut a2 = a.clone();
-    a2.sets.get_mut(&set_key(0, 0)).unwrap().frames[0].pixels[1] = 8;
+    let mut perturbed = sets();
+    perturbed[0].1.frames[0].pixels[1] = 8;
+    let a2 = assets_from(perturbed);
     let changed = compose_cpu(&f, &a2).unwrap();
     assert_eq!(differing(&base, &changed), vec![(42, 48)]);
     assert_ne!(fnv1a(&changed), fnv1a(&base));
@@ -516,15 +523,51 @@ fn frame_hash_catches_perturbations() {
 fn gpu_packing_emulates_to_the_cpu_image() {
     let (f, a) = scene_frame();
     let mut atlas = GpuAtlas::new(2).unwrap();
-    atlas.ensure(&f, &a).unwrap();
+    atlas.ensure(&a.frames).unwrap();
     let packed = atlas.pack(&f, &a).unwrap();
     let gpu = emulate(&packed, atlas.atlas().pages()).unwrap();
-    let cpu = scene::compose(&f.items, &f.frames.bind(&a), &a.maps, VIEW).unwrap();
+    let cpu = scene::compose(&f.items, &a.frames, &a.maps, VIEW).unwrap();
     assert_eq!(gpu, cpu);
-    // Sets go in once, in frame-id order.
+    // Frames go in once, in id order.
+    assert_eq!(atlas.frames(), a.frames.len());
     let before = atlas.atlas().pages()[0].generation;
-    atlas.ensure(&f, &a).unwrap();
+    atlas.ensure(&a.frames).unwrap();
     assert_eq!(atlas.atlas().pages()[0].generation, before);
+    // A store that grew: only the new frames are packed, the old slots
+    // stay; the frame still emulates to the CPU image.
+    let old: Vec<_> = atlas.slots().to_vec();
+    let mut grown = a.clone();
+    let extra = FrameSetKey::new("data/global/tst/extra.dc6", FramePart::Dir(0)).unwrap();
+    grown.frames.insert(extra, set(1, 1, 0, 0, &[2])).unwrap();
+    atlas.ensure(&grown.frames).unwrap();
+    assert_eq!(&atlas.slots()[..old.len()], &old[..]);
+    assert_eq!(atlas.frames(), old.len() + 1);
+    let packed = atlas.pack(&f, &grown).unwrap();
+    assert_eq!(emulate(&packed, atlas.atlas().pages()).unwrap(), cpu);
+    // An atlas ahead of its store (a rebuilt store) is refused.
+    assert!(matches!(
+        atlas.ensure(&a.frames),
+        Err(ViewError::AtlasAhead { atlas: 6, store: 5 })
+    ));
+}
+
+// Ids come from the store: another insertion order gives other ids for
+// the same draws, and the same image.
+#[test]
+fn frame_ids_are_the_frame_stores() {
+    let (f, a) = scene_frame();
+    let mut reversed = sets();
+    reversed.reverse();
+    let b = assets_from(reversed);
+    let w = world(&[(0, 7), (1, 4), (1, 9)]);
+    let g = build(&w, &[ui_image(300, 200)], &TestRules, &b).unwrap();
+    assert_eq!(rows(&g, &b), rows(&f, &a));
+    for i in &g.items {
+        let (key, n) = b.frames.owner(i.frame).unwrap();
+        assert_eq!(b.frames.id(key, n).unwrap(), i.frame);
+    }
+    assert_ne!(g.items, f.items);
+    assert_eq!(compose_cpu(&g, &b).unwrap(), compose_cpu(&f, &a).unwrap());
 }
 
 // --- UI binding and the Bevy edge ---------------------------------------

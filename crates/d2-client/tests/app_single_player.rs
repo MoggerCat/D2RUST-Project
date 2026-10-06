@@ -5,7 +5,9 @@
 //! (with `D2_GAME_DIR`, ignored by default) give a waypoint object.
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, WaypointTables, DEFAULT_SEED};
+use d2_client::app::single_player::{
+    self, GameData, Link, WaypointTables, ACT2_TOWN, COLD_PLAINS, DEFAULT_SEED,
+};
 use d2_client::bridge::link::ServerLink;
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_proto::PROTOCOL_VERSION;
@@ -89,6 +91,47 @@ fn live_tables_give_a_waypoint_object() {
     assert!(t.objects[..class]
         .iter()
         .all(|o| !(o.operatefn == 23 && o.initfn == 17)));
-    let g = single_player::build(&GameData::Live(t), DEFAULT_SEED).unwrap();
+}
+
+/// The game on the user's files (`GameData::select`): levels generated
+/// through drlg-data's providers and the level-type dispatcher. Act 0
+/// holds the town (level 1, generated at act creation) and Cold Plains,
+/// act 1 Lut Gholein (its town), each with rooms; the waypoint world is
+/// set.
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR"]
+fn live_data_generates_the_levels_from_the_users_files() {
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    assert!(matches!(data, GameData::Live(_)));
+    let mut g = single_player::build(&data, DEFAULT_SEED).unwrap();
     assert!(g.sim.world.waypoints.is_some());
+    let dungeon = &g.sim.events.hooks().drlg.dungeon;
+    for (act, level) in [(0, 1), (0, COLD_PLAINS), (1, ACT2_TOWN)] {
+        let d = dungeon.acts[act].as_ref().expect("act created");
+        let l = d.find_level(level).expect("level allocated");
+        let rooms = d.level_rooms(l).len();
+        assert!(rooms > 0, "level {level}: no rooms");
+        eprintln!(
+            "act {act} level {level}: {rooms} rooms, rect {:?}",
+            d.level(l).rect
+        );
+    }
+}
+
+/// Without a game directory, or with `--synthetic`, the data is synthetic;
+/// a directory that does not load is an error, never a fallback.
+#[test]
+fn data_selection_falls_back_only_without_game_files() {
+    assert!(matches!(
+        GameData::select(None, false).unwrap(),
+        GameData::Synthetic
+    ));
+    let missing = std::path::Path::new("/nonexistent/d2rs-no-game-dir");
+    assert!(matches!(
+        GameData::select(Some(missing), true).unwrap(),
+        GameData::Synthetic
+    ));
+    let e = GameData::select(Some(missing), false).unwrap_err();
+    assert!(e.to_string().contains("d2rs-no-game-dir"), "{e}");
 }
