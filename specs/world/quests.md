@@ -43,14 +43,14 @@
 |   7. NPC dialog hooks | 518–550 |
 |   8. Act transitions, warps and portals | 551–607 |
 |   9. Quest items, rewards and helpers | 608–651 |
-|   10. Act I quests | 652–1387 |
-|   11. Acts II–V | 1388–1393 |
-| Constants & data dependencies | 1394–1408 |
-| Randomness | 1409–1427 |
-| Edge cases & original bugs | 1428–1446 |
-| Test vectors | 1447–1478 |
-| Provenance | 1479–1500 |
-| Open questions | 1501–1541 |
+|   10. Act I quests | 652–1406 |
+|   11. Acts II–V | 1407–1412 |
+| Constants & data dependencies | 1413–1427 |
+| Randomness | 1428–1446 |
+| Edge cases & original bugs | 1447–1465 |
+| Test vectors | 1466–1497 |
+| Provenance | 1498–1519 |
+| Open questions | 1520–1560 |
 <!-- /index -->
 
 ## Summary
@@ -749,10 +749,29 @@ compare constants in the 1.14d scroll callbacks (`quests.tsv` callback
   41.0) and `0x0058FD50` (after the respec: set 41.0, clear 41.1; if
   41.15 is clear, chain 30's record gets active := 0; lookup failure
   is fatal).
-- Act I intro (chain 37, `0x0058FA20`): per-NPC first-talk text for
-  akara, gheed, charsi, kashya (special text for sorceress, necromancer,
-  barbarian, amazon respectively), recorded in the NPC intro record
-  (§6.7) by event 11.
+- Status functions of chains 25 / 30 (`0x00596BB0`) and 37
+  (`0x0058F9B0`, which also writes out := 0) return false: nothing is
+  reported. Flavie's active fn is `0x00596BC0` (as above; chain 1's
+  record is looked up without a null check).
+- Act I intro (chain 37, `0x0058FA20`): per-NPC first-talk text, kept in
+  the NPC intro record (§6.7; set `0x00572360`, test `0x005723C0`, both
+  by NPC class through the class table `0x00732738`).
+
+  | NPC (class) | Special-text player class | Event 11 messages that set the intro bit |
+  |---|---|---|
+  | gheed (147) | 2 necromancer | 45, 46 |
+  | akara (148) | 1 sorceress | 11, 12 |
+  | kashya (150) | 0 amazon | 24, 25 |
+  | charsi (154) | 4 barbarian | 36, 37 |
+
+  1. **Event 0** `0x0058F8F0`: only the four NPCs above (jump table on
+     class − 147). If the player's intro bit for the NPC is set: nothing.
+     Else add state 1 if the player's class (unit +4; −1 when no player)
+     is the NPC's special class, else state 0.
+  2. **Event 11** `0x0058F870`: NPC and message in the table → set the
+     player's intro bit for that NPC. Nothing else (no 0x27 refresh).
+  3. **Active** `0x0058F9C0`: true iff the player's record lacks 1.0,
+     the NPC is akara (148) and the player's akara intro bit is clear.
 
 #### 10.4 A1Q1 Den of Evil (chain 1)
 
