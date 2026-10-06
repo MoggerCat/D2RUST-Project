@@ -33,22 +33,22 @@
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
 |   1. Inventory model | 89–181 |
-|   2. Grid placement | 182–272 |
-|   3. Belt | 273–330 |
-|   4. Equipping | 331–485 |
-|   5. Shared checks | 486–610 |
-|   6. Deferred item messages | 611–704 |
-|   7. Intents | 705–1090 |
-|   8. Pickup from the ground | 1091–1191 |
-|   9. Drop to the ground | 1192–1234 |
-|   10. Gold | 1235–1265 |
-|   11. Message layouts | 1266–1295 |
-| Constants & data dependencies | 1296–1318 |
-| Randomness | 1319–1331 |
-| Edge cases & original bugs | 1332–1347 |
-| Test vectors | 1348–1395 |
-| Provenance | 1396–1442 |
-| Open questions | 1443–1509 |
+|   2. Grid placement | 182–276 |
+|   3. Belt | 277–334 |
+|   4. Equipping | 335–512 |
+|   5. Shared checks | 513–637 |
+|   6. Deferred item messages | 638–731 |
+|   7. Intents | 732–1142 |
+|   8. Pickup from the ground | 1143–1249 |
+|   9. Drop to the ground | 1250–1297 |
+|   10. Gold | 1298–1337 |
+|   11. Message layouts | 1338–1367 |
+| Constants & data dependencies | 1368–1390 |
+| Randomness | 1391–1403 |
+| Edge cases & original bugs | 1404–1441 |
+| Test vectors | 1442–1490 |
+| Provenance | 1491–1547 |
+| Open questions | 1548–1638 |
 <!-- /index -->
 
 ## Summary
@@ -263,7 +263,11 @@ quests.
    (targetable, unit +0xC4) cleared. If the item counts as an active
    inventory item for its owner (§5.6, `0x0062FF70`) → stat refresh
    `0x0055C2C0(owner, 0)`.
-7. Cursor := none (unless step 3 said not), mode := 0 (stored).
+7. Cursor := none (unless step 3 said not), mode := 0 (stored). The
+   clear (`0x0063C180(inventory, none)`, §1.4 rule 3) does not test what
+   the cursor holds: only step 3's page-1 flag gates it (`0x00560200`).
+   A caller placing a mode-4 item that is not the cursor item while the
+   player holds one orphans the held item (edge case 12).
 8. "Send" set: command flag 0x2; item flag 0x1 when the item is socketed
    with fillers (`0x0055F590`); item flag 0x4000 cleared; owner refresh
    (`0x00621000`, §6.1); update list += item.
@@ -482,6 +486,29 @@ unit is given, it is a player (`0x0044BE50` = 0) and the skill's
 from an extended stat list (flag bit 31; `0x006261D0`, at most 64 per
 stat; skill ids ≥ the skills count are skipped). Last, R := R + item
 stat 92 (`item_levelreq`); a sum < 1 returns 0.
+
+#### 4.9 Equip without the cursor (`0x00562E00`, ECX game, EDX unit U, item I, skip)
+
+Callers, all with skip 0: auto pickup §8.1 step 5 (`0x005636DE`), the
+vendor buy §7.1 rule 9.7 of `world/vendors.md` (`0x00577D90`), and
+`0x00562F30` (`0x005631F6`; called from `0x0057FB70`).
+
+1. §4.7(U, I, &L, skip) fails → result 0, nothing changed.
+2. Put I at L on grid 0 (`0x0063BDB0`); failure → fatal assert
+   (`ItemMode.cpp` line 0x1674). L = 11 or 12 → fatal assert (0x1656;
+   §4.7 never returns them). Link check `0x0063B210(kind 3)` fails →
+   location L emptied again (`0x0063BE30`), then fatal assert (0x1671).
+3. Body location := L (`0x00627D70`); stat link `0x0063D1D0`; cursor :=
+   none (§1.4 rule 3); stat refresh `0x0055C2C0(U, 0)`; unit flag 0x2
+   cleared; mode 1; command flag 0x200 (`item-actions.tsv` row 5: 0x9D
+   action 6 to every client); unit flag 0x2000000 cleared; update list +=
+   I; owner refresh; page := 0xFF; weapon bookkeeping `0x0055C5C0`.
+   Result 1.
+
+Differences from §4.6: no mode test and no §4.3 (the caller's), no
+weapon-in-use update `0x006233A0`, command flag 0x200 instead of 0x8, no
+item flag 0x1, item flag 0x4000 not cleared, no inventory pass, no out
+argument.
 
 ### 5. Shared checks
 
@@ -868,6 +895,22 @@ Fields: cursor u32 @1, target u32 @5, x u32 @9, y u32 @13.
    x, y set; link; item-skill link; stat refresh if active; mode 0; command
    flag 0x40000; update list; refresh; inventory pass if T was active.
    Both send 0x9C action 0xD.
+4. Order and failures (`0x00561B00` read in full): T is taken (rule 3,
+   up to its update-list entry) **before** C's fit test, and nothing is
+   restored on a later failure. C's §2.2 placement failing → out 1,
+   result 0: T stays the cursor item in mode 4 (its update-list entry,
+   command flag 0x40000, goes out at the next owner refresh, wherever T
+   is by then); C stays in mode 4, in no grid and not the cursor (its
+   item data +0x5C still names the inventory); no owner refresh runs.
+   C's link check (`0x0063B210`, kind 1) failing → out 1, result 0 with
+   C placed in the grid but in mode 4 (as §2.4 step 5). Edge case 10.
+5. Item flag 0x4000 is cleared on both items: on T before C's placement,
+   on C after its item flag 0x1 test. The page-2 trade hook
+   `0x00568770` after C's link is unreachable (page 2 returned in rule 3).
+6. C's placement unlinks C as a listed item (it is no longer the cursor,
+   §1.4 rule 1): the list is unchanged but the count drops by 1, and the
+   link adds 1. A successful 0x1F leaves inventory +0x28 one below the
+   number of linked items (edge case 11).
 
 #### 7.11 0x20 UseGridItem (`0x0054B1E0` → `0x0055E170`)
 
@@ -963,6 +1006,9 @@ equivalence `0x00629BB0`), else 0; the target becomes the hireling
 (`0x00574EC0(7, 0)`). Use: `0x005BF240` (item-use spec). Used → tome /
 skill charge update (`0x0055E050`, `0x006439B0`, S→C 0x22 via
 `0x0053C520`), targeting reset, removal `0x00561E70`, compaction §3.8.
+No hireling (`0x00574EC0` returns none): the target stays the player,
+so the potion is used on the player (`0x00562494`–`0x005624A0`). Use
+failing (`0x005BF240` = 0) → 0 with out 0, nothing removed.
 
 #### 7.18 0x27 UseItemAction (`0x0054B280` → `0x00561ED0`)
 
@@ -1055,13 +1101,19 @@ gold − pile gold (`0x00530EA0`). Result 0.
    location (u16 @1) ≠ 0 → `0x0054D130` (take from the hireling) and its
    result; location 0 → 0.
 
-`0x0054D130` (take): location ∉ 1..10 → 2; the hireling's item at the
-location must exist in mode 1, else 2; unlink, slot cleared, hireling
+`0x0054D130` (take; EBX game, ESI hireling): classic game, a hireling
+without an inventory, or location ∉ 1..10 → 3 (`0x0054D141`–`0x0054D15E`);
+the hireling's item at the location must exist in mode 1 and its unlink
+must return it, else 2; unlink, slot cleared, hireling
 stat refresh `0x0055C730(merc, 0, 0)`, command flag 0x10 on it, update
 list of the hireling, hireling refresh; a **copy** (`0x0055A2A0`,
 `items/generation.md` duplicate) becomes the player's cursor item
-(`0x0055FB10`), the original gets item flag 0x20; hireling inventory pass,
-`0x0055F500`, `0x0055F4F0(0)`. Result 0.
+(`0x0063C180`, then `0x0055FB10`: mode 4, command flag 0x100000 = 0x9C
+action 0x12, update list, owner refresh), the original gets item flag
+0x20; hireling inventory pass (`0x0055DF00`), `0x0055F500`,
+`0x0055F4F0(0)`. Result 0. A failed copy (none) is fatal: the cursor is
+set to none, then `0x0055FB10` asserts (line 0x19A1), after the original
+already left the hireling.
 
 `0x0054D230` (give): classic → 3; C not identified → 0; C broken (0x100)
 → 0; C of type 76/81/80 (potions) → used on the hireling
@@ -1123,10 +1175,15 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
      := q_d + q (0x3E), P := 0, both books → item-skill add q, P leaves
      its room and is freed as above, cursor := none, handled. Else D :=
      m (0x3E only for D), P := q + q_d − m, both books → add m − q_d;
-     next candidate.
+     next candidate. Every other exit of `0x0055D0D0` is a fatal assert
+     (negative max stack, a negative sum, the loop ending after a pass
+     without a full merge): none is reachable with valid stats.
 5. Auto-equip §4.7 (skip 0) gives L → §4.3(L, item, 0) must be 1, else
-   out 1; leave the room; `0x00562E00(item, 0)` equips; success → quest
-   hook ITEMPICKEDUP (`0x00543D80`, `world/quests.md`).
+   out 1; leave the room; `0x00562E00(item, 0)` equips (§4.9); success →
+   quest hook ITEMPICKEDUP (`0x00543D80`, `world/quests.md`). §4.9's
+   result 0 cannot occur here (it repeats the §4.7 test that just passed,
+   on an unchanged inventory); its other failures are fatal. Were it 0:
+   result 0, out 0, the item out of its room in mode 3 and sent nothing.
 6. Else beltable, §3.6 (always) and §3.5 + §3.7 succeed → leave the room,
    link kind 2 (failure fatal), cursor := none, item-skill link, stat
    refresh if active, unit flag 0x2 cleared, mode 2, page 0xFF, command
@@ -1137,7 +1194,8 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
    unit flag 0x2 cleared, mode 0, command flag 0x80 (0x9C action 4),
    update list, refresh, unit flag 0x2000000 cleared, page := 0, quest
    hook ITEMPICKEDUP, inventory pass if active). No room → refused
-   pickup with sound 0x17, 0.
+   pickup with sound 0x17, 0. The link (`0x0063B210`, kind 1) failing
+   in `0x005600A0` is a fatal assert.
 
 #### 8.2 To cursor (`0x0055CF50`, cursor flag ≠ 0)
 
@@ -1231,6 +1289,11 @@ player's item list on page 3, in list order: queue 0x9D action 5 now
 as 3), unlink, room-change notice, mode 4, page := 0, and place with
 §2.4 steps 2–9 into page 0 (find free, send). Placement fails → page :=
 0xFF and the item is dropped next to the player (§9.1 steps 2–3).
+The unlink not returning the item is a fatal assert. The drop search
+is `0x00555DA0` with size 1 and fallback 1 (`0x00563B9C`), as §9.1's
+(`0x00563C83`); it returns none only when the start cell has no room:
+then the item stays in mode 4 with page 0xFF, in no grid and not the
+cursor, and the spill goes on with the next item (edge case 13).
 
 ### 10. Gold
 
@@ -1253,6 +1316,15 @@ count < max: pile = min(rest, 2,000,000,000); start and search as §9.1
 step 2 (last argument 0); none → stop; create the item (`0x00559CE0`,
 code `gld`, `items/generation.md`); pile gold := pile (0 if negative);
 ground placement (§9.1 step 3); append to the list.
+The search (`0x0064E810` called directly, size 1, masks 0x3E01 /
+0x801, fallback 0, field origin = the unit's position) takes as its
+room the previous pile's result room, the unit's room for the first
+pile. A failed creation (`0x00559CE0` returns none) skips that pile and
+does **not** stop: its amount already counts as placed, the loop goes
+on with the rest, and the caller (§7.22) subtracts only the piles in
+the list, so that gold stays with the player. (A per-pile cap through
+`0x00622E70` applies only when the new unit's type is 0, never for an
+item: dead code.)
 
 #### 10.3 Gold messages
 
@@ -1344,6 +1416,28 @@ happen only inside the systems these paths call, in handler order:
 9. Weighted searches fail when every fitting spot has weight 0 (cannot
    happen in a non-empty search space: a free region always touches an
    edge or an item).
+10. 0x1F takes the target before testing the cursor item's fit and
+    restores nothing (§7.10 rule 4): with a failed placement (e.g. a
+    2 × 2 cursor item at x = 9 of a 10-wide page) the old cursor item is
+    left in mode 4, in no grid and not the cursor; the target is the new
+    cursor item; result 3.
+11. Each successful 0x1F lowers inventory +0x28 by one below the number
+    of linked items (§7.10 rule 6). Readers of +0x28 (getter
+    `0x0063CD60`, callers `0x004843E0`, `0x0048C060`, `0x0055F590`,
+    `0x00562660`, `0x005697F0`; the socket link `0x0063B210` uses it as
+    the filler's x): the ones read (`0x004843E0`, `0x0055F590`,
+    `0x00562660`, `0x0063B210`) take an item's own (socket) inventory,
+    where 0x1F never runs; open question 21 for the other two.
+12. §2.4 step 7 clears the cursor whatever it holds. A transmute
+    (`world/cube.md` §8 step 3: outputs are created in mode 4) while the
+    player holds a cursor item H unlinks H (§1.4 rule 3) and leaves it in
+    mode 4, in no grid and not the cursor. Nothing on the server's
+    transmute path tests for a cursor item (`0x00568060` → `0x00566AE0` →
+    `0x005665F0`); whether the client sends it while holding an item is
+    open question 20. A ground item offered by 0x2A never reaches step 7
+    (step 2 refuses mode 3; `world/cube.md` edge case 15).
+13. A cube spill item whose drop search finds no room stays in mode 4,
+    in no grid and not the cursor (§9.3).
 
 ## Test vectors
 
@@ -1392,6 +1486,7 @@ Recordings (conformance; none recorded yet):
 | R4 | Belt: pick up three `hp1` with an empty belt column and a sash equipped; shift-click a potion from the inventory (0x63); take one from the belt (0x24); swap (0x25); drink one from slot 4 (0x26) | slots, compaction, direct 0x9D 5 + 0x9C 0xE |
 | R5 | Gold: drop 1, 255, 70000 gold (0x50); pick each up | piles, 0x19/0x1E/0x1F bytes, RNG trace of pile creation |
 | R6 | Pick up an item with a full inventory; equip an item whose strength requirement is not met | refused-pickup bytes (sound 0x17), result codes |
+| R7 | Cube open with a valid recipe (e.g. 3 `gcv` chipped gems): hold another item on the cursor and press Transmute; then swap (0x1F) a 2 × 2 item onto a 1 × 1 item at the inventory's last column | whether the client sends 0x4F 0x18 / the 0x1F at all; the held item's later 0x9C messages (edge cases 10, 12) |
 
 ## Provenance
 
@@ -1440,6 +1535,16 @@ the 1.14d `patch_d2` `.txt` files (the `Expansion` row skipped). The
 "charm re-link" of the first pass is the scroll/tome item-skill link
 (§5.5).
 
+Third pass (property-test questions, MV4 sites): `0x00561B00`,
+`0x00560200`, `0x0063AAF0` with `0x0063A810` (disassembled: the list
+removal is a no-op for an item that is neither head, tail nor linked),
+`0x0063CD60` and its callers, `0x00562E00` (disassembled: ECX / EDX
+arguments, the three callers and their skip 0), `0x00563560`,
+`0x005600A0`, `0x0055D0D0`, `0x00562390` (disassembled:
+`0x00562494`–`0x005624A0`), `0x0054D130` (disassembled: return values),
+`0x0055FB10`, `0x00563840`, `0x0055A090`, `0x00555DA0` (disassembled:
+size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
+
 ## Open questions
 
 1. Answered: `items/bitstream.md` (owner; checked on all 144 recorded
@@ -1468,6 +1573,11 @@ the 1.14d `patch_d2` `.txt` files (the `Expansion` row skipped). The
     10 % life gate, force every 20 ticks or 10 with queued messages);
     R5 still confirms the gold bytes and timing.
 19. Answered: §8.4 step 6 (full pair list; second list = corpses).
+20. Does the 1.14d client send C→S 0x4F button 0x18 (transmute) while
+    an item is on the cursor (edge case 12)? Settle: recording R7.
+21. Readers of inventory +0x28 at `0x005697F0` and `0x0048C060`: do
+    they read a player inventory, so that edge case 11's drift changes
+    an outcome? Settle: Ghidra on both.
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 
@@ -1506,3 +1616,22 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
 - MV6: §8.2 a refused pickup returns at once (no pickup sound,
   `0x0055D01C`); 0x26 reads bytes 1–8 only (`0x0054B560`: +1, +5),
   bytes 9–12 are unread.
+- MV4, the rest (re-read): §7.17 no hireling → the player is the
+  target; §7.23 `0x0054D130` returns 3 (not 2) for classic / no hireling
+  inventory / location ∉ 1..10, and a failed copy is fatal; §8.1 rule 5
+  `0x00562E00` is §4.9 (result 0 unreachable there), rules 6–7 link
+  failures fatal; §8.1 rule 4 auto-stack failures fatal; §9.3 unlink
+  failure fatal, a roomless drop leaves the item in mode 4; §10.2 a
+  failed pile creation skips the pile, the loop goes on.
+- `docs/handoff/prop-unified-items.md` Q1: §7.10 rules 4–6, edge cases
+  10–11 (T is taken first; nothing restored). Q2: §2.4 step 7, edge
+  case 12 (unconditional clear; 0x2A ground items never reach it; the
+  client side is OQ20). Q3: §4.9 (`0x00562E00` written; failure →
+  nothing changed, result 0; not reachable from §8.1).
+- IV1: §1.4 rule 3 (the cursor item is not in the item list). IV2:
+  §2.4 step 5. IV3: §2.4 step 3 (after step 8, before step 9). IV4: §3
+  rule 5 (next column). IV5: §3 rule 8 (item flags). IV6: §4.7 steps
+  1–2. IV7: §1.3 (no record for item owners). IV8: §4.4 rule 6 (no).
+  MV1: §6.2. MV7: OQ1, 6, 9–17, 19 above (answered); the remaining
+  `MovePending` seams are code. PN1: §2.2 (32-bit wrap: the item is
+  placed without cells). WN3: §7.7 (empty location → 0 before §4.3).
