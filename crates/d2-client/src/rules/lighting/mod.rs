@@ -38,3 +38,6 @@ mod view_tests;
 pub use map::{LightCell, LightMap};
 #[cfg(test)]
 mod core_tests;
+
+#[cfg(test)]
+mod env_tests;
