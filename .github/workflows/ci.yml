@@ -146,3 +146,19 @@ jobs:
 
       - name: Doc-tests
         run: cargo test --doc -p d2-client
+
+  # Branch protection on main requires a status named `check` (the single
+  # job before the split). This job keeps that name and passes only when
+  # every job above passed.
+  check:
+    if: always()
+    needs: [tools, clippy-core, test-sim, test-rest, client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All jobs passed
+        run: |
+          test "${{ needs.tools.result }}" = success
+          test "${{ needs.clippy-core.result }}" = success
+          test "${{ needs.test-sim.result }}" = success
+          test "${{ needs.test-rest.result }}" = success
+          test "${{ needs.client.result }}" = success
