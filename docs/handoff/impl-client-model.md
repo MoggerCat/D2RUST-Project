@@ -75,7 +75,16 @@ also asserts the dropped / rejected sets). `py tools/coverage.py`:
 13 (uncovered: model §2 r7, §8 r2; msg-units §3 r3, §5 r4: all Phase 6 or
 client DRLG, nothing to model yet).
 
-Gate: `sh tools/gate.sh` (see the commit message for the run).
+Gate (`sh tools/gate.sh`, this branch): every step passes except "test
+d2-sim + conformance", which fails on the base `b435f5a` too (no file of
+`d2-sim`, `conformance` or `specs/` is changed here):
+`d2-sim monsters::ai::tests::implemented_matches_catalogue` and
+`monsters::ai::tests::rules::d2moo_only_act1_ais_are_stubs` — the AI
+catalogue TSV marks thinks 4, 5, 8, 10, 11, 15, 20, 26, 28, 30–33, 37, 43,
+59, 60, 64, 90, 98 `spec'd-here` while `IMPLEMENTED` has none of them (a
+monster-AI spec landed ahead of its implementation). Owner: the
+monster-AI implementation session. "test d2-client" (all of the above)
+passes, clippy and fmt pass.
 
 ## 2. Code map rows (for `docs/HANDOFF.md` §3)
 
