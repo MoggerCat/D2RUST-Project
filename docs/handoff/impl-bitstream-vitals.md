@@ -152,7 +152,7 @@ Constants.
 
 ## 5. Gate
 
-See §7 (run at the end of the session).
+See §7.
 
 ## 6. Local run queue (add to `docs/HANDOFF.md` §5)
 
@@ -174,3 +174,28 @@ See §7 (run at the end of the session).
   tick.
 
 ## 7. Gate result
+
+`sh tools/gate.sh` (after `tools/cloud-setup.sh`): **FAIL, on failures
+the base already has.** PASS: spec_index, methods, coverage (4,524
+claims, 0 errors), trace checkers, hook selftest, fmt, depcheck, clippy
+workspace, test rest (no client: 886), both doc-test steps. FAIL: test
+d2-sim + conformance, test d2-client. Run with `--no-fail-fast` on this
+branch and on the base `7f684ad` (worktree, same toolchain): the same
+55 tests fail on both (`diff` of the two lists: identical), none in the
+files this session touched:
+
+- d2-sim (9): skill / missile / AI catalogue checks
+  (`skills::use_::tests::function_tables_match_tsv` and its
+  perturbation / mutant tests, `missiles::tests_bodies::*`,
+  `monsters::ai::tests::implemented_matches_catalogue`,
+  `d2moo_only_act1_ais_are_stubs`): specs merged ahead of their code
+  (`spec-skill-bodies`, missile and AI bodies); owners: the
+  implementation sessions of those specs.
+- d2-client (46): the bridge's dispatch table does not match its spec
+  table (`bridge::tests::dispatch_table_matches_spec`: `NoHandler` for
+  51 S→C ids), so every test that builds the bridge fails (bridge, UI,
+  app frame loop, every e2e, the bridge properties); owner:
+  `impl-client-model`.
+
+This branch's own tests all pass (d2-sim 2,754 of 2,809 in the three
+crates' run; d2-server and d2-proto clean).
