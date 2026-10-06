@@ -129,15 +129,20 @@ with the 16 skill slots) have bodies.
 
 ## Gate
 
-`sh tools/gate.sh` on this branch: see the summary in the commit /
-final report. Failing on the base `b435f5a` already and identical with
-and without this branch (checked by stashing): d2-sim
-`monsters::ai::tests::implemented_matches_catalogue`,
-`monsters::ai::tests::rules::d2moo_only_act1_ais_are_stubs` (AI
-`functions.tsv` rows flipped to `spec'd-here` by `9f64a3a` without the
-implementation); d2-client 45 tests (bridge dispatch table against the
-new client specs: `NoHandler` for 51 ids; the e2e / app tests through
-the bridge fail with it).
+`sh tools/gate.sh` at `18c188f` (after the merge with `7f684ad`): every
+step passes (spec index, methods, coverage, trace checkers, hook, fmt,
+depcheck, clippy, tests of every crate but two, doc-tests) except two
+test steps, failing only on tests that fail without this branch too:
+
+- d2-sim: `monsters::ai::tests::implemented_matches_catalogue` and
+  `monsters::ai::tests::rules::d2moo_only_act1_ais_are_stubs` (the AI
+  `functions.tsv` rows flipped to `spec'd-here` by `9f64a3a`, waiting for
+  their implementation).
+- d2-client: the bridge dispatch-table tests (`NoHandler` for 51
+  server message ids of the new client specs; `bridge::tests::*`,
+  `bridge::local_tests::*`). Before the merge 45 client tests failed on
+  the base (checked by stashing this branch: the same list); after it,
+  the bridge table tests remain.
 
 ## Open questions (new; owner in brackets)
 
