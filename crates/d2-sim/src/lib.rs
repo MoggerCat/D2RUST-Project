@@ -9,6 +9,8 @@
 //! of these are enforced by `clippy.toml` and `[lints]` in this crate.
 
 pub mod game;
+pub mod missiles;
+pub mod monsters;
 pub mod rng;
 pub mod tick;
 pub mod units;
