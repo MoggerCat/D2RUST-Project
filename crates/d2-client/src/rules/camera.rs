@@ -301,10 +301,9 @@ impl Shake {
             a.wrapping_mul(t) / t1
         } else if t < t1.wrapping_add(t2) {
             a
-        } else if t3 == 0 {
-            0
         } else {
-            a.wrapping_mul(end - t) / t3
+            // t3 = 0: only t = t1 + t2 reaches this row, a = 0.
+            a.wrapping_mul(end - t).checked_div(t3).unwrap_or(0)
         })
     }
 
