@@ -162,7 +162,12 @@ and type flags; Nightmare melee, freeze, knockback, Fallen Shaman
 resurrect; missile exits `0x005AE1F0`, `0x005ADF10`); world (Flavie chat
 RNG + packets; game start mode at `0x00546270`; act transitions via
 Warriv/Meshif, 0x61; Inifuss scroll 0x50; waypoint to another act and an
-undiscovered waypoint twice).
+undiscovered waypoint twice); vitals (hook `0x00570880` entry/exit and
+`0x00570D60`, stats 4–13 before/after, one level-up and stat spending);
+DRLG (full RNG hook: Den of Evil, Cave 1, Acts 2–4 with drlg +0x94,
++0x484, +0x474; entry returned by `0x0066D820`; `record_tick` extended
+with each active room's DRLG rect, near list, status/counts, client
+count and counter, `rooms.md` Test vectors).
 
 **Cross-spec fixes reported by writers** (apply on the owning spec with
 evidence): `rng.md` §5.3 (item seed re-init after a failed quality
@@ -174,7 +179,16 @@ without an entry returns the level-0 special value; OQ5/OQ8 answered by
 `skills/levels.md`); `server-messages.tsv` (0x63, 0x28, 0x5D, 0x50, 0x91
 per `world/quests.md`; 0xAC per `monsters/init.md` §24); `tick.md` §4
 (`0x0052D0F0`), §5.6 (thinks dropped by the freeze gate are never
-rescheduled); `units.md` (pointers from the skills and monsters specs).
+rescheduled); `units.md` (pointers from the skills and monsters specs);
+`client-messages.tsv` 0x3A (byte +1 stat id ≤ 15, byte +2 count − 1 ≤ 99,
+not `stat:u16@1`, `combat/vitals.md`); `rng.md` §7 DRLG rows (level seed
+for `0x0066F690`/`0x0066F990`, room-seed sites `0x0066D820`, `0x00670170`,
+`0x006706D7`, maze draws `0x006711A0`–`0x00673EC9`, `drlg/rooms.md`);
+`unit-order.md` §9/OQ2 → `drlg/rooms.md` §6, OQ3 → units/monsters;
+`tick.md` OQ4 → `drlg/rooms.md` §7; `ds1.md` OQ1/OQ4 closed (bytes never
+read), OQ3 (truncated `trees.ds1` group: keep 0). Carried-over question 1
+below: the server tile build does not hide those tiles; the cause is in
+the client draw path.
 
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
@@ -215,13 +229,18 @@ drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
 (+ `property-functions.tsv`; `claude/phase3-items`). Combat and skills:
 `specs/combat/hit.md`, `damage.md`, `specs/skills/levels.md` (+
 `skillcalc.tsv`, `misscalc.tsv`), `use.md` (+ `functions.tsv`;
-`claude/phase3-skills`; `combat/vitals.md` in progress). Monsters and
+`claude/phase3-skills`; `combat/vitals.md`: creation, stat points,
+level-up, experience table). Monsters and
 missiles: `specs/monsters/population.md` (+ `preset-monsters.tsv`),
 `init.md` (+ `umods.tsv`), `ai.md` (+ `ai-functions.tsv`),
 `specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`;
 `claude/phase3-monsters`). World: `specs/world/quests.md` (+
 `quests.tsv`, `quest-messages.tsv`), `waypoints.md` (+ `waypoints.tsv`;
-`claude/phase3-world`; cube, NPC, vendors in progress). All draft: rules
+`claude/phase3-world`; cube, NPC, vendors in progress). Level generation:
+`specs/drlg/levels.md`, `rooms.md` (rooms-near order, adjacency arrays,
+the deactivation counter = `tick.md` OQ4), `preset.md` (+
+`preset-tables.tsv`), `maze.md` (+ `maze-specials.tsv`), `outdoor.md`,
+`outdoor-tilesub.md` (`claude/phase3-drlg`). All draft: rules
 from the 1.14d disassembly, RNG draw order not yet checked on a trace. Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
 `specs/sim/rng.md`. Each spec's "Open questions" holds its unknowns.
