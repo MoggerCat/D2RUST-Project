@@ -21,6 +21,7 @@
 //! The client decides no outcome here (CLAUDE.md rule 7): this module only
 //! reads the model.
 
+pub mod feed;
 pub mod node;
 pub mod present;
 pub mod ui_bind;
@@ -46,6 +47,7 @@ use crate::scene::{
     self, BlendOp, DrawItem, DrawKey, FrameId, ItemTag, MapTable, Rect, SceneError, ShadeChain,
 };
 
+pub use feed::{build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
 

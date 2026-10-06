@@ -126,3 +126,13 @@ None new.
 ## 6. Gate
 
 `sh tools/gate.sh all`: GATE PASS (all 13 steps, `d2-client` included).
+
+## 7. Port to the new base
+
+Merged `origin/claude/tender-meitner-mphas3` (the `wire-path-sim` seams):
+`path/gap_tests.rs` now uses `path::coords::Point` and `drlg::TileRect`
+(`SubPoint` / `RoomRect` are gone); every assertion and claim kept.
+After the merge: `coverage.py --check` 3,873 claims, 0 errors;
+`path-placement.md` 80/84, `inventory.md` 145/148, `quests.md` 74/81
+(any tier); total 2,829/3,106 (91.1%). `cargo check --workspace
+--all-targets --keep-going` clean; `sh tools/gate.sh all` GATE PASS.

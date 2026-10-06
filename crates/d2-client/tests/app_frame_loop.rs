@@ -7,7 +7,9 @@
 //! - every update runs one bridge frame (pump: drain → tick → flush;
 //!   receive), the server ticks on its host clock, the bridge receives
 //!   the server's S→C message, and the world view builds a frame from the
-//!   bridge's model;
+//!   bridge's model through the original's view rules
+//!   (`rules::OriginalView`, camera from the `ViewFeed`), once per server
+//!   tick (`render/camera.md` §9: no tick, no draw);
 //! - the GPU compositor's render-graph node runs when an adapter exists:
 //!   its output, read back from the presented texture, equals the CPU
 //!   reference byte for byte. Without an adapter the GPU test reports the
@@ -47,7 +49,8 @@ use d2_client::bridge::{BridgeResource, ClientUnit};
 use d2_client::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use d2_client::frames::{FramePart, FrameSet, FrameSetKey, IndexFrame};
 use d2_client::gpu_compositor::Gpu;
-use d2_client::scene::{BlendOp, DrawKey, Rect, ShadeChain};
+use d2_client::rules::{MapTile, OpenMode, Shake, TileList, UnitPosition, ViewSource};
+use d2_client::scene::{BlendOp, DrawKey, ShadeChain};
 use d2_client::ui::{
     GlyphLookup, GlyphPlacement, ImageRequest, NoPanelRules, Panel, PanelId, Point, TextError,
     TextOpts, TextRequest, TextRules, TextStyle, UiCtx, UiDraw, UiDrawSink, UiEvent, UiResponse,
@@ -56,13 +59,15 @@ use d2_client::ui::{
 use d2_client::world_view::node::NodeRuns;
 use d2_client::world_view::present::{FrameStats, WorldViewTarget};
 use d2_client::world_view::{
-    build, compose_cpu, text_sprites, TextFont, TextHooks, TileDraw, UiRules, UiSprite, UnitPose,
-    Unspecified, ViewAssets, ViewError, ViewRules, WorldViewState, WorldViewUi, VIEW,
+    build_frame, compose_cpu, text_sprites, NoFeed, RunningShake, TextFont, TextHooks, TileDraw,
+    UiRules, UiSprite, UnitPose, Unspecified, ViewAssets, ViewError, ViewFeed, ViewRules,
+    WorldViewState, WorldViewUi, VIEW,
 };
 use d2_formats::font::{FontTable, Glyph};
 use d2_formats::palette::{Palette, Rgb};
 use d2_proto::client::TakeOrCloseWp;
 use d2_server::seams::Clock;
+use d2_sim::rng::Seed;
 
 /// The host clock, advanced by the test.
 struct StepClock(Arc<AtomicU32>);
@@ -114,23 +119,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(link), true).unwrap();
 
-    // Frame 1 at 1000 ms: the host starts its clock, no tick; the world
-    // view composes the (empty) model on the CPU (no render world).
+    // Frame 1 at 1000 ms: the host starts its clock, no tick; nothing is
+    // drawn (camera.md §9: the draw follows a server tick).
     app.update();
     let w = &bridge(&app).0.world();
     assert_eq!((w.frames, w.server_ticks), (1, 0));
-    assert_eq!(
-        stats(&app),
-        FrameStats {
-            bridge_frame: 1,
-            items: 0,
-            units_drawn: 0,
-            units_hidden: 0,
-            ui_sent: 0,
-            ui_unhandled: 0,
-            gpu: false,
-        }
-    );
+    assert_eq!(app.world().resource::<WorldViewState>().last, None);
     assert_eq!(
         app.world().get_resource::<NodeRuns>().map(|r| r.get()),
         None
@@ -138,7 +132,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
 
     // An intent sent between frames 1 and 2 is drained by frame 2's pump;
     // the tick's flush reaches the bridge in the same frame: S→C 0x0D,
-    // which has no owner spec yet, so it is recorded as unowned.
+    // which has no owner spec yet, so it is recorded as unowned. The world
+    // view composes the (empty) model of tick 1 on the CPU (no render
+    // world).
     let sent = app
         .world_mut()
         .resource_mut::<BridgeResource>()
@@ -155,12 +151,26 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
     assert_eq!(b.log().unowned.get(&0x0D), Some(&1));
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
-    assert_eq!(stats(&app).bridge_frame, 2);
+    assert_eq!(
+        stats(&app),
+        FrameStats {
+            bridge_frame: 2,
+            server_tick: 1,
+            items: 0,
+            units_drawn: 0,
+            units_hidden: 0,
+            ui_sent: 0,
+            ui_unhandled: 0,
+            gpu: false,
+        }
+    );
 
-    // A frame shorter than a tick pumps without ticking.
+    // A frame shorter than a tick pumps without ticking, and draws
+    // nothing: the presented frame stays tick 1's (no interpolation).
     app.update();
     let w = bridge(&app).0.world();
     assert_eq!((w.frames, w.server_ticks), (3, 1));
+    assert_eq!(stats(&app).bridge_frame, 2);
 
     // A frame much longer than a tick still runs one tick: no catch-up.
     ms.fetch_add(200, Ordering::SeqCst);
@@ -177,13 +187,189 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     }
     let w = bridge(&app).0.world();
     assert_eq!((w.frames, w.server_ticks), (304, 302));
-    assert_eq!(stats(&app).bridge_frame, 304);
+    assert_eq!(
+        (stats(&app).bridge_frame, stats(&app).server_tick),
+        (304, 302)
+    );
     assert_eq!(bridge(&app).0.log().unowned.get(&0x0D), Some(&1));
 
-    // The presented image is the CPU reference of the empty list.
+    // The presented image is the CPU reference of the empty list (the
+    // app's placeholder feed states no local player: no camera, nothing
+    // placeable, nothing listed).
     let state = app.world().resource::<WorldViewState>();
-    let frame = build(&ClientWorld::default(), &[], &Unspecified, &state.assets).unwrap();
+    let frame = build_frame(
+        &ClientWorld::default(),
+        &[],
+        &Unspecified,
+        &mut NoFeed,
+        &state.assets,
+    )
+    .unwrap();
     let want = compose_cpu(&frame, &state.assets).unwrap();
+    let target = app.world().resource::<WorldViewTarget>();
+    let image = app
+        .world()
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .unwrap();
+    assert_eq!(image.data.as_deref(), Some(&want[..]));
+}
+
+// The app's world view places through the original's camera (camera.md
+// §3, §6, placement §8), fed by the app's `ViewFeed`, once per server
+// tick (§9): a walking player moves the tiles one pixel per tick, frames
+// without a tick draw nothing, and a running shake asks for its
+// amplitude once per drawn frame on the tick time base.
+// Covers: specs/render/camera.md §3, §9
+#[test]
+fn frame_loop_draws_each_tick_through_the_original_view() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (link, _) = game(&ms);
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>();
+    add_game(&mut app, Box::new(link), true).unwrap();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let feed = TestFeed {
+        step: 1,
+        asked: asked.clone(),
+        ..TestFeed::default()
+    };
+    app.insert_resource(WorldViewState::new(
+        assets(),
+        Box::new(TestRules),
+        Box::new(feed),
+    ));
+    app.update();
+    // Five ticks, each followed by a frame without a tick.
+    for _ in 0..5 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+        app.update();
+    }
+    assert_eq!(bridge(&app).0.world().server_ticks, 5);
+    assert_eq!(*asked.lock().unwrap(), vec![1, 2, 3, 4, 5]);
+    assert_eq!((stats(&app).server_tick, stats(&app).items), (5, 3));
+
+    // The presented frame of tick 5, painted from the spec's coordinates
+    // by hand: player client x 1005, tile origin x 605; floor handed (sx −
+    // 605, sy − 1720), drawn 80 left (camera §5, §6; the image's x0 is 0).
+    let a = assets();
+    let tile = a.frames.frames()[0].clone();
+    let mut want = vec![0u8; (VIEW.width * VIEW.height) as usize];
+    for (x, y) in [(-45, 40), (35, 80), (755, 40)] {
+        for ty in 0..tile.height as i32 {
+            for tx in 0..tile.width as i32 {
+                let v = tile.pixels[(ty * tile.width as i32 + tx) as usize];
+                let (px, py) = (x + tx, y + ty);
+                if v != 0 && (0..800).contains(&px) && (0..600).contains(&py) {
+                    want[(py * 800 + px) as usize] = v;
+                }
+            }
+        }
+    }
+    let rgba: Vec<u8> = want
+        .iter()
+        .flat_map(|&i| {
+            let c = palette().colors[usize::from(i)];
+            [c.r, c.g, c.b, 255]
+        })
+        .collect();
+    let target = app.world().resource::<WorldViewTarget>();
+    let image = app
+        .world()
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .unwrap();
+    assert_eq!(image.data.as_deref(), Some(&rgba[..]));
+
+    // M08: one tick later the frame moves by exactly one pixel column per
+    // tile edge.
+    ms.fetch_add(40, Ordering::SeqCst);
+    app.update();
+    let target = app.world().resource::<WorldViewTarget>();
+    let moved = app
+        .world()
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .unwrap()
+        .data
+        .clone()
+        .unwrap();
+    assert_ne!(moved, rgba);
+}
+
+// Covers: specs/render/camera.md §8, §9
+#[test]
+fn frame_loop_shakes_on_the_tick_time_base() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (link, _) = game(&ms);
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>();
+    add_game(&mut app, Box::new(link), true).unwrap();
+    let mut seed = Seed::default();
+    seed.set(0x1234_5678, 666);
+    let shake = Shake::start(10, 100, 200, 100).unwrap();
+    let feed = TestFeed {
+        shake: Some(shake),
+        seed,
+        ..TestFeed::default()
+    };
+    app.insert_resource(WorldViewState::new(
+        assets(),
+        Box::new(TestRules),
+        Box::new(feed),
+    ));
+    app.update();
+    for _ in 0..3 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+        app.update();
+    }
+    assert_eq!(bridge(&app).0.world().server_ticks, 3);
+
+    // Ticks 1–3: t = 40, 80, 120 ms → a = 4, 8, 10; two draws each on the
+    // player seed, once per drawn frame. The presented frame is tick 3's,
+    // its origins moved by the third pair of offsets.
+    let mut reference = seed;
+    let mut offsets = (0, 0);
+    for a in [4, 8, 10] {
+        offsets = d2_client::rules::camera::shake_offsets(a, &mut reference);
+    }
+    let world = ClientWorld {
+        server_ticks: 3,
+        ..ClientWorld::default()
+    };
+    let mut at_tick_2 = TestFeed {
+        shake: Some(shake),
+        seed,
+        ..TestFeed::default()
+    };
+    for a in [4, 8] {
+        d2_client::rules::camera::shake_offsets(a, &mut at_tick_2.seed);
+    }
+    let cam = d2_client::world_view::frame_camera(&world, &mut at_tick_2)
+        .unwrap()
+        .unwrap();
+    assert_eq!(at_tick_2.seed, reference);
+    assert_eq!(
+        (cam.tile.x, cam.tile.y),
+        (600 + offsets.0, 1720 + offsets.1)
+    );
+    let a = assets();
+    let mut fresh = TestFeed {
+        shake: Some(shake),
+        seed,
+        ..TestFeed::default()
+    };
+    for a in [4, 8] {
+        d2_client::rules::camera::shake_offsets(a, &mut fresh.seed);
+    }
+    let frame = build_frame(&world, &[], &TestRules, &mut fresh, &a).unwrap();
+    let want = compose_cpu(&frame, &a).unwrap();
     let target = app.world().resource::<WorldViewTarget>();
     let image = app
         .world()
@@ -231,26 +417,83 @@ fn assets() -> ViewAssets {
     a
 }
 
-/// Fixture rules: the tile twice, overlapping, partly off the frame's
-/// right edge; nothing else.
-struct TestRules;
+/// Moving-unit 16.16 coordinates whose client position is `(px, py)`
+/// (`render/camera.md` §2: a − b = 2 px, a + b = 4 py).
+fn moving(px: i32, py: i32) -> UnitPosition {
+    let (a, b) = (px + 2 * py, 2 * py - px);
+    UnitPosition::Moving {
+        x16: (a as u32) << 11,
+        y16: (b as u32) << 11,
+    }
+}
 
-impl ViewRules for TestRules {
-    fn tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
-        let tile = |x, y, minor| TileDraw {
+/// Fixture camera feed (not a rule): the local player at client
+/// (1000 + `step` × server ticks, 2000), open mode 0, the tile on floor
+/// cells (26, 18), (27, 18) and (31, 13) (handed (40, 40), (120, 80),
+/// (840, 40) at step 0: drawn at x − 80, the first partly off the left
+/// edge), and an optional shake from tick 0 whose asks are logged.
+#[derive(Default)]
+struct TestFeed {
+    step: i32,
+    shake: Option<Shake>,
+    seed: Seed,
+    asked: Arc<Mutex<Vec<u64>>>,
+}
+
+impl ViewSource for TestFeed {
+    fn unit_position(&self, _: &ClientUnit) -> Result<UnitPosition, String> {
+        Err("no units in these scenes".into())
+    }
+    fn unit_offset(&self, _: &ClientUnit, _: &UnitPose) -> Result<(i32, i32), String> {
+        Err("no units in these scenes".into())
+    }
+    fn map_tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<MapTile>, ViewError> {
+        let tile = |cell, minor| MapTile {
+            cell,
+            list: TileList::Floor,
             frame: ComponentFrame {
                 set: tile_key(),
                 index: 0,
             },
-            x,
-            y,
-            clip: Rect::FRAME,
+            blocks: Vec::new(),
             shade: ShadeChain::EMPTY,
             blend: BlendOp::Opaque,
             key: DrawKey::new(0, 0, minor, 0).unwrap(),
-            cell: (minor as i32, 0),
         };
-        Ok(vec![tile(100, 90, 0), tile(120, 100, 1), tile(780, 300, 2)])
+        Ok(vec![
+            tile((26, 18), 0),
+            tile((27, 18), 1),
+            tile((31, 13), 2),
+        ])
+    }
+}
+
+impl ViewFeed for TestFeed {
+    fn player(&self, w: &ClientWorld) -> Result<Option<UnitPosition>, ViewError> {
+        Ok(Some(moving(1000 + self.step * w.server_ticks as i32, 2000)))
+    }
+    fn open_mode(&self, _: &ClientWorld) -> Result<OpenMode, ViewError> {
+        Ok(OpenMode::NONE)
+    }
+    fn shake(&self, w: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
+        self.asked.lock().unwrap().push(w.server_ticks);
+        Ok(self.shake.map(|shake| RunningShake {
+            shake,
+            start_tick: 0,
+        }))
+    }
+    fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
+        Ok(&mut self.seed)
+    }
+}
+
+/// Fixture rules: no tile of their own (the original's placement answers
+/// tiles, from [`TestFeed`]), no unit drawn.
+struct TestRules;
+
+impl ViewRules for TestRules {
+    fn tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
+        unreachable!("OriginalView answers tiles")
     }
     fn unit_pose(&self, w: &ClientWorld, u: &ClientUnit) -> Result<Option<UnitPose>, ViewError> {
         Unspecified.unit_pose(w, u)
@@ -344,7 +587,11 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
             .disable::<bevy::log::LogPlugin>(),
     );
     add_game(&mut app, Box::new(link), true).unwrap();
-    app.insert_resource(WorldViewState::new(assets(), Box::new(TestRules)));
+    app.insert_resource(WorldViewState::new(
+        assets(),
+        Box::new(TestRules),
+        Box::new(TestFeed::default()),
+    ));
     app.finish();
     app.cleanup();
 
@@ -385,7 +632,7 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
 
     let world = ClientWorld::default();
     let a = assets();
-    let frame = build(&world, &[], &TestRules, &a).unwrap();
+    let frame = build_frame(&world, &[], &TestRules, &mut TestFeed::default(), &a).unwrap();
     let want = compose_cpu(&frame, &a).unwrap();
     let got = unpad(&data, VIEW.width, VIEW.height);
     let differ = got
@@ -645,8 +892,12 @@ fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(link), true).unwrap();
-    app.insert_resource(WorldViewState::new(text_assets(), Box::new(TextTestRules)))
-        .insert_resource(audio());
+    app.insert_resource(WorldViewState::new(
+        text_assets(),
+        Box::new(TextTestRules),
+        Box::new(TestFeed::default()),
+    ))
+    .insert_resource(audio());
     let mut root = UiRoot::new(Box::new(NoPanelRules));
     root.add(Box::new(TextPanel)).unwrap();
     root.open(PanelId(1)).unwrap();
@@ -670,7 +921,18 @@ fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
     let s = stats(&app);
     assert_eq!((s.items, s.gpu), (6, false));
     let a = text_assets();
-    let frame = build(&ClientWorld::default(), &[hi()], &TextTestRules, &a).unwrap();
+    let world = ClientWorld {
+        server_ticks: 2,
+        ..ClientWorld::default()
+    };
+    let frame = build_frame(
+        &world,
+        &[hi()],
+        &TextTestRules,
+        &mut TestFeed::default(),
+        &a,
+    )
+    .unwrap();
     let glyphs: Vec<_> = frame.items[3..]
         .iter()
         .map(|i| (i.frame.0, i.x, i.y))

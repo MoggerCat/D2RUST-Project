@@ -140,7 +140,14 @@ impl CellGrid {
         }
         let w = u32::from(cols) * u32::from(cell_w);
         let h = u32::from(rows) * u32::from(cell_h);
-        if w > u32::from(u16::MAX) || h > u32::from(u16::MAX) {
+        // Every pixel of the grid must be an i32 point, so cell rects and
+        // hit math stay in range.
+        let past_end = |o: i32, size: u32| i64::from(o) + i64::from(size) > i64::from(i32::MAX) + 1;
+        if w > u32::from(u16::MAX)
+            || h > u32::from(u16::MAX)
+            || past_end(origin.x, w)
+            || past_end(origin.y, h)
+        {
             return Err(WidgetError::TooLarge(id));
         }
         Ok(Self {
@@ -258,7 +265,9 @@ impl ScrollList {
 
     /// Moves `first` by `rows` (negative: up), clamped to the range.
     pub fn scroll(&mut self, rows: i64) {
-        let f = (i64::from(self.first) + rows).clamp(0, i64::from(self.max_first()));
+        let f = i64::from(self.first)
+            .saturating_add(rows)
+            .clamp(0, i64::from(self.max_first()));
         self.first = f as u32;
     }
 

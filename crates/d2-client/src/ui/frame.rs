@@ -60,8 +60,10 @@ impl Presentation {
     /// Maps a window pixel (physical, top-left origin) to the frame.
     pub fn to_frame(&self, x: i64, y: i64) -> FramePos {
         let s = i64::from(self.scale);
-        let dx = x - i64::from(self.left);
-        let dy = y - i64::from(self.top);
+        // Saturating: a far-off position (the edge floors any float,
+        // infinities included) stays outside instead of wrapping.
+        let dx = x.saturating_sub(i64::from(self.left));
+        let dy = y.saturating_sub(i64::from(self.top));
         let (fw, fh) = (i64::from(FRAME_W), i64::from(FRAME_H));
         if dx < 0 || dy < 0 || dx >= fw * s || dy >= fh * s {
             return FramePos::Outside;

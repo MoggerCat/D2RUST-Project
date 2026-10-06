@@ -4,20 +4,17 @@
 //! mask and size, and the warp tile preset's inputs. Fakes from
 //! `search::tests` and `warp`'s own view are reused where public.
 
+use super::coords::Point;
 use super::place::floor_drop;
-use super::place_seams::{mask, LvlWarp, PlaceError, RoomRect, SubPoint, TileRect, WarpTileView};
+use super::place_seams::{mask, LvlWarp, PlaceError, WarpTileView};
 use super::search::tests::{sign_field, Grid};
 use super::search::{free_point, free_point_field, free_point_step, FREE_MAX_DISTANCE};
 use super::warp::warp_tile_preset;
+use crate::drlg::TileRect;
 
 /// A 120 × 120 room with every cell a wall (0x1) except `free`.
 fn walled(free: &[(i32, i32)]) -> Grid {
-    let mut g = Grid::with_rooms(&[RoomRect {
-        x: 0,
-        y: 0,
-        w: 120,
-        h: 120,
-    }]);
+    let mut g = Grid::with_rooms(&[TileRect::new(0, 0, 120, 120)]);
     for y in 0..120 {
         for x in 0..120 {
             if !free.contains(&(x, y)) {
@@ -35,25 +32,25 @@ fn wrapper_max_distance_fifty() {
     // Ring r reaches Chebyshev distance r; with D = 50 and step 1 the
     // last ring searched is 49.
     let g = walled(&[(109, 60)]);
-    let mut p = SubPoint::new(60, 60);
+    let mut p = Point::new(60, 60);
     assert_eq!(
         free_point(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, false),
         Ok(Some(0))
     );
-    assert_eq!(p, SubPoint::new(109, 60));
+    assert_eq!(p, Point::new(109, 60));
     let g = walled(&[(110, 60)]);
-    let mut p = SubPoint::new(60, 60);
+    let mut p = Point::new(60, 60);
     assert_eq!(
         free_point(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, false),
         Ok(None)
     );
-    assert_eq!(p, SubPoint::new(60, 60));
+    assert_eq!(p, Point::new(60, 60));
     // `0x0064E7B0`'s fallback argument: the room at the unchanged point.
     assert_eq!(
         free_point(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, true),
         Ok(Some(0))
     );
-    assert_eq!(p, SubPoint::new(60, 60));
+    assert_eq!(p, Point::new(60, 60));
 }
 
 // Covers: specs/sim/path-placement.md §7.1
@@ -62,25 +59,25 @@ fn step_wrapper_steps_and_never_falls_back() {
     // Step 2: ring 2 lies at distance 3 and its side columns are tested
     // every second row, so (62, 60) is never a candidate.
     let g = walled(&[(62, 60)]);
-    let mut p = SubPoint::new(60, 60);
+    let mut p = Point::new(60, 60);
     assert_eq!(
         free_point_step(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, 2),
         Ok(None)
     );
-    assert_eq!(p, SubPoint::new(60, 60));
-    let mut p = SubPoint::new(60, 60);
+    assert_eq!(p, Point::new(60, 60));
+    let mut p = Point::new(60, 60);
     assert_eq!(
         free_point_step(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, 1),
         Ok(Some(0))
     );
-    assert_eq!(p, SubPoint::new(62, 60));
+    assert_eq!(p, Point::new(62, 60));
     let g = walled(&[(63, 61)]);
-    let mut p = SubPoint::new(60, 60);
+    let mut p = Point::new(60, 60);
     assert_eq!(
         free_point_step(&g, Some(0), &mut p, 1, mask::PLAYER_PLACE, 2),
         Ok(Some(0))
     );
-    assert_eq!(p, SubPoint::new(63, 61));
+    assert_eq!(p, Point::new(63, 61));
 }
 
 // Covers: specs/sim/path-placement.md §7.1
@@ -91,7 +88,7 @@ fn field_wrapper_needs_a_walk_back_to_the_origin() {
     for y in 0..20 {
         g.set(12, y, 0x1);
     }
-    let start = SubPoint::new(13, 10);
+    let start = Point::new(13, 10);
     // Without a field the free start is the answer.
     let mut p = start;
     assert_eq!(
@@ -109,7 +106,7 @@ fn field_wrapper_needs_a_walk_back_to_the_origin() {
             &field,
             Some(0),
             &mut p,
-            SubPoint::new(10, 10),
+            Point::new(10, 10),
             1,
             mask::ITEM_FLOOR,
             mask::FIELD,
@@ -117,30 +114,26 @@ fn field_wrapper_needs_a_walk_back_to_the_origin() {
         ),
         Ok(Some(0))
     );
-    assert_eq!(p, SubPoint::new(11, 10));
+    assert_eq!(p, Point::new(11, 10));
 }
 
 // Covers: specs/sim/path-placement.md §9 text
 #[test]
 fn floor_drop_is_one_cell_against_item_mask() {
     assert_eq!(mask::ITEM_FLOOR, 0x3E01);
-    let drop = |g: &Grid| floor_drop(g, &sign_field(), Some(0), SubPoint::new(10, 10), 1, true);
+    let drop = |g: &Grid| floor_drop(g, &sign_field(), Some(0), Point::new(10, 10), 1, true);
     // Bits outside 0x3E01 (here 0x8, NOPLAYER) never block the start
     // (12, 13); a wall next to it does not matter for size 1.
     let mut g = Grid::vec20();
     g.set(12, 13, 0x8);
     g.set(13, 13, 0x1);
     g.set(12, 14, 0x1);
-    assert_eq!(drop(&g), Ok((Some(0), SubPoint::new(12, 13))));
+    assert_eq!(drop(&g), Ok((Some(0), Point::new(12, 13))));
     // Each bit of 0x3E01 blocks it.
     for bit in [0x1, 0x200, 0x400, 0x800, 0x1000, 0x2000] {
         let mut g = Grid::vec20();
         g.set(12, 13, bit);
-        assert_eq!(
-            drop(&g),
-            Ok((Some(0), SubPoint::new(11, 13))),
-            "bit {bit:#x}"
-        );
+        assert_eq!(drop(&g), Ok((Some(0), Point::new(11, 13))), "bit {bit:#x}");
     }
 }
 
