@@ -169,7 +169,14 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       split, typed fixed layouts. `d2-server` local transport and host loop (queues, drain, gate, size
       check, point/unit parse, buffers, flush, delivery, tick driver) done
       against seams (34 unit tests); wiring to `d2-proto` / `d2-sim` pending.*
-- [ ] Units, stats, stat lists, modifiers
+- [ ] Units, stats, stat lists, modifiers. *Specs written (2026-10-06,
+      branch `claude/phase3-units`): `specs/sim/units.md` (+ TSVs; per-kind
+      event rules 0 errors on the three recordings, `check_units.py`),
+      `sim/stats.md`, `sim/stat-lists.md` (unverified: recording queued,
+      HANDOFF §5). Tick traces `traces/sim/tick/sim-0006`–`0008` committed
+      (`convert_tick.py`). Status draft until implemented.*
+- [ ] *Specs for the remaining items below in progress (2026-10-06), one
+      writer per topic on `claude/phase3-{items,treasure,skills,drlg,monsters,world}`.*
 - [ ] Items: generation, quality rolls, affixes, uniques/sets, runewords
 - [ ] Treasure classes and drops
 - [ ] Skills and combat formulas
