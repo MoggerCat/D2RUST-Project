@@ -475,7 +475,12 @@ fn player_leaving_with_quest_items() {
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
+    // Chains 22 and 24 have bodies too (quests-act4.md §3.7, §4.5).
+    ctl.record_mut(22).unwrap().guids.add(1);
+    ctl.record_mut(24).unwrap().guids.add(1);
     ctl.player_leaves(&mut w, P1);
+    assert!(!ctl.record(22).unwrap().guids.contains(1));
+    assert!(!ctl.record(24).unwrap().guids.contains(1));
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
             .iter()
@@ -491,7 +496,8 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
     let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=6).contains(&r.chain) {
+        let body = (1..=6).contains(&r.chain) || matches!(r.chain, 22 | 24);
+        if r.has_callback(event::PLAYER_LEAVES_GAME) && !body {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
@@ -686,7 +692,6 @@ fn object_quest_functions_by_class() {
         (0x7A, "unhandled 11 0x59b710"),
         (0x155, "unhandled 20 0x5bcac0"),
         (0x173, "unhandled 5 0x5954f0"),
-        (0x178, "unhandled 24 0x5b6710"),
         (0x1CB, "unhandled 255 0x58b940"),
         (0x1CC, "unhandled 255 0x58a500"),
         (0x1CD, "unhandled 255 0x589540"),
@@ -698,6 +703,16 @@ fn object_quest_functions_by_class() {
         object_event(&mut ctl, &mut f, obj, class);
         assert_eq!(f.log, [want], "class {class:#x}");
     }
+    // 0x178, the Hellforge (`0x005B6710`, quests-act4.md §4.7): a fresh
+    // record (nothing smashed, no gems pending) does nothing; once
+    // smashed, mode 4.
+    let mut f = Fake::new();
+    object_event(&mut ctl, &mut f, obj, 0x178);
+    assert!(f.log.is_empty() && f.sent.is_empty());
+    ctl.record_mut(24).unwrap().extra.a4.q3.smashed = true;
+    object_event(&mut ctl, &mut f, obj, 0x178);
+    assert_eq!(f.log, ["mode 112 4"]);
+    ctl.record_mut(24).unwrap().extra.a4.q3.smashed = false;
     // 0x83 in a room: mode 1 → 2; level 76 → `0x005B23C0`.
     let mut f = Fake::new();
     f.objects.insert(obj, (0x70, 0x83, 1));

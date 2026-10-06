@@ -209,6 +209,12 @@ pub(super) struct Fake {
     pub(super) sent: Vec<(UnitId, Vec<u8>)>,
     pub(super) log: Vec<String>,
     // -- Act IV q1/q3 fake fields.
+    /// `room_in_act_at`'s answer.
+    pub(super) a4_room: Option<RoomId>,
+    /// `unit_distance` by the first unit (a player); missing: `None`.
+    pub(super) a4_dist: BTreeMap<UnitId, i32>,
+    /// `wielded_weapon_code` by player.
+    pub(super) a4_wield: BTreeMap<UnitId, [u8; 4]>,
     // -- end Act IV q1/q3 fake fields.
 
     // -- Act IV q2 fake fields.
@@ -547,6 +553,16 @@ impl QuestWorld for Fake {
     }
 
     // -- Act IV q1/q3 seam fakes.
+    fn room_in_act_at(&mut self, act: u8, x: i32, y: i32) -> Option<RoomId> {
+        self.log.push(format!("room act {act} {x} {y}"));
+        self.a4_room
+    }
+    fn unit_distance(&mut self, a: UnitId, _: UnitId) -> Option<i32> {
+        self.a4_dist.get(&a).copied()
+    }
+    fn wielded_weapon_code(&mut self, player: UnitId) -> Option<[u8; 4]> {
+        self.a4_wield.get(&player).copied()
+    }
     // -- end Act IV q1/q3 seam fakes.
 
     // -- Act IV q2 seam fakes.
