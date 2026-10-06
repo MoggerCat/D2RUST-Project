@@ -39,4 +39,10 @@ pub mod bench_fixtures {
         crate::stats::tests::data()
     }
     pub use crate::wiring::worldgen::tests::{ds1, Ds1s, Fx, ISLE, ISLE_DEF};
+    /// The combat / missile fixtures of the e2e combat path and the
+    /// "fight" tick fixture (`wiring::action::tests::fight`).
+    pub mod combat {
+        pub use crate::wiring::action::tests::fight::*;
+        pub use crate::wiring::action::tests::Fx as ActionFx;
+    }
 }
