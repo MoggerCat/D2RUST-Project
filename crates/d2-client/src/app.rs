@@ -13,6 +13,7 @@ pub mod play;
 pub mod server_thread;
 pub mod single_player;
 pub mod sound;
+pub mod ui;
 
 use std::path::PathBuf;
 use std::sync::Arc;

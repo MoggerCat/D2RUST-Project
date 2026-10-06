@@ -27,6 +27,13 @@
 //! through `ui::text::layout_text` (`world_view::text_sprites`), and the
 //! audio core plays from the sound pool after each bridge frame
 //! ([`super::sound`]; the user's archives with `D2_GAME_DIR`).
+//!
+//! With the user's files ([`run`] on live data) the original UI is added
+//! ([`super::ui`]: the `ui/panels.md` panels in the world view's root,
+//! hotkeys from the `dev` bindings, panel art from the archives, the UI
+//! flags' open mode as the camera's) and the audio runs the original
+//! sound layer (`AudioParts::original`: `sounds.txt`, the 1.14d WAV
+//! decoder, one sound tick per server tick, the UI's sound requests).
 
 use bevy::prelude::*;
 use d2_formats::palette::{Palette, Rgb};
@@ -35,6 +42,7 @@ use d2_server::host::SystemClock;
 
 use super::single_player::{self, GameData};
 use super::sound::{self, AudioParts, GameAudio};
+use super::ui;
 use crate::bridge::mirror::DynLink;
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
@@ -139,7 +147,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     }));
     add_game(&mut app, Box::new(link), true)?;
     if let Some(archives) = archives {
-        app.insert_resource(GameAudio::new(AudioParts::unspecified(archives)));
+        let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
+        ui::add_original_ui(&mut app, parts)?;
+        let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
+        app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
     }
     sound::add_output(&mut app);
     if let Some(frames) = config.exit_after {
