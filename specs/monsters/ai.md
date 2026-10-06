@@ -36,14 +36,14 @@
 |   6. Distances and line tests | 538–552 |
 |   7. Tactics helpers | 553–610 |
 |   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1413 |
-|   10. The catalogue `ai-functions.tsv` | 1414–1434 |
-| Constants & data dependencies | 1435–1458 |
-| Randomness | 1459–1480 |
-| Edge cases & original bugs | 1481–1522 |
-| Test vectors | 1523–1611 |
-| Provenance | 1612–1651 |
-| Open questions | 1652–1689 |
+|   9. Per-AI behaviours | 633–1415 |
+|   10. The catalogue `ai-functions.tsv` | 1416–1436 |
+| Constants & data dependencies | 1437–1460 |
+| Randomness | 1461–1482 |
+| Edge cases & original bugs | 1483–1524 |
+| Test vectors | 1525–1613 |
+| Provenance | 1614–1653 |
+| Open questions | 1654–1691 |
 <!-- /index -->
 
 ## Summary
@@ -1410,6 +1410,8 @@ No draws. 1.14d-confirmed; same as D2MOO.
 Act II bodies (PantherJavelin, GreaterMummy, Mummy, PantherWoman, MaggotLarva, SandLeaper, MaggotEgg, PinHead, ClawViper, Vulture, BatDemon, SandMaggotQueen, Duriel, Summoner) and the special-state thinks 10/17, 11, 12: `monsters/ai-bodies-2.md`.
 
 Act III bodies (Mosquito, ThornHulk, ZakarumZealot, ZakarumPriest, FrogDemon, FetishShaman, HighPriest, FetishBlowgun, WillOWisp, Mephisto) with the FrogDemon and FetishShaman alternates: `monsters/ai-bodies-3.md`.
+
+Act IV bodies (VileMother, VileDog, FingerMage, Regurgitator, Megademon, Diablo with its alternate and the boss target pick and score, Izual, DoomKnight, AbyssKnight, OblivionKnight): `monsters/ai-bodies-4.md`.
 
 ### 10. The catalogue `ai-functions.tsv`
 
