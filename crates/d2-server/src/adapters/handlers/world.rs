@@ -17,11 +17,13 @@
 //! provide, stays a stub ([`handle`] returns `None`).
 
 mod action;
+mod trade;
 
 #[cfg(test)]
 mod tests;
 
 pub use action::{ActionEvents, ActionWorld, Outbox};
+pub use trade::{Parts, TradeRest, TradeWorld};
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;

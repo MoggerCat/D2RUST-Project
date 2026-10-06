@@ -1,9 +1,9 @@
 // Spec: specs/world/waypoints.md §6, §7.1
 //! [`ActionWorld`]: the world systems whose seams have a provider in
 //! `d2_sim::wiring::action` — the waypoints (`WaypointView` on
-//! [`ActionSim`], reached through [`ActionEvents`]). The NPC, vendor and quest seams (`NpcWorld`,
-//! `VendorWorld`, the quests' `QuestRest`) have no provider in `d2-sim`
-//! yet, so their ids stay stubs on this host.
+//! [`ActionSim`], reached through [`ActionEvents`]). The NPC and vendor
+//! ids stay stubs on this host; [`super::TradeWorld`] adds them on the
+//! interaction wiring. The quests' ids stay stubs on both.
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;

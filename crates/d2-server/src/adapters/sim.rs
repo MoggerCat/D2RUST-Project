@@ -114,6 +114,12 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     where
         W: Default,
     {
+        Self::with_world(game, events, W::default())
+    }
+
+    /// A game with the given world host (one without a `Default`, e.g.
+    /// `handlers::world::TradeWorld`, built from the game's tables).
+    pub fn with_world(game: Game, events: D, world: W) -> Self {
         Self {
             game,
             events,
@@ -124,7 +130,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             items: None,
-            world: W::default(),
+            world,
             skills: None,
         }
     }
