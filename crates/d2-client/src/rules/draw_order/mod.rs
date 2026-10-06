@@ -15,6 +15,7 @@
 
 pub mod sight;
 pub mod source;
+pub mod weather;
 
 #[cfg(test)]
 mod tests;
