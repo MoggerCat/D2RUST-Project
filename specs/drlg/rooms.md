@@ -542,7 +542,7 @@ Y ≤ wy < Y+H, i.e. not the extra edge row/column):
    - `t` 8 or 9 (door) and the level is not 111, 112 or 117: add the
      door's preset unit (`0x0066D9E0`, below) and stop.
    - `t` 10 or 11 (exit, `main < 8` here): add the warp unit
-     (`0x0066E1C0`), then the floor warp tiles (`0x0066E360`, below), and
+     (`0x0066E1C0`, `sim/path-placement.md` §12.1), then the floor warp tiles (`0x0066E360`, below), and
      stop.
 4. If the linked bit (0x4) is set (§9.6), at most one of, then stop:
    - floor bit: if key (30, 0/1), clear bit 7; linked tile of type 0;

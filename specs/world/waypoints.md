@@ -326,7 +326,7 @@ the interact info names `wp`, the destination act, expansion, quests.
    (`0x0064E7B0`, mask 0x1C09; not found → fatal assert). Measured: every
    1.14d waypoint level with `Position` = 1 gets code 13, so waypoint
    travel always ends in the waypoint room. Room selection, the free-
-   coordinate search and placement belong to the DRLG/collision specs.
+   coordinate search and placement: `drlg/levels.md` §10, `sim/path-placement.md` §7, §10, §11.
 7. Arrival message: if the player now has a room and it equals the room
    that `0x00619E50(act of level, level, tile code)` returns (same search
    without the free-coordinate step): set the player's mode to 2 at its
