@@ -45,6 +45,7 @@ behaviors the engine reproduces exactly.
 | Unspecified table callbacks (Phase 2) | Superseded 2026-10-05: implemented from `specs/data/callbacks.md` | Was: write nothing until specified, with their bytes counted as explained by the cross-check. Now every byte must match. |
 | Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
+| Tick trace replay (2026-10-06) | `conformance::tick` runs `d2_sim::tick::tick` once per recorded tick; hooks apply each step's recorded inputs, the dispatch compares every run and applies the recorded handler's work; d2-sim's own work (step 6 clears, step 9 deactivation, freeing timers after their run) is produced, not replayed | The recording logs list primitives, d2-sim's API is coarser: each recorded primitive starts a d2-sim operation and the primitives it performs next must follow in the recording ("owed"). Unit allocation is split from `SUNIT_Add` in `d2-sim` (`alloc_unit`, `add_allocated`), as the spec has it, because a missile's init schedules a timer before the missile is listed. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 
 ## Phases
@@ -164,7 +165,11 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
       snapshots, 0 mismatches; `check_packets.py`: rules R1–R7, 0
       failures). Status draft until implemented.* *Tick core implemented
       2026-10-06 (`d2-sim::tick`, `units::lists`, `game`): unit tests from
-      every synthetic vector pass; trace replay open. `d2-proto` part done:
+      every synthetic vector pass. Trace replay done 2026-10-06
+      (`cargo test -p conformance --test tick_replay`): `sim-0006..0008`,
+      11,105 ticks, 48,316 timer runs and 446 list snapshots equal, 0
+      mismatches; `tick.md` and `unit-order.md` are `conformance-passing`.
+      `d2-proto` part done:
       ids, names, size rules and layouts of both directions generated from
       the two TSVs (`data-tool gen-proto`), size lookup, classifier, S→C
       split, typed fixed layouts. `d2-server` local transport and host loop (queues, drain, gate, size
@@ -193,7 +198,7 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 
 ### Phase 4 — Conformance (runs alongside Phase 3)
 - [ ] Trace recorder for the original game. *Feasibility proven 2026-10-05: `tools/trace-recorder` records every RNG draw of 1.14d (Python debugger); traces in `traces/sim/rng/`. Other event types not yet.*
-- [ ] Replay harness
+- [ ] Replay harness. *Per-behavior replayers in `crates/conformance`: RNG draws (`conformance::rng`) and the tick (`conformance::tick`: timer runs and unit lists, perturbation-tested).*
 - [ ] Coverage report (the "99.x%" number)
 
 ### Phase 5 — Local server + bridge

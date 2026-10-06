@@ -125,3 +125,37 @@ impl Game {
         }
     }
 }
+
+/// Allocation apart from `SUNIT_Add` (`unit-order.md` §1.4, §3.1; see
+/// `units::lists` `alloc`): the type's init may schedule timers in
+/// between (`tick.md` §5.3, missile setup).
+impl Game {
+    /// Unit allocation `0x00555230`: a GUID (`unit-order.md` §1.3) and a
+    /// unit in no list yet. [`Game::spawn_unit`] also adds it.
+    pub fn alloc_unit(&mut self, ty: UnitType, allied: bool) -> UnitId {
+        let guid = self.lists.guids.alloc(ty);
+        self.lists.alloc_unit(ty, guid, allied)
+    }
+}
+
+#[cfg(test)]
+mod alloc_tests {
+    use super::*;
+    use crate::tick::timer::TimerClass;
+
+    #[test]
+    fn timer_scheduled_before_the_unit_is_added() {
+        // Missile setup: allocate, schedule the every-tick event, add.
+        let mut g = Game::new();
+        g.lists.ensure_act(0).unwrap();
+        let room = g.lists.create_room(0).unwrap();
+        g.lists.activate_room(room).unwrap();
+        let m = g.alloc_unit(UnitType::Missile, false);
+        let t = g.schedule_event(m, 0, -1, None, 0, 0).unwrap().unwrap();
+        g.lists.add_allocated(m, Some(room)).unwrap();
+        assert_eq!(g.lists.unit(m).unwrap().guid, 1);
+        assert_eq!(g.timers.every_tick(TimerClass::Missile), [t]);
+        assert_eq!(g.timers.unit_timers(m), [t]);
+        assert_eq!(g.lists.room_units(room), [m]);
+    }
+}

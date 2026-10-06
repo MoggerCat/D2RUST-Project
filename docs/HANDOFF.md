@@ -13,7 +13,7 @@ rather than restating them.
 | 1 Formats | done | `mpq-tool check`, `mpq-tool formats` |
 | 1b First pixels | done | `d2-client verify` (GPU = CPU reference, byte-exact) |
 | 2 Data | done | `data-tool tables` (2026-10-05, with callbacks): 73 live tables, 72 byte-identical, 1 explained (`monstats` `NameStr`); 4/4 code buffers identical; `data-tool links`: 0 broken; `data-tool dump-compare traces/raw/20261006-021210-tables`: 70/70 tables and every map identical to 1.14d memory; `d2-data` game-file tests all pass (incl. `fixups_on_live_set`, `typed_tables_decode`, patch G1–G8) |
-| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) implemented from `tick.md` / `unit-order.md`, synthetic vectors pass, trace replay pending; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
+| 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) done: `tick.md` / `unit-order.md` `conformance-passing`; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `cargo test -p conformance --test tick_replay`: `traces/sim/tick/sim-0006..0008` (11,105 ticks, 65,754 inputs) replay through `d2_sim::tick::tick` with all 48,316 timer runs in order and all 446 list snapshots equal, 0 mismatches; 4 perturbation tests reported at exactly the changed record. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
 | 4 Conformance | recording proven feasible | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly |
 | 5–6 | not started | |
 | 7–9 | deferred (out of current scope) | |
@@ -31,19 +31,20 @@ rather than restating them.
 2. **Tick core**: done (`d2-sim::tick`, `units::lists`, `game`). Step
    bodies owned by other specs are hooks (`TickHooks`), timer events go
    to `EventDispatch`; unit specs plug in there.
-3. **Trace replay of the tick** (implementation; the converter
-   `tools/trace-recorder/convert_tick.py` and the traces
-   `traces/sim/tick/sim-0006..0008.json` are merged, shape-checked by
-   `crates/conformance/tests/tick_traces.rs`): hook in at `d2_sim::tick::run_timer_events`
-   with an `EventDispatch` that logs each `TimerRun` (its fields are the
-   comparison record of `tick.md` Test vectors: class, list, event type,
-   unit type, GUID, expire, arg1, arg2) and replays the recorded
-   schedules and cancels through `Game::schedule_event` /
-   `TimerQueue::cancel*`; list snapshots compare against
-   `UnitLists::{units_of_type, hash_bucket, active_rooms, room_units,
-   update_queue, clients}`. A test in `crates/conformance/tests/` like
-   `rng_traces.rs`. The host-schedule vectors of `tick.md` §1 (driver:
-   last/now/catch-up) belong to `d2-server`, not tested yet.
+3. **Trace replay of the tick**: done on `claude/phase3-tick-replay`
+   (2026-10-06, cloud). `conformance::tick::replay` runs `tick()` per
+   recorded tick: `TickHooks` apply each step's recorded inputs at that
+   step, the `EventDispatch` compares each `TimerRun` (timer, class,
+   list, type, unit, expire, args, callback) with the next recorded run
+   and applies the handler's recorded work; step 6 clears, step 9
+   deactivation (rooms in list order, units in room-list order) and the
+   runner's frees are d2-sim's own and checked against the recording.
+   Tests: `crates/conformance/tests/tick_replay.rs`. d2-sim change:
+   unit allocation split from `SUNIT_Add` (new public `UnitLists::
+   alloc_unit`, `UnitLists::add_allocated`, `Game::alloc_unit`, in their
+   own impl blocks: `units/lists/alloc.rs`, end of `game.rs`); nothing
+   else changed. Findings: §7 TR1–TR4. Still open: the host-schedule
+   vectors of `tick.md` §1 have `d2-server` unit tests only.
 4. **Implement the Phase 3 systems** (implementation, medium; cloud): one
    session per spec group: units/stats/stat lists, items
    (generation/quality/affixes/properties), treasure, combat + skill
@@ -99,9 +100,10 @@ rather than restating them.
 | `crates/d2-client/src/{app,assets,render}` | Bevy app, `mpq://` assets, palette shader | `render/map-preview.md` |
 | `crates/d2-sim/src/rng.rs` | seeded RNG: `Seed`, draw helpers, `derive`, `time_value` | `sim/rng.md` |
 | `crates/d2-sim/src/tick/{mod,timer,events}.rs` (+ `tick/tests.rs`) | `tick()` step order and passes, `TickHooks` / `EventDispatch` hooks; timer queue (`TimerQueue`: schedule, every-tick, cancel helpers, cursor run); event types and §5.6 dispatch data | `sim/tick.md` |
-| `crates/d2-sim/src/units/lists.rs` (+ `lists/tests.rs`) | GUID counters, hash lists, room/act/update-queue/client lists (`UnitLists`) | `sim/unit-order.md` |
+| `crates/d2-sim/src/units/lists.rs` (+ `lists/tests.rs`, `lists/alloc.rs`) | GUID counters, hash lists, room/act/update-queue/client lists (`UnitLists`); unit allocation apart from `SUNIT_Add` (`alloc.rs`) | `sim/unit-order.md` |
 | `crates/d2-sim/src/game.rs` | `Game`: frame counter, lists, timers; spawn/remove unit, schedule, hash iteration helpers | `sim/tick.md` §2, §5; `sim/unit-order.md` §2.5, §3 |
 | `crates/conformance/src/{trace,rng}.rs` (+ `tests/rng_traces.rs`) | trace loading and top-level checks; RNG trace replay | `traces/FORMAT.md`, `sim/rng.md` |
+| `crates/conformance/src/tick.rs` (+ `tests/tick_replay.rs`, `tests/tick_traces.rs`) | tick trace replay through `d2_sim::tick::tick`: hooks per step, run comparison, list snapshots, owed list primitives; perturbation tests | `sim/tick.md`, `sim/unit-order.md` |
 | `crates/d2-proto/src/{schema,transport,wire}.rs` | message descriptors and size rules; size lookup per direction, C→S classifier, S→C buffer split; LE reads/writes, `FixedMessage` | `sim/intents-events.md` §2–3 |
 | `crates/d2-proto/src/{tsv,codegen}.rs`, `generated.rs` | strict TSV parser + TSV-vs-code check (`tsv::check`); generator; generated `CLIENT_MESSAGES` / `SERVER_MESSAGES` and typed `client::*` / `server::*` (don't edit; `data-tool gen-proto`) | `sim/intents-events.md` §5 |
 | `crates/d2-server/src/seams.rs` | the traits `d2-server` needs from `d2-proto` / `d2-sim` / session code (§2 step 4) | `sim/intents-events.md` |
@@ -128,6 +130,7 @@ rather than restating them.
 | Command | Proves | Needs |
 |---|---|---|
 | `cargo test -p <crate>` | unit tests from spec vectors | repo |
+| `cargo test -p conformance --test tick_replay` | `d2-sim::tick` reproduces every timer run and list snapshot of `traces/sim/tick/*.json`; perturbation tests (`a_*_is_reported_exactly`) report exactly the changed record (M08) | repo |
 | `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo fmt --all` | lint/format gate | repo |
 | `cargo run -p depcheck` | crate dependency rules | repo |
 | `cargo run -p data-tool -- gen-proto` then `cargo test -p d2-proto` | `d2-proto` tables regenerated from `specs/sim/*-messages.tsv`; tests `generated_file_is_current`, `tables_match_tsv` (perturbation: `check_reports_exactly_a_changed_row`) | repo |
@@ -307,6 +310,41 @@ From the tick-core implementation (`claude/phase3-tick`; each has a
 - T5. Step 9 `0x0061A910` and `compress_unit`: d2rs only unlinks the
   room from the act list; whether compression unlinks units and what
   else room removal frees belong to the DRLG / room-lifecycle spec.
+
+From the tick trace replay (`claude/phase3-tick-replay`):
+
+- TR1. d2-sim deviated from `unit-order.md` §1.4/§3.1: it could not
+  hold a unit allocated but not yet added, and the missile init
+  (`0x0059F8A0`, `tick.md` §5.3) schedules its every-tick event in
+  between (`sim-0006` tick 3576, `sim-0008` tick 677: `timer_set` before
+  the missile's `room_add`). Fixed with `alloc_unit` / `add_allocated`.
+  The spec rules already say this; a spec session may add the missile
+  case to §3.1 as an example.
+- TR2. Recorder/converter gaps (not bugs; the replay works around them,
+  documented in `conformance::tick::replay`): unit allocation is not
+  recorded (the replay allocates a unit at its first reference, a
+  `timer_set`); client joins, client states and the client's player link
+  are not recorded (the replay sets up the single-player client in game
+  without a player, so the §6.5 per-client player queue insert is
+  replayed from the recording, not produced by d2-sim); the snapshots'
+  `adj` arrays are not compared (DRLG data, no input drives them).
+  Recording client joins and the client→player link in `record_tick.py`
+  would let the replay produce the client pass. Recorder semantics the
+  replay relies on, confirmed on all three traces: `room_remove` is
+  logged for every call (also for a unit without a room, then no
+  `queue_remove` follows), `queue_remove` for every call from the room
+  unlink of a unit in a room (queued or not), `queue_add` only for an
+  actual insert.
+- TR3. T5 above, partly answered by the recordings: step 9 compression
+  removes each unit of the room (room unlink, queue unlink, hash unlink,
+  `unit-order.md` §3.2) in room-list order before the room is unlinked;
+  the replay feeds the removals from the recording (`compress_unit` hook)
+  and d2-sim's own `deactivate_room` matches. What else compression and
+  `0x0061A910` do stays with the DRLG spec.
+- TR4. `convert_tick.py` and `tests/tick_traces.rs` cite `tick.md`
+  "Test vectors, Trace sim/tick" for the event kinds and fields; that
+  section does not exist. A spec session should add it (kinds and
+  fields: `convert_tick.py` docstring and `convert()`).
 
 From parser robustness (`claude/parser-robustness`):
 
