@@ -1,0 +1,1330 @@
+// Spec: specs/world/quests.md
+//! The quest system: flag records (§1), quest control and records (§2),
+//! game entry (§3), event dispatch (§4), the updater and its timers (§5),
+//! status messages (§6), NPC dialog hooks (§7), act transitions and
+//! portals (§8), helpers (§9). Act I state machines are in [`act1`].
+//!
+//! Units, items, NPC chat, monsters and levels belong to other specs and
+//! are reached through [`QuestWorld`]. Message bytes leave through
+//! `QuestWorld::send`. Callbacks the spec only catalogues (Acts II–V, and
+//! Act I functions it does not describe) are reported through
+//! `QuestWorld::unhandled` instead of being guessed.
+
+pub mod act1;
+pub mod tables;
+
+#[cfg(test)]
+mod tests;
+
+use std::collections::BTreeSet;
+
+use crate::rng::Seed;
+use crate::units::UnitId;
+
+pub use tables::{MessageEntry, QuestRow, QuestTables};
+
+/// Bytes of a flag record (§1.1).
+pub const FLAG_BYTES: usize = 0x60;
+/// Quest slots (§1.1).
+pub const SLOTS: u8 = 42;
+/// Init-table rows and intro records (§2.3).
+pub const TABLE_ROWS: usize = 37;
+pub const INTRO_ROWS: usize = 4;
+
+/// Slot bits (§1.2, D2MOO names).
+pub mod bit {
+    pub const REWARD_GRANTED: u8 = 0;
+    pub const REWARD_PENDING: u8 = 1;
+    pub const STARTED: u8 = 2;
+    pub const LEAVE_TOWN: u8 = 3;
+    pub const ENTER_AREA: u8 = 4;
+    pub const CUSTOM1: u8 = 5;
+    pub const UPDATE_QUEST_LOG: u8 = 12;
+    pub const PRIMARY_GOAL_DONE: u8 = 13;
+    pub const COMPLETED_NOW: u8 = 14;
+    pub const COMPLETED_BEFORE: u8 = 15;
+}
+
+/// Event ids (§4.1).
+pub mod event {
+    pub const NPC_ACTIVATE: u8 = 0;
+    pub const NPC_DEACTIVATE: u8 = 2;
+    pub const CHANGED_LEVEL: u8 = 3;
+    pub const ITEM_PICKED_UP: u8 = 4;
+    pub const ITEM_DROPPED: u8 = 5;
+    pub const EVENT6: u8 = 6;
+    pub const MONSTER_KILLED: u8 = 8;
+    pub const PLAYER_DROPPED_WITH_QUEST_ITEM: u8 = 9;
+    pub const PLAYER_LEAVES_GAME: u8 = 10;
+    pub const SCROLL_MESSAGE: u8 = 11;
+    pub const PLAYER_STARTED_GAME: u8 = 13;
+    pub const PLAYER_JOINED_GAME: u8 = 14;
+}
+
+/// NPC class ids used by the quest code.
+pub mod npc {
+    pub const AKARA: u16 = 148;
+    pub const KASHYA: u16 = 150;
+    pub const CHARSI: u16 = 154;
+    pub const WARRIV1: u16 = 155;
+    pub const MESHIF1: u16 = 210;
+    pub const CAIN5: u16 = 265;
+    pub const NAVI: u16 = 266;
+    pub const TYRAEL2: u16 = 367;
+}
+
+/// Fatal asserts of the original, returned instead of aborting.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum QuestError {
+    #[error("flag record copy of {0} bytes (want 0x60)")]
+    Size(usize),
+    #[error("quest set not picked")]
+    NotPicked,
+    #[error("no quest record for chain {0}")]
+    NoRecord(u8),
+    #[error("chain {0} has no sequence function")]
+    NoSequenceFn(u8),
+    #[error("timer created while the updater runs")]
+    TimerWhileExecuting,
+    #[error("default status rule on filter {0} > 40")]
+    Filter(u8),
+    #[error("quest table: {0}")]
+    Table(#[from] crate::world::TsvError),
+    #[error("quests.tsv: {0}")]
+    TableShape(&'static str),
+}
+
+// ------------------------------------------------------------------ §1
+
+/// A quest flag record (§1.1): 42 slots × 16 bits, LSB first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuestFlags(pub [u8; FLAG_BYTES]);
+
+impl Default for QuestFlags {
+    /// `0x0065C430`: zeroed.
+    fn default() -> Self {
+        Self([0; FLAG_BYTES])
+    }
+}
+
+impl QuestFlags {
+    fn pos(q: u8, b: u8) -> (usize, u8) {
+        let n = 16 * usize::from(q) + usize::from(b);
+        (n >> 3, 1 << (n & 7))
+    }
+
+    /// `0x0065C310`.
+    pub fn get(&self, q: u8, b: u8) -> bool {
+        let (i, m) = Self::pos(q, b);
+        self.0[i] & m != 0
+    }
+
+    /// `0x0065C360`.
+    pub fn set(&mut self, q: u8, b: u8) {
+        let (i, m) = Self::pos(q, b);
+        self.0[i] |= m;
+    }
+
+    /// `0x0065C3A0`.
+    pub fn clear(&mut self, q: u8, b: u8) {
+        let (i, m) = Self::pos(q, b);
+        self.0[i] &= !m;
+    }
+
+    /// `0x0065C3E0`: clear bits 2..11 of slot q.
+    pub fn reset_progress(&mut self, q: u8) {
+        for b in 2..=11 {
+            self.clear(q, b);
+        }
+    }
+
+    /// Slot q's word (little-endian u16).
+    pub fn word(&self, q: u8) -> u16 {
+        let i = 2 * usize::from(q);
+        u16::from_le_bytes([self.0[i], self.0[i + 1]])
+    }
+
+    /// `0x0065C4D0`: copy in (§1.6). With `normalize`, for every slot 0..41
+    /// clear bits 13 and 14, then set bit 15 if bit 1 is set.
+    pub fn copy_in(buf: &[u8], normalize: bool) -> Result<Self, QuestError> {
+        let bytes: [u8; FLAG_BYTES] = buf.try_into().map_err(|_| QuestError::Size(buf.len()))?;
+        let mut r = Self(bytes);
+        if normalize {
+            for q in 0..SLOTS {
+                r.clear(q, bit::PRIMARY_GOAL_DONE);
+                r.clear(q, bit::COMPLETED_NOW);
+                if r.get(q, bit::REWARD_PENDING) {
+                    r.set(q, bit::COMPLETED_BEFORE);
+                }
+            }
+        }
+        Ok(r)
+    }
+
+    /// `0x0065C560`.
+    pub fn copy_out(&self) -> [u8; FLAG_BYTES] {
+        self.0
+    }
+}
+
+/// A player's quest state (player data +0x10 and +0x60, §1.4, §6.7).
+/// Owned by the player unit (provider: the units group).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PlayerQuests {
+    /// Flag record per difficulty.
+    pub flags: [QuestFlags; 3],
+    /// NPC intro record per difficulty: NPC class ids heard.
+    pub intro: [BTreeSet<u16>; 3],
+}
+
+// ------------------------------------------------------------------ §2
+
+/// A unit's quest chain (unit +0x74, §4.6): chain ids, newest first.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct QuestChain(pub Vec<u8>);
+
+/// A list of up to 32 player GUIDs (§9.3).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GuidList(pub Vec<u32>);
+
+impl GuidList {
+    /// `0x00545200`: ignores duplicates and a full list.
+    pub fn add(&mut self, guid: u32) {
+        if self.0.len() < 32 && !self.0.contains(&guid) {
+            self.0.push(guid);
+        }
+    }
+
+    /// `0x00545240`: remove by swapping with the last.
+    pub fn remove(&mut self, guid: u32) {
+        if let Some(i) = self.0.iter().position(|&g| g == guid) {
+            self.0.swap_remove(i);
+        }
+    }
+
+    /// `0x00545290`.
+    pub fn contains(&self, guid: u32) -> bool {
+        self.0.contains(&guid)
+    }
+}
+
+/// A quest record (§2.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuestRecord {
+    pub chain: u8,
+    pub act: u8,
+    /// +0x09 (`bNotIntro`).
+    pub not_intro: bool,
+    /// +0x0A (`bActive`).
+    pub active: bool,
+    /// +0x0B: status shown to clients.
+    pub status: u8,
+    /// +0x0C.
+    pub state: u8,
+    /// +0x0D.
+    pub init_no: u8,
+    /// +0x10.
+    pub seq_id: Option<u8>,
+    /// +0x14 (low byte sent in 0x5D).
+    pub flags: u8,
+    /// +0xE0.
+    pub filter: u8,
+    /// +0xE4.
+    pub flag2: Option<u8>,
+    /// +0x1C: player GUIDs.
+    pub guids: GuidList,
+    /// Bit per event id with a non-null callback (+0xA0).
+    pub callbacks: u16,
+    pub status_fn: Option<u32>,
+    pub active_fn: Option<u32>,
+    pub seq_fn: Option<u32>,
+    /// NPC message table address (+0xDC).
+    pub msgs: Option<u32>,
+    /// Per-quest extra data (+0x18).
+    pub extra: act1::Extra,
+}
+
+impl QuestRecord {
+    pub fn has_callback(&self, ev: u8) -> bool {
+        self.callbacks & (1 << ev) != 0
+    }
+
+    pub fn clear_callback(&mut self, ev: u8) {
+        self.callbacks &= !(1 << ev);
+    }
+}
+
+/// What a quest timer runs (§5). Only the callbacks the spec describes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimerFn {
+    /// `0x00590230`: Den of Evil status 5 while state 4; returns 1.
+    DenOfEvilStatus,
+    /// Test probe: logs through `unhandled(chain, tick)`, never removed.
+    #[cfg(test)]
+    Probe,
+}
+
+/// A quest timer (§5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuestTimer {
+    pub func: TimerFn,
+    pub chain: u8,
+    pub due: u32,
+    pub period: u32,
+}
+
+/// The quest control (game +0x10F4, §2.1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuestControl {
+    /// Records in list order: newest first (§2.3).
+    pub records: Vec<QuestRecord>,
+    pub executing: bool,
+    pub picked: bool,
+    /// Game quest flag record (never saved).
+    pub game: QuestFlags,
+    /// Timer list, head first.
+    pub timers: Vec<QuestTimer>,
+    pub tick: u32,
+    pub seed: Seed,
+    /// FX byte for 0x89.
+    pub fx: u8,
+    /// Init-table rows (for §3 and 0x5E).
+    pub rows: Vec<QuestRow>,
+    /// NPC message tables.
+    pub messages: Vec<MessageEntry>,
+}
+
+/// The seam to the rest of the game. Expected providers in brackets.
+pub trait QuestWorld {
+    // Game.
+    fn frame(&self) -> i32;
+    /// Game +0x6D.
+    fn difficulty(&self) -> u8;
+    /// Game +0x70.
+    fn expansion(&self) -> bool;
+    /// Game +0x6A.
+    fn game_type(&self) -> u8;
+    /// Game +0xC0: the game has an Act II (DRLG).
+    fn has_act2(&self) -> bool;
+
+    // Players and units (units group).
+    /// Every player, in `unit-order.md` §7 order.
+    fn players(&self) -> Vec<UnitId>;
+    /// `0x00539070` / `0x00537860`: the first client's player.
+    fn first_client_player(&self) -> Option<UnitId>;
+    fn guid(&self, unit: UnitId) -> u32;
+    fn player_by_guid(&self, guid: u32) -> Option<UnitId>;
+    /// The player's quest records (player data; `None`: missing).
+    fn quests(&mut self, player: UnitId) -> Option<&mut PlayerQuests>;
+    /// Act of the unit's room's level (`None`: no room).
+    fn unit_act(&self, unit: UnitId) -> Option<u8>;
+    /// Level id of the unit's room.
+    fn unit_level(&self, unit: UnitId) -> Option<u32>;
+    fn player_class(&self, player: UnitId) -> u8;
+    /// The unit seed (+0x20).
+    fn unit_seed(&mut self, unit: UnitId) -> &mut Seed;
+    fn stat(&self, unit: UnitId, stat: u16) -> i32;
+    /// `0x006272B0`: add to a stat.
+    fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32);
+    /// `0x00553380`.
+    fn attach_sound(&mut self, player: UnitId, sound: u16);
+    /// Player data +0x4C.
+    fn player_byte_4c(&self, player: UnitId) -> u8;
+    fn set_player_byte_4c(&mut self, player: UnitId, v: u8);
+    /// The unit's quest chain (unit +0x74).
+    fn quest_chain(&mut self, unit: UnitId) -> Option<&mut QuestChain>;
+    /// What a killer or victim is (§4.4).
+    fn unit_kind(&self, unit: UnitId) -> UnitKind;
+    /// The monster with this GUID and its class (NPC lookup).
+    fn monster_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
+    /// A monster unit's class id (NPC class), if it is a monster.
+    fn monster_class(&self, unit: UnitId) -> Option<u16>;
+    /// Players in the unit's room or an adjacent room (A1Q2, D2MOO
+    /// `ACT1Q2_UnitIterate_SetRewardPending`).
+    fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+
+    // Messages (server transport).
+    fn send(&mut self, player: UnitId, msg: &[u8]);
+    /// The 0x27 text list (`world/npc.md`, `0x00661480`).
+    fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
+
+    // Items (items / inventory).
+    fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool;
+    /// `0x00544160`: delete the player's item with `code`.
+    fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
+    /// `0x005466B0` (§9.1): create, place or drop a reward item.
+    fn reward_item(
+        &mut self,
+        player: UnitId,
+        code: [u8; 4],
+        level: i32,
+        quality: u8,
+        droppable: bool,
+    ) -> Option<UnitId>;
+    /// `0x00559A30`: drop an item of `code` at a unit (normal quality 2).
+    fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool;
+    /// Player inventory items with their items record `quest` byte ≠ 0,
+    /// in inventory order (§4.5).
+    fn quest_items(&self, player: UnitId) -> Vec<(UnitId, u8)>;
+
+    // Levels and objects (DRLG / objects).
+    /// Level 8's monster region: (spawn count, kill count, room count
+    /// +0x04, populated rooms).
+    fn den_region(&self) -> (u32, u32, u32, u32);
+    /// `0x0061AEB0`: level id of the true tomb.
+    fn true_tomb_level(&self) -> u32;
+    /// `0x00545340`: free spot near the player (size, mask, radius, limit).
+    fn free_spot(
+        &mut self,
+        player: UnitId,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32)>;
+    /// `0x0056D130`: a portal object of `class` to `level` at (x, y).
+    fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
+    /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
+    fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
+    /// Set a quest object "opened" (objects).
+    fn set_object_opened(&mut self, object: UnitId);
+    /// `0x00579180(npc)`: the mercenary reward (NPC spec).
+    fn mercenary_reward(&mut self, player: UnitId, npc: u16);
+
+    /// A function the spec names but does not specify was reached; the
+    /// host logs it (open questions 6–8).
+    fn unhandled(&mut self, chain: u8, function: u32);
+}
+
+/// A unit as the kill parse sees it (§4.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnitKind {
+    Player,
+    Monster {
+        class: u32,
+        /// `superuniques.txt` hcIdx, if a superunique.
+        superunique: Option<u32>,
+        /// `0x0058F090`: the owning player, if any.
+        owner: Option<UnitId>,
+    },
+    Other,
+}
+
+/// Event arguments (§4.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EventArgs {
+    pub event: u8,
+    pub target: Option<UnitId>,
+    pub player: Option<UnitId>,
+    /// Event 3: old level; event 11: NPC class.
+    pub a: u32,
+    /// Event 3: new level; event 11: message index.
+    pub b: u32,
+}
+
+/// A text list being built for 0x27: (message index, menu).
+pub type TextList = Vec<(u16, u32)>;
+
+/// Players' current flag record.
+fn flags_of<W: QuestWorld>(w: &mut W, player: UnitId) -> Option<&mut QuestFlags> {
+    let d = usize::from(w.difficulty());
+    w.quests(player).map(|q| &mut q.flags[d])
+}
+
+impl QuestControl {
+    /// `0x00545D80` (§2.3): every record, then the quest seed from one
+    /// game-seed step, then an empty game record.
+    pub fn new(tables: &QuestTables, game_seed: &mut Seed) -> Result<Self, QuestError> {
+        if tables.rows.len() != TABLE_ROWS + INTRO_ROWS {
+            return Err(QuestError::TableShape("want 37 + 4 rows"));
+        }
+        let mut made = Vec::new();
+        for (i, row) in tables.rows.iter().enumerate() {
+            if usize::from(row.index) != i || (i < TABLE_ROWS) == row.flag.is_none() {
+                return Err(QuestError::TableShape("index / flag columns"));
+            }
+            let intro = i >= TABLE_ROWS;
+            let mut r = QuestRecord {
+                chain: row.chain,
+                act: row.act,
+                not_intro: !intro,
+                active: intro,
+                status: 0,
+                state: 0,
+                init_no: row.init_no.unwrap_or(0),
+                seq_id: row.seq_id,
+                flags: 0,
+                // TODO(quests OQ6): row 40's init (Act V intro) is not
+                // disassembled; its filter is taken as the intros' 42.
+                filter: row.filter.unwrap_or(42),
+                flag2: row.flag2,
+                guids: GuidList::default(),
+                callbacks: row.callbacks.iter().fold(0, |m, &(ev, _)| m | 1 << ev),
+                status_fn: row.status_fn,
+                active_fn: row.active_fn,
+                seq_fn: row.seq_fn,
+                msgs: row.msgs,
+                extra: act1::Extra::default(),
+            };
+            act1::init(&mut r);
+            made.push(r);
+        }
+        made.reverse();
+        Ok(Self {
+            records: made,
+            executing: false,
+            picked: false,
+            game: QuestFlags::default(),
+            timers: Vec::new(),
+            tick: 0,
+            seed: game_seed.derive(),
+            fx: 0,
+            rows: tables.rows.clone(),
+            messages: tables.messages.clone(),
+        })
+    }
+
+    /// `0x00543640`: the record index of `chain`.
+    pub fn find(&self, chain: u8) -> Option<usize> {
+        self.records.iter().position(|r| r.chain == chain)
+    }
+
+    pub fn record(&self, chain: u8) -> Option<&QuestRecord> {
+        self.find(chain).map(|i| &self.records[i])
+    }
+
+    pub fn record_mut(&mut self, chain: u8) -> Option<&mut QuestRecord> {
+        self.find(chain).map(|i| &mut self.records[i])
+    }
+
+    /// `0x00543F10` (§5): prepend a timer.
+    pub fn add_timer(&mut self, chain: u8, func: TimerFn, period: u32) -> Result<(), QuestError> {
+        if self.executing {
+            return Err(QuestError::TimerWhileExecuting);
+        }
+        self.timers.insert(
+            0,
+            QuestTimer {
+                func,
+                chain,
+                due: self.tick.wrapping_add(period),
+                period,
+            },
+        );
+        Ok(())
+    }
+
+    /// `0x00543E10`: the updater (§5), run at tick step 8 when frame % 20
+    /// = 0.
+    pub fn update<W: QuestWorld>(&mut self, w: &mut W) {
+        self.tick = self.tick.wrapping_add(1);
+        if self.tick == u32::MAX {
+            for t in &mut self.timers {
+                t.due = u32::MAX - t.due;
+            }
+        }
+        self.executing = true;
+        let mut i = 0;
+        while i < self.timers.len() {
+            let t = self.timers[i];
+            if t.due < self.tick {
+                if act1::run_timer(self, w, t.func, t.chain) {
+                    self.timers.remove(i);
+                    continue;
+                }
+                self.timers[i].due = self.tick.wrapping_add(t.period);
+            }
+            i += 1;
+        }
+        self.executing = false;
+    }
+
+    // ------------------------------------------------------------ §3
+
+    /// `0x00546270`: a player enters the game (§3). `mode` 1 for the
+    /// callers `0x00532590` / `0x00569F80`, 0 for `0x005344B0` /
+    /// `0x00534520` (open question 4: which one single player takes).
+    pub fn player_enters<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        player: UnitId,
+        mode: u8,
+    ) -> Result<(), QuestError> {
+        let args = EventArgs {
+            player: Some(player),
+            target: Some(player),
+            ..EventArgs::default()
+        };
+        if self.picked {
+            self.dispatch_list(w, event::PLAYER_JOINED_GAME, args, true, None);
+        } else {
+            self.picked = true;
+            if mode == 0 {
+                // The global byte `0x0073150C` is 1 in 1.14d.
+                let pf = flags_of(w, player).copied().unwrap_or_default();
+                for k in 0..TABLE_ROWS {
+                    let row = &self.rows[k];
+                    let (chain, no_set_state) = (row.chain, row.no_set_state);
+                    let Some(slot) = row.flag else { continue };
+                    if no_set_state == Some(false)
+                        && (pf.get(slot, bit::REWARD_GRANTED)
+                            || pf.get(slot, bit::COMPLETED_BEFORE))
+                    {
+                        let r = self.record_mut(chain).ok_or(QuestError::NoRecord(chain))?;
+                        r.not_intro = false;
+                        r.active = false;
+                        r.status = 0;
+                        self.game.set(slot, bit::COMPLETED_BEFORE);
+                    }
+                }
+                self.dispatch_list(w, event::PLAYER_STARTED_GAME, args, true, None);
+            }
+            for chain in [1, 8, 18, 22, 31] {
+                let r = self.record(chain).ok_or(QuestError::NoRecord(chain))?;
+                if r.seq_fn.is_none() {
+                    return Err(QuestError::NoSequenceFn(chain));
+                }
+                act1::sequence(self, w, chain);
+            }
+        }
+        // Steps 5–8.
+        let mut m = vec![0x5E];
+        for row in &self.rows[..TABLE_ROWS] {
+            let r = self
+                .record(row.chain)
+                .ok_or(QuestError::NoRecord(row.chain))?;
+            m.push(u8::from(r.not_intro));
+        }
+        w.send(player, &m);
+        send_player_flags(w, player, 6, 0);
+        self.send_game_flags(w, player);
+        if self.record(1).is_some_and(|r| r.not_intro && r.state >= 4) {
+            w.send(player, &[0x89, 0x00]);
+        }
+        Ok(())
+    }
+
+    /// `0x00544520`: S→C 0x29 (97 bytes).
+    pub fn send_game_flags<W: QuestWorld>(&self, w: &mut W, player: UnitId) {
+        let mut m = Vec::with_capacity(97);
+        m.push(0x29);
+        m.extend_from_slice(&self.game.0);
+        w.send(player, &m);
+    }
+
+    // ------------------------------------------------------------ §4
+
+    /// `0x005438E0`: dispatch to all records (§4.2). `by_act`: filter by
+    /// the act of `args.player`'s room. `list`: event 0's text list.
+    pub fn dispatch_list<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        ev: u8,
+        mut args: EventArgs,
+        by_act: bool,
+        mut list: Option<&mut TextList>,
+    ) {
+        args.event = ev;
+        let act = if by_act {
+            args.player.and_then(|p| w.unit_act(p))
+        } else {
+            None
+        };
+        // All callers pass ignore_active = 1.
+        for i in 0..self.records.len() {
+            let r = &self.records[i];
+            if !r.has_callback(ev) || act.is_some_and(|a| a != r.act) {
+                continue;
+            }
+            act1::callback(self, w, i, args, list.as_deref_mut(), false);
+        }
+    }
+
+    /// `0x005439A0`: dispatch along the target unit's chain (§4.3).
+    pub fn dispatch_chain<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        ev: u8,
+        mut args: EventArgs,
+        force: bool,
+    ) {
+        args.event = ev;
+        let Some(target) = args.target else { return };
+        let Some(chain) = w.quest_chain(target).map(|c| c.0.clone()) else {
+            return;
+        };
+        for c in chain {
+            let Some(i) = self.find(c) else { continue };
+            let r = &self.records[i];
+            if r.has_callback(ev) && (r.active || force) {
+                act1::callback(self, w, i, args, None, force);
+            }
+        }
+    }
+
+    /// `0x005436B0`: add a link for `chain` to the unit (§4.6). The
+    /// special cases for chains 4, 8, 12 (`0x00592F80`, `0x005991B0`,
+    /// `0x0059C3B0`) are reported as unhandled before the link is added.
+    pub fn add_link<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        unit: UnitId,
+        chain: u8,
+        special: Option<u32>,
+    ) -> bool {
+        if self.find(chain).is_none() {
+            return false;
+        }
+        if let Some(f) = special {
+            w.unhandled(chain, f);
+        }
+        let Some(c) = w.quest_chain(unit) else {
+            return false;
+        };
+        if c.0.contains(&chain) {
+            return false;
+        }
+        c.0.insert(0, chain);
+        true
+    }
+
+    /// `0x00545CD0`: link a new monster to its level's `Quest` chain.
+    pub fn link_monster<W: QuestWorld>(&mut self, w: &mut W, unit: UnitId, level_quest: u8) {
+        if level_quest != 0 {
+            self.add_link(w, unit, level_quest, None);
+        }
+    }
+
+    /// `0x00543A30`: kill parse (§4.4).
+    pub fn monster_killed<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        victim: UnitId,
+        killer: Option<UnitId>,
+    ) {
+        if w.quest_chain(victim).is_none_or(|c| c.0.is_empty()) {
+            return;
+        }
+        let killer = match killer {
+            None if w.game_type() == 3 => w.first_client_player(),
+            k => k,
+        };
+        let player = killer.and_then(|k| match w.unit_kind(k) {
+            UnitKind::Player => Some(k),
+            UnitKind::Monster { owner, .. } => owner,
+            UnitKind::Other => None,
+        });
+        let force = match w.unit_kind(victim) {
+            UnitKind::Monster {
+                class, superunique, ..
+            } => {
+                superunique.is_some_and(|s| matches!(s, 26 | 27 | 29 | 36..=39 | 42..=45 | 60))
+                    || matches!(class, 242 | 243 | 391 | 544)
+            }
+            _ => false,
+        };
+        let args = EventArgs {
+            target: Some(victim),
+            player,
+            ..EventArgs::default()
+        };
+        self.dispatch_chain(w, event::MONSTER_KILLED, args, force);
+    }
+
+    /// `0x00543BD0`: a player leaves (§4.5).
+    pub fn player_leaves<W: QuestWorld>(&mut self, w: &mut W, player: UnitId) {
+        for (item, quest) in w.quest_items(player) {
+            let Some(i) = self.find(quest.wrapping_sub(1)) else {
+                continue;
+            };
+            if self.records[i].has_callback(event::PLAYER_DROPPED_WITH_QUEST_ITEM) {
+                let args = EventArgs {
+                    event: event::PLAYER_DROPPED_WITH_QUEST_ITEM,
+                    target: Some(item),
+                    player: Some(player),
+                    ..EventArgs::default()
+                };
+                act1::callback(self, w, i, args, None, false);
+            }
+        }
+        let args = EventArgs {
+            player: Some(player),
+            target: Some(player),
+            ..EventArgs::default()
+        };
+        self.dispatch_list(w, event::PLAYER_LEAVES_GAME, args, false, None);
+    }
+
+    /// `0x00543B90`: level change (event 3, (1, 0)).
+    pub fn changed_level<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, old: u32, new: u32) {
+        let args = EventArgs {
+            target: Some(player),
+            player: Some(player),
+            a: old,
+            b: new,
+            ..EventArgs::default()
+        };
+        self.dispatch_list(w, event::CHANGED_LEVEL, args, false, None);
+    }
+
+    /// `0x00543D50`: NPC chat end (event 2, (1, 1)).
+    pub fn npc_deactivate<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, npc: UnitId) {
+        let args = EventArgs {
+            target: Some(npc),
+            player: Some(player),
+            ..EventArgs::default()
+        };
+        self.dispatch_list(w, event::NPC_DEACTIVATE, args, true, None);
+    }
+
+    /// `0x00543D10`: NPC chat start (event 0, (1, 1)); quest records add
+    /// their lines to `list`.
+    pub fn npc_activate<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        player: UnitId,
+        npc: UnitId,
+        list: &mut TextList,
+    ) {
+        let args = EventArgs {
+            target: Some(npc),
+            player: Some(player),
+            ..EventArgs::default()
+        };
+        self.dispatch_list(w, event::NPC_ACTIVATE, args, true, Some(list));
+    }
+
+    /// `0x00543D80` / `0x00543DB0`: item picked up (4) or dropped (5),
+    /// along the item's chain, force 0 (edge case 3).
+    pub fn item_event<W: QuestWorld>(&mut self, w: &mut W, ev: u8, player: UnitId, item: UnitId) {
+        let args = EventArgs {
+            target: Some(item),
+            player: Some(player),
+            ..EventArgs::default()
+        };
+        self.dispatch_chain(w, ev, args, false);
+    }
+
+    /// `0x00545780` (§7.2): refresh an NPC's text after a state change.
+    pub fn refresh_text<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, npc: UnitId) {
+        let mut list = TextList::new();
+        self.npc_activate(w, player, npc, &mut list);
+        w.send_text_list(player, npc, &list);
+        self.send_game_flags(w, player);
+    }
+
+    /// `0x00543790` (§7.1): add the table's lines for (state, npc).
+    pub fn add_messages(&self, table: u32, list: &mut TextList, npc: u16, state: u8) {
+        let mut entries: Vec<&MessageEntry> = self
+            .messages
+            .iter()
+            .filter(|m| m.table == table && m.state == state && m.npc == npc)
+            .collect();
+        entries.sort_by_key(|m| m.slot);
+        for m in entries {
+            list.push((m.string, if m.menu == 1 { 0 } else { m.menu }));
+        }
+    }
+
+    // ------------------------------------------------------------ §6
+
+    /// `0x00543F90`: the default status rule (§6.1).
+    pub fn default_status(r: &QuestRecord, pf: &QuestFlags) -> Result<u8, QuestError> {
+        let q = r.filter;
+        let (s, n, l) = (r.state, r.init_no, r.status);
+        let done = pf.get(q, bit::PRIMARY_GOAL_DONE);
+        let now = pf.get(q, bit::COMPLETED_NOW);
+        Ok(if s < n {
+            if now || (r.chain == 4 && l == 6 && !done) {
+                12
+            } else {
+                l
+            }
+        } else if done {
+            if q > 40 {
+                return Err(QuestError::Filter(q));
+            }
+            l
+        } else if r.chain == 4 && now {
+            if s == 6 {
+                12
+            } else {
+                l
+            }
+        } else if r.chain == 10 {
+            if l == 4 {
+                4
+            } else {
+                12
+            }
+        } else {
+            12
+        })
+    }
+
+    /// The status a record reports to a player: its status function, or
+    /// the default rule. `None`: nothing reported.
+    fn status_for<W: QuestWorld>(
+        &self,
+        w: &mut W,
+        i: usize,
+        player: UnitId,
+    ) -> Result<Option<u8>, QuestError> {
+        let r = &self.records[i];
+        let pf = flags_of(w, player).copied().unwrap_or_default();
+        match r.status_fn {
+            Some(f) => Ok(act1::status_fn(self, w, i, player, &pf, f)),
+            None => Self::default_status(r, &pf).map(Some),
+        }
+    }
+
+    /// `0x00546040` for C→S 0x40 (§6.2): 0x28, maybe 0x50, then 0x52.
+    pub fn request_quest_data<W: QuestWorld>(
+        &self,
+        w: &mut W,
+        player: UnitId,
+    ) -> Result<(), QuestError> {
+        send_player_flags(w, player, 6, 0);
+        let mut list = [0u8; 41];
+        for i in 0..self.records.len() {
+            let r = &self.records[i];
+            if r.status == 0 {
+                continue;
+            }
+            if r.chain > 40 {
+                return Err(QuestError::NoRecord(r.chain));
+            }
+            if let Some(s) = self.status_for(w, i, player)? {
+                if let Some(slot) = list.get_mut(usize::from(r.filter)) {
+                    *slot = s;
+                }
+            }
+        }
+        let pf = flags_of(w, player).copied().unwrap_or_default();
+        let staff = (pf.get(12, 0) || pf.get(12, 13)) && w.has_act2();
+        if list[1] != 0 || list[36] != 0 || staff {
+            let mut m = [0u8; 15];
+            m[0] = 0x50;
+            m[1..3].copy_from_slice(&1u16.to_le_bytes());
+            if list[1] != 0 {
+                let left = self.record(1).map_or(0, act1::den_monsters_left);
+                m[3..5].copy_from_slice(&left.to_le_bytes());
+            }
+            if staff {
+                let tomb = (w.true_tomb_level() as i32 - 66) as i16;
+                m[5..7].copy_from_slice(&tomb.to_le_bytes());
+            }
+            if list[36] != 0 {
+                // TODO(quests OQ8): `0x00588C50` (barbarians left, Act V)
+                // is not specified; reported as 0.
+                w.unhandled(32, 0x0058_8C50);
+            }
+            w.send(player, &m);
+        }
+        let mut m = vec![0x52];
+        m.extend_from_slice(&list);
+        w.send(player, &m);
+        Ok(())
+    }
+
+    /// `0x00544190` (§6.3): S→C 0x5D for one quest to one player.
+    pub fn send_status<W: QuestWorld>(
+        &self,
+        w: &mut W,
+        player: UnitId,
+        chain: u8,
+    ) -> Result<(), QuestError> {
+        let Some(i) = self.find(chain) else {
+            return Ok(());
+        };
+        let r = &self.records[i];
+        if w.unit_act(player) != Some(r.act) {
+            return Ok(());
+        }
+        // TODO(quests §6.3): a status function returning false leaves the
+        // status byte undefined; d2rs sends the record's status byte.
+        let status = self.status_for(w, i, player)?.unwrap_or(r.status);
+        let extra = match r.filter {
+            1 => act1::den_monsters_left(r),
+            36 => {
+                w.unhandled(32, 0x0058_8C50);
+                0
+            }
+            _ => 0,
+        };
+        let mut m = [0u8; 6];
+        m[0] = 0x5D;
+        m[1] = chain;
+        m[2] = r.flags;
+        m[3] = status;
+        m[4..6].copy_from_slice(&extra.to_le_bytes());
+        w.send(player, &m);
+        Ok(())
+    }
+
+    /// `0x00544300` with iterate: set the status byte, then 0x5D to every
+    /// player. TODO(quests OQ7): the per-quest iterate functions' flag
+    /// tests are not specified; d2rs sends to every player (§10.1).
+    pub fn set_status_all<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        chain: u8,
+        status: u8,
+    ) -> Result<(), QuestError> {
+        let i = self.find(chain).ok_or(QuestError::NoRecord(chain))?;
+        self.records[i].status = status;
+        for p in w.players() {
+            self.send_status(w, p, chain)?;
+        }
+        Ok(())
+    }
+
+    /// `0x00544590` (§6.4): S→C 0x8A when an active function wants the
+    /// player to talk to `npc`.
+    pub fn npc_wants_interact<W: QuestWorld>(
+        &self,
+        w: &mut W,
+        player: UnitId,
+        npc: UnitId,
+        npc_class: u16,
+    ) -> Result<(), QuestError> {
+        if !self.picked {
+            return Err(QuestError::NotPicked);
+        }
+        let act = w.unit_act(player);
+        for i in 0..self.records.len() {
+            let r = &self.records[i];
+            let Some(f) = r.active_fn else { continue };
+            if Some(r.act) != act {
+                continue;
+            }
+            if act1::active_fn(self, w, i, player, npc_class, f) {
+                let mut m = [0u8; 6];
+                m[0] = 0x8A;
+                m[1] = 1;
+                m[2..6].copy_from_slice(&w.guid(npc).to_le_bytes());
+                w.send(player, &m);
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// `0x00545760` (§6.5): store b, then 0x28 and `89 b` to every player.
+    pub fn unique_event<W: QuestWorld>(&mut self, w: &mut W, b: u8) {
+        self.fx = b;
+        for p in w.players() {
+            send_player_flags(w, p, 6, 0);
+            w.send(p, &[0x89, b]);
+        }
+    }
+
+    // ------------------------------------------------------------ §7
+
+    /// C→S 0x31 (`0x0054BA90` → `0x005443B0`, §7.3). Returns the result
+    /// code.
+    pub fn quest_message<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, msg: &[u8]) -> u32 {
+        if msg.len() != 9 {
+            return 3;
+        }
+        let guid = u32::from_le_bytes(msg[1..5].try_into().expect("4 bytes"));
+        let index = u16::from_le_bytes([msg[5], msg[6]]);
+        let npc = if guid != u32::MAX {
+            w.monster_by_guid(guid)
+        } else {
+            None
+        };
+        let args = EventArgs {
+            target: npc.map(|n| n.0),
+            player: Some(player),
+            a: u32::from(npc.map_or(0, |n| n.1)),
+            b: u32::from(index),
+            ..EventArgs::default()
+        };
+        self.dispatch_list(w, event::SCROLL_MESSAGE, args, true, None);
+        0
+    }
+
+    /// C→S 0x58 (`0x0054C9C0`, §1.7). Returns the result code.
+    pub fn quest_completed<W: QuestWorld>(&self, w: &mut W, player: UnitId, msg: &[u8]) -> u32 {
+        if msg.len() != 3 {
+            return 3;
+        }
+        let q = u16::from_le_bytes([msg[1], msg[2]]);
+        if q >= u16::from(SLOTS) {
+            return 2;
+        }
+        if let Some(f) = flags_of(w, player) {
+            f.set(q as u8, bit::UPDATE_QUEST_LOG);
+        }
+        0
+    }
+
+    // ------------------------------------------------------------ §8
+
+    /// `0x005467E0` (§8.1): NPC act travel, before the act change.
+    pub fn act_completion<W: QuestWorld>(
+        &mut self,
+        w: &mut W,
+        player: UnitId,
+        npc_class: u16,
+    ) -> Result<(), QuestError> {
+        // TODO(quests OQ10): the 0x61 byte and the intro-flag act are D2MOO
+        // 1.10f's (2, 3, 5; acts I, II, II); 1.14d's registers are open.
+        match npc_class {
+            npc::WARRIV1 => {
+                let Some(f) = flags_of(w, player) else {
+                    return Ok(());
+                };
+                if !f.get(7, 0) {
+                    f.set(7, 0);
+                    f.set(7, 13);
+                    send_player_flags(w, player, 6, 0);
+                    can_go_to_act(w, player, 2);
+                    set_intro_flags(w, player, 0);
+                }
+                let f = flags_of(w, player).copied().unwrap_or_default();
+                if f.get(6, 13) && f.get(6, 0) && self.record(6).is_some_and(|r| r.not_intro) {
+                    // Chain 6's callback 3 with these arguments is not
+                    // specified (OQ8).
+                    w.unhandled(6, 0x0059_6010);
+                }
+                w.unhandled(4, 0x0059_7310);
+            }
+            npc::MESHIF1 => {
+                let Some(f) = flags_of(w, player) else {
+                    return Ok(());
+                };
+                if !f.get(15, 0) {
+                    if !f.get(10, 0) {
+                        f.set(10, 0);
+                        f.set(10, 13);
+                        w.delete_item(player, *b"msf ");
+                        w.delete_item(player, *b"vip ");
+                    }
+                    let f = flags_of(w, player).expect("checked");
+                    f.set(15, 0);
+                    f.set(15, 13);
+                    set_intro_flags(w, player, 1);
+                    send_player_flags(w, player, 6, 0);
+                    can_go_to_act(w, player, 3);
+                }
+            }
+            npc::TYRAEL2 => {
+                let expansion = w.expansion();
+                let Some(f) = flags_of(w, player) else {
+                    return Ok(());
+                };
+                if !f.get(28, 0) && expansion {
+                    f.set(28, 0);
+                    f.set(28, 13);
+                    set_intro_flags(w, player, 1);
+                    send_player_flags(w, player, 6, 0);
+                    if w.player_byte_4c(player) != 1 {
+                        // TODO(quests OQ10): the 0x5D sent before 0x61 is
+                        // not specified.
+                        w.unhandled(28, 0x0054_67E0);
+                        can_go_to_act(w, player, 5);
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// `0x00546AC0` (§8.1): object warp to `level`. Level 102 is the
+    /// Durance; others go to `0x005BCFD0` (A3Q6, unspecified).
+    pub fn object_warp<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, level: u32) {
+        if level != 102 {
+            w.unhandled(20, 0x005B_CFD0);
+            return;
+        }
+        let Some(f) = flags_of(w, player) else { return };
+        if f.get(23, 0) {
+            return;
+        }
+        if !f.get(18, 0) {
+            f.set(18, 0);
+            f.set(18, 13);
+            for code in [*b"qey ", *b"qhr ", *b"qbr ", *b"qf1 ", *b"qf2 "] {
+                w.delete_item(player, code);
+            }
+        }
+        let f = flags_of(w, player).expect("checked");
+        f.set(23, 0);
+        f.set(23, 13);
+        set_intro_flags(w, player, 2);
+        send_player_flags(w, player, 6, 0);
+        can_go_to_act(w, player, 4);
+    }
+}
+
+/// `0x0053D670`: S→C 0x28 (103 bytes) with the player's current record.
+pub fn send_player_flags<W: QuestWorld>(w: &mut W, player: UnitId, unit_type: u8, guid: u32) {
+    let rec = flags_of(w, player).copied().unwrap_or_default();
+    let mut m = Vec::with_capacity(103);
+    m.push(0x28);
+    m.push(unit_type);
+    m.extend_from_slice(&guid.to_le_bytes());
+    m.push(0);
+    m.extend_from_slice(&rec.0);
+    w.send(player, &m);
+}
+
+/// Player data +0x4C ≠ 1 → set it and send `61 act` (§8.1).
+fn can_go_to_act<W: QuestWorld>(w: &mut W, player: UnitId, act: u8) {
+    if w.player_byte_4c(player) != 1 {
+        w.set_player_byte_4c(player, 1);
+        w.send(player, &[0x61, act]);
+    }
+}
+
+/// NPC intro lists by act (§Constants; Act IV has none).
+pub const INTRO_NPCS: [&[u16]; 5] = [
+    &[148, 154, 150, 147, 155, 265],
+    &[175, 176, 177, 178, 202, 200, 210, 201, 198, 199, 244],
+    &[245, 252, 253, 254, 255, 264, 297],
+    &[],
+    &[520, 521, 511, 512, 513, 514, 515],
+];
+
+/// `0x00544FA0(act)`: set the intro bit of every NPC of the act's list.
+pub fn set_intro_flags<W: QuestWorld>(w: &mut W, player: UnitId, act: u8) {
+    let d = usize::from(w.difficulty());
+    if let Some(q) = w.quests(player) {
+        for &n in INTRO_NPCS[usize::from(act)] {
+            q.intro[d].insert(n);
+        }
+    }
+}
+
+/// `0x00545100` (§6.7): S→C 0x91 for acts 0, 1, 2, 4; introduced NPCs
+/// packed at the front; sent only if one is set.
+pub fn npc_gossip<W: QuestWorld>(w: &mut W, player: UnitId, act: u8) {
+    if act == 3 || act > 4 {
+        return;
+    }
+    let d = usize::from(w.difficulty());
+    let heard = w
+        .quests(player)
+        .map(|q| q.intro[d].clone())
+        .unwrap_or_default();
+    let mut m = [0xFFu8; 26];
+    m[0] = 0x91;
+    m[1] = act;
+    let mut n = 0;
+    for &c in INTRO_NPCS[usize::from(act)] {
+        if heard.contains(&c) {
+            m[2 + 2 * n..4 + 2 * n].copy_from_slice(&c.to_le_bytes());
+            n += 1;
+        }
+    }
+    if n > 0 {
+        w.send(player, &m);
+    }
+}
+
+/// `0x005455F0` (§9.3): for each GUID whose player exists and lacks bits
+/// 0 and 1 of `slot`: set bits 13 and 1; attach `sound` if ≠ 0.
+pub fn grant_pending<W: QuestWorld>(w: &mut W, list: &GuidList, slot: u8, sound: u16) {
+    for &g in &list.0 {
+        let Some(p) = w.player_by_guid(g) else {
+            continue;
+        };
+        let Some(f) = flags_of(w, p) else { continue };
+        if f.get(slot, bit::REWARD_GRANTED) || f.get(slot, bit::REWARD_PENDING) {
+            continue;
+        }
+        f.set(slot, bit::PRIMARY_GOAL_DONE);
+        f.set(slot, bit::REWARD_PENDING);
+        if sound != 0 {
+            w.attach_sound(p, sound);
+        }
+    }
+}
+
+/// Result of a warp or portal check (§8.2, §8.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WarpCheck {
+    Open,
+    /// Decided by an Act II–V function the spec does not specify.
+    Delegate(u32),
+}
+
+/// `0x00545B80` (§8.2).
+pub fn warp_check(from: u32, to: u32) -> WarpCheck {
+    match to {
+        73 => WarpCheck::Delegate(0x0059_DB20),
+        100 => WarpCheck::Delegate(0x005B_BFA0),
+        118 | 128 if from == 120 => WarpCheck::Delegate(0x0058_D090),
+        132 => WarpCheck::Delegate(0x0058_E640),
+        _ => WarpCheck::Open,
+    }
+}
+
+/// `0x00545830` (§8.3).
+pub fn portal_check(level: u32) -> WarpCheck {
+    if level == 73 {
+        WarpCheck::Delegate(0x0059_DFD0)
+    } else {
+        WarpCheck::Open
+    }
+}
+
+/// `0x00594140` (§8.4): the Cow portal (cube output kind 1).
+pub fn cow_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId) -> bool {
+    let expansion = w.expansion();
+    let in_town = w.unit_level(player) == Some(1);
+    let pf = flags_of(w, player).copied().unwrap_or_default();
+    let refused = ctl.game.get(4, 11)
+        || pf.get(4, 10)
+        || (!expansion && !pf.get(26, 0))
+        || (expansion && !pf.get(40, 0))
+        || !in_town;
+    if !refused {
+        if let Some((x, y)) = w.free_spot(player, 3, 0x400, 4, 100) {
+            if w.create_portal(player, x, y, 60, 39) {
+                ctl.game.set(4, 11);
+                return true;
+            }
+        }
+    }
+    // TODO(quests §8.4): the spec names the sound for the refusal tests;
+    // that a failed spot search or portal creation also plays it is
+    // `world/cube.md` §9's reading ("on failure").
+    w.attach_sound(player, u16::from(crate::world::cube::SOUND_COW_REFUSED));
+    false
+}
+
+/// `0x00544840` (§9.4): C→S 0x3E read a clue item (after the handler's
+/// item checks). `bkd ` → the Cairn stone order; `trs ` → `0x0059D6A0`.
+pub fn read_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId, code: [u8; 4]) {
+    match &code {
+        b"bkd " => act1::send_stone_order(ctl, w, player),
+        b"trs " => w.unhandled(13, 0x0059_D6A0),
+        _ => {}
+    }
+}
+
+/// `0x005449E0` (§9.5): object timer event 7 by object class.
+pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
+    match class {
+        act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
+        0x16F
+        | 0xBD
+        | 0x1A
+        | 0x7A
+        | 0x83
+        | 0x155
+        | 0x173
+        | 0x178
+        | 0x1CB..=0x1CD
+        | 0x1DA..=0x1DC => {
+            // TODO(quests §9.5, OQ8): the per-class quest functions other
+            // than Wirt's body are not specified.
+            w.unhandled(0xFF, u32::from(class));
+        }
+        _ => {}
+    }
+}
