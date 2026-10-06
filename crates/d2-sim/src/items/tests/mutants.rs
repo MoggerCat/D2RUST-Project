@@ -1300,3 +1300,49 @@ fn set_candidate_version() {
         );
     }
 }
+
+/// The skills projection keeps `itypea1` (link16 read as i16, so 0xFFFF
+/// is −1, `generation.md` §6.2 r5 "< 1"), `reqlevel` and `maxlvl`
+/// (`properties.md` §5 r4).
+#[test]
+fn skill_record_projection() {
+    use d2_data::tables::Skills;
+    let mut s = Skills::decode(&[0u8; Skills::SIZE]);
+    (s.itypea1, s.reqlevel, s.maxlvl) = (0xFFFF, 12, 20);
+    assert_eq!(
+        SkillRec::from(&s),
+        SkillRec {
+            itypea1: -1,
+            reqlevel: 12,
+            maxlvl: 20
+        }
+    );
+}
+
+/// `generation.md` §1.3: `type2` counts only when > 0 (here row 0 of the
+/// matrix is made equivalent to the ring type to expose a 0 `type2`).
+// Covers: specs/items/generation.md §1.3
+#[test]
+fn type2_zero_not_tested() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(ty::HELM, b"cap "));
+    t.equiv.bits[RING as usize / 32] |= 1 << (RING % 32);
+    assert!(t.equiv.get(0, RING as usize));
+    assert!(!t.is_type(i, RING as i16));
+}
+
+/// `sim/stats.md` §2 r1 as `properties.md` §4.2 uses it: a stat id equal
+/// to the stat count is out of range and writes nothing.
+// Covers: specs/items/properties.md §4.2
+#[test]
+fn stat_id_at_count_is_invalid() {
+    let mut t = tables();
+    let n = t.valshift.len() as u16;
+    assert!(t.stat_valid(n - 1));
+    assert!(!t.stat_valid(n));
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = vec![prop1(1, n)];
+    let mut it = item(i, 1);
+    run_prop(&t, &mut it, rec(0, 0, 3, 3));
+    assert!(it.stats.lists.is_empty());
+}
