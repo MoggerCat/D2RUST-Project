@@ -24,6 +24,7 @@ pub mod log;
 pub mod mixer;
 pub mod output;
 pub mod pool;
+pub mod sound_table;
 pub mod triggers;
 
 #[cfg(test)]
