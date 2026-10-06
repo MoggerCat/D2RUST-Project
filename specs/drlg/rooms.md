@@ -40,9 +40,9 @@
 | Constants & data dependencies | 899–911 |
 | Randomness | 912–929 |
 | Edge cases & original bugs | 930–947 |
-| Test vectors | 948–985 |
-| Provenance | 986–1005 |
-| Open questions | 1006–1036 |
+| Test vectors | 948–995 |
+| Provenance | 996–1015 |
+| Open questions | 1016–1046 |
 <!-- /index -->
 
 ## Summary
@@ -968,15 +968,25 @@ Recorded:
 | `20261006-022304-tick.jsonl`, frames 1–50 | 9 activations: the start room, then 8 rooms in the order they appear in the start room's adjacency array (snapshot frame 50: `b80, c00, c80, d00, d80, [b00], e00, e80, f00`) | §4.1, §6.1 |
 | both tick recordings, all snapshots | 4,975 room snapshots: own room present, members active, no duplicates, symmetric | §6 |
 
-Queued check (coordinator, on the existing tick recordings, no build):
-replay `ract` / `rdeact` events and require, for every snapshot: (C1)
-the properties of the last row above; (C2) for each room, the arrays seen
-in snapshots taken after an activation next to it and before any removal
-next to it are all subsequences of one fixed sequence (its rooms-near
-order); (C3) across a snapshot pair separated by exactly one removal of
-R, every array that held R equals the previous one with R replaced by its
-last entry and the length −1; (C4) each activation burst after a room
-change activates rooms in the new room's array order. Full check (needs a
+Checked on the three traces (`py tools/trace-recorder/check_rooms.py
+traces/sim/tick/*.json`; `--selftest` runs the rooms.md vectors above
+plus one perturbation per check, each reported at exactly the changed
+event; 446 snapshots, 0 violations). Replay of the `room_activate` /
+`room_deactivate` inputs and the player's `room_add` events against the
+`lists` snapshots:
+
+| Check | Property | Result |
+|---|---|---|
+| C1 | own room present, members active and listed, no duplicates, symmetric | 5,808 arrays, 0 violations |
+| C2 | per room, the arrays seen after a refill (activation of the room or of a neighbour) and before the next removal next to it are subsequences of one fixed sequence (union of their orders acyclic) | 4,668 arrays checked, 0 violations; 1,140 excluded as perturbed by a removal and not yet refilled |
+| C3 | across a snapshot pair with exactly one removal of R and no activation, arrays that held R = previous with R replaced by the last entry, length −1 | 4 pairs, 5 arrays, 0 violations; 56 pairs undecidable (several removals, or activations in the same window, which refill the arrays) |
+| C4 | burst = consecutive `room_activate` events of one tick; anchor = room of the player `room_add` directly before it (else directly after, for the first placement); the anchor itself is excluded (built first); the other rooms are activated in the anchor's array order read from the first later snapshot with no removal in between | 69 of 95 bursts checked (205 activations), 0 violations; 26 undecidable (19 without an adjacent player `room_add`, 7 with a removal before the next snapshot) |
+
+C3 is thin (5 arrays): the traces hold few isolated removals, and the
+snapshots are 25 frames apart, so most removal windows also contain
+activations. The §6.3 swap-with-last rule is otherwise exercised only by
+the synthetic vector. Rooms-near order itself (§3) and §7.3 are not
+checkable from the trace. Full check (needs a
 recorder extension): record per active room the DRLG room (+0x10), its
 tile rect (+0x34..+0x40), level id, rooms-near array (+0x08/+0x2C),
 status (+0x44) and counts (+0x0C), the room's client count (+0x78) and
