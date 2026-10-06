@@ -22,6 +22,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-2`) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
+| `spawn.py` | Subclass of `record_rng.py`'s `Recorder`: starts a single-player game (`-name`, forced menu), and at the end of server frame N calls a spawn entry point of the game (normal, champion, unique, random boss, superunique) with a monstats row near the player; records every RNG draw of the call (the `record_rng.py` hooks, armed only for the call) and every monster created; writes `traces/raw/<time>-spawn.jsonl` (gitignored). Spec: `specs/tools/original-hooks-spawn.md` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -252,3 +253,35 @@ entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
 `u`, `par`, `prev`, `next`, `b` (base `[stat, layer, value]`), and for
 extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
 `sb` (state bits).
+
+## spawn.py: monsters on demand
+
+```
+py tools/trace-recorder/spawn.py --name bdAma --char-class ama --tick 60 --class 5
+py tools/trace-recorder/spawn.py --class 19 --kind champion
+py tools/trace-recorder/spawn.py --class 19 --kind unique
+py tools/trace-recorder/check_rng.py traces/raw/<time>-spawn.jsonl
+```
+
+Launches `Game.exe -w -ns -nosave -name <name> -<class>`, leaves the menu
+as `dump_tables.py` does, and waits for the tick-return hook `0x0052FD1E`
+with game +0xA8 >= `--tick` and the player in client state 4. There it
+saves the thread context, arms the `record_rng.py` hooks, calls the entry
+of `specs/tools/original-hooks-spawn.md` §1 (through a return trap in a
+scratch page), disarms the hooks, logs the new monsters, restores the
+context and lets the game run `--after-ticks` more frames. Options:
+`--class` (monstats row), `--kind normal|champion|unique|boss`,
+`--superunique ROW`, `--dx/--dy` (offset from the player, subtiles),
+`--spread`, `--flags`, `--no-inline`, `--manual` (start the game by
+hand), `--seconds`. Same reference-hash check and kill guarantees as
+`record_rng.py`.
+
+Raw format `spawn-raw-1` (JSON lines): `header` (with the request),
+`first_tick`, `spawn_start` (frame, player and target position, room and
+its box), `call` / `call_return` (entry, ECX, EDX, stack arguments, EAX,
+stack check), `draw` / `seed_set` as `rng-raw-1` plus `in_call` (true:
+on the spawning thread during the call), `unit` (each monster created:
+class, GUID, mode, seed, position, type flags, umods, name seed, hcIdx,
+components, hitpoints, maxhp, level, experience, armorclass), `spawn`
+(summary: units created, draw counts, game and room seed before and
+after), `footer`. `check_rng.py` checks the draw records.
