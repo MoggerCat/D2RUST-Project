@@ -31,6 +31,15 @@ Hosts of `prop_handle.rs`, as the server's handler tests build them:
   item and a waypoint object; `NoLevelTypes` DRLG.
 - **item host**: `SimGame` with an `ItemWorld` (cube recipe ring →
   amulet), a player with the cube stored, a ring in any mode 0–5.
+- **trade host**: `SimGame<ActionSim<_>, TradeWorld<_>>` as
+  `d2-client`'s `e2e_vendor.rs` builds it (its rests copied: talk range,
+  staged inventory, room in the NPC grid, no item copy): Akara, a player
+  with 5000 gold owning a buckler and a cap, any game seed; half the
+  cases first open a trade (0x13, 0x2F, 0x38 action 1, each asserted 0),
+  then the generated store items join the GUID pool. Ids 0x13, 0x2F–0x38,
+  0x40, 0x58, 0x62 get 3 in 4 messages. A spot check of 600 messages:
+  0x13, 0x2F, 0x30, 0x34–0x38, 0x62 reach their handlers with 0 and with
+  refusals; 0x31, 0x40, 0x58 stay stubs on this host.
 
 Field values: half from the field's own domain by layout name (x/y within
 50 of the player, unit types 0–5, the host's GUIDs or −1, skill ids 0–4,
@@ -43,10 +52,11 @@ the item host mostly 1: the generated ring is rarely in a mode the cube
 takes).
 
 Default case counts and debug-build runtimes: `prop_messages` 256/test
-(0.2 s), `prop_transport` 256 and 64 (1.3 s), `prop_handle` 48/48/96
-(≈ 1 s), `prop_bridge` 128 (≈ 0.5 s). Hunts run with `PROPTEST_CASES`:
-20,000 (`prop_messages`), 5,000 (`prop_transport`), 3,000 (`prop_handle`,
-`prop_bridge`): no failure left.
+(0.2 s), `prop_transport` 256 and 64 (1.3 s), `prop_handle` 48/48/96/64
+(≈ 1.5 s), `prop_bridge` 128 (≈ 0.5 s). Hunts run with `PROPTEST_CASES`:
+20,000 (`prop_messages`), 5,000 (`prop_transport`), 2,000–3,000
+(`prop_handle`, `prop_bridge`), 6,000 (the trade host alone): no failure
+left.
 
 ## 2. Bugs found
 
@@ -60,7 +70,7 @@ vs `Err(TooLarge(517))`) and passes with it (M08).
 
 Nothing else failed: no panic, overflow, abort or recorded fatal path in
 `d2-proto`, the `d2-server` transport, dispatcher and host, the wired skill,
-waypoint and cube handlers, or the bridge's receive path.
+waypoint, cube, NPC and vendor handlers, or the bridge's receive path.
 
 Facts the properties had to learn (not bugs; for whoever writes the next
 ones):
@@ -92,12 +102,15 @@ ones):
 1. **`d2-net`** has no code yet (`lib.rs` is a doc comment): no
    `crates/d2-net/tests/prop_*.rs`. Its transport needs the same
    properties when Phase 7 writes it (framing, length prefix).
-2. **`TradeWorld`** (NPC and vendor handlers: 0x13, 0x2F–0x38, 0x62) and
-   **`WorldSim`** around `ActionSim` are not fuzzed: on `ActionWorld` those
-   ids are stubs. The fixture is `crates/d2-client/tests/e2e_vendor.rs`'s
-   rests (~800 lines); a follow-up can lift it into a shared test module.
-   These handlers take GUIDs, item ids and costs from the client, so they
-   are the next place to look.
+2. **`WorldSim`** around `ActionSim` (the world-generation dispatch of
+   `e2e_single_player.rs`) is not fuzzed: its handlers are the same as on
+   `ActionSim` (`ActionEvents` reaches the same `ActionSim`), but its tick
+   runs the room, DRLG and population steps, which need the e2e's DRLG
+   fixture (~900 lines). The quest ids 0x31, 0x40, 0x58 are stubs on every
+   host here (`TradeWorld` routes none of them yet).
+   The `TradeWorld` rests in `prop_handle.rs` are a copy of
+   `e2e_vendor.rs`'s; a follow-up can move both into a shared test-support
+   module.
 3. Question for `bridge.md` §4 r3: the rule covers the 0x204 case only
    through "never sends a message the transport would assert on". Should
    it name it (and the error) next to the 0x200 game-sender case?
@@ -123,6 +136,6 @@ All passed on this branch, 2026-10-06:
 - `python3 tools/spec_index.py --check`: OK.
 - `python3 tools/methods.py check`: 21 methods OK.
 - `python3 tools/coverage.py --check`: 3197 claims, 0 errors; `--selftest`: ok.
-- Final hunts on the committed tests: `prop_handle` and `prop_bridge` at
-  `PROPTEST_CASES=3000`, `prop_transport` at 5000, `prop_messages` at
-  20000: all pass.
+- Final hunts on the committed tests: `prop_handle` at
+  `PROPTEST_CASES=2000` (trade host alone at 6000), `prop_bridge` at
+  3000, `prop_transport` at 5000, `prop_messages` at 20000: all pass.

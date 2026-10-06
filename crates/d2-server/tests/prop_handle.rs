@@ -773,6 +773,8 @@ fn pick(name: &str, guids: &[u32], (sel, rnd): (u8, u32)) -> u32 {
             "id" | "item" | "cube" | "unit" | "npc" | "wp" | "target" | "merc" | "book"
             | "scroll" | "socketable" | "cursor" | "player" => guid,
             "skill" => rnd % 5,
+            "cost" => rnd % 6000,
+            "action" | "msg" | "quest" => rnd % 8,
             "stat" => rnd % 8,
             "left" => rnd % 2,
             "button" | "page" | "bodyloc" | "slot" | "level" | "tab" => rnd % 20,
@@ -1036,4 +1038,665 @@ fn hosts_reach_the_handlers() {
     m.extend_from_slice(&guids[1].to_le_bytes());
     dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &m, 9);
     assert!(sim.unhandled.is_empty(), "{:?}", sim.unhandled);
+}
+
+// ---- the trade host --------------------------------------------------------------------
+//
+// `SimGame<ActionSim<_>, TradeWorld<_>>` as `d2-client`'s
+// `e2e_vendor.rs` builds it: the NPC, vendor and quest handlers on
+// `wiring::interaction` over the action sim's own units. Akara (class
+// 148) next to the player; the player owns a buckler and a cap and
+// carries 5000 gold.
+
+mod trade {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::Arc;
+
+    use d2_data::tables::{Itemratio, Itemtypes, Monstats};
+    use d2_server::adapters::handlers::world::{ActionWorld, Outbox, TradeWorld};
+    use d2_server::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts};
+    use d2_server::seams::Pos;
+    use d2_sim::combat::CombatTables;
+    use d2_sim::drlg::data::DrlgData;
+    use d2_sim::drlg::{Dungeon, NoLevelTypes};
+    use d2_sim::game::Game;
+    use d2_sim::items::tables::ItemRec;
+    use d2_sim::items::{ty, ItemRequest, ItemTables};
+    use d2_sim::rng::Seed;
+    use d2_sim::skills::SkillTables;
+    use d2_sim::units::hooks::{MonsterInfo, UnitData};
+    use d2_sim::units::lifecycle::AllocRequest;
+    use d2_sim::units::lists::client_state;
+    use d2_sim::units::{UnitId, UnitType};
+    use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
+    use d2_sim::wiring::economy::{GameFields, ItemSpawn, QuestRest};
+    use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
+    use d2_sim::world::npc::{self, class, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
+    use d2_sim::world::quests::{
+        PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
+    };
+    use d2_sim::world::vendors::price::Bonus;
+    use d2_sim::world::vendors::{
+        NpcPrices, Transaction, TypeRec, VendorItem, VendorTables, NO_CODE, XXX,
+    };
+
+    use super::{blank, stat_data, NoTiles, Snapshot, ALIVE, N_STATS};
+
+    const N_TYPES: usize = 80;
+    const N_MONSTATS: usize = 400;
+    const CAP: usize = 0;
+    const BUC: usize = 1;
+
+    /// The action wiring's seams: `Pending`'s defaults; sends kept.
+    #[derive(Default)]
+    pub struct ActionRest {
+        sent: Vec<(UnitId, Vec<u8>)>,
+    }
+
+    impl Pending for ActionRest {
+        fn send(&mut self, player: UnitId, msg: &[u8]) {
+            self.sent.push((player, msg.to_vec()));
+        }
+    }
+
+    impl Outbox for ActionRest {
+        fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+            std::mem::take(&mut self.sent)
+        }
+    }
+
+    /// The interaction seams no written spec provides, answered as in
+    /// `e2e_vendor.rs` (talk range, the staged inventory, room in the
+    /// NPC grid, no item copy).
+    #[derive(Default)]
+    pub struct Rest {
+        interact: BTreeMap<UnitId, (u8, u32)>,
+        quests: BTreeMap<UnitId, PlayerQuests>,
+        inventory: BTreeSet<UnitId>,
+        last_bought: BTreeMap<UnitId, u32>,
+        sent: Vec<(UnitId, Vec<u8>)>,
+    }
+
+    impl Outbox for Rest {
+        fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+            std::mem::take(&mut self.sent)
+        }
+    }
+
+    impl PlayerQuestsRef for Rest {
+        fn quests_ref(&self, player: UnitId) -> Option<&PlayerQuests> {
+            self.quests.get(&player)
+        }
+    }
+
+    impl NpcRest for Rest {
+        fn item_format(&self) -> u16 {
+            1
+        }
+        fn distance(&self, _: UnitId, _: UnitId) -> i32 {
+            3
+        }
+        fn axis_check(&self, _: UnitId, _: UnitId) -> u32 {
+            0
+        }
+        fn unit_check(&self, _: UnitId, _: u32) -> u32 {
+            0
+        }
+        fn clear_path(&mut self, _: UnitId) {}
+        fn approach(&mut self, _: UnitId, _: UnitId) {}
+        fn player_busy(&self, _: UnitId) -> u32 {
+            0
+        }
+        fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
+            true
+        }
+        fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
+            self.interact.get(&player).copied()
+        }
+        fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
+            self.interact.insert(player, (t, guid));
+        }
+        fn reset_interact(&mut self, player: UnitId) {
+            self.interact.remove(&player);
+        }
+        fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
+            None
+        }
+        fn pets(&self, _: UnitId) -> Vec<UnitId> {
+            Vec::new()
+        }
+        fn player_name(&self, _: UnitId) -> Vec<u8> {
+            b"tester".to_vec()
+        }
+        fn reset_stats(&mut self, _: UnitId) {}
+        fn reset_skills(&mut self, _: UnitId) {}
+        fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
+        fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
+        fn npc_ai_param(&mut self, _: UnitId, _: u32) {}
+        fn stat_sent(&mut self, _: UnitId, _: u16, _: u32) {}
+        fn respec_sound(&mut self, _: UnitId) {}
+        fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
+            [0; 34]
+        }
+        fn socket_granted(&mut self, _: UnitId) {}
+        fn personalize_granted(&mut self, _: UnitId) {}
+        fn inventory_entries(&self, _: UnitId) -> Vec<InvEntry> {
+            Vec::new()
+        }
+        fn identify(&mut self, _: UnitId) {}
+        fn cursor_item(&self, _: UnitId) -> Option<UnitId> {
+            None
+        }
+        fn item_facts(&self, _: UnitId) -> ItemFacts {
+            ItemFacts::default()
+        }
+        fn put_back(&mut self, _: UnitId, _: UnitId) {}
+        fn remove_cursor_item(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn duplicate(&mut self, _: UnitId, _: UnitId) -> Option<UnitId> {
+            None
+        }
+        fn create_imbued(&mut self, _: UnitId, _: UnitId, _: &ImbueMods) -> Option<UnitId> {
+            None
+        }
+        fn item_refresh(&mut self, _: UnitId) {}
+        fn personal_name(&self, _: UnitId) -> Vec<u8> {
+            Vec::new()
+        }
+        fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
+        fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
+        fn set_mode(&mut self, _: UnitId, _: u8) {}
+        fn spawn_mercenary(&mut self, _: UnitId, _: u32, _: u8) -> Option<UnitId> {
+            None
+        }
+        fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
+        fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
+    }
+
+    impl VendorRest for Rest {
+        fn players_in_level(&self, _: u16) -> i32 {
+            1
+        }
+        fn player_level_id(&self, _: UnitId) -> u16 {
+            1
+        }
+        fn gold_cap(&self, _: UnitId) -> i32 {
+            100_000
+        }
+        fn stash_cap(&self, _: UnitId) -> i32 {
+            100_000
+        }
+        fn drop_gold(&mut self, _: UnitId, _: i32) {}
+        fn last_bought(&self, p: UnitId) -> u32 {
+            self.last_bought.get(&p).copied().unwrap_or(u32::MAX)
+        }
+        fn set_last_bought(&mut self, p: UnitId, guid: u32) {
+            self.last_bought.insert(p, guid);
+        }
+        fn has_cursor_item(&self, _: UnitId) -> bool {
+            false
+        }
+        fn copy_item(&mut self, _: UnitId) -> Option<UnitId> {
+            None
+        }
+        fn has_filled_sockets(&self, _: UnitId) -> bool {
+            false
+        }
+        fn socketed(&self, _: UnitId) -> Vec<UnitId> {
+            Vec::new()
+        }
+        fn price_bonuses(&self, _: UnitId) -> Vec<Bonus> {
+            Vec::new()
+        }
+        fn recharge(&mut self, _: UnitId) {}
+        fn repair_broken(&mut self, _: UnitId) {}
+        fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
+        fn send_transaction(&mut self, p: UnitId, t: Transaction) {
+            let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
+            self.sent.push((p, m.to_vec()));
+        }
+        fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
+        fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
+            true
+        }
+        fn remove_store_item(&mut self, _: u16, _: UnitId) {}
+        fn take_from_store(&mut self, _: u16, _: UnitId) {}
+        fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
+            true
+        }
+        fn remove_gamble_item(&mut self, _: u16, _: u32, _: UnitId) {}
+        fn refresh_npc_inventory(&mut self, _: UnitId) {}
+        fn add_trade_inventory(&mut self, _: u16, _: UnitId) {}
+        fn owns_item(&self, _: UnitId, item: UnitId) -> bool {
+            self.inventory.contains(&item)
+        }
+        fn in_inventory(&self, _: UnitId, item: UnitId) -> bool {
+            self.inventory.contains(&item)
+        }
+        fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
+            Vec::new()
+        }
+        fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+            None
+        }
+        fn add_to_tome(&mut self, _: UnitId, _: i32) {}
+        fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+            None
+        }
+        fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+        fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
+        fn remove_stored(&mut self, _: UnitId, item: UnitId) {
+            self.inventory.remove(&item);
+        }
+        fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
+            false
+        }
+    }
+
+    impl QuestRest for Rest {
+        fn has_act2(&self) -> bool {
+            false
+        }
+        fn players(&self) -> Vec<UnitId> {
+            self.quests.keys().copied().collect()
+        }
+        fn first_client_player(&self) -> Option<UnitId> {
+            self.quests.keys().next().copied()
+        }
+        fn quests(&mut self, player: UnitId) -> Option<&mut PlayerQuests> {
+            self.quests.get_mut(&player)
+        }
+        fn player_byte_4c(&self, _: UnitId) -> u8 {
+            0
+        }
+        fn set_player_byte_4c(&mut self, _: UnitId, _: u8) {}
+        fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
+            None
+        }
+        fn unit_act(&self, _: UnitId) -> Option<u8> {
+            Some(0)
+        }
+        fn unit_level(&self, _: UnitId) -> Option<u32> {
+            Some(1)
+        }
+        fn unit_kind(&self, _: UnitId) -> UnitKind {
+            UnitKind::Other
+        }
+        fn players_near(&self, _: UnitId) -> Vec<UnitId> {
+            Vec::new()
+        }
+        fn attach_sound(&mut self, _: UnitId, _: u16) {}
+        fn send(&mut self, player: UnitId, msg: &[u8]) {
+            self.sent.push((player, msg.to_vec()));
+        }
+        fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
+        fn inventory(&self, _: UnitId) -> Vec<UnitId> {
+            Vec::new()
+        }
+        fn delete_item(&mut self, _: UnitId, _: [u8; 4]) {}
+        fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
+            None
+        }
+        fn drop_item_at(&mut self, _: UnitId, _: [u8; 4], _: u8) -> bool {
+            false
+        }
+        fn den_region(&self) -> (u32, u32, u32, u32) {
+            (0, 0, 0, 0)
+        }
+        fn true_tomb_level(&self) -> u32 {
+            0
+        }
+        fn free_spot(&mut self, _: UnitId, _: u32, _: u32, _: u32, _: u32) -> Option<(i32, i32)> {
+            None
+        }
+        fn create_portal(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: u32) -> bool {
+            false
+        }
+        fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
+        fn set_object_opened(&mut self, _: UnitId) {}
+        fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
+        fn unhandled(&mut self, _: u8, _: u32) {}
+    }
+
+    /// Every type is its own and type 0's; helm and shield are armor.
+    fn equiv() -> d2_data::fixup::maps::EquivMatrix {
+        let n = N_TYPES;
+        let words = n.div_ceil(32);
+        let mut m = d2_data::fixup::maps::EquivMatrix {
+            n,
+            words,
+            bits: vec![0; n * words],
+        };
+        let mut set = |i: usize, j: usize| m.bits[i * words + j / 32] |= 1 << (j % 32);
+        for i in 1..n {
+            set(i, 0);
+            set(i, i);
+        }
+        set(usize::from(ty::HELM), usize::from(ty::ARMO));
+        set(usize::from(ty::SHIE), usize::from(ty::ARMO));
+        m
+    }
+
+    /// A cap (helm) and a buckler (shield), durability 12.
+    fn item_tables() -> ItemTables {
+        let mut ratio: Itemratio = blank();
+        ratio.version = 0;
+        let rec = |t: u16, code: &[u8; 4], (minac, maxac): (u32, u32)| ItemRec {
+            code: *code,
+            type_: t as i16,
+            level: 1,
+            durability: 12,
+            minac,
+            maxac,
+            ..ItemRec::default()
+        };
+        ItemTables {
+            items: vec![
+                rec(ty::HELM, b"cap ", (3, 5)),
+                rec(ty::SHIE, b"buc ", (4, 6)),
+            ],
+            itemtypes: (0..N_TYPES)
+                .map(|_| {
+                    let mut t: Itemtypes = blank();
+                    t.class = 0xFF;
+                    t.staffmods = 0xFF;
+                    t.rare = 1;
+                    t
+                })
+                .collect(),
+            equiv: equiv(),
+            itemratio: vec![ratio],
+            valshift: vec![0; N_STATS],
+            stat_shift: 6,
+            stat_mask: 0x3F,
+            ..ItemTables::default()
+        }
+    }
+
+    /// Akara's column holds the cap (permanent) and the buckler (1–3).
+    fn vendor_tables() -> VendorTables {
+        let item = |code: &[u8; 4], t: u16, cost: u32, (minac, maxac): (u32, u32)| VendorItem {
+            code: *code,
+            normcode: *code,
+            ubercode: NO_CODE,
+            ultracode: NO_CODE,
+            cost,
+            type_: t as i16,
+            type2: -1,
+            level: 1,
+            spawnable: 1,
+            durability: 12,
+            minac,
+            maxac,
+            nightmare_upgrade: XXX,
+            hell_upgrade: XXX,
+            ..VendorItem::default()
+        };
+        let mut cap = item(b"cap ", ty::HELM, 100, (3, 5));
+        cap.perm_store = 1;
+        cap.columns[0] = [1, 1, 0, 0, 0];
+        let mut buc = item(b"buc ", ty::SHIE, 80, (4, 6));
+        buc.columns[0] = [1, 3, 0, 0, 0];
+        let mut itemtypes = vec![
+            TypeRec {
+                repair: 1,
+                class: 7,
+                storepage: 3,
+                staffmods: 0xFF,
+                ..TypeRec::default()
+            };
+            N_TYPES
+        ];
+        itemtypes[usize::from(ty::HELM)].storepage = 0;
+        itemtypes[usize::from(ty::SHIE)].storepage = 0;
+        VendorTables {
+            items: vec![cap, buc],
+            itemtypes,
+            equiv: equiv(),
+            stat_shift: 6,
+            stat_mask: 0x3F,
+            monster_levels: vec![[1, 1, 1]; N_MONSTATS],
+            interact: vec![class::AKARA],
+            npc: vec![NpcPrices {
+                class: u32::from(class::AKARA),
+                sell: 1024,
+                buy: 512,
+                rep: 128,
+                quests: [(0, 0, 0, 0); 3],
+                max_buy: [5000; 3],
+            }],
+            difficulty: vec![Default::default(); 3],
+            ..VendorTables::default()
+        }
+    }
+
+    fn monstats() -> Vec<Monstats> {
+        let mut v: Vec<Monstats> = (0..N_MONSTATS).map(|_| blank()).collect();
+        v[usize::from(class::AKARA)].npc = true;
+        v[usize::from(class::AKARA)].interact = true;
+        v
+    }
+
+    pub type TradeGame = SimGame<ActionSim<ActionRest>, TradeWorld<Rest>>;
+
+    impl Snapshot for TradeGame {
+        fn snapshot(&self) -> String {
+            let s = &self.events.sys;
+            format!(
+                "{:?}{:?}{:?}{:?}",
+                self.game, s.units, s.stats, self.world.items
+            )
+        }
+        fn faults(&self) -> Vec<String> {
+            let s = &self.events.sys;
+            let mut e: Vec<String> = s.hooks.errors.iter().map(|e| format!("{e:?}")).collect();
+            e.extend(s.errors.iter().map(|e| format!("{e:?}")));
+            e.extend(self.world.state.errors.iter().map(|e| format!("{e:?}")));
+            e.extend(self.world.action.faults.iter().map(|f| format!("{f:?}")));
+            e
+        }
+    }
+
+    /// The host and its GUIDs: player, Akara, buckler, cap.
+    pub fn trade_host(game_seed: u32) -> (TradeGame, Vec<u32>) {
+        let tables = ActionTables {
+            missiles: Vec::new(),
+            skills: SkillTables {
+                skills: Vec::new(),
+                skilldesc: Vec::new(),
+                missiles: Vec::new(),
+                skills_code: Vec::new(),
+                miss_code: Vec::new(),
+                level_cap: 0,
+                stat_count: 0,
+            },
+            combat: CombatTables {
+                charstats: Vec::new(),
+                difficultylevels: Vec::new(),
+                monstats: Vec::new(),
+                monstats2: Vec::new(),
+                hitclass: Vec::new(),
+            },
+            levels: Vec::new(),
+            skill_modes: Vec::new(),
+        };
+        let drlg = DrlgWorld {
+            dungeon: Dungeon::default(),
+            data: Arc::new(DrlgData::default()),
+            tiles: Box::new(NoTiles),
+            types: Box::new(NoLevelTypes),
+        };
+        let hooks = ActionHooks::new(
+            Arc::new(tables),
+            drlg,
+            Seed::init_low(game_seed),
+            ActionRest::default(),
+        );
+        let data = UnitData {
+            monsters: vec![
+                MonsterInfo {
+                    enabled: true,
+                    aidel: [15; 3],
+                    moves: 0,
+                };
+                N_MONSTATS
+            ],
+            ..UnitData::default()
+        };
+        let mut events = ActionSim::new(stat_data(), data, hooks);
+        let mut game = Game::new();
+        game.lists.ensure_act(0).unwrap();
+        let mut seed = events.hooks().game_seed;
+        let ctl = NpcControl::new(&monstats(), Vec::new(), false, 0, &mut seed).expect("npc");
+        let quests = QuestControl::new(&QuestTables::load().unwrap(), &mut seed).unwrap();
+        events.hooks().game_seed = seed;
+        let mut alloc = |ty, class| {
+            let req = AllocRequest {
+                ty,
+                class,
+                room: None,
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: ty == UnitType::Player,
+            };
+            events
+                .with(&mut game, |g, v| v.allocate(g, &req, 0, 0))
+                .expect("allocated")
+        };
+        let npc = alloc(UnitType::Monster, u32::from(class::AKARA));
+        let player = alloc(UnitType::Player, 1);
+        events.sys.units.get_mut(player).unwrap().mode = 1;
+        events.with(&mut game, |_, v| {
+            v.set_base(player, 12, 1);
+            v.set_base(player, 14, 5000);
+        });
+        let mut rest = Rest::default();
+        rest.quests.insert(player, PlayerQuests::default());
+        let mut world = TradeWorld::new(
+            ActionWorld::default(),
+            GameFields::new(Seed::init_low(game_seed), false),
+            item_tables(),
+            quests,
+            ctl,
+            vendor_tables(),
+            rest,
+            1000,
+        );
+        world.state.add_npc(npc);
+        let (buckler, cap) = world.with_economy(&mut game, &mut events, |econ, _| {
+            let mut make = |record: usize| {
+                let mut rq = ItemRequest {
+                    item: record as i32,
+                    ilvl: 1,
+                    quality: 2,
+                    format: 1,
+                    ..ItemRequest::default()
+                };
+                let spawn = ItemSpawn {
+                    room: None,
+                    mode: 0,
+                    init_flags: 1,
+                };
+                econ.create_item(&mut rq, false, spawn).expect("item")
+            };
+            (make(BUC), make(CAP))
+        });
+        world.rest.inventory.extend([buckler, cap]);
+        let mut s: TradeGame = SimGame::with_world(game, events, world);
+        s.join(0, Some(player), None, client_state::IN_GAME)
+            .unwrap();
+        s.set_player(
+            player,
+            PlayerFields {
+                gate: ALIVE,
+                data: Some(PlayerData { last_accept: 0 }),
+            },
+        );
+        let at = UnitFacts {
+            act: 0,
+            pos: Pos { x: 100, y: 100 },
+            owner: None,
+        };
+        s.set_unit(player, at);
+        s.set_unit(npc, at);
+        let guids = [player, npc, buckler, cap]
+            .iter()
+            .map(|&u| s.game.lists.unit(u).unwrap().guid)
+            .collect();
+        (s, guids)
+    }
+}
+
+/// The NPC, vendor and quest ids `TradeWorld` handles.
+fn trade_id() -> impl Strategy<Value = u8> {
+    prop::sample::select(vec![
+        0x13u8, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x40, 0x58, 0x62,
+    ])
+}
+
+/// Talk (0x13), chat (0x2F) and trade (0x38 action 1) with Akara, so the
+/// vendor paths past "no interaction" are reached.
+fn open_trade(npc: u32) -> Vec<Vec<u8>> {
+    let mut talk = vec![0x13, 1, 0, 0, 0];
+    talk.extend_from_slice(&npc.to_le_bytes());
+    let mut chat = vec![0x2F, 1, 0, 0, 0];
+    chat.extend_from_slice(&npc.to_le_bytes());
+    let mut trade = vec![0x38, 1, 0, 0, 0];
+    trade.extend_from_slice(&npc.to_le_bytes());
+    trade.extend_from_slice(&[0; 4]);
+    vec![talk, chat, trade]
+}
+
+proptest! {
+    #![proptest_config(config(64))]
+
+    /// Every game id on the trade host, optionally after opening a trade
+    /// with Akara; the NPC / vendor / quest ids get most of the cases.
+    #[test]
+    fn trade_host_any_intents(
+        seed in any::<u32>(),
+        open in any::<bool>(),
+        ids in prop::collection::vec(prop_oneof![3 => trade_id(), 1 => 1u8..0x67], 1..12),
+        gens in prop::collection::vec(gen(), 12),
+    ) {
+        let (mut sim, mut guids) = trade::trade_host(seed);
+        if open {
+            let mut out = ClientBuffers::new();
+            out.add_client(0);
+            for m in open_trade(guids[1]) {
+                let code = dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &m, m.len());
+                prop_assert_eq!(code, ResultCode::Done, "{:02X?}", m);
+            }
+            // The store items the trade generated join the GUID pool.
+            let mut items = sim.game.lists.units_of_type(d2_sim::units::UnitType::Item);
+            items.sort();
+            for u in items {
+                let g = sim.game.lists.unit(u).unwrap().guid;
+                if !guids.contains(&g) {
+                    guids.push(g);
+                }
+            }
+        }
+        let msgs: Vec<Gen> = ids.iter().zip(gens).map(|(&id, g)| Gen { id, ..g }).collect();
+        run(&mut sim, &guids, &msgs)?;
+    }
 }
