@@ -80,8 +80,10 @@ pub trait TextHooks {
 /// UI text through `ui::text::layout_text` (`ui.md` §A3): the style's
 /// font from `assets`, the rules' placements resolved to glyph records,
 /// one sprite per placed glyph (its DC6 frame at the placed point) in
-/// placement order. TODO(spec: ui/text.md) (§B3): the layout options are
-/// the defaults until the spec says what the original's text call takes.
+/// placement order. The request's clip rect goes to the rules as
+/// `TextOpts::clip`; TODO(spec: ui/text.md) (§B3): the other layout
+/// options are the defaults until the spec says what the original's text
+/// call takes.
 pub fn text_sprites<H: TextHooks + ?Sized>(
     hooks: &H,
     req: &TextRequest,
@@ -97,7 +99,9 @@ pub fn text_sprites<H: TextHooks + ?Sized>(
         &req.text,
         req.at,
         req.style,
-        &TextOpts::default(),
+        &TextOpts {
+            clip: Some(req.clip),
+        },
         hooks.text_rules(),
     )?;
     glyphs

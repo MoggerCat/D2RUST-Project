@@ -731,7 +731,7 @@ fn compile_only_lookup_tables() {
     assert_eq!(data().table("compcode").unwrap().record(1), b"lit ");
 }
 
-// Covers: specs/data/loading.md §edge-cases-original-bugs
+// Covers: specs/data/loading.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r2, §edge-cases-original-bugs r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn loading_edge_cases() {

@@ -318,21 +318,21 @@ None.
 ## Edge cases & original bugs
 
 Reproduced:
-- Unstable sort order for equal keys (§1).
-- itemtypes column 0 is set in every row; montype column 0 never (§2).
-- The equivalence walk gives up on any link ≥ n or a deep stack, even if
+1. Unstable sort order for equal keys (§1).
+2. itemtypes column 0 is set in every row; montype column 0 never (§2).
+3. The equivalence walk gives up on any link ≥ n or a deep stack, even if
   another branch would match (§2).
-- Rows of monpreset / lvlsub / monseq out of the expected order are
+4. Rows of monpreset / lvlsub / monseq out of the expected order are
   counted as §8–§9 say, not rejected.
 
 Out of range in 1.14d (reads or writes outside an array); no 1.14d row
 reaches them; d2rs reports a load error:
-- an equivalence link < 0 that gets pushed (e1 > 0 with e2 < 0, or e3
+5. an equivalence link < 0 that gets pushed (e1 > 0 with e2 < 0, or e3
   < 0) (§2);
-- monseq sequence < 0 or ≥ E (§8);
-- monpreset Act > 5 (writes past the five pairs) (§8);
-- hireling Id < 0 (§8);
-- lvlsub Type < 0 (§9).
+6. monseq sequence < 0 or ≥ E (§8);
+7. monpreset Act > 5 (writes past the five pairs) (§8);
+8. hireling Id < 0 (§8);
+9. lvlsub Type < 0 (§9).
 
 ## Test vectors
 

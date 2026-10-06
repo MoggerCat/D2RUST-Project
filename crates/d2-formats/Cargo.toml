@@ -22,6 +22,8 @@ workspace = true
 criterion.workspace = true
 # The MPQ bench builds a synthetic archive with the test-support writer.
 d2-formats = { path = ".", features = ["test-support"] }
+# Live-shaped DC6 / DCC files for the sprite benches (bytes only).
+test-fixtures = { path = "../test-fixtures" }
 proptest.workspace = true
 
 [[bench]]

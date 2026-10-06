@@ -194,8 +194,15 @@ impl FrameSet {
     /// the orientation bit as [`FrameAnchor`] (`sprite-placement.md` §8).
     /// A `flip` other than 0 or 1 is an error: the original tests bit 0
     /// only (§1) while the decoder reads any non-zero `flip` as top-down,
-    /// so such a frame's rows would not be the original's.
+    /// so such a frame's rows would not be the original's. A file whose
+    /// version is not 6 or whose flags word has bit 2 is an error too:
+    /// the original's rasterizer refuses it with a fatal error
+    /// (`sprite-placement.md` Edge cases 4).
     pub fn from_dc6(dc6: &Dc6, dir: u8) -> Result<Self, FrameError> {
+        let (version, flags) = (dc6.header.version, dc6.header.flags);
+        if version != 6 || flags & 4 != 0 {
+            return Err(FrameError::Dc6Header { version, flags });
+        }
         let dirs = dc6.header.directions as usize;
         let per = dc6.header.frames_per_direction as usize;
         if usize::from(dir) >= dirs {
@@ -290,6 +297,8 @@ pub enum FrameError {
         frame: usize,
         variable0: u32,
     },
+    #[error("DC6 version {version}, flags {flags:#x}: the original refuses a version other than 6 or flags bit 2")]
+    Dc6Header { version: i32, flags: u32 },
     #[error("DC6 direction {dir} frame {frame}: flip {flip} is neither 0 nor 1")]
     Dc6Flip { dir: u8, frame: usize, flip: u32 },
     #[error("{0} does not apply to this file type")]

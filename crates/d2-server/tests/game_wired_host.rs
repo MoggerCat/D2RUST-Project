@@ -353,6 +353,7 @@ impl Fx {
             monstats_extra: monstats_extra(table("monstats")),
             components: component_counts(table("monstats2")),
             ids: NamedIds::default(),
+            montype_equiv: live().fixed.montype_equiv.clone(),
         };
         let info = GameInfo {
             expansion: true,

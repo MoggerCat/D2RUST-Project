@@ -11,6 +11,7 @@ mod buffer;
 mod equip;
 mod gold;
 mod ground;
+mod host;
 mod stack;
 
 use std::cell::RefCell;

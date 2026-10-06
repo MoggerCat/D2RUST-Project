@@ -18,6 +18,8 @@ pub mod receive;
 pub mod world;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod local_tests;
 #[cfg(test)]
 mod tests;

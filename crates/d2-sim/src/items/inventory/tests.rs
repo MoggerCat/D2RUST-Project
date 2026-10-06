@@ -1589,3 +1589,5 @@ fn real_grid_belt_and_type_tables() {
 
 #[path = "gap_tests.rs"]
 mod gap_tests;
+#[path = "mutant_tests.rs"]
+mod mutant_tests;

@@ -71,6 +71,10 @@ pub enum UnitError {
     Anim(#[from] AnimError),
     #[error(transparent)]
     Game(#[from] GameError),
+    /// Stat-list expiry an expired extended list stops (`stat-lists.md`
+    /// edge case 4: endless in 1.14d).
+    #[error(transparent)]
+    Stats(#[from] crate::stats::lists::StatListError),
 }
 
 fn record_mut<'a>(

@@ -2447,6 +2447,7 @@ dependencies = [
  "criterion",
  "d2-formats",
  "proptest",
+ "test-fixtures",
  "thiserror 2.0.21",
 ]
 
@@ -2515,6 +2516,7 @@ dependencies = [
  "d2-data",
  "d2-formats",
  "d2-proto",
+ "test-fixtures",
 ]
 
 [[package]]
@@ -5268,6 +5270,7 @@ version = "0.0.0"
 dependencies = [
  "d2-data",
  "d2-formats",
+ "d2-server",
  "d2-sim",
  "thiserror 2.0.21",
 ]

@@ -1,0 +1,328 @@
+// Spec: specs/data/loading.md (the loaded set), specs/data/fixups.md (the fixed-up set), specs/drlg/levels.md §3 (act creation), specs/drlg/preset.md §5, specs/drlg/rooms.md §9.3 (the DRLG providers); the table views of specs/skills, specs/combat, specs/monsters/population.md, specs/sim/units.md
+//! A game from a loaded table set: [`GameData`] holds the loaded and
+//! fixed-up tables, the level-type views and every DRLG file
+//! (`d2_server::world_data`), and builds what the server hands the sim:
+//! [`ActionTables`], [`WorldTables`], the vitals, stat and unit data,
+//! the shared level types, an act's [`DrlgWorld`] and a [`WorldSim`].
+//!
+//! The builders are the ones the game-file tests use on the live set
+//! (`d2-server/tests/game_wired_host.rs`), gathered here so a synthetic
+//! install ([`crate::install`]) goes the same way; nothing here adds a
+//! rule. The seams with no provider keep the sim's defaults: [`Seams`]
+//! answers only the bookkeeping no rule decides (the interaction owner,
+//! the transport), as the live host test does.
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use d2_data::bin::{BinSet, BinTable};
+use d2_data::fixup::{self, FixedSet};
+use d2_data::tables::{
+    decode_all, Difficultylevels, Levels, Missiles, Monequip, Monlvl, Monprop, Monstats, Monstats2,
+    Monumod, Objects, Record, Superuniques,
+};
+use d2_formats::animdata::AnimData;
+use d2_formats::mpq::ArchiveSet;
+use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
+use d2_server::adapters::SimGame;
+use d2_server::world_data::tables::LevelTables;
+use d2_server::world_data::{archive, WorldDataError, WorldFiles};
+use d2_sim::combat::vitals::VitalsTables;
+use d2_sim::combat::CombatTables;
+use d2_sim::drlg::maze::Maze;
+use d2_sim::drlg::{Drlg, DrlgData, DrlgError, Dungeon, NoLevelTypes};
+use d2_sim::monsters::ai::skill_modes;
+use d2_sim::monsters::init::{component_counts, monstats_extra, GameInfo, NamedIds};
+use d2_sim::monsters::population::PopTables;
+use d2_sim::rng::Seed;
+use d2_sim::skills::{SkillTables, LEVEL_CAP_114D};
+use d2_sim::stats::{StatData, StateTable};
+use d2_sim::units::hooks::UnitData;
+use d2_sim::units::UnitId;
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::worldgen::dispatch::WorldSim;
+use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
+use d2_sim::wiring::worldgen::{WorldPending, WorldState, WorldTables};
+use d2_sim::world::waypoints::WaypointData;
+
+use crate::install::Install;
+
+/// A step of the game build failed.
+#[derive(Debug, thiserror::Error)]
+pub enum GameError {
+    /// A table view could not be built from the set.
+    #[error("{what}: {detail}")]
+    Table { what: String, detail: String },
+    #[error(transparent)]
+    WorldData(#[from] WorldDataError),
+    #[error("act {act}: {source:?}")]
+    Drlg { act: u8, source: DrlgError },
+}
+
+/// How act 0's DRLG is created.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActCreation {
+    /// `Drlg::create` over the level types (`levels.md` §3): the act
+    /// placer (step 7) and the town (step 8). What a game on the live
+    /// tables does.
+    Full,
+    /// `Drlg::create` without the act placer (step 7 over
+    /// `NoLevelTypes`, no town), then the town allocated and generated
+    /// over the level types. For the synthetic set: the Act I placer
+    /// (`outdoor.md`, `place.rs` A1W / A1M) links levels 1–7, 17, 26 and
+    /// 39 by their 1.14d ids and types, which an 8-row made-up levels
+    /// table does not have. The DRLG seed then skips the placer's draws:
+    /// a fixture state, not a 1.14d one.
+    TownOnly,
+}
+
+fn err(what: &str, detail: impl std::fmt::Display) -> GameError {
+    GameError::Table {
+        what: what.to_owned(),
+        detail: detail.to_string(),
+    }
+}
+
+/// Everything a game is built from.
+#[derive(Clone, Debug)]
+pub struct GameData {
+    /// The loaded set (`bin::load`): the skill, combat and vitals views
+    /// read it.
+    pub bins: BinSet,
+    pub anim: AnimData,
+    /// The fixed-up set (`fixup::apply`): every other view.
+    pub fixed: FixedSet,
+    pub level: LevelTables,
+    pub files: WorldFiles,
+}
+
+impl GameData {
+    /// From a loaded set and the archives it came from: `AnimData.d2`,
+    /// the fix-ups, the level-type views and every DRLG file the views
+    /// name (`WorldFiles::load`; a missing or bad file is an error).
+    pub fn load(bins: BinSet, archives: &ArchiveSet) -> Result<Self, GameError> {
+        let anim = fixup::read_animdata(archives).map_err(|e| err("AnimData.d2", e))?;
+        let fixed = fixup::apply(&bins, &anim).map_err(|e| err("fixup", e))?;
+        let level = LevelTables::from_fixed(&fixed)?;
+        let files = WorldFiles::load(
+            &level.drlg,
+            &level.preset,
+            &level.outdoor,
+            archive::reader(archives),
+        )?;
+        Ok(Self {
+            bins,
+            anim,
+            fixed,
+            level,
+            files,
+        })
+    }
+
+    /// From a built synthetic install.
+    pub fn from_install(i: &Install) -> Result<Self, GameError> {
+        Self::load(i.loaded.clone(), &i.archives)
+    }
+
+    /// A fixed-up table by name.
+    pub fn table(&self, name: &str) -> Result<&BinTable, GameError> {
+        self.fixed
+            .table(name)
+            .ok_or_else(|| err(name, "not in the set"))
+    }
+
+    /// A fixed-up table's typed rows.
+    pub fn rows<T: Record>(&self) -> Result<Vec<T>, GameError> {
+        decode_all(self.table(T::TABLE)?).map_err(|e| err(T::TABLE, e))
+    }
+
+    /// Missiles, skills, combat, levels and the monster skill modes.
+    pub fn action_tables(&self) -> Result<ActionTables, GameError> {
+        Ok(ActionTables {
+            missiles: self.rows::<Missiles>()?,
+            skills: SkillTables::from_bin(&self.bins, LEVEL_CAP_114D)
+                .map_err(|e| err("skills", e))?,
+            combat: CombatTables::from_bin(&self.bins).map_err(|e| err("combat", e))?,
+            levels: self.rows::<Levels>()?,
+            skill_modes: skill_modes(self.table("monstats")?),
+        })
+    }
+
+    /// Population and monster-init tables.
+    pub fn world_tables(&self) -> Result<WorldTables, GameError> {
+        let levels = self.rows::<Levels>()?;
+        let monstats = self.rows::<Monstats>()?;
+        let monstats2 = self.rows::<Monstats2>()?;
+        let superuniques = self.rows::<Superuniques>()?;
+        Ok(WorldTables {
+            pop: PopTables::from_records(&levels, &monstats, &monstats2, &superuniques)
+                .with_bins(self.table("monstats")?, self.table("monstats2")?),
+            monstats,
+            monstats2,
+            monlvl: self.rows::<Monlvl>()?,
+            levels,
+            monprop: self.rows::<Monprop>()?,
+            monequip: self.rows::<Monequip>()?,
+            monumod: self.rows::<Monumod>()?,
+            superuniques,
+            difficultylevels: self.rows::<Difficultylevels>()?,
+            monstats_extra: monstats_extra(self.table("monstats")?),
+            components: component_counts(self.table("monstats2")?),
+            ids: NamedIds::default(),
+            montype_equiv: self.fixed.montype_equiv.clone(),
+        })
+    }
+
+    pub fn vitals(&self) -> Result<VitalsTables, GameError> {
+        VitalsTables::from_bin(&self.bins).map_err(|e| err("vitals", e))
+    }
+
+    pub fn stat_data(&self) -> Result<StatData, GameError> {
+        let states = StateTable::new(self.table("states")?, &self.fixed.states)
+            .map_err(|e| err("states", e))?;
+        StatData::new(
+            self.table("itemstatcost")?,
+            self.table("charstats")?,
+            states,
+            self.table("monstats")?,
+            self.table("skills")?,
+        )
+        .map_err(|e| err("stat data", e))
+    }
+
+    /// Unit data of an expansion game.
+    pub fn unit_data(&self) -> Result<UnitData, GameError> {
+        let u = UnitData::new(self.table("monstats")?, self.table("monstats2")?)
+            .map_err(|e| err("unit data", e))?;
+        Ok(UnitData {
+            expansion: true,
+            ..u
+        })
+    }
+
+    /// The waypoint tables of `ActionWorld`.
+    pub fn waypoints(&self) -> Result<WaypointData, GameError> {
+        Ok(WaypointData::new(
+            &self.rows::<Levels>()?,
+            &self.rows::<Objects>()?,
+        ))
+    }
+
+    /// The DRLG data and the level-type dispatcher over the providers.
+    pub fn level_types(&self) -> (Arc<DrlgData>, SharedTypes) {
+        let data = Arc::new(self.level.drlg.clone());
+        let types = SharedTypes::new(WorldTypes::new(
+            data.clone(),
+            Maze::new(self.level.maze.clone()),
+            self.level.preset.clone(),
+            self.level.outdoor.clone(),
+            Box::new(self.files.ds1.clone()),
+            Box::new(self.files.subs.clone()),
+        ));
+        (data, types)
+    }
+
+    /// Act 0 created on `init_seed` with `town` as its town level
+    /// ([`ActCreation`]), over the level types; the DT1 provider.
+    pub fn drlg_world(
+        &self,
+        data: Arc<DrlgData>,
+        types: &SharedTypes,
+        creation: ActCreation,
+        init_seed: u32,
+        town: u32,
+    ) -> Result<DrlgWorld, GameError> {
+        let drlg_err = |source| GameError::Drlg { act: 0, source };
+        let mut handle = types.clone();
+        let drlg = match creation {
+            ActCreation::Full => {
+                Drlg::create(0, init_seed, 0, town, false, &data, &mut handle).map_err(drlg_err)?
+            }
+            ActCreation::TownOnly => {
+                let mut d = Drlg::create(0, init_seed, 0, 0, false, &data, &mut NoLevelTypes)
+                    .map_err(drlg_err)?;
+                let l = d
+                    .get_or_alloc_level(&data, &mut handle, town)
+                    .map_err(drlg_err)?;
+                d.generate_level(&data, &mut handle, l).map_err(drlg_err)?;
+                d
+            }
+        };
+        let mut dungeon = Dungeon::default();
+        dungeon.acts[0] = Some(drlg);
+        Ok(DrlgWorld {
+            dungeon,
+            data,
+            tiles: Box::new(self.files.dt1.clone()),
+            types: Box::new(handle),
+        })
+    }
+
+    /// A `WorldSim` of an expansion game: act 0 ([`Self::drlg_world`]),
+    /// the action hooks on `game_seed` with AnimData, vitals and the path
+    /// provider, the world state, the population regions created.
+    /// Returns the sim and the shared level types (preset lookups).
+    pub fn world_sim<X: WorldPending>(
+        &self,
+        creation: ActCreation,
+        init_seed: u32,
+        town: u32,
+        game_seed: u32,
+        x: X,
+    ) -> Result<(WorldSim<X>, SharedTypes), GameError> {
+        let (data, types) = self.level_types();
+        let world = self.drlg_world(data, &types, creation, init_seed, town)?;
+        let mut hooks = ActionHooks::new(
+            Arc::new(self.action_tables()?),
+            world,
+            Seed::init_low(game_seed),
+            x,
+        );
+        hooks.anim_data = Some(Arc::new(self.anim.clone()));
+        hooks.vitals = Some(Arc::new(self.vitals()?));
+        hooks.enable_paths().map_err(|e| err("paths", e))?;
+        let info = GameInfo {
+            expansion: true,
+            ..GameInfo::default()
+        };
+        let state = WorldState::new(types.clone(), Arc::new(self.world_tables()?), info);
+        let mut sim = WorldSim::new(Arc::new(self.stat_data()?), self.unit_data()?, hooks, state);
+        sim.create_regions();
+        Ok((sim, types))
+    }
+}
+
+/// The seams without a provider keep their defaults (`Pending`,
+/// `WorldPending`), except the interaction owner (kept as set) and the
+/// transport (`send` collected and handed to the host by [`Outbox`]).
+#[derive(Default)]
+pub struct Seams {
+    pub interact: BTreeMap<UnitId, (u8, u32)>,
+    pub sent: Vec<(UnitId, Vec<u8>)>,
+}
+
+impl Pending for Seams {
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        self.interact.entry(player).or_insert((unit_type, guid));
+    }
+    fn reset_interact(&mut self, player: UnitId) {
+        self.interact.remove(&player);
+    }
+    fn interact_guid(&self, player: UnitId) -> Option<u32> {
+        self.interact.get(&player).map(|i| i.1)
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.sent.push((player, msg.to_vec()));
+    }
+}
+
+impl WorldPending for Seams {}
+
+impl Outbox for Seams {
+    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+}
+
+/// The server game over a [`WorldSim`] with [`Seams`].
+pub type Sim = SimGame<WorldSim<Seams>, ActionWorld>;

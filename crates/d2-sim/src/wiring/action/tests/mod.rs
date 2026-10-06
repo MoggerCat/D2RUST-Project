@@ -4,12 +4,20 @@
 //! preset rooms, streamed). Only the seams without a provider
 //! ([`Pending`]) are faked: a straight-line path, positions, hostility.
 
+#[cfg(test)]
 mod ai;
+#[cfg(test)]
 mod combat;
+#[cfg(test)]
 mod death;
+#[cfg(test)]
 mod e2e;
+pub mod fight;
+#[cfg(test)]
 mod missiles;
+#[cfg(test)]
 mod rooms;
+#[cfg(test)]
 mod waypoints;
 
 use std::collections::BTreeMap;
@@ -325,6 +333,9 @@ pub struct Fx {
 }
 
 impl Fx {
+    // Shared with the benches (`bench_fixtures::combat`), where clippy
+    // sees it as a public type.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self::with_rooms(&[
             (LEVEL, TileRect::new(0, 0, 8, 8)),

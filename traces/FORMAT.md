@@ -105,11 +105,11 @@ their hashes and the state they were drawn from.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `capture_format` | integer | Version of this section's payload; `1`. A reader rejects an unknown value. |
+| `capture_format` | integer | Version of this section's payload; `2` (`1`: traces taken from `frames-raw-1`, state without cursor, level, seeds, light, weather, draws). A reader rejects an unknown value. |
 | `case` | string | Capture case id, e.g. `"stability-0001"` (`capture.md` §8). |
 | `video_type` | integer | `1` (GDI); other values are rejected. |
 | `size` | `[w, h]` | `[800, 600]`. |
-| `raw` | string | Name of the `frames-raw-1` file the frames were taken from. |
+| `raw` | string | Name of the raw file the frames were taken from (`frames-raw-2` for `capture_format` 2). |
 | `images` | string | Directory under `game/captures/` holding the PNGs (local only). |
 
 - `expected[]`: one event per kept frame, `kind` `"frame"`, `tick` = the
@@ -117,11 +117,13 @@ their hashes and the state they were drawn from.
 
 | Field | Type | Meaning |
 |---|---|---|
+| `seq` | integer | The recorder's capture sequence number (`capture.md` §4; the draw counter is not unique). |
 | `draw` | integer | In-game draw counter `[0x7A0494]`. |
 | `index_sha256` | string | SHA-256 of the W × H index bytes, row-major, top row first. |
 | `palette_sha256` | string | SHA-256 of the 768 palette bytes R, G, B. |
 | `image` | string | PNG file name in `setup.images` (8-bit palettized, indices unchanged). |
-| `state` | object | The recorded state of `capture.md` §3 (`player`, `tile_origin`, `unit_origin`, `view_rect`, `open_mode`, `shift_x`, `shake`, `clear_counter`). |
+| `state` | object | The recorded state of `capture.md` §3 (`player`, `tile_origin`, `unit_origin`, `view_rect`, `open_mode`, `shift_x`, `shake`, `clear_counter`; from `capture_format` 2 also `client_update`, `level`, `cursor`, `seed_start`, `seed_end`, `light`, `weather`). |
+| `draws` | array | Optional: the frame's draw log of `capture.md` §3.5, in call order. |
 
 - `compare.mode` is `"exact"`: the CPU reference's index frame and palette
   must hash to the recorded values (`capture.md` §6).
@@ -166,3 +168,4 @@ their hashes and the state they were drawn from.
 |---|---|---|
 | 1 | 2026-10-05 | Initial format. |
 | 1 | 2026-10-06 | Added §Render captures (new area and kind, no bump; its payload carries `capture_format` 1). |
+| 1 | 2026-10-06 | §Render captures payload `capture_format` 2 (raw `frames-raw-2`, `record_frames.py` 0.2.0): `seq`, cursor, level, seeds, light, weather and the optional draw log; images named by `seq`. Readers keep accepting 1. |
