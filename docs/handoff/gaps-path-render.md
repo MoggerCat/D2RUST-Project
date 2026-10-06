@@ -1,6 +1,6 @@
 # Gap tests: path-placement §1–§6, pathing, camera, sprite-placement
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md`; this file is the detailed record until a docs session folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Scope: branch `claude/gaps-path-render`, based on
 `claude/tender-meitner-mphas3` at `002b244`, then merged with its later

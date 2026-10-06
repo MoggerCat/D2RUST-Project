@@ -1,6 +1,6 @@
 # Handoff: mutation testing of `d2-server` and `d2-net` — `claude/mutants-server`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, base `claude/tender-meitner-mphas3`
 `9b49081`. Repo only (M09). METHODS M08 applied to the server crates:
