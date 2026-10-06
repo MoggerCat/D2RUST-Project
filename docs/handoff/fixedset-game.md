@@ -126,3 +126,13 @@ constructor is a refactor for whoever owns that file.
 | `crates/test-fixtures/src/{content,synth,install,lib}.rs` | path constants, field def, `Synthetic::files`, packing |
 | `crates/test-fixtures/tests/synthetic_game.rs` | the e2e |
 | `crates/test-fixtures/Cargo.toml` | deps `d2-sim`, `d2-server` |
+
+## 6. Gate
+
+`sh tools/gate.sh --no-client`: PASS (every step). The full
+`sh tools/gate.sh` fails only in its three `d2-client` steps (clippy
+workspace, test d2-client, doc-tests d2-client): in this container the
+`wayland-sys` build script fails because the Wayland system libraries
+are missing. This branch does not touch `d2-client`, and nothing it
+builds depends on `test-fixtures`; CI (with the libraries) is the check
+for those steps.
