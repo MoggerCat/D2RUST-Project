@@ -488,6 +488,14 @@ patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
 game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
 `66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
 
+Done 2026-10-06 (local, `main` at `bc739e4`): parser robustness. `cargo
+test -p d2-data -p d2-formats -- --ignored` 29/29 pass; `data-tool tables`
+73 runtime tables 72 identical, 1 explained, 0 mismatched, code buffers
+4/4; `mpq-tool check` all blocks decoded; `mpq-tool formats` 0 errors in
+every kind (cof 3605/3606, dt1 254/260: the 7 gaps are the `KNOWN_UNUSED`
+files, failing as expected). No file reaches the new whole-file limits
+(DC6/DCC ≤ 64M pixels, DT1 blocks ≤ len/20, TBL bytes ≤ len).
+
 Phase 3 recordings: done 2026-10-06 (first skipped at the user's
 request, then recorded when the user asked). Combat with missiles
 `traces/raw/20261006-022304-tick.jsonl` (4,632 ticks, 24,894 timer runs
