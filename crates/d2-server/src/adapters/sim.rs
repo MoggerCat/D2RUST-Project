@@ -16,6 +16,7 @@ use d2_sim::tick::timer::TimerRun;
 use d2_sim::tick::{self, EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
+use super::handlers::world::{self as world_handlers, NoWorld, WorldHost};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
     UnitTarget,
@@ -87,7 +88,7 @@ impl<D: EventDispatch> TickHooks for Steps<'_, D> {}
 ///
 /// Transport client ids (`d2-server`) and client records (`d2-sim` slots)
 /// are mapped by [`SimGame::join`]. Timer events go to `events`.
-pub struct SimGame<D = Unspecified> {
+pub struct SimGame<D = Unspecified, W = NoWorld> {
     pub game: Game,
     pub events: D,
     clients: BTreeMap<ClientId, SimClient>,
@@ -101,6 +102,9 @@ pub struct SimGame<D = Unspecified> {
     /// Intents that passed the gate, size check and parse, in order:
     /// (client, id, size). Their handlers are not written (see `handle`).
     pub unhandled: Vec<(ClientId, u8, usize)>,
+    /// World systems for the world intent handlers
+    /// ([`world_handlers`]).
+    pub world: W,
 }
 
 impl SimGame<Unspecified> {
@@ -109,8 +113,11 @@ impl SimGame<Unspecified> {
     }
 }
 
-impl<D: EventDispatch> SimGame<D> {
-    pub fn with_events(game: Game, events: D) -> Self {
+impl<D: EventDispatch, W> SimGame<D, W> {
+    pub fn with_events(game: Game, events: D) -> Self
+    where
+        W: Default,
+    {
         Self {
             game,
             events,
@@ -120,6 +127,7 @@ impl<D: EventDispatch> SimGame<D> {
             units: BTreeMap::new(),
             resyncs: Vec::new(),
             unhandled: Vec::new(),
+            world: W::default(),
         }
     }
 
@@ -180,7 +188,7 @@ impl<D: EventDispatch> SimGame<D> {
     }
 }
 
-impl<D: EventDispatch> Intents for SimGame<D> {
+impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     /// Not joined (or record gone) → not in game; no player unit, not a
     /// player, or no staged [`PlayerFields`] → no player.
     fn player(&self, client: ClientId) -> PlayerLookup {
@@ -268,8 +276,11 @@ impl<D: EventDispatch> Intents for SimGame<D> {
         client: ClientId,
         msg: &[u8],
         size: usize,
-        _out: &mut dyn MessageSink,
+        out: &mut dyn MessageSink,
     ) -> ResultCode {
+        if let Some(code) = world_handlers::handle(self, client, msg, size, out) {
+            return code;
+        }
         self.unhandled.push((client, msg[0], size));
         ResultCode::Done
     }
@@ -286,7 +297,7 @@ impl<D: EventDispatch> Intents for SimGame<D> {
     }
 }
 
-impl<D: EventDispatch> Tick for SimGame<D> {
+impl<D: EventDispatch, W> Tick for SimGame<D, W> {
     /// `d2_sim::tick::tick`. No step sends a message yet: every sender
     /// belongs to an unwritten spec, so `out` is unused.
     fn tick(&mut self, _out: &mut dyn MessageSink) {
