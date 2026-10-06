@@ -236,7 +236,9 @@ impl<X: Pending> AiModes for View<'_, X> {
         };
         if let Some((_, Some(d))) = self.operate_object(game, Some(unit), guid) {
             if !matches!(d, Dispatch::Done(_)) {
-                self.h.x.object_route(game, ObjectRoute::Operate(d));
+                let room = game.lists.unit(door).and_then(|e| e.room());
+                let at = self.h.path_position(door);
+                self.object_route(game, ObjectRoute::Operate(d), room, at);
             }
         }
     }

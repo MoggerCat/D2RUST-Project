@@ -148,6 +148,15 @@ impl GameData {
         })
     }
 
+    /// The object code's tables (`objects`, `shrines`, `levels`).
+    pub fn object_tables(&self) -> Result<d2_sim::world::objects::ObjectTables, GameError> {
+        Ok(d2_sim::world::objects::ObjectTables {
+            objects: self.rows::<d2_data::tables::Objects>()?,
+            shrines: self.rows::<d2_data::tables::Shrines>()?,
+            levels: self.rows::<Levels>()?,
+        })
+    }
+
     /// Population and monster-init tables.
     pub fn world_tables(&self) -> Result<WorldTables, GameError> {
         let levels = self.rows::<Levels>()?;
@@ -276,7 +285,10 @@ impl GameData {
 
     /// A `WorldSim` of an expansion game: act 0 ([`Self::drlg_world`]),
     /// the action hooks on `game_seed` with AnimData, vitals and the path
-    /// provider, the world state, the population regions created.
+    /// provider, the world state, the population regions and the object
+    /// control created (`rng.md` §5.2 order; the NPC and quest controls,
+    /// the next two creation seeds, are the caller's:
+    /// `WorldSim::create_game` runs all four).
     /// Returns the sim and the shared level types (preset lookups).
     pub fn world_sim<X: WorldPending>(
         &self,
@@ -304,6 +316,7 @@ impl GameData {
         let state = WorldState::new(types.clone(), Arc::new(self.world_tables()?), info);
         let mut sim = WorldSim::new(Arc::new(self.stat_data()?), self.unit_data()?, hooks, state);
         sim.create_regions();
+        sim.create_objects(Arc::new(self.object_tables()?));
         Ok((sim, types))
     }
 }

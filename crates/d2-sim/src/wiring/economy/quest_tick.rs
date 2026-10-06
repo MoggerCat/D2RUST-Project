@@ -5,7 +5,9 @@
 //! (any [`TickHooks`] with a unit side, e.g. the action or world
 //! dispatcher) and runs [`QuestControl::update`] as its `update_quests`.
 //! The tick decides when (`frame % 20 = 0`, `tick.md` §3); every other
-//! hook and every timer event is the wrapped dispatcher's.
+//! hook and every timer event is the wrapped dispatcher's, followed by
+//! the object module's quest routes it queued
+//! ([`QuestTick::run_quest_objects`]).
 
 use crate::game::Game;
 use crate::items::ItemTables;
@@ -17,7 +19,7 @@ use crate::units::hooks::UnitData;
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::record::Units;
 use crate::units::{ClientId, RoomId, UnitId};
-use crate::wiring::action::{ActionHooks, ActionSim, Pending};
+use crate::wiring::action::{ActionHooks, ActionSim, ObjectRoute, Pending, QuestObjectCall};
 use crate::wiring::worldgen::{WorldPending, WorldSim};
 use crate::world::quests::QuestControl;
 
@@ -28,6 +30,15 @@ use super::{Economy, EconomyQuests, GameFields, ItemStore, QuestRest};
 pub trait UnitSide {
     type Hooks: LifecycleHooks;
     fn unit_side(&mut self) -> (&mut Units, &mut StatLists, &UnitData, &mut Self::Hooks);
+    /// The object module's queued quest routes (`ActionSim::take_quest_calls`;
+    /// none without an object state).
+    fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
+        Vec::new()
+    }
+    /// A route no quest spec states, for `Pending::object_route`.
+    fn hand_back(&mut self, game: &mut Game, route: ObjectRoute) {
+        let _ = (game, route);
+    }
 }
 
 impl<H: LifecycleHooks> UnitSide for UnitSystem<H> {
@@ -47,12 +58,24 @@ impl<X: Pending> UnitSide for ActionSim<X> {
     fn unit_side(&mut self) -> (&mut Units, &mut StatLists, &UnitData, &mut ActionHooks<X>) {
         self.sys.unit_side()
     }
+    fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
+        ActionSim::take_quest_calls(self)
+    }
+    fn hand_back(&mut self, game: &mut Game, route: ObjectRoute) {
+        self.sys.hooks.x.object_route(game, route);
+    }
 }
 
 impl<X: WorldPending> UnitSide for WorldSim<X> {
     type Hooks = ActionHooks<X>;
     fn unit_side(&mut self) -> (&mut Units, &mut StatLists, &UnitData, &mut ActionHooks<X>) {
         self.action.sys.unit_side()
+    }
+    fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
+        self.action.take_quest_calls()
+    }
+    fn hand_back(&mut self, game: &mut Game, route: ObjectRoute) {
+        self.action.sys.hooks.x.object_route(game, route);
     }
 }
 
@@ -67,9 +90,45 @@ pub struct QuestTick<'q, S, R> {
     pub rest: &'q mut R,
 }
 
-impl<S: EventDispatch, R> EventDispatch for QuestTick<'_, S, R> {
+impl<S: UnitSide, R: QuestRest> QuestTick<'_, S, R> {
+    /// Runs the object module's queued quest routes on the quests
+    /// ([`super::quest_objects`]) until none is left (a quest function
+    /// may allocate an object whose init queues another); routes no quest
+    /// spec states go back to `Pending::object_route`.
+    pub fn run_quest_objects(&mut self, game: &mut Game) {
+        loop {
+            let calls = self.sim.take_quest_calls();
+            if calls.is_empty() {
+                return;
+            }
+            let back = {
+                let (units, stats, data, hooks) = self.sim.unit_side();
+                let mut econ = Economy {
+                    game: &mut *game,
+                    units,
+                    stats,
+                    data,
+                    hooks,
+                    fields: &mut *self.fields,
+                    tables: self.tables,
+                    items: &mut *self.items,
+                };
+                let mut w = EconomyQuests::new(&mut econ, &mut *self.rest);
+                super::quest_objects::run_all(self.quests, &mut w, calls)
+            };
+            for r in back {
+                self.sim.hand_back(game, r);
+            }
+        }
+    }
+}
+
+/// The wrapped dispatcher's timer event, then the quest routes it queued
+/// (an object event 7 runs its quest function right after the event).
+impl<S: EventDispatch + UnitSide, R: QuestRest> EventDispatch for QuestTick<'_, S, R> {
     fn run_event(&mut self, game: &mut Game, run: &TimerRun) {
         self.sim.run_event(game, run);
+        self.run_quest_objects(game);
     }
 }
 
@@ -89,6 +148,7 @@ impl<S: TickHooks + UnitSide, R: QuestRest> TickHooks for QuestTick<'_, S, R> {
         };
         let mut w = EconomyQuests::new(&mut econ, &mut *self.rest);
         self.quests.update(&mut w);
+        self.run_quest_objects(game);
     }
 
     fn advance_environment(&mut self, game: &mut Game, act: u8) -> bool {
@@ -101,16 +161,20 @@ impl<S: TickHooks + UnitSide, R: QuestRest> TickHooks for QuestTick<'_, S, R> {
         self.sim.ambient_spawns(game, room)
     }
     fn spawn_presets(&mut self, game: &mut Game, room: RoomId) {
-        self.sim.spawn_presets(game, room)
+        self.sim.spawn_presets(game, room);
+        self.run_quest_objects(game);
     }
     fn restore_inactive_units(&mut self, game: &mut Game, room: RoomId) {
-        self.sim.restore_inactive_units(game, room)
+        self.sim.restore_inactive_units(game, room);
+        self.run_quest_objects(game);
     }
     fn populate_objects(&mut self, game: &mut Game, room: RoomId) {
-        self.sim.populate_objects(game, room)
+        self.sim.populate_objects(game, room);
+        self.run_quest_objects(game);
     }
     fn populate_monsters(&mut self, game: &mut Game, room: RoomId) {
-        self.sim.populate_monsters(game, room)
+        self.sim.populate_monsters(game, room);
+        self.run_quest_objects(game);
     }
     fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool {
         self.sim.client_room_ready(game, client)

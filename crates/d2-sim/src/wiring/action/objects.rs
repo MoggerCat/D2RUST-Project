@@ -22,7 +22,10 @@
 //! the per-client update pass ([`super::dispatch`] →
 //! [`objects::update_messages`]) and the C→S 0x13 object case
 //! ([`super::ActionSim::operate_object_message`]). What the module hands
-//! back (quest, waypoint, `todo` routes) goes to [`Pending::object_route`].
+//! back (quest, waypoint, `todo` routes) goes to [`Pending::object_route`],
+//! or, for a quest route of a host holding the quest control
+//! ([`ObjectState::route_quests`]), to that host's queue
+//! ([`QuestObjectCall`]).
 
 use std::sync::Arc;
 
@@ -50,6 +53,25 @@ pub struct ObjectState {
     /// The allocation's (x, y) while [`View::create_object`] allocates
     /// (the per-kind init has no position argument).
     alloc_at: Option<(i32, i32)>,
+    /// The quest routes for a host that holds the quest control
+    /// ([`ObjectState::route_quests`]); `None` (the default): every
+    /// route goes to [`Pending::object_route`].
+    quest_calls: Option<Vec<QuestObjectCall>>,
+}
+
+/// A quest route of the object module (a quest init, operate or object
+/// event 7), queued for the host that holds the quest control
+/// (`d2_sim::wiring::economy::quest_objects`), with what the quest
+/// function reads beyond the route: the object's class and the init's
+/// room and position (`quests-act1-rest.md` §3: the marker init's
+/// arguments).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuestObjectCall {
+    pub route: ObjectRoute,
+    pub class: u16,
+    pub room: Option<RoomId>,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// What the object module handed back to its caller.
@@ -163,11 +185,69 @@ impl ObjectState {
             tables,
             host_tick: 0,
             alloc_at: None,
+            quest_calls: None,
         }
+    }
+
+    /// Queues the quest routes for the host instead of handing them to
+    /// [`Pending::object_route`] (a host with a quest control turns this
+    /// on; idempotent).
+    pub fn route_quests(&mut self) {
+        self.quest_calls.get_or_insert_with(Vec::new);
+    }
+
+    /// The queued quest routes, in queue order (empty when off).
+    pub fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
+        self.quest_calls
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default()
     }
 }
 
 impl<X: Pending> View<'_, X> {
+    /// Hands a route back: a quest route to the host's queue when it is
+    /// on ([`ObjectState::route_quests`]), anything else (and every route
+    /// when it is off) to [`Pending::object_route`].
+    pub fn object_route(
+        &mut self,
+        game: &mut Game,
+        route: ObjectRoute,
+        room: Option<RoomId>,
+        (x, y): (i32, i32),
+    ) {
+        let object = match route {
+            ObjectRoute::Init {
+                object,
+                created:
+                    Created {
+                        init: objects::Route::Quest,
+                        ..
+                    },
+            } => Some(object),
+            ObjectRoute::Operate(Dispatch::Quest(op)) => Some(op.object),
+            ObjectRoute::Event {
+                object,
+                run: EventRun::Quest,
+            } => Some(object),
+            _ => None,
+        };
+        let class = object
+            .and_then(|o| self.units.get(o))
+            .map(|r| u16::try_from(r.class).unwrap_or(u16::MAX));
+        let queue = self.h.objects.as_mut().and_then(|s| s.quest_calls.as_mut());
+        match (class, queue) {
+            (Some(class), Some(q)) => q.push(QuestObjectCall {
+                route,
+                class,
+                room,
+                x,
+                y,
+            }),
+            _ => self.h.x.object_route(game, route),
+        }
+    }
+
     /// The per-kind init of an object allocation (`units.md` §3.1, §1
     /// table: the object data and `0x0054F5D0`, `objects.md` §3) on the
     /// object state; a game without one keeps the default (nothing).
@@ -207,13 +287,11 @@ impl<X: Pending> View<'_, X> {
             return;
         };
         if !matches!(created.init, objects::Route::Here | objects::Route::Null) {
-            self.h.x.object_route(
-                game,
-                ObjectRoute::Init {
-                    object: unit,
-                    created,
-                },
-            );
+            let route = ObjectRoute::Init {
+                object: unit,
+                created,
+            };
+            self.object_route(game, route, room, (x, y));
         }
     }
 
@@ -274,9 +352,9 @@ impl<X: Pending> View<'_, X> {
             return;
         };
         if run != EventRun::Done {
-            self.h
-                .x
-                .object_route(game, ObjectRoute::Event { object: unit, run });
+            let room = game.lists.unit(unit).and_then(|e| e.room());
+            let at = self.h.path_position(unit);
+            self.object_route(game, ObjectRoute::Event { object: unit, run }, room, at);
         }
     }
 
@@ -347,7 +425,9 @@ impl<X: Pending> View<'_, X> {
         Some(match d {
             Some(Dispatch::Waypoint(op)) => ObjectCase::Waypoint(op),
             Some(d @ (Dispatch::Quest(_) | Dispatch::NotCovered(_))) => {
-                self.h.x.object_route(game, ObjectRoute::Operate(d));
+                let room = game.lists.unit(object).and_then(|e| e.room());
+                let at = self.h.path_position(object);
+                self.object_route(game, ObjectRoute::Operate(d), room, at);
                 ObjectCase::Code(0)
             }
             Some(Dispatch::Done(_)) | None => ObjectCase::Code(0),

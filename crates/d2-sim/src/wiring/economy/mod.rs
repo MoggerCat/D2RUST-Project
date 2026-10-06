@@ -23,6 +23,11 @@
 //!   provider's floor drop when it is on with its field, else a seam
 //!   ([`FreeSpot`]); [`DropPlacer`] receives the economy (its hooks
 //!   hold the rooms).
+//! - [`quest_host`]: the quests' world on the wired host ([`HostQuests`]:
+//!   [`EconomyQuests`] with the object, level, interaction and identify
+//!   calls the action wiring provides).
+//! - [`quest_objects`]: the object module's quest routes on the quest
+//!   control (init / operate functions by index, object event 7).
 //! - [`quest_tick`]: tick step 8, the quest updater, on the same quest
 //!   world, wrapped around a game's tick hooks ([`QuestTick`]).
 //!
@@ -33,7 +38,9 @@ pub mod death;
 pub mod game_fields;
 pub mod item_stats;
 pub mod item_units;
+pub mod quest_host;
 pub mod quest_items;
+pub mod quest_objects;
 pub mod quest_tick;
 pub mod treasure_items;
 
@@ -45,7 +52,9 @@ pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
+pub use quest_host::HostQuests;
 pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};
+pub use quest_objects::QuestObjectRun;
 pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
 

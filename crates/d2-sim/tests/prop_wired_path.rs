@@ -1347,3 +1347,18 @@ fn regress_coarse_box_room_need_not_hold_the_point() {
     );
     assert_eq!((r, pt.x, pt.y), (Some(above), 40007, 40079));
 }
+
+/// `path-placement.md` §10 rule 6: a placed player's pets follow
+/// (`0x005754B0`), queued for the host holding the pet lists
+/// (`ActionHooks::pet_follows`); without the queue nothing is recorded.
+// Covers: specs/sim/path-placement.md §10 r6
+#[test]
+fn a_warped_player_queues_its_pet_follow() {
+    let mut h = host(&plain(2, 0, Vec::new()));
+    let (p0, p1) = (h.players[0], h.players[1]);
+    assert_eq!(warp(&mut h, p0), Some(true));
+    assert_eq!(h.fx.sim.action.sys.hooks.pet_follows, None);
+    h.fx.sim.action.sys.hooks.pet_follows = Some(Vec::new());
+    assert_eq!(warp(&mut h, p1), Some(true));
+    assert_eq!(h.fx.sim.action.sys.hooks.pet_follows, Some(vec![p1]));
+}

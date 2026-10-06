@@ -174,6 +174,14 @@ pub trait Intents {
     /// The game's client list in list order (`sim/unit-order.md` §7):
     /// the flush order (spec §3.2 rule 3).
     fn clients(&self) -> Vec<ClientId>;
+
+    /// The host's millisecond clock of this frame, read once per frame
+    /// before the drain (`Host::frame`): the `GetTickCount` input of the
+    /// object code (`world/objects.md` edge case 9; `d2-sim` never reads a
+    /// clock). Default: the game has no reader.
+    fn set_host_tick(&mut self, ms: u32) {
+        let _ = ms;
+    }
 }
 
 /// One game tick (`tick.md` §3: frame += 1, then the steps).

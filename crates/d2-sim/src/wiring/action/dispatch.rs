@@ -153,6 +153,26 @@ impl<X: Pending> ActionSim<X> {
         h.objects = Some(ObjectState::new(&mut h.game_seed, tables));
     }
 
+    /// A host holding the quest control takes the object module's quest
+    /// routes from a queue ([`ActionSim::take_quest_calls`]) instead of
+    /// [`super::Pending::object_route`]; call right after
+    /// [`ActionSim::create_objects`]. No object state: nothing.
+    pub fn route_quest_objects(&mut self) {
+        if let Some(st) = self.sys.hooks.objects.as_mut() {
+            st.route_quests();
+        }
+    }
+
+    /// The queued quest routes ([`super::QuestObjectCall`]), in order.
+    pub fn take_quest_calls(&mut self) -> Vec<super::QuestObjectCall> {
+        self.sys
+            .hooks
+            .objects
+            .as_mut()
+            .map(|s| s.take_quest_calls())
+            .unwrap_or_default()
+    }
+
     /// Runs `f` with the object control, the tables and the object
     /// code's view (tests, skills that call the dispatch directly).
     /// `None`: no object state.
