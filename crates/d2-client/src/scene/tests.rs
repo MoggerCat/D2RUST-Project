@@ -1,0 +1,601 @@
+//! Test vectors of `specs/client/render-pipeline.md` (CPU half, §A3–A9)
+//! and the strict-input checks with their perturbations (M07, M08).
+
+use d2_formats::palette::{Palette, Rgb};
+
+use super::*;
+
+const W: u32 = 32;
+const H: u32 = 24;
+const VIEW: Rect = Rect::new(0, 0, W, H);
+
+/// A palette whose every entry is distinct, so RGBA reveals the index.
+fn palette() -> Palette {
+    let mut p = Palette {
+        colors: [Rgb::default(); 256],
+    };
+    for (i, c) in p.colors.iter_mut().enumerate() {
+        let i = i as u8;
+        *c = Rgb {
+            r: i,
+            g: 255 - i,
+            b: i ^ 0x5a,
+        };
+    }
+    p
+}
+
+fn rgb_at(rgba: &[u8], width: u32, x: u32, y: u32) -> [u8; 3] {
+    let o = (y * width + x) as usize * 4;
+    assert_eq!(rgba[o + 3], 255);
+    [rgba[o], rgba[o + 1], rgba[o + 2]]
+}
+
+fn color(p: &Palette, i: u8) -> [u8; 3] {
+    let c = p.colors[usize::from(i)];
+    [c.r, c.g, c.b]
+}
+
+fn frames() -> Vec<FrameImage> {
+    vec![
+        // 0: the spec's 2×2 `[0,5;7,0]`.
+        FrameImage {
+            width: 2,
+            height: 2,
+            pixels: vec![0, 5, 7, 0],
+        },
+        // 1: solid 3×3 of index 1.
+        FrameImage {
+            width: 3,
+            height: 3,
+            pixels: vec![1; 9],
+        },
+        // 2: solid 3×3 of index 2.
+        FrameImage {
+            width: 3,
+            height: 3,
+            pixels: vec![2; 9],
+        },
+    ]
+}
+
+fn map_with(pairs: &[(u8, u8)]) -> [u8; 256] {
+    let mut row = [0u8; 256];
+    for (i, v) in row.iter_mut().enumerate() {
+        *v = i as u8;
+    }
+    for &(from, to) in pairs {
+        row[usize::from(from)] = to;
+    }
+    row
+}
+
+fn key(major: u32) -> DrawKey {
+    DrawKey::new(2, major, 0, 0).unwrap()
+}
+
+// Covers: specs/client/render-pipeline.md §a3-draw-item, §a8-cpu-reference-compositor
+#[test]
+fn opaque_frame_vector() {
+    let pal = palette();
+    let items = [DrawItem::new(FrameId(0), 10, 10)];
+    let rgba = compose_rgba(&items, &frames(), &MapTable::new(), &pal, VIEW).unwrap();
+    assert_eq!(rgba.len(), (W * H * 4) as usize);
+    for y in 0..H {
+        for x in 0..W {
+            let want = match (x, y) {
+                (11, 10) => 5,
+                (10, 11) => 7,
+                _ => 0, // background
+            };
+            assert_eq!(rgb_at(&rgba, W, x, y), color(&pal, want), "({x},{y})");
+        }
+    }
+}
+
+// Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots
+#[test]
+fn shade_chain_one_map() {
+    let pal = palette();
+    let mut maps = MapTable::new();
+    let m = maps.push(map_with(&[(5, 9)]));
+    let mut item = DrawItem::new(FrameId(0), 10, 10);
+    item.shade = ShadeChain::new(&[m]).unwrap();
+    let rgba = compose_rgba(&[item], &frames(), &maps, &pal, VIEW).unwrap();
+    assert_eq!(rgb_at(&rgba, W, 11, 10), color(&pal, 9));
+    assert_eq!(rgb_at(&rgba, W, 10, 11), color(&pal, 7));
+}
+
+// Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots
+#[test]
+fn shade_chain_order() {
+    let pal = palette();
+    let mut maps = MapTable::new();
+    let m1 = maps.push(map_with(&[(5, 9)]));
+    let m2 = maps.push(map_with(&[(9, 3)]));
+    let mut item = DrawItem::new(FrameId(0), 10, 10);
+    item.shade = ShadeChain::new(&[m1, m2]).unwrap();
+    let rgba = compose_rgba(&[item], &frames(), &maps, &pal, VIEW).unwrap();
+    assert_eq!(rgb_at(&rgba, W, 11, 10), color(&pal, 3));
+    // Reversed order: m2 leaves 5 alone, then m1 gives 9.
+    item.shade = ShadeChain::new(&[m2, m1]).unwrap();
+    let rgba = compose_rgba(&[item], &frames(), &maps, &pal, VIEW).unwrap();
+    assert_eq!(rgb_at(&rgba, W, 11, 10), color(&pal, 9));
+}
+
+// Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots
+#[test]
+fn zero_is_tested_before_the_chain() {
+    let mut maps = MapTable::new();
+    // m[0] = 4 would paint transparent pixels if 0 went through the chain;
+    // m[7] = 0 shows the neutral rule for a mapped 0 (drawn as index 0).
+    let m = maps.push(map_with(&[(0, 4), (7, 0)]));
+    let mut under = DrawItem::new(FrameId(1), 10, 10);
+    under.key = key(0);
+    let mut item = DrawItem::new(FrameId(0), 10, 10);
+    item.key = key(1);
+    item.shade = ShadeChain::new(&[m]).unwrap();
+    let out = compose(&[under, item], &frames(), &maps, VIEW).unwrap();
+    let at = |x: u32, y: u32| out[(y * W + x) as usize];
+    assert_eq!(at(10, 10), 1); // transparent: underlying item shows
+    assert_eq!(at(11, 11), 1);
+    assert_eq!(at(11, 10), 5);
+    assert_eq!(at(10, 11), 0); // TODO(spec: render/shading.md)
+}
+
+// Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots
+#[test]
+fn chain_of_four_and_too_long() {
+    let mut maps = MapTable::new();
+    let ms: Vec<MapId> = (0..4u8)
+        .map(|k| maps.push(map_with(&[(5 + k, 6 + k)])))
+        .collect();
+    let mut item = DrawItem::new(FrameId(0), 0, 0);
+    item.shade = ShadeChain::new(&ms).unwrap();
+    assert_eq!(item.shade.maps(), &ms[..]);
+    let out = compose(&[item], &frames(), &maps, VIEW).unwrap();
+    assert_eq!(out[1], 9);
+    assert_eq!(
+        ShadeChain::new(&[MapId(0); 5]),
+        Err(SceneError::ShadeChainTooLong { len: 5 })
+    );
+}
+
+// Covers: specs/client/render-pipeline.md §a6-draw-order
+#[test]
+fn higher_key_draws_on_top() {
+    // Built in the wrong order; `order` puts k1 < k2 first.
+    let mut top = DrawItem::new(FrameId(2), 1, 1);
+    top.key = key(7);
+    let mut bottom = DrawItem::new(FrameId(1), 0, 0);
+    bottom.key = key(3);
+    let mut items = vec![top, bottom];
+    order(&mut items);
+    assert_eq!(items[0].key, key(3));
+    let out = compose(&items, &frames(), &MapTable::new(), VIEW).unwrap();
+    let at = |x: u32, y: u32| out[(y * W + x) as usize];
+    assert_eq!(at(0, 0), 1);
+    assert_eq!(at(1, 1), 2); // overlap: the second visible
+    assert_eq!(at(2, 2), 2);
+    assert_eq!(at(3, 3), 2);
+}
+
+// Covers: specs/client/render-pipeline.md §a6-draw-order
+#[test]
+fn equal_keys_keep_build_order() {
+    let mut items: Vec<DrawItem> = (0..6)
+        .map(|n| {
+            let mut it = DrawItem::new(FrameId(1 + n % 2), 0, 0);
+            it.key = key(if n == 3 { 0 } else { 5 });
+            it.tag = ItemTag::Ui(n);
+            it
+        })
+        .collect();
+    order(&mut items);
+    let tags: Vec<ItemTag> = items.iter().map(|i| i.tag).collect();
+    let want = [3, 0, 1, 2, 4, 5].map(ItemTag::Ui);
+    assert_eq!(tags, want);
+    // Last of the equal keys is n = 5 (frame 2).
+    let out = compose(&items, &frames(), &MapTable::new(), VIEW).unwrap();
+    assert_eq!(out[0], 2);
+}
+
+// Covers: specs/client/render-pipeline.md §a6-draw-order
+#[test]
+fn key_layout() {
+    let k = DrawKey::new(15, DrawKey::MAJOR_MAX, DrawKey::MINOR_MAX, 255).unwrap();
+    assert_eq!(k.0, u64::MAX);
+    let k = DrawKey::new(3, 0x0abc_def1, 0x12_3456, 0x78).unwrap();
+    assert_eq!(k.0, 0x3abc_def1_1234_5678);
+    assert_eq!(
+        (k.pass(), k.major(), k.minor(), k.sub()),
+        (3, 0x0abc_def1, 0x12_3456, 0x78)
+    );
+    // Field significance: pass > major > minor > sub.
+    let a = DrawKey::new(1, 0, 0, 0).unwrap();
+    let b = DrawKey::new(0, DrawKey::MAJOR_MAX, DrawKey::MINOR_MAX, 255).unwrap();
+    assert!(a > b);
+    let a = DrawKey::new(0, 1, 0, 0).unwrap();
+    let b = DrawKey::new(0, 0, DrawKey::MINOR_MAX, 255).unwrap();
+    assert!(a > b);
+    assert!(DrawKey::new(0, 0, 1, 0).unwrap() > DrawKey::new(0, 0, 0, 255).unwrap());
+}
+
+/// Synthetic 256×256 blend table with distinct-looking entries.
+fn blend_table() -> Box<[[u8; 256]; 256]> {
+    let mut t = Box::new([[0u8; 256]; 256]);
+    for (s, row) in t.iter_mut().enumerate() {
+        for (d, v) in row.iter_mut().enumerate() {
+            *v = (s * 7 + d * 13 + 1) as u8;
+        }
+    }
+    t
+}
+
+// Covers: specs/client/render-pipeline.md §a5-blend-ops
+#[test]
+fn index_table_every_src_and_dest() {
+    let table = blend_table();
+    let mut maps = MapTable::new();
+    maps.push(map_with(&[])); // rows before the table: base is not 0
+    let base = maps.push_table(&table);
+    assert_eq!(base, MapId(1));
+    // Destination: row y holds index y (row 0 is transparent → clear 0).
+    // Source: column x holds index x (column 0 transparent → dest kept).
+    let dest = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p / 256) as u8).collect(),
+    };
+    let src = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p % 256) as u8).collect(),
+    };
+    let frames = vec![dest, src];
+    let mut over = DrawItem::new(FrameId(1), 0, 0);
+    over.blend = BlendOp::IndexTable(base);
+    let view = Rect::new(0, 0, 256, 256);
+    let mut items = [DrawItem::new(FrameId(0), 0, 0), over];
+    items[0].clip = view;
+    items[1].clip = view;
+    let out = compose(&items, &frames, &maps, view).unwrap();
+    for d in 0..256usize {
+        for s in 0..256usize {
+            let want = if s == 0 { d as u8 } else { table[s][d] };
+            assert_eq!(out[d * 256 + s], want, "src {s} dest {d}");
+        }
+    }
+}
+
+// Covers: specs/client/render-pipeline.md §a5-blend-ops, §a4-shade-chain-and-palette-slots
+#[test]
+fn chain_applies_before_blend() {
+    let table = blend_table();
+    let mut maps = MapTable::new();
+    let m = maps.push(map_with(&[(2, 40)]));
+    let base = maps.push_table(&table);
+    let mut over = DrawItem::new(FrameId(2), 0, 0);
+    over.shade = ShadeChain::new(&[m]).unwrap();
+    over.blend = BlendOp::IndexTable(base);
+    let items = [DrawItem::new(FrameId(1), 0, 0), over];
+    let out = compose(&items, &frames(), &maps, VIEW).unwrap();
+    assert_eq!(out[0], table[40][1]);
+    // Where nothing was below, dest is the cleared 0.
+    let out = compose(&items[1..], &frames(), &maps, VIEW).unwrap();
+    assert_eq!(out[0], table[40][0]);
+}
+
+// Covers: specs/client/render-pipeline.md §a3-draw-item
+#[test]
+fn clip_rect_bounds_every_pixel() {
+    let big = FrameImage {
+        width: 20,
+        height: 20,
+        pixels: vec![6; 400],
+    };
+    let mut item = DrawItem::new(FrameId(0), 2, 3);
+    item.clip = Rect::new(5, 4, 7, 9);
+    let out = compose(&[item], &vec![big], &MapTable::new(), VIEW).unwrap();
+    for y in 0..H as i64 {
+        for x in 0..W as i64 {
+            let inside = item.clip.contains(x, y);
+            assert_eq!(out[(y * W as i64 + x) as usize], if inside { 6 } else { 0 });
+        }
+    }
+}
+
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn view_origin_and_edges() {
+    // View offset: output pixel 0 is screen (view.x, view.y).
+    let view = Rect::new(9, 9, 4, 3);
+    let mut item = DrawItem::new(FrameId(0), 10, 10);
+    item.clip = Rect::new(-100, -100, 1000, 1000);
+    let out = compose(&[item], &frames(), &MapTable::new(), view).unwrap();
+    assert_eq!(out, [0, 0, 0, 0, 0, 0, 5, 0, 0, 7, 0, 0]);
+    // Partly and fully off-screen items, extreme coordinates: no panic.
+    let mut items = vec![
+        DrawItem::new(FrameId(1), -2, -2),
+        DrawItem::new(FrameId(1), i32::MAX, i32::MAX),
+        DrawItem::new(FrameId(1), i32::MIN, 0),
+        DrawItem::new(FrameId(1), W as i32 - 1, H as i32 - 1),
+    ];
+    for it in &mut items {
+        it.clip = Rect::new(i32::MIN, i32::MIN, u32::MAX, u32::MAX);
+    }
+    let out = compose(&items, &frames(), &MapTable::new(), VIEW).unwrap();
+    let ones: Vec<usize> = (0..out.len()).filter(|&i| out[i] == 1).collect();
+    assert_eq!(ones, [0, (H * W - 1) as usize]);
+    // Empty view.
+    let empty = Rect::new(0, 0, 0, 5);
+    assert!(compose(&items, &frames(), &MapTable::new(), empty)
+        .unwrap()
+        .is_empty());
+}
+
+/// A mixed scene: shading, blending, clipping, overlap, off-screen parts.
+fn scene() -> (Vec<DrawItem>, Vec<FrameImage>, MapTable) {
+    let mut maps = MapTable::new();
+    let m = maps.push(map_with(&[(3, 200), (4, 0)]));
+    let base = maps.push_table(&blend_table());
+    let mut frames = Vec::new();
+    for n in 0..5u32 {
+        let (w, h) = (17 + n * 9, 13 + n * 7);
+        frames.push(FrameImage {
+            width: w,
+            height: h,
+            pixels: (0..w * h).map(|p| ((p * (n + 3)) % 7) as u8).collect(),
+        });
+    }
+    let mut items = Vec::new();
+    for n in 0..12i32 {
+        let mut it = DrawItem::new(FrameId((n % 5) as u32), n * 11 - 15, n * 7 - 9);
+        it.key = DrawKey::new(1, (n % 4) as u32, 0, n as u8).unwrap();
+        if n % 3 == 0 {
+            it.shade = ShadeChain::new(&[m]).unwrap();
+        }
+        if n % 4 == 1 {
+            it.blend = BlendOp::IndexTable(base);
+        }
+        if n == 5 {
+            it.clip = Rect::new(40, 20, 30, 25);
+        }
+        items.push(it);
+    }
+    order(&mut items);
+    (items, frames, maps)
+}
+
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn frame_spanning_four_bins() {
+    // A 4×4 frame across the corner of bins (0,0), (1,0), (0,1), (1,1).
+    let f = FrameImage {
+        width: 4,
+        height: 4,
+        pixels: (1..=16).collect(),
+    };
+    let frames = vec![f];
+    let view = Rect::new(0, 0, 64, 64);
+    let items = [DrawItem::new(FrameId(0), 30, 30)];
+    let maps = MapTable::new();
+    let bins = bin(&items, &frames, &maps, view).unwrap();
+    assert_eq!((bins.cols(), bins.rows()), (2, 2));
+    for (c, r) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+        assert_eq!(bins.list(c, r), &[0]);
+    }
+    let plain = compose(&items, &frames, &maps, view).unwrap();
+    assert_eq!(
+        compose_binned(&items, &bins, &frames, &maps, view).unwrap(),
+        plain
+    );
+}
+
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn binned_equals_plain() {
+    let (items, frames, maps) = scene();
+    // Partial last bins and an offset view.
+    for view in [Rect::new(0, 0, 100, 70), Rect::new(-7, 5, 33, 65), VIEW] {
+        let bins = bin(&items, &frames, &maps, view).unwrap();
+        assert_eq!(bins.cols(), view.width.div_ceil(BIN_SIZE));
+        assert_eq!(
+            bins.rect(bins.cols() - 1, 0).width,
+            (view.width - 1) % BIN_SIZE + 1
+        );
+        let plain = compose(&items, &frames, &maps, view).unwrap();
+        assert!(plain.iter().any(|&p| p != 0));
+        assert_eq!(
+            compose_binned(&items, &bins, &frames, &maps, view).unwrap(),
+            plain
+        );
+        // Lists are in draw order.
+        for r in 0..bins.rows() {
+            for c in 0..bins.cols() {
+                assert!(bins.list(c, r).windows(2).all(|w| w[0] < w[1]));
+            }
+        }
+    }
+}
+
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn compose_is_deterministic() {
+    let (items, frames, maps) = scene();
+    let a = compose_rgba(&items, &frames, &maps, &palette(), Rect::FRAME).unwrap();
+    let b = compose_rgba(&items, &frames, &maps, &palette(), Rect::FRAME).unwrap();
+    assert_eq!(a.len(), (FRAME_WIDTH * FRAME_HEIGHT * 4) as usize);
+    assert_eq!(a, b);
+}
+
+/// M08: the image reflects exactly the input changed. Perturbing N visible
+/// opaque source pixels changes exactly N output pixels, in plain and
+/// binned composition alike (what verify's `--perturb N` relies on).
+// Covers: specs/client/render-pipeline.md §a8-cpu-reference-compositor
+#[test]
+fn perturbed_pixels_change_exactly_n_outputs() {
+    let view = Rect::new(0, 0, 64, 48);
+    let solid = FrameImage {
+        width: 40,
+        height: 30,
+        pixels: vec![9; 1200],
+    };
+    let items = [DrawItem::new(FrameId(0), 10, 6)];
+    let maps = MapTable::new();
+    let base = compose(&items, &vec![solid.clone()], &maps, view).unwrap();
+    for n in [1usize, 5, 37] {
+        let mut changed = solid.clone();
+        for k in 0..n {
+            changed.pixels[k * 31 % 1200] = 10; // stays non-zero
+        }
+        let frames = vec![changed];
+        let out = compose(&items, &frames, &maps, view).unwrap();
+        let diff = base.iter().zip(&out).filter(|(a, b)| a != b).count();
+        assert_eq!(diff, n);
+        let bins = bin(&items, &frames, &maps, view).unwrap();
+        assert_eq!(
+            compose_binned(&items, &bins, &frames, &maps, view).unwrap(),
+            out
+        );
+    }
+}
+
+/// M07 + M08: each invalid input is reported as exactly that error, with
+/// the index of the item that carries it, by both compose paths and `bin`.
+// Covers: specs/client/render-pipeline.md §edge-cases-original-bugs, §a5-blend-ops, §a3-draw-item
+#[test]
+fn strict_inputs_report_exactly_the_perturbation() {
+    let mut maps = MapTable::new();
+    let m = maps.push(map_with(&[]));
+    let base = maps.push_table(&blend_table()); // rows 1..=256
+    let mut frames = frames();
+    let good = || {
+        let mut it = DrawItem::new(FrameId(0), 1, 1);
+        it.shade = ShadeChain::new(&[m]).unwrap();
+        it.blend = BlendOp::IndexTable(base);
+        it
+    };
+    let clean = vec![good(), good(), good()];
+    compose(&clean, &frames, &maps, VIEW).unwrap();
+
+    let check = |items: &[DrawItem], frames: &Vec<FrameImage>, want: SceneError| {
+        let want = SceneError::Item {
+            index: 1,
+            error: Box::new(want),
+        };
+        assert_eq!(compose(items, frames, &maps, VIEW), Err(want.clone()));
+        assert_eq!(bin(items, frames, &maps, VIEW), Err(want.clone()));
+        let bins = bin(&clean, frames, &maps, VIEW);
+        if let Ok(bins) = bins {
+            let got = compose_binned(items, &bins, frames, &maps, VIEW);
+            assert_eq!(got, Err(want));
+        }
+    };
+    let perturb = |f: &dyn Fn(&mut DrawItem)| {
+        let mut items = clean.clone();
+        f(&mut items[1]);
+        items
+    };
+    check(
+        &perturb(&|it| it.frame = FrameId(3)),
+        &frames,
+        SceneError::FrameMissing(FrameId(3)),
+    );
+    check(&perturb(&|it| it.flip_x = true), &frames, SceneError::FlipX);
+    check(
+        &perturb(&|it| it.shade = ShadeChain::new(&[m, MapId(257)]).unwrap()),
+        &frames,
+        SceneError::MapMissing(MapId(257)),
+    );
+    check(
+        &perturb(&|it| it.blend = BlendOp::IndexTable(MapId(2))),
+        &frames,
+        SceneError::BlendTable(MapId(2)),
+    );
+    check(
+        &perturb(&|it| it.blend = BlendOp::IndexTable(MapId(u32::MAX))),
+        &frames,
+        SceneError::BlendTable(MapId(u32::MAX)),
+    );
+    // Off-screen items are validated too.
+    check(
+        &perturb(&|it| {
+            it.x = -1000;
+            it.frame = FrameId(9);
+        }),
+        &frames,
+        SceneError::FrameMissing(FrameId(9)),
+    );
+    // A frame whose pixel count disagrees with its size.
+    frames[0].pixels.pop();
+    let want = SceneError::Item {
+        index: 0,
+        error: Box::new(SceneError::FrameSize {
+            width: 2,
+            height: 2,
+            len: 3,
+        }),
+    };
+    assert_eq!(compose(&clean, &frames, &maps, VIEW), Err(want));
+}
+
+// Covers: specs/client/render-pipeline.md §a6-draw-order
+#[test]
+fn key_fields_out_of_range_are_errors() {
+    assert!(DrawKey::new(15, DrawKey::MAJOR_MAX, DrawKey::MINOR_MAX, 255).is_ok());
+    for (args, field, value, max) in [
+        ((16, 0, 0), "pass", 16, 15),
+        ((0, 1 << 28, 0), "major", 1 << 28, DrawKey::MAJOR_MAX),
+        ((0, 0, 1 << 24), "minor", 1 << 24, DrawKey::MINOR_MAX),
+    ] {
+        assert_eq!(
+            DrawKey::new(args.0, args.1, args.2, 0),
+            Err(SceneError::KeyField { field, value, max })
+        );
+    }
+}
+
+#[test]
+fn bins_must_match_the_composed_list() {
+    let (items, frames, maps) = scene();
+    let bins = bin(&items, &frames, &maps, VIEW).unwrap();
+    let other = Rect::new(0, 0, W, H + 1);
+    assert_eq!(
+        compose_binned(&items, &bins, &frames, &maps, other),
+        Err(SceneError::BinsView {
+            built: VIEW,
+            view: other
+        })
+    );
+    assert_eq!(
+        compose_binned(&items[1..], &bins, &frames, &maps, VIEW),
+        Err(SceneError::BinsItems {
+            built: items.len(),
+            items: items.len() - 1
+        })
+    );
+}
+
+#[test]
+fn rgba_is_a_plain_palette_lookup() {
+    let pal = palette();
+    let rgba = to_rgba(&[0, 2, 255], &pal);
+    assert_eq!(
+        rgba,
+        [
+            0,
+            255,
+            0x5a,
+            255,
+            2,
+            253,
+            2 ^ 0x5a,
+            255,
+            255,
+            0,
+            255 ^ 0x5a,
+            255
+        ]
+    );
+}
