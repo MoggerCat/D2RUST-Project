@@ -32,23 +32,23 @@
 | Outputs / state changes | 78–83 |
 | Rules | 84–85 |
 |   1. Coordinates | 86–99 |
-|   2. Path records | 100–200 |
-|   3. Size, collision pattern, footprint mask | 201–237 |
-|   4. Collision queries | 238–269 |
-|   5. Footprints | 270–313 |
-|   6. Moving a footprint | 314–337 |
-|   7. Nearest free point (`0x0064DEA0`) | 338–400 |
-|   8. Coarse free-box search (`0x0064E840`) | 401–429 |
-|   9. Floor drop placement (`0x00555DA0`) | 430–448 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 449–483 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 484–506 |
-|   12. Warp tiles and warp arrival | 507–543 |
-| Constants & data dependencies | 544–562 |
-| Randomness | 563–572 |
-| Edge cases & original bugs | 573–599 |
-| Test vectors | 600–632 |
-| Provenance | 633–661 |
-| Open questions | 662–686 |
+|   2. Path records | 100–202 |
+|   3. Size, collision pattern, footprint mask | 203–239 |
+|   4. Collision queries | 240–276 |
+|   5. Footprints | 277–325 |
+|   6. Moving a footprint | 326–358 |
+|   7. Nearest free point (`0x0064DEA0`) | 359–423 |
+|   8. Coarse free-box search (`0x0064E840`) | 424–456 |
+|   9. Floor drop placement (`0x00555DA0`) | 457–475 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 476–510 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 511–552 |
+|   12. Warp tiles and warp arrival | 553–606 |
+| Constants & data dependencies | 607–625 |
+| Randomness | 626–635 |
+| Edge cases & original bugs | 636–662 |
+| Test vectors | 663–699 |
+| Provenance | 700–728 |
+| Open questions | 729–783 |
 <!-- /index -->
 
 ## Summary
@@ -180,7 +180,9 @@ on the computed direction); 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
      0x804; else move mask from `0x00648480`: monstats `flying` → 0x1804,
      else `opendoors` → 0x3401, else 0x3C01; max distance 14. (A previous
      type 11 or 8 is a fatal assert.)
-   - missile: masks 0, type 4.
+   - missile: masks 0, type 4 through set type (`0x00648CF0`,
+     `sim/pathing.md` §2: flags get the table's 0x60000, direction
+     offset 0).
 5. If a room was given: stamp the footprint (§5.2) and put the unit in
    the room's unit list (`0x0064C350`, `sim/unit-order.md` §5).
 6. Client coordinates; if `set0x10`: flags |= 0x10.
@@ -256,7 +258,12 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
    The box is clipped at that room's right and top edges into up to three
    boxes (the inside one, the strip right of the room, the strip above
    it at the inside box's width); each outside strip is queried again
-   from that room (recursively). The inside box ORs its cells.
+   from that room (recursively). The inside box ORs its cells. Splitter
+   `0x0064CDF0`: the right strip spans the box's full height (input
+   bottom to input top), the top strip spans the clipped (inside) width,
+   so the top-right corner belongs to the right strip. The box queries
+   and the box set / clear (`0x0064CEB0`, `0x0064CF50`, `0x0064CFF0`,
+   `0x0064D060`) all split this way.
 5. Query functions (room, x, y, size or pattern, mask):
 
 | Function | Shape argument | Result |
@@ -272,7 +279,12 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
 #### 5.1 Stamp and clear primitives
 
 Set ORs the mask into each cell of the shape; clear ANDs its
-complement; cells without a room are skipped. Pattern stamp
+complement; cells without a room are skipped. Every cell (and the
+marker cell) is looked up separately from the **room argument** (§4
+rule 1), not from the centre's room; plus order (x−1, y), (x, y),
+(x+1, y), (x, y−1), (x, y+1). Pattern 0 stamps and clears **nothing**
+(its jump-table entry is empty; the pattern query still tests the
+point), and patterns above 5 do nothing. Pattern stamp
 `0x0064EA90(room, x, y, pattern, mask)` and pattern clear `0x0064EC10`
 apply the §3 cells with the mask, then, **only when the mask is not 0**,
 the marker (set: OR the marker; clear: AND it out). Clear with a null
@@ -296,7 +308,7 @@ Remove (`0x00649560(unit, force)`), returns whether it cleared:
 |---|---|---|
 | 0 player | force, or mode not 0 (DT) and not 17 (DD) | pattern |
 | 1 monster | force, or mode not 0 (DT) and not 12 (DD) | pattern |
-| 2 object | force, or `HasCollision[mode]` ≠ 0 | box |
+| 2 object | force, or `HasCollision[mode]` ≠ 0 (`0x006219C0`: objects byte +0x120 + mode, no bound; `ObjMode.txt` has modes 0–7, a mode above 7 would read the next fields, `IsAttackable0`, `Start0`…) | box |
 | others | always | size |
 
 #### 5.3 Changes of shape or mask
@@ -318,17 +330,26 @@ Remove (`0x00649560(unit, force)`), returns whether it cleared:
    with the test mask; r ≠ 0 → stamp at old again and return r; r = 0 →
    stamp at new, return 0. One room (the path's) serves both points;
    cells are looked up from it (§4 rule 1).
-2. **Forced move** (`0x0064EFA0`): clear at old, stamp at new, no test;
-   room null → nothing.
+2. **Forced move** (`0x0064EFA0(room1, old, room2, new, pattern,
+   foot)`): clear at old looked up from room1, stamp at new looked up
+   from room2, no test; room1 null → nothing (no stamp either). The
+   footprint move of `sim/pathing.md` §9.6 passes the path's room as
+   both.
 3. **Missile move** (`0x0064ED20`, size shapes): clear at old, query at
    new; stamp at new unless the result has 0x1 or 0x4, else at old;
    returns the result.
 4. **Teleport** (`0x00650910(path, room, x, y)`, D2MOO
    `sub_6FDAD5E0`), always succeeds:
-   - missile: (0, 0) → clear (size); else flags 0x8 := moved, collided
-     mask := size query at new with the move mask, footprint moved
-     without condition, saved steps := {(x, y)};
-   - others: (0, 0) → clear (pattern); else forced move (rule 2);
+   - missile: (0, 0) → clear (size, path room), collided mask := 0;
+     else flag 0x8 := 1 if the new cell differs from the old cell, else
+     0; `0x0064EE70`: clear (size) at old from the path's room (if any),
+     collided mask := size query at new from the **destination room**
+     with the move mask, stamp at new from the destination room without
+     condition; saved steps := {(x, y)};
+   - others: (0, 0) → clear (pattern) from the path's room; else forced
+     move (rule 2) with room1 = the path's room, room2 = the
+     **destination room** argument (a warp to a room not adjacent to the
+     old one still stamps at the destination);
    - flags |= 0x1 if the room differs; position := the cell centre with
      the room recache of `sim/pathing.md` §9.6 (destination room as the
      hint); a non-zero point without a room is a fatal assert;
@@ -396,7 +417,9 @@ rings skip cells.
    Then repeat: step (x, y) by the direction stored at (x − ox + 128,
    y − oy + 128) (origin (ox, oy)); stop with "passes" when the byte at
    the new cell is 8; the new cell's point test ≠ 0 → fails. All point
-   tests use the room the search passed, not a per-cell room.
+   tests use the room the search passed, not a per-cell room: the
+   candidate cell's room (the room rule 1's lookup just found, which is
+   also the new hint; `0x0064DEA0` → `0x0066A670`).
 
 ### 8. Coarse free-box search (`0x0064E840`)
 
@@ -419,6 +442,10 @@ rings skip cells.
    (`0x0064CEB0`, (n + 2) × (n + 2) box centred on (x, y) by §4 rule 4;
    n + 2 < 2 → the cell's grid value, 0x27 without a grid) with `mask`
    = 0 → out room := the cell room and stop; the point holds (x, y).
+   For n + 2 ≤ 1 the value is the cell's grid value **masked** with
+   `mask`, read from the room the cell lookup finds from the cell room
+   (no room or no grid → 0x27 unmasked). "Inside the rows / columns" is
+   half-open: rect x ≤ x < rect x + w (likewise y).
 4. After pass 49: out room := null; the point holds the last written
    coordinates.
 
@@ -497,12 +524,31 @@ start level, act +0x08) and its follower placement (`0x005352C0`),
 level warp `0x0053AEC0` (same act; the tile index from the caller; an
 act change goes to `0x00537340` + `0x0053ACC0`, the act-change spec),
 `0x0053ACC0`, `0x0056CF40`, `0x00584870`, `0x00584D00`, `0x0059DFD0`.
+On every 1.14d waypoint level the spawn search of waypoint travel ends at
+the level's waypoint room (`drlg/levels.md` §10 rule 4: the first room
+with a waypoint flag, no draw) for both `Position` values, so the second
+search of `world/waypoints.md` §7 rule 7 (`0x00619E50`) returns the same
+room as the placement's; the room roll (`0x0066AE70`) is never reached
+there.
 
-Game entry (`0x005394A0`, player not yet placed): spawn point as above;
-S→C 0x07 for the spawn room; `0x00554850` puts the player in the world
-(§2.5); S→C 0x15 (`0x0053BC10`: type, GUID, x, y, flag 1) at once.
-Level warp `0x0053AEC0` places with `0x00554EA0(exact 0, alt 0)`, so the
-free search runs twice (the second finds the same point).
+Game entry (`0x005394A0`, player not yet placed): spawn point as above
+with size = the unit's size (`0x00620510`, 2 for a player) and tile
+index 0; no spawn room → fatal assert; S→C 0x07 for the spawn room;
+`0x00554850(flag 0)` puts the player in the world (§2.5; the
+room-changed flag is set); S→C 0x15 (`0x0053BC10`: type, GUID, x, y,
+flag 1) at once. Level warp `0x0053AEC0` (same act) passes the unit's
+size too; no spawn room → nothing (the player stays); else it places
+with `0x00554EA0(exact 0, alt 0)`, so the free search runs twice (the
+second finds the same point).
+
+Recipients: every message of §10–§12 goes to the moving player's own
+client. The other 0x07 seen at game entry come from the first
+per-client update's room switch (`sim/tick.md` §6 rule 5, `0x00537B50`):
+for each room of the new room's adjacency array that was not in the old
+one's (all of them at game entry) `0x0053A8E0` sends 0x07 for the room,
+adds the client to the room, and sends the add messages (`0x00571F90`)
+of every unit in it but the player (R2: one 0x07 from this section,
+nine from the switch).
 
 ### 12. Warp tiles and warp arrival
 
@@ -524,7 +570,7 @@ value v, DRLG room R:
 #### 12.2 Walking into a warp (`0x005550B0(game, player, tile)`, D2MOO `SUNIT_WarpPlayer`)
 
 1. Game or player null → fatal. Destination tile and its lvlwarp record:
-   `0x006195A0(room of the tile, tile class)`; none → nothing.
+   `0x006195A0(room of the tile, tile class)` (rule 7); none → nothing.
 2. Point := the destination tile's position; free point (§7,
    `0x0064E7B0`, player size, 0x1C09, **fallback 1**) from the
    destination tile's room; none → nothing.
@@ -537,6 +583,23 @@ value v, DRLG room R:
    (`0x005809D0(no skill, 2, target, 0)`, `sim/pathing.md` §1).
 6. S→C 0x0D (`0x0053B4B0`): unit type, GUID, 1, target x, target y, 0,
    life percent (`0x00621F20`).
+7. Destination (`0x006195A0(room, class, &record)` → `0x0066AB00`): in
+   the DRLG room of `room`, walk its warp links (`drlg/rooms.md` §3.3,
+   room +0x4C) to the first whose lvlwarp record's `Id` equals `class`.
+   Its destination DRLG room D: walk D's links to the first whose
+   destination is the source room (the link back). Either walk failing
+   is a **fatal assert** in `0x006195A0`. Out class := that back link's record `Id`, record := that
+   record (so rule 5's `ExitWalkX/Y` are the **destination side's**);
+   D's active room is created if missing (`0x0061B730`). Then the first
+   unit of D's active-room unit list (room +0x74, next unit +0xE8) of
+   type 5 (tile) with that class is the destination tile; none → result
+   none (rule 1: nothing).
+
+Rule 5 uses the point of rule 2, not the point `0x00554EA0` may have
+moved the player to (the two are equal unless rule 4's search moves it).
+Arithmetic of §12.1 rule 3 and rule 5 is 32-bit two's complement; the
+1.14d lvlwarp values (`OffsetX` −4..10, `OffsetY` −6..6, `ExitWalkX/Y`
+−5..5, measured on `LvlWarp.txt`) keep every result small.
 
 Callers: `0x00548C32` (C→S 0x13 on a warp tile), `0x00581F3A`,
 `0x00582027`, `0x0059D9EF`.
@@ -622,7 +685,11 @@ Expected values come from the rules above (scratch model
 | D3 | empty, item bit 0x200 at (12, 13) | §9 drop from (10, 10) | (11, 13) |
 
 Real vectors (recordings, `traces/raw/`, reproducible once the DRLG of
-the recorded game is regenerated from its seeds):
+the recorded game is regenerated from its seeds). The map seed (game
++0x7C, `drlg/levels.md` init seed) is bytes 2–5 of the S→C 0x03 of each
+recording (`0x0053ABE0` → `0x0053B390`: act u8 @1, game +0x7C u32 @2,
+start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
+644,409,375; R2 / R3 `03 00 c4883810 0100 …` = 272,140,484.
 
 | Id | Recording | Event | Expected |
 |---|---|---|---|
@@ -661,25 +728,55 @@ the recorded game is regenerated from its seeds):
 
 ## Open questions
 
-1. No recording logs unit positions: record per-tick path state (see
-   `sim/pathing.md` open question 1) and the placement calls (`0x0064DEA0`
-   entry/exit, `0x00554EA0` arguments/result) to check §7 and §10 on
-   live data.
-2. §4 rule 4 sub-box recursion: confirm on a box straddling two room
-   edges (corner) that the strip above uses the inside box's clipped
-   width (D2MOO's reading; `0x0064CDF0`/`0x0064CC30` not traced
-   line by line). Settle: Ghidra on `0x0064CDF0`, or a recorded drop at a
-   room corner.
-3. `0x006195A0` (destination warp tile of a source tile) is named but
-   not specified: which tile and lvlwarp record it returns for a level
-   with several warps. Settle: Ghidra `0x006195A0` (with
-   `drlg/levels.md` §7).
+1. No recording logs unit positions. Design of the recording that
+   settles it (recorder `tools/trace-recorder`, one JSONL line per hook
+   call, frame = game +0xA8, values as integers):
+   - `0x00650840` entry and exit (movement, `sim/pathing.md` §9.4): unit
+     type, GUID, class; path +0x00/+0x04 precise x/y; +0x24 index, +0x28
+     count, points +0x9C (count × {x, y}); +0x7C velocity, +0x72/+0x76
+     velocity vector, +0x6A/+0x6E direction vector; +0x34 flags, +0x3C
+     type, +0x54 collided mask, +0x1D4 saved-step count and steps; room
+     (+0x1C) as its sub-tile rect; exit: result.
+   - `0x00649970` exit (path compute): the same fields plus target
+     +0x10/+0x12 and the result.
+   - Placement: `0x0064DEA0` entry (room rect, point, size, mask, field
+     origin, fallback, max distance, step) and exit (point, result room
+     rect); `0x00554EA0` entry (unit GUID, room rect, x, y, exact, alt)
+     and exit; `0x00555DA0`, `0x0061B060`, `0x00650910` (teleport) entry
+     and exit; unit allocation `0x00555230` exit (type, class, GUID, x,
+     y, room rect).
+   - Scenarios: game entry; walk and run in the Rogue Encampment and the
+     Blood Moor, clicking walls and NPCs; waypoint travel; walking into
+     a level warp (cave); dropping items next to walls; a monster
+     spawn. The map seed of each run is the S→C 0x03 seed (Test
+     vectors). Compare per frame and unit: every field equal.
+   The alternative (0xAC / 0x9C position bytes in `server-messages.tsv`)
+   sees only spawn points, not paths.
+2. Answered: §4 rule 4 (`0x0064CDF0` read: the top strip has the
+   clipped width, the right strip the full height).
+3. Answered: `0x006195A0` is §12.2 rule 7.
 4. Player position history (§10 rule 7): which code reads player data
    +0xA0..+0x14C (anti-cheat, C→S 0x5F?). Settle: xref the readers.
-5. `0x00545B80` quest warp gate (§12.2 rule 3): owner is the quests
-   spec; its result for each level pair is not specified.
+5. Answered: `0x00545B80` is specified in `world/quests.md` §8.2
+   (levels 73, 100, 118 and 128 from 120, 132).
 6. C→S 0x5F handler `0x0054CD50` → `0x0054CC40`: the state-108 timer and
    its `roll(100)` table `0x006E1064` are not specified (owner: a client
    resync spec). Settle: Ghidra `0x0054CD50`; record a 0x5F.
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
    mercenary spec.
+
+Answered handoff questions (`docs/HANDOFF.md` §7):
+
+- PC1 (and OQ2): §4 rule 4. PC2: §5.1 (cells from the room argument;
+  pattern 0 stamps nothing). PC3: §2.4 rule 4 (set type, flags
+  0x60000). PC4, WP4: §6 rule 4 (flag 0x8 = cell changed; stamp and
+  query from the destination room). PC5: §5.2 (no bound; modes 0–7).
+- PF1: §12.2 (32-bit two's complement; 1.14d values small). WP5: §11
+  (the waypoint room ends both searches). GX4: Test vectors (S→C 0x03
+  seeds 644,409,375 / 272,140,484).
+- PP1: §7.3 rule 3 (the candidate's room). PP2, PP3: §8 rule 3 (masked;
+  half-open). PP4: §11 (unit size; game entry asserts, level warp does
+  nothing). PP5: §11 "Recipients". PP6: §12.2 (rule 2's point). PP7:
+  §12.2 rule 7, `world/quests.md` §8.2; §10 rule 7 stays host-only.
+- CR1, CR2: open question 1 (recording design). CR3: `combat/vitals.md`
+  §5.

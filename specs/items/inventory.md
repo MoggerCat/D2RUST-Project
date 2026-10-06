@@ -48,7 +48,7 @@
 | Edge cases & original bugs | 970–985 |
 | Test vectors | 986–1033 |
 | Provenance | 1034–1069 |
-| Open questions | 1070–1129 |
+| Open questions | 1070–1127 |
 <!-- /index -->
 
 ## Summary
@@ -900,7 +900,7 @@ ground placement (§9.1 step 3); append to the list.
 #### 10.3 Gold messages
 
 Inventory gold reaches the client through the per-client vitals sync
-`0x00548760` (no owner spec; open question 18): when stat 14 differs
+`0x00548760` (`combat/vitals.md` §5, which owns when it runs): when stat 14 differs
 from the client's cached value (client data +0x14), `0x0053E9B0(new,
 old)` sends: new − old in 1..254 → 0x19 [delta u8]; else new < 0xFF →
 0x1D [0x0E][u8]; new < 0xFFFF → 0x1E [0x0E][u16]; else 0x1F [0x0E][u32];
@@ -1109,11 +1109,9 @@ dual-wield monster classes are 1.14d constants.
     Settle: Ghidra disassembly.
 17. Reader of the ground expiry (item data +0x24). Settle: Ghidra xrefs;
     owner `sim/units.md` §6.5.
-18. Owner of the per-client vitals sync `0x00548760` (life/mana 0x18,
-    0x95, 0x96; experience 0x1A–0x1C; gold §10.3), including when it
-    reaches the gold compare (its early returns depend on a life change
-    of ≥ 10 % unless forced). Settle: coordinator names an owner spec;
-    R5 confirms the gold bytes and timing.
+18. Answered: `combat/vitals.md` §5 owns the sync (when it runs, the
+    10 % life gate, force every 20 ticks or 10 with queued messages);
+    R5 still confirms the gold bytes and timing.
 19. Full code-equivalence list and the second list walked by the held
     test `0x0055CA40` (`0x0063D570` / `0x0063D610`). Settle: Ghidra
     disassembly of `0x0055CA40`.
