@@ -18,7 +18,8 @@ pub mod states;
 mod gap_tests;
 #[cfg(test)]
 mod prop_tests;
-#[cfg(test)]
+#[cfg(any(test, feature = "bench-fixtures"))]
+#[cfg_attr(not(test), allow(unused, dead_code))]
 pub(crate) mod tests;
 
 use d2_data::bin::BinTable;

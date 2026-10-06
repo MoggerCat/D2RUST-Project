@@ -1,6 +1,6 @@
 # Game-file tests: formats sweeps and the client asset path
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/game-tests-client-assets`, based on
 `claude/tender-meitner-mphas3` at `4b5b0bf`. It was then merged with that

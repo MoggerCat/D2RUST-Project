@@ -5,7 +5,7 @@
 //! `0x00548760` that sends 0x96 has no owner spec yet (open question 6),
 //! so only its byte layout is here.
 
-use super::seams::WalkPath;
+use crate::path::record::DynamicPath;
 
 /// S→C 0x0D PlayerStop (13 bytes): type, GUID, a, x, y, b, life %.
 pub fn player_stop(ty: u8, guid: u32, a: u8, x: u16, y: u16, b: u8, life_pct: u8) -> [u8; 13] {
@@ -128,7 +128,7 @@ pub fn mode_update(
     mode: u32,
     ty: u8,
     guid: u32,
-    path: &WalkPath,
+    path: &DynamicPath,
     own_client: bool,
 ) -> Option<[u8; 16]> {
     let (to_point, to_unit) = mode_codes(mode)?;
@@ -150,8 +150,8 @@ pub fn mode_update(
             ty,
             guid,
             to_point,
-            path.target.x as u16,
-            path.target.y as u16,
+            path.target_x,
+            path.target_y,
             pos.x as u16,
             pos.y as u16,
         ),

@@ -1,6 +1,6 @@
 # Handoff: the parallel client pieces wired into the app (`claude/p6-integrate`, 2026-10-06)
 
-> Not folded into `docs/HANDOFF.md` and `docs/PLAN.md` yet (a docs session folds it); this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, task class: integration from clear specs,
 medium (METHODS M14). Base: `claude/tender-meitner-mphas3` at `2f8c7e3`

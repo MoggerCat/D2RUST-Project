@@ -1,6 +1,6 @@
 # Handoff: `bits:` layouts in d2-proto — `claude/proto-bits`
 
-> Not yet folded into `docs/HANDOFF.md`; this file is the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, base `claude/specs-staging`
 `c6e40f9`. Repo only (M09). Spec: `specs/sim/intents-events.md` §5

@@ -1,6 +1,6 @@
 # Handoff: typed S→C builders in `d2-proto` — `claude/s2c-builders`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (for the coordinator: §1 3k and 5, §3 code map, §4 command map, §7); this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: implementation
 from written specs, medium (METHODS M14). Branch `claude/s2c-builders`

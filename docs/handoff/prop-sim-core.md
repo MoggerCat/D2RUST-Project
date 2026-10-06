@@ -1,6 +1,6 @@
 # Handoff: property tests of the d2-sim core — `claude/prop-sim-core`
 
-> Not yet folded into `docs/HANDOFF.md` (§1, §3, §7, §8) and `docs/PLAN.md`; a docs session folds it, then this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06. Task class: tests from specs plus
 root-cause fixes, medium effort (METHODS M14). Base:

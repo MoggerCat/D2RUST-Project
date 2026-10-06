@@ -1,5 +1,7 @@
 # Handoff: Phase 6 world view (`d2_client::world_view`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/p6-world-view`, from `main` at `fd37fba`
 (2026-10-06, cloud, repo only). Specs: `specs/client/render-pipeline.md`
 §A1 (stages 1–5), §A6–A9; `specs/client/bridge.md` §5, §7 rule 4, §8;
