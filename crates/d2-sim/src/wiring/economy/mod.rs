@@ -19,8 +19,10 @@
 //!   ([`EconomyQuests`], [`QuestRest`]).
 //! - [`death`]: a dead monster's drop (`treasure.md` §3) on the action
 //!   wiring's units and DRLG, through [`ItemDrops`] ([`DeathDrops`],
-//!   [`monster_death_drop`]); the free-spot search stays a seam
-//!   ([`FreeSpot`]).
+//!   [`monster_death_drop`]); the free-spot search is the path
+//!   provider's floor drop when it is on with its field, else a seam
+//!   ([`FreeSpot`]); [`DropPlacer`] receives the economy (its hooks
+//!   hold the rooms).
 //! - [`quest_tick`]: tick step 8, the quest updater, on the same quest
 //!   world, wrapped around a game's tick hooks ([`QuestTick`]).
 //!

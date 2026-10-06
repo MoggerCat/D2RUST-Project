@@ -374,3 +374,42 @@ fn none_rows_are_rejected_like_the_original() {
     // No sim handler ran for any of them.
     assert!(h.game.handled.is_empty());
 }
+
+/// `in_range` (`0x00548EF0`, spec §2.4 rule 3: |dx| ≤ 50 and |dy| ≤ 50)
+/// on any two `i32` positions: the exact difference, no overflow (FS3).
+// Covers: specs/sim/intents-events.md §2.4 r3
+#[test]
+fn in_range_takes_any_positions() {
+    let p = |x, y| Pos { x, y };
+    assert!(dispatch::in_range(
+        p(i32::MAX, i32::MIN),
+        p(i32::MAX - 50, i32::MIN + 50)
+    ));
+    assert!(!dispatch::in_range(p(i32::MAX, 0), p(i32::MAX - 51, 0)));
+    assert!(!dispatch::in_range(p(i32::MIN, 0), p(i32::MAX, 0)));
+    assert!(!dispatch::in_range(p(0, i32::MAX), p(0, i32::MIN)));
+    assert!(!dispatch::in_range(p(0, 0), p(0, i32::MIN)));
+}
+
+proptest::proptest! {
+    /// Against the spec's rule in 64-bit arithmetic, for any positions.
+    #[test]
+    fn in_range_is_the_exact_chebyshev_test(
+        px in proptest::num::i32::ANY, py in proptest::num::i32::ANY,
+        dx in -60i64..=60, dy in -60i64..=60, far in proptest::bool::ANY,
+        tx in proptest::num::i32::ANY, ty in proptest::num::i32::ANY,
+    ) {
+        let (tx, ty) = if far {
+            (tx, ty)
+        } else {
+            let c = |v: i32, d: i64| (i64::from(v) + d).clamp(i32::MIN.into(), i32::MAX.into()) as i32;
+            (c(px, dx), c(py, dy))
+        };
+        let want = (i64::from(tx) - i64::from(px)).abs() <= 50
+            && (i64::from(ty) - i64::from(py)).abs() <= 50;
+        proptest::prop_assert_eq!(
+            dispatch::in_range(Pos { x: px, y: py }, Pos { x: tx, y: ty }),
+            want
+        );
+    }
+}

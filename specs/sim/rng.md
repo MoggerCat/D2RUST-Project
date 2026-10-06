@@ -25,15 +25,15 @@
 |   2. Step | 75–96 |
 |   3. Draw helpers | 97–126 |
 |   4. Setting and reading seeds | 127–143 |
-|   5. Where seeds come from | 144–210 |
-|   6. Inlined draws | 211–230 |
-|   7. Which systems draw from which seed | 231–254 |
-| Constants & data dependencies | 255–265 |
-| Randomness | 266–270 |
-| Edge cases & original bugs | 271–283 |
-| Test vectors | 284–332 |
-| Provenance | 333–365 |
-| Open questions | 366–380 |
+|   5. Where seeds come from | 144–214 |
+|   6. Inlined draws | 215–235 |
+|   7. Which systems draw from which seed | 236–261 |
+| Constants & data dependencies | 262–272 |
+| Randomness | 273–277 |
+| Edge cases & original bugs | 278–290 |
+| Test vectors | 291–339 |
+| Provenance | 340–372 |
+| Open questions | 373–387 |
 <!-- /index -->
 
 ## Summary
@@ -157,6 +157,7 @@ value as an input (determinism rule), never from the clock.
 
 #### 5.2 Game
 
+<!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
 | game seed, game +0xD0 [`pGameSeed`] | `0x0052C280` at game creation | `init()`, then `init_low(time_value(QueryPerformanceCounter low word))`. A fixed-seed global `0x00731004` (≠ −1) would replace this; its only writer `0x0052C320` has no callers (dead code). |
@@ -173,6 +174,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 
 #### 5.3 Units, items, missiles
 
+<!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
 | server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: `time_value(counter)`, counter `0x008846E8` incremented per use. |
@@ -185,6 +187,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 
 #### 5.4 DRLG
 
+<!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
 | DRLG seed, drlg +0x00 | `0x00642DA0` | `init_low(map seed)`. Observed: the character's saved map ID (`.d2s` offset 0xAB; 644409375 for the test character), identical across runs. |
@@ -198,6 +201,7 @@ sequence was recorded twice per run, identical.
 
 #### 5.5 Client-only globals
 
+<!-- rows -->
 | Seed | Where | Initial value | Drawn by |
 |---|---|---|---|
 | automap seed, global `0x0096C8C8` | `0x0061FCF0` at table load | `{0, 666}` | automap cell picker `0x0061FFF0` (`roll`), sim-0001 |
@@ -215,6 +219,7 @@ belongs to each system's spec. Forms found, all on the **unsigned low
 word** (no 64-bit modulo, no signed modulo, the high word never used as
 a value):
 
+<!-- rows -->
 | Form | Approx. sites | Examples |
 |---|---|---|
 | `lo' % 100` (percent check) | 323 | `0x005E0490`, `0x005516C0`, `0x0064A850` |
@@ -230,6 +235,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 
 ### 7. Which systems draw from which seed
 
+<!-- rows -->
 | System | Seed | 1.14d sites |
 |---|---|---|
 | treasure-class picks, drop quality | dropping unit's seed | `0x0055A6D0`, `0x00558640` |
@@ -238,6 +244,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | ambient spawns, spawn positions | active room seed | `0x0054F060`, `0x005B2A00` |
 | region monster lists | monster-region seed | `0x005475E0`, `0x005BDB20` (sim-0004) |
 | AI decisions (largest group: 314 inline sites) | monster's unit seed | `0x005E0490`, `0x005E6320`, `0x005F1800` |
+| client position resync lock (C→S 0x5F, `sim/pathing.md` §1.6) | player's unit seed | `0x0054CC40` |
 | combat: damage, crit, deadly strike | attacker or defender unit seed | `0x0057B7D0`, `0x0057D760`, `0x0057DD60`, `0x0064A850` |
 | skills | caster's unit seed | `0x005BE3F0`–`0x005DFBF0` |
 | unique monster names | unit seed | `0x00653ED0`–`0x00653F50` |

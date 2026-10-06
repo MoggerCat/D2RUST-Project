@@ -1,6 +1,7 @@
 // Spec: specs/formats/mpq.md (§11 Huffman, Storm adaptive Huffman)
 
-use std::collections::{BTreeMap, HashMap};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use super::bits::BitReader;
@@ -13,6 +14,10 @@ const SYM_ESCAPE: u16 = 0x101;
 /// Output bytes per input byte, at most: every symbol takes at least one
 /// bit. Bounds the preallocation, since `max_out` is untrusted.
 const MAX_RATIO: usize = 8;
+
+/// Slots of the leader cache (a power of two).
+const LEADER_SLOTS: usize = 256;
+const NO_NODE: u32 = u32::MAX;
 
 fn err(reason: &'static str) -> CodecError {
     CodecError {
@@ -41,9 +46,11 @@ struct Tree {
     nodes: Vec<Node>,
     head: usize,
     tail: usize,
-    /// For each weight, the first node in the list (closest to the head)
-    /// with that weight.
-    leader: HashMap<u32, usize>,
+    /// Leader cache: slot `w % LEADER_SLOTS` holds a node that may be the
+    /// first node in the list (closest to the head) with weight `w`. Only
+    /// a hint: [`Tree::leader`] checks it against the list and falls back
+    /// to a walk, so a stale or colliding entry never changes a result.
+    leader: [u32; LEADER_SLOTS],
 }
 
 impl Tree {
@@ -84,18 +91,56 @@ impl Tree {
 
         let head = b.head.expect("tree has nodes");
         let tail = b.tail.expect("tree has nodes");
-        let mut leader = HashMap::new();
-        let mut cur = Some(head);
-        while let Some(i) = cur {
-            leader.entry(b.nodes[i].weight).or_insert(i);
-            cur = b.nodes[i].next;
-        }
-        Tree {
+        let mut tree = Tree {
             nodes: b.nodes,
             head,
             tail,
-            leader,
+            leader: [NO_NODE; LEADER_SLOTS],
+        };
+        let mut cur = Some(head);
+        while let Some(i) = cur {
+            tree.note_leader(i);
+            cur = tree.nodes[i].next;
         }
+        tree
+    }
+
+    /// Whether `c` is the first node in the list with weight `w`. The list
+    /// is non-increasing, so that node is the only one of weight `w` whose
+    /// predecessor (if any) has another weight.
+    fn is_leader(&self, c: usize, w: u32) -> bool {
+        self.nodes.get(c).is_some_and(|node| {
+            node.weight == w && node.prev.is_none_or(|p| self.nodes[p].weight != w)
+        })
+    }
+
+    /// Records `c` in the cache if it is the first node of its weight.
+    fn note_leader(&mut self, c: usize) {
+        let w = self.nodes[c].weight;
+        if self.is_leader(c, w) {
+            self.leader[w as usize % LEADER_SLOTS] = c as u32;
+        }
+    }
+
+    /// The first node in the list with `n`'s weight (Increment step 1):
+    /// the cached node if it checks out, else a walk back from `n` through
+    /// its weight block.
+    fn leader(&mut self, n: usize) -> usize {
+        let w = self.nodes[n].weight;
+        let slot = w as usize % LEADER_SLOTS;
+        let c = self.leader[slot] as usize;
+        if self.is_leader(c, w) {
+            return c;
+        }
+        let mut c = n;
+        while let Some(p) = self.nodes[c].prev {
+            if self.nodes[p].weight != w {
+                break;
+            }
+            c = p;
+        }
+        self.leader[slot] = c as u32;
+        c
     }
 
     fn root(&self) -> usize {
@@ -169,7 +214,7 @@ impl Tree {
         loop {
             let w = self.nodes[n].weight;
             let w1 = w.checked_add(1).ok_or(err("weight overflow"))?;
-            let lead = *self.leader.get(&w).ok_or(err("inconsistent tree"))?;
+            let lead = self.leader(n);
             if lead != n {
                 if self.nodes[lead].parent.is_none()
                     || self.nodes[n].parent.is_none()
@@ -181,17 +226,23 @@ impl Tree {
                 self.swap_tree(n, lead);
             }
             // `n` now heads its weight block; the block's new leader is
-            // whatever follows it with the same weight.
-            match self.nodes[n].next {
-                Some(x) if self.nodes[x].weight == w => {
-                    self.leader.insert(w, x);
-                }
-                _ => {
-                    self.leader.remove(&w);
+            // whatever follows it with the same weight. Keeping the cache
+            // current saves walks; it is not needed for correctness.
+            // (`n`'s predecessor weighs more than `w`, so `x` below heads
+            // block `w`, and `n` heads block `w + 1` unless its
+            // predecessor weighs `w + 1` too.)
+            self.nodes[n].weight = w1;
+            if let Some(x) = self.nodes[n].next {
+                if self.nodes[x].weight == w {
+                    self.leader[w as usize % LEADER_SLOTS] = x as u32;
                 }
             }
-            self.nodes[n].weight = w1;
-            self.leader.entry(w1).or_insert(n);
+            if self.nodes[n]
+                .prev
+                .is_none_or(|p| self.nodes[p].weight != w1)
+            {
+                self.leader[w1 as usize % LEADER_SLOTS] = n as u32;
+            }
             match self.nodes[n].parent {
                 Some(p) => n = p,
                 None => return Ok(()),
@@ -213,7 +264,7 @@ impl Tree {
         });
         self.link(Some(b), Some(a));
         self.link(Some(a), None);
-        self.leader.entry(0).or_insert(a);
+        self.note_leader(a);
 
         let bw = self.nodes[b].weight;
         let parent = self.nodes[b].parent;
@@ -236,9 +287,7 @@ impl Tree {
         let before = self.nodes[b].prev;
         self.link(before, Some(m));
         self.link(Some(m), Some(b));
-        if self.leader.get(&bw) == Some(&b) {
-            self.leader.insert(bw, m);
-        }
+        self.note_leader(m);
         self.nodes[a].parent = Some(m);
         self.nodes[b].parent = Some(m);
         a
@@ -305,9 +354,54 @@ impl Builder {
     }
 }
 
+/// Stream bits resolved by one [`Fast`] lookup.
+const FAST_BITS: u32 = 10;
+
+/// Where the walk from the root of an unmodified tree ends after reading
+/// the low `bits` bits of a [`FAST_BITS`]-bit window: at a leaf, or at
+/// the branch reached after all `FAST_BITS` bits.
+#[derive(Clone, Copy)]
+struct Fast {
+    node: u16,
+    bits: u8,
+}
+
+/// The tree of weight table `t`, and its [`Fast`] table: entry `j` is the
+/// walk for the window `j`.
+struct Template {
+    tree: Tree,
+    fast: Vec<Fast>,
+}
+
+impl Template {
+    fn new(weights: &[u8; 256]) -> Template {
+        let tree = Tree::build(weights);
+        let fast = (0..1u32 << FAST_BITS)
+            .map(|j| {
+                let (mut n, mut bits) = (tree.root(), 0);
+                while tree.nodes[n].symbol.is_none() && bits < FAST_BITS {
+                    n = tree.nodes[n].child[(j >> bits & 1) as usize];
+                    bits += 1;
+                }
+                let node = u16::try_from(n).expect("templates have < 2^16 nodes");
+                Fast {
+                    node,
+                    bits: bits as u8,
+                }
+            })
+            .collect();
+        Template { tree, fast }
+    }
+}
+
+fn templates(table: usize) -> &'static Template {
+    static TEMPLATES: OnceLock<Vec<Template>> = OnceLock::new();
+    &TEMPLATES.get_or_init(|| HUFFMAN_WEIGHTS.iter().map(Template::new).collect())[table]
+}
+
+#[cfg(any(test, feature = "test-support"))]
 fn template(table: usize) -> &'static Tree {
-    static TEMPLATES: OnceLock<Vec<Tree>> = OnceLock::new();
-    &TEMPLATES.get_or_init(|| HUFFMAN_WEIGHTS.iter().map(Tree::build).collect())[table]
+    &templates(table).tree
 }
 
 /// Decodes a Huffman stream into at most `max_out` bytes.
@@ -318,11 +412,22 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
         return Err(err("invalid table type"));
     }
     let adaptive = table == 0;
-    let mut tree = template(table).clone();
+    let template = templates(table);
+    // Borrowed until the first change: tables 1–8 change only on escape.
+    let mut tree = Cow::Borrowed(&template.tree);
 
     let mut out = Vec::with_capacity(max_out.min(input.len().saturating_mul(MAX_RATIO)));
     while out.len() < max_out {
         let mut n = tree.root();
+        if let Cow::Borrowed(_) = tree {
+            // The tree is still the template: resolve up to FAST_BITS bits
+            // with one lookup. The window is zero-filled past the input,
+            // so a walk that used a missing bit fails in `consume`, as
+            // reading bit by bit would.
+            let f = template.fast[r.peek(FAST_BITS) as usize];
+            r.consume(u32::from(f.bits))?;
+            n = usize::from(f.node);
+        }
         while tree.nodes[n].symbol.is_none() {
             let bit = r.read(1)? as usize;
             n = tree.nodes[n].child[bit];
@@ -332,10 +437,11 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
             SYM_END => break,
             SYM_ESCAPE => {
                 let v = r.read(8)? as u8;
-                n = tree.add_value(v);
-                tree.increment(n)?;
+                let t = tree.to_mut();
+                n = t.add_value(v);
+                t.increment(n)?;
                 if !adaptive {
-                    tree.increment(n)?;
+                    t.increment(n)?;
                 }
                 v
             }
@@ -343,52 +449,52 @@ pub(crate) fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>, CodecE
         };
         out.push(byte);
         if adaptive {
-            tree.increment(n)?;
+            tree.to_mut().increment(n)?;
         }
     }
     Ok(out)
 }
 
-/// Encodes `data` with weight table `table`, mirroring [`decompress`]'s
-/// tree updates, and appends the end symbol. Test helper for building
-/// valid streams.
-#[cfg(test)]
+/// Encodes `data` with weight table `table` (0..=8), the inverse of
+/// [`decompress`]: the same tree is built and updated symbol by symbol
+/// (§11 Build, Increment, AddValue), each byte is written as its leaf's
+/// path from the root (child0 → 0, child1 → 1), a byte with no leaf as the
+/// escape code plus 8 bits, and the end symbol last. Used by the
+/// test-support MPQ writer and by tests.
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn compress(table: u8, data: &[u8]) -> Vec<u8> {
-    use super::bits::BitWriter;
-
-    fn leaf(tree: &Tree, sym: u16) -> Option<usize> {
-        (0..tree.nodes.len()).find(|&i| tree.nodes[i].symbol == Some(sym))
-    }
-    fn emit(tree: &Tree, w: &mut BitWriter, mut n: usize) {
-        let mut path = Vec::new();
-        while let Some(p) = tree.nodes[n].parent {
-            path.push(u32::from(tree.nodes[p].child[1] == n));
-            n = p;
-        }
-        for &bit in path.iter().rev() {
-            w.write(bit, 1);
-        }
-    }
-
-    let mut w = BitWriter::default();
-    w.write(u32::from(table), 8);
+    assert!(
+        usize::from(table) < HUFFMAN_WEIGHTS.len(),
+        "Huffman table {table} outside 0..=8"
+    );
     let adaptive = table == 0;
     let mut tree = template(usize::from(table)).clone();
+    // Symbol → leaf. Leaves never change symbol; AddValue adds new ones.
+    let mut leaf_of = [usize::MAX; 0x102];
+    for (i, n) in tree.nodes.iter().enumerate() {
+        if let Some(s) = n.symbol {
+            leaf_of[usize::from(s)] = i;
+        }
+    }
+
+    let mut w = Bits::default();
+    w.put(u32::from(table), 8);
+    let mut path = Vec::new();
     for &b in data {
-        let n = match leaf(&tree, u16::from(b)) {
-            Some(n) => {
-                emit(&tree, &mut w, n);
-                n
-            }
-            None => {
-                let esc = leaf(&tree, SYM_ESCAPE).expect("escape leaf");
-                emit(&tree, &mut w, esc);
-                w.write(u32::from(b), 8);
+        let n = match leaf_of[usize::from(b)] {
+            usize::MAX => {
+                w.path(&tree, leaf_of[usize::from(SYM_ESCAPE)], &mut path);
+                w.put(u32::from(b), 8);
                 let n = tree.add_value(b);
+                leaf_of[usize::from(b)] = n;
                 tree.increment(n).expect("valid tree");
                 if !adaptive {
                     tree.increment(n).expect("valid tree");
                 }
+                n
+            }
+            n => {
+                w.path(&tree, n, &mut path);
                 n
             }
         };
@@ -396,9 +502,51 @@ pub(crate) fn compress(table: u8, data: &[u8]) -> Vec<u8> {
             tree.increment(n).expect("valid tree");
         }
     }
-    let end = leaf(&tree, SYM_END).expect("end leaf");
-    emit(&tree, &mut w, end);
-    w.bytes
+    w.path(&tree, leaf_of[usize::from(SYM_END)], &mut path);
+    w.finish()
+}
+
+/// LSB-first bit writer for [`compress`].
+#[cfg(any(test, feature = "test-support"))]
+#[derive(Default)]
+struct Bits {
+    out: Vec<u8>,
+    acc: u64,
+    count: u32,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl Bits {
+    /// Appends the low `n` (≤ 32) bits of `v`.
+    fn put(&mut self, v: u32, n: u32) {
+        self.acc |= (u64::from(v) & ((1u64 << n) - 1)) << self.count;
+        self.count += n;
+        while self.count >= 8 {
+            self.out.push(self.acc as u8);
+            self.acc >>= 8;
+            self.count -= 8;
+        }
+    }
+
+    /// Appends the code of node `n`: the branch bits from the root down.
+    /// `path` is scratch space.
+    fn path(&mut self, tree: &Tree, mut n: usize, path: &mut Vec<u8>) {
+        path.clear();
+        while let Some(p) = tree.nodes[n].parent {
+            path.push(u8::from(tree.nodes[p].child[1] == n));
+            n = p;
+        }
+        for &bit in path.iter().rev() {
+            self.put(u32::from(bit), 1);
+        }
+    }
+
+    fn finish(mut self) -> Vec<u8> {
+        if self.count > 0 {
+            self.out.push(self.acc as u8);
+        }
+        self.out
+    }
 }
 
 #[cfg(test)]
@@ -420,11 +568,12 @@ pub(crate) mod tests {
 
     /// Checks the invariants every tree must keep: the list is non-increasing
     /// in weight, branches weigh the sum of their children, parent links
-    /// match, and `leader` points at the first node of each weight.
+    /// match, and `leader` finds the first node of each weight from every
+    /// node of that weight, whatever the cache holds.
     fn check(tree: &Tree) {
         let mut cur = Some(tree.head);
         let mut prev_w = u32::MAX;
-        let mut seen = HashMap::new();
+        let mut seen = std::collections::HashMap::new();
         let mut count = 0;
         while let Some(i) = cur {
             let n = &tree.nodes[i];
@@ -442,7 +591,29 @@ pub(crate) mod tests {
         }
         assert_eq!(count, tree.nodes.len(), "every node is in the list");
         assert_eq!(tree.nodes[tree.head].parent, None, "head is the root");
-        assert_eq!(seen, tree.leader, "leader map");
+        let mut cold = tree.clone();
+        cold.leader = [NO_NODE; LEADER_SLOTS];
+        for (i, n) in tree.nodes.iter().enumerate() {
+            assert_eq!(tree.clone().leader(i), seen[&n.weight], "leader of {i}");
+            assert_eq!(cold.leader(i), seen[&n.weight], "uncached leader of {i}");
+        }
+    }
+
+    /// A stale or colliding cache entry is checked, never trusted.
+    #[test]
+    fn leader_cache_is_only_a_hint() {
+        let mut tree = template(1).clone();
+        let n = tree.nodes.len();
+        for c in [0u32, 1, 7, n as u32 - 1, n as u32, NO_NODE] {
+            tree.leader = [c; LEADER_SLOTS];
+            check(&tree);
+            let mut t = tree.clone();
+            let mut want = tree.clone();
+            want.leader = [NO_NODE; LEADER_SLOTS];
+            for i in 0..n {
+                assert_eq!(t.leader(i), want.leader(i));
+            }
+        }
     }
 
     #[test]
@@ -481,10 +652,7 @@ pub(crate) mod tests {
     fn regress_weight_overflow_is_an_error() {
         let mut tree = template(0).clone();
         let root = tree.root();
-        let w = tree.nodes[root].weight;
-        tree.leader.remove(&w);
         tree.nodes[root].weight = u32::MAX;
-        tree.leader.insert(u32::MAX, root);
         assert!(tree.increment(root).is_err());
     }
 

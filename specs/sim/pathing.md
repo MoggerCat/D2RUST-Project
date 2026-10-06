@@ -28,23 +28,23 @@
 | Inputs | 66–75 |
 | Outputs / state changes | 76–82 |
 | Rules | 83–84 |
-|   1. Walk and run requests | 85–178 |
-|   2. Path types | 179–218 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 219–264 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 265–281 |
-|   5. Toward (type 2, `0x00679C80`) | 282–341 |
-|   6. Straight (type 7, `0x00679ED0`) | 342–351 |
-|   7. A* (type 1, `0x0067B850`) | 352–389 |
-|   8. Velocity, direction vector, facing | 390–459 |
-|   9. Per-tick movement | 460–621 |
-|   10. Messages | 622–644 |
-|   11. Missile paths (`0x00649760`) | 645–694 |
-| Constants & data dependencies | 695–731 |
-| Randomness | 732–742 |
-| Edge cases & original bugs | 743–789 |
-| Test vectors | 790–827 |
-| Provenance | 828–865 |
-| Open questions | 866–920 |
+|   1. Walk and run requests | 85–229 |
+|   2. Path types | 230–269 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 270–336 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 337–353 |
+|   5. Toward (type 2, `0x00679C80`) | 354–413 |
+|   6. Straight (type 7, `0x00679ED0`) | 414–423 |
+|   7. A* (type 1, `0x0067B850`) | 424–461 |
+|   8. Velocity, direction vector, facing | 462–544 |
+|   9. Per-tick movement | 545–711 |
+|   10. Messages | 712–734 |
+|   11. Missile paths (`0x00649760`) | 735–784 |
+| Constants & data dependencies | 785–821 |
+| Randomness | 822–832 |
+| Edge cases & original bugs | 833–879 |
+| Test vectors | 880–917 |
+| Provenance | 918–955 |
+| Open questions | 956–1009 |
 <!-- /index -->
 
 ## Summary
@@ -176,6 +176,57 @@ none; `0x005415A0`); frame = game +0xA8.
 A new request while moving recomputes the path from the current
 precise position (§3); the fraction is kept.
 
+#### 1.6 Client position resync (C→S 0x5F, `0x0054CD50`)
+
+The message (5 bytes: id, x u16, y u16; `sim/client-messages.tsv`)
+carries the position the client believes its player is at. Handler
+`0x0054CD50(game, player, msg, len)`:
+
+1. len ≠ 5 → result 3. The player's client (`0x005531C0`: player data
+   +0x9C) is required (null → fatal).
+2. Ignored (result 0) when a used skill is set (`0x00620250`), the
+   player is dead (`0x005541B0`), or d < 5, where d =
+   `0x006417F0(player, x, y)` = max(|dx|, |dy|) + ⌊min(|dx|, |dy|)/2⌋
+   between the player's sub-tile position and (x, y).
+3. **Walk branch**, when the player has state 108 or d < 15 or d > 45:
+   if the path has a target unit other than the player (`0x00553540`,
+   after its validity check `0x00553490`) → result 0; else the mode
+   request of §1.2–§1.5 (`0x005809D0(no skill, m, x, y, 0)`) with m = 3 if
+   the player's mode is 3 (run), else 2.
+4. **Snap branch**, 15 ≤ d ≤ 45 without state 108:
+   1. Reachability test (`0x0054CB10`): (x, y) must have a room by the
+      cell lookup from the player's room (`sim/path-placement.md` §4
+      rule 1) and the player must have neither state 54 nor 108; else
+      not reachable. Save the path's move-test mask (+0x50), path type
+      (+0x3C), max path distance (+0x91) and target (unit, else point);
+      set mask 0x409, type 15, +0x90 = +0x91 = 77, target := (x, y);
+      compute (§3, `0x00649970` with town access 0). Reachable iff the
+      compute returns non-zero and the last path point (index count −
+      1) equals (x, y). Restore mask, type, the target, and +0x90 =
+      +0x91 := the saved +0x91. The computed points and count are
+      **not** restored.
+   2. Reachable → placement (`0x0054CC40`): `0x00554EA0(room 0, x, y,
+      exact 0, alt 1)` (`sim/path-placement.md` §10); failure → step 3.
+      Success: record the game frame (game +0xA8) in the client's
+      5-slot resync ring (+0x3C0, `0x00539360`: the first slot that is
+      0 or more than 2250 frames old; none → nothing recorded). Delay
+      := 125 frames, unless the ring is full (`0x005393F0`: all five
+      slots non-zero and at most 2250 frames old) and the game type
+      byte (game +0x6A) is 0: then r = `lo' % 100` (one inlined step
+      of the player's unit seed, unit +0x20, `sim/rng.md` §6) picks
+      from table `0x006E1064`
+      (r < 50 → 1500, r < 75 → 3000, else 4500 frames). Set state 108;
+      attach a stat list (`0x006251F0` flags 2, expire = frame +
+      delay; state 108; remove callback `0x0054CC30` clears state 108)
+      and schedule event 12 at frame + delay (`0x005417D0`,
+      `sim/stat-lists.md` §10.4). Result 0.
+   3. Not reachable, or placement failed → S→C 0x15 to the client
+      (`0x00548010(player, client, 0)`, §10). Result 0.
+
+So a player whose client keeps snapping (five snaps within 2250
+frames) is locked to the walk branch for 1500–4500 frames, otherwise
+for 125.
+
 ### 2. Path types
 
 Type table, index = path type (`sim/path-tables.tsv` tables
@@ -227,7 +278,7 @@ here and specified with their callers (open question 3).
    with a target unit, target (+0x10/+0x12) := its position; (0, 0) →
    step 11 with r = 0. By the target's type: player or monster: if the
    path lead byte (+0x68) ≠ 0, the target point is moved ahead
-   (`0x00679190`, uses floating point, open question 4), r = 1; object:
+   (`0x00679190`, rule below), r = 1; object:
    doors (`0x00621A70`) shift the target 2 sub-tiles away from the
    door's line toward the unit's side (orientation `0x00621AC0` set:
    y ± 2, else x ± 2; − when the unit's coordinate is smaller) and
@@ -257,6 +308,27 @@ here and specified with their callers (open question 3).
     result = count. If no point remains → step 11.
 11. Index := 0, count := 0.
 12. Flag 0x20 := 0; result 0.
+
+**Target lead** (`0x00679190(path)`, and `0x00679250(out, path)`
+which writes the led target point to `out` and skips the lead when
++0x68 = 0): with the target unit's direction d (`0x006487F0` on the
+target's path, +0x64) and lead L = path +0x68 (u8), a := (8·d −
+256·L) & 0x1FF; target x += trunc(L · T[(a + 0x80) & 0x1FF]), target y
++= trunc(L · T[a]) (16-bit wrapping adds; trunc toward zero, x87
+control word with RC = 11), T = the 512-entry f32 sine table at
+`0x00707800` (`0x0040B330` cosine, `0x0040B350` sine). **In 1.14d L is
+always 0**: the only writer of +0x68 is `0x006490C0` (D2MOO
+`D2Common_10207`, also writes +0x67), which has no call and no
+pointer anywhere in the image (`disasm.py xref`), and the path record
+is zeroed at allocation (`sim/path-placement.md` §2.3). So the lead
+adds 0 and the floating point never affects an outcome; d2rs
+implements "lead = 0" (no table, hard rule 6 holds). Were it needed:
+T is not the f32 rounding of sin(2πi/512) (328 of 512 entries differ
+by one ulp; sha256 of the 2048 bytes
+`22d4615dd85e77c049244da1033035af272eedf66ea63ef3476cb7e397afaf54`),
+and trunc(L·T[i]) is the same under 24-, 53- and 64-bit x87 precision
+for all L ≤ 255 and all i (exhaustive check), so an integer form from
+T's bit patterns would be exact.
 
 Path functions receive a record ("path info", D2MOO `D2PathInfoStrc`):
 start, target, start room, target room, slack r (step 4), max distance
@@ -453,9 +525,22 @@ From precise start (sx, sy) to precise point (tx, ty) (`tan` table:
 d &= 63. Unit type 2 or 4, or a missile without path flag 0x40:
 direction := d. A missile with flag 0x40: nothing. Others (players,
 monsters): if d ≠ new direction (+0x65): new direction := d, turn step
-(+0x66) := `dirdiff`[(d − direction) & 63]. Turning the current
-direction toward the new one over time is not part of this spec (open
-question 5).
+(+0x66) := `dirdiff`[(d − direction) & 63]. `0x00648820(path, d)` is
+the same with d ≥ 64 → fatal and a missing owner read as type 6.
+
+Turning the current direction toward the new one (`0x00648640`, D2MOO
+`D2Common_10193`: direction := (direction + turn step) & 63, snapped to
+the new direction once it is passed) is called only from the client's
+unit update (`0x00480810` → `0x00463390` players, `0x004B13A0`
+monsters). **The server never turns**: of the path functions that
+write +0x64 (`0x006485F0`, `0x00648820`, `0x00648640`, `0x006488A0`),
+the only one that changes a player's or monster's direction on the
+server is the snap `0x006488A0(path, d)` (direction := new direction
+:= d & 63; server callers `0x005A65E3`, `0x005C5E30`, `0x005F95DD`).
+Direct writes outside these functions were not searched.
+Server readers of +0x64 (`0x006487F0`): the target lead (`0x006791CF`,
+`0x006792F8`, §3; its lead is always 0), `0x0057CDB2`, `0x00597FE7`,
+`0x00597FFB`, `0x00620139` (owners: their callers' specs).
 
 ### 9. Per-tick movement
 
@@ -479,10 +564,9 @@ mode's end (`0x005A8030`).
    movement (§1.5 with mode 2: walk, or town walk in a town; path
    recomputed).
 4. Step (§9.3), result s.
-5. Host-only position history (`sim/path-placement.md` §10 rule 7):
-   when `GetTickCount` > last + 25 ms and the position is more than
-   √45 sub-tiles from the previous record. Not simulated (open
-   question 4 there).
+5. Position history (`sim/path-placement.md` §10 rule 7, the owner):
+   when `GetTickCount` > last + 25 ms and the squared distance to the
+   previous record is > 45. Simulated: monster AI reads it.
 6. s = 2 (stopped): player data +0x150 ≠ 0 would start a queued action
    (`0x00548B00` NPC talk, or a skill on a unit through `0x00580A70`);
    no 1.14d server code stores a non-zero value there (every server
@@ -610,11 +694,17 @@ add/remove messages.
 
 #### 9.10 Re-path (`0x00650350(unit, finish)`)
 
-No path → 0. Unless flag 0x10: a monster for which `0x00649120`
-(distance budget) is 0 → 0; else (any unit) queue for update, unit flags
-|= 1, distance budget −= index (`0x00649140`). Types 2, 13, 15: finish →
-type 13; else type 2 and target := final target; compute (§3); non-zero
-→ result; else type 15 and compute again. Other types: compute (§3).
+No path → 0. Unless flag 0x10: a monster (type 1) whose re-path
+budget (path +0x94, u8, read by `0x00649120`) is 0 → 0 (players skip
+this test); else queue for update, unit flags (+0xC4) |= 1, and the
+budget += −(current point index +0x24), clamped to 0..255
+(`0x00649140`). The only setter is `0x006490E0` (value > 255 → fatal),
+called with 20 by the monster movement start `0x005A7C20` (after the
+target is set; that function belongs to `monsters/ai.md`), so a monster
+re-paths until it has advanced 20 points in total since that start.
+Types 2, 13, 15: finish → type 13; else
+type 2 and target := final target; compute (§3); non-zero → result;
+else type 15 and compute again. Other types: compute (§3).
 The types are written to path +0x3C directly (not through set type,
 §2: flags and direction offset unchanged). Every compute here passes
 town access 0.
@@ -737,8 +827,8 @@ skills `srvdofunc`, `SeqInput`, `interrupt`.
    state 42 (concentration). A walk request has no skill argument, so
    the draw depends on the player's *used* skill, which mode starts
    clear (§1.5 step 4) but skill code sets.
-3. Target lead (§3 step 4) uses x87 floating point (no draw; open
-   question 4).
+3. Target lead (§3 step 4) uses x87 floating point, but its lead byte
+   is never set in 1.14d, so it adds 0 (§3, after the steps).
 
 ## Edge cases & original bugs
 
@@ -877,20 +967,19 @@ Real (recordings; message side):
    15, 16) and `0x00679B30` (direction offset): specify with the AI and
    skill specs (Ghidra on `0x0067AD00`, `0x0067A000`, `0x0067C2D0`).
    The missile types 4, 10, 14 are answered in §11.
-4. Target lead (`0x00679190`, `0x00679250` with path +0x68 ≠ 0): x87
-   sine/cosine (`0x0040B330`, `0x0040B350`) on (8·direction − 256·lead)
-   & 0x1FF; who sets +0x68 (monster AI?) and the exact rounding. Settle:
-   Ghidra on `0x00679190`, `0x0040B330`; d2rs needs a bit-exact
-   replacement (hard rule 6).
-5. Server-side facing turn (D2MOO `D2Common_10193`, turning +0x64 toward
-   +0x65 by +0x66): which server code calls it and whether facing feeds
-   any message or outcome. Settle: xref the 1.14d equivalent.
+4. *Answered:* target lead (`0x00679190`, `0x00679250`): table sine,
+   truncation, and +0x68 has no reachable writer, so the lead is 0
+   (§3, after the steps).
+5. *Answered:* the facing turn `0x00648640` runs only in the client
+   (§8.5); the server direction changes by snap only. What each server
+   reader of +0x64 does with it is its owner's (§8.5 list).
 6. Answered: the status messages 0x95 / 0x96 / 0x18 (`0x00548760`) are
    owned by `combat/vitals.md` §5 (§10 rule 5).
 7. Monster movement messages 0x67 / 0x68 and the unit-update pass
    (`0x00598220`, `0x00571600`, `0x00571F90`): the unit-update spec.
-8. `0x00649120` (monster re-path budget) and `0x00649140`: read only in
-   §9.10; confirm with the AI spec.
+8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
+   re-path budget at path +0x94 (not the distance budget +0x90); set to
+   20 by `0x005A7C20` (§9.10).
 9. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
    rounds cos · r to float32 before the truncation). Settle: a recording
    of a Blessed Hammer missile's per-tick positions, or a debugger read

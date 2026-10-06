@@ -32,23 +32,23 @@
 | Outputs / state changes | 78–83 |
 | Rules | 84–85 |
 |   1. Coordinates | 86–99 |
-|   2. Path records | 100–202 |
-|   3. Size, collision pattern, footprint mask | 203–239 |
-|   4. Collision queries | 240–276 |
-|   5. Footprints | 277–325 |
-|   6. Moving a footprint | 326–358 |
-|   7. Nearest free point (`0x0064DEA0`) | 359–423 |
-|   8. Coarse free-box search (`0x0064E840`) | 424–456 |
-|   9. Floor drop placement (`0x00555DA0`) | 457–475 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 476–510 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 511–552 |
-|   12. Warp tiles and warp arrival | 553–606 |
-| Constants & data dependencies | 607–625 |
-| Randomness | 626–635 |
-| Edge cases & original bugs | 636–662 |
-| Test vectors | 663–699 |
-| Provenance | 700–728 |
-| Open questions | 729–783 |
+|   2. Path records | 100–203 |
+|   3. Size, collision pattern, footprint mask | 204–244 |
+|   4. Collision queries | 245–325 |
+|   5. Footprints | 326–378 |
+|   6. Moving a footprint | 379–411 |
+|   7. Nearest free point (`0x0064DEA0`) | 412–476 |
+|   8. Coarse free-box search (`0x0064E840`) | 477–509 |
+|   9. Floor drop placement (`0x00555DA0`) | 510–528 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 529–578 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 579–620 |
+|   12. Warp tiles and warp arrival | 621–679 |
+| Constants & data dependencies | 680–698 |
+| Randomness | 699–708 |
+| Edge cases & original bugs | 709–735 |
+| Test vectors | 736–772 |
+| Provenance | 773–801 |
+| Open questions | 802–859 |
 <!-- /index -->
 
 ## Summary
@@ -153,6 +153,7 @@ names; every offset read in the 1.14d functions named):
 | +0x72, +0x76 | velocity vector x, y (i32, 16.16 per tick) | pathing §8 |
 | +0x7C, +0x80, +0x84, +0x88, +0x8C | velocity, saved velocity, max velocity, acceleration, acceleration counter | pathing §7 |
 | +0x90, +0x91, +0x92, +0x93 | distance budget, max path distance, IDA* start score, stop distance (u8) | pathing |
+| +0x94 | monster re-path budget (u8) | pathing §9.10 |
 | +0x98 | direction offset of the path type | pathing §2 |
 | +0x9C | points: 78 × {u16 x, u16 y} | pathing |
 | +0x1D4, +0x1D8 | saved-step count, 10 × {u16 x, u16 y} | §6, pathing §9 |
@@ -230,7 +231,11 @@ clear gets 1 → 3 and 2 → 4.
 
 Size-based shapes (missiles, items, tiles, and the size queries of §4):
 0 or 1 → the cell; 2 → plus; 3 → 3×3 box; objects use a sizeX × sizeY
-box (§4 rule 4).
+box (§4 rule 4). The size query `0x0064D9B0` reads exactly these cells
+(jump table `0x0064DA2C`: sizes 0 and 1 the point read `0x0064D450`, 2
+the plus `0x0064D100`, 3 the 3×3 box `0x0064D4A0`); the size stamp and
+clear (§5.1) differ only at size 0, which they skip. A size above 1
+never reduces to the single cell.
 
 Collision bits: `drlg/rooms.md` §10.6. Masks used here: 0x1C09 player
 move / placement (WALL, NOPLAYER, OBJECT, DOOR, NO_PATH); 0x3C01 monster
@@ -258,12 +263,20 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
    The box is clipped at that room's right and top edges into up to three
    boxes (the inside one, the strip right of the room, the strip above
    it at the inside box's width); each outside strip is queried again
-   from that room (recursively). The inside box ORs its cells. Splitter
-   `0x0064CDF0`: the right strip spans the box's full height (input
-   bottom to input top), the top strip spans the clipped (inside) width,
-   so the top-right corner belongs to the right strip. The box queries
-   and the box set / clear (`0x0064CEB0`, `0x0064CF50`, `0x0064CFF0`,
-   `0x0064D060`) all split this way.
+   from that room (recursively). The inside box ORs its cells.
+   Split (`0x0064CDF0`; boxes are inclusive {left, bottom, right, top};
+   R, T = the room's sub-tile right and top edge, exclusive):
+   - bottom > top or left > right, or the room has no collision record
+     (`0x0061A010` null; R, T come from it, `drlg/rooms.md` §10) → no
+     boxes → the query returns 0x27;
+   - box 1 := the box; if right ≥ R: box 1 right := R − 1 and the
+     right strip := {R, bottom, right, top} (**full height**, so the
+     corner beyond both edges belongs to it);
+   - if top ≥ T: box 1 top := T − 1 and the top strip := {box 1 left,
+     T, box 1 right (already clipped), top};
+   - order: box 1, right strip, top strip. Box 1 is read by
+     `0x0064CC30`; each strip by `0x0064CEB0` again with the room found
+     for (left, bottom) as the lookup start; results are ORed.
 5. Query functions (room, x, y, size or pattern, mask):
 
 | Function | Shape argument | Result |
@@ -273,6 +286,42 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
 | `0x0064D870` | pattern 0 point; 1, 3, 5 plus; 2, 4 box; other 0xFFFF | OR of masked values |
 | `0x0064D910` | pattern as above, other → 1 | 1 if any cell collides, else 0 |
 | `0x0064DE30` / `0x0064DC00` | sizeX × sizeY box | set / clear bits |
+
+6. **Unit at a point** (`0x00641CB0(room, x, y, accept, arg, r)`, D2MOO
+   `D2Common_10407`; callers: missile collision `0x005AE3A4` with r =
+   the missile's size, `missiles/missiles.md` §R4 rule 9; `0x00467729`
+   with r = 1; `0x00663E75` with r from its caller; `0x004F10A8`,
+   `0x004D32EB`). Returns the
+   first accepted unit or null:
+   1. Room null, or r outside 1..3 → null.
+   2. Rooms: the room's adjacency array (`drlg/rooms.md` §6: contains
+      the room itself) from index 0 to count − 1 (`0x00619790` reads
+      room +0x00 and +0x24). Each room passes a near-rect test
+      (`0x00641930`, margin 2 against the sub-tile rect at room +0x4C)
+      that, as written, never rejects a room with non-negative width
+      and height (it rejects only when x + 2 < left **and** x − 2 >
+      right, or the same for y): every adjacent room is searched. A
+      room without a unit list head (+0x74) is skipped.
+   3. Units: the room unit list from its head (+0x74) along unit +0xE8
+      (`sim/unit-order.md` §5 order). Skipped: type 0 (player) in mode
+      0 or 17; type 1 (monster) in mode 0 or 12; types 2 (object), 4
+      (item) and any type above 4. Missiles (type 3) are candidates,
+      the searching missile included (the callback filters).
+   4. Unit size s := §3 size (`0x00620510`); s ≤ 0 → skipped; s > 3 →
+      3. Unit point (ux, uy) := the dynamic path's sub-tile position
+      (path +0x2C null → (0, 0)).
+   5. Hit test, d = (|x − ux|, |y − uy|): the query shape of size r
+      (1 point, 2 plus, 3 3×3 box) overlaps the unit's shape of size s:
+
+      | r \ s | 1 | 2 | 3 |
+      |---|---|---|---|
+      | 1 | d = (0, 0) | dx + dy ≤ 1 | dx ≤ 1 and dy ≤ 1 |
+      | 2 | dx + dy ≤ 1 | dx + dy ≤ 2 | (dx ≤ 2 and dy ≤ 1) or (dx ≤ 1 and dy ≤ 2) |
+      | 3 | dx ≤ 1 and dy ≤ 1 | (dx ≤ 2 and dy ≤ 1) or (dx ≤ 1 and dy ≤ 2) | dx ≤ 2 and dy ≤ 2 |
+
+      (jump table `0x00641EF8`, index s − 1 + 3(r − 1)).
+   6. On a hit, `accept(unit, arg)` (fastcall); non-zero → return the
+      unit. Otherwise continue with the next unit, then the next room.
 
 ### 5. Footprints
 
@@ -289,7 +338,11 @@ point), and patterns above 5 do nothing. Pattern stamp
 apply the §3 cells with the mask, then, **only when the mask is not 0**,
 the marker (set: OR the marker; clear: AND it out). Clear with a null
 room does nothing. Size stamp `0x0064EA00` / clear `0x0064EBA0`: size 1
-cell, 2 plus, 3 box, others nothing (no marker).
+cell, 2 plus, 3 box, others nothing (no marker). The clear tests the
+room first (null → nothing) and dispatches through `0x0064EBFC`
+(size 0 → return; 1 → `0x0064DB70` one cell; 2 → `0x0064DA40` plus;
+3 → `0x0064DBC0` 3×3 box); the stamp tests the size by subtraction
+(1, 2, 3; anything else returns).
 
 #### 5.2 Per unit kind
 
@@ -490,14 +543,29 @@ query is a single cell against 0x3E01.
 6. Player: client of the player (`0x005531C0`); S→C 0x07 (MapReveal:
    tile x, tile y of the destination room, its level id; builder
    `0x0053BC50`); queue for update; flags 2 as in rule 5; room-change
-   messages; player data +0x148 / +0x14C := x, y; host-only position
-   history (rule 7); timer event 14 at frame + 50 with callback
+   messages; player data +0x148 / +0x14C := x, y; position history
+   (rule 7); timer event 14 at frame + 50 with callback
    `0x00554570` (`sim/units.md` §6); pets follow (`0x005754B0`, the
    pet/mercenary spec); result 1.
-7. Position history (player data +0xA0 index u8, +0xA4 `GetTickCount`,
-   +0xA8 + 8·i: 20 × {x, y}): written here and in the walk step
-   (`sim/pathing.md` §9.2) from wall-clock time; nothing in the
-   simulation reads it (open question 4). d2rs keeps it out of `d2-sim`.
+7. Position history (player data +0xA0 next index u8, +0xA4 time of the
+   last write (`GetTickCount`), +0xA8 + 8·i: 20 × {u32 x, u32 y}, a
+   ring; `0x006221A0` gives the player data):
+   - here (`0x00554FD0`): entry[index] := (x, y) unconditionally, +0xA4
+     := now, index := index + 1, 20 → 0;
+   - walk step (`0x00580C20`, `sim/pathing.md` §9.2, after the step):
+     only when now > +0xA4 + 25 ms (unsigned); with p := index − 1 (0
+     → 19), when the squared distance (`0x006492A0`: dx² + dy²) from
+     the player's sub-tile position to entry[p] is > 45: entry[index]
+     := position, index + 1 (20 → 0), +0xA4 := now.
+   **It is read by the simulation**: monster AI helpers `0x005E3930`
+   and `0x005E3EA0` (called from many AI functions) walk the target
+   player's ring backwards from the newest entry to pick a past
+   position as a move target (owner: `monsters/ai.md`). So the ring
+   belongs in `d2-sim`. The only wall-clock input is the 25 ms gate of
+   the walk-step write; the walk step runs at most once per player per
+   tick and ticks are 40 ms apart at normal speed, so d2rs reads the
+   gate as always open (deviation only when the original server
+   catches up several ticks within 25 ms; not recorded).
 
 The unit's +0xC8 flags drive S→C 0x15 in the update pass
 (`sim/pathing.md` §10.3). Callers: level warp `0x0053AEC0` (§11), warp
@@ -570,12 +638,28 @@ value v, DRLG room R:
 #### 12.2 Walking into a warp (`0x005550B0(game, player, tile)`, D2MOO `SUNIT_WarpPlayer`)
 
 1. Game or player null → fatal. Destination tile and its lvlwarp record:
-   `0x006195A0(room of the tile, tile class)` (rule 7); none → nothing.
+   `0x006195A0(room of the tile, tile class)`; none → nothing.
+   `0x006195A0(room, class, &record)` (room null → fatal):
+   1. Via `0x0066AB00` on the room's DRLG room S: in S's warp-link list
+      (+0x4C, list order, next +4; `drlg/rooms.md` §3 rule 3 prepends)
+      the first link whose lvlwarp record (+0x10) has `Id` = class
+      gives the destination DRLG room D (link +0x00); in D's warp-link
+      list the first link whose room is S gives the destination record
+      R. Either not found → fatal assert (line 0x71). So with several
+      warps in one room the tile class picks the link, and the
+      destination is always D's link back to S.
+   2. record := R (so rule 5's `ExitWalkX/Y` are the destination
+      side's record); D's active room (+0x30), activated by
+      `0x0061B730` when D has none.
+   3. Result: the first unit of type 5 (tile) with class = R's `Id` in
+      that active room's unit list (head +0x74, next +0xE8); none →
+      null.
 2. Point := the destination tile's position; free point (§7,
    `0x0064E7B0`, player size, 0x1C09, **fallback 1**) from the
    destination tile's room; none → nothing.
 3. Quest gate: destination level 73, 100, 118, 128 or 132 and
-   `0x00545B80(source level, destination level)` ≠ 0 → nothing.
+   `0x00545B80(source level, destination level)` ≠ 0 → nothing
+   (the checks: `world/quests.md` §8.2).
 4. `0x00554EA0(destination tile room, x, y, exact 0, alt 0)`; failure →
    nothing.
 5. Walk-out: target := (x + `ExitWalkX`, y + `ExitWalkY`) (lvlwarp
@@ -583,17 +667,6 @@ value v, DRLG room R:
    (`0x005809D0(no skill, 2, target, 0)`, `sim/pathing.md` §1).
 6. S→C 0x0D (`0x0053B4B0`): unit type, GUID, 1, target x, target y, 0,
    life percent (`0x00621F20`).
-7. Destination (`0x006195A0(room, class, &record)` → `0x0066AB00`): in
-   the DRLG room of `room`, walk its warp links (`drlg/rooms.md` §3.3,
-   room +0x4C) to the first whose lvlwarp record's `Id` equals `class`.
-   Its destination DRLG room D: walk D's links to the first whose
-   destination is the source room (the link back). Either walk failing
-   is a **fatal assert** in `0x006195A0`. Out class := that back link's record `Id`, record := that
-   record (so rule 5's `ExitWalkX/Y` are the **destination side's**);
-   D's active room is created if missing (`0x0061B730`). Then the first
-   unit of D's active-room unit list (room +0x74, next unit +0xE8) of
-   type 5 (tile) with that class is the destination tile; none → result
-   none (rule 1: nothing).
 
 Rule 5 uses the point of rule 2, not the point `0x00554EA0` may have
 moved the player to (the two are equal unless rule 4's search moves it).
@@ -628,8 +701,8 @@ lvlwarp `Id`, `ExitWalkX/Y`, `OffsetX/Y`, `Direction`.
 No function of this spec draws. Draws on the paths that use it belong
 to their owners: the spawn tile pick of `drlg/levels.md` §10 (level
 seed), the mode request of `sim/pathing.md` §1.3 (unit seed, state 42),
-the 0x5F handler `0x0054CC40` (`roll(100)` on the player's seed for its
-state-108 timer; owner: the C→S 0x5F spec, open question 6). Ring order
+the 0x5F handler `0x0054CC40` (`lo' % 100` on the player's seed for
+its state-108 lock; owner: `sim/pathing.md` §1.6). Ring order
 (§7.2) and the scan order (§8) are deterministic and must be followed
 exactly: they decide which free cell wins.
 
@@ -752,16 +825,19 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
      vectors). Compare per frame and unit: every field equal.
    The alternative (0xAC / 0x9C position bytes in `server-messages.tsv`)
    sees only spawn points, not paths.
-2. Answered: §4 rule 4 (`0x0064CDF0` read: the top strip has the
-   clipped width, the right strip the full height).
-3. Answered: `0x006195A0` is §12.2 rule 7.
-4. Player position history (§10 rule 7): which code reads player data
-   +0xA0..+0x14C (anti-cheat, C→S 0x5F?). Settle: xref the readers.
-5. Answered: `0x00545B80` is specified in `world/quests.md` §8.2
-   (levels 73, 100, 118 and 128 from 120, 132).
-6. C→S 0x5F handler `0x0054CD50` → `0x0054CC40`: the state-108 timer and
-   its `roll(100)` table `0x006E1064` are not specified (owner: a client
-   resync spec). Settle: Ghidra `0x0054CD50`; record a 0x5F.
+2. *Answered:* §4 rule 4 sub-box recursion (`0x0064CDF0`): the top
+   strip uses the inside box's clipped width; the right strip takes the
+   corner.
+3. *Answered:* `0x006195A0` (destination warp tile and lvlwarp record)
+   is §12.2 rule 1.
+4. *Answered:* the position history (§10 rule 7) is read by the AI
+   helpers `0x005E3930` / `0x005E3EA0`, not by the 0x5F handler.
+   Their use of it is `monsters/ai.md`'s to specify.
+5. *Answered:* `0x00545B80` quest warp gate (§12.2 rule 3): its
+   checks per destination level are `world/quests.md` §8.2.
+6. *Answered:* C→S 0x5F handler `0x0054CD50` → `0x0054CC40`, its
+   state-108 lock and table `0x006E1064`: `sim/pathing.md` §1.6 (a
+   recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
    mercenary spec.
 
@@ -777,6 +853,6 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
 - PP1: §7.3 rule 3 (the candidate's room). PP2, PP3: §8 rule 3 (masked;
   half-open). PP4: §11 (unit size; game entry asserts, level warp does
   nothing). PP5: §11 "Recipients". PP6: §12.2 (rule 2's point). PP7:
-  §12.2 rule 7, `world/quests.md` §8.2; §10 rule 7 stays host-only.
+  §12.2 rule 1, `world/quests.md` §8.2; §10 rule 7 stays host-only.
 - CR1, CR2: open question 1 (recording design). CR3: `combat/vitals.md`
   §5.

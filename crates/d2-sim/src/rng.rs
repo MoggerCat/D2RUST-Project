@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(time_value(12345), 185_352_726);
     }
 
-    // Covers: specs/sim/rng.md §4 text, §4 r1, §5 text
+    // Covers: specs/sim/rng.md §4 text, §4 r1, §5 text, §5.4 row1, §5.4 row2
     #[test]
     fn setters_and_derive() {
         let mut s = Seed::new(5, 6);

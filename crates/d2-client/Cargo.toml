@@ -45,8 +45,9 @@ wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12
 [dev-dependencies]
 criterion.workspace = true
 proptest.workspace = true
-# The local-server end-to-end test builds a wired sim from synthetic tables.
-d2-sim.workspace = true
+# The local-server end-to-end test builds a wired sim from synthetic tables
+# (its combat / missile tables are the shared `bench_fixtures::combat`).
+d2-sim = { workspace = true, features = ["bench-fixtures"] }
 d2-data.workspace = true
 
 [lints]

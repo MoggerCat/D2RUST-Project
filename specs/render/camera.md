@@ -1,8 +1,9 @@
 # Spec: Render — Camera (world position → screen draw position)
 
-- **Status:** draft (2026-10-06, RE on 1.14d `Game.exe`; no capture yet).
-  Every rule names its 1.14d address; unverified until the capture cases
-  of §Test vectors run.
+- **Status:** draft (2026-10-06, RE on 1.14d `Game.exe`). §1–§3 match
+  every frame of the first two 1.14d capture runs (15,934 frames, open
+  modes 0–3, no shake; `capture.md` Test vectors); the pixel cases of §Test
+  vectors have not run.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::world_view` (`ViewRules::tiles`,
   `unit_params`, `place`), `d2-client::composite` (`UnitParams.clip`)
@@ -15,26 +16,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–50 |
-| Inputs | 51–61 |
-| Outputs / state changes | 62–67 |
-| Rules | 68–69 |
-|   1. Frame size and play area | 70–91 |
-|   2. World coordinates → client pixels | 92–116 |
-|   3. Camera origins (once per drawn frame) | 117–132 |
-|   4. Units | 133–151 |
-|   5. Panel shift for floors | 152–157 |
-|   6. Tiles | 158–178 |
-|   7. View culling | 179–189 |
-|   8. Screen shake | 190–211 |
-|   9. Time base: no interpolation | 212–227 |
-|   10. What d2rs hooks get | 228–236 |
-| Constants & data dependencies | 237–243 |
-| Randomness | 244–249 |
-| Edge cases & original bugs | 250–259 |
-| Test vectors | 260–276 |
-| Provenance | 277–291 |
-| Open questions | 292–313 |
+| Summary | 41–51 |
+| Inputs | 52–62 |
+| Outputs / state changes | 63–68 |
+| Rules | 69–70 |
+|   1. Frame size and play area | 71–92 |
+|   2. World coordinates → client pixels | 93–117 |
+|   3. Camera origins (once per drawn frame) | 118–133 |
+|   4. Units | 134–152 |
+|   5. Panel shift for floors | 153–158 |
+|   6. Tiles | 159–182 |
+|   7. View culling | 183–212 |
+|   8. Screen shake | 213–244 |
+|   9. Time base: no interpolation | 245–260 |
+|   10. What d2rs hooks get | 261–269 |
+| Constants & data dependencies | 270–276 |
+| Randomness | 277–282 |
+| Edge cases & original bugs | 283–292 |
+| Test vectors | 293–314 |
+| Provenance | 315–333 |
+| Open questions | 334–364 |
 <!-- /index -->
 
 ## Summary
@@ -161,10 +162,13 @@ With `left` from §1 and `top = 0`, tile cell `(tx, ty)` is drawn at:
 
 | Tile list | Caller → drawer | (X, Y) handed to the drawer | block pixel `(bx, by)` lands at |
 |---|---|---|---|
-| floors | `0x004DE730` → `0x004DE410` → `DrawGroundTile 0x004F68E0` | `(sx − cx_t, sy − cy_t)` | `(sx − 80 + bx − cx_t + left, sy + by − cy_t)` |
-| walls (wall-layer list) | `0x004DF1C0` → `DrawWallTile 0x004F6920` / translucent `0x004F6950` | `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | `(sx − 80 + bx − cx_t + left, sy + 80 + by − cy_t)` |
-| roofs (fading list) | `0x004DEA70` → `DrawGroundTile` | `(sx − cx_t, sy − roof_height − cy_t)` | `(sx − 80 + bx − cx_t + left, sy − roof_height + by − cy_t)` |
+| floors | `0x004DE730` → `0x004DE410` → `DrawGroundTile 0x004F68E0` (driver slot `+0x7C`: floor drawer, DirectDraw `0x005132C0`, GDI `0x006C95D0`) | `(sx − cx_t, sy − cy_t)` | `(sx − 80 + bx − cx_t + left, sy + by − cy_t)` |
+| walls (wall-layer list) | `0x004DF1C0` → `DrawWallTile 0x004F6920` (slot `+0x9C`: wall drawer, DirectDraw `0x005131B0`, GDI `0x006C94B0`) / translucent `0x004F6950` (slot `+0xA0`, DirectDraw `0x005130A0`, GDI `0x006C93A0`) | `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | `(sx − 80 + bx − cx_t + left, sy + 80 + by − cy_t)` |
+| roofs (fading list) | `0x004DEA70` → `DrawGroundTile 0x004F68E0` (the floor drawer, as floors) | `(sx − cx_t, sy − roof_height − cy_t)` | `(sx − 80 + bx − cx_t + left, sy − roof_height + by − cy_t)` |
 
+Roofs go through the floor drawer (`0x004DEA70` calls `0x004F68E0`
+only), so they take its −80 and panel shift (§5) and its whole-tile
+culling (§7), not the wall drawer's per-block culling.
 `roof_height` is the DT1 tile header field at `0x04` (read at `0x004DEBA6`). Which
 orientations are in which list, the order, shadows and the fade alpha are
 `draw-order.md` / `blend-modes.md`. The floor/wall alignment equals
@@ -182,10 +186,29 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   the view clip rectangle `view +0x14..+0x20` = `[−80, W + 80) ×
   [−80, H − 47)` (`0x00476000` sets it; `0x004DE410`, `0x004DEA70` test
   it). Perspective mode only (not the software renderer) widens it.
-- Wall blocks: skipped when the block's screen x is outside `[−32, W)` in
-  modes 0/3, `[−32, W − W / 2)` in mode 1, `[W / 2 − 32, W)` in mode 2, or
-  its y outside `[−32, H + 32)` (`0x005131D3`–`0x0051324B`).
-- Units: Open question 2.
+- Wall blocks (wall drawers only, lit `0x005131B0` and translucent
+  `0x005130A0` alike): skipped when the block's screen x is
+  outside `[−32, W)` in modes 0/3, `[−32, W − W / 2)` in mode 1,
+  `[W / 2 − 32, W)` in mode 2, or its y outside `[−32, H + 32)`
+  (`0x005131D3`–`0x0051324B`; the block's screen position is the X, Y
+  handed plus the block's `(x, y)`). The test is per block: a kept block
+  is drawn whole even where it reaches past the bound (up to 31 pixels).
+  It equals one clip of the assembled tile image to the union of the kept
+  blocks only when no culled block overlaps a kept one; with 32-wide
+  blocks whose x lies on a 32 grid of the tile that always holds (count
+  of live wall blocks: Open question 7). In modes 0/3 a culled block has
+  no pixel in the frame, so culling changes no pixel there.
+- Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
+  unit only (a) by the unit flags and states it checks (owner
+  `draw-order.md`), (b) in perspective mode (not GDI) by `0x004F66E0`, and
+  (c) when the visibility test `0x004DC710` fails: other players (not the
+  local one) alive, monsters alive (mode ≠ 0, 12), missiles and items
+  are hidden when `0x00622AA0(local player, unit, 2)` is non-zero, unless
+  the player's level has `0x00642840` = 0 (that test is skipped); objects
+  and dead units always pass. Unit tiles (type 5) are never drawn
+  (`0x00471EC0`). Pixels outside the frame are cut by the cel clip
+  (`sprite-placement.md` §5), whose pre-test only rejects cels with no
+  visible pixel.
 
 ### 8. Screen shake
 
@@ -194,12 +217,20 @@ Started by `0x00476A80` (peak `A` in ECX, attack `t1` ms in EDX, sustain
 `t2 = 0`). Each drawn frame (`0x00476D40`), with `t = now − start` (ms,
 wall clock):
 
-| t | amplitude a |
+| `t` | amplitude a |
 |---|---|
 | `t > t1 + t2 + t3` | 0; shake ends (`0x007B9534 = 0`, offsets 0) |
-| `t < t1` | `A × t / t1` (unsigned, floor) |
+| `t < t1` | `(A × t mod 2^32) / t1` |
 | `t1 ≤ t < t1 + t2` | `A` |
-| otherwise | `A × (t1 + t2 + t3 − t) / t3` |
+| otherwise | `(A × (t1 + t2 + t3 − t) mod 2^32) / t3` |
+
+All values are unsigned 32-bit (comparisons unsigned, `t` a
+`GetTickCount` difference); the product keeps its low 32 bits (`imul`) and
+the division is unsigned. A zero divisor is never reached: the attack row
+cannot apply with `t1 = 0`, and with `t3 = 0` the release row (only `t =
+t1 + t2`) gives `a = 0` for that frame (`0x00476D9D`, `0x00476DBE`). When
+`a = 0` and the shake has not ended, no random draw is made, the origins
+get no offset, and `0x007B9538` / `0x007B8D20` keep their last values.
 
 If `a ≠ 0`: `dx = −a + rnd(2a)`, then `dy = −a + rnd(2a)` (two draws of the
 seeded RNG helper `0x00472280` on the local player unit's seed,
@@ -207,7 +238,9 @@ seeded RNG helper `0x00472280` on the local player unit's seed,
 `0x007B8D20`, added to the tile origin and, through `0x00476AC0`, to the
 unit origin. `0x004769D0(a)` also drives a rumble sound (audio specs).
 Callers of `0x00476A80` (skills/missiles) and their parameters belong to
-their effect specs.
+their effect specs. The same seed is stepped by the mouse cursor in its
+idle state and by the weather in the same frame (`capture.md` §3.3,
+Randomness).
 
 ### 9. Time base: no interpolation
 
@@ -272,6 +305,11 @@ not touch server RNG.
 | 640 × 480, mode 0, player `(0, 0)` | `cx_t = −320`, `cy_t = −220`, player at (320, 232) | §1, §3 |
 | floor handed (X, Y) = (−81, 0) | culled; (−80, 0) drawn; Y = 553 at H = 600 culled | §7 |
 | shake A = 10, t1 = 100, t2 = 200, t3 = 100, t = 50 | a = 5, offsets in [−5, 4] | §8 |
+| shake A = 10, t1 = 100, t2 = 200, t3 = 0, t = 300 | a = 0: no draw, origins unchanged, shake not ended | §8 |
+| shake A = 10, t1 = 100, t2 = 200, t3 = 0, t = 301 | ended: `0x007B9534 = 0`, offsets 0 | §8 |
+| shake A = 0x10000, t1 = 0x20000, t2 = 1, t3 = 1, t = 0x10000 (attack) | product 2^32 keeps 0 → a = 0 | §8 |
+| mode 1, W = 800: wall blocks at screen x 399 and 400 | 399 drawn (pixels 399–430), 400 skipped | §7 |
+| 1.14d captures (`capture.md`): recorded path client `(px, py)` vs §2 from the fixed position; tile / unit origin, view rect and `shiftX` vs §1, §3 | equal on 15,934 of 15,934 frames | `frames-raw-1` runs 1, 2 |
 | capture case `camera-0001`: walk 5 s in a cleared area, every frame captured with state (`capture.md`) | per frame, CPU reference from the recorded positions equals the capture; recorded origins equal §3 | capture, queued |
 
 ## Provenance
@@ -287,7 +325,11 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
 (`refs/1.14d-notes`): `ScreenOpenMode`, `GeneralPlayAreaCameraShiftX`,
 `GeneralDisplayWidth/Height`, `ResolutionMode`. D2MOO (1.10f)
 `D2DynamicPathStrc` field names and `DUNGEON_*Coords` were hints; the
-1.14d shifts differ as noted (§2). No capture yet.
+1.14d shifts differ as noted (§2). Driver slots read from the wrappers
+`0x004F68E0` (`+0x7C`), `0x004F6920` (`+0x9C`), `0x004F6950` (`+0xA0`) and
+the driver tables `0x0072F6D0` / `0x0074C4A8`; unit visibility
+`0x004DC710`, `0x004DC7B0`; shake arithmetic `0x00476D40`. §1–§3 confirmed
+by the `frames-raw-1` capture runs (`capture.md` Test vectors).
 
 ## Open questions
 
@@ -295,9 +337,9 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
    (§6); `map-preview.md` places roofs at `sy + 80 − roof_height`. Which
    y range do live roof (orientation 15) blocks use? A game-file read of
    roof block y's plus a capture under a roof settles it.
-2. Unit culling: which test skips units outside the view (the unit draw
-   path `0x004DC7B0`/`0x00471EC0` beyond the cel pre-test)? A Ghidra read
-   of `0x004DC710` and of `0x00471EC0` past `0x004720F6`.
+2. ~~Unit culling~~: answered in §7 (no view test; visibility test
+   `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
+   `0x00642840` test (line of sight vs room; owner `draw-order.md`).
 3. The extra unit offsets of `0x004DA0B0`/`0x004DA0D0`/`0x004DA0F0`
    (record of `0x0046F060`, fields `+0x34/+0x38/+0x3C`) and the missile
    offsets (`0x0046ACE0` record `+0xA2/+0xA4/+0xA6`): what they are and
@@ -310,3 +352,12 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
    tick plus the client's own path step.
 6. How the client's copy of the player unit seed (`unit +0x20`) is
    initialised, so d2rs can reproduce shake offsets without recordings.
+   The cursor (state 1, wall clock) and the weather step the same seed
+   each frame (`capture.md` §3.3), so shake offsets also depend on them;
+   captures record the seed at frame start and end.
+7. Wall blocks: is every live wall block 32 pixels wide with an x on a 32
+   grid of its tile (§7 clip equivalence)? Game-file count with the C52
+   DT1 counts.
+8. Draws with no server tick between them (118 frames of run 1 while not
+   paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
+   not draw"; the `frames-raw-2` client-update counter settles it.

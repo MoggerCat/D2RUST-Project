@@ -171,7 +171,7 @@ pub fn dispatch<H: UnitHooks>(
         TimerClass::Item => {
             match ev {
                 event::STAT_REGEN => hooks.item_replenish(sim, unit),
-                event::REMOVE_STATE => remove_state(sim, hooks, unit),
+                event::REMOVE_STATE => remove_state(sim, hooks, unit)?,
                 // 0x0055F120 returns at once.
                 _ => {}
             }
@@ -208,7 +208,7 @@ fn player<H: UnitHooks>(
                 0,
             )?;
         }
-        event::REMOVE_STATE => remove_state(sim, hooks, unit),
+        event::REMOVE_STATE => remove_state(sim, hooks, unit)?,
         event::UPDATE_TRADE => hooks.update_trade(sim, unit, a1, a2),
         _ => {}
     }
@@ -234,7 +234,7 @@ fn monster<H: UnitHooks>(
         event::PERIODIC_SKILLS => hooks.periodic_skills(sim, unit, a1, a2),
         event::PERIODIC_STATS => periodic_stats(sim, hooks, unit, a1, a2),
         event::AI_RESET => hooks.ai_reset(sim, unit, a1, a2),
-        event::REMOVE_STATE => remove_state(sim, hooks, unit),
+        event::REMOVE_STATE => remove_state(sim, hooks, unit)?,
         _ => {}
     }
     Ok(())
@@ -242,9 +242,14 @@ fn monster<H: UnitHooks>(
 
 /// Event 12 (`0x00580800`, `0x005A7EF0`, `0x0055F130`): `0x00627460`(unit,
 /// frame), `stat-lists.md` §10.4.
-fn remove_state<H: UnitHooks>(sim: &mut Sim<'_>, hooks: &mut H, unit: UnitId) {
+fn remove_state<H: UnitHooks>(
+    sim: &mut Sim<'_>,
+    hooks: &mut H,
+    unit: UnitId,
+) -> Result<(), UnitError> {
     let f = sim.game.frame;
-    sim.stats.expire_lists(hooks, unit, f);
+    sim.stats.expire_lists(hooks, unit, f)?;
+    Ok(())
 }
 
 /// Event 6 (`0x00580B70`, `0x005A7F00`, units.md §6.1).
