@@ -674,3 +674,203 @@ fn one_logical_frame_of_800_by_600() {
         Err(FrameError::TooSmall { w: 640, h: 480 })
     );
 }
+
+// --- Text (§A3) --------------------------------------------------------------
+
+mod text {
+    use std::cell::RefCell;
+
+    use d2_formats::font::{FontTable, Glyph};
+
+    use super::super::text::*;
+    use super::*;
+
+    fn glyph(code: u16, width: u8, frame: u8) -> Glyph {
+        Glyph {
+            code,
+            unknown1: 0,
+            width,
+            height: 10,
+            unknown2: 1,
+            unknown3: 0,
+            frame,
+            unknown4: 0,
+            unknown5: 0,
+        }
+    }
+
+    /// Records are deliberately not in code order: lookup goes by the
+    /// `code` field, not by index.
+    fn font() -> FontTable {
+        FontTable {
+            version: 1,
+            unknown: [0; 4],
+            height: 10,
+            width: 8,
+            glyphs: vec![glyph(0x42, 7, 9), glyph(0x41, 5, 3), glyph(0x00ff, 4, 200)],
+        }
+    }
+
+    /// Test-only rules (not the original's): one glyph per code unit,
+    /// advancing by the record's `width`; records the text it was given.
+    #[derive(Default)]
+    struct Advance {
+        seen: RefCell<Vec<Vec<u16>>>,
+    }
+
+    impl TextRules for Advance {
+        fn place(
+            &self,
+            glyphs: &GlyphLookup<'_>,
+            text: &[u16],
+            origin: Point,
+            style: TextStyle,
+            _: &TextOpts,
+        ) -> Result<Vec<GlyphPlacement>, TextError> {
+            self.seen.borrow_mut().push(text.to_vec());
+            let mut x = origin.x;
+            text.iter()
+                .map(|&code| {
+                    let at = Point::new(x, origin.y);
+                    x += i32::from(glyphs.font().glyphs[glyphs.record(code)?].width);
+                    Ok(GlyphPlacement {
+                        code,
+                        at,
+                        color: style.color,
+                    })
+                })
+                .collect()
+        }
+    }
+
+    // Covers: specs/client/ui.md §a3-text
+    #[test]
+    fn glyphs_resolve_code_to_record_to_frame() {
+        let style = TextStyle { font: 1, color: 4 };
+        let out = layout_text(
+            &font(),
+            &[0x41, 0x42, 0x41],
+            Point::new(10, 20),
+            style,
+            &TextOpts::default(),
+            &Advance::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            out,
+            [
+                GlyphDraw {
+                    code: 0x41,
+                    record: 1,
+                    frame: 3,
+                    at: Point::new(10, 20),
+                    color: 4
+                },
+                GlyphDraw {
+                    code: 0x42,
+                    record: 0,
+                    frame: 9,
+                    at: Point::new(15, 20),
+                    color: 4
+                },
+                GlyphDraw {
+                    code: 0x41,
+                    record: 1,
+                    frame: 3,
+                    at: Point::new(22, 20),
+                    color: 4
+                },
+            ]
+        );
+    }
+
+    // Covers: specs/client/ui.md §a3-text
+    #[test]
+    fn missing_code_is_an_error_not_a_fallback_glyph() {
+        let err = layout_text(
+            &font(),
+            &[0x41, 0x43],
+            Point::new(0, 0),
+            TextStyle::default(),
+            &TextOpts::default(),
+            &Advance::default(),
+        )
+        .unwrap_err();
+        assert_eq!(err, TextError::MissingGlyph(0x43));
+
+        // A placement naming a code the font lacks fails at resolution too.
+        struct Stray;
+        impl TextRules for Stray {
+            fn place(
+                &self,
+                _: &GlyphLookup<'_>,
+                _: &[u16],
+                origin: Point,
+                _: TextStyle,
+                _: &TextOpts,
+            ) -> Result<Vec<GlyphPlacement>, TextError> {
+                Ok(vec![GlyphPlacement {
+                    code: 0x7a,
+                    at: origin,
+                    color: 0,
+                }])
+            }
+        }
+        let err = layout_text(
+            &font(),
+            &[0x41],
+            Point::new(0, 0),
+            TextStyle::default(),
+            &TextOpts::default(),
+            &Stray,
+        )
+        .unwrap_err();
+        assert_eq!(err, TextError::MissingGlyph(0x7a));
+
+        let mut dup = font();
+        dup.glyphs.push(glyph(0x41, 1, 1));
+        assert_eq!(
+            GlyphLookup::new(&dup).record(0x41),
+            Err(TextError::AmbiguousGlyph {
+                code: 0x41,
+                count: 2
+            })
+        );
+    }
+
+    // Covers: specs/client/ui.md §a3-text
+    #[test]
+    fn text_reaches_the_rules_as_utf16_units_unchanged() {
+        // `ÿ` (0x00ff, the color-code lead) and a lone surrogate: the
+        // units are passed as given, never re-encoded.
+        let text = [0x00ff, 0x41, 0xd800];
+        let rules = Advance::default();
+        let err = layout_text(
+            &font(),
+            &text,
+            Point::new(0, 0),
+            TextStyle::default(),
+            &TextOpts::default(),
+            &rules,
+        )
+        .unwrap_err();
+        assert_eq!(*rules.seen.borrow(), [text.to_vec()]);
+        assert_eq!(err, TextError::MissingGlyph(0xd800));
+    }
+
+    // Covers: specs/client/ui.md §a3-text
+    #[test]
+    fn layout_rules_are_unspecified_until_ui_text_md() {
+        let err = layout_text(
+            &font(),
+            &[0x41],
+            Point::new(0, 0),
+            TextStyle::default(),
+            &TextOpts::default(),
+            &NoTextRules,
+        )
+        .unwrap_err();
+        assert_eq!(err, TextError::Unspecified("ui/text.md §B3"));
+        assert!(err.to_string().contains("TODO(spec: ui/text.md §B3)"));
+    }
+}

@@ -1,12 +1,18 @@
-# Handoff (updated 2026-10-06, branch `claude/local-2026-10-06` from main `edad871`: group C game-file and real-GPU run recorded in §5 Done)
+# Handoff (updated 2026-10-06, branch `claude/tender-meitner-mphas3`: `claude/docs-fold-4` (quest-host, e2e-next, determinism-lint and four gap-test notes; 45 notes folded in all) combined with the local group C and parser-robustness runs recorded in §5 Done)
 
 Start here in a fresh session, after `CLAUDE.md` and `docs/METHODS.md`.
 This file holds state, the next steps, the code and command map, and the
 local run queue. Rules and facts live in specs (`specs/README.md`); this
 file points to them rather than restating them. The detailed per-session
 records (seams, public APIs, design choices, per-site questions) stay in
-`docs/handoff/*.md`; each of the 38 notes folded here starts with a
-pointer line. No note is waiting to be folded as of this commit.
+`docs/handoff/*.md`; each of the 45 notes folded here starts with a
+pointer line. **Five earlier notes are still waiting to be folded** (no
+pointer line yet): `e2e-single-player`, `e2e-combat-path`,
+`e2e-vendor-host`, `wire-open-seams`, `p6-world-view`; their facts (the
+`TradeWorld` host, the single-player e2e, the combat path, the second
+wiring seams, the Phase 6 world view) appear here only where the seven
+new notes cite them. Read those five notes directly until a docs session
+folds them.
 
 Index (this file is long; read by section, METHODS M11): §1 State ·
 §2 Next steps · §3 Code map (Phase 0–2 crates, tick / server, Phase 3
@@ -17,7 +23,8 @@ Blocked) · §6 Environment · §7 Where facts live and open questions
 systems by owner spec incl. the second set, wiring W1–W16 / WE1–WE9 and
 the third set: server handlers SI1–SI4 / SK1–SK9, worldgen WG1–WG9,
 interaction WI1–WI10, gap-test questions GI / GC / GD / GW, integration
-J1–J6; Phase 6 by owner spec) · §8 Lessons.
+J1–J6; fourth set: J7–J8, QH1–QH2, EN1, GD8–GD11, GT1, GP1, GB1; Phase 6
+by owner spec) · §8 Lessons.
 
 ## 1. State
 
@@ -43,11 +50,11 @@ merged tree (the coordinator's gate runs it).
 | 3h World (quests, waypoints, cube, NPC, vendors) | `d2_sim::world` (quests, waypoints, cube) implemented, **unverified**; Act II–V quest callbacks and several Act I ones are `unhandled`. `world::npc` (interaction, chat, menu, heal, hire, resurrect, services, act travel) and `world::vendors` (price, store generation, gamble, buy / sell / repair) implemented, **unverified**: no recording of hire, resurrect, heal, identify or services exists | 78 new tests (134 in d2-sim); TSV checks with perturbation tests; npc 33 + 1 ignored (`live_monstats_records`; 544 in d2-sim on its branch), vendors 60 (572; every synthetic vector, the three recorded prices, the recorded Charsi store order of 43 codes, the recorded 0x32 / 0x33 bytes, `vendors.tsv` check with perturbation) |
 | 3i Skill use, vitals | `d2_sim::skills::use_` (validators and handlers, use at point / on unit, mode gate, skill start / do, delay, periodic and aura events, 0x3C select) and `d2_sim::combat::vitals` (player creation stats, 0x3A stat points, level-up, experience level factor, `add_experience` as far as creation needs) implemented, **unverified**; the per-skill bodies (`srvst` 64 and `srvdo` 152 filled slots of `table::FUNCS`) are the seam `SkillFunctions`; the kill experience gain is not implemented | 28 + 12 tests (551 pass, 3 ignored in d2-sim on its branch); every vector of `use.md` and `vitals.md`; `FUNCS` checked row by row against `functions.tsv` with perturbation |
 | 3j Wiring | `d2_sim::wiring::economy` (items, treasure, cube and quest item seams on real `Economy`, `StatLists`, `UnitRecord`) and `d2_sim::wiring::action` (`ActionSim`: the combined `EventDispatch` + `TickHooks`; combat, missile, AI, DRLG room, waypoint seams) wired, **unverified**: the adapters add no rule of their own; every seam call without a provider is `Pending` / `…Rest` with the narrowest default | economy 17 integration tests (512 pass, 3 ignored in d2-sim on its branch, game seed `0x5EED`), action 19 (514 pass, 3 ignored; `cargo test -p conformance` tick replay unchanged); neither branch's count is a merged count |
-| 3k Server intent handlers | `d2_server::adapters::handlers::{items, skills, world}`, called from `SimGame::handle` in the order items, world, skills, then the stub; **implemented, unverified** (every owner spec is a draft; no recording replayed through them). Items: C→S 0x2A and 0x4F (the cube's buttons) run `world::cube` through `wiring::economy::EconomyCube`; the other item ids (0x16–0x29, 0x4C, 0x50, 0x61, 0x63) have no owner spec and stay stubs. Skills / combat: 0x05–0x11 (skill at point / on unit, hold forms, 0x0B), 0x3A, 0x3B, 0x3C run `skills::use_`, `skills::levels`, `combat::vitals` on `wiring::action::ActionSim`; 0x12, 0x41, 0x51 and walk / run 0x01–0x04 stay stubs. World: 0x13 (NPC), 0x2F, 0x30, 0x31, 0x32–0x38, 0x40, 0x58, 0x62 and 0x49 reach `d2_sim::world`, but **only 0x49 runs on a real provider** (`ActionWorld`, waypoints); NPC / vendor / quest ids stay stubs on `ActionWorld` and `NoWorld` (tested on a seam fake with the real `NpcControl`, trade functions and `QuestControl`); 0x3E, 0x3F, 0x44, 0x46, 0x47, 0x4D, 0x59 are stubs. The item and skill handlers are inert until `SimGame::items` / `SimGame::skills` is set (default `None`). S→C: only 0x77 (cube) has known bytes; 0x15 and 0x5A are recorded, not sent; 0x3F and 0x9D are not built | per branch (each from `claude/bold-ptolemy-jvyvxy` at `1470723`, none merged-count): d2-server 53 (items, 10 new), 54 (skills, 11 new), 68 (world, 25 new); d2-sim 828 pass, 5 ignored on each. M08: ground range 11 fails `item_to_cube_ground_item`; cutting the sent 0x77 to one byte fails both byte tests. `ids_match_client_tsv` (skills) and `world_ids_are_sim_handlers` (world) check the id tables against `client-messages.tsv` with perturbation; `ITEM_IDS` has a test. On the wired sim a mode start fails after the mode set (no AnimData record routed), so no skill do runs from a message (§7 SK1) |
+| 3k Server intent handlers | `d2_server::adapters::handlers::{items, skills, world}`, called from `SimGame::handle` in the order items, world, skills, then the stub; **implemented, unverified** (every owner spec is a draft; no recording replayed through them). Items: C→S 0x2A and 0x4F (the cube's buttons) run `world::cube` through `wiring::economy::EconomyCube`; the other item ids (0x16–0x29, 0x4C, 0x50, 0x61, 0x63) have no owner spec and stay stubs. Skills / combat: 0x05–0x11 (skill at point / on unit, hold forms, 0x0B), 0x3A, 0x3B, 0x3C run `skills::use_`, `skills::levels`, `combat::vitals` on `wiring::action::ActionSim`; 0x12, 0x41, 0x51 and walk / run 0x01–0x04 stay stubs. World: 0x13 (NPC), 0x2F, 0x30, 0x31, 0x32–0x38, 0x40, 0x58, 0x62 and 0x49 reach `d2_sim::world`, but on `ActionWorld` **only 0x49 runs on a real provider** (waypoints); NPC / vendor / quest ids stay stubs on `ActionWorld` and `NoWorld` (tested on a seam fake with the real `NpcControl`, trade functions and `QuestControl`). **On `TradeWorld<R>` (`handlers::world::trade`, from the unfolded `e2e-vendor-host`) the quest ids run too** (`quest-host`, 2026-10-06, unverified): `WorldHost::quests` runs the real `QuestControl` on `wiring::economy::EconomyQuests` built from the interaction `Desk`'s economy and rest; C→S 0x31, 0x40, 0x58 leave their stubs there; the Kashya mercenary reward (`0x00579180`) is collected during the quest call and run right after it as `NpcControl::quest_mercenary` before the result goes back, so `QuestRest::mercenary_reward` is not reached on that host; no Act II–V callback is raised, the `unhandled` calls the tests reach are Act I gaps (§2 step 7c); 0x3E, 0x3F, 0x44, 0x46, 0x47, 0x4D, 0x59 are stubs. The item and skill handlers are inert until `SimGame::items` / `SimGame::skills` is set (default `None`). S→C: only 0x77 (cube) has known bytes; 0x15 and 0x5A are recorded, not sent; 0x3F and 0x9D are not built | per branch (each from `claude/bold-ptolemy-jvyvxy` at `1470723`, none merged-count): d2-server 53 (items, 10 new), 54 (skills, 11 new), 68 (world, 25 new); d2-sim 828 pass, 5 ignored on each. M08: ground range 11 fails `item_to_cube_ground_item`; cutting the sent 0x77 to one byte fails both byte tests. `ids_match_client_tsv` (skills) and `world_ids_are_sim_handlers` (world) check the id tables against `client-messages.tsv` with perturbation; `ITEM_IDS` has a test. On the wired sim a mode start fails after the mode set (no AnimData record routed), so no skill do runs from a message (§7 SK1). Quest host: `cargo test -p d2-server --lib trade_quests` 7 pass on `SimGame<ActionSim, TradeWorld>` through the host frame (Akara 0x31 message 64 → S→C 0x27 + 0x29, record diff = slot 1 bit 2 only, chain 1 state 2, chat end `5d 01 00 01 0000`; Kashya message 92 → `50 0200 <name> 00×10`; 0x40 → `28 06 …` + `52`; 0x58 sets the log bit; same seed twice identical). M08: one flag bit changes exactly one byte of 0x28 (byte 13, xor 0x04); removing `mercenaries` from `TradeWorld::quests` fails the Kashya test. Staged answers, not behavior: 0x27 bytes 6–39 zero, mercenary spawn fails, unit act 0 |
 | 3l Wiring, second set | `d2_sim::wiring::worldgen` (`WorldSim` = `ActionSim` + `WorldState`: act DRLGs through one `LevelTypes` dispatching to Maze / Presets / Outdoor; population and init on real rooms and regions) and `wiring::interaction` (`Desk`: NPC, vendor and quest seams on real units, stat lists and store; `UseView`: skill use; `VitalsView`: vitals) wired, **unverified**: the adapters add no rule of their own. With the default `WorldPending` **no room population (`population.md` §3) runs, only presets place monsters**: the DRLG data population reads (coordinate lists `0x0061AD50` / `0x0061AD30` / `0x0061B130`, populated level `0x0061A1F0`, populated-room count `0x0061ABF0`, warp points `0x0061AC10`, level spawn of kind 11, nearest free point `0x0064E840`) are in no DRLG spec. Not routed: monster event 7 and the umod callbacks, `init_kind` for monsters allocated by action code, skill-use tick events 5, 8, 9, 14, the kill → `kill_experience`. `wiring::interaction` makes one module change (`NpcLink::make_hire_list` takes the NPC-control seed, §3 Seams) | worldgen 12 integration tests (d2-sim 840 pass, 5 ignored; `tick_replay` 7 pass unchanged; `cargo check -p d2-server` builds); fixture act 0 with init seed 644409375 (`dwStartSeed` 4014346869), game seed {1234, 666}; the recorded Act I placement vector through the dispatcher (DRLG seed {1406222081, 1674353446}, allocation order 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5), the Den of Evil maze vector, preset room streaming, population and init on the real rooms, two identical runs of 10 ticks. interaction 11 tests (d2-sim 839 pass, 5 ignored; `tick_replay` 7, `tick_traces` 2, `rng_traces` 2): real gold paid, store generation with the game seed stepped exactly twice, hire list on the continued NPC seed, a skill missile hitting a real monster, cooldown list and its type-12 timers, a kill granting a level-up. Neither count is merged |
-| 3m Gap tests | four sessions of unit tests from the specs (`gaps-items-stats`: 140 tests, 7 specs; `gaps-combat-ai`: ai, missiles, damage; `gaps-data-formats`: data, formats, rng; `gaps-drlg-world`: drlg, world, tick, unit-order, intents-events), no game files, unit tier only; the data-formats session also wrote game-tier claims on `#[ignore]` tests that have never run (§5 C17). Code fixes: `units.md §3.1 r7` (`units/lifecycle.rs`: allocation set `mode := arg` for tiles too; a tile keeps mode 0); `quality.md` edge-case r4 (`items/tables.rs`: unique rarity read as 32 bits at `+0x30`, `UniqueRec::from_record(r, raw)`; no change on 1.14d data). Behavior-neutral: `rng::Seed` is `#[repr(C)]` (`rng.md` §1 r1); `d2-data::bin::check_server_files` split out of `load()` (`loading.md` §3.3). **Deviation found, not fixed**: `units.md §5 r4` (an event scheduled through `0x005416B0` with expire −1 becomes every-tick and loses its callback) vs `TimerQueue::schedule` (`tick/timer.rs`), which passes the callback to `schedule_every_tick`; `tick.md` §5.2 does not mention dropping it (owner: tick module, after reconciling the two specs, §7 GI) | M08 by hand: items 13 + 7 breaks and stats 12 each failed a new test (uncaught mutants unobservable, except the MulDiv 32-bit product, which got `muldiv(-0x20_0000, 0x1_0000, 3) == 0`); ai, missiles, damage breaks each failed the matching test. Gates `cargo test -p d2-data -p d2-formats -p d2-sim` pass on the data-formats branch; `coverage.py --check` 0 errors |
+| 3m Gap tests | eight sessions of unit tests from the specs, no game files, unit tier only (the first four: `gaps-items-stats`: 140 tests, 7 specs; `gaps-combat-ai`: ai, missiles, damage; `gaps-data-formats`: data, formats, rng; `gaps-drlg-world`: drlg, world, tick, unit-order, intents-events; the second four, 2026-10-06: `gaps-drlg-sim-world` (`outdoor.md` §2.4 linkers, `unit-order.md` §1 r4 / r5: 65/72 and 38/38), `gaps-combat-items-monsters` (24 tests: `treasure.md` 62 → 77 of 85, `hit.md` 41 → 46 of 49, `levels.md` 40 → 43 of 47, `population.md` 156 → 158 of 165), `gaps-data-rng` (14 `d2-data` tests: `callbacks.md` 41/41, `runtime-maps.md` 25/25, `fixups.md` 34/36, `loading.md` 33/47; `tools/coverage.py` accepts the claim `r0`, which enabled `vendors.md §9.2 r0` and `affixes.md §5 r0`; `sim/rng.md` gets no claim, its 7 open units are cross-reference tables, §7 GD11), `gaps-client-formats` (18 units: `bridge.md` 22 → 33 of 39, `map-preview.md` 11 → 13, `ui.md` 8 → 9, `assets.md` 7 → 8, `cof.md`, `dcc.md`, `ds1.md`; one is a game-tier claim on an `#[ignore]` test); the data-formats session also wrote game-tier claims on `#[ignore]` tests that have never run (§5 C17). Code fixes: `units.md §3.1 r7` (`units/lifecycle.rs`: allocation set `mode := arg` for tiles too; a tile keeps mode 0); `quality.md` edge-case r4 (`items/tables.rs`: unique rarity read as 32 bits at `+0x30`, `UniqueRec::from_record(r, raw)`; no change on 1.14d data). Behavior-neutral: `rng::Seed` is `#[repr(C)]` (`rng.md` §1 r1); `d2-data::bin::check_server_files` split out of `load()` (`loading.md` §3.3). **Deviation found, not fixed**: `units.md §5 r4` (an event scheduled through `0x005416B0` with expire −1 becomes every-tick and loses its callback) vs `TimerQueue::schedule` (`tick/timer.rs`), which passes the callback to `schedule_every_tick`; `tick.md` §5.2 does not mention dropping it (owner: tick module, after reconciling the two specs, §7 GI). The second four found no code deviation; they found spec / code or spec / TSV disagreements that stay unfixed (§7 GD8–GD11, GT1, GP1, GB1) and no non-test code changed except three `#[cfg(test)] mod` lines and `pub(super)` on test fixtures | M08 by hand: items 13 + 7 breaks and stats 12 each failed a new test (uncaught mutants unobservable, except the MulDiv 32-bit product, which got `muldiv(-0x20_0000, 0x1_0000, 3) == 0`); ai, missiles, damage breaks each failed the matching test. Gates `cargo test -p d2-data -p d2-formats -p d2-sim` pass on the data-formats branch; `coverage.py --check` 0 errors. Second four: each claimed test failed when its rule was broken by hand (treasure 15 breaks, hit / levels 10, population 2, linkers 2; M08); `cargo test -p d2-sim` 1,230 pass, 5 ignored on `gaps-combat-items-monsters`, 1,208 on `gaps-drlg-sim-world` (per branch); the `r0` selftest fails on the old grammar |
 | 3 not implemented | object operate / init, the per-skill function bodies (`use.md` OQ10), kill experience (`kill_experience` in `wiring::interaction` applies `vitals.md` §4.2 and §4.3's add only; nothing calls it, the kill has no provider, §7 WI10), path / position / movement (`units.md` path spec not written; wiring `Pending`), inventory and player data (the item-use C→S ids 0x16–0x29, 0x4C, 0x50, 0x61, 0x63 have no owner spec), message 0x73 (`missiles.md` R2.4, needs a protocol seam outside `missiles/`), Act II–V quests, the other 131 AI functions, server-do / server-hit bodies, mercenary spawn / init (spec not written) | specs exist as drafts or are unwritten |
-| 4 Conformance | recording proven feasible; coverage tool done | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at this commit: 3,164 claims over 2,704 rule units: unit 2,342 (86.6%), game-file 186 (6.9%), trace 30 (1.1%), verified 216 (8.0%), any 2,396 (88.6%) — tested (any tier) 88.6%, verified 8.0%; the 28 game-tier claims the `gaps-data-formats` session added sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before them), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 216 as an upper bound until §5 C17 is run (`py tools/coverage.py --summary` total line on main at `fd37fba`; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases, are not additive). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity |
+| 4 Conformance | recording proven feasible; coverage tool done | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at `4b5b0bf` (all branches merged): 3,259 claims over 2,704 rule units: unit 2,404 (88.9%), game-file 187 (6.9%), trace 30 (1.1%), verified 217 (8.0%), any 2,459 (90.9%) — tested (any tier) 90.9%, verified 8.0%; the 28 game-tier claims the `gaps-data-formats` session added and the one of `gaps-client-formats` (`ds1.md` edge cases) sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before the first 28), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 217 as an upper bound until §5 C17 and C20 are run (history: `--summary` total line on main at `fd37fba` was 3,164 claims, unit 86.6%, any 88.6%, verified 216; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases and 88.8% → 89.2–89.9% for the second four, are not additive; the 90.9% above is the one merged run). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity |
 | 5 Local server + bridge | bridge design `specs/client/bridge.md` and skeleton `d2-client::bridge` done; `bridge::local::LocalLink` implements `ServerLink` on `d2_server::host::Host` (`claude/p5-local-server`, synthetic data only, unverified; `d2-client` now depends on `d2-server`); every S→C id still unowned (`bridge-dispatch.tsv` all `TBD`); session code is the placeholder `PendingSession`; the app builds no single-player game yet | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, the dispatch TSV check with its perturbation test, a windowless Bevy `App` mirror test; `bridge/local_tests.rs` headless end to end on the real host, `ProtoSizes` and `SimGame<ActionSim, ActionWorld>` (two-act synthetic DRLG, seed 1234, a sorceress at (42, 20) beside a Cold Plains waypoint): C→S 0x49 drained, dispatched (result 0), ticked, flushed, and the exact S→C `0D 00 <guid> 01 2D00 1700 0000` reaches a synthetic 0x0D handler that adds unit (0, guid) to `ClientWorld`; duplicate filter, protocol version check (a wrapper reporting version + 1 refused), unknown / unowned ids |
 | 6 Client | design drafts `specs/client/{render-pipeline,assets,ui,audio}.md` (d2rs-own). Cloud tasks implemented (plain-Rust infrastructure, no original behavior): **C1** paths + loaders, **C2** residency cache, **C3** frames + atlas, **C4** scene + CPU compositor, **C5** GPU compute compositor (`gpu_compositor`: WGSL, integer math, no sampler, 16×16 workgroups), **C6** verify harness (`verify`: case files version 1, `--perturb`, `GpuCompositor` seam), **C6×C5** GPU half of the synthetic cases wired (`verify::gpu::Wgpu`, `[[unit]]` COF cases), **C7** COF composite mechanics (`composite`), **C8** UI core, **C9** controls file, **C10** audio core. Nothing original-behavior is reproduced: every §B point is a `TODO(spec: …)` hook or a `ComponentResolver` method. GPU byte-exactness **proven on a real GPU** (Intel HD Graphics 630, Vulkan: `gpu_compare` 12/12, `d2-client verify` 11/11, perturbations exact, §5 Done 2026-10-06) and on Mesa llvmpipe 25.2.8 | CI unit tests from each spec's vectors (`d2-client` per branch: frames 53 pass + 1 ignored, scene 20 tests, ui 20, controls 16, audio 25; `gpu_compositor` 11 + 2 ignored, `composite` 11 + 1 ignored, `verify` 191 lib tests pass, 5 ignored on the `p6-verify-gpu` branch); llvmpipe: all 12 `gpu_compare` cases and all 10 synthetic verify cases 0 differing, `--perturb 7` reports exactly 7 on every half; game-file and real-GPU halves queued (§5) |
 | 7–9 | deferred (out of current scope) | |
@@ -97,7 +104,11 @@ Cloud (repo only):
    skill / combat and world ids are done, §1 3k). Open: providers so the
    NPC / vendor / quest ids leave their stubs (`WorldHost::npc` /
    `vendors` / `quests` on a wired host, written like
-   `ActionWorld::waypoints`; the handlers need no change); an AnimData
+   `ActionWorld::waypoints`; the handlers need no change). **Quests done
+   on `TradeWorld`** (`quest-host`, §1 3k; `ActionWorld` still stubs
+   them, and the doc of `world/action.rs` lines 5–6 still says "the
+   quests' ids stay stubs on both": it should read "on this host;
+   `TradeWorld` adds them", fix it the next time that file is touched); an AnimData
    record routed in the wired sim (`UnitHooks::anim_record`,
    `wire-action.md` §4), else a mode start schedules no timers and no
    skill do runs from a message (§7 SK1); routing of `player_action_frame`
@@ -132,14 +143,18 @@ Cloud (repo only):
    port the `map` verify case to the compositor (`verify/map.rs` moves to
    `GpuCompositor`, the `Material2d` path goes, §A9). `AtlasFrames` and
    `SlotSource` already map `FrameId` → `AtlasSlot` for the verify path.
-6. **Coverage** (`coverage-claims` is done, §1; the rest is test and tool
-   work). Next test-writing targets are the units no claim names
-   (`py tools/coverage.py` lists them per spec) and the specs with the
-   lowest unit-tier share in `--summary` at `fd37fba` (`data/loading.md`
-   44.7%, `client/bridge.md` 56.4%, `data/patch-layers.md` 57.1%,
-   `client/assets.md` 58.3%, `client/audio.md` and `data/field-types.md`
-   60.0%; the gap-test sessions covered the rest of the Phase 3 specs, the
-   rules they left are listed in `gaps-*.md`). Two
+6. **Coverage** (`coverage-claims` and eight gap-test sessions are done,
+   §1; the rest is test and tool work). Next test-writing targets are the
+   units no claim names (`py tools/coverage.py` lists them per spec) and
+   the specs with the lowest any-tier share in `--summary` at `4b5b0bf`
+   (`client/audio.md` 60.0%, `client/assets.md` and `data/schema.md`
+   66.7%, `client/ui.md` 69.2%, `data/loading.md` 70.2%,
+   `data/patch-layers.md` and `formats/animdata.md` 71.4%,
+   `sim/intents-events.md` 72.6%, `sim/rng.md` 73.1%, `world/waypoints.md`
+   77.0%, `sim/tick.md` 77.6%, `drlg/preset.md` 78.3%); most of what is
+   left there is blocked on a spec (no `ui/text.md`, `formats/wav.md`,
+   sound pool, prefetch; numbered rows in `rng.md` §5.2–§7) or a game run;
+   the rules each gap session left, with reasons, are in `gaps-*.md`. Two
    policy / tool items from that session and `impl-vendors` (the same
    tool limit as (b) hits `affixes.md` §5, whose line ~152 wraps to start
    with `0.`, so `affixes.md §5 r0` cannot be claimed either,
@@ -148,11 +163,13 @@ Cloud (repo only):
    edge-case bullets, `stats.md` §6.3, …) are one unit, so a claim can
    cover more than its test checks; the fix is numbered items in those
    specs (spec work), after which claims can be narrowed; (b)
-   `tools/coverage.py` lists rule `§9.2 r0` of `vendors.md` (the list starts
-   at `0.`) but rejects the claim `§9.2 r0` as malformed (`r<N>`), so it
-   cannot be claimed (the test is `price::rule_zero`): accept `r0` in the
-   claim grammar or number from the first item. Rule: `Covers:` comments
-   (`docs/COVERAGE.md`).
+   `tools/coverage.py` listed rule `§9.2 r0` of `vendors.md` (the list starts
+   at `0.`) but rejected the claim as malformed: **done** in `gaps-data-rng`
+   (`RULE_REF` accepts `r0`, `r00` / `r01` stay malformed, rule IDs
+   unchanged, `price::rule_zero` claims `vendors.md §9.2 r0` and
+   `rare_name_pick` claims `affixes.md §5 r0`; the "charges not all full"
+   branch of `repairable` is not asserted separately, drop the claim if
+   that counts). Rule: `Covers:` comments (`docs/COVERAGE.md`).
 7. **Level-type dispatcher: done** as `wiring::worldgen::levels::WorldTypes`
    (§1 3l, unverified): `DrlgError::LevelType(u32)`,
    `LevelTypes::door_unit(…, orientation)`, `MazePresets` and
@@ -182,12 +199,43 @@ Cloud (repo only):
    UseRest`; proposed in `wire-interaction.md` §6, a different owner is
    proposed in `server-skills.md` §5 item 2, §7 J3); the kill →
    `kill_experience` (`Pending::reaction` has no provider; `vitals.md`
-   OQ2); `QuestRest::mercenary_reward` → `NpcControl::quest_mercenary`
-   (needs a quest-rest wrapper over `Desk` + `NpcControl`); the first think
+   OQ2; the e2e kill grants its level-up through the sim's own call,
+   `e2e-next` frame 15); `QuestRest::mercenary_reward` →
+   `NpcControl::quest_mercenary` (**done on `TradeWorld`**, `quest-host`:
+   `EconomyQuests::mercenaries` collects, the host runs it after the call;
+   `Desk::quest_message` keeps its own copy of the loop, §7 QH1); the first think
    of a created monster (§7 WG8); `NpcControl::new` steps the game seed
    once, third among the game-creation seeds, after the object-control seed
    and before `QuestControl::new`; `SkillFunctions` bodies
    (`use.md` OQ10).
+7c. **One game, one unit world and one item store** (`e2e-next` §5, §7 J7 /
+   J8, not done): the single-player e2e now runs on `SimGame<WorldSim<_>,
+   TradeWorld<Rest>>` with the cube on `ItemWorld`, and the run shows the
+   cost of the split: the cube's box, ring and amulet are not in
+   `ActionSim`'s unit records and their creation steps `ItemWorld`'s game
+   seed, not `ActionHooks::game_seed`; three `ItemStore` / `ItemTables`
+   pairs exist (`DeathDrops::items`, `TradeWorld::items`,
+   `ItemWorld::items`), so the dropped gold cannot be sold or cubed; the
+   player's interaction (+0x64 / +0x68) has three owners (`Rest::interact`,
+   `TestPending::interact`, `ItemWorld::staged.interactions`). Fix: one
+   `ItemStore` + `ItemTables` per game, `ServerCube` and
+   `handlers::items::handle` generic over the economy's hooks and sourcing
+   the economy from the wired host as `TradeWorld::with_economy` does, with
+   the cube parts (`CubeData`, `Staged`, `creation`, `ItemPending`) moved
+   to the wired world host (`trade.rs`). The e2e steps that still stop at a
+   seam: pick-up 0x16 (inventory / item-use spec), the item copy
+   `0x0055A2A0` (buy, sell of a non-permanent item), the waypoint's
+   same-act placement `0x00554EA0` (path spec), inventory placement /
+   removal, session flow. Same-run tests: `e2e-next` asserts 26 frames and
+   26 ticks (`cargo test -p d2-client --test e2e_single_player`, 3 tests).
+7d. **Determinism lint: done** (`determinism-lint`, 2026-10-06):
+   CLAUDE.md hard rule 6 is machine-checked by `cargo run -p depcheck`
+   (§4); zero real hits on `d2-sim` at `edad871`, no allowlist entry. Open
+   only as limits: the scan is lexical (a `HashMap` behind a type alias in
+   another crate, a float from a dependency's API, `BTreeMap` iteration
+   with a non-total key are not seen), and "no `HashMap` iteration
+   affecting outcomes" is enforced as the stricter "no hash collections".
+   `tests/` of `d2-sim` are not scanned.
 
 Local (spec / recording / game files; the coordinator batches them, §5):
 
@@ -205,6 +253,11 @@ Local (spec / recording / game files; the coordinator batches them, §5):
     frame-capture recorder (render §B1, §B2, §B7, §B9); then unit
     composite and draw order; shading, blend modes, lighting; audio;
     UI text, panels, controls, inventory, automap.
+11. **Spec and code questions of the fourth fold** (spec writing / Ghidra,
+    §5 B, §7): GD8–GD11 (patch-layers report order and A05, the `.bin`
+    automap check, numbering the `rng.md` cross-reference tables), GT1,
+    GP1, GB1, QH1 and EN1; plus the earlier GD items the new notes
+    extend (`loading.md` §7.3 also omits `setitems.set` → `sets.index`).
 
 Done (kept for the record): step "tick trace replay" (`claude/phase3-tick-replay`,
 2026-10-06: `conformance::tick::replay`, d2-sim `UnitLists::alloc_unit` /
@@ -221,14 +274,20 @@ C1–C10 (`docs/handoff/p6-*.md`, including `p6-gpu`, `p6-verify`, `p6-cof`,
 `p6-verify-gpu`); the `d2-server` handler sessions (`server-items`,
 `server-world`, `server-skills`: step 3 for the ids that have an owner spec),
 the second wiring pass (`wire-worldgen`, `wire-interaction`: steps 2, 7, 7b),
-`p5-local-server` (the adapter of step 4) and the four gap-test sessions
+`p5-local-server` (the adapter of step 4), the four gap-test sessions
 (`gaps-items-stats`, `gaps-combat-ai`, `gaps-data-formats`,
-`gaps-drlg-world`: step 6).
+`gaps-drlg-world`: step 6) and, in the fourth fold, `quest-host` (step 3,
+quests; step 7b, mercenary reward), `determinism-lint` (step 7d), the
+four later gap-test sessions (`gaps-drlg-sim-world`,
+`gaps-combat-items-monsters`, `gaps-data-rng` incl. the `r0` claim,
+`gaps-client-formats`: step 6) and `e2e-next` (the single-player e2e on
+`TradeWorld`, step 7c opened).
 
 Per-session notes live in `docs/handoff/*.md` (detailed record of seams,
 public APIs, design choices and per-site open questions). The ones for the
-38 sessions above are folded into this file as of this commit; read the
-note of a module before you change it. Every note in `docs/handoff/`
+45 sessions above are folded into this file as of this commit (the five
+notes named in the header are not); read the note of a module before you
+change it. Every note in `docs/handoff/`
 starts with the pointer line.
 
 ## 3. Code map
@@ -267,6 +326,7 @@ starts with the pointer line.
 | `crates/d2-server/src/adapters/handlers/items.rs`, `items/{cube_world,tests}.rs` | `ITEM_IDS` (checked by a test), `handle` (0x2A, 0x4F), `ItemWorld` (units, stat lists, unit data, hooks, `GameFields`, `ItemTables`, `ItemStore`, `CubeData`, `Staged`, `ItemPending`), `ItemView`, `ItemError`; `ServerCube` (a `CubeWorld` forwarding item, stat and creation calls to `EconomyCube`, the rest from `Staged`, the `cube.md` §2 checks and `ItemPending`; `InfoRest` answers `player_info`); 10 host-frame tests | `world/cube.md` §1, §2, §8 |
 | `crates/d2-server/src/adapters/handlers/skills/{mod,wired,world,seams,tests}.rs` | `IDS`, `SkillHost<D>` (object-safe), `Call`, `Staged`, `Handled`, routing `handle`; `WiredSkills<S>` (`SkillHost<ActionSim<X>>`: `run`, `add_skill_point`); `World` (`SkillUnits`, `ManaUnits`, `SkillFunctions`, `UseMissiles`, `UseWorld`, `LearnUnits`, `VitalsUnits` on the game, the wired unit system and staged facts); `SkillSeams` (every part with no provider, defaults = nothing); 11 tests through `Host::frame` | `skills/use.md` §1, §7; `skills/levels.md` §6.4; `combat/vitals.md` §2; `intents-events.md` §2.4 |
 | `crates/d2-server/src/adapters/handlers/world.rs`, `world/{action,tests/}.rs` | `WORLD_IDS` (checked against `client-messages.tsv`), `system`; seam `WorldHost<D>` with the visitor traits `NpcCall`, `VendorCall`, `WaypointCall`, `QuestCall`; `NoWorld`; `WorldError` / `WorldFault`; `handle` (player lookup, module call, send routing, result mapping); `ActionWorld` (`WorldHost<ActionSim<X>>`: waypoints), seam `Outbox`; 25 tests (`waypoints`, `npc`, `vendors`, `quests` on the seam fake `fake.rs`, `ids`) | `world/{npc,vendors,waypoints,quests}.md`, `intents-events.md` §2.4, §3.2 |
+| `crates/d2-server/src/adapters/handlers/world/trade.rs`, `world/tests/trade_quests.rs` | `TradeWorld<R>` (`WorldHost`; from the unfolded `e2e-vendor-host`): `quests` (real `QuestControl` on `EconomyQuests`, the mercenary routing); `trade_quests`: 7 tests on `SimGame<ActionSim, TradeWorld>` through the host frame, staged `Rest` | `world/quests.md` §7.3, §6.2, §1.7; `world/npc.md` §7.5 |
 | `crates/d2-server/src/transport.rs` | client duplicate filter, classifier, three server queues, drain (truncating copy) | `sim/intents-events.md` §2.1 |
 | `crates/d2-server/src/dispatch.rs` | game message entry, dispatcher, gate, stubs, exact size, point/unit parse, chat check, 0x3C/0x51 decode | `sim/intents-events.md` §2.2–2.4 |
 | `crates/d2-server/src/buffers.rs` | per-client 0x200-byte buffers, local delivery split, receive lists | `sim/intents-events.md` §3 |
@@ -302,6 +362,9 @@ starts with the pointer line.
 | `crates/d2-sim/src/wiring/economy/{mod,game_fields,item_stats,item_units,treasure_items,cube_items,quest_items}.rs` (+ `economy/tests/`) | `EconomyError`; `GameFields` (game seed, +0x6D, +0x70, +0x6A, +0x74, +0x1B24; `ItemGame`, `treasure_facts`); `UnitStats` / `StatCtx` (`ItemStats` on `StatLists`, `find_list`); `Economy` (`create_item`, `free_item`, `with_item`, `ItemStore`, `ItemSpawn`); `ItemDrops` (`DropSink`, seam `DropPlacer`); `EconomyCube` + `CubeRest`; `EconomyQuests` + `QuestRest` | `items/generation.md`, `properties.md`, `treasure.md`, `cube.md`, `quests.md`, `units.md` §3 |
 | `crates/d2-sim/src/wiring/worldgen/{mod,levels,maze_presets,outdoor_presets,population,population_init,init_units,dispatch}.rs` (+ `worldgen/tests/`) | `WorldgenError`, `WorldPending` (seams without a provider), `WorldTables`, `WorldState` (regions, monster data, minions, superunique tails), `WorldHost`; `WorldTypes` (the act DRLGs' `LevelTypes`, dispatching by `DrlgType` to `Maze` / `Presets` / `Outdoor`; `AllocView`, `SharedTypes` = `Rc<RefCell<WorldTypes>>`); `MazeToPreset`, `OutdoorToPreset`; `PopWorld`, `MonsterInit`, `InitHost` on `WorldHost`; `WorldSim` (`ActionSim` + `WorldState`: `EventDispatch` and every `TickHooks` method to the action systems; `populate_monsters` → `room::populate_room`) | `levels.md` §3.7, §4.3, §5.2, §9.4; `maze.md` §7, §9; `preset.md` §4, §6; `outdoor.md` §12.1; `population.md` §3, §6, §8, §9, §11; `init.md` §4–§6, §10, §14, §16–§20; `tick.md` §3, §4 |
 | `crates/d2-sim/src/wiring/interaction/{mod,npc_world,npc_vendors,vendor_world,skill_use,vitals}.rs` (+ `interaction/tests/`) | `InteractionState` (one `VendorRecord` per NPC record, the NPCs' `InteractionList`s, errors), `Desk` (borrows `Economy`, `QuestControl`, `VendorTables`, the state, the rest, host ms), `PlayerQuestsRef`, `InteractionError`; `NpcWorld` for `Desk` (`NpcRest`); `NpcVendors` for `Desk`, `VendorDesk` with `NpcLink`, entry points `buy` (0x32), `sell` (0x33), `repair` (0x35), `identify_gamble` (0x37), `level_changed`, `client_left`; `VendorWorld` for `VendorDesk` (`VendorRest`); `UseView` (wraps `CombatView`: `SkillUnits`, `ManaUnits`, `SkillFunctions`, `UseMissiles`, `UseWorld`; `ActionSim::skill_use`; `UseRest`); `VitalsView` (`VitalsUnits`, `kill_experience`, `VitalsRest`) | `npc.md` §1–§8; `vendors.md` §3–§9; `use.md` §1–§7; `missiles.md` §R2; `vitals.md` §1–§4 |
+| `crates/d2-client/tests/e2e_single_player.rs`, `tests/e2e_support/mod.rs`, `tests/e2e_vendor.rs` | the single-player e2e (3 tests; 26 bridge frames: creation, join, cast, kill, level-up, 0x3A, pick-up stub, Akara talk / chat / trade / buy / sell, cube put-in and transmute on `ItemWorld`, waypoint) and its shared fixtures (`Rest`, `item_tables`, `vendor_tables`, `monstats`, `equiv`, `tx`, `blank`, moved unchanged out of `e2e_vendor.rs`, 4 tests) | `e2e-next.md`, the three e2e notes |
+| `crates/d2-sim/src/drlg/outdoor/linker_tests.rs`, `units/gap_tests.rs`, `treasure/gap_tests.rs`, `combat/hit_gap_tests.rs`, `skills/levels_gap_tests.rs`, `monsters/population/gap_tests.rs` | fourth-fold gap tests (test-only; the `#[cfg(test)] mod` lines sit in `place.rs`, `treasure/mod.rs`, `combat/mod.rs`, `skills/mod.rs`, `monsters/population/mod.rs`) | `drlg/outdoor.md` §2.4, `sim/unit-order.md` §1, `items/treasure.md`, `combat/hit.md`, `skills/levels.md`, `monsters/population.md` |
+| `crates/d2-data/src/{gaps_loading_tests,gaps_patch_fixup_tests}.rs`, `crates/d2-client/src/{bridge/tests,ui/tests}.rs` + tests in `assets/cache.rs`, `map/layout.rs`, `d2-formats/src/{cof,dcc,ds1}.rs` | gap tests for `data/{loading,fixups,runtime-maps,callbacks}.md` (synthetic `patch_d2.mpq`) and for bridge §1 / §2 / §5–§8, ui, assets, map-preview, cof, dcc, ds1; the game half is `d2-formats/tests/formats_game.rs::ds1_layer_limits_and_truncated_trees_groups` (`#[ignore]`, §5 C20) | `data/*`, `client/*`, `formats/*`, `render/map-preview.md` |
 | `crates/d2-client/src/gpu_compositor/{mod,pack,device,harness,tests}.rs`, `compositor.wgsl`, `examples/gpu_compare.rs` | `SHADER`, `WORKGROUP` = 16, `GpuError`; `pack` (validate + serialize, re-bins with `scene::bin`), `Packed`, `GpuItem`, `Params`, `SlotSource`, `emulate` (the shader on packed bytes, CPU), `AtlasFrames`; WGSL `compose` + `to_rgba`; `Gpu` (`headless`, `from_device`, `compose`, `compose_rgba`; limits checked before dispatch); 12 synthetic cases, `compare`, `diff`, `perturb`, `Report`; CLI `gpu_compare [--case] [--perturb N]` | `client/render-pipeline.md` §A9, §A10 |
 | `crates/d2-client/src/verify/{mod,case,map,gpu,tests}.rs`, `render-cases/*.toml` | runner over versioned case files: `GpuCompositor` trait, `GpuJob`, `GpuOutcome::{Image{indices,rgba}, NotWired, NoAdapter, Error}`, `build`, `run_cpu`, `compare`, `compare_indices`, `perturb`, `perturb_indices`, `Status`, `Summary` (exit codes 0 / 1 / 2); case format v1 strict parser (`[[frame]]`, `[[map]]`, `[[table]]`, `[[item]]`, `[[unit]]`, `[[expect]]`); `map.rs` = today's map verify; `gpu.rs` `Wgpu` (lazy headless adapter, two dispatches must agree); cases: `map` + 10 `synth-*` | `client/render-pipeline.md` §A10, `render/map-preview.md` |
 | `crates/d2-client/src/composite/{mod,tests}.rs` | `Slot`, `slot_order` (§A7 step 2, strict COF checks), `ComponentRequest`, `ComponentFrame`, `ComponentResolver` (hooks: `frame`, `frame_id`, `place`, `shade`, `blend`), `UnitParams`, `ComponentDraw`, `build`, `CompositeError` | `client/render-pipeline.md` §A7, `formats/cof.md` |
@@ -311,10 +374,10 @@ starts with the pointer line.
 | `tools/trace-recorder` | Python debugger recording RNG draws from `Game.exe` (Windows); `dump_tables.py`: the excel tables and runtime maps in 1.14d memory after the load; `record_tick.py` + `check_tick.py`: server tick, timer events, unit lists; `record_packets.py` + `check_packets.py`: client↔server messages | `sim/rng.md`, `traces/FORMAT.md`, `data/runtime-maps.md`, `sim/tick.md`, `sim/unit-order.md`, `sim/intents-events.md` |
 | `tools/trace-recorder/convert_tick.py` | tick recording → format-1 trace `traces/sim/tick/sim-NNNN.json`; `--check` replays traces through the `check_tick.py` model (CI) | `sim/tick.md` Test vectors |
 | `tools/trace-recorder/{check_units,record_stats,check_stats}.py` | per-kind event rules U1–U11 on tick recordings; stat-list recorder (`stats-raw-1`) and checker | `sim/units.md`, `sim/stat-lists.md` |
-| `tools/depcheck` | dependency rules (no Bevy outside `d2-client`) | |
+| `tools/depcheck` (+ `src/determinism.rs`, `determinism-allow.txt`) | dependency rules (no Bevy outside `d2-client`; `d2-sim` must not depend on `rand` / `getrandom`) and the determinism lint over the non-test `.rs` of `crates/d2-sim/src` (rules `float`, `hash-collection`, `clock`, `ambient-rng`, `io`, `env`, `global-state`, `unsafe`; allowlist lines `file<TAB>rule<TAB>reason`, a missing reason or a stale entry is an error; `#[cfg(test)]` items and files skipped) | CLAUDE.md hard rule 6 |
 | `tools/methods.py` | methods collection `docs/METHODS.md`: `check` (CI), `list`, `new`, `export` | `docs/METHODS.md` |
 | `tools/spec_index.py` | section indexes in specs (`--check` in CI) | `specs/README.md` |
-| `tools/coverage.py` | spec rule coverage: rule IDs from specs, `Covers:` claims from tests and checks, unit / game-file / trace table, uncovered list; `--check` (CI), `--selftest` | `docs/COVERAGE.md` |
+| `tools/coverage.py` | spec rule coverage (claim grammar accepts `r0`): rule IDs from specs, `Covers:` claims from tests and checks, unit / game-file / trace table, uncovered list; `--check` (CI), `--selftest` | `docs/COVERAGE.md` |
 | `tools/cloud-setup.sh` | cloud session setup (Linux libs, pinned Rust) | |
 | `tools/ghidra/` | Ghidra scripts (label import, export); `disasm.py`: disassembly, xrefs, whole-binary dump (the decompile drops register arguments) | |
 
@@ -365,7 +428,8 @@ typed records, DT1 tiles as `TileInfo`, DS1 grids as `RoomGrids`.
 | `cargo test -p <crate>` | unit tests from spec vectors | repo |
 | `cargo test -p conformance --test tick_replay` | `d2-sim::tick` reproduces every timer run and list snapshot of `traces/sim/tick/*.json`; perturbation tests (`a_*_is_reported_exactly`) report exactly the changed record (M08) | repo |
 | `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo fmt --all` | lint/format gate | repo |
-| `cargo run -p depcheck` | crate dependency rules | repo |
+| `cargo run -p depcheck` | crate dependency rules **and the determinism lint** (CLAUDE.md hard rule 6): every non-test `.rs` under `crates/d2-sim/src` is scanned and `file:line: determinism rule `<rule>`` is reported for floats, `HashMap` / `HashSet`, `std::time` / `Instant`, `rand` / `thread_rng`, `std::fs` / `std::io`, `std::env`, `thread_local!` / `static mut`, `unsafe`; exit non-zero on any hit (already a CI step). Lexical, so it does not see aliases in other crates or dependency floats | repo |
+| `cargo test -p depcheck` | 5 selftests (M08): each of 22 banned constructs caught with its line; comments, strings, raw / byte strings, chars, lifetimes not flagged; `#[cfg(test)]` items and external test-module files skipped; allowlist reason mandatory, stale entries reported | repo |
 | `cargo run -p data-tool -- gen-proto` then `cargo test -p d2-proto` | `d2-proto` tables regenerated from `specs/sim/*-messages.tsv`; tests `generated_file_is_current`, `tables_match_tsv` (perturbation: `check_reports_exactly_a_changed_row`) | repo |
 | `py tools/spec_index.py --check` | spec indexes current | repo |
 | `py tools/coverage.py --check` / `--selftest` | every `Covers:` claim names an existing spec rule (perturbation: a renamed claim is reported at its file and line) | repo |
@@ -392,6 +456,8 @@ typed records, DT1 tiles as `TileInfo`, DS1 grids as `RoomGrids`.
 | `cargo test -p d2-sim -- --ignored` | 5 game-file tests (`.bin` tables read through `skills::tests_game`): combat `codes_match_game_tables`, `real_skill_vectors`, `real_table_constants`; monster init `real_level_stats`; NPC `live_monstats_records` (§5 group C) | `game/extracted/patch_d2/data/global/excel/` |
 | `cargo test -p d2-sim wiring` | the 17 economy, 19 action, 12 worldgen and 11 interaction integration tests (real modules together, synthetic tables / DRLG level, fixed seeds; per-branch counts, no merged run recorded); re-run `cargo test -p conformance --test tick_replay` after any change to `ActionSim`'s tick hooks (only steps 9 / 10 and the client room change are routed; the replay's own hooks do not use them) | repo |
 | `cargo test -p d2-server` (modules `adapters::handlers::{items, skills, world}`, `tests::gaps`) | handler vectors through real host frames (send → drain → tick → flush → receive) with `ProtoSizes`: 0x2A / 0x4F bytes (0x77), skill / stat-point / select-skill results, world ids (0x49 wired, NPC / vendor / quest on a seam fake); `ids_match_client_tsv`, `world_ids_are_sim_handlers`, `ITEM_IDS` with perturbation; the gate of the three handler notes also runs `cargo test -p d2-sim` and `cargo clippy -p d2-server -p d2-sim --all-targets -- -D warnings` | repo |
+| `cargo test -p d2-server --lib trade_quests` | 7 quest-host tests through the host frame on `TradeWorld` (0x31 / 0x40 / 0x58, Kashya reward, one-flag-bit and routing perturbations, same seed twice) | repo |
+| `cargo test -p d2-client --test e2e_single_player` (also `--test e2e_vendor`) | the single-player e2e on `TradeWorld` + `ItemWorld`: 26 frames, `same_seed_same_run`, `other_seed_other_run` (wire identical up to the trade, result codes equal); stops at the seams of §2 step 7c | repo |
 | `cargo test -p d2-client bridge` | also `bridge/local_tests.rs`: `LocalLink` end to end on the real host (C→S 0x49 → exact S→C `0D …` → `ClientWorld`) | repo |
 | `D2_GAME_DIR=<install> cargo test -p d2-data --test gaps_fields_game -- --ignored`, `… calc::tests::game -- --ignored`, `… --test game_data -- --ignored <names>`, `D2_GAME_DIR=<install> cargo test -p d2-formats --test formats_game -- --ignored` | the gap-test game-file tests (28 new game-tier claims, never run; names and expectations in §5 C17) | `game/` |
 | `py tools/trace-recorder/check_stats.py --files <GAME_DIR>` | the specs' stat facts on the 1.14d tables (`stats.md` §2 r2, §5 C2) | `game/` |
@@ -410,7 +476,10 @@ of the second fold (`wire-*`, `p6-gpu`, `p6-verify`, `p6-cof`,
 `impl-npc`), then from the 10 notes of the third fold (`server-items`,
 `server-world`, `server-skills`, `wire-worldgen`, `wire-interaction`,
 `gaps-items-stats`, `gaps-combat-ai`, `gaps-data-formats`,
-`gaps-drlg-world`; `p5-local-server` needs no check) and the earlier queue, deduplicated and grouped by what the run
+`gaps-drlg-world`; `p5-local-server` needs no check), then from the 7
+notes of the fourth fold (`quest-host`, `e2e-next`, `gaps-data-rng`,
+`gaps-client-formats` add checks; `determinism-lint`, `gaps-drlg-sim-world`,
+`gaps-combat-items-monsters` queue none) and the earlier queue, deduplicated and grouped by what the run
 needs: **A** the player at the game (recordings), **B** Ghidra / spec edits
 only (no game run), **C** game files only (no player; includes the checks
 that need a real GPU). Order inside a group is the order to run.
@@ -418,6 +487,12 @@ that need a real GPU). Order inside a group is the order to run.
 for the owner spec, not a reason to change the numbers.
 
 Queue size at `docs/handoff` third fold (entries as numbered or bulleted below): A player 24 (4 lead entries + items 1–20; the third fold added (19), (20) and extended (9), (13), (16)); B Ghidra / spec edits 27 items in the two bullets of the third fold (13 Ghidra reads, 14 spec edits) beside the earlier ones; C game files and GPU 19 numbered (the third fold added C17–C19 and extended C2, C5) plus 3 kept entries; Blocked 8 (2 added, the level-types entry extended). Nothing in the third fold needs a new player recording beyond (19) and the cube / world recordings already queued.
+
+Fourth fold: A player none new; B Ghidra / spec edits 1 bullet (the
+`gaps-data-rng` and `gaps-client-formats` spec questions); C 2 new numbered
+(C20 the `ds1` game test, C21 the `automap.bin` check) and C17's command
+list gains nothing (the `formats_game` run already includes C20's test);
+Blocked 2 added (the quest-host and e2e-next replays).
 
 Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Blocked.
 
@@ -487,6 +562,14 @@ counterpart identical, nothing pending; `fixups_on_live_set` ok) and
 patch layers (`patch_game` 5/5 incl. G1–G8; `data-tool patch check
 game/patch-example/overhaul.d2stack`: exit 0, one N01 note, data digest
 `66010ecda7c8df5b7135579888c536fd2a30287fb877848719a31b6c8f97a625`).
+
+Done 2026-10-06 (local, `main` at `bc739e4`): parser robustness. `cargo
+test -p d2-data -p d2-formats -- --ignored` 29/29 pass; `data-tool tables`
+73 runtime tables 72 identical, 1 explained, 0 mismatched, code buffers
+4/4; `mpq-tool check` all blocks decoded; `mpq-tool formats` 0 errors in
+every kind (cof 3605/3606, dt1 254/260: the 7 gaps are the `KNOWN_UNUSED`
+files, failing as expected). No file reaches the new whole-file limits
+(DC6/DCC ≤ 64M pixels, DT1 blocks ≤ len/20, TBL bytes ≤ len).
 
 Phase 3 recordings: done 2026-10-06 (first skipped at the user's
 request, then recorded when the user asked). Combat with missiles
@@ -802,6 +885,26 @@ the client draw path.
   (the replay applies the recorded cancels, not the free routine's own).
 
 
+**From the fourth fold (2026-10-06; spec questions, each also in §7 by
+owner spec):**
+
+- *Spec edits, no Ghidra* (`gaps-data-rng.md` §5–§6, `gaps-client-formats.md`
+  §7, `gaps-combat-items-monsters.md` §6): `loading.md` §7.3 lists
+  `chartemplate` and `setitems` under "all others — none" although
+  `chartemplate.class` links `playerclass.code` and `setitems.set` links
+  `sets.index` (extends the `loading.md` §7.3 item of GD1–GD7; both targets load earlier); `patch-layers.md`
+  §8 "B (table)" order and §11's list of allowed order-dependent failures
+  (add A05, or give the row-label check after an index-selector rename a
+  rule; GD8, GD9); `sim/rng.md` §5.2–§5.4 and §7: number the rows as items
+  so the system tests can claim them one by one, and move §6 (it restates
+  the owner specs) out of the rules sections (GD11); `bridge.md` §6 r2
+  ("Today every row is `TBD`") moves to Status, or the test pinning it
+  changes with the first owner spec (GB1); `treasure.md` §1.2 whether a TC
+  row can name itself (GT1); `population.md` §1 r2 whether `0x0052D0F0`
+  includes the §1 r1 ambient spawns (GP1, ties to `population.md` OQ1).
+- *Ghidra / memory*: none new. `treasure.md` §1.5 counts and `population.md`
+  §1 r3 fill order wait for a spec session to state their comparison.
+
 **From the third set of notes (2026-10-06):**
 
 - *Ghidra reads, handlers and wiring*: SI1 `0x00549350` (failure value of
@@ -942,6 +1045,24 @@ the dev-dependency) and record results here.
     live `.bin` set and compare every TC record and entry byte for byte
     with `map-tc_records.bin` / `map-tc_entries.bin` (`tc_chest` as record
     indices via `manifest.json` `tc_base`). Expect identical.
+21. `d2-formats` DS1 game claim (`gaps-client-formats.md` §5; claim on
+    `ds1.md` edge cases, the last unclaimed unit of `ds1.md`):
+    `D2_GAME_DIR=<install> cargo test -p d2-formats --test formats_game
+    -- --ignored ds1_layer_limits_and_truncated_trees_groups`. Expect a
+    pass: `data\global\tiles\ACT1\OUTDOORS\trees.ds1` (from `d2exp.mpq`,
+    else `d2data.mpq`) reads version 12, tag_type 1, 14 groups,
+    `groups_truncated`, the 14th group's y / width / height 0, and its
+    `files` list holds `C:\D2\DATA\GLOBAL\TILES\ACT1\TOWN\trees.tg1`
+    (ASCII case ignored). The synthetic half (4 walls, 2 floors, 1 shadow
+    layer) already passes in CI. On failure fix the expected value from the
+    file or remove the claim in the same session (`COVERAGE.md` §3).
+22. `automap.bin` names (`gaps-data-rng.md` §7, deviation D5 / §7 GD10):
+    `cargo run -p data-tool -- tables`, then read the 1.14d `automap.bin`
+    for any record whose LevelName or TileName is empty or starts with
+    `0`. Expect none (the stricter `bin.rs` `post_load_check`, which treats
+    an empty name as known and has no `0` case, is then harmless); any such
+    record shows which of the spec (`0…` gives 0 without a compare, empty
+    fails) and the `.bin` check is right.
 
 Kept entries (unchanged):
 
@@ -1015,6 +1136,18 @@ set the default budgets from them.
   providers; group sizes and creation order of
   `20261006-015554` / `-021854` / `-022304` through `population` once
   `MonsterInit` and the DRLG providers exist (§5 A18).
+- Replay of `traces/raw/20261006-015956-packets.jsonl` frames 1729–1751
+  through `Host` + `TradeWorld` (`quest-host.md` §7; needs a packet-recording
+  replay through the server host, `e2e-vendor-host.md` §8): expect S→C 0x27
+  and 0x29 in frame 1729 and `5d 01 00 01 0000` at frame 1744, comparing
+  bytes with 0x27 bytes 6–39 masked until `0x00661480` is specified.
+- Replays through the single-player e2e (`e2e-next.md` §7; need the trade
+  recording replay, `wire-interaction.md` §8 item 1, and the sorceress
+  kill recording, `e2e-combat-path.md` §6 item 2): `cargo test -p d2-client
+  --test e2e_single_player` with recording-backed seams; compare S→C bytes
+  per frame (0x2A bytes 3–6 masked) and the level-up stats after the kill
+  (expect equal; the 100-experience threshold in the e2e is synthetic, the
+  real `experience.txt` needs 500).
 - A recording of a first room population through `WorldSim` (population
   note check 2, `wire-worldgen.md` §7.2): blocked until the DRLG coordinate
   lists are specified; with the default `WorldPending` no room population
@@ -1625,6 +1758,77 @@ repeated.
   (`wire-worldgen.md` WG8); both notes leave "which step starts the mode"
   to a spec.
 
+**Fourth set (notes `quest-host`, `e2e-next`, `gaps-*`; same rule), by
+owner spec.**
+
+**Integration (from `e2e-next.md` §5, now visible in one run; not
+decided here):**
+
+- J7. Two unit worlds and three item stores in one game. The cube runs on
+  `ItemWorld` (own `Units`, `StatLists`, `GameFields` with a second game
+  seed, `ItemStore`) while the action sim owns the units, and
+  `DeathDrops::items`, `TradeWorld::items` and `ItemWorld::items` each hold
+  a store with its own `ItemTables`; an item made by one is unknown to the
+  others (the dropped gold cannot be sold or cubed). Extends J1. Fix in
+  §2 step 7c.
+- J8. The player's interaction (+0x64 / +0x68) has three owners after one
+  e2e run: `Rest::interact` (Akara), `TestPending::interact` (waypoint),
+  `ItemWorld::staged.interactions` (cube); extends `e2e-vendor-host.md`
+  §4.1.
+
+**`world/quests.md`, `world/npc.md`** (quest host; `TODO` at the sites):
+QH1 `Desk::quest_message` (`d2-sim`) and `TradeWorld::quests` each carry
+the mercenary-reward loop (the host takes a generic `QuestCall` and cannot
+call `Desk::quest_message`): should it become a generic `Desk::quests(|ctl,
+w| …)`? Left as is, `d2-sim` untouched. QH2 `unhandled 37 0x58f870` (chain
+37, Act I intro, event 11) fires on every 0x31: `wire-open-seams.md` has the
+open question of its order against the mercenary reward; the other
+`unhandled` calls the tests reach are the Act I event-0 callbacks
+`0x58f8f0`, `0x595e20`, `0x594c50`, `0x592580`, `0x5916a0`, `0x590b10`,
+`0x58ff90` (`quests.md` §10, not written), so the text list after Akara's
+message 64 comes out empty. The 0x40 result 0 stays a reading ("the spec
+names no result"). EN1 (`e2e-next.md` §6): where in game creation the
+NPC-control and quest seeds are drawn relative to the regions and the
+object-control seed (the e2e puts them after `create_regions`, before the
+player's items; only `NpcControl::new` → `QuestControl::new` is written,
+§2 step 7b); settles the monster seeds of the e2e run against a recording.
+
+**Gap-test questions, fourth set** (the four later `gaps-*` notes; GD1–GD7
+above are not repeated):
+- `data/*`, `sim/rng.md` (GD8–GD11): GD8 `patch-layers.md` §8 report order
+  "B (table)": `patch.rs` `Finding::sort_key` class 2 sorts by code before
+  table (B03 `aaa` and B01 `zzz` come out B01 `zzz`, B03 `aaa`); a one-line
+  code fix if "(table)" means table first (owner: `patch` module). GD9
+  `patch-layers.md` §11 order independence: the valid layer `set #2 ax2 lvl
+  5 -> 6` / `set #2 ax2 code ax2 -> ax3` gives A05 when reversed (the row
+  label differs after the rename), which §4 implies but §11's list of
+  allowed failures does not name. GD10 `loading.md` §8 automap names vs
+  `bin.rs` `post_load_check` (empty or `0…` names; check queued, §5 C21).
+  GD11 `sim/rng.md` §5.2–§5.5, §6, §7 are one unit each (cross-reference
+  tables), so no test can claim them honestly; proposal: number the rows.
+  Two more deviations of the same note extend GD items instead of adding
+  new ones (GD1–GD7 above): `loading.md` §7.3 also omits `setitems` → `sets`, and
+  policy r5 (`d2exp.mpq` required) is not enforced by `bin::load`, which
+  sets `lod = set.has_archive("d2exp.mpq")` and loads a classic set
+  without error, skipping `expansionstring.tbl` and the hireling check
+  (`bin.rs:244`).
+- `items/treasure.md` (GT1): §1.2 a lookup "sees only TCs created before":
+  can a row name its own TC? The record exists before its items are parsed
+  but the code registers the name after them, so a self-reference misses;
+  untested.
+- `monsters/population.md` (GP1): §1 r2 `0x0052D0F0` "runs the same
+  sequence for one room": does that include the §1 r1 ambient spawns?
+  `populate_once` (`monsters/population/mod.rs` ~146) leaves ambient out on
+  purpose (impl note 14, `impl-monster-population.md`); ties into `population.md` OQ1.
+- `client/bridge.md` (GB1): §6 r2 "Today every row is `TBD`" is pinned by
+  `every_row_is_tbd_and_no_handler_is_registered`; the session that takes
+  the first id must change the spec and the test together; should the
+  sentence move to Status.
+- Not questions, for the record: `outdoor.md` §2.4 B2 offset index outside
+  0..3 stays the `TODO(outdoor.md §2.4)` in `place.rs`; `tick.md` §5.2 r4
+  has no caller of `0x005544B0`; `intents-events.md` §3.2 r3 / r4 (empty-game
+  timeout, failed-send drop) are not implemented in `Host::flush`.
+
 **`world/cube.md`** (server items; `TODO` at the sites):
 SI1 §2 step 1: the failed range-10 test is "non-zero"; d2rs returns 1, the
 "out of range" code of `intents-events.md` §2.3 (Ghidra `0x00549350`). SI2
@@ -1913,5 +2117,8 @@ From the Phase 6 infrastructure (notes `docs/handoff/p6-*.md`), by owner:
 | Five game-file assertions written without game files (`gaps-data-formats`, 2026-10-06) and two spec facts stated without a measurement (`animdata.md` "second copy in all 9", `dc6.md` "zero-size frames occur") failed on the first local run of C17 | a blind-written game assertion is marked "expected value unconfirmed" in its handoff and is not claimed (`COVERAGE.md` §3) until its first local run; a spec fact names its measurement or is an open question (`specs/README.md` bar 1; METHODS M21) |
 | Three parallel d2-server handler branches each added `[dev-dependencies] d2-data` and a field/generic to `SimGame`; git merged the two `Cargo.toml` sections silently into a duplicate key and the `SimGame` generics conflicted (2026-10-06, caught by the coordinator's build before the gate) | parallel sessions that extend a shared struct get one named owner per field in their prompts; the coordinator builds the touched crate after each merge, not only after the last (METHODS M21) |
 | `wire-interaction` added a seed parameter to the `NpcLink::make_hire_list` seam while `server-world` (in parallel) wrote a test fake against the old signature; each branch was green alone (2026-10-06, caught by the coordinator's workspace clippy on the combined branch) | sessions that change a seam signature name it in their notes under "signature changes"; the coordinator greps other branches for implementors before merging, and always runs clippy/tests on the whole workspace after combining (METHODS M21) |
+| A spec branch (`claude/spec-inventory`, 2026-10-06) changed `specs/sim/server-messages.tsv` layouts without regenerating `crates/d2-proto/src/generated.rs`; three d2-proto tests failed after the merge (caught by the coordinator's full gate, not by `cargo check`) | after merging any branch that touches `specs/sim/*-messages.tsv`, run `cargo run -p data-tool -- gen-proto` and commit the result in the merge; spec sessions that edit the TSVs regenerate in the same commit (METHODS M21) |
+| `test-fixtures` tests built the synthetic install into one fixed `CARGO_TARGET_TMPDIR` directory behind a `OnceLock`; CI's nextest runs each test in its own process, so processes raced on the same archives (`failed to fill whole buffer`, PR #21). The local gate passed because `cargo nextest` was not installed and `tools/gate.sh` fell back to `cargo test` (one process) | test scratch paths include `std::process::id()`; coordinators install `cargo-nextest` so `tools/gate.sh` runs the same runner as CI (METHODS M21) |
+| `ci-speed` split CI's single `check` job into five; main's branch protection requires a status named `check`, so PR #21 was green on every job yet could not merge (2026-10-06) | an aggregate `check` job (`needs:` every job, fails unless all succeed) keeps the required name; a CI change that renames or removes jobs checks the branch-protection required checks first (METHODS M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 

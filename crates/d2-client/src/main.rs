@@ -1,11 +1,18 @@
 //! d2-client entry point.
 //!
 //! Usage:
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
 //!
+//! `play` (the default) opens a window running the local single-player game: the
+//! in-process server (`d2-server` host over the wired `d2-sim`) pumped
+//! once per frame through the bridge, the world view composed by the GPU
+//! compositor's render-graph node. With $D2_GAME_DIR set it reads the
+//! game's `levels` and `objects` tables from the user's files (unless
+//! `--synthetic`); otherwise it uses synthetic tables.
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -49,8 +56,12 @@ struct Options {
     case_dir: Option<PathBuf>,
     /// `verify`: run only these cases (file stems); default all.
     cases: Vec<String>,
-    /// `view`: close after this many frames (smoke test).
+    /// `view`, `play`: close after this many frames (smoke test).
     frames: Option<u32>,
+    /// `play`: game seed.
+    seed: u32,
+    /// `play`: synthetic tables even with $D2_GAME_DIR set.
+    synthetic: bool,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -82,6 +93,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
         case_dir: None,
         cases: Vec::new(),
         frames: None,
+        seed: d2_client::app::single_player::DEFAULT_SEED,
+        synthetic: false,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -98,6 +111,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--out" => o.out = Some(PathBuf::from(value()?)),
             "--perturb" => o.perturb = value()?.parse().context("--perturb")?,
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
+            "--seed" => o.seed = value()?.parse().context("--seed")?,
+            "--synthetic" => o.synthetic = true,
             "--probe" => {
                 let v = value()?;
                 let (x, y) = v.split_once(',').context("--probe expects X,Y")?;
@@ -290,13 +305,43 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
+fn play(o: Options) -> Result<()> {
+    use d2_client::app::{play, single_player};
+    let data = match std::env::var_os("D2_GAME_DIR") {
+        Some(_) if !o.synthetic => {
+            let tables = single_player::WaypointTables::live(&archives()?)?;
+            println!(
+                "play: game tables from D2_GAME_DIR ({} levels, {} objects, waypoint object class {})",
+                tables.levels.len(),
+                tables.objects.len(),
+                tables.object_class
+            );
+            single_player::GameData::Live(tables)
+        }
+        _ => {
+            println!("play: synthetic tables");
+            single_player::GameData::Synthetic
+        }
+    };
+    let result = play::run(play::PlayConfig {
+        data,
+        seed: o.seed,
+        exit_after: o.frames,
+    })?;
+    match result {
+        bevy::app::AppExit::Success => Ok(()),
+        bevy::app::AppExit::Error(code) => bail!("play exited with code {code}"),
+    }
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
-        Some("view") | None => view(parse_options(args.get(1..).unwrap_or(&[]))?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N]"),
+        Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
+        Some("view") => view(parse_options(&args[1..])?),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic]"),
     }
 }
 

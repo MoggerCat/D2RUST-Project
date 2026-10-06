@@ -1,6 +1,6 @@
 # Gap tests: client, render and format specs
 
-> To be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` by a docs session; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Branch `claude/gaps-client-formats`, based on `main` at `edad871`. Cloud
 session (repo only, no game files). Task class: tests from specs, medium
