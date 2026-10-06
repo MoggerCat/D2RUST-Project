@@ -108,6 +108,8 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// World systems for the world intent handlers
     /// ([`world_handlers`]).
     pub world: W,
+    /// Skill / combat handlers (`handlers::skills`); `None`: stubs.
+    pub skills: Option<Box<dyn super::handlers::skills::SkillHost<D> + Send + Sync>>,
 }
 
 impl SimGame<Unspecified> {
@@ -132,6 +134,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             unhandled: Vec::new(),
             items: None,
             world: W::default(),
+            skills: None,
         }
     }
 
@@ -286,6 +289,9 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
             return r;
         }
         if let Some(code) = world_handlers::handle(self, client, msg, size, out) {
+            return code;
+        }
+        if let Some(code) = super::handlers::skills::handle(self, client, msg, out) {
             return code;
         }
         self.unhandled.push((client, msg[0], size));
