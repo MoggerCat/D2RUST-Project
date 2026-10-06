@@ -7,6 +7,7 @@
 //! real `d2-sim` modules on a seam fake ([`fake`]).
 
 mod fake;
+mod gaps;
 mod ids;
 mod npc;
 mod quests;

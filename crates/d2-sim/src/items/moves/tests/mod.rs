@@ -1,6 +1,7 @@
 //! Tests of `items::moves` on a fake world implementing the three seams.
 
 mod deferred;
+mod gaps;
 mod ground;
 mod handlers;
 mod tsv;
