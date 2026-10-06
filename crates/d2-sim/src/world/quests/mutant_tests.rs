@@ -558,7 +558,8 @@ fn unspecified_status_function_is_reported() {
         .records
         .iter()
         .find_map(|r| match r.status_fn {
-            Some(func) if !matches!(r.chain, 0 | 37..=40) => Some((r.chain, func)),
+            // Chain 34's (`0x0058AF00`) is quests-act5-2.md §6.9.
+            Some(func) if !matches!(r.chain, 0 | 34 | 37..=40) => Some((r.chain, func)),
             _ => None,
         })
         .unwrap();
