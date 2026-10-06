@@ -656,7 +656,8 @@ fn set_stamina(game: &mut Game, sys: &mut Sys, p: UnitId, v: i32) {
 
 /// §4.5: the player start table, event 0's action functions and event
 /// 1's end-of-animation rules.
-// Covers: specs/sim/units.md §4.5
+// Not a claim on §4.5 yet: the 0x006E1740 position/unit forms and the GH
+// argument -1 are not modelled (see docs/handoff/gaps-items-stats.md).
 #[test]
 fn player_mode_starts() {
     // Animated starts: GH, BL plain; 7, 8, 10–16, 18 also clear 0x40 and
