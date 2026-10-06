@@ -12,10 +12,13 @@
 pub mod dispatch;
 pub mod intent;
 pub mod link;
+pub mod local;
 pub mod mirror;
 pub mod receive;
 pub mod world;
 
+#[cfg(test)]
+mod local_tests;
 #[cfg(test)]
 mod tests;
 
@@ -29,6 +32,7 @@ use receive::{receive_chunk, ReceiveLog};
 use world::ClientWorld;
 
 pub use link::{Pumped, SendQueue, LOCAL_CLIENT};
+pub use local::{LocalLink, SinglePlayer};
 pub use mirror::{BridgePlugin, BridgeResource, UnitView};
 pub use world::{ClientUnit, UnitKey};
 
