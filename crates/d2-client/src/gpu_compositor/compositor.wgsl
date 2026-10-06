@@ -1,12 +1,16 @@
 // Spec: specs/client/render-pipeline.md (A9)
 // Spec: specs/render/composition.md (§3 frame cycle, §5 one pixel write)
+// Spec: specs/render/shading.md (§4 tile light gradients)
+// Spec: specs/render/blend-modes.md (§2 table orientation per drawer)
 // GPU compute compositor. Same formulas as the CPU reference
 // (`scene::cpu::compose_binned_frame`): per pixel, start from the base
 // (the previous frame; 0 in rows below `clear_rows`), walk the pixel's bin
 // list in order; index 0 of the frame leaves the pixel unchanged;
-// otherwise the shade chain maps the index (A4) and the blend op combines
-// it with the pixel's value (A5; a table is row = destination, column =
-// source); `clear_after` sets the result to 0. Integers only; frames are
+// otherwise the shade chain maps the index (A4), then the item's light
+// gradient map of the pixel if any (shading §4), and the blend op combines
+// it with the pixel's value (A5; `IndexTable` reads row = destination,
+// column = source, `IndexTableSrcRow` the transpose); `clear_after` sets
+// the result to 0. Integers only; frames are
 // read with textureLoad.
 // Buffer layouts: `pack.rs` (all little-endian).
 
@@ -27,11 +31,14 @@ struct Item {
     area: vec4<u32>,   // x0, y0, x1, y1 in view pixels, ends exclusive
     texel: vec4<u32>,  // atlas x, y of the area's top-left; page; shade length
     shade: vec4<u32>,  // map rows, used in order
-    blend: vec4<u32>,  // op (0 opaque, 1 index table), table base row, 0, 0
+    blend: vec4<u32>,  // op (0 opaque, 1 index table, 2 index table src row), table base row, 0, 0
+    light: vec4<u32>,  // gradient kind (0 none, 1 wall, 2 RLE floor), light map 0 row, corners c0..c3 (bytes), dx | dy << 16
 }
 
 const BIN_SIZE: u32 = 32u;
 const BLEND_OPAQUE: u32 = 0u;
+const BLEND_INDEX_TABLE_SRC_ROW: u32 = 2u;
+const GRADIENT_WALL: u32 = 1u;
 
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var<storage, read> items: array<Item>;
@@ -62,6 +69,26 @@ fn shade(it: Item, index: u32) -> u32 {
     return s;
 }
 
+fn corner(it: Item, i: u32) -> i32 {
+    return i32((it.light.z >> (8u * i)) & 0xffu);
+}
+
+// Light map row of area pixel (ax, ay) of a gradient-lit item: block
+// column x, row r; a_r, b_r the row's left and right levels; G[a][b][x].
+fn gradient_row(it: Item, ax: u32, ay: u32) -> u32 {
+    var scale = 16;
+    var shift = 7u;
+    if it.light.x == GRADIENT_WALL {
+        scale = 32;
+        shift = 8u;
+    }
+    let x = i32(ax + (it.light.w & 0xffffu));
+    let r = i32(ay + (it.light.w >> 16u));
+    let a = (scale * corner(it, 0u) + r * (corner(it, 3u) - corner(it, 0u))) >> shift;
+    let b = (scale * corner(it, 1u) + r * (corner(it, 2u) - corner(it, 1u))) >> shift;
+    return it.light.y + u32((32 * a + x * (b - a)) >> 5u);
+}
+
 @compute @workgroup_size(16, 16, 1)
 fn compose(@builtin(global_invocation_id) gid: vec3<u32>) {
     let px = gid.x;
@@ -85,9 +112,14 @@ fn compose(@builtin(global_invocation_id) gid: vec3<u32>) {
         if src == 0u {
             continue;
         }
-        let s = shade(it, src);
+        var s = shade(it, src);
+        if it.light.x != 0u {
+            s = map_byte(gradient_row(it, px - it.area.x, py - it.area.y), s);
+        }
         if it.blend.x == BLEND_OPAQUE {
             value = s;
+        } else if it.blend.x == BLEND_INDEX_TABLE_SRC_ROW {
+            value = map_byte(it.blend.y + s, value);
         } else {
             value = map_byte(it.blend.y + value, s);
         }

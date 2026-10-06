@@ -270,6 +270,53 @@ fn index_table_every_src_and_dest() {
     }
 }
 
+/// §A5 `IndexTableSrcRow`: the same table read transposed, `dest =
+/// table[src][dest]` (the lit translucent wall drawer).
+// Covers: specs/client/render-pipeline.md §a5-blend-ops
+// Covers: specs/render/blend-modes.md §2
+#[test]
+fn index_table_src_row_every_src_and_dest() {
+    let table = blend_table();
+    let mut maps = MapTable::new();
+    maps.push(map_with(&[]));
+    let base = maps.push_table(&table);
+    let dest = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p / 256) as u8).collect(),
+    };
+    let src = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p % 256) as u8).collect(),
+    };
+    let mut over = DrawItem::new(FrameId(1), 0, 0);
+    over.blend = BlendOp::IndexTableSrcRow(base);
+    let view = Rect::new(0, 0, 256, 256);
+    let items = [DrawItem::new(FrameId(0), 0, 0), over];
+    let out = compose(&items, &vec![dest, src], &maps, view).unwrap();
+    for d in 0..256usize {
+        for s in 0..256usize {
+            let want = if s == 0 { d as u8 } else { table[s][d] };
+            assert_eq!(out[d * 256 + s], want, "src {s} dest {d}");
+        }
+    }
+    // A table past the map table is refused like `IndexTable`.
+    let mut bad = DrawItem::new(FrameId(1), 0, 0);
+    bad.blend = BlendOp::IndexTableSrcRow(MapId(2));
+    assert!(compose(
+        &[bad],
+        &vec![FrameImage {
+            width: 1,
+            height: 1,
+            pixels: vec![1]
+        }],
+        &maps,
+        view
+    )
+    .is_err());
+}
+
 // Covers: specs/client/render-pipeline.md §a5-blend-ops, §a4-shade-chain-and-palette-slots
 #[test]
 fn chain_applies_before_blend() {

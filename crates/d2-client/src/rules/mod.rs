@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md
+// Spec: specs/render/camera.md, specs/render/sprite-placement.md, specs/render/draw-order.md, specs/render/unit-composite.md, specs/render/shading.md, specs/render/blend-modes.md
 //! Original-behavior answers to the world-view hooks, one owner spec per
 //! module. Plain Rust, integer math, no Bevy types.
 //!
@@ -18,15 +18,25 @@
 //! - [`draw_order`]: the draw-cell grid, its lists, the world passes and
 //!   the draw keys of a frame (`render/draw-order.md`), wired in through
 //!   [`draw_order::source::OrderedSource`].
+//! - [`shading`]: the act palette-table block as map-table rows (light
+//!   maps, the computed highlight and red maps, remaps), cel light maps,
+//!   DT1 wall and floor block light (`render/shading.md`).
+//! - [`blend`]: draw mode → blend table and the pixel ops of a cel
+//!   (through `scene::PixelTables`), component, missile, item and overlay
+//!   draw modes, shadows, translucent walls (`render/blend-modes.md`).
 
+pub mod blend;
 pub mod camera;
 pub mod draw_order;
 pub mod placement;
+pub mod shading;
 pub mod unit_composite;
 pub mod view;
 
 #[cfg(test)]
 mod gaps_numbered_tests;
+#[cfg(test)]
+mod shading_blend_tests;
 #[cfg(test)]
 mod tests;
 

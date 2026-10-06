@@ -1,5 +1,7 @@
 // Spec: specs/client/render-pipeline.md (A9)
 // Spec: specs/render/composition.md (§3 frame cycle, §5 one pixel write)
+// Spec: specs/render/shading.md (§4 tile light gradients)
+// Spec: specs/render/blend-modes.md (§2 table orientation per drawer)
 //! Packing the draw list for the GPU: plain Rust, explicit little-endian.
 //!
 //! Buffers (WGSL bindings of group 0, `compositor.wgsl`):
@@ -31,14 +33,16 @@ use super::GpuError;
 
 /// Size of the params uniform in bytes.
 pub const PARAMS_SIZE: usize = 48;
-/// Size of one packed item in bytes (four `vec4<u32>`).
-pub const ITEM_SIZE: usize = 64;
+/// Size of one packed item in bytes (five `vec4<u32>`).
+pub const ITEM_SIZE: usize = 80;
 /// Bytes per map-table row.
 pub const MAP_ROW_SIZE: usize = 256;
 /// [`GpuItem::blend`] of [`BlendOp::Opaque`].
 pub const BLEND_OPAQUE: u32 = 0;
 /// [`GpuItem::blend`] of [`BlendOp::IndexTable`].
 pub const BLEND_INDEX_TABLE: u32 = 1;
+/// [`GpuItem::blend`] of [`BlendOp::IndexTableSrcRow`].
+pub const BLEND_INDEX_TABLE_SRC_ROW: u32 = 2;
 
 /// Where the GPU finds a frame: the atlas slot of each [`FrameId`] (C3's
 /// atlas owns the numbering of slots, C4's frame source the ids).
@@ -60,7 +64,7 @@ impl SlotSource for Vec<AtlasSlot> {
     }
 }
 
-/// One draw item as the shader reads it (WGSL `Item`, 4 × `vec4<u32>`).
+/// One draw item as the shader reads it (WGSL `Item`, 5 × `vec4<u32>`).
 /// Coordinates are relative to the view's top-left, so every field is a
 /// non-negative integer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -76,14 +80,20 @@ pub struct GpuItem {
     pub shade_len: u32,
     /// Shade chain map rows; unused slots 0.
     pub shade: [u32; 4],
-    /// [`BLEND_OPAQUE`] or [`BLEND_INDEX_TABLE`].
+    /// [`BLEND_OPAQUE`], [`BLEND_INDEX_TABLE`] or
+    /// [`BLEND_INDEX_TABLE_SRC_ROW`].
     pub blend: u32,
-    /// First row of the blend table (`IndexTable`), else 0.
+    /// First row of the blend table (both table ops), else 0.
     pub blend_base: u32,
+    /// Light gradient ([`scene::LightGradient`]): kind code
+    /// ([`scene::GradientKind::code`], 0 = none), map row of light map 0,
+    /// corners `c0 | c1 << 8 | c2 << 16 | c3 << 24`, and the block column
+    /// and row of the area's top-left pixel `dx | dy << 16` (both 0…31).
+    pub light: [u32; 4],
 }
 
 impl GpuItem {
-    fn words(&self) -> [u32; 16] {
+    fn words(&self) -> [u32; ITEM_SIZE / 4] {
         let a = self.area;
         let s = self.shade;
         [
@@ -103,6 +113,10 @@ impl GpuItem {
             self.blend_base,
             0,
             0,
+            self.light[0],
+            self.light[1],
+            self.light[2],
+            self.light[3],
         ]
     }
 
@@ -124,6 +138,7 @@ impl GpuItem {
             shade: [w[8], w[9], w[10], w[11]],
             blend: w[12],
             blend_base: w[13],
+            light: [w[16], w[17], w[18], w[19]],
         }
     }
 }
@@ -376,6 +391,10 @@ where
             out.blend = BLEND_INDEX_TABLE;
             out.blend_base = base.0;
         }
+        BlendOp::IndexTableSrcRow(base) => {
+            out.blend = BLEND_INDEX_TABLE_SRC_ROW;
+            out.blend_base = base.0;
+        }
     }
     // The same area as the CPU's `DrawItem::resolve`.
     let image = Rect::new(item.x, item.y, width, height);
@@ -389,6 +408,18 @@ where
             slot.x + (i64::from(area.x) - i64::from(item.x)) as u32,
             slot.y + (i64::from(area.y) - i64::from(item.y)) as u32,
         ];
+        if let Some(g) = item.shade.gradient() {
+            // `scene::bin` checked the area lies inside the block.
+            let dx = (i64::from(area.x) - i64::from(g.x)) as u32;
+            let dy = (i64::from(area.y) - i64::from(g.y)) as u32;
+            let [c0, c1, c2, c3] = g.corners.map(u32::from);
+            out.light = [
+                g.kind.code(),
+                g.light0.0,
+                c0 | c1 << 8 | c2 << 16 | c3 << 24,
+                dx | dy << 16,
+            ];
+        }
     }
     Ok(out)
 }
@@ -444,10 +475,13 @@ pub fn emulate(packed: &Packed, pages: &[AtlasPage]) -> Result<Vec<u8>, GpuError
                 for &m in &it.shade[..it.shade_len as usize] {
                     s = map_byte(m, s);
                 }
-                value = if it.blend == BLEND_OPAQUE {
-                    s
-                } else {
-                    map_byte(it.blend_base + value, s)
+                if it.light[0] != 0 {
+                    s = map_byte(gradient_row(it, px - x0, py - y0), s);
+                }
+                value = match it.blend {
+                    BLEND_OPAQUE => s,
+                    BLEND_INDEX_TABLE_SRC_ROW => map_byte(it.blend_base + s, value),
+                    _ => map_byte(it.blend_base + value, s),
                 };
             }
             if params.clear_after != 0 {
@@ -457,6 +491,19 @@ pub fn emulate(packed: &Packed, pages: &[AtlasPage]) -> Result<Vec<u8>, GpuError
         }
     }
     Ok(out)
+}
+
+/// The shader's `gradient_row`: the light map row of area pixel
+/// `(ax, ay)` of a gradient-lit item, from the packed words only.
+fn gradient_row(it: &GpuItem, ax: u32, ay: u32) -> u32 {
+    let [kind, light0, corners, origin] = it.light;
+    let c = |i: u32| ((corners >> (8 * i)) & 0xFF) as i32;
+    let (scale, shift) = if kind == 1 { (32, 8) } else { (16, 7) };
+    let x = (ax + (origin & 0xFFFF)) as i32;
+    let r = (ay + (origin >> 16)) as i32;
+    let a = (scale * c(0) + r * (c(3) - c(0))) >> shift;
+    let b = (scale * c(1) + r * (c(2) - c(1))) >> shift;
+    light0 + ((32 * a + x * (b - a)) >> 5) as u32
 }
 
 /// Frames put in an atlas, for synthetic cases: slot `n` holds
