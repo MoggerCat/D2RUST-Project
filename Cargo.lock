@@ -5119,6 +5119,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-fixtures"
+version = "0.0.0"
+dependencies = [
+ "d2-data",
+ "d2-formats",
+ "d2-sim",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
