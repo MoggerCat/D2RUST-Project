@@ -32,23 +32,23 @@
 | Inputs | 68–78 |
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
-|   1. Inventory model | 89–172 |
-|   2. Grid placement | 173–251 |
-|   3. Belt | 252–306 |
-|   4. Equipping | 307–460 |
-|   5. Shared checks | 461–585 |
-|   6. Deferred item messages | 586–654 |
-|   7. Intents | 655–1031 |
-|   8. Pickup from the ground | 1032–1132 |
-|   9. Drop to the ground | 1133–1175 |
-|   10. Gold | 1176–1206 |
-|   11. Message layouts | 1207–1232 |
-| Constants & data dependencies | 1233–1255 |
-| Randomness | 1256–1268 |
-| Edge cases & original bugs | 1269–1284 |
-| Test vectors | 1285–1332 |
-| Provenance | 1333–1368 |
-| Open questions | 1369–1399 |
+|   1. Inventory model | 89–180 |
+|   2. Grid placement | 181–267 |
+|   3. Belt | 268–322 |
+|   4. Equipping | 323–476 |
+|   5. Shared checks | 477–601 |
+|   6. Deferred item messages | 602–674 |
+|   7. Intents | 675–1058 |
+|   8. Pickup from the ground | 1059–1159 |
+|   9. Drop to the ground | 1160–1202 |
+|   10. Gold | 1203–1233 |
+|   11. Message layouts | 1234–1259 |
+| Constants & data dependencies | 1260–1282 |
+| Randomness | 1283–1295 |
+| Edge cases & original bugs | 1296–1311 |
+| Test vectors | 1312–1359 |
+| Provenance | 1360–1395 |
+| Open questions | 1396–1426 |
 <!-- /index -->
 
 ## Summary
@@ -152,7 +152,7 @@ Measured on the 1.14d `inventory.bin` (32 records; the `.txt`
 | 10 / 11 | Guild Vault / Trophy Case | 10 × 4 |
 | 12 | Big Bank Page 1 (expansion stash) | 6 × 8 |
 | 13 | Hireling | 0 × 0 |
-| 16–31 | 800 × 600 copies of 0–15 (record 29: 255 × 255) | client only |
+| 16–31 | 800 × 600 layouts of records 0–15 (record r + 16): same grid sizes, different screen coordinates, except record 29 (`Hireling2`, `.txt` gridX/gridY −1, stored 255 × 255; record 13 is 0 × 0) | client only |
 
 The server uses records 0–15 only. Screen coordinates in the records are
 the client's (`client/ui.md` B5).
@@ -168,7 +168,15 @@ the client's (`client/ui.md` B5).
    capture walk the list from the first linked item).
 2. Update list (`0x0063CC70`): appends the item's GUID unless it is
    already listed (`0x0063CC30`).
-3. Cursor (`0x0063C1E0` get, `0x0063C180` set): one item, not in any grid.
+3. Cursor (`0x0063C1E0` get, `0x0063C180` set): one item, not in any grid
+   and **not** in the item list. Set with an item (an item unit with item
+   data): inventory +0x20 := item, item data +0x5C := inventory; nothing
+   else (no list link, no count change). Set with none: the current
+   cursor item, if any, is unlinked (`0x0063AAF0`: since it is the
+   cursor, only the cursor field is cleared, not the list or the count;
+   then as for any unlink: +0x5C, +0x68, +0x69 zeroed, item data +0x0C
+   := −1, `0x006277F0(owner, item)` when the inventory has an owner,
+   weapon GUID cleared if it matches).
 
 ### 2. Grid placement
 
@@ -182,6 +190,14 @@ y + h ≤ height.
 
 Grid = page + 2. Items with invwidth or invheight 0 never place. Bounds
 and fit as §2.1 (negative x or y become 0 in `0x00560200` before this).
+All arithmetic is signed 32-bit with wrap (`0x0063B05D`–`0x0063B08C`:
+x < 0 or x + w > width fails, the same for y): when x + w (or y + h)
+wraps past 2^31 the bound test passes, and the fit test (`0x0063A8A0`)
+and the cell marking (`0x0063A910`) loop from x to x + w with a signed
+`<`, so they run zero times: the item fits and is placed (linked,
+counted, x and y stored) without occupying any cell. Reproduce (e.g.
+0x18 with x = 0x7FFFFFFF on a 1-wide item). Grids 0 and 1 skip this
+bound test (1 × 1, callers check the slot).
 On success: an item still in a room (mode 3) is removed from the room
 (room delete notice `0x0061A270`, collision freed `0x00623830`, room list
 `0x0064C370`); unlinked from its old inventory; linked (§1.4); cells
@@ -642,7 +658,11 @@ items in mode 3 without unit flag 0x10 send 0x9C action 2 (dropped,
 `0x0053EC90`) when unit flag 0x1000 is set, else action 3 (on ground,
 `0x0053ECF0`). Flag 0x1000 is set by a drop (`0x00558AA0`) and by a
 refused pickup (`0x0055C9A0`) and cleared by the room clean-up
-(`0x00553220`).
+(`0x00553220`). Unit flag 0x10 is set at allocation (`sim/units.md`) and
+cleared, with 0x1, by the same room clean-up (`0x0055325A`, §6.1 rule
+4): an item allocated in this tick sends no ground message in the update
+pass that precedes its first clean-up; afterwards every update with +0xC4
+bit 0 sends one.
 
 #### 6.4 Direct sends
 
@@ -734,8 +754,15 @@ must give 2 (else out 1); requirements (not equipping) fail → stat
 refresh, sound, 0 (out 0). Then X leaves the body (`0x0062A360`,
 `0x0063D2B0`, unlink, slot cleared `0x0063BE30`; X of type 19 (belt) →
 `0x005608C0`, §3 rule 9, with no new belt) and becomes the cursor item (mode 4, unit
-flag 0x2 cleared); N goes to the location as §4.6 step 5 with command
-flag 0x10000 (0x9D action 7) instead of 0x8. Result 0 or 3.
+flag 0x2 cleared; no command flag and no update-list entry for X). N then
+goes to the location (`0x0063BDB0`) and is linked (kind 3; link failure →
+out 1, 0): body location, stat link, stat refresh, unit flag 0x2
+cleared, mode 1, page 0xFF, command flag 0x10000 (0x9D action 7), item
+flag 0x1, 0x4000 cleared, update list, weapon bookkeeping, inventory
+pass. The cursor is **not** cleared afterwards: X stays the cursor item
+(read at `0x00563D20`; §4.6 step 5's "cursor := none" does not apply). If
+the put at the location fails, N is left detached, X is the cursor, and
+the result is still 1 (original bug). Owner refresh; result 0 or 3.
 
 #### 7.7 0x1C RemoveBodyItem (`0x0054AEC0` → `0x00560CD0`)
 
