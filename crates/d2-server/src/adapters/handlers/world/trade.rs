@@ -1,8 +1,9 @@
-// Spec: specs/world/npc.md §1.1, §2–§4; specs/world/vendors.md §1, §3, §4, §7
-//! [`TradeWorld`]: the NPC and vendor systems on their `d2-sim`
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §10.2
+//! [`TradeWorld`]: the NPC, vendor and quest systems on their `d2-sim`
 //! providers (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
-//! NpcVendors`, [`VendorDesk`] for `VendorWorld`), beside the waypoints
-//! of [`ActionWorld`].
+//! NpcVendors`, [`VendorDesk`] for `VendorWorld`;
+//! `d2_sim::wiring::economy`: [`EconomyQuests`] for `QuestWorld`, on the
+//! same desk), beside the waypoints of [`ActionWorld`].
 //!
 //! One unit world: the economy ([`Economy`]) is built per call from the
 //! action wiring's own unit records, stat lists, unit data and hooks
@@ -19,16 +20,17 @@ use d2_sim::game::Game;
 use d2_sim::items::ItemTables;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::ActionHooks;
-use d2_sim::wiring::economy::{Economy, GameFields, ItemStore, QuestRest};
+use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, ItemStore, QuestRest};
 use d2_sim::wiring::interaction::{
-    Desk, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
+    Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
 };
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::QuestControl;
 use d2_sim::world::vendors::{GlobalLists, VendorTables};
 
 use super::{
-    ActionEvents, ActionWorld, NpcCall, Outbox, VendorCall, WaypointCall, WorldFault, WorldHost,
+    ActionEvents, ActionWorld, NpcCall, Outbox, QuestCall, VendorCall, WaypointCall, WorldFault,
+    WorldHost,
 };
 
 /// The seams of the NPC and vendor wiring without a provider: the
@@ -200,8 +202,33 @@ where
         WorldHost::<D>::waypoints(&mut self.action, game, events, call)
     }
 
-    /// The action wiring's sends (waypoints), then the rest's (NPC and
-    /// vendor messages); one system runs per message, so the two never
+    /// The quest control on the desk's economy and rest
+    /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
+    /// quest grants (`quests.md` §10.2) are collected during the call and
+    /// run on the NPC control block right after it (`npc.md` §7.5,
+    /// [`d2_sim::world::npc::NpcControl::quest_mercenary`] with the desk
+    /// as its world), before the result is returned: the order of
+    /// `Desk::quest_message`, here for every quest call. A reward's NPC
+    /// error goes to the interaction state's errors, as there.
+    fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
+        Some(self.desk(game, events, |desk, ctl| {
+            let mut rewards = Vec::new();
+            let out = {
+                let mut w = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
+                w.mercenaries = Some(&mut rewards);
+                call.call(&mut *desk.quests, &mut w)
+            };
+            for (p, class) in rewards {
+                if let Err(e) = ctl.quest_mercenary(desk, p, class) {
+                    desk.state.errors.push(InteractionError::Npc(e));
+                }
+            }
+            out
+        }))
+    }
+
+    /// The action wiring's sends (waypoints), then the rest's (NPC,
+    /// vendor and quest messages); one system runs per message, so the two never
     /// interleave.
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         let mut sent = events.action().hooks().x.take_sent();

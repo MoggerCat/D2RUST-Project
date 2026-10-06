@@ -1,14 +1,16 @@
 // Spec: specs/world/npc.md, specs/world/vendors.md, specs/world/waypoints.md, specs/world/quests.md
 //! The world handlers through the real host frame (drain → tick →
 //! flush, `intents-events.md` §1) on the real `d2-proto` sizes.
-//! Waypoints run on the wired `ActionSim` ([`waypoints`]); the NPC,
-//! vendor and quest seams have no `d2-sim` provider yet, so those tests
-//! run the real `d2-sim` modules on a seam fake ([`fake`]).
+//! Waypoints run on the wired `ActionSim` ([`waypoints`]); the quests
+//! also run on the wired `TradeWorld` ([`trade_quests`]). The NPC,
+//! vendor and quest tests in [`npc`], [`vendors`], [`quests`] run the
+//! real `d2-sim` modules on a seam fake ([`fake`]).
 
 mod fake;
 mod ids;
 mod npc;
 mod quests;
+mod trade_quests;
 mod vendors;
 mod waypoints;
 
