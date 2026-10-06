@@ -19,6 +19,7 @@ read from the text.
 | `§<s> r<N>` | item `N.` of the first numbered list (at column 0) directly under section `s` | `specs/sim/tick.md §5.2 r4` |
 | `§<s> l<K> r<N>` | item `N.` of the K-th list of section `s` (a list restarting at `1.` starts list K ≥ 2) | `specs/sim/tick.md §5.5 l2 r1` (the "Consequences" list) |
 | `§<s> text` | the section's own text (lines at column 0 outside its items: tables, prose, formulas) when the section also has items or subsections | `specs/sim/rng.md §3 text` (the helper table) |
+| `§<s> row<N>` / `§<s> t<K> row<N>` | data row `N` (after the header and separator lines) of a table that an opt-in marker line makes row-numbered (below); `t<K>` names the K-th marked table of the section, K ≥ 2 | `specs/sim/rng.md §5.4 row2` |
 
 Which sections hold rules: every `##` section of a spec except
 Summary, Inputs, Outputs / state changes, Constants & data dependencies,
@@ -28,6 +29,16 @@ original bugs, policy sections and spec-specific sections (`mpq.md`
 Archive set, `mpq-tables.md` A–D) count. Randomness restates the draw
 order its Rules own; Constants are data the rules use; Test vectors are
 the inputs of the checks, not rules.
+
+**Row units (opt-in).** A table is plain text (part of `§<s> text`) unless
+the line directly above it is `<!-- rows -->`. A marked table gives one
+unit per data row, numbered from 1 by position; the marker line, header
+and separator are not rule text. The section id and `§<s> text` keep
+their meaning (the section still covers its rows; `text` stays the
+unmarked prose), so no existing claim changes and a spec opts in table
+by table. A marker not directly above a table is an error. Row numbers
+are positional like list numbers: inserting a row renumbers the later
+ones and the tool reports claims that no longer exist (§4).
 
 **Units** (what the metric counts): every list item; every section
 without items or subsections; every `§<s> text`. A claim on a section
@@ -40,7 +51,7 @@ claims are fixed in the same change. A spec whose IDs repeat (two
 headings with one number, a list numbered 1, 2, 2) is an error until it
 is renumbered; nothing is guessed.
 
-Not counted yet: rows of machine-readable spec tables (`fields.tsv`,
+Not counted: rows of unmarked tables and of machine-readable spec tables (`fields.tsv`,
 `tables.tsv`, `*-messages.tsv`). Their checks are whole-table
 (`data-tool tables`, `tables_match_tsv`); a row-level metric would need
 row IDs and is left for when it is needed (M10).
