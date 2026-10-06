@@ -65,6 +65,14 @@ one sentence of evidence, e.g. "verified: `data-tool tables` reproduces all
 - Implementation sessions that find a gap add an open question to the spec
   and let the real data decide; they don't peek at `re/` or `../refs/`.
 - A spec past ~60 KB usually mixes several owners: split it.
+- Before pushing a spec branch, in the same commit: `py tools/spec_index.py
+  --check` and `py tools/coverage.py --check` pass (a renumbered list must
+  not repeat a rule id); if `specs/sim/*-messages.tsv` changed, run
+  `cargo run -p data-tool -- gen-proto` and commit `crates/d2-proto/src/
+  generated.rs`. A TSV cell uses only the grammar its spec documents
+  (`sim/intents-events.md` §5 for message layouts); new syntax needs the
+  parser change first, otherwise state the fact in prose and leave the cell
+  empty.
 
 ## Good examples
 

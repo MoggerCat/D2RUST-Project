@@ -702,7 +702,7 @@ fn scan_room_flags() {
     assert_eq!(w.drlg.room(room_at(&w, l, 0, 0)).dt1_mask, 3);
 }
 
-// Covers: specs/drlg/preset.md §6 r5, §edge-cases-original-bugs
+// Covers: specs/drlg/preset.md §6 r5, §edge-cases-original-bugs r1
 #[test]
 fn size_mismatch_fatal_only_at_build() {
     let mut w = World::new();
@@ -869,7 +869,7 @@ fn lazy_load_filters_on_room_seed() {
     assert_eq!(w.cache.refs(b"t.ds1"), 1);
 }
 
-// Covers: specs/drlg/preset.md §8 r2, §edge-cases-original-bugs
+// Covers: specs/drlg/preset.md §8 r2, §edge-cases-original-bugs r9
 #[test]
 fn navi_unit() {
     let mut w = World::new();

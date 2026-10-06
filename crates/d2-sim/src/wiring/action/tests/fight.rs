@@ -1,4 +1,4 @@
-// Spec: specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/items/treasure.md §3, §7, §8; specs/sim/tick.md §3, §4 (shared fixtures)
+// Spec: specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/combat/vitals.md §2, §3, §4.2, §4.3; specs/formats/animdata.md §5; specs/sim/units.md §4.1, §4.2, §4.6; specs/sim/tick.md §3, §4 (shared fixtures)
 //! The combat / missile fixtures of the end-to-end combat path
 //! (`docs/handoff/e2e-combat-path.md`), shared by the client's
 //! single-player e2e (`d2-client/tests/e2e_single_player.rs`) and the
@@ -11,10 +11,9 @@
 //! missile flights, hits, damage, kills (death mode, experience, level
 //! up) and the monsters' AI on top of the timer queue.
 
-use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::{
-    Charstats, Difficultylevels, Experience, Itemratio, Itemtypes, Levels, Missiles as MissileRow,
-    Monstats, Monstats2, Skilldesc, Skills,
+    Charstats, Difficultylevels, Experience, Levels, Missiles as MissileRow, Monstats, Monstats2,
+    Skilldesc, Skills,
 };
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 
@@ -22,16 +21,12 @@ use super::{blank, Fx};
 use crate::combat::vitals::VitalsTables;
 use crate::combat::CombatTables;
 use crate::drlg::collision::bits;
-use crate::items::tables::ItemRec;
-use crate::items::{ty, ItemTables};
 use crate::missiles::{create_missile, param_flags, unit_flag, MissileParams};
 use crate::skills::{SkillTables, LEVEL_CAP_114D};
 use crate::stats::stat as st;
-use crate::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use crate::units::lists::client_state;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::action::{ActionTables, Pending};
-use crate::wiring::economy::DropTables;
 use std::sync::Arc;
 
 /// The right skill of the e2e cast (the Multiple Shot slot).
@@ -198,98 +193,6 @@ pub fn anim_data() -> AnimData {
     put(PLAYER_SC, 8, Some(4));
     put(MONSTER_DT, 4, None);
     a
-}
-
-/// Items: gold only (`ty::GOLD`, a child of `ty::MISC`); treasure class
-/// 1: one pick of gold.
-pub fn drop_tables() -> DropTables {
-    let n: usize = 40;
-    let words = n.div_ceil(32);
-    let mut equiv = EquivMatrix {
-        n,
-        words,
-        bits: vec![0; n * words],
-    };
-    for i in 1..n {
-        equiv.bits[i * words] |= 1;
-        equiv.bits[i * words + i / 32] |= 1 << (i % 32);
-    }
-    let (g, m) = (usize::from(ty::GOLD), usize::from(ty::MISC));
-    equiv.bits[g * words + m / 32] |= 1 << (m % 32);
-    let mut itemtypes: Vec<Itemtypes> = (0..n)
-        .map(|_| {
-            let mut t: Itemtypes = blank();
-            (t.class, t.staffmods, t.rare) = (0xFF, 0xFF, 1);
-            t
-        })
-        .collect();
-    // Gold is always normal quality (itemtypes `Normal`, `treasure.md`
-    // §6 step 1).
-    itemtypes[g].normal = 1;
-    let mut ratio: Itemratio = blank();
-    ratio.version = 1;
-    let gold = ItemRec {
-        code: *b"gld ",
-        type_: ty::GOLD as i16,
-        level: 1,
-        ..ItemRec::default()
-    };
-    let items = ItemTables {
-        items: vec![gold],
-        itemtypes,
-        equiv,
-        itemratio: vec![ratio],
-        valshift: vec![0; 359],
-        stat_shift: 6,
-        stat_mask: 0x3F,
-        ..ItemTables::default()
-    };
-    let treasure_items = items
-        .items
-        .iter()
-        .map(|r| ItemData {
-            code: r.code,
-            ubercode: r.ubercode,
-            ultracode: r.ultracode,
-            version: r.version,
-            level: r.level,
-            type_: r.type_ as u16,
-            type2: r.type2 as u16,
-            unique: r.unique,
-            quest: r.quest,
-            spawnable: 1,
-        })
-        .collect();
-    let tc = |name: &[u8], entries: Vec<TcEntry>, total| TreasureClass {
-        name: name.to_vec(),
-        group: 0,
-        level: 0,
-        total_classic: total,
-        total_expansion: total,
-        picks: 1,
-        nodrop: 0,
-        mods: [0; 6],
-        entries,
-    };
-    let gold_entry = TcEntry {
-        start_classic: 0,
-        start_expansion: 0,
-        id: 0,
-        row: 0,
-        flags: 0,
-        mods: [0; 6],
-    };
-    DropTables {
-        items,
-        tcs: TreasureClasses {
-            tcs: vec![tc(b"none", Vec::new(), 0), tc(b"gold", vec![gold_entry], 1)],
-            group_offset: 0,
-            chest: [None; 45],
-            notes: Vec::new(),
-        },
-        treasure_items,
-        superuniques: Vec::new(),
-    }
 }
 
 // ---- the fight ------------------------------------------------------------------------

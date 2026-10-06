@@ -273,11 +273,11 @@ None. The bridge draws no random numbers.
 
 ## Edge cases & original bugs
 
-- S→C ids with size 0 that a server builder can still produce (0x83,
+1. S→C ids with size 0 that a server builder can still produce (0x83,
   0x84, 0x88, `intents-events.md` §3.1 rule 3) end the split: the bridge
   discards the rest of the chunk exactly as 1.14d does and records it.
-- 0x80 can never be received (size 0, §3.1 rule 2); same handling.
-- Ids 0x6E–0x72 have a unit handler but are 1 byte long: the unit lookup
+2. 0x80 can never be received (size 0, §3.1 rule 2); same handling.
+3. Ids 0x6E–0x72 have a unit handler but are 1 byte long: the unit lookup
   of §5 rule 4 has no bytes to read (open question 3).
 
 ## Test vectors

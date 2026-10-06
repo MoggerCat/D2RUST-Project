@@ -1,9 +1,10 @@
-// Spec: specs/formats/mpq.md §1, §5–§9; specs/formats/dc6.md; specs/formats/dcc.md
+// Spec: specs/formats/mpq.md §1, §5–§9, §11; specs/formats/dc6.md; specs/formats/dcc.md
 //! Performance baselines of `d2-formats` (criterion;
 //! `docs/handoff/bench-baselines.md`): MPQ open / read / decompress of a
-//! synthetic archive, DC6 and DCC decode of synthetic frames (the shallow
-//! ones below, and live-shaped files from `test_fixtures::sprites`). Not
-//! run in CI; `cargo bench -p d2-formats`.
+//! synthetic archive, Huffman sector decompression (`mpq_huffman`), DC6
+//! and DCC decode of synthetic frames (the shallow ones below, and
+//! live-shaped files from `test_fixtures::sprites`). Not run in CI;
+//! `cargo bench -p d2-formats`.
 
 use std::hint::black_box;
 
@@ -11,7 +12,7 @@ use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 use d2_formats::dc6::Dc6;
 use d2_formats::dcc::Dcc;
-use d2_formats::mpq::writer::{FileOptions, MpqWriter};
+use d2_formats::mpq::writer::{huffman as huffman_stream, FileOptions, Method, MpqWriter, Pkware};
 use d2_formats::mpq::Archive;
 
 /// Names and contents of the synthetic archive: a 256 KiB text file
@@ -72,6 +73,68 @@ fn bench_mpq(c: &mut Criterion) {
     g.bench_function("read_64k_plain", |b| {
         b.iter(|| black_box(archive.read(plain).expect("read")))
     });
+    g.finish();
+    let _ = std::fs::remove_file(&path);
+}
+
+/// Huffman sectors (§11), 256 KiB in 512-byte sectors: the text above under
+/// tables 0–3 (table 0 is the adaptive one) and under table 0 then PKWARE
+/// (mask 0x09); small signed deltas (-3..=3, like ADPCM output) under the
+/// tables that shrink them. Every case is checked to store compressed
+/// sectors, so none is measuring a raw copy.
+fn bench_huffman(c: &mut Criterion) {
+    let text = mpq_files().swap_remove(0).1;
+    let mut s = 0x1234_5678u32;
+    let deltas: Vec<u8> = (0..256 * 1024)
+        .map(|_| {
+            s = s.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+            (((s >> 16) % 7) as i8 - 3) as u8
+        })
+        .collect();
+    let huffman = |table, pkware| Method::Huffman { table, pkware };
+    let mut cases: Vec<(String, &[u8], Method)> = (0..4u8)
+        .map(|t| (format!("text_table{t}"), &text[..], huffman(t, None)))
+        .collect();
+    cases.push((
+        "text_table0_pkware".into(),
+        &text,
+        huffman(0, Some(Pkware::default())),
+    ));
+    for t in [0, 1, 4, 5, 6] {
+        cases.push((format!("deltas_table{t}"), &deltas, huffman(t, None)));
+    }
+    for (name, data, method) in &cases {
+        if let Method::Huffman { table, .. } = method {
+            let sector = &data[..512];
+            assert!(
+                huffman_stream(*table, sector).len() < sector.len(),
+                "{name}"
+            );
+        }
+    }
+
+    let mut w = MpqWriter::new().sector_size_shift(0);
+    for (name, data, method) in &cases {
+        let options = FileOptions {
+            method: *method,
+            ..FileOptions::default()
+        };
+        w.add(name, data.to_vec(), options);
+    }
+    let path = std::env::temp_dir().join(format!(
+        "d2-formats-bench-huffman-{}.mpq",
+        std::process::id()
+    ));
+    w.write(&path).expect("write archive");
+    let archive = Archive::open(&path).expect("open");
+    let mut g = c.benchmark_group("mpq_huffman");
+    for (name, data, _) in &cases {
+        assert_eq!(&archive.read(name).expect("read")[..], *data, "{name}");
+        g.throughput(Throughput::Bytes(data.len() as u64));
+        g.bench_function(name.as_str(), |b| {
+            b.iter(|| black_box(archive.read(name).expect("read")))
+        });
+    }
     g.finish();
     let _ = std::fs::remove_file(&path);
 }
@@ -248,5 +311,11 @@ fn bench_live_sprites(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, bench_mpq, bench_sprites, bench_live_sprites);
+criterion_group!(
+    benches,
+    bench_mpq,
+    bench_huffman,
+    bench_sprites,
+    bench_live_sprites
+);
 criterion_main!(benches);

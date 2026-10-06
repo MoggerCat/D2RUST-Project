@@ -43,11 +43,11 @@ giving a palette index.
 
 | Field | Size (bytes) | Count of 256-byte maps |
 |---|---|---|
-| base palette: 256 × 4 bytes (copy of the `.dat` colors, ignored) | 1024 | — |
+| base palette: 256 × (R, G, B, x); 1.14d presents it (`render/composition.md` §4) | 1024 | — |
 | light level variations [32] | 8192 | 32 |
 | inventory color variations [16] | 4096 | 16 |
 | selected-unit shift | 256 | 1 |
-| alpha blend [3][256] (indexed by [level][source index], gives a map over the destination index) | 196608 | 768 |
+| alpha blend [3][256] (indexed by [level][destination index], each a map over the source index: `render/composition.md` §5) | 196608 | 768 |
 | additive blend [256] | 65536 | 256 |
 | multiplicative blend [256] | 65536 | 256 |
 | hue variations [111] | 28416 | 111 |
@@ -106,9 +106,10 @@ No Blizzard code or decompiler output was consulted.
 1. ~~Byte order of the PL2 base palette~~: R, G, B, x, and it is not
    ignored: 1.14d presents it (`render/composition.md` §4). Whether it
    equals the `.dat` colors is `composition.md` OQ1.
-2. Index order of the alpha / additive / multiplicative 256×256 tables:
-   1.14d's drawer reads them row = destination, column = source
-   (`render/composition.md` §5), the reverse of the Layout table's wording.
+2. ~~Index order of the alpha / additive / multiplicative 256×256
+   tables~~: row = destination, column = source (`render/composition.md`
+   §5; the Layout table now says so). The `d2-formats` doc comment of
+   `Pl2::alpha_blend` still says `[level][source index]`: a code-doc edit.
    Owner of the meaning: `render/blend-modes.md`.
 2. Rendering meaning of each table: to be specified in a Phase 1b rendering
    spec, checked visually against the original game.

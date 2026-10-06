@@ -7,13 +7,15 @@
 //! provides ([`InvFx`]). Each test crate uses a part of it.
 #![allow(dead_code)]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::{Itemratio, Itemtypes, Monstats, Record};
-use d2_server::adapters::handlers::items::moves::MoveRest;
-use d2_server::adapters::handlers::world::Outbox;
-use d2_sim::items::inventory::InteractionTarget;
+use d2_server::adapters::handlers::items::moves::{InvParts, MoveRest};
+use d2_server::adapters::handlers::world::{ActionEvents, Outbox, WiredWorld};
+use d2_sim::game::Game;
+use d2_sim::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use d2_sim::items::inventory::{InteractionTarget, InvTables, UnitKind as InvKind};
 use d2_sim::items::moves::{Guid, MovePending, Owner, Spot};
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
@@ -40,18 +42,22 @@ pub fn blank<T: Record>() -> T {
     T::decode(&vec![0u8; T::SIZE])
 }
 
+/// The vendors' player-inventory calls the server's `WiredWorld` answers
+/// from its inventory model (`handlers::items::InvVendors`) before they
+/// reach a rest.
+const MODEL: &str = "WiredWorld answers from the inventory model";
+
 /// The interaction seams no written spec provides
 /// (`wire-interaction.md` §6): staged answers (positions as a fixed
-/// distance, the player's interact unit, the player's quest records and
-/// inventory, the NPC grid always having room, the carried-gold caps)
-/// and a log of every call that would change state outside `d2-sim`.
-/// The item copy `0x0055A2A0` answers null: no spec writes it.
+/// distance, the player's interact unit, the player's quest records,
+/// the NPC grid always having room, the carried-gold caps) and a log of
+/// every call that would change state outside `d2-sim`. The item copy
+/// `0x0055A2A0` answers null: no spec writes it. The player's inventory
+/// is the host's inventory model, not this rest's.
 #[derive(Default)]
 pub struct Rest {
     pub interact: BTreeMap<UnitId, (u8, u32)>,
     pub quests: BTreeMap<UnitId, PlayerQuests>,
-    /// The player's items (inventory spec): what `owns_item` answers.
-    pub inventory: BTreeSet<UnitId>,
     pub last_bought: BTreeMap<UnitId, u32>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
@@ -196,7 +202,7 @@ impl VendorRest for Rest {
         self.last_bought.insert(p, guid);
     }
     fn has_cursor_item(&self, _: UnitId) -> bool {
-        false
+        unreachable!("{MODEL}")
     }
     /// `0x0055A2A0`: no items spec writes the copy. Null: the vendor
     /// code's own refusal runs (`vendors.md` §7.1 rule 9.2, §7.2 rule 8).
@@ -247,14 +253,14 @@ impl VendorRest for Rest {
     fn add_trade_inventory(&mut self, class: u16, item: UnitId) {
         self.log.push(format!("trade inv {class} {}", item.0));
     }
-    fn owns_item(&self, _: UnitId, item: UnitId) -> bool {
-        self.inventory.contains(&item)
+    fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
-    fn in_inventory(&self, _: UnitId, item: UnitId) -> bool {
-        self.inventory.contains(&item)
+    fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
-        Vec::new()
+        unreachable!("{MODEL}")
     }
     fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
@@ -272,18 +278,15 @@ impl VendorRest for Rest {
     fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
-    fn place_in_backpack(&mut self, _: UnitId, item: UnitId) -> bool {
-        self.log.push(format!("backpack {}", item.0));
-        false
+    fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
+        unreachable!("{MODEL}")
     }
     fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
-    /// `0x0055DF10` (inventory spec): the staged inventory forgets it.
-    fn remove_stored(&mut self, _: UnitId, item: UnitId) {
-        self.log.push(format!("remove stored {}", item.0));
-        self.inventory.remove(&item);
+    fn remove_stored(&mut self, _: UnitId, _: UnitId) {
+        unreachable!("{MODEL}")
     }
     fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
         false
@@ -623,4 +626,83 @@ impl MoveRest for InvFx {
     fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
         self.with(|r| std::mem::take(&mut r.sent))
     }
+}
+
+/// Inventory tables (`inventory.md` §1.3 grid records: player classes
+/// 10 × 4, the cube 3 × 4, ...) over the item tables' records with the
+/// given (invwidth, invheight); helms on the head, shields in either
+/// hand (§4).
+pub fn inv_tables(t: &ItemTables, sizes: &[(u8, u8)]) -> InvTables {
+    let g = |x, y| GridRec {
+        grid_x: x,
+        grid_y: y,
+    };
+    let mut grids = vec![g(10, 4); 16];
+    grids[5] = g(10, 10);
+    grids[8] = g(6, 4);
+    grids[9] = g(3, 4);
+    grids[12] = g(6, 8);
+    grids[13] = g(0, 0);
+    let mut itemtypes = vec![
+        InvTypeRec {
+            class: 7,
+            ..InvTypeRec::default()
+        };
+        t.itemtypes.len()
+    ];
+    for (ty, loc1, loc2) in [(ty::HELM, 1, 1), (ty::SHIE, 5, 4)] {
+        let r = &mut itemtypes[usize::from(ty)];
+        r.body = 1;
+        r.bodyloc1 = loc1;
+        r.bodyloc2 = loc2;
+    }
+    InvTables {
+        grids,
+        belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
+        items: t
+            .items
+            .iter()
+            .zip(sizes)
+            .map(|(r, &(w, h))| InvItemRec {
+                code: r.code,
+                type_: r.type_,
+                invwidth: w,
+                invheight: h,
+                ..InvItemRec::default()
+            })
+            .collect(),
+        itemtypes,
+        equiv: t.equiv.clone(),
+    }
+}
+
+/// The server host's inventory model over `tables` with the item-move
+/// seams of `inv`, and the player's inventory (`0x0063ABD0` at player
+/// creation: the unit spec's, done here).
+pub fn inv_parts(tables: InvTables, inv: InvFx, player: UnitId, class: u8, guid: u32) -> InvParts {
+    let mut parts = InvParts::new(tables, Box::new(inv));
+    parts
+        .state
+        .add_inventory(player, InvKind::Player { class }, guid);
+    parts
+}
+
+/// Puts `item` on page `page` of the player's inventory through
+/// `inventory.md` §2.4 (from the cursor, a free position, no "send"): a
+/// fixture's stored item, as a loaded character's would be.
+pub fn store<D: ActionEvents, R, S>(
+    world: &mut WiredWorld<R, S>,
+    game: &mut Game,
+    events: &mut D,
+    (player, item): (UnitId, UnitId),
+    page: u8,
+) {
+    let sys = &mut events.action().sys;
+    sys.units.get_mut(item).expect("item unit").mode = 4;
+    sys.hooks.items.get_mut(item).expect("item").inv_page = page;
+    let placed = world.with_economy(game, events, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory parts");
+        inv.desk(econ).place(player, item, (0, 0), true, false)
+    });
+    assert!(placed, "stored");
 }

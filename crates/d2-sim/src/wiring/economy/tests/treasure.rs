@@ -9,8 +9,8 @@ use crate::wiring::economy::{dropper, find_list, recipient, DropPlacer, DropSpot
 /// Places every drop at the dropper's position in no room.
 struct Here;
 
-impl DropPlacer for Here {
-    fn place(&mut self, x: i32, y: i32) -> Option<DropSpot> {
+impl<H> DropPlacer<H> for Here {
+    fn place(&mut self, _: &mut Economy<'_, H>, x: i32, y: i32) -> Option<DropSpot> {
         Some(DropSpot { room: None, x, y })
     }
 }

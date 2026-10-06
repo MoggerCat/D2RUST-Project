@@ -10,7 +10,7 @@ use std::sync::Arc;
 use d2_data::bin::BinTable;
 use d2_data::tables::{Itemstatcost, Record};
 
-use super::lists::{flag, owner, RemoveCallback};
+use super::lists::{flag, owner, RemoveCallback, StatListError};
 use super::tests::{data, item_list, itemstatcost_with, player, set_u16, Log, ITEM, N, P};
 use super::*;
 use crate::units::{UnitId, UnitType};
@@ -1133,4 +1133,122 @@ fn free_leaves_parked_children_pointing_at_the_parent() {
         (lists.parent(s), lists.attached_unit(s)),
         (Some(p), Some(P))
     );
+}
+
+// ---- edge case 4 and stale handles (handoff 7n) ----------------------------------
+
+/// Edge case 4 (§10.4): an expired extended list in the active chain
+/// loops forever in 1.14d. d2rs stops the walk there with an error, in
+/// the state the original spins in: the plain due list met first is
+/// freed (its remove callback runs), the extended one and every list
+/// behind it stay.
+// Covers: specs/sim/stat-lists.md §10.4, §edge-cases-original-bugs r4
+#[test]
+fn expired_extended_list_stops_the_walk() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    // Deepest: a plain due list behind the extended one.
+    let behind = lists.alloc(0, 0, owner::PLAYER, 1);
+    lists.set_state(behind, 40);
+    lists.set_expire(behind, 10);
+    lists.attach(&mut log, P, behind, true);
+    let i = item_list(&mut lists, &mut log, &[(0, 4)]);
+    lists.set_expire(i, 10);
+    lists.attach(&mut log, P, i, true);
+    // Head: a plain due list with a remove callback.
+    let s = lists.alloc(0, 0, owner::PLAYER, 1);
+    lists.set_state(s, 30);
+    lists.set_expire(s, 10);
+    lists.set(&mut log, s, 0, 5, 0, None);
+    lists.set_remove_callback(s, Some(RemoveCallback(1)));
+    lists.attach(&mut log, P, s, true);
+    assert_eq!(lists.active_chain(p), [s, i, behind]);
+
+    assert_eq!(
+        lists.expire_lists(&mut log, P, 10),
+        Err(StatListError::EndlessExpiry(i))
+    );
+    assert!(!lists.is_live(s));
+    assert_eq!(log.removed, [(P, 30)]);
+    assert_eq!(lists.active_chain(p), [i, behind]);
+    assert_eq!(lists.total(p, 0, 0), 34);
+    // Not due yet: the walk passes the extended list.
+    let mut lists2 = lists.clone();
+    assert_eq!(lists2.expire_lists(&mut log, P, 9), Ok(()));
+    assert_eq!(lists2.active_chain(p), [i, behind]);
+}
+
+/// Stale handles: a freed [`ListId`] (also once its slot is reused) reads
+/// as a null list (`stats.md` §4.2: reads 0; `stat-lists.md` §5: writes
+/// do nothing; §8.4: a missing item list does nothing) and changes no list.
+#[test]
+fn stale_list_handles_act_as_null_lists() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    let stale = item_list(&mut lists, &mut log, &[(0, 4)]);
+    lists.attach(&mut log, P, stale, true);
+    lists.free(&mut log, stale);
+    let plain = lists.alloc(0, 0, owner::PLAYER, 1);
+    let stale_plain = plain;
+    lists.free(&mut log, plain);
+    // Reuse the freed slots with live lists that must stay untouched.
+    let reused = lists.alloc(0, 7, owner::MONSTER, 9);
+    lists.set(&mut log, reused, 0, 3, 0, None);
+    lists.attach(&mut log, P, reused, true);
+    let before = format!("{lists:?}");
+    log.callbacks.clear();
+    for l in [stale, stale_plain] {
+        assert!(!lists.is_live(l));
+        assert_eq!(lists.flags(l), 0);
+        assert!(!lists.is_extended(l));
+        assert_eq!((lists.owner_type(l), lists.owner_guid(l)), (0, 0));
+        assert_eq!(lists.owner(l), None);
+        assert_eq!(lists.attached_unit(l), None);
+        assert_eq!(
+            (lists.parent(l), lists.prev(l), lists.next(l)),
+            (None, None, None)
+        );
+        assert_eq!(lists.heads(l), (None, None));
+        assert_eq!(
+            (lists.state(l), lists.expire(l), lists.skill(l)),
+            (0, 0, (0, 0))
+        );
+        assert!(lists.base_entries(l).is_empty());
+        assert!(lists.full_entries(l).is_empty());
+        assert!(lists.mods(l).is_empty());
+        assert!(lists.active_chain(l).is_empty() && lists.parked_chain(l).is_empty());
+        assert_eq!((lists.base(l, 0, 0), lists.total(l, 0, 0)), (0, 0));
+        assert_eq!(lists.percent_adjusted(l, 0, 3, true), 0);
+        assert_eq!(lists.eval(&log, l, 0), 0);
+        assert_eq!(lists.list_of_state(l, 0), None);
+        assert_eq!(lists.list_by_flags(l, 0), None);
+
+        lists.set_flags(l, flag::DYNAMIC, true);
+        lists.set_state(l, 30);
+        lists.set_expire(l, 5);
+        lists.set_skill(l, 1, 2);
+        lists.set_remove_callback(l, Some(RemoveCallback(1)));
+        lists.propagate(&mut log, l, 0, 5, None);
+        assert_eq!(lists.recompute(&mut log, l, 0, None), 0);
+        assert!(!lists.set(&mut log, l, 0, 5, 0, None));
+        lists.add(&mut log, l, 0, 5, 0);
+        lists.remove_all(&mut log, l);
+        lists.merge(&mut log, l, reused);
+        lists.merge(&mut log, reused, l);
+        lists.attach(&mut log, P, l, true);
+        lists.detach(&mut log, l);
+        lists.unit_detach(&mut log, l);
+        lists.equip(&mut log, P, Some(l), false, true);
+        lists.equip(&mut log, P, Some(l), true, true);
+        lists.make_static(&mut log, P, l, false);
+        lists.make_dynamic(&mut log, P, l, false);
+        lists.by_time_refresh(&mut log, P, l);
+        lists.free_plain(&mut log, l);
+        lists.free(&mut log, l);
+    }
+    assert_eq!(format!("{lists:?}"), before);
+    assert!(log.callbacks.is_empty());
+    assert_eq!(lists.total(p, 0, 0), 33);
 }

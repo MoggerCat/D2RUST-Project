@@ -67,9 +67,9 @@ The headers must fit in the file. Every index must be < hash_table_size.
   exceed the file length: strings that don't overlap never do, and entries
   sharing one string could otherwise copy it once per entry (quadratic in
   the file size; see Open questions).
-- Strings are raw 8-bit text. English 1.14d uses Windows-1252. Byte 0xFF
-  followed by `c` and a character is an in-game color code. Text is kept as
-  bytes; decoding to Unicode is a presentation step.
+- Strings are raw 8-bit text, kept as bytes here. 1.14d decodes them as
+  UTF-8 when the tables load (`ui/text.md` §2; the color-code lead `ÿ` is
+  stored as `C3 BF`); color codes are `ui/text.md` §5.
 
 ### Element access
 

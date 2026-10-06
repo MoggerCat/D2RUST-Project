@@ -19,10 +19,12 @@ cargo bench -p d2-formats --bench formats -- sprites_live
 - **Moved** (verbatim) out of `crates/d2-client/tests/e2e_single_player.rs`
   into `crates/d2-sim/src/wiring/action/tests/fight.rs`: `MULTI`,
   `PLAYER_SC`, `MONSTER_DT`, `monster_class`, `skill_rec`, `arrow`,
-  `skills`, `combat_tables`, `vitals`, `anim_data`, `drop_tables`. They
+  `skills`, `combat_tables`, `vitals`, `anim_data`. They
   are reached as `d2_sim::bench_fixtures::combat::*`; the e2e imports
   them from there (its dev-dependency on `d2-sim` now enables
-  `bench-fixtures`). No test changed; the e2e's 3 tests pass. Only the
+  `bench-fixtures`). `drop_tables` stays in the e2e: since the merge of
+  `unify-items` it builds on the e2e's own item world
+  (`game_item_tables`, `GOLD_REC`). No test changed; the e2e's 3 tests pass. Only the
   e2e-combat-path fixtures were touched (`prop_worldsim` / `prop_handle`
   copies are `test-support-fold`'s). The e2e's `TestPending` stays in the
   test: it implements `d2-server` traits (`WorldPending`, `Outbox`,
