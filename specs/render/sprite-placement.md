@@ -25,14 +25,14 @@
 |   4. Orientation bit set (top-down cels) | 106–115 |
 |   5. Clipping | 116–132 |
 |   6. Transparency | 133–142 |
-|   7. DT1 tiles | 143–156 |
-|   8. d2rs mapping (answers the `place` hooks) | 157–175 |
-| Constants & data dependencies | 176–180 |
-| Randomness | 181–184 |
-| Edge cases & original bugs | 185–199 |
-| Test vectors | 200–213 |
-| Provenance | 214–226 |
-| Open questions | 227–245 |
+|   7. DT1 tiles | 143–158 |
+|   8. d2rs mapping (answers the `place` hooks) | 159–177 |
+| Constants & data dependencies | 178–182 |
+| Randomness | 183–186 |
+| Edge cases & original bugs | 187–210 |
+| Test vectors | 211–224 |
+| Provenance | 225–237 |
+| Open questions | 238–256 |
 <!-- /index -->
 
 ## Summary
@@ -144,13 +144,15 @@ live DT1 block pixel holds 0 (Open question 1; check queued).
 
 A tile drawn at (X, Y) puts block `b`'s pixel `(px, py)` (block-local,
 `py = 0` the block's top row, `formats/dt1.md` §Block pixels) at screen
-`(X + b.x + px, Y + b.y + py)`: wall/roof drawers `0x005131B0` (DirectDraw)
-/ `0x006C94B0` (GDI), lit or translucent; floor drawer `0x005132C0` /
-`0x006C95D0`, which first moves X by −80 and by the panel shift
-(`camera.md` §5). The block pixels go through the DT1 helpers (e.g.
+`(X + b.x + px, Y + b.y + py)`: wall drawers `0x005131B0` (DirectDraw)
+/ `0x006C94B0` (GDI, slot `+0x9C`, lit) and `0x005130A0` / `0x006C93A0`
+(slot `+0xA0`, translucent); floor drawer `0x005132C0` / `0x006C95D0`
+(slot `+0x7C`), which first moves X by −80 and by the panel shift
+(`camera.md` §5). Floors **and roofs** use the floor drawer (`camera.md`
+§6: the roof list `0x004DEA70` calls only `0x004F68E0`). The block pixels go through the DT1 helpers (e.g.
 `0x004F7EA0` for RLE blocks: runs copied verbatim, `(0, 0)` = next row).
-Whole blocks are culled outside x `[−32, W)` (narrower with a panel open,
-`camera.md` §7) and y `[−32, H + 32)`; the pixel clip is the frame.
+The wall drawer culls whole blocks (`camera.md` §7); the floor drawer
+culls nothing per block. The pixel clip is the frame.
 
 The screen (X, Y) passed for each tile kind is `camera.md` §6.
 
@@ -188,13 +190,22 @@ None.
   rasterizer still computes the skipped rows and the row count as if rows
   ran up from `Y + yoff` (§5) while the drawer walks down: a top-down cel
   crossing the frame's top or bottom edge is cut wrongly (rows skipped
-  from its top, count limited by `Y + yoff + 1`). Reproduce; no live case
-  is known to cross an edge (inventory items are drawn inside panels).
-2. **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
+  from its top, count limited by `Y + yoff + 1`). Reproduce the rows kept
+  inside the frame. Rows the original writes past the end of the surface
+  (a top-down cel whose first row is near `H − 1`) land outside the
+  framebuffer in process memory and cannot be reproduced: d2rs clips them,
+  and a capture case containing such a draw does not count. No live case
+  is known to cross an edge (the top-down frames are inventory item cels,
+  drawn inside panels).
+2. **Orientation bit only.** The drawer tests bit 0 of the orientation word
+  (§1, §4); a DC6 `flip` of 2 would draw bottom-up. d2rs refuses DC6
+  frames with `flip ∉ {0, 1}` and DCC frames with an odd `variable0` until
+  the game-file counts (Open question 2, C52) show none exist.
+3. **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
   and `Y + yoff` clamped `≥ 0` instead of clipping columns (`0x0060155C`).
   `R` is never 0 after surface creation, so the branch is dead in play.
-3. Zero-size frames draw nothing (`dc6.md` Edge cases).
-4. `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
+4. Zero-size frames draw nothing (`dc6.md` Edge cases).
+5. `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
   flags word has bit 2 (fatal errors `0x452`/`0x453`).
 
 ## Test vectors

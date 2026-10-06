@@ -71,7 +71,9 @@ and frame pointers may repeat; see Open questions).
 Start with every pixel 0 (transparent). Row order: if `flip == 0`, the
 first encoded row is the **bottom** row (y = height − 1) and rows go up. If
 `flip != 0`, the first row is the top row (y = 0) and rows go down. Begin
-at x = 0 on the first row.
+at x = 0 on the first row. (1.14d's drawer tests bit 0 only,
+`render/sprite-placement.md` §4; the two rules agree on the live values
+0 and 1; other values are counted by the C52 game-file check.)
 
 Read bytes until `length` bytes are consumed:
 - `0x80`: end of row. x = 0, move to the next row.
