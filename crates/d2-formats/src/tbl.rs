@@ -23,8 +23,9 @@ pub struct TblEntry {
     pub hash: u32,
     /// Key bytes (without the NUL). Empty for unused slots.
     pub key: Vec<u8>,
-    /// Value bytes (without the NUL). Raw 8-bit text (Windows-1252 for
-    /// English); `ÿc` (0xFF 'c') starts a color code.
+    /// Value bytes (without the NUL), kept as bytes (spec §Strings). The
+    /// 1.14d tables hold UTF-8 text, decoded when the tables load
+    /// (`ui/text.md` §2): the color-code lead `ÿ` is stored as `C3 BF`.
     pub value: Vec<u8>,
 }
 
@@ -260,6 +261,24 @@ mod tests {
         }
         assert_eq!(t.get(b"missing"), None);
         assert!(t.element(3).is_none());
+    }
+
+    // Covers: specs/formats/tbl.md §strings
+    #[test]
+    fn values_are_kept_as_bytes() {
+        // The color-code lead `ÿ` as 1.14d stores it (UTF-8 `C3 BF`), then
+        // bytes that are not UTF-8: both come back unchanged, not decoded.
+        let utf8 = [0xC3, 0xBF, b'c', b'1', b'x'];
+        let raw = [0xFF, b'c', 0x80];
+        let mut data = build(&[("A", "abcde"), ("B", "abc")], 4);
+        let at = |d: &[u8], v: &[u8]| d.windows(v.len()).rposition(|w| w == v).unwrap();
+        let (a, b) = (at(&data, b"abcde\0"), at(&data, b"abc\0"));
+        data[a..a + 5].copy_from_slice(&utf8);
+        data[b..b + 3].copy_from_slice(&raw);
+        let t = StringTable::parse(&data).unwrap();
+        assert_eq!(t.get(b"A"), Some(&utf8[..]));
+        assert_eq!(t.get(b"B"), Some(&raw[..]));
+        assert!(std::str::from_utf8(t.get(b"A").unwrap()).unwrap() == "ÿc1x");
     }
 
     // Covers: specs/formats/tbl.md §header-21-bytes
