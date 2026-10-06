@@ -475,7 +475,16 @@ fn player_leaving_with_quest_items() {
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
+    // Act III chains 15, 18, 19, 20 remove P1 from their lists
+    // (`quests-act3.md` §1.1); chain 16's event 10 is a bare `ret`.
+    for c in [15, 16, 18, 19, 20] {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
     ctl.player_leaves(&mut w, P1);
+    for c in [15, 18, 19, 20] {
+        assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
+    }
+    assert!(ctl.record(16).unwrap().guids.contains(1));
     let fn_of = |chain: u8, ev: u8| {
         ctl.rows
             .iter()
@@ -491,7 +500,10 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
     let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=6).contains(&r.chain) {
+        if r.has_callback(event::PLAYER_LEAVES_GAME)
+            && !(1..=6).contains(&r.chain)
+            && !(14..=20).contains(&r.chain)
+        {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
