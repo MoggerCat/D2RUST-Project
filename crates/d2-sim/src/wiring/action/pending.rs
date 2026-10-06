@@ -481,7 +481,8 @@ pub trait Pending {
     fn refresh_anim_rate(&mut self, unit: UnitId) {}
     /// Monster sound.
     fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {}
-    /// Operate a door (`0x00584540`, objects spec).
+    /// Operate a door (`0x00584540`, objects spec) in a game without an
+    /// object state (with one: [`super::objects`]).
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {}
 
     // ---- items (items group) -------------------------------------------
@@ -552,7 +553,8 @@ pub trait Pending {
 
     // ---- objects, interaction, messages (waypoints seam) ---------------
 
-    /// `0x00624690` object mode change (objects spec).
+    /// `0x00624690` object mode change of an object without object data
+    /// (with data: [`super::objects`], `objects.md` §4).
     fn set_object_mode(&mut self, game: &mut Game, object: UnitId, mode: u8) {}
     /// `0x00554120`.
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {}
@@ -574,6 +576,64 @@ pub trait Pending {
     fn warp(&mut self, game: &mut Game, player: UnitId, level: u32, tile_code: u8) {}
     /// `0x005809D0(game, player, no skill, 2, x, y, 0)` (player path modes).
     fn set_player_mode_arrival(&mut self, game: &mut Game, player: UnitId) {}
+
+    // ---- objects (`world/objects.md`; `ObjectWorld` seams) ------------
+
+    /// `0x00620A70`: stamp an object's footprint. The path provider has
+    /// no objects.txt shape for objects (`wiring::path` `path_shape`) and
+    /// the function is not in `path-placement.md`.
+    fn object_stamp_footprint(&mut self, game: &mut Game, object: UnitId) {}
+    /// `0x00623830`: free an object's footprint (as above).
+    fn object_free_footprint(&mut self, game: &mut Game, object: UnitId) {}
+    /// Attach object sound `id` (`objects.md` §14; `0x00571740` when
+    /// `now`). Sounds spec, not written.
+    fn object_sound(&mut self, unit: UnitId, id: u8, to: Option<UnitId>, now: bool) {}
+    /// `0x0055F140`: the key test and use (inventory). Default: no key.
+    fn object_key_test(&mut self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x00623660`: the operator is in interact range of the object
+    /// (path; not in `path-placement.md`). Default: out of range (the
+    /// operate entry `objects.md` §7.1 rule 3 returns before the
+    /// dispatch).
+    fn object_in_range(&self, game: &Game, operator: UnitId, object: UnitId) -> bool {
+        false
+    }
+    /// Player data +0x4C ≠ 0 (`objects.md` §7.2 rule 2).
+    fn object_player_busy(&self, player: UnitId) -> bool {
+        false
+    }
+    /// An item is on the player's cursor (inventory).
+    fn object_cursor_item(&self, player: UnitId) -> bool {
+        false
+    }
+    /// `0x0061AEB0`: the act II staff-tomb level (quest spec). Default: a
+    /// level id no level has.
+    fn object_staff_tomb(&self) -> u32 {
+        u32::MAX
+    }
+    /// What the object module handed back without running it: quest,
+    /// waypoint and `todo` inits, operates and events, uncovered presets
+    /// ([`super::objects::ObjectRoute`]).
+    fn object_route(&mut self, game: &mut Game, route: super::objects::ObjectRoute) {}
+    /// S→C 0x60 for the object `object` to `receiver`'s client
+    /// (`0x0053D900`, `objects.md` §14 rule 1; layout owned by
+    /// `intents-events.md`).
+    fn object_portal_message(&mut self, receiver: UnitId, object: UnitId) {}
+    /// The C→S 0x13 object case's reach step (`waypoints.md` §5.2,
+    /// `0x00548B00`: distance > 50 → refuse; in range and unobstructed →
+    /// stop the player and operate; else walk and operate on arrival;
+    /// owner: the object-interaction spec, not written). Default:
+    /// operate (the operate entry's own range test,
+    /// [`Pending::object_in_range`], still applies).
+    fn object_approach(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+        object: UnitId,
+    ) -> super::objects::ObjectReach {
+        super::objects::ObjectReach::Operate
+    }
 
     // ---- the kill and the death (`damage.md` §7.2, `treasure.md` §3) ---
 

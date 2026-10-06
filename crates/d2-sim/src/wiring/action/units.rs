@@ -250,6 +250,12 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         );
     }
 
+    /// Object events (`units.md` §6.4) on the object state
+    /// ([`super::objects`]); a game without one keeps the default.
+    fn object_event(&mut self, sim: &mut Sim<'_>, unit: UnitId, event: u8) {
+        View::of(sim.units, sim.stats, sim.data, self).object_event(sim.game, unit, event);
+    }
+
     /// Missile events (`0x005ADBB0`, `missiles.md` §R3).
     fn missile_do(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let Some(mut store) = self.missiles.take() else {
@@ -273,18 +279,23 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
-    /// monster world ([`super::monsters`]); other kinds and a game without
-    /// a lent world keep the default (nothing).
+    /// monster world ([`super::monsters`]); the object data and init
+    /// `0x0054F5D0` of an object on the object state
+    /// ([`View::object_init`], `objects.md` §3); other kinds, and a game
+    /// without the lent world or the object state, keep the default
+    /// (nothing).
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
+        } else if req.ty == UnitType::Object {
+            View::of(sim.units, sim.stats, sim.data, self).object_init(sim.game, unit);
         }
     }
 
     /// The per-kind state of the action modules leaves with the unit:
     /// AI control (`AiStore::remove`), missile data, combat list; then
     /// the lent monster world's part (monster data, minion list, owner
-    /// link).
+    /// link); an object's object data.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let (ty, mode) = sim
             .units
@@ -299,6 +310,9 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
         self.combat_lists.remove(&unit);
         self.handlers.remove(&unit);
+        if let Some(st) = self.objects.as_mut() {
+            st.control.data.remove(&unit);
+        }
         self.with_monster_world(|w, _| w.forget(unit));
     }
 }
