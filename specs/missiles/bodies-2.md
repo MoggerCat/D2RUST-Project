@@ -17,37 +17,48 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–66 |
-| Inputs | 67–74 |
-| Outputs / state changes | 75–80 |
-| Rules | 81–82 |
-|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 83–93 |
-|   32. Server-hit 20 Lightning Fury `0x005AB370` | 94–119 |
-|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 120–146 |
-|   34. Server-hit 21 Battle Cry `0x005AB500` | 147–165 |
-|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 166–193 |
-|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 194–205 |
-|   37. Server-hit 25 panther pot green `0x005AB820` | 206–229 |
-|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 230–248 |
-|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 249–287 |
-|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 288–304 |
-|   41. Server-hit 31 fire head `0x005ABD70` | 305–320 |
-|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 321–331 |
-|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 332–366 |
-|   44. Server-do 19 Radament death `0x005B0940` | 367–394 |
-|   45. Server-hit 35 orb mist `0x005ABEE0` | 395–409 |
-|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 410–437 |
-|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 438–457 |
-|   48. Server-hit 40 catapult spike ball `0x005AC250` | 458–486 |
-|   49. Server-hit 43 Healing Vortex `0x005AC350` | 487–501 |
-|   50. Server-hit 47 Molten Boulder `0x005AC550` | 502–523 |
-|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 524–532 |
-| Constants & data dependencies | 533–554 |
-| Randomness | 555–571 |
-| Edge cases & original bugs | 572–593 |
-| Test vectors | 594–609 |
-| Provenance | 610–629 |
-| Open questions | 630–643 |
+| Summary | 64–77 |
+| Inputs | 78–85 |
+| Outputs / state changes | 86–91 |
+| Rules | 92–93 |
+|   31. Server-do 12 Diablo wall maker `0x005AECA0` | 94–104 |
+|   32. Server-hit 20 Lightning Fury `0x005AB370` | 105–130 |
+|   33. Server-do 13 Bone Wall maker `0x005AEDA0` | 131–157 |
+|   34. Server-hit 21 Battle Cry `0x005AB500` | 158–176 |
+|   35. Server-hit 22 Fist of the Heavens delay `0x005ADD20` | 177–204 |
+|   36. Server-hit 24 panther pot orange `0x005A9BF0` | 205–216 |
+|   37. Server-hit 25 panther pot green `0x005AB820` | 217–240 |
+|   38. Server-hit 28 Grim Ward scare `0x005ABA10` | 241–259 |
+|   39. Server-do 15 Frozen Orb `0x005AF030`, server-hit 29 `0x005ABB00` | 260–298 |
+|   40. Server-do 16 Frozen Orb nova `0x005AF170` | 299–315 |
+|   41. Server-hit 31 fire head `0x005ABD70` | 316–331 |
+|   42. Server-hit 32 Cairn Stones `0x005ABE50` | 332–342 |
+|   43. Server-do 18 tower chest spawner `0x005AF300`, server-hit 33 `0x005ABEB0` | 343–377 |
+|   44. Server-do 19 Radament death `0x005B0940` | 378–405 |
+|   45. Server-hit 35 orb mist `0x005ABEE0` | 406–420 |
+|   46. Server-do 20 blade creeper `0x005AF540`, server-do 21 Distraction `0x005AF590`, server-hit 37 `0x005AC020` | 421–448 |
+|   47. Server-hit 39 imp spawn monsters `0x005AC1D0` | 449–468 |
+|   48. Server-hit 40 catapult spike ball `0x005AC250` | 469–497 |
+|   49. Server-hit 43 Healing Vortex `0x005AC350` | 498–512 |
+|   50. Server-hit 47 Molten Boulder `0x005AC550` | 513–534 |
+|   51. Server-hit 48 Molten Boulder emerge `0x005AC6D0` | 535–543 |
+|   52. Server-hit 50 plague vines trail `0x005AC800` | 544–554 |
+|   53. Server-do 27 Tornado `0x005AFA30` | 555–573 |
+|   54. Server-hit 51 volcano debris `0x005AC870` | 574–584 |
+|   55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0` | 585–601 |
+|   56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50` | 602–637 |
+|   57. Server-do 32 Tiger Fury `0x005B03E0` | 638–650 |
+|   58. Server-hit 54 Baal spawn monsters `0x005ACAF0` | 651–662 |
+|   59. Server-hit 55 Baal inferno `0x005ACB60` | 663–673 |
+|   60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control | 674–688 |
+|   61. Server-hit 59 Baal taunt poison control `0x005ACF20` | 689–700 |
+|   62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0` | 701–727 |
+| Constants & data dependencies | 728–753 |
+| Randomness | 754–773 |
+| Edge cases & original bugs | 774–800 |
+| Test vectors | 801–820 |
+| Provenance | 821–845 |
+| Open questions | 846–865 |
 <!-- /index -->
 
 ## Summary
@@ -530,6 +541,190 @@ Row: moltenboulderemerge (453); `HitSubMissile1` moltenboulder.
    missile's position, skill, level, class `HitSubMissile1`, target =
    the path target point (path +0x10, +0x12). Create. Return 1.
 
+### 52. Server-hit 50 plague vines trail `0x005AC800`
+
+Row: plague vines trail (475); `sHitPar1` 15.
+
+1. Missile none or no record → return 1.
+2. Unit given and elapsed < total frames (`0x0064A300`) − `sHitPar1`
+   (signed) → return 2.
+3. Else return 0.
+
+The trail damages only while more than `sHitPar1` frames are left.
+
+### 53. Server-do 27 Tornado `0x005AFA30`
+
+Row: tornado (478); `Param1` 0, `Param2` 0.
+
+1. Missile none or no record → return 2. k = skill; k invalid → return
+   2.
+2. O = owner (may be none), L = level, e = elapsed.
+3. n = `Param1`; ≤ 0 → max(`eval(O, k.calc4, k, L)`, 1).
+4. e mod n = 0 (signed):
+   1. Damage record: `0x005A89A0(missile, no unit, record)` (zeroes it;
+      §R6.2 rolls on the missile seed).
+   2. r = `Param2`; ≤ 0 → max(`eval(O, k.aurarangecalc, k, L)`, 1).
+   3. Hit flags |= `HitFlags`, result flags |= `ResultFlags`.
+   4. `area_damage(game, missile, 0, 0, r, record, k.aurafilter)`
+      (`missiles.md` §R9.6): the **missile** is the source (the per-unit
+      callback turns a missile attacker into its owner), x = y = 0 makes
+      `scan_unit` use the missile's position, filter 0 → 0x8583.
+5. Return flight.
+
+### 54. Server-hit 51 volcano debris `0x005AC870`
+
+Row: volcano debris 2 (481); `HitSubMissile1` volcano small fire.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1.
+2. Zeroed record, flags 0 (start at the origin, target = start): owner
+   (may be none), origin the missile, skill, level; class
+   `HitSubMissile1`; create. `HitSubMissile2` ≥ 0 → the same record with
+   that class; create. `HitSubMissile3` ≥ 0 → likewise.
+3. Return 1.
+
+### 55. Server-do 29 recycler delay `0x005AFD70`, server-do 33 vine recycler delay `0x005AFEC0`
+
+Rows: recycler delay (498, server-do 29), vine recycler delay (540,
+server-do 33); `Param1` 45, `Range` 47.
+
+1. Missile none or no record → return 2. k invalid → return 2.
+2. O = owner; none or dead → return flight.
+3. Elapsed = `Param1` (signed equality):
+   1. Server-do 29: v = O life (stat 6) >> 8, m = max life (`0x00625D10`)
+      >> 8. Server-do 33: v = O mana (stat 8) >> 8, m = max mana
+      (`0x00625D60`) >> 8 (arithmetic shifts).
+   2. v < m: p = `eval(O, k.calc1, k, L)`; v' = min(v + `pct(m, p,
+      100)`, m) (`0x00483360`); the stat := v' << 8. `ProgOverlay` in 1 …
+      overlay count − 1 (data tables +0xBC0) → overlay on O
+      (`0x00621E40(O, ProgOverlay, 0)`).
+4. Return flight.
+
+### 56. Server-do 30 rabies plague `0x005B0010`, server-hit 53 rabies contagion `0x005ACA50`
+
+Rows: rabiesplague (515, server-do 30; `Param1` 4, `Param2` 7,
+`SubMissile1` rabiescontagion), rabiescontagion (516, server-hit 53).
+Plague data +0x28 / +0x2C = (type, GUID) of the infected unit U (set by
+the skill).
+
+Server-do 30:
+
+1. Missile none, no record or `SubMissile1` < 0 → return 2. k invalid →
+   return 2.
+2. U = the unit (data +0x28 type, +0x2C GUID) (`0x00552F60`). O = owner.
+3. U none, O none, O dead, or frames left < 0 → hit handler
+   `0x005ADF10(game, missile, no unit, a4 = 1)`; return 2.
+4. Follow the owner (`0x005A99E0`, §46 step 2).
+5. Elapsed mod max(`Param1`, 1) = 0 (signed):
+   1. Zeroed record, flags 2 (target relative; start = the origin's
+      position): class `SubMissile1`, **owner U**, origin the missile,
+      skill k, level L.
+   2. r = `Param2`; dx = `roll(2r + 1)` − r, then dy = `roll(2r + 1)` −
+      r, on **U's** seed (U + 0x20, `0x0045C390`). Create → N.
+   3. s = k.`auratargetstate` (i16) > 0: Lst = O's list of s
+      (`0x006256B0`); N and Lst → N data +0x28 := Lst's expiry frame
+      (list +0x18, `0x00626090`).
+6. Flight, result ignored. Return 1.
+
+Server-hit 53:
+
+1. O = owner; none, or no unit → return 1.
+2. k = skill, L = level; t = data +0x28 − F (frames the source state
+   has left).
+3. t < 10 → return 1. t > `elem_len(O, k, L, 1)` (`0x00644F20`,
+   `skills/levels.md` §3.2) → return 1.
+4. `0x005C7DB0(game, O, unit, t, k, L)` (D2MOO `sub_6FCFEDD0`, the
+   rabies poison; skills spec, Open question 5). Return 2.
+
+### 57. Server-do 32 Tiger Fury `0x005B03E0`
+
+Row: tigerfury (520); `Param1` 5, `SubMissile1` tigerfurytrail.
+
+1. Missile none, no record or `SubMissile1` < 0 → return 2.
+2. New-step flag: zeroed record, flags 1 (position given), owner,
+   origin the missile, skill, level, class `SubMissile1`. **The position
+   is never written**: start (0, 0), so the creation fails at its room
+   lookup (`missiles.md` §R2.3 step 3) and no trail appears (Open
+   question 6).
+3. Return server-do 7 (`0x005AE780`, `missiles.md` §R9.5 item 4: homing
+   on `Param1`).
+
+### 58. Server-hit 54 Baal spawn monsters `0x005ACAF0`
+
+Row: baal spawn monsters (550).
+
+1. Unit given → return 1.
+2. O = owner; none → return 1. E = O's skill entry for the missile's
+   skill (`0x006439F0`); none → return 1.
+3. `0x0054E600(game, missile room, class = E param 1 (+0x18,
+   `0x006444A0`), x, y, mode 1)` (`monsters/population.md` §11.2) at the
+   missile's position.
+4. Return 1.
+
+### 59. Server-hit 55 Baal inferno `0x005ACB60`
+
+Row: baal inferno (554); `sHitPar1` 50.
+
+1. No unit or the unit is not a player → return 2.
+2. Missile none, no record or `sHitPar1` ≤ 0 → return 1.
+3. m = the unit's mana (stat 8); m ≤ 0 → return 1.
+4. p = `sHitPar1` clamped to 1…100; loss = min(max(`pct(m, p, 100)`,
+   1), m) (`0x00483360`); mana := m − loss.
+5. Return 2.
+
+### 60. Server-do 36 `0x005B0A40`, server-hit 57 `0x005AD970` Baal FX control
+
+Row: baalfx control (625); `Range` 650.
+
+`tyrael(game, missile)`: data +0x28 := 1; R = the missile's room; the
+quest test `0x005444B0(game, 36)` (the game's quest list, game +0x10F4:
+no entry with id 36 → true; else its byte +9 = 1) → `0x0058E920(game,
+R, missile)` (D2MOO `ACT5Q6_SpawnTyrael`; quests spec, Open question 7);
+then refresh R (`0x0061AED0(R, 1)`).
+
+Server-do 36: data +0x28 = 0 and frames left ≤ 100 → `tyrael`. Return
+flight (tail jump).
+
+Server-hit 57: no unit and data +0x28 = 0 → `tyrael`. Return 0.
+
+### 61. Server-hit 59 Baal taunt poison control `0x005ACF20`
+
+Row: baal taunt poison control (655); `sHitPar1` 2, `HitSubMissile1`
+baal taunt poison.
+
+1. Missile none, no record or `HitSubMissile1` < 0 → return 1. O =
+   owner; none → return 1.
+2. `ring(game, O, missile, HitSubMissile1, k, L, a = max(sHitPar1, 1),
+   b = 2, loops 0)` (`bodies.md` §6). Return 1.
+
+Live: 8 pieces at the even ring directions, then 8 at 1, 3, …, 15.
+
+### 62. Unused bodies: server-do 37 `0x005B0AA0`, server-hit 5 `0x005ABC40`, 6 `0x005AA1C0`, 11 `0x005B0870`, 23 `0x005ACFC0`
+
+No live row uses them; read for completeness.
+
+Server-do 37: missile none or no record → 2. For j = 1, 2, 3:
+`SubMissile_j` > 0 (i16) and elapsed = `Param_j` → `0x0056EDE0(game,
+owner, skill, level, SubMissile_j, x, y)`. Return flight.
+
+Server-hit 5: as server-hit 29 (§39) without the frames-left test, with
+the circle C64 at `0x006E2938` and S64 at `0x006E2838` (same values).
+Return 3; 1 on a missing record, `HitSubMissile1` < 0 or no owner.
+
+Server-hit 6: missile none or no record → 1. c = `sHitPar1` in 0 …
+monstats count − 1: mode = `sHitPar2` when in 0…15, else 1;
+`0x0054E600(game, missile room, c, x, y, mode)`. Return 1.
+
+Server-hit 11: missile none or no record → 1. Zeroed record, flags 0:
+owner, origin the missile, skill, level. For i = 1…4:
+`HitSubMissile_i` > 0 → create; created and `sHitPar1` > 0 → hit
+handler `0x005ADF10(game, new, unit, a4 = 1)`. Return 1 (server-hit 4
+returns 3, `missiles.md` §R9.6 item 2).
+
+Server-hit 23: missile none or no record → 1. k > 0, L > 0 and an
+owner: unit given → the missile's path target unit := it
+(`0x00620C10`); skill server-do `sHitPar1` with the missile as the
+caster (`0x0056D810`, §15 step 4). Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -547,6 +742,10 @@ Row: moltenboulderemerge (453); `HitSubMissile1` moltenboulder.
 | imp spawn request | mode 1, spread 5, flags 0 | `0x005B3570` |
 | spike scatter | n targets within ±n/4, kept when d² ≥ 4 | `0x005D5BF0` |
 | molten boulder burst | monstats2 `large` (flag 11) or expiry | `0x005AC550` |
+| recycler heal / mana | at elapsed `Param1`: + pct(max, `calc1`) | `0x005AFD70`, `0x005AFEC0` |
+| rabies | contagion every `Param1` frames within ±`Param2` (U's seed); contagion applies while 10 ≤ t ≤ `elem_len` | `0x005B0010`, `0x005ACA50` |
+| baal inferno mana burn | clamp(`sHitPar1`, 1, 100) % of mana, at least 1 | `0x005ACB60` |
+| baal fx | Tyrael at frames left ≤ 100 (or expiry), quest id 36 | `0x005B0A40`, `0x005AD970` |
 | missiles.txt | `sHitPar1..2`, `HitSubMissile1`, `SubMissile1`, `HitFlags`, `ResultFlags` | `data/fields.tsv` |
 | skills.txt | `aurarangecalc`, `auralencalc` +0x60, `aurafilter` +0x50, `auratargetstate` +0x82, `calc1`, `calc4`, `pettype` +0xBE | `data/fields.tsv` |
 
@@ -564,6 +763,9 @@ Use counts and order: `bodies.md` Constants.
 | hit 40 | missile seed := `init_low(target x)` | `roll(2r)` × 2 per target (x first), only when n > 1 and r ≥ 2 |
 | hit 43 | — | `roll(hi − lo)` on the missile seed |
 | hit 47 | — | §R6.2 rolls; `area_damage` per unit |
+| do 27 | — | §R6.2 rolls on the missile seed each pulse; `area_damage` per unit |
+| do 30 | — | `roll(2r + 1)` × 2 on the **infected unit's** seed per contagion (x first) |
+| hit 50, hit 51, do 29, do 33, hit 53, do 32, hit 54, hit 55, do 36, hit 57, hit 59, do 37, hit 5, hit 6, hit 11, hit 23 | — | none of their own (seams named in each section may draw) |
 | do 18 | — | `roll(2r + 1)` × 2 on the missile seed (x first) per gold pile; then the item pipeline's own draws |
 | hit 22, hit 24 | — | `missiles.md` §R6.2 rolls on the missile seed; then the damage tail (hit 22) or `area_damage`'s per-unit draws |
 
@@ -590,6 +792,11 @@ Created missiles and monsters draw on their own seeds.
    with `isSpawn`, and on an invalid class in the list.
 10. Server-hit 47 bursts at expiry in 1.14d (D2MOO 1.10f: returns 2
     without a burst).
+11. Server-do 32 never sets the sub-missile's position, so Tiger Fury's
+    trail is never created.
+12. Server-do 30's contagions belong to the infected unit, not to the
+    plague's owner, and draw on that unit's seed.
+13. Server-do 27 makes the tornado itself the damage source.
 
 ## Test vectors
 
@@ -605,6 +812,10 @@ Created missiles and monsters draw on their own seeds.
 | scatter_at_target n = 8, r = 2, target (50, 50) | `init_low(50)`; 8 × two draws `roll(4)`; points in 48…51 × 48…51 | synthetic, §48 |
 | catapult spike ball, `calc4` 5 | n = 5, r = 1 → one spike at the target, no draw | synthetic, §48 |
 | healing vortex, lo = hi | v = lo, no draw | synthetic, §49 |
+| baal inferno, mana 1000 (8.8: 256 000), `sHitPar1` 50 | loss 128 000 → mana 128 000 | synthetic, §59 |
+| baal inferno, mana 1 | loss = min(max(0, 1), 1) = 1 → 0 | synthetic, §59 |
+| recycler delay, life 50 / 100, `calc1` 20, elapsed 45 | life 70 (<< 8 stored) | synthetic, §55 |
+| plague vines trail, total 100, elapsed 84 | 84 < 85 → return 2; elapsed 85 → 0 | live row, §52 |
 | towerchestspawner, frames left 250 | chest drop; data +0x2C := 1; 250 mod 8 ≠ 0, no gold | live row, §43 |
 
 ## Provenance
@@ -620,7 +831,12 @@ Created missiles and monsters draw on their own seeds.
   `0x0056DCC0`, `0x005AD8F0`, `0x005AD910`, `0x005ABEE0`, `0x005AF540`,
   `0x005A99E0`, `0x005AF590`, `0x005AC020`, `0x005AC1D0`, `0x005B3570`,
   `0x005AC250`, `0x005D5BF0` (callers `0x005AC32F`, `0x005D5DF4`),
-  `0x005AC350`, `0x005AC550`, `0x004638A0`, `0x005AC6D0`.
+  `0x005AC350`, `0x005AC550`, `0x004638A0`, `0x005AC6D0`, `0x005AC800`,
+  `0x005AFA30`, `0x005AC870`, `0x005AFD70`, `0x005AFEC0`, `0x005B0010`,
+  `0x00626090`, `0x005ACA50`, `0x005B03E0`, `0x005ACAF0`, `0x006444A0`,
+  `0x005ACB60`, `0x005B0A40`, `0x005AD970`, `0x005444B0`, `0x005ACF20`,
+  `0x005B0AA0`, `0x005ABC40`, `0x005AA1C0`, `0x005B0870`, `0x005ACFC0`;
+  table `0x006E2838`–`0x006E2A37` dumped.
   Table entries checked against `0x0073C768` / `0x0073C840`.
 - Live `patch_d2` missiles.txt rows per section; skills.txt Lightning
   Fury, Fist of the Heavens, Battle Cry, Bone Wall; monumod.txt row 15.
@@ -640,3 +856,9 @@ Created missiles and monsters draw on their own seeds.
 4. `0x005D0C40` (D2MOO `SKILLS_ApplyRedemptionEffect`) has no spec: the
    skills spec should own it (Redemption's per-corpse effect; called
    with last = 1 on the final frame).
+5. `0x005C7DB0` (rabies poison from a contagion, D2MOO `sub_6FCFEDD0`)
+   has no spec; the skills spec should own it.
+6. Server-do 32 (§57): confirm with a Tiger Strike / Royal Strike
+   recording that no tigerfurytrail missile is ever created.
+7. `0x0058E920` (Tyrael's spawn in the Worldstone Chamber) and the quest
+   test `0x005444B0`: the quests spec should own both.

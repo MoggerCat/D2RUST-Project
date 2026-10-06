@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 483–536 |
 |   R7. Lifetime and expiry | 537–560 |
 |   R8. Pierce | 561–586 |
-|   R9. Server-do and server-hit catalogues | 587–805 |
-|   R10. Behaviour of the recorded missiles | 806–839 |
-|   R11. `missiles.txt` columns and their server use | 840–874 |
-| Constants & data dependencies | 875–901 |
-| Randomness | 902–934 |
-| Edge cases & original bugs | 935–958 |
-| Test vectors | 959–1038 |
-| Provenance | 1039–1081 |
-| Open questions | 1082–1127 |
+|   R9. Server-do and server-hit catalogues | 587–807 |
+|   R10. Behaviour of the recorded missiles | 808–841 |
+|   R11. `missiles.txt` columns and their server use | 842–876 |
+| Constants & data dependencies | 877–903 |
+| Randomness | 904–936 |
+| Edge cases & original bugs | 937–960 |
+| Test vectors | 961–1040 |
+| Provenance | 1041–1083 |
+| Open questions | 1084–1129 |
 <!-- /index -->
 
 ## Summary
@@ -801,7 +801,9 @@ Bodies:
    from the row as in 1; `area_damage(…, 0)`, which always returns 1, so
    the result is always 1 (the code maps a 0 to 3).
 
-Server-do 17, 28, 34, 35 and server-hit 58: `missiles/bodies.md`.
+Server-do 17, 28, 34, 35 and server-hit 58: `missiles/bodies.md` §1–§5;
+every other body: `missiles/bodies.md` §6–§30 and
+`missiles/bodies-2.md` §31–§62.
 
 ### R10. Behaviour of the recorded missiles
 
