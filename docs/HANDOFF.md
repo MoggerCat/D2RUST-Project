@@ -1462,6 +1462,23 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local PC 2, coordinator #2, main `63a706b`, Windows 11
+Pro 26200; `hash-manifest` of the install = `traces/reference-install.toml`
+byte for byte, 19 entries): `cargo build --workspace --release` OK;
+`cargo run -p depcheck` OK; `cargo test --workspace -- --ignored`: 66 pass,
+5 fail, the same five `game_sweep` counts as the entry below (stops at the
+first failing crate, so not a full count). **Second real GPU: AMD Radeon
+RX 9070 XT (Vulkan, DiscreteGpu, driver "AMD proprietary driver 26.8.1
+(LLPC)")**: `d2-client verify` (release) `summary: 11 pass, 0 fail, 0
+error, 0 GPU not wired, 0 no adapter`, map `townN1.ds1` 2,697 draw items,
+view 7840×4112 at −3200,−192, CPU binned / GPU indices / GPU RGBA all 0 of
+32,238,080 differ; `--perturb 7`: all 11 cases FAIL with exactly 7 on each
+of the three comparisons, `0 pass, 11 fail`, exit 1. GPU byte-exactness
+now holds on two real adapters (Intel iGPU and AMD discrete). Fresh table
+dump `traces/raw/20261006-201456-tables` (73 tables, 30 maps, not
+committed). The full LOCAL-RUN batches 1–5 on main `0472619` run as the
+buddy session (`docs/handoff/local-buddy-2026-10-06.md`).
+
 Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
 install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
 clean). `cargo test --workspace --no-fail-fast -- --ignored`: 112 pass,
@@ -4699,5 +4716,6 @@ GitHub runners may be 1.5–2× slower than the measured 670 s.
 | `game_wired_host.rs` (`game-tests-wired-host`) was written on a base without the walk handler and asserts the stub for 0x03; `wire-path-server` merged next and made the assertion false before the test ever ran (2026-10-06, found while folding) | a blind-written game-file test names the handler state it assumes; the coordinator greps the `#[ignore]` tests for stub assertions when a handler lands (§2 step 7u(a)) |
 | A full `cargo mutants` run takes about 2 h per 1,900 mutants with `-j 3` on a 4-core container, a background command is stopped after 2 h, `pgrep -f` / `pkill -f` match their own shell, and a `cargo install` beside the toolchain's first install corrupted the 1.99.0 toolchain (rustup lost `rust-std`, 2026-10-06, `mutants-combat-skills` §6) | start the run detached (`setsid nohup … &`) and use `--iterate` for the survivors; match processes by name (`pgrep -x cargo-mutants`); let `tools/cloud-setup.sh` or the first `cargo` call finish before a second cargo |
 | The first deep nightly run (`ci-nightly-props`, 20,000 cases) found two counterexamples PR CI never reached: the stat-list model failure and `anim_schedule_matches_the_closed_form` aborting with "Too many global rejects" (a `prop_assume!` rejecting too often at high case counts, 2026-10-06) | a `prop_assume!` is a rejection budget: constrain the strategy so it holds at 20,000 cases (`schedule_inputs()`), and run `tools/props-deep.sh` after adding a property |
+| The coordinator merged four local spec branches that change code-mirrored tables (`ai-functions.tsv`, `functions.tsv` / `srvdo.tsv` / `srvhit.tsv`, `bridge-dispatch.tsv`) onto its integration branch before their implementations (2026-10-06): every session based on it saw ~55 red tests (bridge `Dispatch::from_spec` Mismatch, AI / skill catalogue checks) that were not its own | a spec branch marked `CODE-TABLE CHANGE` waits on `claude/specs-staging` and is merged into the integration branch together with (or after) its implementation branch; spec-only branches merge at once |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 

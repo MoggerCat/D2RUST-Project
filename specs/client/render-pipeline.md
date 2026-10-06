@@ -21,14 +21,14 @@
 | Inputs | 51–60 |
 | Outputs / state changes | 61–65 |
 | Rules | 66–67 |
-|   A. d2rs design (ours) | 68–248 |
-|   B. Original behavior to reproduce (not specified here) | 249–267 |
-| Constants & data dependencies | 268–274 |
-| Randomness | 275–280 |
-| Edge cases & original bugs | 281–286 |
-| Test vectors | 287–301 |
-| Provenance | 302–309 |
-| Open questions | 310–322 |
+|   A. d2rs design (ours) | 68–249 |
+|   B. Original behavior to reproduce (not specified here) | 250–268 |
+| Constants & data dependencies | 269–275 |
+| Randomness | 276–281 |
+| Edge cases & original bugs | 282–287 |
+| Test vectors | 288–303 |
+| Provenance | 304–311 |
+| Open questions | 312–324 |
 <!-- /index -->
 
 ## Summary
@@ -146,7 +146,8 @@ twice from one table-driven description: CPU in Rust, GPU in WGSL.
 | Op | Domain | Meaning |
 |---|---|---|
 | `Opaque` | either | dest = src |
-| `IndexTable(MapId base)` | indexed | dest_index = map[base + src][dest_index] (PL2 256×256 tables) |
+| `IndexTable(MapId base)` | indexed | dest_index = map[base + dest_index][src] (PL2 256×256 tables, row = destination: cels, shadows, shadow tiles; `render/blend-modes.md` §2) |
+| `IndexTableSrcRow(MapId base)` | indexed | dest_index = map[base + src][dest_index] (the transposed read of 1.14d's lit translucent wall drawer, `render/blend-modes.md` §2, §6) |
 | `Rgb(RgbFormula)` | rgb | dest_rgb = integer formula of (palette[src], dest_rgb) |
 
 Which domain the original composes in, the formulas and which op each
@@ -256,9 +257,9 @@ leave a hook that panics or a `TODO(spec: …)`, never a guess.
 |---|---|---|---|---|
 | B1 | Sprite placement: DCC/DC6 frame offsets → screen pixel (the one-row question, HANDOFF §7 #3), DT1 tile vs unit anchor | **written:** `render/sprite-placement.md` (draft; bottom row = `Y + offset_y` inclusive) | client draw path; captures of a unit at known coordinates | identical pixels on a `sprite`/`unit` capture (`capture.md` case `placement-0001`) |
 | B2 | Composition domain of 1.14d's renderer (indexed with PL2 tables vs RGB) and which video mode is the reference | **written:** `render/composition.md` (draft; indexed, GDI reference) | 1.14d video modes and their draw path | identical pixels of one capture with translucent sprites (`composition-0001`) |
-| B3 | Meaning of each PL2 table (`palette.md` OQ 2); light-level map selection; selected-unit shift; whether mapped index 0 is transparent; palettes per screen region | `render/shading.md` | client shading path; captures at known light levels | identical pixels |
+| B3 | Meaning of each PL2 table (`palette.md` OQ 2); light-level map selection; selected-unit shift; whether mapped index 0 is transparent; palettes per screen region | **written:** `render/shading.md` (draft; light map `v >> 3`, tile gradients, highlight map computed ×1.7, mapped 0 drawn as index 0, one palette) | client shading path; captures at known light levels | identical pixels |
 | B4 | Unit composites: COF/DCC path rules, component variants (armor class letters), colormaps per component, direction mapping (unit dirs → file dirs), frame source (animdata vs COF rate) | **written:** `render/unit-composite.md` (draft; COF rows angular, file directions interleaved) | client unit draw path; `animdata.md` use | identical pixels on `unit` captures across dirs/frames |
-| B5 | Blend modes: COF translucency override, missiles, overlays, shadows (the darkening blend), formulas | `render/blend-modes.md` | blend path; captures | identical pixels |
+| B5 | Blend modes: COF translucency override, missiles, overlays, shadows (the darkening blend), formulas | **written:** `render/blend-modes.md` (draft; modes 0–7 → PL2 tables, row = destination except lit translucent walls) | blend path; captures | identical pixels |
 | B6 | Draw order: floors, shadows, walls vs units (the isometric rules, `map-preview.md` OQ 2), roofs, missiles, overlays, UI | **written:** `render/draw-order.md` (draft; per-frame draw-cell grid, 10 world passes) | client sort and passes | identical pixels on scenes with occlusion |
 | B7 | Camera: world (subtile) → screen, view size and centering, interpolation between ticks (if any), screen shake | **written:** `render/camera.md` (draft; no interpolation) | client view path; captures while walking | identical pixels per tick (`camera-0001`) |
 | B8 | Lighting: light radius, light sources, day/night, per-tile or per-pixel light level | `render/lighting.md` | client lighting path; captures at night/with torches | identical pixels |
@@ -293,7 +294,8 @@ not resident is an error in verify and a stall in play (`client/assets.md`
 | chain `[m1, m2]`, `m1[5]=9`, `m2[9]=3` | palette[3] | §A4 order |
 | two overlapping opaque items, keys k1 < k2 | second visible on overlap | §A6 |
 | equal keys | build order decides | §A6 stable sort |
-| `IndexTable(base)`, synthetic 256×256 table | dest = table[src][dest] | §A5 |
+| `IndexTable(base)`, synthetic 256×256 table | dest = table[dest][src] | §A5 |
+| `IndexTableSrcRow(base)`, same table | dest = table[src][dest] | §A5 |
 | item clipped by `clip` | no pixel outside clip | §A3 |
 | frame spanning 4 bins | same image as without binning | §A9 |
 | any case with `--perturb N` | verify fails with exactly N | §A10, M08 |
@@ -309,8 +311,8 @@ compute availability checked in the pinned `bevy_render 0.19.1` source.
 
 ## Open questions
 
-1. §B3, §B5, §B8 (each an owner spec to write locally); §B1, §B2, §B4,
-   §B6, §B7, §B9, §B10 written as drafts.
+1. §B8 (an owner spec to write locally); §B1–§B7, §B9, §B10 written as
+   drafts.
 2. Whether the compute compositor reaches 60 frames per second at
    800×600 with a full town scene on the developer GPU: measure once
    implemented; if not, bins per item list may be culled by item bounding
