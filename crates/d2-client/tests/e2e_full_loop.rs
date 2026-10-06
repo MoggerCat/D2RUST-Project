@@ -71,12 +71,12 @@ use d2_sim::items::inventory::InvItem;
 use d2_sim::items::moves::Owner;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, ty, ItemRequest, ItemTables};
-use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
+use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::path::CollisionRooms;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
@@ -379,7 +379,6 @@ impl UseRest for TestPending {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -421,12 +420,6 @@ impl UseRest for TestPending {
         true
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aimed at the cast's
-    /// target point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
         self.book.srvst(index, u, skill, lvl)
     }
@@ -849,13 +842,15 @@ fn arrow() -> MissileRow {
     r
 }
 
-/// The right skill: start function 4, do function 8 (the Multiple Shot
+/// The right skill: start function 6 (a `mapped` slot standing in for
+/// Multiple Shot's 4, whose body, `skills/bodies.md` §3.4, now runs on
+/// the wired host), do function 8 (the Multiple Shot
 /// slot, body catalogued only), `srvmissile` 0 (the generic missile of
 /// `use.md` §5.4 step 7).
 fn skills() -> SkillTables {
     let mut v = vec![skill_rec(), skill_rec()];
     let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
+    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (6, 4, 1, 8);
     (m.srvdofunc, m.srvmissile) = (8, 0);
     SkillTables {
         skills: v,
@@ -1753,7 +1748,7 @@ fn run_with(game_seed: u32) -> Transcript {
     }
     assert_eq!(
         fx.book.get().log,
-        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 6 1 10", "srvdo 8 1 10 true false false"]
     );
     let shot = fx.missiles();
     assert_eq!(shot.len(), 1);

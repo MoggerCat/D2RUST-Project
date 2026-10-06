@@ -559,6 +559,78 @@ pub trait Pending {
         true
     }
 
+    // ---- skill bodies (`skills/bodies.md`; their other systems) ---------
+
+    /// `0x00554DE0`: allies (same unit after the monster owner
+    /// resolution, or two players in one party; units / party, not
+    /// written). Default: the same unit.
+    fn allied(&self, a: UnitId, b: UnitId) -> bool {
+        a == b
+    }
+    /// `0x00574A20(unit, pet GUID)` and the pettype `unsummon` bit: the
+    /// player's pet may be unsummoned (pets, not written).
+    fn pet_unsummonable(&self, unit: UnitId, pet: UnitId) -> bool {
+        false
+    }
+    /// Used skill entry param `i` (1: +0x18 `0x00644560`, 2:
+    /// `0x006445A0`; the skill list's owner).
+    fn set_entry_param(&mut self, unit: UnitId, i: u8, v: i32) {}
+    /// `0x0064F060` through the disguise remap `0x00645270`: the composit
+    /// weapon class (items / composits).
+    fn composit_weapon_class(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x00623C60`: a player's hand class (items).
+    fn hand_class(&self, unit: UnitId) -> i32 {
+        0
+    }
+    /// `0x0062E6F0`: the item's type has a `shoots` value (items).
+    fn item_shoots(&self, item: UnitId) -> bool {
+        false
+    }
+    /// `0x006289F0`: items `stackable` (items).
+    fn item_stackable(&self, item: UnitId) -> bool {
+        false
+    }
+    /// `0x006295B0`: the maximum stack (items).
+    fn item_max_stack(&self, item: UnitId) -> i32 {
+        0
+    }
+    /// `0x00625E00`: the maximum durability (items). `None`: unknown, the
+    /// durability is left as it is.
+    fn item_max_durability(&self, item: UnitId) -> Option<i32> {
+        None
+    }
+    /// `0x00558580(game, item)`: the quantity-replenish timer
+    /// (`items/generation.md`).
+    fn quantity_timer(&mut self, game: &mut Game, item: UnitId) {}
+    /// Message 0x3E (item stat) to the player's client.
+    fn send_item_stat(&mut self, unit: UnitId, item: UnitId, stat: u16, value: i32) {}
+    /// `0x00580310(game, unit)`: attack-mode cleanup (`bodies.md` OQ4).
+    fn attack_cleanup(&mut self, unit: UnitId) {}
+    /// `0x00580380(game, unit)` (`bodies.md` OQ4).
+    fn weapon_cleanup(&mut self, unit: UnitId) {}
+    /// `0x00646F20(unit)`: passive refresh.
+    fn passive_refresh(&mut self, unit: UnitId) {}
+    /// `0x0056DE40(unit)`: the buff callback's refresh.
+    fn buff_refresh(&mut self, unit: UnitId) {}
+    /// `0x00575900(game, unit)`: a player's skill resync (`bodies.md` OQ5).
+    fn skill_resync(&mut self, unit: UnitId) {}
+    /// `0x00646D60(unit, entry)` after a passive state is switched on.
+    fn passive_state_apply(&mut self, unit: UnitId, entry: &crate::skills::SkillEntry) {}
+    /// `0x005B0E00(game, unit, AI control or none, k)` (`monsters/ai.md`
+    /// §3.3) from the curse bodies.
+    fn set_ai_state(&mut self, unit: UnitId, k: i32) {}
+    /// `0x005D2B60`: aura mana under blood mana (`levels.md` OQ8).
+    fn blood_mana(&mut self, unit: UnitId, cost: i32) {}
+    /// `0x00571AA0`: message 0xA3 queued on the unit.
+    fn queue_progressive(
+        &mut self,
+        unit: UnitId,
+        msg: crate::skills::use_::bodies::ProgressiveMsg<UnitId>,
+    ) {
+    }
+
     // ---- skill timer events (`stat-lists.md` §10.2, §10.3; `use.md` §7) --
 
     /// Routes timer events 5, 8 and 9 to the skill use pipeline. The

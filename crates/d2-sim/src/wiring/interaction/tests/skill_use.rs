@@ -21,11 +21,11 @@ use crate::drlg::{
     LevelTypes, RoomGrids, RoomKind as DrlgRoomKind, TileInfo, TileRect, TileSource,
 };
 use crate::game::Game;
-use crate::missiles::{param_flags, unit_flag, MissileParams};
+use crate::missiles::unit_flag;
 use crate::rng::Seed;
 use crate::skills::fake::{blank, combat_tables, monster_rec, skill_rec, skill_tables};
 use crate::skills::use_::{
-    do_skill, set_delay, MissileAim, ModeTarget, ServerMsg, UseState, FLAG_MISSILE_FIRED,
+    do_skill, set_delay, ModeTarget, ServerMsg, UseState, FLAG_MISSILE_FIRED,
 };
 use crate::skills::{SkillEntry, SkillTables};
 use crate::stats::stat as sst;
@@ -65,8 +65,15 @@ pub(super) struct Open {
     pub(super) used: BTreeMap<UnitId, SkillEntry>,
     /// Right skills (`UseRest::right_skill`).
     pub(super) right: BTreeMap<UnitId, SkillEntry>,
-    aim_at: (i32, i32),
+    pub(super) aim_at: (i32, i32),
     pub(super) log: Vec<String>,
+    /// Path targets (`UseRest::target`).
+    pub(super) targets: BTreeMap<UnitId, UnitId>,
+    /// Items by (unit, body location); the current weapon; stackable
+    /// items (the skill bodies' item seams).
+    pub(super) items: BTreeMap<(UnitId, u8), UnitId>,
+    pub(super) weapon: BTreeMap<UnitId, UnitId>,
+    pub(super) stackable: Vec<UnitId>,
 }
 
 impl Pending for Open {
@@ -124,6 +131,22 @@ impl Pending for Open {
     }
     fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
         crate::wiring::interaction::skill_events::route(h, sim, ev);
+    }
+    fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
+        self.items.get(&(unit, loc)).copied()
+    }
+    fn current_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapon.get(&unit).copied()
+    }
+    fn item_stackable(&self, item: UnitId) -> bool {
+        self.stackable.contains(&item)
+    }
+    fn send_item_stat(&mut self, unit: UnitId, item: UnitId, stat: u16, value: i32) {
+        self.log
+            .push(format!("0x3E {} {} {stat} {value}", unit.0, item.0));
+    }
+    fn set_ai_state(&mut self, unit: UnitId, k: i32) {
+        self.log.push(format!("ai {} {k}", unit.0));
     }
 }
 
@@ -193,7 +216,6 @@ impl UseRest for Open {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -217,8 +239,8 @@ impl UseRest for Open {
     }
     fn start_mode(&mut self, _: &mut Game, _: UnitId, _: u32, _: ModeTarget<UnitId>) {}
     fn run_to(&mut self, _: UnitId, _: UnitId, _: SkillEntry) {}
-    fn target(&self, _: UnitId) -> Option<UnitId> {
-        None
+    fn target(&self, u: UnitId) -> Option<UnitId> {
+        self.targets.get(&u).copied()
     }
     fn clear_target(&mut self, _: UnitId) {}
     fn event_arg(&self, _: UnitId) -> i32 {
@@ -235,13 +257,6 @@ impl UseRest for Open {
         true
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aim at the target
-    /// point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, aim: MissileAim, p: &mut MissileParams) {
-        assert_eq!(aim, MissileAim::None);
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
     fn srvst(&mut self, _: u16, _: UnitId, _: i32, _: i32) -> i32 {
         1
     }

@@ -112,11 +112,11 @@ use d2_sim::items::inventory::InvItem;
 use d2_sim::items::moves::Owner;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, q, ty, ItemRequest, ItemTables};
-use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
+use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
+use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::SkillEntry;
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
@@ -448,7 +448,6 @@ impl UseRest for TestPending {
     fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
         UseState::Usable
     }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
     fn shapeshifted(&self, _: UnitId) -> bool {
         false
     }
@@ -490,12 +489,6 @@ impl UseRest for TestPending {
         true
     }
     fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aimed at the cast's
-    /// target point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
     fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
         self.book.srvst(index, u, skill, lvl)
     }
@@ -1727,7 +1720,7 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 4 1 10"]);
+    assert_eq!(fx.book.get().log, ["srvst 6 1 10"]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
@@ -1746,7 +1739,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 6 1 10", "srvdo 8 1 10 true false false"]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();
