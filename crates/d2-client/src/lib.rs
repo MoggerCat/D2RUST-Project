@@ -3,10 +3,10 @@
 //!
 //! [`map`] is plain Rust (no Bevy types): asset assembly and the CPU
 //! reference renderer used to check the GPU output. [`scene`] is plain
-//! Rust too: the draw list and the CPU reference compositor. [`verify`]
-//! runs the render cases (CPU reference vs GPU).
 //! Rust too: the draw list and the CPU reference compositor, as is
 //! [`composite`], which turns COF frames into scene draw items.
+//! [`gpu_compositor`] is the GPU twin of the CPU compositor; [`verify`]
+//! runs the render cases (CPU reference vs GPU).
 
 pub mod app;
 pub mod assets;
