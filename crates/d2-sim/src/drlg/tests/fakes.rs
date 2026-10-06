@@ -137,7 +137,16 @@ impl LevelTypes for FakeTypes {
             .unwrap_or_default())
     }
 
-    fn door_unit(&mut self, _: &mut Drlg, _: &DrlgData, _: DrlgRoomId, wx: i32, wy: i32, _: u32) {
+    fn door_unit(
+        &mut self,
+        _: &mut Drlg,
+        _: &DrlgData,
+        _: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        _: u32,
+        _: u32,
+    ) {
         self.door_units.push((wx, wy));
     }
 

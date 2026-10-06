@@ -187,7 +187,7 @@ impl PopWorld for Fake {
 }
 
 impl MonsterInit for Fake {
-    fn allocate_monster(&mut self, a: Alloc) -> Option<UnitId> {
+    fn allocate_monster(&mut self, a: Alloc, _: &mut PopState) -> Option<UnitId> {
         if self.alloc_fail {
             return None;
         }
@@ -254,7 +254,7 @@ impl MonsterInit for Fake {
     fn boss_modifier_init(&mut self, boss: UnitId) {
         self.log.push(format!("modinit {}", boss.0));
     }
-    fn add_modifier(&mut self, unit: UnitId, m: u8) {
+    fn add_modifier(&mut self, unit: UnitId, m: u8, _: &mut PopState) {
         self.log.push(format!("mod {} {m}", unit.0));
         if m == 16 {
             self.units[unit.0 as usize].type_flags |= 4;

@@ -831,9 +831,26 @@ pub fn superunique_init<H: InitHost + ?Sized>(
     min: i32,
     max: i32,
 ) {
-    let Some(su) = cx.tables.superuniques.get(usize::from(row)) else {
+    let Some(aura) = superunique_mods(cx, h, unit, row) else {
         return;
     };
+    // Step 3.
+    boss_minions_and_init(cx, h, unit, min, max, None, true);
+    superunique_finish(cx, h, unit, row, aura);
+    super::create::assign_umod(cx, h, unit, 22, true);
+}
+
+/// §20 steps 1–2: the superunique row and its umods. Returns whether 30
+/// (aura) was one of `Mod1`..`Mod3`; `None` for an unknown row (nothing
+/// done). Population's §11.4 runs the minions (step 3) itself
+/// (`population.md` §11.4 step 5).
+pub fn superunique_mods<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    row: u16,
+) -> Option<bool> {
+    let su = cx.tables.superuniques.get(usize::from(row))?;
     // Step 1.
     h.monsters().entry(unit).boss_hc_idx = row;
     // Step 2. The difficulty picks are read as part of the "fewer than
@@ -861,15 +878,27 @@ pub fn superunique_init<H: InitHost + ?Sized>(
             used.push(u);
         }
     }
-    // Step 3.
-    boss_minions_and_init(cx, h, unit, min, max, None, true);
+    Some(aura)
+}
+
+/// §20 steps 4–5 without the closing umod 22: the aura re-run and the
+/// quest records by `hcIdx`.
+pub fn superunique_finish<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    row: u16,
+    aura: bool,
+) {
+    let Some(su) = cx.tables.superuniques.get(usize::from(row)) else {
+        return;
+    };
     // Step 4.
     if aura {
         run_umod_init(cx, h, unit, 30, true);
     }
     // Step 5.
     superunique_quest(h, unit, su.hcidx);
-    super::create::assign_umod(cx, h, unit, 22, true);
 }
 
 fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32) {

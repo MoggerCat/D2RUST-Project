@@ -47,8 +47,8 @@ pub use seams::InitHost;
 pub use umods::{
     aura_choice, boss_minions_and_init, callback, champion_pack_member, choose_umods, dispatch,
     eligible, handle_event7, mark_boss, mark_unique, pick_champion, pick_unique, random_boss,
-    restore_boss, restore_minion, run_umod_init, superunique_init, xfer_umods, Gate, Saved,
-    UmodRow, AURAS, UMODS, UMODS_TSV,
+    restore_boss, restore_minion, run_umod_init, superunique_finish, superunique_init,
+    superunique_mods, xfer_umods, Gate, Saved, UmodRow, AURAS, UMODS, UMODS_TSV,
 };
 
 /// Stat ids (`itemstatcost.txt` rows) init reads or writes.

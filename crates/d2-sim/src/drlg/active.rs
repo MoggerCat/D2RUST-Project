@@ -91,6 +91,12 @@ impl Drlg {
         self.room_mut(id).active.as_mut()
     }
 
+    /// The active-room seed (+0x6C) of a DRLG room, mutable: population
+    /// draws on it (`monsters/population.md` §3.2, §9.3).
+    pub fn active_room_seed_mut(&mut self, id: DrlgRoomId) -> Option<&mut crate::rng::Seed> {
+        self.active_mut(id).map(|a| &mut a.seed)
+    }
+
     /// Active room creation `0x006422A0` / `0x00619890` (§5). Nothing if
     /// the tile grid has no floor and no wall records.
     pub(super) fn create_active_room(
