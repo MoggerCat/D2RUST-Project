@@ -18,3 +18,4 @@ workspace = true
 
 [dev-dependencies]
 d2-data.workspace = true
+proptest.workspace = true
