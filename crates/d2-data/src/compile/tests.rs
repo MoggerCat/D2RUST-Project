@@ -1431,7 +1431,8 @@ fn txt_edge_cases() {
     assert_eq!(outcome(&f[..1], 1, &text, &mut l), COMPILED);
 }
 
-// Covers: specs/data/schema.md §5, specs/world/vendors.md §1 r1
+// Covers: specs/data/schema.md §5
+// Covers: specs/world/vendors.md §1 r1
 #[test]
 fn hratli_magic_lvl_header_does_not_bind() {
     // `fields.tsv` names Hratli's weapons / armor column `HraltiMagicLvl`
@@ -1445,7 +1446,12 @@ fn hratli_magic_lvl_header_does_not_bind() {
         assert_eq!(f.offset, 400, "{table}");
         let size = 401;
         let mut l = Linkers::default();
-        let c = compile(&[f.clone()], size, b"HratliMagicLvl\r\n20\r\n", &mut l);
+        let c = compile(
+            std::slice::from_ref(&f),
+            size,
+            b"HratliMagicLvl\r\n20\r\n",
+            &mut l,
+        );
         assert_eq!(c.record(0)[400], 0, "{table}: typo header binds nothing");
         let c = compile(&[f], size, b"HraltiMagicLvl\r\n255\r\n", &mut l);
         assert_eq!(c.record(0)[400], 255, "{table}: field spelling binds");
