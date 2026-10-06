@@ -199,4 +199,9 @@ impl StateTable {
             srvactivefunc: vec![0; count],
         }
     }
+
+    /// Sets a state's `srvactivefunc` (test-only).
+    pub(crate) fn set_srvactivefunc(&mut self, s: u32, f: u16) {
+        self.srvactivefunc[s as usize] = f;
+    }
 }
