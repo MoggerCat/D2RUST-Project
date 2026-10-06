@@ -270,4 +270,6 @@ impl CombatTables {
 #[cfg(test)]
 mod damage_tests;
 #[cfg(test)]
+mod hit_gap_tests;
+#[cfg(test)]
 mod tests;
