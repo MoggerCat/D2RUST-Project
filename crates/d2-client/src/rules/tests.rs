@@ -820,3 +820,69 @@ fn a_cut_top_down_unit_cel_is_an_error() {
     let err = world_view::build(&world, &[], &view, &assets).unwrap_err();
     assert!(matches!(err, ViewError::Unit { guid: OBJECT, .. }), "{err}");
 }
+
+// Per-block shade (shading §4, lighting §11 r2: each 32-pixel block has
+// its own light): one draw per block clipped to it, the gradient moved to
+// the block's screen position; a culled block (camera §7) draws nothing.
+// Covers: specs/render/shading.md §4 r4; specs/render/lighting.md §11 r2
+#[test]
+fn tile_blocks_draw_one_item_per_block() {
+    use crate::scene::{GradientKind, LightGradient, MapId};
+    let block = |x| BlockRect {
+        x,
+        y: 0,
+        width: 32,
+        height: 32,
+    };
+    let scene = Scene {
+        units: Vec::new(),
+        tiles: Vec::new(),
+    };
+    let image = filled(64, 32, -184, 0, 1);
+    let tile = map_tile(
+        (0, 0),
+        TileList::Wall,
+        "wall",
+        vec![block(-184), block(-152)],
+    );
+    let gradient = LightGradient {
+        kind: GradientKind::Wall,
+        x: 0,
+        y: 0,
+        corners: [0, 255, 255, 0],
+        light0: MapId(3),
+    };
+    let shades = [
+        BlockShade {
+            block: block(-184),
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+        },
+        BlockShade {
+            block: block(-152),
+            shade: ShadeChain::EMPTY.with_gradient(gradient),
+            blend: BlendOp::IndexTableSrcRow(MapId(9)),
+        },
+    ];
+    // Mode 0: both kept; block 0 at x 336, block 1 at 368, y 360.
+    let view = OriginalView::new(camera(0, pos(0, 0)), &Fixture, &scene);
+    let whole = view.tile(&tile, &image).unwrap().unwrap();
+    let draws = view.tile_draws(&tile, &image, &shades).unwrap();
+    assert_eq!(draws.len(), 2);
+    assert_eq!(draws[0].clip, Rect::new(whole.x, 360, 32, 32));
+    assert_eq!(draws[0].shade, ShadeChain::EMPTY);
+    assert_eq!(draws[1].clip, Rect::new(whole.x + 32, 360, 32, 32));
+    assert_eq!(draws[1].blend, BlendOp::IndexTableSrcRow(MapId(9)));
+    let g = draws[1].shade.gradient().unwrap();
+    assert_eq!((g.x, g.y), (whole.x + 32, 360));
+    assert!(draws
+        .iter()
+        .all(|d| (d.x, d.y, &d.frame) == (whole.x, whole.y, &whole.frame)));
+    // No per-block shade: the whole tile, unchanged.
+    assert_eq!(view.tile_draws(&tile, &image, &[]).unwrap(), vec![whole]);
+    // Mode 2: block 0 culled (x 336 < 368), only block 1 drawn.
+    let view = OriginalView::new(camera(2, pos(0, 0)), &Fixture, &scene);
+    let draws = view.tile_draws(&tile, &image, &shades).unwrap();
+    assert_eq!(draws.len(), 1);
+    assert_eq!(draws[0].clip, Rect::new(368, 360, 32, 32));
+}

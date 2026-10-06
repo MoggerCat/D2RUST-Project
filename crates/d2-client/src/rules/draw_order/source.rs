@@ -80,6 +80,13 @@ impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
         Ok(self.tiles.clone())
     }
 
+    fn tile_blocks(
+        &self,
+        tile: &MapTile,
+    ) -> Result<Vec<super::super::view::BlockShade>, ViewError> {
+        self.source.tile_blocks(tile)
+    }
+
     /// Drawn units with their key; every other unit is not drawn.
     fn unit_slot(&self, unit: &ClientUnit) -> UnitSlot {
         self.units

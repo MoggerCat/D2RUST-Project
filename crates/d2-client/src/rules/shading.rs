@@ -37,8 +37,6 @@ pub enum ShadingError {
         gx: u8,
         gy: u8,
     },
-    #[error("gradient light of an isometric floor block (TODO(spec: render/shading.md OQ1))")]
-    IsometricFloorGradient,
 }
 
 /// The palette-table block of one act PL2 pushed into a [`MapTable`] (§1):
@@ -268,20 +266,13 @@ pub fn floor_block_light(
     ]))
 }
 
-/// The shade chain of a floor block (§4 floors): RLE blocks (block flag
-/// bit 2) use the 15-row gradient; an isometric block with a gradient is
-/// Open question 1.
-pub fn floor_block_chain(
-    tables: &ShadeTables,
-    light: BlockLight,
-    rle: bool,
-    x: i32,
-    y: i32,
-) -> Result<ShadeChain, ShadingError> {
-    if !rle && matches!(light, BlockLight::Gradient(_)) {
-        return Err(ShadingError::IsometricFloorGradient);
-    }
-    Ok(tables.block_chain(light, GradientKind::RleFloor, x, y))
+/// The shade chain of a floor block at screen `(x, y)` (§4 floors r3,
+/// r4): RLE (block flag bit 2) and isometric blocks alike use the 15-row
+/// gradient `a_r = (16·c0 + r·(c3 − c0)) >> 7` with `x` the column inside
+/// the 32-wide block; an isometric block's diamond rows only cover their
+/// pixels of that block (its transparent image corners draw nothing).
+pub fn floor_block_chain(tables: &ShadeTables, light: BlockLight, x: i32, y: i32) -> ShadeChain {
+    tables.block_chain(light, GradientKind::RleFloor, x, y)
 }
 
 /// The item palette files of §6 r4 by `t` (1…8), loaded as 21 maps each
@@ -308,4 +299,220 @@ pub fn item_color(t: u8, c: u8) -> Option<(u8, u8)> {
         1 | 2 | 5..=8 if c < ITEM_PALETTE_MAPS => Some((t, c)),
         _ => None,
     }
+}
+
+// ---------------------------------------------------------------------
+// Monster palette shift and blood map (§6 r2, r3, r6, r7).
+// ---------------------------------------------------------------------
+
+/// Bytes of one remap map.
+pub const MAP_BYTES: usize = 256;
+/// Maps of `RandTransforms.dat` (§6 r2).
+pub const RAND_TRANSFORMS_MAPS: u32 = 30;
+/// The shift index every gfx starts with (`0x0046EBB0`, §6 r6).
+pub const SHIFT_DEFAULT: u32 = 2;
+/// Monster classes whose shift 0 / 1 picks a `palshift` map (jump table
+/// `0x00477608`, §6 r6): 363 `necroskeleton`, 364 `necromage`.
+pub const SHIFT_LOW_CLASSES: [u32; 2] = [363, 364];
+/// Offset of `palshift` map 0 from the class's base (§6 r6:
+/// `base + 4 + 256·s`).
+pub const PALSHIFT_FIRST: usize = 4;
+/// Offset of the second 8-map set from the class's base (§6 r6:
+/// `base + 0x804 + 256·s`).
+pub const PALSHIFT_SECOND: usize = 0x804;
+/// Fatal error code of a RandTransforms index past 29 (§6 r6).
+pub const FATAL_RAND_TRANSFORMS: u32 = 0x160;
+
+/// Errors of the monster palette shift and blood map rules.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ShiftError {
+    /// `s − 8` > 29 with RandTransforms loaded: the original's fatal
+    /// error 0x160 (§6 r6; r6.5 keeps `s` ≤ 29 for a 0xAC monster).
+    #[error("RandTransforms map {0} > 29: fatal 0x160 (render/shading.md §6 r6)")]
+    RandTransformsFatal(u32),
+    /// A map read past the end of the caller's data (the original reads
+    /// past the loaded maps, §6 r6 `s` ≥ 8 without RandTransforms).
+    #[error("{what} map at byte {offset} is past the {len} bytes given")]
+    PastData {
+        what: &'static str,
+        offset: usize,
+        len: usize,
+    },
+}
+
+/// What the shift index of a monster created by S→C 0xAC depends on (§6
+/// r6, `0x00466360`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ShiftInputs {
+    /// Monster class (`monstats` row).
+    pub class: u32,
+    /// The 16-bit name seed of the message.
+    pub name_seed: u16,
+    /// `monstats` `TransLvl` (`+0x4D`).
+    pub trans_lvl: u8,
+    /// Monster type flag 0x8 (`0x004AE360`).
+    pub unique: bool,
+    /// `monstats2` `noUniqueShift` (flag bit 15, `0x004638A0(class, 15)`).
+    pub no_unique_shift: bool,
+    /// `monstats2` `Utrans` for the current difficulty (`+0x122 +
+    /// [0x007A060C]`).
+    pub utrans: u8,
+    /// `0x004791B0(unit)` ≠ 0, the owner relation test of `Utrans` 255.
+    /// Its inputs are Open question 7 of `render/shading.md`: the caller
+    /// supplies the result.
+    pub owner_relation: bool,
+    /// Superunique (type flag 0x2): the `superuniques` row's `Utrans` for
+    /// the difficulty (`+0x28 + difficulty`); `None` when not superunique.
+    pub superunique_utrans: Option<u8>,
+}
+
+/// §6 r6 step 1: `TransLvl + 2` when `TransLvl` < 8, else 2.
+pub fn shift_trans_lvl(trans_lvl: u8) -> u32 {
+    if trans_lvl < 8 {
+        u32::from(trans_lvl) + 2
+    } else {
+        SHIFT_DEFAULT
+    }
+}
+
+/// §6 r6 step 2 (`0x00477620`): `9 + (n mod 30)`, `n` the new low word of
+/// one D2 RNG step of the seed {low = class + name seed, high = 666}.
+pub fn shift_unique(class: u32, name_seed: u16) -> u32 {
+    let mut seed = d2_sim::rng::Seed::init_low(class.wrapping_add(u32::from(name_seed)));
+    9 + seed.step() % 30
+}
+
+/// §6 r6 step 3: `Utrans` ≠ 0 replaces `s`; 255 gives 1 when the owner
+/// relation `0x004791B0` is 0, else 0. `None` = no change.
+pub fn shift_utrans(utrans: u8, owner_relation: bool) -> Option<u32> {
+    match utrans {
+        0 => None,
+        255 => Some(if owner_relation { 0 } else { 1 }),
+        u => Some(u32::from(u)),
+    }
+}
+
+/// The shift index `s` of a monster created by S→C 0xAC (§6 r6 steps 1–5,
+/// each overriding the previous one).
+pub fn monster_shift_index(m: &ShiftInputs) -> u32 {
+    let mut s = shift_trans_lvl(m.trans_lvl);
+    if m.unique && !m.no_unique_shift {
+        s = shift_unique(m.class, m.name_seed);
+    }
+    if let Some(u) = shift_utrans(m.utrans, m.owner_relation) {
+        s = u;
+    }
+    if let Some(u) = m.superunique_utrans.filter(|&u| u != 0) {
+        s = u32::from(u);
+    }
+    if s >= 30 {
+        s = SHIFT_DEFAULT;
+    }
+    s
+}
+
+/// The unit and class state the map choice `0x00477530` reads (§6 r6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ShiftMapInputs {
+    /// Unit type (1 = monster).
+    pub unit_type: u32,
+    /// Monster class.
+    pub class: u32,
+    /// The class has `palshift` data (`[0x007B9578]` entry).
+    pub has_palshift: bool,
+    /// The green-blood switch (r7, [`green_blood_switch`]).
+    pub green_blood: bool,
+    /// `monstats2` `localBlood` (`+0x11C`).
+    pub local_blood: u32,
+    /// RandTransforms loaded (`[0x007BB380]` = 1, `0x00476EA0`).
+    pub rand_transforms_loaded: bool,
+}
+
+/// The `P` a monster's shift index selects (§6 r6, `0x00477530`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShiftMap {
+    /// No `P`.
+    None,
+    /// A `palshift` map: `offset` = bytes from the class's base
+    /// (`base + 4 + 256·s` or `base + 0x804 + 256·s`).
+    Palshift { offset: usize },
+    /// RandTransforms map `m` (0…29).
+    RandTransforms(u32),
+}
+
+/// The map choice of `0x00477530` for shift index `s` (§6 r6).
+pub fn shift_map(s: u32, m: &ShiftMapInputs) -> Result<ShiftMap, ShiftError> {
+    if m.unit_type != 1 || !m.has_palshift {
+        return Ok(ShiftMap::None);
+    }
+    let palshift = |set: usize| ShiftMap::Palshift {
+        offset: set + MAP_BYTES * s as usize,
+    };
+    match s {
+        0 | 1 if SHIFT_LOW_CLASSES.contains(&m.class) => Ok(palshift(PALSHIFT_FIRST)),
+        0 | 1 => Ok(ShiftMap::None),
+        s if s >= 8 && m.rand_transforms_loaded => {
+            let k = s - 8;
+            if k >= RAND_TRANSFORMS_MAPS {
+                Err(ShiftError::RandTransformsFatal(k))
+            } else {
+                Ok(ShiftMap::RandTransforms(k))
+            }
+        }
+        // 2…7, and ≥ 8 without RandTransforms (reads past the 8 maps).
+        _ if m.green_blood && m.local_blood == 2 => Ok(palshift(PALSHIFT_SECOND)),
+        _ => Ok(palshift(PALSHIFT_FIRST)),
+    }
+}
+
+fn map_at<'a>(
+    data: &'a [u8],
+    offset: usize,
+    what: &'static str,
+) -> Result<&'a [u8; MAP_BYTES], ShiftError> {
+    data.get(offset..offset + MAP_BYTES)
+        .map(|m| m.try_into().expect("256 bytes"))
+        .ok_or(ShiftError::PastData {
+            what,
+            offset,
+            len: data.len(),
+        })
+}
+
+/// The 256 bytes of a [`ShiftMap::Palshift`] offset in the class's
+/// `palshift` block `base` (the caller's bytes from the class's base, as
+/// `0x00477530` addresses them; the spec does not say what `base + 0…3`
+/// holds, so the caller supplies the block, not the bare file).
+pub fn palshift_map(base: &[u8], offset: usize) -> Result<&[u8; MAP_BYTES], ShiftError> {
+    map_at(base, offset, "palshift")
+}
+
+/// RandTransforms map `m` from the bytes of
+/// `Data\Global\Monsters\RandTransforms.dat` (30 maps of 256 bytes, §6 r2).
+pub fn rand_transforms_map(file: &[u8], m: u32) -> Result<&[u8; MAP_BYTES], ShiftError> {
+    if m >= RAND_TRANSFORMS_MAPS {
+        return Err(ShiftError::RandTransformsFatal(m));
+    }
+    map_at(file, MAP_BYTES * m as usize, "RandTransforms")
+}
+
+/// The blood map (§6 r3, `0x00477680`): the `GreenBlood.dat` map (its
+/// first 256 bytes) for an S8 component or a missile with `LocalBlood`
+/// (`uses_blood`) when the green-blood switch (r7) is on; else none.
+pub fn blood_map(
+    green_blood_file: &[u8],
+    green_blood: bool,
+    uses_blood: bool,
+) -> Result<Option<&[u8; MAP_BYTES]>, ShiftError> {
+    if !(green_blood && uses_blood) {
+        return Ok(None);
+    }
+    map_at(green_blood_file, 0, "GreenBlood").map(Some)
+}
+
+/// The green-blood switch `[0x007A05FC]` (§6 r7, `0x0044DBE0`): on when
+/// `Data\Local\Color.txt` opens (`color_txt` = its bytes) and its first
+/// byte is `1` (0x31).
+pub fn green_blood_switch(color_txt: Option<&[u8]>) -> bool {
+    color_txt.and_then(|b| b.first()) == Some(&b'1')
 }

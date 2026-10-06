@@ -87,6 +87,10 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
     ) -> Result<Vec<MapTile>, ViewError> {
         self.inner.map_tiles(world, assets)
     }
+
+    fn tile_blocks(&self, tile: &MapTile) -> Result<Vec<crate::rules::BlockShade>, ViewError> {
+        self.inner.tile_blocks(tile)
+    }
 }
 
 impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
@@ -135,6 +139,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
                 spec: "client/model.md",
                 message: format!("level {level} past the Levels rows"),
             })
+    }
+
+    fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
+        self.inner.light(world)
     }
 }
 

@@ -954,3 +954,104 @@ fn bevy_frame_presents_the_cpu_image() {
         2
     );
 }
+
+/// [`TestFeed`] with a frame light: every unit stands on sub-tile (10,
+/// 20) at intensity 0x7F; component looks carry remap `MapId(3)`.
+struct LitFeed {
+    light: crate::rules::lighting::view::FrameLight,
+}
+
+impl crate::rules::lighting::view::LookFeed for LitFeed {
+    fn light_subtile(&self, _: &ClientUnit) -> Result<(i32, i32), String> {
+        Ok((10, 20))
+    }
+    fn look(
+        &self,
+        _: &ClientUnit,
+        _: &ComponentRequest<'_>,
+    ) -> Result<crate::rules::lighting::view::ComponentLook, String> {
+        Ok(crate::rules::lighting::view::ComponentLook {
+            ghostly: false,
+            override_input: None,
+            hovered: false,
+            remap: Some(scene::MapId(3)),
+        })
+    }
+}
+
+impl crate::rules::ViewSource for LitFeed {
+    fn unit_position(&self, u: &ClientUnit) -> Result<crate::rules::UnitPosition, String> {
+        TestFeed.unit_position(u)
+    }
+    fn unit_offset(&self, u: &ClientUnit, p: &UnitPose) -> Result<(i32, i32), String> {
+        TestFeed.unit_offset(u, p)
+    }
+    fn map_tiles(
+        &self,
+        w: &ClientWorld,
+        a: &ViewAssets,
+    ) -> Result<Vec<crate::rules::MapTile>, ViewError> {
+        TestFeed.map_tiles(w, a)
+    }
+}
+
+impl ViewFeed for LitFeed {
+    fn player(&self, w: &ClientWorld) -> Result<Option<crate::rules::UnitPosition>, ViewError> {
+        TestFeed.player(w)
+    }
+    fn open_mode(&self, w: &ClientWorld) -> Result<crate::rules::OpenMode, ViewError> {
+        TestFeed.open_mode(w)
+    }
+    fn shake(&self, _: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
+        Ok(None)
+    }
+    fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut d2_sim::rng::Seed, ViewError> {
+        unreachable!("no shake")
+    }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+    fn light(&self, _: &ClientWorld) -> Result<Option<FeedLight<'_>>, ViewError> {
+        Ok(Some(FeedLight {
+            light: &self.light,
+            look: self,
+        }))
+    }
+}
+
+// A feed that states the frame's light gets every unit component's shade
+// and blend from `LitRules` (cel ops of the unit's light-map cell);
+// tiles and UI keep the rules' answers.
+// Covers: specs/render/lighting.md §13; specs/render/shading.md §10
+#[test]
+fn build_frame_lights_units_through_the_feeds_light() {
+    use crate::rules::blend::cel_ops;
+    use crate::rules::lighting::view::FrameLight;
+    use crate::rules::lighting::LightMap;
+    use crate::rules::shading::ShadeTables;
+    let mut maps = scene::MapTable::new();
+    let tables = ShadeTables::push(&mut maps, &crate::rules::lighting::view_tests::pl2());
+    let mut map = LightMap::new((10, 20));
+    let (gx, gy) = (10 - map.origin.0, 20 - map.origin.1);
+    map.cell_mut(gx, gy).unwrap().i = 0x7F;
+    let mut feed = LitFeed {
+        light: FrameLight { tables, map },
+    };
+    let a = assets();
+    let w = world(&[(0, 7), (1, 4), (1, 9)]);
+    let lit = build_frame(&w, &[ui_image(300, 200)], &TestRules, &mut feed, &a).unwrap();
+    let plain = build_frame(&w, &[ui_image(300, 200)], &TestRules, &mut TestFeed, &a).unwrap();
+    assert_eq!(lit.items.len(), plain.items.len());
+    let (shade, blend) = cel_ops(&tables, 5, Some(scene::MapId(3)), 0x7F);
+    let mut units = 0;
+    for (l, p) in lit.items.iter().zip(&plain.items) {
+        if matches!(l.tag, ItemTag::Unit(_)) {
+            units += 1;
+            assert_eq!((l.shade, l.blend), (shade, blend));
+            assert_eq!((l.x, l.y, l.frame), (p.x, p.y, p.frame));
+        } else {
+            assert_eq!(l, p);
+        }
+    }
+    assert!(units > 0);
+}

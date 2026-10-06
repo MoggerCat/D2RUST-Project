@@ -296,14 +296,15 @@ fn floor_block_light_vectors() {
     assert_eq!(g.level(0, 0), (16 * 255) >> 7);
     assert_eq!(g.level(0, 14), (16 * 255 - 14 * 255) >> 7);
     assert_eq!(GradientKind::RleFloor.rows(), 15);
-    // Isometric floors with a gradient: Open question 1.
+    // Isometric floors with a gradient (§4 floors r4, answered since the
+    // spec's OQ1): the same 15-row gradient as RLE blocks.
     assert_eq!(
-        shading::floor_block_chain(&t, BlockLight::Gradient([0, 99, 0, 0]), false, 0, 0),
-        Err(ShadingError::IsometricFloorGradient)
+        shading::floor_block_chain(&t, BlockLight::Gradient([0, 99, 0, 0]), 5, 6),
+        ShadeChain::EMPTY.with_gradient(t.gradient(GradientKind::RleFloor, 5, 6, [0, 99, 0, 0]))
     );
     assert_eq!(
-        shading::floor_block_chain(&t, BlockLight::Flat(3), false, 0, 0),
-        Ok(ShadeChain::new(&[t.light_map(3)]).unwrap())
+        shading::floor_block_chain(&t, BlockLight::Flat(3), 0, 0),
+        ShadeChain::new(&[t.light_map(3)]).unwrap()
     );
 }
 
