@@ -516,7 +516,9 @@ fn pick_up_and_drop_reach_only_active_records() {
         let (mut ctl, _) = control();
         let mut f = Fake::new();
         f.chains.insert(item, QuestChain(vec![chain]));
-        assert!(!ctl.record(chain).unwrap().active);
+        // Chain 9 is active from its init (quests-act2.md §2); switch it
+        // off to test the gate.
+        ctl.record_mut(chain).unwrap().active = false;
         ctl.item_event(&mut f, ev, P1, item);
         assert!(f.log.is_empty());
         ctl.record_mut(chain).unwrap().active = true;
