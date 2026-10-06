@@ -11,8 +11,9 @@
   all match; no layout mismatch was found. One binary reading was
   corrected (§6 rule 3: field A has callers). The waypoint section
   also matches the saves measured for `world/waypoints.md`. Still
-  unmeasured: a classic character, a hireling's items, a corpse, an
-  Iron Golem item (Open questions).
+  unmeasured: a classic character, a hireling's items, an Iron Golem
+  item (Open questions). A corpse was measured on the final `bdDead`
+  save (§8.3 rules 6–7).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
@@ -32,26 +33,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–71 |
-| Inputs | 72–81 |
-| Outputs / state changes | 82–87 |
-| Rules | 88–89 |
-|   1. File layout and framing | 90–135 |
-|   2. Header (335 bytes) | 136–333 |
-|   3. Checksum (`0x00411130`) | 334–344 |
-|   4. Quest section (298 bytes at 0x14F) | 345–360 |
-|   5. Waypoint section (80 bytes at 0x279) | 361–366 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 367–405 |
-|   7. Stats and skills | 406–498 |
-|   8. Item sections | 499–620 |
-|   9. Load sequence (`0x0056B180`) | 621–640 |
-|   10. Errors | 641–687 |
-| Constants & data dependencies | 688–707 |
-| Randomness | 708–712 |
-| Edge cases & original bugs | 713–746 |
-| Test vectors | 747–781 |
-| Provenance | 782–838 |
-| Open questions | 839–883 |
+| Summary | 58–72 |
+| Inputs | 73–82 |
+| Outputs / state changes | 83–88 |
+| Rules | 89–90 |
+|   1. File layout and framing | 91–136 |
+|   2. Header (335 bytes) | 137–340 |
+|   3. Checksum (`0x00411130`) | 341–351 |
+|   4. Quest section (298 bytes at 0x14F) | 352–367 |
+|   5. Waypoint section (80 bytes at 0x279) | 368–373 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 374–412 |
+|   7. Stats and skills | 413–505 |
+|   8. Item sections | 506–641 |
+|   9. Load sequence (`0x0056B180`) | 642–661 |
+|   10. Errors | 662–708 |
+| Constants & data dependencies | 709–728 |
+| Randomness | 729–733 |
+| Edge cases & original bugs | 734–770 |
+| Test vectors | 771–805 |
+| Provenance | 806–874 |
+| Open questions | 875–931 |
 <!-- /index -->
 
 ## Summary
@@ -245,6 +246,12 @@ character-select screen reads them, §2.7), +0xD0.. .
 | bits 8–12 | progression (acts completed; §2.2 rule 5.4 thresholds) | game |
 
 Bits 0x10, 0x80 and 13–15 are kept as found (no rule reads them).
+
+Measured: bit 0x0008 is also set for a softcore character that died
+and respawned in town (status 0x0028 in the save, §8.3 rule 6); the
+writer copies the status from the client record (`0x00538640`) and
+only ORs 0x20 / 0x40, so 0x08 is set in that record by the game on a
+softcore death too (the setter is not traced).
 
 #### 2.4 Hotkeys and mouse skills
 
@@ -587,6 +594,20 @@ them); this list is a measurement, not a constant.
    a player corpse unit is created for the player's class and the
    item list is read into it, then linked to the player.
 5. Measured: every save without a corpse has `4A 4D 00 00` here.
+6. Measured (a softcore Sorceress that died in Blood Moor, respawned
+   in town and saved without touching the corpse): n = 1; the first
+   u32 is non-zero (stack data, rule 3; never write 0 as the
+   original's value); x = 0 and y = 0; the corpse list holds the
+   equipped weapon (right hand, body 4, mode 1), while the belt
+   potions and the inventory scrolls stay in the player list.
+7. x and y come from the corpse unit's path: for unit types 0, 1, 3
+   the getters (`0x0045ADF0`, `0x0045AE20`) return 0 when unit +0x2C
+   (path) is null, else the path's u16 at +2 / +6 (`0x006488C0`,
+   `0x00648900`); types 2, 4, 5 read the static path's +0x0C / +0x10.
+   The 0 measured in rule 6 means the town-respawn save sees the
+   Blood Moor corpse with no path or a zero path position (which one
+   is not traced). The reader skips the 12 bytes (rule 4), so the
+   values have no effect on load.
 
 #### 8.4 Hireling items (`jf`, expansion only)
 
@@ -743,6 +764,9 @@ draws.
     load takes the new-character path, which does not copy +0x2C, so
     every later save stores 0 there (§2.2 rule 10). d2rs reproduces
     the 0.
+12. The corpse's x and y can be saved as 0 even though the corpse lies
+    in Blood Moor (§8.3 rules 6–7); the loader never reads them, so
+    the corpse's saved position carries no information.
 
 ## Test vectors
 
@@ -820,6 +844,18 @@ and prints every field; it holds no save data.
   985 bytes after a fight and a talk with Kashya, no hireling hired yet);
   `bdDead` (Sorceress, 958 bytes after play, alive with no corpse when
   read).
+  Final saves, read again with `tools/d2s_check.py`: `bdDead` 974
+  bytes, 24 pass / 0 fail, corpse count 1 at 0x39B, corpse list count
+  1 at 0x3AB, status 0x0028 — §2.3 note, §8.3 rules 6–7, edge case 12
+  confirmed on bdDead (1.14d); the corpse writer `0x005697F0` and the
+  getters `0x0045ADF0`/`0x0045AE20` → `0x006488C0`/`0x00648900` read
+  with `tools/ghidra/disasm.py` (the first u32 slot `[ebp-0x2C]` is
+  never written). `bdMerc` 985 bytes, 23 pass / 0 fail, no hireling
+  (a fresh character cannot hire from Kashya); it is 5 bytes larger
+  than `bdBar` (980) only because its stats stream is 5 bytes longer
+  (ends 0x328 vs 0x323): it carries experience (stat 13, 32-bit
+  value; 41 more bits) after a fight; Kashya's first-talk bit is set
+  in NPC field A (§6 rule 3).
   Checked with `tools/d2s_check.py` and the 1.14d `patch_d2` tables:
   all pass every structural check (§1 rule 7); field values in §2.1,
   §2.4 rule 7, §2.6, §6 rules 3 and 5, §7.1 rule 8, §7.2 rule 5,
@@ -850,11 +886,20 @@ and prints every field; it holds no save data.
    with no `jf`/`kf`.
 4. Hireling block and `jf`: a character with a hired rogue (Kashya)
    and one with a dead hireling (flags 0x10000) — confirms §2.5 and
-   §8.4 (`world/hirelings.md` Open question 1).
+   §8.4 (`world/hirelings.md` Open question 1). Still missing: a save
+   of a character with a hired rogue. `bdMerc` has none: a fresh
+   level-1 character only gets Talk/Cancel from Kashya, since hiring
+   needs the Sisters' Burial Grounds (Blood Raven) quest plus the
+   gold, or level 8 (`world/npc.md` §7.3), so it was not produced
+   automatically.
 5. Item index stability (edge case 3): a save with a hotkeyed Tome of
    Town Portal and an equipped weapon, saved, reloaded and saved again.
-6. Corpse (§8.3): a dead softcore character whose corpse is on the
-   ground at save time (x, y, the first u32, its item list).
+6. **Answered** (§8.3 rules 6–7, edge case 12; bdDead, 1.14d): a
+   dead softcore character whose corpse is on the ground at save time
+   writes n = 1, a non-zero first u32 (stack data), x = y = 0, and its
+   equipped weapon as the corpse list. Still untraced: whether x, y
+   are 0 because the path is null or its position is 0 (no effect on
+   load).
 7. Header +0xCF (client +0x480): any save with a non-zero byte there
    (Battle.net-style emblem) or Ghidra on `0x00539BE0`. Every save of
    this PC has 0.
@@ -877,6 +922,9 @@ and prints every field; it holds no save data.
 14. Corpse first u32: whether any reader (client, realm) uses it; d2rs
     writes 0.
 15. Iron Golem item on load: how `0x00538700` and the re-summon use it.
-    Settle: a Necromancer with an Iron Golem made from an item.
+    Settle: a Necromancer with an Iron Golem made from an item. Still
+    missing: that save; none was produced automatically because it
+    needs a Necromancer able to cast Iron Golem (skill points and
+    level well past a fresh character).
 16. Result texts: the strings shown for results 1–26 (character
     select error dialog).
