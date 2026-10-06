@@ -1,0 +1,809 @@
+# Spec: Skills — Start and do function bodies
+
+- **Status:** draft: every body and helper below read from the 1.14d
+  `Game.exe` disassembly (addresses per rule; `py tools/ghidra/disasm.py`,
+  the Ghidra export lacks several entries, `use.md` Open question 1);
+  D2MOO 1.10f `Skills.cpp`, `SkillPal.cpp`, `SkillSor.cpp`,
+  `SkillNec.cpp`, `SkillAss.cpp` compared, differences noted. No
+  recording covers these bodies yet (Open questions 1–3).
+- **Target version:** 1.14d
+- **Crate/module:** `d2-sim::skills::use_::bodies` (start / do bodies,
+  `functions.tsv` status `spec'd-here`); helpers beside them
+- **Related specs:** `skills/use.md` (pipeline: §5.3 start core, §5.4 do
+  core, §7 periodic and aura scheduling, §8 tables); `skills/levels.md`
+  (`skill_level`, `highest_entry`, `eval`, `to_hit`, mana cost,
+  `roll_elemental`); `combat/hit.md` §4 (`melee_result`);
+  `combat/damage.md` (§1 damage record, §3 `start_combat`, §3.1 `fill`,
+  §3.2 `bonuses`, §5.1 `apply_melee`, §5.4 unit events);
+  `missiles/missiles.md` §R2 (missile creation); `sim/stat-lists.md`
+  (lists, attach §8.1, detach §8.2, states §9); `sim/units.md` (modes,
+  flags, animation rate); `sim/unit-order.md` §5 (room unit lists);
+  `drlg/rooms.md` §6 (adjacency arrays); `sim/tick.md` §5 (timers);
+  `data/fields.tsv` (column offsets); `skills/functions.tsv` (which
+  slots are specified here).
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 45–57 |
+| Inputs | 58–68 |
+| Outputs / state changes | 69–76 |
+| Rules | 77–78 |
+|   1. Conventions | 79–110 |
+|   2. Shared helpers | 111–424 |
+|   3. Start functions (srvst) | 425–514 |
+|   4. Do functions (srvdo) | 515–698 |
+|   5. `srvmissile` path | 699–714 |
+| Constants & data dependencies | 715–729 |
+| Randomness | 730–739 |
+| Edge cases & original bugs | 740–760 |
+| Test vectors | 761–775 |
+| Provenance | 776–789 |
+| Open questions | 790–810 |
+<!-- /index -->
+
+## Summary
+
+A skill's start function (`srvstfunc`) runs when its animation starts and
+may refuse it; its do function (`srvdofunc`) runs at the action frame
+(`skills/use.md` §5). This spec gives the 1.14d bodies of the slots used
+by the basic skills, the level-1 skills of the five classic classes, the
+Act I monster skills that have a start function, the aura, curse and
+buff do functions, and the `srvmissile` path, with the helpers they
+share: target lookup, ammunition and quantity, skill missiles, state
+lists, aura and curse area scans with the `aurafilter` bits, unit event
+handlers and Assassin progressive charges. Combat rolls, missile flight
+and stat arithmetic belong to their own specs; bodies here call them.
+
+## Inputs
+
+| Name | Type | Source |
+|---|---|---|
+| game, unit | game, player or monster | start / do core (`use.md` §5.3, §5.4) |
+| skill id, level L | i32 | core arguments (level from `skill_level(unit, entry, 1)`) |
+| `skills.txt` record R | 0x23C bytes | columns by `data/fields.tsv` offset |
+| target | unit | the unit's path target (§2.1) |
+| frame F | u32 | game +0xA8 |
+| difficulty | u8 | game +0x6D |
+
+## Outputs / state changes
+
+Damage records and combat entries (`combat/damage.md` §3), missiles
+(`missiles.md` §R2), state stat lists on the unit and targets, state
+bits, type-12 timers, unit event handlers, item quantity and durability
+stats with message 0x3E, unit flag 0x40, the used skill entry's params,
+and the return value read by the core (0 = refused / nothing happened).
+
+## Rules
+
+### 1. Conventions
+
+- Calling convention of every body: ECX game, EDX unit, stack (skill,
+  L); `ret 8`. "Return v" is the value the core sees (`use.md` §5.3
+  step 6.6, §5.4 step 6).
+- R = the skill's record; "R invalid" = skill < 0 or ≥ the skills count.
+  Columns are named by `fields.tsv` (`aurastate` +0x80, `calc1` +0x138,
+  …). `eval(c)` = `levels.md` `eval(unit, c, skill, L)` with the acting
+  unit unless another unit is named.
+- T = `target(game, unit)` (§2.1). F = game frame.
+- Position of a unit: types 2, 4, 5 read the static path (+0x0C x,
+  +0x10 y); other types the dynamic path x / y (`0x006488C0`,
+  `0x00648900`), 0 without a path (`units.md`).
+- State operations (`stat-lists.md` §9): "state on/off" = `0x00639DB0`
+  (toggle with update-queue insert); "mark changed" = `0x00639E30(unit,
+  s, 1)`; "list of s" = `0x006256B0(unit, s)`; "has s" = `0x00639DF0`;
+  "group g" = `0x0063A7B0(unit, g)` (any state with flag bit g).
+- List operations (`stat-lists.md`): alloc `0x006251F0(pool, flags,
+  expire, owner type, owner GUID)` (no unit → type 6, GUID −1); set
+  state id `0x006252D0`; attach `0x00626E10(unit, list, 1)` (§8.1);
+  remove callback := `0x00625CE0(list, f)` (list +0x38); "detach and
+  free" = `0x006277E0(unit, list)` then `0x00626CD0(list)` (§8.2, §8.3;
+  detach runs the remove callback); "list set" = `0x00627150(list, s,
+  v, 0)` (§5 rule 2); list stat read `0x00625D00(list, s, 0)`.
+- "Timer 12 at e" = `0x005417D0(game, unit, 12, e, 0, 0)` (remove-state
+  timer, `tick.md` §5); another one per call.
+- "Anim refresh" = `0x00623F50(unit)` (`units.md` §4.3).
+- Stat 350 `modifierlist_skill`, 351 `modifierlist_level` mark which
+  skill and level own a state list.
+- Mask table `0x006CE268` holds `1 << k`; flag tests below name the
+  `fields.tsv` bit they select.
+
+### 2. Shared helpers
+
+#### 2.1 Target `0x00553540`
+
+`target(game, unit)` (stdcall):
+
+1. Refresh `0x00553490` (a missing unit, game or path is a fatal
+   assertion): if the path has a target unit (`0x00648BF0`), read its
+   stored (type, GUID) (`0x00648BB0`) and look the unit up
+   (`0x00552F60`). Found unit ≠ the stored pointer (including none) →
+   clear the path target (`0x00648B90(path, 0)`). Found unit is an item
+   (type 4) in mode 1 or 2 → clear it too.
+2. Return the path target unit, or none when it is the unit itself.
+
+#### 2.2 Pair record `0x0057D690`
+
+`pair_record(attacker, defender)` (ECX, EDX): none if either is null;
+else the first entry of the attacker's combat list (+0xAC, next +0x84)
+whose attacker type / GUID (+0x04, +0x08) and defender type / GUID
+(+0x0C, +0x10) match; return a pointer to its damage record (entry
++0x14, `combat/damage.md` §1). Writes through it change what
+`apply_melee` later applies.
+
+#### 2.3 Weapon and ammunition
+
+- `is_bow(unit)` = `0x0064F460`: weapon class of the unit's composit
+  (`0x0064F060`; through the disguise remap `0x00645270` when unit +0xC8
+  bit 3 is set) is 1 (bow) or 7 (crossbow).
+- `bow_missile(unit, &lvl)` = `0x00645F00`: none → 0. Player (type 0):
+  hand class `0x00623C60` = 1 → arrows, = 7 → bolts, else −1. Other
+  types → arrows. Arrows / bolts: the unit's `item_magicarrow(157)`
+  (item/skill getter `0x00625500`) > 0 → `lvl` := it, return 27 (magicarrow); else
+  `item_explosivearrow(158)` > 0 → `lvl` := it, return 41
+  (explodingarrow); else arrows 0 (arrow), bolts 31 (bolt).
+- `has_ammo(unit)` = `0x0056C4E0`: non-players → 1. Player: weapon W
+  (`0x00535BC0`) none → 0; used skill entry (`0x00620250`) none → 0.
+  `any = 1`; if W's item type has a `shoots` value (itemtypes +0x0C,
+  `0x0062E6F0`): `any = 0`, and if the used skill's id is 0 (Attack)
+  and W has `item_magicarrow(157)` → 1. Then right hand (body location
+  4), then left (5) (`0x0063BDE0`): an item I there, accepted when `any
+  = 0` or I = W, that is a stack (`stackable` items +0x132,
+  `0x006289F0`; or its type `throwable`, itemtypes +0x10, `0x0062BA80`;
+  or `item_throwable(125)` ≠ 0) → return `has_qty(I)`. Else 0.
+- `has_qty(I)` = `0x0062A310`: `quantity(70)` > 0 → 1; else
+  `item_throwable(125)` ≠ 0 → set quantity 0, 1; else 1 when the
+  maximum stack (`0x006295B0`) ≤ 0, otherwise 0.
+
+#### 2.4 Skill missiles `0x0056ECB0`, `0x0056EE90`
+
+`skill_missile(game, missile, unit, skill, L, dx, dy, tx, ty, quant)`
+(ECX game, EDX missile class; `ret 0x20`) fills a zeroed 0x5C parameter
+record (`missiles.md` §R2.1) and creates the missile:
+
+| Field | `0x0056ECB0` (straight) | `0x0056EE90` (lob) |
+|---|---|---|
+| flags | 0x21 (position given, target absolute) | 0x420 (target absolute, frames from distance) |
+| owner | unit | unit |
+| origin | — | unit |
+| x, y | unit position + (dx, dy) | unit position + (dx, dy) |
+| target | (tx, ty) | (tx, ty) |
+| skill, level | skill, L | skill, L |
+| attack bonus | monster with `tohit(19)` ≠ 0: flag 0x1000, bonus = it | — |
+
+Steps: tx = 0 or ty = 0 → target position `0x0056D2C0(game, unit,
+&tx, &ty)` (target unit's position, else the path's target point
+`0x00648A00` / `0x00648A10`; returns 0 when either is 0) and return 0
+if that fails; still tx = 0 or ty = 0 → 0. `quant ≠ 0` and the unit is
+a player: `dec_quantity` (§2.5) < 1 → 0. Return `0x0059FA30(game,
+record)` (the missile, or none).
+
+#### 2.5 Quantity `0x0056C3F0`
+
+`dec_quantity(game, unit)` (`decquant` in `use.md` §5.4 step 9):
+
+1. Not a player → 0.
+2. W = weapon (`0x00535BC0`). `weapon_only = 1`, or 0 when W is of
+   item type 27 (bow) or 35 (crossbow) (`0x00629BB0`).
+3. For the right hand (4), then the left (5): item I there, accepted
+   when `weapon_only = 0` or I = W, and a stack (as in `has_ammo`) →
+   return `use_one(game, unit, I)`.
+4. Return 0.
+
+`use_one(game, player, I)` = `0x0056C310`: `q = quantity(70) − 1`
+(unit getter); `q < 0` → `q = 0`, empty. Set stat 70 := q
+(`0x00627260`); quantity-replenish timer `0x00558580(game, I)`
+(`items/generation.md`); message 0x3E to the player's client
+(`0x005531C0`, then `0x0053D130(client, I, 1, 70, q, 0)`). m = maximum
+durability (`0x00625E00`); m ≠ `durability(72)` → set 72 := m and send
+0x3E for stat 72. Attack-mode cleanup `0x00580310(game, player)`
+(`units.md` §4.5; Open question 4). Return 0 when empty, else q + 1.
+
+#### 2.6 Stat fills `0x005C6CC0`, `0x005C6DC0`
+
+`aura_fill(unit, list, R, skill, L)` = `0x005C6CC0` (ECX unit, EDX
+list; R null → looked up from skill, invalid → nothing; unit or list
+null → nothing): for i = 1…6: s = `aurastat_i`; s valid (0 ≤ s <
+itemstatcost count): `v = eval(unit, aurastatcalc_i)`; v ≠ 0 → list
+set s := v (`0x006270B0`), and s = 68 (`attackrate`) → also stat 69 :=
+v. After the loop: anim refresh of the unit.
+
+`passive_fill` = `0x005C6DC0`: the same over `passivestat1–5` (+0x98) /
+`passivecalc1–5` (+0xA4).
+
+The unit given is the one formulas are evaluated on.
+
+#### 2.7 State lists: `apply_state` `0x0056E970`
+
+Request (ECX): +0x00 source, +0x04 target, +0x08 skill, +0x0C level,
++0x10 duration, +0x14 stat (−1 none), +0x18 value, +0x1C state, +0x20
+remove callback (0 → `0x0056E900`). Returns the list or none. D2MOO
+`sub_6FD10EC0`.
+
+1. State invalid (not 0 ≤ s < states count) → none.
+2. Target a monster: its monstats `npc` (+0x0C bit 8) set → none; no
+   monstats2 record (`0x00451FE0`) or `isAtt` (+0x04 bit 9) clear →
+   none.
+3. Curse state (flag group 11 `curse`, `0x0063A420`): r =
+   `curse_resistance(109)` of the target (unit getter); r ≥ 100 → none;
+   r ≠ 0 → duration −= `pct(duration, r, 100)` (`0x00483360`). Target
+   has state 57 (`attract`) → none. Old = the target's first list with
+   flag 0x20 (`0x00625760`); new flags = 0x20.
+   Not a curse: old = list of s; new flags = 0.
+4. Old exists: same state, same skill (+0x1C) and same level (+0x20) →
+   refresh: duration ≠ 0 → expiry := F + duration (`0x00625310`), timer
+   12 at it; return old. Same state and skill, request level < old
+   level → none. Otherwise detach and free old.
+5. Queue the target for update (`0x0064C040`); state s on.
+6. duration ≠ 0: e = F + duration, timer 12 at e on the target, flags
+   |= 2. State has `exp` (group 30, `0x0063A6B0`) → flags |= 0x800.
+   State `aura` (states +0x10 bit 1) → flags |= 8.
+7. Alloc (target's pool, flags, e or 0, source type / GUID), set state
+   s, skill, level (`0x006260D0`, `0x006260F0`); stat ≠ −1 → list set
+   stat := value; attach to the target; remove callback := request +0x20
+   or `0x0056E900`. Return it.
+
+#### 2.8 Remove callbacks
+
+Called by detach (`stat-lists.md` §8.2 step 6) with ECX unit, EDX state,
+stack list.
+
+- **Default** `0x0056E900` (D2MOO `sub_6FD10E50`): unregister the unit's
+  handlers of (1, state) (§2.13). If the unit is alive (`0x005541B0` = 0)
+  or the state is not "stay on death" for it (`0x0063A4A0`): state off;
+  anim refresh; passive refresh `0x00646F20(unit)`; a player also gets
+  the skill resync `0x00575900(game, unit)` (Open question 5).
+- **Self aura** `0x005CEC50`: state off; has 85 (`nomanaregen`) → 85
+  off; re-enable passive states `0x0056DFA0` (for each skill entry with
+  a `passivestate` > 0: state on, `0x00646D60(unit, entry)`); clamp
+  `0x0056B6C0` (life 6, mana 8, stamina 10 each set to its maximum
+  `0x00625D10` / `0x00625D60` / `0x00625DB0` when above it, then anim
+  refresh).
+- **Buff** `0x005C9420`: unregister (1, state); if alive or not
+  "stay on death": state off, anim refresh, passive refresh
+  `0x0056DE40(unit)`.
+- **AI curse** `0x005C3370` (Dim Vision, Terror): unregister (1, state);
+  a monster gets AI state 0 back (`0x005B0E00(game, unit, AI control,
+  0)`, `monsters/ai.md` §3.3; control = monster data +0x28, none
+  without data); then the default callback.
+
+#### 2.9 Same-group removal `0x0056C740`
+
+`clear_group(unit, s, include_self)`: g = states `group` (+0x1E) of s;
+s invalid or g = 0 → 0. For each state t in index order: skip t = s
+when `include_self = 0`; if t's group = g and the unit has t: state t
+off, detach and free t's list (if any); result 1. Return the result.
+
+#### 2.10 Resistance scaling `0x005C3540`
+
+`scaled(target, s, v)` (ECX target, EDX s): for s ∈ {36
+`damageresist`, 37 `magicresist`, 39 `fireresist`, 41
+`lightresist`, 43 `coldresist`, 45 `poisonresist`} (byte table
+`0x005C35B0`), v ≤ 0, a target that is not a player (none counts as
+"not a player") and not a hireling (`0x0063EE90` = 0), and the target's
+base stat s (`0x006253B0`) ≥ 100: return v / 5 (signed, truncating).
+Else v.
+
+#### 2.11 Unit filter `0x0056B3E0` (`aurafilter`)
+
+`accepts(source, unit, f)` (ECX source, EDX unit; f = 0 is replaced by
+0x583 in `scan_unit` only, §2.12). By the unit's type (jump table
+`0x0056B6AC`), then the common tests:
+
+| Type | Needs | Mode rule | Extra |
+|---|---|---|---|
+| 0 player | f & 0x1 | f & 0x1000: mode 17 (dead) only; else not mode 0 or 17 | — |
+| 1 monster | f & 0x2 | f & 0x1000: mode 12 (dead) only; else not mode 0 or 12 | f & 0x4: undead (monstats `lUndead` or `hUndead`, `0x0063E990`); f & 0x4000: not `boss`; f & 0x40000: not `primeevil` |
+| 2 object | f & 0x10 | — | — |
+| 3 missile | f & 0x8 | — | row has `Explosion` (missiles +0x04 bit 1) |
+| 4 item | f & 0x20 | — | — |
+| other | refused | | |
+
+Common tests, in order (all must pass):
+
+| Bit | Test |
+|---|---|
+| 0x80 | unit flags +0xC4 bit 0x4 |
+| 0x400 | unit flags +0xC4 bit 0x8 |
+| 0x100 | the unit's room not in town (`0x0061AB00`) |
+| 0x10000 | ally: source (a missile source is replaced by its owner `0x00552FD0`, none → refused) and unit pass `0x00554DE0` (same unit after monster owner resolution `0x0058F0D0`, or two players in one party; `units.md`); a monster unit must not be `npc` |
+| 0x8000 | hostile: `0x00554200(game, source, unit)` (missile → owner) |
+| 0x20000 | melee range `0x00622C40(source, unit, 0)` (missile → owner) |
+| 0x80000 | the unit lacks state 86 (`justhit`) |
+| 0x200 | both rooms exist and the line test `0x0064E260(source room, source xy, unit xy, mask 4)` is clear |
+
+Bit 0x2000 is read by the scans (§2.12). 1.14d `skills.txt` values:
+Might, Prayer and the other party auras use 73731 = 0x12003 (players,
+monsters, allies, no town rooms); the curses use 2 or 3.
+
+#### 2.12 Area scans `0x0056B7E0`, `0x0056E780`
+
+**Around the unit** `scan_unit(game, source, x, y, r, f, cb, arg,
+noaura)` = `0x0056B7E0` (ECX game, EDX source; D2MOO `sub_6FD0FE80`):
+
+1. Game, source or cb null, or r ≤ 0 → nothing. Room = the source's
+   room (`0x00620BB0`); none → nothing.
+2. x or y = 0 → the source's position. f = 0 → 0x583. Context {game,
+   source, count 0, arg}.
+3. For each room of the room's adjacency array in order (`0x00619790`,
+   `drlg/rooms.md` §6, includes the room itself): f & 0x2000 and the room
+   is in town → skip it. The room-box test `0x0056B770` always passes
+   for r > 0 (its comparisons never fail; Edge case 5). For each unit of
+   the room's unit list (head +0x74, next +0xE8, `unit-order.md` §5)
+   except the source: d² = (ux − x)² + (uy − y)² (`0x006492A0`); d² ≤
+   r² and `accepts(source, unit, f)` and not (noaura and a monster with
+   monstats `noaura`, `0x00457490(class, 27)`) → `cb(ECX context, EDX
+   unit)`; non-zero → count += 1.
+
+**Around the target point** `scan_point(game, f, source, r, cb, arg)`
+= `0x0056E780` (ECX game, EDX f; returns 1, or 0 when cb is null, the
+target position fails or no room contains it):
+
+1. Center = target position `0x0056D2C0` (§2.4). Room = the room
+   containing it, searched from the source's room (`0x00463740`).
+2. As above over that room's adjacency array (f & 0x2000 town skip;
+   f = 0 is **not** replaced), without the source exclusion and the
+   noaura test, distance from the center: `accepts(source, unit, f)` →
+   `cb(ECX unit, EDX arg)`.
+
+#### 2.13 Unit event handlers
+
+Handler record (0x20 bytes, list head unit +0x90): +0x00 event (u8),
++0x02 flags (u16), +0x04 key type, +0x08 key (a state), +0x0C skill,
++0x10 level, +0x14 function, +0x18 previous, +0x1C next.
+
+- Register `0x0056E740(game, unit, event, skill, L, func, type, key)`:
+  func > 49 or table `0x007325B0[func]` null → 0. Else `0x005C0AD0`:
+  allocate the record and **prepend** it to the unit's list.
+- Unregister `0x005C0B50(game, unit, type, key)`: for each record with
+  this type and key, in list order: flags bit 0 set (running) → flags
+  |= 2; else unlink and free it.
+
+The iteration by `0x005C0C30` (`combat/damage.md` §5.4) is not covered
+here (Open question 6).
+
+#### 2.14 Progressive charges
+
+The progressive (`pgsv`) states (`data/runtime-maps.md` §4: 122–127)
+carry a list with 350 = skill, 351 = level and the charge count in the
+skill's `aurastat1`. Common lookup for a list P: skill k = P[350];
+`lvl = max(P[351], skill_level(unit, highest_entry(unit, k), 1))`;
+proceed only when k's record exists, lvl > 0, `aurastat1` valid and n =
+P[`aurastat1`] > 0.
+
+- **Before the roll** `0x005D3AC0(ECX unit, EDX record)`: record
+  null or result lacks 1 (hit) → nothing. For each pgsv state the unit
+  has with a list whose skill is > 0 and valid with `prgdam` (+0x44) =
+  1: `0x005D3680` — record +0x0C (enhanced damage %) += n ×
+  `eval(calc1)` (evaluated with k, lvl); then if T exists and k's
+  `tgtoverlay` (+0x108) is in 1…count − 1: overlay on T
+  (`0x00621E40(T, overlay, 0)`).
+- **After the roll** `0x005D3BA0(ECX unit, EDX record)`: same guard
+  and loop, by `prgdam`:
+  - 2 `0x005D3790`: x = `ln12` of k at lvl (`0x004E6CA0`); n = 1:
+    life leech (+0x38) += x; n = 2: life and mana leech (+0x3C) += x;
+    n = 3: both += 2x; other n: nothing.
+  - 3 `0x005D3880`: `roll_elemental(unit, record, k, lvl)`
+    (`levels.md` §3.6); k's `EType` = 4 (cold), n ∈ {2, 3} and `Param2`
+    ≠ 0 → freeze length (+0x34) += cold length (+0x30) / `Param2`
+    (signed); result |= 0x4000.
+  - 4 `0x005D3970`: `roll_elemental`; `EType` = 4, n = 3 and `Param5` ≠
+    0 → freeze length += cold length / `Param5`; result |= 0x4000; p =
+    `eval(calc1)` > 0 → p = min(p, 100); c = min(pct(physical, p, 100),
+    physical); physical −= c; `0x0056C8E0(unit, record, EType, c, 0, 0,
+    0)` adds c as that element (`levels.md` §3.6).
+- **Finisher** `0x005D5220(game, unit, record)`: record null or no hit
+  → nothing. T none → nothing. Not in melee range
+  (`0x00622C40(unit, T, 0)`) → nothing. Unit flags |= 0x40. For each
+  pgsv state the unit has, with a list P:
+  1. Record of k = P[350] missing → skip to step 6.
+  2. lvl as above; lvl ≤ 0 or `aurastat1` invalid → step 6.
+  3. n = P[`aurastat1`] clamped to 1…3. Peek one draw of the unit's
+     seed (save, step, restore; `rng.md` §3: the seed is unchanged) →
+     r.
+  4. With `prgstack` (flags +0x04 bit 7): for i = 1…n − 1: list set
+     `aurastat1` := i; `srvprgfunc_i` (+0x30 + 2(i − 1)) in 1…190 with a
+     non-null srvdo entry → call it (game, unit, k, lvl). Then list set
+     `aurastat1` := n.
+  5. `srvprgfunc_n` valid and non-null → call it. Queue message 0xA3
+     on the unit (`0x00571AA0`: unit +0xEC/+0xF0 list, record {u8 n,
+     u16 k, u16 lvl, unit type / GUID, T type / GUID, r, 0}).
+  6. Detach and free P.
+  After the loop all `pgsv` states are cleared at once (`0x0063A2D0` →
+  `0x0063A180`: changed bits set, bits cleared, unit queued).
+
+#### 2.15 Shape-shift attack start `0x005C8980`
+
+`shape_start(game, unit, L)`: T none → 0. bonus = 0, s = 128. For each
+`disguise` state (`runtime-maps.md` §4) the unit has, with a valid
+state record and a list: k = list[350] valid → bonus += `to_hit(unit, k,
+L)` (`levels.md` §5; L is the Attack level, not k's); k's `SrcDam`
+(+0x1A5) ≠ 0 → s = it. Zeroed record; result = `melee_result(game,
+unit, T, bonus, 0)`; hit class 1; `start_combat(game, unit, T, record,
+s)`. Return 1.
+
+### 3. Start functions (srvst)
+
+#### 3.1 1 Attack, Left Hand Swing `0x0056CA40`
+
+1. Unit +0x44 (animation frame, 8.8) := frame bonus `0x00623B10(unit)`
+   << 8 (`units.md` §4.3).
+2. Group 38 (`meleeonly`: states 139 wolf, 140 bear) → return
+   `shape_start(game, unit, L)` (§2.15).
+3. `is_bow` and not `has_ammo` → attack-mode cleanup `0x00580310(game,
+   unit)`, `0x00580380(game, unit)`; return 0.
+4. Return 1.
+
+#### 3.2 2 Kick `0x0056CAF0`
+
+T none → 0. Zeroed record: hit flags 2 (no roll), result 9 (hit,
+knockback), physical = `MinDam` (+0x1A8) << `HitShift` (+0x1A4), hit
+class 1. `start_combat(game, unit, T, record, 128)`. Return 1. (An
+invalid skill reads a null record: fatal in the original.)
+
+#### 3.3 3 Unsummon `0x0056CBA0`
+
+Return 1 only when: T is a monster; the unit is a player; T's minion
+owner (`0x0058F0D0`) is the unit; T's pet type in the player's pet
+lists (`0x00574A20(unit, T GUID)`) has a pettype record with
+`unsummon` (+0x04 bit 3); the used skill entry exists — then entry
+param 1 (+0x18, `0x00644560`) := T's GUID. Otherwise 0.
+
+#### 3.4 4 Arrow/Bolt `0x005DA8B0`, 65 Throw `0x0056CAB0`
+
+Identical bodies: `has_ammo(unit)` → 1; else attack-mode cleanup
+(`0x00580310`, `0x00580380`) and 0.
+
+#### 3.5 5 Jab `0x005DA8F0`
+
+R invalid → 0; return 1 if T exists, else 0.
+
+#### 3.6 15 Raise Skeleton, Raise Skeletal Mage `0x005C3070`
+
+T none, or T's room in town → 0. Return `0x00645510(T, 0)`: T is a
+monster in mode 12 (dead), has no state of group 33 (`udead`), its
+monstats2 has `corpseSel` (`0x004638A0(class, 7)`), and its monstats
+`Velocity` (+0x32) ≠ 0.
+
+#### 3.7 29 Sacrifice `0x005CE790`
+
+1. R invalid, no used skill entry, T none, or T not in melee range
+   (`0x00622C40(unit, T, 0)`) → 0.
+2. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+3. Hit (result & 1): physical = `bonuses(unit, get 1, item none, 0, 0,
+   pct = eval(calc1), 0, s = SrcDam)` (`combat/damage.md` §3.2; SrcDam 0
+   is passed as 0). `EType` ≠ 0 and c = `eval(calc4)` > 0 → conversion
+   % (+0x68) = c, conversion element (+0x65) = `EType`.
+   `roll_elemental(unit, record, skill, L)`. Result |= `ResultFlags`
+   (+0x12E); hit flags = `HitFlags` (+0x130) | 1.
+4. `start_combat(game, unit, T, record, 128)` (also on a miss). Return
+   1.
+
+#### 3.8 32 Bash, Stun, Concentrate, Conversion, BearSmite `0x005D7EA0`
+
+1. R invalid, T none, or T's room in town → 0.
+2. `0x0056E520(unit, eval(calc3))`: a list (pool 0, flags 4, expire 0,
+   owner the unit) attached with `attackrate(68)` := the value, anim
+   refresh. Its removal is not in this body (Open question 4).
+3. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+4. Hit: result |= `ResultFlags`; hit flags |= `HitFlags`; `HitClass`
+   (+0x134) ≠ 0 → hit class := it; enhanced damage % (+0x0C) :=
+   `eval(calc1)`; `EType` ≠ 0 and `eval(calc4)` > 0 → conversion as in
+   §3.7; `roll_elemental`.
+5. `start_combat(game, unit, T, record, SrcDam or 128 when 0)`.
+6. p = `pair_record(unit, T)`; p → p.physical += `eval(calc2)` << 8
+   (after the roll and the "will die" test).
+7. `aurastate` (+0x80) valid (≥ 0, < count): its list on the unit, or a
+   new one (flags 4, expire 0, owner the unit, state set, attached,
+   callback `0x0056E900`); state on; `aura_fill(unit, list, R, skill,
+   L)`.
+8. Return 1.
+
+#### 3.9 33 Find Potion, Grim Ward `0x005D80C0`
+
+T none → 0. v = `0x00645590(T)`: T a monster in mode 12, no group-33
+state, monstats2 `corpseSel` and `soft` (`0x00621F60`) → 1, else 0. v
+≠ 0 and T has state 118 (`corpse_noselect`) → 0. Return v.
+
+#### 3.10 46 AndrialSpray `0x005CB4D0`
+
+T none or no used skill entry → 0. Entry param 1 (+0x18) := T's x,
+param 2 (`0x006445A0`) := T's y (position as in §1). Return 1.
+
+### 4. Do functions (srvdo)
+
+#### 4.1 1 Attack, Left Hand Swing `0x0056F070`
+
+1. Unit flags |= 0x40.
+2. Weapon (`0x00535BC0`) of item type 38 (missile potion,
+   `0x0062B400`) → return 0.
+3. `is_bow`: m = `bow_missile(unit, &L)` (L replaced by the arrow
+   stat for magic / exploding arrows); `skill_missile` straight
+   (`0x0056ECB0`) with (m, unit, skill, L, 0, 0, 0, 0, quant = 0 when m
+   = 27, else 1). Return 1 (whatever the creation gave).
+4. T none → 0.
+5. Zeroed record; result = `melee_result(game, unit, T,
+   progressive_tohit(325) of the unit, 0)`; hit flags |= 2.
+6. Before-roll charges `0x005D3AC0` (§2.14); `fill(game, unit, T,
+   record, 0, 128)` (`combat/damage.md` §3.1); after-roll charges
+   `0x005D3BA0`; `start_combat(game, unit, T, record, 128)` (its own
+   `fill` is skipped by hit flag 2).
+7. Group 38 (wolf / bear): return `0x0056C2D0(game, unit, L)` — flags
+   |= 0x40, T none → 0, `apply_melee(game, unit, T)`, 1.
+8. Else p = `pair_record(unit, T)`; p → finisher `0x005D5220(game, unit,
+   p)` (§2.14). `apply_melee(game, unit, T)` (`combat/damage.md` §5.1;
+   a second stack argument 0 is unread). Return 1.
+
+1.14d differs from D2MOO 1.10f: the wolf / bear path applies the melee
+at once instead of only draining durability.
+
+#### 4.2 2 Kick, Power Strike, … `0x0056F1F0`
+
+Skills: Kick, Power Strike, MonIceSpear, Impale, Bash, Stun,
+Concentrate, BearSmite, Vengeance, Berserk, Fire Claws, MonPowerStrike
+(`functions.tsv`).
+
+1. R invalid → 0.
+2. `srvoverlay` (+0x4E) in 1…overlay count (inclusive; Edge case 3): T
+   none → 0; p = `pair_record(unit, T)` none → **return 1** (the rest is
+   skipped); p hit → overlay on T (`0x00621E40(T, srvoverlay, 0)`).
+3. `auratargetstate` (+0x82) valid: T none → 0; p none → return 1; p
+   hit: `len = max(eval(auralencalc), 1)`, e = F + len. List of the
+   state on T, or a new one (game pool +0x1C, flags 2, expire e, owner
+   T's type / GUID; failure → return 1). Then (both cases) timer 12 at e on
+   T; state on (T); set state id; attach to T; callback `0x0056E900`;
+   `aura_fill(T, list, R, skill, L)` (formulas on T). An existing list
+   keeps its old expiry.
+4. `aurastate` (+0x80) in 1…count − 1: list on the unit, or a new one
+   (flags 4, expire 0, owner the unit, state set, attached, callback
+   `0x0056E900`; failure → return 1); state on; `aura_fill(unit, …)`.
+5. Unit flags |= 0x40; T none → 0; `apply_melee(game, unit, T)`;
+   return 1.
+
+#### 4.3 18 Defensive buff `0x005C9480`
+
+Skills (11): Frozen Armor, Shiver Armor, Chilling Armor, Bone Armor,
+Cyclone Armor, Fade, Holy Shield, Quickness, Venom, MonBoneArmor,
+MonFrozenArmor.
+
+1. R invalid or `aurastate` invalid (< 0 or ≥ count) → 0.
+2. Unit flags |= 0x40.
+3. `clear_group(unit, aurastate, 1)` (§2.9): every state of the same
+   `group`, this one included, is removed first.
+4. `apply_state` {source = target = unit, skill, L, duration =
+   `eval(auralencalc)`, stat −1, state `aurastate`, callback
+   `0x005C9420`} → list; none → 0.
+5. `aura_fill(unit, list, R, skill, L)`; `passive_fill(unit, list, R,
+   skill, L)`; list set 350 := skill, 351 := L.
+6. `auraevent1` (+0x84) ≥ 0: unregister (1, `aurastate`); for i = 1…3
+   while `auraevent_i` ≥ 0: register (event_i, skill, L,
+   `auraeventfunc_i` (+0x8A + 2(i − 1)), 1, `aurastate`) (§2.13).
+7. Mark `aurastate` changed. Return the list (non-zero).
+
+#### 4.4 30 Curse `0x005C37C0`
+
+Skills (10): Amplify Damage, Dim Vision, Weaken, Iron Maiden, Terror,
+Life Tap, Decrepify, Lower Resist, Blood Mana, Defense Curse.
+
+1. R invalid, `aurastat1` < −1 or ≥ itemstatcost count, or
+   `auratargetstate` invalid → 0.
+2. Unit flags |= 0x40.
+3. ai = 1 when `auratargetstate` is 23 (`dimvision`) or 56 (`terror`)
+   (`0x005C3400`), else 0.
+4. r = `eval(aurarangecalc)`; d = `eval(auralencalc)`. ai → d = d /
+   `AiCurseDivisor` (difficultylevels +0x1C of the game's difficulty;
+   skipped when 0; 1.14d: 1, 2, 4).
+5. Context (0x68 bytes): game, unit, ai, upd, skill, L, d, stats[6],
+   values[6], state = `auratargetstate`, `auraevent1–3`,
+   `auraeventfunc1–3`. For i = 1…6: `aurastat_i` < 0 or ≥ count → stat
+   −1, stop; no itemstatcost record → stop; record has `updateanimrate`
+   (+0x04 bit 9) → upd = 1; stat = it, value = `eval(aurastatcalc_i)`.
+6. Return `scan_point(game, aurafilter, unit, r, 0x005C35C0, context)`
+   (§2.12).
+
+Per unit U (`0x005C35C0`, ECX U, EDX context):
+
+1. ai: U must be a monster, its alignment (`0x006259B0`) ≠ 1, and
+   `can_switch(U, k)` (k = 10 for state 23, 11 for 56; Open question 7);
+   else 0.
+2. v1 = 0; stat1 ≥ 0 → v1 = `scaled(U, stat1, value1)` (§2.10); v1 = 0
+   → 0.
+3. `0x005C3420(game, unit, U)`: U non-null; a monster U needs a walk
+   mode (`0x0046C140(class, 2)`) and no type flag 0x20 (possessed,
+   `0x005A0180`); U flags +0xC4 bits 0x4, 0x8 and 0x2 all set; U alive;
+   hostile (`0x00554200`). Fails → 0.
+4. `apply_state` {source unit, target U, skill, L, d, stat1, v1, state,
+   callback ai ? `0x005C3370` : default} → none → 0.
+5. ai → install the curse AI (`0x005C34B0(game, unit, U, skill, L)`:
+   `0x005B0E00(game, U, U's AI control or none, k)`, `monsters/ai.md`
+   §3.3).
+6. Stats 2…6 valid → v = `scaled(U, stat, value)`; v ≠ 0 → list set.
+7. upd → anim refresh of U.
+8. `auraevent1` ≥ 0 and `auraeventfunc1` > 0: unregister (1, state) on
+   U; then **three times**, while event 1 ≥ 0 and func 1 > 0 (always
+   the first pair): register (event_i, skill, L, func_i, 1, state) on U
+   (Edge case 4).
+9. Return 1.
+
+`can_switch(U, k)` = `0x0056E2F0`: a monster whose base class
+(monstats +0x02) is 492 and which has state 143 (`attached`) → 0;
+else `0x005DD480(U, k)`: U a monster, k ≤ 19, no state 54, its class
+switch-capable (`0x00623470`: has a walk mode, not `boss`, `switchai`),
+(unit flags 0x4 set or U alive), no type flag 0x2 or 0x8 (superunique,
+unique); k = 19 → 1; else `0x005B0DA0`: k ∈ {10, 11, 12} → not
+superunique and switch-capable; other k → 1.
+
+#### 4.5 65 Basic aura `0x005CF010`
+
+Skills (17): Might, Prayer, Resist Fire, Resist Cold, Resist Lightning,
+Thorns, Defiance, Blessed Aim, Cleansing, Concentration, Vigor,
+Meditation, Fanaticism, Salvation, Barbs Aura, Wolverine Aura, Oak Sage
+Aura; run by the aura timer and the immediate run (`use.md` §7).
+
+1. R invalid → 0.
+2. cost = `0x00644B10(skill, L)` (`levels.md` §4, no level clamp);
+   mana = the unit's `mana(8)` (unit getter).
+3. Context (0x50 bytes, zeroed): state, skill, L, duration = `period(…)`
+   − F + 1 (`use.md` §7 `0x0056CD50`), stats[6], values[6], count (+0x40),
+   list (+0x44), passivestate (+0x48) = `passivestate` (+0x94) when > 0,
+   remove callback (+0x4C) = 0.
+4. Not a player, or mana ≥ cost: for i = 1…6: `aurastat_i` < 0 → stop;
+   stat i = it, value i = `eval(aurastatcalc_i)` (on the caster).
+   A player with mana < cost keeps all six stats 0 (nothing is applied,
+   but state lists are still created or refreshed).
+5. `aurastate` (+0x80) in 1…count − 1: state = it; run the callback on
+   the unit itself (`0x0056B740`: context {game, unit, 0, arg}). Then if
+   the context list is set, mana > cost (strict) and `passivestate` ≤
+   0: for i = 1…5: v = `eval(passivecalc_i)`; v ≠ 0 and `passivestat_i`
+   in 1…count − 1 → list set.
+6. `auratargetstate` (+0x82) in 0…count − 1: state = it; `scan_unit(game,
+   unit, 0, 0, eval(aurarangecalc), aurafilter, callback, context,
+   noaura = 1)` (§2.12). Then, for a player with cost > 0: count > 0 →
+   state 85 on and `0x0056C110(unit, cost)` (players only; blood mana
+   state 114 → `0x005D2B60`, `levels.md` Open question 8; mana < cost
+   → nothing; else mana −= cost (`0x006272B0`); result ignored); count
+   = 0 → state 85 off.
+7. Return 1.
+
+Callback `0x005CEDC0` (ECX scan context, EDX unit U):
+
+1. `apply_state` {source = context unit, target U, skill, L, duration,
+   stat −1, state; callback: context +0x4C, else `0x005CEC50` when U is
+   the source, else default}. None → 0. Context list := it.
+2. For i = 1…6 with value_i ≠ 0 and stat_i in 1…count − 1:
+   - stat 110 (`item_poisonlengthresist`): `0x005CEC90(game, U, v)` → 1
+     → count += 1. It scales the remaining time of U's state 2
+     (`poison`) list and of each `curse` state U has that is `curable`
+     (group 12): new expiry = F + pct(expiry − F, v, 100), timer 12 at it;
+     returns 1 when U has a poison list or any curse state with a list
+     (curable or not).
+   - Else v' = `scaled(U, stat, v)`; v' = 0, or no itemstatcost
+     record → next.
+   - Stat not `direct` (+0x04 bit 4): if the list's value ≠ v', mark the
+     state changed on U. Stats 67 / 68: v' = max(v', floor), floor =
+     `ColdEffect` of U's monstats for the difficulty (+0x168 +
+     difficulty, i8) or −50 for non-monsters (`0x0057AF30`). List set
+     stat := v' (68 → also 69). count += 1.
+   - `direct`: b = U's stat (unit getter); w = b + v'; capped at U's
+     value of the stat's `maxstat` (+0x32) when that is valid; w ≠ b →
+     set U's stat := w (`0x00627260`), count += 1.
+3. Anim refresh of U; list set 350 := skill, 351 := L.
+4. passivestate > 0: U's list of it → detach and free, mark it changed.
+5. Return 1.
+
+Context fields after a run: count adds the self call and every scanned
+unit; list = the last list made (the self list right after step 5).
+
+### 5. `srvmissile` path
+
+`use.md` §5.4 step 7 in full (do core `0x0056F7F0`, `0x0056F96D`–
+`0x0056FA3B`):
+
+1. `srvmissile` (+0x46) ≥ 0 with a missiles record (`0x0046ACE0`);
+   else skip.
+2. Unit flags |= 0x40.
+3. dx = dy = tx = ty = 0. `item ≠ 0` and `aim ≠ 0`: target position
+   (`0x0056D2C0`); both coordinates non-zero → tx, ty = it; dx = tx −
+   unit x, dy = ty − unit y; tx += dx, ty += dy.
+4. `lob` (flags +0x04 bit 1) → `0x0056EE90`, else `0x0056ECB0`, with
+   (srvmissile, unit, skill, L, dx, dy, tx, ty, quant = 0) (§2.4).
+5. r = 1 whatever the creation gave. Ammunition is spent by the core's
+   `decquant` step (§2.5).
+
+## Constants & data dependencies
+
+| Item | Value | Where |
+|---|---|---|
+| default aura filter | 0x583 | §2.12 |
+| curse AI states / AI kinds | 23 → 10, 56 → 11 (27 → 12 coded, unused) | §4.4 |
+| `AiCurseDivisor` | difficultylevels +0x1C (1, 2, 4) | §4.4 |
+| velocity / attack-rate floor | monstats `ColdEffect` (+0x168 + difficulty), else −50 | §4.5 |
+| resist scaling | v / 5 at base resist ≥ 100 | §2.10 |
+| state ids | 2 poison, 23 dimvision, 54, 56 terror, 57 attract, 85 nomanaregen, 86 justhit, 114 blood mana, 118 corpse_noselect, 139 wolf, 140 bear, 143 attached | |
+| flag groups | 11 curse, 12 curable, 30 exp, 33 udead, 38 meleeonly; lists pgsv (data tables +0x16C), curse (+0x174), disguise (+0x17C) | `runtime-maps.md` §4 |
+| skills columns | srvoverlay +0x4E, aurafilter +0x50, aurastat1–6 +0x54, auralencalc +0x60, aurarangecalc +0x64, aurastatcalc1–6 +0x68, aurastate +0x80, auratargetstate +0x82, auraevent1–3 +0x84, auraeventfunc1–3 +0x8A, passivestate +0x94, passivestat1–5 +0x98, passivecalc1–5 +0xA4, tgtoverlay +0x108, ResultFlags +0x12E, HitFlags +0x130, HitClass +0x134, calc1–4 +0x138, Param2 +0x14C, Param5 +0x158, HitShift +0x1A4, SrcDam +0x1A5, MinDam +0x1A8, EType +0x1DC, prgdam +0x44, srvprgfunc1–3 +0x30 | `fields.tsv` |
+| item types | 27 bow, 35 crossbow, 38 missile potion | |
+| missiles | 0 arrow, 27 magicarrow, 31 bolt, 41 explodingarrow | §2.3 |
+
+## Randomness
+
+No body here draws on its own. Draws happen inside the callees, in the
+order the steps call them: `melee_result` (`combat/hit.md` §4),
+`fill` / `start_combat` / `bonuses` (`combat/damage.md` §3),
+`roll_elemental` and its random element (`levels.md` §3.6), missile
+creation (`missiles.md` §R2). The finisher's peek (§2.14 step 3) steps a
+copy and restores the unit seed: no net advance. Aura, curse and buff
+bodies draw nothing.
+
+## Edge cases & original bugs
+
+1. A player whose mana is below an aura's cost still refreshes the
+   aura state lists on itself and its targets, with no stats (§4.5 step
+   4); the passive stats need mana strictly above the cost.
+2. Bash's attack-rate list (§3.8 step 2) is attached on every start and
+   removed elsewhere (Open question 4).
+3. Srvdo 2 accepts `srvoverlay` = overlay count (one past the table)
+   and returns 1 without applying the melee when no combat record
+   exists for the target (§4.2 steps 2–3).
+4. The curse callback registers events 2 and 3 based on event 1's
+   validity (§4.4 step 8); no 1.14d curse has `auraevent1`.
+5. The room-box test `0x0056B770` of the scans never rejects a room
+   (r > 0): every adjacent room is scanned unit by unit.
+6. Shape-shift starts add the to-hit of each shape skill at the Attack
+   level (§2.15).
+7. `apply_state` refuses a lower-level recast of the same state and
+   skill; a higher level replaces the list (§2.7 step 4).
+8. Srvdo 2 refreshes an existing `auratargetstate` list's stats and
+   timer but keeps its old expiry (§4.2 step 3).
+
+## Test vectors
+
+| Case (1.14d data unless synthetic) | Expected |
+|---|---|
+| Kick start, T present (MinDam 0, HitShift 8) | record: hit flags 2, result 9, physical 0, hit class 1; `start_combat(…, 128)` without a roll; returns 1 |
+| Kick start, no T | 0, no combat entry |
+| Might L1 aura run at F = 1251 (perdelay 50) | period 1301 → duration 51; lists expire at 1302 with a timer 12 there; next run 1301 refreshes to 1352 |
+| Amplify Damage L1 on a monster with base damageresist 100 | duration 200; stat 36 = −100 / 5 = −20 in the curse list (state 9) |
+| Dim Vision L1 (`ln34` = Param3 175) on a monster, Hell | duration 175 / 4 = 43 |
+| Aura filter 73731 | players and monsters, allies only, no units in town rooms; no 0x80 / 0x400 tests |
+| `dec_quantity`, right-hand javelins q = 1 (synthetic) | quantity 0, 0x3E sent, returns 1 |
+| `dec_quantity`, q = 0 (synthetic) | quantity 0, returns 0: no missile when called from `skill_missile` |
+| Progressive prgdam 2, n = 3, ln12 = 10 (synthetic) | life and mana leech += 20 |
+| Curse resistance 50, duration 200 (synthetic) | duration 100 |
+
+## Provenance
+
+- 1.14d disassembly of every listed address (`py tools/ghidra/disasm.py
+  fn|at`); tables `0x00732140` (srvst), `0x007322B0` (srvdo) for
+  identification (`use.md` §8); jump tables `0x0056B6AC`, `0x005C35A8`
+  / `0x005C35B0`, `0x0056CA0C` dumped from the image; offsets from
+  `data/fields.tsv`; values from the 1.14d `patch_d2` tables.
+- D2MOO 1.10f `SKILLS_SrvSt01…`, `SrvDo001/002/018/030/065`,
+  `sub_6FCF5680`, `sub_6FCF5870`, `sub_6FD10EC0`, `sub_6FD10E50`,
+  `AURAFILTER_*` for names. 1.14d differences: wolf / bear Attack do
+  applies the melee (§4.1 step 7); the curse callback's event loop tests
+  event 1 each time (as D2MOO); `0x005C3540` resistance scaling and the
+  hireling exception are not in D2MOO's curse callback.
+
+## Open questions
+
+1. Recording: hook `0x005CF010` and `0x0056E970` (entry, return) with a
+   Paladin running Might in a party: confirm duration, expiry, count and
+   state 85 per tick.
+2. Recording: Kick, Bash and Attack on a monster: `0x0057DBF0` record
+   before / after (`combat/damage.md` Open question) to confirm §3.2,
+   §3.8, §4.1.
+3. Recording: Amplify Damage on an immune monster (stat 36 value in the
+   list) and Dim Vision in Nightmare (expiry − F).
+4. Items spec: bodies of the attack-mode cleanup `0x00580310` (hand
+   refill after a stack empties) and `0x00580380` (zero-durability
+   weapons), and who removes Bash's flag-4 attack-rate list.
+5. `0x00575900` (player skill resync after a state list is removed):
+   messages sent.
+6. Unit event handler iteration (`0x005C0C30`) and the deferred-free
+   flag 2: owner `sim/units.md` (`combat/damage.md` Open question 4).
+7. `0x005B0DA0` second argument (monstats) and AI kinds 10–12
+   (`monsters/ai.md` special states): confirm which classes Terror and
+   Dim Vision can switch.
