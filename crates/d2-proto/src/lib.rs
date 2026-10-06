@@ -12,6 +12,8 @@
 //!   rule 4) and the S→C buffer split (§3.3).
 //! - [`generated::client`] / [`generated::server`]: typed decode/encode of
 //!   the fixed layouts ([`wire::FixedMessage`]).
+//! - [`s2c`]: typed S→C builders, the client-side parser and the audit
+//!   of every S→C id (which layouts the specs give).
 //! - [`tsv`]: strict TSV parser and the TSV-vs-code check; [`codegen`]: the
 //!   generator.
 
@@ -19,6 +21,7 @@ pub mod codegen;
 // Generated layout (one row per line); `cargo fmt` leaves it alone.
 #[rustfmt::skip]
 pub mod generated;
+pub mod s2c;
 pub mod schema;
 pub mod transport;
 pub mod tsv;

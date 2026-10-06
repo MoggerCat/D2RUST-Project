@@ -3237,7 +3237,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x16, name: "UnitPositions", size: SizeRule::Field { width: Width::U16, offset: 1, mul: 1, add: 0, cap: None, min: 13 }, layout: &[], senders: &[], client_handler: Some(0x0045D2E0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x17, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D260), produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x18, name: "LifeManaUpdate", size: SizeRule::Fixed(15), layout: &[], senders: &[0x0053C230], client_handler: Some(0x0045D9B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x19, name: "SmallGoldPickup", size: SizeRule::Fixed(2), layout: &[], senders: &[0x0053E9B0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x19, name: "SmallGoldPickup", size: SizeRule::Fixed(2), layout: &[Field { name: "delta", ty: FieldType::U8, offset: Some(1) }], senders: &[0x0053E9B0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x1A, name: "AddExpByte", size: SizeRule::Fixed(2), layout: &[Field { name: "value", ty: FieldType::U8, offset: Some(1) }], senders: &[0x0053BDD0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x1B, name: "AddExpWord", size: SizeRule::Fixed(3), layout: &[Field { name: "value", ty: FieldType::U16, offset: Some(1) }], senders: &[0x0053BDD0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x1C, name: "AddExpDword", size: SizeRule::Fixed(5), layout: &[Field { name: "value", ty: FieldType::U32, offset: Some(1) }], senders: &[0x0053BDD0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3275,16 +3275,16 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x3C, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x3D, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x3E, name: "UpdateItemStats", size: SizeRule::Field { width: Width::U8, offset: 1, mul: 1, add: 0, cap: None, min: 2 }, layout: &[], senders: &[0x0053D130], client_handler: Some(0x0045E130), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x3F, name: "UseStackableItem", size: SizeRule::Fixed(8), layout: &[], senders: &[0x0053D220], client_handler: Some(0x0045E220), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x3F, name: "UseStackableItem", size: SizeRule::Fixed(8), layout: &[Field { name: "code", ty: FieldType::U8, offset: Some(1) }, Field { name: "item", ty: FieldType::U32, offset: Some(2) }, Field { name: "arg", ty: FieldType::U16, offset: Some(6) }], senders: &[0x0053D220], client_handler: Some(0x0045E220), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x40, name: "ItemFlags", size: SizeRule::Fixed(13), layout: &[], senders: &[0x0053D270], client_handler: Some(0x0045E240), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x41, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x42, name: "ClearCursor", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053D2E0], client_handler: Some(0x0045E270), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x42, name: "ClearCursor", size: SizeRule::Fixed(6), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "unit", ty: FieldType::U32, offset: Some(2) }], senders: &[0x0053D2E0], client_handler: Some(0x0045E270), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x43, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x44, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x45, name: "Unknown45", size: SizeRule::Fixed(13), layout: &[], senders: &[], client_handler: Some(0x0045E290), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x46, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x47, name: "Relator1", size: SizeRule::Fixed(11), layout: &[], senders: &[0x0053D370], client_handler: Some(0x0045E2A0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x48, name: "Relator2", size: SizeRule::Fixed(11), layout: &[], senders: &[0x0053D3C0], client_handler: Some(0x0045E2D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x47, name: "Relator1", size: SizeRule::Fixed(11), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "", ty: FieldType::U8, offset: Some(2) }, Field { name: "unit", ty: FieldType::U32, offset: Some(3) }], senders: &[0x0053D370], client_handler: Some(0x0045E2A0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x48, name: "Relator2", size: SizeRule::Fixed(11), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "arg", ty: FieldType::U8, offset: Some(2) }, Field { name: "unit", ty: FieldType::U32, offset: Some(3) }], senders: &[0x0053D3C0], client_handler: Some(0x0045E2D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x49, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x4A, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x4B, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
@@ -3337,7 +3337,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x7A, name: "PetAction", size: SizeRule::Fixed(13), layout: &[], senders: &[0x0053CB30], client_handler: Some(0x0045E860), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7B, name: "AssignHotkey", size: SizeRule::Fixed(8), layout: &[], senders: &[0x0053DB20], client_handler: Some(0x0045E8D0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7C, name: "UseScroll", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053B3D0], client_handler: Some(0x0045E910), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x7D, name: "SetItemState", size: SizeRule::Fixed(18), layout: &[], senders: &[0x0053D440], client_handler: Some(0x0045E930), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x7D, name: "SetItemState", size: SizeRule::Fixed(18), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "unit", ty: FieldType::U32, offset: Some(2) }, Field { name: "item", ty: FieldType::U32, offset: Some(6) }, Field { name: "flag", ty: FieldType::U32, offset: Some(10) }, Field { name: "state", ty: FieldType::U32, offset: Some(14) }], senders: &[0x0053D440], client_handler: Some(0x0045E930), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7E, name: "Unknown7E", size: SizeRule::Fixed(5), layout: &[], senders: &[0x0053DB70], client_handler: Some(0x0045E970), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x7F, name: "AllyPartyInfo", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053CDF0], client_handler: Some(0x0045E990), client_unit_handler: None, produced_by: ProducedBy::Out, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x80, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: None, client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
@@ -3368,8 +3368,8 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x99, name: "SkillTriggered", size: SizeRule::Fixed(16), layout: &[], senders: &[], client_handler: Some(0x0045DE80), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x9A, name: "Unknown9A", size: SizeRule::Fixed(17), layout: &[], senders: &[], client_handler: Some(0x0045DEC0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x9B, name: "Unknown9B", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053E0E0], client_handler: Some(0x0045EAC0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x9C, name: "ItemActionWorld", size: SizeRule::Field { width: Width::U8, offset: 2, mul: 1, add: 0, cap: None, min: 3 }, layout: &[], senders: &[0x0053EAE0], client_handler: Some(0x0045EB10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x9D, name: "ItemActionOwned", size: SizeRule::Field { width: Width::U8, offset: 2, mul: 1, add: 0, cap: None, min: 3 }, layout: &[], senders: &[0x0053CEF0], client_handler: Some(0x0045EC70), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x9C, name: "ItemActionWorld", size: SizeRule::Field { width: Width::U8, offset: 2, mul: 1, add: 0, cap: None, min: 3 }, layout: &[Field { name: "action", ty: FieldType::U8, offset: Some(1) }, Field { name: "size", ty: FieldType::U8, offset: Some(2) }, Field { name: "category", ty: FieldType::U8, offset: Some(3) }, Field { name: "item", ty: FieldType::U32, offset: Some(4) }, Field { name: "data", ty: FieldType::Tail, offset: Some(8) }], senders: &[0x0053EAE0], client_handler: Some(0x0045EB10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x9D, name: "ItemActionOwned", size: SizeRule::Field { width: Width::U8, offset: 2, mul: 1, add: 0, cap: None, min: 3 }, layout: &[Field { name: "action", ty: FieldType::U8, offset: Some(1) }, Field { name: "size", ty: FieldType::U8, offset: Some(2) }, Field { name: "category", ty: FieldType::U8, offset: Some(3) }, Field { name: "item", ty: FieldType::U32, offset: Some(4) }, Field { name: "owner_type", ty: FieldType::U8, offset: Some(8) }, Field { name: "owner", ty: FieldType::U32, offset: Some(9) }, Field { name: "data", ty: FieldType::Tail, offset: Some(13) }], senders: &[0x0053CEF0], client_handler: Some(0x0045EC70), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x9E, name: "MercStatByte", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053BEE0], client_handler: Some(0x0045D540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x9F, name: "MercStatWord", size: SizeRule::Fixed(8), layout: &[], senders: &[0x0053BEE0], client_handler: Some(0x0045D540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0xA0, name: "MercStatDword", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053BEE0, 0x0053BFD0], client_handler: Some(0x0045D540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3696,6 +3696,37 @@ pub mod server {
         }
     }
 
+    /// 0x19 SmallGoldPickup (2 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct SmallGoldPickup {
+        /// `u8` at 1.
+        pub delta: u8,
+    }
+
+    impl FixedMessage for SmallGoldPickup {
+        const ID: u8 = 0x19;
+        const SIZE: usize = 2;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                delta: u8_at(b, 1),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.delta);
+        }
+    }
+
+    impl SmallGoldPickup {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 2] {
+            let mut b = [0; 2];
+            self.write(&mut b);
+            b
+        }
+    }
+
     /// 0x1A AddExpByte (2 bytes).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct AddExpByte {
@@ -3894,6 +3925,158 @@ pub mod server {
         }
     }
 
+    /// 0x3F UseStackableItem (8 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct UseStackableItem {
+        /// `u8` at 1.
+        pub code: u8,
+        /// `u32` at 2.
+        pub item: u32,
+        /// `u16` at 6.
+        pub arg: u16,
+    }
+
+    impl FixedMessage for UseStackableItem {
+        const ID: u8 = 0x3F;
+        const SIZE: usize = 8;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                code: u8_at(b, 1),
+                item: u32_at(b, 2),
+                arg: u16_at(b, 6),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.code);
+            put_u32(out, 2, self.item);
+            put_u16(out, 6, self.arg);
+        }
+    }
+
+    impl UseStackableItem {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 8] {
+            let mut b = [0; 8];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x42 ClearCursor (6 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct ClearCursor {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u32` at 2.
+        pub unit: u32,
+    }
+
+    impl FixedMessage for ClearCursor {
+        const ID: u8 = 0x42;
+        const SIZE: usize = 6;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                unit: u32_at(b, 2),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u32(out, 2, self.unit);
+        }
+    }
+
+    impl ClearCursor {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 6] {
+            let mut b = [0; 6];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x47 Relator1 (11 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Relator1 {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u8` at 2.
+        pub f2: u8,
+        /// `u32` at 3.
+        pub unit: u32,
+    }
+
+    impl FixedMessage for Relator1 {
+        const ID: u8 = 0x47;
+        const SIZE: usize = 11;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                f2: u8_at(b, 2),
+                unit: u32_at(b, 3),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u8(out, 2, self.f2);
+            put_u32(out, 3, self.unit);
+        }
+    }
+
+    impl Relator1 {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 11] {
+            let mut b = [0; 11];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x48 Relator2 (11 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Relator2 {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u8` at 2.
+        pub arg: u8,
+        /// `u32` at 3.
+        pub unit: u32,
+    }
+
+    impl FixedMessage for Relator2 {
+        const ID: u8 = 0x48;
+        const SIZE: usize = 11;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                arg: u8_at(b, 2),
+                unit: u32_at(b, 3),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u8(out, 2, self.arg);
+            put_u32(out, 3, self.unit);
+        }
+    }
+
+    impl Relator2 {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 11] {
+            let mut b = [0; 11];
+            self.write(&mut b);
+            b
+        }
+    }
+
     /// 0x4F StartMercList (1 byte).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct StartMercList;
@@ -4070,6 +4253,53 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 1] {
             let mut b = [0; 1];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x7D SetItemState (18 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct SetItemState {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u32` at 2.
+        pub unit: u32,
+        /// `u32` at 6.
+        pub item: u32,
+        /// `u32` at 10.
+        pub flag: u32,
+        /// `u32` at 14.
+        pub state: u32,
+    }
+
+    impl FixedMessage for SetItemState {
+        const ID: u8 = 0x7D;
+        const SIZE: usize = 18;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                unit: u32_at(b, 2),
+                item: u32_at(b, 6),
+                flag: u32_at(b, 10),
+                state: u32_at(b, 14),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u32(out, 2, self.unit);
+            put_u32(out, 6, self.item);
+            put_u32(out, 10, self.flag);
+            put_u32(out, 14, self.state);
+        }
+    }
+
+    impl SetItemState {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 18] {
+            let mut b = [0; 18];
             self.write(&mut b);
             b
         }
