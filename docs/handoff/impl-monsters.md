@@ -1,5 +1,7 @@
 # Handoff: missiles + monster AI implementation (`claude/impl-monsters`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Session: cloud implementation (METHODS M14, medium), 2026-10-06. Base:
 `claude/bold-ptolemy-jvyvxy` at `4c7a7c7` (PR #9; same content). Inputs:
 `specs/missiles/missiles.md` (+ `srvdo.tsv`, `srvhit.tsv`),

@@ -1,5 +1,7 @@
 # Handoff: treasure implementation (`d2_sim::treasure`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Scope: branch `claude/impl-treasure`, from `claude/bold-ptolemy-jvyvxy` at
 `4c7a7c7`. Spec: `specs/items/treasure.md` (draft) with
 `treasure-quality.tsv` and `treasure-chest-acts.tsv`. Cloud session, repo

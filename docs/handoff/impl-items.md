@@ -1,5 +1,7 @@
 # Handoff: items implementation (`d2_sim::items`)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/impl-items`, based on `claude/bold-ptolemy-jvyvxy` at
 `4c7a7c7` (2026-10-06, cloud). Specs: `specs/items/generation.md`,
 `quality.md`, `affixes.md`, `properties.md` (+ `property-functions.tsv`),

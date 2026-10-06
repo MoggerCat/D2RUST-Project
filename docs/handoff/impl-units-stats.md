@@ -1,5 +1,7 @@
 # Handoff: units, stats, stat lists (implementation)
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Branch `claude/impl-units-stats`, from `claude/bold-ptolemy-jvyvxy` at
 `4c7a7c7` (cloud session, 2026-10-06). Task class: implementation from a
 clear spec, medium (METHODS M14). For the coordinator to fold into
