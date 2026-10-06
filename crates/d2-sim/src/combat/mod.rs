@@ -13,6 +13,7 @@
 
 pub mod damage;
 pub mod hit;
+pub mod vitals;
 
 use crate::skills::SkillUnits;
 use crate::units::UnitType;
