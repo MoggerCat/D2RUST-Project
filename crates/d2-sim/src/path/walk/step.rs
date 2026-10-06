@@ -4,13 +4,16 @@
 //! reset, room-change messages, run drain and re-path. 16.16 fixed point
 //! on u32 positions, as the original (wrapping where it wraps).
 
-use super::find::{compute, path_type, set_type};
-use super::geom::{centre, unit_distance};
+use super::find::compute;
+use super::geom::unit_distance;
 use super::request::{neutral_start, start_movement};
-use super::seams::{flag, PathWorld, Point, WalkError, WalkPath, WalkUnits, MAX_POINTS};
-use super::tables::PathTables;
+use super::seams::{count, index, room_contains, PathWorld, Point, WalkError, WalkUnits};
 use super::velocity::aim;
-use crate::game::Game;
+use crate::path::collision::find_room;
+use crate::path::coords::to_fp16_center;
+use crate::path::footprint::{forced_move, missile_move, try_move};
+use crate::path::record::{flags, path_types, DynamicPath, PathPoint, PATH_POINTS, SAVED_STEPS};
+use crate::path::tables::PathTables;
 use crate::units::{RoomId, UnitId, UnitType};
 
 /// Step base, 100 % (`0x00554CA0`).
@@ -35,73 +38,72 @@ pub enum Step {
     Stopped = 2,
 }
 
-/// The walk context: tables and both seam sides.
-pub struct Walk<'a, W: ?Sized, U: ?Sized> {
+/// The walk context: tables and the one object that holds the game,
+/// units, DRLG grids and path store ([`PathWorld`] + [`WalkUnits`]).
+pub struct Walk<'a, C: ?Sized> {
     pub t: &'a PathTables,
-    pub w: &'a mut W,
-    pub u: &'a mut U,
+    pub c: &'a mut C,
 }
 
 fn cell_of(p: u32) -> i32 {
     (p >> 16) as i32
 }
 
-fn centre_of(path: &WalkPath) -> (u32, u32) {
+fn centre_of(path: &DynamicPath) -> (u32, u32) {
     let c = path.cell();
-    (centre(c.x), centre(c.y))
+    (to_fp16_center(c.x), to_fp16_center(c.y))
 }
 
-impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
+impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
     /// Player event 0 (`0x00580C20`, §9.2). Returns the step result.
-    pub fn player_event0(&mut self, game: &mut Game, unit: UnitId) -> Result<Step, WalkError> {
-        let Some(mut path) = self.w.load_path(unit) else {
+    pub fn player_event0(&mut self, unit: UnitId) -> Result<Step, WalkError> {
+        let Some(mut path) = self.c.load_path(unit) else {
             return Ok(Step::Stopped);
         };
-        let r = self.player_event0_on(game, unit, &mut path);
-        self.w.store_path(unit, &path);
+        let r = self.player_event0_on(unit, &mut path);
+        self.c.store_path(unit, &path);
         let s = r?;
         if s == Step::Stopped {
             // Step 6: no 1.14d server code stores a non-zero queued action
             // (player data +0x150), so a stop is a neutral start.
-            neutral_start(self.w, self.u, game, unit, &path);
+            neutral_start(self.c, unit, &path);
         }
         Ok(s)
     }
 
     fn player_event0_on(
         &mut self,
-        game: &mut Game,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
     ) -> Result<Step, WalkError> {
         // Step 1.
         self.target_check(path);
         // Step 2.
-        if self.u.has_state(unit, 13) {
+        if self.c.has_state(unit, 13) {
             // `0x005C9D90` (skills spec). TODO(spec: pathing.md §9.2 step 2,
             // whether the step continues after it): treated as a branch.
-            self.u.state13_step(game, unit);
+            self.c.state13_step(unit);
             return Ok(Step::Moving);
         }
         // Step 3.
-        if self.u.mode(unit) == 3
-            && self.run_drain(game, unit, path)
-            && start_movement(self.t, self.w, self.u, game, unit, path, 3)? == 0
+        if self.c.mode(unit) == 3
+            && self.run_drain(unit, path)
+            && start_movement(self.t, self.c, unit, path, 3)? == 0
         {
-            neutral_start(self.w, self.u, game, unit, path);
+            neutral_start(self.c, unit, path);
         }
         // Step 4.
-        self.step(game, unit, path)
+        self.step(unit, path)
         // Step 5 (host-only position history) is not simulated.
     }
 
     /// Target check `0x00553490` (§9.2 step 1).
-    pub fn target_check(&mut self, path: &mut WalkPath) {
+    pub fn target_check(&mut self, path: &mut DynamicPath) {
         let Some(tu) = path.target_unit else { return };
-        let found = self.u.find_unit(tu.ty, tu.guid);
+        let found = self.c.find_unit(tu.ty, tu.guid);
         let drop = match found {
             Some(f) if f == tu.unit => {
-                self.u.unit_type(f) == UnitType::Item && matches!(self.u.mode(f), 1 | 2)
+                self.c.unit_type(f) == UnitType::Item && matches!(self.c.mode(f), 1 | 2)
             }
             _ => true,
         };
@@ -111,16 +113,11 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
     }
 
     /// Step `0x00554CA0(game, unit)` (§9.3).
-    pub fn step(
-        &mut self,
-        game: &mut Game,
-        unit: UnitId,
-        path: &mut WalkPath,
-    ) -> Result<Step, WalkError> {
+    pub fn step(&mut self, unit: UnitId, path: &mut DynamicPath) -> Result<Step, WalkError> {
         self.target_check(path);
-        let m = self.movement(game, unit, path, STEP_BASE)?;
-        if path.flags & flag::ROOM_CHANGED != 0 {
-            self.room_change_messages(game, unit, path);
+        let m = self.movement(unit, path, STEP_BASE)?;
+        if path.flags & flags::ROOM_CHANGED != 0 {
+            self.room_change_messages(unit, path);
         }
         Ok(if m { Step::Moving } else { Step::Stopped })
     }
@@ -128,24 +125,23 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
     /// Movement `0x00650840(unit, base)` (§9.4). True = result 1.
     pub fn movement(
         &mut self,
-        game: &mut Game,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         base: i32,
     ) -> Result<bool, WalkError> {
-        let ty = self.u.unit_type(unit);
+        let ty = self.c.unit_type(unit);
         let missile = ty == UnitType::Missile;
         // Rule 1.
-        path.flags &= !flag::CROSSED;
+        path.flags &= !flags::MOVED;
         if missile {
-            path.collided = 0;
+            path.collided_mask = 0;
         }
         // Rule 2.
-        let go = path.flags & flag::ACTIVE != 0
-            && path.count > 0
+        let go = path.flags & flags::ACTIVE != 0
+            && count(path) > 0
             && path.velocity != 0
-            && (missile || self.arrival(game, unit, path)?)
-            && path.index < path.count;
+            && (missile || self.arrival(unit, path)?)
+            && index(path) < count(path);
         if go {
             // 2.1.
             let base = if base <= 0 { STEP_BASE } else { base };
@@ -160,21 +156,19 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
                 }
             }
             let m = base.wrapping_mul(path.velocity) >> 6;
-            path.vel_vec = (
-                m.wrapping_mul(path.dir_vec.0) >> 12,
-                m.wrapping_mul(path.dir_vec.1) >> 12,
-            );
+            path.vel_vec_x = m.wrapping_mul(path.dir_vec_x) >> 12;
+            path.vel_vec_y = m.wrapping_mul(path.dir_vec_y) >> 12;
             // 2.2.
-            if path.vel_vec != (0, 0) {
+            if (path.vel_vec_x, path.vel_vec_y) != (0, 0) {
                 // 2.3, 2.4.
-                let q = self.one_step(game, unit, path)?;
+                let q = self.one_step(unit, path)?;
                 self.set_position(unit, path, q, None);
                 // 2.5.
-                if !missile && path.index < path.count {
+                if !missile && index(path) < count(path) {
                     aim(self.t, path, ty);
                 }
                 // 2.6.
-                if path.index < path.count {
+                if index(path) < count(path) {
                     return Ok(true);
                 }
             }
@@ -186,67 +180,57 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
 
     /// Arrival check `0x006503F0` (§9.5). The re-path's result decides
     /// where the rule says "re-path".
-    fn arrival(
-        &mut self,
-        game: &mut Game,
-        unit: UnitId,
-        path: &mut WalkPath,
-    ) -> Result<bool, WalkError> {
+    fn arrival(&mut self, unit: UnitId, path: &mut DynamicPath) -> Result<bool, WalkError> {
         let pos = path.cell();
-        if matches!(path.path_type, 5 | 6) && path.index >= path.count {
+        if matches!(path.path_type, 5 | 6) && index(path) >= count(path) {
             return Ok(true);
         }
         let Some(tu) = path.target_unit else {
-            if path.index >= path.count && pos != path.final_target {
-                return Ok(self.repath(game, unit, path, false)? != 0);
+            if index(path) >= count(path) && pos != path.final_target() {
+                return Ok(self.repath(unit, path, false)? != 0);
             }
             return Ok(true);
         };
-        let tpos = self.u.position(tu.unit);
-        let d = unit_distance(self.t, pos, path.size, tpos, self.u.unit_size(tu.unit));
+        let tpos = self.c.position(tu.unit);
+        let d = unit_distance(self.t, pos, path.unit_size, tpos, self.c.unit_size(tu.unit));
         if d <= path.stop_distance as i32 {
             return Ok(false);
         }
-        let refreshed = super::find::refresh_point(self.u, path, tu.unit);
-        let tty = self.u.unit_type(tu.unit);
+        let refreshed = super::find::refresh_point(&*self.c, path, tu.unit);
+        let tty = self.c.unit_type(tu.unit);
+        let prev = path.prev_target();
         if matches!(tty, UnitType::Player | UnitType::Monster)
-            && ((refreshed.x - path.prev_target.x).abs() > 5
-                || (refreshed.y - path.prev_target.y).abs() > 5)
+            && ((refreshed.x - prev.x).abs() > 5 || (refreshed.y - prev.y).abs() > 5)
         {
-            return Ok(self.repath(game, unit, path, true)? != 0);
+            return Ok(self.repath(unit, path, true)? != 0);
         }
-        if path.index < path.count || pos == path.final_target {
+        if index(path) < count(path) || pos == path.final_target() {
             return Ok(true);
         }
-        Ok(self.repath(game, unit, path, true)? != 0)
+        Ok(self.repath(unit, path, true)? != 0)
     }
 
     /// One step `0x00650660` (§9.6 rules 1–7): the new precise position Q.
-    fn one_step(
-        &mut self,
-        game: &mut Game,
-        unit: UnitId,
-        path: &mut WalkPath,
-    ) -> Result<(u32, u32), WalkError> {
-        let ty = self.u.unit_type(unit);
+    fn one_step(&mut self, unit: UnitId, path: &mut DynamicPath) -> Result<(u32, u32), WalkError> {
+        let ty = self.c.unit_type(unit);
         let missile = ty == UnitType::Missile;
         // Rule 1.
-        path.collided = 0;
-        let monster_repath = ty == UnitType::Monster && path.flags & flag::KEEP_TARGET != 0;
+        path.collided_mask = 0;
+        let monster_repath = ty == UnitType::Monster && path.flags & flags::KEEP_TARGET != 0;
         // Rule 2.
-        if path.vel_vec == (0, 0) {
-            path.count = 0;
-            path.index = 0;
+        if (path.vel_vec_x, path.vel_vec_y) == (0, 0) {
+            path.point_count = 0;
+            path.cur_point = 0;
             return Ok(centre_of(path));
         }
         // Rule 3.
-        let (mut dx, mut dy) = path.vel_vec;
+        let (mut dx, mut dy) = (path.vel_vec_x, path.vel_vec_y);
         let mut reaches = false;
         if !missile {
-            let i = path.index.clamp(0, MAX_POINTS as i32 - 1) as usize;
-            let p = path.points[i];
-            let rx = centre(p.x).wrapping_sub(path.precise_x) as i32;
-            let ry = centre(p.y).wrapping_sub(path.precise_y) as i32;
+            let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
+            let p = path.point(i);
+            let rx = to_fp16_center(p.x).wrapping_sub(path.precise_x) as i32;
+            let ry = to_fp16_center(p.y).wrapping_sub(path.precise_y) as i32;
             let m = dx.abs().max(dy.abs());
             if rx.abs() <= m && ry.abs() <= m {
                 dx = rx;
@@ -259,20 +243,20 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
         let ny = path.precise_y.wrapping_add_signed(dy);
         let mut q = (nx, ny);
         if (cell_of(nx), cell_of(ny)) != (cell_of(path.precise_x), cell_of(path.precise_y)) {
-            if path.distance_budget > 0
-                && path.path_type != path_type::KNOCKBACK
-                && path.path_type != path_type::KNOCKBACK_CLIENT
+            if path.dist_budget > 0
+                && path.path_type != path_types::KNOCKBACK_SERVER
+                && path.path_type != path_types::KNOCKBACK_CLIENT
             {
-                path.distance_budget -= 1;
+                path.dist_budget -= 1;
             }
             match self.cell_walk(unit, path, (dx, dy))? {
                 Ok(end) => q = end,
                 Err(last_free) => {
                     if monster_repath {
                         let finish = path.target_unit.is_some();
-                        self.repath(game, unit, path, finish)?;
+                        self.repath(unit, path, finish)?;
                     } else {
-                        path.index = path.count;
+                        path.cur_point = path.point_count;
                     }
                     return Ok(last_free);
                 }
@@ -280,7 +264,7 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
         }
         // Rule 7.
         if reaches {
-            path.index += 1;
+            path.cur_point += 1;
         }
         Ok(q)
     }
@@ -291,7 +275,7 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
     pub(crate) fn cell_walk(
         &mut self,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         d: (i32, i32),
     ) -> Result<Result<(u32, u32), (u32, u32)>, WalkError> {
         let mut k = 0usize;
@@ -320,25 +304,25 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
             );
             if cc != nc {
                 if !self.footprint_move(unit, path, cc, nc)? {
-                    path.saved_count = k as i32;
+                    path.saved_count = k as u32;
                     if k > 0 {
-                        path.flags |= flag::CROSSED;
+                        path.flags |= flags::MOVED;
                     }
-                    return Ok(Err((centre(cc.x), centre(cc.y))));
+                    return Ok(Err((to_fp16_center(cc.x), to_fp16_center(cc.y))));
                 }
-                if path.flags & flag::SAVE_STEPS != 0 {
-                    path.saved_steps[k] = nc;
+                if path.flags & flags::SAVE_STEPS != 0 {
+                    path.saved_steps[k] = PathPoint::from_point(nc);
                     k += 1;
-                    if k >= super::seams::MAX_SAVED_STEPS {
+                    if k >= SAVED_STEPS {
                         break;
                     }
                 }
             }
             c = n;
         }
-        path.saved_count = k as i32;
+        path.saved_count = k as u32;
         if k > 0 {
-            path.flags |= flag::CROSSED;
+            path.flags |= flags::MOVED;
         }
         Ok(Ok(end))
     }
@@ -347,68 +331,59 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
     fn footprint_move(
         &mut self,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         old: Point,
         new: Point,
     ) -> Result<bool, WalkError> {
-        let ty = self.u.unit_type(unit);
-        if path.flags & flag::FORCED != 0 {
+        let ty = self.c.unit_type(unit);
+        let (o, n) = ((old.x, old.y), (new.x, new.y));
+        if path.flags & flags::NO_TEST != 0 {
             if !matches!(ty, UnitType::Player | UnitType::Monster) {
                 return Err(WalkError::Fatal("forced footprint move of a non-walker"));
             }
-            self.w
-                .forced_move(path.room, old, new, path.pattern, path.footprint_mask);
+            forced_move(self.c, path.room, o, n, path.pattern, path.foot_mask);
             return Ok(true);
         }
         if ty == UnitType::Missile {
-            let r = self.w.missile_move(
+            let r = missile_move(
+                self.c,
                 path.room,
-                old,
-                new,
-                path.size,
-                path.footprint_mask,
+                o,
+                n,
+                path.unit_size,
+                path.foot_mask,
                 path.move_mask,
             );
-            path.collided |= r;
-            return Ok(path.collided & 0x5 == 0);
+            path.collided_mask |= r;
+            return Ok(path.collided_mask & 0x5 == 0);
         }
         let test = if path.move_mask == 0x3401 {
             0x3C01
         } else {
             path.move_mask
         };
-        let r = self
-            .w
-            .try_move(path.room, old, new, path.pattern, path.footprint_mask, test);
-        path.collided |= r;
-        Ok(path.collided == 0)
+        let r = try_move(self.c, path.room, o, n, path.pattern, path.foot_mask, test);
+        path.collided_mask |= r;
+        Ok(path.collided_mask == 0)
     }
 
     /// Set position `0x0064FB90(Q, hint)` (§9.6 rule 8).
     pub fn set_position(
         &mut self,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         q: (u32, u32),
         hint: Option<RoomId>,
     ) {
-        let missile = self.u.unit_type(unit) == UnitType::Missile;
-        if missile
-            && self
-                .w
-                .cell_room(path.room, cell_of(q.0), cell_of(q.1))
-                .is_none()
-        {
-            path.count = 0;
+        let missile = self.c.unit_type(unit) == UnitType::Missile;
+        if missile && find_room(&*self.c, path.room, cell_of(q.0), cell_of(q.1)).is_none() {
+            path.point_count = 0;
             return;
         }
         path.precise_x = q.0;
         path.precise_y = q.1;
-        let a = (q.0 as i32) >> 11;
-        let b = (q.1 as i32) >> 11;
-        path.client_x = (a - b) >> 1;
-        path.client_y = (a + b) >> 2;
-        if path.flags & flag::OUTSIDE_ROOM != 0 {
+        path.update_client();
+        if path.flags & flags::OUTSIDE_ROOM != 0 {
             self.room_recache(unit, path, hint, missile);
         }
     }
@@ -417,62 +392,60 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
     fn room_recache(
         &mut self,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         hint: Option<RoomId>,
         missile: bool,
     ) {
         let c = path.cell();
         if let Some(r) = path.room {
-            let (rx, ry, rw, rh) = self.w.room_rect(r);
-            if c.x >= rx && c.x < rx + rw && c.y >= ry && c.y < ry + rh {
+            if room_contains(&*self.c, r, c) {
                 return;
             }
         }
-        let new = self
-            .w
-            .cell_room(path.room, c.x, c.y)
-            .or_else(|| self.w.cell_room(hint, c.x, c.y));
+        let new = find_room(&*self.c, path.room, c.x, c.y)
+            .or_else(|| find_room(&*self.c, hint, c.x, c.y));
         if new.is_none() && missile {
-            path.count = 0;
+            path.point_count = 0;
             return;
         }
         path.prev_room = path.room;
         if let Some(old) = path.room {
-            self.w.room_list_remove(unit, old);
+            self.c.room_list_remove(unit, old);
         }
-        path.flags |= flag::ROOM_CHANGED;
+        path.flags |= flags::ROOM_CHANGED;
         path.room = new;
         if let Some(n) = new {
-            self.w.room_list_insert(unit, n);
-            self.w.queue_for_update(unit);
+            self.c.room_list_insert(unit, n);
+            self.c.queue_for_update(unit);
         }
     }
 
     /// Reset `0x006507B0` (§9.7).
-    pub fn reset(&mut self, unit: UnitId, path: &mut WalkPath) {
+    pub fn reset(&mut self, unit: UnitId, path: &mut DynamicPath) {
         let q = centre_of(path);
         self.set_position(unit, path, q, None);
-        path.flags &= !flag::ACTIVE;
-        path.count = 0;
-        path.index = 0;
-        path.vel_vec = (0, 0);
+        path.flags &= !flags::ACTIVE;
+        path.point_count = 0;
+        path.cur_point = 0;
+        path.vel_vec_x = 0;
+        path.vel_vec_y = 0;
     }
 
     /// Room-change messages `0x00554670(game, unit, 0)` (§9.8).
-    pub fn room_change_messages(&mut self, game: &mut Game, unit: UnitId, path: &mut WalkPath) {
-        if path.flags & flag::ROOM_CHANGED == 0 {
+    pub fn room_change_messages(&mut self, unit: UnitId, path: &mut DynamicPath) {
+        if path.flags & flags::ROOM_CHANGED == 0 {
             return;
         }
-        if self.u.unit_type(unit) == UnitType::Monster {
-            self.u.clear_ai_room_memo(unit);
+        if self.c.unit_type(unit) == UnitType::Monster {
+            self.c.clear_ai_room_memo(unit);
         }
         let old = path
             .prev_room
-            .map(|r| self.w.room_clients(r))
+            .map(|r| self.c.room_clients(r))
             .unwrap_or_default();
         let new = path
             .room
-            .map(|r| self.w.room_clients(r))
+            .map(|r| self.c.room_clients(r))
             .unwrap_or_default();
         let (mut i, mut j) = (0, 0);
         while i < old.len() || j < new.len() {
@@ -484,83 +457,83 @@ impl<W: PathWorld + ?Sized, U: WalkUnits + ?Sized> Walk<'_, W, U> {
                     j += 1;
                 }
                 (Some(x), y) if y.is_none_or(|y| x < y) => {
-                    if self.u.client_player(x) != Some(unit) {
-                        self.u.send_unit_removal(game, x, unit);
+                    if self.c.client_player(x) != Some(unit) {
+                        self.c.send_unit_removal(x, unit);
                     }
                     i += 1;
                 }
                 (_, Some(y)) => {
-                    if self.u.client_player(y) != Some(unit) {
-                        self.u.send_unit_add(game, y, unit);
+                    if self.c.client_player(y) != Some(unit) {
+                        self.c.send_unit_add(y, unit);
                     }
                     j += 1;
                 }
                 _ => break,
             }
         }
-        path.flags &= !flag::ROOM_CHANGED;
+        path.flags &= !flags::ROOM_CHANGED;
     }
 
     /// Run drain `0x0057F240` (§9.9). True = exhausted.
-    pub fn run_drain(&mut self, game: &mut Game, unit: UnitId, path: &WalkPath) -> bool {
-        if path.room.is_some_and(|r| self.w.room_in_town(r)) {
+    pub fn run_drain(&mut self, unit: UnitId, path: &DynamicPath) -> bool {
+        if path.room.is_some_and(|r| self.c.room_in_town(r)) {
             return false;
         }
-        let mut d = 2 * self.u.charstats_velocity(unit).2;
-        if let Some(speed) = self.u.torso_speed(unit) {
+        let mut d = 2 * self.c.charstats_velocity(unit).2;
+        if let Some(speed) = self.c.torso_speed(unit) {
             d *= speed / 10 + 1;
         }
-        let s = self.u.item_stat(unit, STAT_STAMINADRAIN);
+        let s = self.c.item_stat(unit, STAT_STAMINADRAIN);
         d -= s.wrapping_mul(d) / 100;
         if d < 1 {
             d = 1;
         }
-        self.u.add_base_stat(game, unit, STAT_STAMINA, -d);
-        if self.u.stat(unit, STAT_STAMINA) > 0 {
+        self.c.add_base_stat(unit, STAT_STAMINA, -d);
+        if self.c.stat(unit, STAT_STAMINA) > 0 {
             return false;
         }
-        self.u.set_base_stat(game, unit, STAT_STAMINA, 0);
+        self.c.set_base_stat(unit, STAT_STAMINA, 0);
         true
     }
 
     /// Re-path `0x00650350(unit, finish)` (§9.10).
     pub fn repath(
         &mut self,
-        _game: &mut Game,
         unit: UnitId,
-        path: &mut WalkPath,
+        path: &mut DynamicPath,
         finish: bool,
     ) -> Result<i32, WalkError> {
-        let ty = self.u.unit_type(unit);
-        if path.flags & flag::KEEP_TARGET == 0 {
-            if matches!(ty, UnitType::Player | UnitType::Monster) && self.u.repath_budget(unit) == 0
+        let ty = self.c.unit_type(unit);
+        let player = ty == UnitType::Player;
+        if path.flags & flags::KEEP_TARGET == 0 {
+            if matches!(ty, UnitType::Player | UnitType::Monster) && self.c.repath_budget(unit) == 0
             {
                 return Ok(0);
             }
-            self.w.queue_for_update(unit);
-            self.u.set_unit_flag(unit, 1);
-            path.distance_budget = path.distance_budget.wrapping_sub(path.index as u8);
+            self.c.queue_for_update(unit);
+            self.c.set_unit_flag(unit, 1);
+            path.dist_budget = path.dist_budget.wrapping_sub(path.cur_point as u8);
         }
         // TODO(spec: pathing.md §9.10, the town-access argument of the
         // re-path's compute): 0, the walk request's value.
         let town = false;
         if matches!(
             path.path_type,
-            path_type::TOWARD | path_type::TOWARD_FINISH | path_type::WALL_FOLLOW
+            path_types::TOWARD | path_types::TOWARD_FINISH | path_types::WALL_FOLLOW
         ) {
             if finish {
-                set_type(self.t, path, ty, path_type::TOWARD_FINISH)?;
+                path.set_path_type(self.t, player, path_types::TOWARD_FINISH)?;
             } else {
-                set_type(self.t, path, ty, path_type::TOWARD)?;
-                path.target = path.final_target;
+                path.set_path_type(self.t, player, path_types::TOWARD)?;
+                path.put_target(path.final_target());
             }
-            let r = compute(self.t, self.w, self.u, path, unit, town)?;
+            let r = compute(self.t, self.c, path, unit, town)?;
             if r != 0 {
                 return Ok(r);
             }
-            set_type(self.t, path, ty, path_type::WALL_FOLLOW)?;
-            return compute(self.t, self.w, self.u, path, unit, town);
+            path.set_path_type(self.t, player, path_types::WALL_FOLLOW)?;
+            return compute(self.t, self.c, path, unit, town);
         }
-        compute(self.t, self.w, self.u, path, unit, town)
+        compute(self.t, self.c, path, unit, town)
     }
 }

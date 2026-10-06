@@ -4,9 +4,10 @@
 //! `0x005394A0` (§11). Nothing here draws (the spawn tile pick of
 //! `drlg/levels.md` §10 behind [`LevelView::spawn_room`] does).
 
+use super::coords::Point;
 use super::place_seams::{
-    flags2, mask, CollisionView, LevelView, PlaceError, PlaceHost, PlaceMessage, SubPoint,
-    PLACE_TIMER_DELAY, PLACE_TIMER_EVENT,
+    flags2, mask, CollisionView, LevelView, PlaceError, PlaceHost, PlaceMessage, PLACE_TIMER_DELAY,
+    PLACE_TIMER_EVENT,
 };
 use super::search::{free_point, free_point_field, ExpField};
 
@@ -25,12 +26,12 @@ pub fn floor_drop<C: CollisionView>(
     cv: &C,
     field: &ExpField,
     room: Option<C::Room>,
-    from: SubPoint,
+    from: Point,
     size: i32,
     fallback: bool,
-) -> Result<(Option<C::Room>, SubPoint), PlaceError> {
+) -> Result<(Option<C::Room>, Point), PlaceError> {
     // Rule 1.
-    let shifted = SubPoint::new(from.x + DROP_START_DX, from.y + DROP_START_DY);
+    let shifted = Point::new(from.x + DROP_START_DX, from.y + DROP_START_DY);
     let mut start = if cv.cell_room(room, shifted.x, shifted.y).is_some() {
         shifted
     } else {
@@ -87,7 +88,7 @@ where
         },
     };
     // Rule 3.
-    let mut p = SubPoint::new(x, y);
+    let mut p = Point::new(x, y);
     let room = if exact {
         room
     } else {
@@ -140,7 +141,7 @@ pub fn level_spawn_point<C, L>(
     level: u32,
     tile_index: u32,
     size: i32,
-) -> Result<Option<(C::Room, SubPoint)>, PlaceError>
+) -> Result<Option<(C::Room, Point)>, PlaceError>
 where
     C: CollisionView,
     L: LevelView<C::Room>,
@@ -151,7 +152,7 @@ where
         return Ok(None);
     };
     // Rule 2.
-    let mut p = SubPoint::new(
+    let mut p = Point::new(
         tx * SUBTILES_PER_TILE + SPAWN_OFFSET,
         ty * SUBTILES_PER_TILE + SPAWN_OFFSET,
     );
@@ -315,15 +316,15 @@ pub(crate) mod tests {
     pub(crate) fn unit(g: &mut Grid, room: Option<usize>, player: bool) -> usize {
         g.units.push(FakeUnit {
             room,
-            pos: SubPoint::new(1, 1),
+            pos: Point::new(1, 1),
             size: if player { 2 } else { 1 },
             has_path: true,
         });
         g.units.len() - 1
     }
 
-    fn drop_at(g: &Grid, x: i32, y: i32) -> (Option<usize>, SubPoint) {
-        floor_drop(g, &sign_field(), Some(0), SubPoint::new(x, y), 1, true).unwrap()
+    fn drop_at(g: &Grid, x: i32, y: i32) -> (Option<usize>, Point) {
+        floor_drop(g, &sign_field(), Some(0), Point::new(x, y), 1, true).unwrap()
     }
 
     // Covers: specs/sim/path-placement.md §9 r1, §9 r2, §9 r3
@@ -333,21 +334,21 @@ pub(crate) mod tests {
         for y in 0..20 {
             g.set(12, y, 0x1);
         }
-        assert_eq!(drop_at(&g, 10, 10), (Some(0), SubPoint::new(11, 13)));
+        assert_eq!(drop_at(&g, 10, 10), (Some(0), Point::new(11, 13)));
     }
 
     // Covers: specs/sim/path-placement.md §9 r1, §9 r2
     #[test]
     fn d2_d3_floor_drop() {
         let g = Grid::vec20();
-        assert_eq!(drop_at(&g, 10, 10), (Some(0), SubPoint::new(12, 13)));
+        assert_eq!(drop_at(&g, 10, 10), (Some(0), Point::new(12, 13)));
         let mut g = Grid::vec20();
         g.set(12, 13, 0x200);
-        assert_eq!(drop_at(&g, 10, 10), (Some(0), SubPoint::new(11, 13)));
+        assert_eq!(drop_at(&g, 10, 10), (Some(0), Point::new(11, 13)));
         // Start (x + 2, y + 3) outside every room: the search starts at
         // the dropper's own cell.
         let g = Grid::vec20();
-        assert_eq!(drop_at(&g, 18, 17), (Some(0), SubPoint::new(18, 17)));
+        assert_eq!(drop_at(&g, 18, 17), (Some(0), Point::new(18, 17)));
     }
 
     // Covers: specs/sim/path-placement.md §10 r3, §10 r4, §10 r5
@@ -421,7 +422,7 @@ pub(crate) mod tests {
         g.teleports.clear();
         place_unit(&mut g, &mut h, &lv, u, Some(0), 6, 6, true, false).unwrap();
         assert_eq!(g.teleports, [(u, 0, 6, 6)]);
-        assert_eq!(g.units[u].pos, SubPoint::new(6, 6));
+        assert_eq!(g.units[u].pos, Point::new(6, 6));
         // No free point: not placed, nothing moved.
         let mut gw = Grid::vec20();
         for y in 0..20 {
@@ -455,7 +456,7 @@ pub(crate) mod tests {
         // Tile (2, 1) → (13, 8).
         assert_eq!(
             level_spawn_point(&g, &mut lv, Some(0), 1, 0, 2),
-            Ok(Some((0, SubPoint::new(13, 8))))
+            Ok(Some((0, Point::new(13, 8))))
         );
         assert_eq!(lv.spawn_calls, [(0, 1, 0)]);
         // A wall there: the free search moves it.
@@ -463,7 +464,7 @@ pub(crate) mod tests {
         g2.set(13, 8, 0x1);
         assert_eq!(
             level_spawn_point(&g2, &mut lv, Some(0), 1, 0, 1),
-            Ok(Some((0, SubPoint::new(12, 8))))
+            Ok(Some((0, Point::new(12, 8))))
         );
         // No spawn room: result 0.
         lv.spawn = None;
@@ -527,7 +528,7 @@ pub(crate) mod tests {
         );
         assert_eq!(lv.spawn_calls, [(0, 3, 5)]);
         let (_, _, x, y) = g.teleports[0];
-        let mut q = SubPoint::new(13, 8);
+        let mut q = Point::new(13, 8);
         free_point(&g, Some(0), &mut q, 2, mask::PLAYER_PLACE, false).unwrap();
         assert_eq!((x, y), (q.x, q.y));
         assert_ne!((x, y), (13, 8));

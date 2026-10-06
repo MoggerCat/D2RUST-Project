@@ -5,9 +5,10 @@
 //! and players from the unit lists and records with the level of their
 //! room (DRLG), room rectangles (active-room sub-tiles), the ENDANIM
 //! timer (`tick.md` §5.2), and the spawn search `0x00619E50` →
-//! `0x0066B2B0` (`levels.md` §10). The warp itself (act change, free
-//! coordinates, placement), object modes, interaction, sounds and
-//! messages go to [`Pending`].
+//! `0x0066B2B0` (`levels.md` §10); with the path provider
+//! ([`crate::wiring::path`]) the same-act warp (spawn point, free
+//! coordinates, placement) and the arrival mode request. The act change,
+//! object modes, interaction, sounds and messages go to [`Pending`].
 
 use crate::drlg::act_of_level;
 use crate::game::Game;
@@ -53,7 +54,7 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
         let u = self.game.lists.find_unit(UnitType::Object, guid)?;
         let r = self.v.units.get(u)?;
         let (room, level) = self.room_and_level(u);
-        let (x, y) = self.v.h.x.position(u);
+        let (x, y) = self.v.h.path_position(u);
         Some((
             u,
             ObjectFacts {
@@ -69,7 +70,7 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
     }
     fn player(&self, player: UnitId) -> PlayerFacts {
         let (room, level) = self.room_and_level(player);
-        let (x, y) = self.v.h.x.position(player);
+        let (x, y) = self.v.h.path_position(player);
         let r = self.v.units.get(player);
         PlayerFacts {
             guid: self.game.lists.unit(player).map_or(0, |e| e.guid),
@@ -123,7 +124,19 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.v.h.x.send(player, msg);
     }
+    /// `0x0053AEC0` (rule 5): with the path provider, the same-act warp
+    /// is the spawn point and placement of `path-placement.md` §11
+    /// ([`crate::wiring::path::place::level_warp`]); an act change (and
+    /// every warp without the provider) goes to [`Pending::warp`].
     fn warp(&mut self, player: UnitId, level: u32, tile_code: u8) {
+        if self.v.h.paths.is_some() {
+            let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+            if crate::wiring::path::place::level_warp(c, player, level, u32::from(tile_code))
+                .is_some()
+            {
+                return;
+            }
+        }
         self.v.h.x.warp(self.game, player, level, tile_code);
     }
     /// `0x00619E50(act of level, level, tile code)`: the room the spawn
@@ -151,7 +164,15 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
             }
         }
     }
+    /// `0x005809D0(game, player, no skill, 2, x, y, 0)` at the player's
+    /// own position (rule 7; `pathing.md` §1.2) with the path provider.
     fn set_player_mode_arrival(&mut self, player: UnitId) {
+        if self.v.h.paths.is_some() {
+            let (x, y) = self.v.h.path_position(player);
+            let mut c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+            c.walk_to(player, 2, x, y);
+            return;
+        }
         self.v.h.x.set_player_mode_arrival(self.game, player);
     }
 }

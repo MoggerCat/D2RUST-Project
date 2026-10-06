@@ -97,6 +97,12 @@ impl Drlg {
         self.active_mut(id).map(|a| &mut a.seed)
     }
 
+    /// The collision grid (§10) of a DRLG room's active room, mutable:
+    /// unit footprints (`sim/path-placement.md` §5) write it.
+    pub fn active_grid_mut(&mut self, id: DrlgRoomId) -> Option<&mut CollisionGrid> {
+        self.active_mut(id).map(|a| &mut a.collision)
+    }
+
     /// Active room creation `0x006422A0` / `0x00619890` (§5). Nothing if
     /// the tile grid has no floor and no wall records.
     pub(super) fn create_active_room(
