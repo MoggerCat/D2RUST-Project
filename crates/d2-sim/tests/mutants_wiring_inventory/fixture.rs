@@ -254,14 +254,11 @@ pub struct Answers {
     pub copy: Option<Guid>,
     pub owner: Option<Owner>,
     pub share_id: i32,
-    pub pair: (bool, bool),
     pub code: u32,
     pub bits: Vec<u8>,
     pub msgs: Vec<Vec<u8>>,
-    pub filler_owner: Option<Owner>,
     pub two_handed: BTreeSet<Guid>,
     pub gold: bool,
-    pub percent_bias: i32,
     pub number: i32,
     pub ammo: Option<i16>,
     pub interaction: Option<InteractionTarget>,
@@ -383,9 +380,6 @@ impl MovePending for Rest {
     fn hireling_owner_pass(&mut self, owner: Owner) {
         self.note(format!("hireling_owner_pass {}", og(owner)));
     }
-    fn belt_unequip(&mut self, owner: Owner, item: Guid) {
-        self.note(format!("belt_unequip {} {item}", og(owner)));
-    }
     fn belt_remove_allowed(&self, player: Owner) -> bool {
         self.note(format!("belt_remove_allowed {}", og(player)));
         self.a.flag
@@ -458,10 +452,6 @@ impl MovePending for Rest {
     fn book_count_changed(&mut self, player: Owner, n: i32) {
         self.note(format!("book_count_changed {} {n}", og(player)));
     }
-    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
-        self.note(format!("use_grid_item {} {item} {x} {y}", og(player)));
-        self.a.pair
-    }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         self.note(format!("use_item {} {} {item}", og(player), og(target)));
         self.a.flag
@@ -471,18 +461,6 @@ impl MovePending for Rest {
     }
     fn remove_used(&mut self, player: Owner, item: Guid) {
         self.note(format!("remove_used {} {item}", og(player)));
-    }
-    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
-        self.note(format!("use_item_action {} {target} {used}", og(player)));
-        self.a.pair
-    }
-    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
-        self.note(format!("swap_1h_with_2h {} {item} {loc}", og(player)));
-        self.a.pair
-    }
-    fn pickup_special(&mut self, player: Owner, item: Guid) -> bool {
-        self.note(format!("pickup_special {} {item}", og(player)));
-        self.a.flag
     }
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
         self.note(format!("equip_picked {} {item}", og(player)));
@@ -498,10 +476,6 @@ impl MovePending for Rest {
     fn hireling(&self, player: Owner) -> Option<Owner> {
         self.note(format!("hireling {}", og(player)));
         self.a.owner
-    }
-    fn not_dead(&self, player: Owner) -> bool {
-        self.note(format!("not_dead {}", og(player)));
-        self.a.flag
     }
     fn owns_hireling(&self, player: Owner, merc: Owner) -> bool {
         self.note(format!("owns_hireling {} {}", og(player), og(merc)));
@@ -521,13 +495,6 @@ impl MovePending for Rest {
         self.note(format!("pick_object {} {guid} {cursor}", og(player)));
         self.a.code
     }
-    fn pick_other(&mut self, player: Owner, ty: u32, guid: Guid, cursor: u32) -> u32 {
-        self.note(format!("pick_other {} {ty} {guid} {cursor}", og(player)));
-        self.a.code
-    }
-    fn resync(&mut self, player: Owner) {
-        self.note(format!("resync {}", og(player)));
-    }
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.note(format!("send {} {bytes:?}", og(player)));
         self.sent.push((player, bytes));
@@ -542,13 +509,6 @@ impl MovePending for Rest {
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
         self.note(format!("store_messages {} {item}", og(client)));
         self.a.msgs.clone()
-    }
-    fn filler_owner(&self, parent: Guid) -> Owner {
-        self.note(format!("filler_owner {parent}"));
-        self.a.filler_owner.unwrap_or(Owner {
-            ty: Owner::NONE,
-            guid: u32::MAX,
-        })
     }
 }
 
@@ -601,9 +561,6 @@ impl InvRest for Rest {
         self.note(format!("targeting_probe {item}"));
         self.a.probe
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value * p / 100 + self.a.percent_bias
-    }
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool {
         self.note(format!("item_active_on {item} {}", og(unit)));
         self.a.flag
@@ -627,10 +584,6 @@ impl InvRest for Rest {
         self.note(format!("ammo_type {item}"));
         self.a.ammo
     }
-    fn stack_quality_ok(&self, item: Guid) -> bool {
-        self.note(format!("stack_quality_ok {item}"));
-        self.a.open_ok
-    }
     fn has_allowed_location(&self, item: Guid) -> bool {
         self.note(format!("has_allowed_location {item}"));
         self.a.open_ok
@@ -638,10 +591,6 @@ impl InvRest for Rest {
     fn quiver_kind(&self, item: Guid) -> bool {
         self.note(format!("quiver_kind {item}"));
         self.a.flag
-    }
-    fn auto_equip_allows(&self, unit: Owner, item: Guid, loc: u8) -> bool {
-        self.note(format!("auto_equip_allows {} {item} {loc}", og(unit)));
-        self.a.open_ok
     }
     fn interaction(&self, player: Owner) -> InteractionTarget {
         self.note(format!("interaction {}", og(player)));

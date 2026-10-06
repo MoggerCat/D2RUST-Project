@@ -6,8 +6,8 @@
 
 use super::{InvDesk, InvRest};
 use crate::items::inventory::{
-    find_free_position, InteractionTarget, InvItem, InvWorld, Inventory, UnitKind,
-    UNIT_FLAG_TARGETABLE,
+    active_inventory_item, find_free_position, InteractionTarget, InvItem, InvWorld, Inventory,
+    UnitKind, UNIT_FLAG_TARGETABLE,
 };
 use crate::items::moves::{layouts, Guid, Owner};
 use crate::units::lifecycle::LifecycleHooks;
@@ -96,8 +96,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         let (o, i) = (self.o(owner), self.g(item));
         self.rest.charm_relink(o, i)
     }
+    /// §5.6 (`0x0062FF70`).
     fn active_item(&self, owner: UnitId, item: UnitId) -> bool {
-        self.rest.is_active(self.o(owner), self.g(item))
+        active_inventory_item(self, self.tables, item, owner)
     }
     fn stat_refresh(&mut self, owner: UnitId) {
         let o = self.o(owner);
@@ -143,9 +144,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     fn req_percent(&self, item: UnitId) -> i32 {
         self.econ.stats.unit_total(item, STAT_REQ_PERCENT, 0)
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        self.rest.percent_of(value, p)
-    }
     fn item_active_on(&self, item: UnitId, unit: UnitId) -> bool {
         self.rest.item_active_on(self.g(item), self.o(unit))
     }
@@ -180,16 +178,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     fn stack_file_index(&self, item: UnitId) -> i32 {
         self.econ.items.get(item).map_or(-1, |i| i.file_index)
     }
-    /// `0x0062A8D0`: ethereal (`world/cube.md` §4.1 row 5).
-    fn stack_value(&self, item: UnitId) -> i32 {
-        self.econ
-            .items
-            .get(item)
-            .map_or(0, |i| i32::from(i.flags & ETHEREAL != 0))
-    }
-    fn stack_quality_ok(&self, item: UnitId) -> bool {
-        self.rest.stack_quality_ok(self.g(item))
-    }
     /// `0x006299B0`: stat 194 ≠ 0.
     fn has_sockets(&self, item: UnitId) -> bool {
         self.econ.stats.unit_total(item, STAT_SOCKETS, 0) != 0
@@ -200,9 +188,6 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     }
     fn quiver_kind(&self, item: UnitId) -> bool {
         self.rest.quiver_kind(self.g(item))
-    }
-    fn auto_equip_allows(&self, unit: UnitId, item: UnitId, loc: u8) -> bool {
-        self.rest.auto_equip_allows(self.o(unit), self.g(item), loc)
     }
 
     fn targeting_probe(&self, item: UnitId) -> u32 {

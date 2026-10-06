@@ -829,7 +829,9 @@ fn box_set_clear_across_rooms() {
 fn pattern_and_size_stamps() {
     type Cells = Vec<(i32, i32)>;
     let cases: [(u32, Cells, u16, Cells); 6] = [
-        (0, vec![(10, 10)], 0, vec![]),
+        // Pattern 0 stamps and clears nothing (§5.1: empty jump-table
+        // entry).
+        (0, vec![], 0, vec![]),
         (1, plus_at(10, 10), bits::NO_PATH, vec![(10, 10)]),
         (2, box_at(10, 10), bits::NO_PATH, plus_at(10, 10)),
         (3, plus_at(10, 10), bits::PET, vec![(10, 10)]),
@@ -1287,4 +1289,328 @@ fn teleport_player_and_missile() {
         (1, PathPoint { x: 4, y: 4 })
     );
     assert_eq!((w.at(2, 2), w.at(4, 4)), (0, 0x41));
+}
+
+// ---- answered handoff questions (PC1–PC5, WP4, W5, W6) ---------------------
+
+/// Three rooms in a row, A [0,10), B [10,20), C [20,30) × [0,10): A sees
+/// B, B sees A and C, C sees B (A does not see C).
+fn three_in_a_row() -> (Rooms, [RoomId; 3]) {
+    let mut w = Rooms::default();
+    let a = w.add(0, 0, 10, 10);
+    let b = w.add(10, 0, 10, 10);
+    let c = w.add(20, 0, 10, 10);
+    w.adj(a, &[a, b]);
+    w.adj(b, &[b, a, c]);
+    w.adj(c, &[c, b]);
+    (w, [a, b, c])
+}
+
+// PC2: every stamped cell is looked up from the room argument, not from
+// the centre's room.
+// Covers: specs/sim/path-placement.md §5.1
+#[test]
+fn stamp_cells_are_looked_up_from_the_room_argument() {
+    let (mut w, [a, b, _]) = three_in_a_row();
+    // Centre (19, 5) lies in B; given room A, (20, 5) (in C) is not
+    // found from A: skipped.
+    stamp_pattern(&mut w, Some(a), 19, 5, 1, 0x80);
+    assert_eq!(w.at(20, 5), 0);
+    assert_eq!(w.at(19, 5), 0x80 | bits::NO_PATH);
+    assert_eq!((w.at(18, 5), w.at(19, 4), w.at(19, 6)), (0x80, 0x80, 0x80));
+    // Given room B, C is found.
+    let (mut w, [_, b2, _]) = three_in_a_row();
+    let _ = b;
+    stamp_size(&mut w, Some(b2), 19, 5, 2, 0x40);
+    assert_eq!(w.at(20, 5), 0x40);
+    // Pattern 0 stamps nothing, the pattern query still tests the point.
+    let (mut w, a) = one_room();
+    stamp_pattern(&mut w, Some(a), 5, 5, 0, 0x80);
+    assert!(nonzero(&w).is_empty());
+    w.set(5, 5, 0x1);
+    assert_eq!(pattern_value(&w, Some(a), 5, 5, 0, 0x1), 0x1);
+}
+
+// PC1: an empty box reads 0x27; the right strip takes the corner beyond
+// both edges and the top strip the clipped width.
+// Covers: specs/sim/path-placement.md §4 r4
+#[test]
+fn box_split_empty_box_and_corner_strip() {
+    let (w, [a, ..]) = four_rooms();
+    assert_eq!(box_value(&w, Some(a), 5, 5, (0, 3), 0xFFFF), MISSING_ROOM);
+    assert_eq!(box_value(&w, Some(a), 5, 5, (3, 0), 0xFFFF), MISSING_ROOM);
+    // The set / clear of an empty box does nothing.
+    let (mut w, [a, ..]) = four_rooms();
+    box_apply(&mut w, Some(a), 5, 5, (0, 0), 0x400, true);
+    assert!(nonzero(&w).is_empty());
+    // A box straddling A's corner: D's corner cell (10, 10) belongs to the
+    // right strip (queried from A, found through A's adjacency).
+    let (mut w, [a, ..]) = four_rooms();
+    w.set(10, 10, 0x8);
+    assert_eq!(box_value(&w, Some(a), 9, 9, (3, 3), 0x8), 0x8);
+    box_apply(&mut w, Some(a), 9, 9, (3, 3), 0x400, true);
+    for (x, y) in [(8, 8), (10, 8), (8, 10), (10, 10)] {
+        assert_ne!(w.at(x, y) & 0x400, 0, "({x}, {y})");
+    }
+}
+
+// PC3: a missile path gets type 4 through set type: flags 0x60000.
+// Covers: specs/sim/path-placement.md §2.4 r4
+#[test]
+fn missile_allocation_sets_type_4_through_set_type() {
+    let (mut w, a) = one_room();
+    let p = alloc_dynamic_path(
+        &tables(),
+        &mut w,
+        DynamicKind::Missile { size: 1 },
+        UnitId(4),
+        Some(a),
+        3,
+        3,
+        false,
+    )
+    .unwrap();
+    assert_eq!(p.path_type, 4);
+    assert_eq!(p.flags & 0x7FF00, 0x60000);
+    assert_eq!(p.dir_offset, 0);
+}
+
+// PC4 / WP4: teleport stamps (and a missile queries) from the destination
+// room; the zero point clears the missile's collided mask; the forced move
+// with room1 null does nothing.
+// Covers: specs/sim/path-placement.md §6 r2, §6 r4
+#[test]
+fn teleport_uses_the_destination_room() {
+    // A player from A to C (not adjacent to A).
+    let (mut w, [a, _, c]) = three_in_a_row();
+    let mut p = player_path(&mut w, a, 5, 5);
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut p,
+        false,
+        Some(c),
+        25,
+        5,
+    )
+    .unwrap();
+    assert_eq!(w.at(5, 5), 0);
+    assert_eq!(w.at(25, 5), 0x80 | bits::NO_PATH);
+    // Forced move: room1 null → nothing, not even the stamp.
+    let (mut w, [a, _, c]) = three_in_a_row();
+    forced_move_rooms(&mut w, None, (5, 5), Some(c), (25, 5), 1, 0x80);
+    assert!(nonzero(&w).is_empty());
+    forced_move_rooms(&mut w, Some(a), (5, 5), Some(c), (25, 5), 1, 0x80);
+    assert_eq!(w.at(25, 5), 0x80 | bits::NO_PATH);
+    // Missile from A to C: the query and the stamp from C; the clear at
+    // old happens first, so the missile's own footprint never collides.
+    let (mut w, [a, _, c]) = three_in_a_row();
+    let mut ms = alloc_dynamic_path(
+        &tables(),
+        &mut w,
+        DynamicKind::Missile { size: 2 },
+        UnitId(3),
+        Some(a),
+        5,
+        5,
+        false,
+    )
+    .unwrap();
+    ms.foot_mask = 0x40;
+    ms.move_mask = 0x41;
+    stamp_size(&mut w, Some(a), 5, 5, 2, 0x40);
+    w.set(26, 5, bits::WALL);
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(c),
+        25,
+        5,
+    )
+    .unwrap();
+    assert_eq!(ms.collided_mask, 0x1);
+    assert_eq!(w.at(25, 5), 0x40);
+    assert_eq!(w.at(5, 5), 0);
+    // Overlapping move inside one room: old cells cleared before the
+    // query, so the own footprint (0x40) is not reported.
+    let (mut w, a) = one_room();
+    let mut ms = alloc_dynamic_path(
+        &tables(),
+        &mut w,
+        DynamicKind::Missile { size: 2 },
+        UnitId(3),
+        Some(a),
+        5,
+        5,
+        false,
+    )
+    .unwrap();
+    ms.foot_mask = 0x40;
+    ms.move_mask = 0x40;
+    stamp_size(&mut w, Some(a), 5, 5, 2, 0x40);
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(a),
+        6,
+        5,
+    )
+    .unwrap();
+    assert_eq!(ms.collided_mask, 0);
+    // Same cell: flag 0x8 cleared. Zero point: collided mask := 0.
+    ms.collided_mask = 0x55;
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(a),
+        6,
+        5,
+    )
+    .unwrap();
+    assert_eq!(ms.flags & flags::MOVED, 0);
+    ms.collided_mask = 0x55;
+    teleport(
+        &mut Both(&mut w, &mut Motion::default()),
+        &mut ms,
+        true,
+        Some(a),
+        0,
+        0,
+    )
+    .unwrap();
+    assert_eq!(ms.collided_mask, 0);
+}
+
+// PC5: HasCollision has no bound in the original; d2rs reads modes above
+// 7 (absent from ObjMode.txt) as 0.
+// Covers: specs/sim/path-placement.md §5.2
+#[test]
+fn object_modes_above_7_do_not_collide() {
+    let shape = ObjectShape {
+        has_collision: [true; 8],
+        ..ObjectShape::default()
+    };
+    assert!(shape.collides_in(7));
+    assert!(!shape.collides_in(8));
+}
+
+/// Units for the unit search (§4 rule 6): (room, type, mode, size, x, y).
+struct UnitWorld {
+    rooms: Rooms,
+    units: Vec<(RoomId, UnitType, u32, i32, i32, i32)>,
+}
+
+impl CollisionRooms for UnitWorld {
+    fn subtile_rect(&self, room: RoomId) -> Option<TileRect> {
+        self.rooms.subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.rooms.adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        self.rooms.adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&CollisionGrid> {
+        self.rooms.grid(room)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut CollisionGrid> {
+        self.rooms.grid_mut(room)
+    }
+}
+
+impl UnitsAtPoint for UnitWorld {
+    type Unit = usize;
+    fn room_units(&self, room: RoomId) -> Option<Vec<usize>> {
+        let v: Vec<usize> = (0..self.units.len())
+            .filter(|&i| self.units[i].0 == room)
+            .collect();
+        (!v.is_empty()).then_some(v)
+    }
+    fn unit_type(&self, u: usize) -> UnitType {
+        self.units[u].1
+    }
+    fn unit_mode(&self, u: usize) -> u32 {
+        self.units[u].2
+    }
+    fn unit_size(&self, u: usize) -> i32 {
+        self.units[u].3
+    }
+    fn unit_point(&self, u: usize) -> (i32, i32) {
+        (self.units[u].4, self.units[u].5)
+    }
+}
+
+// W6: rooms in adjacency order, units in list order, the type / mode
+// filter, the size table and the accept callback.
+// Covers: specs/sim/path-placement.md §4 r6
+#[test]
+fn unit_at_point_search_order_and_hit_table() {
+    let (rooms, [a, b, ..]) = four_rooms();
+    let mut w = UnitWorld {
+        rooms,
+        units: vec![
+            // 0: player in mode 17 (DD): skipped.
+            (a, UnitType::Player, 17, 2, 5, 5),
+            // 1: object: skipped.
+            (a, UnitType::Object, 1, 3, 5, 5),
+            // 2: monster at distance (1, 1) of size 3.
+            (b, UnitType::Monster, 1, 3, 6, 6),
+            // 3: missile on the point, size 1.
+            (b, UnitType::Missile, 1, 1, 5, 5),
+        ],
+    };
+    // Room A is searched first (no candidate), then B in list order.
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 1, |_| true), Some(2));
+    // accept refuses the monster: the missile next.
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 1, |u| u != 2), Some(3));
+    // r outside 1..3 or no room: none.
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 0, |_| true), None);
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 4, |_| true), None);
+    assert_eq!(unit_at_point(&w, None, 5, 5, 1, |_| true), None);
+    // Size above 3 reads as 3; size 0 is skipped.
+    w.units = vec![
+        (a, UnitType::Monster, 1, 0, 5, 5),
+        (a, UnitType::Monster, 1, 7, 7, 7),
+    ];
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 3, |_| true), Some(1));
+    assert_eq!(unit_at_point(&w, Some(a), 5, 5, 2, |_| true), None);
+    // The table (r \ s).
+    for (r, s, d, hit) in [
+        (1, 1, (0, 0), true),
+        (1, 1, (1, 0), false),
+        (1, 2, (1, 0), true),
+        (2, 1, (1, 1), false),
+        (1, 3, (1, 1), true),
+        (2, 2, (1, 1), true),
+        (2, 2, (2, 1), false),
+        (2, 3, (2, 1), true),
+        (3, 2, (1, 2), true),
+        (3, 2, (2, 2), false),
+        (3, 3, (2, 2), true),
+        (3, 3, (3, 0), false),
+    ] {
+        assert_eq!(shapes_overlap(r, s, d.0, d.1), hit, "r {r} s {s} d {d:?}");
+    }
+}
+
+// W5: the size query reads the size's cells (0, 1 point; 2 plus; 3 box),
+// and the size stamp / clear skip size 0.
+// Covers: specs/sim/path-placement.md §3 r1
+#[test]
+fn size_query_reads_the_shape_of_the_size() {
+    let (mut w, a) = one_room();
+    w.set(6, 5, 0x1);
+    w.set(6, 6, 0x2);
+    assert_eq!(size_value(&w, Some(a), 5, 5, 0, 0xFF), 0);
+    assert_eq!(size_value(&w, Some(a), 5, 5, 1, 0xFF), 0);
+    assert_eq!(size_value(&w, Some(a), 5, 5, 2, 0xFF), 0x1);
+    assert_eq!(size_value(&w, Some(a), 5, 5, 3, 0xFF), 0x3);
+    let (mut w, a) = one_room();
+    stamp_size(&mut w, Some(a), 5, 5, 0, 0x40);
+    assert!(nonzero(&w).is_empty());
+    stamp_size(&mut w, Some(a), 5, 5, 2, 0x40);
+    clear_size(&mut w, Some(a), 5, 5, 0, 0x40);
+    assert_eq!(nonzero(&w).len(), 5);
 }

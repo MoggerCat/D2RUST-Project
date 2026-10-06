@@ -102,3 +102,20 @@ pub fn gold(new: u32, old: u32) -> Option<Vec<u8>> {
         b
     })
 }
+
+/// "Can't do that" `0x00549A60` (§7.4 step 2): S→C 0x5A, 40 bytes
+/// `5A 0E 01` then 37 zero bytes.
+pub fn cant_do_that() -> Vec<u8> {
+    let mut b = vec![0u8; 40];
+    b[0] = 0x5A;
+    b[1] = 0x0E;
+    b[2] = 0x01;
+    b
+}
+
+/// S→C 0x7C (6 bytes, `0x0053B3D0`): [1] unit type, [2..5] GUID (§7.18).
+pub fn item_used(unit_type: u8, unit: Guid) -> Vec<u8> {
+    let mut b = vec![0x7C, unit_type];
+    b.extend_from_slice(&unit.to_le_bytes());
+    b
+}

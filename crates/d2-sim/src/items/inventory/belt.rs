@@ -3,7 +3,10 @@
 //! similar items (§3.4), the free slot for an item (§3.5), the auto-belt
 //! gate (§3.6), placing in a slot (§3.7) and compaction (§3.8).
 
-use super::{body, grid::place_in_grid, grid_id, iflag, InvTables, InvWorld, Inventory, BELT_GRID};
+use super::{
+    body, grid::place_in_grid, grid_id, iflag, node, InteractionTarget, InvTables, InvWorld,
+    Inventory, BELT_GRID,
+};
 use crate::units::UnitId;
 
 /// Belt record used without a belt (§3.1): `belts` record 2, 4 boxes.
@@ -19,7 +22,7 @@ pub const POTION_GROUPS: [&[[u8; 4]]; 3] = [
 ];
 
 /// Belt type (`0x00621ED0`, §3.1 rule 1): items `belt` of the item at body
-/// location 8; no belt → record 2.
+/// location 8, with no item-type test; no item → record 2.
 pub fn belt_type<W: InvWorld + ?Sized>(inv: &Inventory, w: &W, t: &InvTables) -> usize {
     inv.body_item(body::BELT)
         .and_then(|b| w.item(b))
@@ -71,7 +74,7 @@ pub fn free_belt_slot<W: InvWorld + ?Sized>(
         let held = inv.belt_item(c).and_then(|i| w.item(i)).map(|d| d.record);
         if c < n && held.is_some_and(|h| similar(t, h, rec)) {
             let slot = (c..n).step_by(4).find(|&s| inv.belt_item(s).is_none());
-            // TODO(spec: §3.5 does not say what follows a similar column with no empty slot; the next column is tried)
+            // A column with no empty slot falls through to the next one.
             if slot.is_some() {
                 return slot;
             }
@@ -95,8 +98,10 @@ pub fn auto_belt_gate<W: InvWorld + ?Sized>(
     true
 }
 
-/// Place in a slot (`0x0063C4F0`, §3.7): beltable, 1 × 1, slot < 16 →
-/// §2.2 on grid 1 at (slot, 0). No `numboxes` check (edge case 6).
+/// Place in a slot (`0x0063C4F0`, §3.7): beltable, 1 × 1, slot ≤ 15
+/// (unsigned) → §2.2 on grid 1 at (slot, 0). No `numboxes` check here nor
+/// in 0x23 / 0x25: a crafted message fills any empty slot 0–15 whatever
+/// the belt (edge case 6).
 pub fn place_in_belt_slot<W: InvWorld + ?Sized>(
     inv: &mut Inventory,
     w: &mut W,
@@ -125,7 +130,8 @@ pub fn place_in_belt_slot<W: InvWorld + ?Sized>(
 /// Compaction after slot `s` is emptied (`0x0055EDC0`, §3.8): column
 /// c = min(s & 3, 3); walking rows 0..3, each item found moves down to the
 /// lowest free row of the column below it (§3.7), gets item flags 0x400
-/// and 0x1, loses 0x4000, refreshes its owner and joins the update list.
+/// and 0x1 (item flags +0x18, not command flags), loses 0x4000,
+/// refreshes its owner and joins the update list.
 /// Returns the moves (from slot, to slot) in order.
 pub fn compact_belt<W: InvWorld + ?Sized>(
     inv: &mut Inventory,
@@ -140,8 +146,8 @@ pub fn compact_belt<W: InvWorld + ?Sized>(
         let Some(item) = inv.belt_item(from) else {
             continue;
         };
+        // Only items whose row changes are flagged and listed.
         let Some(to_row) = (0..row).find(|&r| inv.belt_item(c + 4 * r).is_none()) else {
-            // TODO(spec: whether an item that does not move is still flagged and listed)
             continue;
         };
         let to = c + 4 * to_row;
@@ -161,4 +167,29 @@ pub fn compact_belt<W: InvWorld + ?Sized>(
         }
     }
     moves
+}
+
+/// `numboxes` of the belt type of item `belt` (`0x00621ED0` on the item),
+/// or of record 2 when there is none (§3 rule 9, `0x00660CB0(type, 0)`).
+pub fn belt_boxes_of<W: InvWorld + ?Sized>(w: &W, t: &InvTables, belt: Option<UnitId>) -> u8 {
+    let ty = belt
+        .and_then(|b| w.item(b))
+        .and_then(|d| t.item(d.record))
+        .map_or(DEFAULT_BELT, |r| usize::from(r.belt));
+    t.numboxes(ty).unwrap_or(0)
+}
+
+/// Belt removal gate (`0x00567840`, §3 rule 10): refused only when the
+/// owner has an interaction with a unit of type 0 (another player: trade)
+/// and some item of the inventory is in the belt (node kind 2).
+pub fn belt_removal_allowed<W: InvWorld + ?Sized>(inv: &Inventory, w: &W) -> bool {
+    let trading = matches!(
+        w.interaction(inv.owner),
+        InteractionTarget::Unit { ty: 0, .. }
+    );
+    !(trading
+        && inv
+            .items()
+            .iter()
+            .any(|&i| w.item(i).is_some_and(|d| d.node_kind == node::BELT)))
 }

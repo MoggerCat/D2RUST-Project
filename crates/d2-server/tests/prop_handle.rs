@@ -855,9 +855,6 @@ impl MovePending for InvStandIn {
 }
 
 impl InvRest for InvStandIn {
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value.wrapping_mul(p) / 100
-    }
     fn item_active_on(&self, _: Guid, _: Owner) -> bool {
         false
     }
@@ -876,17 +873,11 @@ impl InvRest for InvStandIn {
     fn ammo_type(&self, _: Guid) -> Option<i16> {
         None
     }
-    fn stack_quality_ok(&self, _: Guid) -> bool {
-        true
-    }
     fn has_allowed_location(&self, _: Guid) -> bool {
         true
     }
     fn quiver_kind(&self, _: Guid) -> bool {
         false
-    }
-    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
-        true
     }
     fn interaction(&self, _: Owner) -> InteractionTarget {
         InteractionTarget::None

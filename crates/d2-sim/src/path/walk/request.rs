@@ -230,16 +230,17 @@ pub fn interrupt_check<C: PathWorld + WalkUnits + ?Sized>(
         let e = c.first_type1_expire(unit);
         return Ok(matches!(m, 7 | 8 | 10 | 11 | 13 | 18) && c.frame() <= e + 5);
     }
-    // Rule 5. TODO(spec: pathing.md §1.4 rule 5, whether a failed
-    // concentration roll falls through to the state 15 test): read as
-    // "state 42 → roll; else state 15".
-    let to_rule6 = if c.has_state(unit, state::CONCENTRATION) {
+    // Rule 5: state 42 → one roll; r < v → rule 6. A failed roll, or no
+    // state 42, goes on to the state 15 test.
+    let mut to_rule6 = false;
+    if c.has_state(unit, state::CONCENTRATION) {
         let v = c.state_stat(unit, state::CONCENTRATION, STAT_164);
         let r = c.seed(unit).roll(100);
-        (r as i64) < v as i64
-    } else {
-        c.has_state(unit, state::STATE_15)
-    };
+        to_rule6 = (r as i64) < v as i64;
+    }
+    if !to_rule6 {
+        to_rule6 = c.has_state(unit, state::STATE_15);
+    }
     if !to_rule6 {
         return Ok(true);
     }

@@ -27,6 +27,7 @@ const T_HPOT: i16 = 76;
 const T_RING: i16 = 10;
 const T_BOWQ: i16 = 5;
 const T_MISC: i16 = 52;
+const T_SHLD: i16 = 51;
 const N_TYPES: usize = 81;
 
 // Item records of the synthetic tables.
@@ -156,6 +157,8 @@ fn tables() -> InvTables {
     for t in [T_SWOR, T_AXE, T_BOW, T_H2H] {
         eq(t as usize, T_WEAP as usize);
     }
+    // `shie` is a `shld` (itemtypes 51; §4.7 profile).
+    eq(T_SHIE as usize, T_SHLD as usize);
     InvTables {
         grids,
         belts,
@@ -195,7 +198,6 @@ struct Fake {
     same_act: bool,
     in_range: bool,
     link_ok: bool,
-    allows: bool,
     /// `0x0063CB00` answers "no free position on page 0".
     no_free_page0: bool,
     log: Vec<String>,
@@ -207,7 +209,6 @@ impl Fake {
             same_act: true,
             in_range: true,
             link_ok: true,
-            allows: true,
             ..Default::default()
         };
         f.kinds.insert(PLAYER, UnitKind::Player { class: 1 });
@@ -226,6 +227,8 @@ impl Fake {
             u,
             Props {
                 level_req: -1,
+                // Normal quality (§4.5 stacks only qualities 1–3).
+                quality: 2,
                 ..Default::default()
             },
         );
@@ -315,9 +318,6 @@ impl InvWorld for Fake {
     fn req_percent(&self, item: UnitId) -> i32 {
         self.props[&item].req_percent
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value * p / 100
-    }
     fn item_active_on(&self, item: UnitId, _unit: UnitId) -> bool {
         self.props[&item].active
     }
@@ -349,12 +349,6 @@ impl InvWorld for Fake {
     fn stack_file_index(&self, _item: UnitId) -> i32 {
         -1
     }
-    fn stack_value(&self, _item: UnitId) -> i32 {
-        0
-    }
-    fn stack_quality_ok(&self, _item: UnitId) -> bool {
-        true
-    }
     fn has_sockets(&self, item: UnitId) -> bool {
         self.props[&item].sockets
     }
@@ -363,9 +357,6 @@ impl InvWorld for Fake {
     }
     fn quiver_kind(&self, item: UnitId) -> bool {
         self.items[&item].record == R_ARROWS
-    }
-    fn auto_equip_allows(&self, _unit: UnitId, _item: UnitId, _loc: u8) -> bool {
-        self.allows
     }
     fn targeting_probe(&self, item: UnitId) -> u32 {
         self.props[&item].probe
@@ -740,7 +731,9 @@ fn place_in_page_cursor_charm_and_passes() {
     let t = tables();
     let mut w = Fake::new();
     let mut inv = player_inv();
-    // Page 1: the cursor is kept.
+    // Page 1: step 7 keeps the cursor, but the placement's unlink of the
+    // cursor item (§2.2, §1.4 rule 3: +0x5C is this inventory) already
+    // cleared it (§2.4 step 5).
     let a = w.add(10, R_RING, mode::CURSOR);
     w.items.get_mut(&a).unwrap().page = page::TRADE1;
     inv.set_cursor(Some(a));
@@ -754,7 +747,7 @@ fn place_in_page_cursor_charm_and_passes() {
         false,
         false
     ));
-    assert_eq!(inv.cursor(), Some(a));
+    assert_eq!(inv.cursor(), None);
     // Page 4: no charm re-link; an active item refreshes stats and runs
     // the inventory pass with an owner refresh.
     let b = w.add(11, R_RING, mode::CURSOR);
@@ -799,7 +792,7 @@ fn place_in_page_cursor_charm_and_passes() {
         w.log,
         vec!["link_check 12 1", "charm 12", "untargetable 12"]
     );
-    // Page 2: trade hook.
+    // Page 2: trade hook after step 8, before step 9 (§2.4 step 3).
     let e = w.add(13, R_RING, mode::CURSOR);
     w.items.get_mut(&e).unwrap().page = page::TRADE2;
     w.log.clear();
@@ -813,7 +806,10 @@ fn place_in_page_cursor_charm_and_passes() {
         false,
         false
     ));
-    assert_eq!(w.log[0], "trade 13");
+    assert_eq!(
+        w.log,
+        vec!["link_check 13 1", "charm 13", "untargetable 13", "trade 13"]
+    );
 }
 
 // Covers: specs/items/inventory.md §2.4 r1
@@ -1355,14 +1351,16 @@ fn auto_equip_rules() {
     // Two locations (sword 4 / 5).
     let s = h.w.add(13, R_SWORD, mode::GROUND);
     assert_eq!(auto_equip_location(&h.inv, &h.w, &h.t, s, false), Some(4));
+    // A one-hand weapon and a shield are compatible (§4.7 profile).
     h.equip(14, R_SHIELD, 5);
     assert_eq!(auto_equip_location(&h.inv, &h.w, &h.t, s, false), Some(4));
-    h.w.allows = false;
-    assert_eq!(auto_equip_location(&h.inv, &h.w, &h.t, s, false), None);
-    h.w.allows = true;
+    // Two one-hand weapons need two dual-wielders: a sorceress (class 1)
+    // gets no; a barbarian (class 4) gets the free hand.
     let mut h2 = hands();
     h2.equip(14, R_SWORD, 4);
     let s2 = h2.w.add(13, R_SWORD, mode::GROUND);
+    assert_eq!(auto_equip_location(&h2.inv, &h2.w, &h2.t, s2, false), None);
+    h2.w.kinds.insert(PLAYER, UnitKind::Player { class: 4 });
     assert_eq!(
         auto_equip_location(&h2.inv, &h2.w, &h2.t, s2, false),
         Some(5)
@@ -1587,6 +1585,8 @@ fn real_grid_belt_and_type_tables() {
     }
 }
 
+#[path = "answer_tests.rs"]
+mod answer_tests;
 #[path = "gap_tests.rs"]
 mod gap_tests;
 #[path = "mutant_tests.rs"]
