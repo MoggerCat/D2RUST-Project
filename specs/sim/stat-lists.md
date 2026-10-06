@@ -22,23 +22,23 @@
 | Inputs | 58–66 |
 | Outputs / state changes | 67–73 |
 | Rules | 74–75 |
-|   1. Records | 76–116 |
-|   2. Flags (+0x10) | 117–133 |
-|   3. Stat arrays | 134–149 |
-|   4. Allocation and ownership | 150–164 |
-|   5. Base writes | 165–189 |
-|   6. Full values | 190–248 |
-|   7. Value-change notification | 249–277 |
-|   8. Chain operations | 278–359 |
-|   9. States | 360–386 |
-|   10. Timer event handlers | 387–462 |
-|   11. Mod array and stat messages | 463–480 |
-| Constants & data dependencies | 481–492 |
-| Randomness | 493–496 |
-| Edge cases & original bugs | 497–510 |
-| Test vectors | 511–547 |
-| Provenance | 548–571 |
-| Open questions | 572–587 |
+|   1. Records | 76–124 |
+|   2. Flags (+0x10) | 125–141 |
+|   3. Stat arrays | 142–157 |
+|   4. Allocation and ownership | 158–181 |
+|   5. Base writes | 182–206 |
+|   6. Full values | 207–265 |
+|   7. Value-change notification | 266–294 |
+|   8. Chain operations | 295–394 |
+|   9. States | 395–426 |
+|   10. Timer event handlers | 427–502 |
+|   11. Mod array and stat messages | 503–520 |
+| Constants & data dependencies | 521–532 |
+| Randomness | 533–536 |
+| Edge cases & original bugs | 537–555 |
+| Test vectors | 556–592 |
+| Provenance | 593–616 |
+| Open questions | 617–632 |
 <!-- /index -->
 
 ## Summary
@@ -109,6 +109,14 @@ the fields above, plus
 Array entry: 8 bytes, u16 layer, u16 stat, i32 value, so the first dword
 is the key (`stats.md` §1.3).
 
+The base array of an extended list is the common field at +0x24 (i16
+count +0x28, capacity +0x2A): a unit's own base stats (unit +0x5C) live
+there, and the base reader `0x006253B0` searches it through
+`0x00624ED0` (list +0x24) for plain and extended lists alike. The full
+array (+0x48) is separate and holds the totals (§6). A tool that records
+a unit's base stats reads +0x24 / +0x28 (`tools/original-hooks.md` §4
+rule 5).
+
 Chains: a parent's +0x3C (or +0x40) points at its newest child; each
 child links to the older one through prev (+0x2C) and to the newer one
 through next (+0x30). Walking "the chain" means from the head through
@@ -161,6 +169,15 @@ Callers pass other bits (e.g. 0x08, 0x20, 0x40) for their own lookups
    units `0x00460BF0` (callback `0x004609F0`), `0x004AE8D0`,
    `0x004AEDD0`, `0x004C1910`, `0x004CD540`. Objects and tiles have no
    list. All pass flags 0.
+4. A freed list is never passed again by 1.14d code: the specs found
+   no caller that keeps a list pointer past its free (§8.3) and then
+   reads, writes, attaches, detaches, frees or toggles it. So only the
+   null list has original behaviour (`stats.md` §4.2: reads 0; §5.1 /
+   §5.3: no-op; §8.4: nothing). A d2rs handle naming a freed list is
+   outside fidelity: an implementation may treat it as the null list
+   where a null rule exists and do nothing / answer 0 elsewhere, and a
+   replay that reaches such a call is itself a mismatch to report, not
+   a behaviour to match.
 
 ### 5. Base writes
 
@@ -357,6 +374,24 @@ set-full(U's list, S, eval(U's list, S), unit U). Caller `0x005627F4`.
    Called from the room update queue step (`tick.md` §3 step 6,
    `0x00553220`) when the unit's list has 0x100.
 
+#### 8.9 Temporary lists (`0x006272E0`(unit))
+
+Run by every real mode change (`0x00624690`, `sim/units.md` §4.1: a
+new mode, not for unit type 5) after the mode is written, and by the
+client's twin (`0x004B0D5A`). R := the unit's list; R missing or
+without NEWLENGTH → nothing. Else walk R's active chain from the head:
+each TEMPONLY list whose state (+0x14) is non-zero first turns that
+state off (`0x00639DB0`(unit, state, 0), §9.2); a non-extended one is
+then freed (§8.3); after any TEMPONLY list the walk restarts at the
+head (an extended TEMPONLY list would loop forever, but extended lists
+keep only bit 0x1 of their allocation flags, §4, so none exists).
+Other lists are passed over (next := prev link). Finally R's NEWLENGTH is
+cleared, even when expiring lists are still attached (they then wait
+for the next attach that sets it again). So a TEMPONLY list (§8.1 step
+4; e.g. Bash's attack-rate list, `skills/bodies.md` §3.8) lives until
+the next mode change. 1.14d-confirmed (asm of `0x006272E0`,
+`0x00624690`).
+
 ### 9. States
 
 #### 9.1 Bits
@@ -371,6 +406,11 @@ Set or clear bit s. If it changed: set bit s of the second half; if the
 state has flag `disguise` (states flag bit 16): on → unit +0xC8 |= 8;
 off → clear it unless another disguise state is still on (`0x0063A7B0`).
 `0x00639E30` sets or clears a second-half bit only.
+
+`0x00639DB0`(unit, s, on): s outside 0 … states count − 1 → nothing
+(no toggle, no queue). Else the toggle above, then the update-queue
+insert (`unit-order.md` §6.2) **always**, whether or not the bit
+changed. 1.14d-confirmed (asm of `0x00639DB0`).
 
 #### 9.3 Queries
 
@@ -501,7 +541,12 @@ None.
    (§6.4); per-level stats never appear in a player's full array.
 3. A plain DYNAMIC child's damage-related base changes still reach its
    parent (§6.1).
-4. Expiry of an extended list loops forever (§10.4).
+4. Expiry of an extended list loops forever (§10.4). The state it
+   spins in is fixed: every expired plain list met before it in the
+   walk is freed, nothing behind it changes. d2rs stops there instead
+   of hanging and reports `StatListError::EndlessExpiry(list)` with the
+   lists in that state; a recording that finished the walk contradicts
+   the loop and is a mismatch.
 5. Attach/detach collect at most 16 A53 keys (a 16-slot buffer, no
    bound check); 1.14d data has 4 such stats.
 6. Free leaves parked children pointing at the freed parent (§8.3).

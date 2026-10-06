@@ -87,7 +87,7 @@ pub const ISLE_MONSTER: (u32, u32) = (12, 10);
 pub const PLAYER_AT: (i32, i32) = (40_020, 40_020);
 /// The waypoint object's position.
 pub const WP_AT: (i32, i32) = (40_024, 40_020);
-/// Skills of the synthetic table: attack, and a right skill (srvst 6
+/// Skills of the synthetic table: attack, and a right skill (srvst 42
 /// standing in for Multiple Shot's 4, mana 4 + 1 per level, shift 8;
 /// `use.md`'s Multiple Shot vector).
 pub const ATTACK: i32 = 0;

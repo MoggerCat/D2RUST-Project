@@ -28,20 +28,20 @@
 |   3. DrlgType 2 levels | 115–171 |
 |   4. Allocating a preset map (`0x00666ED0`; all level types) | 172–188 |
 |   5. Loading a DS1 (`0x00665F40`, parser `0x00665950`) | 189–271 |
-|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 272–334 |
-|   7. Unit filter (`0x00667620`) | 335–359 |
-|   8. First activation of a preset room (`0x00667890`) | 360–396 |
-|   9. Preset room grids and unit transfer (`0x006667D0`) | 397–426 |
-|   10. Tile fill switches (`0x00666AC0`) | 427–439 |
-|   11. Door preset units (`0x0066D9E0`) | 440–453 |
-|   12. Pops at run time (presentation) | 454–466 |
-|   13. lvlprest columns (1.14d use) | 467–487 |
-| Constants & data dependencies | 488–519 |
-| Randomness | 520–542 |
-| Edge cases & original bugs | 543–560 |
-| Test vectors | 561–586 |
-| Provenance | 587–628 |
-| Open questions | 629–650 |
+|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 272–343 |
+|   7. Unit filter (`0x00667620`) | 344–368 |
+|   8. First activation of a preset room (`0x00667890`) | 369–405 |
+|   9. Preset room grids and unit transfer (`0x006667D0`) | 406–435 |
+|   10. Tile fill switches (`0x00666AC0`) | 436–448 |
+|   11. Door preset units (`0x0066D9E0`) | 449–473 |
+|   12. Pops at run time (presentation) | 474–486 |
+|   13. lvlprest columns (1.14d use) | 487–507 |
+| Constants & data dependencies | 508–539 |
+| Randomness | 540–562 |
+| Edge cases & original bugs | 563–580 |
+| Test vectors | 581–606 |
+| Provenance | 607–648 |
+| Open questions | 649–673 |
 <!-- /index -->
 
 ## Summary
@@ -315,7 +315,12 @@ generation (§3.2: F = 0, multi-room), `drlg/maze.md` (`0x00673A60`),
 9. **Waypoints** (`Scan` ≠ 0): for each unit in the **file's** list
    (unfiltered, DS1 coordinates): type 2, class id < 573 and objects
    `SubClass` bit 0x40 (record +0x167): cell (x/5/8, y/5/8) (single
-   mode: cell 0) |= 0x30000.
+   mode: cell 0) |= 0x30000. Both divisions truncate toward zero; the
+   cell is element cy·(w/8 + 1) + cx of the grid (row offsets r·(w/8 +
+   1), `0x0067CBF0`), written through `0x0067C4F0` with **no bound
+   check**: cx past the row width writes into the next row's cells, a
+   row outside 0..h/8 reads past the row-offset array (open question
+   7).
 10. **Rooms:**
     - Multi-room: for tile row Y = map y, map y + 8, … < map y + h (outer)
       and column X = map x, map x + 8, … < map x + w (inner): a room of
@@ -330,7 +335,11 @@ generation (§3.2: F = 0, multi-room), `drlg/maze.md` (`0x00673A60`),
     lvlprest `Dt1Mask`; rectangle; preset data: map, lvlprest index,
     preset room flags, link (if non-zero, link +0x0C |= 1); if
     `Populate` = 0: room flag 0x800000; add the room to the level
-    (`0x0066B970`). BuildArea returns the last room.
+    (`0x0066B970`: **head insert**: room next (+0x24) := level first
+    room (+0x10), level first room := room, level room count (+0x08) +=
+    1). So the level list holds the rooms in reverse creation order
+    (multi-room: the last row's last column first). BuildArea returns
+    the last room.
 
 ### 7. Unit filter (`0x00667620`)
 
@@ -450,6 +459,17 @@ nothing. Unit type 1: class id range-checked (out of range → −1), mode 1.
 Type 2: mode 0; object ids 91 and 92 only: `roll(3)` on the room seed,
 result 0 → no unit. The unit goes straight to the room's preset-unit
 list (head insert), flags 0; then the door record gets flag 0x20.
+
+Arguments (`0x0066D9E0`): room, cell world tile (wx, wy), packed cell
+v, the door's tile record or none, and the cell orientation. With a
+record: a record that already has flag 0x20 is skipped entirely (no
+lookup, no draw); right = (record type = 9). Without a record (hidden
+door cell, `drlg/rooms.md` §9.5.1 step 3): right = (orientation = 9);
+the orientation argument is read only in this case. **Flag 0x20** is set
+on the record (when there is one) after a unit is added **and** when
+`roll(3)` gave 0 (no unit, the draw is still spent); it is not set when
+no table row matches or the position is outside the room. So a door
+record draws `roll(3)` at most once over all calls.
 
 ### 12. Pops at run time (presentation)
 
@@ -647,3 +667,6 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
 6. Whether the lvlprest loader's DS1 preload (`0x0061EBB0`) ever runs
    (`data/loading.md` open question 9); it does not change results, only
    load timing.
+7. Does any lvlprest DS1 with `Scan` ≠ 0 have a waypoint object outside
+   its map (§6 step 9 writes without a bound check)? Scan the waypoint
+   objects (objects `SubClass` bit 0x40) of those DS1s against w, h.

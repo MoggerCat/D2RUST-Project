@@ -28,21 +28,21 @@
 | Inputs | 63–73 |
 | Outputs / state changes | 74–82 |
 | Rules | 83–84 |
-|   1. Vendor columns and per-NPC store lists | 85–115 |
-|   2. Store item level | 116–121 |
-|   3. Store generation (`0x00576980(npc, player, record)`) | 122–218 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 219–243 |
-|   5. Gambling | 244–299 |
-|   6. Refresh | 300–331 |
-|   7. Buying and selling | 332–427 |
-|   8. Repair | 428–464 |
-|   9. Prices | 465–616 |
-| Constants & data dependencies | 617–636 |
-| Randomness | 637–652 |
-| Edge cases & original bugs | 653–682 |
-| Test vectors | 683–705 |
-| Provenance | 706–739 |
-| Open questions | 740–759 |
+|   1. Vendor columns and per-NPC store lists | 85–125 |
+|   2. Store item level | 126–131 |
+|   3. Store generation (`0x00576980(npc, player, record)`) | 132–228 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
+|   5. Gambling | 254–309 |
+|   6. Refresh | 310–341 |
+|   7. Buying and selling | 342–517 |
+|   8. Repair | 518–554 |
+|   9. Prices | 555–706 |
+| Constants & data dependencies | 707–726 |
+| Randomness | 727–742 |
+| Edge cases & original bugs | 743–772 |
+| Test vectors | 773–795 |
+| Provenance | 796–834 |
+| Open questions | 835–865 |
 <!-- /index -->
 
 ## Summary
@@ -89,7 +89,17 @@ spec; recorded action 11 = shown in a store, 12 = taken out of a store,
    Drognan 5, Hratli 6, Alkor 7, Ormus 8, Elzix 9, Asheara 10, Cain 11,
    Halbu 12, Jamella 13, Malah 14, Larzuk 15, Drehya 16. Fields at
    326+i (Min), 343+i (Max), 360+i (MagicMin), 377+i (MagicMax), 394+i
-   (MagicLvl), u8 each (`fields.tsv`).
+   (MagicLvl), u8 each (`fields.tsv`). Column names: Hratli's (index 6)
+   are spelled `HraltiMin`, `HraltiMax`, `HraltiMagicMin`,
+   `HraltiMagicMax`, `HraltiMagicLvl` in the `Game.exe` field tables of
+   weapons, armor and misc (Blizzard's typo, offsets 332 / 349 / 366 /
+   383 / 400); look columns up by these names (or by offset), never by
+   the NPC's name. The 1.14d `weapons.txt` and `armor.txt` headers spell
+   the last one `HratliMagicLvl`, so it does not bind (`data/schema.md`
+   absent list) and offset 400 holds the missing-column value 0 in every
+   row of the live `weapons.bin` (306 rows) and `armor.bin` (202 rows),
+   although the `.txt` cells hold 1, 20 or 255; `misc.txt` spells it
+   `HraltiMagicLvl` and its 151 rows load 255.
 2. **Global lists** (`0x00536F80` → `0x00536D50(i)`, once per server
    start from `0x00530690`, freed by `0x00537120`): for every
    `interact` monstats row whose class has a column (switch at
@@ -365,16 +375,17 @@ not the player's interact unit → 0x2A code 9, result 1. Then
 9. Purchase loop. fill := 0 unless the item can go to the belt
    (`0x00628BA0`). Each pass:
    1. after one purchase without fill → done (result 0);
-   2. copy the store item (`0x0055A2A0`); null → code 9, result 1;
+   2. copy the store item (§7.3, `0x0055A2A0`, fillers 1); null → code
+      9, result 1;
    3. step 8's n is set as the copy's quantity (fill, stackable);
    4. pay price (§9.1); fail → code 12, result 0 (copy not freed);
    5. player data +0x6C := copy GUID; copy mode := 4;
    6. belt-able → put in the belt (`0x0055E9B0`); fail → fill := 0;
-   7. not placed: arrows / bolts may be equipped (`0x00562E00`, rules of
-      `0x0063BEF0` and `0x00623C60`, Open question 3); else after a
-      first purchase → undo this pass's gold change, destroy the copy,
-      done silently; else inventory page 0 and auto-place
-      (`0x00560200`); fail → undo gold, destroy, code 10, result 0;
+   7. not placed: the equip try (§7.1.1) when it applies; success →
+      step 8. Else after a first purchase → undo this pass's gold
+      change, destroy the copy, done silently; else page := 0 and
+      auto-place (`0x00560200`, find a free position, send); fail →
+      undo gold, destroy, code 10, result 0;
    8. on-buy hook (step 12); copy flag 2 := 1; 0x2A code 0, kind 4,
       GUID = copy.
 10. Recorded: `32 06000000 12000000 00000000 38000000` (Charsi, `dgr`
@@ -387,6 +398,30 @@ not the player's interact unit → 0x2A code 9, result 1. Then
     any other store item is taken out of the NPC grid (`0x005766D0`:
     removed, unit +0xC8 |= 0x10, re-added to the trade inventory so the
     client drops it).
+
+##### 7.1.1 Equip try at buy (`0x00577D18`–`0x00577D9A`)
+
+W := the weapon in use (`0x0063BEF0`: the right-hand item, else the
+left-hand item, that is type 45 `weap` and whose GUID is inventory
++0x1C; else none). h := the player's hand class (`0x00623C60`,
+`skills/bodies.md` §2 `bow_missile`: weapon class index from items `wclass` through
+table `0x007446A0`, 1 = `bow`, 7 = `xbw`, 0 = none). The class ids of
+`cqv` and `aqv` are the globals of `world/npc.md` §1.1 step 3
+(`0x00883E9C` = `cqv`, `0x00883EA0` = `aqv`, read at `0x00536102`).
+
+| W | Copy | Try |
+|---|---|---|
+| none | `cqv` or `aqv` | no |
+| none | anything else (weapons too) | yes |
+| present | type 45 (`weap`, equivalence) | no |
+| present | `cqv` and h ≠ 7, or `aqv` and h ≠ 1 | no |
+| present | anything else (quivers matching h, armor, jewelry) | yes |
+
+Try = `items/inventory.md` §4.9 (`0x00562E00(copy, skip 0)`): the
+auto-equip test §4.7 picks the location; a free matching slot equips
+the copy (command flag 0x200, 0x9D action 6). Result 0 (no slot, a
+requirement failing) → the "not placed" path of step 7. Quivers are not
+weapons (`bowq` / `xboq` → `misl` → `misc`, live `itemtypes.txt`).
 
 #### 7.2 Sell (C→S 0x33, 17 bytes)
 
@@ -407,7 +442,7 @@ client price (not read). Handler `0x0054BB20` → `0x00579510`:
    of mask `0x006CE270` (`0x00575FA0`); the player's vendor-chain node
    at this NPC is in gamble mode.
 8. Re-sellable and not a permanent item / NM-Hell hp4-5 mp4-5
-   (`0x00576ED0`): copy into the NPC (`0x0055A2A0`; null → code 9,
+   (`0x00576ED0`): copy into the NPC (§7.3, `0x0055A2A0`, fillers 1; null → code 9,
    result 3); mode 4; store page (§3.1 step 3; 0xFF → destroy, no
    copy); place, page 1 → 2 retry (fail → destroy); placed: mark
    (§3.1 step 5), durability := max, quantity := max stack, and price
@@ -424,6 +459,61 @@ client price (not read). Handler `0x0054BB20` → `0x00579510`:
 Recorded: `33 06000000 07000000 0400 0000 f4010000` (Charsi, `skc`, on
 cursor) → S→C 0x42 then 0x2A code 1, kind 3, GUID 7, gold 500; the
 copy appears next frame as 0x9C action 11, GUID 0x35.
+
+#### 7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers)
+
+The copy routine of every caller that needs a second item equal to an
+existing one: buy (§7.1 rule 9.2), sell (§7.2 rule 8), cube outputs
+(`world/cube.md` §7.3), hireling take (`items/inventory.md` §7.23), NPC
+socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
+1) is not read in 1.14d. Result: the copy, or none.
+
+1. R := S's room (`0x00620BB0`; none when S is not on the ground).
+2. Write S as a **save-format** stream with children
+   (`items/bitstream.md`, `0x006313E0(S, buffer, 0x400, save 1,
+   children 1, alt 0)`) into a 1,024-byte buffer. A stream that would
+   not fit gives length 0 and the read in step 3 fails.
+3. Read the first record (`0x00558CB0`): peek its header (`0x0062E410`:
+   flags, version, mode, location, item code → class; filled-socket
+   count N; the `ear` flag 0x10000 maps to code `ear `); class outside
+   the items table → none. Allocate a new item unit of that class in R
+   at the stream's position and mode (`0x00555230`, `sim/units.md`; a
+   new GUID). Decode the record into it (`0x0062E430`); a decode error
+   or a missing record frees the unit (`0x00555600`) and the result is
+   none. Then item flag 0x80000 (init) set, 0x2000 (in store) cleared
+   (`items/generation.md` §1.4), replenish timers
+   (`items/generation.md` §9 step 6: `0x00558530`, `0x00558580`).
+4. Item flag 0x80000 set, 0x2000 cleared on the copy again.
+5. fillers ≠ 0 and N ≠ 0: for each of the N child records in stream
+   order: read it as in step 3 with no room (failure → result none;
+   the copy and the children read so far are not freed); child mode
+   := 4; socket it into the copy through `0x00562660(child GUID, copy
+   GUID, &out, 0, 1, 0, 0)` (`items/inventory.md` §7.19; result 0 →
+   fatal assert, line 0xDD4); child item flags 0x80000 set, 0x2000
+   cleared; child command flag 0x1 cleared (`0x00628170`).
+   fillers = 0: the children are not read; the copy keeps the stream's
+   socket flags and its stat lists but has no fillers.
+6. S item flag 0x8000000 set.
+7. Replenish: for stat 252 (`item_replenish_durability`) and then 253
+   (`item_replenish_quantity`), total r ≠ 0 and no type-3 timer on the
+   copy (`0x005415A0`) → a type-3 timer at game frame (+0xA8) + 2500 / r
+   + 1 (`0x005417D0`; `sim/unit-events.tsv` rows `0x0055a4be`,
+   `0x0055a500`; the handler is `sim/units.md` §6.5).
+8. Per-item reset of the deferred-message bits (`0x005979B0`,
+   `items/inventory.md` §6.1 rule 4); command flag 0x1 cleared. Result:
+   the copy.
+
+What carries over is exactly what the save stream carries
+(`items/bitstream.md` §2–§5): stats with `Save Bits` 0, values the clamp
+changes (§1 rule 3) and unit state outside the item record (timers
+other than step 7, owner links, unit flags) are not copied. No RNG draw
+(the stream holds the seeds, §4.1 rule 7). The decode rules of
+`0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
+of `items/bitstream.md`; their differences are Open question 8.
+
+Recorded: the buy of rule 10 creates the copy GUID 0x36 from store item
+0x12; the sell of §7.2 creates GUID 0x35 from GUID 7 (each the next
+item GUID; `sim/units.md` numbering).
 
 ### 8. Repair
 
@@ -713,7 +803,12 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
   refresh `0x00537340`, `0x00537580`, `0x00537230`, `0x00536580`,
   `0x00536D10`; buy `0x0054BAC0`, `0x00577F30`, `0x00577830`,
   `0x00577700`, `0x0055F640`, `0x00576F50`, `0x00576650`, `0x005766D0`,
-  `0x00576ED0`; sell `0x0054BB20`, `0x00579510`, `0x00576E40`,
+  `0x00576ED0`; equip try `0x00577D18`–`0x00577D9A`, `0x0063BEF0`,
+  `0x00623C60` → `0x00623990` / `0x00629FE0` (table `0x007446A0` read
+  from the image: `bow` 1 … `xbw` 7, `ht1` 12), `cqv` / `aqv` lookups
+  `0x00536102`; item copy `0x0055A2A0` (disassembled; 17 call sites),
+  `0x00558CB0`, `0x0062E410` → `0x0062AE20`, `0x0062E430`,
+  `0x00451F50`, `0x00620BB0`; sell `0x0054BB20`, `0x00579510`, `0x00576E40`,
   `0x0055B060`; repair `0x0054BB60`, `0x00578050`, `0x0062FE60`,
   `0x005761C0`; pay `0x00576D90`; prices `0x0062EFB0`, `0x0062EDD0`,
   `0x00628E70`, `0x00628D30`, `0x006292F0`, `0x00629370`, `0x00483360`,
@@ -745,8 +840,10 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 2. Item format field (item data +0x30) that selects the gamble-cost
    column (§9.4): when it is 0 in an expansion game; check items created
    by §5.1.
-3. Arrow / bolt auto-equip at buy (`0x0063BEF0`, `0x00623C60`, type 45
-   test): record a quiver purchase with a bow and a crossbow equipped.
+3. Answered from the code: §7.1.1 (`0x00577D18`). A recording still
+   confirms it: buy `aqv` with a bow, then with a crossbow equipped, and
+   a helm with the head slot empty (expect 0x9D action 6, no 0x9C
+   action 4).
 4. Order of §6 rule 1 versus the player's room change: the code passes
    the current room as `to`; confirm with a recording that leaving town
    and returning gives a new Charsi store.
@@ -756,3 +853,12 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    one to confirm §9.2 rules 4–5 end to end.
 7. Gamble list: record one gamble open (14 items, ring then amulet
    first) and one gamble purchase + 0x37.
+8. §7.3 step 3: the decoder `0x0062E430` (full record `0x0062CBE0`, compact
+   record `0x0062A970`) is read only as "the inverse of
+   `items/bitstream.md`"; a field it rebuilds instead of reading (base
+   stats from the item record, list values after the clamp) would make
+   the copy differ from S. Settle: Ghidra on `0x0062CBE0`, or a buy of
+   a socketed magic item compared stat by stat with the store item.
+9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
+   has no name in `items/generation.md` §1.4. Settle: the readers of
+   item flag 0x8000000.

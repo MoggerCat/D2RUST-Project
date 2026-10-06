@@ -10,7 +10,7 @@
   §4–§5 (palette and the pixel write), `render/blend-modes.md` (draw modes,
   blend tables), `render/unit-composite.md` §7 (which colormap source a
   component uses), `ui/text.md` §4 (text-color maps), `render/lighting.md`
-  (light values; to write), `client/render-pipeline.md` §A4, §B3
+  (light values, §11), `client/render-pipeline.md` §A4, §B3
 
 <!-- index -->
 | Section | Lines |
@@ -22,19 +22,19 @@
 |   1. The palette-table block | 70–100 |
 |   2. Map semantics | 101–109 |
 |   3. Light map of a cel draw | 110–123 |
-|   4. Light maps of DT1 tile blocks | 124–171 |
-|   5. Selected-unit highlight | 172–187 |
-|   6. Remap tables (`P`) | 188–219 |
-|   7. Mapped index 0 | 220–229 |
-|   8. Tables loaded but not drawn by GDI | 230–241 |
-|   9. Palettes per screen region | 242–247 |
-|   10. d2rs answers | 248–259 |
-| Constants & data dependencies | 260–267 |
-| Randomness | 268–272 |
-| Edge cases & original bugs | 273–280 |
-| Test vectors | 281–304 |
-| Provenance | 305–322 |
-| Open questions | 323–341 |
+|   4. Light maps of DT1 tile blocks | 124–183 |
+|   5. Selected-unit highlight | 184–199 |
+|   6. Remap tables (`P`) | 200–273 |
+|   7. Mapped index 0 | 274–283 |
+|   8. Tables loaded but not drawn by GDI | 284–295 |
+|   9. Palettes per screen region | 296–301 |
+|   10. d2rs answers | 302–313 |
+| Constants & data dependencies | 314–321 |
+| Randomness | 322–326 |
+| Edge cases & original bugs | 327–334 |
+| Test vectors | 335–361 |
+| Provenance | 362–387 |
+| Open questions | 388–408 |
 <!-- /index -->
 
 ## Summary
@@ -56,8 +56,8 @@ the unit and item colormap tables, and the rule for a mapped index 0. How
 |---|---|---|
 | act `pal.pl2` | 439,808 + 259·T bytes | `formats/palette.md`; act by `composition.md` §4 |
 | light value of a cel draw | byte `v` (0xFF = unlit) | caller; for units `lighting.md` |
-| light values of a wall/roof block | 4 ints `c0…c3` | caller's light record (`lighting.md`) |
-| floor light grid | 12-byte cells, 8 per row | `lighting.md` (`0x00477730` grid) |
+| light values of a wall/roof block | 4 ints `c0…c3` | `lighting.md` §11 r2 |
+| floor light grid | 12-byte cells, 8 per row | `lighting.md` §11 r3 (`0x004DDEF0`) |
 | remap request | unit palette index, monster shift, item, text color | `unit-composite.md` §7, `ui/text.md` §5 |
 | `items\Palette\*.dat`, monster `palshift.dat`, `RandTransforms.dat`, `GreenBlood.dat` | index maps | archives (§6) |
 
@@ -167,7 +167,19 @@ base `g = gx + 8·gy`.
 3. RLE floor blocks (block flag bit 2, `0x004F8850`): rows `r` = 0…14,
    `a_r = (16·c0 + r·(c3 − c0)) >> 7`, `b_r = (16·c1 + r·(c2 − c1)) >> 7`,
    column `x` uses `G[a_r][b_r][x]`. Isometric (diamond) blocks go to
-   `0x004F6BB0` with the same corners: per-pixel rule is Open question 1.
+   `0x004F6BB0` with the same corners (r4).
+4. Isometric floor blocks (block flag bit 2 clear, `0x004F6BB0`; caller
+   `0x004F8850` passes `16·c0`, `c3 − c0`, `16·c1`, `c2 − c1`): the
+   block's 15 rows `r` = 0…14 are the diamond rows of the packed block
+   data; row `r` starts at column `s_r` and has `w_r` pixels:
+   `s` = 14, 12, 10, 8, 6, 4, 2, 0, 2, 4, …, 14 and `w` = 4, 8, …, 32, …,
+   8, 4 (tables `0x0072DB48`, `0x0072DB84`; row data offsets `0x0072DBC0`
+   = 0, 4, 12, 24, 40, 60, 84, 112, 144, 172, 196, 216, 232, 244, 252).
+   `a_r = (16·c0 + r·(c3 − c0)) >> 7`, `b_r = (16·c1 + r·(c2 − c1)) >> 7`
+   (arithmetic shifts, accumulated per row), and the pixel at block column
+   `x` (`s_r ≤ x < s_r + w_r`) uses light map `G[a_r][b_r][x]`, i.e. the
+   same rule as RLE blocks with `x` the column inside the 32-wide block.
+   Destination rows advance by the surface pitch `[0x007D544C]`.
 
 ### 5. Selected-unit highlight
 
@@ -200,10 +212,10 @@ of each component's `P` is `unit-composite.md` §7; the tables are:
    per class) or, for a shift index ≥ 8, map `index − 8` of
    `Data\Global\Monsters\RandTransforms.dat` (30 maps at `0x007B9580`,
    loaded by `0x00476EA0`). The shift index is `0x0046F250` of the unit's
-   gfx (+0x54). Details: Open question 2.
+   gfx (+0x54); its value and the map it picks: r6.
 3. **Blood map** (`0x00477680`): `Data\Global\Monsters\GreenBlood.dat`
    (one map at `[0x007BB384]`); used for S8 components and missiles with
-   `LocalBlood` when `0x0044DC60` (`[0x007A05FC]`) ≠ 0 (Open question 3).
+   `LocalBlood` when `0x0044DC60` (`[0x007A05FC]`) ≠ 0 (r7).
 4. **Item color** (`0x0062C100(unit, item, …)` → `0x00600C20(t, c)`):
    map `c` (0…20) of item palette file `t`, stored at
    `0x008ADBB8 + (105·t + c)·256` (`0x006009C0` loads each file's 21 maps,
@@ -216,6 +228,48 @@ of each component's `P` is `unit-composite.md` §7; the tables are:
    (states `+0x2C`) < 21 whose `itemtype` (`+0x2A`) the item matches; the
    remaining cases (by item quality and affixes) are Open question 4.
 5. **Text color** `k`: `ui/text.md` §4.
+6. **Monster palette shift index** `s` (gfx `+0x38`, read by
+   `0x0046F250` through `0x00463EB0`; gfx `+0x34` gets the same value).
+   Every gfx starts with `s` = 2 (`0x0046EBB0`). A monster created by
+   S→C 0xAC (`0x00466360`, `client/msg-units.md` §1.2) sets it in this
+   order, each step overriding the previous one:
+   1. `monstats` `TransLvl` (`+0x4D`): `TransLvl + 2` when < 8, else 2.
+   2. Unique (monster type flag 0x8, `0x004AE360`) and `monstats2`
+      `noUniqueShift` (flag bit 15, `0x004638A0(class, 15)`) clear:
+      `s = 9 + (n mod 30)`, where `n` is the new low 32 bits (unsigned)
+      of one D2 RNG step (`sim/rng.md`) of the seed {low = class + name seed, high = 666}
+      (`0x00477620`, `0x00650E40`; the name seed is the 16-bit field of
+      the message).
+   3. `monstats2` `Utrans` for the current difficulty (`+0x122 +
+      [0x007A060C]`) ≠ 0: `s` := it; the value 255 instead gives
+      `s` = 1 when `0x004791B0(unit)` is 0, else 0 (owner lookup in the
+      client list `[0x007BB5BC]` and relation test `0x004DC440(owner,
+      8)`; Open question 7). In 1.14d only `necroskeleton` and
+      `necromage` have 255; the act bosses, `diabloclone` (5) and the
+      Baal forms have other non-zero values.
+   4. Superunique (type flag 0x2, `0x004AC7E0(unit, 2)`): the
+      `superuniques` row (hcIdx, monster data `+0x26`) `Utrans` for the
+      difficulty (`+0x28 + difficulty`), when ≠ 0.
+   5. `s` ≥ 30 → 2.
+
+   The map (`0x00477530`; `none` = no `P`): units of type ≠ 1 → none;
+   class without `palshift` data → none. `s` 0, 1: the `palshift` map `s`
+   for classes 363 `necroskeleton` and 364 `necromage` only (jump table
+   `0x00477608`/`0x00477610`), none for others. `s` 2…7: `palshift` map
+   `s` (`base + 4 + 256·s`), or `base + 0x804 + 256·s` (the second
+   8-map set) when the green-blood switch (r7) is on and the class's
+   `monstats2` `localBlood` (`+0x11C`) = 2. `s` ≥ 8 with RandTransforms
+   loaded (`[0x007BB380]` = 1, set by `0x00476EA0`): RandTransforms map
+   `s − 8` (`s − 8` > 29 is fatal 0x160; r6.5 keeps `s` ≤ 29). `s` ≥ 8
+   without RandTransforms: the `palshift` rule of `s` 2…7 with that `s`
+   (reads past the 8 maps; unreachable with the reference install).
+7. **Green-blood switch** `[0x007A05FC]` (`0x0044DC60`): set to 1 once by
+   `0x0044DBE0` (game init `0x0044E261`) when the file
+   `Data\Local\Color.txt` opens (`0x00516E46`, archives or disk) and its
+   first byte is `1` (0x31); never cleared. The reference install's
+   archives (`d2data`, `d2exp`, `d2speech`, `patch_d2`) hold no such
+   file, so it is 0 and the blood map (r3) and the second palshift set
+   (r6) are unused there.
 
 ### 7. Mapped index 0
 
@@ -301,6 +355,9 @@ R, G, B: `composition.md` §4).
 | floor grid, every cell 0x80 | `Δ` = 0: flat, map 16 | §4 floors r1 |
 | `t = 3` (gold), any `c` | no map | §6 r4 |
 | drawn `s = 5`, `P[5] = 0`, no `L`, no `T` | index 0 written | §7 |
+| iso floor block, corners 0, 255, 255, 0, rows 0 / 7 / 14 | every row `a = 0`, `b = 31`; row 7 columns 0, 14, 31 → maps 0, 13, 30; row 0 draws only columns 14…17 | §4 floors r4 |
+| unique monster, class 5, name seed 0x1234, `noUniqueShift` clear, no `Utrans`, not superunique | seed {0x1239, 666} → low 0xBC641877, mod 30 = 11 → `s` = 20 → RandTransforms map 12 | §6 r6 |
+| monster with `TransLvl` 8 | `s` = 2 (palshift map 2) | §6 r6 |
 
 ## Provenance
 
@@ -319,17 +376,23 @@ Measurements: scratch scripts over the five act PL2 files and
 extract`; field offsets from `specs/data/fields.tsv` (items `Transform`
 `+0x141`, states `itemtype` `+0x2A`, `itemtrans` `+0x2C`). `D2MOO`
 not used.
+Ghidra backlog (2026-10-06): iso floor light `0x004F8850` →
+`0x004F6BB0` with row tables `0x0072DB48`/`0x0072DB84`/`0x0072DBC0` read
+from the file; shift index writers `0x0046EBB0`, `0x0046F220` (from
+`0x00466360`), helpers `0x00477620`, `0x004638A0`, `0x004AE360`,
+`0x004AC7E0`, `0x006556E0`, `0x004791B0`; map choice `0x00477530`
+(jump table `0x00477608`); green-blood switch `0x0044DBE0` (string
+`Data\Local\Color.txt` at `0x006D5DC0`). Live data: `monstats2` Utrans
+255 rows and `monstats` rows 363/364 read from `patch_d2`.
 
 ## Open questions
 
-1. Per-pixel light of isometric floor blocks (`0x004F6BB0`, from the four
-   corners of §4): Ghidra read; a capture of a lit floor at night.
-2. Monster palette shift: what `0x0046F250` returns (the shift index),
-   the `+0x804` second set in `0x00477530` (when `0x0044DC60` ≠ 0 and the
-   `+0x11C` byte = 2), the class rule for 0x16B / 0x16C and the
-   `[0x007BB380]` gate. Ghidra read.
-3. `0x0044DC60` (`[0x007A05FC]`): which option turns the green-blood map on.
-   Ghidra read of its writers.
+1. ~~Per-pixel light of isometric floor blocks~~: answered in §4,
+   floors r4 (`0x004F6BB0`). Capture of a lit floor at night confirms.
+2. ~~Monster palette shift~~: answered in §6 r6 (`0x0046F250` reads gfx
+   `+0x38`, set by `0x00466360`; `+0x804` set; classes 363 / 364;
+   `[0x007BB380]`).
+3. ~~`0x0044DC60` (`[0x007A05FC]`)~~: answered in §6 r7 (`Color.txt`).
 4. Item color `c` beyond the state rule: the quality / affix branches of
    `0x0062C100` (`colors.txt` codes in magic, unique and set rows). Ghidra
    read; a capture of a colored item on the ground.
@@ -338,3 +401,7 @@ not used.
    on `[0x007C9150]` users.
 6. The light values themselves (unit `v`, wall `c0…c3`, floor grid,
    player light flicker, `capture.md` findings): `render/lighting.md`.
+7. The relation that `0x004791B0` tests for `Utrans` 255 (§6 r6.3):
+   which owner list `[0x007BB5BC]` holds and what `0x004DC440(owner, 8)`
+   decides (likely "owned by the local player or an ally"). Ghidra read
+   of both.

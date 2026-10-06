@@ -321,10 +321,12 @@ impl Presets {
                         } else {
                             (u.y / SUBTILES / 8) as usize * gw + (u.x / SUBTILES / 8) as usize
                         };
-                        // TODO(preset.md §6 step 9): a unit far enough
-                        // outside the map writes past the cell grid in
-                        // 1.14d; skipped here. In-grid overflow of a row
-                        // lands in the next row, as the linear index does.
+                        // Element cy·(w/8 + 1) + cx, no bound check: cx
+                        // past the row width lands in the next row's
+                        // cells, as the linear index does.
+                        // TODO(preset.md §6 step 9, open question 7): a
+                        // row outside 0..h/8 reads past the row-offset
+                        // array in 1.14d; such a unit is skipped here.
                         if let Some(c) = cells.get_mut(i) {
                             *c |= room_flags::ANY_WAYPOINT;
                         }
@@ -350,8 +352,9 @@ impl Presets {
                 room.flags |= room_flags::NO_POPULATION;
             }
             // TODO(preset.md §6 step 10): a non-zero link also sets bit 0
-            // of the link record's +0x0C; the record is outdoor code's
-            // (`drlg/outdoor.md`), which reads `PresetRoom::link`.
+            // of the link record's +0x0C (`link +0x0C |= 1`); the link
+            // grid holds plain values here (no record to flag), and the
+            // record is outdoor code's (`drlg/outdoor.md`).
             presets.rooms.insert(
                 id,
                 PresetRoom {
@@ -363,9 +366,8 @@ impl Presets {
                     tombstones: None,
                 },
             );
-            // TODO(preset.md §6 step 10): `0x0066B970`'s list position is
-            // not stated; head insert read from rooms.md §9.9 (the client
-            // streams the town's rooms 34 → 0 in list order).
+            // `0x0066B970`: head insert and count (§6 step 10), so the
+            // level list holds the rooms in reverse creation order.
             drlg.link_room(id, LinkAt::Head);
             id
         };

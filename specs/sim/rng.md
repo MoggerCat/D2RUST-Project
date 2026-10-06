@@ -27,13 +27,13 @@
 |   4. Setting and reading seeds | 127–143 |
 |   5. Where seeds come from | 144–214 |
 |   6. Inlined draws | 215–235 |
-|   7. Which systems draw from which seed | 236–261 |
-| Constants & data dependencies | 262–272 |
-| Randomness | 273–277 |
-| Edge cases & original bugs | 278–290 |
-| Test vectors | 291–339 |
-| Provenance | 340–372 |
-| Open questions | 373–387 |
+|   7. Which systems draw from which seed | 236–262 |
+| Constants & data dependencies | 263–273 |
+| Randomness | 274–278 |
+| Edge cases & original bugs | 279–291 |
+| Test vectors | 292–340 |
+| Provenance | 341–373 |
+| Open questions | 374–388 |
 <!-- /index -->
 
 ## Summary
@@ -160,7 +160,7 @@ value as an input (determinism rule), never from the clock.
 <!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
-| game seed, game +0xD0 [`pGameSeed`] | `0x0052C280` at game creation | `init()`, then `init_low(time_value(QueryPerformanceCounter low word))`. A fixed-seed global `0x00731004` (≠ −1) would replace this; its only writer `0x0052C320` has no callers (dead code). |
+| game seed, game +0xD0 [`pGameSeed`] | `0x0052C280` at game creation | `init()`, then `init_low(time_value(QueryPerformanceCounter low word))`. A fixed-seed global `0x00731004` (≠ −1) would replace this; its writer `0x0052C320` is called by the `-seed N` switch handler `0x0044D860` (N ≠ 0) and by `0x00451909`; that branch (game +0x84 := 1, +0x7C := N, seed `{N, 666}` unstepped) is `tools/original-hooks.md` §2 rule 3. |
 | `dwInitSeed`, game +0x7C | `0x0052C280` | one game-seed step, then `time_value(lo')`. Single player's DRLG does not use it; it uses the character's map seed (§5.4, observed). |
 
 Game creation (`0x00530930`; `0x00530BF0` with a client) then derives,
@@ -183,7 +183,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
 | item seed from a save | `0x0062CBE0` (`0x0062A970` sets 0) | 32 bits from the item bit stream |
 | client unit seeds | `0x00465FD0`, `0x00466200`, `0x00466360` | derived from the client room seed (+0x6C); stays `{1, 666}` without a room |
-| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
+| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005AC040`, `0x005D5BF0`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
 
 #### 5.4 DRLG
 
@@ -252,6 +252,7 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | DRLG layouts, mazes, outdoor presets | level seed | `0x006714D0`–`0x006735F0`, `0x006744F0`–`0x00674E40`, `0x0067EED0`–`0x00681240` |
 | DRLG tiles | DRLG room seed | `0x0066D820`, `0x0066F690`, `0x00670170` |
 | client weather, particles, missiles, light colour | client seeds (§5.3, §5.5) | `0x00473090`, `0x00476190`, `0x004CDDB0`–`0x004D8260`, `0x004ACC70` |
+| sound variants, NPC greetings, unit sound timers, ambience cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590` and the trigger code; owners `audio/sound-table.md` §4, `audio/triggers.md` Randomness, `audio/environment.md` §7 |
 
 Helper call sites: `roll` 476 (mostly AI, skills, items, missiles),
 `roll_range` 37, `mask` 14 (server AI/skills), `step` 1, `mask_range` 0.

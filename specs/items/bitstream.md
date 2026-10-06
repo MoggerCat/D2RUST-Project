@@ -27,15 +27,15 @@
 | Rules | 70–71 |
 |   1. Writer | 72–88 |
 |   2. Header (`0x006312B0`) | 89–101 |
-|   3. Compact record (`0x0062AF80`) | 102–116 |
-|   4. Full record (`0x0062FFF0`) | 117–230 |
-|   5. Save-format extras (never on the wire) | 231–236 |
-| Constants & data dependencies | 237–256 |
-| Randomness | 257–260 |
-| Edge cases & original bugs | 261–274 |
-| Test vectors | 275–297 |
-| Provenance | 298–318 |
-| Open questions | 319–329 |
+|   3. Compact record (`0x0062AF80`) | 102–121 |
+|   4. Full record (`0x0062FFF0`) | 122–245 |
+|   5. Save-format extras (never on the wire) | 246–251 |
+| Constants & data dependencies | 252–275 |
+| Randomness | 276–279 |
+| Edge cases & original bugs | 280–306 |
+| Test vectors | 307–329 |
+| Provenance | 330–354 |
+| Open questions | 355–372 |
 <!-- /index -->
 
 ## Summary
@@ -101,8 +101,13 @@ quality 2 into the item (§4.3 rule 6).
 
 ### 3. Compact record (`0x0062AF80`)
 
-1. 10 bits version (item data +0x30, `0x0062A670`).
-2. Location (§4.1 rules 2–3).
+1. 10 bits version (item data +0x30, `0x0062A670`; clamped to 0x3FF).
+   The version is the item format of `items/generation.md` §1.2: the
+   creation pipeline stores the request's format (request +0x2A) at
+   item data +0x30 (`0x0062A6C0` called at `0x00558E42`), so both name
+   one value (101 in expansion games).
+2. 3 bits mode (unit +0x10, clamped to 7), then the location of §4.1
+   rules 2–3 (`0x0062AFF0`–`0x0062B1B7`; 92 bits for B1 / B2).
 3. Ear (F & 0x10000): 3 bits ear class (file index, `0x00629DA0`), 7
    bits ear level (+0x48), then the name (+0x4A) as 7-bit characters up
    to and **including** the terminating 0.
@@ -118,7 +123,8 @@ quality 2 into the item (§4.3 rule 6).
 
 #### 4.1 Head
 
-1. 10 bits version (+0x30); 3 bits mode (unit +0x10).
+1. 10 bits version (+0x30, the item format, §3 rule 1); 3 bits mode
+   (unit +0x10).
 2. Mode 3 (ground) or 5 (dropping): 16 bits x, 16 bits y (sub-tile
    position, static path +0x0C / +0x10).
 3. Other modes: 4 bits body location (+0x44); 4 bits x and 4 bits y
@@ -165,6 +171,9 @@ array, `items/affixes.md` §1).
 7. Any other quality (2 normal, also 0 or > 9): a quality other than 2
    is **overwritten with 2** in the item and the property lists of §4.6
    are skipped (only the 0x1FF terminator of the main list is written).
+   Quality 2 itself keeps its lists: the skip flag is set only on the
+   overwrite branch (`0x00630724`–`0x00630737`; B10 is quality 2 with
+   stat 107).
    Then: type 13 (`char`, equivalence) and shown: 1 bit (prefix slot 0
    after §4.2 ≠ 0), then 11 bits that prefix, or suffix slot 0 when the
    prefix is 0. Type 40 (`body`) and not type 7 (`play`): 10 bits file
@@ -173,7 +182,9 @@ array, `items/affixes.md` §1).
 #### 4.4 Runeword and names
 
 1. F & 0x4000000 (runeword): 16 bits the runeword record's +0x82
-   (`0x0062BED0`; no record → 0xFFFF).
+   (`0x0062BED0`; no record → 0xFFFF). The record is the match of
+   `items/properties.md` §10.1 (owner); +0x82 is the record's name
+   string id (`data/fixups.md` §7).
 2. F & 0x10000 (ear): 3 bits ear class, 7 bits ear level, name as in §3
    rule 3. Else F & 0x1000000 (personalized): the name (+0x4A) as 7-bit
    characters including the terminating 0.
@@ -220,6 +231,10 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
       48 → 49; 50 → 51; 52 → 53; 54 → 55, 56; 57 → 58, 59. The partner
       values 18, 49, 51, 53, 55, 56, 58, 59 are recorded, so the
       partner's own entry, met later in the list, is skipped when equal.
+      The record is per list: all 511 slots are zeroed before each
+      list's stats are read (`0x00630E45`), so a partner written in the
+      main list does not suppress an equal entry in a set or runeword
+      list.
    4. s = 326: nothing more (only the id; unreachable with 1.14d data:
       `poison_count` has `Save Bits` 0).
    5. Other s: when `Save Param Bits` > 0, the param in that many bits
@@ -248,9 +263,13 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 
 Columns read: itemstatcost `ValShift`, `Save Bits`, `Save Add`, `Save
 Param Bits` (1.14d values used by the vectors: 9 `maxmana` shift 8, 8
-bits, add 32; 17 / 18 9 bits; 19 10 bits; 31 11 bits add 10; 48 8 bits;
-49 9 bits; 72 9 bits; 73 8 bits; 107 3 bits, param 9 bits; 194 4 bits;
-356 2 bits), items `code`, `compactsave`, `hasinv`, `quest`,
+bits, add 32; 17 / 18 9 bits; 19 10 bits; 21 6 bits; 22 `maxdamage` 7
+bits, add 0; 31 11 bits add 10; 48 8 bits; 49 9 bits; 60
+`lifedrainmindam` 7 bits, add 0; 72 9 bits; 73 8 bits; 75
+`item_maxdurability_percent` 7 bits, add 20; 107 3 bits, param 9 bits;
+194 4 bits; 356 2 bits; 22, 60, 75 read from live `patch_d2`
+`itemstatcost.txt`, handoff LB1, and the only widths with which B5, B6
+and B8 end in their last byte), items `code`, `compactsave`, `hasinv`, `quest`,
 `questdiffcheck`, `stackable`, itemtypes `varinvgfx` and the
 equivalence chain.
 
@@ -271,6 +290,19 @@ None.
 5. Stat 326 has a no-value branch that 1.14d data never reaches.
 6. A runeword item writes a terminator for every set-list slot, present
    or not (§4.6 rule 5).
+7. Names (§3 rule 3, §4.4 rule 2) are written up to the first 0 byte
+   with no length bound (`0x0062B250` loop, `0x006308E9` loop); the
+   name setter `0x00628370` and the readers (`0x0062D298`) are unbounded
+   copies too. The buffer is 16 bytes (+0x4A–+0x59); the 1.14d names are
+   player names (ears, personalization), which fit with their
+   terminator, so a 16-character name is not expected (Open question 4). A name with no 0 in its 16 bytes
+   would read on into +0x5A…; d2rs stores at most 15 characters and
+   rejects a longer one at the setter instead (handoff BV7).
+8. A compact ear has no item code on the wire (§3 rule 4). The reader
+   takes the class from code `ear ` for F & 0x10000 (`0x0062AEF1`, the
+   header peek), and live `misc.txt` row `ear` has `quest` empty (0), so
+   §3 rule 5 never applies to an ear: a reader writes no quest
+   difficulty for it (handoff BV9).
 
 ## Test vectors
 
@@ -307,6 +339,10 @@ with `Save Add` 0 in 8 bits → 0xFF.
   `0x006253B0`, `0x00625480`, `0x00625D00`, `0x00625C90`, `0x006257D0`,
   `0x00625790`; senders `0x0053EAE0` (0x9C), `0x0053CEF0` (0x9D),
   `0x0053EA50` (fillers). Table `0x006E90B8` read from the image.
+  Re-read for the implementation questions: compact `0x0062AF80` (mode
+  bits), `0x0062FFF0` (overwrite flag `0x00630737`, per-list reset
+  `0x00630E45`), format setter `0x0062A6C0`, header peek `0x0062AE20`,
+  name setter `0x00628370`.
 - Recordings: all 144 0x9C / 0x9D of the two packet recordings decode
   to their exact byte length with the 1.14d `patch_d2` tables
   (`itemstatcost.txt`, `itemtypes.txt` without its `Expansion` row,
@@ -326,3 +362,10 @@ with `Save Add` 0 in 8 bits → 0xFF.
    such items (inventory R2/R5 scenarios).
 3. The save-format trailer values (`0x00629E40`) are not named.
    Settle: Ghidra on `0x00629E40` (save spec).
+4. Edge case 7: that every caller of the name setter `0x00628370`
+   (`0x0055903B`, `0x005590A4`, `0x0055910E`, `0x00567086`,
+   `0x005670CC`, `0x0057A12B`, `0x0057A625`) passes a name of at most 15
+   characters. Settle: read the source buffer of each call site.
+5. Answered (handoff `impl-bitstream-vitals` BV1-BV4, BV5, BV7, BV9,
+   LB1): §3 rules 1-2, §4.3 rule 7, §4.6 rule 4.3, §4.4 rule 1
+   (`items/properties.md` §10.1), edge cases 7-8, Constants.

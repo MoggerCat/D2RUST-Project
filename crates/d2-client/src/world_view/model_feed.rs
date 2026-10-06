@@ -1,7 +1,8 @@
-// Spec: specs/client/model.md (§3 rule 3, §1 rule 2), specs/render/camera.md (§2, §3)
+// Spec: specs/client/model.md (§3 rule 3, §1 rule 2, §11 rules 3, 5), specs/render/camera.md (§2, §3)
 //! [`ModelFeed`]: the [`ViewFeed`] hooks the client world model answers
 //! (RW2): the local player's position (camera §3) and unit positions
-//! (camera §2). Every other hook (open mode, shake, player seed, unit
+//! (camera §2), and, given the `Levels.txt` rows, BlankScreen of the
+//! local player's level (`model.md` §11 rule 5). Every other hook (open mode, shake, player seed, unit
 //! offsets, map tiles) goes to the wrapped feed, [`NoFeed`] by default,
 //! until its owner spec is implemented.
 //!
@@ -17,7 +18,7 @@
 
 use d2_sim::rng::Seed;
 
-use crate::bridge::world::{ClientWorld, ITEM, OBJECT, TILE};
+use crate::bridge::world::{ClientWorld, LevelRow, ITEM, OBJECT, TILE};
 use crate::bridge::ClientUnit;
 use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 
@@ -56,11 +57,17 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
 #[derive(Debug, Clone, Default)]
 pub struct ModelFeed<F = NoFeed> {
     pub inner: F,
+    /// The `Levels.txt` rows by level id. `None`: BlankScreen goes to
+    /// `inner` (the app supplies no rows yet).
+    pub levels: Option<Vec<LevelRow>>,
 }
 
 impl<F> ModelFeed<F> {
     pub fn new(inner: F) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            levels: None,
+        }
     }
 }
 
@@ -79,6 +86,10 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
         assets: &ViewAssets,
     ) -> Result<Vec<MapTile>, ViewError> {
         self.inner.map_tiles(world, assets)
+    }
+
+    fn tile_blocks(&self, tile: &MapTile) -> Result<Vec<crate::rules::BlockShade>, ViewError> {
+        self.inner.tile_blocks(tile)
     }
 }
 
@@ -110,8 +121,28 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         self.inner.player_seed(world)
     }
 
+    /// `model.md` §11 rules 3, 5: BlankScreen of the level of the local
+    /// player's room; no room → no level, BlankScreen 0. The level never
+    /// comes from 0x03 u16@6 or a 0x07 level byte.
     fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError> {
-        self.inner.blank_screen(world)
+        let Some(levels) = &self.levels else {
+            return self.inner.blank_screen(world);
+        };
+        let Some(level) = world.player_level() else {
+            return Ok(false);
+        };
+        levels
+            .get(usize::from(level))
+            .map(|r| r.blank_screen)
+            .ok_or(ViewError::Unresolved {
+                what: "player level BlankScreen",
+                spec: "client/model.md",
+                message: format!("level {level} past the Levels rows"),
+            })
+    }
+
+    fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
+        self.inner.light(world)
     }
 }
 

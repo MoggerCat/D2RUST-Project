@@ -31,13 +31,13 @@
 |   2. Spending stat points (message 0x3A) | 96–133 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 134–155 |
 |   4. Experience | 156–195 |
-|   5. Client vitals sync (`0x00548760`) | 196–288 |
-| Constants & data dependencies | 289–305 |
-| Randomness | 306–309 |
-| Edge cases & original bugs | 310–321 |
-| Test vectors | 322–342 |
-| Provenance | 343–358 |
-| Open questions | 359–387 |
+|   5. Client vitals sync (`0x00548760`) | 196–307 |
+| Constants & data dependencies | 308–324 |
+| Randomness | 325–328 |
+| Edge cases & original bugs | 329–340 |
+| Test vectors | 341–361 |
+| Provenance | 362–382 |
+| Open questions | 383–411 |
 <!-- /index -->
 
 ## Summary
@@ -212,15 +212,34 @@ link here.
    the client has a queued buffer (head, client +0x1B8 ≠ 0); else 0.
    Client +0x1B0 counts per-client updates (`sim/tick.md` §6 rule 5,
    +1 per tick) and is reset to 0 when the routine returns 1.
-3. The client's player must be a player unit (fatal assert otherwise);
-   the routine runs with ECX = EDX = that player.
-4. Before it, when the host setting at `0x00883D4C` (read at server
-   start by `0x00530690`) is non-zero, `0x0052DA00` runs (open question
-   7).
+3. The client's unit (`0x00537860(client, 0)`) missing → nothing (the
+   counter keeps counting). Not a player → fatal assert (`0x0052D9BD`,
+   process exit): unreachable, a client's unit is always its player; an
+   implementation asserts. The routine runs with ECX = EDX = that
+   player.
+4. Before it, when the host setting at `0x00883D4C` is non-zero,
+   `0x0052DA00` runs. The setting is the registry value `PlayerPos` of
+   the `Diablo II` key (HKCU, then HKLM; `0x00414F10` → `0x00414B00`,
+   `RegOpenKeyExA` / `RegQueryValueExA`, text parsed by `strtoul`),
+   read once at server start (`0x00530690`); absent → 0. A standard
+   1.14d install has no such value, so `0x0052DA00` never runs and
+   d2rs does not run it (`Ruleset::Original`). What it does when on:
+   head buffer B (`0x005392E0`), the client's unit and client +0x1B0 ≥
+   10 all required; n = (499 − B's size, B +0x00) / 9 (signed,
+   truncating); n ≤ 0 → nothing; n > 55 → fatal; else `0x00537FD0(client,
+   n)` (a scan of the units around the client's room) and `0x0053E130`
+   (Open question 7).
 
 #### 5.2 Values
 
-Per-client cache record at client +0x48C (`0x00539330`):
+Per-client cache record at client +0x48C (`0x00539330`). The client
+record (0x518 bytes, `0x00539A30`) is zero-filled at allocation and
+nothing else writes +0x48C … +0x4A7, so every cache field starts at 0
+and keeps its last sent value for the client's whole life (no reset on
+level change or rejoin of the same record). With life cache 0, the
+first sync after joining passes step 2 once d · 100 / M ≥ 10 (life ≥ 10
+% of max) or force is 1 and sends 0x95 or 0x18 (lp / mp 0 equal the cache unless a
+potion runs):
 
 | Offset | Field |
 |---|---|
@@ -354,7 +373,12 @@ stat points: three spends succeed, the fourth fails, result 2.
 - §5 (sync): `0x00548760`, `0x005485B0`, `0x00548640`, `0x0052D980`,
   `0x0052E320`, `0x00539330`, `0x005392E0`, builders `0x0053C230`,
   `0x0053C320`, `0x0053C3F0`, `0x0053BDD0`, bit writer `0x00410E40`,
-  `0x00410EB0`, `0x00410E90`, counter `0x005380D0`.
+  `0x00410EB0`, `0x00410E90`, counter `0x005380D0`; client record
+  allocation `0x00539A30` (0x518 bytes, memset 0; the only reference to
+  +0x48C is the getter `0x00539330`, by a scan of `all.asm`),
+  `0x0052DA00`, `0x00530690`, `0x00414F10`, `0x00414B00` (strings
+  `Diablo II`, `PlayerPos` at `0x006CC8B8`, `0x006E08A0`; imports
+  `RegOpenKeyExA` / `RegQueryValueExA`).
 
 ## Open questions
 
@@ -364,7 +388,8 @@ stat points: three spends succeed, the fourth fails, result 2.
 2. Ghidra request: read `0x0057E480` (experience gain: `ExpRatio`, stat
    85, hireling cap) and its callers `0x0057E6C0` / `0x0057E990`
    (distribution, party share with its float math, add function and
-   event 12) against §4.3.
+   event 12) against §4.3. The hireling part (86/256 share, 1/64-level
+   cap, 1.14d adds 2·gain) is confirmed in `world/hirelings.md` §7.
 3. §4.2 branch for `dlvl > alvl`: confirm the operand roles of the
    `pct(exp, alvl, dlvl)` call (the read gives EAX = defender level,
    EDX = attacker level, ECX = experience).
@@ -376,11 +401,10 @@ stat points: three spends succeed, the fourth fails, result 2.
    owner is the monsters spec; not specified here.
 6. Player death penalties (`DeathExpPenalty`, gold loss) and the stat
    reset callers: not specified.
-7. §5.1 rule 4: the host setting `0x00883D4C` (`0x00414F10` read at
-   `0x00530690`) and `0x0052DA00` (with a queued buffer and client
-   +0x1B0 ≥ 10: n = (499 − head buffer size) / 9, then `0x00537FD0(n)`
-   and `0x0053E130`). Settle: Ghidra on `0x00414F10`, `0x00537FD0`, or a
-   memory read of `0x00883D4C` in single player.
+7. §5.1 rule 4: the setting is answered (registry `PlayerPos`, off in a
+   standard install). Still unread, only for `PlayerPos` ≠ 0:
+   `0x00537FD0(client, n)` and `0x0053E130`; not needed for
+   `Ruleset::Original`.
 8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
    any recording with damage, potions and running: every 0x18 / 0x95 /
    0x96 / 0x1A–0x1C byte and its tick.

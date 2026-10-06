@@ -25,8 +25,8 @@ use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
 use d2_sim::wiring::economy::{EconomyQuests, QuestRest};
-use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
-use d2_sim::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
+use d2_sim::wiring::interaction::{HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
+use d2_sim::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, NpcControl};
 use d2_sim::world::quests::{
     PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
 };
@@ -193,17 +193,39 @@ impl NpcRest for Rest {
     }
     fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
     fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
-    fn set_mode(&mut self, u: UnitId, mode: u8) {
-        self.log.push(format!("mode {} {mode}", u.0));
-    }
     /// The monster spawn (monster spec): none, so the quest mercenary
     /// stops after S→C 0x50 (`npc.md` §7.5).
     fn spawn_mercenary(&mut self, _: UnitId, class: u32, mode: u8) -> Option<UnitId> {
         self.log.push(format!("spawn merc {class} {mode}"));
         None
     }
-    fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
-    fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
+}
+
+impl HirelingRest for Rest {
+    fn set_mode(&mut self, u: UnitId, mode: u8) {
+        self.log.push(format!("mode {} {mode}", u.0));
+    }
+    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
+    fn skill_count(&self) -> u32 {
+        0
+    }
+    fn skill_reqlevel(&self, _: u32) -> Option<i16> {
+        None
+    }
+    fn set_skill_level(&mut self, _: UnitId, _: u32, _: i32) {}
+    fn set_owner(&mut self, _: UnitId, _: u32, _: u8) {}
+    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
+        None
+    }
+    fn join_team(&mut self, _: UnitId, _: UnitId) {}
+    fn hireling_ai(&mut self, _: UnitId) {}
+    fn free_unit(&mut self, _: UnitId) {}
+    fn queue_room_removal(&mut self, _: UnitId) {}
+    fn death_event(&mut self, _: UnitId) {}
+    fn dismiss(&mut self, _: UnitId) {}
+    fn warp_to(&mut self, _: UnitId, _: UnitId) {}
+    fn level_events(&mut self, _: UnitId, _: UnitId) {}
+    fn reapply_item_stats(&mut self, _: UnitId) {}
 }
 
 /// No vendor path runs in these tests.
@@ -759,14 +781,15 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
     let before = f.record();
     let (code, got) = send(&mut f.h, &quest_message(g, 92));
     assert_eq!(code, ResultCode::Done);
-    // 0x28 and the text refresh (`quests.md` §10.5 r7), then S→C 0x50
-    // (15 bytes): u16 2, the slot's name, zeros (§7.5).
+    // 0x28, S→C 0x50 (15 bytes): u16 2, the slot's name, zeros (§7.5),
+    // then the text refresh (`quests.md` §10.5 r7, `quests-act1-rest.md`
+    // §8 item 8).
     let mut m50 = vec![0x50, 2, 0];
     m50.extend_from_slice(&name.to_le_bytes());
     m50.extend_from_slice(&[0; 10]);
     assert_eq!(got.len(), 4);
-    assert_eq!((got[0][0], got[1][0], got[2][0]), (0x28, 0x27, 0x29));
-    assert_eq!(got[3], m50);
+    assert_eq!((got[0][0], got[2][0], got[3][0]), (0x28, 0x27, 0x29));
+    assert_eq!(got[1], m50);
     let mut want = before;
     want[4] = (want[4] | 1 << REWARD_GRANTED) & !(1 << REWARD_PENDING);
     assert_eq!(f.record(), want);
@@ -781,11 +804,14 @@ fn kashya_message_92_grants_the_mercenary_on_the_npc_control() {
         .slots;
     assert!(slots.iter().any(|s| s.name == name && s.hired));
     // The reward ran on the NPC control (the spawn seam, modes 4, 6, 12)
-    // after the quest call, never on `QuestRest::mercenary_reward`; the
-    // refreshed Kashya lines: the Act I intro's (`quests.md` §10.3, 24)
-    // and A1Q2's message state 4 (92, `quest-messages.tsv`).
-    let mut log = vec![format!("text list {} [(24, 0), (92, 2)]", f.kashya.0)];
-    log.extend(["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"].map(String::from));
+    // after the quest call, never on `QuestRest::mercenary_reward`, and
+    // before the refresh; the refreshed Kashya lines: the Act I intro's
+    // (`quests.md` §10.3, 24) and A1Q2's message state 4 (92,
+    // `quest-messages.tsv`).
+    let mut log: Vec<String> = ["spawn merc 271 4", "spawn merc 271 6", "spawn merc 271 12"]
+        .map(String::from)
+        .into();
+    log.push(format!("text list {} [(24, 0), (92, 2)]", f.kashya.0));
     assert_eq!(f.take_log(), log);
     assert_eq!(f.errors(), Vec::<String>::new());
 }

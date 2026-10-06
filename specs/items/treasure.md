@@ -37,14 +37,14 @@
 |   4. Chest drop (`0x00585B90`) | 276–302 |
 |   5. The TC walk (`0x0055A6D0`) | 303–409 |
 |   6. Drop quality (`0x00558640`) | 410–441 |
-|   7. Creation inputs and placement (`0x0055A550`) | 442–456 |
-|   8. Gold amount | 457–469 |
-| Constants & data dependencies | 470–499 |
-| Randomness | 500–516 |
-| Edge cases & original bugs | 517–532 |
-| Test vectors | 533–561 |
-| Provenance | 562–586 |
-| Open questions | 587–607 |
+|   7. Creation inputs and placement (`0x0055A550`) | 442–466 |
+|   8. Gold amount | 467–479 |
+| Constants & data dependencies | 480–509 |
+| Randomness | 510–526 |
+| Edge cases & original bugs | 527–550 |
+| Test vectors | 551–580 |
+| Provenance | 581–605 |
+| Open questions | 606–629 |
 <!-- /index -->
 
 ## Summary
@@ -442,17 +442,27 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 ### 7. Creation inputs and placement (`0x0055A550`)
 
 1. Item id < 0 → nothing.
-2. Position: from `U`'s position (`x`, `y`): start = (`x` + 2, `y` + 3) if
-   a room exists there (`0x00463740`), else (`x`, `y`); the free-spot
-   search `0x0064E810`(room, start, (`x`, `y`), 1, 0x3E01, 0x801, 1)
-   gives the final room and position; none → nothing. Items of one walk
-   are placed one after another, each seeing the previous ones.
+2. Position: the floor drop `0x00555DA0`(room of `U` (`0x00620BB0`),
+   `U`'s position (`x`, `y`; unit coordinates `0x00620870`,
+   `sim/path-placement.md` §2.1: a monster's dynamic path sub-tile,
+   (0, 0) only when it has no path), size 1, fallback 1)
+   (`sim/path-placement.md` §9): start = (`x` + 2, `y` + 3) if a room
+   exists there (`0x00463740`), else (`x`, `y`); the free-spot search
+   `0x0064E810` gets `U`'s room as its room argument (never the room the
+   start lookup found, `0x00555DEC`) and gives the final room and
+   position; none → nothing. Items of one walk are placed one after
+   another, each seeing the previous ones.
 3. Item level: `U` none → 1; monster → its `level` stat; player → base
    `level`; else area level of `U`'s level (§4 `a`); at least 1.
 4. Drop request to the items spec (`0x00558D90`): id, quality, index,
    item level, room and position, spawn type 3, init flags 1, the game's
    item format (game +0x78), drop flags `d`, plus 0x01 when `U` is
    monster class 391 (`hellbovine`).
+   Spawn type 3 with init flag 1 makes the allocation add the item to the
+   world at the request's room and position (`sim/units.md` §3.1 step 8 →
+   `sim/path-placement.md` §2.5: static path, footprint, room list) inside
+   `0x00558D90`, before its base stats; so the next drop's search sees
+   it.
 
 ### 8. Gold amount
 
@@ -529,6 +539,14 @@ draw only 2–9. Nothing in §1–§4 draws.
 8. D2MOO 1.10f differences: on an exact hit the expansion search returns
    `max(lo − 1, 0)` instead of `m` (1.14d: `m`, §5.5); the act 5 chest
    range ends at level 132 (1.14d: 136); player count lacks `S` (§5.4).
+9. `M` ≤ −100 jumps past the itemtypes `magic` gate (§6 step 5:
+   `0x0055871F` branches to the superior step at `0x00558921`; the gate
+   is at `0x005588B4`), so a `magic` itemtype (rings, amulets, jewels,
+   charms) can get drop quality 3, 2 or 1. Creation does not keep it:
+   the quality dispatch overrides any quality outside 4–9 to 4 for a
+   `magic` itemtype (`items/quality.md` §4 step 3.1, `0x005574E6`–
+   `0x00557513`). The drop quality only changes the draws: steps 1–5
+   draw nothing and the item comes out magic. (Handoff triage Q3.)
 
 ## Test vectors
 
@@ -545,6 +563,7 @@ Synthetic (from the rules; CI-safe). RNG steps per `rng.md` §2.
 | Same with `M` = 100 | unique `f` 171, `b` 28444; set `f` 183, `b` 10491; rare `f` 185; magic `f` 200, `b` 1792 | §6 step 6 |
 | Slot mod magic 1024 (e.g. `Andariel`), magic step reached | chance 0 → 4 without a draw | §6 |
 | Negative picks −2, entries prob 1, 2 | picks give `r` 0 → entry 0, `r` 1 → entry 1; no draw | §5.3 |
+| Quality, `M` = −100, an item of a `magic` itemtype (`amul`; not `normal`, not `unique`, not `quest`), ratio row as above (HiQuality 12/8), `L` 99, item `level` 1 | `D` 98, `h` = (12 − 12) × 128 = 0 → 3, no draw; creation sets quality 4 (`items/quality.md` §4 step 3.1) | §6 step 5, edge case 9 |
 
 Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
 
@@ -603,4 +622,7 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    effect in creation: items spec.
 7. `0x005541B0` ("living") in the player and party counts is read as
    D2MOO's living check, not confirmed.
-8. The free-spot search `0x0064E810` has no spec yet (collision).
+8. Answered: `sim/path-placement.md` §7 (search, no RNG draw) and §9 (floor drop, §7 step 2 here).
+9. Answered (handoff `triage-game-findings` Q3): edge case 9; the d2rs
+   sweep's "`magic` ⇒ q ≥ 4" holds after creation, not for the drop
+   quality when `M` ≤ −100.

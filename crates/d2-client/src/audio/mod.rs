@@ -15,13 +15,17 @@
 //!   `audio/sound-table.md`;
 //! - voice limits, stealing, repeat suppression ([`VoicePolicy`],
 //!   placeholder [`Unlimited`]): `audio/sound-table.md`;
-//! - the WAV decode giving [`Sound`] ([`pool::WavDecoder`]; the pool
+//! - the WAV decode giving [`Sound`] ([`pool::D2Wav`]; the pool
 //!   reading and keeping each file once is ours): `formats/wav.md`.
 
+pub mod calls;
+pub mod environment;
 pub mod log;
 pub mod mixer;
 pub mod output;
 pub mod pool;
+pub mod sound_table;
+pub mod triggers;
 
 #[cfg(test)]
 mod tests;
@@ -33,7 +37,7 @@ pub use mixer::{
     mix, GainCurve, Gains, Sound, UnityGain, Voice, BLOCK_FRAMES, BLOCK_SAMPLES, GAIN_UNITY,
     OUTPUT_RATE,
 };
-pub use pool::{sound_bytes, SoundPool, SoundPoolError, WavDecoder};
+pub use pool::{sound_bytes, D2Wav, SoundPool, SoundPoolError, WavDecoder};
 
 /// Errors of the audio core. None is swallowed: each is returned or kept in
 /// [`AudioEngine::take_errors`] (M07).

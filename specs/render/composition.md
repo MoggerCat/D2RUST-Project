@@ -21,17 +21,17 @@
 | Rules | 63–64 |
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
-|   3. Frame cycle | 114–146 |
-|   4. Palette (one per presented frame) | 147–164 |
-|   5. One pixel write (index domain) | 165–203 |
-|   6. d2rs answers | 204–217 |
-|   7. DirectDraw (display type 3) differences | 218–229 |
-| Constants & data dependencies | 230–235 |
-| Randomness | 236–239 |
-| Edge cases & original bugs | 240–249 |
-| Test vectors | 250–261 |
-| Provenance | 262–279 |
-| Open questions | 280–300 |
+|   3. Frame cycle | 114–151 |
+|   4. Palette (one per presented frame) | 152–198 |
+|   5. One pixel write (index domain) | 199–237 |
+|   6. d2rs answers | 238–256 |
+|   7. DirectDraw (display type 3) differences | 257–268 |
+| Constants & data dependencies | 269–274 |
+| Randomness | 275–278 |
+| Edge cases & original bugs | 279–288 |
+| Test vectors | 289–300 |
+| Provenance | 301–327 |
+| Open questions | 328–361 |
 <!-- /index -->
 
 ## Summary
@@ -122,7 +122,12 @@ The in-game frame (`0x0044C990`), once per client tick (`camera.md` §9):
    `0 … H − 48` are set to index 0 (`0x006C9220` with partial = 1: the first
    `(H − 47) × W` bytes); rows `H − 47 … H − 1` are not cleared. If
    `bClear = 0` nothing is cleared. All 137 rows of the live
-   `patch_d2` `levels.txt` have BlankScreen = 1.
+   `patch_d2` `levels.txt` have BlankScreen = 1. "The player's current
+   level" is the level of the local player unit's current room
+   (`0x0044CA8F`–`0x0044CAC8`: `0x004646A0` → `0x0061A1B0` level id →
+   `0x0061DB70` record; the chain `capture.md` §3 records as "level id").
+   No room (player not yet placed) → `bClear` = 0, nothing cleared; a
+   level id without a Levels record is fatal (error 0x5DE).
 3. World (`0x00476BC0`, skipped in screen open mode 3), then UI, cursor
    and overlays (`0x00456EE0`, `0x004F98E0`, `0x00468820`, `0x004684C0`,
    `0x00477980`); order is `draw-order.md`.
@@ -161,6 +166,35 @@ named next to it is loaded by `0x004FB1E0` but its colors are not used.
 So index `i` presents as `(pl2[4i], pl2[4i + 1], pl2[4i + 2])`, index 0
 included (`formats/palette.md` OQ1: the base palette's order is R, G, B and
 it is the palette used).
+
+**Which act's palette** (frame-cycle FC1). `0x004FB480(a)` loads
+`DATA\GLOBAL\palette\act<n>\pal.pl2` (and `pal.dat`) with `n = a + 1`,
+`n` outside 1…5 → 1, then `SetPalette`. In game it is called by the
+client loop at game start with `a = 0` (`0x0044F2DC`: act 1) and by the
+client unit room change `0x004654C0` when the moved unit is the local
+player (`[0x007A6A70]`) and the Levels `Act` byte (`+0x02`) of the new
+room's level differs from the old room's (`0x00465603`–`0x0046562A`),
+with `a` = the new level's act; the first placement (no old room) does
+not switch. So while playing, the presented palette is that of the act of
+the local player's current room's level, switched on the room change that
+crosses acts. A game that starts in another act gets its act palette
+from the act load: S→C 0x03 (`0x0044E100`, `client/model.md`) stores the
+act byte in `[0x007A288C]` (`0x00454790`) and draws the loading screen
+(`0x004565E0` → `0x00456550`, which loads the loading-screen cel into
+`[0x007A2888]`). The next client frame `0x0044C990` first calls
+`0x004547B0`: when a loading-screen cel is held it is freed and
+`0x004FB480([0x007A288C])` loads that act's palette, then the act
+set-ups run. So the first in-game frame is drawn with the loaded act's
+palette, and the later first room placement (no old room) needs no
+switch. The other two callers are not game start: `0x0044D100` is the
+out-of-game "betascreens" slideshow (`DATA\GLOBAL\ui\betascreens\screen01`
+… `screen10`, 13-byte entries at `0x0070F238`, count `[0x0070F024]` = 10,
+each shown 10,000 ms with its entry's act byte, 0 = act 1 for all ten);
+`0x00482EF0` plays a video (`%s\video\%s`, 640 × 292 or 640 × 146) and
+then loads act 5's palette (`a` = 4 at `0x00483283`); the state loop
+`0x0044F360` calls it with video 5 when `[0x007A0604]` ≠ 0 (set by
+`0x0044EC80`) and with video 7 when `[0x007A0628]` ≠ 0, and S→C 0x61
+(`0x0045E660` → `0x004B9320`) calls it with the video id u8@1.
 
 ### 5. One pixel write (index domain)
 
@@ -210,6 +244,11 @@ file: the lit translucent wall drawer reads the transpose
   single-frame verify case starts from an all-0 buffer unless it records
   the previous frame.
 - `scene/item.rs` domain: indexed, `Rgb` stays out of `BlendOp`.
+- `scene/item.rs` table chain (`triage-game-findings` Q12): when a draw
+  has both a blend table `T` and a light map `L`, its remap `P` is
+  dropped (`d' = T[256·d + L[s]]`, §5); the chain `P` → `L` → `T` is only
+  for draws without one of them (`L[P[s]]` without `T`, `T[256·d +
+  P[s]]` without `L`).
 - `IndexTable`: row = destination (§5).
 - RGBA for verify and present: `(R, G, B, 255)` of §4 for every index,
   0 included. `map::cpu::to_rgba` (0 → black) equals this exactly when
@@ -275,7 +314,16 @@ the table cases to `0x00606E40`, `0x00607060`, `0x006072F0`,
 act load `0x0045C8E0` → `0x0044E100`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
 D2MOO `DisplayType.h`. Levels BlankScreen counted in
 `game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1). No
-capture yet.
+capture yet. Frame-cycle follow-ups (FC1, FC2): BlankScreen level chain
+read at `0x0044CA8F`–`0x0044CAD5`; act palette loader `0x004FB480`
+(format `%s\palette\act%d\%s`), callers `0x0044F2DC`, `0x0046562A`
+(room change in `0x004654C0`: old room `0x00620BB0`, new room
+`0x00465420`), `0x0044D1A5`, `0x00483293`.
+Ghidra backlog (2026-10-06): act palette at game start from
+`0x0044E100` → `0x00454790`, `0x004565E0`/`0x00456550`, frame
+`0x0044C990` → `0x004547B0`; the other `0x004FB480` callers
+`0x0044D100` (betascreens table `0x0070F238` read from the file),
+`0x00482EF0`, `0x004F8FE0`.
 
 ## Open questions
 
@@ -286,14 +334,27 @@ capture yet.
    palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
    `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
 2. ~~Write order when both `L` and `T` are present~~: answered in §5
-   (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). Open: the
-   identification of the two 256-byte arguments as `L` (outer) and `P`
-   (inner) rests on the no-`T` case `L[P[s]]`; a capture of a lit,
-   remapped, translucent draw confirms it (`composition-0001` if the
-   portal is lit).
+   (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). The
+   identification is now read from the caller too: the GDI cel draw
+   `0x006C84B0` pushes, as the last three arguments of `0x006014C0`
+   (stdcall, `[ebp+0x28]`, `+0x2C`, `+0x30`, passed through unchanged to
+   the row drawer table `0x006E3688` → `0x00608540`), the light table
+   chosen by the light byte (`0x006C8545`, or `+0x118` for mode 7), the
+   blend table of `0x006C8250`, and the draw call's palette argument, in
+   that order; `0x00608540` uses the first as the outer table of `L[P[s]]`
+   and the one kept with `T`. A capture of a lit, remapped, translucent
+   draw remains a pixel check, not an open rule.
 3. Out-of-game screens (menus, loading screens, cut-scenes) use other
    callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
    `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
    `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
+5. ~~Act palette at game start outside act 1~~: answered in §4 (the act
+   load's `[0x007A288C]`, applied by `0x004547B0` at the first frame;
+   `0x0044D100` and `0x00482EF0` are not game start). Capture
+   confirmation: the first frames after loading a character saved in
+   act 2.
+6. ~~d2rs input for §3 step 2 and §4~~: answered in `client/model.md`
+   §11 (act from S→C 0x03, level from the local player's room placed by
+   0x15; no message carries the level) and §12 (room of a point).

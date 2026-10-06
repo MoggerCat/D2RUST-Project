@@ -65,7 +65,7 @@ exist on that branch (Python + JSON), so the API stays self-contained.
 
 ## 2. Findings / limits (read before trusting a hit)
 
-- **F1 Room population does not run on the live host.** Population's
+- **F1 (closed by `impl-room-population`, `levels.md` §11: the live host now populates rooms and answers champion / unique queries; text kept for history.) Room population does not run on the live host.** Population's
   DRLG reads (coordinate lists `0x0061AD50` / `0x0061AD30` /
   `0x0061B130`, populated level `0x0061A1F0`, populated-room count
   `0x0061ABF0`) are in no DRLG spec (`HANDOFF.md` 3l, GH1); with the

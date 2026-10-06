@@ -22,17 +22,17 @@
 | Inputs | 55–61 |
 | Outputs / state changes | 62–66 |
 | Rules | 67–68 |
-|   1. Unit add | 69–157 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 158–164 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 165–196 |
-|   4. Queued movement and action messages | 197–231 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 232–253 |
-| Constants & data dependencies | 254–265 |
-| Randomness | 266–271 |
-| Edge cases & original bugs | 272–286 |
-| Test vectors | 287–316 |
-| Provenance | 317–334 |
-| Open questions | 335–350 |
+|   1. Unit add | 69–224 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 225–234 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 235–271 |
+|   4. Queued movement and action messages | 272–306 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 307–328 |
+| Constants & data dependencies | 329–340 |
+| Randomness | 341–346 |
+| Edge cases & original bugs | 347–361 |
+| Test vectors | 362–395 |
+| Provenance | 396–421 |
+| Open questions | 422–440 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -57,7 +57,7 @@ local player gets 0x15, 0x0D, 0x18, 0x95, 0x96.
 | Name | Type | Source |
 |---|---|---|
 | message | id + bytes | `client/model.md` §4 |
-| tables | `monstats` (row count, `MonStatsEx` link), `monstats2` (component choice counts, byte +0x0E), `itemstatcost` (send bits, send param bits, signed flag) | `data/` (live tables) |
+| tables | `monstats` (row count, `MonStatsEx` link), `monstats2` (component choice counts at +0x15 + i, §1.2 rule 7; path byte +0x0E), `itemstatcost` (send bits, send param bits, signed flag) | `data/` (live tables) |
 
 ## Outputs / state changes
 
@@ -126,7 +126,11 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    hireling class with mode 1: flag +0xC8 bit 0x40000 cleared. Stat 328
    (0x148) := (x + y) & 0xFFFF.
 4. Then from the same stream: 1 bit; set → 31 bits v, `0x00621CC0(unit,
-   0, v)` (open question 3). 1 bit; set → a stat list: 9-bit stat id s
+   0, v)`: the source-unit link (`skills/bodies.md` §6.20, `0x00621C30`)
+   with owner type 0 (player) and GUID v: unit `+0x94` := 0, `+0x98` :=
+   v, state 98 `sourceunit` with stats 353 := 0, 354 := v when the unit
+   has a stat holder, and flag-ex (`+0xC8`) |= 0x400 (the linked-unit
+   bit read by `0x004639D0`, `render/unit-composite.md` §1.1). 1 bit; set → a stat list: 9-bit stat id s
    until s ≥ 0x1FF, s < 0, s ≥ `itemstatcost` row count, or the row's
    send bits are 0 (each ends the list); param := `send param bits`
    bits (0 when 0); value := `send bits` bits, signed when send bits <
@@ -134,11 +138,67 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    stat gets the unit a stat list with flag 0x40 (an existing one is
    reused, `0x006257D0`; else `0x006251F0` + attach `0x00626E10`); set
    (s, value, param) on that list (`0x00627150`).
-5. Model: `class`, `position` (x, y), `mode` (the 4-bit mode, open
-   question 2), stats {6:
+5. Model: `class`, `position` (x, y), `mode` (the 4-bit mode, rule 6),
+   stats {6:
    life << 8, 7: 0x8000, 328: (x + y) & 0xFFFF} plus the table stats of
-   rule 2 (open question 2), kind data {name seed, flags, hcIdx, umods,
-   components, value, v31}, the 0x40 stat list.
+   rule 6, kind data {name seed, flags, hcIdx, umods, components, value,
+   v31}, the 0x40 stat list.
+6. Monster set-up `0x004AE8D0(unit, room, x, y, class, mode)` (`d` =
+   difficulty `[0x007A060C]`), in order:
+   1. A new stat list (`0x00626D40`); base stats (`0x00627260`): 12
+      `level` := `monstats` Level[`d`] (`+0xAA + 2d`); 68 `attackrate`
+      := 100; 67 `velocitypercent` := 75; 69 `other_animrate` := 100;
+      36, 37, 39, 41, 43, 45 (damage, magic, fire, light, cold, poison
+      resist) := `ResDm`, `ResMa`, `ResFi`, `ResLi`, `ResCo`, `ResPo`
+      [`d`] (`+0x144`, `+0x14A`, `+0x150`, `+0x156`, `+0x15C`, `+0x162`
+      + 2d); classic scaling `0x0063EEF0(unit, expansion, d)`
+      (`monsters/init.md` §13); 7 `maxhp` := 0x6400; 6 `hitpoints` :=
+      0x6400 (rule 3 later overwrites 6 and 7).
+   2. Path: `0x00649D00(…, room, x, y, unit, 1)` places the dynamic path;
+      velocity := `monstats` `Velocity` (`+0x32`) << 8 (`0x00648690`).
+   3. Inventory (`0x0063ABD0`) when the unit has none and `monstats`
+      `interact` is set or the class is 291 `irongolem`, 357
+      `valkyrie`, 417 `deathsentry` or 418 `shadowwarrior`.
+   4. Mode := the `mode` argument (`0x00624690`: the 4-bit mode of rule
+      1's stream). When `0x0063EA40(unit)` holds and `monstats2` `deadCol`
+      (byte `+0x06` bit 3) is clear: path settings `0x00649560(unit, 1)`,
+      `0x00649190(unit, 5)`, `0x00648C30(path, 0x8000)`.
+   5. Current frame `+0x44` := rnd(`+0x48`) from the unit seed `+0x20`
+      (`0x0045C3E0`, `sim/rng.md` range rule).
+   6. Unit flags (`+0xC4`): 0x2 := `monstats2` `isSel` (byte `+4`
+      bit 3); 0x20 := not `shadow` (byte `+5` bit 6); 0x8 set; 0x4 :=
+      `isAtt` (byte `+5` bit 1).
+   7. `0x004AE0A0(unit, 0)`, `0x004AE4F0(unit, class)`, light
+      (`0x004AE210`, `render/lighting.md` §8), `+0xA8` :=
+      `0x006438B0(0)`, umod hooks (`0x004AD020`, `render/lighting.md` §8
+      r2).
+   8. Skills: for `i` = 0…7, `monstats` Skill`i` (`+0x170 + 2i`) ≥ 0
+      with level byte (`+0x198 + i`) > 0: add the skill at level byte +
+      the act level bonus (`0x00611D30(d)` `+0x10`) (`0x00647280`), then
+      `0x00644340(0x006439F0(unit, skill), mode byte +0x180 + i)`. Then
+      `0x0063EBC0(unit, bonus)`.
+   9. Unless `monstats` byte `+0x0D` bit 0 (`npc`): initial direction
+      byte `b` := 0, or `low 6 bits` of one RNG step of the unit seed
+      when `0x0046C140(unit, 2)`; base class 96 (`mummy1` family) → 7;
+      base 301 (`vilechild` family) → `0x0046C570(unit, 0, 0x004AE7B0)`;
+      class 351 → 0x18, 353 → 0x28, 352, 357, 344 → 0; then
+      `0x006488A0(path, b)`.
+7. **Table inputs of rule 1** (read at `0x0045F1F1`–`0x0045F293`): the
+   class must satisfy 0 ≤ class < `monstats` row count (`[0x00744304]`
+   +0xA80; rows 0x1A8 bytes at +0xA78); that row's `MonStatsEx` link
+   (s16 at row +0x18, the `monstats2` row index) must satisfy 0 ≤ link
+   < `monstats2` row count (+0xA98; rows 0x134 bytes at +0xA90). Then
+   for i = 0…15 the choice count c is the u8 at `monstats2` row
+   +0x15 + i, i.e. byte 21 + i written by the `HDv`, `TRv`, `LGv`,
+   `Rav`, `Lav`, `RHv`, `LHv`, `SHv`, `S1v`…`S8v` columns
+   (`data/callbacks.md` §5; `data/fields.tsv` `monstats2` fields 10–25,
+   `cb(monstats2.composit)`). Bits read for component i: c < 3 → 1;
+   else bit length of c − 1 (`bsr` + 1; c = 1 is covered by c < 3).
+   Either check failing skips the 16 reads (rule 1) and the creation
+   (rule 2). d2rs: the loader fills `ModelInputs::tables` from
+   `d2-data`'s `monstats` rows (`MonStatsEx`) and `monstats2` count
+   bytes; no other column is needed by 0xAC's stream.
+8. The hireling GUID of rule 2 and rule 3: `client/model.md` §14 rule 4.
 
 #### 1.3 0x51 AssignObject (`0x0045CBD0` → `0x00466300`)
 
@@ -154,6 +214,13 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
    {interact}.
+5. **Types 0, 3, 4, 5 are never sent.** The only 1.14d builder of 0x51,
+   `0x0053BD10`, has one caller (`0x00572067` in the add messages,
+   `sim/intents-events.md` §7.2), which passes type 2; all 206 recorded
+   0x51 (both recordings) have type 2. d2rs: a 0x51 with type 0, 3, 4
+   or 5 is a handler error (refused and recorded, `client/bridge.md`
+   §2.4), like type 1; the kind inits of rule 2 are not modelled. This
+   is not an exact-match risk: no 1.14d server input reaches them.
 
 ### 2. 0x0A RemoveUnit (`0x0045CC10`)
 
@@ -161,6 +228,9 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 2. Type 1 with GUID = the local player's hireling GUID
    (`0x00478F20(local player, 7)`) → nothing. Else remove (`client/model.md`
    §2 rule 5).
+3. The hireling GUID here and in §1.2 rule 2: `client/model.md` §14
+   rule 4 (pet list from 0x7A / 0x81; −1 when there is none, so with no
+   hireling 0x0A always removes and 0xAC always creates).
 
 ### 3. 0x15 ReassignPlayer (`0x0045D160`)
 
@@ -193,6 +263,11 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
       (`0x00650C20`), whose failure is fatal 0x1A9.
    6. `0x00459140`; local player: `0x00472C20(flag)`; `0x00463B80`.
 5. Model: `position` := (x, y) (or the free point of rule 4.5).
+6. For the local player this placement is how the client learns its
+   level: the room of rule 4.2 and its level (`client/model.md` §11
+   rule 3); at a join 0x15 is the first message that gives the player
+   a room. Room of a point, the fatal asserts 0x168 / 0x538 / 0x1A9 and
+   the free-point fallback in d2rs: `client/model.md` §12.
 
 ### 4. Queued movement and action messages
 
@@ -313,6 +388,10 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | 0x15 for a dead monster | position unchanged | synthetic, §3 rule 4.3 |
 | 0x0A type 1, GUID = local player's hireling | nothing | synthetic |
 | 0x96 with dx 0x80 | tx = x + 128 | synthetic |
+| 0xAC component bits for counts 7, 3, 3, 3, 3, 10, 0, 5, 12, 12, 0 × 6 (`skeleton1`, `data/callbacks.md` §5 example) | 3, 2, 2, 2, 2, 4, 1, 3, 4, 4, 1 × 6 = 33 bits | §1.2 rule 7 |
+| 0xAC with class ≥ `monstats` row count, or a row whose `MonStatsEx` is −1 | no component reads, no unit | synthetic, §1.2 rule 7 |
+| 0x51 with type 4 | handler error | synthetic, §1.3 rule 5 |
+| 0x0A type 1, GUID 0x21, pet list empty | (1, 0x21) removed (hireling GUID −1) | synthetic, §2 rule 3 |
 
 ## Provenance
 
@@ -331,19 +410,30 @@ layouts (every decoded position lies next to the player's recorded
 positions; 0x96 stamina tracks walking). The server-side meaning of the
 `code` bytes belongs to the sim specs (`sim/pathing.md` §10 rule 2, the
 monster update spec).
+Ghidra backlog (2026-10-06): monster set-up `0x004AE8D0` (field offsets
+from `specs/data/fields.tsv`, stat names from `itemstatcost`); source
+link `0x00621CC0` → `0x00621C30`.
+Join-update session (2026-10-06): 0xAC table reads `0x0045F1F1`–
+`0x0045F293` (row sizes 0x1A8 / 0x134 from the `imul`s); 0x51 builder
+`0x0053BD10` and its single caller `0x00572067` (type pushed as 2),
+type bytes counted in both recordings (206 × 2). The code bytes'
+server meaning: `sim/intents-events.md` §7.4.
 
 ## Open questions
 
 1. Meaning of each mode-request code per unit kind: Phase 6 unit-modes
    spec (`client/model.md` open question 1).
-2. Monster creation's table stats and placement (`0x004AE8D0`: about
-   twelve stat sets from `monstats`, path, mode): needed for the model's
-   monster stats beyond 6, 7, 328.
-3. `0x00621CC0(unit, 0, v)` of 0xAC's optional 31-bit value: which field
-   it sets (owner GUID?).
+2. ~~Monster creation's table stats and placement~~: answered in §1.2
+   rule 6. Open inside it: `0x004AE0A0`, `0x004AE4F0`, `0x0046C140`,
+   `0x0046C570` (client monster AI / animation set-up, Phase 6).
+3. ~~`0x00621CC0(unit, 0, v)`~~: answered in §1.2 rule 4 (source-unit
+   link to player GUID v).
 4. The party roster (0x5B, `0x0047A6F0`) that 0x0D's life percent
    updates: owner spec of 0x5B.
 5. `0x0063EA40` (0x15 rule 2) and `0x00621B00` / `0x004BD6B0` (0x51
    rule 3): what they test.
 6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
+7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
+   confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
+   (`client/model.md` open question 10).

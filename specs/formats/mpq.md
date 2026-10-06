@@ -31,10 +31,10 @@
 | Randomness | 407–410 |
 | Edge cases & original bugs | 411–420 |
 | Archive set (D2-specific) | 421–427 |
-| Observations (1.14d install) | 428–451 |
-| Test vectors | 452–465 |
-| Provenance | 466–483 |
-| Open questions | 484–497 |
+| Observations (1.14d install) | 428–452 |
+| Test vectors | 453–466 |
+| Provenance | 467–484 |
+| Open questions | 485–498 |
 <!-- /index -->
 
 ## Summary
@@ -444,7 +444,8 @@ use, all decoded, 0 errors.
 - `(listfile)`: present in all archives except `patch_d2.mpq`, but often
   incomplete. `d2sfx.mpq` lists only 31 of its 2,360 files. §13 key recovery
   decoded every unnamed encrypted block (2,345 blocks).
-- All 5,008 Huffman + ADPCM `.wav` files decode to their exact RIFF size.
+- All 4,992 RIFF (`.wav`) blocks decode to their exact RIFF size (4,975 of
+  them use ADPCM sectors; counts per archive in `wav.md` Survey).
   Decoded speech (`Cain_act1_gossip_01.wav`, 22,050 Hz mono) has no clipped
   samples, with mean |Δsample| / mean |sample| = 0.23, consistent with
   clean audio.

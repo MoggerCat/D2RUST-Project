@@ -27,28 +27,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 54–68 |
-| Inputs | 69–77 |
-| Outputs / state changes | 78–83 |
-| Rules | 84–85 |
-|   1. Coordinates | 86–99 |
-|   2. Path records | 100–203 |
-|   3. Size, collision pattern, footprint mask | 204–244 |
-|   4. Collision queries | 245–325 |
-|   5. Footprints | 326–378 |
-|   6. Moving a footprint | 379–411 |
-|   7. Nearest free point (`0x0064DEA0`) | 412–476 |
-|   8. Coarse free-box search (`0x0064E840`) | 477–509 |
-|   9. Floor drop placement (`0x00555DA0`) | 510–528 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 529–578 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 579–620 |
-|   12. Warp tiles and warp arrival | 621–679 |
-| Constants & data dependencies | 680–698 |
-| Randomness | 699–708 |
-| Edge cases & original bugs | 709–735 |
-| Test vectors | 736–772 |
-| Provenance | 773–801 |
-| Open questions | 802–859 |
+| Summary | 55–69 |
+| Inputs | 70–78 |
+| Outputs / state changes | 79–84 |
+| Rules | 85–86 |
+|   1. Coordinates | 87–100 |
+|   2. Path records | 101–204 |
+|   3. Size, collision pattern, footprint mask | 205–245 |
+|   4. Collision queries | 246–326 |
+|   5. Footprints | 327–379 |
+|   6. Moving a footprint | 380–412 |
+|   7. Nearest free point (`0x0064DEA0`) | 413–477 |
+|   8. Coarse free-box search (`0x0064E840`) | 478–510 |
+|   9. Floor drop placement (`0x00555DA0`) | 511–533 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 534–583 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 584–625 |
+|   12. Warp tiles and warp arrival | 626–686 |
+|   13. Where a joining character stands at tick 0 | 687–731 |
+| Constants & data dependencies | 732–750 |
+| Randomness | 751–760 |
+| Edge cases & original bugs | 761–796 |
+| Test vectors | 797–834 |
+| Provenance | 835–869 |
+| Open questions | 870–944 |
 <!-- /index -->
 
 ## Summary
@@ -522,8 +523,12 @@ The rule items use to put a dropped item on the floor; 20 call sites
 3. Out := the written point; result := the room (null: no place; with
    fallback the unchanged start's room).
 
-`items/treasure.md` §7 step 2 calls `0x0064E810` with the same
-arguments directly (size 1, fallback 1). Item size is 1, so the size
+The room argument of rule 2 is the caller's `room` unchanged
+(`0x00555DEC`), not the room rule 1's lookup found. `items/treasure.md`
+§7 step 2 (`0x0055A550`) is one of the callers: room of the dropper
+(`0x00620BB0`), its position, size 1, fallback 1. The inventory drops
+(`items/inventory.md` §9.1, §9.3) also pass size 1, fallback 1; the gold
+piles (§10.2 there) call `0x0064E810` directly with fallback 0. Item size is 1, so the size
 query is a single cell against 0x3E01.
 
 ### 10. Placing a unit at a point (`0x00554EA0`)
@@ -626,7 +631,9 @@ Called by the tile grid fill (`drlg/rooms.md` §9.5.1 step 3) for a
 hidden exit cell of type t (10 or 11) at world tile (wx, wy) with packed
 value v, DRLG room R:
 
-1. Direction letter: t = 11 → 'l', else 'r'. Warp slot = main index
+1. Direction letter: t = 11 → 'r', else (10) 'l' (read at
+   `0x0066E1C4`–`0x0066E1D5`; D2MOO `DRLGROOMTILE_AddWarp` agrees: the
+   right exit type takes 'r'). Earlier text had the letters swapped. Warp slot = main index
    (v bits 20–25). lvlwarp record: `drlg/levels.md` §7 rule 4 for R's
    level, that slot and letter (no record → fatal).
 2. Local tile (lx, ly) = (wx − R tile x, wy − R tile y). If lx = R tile
@@ -676,6 +683,51 @@ Arithmetic of §12.1 rule 3 and rule 5 is 32-bit two's complement; the
 
 Callers: `0x00548C32` (C→S 0x13 on a warp tile), `0x00581F3A`,
 `0x00582027`, `0x0059D9EF`.
+
+### 13. Where a joining character stands at tick 0
+
+Owner of the game-entry position; the search itself is §11.
+
+1. **No saved position.** Game entry `0x005394A0` (ECX = client, EDX =
+   player; stack game, room, x, y) takes a room and point only from its
+   act-change callers `0x0053A2F0`, `0x0053A420`. The join path (C→S
+   0x6B → `0x0052C550` → `0x00530190`, `sim/intents-events.md`) creates
+   the act (`drlg/levels.md` §2, `0x0052C210`) and passes room 0, x 0,
+   y 0, so the point always comes from the §11 spawn search. A loaded
+   save places the player exactly as a new character.
+2. **Act and level.** Act = the client's act byte (client +0x1AC,
+   `0x005382B0`); level = the act's town (act +0x08: 1, 40, 75, 103,
+   109; `drlg/levels.md` §2 rule 2). The byte is written at join:
+   - from the global `0x00883D44` (game creation `0x00530BF0` at
+     `0x00530E17`, join `0x0052FA50` at `0x0052FB90`); the global is 0
+     except through the setter `0x0052DFA0` (no direct caller) and is
+     cleared at shutdown (`0x0052C030`);
+   - from the save (`0x00532690`, the header reader of the save parser
+     `0x00534020`): header byte +0x58 (header: 0x82 bytes, u32
+     0xAA55AA55 at +0x00, u16 0x82 at +0x20), low nibble = act, high
+     nibble = difficulty. Act ≥ 5 or difficulty ≥ 3 takes the error
+     exit (`0x00532BC2`). If that difficulty equals the game's (game
+     +0x6D) the act is used, else act 0. When it matches and game +0x6A
+     = 3 and game +0x84 = 0, the header's map ID (+0x7E) is also copied
+     into game +0x7C.
+   Which write is last on a single-player load of a saved character is
+   open question 8.
+3. **Spawn point.** §11 with tile index 0 and size 2: the town has
+   `Position` ≠ 0, so the §10 rule 2 class pick of `drlg/levels.md`
+   matches spawn-tile records 0–4 and **draws `roll(n)` on the town's
+   level seed** when n > 0; position × 5 + (3, 3); free point (§7,
+   mask 0x1C09); no point → fatal. Then S→C 0x07, placement
+   `0x00554850` and S→C 0x15 (§11). Recorded: Test vectors R1, R2.
+4. Followers (pets, mercenary) are placed by the same search from the
+   act's town with their own size (`0x005352C0`, §11).
+
+**Tools placing a character at a point** (scenario `char at x y`):
+after entry, `0x00554EA0(game, unit, room, x, y, exact, alt)` (§10)
+with the room that holds (x, y) (`monsters/init.md` §25.1 room lookup)
+and exact = 1 places it there without a search; exact = 0 runs the
+§7 free search from (x, y) first. Either sends 0x07, 0x15 and the
+room-change messages of §10 rule 6 like a warp, and moves pets
+(§10 rule 6) as the original would on a teleport.
 
 ## Constants & data dependencies
 
@@ -732,6 +784,15 @@ Reproduced by default.
    (dead-body sequence §5.3 rule 3 is safe because it removes first).
 9. §12.1: an exit cell on the room's far column or far row adds no warp
    tile (only one of the two needs to match).
+10. §8: the out room need not hold the out point. The row test reads the
+   rect last read (a cell visit's row room) but a row inside it takes
+   `room` (the argument) as row room, and a cell inside the row room's
+   columns takes the row room without testing its rows (`0x0064E840`).
+   Vector C1: the result is A with a point in the room above. Callers
+   pass the room on as returned (monster spawn `0x005A09E0` →
+   `0x005B30E0`, `monsters/init.md`); a later §7 search from it
+   (§10 rule 3) or the first move's room recache (`sim/pathing.md` §9.6)
+   finds the holding room.
 
 ## Test vectors
 
@@ -756,6 +817,7 @@ Expected values come from the rules above (scratch model
 | D1 | 20×20, walls x = 12 (all y) | §9 drop from (10, 10), size 1 | start (12, 13) is a wall; ring 1: (11, 12) d 2 kept, (13, 12) fails the walk-back, (11, 13) d 1 wins → (11, 13) |
 | D2 | 20×20 empty | §9 drop from (10, 10) | (12, 13) (start free, walk-back passes) |
 | D3 | empty, item bit 0x200 at (12, 13) | §9 drop from (10, 10) | (11, 13) |
+| C1 | room A sub-tiles x 40000..40039, y 40080..40089; room B (adjacent) x 40000..40039, y 40070..40079; wall at (40008, 40078) | §8 from A, (40008, 40080), n = 1, mask 0x1 | pass 1 (40007, 40079) in B: box hits the wall; pass 2 row 40078 is inside B's rect, so row room A; (40006, 40078) free → out room **A**, point (40006, 40078) (in B). Without the wall: out room B, (40007, 40079) |
 
 Real vectors (recordings, `traces/raw/`, reproducible once the DRLG of
 the recorded game is regenerated from its seeds). The map seed (game
@@ -772,6 +834,12 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
 
 ## Provenance
 
+- §13: `0x005394A0` and its three callers (`0x00530190` at
+  `0x00530224`–`0x00530237`, `0x0053A2F0`, `0x0053A420`); `0x005382B0`,
+  `0x005382E0` and its callers `0x00530BF0`, `0x00532690`,
+  `0x0053ACC0`, `0x0056A090`; the global `0x00883D44` (writers
+  `0x0052C030`, `0x0052DFA0`; readers `0x0052FA50`, `0x00530BF0`);
+  `0x00532690` header checks `0x00532717`–`0x00532A51`; `0x0061AE80`.
 - 1.14d functions read (decompile exports and `tools/ghidra/disasm.py`):
   path records `0x00649D00`, `0x00620AE0`, `0x006488C0`, `0x00648900`,
   `0x00620BB0`, `0x00648C30`, `0x00649190`; size and masks `0x00620510`,
@@ -839,7 +907,14 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
    state-108 lock and table `0x006E1064`: `sim/pathing.md` §1.6 (a
    recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
-   mercenary spec.
+   mercenary spec (`world/hirelings.md` §6).
+8. §13 rule 2: on a single-player load of a character saved in Act
+   III, which write of client +0x1AC comes last (the global
+   `0x00883D44` or the save header byte +0x58), and who calls the
+   setter `0x0052DFA0`? Watch writes to client +0x1AC and the global
+   during the load; the S→C 0x03 act byte (§Test vectors) shows the
+   result. Also: how the header's +0x58 byte relates to the `.d2s`
+   difficulty bytes (`formats/d2s.md`, not yet written).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 
@@ -856,3 +931,13 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   §12.2 rule 1, `world/quests.md` §8.2; §10 rule 7 stays host-only.
 - CR1, CR2: open question 1 (recording design). CR3: `combat/vitals.md`
   §5.
+- `docs/handoff/prop-wired-path.md` PWQ1: edge case 10, vector C1
+  (`0x0064E840` re-read). Its row 4 (warp footprint room): §6 rule 4 as
+  written: `0x00650910` clears from the path's room (ECX = path +0x1C)
+  and stamps from its destination-room argument (`0x006509FD`–
+  `0x00650A0B`), so a warp to a non-adjacent room is stamped. Its row 3
+  (room deactivation compress): `sim/units.md` §3.3.
+- `docs/handoff/drop-freespot.md` DF1: §9 (the caller's room, i.e. the
+  dropper's room). DF2: `items/treasure.md` §7 step 4 (the allocation
+  adds the dropped item to the world, path and footprint included).
+  DF3: no spec question (provider-off wiring).

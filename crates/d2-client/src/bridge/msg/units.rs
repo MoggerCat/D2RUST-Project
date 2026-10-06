@@ -1,4 +1,4 @@
-// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, Randomness)
+// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, §11, §12 rules 2–3, §14 rule 4, Randomness)
 //! Unit messages: add (0x59 players, 0xAC monsters, 0x51 objects),
 //! remove (0x0A), re-place (0x15), the queued movement and action
 //! messages (0x0C–0x10, 0x4C, 0x4D, 0x67–0x72: a position check, then a
@@ -16,8 +16,8 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::world::{
-    ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
-    INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
+    room_of_point, ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData,
+    PlayerData, UnitKey, INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
 };
 use super::Bytes;
 
@@ -90,9 +90,11 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     let (x, y) = (b.u16(7)?, b.u16(9)?);
     let life = b.u8(0xB)?;
     let mut r = BitReader::new(&msg.bytes[0xD..]);
-    // TODO(spec: msg-units.md §1.2 rule 2): the hireling re-initialisation
-    // needs the local player's hireling GUID, which the model does not
-    // hold; every 0xAC takes the creation path.
+    // TODO(spec: msg-units.md §1.2 rules 2–3): the hireling GUID is
+    // `ClientWorld::hireling_guid`, but the re-initialisation `0x0046EC10`
+    // (which fields it resets, whether rules 3–4 then run) and the hireling
+    // class test `0x0063EE90` are not stated; every 0xAC takes the creation
+    // path.
     let tables = &msg.inputs.tables;
     let class_row = tables.monsters.get(usize::from(class)).copied().flatten();
     let mode = r.read(4);
@@ -224,14 +226,18 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     Ok(())
 }
 
-/// 0x0A RemoveUnit (§2). TODO(spec: msg-units.md §2 rule 2): the local
-/// player's hireling (never removed) needs its GUID, not in the model.
+/// 0x0A RemoveUnit (§2): the local player's hireling (`model.md` §14
+/// rule 4) is never removed.
 pub fn remove_unit(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     let b = Bytes(msg.bytes);
     if msg.bytes.len() != 6 {
         return Err(HandlerError::Invalid("0x0A is 6 bytes"));
     }
-    w.remove(UnitKey::new(b.u8(1)?, b.u32(2)?));
+    let key = UnitKey::new(b.u8(1)?, b.u32(2)?);
+    if key.unit_type == MONSTER && key.guid == w.hireling_guid(w.local_player) {
+        return Ok(());
+    }
+    w.remove(key);
     Ok(())
 }
 
@@ -243,24 +249,59 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     }
     let key = UnitKey::new(b.u8(1)?, b.u32(2)?);
     let (x, y) = (b.u16(6)?, b.u16(8)?);
-    let Some(u) = w.units.get_mut(&key) else {
-        return Ok(());
-    };
-    // Rule 4.3: a dead unit stays where it is.
-    if u.is_dead() {
+    // Rule 2: a unit not in S → nothing.
+    if !w.units.contains_key(&key) {
         return Ok(());
     }
-    // Rule 4.2: (x, y) ≠ (0, 0) needs a room (fatal 0x168); at (0, 0) the
-    // unit ends without one (rule 2: fatal 0x538).
-    // TODO(spec: model.md open question 5): the room lookup needs the
-    // client DRLG; a non-zero point is taken as in a room.
+    // Rule 4.2: room' := room of (x, y) (`model.md` §12 rule 2); a
+    // non-zero point with no room' is fatal 0x168. Without the client DRLG
+    // (`active_rooms` none) the point is taken as in a room.
+    let new_room = match &w.active_rooms {
+        Some(rooms) => {
+            let r = room_of_point(rooms, i32::from(x), i32::from(y)).copied();
+            if r.is_none() && (x, y) != (0, 0) {
+                return Err(HandlerError::Fatal(0x168));
+            }
+            r
+        }
+        None => None,
+    };
+    // TODO(spec: model.md §12 rule 2 a): the cell lookup from the unit's
+    // room and its adjacency array runs before the act lookup; the model
+    // has no adjacency, so only the act lookup (b) runs.
+    // Rule 4.3: a dead unit stays where it is.
+    if w.units[&key].is_dead() {
+        return Ok(());
+    }
+    // Rule 2: at (0, 0) the unit ends without a room (fatal 0x538).
     if (x, y) == (0, 0) {
         return Err(HandlerError::Fatal(0x538));
     }
-    // Rule 4.5. TODO(spec: msg-units.md §3 rule 4.5): a failed teleport
-    // falls back to the nearest free point (`0x0064E7B0`), which needs the
-    // client's collision map.
-    u.position = Some((x, y));
+    // Rule 4.4 / `model.md` §11 rule 4: the local player moving to a room
+    // whose level's `Act` differs from the old room's switches the act
+    // palette; the first placement (no old room) does not.
+    if w.local_player == Some(key) {
+        if let (Some(old), Some(new)) = (w.local_room().copied(), new_room) {
+            let act = |level: u16| {
+                msg.inputs
+                    .tables
+                    .levels
+                    .get(usize::from(level))
+                    .map(|l| l.act)
+                    .ok_or(HandlerError::Invalid("room level past the Levels rows"))
+            };
+            let new_act = act(new.level)?;
+            if act(old.level)? != new_act {
+                w.palette_act = Some(new_act);
+            }
+        }
+    }
+    // Rule 4.5. TODO(spec: msg-units.md §3 rule 4.5, model.md §12 rule 4):
+    // a failed teleport falls back to the nearest free point
+    // (`0x0064E7B0`), which needs the client's collision map.
+    if let Some(u) = w.units.get_mut(&key) {
+        u.position = Some((x, y));
+    }
     Ok(())
 }
 

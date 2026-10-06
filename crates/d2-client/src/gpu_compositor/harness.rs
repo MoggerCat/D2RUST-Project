@@ -500,6 +500,7 @@ fn composition_cases() -> Vec<Case> {
     out.push(c);
 
     out.extend(shading_cases());
+    out.push(gdi_case());
 
     // The stress list as one frame of a running cycle: a random previous
     // frame, BlankScreen clear, draws over both the cleared and the kept
@@ -644,6 +645,79 @@ fn shading_cases() -> Vec<Case> {
     c.base = Some((0..256 * 160u32).map(|_| rng.below(256) as u8).collect());
     out.push(c);
     out
+}
+
+/// GDI lines and rectangles (`blend-modes.md` §8) as built by
+/// `rules::blend`: opaque color lines (color 0 included) clipped to the
+/// surface, and rectangles of every per-mode value `k` (0: color, 1:
+/// `T[d]` through chain `[Z]` and the transposed read, 2: `T[256·d +
+/// color]`) over a varied base.
+fn gdi_case() -> Case {
+    use crate::rules::blend;
+    use crate::rules::camera::FrameSize;
+    use crate::rules::shading::ShadeTables;
+    use d2_formats::palette::Pl2;
+
+    let row = |seed: u32| -> Vec<[u8; 256]> { blend_table(seed).to_vec() };
+    let ident = map_with(&[]);
+    let pl2 = Pl2 {
+        base_palette: distinct_palette(),
+        light_levels: vec![ident; 32],
+        inventory_variations: vec![ident; 16],
+        selected_unit_shift: ident,
+        alpha_blend: vec![row(11), row(12), row(13)],
+        additive_blend: row(14),
+        multiplicative_blend: row(15),
+        hue_variations: vec![ident; 111],
+        red_tones: ident,
+        green_tones: ident,
+        blue_tones: ident,
+        unknown_variations: vec![ident; 14],
+        max_component_blend: row(16),
+        darkened_shift: ident,
+        text_colors: Vec::new(),
+        text_color_shifts: Vec::new(),
+    };
+    let mut maps = MapTable::new();
+    let t = ShadeTables::push(&mut maps, &pl2);
+    let size = FrameSize {
+        width: 96,
+        height: 64,
+    };
+    let mut draws = Vec::new();
+    for (n, mode) in [0u8, 1, 2, 3, 4, 5, 6, 7, 9].into_iter().enumerate() {
+        let c = maps.push(blend::color_row(n as u8 * 29));
+        let x = (n as i32 % 3) * 34 - 6;
+        let y = (n as i32 / 3) * 22 - 3;
+        draws.extend(blend::gdi_rectangle(&t, size, c, x, y, x + 30, y + 20, mode).expect("rect"));
+    }
+    for (n, (x0, y0, x1, y1)) in [
+        (-10, 5, 120, 40),
+        (50, -20, 40, 90),
+        (3, 60, 90, 2),
+        (95, 63, 95, 63),
+        (0, 0, 0, 0),
+        (70, 10, -5, 13),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let c = maps.push(blend::color_row(n as u8 * 41));
+        draws.extend(blend::gdi_line(size, c, x0, y0, x1, y1).expect("line"));
+    }
+    let frames: Vec<FrameImage> = draws.iter().map(|d| d.image.clone()).collect();
+    let items: Vec<DrawItem> = draws
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            let mut it = d.item(FrameId(i as u32));
+            it.key = key(i as u32);
+            it
+        })
+        .collect();
+    let mut c = case("gdi-lines-rects", frames, maps, items, size.rect());
+    c.base = Some((0..96 * 64u32).map(|i| (i * 37 % 253 + 1) as u8).collect());
+    c
 }
 
 /// A 40×40 frame with transparent holes and every index 0..=255.

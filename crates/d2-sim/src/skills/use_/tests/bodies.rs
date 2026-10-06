@@ -40,7 +40,12 @@ fn bodies_mismatches(tsv: &str) -> Vec<String> {
     out
 }
 
-/// Every `spec'd-here` row must name its section ("body: bodies.md §")
+/// Unreferenced slots whose body is a helper here (called directly, not
+/// through the table): srvdo 142 = [`bodies::blade_pulse`].
+const HELPER_SLOTS: &[(&str, u16)] = &[("srvdo", 142)];
+
+/// Every `spec'd-here` row must name its section ("body: bodies.md §" or
+/// "body: bodies-2.md §")
 /// and be in [`START_BODIES`] / [`DO_BODIES`]; every slot there must be
 /// such a row. Returns the mismatches.
 fn specd_mismatches(tsv: &str) -> Vec<String> {
@@ -57,8 +62,18 @@ fn specd_mismatches(tsv: &str) -> Vec<String> {
             _ => continue,
         };
         let specd = c.get(4) == Some(&"spec'd-here");
-        let noted = c.get(6).is_some_and(|n| n.contains("body: bodies.md §"));
-        if listed != specd || specd != noted {
+        let noted = c
+            .get(6)
+            .is_some_and(|n| n.contains("body: bodies.md §") || n.contains("body: bodies-2.md §"));
+        // An `unreferenced` slot whose note names a body is a helper the
+        // bodies call directly (srvdo 142, the Blade Shield pulse of
+        // `bodies-2.md` §2.26): no slot body, but the helper must exist.
+        let helper = !specd && noted && c.get(4) == Some(&"unreferenced");
+        if helper {
+            if !HELPER_SLOTS.contains(&(*kind, index)) {
+                out.push(format!("{kind} {index}"));
+            }
+        } else if listed != specd || specd != noted {
             out.push(format!("{kind} {index}"));
         }
         if specd {
@@ -84,7 +99,9 @@ fn bodies_match_tsv_notes() {
     assert_eq!(bodies_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
     assert_eq!(specd_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
     assert_eq!(PURE_START, [18]);
-    assert_eq!(START_BODIES.len() + DO_BODIES.len(), 16);
+    // `bodies.md` §3–§4 (16), §7–§8 (29), `bodies-2.md` (85).
+    assert_eq!(START_BODIES.len() + DO_BODIES.len(), 130);
+    assert_eq!((START_BODIES.len(), DO_BODIES.len()), (45, 85));
     for &i in PURE_START.iter().chain(START_BODIES) {
         assert!(table::lookup(Kind::Start, i).is_some());
     }
@@ -105,12 +122,12 @@ fn bodies_check_reports_perturbations() {
     assert_eq!(bodies_mismatches(&bad), ["srvst 18"]);
     // A slot that states a body the code lacks.
     let bad = FUNCTIONS_TSV.replacen(
-        "SrvSt06_PowerStrike_ChargedStrike\tmapped\tPower Strike,Charged Strike,MonPowerStrike,MonIceSpear\t",
-        "SrvSt06_PowerStrike_ChargedStrike\tmapped\tPower Strike,Charged Strike,MonPowerStrike,MonIceSpear\t1.14d body is \"return 1\"",
+        "SrvSt42_FireHit\tmapped\tFire Hit\t",
+        "SrvSt42_FireHit\tmapped\tFire Hit\t1.14d body is \"return 1\"",
         1,
     );
     assert_ne!(bad, FUNCTIONS_TSV);
-    assert_eq!(bodies_mismatches(&bad), ["srvst 6"]);
+    assert_eq!(bodies_mismatches(&bad), ["srvst 42"]);
     // A spec'd-here row demoted to mapped: the body list disagrees.
     let bad = FUNCTIONS_TSV.replacen("SrvSt02_Kick\tspec'd-here", "SrvSt02_Kick\tmapped", 1);
     assert_ne!(bad, FUNCTIONS_TSV);
@@ -119,6 +136,22 @@ fn bodies_check_reports_perturbations() {
     let bad = FUNCTIONS_TSV.replacen("body: bodies.md §4.4", "body: elsewhere", 1);
     assert_ne!(bad, FUNCTIONS_TSV);
     assert_eq!(specd_mismatches(&bad), ["srvdo 30"]);
+    // A bodies-2.md row without its section note.
+    let bad = FUNCTIONS_TSV.replacen("body: bodies-2.md §8.14", "body: elsewhere", 1);
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvdo 54"]);
+    // A helper note on an unreferenced slot the code has no helper for.
+    let bad = FUNCTIONS_TSV.replacen(
+        "SrvDo138_Unused\tunreferenced\t(none)\t",
+        "SrvDo138_Unused\tunreferenced\t(none)\tbody: bodies-2.md §2.26",
+        1,
+    );
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvdo 138"]);
+    // A bodies-2.md row demoted to mapped.
+    let bad = FUNCTIONS_TSV.replacen("SrvDo150_Smite\tspec'd-here", "SrvDo150_Smite\tmapped", 1);
+    assert_ne!(bad, FUNCTIONS_TSV);
+    assert_eq!(specd_mismatches(&bad), ["srvdo 150", "srvdo 150 missing"]);
     // A mapped row promoted: no body for it.
     let bad = FUNCTIONS_TSV.replacen(
         "SrvDo003_Throw\tmapped\tThrow\t",

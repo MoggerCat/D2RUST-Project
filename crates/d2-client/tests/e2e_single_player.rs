@@ -357,7 +357,7 @@ impl Fx {
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
-            skill_modes: vec![[0; 4]],
+            skill_modes: vec![[0; 8]],
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1010,12 +1010,12 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 6 1 10"]);
+    assert_eq!(fx.book.get().log, ["srvst 42 1 10"]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Frames 3–5. On frame 5 the action frame `0x00580460` runs the used
-    // skill's do function (`use.md` §5.2, §5.4): srvdo 8 (body
+    // skill's do function (`use.md` §5.2, §5.4): srvdo 3 (body
     // catalogued only, `use.md` OQ10: the seam), then the generic
     // `srvmissile` 0 through the real missile creation (`missiles.md`
     // §R2) at the player, aimed at the cast point.
@@ -1029,7 +1029,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 6 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();

@@ -16,7 +16,7 @@
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::{ClientId as SimClient, UnitId};
-use d2_sim::wiring::action::{vitals_sync, ActionSim, Pending};
+use d2_sim::wiring::action::{vitals_sync, ActionSim, ObjectCase, Pending};
 use d2_sim::wiring::economy::GameFields;
 use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData};
@@ -121,6 +121,23 @@ where
                 .action()
                 .waypoints(game, |w| call.call(data, arrivals, w)),
         )
+    }
+
+    /// The 0x13 object case on the action wiring's object state
+    /// (`ActionSim::operate_object_message`; `None` until
+    /// `ActionSim::create_objects` ran).
+    ///
+    /// TODO(objects.md edge case 9): the host tick of the object calls
+    /// (`ActionHooks::set_host_tick`) is not set here: the handler has no
+    /// clock (`Intents::handle`).
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        events.action().operate_object_message(game, player, guid)
     }
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {

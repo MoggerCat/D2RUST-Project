@@ -45,7 +45,7 @@
 use d2_sim::game::Game;
 use d2_sim::items::{ItemTables, UniqueBits};
 use d2_sim::units::{RoomId, UnitId};
-use d2_sim::wiring::action::ActionHooks;
+use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, QuestRest};
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
@@ -392,23 +392,41 @@ where
         WorldHost::<D>::waypoints(&mut self.action, game, events, run)
     }
 
+    /// The action wiring's 0x13 object case ([`ActionWorld`]).
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        WorldHost::<D>::objects(&mut self.action, game, events, player, guid)
+    }
+
     /// The quest control on the desk's economy and rest
     /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
-    /// quest grants (`quests.md` §10.2) are collected during the call and
-    /// run on the NPC control block right after it (`npc.md` §7.5,
+    /// quest grants (`quests.md` §10.2) are queued during the call, with
+    /// the sends that follow them
+    /// ([`d2_sim::wiring::economy::QuestDeferred`]), and run on the NPC
+    /// control block right after it (`npc.md` §7.5,
     /// [`d2_sim::world::npc::NpcControl::quest_mercenary`] with the desk
-    /// as its world), before the result is returned: the order of
+    /// as its world), then the queued sends, before the result is
+    /// returned: the reward's 0x50 precedes the text refresh's 0x27 / 0x29
+    /// (`quests-act1-rest.md` §8 item 8). The order of
     /// `Desk::quest_message`, here for every quest call. A reward's NPC
     /// error goes to the interaction state's errors, as there.
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         Some(self.desk(game, events, |desk, ctl, _| {
-            let mut rewards = Vec::new();
+            let mut deferred = Vec::new();
             let out = {
                 let mut w = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
-                w.mercenaries = Some(&mut rewards);
+                w.deferred = Some(&mut deferred);
                 call.call(&mut *desk.quests, &mut w)
             };
-            for (p, class) in rewards {
+            for d in deferred {
+                let Some((p, class)) = d.run(&mut *desk.rest) else {
+                    continue;
+                };
                 if let Err(e) = ctl.quest_mercenary(desk, p, class) {
                     desk.state.errors.push(InteractionError::Npc(e));
                 }

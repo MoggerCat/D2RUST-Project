@@ -46,12 +46,6 @@ impl Kind {
             _ => bail!("unknown kind {s:?} (normal, minion, champion, unique, superunique)"),
         })
     }
-
-    /// Kinds only room population (`population.md` §3, §5–§7) creates:
-    /// presets place normal monsters and superuniques (with minions).
-    pub fn needs_room_population(self) -> bool {
-        matches!(self, Kind::Champion | Kind::Unique)
-    }
 }
 
 impl fmt::Display for Kind {

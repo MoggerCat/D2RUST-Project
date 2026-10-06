@@ -1,24 +1,27 @@
-// Spec: specs/monsters/ai.md §9 (per-AI behaviours), §10 (catalogue)
+// Spec: specs/monsters/ai.md §9 (per-AI behaviours), §10 (catalogue); specs/monsters/ai-bodies-2.md..ai-bodies-5.md (Act II–V bodies)
 //! The AI functions, dispatched by their 1.14d address (the control
 //! stores the address, as the original stores the pointer). Functions
 //! with status `spec'd-here` in `ai-functions.tsv` are implemented here,
-//! in [`super::bodies`] or in [`super::npc`], with the init functions
-//! [`INIT_IMPLEMENTED`] and SandMaggot's alternate; every other address,
-//! the special-state thinks other than state 5 (GoodNpcRanged) and the
-//! other init / alternate functions are stubs that log
-//! [`Unhandled::Function`] and do nothing (TODO(ai.md open question 10)).
+//! in [`super::bodies`], [`super::npc`] or the act modules
+//! (`bodies2`..`bodies5`), with the init functions [`INIT_IMPLEMENTED`]
+//! and the alternates of SandMaggot, BatDemon, FrogDemon, FetishShaman,
+//! Diablo / BaalCrab and Nihlathak / Hireable. The special-state thinks
+//! implemented are states 5 (GoodNpcRanged), 10 / 17, 11, 12 and 15
+//! (SuicideMinion). Every other address is a stub that logs
+//! [`Unhandled::Function`] and does nothing (TODO(ai.md open question
+//! 10)).
 
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
-use super::bodies;
 use super::tactics::*;
+use super::{bodies, bodies2, bodies3, bodies4, bodies5};
 use super::{idle, mode, AiCommand, AiHost, Ctx, ModeTarget, TickParam, Unhandled};
 
 /// Think functions implemented here, by address (AI table index in the
 /// comment). Checked against the catalogue's `spec'd-here` rows by
 /// `tests::implemented_matches_catalogue`.
-pub const IMPLEMENTED: [(u32, u8); 37] = [
+pub const IMPLEMENTED: [(u32, u8); 93] = [
     (0x005B_0CC0, 0),   // None
     (0x005B_0CD0, 1),   // Idle
     (0x005E_FCF0, 2),   // Skeleton
@@ -35,10 +38,20 @@ pub const IMPLEMENTED: [(u32, u8); 37] = [
     (0x005F_1440, 13),  // FallenShaman
     (0x005F_1140, 14),  // QuillRat
     (0x005F_1800, 15),  // SandMaggot
+    (0x005F_1B60, 16),  // ClawViper
+    (0x005F_20A0, 17),  // SandLeaper
+    (0x005F_22B0, 18),  // PantherWoman
     (0x005F_2460, 19),  // Swarm
     (0x005F_2540, 20),  // Scarab
+    (0x005F_2850, 21),  // Mummy
+    (0x005F_2B10, 22),  // GreaterMummy
+    (0x005F_3170, 23),  // Vulture
+    (0x005F_3730, 24),  // Mosquito
+    (0x005F_39B0, 25),  // WillOWisp
     (0x005F_4510, 26),  // Arach
+    (0x005F_4850, 27),  // ThornHulk
     (0x005F_4A70, 28),  // Vampire
+    (0x005F_5040, 29),  // BatDemon
     (0x005F_53E0, 30),  // Fetish
     (0x005E_7880, 31),  // NpcOutOfTown
     (0x005E_7130, 32),  // Npc
@@ -47,19 +60,73 @@ pub const IMPLEMENTED: [(u32, u8); 37] = [
     (0x005F_5A20, 35),  // CorruptArcher
     (0x005F_5D50, 36),  // CorruptLancer
     (0x005F_6070, 37),  // SkeletonBow
+    (0x005F_6220, 38),  // MaggotLarva
+    (0x005F_6340, 39),  // PinHead
+    (0x005F_6530, 40),  // MaggotEgg
     (0x005F_6650, 43),  // FoulCrowNest
+    (0x005F_67B0, 44),  // Duriel
+    (0x005F_6E60, 48),  // ZakarumZealot
+    (0x005F_72D0, 49),  // ZakarumPriest
+    (0x005F_78B0, 50),  // Mephisto
+    (0x005E_9170, 51),  // Diablo
+    (0x005F_8260, 52),  // FrogDemon
+    (0x005F_85C0, 53),  // Summoner
+    (0x005F_89B0, 55),  // Izual
     (0x005E_7E20, 58),  // Navi
     (0x005E_6320, 59),  // BloodRaven
     (0x005E_7AC0, 60),  // GoodNpcRanged
     (0x005E_7D60, 62),  // TownRogue
     (0x005F_96C0, 64),  // SkeletonMage
+    (0x005F_9A80, 65),  // FetishShaman
+    (0x005F_9CF0, 66),  // SandMaggotQueen
+    (0x005F_A010, 68),  // VileMother
+    (0x005F_A280, 69),  // VileDog
+    (0x005F_A380, 70),  // FingerMage
+    (0x005F_A710, 71),  // Regurgitator
+    (0x005F_AA90, 72),  // DoomKnight
+    (0x005F_AB80, 73),  // AbyssKnight
+    (0x005F_AF00, 74),  // OblivionKnight
+    (0x005E_0490, 85),  // HighPriest
+    (0x005E_0C80, 89),  // Megademon
     (0x005E_5AC0, 90),  // Griswold
+    (0x005E_1080, 95),  // PantherJavelin
+    (0x005E_1250, 96),  // FetishBlowgun
     (0x005E_3890, 98),  // Smith
     (0x005E_7F50, 100), // Buffy
+    (0x005E_1540, 114), // ReanimatedHorde
+    (0x005E_1900, 115), // SiegeBeast
+    (0x005E_1B60, 116), // Minion
+    (0x005E_1D30, 117), // SuicideMinion
+    (0x005E_1E00, 118), // Succubus
+    (0x005E_2120, 119), // SuccubusWitch
+    (0x005E_27A0, 120), // Overseer
+    (0x005E_2FF0, 122), // Imp
+    (0x005E_3530, 124), // FrozenHorror
+    (0x005E_36F0, 125), // BloodLord
+    (0x005E_E5D0, 128), // Nihlathak
+    (0x005E_E260, 130), // DeathMauler
+    (0x005E_EAA0, 132), // AncientStatue
+    (0x005E_F1A0, 133), // Ancient
+    (0x005E_F320, 134), // BaalThrone
+    (0x005F_CFE0, 135), // BaalCrab
+    (0x005E_F710, 136), // BaalTaunt
+    (0x005E_FA90, 137), // PutridDefiler
+    (0x005E_F620, 138), // BaalToStairs
+    (0x005F_D210, 140), // BaalCrabClone
+    (0x005E_F910, 141), // BaalMinion
+    (0x005F_1DE0, 142), // ClawViperEx
 ];
 
-/// Init functions implemented here (`ai.md` §9.17, §9.18).
-pub const INIT_IMPLEMENTED: [u32; 2] = [0x005F_6630, 0x005E_6300];
+/// Init functions implemented here (`ai.md` §9.17, §9.18;
+/// `ai-bodies-2.md` §16 terror; `ai-bodies-5.md` §3, §20, §23).
+pub const INIT_IMPLEMENTED: [u32; 6] = [
+    0x005F_6630,
+    0x005E_6300,
+    0x005E_80E0,
+    0x005E_2FD0,
+    0x005E_F310,
+    0x005E_E5C0,
+];
 
 /// Runs the init function at `addr` (§3.3 step 4); a stub logs
 /// [`Unhandled::Function`].
@@ -67,6 +134,10 @@ pub fn run_init<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, addr: 
     match addr {
         0x005F_6630 => bodies::nest_init(game, cx, u),
         0x005E_6300 => bodies::blood_raven_init(cx, u),
+        0x005E_80E0 => bodies2::terror_init(game, cx, u),
+        0x005E_2FD0 => bodies5::imp_init(cx, u),
+        0x005E_F310 => bodies5::baal_throne_init(),
+        0x005E_E5C0 => bodies5::nihlathak_init(),
         _ => cx
             .store
             .unhandled
@@ -124,6 +195,77 @@ pub fn run_function<W: AiHost + ?Sized>(
         0x005F_96C0 => bodies::skeleton_mage(game, cx, u, p),
         0x005E_3890 => smith(game, cx, u, p),
         0x005E_5AC0 => griswold(game, cx, u, p),
+        // Act II (`ai-bodies-2.md`).
+        0x005E_1080 => bodies2::panther_javelin(game, cx, u, p),
+        0x005F_2B10 => bodies2::greater_mummy(game, cx, u, p),
+        0x005F_2850 => bodies2::mummy(game, cx, u, p),
+        0x005F_22B0 => bodies2::panther_woman(game, cx, u, p),
+        0x005F_6220 => bodies2::maggot_larva(game, cx, u, p),
+        0x005F_20A0 => bodies2::sand_leaper(game, cx, u, p),
+        0x005F_6530 => bodies2::maggot_egg(game, cx, u, p),
+        0x005F_6340 => bodies2::pin_head(game, cx, u, p),
+        0x005F_1B60 => bodies2::claw_viper(game, cx, u, p),
+        0x005F_3170 => bodies2::vulture(game, cx, u, p),
+        0x005F_5040 => bodies2::bat_demon(game, cx, u, p),
+        0x005F_4FD0 => bodies2::bat_demon_alt(game, cx, u),
+        0x005F_9CF0 => bodies2::sand_maggot_queen(game, cx, u, p),
+        0x005F_67B0 => bodies2::duriel(game, cx, u, p),
+        0x005F_85C0 => bodies2::summoner(game, cx, u, p),
+        0x005E_8020 => bodies2::dim_vision(game, cx, u, p),
+        0x005E_8140 => bodies2::terror(game, cx, u, p),
+        0x005E_8340 => bodies2::taunted(game, cx, u, p),
+        // Act III (`ai-bodies-3.md`).
+        0x005F_3730 => bodies3::mosquito(game, cx, u, p),
+        0x005F_4850 => bodies3::thorn_hulk(game, cx, u, p),
+        0x005F_6E60 => bodies3::zakarum_zealot(game, cx, u, p),
+        0x005F_72D0 => bodies3::zakarum_priest(game, cx, u, p),
+        0x005F_8260 => bodies3::frog_demon(game, cx, u, p),
+        0x005F_81D0 => bodies3::frog_demon_alt(game, cx, u, p),
+        0x005F_9A80 => bodies3::fetish_shaman(game, cx, u, p),
+        0x005F_9950 => bodies3::fetish_shaman_alt(game, cx, u),
+        0x005E_0490 => bodies3::high_priest(game, cx, u, p),
+        0x005E_1250 => bodies3::fetish_blowgun(game, cx, u, p),
+        0x005F_39B0 => bodies3::will_o_wisp(game, cx, u, p),
+        0x005F_78B0 => bodies3::mephisto(game, cx, u, p),
+        // Act IV (`ai-bodies-4.md`).
+        0x005F_A010 => bodies4::vile_mother(game, cx, u, p),
+        0x005F_A280 => bodies4::vile_dog(game, cx, u, p),
+        0x005F_A380 => bodies4::finger_mage(game, cx, u, p),
+        0x005F_A710 => bodies4::regurgitator(game, cx, u, p),
+        0x005E_0C80 => bodies4::megademon(game, cx, u, p),
+        0x005E_9170 => bodies4::diablo(game, cx, u, p),
+        // Diablo's alternate; BaalCrab's `0x005FCF30` is the same
+        // (`ai-bodies-5.md` §21).
+        0x005E_8480 | 0x005F_CF30 => bodies4::diablo_alt(game, cx, u),
+        0x005F_89B0 => bodies4::izual(game, cx, u, p),
+        0x005F_AA90 => bodies4::doom_knight(game, cx, u, p),
+        0x005F_AB80 => bodies4::abyss_knight(game, cx, u, p),
+        0x005F_AF00 => bodies4::oblivion_knight(game, cx, u, p),
+        // Act V (`ai-bodies-5.md`).
+        0x005E_1B60 => bodies5::minion(game, cx, u, p),
+        0x005E_2FF0 => bodies5::imp(game, cx, u, p),
+        0x005E_1E00 => bodies5::succubus(game, cx, u, p),
+        0x005E_36F0 => bodies5::blood_lord(game, cx, u, p),
+        0x005E_2120 => bodies5::succubus_witch(game, cx, u, p),
+        0x005E_27A0 => bodies5::overseer(game, cx, u, p),
+        0x005E_1540 => bodies5::reanimated_horde(game, cx, u, p),
+        0x005F_1DE0 => bodies5::claw_viper_ex(game, cx, u, p),
+        0x005E_E260 => bodies5::death_mauler(game, cx, u, p),
+        0x005E_FA90 => bodies5::putrid_defiler(game, cx, u, p),
+        0x005E_F1A0 => bodies5::ancient(game, cx, u, p),
+        0x005E_EAA0 => bodies5::ancient_statue(game, cx, u),
+        0x005E_3530 => bodies5::frozen_horror(game, cx, u, p),
+        0x005E_1900 => bodies5::siege_beast(game, cx, u, p),
+        0x005E_1D30 => bodies5::suicide_minion(game, cx, u, p),
+        0x005E_F910 => bodies5::baal_minion(game, cx, u, p),
+        0x005E_F710 => bodies5::baal_taunt(game, cx, u, p),
+        0x005E_F620 => bodies5::baal_to_stairs(game, cx, u, p),
+        0x005E_F320 => bodies5::baal_throne(game, cx, u, p),
+        0x005F_CFE0 => bodies5::baal_crab(game, cx, u, p),
+        0x005F_D210 => bodies5::baal_crab_clone(game, cx, u, p),
+        0x005E_E5D0 => bodies5::nihlathak(game, cx, u, p),
+        // Nihlathak's alternate, also the Hireable alternate.
+        0x005E_5280 => bodies5::nihlathak_alt(game, cx, u),
         _ => cx
             .store
             .unhandled

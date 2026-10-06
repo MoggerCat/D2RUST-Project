@@ -200,7 +200,7 @@ fn den_of_evil_through_every_state() {
     assert_eq!(f.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/world/quests.md §3 r2, §10.1 r2, §10.5 r2, §10.5 r3, §10.5 r4, §10.5 r5, §10.5 r7
+// Covers: specs/world/quests.md §3 r2, §10.1 r2, §10.5 r2, §10.5 r3, §10.5 r4, §10.5 r5, §10.5 r7; specs/world/quests-act1-rest.md §8 r8
 #[test]
 fn burial_grounds_through_every_state() {
     // Den of Evil done by the first player: switched off, so its
@@ -229,11 +229,12 @@ fn burial_grounds_through_every_state() {
     assert!(ticks(&mut f, 15).is_empty());
     assert_eq!(ticks(&mut f, 1), [hex("5d 02 00 03 0000")]);
     // 92: state 5, status 13, chain 4 opens; 2.0 with bits 2–4 kept;
-    // 0x28, the text refresh, then the mercenary's 0x50 (NPC control).
+    // 0x28, the mercenary's 0x50 (NPC control), then the text refresh
+    // (`quests-act1-rest.md` §8 item 8).
     let got = say(&mut f, kashya, 92);
     assert_eq!(
         got.iter().map(|m| m[0]).collect::<Vec<_>>(),
-        [0x28, 0x27, 0x29, 0x50]
+        [0x28, 0x50, 0x27, 0x29]
     );
     assert_eq!(state(&mut f, 2), (5, 13));
     assert_eq!(state(&mut f, 4).0, 1);
@@ -443,7 +444,9 @@ fn forgotten_tower_through_every_state() {
     assert_eq!(word(&f, 5), 0x2015);
     let log = f.take_log();
     assert!(log.contains(&format!("sound {} 37", p.0)));
-    assert!(log.contains(&"unhandled 5 0x5954f0".to_string()));
+    // The trap step runs (`quests-act1-rest.md` §4): no chest listed, so
+    // nothing is spawned and nothing of chain 5 is reported.
+    assert!(!log.iter().any(|l| l.starts_with("unhandled 5")));
     assert!(ticks(&mut f, 7).is_empty());
     assert_eq!(ticks(&mut f, 1), [hex("5d 05 00 0d 0000")]);
     // The report to Kashya (142): the sequence opens chain 3; the player

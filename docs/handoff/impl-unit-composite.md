@@ -67,21 +67,27 @@ Test vectors has not run).
 - The draw-time write-back (§3 r5) is returned, not applied (client unit
   path state does not exist yet).
 
-## 4. Readings where the spec is silent (`TODO(spec: …)` at the site)
+## 4. Readings where the spec is silent (answered 2026-10-06)
 
-1. Duplicate layer records for one component stay an error
-   (`CompositeError::DuplicateLayer`): §5.1's layer walk would take the
-   first; the spec does not say, no 1.14d COF is known to have one.
-2. An `armtype` index above 2 fails the request (the original reads past
-   the table, Edge cases; no 1.14d row has one).
-3. §8 r3 bounce reading: the bounce-count decrement (§8 r3) runs
-   only when the limit is hit ("then" read as inside the hit branch).
-4. `OYTRlitTNhth` (§6 r2) is compared byte for byte (case not stated).
-5. Refused as `UnitCompositeError::Unresolved`: Barbarian dual-wield
-   class (OQ3), monster armor override tables (OQ5), linked-unit
-   inventory (OQ2), motion-record follow branch (OQ7). Mode override
-   pairs (OQ1) and the per-mode monster direction table (OQ4) are caller
-   inputs.
+The spec owner answered UC1–UC5 (spec Provenance, "Implementation
+readings"). State of the code:
+
+1. UC1 duplicate layer records: the spec says first match, not an error
+   (§5.1 r5). **Not yet changed**: `composite::check` still returns
+   `CompositeError::DuplicateLayer` (outside the UC2/UC3/UC5 task).
+2. UC2 `armtype` index above 2: the request fails and is reported:
+   `armor_class` returns `UnitCompositeError::ArmTypeIndex` (§10 row).
+3. UC3 bounce count: decrement inside the hit branch (§8 r3), as
+   implemented; tested both ways.
+4. UC4 `OYTRlitTNhth`: ASCII case-insensitive (`_strnicmp`, §6 r2).
+5. UC5 refused inputs (§10 row): now implemented: static mode override
+   tables (`mode_overrides`, §2 r2), Barbarian dual-wield class
+   (`weapon_type_class`, `weapon_in_use_write`, §2.1 r-dual), linked-unit
+   inventory (`linked_inventory`, `PlayerLook::with_linked_items`, §1.1),
+   graphics-ready flag as a caller input (§3 r3), act II skeleton tables
+   (`act_two_table`, §5.2), follow branch (`MotionRecord::update(missile,
+   linked)`, `FollowTarget`, §8 r4). Still open: motion-record creators
+   (OQ7).
 
 ## 5. Local run queue (game files / captures)
 

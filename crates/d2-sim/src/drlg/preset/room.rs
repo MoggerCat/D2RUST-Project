@@ -6,6 +6,7 @@ use super::ds1::unit_type;
 use super::map::{style, sub};
 use super::{PresetCtx, PresetError, PresetUnit, Presets};
 use crate::drlg::level::Drlg;
+use crate::drlg::logic::LogicGrids;
 use crate::drlg::tiles::{CellGrid, GridPass, RoomGrids};
 use crate::drlg::{DrlgRoomId, SUBTILES};
 
@@ -33,6 +34,16 @@ pub enum DoorOutcome {
     Placed,
 }
 
+impl DoorOutcome {
+    /// Whether the door record (when there is one) gets flag 0x20
+    /// (§11): after a unit is added and when `roll(3)` gave 0; not when
+    /// no table row matches or the position is outside the room. So a
+    /// record draws `roll(3)` at most once over all calls.
+    pub fn sets_record_flag(self) -> bool {
+        matches!(self, DoorOutcome::Placed | DoorOutcome::Rolled0)
+    }
+}
+
 impl Presets {
     /// `0x006667D0` (§9) with the §10 switches,
     /// [`crate::drlg::LevelTypes::room_grids`]: OR the edge and layer bits
@@ -40,8 +51,10 @@ impl Presets {
     /// the map's units inside the room to the room's list, and (level 17,
     /// once) collect tombstones. No draws.
     ///
-    /// `Logicals` (§10) is not part of [`RoomGrids`]: the logical
-    /// coordinate lists are not modelled by the tile code.
+    /// With lvlprest `Logicals` ≠ 0 (§10), [`RoomGrids::logicals`] carries
+    /// wall layer 0's orientation grid, floor layer 0 and wall layer 0 for
+    /// the logical-room build (`levels.md` §11.2 step 1); an absent layer
+    /// is an empty (zero) grid.
     pub fn room_grids(
         &mut self,
         drlg: &Drlg,
@@ -135,8 +148,22 @@ impl Presets {
                 fill_blanks: false,
             });
         }
+        let logicals = if def.logicals != 0 {
+            let first = |layers: &[Vec<u32>]| match layers.first() {
+                Some(l) => cut(l),
+                None => Ok(CellGrid::new(gw, gh)),
+            };
+            Some(LogicGrids {
+                orientation: first(&file.orientations)?,
+                floor: first(&file.floors)?,
+                wall: first(&file.walls)?,
+            })
+        } else {
+            None
+        };
         let kill = def.kill_edge != 0;
         let grids = RoomGrids {
+            logicals,
             kill_edge_x: kill && rect.x + rect.w == m_rect.x + m_rect.w,
             kill_edge_y: kill && rect.y + rect.h == m_rect.y + m_rect.h,
             animate: def.animate != 0,
@@ -198,12 +225,12 @@ impl Presets {
     }
 
     /// `0x0066D9E0` (§11): the door cell's preset unit. `wx`, `wy` are the
-    /// cell's world tile, `cell` its packed value, `orientation` its type
-    /// (9 = right door). The caller skips cells whose door record already
-    /// has flag 0x20 and sets it on [`DoorOutcome::Placed`]. Draws
-    /// `roll(3)` on the room seed for objects 91 and 92.
-    // TODO(preset.md §11): whether flag 0x20 is also set when the roll
-    // gives 0 or the position is outside the room is not stated.
+    /// cell's world tile, `cell` its packed value, `orientation` the
+    /// right-door test input (with a record: record type = 9; without
+    /// one: the cell orientation = 9). The caller skips a record that
+    /// already has flag 0x20 (no lookup, no draw) and sets it when
+    /// [`DoorOutcome::sets_record_flag`]. Draws `roll(3)` on the room
+    /// seed for objects 91 and 92.
     #[allow(clippy::too_many_arguments)]
     pub fn door_unit(
         &mut self,

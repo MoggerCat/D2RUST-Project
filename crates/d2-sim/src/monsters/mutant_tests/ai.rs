@@ -298,6 +298,8 @@ fn think_event_runs_the_think() {
                 monstats2: &w.monstats2,
                 levels: &w.levels,
                 skill_modes: &w.modes,
+                skills: &w.skills,
+                missiles: &w.missiles,
             },
             info: GameInfo::default(),
             store: &mut w.store,

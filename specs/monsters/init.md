@@ -22,43 +22,44 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 64–82 |
-| Inputs | 83–93 |
-| Outputs / state changes | 94–118 |
-| Rules | 119–120 |
-|   1. Entry points | 121–143 |
-|   2. The create request | 144–161 |
-|   3. Placement | 162–170 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 171–188 |
-|   5. Monster type init (`0x00574250`) | 189–206 |
-|   6. Stats and skills (`0x00573CB0`) | 207–246 |
-|   7. Monster level | 247–262 |
-|   8. Base values from monlvl | 263–297 |
-|   9. Player-count bonus (`0x00573930`) | 298–309 |
-|   10. Components (`0x005739D0`) | 310–320 |
-|   11. monprop (`monprop.txt`) | 321–329 |
-|   12. monequip (`0x005D6B60`) | 330–346 |
-|   13. Classic scaling (`0x0063EEF0`) | 347–354 |
-|   14. Normal mods and boss mods | 355–389 |
-|   15. Party minions | 390–394 |
-|   16. Boss spawns | 395–430 |
-|   17. Choosing umods (`0x005A0760`) | 431–466 |
-|   18. Boss minions and umod init (`0x005A2120`) | 467–484 |
-|   19. Umod init functions | 485–564 |
-|   20. Superuniques (`0x005A49B0`) | 565–588 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 589–603 |
-|   22. Umod callbacks and the type-7 event | 604–645 |
-|   23. Unique names (client) | 646–655 |
-|   24. Monster assign message | 656–668 |
-| Constants & data dependencies | 669–690 |
-| Randomness | 691–726 |
-| Edge cases & original bugs | 727–752 |
-| Test vectors | 753–754 |
-|   Synthetic (CI-safe) | 755–774 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 775–805 |
-|   Recorded checks (monster assign 0xAC) | 806–818 |
-| Provenance | 819–856 |
-| Open questions | 857–880 |
+| Summary | 65–83 |
+| Inputs | 84–94 |
+| Outputs / state changes | 95–119 |
+| Rules | 120–121 |
+|   1. Entry points | 122–144 |
+|   2. The create request | 145–162 |
+|   3. Placement | 163–171 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 172–189 |
+|   5. Monster type init (`0x00574250`) | 190–207 |
+|   6. Stats and skills (`0x00573CB0`) | 208–247 |
+|   7. Monster level | 248–263 |
+|   8. Base values from monlvl | 264–298 |
+|   9. Player-count bonus (`0x00573930`) | 299–310 |
+|   10. Components (`0x005739D0`) | 311–321 |
+|   11. monprop (`monprop.txt`) | 322–330 |
+|   12. monequip (`0x005D6B60`) | 331–347 |
+|   13. Classic scaling (`0x0063EEF0`) | 348–355 |
+|   14. Normal mods and boss mods | 356–390 |
+|   15. Party minions | 391–395 |
+|   16. Boss spawns | 396–431 |
+|   17. Choosing umods (`0x005A0760`) | 432–475 |
+|   18. Boss minions and umod init (`0x005A2120`) | 476–493 |
+|   19. Umod init functions | 494–573 |
+|   20. Superuniques (`0x005A49B0`) | 574–597 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 598–612 |
+|   22. Umod callbacks and the type-7 event | 613–654 |
+|   23. Unique names (client) | 655–664 |
+|   24. Monster assign message | 665–677 |
+|   25. Calling the spawn functions outside population (tools) | 678–768 |
+| Constants & data dependencies | 769–790 |
+| Randomness | 791–826 |
+| Edge cases & original bugs | 827–852 |
+| Test vectors | 853–854 |
+|   Synthetic (CI-safe) | 855–877 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 878–908 |
+|   Recorded checks (monster assign 0xAC) | 909–921 |
+| Provenance | 922–984 |
+| Open questions | 985–1008 |
 <!-- /index -->
 
 ## Summary
@@ -459,8 +460,16 @@ an inline `roll(total)`; total ≤ 0 → no step, result 0.
 #### 17.3 Eligibility (`0x005A03E0`)
 
 1. `enabled` = 0 → no. Not expansion and `version` ≥ 100 → no.
-2. `exclude1`, `exclude2` (> 0): the class's MonType is that type or
-   nested in it (`0x005A0070`) → no.
+2. `exclude1`, `exclude2` (> 0): `0x005A0070(unit, exclude)` set → no.
+   It reads the montype equivalence matrix (`data/runtime-maps.md` §2)
+   at row = the exclude type, column = the class's monstats `MonType`
+   (+0x1C, i16): set when the exclude type **is the class's MonType or
+   a sub-type of it** (MonType reachable from the exclude type by its
+   `equiv` links). Unit null or not a monster, class outside 0 … rows
+   − 1 of monstats, or MonType / exclude outside 0 … montype rows − 1 →
+   not set. The provider answers from the matrix itself (same bits, so
+   the walk's depth limit and bad links come out as the matrix has
+   them).
 3. `fPick` 1: class must have mode A1 in monstats2; 2: no if `isMelee` or
    `nomultishot`; 3: class must have mode WL. Else yes.
 
@@ -666,6 +675,97 @@ ghostly 0x40 (one bit each, in that order), hcIdx (16 bits, superunique
 only), umods (8 bits each, 0-terminated), name seed (16 bits). Bits are
 written low bit first.
 
+### 25. Calling the spawn functions outside population (tools)
+
+For a recorder that injects a spawn into the original
+(`tools/original-hooks.md`, scenario spawn steps): register conventions
+read from the 1.14d disassembly, the effects of each call, and what
+differs from a population-made unit. Behavior is owned by §16–§18 and
+`monsters/population.md` §6–§10; this section adds no rule.
+
+#### 25.1 Conventions
+
+All are callee-cleans-stack; "stack" lists arguments in push-reverse
+order (first = lowest address, `[esp+4]` at entry). Return in EAX.
+
+| 1.14d | Registers | Stack | Pops | Returns |
+|---|---|---|---|---|
+| `0x005B2A00` creation | ECX = request (§2, 0x28 bytes, caller-owned) | — | 0 | unit, 0, or 1 for a probe (flag 0x01) |
+| `0x005A09E0` boss spawn | EDI = game, EBX = class | room, cl, x, y, GUID, warp check | 0x18 | unit or 0 |
+| `0x005A43E0` random boss | ECX = game, EDX = room | cl, class, champion allowed, x (low 16 bits used), y (low 16 bits used), warp check | 0x18 | boss or 0 |
+| `0x005A0760` choose umods | ECX = unit | game, champion allowed | 8 | — |
+| `0x005A2120` minions + umod init | ECX = min, EDX = cl, EAX = max | game, unit, spawn minions | 0xC | — |
+| `0x005A48C0` champion pack member | ECX = game, EDX = unit | umod (low byte) | 4 | — |
+| `0x0054E1E0` champion minions | ESI = boss, EDI = game | cl, class | 8 | — |
+
+`0x005A09E0` takes the game in EDI and the class in EBX (not ECX /
+EDX); its callers load them before the call (`0x005A43E0` at
+`0x005A43F4`, `0x005A4400`). x = y = 0 asks for a searched point
+(`monsters/population.md` §6.3 step 1); cl may be 0 (room box,
+§6.3 steps 3–4); GUID −1 for a new unit. The population call of
+`0x005A43E0` is (game, room, cl, class, 1, 0, 0, 1)
+(`0x0054EF13`–`0x0054EF23`), then `0x0054E1E0(cl, class)` with ESI =
+the boss (`0x0054EF2C`–`0x0054EF36`).
+
+**Plain spawn** (`scenario.md` §3.1 rule 2: room, no cl, class, mode 1,
+x, y, r −1, flags 0): fill the request (§2) with game, room, cl 0,
+class, mode 1, GUID 0, x, y, r −1, flags 0 and call `0x005B2A00`.
+r = −1 tests only (x, y) itself (`monsters/population.md` §9.3); flags 0
+spawns the class's party (§10 there). Room for a sub-tile point: walk
+the act's active room list (act = game +0xBC + 4·act, head act +0x10,
+next active room +0x7C, `sim/unit-order.md` §4) and take the first room
+whose sub-tile box (active room +0x4C: x, y, w, h) holds the point,
+half-open (`drlg/levels.md` §8 rule 2); or, from a known room (the
+player's), `0x00463740(ECX = room, EDX = x, stack y; pops 4)`, which
+searches that room and its adjacency array (`drlg/rooms.md` §6).
+
+#### 25.2 Effects and differences from room population
+
+1. Draws: active room seed of the room passed (placement, search,
+   minion placement), the game seed (one step per allocated unit; GUIDs
+   come from a counter, `sim/unit-order.md` §1), unit seeds (umod choice §17, minion counts, umod init
+   §19, champion minion count), and the level seed only through the
+   kind-11 query (x = y = 0 with warp check 1, `drlg/levels.md` §11.5
+   item 4). All are game-owned: the unit seed's clock fallback
+   (`sim/rng.md` §5.3) runs only without a parent seed, and allocation
+   always passes the game seed.
+2. Region counters touched exactly as for a population-made unit: the
+   spawned count +0x2CC (`0x00547D90`, §4 step 2), and for every
+   `0x005A09E0` boss and `0x005A48C0` member the boss count +0x2C8 of
+   the region of the unit's level (`0x005A0320`). So a tool boss lowers
+   the later random-boss chances of its level (`monsters/population.md`
+   §5 steps 1–2).
+3. Not touched (they belong to `0x0054EC90`): rooms visited (+0x04),
+   rooms with spawns (+0x08), the region room count (+0x0C), the room's
+   spawned flag and the active room's populated bit (+0x34 bit 0). A
+   room not yet populated is still populated later on top of the tool's
+   units.
+4. Order of a population random boss: `0x005A43E0` (= `0x005A09E0`,
+   `0x005A0760`, `0x005A2120` with min 3, max 6, spawn minions 1), then
+   `0x0054E1E0` (champions only: 1–3 members, each `0x005A48C0` with
+   umod 16). A tool that calls them in this order with population's
+   arguments leaves the state population would, except item 3.
+
+#### 25.3 Explicit umods
+
+1. List: monster data (unit +0x14) +0x1C, 9 bytes. Count = bytes
+   before the first 0, at most 9 (`0x005A0260`); with 9 entries there
+   is no terminator.
+2. `0x005A0760` writes only this list and, on the champion branch, type
+   flag 4 (monster data +0x16). To give a boss scripted umods: spawn
+   with `0x005A09E0`; append each umod id as a byte at index count
+   while count < 9 (umod ids 1–42, `monsters/umods.tsv`); for a
+   champion also OR 4 into +0x16; then `0x005A2120(min 3, cl, max 6,
+   game, unit, 1)` (min 0, max 0 gives no minions); for a champion then
+   `0x0054E1E0(cl, class)`.
+3. Skipping `0x005A0760` skips its unit-seed draws (the champion
+   `roll(100)`, the count `roll(1)`, the picks of §17.1–§17.2), so every
+   later unit-seed draw of that boss (minion count, umod init §19, name
+   seed) differs from a population boss with the same umods. A tool
+   that must match a population boss calls `0x005A0760` instead.
+4. With type flag 4, `0x005A2120` spawns no minions (§18 step 1) and
+   runs the umod inits with unique = 1, as for a population champion.
+
 ## Constants & data dependencies
 
 | Table | Columns read at creation (fields.tsv names) |
@@ -771,6 +871,9 @@ Then, for bosses:
 | umod count, unique, d = 0/1/2, no umods | 1 / 2 / 3 | §17 step 2 |
 | aura, level 5, roll index 3 | holyfreeze level max(5 / 7, 1) = 1 | §19.5 |
 | aura, level 40, index 6 | holyshock level 5 | §19.5 |
+| montype rows 1 `a`, 2 `b` (equiv1 `a`); class MonType 1, exclude 2 | excluded (2 is a sub-type of 1) | §17.3 r2 |
+| same, class MonType 2, exclude 1 | not excluded (1 is not of type 2) | §17.3 r2 |
+| class MonType 0, any exclude | not excluded (montype column 0 never set) | §17.3 r2 |
 
 ### Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`)
 
@@ -818,6 +921,13 @@ Bosses, Normal, Blood Moor (L-flag 1):
 
 ## Provenance
 
+- §25 conventions from the prologues, `ret n` and call sites of
+  `0x005B2A00`, `0x005A09E0`, `0x005A43E0` (`0x005A43E0`–`0x005A4437`),
+  `0x005A0760`, `0x005A2120` (`ret 0xc` at `0x005A21CA`), `0x005A48C0`,
+  `0x0054E1E0` (`ret 8` at `0x0054E25B`), `0x00463740`, and the callers
+  `0x0054EC90`, `0x0054E260`; `0x005A0260` (umod count);
+  `time_value` (`0x00650DE0`) callers listed from the disassembly
+  (`0x00476290`, `0x00476460`, `0x0052C280`, `0x00552DF0` only).
 - 1.14d `Game.exe` (asm `re/exports/all.asm`, table bytes from
   `game/Game.exe`): `0x005B2A00` and wrappers `0x005B2F20`,
   `0x005B3040`, `0x005B3090`, `0x005B30E0`, `0x005B23C0`, `0x005B24E0`,
@@ -853,6 +963,24 @@ Bosses, Normal, Blood Moor (L-flag 1):
   bonus stub, uber cases in boss mods, the always-present unique flag on
   `0x005A09E0` bosses (as in D2MOO), umod 41 handler details. Rows marked
   "D2MOO" in `umods.tsv` were not re-read.
+- §17.3 rule 2: asm of `0x005A0070` (unit in ECX, exclude in EDX; row
+  = EDX, column = monstats +0x1C; matrix count / words / width at data
+  tables +0xC40 / +0xC44 / +0xC48, filled by `0x006C2110`). 1.14d live
+  data: one `monumod.txt` row has an exclude (`lightning`, id 17:
+  `exclude1` `sandleaper`, montype row 22, no `equiv` links and no
+  sub-types), so the matrix direction does not change a live answer:
+  exactly the 7 classes with MonType `sandleaper` (sandleaper1–7) are
+  excluded.
+  Re-read 2026-10-06 (implementation question IH1): `0x005A0070` does
+  no walk of its own; after the bounds tests it loads one word of the
+  built matrix (row = exclude, word = row × width + MonType / 32) and
+  masks it with the bit table at `0x006CE268` (bit MonType mod 32), so
+  an answer from the matrix is exact, including the walk's depth limit
+  and bad links as `0x006C2110` built them. Direction: row = exclude,
+  column = MonType ("is the exclude type of type MonType?"), as in rule
+  2 and its three test vectors; a description as "MonType nested in the
+  exclude type" is the reverse and wrong. The return value is the
+  masked word (non-zero = set), not 1.
 
 ## Open questions
 

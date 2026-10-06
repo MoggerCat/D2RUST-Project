@@ -12,31 +12,32 @@
   (what one unit draws), `drlg/rooms.md` §9 (tile records, variant choice,
   hidden flag, animation), §3/§6 (near-room arrays), `render/map-preview.md`
   (Phase 1b simplification this replaces), `client/render-pipeline.md` §A6,
-  §B6, §B10
+  §B6, §B10; continued in `render/draw-order-2.md` (§11 weather, §12
+  level backgrounds, §13 pass 8, §14 edge floors, §15–§16 sight test)
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–55 |
-| Inputs | 56–64 |
-| Outputs / state changes | 65–71 |
-| Rules | 72–73 |
-|   1. Frame passes | 74–98 |
-|   2. The draw-cell grid (`0x004DCE60`, `0x004DDB70`) | 99–120 |
-|   3. Filling the grid (`0x004DD7C0` per room) | 121–162 |
-|   4. List insertion | 163–173 |
-|   5. Which units draw | 174–195 |
-|   6. The passes | 196–236 |
-|   7. Tile records that never draw | 237–250 |
-|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 251–275 |
-|   9. Map-tile feed | 276–296 |
-|   10. d2rs mapping | 297–318 |
-| Constants & data dependencies | 319–327 |
-| Randomness | 328–333 |
-| Edge cases & original bugs | 334–345 |
-| Test vectors | 346–365 |
-| Provenance | 366–381 |
-| Open questions | 382–425 |
+| Summary | 43–56 |
+| Inputs | 57–65 |
+| Outputs / state changes | 66–72 |
+| Rules | 73–74 |
+|   1. Frame passes | 75–100 |
+|   2. The draw-cell grid (`0x004DCE60`, `0x004DDB70`) | 101–130 |
+|   3. Filling the grid (`0x004DD7C0` per room) | 131–172 |
+|   4. List insertion | 173–183 |
+|   5. Which units draw | 184–206 |
+|   6. The passes | 207–285 |
+|   7. Tile records that never draw | 286–299 |
+|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 300–356 |
+|   9. Map-tile feed | 357–377 |
+|   10. d2rs mapping | 378–427 |
+| Constants & data dependencies | 428–436 |
+| Randomness | 437–442 |
+| Edge cases & original bugs | 443–460 |
+| Test vectors | 461–489 |
+| Provenance | 490–526 |
+| Open questions | 527–603 |
 <!-- /index -->
 
 ## Summary
@@ -65,8 +66,8 @@ are `camera.md`; blend, shading and lighting are hooks named here.
 ## Outputs / state changes
 
 The draw order of every world item of a frame. Writes during the frame:
-record flags 0x400 / 0x8 and fade bytes (§8), record flag 0x20000 when a
-wall or roof draws, unit flag 0x10000000 when a unit draws, unit flag-ex
+record flags 0x400 / 0x8 and fade bytes (§8), record flag 0x20000 (§6
+r6), unit flag 0x10000000 when a unit draws, unit flag-ex
 0x80 (§5 r3).
 
 ## Rules
@@ -82,19 +83,20 @@ order:
 
 | # | Pass | Function | Condition |
 |---|---|---|---|
-| 1 | level background | `0x00476290` (level 74) / `0x00476460` (level 120) | player's level (Open question 1) |
+| 1 | level background | `0x00476290` (level 74) / `0x00476460` (level 120) | player's level (`draw-order-2.md` §12) |
 | 2 | lower walls | `0x004DF480` → `0x004DEDF0` per cell | grid flag lower walls (`[0x006CE268]`) |
 | 3 | floors | `0x004DED10` → `0x004DE730` | always |
-| 4 | (unidentified) | `0x00473C00` | Open question 2 |
+| 4 | environment pools: rain splashes, mud bubbles | `0x00473C00` | live pools (`draw-order-2.md` §11.6) |
 | 5 | shadow pass | `0x004DF510` | grid flag shadows (`[0x006CE274]`) |
 | 6 | walls and units | `0x004DF1C0` | always |
 | 7 | roofs | `0x004DEA70` | grid flag roofs (`[0x006CE26C]`) |
-| 8 | (unidentified) | `0x00475B20` | `[0x007B9564]` ≠ 0 |
-| 9 | (unidentified) | `0x00473910` | Open question 2 |
+| 8 | light-map debug view (never runs) | `0x00475B20` | `[0x007B9564]` ≠ 0 (`draw-order-2.md` §13) |
+| 9 | lightning flash, rain / snow particles | `0x00473910` | always (`draw-order-2.md` §11.7) |
 | 10 | screen fade | `0x004DC000` | `[0x007C89CC]` running: fill of the play area `[0,W) × [0,H−47)` (half width with a panel open), alpha `255 × remaining / 500` ms |
 
 The three grid flags live at view +0x38; the builder sets them when it
-files an entry of that kind (§4).
+files an entry of that kind (§4) into a pool slot (not for a dropped
+entry, §2).
 
 ### 2. The draw-cell grid (`0x004DCE60`, `0x004DDB70`)
 
@@ -117,6 +119,14 @@ view +8 (`camera.md` §1: `W` and `H − 40`), C signed division:
   +0xEA9C). An entry past the 3,000th is dropped silently (the count still
   rises). Entry: kind (0 unit, 1 tile, 2 unit shadow), x, y (used only by
   the perspective renderer), pointer, next.
+- **Pool overflow.** Every inserter (`0x004DD550`, `0x004DD460`,
+  `0x004DD350`, `0x004DD180`, `0x004DCFA0`, `0x004DD600`, `0x004DD6E0`)
+  first increments the count and stops when the old count was ≥ 3,000.
+  A dropped entry therefore sets no grid flag (§1) and, for a wall-list
+  record, gets no fade-target update (§8: `0x004DD180` returns before
+  reading `GetTickCount`). Cell flag 4 (§3 r2) is set **before** the pool
+  test (`0x004DD350`, `0x004DD180`), so a dropped lower wall or wall still
+  sets it.
 
 ### 3. Filling the grid (`0x004DD7C0` per room)
 
@@ -187,7 +197,8 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    `0x00622AA0(local player, unit, 2)` ≠ 0. Hidden: flag-ex 0x80 cleared,
    not drawn; else flag-ex 0x80 set. (Flag-ex 0x80 also gates the shadow
    entry of §3 r4, so a unit's shadow follows the previous frame's
-   result.) Open question 9.
+   result.) The level gate is leveldefs `LOSDraw` and `0x00622AA0` the
+   size-shrunk line test with mask 2: `draw-order-2.md` §15, §16.
 4. Draw at the unit's client position through `0x00471EC0`
    (`unit-composite.md` §1, missile offsets §8); players between
    `0x004D8520` / `0x004D85C0`, monsters with flag a = `0x004AE340` ≠ 0.
@@ -209,17 +220,20 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    §6 floors) passes `camera.md` §7 and its DT1 orientation is 0; drawer
    `0x004F68E0` with a filter flag set only for `ℓ` = 1 in levels whose
    `FloorFilter` (+0x214) ≠ 0 (`render/shading.md`), light grid per
-   `0x00477730` (`render/lighting.md`). After a draw: DT1 material bit
+   `render/lighting.md` §11 (`0x00477730` only returns the render kind). After a draw: DT1 material bit
    0x2 tiles may start client water effects (`0x00472DA0` / `0x00472EC0`)
-   with a draw `0x00472280(1000)` (Open question 11); `0x004DDE80` records
+   with a draw `0x00472280(1000)` on the local player's seed, made for
+   every such drawn floor (`draw-order-2.md` §11.5); `0x004DDE80` records
    the drawn extents. Levels with `DrawEdges` (+9) at open mode 0 and
    resolution mode 2 draw up to 3 extra edge floors per side near the
-   drawn extents (`0x004DE6C0` / `0x004DE630`, Open question 10).
+   drawn extents (`0x004DE6C0` / `0x004DE630`, `draw-order-2.md` §14).
 3. **Shadow pass** (`0x004DF510`, cells in order, shadow list in list
    order): kind 0 → the unit (§5); kind 1 → DT1 shadow tile through
-   `0x004F6980` at the wall position, draw mode 4 (`render/blend-modes.md`,
-   Open question 4); kind 2 → the unit's shadow `0x00471620` (Open
-   question 3). After a cell's list, its wall list is walked once for
+   `0x004F6980` (slot `+0xA4`) at the wall position; the caller passes
+   draw mode 4, which the GDI drawer `0x006C9290` never reads (its blend
+   is fixed: blended shadows or an opaque copy, `render/blend-modes.md`
+   §5, branch `claude/spec-shading-blend`; Open question 4); kind 2 → the unit's shadow `0x00471620`
+   (position and blend: `render/blend-modes.md` §5). After a cell's list, its wall list is walked once for
    records without layer bits (none exist, §3 r2; the walk still runs the
    §8 fade updates).
 4. **Walls and units** (`0x004DF1C0`, cells in order): the cell's wall
@@ -233,6 +247,41 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
    at `camera.md` §6 roofs row, alpha byte as given, culled by `camera.md`
    §7; drawn records get flag 0x20000. This settles RC1: roofs use the
    floor drawer path (camera §6), not the wall drawer.
+6. **Record flag 0x20000** ("drawn") is set after the draw call, so the
+   culling of `camera.md` §7 comes first. Lower walls (`0x004DEDF0`),
+   walls (`0x004DF1C0`) and the shadow pass's wall-list walk
+   (`0x004DEF80`) set it when the wall drawer returns non-zero: the GDI
+   wall drawers (`0x006C94B0` lit, `0x006C93A0` translucent) return 1
+   when at least one block passed their block test, 0 when the tile does
+   not load (`0x005FDEA0`) or every block was culled. Roofs
+   (`0x004DEA70`) set it unconditionally once the record passed the
+   whole-tile view test, whatever the floor drawer did. Floors set it
+   too: `0x004DE410` calls `0x004DDE80` after every floor draw (the
+   record passed the whole-tile test of `camera.md` §7), which sets the
+   flag unconditionally and then widens the drawn extents. Shadow tiles
+   and units never set it. No draw pass reads it; the reader is the
+   automap reveal (r7).
+7. **Automap reveal** (`0x00459020`, called by the frame `0x0044C7EB`):
+   skipped while the countdown `[0x007A51A4]` is non-zero (it is
+   decremented instead); otherwise, when the local player's position
+   moved by `d ≥ 0x50` since the last reveal (`|Δx|`, `|Δy|` from the
+   stored `[0x007A51FC]`/`[0x007A51F4]`: `d = (2·max + min) / 2`, C
+   division), it stores the new position and walks the player room's
+   near-room array; for each room of the player's level it calls
+   `0x00458F40(room, 0, cell)`. That function walks the room's floor
+   array (`0x00619660`: tile data +0x08 / +0x0C, §9) and then its wall
+   array (`0x006196A0`: +0x00 / +0x04, the getter the grid fill uses) in
+   order and
+   adds to the automap (`0x00457CF0`, owner: the automap spec) every
+   record without flag 0x8 that has flag 0x20000, or any record when
+   `[0x007A51A0]` ≠ 0 (no writer in `Game.exe`: 0) or the second
+   argument is 1; then `0x00458DC0` (room objects). The DRLG room-init
+   callback `0x00459150` (drlg `+0x454`, `client/model.md` S→C 0x03)
+   calls it with 1 for every room of a preset level whose lvlprest
+   `AutoMap` ≠ 0 (`drlg/preset.md` step 4), so those levels are revealed
+   whole. So a wall or floor
+   joins the automap only after one frame drew it (r6) and the player
+   then moved 0x50 or more.
 
 ### 7. Tile records that never draw
 
@@ -256,22 +305,54 @@ clear, at `t` = `GetTickCount() + 500`, with the record's absolute subtile
 player's tile `(px, py)` (`[0x007C8A08]`, `[0x007C8A10]`, set by
 `0x004DDB70` as path subtile / 5):
 
-- "near" when `5px < lx < 5px + 20` and type ∈ {1, 4, 5, 7, 8, 10, 12},
-  or `5py < ly < 5py + 20` and type ∈ {2, 3, 6, 7, 9, 11, 12}
-  (`[0x0072A968]` = 0; the other mode compares a per-record group with
-  `[0x007C8A0C]`: Open question 6).
+- "near" (`0x004DD060`) in 1.14d is the **group mode**: `[0x0072A968]`
+  is 1 in `.data` and has no writer (its one reference is this read), so
+  the geometric branch below never runs. With `G` = the record's
+  coordinate record (+0x10; `drlg/levels.md` §11.1): near when `G` ≠ 0,
+  `G` index (+0x28) ≠ the player's index `[0x007C8A0C]`, and (`px` <
+  `G` x0 (+0x00) or `py` < `G` y0 (+0x04)) — the wall belongs to another
+  logical room lying in front of the player (larger x or y). The
+  player's index is `0x0061B130(player room, path sub-tile x, y)`, set by
+  `0x004DDB70` each frame (0 when the point is in no room, −1 for a null
+  record). Record +0x10 is set only by the grid build of a preset room
+  with lvlprest `Logicals` ≠ 0 (`0x0066C9C0` at the end of `0x0066D110`:
+  the coordinate record at the wall's tile); every other wall record has
+  0 (arrays are zeroed, `0x0066EEE0`), so walls of outdoor levels and of
+  presets without `Logicals` (the towns included: `Act 1 - Town 1` has
+  `Logicals` 0) never fade.
+- Unused geometric branch (`[0x0072A968]` = 0): near when `5px < lx <
+  5px + 20` and type ∈ {1, 4, 5, 7, 8, 10, 12}, or `5py < ly < 5py + 20`
+  and type ∈ {2, 3, 6, 7, 9, 11, 12}.
 - Near, fade state (+0x24) bit 0 clear: from 0xFF to 0x80, end time
   `t + 500 × (alpha − 0xFF) / 127` (`t` when alpha is 0xFF; C division),
   state |= 3. Not near, bit 0 set: from 0x80 to 0xFF, end time
   `t + 500 × (0x80 − alpha) / 127` (`t` when alpha is 0x80), state bit 0
   cleared, bit 1 set. Otherwise nothing changes.
-- Each pass that walks a wall-array record (§6 r1, r3–r5) first advances
-  a running fade (state bit 1): alpha := to when `0x00477730` ≤ 3 or the
-  end time is reached (bit 1 cleared), else `from + (to − from) × (now −
-  end + 500) / 500` in bytes; alpha 0 sets flag 0x400, other values clear
-  it; state bit 2 sets flag 0x8 once its end time is reached. The ramp
-  arithmetic, its wall-clock base (`GetTickCount`) and the translucent
-  draw belong to `render/blend-modes.md`.
+- Each pass that walks a wall-array record (§6 r3–r5; the lower-wall
+  pass r1 only applies state bit 2, its records never get a fade target)
+  first advances a running fade (state bit 1): alpha := to when
+  `0x00477730` ≤ 3 or the end time is reached (bit 1 cleared), else
+  `from + (to − from) × (now − end + 500) / 500` in bytes; alpha 0 sets
+  flag 0x400, other values clear it; state bit 2 sets flag 0x8 once its
+  end time is reached. The translucent draw of the resulting alpha is
+  `render/blend-modes.md` §6 (branch `claude/spec-shading-blend`).
+- **Clock arithmetic** (`0x004DD180`, `0x004DEF80`, `0x004DF1C0`,
+  `0x004DEA70`, `0x004DEDF0`): `now` is one `GetTickCount()` read per
+  cell in the lower-wall, shadow and wall passes and once for all four
+  roof passes, an unsigned 32-bit millisecond
+  count. End times are stored as 32-bit values (`t` + the signed C
+  quotient, wrapping mod 2^32). "End time reached" is the **unsigned**
+  compare `end ≤ now`, so it misfires across the 49.7-day wrap of
+  `GetTickCount` (reproduce: compare as `u32`). The ramp product
+  `(to − from) × ((now − end) + 500)` is a 32-bit signed product
+  (`now − end` wrapping), divided by 500 with C truncation; its low byte
+  is added to `from` mod 256. The reference renderer (GDI, render kind
+  `0x00477730` < 4, `capture.md` §3.4) completes every ramp at the first
+  walk, so only the bit-2 compare depends on the clock there. d2rs: the
+  `FadeClock` hook gives `now` as a `u32` millisecond count; a capture
+  case without recorded `GetTickCount` values must not contain a record
+  with state bit 2 set; no 1.14d code sets that bit (Open question 16,
+  answered), so the bit-2 branch is unreachable from original data.
 
 ### 9. Map-tile feed
 
@@ -304,17 +385,45 @@ reproduces §1–§6; items are built in the same order:
 | level background | 1 | 0 | build order |
 | lower walls | 2 | cell index | position in the cell's lower-wall list |
 | floors | 3 | 2 × room position in the near array + (`ℓ` − 1) | record index in the floor array |
-| `0x00473C00` | 4 | — | — |
+| environment pools (`0x00473C00`) | 4 | 0 for splashes, 1 for bubbles | slot index (`draw-order-2.md` §11.6) |
 | shadow pass | 5 | cell index | position in the shadow list |
 | walls and units | 6 | cell index | wall-list position; units: wall count + unit-list position |
 | roofs | 7 | (`L` − 1) × n² + cell index | roof-list position |
-| `0x00475B20`, `0x00473910`, screen fade | 8, 9, 10 | 0 | build order |
+| `0x00475B20` (never runs), `0x00473910`, screen fade | 8, 9, 10 | 0 | build order (pass 9: flash, else particles in slot order) |
 | UI (everything after `0x00476BC0`) | 11 | `client/ui.md` | `client/ui.md` |
 
 `sub`: `unit-composite.md` §10. `ViewSource::map_tiles` returns the kept
 records (§3, §6 tests) with their pass and list position; `TileList` needs
 two more kinds placed as walls: lower wall and shadow tile. Cell index
 ranges below n² ≤ 2^28 for any frame size the client supports.
+
+Implementation questions (`impl-draw-order`, 2026-10-06): DO1 (vector
+`T(−160, 0)`) is answered by the corrected Test vectors row (−2, 1); the
+§2 rule was right. DO3 by §2 pool overflow (a dropped entry sets no grid
+flag). DO4 by §6 r6: lower walls set 0x20000 like walls, after the
+drawer returned non-zero, so the drawer's block culling (`camera.md` §7)
+comes first; a record that is not drawn (hidden, faded out, no layer
+bits) never gets it. DO5 by §8 clock arithmetic: `now` and end times are
+`u32` millisecond counts compared unsigned; the render kind
+`0x00477730` is the display type (`composition.md` §1: 1 GDI, 3
+DirectDraw default, 4 / 6 the 3D drivers), so on the reference (1) and
+the default renderer every ramp completes at its first walk and no
+`FadeClock` value changes a pixel; the hook is needed only for the
+unreachable bit-2 branch (OQ16).
+
+A shadow tile item carries no draw mode: its blend is the shadow-tile
+rule of `render/blend-modes.md` §5, whatever mode the caller names (§6
+r3). A unit's items keep the order's `pass` / `major` / `minor` and take
+`sub` from the composite; the unit's own position and offsets are
+`camera.md` §4 and `unit-composite.md` §8. An item this order emits whose
+drawing has no spec yet makes the frame an error, never a silent skip.
+Since 2026-10-06 the former gaps are specified: water effects and passes
+4 and 9 (`draw-order-2.md` §11; the particle floats are its Open
+question 3, so a frame with live rain or snow particles stays an error
+until it is answered), level backgrounds (§12; they need the recorded
+background seed), pass 8 (§13: emits nothing), edge floors (§14; the act
+edge record is its Open question 2), the sight test (§15, §16) and the
+fade group mode (§8). Pass 10 has no d2rs input (screen fade timer).
 
 ## Constants & data dependencies
 
@@ -342,13 +451,20 @@ LCG at `[0x00712C50]` (multiplier 0x6AC690C5). Both: Open questions 1, 11.
 - A unit's shadow appears one frame after it becomes visible (§5 r3).
 - Floors are drawn per room, so overlapping floor tiles of two rooms
   (shared border cells) follow room order, not cell order.
+- A pool-dropped wall still sets cell flag 4 but gets no fade target, and
+  a dropped entry sets no grid flag (§2 pool overflow).
+- Fade end times are compared unsigned, so a ramp running across the
+  `GetTickCount` wrap overshoots (§8 clock arithmetic).
+- The drawer's "shadow tile" draw mode 4 is passed but ignored by GDI
+  (§6 r3).
 
 ## Test vectors
 
 | Input | Expected | Source |
 |---|---|---|
 | 800 × 600 mode 0 (`Wv` 800, `Hv` 560) | `a` = 16, `n` = 34; 640 × 480: 15, 31 | §2 |
-| `T(600, 1720)`; `T(−160, 0)` | (25, 17); (−2, −1) | §2 |
+| `T(600, 1720)`; `T(−160, 0)` | (25, 17); (−2, 1): `tx = q(−160) = −2`, `ty = q(2·0 + 160) = q(160) = 1` (the earlier (−2, −1) had the sign of `ty` wrong; `0x00643340` confirms `ty = q(2y − x)`) | §2 |
+| `T(0, −80)`; `T(−1, 0)` | (−2, −2): `q(−160)` both; (−1, 0): `q(−1) = −1`, `q(1) = 0` | §2 |
 | tile origin (600, 1720) | grid origin (22, 1); player at client (1000, 2000) → cell (9, 17), index 587 | §2, §3 |
 | wall record of tile (30, 20): `(e0, e1)` = (720, 2080) | `T` = (30, 21) → cell tile (30, 20) | §3 r2 |
 | wall list `[ℓ2]`, insert `ℓ1` | `[ℓ2, ℓ1]` | §4 |
@@ -359,9 +475,17 @@ LCG at `[0x00712C50]` (multiplier 0x6AC690C5). Both: Open questions 1, 11.
 | dead monster (mode 12), `unflatDead` 0 | shadow list, kind 0, drawn in pass 5 | §3 |
 | item on the ground (mode 3) | shadow list, pass 5 | §3 |
 | 3,001st entry | dropped | §2 |
+| empty grid, pool full (3,000), file one roof (type 15) and one shadow-array record | count 3,002; roof and shadow grid flags stay clear; nothing filed | §2 pool overflow |
+| pool full, file a wall (type 1, record flag 0x4 clear) | cell flag 4 set; record fade state, alpha and end time unchanged; not filed | §2 pool overflow |
+| lit wall, every block culled by the drawer's block test | flag 0x20000 not set | §6 r6 |
+| roof passing the whole-tile test, all blocks off screen | flag 0x20000 set | §6 r6 |
+| running fade 0xFF → 0x80, `end` = 0xFFFFFF00, `now` = 0x00000010 (after the `GetTickCount` wrap), render kind ≥ 4 | unsigned `end ≤ now` is false → not reached; `now − end` = 0x110; `−127 × 772 = −98,044`, `/ 500` = −196, low byte 0x3C; alpha = 0xFF + 0x3C mod 256 = 0x3B | §8 clock (original bug) |
+| same record, render kind < 4 | alpha := 0x80 at once, bit 1 cleared | §8 |
 | capture `order-0001`: walk the Rogue Encampment along the palisade and behind a tent, every frame captured with the recorded lists (`capture.md`) | CPU reference with this order equals the capture | capture, queued |
 | capture `order-0002`: walk under a Lut Gholein roof | roof passes and fade equal the capture | capture, queued |
-| capture `order-0003`: stand at `townN1` cells (44, 32) and (51, 32) | settles Open question 7 | capture, queued |
+| capture `order-0003`: stand next to a visible river-bank cell of the town variant (`townN1` (44, 32), (51, 32); run-2 seed `TownE1`: tile (950, 933)) | settles Open question 7 | capture, queued |
+| floor record `ℓ` 1 passing the whole-tile test | flag 0x20000 set (`0x004DDE80`) | §6 r6 |
+| last reveal at (1000, 2000), countdown 0; player at (1040, 2010) / (1060, 2000) / (1080, 2000) | `d` = 45 / 60 / 80: no reveal / no reveal / reveal (0x50 = 80) | §6 r7 |
 
 ## Provenance
 
@@ -377,41 +501,86 @@ LCG at `[0x00712C50]` (multiplier 0x6AC690C5). Both: Open questions 1, 11.
 (Ghidra shows the grid base relative to view +0x38). Record and room
 layouts agree with `drlg/rooms.md` §1, §9; table offsets with
 `specs/data/fields.tsv`. No D2MOO equivalent (D2Client is not in D2MOO);
-no capture yet.
+no capture yet. Follow-ups from the implementation (DO1–DO7, 2026-10-06):
+`T` re-read at `0x00643340` (`tx = x + 2y`, `ty = 2y − x`, negative
+values truncate then −1); pool test and flag placement in the seven
+inserters; flag 0x20000 sites `0x004DEDF0`/`0x004DF1C0`/`0x004DEF80`
+(drawer result) and `0x004DEA70` (unconditional), drawer returns from GDI
+`0x006C94B0`/`0x006C93A0` (1 when a block passed the block test); fade
+compares `end ≤ now` unsigned in the four walkers; shadow-tile slot
+`+0xA4` GDI `0x006C9290` reads only (tile, X, Y, half), not the mode
+argument.
+Ghidra backlog (2026-10-06, disassembly of 1.14d `Game.exe`): every
+`0x20000` test in the export (18 sites) and the record-flag writers
+(`0x004DDE80` floors, the four pass functions); automap reveal
+`0x00459020`/`0x00458F40`/`0x00459150`; all writes of record `+0x24`
+(none sets bit 2).
+2026-10-06 (A7 answers): fade group mode `0x004DD060` (the flag
+`[0x0072A968]` read with `disasm.py xref`: one reference, `.data` value
+1), record +0x10 writer `0x0066C9C0` (record grid lookup `0x0067C570`),
+array zeroing `0x0066EEE0`, player index `0x004DDDAD`; getters
+`0x00619660` (floors, +0x08) / `0x006196A0` (walls, +0x00) /
+`0x006196E0` (shadows, +0x10), as `0x004DD7C0` and `0x004DE730` use
+them; render kind `[0x00712CCC]` = display type (`.data` 3, set by the
+command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
 
 ## Open questions
 
-1. Level backgrounds (levels 74, 120: `0x00476290`, `0x00476460`, cloud
-   LCG at `[0x00712C50]`): a spec of their own; Ghidra read of
-   `0x00476290`, capture in the Arcane Sanctuary and on Arreat Summit.
-2. What `0x00473C00` (→ `0x00473A70` on two objects at `[0x007A89FC]`,
-   `[0x007A8A00]`), `0x00475B20` and `0x00473910` draw (weather?
-   automap?). Ghidra reads.
-3. Unit shadows `0x00471620`: placement and blend (`render/blend-modes.md`,
-   `render/shading.md`). Ghidra read.
+1. ~~Level backgrounds (levels 74, 120)~~: answered in `draw-order-2.md`
+   §12 (stars; mountains and clouds; both time-seeded). Open: a capture
+   in the Arcane Sanctuary and on Arreat Summit with the seed recorded.
+2. ~~What passes 4, 8 and 9 draw~~: answered in `draw-order-2.md` §11.6
+   (splash and bubble pools), §13 (a light-map debug view that never
+   runs) and §11.7 (lightning flash, rain and snow particles).
+3. ~~Unit shadows `0x00471620`~~: answered in `render/blend-modes.md`
+   §5 (position, layers, skip rules).
 4. DT1 shadow tiles `0x004F6980`: driver slot, block placement and block
    culling (`camera.md` OQ4: the handed (X, Y) is the wall position).
-   Ghidra read of the slot.
+   Partly read: slot `+0xA4`, GDI `0x006C9290`, uses the same per-block
+   view test as the GDI wall drawers (`camera.md` §7, shadow tiles) and a
+   fixed blend (`render/blend-modes.md` §5, branch
+   `claude/spec-shading-blend`). Open: block placement (X, Y) of
+   orientation-13 tiles (`camera.md` OQ4).
 5. Who reads cell flag 4 (§3 r2). Search the export for reads of the cell
    word.
-6. Fade mode `[0x0072A968]` ≠ 0 and the per-record group compared with
-   `[0x007C8A0C]` (`0x0061B130`). Ghidra read.
+6. ~~Fade group mode~~: answered in §8: the group mode is the only live
+   mode in 1.14d (`[0x0072A968]` = 1, no writer); record +0x10 is the
+   coordinate record of `drlg/levels.md` §11. Open: a capture walking
+   past walls of a `Logicals` preset room (446 lvlprest rows, e.g. the
+   `Act 1 - Crypt` rooms of the Crypt and Mausoleum, levels 18, 19)
+   settles it on pixels.
 7. The 8 `townN1` river-bank cells (`map-preview.md` OQ3): the draw path
    draws visible-flagged records (§7), so either the client DRLG hides
    them (`drlg/rooms.md` §9.6 linking or a different preset) or 1.14d
    shows them; capture `order-0003` or a client DRLG simulation of
    `townN1` with linking settles it (owner of a DRLG answer:
-   `drlg/rooms.md`).
+   `drlg/rooms.md`). Still open after the 2026-10-06 captures: every
+   Act 1 town variant has such cells (wall layer 0, value `0x00500081`,
+   no hidden bit; `TownN1` 8, `TownE1` 3 at (48, 36…38), `TownS1` 17,
+   `TownW1` 17; survey of the four `lvlprest` files). Runs 1b and 2
+   (`20261006-140102`, `20261006-141725`) use `TownE1` (the only variant
+   with a bridge, floor rows 15–18; the player crosses it at tile y
+   912.4–913.1, giving level origin (904, 896)), whose three cells are
+   level tiles (952, 932…934), about 16 tiles south of the southernmost
+   town position either run reached (y ≤ 916): never on screen. No
+   sampled run-2 frame (every 25th) shows a uniform 16 × 16 area of one
+   index in the play area other than near-black 172 in shadow. Capture
+   `order-0003` for this seed: stand near tile (950, 933) on the west bank
+   in daylight; a drawn tile #28 is a 160 × 128 wall of index 233 lit
+   per block (light maps 0–1 give 0, 2–5 give 172, 6–11 give 173–174,
+   12–22 give 136, 23–31 keep 233, act 1 `pal.pl2`).
 8. Cross-spec (`drlg/rooms.md` §9.1 says roofs share the shadow list):
    the client reads roofs from the wall array (type 15, §3 r2); the DRLG
    owner should reconcile its wording.
-9. The sight test `0x00622AA0` and the level predicate `0x00642840`
-   (owner: the collision / line-of-sight spec). Ghidra read.
-10. Edge floors: the act record `0x00619720` and the extents kept by
-    `0x004DDE80`. Ghidra read.
-11. Water effects of material-0x2 floors: what `0x00472DA0` /
-    `0x00472EC0` spawn and which seed `0x00472280` draws from here
-    (affects the seed of `camera.md` §8 / OQ6). Ghidra read.
+9. ~~The sight test~~: answered in `draw-order-2.md` §15 (leveldefs
+   `LOSDraw`, size-shrunk ends) and §16 (the line test `0x0064E260`,
+   which had no owner).
+10. ~~Edge floors~~: answered in `draw-order-2.md` §14. Open there (its
+    Open question 2): who fills the act's edge record.
+11. ~~Water effects of material-0x2 floors~~: answered in
+    `draw-order-2.md` §11.5: one `roll_range(0, 1000)` on the local
+    player's seed per drawn water floor, then splash (`Rain3`/`Rain4`)
+    and bubble (`bubble3`) spawns.
 12. A tile record holds no DT1 file: the feed must map the DT1 tile
     pointer to (file, index) through the room's tile library
     (`drlg/rooms.md` §9.3); for a recorder, read the library slots of the
@@ -422,3 +591,12 @@ no capture yet.
 14. Whether any UI or cursor item is drawn between the world passes
     (`0x00456EE0` … `0x00477980` order): `client/ui.md` owner; a capture
     with a panel open.
+15. ~~Who reads record flag 0x20000~~: the automap reveal
+    `0x00458F40` (§6 r7); floors also set it (§6 r6). Search of every
+    `0x20000` test in the export: no other reader of record `+0x14`.
+16. ~~Who sets fade state bit 2~~: nobody. Every write of record
+    `+0x24` in `Game.exe` (`0x004DD180`, `0x004DEA70`, `0x004DEDF0`,
+    `0x004DEF80`, `0x004DF1C0`) sets bits 0–1 or clears bits 1–2, and no
+    instruction ORs or stores an immediate with bit 2 into a `+0x24`
+    field of a tile record; records start zeroed. §8 keeps the rule for
+    completeness; d2rs needs no recorded `GetTickCount` for it.

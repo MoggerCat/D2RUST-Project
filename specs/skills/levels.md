@@ -25,16 +25,16 @@
 | Rules | 69–70 |
 |   1. Skill level | 71–125 |
 |   2. Special values | 126–171 |
-|   3. Skill damage | 172–282 |
-|   4. Mana cost | 283–304 |
-|   5. To-hit | 305–312 |
-|   6. Learning a skill | 313–340 |
-| Constants & data dependencies | 341–363 |
-| Randomness | 364–375 |
-| Edge cases & original bugs | 376–398 |
-| Test vectors | 399–435 |
-| Provenance | 436–455 |
-| Open questions | 456–477 |
+|   3. Skill damage | 172–288 |
+|   4. Mana cost | 289–310 |
+|   5. To-hit | 311–318 |
+|   6. Learning a skill | 319–346 |
+| Constants & data dependencies | 347–369 |
+| Randomness | 370–381 |
+| Edge cases & original bugs | 382–404 |
+| Test vectors | 405–441 |
+| Provenance | 442–461 |
+| Open questions | 462–483 |
 <!-- /index -->
 
 ## Summary
@@ -276,6 +276,12 @@ synergy.
   v, freeze length := len, 0x30, res 43; any other e (0, after the
   remap never 10): physical += v. `res` (if given) := the resist stat,
   −1 for 6–9, 11 and physical. Jump table `0x0056CA0C`.
+  "Hit class h" is a plain u32 store: record +0x60 := h, replacing
+  whatever was there (not or-ed, not a nibble); e = 3, 6, 7, 8, 11 and
+  physical leave +0x60 unchanged. The value goes to its field by `+=`;
+  the lengths by `:=` (except stun: length += v + len). `len ≤ 0` → 50
+  applies only on the e = 10 path; a given e uses `len` as passed.
+  1.14d-confirmed (asm of `0x0056C8E0`).
 
 `roll(n)` with `n < 1` does not step (`sim/rng.md` §3). Rolled values
 are below the maximum by at least one 1/256 point.

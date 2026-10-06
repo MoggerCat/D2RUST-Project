@@ -217,16 +217,16 @@ pub fn buff<W: BodyWorld>(
 // ---------------------------------------------------------------- §4.4
 
 /// The curse context (0x68 bytes, §4.4 step 5).
-struct CurseCtx {
-    ai: bool,
-    upd: bool,
-    skill: i32,
-    lvl: i32,
-    duration: i32,
-    stats: [i32; 6],
-    values: [i32; 6],
-    state: i32,
-    events: [(i32, i32); 3],
+pub(crate) struct CurseCtx {
+    pub(crate) ai: bool,
+    pub(crate) upd: bool,
+    pub(crate) skill: i32,
+    pub(crate) lvl: i32,
+    pub(crate) duration: i32,
+    pub(crate) stats: [i32; 6],
+    pub(crate) values: [i32; 6],
+    pub(crate) state: i32,
+    pub(crate) events: [(i32, i32); 3],
 }
 
 /// 30 Curse `0x005C37C0` (§4.4).
@@ -335,7 +335,7 @@ pub fn can_switch<W: BodyWorld>(w: &mut W, ct: &CombatTables, x: W::Unit, k: i32
 }
 
 /// Per-unit curse callback `0x005C35C0` (§4.4).
-fn curse_unit<W: BodyWorld>(
+pub(crate) fn curse_unit<W: BodyWorld>(
     w: &mut W,
     t: &SkillTables,
     ct: &CombatTables,
@@ -343,7 +343,14 @@ fn curse_unit<W: BodyWorld>(
     cx: &CurseCtx,
     x: W::Unit,
 ) -> i32 {
-    let k = if cx.state == state::DIMVISION { 10 } else { 11 };
+    // k = 10 for state 23, 12 for 27 (Taunt, `bodies-2.md` Edge case
+    // 10), 11 for 56, else 0.
+    let k = match cx.state {
+        state::DIMVISION => 10,
+        27 => 12,
+        state::TERROR => 11,
+        _ => 0,
+    };
     if cx.ai
         && (w.unit_type(x) != UnitType::Monster
             || w.combat().alignment(x) == 1
@@ -421,17 +428,17 @@ fn curse_unit<W: BodyWorld>(
 // ---------------------------------------------------------------- §4.5
 
 /// The aura context (0x50 bytes, §4.5 step 3).
-struct AuraCtx<L> {
-    source_state: i32,
-    skill: i32,
-    lvl: i32,
-    duration: i32,
-    stats: [i32; 6],
-    values: [i32; 6],
-    count: i32,
-    list: Option<L>,
-    passivestate: i32,
-    callback: u32,
+pub(crate) struct AuraCtx<L> {
+    pub(crate) source_state: i32,
+    pub(crate) skill: i32,
+    pub(crate) lvl: i32,
+    pub(crate) duration: i32,
+    pub(crate) stats: [i32; 6],
+    pub(crate) values: [i32; 6],
+    pub(crate) count: i32,
+    pub(crate) list: Option<L>,
+    pub(crate) passivestate: i32,
+    pub(crate) callback: u32,
 }
 
 /// 65 Basic aura `0x005CF010` (§4.5).
@@ -528,7 +535,7 @@ pub fn aura<W: BodyWorld>(
 
 /// `0x0056C110(unit, cost)`: players only; blood mana (state 114) →
 /// `0x005D2B60`; mana < cost → nothing; else mana −= cost.
-fn spend_aura_mana<W: BodyWorld>(w: &mut W, u: W::Unit, cost: i32) {
+pub(crate) fn spend_aura_mana<W: BodyWorld>(w: &mut W, u: W::Unit, cost: i32) {
     if w.unit_type(u) != UnitType::Player {
         return;
     }
@@ -544,7 +551,7 @@ fn spend_aura_mana<W: BodyWorld>(w: &mut W, u: W::Unit, cost: i32) {
 }
 
 /// Aura callback `0x005CEDC0` (§4.5).
-fn aura_unit<W: BodyWorld>(
+pub(crate) fn aura_unit<W: BodyWorld>(
     w: &mut W,
     t: &SkillTables,
     ct: &CombatTables,
@@ -634,7 +641,7 @@ fn aura_unit<W: BodyWorld>(
 
 /// `0x0057AF30`: the velocity / attack-rate floor, monstats `ColdEffect`
 /// for the game's difficulty (i8), −50 for non-monsters.
-fn cold_floor<W: BodyWorld>(w: &mut W, ct: &CombatTables, x: W::Unit) -> i32 {
+pub(crate) fn cold_floor<W: BodyWorld>(w: &mut W, ct: &CombatTables, x: W::Unit) -> i32 {
     if w.unit_type(x) != UnitType::Monster {
         return -50;
     }

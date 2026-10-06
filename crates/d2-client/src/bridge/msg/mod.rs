@@ -3,10 +3,12 @@
 //! `bridge-dispatch.tsv`, registered in [`HANDLERS`]:
 //!
 //! - [`session`]: `client/model.md` (0x00–0x08, 0x0B);
+//! - [`pets`]: `client/model.md` §14 (0x7A, 0x81);
 //! - [`units`]: `client/msg-units.md` (unit add, remove, place, queued
 //!   movement and action messages, the local player's vitals);
 //! - [`stats_items`]: `client/msg-stats-items.md` (stats, items).
 
+pub mod pets;
 pub mod session;
 pub mod stats_items;
 pub mod units;
@@ -88,6 +90,8 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x70, units::no_effect),
     unit(0x71, units::no_effect),
     unit(0x72, units::no_effect),
+    general(0x7A, MODEL, pets::pet_action),
+    general(0x81, MODEL, pets::assign_merc),
     general(0x95, UNITS, units::vitals),
     general(0x96, UNITS, units::vitals),
     general(0x9C, STATS_ITEMS, stats_items::item_action),

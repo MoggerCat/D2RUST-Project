@@ -17,12 +17,12 @@ use crate::units::{UnitId, UnitType};
 
 use super::skill_use::{skills, Fx};
 
-/// The aura skill: `aura`, `srvdofunc` 66 (an aura do whose body is not
+/// The aura skill: `aura`, `srvdofunc` 111 (an aura do whose body is not
 /// specified, so the fake logs it; the specified basic aura do 65 runs
 /// its body, `skill_bodies`), no missile, no mana, no formulas.
 const AURA: i32 = 1;
-/// Its do function (`functions.tsv` srvdo 66, status `mapped`).
-const AURA_DO: u16 = 66;
+/// Its do function (`functions.tsv` srvdo 111, status `mapped`).
+const AURA_DO: u16 = 111;
 /// Its aura state.
 const AURA_STATE: u16 = 40;
 /// `srvactivefunc` of the aura state: hurricane (`use.md` §7).

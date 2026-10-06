@@ -13,7 +13,7 @@ use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::{FrameAnchor, IndexFrame};
-use crate::scene::{BlendOp, DrawKey, Rect, ShadeChain};
+use crate::scene::{BlendOp, DrawKey, LightGradient, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
@@ -47,6 +47,18 @@ impl BlockRect {
             })
             .collect()
     }
+}
+
+/// The shade and blend of one DT1 block of a tile (`render/shading.md`
+/// §4, `render/lighting.md` §11 r2–r4: each 32-pixel block has its own
+/// light; `render/blend-modes.md` §6: translucent walls per block). A
+/// gradient in `shade` is positioned at the block when the tile is placed
+/// (its `x`, `y` are overwritten).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockShade {
+    pub block: BlockRect,
+    pub shade: ShadeChain,
+    pub blend: BlendOp,
 }
 
 /// One map tile to draw, as the map and draw-order owners state it: the
@@ -96,6 +108,15 @@ pub trait ViewSource {
     /// its keys to the wrapped rules.
     fn unit_slot(&self, _unit: &ClientUnit) -> UnitSlot {
         UnitSlot::Unordered
+    }
+
+    /// TODO(spec: render/lighting.md §11 r2–r4, render/shading.md §4,
+    /// render/blend-modes.md §6): the per-block shade and blend of a tile
+    /// (`rules::lighting::draws` and `rules::shading` answer them from the
+    /// frame's light map). Empty (the default) = the tile's own `shade`
+    /// and `blend` for the whole tile.
+    fn tile_blocks(&self, _tile: &MapTile) -> Result<Vec<BlockShade>, ViewError> {
+        Ok(Vec::new())
     }
 }
 
@@ -181,6 +202,51 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
         }))
     }
 
+    /// The draws of one tile: [`Self::tile`] when `blocks` is empty, else
+    /// one draw per block, clipped to the block's screen rectangle
+    /// (`placement::block_pixel`) inside the tile's clip, with the block's
+    /// shade (its gradient moved to the block) and blend. Blocks outside
+    /// the tile's clip (culled, camera §7) draw nothing.
+    pub fn tile_draws(
+        &self,
+        tile: &MapTile,
+        image: &IndexFrame,
+        blocks: &[BlockShade],
+    ) -> Result<Vec<TileDraw>, ViewError> {
+        let Some(whole) = self.tile(tile, image)? else {
+            return Ok(Vec::new());
+        };
+        if blocks.is_empty() {
+            return Ok(vec![whole]);
+        }
+        let cam = &self.camera;
+        let origin = cam.block_origin(
+            tile.list,
+            cam.tile_handed(tile.list, tile.cell.0, tile.cell.1),
+        );
+        let mut out = Vec::with_capacity(blocks.len());
+        for b in blocks {
+            let (x, y) = placement::block_pixel(origin, (b.block.x, b.block.y), (0, 0));
+            let Some(clip) = whole
+                .clip
+                .intersect(&Rect::new(x, y, b.block.width, b.block.height))
+            else {
+                continue;
+            };
+            let shade = match b.shade.gradient() {
+                Some(g) => b.shade.with_gradient(LightGradient { x, y, ..*g }),
+                None => b.shade,
+            };
+            out.push(TileDraw {
+                clip,
+                shade,
+                blend: b.blend,
+                ..whole.clone()
+            });
+        }
+        Ok(out)
+    }
+
     /// Camera §7 wall block culling as a clip of the assembled image: the
     /// frame when every block is kept, `None` when none is, else the
     /// bounding box of the kept blocks, which must not touch a culled
@@ -247,12 +313,12 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
                     index,
                     error: Box::new(e),
                 })?;
-            if let Some(draw) = self.tile(tile, image).map_err(|e| ViewError::Tile {
+            let tile_error = |e| ViewError::Tile {
                 index,
                 error: Box::new(e),
-            })? {
-                out.push(draw);
-            }
+            };
+            let blocks = self.source.tile_blocks(tile).map_err(tile_error)?;
+            out.extend(self.tile_draws(tile, image, &blocks).map_err(tile_error)?);
         }
         Ok(out)
     }

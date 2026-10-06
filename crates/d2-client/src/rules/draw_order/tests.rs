@@ -3,7 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use super::source::{ordered_source, placement_list, resolve, TileArt};
+use super::source::{
+    ordered_source, placement_list, resolve, resolve_drawn, TileArt, WeatherFrame,
+};
+use super::weather::{FloorContext, Weather};
 use super::*;
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
@@ -49,6 +52,7 @@ fn record(tile: (i32, i32), layer: u32, ty: u32) -> TileRecord {
         ty,
         dt1: Dt1Facts::default(),
         fade: Fade::OPAQUE,
+        logical: None,
     }
 }
 
@@ -70,6 +74,7 @@ fn near(rooms: Vec<Room>) -> NearRooms {
     NearRooms {
         rooms,
         player_tile: (0, 0),
+        player_logical: 0,
         level: LevelFacts::default(),
     }
 }
@@ -126,10 +131,10 @@ fn tile_of_pixel() {
     assert_eq!(q(-160), -2);
     assert_eq!(q(-1), -1);
     assert_eq!(q(159), 0);
-    // TODO(spec: draw-order.md §Test vectors): the vector lists
-    // T(−160, 0) = (−2, −1); the §2 rule gives ty = q(160) = 1. Only the
-    // x half is asserted until the spec settles it (handoff note).
-    assert_eq!(tile_of(-160, 0).0, -2);
+    // DO1, answered: ty = q(2·0 + 160) = 1.
+    assert_eq!(tile_of(-160, 0), (-2, 1));
+    assert_eq!(tile_of(0, -80), (-2, -2));
+    assert_eq!(tile_of(-1, 0), (-1, 0));
 }
 
 // Covers: specs/render/draw-order.md §4
@@ -611,7 +616,8 @@ fn roofs_draw_by_layer_mask() {
     assert_eq!(passes[&2], [2]);
     assert_eq!(passes[&3], [1, 2, 3]);
     assert_eq!(passes[&4], [4]);
-    assert!(n.rooms[0].walls.iter().all(|w| w.flags & REC_DRAWN != 0));
+    // Flag 0x20000 comes after the draw (§6 r6), not from the order.
+    assert!(n.rooms[0].walls.iter().all(|w| w.flags & REC_DRAWN == 0));
 }
 
 // Covers: specs/render/draw-order.md §6 r2
@@ -758,6 +764,8 @@ fn wall_fade_runs_through_the_frame() {
     r.walls.push(record((10, 10), 1, 1));
     let mut n = near(vec![r]);
     n.player_tile = (29, 0);
+    // The unused geometric branch ([0x0072A968] = 0).
+    n.level.fade_geometric = true;
     let o = order(&mut n, &BTreeMap::new());
     // t = 10 500: end = t (alpha 0xFF); the ramp starts at now = end − 500.
     let w = &n.rooms[0].walls[0];
@@ -867,19 +875,25 @@ fn map_tiles_carry_kind_list_and_key() {
 // Covers: specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r3
 #[test]
 fn unresolved_items_fail_the_frame() {
-    // A drawn water floor (open question 11).
+    // A drawn water floor is reported with its handed position
+    // (draw-order-2.md §11.5 runs in the feed's weather state).
     let mut r = room();
     let mut water = record((11, 7), 1, 0);
     water.dt1.material = 0x2;
     r.floors.push(water);
     let mut n = near(vec![r]);
     let o = order_frame(&camera(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
-    assert!(resolve(&camera(), &o, art).is_err());
+    let (_, _, fx) = resolve_drawn(&camera(), &o, art).unwrap();
+    let handed = camera().tile_handed(TileList::Floor, 31, 17);
+    assert_eq!(fx.water, [handed]);
+    assert_eq!(fx.drawn, [(0, TileArray::Floor, 0)]);
     // A culled one is not drawn, so no effect starts.
     n.rooms[0].floors[0].tile = (-500, 0);
     let o = order_frame(&camera(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
-    assert_eq!(resolve(&camera(), &o, art).unwrap().0.len(), 1);
-    // A unit shadow (open question 3).
+    let (tiles, _, fx) = resolve_drawn(&camera(), &o, art).unwrap();
+    assert_eq!(tiles.len(), 1);
+    assert!(fx.water.is_empty() && fx.drawn.is_empty());
+    // A unit shadow (blend-modes.md §5, not wired).
     let o = FrameOrder {
         items: vec![Ordered::UnitShadow {
             key: UnitKey {
@@ -901,6 +915,7 @@ fn unresolved_items_fail_the_frame() {
 struct MapFeed {
     near: NearRooms,
     seed: Seed,
+    weather: Option<(Weather, FloorContext)>,
 }
 
 impl ViewSource for MapFeed {
@@ -954,6 +969,16 @@ impl ViewFeed for MapFeed {
     fn tile_art(&self, t: &OrderedTile, _: &ViewAssets) -> Result<TileArt, ViewError> {
         art(t)
     }
+
+    fn weather_frame(&mut self, _: &ClientWorld) -> Result<Option<WeatherFrame<'_>>, ViewError> {
+        Ok(self.weather.as_mut().map(|(weather, floors)| WeatherFrame {
+            weather,
+            floors,
+            seed: &mut self.seed,
+            update_count: 100,
+            mud: false,
+        }))
+    }
 }
 
 fn palette() -> Palette {
@@ -990,6 +1015,7 @@ fn ordered_source_wraps_the_feed() {
     let mut feed = MapFeed {
         near: near(vec![r]),
         seed: Seed::new(1, 0),
+        weather: None,
     };
     let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
     let assets = ViewAssets::new(palette());
@@ -1015,4 +1041,308 @@ fn ordered_source_wraps_the_feed() {
     // A room unit the world does not hold is an error.
     feed.near.rooms[0].units.push(unit(7, MONSTER, 1));
     assert!(ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets).is_err());
+}
+
+// ------------------------------------------------- implementation answers
+
+/// A room whose wall array fills the pool with 3,000 walls of tile
+/// (10, 10) (no fade: record flag 0x4).
+fn full_pool_room() -> Room {
+    let mut r = room();
+    for _ in 0..POOL {
+        let mut w = record((10, 10), 1, 1);
+        w.flags |= REC_NO_FADE;
+        r.walls.push(w);
+    }
+    r
+}
+
+// Covers: specs/render/draw-order.md §2
+#[test]
+fn pool_overflow_sets_no_grid_flag() {
+    // Pool full, then one roof (type 15) and one shadow-array record:
+    // count 3,002, the roof and shadow grid flags stay clear, nothing filed.
+    let mut r = full_pool_room();
+    r.walls.push(record((10, 10), 1, 15));
+    r.shadows.push(record((10, 10), 0, 0));
+    let mut n = near(vec![r]);
+    let lists = fill(&grid(), &mut n, &BTreeMap::new(), CLOCK, false).unwrap();
+    assert_eq!(lists.count, POOL + 2);
+    assert_eq!(lists.flags, GridFlags::default());
+    let cell = &lists.cells[grid().cell((30, 20)).unwrap()];
+    assert!(cell.roof.is_empty() && cell.shadow.is_empty());
+    assert_eq!(cell.wall.len(), POOL);
+}
+
+// Covers: specs/render/draw-order.md §2; specs/render/draw-order.md §8
+#[test]
+fn pool_dropped_wall_sets_flag_4_but_no_fade_target() {
+    // Pool full, then a wall (type 1, record flag 0x4 clear) of another
+    // logical room in front of the player: cell flag 4 set, its fade
+    // bytes unchanged, not filed.
+    let mut r = full_pool_room();
+    let mut w = record((10, 10), 1, 1);
+    w.logical = Some(Logical {
+        x0: 40,
+        y0: 40,
+        index: 2,
+    });
+    r.walls.push(w);
+    let mut n = near(vec![r]);
+    n.player_logical = 1;
+    let lists = fill(&grid(), &mut n, &BTreeMap::new(), CLOCK, false).unwrap();
+    let cell = &lists.cells[grid().cell((30, 20)).unwrap()];
+    assert_eq!(cell.flags, 4);
+    assert_eq!(cell.wall.len(), POOL);
+    assert_eq!(n.rooms[0].walls[POOL].fade, Fade::OPAQUE);
+    // With room in the pool the same wall gets its target.
+    let mut r = room();
+    r.walls.push(w);
+    let mut n = near(vec![r]);
+    n.player_logical = 1;
+    fill(&grid(), &mut n, &BTreeMap::new(), CLOCK, false).unwrap();
+    assert_eq!(n.rooms[0].walls[0].fade.state, 3);
+}
+
+// Covers: specs/render/draw-order.md §8
+#[test]
+fn group_mode_near() {
+    let g = Some(Logical {
+        x0: 30,
+        y0: 20,
+        index: 5,
+    });
+    // Player tile before the corner on x or y, other index: near.
+    assert!(fade_near_group(g, 4, (29, 25)));
+    assert!(fade_near_group(g, 4, (35, 19)));
+    // Inside or past the corner on both axes: not near.
+    assert!(!fade_near_group(g, 4, (30, 20)));
+    assert!(!fade_near_group(g, 4, (40, 30)));
+    // The player's own logical room never fades.
+    assert!(!fade_near_group(g, 5, (0, 0)));
+    // No coordinate record (outdoor levels, presets without Logicals,
+    // the towns): never near.
+    assert!(!fade_near_group(None, 4, (0, 0)));
+    assert!(!fade_near_group(None, 0, (0, 0)));
+}
+
+// Covers: specs/render/draw-order.md §8
+#[test]
+fn group_mode_is_the_default_and_only_logicals_walls_fade() {
+    // 1.14d: [0x0072A968] = 1, so LevelFacts::default() is group mode.
+    assert!(!LevelFacts::default().fade_geometric);
+    let mut r = room();
+    // A wall the geometric branch would call near (see
+    // `wall_fade_runs_through_the_frame`) but with no coordinate record.
+    r.walls.push(record((10, 10), 1, 1));
+    let mut logical = record((11, 10), 1, 1);
+    logical.logical = Some(Logical {
+        x0: 31,
+        y0: 0,
+        index: 3,
+    });
+    r.walls.push(logical);
+    let mut n = near(vec![r]);
+    n.player_tile = (29, 0);
+    n.player_logical = 2;
+    order(&mut n, &BTreeMap::new());
+    assert_eq!(n.rooms[0].walls[0].fade.state, 0);
+    assert_eq!(n.rooms[0].walls[1].fade.state, 3);
+    // The player walks into that logical room: the fade reverses.
+    n.player_logical = 3;
+    order(&mut n, &BTreeMap::new());
+    assert_eq!(n.rooms[0].walls[1].fade.state & 1, 0);
+    assert_eq!(n.rooms[0].walls[1].fade.to, 0xFF);
+}
+
+// Covers: specs/render/draw-order.md §8
+#[test]
+fn fade_clock_wraps_unsigned() {
+    let mut rec = record((0, 0), 1, 1);
+    let running = Fade {
+        state: 3,
+        alpha: 0xFF,
+        from: 0xFF,
+        to: 0x80,
+        end: 0xFFFF_FF00,
+    };
+    rec.fade = running;
+    advance(
+        &mut rec,
+        FadeClock {
+            now: 0x10,
+            instant: false,
+        },
+    );
+    // end ≤ now is false unsigned; (−127 × 772) / 500 = −196 → 0x3C.
+    assert_eq!(rec.fade.alpha, 0x3B);
+    assert_eq!(rec.fade.state & 2, 2);
+    // Render kind < 4: the ramp completes at once.
+    rec.fade = running;
+    advance(
+        &mut rec,
+        FadeClock {
+            now: 0x10,
+            instant: true,
+        },
+    );
+    assert_eq!((rec.fade.alpha, rec.fade.state & 2), (0x80, 0));
+}
+
+fn ordered(kind: TileKind, cell: (i32, i32)) -> OrderedTile {
+    OrderedTile {
+        room: 0,
+        array: TileArray::Wall,
+        record: 0,
+        kind,
+        cell,
+        dt1: Dt1Facts::default(),
+        alpha: 0xFF,
+        key: OrderKey {
+            pass: 0,
+            major: 0,
+            minor: 0,
+        },
+    }
+}
+
+// Covers: specs/render/draw-order.md §6 r6
+#[test]
+fn drawn_flag_after_the_drawer() {
+    let cam = camera();
+    // A tile cell whose wall position lands on screen.
+    let (tx, ty) = tile_of(1000, 2000);
+    let wall = ordered(TileKind::Wall, (tx, ty));
+    let handed = cam.tile_handed(TileList::Wall, tx, ty);
+    let on = BlockRect {
+        x: 0,
+        y: 0,
+        width: 32,
+        height: 32,
+    };
+    let off = BlockRect {
+        x: -handed.0 - 5_000,
+        ..on
+    };
+    // Lit wall, every block culled by the block test: not set.
+    assert!(!sets_drawn_flag(&cam, &wall, &[off]));
+    assert!(!sets_drawn_flag(&cam, &wall, &[]));
+    assert!(sets_drawn_flag(&cam, &wall, &[off, on]));
+    let lower = ordered(TileKind::LowerWall, (tx, ty));
+    assert!(sets_drawn_flag(&cam, &lower, &[on]));
+    // Roof passing the whole-tile test, all blocks off screen: set.
+    let roof = ordered(TileKind::Roof { pass: 1 }, (tx, ty));
+    assert!(sets_drawn_flag(&cam, &roof, &[off]));
+    // Floor ℓ 1 passing the whole-tile test: set; far away: not.
+    assert!(sets_drawn_flag(
+        &cam,
+        &ordered(TileKind::Floor { layer: 1 }, (tx, ty)),
+        &[]
+    ));
+    assert!(!sets_drawn_flag(
+        &cam,
+        &ordered(TileKind::Floor { layer: 1 }, (tx - 50, ty)),
+        &[]
+    ));
+    // Shadow tiles never set it.
+    assert!(!sets_drawn_flag(
+        &cam,
+        &ordered(TileKind::ShadowTile, (tx, ty)),
+        &[on]
+    ));
+
+    let mut r = room();
+    r.walls.push(record((0, 0), 1, 1));
+    r.floors.push(record((0, 0), 1, 0));
+    let mut n = near(vec![r]);
+    mark_drawn(&mut n, &[(0, TileArray::Floor, 0)]);
+    assert_eq!(n.rooms[0].floors[0].flags & REC_DRAWN, REC_DRAWN);
+    assert_eq!(n.rooms[0].walls[0].flags & REC_DRAWN, 0);
+}
+
+// Covers: specs/render/draw-order.md §6 r7
+#[test]
+fn automap_reveal_distance_and_records() {
+    let mut r = room();
+    r.level = 1;
+    let mut drawn = record((0, 0), 1, 1);
+    drawn.flags |= REC_DRAWN;
+    let mut hidden = drawn;
+    hidden.flags |= REC_HIDDEN;
+    r.walls.push(drawn);
+    r.walls.push(hidden);
+    r.walls.push(record((0, 0), 1, 1));
+    r.floors.push(drawn);
+    let mut other = r.clone();
+    other.level = 2;
+    let n = near(vec![r, other]);
+
+    let mut a = AutomapReveal {
+        countdown: 0,
+        last: (1000, 2000),
+    };
+    // d = 45 / 60: no reveal; the last position stays.
+    assert!(a.frame((1040, 2010), 1, &n).is_empty());
+    assert!(a.frame((1060, 2000), 1, &n).is_empty());
+    assert_eq!(a.last, (1000, 2000));
+    // d = 80 = 0x50: floors then walls of the player level's rooms,
+    // drawn and not hidden.
+    assert_eq!(
+        a.frame((1080, 2000), 1, &n),
+        [(0, TileArray::Floor, 0), (0, TileArray::Wall, 0)]
+    );
+    assert_eq!(a.last, (1080, 2000));
+    // A running countdown is decremented instead.
+    let mut c = AutomapReveal {
+        countdown: 2,
+        last: (0, 0),
+    };
+    assert!(c.frame((5000, 0), 1, &n).is_empty());
+    assert_eq!((c.countdown, c.last), (1, (0, 0)));
+    // The AutoMap preset path reveals every record.
+    let mut all = Vec::new();
+    reveal_room(0, &n.rooms[0], true, &mut all);
+    assert_eq!(all.len(), 4);
+}
+
+// Covers: specs/render/draw-order-2.md §11.5 r1; specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r6
+#[test]
+fn water_floor_draws_the_player_seed_through_the_feed() {
+    let world = ClientWorld::default();
+    let at = UnitPosition::Static { sx: 187, sy: 62 }.client();
+    let (tx, ty) = tile_of(at.x, at.y);
+    let mut r = room();
+    let mut water = record((tx - 20, ty - 10), 1, 0);
+    water.dt1.material = 0x2;
+    r.floors.push(water);
+    let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+    let assets = ViewAssets::new(palette());
+    // No weather state: the frame fails, never skips the draw.
+    let mut feed = MapFeed {
+        near: near(vec![r.clone()]),
+        seed: Seed::new(1, 0),
+        weather: None,
+    };
+    let e = ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
+        .err()
+        .unwrap();
+    assert!(e.to_string().contains("water floor"), "{e}");
+    // Rain off (intensity 0, no mud): one roll_range(0, 1000), no spawn.
+    let mut feed = MapFeed {
+        near: near(vec![r]),
+        seed: Seed::new(1, 0),
+        weather: Some((Weather::new(), FloorContext::default())),
+    };
+    assert!(
+        ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
+            .unwrap()
+            .is_some()
+    );
+    let mut want = Seed::new(1, 0);
+    want.roll_range(0, 1_000);
+    assert_eq!(feed.seed, want);
+    let (w, _) = feed.weather.as_ref().unwrap();
+    assert_eq!((w.splashes().live(), w.bubbles().live()), (0, 0));
+    // The drawn floor got flag 0x20000 after its draw.
+    assert_eq!(feed.near.rooms[0].floors[0].flags & REC_DRAWN, REC_DRAWN);
 }

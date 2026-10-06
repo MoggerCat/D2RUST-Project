@@ -1,6 +1,6 @@
 // Spec: specs/drlg/outdoor.md
-//! Acts II–V level builds: desert (§8), jungle and Kurast (§9.3), mesas
-//! and Chaos Sanctum (§10), siege strip and highlands (§11).
+//! Acts II and IV level builds: desert (§8), mesas and Chaos Sanctum
+//! (§10). Act III is `act3.rs`, Act V `act5.rs`.
 
 use super::grid::Gen;
 use super::tilesub::BorderCtx;
@@ -205,22 +205,6 @@ impl Gen<'_> {
         self.stamp(4, 4, 394, -1, false)
     }
 
-    /// Act III `0x0067F450` (§9.3).
-    pub fn act3(&mut self) -> Result<(), OutdoorError> {
-        self.link_flags()?;
-        if (76..=78).contains(&self.id) {
-            // `0x0067E910`: r := roll(2 + 4·3).
-            let _r = self.seed().roll(2 + 4 * 3);
-            // TODO(outdoor.md §9.3, OQ 7): the per-block stamping needs the
-            // jungle preset ids stored by the jungle placer, which §9.1
-            // does not specify; nothing is stamped.
-        }
-        // TODO(outdoor.md §9.3, OQ 8): Kurast (`0x0067F190`, random preset
-        // placer `0x0067EED0`) and Travincal (`0x0067F3B0`) lists and
-        // positions are not given; not built.
-        Ok(())
-    }
-
     /// Act IV `0x0067E890` (§10).
     pub fn act4(&mut self) -> Result<(), OutdoorError> {
         if self.id == 108 {
@@ -271,31 +255,6 @@ impl Gen<'_> {
         for p in seq {
             self.s(p)?;
         }
-        Ok(())
-    }
-
-    /// Act V `0x0067E600` (§11).
-    pub fn act5(&mut self) -> Result<(), OutdoorError> {
-        if self.id == 110 {
-            // Siege strip `0x0067E560`.
-            let s = self.od.preset(865)?.size_x / 8;
-            for i in 0..15 {
-                let x = self.gw() - s * (i + 1);
-                if x < 0 {
-                    return Err(OutdoorError::SiegeStrip(865 + i as u32));
-                }
-                self.stamp(x, 0, 865 + i as u32, 0, false)?;
-            }
-            return Ok(());
-        }
-        self.link_flags()?;
-        // TODO(outdoor.md §11, OQ 9): the barricade border walk
-        // (`0x0067DCF0`), ravine (`0x0067DEF0`), entrances (`0x0067DB50`),
-        // caves (`0x0067DA70`), siege link (`0x0067E4B0`), the barricade
-        // border substitution (type 12, `outdoor-tilesub.md` §2.3 — see
-        // `BorderCtx::barricade`), prisons (`0x0067E240`) and special
-        // presets (`0x0067E160`) are not specified beyond their order;
-        // not built.
         Ok(())
     }
 }
