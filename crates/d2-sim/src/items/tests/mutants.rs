@@ -23,15 +23,20 @@ fn unique_bit_4096_is_a_bit() {
     assert!(!b.get(4095));
 }
 
-/// Tables for the rare kind-order model: one magic suffix (group 2), one
-/// magic prefix (group 1), one rare suffix and one rare prefix, all
-/// fitting a helm.
+/// Tables for the rare kind-order model: one magic suffix (group 2), two
+/// magic prefixes (groups 1, 3), one rare suffix and one rare prefix, all
+/// fitting a helm. The kinds are asymmetric, so the kind order shows in
+/// the draws.
 fn rare_tables() -> (ItemTables, usize) {
     let mut t = tables();
     let i = push_item(&mut t, item_rec(ty::HELM, b"cap "));
-    t.magic = vec![affix_row(ty::HELM, 2), affix_row(ty::HELM, 1)];
+    t.magic = vec![
+        affix_row(ty::HELM, 2),
+        affix_row(ty::HELM, 1),
+        affix_row(ty::HELM, 3),
+    ];
     t.n_suffix = 1;
-    t.n_prefix = 1;
+    t.n_prefix = 2;
     let r = RareRec {
         itype: [ty::HELM as i16, 0, 0, 0, 0, 0, 0],
         ..Default::default()
@@ -43,9 +48,9 @@ fn rare_tables() -> (ItemTables, usize) {
 
 /// `affixes.md` §7 on [`rare_tables`], step by step: rare names draw
 /// roll(1) each, the count one step, then per affix the kind step (lo′
-/// odd → suffix; only while both kinds are open) and §3 (coin step; with
-/// the kind's slot empty one roll(2) step and the row, else its group is
-/// taken: no candidate, 0). Returns the seed and the slot counts.
+/// odd → suffix; only while both kinds are open) and §3 (coin step; then
+/// with c rows of the kind whose group is not taken, roll(c + 1) when c >
+/// 0, else 0). Returns the seed and the slot counts.
 fn rare_model(mut s: Seed) -> (Seed, usize, usize) {
     s.roll(1);
     s.roll(1);
@@ -63,8 +68,8 @@ fn rare_model(mut s: Seed) -> (Seed, usize, usize) {
             s.step() % 2 == 1
         };
         s.step(); // coin
-        let filled = if suffix { ns } else { np };
-        if filled > 0 {
+        let c = if suffix { 1 - ns } else { 2 - np };
+        if c == 0 {
             if suffix {
                 sdone = true;
             } else {
@@ -72,7 +77,7 @@ fn rare_model(mut s: Seed) -> (Seed, usize, usize) {
             }
             continue;
         }
-        s.roll(2);
+        s.roll(c as i32 + 1);
         if suffix {
             ns += 1;
         } else {
@@ -97,7 +102,8 @@ fn rare_kind_step_parity() {
         assert!(rare(&t, &mut it, &rq));
         let (s, np, ns) = rare_model(Seed::init_low(seed));
         assert_eq!(it.item_seed, s, "seed {seed}");
-        assert_eq!((it.prefix[0] != 0, it.suffix[0] != 0), (np == 1, ns == 1));
+        let count = |a: &[u16; 3]| a.iter().filter(|&&x| x != 0).count();
+        assert_eq!((count(&it.prefix), count(&it.suffix)), (np, ns));
         // Which kind came first (the first kind step).
         let mut f = Seed::init_low(seed);
         f.roll(1);
@@ -1037,6 +1043,10 @@ fn rare_override_only_for_rare() {
     let mut t = tables();
     t.itemtypes[ty::HELM as usize].rare = 0;
     let i = push_item(&mut t, item_rec(ty::HELM, b"cap "));
+    // Magic affixes exist, so a wrong magic quality would stick.
+    t.magic = vec![affix_row(ty::HELM, 1), affix_row(ty::HELM, 2)];
+    t.n_suffix = 1;
+    t.n_prefix = 1;
     let mut it = item(i, 1);
     let mut rq = ItemRequest {
         quality: q::NORMAL,
@@ -1047,6 +1057,7 @@ fn rare_override_only_for_rare() {
         Ok(true)
     );
     assert_eq!(it.quality, q::NORMAL);
+    assert_eq!((it.prefix, it.suffix), ([0; 3], [0; 3]));
 }
 
 /// `quality.md` §7.1: each type column fits its own types only; `weapon`
@@ -1371,4 +1382,23 @@ fn set_pick_by_weight() {
         assert!(set_item(&t, &mut it, &ItemRequest::default()));
         assert_eq!(it.file_index, want, "r {r}");
     }
+}
+
+/// `quality.md` §8 r3, r5: a preferred row (index − 1) is picked without
+/// a draw, even when later candidates exist.
+// Covers: specs/items/quality.md §8 r5
+#[test]
+fn unique_preferred_first_row() {
+    use crate::items::quality::unique;
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.uniques = vec![unique_row(b"rin "), unique_row(b"rin ")];
+    let rq = ItemRequest {
+        index: 1,
+        ..Default::default()
+    };
+    let mut it = item(i, 3);
+    assert!(unique(&t, &mut FakeGame::default(), &mut it, &rq));
+    assert_eq!(it.file_index, 0);
+    assert_eq!(it.item_seed, Seed::init_low(3));
 }

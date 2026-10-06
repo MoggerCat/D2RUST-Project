@@ -53,6 +53,34 @@ fn rounding_carry_matches_ieee() {
     }
 }
 
+/// A rounding carry leaves a normalized value: later operations see
+/// 2^54, not twice it.
+#[test]
+fn rounding_carry_then_operate() {
+    let v = (1i64 << 54) - 1;
+    let x = f(v).mul_rne(F64::ONE).unwrap();
+    assert_eq!(x.to_bits(), (v as f64).to_bits());
+    let y = f(v).add_rne(f(1)).unwrap();
+    assert_eq!(y.to_bits(), ((v as f64) + 1.0).to_bits());
+}
+
+/// The binary64 normal range ends at 2^−1022 and 2^1023 (both
+/// representable).
+#[test]
+fn normal_range_ends() {
+    let step = f(1 << 62);
+    let mut small = F64::ONE;
+    let mut large = F64::ONE;
+    for _ in 0..16 {
+        small = small.div_rne(step).unwrap();
+        large = large.mul_rne(step).unwrap();
+    }
+    small = small.div_rne(f(1 << 30)).unwrap();
+    large = large.mul_rne(f(1 << 31)).unwrap();
+    assert_eq!(small.to_bits(), f64::MIN_POSITIVE.to_bits());
+    assert_eq!(large.to_bits(), 2f64.powi(1023).to_bits());
+}
+
 /// Truncation of values far outside i32 (exponent > 10) is out of range,
 /// never a wrapped small value.
 #[test]
@@ -231,15 +259,22 @@ fn quality_row_class_and_uber() {
         roll_quality(&w.data(), 0, 50, 0, &[0; 6], &mut seed).unwrap();
         assert_eq!(seed == Seed::default(), cs, "class {class}");
     }
-    let mut w = quality_world();
-    w.equiv = equiv(60, &[(10, 45)]);
-    w.items[0].ubercode = w.items[0].code;
     let mut row = instant;
     row.uber = 1;
-    w.ratio = vec![ratio_row(), row];
-    let mut seed = Seed::default();
-    assert_eq!(roll_quality(&w.data(), 0, 50, 0, &[0; 6], &mut seed), Ok(7));
-    assert_eq!(seed, Seed::default());
+    for ultra in [false, true] {
+        let mut w = quality_world();
+        w.equiv = equiv(60, &[(10, 45)]);
+        if ultra {
+            w.items[0].ultracode = w.items[0].code;
+        } else {
+            w.items[0].ubercode = w.items[0].code;
+        }
+        w.ratio = vec![ratio_row(), row.clone()];
+        let mut seed = Seed::default();
+        let q = roll_quality(&w.data(), 0, 50, 0, &[0; 6], &mut seed);
+        assert_eq!(q, Ok(7), "ultra {ultra}");
+        assert_eq!(seed, Seed::default(), "ultra {ultra}");
+    }
 }
 
 /// §6 r6: `roll(chance)` < 128 → the step's result; 128 is not.
