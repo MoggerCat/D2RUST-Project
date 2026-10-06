@@ -22,6 +22,7 @@
 //! reads the model.
 
 pub mod feed;
+pub mod model_feed;
 pub mod node;
 pub mod present;
 pub mod ui_bind;
@@ -48,6 +49,7 @@ use crate::scene::{
 };
 
 pub use feed::{build_frame, frame_camera, NoCamera, NoFeed, RunningShake, ViewFeed};
+pub use model_feed::ModelFeed;
 pub use present::{WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
 pub use ui_bind::{text_sprites, TextFont, TextHooks, UiQueue, UiRules, UiSprite};
 
