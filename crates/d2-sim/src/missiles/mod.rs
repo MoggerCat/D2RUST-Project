@@ -12,6 +12,8 @@
 //! other event to the next dispatcher.
 
 pub mod bodies;
+pub mod bodies_ext;
+pub mod bodies_ext2;
 pub mod catalogue;
 mod create;
 mod flight;
@@ -36,11 +38,12 @@ pub use create::{
 };
 pub use flight::{default_flight, PathVelocity};
 pub use hit::{
-    damage_roll, fill_damage, hit_handler, pct, result_flag, result_flags, Damage, ELEMENTS,
+    damage_roll, damage_tail, fill_damage, hit_handler, pct, result_flag, result_flags, Damage,
+    ELEMENTS,
 };
 pub use seams::{
     MissileBodies, MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits,
-    MissileWorld, SkillCalc,
+    MissileWorld, SkillCalc, SkillField, SummonClass,
 };
 
 /// Flag bits of the parameter record (§R2.1, record +0x00) read by
@@ -298,6 +301,11 @@ pub enum Unhandled {
     NullSrvHit { index: i16, missile: UnitId },
     /// A null server-damage entry (15–30) would be called.
     NullSrvDmg { index: i16, missile: UnitId },
+    /// The original stops here: a fatal assertion, a read through a null
+    /// record or an endless loop in the function at `addr`
+    /// (`missiles/bodies.md`, `bodies-2.md` edge cases). d2rs skips the
+    /// rest of that function.
+    Fatal { addr: u32, missile: UnitId },
 }
 
 /// The missile system's state: per-missile data by unit, plus the log of
@@ -350,7 +358,7 @@ impl<W: MissileWorld + ?Sized> Ctx<'_, W> {
     }
 
     /// The record of a missile's class.
-    fn row_of(&self, m: UnitId) -> Option<&MissileRow> {
+    pub(crate) fn row_of(&self, m: UnitId) -> Option<&MissileRow> {
         let class = self.store.get(m)?.class;
         self.row(i32::from(class))
     }

@@ -167,7 +167,7 @@ fn srvdo_10_and_25_need_the_skill() {
     let (mut w, m) = world(r.clone(), None);
     assert_eq!(srv_do(&mut w, 10, m), 2);
     // With the skill: calc1 then calc2.
-    w.fake.mb.skills.insert(7, [2, 1, 0, 0]);
+    w.fake.mb.skills.insert(7, [2, 1, 0, 0, 0]);
     srv_do(&mut w, 10, m);
     let order: Vec<_> = w
         .fake
@@ -220,7 +220,7 @@ fn srvhit_1_area_fire() {
     assert_eq!(srv_hit(&mut w, 1, m, None), 1);
     assert_eq!(w.fake.logged("scan"), 0);
     // With the skill: r = max(calc1 0, 1) = 1; f 0 → 0x8583.
-    w.fake.mb.skills.insert(7, [0, 0, 0, 0]);
+    w.fake.mb.skills.insert(7, [0, 0, 0, 0, 0]);
     w.fake.mb.area = vec![w.monster];
     assert_eq!(srv_hit(&mut w, 1, m, None), 1);
     let (x, y) = w.fake.pos[&m];
@@ -293,7 +293,7 @@ fn srvhit_13_length_and_result_one() {
     let (mut w, m) = world(r, None);
     w.fake.stats.insert((m, 54), 4);
     w.fake.stats.insert((m, 55), 4);
-    w.fake.mb.skills.insert(7, [0, 0, 0, 0]);
+    w.fake.mb.skills.insert(7, [0, 0, 0, 0, 0]);
     w.fake.mb.area = vec![w.monster];
     assert_eq!(srv_hit(&mut w, 13, m, None), 1);
     assert!(w
