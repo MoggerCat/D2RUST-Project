@@ -33,6 +33,16 @@ pub enum DoorOutcome {
     Placed,
 }
 
+impl DoorOutcome {
+    /// Whether the door record (when there is one) gets flag 0x20
+    /// (§11): after a unit is added and when `roll(3)` gave 0; not when
+    /// no table row matches or the position is outside the room. So a
+    /// record draws `roll(3)` at most once over all calls.
+    pub fn sets_record_flag(self) -> bool {
+        matches!(self, DoorOutcome::Placed | DoorOutcome::Rolled0)
+    }
+}
+
 impl Presets {
     /// `0x006667D0` (§9) with the §10 switches,
     /// [`crate::drlg::LevelTypes::room_grids`]: OR the edge and layer bits
@@ -198,12 +208,12 @@ impl Presets {
     }
 
     /// `0x0066D9E0` (§11): the door cell's preset unit. `wx`, `wy` are the
-    /// cell's world tile, `cell` its packed value, `orientation` its type
-    /// (9 = right door). The caller skips cells whose door record already
-    /// has flag 0x20 and sets it on [`DoorOutcome::Placed`]. Draws
-    /// `roll(3)` on the room seed for objects 91 and 92.
-    // TODO(preset.md §11): whether flag 0x20 is also set when the roll
-    // gives 0 or the position is outside the room is not stated.
+    /// cell's world tile, `cell` its packed value, `orientation` the
+    /// right-door test input (with a record: record type = 9; without
+    /// one: the cell orientation = 9). The caller skips a record that
+    /// already has flag 0x20 (no lookup, no draw) and sets it when
+    /// [`DoorOutcome::sets_record_flag`]. Draws `roll(3)` on the room
+    /// seed for objects 91 and 92.
     #[allow(clippy::too_many_arguments)]
     pub fn door_unit(
         &mut self,

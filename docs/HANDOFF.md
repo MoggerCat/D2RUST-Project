@@ -2724,6 +2724,16 @@ the dev-dependency) and record results here.
     `D2_GAME_DIR` set and `-- --include-ignored` for those files; expect the
     survivors named in the two notes to be caught. Optional, about an hour.
 
+65. Act III / Act V on live tables (`impl-drlg-act3-5`): `D2_GAME_DIR=<install>
+    cargo test -p d2-sim --test game_drlg_tables act3_act5 -- --ignored`.
+    Expect `act3_act5_table_values` (the leveldefs / lvlprest values of
+    `outdoor-act3-act5.md` Test vectors "Real 1.14d values") and
+    `act3_act5_placement_on_live_tables` (the derived Act III placement:
+    DRLG seed after {4015082244, 577631236}, rects and block ids of 76..78,
+    Kurast chain; Act V rects of 110, 111, 112, 117) to pass. A mismatch is
+    a finding for `outdoor-act3-act5.md`. Recordings of Act 3 creation and
+    of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):

@@ -14,7 +14,9 @@
 //! Cells are real DRLG rooms of the level ([`Drlg::alloc_room`], which
 //! draws the level-seed and room-seed steps of §3.1), kept in the level's
 //! room list newest first. Their maze data (def, file, lock, links) lives
-//! here beside them: `drlg::room` has no orth links.
+//! here beside them: `drlg::room` has no orth links. The rooms the cells
+//! are built into (§9 step 4) get their links here too; they are dropped
+//! with the generation state.
 //!
 //! Seams: [`MazePresets`] reaches `drlg::preset` (DS1 map alloc and its
 //! file draw, building a map into rooms, a preset level's direction) and
@@ -28,6 +30,8 @@ pub mod layout;
 pub mod specials;
 
 #[cfg(test)]
+mod links_tests;
+#[cfg(test)]
 mod mutant_tests;
 #[cfg(test)]
 mod tests;
@@ -39,7 +43,7 @@ use thiserror::Error;
 
 use super::data::DrlgData;
 use super::level::Drlg;
-use super::{DrlgError, LevelIdx, TileRect};
+use super::{DrlgError, DrlgRoomId, LevelIdx, TileRect};
 
 pub use cells::{Cell, LinkTarget, MazeLink};
 pub use specials::{SpecialRow, Specials, SPECIALS_TSV};
@@ -142,15 +146,13 @@ pub trait MazePresets {
     /// Overwrite a map's file (§9 step 2).
     fn set_map_file(&mut self, map: MapId, file: i32);
 
-    /// `0x00667ED0` (§9 steps 3–4): build the map into room(s), `small`
-    /// when the cell is at most 12 × 12, then link the built room to each
-    /// of `links` (the cell's init-flag links, in list order) with the
-    /// same direction. The cells named by `links` may already be freed
-    /// (built earlier in list order).
-    // TODO(spec: maze.md §9 step 4): which built room carries the links
-    // when one DS1 builds several rooms, and what a link to an already
-    // freed cell resolves to, belong to drlg/preset.md; the provider
-    // decides.
+    /// `0x00667ED0` (§9 step 3): build the map into room(s) with room
+    /// flags F = 0, single-room mode when `small` (the cell is at most
+    /// 12 × 12). Returns the room BuildArea returns (the last room built;
+    /// `None` only when it built none). `links` are the cell's init-flag
+    /// links in list order (newest first), for the provider's
+    /// information: maze code itself links the returned room to them
+    /// (§9 step 4).
     fn build_map(
         &mut self,
         drlg: &mut Drlg,
@@ -159,7 +161,7 @@ pub trait MazePresets {
         map: MapId,
         small: bool,
         links: &[MazeLink],
-    ) -> Result<(), DrlgError>;
+    ) -> Result<Option<DrlgRoomId>, DrlgError>;
 }
 
 /// Maze generation errors: the original's fatal paths (edge cases 3, 7)
