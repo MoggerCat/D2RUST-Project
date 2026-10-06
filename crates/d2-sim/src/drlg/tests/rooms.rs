@@ -4,7 +4,7 @@ use super::fakes::*;
 use crate::drlg::room::{is_near, near_gaps, sort_near};
 use crate::drlg::*;
 use crate::rng::Seed;
-use crate::units::ClientId;
+use crate::units::{ClientId, UnitType};
 
 const INIT: u32 = 644_409_375;
 
@@ -438,4 +438,36 @@ fn preset_units_added_once_by_handler_3() {
     let mut sorted = w.types.preset_units_added.clone();
     sorted.sort();
     assert_eq!(sorted, [r[0], r[1], r[2], r[3], r[4]]);
+}
+
+/// PW1: a room removed while units are still in it (tick step 9 normally
+/// compresses them first, §8.2). The units leave the freed record (§5.3,
+/// list order), so a later room in the reused slot does not hold them.
+/// TODO(rooms.md §8.2): the flag 0x800000 / flag-ex 0x20 and path update
+/// of `0x0061A840` (unit specs; handoff `prop-fixes` Q3).
+// Covers: specs/drlg/rooms.md §8 r2
+#[test]
+fn removal_of_a_room_with_units_unlinks_them() {
+    let (mut w, mut d, r) = row_world();
+    let mut svc = w.svc();
+    let a = d.stream_room(&mut svc, r[0]).unwrap().unwrap();
+    let g = w.lists.guids.alloc(UnitType::Monster);
+    let u = w
+        .lists
+        .add_unit(UnitType::Monster, g, Some(a), true)
+        .unwrap();
+    let g = w.lists.guids.alloc(UnitType::Player);
+    let v = w
+        .lists
+        .add_unit(UnitType::Player, g, Some(a), false)
+        .unwrap();
+    let mut svc = w.svc();
+    d.remove_active_room(&mut svc, a).unwrap();
+    assert!(w.lists.room(a).is_none(), "record freed");
+    for x in [u, v] {
+        assert_eq!(w.lists.unit(x).unwrap().room(), None);
+    }
+    let mut svc = w.svc();
+    let b = d.stream_room(&mut svc, r[0]).unwrap().unwrap();
+    assert_eq!(w.lists.room_unit_first(b), None);
 }

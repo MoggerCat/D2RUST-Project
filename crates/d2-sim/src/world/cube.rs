@@ -18,6 +18,8 @@ use crate::rng::Seed;
 use crate::units::UnitId;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod tests;

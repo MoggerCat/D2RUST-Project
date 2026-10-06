@@ -465,3 +465,140 @@ fn the_gate_stops_the_drop() {
         assert!(fx.game.lists.units_of_type(UnitType::Item).is_empty());
     }
 }
+
+/// The drop fixture with the path provider on and the synthetic
+/// walk-back field (`path::search` tests: vectors F1–F3) loaded.
+fn drop_setup_paths(fx: &mut Fx) -> (DeathDrops, UnitId, UnitId) {
+    let h = fx.sim.hooks();
+    h.enable_paths().expect("embedded tables");
+    h.paths.as_mut().unwrap().field = Some(Arc::new(crate::path::search::tests::sign_field()));
+    drop_setup(fx)
+}
+
+/// Sets collision bits on the cell (x, y) of room A's grid.
+fn set_cell(fx: &mut Fx, x: i32, y: i32, bit: u16) {
+    let (a, game) = (fx.a, &fx.game);
+    *fx.sim
+        .sys
+        .hooks
+        .drlg
+        .collision_mut(game, a, x, y)
+        .expect("in a grid") |= bit;
+}
+
+fn spot_of(fx: &mut Fx, d: &mut DeathDrops, mon: UnitId, p: UnitId) -> DropSpot {
+    let before = d.placed.len();
+    let out = run_drop(fx, d, mon, p);
+    assert_eq!(out.len(), 1, "{:?} {:?}", d.failures, d.errors);
+    assert_eq!(d.placed.len(), before + 1);
+    d.placed[before].1
+}
+
+/// `treasure.md` §7 step 2 on the floor drop (`path-placement.md` §9,
+/// vector D2 translated by (+3, 0)): the monster at (13, 10) by its path
+/// record (the `Pending` position is not set with the provider on), an
+/// empty room → the start (15, 13). The item gets its static path at
+/// the spot and its footprint (0x200).
+#[test]
+fn with_the_path_provider_the_drop_lands_on_the_floor_drop_spot() {
+    let mut fx = Fx::new();
+    let (mut d, p, mon) = drop_setup_paths(&mut fx);
+    assert_eq!(fx.sim.hooks().path_position(mon), (13, 10));
+    let a = fx.a;
+    let spot = spot_of(&mut fx, &mut d, mon, p);
+    assert_eq!(
+        spot,
+        DropSpot {
+            room: Some(a),
+            x: 15,
+            y: 13
+        }
+    );
+    let item = d.placed[0].0;
+    assert!(matches!(
+        fx.sim.hooks().paths.as_ref().unwrap().record(item),
+        Some(crate::path::UnitPath::Static(_))
+    ));
+    assert_eq!(fx.sim.hooks().path_position(item), (15, 13));
+    let cell = |fx: &mut Fx, x, y| {
+        crate::path::collision::point_value(&fx.sim.hooks().drlg, Some(a), x, y, 0xFFFF)
+    };
+    assert_ne!(cell(&mut fx, 15, 13) & bits::ITEM, 0);
+    fx.assert_clean();
+}
+
+/// Vector D1 translated: a wall column at x = 15 (the start's column)
+/// → ring 1: (14, 12) d 2 kept, (16, *) fail the walk-back through the
+/// wall, (14, 13) d 1 wins. Vector D3 translated: only an item bit
+/// (0x200) at the start → (14, 13). M08: the same drop without the
+/// blocked cells lands on the start (previous test).
+#[test]
+fn the_floor_drop_avoids_blocked_cells() {
+    for case in 0..2 {
+        let mut fx = Fx::new();
+        let (mut d, p, mon) = drop_setup_paths(&mut fx);
+        if case == 0 {
+            for y in 0..40 {
+                set_cell(&mut fx, 15, y, bits::WALL);
+            }
+        } else {
+            set_cell(&mut fx, 15, 13, bits::ITEM);
+        }
+        let a = fx.a;
+        assert_eq!(
+            spot_of(&mut fx, &mut d, mon, p),
+            DropSpot {
+                room: Some(a),
+                x: 14,
+                y: 13
+            },
+            "case {case}"
+        );
+        fx.assert_clean();
+    }
+}
+
+/// §7 step 2 "each seeing the previous ones": the first drop's item
+/// footprint (0x200, in mask 0x3E01) blocks the start for the next, which
+/// lands as in vector D3 (14, 13).
+#[test]
+fn a_dropped_item_blocks_the_next_drop() {
+    let mut fx = Fx::new();
+    let (mut d, p, mon) = drop_setup_paths(&mut fx);
+    let a = fx.a;
+    let first = spot_of(&mut fx, &mut d, mon, p);
+    let second = spot_of(&mut fx, &mut d, mon, p);
+    assert_eq!((first.x, first.y), (15, 13));
+    assert_eq!(
+        second,
+        DropSpot {
+            room: Some(a),
+            x: 14,
+            y: 13
+        }
+    );
+    fx.assert_clean();
+}
+
+/// The provider on without the walk-back field: the drop keeps the
+/// [`FreeSpot`] seam (here: the start as is), at the path position.
+#[test]
+fn without_the_field_the_drop_keeps_the_free_spot_seam() {
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let (mut d, p, mon) = drop_setup(&mut fx);
+    // A wall at the start: the seam answers the start regardless.
+    set_cell(&mut fx, 15, 13, bits::WALL);
+    let spot = spot_of(&mut fx, &mut d, mon, p);
+    assert_eq!((spot.x, spot.y), (15, 13));
+    let item = d.placed[0].0;
+    assert!(fx
+        .sim
+        .hooks()
+        .paths
+        .as_ref()
+        .unwrap()
+        .record(item)
+        .is_none());
+    fx.assert_clean();
+}
