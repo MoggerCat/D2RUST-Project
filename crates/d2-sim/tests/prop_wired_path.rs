@@ -496,6 +496,11 @@ struct Model {
     /// path record and are left out of every check from then on, except
     /// that their last footprint may stay in a neighbouring room's grid.
     compressed: BTreeMap<UnitId, Foot>,
+    /// Monsters placed by the coarse search into a room that does not
+    /// hold their cell (§8 rule 2 tests the row against the rect last
+    /// read: `regress_coarse_box_room_need_not_hold_the_point`), until
+    /// they change cell (the room recache of `pathing.md` §9.6 r9).
+    outside: BTreeSet<UnitId>,
 }
 
 impl Model {
@@ -670,7 +675,12 @@ fn check_grid(
 }
 
 /// Property 5 for every unit, after any step.
-fn check_rooms(h: &Host, ft: &BTreeMap<UnitId, Foot>, at: &str) -> Result<(), TestCaseError> {
+fn check_rooms(
+    h: &Host,
+    m: &Model,
+    ft: &BTreeMap<UnitId, Foot>,
+    at: &str,
+) -> Result<(), TestCaseError> {
     let fx = &h.fx;
     let d = &fx.sim.action.sys.hooks.drlg;
     let active = fx.game.lists.active_rooms(0);
@@ -680,7 +690,7 @@ fn check_rooms(h: &Host, ft: &BTreeMap<UnitId, Foot>, at: &str) -> Result<(), Te
         let r = room.unwrap();
         prop_assert!(active.contains(&r), "{}: {:?} in inactive {:?}", at, u, r);
         prop_assert!(
-            d.subtile_rect(r).is_some_and(|t| t.contains(f.x, f.y)),
+            m.outside.contains(&u) || d.subtile_rect(r).is_some_and(|t| t.contains(f.x, f.y)),
             "{}: {:?} at ({}, {}) outside its room {:?} {:?}",
             at,
             u,
@@ -921,7 +931,7 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
     m.step(&BTreeMap::new(), &prev);
     h.refresh(&mut m);
     check_grid(&h, &m, &prev, "setup")?;
-    check_rooms(&h, &prev, "setup")?;
+    check_rooms(&h, &m, &prev, "setup")?;
     clean(&h, "setup")?;
     let quiet = Op::Ticks(60);
     for (i, op) in ops.iter().chain(std::iter::once(&quiet)).enumerate() {
@@ -1004,6 +1014,7 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
                     for (u, f) in &now {
                         if prev.get(u).is_some_and(|b| (b.x, b.y) != (f.x, f.y)) {
                             m.unstamped.remove(u);
+                            m.outside.remove(u);
                         }
                     }
                     check_tick(&h, &m, &prev, &now, &at)?;
@@ -1011,7 +1022,7 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
                     h.refresh(&mut m);
                     prev = now;
                     check_grid(&h, &m, &prev, &at)?;
-                    check_rooms(&h, &prev, &at)?;
+                    check_rooms(&h, &m, &prev, &at)?;
                     clean(&h, &at)?;
                     out.push(digest(&h));
                 }
@@ -1040,9 +1051,21 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
                     mode: 1,
                     allied: false,
                 };
-                h.fx.sim
-                    .action
-                    .with(&mut h.fx.game, |g, v| v.allocate(g, &req, pt.x, pt.y));
+                let u =
+                    h.fx.sim
+                        .action
+                        .with(&mut h.fx.game, |g, v| v.allocate(g, &req, pt.x, pt.y));
+                let holds =
+                    h.fx.sim
+                        .action
+                        .sys
+                        .hooks
+                        .drlg
+                        .subtile_rect(room)
+                        .is_some_and(|t| t.contains(pt.x, pt.y));
+                if let (Some(u), false) = (u, holds) {
+                    m.outside.insert(u);
+                }
             }
             Op::Warp { who } => {
                 let Some(&p) = h.players.get(who) else {
@@ -1090,7 +1113,7 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
         h.refresh(&mut m);
         prev = now;
         check_grid(&h, &m, &prev, &at)?;
-        check_rooms(&h, &prev, &at)?;
+        check_rooms(&h, &m, &prev, &at)?;
         clean(&h, &at)?;
         out.push(digest(&h));
     }
@@ -1264,4 +1287,43 @@ fn regress_a_warp_streams_its_spawn_room_back_in() {
     for (x, y, _) in f.cells() {
         assert!(g.get(x, y).is_some_and(|v| v & PLAYER_MOVE == 0));
     }
+}
+
+/// Counterexample 6 (release hunt, 600 cases): the coarse free-box
+/// search (§8) from room A = (40000, 40080, 40 × 10) around (40008,
+/// 40080), with a wall at (40008, 40078), returns room A with the point
+/// (40006, 40078), which lies in the room above. Pass 1's row y = 40079
+/// is outside A's rows, so its row room is the room above (B) and the
+/// cell visit reads B's rect; pass 2's row y = 40078 is inside the rect
+/// last read (B's), so rule 2 takes `room` (A) as the row room, and the
+/// cell (40006, 40078) is inside A's columns: out room A. The code
+/// follows the spec's wording; the spec does not list the consequence
+/// (open point PWQ1 in `docs/handoff/prop-wired-path.md`). A monster
+/// placed there stands outside its room until its first move.
+#[test]
+fn regress_coarse_box_room_need_not_hold_the_point() {
+    let h = host(&plain(1, 0, vec![(8, 78, bits::WALL)]));
+    let a = room_at(&h.fx, &active(&h.fx), 40008, 40080).unwrap();
+    let above = room_at(&h.fx, &active(&h.fx), 40008, 40079).unwrap();
+    assert_ne!(a, above);
+    let mut pt = d2_sim::path::coords::Point::new(40008, 40080);
+    let r = place::coarse_free_box(
+        &h.fx.sim.action.sys.hooks.drlg,
+        a,
+        &mut pt,
+        1,
+        MONSTER_PLACE,
+    );
+    assert_eq!((r, pt.x, pt.y), (Some(a), 40006, 40078));
+    // M08: without the wall pass 1 succeeds in the room above.
+    let h2 = host(&plain(1, 0, Vec::new()));
+    let mut pt = d2_sim::path::coords::Point::new(40008, 40080);
+    let r = place::coarse_free_box(
+        &h2.fx.sim.action.sys.hooks.drlg,
+        a,
+        &mut pt,
+        1,
+        MONSTER_PLACE,
+    );
+    assert_eq!((r, pt.x, pt.y), (Some(above), 40007, 40079));
 }
