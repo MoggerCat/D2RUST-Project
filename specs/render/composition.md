@@ -21,17 +21,17 @@
 | Rules | 63–64 |
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
-|   3. Frame cycle | 114–143 |
-|   4. Palette (one per presented frame) | 144–161 |
-|   5. One pixel write (index domain) | 162–191 |
-|   6. d2rs answers | 192–205 |
-|   7. DirectDraw (display type 3) differences | 206–217 |
-| Constants & data dependencies | 218–223 |
-| Randomness | 224–227 |
-| Edge cases & original bugs | 228–237 |
-| Test vectors | 238–249 |
-| Provenance | 250–265 |
-| Open questions | 266–282 |
+|   3. Frame cycle | 114–146 |
+|   4. Palette (one per presented frame) | 147–164 |
+|   5. One pixel write (index domain) | 165–202 |
+|   6. d2rs answers | 203–216 |
+|   7. DirectDraw (display type 3) differences | 217–228 |
+| Constants & data dependencies | 229–234 |
+| Randomness | 235–238 |
+| Edge cases & original bugs | 239–248 |
+| Test vectors | 249–260 |
+| Provenance | 261–278 |
+| Open questions | 279–299 |
 <!-- /index -->
 
 ## Summary
@@ -129,7 +129,10 @@ The in-game frame (`0x0044C990`), once per client tick (`camera.md` §9):
 4. If the counter `[0x0070F2C0]` is above 0, `ClearScreen(0)` (slot
    `+0xC4`, GDI `0x006C9270` → `0x006C9220(0)`: all W × H bytes set to 0)
    runs **after** all drawing, and the counter is decremented: that frame
-   presents all index 0. `0x0044E100` sets the counter to 1.
+   presents all index 0. `0x0044E100` sets the counter to 1 when it
+   replaces the client act; its only caller is the S→C 0x03 handler
+   `0x0045C8E0` (entry 3 of the handler table `0x007114D0`, size 12): the
+   first in-game frame after each act load is black.
 5. `EndScene` (`0x004F6190`): frame pacing (if less than 5 ms passed since
    the last call, `Sleep` up to 5 ms; no pixel effect), `EndDraw` (slot
    `+0x1C`, GDI `0x006C7DF0`: leave the draw lock), then `Blit` (slot
@@ -176,9 +179,17 @@ Read in `0x00608540` (each table may be absent; an absent step is skipped):
 - no `T`: `d' = L[P[s]]`
 - `T`, no `L`: `d' = T[256 × d + P[s]]` — **row = destination, column =
   source**.
+- `T` and `L`: `d' = T[256 × d + L[s]]` — **`P` is not applied**, whether
+  or not the draw passed one.
 
-The `L`-and-`T` variants are separate routines (`0x00606E40`,
-`0x00607060`, `0x00607970`, `0x00607B90`; Open question 2).
+The table-carrying runs go to one routine per case (no clip / column
+clip): `L` and `T` → `0x00606E40` / `0x00607060`, `P` and `T` →
+`0x00607970` / `0x00607B90`, `L` and `P` → `0x006072F0` / `0x00607480`;
+each `T` routine applies a single 256-byte map before `T`, and the
+dispatcher picks the `L` routine whenever `L` is present. The inline
+path (`[0x008F03C8] ≠ 0`) computes the same values. Translucency with a
+remap therefore loses the remap when the draw is lit; `blend-modes.md`
+owns which draws pass which tables.
 
 The tables are copied unchanged from `pal.pl2` by `0x004FB1E0` (no
 transposition): blend tables from file offset `0x3500` (3 × 65,536 bytes),
@@ -257,8 +268,10 @@ command-line records at `0x0070509C`, GDI driver `0x006C7B00`,
 `0x006C7C10`, `0x006C7D80`, `0x006C7DF0`, `0x006C7E30`, `0x006C7FA0`,
 `0x006C9220`, DirectDraw driver `0x00510160`, `0x00511210`, `0x00511720`,
 `0x00511870`, `0x00512ED0`, frame `0x0044C990`, `0x004F6190`, palette
-loader `0x004FB1E0`, `0x004FB010`, row drawer `0x00608540`, blend getter
-`0x00511D70`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
+loader `0x004FB1E0`, `0x004FB010`, row drawer `0x00608540` (dispatch of
+the table cases to `0x00606E40`, `0x00607060`, `0x006072F0`,
+`0x00607480`, `0x00607970`, `0x00607B90`), blend getter `0x00511D70`,
+act load `0x0045C8E0` → `0x0044E100`. Display-type names from `refs/1.14d-notes` (`VideoMode`) and
 D2MOO `DisplayType.h`. Levels BlankScreen counted in
 `game/extracted/patch_d2/data/global/excel/levels.txt` (137 × 1). No
 capture yet.
@@ -268,14 +281,18 @@ capture yet.
 1. For every act palette: does the PL2 base palette (R, G, B at bytes
    `4i…4i + 2`) equal the `.dat` palette (B, G, R at `3i…`), and is entry 0
    (0, 0, 0)? Game-file check (`mpq-tool` extension); decides whether
-   d2rs may keep reading `.dat`.
-2. Write order when both `L` and `T` are present (`0x00606E40`,
-   `0x00607060`, `0x00607970`, `0x00607B90`): `T[256 × d + L[P[s]]]` is
-   expected; a Ghidra read settles it. Owner of the rule stays here, the
-   table choice in `blend-modes.md`.
+   d2rs may keep reading `.dat`. Each capture also holds the presented
+   palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
+   `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
+2. ~~Write order when both `L` and `T` are present~~: answered in §5
+   (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). Open: the
+   identification of the two 256-byte arguments as `L` (outer) and `P`
+   (inner) rests on the no-`T` case `L[P[s]]`; a capture of a lit,
+   remapped, translucent draw confirms it (`composition-0001` if the
+   portal is lit).
 3. Out-of-game screens (menus, loading screens, cut-scenes) use other
    callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
    `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
    `ui/` capture cases.
-4. What sets the post-draw clear counter (`0x0044E100`, writes 1 at
-   `0x0044E1D2`): which event, for scene captures around it.
+4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
+   §3 step 4).
