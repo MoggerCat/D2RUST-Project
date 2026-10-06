@@ -31,20 +31,20 @@
 |   R1. Data the server keeps per missile | 96–140 |
 |   R2. Creation | 141–275 |
 |   R3. Per-tick dispatch | 276–305 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 306–383 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 384–433 |
-|   R6. Damage stage (missile-owned part) | 434–487 |
-|   R7. Lifetime and expiry | 488–511 |
-|   R8. Pierce | 512–537 |
-|   R9. Server-do and server-hit catalogues | 538–600 |
-|   R10. Behaviour of the recorded missiles | 601–634 |
-|   R11. `missiles.txt` columns and their server use | 635–669 |
-| Constants & data dependencies | 670–696 |
-| Randomness | 697–728 |
-| Edge cases & original bugs | 729–752 |
-| Test vectors | 753–827 |
-| Provenance | 828–863 |
-| Open questions | 864–902 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 306–385 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 386–435 |
+|   R6. Damage stage (missile-owned part) | 436–489 |
+|   R7. Lifetime and expiry | 490–513 |
+|   R8. Pierce | 514–539 |
+|   R9. Server-do and server-hit catalogues | 540–602 |
+|   R10. Behaviour of the recorded missiles | 603–636 |
+|   R11. `missiles.txt` columns and their server use | 637–671 |
+| Constants & data dependencies | 672–698 |
+| Randomness | 699–730 |
+| Edge cases & original bugs | 731–754 |
+| Test vectors | 755–829 |
+| Provenance | 830–865 |
+| Open questions | 866–904 |
 <!-- /index -->
 
 ## Summary
@@ -335,7 +335,9 @@ also call last. Steps per run, 1.14d-confirmed:
    `0x00648F40`, in path order): collision mask there with the missile's
    size against the mode's mask (`0x0064D9B0`). If non-zero: look for a
    unit on that subtile accepted by the mode's callback (`0x00641CB0`,
-   D2MOO `D2Common_10407`, `units.md`); found → hit handler
+   D2MOO `D2Common_10407`, `sim/path-placement.md` §4 rule 6 with
+   r = the missile's size, so a size outside 1..3 finds no unit);
+   found → hit handler
    (unit, a4 = 0), return its result. Not found and mask bit 2 (missile
    barrier) set → expiry-style hit (none, a4 = 1), return 2.
 10. No subtile hit → return 1.

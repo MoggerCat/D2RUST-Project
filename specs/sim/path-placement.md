@@ -33,22 +33,22 @@
 | Rules | 84–85 |
 |   1. Coordinates | 86–99 |
 |   2. Path records | 100–200 |
-|   3. Size, collision pattern, footprint mask | 201–237 |
-|   4. Collision queries | 238–269 |
-|   5. Footprints | 270–313 |
-|   6. Moving a footprint | 314–337 |
-|   7. Nearest free point (`0x0064DEA0`) | 338–400 |
-|   8. Coarse free-box search (`0x0064E840`) | 401–429 |
-|   9. Floor drop placement (`0x00555DA0`) | 430–448 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 449–483 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 484–506 |
-|   12. Warp tiles and warp arrival | 507–543 |
-| Constants & data dependencies | 544–562 |
-| Randomness | 563–572 |
-| Edge cases & original bugs | 573–599 |
-| Test vectors | 600–632 |
-| Provenance | 633–661 |
-| Open questions | 662–686 |
+|   3. Size, collision pattern, footprint mask | 201–241 |
+|   4. Collision queries | 242–309 |
+|   5. Footprints | 310–357 |
+|   6. Moving a footprint | 358–381 |
+|   7. Nearest free point (`0x0064DEA0`) | 382–444 |
+|   8. Coarse free-box search (`0x0064E840`) | 445–473 |
+|   9. Floor drop placement (`0x00555DA0`) | 474–492 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 493–527 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 528–550 |
+|   12. Warp tiles and warp arrival | 551–587 |
+| Constants & data dependencies | 588–606 |
+| Randomness | 607–616 |
+| Edge cases & original bugs | 617–643 |
+| Test vectors | 644–676 |
+| Provenance | 677–705 |
+| Open questions | 706–730 |
 <!-- /index -->
 
 ## Summary
@@ -228,7 +228,11 @@ clear gets 1 → 3 and 2 → 4.
 
 Size-based shapes (missiles, items, tiles, and the size queries of §4):
 0 or 1 → the cell; 2 → plus; 3 → 3×3 box; objects use a sizeX × sizeY
-box (§4 rule 4).
+box (§4 rule 4). The size query `0x0064D9B0` reads exactly these cells
+(jump table `0x0064DA2C`: sizes 0 and 1 the point read `0x0064D450`, 2
+the plus `0x0064D100`, 3 the 3×3 box `0x0064D4A0`); the size stamp and
+clear (§5.1) differ only at size 0, which they skip. A size above 1
+never reduces to the single cell.
 
 Collision bits: `drlg/rooms.md` §10.6. Masks used here: 0x1C09 player
 move / placement (WALL, NOPLAYER, OBJECT, DOOR, NO_PATH); 0x3C01 monster
@@ -267,6 +271,42 @@ OBJECT, DOOR, NO_PATH, PET); 0x801 walk-back field (WALL, DOOR).
 | `0x0064D910` | pattern as above, other → 1 | 1 if any cell collides, else 0 |
 | `0x0064DE30` / `0x0064DC00` | sizeX × sizeY box | set / clear bits |
 
+6. **Unit at a point** (`0x00641CB0(room, x, y, accept, arg, r)`, D2MOO
+   `D2Common_10407`; callers: missile collision `0x005AE3A4` with r =
+   the missile's size, `missiles/missiles.md` §R4 rule 9; `0x00467729`
+   with r = 1; `0x00663E75` with r from its caller; `0x004F10A8`,
+   `0x004D32EB`). Returns the
+   first accepted unit or null:
+   1. Room null, or r outside 1..3 → null.
+   2. Rooms: the room's adjacency array (`drlg/rooms.md` §6: contains
+      the room itself) from index 0 to count − 1 (`0x00619790` reads
+      room +0x00 and +0x24). Each room passes a near-rect test
+      (`0x00641930`, margin 2 against the sub-tile rect at room +0x4C)
+      that, as written, never rejects a room with non-negative width
+      and height (it rejects only when x + 2 < left **and** x − 2 >
+      right, or the same for y): every adjacent room is searched. A
+      room without a unit list head (+0x74) is skipped.
+   3. Units: the room unit list from its head (+0x74) along unit +0xE8
+      (`sim/unit-order.md` §5 order). Skipped: type 0 (player) in mode
+      0 or 17; type 1 (monster) in mode 0 or 12; types 2 (object), 4
+      (item) and any type above 4. Missiles (type 3) are candidates,
+      the searching missile included (the callback filters).
+   4. Unit size s := §3 size (`0x00620510`); s ≤ 0 → skipped; s > 3 →
+      3. Unit point (ux, uy) := the dynamic path's sub-tile position
+      (path +0x2C null → (0, 0)).
+   5. Hit test, d = (|x − ux|, |y − uy|): the query shape of size r
+      (1 point, 2 plus, 3 3×3 box) overlaps the unit's shape of size s:
+
+      | r \ s | 1 | 2 | 3 |
+      |---|---|---|---|
+      | 1 | d = (0, 0) | dx + dy ≤ 1 | dx ≤ 1 and dy ≤ 1 |
+      | 2 | dx + dy ≤ 1 | dx + dy ≤ 2 | (dx ≤ 2 and dy ≤ 1) or (dx ≤ 1 and dy ≤ 2) |
+      | 3 | dx ≤ 1 and dy ≤ 1 | (dx ≤ 2 and dy ≤ 1) or (dx ≤ 1 and dy ≤ 2) | dx ≤ 2 and dy ≤ 2 |
+
+      (jump table `0x00641EF8`, index s − 1 + 3(r − 1)).
+   6. On a hit, `accept(unit, arg)` (fastcall); non-zero → return the
+      unit. Otherwise continue with the next unit, then the next room.
+
 ### 5. Footprints
 
 #### 5.1 Stamp and clear primitives
@@ -277,7 +317,11 @@ complement; cells without a room are skipped. Pattern stamp
 apply the §3 cells with the mask, then, **only when the mask is not 0**,
 the marker (set: OR the marker; clear: AND it out). Clear with a null
 room does nothing. Size stamp `0x0064EA00` / clear `0x0064EBA0`: size 1
-cell, 2 plus, 3 box, others nothing (no marker).
+cell, 2 plus, 3 box, others nothing (no marker). The clear tests the
+room first (null → nothing) and dispatches through `0x0064EBFC`
+(size 0 → return; 1 → `0x0064DB70` one cell; 2 → `0x0064DA40` plus;
+3 → `0x0064DBC0` 3×3 box); the stamp tests the size by subtraction
+(1, 2, 3; anything else returns).
 
 #### 5.2 Per unit kind
 
