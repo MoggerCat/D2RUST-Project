@@ -1,14 +1,14 @@
 // Spec: specs/sim/intents-events.md
 //! The narrow interfaces `d2-server` needs from other crates, defined here
 //! so the transport and host loop can be built and tested before those
-//! crates exist. Each trait names its expected provider; the coordinator
-//! wires the real implementations (`docs/HANDOFF.md` §2).
+//! crates exist. Each trait names its provider; the adapters in
+//! [`crate::adapters`] implement them on the real crates.
 //!
 //! | Trait | Provider |
 //! |---|---|
-//! | [`MessageSizes`] | `d2-proto` (size rules from `sim/*-messages.tsv`) |
-//! | [`Intents`] | `d2-sim` (player gate state, intent handlers, client list) |
-//! | [`Tick`] | `d2-sim::tick` (one game tick) |
+//! | [`MessageSizes`] | `d2-proto` (size rules from `sim/*-messages.tsv`): [`crate::adapters::ProtoSizes`] |
+//! | [`Intents`] | `d2-sim` (player gate state, intent handlers, client list): [`crate::adapters::SimGame`] |
+//! | [`Tick`] | `d2-sim::tick` (one game tick): [`crate::adapters::SimGame`] |
 //! | [`SessionHandler`] | `d2-server` session code (Phase 5) |
 //! | [`Clock`] | host: [`crate::host::SystemClock`]; tests: a manual clock |
 
@@ -23,6 +23,11 @@ pub enum SizeError {
     Invalid,
     /// Fewer bytes than the rule needs, or a string without its NUL.
     Incomplete,
+    /// The C→S chat rule (§2.1 rule 5) came out negative (signed byte).
+    /// What the classifier `0x0052B100` does with it is not in the spec
+    /// (`docs/HANDOFF.md` §7 question 6); callers must not treat it as
+    /// either of the other results.
+    Negative(i32),
 }
 
 /// Per-direction message size rules (spec §2.1 rule 5, §3.1 rule 1).

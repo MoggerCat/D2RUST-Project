@@ -133,7 +133,11 @@ pub fn eval(rule: &Rule, b: &[u8]) -> Result<usize, SizeError> {
             if cap.is_some_and(|c| v > c) {
                 v = 0;
             }
-            Ok(v * mul + add)
+            // A rule giving 0 is "not a valid message" (§2.1 rule 5).
+            match v * mul + add {
+                0 => Err(SizeError::Invalid),
+                n => Ok(n),
+            }
         }
         Rule::Chat => {
             need(3)?;
@@ -143,8 +147,13 @@ pub fn eval(rule: &Rule, b: &[u8]) -> Result<usize, SizeError> {
             let c = b[l1 + l2 + 5] as i8 as isize;
             let size = (l1 + l2 + 6) as isize + c;
             // "needs >= size" is left to the classifier's "> the given
-            // size" test (same result 3), as in `check_packets.py`.
-            usize::try_from(size).map_err(|_| SizeError::Incomplete)
+            // size" test (same result 3), as in `check_packets.py`. A
+            // negative size is its own result (HANDOFF §7 question 6).
+            match size {
+                0 => Err(SizeError::Invalid),
+                n if n < 0 => Err(SizeError::Negative(n as i32)),
+                n => Ok(n as usize),
+            }
         }
         Rule::Chat26 => {
             need(10)?;
