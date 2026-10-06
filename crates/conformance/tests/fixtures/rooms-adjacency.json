@@ -1,0 +1,397 @@
+{
+ "area": "sim",
+ "behavior": "tick",
+ "expected": [
+  {
+   "data": {
+    "acts": [
+     [],
+     null,
+     null,
+     null,
+     null
+    ],
+    "clients": [
+     1
+    ],
+    "hash": {},
+    "seq": 1,
+    "step": "pre",
+    "tiles": []
+   },
+   "kind": "lists",
+   "tick": 1
+  },
+  {
+   "data": {
+    "acts": [
+     [
+      {
+       "adj": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+       ],
+       "queue": [],
+       "room": "R1",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+       ],
+       "queue": [],
+       "room": "R2",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+       ],
+       "queue": [],
+       "room": "R3",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+       ],
+       "queue": [],
+       "room": "R4",
+       "units": []
+      }
+     ],
+     null,
+     null,
+     null,
+     null
+    ],
+    "clients": [
+     1
+    ],
+    "hash": {},
+    "seq": 7,
+    "step": "pre",
+    "tiles": []
+   },
+   "kind": "lists",
+   "tick": 25
+  },
+  {
+   "data": {
+    "acts": [
+     [
+      {
+       "adj": [
+        "R1",
+        "R4",
+        "R3"
+       ],
+       "queue": [],
+       "room": "R1",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R4",
+        "R3"
+       ],
+       "queue": [],
+       "room": "R3",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R4",
+        "R3"
+       ],
+       "queue": [],
+       "room": "R4",
+       "units": []
+      }
+     ],
+     null,
+     null,
+     null,
+     null
+    ],
+    "clients": [
+     1
+    ],
+    "hash": {},
+    "seq": 9,
+    "step": "pre",
+    "tiles": []
+   },
+   "kind": "lists",
+   "tick": 50
+  },
+  {
+   "data": {
+    "acts": [
+     [
+      {
+       "adj": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+       ],
+       "queue": [],
+       "room": "R1",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+       ],
+       "queue": [],
+       "room": "R3",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+       ],
+       "queue": [],
+       "room": "R4",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+       ],
+       "queue": [],
+       "room": "R5",
+       "units": []
+      },
+      {
+       "adj": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+       ],
+       "queue": [],
+       "room": "R6",
+       "units": []
+      }
+     ],
+     null,
+     null,
+     null,
+     null
+    ],
+    "clients": [
+     1
+    ],
+    "hash": {},
+    "seq": 14,
+    "step": "pre",
+    "tiles": []
+   },
+   "kind": "lists",
+   "tick": 75
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "sim-9001",
+ "inputs": [
+  {
+   "data": {
+    "act": 0,
+    "room": "R1",
+    "seq": 2,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 2
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R2",
+    "seq": 3,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 2
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R3",
+    "seq": 4,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 2
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R4",
+    "seq": 5,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 2
+  },
+  {
+   "data": {
+    "room": "R1",
+    "seq": 6,
+    "step": "pre",
+    "unit": [
+     0,
+     1
+    ]
+   },
+   "kind": "room_add",
+   "tick": 2
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R2",
+    "seq": 8,
+    "step": "pre"
+   },
+   "kind": "room_deactivate",
+   "tick": 30
+  },
+  {
+   "data": {
+    "seq": 10,
+    "step": "pre",
+    "unit": [
+     0,
+     1
+    ]
+   },
+   "kind": "room_remove",
+   "tick": 60
+  },
+  {
+   "data": {
+    "room": "R4",
+    "seq": 11,
+    "step": "pre",
+    "unit": [
+     0,
+     1
+    ]
+   },
+   "kind": "room_add",
+   "tick": 60
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R5",
+    "seq": 12,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 60
+  },
+  {
+   "data": {
+    "act": 0,
+    "room": "R6",
+    "seq": 13,
+    "step": "pre"
+   },
+   "kind": "room_activate",
+   "tick": 60
+  }
+ ],
+ "notes": "rooms.md \u00a76 synthetic vector: [R, X, Y, Z], remove X gives [R, Z, Y]; then two activations refill. setup.near: every room near every other, in this order (test model input, not a recorded field).",
+ "recorded": {
+  "by": "fixture",
+  "date": "2026-10-06",
+  "method": "debugger",
+  "tool": "hand-built (check_rooms.py synthetic)"
+ },
+ "setup": {
+  "frames": 75,
+  "near": {
+   "R1": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ],
+   "R2": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ],
+   "R3": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ],
+   "R4": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ],
+   "R5": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ],
+   "R6": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+   ]
+  }
+ },
+ "spec": "specs/sim/tick.md"
+}

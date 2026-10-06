@@ -16,12 +16,24 @@ d2-net.workspace = true
 # The in-process server of single player (`bridge::local`). Never the
 # reverse (tools/depcheck).
 d2-server.workspace = true
+# The app's single-player game (`app::single_player`): the wired sim and
+# the user's own tables. Game logic stays in d2-sim; the app only builds
+# and stages it, as the server tests do.
+d2-sim.workspace = true
+d2-data.workspace = true
 d2-verify.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 # PNG output for the CPU reference renderer and verification images. Same
 # version Bevy already uses, so no extra copy is built.
 image = { version = "0.25", default-features = false, features = ["png"] }
+# 1.14d frame captures (`verify::capture`, `specs/render/capture.md` §5–§6):
+# the palettized PNGs are read raw (indices, PLTE) with the png crate the
+# image crate already builds; the raw format is JSON lines; hashes are
+# SHA-256. No new crate is downloaded.
+png = "0.18"
+sha2.workspace = true
+serde_json.workspace = true
 # Controls file parser (`specs/client/ui.md` §A6): same toml_edit Bevy's
 # macros already build, so no new crate is downloaded.
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
@@ -31,10 +43,6 @@ toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan", "naga-ir"] }
 
 [dev-dependencies]
-# The local-server end-to-end test builds a wired sim from synthetic tables.
-d2-sim.workspace = true
-d2-data.workspace = true
-# Property tests on the untrusted-input paths (`tests/prop_*.rs`, M07).
 proptest.workspace = true
 
 [lints]

@@ -1,4 +1,5 @@
 // Spec: specs/client/render-pipeline.md (A2–A5)
+// Spec: specs/render/composition.md (§5 one pixel write, §6)
 //! Draw items and their inputs: frames, the map table, shade chains, blend
 //! ops.
 
@@ -110,8 +111,11 @@ impl MapTable {
         id
     }
 
-    /// Appends a 256×256 blend table (`table[src][dest]`) and returns the
-    /// base id for [`BlendOp::IndexTable`].
+    /// Appends a 256×256 blend table and returns the base id for
+    /// [`BlendOp::IndexTable`]. The table is `table[dest][src]`: row =
+    /// destination index, column = source index, the layout of the PL2
+    /// tables as 1.14d reads them (`composition.md` §5), so a PL2 table is
+    /// pushed unchanged.
     pub fn push_table(&mut self, table: &[[u8; 256]; 256]) -> MapId {
         let id = MapId(self.rows.len() as u32);
         self.rows.extend_from_slice(table);
@@ -187,16 +191,24 @@ impl Default for ShadeChain {
 }
 
 /// How a shaded source index combines with the destination (§A5). The
-/// framebuffer is indexed (u8 per pixel, palette at the end).
-/// TODO(spec: render/composition.md): the composition domain (§B2); the
-/// `Rgb` op of §A5 joins this enum, with an RGB framebuffer, only if it says
-/// RGB. TODO(spec: render/blend-modes.md): which op each draw uses (§B5).
+/// framebuffer is indexed (u8 per pixel, palette at present): 1.14d's
+/// reference renderer composes in the index domain, so `Rgb` is not an op
+/// (`composition.md` §1, §6).
+///
+/// One pixel write of 1.14d (`composition.md` §5) is: the source index `s`
+/// through the remap `P` and the light map `L` (the shade chain, in that
+/// order), then, if the draw has a blend table `T`, `T[256 × d + P[s]]`
+/// (row = destination). TODO(spec: render/composition.md OQ2): when both
+/// `L` and `T` are present the order is unconfirmed; this compositor applies
+/// the whole chain first, as for `P` alone. TODO(spec:
+/// render/blend-modes.md): which op and table each draw uses (§B5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BlendOp {
-    /// `dest = src`.
+    /// `dest = src` (no `T`: `d' = L[P[s]]`).
     Opaque,
-    /// `dest = map[base + src][dest]`: a 256×256 table stored as rows
-    /// `base..base + 256` of the map table.
+    /// `dest = map[base + dest][src]`: a 256×256 table stored as rows
+    /// `base..base + 256` of the map table, row = destination, column =
+    /// source (`T[256 × d + s]`).
     IndexTable(MapId),
 }
 
@@ -205,7 +217,7 @@ impl BlendOp {
         match *self {
             BlendOp::Opaque => src,
             BlendOp::IndexTable(base) => {
-                maps.row(MapId(base.0 + u32::from(src)))[usize::from(dest)]
+                maps.row(MapId(base.0 + u32::from(dest)))[usize::from(src)]
             }
         }
     }

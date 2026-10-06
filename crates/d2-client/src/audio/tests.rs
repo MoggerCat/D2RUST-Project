@@ -737,3 +737,172 @@ fn compare_logs_reports_exactly_the_perturbed_fields() {
         [LogMismatch::Length { ours: 3, theirs: 2 }]
     );
 }
+
+// --- Sound pool (§A1 decode path) -------------------------------------------
+
+mod pool {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::*;
+    use crate::assets::cache::CacheEvent;
+    use crate::assets::path::{CanonicalPath, FileSource, MemorySource, ReadError};
+
+    /// Test decoder: the bytes are LE i16 samples of a mono 22,050 Hz
+    /// sound (not the WAV format; that is `formats/wav.md`). Records every
+    /// call.
+    /// Decoder calls: (canonical path, bytes).
+    type Calls = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
+    #[derive(Default)]
+    struct RawDecoder {
+        calls: Calls,
+    }
+
+    impl WavDecoder for RawDecoder {
+        fn decode(&self, path: &CanonicalPath, bytes: &[u8]) -> Result<Sound, String> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((path.as_str().to_owned(), bytes.to_vec()));
+            if !bytes.len().is_multiple_of(2) {
+                return Err(format!("{} bytes", bytes.len()));
+            }
+            let samples = bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| i16::from_le_bytes(*c))
+                .collect();
+            Sound::new(22_050, 1, samples).map_err(|e| e.to_string())
+        }
+    }
+
+    /// Counts reads, so "read once" is visible.
+    struct CountingSource {
+        inner: MemorySource,
+        reads: AtomicU64,
+    }
+
+    impl FileSource for CountingSource {
+        fn read_file(&self, archive_name: &str) -> Option<Result<Vec<u8>, String>> {
+            self.reads.fetch_add(1, Ordering::Relaxed);
+            self.inner.read_file(archive_name)
+        }
+    }
+
+    const STEP: &str = "data\\global\\sfx\\cursor\\button.wav";
+    const STEP_BYTES: [u8; 6] = [0x01, 0x00, 0xff, 0x7f, 0x00, 0x80];
+
+    fn setup(budget: u64) -> (SoundPool, Arc<CountingSource>, Calls) {
+        let mut files = MemorySource::default();
+        files.insert(STEP, STEP_BYTES.to_vec());
+        files.insert("data\\global\\sfx\\b.wav", vec![0; 8]);
+        files.insert("data\\global\\sfx\\c.wav", vec![0; 8]);
+        files.insert("data\\global\\sfx\\odd.wav", vec![0; 3]);
+        let source = Arc::new(CountingSource {
+            inner: files,
+            reads: AtomicU64::new(0),
+        });
+        let decoder = RawDecoder::default();
+        let calls = Arc::clone(&decoder.calls);
+        let pool = SoundPool::new(
+            Arc::clone(&source) as Arc<dyn FileSource>,
+            Box::new(decoder),
+            budget,
+        );
+        (pool, source, calls)
+    }
+
+    // Covers: specs/client/audio.md §a1-decode-path r1
+    #[test]
+    fn wav_bytes_come_from_the_archive_read_unchanged() {
+        // §A1 r1: the file is read through the archive set (here a memory
+        // source behind the same `FileSource` seam `ArchiveSet` implements)
+        // and its bytes reach the decoder as read.
+        let (mut pool, source, calls) = setup(1 << 20);
+        let sound = pool.load(STEP).unwrap();
+        assert_eq!(source.reads.load(Ordering::Relaxed), 1);
+        let calls = calls.lock().unwrap();
+        assert_eq!(
+            *calls,
+            [(
+                "data/global/sfx/cursor/button.wav".to_owned(),
+                STEP_BYTES.to_vec()
+            )]
+        );
+        assert_eq!(sound.samples(), [1, 32767, -32768]);
+    }
+
+    // Covers: specs/client/audio.md §a1-decode-path r3
+    #[test]
+    fn each_file_is_decoded_once_and_kept_as_decoded() {
+        // §A1 r3: stored once per file; two spellings are one file
+        // (`assets.md` §A1); no resampling at decode (rate and samples are
+        // the decoder's).
+        let (mut pool, source, calls) = setup(1 << 20);
+        let a = pool.load(STEP).unwrap();
+        let b = pool.load("DATA/Global/SFX/Cursor/BUTTON.WAV").unwrap();
+        assert!(Arc::ptr_eq(&a, &b));
+        assert_eq!(pool.decodes(), 1);
+        assert_eq!(source.reads.load(Ordering::Relaxed), 1);
+        assert_eq!(calls.lock().unwrap().len(), 1);
+        assert_eq!(a.rate(), 22_050);
+        assert_eq!(a.channels(), 1);
+        assert_eq!(a.samples(), [1, 32767, -32768]);
+        assert_eq!(pool.len(), 1);
+        // §A5: charged samples × 2 bytes.
+        assert_eq!(pool.used(), 6);
+        assert_eq!(sound_bytes(&a), 6);
+        assert!(Arc::ptr_eq(&pool.peek(STEP).unwrap(), &a));
+    }
+
+    #[test]
+    fn missing_and_undecodable_files_are_errors_naming_the_path() {
+        let (mut pool, _, _) = setup(1 << 20);
+        let missing = pool.load("data\\global\\sfx\\none.wav").unwrap_err();
+        assert_eq!(
+            missing,
+            SoundPoolError::Read(ReadError::NotFound(
+                CanonicalPath::new("data/global/sfx/none.wav").unwrap()
+            ))
+        );
+        let odd = pool.load("data\\global\\sfx\\odd.wav").unwrap_err();
+        assert!(odd.to_string().contains("data/global/sfx/odd.wav"), "{odd}");
+        assert!(matches!(
+            pool.load("").unwrap_err(),
+            SoundPoolError::Path(_)
+        ));
+        // A failed load leaves nothing resident and is retried next time.
+        assert!(pool.is_empty());
+        assert!(pool.load("data\\global\\sfx\\odd.wav").is_err());
+        assert_eq!(pool.decodes(), 2);
+    }
+
+    // Covers: specs/client/assets.md §a5-budgets-and-eviction
+    #[test]
+    fn sound_pool_evicts_by_last_frame_used() {
+        // Budget fits two 8-byte sounds (4 samples each).
+        let (mut pool, _, _) = setup(16);
+        pool.begin_frame(1).unwrap();
+        let held = pool.load("data\\global\\sfx\\b.wav").unwrap();
+        pool.begin_frame(2).unwrap();
+        pool.load("data\\global\\sfx\\c.wav").unwrap();
+        pool.begin_frame(3).unwrap();
+        pool.load(STEP).unwrap();
+        assert!(pool.peek("data\\global\\sfx\\b.wav").is_none());
+        assert_eq!(
+            pool.drain_events(),
+            [CacheEvent::Evicted {
+                pool: "sounds",
+                key: "CanonicalPath(\"data/global/sfx/b.wav\")".into(),
+                bytes: 8,
+                last_used: 1,
+            }]
+        );
+        // A playing voice keeps its samples after eviction.
+        assert_eq!(held.samples(), [0, 0, 0, 0]);
+        // Reloading an evicted file decodes it again.
+        pool.load("data\\global\\sfx\\b.wav").unwrap();
+        assert_eq!(pool.decodes(), 4);
+    }
+}

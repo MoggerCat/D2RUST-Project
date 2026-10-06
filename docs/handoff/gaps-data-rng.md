@@ -1,5 +1,7 @@
 # Handoff: gap tests for data specs, rng and the `r0` claim — `claude/gaps-data-rng`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06. Task class: tests from specs plus
 a small tool change, medium effort (METHODS M14). Base: `main` at `edad871`.
 The session had the repo only, synthetic data and no game files (M09). This

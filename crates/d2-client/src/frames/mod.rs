@@ -8,6 +8,7 @@
 //! `render/sprite-placement.md` (render-pipeline §B1), not decided here.
 
 pub mod atlas;
+pub mod store;
 pub mod upload;
 
 #[cfg(test)]
@@ -20,6 +21,7 @@ use d2_formats::dcc::Dcc;
 use d2_formats::dt1::Dt1;
 
 pub use atlas::{Atlas, AtlasError, AtlasSlot, CheckReport, GUTTER, PAGE_SIZE};
+pub use store::{FrameStore, StoreError};
 
 /// One decoded frame: 8-bit palette indices, row-major, top row first,
 /// index 0 = transparent.

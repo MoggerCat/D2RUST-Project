@@ -228,8 +228,8 @@ consulted.
 
 1. ~~Frames with bottom-up = 1~~: none exist in 1.14d, so the question
    doesn't arise for the original data.
-2. Exact screen placement (the same one-row question as DC6): rendering
-   spec.
+2. ~~Exact screen placement~~: 1.14d covers the §Boxes frame box offset
+   by the draw position; owner `render/sprite-placement.md` §2–§3.
 3. Meaning of variable0 and the optional bytes.
 4. Whole-file direction-box limit (64M pixels, §Boxes) is an
    implementation limit, not observed original behavior: confirm every

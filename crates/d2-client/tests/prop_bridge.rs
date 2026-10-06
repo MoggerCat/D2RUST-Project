@@ -1,488 +1,287 @@
-// Spec: specs/client/bridge.md §2, §4, §5, §6, §8, §9 (robustness, METHODS M07)
-//! Property tests on the bridge's untrusted paths: arbitrary S→C chunks
-//! through the receive path and dispatch (split, unowned ids, handler
-//! rejections, discarded bytes, refused chunks), the frame loop over a
-//! link that returns arbitrary chunks, the protocol version check, and
-//! arbitrary C→S bytes through the send path on the in-process host
-//! (classifier and the link's duplicate filter).
+// Spec: specs/client/bridge.md (§2, §3, §4, §8); specs/sim/intents-events.md (§2.1, §3.3)
+//! Robustness properties (METHODS M07, `CLAUDE.md` hard rule 7) of the
+//! bridge on its in-process server link ([`LocalLink`]): any C→S bytes go
+//! through the bridge's classifier check, the link and the host without
+//! a panic, and a message the bridge sends arrives at the server's
+//! drain byte for byte; any S→C bytes the server delivers (buffered or
+//! direct) go through the receive path and the handlers without a panic.
 //!
-//! The expected results come from the spec's rules applied to
-//! `d2_proto::transport::split_server_buffer` / `classify_client` (the
-//! size rules the spec names), never from the bridge's own code.
+//! The game behind the host is `SimGame` with a joined player and no
+//! wiring: every intent ends in a stub, which is all the transport round
+//! trip needs (the wired handlers are `d2-server`'s `prop_handle.rs`).
+//!
+//! Default case counts are small so `cargo test` stays fast; set
+//! `PROPTEST_CASES` to hunt harder (it overrides every default here).
 
-mod prop_support;
-
-use std::collections::{BTreeMap, VecDeque};
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-
-use d2_client::bridge::dispatch::{Dispatch, HandlerError, Message, IDS};
-use d2_client::bridge::intent::{self, IntentError};
-use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
-use d2_client::bridge::local::{LocalLink, PendingSession};
-use d2_client::bridge::world::{addressed_unit, ClientWorld};
-use d2_client::bridge::{Bridge, BridgeError, ClientUnit, LOCAL_CLIENT};
-use d2_proto::schema::Size;
-use d2_proto::transport::{client_size, server_size, split_server_buffer};
-use d2_proto::PROTOCOL_VERSION;
-use d2_server::adapters::ProtoSizes;
-use d2_server::host::Host;
-use d2_server::seams::{
-    ClientId, Clock, Intents, MessageSink, PlayerLookup, PointState, ResultCode, Tick, UnitTarget,
+use d2_client::bridge::dispatch::Dispatch;
+use d2_client::bridge::intent::{route, IntentError, MAX_GAME_SEND};
+use d2_client::bridge::link::{LinkError, SendQueue, Sent, ServerLink};
+use d2_client::bridge::local::{LocalError, LocalLink, PendingSession};
+use d2_client::bridge::{Bridge, BridgeError, LOCAL_CLIENT};
+use d2_proto::transport::{
+    classify_client, split_server_buffer, Classified, ClientQueue, SplitError, MAX_MESSAGE,
 };
-use d2_server::transport::duplicate_window;
+use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
+use d2_server::host::{Handled, Host};
+use d2_server::seams::{Clock, PlayerGate, Pos};
+use d2_server::transport::DRAIN_COPY;
+use d2_sim::game::Game;
+use d2_sim::units::lists::client_state;
+use d2_sim::units::UnitType;
 use proptest::prelude::*;
+use proptest::test_runner::Config;
 
-use prop_support::{bounded, config};
-
-// ---------------------------------------------------------------------------
-// Receive path
-
-/// Test handler: checks what the bridge hands it (§5 rule 4, §6), then
-/// rejects messages whose length is a multiple of 3 (§6 rule 4) and
-/// otherwise toggles the addressed unit in the model.
-fn track(world: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
-    if msg.bytes.first() != Some(&msg.id) {
-        return Err(HandlerError::Invalid("id is not the first byte"));
-    }
-    if msg.unit != addressed_unit(msg.bytes) {
-        return Err(HandlerError::Invalid("unit is not the addressed unit"));
-    }
-    if msg.bytes.len().is_multiple_of(3) {
-        return Err(HandlerError::Invalid("rejected by the fixture"));
-    }
-    if let Some(key) = msg.unit {
-        if world.units.remove(&key).is_none() {
-            world.units.insert(key, ClientUnit { key });
-        }
-    }
-    Ok(())
-}
-
-fn dispatch(owned: &[u8]) -> Dispatch {
-    let mut d = Dispatch::empty();
-    for &id in owned {
-        if usize::from(id) < IDS {
-            d.set(id, "specs/client/bridge.md", track);
-        }
-    }
-    d
-}
-
-/// What the receive path must do with `chunks` (§2, §6), computed from
-/// the split alone: the model, unowned counts per id, handled, rejected,
-/// discarded (first byte, count) per chunk, and the index of the first
-/// refused chunk.
-#[derive(Debug, Default, PartialEq, Eq)]
-struct Expected {
-    world: ClientWorld,
-    handled: u64,
-    unowned: BTreeMap<u8, u64>,
-    rejected: Vec<u8>,
-    discarded: Vec<(u8, usize)>,
-}
-
-fn expect(owned: &[u8], chunk: &[u8], e: &mut Expected) -> bool {
-    let Ok(split) = split_server_buffer(chunk) else {
-        return false;
-    };
-    for m in &split.messages {
-        let id = m[0];
-        if owned.contains(&id) && usize::from(id) < IDS {
-            if m.len().is_multiple_of(3) {
-                e.rejected.push(id);
-            } else {
-                e.handled += 1;
-                if let Some(key) = addressed_unit(m) {
-                    if e.world.units.remove(&key).is_none() {
-                        e.world.units.insert(key, ClientUnit { key });
-                    }
-                }
-            }
-        } else {
-            *e.unowned.entry(id).or_default() += 1;
-        }
-    }
-    if let Some(&first) = split.discarded.first() {
-        e.discarded.push((first, split.discarded.len()));
-    }
-    true
-}
-
-/// One S→C message the size rule accepts: id, then `fill` cut to the
-/// rule's size (the size may depend on the bytes, so it is evaluated on
-/// the filled buffer).
-fn server_message_bytes(id: u8, fill: &[u8]) -> Option<Vec<u8>> {
-    let mut b = vec![id];
-    b.extend_from_slice(fill);
-    match server_size(&b) {
-        Size::Bytes(n) if n >= 1 && n <= b.len() => {
-            b.truncate(n);
-            Some(b)
-        }
-        _ => None,
+/// Proptest config with `default` cases, or `PROPTEST_CASES` when set.
+fn config(default: u32) -> Config {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(default);
+    Config {
+        cases,
+        failure_persistence: None,
+        ..Config::default()
     }
 }
 
-/// Chunks: raw bytes (mostly refused or discarded), or a run of messages
-/// the size rule accepts with an optional raw tail (mostly dispatched).
-fn chunk() -> impl Strategy<Value = Vec<u8>> {
-    let raw = proptest::collection::vec(any::<u8>(), 0..64);
-    let wellformed = (
-        proptest::collection::vec(
-            (0u8..0xB5, proptest::collection::vec(any::<u8>(), 0..0x30)),
-            0..8,
-        ),
-        proptest::collection::vec(any::<u8>(), 0..4),
-    )
-        .prop_map(|(msgs, tail)| {
-            let mut out = Vec::new();
-            for (id, fill) in msgs {
-                if let Some(m) = server_message_bytes(id, &fill) {
-                    out.extend_from_slice(&m);
-                }
-            }
-            out.extend_from_slice(&tail);
-            out
-        });
-    prop_oneof![1 => raw, 3 => wellformed]
-}
-
-/// Owned ids: a few random ids plus some unit-handler ids, so handlers,
-/// unit lookups and rejections all run.
-fn owned_ids() -> impl Strategy<Value = Vec<u8>> {
-    proptest::collection::vec(prop_oneof![any::<u8>(), 0x0Eu8..0x20, 0x67u8..0x6E], 0..24)
-}
-
-/// A test link: delivers queued chunk lists one frame at a time.
-struct Script {
-    version: u32,
-    frames: VecDeque<Vec<Vec<u8>>>,
-    pending: Vec<Vec<u8>>,
-}
-
-impl ServerLink for Script {
-    fn protocol_version(&self) -> u32 {
-        self.version
-    }
-    fn send(&mut self, _: SendQueue, _: &[u8]) -> Result<Sent, LinkError> {
-        Ok(Sent::Queued)
-    }
-    fn pump(&mut self) -> Result<Pumped, LinkError> {
-        self.pending = self.frames.pop_front().unwrap_or_default();
-        Ok(Pumped { ticked: true })
-    }
-    fn receive(&mut self) -> Vec<Vec<u8>> {
-        std::mem::take(&mut self.pending)
-    }
-}
-
-fn script(frames: Vec<Vec<Vec<u8>>>) -> Script {
-    Script {
-        version: PROTOCOL_VERSION,
-        frames: frames.into(),
-        pending: Vec::new(),
-    }
-}
-
-proptest! {
-    #![proptest_config(config(256))]
-
-    /// Arbitrary chunks into `receive_chunk`: a refused chunk changes
-    /// nothing (§2 rule 4); otherwise every split message is handled,
-    /// unowned or rejected, in order, and the discarded tail is recorded
-    /// (§2 rules 2–3, §6 rules 3–4).
-    // Covers: specs/client/bridge.md §2 r2, §2 r3, §2 r4, §6 r3, §6 r4
-    #[test]
-    fn receive_matches_split(owned in owned_ids(), chunks in proptest::collection::vec(chunk(), 0..8)) {
-        bounded(move || {
-            let mut bridge = Bridge::with_dispatch(script(Vec::new()), dispatch(&owned)).unwrap();
-            let mut e = Expected::default();
-            for c in &chunks {
-                let before_world = bridge.world().clone();
-                let before_rejected = bridge.log().rejected.len();
-                let before_discarded = bridge.log().discarded.len();
-                let accepted = expect(&owned, c, &mut e);
-                match bridge.receive_chunk(c) {
-                    Ok(r) => {
-                        assert!(accepted, "chunk the split refuses was accepted: {c:02X?}");
-                        assert_eq!(r.messages, r.handled + r.unowned + r.rejected);
-                        assert_eq!(r.discarded_bytes, split_server_buffer(c).unwrap().discarded.len());
-                    }
-                    Err(_) => {
-                        assert!(!accepted, "chunk the split accepts was refused: {c:02X?}");
-                        assert_eq!(bridge.world(), &before_world);
-                        assert_eq!(bridge.log().rejected.len(), before_rejected);
-                        assert_eq!(bridge.log().discarded.len(), before_discarded);
-                    }
-                }
-            }
-            let log = bridge.log();
-            assert_eq!(bridge.world(), &e.world);
-            assert_eq!(log.handled, e.handled);
-            assert_eq!(log.unowned, e.unowned);
-            assert_eq!(log.rejected.iter().map(|r| r.id).collect::<Vec<_>>(), e.rejected);
-            assert_eq!(
-                log.discarded.iter().map(|d| (d.first, d.bytes)).collect::<Vec<_>>(),
-                e.discarded
-            );
-        });
-    }
-
-    /// The frame loop over a link returning arbitrary chunks: counters
-    /// advance once per frame (§5 rule 3), the report sums its chunks,
-    /// and a refused chunk ends the frame with an error after the chunks
-    /// before it were applied (§8).
-    // Covers: specs/client/bridge.md §5 r3, §8 r1
-    #[test]
-    fn frames_over_arbitrary_chunks(
-        owned in owned_ids(),
-        frames in proptest::collection::vec(proptest::collection::vec(chunk(), 0..4), 0..6),
-    ) {
-        bounded(move || {
-            let mut bridge = Bridge::with_dispatch(script(frames.clone()), dispatch(&owned)).unwrap();
-            let mut e = Expected::default();
-            for (n, chunks) in frames.iter().enumerate() {
-                let result = bridge.frame();
-                let mut refused = false;
-                let (mut messages, mut discarded) = (0, 0);
-                for c in chunks {
-                    if !expect(&owned, c, &mut e) {
-                        refused = true;
-                        break;
-                    }
-                    let s = split_server_buffer(c).unwrap();
-                    messages += s.messages.len();
-                    discarded += s.discarded.len();
-                }
-                match result {
-                    Ok(r) => {
-                        assert!(!refused);
-                        assert!(r.ticked);
-                        assert_eq!(r.chunks, chunks.len());
-                        assert_eq!(r.messages, messages);
-                        assert_eq!(r.messages, r.handled + r.unowned + r.rejected);
-                        assert_eq!(r.discarded_bytes, discarded);
-                    }
-                    Err(BridgeError::Split(_)) => assert!(refused),
-                    Err(other) => panic!("unexpected frame error {other}"),
-                }
-                assert_eq!(bridge.world().frames, n as u64 + 1);
-                assert_eq!(bridge.world().server_ticks, n as u64 + 1);
-                assert_eq!(bridge.world().units, e.world.units);
-            }
-        });
-    }
-
-    /// Any protocol version but the client's is refused (§9 rule 1).
-    // Covers: specs/client/bridge.md §9 r1
-    #[test]
-    fn version_check(version in prop_oneof![Just(PROTOCOL_VERSION), any::<u32>()]) {
-        let mut link = script(Vec::new());
-        link.version = version;
-        match Bridge::with_dispatch(link, Dispatch::empty()) {
-            Ok(_) => prop_assert_eq!(version, PROTOCOL_VERSION),
-            Err(BridgeError::Version { client, server }) => {
-                prop_assert_ne!(version, PROTOCOL_VERSION);
-                prop_assert_eq!((client, server), (PROTOCOL_VERSION, version));
-            }
-            Err(other) => panic!("unexpected error {other}"),
-        }
-    }
-
-    /// `addressed_unit` on arbitrary bytes never panics and follows §5
-    /// rule 4 (monster ids 0x67–0x6D read a u32 at +1, others type at +1
-    /// and u32 at +2; too short → none).
-    // Covers: specs/client/bridge.md §5 r4
-    #[test]
-    fn addressed_unit_total(msg in proptest::collection::vec(any::<u8>(), 0..12)) {
-        let unit = addressed_unit(&msg);
-        let Some(&id) = msg.first() else {
-            prop_assert_eq!(unit, None);
-            return Ok(());
-        };
-        let has_handler = d2_proto::transport::server_message(id)
-            .is_some_and(|m| m.client_unit_handler.is_some());
-        let need = if (0x67..=0x6D).contains(&id) { 5 } else { 6 };
-        prop_assert_eq!(unit.is_some(), has_handler && msg.len() >= need);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Send path on the in-process host
-
-/// A game with no players: every intent is refused by the gate and a tick
-/// sends nothing. The send path and the duplicate filter run before it.
-struct NoGame;
-
-impl Intents for NoGame {
-    fn player(&self, _: ClientId) -> PlayerLookup {
-        PlayerLookup::NotInGame
-    }
-    fn frame(&self) -> i32 {
-        0
-    }
-    fn point_state(&self, _: ClientId) -> Option<PointState> {
-        None
-    }
-    fn set_point_accept(&mut self, _: ClientId, _: i32) {}
-    fn queue_resync(&mut self, _: ClientId, _: &mut dyn MessageSink) {}
-    fn unit_target(&self, _: ClientId, _: u32, _: u32) -> UnitTarget {
-        UnitTarget::Missing
-    }
-    fn handle(&mut self, _: ClientId, _: &[u8], _: usize, _: &mut dyn MessageSink) -> ResultCode {
-        ResultCode::Refused
-    }
-    fn clients(&self) -> Vec<ClientId> {
-        vec![LOCAL_CLIENT]
-    }
-}
-
-impl Tick for NoGame {
-    fn tick(&mut self, _: &mut dyn MessageSink) {}
-}
-
-/// A manual host clock shared with the test.
-#[derive(Clone, Default)]
-struct Ms(Arc<AtomicU32>);
+struct Ms(u32);
 
 impl Clock for Ms {
     fn now_ms(&mut self) -> u32 {
-        self.0.load(Ordering::Relaxed)
+        self.0
     }
 }
 
-type Local = LocalLink<NoGame, ProtoSizes, PendingSession, Ms>;
+type Link = LocalLink<SimGame, ProtoSizes, PendingSession, Ms>;
 
-fn local() -> (Bridge<Local>, Ms) {
-    let clock = Ms::default();
-    let host = Host::new(NoGame, ProtoSizes, PendingSession::default(), clock.clone());
-    (Bridge::new(LocalLink::new(host)).unwrap(), clock)
+/// A host with the local client's player joined, alive, at (100, 100).
+fn link() -> Link {
+    let mut game = Game::new();
+    game.lists.ensure_act(0).unwrap();
+    let player = game.spawn_unit(UnitType::Player, None, true).unwrap();
+    let mut sim = SimGame::new(game);
+    sim.join(LOCAL_CLIENT, Some(player), None, client_state::IN_GAME)
+        .unwrap();
+    sim.set_player(
+        player,
+        PlayerFields {
+            gate: PlayerGate {
+                mode: 1,
+                uninterruptable: false,
+            },
+            data: Some(PlayerData { last_accept: 0 }),
+        },
+    );
+    sim.set_unit(
+        player,
+        UnitFacts {
+            act: 0,
+            pos: Pos { x: 100, y: 100 },
+            owner: None,
+        },
+    );
+    LocalLink::new(Host::new(
+        sim,
+        ProtoSizes,
+        PendingSession::default(),
+        Ms(1000),
+    ))
 }
 
-/// A C→S message the classifier accepts: id, then `fill` cut to the
-/// size rule's size.
-fn client_message_bytes(id: u8, fill: &[u8]) -> Option<Vec<u8>> {
-    let mut b = vec![id];
-    b.extend_from_slice(fill);
-    match client_size(&b) {
-        Size::Bytes(n) if n >= 1 && n <= b.len() => {
-            b.truncate(n);
-            Some(b)
+/// A C→S-shaped input: an id (mostly sendable), then `0..max` bytes, or
+/// exactly its fixed size.
+fn message(max: usize) -> impl Strategy<Value = Vec<u8>> {
+    let id = prop_oneof![3 => 0u8..0x71, 1 => any::<u8>()];
+    let byte = prop_oneof![4 => any::<u8>(), 1 => Just(0u8), 1 => Just(0xFFu8)];
+    (id, prop::collection::vec(byte, 0..max), any::<bool>()).prop_map(|(id, rest, exact)| {
+        let mut m = vec![id];
+        m.extend(rest);
+        if exact {
+            if let Some(n) =
+                d2_proto::transport::client_message(id).and_then(|r| r.transport_size.fixed())
+            {
+                m.resize(n, 0);
+            }
         }
-        _ => None,
-    }
+        m
+    })
 }
 
-/// One send: either arbitrary bytes or one of a small pool of valid
-/// messages (so repeats happen), after `dt` ms.
-#[derive(Debug, Clone)]
-enum SendOp {
-    Raw(Vec<u8>),
-    Pool(usize),
-}
-
-/// A pool of valid messages and the sends: (op, ms before it, pump after).
-type SendPlan = (Vec<Vec<u8>>, Vec<(SendOp, u32, bool)>);
-
-fn send_ops() -> impl Strategy<Value = SendPlan> {
-    let pool = proptest::collection::vec(
-        (
-            prop_oneof![0u8..0x67, 0x67u8..0x71, Just(0xFFu8)],
-            proptest::collection::vec(any::<u8>(), 0..0x20),
-        ),
-        1..4,
-    )
-    .prop_map(|v| {
-        v.into_iter()
-            .filter_map(|(id, fill)| client_message_bytes(id, &fill))
-            .collect::<Vec<_>>()
-    });
-    let op = prop_oneof![
-        1 => proptest::collection::vec(any::<u8>(), 0..0x220).prop_map(SendOp::Raw),
-        4 => (0usize..4).prop_map(SendOp::Pool),
-    ];
-    let dt = prop_oneof![Just(0u32), 0u32..60, 0u32..400, any::<u32>()];
-    (
-        pool,
-        proptest::collection::vec((op, dt, proptest::bool::weighted(0.2)), 0..24),
-    )
+/// The link's error as the local host's.
+fn local(e: &LinkError) -> Option<&LocalError> {
+    let LinkError::Server(e) = e;
+    e.downcast_ref::<LocalError>()
 }
 
 proptest! {
     #![proptest_config(config(128))]
 
-    /// Arbitrary C→S bytes: refused exactly when the classifier refuses
-    /// them, the admin queue or a game message of 0x200+ bytes (§4 rule
-    /// 3); a sendable message is queued or filtered, and filtered exactly
-    /// when the 1.14d sender's duplicate rule says so (§4 rule 5,
-    /// `intents-events.md` §2.1 rule 1: same bytes over the new length
-    /// of a store each send overwrites for its own length, within the
-    /// id's window). Pumping between sends never fails.
-    // Covers: specs/client/bridge.md §4 r2, §4 r3, §4 r5
+    /// The bridge's send path (§4 rules 2–3) on any bytes: the bridge
+    /// refuses what the classifier refuses, the admin queue and game
+    /// messages of 0x200 bytes or more; what it routes, the link queues
+    /// or filters, never errs; a frame then succeeds and the server
+    /// drains every queued message with its bytes and size.
     #[test]
-    fn send_path_and_duplicate_filter((pool, ops) in send_ops()) {
-        bounded(move || {
-            let (mut bridge, clock) = local();
-            let mut stored = [0u8; 0x200];
-            let mut at = 0u32;
-            for (op, dt, pump) in ops {
-                let now = clock.0.load(Ordering::Relaxed).wrapping_add(dt);
-                clock.0.store(now, Ordering::Relaxed);
-                let msg = match op {
-                    SendOp::Raw(b) => b,
-                    SendOp::Pool(i) if !pool.is_empty() => pool[i % pool.len()].clone(),
-                    SendOp::Pool(_) => Vec::new(),
-                };
-                let routed = intent::route(&msg);
-                // §4 rule 3: nothing the net send asserts on (> 0x204).
-                if msg.len() > d2_proto::transport::MAX_MESSAGE {
-                    assert_eq!(routed, Err(IntentError::TooLarge(msg.len())));
+    fn bridge_send_any(msgs in prop::collection::vec(message(0x240), 1..12)) {
+        let mut bridge = Bridge::with_dispatch(link(), Dispatch::from_spec().unwrap()).unwrap();
+        let mut queued = Vec::new();
+        for m in &msgs {
+            let class = classify_client(m);
+            match bridge.send_bytes(m) {
+                Ok(Sent::Queued) => queued.push(m.clone()),
+                Ok(Sent::Filtered) => prop_assert!(m[0] < 0x67, "{:02X?}", m),
+                Err(BridgeError::Intent(IntentError::NotSendable(c))) => {
+                    prop_assert_eq!(c, class);
+                    prop_assert!(!matches!(c, Classified::Queue(_)));
                 }
-                let got = bridge.send_bytes(&msg);
-                match (routed, got) {
-                    (Err(want), Err(BridgeError::Intent(e))) => assert_eq!(e, want),
-                    (Err(want), other) => panic!("route refused {msg:02X?} ({want}) but send gave {other:?}"),
-                    (Ok(SendQueue::System), Ok(s)) => assert_eq!(s, Sent::Queued),
-                    (Ok(SendQueue::Game), Ok(s)) => {
-                        let filtered = duplicate_window(msg[0]).is_some_and(|w| {
-                            stored[..msg.len()] == msg[..] && now.wrapping_sub(at) < w
-                        });
-                        if filtered {
-                            assert_eq!(s, Sent::Filtered, "{msg:02X?} at {now}");
-                        } else {
-                            assert_eq!(s, Sent::Queued, "{msg:02X?} at {now}");
-                            stored[..msg.len()].copy_from_slice(&msg);
-                            at = now;
-                        }
-                    }
-                    (Ok(q), Err(e)) => panic!("routable {msg:02X?} ({q:?}) failed: {e}"),
+                Err(BridgeError::Intent(IntentError::AdminQueue)) => {
+                    prop_assert_eq!(class, Classified::Queue(ClientQueue::Admin));
                 }
-                if let Err(IntentError::GameTooLarge(n)) = intent::route(&msg) {
-                    assert!(n >= intent::MAX_GAME_SEND);
+                Err(BridgeError::Intent(IntentError::GameTooLarge(n))) => {
+                    prop_assert!(n >= MAX_GAME_SEND);
+                    prop_assert_eq!(class, Classified::Queue(ClientQueue::Game));
                 }
-                if pump {
-                    bridge.frame().expect("pump over a game with no players");
+                // Found by this test: a system message over 0x204 bytes
+                // passed the classifier and failed in the transport.
+                Err(BridgeError::Intent(IntentError::TooLarge(n))) => {
+                    prop_assert!(n > MAX_MESSAGE);
+                    prop_assert_eq!(class, Classified::Queue(ClientQueue::System));
                 }
+                Err(e) => return Err(TestCaseError::fail(format!("{:02X?}: {e}", m))),
             }
-        });
+        }
+        bridge.link_mut().host_mut().clock.0 += 40;
+        // The first frame only starts the tick driver (`tick.md` §1 rule 2).
+        bridge.frame().expect("frame");
+        let drained = &bridge.link().last_frame().messages;
+        prop_assert_eq!(drained.len(), queued.len());
+        // System messages drain before game messages (§2.1 rule 7).
+        let (sys, game): (Vec<_>, Vec<_>) = queued.iter().partition(|m| m[0] >= 0x67);
+        for (h, m) in drained.iter().zip(sys.iter().chain(game.iter())) {
+            prop_assert_eq!(h.id, m[0]);
+            prop_assert_eq!(h.size, m.len());
+            prop_assert_eq!(matches!(h.handled, Handled::System), m[0] >= 0x67);
+        }
+        let session = &bridge.link().host().session.received;
+        for ((_, bytes, size), m) in session.iter().zip(&sys) {
+            // The drain copy stops at 0x1FC bytes (§2.1 rule 7).
+            prop_assert_eq!(&bytes[..], &m[..m.len().min(DRAIN_COPY)]);
+            prop_assert_eq!(*size, m.len());
+        }
+    }
+
+    /// The link itself (§3 rule 1) on any bytes and either queue, past
+    /// the bridge's check: a send is queued, filtered, or refused with
+    /// the transport's assert or the classifier's drop; never a panic.
+    #[test]
+    fn link_send_any(msgs in prop::collection::vec((any::<bool>(), message(0x240)), 1..12)) {
+        let mut l = link();
+        for (system, m) in &msgs {
+            let queue = if *system { SendQueue::System } else { SendQueue::Game };
+            match l.send(queue, m) {
+                Ok(_) => {
+                    prop_assert!(m.len() <= MAX_MESSAGE);
+                }
+                Err(e) => match local(&e) {
+                    Some(LocalError::Send(_)) => prop_assert!(m.len() >= MAX_GAME_SEND),
+                    Some(LocalError::Dropped { id, class }) => {
+                        prop_assert_eq!(*id, m[0]);
+                        prop_assert!(!matches!(class, d2_server::transport::Classified::Queued(_)));
+                    }
+                    other => return Err(TestCaseError::fail(format!("{other:?}"))),
+                },
+            }
+        }
+        l.host_mut().clock.0 += 40;
+        prop_assert!(l.pump().is_ok());
+        let _ = l.receive();
+    }
+
+    /// The receive path (§2) on any S→C chunk: split and dispatched, or
+    /// refused whole with the split's error (§2 rule 4); the handlers
+    /// never panic on any bytes.
+    #[test]
+    fn receive_any_chunk(chunks in prop::collection::vec(prop::collection::vec(any::<u8>(), 0..0x240), 1..6)) {
+        let mut bridge = Bridge::with_dispatch(link(), Dispatch::from_spec().unwrap()).unwrap();
+        for c in &chunks {
+            match (bridge.receive_chunk(c), split_server_buffer(c)) {
+                (Ok(r), Ok(s)) => {
+                    prop_assert_eq!(r.messages, s.messages.len());
+                    prop_assert_eq!(r.handled + r.unowned + r.rejected, r.messages);
+                    prop_assert_eq!(r.discarded_bytes, s.discarded.len());
+                }
+                (Err(BridgeError::Split(e)), Err(w)) => prop_assert_eq!(e, w),
+                (r, s) => return Err(TestCaseError::fail(format!("{r:?} vs {s:?}"))),
+            }
+        }
+    }
+
+    /// Well-formed S→C messages (whole, by the size rule) for every id,
+    /// so the handlers see their own ids with arbitrary fields.
+    #[test]
+    fn receive_any_message(id in 0u8..0xB5, body in prop::collection::vec(any::<u8>(), 0x204)) {
+        let mut bridge = Bridge::with_dispatch(link(), Dispatch::from_spec().unwrap()).unwrap();
+        let mut m = body;
+        m[0] = id;
+        if let d2_proto::schema::Size::Bytes(n) = d2_proto::transport::server_size(&m) {
+            // Some rules read past the size they give (0x16 needs 13
+            // bytes for any size): only a message that sizes itself.
+            let whole = |m: &[u8]| d2_proto::transport::server_size(m) == d2_proto::schema::Size::Bytes(m.len());
+            if n <= MAX_MESSAGE && whole(&m[..n]) {
+                m.truncate(n);
+                let r = bridge.receive_chunk(&m).expect("a whole message");
+                prop_assert_eq!(r.messages, 1);
+            }
+        }
+    }
+
+    /// Direct sends (§3.3 rule 5) of any bytes reach the client through
+    /// the frame: the host refuses what local delivery asserts on, and
+    /// the bridge refuses whole a chunk it cannot split.
+    #[test]
+    fn direct_any(direct in prop::collection::vec(prop::collection::vec(any::<u8>(), 0..0x240), 1..6)) {
+        let mut bridge = Bridge::with_dispatch(link(), Dispatch::from_spec().unwrap()).unwrap();
+        let mut pushed = Vec::new();
+        for d in &direct {
+            if bridge.link_mut().host_mut().send_direct(LOCAL_CLIENT, d).is_ok() {
+                prop_assert!(!d.is_empty() && d.len() <= MAX_MESSAGE && d[0] < 0xB5);
+                pushed.push(d.clone());
+            }
+        }
+        bridge.link_mut().host_mut().clock.0 += 40;
+        match bridge.frame() {
+            Ok(r) => prop_assert_eq!(r.chunks, pushed.len()),
+            Err(BridgeError::Split(SplitError::Truncated { .. } | SplitError::TooLarge { .. })) => {}
+            Err(e) => return Err(TestCaseError::fail(format!("{e}"))),
+        }
     }
 }
 
-/// Minimized failure (fixed at the root): a system message buffer longer
-/// than 0x204 bytes passed the classifier (which reads only the
-/// message's own size) and failed in the host's net send; the bridge now
-/// refuses it before sending (§4 rule 3).
+/// `route` agrees with the classifier on every id at every length up to
+/// one past the transport limit, and refuses what the sender or the
+/// transport asserts on (§4 rules 2–3).
+// Covers: specs/client/bridge.md §4 r2, §4 r3
 #[test]
-fn regress_system_buffer_over_0x204() {
-    let msg = client_message_bytes(0x6A, &[0; 0x40]).expect("0x6A has a size rule");
-    let mut long = msg.clone();
-    long.resize(0x205, 0);
-    assert_eq!(intent::route(&long), Err(IntentError::TooLarge(0x205)));
-    let (mut bridge, _) = local();
-    assert!(matches!(
-        bridge.send_bytes(&long),
-        Err(BridgeError::Intent(IntentError::TooLarge(0x205)))
-    ));
-    assert_eq!(bridge.send_bytes(&msg).unwrap(), Sent::Queued);
+fn route_every_id_and_length() {
+    for id in 0..=255u8 {
+        for len in 1..=MAX_MESSAGE + 1 {
+            let mut m = vec![0u8; len];
+            m[0] = id;
+            let r = route(&m);
+            match classify_client(&m) {
+                Classified::Queue(ClientQueue::Admin) => {
+                    assert_eq!(r, Err(IntentError::AdminQueue))
+                }
+                Classified::Queue(ClientQueue::Game) if len >= MAX_GAME_SEND => {
+                    assert_eq!(r, Err(IntentError::GameTooLarge(len)))
+                }
+                Classified::Queue(ClientQueue::Game) => assert_eq!(r, Ok(SendQueue::Game)),
+                Classified::Queue(ClientQueue::System) if len > MAX_MESSAGE => {
+                    assert_eq!(r, Err(IntentError::TooLarge(len)))
+                }
+                Classified::Queue(ClientQueue::System) => assert_eq!(r, Ok(SendQueue::System)),
+                c => assert_eq!(r, Err(IntentError::NotSendable(c))),
+            }
+        }
+    }
 }

@@ -20,10 +20,10 @@ pub enum IntentError {
     AdminQueue,
     #[error("game message of {0} bytes (the sender asserts < 0x200)")]
     GameTooLarge(usize),
-    /// The net send asserts size ≤ 0x204 before it classifies
-    /// (`intents-events.md` §2.1 rule 3): the classifier reads only the
-    /// message's own size, so a longer buffer passes it.
-    #[error("message of {0} bytes (the net send asserts <= 0x204)")]
+    /// A system message the classifier queues (it accepts a buffer longer
+    /// than the size rule) but the transport asserts on (size ≤ 0x204,
+    /// `intents-events.md` §2.1 rule 3).
+    #[error("message of {0} bytes (the transport asserts <= 0x204)")]
     TooLarge(usize),
 }
 
@@ -36,14 +36,14 @@ pub fn encode<M: FixedMessage>(msg: &M) -> Vec<u8> {
 
 /// The send queue of `msg`, or why it may not be sent (§4 rules 2–3).
 pub fn route(msg: &[u8]) -> Result<SendQueue, IntentError> {
-    if msg.len() > MAX_MESSAGE {
-        return Err(IntentError::TooLarge(msg.len()));
-    }
     match classify_client(msg) {
         Classified::Queue(q) => {
             let queue = SendQueue::of(q).ok_or(IntentError::AdminQueue)?;
             if q == ClientQueue::Game && msg.len() >= MAX_GAME_SEND {
                 return Err(IntentError::GameTooLarge(msg.len()));
+            }
+            if msg.len() > MAX_MESSAGE {
+                return Err(IntentError::TooLarge(msg.len()));
             }
             Ok(queue)
         }

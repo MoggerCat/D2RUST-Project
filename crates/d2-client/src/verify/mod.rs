@@ -7,8 +7,10 @@
 //! exactly N (M08).
 //!
 //! Kinds: `synthetic` (inline frames, repo only; the CPU half runs in
-//! `cargo test`) and `map` (today's `map-preview.md` verify, [`map`],
-//! game files and a GPU).
+//! `cargo test`), `map` (today's `map-preview.md` verify, [`map`],
+//! game files and a GPU) and `scene` (a 1.14d frame capture,
+//! `render/capture.md`: [`capture`] reads it, [`capture_case`] compares
+//! it; cases in `capture-cases/`).
 //!
 //! The GPU half of `synthetic` cases goes through the narrow
 //! [`GpuCompositor`] trait; [`gpu::Wgpu`] runs the compute compositor (C5,
@@ -20,10 +22,14 @@
 //! bytes go through `d2_formats::cof` and [`crate::composite::build`], so
 //! the case covers COF bytes → composite → scene → CPU and GPU.
 
+pub mod capture;
+pub mod capture_case;
 pub mod case;
 pub mod gpu;
 pub mod map;
 
+#[cfg(test)]
+mod capture_tests;
 #[cfg(test)]
 mod tests;
 
@@ -35,7 +41,7 @@ use d2_formats::palette::{Palette, Rgb};
 use crate::composite::{
     self, ComponentFrame, ComponentRequest, ComponentResolver, CompositeError, UnitParams,
 };
-use crate::frames::{FramePart, FrameSetKey};
+use crate::frames::{FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
 use crate::scene::{
     self, Bins, BlendOp, DrawItem, DrawKey, FrameId, FrameImage, ItemTag, MapId, MapTable, Rect,
     SceneError, ShadeChain,
@@ -155,14 +161,23 @@ pub enum BuildError {
 /// The case's fixture answers for one unit, resolved to scene values: per
 /// COF component, the frame drawn, the top-left, the shade chain and the
 /// blend. A component the COF draws without an answer is an error
-/// (`Unresolved`), never a default.
+/// (`Unresolved`), never a default. The frame is frame `n` of the case's
+/// one frame set ([`case_frames_key`]); its scene id comes from the frame
+/// store ([`composite::build_with`]), not from the fixture.
 struct UnitFixture {
     /// Indexed by component id.
     components: [Option<Answer>; 16],
 }
 
-/// One component's answer: frame, top-left x and y, shade chain, blend.
-type Answer = (FrameId, i32, i32, ShadeChain, BlendOp);
+/// One component's answer: case frame index, top-left x and y, shade
+/// chain, blend.
+type Answer = (u32, i32, i32, ShadeChain, BlendOp);
+
+/// The frame set holding a synthetic case's `[[frame]]`s in file order, so
+/// the frame store gives `[[frame]]` `n` the scene id `FrameId(n)`.
+pub fn case_frames_key() -> FrameSetKey {
+    FrameSetKey::new("synthetic/case-frames.dc6", FramePart::Dir(0)).expect("canonical path")
+}
 
 impl UnitFixture {
     fn get(
@@ -184,25 +199,10 @@ impl UnitFixture {
 
 impl ComponentResolver for UnitFixture {
     fn frame(&self, req: &ComponentRequest<'_>) -> Result<ComponentFrame, CompositeError> {
-        self.get(req, "frame")?;
-        let dir = u8::try_from(req.dir).expect("COF directions are a u8");
-        let set = FrameSetKey::new(
-            format!("synthetic/c{}.dcc", req.slot.component),
-            FramePart::Dir(dir),
-        )
-        .expect("canonical synthetic path");
         Ok(ComponentFrame {
-            set,
-            index: req.frame,
+            set: case_frames_key(),
+            index: self.get(req, "frame")?.0 as usize,
         })
-    }
-
-    fn frame_id(
-        &self,
-        req: &ComponentRequest<'_>,
-        _: &ComponentFrame,
-    ) -> Result<FrameId, CompositeError> {
-        Ok(self.get(req, "frame_id")?.0)
     }
 
     fn place(
@@ -242,8 +242,9 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         .iter()
         .map(|rule| {
             let mut table = Box::new([[0u8; 256]; 256]);
-            for (src, row) in table.iter_mut().enumerate() {
-                for (dest, v) in row.iter_mut().enumerate() {
+            // Row = destination, column = source (composition.md §5).
+            for (dest, row) in table.iter_mut().enumerate() {
+                for (src, v) in row.iter_mut().enumerate() {
                     *v = rule.value(src as u8, dest as u8);
                 }
             }
@@ -301,6 +302,23 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
         item.flip_x = spec.flip_x;
         items.push(item);
     }
+    let mut store = FrameStore::new();
+    store
+        .insert(
+            case_frames_key(),
+            FrameSet {
+                frames: frames
+                    .iter()
+                    .map(|f| {
+                        // Same check as the compositor's frame source.
+                        scene::FrameView::new(f.width, f.height, &f.pixels)?;
+                        Ok(IndexFrame::new(f.width, f.height, 0, 0, f.pixels.clone())
+                            .expect("pixel count checked"))
+                    })
+                    .collect::<Result<_, SceneError>>()?,
+            },
+        )
+        .expect("a new store has no sets");
     for (u, spec) in s.units.iter().enumerate() {
         let mut fixture = UnitFixture {
             components: Default::default(),
@@ -336,7 +354,7 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
                 None => BlendOp::Opaque,
             };
             fixture.components[usize::from(cs.component)] =
-                Some((FrameId(cs.frame), cs.x, cs.y, shade, blend));
+                Some((cs.frame, cs.x, cs.y, shade, blend));
         }
         let cof = d2_formats::cof::Cof::parse(&spec.cof).map_err(|e| BuildError::Cof {
             unit: u,
@@ -352,12 +370,13 @@ pub fn build(s: &case::Synthetic) -> Result<Built, BuildError> {
                 .map_or(Rect::FRAME, |(x, y, w, h)| Rect::new(x, y, w, h)),
             tag: ItemTag::Unit(u as u32),
         };
-        let draws = composite::build(
+        let draws = composite::build_with(
             &cof,
             spec.dir as usize,
             spec.frame as usize,
             &unit,
             &fixture,
+            &store,
         )
         .map_err(|error| BuildError::Composite { unit: u, error })?;
         items.extend(draws.into_iter().map(|d| d.item));
@@ -529,6 +548,9 @@ pub enum Status {
     GpuNotWired,
     /// The CPU half passed; the GPU half found no adapter. Not a pass.
     NoAdapter(String),
+    /// A scene case's capture checks ran; no source of the d2rs scene
+    /// is wired, so nothing was compared. Not a pass.
+    SceneNotWired,
     /// A comparison or expectation failed.
     Fail(String),
     /// The case could not be built or run.
@@ -541,6 +563,7 @@ impl Status {
             Status::Pass => "PASS",
             Status::GpuNotWired => "GPU NOT WIRED",
             Status::NoAdapter(_) => "NO ADAPTER",
+            Status::SceneNotWired => "SCENE NOT WIRED",
             Status::Fail(_) => "FAIL",
             Status::Error(_) => "ERROR",
         }
@@ -746,6 +769,7 @@ pub struct Summary {
     pub pass: usize,
     pub not_wired: usize,
     pub no_adapter: usize,
+    pub scene_not_wired: usize,
     pub fail: usize,
     pub error: usize,
 }
@@ -756,18 +780,19 @@ impl Summary {
             Status::Pass => self.pass += 1,
             Status::GpuNotWired => self.not_wired += 1,
             Status::NoAdapter(_) => self.no_adapter += 1,
+            Status::SceneNotWired => self.scene_not_wired += 1,
             Status::Fail(_) => self.fail += 1,
             Status::Error(_) => self.error += 1,
         }
     }
 
     /// Process exit code: 0 all passed, 1 any failure or error, 2 none
-    /// failed but some GPU halves are not wired or found no adapter
-    /// (incomplete, not a pass).
+    /// failed but some GPU halves are not wired or found no adapter, or
+    /// some scene case has no scene source (incomplete, not a pass).
     pub fn exit_code(&self) -> i32 {
         if self.fail + self.error > 0 {
             1
-        } else if self.not_wired + self.no_adapter > 0 {
+        } else if self.not_wired + self.no_adapter + self.scene_not_wired > 0 {
             2
         } else {
             0
@@ -781,7 +806,11 @@ impl fmt::Display for Summary {
             f,
             "{} pass, {} fail, {} error, {} GPU not wired, {} no adapter",
             self.pass, self.fail, self.error, self.not_wired, self.no_adapter
-        )
+        )?;
+        if self.scene_not_wired > 0 {
+            write!(f, ", {} scene not wired", self.scene_not_wired)?;
+        }
+        Ok(())
     }
 }
 

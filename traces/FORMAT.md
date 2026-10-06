@@ -92,6 +92,40 @@ strings with a `0x` hex prefix so JSON readers don't lose precision.
 `"exact"` is the default and the goal. Anything looser needs a reason in
 `notes`.
 
+## Render captures
+
+Frames captured from 1.14d (`specs/render/capture.md`) are traces with
+`area` `"render"`, `behavior` the capture case's spec name (e.g.
+`"camera"`), `recorded.method` `"debugger"`. The images show Blizzard art
+and are never committed: they stay in `game/captures/` and the trace holds
+their hashes and the state they were drawn from.
+
+- Files: `traces/render/<behavior>/render-NNNN.json`.
+- `setup` (required fields):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `capture_format` | integer | Version of this section's payload; `1`. A reader rejects an unknown value. |
+| `case` | string | Capture case id, e.g. `"stability-0001"` (`capture.md` §8). |
+| `video_type` | integer | `1` (GDI); other values are rejected. |
+| `size` | `[w, h]` | `[800, 600]`. |
+| `raw` | string | Name of the `frames-raw-1` file the frames were taken from. |
+| `images` | string | Directory under `game/captures/` holding the PNGs (local only). |
+
+- `expected[]`: one event per kept frame, `kind` `"frame"`, `tick` = the
+  capture's server tick relative to the first kept frame, `data`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `draw` | integer | In-game draw counter `[0x7A0494]`. |
+| `index_sha256` | string | SHA-256 of the W × H index bytes, row-major, top row first. |
+| `palette_sha256` | string | SHA-256 of the 768 palette bytes R, G, B. |
+| `image` | string | PNG file name in `setup.images` (8-bit palettized, indices unchanged). |
+| `state` | object | The recorded state of `capture.md` §3 (`player`, `tile_origin`, `unit_origin`, `view_rect`, `open_mode`, `shift_x`, `shake`, `clear_counter`). |
+
+- `compare.mode` is `"exact"`: the CPU reference's index frame and palette
+  must hash to the recorded values (`capture.md` §6).
+
 ## Example
 
 ```json
@@ -131,3 +165,4 @@ strings with a `0x` hex prefix so JSON readers don't lose precision.
 | Version | Date | Change |
 |---|---|---|
 | 1 | 2026-10-05 | Initial format. |
+| 1 | 2026-10-06 | Added §Render captures (new area and kind, no bump; its payload carries `capture_format` 1). |

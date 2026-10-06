@@ -233,6 +233,7 @@ fn blend_table() -> Box<[[u8; 256]; 256]> {
 }
 
 // Covers: specs/client/render-pipeline.md §a5-blend-ops
+// Covers: specs/render/composition.md §5
 #[test]
 fn index_table_every_src_and_dest() {
     let table = blend_table();
@@ -262,7 +263,8 @@ fn index_table_every_src_and_dest() {
     let out = compose(&items, &frames, &maps, view).unwrap();
     for d in 0..256usize {
         for s in 0..256usize {
-            let want = if s == 0 { d as u8 } else { table[s][d] };
+            // Row = destination, column = source (composition.md §5).
+            let want = if s == 0 { d as u8 } else { table[d][s] };
             assert_eq!(out[d * 256 + s], want, "src {s} dest {d}");
         }
     }
@@ -280,10 +282,10 @@ fn chain_applies_before_blend() {
     over.blend = BlendOp::IndexTable(base);
     let items = [DrawItem::new(FrameId(1), 0, 0), over];
     let out = compose(&items, &frames(), &maps, VIEW).unwrap();
-    assert_eq!(out[0], table[40][1]);
+    assert_eq!(out[0], table[1][40]);
     // Where nothing was below, dest is the cleared 0.
     let out = compose(&items[1..], &frames(), &maps, VIEW).unwrap();
-    assert_eq!(out[0], table[40][0]);
+    assert_eq!(out[0], table[0][40]);
 }
 
 // Covers: specs/client/render-pipeline.md §a3-draw-item
@@ -598,4 +600,242 @@ fn rgba_is_a_plain_palette_lookup() {
             255
         ]
     );
+}
+
+// --- specs/render/composition.md ---------------------------------------
+
+const FW: u32 = 800;
+const FH: u32 = 600;
+
+fn rows_of(pixels: &[u8], width: u32) -> Vec<(u32, u32, u8)> {
+    // (first row, last row, value) runs of whole uniform rows.
+    let mut runs: Vec<(u32, u32, u8)> = Vec::new();
+    for (y, row) in pixels.chunks(width as usize).enumerate() {
+        let v = row[0];
+        assert!(row.iter().all(|&p| p == v), "row {y} is uniform");
+        match runs.last_mut() {
+            Some(r) if r.2 == v => r.1 = y as u32,
+            _ => runs.push((y as u32, y as u32, v)),
+        }
+    }
+    runs
+}
+
+/// Test vectors 1–3: framebuffer all 5, nothing drawn, 800 × 600.
+// Covers: specs/render/composition.md §3 r2, §3 r4, §3 r5, §3 text, §2, §edge-cases-original-bugs
+#[test]
+fn frame_cycle_clears() {
+    let all_5 = || FrameCycle::with_pixels(FW, FH, vec![5; (FW * FH) as usize]).unwrap();
+    let nothing = |c: &mut FrameCycle, blank| {
+        c.compose(blank, &[], &Vec::<FrameImage>::new(), &MapTable::new())
+            .unwrap()
+            .to_vec()
+    };
+    // BlankScreen 1: rows 0–552 = 0, rows 553–599 = 5.
+    let mut c = all_5();
+    assert_eq!(c.plan(true).clear_rows, 553);
+    assert_eq!(
+        rows_of(&nothing(&mut c, true), FW),
+        [(0, 552, 0), (553, 599, 5)]
+    );
+    // BlankScreen 0: all 5.
+    let mut c = all_5();
+    assert_eq!(rows_of(&nothing(&mut c, false), FW), [(0, 599, 5)]);
+    // Counter 1: all 0 and the counter becomes 0; the next frame keeps
+    // the persistent framebuffer again.
+    let mut c = all_5();
+    c.set_post_clear(1);
+    assert_eq!(rows_of(&nothing(&mut c, false), FW), [(0, 599, 0)]);
+    assert_eq!(c.post_clear(), 0);
+    assert!(!c.plan(true).clear_after);
+}
+
+/// Drawn pixels survive in the uncleared bottom 47 rows into the next
+/// frame; the post-draw clear blacks out a frame that was drawn.
+// Covers: specs/render/composition.md §3 text, §3 r4, §edge-cases-original-bugs, §6
+#[test]
+fn framebuffer_persists_between_frames() {
+    let frames = vec![FrameImage {
+        width: 4,
+        height: 4,
+        pixels: vec![9; 16],
+    }];
+    let maps = MapTable::new();
+    let mut c = FrameCycle::new(FW, FH).unwrap();
+    // A fresh framebuffer is all 0 (a single-frame case starts there).
+    assert!(c.pixels().iter().all(|&p| p == 0));
+    let top = DrawItem::new(FrameId(0), 10, 10);
+    let bottom = DrawItem::new(FrameId(0), 10, 580);
+    c.compose(true, &[top, bottom], &frames, &maps).unwrap();
+    // Next frame, nothing drawn: the top square is cleared, the bottom one
+    // (rows 580..584 ≥ 553) is still there.
+    let out = c.compose(true, &[], &frames, &maps).unwrap();
+    let at = |x: u32, y: u32| out[(y * FW + x) as usize];
+    assert_eq!((at(10, 10), at(13, 583), at(14, 583)), (0, 9, 0));
+    // Pixel (x, y) is byte y × W + x.
+    assert_eq!(c.pixels()[(580 * FW + 10) as usize], 9);
+    // The post-draw clear: drawn, then all 0.
+    c.set_post_clear(1);
+    let out = c.compose(false, &[top], &frames, &maps).unwrap();
+    assert!(out.iter().all(|&p| p == 0));
+}
+
+/// The frame cycle is strict: no change on error, foreign plans and sizes
+/// are rejected, and the clear needs more than 47 rows.
+// Covers: specs/render/composition.md §2
+#[test]
+fn frame_cycle_strict_inputs() {
+    assert_eq!(
+        FrameCycle::new(10, 47),
+        Err(SceneError::FramebufferHeight { height: 47 })
+    );
+    assert!(FrameCycle::new(10, 48).is_ok());
+    assert!(matches!(
+        FrameCycle::with_pixels(10, 48, vec![0; 479]),
+        Err(SceneError::BaseSize { .. })
+    ));
+    let mut c = FrameCycle::with_pixels(4, 48, vec![3; 4 * 48]).unwrap();
+    let mut flipped = DrawItem::new(FrameId(0), 0, 0);
+    flipped.flip_x = true;
+    assert!(c
+        .compose(true, &[flipped], &frames(), &MapTable::new())
+        .is_err());
+    assert!(c.pixels().iter().all(|&p| p == 3));
+    // A plan this cycle would not make.
+    let odd = FramePlan {
+        clear_rows: 2,
+        clear_after: false,
+    };
+    assert_eq!(
+        c.commit(odd, vec![0; 4 * 48]),
+        Err(SceneError::FramePlan(odd))
+    );
+    let late = FramePlan {
+        clear_rows: 0,
+        clear_after: true,
+    };
+    assert_eq!(
+        c.commit(late, vec![0; 4 * 48]),
+        Err(SceneError::FramePlan(late))
+    );
+    assert!(matches!(
+        c.commit(FramePlan::NONE, vec![0; 3]),
+        Err(SceneError::BaseSize { .. })
+    ));
+    // compose_frame: base size and rows inside the view.
+    let view = Rect::new(0, 0, 4, 2);
+    let none: Vec<FrameImage> = Vec::new();
+    assert!(matches!(
+        compose_frame(&[], &none, &MapTable::new(), view, &[0; 7], FramePlan::NONE),
+        Err(SceneError::BaseSize { .. })
+    ));
+    let three = FramePlan {
+        clear_rows: 3,
+        clear_after: false,
+    };
+    assert_eq!(
+        compose_frame(&[], &none, &MapTable::new(), view, &[0; 8], three),
+        Err(SceneError::FramePlan(three))
+    );
+}
+
+/// Test vectors 4–5: `L[P[s]]` without `T`; `T[256 × d + P[s]]` with `T`.
+// Covers: specs/render/composition.md §5, §6
+#[test]
+fn pixel_write_vectors() {
+    let mut maps = MapTable::new();
+    let p = maps.push(map_with(&[(7, 9)]));
+    let l = maps.push(map_with(&[(9, 3)]));
+    // T[d][s] = distinct for every pair.
+    let mut table = Box::new([[0u8; 256]; 256]);
+    for (d, row) in table.iter_mut().enumerate() {
+        for (s, v) in row.iter_mut().enumerate() {
+            *v = (d * 3 + s * 5 + 11) as u8;
+        }
+    }
+    let t = maps.push_table(&table);
+    let frames = vec![FrameImage {
+        width: 1,
+        height: 1,
+        pixels: vec![7],
+    }];
+    let mut pl = DrawItem::new(FrameId(0), 0, 0);
+    pl.shade = ShadeChain::new(&[p, l]).unwrap();
+    let mut pt = DrawItem::new(FrameId(0), 1, 0);
+    pt.shade = ShadeChain::new(&[p]).unwrap();
+    pt.blend = BlendOp::IndexTable(t);
+    let view = Rect::new(0, 0, 2, 1);
+    let out = compose_frame(
+        &[pl, pt],
+        &frames,
+        &maps,
+        view,
+        &[200, 200],
+        FramePlan::NONE,
+    )
+    .unwrap();
+    assert_eq!(out[0], 3);
+    // The flat PL2 layout: byte 256 × 200 + 9 of the table.
+    let flat: Vec<u8> = table.iter().flatten().copied().collect();
+    assert_eq!(out[1], flat[256 * 200 + 9]);
+    assert_ne!(flat[256 * 200 + 9], flat[256 * 9 + 200]);
+    // Binned: the same.
+    let bins = bin(&[pl, pt], &frames, &maps, view).unwrap();
+    let binned = compose_binned_frame(
+        &[pl, pt],
+        &bins,
+        &frames,
+        &maps,
+        view,
+        &[200, 200],
+        FramePlan::NONE,
+    )
+    .unwrap();
+    assert_eq!(binned, out);
+}
+
+/// Test vector 6: PL2 bytes `01 02 03 xx 10 20 30 xx` → index 0 (1, 2, 3),
+/// index 1 (0x10, 0x20, 0x30); RGBA alpha 255, index 0 included.
+// Covers: specs/render/composition.md §4, §6
+#[test]
+fn present_palette_from_pl2() {
+    let mut pl2 = vec![0xEEu8; PL2_PALETTE_BYTES + 100];
+    pl2[..8].copy_from_slice(&[1, 2, 3, 0xAA, 0x10, 0x20, 0x30, 0xBB]);
+    pl2[1020..1024].copy_from_slice(&[7, 8, 9, 0xCC]);
+    let p = present_palette(&pl2).unwrap();
+    let rgb = |i: usize| (p.colors[i].r, p.colors[i].g, p.colors[i].b);
+    assert_eq!(rgb(0), (1, 2, 3));
+    assert_eq!(rgb(1), (0x10, 0x20, 0x30));
+    assert_eq!(rgb(255), (7, 8, 9));
+    assert_eq!(to_rgba(&[0, 1], &p), [1, 2, 3, 255, 0x10, 0x20, 0x30, 255]);
+    assert_eq!(
+        present_palette(&pl2[..1023]),
+        Err(SceneError::Pl2Size { len: 1023 })
+    );
+}
+
+/// The binned model equals the reference on a whole running frame: random
+/// previous frame, BlankScreen clear, the mixed scene drawn across it.
+// Covers: specs/render/composition.md §3 text
+#[test]
+fn binned_frame_matches_reference() {
+    let (items, frames, maps) = scene();
+    let base: Vec<u8> = (0..W * H).map(|i| (i * 37 % 256) as u8).collect();
+    for plan in [
+        FramePlan::NONE,
+        FramePlan {
+            clear_rows: 5,
+            clear_after: false,
+        },
+        FramePlan {
+            clear_rows: H,
+            clear_after: true,
+        },
+    ] {
+        let reference = compose_frame(&items, &frames, &maps, VIEW, &base, plan).unwrap();
+        let bins = bin(&items, &frames, &maps, VIEW).unwrap();
+        let binned =
+            compose_binned_frame(&items, &bins, &frames, &maps, VIEW, &base, plan).unwrap();
+        assert_eq!(binned, reference, "{plan:?}");
+    }
 }

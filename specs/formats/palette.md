@@ -103,7 +103,12 @@ No Blizzard code or decompiler output was consulted.
 
 ## Open questions
 
-1. Byte order of the PL2 base palette (it is ignored, so this doesn't block
-   anything).
+1. ~~Byte order of the PL2 base palette~~: R, G, B, x, and it is not
+   ignored: 1.14d presents it (`render/composition.md` §4). Whether it
+   equals the `.dat` colors is `composition.md` OQ1.
+2. Index order of the alpha / additive / multiplicative 256×256 tables:
+   1.14d's drawer reads them row = destination, column = source
+   (`render/composition.md` §5), the reverse of the Layout table's wording.
+   Owner of the meaning: `render/blend-modes.md`.
 2. Rendering meaning of each table: to be specified in a Phase 1b rendering
    spec, checked visually against the original game.

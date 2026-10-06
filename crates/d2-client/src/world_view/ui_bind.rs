@@ -7,16 +7,22 @@
 //! No panel is defined here: `ui.md` defines no d2rs-owned panel, and the
 //! original's panels (art, layout, open/close rules) are `ui/panels.md`,
 //! `ui/inventory.md` and `ui/text.md` (§B1–§B7). What a request draws and
-//! where is a [`UiRules`] hook.
+//! where is a [`UiRules`] hook. Text goes through `ui::text::layout_text`
+//! ([`text_sprites`]); what the request does not carry (font, layout
+//! rules, glyph look) is a [`TextHooks`] hook.
 
+use crate::assets::path::CanonicalPath;
 use crate::bridge::link::ServerLink;
 use crate::bridge::{Bridge, BridgeError};
 use crate::composite::ComponentFrame;
-use crate::frames::IndexFrame;
+use crate::frames::FrameSetKey;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, Rect, ShadeChain};
-use crate::ui::{ImageRequest, StringLookup, TextRequest, UiCtx, UiDraw, UiEvent, UiInput, UiRoot};
+use crate::ui::{
+    layout_text, ImageRequest, NoTextRules, StringLookup, TextOpts, TextRequest, TextRules,
+    TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
+};
 
-use super::{FrameTable, Unspecified, ViewAssets, ViewError};
+use super::{Unspecified, ViewAssets, ViewError};
 
 /// One sprite of a UI request: an image, or one glyph of laid-out text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,9 +42,9 @@ pub trait UiRules {
     /// `req.at`, shading and blend. `image` reads a resident frame.
     fn ui_image(&self, req: &ImageRequest, assets: &ViewAssets) -> Result<UiSprite, ViewError>;
 
-    /// TODO(spec: ui/text.md) (§B3): `layout_text` (font file, glyph
-    /// frames, advance, baseline, wrap, alignment, color codes, text-color
-    /// map). One sprite per drawn glyph, in drawing order.
+    /// TODO(spec: ui/text.md) (§B3): one sprite per drawn glyph, in
+    /// drawing order. [`text_sprites`] answers it through `layout_text`
+    /// from [`TextHooks`]; [`Unspecified`] does so.
     fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError>;
 
     /// TODO(spec: render/draw-order.md) (§B6): the pass number of UI items.
@@ -47,13 +53,92 @@ pub trait UiRules {
     fn ui_pass(&self) -> Result<u32, ViewError>;
 }
 
+/// The font of a text style: its glyph table (`.tbl`, `formats/font-tbl.md`)
+/// and the DC6 frame set its glyph frames index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextFont {
+    pub table: CanonicalPath,
+    pub glyphs: FrameSetKey,
+}
+
+/// What UI text needs besides the request and `layout_text`, one hook per
+/// question.
+pub trait TextHooks {
+    /// TODO(spec: ui/text.md) (§B3): the font a style's `font` number
+    /// names (glyph table and DC6).
+    fn text_font(&self, style: TextStyle) -> Result<TextFont, ViewError>;
+
+    /// TODO(spec: ui/text.md) (§B3): the layout rules (advance, wrap,
+    /// alignment, color codes).
+    fn text_rules(&self) -> &dyn TextRules;
+
+    /// TODO(spec: ui/text.md, render/shading.md) (§B3): shade and blend of
+    /// a glyph in text color `color` (the PL2 text-color map).
+    fn glyph_look(&self, color: u16) -> Result<(ShadeChain, BlendOp), ViewError>;
+}
+
+/// UI text through `ui::text::layout_text` (`ui.md` §A3): the style's
+/// font from `assets`, the rules' placements resolved to glyph records,
+/// one sprite per placed glyph (its DC6 frame at the placed point) in
+/// placement order. TODO(spec: ui/text.md) (§B3): the layout options are
+/// the defaults until the spec says what the original's text call takes.
+pub fn text_sprites<H: TextHooks + ?Sized>(
+    hooks: &H,
+    req: &TextRequest,
+    assets: &ViewAssets,
+) -> Result<Vec<UiSprite>, ViewError> {
+    let font = hooks.text_font(req.style)?;
+    let table = assets
+        .fonts
+        .get(&font.table)
+        .ok_or_else(|| ViewError::FontMissing(font.table.clone()))?;
+    let glyphs = layout_text(
+        table,
+        &req.text,
+        req.at,
+        req.style,
+        &TextOpts::default(),
+        hooks.text_rules(),
+    )?;
+    glyphs
+        .into_iter()
+        .map(|g| {
+            let (shade, blend) = hooks.glyph_look(g.color)?;
+            Ok(UiSprite {
+                frame: ComponentFrame {
+                    set: font.glyphs.clone(),
+                    index: usize::from(g.frame),
+                },
+                x: g.at.x,
+                y: g.at.y,
+                shade,
+                blend,
+            })
+        })
+        .collect()
+}
+
+impl TextHooks for Unspecified {
+    fn text_font(&self, _: TextStyle) -> Result<TextFont, ViewError> {
+        Err(ViewError::unresolved("UI text font", "ui/text.md"))
+    }
+
+    fn text_rules(&self) -> &dyn TextRules {
+        &NoTextRules
+    }
+
+    fn glyph_look(&self, _: u16) -> Result<(ShadeChain, BlendOp), ViewError> {
+        Err(ViewError::unresolved("UI text color", "ui/text.md"))
+    }
+}
+
 impl UiRules for Unspecified {
     fn ui_image(&self, _: &ImageRequest, _: &ViewAssets) -> Result<UiSprite, ViewError> {
         Err(ViewError::unresolved("UI image", "ui/panels.md"))
     }
 
-    fn ui_text(&self, _: &TextRequest, _: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
-        Err(ViewError::unresolved("UI text layout", "ui/text.md"))
+    fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
+        text_sprites(self, req, assets)
     }
 
     fn ui_pass(&self) -> Result<u32, ViewError> {
@@ -72,7 +157,6 @@ pub(super) fn ui_items<R: UiRules + ?Sized>(
     draws: &[UiDraw],
     rules: &R,
     assets: &ViewAssets,
-    table: &mut FrameTable,
     items: &mut Vec<DrawItem>,
 ) -> Result<(), ViewError> {
     if draws.is_empty() {
@@ -89,8 +173,8 @@ pub(super) fn ui_items<R: UiRules + ?Sized>(
             UiDraw::Text(r) => (rules.ui_text(r, assets).map_err(at)?, r.clip),
         };
         for s in sprites {
-            let _: &IndexFrame = assets.frame(&s.frame.set, s.frame.index).map_err(at)?;
-            let mut item = DrawItem::new(table.id(&s.frame.set, s.frame.index), s.x, s.y);
+            let id = assets.id(&s.frame.set, s.frame.index).map_err(at)?;
+            let mut item = DrawItem::new(id, s.x, s.y);
             item.clip = clip_rect(clip);
             item.shade = s.shade;
             item.blend = s.blend;

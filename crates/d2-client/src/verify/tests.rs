@@ -12,7 +12,7 @@ fn cases() -> Vec<Case> {
 fn synthetic(c: &Case) -> Option<&case::Synthetic> {
     match &c.kind {
         CaseKind::Synthetic(s) => Some(s),
-        CaseKind::Map(_) => None,
+        CaseKind::Map(_) | CaseKind::Scene(_) => None,
     }
 }
 

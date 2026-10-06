@@ -17,6 +17,10 @@ mod huffman;
 mod robust_tests;
 mod set;
 mod tables;
+#[cfg(any(test, feature = "test-support"))]
+pub mod writer;
+#[cfg(test)]
+mod writer_tests;
 
 pub use set::{
     archive_file_name, priority, search_order, ArchiveSet, ArchiveSpec, OPEN_ORDER, PRIORITY,
