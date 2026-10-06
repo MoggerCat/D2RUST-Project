@@ -121,4 +121,26 @@ mod tests {
         let out = decompress(&[0x00, 0x00, 0x10, 0x00, 0x80, 0x80, 0x80], 1, 4);
         assert_eq!(out.len(), 4);
     }
+
+    // Covers: specs/formats/mpq.md §12 r1
+    #[test]
+    fn header_bytes() {
+        // Fewer than 2 bytes: no output.
+        assert!(decompress(&[], 1, 64).is_empty());
+        assert!(decompress(&[0x05], 2, 64).is_empty());
+        // Byte 0 is ignored.
+        let body = [0x10, 0x00, 0x01, 0x45, 0x80];
+        let base: Vec<u8> = [0x00, 0x03].iter().chain(&body).copied().collect();
+        for b0 in [0x01, 0x7F, 0xFF] {
+            let mut other = base.clone();
+            other[0] = b0;
+            assert_eq!(decompress(&other, 1, 64), decompress(&base, 1, 64));
+        }
+        // Byte 1 is `shift`: diff = (base >> shift) + (base >> 0) for op 1,
+        // base = StepSize[44] = 0x1EE.
+        for (shift, want) in [(0u8, 16 + 0x1EE + 0x1EE), (3, 16 + (0x1EE >> 3) + 0x1EE)] {
+            let out = decompress(&[0x00, shift, 0x10, 0x00, 0x01], 1, 64);
+            assert_eq!(samples(&out), [16, want as i16]);
+        }
+    }
 }

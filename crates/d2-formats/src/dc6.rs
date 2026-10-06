@@ -241,6 +241,33 @@ mod tests {
         assert!(dc6.frame(0, 2).is_none());
     }
 
+    // Covers: specs/formats/dc6.md §rules text, §placement-informational
+    #[test]
+    fn integers_are_little_endian_and_offsets_signed() {
+        let mut data = file(&[(2, 1, &[0x02, 1, 2])]);
+        data[4..8].copy_from_slice(&[0x04, 0x03, 0x02, 0x01]); // flags
+                                                               // Frame header at the pointer; offset_x / offset_y at +0x0C / +0x10.
+        let p = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
+        data[p + 0x0C..p + 0x10].copy_from_slice(&(-7i32).to_le_bytes());
+        data[p + 0x10..p + 0x14].copy_from_slice(&(-300i32).to_le_bytes());
+        let dc6 = Dc6::parse(&data).unwrap();
+        assert_eq!(dc6.header.flags, 0x0102_0304);
+        let f = dc6.frame(0, 0).unwrap();
+        assert_eq!((f.width, f.height), (2, 1));
+        // Placement offsets are kept as read, signed.
+        assert_eq!((f.offset_x, f.offset_y), (-7, -300));
+        assert_eq!(f.pixels, [1, 2]);
+    }
+
+    #[test]
+    fn zero_size_frames_are_empty() {
+        let data = file(&[(0, 0, &[]), (0, 5, &[0x80, 0x80]), (7, 0, &[0x85, 0x80])]);
+        let dc6 = Dc6::parse(&data).unwrap();
+        for f in &dc6.frames {
+            assert!(f.pixels.is_empty());
+        }
+    }
+
     // Covers: specs/formats/dc6.md §file-header-24-bytes
     #[test]
     fn bad_version() {

@@ -143,3 +143,26 @@ pub fn compile_all(
         linkers,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The compile reads each table's `.txt` (`levels.txt` for
+    /// `leveldefs`); a missing file stops it.
+    // Covers: specs/data/loading.md §3.2 r1
+    #[test]
+    fn missing_txt_is_fatal() {
+        assert_eq!(schema().table("leveldefs").unwrap().txt_name, "levels.txt");
+        let mut asked = Vec::new();
+        let mut read = |f: &str| {
+            asked.push(f.to_owned());
+            Ok(None)
+        };
+        match compile_all(&mut read, &StringTables::default()) {
+            Err(CompileSetError::Missing { file }) => assert_eq!(file, "compcode.txt"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(asked, ["compcode.txt"]);
+    }
+}

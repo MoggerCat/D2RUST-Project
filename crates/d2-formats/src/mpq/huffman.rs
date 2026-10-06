@@ -402,7 +402,7 @@ pub(crate) fn compress(table: u8, data: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -492,5 +492,291 @@ mod tests {
     #[test]
     fn rejects_bad_table_type() {
         assert!(decompress(&[9, 0, 0], 16).is_err());
+    }
+
+    // -----------------------------------------------------------------
+    // A plain reference model of §11, written from the spec text: the
+    // ordered list `L` is a `Vec` and every lookup is a linear scan.
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub(crate) struct Model {
+        w: Vec<u32>,
+        sym: Vec<Option<u16>>,
+        child: Vec<[usize; 2]>,
+        parent: Vec<Option<usize>>,
+        /// `L`, head first.
+        l: Vec<usize>,
+    }
+
+    impl Model {
+        fn node(&mut self, w: u32, sym: Option<u16>, child: [usize; 2]) -> usize {
+            self.w.push(w);
+            self.sym.push(sym);
+            self.child.push(child);
+            self.parent.push(None);
+            self.w.len() - 1
+        }
+
+        fn pos(&self, n: usize) -> usize {
+            self.l.iter().position(|&x| x == n).expect("in L")
+        }
+
+        /// Insert rule: right after the last node with weight ≥ w, else
+        /// at the head.
+        fn insert(&mut self, n: usize) {
+            let w = self.w[n];
+            let at = self
+                .l
+                .iter()
+                .rposition(|&x| self.w[x] >= w)
+                .map_or(0, |p| p + 1);
+            self.l.insert(at, n);
+        }
+
+        /// Build, steps 1–3.
+        fn build(weights: &[u8; 256]) -> Model {
+            let mut m = Model {
+                w: vec![],
+                sym: vec![],
+                child: vec![],
+                parent: vec![],
+                l: vec![],
+            };
+            for (s, &w) in weights.iter().enumerate() {
+                if w != 0 {
+                    let n = m.node(u32::from(w), Some(s as u16), [0, 0]);
+                    m.insert(n);
+                }
+            }
+            for s in [SYM_END, SYM_ESCAPE] {
+                let n = m.node(1, Some(s), [0, 0]);
+                m.insert(n);
+            }
+            let mut c = *m.l.last().unwrap();
+            while c != m.l[0] {
+                let a = c;
+                let b = m.l[m.pos(a) - 1];
+                let br = m.node(m.w[a] + m.w[b], None, [a, b]);
+                m.parent[a] = Some(br);
+                m.parent[b] = Some(br);
+                m.insert(br);
+                let pb = m.pos(b);
+                if pb == 0 {
+                    break;
+                }
+                c = m.l[pb - 1];
+            }
+            m
+        }
+
+        fn root(&self) -> usize {
+            self.l[0]
+        }
+
+        /// Increment(n), steps 1–3, up to and including the root.
+        fn increment(&mut self, mut n: usize) -> Result<(), ()> {
+            loop {
+                let w = self.w[n];
+                let lead = *self.l.iter().find(|&&x| self.w[x] == w).unwrap();
+                if lead != n {
+                    // (The implementation rejects a swap with the root or
+                    // with n's own parent; valid streams never reach it.)
+                    let (pn, pl) = (self.parent[n].ok_or(())?, self.parent[lead].ok_or(())?);
+                    if pn == lead {
+                        return Err(());
+                    }
+                    let (a, b) = (self.pos(n), self.pos(lead));
+                    self.l.swap(a, b);
+                    if pn == pl {
+                        self.child[pn].swap(0, 1);
+                    } else {
+                        let sn = usize::from(self.child[pn][1] == n);
+                        let sl = usize::from(self.child[pl][1] == lead);
+                        self.child[pn][sn] = lead;
+                        self.child[pl][sl] = n;
+                        self.parent[n] = Some(pl);
+                        self.parent[lead] = Some(pn);
+                    }
+                }
+                self.w[n] = w + 1;
+                match self.parent[n] {
+                    Some(p) => n = p,
+                    None => return Ok(()),
+                }
+            }
+        }
+
+        /// AddValue(v), steps 1–3.
+        fn add_value(&mut self, v: u8) -> usize {
+            let a = self.node(0, Some(u16::from(v)), [0, 0]);
+            self.insert(a);
+            assert_eq!(*self.l.last().unwrap(), a, "the new leaf is the tail");
+            let b = self.l[self.pos(a) - 1];
+            let m = self.node(self.w[b], None, [a, b]);
+            let pb = self.parent[b];
+            if let Some(p) = pb {
+                let side = usize::from(self.child[p][1] == b);
+                self.child[p][side] = m;
+            }
+            self.parent[m] = pb;
+            let at = self.pos(b);
+            self.l.insert(at, m);
+            self.parent[a] = Some(m);
+            self.parent[b] = Some(m);
+            a
+        }
+
+        /// Decode, steps 1–5. `escape_increments` is 1 or 2 for tables
+        /// 1–8 (the spec says 2); table 0 always uses the adaptive rule.
+        pub(crate) fn decode(
+            input: &[u8],
+            max_out: usize,
+            escape_increments: u32,
+        ) -> Result<Vec<u8>, ()> {
+            let mut bit = 0usize;
+            let mut read = |n: u32| -> Result<u32, ()> {
+                let mut v = 0;
+                for k in 0..n {
+                    let byte = *input.get(bit / 8).ok_or(())?;
+                    v |= u32::from(byte >> (bit % 8) & 1) << k;
+                    bit += 1;
+                }
+                Ok(v)
+            };
+            let t = read(8)? as usize;
+            if t > 8 {
+                return Err(());
+            }
+            let adaptive = t == 0;
+            let mut m = Model::build(&HUFFMAN_WEIGHTS[t]);
+            let mut out = Vec::new();
+            while out.len() < max_out {
+                let mut n = m.root();
+                while m.sym[n].is_none() {
+                    n = m.child[n][read(1)? as usize];
+                }
+                let sym = match m.sym[n].unwrap() {
+                    SYM_END => break,
+                    SYM_ESCAPE => {
+                        let v = read(8)? as u8;
+                        n = m.add_value(v);
+                        m.increment(n)?;
+                        if !adaptive && escape_increments == 2 {
+                            m.increment(n)?;
+                        }
+                        v
+                    }
+                    s => s as u8,
+                };
+                out.push(sym);
+                if adaptive {
+                    m.increment(n)?;
+                }
+            }
+            Ok(out)
+        }
+    }
+
+    /// The implementation's tree in model form (node indices match: both
+    /// create nodes in the order the spec does).
+    fn as_model(t: &Tree) -> Model {
+        let mut l = vec![];
+        let mut cur = Some(t.head);
+        while let Some(i) = cur {
+            l.push(i);
+            cur = t.nodes[i].next;
+        }
+        let branch = |n: &Node| if n.symbol.is_none() { n.child } else { [0, 0] };
+        Model {
+            w: t.nodes.iter().map(|n| n.weight).collect(),
+            sym: t.nodes.iter().map(|n| n.symbol).collect(),
+            child: t.nodes.iter().map(branch).collect(),
+            parent: t.nodes.iter().map(|n| n.parent).collect(),
+            l,
+        }
+    }
+
+    /// Deterministic byte source for the property checks.
+    fn lcg_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut x = seed;
+        (0..len)
+            .map(|_| {
+                x = x.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+                (x >> 16) as u8
+            })
+            .collect()
+    }
+
+    // Covers: specs/formats/mpq.md §11 r1, §11 r2, §11 r3
+    #[test]
+    fn build_matches_reference_model() {
+        for (t, weights) in HUFFMAN_WEIGHTS.iter().enumerate() {
+            let model = Model::build(weights);
+            let tree = template(t);
+            assert_eq!(as_model(tree), model, "table {t}");
+            assert_eq!(tree.root(), model.root());
+            // Leaves: every non-zero weight in symbol order, then 0x100, 0x101.
+            let leaves: Vec<u16> = model.sym.iter().map_while(|s| *s).collect();
+            let mut want: Vec<u16> = (0..256u16)
+                .filter(|&s| weights[usize::from(s)] != 0)
+                .collect();
+            want.extend([SYM_END, SYM_ESCAPE]);
+            assert_eq!(leaves, want);
+        }
+    }
+
+    // Covers: specs/formats/mpq.md §11 l2 r1, §11 l2 r2, §11 l2 r3, §11 l3 r1, §11 l3 r2, §11 l3 r3
+    #[test]
+    fn updates_match_reference_model() {
+        for (t, weights) in HUFFMAN_WEIGHTS.iter().enumerate() {
+            let mut tree = template(t).clone();
+            let mut model = Model::build(weights);
+            let ops = lcg_bytes(t as u32 + 1, 600);
+            for (k, &op) in ops.iter().enumerate() {
+                if k % 5 == 0 {
+                    // AddValue, then Increment of the new leaf.
+                    let a = tree.add_value(op);
+                    assert_eq!(a, model.add_value(op));
+                    assert_eq!(as_model(&tree), model, "table {t} add {k}");
+                    tree.increment(a).unwrap();
+                    model.increment(a).unwrap();
+                } else {
+                    // Increment an existing leaf picked by `op`.
+                    let leaves: Vec<usize> = (0..model.w.len())
+                        .filter(|&i| model.sym[i].is_some())
+                        .collect();
+                    let n = leaves[usize::from(op) % leaves.len()];
+                    tree.increment(n).unwrap();
+                    model.increment(n).unwrap();
+                }
+                assert_eq!(as_model(&tree), model, "table {t} op {k}");
+            }
+        }
+    }
+
+    // Covers: specs/formats/mpq.md §11 l4 r1, §11 l4 r2, §11 l4 r3, §11 l4 r4, §11 l4 r5
+    #[test]
+    fn decode_matches_reference_model() {
+        let data: Vec<u8> = b"Stay awhile and listen. \x00\x01\xfe\xff"
+            .iter()
+            .copied()
+            .chain(lcg_bytes(99, 300))
+            .collect();
+        for t in 0..HUFFMAN_WEIGHTS.len() as u8 {
+            // Valid streams (every escape path), full and capped output.
+            let stream = compress(t, &data);
+            for max in [0, 1, 17, data.len(), 4096] {
+                let got = decompress(&stream, max).map_err(|_| ());
+                assert_eq!(got, Model::decode(&stream, max, 2), "table {t} max {max}");
+            }
+            assert_eq!(Model::decode(&stream, 4096, 2).unwrap(), data);
+            // Arbitrary bit streams: same output or both an error.
+            for seed in 0..40 {
+                let mut s = vec![t];
+                s.extend(lcg_bytes(seed * 9 + u32::from(t), 64));
+                let got = decompress(&s, 4096).map_err(|_| ());
+                assert_eq!(got, Model::decode(&s, 4096, 2), "table {t} seed {seed}");
+            }
+        }
     }
 }

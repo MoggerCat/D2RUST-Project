@@ -453,6 +453,221 @@ fn synthetic_archive_reads_back() {
     ));
 }
 
+/// `parts` with block `index`'s plain block-table dword `field` (0 =
+/// file_pos, 1 = compressed_size, 2 = file_size, 3 = flags) set to `v`.
+fn with_block_field(parts: &Parts, index: usize, field: usize, v: u32) -> Vec<u8> {
+    let mut p = parts.clone();
+    let at = index * 16 + field * 4;
+    p.block_plain[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    p.assemble()
+}
+
+// Covers: specs/formats/mpq.md §rules text
+#[test]
+fn little_endian_and_wrapping_dwords() {
+    let p = synthetic_parts();
+    let bytes = p.assemble();
+    let tmp = TempFile::new(&bytes);
+    let a = Archive::open(&tmp.0).unwrap();
+    let le = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+    let h = a.header();
+    assert_eq!(h.header_size, le(0x04));
+    assert_eq!(h.archive_size, le(0x08));
+    assert_eq!(
+        h.sector_size_shift,
+        u16::from_le_bytes([bytes[0x0E], bytes[0x0F]])
+    );
+    assert_eq!((h.hash_table_pos, h.block_table_pos), (le(0x10), le(0x14)));
+    assert_eq!(
+        (h.hash_table_count, h.block_table_count),
+        (le(0x18), le(0x1C))
+    );
+    // One dword decrypted by hand (§4) with wrapping arithmetic and a key
+    // near 2^32; the reader must agree (debug builds trap on overflow).
+    let key = 0xFFFF_FFF0u32;
+    let mut d = 0xDEAD_BEEFu32.to_le_bytes();
+    let seed = 0xEEEE_EEEEu32.wrapping_add(crypto_table(0x400 + 0xF0));
+    let want = 0xDEAD_BEEF ^ key.wrapping_add(seed);
+    super::crypto::decrypt(&mut d, key);
+    assert_eq!(u32::from_le_bytes(d), want);
+    // A long name runs every hash seed through many wrapping additions.
+    let long = "x\\".repeat(500);
+    let _ = hash(long.as_bytes(), HashType::FileKey);
+}
+
+fn crypto_table(i: usize) -> u32 {
+    super::crypto::CRYPT_TABLE[i]
+}
+
+// Covers: specs/formats/mpq.md §6
+#[test]
+fn block_table_fields_and_flags() {
+    use flags::*;
+    let p = synthetic_parts();
+    let tmp = TempFile::new(&p.assemble());
+    let a = Archive::open(&tmp.0).unwrap();
+    // Fields, decrypted with the block-table key, in table order.
+    let want: Vec<BlockEntry> = p
+        .block_plain
+        .as_chunks::<16>()
+        .0
+        .iter()
+        .map(|e| {
+            let d = |i: usize| u32::from_le_bytes(e[i..i + 4].try_into().unwrap());
+            BlockEntry {
+                file_pos: d(0),
+                compressed_size: d(4),
+                file_size: d(8),
+                flags: d(12),
+            }
+        })
+        .collect();
+    assert_eq!(a.block_table(), want);
+    // Every flag combination of the synthetic archive reads back: IMPLODE
+    // (no mask byte), COMPRESS (mask byte), ENCRYPTED, FIX_KEY,
+    // SINGLE_UNIT, SECTOR_CRC.
+    for name in NAMES {
+        assert_eq!(a.read(name).unwrap(), contents(name), "{name}");
+    }
+    drop(a);
+
+    let idx = |name: &str| NAMES.iter().position(|&n| n == name).unwrap();
+    let flags_of = |name: &str| want[idx(name)].flags;
+    let open = |bytes: Vec<u8>| {
+        let tmp = TempFile::new(&bytes);
+        let a = Archive::open(&tmp.0).unwrap();
+        (tmp, a)
+    };
+
+    // PATCH_FILE is rejected.
+    let (_t, a) = open(with_block_field(
+        &p,
+        idx("a.txt"),
+        3,
+        flags_of("a.txt") | PATCH_FILE,
+    ));
+    assert!(matches!(a.read("a.txt"), Err(MpqError::Unsupported(_))));
+    // DELETE_MARKER: treated as not found.
+    let (_t, a) = open(with_block_field(
+        &p,
+        idx("a.txt"),
+        3,
+        flags_of("a.txt") | DELETE_MARKER,
+    ));
+    assert!(matches!(a.read("a.txt"), Err(MpqError::NotFound(_))));
+    // Without EXISTS, reading the block is an error.
+    let (_t, a) = open(with_block_field(
+        &p,
+        idx("a.txt"),
+        3,
+        flags_of("a.txt") & !EXISTS,
+    ));
+    assert!(a.read("a.txt").is_err());
+    // SECTOR_CRC adds one offset-table entry: without it the table is wrong.
+    let (_t, a) = open(with_block_field(
+        &p,
+        idx("b.bin"),
+        3,
+        flags_of("b.bin") & !SECTOR_CRC,
+    ));
+    assert!(a.read("b.bin").is_err());
+    // The data range must lie inside the file.
+    let len = p.assemble().len() as u32;
+    let (_t, a) = open(with_block_field(&p, idx("a.txt"), 1, len));
+    assert!(a.read("a.txt").is_err());
+    let (_t, a) = open(with_block_field(&p, idx("a.txt"), 0, len));
+    assert!(a.read("a.txt").is_err());
+}
+
+// Covers: specs/formats/mpq.md §7
+#[test]
+fn file_key_from_plain_name() {
+    let p = synthetic_parts();
+    let tmp = TempFile::new(&p.assemble());
+    let a = Archive::open(&tmp.0).unwrap();
+    let key = |name: &str| hash(name.as_bytes(), HashType::FileKey);
+
+    // No FIX_KEY: the hash of the part after the last `\` or `/`.
+    let d = a.find(r"sub\d.dat").unwrap();
+    assert_eq!(a.file_key(r"sub\d.dat", d), Some(key("d.dat")));
+    assert_eq!(a.file_key("x/y\\z/d.dat", d), Some(key("d.dat")));
+    assert_eq!(
+        a.read_block(d, Some(key("d.dat"))).unwrap(),
+        contents(r"sub\d.dat")
+    );
+    let t = a.find("a.txt").unwrap();
+    assert_eq!(a.file_key("a.txt", t), Some(key("a.txt")));
+
+    // FIX_KEY: (base + file_pos) ^ file_size.
+    let b = a.find("b.bin").unwrap();
+    let e = a.block_table()[b];
+    let fixed = key("b.bin").wrapping_add(e.file_pos) ^ e.file_size;
+    assert_ne!(fixed, key("b.bin"));
+    assert_eq!(a.file_key("b.bin", b), Some(fixed));
+    assert_eq!(a.read_block(b, Some(fixed)).unwrap(), contents("b.bin"));
+    assert!(a.read_block(b, Some(key("b.bin"))).is_err());
+
+    // Not encrypted: no key.
+    let c = a.find("c.wav").unwrap();
+    assert_eq!(a.file_key("c.wav", c), None);
+}
+
+// Covers: specs/formats/mpq.md §edge-cases-original-bugs
+#[test]
+fn edge_cases_original_bugs() {
+    // 1. Encrypted lengths not a multiple of 4: the last 1–3 bytes stay
+    //    plain.
+    for tail in 1..4 {
+        let plain: Vec<u8> = (0..8 + tail as u8).collect();
+        let mut enc = plain.clone();
+        encrypt(&mut enc, 0x1234_5678);
+        assert_eq!(enc[8..], plain[8..], "tail {tail}");
+        assert_ne!(enc[..8], plain[..8]);
+        let mut whole = plain[..8].to_vec();
+        encrypt(&mut whole, 0x1234_5678);
+        assert_eq!(enc[..8], whole[..]);
+        super::crypto::decrypt(&mut enc, 0x1234_5678);
+        assert_eq!(enc, plain);
+    }
+
+    // 2. A sector exactly expected(i) long is stored raw under COMPRESS:
+    //    b.bin's last sector is 276 raw bytes whose first byte (0x0B) would
+    //    be an invalid mask if decoded.
+    let p = synthetic_parts();
+    let tmp = TempFile::new(&p.assemble());
+    let a = Archive::open(&tmp.0).unwrap();
+    let c = contents("b.bin");
+    assert_eq!(c[2 * SECTOR], 0x0B);
+    assert!(decompress_masked(c[2 * SECTOR], &c[2 * SECTOR + 1..], c.len() - 2 * SECTOR).is_err());
+    assert_eq!(a.read("b.bin").unwrap(), c);
+
+    // 3. The PKWARE end marker may end exactly at the end of input: 8
+    //    literals (72 bits) + end marker (1 + 7 + 8 bits) = 11 bytes, no
+    //    padding.
+    let s = implode(4, &literals(b"abcdefgh"));
+    assert_eq!(s.len(), 2 + 11);
+    assert_eq!(explode::explode(&s, 64).unwrap(), b"abcdefgh");
+
+    // 4. Tables 1–8 aren't adaptive, but an escaped value gets two
+    //    increments: decoding agrees with the §11 model only when it
+    //    applies the second increment.
+    let data = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+    let mut differs = false;
+    for t in 1..9u8 {
+        let mut d = data.to_vec();
+        d.extend(b"\x10\x10\x10\x10\x10\x11\x11\x11\x12\x12");
+        let stream = huffman::compress(t, &d);
+        let got = huffman::decompress(&stream, 4096).unwrap();
+        assert_eq!(got, d);
+        assert_eq!(
+            Ok(got.clone()),
+            huffman::tests::Model::decode(&stream, 4096, 2)
+        );
+        differs |= huffman::tests::Model::decode(&stream, 4096, 1) != Ok(got);
+    }
+    assert!(differs, "one increment would decode differently");
+}
+
 // ---------------------------------------------------------------------------
 // Regressions (minimized inputs).
 

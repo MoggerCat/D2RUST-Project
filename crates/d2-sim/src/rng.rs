@@ -12,6 +12,8 @@ pub const K: u32 = 0x6AC6_90C5;
 pub const INIT_HI: u32 = 666;
 
 /// One seed: the generator state (spec §1). D2MOO: `D2SeedStrc`.
+/// `repr(C)` pins `lo` at offset 0 and `hi` at offset 4 (spec §1.1).
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Seed {
     /// Low word (offset 0); a draw's raw output.
@@ -261,5 +263,150 @@ mod tests {
         let mut s = Seed::new(1_936_801_471, 624_310_379);
         assert_eq!(s.roll(3), 2);
         assert_eq!(s, Seed::new(1_281_421_670, 807_825_114));
+    }
+
+    // Covers: specs/sim/rng.md §1 r1
+    #[test]
+    fn seed_layout_lo_then_hi() {
+        assert_eq!(std::mem::size_of::<Seed>(), 8);
+        assert_eq!(std::mem::offset_of!(Seed, lo), 0);
+        assert_eq!(std::mem::offset_of!(Seed, hi), 4);
+        // Read as one little-endian u64, lo is the low half: the step's
+        // v = lo·K + hi is exactly the new state read that way.
+        let mut s = Seed::new(0x0102_0304, 0x0506_0708);
+        let v = u64::from(s.lo) * u64::from(K) + u64::from(s.hi);
+        s.step();
+        let mut bytes = [0u8; 8];
+        bytes[..4].copy_from_slice(&s.lo.to_le_bytes());
+        bytes[4..].copy_from_slice(&s.hi.to_le_bytes());
+        assert_eq!(u64::from_le_bytes(bytes), v);
+    }
+
+    // Covers: specs/sim/rng.md §1 r2, §edge-cases-original-bugs r4
+    #[test]
+    fn copy_duplicates_generator() {
+        // Only the two words: 8 bytes, nothing else.
+        assert_eq!(std::mem::size_of::<Seed>(), 2 * std::mem::size_of::<u32>());
+        let mut a = Seed::new(4_014_346_871, 666);
+        a.step();
+        let mut b = a; // struct copy
+        for n in [3, 100, 7, 1 << 20, 0x7FFF_FFFF] {
+            assert_eq!(a.roll(n), b.roll(n));
+            assert_eq!(a.step(), b.step());
+            assert_eq!(a.mask(16), b.mask(16));
+            assert_eq!(a, b);
+        }
+    }
+
+    /// The low word the next step would produce, without stepping `s`.
+    fn next_lo(mut s: Seed) -> u32 {
+        s.step()
+    }
+
+    /// Small deterministic sweep of low words for property tests.
+    fn sweep() -> impl Iterator<Item = Seed> {
+        let mut s = Seed::new(971_488_495, 666);
+        (0..2000).map(move |_| {
+            s.step();
+            s
+        })
+    }
+
+    // Covers: specs/sim/rng.md §3 r3
+    #[test]
+    fn power_of_two_branch_equals_modulo() {
+        for start in sweep() {
+            for k in 0..31 {
+                let n = 1i32 << k;
+                let mut s = start;
+                let lo2 = next_lo(s);
+                let got = s.roll(n);
+                // Power-of-two branch and modulo branch agree.
+                assert_eq!(lo2 & (n as u32 - 1), lo2 % n as u32);
+                assert_eq!(got, lo2 & (n as u32 - 1));
+            }
+        }
+    }
+
+    // Covers: specs/sim/rng.md §3 r5
+    #[test]
+    fn roll_results_in_range() {
+        let ns = [1, 2, 3, 7, 10, 100, 1000, 0x7FFF_FFFF];
+        let mins = [0, -10, 5, i32::MIN / 2];
+        for start in sweep() {
+            for n in ns {
+                let mut s = start;
+                assert!(s.roll(n) < n as u32);
+                for min in mins {
+                    let mut s = start;
+                    let r = i64::from(s.roll_range(min, n));
+                    let lo = i64::from(min);
+                    assert!(lo <= r && r < lo + i64::from(n), "{min} {n} {r}");
+                }
+            }
+        }
+    }
+
+    // Covers: specs/sim/rng.md §4 r2, §4 r3
+    #[test]
+    fn init_then_init_low_and_inline_store() {
+        for x in [0, 1, 42, 644_409_375, u32::MAX] {
+            // init() then init_low(x): the init() is overwritten.
+            let mut s = Seed::init();
+            assert_eq!(s, Seed::new(1, INIT_HI));
+            s = Seed::init_low(x);
+            assert_eq!(s, Seed::init_low(x));
+            // An inline store of {x, 0x29A} has the same effect.
+            let mut t = Seed::new(9, 9);
+            t.set(x, 0x29A);
+            assert_eq!(t, s);
+        }
+    }
+
+    // Covers: specs/sim/rng.md §edge-cases-original-bugs r1
+    #[test]
+    fn roll_nonpositive_returns_zero_seed_unchanged() {
+        for start in [START, Seed::new(7_657_093, 405_200_438)] {
+            for n in [0, -1, -5, i32::MIN] {
+                let mut s = start;
+                assert_eq!(s.roll(n), 0);
+                assert_eq!(s, start);
+            }
+        }
+    }
+
+    // Covers: specs/sim/rng.md §edge-cases-original-bugs r2
+    #[test]
+    fn mask_non_power_of_two_is_biased() {
+        // mask(10) = lo' & 9: only 0, 1, 8 and 9 can occur.
+        let mut seen = [false; 10];
+        for start in sweep() {
+            let mut s = start;
+            let lo2 = next_lo(start);
+            let v = s.mask(10);
+            assert_eq!(v, lo2 & 9);
+            seen[v as usize] = true;
+        }
+        assert_eq!(
+            seen,
+            [true, true, false, false, false, false, false, false, true, true]
+        );
+    }
+
+    // Covers: specs/sim/rng.md §edge-cases-original-bugs r3
+    #[test]
+    fn roll_is_low_word_modulo() {
+        // n not dividing 2^32: the plain unsigned lo' mod n, reproduced as is.
+        for start in sweep() {
+            for n in [3, 7, 100, 0x7FFF_FFFF] {
+                let mut s = start;
+                let lo2 = next_lo(start);
+                assert_eq!(s.roll(n), lo2 % n as u32);
+            }
+        }
+        // lo' = 0xFFFFFFFF with n = 0x7FFFFFFF wraps to 1 (2^32 is not a
+        // multiple of n, so 0 and 1 have one more preimage than the rest).
+        let mut s = Seed::new(0, 0xFFFF_FFFF);
+        assert_eq!(s.roll(0x7FFF_FFFF), 1);
     }
 }

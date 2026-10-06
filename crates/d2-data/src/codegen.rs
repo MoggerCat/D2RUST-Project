@@ -203,6 +203,46 @@ mod tests {
         assert_eq!(struct_ident("treasureclassex"), "Treasureclassex");
     }
 
+    /// Every decoded field reads its own `fields.tsv` offset with the
+    /// little-endian reader of its width (`loading.md` d2-data policy 2).
+    // Covers: specs/data/loading.md §d2-data-policy r2
+    #[test]
+    fn fields_decode_at_schema_offsets() {
+        let mut fields = 0;
+        for t in schema().runtime() {
+            for f in &t.fields {
+                let Some((ty, expr)) = field_code(f) else {
+                    assert!(f.field_type.is_field_callback(), "{}", f.name());
+                    continue;
+                };
+                fields += 1;
+                let o = f.offset;
+                let want = match f.field_type.id() {
+                    26 => format!(
+                        "bit(r, {}, 0x{:02X})",
+                        o + (f.length >> 3),
+                        1u32 << (f.length & 7)
+                    ),
+                    _ => match f.footprint().len() {
+                        4 if ty == "u32" => format!("u32_at(r, {o})"),
+                        2 if ty == "u16" => format!("u16_at(r, {o})"),
+                        1 if ty == "u8" => format!("r[{o}]"),
+                        _ => format!("bytes(r, {o})"),
+                    },
+                };
+                assert_eq!(expr, want, "{}.{}", t.name, f.name());
+            }
+        }
+        assert!(fields > 3_000);
+        // The readers are little-endian.
+        use crate::tables::{Itemstatcost, Record};
+        let mut r = vec![0u8; Itemstatcost::SIZE];
+        r[0..2].copy_from_slice(&[0x01, 0x02]);
+        r[12..16].copy_from_slice(&[0x01, 0x02, 0x03, 0x04]);
+        let d = Itemstatcost::decode(&r);
+        assert_eq!((d.stat, d.divide), (0x0201, 0x0403_0201));
+    }
+
     /// The committed file is what the generator writes today.
     #[test]
     fn generated_file_is_current() {

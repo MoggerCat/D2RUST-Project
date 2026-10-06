@@ -125,6 +125,48 @@ mod tests {
         assert!(FontTable::is_font_table(&file(&[])));
     }
 
+    // Covers: specs/formats/font-tbl.md §rules text
+    #[test]
+    fn integers_are_little_endian() {
+        let mut f = file(&[[
+            0x34, 0x12, 0, 0, 0, 0, 0xCD, 0xAB, 0, 0, 0x78, 0x56, 0x34, 0x12,
+        ]]);
+        f[4..6].copy_from_slice(&[1, 0]); // version 1 as LE u16
+        let t = FontTable::parse(&f).unwrap();
+        assert_eq!(t.version, 1);
+        let g = t.glyphs[0];
+        assert_eq!(
+            (g.code, g.unknown3, g.unknown5),
+            (0x1234, 0xABCD, 0x1234_5678)
+        );
+        // Big-endian version 1 (0x0100) is not version 1.
+        f[4..6].copy_from_slice(&[0, 1]);
+        assert!(FontTable::parse(&f).is_err());
+    }
+
+    // Covers: specs/formats/font-tbl.md §edge-cases-original-bugs
+    #[test]
+    fn frame_is_one_byte() {
+        // 300 records parse, but `frame` is the single byte at offset 8:
+        // record 256 can only say 0 again, so at most 256 frames are
+        // addressable.
+        let recs: Vec<[u8; 14]> = (0..300u16)
+            .map(|i| {
+                let mut r = [0u8; 14];
+                r[..2].copy_from_slice(&i.to_le_bytes());
+                r[8] = i as u8;
+                r[9] = 0xEE; // unknown4: not part of the frame index
+                r
+            })
+            .collect();
+        let t = FontTable::parse(&file(&recs)).unwrap();
+        assert_eq!(t.glyphs.len(), 300);
+        assert_eq!(t.glyphs[255].frame, 255);
+        assert_eq!(t.glyphs[256].frame, 0);
+        let distinct: std::collections::BTreeSet<u8> = t.glyphs.iter().map(|g| g.frame).collect();
+        assert_eq!(distinct.len(), 256);
+    }
+
     mod robust {
         use super::*;
         use crate::robust::mutated;
