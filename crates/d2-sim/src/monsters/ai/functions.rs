@@ -106,7 +106,7 @@ fn zombie<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p
     }
     let run = cx.ai_state_set(u)
         || (p.distance < cx.aip(p, 2) && cx.chance(u, cx.aip(p, 1)))
-        || cx.world.level_id(u) == 17;
+        || cx.world.level_id(game, u) == 17;
     if !run {
         wander(game, cx, u, 3);
         return;
