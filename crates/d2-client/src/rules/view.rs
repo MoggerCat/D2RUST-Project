@@ -220,11 +220,16 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
             return Ok(vec![whole]);
         }
         let cam = &self.camera;
-        let origin = cam.block_origin(tile.list, cam.tile_handed(tile.list, tile.cell.0, tile.cell.1));
+        let origin = cam.block_origin(
+            tile.list,
+            cam.tile_handed(tile.list, tile.cell.0, tile.cell.1),
+        );
         let mut out = Vec::with_capacity(blocks.len());
         for b in blocks {
             let (x, y) = placement::block_pixel(origin, (b.block.x, b.block.y), (0, 0));
-            let Some(clip) = whole.clip.intersect(&Rect::new(x, y, b.block.width, b.block.height))
+            let Some(clip) = whole
+                .clip
+                .intersect(&Rect::new(x, y, b.block.width, b.block.height))
             else {
                 continue;
             };

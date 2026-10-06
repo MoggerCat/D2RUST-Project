@@ -128,14 +128,22 @@ fn look() -> ComponentLook {
 fn layer_mode_reads_the_cof_override_bytes() {
     let plain = cof(layer(0, 3));
     let over = cof(layer(1, 3));
-    assert_eq!(layer_mode(&look(), &request(&plain)), 5, "byte 3 = 0: lv ignored");
+    assert_eq!(
+        layer_mode(&look(), &request(&plain)),
+        5,
+        "byte 3 = 0: lv ignored"
+    );
     assert_eq!(layer_mode(&look(), &request(&over)), 3);
     let hovered = ComponentLook {
         hovered: true,
         ..look()
     };
     assert_eq!(layer_mode(&hovered, &request(&plain)), 7);
-    assert_eq!(layer_mode(&hovered, &request(&over)), 3, "override layers are never highlighted");
+    assert_eq!(
+        layer_mode(&hovered, &request(&over)),
+        3,
+        "override layers are never highlighted"
+    );
     let ghostly = ComponentLook {
         ghostly: true,
         ..hovered
@@ -152,7 +160,11 @@ fn layer_mode_reads_the_cof_override_bytes() {
         }),
         ..hovered
     };
-    assert_eq!(layer_mode(&faded, &request(&plain)), 1, "r before the highlight");
+    assert_eq!(
+        layer_mode(&faded, &request(&plain)),
+        1,
+        "r before the highlight"
+    );
 }
 
 // Covers: specs/render/lighting.md §11 r1, §11 text
@@ -177,10 +189,7 @@ fn component_light_is_the_low_byte_of_the_units_cell() {
         cel_ops(&light.tables, 5, remap, 0)
     );
     // Mode 7 doubles the light byte (GDI then uses H).
-    let hovered = ComponentLook {
-        hovered: true,
-        ..l
-    };
+    let hovered = ComponentLook { hovered: true, ..l };
     assert_eq!(
         component_ops(&light, (101, 100), &hovered, &request(&plain)),
         cel_ops(&light.tables, 7, remap, hover_light(0x7F))
@@ -234,6 +243,9 @@ fn lit_rules_answer_shade_and_blend_and_refuse_without_inputs() {
     };
     assert!(matches!(
         rules.shade(&unit, &request(&c)),
-        Err(CompositeError::Unresolved { what: "unit light", .. })
+        Err(CompositeError::Unresolved {
+            what: "unit light",
+            ..
+        })
     ));
 }

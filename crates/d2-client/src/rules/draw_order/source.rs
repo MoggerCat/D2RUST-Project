@@ -80,7 +80,10 @@ impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
         Ok(self.tiles.clone())
     }
 
-    fn tile_blocks(&self, tile: &MapTile) -> Result<Vec<super::super::view::BlockShade>, ViewError> {
+    fn tile_blocks(
+        &self,
+        tile: &MapTile,
+    ) -> Result<Vec<super::super::view::BlockShade>, ViewError> {
         self.source.tile_blocks(tile)
     }
 

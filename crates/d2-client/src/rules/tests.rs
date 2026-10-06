@@ -875,7 +875,9 @@ fn tile_blocks_draw_one_item_per_block() {
     assert_eq!(draws[1].blend, BlendOp::IndexTableSrcRow(MapId(9)));
     let g = draws[1].shade.gradient().unwrap();
     assert_eq!((g.x, g.y), (whole.x + 32, 360));
-    assert!(draws.iter().all(|d| (d.x, d.y, &d.frame) == (whole.x, whole.y, &whole.frame)));
+    assert!(draws
+        .iter()
+        .all(|d| (d.x, d.y, &d.frame) == (whole.x, whole.y, &whole.frame)));
     // No per-block shade: the whole tile, unchanged.
     assert_eq!(view.tile_draws(&tile, &image, &[]).unwrap(), vec![whole]);
     // Mode 2: block 0 culled (x 336 < 368), only block 1 drawn.
