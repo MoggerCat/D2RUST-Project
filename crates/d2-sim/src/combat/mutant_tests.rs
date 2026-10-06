@@ -1023,3 +1023,44 @@ fn apply_melee_overlay_and_thorns() {
     melee(&mut f, m, d, hit);
     assert!(f.log.contains(&"thorns 2 1".to_string()), "{:?}", f.log);
 }
+
+// ---------------------------------------------------------------- §6
+
+// §6.1: the critical nibble 0x10 only when no element matched and the
+// result has 0x2000.
+#[test]
+fn element_hit_class_crit_fallback() {
+    let mut counter = 0u8;
+    let rec = fire(10);
+    assert_eq!(element_hit_class(&mut counter, &rec, 2), 0x22);
+    assert_eq!(
+        element_hit_class(&mut counter, &DamageRecord::default(), 2),
+        2
+    );
+    let crit = DamageRecord {
+        result: result::CRITICAL,
+        ..fire(10)
+    };
+    assert_eq!(element_hit_class(&mut counter, &crit, 2), 0x22);
+}
+
+// §6.2 step 2: poison alone (poison = total) skips get-hit; mixed damage
+// goes on to the size tests (1000 ≥ 1000 / 4: get-hit).
+#[test]
+fn no_get_hit_poison_only() {
+    let c = ct();
+    let mut f = world();
+    let u = f.add(FUnit::new(UnitType::Player, 0).with(7, 1000));
+    let rec = DamageRecord {
+        poison: 100,
+        total: 1000,
+        ..DamageRecord::default()
+    };
+    assert!(!no_get_hit(&mut f, &c.hitclass, u, &rec, 0));
+    let rec = DamageRecord {
+        poison: 1000,
+        total: 1000,
+        ..DamageRecord::default()
+    };
+    assert!(no_get_hit(&mut f, &c.hitclass, u, &rec, 0));
+}
