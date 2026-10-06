@@ -272,4 +272,6 @@ mod damage_tests;
 #[cfg(test)]
 mod hit_gap_tests;
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;

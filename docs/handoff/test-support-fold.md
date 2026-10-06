@@ -36,7 +36,27 @@ claim: this branch, `cargo test` in a debug build. Task: `docs/HANDOFF.md`
   dependency). One behaviour-neutral difference: the shared `Rest` logs
   its calls (`log`), which `prop_handle`'s snapshot does not read.
 - `e2e_support::Rest` now derives `Debug` (for the refusal digests).
-- Net: −2,412 / +622 lines over the branch, part (b) included.
+- Net (first commit): −2,412 / +622 lines over the branch, part (b)
+  included.
+
+**Merge with the base at `62fcef6`** (`unify-items`: one item store and
+one inventory per game; `path-update-pass`).
+
+- The fold was redone on the base's files, not hand-merged.
+- One new difference between the two copies: `drop_tables`. The e2e now
+  drops over the game's one item table (`game_item_tables`,
+  `GOLD_REC` 5); `prop_worldsim` still uses its gold-only table
+  (record 0).
+- The shared fixture has `drop_tables_from(items, gold)` and
+  `gold_item_tables()`. Each file keeps a three-line `drop_tables()`
+  passing its own table, so each test runs what it ran on the base.
+- `prop_handle`'s trade copy of `Rest` and the tables was still a copy of
+  `e2e_support`'s (logging aside) and is folded again.
+- The cube refusal tests are ported to the one inventory model: the
+  cursor goes through `Inventory::set_cursor`, and the targeting reset
+  is seen as the cube item's flag 0x4 being cleared.
+- Test counts after the merge: `e2e_single_player` 3, `e2e_vendor` 4,
+  `prop_worldsim` 4 (as on the base); `prop_handle` 5 + 7.
 
 Test names and counts, before → after (same names):
 
@@ -118,6 +138,15 @@ bugs and no non-test code changed. Two test-design notes:
 None.
 
 ## 3. Open questions / follow-ups
+
+0. Observation, not a bug: the inventory model's item data copies
+   (`InvState::items`) are refreshed from the units and the item store
+   whenever a desk opens (`InvDesk::new` → `sync_in`).
+   - So a refusal whose handler opens a desk "changes" the copies when
+     the store was edited directly (fixture edits) since the last desk.
+   - The refusal tests `settle` (open a desk once) after such edits.
+   - A full-state comparison of the inventory model needs the same
+     settling, or to compare the owners (units, item store) only.
 
 1. Not covered by (b), each needs a fixture step this session did not
    take:

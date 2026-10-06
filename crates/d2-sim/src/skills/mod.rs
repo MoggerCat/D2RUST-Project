@@ -190,6 +190,8 @@ pub(crate) mod fake;
 #[cfg(test)]
 mod levels_gap_tests;
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 pub(crate) use tests::game_loader as tests_game;

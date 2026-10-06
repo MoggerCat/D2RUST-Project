@@ -780,6 +780,161 @@ fn a_warp_within_the_level_sends_0x15_in_the_next_update_pass() {
     fx.assert_clean();
 }
 
+// ---- the update pass (`pathing.md` §10 rules 2–3, `tick.md` §6.5) -----------------------
+
+/// S→C 0x15 for `u` at its path cell with `flag`.
+fn reassign(fx: &mut Fx, u: UnitId, flag: u8) -> Vec<u8> {
+    let d = fx.path(u);
+    ReassignPlayer {
+        type_: 0,
+        guid: fx.guid(u),
+        x: d.x() as u16,
+        y: d.y() as u16,
+        flag,
+    }
+    .encode()
+    .to_vec()
+}
+
+/// S→C 0x0F for `u` walking from (26, 10) to (31, 10) with `code`.
+fn m1_move(fx: &Fx, u: UnitId, code: u8) -> Vec<u8> {
+    PlayerMove {
+        type_: 0,
+        guid: fx.guid(u),
+        code,
+        target_x: 31,
+        target_y: 10,
+        zero: 0,
+        x: 26,
+        y: 10,
+    }
+    .encode()
+    .to_vec()
+}
+
+fn set_flags2(fx: &mut Fx, u: UnitId, bits: u32) {
+    fx.sim.events.sys.units.get_mut(u).unwrap().flags2 |= bits;
+}
+
+// Covers: specs/sim/pathing.md §10 r2, §10 r3
+#[test]
+fn bit_0x800_tells_only_the_other_clients_before_the_mode_update() {
+    // Rule 3: flags 2 bit 0x800 → 0x15 with flag 0 to every client whose
+    // player is not the unit; the unit's own client gets nothing. Rule 3
+    // runs before rule 2 in the same pass, so client 1 gets 0x15, then
+    // the walk's 0x0F.
+    let (mut fx, p, _, _) = two_players();
+    set_flags2(&mut fx, p, 0x800);
+    let x15 = reassign(&mut fx, p, 0);
+    assert_eq!(
+        fx.handle(0, &point(0x01, 31, 10)),
+        (ResultCode::Done, vec![])
+    );
+    let ticks = fx.run(p, 2, 20);
+    assert_m1(&ticks, 2);
+    assert_eq!(ticks[0].3, vec![(1, x15), (1, m1_move(&fx, p, 1))]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pathing.md §10 r2, §10 r3
+#[test]
+fn bit_0x10000_tells_every_client_before_the_mode_update() {
+    // Rule 3: bit 0x10000 → 0x15 with flag 1, the own client included;
+    // bit 0x10000 wins over 0x800 (flag 1, and the own client still gets
+    // it). Then rule 2 for the other client only.
+    let (mut fx, p, _, _) = two_players();
+    set_flags2(&mut fx, p, 0x10000 | 0x800);
+    let x15 = reassign(&mut fx, p, 1);
+    assert_eq!(
+        fx.handle(0, &point(0x01, 31, 10)),
+        (ResultCode::Done, vec![])
+    );
+    let ticks = fx.run(p, 2, 20);
+    assert_m1(&ticks, 2);
+    let mut got = ticks[0].3.clone();
+    // Clients run in client-list order (`unit-order.md` §7); per client
+    // the order of rules 3 then 2 is the spec's.
+    got.sort_by_key(|m| m.0);
+    assert_eq!(
+        got,
+        vec![(0, x15.clone()), (1, x15), (1, m1_move(&fx, p, 1))]
+    );
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pathing.md §1.3, §10 r2
+#[test]
+fn town_walk_sends_the_walk_code() {
+    // In the town the walk request sets mode 6 (town walk); its row
+    // shares the walk's code 1 (rule 2).
+    let mut fx = Fx::new();
+    let c = fx.c;
+    let rect = fx.sim.events.hooks().drlg.subtile_rect(c).unwrap();
+    let (x, y) = (rect.x + 10, rect.y + 10);
+    let p = fx.player(0, c, x, y);
+    fx.player(1, c, x, y + 4);
+    assert_eq!(
+        fx.handle(0, &point(0x01, (x + 5) as u16, y as u16)),
+        (ResultCode::Done, vec![])
+    );
+    assert_eq!(fx.mode(p), 6);
+    let want = PlayerMove {
+        type_: 0,
+        guid: fx.guid(p),
+        code: 1,
+        target_x: (x + 5) as u16,
+        target_y: y as u16,
+        zero: 0,
+        x: x as u16,
+        y: y as u16,
+    };
+    let ticks = fx.run(p, 6, 20);
+    // The stop sets town neutral (5).
+    assert_eq!(ticks.last().unwrap().2, 5);
+    assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())]);
+    assert!(ticks[1..].iter().all(|t| t.3.is_empty()));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pathing.md §10 r2, §10 r3
+#[test]
+fn only_players_get_the_movement_messages() {
+    // An object with a player's flags in a walk mode, queued in the
+    // clients' room: rules 2–3 are the player's (monsters: rule 4, the
+    // monster update's, not written; other unit types: no rule), nothing
+    // is sent.
+    let (mut fx, _, _, o) = two_players();
+    let r = fx.sim.events.sys.units.get_mut(o).unwrap();
+    r.mode = 2;
+    r.flags |= d2_sim::units::record::flags::CHANGED;
+    r.flags2 |= 0x10000 | 0x800;
+    fx.sim.game.lists.queue_update(o).unwrap();
+    assert!(fx.tick().is_empty());
+    fx.assert_clean();
+}
+
+#[test]
+fn the_update_pass_sends_nothing_without_the_path_provider() {
+    // M08 for the update pass: the same queued player with bit 0x10000
+    // sends 0x15 with the provider on, nothing with it off.
+    for on in [true, false] {
+        let (mut fx, p, _, _) = two_players();
+        set_flags2(&mut fx, p, 0x10000);
+        let x15 = reassign(&mut fx, p, 1);
+        if !on {
+            fx.sim.events.hooks().paths = None;
+        }
+        fx.sim.game.lists.queue_update(p).unwrap();
+        let mut got = fx.tick();
+        got.sort_by_key(|m| m.0);
+        if on {
+            assert_eq!(got, vec![(0, x15.clone()), (1, x15)]);
+        } else {
+            assert!(got.is_empty(), "{got:?}");
+        }
+    }
+}
+
 // ---- id table ----------------------------------------------------------------------------
 
 const CLIENT_TSV: &str = include_str!("../../../../../../specs/sim/client-messages.tsv");

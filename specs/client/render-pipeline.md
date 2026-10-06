@@ -257,13 +257,13 @@ leave a hook that panics or a `TODO(spec: …)`, never a guess.
 | B1 | Sprite placement: DCC/DC6 frame offsets → screen pixel (the one-row question, HANDOFF §7 #3), DT1 tile vs unit anchor | **written:** `render/sprite-placement.md` (draft; bottom row = `Y + offset_y` inclusive) | client draw path; captures of a unit at known coordinates | identical pixels on a `sprite`/`unit` capture (`capture.md` case `placement-0001`) |
 | B2 | Composition domain of 1.14d's renderer (indexed with PL2 tables vs RGB) and which video mode is the reference | **written:** `render/composition.md` (draft; indexed, GDI reference) | 1.14d video modes and their draw path | identical pixels of one capture with translucent sprites (`composition-0001`) |
 | B3 | Meaning of each PL2 table (`palette.md` OQ 2); light-level map selection; selected-unit shift; whether mapped index 0 is transparent; palettes per screen region | `render/shading.md` | client shading path; captures at known light levels | identical pixels |
-| B4 | Unit composites: COF/DCC path rules, component variants (armor class letters), colormaps per component, direction mapping (unit dirs → file dirs), frame source (animdata vs COF rate) | `render/unit-composite.md` | client unit draw path; `animdata.md` use | identical pixels on `unit` captures across dirs/frames |
+| B4 | Unit composites: COF/DCC path rules, component variants (armor class letters), colormaps per component, direction mapping (unit dirs → file dirs), frame source (animdata vs COF rate) | **written:** `render/unit-composite.md` (draft; COF rows angular, file directions interleaved) | client unit draw path; `animdata.md` use | identical pixels on `unit` captures across dirs/frames |
 | B5 | Blend modes: COF translucency override, missiles, overlays, shadows (the darkening blend), formulas | `render/blend-modes.md` | blend path; captures | identical pixels |
-| B6 | Draw order: floors, shadows, walls vs units (the isometric rules, `map-preview.md` OQ 2), roofs, missiles, overlays, UI | `render/draw-order.md` | client sort and passes | identical pixels on scenes with occlusion |
+| B6 | Draw order: floors, shadows, walls vs units (the isometric rules, `map-preview.md` OQ 2), roofs, missiles, overlays, UI | **written:** `render/draw-order.md` (draft; per-frame draw-cell grid, 10 world passes) | client sort and passes | identical pixels on scenes with occlusion |
 | B7 | Camera: world (subtile) → screen, view size and centering, interpolation between ticks (if any), screen shake | **written:** `render/camera.md` (draft; no interpolation) | client view path; captures while walking | identical pixels per tick (`camera-0001`) |
 | B8 | Lighting: light radius, light sources, day/night, per-tile or per-pixel light level | `render/lighting.md` | client lighting path; captures at night/with torches | identical pixels |
 | B9 | Frame capture of 1.14d: which surface, at which point in the frame, how frames are tied to ticks | **written:** `render/capture.md` (draft), `tools/trace-recorder/record_frames.py`, `traces/FORMAT.md` §Render captures | debugger hook on the present call | capture of a static scene repeats identically (`stability-0001`, first) |
-| B10 | Tile variants by rarity and the invisible-collision-tile skip (`map-preview.md` OQ 3) | DRLG spec (sim) + `render/draw-order.md` | DRLG; tile draw path | identical pixels on town captures |
+| B10 | Tile variants by rarity and the invisible-collision-tile skip (`map-preview.md` OQ 3) | `drlg/rooms.md` §9.4 (variants) + **written:** `render/draw-order.md` §7 (no draw-path skip; OQ7) | DRLG; tile draw path | identical pixels on town captures |
 
 ## Constants & data dependencies
 
@@ -309,8 +309,8 @@ compute availability checked in the pinned `bevy_render 0.19.1` source.
 
 ## Open questions
 
-1. §B3–§B6, §B8, §B10 (each an owner spec to write locally); §B1, §B2,
-   §B7, §B9 written as drafts.
+1. §B3, §B5, §B8 (each an owner spec to write locally); §B1, §B2, §B4,
+   §B6, §B7, §B9, §B10 written as drafts.
 2. Whether the compute compositor reaches 60 frames per second at
    800×600 with a full town scene on the developer GPU: measure once
    implemented; if not, bins per item list may be culled by item bounding

@@ -919,9 +919,72 @@ pub fn anim_data() -> AnimData {
     a
 }
 
-/// Items: gold only (`ty::GOLD`, a child of `ty::MISC`); treasure class
-/// 1: one pick of gold.
-pub fn drop_tables() -> DropTables {
+/// The drop tables over `items`, whose record `gold` is gold; treasure
+/// class 1: one pick of gold. `e2e_single_player.rs` passes the game's
+/// one item table (`game_item_tables`, `GOLD_REC`), `prop_worldsim.rs`
+/// the gold-only table ([`gold_item_tables`], 0).
+pub fn drop_tables_from(items: ItemTables, gold: usize) -> DropTables {
+    let treasure_items = items
+        .items
+        .iter()
+        .map(|r| ItemData {
+            code: r.code,
+            ubercode: r.ubercode,
+            ultracode: r.ultracode,
+            version: r.version,
+            level: r.level,
+            type_: r.type_ as u16,
+            type2: r.type2 as u16,
+            unique: r.unique,
+            quest: r.quest,
+            spawnable: 1,
+        })
+        .collect();
+    let tc = |name: &[u8], entries: Vec<TcEntry>, total| TreasureClass {
+        name: name.to_vec(),
+        group: 0,
+        level: 0,
+        total_classic: total,
+        total_expansion: total,
+        picks: 1,
+        nodrop: 0,
+        mods: [0; 6],
+        entries,
+    };
+    let gold_entry = TcEntry {
+        start_classic: 0,
+        start_expansion: 0,
+        id: gold as _,
+        row: 0,
+        flags: 0,
+        mods: [0; 6],
+    };
+    DropTables {
+        items,
+        tcs: TreasureClasses {
+            tcs: vec![tc(b"none", Vec::new(), 0), tc(b"gold", vec![gold_entry], 1)],
+            group_offset: 0,
+            chest: [None; 45],
+            notes: Vec::new(),
+        },
+        treasure_items,
+        superuniques: Vec::new(),
+    }
+}
+
+/// One waypoint object class (0): operate 23, init 17.
+pub fn waypoint_data() -> WaypointData {
+    let mut o: Objects = blank();
+    o.operatefn = 23;
+    o.initfn = 17;
+    o.framecnt1 = 15 << 8;
+    WaypointData::new(&levels(), &[o])
+}
+
+/// Items: gold only (`ty::GOLD`, a child of `ty::MISC`), with the item
+/// types and equivalences the treasure walk reads: `prop_worldsim.rs`'s
+/// drop table (no vendor or cube items on its host).
+pub fn gold_item_tables() -> ItemTables {
     let n: usize = 40;
     let words = n.div_ceil(32);
     let mut equiv = EquivMatrix {
@@ -953,7 +1016,7 @@ pub fn drop_tables() -> DropTables {
         level: 1,
         ..ItemRec::default()
     };
-    let items = ItemTables {
+    ItemTables {
         items: vec![gold],
         itemtypes,
         equiv,
@@ -962,60 +1025,5 @@ pub fn drop_tables() -> DropTables {
         stat_shift: 6,
         stat_mask: 0x3F,
         ..ItemTables::default()
-    };
-    let treasure_items = items
-        .items
-        .iter()
-        .map(|r| ItemData {
-            code: r.code,
-            ubercode: r.ubercode,
-            ultracode: r.ultracode,
-            version: r.version,
-            level: r.level,
-            type_: r.type_ as u16,
-            type2: r.type2 as u16,
-            unique: r.unique,
-            quest: r.quest,
-            spawnable: 1,
-        })
-        .collect();
-    let tc = |name: &[u8], entries: Vec<TcEntry>, total| TreasureClass {
-        name: name.to_vec(),
-        group: 0,
-        level: 0,
-        total_classic: total,
-        total_expansion: total,
-        picks: 1,
-        nodrop: 0,
-        mods: [0; 6],
-        entries,
-    };
-    let gold_entry = TcEntry {
-        start_classic: 0,
-        start_expansion: 0,
-        id: 0,
-        row: 0,
-        flags: 0,
-        mods: [0; 6],
-    };
-    DropTables {
-        items,
-        tcs: TreasureClasses {
-            tcs: vec![tc(b"none", Vec::new(), 0), tc(b"gold", vec![gold_entry], 1)],
-            group_offset: 0,
-            chest: [None; 45],
-            notes: Vec::new(),
-        },
-        treasure_items,
-        superuniques: Vec::new(),
     }
-}
-
-/// One waypoint object class (0): operate 23, init 17.
-pub fn waypoint_data() -> WaypointData {
-    let mut o: Objects = blank();
-    o.operatefn = 23;
-    o.initfn = 17;
-    o.framecnt1 = 15 << 8;
-    WaypointData::new(&levels(), &[o])
 }

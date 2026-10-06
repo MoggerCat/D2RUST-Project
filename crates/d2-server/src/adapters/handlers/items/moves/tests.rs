@@ -256,32 +256,33 @@ fn plain(record: usize) -> ItemRequest {
 
 /// The answers of the [`MoveRest`] fake and its call log.
 #[derive(Default)]
-struct RestState {
-    log: Vec<String>,
-    pos: BTreeMap<Owner, (i32, i32)>,
-    distance: i32,
-    spot: Option<Spot>,
-    room_at: bool,
-    in_town: bool,
-    two_handed: BTreeSet<Guid>,
-    use_ok: bool,
-    gold: bool,
-    spells: BTreeMap<Guid, i32>,
-    sent: Vec<(Owner, Vec<u8>)>,
+pub(crate) struct RestState {
+    pub(crate) log: Vec<String>,
+    pub(crate) pos: BTreeMap<Owner, (i32, i32)>,
+    pub(crate) distance: i32,
+    pub(crate) spot: Option<Spot>,
+    pub(crate) room_at: bool,
+    pub(crate) in_town: bool,
+    pub(crate) two_handed: BTreeSet<Guid>,
+    pub(crate) use_ok: bool,
+    pub(crate) gold: bool,
+    pub(crate) spells: BTreeMap<Guid, i32>,
+    pub(crate) sent: Vec<(Owner, Vec<u8>)>,
 }
 
-/// [`MoveRest`] fake, shared with the test.
+/// [`MoveRest`] fake, shared with the test (and the cube and vendor
+/// tests, whose inventories are the same model).
 #[derive(Clone, Default)]
-struct MRest(Arc<Mutex<RestState>>);
+pub(crate) struct MRest(Arc<Mutex<RestState>>);
 
 impl MRest {
-    fn with<T>(&self, f: impl FnOnce(&mut RestState) -> T) -> T {
+    pub(crate) fn with<T>(&self, f: impl FnOnce(&mut RestState) -> T) -> T {
         f(&mut self.0.lock().unwrap())
     }
     fn log(&self, s: String) {
         self.with(|r| r.log.push(s));
     }
-    fn take_log(&self) -> Vec<String> {
+    pub(crate) fn take_log(&self) -> Vec<String> {
         self.with(|r| std::mem::take(&mut r.log))
     }
 }
@@ -616,7 +617,7 @@ impl T {
                 )
             })
             .unwrap();
-        world.items.get_mut(u).unwrap().flags |= 0x10;
+        events.sys.hooks.items.get_mut(u).unwrap().flags |= 0x10;
         let guid = events.sys.units.get(u).unwrap().guid;
         // The item's position is its item data's (§2.2, §9.1 step 3).
         let inv = world.inventory.as_mut().unwrap();
@@ -1339,7 +1340,7 @@ impl T {
             sim.game,
             s.units,
             s.stats,
-            w.items,
+            s.hooks.items,
             w.inventory.as_ref().map(|i| &i.state),
             sim.player_fields(p),
             sim.unhandled,
