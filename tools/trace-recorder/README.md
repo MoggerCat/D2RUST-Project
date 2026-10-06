@@ -194,7 +194,8 @@ unit type and GUID; rooms by address with their adjacent-room arrays),
 in a 200 s run, start-up included).
 
 Version 0.2.0 (same format name; both additions are optional, so
-`check_tick.py` reads old and new files alike):
+`check_tick.py` reads old and new files alike; `convert_tick.py` skips
+`anim`, which a `sim/tick` trace does not hold):
 
 - `set` gains `site` (address of the call to the public scheduling
   function: the return address two frames above the scheduler, minus 5;

@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 
 use super::scene_source::{
     camera_differences, recorded_camera, CaptureWorld, NotRecorded, RecordedScene, WorldAnswer,
-    WorldScene, RECORDER_GAP,
+    WorldScene, NO_DRAW_LOG, NO_INITIAL_FRAME, RECORDER_GAP,
 };
 use super::{run_capture, SceneJob};
 use crate::assets::path::CanonicalPath;
@@ -354,7 +354,7 @@ fn record(dir: &Path, shots: &[Shot]) -> SceneCase {
         raw: RawRef::Path(raw.display().to_string()),
         images: Some(images.display().to_string()),
         check: CaptureCheck::Compare,
-        draws: Vec::new(),
+        seqs: Vec::new(),
     }
 }
 
@@ -551,8 +551,8 @@ fn recorded_camera_reads_mode_size_and_shake() {
 }
 
 // Today's recordings: the camera check runs, then the frame stops at the
-// recorder seam (never a pass).
-// Covers: specs/render/capture.md §3
+// recorder seam (never a pass). A frames-raw-1 frame has no draw log.
+// Covers: specs/render/capture.md §3, §6
 #[test]
 fn todays_recordings_stop_at_the_recorder_seam() {
     let dir = tmp("seam");
@@ -564,8 +564,86 @@ fn todays_recordings_stop_at_the_recorder_seam() {
         1
     );
     assert_eq!(count(&r, "equal camera.md §1, §3"), 1, "{:#?}", r.lines);
-    assert_eq!(count(&r, &format!("scene: seam: {RECORDER_GAP}")), 1);
-    assert!(RECORDER_GAP.contains("record_frames.py must add"));
+    assert_eq!(count(&r, &format!("scene: seam: {NO_DRAW_LOG}")), 1);
+}
+
+// capture.md §6: a frame is composed only with its draw log and the
+// initial framebuffer (frame seq − 1 of an --every 1 recording); the
+// seam names the first missing input.
+// Covers: specs/render/capture.md §6
+#[test]
+fn a_frame_needs_its_draw_log_and_initial_framebuffer() {
+    let mut frame = shot(10, 0).record;
+    for (k, v) in [
+        ("seq", json!(1)),
+        ("client_update", json!(5)),
+        ("level", json!({"level_id": 1, "act": 0})),
+        (
+            "light",
+            json!({"quality": 0, "draw_rate": 25, "opt_a": 0, "opt_b": 0, "render_kind": 1}),
+        ),
+        ("light_key", json!(0)),
+        (
+            "weather",
+            json!({"rain": 0, "snow": 0, "lightning": 0, "flash": 0, "update": 0}),
+        ),
+        ("index_sha256", json!("0".repeat(64))),
+        ("palette_sha256", json!("0".repeat(64))),
+    ] {
+        frame[k] = v;
+    }
+    let mut logged = frame.clone();
+    logged["draws"] = json!([{"op": "CelDraw", "at": 1, "a": [0, 1, 2]}]);
+    let parse = |f: &Value| {
+        let text = format!(
+            "{}\n{}\n{}\n{}\n",
+            json!({"k": "header", "format": "frames-raw-2", "tool": "t", "date": "d",
+                   "game_exe_sha256": "x", "args": []}),
+            json!({"k": "capture", "images": null, "every": 1, "draws_every": 1,
+                   "state_key": []}),
+            f,
+            json!({"k": "footer", "ticks": 0, "counts": {"capture": 1, "frame": 1}, "notes": []})
+        );
+        capture::parse_raw(&text).unwrap().frames.remove(0)
+    };
+    let previous = capture::Image {
+        width: 1,
+        height: 1,
+        indices: vec![0],
+        palette: vec![0; 768],
+    };
+    let bare = parse(&frame);
+    let logged = parse(&logged);
+    let entry = logged.captured().unwrap().draws.as_ref().unwrap();
+    assert_eq!(entry[0]["op"], "CelDraw");
+    let camera = recorded_camera(W, H, &bare.captured().unwrap().state).unwrap();
+    let gap = |f: &capture::Frame, previous: Option<&capture::Image>| {
+        let job = SceneJob {
+            case: "t",
+            frame: f,
+            captured: f.captured().unwrap(),
+            previous,
+        };
+        match NotRecorded.scene(&job, &camera) {
+            WorldAnswer::Seam(s) => s,
+            _ => panic!("NotRecorded answers a seam"),
+        }
+    };
+    assert_eq!(gap(&bare, Some(&previous)), NO_DRAW_LOG);
+    assert_eq!(gap(&logged, None), NO_INITIAL_FRAME);
+    assert_eq!(gap(&logged, Some(&previous)), RECORDER_GAP);
+    // An entry without its op is refused by the reader.
+    let mut bad = frame;
+    bad["draws"] = json!([{"at": 1}]);
+    let text = format!(
+        "{}\n{}\n{}\n",
+        json!({"k": "header", "format": "frames-raw-2", "tool": "t", "date": "d",
+               "game_exe_sha256": "x", "args": []}),
+        json!({"k": "capture", "images": null, "every": 1, "draws_every": 1, "state_key": []}),
+        bad
+    );
+    let e = capture::parse_raw(&text).unwrap_err().to_string();
+    assert!(e.contains("draws[0].op: expected a string"), "{e}");
 }
 
 /// The real GPU half (llvmpipe in the cloud): byte-identical to the

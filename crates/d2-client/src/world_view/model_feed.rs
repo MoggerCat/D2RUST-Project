@@ -109,6 +109,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
     fn player_seed(&mut self, world: &ClientWorld) -> Result<&mut Seed, ViewError> {
         self.inner.player_seed(world)
     }
+
+    fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError> {
+        self.inner.blank_screen(world)
+    }
 }
 
 #[cfg(test)]

@@ -794,6 +794,87 @@ fn pixel_write_vectors() {
     assert_eq!(binned, out);
 }
 
+/// §5 with all three tables: `T[256 × d + L[s]]`, the remap dropped;
+/// each other combination as its row of §5.
+// Covers: specs/render/composition.md §5
+#[test]
+fn lit_blend_drops_the_remap() {
+    let mut maps = MapTable::new();
+    let p = maps.push(map_with(&[(7, 9)]));
+    let l = maps.push(map_with(&[(7, 4), (9, 3)]));
+    let mut table = Box::new([[0u8; 256]; 256]);
+    for (d, row) in table.iter_mut().enumerate() {
+        for (s, v) in row.iter_mut().enumerate() {
+            *v = (d * 3 + s * 5 + 11) as u8;
+        }
+    }
+    let t = maps.push_table(&table);
+    let frames = vec![FrameImage {
+        width: 1,
+        height: 1,
+        pixels: vec![7],
+    }];
+    let cases = [
+        (PixelTables::default(), 7),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: Some(l),
+                blend: None,
+            },
+            3,
+        ),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: None,
+                blend: Some(t),
+            },
+            table[200][9],
+        ),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: Some(l),
+                blend: Some(t),
+            },
+            table[200][4],
+        ),
+        (
+            PixelTables {
+                remap: None,
+                light: Some(l),
+                blend: Some(t),
+            },
+            table[200][4],
+        ),
+    ];
+    let items: Vec<DrawItem> = cases
+        .iter()
+        .enumerate()
+        .map(|(i, (tables, _))| {
+            let mut item = DrawItem::new(FrameId(0), i as i32, 0);
+            (item.shade, item.blend) = tables.ops();
+            item
+        })
+        .collect();
+    let view = Rect::new(0, 0, cases.len() as u32, 1);
+    let out = compose_frame(&items, &frames, &maps, view, &[200; 5], FramePlan::NONE).unwrap();
+    let want: Vec<u8> = cases.iter().map(|&(_, v)| v).collect();
+    assert_eq!(out, want);
+    // With the remap applied the lit blend would read column L[P[s]] = 3.
+    assert_ne!(table[200][4], table[200][3]);
+    assert_eq!(
+        PixelTables {
+            remap: Some(p),
+            light: Some(l),
+            blend: Some(t),
+        }
+        .ops(),
+        (ShadeChain::new(&[l]).unwrap(), BlendOp::IndexTable(t))
+    );
+}
+
 /// Test vector 6: PL2 bytes `01 02 03 xx 10 20 30 xx` → index 0 (1, 2, 3),
 /// index 1 (0x10, 0x20, 0x30); RGBA alpha 255, index 0 included.
 // Covers: specs/render/composition.md §4, §6

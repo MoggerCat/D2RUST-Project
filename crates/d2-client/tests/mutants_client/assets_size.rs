@@ -306,10 +306,13 @@ fn palette_is_its_fixed_size() {
 
 #[test]
 fn pl2_counts_every_map_list() {
-    use d2_formats::palette::{Pl2, Rgb};
+    use d2_formats::palette::{Palette, Pl2, Rgb};
 
     let maps = |n: usize| vec![[0u8; 256]; n];
     let pl2 = Pl2 {
+        base_palette: Palette {
+            colors: [Rgb::default(); 256],
+        },
         light_levels: maps(1),
         inventory_variations: maps(2),
         selected_unit_shift: [0; 256],
