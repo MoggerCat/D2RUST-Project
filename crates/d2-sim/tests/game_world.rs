@@ -47,13 +47,6 @@ fn item_index(code: &[u8; 4]) -> u16 {
         .unwrap_or_else(|| panic!("item {}", String::from_utf8_lossy(code))) as u16
 }
 
-fn type_index(code: &[u8; 4]) -> u16 {
-    fixed()
-        .item_types
-        .find(u32::from_le_bytes(*code))
-        .unwrap_or_else(|| panic!("item type {}", String::from_utf8_lossy(code))) as u16
-}
-
 /// Tab-separated rows after the header.
 fn tsv(text: &str) -> Vec<Vec<&str>> {
     text.lines()
@@ -143,7 +136,11 @@ fn waypoint_objects() {
         let o = &objects[usize::from(c)];
         assert_eq!((o.mode0, o.mode1, o.mode2), (1, 1, 1), "modes of {c}");
         let long = [494, 496, 511, 539].contains(&c);
-        assert_eq!(o.framecnt1, if long { 20 } else { 15 }, "FrameCnt1 of {c}");
+        // The fixed-up set holds `FrameCnt` × 256 (`data/fixups.md` §13
+        // rule 2; `waypoints.md` Inputs: "already × 256"); §5 r1 states the
+        // `objects.txt` value 15 / 20, read back as `FrameCnt1 >> 8` (§5.1 r2).
+        let frames: u32 = if long { 20 } else { 15 };
+        assert_eq!(o.framecnt1, frames << 8, "FrameCnt1 of {c}");
         assert_eq!(o.framedelta1, 200, "FrameDelta1 of {c}");
         let unsynced = [429, 494, 496, 511, 539].contains(&c);
         assert_eq!(o.sync, u8::from(!unsynced), "Sync of {c}");
@@ -340,10 +337,12 @@ fn cubemain_vector_records() {
     let s = &r(13).inputs[0];
     assert_eq!((s.item, s.quality, s.quantity), (item_index(b"rin "), 4, 3));
     assert_eq!(r(13).outputs[0].plvl, 75);
-    // V6: `fhl,mag,upg`, version 100.
+    // V6: `fhl,mag,upg`, version 100. `fhl` is an item code, not an item
+    // type: `data/callbacks.md` §3 input parse step 4.3 (item code →
+    // 0x0001 USEANY, item = item index), plus `upg` 0x0080.
     let s = &r(64).inputs[0];
-    assert_eq!(s.flags, input_flags::ITEMCODE | input_flags::UPG);
-    assert_eq!((s.item, s.quality), (type_index(b"fhl "), 4));
+    assert_eq!(s.flags, input_flags::USEANY | input_flags::UPG);
+    assert_eq!((s.item, s.quality), (item_index(b"fhl "), 4));
     assert_eq!(r(64).version, 100);
     // V7, V9, V10, V11: level fields.
     let lv = |i: usize| {
@@ -427,7 +426,14 @@ fn raw_column(i: usize) -> Column {
                 .unwrap_or_else(|| panic!("{table}.{col}"))
                 .offset as usize
         };
-        let v = VENDORS[i];
+        // The item tables spell Hratli's columns `Hralti…` (`fields.tsv`
+        // weapons / armor / misc seq 127–131 at 332 + …); `vendors.md` §1 r1
+        // names the NPC.
+        let v = if VENDORS[i] == "Hratli" {
+            "Hralti"
+        } else {
+            VENDORS[i]
+        };
         let (min, max) = (at(&format!("{v}Min")), at(&format!("{v}Max")));
         let (mmin, mmax) = (at(&format!("{v}MagicMin")), at(&format!("{v}MagicMax")));
         let mlvl = at(&format!("{v}MagicLvl"));
