@@ -182,7 +182,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 | item seed re-init | `0x005572A0`–`0x00557450` (quality downgrade chain) | `init_low(start seed)`: the item rolls again from its start |
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
 | item seed from a save | `0x0062CBE0` (`0x0062A970` sets 0) | 32 bits from the item bit stream |
-| client unit seeds | `0x00465FD0`, `0x00466200`, `0x00466360` | derived from the client room seed (+0x6C); stays `{1, 666}` without a room |
+| client unit seeds | `0x00465FD0`, `0x00466200`, `0x00466360` | unit +0x20 := `{1, 666}` (`0x00650E30`); then, if a client room is found at the unit's (x, y) (`0x00465420`), that room's seed (+0x6C/+0x70) takes one `step` and the unit seed := `init_low(lo')`, init seed +0x28 := `lo'` (`0x00465FD0` at `0x0046606A`–`0x00466093`); so each client unit created in a room advances that room's seed once. Without a room it stays `{1, 666}` |
 | missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
 
 #### 5.4 DRLG
