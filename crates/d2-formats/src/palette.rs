@@ -56,7 +56,9 @@ pub struct Pl2 {
     pub light_levels: Vec<ColorMap>,
     pub inventory_variations: Vec<ColorMap>,
     pub selected_unit_shift: ColorMap,
-    /// `[level][source index]`, each a map over the destination index.
+    /// `[level][dest][src]`: row = destination index, column = source
+    /// index, as 1.14d's drawer reads them (`render/composition.md` §5;
+    /// `formats/palette.md` open question 2).
     pub alpha_blend: Vec<Vec<ColorMap>>,
     pub additive_blend: Vec<ColorMap>,
     pub multiplicative_blend: Vec<ColorMap>,

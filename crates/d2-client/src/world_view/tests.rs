@@ -551,6 +551,132 @@ fn gpu_packing_emulates_to_the_cpu_image() {
     ));
 }
 
+/// The frame of [`scene_frame`] composed onto `base` with `plan`: the
+/// CPU reference of one frame of the cycle.
+fn cycle_reference(f: &WorldFrame, a: &ViewAssets, base: &[u8], plan: scene::FramePlan) -> Vec<u8> {
+    scene::compose_frame(&f.items, &a.frames, &a.maps, VIEW, base, plan).unwrap()
+}
+
+// The world view composes frames of the frame cycle: the framebuffer
+// persists, BlankScreen clears rows 0..H − 47 before the draws, the
+// post-draw clear blanks the frame and steps the counter.
+// Covers: specs/render/composition.md §3 r2, §3 r4, §3 text, §6
+#[test]
+fn cpu_frames_run_the_frame_cycle() {
+    let (f, a) = scene_frame();
+    let pixels = (VIEW.width * VIEW.height) as usize;
+    let all_5 = || FrameCycle::with_pixels(VIEW.width, VIEW.height, vec![5; pixels]).unwrap();
+    let drawn = scene::compose(&f.items, &a.frames, &a.maps, VIEW).unwrap();
+
+    // From an all-0 framebuffer the first frame is the single-frame image.
+    let mut c = FrameCycle::new(VIEW.width, VIEW.height).unwrap();
+    assert_eq!(
+        compose_cycle_cpu(&mut c, true, &f, &a).unwrap(),
+        compose_cpu(&f, &a).unwrap()
+    );
+    assert_eq!(c.pixels(), &drawn[..]);
+
+    // BlankScreen 1 over a previous frame of 5: rows 553–599 keep 5 where
+    // nothing draws; the presented image is the cycle's indices.
+    let mut c = all_5();
+    let plan = c.plan(true);
+    assert_eq!(plan.clear_rows, 553);
+    let want = cycle_reference(&f, &a, &vec![5; pixels], plan);
+    let rgba = compose_cycle_cpu(&mut c, true, &f, &a).unwrap();
+    assert_eq!(c.pixels(), &want[..]);
+    assert_eq!(rgba, scene::to_rgba(&want, &a.palette));
+    assert_eq!(c.pixels()[552 * 800 + 799], 0);
+    assert_eq!(c.pixels()[553 * 800 + 799], 5);
+    assert_eq!(c.pixels()[599 * 800], 5);
+    assert_eq!(&c.pixels()[..553 * 800], &drawn[..553 * 800]);
+
+    // BlankScreen 0: nothing cleared, the draws land on the 5s.
+    let mut c = all_5();
+    compose_cycle_cpu(&mut c, false, &f, &a).unwrap();
+    assert_eq!(
+        c.pixels(),
+        &cycle_reference(&f, &a, &vec![5; pixels], scene::FramePlan::NONE)[..]
+    );
+    assert_eq!(c.pixels()[0], 5);
+
+    // The next frame starts from the last one.
+    let prev = c.pixels().to_vec();
+    compose_cycle_cpu(&mut c, false, &f, &a).unwrap();
+    assert_eq!(
+        c.pixels(),
+        &cycle_reference(&f, &a, &prev, scene::FramePlan::NONE)[..]
+    );
+
+    // Post-draw clear: that frame is all 0 and the counter steps down.
+    c.set_post_clear(1);
+    let rgba = compose_cycle_cpu(&mut c, true, &f, &a).unwrap();
+    assert!(c.pixels().iter().all(|&i| i == 0));
+    assert_eq!(rgba, scene::to_rgba(&vec![0; pixels], &a.palette));
+    assert_eq!(c.post_clear(), 0);
+
+    // A cycle of another size than the view is refused, unchanged.
+    let mut small = FrameCycle::new(10, 48).unwrap();
+    assert!(matches!(
+        compose_cycle_cpu(&mut small, true, &f, &a),
+        Err(ViewError::Scene(SceneError::BaseSize { .. }))
+    ));
+    assert_eq!(small, FrameCycle::new(10, 48).unwrap());
+}
+
+// The GPU path packs the same frame of the cycle: the previous frame as
+// base and the plan's clears; its image (shader emulation) is the CPU
+// cycle's, and committing it steps the cycle as the CPU path does.
+// Covers: specs/render/composition.md §3 r2, §3 r4, §3 text
+#[test]
+fn gpu_cycle_packing_emulates_to_the_cpu_cycle() {
+    let (f, a) = scene_frame();
+    let pixels = (VIEW.width * VIEW.height) as usize;
+    let mut atlas = GpuAtlas::new(2).unwrap();
+    atlas.ensure(&a.frames).unwrap();
+    for (blank, post) in [(true, 0), (false, 0), (true, 1)] {
+        let base: Vec<u8> = (0..pixels).map(|i| (i % 7) as u8).collect();
+        let mut gpu = FrameCycle::with_pixels(VIEW.width, VIEW.height, base.clone()).unwrap();
+        gpu.set_post_clear(post);
+        let mut cpu = gpu.clone();
+        let (packed, plan) = atlas.pack_cycle(&gpu, blank, &f, &a).unwrap();
+        assert_eq!(plan, gpu.plan(blank));
+        assert_eq!(packed.plan(), plan);
+        let indices = emulate(&packed, atlas.atlas().pages()).unwrap();
+        gpu.commit(plan, indices).unwrap();
+        compose_cycle_cpu(&mut cpu, blank, &f, &a).unwrap();
+        assert_eq!(gpu, cpu, "BlankScreen {blank}, counter {post}");
+    }
+}
+
+// Covers: specs/render/composition.md §4
+#[test]
+fn view_assets_present_the_pl2_palette() {
+    let mut pl2 = vec![0xEE; 2048];
+    pl2[..8].copy_from_slice(&[1, 2, 3, 0xFF, 0x10, 0x20, 0x30, 0]);
+    let a = ViewAssets::from_pl2(&pl2).unwrap();
+    assert_eq!(a.palette.colors[0], Rgb { r: 1, g: 2, b: 3 });
+    assert_eq!(
+        a.palette.colors[1],
+        Rgb {
+            r: 0x10,
+            g: 0x20,
+            b: 0x30
+        }
+    );
+    assert_eq!(
+        a.palette.colors[255],
+        Rgb {
+            r: 0xEE,
+            g: 0xEE,
+            b: 0xEE
+        }
+    );
+    assert!(matches!(
+        ViewAssets::from_pl2(&pl2[..1023]),
+        Err(ViewError::Scene(SceneError::Pl2Size { len: 1023 }))
+    ));
+}
+
 // Ids come from the store: another insertion order gives other ids for
 // the same draws, and the same image.
 #[test]
@@ -673,6 +799,9 @@ impl ViewFeed for TestFeed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut d2_sim::rng::Seed, ViewError> {
         unreachable!("no shake")
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 /// C→S Walk to (3, 4).
@@ -791,12 +920,30 @@ fn bevy_frame_presents_the_cpu_image() {
         .get(&target.image)
         .unwrap();
     assert_eq!(image.data.as_deref(), Some(&expected[..]));
+    // The presented frame is the frame cycle's framebuffer
+    // (composition.md §3): the first frame starts from all 0.
+    let cycle = &app.world().resource::<WorldViewState>().cycle;
+    assert_eq!(
+        cycle.pixels(),
+        &scene::compose(&f.items, &a.frames, &a.maps, VIEW).unwrap()[..]
+    );
 
-    // Second frame: the same target image is overwritten, not re-created.
+    // Second frame: the same target image is overwritten, not re-created,
+    // with the next frame of the cycle.
     let handle = target.image.clone();
     app.update();
     let target = app.world().resource::<present::WorldViewTarget>();
     assert_eq!(target.image, handle);
+    let image = app
+        .world()
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .unwrap();
+    let cycle = &app.world().resource::<WorldViewState>().cycle;
+    assert_eq!(
+        image.data.as_deref(),
+        Some(&scene::to_rgba(cycle.pixels(), &a.palette)[..])
+    );
     assert_eq!(
         app.world()
             .resource::<WorldViewState>()
