@@ -31,13 +31,13 @@
 |   7. Tile records that never draw | 286–299 |
 |   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 300–356 |
 |   9. Map-tile feed | 357–377 |
-|   10. d2rs mapping | 378–413 |
-| Constants & data dependencies | 414–422 |
-| Randomness | 423–428 |
-| Edge cases & original bugs | 429–446 |
-| Test vectors | 447–475 |
-| Provenance | 476–512 |
-| Open questions | 513–575 |
+|   10. d2rs mapping | 378–427 |
+| Constants & data dependencies | 428–436 |
+| Randomness | 437–442 |
+| Edge cases & original bugs | 443–460 |
+| Test vectors | 461–489 |
+| Provenance | 490–526 |
+| Open questions | 527–603 |
 <!-- /index -->
 
 ## Summary
@@ -397,6 +397,20 @@ records (§3, §6 tests) with their pass and list position; `TileList` needs
 two more kinds placed as walls: lower wall and shadow tile. Cell index
 ranges below n² ≤ 2^28 for any frame size the client supports.
 
+Implementation questions (`impl-draw-order`, 2026-10-06): DO1 (vector
+`T(−160, 0)`) is answered by the corrected Test vectors row (−2, 1); the
+§2 rule was right. DO3 by §2 pool overflow (a dropped entry sets no grid
+flag). DO4 by §6 r6: lower walls set 0x20000 like walls, after the
+drawer returned non-zero, so the drawer's block culling (`camera.md` §7)
+comes first; a record that is not drawn (hidden, faded out, no layer
+bits) never gets it. DO5 by §8 clock arithmetic: `now` and end times are
+`u32` millisecond counts compared unsigned; the render kind
+`0x00477730` is the display type (`composition.md` §1: 1 GDI, 3
+DirectDraw default, 4 / 6 the 3D drivers), so on the reference (1) and
+the default renderer every ramp completes at its first walk and no
+`FadeClock` value changes a pixel; the hook is needed only for the
+unreachable bit-2 branch (OQ16).
+
 A shadow tile item carries no draw mode: its blend is the shadow-tile
 rule of `render/blend-modes.md` §5, whatever mode the caller names (§6
 r3). A unit's items keep the order's `pass` / `major` / `minor` and take
@@ -469,7 +483,7 @@ LCG at `[0x00712C50]` (multiplier 0x6AC690C5). Both: Open questions 1, 11.
 | same record, render kind < 4 | alpha := 0x80 at once, bit 1 cleared | §8 |
 | capture `order-0001`: walk the Rogue Encampment along the palisade and behind a tent, every frame captured with the recorded lists (`capture.md`) | CPU reference with this order equals the capture | capture, queued |
 | capture `order-0002`: walk under a Lut Gholein roof | roof passes and fade equal the capture | capture, queued |
-| capture `order-0003`: stand at `townN1` cells (44, 32) and (51, 32) | settles Open question 7 | capture, queued |
+| capture `order-0003`: stand next to a visible river-bank cell of the town variant (`townN1` (44, 32), (51, 32); run-2 seed `TownE1`: tile (950, 933)) | settles Open question 7 | capture, queued |
 | floor record `ℓ` 1 passing the whole-tile test | flag 0x20000 set (`0x004DDE80`) | §6 r6 |
 | last reveal at (1000, 2000), countdown 0; player at (1040, 2010) / (1060, 2000) / (1080, 2000) | `d` = 45 / 60 / 80: no reveal / no reveal / reveal (0x50 = 80) | §6 r7 |
 
@@ -540,7 +554,21 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
    them (`drlg/rooms.md` §9.6 linking or a different preset) or 1.14d
    shows them; capture `order-0003` or a client DRLG simulation of
    `townN1` with linking settles it (owner of a DRLG answer:
-   `drlg/rooms.md`).
+   `drlg/rooms.md`). Still open after the 2026-10-06 captures: every
+   Act 1 town variant has such cells (wall layer 0, value `0x00500081`,
+   no hidden bit; `TownN1` 8, `TownE1` 3 at (48, 36…38), `TownS1` 17,
+   `TownW1` 17; survey of the four `lvlprest` files). Runs 1b and 2
+   (`20261006-140102`, `20261006-141725`) use `TownE1` (the only variant
+   with a bridge, floor rows 15–18; the player crosses it at tile y
+   912.4–913.1, giving level origin (904, 896)), whose three cells are
+   level tiles (952, 932…934), about 16 tiles south of the southernmost
+   town position either run reached (y ≤ 916): never on screen. No
+   sampled run-2 frame (every 25th) shows a uniform 16 × 16 area of one
+   index in the play area other than near-black 172 in shadow. Capture
+   `order-0003` for this seed: stand near tile (950, 933) on the west bank
+   in daylight; a drawn tile #28 is a 160 × 128 wall of index 233 lit
+   per block (light maps 0–1 give 0, 2–5 give 172, 6–11 give 173–174,
+   12–22 give 136, 23–31 keep 233, act 1 `pal.pl2`).
 8. Cross-spec (`drlg/rooms.md` §9.1 says roofs share the shadow list):
    the client reads roofs from the wall array (type 15, §3 r2); the DRLG
    owner should reconcile its wording.
