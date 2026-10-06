@@ -73,6 +73,7 @@ mod tests {
     use super::*;
     use crate::schema::schema;
 
+    // Covers: specs/data/schema.md §1
     #[test]
     fn decodes_at_schema_offsets() {
         let mut r = vec![0u8; Skills::SIZE];

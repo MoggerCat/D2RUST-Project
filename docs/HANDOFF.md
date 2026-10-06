@@ -66,6 +66,20 @@ rather than restating them.
    `crates/d2-server/src/tests/messages.rs` (`size_vectors`, generic over
    the seam) on the `d2-proto` implementation.
 
+5. **Coverage claims, part 2** (tools/implementation, medium): the tool
+   and scheme are done (`docs/COVERAGE.md`, `py tools/coverage.py`,
+   2026-10-06, branch `claude/phase4-coverage`): 298 claims; 619 rule
+   units; unit 230 (37.2%), game-file 144 (23.3%), trace 2 (0.3%),
+   verified 146 (23.6%), any 256 (41.4%). Claims exist only in d2-sim
+   `rng.rs`, d2-formats, d2-data and `check_rng.py`. Next, once the
+   sessions working there have merged: claim `crates/conformance`
+   (`rng_traces.rs`, tick replay: trace tier), `d2-server`, d2-sim
+   `tick`/`units`, `d2-proto`, `d2-client` (`verify`: game tier), and the
+   trace checkers `check_tick.py` / `check_packets.py` (trace tier; their
+   docstrings already name the § they check). Gaps to fill with tests
+   after that: `intents-events.md`, `tick.md`, `unit-order.md`,
+   `calc-expressions.md`, `loading.md`.
+
 ## 3. Code map
 
 | Path | What | Spec |
