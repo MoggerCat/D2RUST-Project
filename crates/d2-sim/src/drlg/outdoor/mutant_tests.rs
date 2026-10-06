@@ -2688,3 +2688,120 @@ fn grid_path_by_the_rules() {
     assert_eq!(p, grid_path_model((0, 0), (4, 0), 20, 15, &wall));
     assert!(p.is_some());
 }
+
+/// `outdoor.md` §7.1 cliff marking from the rule text: (directions,
+/// whether flag 0x20 was set).
+fn cliff_model(vs: &[Vertex]) -> (Vec<u8>, bool) {
+    let n = vs.len();
+    let at = |i: usize| vs[i % n];
+    let link = |i: usize| at(i).flags & VERTEX_LINK != 0;
+    let stop = |w: usize| {
+        let (a, b) = (at(w), at(w + 1));
+        a.y < b.y || a.x > b.x || link(w) || link(w + 1)
+    };
+    let turn = |w: usize| {
+        let (a, b, c) = (at(w), at(w + 1), at(w + 2));
+        !link(w) && !link(w + 1) && ((a.x < b.x && b.y < c.y) || (a.y > b.y && b.x < c.x))
+    };
+    let mut dirs: Vec<u8> = vs.iter().map(|v| v.direction).collect();
+    let mut flag = false;
+    let (mut v, mut p) = (0usize, n - 1);
+    let mut head_passed = false;
+    loop {
+        let (cv, cp, cn) = (at(v), at(p), at(v + 1));
+        let starts =
+            !link(v) && !link(p) && ((cv.x < cn.x && cp.y > cv.y) || (cv.y > cn.y && cp.x > cv.x));
+        let mut end = v;
+        if starts {
+            let mut w = v;
+            let mut u = None;
+            loop {
+                if w == 0 {
+                    head_passed = true;
+                }
+                if stop(w) {
+                    end = w;
+                    break;
+                }
+                if turn(w) {
+                    u = Some(w);
+                }
+                w = (w + 1) % n;
+                if w == v {
+                    end = v;
+                    break;
+                }
+            }
+            if let Some(u) = u {
+                let mut k = v;
+                loop {
+                    dirs[k] = 1;
+                    if k == u {
+                        break;
+                    }
+                    k = (k + 1) % n;
+                }
+                flag = true;
+            }
+        }
+        p = end;
+        v = (p + 1) % n;
+        if head_passed || v == 0 {
+            break;
+        }
+    }
+    (dirs, flag)
+}
+
+/// `outdoor.md` §7.1 against the rule model on pseudo-random vertex
+/// lists (coordinates and link flags).
+#[test]
+fn cliff_marking_by_the_rules() {
+    let mut seed = Seed::init_low(1414);
+    let mut r = |n: i32| seed.roll(n) as i32;
+    let mut marked = 0;
+    for case in 0..500 {
+        let n = 3 + r(8);
+        let vs: Vec<Vertex> = (0..n)
+            .map(|_| Vertex {
+                x: r(6),
+                y: r(6),
+                direction: 0,
+                flags: if r(5) == 0 { VERTEX_LINK } else { 0 },
+            })
+            .collect();
+        let (dirs, flag) = cliff_model(&vs);
+        let mut e = Env::new(4, 8, 8);
+        e.info.vertices = vs.clone();
+        let mut g = e.gen();
+        g.cliff_marking();
+        let got: Vec<u8> = g.info.vertices.iter().map(|v| v.direction).collect();
+        assert_eq!(got, dirs, "case {case}: {vs:?}");
+        assert_eq!(g.info.flags & 0x20 != 0, flag, "case {case}");
+        marked += usize::from(flag);
+    }
+    assert!(marked > 30, "{marked}");
+    // A link vertex next on the run stops it at once: no turn is reached
+    // past the link (which would mark v0..v2).
+    let v = |x, y, flags| Vertex {
+        x,
+        y,
+        direction: 0,
+        flags,
+    };
+    let vs = vec![
+        v(0, 0, 0),
+        v(2, 0, VERTEX_LINK),
+        v(4, 0, 0),
+        v(6, 0, 0),
+        v(6, 5, 0),
+        v(0, 5, 0),
+    ];
+    let mut e = Env::new(4, 8, 8);
+    e.info.vertices = vs.clone();
+    let mut g = e.gen();
+    g.cliff_marking();
+    assert!(g.info.vertices.iter().all(|v| v.direction == 0));
+    assert_eq!(g.info.flags & 0x20, 0);
+    assert_eq!(cliff_model(&vs), (vec![0; 6], false));
+}
