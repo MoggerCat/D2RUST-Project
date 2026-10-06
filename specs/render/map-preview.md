@@ -154,10 +154,10 @@ None (first-match tile choice).
 ## Edge cases & original bugs
 
 Simplifications versus the game (all for Phase 6):
-- Tile variant choice by rarity (DRLG) → first match.
-- Shadows and translucent tiles → not drawn.
-- Lighting, PL2 transforms, day/night → none.
-- D2's exact isometric draw-order rules for walls versus units → the simple
+1. Tile variant choice by rarity (DRLG) → first match.
+2. Shadows and translucent tiles → not drawn.
+3. Lighting, PL2 transforms, day/night → none.
+4. D2's exact isometric draw-order rules for walls versus units → the simple
   depth order above.
 
 ## Test vectors

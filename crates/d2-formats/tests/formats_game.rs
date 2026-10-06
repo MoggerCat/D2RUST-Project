@@ -325,7 +325,7 @@ fn name_of(r: &AnimRecord) -> String {
     String::from_utf8_lossy(&r.name[..n]).into_owned()
 }
 
-// Covers: specs/formats/animdata.md §edge-cases-original-bugs
+// Covers: specs/formats/animdata.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r2, §edge-cases-original-bugs r3, §edge-cases-original-bugs r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn animdata_edge_cases() {
