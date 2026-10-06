@@ -30,20 +30,20 @@
 | Rules | 82–83 |
 |   1. Walk and run requests | 84–227 |
 |   2. Path types | 228–266 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 267–312 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 313–329 |
-|   5. Toward (type 2, `0x00679C80`) | 330–389 |
-|   6. Straight (type 7, `0x00679ED0`) | 390–399 |
-|   7. A* (type 1, `0x0067B850`) | 400–437 |
-|   8. Velocity, direction vector, facing | 438–503 |
-|   9. Per-tick movement | 504–660 |
-|   10. Messages | 661–683 |
-| Constants & data dependencies | 684–720 |
-| Randomness | 721–731 |
-| Edge cases & original bugs | 732–762 |
-| Test vectors | 763–798 |
-| Provenance | 799–834 |
-| Open questions | 835–865 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 267–333 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 334–350 |
+|   5. Toward (type 2, `0x00679C80`) | 351–410 |
+|   6. Straight (type 7, `0x00679ED0`) | 411–420 |
+|   7. A* (type 1, `0x0067B850`) | 421–458 |
+|   8. Velocity, direction vector, facing | 459–537 |
+|   9. Per-tick movement | 538–693 |
+|   10. Messages | 694–716 |
+| Constants & data dependencies | 717–753 |
+| Randomness | 754–764 |
+| Edge cases & original bugs | 765–795 |
+| Test vectors | 796–831 |
+| Provenance | 832–867 |
+| Open questions | 868–896 |
 <!-- /index -->
 
 ## Summary
@@ -275,7 +275,7 @@ here and specified with their callers (open question 3).
    with a target unit, target (+0x10/+0x12) := its position; (0, 0) →
    step 11 with r = 0. By the target's type: player or monster: if the
    path lead byte (+0x68) ≠ 0, the target point is moved ahead
-   (`0x00679190`, uses floating point, open question 4), r = 1; object:
+   (`0x00679190`, rule below), r = 1; object:
    doors (`0x00621A70`) shift the target 2 sub-tiles away from the
    door's line toward the unit's side (orientation `0x00621AC0` set:
    y ± 2, else x ± 2; − when the unit's coordinate is smaller) and
@@ -305,6 +305,27 @@ here and specified with their callers (open question 3).
     result = count. If no point remains → step 11.
 11. Index := 0, count := 0.
 12. Flag 0x20 := 0; result 0.
+
+**Target lead** (`0x00679190(path)`, and `0x00679250(out, path)`
+which writes the led target point to `out` and skips the lead when
++0x68 = 0): with the target unit's direction d (`0x006487F0` on the
+target's path, +0x64) and lead L = path +0x68 (u8), a := (8·d −
+256·L) & 0x1FF; target x += trunc(L · T[(a + 0x80) & 0x1FF]), target y
++= trunc(L · T[a]) (16-bit wrapping adds; trunc toward zero, x87
+control word with RC = 11), T = the 512-entry f32 sine table at
+`0x00707800` (`0x0040B330` cosine, `0x0040B350` sine). **In 1.14d L is
+always 0**: the only writer of +0x68 is `0x006490C0` (D2MOO
+`D2Common_10207`, also writes +0x67), which has no call and no
+pointer anywhere in the image (`disasm.py xref`), and the path record
+is zeroed at allocation (`sim/path-placement.md` §2.3). So the lead
+adds 0 and the floating point never affects an outcome; d2rs
+implements "lead = 0" (no table, hard rule 6 holds). Were it needed:
+T is not the f32 rounding of sin(2πi/512) (328 of 512 entries differ
+by one ulp; sha256 of the 2048 bytes
+`22d4615dd85e77c049244da1033035af272eedf66ea63ef3476cb7e397afaf54`),
+and trunc(L·T[i]) is the same under 24-, 53- and 64-bit x87 precision
+for all L ≤ 255 and all i (exhaustive check), so an integer form from
+T's bit patterns would be exact.
 
 Path functions receive a record ("path info", D2MOO `D2PathInfoStrc`):
 start, target, start room, target room, slack r (step 4), max distance
@@ -497,9 +518,22 @@ From precise start (sx, sy) to precise point (tx, ty) (`tan` table:
 d &= 63. Unit type 2 or 4, or a missile without path flag 0x40:
 direction := d. A missile with flag 0x40: nothing. Others (players,
 monsters): if d ≠ new direction (+0x65): new direction := d, turn step
-(+0x66) := `dirdiff`[(d − direction) & 63]. Turning the current
-direction toward the new one over time is not part of this spec (open
-question 5).
+(+0x66) := `dirdiff`[(d − direction) & 63]. `0x00648820(path, d)` is
+the same with d ≥ 64 → fatal and a missing owner read as type 6.
+
+Turning the current direction toward the new one (`0x00648640`, D2MOO
+`D2Common_10193`: direction := (direction + turn step) & 63, snapped to
+the new direction once it is passed) is called only from the client's
+unit update (`0x00480810` → `0x00463390` players, `0x004B13A0`
+monsters). **The server never turns**: of the path functions that
+write +0x64 (`0x006485F0`, `0x00648820`, `0x00648640`, `0x006488A0`),
+the only one that changes a player's or monster's direction on the
+server is the snap `0x006488A0(path, d)` (direction := new direction
+:= d & 63; server callers `0x005A65E3`, `0x005C5E30`, `0x005F95DD`).
+Direct writes outside these functions were not searched.
+Server readers of +0x64 (`0x006487F0`): the target lead (`0x006791CF`,
+`0x006792F8`, §3; its lead is always 0), `0x0057CDB2`, `0x00597FE7`,
+`0x00597FFB`, `0x00620139` (owners: their callers' specs).
 
 ### 9. Per-tick movement
 
@@ -521,10 +555,9 @@ mode's end (`0x005A8030`).
 3. Mode 3 (run): run drain (rule 9.9); exhausted → restart the
    movement (§1.5 with mode 3: becomes walk, path recomputed).
 4. Step (§9.3), result s.
-5. Host-only position history (`sim/path-placement.md` §10 rule 7):
-   when `GetTickCount` > last + 25 ms and the position is more than
-   √45 sub-tiles from the previous record. Not simulated (open
-   question 4 there).
+5. Position history (`sim/path-placement.md` §10 rule 7, the owner):
+   when `GetTickCount` > last + 25 ms and the squared distance to the
+   previous record is > 45. Simulated: monster AI reads it.
 6. s = 2 (stopped): player data +0x150 ≠ 0 would start a queued action
    (`0x00548B00` NPC talk, or a skill on a unit through `0x00580A70`);
    no 1.14d server code stores a non-zero value there (every server
@@ -726,8 +759,8 @@ skills `srvdofunc`, `SeqInput`, `interrupt`.
    state 42 (concentration). A walk request has no skill argument, so
    the draw depends on the player's *used* skill, which mode starts
    clear (§1.5 step 4) but skill code sets.
-3. Target lead (§3 step 4) uses x87 floating point (no draw; open
-   question 4).
+3. Target lead (§3 step 4) uses x87 floating point, but its lead byte
+   is never set in 1.14d, so it adds 0 (§3, after the steps).
 
 ## Edge cases & original bugs
 
@@ -845,14 +878,12 @@ Real (recordings; message side):
 3. Path types of monster AI and skills (0, 3, 5, 6, 8, 9, 11, 12, 13,
    15, 16) and `0x00679B30` (direction offset): specify with the AI and
    skill specs (Ghidra on `0x0067AD00`, `0x0067A000`, `0x0067C2D0`).
-4. Target lead (`0x00679190`, `0x00679250` with path +0x68 ≠ 0): x87
-   sine/cosine (`0x0040B330`, `0x0040B350`) on (8·direction − 256·lead)
-   & 0x1FF; who sets +0x68 (monster AI?) and the exact rounding. Settle:
-   Ghidra on `0x00679190`, `0x0040B330`; d2rs needs a bit-exact
-   replacement (hard rule 6).
-5. Server-side facing turn (D2MOO `D2Common_10193`, turning +0x64 toward
-   +0x65 by +0x66): which server code calls it and whether facing feeds
-   any message or outcome. Settle: xref the 1.14d equivalent.
+4. *Answered:* target lead (`0x00679190`, `0x00679250`): table sine,
+   truncation, and +0x68 has no reachable writer, so the lead is 0
+   (§3, after the steps).
+5. *Answered:* the facing turn `0x00648640` runs only in the client
+   (§8.5); the server direction changes by snap only. What each server
+   reader of +0x64 does with it is its owner's (§8.5 list).
 6. Owner of the player status messages 0x95 / 0x96 / 0x18
    (`0x00548760`: life/mana/stamina change thresholds, potion-heal
    prediction states 100/106, position resend after 4 quiet calls when
