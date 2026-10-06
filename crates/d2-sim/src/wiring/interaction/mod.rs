@@ -9,6 +9,8 @@
 //! - [`npc_world`]: [`crate::world::npc::NpcWorld`] on the unit records,
 //!   stat lists, timers, item data (through the economy wiring) and the
 //!   quests ([`QuestControl`]); the rest stays a seam ([`NpcRest`]).
+//! - [`quest_npc`]: C→S 0x31 with the quests' mercenary reward run on
+//!   the NPC control block ([`Desk::quest_message`]).
 //! - [`vendor_world`]: [`crate::world::vendors::VendorWorld`] on the same
 //!   providers, item creation through
 //!   [`crate::wiring::economy::Economy::create_item`]; the rest is
@@ -17,6 +19,9 @@
 //!   the action wiring's units, stats, timers and missiles
 //!   ([`UseView`]); missile creation through [`crate::missiles`]; the rest
 //!   is [`UseRest`].
+//! - [`skill_events`]: timer events 5, 8 and 9 of the unit dispatch on
+//!   the same pipeline (the action hooks hand them over through
+//!   [`crate::wiring::action::Pending::skill_event`]).
 //! - [`vitals`]: [`crate::combat::vitals::VitalsUnits`] on unit records
 //!   and stat lists ([`VitalsView`]); experience on a kill from the parts
 //!   the specs write ([`vitals::kill_experience`]).
@@ -35,6 +40,8 @@
 
 pub mod npc_vendors;
 pub mod npc_world;
+pub mod quest_npc;
+pub mod skill_events;
 pub mod skill_use;
 pub mod vendor_world;
 pub mod vitals;
@@ -138,10 +145,7 @@ impl<'a, H, R: QuestRest> Desk<'_, 'a, H, R> {
     ) {
         (
             self.quests,
-            super::economy::EconomyQuests {
-                econ: self.econ,
-                rest: self.rest,
-            },
+            super::economy::EconomyQuests::new(self.econ, self.rest),
         )
     }
 }

@@ -17,6 +17,8 @@
 //!   units ([`EconomyCube`]); the rest stays a seam ([`CubeRest`]).
 //! - [`quest_items`]: [`crate::world::quests::QuestWorld`] likewise
 //!   ([`EconomyQuests`], [`QuestRest`]).
+//! - [`quest_tick`]: tick step 8, the quest updater, on the same quest
+//!   world, wrapped around a game's tick hooks ([`QuestTick`]).
 //!
 //! Status: wired, unverified (every spec involved is a draft).
 
@@ -25,6 +27,7 @@ pub mod game_fields;
 pub mod item_stats;
 pub mod item_units;
 pub mod quest_items;
+pub mod quest_tick;
 pub mod treasure_items;
 
 #[cfg(test)]
@@ -35,6 +38,7 @@ pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
 pub use quest_items::{EconomyQuests, QuestRest};
+pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
 
 use crate::game::GameError;

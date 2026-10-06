@@ -29,12 +29,14 @@ use crate::skills::use_::{
 };
 use crate::skills::{SkillEntry, SkillTables};
 use crate::stats::stat as sst;
+use crate::stats::StatData;
 use crate::tick::events::event;
+use crate::units::hooks::Sim;
 use crate::units::hooks::{MonsterInfo, UnitData};
 use crate::units::lifecycle::AllocRequest;
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::{
-    ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending, WiringError,
+    ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending, SkillEvent, WiringError,
 };
 use crate::wiring::interaction::UseRest;
 
@@ -54,15 +56,17 @@ const SKILL: i32 = 0;
 /// positions, hostility (everyone but oneself), the unit's skill list and
 /// used skill, and the skill missile record fill (aim at `aim_at`).
 #[derive(Default)]
-struct Open {
+pub(super) struct Open {
     pos: BTreeMap<UnitId, (i32, i32)>,
     dir: BTreeMap<UnitId, i32>,
     crossed: BTreeMap<UnitId, Vec<(i32, i32)>>,
     velocity: BTreeMap<UnitId, i32>,
-    skills: BTreeMap<UnitId, Vec<SkillEntry>>,
-    used: BTreeMap<UnitId, SkillEntry>,
+    pub(super) skills: BTreeMap<UnitId, Vec<SkillEntry>>,
+    pub(super) used: BTreeMap<UnitId, SkillEntry>,
+    /// Right skills (`UseRest::right_skill`).
+    pub(super) right: BTreeMap<UnitId, SkillEntry>,
     aim_at: (i32, i32),
-    log: Vec<String>,
+    pub(super) log: Vec<String>,
 }
 
 impl Pending for Open {
@@ -118,6 +122,9 @@ impl Pending for Open {
         self.log
             .push(format!("reaction {} {} {:#x}", a.0, d.0, r.result));
     }
+    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
+        crate::wiring::interaction::skill_events::route(h, sim, ev);
+    }
 }
 
 impl UseRest for Open {
@@ -152,8 +159,8 @@ impl UseRest for Open {
     fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
         None
     }
-    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        None
+    fn right_skill(&self, u: UnitId) -> Option<SkillEntry> {
+        self.right.get(&u).copied()
     }
     fn set_left_skill(&mut self, _: UnitId, _: SkillEntry) {}
     fn set_right_skill(&mut self, _: UnitId, _: SkillEntry) {}
@@ -364,7 +371,7 @@ fn arrow() -> MissileRow {
 }
 
 /// Skill 0: `srvmissile` 0, mana 2 (shift 8), no start / do function.
-fn skills() -> SkillTables {
+pub(super) fn skills() -> SkillTables {
     let mut s = skill_rec();
     s.srvmissile = 0;
     s.mana = 2;
@@ -382,15 +389,22 @@ fn monster_class() -> d2_data::tables::Monstats {
     m
 }
 
-struct Fx {
-    game: Game,
-    sim: ActionSim<Open>,
+pub(super) struct Fx {
+    pub(super) game: Game,
+    pub(super) sim: ActionSim<Open>,
     room: RoomId,
     skills: SkillTables,
 }
 
 impl Fx {
     fn new() -> Self {
+        Self::with(super::stat_data(), skills())
+    }
+
+    /// The fixture on other stat data and skill tables (the skill's
+    /// missile stays the arrow).
+    pub(super) fn with(stat_data: Arc<StatData>, mut skills: SkillTables) -> Self {
+        skills.missiles = vec![arrow()];
         let data = drlg_data();
         let mut types = Types {
             rooms: vec![TileRect::new(0, 0, 8, 8), TileRect::new(8, 0, 8, 8)],
@@ -404,7 +418,6 @@ impl Fx {
             tiles: Box::new(tiles()),
             types: Box::new(types),
         };
-        let skills = skills();
         let tables = ActionTables {
             missiles: vec![arrow()],
             skills: skills.clone(),
@@ -426,7 +439,7 @@ impl Fx {
             }],
             ..UnitData::default()
         };
-        let mut sim = ActionSim::new(super::stat_data(), unit_data, hooks);
+        let mut sim = ActionSim::new(stat_data, unit_data, hooks);
         let mut game = Game::new();
         game.lists.ensure_act(0).unwrap();
         let rooms = sim
@@ -451,7 +464,7 @@ impl Fx {
         }
     }
 
-    fn spawn(&mut self, ty: UnitType, x: i32, y: i32) -> UnitId {
+    pub(super) fn spawn(&mut self, ty: UnitType, x: i32, y: i32) -> UnitId {
         let req = AllocRequest {
             ty,
             class: 0,
@@ -469,7 +482,7 @@ impl Fx {
         u
     }
 
-    fn set(&mut self, u: UnitId, values: &[(u16, i32)]) {
+    pub(super) fn set(&mut self, u: UnitId, values: &[(u16, i32)]) {
         self.sim.with(&mut self.game, |_, v| {
             for &(s, x) in values {
                 v.set_base(u, s, x);
@@ -494,12 +507,12 @@ impl Fx {
             .expect("in a grid") |= bit;
     }
 
-    fn frame(&mut self) {
+    pub(super) fn frame(&mut self) {
         self.game.frame += 1;
         crate::tick::run_timer_events(&mut self.game, &mut self.sim);
     }
 
-    fn assert_clean(&self) {
+    pub(super) fn assert_clean(&self) {
         assert_eq!(self.sim.sys.hooks.errors, Vec::<WiringError>::new());
         assert!(self.sim.sys.errors.is_empty(), "{:?}", self.sim.sys.errors);
     }

@@ -1,10 +1,12 @@
 // Spec: specs/sim/tick.md §3, §4 (room pass), §5; specs/monsters/population.md §1.1
 //! [`WorldSim`]: the action systems ([`ActionSim`]) plus the world state,
 //! as one [`EventDispatch`] and [`TickHooks`] for [`crate::tick::tick`].
-//! Timer events and every tick hook go to the action systems, except the
-//! room-pass hooks of step 3 (`tick.md` §4), which run population
-//! (`population.md` §1.1): ambient spawns, presets, inactive restore,
-//! objects, monster population.
+//! Timer events run the unit dispatch with the action hooks plus the
+//! world state ([`super::events`]: monster event 7, the world state's
+//! part of a unit free). Every tick hook goes to the action systems,
+//! except the room-pass hooks of step 3 (`tick.md` §4), which run
+//! population (`population.md` §1.1): ambient spawns, presets, inactive
+//! restore, objects, monster population.
 
 use std::sync::Arc;
 
@@ -103,8 +105,11 @@ impl<X: WorldPending> WorldSim<X> {
 }
 
 impl<X: WorldPending> EventDispatch for WorldSim<X> {
+    /// The unit dispatch with the action hooks and the world state
+    /// ([`super::events::WorldHooks`]: monster event 7, the world state's
+    /// part of a unit free).
     fn run_event(&mut self, game: &mut Game, run: &TimerRun) {
-        self.action.run_event(game, run);
+        self.run_world_event(game, run);
     }
 }
 
