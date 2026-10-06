@@ -13,7 +13,7 @@
 //! adapter that wires it.
 
 use crate::game::Game;
-use crate::monsters::ai::ModeTarget;
+use crate::monsters::ai::{ModeTarget, PortalNpc};
 use crate::units::hooks::Sim;
 use crate::units::{RoomId, UnitId, UnitType};
 
@@ -271,6 +271,14 @@ pub trait Pending {
     fn busy(&self, unit: UnitId) -> bool {
         false
     }
+    /// Monster data +0x30, the NPC interaction block (`world/npc.md` §2).
+    fn has_interaction_block(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// `0x00572DE0`: `player` is in the NPC's interaction list.
+    fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool {
+        false
+    }
     /// The unit's last attacker (`0x00621D50`; unit field not described).
     fn set_last_attacker(&mut self, defender: UnitId, attacker: UnitId) {}
     /// `0x005A4390(game, attacker)` after a monster's hit.
@@ -339,6 +347,30 @@ pub trait Pending {
     ) -> (Option<UnitId>, u32) {
         (None, 0)
     }
+    // ---- AI quest calls (ai.md §9.32; world/quests.md) -----------------
+
+    /// Portal coordinates set up; `true` (nothing to report) by default.
+    fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        true
+    }
+    fn spawn_town_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) {}
+    /// The out-of-town portal; `false` (none spawned) by default.
+    fn spawn_outside_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        false
+    }
+    fn portal_coords(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        npc: PortalNpc,
+    ) -> Option<(i32, i32)> {
+        None
+    }
+    fn drehya_update(&mut self, game: &mut Game) {}
+    fn drehya_wait(&mut self, game: &mut Game) -> bool {
+        false
+    }
+
     /// `0x005FD470(skill, target)`.
     fn skill_usable(&mut self, game: &mut Game, unit: UnitId, skill: i32, target: UnitId) -> bool {
         false

@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use d2_data::tables::{Levels, Monstats, Monstats2, Record};
 
 use super::functions::IMPLEMENTED;
-use super::table::AI_FUNCTIONS_TSV;
+use super::table::{AI_FUNCTIONS_TSV, SPECD_HERE};
 use super::*;
 use crate::rng::Seed;
 use crate::units::RoomId;
@@ -60,6 +60,18 @@ struct Fake {
     acts: BTreeMap<UnitId, u8>,
     /// `choose_alternative` takes the slot-9 alternative.
     take_alt: bool,
+    /// NPC interaction block (monster data +0x30).
+    npc_block: bool,
+    /// Players in the NPC's interaction list.
+    npc_list: BTreeSet<UnitId>,
+    /// Quest seams (§9.32): setup result, out-of-town spawn result,
+    /// portal coordinates, drehya walk gate.
+    portal_setup_fails: bool,
+    portal_spawn_ok: bool,
+    portal: Option<(i32, i32)>,
+    drehya_wait: bool,
+    /// Path stops (`stop_path` calls).
+    stops: u32,
 }
 
 impl Fake {
@@ -140,6 +152,15 @@ impl AiUnits for Fake {
     fn busy(&self, unit: UnitId) -> bool {
         self.busy.contains(&unit)
     }
+    fn has_interaction_block(&self, _: UnitId) -> bool {
+        self.npc_block
+    }
+    fn in_interaction_list(&self, _: UnitId, player: UnitId) -> bool {
+        self.npc_list.contains(&player)
+    }
+    fn set_life(&mut self, unit: UnitId, value: i32) {
+        self.log.push(format!("setlife {} {value}", unit.0));
+    }
 }
 
 impl AiModes for Fake {
@@ -167,7 +188,9 @@ impl AiModes for Fake {
     fn path_blocked(&self, _: UnitId) -> bool {
         self.blocked_path
     }
-    fn stop_path(&mut self, _: UnitId) {}
+    fn stop_path(&mut self, _: UnitId) {
+        self.stops += 1;
+    }
     fn set_current_skill(&mut self, _: UnitId, skill: i32) -> bool {
         self.log.push(format!("skill {skill}"));
         skill >= 0
@@ -284,6 +307,31 @@ impl AiSkills for Fake {
     fn skill_usable(&mut self, _: &mut Game, _: UnitId, skill: i32, _: UnitId) -> bool {
         self.log.push(format!("usable {skill}"));
         !self.skill_unusable
+    }
+}
+
+impl AiQuests for Fake {
+    fn portal_setup(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest setup {npc:?}"));
+        !self.portal_setup_fails
+    }
+    fn spawn_town_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) {
+        self.log.push(format!("quest town portal {npc:?}"));
+    }
+    fn spawn_outside_portal(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> bool {
+        self.log.push(format!("quest outside portal {npc:?}"));
+        self.portal_spawn_ok
+    }
+    fn portal_coords(&mut self, _: &mut Game, _: UnitId, npc: PortalNpc) -> Option<(i32, i32)> {
+        self.log.push(format!("quest coords {npc:?}"));
+        self.portal
+    }
+    fn drehya_update(&mut self, _: &mut Game) {
+        self.log.push("quest drehya update".into());
+    }
+    fn drehya_wait(&mut self, _: &mut Game) -> bool {
+        self.log.push("quest drehya wait".into());
+        self.drehya_wait
     }
 }
 
@@ -1009,7 +1057,7 @@ fn special_states_10_to_12_need_switchai() {
 
 #[test]
 fn stub_ai_logged() {
-    let mut w = World::new(monstats(32, [0; 5], 15)); // Npc (summarized)
+    let mut w = World::new(monstats(32, [0; 5], 15)); // Npc (not implemented yet)
     w.run(false, 0);
     let mon = w.mon;
     assert_eq!(
@@ -1074,23 +1122,78 @@ fn ai_table_check_catches_perturbations() {
     assert!(err.starts_with("index 15:"), "{err}");
 }
 
+/// `spec'd-here` bodies not implemented yet (other sessions' tasks);
+/// an index leaves this list when its body lands.
+const NOT_IMPLEMENTED_YET: [u8; 16] = [4, 5, 8, 10, 11, 15, 20, 26, 28, 30, 32, 33, 37, 43, 59, 64];
+
+/// Checks [`SPECD_HERE`] against the catalogue's `status` column, row by
+/// row. Returns the first disagreement.
+fn check_specd_here(tsv: &str, specd: &[u8]) -> Result<(), String> {
+    let rows: Vec<&str> = tsv.lines().skip(1).filter(|l| !l.is_empty()).collect();
+    if specd.windows(2).any(|w| w[0] >= w[1]) {
+        return Err("SPECD_HERE not ascending".into());
+    }
+    if let Some(&i) = specd.iter().find(|&&i| usize::from(i) >= rows.len()) {
+        return Err(format!("index {i}: no row"));
+    }
+    for (i, line) in rows.iter().enumerate() {
+        let c: Vec<&str> = line.split('\t').collect();
+        if c.len() != 11 || c[0] != i.to_string() {
+            return Err(format!("row {i}: bad row"));
+        }
+        let tsv = c[10] == "spec'd-here";
+        let ours = specd.contains(&(i as u8));
+        if tsv != ours {
+            return Err(format!("index {i}: status {}, mirror {ours}", c[10]));
+        }
+    }
+    Ok(())
+}
+
+// Covers: specs/monsters/ai.md §10
+#[test]
+fn specd_here_matches_tsv() {
+    check_specd_here(AI_FUNCTIONS_TSV, &SPECD_HERE).unwrap();
+}
+
+#[test]
+fn specd_here_check_catches_perturbations() {
+    // A row's status changed in the catalogue.
+    let row98 = AI_FUNCTIONS_TSV
+        .lines()
+        .find(|l| l.starts_with("98\t"))
+        .unwrap();
+    let bad = AI_FUNCTIONS_TSV.replacen(row98, &row98.replace("\tspec'd-here", "\tsummarized"), 1);
+    let err = check_specd_here(&bad, &SPECD_HERE).unwrap_err();
+    assert!(err.starts_with("index 98:"), "{err}");
+    // An index dropped from, or added to, the mirror.
+    let mut fewer = SPECD_HERE.to_vec();
+    fewer.retain(|&i| i != 60);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &fewer).unwrap_err();
+    assert!(err.starts_with("index 60:"), "{err}");
+    let mut more = SPECD_HERE.to_vec();
+    more.push(147);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &more).unwrap_err();
+    assert!(err.starts_with("index 147:"), "{err}");
+}
+
 #[test]
 fn implemented_matches_catalogue() {
-    // Every spec'd-here think has a body here, and only those (Npc, 32,
-    // is `summarized` and stays a stub).
-    let mut spec: Vec<u8> = AI_FUNCTIONS_TSV
-        .lines()
-        .skip(1)
-        .filter(|l| l.ends_with("\tspec'd-here"))
-        .map(|l| l.split('\t').next().unwrap().parse().unwrap())
-        .collect();
-    spec.sort_unstable();
+    // Every implemented think is a spec'd-here row, and every spec'd-here
+    // row is implemented or listed as not implemented yet.
     let mut ours: Vec<u8> = IMPLEMENTED.iter().map(|&(_, i)| i).collect();
     ours.sort_unstable();
-    assert_eq!(ours, spec);
+    for i in NOT_IMPLEMENTED_YET {
+        assert!(!ours.contains(&i), "index {i} is implemented");
+        assert!(!implemented(AI_TABLE[i as usize].think), "index {i}");
+    }
+    ours.extend(NOT_IMPLEMENTED_YET);
+    ours.sort_unstable();
+    assert_eq!(ours, SPECD_HERE);
     for (addr, i) in IMPLEMENTED {
         assert_eq!(AI_TABLE[i as usize].think, addr, "index {i}");
         assert!(implemented(addr));
     }
 }
+mod npc;
 mod rules;

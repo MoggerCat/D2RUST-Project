@@ -1,10 +1,11 @@
 // Spec: specs/monsters/ai.md §9 (per-AI behaviours), §10 (catalogue)
 //! The AI functions, dispatched by their 1.14d address (the control
 //! stores the address, as the original stores the pointer). Functions
-//! with status `spec'd-here` in `ai-functions.tsv` are implemented, except
-//! Npc (32, `summarized`): every other address, the special-state thinks
-//! and all init / alternate functions are stubs that log
-//! [`Unhandled::Function`] and do nothing (TODO(ai.md open question 10)).
+//! with status `spec'd-here` in `ai-functions.tsv` are implemented here or
+//! in [`super::npc`]; every other address, the special-state thinks other
+//! than state 5 (GoodNpcRanged) and all init / alternate functions are
+//! stubs that log [`Unhandled::Function`] and do nothing (TODO(ai.md open
+//! question 10)).
 
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
@@ -15,7 +16,7 @@ use super::{idle, mode, AiCommand, AiHost, Ctx, ModeTarget, TickParam, Unhandled
 /// Think functions implemented here, by address (AI table index in the
 /// comment). Checked against the catalogue's `spec'd-here` rows by
 /// `tests::implemented_matches_catalogue`.
-pub const IMPLEMENTED: [(u32, u8); 17] = [
+pub const IMPLEMENTED: [(u32, u8); 21] = [
     (0x005B_0CC0, 0),   // None
     (0x005B_0CD0, 1),   // Idle
     (0x005E_FCF0, 2),   // Skeleton
@@ -26,12 +27,16 @@ pub const IMPLEMENTED: [(u32, u8); 17] = [
     (0x005F_12A0, 12),  // Goatman
     (0x005F_1440, 13),  // FallenShaman
     (0x005F_1140, 14),  // QuillRat
+    (0x005E_7880, 31),  // NpcOutOfTown
     (0x005F_2460, 19),  // Swarm
     (0x005F_5830, 34),  // Andariel
     (0x005F_5A20, 35),  // CorruptArcher
     (0x005F_5D50, 36),  // CorruptLancer
     (0x005E_7E20, 58),  // Navi
+    (0x005E_7AC0, 60),  // GoodNpcRanged
     (0x005E_7D60, 62),  // TownRogue
+    (0x005E_5AC0, 90),  // Griswold
+    (0x005E_3890, 98),  // Smith
     (0x005E_7F50, 100), // Buffy
 ];
 
@@ -64,6 +69,10 @@ pub fn run_function<W: AiHost + ?Sized>(
         0x005F_5D50 => corrupt_lancer(game, cx, u, p),
         0x005E_7E20 => navi(game, cx, u, p),
         0x005E_7D60 => town_rogue(game, cx, u),
+        0x005E_7AC0 => super::npc::good_npc_ranged(game, cx, u, p),
+        0x005E_7880 => super::npc::npc_out_of_town(game, cx, u, p),
+        0x005E_3890 => smith(game, cx, u, p),
+        0x005E_5AC0 => griswold(game, cx, u, p),
         _ => cx
             .store
             .unhandled
@@ -595,5 +604,33 @@ fn town_rogue<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
     match s {
         Some(s) if e < 25 => a1(game, cx, u, Some(s)),
         _ => idle(game, cx, u, 50),
+    }
+}
+
+/// §9.30 Smith (the Smith, hephasto): no draws.
+fn smith<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
+    let t = p.target;
+    if p.combat {
+        a1(game, cx, u, t);
+        return;
+    }
+    let l = cx.world.life_percent(u).clamp(0, 100);
+    set_velocity(cx, u, 0, (100 - l) >> 1, 0);
+    walk_to(game, cx, u, t, 7);
+}
+
+/// §9.30 Griswold.
+fn griswold<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
+    let t = p.target;
+    if p.combat {
+        if cx.chance(u, 80) {
+            a1(game, cx, u, t);
+        } else {
+            idle(game, cx, u, 10);
+        }
+    } else if cx.chance(u, 50) {
+        walk_to(game, cx, u, t, 7);
+    } else {
+        idle(game, cx, u, 10);
     }
 }

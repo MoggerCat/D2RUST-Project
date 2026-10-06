@@ -66,6 +66,13 @@ pub trait AiUnits {
     fn interacting(&self, unit: UnitId) -> bool;
     /// Player busy (`0x00535060`).
     fn busy(&self, unit: UnitId) -> bool;
+    /// Monster data +0x30: the NPC interaction block exists
+    /// (`world/npc.md` §2; read by the interaction handler `0x005E68F0`).
+    fn has_interaction_block(&self, unit: UnitId) -> bool;
+    /// `0x00572DE0`: `player` is in the NPC's interaction list.
+    fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool;
+    /// `0x00627260(unit, 6, value)`: sets stat 6 (life).
+    fn set_life(&mut self, unit: UnitId, value: i32);
 }
 
 /// The mode machinery, paths and sounds. Provider: the units session
@@ -185,7 +192,41 @@ pub trait AiSkills {
     fn skill_usable(&mut self, game: &mut Game, unit: UnitId, skill: i32, target: UnitId) -> bool;
 }
 
-/// Everything AI code needs.
-pub trait AiHost: AiUnits + AiModes + AiWorld + AiTargets + AiSkills {}
+/// The quest NPC whose portal functions NpcOutOfTown calls (§9.32).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PortalNpc {
+    /// cain1: Act 1 quest 4 functions.
+    Cain,
+    /// drehyaiced: Act 5 quest 3 functions.
+    Drehya,
+}
 
-impl<T: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + ?Sized> AiHost for T {}
+/// Quest calls of the AI functions (§9.32). Provider: the quest session
+/// (`world/quests.md`); the names are D2MOO's.
+pub trait AiQuests {
+    /// Set up the portal coordinates (`0x005944B0` /
+    /// `0x0058A940`); false = failed.
+    fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool;
+    /// Spawn the town portal (`0x005944F0` / `0x0058A980`).
+    fn spawn_town_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc);
+    /// Spawn the portal out of town (`0x005943B0` / `0x0058A820`); false
+    /// = failed.
+    fn spawn_outside_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool;
+    /// The portal coordinates (`0x00594450` / `0x0058A8D0`); `None` =
+    /// none.
+    fn portal_coords(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        npc: PortalNpc,
+    ) -> Option<(i32, i32)>;
+    /// drehyaiced's per-think call `0x0058AA10(game)`.
+    fn drehya_update(&mut self, game: &mut Game);
+    /// drehyaiced's walk gate `0x0058A9F0(game)` (nonzero → wait).
+    fn drehya_wait(&mut self, game: &mut Game) -> bool;
+}
+
+/// Everything AI code needs.
+pub trait AiHost: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests {}
+
+impl<T: AiUnits + AiModes + AiWorld + AiTargets + AiSkills + AiQuests + ?Sized> AiHost for T {}

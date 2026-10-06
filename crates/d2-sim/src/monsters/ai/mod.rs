@@ -10,6 +10,7 @@
 //! [`MonsterDispatch`].
 
 mod functions;
+mod npc;
 pub mod seams;
 pub mod table;
 mod tactics;
@@ -27,7 +28,9 @@ use crate::tick::EventDispatch;
 use crate::units::{UnitId, UnitType};
 
 pub use functions::{implemented, run_function};
-pub use seams::{AiHost, AiModes, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget};
+pub use seams::{
+    AiHost, AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
+};
 pub use table::{AiRecord, AI_TABLE, SPECIAL_TABLE};
 pub use tactics::*;
 pub use target::{main_search, precheck_a, precheck_b, precheck_c};

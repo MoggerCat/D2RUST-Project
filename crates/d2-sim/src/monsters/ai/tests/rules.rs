@@ -1769,7 +1769,9 @@ fn corrupt_archer_circles_toward_no_target() {
 
 // Covers: specs/monsters/ai.md §9.14
 #[test]
-fn d2moo_only_act1_ais_are_stubs() {
+fn no_act1_ai_is_d2moo_only() {
+    // §9.14: the Act 1 AIs that were D2MOO-only are read in 1.14d; until
+    // a body lands, its think stays a logged stub.
     for i in [4usize, 5, 10, 37, 43, 59] {
         let row: Vec<&str> = AI_FUNCTIONS_TSV
             .lines()
@@ -1778,10 +1780,12 @@ fn d2moo_only_act1_ais_are_stubs() {
             .split('\t')
             .collect();
         assert_eq!(row[0], i.to_string());
-        assert_eq!(row[10], "D2MOO-only", "index {i}");
+        assert_eq!(row[10], "spec'd-here", "index {i}");
         assert_ne!(row[9], "-", "index {i} has a summary");
         let addr = AI_TABLE[i].think;
-        assert!(!implemented(addr));
+        if implemented(addr) {
+            continue;
+        }
         let mut w = World::new(monstats(i as u16, [0; 5], 15));
         w.store.unhandled.clear();
         w.run(false, 5);

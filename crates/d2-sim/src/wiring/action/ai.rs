@@ -1,4 +1,4 @@
-// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7 (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`)
+// Spec: specs/monsters/ai.md §1–§9; specs/monsters/init.md §7 (seams `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills`, `AiQuests`)
 //! Monster AI ↔ units, modes, timer events and the DRLG: [`View`]
 //! implements [`crate::monsters::ai::AiHost`]. Real providers: seeds,
 //! class, mode, states (`stat-lists.md` §9), the state-54 clear of
@@ -9,7 +9,9 @@
 //! ([`super::monsters`]) does not answer go to [`Pending`].
 
 use crate::game::Game;
-use crate::monsters::ai::{AiModes, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget};
+use crate::monsters::ai::{
+    AiModes, AiQuests, AiSkills, AiTargets, AiUnits, AiWorld, ModeTarget, PortalNpc,
+};
 use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::record::flags;
@@ -122,6 +124,16 @@ impl<X: Pending> AiUnits for View<'_, X> {
     }
     fn busy(&self, unit: UnitId) -> bool {
         self.h.x.busy(unit)
+    }
+    fn has_interaction_block(&self, unit: UnitId) -> bool {
+        self.h.x.has_interaction_block(unit)
+    }
+    fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool {
+        self.h.x.in_interaction_list(npc, player)
+    }
+    /// `0x00627260(unit, 6, value)`: life (stat 6) base := value.
+    fn set_life(&mut self, unit: UnitId, value: i32) {
+        self.set_base(unit, stat::HITPOINTS, value);
     }
 }
 
@@ -287,5 +299,31 @@ impl<X: Pending> AiTargets for View<'_, X> {
 impl<X: Pending> AiSkills for View<'_, X> {
     fn skill_usable(&mut self, game: &mut Game, unit: UnitId, skill: i32, target: UnitId) -> bool {
         self.h.x.skill_usable(game, unit, skill, target)
+    }
+}
+
+impl<X: Pending> AiQuests for View<'_, X> {
+    fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        self.h.x.portal_setup(game, unit, npc)
+    }
+    fn spawn_town_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) {
+        self.h.x.spawn_town_portal(game, unit, npc);
+    }
+    fn spawn_outside_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
+        self.h.x.spawn_outside_portal(game, unit, npc)
+    }
+    fn portal_coords(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        npc: PortalNpc,
+    ) -> Option<(i32, i32)> {
+        self.h.x.portal_coords(game, unit, npc)
+    }
+    fn drehya_update(&mut self, game: &mut Game) {
+        self.h.x.drehya_update(game);
+    }
+    fn drehya_wait(&mut self, game: &mut Game) -> bool {
+        self.h.x.drehya_wait(game)
     }
 }

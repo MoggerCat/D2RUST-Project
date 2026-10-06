@@ -374,3 +374,100 @@ pub fn command_minions<W: AiHost + ?Sized>(
         }
     }
 }
+
+/// `0x0058EEF0(type, set)` `GetAiCommandFromParam`: the index of the first
+/// command of type `ty`, searching from the current one's next round to
+/// the current one; `set` makes it current.
+///
+/// TODO(spec: ai.md §8): the search start when the current command is
+/// gone (current past the end of the ring) is not stated; the list is
+/// searched from its first command.
+pub fn find_command<W: AiHost + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ty: i32,
+    set: bool,
+) -> Option<usize> {
+    let c = cx.store.control_mut(unit)?;
+    let len = c.commands.len();
+    if len == 0 {
+        return None;
+    }
+    // With no current command, start before the first one.
+    let base = if c.cur < len { c.cur } else { len - 1 };
+    let at = (1..=len)
+        .map(|i| (base + i) % len)
+        .find(|&i| c.commands[i].params[0] == ty)?;
+    if set {
+        c.cur = at;
+    }
+    Some(at)
+}
+
+/// `0x0058EFA0(type, set)` `SetCurrentAiCommand`: [`find_command`], or a
+/// new command (type, 0, 0, 0, 0) when there is none. `None` only
+/// without an AI control.
+///
+/// TODO(spec: ai.md §8): where the new command goes is not stated; it is
+/// inserted as [`copy_command`] does (before the current one, becoming
+/// current).
+pub fn get_or_create_command<W: AiHost + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ty: i32,
+    set: bool,
+) -> Option<usize> {
+    if let Some(i) = find_command(cx, unit, ty, set) {
+        return Some(i);
+    }
+    cx.store.control(unit)?;
+    copy_command(
+        cx,
+        unit,
+        AiCommand {
+            params: [ty, 0, 0, 0, 0],
+        },
+    );
+    cx.store.control(unit).map(|c| c.cur)
+}
+
+/// The command at `index` of the unit's list.
+pub fn command_mut<'a, W: AiHost + ?Sized>(
+    cx: &'a mut Ctx<'_, W>,
+    unit: UnitId,
+    index: usize,
+) -> Option<&'a mut AiCommand> {
+    cx.store.control_mut(unit)?.commands.get_mut(index)
+}
+
+/// `0x005DC5C0` `AIUTIL_GetDistanceToCoordinates` (§6): the no-size
+/// formula from the unit's path position (the seam's position) to (x, y).
+pub fn path_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId, x: i32, y: i32) -> i32 {
+    distance_no_size(cx.world.position(unit), (x, y))
+}
+
+/// `0x005DED90`: walk to coordinates (§7.2).
+///
+/// TODO(spec: ai.md §7.2): the step count of the coordinate walks is not
+/// given in the table; 1 is used, as for the unit walks.
+pub fn walk_to_point<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 1, 0)
+}
+
+/// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):
+/// mode 2 at (x, y), step 0, no flags; the mode-change result.
+pub fn walk_step0<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 0, 0)
+}
