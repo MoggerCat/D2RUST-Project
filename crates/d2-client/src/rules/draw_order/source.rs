@@ -16,7 +16,10 @@ use crate::world_view::{UnitPose, ViewAssets, ViewError, ViewFeed};
 
 use super::super::camera::{Camera, ClientPos, OpenMode, TileList, UnitPosition};
 use super::super::view::{BlockRect, MapTile, ViewSource};
-use super::{order_frame, FrameOrder, Ordered, OrderedTile, TileKind, UnitSlot, SPEC};
+use super::{
+    mark_drawn, order_frame, sets_drawn_flag, FrameOrder, Ordered, OrderedTile, TileArray,
+    TileKind, UnitSlot, SPEC,
+};
 
 /// The art of one ordered tile, answered by its owner specs: the DT1
 /// frame (open question 12: the room's tile library maps the record to a
@@ -134,8 +137,16 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
             .ok_or_else(|| open("draw order", "the near rooms vanished mid-frame".into()))?;
         order_frame(camera, mode, near, &positions, clock).map_err(order_error)?
     };
+    let (tiles, units, drawn) = {
+        let feed: &F = feed;
+        resolve_drawn(camera, &order, |t| feed.tile_art(t, assets))?
+    };
+    // §6 r6: flag 0x20000 after the draws.
+    let near = feed
+        .near_rooms(world)?
+        .ok_or_else(|| open("draw order", "the near rooms vanished mid-frame".into()))?;
+    mark_drawn(near, &drawn);
     let feed: &'a F = feed;
-    let (tiles, units) = resolve(camera, &order, |t| feed.tile_art(t, assets))?;
     Ok(Some(OrderedSource {
         source: feed,
         tiles,
@@ -151,8 +162,27 @@ pub fn resolve(
     order: &FrameOrder,
     art: impl Fn(&OrderedTile) -> Result<TileArt, ViewError>,
 ) -> Result<(Vec<MapTile>, BTreeMap<UnitKey, UnitSlot>), ViewError> {
+    resolve_drawn(camera, order, art).map(|(t, u, _)| (t, u))
+}
+
+/// [`resolve`], plus the records whose draw sets flag 0x20000 (§6 r6,
+/// [`sets_drawn_flag`]), for [`mark_drawn`].
+#[allow(clippy::type_complexity)]
+pub fn resolve_drawn(
+    camera: &Camera,
+    order: &FrameOrder,
+    art: impl Fn(&OrderedTile) -> Result<TileArt, ViewError>,
+) -> Result<
+    (
+        Vec<MapTile>,
+        BTreeMap<UnitKey, UnitSlot>,
+        Vec<(usize, TileArray, usize)>,
+    ),
+    ViewError,
+> {
     let mut tiles = Vec::new();
     let mut units = BTreeMap::new();
+    let mut drawn = Vec::new();
     for item in &order.items {
         match item {
             Ordered::Tile(t) => {
@@ -170,6 +200,9 @@ pub fn resolve(
                     }
                 }
                 let a = art(t)?;
+                if sets_drawn_flag(camera, t, &a.blocks) {
+                    drawn.push((t.room, t.array, t.record));
+                }
                 tiles.push(MapTile {
                     cell: t.cell,
                     list,
@@ -194,5 +227,5 @@ pub fn resolve(
             }
         }
     }
-    Ok((tiles, units))
+    Ok((tiles, units, drawn))
 }
