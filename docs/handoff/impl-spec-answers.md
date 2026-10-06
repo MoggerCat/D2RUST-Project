@@ -55,4 +55,22 @@ No other test changed; nothing was skipped, ignored or weakened.
 
 ## 4. Gate
 
-See the commit: `sh tools/gate.sh` result recorded below.
+`sh tools/gate.sh` (after `tools/cloud-setup.sh`): **FAIL, only on tests
+that already fail on the base `b435f5a`**. This diff touches no file they
+read. Everything else passes: spec_index, methods, coverage
+check/selftest, trace checkers, hook selftest, fmt, depcheck, clippy
+workspace, rest tests (879), doc-tests. d2-sim: 990 of 992 run pass.
+nextest stopped at the first failures, so the rest of d2-sim did not
+run in the gate; the targeted run of every module this diff touches
+passed (298 tests).
+
+- d2-sim `monsters::ai::tests::implemented_matches_catalogue` and
+  `rules::d2moo_only_act1_ais_are_stubs`: `ai-functions.tsv` now marks
+  more thinks `spec'd-here` (merged spec branch) than `IMPLEMENTED` has.
+- d2-client `bridge::local_tests::{protocol_version_check,
+  unknown_and_unowned_ids, spec_table_records_the_server_message_as_unowned}`,
+  `bridge::tests::bridge_modules_except_mirror_have_no_bevy_type`: the
+  client message table (merged `spec-client-model`) now names handlers
+  for ids 0–8, 10–16, … 172 that the bridge does not have (`NoHandler`).
+
+Both belong to the sessions that implement those specs.
