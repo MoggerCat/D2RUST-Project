@@ -321,9 +321,9 @@ fn stat_list_vectors() {
     assert_eq!(lists.total(p, 0, 0), 35);
     assert!(lists.has_state(P, 30));
 
-    lists.expire_lists(&mut log, P, 19);
+    lists.expire_lists(&mut log, P, 19).unwrap();
     assert!(lists.is_live(s));
-    lists.expire_lists(&mut log, P, 20);
+    lists.expire_lists(&mut log, P, 20).unwrap();
     assert!(!lists.is_live(s));
     assert_eq!(lists.total(p, 0, 0), 30);
     assert_eq!(log.removed, [(P, 30)]);

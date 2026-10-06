@@ -67,9 +67,26 @@ impl TimerClass {
     }
 }
 
-/// A timer record, by slot.
+/// A timer record, by slot and generation.
+///
+/// The slot is the record the original takes from and pushes back on the
+/// slab free list (§5.2 rule 5, §5.4 rule 4): a freed slot is the next one
+/// reused. The generation is d2rs's own: it changes each time the record
+/// is freed, so a handle kept past its timer's free names no timer (a
+/// free timer, §5.4 rule 1 does nothing for it) instead of the record's
+/// next timer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TimerId(pub u32);
+pub struct TimerId {
+    slot: u32,
+    generation: u32,
+}
+
+impl TimerId {
+    /// The record slot (reused through the free list).
+    pub const fn slot(self) -> u32 {
+        self.slot
+    }
+}
 
 /// A timer's explicit callback (timer +0x2C). Opaque: the
 /// [`super::EventDispatch`] implementation gives ids their meaning. A
@@ -141,6 +158,8 @@ struct Timer {
     /// removed while this timer executes).
     in_unit_list: bool,
     callback: Option<CallbackId>,
+    /// d2rs handle generation of this record (see [`TimerId`]).
+    generation: u32,
 }
 
 /// Signed frame remainder (`idiv`, §2.2): negative for negative frames.
@@ -173,7 +192,8 @@ pub struct TimerQueue {
     /// Iteration cursor (+0xA18): next timer to visit.
     cursor: Option<TimerId>,
     timers: Vec<Timer>,
-    free: Vec<TimerId>,
+    /// Slab free list (slots).
+    free: Vec<u32>,
     /// Each unit's timer list head (`unit-order.md` §8), by unit slot.
     unit_heads: Vec<Option<TimerId>>,
 }
@@ -199,13 +219,13 @@ impl TimerQueue {
     }
 
     fn t(&mut self, id: TimerId) -> &mut Timer {
-        &mut self.timers[id.0 as usize]
+        &mut self.timers[id.slot as usize]
     }
 
     fn live(&self, id: TimerId) -> Option<&Timer> {
         self.timers
-            .get(id.0 as usize)
-            .filter(|t| t.flags & flags::FREE == 0)
+            .get(id.slot as usize)
+            .filter(|t| t.generation == id.generation && t.flags & flags::FREE == 0)
     }
 
     /// The current bucket index (queue +0x000), set by each run.
@@ -243,7 +263,7 @@ impl TimerQueue {
         let mut cur = self.unit_heads.get(unit.0 as usize).copied().flatten();
         while let Some(t) = cur {
             out.push(t);
-            cur = self.timers[t.0 as usize].unit_next;
+            cur = self.timers[t.slot as usize].unit_next;
         }
         out
     }
@@ -262,7 +282,7 @@ impl TimerQueue {
         let mut out = Vec::new();
         while let Some(t) = cur {
             out.push(t);
-            cur = self.timers[t.0 as usize].next;
+            cur = self.timers[t.slot as usize].next;
         }
         out
     }
@@ -281,7 +301,7 @@ impl TimerQueue {
         arg1: u32,
         arg2: u32,
     ) -> TimerId {
-        let timer = Timer {
+        let mut timer = Timer {
             event,
             flags,
             expire,
@@ -295,15 +315,21 @@ impl TimerQueue {
             unit_prev: None,
             in_unit_list: true,
             callback,
+            generation: 0,
         };
         let id = match self.free.pop() {
-            Some(id) => {
-                self.timers[id.0 as usize] = timer;
-                id
+            Some(slot) => {
+                let generation = self.timers[slot as usize].generation;
+                timer.generation = generation;
+                self.timers[slot as usize] = timer;
+                TimerId { slot, generation }
             }
             None => {
                 self.timers.push(timer);
-                TimerId((self.timers.len() - 1) as u32)
+                TimerId {
+                    slot: (self.timers.len() - 1) as u32,
+                    generation: 0,
+                }
             }
         };
         let head = self.unit_head(owner.unit).replace(id);
@@ -436,7 +462,8 @@ impl TimerQueue {
         t.unit_next = None;
         t.unit_prev = None;
         t.in_unit_list = false;
-        self.free.push(id);
+        t.generation = t.generation.wrapping_add(1);
+        self.free.push(id.slot);
     }
 
     /// Cancels the unit's timers matching `keep`, walking its timer list
@@ -444,7 +471,7 @@ impl TimerQueue {
     fn cancel_unit_where(&mut self, unit: UnitId, pred: impl Fn(&Timer) -> bool) {
         let mut cur = self.unit_heads.get(unit.0 as usize).copied().flatten();
         while let Some(id) = cur {
-            let t = &self.timers[id.0 as usize];
+            let t = &self.timers[id.slot as usize];
             cur = t.unit_next;
             if pred(t) {
                 self.cancel(id);
@@ -511,7 +538,7 @@ impl TimerQueue {
     pub(crate) fn next_run(&mut self, list: TimerList, frame: i32) -> Option<TimerRun> {
         loop {
             let id = self.cursor?;
-            let t = &self.timers[id.0 as usize];
+            let t = &self.timers[id.slot as usize];
             self.cursor = t.next;
             if list == TimerList::Due && t.expire != frame {
                 continue;
