@@ -5,5 +5,6 @@
 mod fakes;
 mod gaps;
 mod levels;
+mod mutant_tests;
 mod rooms;
 mod tiles;

@@ -1,11 +1,14 @@
-// Spec: specs/client/render-pipeline.md (A9, A1 stage 4b)
+// Spec: specs/client/render-pipeline.md (A9, A1 stage 4b), specs/render/composition.md (§3)
 //! The in-app GPU compositor: a system of Bevy's render graph (the
 //! `RenderGraph` schedule of the render world, set
 //! `RenderGraphSystems::Render`, before the camera driver) that runs the
 //! compute compositor ([`Gpu::encode_rgba`]) on Bevy's own device
 //! (`Gpu::from_device(render_device.wgpu_device().clone(), queue)`, HANDOFF
 //! §2 step 5) and copies its RGBA rows into the presented image's texture.
-//! No readback: the frame never leaves the GPU.
+//! The presented image never leaves the GPU; the index framebuffer is read
+//! back once per job ([`NodeIndices`]) because it is the next frame's base
+//! (`composition.md` §3: the framebuffer persists), which the main world's
+//! `FrameCycle` holds.
 //!
 //! The main world packs the frame ([`super::GpuAtlas::pack`]) and hands
 //! the render world a [`ComposeJob`]: the packed buffers, the atlas pages
@@ -15,7 +18,7 @@
 //! this module moves bytes and decides none.
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bevy::core_pipeline::schedule::camera_driver;
 use bevy::prelude::*;
@@ -25,7 +28,7 @@ use bevy::render::renderer::{
     RenderContext, RenderDevice, RenderGraph, RenderGraphSystems, RenderQueue,
 };
 use bevy::render::texture::GpuImage;
-use bevy::render::RenderApp;
+use bevy::render::{Render, RenderApp, RenderSystems};
 use d2_formats::palette::Palette;
 
 use crate::frames::atlas::AtlasPage;
@@ -65,6 +68,30 @@ impl NodeRuns {
     }
 }
 
+/// The index framebuffer of the last composed job, read back: `(seq,
+/// indices)`, one byte per pixel, row-major. Shared by both worlds: the
+/// render world fills it once the copy is mapped, the main world takes it
+/// to commit the frame to its `FrameCycle`.
+#[derive(Resource, Clone, Default)]
+pub struct NodeIndices(pub Arc<Mutex<Option<JobIndices>>>);
+
+/// A job's `seq` and its read-back indices.
+pub type JobIndices = (u64, Vec<u8>);
+
+impl NodeIndices {
+    /// Takes the read-back indices of job `seq`, if they have arrived.
+    pub fn take(&self, seq: u64) -> Option<Vec<u8>> {
+        let mut slot = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        match slot.take() {
+            Some((s, indices)) if s == seq => Some(indices),
+            other => {
+                *slot = other;
+                None
+            }
+        }
+    }
+}
+
 /// The node's own GPU state (render world).
 #[derive(Resource, Default)]
 struct NodeState {
@@ -73,6 +100,8 @@ struct NodeState {
     atlas: Option<(u64, wgpu::Texture, u32)>,
     /// The last composed job's `seq`.
     last: Option<u64>,
+    /// The copy of the last job's indices, to map after submission.
+    readback: Option<(u64, wgpu::Buffer)>,
 }
 
 /// Adds the node and the job's extraction when there is a render world.
@@ -80,19 +109,23 @@ struct NodeState {
 /// presented).
 pub fn add_node(app: &mut App) -> bool {
     let runs = NodeRuns::default();
+    let indices = NodeIndices::default();
     let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
         return false;
     };
     render_app
         .insert_resource(runs.clone())
+        .insert_resource(indices.clone())
         .init_resource::<NodeState>()
         .add_systems(
             RenderGraph,
             compose_node
                 .in_set(RenderGraphSystems::Render)
                 .before(camera_driver),
-        );
+        )
+        .add_systems(Render, map_indices.in_set(RenderSystems::Cleanup));
     app.insert_resource(runs)
+        .insert_resource(indices)
         .add_plugins(ExtractResourcePlugin::<ComposeJob>::default());
     true
 }
@@ -137,10 +170,18 @@ fn compose_node(
         .into());
     }
     let encoder = ctx.command_encoder();
-    let Some(rgba) = gpu.encode_rgba(encoder, &job.packed, atlas, *atlas_pages, &job.palette)?
+    let Some((indices, rgba)) =
+        gpu.encode_rgba(encoder, &job.packed, atlas, *atlas_pages, &job.palette)?
     else {
         return Ok(());
     };
+    let staging = device.wgpu_device().create_buffer(&wgpu::BufferDescriptor {
+        label: Some("indices readback"),
+        size: indices.size(),
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    encoder.copy_buffer_to_buffer(&indices, 0, &staging, 0, indices.size());
     // One copy per row: the buffer's rows are `width × 4` bytes, which
     // need not meet the 256-byte row alignment of a multi-row copy.
     let row = u64::from(p.width * PIXEL);
@@ -168,6 +209,35 @@ fn compose_node(
         );
     }
     state.last = Some(job.seq);
+    state.readback = Some((job.seq, staging));
     runs.0.fetch_add(1, Ordering::AcqRel);
     Ok(())
+}
+
+/// After the frame's commands were submitted: maps the copy of the last
+/// job's indices and hands them to [`NodeIndices`] (one u32 word per
+/// pixel holding 0..=255: the low byte is the index). The device is
+/// polled by Bevy each frame, as for its own GPU readbacks.
+fn map_indices(mut state: ResMut<NodeState>, out: Res<NodeIndices>) {
+    let Some((seq, buffer)) = state.readback.take() else {
+        return;
+    };
+    let slot = out.0.clone();
+    let mapped = buffer.clone();
+    buffer.slice(..).map_async(wgpu::MapMode::Read, move |res| {
+        if let Err(e) = res {
+            error!("world view: index readback of job {seq} failed: {e}");
+            return;
+        }
+        let indices: Vec<u8> = mapped
+            .slice(..)
+            .get_mapped_range()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|w| w[0])
+            .collect();
+        mapped.unmap();
+        *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((seq, indices));
+    });
 }

@@ -121,6 +121,13 @@ pub trait MessageSink {
     /// Queue `msg` for `client`. An unknown client is ignored (spec §3.2
     /// rule 1: "client null → nothing").
     fn queue(&mut self, client: ClientId, msg: &[u8]) -> Result<(), crate::buffers::QueueError>;
+
+    /// The client has a queued buffer (head, client +0x1B8 ≠ 0; read by
+    /// the vitals sync's force rule, `combat/vitals.md` §5.1 rule 2).
+    /// Default: no.
+    fn has_queued(&self, _client: ClientId) -> bool {
+        false
+    }
 }
 
 /// Game state the dispatcher reads and the intent handlers.

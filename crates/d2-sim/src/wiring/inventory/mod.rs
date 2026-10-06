@@ -34,6 +34,7 @@
 //! R1–R6 exists). Nothing here decides behaviour: rules stay in the
 //! modules; an adapter maps a seam call to a provider call.
 
+pub mod bits;
 pub mod host;
 pub mod inv_world;
 pub mod ops;
@@ -160,13 +161,12 @@ pub trait InvRest: MovePending {
     fn targeting_probe(&self, item: Guid) -> u32 {
         1
     }
-    /// `value × p / 100` (`0x00483360`; rounding: open question 4).
-    fn percent_of(&self, value: i32, p: i32) -> i32;
     /// The item is active on the unit (`0x00625820`).
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool;
     /// The item's own contribution to a unit stat (`0x0062B450`).
     fn own_contribution(&self, item: Guid, unit: Owner, stat: u16) -> i32;
-    /// Level requirement (`0x0062B5B0`, −1 none; open question 5).
+    /// Level requirement (`0x0062B5B0`, §4.8): the provider gathers the
+    /// values and runs `items::inventory::level_requirement`.
     fn level_requirement(&self, item: Guid, unit: Owner) -> i32;
     /// Two-handed (`0x006289C0`).
     fn two_handed(&self, item: Guid) -> bool;
@@ -174,14 +174,10 @@ pub trait InvRest: MovePending {
     fn one_or_two_handed(&self, unit: Owner, item: Guid) -> bool;
     /// Ammo type (`0x0062E6F0`): an itemtypes row.
     fn ammo_type(&self, item: Guid) -> Option<i16>;
-    /// `0x0062A2F0` in the stack test (open question 7).
-    fn stack_quality_ok(&self, item: Guid) -> bool;
     /// Allowed location (`0x0062FDF0`).
     fn has_allowed_location(&self, item: Guid) -> bool;
     /// Quiver-type item (`0x00628480`).
     fn quiver_kind(&self, item: Guid) -> bool;
-    /// Weapon / shield comparison of auto-equip (open question 8).
-    fn auto_equip_allows(&self, unit: Owner, item: Guid, loc: u8) -> bool;
 
     // ---- player data and interaction (`world/npc.md` §2) -------------------
 
@@ -314,24 +310,12 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         Some(out)
     }
 
-    /// The clean-up after the update pass (§6.1 rule 4): each item of the
-    /// owner's update list gets its command flags reset (0) and the list
-    /// is freed. The per-unit flags (+0xC8) are the room clean-up's
-    /// (`tick.md` §3 step 6), not this one's.
-    // TODO(spec: inventory.md §6.1 r4, OQ9): the 1.14d address of this
-    // step; "reset" is read as 0.
+    /// The update-list reset after the update pass (`0x00597B00`, §6.1
+    /// rule 4: [`deferred::update_list_reset`]). The per-unit flags of the
+    /// room clean-up `0x00553220` ([`deferred::room_cleanup`]) are the
+    /// tick wiring's (`tick.md` §3 step 6).
     pub fn update_done(&mut self, owner: Owner) {
-        let Some(u) = self.unit_of(owner) else {
-            return;
-        };
-        let Some(list) = self.state.inventories.get_mut(&u).map(|i| i.take_updates()) else {
-            return;
-        };
-        for g in list {
-            if let Some(d) = self.item_unit(g).and_then(|i| self.state.items.get_mut(&i)) {
-                d.cmd_flags = 0;
-            }
-        }
+        deferred::update_list_reset(self, owner);
     }
 
     /// The owner's inventory.

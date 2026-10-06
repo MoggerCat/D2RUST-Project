@@ -1,4 +1,4 @@
-// Spec: specs/world/waypoints.md §6, §7.1; specs/sim/rng.md §5.3
+// Spec: specs/world/waypoints.md §6, §7.1; specs/sim/rng.md §5.3; specs/combat/vitals.md §5.1
 //! [`ActionWorld`]: the systems whose seams have a provider in
 //! `d2_sim::wiring::action` alone — the waypoints (`WaypointView` on
 //! [`ActionSim`], reached through [`ActionEvents`]) and the skill
@@ -15,8 +15,8 @@
 
 use d2_sim::game::Game;
 use d2_sim::tick::EventDispatch;
-use d2_sim::units::UnitId;
-use d2_sim::wiring::action::{ActionSim, Pending};
+use d2_sim::units::{ClientId as SimClient, UnitId};
+use d2_sim::wiring::action::{vitals_sync, ActionSim, Pending};
 use d2_sim::wiring::economy::GameFields;
 use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData};
@@ -130,6 +130,19 @@ where
     /// `handlers::walk::run` (the path provider of the action wiring).
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         super::super::walk::run(game, events, call)
+    }
+
+    /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring
+    /// (on when `ActionHooks::enable_vitals_sync` ran).
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: SimClient,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
+        vitals_sync::run(events.action(), game, client, staged, queued)
     }
 
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {

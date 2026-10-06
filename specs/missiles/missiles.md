@@ -31,20 +31,20 @@
 |   R1. Data the server keeps per missile | 96–140 |
 |   R2. Creation | 141–275 |
 |   R3. Per-tick dispatch | 276–305 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 306–383 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 384–433 |
-|   R6. Damage stage (missile-owned part) | 434–487 |
-|   R7. Lifetime and expiry | 488–511 |
-|   R8. Pierce | 512–537 |
-|   R9. Server-do and server-hit catalogues | 538–600 |
-|   R10. Behaviour of the recorded missiles | 601–634 |
-|   R11. `missiles.txt` columns and their server use | 635–669 |
-| Constants & data dependencies | 670–696 |
-| Randomness | 697–728 |
-| Edge cases & original bugs | 729–752 |
-| Test vectors | 753–827 |
-| Provenance | 828–863 |
-| Open questions | 864–902 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 306–385 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 386–435 |
+|   R6. Damage stage (missile-owned part) | 436–489 |
+|   R7. Lifetime and expiry | 490–513 |
+|   R8. Pierce | 514–539 |
+|   R9. Server-do and server-hit catalogues | 540–754 |
+|   R10. Behaviour of the recorded missiles | 755–788 |
+|   R11. `missiles.txt` columns and their server use | 789–823 |
+| Constants & data dependencies | 824–850 |
+| Randomness | 851–883 |
+| Edge cases & original bugs | 884–907 |
+| Test vectors | 908–982 |
+| Provenance | 983–1018 |
+| Open questions | 1019–1057 |
 <!-- /index -->
 
 ## Summary
@@ -335,7 +335,9 @@ also call last. Steps per run, 1.14d-confirmed:
    `0x00648F40`, in path order): collision mask there with the missile's
    size against the mode's mask (`0x0064D9B0`). If non-zero: look for a
    unit on that subtile accepted by the mode's callback (`0x00641CB0`,
-   D2MOO `D2Common_10407`, `units.md`); found → hit handler
+   D2MOO `D2Common_10407`, `sim/path-placement.md` §4 rule 6 with
+   r = the missile's size, so a size outside 1..3 finds no unit);
+   found → hit handler
    (unit, a4 = 0), return its result. Not found and mask bit 2 (missile
    barrier) set → expiry-style hit (none, a4 = 1), return 2.
 10. No subtile hit → return 1.
@@ -598,6 +600,158 @@ mask. Used by server-do 8, 10, 17, 25.
 Every re-seed sets `{value, 666}` on unit +0x20. Missiles never
 re-seeded draw from the seed derived at allocation.
 
+#### R9.5 Server-do bodies (1.14d-confirmed)
+
+Called by §R3 step 7 (ECX game, EDX missile). "Flight" = §R4
+(`0x005AE1F0`); its result is returned. Position = the missile's path
+x / y. Owner = `0x00552FD0` (none when gone). Level and skill = missile
+data +0x0C / +0x0A (`0x0064A210`, `0x0064A280`); frames left = data
++0x10 (`0x0064A380`).
+
+1. **2 Poison Javelin, poison traps** `0x005AE400`:
+   1. Missile and record exist and `SubMissile1` (+0x18, i16) ≥ 0: v =
+      missiles evaluator `0x0064B7C0(missile, owner, SrvCalc1 (+0x80),
+      class, level)` (`data/calc-expressions.md`), evaluated every run;
+      `sub_at_step(game, missile, SubMissile1, range 0, loops v)`.
+   2. Return flight.
+
+   `sub_at_step(game, missile, class, range, loops)` = `0x005A9720`:
+   nothing unless the path's new-step flag is set (path +0x34 bit 3,
+   `0x006505C0`) and the missile has an owner. Zeroed parameter record
+   (§R2.1): flags 5 (position given, velocity given = 0: the
+   sub-missile does not move); range > 0 → flags |= 0x8000, range field
+   = range; loops > 0 → flags |= 8. Owner; origin = the missile; class;
+   x, y = the missile's position; skill and level = the missile's;
+   loops field = 2 × level − 2 (whatever `loops` was: the argument only
+   switches flag 8). Create (`0x0059FA30`). 1.14d rows: poisonjav
+   (`SrvCalc1` "0": no loops), viper_poisjav (3); the two trap rows have
+   no `SubMissile1`.
+2. **3 Poison cloud, Blizzard, Thunder Storm, Hand of God**
+   `0x005AE480`: path present and path velocity (+0x7C) ≠ 0 → flight.
+   Else OR 0x40 into the one collision cell under the missile
+   (`0x0064CB90(room, x, y, 0x40)`: the room containing (x, y) searched
+   from the missile's room, its collision grid; no size, no marker), then
+   flight.
+3. **5 Fire Wall, Immolation fire, Meteor fire, Molten Boulder path**
+   `0x005AE520`: no record → flight. f = animation frame (unit +0x44 >>
+   8, arithmetic). Stamp 0x40 with the missile's size at its position
+   (`0x0064EA00`, `sim/path-placement.md` §5.1). S = `SubStart`
+   (+0x181), E = `SubStop` (+0x182), unsigned bytes:
+   - f = S − 1: animation frame := (S − 1 + `roll(E − S)`) << 8 — one
+     draw on the missile's seed (`0x0045C3E0`; none when E − S < 1);
+   - else frames left = S: frame := (S − 3) << 8;
+   - else frames left < S: frame := max(f − 2, 0) << 8.
+   Return flight.
+4. **7 Guided Arrow, Bone Spirit** `0x005AE780`:
+   1. Missile or record missing → 2. Owner none or dead (`0x005541B0`)
+      → 2. The missile's room in town (`0x0061AB00`) → 2.
+   2. Homing = data +0x28 bit 0 (srvdo 10 sets +0x28 := 1 with a
+      target unit, 2 with a point, `0x005DB7FE`). Homing: refresh the
+      missile's path target and take T = its target (`skills/bodies.md`
+      §2.1); T dead, or the owner may not attack T (`0x00554200(game,
+      owner, T)`) → T none. n = `Param1`, ≤ 0 → 5. T and frames left mod
+      n = 0 (signed): d = `0x006416D0(missile, T)`; 4 ≤ d ≤ 24 → rebuild
+      the path (`0x00649970(path, missile, 0)`, `sim/pathing.md` §3).
+   3. Return flight.
+
+   `0x006416D0(a, b)`: dx = |bx − ax|, dy = |by − ay|; each minus (a
+   size / 2 + b size / 2) (signed halves, `0x00620510`), floored at 0;
+   d = (2 × max(dx, dy) + min(dx, dy)) / 2, truncating.
+
+5. **8 MonBlizzCenter** `0x005AE8A0`: record missing → the code
+   reads `SubMissile1` through a null record (fatal; class ids are
+   always valid). Else q = level / max(`Param3`, 1) (signed); range =
+   `Param1` + max(q, 2); interval = max(`Param2` − q, 3); §R9.3 helper
+   (missile, range, interval, `SubMissile1`, mask 5) — `SubMissile1` < 0
+   is passed on and the creation fails; return flight.
+6. **10 BlizzardCenter** `0x005AEA60`: record missing → as 5. Missile
+   skill k invalid → return 2 (removed). range = `eval(owner, k.calc1,
+   k, level)`, interval = `eval(owner, k.calc2, k, level)` (calc1
+   first; owner may be none); §R9.3 helper (missile, range, interval,
+   `SubMissile1`, mask 5); return flight.
+7. **25 EruptionCenter** `0x005AF880`: record missing or `SubMissile1`
+   = 0 → 2; k invalid → 2; then as 6 with mask 0x45.
+
+The §R9.3 helper takes ESI = missile, EAX = interval and stack (game,
+range, class, mask).
+
+#### R9.6 Server-hit bodies (1.14d-confirmed)
+
+Called by §R5 step 6.3 (ECX game, EDX missile, stack unit or none);
+result bits per §R5. Helpers:
+
+- `elem_roll(game, missile, unit, record)` = `0x005A8C70`: rolls only
+  the row's `EType` (+0xE4) element with the §R6.2 per-element helper
+  `0x005A8910` (missile seed) and returns it: 0 physical (21/22, no
+  mastery) → +0x08; with a unit, p = missile stat 25 (+ stat 121 if the
+  unit is a demon `0x0063E940`, + 122 if undead `0x0063E990`), at least
+  −90, physical += physical × p / 100 (signed); then stat 141 ≠ 0 →
+  physical × 2 and result |= 0x2000 (no draw); 1 fire (48/49, mastery
+  329) → +0x10; 2 lightning (50/51, 330) → +0x1C; 3 magic (52/53, 357)
+  → +0x20; 4 cold (54/55, 331) → +0x24, cold length +0x30 = stat 56; 5
+  poison (57/58, 332) → +0x28, length +0x2C = stat 59, divided by stat
+  326 when > 1; 6, 7, 8 → life / mana / stamina leech = stat 60 / 62 /
+  64 (no roll); 9 → stun length +0x44 = stat 66; 10 and > 12 → nothing;
+  11 burn (316/317, 329) → +0x14, burn length +0x18 = stat 315; 12
+  freeze (54/55, 331) → +0x24, freeze length +0x34 = stat 56. Unlike
+  §R6.2 there is no `damage_vs_montype` term.
+- `elem_len(record, len)` = `0x005A8F20` by `EType`: 4 cold length, 5
+  poison length, 9 stun length, 11 burn length, 12 freeze length :=
+  len; others nothing.
+- `area_damage(game, owner, x, y, r, record, f)` = `0x0056BAD0`: f = 0
+  → 0x8583; owner none → return 1; else `scan_unit(game, owner, x, y,
+  r, f, cb, record, noaura 0)` (`skills/bodies.md` §2.12) and return 1.
+  Per unit U the callback copies the record and runs `0x0056B9C0(game,
+  owner, U, copy)`: a missile attacker becomes its owner; result flags
+  0 → nothing; b = `block_or_dodge(game, attacker, U, avoid 1, block 0)`
+  (`combat/hit.md` §6.1): 2 → result |= 0x100, 4 → 0x80, 0x10 → 0x8000,
+  1 → 0x10, b ≠ 0 → clear 1; hit and U without state 54 → |= 4;
+  monster critical hit `0x005A5560` (`combat/damage.md` §3.1 step 13);
+  hit → `apply(game, attacker, U, missile 1, copy)` (§5.2); reaction
+  `0x0057CEE0` (§7.1).
+
+Bodies:
+
+1. **1 Fireball, Exploding / Freezing Arrow explosion** `0x005A9A70`:
+   missile, record or owner missing → 1. r = `sHitPar1`; r ≤ 0: missile
+   skill k invalid → return 1 (no explosion); else r = max(`eval(owner,
+   k.calc1, k, level)`, 1). Zeroed record; `elem_roll(game, missile,
+   unit, record)`; hit flags |= `HitFlags` (+0xA8); result |=
+   `ResultFlags` (+0xAC); `area_damage(game, owner, x, y, r, record,
+   0)` around the missile. Return 1.
+2. **4 Exploding Arrow, Freezing Arrow, Royal Strike meteor center**
+   `0x005B07A0`: missile or record missing → 1. Zeroed record: flags 0
+   (start at the origin, target = start), owner (none → every creation
+   fails), origin = the missile, skill and level of the missile. For i =
+   1…4: `HitSubMissile_i` (+0x24 + 2(i − 1)) > 0 → create that class;
+   created and `sHitPar1` > 0 → hit handler `0x005ADF10(game, new
+   missile, unit, a4 = 1)` (§R5; result ignored). Return 3.
+3. **12 Chain Lightning, Lightning Strike** `0x005AA730`: missile or
+   record missing → 1. Owner none or no unit → 3. n = data +0x28
+   (bounces left, `0x0064A730`); n ≤ 1 → 3. r = `sHitPar1`, or (≤ 0)
+   max(`eval(owner, k.aurarangecalc, k, level)`, 1), k = the missile's
+   skill (no record → 3). U = `next_unit(game, owner, x, y, r, 0x88583,
+   unit GUID)`; U none or U = the unit → 3. Record: flags 0x21; owner;
+   target unit U; class = this missile's; start = the missile's
+   position; target point = U's position; skill, level of the missile.
+   Created → its data +0x28 := n − 1 (`0x0064A710`). Return 3.
+
+   `next_unit(game, source, x, y, r, f, g)` = `0x0056BD10`: `scan_unit`
+   with f | 0xA783 (here 0x8A783: players and monsters, flag tests 0x80
+   and 0x400, not in town, line of sight 0x200, no town rooms 0x2000,
+   hostile 0x8000, no `justhit` 0x80000). The callback keeps, comparing
+   GUIDs unsigned, the unit with the smallest GUID > g and the unit with
+   the smallest GUID ≤ g (a later equal one replaces it); returns the
+   first, else the second (the hit unit itself when nothing else
+   qualifies). No draws: the chain order is GUID order with wrap-around.
+4. **13 Glacial Spike, Hell Meteor down** `0x005AA8B0`: missile,
+   record, or the missile skill k's record missing → 1. r = `sHitPar1`,
+   or max(`eval(owner, k.aurarangecalc)`, 1); len = `sHitPar2`, or
+   `eval(owner, k.auralencalc)` (unclamped), both at the missile level.
+   Zeroed record; `elem_roll`; len > 0 → `elem_len(record, len)`; flags
+   from the row as in 1; `area_damage(…, 0)`, which always returns 1, so
+   the result is always 1 (the code maps a 0 to 3).
+
 ### R10. Behaviour of the recorded missiles
 
 All four use server-do 1, server-hit 0, server-damage 0, `CollideType`
@@ -710,7 +864,8 @@ Draws in order, per event:
 5. Unique-mod hook (`monsters/init.md`): monster owners only.
 
 **Per tick** (server-do 1): no draw unless a hit happens. Other
-server-do functions: see `srvdo.tsv` `rng` and §R9.3–R9.4.
+server-do functions: see `srvdo.tsv` `rng` and §R9.3–R9.5 (server-do 5:
+one `roll(SubStop − SubStart)` on the missile seed at frame SubStart − 1).
 
 **Hit on a unit** (`0x005ADF10`):
 
@@ -887,9 +1042,9 @@ Reading:
    `ExplosionMissile` were searched heuristically only (functions that
    index the missile table). Settle: a full xref of record offsets
    +0x135, +0x18E, +0x190, +0x16 through every missile-record pointer.
-8. Server-do and server-hit functions marked D2MOO-only need their
-   1.14d bodies read (priority: 2, 3, 5, 7 for Act 1–2 monsters; hit 1,
-   4, 12, 13 for common skills).
+8. Server-do and server-hit functions marked D2MOO-only or summarized
+   need their 1.14d bodies read (done: server-do 2, 3, 5, 7, server-hit
+   1, 4, 12, 13, §R9.5–R9.6).
 9. The level passed by monster attacks for spike1 (VelLev 8 makes its
    speed level-dependent) is the AI/skills spec's; a recording with
    positions would confirm the speed formula.

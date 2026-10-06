@@ -1,6 +1,6 @@
 # Handoff: mutation testing of `d2_sim::{items, treasure}` — `claude/mutants-items-treasure`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, base `claude/tender-meitner-mphas3` at
 `4b5b0bf`. Repo only (M09). METHODS M08 applied to the item and treasure

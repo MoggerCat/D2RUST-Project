@@ -107,17 +107,21 @@ fn no_op(
 fn dispatch_check_duplicate_handler_and_matching_owner() {
     use d2_client::bridge::dispatch::{check, parse, Handler, Mismatch, TSV};
 
+    // Rows with no owner but 0x61 (a general id, no unit handler).
     let mut rows = parse(TSV).unwrap();
-    rows[0x10].owner = Some("specs/x.md".into());
+    for r in &mut rows {
+        r.owner = None;
+    }
+    rows[0x61].owner = Some("specs/x.md".into());
     let h = Handler {
-        id: 0x10,
+        id: 0x61,
         owner: "specs/x.md",
-        handle: no_op,
+        handle: d2_client::bridge::dispatch::Handle::General(no_op),
     };
     assert_eq!(check(&rows, &[h]), Vec::new());
     assert_eq!(
         check(&rows, &[h, h]),
-        vec![Mismatch::BadHandler { id: 0x10 }]
+        vec![Mismatch::BadHandler { id: 0x61 }]
     );
 }
 
@@ -125,9 +129,9 @@ fn dispatch_check_duplicate_handler_and_matching_owner() {
 #[test]
 fn unowned_messages_are_counted_per_id() {
     let mut bridge = Bridge::new(VersionLink(PROTOCOL_VERSION)).unwrap();
-    // 0x1A (2 bytes) twice, then 0x5F (5 bytes) once.
+    // 0x61 (2 bytes, no owner spec) twice, then 0x5F (5 bytes) once.
     bridge
-        .receive_chunk(&[0x1A, 0x07, 0x1A, 0x07, 0x5F, 1, 2, 3, 4])
+        .receive_chunk(&[0x61, 0x07, 0x61, 0x07, 0x5F, 1, 2, 3, 4])
         .unwrap();
     let counts: Vec<(u8, u64)> = bridge
         .log()
@@ -135,7 +139,7 @@ fn unowned_messages_are_counted_per_id() {
         .iter()
         .map(|(&id, &n)| (id, n))
         .collect();
-    assert_eq!(counts, vec![(0x1A, 2), (0x5F, 1)]);
+    assert_eq!(counts, vec![(0x5F, 1), (0x61, 2)]);
 }
 
 /// §6 rules 2 and 4: messages a registered handler applies are counted as

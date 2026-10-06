@@ -3236,7 +3236,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x15, name: "ReassignPlayer", size: SizeRule::Fixed(11), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "x", ty: FieldType::U16, offset: Some(6) }, Field { name: "y", ty: FieldType::U16, offset: Some(8) }, Field { name: "flag", ty: FieldType::U8, offset: Some(10) }], senders: &[0x0053BC10], client_handler: Some(0x0045D160), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x16, name: "UnitPositions", size: SizeRule::Field { width: Width::U16, offset: 1, mul: 1, add: 0, cap: None, min: 13 }, layout: &[], senders: &[], client_handler: Some(0x0045D2E0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
     ServerMessage { id: 0x17, name: "-", size: SizeRule::Fixed(0), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: Some(0x0045D260), produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x18, name: "LifeManaUpdate", size: SizeRule::Fixed(15), layout: &[], senders: &[0x0053C230], client_handler: Some(0x0045D9B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x18, name: "LifeManaUpdate", size: SizeRule::Fixed(15), layout: &[Field { name: "id", ty: FieldType::Packed { bit: 0, width: 8 }, offset: None }, Field { name: "life", ty: FieldType::Packed { bit: 8, width: 15 }, offset: None }, Field { name: "mana", ty: FieldType::Packed { bit: 23, width: 15 }, offset: None }, Field { name: "stamina", ty: FieldType::Packed { bit: 38, width: 15 }, offset: None }, Field { name: "life_pred", ty: FieldType::Packed { bit: 53, width: 7 }, offset: None }, Field { name: "mana_pred", ty: FieldType::Packed { bit: 60, width: 7 }, offset: None }, Field { name: "x", ty: FieldType::Packed { bit: 67, width: 16 }, offset: None }, Field { name: "y", ty: FieldType::Packed { bit: 83, width: 16 }, offset: None }, Field { name: "dx", ty: FieldType::Packed { bit: 99, width: 8 }, offset: None }, Field { name: "dy", ty: FieldType::Packed { bit: 107, width: 8 }, offset: None }], senders: &[0x0053C230], client_handler: Some(0x0045D9B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x19, name: "SmallGoldPickup", size: SizeRule::Fixed(2), layout: &[Field { name: "delta", ty: FieldType::U8, offset: Some(1) }], senders: &[0x0053E9B0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x1A, name: "AddExpByte", size: SizeRule::Fixed(2), layout: &[Field { name: "value", ty: FieldType::U8, offset: Some(1) }], senders: &[0x0053BDD0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x1B, name: "AddExpWord", size: SizeRule::Fixed(3), layout: &[Field { name: "value", ty: FieldType::U16, offset: Some(1) }], senders: &[0x0053BDD0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3361,7 +3361,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x92, name: "RemoveItemsDisplay", size: SizeRule::Fixed(6), layout: &[], senders: &[0x0053B3D0], client_handler: Some(0x0045E5B0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x93, name: "Unknown93", size: SizeRule::Fixed(8), layout: &[], senders: &[0x0053C6F0], client_handler: Some(0x0045DD10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x94, name: "BaseSkillLevels", size: SizeRule::Field { width: Width::U8, offset: 1, mul: 3, add: 6, cap: None, min: 9 }, layout: &[], senders: &[], client_handler: Some(0x0045DD60), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Partial },
-    ServerMessage { id: 0x95, name: "LifeManaUpdate2", size: SizeRule::Fixed(13), layout: &[], senders: &[0x0053C320], client_handler: Some(0x0045DB20), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x95, name: "LifeManaUpdate2", size: SizeRule::Fixed(13), layout: &[Field { name: "id", ty: FieldType::Packed { bit: 0, width: 8 }, offset: None }, Field { name: "life", ty: FieldType::Packed { bit: 8, width: 15 }, offset: None }, Field { name: "mana", ty: FieldType::Packed { bit: 23, width: 15 }, offset: None }, Field { name: "stamina", ty: FieldType::Packed { bit: 38, width: 15 }, offset: None }, Field { name: "x", ty: FieldType::Packed { bit: 53, width: 16 }, offset: None }, Field { name: "y", ty: FieldType::Packed { bit: 69, width: 16 }, offset: None }, Field { name: "dx", ty: FieldType::Packed { bit: 85, width: 8 }, offset: None }, Field { name: "dy", ty: FieldType::Packed { bit: 93, width: 8 }, offset: None }], senders: &[0x0053C320], client_handler: Some(0x0045DB20), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x96, name: "WalkVerify", size: SizeRule::Fixed(9), layout: &[Field { name: "id", ty: FieldType::Packed { bit: 0, width: 8 }, offset: None }, Field { name: "stamina", ty: FieldType::Packed { bit: 8, width: 15 }, offset: None }, Field { name: "x", ty: FieldType::Packed { bit: 23, width: 16 }, offset: None }, Field { name: "y", ty: FieldType::Packed { bit: 39, width: 16 }, offset: None }, Field { name: "dx", ty: FieldType::Packed { bit: 55, width: 8 }, offset: None }, Field { name: "dy", ty: FieldType::Packed { bit: 63, width: 8 }, offset: None }], senders: &[0x0053C3F0], client_handler: Some(0x0045DC50), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x97, name: "WeaponSwitch", size: SizeRule::Fixed(1), layout: &[], senders: &[0x0053E110], client_handler: Some(0x0045EAD0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x98, name: "Unknown98", size: SizeRule::Fixed(7), layout: &[], senders: &[0x0053E0A0], client_handler: Some(0x0045DE50), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -3954,6 +3954,69 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 11] {
             let mut b = [0; 11];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x18 LifeManaUpdate (15 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct LifeManaUpdate {
+        /// `u15` at bit 8.
+        pub life: u16,
+        /// `u15` at bit 23.
+        pub mana: u16,
+        /// `u15` at bit 38.
+        pub stamina: u16,
+        /// `u7` at bit 53.
+        pub life_pred: u8,
+        /// `u7` at bit 60.
+        pub mana_pred: u8,
+        /// `u16` at bit 67.
+        pub x: u16,
+        /// `u16` at bit 83.
+        pub y: u16,
+        /// `u8` at bit 99.
+        pub dx: u8,
+        /// `u8` at bit 107.
+        pub dy: u8,
+    }
+
+    impl FixedMessage for LifeManaUpdate {
+        const ID: u8 = 0x18;
+        const SIZE: usize = 15;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                life: crate::schema::packed_get(b, 8, 15) as u16,
+                mana: crate::schema::packed_get(b, 23, 15) as u16,
+                stamina: crate::schema::packed_get(b, 38, 15) as u16,
+                life_pred: crate::schema::packed_get(b, 53, 7) as u8,
+                mana_pred: crate::schema::packed_get(b, 60, 7) as u8,
+                x: crate::schema::packed_get(b, 67, 16) as u16,
+                y: crate::schema::packed_get(b, 83, 16) as u16,
+                dx: crate::schema::packed_get(b, 99, 8) as u8,
+                dy: crate::schema::packed_get(b, 107, 8) as u8,
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            crate::schema::packed_put(out, 8, 15, u32::from(self.life));
+            crate::schema::packed_put(out, 23, 15, u32::from(self.mana));
+            crate::schema::packed_put(out, 38, 15, u32::from(self.stamina));
+            crate::schema::packed_put(out, 53, 7, u32::from(self.life_pred));
+            crate::schema::packed_put(out, 60, 7, u32::from(self.mana_pred));
+            crate::schema::packed_put(out, 67, 16, u32::from(self.x));
+            crate::schema::packed_put(out, 83, 16, u32::from(self.y));
+            crate::schema::packed_put(out, 99, 8, u32::from(self.dx));
+            crate::schema::packed_put(out, 107, 8, u32::from(self.dy));
+        }
+    }
+
+    impl LifeManaUpdate {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 15] {
+            let mut b = [0; 15];
             self.write(&mut b);
             b
         }
@@ -4563,6 +4626,61 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 18] {
             let mut b = [0; 18];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x95 LifeManaUpdate2 (13 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct LifeManaUpdate2 {
+        /// `u15` at bit 8.
+        pub life: u16,
+        /// `u15` at bit 23.
+        pub mana: u16,
+        /// `u15` at bit 38.
+        pub stamina: u16,
+        /// `u16` at bit 53.
+        pub x: u16,
+        /// `u16` at bit 69.
+        pub y: u16,
+        /// `u8` at bit 85.
+        pub dx: u8,
+        /// `u8` at bit 93.
+        pub dy: u8,
+    }
+
+    impl FixedMessage for LifeManaUpdate2 {
+        const ID: u8 = 0x95;
+        const SIZE: usize = 13;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                life: crate::schema::packed_get(b, 8, 15) as u16,
+                mana: crate::schema::packed_get(b, 23, 15) as u16,
+                stamina: crate::schema::packed_get(b, 38, 15) as u16,
+                x: crate::schema::packed_get(b, 53, 16) as u16,
+                y: crate::schema::packed_get(b, 69, 16) as u16,
+                dx: crate::schema::packed_get(b, 85, 8) as u8,
+                dy: crate::schema::packed_get(b, 93, 8) as u8,
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            crate::schema::packed_put(out, 8, 15, u32::from(self.life));
+            crate::schema::packed_put(out, 23, 15, u32::from(self.mana));
+            crate::schema::packed_put(out, 38, 15, u32::from(self.stamina));
+            crate::schema::packed_put(out, 53, 16, u32::from(self.x));
+            crate::schema::packed_put(out, 69, 16, u32::from(self.y));
+            crate::schema::packed_put(out, 85, 8, u32::from(self.dx));
+            crate::schema::packed_put(out, 93, 8, u32::from(self.dy));
+        }
+    }
+
+    impl LifeManaUpdate2 {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 13] {
+            let mut b = [0; 13];
             self.write(&mut b);
             b
         }

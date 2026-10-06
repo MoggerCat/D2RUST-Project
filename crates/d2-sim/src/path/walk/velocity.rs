@@ -49,10 +49,10 @@ fn has_modifier<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId, mode
     false
 }
 
-/// The velocity half of `0x00623F50` (§8.1 rules 1–2) for a player or
-/// monster in `mode`. `None`: the spec gives no rule for a mode without
-/// the modifier (velocity unchanged; TODO(spec: pathing.md §8.1, the
-/// velocity of modes without the modifier)).
+/// The velocity half of `0x00623F50` (§8.1 rules 1–2, 4) for a player or
+/// monster in `mode`. `None`: a mode without the velocity modifier (and
+/// not knockback); the routine then sets only the animation rate and the
+/// velocity keeps its previous value (§8.1 rule 4).
 pub fn mode_velocity<U: WalkUnits + ?Sized>(
     t: &PathTables,
     u: &U,
@@ -82,7 +82,8 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
     Some(base.wrapping_mul(p) / 100)
 }
 
-/// Velocity setter `0x00648690` (§8.1 rule 3).
+/// Velocity setter `0x00648690` (§8.1 rule 3): +0x38 := 15 only when the
+/// value differs; velocity and max velocity (+0x84) always.
 pub fn set_velocity(path: &mut DynamicPath, v: i32) {
     if v != path.velocity {
         path.field_38 = 15;

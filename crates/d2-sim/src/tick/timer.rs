@@ -342,7 +342,9 @@ impl TimerQueue {
 
     /// `0x005416B0` (§5.2): schedule a timed event at `frame` (the game's
     /// current frame). `expire == -1` schedules an every-tick event
-    /// (§5.3). Returns `None` for event types ≥ 15.
+    /// (§5.3) with a **null callback** (§5.2 r2: `0x005416D5` pushes 0, so
+    /// the caller's callback is lost and the class default handler runs).
+    /// Returns `None` for event types ≥ 15.
     ///
     /// Precondition (§5.2 rule 4): for a monster's AI-think event (type 2)
     /// with an expire other than −1, the caller first runs the monster
@@ -365,7 +367,7 @@ impl TimerQueue {
             return Ok(None);
         }
         if expire == -1 {
-            return self.schedule_every_tick(owner, event, callback, arg1, arg2);
+            return self.schedule_every_tick(owner, event, None, arg1, arg2);
         }
         let class =
             TimerClass::of(owner.unit_type).ok_or(TimerError::NoTimerClass(owner.unit_type))?;

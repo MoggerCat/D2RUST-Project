@@ -131,8 +131,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     );
 
     // An intent sent between frames 1 and 2 is drained by frame 2's pump;
-    // the tick's flush reaches the bridge in the same frame: S→C 0x0D,
-    // which has no owner spec yet, so it is recorded as unowned. The world
+    // the tick's flush reaches the bridge in the same frame: S→C 0x0D, a
+    // unit-handler message (`client/msg-units.md` §4) for a player the
+    // model was never told about (the server sends no 0x59 yet), so it is
+    // dropped at receive (`client/model.md` §4 rule 1). The world
     // view composes the (empty) model of tick 1 on the CPU (no render
     // world).
     let sent = app
@@ -149,7 +151,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    assert_eq!(b.log().unowned.get(&0x0D), Some(&1));
+    assert_eq!(b.log().dropped.get(&0x0D), Some(&1));
+    assert!(b.log().unowned.is_empty());
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
     assert_eq!(
         stats(&app),
@@ -191,7 +194,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         (stats(&app).bridge_frame, stats(&app).server_tick),
         (304, 302)
     );
-    assert_eq!(bridge(&app).0.log().unowned.get(&0x0D), Some(&1));
+    assert_eq!(bridge(&app).0.log().dropped.get(&0x0D), Some(&1));
 
     // The presented image is the CPU reference of the empty list (the
     // app's placeholder feed states no local player: no camera, nothing
@@ -485,6 +488,9 @@ impl ViewFeed for TestFeed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 /// Fixture rules: no tile of their own (the original's placement answers
@@ -643,6 +649,27 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
         .filter(|(g, w)| g != w)
         .count();
     assert_eq!(differ, 0, "pixels differing from the CPU reference");
+
+    // Each next frame waits for the previous frame's indices (the frame
+    // cycle's base, composition.md §3): the node keeps composing only if
+    // the readback reaches the cycle.
+    for _ in 0..120 {
+        if app.world().resource::<NodeRuns>().get() >= 4 {
+            break;
+        }
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+    }
+    assert!(
+        app.world().resource::<NodeRuns>().get() >= 4,
+        "the frame cycle advanced through the index readback"
+    );
+    let cycle = app.world().resource::<WorldViewState>().cycle.clone();
+    assert_eq!(
+        cycle.pixels(),
+        &d2_client::scene::compose(&frame.items, &a.frames, &a.maps, VIEW).unwrap()[..],
+        "a static frame over its own previous frame"
+    );
 }
 
 // ---- integration: frame store, text layout, sound pool (synthetic) ---------------------
@@ -663,15 +690,15 @@ fn glyph(code: u8, frame: u8) -> Glyph {
         height: 8,
         unknown2: 0,
         unknown3: 0,
-        frame,
-        unknown4: 0,
+        frame: u16::from(frame),
         unknown5: 0,
     }
 }
 
-/// [`assets`] plus a two-glyph font: its glyph DC6 is inserted after the
-/// tile, so the glyph frames are store ids 1 and 2. `H` is frame 1 of the
-/// DC6 but record 0, `i` frame 0 but record 1 (record ≠ frame).
+/// [`assets`] plus a 256-record font (records by position, `ui/text.md`
+/// §3): its two-frame glyph DC6 is inserted after the tile, so the glyph
+/// frames are store ids 1 and 2. `H` is record 72 and frame 1, `i`
+/// record 105 and frame 0 (record ≠ frame).
 fn text_assets() -> ViewAssets {
     let mut a = assets();
     let frame = |v: u8| IndexFrame::new(6, 8, 0, 0, vec![v; 48]).unwrap();
@@ -687,10 +714,11 @@ fn text_assets() -> ViewAssets {
         font_path(),
         FontTable {
             version: 1,
-            unknown: [0; 4],
+            unknown: 0,
+            count: 256,
             height: 8,
             width: 6,
-            glyphs: vec![glyph(b'H', 1), glyph(b'i', 0)],
+            glyphs: (0..=255u8).map(|c| glyph(c, u8::from(c == b'H'))).collect(),
         },
     );
     a
@@ -778,7 +806,7 @@ impl TextHooks for TextTestRules {
     fn text_rules(&self) -> &dyn TextRules {
         &FixedAdvance
     }
-    fn glyph_look(&self, _: u16) -> Result<(ShadeChain, BlendOp), ViewError> {
+    fn glyph_look(&self, _: i32, _: u8) -> Result<(ShadeChain, BlendOp), ViewError> {
         Ok((ShadeChain::EMPTY, BlendOp::Opaque))
     }
 }
@@ -800,6 +828,7 @@ fn hi() -> UiDraw {
         text: "Hii".encode_utf16().collect(),
         at: Point::new(300, 200),
         style: TextStyle::default(),
+        opts: TextOpts::default(),
         clip: d2_client::ui::Rect::new(0, 0, 800, 600),
     })
 }
@@ -990,8 +1019,9 @@ fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
     );
 }
 
-// M08: the default hooks refuse: with the app's own placeholders, text is
-// an error naming ui/text.md and a sound start fails (no table file).
+// M08: the default hooks refuse: with the app's own hooks, text needs the
+// `ui/text.md` font (font 0, not loaded here) and a sound start fails (no
+// table file).
 #[test]
 fn placeholder_hooks_refuse_text_and_sounds() {
     let a = text_assets();
@@ -999,7 +1029,10 @@ fn placeholder_hooks_refuse_text_and_sounds() {
         unreachable!()
     };
     let e = Unspecified.ui_text(&req, &a).unwrap_err();
-    assert!(e.to_string().contains("ui/text.md"), "{e}");
+    assert!(
+        matches!(&e, ViewError::FontMissing(p) if p.as_str() == "data/local/font/latin/font8.tbl"),
+        "{e}"
+    );
 
     let mut parts = AudioParts::empty();
     parts.cues = Box::new(TwoStarts(false));

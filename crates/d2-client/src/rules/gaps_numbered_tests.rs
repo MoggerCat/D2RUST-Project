@@ -20,14 +20,14 @@ fn shake_envelope_is_a_function_of_milliseconds_not_ticks() {
     // Peak 100, attack 100 ms: the envelope changes inside one 40 ms tick,
     // so two wall-clock times of the same tick give different amplitudes.
     let s = Shake::start(100, 100, 100, 100).unwrap();
-    assert_eq!(s.amplitude(41).unwrap(), Some(41));
-    assert_eq!(s.amplitude(79).unwrap(), Some(79));
+    assert_eq!(s.amplitude(41), Some(41));
+    assert_eq!(s.amplitude(79), Some(79));
     // Both are tick 1 of the client loop (40 ms ticks)...
     assert_eq!(41 / TICK_MS, 79 / TICK_MS);
     // ...and the d2rs time base (§9) samples one of them per tick.
     assert_eq!(Shake::time_of(1), 40);
-    assert_eq!(s.amplitude(Shake::time_of(1)).unwrap(), Some(40));
-    assert_eq!(s.amplitude(Shake::time_of(2)).unwrap(), Some(80));
+    assert_eq!(s.amplitude(Shake::time_of(1)), Some(40));
+    assert_eq!(s.amplitude(Shake::time_of(2)), Some(80));
 }
 
 // Covers: specs/render/camera.md §edge-cases-original-bugs r4

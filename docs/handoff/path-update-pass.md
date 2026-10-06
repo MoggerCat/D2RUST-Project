@@ -1,7 +1,6 @@
 # Handoff: update-pass movement messages — `claude/path-update-pass`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md`; the coordinator
-> folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, medium (METHODS M14). Base:
 `claude/tender-meitner-mphas3` at `01dff69` (includes the merged

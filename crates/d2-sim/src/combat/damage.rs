@@ -561,7 +561,22 @@ pub fn fill<W: CombatWorld>(
         }
     }
     // Step 13: monster critical hit `0x005A5560`.
-    if a_type == UnitType::Monster {
+    monster_crit(w, ct, a, d, rec);
+    w.dual_wield_switch(a, offhand, false);
+}
+
+/// Monster critical hit `0x005A5560` (§3.1 step 13; also the missile
+/// area hit, `missiles.md` §R9.6): a monster attacker's `crit` chance
+/// (one `lo' % 100` on its seed) doubles the damage fields and marks the
+/// hit class.
+pub fn monster_crit<W: CombatWorld>(
+    w: &mut W,
+    ct: &CombatTables,
+    a: W::Unit,
+    d: W::Unit,
+    rec: &mut DamageRecord,
+) {
+    if w.unit_type(a) == UnitType::Monster {
         let crit = ct.monstats(w.class_id(a)).map_or(0, |m| i32::from(m.crit));
         if crit != 0 && ((w.seed(a).step() % 100) as i32) < crit {
             for f in [
@@ -584,7 +599,6 @@ pub fn fill<W: CombatWorld>(
             }
         }
     }
-    w.dual_wield_switch(a, offhand, false);
 }
 
 /// `start_combat(game, attacker, defender, record, SrcDam)` =
