@@ -4965,6 +4965,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "seed-finder"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "d2-data",
+ "d2-formats",
+ "d2-server",
+ "d2-sim",
+ "test-fixtures",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -16,6 +16,7 @@ members = [
     "tools/mpq-tool",
     "tools/data-tool",
     "tools/scenario-run",
+    "tools/seed-finder",
 ]
 
 [workspace.package]
