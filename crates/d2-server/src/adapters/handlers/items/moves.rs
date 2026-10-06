@@ -105,6 +105,21 @@ impl InvParts {
             rest,
         }
     }
+
+    /// The inventory desk of one call over the host's economy
+    /// (`InvDesk::new` fills the item data copies): the item moves, the
+    /// update pass, and the vendor and cube adapters all run on it.
+    pub fn desk<'d, 'a, H: LifecycleHooks>(
+        &'d mut self,
+        econ: &'d mut Economy<'a, H>,
+    ) -> InvDesk<'d, 'a, H, dyn MoveRest + Send + Sync> {
+        let InvParts {
+            tables,
+            state,
+            rest,
+        } = self;
+        InvDesk::new(econ, tables, state, rest.as_mut())
+    }
 }
 
 /// One call on the inventory wiring over the host's economy.
@@ -113,22 +128,9 @@ pub trait MoveCall {
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out;
 }
 
-/// The desk of one call (`InvDesk::new` fills the item data copies).
-fn desk<'d, 'a, H: LifecycleHooks>(
-    econ: &'d mut Economy<'a, H>,
-    parts: &'d mut InvParts,
-) -> InvDesk<'d, 'a, H, dyn MoveRest + Send + Sync> {
-    let InvParts {
-        tables,
-        state,
-        rest,
-    } = parts;
-    InvDesk::new(econ, tables, state, rest.as_mut())
-}
-
 /// What the rest sent during a call, with the receiving units looked up
 /// (`None`: a GUID without a unit; nothing is sent to it).
-fn take_sent<H: LifecycleHooks>(
+pub(crate) fn take_sent<H: LifecycleHooks>(
     d: &mut InvDesk<'_, '_, H, dyn MoveRest + Send + Sync>,
 ) -> Vec<(Option<UnitId>, Vec<u8>)> {
     let sent = d.rest.take_sent();
@@ -149,7 +151,7 @@ type MoveOut = (
 impl MoveCall for MoveRun<'_> {
     type Out = MoveOut;
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> MoveOut {
-        let mut d = desk(econ, parts);
+        let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
         (r, take_sent(&mut d))
@@ -226,7 +228,7 @@ type UpdateOut = (Vec<(ClientId, Vec<u8>)>, Vec<(ClientId, MoveFatal)>);
 impl MoveCall for UpdateRun {
     type Out = UpdateOut;
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> UpdateOut {
-        let mut d = desk(econ, parts);
+        let mut d = parts.desk(econ);
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
         for r in &self.receivers {
             let own = d.guid_of(r.own);
@@ -334,4 +336,4 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

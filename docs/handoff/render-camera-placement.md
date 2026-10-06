@@ -1,6 +1,6 @@
 # Handoff: camera and sprite placement rules — `claude/render-camera-placement`
 
-> Waiting to be folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md`; this file stays as the detailed record.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud implementation session, 2026-10-06, task class: implementation
 from a clear spec (medium). Branch `claude/render-camera-placement`, from

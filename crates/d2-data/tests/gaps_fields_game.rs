@@ -218,7 +218,7 @@ fn linker_data_on_live_set() {
 }
 
 /// `txt-format.md` edge cases on the 1.14d set.
-// Covers: specs/data/txt-format.md §edge-cases-original-bugs
+// Covers: specs/data/txt-format.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r3, §edge-cases-original-bugs r5, §edge-cases-original-bugs r8
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn txt_edge_case_data() {
