@@ -32,23 +32,23 @@
 | Inputs | 68–78 |
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
-|   1. Inventory model | 89–180 |
-|   2. Grid placement | 181–267 |
-|   3. Belt | 268–322 |
-|   4. Equipping | 323–476 |
-|   5. Shared checks | 477–601 |
-|   6. Deferred item messages | 602–674 |
-|   7. Intents | 675–1058 |
-|   8. Pickup from the ground | 1059–1159 |
-|   9. Drop to the ground | 1160–1202 |
-|   10. Gold | 1203–1233 |
-|   11. Message layouts | 1234–1259 |
-| Constants & data dependencies | 1260–1282 |
-| Randomness | 1283–1295 |
-| Edge cases & original bugs | 1296–1311 |
-| Test vectors | 1312–1359 |
-| Provenance | 1360–1395 |
-| Open questions | 1396–1426 |
+|   1. Inventory model | 89–181 |
+|   2. Grid placement | 182–272 |
+|   3. Belt | 273–328 |
+|   4. Equipping | 329–483 |
+|   5. Shared checks | 484–608 |
+|   6. Deferred item messages | 609–686 |
+|   7. Intents | 687–1070 |
+|   8. Pickup from the ground | 1071–1171 |
+|   9. Drop to the ground | 1172–1214 |
+|   10. Gold | 1215–1245 |
+|   11. Message layouts | 1246–1271 |
+| Constants & data dependencies | 1272–1294 |
+| Randomness | 1295–1307 |
+| Edge cases & original bugs | 1308–1323 |
+| Test vectors | 1324–1371 |
+| Provenance | 1372–1418 |
+| Open questions | 1419–1449 |
 <!-- /index -->
 
 ## Summary
@@ -138,6 +138,7 @@ codes; the intents accept 1–10 only).
 | player | other (0) | class table `0x00744544` (7 pairs): class 0–4 → 0–4, 5 → 14, 6 → 15; no match → −1 |
 | monster | any | 5 |
 | object | any | class 0x152 → 10, 0x153 → 11, else −1 |
+| missile, item, tile (types 3–5) | any | −1 (no record; socket fillers join an item's inventory through the link `0x0063B210`, not a grid) |
 
 Measured on the 1.14d `inventory.bin` (32 records; the `.txt`
 `Expansion` row is not compiled, so `.txt` rows after it shift by one):
@@ -248,11 +249,15 @@ quests.
 2. The item must exist, be an item and be on the cursor (mode 4), else 0.
 3. Record from the item's page (§1.3). For a player owner: page 1 → the
    cursor is **not** cleared afterwards; page 2 → trade hook
-   `0x00568770` afterwards (multiplayer trade, out of scope).
+   `0x00568770` after step 8 and before step 9 (multiplayer trade, out of
+   scope).
 4. Find-free → §2.3 then §2.2; else §2.2 at (max(x, 0), max(y, 0)).
    Failure → 0, nothing changed.
 5. Link check `0x0063B210(inv, item, 1)` (sockets an item when the
-   inventory belongs to an item; else succeeds).
+   inventory belongs to an item; else succeeds). Failure → result 0 with
+   nothing undone: the item stays placed in the grid by step 4 (cells,
+   item list, count; the placement's unlink already cleared the cursor)
+   but stays in mode 4 (original bug).
 6. Page ≠ 4 → item-skill link (§5.5; `0x0055C270`: for a player owner
    `0x0055C110(1)`). Unit flag 0x2
    (targetable, unit +0xC4) cleared. If the item counts as an active
@@ -280,7 +285,7 @@ quests.
    `0x00744684`, `0x0074466C`, `0x00744660`).
 5. **Free slot for an item** (`0x0063C600`): beltable, 1 × 1. For column
    c = 0..3: if slot c holds a similar item and c < n, the first empty
-   slot among c, c+4, c+8, … < n is the answer. Else, if items `autobelt`
+   slot among c, c+4, c+8, … < n is the answer; a column with no empty slot falls through to the next column (`0x0063C600`). After the four columns, if items `autobelt`
    (+0x131) ≠ 0: the first empty slot among 0..3. Else none.
 6. **Auto-belt gate** (`0x00628BA0`): returns true for every item. It
    calls the "similar item in the bottom row" test `0x0063C560` (which
@@ -294,7 +299,8 @@ quests.
 8. **Compaction** after a slot s is emptied (`0x0055EDC0`): column c =
    min(s & 3, 3); walking rows 0..3, each item found in c moves down to
    the lowest free row of the column (re-placed with §3.7), gets item
-   flags 0x400 and 0x1, item flag 0x4000 cleared, owner refresh, update
+   flags 0x400 and 0x1 (item flags +0x18 via `0x006280D0`, not command
+   flags; only items whose row changes), item flag 0x4000 cleared, owner refresh, update
    list += item. The "remove from slot" helper `0x0063C550` is empty.
 9. **Belt change** (`0x005608C0(game, unit U, new belt N or none)`, run
    when a belt leaves location 8 or a new one replaces it): n :=
@@ -382,7 +388,8 @@ Result codes; N absent means "may L be emptied":
 6. Both weapons: unit missing → no. Player class 4 (barbarian) → yes;
    player class 6 (assassin) → yes when both are type 67 (`h2h`); other
    players → no. Monster class 0x1A1, 0x1A2 → yes when both are `h2h`;
-   0x21C–0x21E → yes; other monsters → no.
+   0x21C–0x21E → yes; other monsters → no. Any other unit type (object,
+   missile, item, tile) → no (`0x0063DCBD`).
 
 #### 4.5 Stack test (`0x0062C850`, A, B)
 
@@ -644,7 +651,12 @@ hirelings). U without an inventory → nothing (after step 1).
 "Owner" = the client's own player is the inventory's owner. First the
 store checks (the item's +0xC8 bits 2 and 4 → `0x0053EF30` with 0x38 /
 0x39 to the client trading with the owner: `world/vendors.md`). Then the **first** matching row of
-`items/item-actions.tsv` sends one message; later rows are skipped.
+`items/item-actions.tsv` sends one message; later rows are skipped. A row matches only when its
+flag test **and** its `to` test pass: a row whose flags
+match but whose `to` excludes this client does not end the walk; later
+rows are tried (`0x005973F0`: each test is "flag and client is owner").
+Only the store checks end the walk for every client (item +0xC8 bit 2
+or 4 set: 0x38 / 0x39 to the trading client, nothing to others, done).
 Columns: `order`; `test` (`cmd` = command flags, `item` = item flags);
 `flags` (any of); `to` (`owner` = only the owner's client, `all` = every
 client that processes this player; `owner|mode1` = owner, or item mode
@@ -768,7 +780,7 @@ the result is still 1 (original bug). Owner refresh; result 0 or 3.
 
 Location u16 @1 ∉ 1..10 → 2. Item-move gate for the item at the location
 refuses → 0. Location 8 (belt) needs `0x00567840` (§3 rule 10),
-else 0. `0x00560CD0`: cursor present → 0; empty location → 0; §4.3 (N
+else 0. `0x00560CD0`: cursor present → 0; empty location → 0 (checked before §4.3, so §4.3 result 4 never occurs here: 0x1C on the empty hand opposite a two-handed weapon does nothing, `0x00560CD0` read in full); §4.3 (N
 absent) must give 3 or 4, else out 1; `0x0063E490` picks the item to
 remove (for 4: the two-handed item in the other hand); remove from body
 as in §7.6; type 19 → `0x005608C0` (§3 rule 9, no new belt); cursor := item; stat refresh; unit
@@ -1392,6 +1404,17 @@ labels them the other way); 1.14d's refused pickup does not re-mark the
 item for a refresh message the D2MOO way but sets unit flag 0x1000 and
 re-enters mode 3; 0x22 is a stub; hireling item rules (§7.23) and the
 dual-wield monster classes are 1.14d constants.
+
+Second pass (open questions 3–19, HANDOFF IV/WN/MV/PN/GX items): read
+from the 1.14d decompile and `tools/ghidra/disasm.py` (register
+arguments) at the addresses cited in §2.2, §3 rules 5 and 7–10, §4.2,
+§4.4, §4.5, §4.7, §4.8, §5.5–§5.7, §6.1 rule 4, §6.2, §6.3, §7.1, §7.6,
+§7.7, §7.9, §7.11, §7.18, §7.23, §8.1, §8.4, §9.2, §11 (0x22); constant
+tables read from the image (`0x00738C70`, `0x00738C4C`, `0x006CE270`);
+itemtypes, itemstatcost, states and inventory row numbers measured on
+the 1.14d `patch_d2` `.txt` files (the `Expansion` row skipped). The
+"charm re-link" of the first pass is the scroll/tome item-skill link
+(§5.5).
 
 ## Open questions
 
