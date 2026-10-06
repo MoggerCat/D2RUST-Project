@@ -1279,7 +1279,78 @@ of the three comparisons, `0 pass, 11 fail`, exit 1. GPU byte-exactness
 now holds on two real adapters (Intel iGPU and AMD discrete). Fresh table
 dump `traces/raw/20261006-201456-tables` (73 tables, 30 maps, not
 committed). The full LOCAL-RUN batches 1–5 on main `0472619` run as the
-buddy session (`docs/handoff/local-buddy-2026-10-06.md`).
+buddy session (`docs/handoff/local-buddy-2026-10-06.md`, branch
+`claude/local-buddy-2026-10-06` `6e406d4`): install identical; batch 3
+(real GPU) all pass incl. `gpu_compare` 18/18; batch 2 has 9 failing rows
+(verbatim there); **`d2-client play --frames 1500` on live data panics at
+`d2-sim/src/drlg/room.rs:144` ("live DRLG room") after ~104 ticks**.
+
+Done 2026-10-06 (local PC 2, coordinator #2; Ghidra 12.1.4 export of the
+1.14d `Game.exe`, 13,048 functions, no community labels: `1.14d-notes`
+absent on this PC). Branches to merge (each verified with `git ls-remote`;
+all from main `0472619`; spec edits pass `spec_index --check` and
+`coverage --check`):
+- `claude/spec-answers-tick-messages` `9b432d3`: `tick.md` §1.2 wrap
+  (signed, only `now` masked), §4 r5 off-tick population (`population.md`
+  OQ1), §5.2 r2 owns expire −1, §5.6 freeze gate; S→C 0x2A, 0x50, 0x58,
+  0x5D, 0x63, 0x91, 0xAC header layouts; C→S 0x3A, 0x4C; classifier
+  table corrected (0x71–0xFE → 3); masked bytes in `intents-events.md` §6
+  r3; `rng.md` §5.3 / §7; `calc-expressions.md` §3.5. Regenerated
+  `d2-proto` (fmt, `cargo check -p d2-client --tests`, `cargo test -p
+  d2-proto` pass). Open: 0x28 byte 6 on the NPC chat path; 0x28 needs a
+  TSV grammar for a fixed-size tail.
+- `claude/spec-answers-inventory` `cce8b7e`: `inventory.md` OQ3–OQ11,
+  OQ14–OQ17, OQ19, IV1–IV8, MV1, WN1–WN3, PN1, GX1, IS1 (part); `cube.md`
+  OQ8. Not done: S→C 0x22 TSV cell (`type:u8@1 unit:u32@3 skill:u16@7
+  quantity:u8@9 body_state:u8@11`, then `gen-proto`).
+- `claude/spec-answers-path` `b4eb5f6`: `path-placement.md` OQ2–OQ6 (new
+  `pathing.md` §1.6 C→S 0x5F resync), `pathing.md` OQ4, OQ5, OQ8; W5, W6
+  (§4 rule 6), `0x0064E840` link.
+- `claude/spec-answers-render` `6b8dc11`: `composition.md` OQ1 / VM1
+  (entry 0 black in all 17 PL2 / `.dat`), OQ3; `sprite-placement.md`
+  OQ1–OQ5; `camera.md` OQ1, OQ2, OQ5–OQ7; `capture.md` OQ3, OQ5;
+  `render-pipeline.md` §A9 wording. `draw-order.md` OQ9 is answered in
+  `camera.md` §7 (for its owner).
+- `claude/spec-answers-units-stats` `9395fa4`: GI3, GI5, GI7; `units.md`
+  §3.1, new §6.6 (unit events), §6.5 replenish; `stat-lists.md` §8.8,
+  §10.4 (endless loop confirmed), OQ2; WE1, WE4, WE6–WE9, W13, W14,
+  `properties.md` G1; `use.md` §1–§7, OQ1, OQ2 (identity), new §5.5 (WI
+  I8); `vitals.md` OQ2 (§4.3 rewritten), OQ3; WI I3 (`npc.md` §8.2).
+  Expect a small conflict with the tick branch in `vitals.md` (adjacent
+  OQ lines + index block).
+- `claude/spec-answers-drlg` `91b4a34`: new `levels.md` §11 (DRLG data
+  population reads: coordinate lists, populated level / room count, warp
+  points, kind-11 spawn), WG1, WG6; `rooms.md` §9.2, §9.5, §9.6 (new
+  `wall-remap.tsv` + `.md`), §9.7, OQ10, new §2.1; `levels.md` §10.2, edge
+  r3; `preset.md` §6 steps 9–10, §11; `maze.md` §2.4, §3.7, §5.5, §7.1,
+  §9; `outdoor.md` §6 r4, §7.5.3 / OQ6 (new `outdoor-path-floor.tsv`),
+  §8.3, OQ8, OQ9. Open: OQ7 jungle placer. `rooms.md` (~64 KB) and
+  `outdoor.md` (~61 KB) are past the split guideline.
+- `claude/spec-formats-wav` `40002d8`: new `formats/wav.md` (all 4,992
+  RIFF blocks are PCM tag 1; no in-file ADPCM; no resampling on load).
+- `claude/spec-audio-sound-table` `3167367`: new `audio/sound-table.md`
+  (closes `client/audio.md` §B3, part of §B8). Design note: 1.14d draws
+  sound variants from the local player's client unit seed, not a separate
+  audio seed (`audio.md` §A2 plans one).
+- `claude/live-c13-ds1-survey` `e8f7e1b`: C13 `preset_ds1_survey` +
+  `preset_ds1_scan_vectors` pass, every stated number exact (C13 done).
+- `claude/live-c20-treasure-dump` `6209859`: C20 pass after fixing TC 0
+  picks 1 → 0 (code + `treasure.md` §1.1–§1.2); 1,012 other TCs, 4,167
+  entries, 45 chest slots identical (C20 done).
+- C2: no new code needed; `game_core::itemstatcost_ops_as_stated` and
+  `itemstatcost_columns_as_stated` pass on live data (perturbation of
+  record 214 byte 0x53 caught). C2's `StatData` part is covered.
+
+Code fixes these spec answers require (implementation sessions; each is an
+escape in §8): `items/inventory` targeting seam passes the player, not the
+item (`inventory/mod.rs:604`, `checks.rs:117`); `path::walk` monster re-path
+budget is path +0x94, monsters only; the position history belongs in
+`d2-sim` (AI reads it, `path-placement.md` §10 r7); `path/warp.rs`
+`EXIT_LEFT` is 10, not 11 (test near line 203 expects the old mapping);
+`mpq-tool formats` name set must ignore case (then re-derive the
+`game_sweep` expected counts, buddy note G1); `render/map-preview.md`
+roofs 80 rows too low (needs a capture under a roof); `units` allocation
+order and the `SUNIT_Add` result (`units.md` §3.1).
 
 Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
 install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
@@ -4263,5 +4334,10 @@ neighbouring wording point).
 | A property test passed locally twice and failed only on CI's random seed (`stat_lists_match_the_model`, PR #24); a green run merged the PR with the bug still live | a property's counterexample is a real bug, never a flake: reproduce it as a fixed regression test and fix the wrong side per the spec (`fix-statlist-prop`) |
 | PR #27 (a fix branch opened from an older main) was green on every job, `check` included, yet GitHub refused the merge ("Required status check `check` is expected"): main's branch protection requires the PR branch to be up to date with main (2026-10-06) | before opening a PR from any branch, merge the latest `origin/main` into it (a merge commit, never a rebase) and let CI run on that head; the coordinator's branch always is, a session's fix branch usually is not (METHODS M21) |
 | `prop_transport::inbox_any` failed on one random seed in the coordinator's gate (2026-10-06): `Inbox::deliver` returned `BadSize(537)` for an id 0x94 split whose size rule exceeded 0x204, which is the original's assert (`intents-events.md` §3.3 r2); the property's model allowed only `BadId` | the model was the wrong side again (as `fix-statlist-prop`): before writing a property's error arms, list every error the spec's rules can raise on that input range; a seed-only counterexample becomes a deterministic regression test (`delivery_asserts_on_an_oversized_split`) |
+| TC 0 `picks` built as 1 in d2rs, 0 in 1.14d memory (made in `treasure/runtime.rs`, spec silent; caught 2026-10-06 by C20's byte compare with the memory dump; `check_treasure.py` checks only TC 430) | whole-table byte compares against `dump_tables.py` dumps for every table d2rs builds (C20 test `game_treasure_dump.rs`) (M21) |
+| Spec text wrong and code built on it, found by disassembly in the 2026-10-06 spec-answer batch: `npc.md` §8.2 stat / skill reset addresses swapped; `pathing.md` §9.10 re-path budget field (+0x94 monsters, not +0x90); position history "never read" (AI reads it); `path-placement.md` §12.1 exit 10 / 11 direction swapped; `inventory.md` targeting probe gets the player, not the item; `0x0055C110` named "charm re-link" from its callers (it handles scroll / tome charges) | name a function only after reading its body; when a spec says "nothing reads X", attach the xref that proves it; test vectors that use both directions / both owner kinds (M21) |
+| `mpq-tool formats` counted a file twice when two listfiles spell it in different case (DC6 1,657 vs 1,653, DT1 260 vs 256), and those counts became `game_sweep`'s expected values and a HANDOFF explanation (caught 2026-10-06 by a spec session's own count) | case-insensitive name sets wherever MPQ names are collected; a count copied into a test names the tool and the method that produced it (M21) |
+| A spec's prose count drifted from the tool (`mpq.md` / `audio.md`: "5,008" `.wav`, `mpq-tool check` 4,992) | counts in spec prose name the command that measures them (README bar 1) |
+| Writers on one PC shared one scratchpad directory; one writer's helper script was overwritten by another's mid-run (2026-10-06) | give each writer its own scratch subfolder in the prompt (M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 
