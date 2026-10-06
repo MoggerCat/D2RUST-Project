@@ -2057,6 +2057,7 @@ name = "conformance"
 version = "0.0.0"
 dependencies = [
  "d2-data",
+ "d2-proto",
  "d2-server",
  "d2-sim",
  "serde_json",
