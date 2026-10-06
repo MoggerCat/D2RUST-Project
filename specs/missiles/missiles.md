@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 434–487 |
 |   R7. Lifetime and expiry | 488–511 |
 |   R8. Pierce | 512–537 |
-|   R9. Server-do and server-hit catalogues | 538–735 |
-|   R10. Behaviour of the recorded missiles | 736–769 |
-|   R11. `missiles.txt` columns and their server use | 770–804 |
-| Constants & data dependencies | 805–831 |
-| Randomness | 832–864 |
-| Edge cases & original bugs | 865–888 |
-| Test vectors | 889–963 |
-| Provenance | 964–999 |
-| Open questions | 1000–1038 |
+|   R9. Server-do and server-hit catalogues | 538–752 |
+|   R10. Behaviour of the recorded missiles | 753–786 |
+|   R11. `missiles.txt` columns and their server use | 787–821 |
+| Constants & data dependencies | 822–848 |
+| Randomness | 849–881 |
+| Edge cases & original bugs | 882–905 |
+| Test vectors | 906–980 |
+| Provenance | 981–1016 |
+| Open questions | 1017–1055 |
 <!-- /index -->
 
 ## Summary
@@ -655,6 +655,23 @@ data +0x0C / +0x0A (`0x0064A210`, `0x0064A280`); frames left = data
    `0x006416D0(a, b)`: dx = |bx − ax|, dy = |by − ay|; each minus (a
    size / 2 + b size / 2) (signed halves, `0x00620510`), floored at 0;
    d = (2 × max(dx, dy) + min(dx, dy)) / 2, truncating.
+
+5. **8 MonBlizzCenter** `0x005AE8A0`: record missing → the code
+   reads `SubMissile1` through a null record (fatal; class ids are
+   always valid). Else q = level / max(`Param3`, 1) (signed); range =
+   `Param1` + max(q, 2); interval = max(`Param2` − q, 3); §R9.3 helper
+   (missile, range, interval, `SubMissile1`, mask 5) — `SubMissile1` < 0
+   is passed on and the creation fails; return flight.
+6. **10 BlizzardCenter** `0x005AEA60`: record missing → as 5. Missile
+   skill k invalid → return 2 (removed). range = `eval(owner, k.calc1,
+   k, level)`, interval = `eval(owner, k.calc2, k, level)` (calc1
+   first; owner may be none); §R9.3 helper (missile, range, interval,
+   `SubMissile1`, mask 5); return flight.
+7. **25 EruptionCenter** `0x005AF880`: record missing or `SubMissile1`
+   = 0 → 2; k invalid → 2; then as 6 with mask 0x45.
+
+The §R9.3 helper takes ESI = missile, EAX = interval and stack (game,
+range, class, mask).
 
 #### R9.6 Server-hit bodies (1.14d-confirmed)
 
