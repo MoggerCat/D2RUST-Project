@@ -7,5 +7,6 @@
 pub mod app;
 pub mod assets;
 pub mod bridge;
+pub mod controls;
 pub mod map;
 pub mod render;
