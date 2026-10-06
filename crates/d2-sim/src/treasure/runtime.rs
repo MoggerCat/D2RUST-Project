@@ -106,7 +106,7 @@ pub struct TreasureClass {
     pub level: u16,
     pub total_classic: i32,
     pub total_expansion: i32,
-    /// Never 0 (§1.4).
+    /// Never 0 (§1.4), except TC 0 (all zero, §1.2).
     pub picks: i32,
     pub nodrop: i32,
     /// magic, rare, set, unique, slot 5, slot 6.
@@ -237,7 +237,7 @@ impl TreasureClasses {
     pub fn build(src: &TcSources) -> Result<Self, TreasureError> {
         let uniques = name_linker(src.uniqueitems.iter().map(|u| &u.index[..]))?;
         let sets = name_linker(src.setitems.iter().map(|s| &s.index[..]))?;
-        let mut tcs = vec![TreasureClass::new(Vec::new(), 0, 0, 1, 0, [0; 6])];
+        let mut tcs = vec![TreasureClass::new(Vec::new(), 0, 0, 0, 0, [0; 6])];
         let mut keys: Vec<Vec<u8>> = vec![Vec::new()];
         let mut notes = Vec::new();
         let mut a: u16 = 0;
