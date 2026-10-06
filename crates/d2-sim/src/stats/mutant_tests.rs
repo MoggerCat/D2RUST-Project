@@ -521,15 +521,15 @@ fn expiry_needs_newlength() {
     // Expire stored without NEWLENGTH (§4.1): never expires.
     let a = lists.alloc(0, 0, owner::PLAYER, 1);
     lists.attach(&mut log, P, a, true);
-    lists.expire_lists(&mut log, P, 10);
+    lists.expire_lists(&mut log, P, 10).unwrap();
     assert!(lists.is_live(a));
     // Frame 0 decrements only NEWLENGTH lists.
     let b = lists.alloc(0, 2, owner::PLAYER, 1);
     lists.attach(&mut log, P, b, true);
-    lists.expire_lists(&mut log, P, 0);
+    lists.expire_lists(&mut log, P, 0).unwrap();
     assert_eq!(lists.expire(b), 2);
     lists.set_flags(b, flag::NEWLENGTH, true);
-    lists.expire_lists(&mut log, P, 0);
+    lists.expire_lists(&mut log, P, 0).unwrap();
     assert_eq!(lists.expire(b), 1);
     assert!(lists.is_live(b));
 }
