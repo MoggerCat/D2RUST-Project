@@ -1530,15 +1530,23 @@ fn item_move_gate_rules() {
 
 // ------------------------------------------------------------ game files
 
-/// Reads one extracted 1.14d `.bin` table (tests only; `CLAUDE.md`
-/// conventions). Path: `D2_GAME_DIR/extracted/patch_d2/data/global/excel/`.
+/// Reads one 1.14d `.bin` table from the MPQs in `D2_GAME_DIR` (tests
+/// only; `CLAUDE.md` conventions), through `d2_data::bin::read_excel`, the
+/// archive lookup order of `specs/data/loading.md` §2. Not a fixed
+/// `patch_d2` path: `specs/data/tables.tsv` gives `inventory` and `belts`
+/// as `d2exp/*.bin` (only `itemtypes` comes from `patch_d2`), and
+/// `d2-data`'s `excel_lookup_order` / `live_bin_set_loads` read
+/// `inventory.bin` from `d2exp.mpq`. The old extracted-`patch_d2` path made
+/// the first local run fail with "inventory.bin not found" (2026-10-06).
 #[allow(clippy::disallowed_methods)]
 fn game_table(name: &str, size: usize) -> d2_data::bin::BinTable {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
+    let set = d2_formats::mpq::ArchiveSet::open_dir(dir).expect("archives open");
     let file = format!("{name}.bin");
-    let path = format!("{dir}/extracted/patch_d2/data/global/excel/{file}");
-    let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
-    d2_data::bin::BinTable::parse(name, "patch_d2.mpq", &file, &bytes, size).expect("table parses")
+    let (source, bytes) = d2_data::bin::read_excel(&set, &file)
+        .unwrap_or_else(|e| panic!("{file}: {e}"))
+        .unwrap_or_else(|| panic!("{file}: in no archive"));
+    d2_data::bin::BinTable::parse(name, &source, &file, &bytes, size).expect("table parses")
 }
 
 /// D1–D3 (expected values measured on the 1.14d install, 2026-10-06;
