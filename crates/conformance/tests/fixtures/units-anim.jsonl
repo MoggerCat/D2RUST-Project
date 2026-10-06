@@ -1,0 +1,64 @@
+{"format": "tick-raw-1", "k": "header"}
+{"g": "0x1", "k": "game"}
+{"cl": 4, "g": 1, "k": "hin", "u": "P", "ut": 0}
+{"cl": 5, "g": 1, "k": "hin", "u": "M", "ut": 1}
+{"cl": 6, "g": 2, "k": "hin", "u": "N", "ut": 1}
+{"cl": 7, "g": 1, "k": "hin", "u": "O", "ut": 2}
+{"f": 1, "k": "tick"}
+{"f": 1, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 2, "tm": "R", "ty": 3, "ut": 0, "x": 2}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 251, "tm": "Q", "ty": 11, "ut": 0, "x": 251}
+{"f": 2, "k": "tick"}
+{"f": 2, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 1, "k": "ex", "l": "d", "tm": "R", "ty": 3, "ut": 0, "x": 2}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 3, "tm": "R", "ty": 3, "ut": 0, "x": 3}
+{"ad": "AMA11HS", "ad_frames": 10, "ad_speed": 256, "b": 0, "cl": 4, "cur": 0, "ev": [[5, 1]], "f": 2, "fc": 2560, "fn": "0x5539b0", "g": 1, "k": "anim", "m": 7, "seq": false, "sp": 256, "ut": 0}
+{"a1": 1, "a2": 0, "c": null, "cb": "0x0", "cl": 4, "g": 1, "k": "set", "l": "d", "m": 7, "req": 7, "site": "0x553a8f", "tm": "A0", "ty": 0, "ut": 0, "x": 7}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "cl": 4, "g": 1, "k": "set", "l": "d", "m": 7, "req": 12, "site": "0x553ae2", "tm": "A1", "ty": 1, "ut": 0, "x": 12}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 24, "tm": "O1", "ty": 1, "ut": 2, "x": 24}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 753, "tm": "O2", "ty": 2, "ut": 2, "x": 753}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 3, "tm": "M1", "ty": 1, "ut": 1, "x": 3}
+{"f": 3, "k": "tick"}
+{"f": 3, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 1, "k": "ex", "l": "d", "tm": "R", "ty": 3, "ut": 0, "x": 3}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 4, "tm": "R", "ty": 3, "ut": 0, "x": 4}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 1, "k": "ex", "l": "d", "tm": "M1", "ty": 1, "ut": 1, "x": 3}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 13, "tm": "M2", "ty": 2, "ut": 1, "x": 13}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 4, "tm": "M3", "ty": 3, "ut": 1, "x": 4}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "i", "req": -1, "tm": "W", "ty": 0, "ut": 1, "x": -1}
+{"deferred": false, "k": "cancel", "tm": "W"}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 4, "tm": "N1", "ty": 1, "ut": 1, "x": 4}
+{"f": 4, "k": "tick"}
+{"f": 4, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 2, "k": "ex", "l": "d", "tm": "N1", "ty": 1, "ut": 1, "x": 4}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 19, "tm": "N2", "ty": 2, "ut": 1, "x": 19}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 1, "k": "ex", "l": "d", "tm": "R", "ty": 3, "ut": 0, "x": 4}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 5, "tm": "R", "ty": 3, "ut": 0, "x": 5}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "cl": 7, "g": 1, "k": "set", "l": "d", "m": 0, "req": 304, "site": "0x583d6e", "tm": "O3", "ty": 6, "ut": 2, "x": 304}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "cl": 5, "g": 1, "k": "set", "l": "d", "m": 1, "req": 14, "site": "0x5a747d", "tm": "M4", "ty": 2, "ut": 1, "x": 14}
+{"cl": 5, "g": 3, "k": "hin", "u": "K", "ut": 1}
+{"f": 5, "k": "tick"}
+{"f": 5, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 9, "tm": "M5", "ty": 1, "ut": 1, "x": 9}
+{"ad": "XXA11HS", "ad_frames": 0, "ad_speed": 256, "arg": 50, "cl": 5, "cur": 512, "ev": [[2, 1], [4, 2], [6, 3]], "f": 5, "fc": 3072, "fn": "0x553b10", "g": 1, "k": "anim", "m": 1, "seq": false, "sp": 128, "ut": 1}
+{"deferred": false, "k": "cancel", "tm": "M5"}
+{"a1": 1, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 7, "tm": "MP0", "ty": 0, "ut": 1, "x": 7}
+{"a1": 2, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 11, "tm": "MP1", "ty": 0, "ut": 1, "x": 11}
+{"a1": 3, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 15, "tm": "MP2", "ty": 0, "ut": 1, "x": 15}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 27, "tm": "MP3", "ty": 1, "ut": 1, "x": 27}
+{"ad": "XXA11HS", "ad_frames": 0, "ad_speed": 33554688, "arg": 0, "cl": 5, "cur": 0, "ev": [[4, 1], [7, 4]], "f": 5, "fc": 2048, "fn": "0x553dc0", "g": 2, "k": "anim", "m": 1, "seq": false, "sp": 256, "ut": 1}
+{"a1": 2, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 6, "tm": "NS0", "ty": 0, "ut": 1, "x": 6}
+{"a1": 1, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 9, "tm": "NS1", "ty": 0, "ut": 1, "x": 9}
+{"a1": 4, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 12, "tm": "NS2", "ty": 0, "ut": 1, "x": 12}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 2, "k": "set", "l": "d", "req": 13, "tm": "NS3", "ty": 1, "ut": 1, "x": 13}
+{"ad": "XXA11HS", "ad_frames": 0, "ad_speed": 256, "b": 2, "cl": 5, "cur": 0, "ev": [[2, 4], [3, 3], [5, 2]], "f": 5, "fc": 1536, "fn": "0x5539b0", "g": 3, "k": "anim", "m": 1, "seq": false, "sp": 200, "ut": 1}
+{"a1": 4, "a2": 0, "c": null, "cb": "0x0", "g": 3, "k": "set", "l": "d", "req": 6, "tm": "KM0", "ty": 0, "ut": 1, "x": 6}
+{"a1": 3, "a2": 0, "c": null, "cb": "0x0", "g": 3, "k": "set", "l": "d", "req": 7, "tm": "KM1", "ty": 0, "ut": 1, "x": 7}
+{"a1": 2, "a2": 1, "c": null, "cb": "0x0", "g": 3, "k": "set", "l": "d", "req": 9, "tm": "KM2", "ty": 0, "ut": 1, "x": 9}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 3, "k": "set", "l": "d", "req": 11, "tm": "KM3", "ty": 1, "ut": 1, "x": 11}
+{"ad": "XXA11HS", "ad_frames": 0, "ad_speed": 256, "arg": 0, "cl": 5, "cur": 0, "ev": [], "f": 5, "fc": 1536, "fn": "0x553c70", "g": 3, "k": "anim", "m": 1, "seq": false, "sp": 200, "ut": 1}
+{"ad": "XXA11HS", "ad_frames": 0, "ad_speed": 256, "b": 0, "cl": 5, "cur": 0, "ev": [], "f": 5, "fc": 1536, "fn": "0x5539b0", "g": 1, "k": "anim", "m": 1, "seq": true, "sp": 256, "ut": 0}
+{"f": 251, "k": "tick"}
+{"f": 251, "k": "step", "s": "events"}
+{"a1": 0, "a2": 0, "c": 0, "cb": "0x0", "cl": null, "g": 1, "k": "ex", "l": "d", "tm": "Q", "ty": 11, "ut": 0, "x": 251}
+{"a1": 0, "a2": 0, "c": null, "cb": "0x0", "g": 1, "k": "set", "l": "d", "req": 281, "tm": "Q", "ty": 11, "ut": 0, "x": 281}

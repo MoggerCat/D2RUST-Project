@@ -10,13 +10,49 @@ use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 use d2_formats::dc6::Dc6;
 use d2_formats::dcc::Dcc;
-use d2_formats::mpq::{bench_fixtures, Archive};
+use d2_formats::mpq::writer::{FileOptions, MpqWriter};
+use d2_formats::mpq::Archive;
+
+/// Names and contents of the synthetic archive: a 256 KiB text file
+/// PKWARE-compressed in 512-byte sectors and encrypted, a 64 KiB plain
+/// file.
+fn mpq_files() -> Vec<(&'static str, Vec<u8>)> {
+    let words = [
+        "strength",
+        "dexterity",
+        "vitality",
+        "energy",
+        "life",
+        "mana",
+    ];
+    let mut text = Vec::new();
+    let mut i = 0usize;
+    while text.len() < 256 * 1024 {
+        text.extend_from_slice(words[i % words.len()].as_bytes());
+        text.push(if i.is_multiple_of(7) { b'\n' } else { b'\t' });
+        i = i.wrapping_mul(31).wrapping_add(17);
+    }
+    let plain: Vec<u8> = (0..64 * 1024u32).map(|i| (i * 13) as u8).collect();
+    vec![
+        ("data\\global\\excel\\big.txt", text),
+        ("data\\global\\plain.bin", plain),
+    ]
+}
 
 fn bench_mpq(c: &mut Criterion) {
-    let bytes = bench_fixtures::archive();
+    let files = mpq_files();
+    let mut w = MpqWriter::new().sector_size_shift(0);
+    w.add(
+        files[0].0,
+        files[0].1.clone(),
+        FileOptions {
+            encrypted: true,
+            ..FileOptions::default()
+        },
+    );
+    w.add(files[1].0, files[1].1.clone(), FileOptions::stored());
     let path = std::env::temp_dir().join(format!("d2-formats-bench-{}.mpq", std::process::id()));
-    std::fs::write(&path, &bytes).expect("write archive");
-    let files = bench_fixtures::files();
+    w.write(&path).expect("write archive");
     let archive = Archive::open(&path).expect("open");
     for (name, content) in &files {
         assert_eq!(&archive.read(name).expect("read"), content, "{name}");
@@ -27,7 +63,7 @@ fn bench_mpq(c: &mut Criterion) {
     });
     let (big, big_content) = &files[0];
     g.throughput(Throughput::Bytes(big_content.len() as u64));
-    g.bench_function("read_256k_huffman_encrypted_sectors", |b| {
+    g.bench_function("read_256k_pkware_encrypted_sectors", |b| {
         b.iter(|| black_box(archive.read(big).expect("read")))
     });
     let (plain, plain_content) = &files[1];

@@ -23,6 +23,7 @@ pub mod ai;
 pub mod combat;
 pub mod dispatch;
 pub mod missiles;
+pub mod monsters;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
@@ -54,6 +55,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
+pub use monsters::MonsterWorld;
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -123,6 +125,13 @@ pub struct ActionHooks<X> {
     /// argument of `0x005A7C20`, `units.md` §4.6); set by the kill's
     /// death mode change only (`damage.md` §7.2).
     pub mode_target: Option<UnitId>,
+    /// The monster state (monster data, umods, monster init) lent by the
+    /// host that owns it ([`monsters`]: `WorldSim` lends its world state
+    /// around its timer events and tick hooks). `None`: the monster
+    /// routes keep their [`Pending`] answers.
+    pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
+    /// The monster world is taken out for a call.
+    monster_world_out: bool,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -146,6 +155,8 @@ impl<X> ActionHooks<X> {
             anim_data: None,
             vitals: None,
             mode_target: None,
+            monster_world: None,
+            monster_world_out: false,
             x,
             orphan_seed: Seed::init(),
             errors: Vec::new(),

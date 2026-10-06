@@ -20,6 +20,7 @@
 //! The client decides no outcome here (CLAUDE.md rule 7): this module only
 //! reads the model.
 
+pub mod node;
 pub mod present;
 pub mod ui_bind;
 
@@ -557,6 +558,11 @@ impl GpuAtlas {
 
     pub fn atlas(&self) -> &Atlas {
         &self.atlas
+    }
+
+    /// Frame sets inserted so far (sets are only ever added).
+    pub fn sets(&self) -> usize {
+        self.slots.len()
     }
 
     /// The slot source of `frame`'s ids.

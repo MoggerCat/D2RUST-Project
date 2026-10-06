@@ -23,15 +23,18 @@ Not run in CI. `cargo clippy --workspace --all-targets` compiles all four
 
 - `d2-sim` feature `bench-fixtures` (enabled for the benches by a self
   dev-dependency; off in every normal build) widens the `cfg(test)` of the
-  worldgen test fixtures (`wiring/worldgen/mod.rs`), `stats::tests`,
-  `skills::fake`, `StateTable::synthetic` and `items::tests` to
-  `cfg(any(test, feature = "bench-fixtures"))`, with
+  worldgen test fixtures (`wiring/worldgen/mod.rs`: `mod tests`),
+  `stats::tests`, `skills::fake`, `StateTable::synthetic` and `items::tests`
+  to `cfg(any(test, feature = "bench-fixtures"))`, with
   `allow(unused, dead_code)` outside tests, and `d2_sim::bench_fixtures`
-  re-exports what the benches need. No behaviour change.
-- `d2-formats` feature `bench-fixtures`: `mpq::bench_fixtures` builds a
-  synthetic archive (a 256 KiB file Huffman-compressed in 512-byte sectors
-  and encrypted, a 64 KiB plain file); `crypto::encrypt`,
-  `huffman::compress` and `bits::BitWriter` are widened the same way.
+  re-exports what the benches need. These are the only source changes kept,
+  and they are needed: the wired-sim, DRLG, item and stat-list fixtures
+  exist nowhere else (`crates/test-fixtures` holds data tables, not a
+  wired sim). No behaviour change.
+- MPQ: the bench uses the base's `d2_formats::mpq::writer` (`test-support`
+  feature, self dev-dependency); it writes PKWARE, so the Huffman path is
+  not benched. (An earlier version of this branch had its own fixture
+  writer; dropped on the merge with `claude/tender-meitner-mphas3`.)
 - DC6, DCC, treasure, and the compositor scene are built inside the bench
   files from the specs' layouts.
 
@@ -50,9 +53,9 @@ settings (1 s warm-up, 2–3 s measurement). Treat as order of magnitude.
 | `create_item` (normal armor / helm with sockets) × 100 | 21.5 µs | ~215 ns / item |
 | treasure `walk` × 1000 (one TC, 16 items, 4 picks) | 331 µs | ~330 ns / drop |
 | stat lists: player + 12 item lists attached, 40 total / recompute, detach | 36.7 µs | — |
-| MPQ open (2 files) | 14 µs | — |
-| MPQ read 256 KiB, Huffman + encrypted sectors | 78 ms | 3.2 MiB/s |
-| MPQ read 64 KiB plain | 4 µs | 15 GiB/s |
+| MPQ open (2 files) | 9.6 µs | — |
+| MPQ read 256 KiB, PKWARE + encrypted 512-byte sectors | 936 µs | 267 MiB/s |
+| MPQ read 64 KiB plain | 3.9 µs | 15.6 GiB/s |
 | DC6 parse, 32 frames of 64 × 64 | 17.8 µs | ~0.55 µs / frame |
 | DCC parse, 8 directions of 32 × 32 | 70 µs | ~8.8 µs / direction |
 | proto: classify one C→S message per fixed-size game id | 606 ns | ~15 ns / message |
@@ -66,11 +69,13 @@ settings (1 s warm-up, 2–3 s measurement). Treat as order of magnitude.
 
 ## Hot spots and caveats
 
-1. **MPQ Huffman sectors: 3.2 MiB/s.** ~150 µs per 512-byte sector; the
-   decoder most likely rebuilds the adaptive tree per sector (its weight
-   table is the whole start state). D2's own data loads (ADPCM sound,
-   some tables) go through it; a full-install load will feel it. Not
-   changed here (not trivial).
+1. **MPQ Huffman sectors: ~3 MiB/s (measured once, not kept).** An
+   earlier version of this branch benched a Huffman-compressed 256 KiB
+   file: 78 ms, ~150 µs per 512-byte sector, ~80× slower than PKWARE
+   (267 MiB/s, table above). The likely cause is the adaptive tree being
+   rebuilt per sector. The merged base's `mpq::writer` has no Huffman
+   encoder, so the committed bench no longer covers it; a Huffman case
+   returns when a writer for it exists. Not changed here.
 2. **CPU compositor `compose`: 4.75 ms/frame** is 12% of a 40 ms tick if
    it ever ran in the loop; it is the reference (GPU is the real path),
    so only relevant for verify runs. `compose_binned` is 2.2× slower than

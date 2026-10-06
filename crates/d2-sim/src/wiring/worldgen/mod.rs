@@ -10,7 +10,8 @@
 //! | population `MonsterInit` → monster init, unit allocation | [`population_init`] |
 //! | init `InitHost` → units, stats, AI, population regions | [`init_units`] |
 //! | tick room pass (`tick.md` §4) → population | [`dispatch::WorldSim`] |
-//! | timer event 7 → init umods; unit free → world state | [`events::WorldHooks`] |
+//! | action hooks → monster init, umods, unit free, monster data (world state lent) | [`monster_world`] |
+//! | timer event 7 → init umods; unit free → world state | [`events`] (through the lent world state) |
 //!
 //! Ownership: [`dispatch::WorldSim`] holds the action systems
 //! ([`ActionSim`]: units, stats, AI, missiles, the act DRLGs) and the
@@ -18,7 +19,10 @@
 //! tables). The act DRLGs hold the level types through a
 //! [`levels::SharedTypes`] handle; [`WorldState::types`] is a clone of it.
 //! Each population or init call builds a short-lived [`WorldHost`] over
-//! the game, the action view and the world state.
+//! the game, the action view and the world state. Around its timer
+//! events and forwarded tick hooks, [`WorldSim`] lends the world state
+//! to the action hooks ([`WorldSim::lend`]); [`WorldSim::world`] holds an
+//! empty placeholder for the call.
 //!
 //! Calls with no provider yet go to [`WorldPending`] (defaults: nothing).
 //! Nothing here decides game behaviour: every rule stays in its module.
@@ -28,10 +32,14 @@ pub mod events;
 pub mod init_units;
 pub mod levels;
 pub mod maze_presets;
+pub mod monster_world;
 pub mod outdoor_presets;
 pub mod population;
 pub mod population_init;
 
+#[cfg(test)]
+#[path = "tests/routing.rs"]
+mod routing_tests;
 #[cfg(any(test, feature = "bench-fixtures"))]
 #[cfg_attr(not(test), allow(unused, dead_code))]
 pub(crate) mod tests;

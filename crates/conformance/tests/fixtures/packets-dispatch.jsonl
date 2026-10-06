@@ -1,0 +1,15 @@
+{"format": "packets-raw-1", "tool": "hand-built fixture", "type": "header"}
+{"frame": 0, "ms": 1000, "phase": "input", "seq": 0, "tid": 1, "type": "drain"}
+{"bytes": "0196003200", "client": 0, "frame": 0, "ms": 1001, "phase": "input", "seq": 1, "size": 5, "tid": 1, "type": "c2s"}
+{"frame": 0, "game_frame": 0, "id": 1, "ms": 1002, "phase": "input", "seq": 2, "size": 5, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 0, "dispatched": true, "frame": 0, "ms": 1003, "phase": "input", "seq": 3, "tid": 1, "type": "result"}
+{"bytes": "0197006400", "client": 0, "frame": 0, "ms": 1004, "phase": "input", "seq": 4, "size": 5, "tid": 1, "type": "c2s"}
+{"frame": 0, "game_frame": 0, "id": 1, "ms": 1005, "phase": "input", "seq": 5, "size": 5, "tid": 1, "type": "dispatch", "unit": 1}
+{"code": 1, "dispatched": true, "frame": 0, "ms": 1006, "phase": "input", "seq": 6, "tid": 1, "type": "result"}
+{"bytes": "0196003200", "client": 7, "frame": 0, "ms": 1007, "phase": "input", "seq": 7, "size": 5, "tid": 1, "type": "c2s"}
+{"dispatched": false, "frame": 0, "ms": 1008, "phase": "input", "seq": 8, "tid": 1, "type": "result"}
+{"bytes": "6b", "client": 0, "frame": 0, "ms": 1009, "phase": "input", "seq": 9, "size": 1, "tid": 1, "type": "c2s_sys"}
+{"frame": 1, "game": "0x1000", "game_type": 0, "ms": 1010, "phase": "tick", "seq": 10, "tid": 1, "type": "tick"}
+{"frame": 1, "ms": 1011, "phase": "post", "seq": 11, "tid": 1, "type": "tick_end"}
+{"frame": 1, "ms": 1012, "phase": "flush", "seq": 12, "tid": 1, "type": "flush"}
+{"events": 13, "type": "footer"}
