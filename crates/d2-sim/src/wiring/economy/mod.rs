@@ -1,0 +1,68 @@
+// Spec: specs/items/generation.md; specs/items/properties.md §2, §4.2; specs/sim/stat-lists.md §4, §8.1, §9.3; specs/sim/units.md §3; specs/items/treasure.md §7, §8; specs/world/cube.md §7; specs/world/quests.md §9
+//! The economy seams on their real providers:
+//!
+//! - [`game_fields`]: [`crate::items::ItemGame`] on [`GameFields`], the
+//!   game-creation fields no written spec puts in [`crate::game::Game`]
+//!   yet (game seed, difficulty, expansion, ladder, unique bits); also
+//!   the treasure [`crate::treasure::GameFacts`].
+//! - [`item_stats`]: [`crate::items::ItemStats`] on
+//!   [`crate::stats::StatLists`] ([`UnitStats`]).
+//! - [`item_units`]: item units: allocation (`sim/units.md` §3.1),
+//!   creation (`items/generation.md` §3) and the per-item fields
+//!   ([`ItemStore`], [`Economy`]); the request unit from unit and stat
+//!   fields.
+//! - [`treasure_items`]: [`crate::treasure::DropSink`] on item creation
+//!   ([`ItemDrops`]); dropper and recipient from unit and stat fields.
+//! - [`cube_items`]: [`crate::world::cube::CubeWorld`] on items, stats and
+//!   units ([`EconomyCube`]); the rest stays a seam ([`CubeRest`]).
+//! - [`quest_items`]: [`crate::world::quests::QuestWorld`] likewise
+//!   ([`EconomyQuests`], [`QuestRest`]).
+//!
+//! Status: wired, unverified (every spec involved is a draft).
+
+pub mod cube_items;
+pub mod game_fields;
+pub mod item_stats;
+pub mod item_units;
+pub mod quest_items;
+pub mod treasure_items;
+
+#[cfg(test)]
+mod tests;
+
+pub use cube_items::{CubeRest, EconomyCube};
+pub use game_fields::GameFields;
+pub use item_stats::{find_list, StatCtx, UnitStats};
+pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
+pub use quest_items::{EconomyQuests, QuestRest};
+pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
+
+use crate::game::GameError;
+use crate::items::{CreateError, Fatal};
+use crate::units::modes::UnitError;
+use crate::units::UnitId;
+
+/// Errors of the economy wiring.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum EconomyError {
+    #[error(transparent)]
+    Create(#[from] CreateError),
+    #[error(transparent)]
+    Fatal(#[from] Fatal),
+    #[error(transparent)]
+    Unit(#[from] UnitError),
+    #[error(transparent)]
+    Game(#[from] GameError),
+    /// The allocator rejected an item unit (it never does: `sim/units.md`
+    /// §3.1 step 1 tests players and monsters only).
+    #[error("item unit not allocated")]
+    NotAllocated,
+    /// The allocator and item creation stepped the game seed differently
+    /// (both derive the unit and item seeds, `sim/rng.md` §5.3).
+    #[error("allocation and creation stepped the game seed differently")]
+    SeedMismatch,
+    #[error("unit {0:?} is not an item of the store")]
+    NotAnItem(UnitId),
+    #[error("unit {0:?} has no unit record")]
+    NoRecord(UnitId),
+}
