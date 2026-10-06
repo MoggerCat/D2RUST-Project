@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 274–283 |
 | Test vectors | 284–295 |
 | Provenance | 296–322 |
-| Open questions | 323–353 |
+| Open questions | 323–351 |
 <!-- /index -->
 
 ## Summary
@@ -345,8 +345,6 @@ Ghidra backlog (2026-10-06): act palette at game start from
    `0x0044D100` and `0x00482EF0` are not game start). Capture
    confirmation: the first frames after loading a character saved in
    act 2.
-6. d2rs input for §3 step 2 and §4: the local player's current room and
-   its level come from the client unit model fed by the S→C unit and
-   room messages; their owner spec (client unit model / S→C messages)
-   must state it. Until then the feed supplies the level (frame-cycle
-   FC1).
+6. ~~d2rs input for §3 step 2 and §4~~: answered in `client/model.md`
+   §11 (act from S→C 0x03, level from the local player's room placed by
+   0x15; no message carries the level) and §12 (room of a point).

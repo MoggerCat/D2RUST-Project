@@ -121,14 +121,14 @@ id	name	owner
 0x77	TradeAction	TBD
 0x78	TradeAccepted	TBD
 0x79	GoldInTrade	TBD
-0x7A	PetAction	TBD
+0x7A	PetAction	specs/client/model.md
 0x7B	AssignHotkey	TBD
 0x7C	UseScroll	TBD
 0x7D	SetItemState	TBD
 0x7E	Unknown7E	TBD
 0x7F	AllyPartyInfo	TBD
 0x80	-	TBD
-0x81	AssignMerc	TBD
+0x81	AssignMerc	specs/client/model.md
 0x82	PortalOwnership	TBD
 0x83	-	TBD
 0x84	-	TBD
