@@ -24,14 +24,14 @@
 |   3. Frame cycle | 114–151 |
 |   4. Palette (one per presented frame) | 152–198 |
 |   5. One pixel write (index domain) | 199–237 |
-|   6. d2rs answers | 238–251 |
-|   7. DirectDraw (display type 3) differences | 252–263 |
-| Constants & data dependencies | 264–269 |
-| Randomness | 270–273 |
-| Edge cases & original bugs | 274–283 |
-| Test vectors | 284–295 |
-| Provenance | 296–322 |
-| Open questions | 323–353 |
+|   6. d2rs answers | 238–256 |
+|   7. DirectDraw (display type 3) differences | 257–268 |
+| Constants & data dependencies | 269–274 |
+| Randomness | 275–278 |
+| Edge cases & original bugs | 279–288 |
+| Test vectors | 289–300 |
+| Provenance | 301–327 |
+| Open questions | 328–363 |
 <!-- /index -->
 
 ## Summary
@@ -244,6 +244,11 @@ file: the lit translucent wall drawer reads the transpose
   single-frame verify case starts from an all-0 buffer unless it records
   the previous frame.
 - `scene/item.rs` domain: indexed, `Rgb` stays out of `BlendOp`.
+- `scene/item.rs` table chain (`triage-game-findings` Q12): when a draw
+  has both a blend table `T` and a light map `L`, its remap `P` is
+  dropped (`d' = T[256·d + L[s]]`, §5); the chain `P` → `L` → `T` is only
+  for draws without one of them (`L[P[s]]` without `T`, `T[256·d +
+  P[s]]` without `L`).
 - `IndexTable`: row = destination (§5).
 - RGBA for verify and present: `(R, G, B, 255)` of §4 for every index,
   0 included. `map::cpu::to_rgba` (0 → black) equals this exactly when
@@ -329,11 +334,16 @@ Ghidra backlog (2026-10-06): act palette at game start from
    palette (PNG `PLTE`, `capture.md` §5): comparing it with the act's
    `pal.pl2` first 1,024 bytes and its `.dat` settles §4 on live frames.
 2. ~~Write order when both `L` and `T` are present~~: answered in §5
-   (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). Open: the
-   identification of the two 256-byte arguments as `L` (outer) and `P`
-   (inner) rests on the no-`T` case `L[P[s]]`; a capture of a lit,
-   remapped, translucent draw confirms it (`composition-0001` if the
-   portal is lit).
+   (`T[256 × d + L[s]]`, `P` dropped; dispatcher `0x00608540`). The
+   identification is now read from the caller too: the GDI cel draw
+   `0x006C84B0` pushes, as the last three arguments of `0x006014C0`
+   (stdcall, `[ebp+0x28]`, `+0x2C`, `+0x30`, passed through unchanged to
+   the row drawer table `0x006E3688` → `0x00608540`), the light table
+   chosen by the light byte (`0x006C8545`, or `+0x118` for mode 7), the
+   blend table of `0x006C8250`, and the draw call's palette argument, in
+   that order; `0x00608540` uses the first as the outer table of `L[P[s]]`
+   and the one kept with `T`. A capture of a lit, remapped, translucent
+   draw remains a pixel check, not an open rule.
 3. Out-of-game screens (menus, loading screens, cut-scenes) use other
    callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
    `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
