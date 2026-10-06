@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use super::act1;
 use super::tables::{parse_messages, parse_quests, MESSAGES_TSV, QUESTS_TSV};
 use super::*;
+use crate::units::RoomId;
 use crate::world::TsvError;
 
 // ------------------------------------------------------------ §1 flags
@@ -188,6 +189,23 @@ pub(super) struct Fake {
     pub(super) den: (u32, u32, u32, u32),
     pub(super) spot: Option<(i32, i32)>,
     pub(super) near: Vec<UnitId>,
+    /// Party members by player (`None`: no party).
+    pub(super) party: BTreeMap<UnitId, Vec<UnitId>>,
+    /// Objects: (guid, class, mode).
+    pub(super) objects: BTreeMap<UnitId, (u32, u16, i32)>,
+    /// Unit positions (x, y, room).
+    pub(super) pos: BTreeMap<UnitId, (i32, i32, RoomId)>,
+    /// Room tile rectangles (x0, y0, x1, y1); `room_contains` excludes
+    /// the last row and column.
+    pub(super) rooms: BTreeMap<RoomId, (i32, i32, i32, i32)>,
+    /// Spawn results in order (empty: fails).
+    pub(super) spawns: Vec<Option<UnitId>>,
+    /// Players chatting with an NPC.
+    pub(super) chats: BTreeMap<UnitId, Vec<UnitId>>,
+    /// Item codes of item units.
+    pub(super) item_codes: BTreeMap<UnitId, [u8; 4]>,
+    /// The `find_object_near` answer.
+    pub(super) near_object: Option<UnitId>,
     pub(super) sent: Vec<(UnitId, Vec<u8>)>,
     pub(super) log: Vec<String>,
 }
@@ -275,6 +293,7 @@ impl QuestWorld for Fake {
             .get(&unit)
             .map(|p| p.guid)
             .or_else(|| self.monsters.get(&unit).map(|m| m.0))
+            .or_else(|| self.objects.get(&unit).map(|o| o.0))
             .unwrap_or(unit.0)
     }
     fn player_by_guid(&self, guid: u32) -> Option<UnitId> {
@@ -297,6 +316,9 @@ impl QuestWorld for Fake {
     }
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.players[&unit].stats.get(&stat).copied().unwrap_or(0)
+    }
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.stat(unit, stat)
     }
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         *self.p(unit).stats.entry(stat).or_default() += delta;
@@ -332,6 +354,9 @@ impl QuestWorld for Fake {
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         self.near.clone()
     }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.party.get(&player).cloned()
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -341,6 +366,9 @@ impl QuestWorld for Fake {
     }
     fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool {
         self.players[&player].items.contains(&code)
+    }
+    fn item_code(&self, item: UnitId) -> Option<[u8; 4]> {
+        self.item_codes.get(&item).copied()
     }
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]) {
         self.p(player).items.retain(|&c| c != code);
@@ -395,11 +423,99 @@ impl QuestWorld for Fake {
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.log.push(format!("event7 {} {frame}", object.0));
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.log.push(format!("opened {}", object.0));
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.objects.get(&object).map_or(0, |o| o.2)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.log.push(format!("mode {} {mode}", object.0));
+        if let Some(o) = self.objects.get_mut(&object) {
+            o.2 = mode;
+        }
+    }
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        self.objects
+            .iter()
+            .find(|o| o.1 .0 == guid)
+            .map(|o| (*o.0, o.1 .1))
     }
     fn mercenary_reward(&mut self, _: UnitId, npc: u16) {
         self.log.push(format!("merc {npc}"));
+    }
+    fn unit_position(&self, u: UnitId) -> Option<(i32, i32, RoomId)> {
+        self.pos.get(&u).copied()
+    }
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
+        self.rooms
+            .get(&room)
+            .is_some_and(|r| x >= r.0 && y >= r.1 && x < r.2 - 1 && y < r.3 - 1)
+    }
+    fn room_at(&self, _: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.rooms
+            .iter()
+            .find(|r| x >= r.1 .0 && y >= r.1 .1 && x < r.1 .2 && y < r.1 .3)
+            .map(|r| *r.0)
+    }
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)> {
+        self.log
+            .push(format!("spot at {x} {y} {size} {mask:#x} {radius} {limit}"));
+        self.spot.map(|(dx, dy)| (x + dx, y + dy, room))
+    }
+    fn spawn_monster(
+        &mut self,
+        _: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("spawn {class} {x} {y} mode {mode} r {r}"));
+        if self.spawns.is_empty() {
+            None
+        } else {
+            self.spawns.remove(0)
+        }
+    }
+    fn or_unit_flags(&mut self, u: UnitId, f: u32) {
+        self.log.push(format!("flags {} {f:#x}", u.0));
+    }
+    fn monsters(&self) -> Vec<UnitId> {
+        self.monsters.keys().copied().collect()
+    }
+    fn npc_chat_clients(&self, n: UnitId) -> Option<Vec<UnitId>> {
+        self.chats.get(&n).cloned()
+    }
+    fn remove_monster(&mut self, m: UnitId) {
+        self.log.push(format!("remove {}", m.0));
+    }
+    fn drop_preset_monster(&mut self, act: u8, class: u16) {
+        self.log.push(format!("preset {act} {class}"));
+    }
+    fn find_object_near(&self, _: UnitId, _: u16) -> Option<UnitId> {
+        self.near_object
+    }
+    fn create_object(&mut self, _: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.log.push(format!("object {class} {x} {y}"));
+        None
+    }
+    fn object_anim_length(&self, _: UnitId) -> i32 {
+        0x1000
+    }
+    fn schedule_object_event(&mut self, o: UnitId, ev: u8, frame: i32) {
+        self.log.push(format!("event{ev} {} {frame}", o.0));
+    }
+    fn open_quest_message(&mut self, p: UnitId, o: UnitId, msg: u16) {
+        self.log.push(format!("message {} {} {msg}", p.0, o.0));
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.log.push(format!("unhandled {chain} {function:#x}"));
@@ -450,14 +566,14 @@ fn fresh_game_entry() {
     let msgs: Vec<Vec<u8>> = f.sent.iter().map(|m| m.1.clone()).collect();
     assert_eq!(msgs, [want_5e, want_28, want_29]);
     assert!(ctl.picked);
-    // The sequence functions of chains 1, 8, 18, 22, 31: chain 2 → 1.
-    assert_eq!(ctl.record(2).unwrap().state, 1);
+    // The sequence functions of chains 1, 8, 18, 22, 31: chain 1 is at
+    // state 1, not its pass state 5, so the walk stops there (§10.1) and
+    // chain 2 stays at 0.
+    assert_eq!(ctl.record(1).unwrap().state, 1);
+    assert_eq!(ctl.record(2).unwrap().state, 0);
     assert_eq!(
         f.log,
         [
-            // Callback 13 of chains 4 and 3 (not specified), list order.
-            "unhandled 4 0x597030",
-            "unhandled 3 0x591ed0",
             // Sequence functions of chains 8, 18, 22, 31.
             "unhandled 8 0x5991c0",
             "unhandled 18 0x5ba7b0",
@@ -726,8 +842,9 @@ fn kill_parse_force_and_chain() {
     assert!(!ctl.add_link(&mut f, victim, 1, None));
     assert!(ctl.add_link(&mut f, victim, 6, None));
     assert_eq!(f.chains[&victim].0, [6, 1]);
-    // Andariel (class 243 is diablo; Andariel is not forced): chain 6 is
-    // inactive (init stores 0), so an unforced kill reaches only chain 1.
+    // Andariel (class 243 is diablo; Andariel is not forced): with chain
+    // 6 made inactive, an unforced kill reaches only chain 1.
+    ctl.record_mut(6).unwrap().active = false;
     f.monsters.insert(
         victim,
         (
@@ -799,10 +916,13 @@ fn den_of_evil_cleared() {
     assert!(r.extra.done && r.extra.timer && r.state == 4);
     assert!(!r.has_callback(event::MONSTER_KILLED) && !r.has_callback(event::NPC_DEACTIVATE));
     assert!(ctl.game.get(1, 13));
-    // Only the killer list gets 13 + 1.
+    // Only the killer list gets 13 + 1; the others get 14, the
+    // completed-now 0x5D and a 0x28 (I4), then everyone 0x28 + 0x89.
     assert!(f.flags(P1).get(1, 13) && f.flags(P1).get(1, 1));
-    assert!(!f.flags(P2).get(1, 13));
-    assert_eq!(f.sent_ids(), [0x28, 0x89, 0x28, 0x89]);
+    assert!(!f.flags(P1).get(1, 14));
+    assert!(!f.flags(P2).get(1, 13) && f.flags(P2).get(1, 14));
+    assert_eq!(f.sent_ids(), [0x5D, 0x28, 0x28, 0x89, 0x28, 0x89]);
+    assert_eq!(f.sent[0], (P2, hex("5d 01 00 0c 0000")));
     // The timer fires 9 updater ticks later: 0x5D status 5 to everyone.
     f.sent.clear();
     for _ in 0..8 {
@@ -971,8 +1091,9 @@ fn cain_rewards() {
         f.p(P1).quests.flags[usize::from(d)].set(4, 1);
         ctl.quest_message(&mut f, P1, &hex("31 10000000 7600 0000")[..9]);
         f.log.retain(|l| !l.starts_with("unhandled 37"));
-        assert_eq!(f.log, [want]);
-        assert_eq!(f.sent_ids(), [0x28, 0x5D]);
+        assert_eq!(f.log[0], want);
+        // Then the text refresh (§10.6 r9).
+        assert_eq!(f.sent_ids(), [0x28, 0x5D, 0x27, 0x29]);
         assert_eq!(f.sent[1].1, hex("5d 04 02 00 0000"));
         assert!(f.flags(P1).get(4, 0) && !f.flags(P1).get(4, 1));
     }
@@ -1006,7 +1127,7 @@ fn wirt_body_gold() {
     );
 }
 
-// Covers: specs/world/quests.md §10.5, §edge-cases-original-bugs r7
+// Covers: specs/world/quests.md §10.5 l2 r2, §edge-cases-original-bugs r7
 #[test]
 fn malus_level_gate() {
     let (mut ctl, _) = control();
@@ -1014,12 +1135,18 @@ fn malus_level_gate() {
     let malus = UnitId(0x71);
     f.p(P1).stats.insert(12, 7);
     act1::malus_operate(&mut ctl, &mut f, malus, P1);
-    assert_eq!(f.log, ["unhandled 3 0x591ac0"]);
+    // Level 7: sound event 19, nothing drops.
+    assert_eq!(f.log, ["sound 1 19"]);
     f.log.clear();
     f.p(P1).stats.insert(12, 8);
     act1::malus_operate(&mut ctl, &mut f, malus, P1);
-    assert_eq!(f.log, ["drop hdm  2", "opened 113"]);
-    assert_eq!(ctl.record(3).unwrap().state, 4);
+    assert_eq!(f.log, ["drop hdm  2", "mode 113 2"]);
+    let r = ctl.record(3).unwrap();
+    assert_eq!((r.state, r.status, r.flags), (4, 1, 0));
+    assert_eq!((r.extra.malus_mode, r.extra.malus_items), (2, 1));
+    assert!(r.extra.malus_known && r.extra.malus_guid == 0x71);
+    // K2 at state 4: bit 3.
+    assert!(f.flags(P1).get(3, bit::LEAVE_TOWN));
 }
 
 // Covers: specs/world/quests.md §8.4
@@ -1061,7 +1188,11 @@ fn act_transitions() {
     ctl.act_completion(&mut f, P1, npc::WARRIV1).unwrap();
     let fl = f.flags(P1);
     assert!(fl.get(7, 0) && fl.get(7, 13));
-    assert_eq!(f.sent_ids(), [0x28, 0x61]);
+    // 0x28, `61 02`, then A1Q4's act-change hook (§10.6 r16): Cain was
+    // never freed, so status 5 goes out and the quest moves to state 7.
+    assert_eq!(f.sent_ids(), [0x28, 0x61, 0x5D]);
+    assert_eq!(f.sent[1].1, [0x61, 2]);
+    assert_eq!(ctl.record(4).unwrap().state, 7);
     assert_eq!(f.players[&P1].byte4c, 1);
     assert!(f.players[&P1].quests.intro[0].contains(&148));
     // Meshif: slot 10 too, staff parts deleted.

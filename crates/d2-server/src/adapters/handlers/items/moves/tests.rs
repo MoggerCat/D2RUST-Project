@@ -94,7 +94,7 @@ fn set_u16(r: &mut [u8], o: usize, v: u16) {
     r[o..o + 2].copy_from_slice(&v.to_le_bytes());
 }
 
-fn stat_data() -> Arc<StatData> {
+pub(crate) fn stat_data() -> Arc<StatData> {
     let size = Itemstatcost::SIZE;
     let mut records = vec![0u8; N_STATS * size];
     for s in 0..N_STATS {

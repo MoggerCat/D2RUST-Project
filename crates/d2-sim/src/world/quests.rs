@@ -14,6 +14,8 @@ pub mod act1;
 pub mod tables;
 
 #[cfg(test)]
+mod act1_tests;
+#[cfg(test)]
 mod gaps_tests;
 #[cfg(test)]
 mod tests;
@@ -21,7 +23,7 @@ mod tests;
 use std::collections::BTreeSet;
 
 use crate::rng::Seed;
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 pub use tables::{MessageEntry, QuestRow, QuestTables};
 
@@ -94,6 +96,10 @@ pub enum QuestError {
     Table(#[from] crate::world::TsvError),
     #[error("quests.tsv: {0}")]
     TableShape(&'static str),
+    /// A fatal assert inside a quest callback (`quests.md` §10): the
+    /// function's 1.14d address.
+    #[error("quest callback {0:#x}: fatal assert")]
+    Fatal(u32),
 }
 
 // ------------------------------------------------------------------ §1
@@ -261,6 +267,16 @@ impl QuestRecord {
 pub enum TimerFn {
     /// `0x00590230`: Den of Evil status 5 while state 4; returns 1.
     DenOfEvilStatus,
+    /// `0x00590BF0`: Burial Grounds status 3; returns 1 (§10.5).
+    BurialStatus,
+    /// `0x00593260`: the Tristram Cain removal walk; returns 1 (§10.6).
+    CainRemoval,
+    /// `0x005954C0`: Forgotten Tower status 13; returns 1 (§10.7).
+    TowerStatus,
+    /// `0x00596500`: Andariel's portals and status 3 (§10.8).
+    AndarielPortals,
+    /// `0x00596580`: chain 6's sequence timer, state 0 → 1 (§10.8).
+    SlaughterOpen,
     /// Test probe: logs through `unhandled(chain, tick)`, never removed.
     #[cfg(test)]
     Probe,
@@ -294,6 +310,9 @@ pub struct QuestControl {
     pub rows: Vec<QuestRow>,
     /// NPC message tables.
     pub messages: Vec<MessageEntry>,
+    /// Fatal asserts the callbacks reached ([`QuestError::Fatal`]), in
+    /// order; the original aborts at the first.
+    pub faults: Vec<QuestError>,
 }
 
 /// The seam to the rest of the game. Expected providers in brackets.
@@ -326,6 +345,8 @@ pub trait QuestWorld {
     /// The unit seed (+0x20).
     fn unit_seed(&mut self, unit: UnitId) -> &mut Seed;
     fn stat(&self, unit: UnitId, stat: u16) -> i32;
+    /// `0x006253B0`: the unit's base stat, layer 0 (A1Q3's level test).
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32;
     /// `0x006272B0`: add to a stat.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32);
     /// `0x00553380`.
@@ -341,9 +362,16 @@ pub trait QuestWorld {
     fn monster_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// A monster unit's class id (NPC class), if it is a monster.
     fn monster_class(&self, unit: UnitId) -> Option<u16>;
-    /// Players in the unit's room or an adjacent room (A1Q2, D2MOO
-    /// `ACT1Q2_UnitIterate_SetRewardPending`).
+    /// The players P with a room for which A1Q2's J3 test holds
+    /// (§10.5): P's room is the unit's room, or the unit's room is in
+    /// P's room's room list (`0x00619790`, `drlg/rooms.md` §10.4). Empty
+    /// when the unit has no room.
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// `0x00554630` and the party list at game +0x1D2C (§10.4 I3): the
+    /// members of the player's party in list order, GUID lookups that
+    /// fail skipped; `None` when the party id is 0xFFFF (no party; a
+    /// single player is in none, open question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
 
     // Messages (server transport).
     fn send(&mut self, player: UnitId, msg: &[u8]);
@@ -352,6 +380,8 @@ pub trait QuestWorld {
 
     // Items (items / inventory).
     fn has_item(&self, player: UnitId, code: [u8; 4]) -> bool;
+    /// `0x00628590`: an item unit's code (`None`: not an item).
+    fn item_code(&self, item: UnitId) -> Option<[u8; 4]>;
     /// `0x00544160`: delete the player's item with `code`.
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]);
     /// `0x005466B0` (§9.1): create, place or drop a reward item.
@@ -388,10 +418,71 @@ pub trait QuestWorld {
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    /// Set a quest object "opened" (objects).
-    fn set_object_opened(&mut self, object: UnitId);
+    /// An object's mode (+0x10); 0 when there is no object (§10.5).
+    fn object_mode(&self, object: UnitId) -> i32;
+    /// `0x00624690`: set an object's mode (objects).
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
+    /// `0x00552F60` with type 2: the object with this GUID and its class.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)>;
     /// `0x00579180(npc)`: the mercenary reward (NPC spec).
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
+
+    // Act I quest seams (§10.6–§10.8; paths, rooms, monsters, objects).
+    /// `0x00620870`: the unit's position and room (`None`: no room).
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    /// `0x00619730`: (x, y) inside the room's tile rectangle, the last
+    /// row and column excluded (§10.6 step 15).
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
+    /// `0x00463740`: the room holding (x, y), searched from `room`.
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
+    /// `0x00545340` from a point: a free spot (size, mask, radius, limit).
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)>;
+    /// `0x005B2F20(game, room, x, y, class, mode, r, 0)`: spawn a monster.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId>;
+    /// Unit +0xC4 |= `flags`.
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32);
+    /// Every monster, in the walk order of `0x005537D0` (type 1).
+    fn monsters(&self) -> Vec<UnitId>;
+    /// `0x00572DC0` / `0x00573180`: the players chatting with `npc`;
+    /// `None` when no chat is open with it.
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>>;
+    /// `0x005A7E60(monster, 0, buf)` + `0x005A7C20(game, buf, 1)`:
+    /// request the monster's removal mode (`monsters/init.md`).
+    fn remove_monster(&mut self, monster: UnitId);
+    /// `0x00543140(game, 1, class, 0)`: drop act `act`'s stored preset
+    /// of monster `class`.
+    fn drop_preset_monster(&mut self, act: u8, class: u16);
+    /// The first object of `class` in the rooms of `object`'s room list
+    /// (§10.6 stone operate).
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId>;
+    /// `0x0056EDE0` then `0x0061AED0`: an object of `class` at (x, y),
+    /// its room refreshed.
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId>;
+    /// `0x00640E90`: the object's animation length (>> 8 gives frames).
+    fn object_anim_length(&self, object: UnitId) -> i32;
+    /// `0x005417D0`: schedule object event `ev` at `frame`.
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32);
+    /// `0x005456A0(player, object, msg)`: open quest message `msg`.
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16);
 
     /// A function the spec names but does not specify was reached; the
     /// host logs it (open questions 6–8).
@@ -483,6 +574,7 @@ impl QuestControl {
             fx: 0,
             rows: tables.rows.clone(),
             messages: tables.messages.clone(),
+            faults: Vec::new(),
         })
     }
 
@@ -664,9 +756,10 @@ impl QuestControl {
         }
     }
 
-    /// `0x005436B0`: add a link for `chain` to the unit (§4.6). The
-    /// special cases for chains 4, 8, 12 (`0x00592F80`, `0x005991B0`,
-    /// `0x0059C3B0`) are reported as unhandled before the link is added.
+    /// `0x005436B0`: add a link for `chain` to the unit (§4.6). `special`
+    /// names the special case the caller found (chain 4 with an object of
+    /// class 61: `0x00592F80`; chains 8 and 12: `ret 4` stubs); it runs
+    /// before the link is added.
     pub fn add_link<W: QuestWorld>(
         &mut self,
         w: &mut W,
@@ -678,7 +771,11 @@ impl QuestControl {
             return false;
         }
         if let Some(f) = special {
-            w.unhandled(chain, f);
+            match chain {
+                4 => act1::q4::link_object(self, w, Some(unit)),
+                8 | 12 => {}
+                _ => w.unhandled(chain, f),
+            }
         }
         let Some(c) = w.quest_chain(unit) else {
             return false;
@@ -1071,8 +1168,6 @@ impl QuestControl {
         player: UnitId,
         npc_class: u16,
     ) -> Result<(), QuestError> {
-        // TODO(quests OQ10): the 0x61 byte and the intro-flag act are D2MOO
-        // 1.10f's (2, 3, 5; acts I, II, II); 1.14d's registers are open.
         match npc_class {
             npc::WARRIV1 => {
                 let Some(f) = flags_of(w, player) else {
@@ -1086,12 +1181,20 @@ impl QuestControl {
                     set_intro_flags(w, player, 0);
                 }
                 let f = flags_of(w, player).copied().unwrap_or_default();
-                if f.get(6, 13) && f.get(6, 0) && self.record(6).is_some_and(|r| r.not_intro) {
-                    // Chain 6's callback 3 with these arguments is not
-                    // specified (OQ8).
-                    w.unhandled(6, 0x0059_6010);
+                if f.get(6, 13) && f.get(6, 0) {
+                    if let Some(i) = self.find(6).filter(|&i| self.records[i].not_intro) {
+                        // Chain 6's callback 3 with a = 1, b = 40 (§10.8).
+                        let args = EventArgs {
+                            event: event::CHANGED_LEVEL,
+                            player: Some(player),
+                            a: 1,
+                            b: 40,
+                            ..EventArgs::default()
+                        };
+                        act1::callback(self, w, i, args, None, false);
+                    }
                 }
-                w.unhandled(4, 0x0059_7310);
+                act1::q4::act_change(self, w, player);
             }
             npc::MESHIF1 => {
                 let Some(f) = flags_of(w, player) else {
@@ -1120,12 +1223,11 @@ impl QuestControl {
                 if !f.get(28, 0) && expansion {
                     f.set(28, 0);
                     f.set(28, 13);
+                    // The Act II list (sic, §8.1).
                     set_intro_flags(w, player, 1);
                     send_player_flags(w, player, 6, 0);
                     if w.player_byte_4c(player) != 1 {
-                        // TODO(quests OQ10): the 0x5D sent before 0x61 is
-                        // not specified.
-                        w.unhandled(28, 0x0054_67E0);
+                        w.send(player, &[0x5D, 0x17, 2, 0, 0, 0]);
                         can_go_to_act(w, player, 5);
                     }
                 }
@@ -1300,33 +1402,74 @@ pub fn cow_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: Unit
 }
 
 /// `0x00544840` (§9.4): C→S 0x3E read a clue item (after the handler's
-/// item checks). `bkd ` → the Cairn stone order; `trs ` → `0x0059D6A0`.
+/// item checks). `bkd ` → the Cairn stone order (§10.6); `trs ` →
+/// `0x0059D6A0`.
 pub fn read_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId, code: [u8; 4]) {
     match &code {
         b"bkd " => act1::send_stone_order(ctl, w, player),
-        b"trs " => w.unhandled(13, 0x0059_D6A0),
+        b"trs " => true_tomb_clue(ctl, w, player),
         _ => {}
     }
 }
 
-/// `0x005449E0` (§9.5): object timer event 7 by object class.
-pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
-    match class {
-        act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
-        0x16F
-        | 0xBD
-        | 0x1A
-        | 0x7A
-        | 0x83
-        | 0x155
-        | 0x173
-        | 0x178
-        | 0x1CB..=0x1CD
-        | 0x1DA..=0x1DC => {
-            // TODO(quests §9.5, OQ8): the per-class quest functions other
-            // than Wirt's body are not specified.
-            w.unhandled(0xFF, u32::from(class));
+/// `0x0059D6A0` (§9.4): 0x50 with u16 13 and the true tomb's level − 66
+/// (0 when the level is 0); a nonzero level is kept at chain 13's extra
+/// +0x34. Bytes 5–14 are never written in the original (stack); 0 here.
+fn true_tomb_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: UnitId) {
+    let level = w.true_tomb_level();
+    let tomb = if level == 0 { 0 } else { level as i32 - 66 };
+    if level != 0 {
+        if let Some(r) = ctl.record_mut(13) {
+            r.extra.tomb_level = level;
         }
+    }
+    let mut m = [0u8; 15];
+    m[0] = 0x50;
+    m[1..3].copy_from_slice(&13u16.to_le_bytes());
+    m[3..5].copy_from_slice(&(tomb as i16).to_le_bytes());
+    w.send(player, &m);
+}
+
+/// `0x005449E0` (§9.5): object timer event 7 by object class. The Act
+/// II–V functions are catalogued only (§11) and reported.
+pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
+    // "Record c": no record → nothing.
+    let record = |ctl: &QuestControl, w: &mut W, chain: u8, f: u32| {
+        if ctl.find(chain).is_some() {
+            w.unhandled(chain, f);
+        }
+    };
+    match class {
+        // Cain's gibbet (open question 11).
+        0x1A => w.unhandled(4, 0x0059_3290),
+        0x7A => record(ctl, w, 11, 0x0059_B710),
+        0x83 => {
+            let Some(level) = w.unit_level(object) else {
+                return;
+            };
+            if w.object_mode(object) == 1 {
+                w.set_object_mode(object, 2);
+            }
+            match level {
+                76 => w.unhandled(0xFF, 0x005B_23C0),
+                108 => w.unhandled(0xFF, 0x005B_5750),
+                _ => {}
+            }
+        }
+        0xBD => match (w.unit_act(object), w.unit_level(object)) {
+            (Some(0), _) => record(ctl, w, 4, 0x0059_42C0),
+            (_, Some(l)) if l == 109 || l >= 113 => record(ctl, w, 33, 0x0058_A730),
+            _ => record(ctl, w, 32, 0x0058_8CA0),
+        },
+        act1::WIRT_BODY => act1::wirt_body(ctl, w, object),
+        0x155 => record(ctl, w, 20, 0x005B_CAC0),
+        0x16F => record(ctl, w, 16, 0x005B_85E0),
+        0x173 => act1::q5::chest_event(ctl, w, object),
+        0x178 => record(ctl, w, 24, 0x005B_6710),
+        0x1CB => w.unhandled(0xFF, 0x0058_B940),
+        0x1CC => w.unhandled(0xFF, 0x0058_A500),
+        0x1CD => w.unhandled(0xFF, 0x0058_9540),
+        0x1DA..=0x1DC => record(ctl, w, 35, 0x0058_C0E0),
         _ => {}
     }
 }

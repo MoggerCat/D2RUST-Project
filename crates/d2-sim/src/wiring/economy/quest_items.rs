@@ -10,7 +10,7 @@
 use super::Economy;
 use crate::rng::Seed;
 use crate::units::lifecycle::LifecycleHooks;
-use crate::units::{UnitId, UnitType};
+use crate::units::{RoomId, UnitId, UnitType};
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
 /// The quest calls no written spec provides yet, each with its expected
@@ -32,7 +32,11 @@ pub trait QuestRest {
     fn unit_level(&self, unit: UnitId) -> Option<u32>;
     /// Superunique hcIdx and minion owner (monsters spec).
     fn unit_kind(&self, unit: UnitId) -> UnitKind;
+    /// `quests.md` §10.5 J3's room test (DRLG rooms).
     fn players_near(&self, unit: UnitId) -> Vec<UnitId>;
+    /// The party list at game +0x1D2C (no party spec; `quests.md` open
+    /// question 7).
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
     fn attach_sound(&mut self, player: UnitId, sound: u16);
     fn send(&mut self, player: UnitId, msg: &[u8]);
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
@@ -67,8 +71,46 @@ pub trait QuestRest {
     ) -> Option<(i32, i32)>;
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
-    fn set_object_opened(&mut self, object: UnitId);
+    /// Object mode (+0x10) and `0x00624690` (objects spec).
+    fn object_mode(&self, object: UnitId) -> i32;
+    fn set_object_mode(&mut self, object: UnitId, mode: i32);
     fn mercenary_reward(&mut self, player: UnitId, npc: u16);
+    /// Act I quest seams (`quests.md` §10.6–§10.8: paths, rooms,
+    /// monsters, objects; `QuestWorld` documents each).
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool;
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId>;
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)>;
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId>;
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32);
+    fn monsters(&self) -> Vec<UnitId>;
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>>;
+    fn remove_monster(&mut self, monster: UnitId);
+    fn drop_preset_monster(&mut self, act: u8, class: u16);
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId>;
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId>;
+    fn object_anim_length(&self, object: UnitId) -> i32;
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32);
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16);
     fn unhandled(&mut self, chain: u8, function: u32);
 }
 
@@ -169,6 +211,10 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.econ.stats.unit_total(unit, stat, 0)
     }
+    /// `0x006253B0`, layer 0.
+    fn base_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        self.econ.stats.unit_base(unit, stat, 0)
+    }
     /// `0x006272B0`, layer 0.
     fn add_stat(&mut self, unit: UnitId, stat: u16, delta: i32) {
         let e = &mut *self.econ;
@@ -200,6 +246,9 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn players_near(&self, unit: UnitId) -> Vec<UnitId> {
         self.rest.players_near(unit)
     }
+    fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
+        self.rest.party_members(player)
+    }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.rest.send(player, msg)
@@ -217,6 +266,11 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         self.inventory_records(player)
             .iter()
             .any(|(_, r)| r.code == code)
+    }
+    /// The item's items record code (`0x00628590`).
+    fn item_code(&self, item: UnitId) -> Option<[u8; 4]> {
+        let rec = self.econ.items.get(item)?.record;
+        Some(self.econ.tables.item(rec)?.code)
     }
     fn delete_item(&mut self, player: UnitId, code: [u8; 4]) {
         self.rest.delete_item(player, code)
@@ -267,14 +321,87 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32) {
         self.rest.schedule_quest_event(object, frame)
     }
-    fn set_object_opened(&mut self, object: UnitId) {
-        self.rest.set_object_opened(object)
+    fn object_mode(&self, object: UnitId) -> i32 {
+        self.rest.object_mode(object)
+    }
+    fn set_object_mode(&mut self, object: UnitId, mode: i32) {
+        self.rest.set_object_mode(object, mode)
+    }
+    /// `0x00552F60` type 2: the game's unit lists, class from the record.
+    fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
+        let u = self.econ.game.lists.find_unit(UnitType::Object, guid)?;
+        Some((u, self.of_type(u, UnitType::Object)?.class as u16))
     }
     fn mercenary_reward(&mut self, player: UnitId, npc: u16) {
         match self.mercenaries.as_mut() {
             Some(q) => q.push((player, npc)),
             None => self.rest.mercenary_reward(player, npc),
         }
+    }
+    fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)> {
+        self.rest.unit_position(unit)
+    }
+    fn room_contains(&self, room: RoomId, x: i32, y: i32) -> bool {
+        self.rest.room_contains(room, x, y)
+    }
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.rest.room_at(room, x, y)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn free_spot_at(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: u32,
+        mask: u32,
+        radius: u32,
+        limit: u32,
+    ) -> Option<(i32, i32, RoomId)> {
+        self.rest
+            .free_spot_at(room, x, y, size, mask, radius, limit)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_monster(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: u32,
+    ) -> Option<UnitId> {
+        self.rest.spawn_monster(room, x, y, class, mode, r)
+    }
+    fn or_unit_flags(&mut self, unit: UnitId, flags: u32) {
+        self.rest.or_unit_flags(unit, flags)
+    }
+    fn monsters(&self) -> Vec<UnitId> {
+        self.rest.monsters()
+    }
+    fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>> {
+        self.rest.npc_chat_clients(npc)
+    }
+    fn remove_monster(&mut self, monster: UnitId) {
+        self.rest.remove_monster(monster)
+    }
+    fn drop_preset_monster(&mut self, act: u8, class: u16) {
+        self.rest.drop_preset_monster(act, class)
+    }
+    fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId> {
+        self.rest.find_object_near(object, class)
+    }
+    fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        self.rest.create_object(room, x, y, class)
+    }
+    fn object_anim_length(&self, object: UnitId) -> i32 {
+        self.rest.object_anim_length(object)
+    }
+    fn schedule_object_event(&mut self, object: UnitId, ev: u8, frame: i32) {
+        self.rest.schedule_object_event(object, ev, frame)
+    }
+    fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
+        self.rest.open_quest_message(player, object, msg)
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.rest.unhandled(chain, function)
