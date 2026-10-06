@@ -105,3 +105,54 @@ diverges at the first `unit` record in every scenario.
   gaps on the original side.
 - After the rng finding is understood, rerun: the next divergences are the
   start position and mode (findings 2, 3).
+
+## Run 2 (task scenarios-2): real saves
+
+`ScnSor` (Sorceress) and `ScnAma` (Amazon) were created with
+`py tools/trace-recorder/make_saves.py scn` (new `scn` mode, same driver as the
+class saves): Expansion, Normal, level 1, Rogue Encampment, Save And Exit
+(958 and 981 bytes, same as bdSor/bdAma). Saves are in
+`%USERPROFILE%\Saved Games\Diablo II\`, not committed. Differences from what
+the scripts ask: kill-monster / pickup-drop say `char level 5` for ScnAma (the
+save is level 1; `char` lines are not applied by the original side anyway,
+header `gaps`), cast-firebolt's `char skill 36 1` is likewise not applied.
+**ScnSorNinety is BLOCKED**: a level-90 Hell Sorceress with the item list
+cannot be made by click automation (no editor, no practical leveling), so
+`champion-pack` still has no original trace (the d2rs side runs: 644 lines).
+
+Raw traces (not committed): `C:\Users\zffit\Desktop\D2test\traces-raw-buddy\<name>.original.trace.jsonl`
+and `.d2rs.trace.jsonl`, plus `norng\` copies with the `rng` records removed.
+All 7 original runs exit 0, with the real save names and no `--save-as`.
+
+| Scenario | Save | Original records | First divergence (full traces) | Without `rng` | Changed vs stand-in run? |
+|---|---|---|---|---|---|
+| walk-town | ScnSor | 492 | tick 0, rng[0] before: expected [148302771, 253542080], got [2714123707, 838425138] | tick 0, unit[0] mode: 5 vs 1 | no |
+| run-cold-plains | ScnSor | 803 | same | same | no |
+| kill-monster | ScnAma | 1186 | tick 0, rng[0] before: expected [1767830925, 304583884], got the same d2rs value | tick 0, unit[0] mode 5 vs 1 | no |
+| pickup-drop | ScnAma | 1327 | same as kill-monster | same | no |
+| vendor-buy-sell | ScnSor | 527 | same as walk-town | same | no (all 7 Akara steps still `unresolved` `@1:148`) |
+| waypoint-travel | ScnSor | 403 | same as walk-town | same | no (`@wp` still unresolved, tool limit) |
+| cast-firebolt | ScnSor | 936 | same as walk-town | same | no |
+| champion-pack | ScnSorNinety missing | not run | BLOCKED | | no |
+
+Record counts and rng seeds equal the stand-in run, so the level-1 stand-ins
+were equivalent to the real saves for these probes. One value differs from
+Finding 3 above: the player's start position at tick 0 in the new traces is
+(4473, 4628) for both classes (d2rs: 4889, 5634), and the end positions are
+run-cold-plains (4538, 4643), cast-firebolt (4532, 4641), kill-monster
+(4492, 4629). Finding 3 listed (5473, 4708), (5538, 4723), (5532, 4721),
+(5492, 4709); those could not be reproduced and the old raw traces are lost,
+so treat this section's values as current. The divergence itself (original
+start differs from d2rs, mode 5 vs 1) is unchanged. Later `unit` diffs were
+not walked.
+
+## For the coordinator: harness change to review
+
+The previous run added a `scenario-run export` subcommand to `tools/scenario-run`
+(Rust, 74 lines) so `run_scenario.py` can read `.scenario` files without a
+second parser. This is a change to the cloud's harness: review and adopt it (or
+replace it with your own export) on the cloud side. `run_scenario.py` locates the
+binary via `$SCENARIO_RUN` (else the cargo target `debug` build); this run used
+a `--release` build through `SCENARIO_RUN`. Also: `run_scenario.py --game` takes
+the path to `Game.exe`, not the game directory (a directory gives
+`Permission denied`).
