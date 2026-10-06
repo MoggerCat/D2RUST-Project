@@ -15,6 +15,7 @@ fn path() -> &'static PathBuf {
 }
 
 fuzz_target!(|data: &[u8]| {
+    d2_fuzz::arm("mpq_archive", data);
     let p = path();
     let Ok(mut f) = std::fs::File::create(p) else {
         return;

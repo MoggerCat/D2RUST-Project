@@ -7,6 +7,7 @@ use d2_data::schema::schema;
 use d2_data::strings::StringTables;
 
 fuzz_target!(|data: &[u8]| {
+    d2_fuzz::arm("bin", data);
     let Some((sel, rest)) = data.split_first() else {
         return;
     };

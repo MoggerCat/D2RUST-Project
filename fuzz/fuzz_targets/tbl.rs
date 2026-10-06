@@ -2,6 +2,7 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
+    d2_fuzz::arm("tbl", data);
     if let Ok(t) = d2_formats::tbl::StringTable::parse(data) {
         for i in 0..8 {
             let _ = t.element(i);

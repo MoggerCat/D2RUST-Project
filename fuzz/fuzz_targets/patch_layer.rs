@@ -48,6 +48,7 @@ fn fixture() -> PatchData {
 }
 
 fuzz_target!(|data: &[u8]| {
+    d2_fuzz::arm("patch_layer", data);
     let (layer, _) = parse_layer("a.d2patch", data, 1);
     let _ = parse_stack("s.d2stack", data);
     let _ = load_stack("s.d2stack", data, &mut |_| Some(data.to_vec()));

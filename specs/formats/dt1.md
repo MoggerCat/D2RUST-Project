@@ -119,6 +119,11 @@ None.
 ## Edge cases & original bugs
 
 - Tiles with 0 blocks occur.
+- **RLE pair with count 0 and a skip:** `(skip, 0)` with `skip` ≠ 0 only
+  moves x. It writes no pixel, so it is not an error even when x passes 32
+  or the row passes 31 (found by fuzzing: the reader must not index the pixel
+  buffer for a zero-length run). A run of count > 0 outside 32 × 32 is
+  an error.
 - **Unused version-4 files:** `d2data.mpq` contains six DT1 files in an
   older version-4 layout: `ACT1\BARRACKS\barracks.dt1`,
   `ACT1\BARRACKS\gargtrap.dt1`, `ACT1\CATACOMB\Catacombs.dt1`,

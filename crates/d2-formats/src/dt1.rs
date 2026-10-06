@@ -235,7 +235,9 @@ fn decode_rle(encoded: &[u8]) -> Result<Vec<u8>, FormatError> {
                 format!("RLE pixels outside the block at row {row}, x {x}"),
             ));
         }
-        pixels[row * RLE_WIDTH + x..row * RLE_WIDTH + x + count].copy_from_slice(run);
+        if count > 0 {
+            pixels[row * RLE_WIDTH + x..row * RLE_WIDTH + x + count].copy_from_slice(run);
+        }
         x += count;
     }
     Ok(pixels)
@@ -266,6 +268,27 @@ mod tests {
         assert!(decode_rle(&[31, 2, 1, 2]).is_err(), "row overflow");
         assert!(decode_rle(&[0, 2, 1]).is_err(), "run past data");
         assert!(decode_rle(&[1]).is_err(), "truncated pair");
+    }
+
+    // Found by cargo-fuzz (target dt1): a (skip, 0) pair that moves x or the
+    // row past the block wrote an empty slice at an out-of-range start and
+    // panicked. Synthetic input. Spec: dt1.md §Block pixels (no pixel is
+    // written, so nothing is out of bounds).
+    #[test]
+    fn regress_rle_empty_run_past_block() {
+        // Row 0, x 255 + 0 pixels: start 255 is inside the buffer.
+        assert!(decode_rle(&[255, 0]).is_ok());
+        // Row 31, x 255: start 31 * 32 + 255 is past the 1024-byte buffer.
+        let mut past_x = [0u8, 0].repeat(31);
+        past_x.extend_from_slice(&[255, 0]);
+        assert_eq!(decode_rle(&past_x).unwrap(), vec![0u8; 1024]);
+        // Row 33 (past the last row) with a skip and no pixels.
+        let mut past_row = [0u8, 0].repeat(33);
+        past_row.extend_from_slice(&[5, 0]);
+        assert_eq!(decode_rle(&past_row).unwrap(), vec![0u8; 1024]);
+        // A pixel written there is still an error.
+        past_row.extend_from_slice(&[0, 1, 9]);
+        assert!(decode_rle(&past_row).is_err());
     }
 
     fn file() -> Vec<u8> {
