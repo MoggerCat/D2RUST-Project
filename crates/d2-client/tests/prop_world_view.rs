@@ -12,7 +12,7 @@
 
 mod prop_support;
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::VecDeque;
 
 use bevy::prelude::{App, Entity, MinimalPlugins, With};
 use d2_client::assets::path::CanonicalPath;
@@ -145,7 +145,7 @@ fn assets(cof: Cof, sizes: &[(u32, u32, i32, i32)]) -> ViewAssets {
                     IndexFrame::new(w, h, xo, yo, px).unwrap()
                 })
                 .collect();
-            a.sets.insert(set_key(c, d), FrameSet { frames });
+            a.frames.insert(set_key(c, d), FrameSet { frames }).unwrap();
         }
     }
     a
@@ -324,11 +324,12 @@ fn check_frame(w: &ClientWorld, ui: &[UiDraw], a: &ViewAssets) {
         f.items.windows(2).all(|p| p[0].key <= p[1].key),
         "not sorted by key"
     );
-    let refs: BTreeSet<_> = f.frames.refs().iter().collect();
-    assert_eq!(refs.len(), f.frames.len(), "frame table repeats an entry");
     for i in &f.items {
-        let (k, idx) = f.frames.get(i.frame).expect("item frame id in the table");
-        a.frame(k, idx).expect("referenced frame is resident");
+        // Every item frame is a resident frame of the store (§A4).
+        a.frames.frame(i.frame).expect("item frame resident");
+        a.frames
+            .owner(i.frame)
+            .expect("item frame has an owner set");
     }
     let img1 = world_view::compose_cpu(&f, a).unwrap();
     let img2 = world_view::compose_cpu(&f, a).unwrap();
