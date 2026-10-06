@@ -3078,6 +3078,8 @@ fn dirt_paths_by_the_rules() {
             put(&mut e, 6, 3, 24, 0);
             put(&mut e, gw - 2, 1, 28, 1);
             put(&mut e, gw / 2 - 1, 2 + k as i32 % 2, 28, 1);
+            // File 1 without the bridge preset, above it: not the bridge.
+            put(&mut e, gw / 2 - 1, 1, 9, 1);
             // The model.
             let mut starts: Vec<PathPoint> = Vec::new();
             let d = case as i32;
@@ -3343,4 +3345,33 @@ fn cottage_counts() {
         }
     }
     assert_eq!(seen, [true; 3]);
+}
+
+/// `outdoor.md` §7.5 step 3: the bridge cell is searched for y in
+/// 1..gw − 2 (sic: gw), so a bridge at y = gw − 1 of a taller grid is
+/// not found; with no start there is no join point at all.
+#[test]
+fn dirt_path_bridge_rows_and_no_start() {
+    let (gw, gh) = (6, 9);
+    let mut e = Env::new(4, gw, gh);
+    e.info.flags = 0x10;
+    e.info.orth = vec![Orth {
+        level_id: 26,
+        direction: 1,
+        init: false,
+        rect: TileRect::new(700, 600, 40, 18),
+        preset: true,
+    }];
+    e.info.grids[0].op(gw / 2 - 1, gw - 1, Op::Set, 28);
+    e.info.grids[2].op(gw / 2 - 1, gw - 1, Op::Set, cell::PRESET | 1 << 16);
+    let mut g = e.gen();
+    g.dirt_paths().unwrap();
+    assert_eq!(g.info.path_ends[0].join.direction, 4);
+    // No start: nothing, no draws.
+    let mut e = Env::new(4, gw, gh);
+    let s = e.seed();
+    let mut g = e.gen();
+    g.dirt_paths().unwrap();
+    assert!(g.info.path_ends.is_empty());
+    assert_eq!(*g.seed(), s);
 }
