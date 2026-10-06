@@ -328,9 +328,9 @@ Index := 0, count := 0. Direction offset ≠ 0 (types 5, 6, 12) →
       reverse of prev ((d − 4) & 7 = prev) → **tail**.
    3. If d ≠ prev: points[n++] := cur unless cur = start; turned := 1.
    4. cur += step(d); steps += 1; prev := d.
-3. After the loop: turned = 1 → done. Else **tail**: steps ≠ 0 →
+5. After the loop: turned = 1 → done. Else **tail**: steps ≠ 0 →
    points[n++] := cur.
-4. count := n.
+6. count := n.
 
 A turn appends the corner it starts from, so a path is the list of
 corners; after step 3 the first greedy turn appends P a second time
