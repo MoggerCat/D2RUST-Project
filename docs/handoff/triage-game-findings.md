@@ -168,3 +168,16 @@ RUST_BACKTRACE=1 cargo run -p d2-client --release -- play --frames 1500
 Expected: everything in the b/a rows passes. The c rows, Cold Plains and
 `ds1` / `string_tables` / the DT1 block counts stay red and print the
 values the questions above need.
+
+## Gate
+
+`sh tools/gate.sh` on this branch: every step passes except
+`test d2-sim + conformance` and `test d2-client`. Their failures, listed with
+`--no-fail-fast`, are only the known base-branch reds: d2-sim
+`missiles::tests_bodies` (2), `monsters::ai::tests` (2), `skills::…` function
+and bodies tables (5); d2-client bridge dispatch (`Mismatch([NoHandler …])`)
+and everything that unwraps it (e2e_*, app_frame_loop, prop_bridge,
+mutants_client bridge, 2 UI `TODO(spec)` tests). `test rest` (d2-server,
+d2-formats, mpq-tool, …) passes. Caveat: the d2-client e2e determinism tests
+stop at the bridge table before any worldgen, so the Act I allocation change is
+not exercised by them until the bridge lands. Rerun them then.
