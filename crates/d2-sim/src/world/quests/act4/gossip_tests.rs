@@ -76,6 +76,9 @@ fn hadriel_gossip() {
     // Forge done, Diablo not killed in this game: 669.
     f.p(P1).quests.flags[0].set(27, 0);
     assert_eq!(chat(&mut ctl, &mut f, HADRIEL_U), [(669, 0)]);
+    // Diablo killed in this game (chain 23 +0x14): nothing.
+    ctl.record_mut(23).unwrap().extra.a4.q2.killed = true;
+    assert_eq!(chat(&mut ctl, &mut f, HADRIEL_U), []);
     // Chain 23 absent: 669.
     ctl.records.retain(|r| r.chain != 23);
     assert_eq!(chat(&mut ctl, &mut f, HADRIEL_U), [(669, 0)]);

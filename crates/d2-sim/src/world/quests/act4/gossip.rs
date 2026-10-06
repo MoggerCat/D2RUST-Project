@@ -72,11 +72,8 @@ fn forge_untouched(f: &QuestFlags) -> bool {
 
 /// Chain 23's extra +0x14 (Diablo killed in this game, `quests-act4.md`
 /// §5.1).
-// TODO(merge, act4/q2): read the q2::Extra field for +0x14 once Terror's
-// End names it. Before q2 lands nothing sets +0x14, so false is its value.
 fn diablo_killed(ctl: &QuestControl, j: usize) -> bool {
-    let _ = &ctl.records[j].extra.a4.q2;
-    false
+    ctl.records[j].extra.a4.q2.killed
 }
 
 /// Event 0 `0x005B6940` (§6.2, edge case 17).
