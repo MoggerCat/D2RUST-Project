@@ -2306,9 +2306,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "d2-data",
  "d2-formats",
  "d2-net",
  "d2-proto",
+ "d2-server",
+ "d2-sim",
  "d2-verify",
  "image",
  "thiserror 2.0.21",
