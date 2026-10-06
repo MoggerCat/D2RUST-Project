@@ -222,7 +222,7 @@ fn after_item_steps_in_order_and_recharge() {
     assert!(!log.contains(&"recharge".to_string()));
 }
 
-// Covers: specs/world/cube.md §edge-cases-original-bugs
+// Covers: specs/world/cube.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r2, §edge-cases-original-bugs r3, §edge-cases-original-bugs r4, §edge-cases-original-bugs r5, §edge-cases-original-bugs r6, §edge-cases-original-bugs r7
 #[test]
 fn edge_cases() {
     // 1. First matching record wins even if all its outputs fail.

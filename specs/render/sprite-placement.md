@@ -184,17 +184,17 @@ None.
 
 ## Edge cases & original bugs
 
-- **Top-down cels clip as bottom-up.** For an orientation-bit-set cel the
+1. **Top-down cels clip as bottom-up.** For an orientation-bit-set cel the
   rasterizer still computes the skipped rows and the row count as if rows
   ran up from `Y + yoff` (§5) while the drawer walks down: a top-down cel
   crossing the frame's top or bottom edge is cut wrongly (rows skipped
   from its top, count limited by `Y + yoff + 1`). Reproduce; no live case
   is known to cross an edge (inventory items are drawn inside panels).
-- **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
+2. **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
   and `Y + yoff` clamped `≥ 0` instead of clipping columns (`0x0060155C`).
   `R` is never 0 after surface creation, so the branch is dead in play.
-- Zero-size frames draw nothing (`dc6.md` Edge cases).
-- `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
+3. Zero-size frames draw nothing (`dc6.md` Edge cases).
+4. `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
   flags word has bit 2 (fatal errors `0x452`/`0x453`).
 
 ## Test vectors

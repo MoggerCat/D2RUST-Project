@@ -249,12 +249,12 @@ not touch server RNG.
 
 ## Edge cases & original bugs
 
-- Tiles and units are anchored 12 rows apart (§6), from the play-area
+1. Tiles and units are anchored 12 rows apart (§6), from the play-area
   height used for tiles and the full height used for units. Reproduce.
-- The shake offset range `[−a, a − 1]` is not symmetric. Reproduce.
-- The shake envelope runs on wall-clock milliseconds, so the original's
+2. The shake offset range `[−a, a − 1]` is not symmetric. Reproduce.
+3. The shake envelope runs on wall-clock milliseconds, so the original's
   shake is not a function of ticks (§9).
-- Panel culling of wall blocks (§7) can leave wall pixels missing at the
+4. Panel culling of wall blocks (§7) can leave wall pixels missing at the
   panel edge where the panel art does not cover them. Reproduce.
 
 ## Test vectors
