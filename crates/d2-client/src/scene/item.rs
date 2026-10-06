@@ -195,12 +195,9 @@ impl Default for ShadeChain {
 /// reference renderer composes in the index domain, so `Rgb` is not an op
 /// (`composition.md` §1, §6).
 ///
-/// One pixel write of 1.14d (`composition.md` §5) is: the source index `s`
-/// through the remap `P` and the light map `L` (the shade chain, in that
-/// order), then, if the draw has a blend table `T`, `T[256 × d + P[s]]`
-/// (row = destination). TODO(spec: render/composition.md OQ2): when both
-/// `L` and `T` are present the order is unconfirmed; this compositor applies
-/// the whole chain first, as for `P` alone. TODO(spec:
+/// One pixel write of 1.14d (`composition.md` §5) is a shade chain then a
+/// blend op; [`PixelTables::ops`] builds both from the draw's `P`, `L`
+/// and `T` (with `L` and `T` the remap `P` is dropped). TODO(spec:
 /// render/blend-modes.md): which op and table each draw uses (§B5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BlendOp {
@@ -219,6 +216,40 @@ impl BlendOp {
             BlendOp::IndexTable(base) => {
                 maps.row(MapId(base.0 + u32::from(dest)))[usize::from(src)]
             }
+        }
+    }
+}
+
+/// The up to three tables 1.14d's row drawer takes for one draw
+/// (`composition.md` §5): remap `P`, light `L` and blend table `T` (the
+/// base id of a 256×256 table pushed with [`MapTable::push_table`]).
+/// Which draw passes which tables is `blend-modes.md`'s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct PixelTables {
+    pub remap: Option<MapId>,
+    pub light: Option<MapId>,
+    pub blend: Option<MapId>,
+}
+
+impl PixelTables {
+    /// The shade chain and blend op of §5:
+    /// - no `T`: `d' = L[P[s]]` (chain `P`, `L`; absent steps skipped);
+    /// - `T`, no `L`: `d' = T[256 × d + P[s]]`;
+    /// - `T` and `L`: `d' = T[256 × d + L[s]]`: `P` is not applied, whether
+    ///   or not the draw passed one (the dispatcher picks the `L` routine).
+    pub fn ops(&self) -> (ShadeChain, BlendOp) {
+        let chain = |maps: &[Option<MapId>]| {
+            let mut c = ShadeChain::EMPTY;
+            for m in maps.iter().flatten() {
+                c.maps[usize::from(c.len)] = *m;
+                c.len += 1;
+            }
+            c
+        };
+        match (self.light, self.blend) {
+            (_, None) => (chain(&[self.remap, self.light]), BlendOp::Opaque),
+            (None, Some(t)) => (chain(&[self.remap]), BlendOp::IndexTable(t)),
+            (Some(l), Some(t)) => (chain(&[Some(l)]), BlendOp::IndexTable(t)),
         }
     }
 }

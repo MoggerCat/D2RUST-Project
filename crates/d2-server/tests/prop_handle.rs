@@ -1436,13 +1436,19 @@ fn hosts_reach_the_handlers() {
 // `e2e_vendor.rs` builds it: the NPC, vendor and quest handlers on
 // `wiring::interaction` over the action sim's own units. Akara (class
 // 148) next to the player; the player owns a buckler and a cap and
-// carries 5000 gold.
+// carries 5000 gold. The interaction rest (`Rest`) and the item, vendor
+// and NPC tables are the e2e fixtures' (`e2e_support`, shared with
+// `d2-client/tests`).
+
+/// The end-to-end fixtures of `d2-client/tests` (one copy for both
+/// crates' tests; `docs/HANDOFF.md` PK3 / FS2).
+#[path = "../../d2-client/tests/e2e_support/mod.rs"]
+mod e2e_support;
 
 mod trade {
-    use std::collections::BTreeMap;
+
     use std::sync::Arc;
 
-    use d2_data::tables::{Itemratio, Itemtypes, Monstats};
     use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
     use d2_server::adapters::{PlayerData, PlayerFields, SimGame, UnitFacts};
     use d2_server::seams::Pos;
@@ -1450,8 +1456,8 @@ mod trade {
     use d2_sim::drlg::data::DrlgData;
     use d2_sim::drlg::{Dungeon, NoLevelTypes};
     use d2_sim::game::Game;
-    use d2_sim::items::tables::ItemRec;
-    use d2_sim::items::{ty, ItemRequest, ItemTables};
+
+    use d2_sim::items::{ty, ItemRequest};
     use d2_sim::rng::Seed;
     use d2_sim::skills::SkillTables;
     use d2_sim::units::hooks::{MonsterInfo, UnitData};
@@ -1459,28 +1465,21 @@ mod trade {
     use d2_sim::units::lists::client_state;
     use d2_sim::units::{UnitId, UnitType};
     use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
-    use d2_sim::wiring::economy::{ItemSpawn, QuestRest};
-    use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorRest};
-    use d2_sim::world::npc::{self, class, ImbueMods, InvEntry, ItemFacts, MercInit, NpcControl};
-    use d2_sim::world::quests::{
-        PlayerQuests, QuestChain, QuestControl, QuestTables, TextList, UnitKind,
-    };
-    use d2_sim::world::vendors::price::Bonus;
-    use d2_sim::world::vendors::{
-        NpcPrices, Transaction, TypeRec, VendorItem, VendorTables, NO_CODE, XXX,
-    };
+    use d2_sim::wiring::economy::ItemSpawn;
 
-    use super::{blank, stat_data, NoTiles, Snapshot, ALIVE, N_STATS};
+    use d2_sim::world::npc::{class, NpcControl};
+    use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 
-    const N_TYPES: usize = 80;
-    const N_MONSTATS: usize = 400;
-    const CAP: usize = 0;
-    const BUC: usize = 1;
+    pub use super::e2e_support::Rest;
+    use super::e2e_support::{
+        equiv, item_tables, monstats, vendor_tables, BUC, CAP, N_MONSTATS, N_TYPES,
+    };
+    use super::{stat_data, NoTiles, Snapshot, ALIVE};
 
     /// The action wiring's seams: `Pending`'s defaults; sends kept.
     #[derive(Default)]
     pub struct ActionRest {
-        sent: Vec<(UnitId, Vec<u8>)>,
+        pub sent: Vec<(UnitId, Vec<u8>)>,
     }
 
     impl Pending for ActionRest {
@@ -1493,470 +1492,6 @@ mod trade {
         fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
             std::mem::take(&mut self.sent)
         }
-    }
-
-    /// The vendors' player-inventory calls `WiredWorld` answers from its
-    /// inventory model (`InvVendors`) before they reach a rest.
-    const MODEL: &str = "WiredWorld answers from the inventory model";
-
-    /// The interaction seams no written spec provides, answered as in
-    /// `e2e_vendor.rs` (talk range, room in the NPC grid, no item copy).
-    /// The player's inventory is the host's inventory model
-    /// (`WiredWorld::inventory`), which answers the vendors' inventory
-    /// calls before they reach this rest.
-    #[derive(Default)]
-    pub struct Rest {
-        interact: BTreeMap<UnitId, (u8, u32)>,
-        quests: BTreeMap<UnitId, PlayerQuests>,
-        last_bought: BTreeMap<UnitId, u32>,
-        sent: Vec<(UnitId, Vec<u8>)>,
-    }
-
-    impl Outbox for Rest {
-        fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-            std::mem::take(&mut self.sent)
-        }
-    }
-
-    impl PlayerQuestsRef for Rest {
-        fn quests_ref(&self, player: UnitId) -> Option<&PlayerQuests> {
-            self.quests.get(&player)
-        }
-    }
-
-    impl NpcRest for Rest {
-        fn item_format(&self) -> u16 {
-            1
-        }
-        fn distance(&self, _: UnitId, _: UnitId) -> i32 {
-            3
-        }
-        fn axis_check(&self, _: UnitId, _: UnitId) -> u32 {
-            0
-        }
-        fn unit_check(&self, _: UnitId, _: u32) -> u32 {
-            0
-        }
-        fn clear_path(&mut self, _: UnitId) {}
-        fn approach(&mut self, _: UnitId, _: UnitId) {}
-        fn player_busy(&self, _: UnitId) -> u32 {
-            0
-        }
-        fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
-            true
-        }
-        fn tristram_cain_busy(&self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn interact_unit(&self, player: UnitId) -> Option<(u8, u32)> {
-            self.interact.get(&player).copied()
-        }
-        fn set_interact(&mut self, player: UnitId, t: u8, guid: u32) {
-            self.interact.insert(player, (t, guid));
-        }
-        fn reset_interact(&mut self, player: UnitId) {
-            self.interact.remove(&player);
-        }
-        fn pet(&self, _: UnitId, _: u8, _: u8) -> Option<UnitId> {
-            None
-        }
-        fn pets(&self, _: UnitId) -> Vec<UnitId> {
-            Vec::new()
-        }
-        fn player_name(&self, _: UnitId) -> Vec<u8> {
-            b"tester".to_vec()
-        }
-        fn reset_stats(&mut self, _: UnitId) {}
-        fn reset_skills(&mut self, _: UnitId) {}
-        fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
-        fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
-        fn npc_ai_param(&mut self, _: UnitId, _: u32) {}
-        fn stat_sent(&mut self, _: UnitId, _: u16, _: u32) {}
-        fn respec_sound(&mut self, _: UnitId) {}
-        fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
-            [0; 34]
-        }
-        fn socket_granted(&mut self, _: UnitId) {}
-        fn personalize_granted(&mut self, _: UnitId) {}
-        fn inventory_entries(&self, _: UnitId) -> Vec<InvEntry> {
-            Vec::new()
-        }
-        fn identify(&mut self, _: UnitId) {}
-        fn cursor_item(&self, _: UnitId) -> Option<UnitId> {
-            None
-        }
-        fn item_facts(&self, _: UnitId) -> ItemFacts {
-            ItemFacts::default()
-        }
-        fn put_back(&mut self, _: UnitId, _: UnitId) {}
-        fn remove_cursor_item(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn duplicate(&mut self, _: UnitId, _: UnitId) -> Option<UnitId> {
-            None
-        }
-        fn create_imbued(&mut self, _: UnitId, _: UnitId, _: &ImbueMods) -> Option<UnitId> {
-            None
-        }
-        fn item_refresh(&mut self, _: UnitId) {}
-        fn personal_name(&self, _: UnitId) -> Vec<u8> {
-            Vec::new()
-        }
-        fn set_personal_name(&mut self, _: UnitId, _: &[u8]) {}
-        fn place_or_drop(&mut self, _: UnitId, _: UnitId) {}
-        fn set_mode(&mut self, _: UnitId, _: u8) {}
-        fn spawn_mercenary(&mut self, _: UnitId, _: u32, _: u8) -> Option<UnitId> {
-            None
-        }
-        fn init_mercenary(&mut self, _: UnitId, _: UnitId, _: &MercInit) {}
-        fn revive_mercenary(&mut self, _: UnitId, _: UnitId) {}
-    }
-
-    impl VendorRest for Rest {
-        fn players_in_level(&self, _: u16) -> i32 {
-            1
-        }
-        fn player_level_id(&self, _: UnitId) -> u16 {
-            1
-        }
-        fn gold_cap(&self, _: UnitId) -> i32 {
-            100_000
-        }
-        fn stash_cap(&self, _: UnitId) -> i32 {
-            100_000
-        }
-        fn drop_gold(&mut self, _: UnitId, _: i32) {}
-        fn last_bought(&self, p: UnitId) -> u32 {
-            self.last_bought.get(&p).copied().unwrap_or(u32::MAX)
-        }
-        fn set_last_bought(&mut self, p: UnitId, guid: u32) {
-            self.last_bought.insert(p, guid);
-        }
-        fn has_cursor_item(&self, _: UnitId) -> bool {
-            unreachable!("{MODEL}")
-        }
-        fn copy_item(&mut self, _: UnitId) -> Option<UnitId> {
-            None
-        }
-        fn has_filled_sockets(&self, _: UnitId) -> bool {
-            false
-        }
-        fn socketed(&self, _: UnitId) -> Vec<UnitId> {
-            Vec::new()
-        }
-        fn price_bonuses(&self, _: UnitId) -> Vec<Bonus> {
-            Vec::new()
-        }
-        fn recharge(&mut self, _: UnitId) {}
-        fn repair_broken(&mut self, _: UnitId) {}
-        fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
-        fn send_transaction(&mut self, p: UnitId, t: Transaction) {
-            let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
-            self.sent.push((p, m.to_vec()));
-        }
-        fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
-        fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
-            true
-        }
-        fn remove_store_item(&mut self, _: u16, _: UnitId) {}
-        fn take_from_store(&mut self, _: u16, _: UnitId) {}
-        fn place_in_gamble(&mut self, _: u16, _: u32, _: UnitId) -> bool {
-            true
-        }
-        fn remove_gamble_item(&mut self, _: u16, _: u32, _: UnitId) {}
-        fn refresh_npc_inventory(&mut self, _: UnitId) {}
-        fn add_trade_inventory(&mut self, _: u16, _: UnitId) {}
-        fn owns_item(&self, _: UnitId, _: UnitId) -> bool {
-            unreachable!("{MODEL}")
-        }
-        fn in_inventory(&self, _: UnitId, _: UnitId) -> bool {
-            unreachable!("{MODEL}")
-        }
-        fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
-            unreachable!("{MODEL}")
-        }
-        fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
-            None
-        }
-        fn add_to_tome(&mut self, _: UnitId, _: i32) {}
-        fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
-            None
-        }
-        fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn equip_ammo(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn place_in_backpack(&mut self, _: UnitId, _: UnitId) -> bool {
-            unreachable!("{MODEL}")
-        }
-        fn take_from_cursor(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-        fn lower_book_skill(&mut self, _: UnitId, _: UnitId, _: i32) {}
-        fn remove_stored(&mut self, _: UnitId, _: UnitId) {
-            unreachable!("{MODEL}")
-        }
-        fn unequip(&mut self, _: UnitId, _: UnitId) -> bool {
-            false
-        }
-    }
-
-    impl QuestRest for Rest {
-        fn has_act2(&self) -> bool {
-            false
-        }
-        fn players(&self) -> Vec<UnitId> {
-            self.quests.keys().copied().collect()
-        }
-        fn first_client_player(&self) -> Option<UnitId> {
-            self.quests.keys().next().copied()
-        }
-        fn quests(&mut self, player: UnitId) -> Option<&mut PlayerQuests> {
-            self.quests.get_mut(&player)
-        }
-        fn player_byte_4c(&self, _: UnitId) -> u8 {
-            0
-        }
-        fn set_player_byte_4c(&mut self, _: UnitId, _: u8) {}
-        fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
-            None
-        }
-        fn unit_act(&self, _: UnitId) -> Option<u8> {
-            Some(0)
-        }
-        fn unit_level(&self, _: UnitId) -> Option<u32> {
-            Some(1)
-        }
-        fn unit_kind(&self, _: UnitId) -> UnitKind {
-            UnitKind::Other
-        }
-        fn players_near(&self, _: UnitId) -> Vec<UnitId> {
-            Vec::new()
-        }
-        fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
-            None
-        }
-        fn attach_sound(&mut self, _: UnitId, _: u16) {}
-        fn send(&mut self, player: UnitId, msg: &[u8]) {
-            self.sent.push((player, msg.to_vec()));
-        }
-        fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
-        fn inventory(&self, _: UnitId) -> Vec<UnitId> {
-            Vec::new()
-        }
-        fn delete_item(&mut self, _: UnitId, _: [u8; 4]) {}
-        fn reward_item(&mut self, _: UnitId, _: [u8; 4], _: i32, _: u8, _: bool) -> Option<UnitId> {
-            None
-        }
-        fn drop_item_at(&mut self, _: UnitId, _: [u8; 4], _: u8) -> bool {
-            false
-        }
-        fn den_region(&self) -> (u32, u32, u32, u32) {
-            (0, 0, 0, 0)
-        }
-        fn true_tomb_level(&self) -> u32 {
-            0
-        }
-        fn free_spot(&mut self, _: UnitId, _: u32, _: u32, _: u32, _: u32) -> Option<(i32, i32)> {
-            None
-        }
-        fn create_portal(&mut self, _: UnitId, _: i32, _: i32, _: u16, _: u32) -> bool {
-            false
-        }
-        fn schedule_quest_event(&mut self, _: UnitId, _: i32) {}
-        fn object_mode(&self, _: UnitId) -> i32 {
-            0
-        }
-        fn set_object_mode(&mut self, _: UnitId, _: i32) {}
-        fn mercenary_reward(&mut self, _: UnitId, _: u16) {}
-        fn unit_position(&self, _: UnitId) -> Option<(i32, i32, d2_sim::units::RoomId)> {
-            None
-        }
-        fn room_contains(&self, _: d2_sim::units::RoomId, _: i32, _: i32) -> bool {
-            false
-        }
-        fn room_at(
-            &self,
-            _: d2_sim::units::RoomId,
-            _: i32,
-            _: i32,
-        ) -> Option<d2_sim::units::RoomId> {
-            None
-        }
-        fn free_spot_at(
-            &mut self,
-            _: d2_sim::units::RoomId,
-            _: i32,
-            _: i32,
-            _: u32,
-            _: u32,
-            _: u32,
-            _: u32,
-        ) -> Option<(i32, i32, d2_sim::units::RoomId)> {
-            None
-        }
-        fn spawn_monster(
-            &mut self,
-            _: d2_sim::units::RoomId,
-            _: i32,
-            _: i32,
-            _: u16,
-            _: u8,
-            _: u32,
-        ) -> Option<UnitId> {
-            None
-        }
-        fn or_unit_flags(&mut self, _: UnitId, _: u32) {}
-        fn monsters(&self) -> Vec<UnitId> {
-            Vec::new()
-        }
-        fn npc_chat_clients(&self, _: UnitId) -> Option<Vec<UnitId>> {
-            None
-        }
-        fn remove_monster(&mut self, _: UnitId) {}
-        fn drop_preset_monster(&mut self, _: u8, _: u16) {}
-        fn find_object_near(&self, _: UnitId, _: u16) -> Option<UnitId> {
-            None
-        }
-        fn create_object(
-            &mut self,
-            _: d2_sim::units::RoomId,
-            _: i32,
-            _: i32,
-            _: u16,
-        ) -> Option<UnitId> {
-            None
-        }
-        fn object_anim_length(&self, _: UnitId) -> i32 {
-            0
-        }
-        fn schedule_object_event(&mut self, _: UnitId, _: u8, _: i32) {}
-        fn open_quest_message(&mut self, _: UnitId, _: UnitId, _: u16) {}
-        fn unhandled(&mut self, _: u8, _: u32) {}
-    }
-
-    /// Every type is its own and type 0's; helm and shield are armor.
-    fn equiv() -> d2_data::fixup::maps::EquivMatrix {
-        let n = N_TYPES;
-        let words = n.div_ceil(32);
-        let mut m = d2_data::fixup::maps::EquivMatrix {
-            n,
-            words,
-            bits: vec![0; n * words],
-        };
-        let mut set = |i: usize, j: usize| m.bits[i * words + j / 32] |= 1 << (j % 32);
-        for i in 1..n {
-            set(i, 0);
-            set(i, i);
-        }
-        set(usize::from(ty::HELM), usize::from(ty::ARMO));
-        set(usize::from(ty::SHIE), usize::from(ty::ARMO));
-        m
-    }
-
-    /// A cap (helm) and a buckler (shield), durability 12.
-    fn item_tables() -> ItemTables {
-        let mut ratio: Itemratio = blank();
-        ratio.version = 0;
-        let rec = |t: u16, code: &[u8; 4], (minac, maxac): (u32, u32)| ItemRec {
-            code: *code,
-            type_: t as i16,
-            level: 1,
-            durability: 12,
-            minac,
-            maxac,
-            ..ItemRec::default()
-        };
-        ItemTables {
-            items: vec![
-                rec(ty::HELM, b"cap ", (3, 5)),
-                rec(ty::SHIE, b"buc ", (4, 6)),
-            ],
-            itemtypes: (0..N_TYPES)
-                .map(|_| {
-                    let mut t: Itemtypes = blank();
-                    t.class = 0xFF;
-                    t.staffmods = 0xFF;
-                    t.rare = 1;
-                    t
-                })
-                .collect(),
-            equiv: equiv(),
-            itemratio: vec![ratio],
-            valshift: vec![0; N_STATS],
-            stat_shift: 6,
-            stat_mask: 0x3F,
-            ..ItemTables::default()
-        }
-    }
-
-    /// Akara's column holds the cap (permanent) and the buckler (1–3).
-    fn vendor_tables() -> VendorTables {
-        let item = |code: &[u8; 4], t: u16, cost: u32, (minac, maxac): (u32, u32)| VendorItem {
-            code: *code,
-            normcode: *code,
-            ubercode: NO_CODE,
-            ultracode: NO_CODE,
-            cost,
-            type_: t as i16,
-            type2: -1,
-            level: 1,
-            spawnable: 1,
-            durability: 12,
-            minac,
-            maxac,
-            nightmare_upgrade: XXX,
-            hell_upgrade: XXX,
-            ..VendorItem::default()
-        };
-        let mut cap = item(b"cap ", ty::HELM, 100, (3, 5));
-        cap.perm_store = 1;
-        cap.columns[0] = [1, 1, 0, 0, 0];
-        let mut buc = item(b"buc ", ty::SHIE, 80, (4, 6));
-        buc.columns[0] = [1, 3, 0, 0, 0];
-        let mut itemtypes = vec![
-            TypeRec {
-                repair: 1,
-                class: 7,
-                storepage: 3,
-                staffmods: 0xFF,
-                ..TypeRec::default()
-            };
-            N_TYPES
-        ];
-        itemtypes[usize::from(ty::HELM)].storepage = 0;
-        itemtypes[usize::from(ty::SHIE)].storepage = 0;
-        VendorTables {
-            items: vec![cap, buc],
-            itemtypes,
-            equiv: equiv(),
-            stat_shift: 6,
-            stat_mask: 0x3F,
-            monster_levels: vec![[1, 1, 1]; N_MONSTATS],
-            interact: vec![class::AKARA],
-            npc: vec![NpcPrices {
-                class: u32::from(class::AKARA),
-                sell: 1024,
-                buy: 512,
-                rep: 128,
-                quests: [(0, 0, 0, 0); 3],
-                max_buy: [5000; 3],
-            }],
-            difficulty: vec![Default::default(); 3],
-            ..VendorTables::default()
-        }
-    }
-
-    fn monstats() -> Vec<Monstats> {
-        let mut v: Vec<Monstats> = (0..N_MONSTATS).map(|_| blank()).collect();
-        v[usize::from(class::AKARA)].npc = true;
-        v[usize::from(class::AKARA)].interact = true;
-        v
     }
 
     pub type TradeGame = SimGame<ActionSim<ActionRest>, WiredWorld<Rest>>;
@@ -2177,4 +1712,374 @@ proptest! {
         let msgs: Vec<Gen> = ids.iter().zip(gens).map(|(&id, g)| Gen { id, ..g }).collect();
         run(&mut sim, &guids, &msgs)?;
     }
+}
+
+// ---- handlers' early refusals ----------------------------------------------------------
+//
+// The refusals each handler's spec orders before any effect ("returns
+// before any effect", checks listed before the first write;
+// `docs/HANDOFF.md` PK1): the result code is the spec's, and the game,
+// the host's world state and the outgoing messages (the client's
+// buffers, the seams' outboxes, the rests' call logs) are unchanged.
+// Refusals the spec orders after a write are left out (`cube.md` §2
+// step 3.1's targeting reset before 3.2 / 3.4; `npc.md` §2's path and AI
+// steps before `start` rule 1; the waypoint refusals with the
+// waypoint as the interaction, §6.3 rule 1; the point forms, whose
+// validator stores the frame first, `intents-events.md` §2.4 rule 4).
+// The item moves and walk are not on these hosts: their refusals are
+// tested with the handler fixtures (`handlers/items/moves/tests.rs`,
+// `handlers/walk/tests.rs`).
+
+/// Everything a refusal could touch on a host, as text, and its
+/// outgoing messages.
+trait Digest {
+    fn digest(&mut self) -> String;
+    /// The seams' outboxes (messages queued for the next flush).
+    fn queued(&mut self) -> Vec<(UnitId, Vec<u8>)>;
+}
+
+fn player_digest<D: EventDispatch, W>(sim: &SimGame<D, W>) -> String {
+    let p = sim.player_of(0);
+    format!(
+        "{:?}{:?}{:?}{:?}",
+        p.and_then(|p| sim.player_fields(p)),
+        sim.resyncs,
+        sim.unhandled,
+        sim.tick_faults
+    )
+}
+
+impl Digest for ActionGame {
+    fn digest(&mut self) -> String {
+        let h = &self.events.sys.hooks;
+        let b = h.x.get();
+        let book = format!(
+            "{:?}{:?}{:?}{:?}{:?}{:?}",
+            b.list, b.left, b.right, b.used, b.pos, b.interact
+        );
+        drop(b);
+        format!(
+            "{}|{}|{:?}{:?}{:?}|{:?}{:?}|{}",
+            self.snapshot(),
+            book,
+            h.game_seed,
+            h.waypoints,
+            h.mode_target,
+            self.world.arrivals,
+            self.world.faults,
+            player_digest(self)
+        )
+    }
+    fn queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        self.events.sys.hooks.x.get().sent.clone()
+    }
+}
+
+impl Digest for ItemGame {
+    fn digest(&mut self) -> String {
+        let w = &self.world;
+        let cube = w
+            .cube
+            .as_ref()
+            .map(|c| format!("{:?}{:?}{:?}", c.staged, c.creation, c.errors));
+        format!(
+            "{}|{:?}{:?}{:?}{:?}{:?}{:?}|{:?}{:?}|{}",
+            self.snapshot(),
+            w.state,
+            w.npc,
+            w.quests,
+            w.uniques,
+            w.rest,
+            cube,
+            self.events.sys.hooks.game_seed,
+            self.world.action.faults,
+            player_digest(self)
+        )
+    }
+    fn queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        let mut q = self.events.sys.hooks.x.sent.clone();
+        q.extend(self.world.rest.sent.iter().cloned());
+        q
+    }
+}
+
+/// Sends `m` through the dispatcher and checks the refusal: result
+/// `code`, nothing changed, nothing sent or queued. `what` names the
+/// spec rule.
+fn refused<D, W>(sim: &mut SimGame<D, W>, m: &[u8], code: ResultCode, what: &str)
+where
+    D: EventDispatch,
+    W: d2_server::adapters::handlers::world::WorldHost<D>,
+    SimGame<D, W>: Digest,
+{
+    let mut out = ClientBuffers::new();
+    out.add_client(0);
+    let before = (sim.digest(), sim.queued());
+    let got = dispatch(sim, &ProtoSizes, &mut out, 0, ALIVE, m, m.len());
+    assert_eq!(got, code, "{what}: {m:02X?}");
+    assert_eq!(out.pop(0), None, "{what}: {m:02X?} sent a message");
+    let after = (sim.digest(), sim.queued());
+    assert!(
+        before == after,
+        "{what}: {m:02X?} changed the host:\n{before:?}\n{after:?}"
+    );
+}
+
+fn msg(id: u8, fields: &[u32]) -> Vec<u8> {
+    let mut m = vec![id];
+    for f in fields {
+        m.extend_from_slice(&f.to_le_bytes());
+    }
+    m
+}
+
+const NO_GUID: u32 = 0xDEAD;
+
+/// Skills (`use.md` §1 rules 3 and 6, §7; `vitals.md` §2;
+/// `levels.md` §6.4).
+// Covers: specs/skills/use.md §7
+#[test]
+fn skill_refusals_change_nothing() {
+    let (mut sim, guids) = action_host(1);
+    // 0x3C: no skill entry (99) → 3, before any write (§7).
+    refused(
+        &mut sim,
+        &msg(0x3C, &[99, u32::MAX]),
+        ResultCode::Malformed,
+        "use §7 entry",
+    );
+    // 0x3A: stat id > 15 → 3; a stat with no spend (4..15) → 2 (§2).
+    refused(
+        &mut sim,
+        &[0x3A, 16, 0],
+        ResultCode::Malformed,
+        "vitals §2 stat id",
+    );
+    refused(
+        &mut sim,
+        &[0x3A, 4, 0],
+        ResultCode::Invalid,
+        "vitals §2 first spend",
+    );
+    // 0x3B: a skill id past the table → 2 (§6.4).
+    refused(
+        &mut sim,
+        &[0x3B, 0xFF, 0x7F],
+        ResultCode::Invalid,
+        "levels §6.4 id",
+    );
+    // 0x06 / 0x0D (unit forms): no left / right skill → 3, before the
+    // pierce index (§1 rules 3, 6).
+    {
+        let mut b = sim.events.sys.hooks.x.get();
+        b.left = None;
+        b.right = None;
+    }
+    for id in [0x06, 0x07, 0x0D, 0x0E] {
+        refused(
+            &mut sim,
+            &msg(id, &[1, guids[1]]),
+            ResultCode::Malformed,
+            "use §1 no skill",
+        );
+    }
+}
+
+/// Waypoint 0x49 (`waypoints.md` §6.2) with no interaction: §6.3 rule
+/// 1's reset does not apply, so each refusal changes nothing.
+// Covers: specs/world/waypoints.md §6.2
+#[test]
+fn waypoint_refusals_change_nothing() {
+    let (mut sim, guids) = action_host(1);
+    refused(
+        &mut sim,
+        &msg(0x49, &[NO_GUID, 1]),
+        ResultCode::Refused,
+        "§6.2 step 1 missing",
+    );
+    refused(
+        &mut sim,
+        &msg(0x49, &[guids[3], 0xFFFF]),
+        ResultCode::Malformed,
+        "§6.2 step 5 level",
+    );
+}
+
+/// The item unit of GUID `g`.
+fn item_unit(sim: &ItemGame, g: u32) -> UnitId {
+    sim.game.lists.find_unit(UnitType::Item, g).unwrap()
+}
+
+/// Opens the inventory desk once with no call, so its item data copies
+/// (`InvDesk::sync_in`) hold the fixture's direct edits of the units and
+/// the item store before a digest is taken: any later handler's desk
+/// would copy them, which is not the handler's effect.
+fn settle(sim: &mut ItemGame) {
+    let (game, events, world) = (&mut sim.game, &mut sim.events, &mut sim.world);
+    world.with_economy(game, events, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory parts");
+        let _ = inv.desk(econ);
+    });
+}
+
+/// The cube's 0x2A steps 1 and 2 (`cube.md` §2), before the step 3.1
+/// targeting reset (the cube carries flag 0x4, so a reset would show);
+/// 0x4F 0x17 / 0x18 with another interaction (§1).
+// Covers: specs/world/cube.md §2 r1, §2 r2, §1
+#[test]
+fn cube_refusals_change_nothing() {
+    // The ring (mode 4) is the cursor item.
+    let (mut sim, guids) = item_host(4);
+    let (cube, ring) = (guids[1], guids[2]);
+    let (cube_u, ring_u) = (item_unit(&sim, cube), item_unit(&sim, ring));
+    sim.events.sys.hooks.items.get_mut(cube_u).unwrap().flags |= 0x4;
+    settle(&mut sim);
+    refused(
+        &mut sim,
+        &msg(0x2A, &[NO_GUID, cube]),
+        ResultCode::Refused,
+        "§2 step 1 missing",
+    );
+    refused(
+        &mut sim,
+        &msg(0x2A, &[ring, NO_GUID]),
+        ResultCode::Refused,
+        "§2 step 2 missing",
+    );
+    // A cursor-mode ring that is not the cursor item.
+    let player = sim.player_of(0).unwrap();
+    let set_cursor = |sim: &mut ItemGame, c| {
+        let parts = sim.world.inventory.as_mut().unwrap();
+        parts
+            .state
+            .inventories
+            .get_mut(&player)
+            .unwrap()
+            .set_cursor(c);
+    };
+    set_cursor(&mut sim, None);
+    refused(
+        &mut sim,
+        &msg(0x2A, &[ring, cube]),
+        ResultCode::Refused,
+        "§2 step 1 cursor",
+    );
+    set_cursor(&mut sim, Some(ring_u));
+    sim.world.rest.interact.insert(player, (2, 77));
+    for b in [0x17u8, 0x18] {
+        refused(
+            &mut sim,
+            &[0x4F, b, 0, 0, 0, 0, 0],
+            ResultCode::Malformed,
+            "§1 interaction",
+        );
+    }
+}
+
+/// NPC ids on the trade host (`npc.md` §2, §3, §6, §7.4).
+// Covers: specs/world/npc.md §2, §3
+#[test]
+fn npc_refusals_change_nothing() {
+    let (mut sim, guids) = trade::trade_host(1);
+    let akara = guids[1];
+    refused(
+        &mut sim,
+        &msg(0x13, &[1, NO_GUID]),
+        ResultCode::Refused,
+        "§2 missing",
+    );
+    refused(
+        &mut sim,
+        &msg(0x2F, &[1, NO_GUID]),
+        ResultCode::Refused,
+        "§3 missing",
+    );
+    refused(
+        &mut sim,
+        &msg(0x30, &[1, NO_GUID]),
+        ResultCode::Refused,
+        "§3 missing",
+    );
+    // 0x34 at the interact unit (after talk) whose class is not Cain:
+    // 0, no message (§6 step 2).
+    let mut out = ClientBuffers::new();
+    out.add_client(0);
+    let talk = &open_trade(akara)[0];
+    dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, talk, talk.len());
+    sim.world.rest.sent.clear();
+    sim.events.sys.hooks.x.sent.clear();
+    refused(
+        &mut sim,
+        &msg(0x34, &[akara]),
+        ResultCode::Done,
+        "§6 step 2 not Cain",
+    );
+}
+
+/// Vendor ids on the trade host after talk, chat and trade
+/// (`vendors.md` §7.2 rule 1, §5.5).
+// Covers: specs/world/vendors.md §7.2, §5.5
+#[test]
+fn vendor_refusals_change_nothing() {
+    let (mut sim, guids) = trade::trade_host(1);
+    let (akara, buckler) = (guids[1], guids[2]);
+    let mut out = ClientBuffers::new();
+    out.add_client(0);
+    for m in open_trade(akara) {
+        dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &m, m.len());
+    }
+    sim.world.rest.sent.clear();
+    sim.events.sys.hooks.x.sent.clear();
+    refused(
+        &mut sim,
+        &msg(0x33, &[akara, NO_GUID, 0, 1]),
+        ResultCode::Refused,
+        "§7.2 r1",
+    );
+    refused(
+        &mut sim,
+        &msg(0x37, &[NO_GUID]),
+        ResultCode::Invalid,
+        "§5.5 missing",
+    );
+    refused(
+        &mut sim,
+        &msg(0x37, &[buckler]),
+        ResultCode::Malformed,
+        "§5.5 not bought",
+    );
+}
+
+/// Quest 0x58 with a quest id ≥ 0x2A → 2 (`quests.md` §1.7).
+// Covers: specs/world/quests.md §1.7
+#[test]
+fn quest_refusal_changes_nothing() {
+    let (mut sim, _) = trade::trade_host(1);
+    refused(
+        &mut sim,
+        &[0x58, 0x2A, 0],
+        ResultCode::Invalid,
+        "§1.7 quest id",
+    );
+}
+
+/// M08: the check sees a refusal that changes something: the cube's
+/// stored-item refusal (§2 step 3.4 → 3) comes after the step 3.1
+/// targeting reset (flag 0x4 cleared), so `refused` must fail on it.
+#[test]
+fn refusal_check_sees_a_late_refusal() {
+    let (mut sim, guids) = item_host(0);
+    let player = sim.player_of(0).unwrap();
+    let (cube_u, ring_u) = (item_unit(&sim, guids[1]), item_unit(&sim, guids[2]));
+    store_item(&mut sim, player, ring_u, 0);
+    sim.events.sys.units.get_mut(ring_u).unwrap().mode = 0;
+    sim.events.sys.hooks.items.get_mut(cube_u).unwrap().flags |= 0x4;
+    settle(&mut sim);
+    let m = msg(0x2A, &[guids[2], guids[1]]);
+    let late = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        refused(&mut sim, &m, ResultCode::Malformed, "§2 step 3.4")
+    }));
+    assert!(late.is_err(), "the targeting reset went unseen");
+    let flags = sim.events.sys.hooks.items.get(cube_u).unwrap().flags;
+    assert_eq!(flags & 0x4, 0, "the reset ran");
 }
