@@ -31,10 +31,31 @@ pub struct IndexFrame {
     pub height: u32,
     /// The format's own offsets, unchanged: DC6 `offset_x/offset_y`, DCC
     /// frame box top-left `(x_min, y_min)`, DT1 tile image `(x0, y0)`.
-    // TODO(spec: render/sprite-placement.md): offsets → screen pixel (§B1).
+    /// Offsets → screen pixel: `crate::rules::placement`
+    /// (`render/sprite-placement.md` §8), which reads [`IndexFrame::anchor`].
     pub x_off: i32,
     pub y_off: i32,
+    /// What `y_off` names (`render/sprite-placement.md` §2, §4, §8).
+    pub anchor: FrameAnchor,
     pub pixels: Vec<u8>,
+}
+
+/// What `y_off` names and how the original's rasterizer clips the frame
+/// (`render/sprite-placement.md` §2–§5, §7, §8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum FrameAnchor {
+    /// `y_off` is the top row and the drawn rows are the image rows inside
+    /// the frame: DCC frame boxes (bottom-up cels, §3), DT1 tile images
+    /// (block drawers, §7), and frames built with [`IndexFrame::new`]
+    /// (synthetic frames whose offsets are already the top-left).
+    #[default]
+    Top,
+    /// `y_off` is the bottom row, inclusive: a DC6 frame with
+    /// `flip & 1 = 0` (bottom-up cel, §2).
+    Bottom,
+    /// `y_off` is the top row of a top-down cel: a DC6 frame with
+    /// `flip & 1 = 1` (§4), clipped by the rasterizer as if bottom-up.
+    TopDown,
 }
 
 impl IndexFrame {
@@ -59,8 +80,15 @@ impl IndexFrame {
             height,
             x_off,
             y_off,
+            anchor: FrameAnchor::Top,
             pixels,
         })
+    }
+
+    /// The frame with `anchor` set.
+    pub fn with_anchor(mut self, anchor: FrameAnchor) -> Self {
+        self.anchor = anchor;
+        self
     }
 
     /// No pixels at all (a 0-wide or 0-high frame).
@@ -132,7 +160,10 @@ impl FrameSet {
             .sum()
     }
 
-    /// Direction `dir` of a DCC; frames keep their DCC frame boxes.
+    /// Direction `dir` of a DCC; frames keep their DCC frame boxes. A frame
+    /// whose `variable0` is odd is an error: the original would draw it
+    /// top-down from the box's bottom row (`sprite-placement.md` §3, §4,
+    /// open question 2), which a frame box cannot express.
     pub fn from_dcc(dcc: &Dcc, dir: u8) -> Result<Self, FrameError> {
         let d = dcc
             .directions
@@ -144,12 +175,26 @@ impl FrameSet {
         let frames = d
             .frames
             .iter()
-            .map(|f| IndexFrame::new(f.width, f.height, f.x_min, f.y_min, f.pixels.clone()))
+            .enumerate()
+            .map(|(i, f)| {
+                if f.variable0 & 1 != 0 {
+                    return Err(FrameError::DccVariable0 {
+                        dir,
+                        frame: i,
+                        variable0: f.variable0,
+                    });
+                }
+                IndexFrame::new(f.width, f.height, f.x_min, f.y_min, f.pixels.clone())
+            })
             .collect::<Result<_, _>>()?;
         Ok(Self { frames })
     }
 
-    /// Direction `dir` of a DC6; frames keep `offset_x/offset_y`.
+    /// Direction `dir` of a DC6; frames keep `offset_x/offset_y` and carry
+    /// the orientation bit as [`FrameAnchor`] (`sprite-placement.md` §8).
+    /// A `flip` other than 0 or 1 is an error: the original tests bit 0
+    /// only (§1) while the decoder reads any non-zero `flip` as top-down,
+    /// so such a frame's rows would not be the original's.
     pub fn from_dc6(dc6: &Dc6, dir: u8) -> Result<Self, FrameError> {
         let dirs = dc6.header.directions as usize;
         let per = dc6.header.frames_per_direction as usize;
@@ -164,7 +209,21 @@ impl FrameSet {
                 let f = dc6
                     .frame(usize::from(dir), i)
                     .ok_or(FrameError::MissingFrame { dir, frame: i })?;
-                IndexFrame::new(f.width, f.height, f.offset_x, f.offset_y, f.pixels.clone())
+                let anchor = match f.flip {
+                    0 => FrameAnchor::Bottom,
+                    1 => FrameAnchor::TopDown,
+                    flip => {
+                        return Err(FrameError::Dc6Flip {
+                            dir,
+                            frame: i,
+                            flip,
+                        })
+                    }
+                };
+                Ok(
+                    IndexFrame::new(f.width, f.height, f.offset_x, f.offset_y, f.pixels.clone())?
+                        .with_anchor(anchor),
+                )
             })
             .collect::<Result<_, _>>()?;
         Ok(Self { frames })
@@ -225,6 +284,14 @@ pub enum FrameError {
     NoPart { part: FramePart, count: usize },
     #[error("DC6 direction {dir} has no frame {frame}")]
     MissingFrame { dir: u8, frame: usize },
+    #[error("DCC direction {dir} frame {frame}: variable0 {variable0} is odd (top-down cel)")]
+    DccVariable0 {
+        dir: u8,
+        frame: usize,
+        variable0: u32,
+    },
+    #[error("DC6 direction {dir} frame {frame}: flip {flip} is neither 0 nor 1")]
+    Dc6Flip { dir: u8, frame: usize, flip: u32 },
     #[error("{0} does not apply to this file type")]
     WrongPartKind(FramePart),
     #[error("path {0:?} is not canonical (lowercase ASCII, '/' separators, no leading '/')")]
