@@ -205,3 +205,47 @@ fn generate_direction_from_the_picked_file() {
     let m = info.map.unwrap();
     assert_eq!(w.p.map(m).unwrap().picked_file, 0);
 }
+
+/// `preset.md` §6 r9: with `Scan`, each file unit of type 2 with class
+/// < 573 and objects `SubClass` bit 0x40 flags its cell (x/5/8, y/5/8)
+/// with 0x30000.
+#[test]
+fn build_area_waypoint_cells() {
+    use crate::drlg::room_flags;
+    let mut w = World::new();
+    w.dd.object_subclass[573] = 0x40;
+    let l = w.level(2, 5, 16, 16);
+    let mut f = ds1(16, 16);
+    let obj = |id, x, y| Ds1ObjectInput {
+        kind: 2,
+        id,
+        x,
+        y,
+        flags: 0,
+    };
+    // Class 119 (id 269) at sub-tiles (45, 50) → cell (1, 1); class 573
+    // (id 723) at (5, 5) → cell (0, 0) not flagged.
+    f.objects = vec![obj(269, 45, 50), obj(723, 5, 5)];
+    w.file(5, b"a.ds1", f);
+    w.pd.defs[5].scan = 1;
+    w.init(l);
+    w.generate(l).unwrap();
+    let mut flagged: Vec<(i32, i32, bool)> = w
+        .drlg
+        .level_rooms(l)
+        .iter()
+        .map(|&r| {
+            let room = w.drlg.room(r);
+            (
+                room.rect.x,
+                room.rect.y,
+                room.flags & room_flags::ANY_WAYPOINT == room_flags::ANY_WAYPOINT,
+            )
+        })
+        .collect();
+    flagged.sort();
+    assert_eq!(
+        flagged,
+        [(0, 0, false), (0, 8, false), (8, 0, false), (8, 8, true)]
+    );
+}
