@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §4; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/items/generation.md §3; specs/items/treasure.md §5; specs/sim/stat-lists.md §6, §8
+// Spec: specs/sim/tick.md §3, §4; specs/missiles/missiles.md §R2–§R6; specs/combat/damage.md §5.2, §7.1, §7.2; specs/drlg/levels.md §5; specs/drlg/preset.md §3, §8, §9; specs/items/generation.md §3; specs/items/treasure.md §5; specs/sim/stat-lists.md §6, §8
 //! Performance baselines of `d2-sim` (criterion; `docs/handoff/bench-baselines.md`).
 //!
 //! The game ticks at 25 Hz, so one tick has a 40 ms budget. Every case
@@ -99,6 +99,35 @@ fn bench_tick(c: &mut Criterion) {
     });
     // Setup alone: the per-iteration cost the case above includes.
     g.bench_function("populated_setup_only", |b| b.iter(populated));
+    g.finish();
+}
+
+/// The loaded tick (`docs/handoff/bench-fight.md`): 36 rows of a player
+/// firing an arrow every 5 frames at a monster 18 sub-tiles away; every
+/// monster dies on its 8th hit (death mode, experience, level-up check).
+/// The first 60 ticks are the fight (the last kills land near frame 58);
+/// 200 ticks add the steady load after it (122 missiles in flight
+/// throughout; the corpses keep their collision bit, so later arrows
+/// still hit them).
+fn bench_fight(c: &mut Criterion) {
+    use d2_sim::bench_fixtures::combat::{Fight, MAX_ROWS};
+    let mut g = c.benchmark_group("sim_fight");
+    g.sample_size(20);
+    for ticks in [60, 200] {
+        g.bench_function(format!("fight_36_rows_{ticks}_ticks"), |b| {
+            b.iter_batched(
+                || Fight::new(MAX_ROWS),
+                |mut f| {
+                    for _ in 0..ticks {
+                        f.tick();
+                    }
+                    f
+                },
+                criterion::BatchSize::LargeInput,
+            )
+        });
+    }
+    g.bench_function("fight_setup_only", |b| b.iter(|| Fight::new(MAX_ROWS)));
     g.finish();
 }
 
@@ -355,6 +384,7 @@ fn bench_stats(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_tick,
+    bench_fight,
     bench_drlg,
     bench_items,
     bench_treasure,

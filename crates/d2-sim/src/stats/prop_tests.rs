@@ -32,7 +32,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use proptest::prelude::*;
 
-use super::lists::{flag, ListId, StatHost, ValueCallback};
+use super::lists::{flag, ListId, StatHost, StatListError, ValueCallback};
 use super::tests::{data, N};
 use super::{key, key_stat, StatLists};
 use crate::units::{UnitId, UnitType};
@@ -376,7 +376,7 @@ impl Machine {
             Op::Expire(u, frame) => {
                 let u = unit(u).0;
                 let Some(r) = self.lists.unit_list(u) else {
-                    self.lists.expire_lists(&mut self.host, u, frame);
+                    assert_eq!(self.lists.expire_lists(&mut self.host, u, frame), Ok(()));
                     return;
                 };
                 // §10.4: every NEWLENGTH list of the active chain with
@@ -388,13 +388,19 @@ impl Machine {
                     .filter(|&c| self.lists.flags(c) & flag::NEWLENGTH != 0)
                     .filter(|&c| self.lists.expire(c) - i32::from(frame == 0) <= frame)
                     .collect();
-                if due.iter().any(|&c| self.lists.is_extended(c)) {
-                    // An expired extended list: endless in 1.14d, a
-                    // deliberate panic in d2rs (edge case 4). Not run.
-                    return;
-                }
-                freed = due;
-                self.lists.expire_lists(&mut self.host, u, frame);
+                // An expired extended list: endless in 1.14d (edge case
+                // 4); d2rs stops at it with an error, after freeing the
+                // plain due lists before it in the chain.
+                let blocker = due.iter().copied().find(|&c| self.lists.is_extended(c));
+                freed = due
+                    .into_iter()
+                    .take_while(|&c| !self.lists.is_extended(c))
+                    .collect();
+                let got = self.lists.expire_lists(&mut self.host, u, frame);
+                assert_eq!(
+                    got,
+                    blocker.map_or(Ok(()), |c| Err(StatListError::EndlessExpiry(c)))
+                );
             }
             Op::Death(u) => {
                 let u = unit(u).0;

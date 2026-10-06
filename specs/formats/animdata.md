@@ -34,7 +34,7 @@
 | Test vectors | 209–241 |
 | expfield.d2 | 242–277 |
 | Provenance | 278–303 |
-| Open questions | 304–318 |
+| Open questions | 304–319 |
 <!-- /index -->
 
 ## Summary
@@ -310,7 +310,8 @@ raw disassembly where Ghidra lost register arguments):
 2. The full COF-name composer `0x0064F5B0` / weapon-class resolver
    `0x0064F060` for players, objects and units with an inventory (which
    weapon class, the `gh` mode override table at `0x00745900`–
-   `0x0074591F`): owned by a future animation/composite spec.
+   `0x0074591F`): answered in `render/unit-composite.md` §2 (table
+   contents: its OQ1).
 3. Whether any 1.14d code path looks up a name of 8 characters (would
    overflow the 8-byte buffers into the stack cookie).
 4. Whether `expfield.d2`'s unread u16 (266) is a version, and what the

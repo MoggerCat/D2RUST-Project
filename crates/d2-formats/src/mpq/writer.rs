@@ -1,4 +1,4 @@
-// Spec: specs/formats/mpq.md (§1, §4–§8, §10 in the writing direction; test support only)
+// Spec: specs/formats/mpq.md (§1, §4–§8, §10, §11 in the writing direction; test support only)
 //! A test-only MPQ writer: builds format-version-0 archives that
 //! [`super::Archive`] reads, so the load path can be tested without game
 //! files. Not used by the game: the spec puts writing out of scope for the
@@ -12,9 +12,11 @@
 //!
 //! Compression (§9, §10): the PKWARE DCL stream, either under the IMPLODE
 //! flag or under COMPRESS with mask 0x08, literal mode binary or ASCII,
-//! dictionary bits 4–6. A sector that does not shrink is stored raw, which
-//! §8.4 reads as stored. Encryption (§4, §7) with or without FIX_KEY;
-//! SINGLE_UNIT and SECTOR_CRC layouts (§8).
+//! dictionary bits 4–6; the Huffman stream (§11) of any weight table under
+//! COMPRESS with mask 0x01, or Huffman then PKWARE with mask 0x09. A sector
+//! that does not shrink is stored raw, which §8.4 reads as stored.
+//! Encryption (§4, §7) with or without FIX_KEY; SINGLE_UNIT and SECTOR_CRC
+//! layouts (§8).
 
 use std::path::Path;
 
@@ -23,7 +25,7 @@ use super::flags;
 use super::tables::{
     CH_BITS, CH_CODE, DIST_BITS, DIST_CODE, EX_LEN_BITS, LEN_BASE, LEN_BITS, LEN_CODE,
 };
-use super::{compression, HEADER_MAGIC};
+use super::{compression, huffman, HEADER_MAGIC};
 
 /// How the sectors of one file are stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +37,11 @@ pub enum Method {
     /// The COMPRESS flag: each compressed sector is mask 0x08 + a PKWARE
     /// stream (§9).
     Compress(Pkware),
+    /// The COMPRESS flag with a Huffman stage (§9, §11): each compressed
+    /// sector is mask 0x01 + a Huffman stream with weight table `table`
+    /// (0..=8), or with `pkware`, mask 0x09 + a PKWARE stream of that
+    /// Huffman stream (the reader explodes first, then decodes Huffman).
+    Huffman { table: u8, pkware: Option<Pkware> },
 }
 
 /// PKWARE DCL stream parameters (§10 header).
@@ -140,6 +147,8 @@ pub enum WriteError {
     TooLarge,
     #[error("dictionary bits {0} outside 4..=6")]
     BadDictBits(u8),
+    #[error("Huffman table {0} outside 0..=8")]
+    BadHuffmanTable(u8),
     #[error("{0}: SECTOR_CRC needs a sectored, compressed file")]
     BadCrc(String),
 }
@@ -310,27 +319,35 @@ impl MpqWriter {
         pos: u32,
     ) -> Result<(Vec<u8>, u32), WriteError> {
         let mut fl = flags::EXISTS;
-        let codec = match o.method {
+        let pkware = match o.method {
             Method::Stored => None,
             Method::Implode(p) => {
                 fl |= flags::IMPLODE;
-                Some((false, p))
+                Some(p)
             }
             Method::Compress(p) => {
                 fl |= flags::COMPRESS;
-                Some((true, p))
+                Some(p)
+            }
+            Method::Huffman { table, pkware } => {
+                if usize::from(table) >= super::tables::HUFFMAN_WEIGHTS.len() {
+                    return Err(WriteError::BadHuffmanTable(table));
+                }
+                fl |= flags::COMPRESS;
+                pkware
             }
         };
-        if let Some((_, p)) = codec {
+        if let Some(p) = pkware {
             if !(4..=6).contains(&p.dict_bits) {
                 return Err(WriteError::BadDictBits(p.dict_bits));
             }
         }
+        let stored = o.method == Method::Stored;
         if o.single_unit {
             fl |= flags::SINGLE_UNIT;
         }
         if o.sector_crc {
-            if codec.is_none() || o.single_unit {
+            if stored || o.single_unit {
                 return Err(WriteError::BadCrc(name.to_owned()));
             }
             fl |= flags::SECTOR_CRC;
@@ -353,20 +370,28 @@ impl MpqWriter {
         }
 
         let compress = |unit: &[u8]| -> Vec<u8> {
-            match codec {
-                None => unit.to_vec(),
-                Some((with_mask, p)) => {
-                    let mut c = Vec::new();
-                    if with_mask {
-                        c.push(compression::PKWARE);
-                    }
-                    c.extend_from_slice(&implode(unit, p));
-                    if c.len() < unit.len() {
-                        c
-                    } else {
-                        unit.to_vec()
+            let c = match o.method {
+                Method::Stored => return unit.to_vec(),
+                Method::Implode(p) => implode(unit, p),
+                Method::Compress(p) => masked(compression::PKWARE, &implode(unit, p)),
+                Method::Huffman { table, pkware } => {
+                    let h = huffman::compress(table, unit);
+                    match pkware {
+                        None => masked(compression::HUFFMAN, &h),
+                        // Each decoder's output is capped at the sector
+                        // size (§9), so the Huffman stream between the two
+                        // stages must fit in it.
+                        Some(p) if h.len() <= unit.len() => {
+                            masked(compression::HUFFMAN | compression::PKWARE, &implode(&h, p))
+                        }
+                        Some(_) => return unit.to_vec(),
                     }
                 }
+            };
+            if c.len() < unit.len() {
+                c
+            } else {
+                unit.to_vec()
             }
         };
 
@@ -379,7 +404,7 @@ impl MpqWriter {
         }
 
         let s = self.sector_size();
-        if codec.is_none() {
+        if stored {
             let mut out = data.to_vec();
             if o.encrypted {
                 for (i, chunk) in out.chunks_mut(s).enumerate() {
@@ -427,6 +452,21 @@ impl MpqWriter {
         out.extend_from_slice(&crc_block);
         Ok((out, fl))
     }
+}
+
+/// A COMPRESS sector: the mask byte, then the payload (§9).
+fn masked(mask: u8, payload: &[u8]) -> Vec<u8> {
+    let mut c = Vec::with_capacity(payload.len() + 1);
+    c.push(mask);
+    c.extend_from_slice(payload);
+    c
+}
+
+/// A Huffman stream (§11) with weight table `table` (0..=8) that the
+/// reader's Huffman stage decodes to `data`; it ends with the end symbol.
+/// Panics on a table outside 0..=8.
+pub fn huffman(table: u8, data: &[u8]) -> Vec<u8> {
+    huffman::compress(table, data)
 }
 
 /// LSB-first bit writer (§10 bit order).
