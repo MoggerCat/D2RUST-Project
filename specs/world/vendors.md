@@ -700,7 +700,7 @@ Reproduced by default.
 
 Game-file test (`#[ignore]`): build the 17 column lists from live
 `weapons/armor/misc.txt`; Charsi's list holds exactly the entries listed
-by `vendors.tsv` column 2 rules (e.g. `aqv`, `cqv` permanent; `axe`
+by its `Charsi*` item columns (§1; e.g. `aqv`, `cqv` permanent; `axe`
 Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 
 ## Provenance

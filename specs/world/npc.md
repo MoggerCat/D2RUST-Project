@@ -112,7 +112,7 @@ Record layout (1.14d offsets):
 | +0x08 | per-player gamble lists (node: inventory, player GUID, next) | `vendors.md` §5 |
 | +0x0C | has gamble list (u32) | `vendors.md` §1 |
 | +0x10 | hire list (0x450 bytes, §7.1) | §7 |
-| +0x14 | NPC event list (§10) | `vendors.md` §3.2 |
+| +0x14 | NPC event list (§10) | `vendors.md` §3.4 |
 | +0x18 | per-player vendor-chain list (node: player GUID, gamble-mode byte at +4, next) | `vendors.md` §4 |
 | +0x1C | has traded (u32, set at trade open) | `vendors.md` §4 |
 | +0x20 | store generated (u8) | `vendors.md` §3 |
@@ -121,8 +121,8 @@ Record layout (1.14d offsets):
 | +0x23 | trader (u8) | NPC table |
 | +0x24, +0x25 | flags set for 9 traders (u8) | `vendors.md` §1 |
 | +0x26 | NPC table byte 6 (u8) | NPC table |
-| +0x27 | refresh pending (u8) | `vendors.md` §4 |
-| +0x28 | store time (`GetTickCount`, u32) | `vendors.md` §4 |
+| +0x27 | refresh pending (u8) | `vendors.md` §6 |
+| +0x28 | store time (`GetTickCount`, u32) | `vendors.md` §6 |
 | +0x2C / +0x30 | store item list / count | `vendors.md` §1 |
 | +0x34 / +0x38 | permanent item codes / count | `vendors.md` §1 |
 | +0x40 | NPC GUID of the last trade | `vendors.md` §4 |
@@ -192,7 +192,7 @@ monster with an interaction list → 3; NPC in another act than the player
   - state ≥ 1: unlink and free it; if the player's interact type is 1,
     reset the interact unit (`0x00554190`: GUID −1, type 6, flag 0); if
     the list is now empty: drop the player's gamble list at this NPC
-    (`0x00537190`, `vendors.md` §5.2);
+    (`0x00537190`, `vendors.md` §5.4);
   - state 0: unlink, reset as above, free; the gamble list is kept.
 
 ### 4. Menu actions (C→S 0x38)
@@ -253,12 +253,12 @@ Handler `0x0054BBA0` (size 5 else 3) → `0x00578460(npc GUID u32 @1)`:
    are in a grid page with inventory page 0 (backpack) or 3 (cube), or
    equipped (node page 3). n = 0 → 0x2A code 9.
 4. Unless quest slot 4 (Search for Cain) bit 0 or bit 1 is set: pay
-   100·n (`vendors.md` §7 step 6); not enough → 0x2A code 12.
+   100·n (`vendors.md` §9.1); not enough → 0x2A code 12.
 5. Identify (`0x00562590`, item spec) every item of step 3 without flag
    0x10, inventory order; stash (page 4) and belt are skipped.
 6. One 0x2A code 3, flag 0, GUID −1.
 
-C→S 0x37 (identify the item just gambled) is `vendors.md` §7.1.
+C→S 0x37 (identify the item just gambled) is `vendors.md` §5.5.
 
 ### 7. Mercenaries
 
@@ -323,7 +323,7 @@ name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
    - price = gold · (100 + 15·(L − row level)) / 100 (signed), at least
      the row's `gold`. Other outputs (life, damage, skills…) belong to
      the mercenary spec.
-6. Pay the price (`vendors.md` §7 step 6); not enough → 0x2A code 12.
+6. Pay the price (`vendors.md` §9.1); not enough → 0x2A code 12.
 7. Create the mercenary unit near the NPC, else near the player
    (`0x005B23C0(class, 1, 4, 0)` twice; mercenary spec); fails → code
    15 (gold already taken).
@@ -382,7 +382,7 @@ Gate bit clear or predicate false → refuse.
   refuse); quality 6 (rare), item level = player's base level (stat 12,
   at least 1, `0x00558200`) + 4 if > 5; create (`0x00558D90`, item
   spec); null → 0x58 result 7 (input lost). Else repair (`0x005761C0`,
-  `vendors.md` §3.2), `0x0055FE00`, inventory page 0, name restored,
+  `vendors.md` §8.2), `0x0055FE00`, inventory page 0, name restored,
   place in the inventory or drop at a free spot near the player; quest
   reward hook `0x00591790` (`quests.md`); result 6.
 - **Socket**: duplicate the input into the player (`0x0055A2A0`) and
@@ -460,7 +460,7 @@ differ between messages.
 - `0x005368F0` / `0x005367B0` NPC event processing; `0x00579030` /
   `0x00576C90` random cache pick (draws from the NPC-control seed).
   Level-up (`0x00570880`) still pushes events (`0x00536850`,
-  `vendors.md` open question 8); they are freed with the record data, never run.
+  `vendors.md` §3.4); they are freed with the record data, never run.
 
 ## Constants & data dependencies
 
@@ -512,7 +512,7 @@ Reproduced by default.
 8. Healing triggers only on the 0 → 1 chat transition; a second 0x2F in
    the same interaction does not heal.
 9. Nihlathak (514) owns a store but no trade action; he can still be
-   sold to while gambling (`vendors.md` §8).
+   sold to while gambling (`vendors.md` §7.2).
 10. 0x58 byte 6 is not written (stack), like 0x2A bytes 3–6.
 
 ## Test vectors
