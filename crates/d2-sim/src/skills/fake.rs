@@ -35,6 +35,8 @@ pub struct FUnit {
     pub hireling: bool,
     pub demon: bool,
     pub undead: bool,
+    pub revived: bool,
+    pub prime_evil: bool,
     pub shield: bool,
     pub weapon_class: i32,
     pub combat: Vec<CombatEntry>,
@@ -65,6 +67,8 @@ impl FUnit {
             hireling: false,
             demon: false,
             undead: false,
+            revived: false,
+            prime_evil: false,
             shield: false,
             weapon_class: 0,
             combat: Vec::new(),
@@ -250,11 +254,11 @@ impl CombatWorld for Fake {
     fn is_undead(&self, u: usize) -> bool {
         self.units[u].undead
     }
-    fn is_prime_evil(&self, _u: usize) -> bool {
-        false
+    fn is_prime_evil(&self, u: usize) -> bool {
+        self.units[u].prime_evil
     }
-    fn is_revived(&self, _u: usize) -> bool {
-        false
+    fn is_revived(&self, u: usize) -> bool {
+        self.units[u].revived
     }
     fn alignment(&self, _u: usize) -> i32 {
         0

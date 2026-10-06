@@ -1396,6 +1396,114 @@ fn dodge_monster_moving_modes() {
     }
 }
 
+// damage.md §3.1 step 7: `skill_poison_override_length` > 0 replaces
+// `poisonlength`; step 10: the burn length grows only when ≠ 0.
+#[test]
+fn fill_poison_override_and_burn_length() {
+    let mut f = world();
+    let a = f.add(
+        FUnit::new(UnitType::Player, 0)
+            .with(57, 256)
+            .with(58, 256)
+            .with(59, 50)
+            .with(101, 30)
+            .with(315, 5),
+    );
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    let r = fill_flags(&mut f, a, d, hitflag::SKIP_PHYSICAL);
+    assert_eq!((r.poison_len, r.burn_len), (30, 0));
+    let (s, c) = (st(), ct());
+    let mut rec = DamageRecord {
+        hit_flags: hitflag::SKIP_PHYSICAL,
+        burn_len: 10,
+        ..DamageRecord::default()
+    };
+    fill(&mut f, &s, &c, a, d, &mut rec, false, 128);
+    assert_eq!(rec.burn_len, 15);
+}
+
+// damage.md §3 step 2: no roll without the hit flag.
+#[test]
+fn start_combat_needs_hit() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(6, 1));
+    let r = start(&mut f, a, d, 0, 0, 0x1_0000);
+    assert_eq!(r.hit_flags & hitflag::ROLLED, 0);
+    assert_eq!(r.result & result::WILL_DIE, 0);
+}
+
+// damage.md §4.2: revived attackers on players (17); prime evil on a
+// revived defender: 400, 200 if the defender is a hireling; neither
+// alone.
+#[test]
+fn damage_percent_revived_rows() {
+    let c = ct();
+    let mut f = world();
+    let p = f.add(FUnit::new(UnitType::Player, 0));
+    let mut rv = FUnit::new(UnitType::Monster, 0);
+    rv.revived = true;
+    let rv = f.add(rv);
+    let mut pe = FUnit::new(UnitType::Monster, 0);
+    pe.prime_evil = true;
+    let pe = f.add(pe);
+    let m = f.add(FUnit::new(UnitType::Monster, 0));
+    let mut rh = FUnit::new(UnitType::Monster, 0);
+    rh.revived = true;
+    rh.hireling = true;
+    let rh = f.add(rh);
+    assert_eq!(damage_percent(&f, &c, Some(rv), p), 17);
+    assert_eq!(damage_percent(&f, &c, Some(pe), rv), 400);
+    assert_eq!(damage_percent(&f, &c, Some(pe), rh), 200);
+    assert_eq!(damage_percent(&f, &c, Some(m), rv), 100);
+    assert_eq!(damage_percent(&f, &c, Some(pe), m), 100);
+}
+
+// damage.md §5.3: the drain percent (≠ 100) scales the player rule's
+// mana and the monster rule's total. Drain 50: mana (10 << 6) % of 1000 =
+// 6400 → 3200 / 64 = 50; monster rule T = 10 → 5.
+#[test]
+fn leech_drain_scales_mana_and_monster_rule() {
+    let mut m = monster_rec();
+    m.drain = 50;
+    let c = combat_tables(vec![m]);
+    let mut f = world();
+    let a = f.add(leecher(UnitType::Player));
+    let d = f.add(FUnit::new(UnitType::Monster, 0));
+    leech(&mut f, &c, Some(a), d, &mut leech_rec(0, 10, 1000));
+    assert_eq!(f.get(a, 8), 50);
+    let ma = f.add(leecher(UnitType::Monster).with(7, 1000));
+    leech(&mut f, &c, Some(ma), d, &mut leech_rec(10, 0, 1000));
+    assert_eq!(f.get(ma, 6), 5);
+}
+
+// hit.md §4 step 5: block / dodge only after a hit (a miss with dodge
+// 100 stays 0).
+#[test]
+fn melee_result_miss_no_dodge() {
+    let (s, c) = (st(), ct());
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0).with(12, 1));
+    let d = f.add(FUnit::new(UnitType::Monster, 0).with(12, 1).with(338, 100));
+    // r = 99 ≥ 95: miss.
+    f.units[a].seed = seed_giving(99);
+    f.units[d].seed = seed_giving(0);
+    assert_eq!(melee_result(&mut f, &s, &c, Some(a), Some(d), 0, 0), 0);
+}
+
+// hit.md §6.2 step 2.1: the weapon-block draw needs `w > 0` (a two-claw
+// defender without weapon block draws nothing).
+#[test]
+fn dodge_weapon_block_needs_value() {
+    let mut f = world();
+    let a = f.add(FUnit::new(UnitType::Player, 0));
+    let d = f.add(FUnit::new(UnitType::Player, 0));
+    f.units[d].weapon_class = 13;
+    let before = f.units[d].seed;
+    assert_eq!(dodge(&mut f, a, d, false), BlockResult::None);
+    assert_eq!(f.units[d].seed, before);
+}
+
 // ---------------------------------------------------------------- vitals.md
 
 mod vitals_mutants {
