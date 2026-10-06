@@ -16,7 +16,7 @@ rather than restating them.
 | 3 Simulation | in progress: RNG done; tick core (`d2-sim::tick`, `d2-sim::units::lists`, `d2-sim::game`) done: `tick.md` / `unit-order.md` `conformance-passing`; units, stats, stat-lists specs written (units confirmed on recordings, stats unverified until the queued recording); draft specs for items, treasure, combat/skills, DRLG, missiles/monster AI, quests/waypoints/cube (confirmations queued, §5); `d2-proto` message tables implemented from the two TSVs; `d2-server` transport + host loop implemented and wired to `d2-proto` / `d2-sim` through adapters (intent handlers are stubs; unverified on recordings) | `cargo test -p d2-sim -p conformance`: spec vectors pass (56 d2-sim tests, incl. every synthetic vector of `tick.md` §2–§7 and `unit-order.md`); all 256 draws of `traces/sim/rng/*.json` replay exactly. `cargo test -p conformance --test tick_replay`: `traces/sim/tick/sim-0006..0008` (11,105 ticks, 65,754 inputs) replay through `d2_sim::tick::tick` with all 48,316 timer runs in order and all 446 list snapshots equal, 0 mismatches; 4 perturbation tests reported at exactly the changed record. `check_tick.py` / `check_packets.py` on the 2026-10-06 recordings: 0 mismatches. `cargo test -p d2-proto`: generated tables equal the TSVs, spec size/classifier/layout vectors pass. `cargo test -p d2-server`: 43 tests, every synthetic vector of `intents-events.md` §1–§3 and `tick.md` §1; the size vectors on `d2-proto` and `d2-proto` = TSV fake on every id (with a perturbation test); one single-player host frame (drain → tick → flush) on the real adapters; `check_units.py`: 0 errors on all three recordings (14,034 schedules checked exactly); `convert_tick.py --check traces/sim/tick/*.json`: 0 errors (CI) |
 | 4 Conformance | recording proven feasible; coverage report tool done (claims seeded in rng, d2-data, d2-formats) | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly; `py tools/coverage.py --summary` (numbers in §2 step 5) |
 | 5 Local server + bridge | in progress: bridge design `specs/client/bridge.md` (d2rs-own) and skeleton `d2-client::bridge` (branch `claude/phase5-bridge`): receive split + dispatch by id, intent send path, `ClientWorld`, Bevy mirror; every S→C id unowned (`specs/client/bridge-dispatch.tsv` all `TBD`); server reached through the `ServerLink` trait (no `d2-server` dependency yet) | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, incl. the dispatch TSV check and its perturbation test, and a windowless Bevy `App` mirror test |
-| 6 | not started | |
+| 6 Client | design drafts (`specs/client/{render-pipeline,assets,ui,audio}.md`, d2rs-own, 2026-10-06); nothing implemented | |
 | 7–9 | deferred (out of current scope) | |
 
 ## 2. Next steps (in order)
@@ -114,6 +114,15 @@ rather than restating them.
    and registers handlers in `bridge::dispatch::HANDLERS` (the test
    `dispatch_table_matches_spec` enforces both). `bridge.md` open
    questions 2–5 go to them.
+
+5. **Phase 6 client** (design drafts 2026-10-06 on `claude/phase6-design`):
+   `specs/client/{render-pipeline,assets,ui,audio}.md`, each split into
+   (a) d2rs design and (b) original behavior still to specify. Cloud
+   infrastructure tasks C1–C10 are listed in `docs/PLAN.md` Phase 6 work
+   breakdown (ready now, independent of the `claude/phase5-bridge`
+   bridge work). The local RE specs that unlock fidelity, in order, are
+   listed there too; first: sprite placement, camera, composition domain
+   and a frame-capture recorder (render §B1, §B2, §B7, §B9).
 
 ## 3. Code map
 
@@ -271,6 +280,12 @@ one session, batched with the topic writers' requests):
    `0x0055A6D0`–`0x0055AF80` and from `0x00558640` must match
    `treasure.md` §Randomness in order and count.
 
+Phase 6 asset budgets (from `specs/client/assets.md` OQ 1, design
+only, no code yet): measure the decoded size (`Σ width × height`) of
+every live DCC/DC6/DT1 frame, per file and in total, and of the files a
+town and a dungeon scene use; record the numbers in `assets.md` §A5 and
+set the default budgets from them.
+
 Next RNG capture when convenient (local, needs the user at the game):
 start `py tools/trace-recorder/record_rng.py --seconds 120`, enter a
 single-player game, kill a few monsters and pick up a drop. Recording
@@ -307,14 +322,16 @@ These are on `claude/phase3-units` until merged. Treasure classes and
 drops: `specs/items/treasure.md` (+ `treasure-quality.tsv`,
 `treasure-chest-acts.tsv`; branch `claude/phase3-treasure`). Format facts: `specs/formats/*`. Map rendering: `specs/render/map-preview.md`.
 Data loading and tables: `specs/data/*` (start at `loading.md`). RNG:
-`specs/sim/rng.md`. Client↔game boundary: `specs/client/bridge.md`. Each spec's "Open questions" holds its unknowns.
+`specs/sim/rng.md`. Client↔game boundary: `specs/client/bridge.md`. Phase 6 client design (d2rs-own drafts, original
+behavior listed as unwritten owner specs in each part (b)):
+`specs/client/{render-pipeline,assets,ui,audio}.md`. Each spec's "Open questions" holds its unknowns.
 Carried-over open questions not yet in a spec's list:
 
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
-3. DC6/DCC vertical placement (one-row disagreement between sources).
-4. Meaning of the PL2 rendering tables (Phase 6).
+3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
+4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
    (0x67 at 0x2B/0x2C, 0x68 at 8/0x14); the generator names them
    `unk_43`, `unk_44`, `unk_8`, `unk_20` (offset suffix). A spec session

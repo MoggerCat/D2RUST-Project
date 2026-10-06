@@ -47,6 +47,7 @@ behaviors the engine reproduces exactly.
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
 | Tick trace replay (2026-10-06) | `conformance::tick` runs `d2_sim::tick::tick` once per recorded tick; hooks apply each step's recorded inputs, the dispatch compares every run and applies the recorded handler's work; d2-sim's own work (step 6 clears, step 9 deactivation, freeing timers after their run) is produced, not replayed | The recording logs list primitives, d2-sim's API is coarser: each recorded primitive starts a d2-sim operation and the primitives it performs next must follow in the recording ("owed"). Unit allocation is split from `SUNIT_Add` in `d2-sim` (`alloc_unit`, `add_allocated`), as the spec has it, because a missile's init schedules a timer before the missile is listed. |
 | Client↔game bridge (2026-10-06) | `specs/client/bridge.md` (d2rs design): the bridge carries the 1.14d message bytes both ways; S→C chunks are split with `d2-proto` and dispatched by id into a plain-Rust `ClientWorld`; ids without an owner spec (`specs/client/bridge-dispatch.tsv`, all `TBD` today) are counted, never interpreted; Bevy entities only mirror the model | Server reached through a narrow `ServerLink` trait in `d2-client` (send / pump / receive / protocol version) until `d2-server` is wired; one bridge frame per Bevy frame in `PreUpdate` = the 1.14d client frame (pump: drain → tick → flush, then receive), input later in the frame, so intents of frame k are drained at k+1. No interpolation or prediction in the bridge (supersedes the ARCHITECTURE line): between-tick views are original client behavior, owned by Phase 6 specs. The link must report `d2_proto::PROTOCOL_VERSION`; the bridge persists nothing. Chunks 1.14d asserts on (message > 0x204 or past the chunk end) stop the frame with an error. |
+| Phase 6 client design (2026-10-06, drafts `specs/client/*`) | Draw list (plain Rust) → CPU reference compositor + GPU **compute** compositor with integer math (no fixed-function blending), proven byte-identical per verify case; UI is our own integer-pixel panel framework on the same compositor (not `bevy_ui`); audio exactness = decoded samples + voice log (tick, file, integer params), the mix itself is ours | Two fidelity links: original → CPU reference (captures; images stay in `game/captures/`, hashes in `traces/render/`) and CPU → GPU (`d2-client verify`). Every original rule is an RE owner spec listed in each draft's part (b). Assets: in-memory only, synchronous load on miss (never a dropped draw), deterministic LRU budgets. Controls file `d2controls 1`, strict TOML. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 | Spec rule coverage (2026-10-06) | Rule IDs read from spec headings and numbered lists (`§5.2 r4`); tests claim them with `// Covers:` comments; `tools/coverage.py` (Python, like `spec_index.py`) reports unit / game-file / trace coverage per spec; only game-file and trace count as verified | `docs/COVERAGE.md`. Comments over a TSV map: one owner per claim, no sync check needed. `--check` in CI fails on dangling claims, never on low coverage. Rows of spec TSVs are not counted yet. |
 
@@ -220,6 +221,44 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 - [ ] Animation (COF/DCC), lighting, blend modes, draw ordering
 - [ ] UI panels, inventory, fonts, audio, controls config
 **Exit:** play through all acts locally with correct visuals.
+
+#### Phase 6 work breakdown (2026-10-06, design drafts)
+
+Design drafts (d2rs-own, part (a) binds code, part (b) lists unwritten
+owner specs): `specs/client/render-pipeline.md`, `client/assets.md`,
+`client/ui.md`, `client/audio.md`. Cloud implements infrastructure now
+(no original behavior needed; each proven by synthetic vectors, GPU
+halves queued locally); everything that reproduces the original waits
+for the local RE spec named.
+
+**Cloud, ready now (pure infrastructure).** Independent unless noted;
+none touches `d2-client::bridge` (`claude/phase5-bridge`).
+
+| # | Task | Spec | Proof in cloud |
+|---|---|---|---|
+| C1 | Canonical lowercase `mpq://` paths; loaders for `pl2`, `cof`, `tbl` (font vs strings by magic) | `assets.md` §A1–A2 | unit tests §Test vectors |
+| C2 | Residency cache core: byte budgets, deterministic LRU, never evict the current frame, stall metric (plain Rust) | `assets.md` §A4–A5 | unit tests |
+| C3 | `IndexFrame` + per-direction `FrameSet` from DCC/DC6/DT1; deterministic shelf atlas packer (plain Rust) + R8Uint page upload | `render-pipeline.md` §A2, `assets.md` §A3 | unit tests (packing, determinism) |
+| C4 | `d2-client::scene`: `DrawItem`, `DrawKey` stable sort, shade chain, `BlendOp::{Opaque, IndexTable}`, bins, CPU reference compositor | `render-pipeline.md` §A3–A8 | §Test vectors (CPU, CI) |
+| C5 | GPU compute compositor matching C4 (after C4) | §A9 | CPU half in CI; GPU byte-exact queued locally |
+| C6 | Verify harness: case files (`version = 1`), runner, per-case `--perturb`; port today's map verify as case `map`; `synthetic` cases (after C4) | §A10 | CPU half in CI; GPU queued |
+| C7 | COF composite mechanics: slot order → per-component items, path and placement behind `TODO(spec)` hooks | §A7 | synthetic COF vectors |
+| C8 | UI core: `Panel`/`UiRoot`, widgets, integer hit tests, event routing, frame-coordinate mapping | `ui.md` §A2, §A4 | §Test vectors |
+| C9 | Controls file `d2controls 1`: strict parser, writer, presets (`dev` only), clash check, migration hook | `ui.md` §A6 | §Test vectors |
+| C10 | Audio core: trigger queue, tick scheduler, integer mixer, voice log (`d2rs-audio-log 1`), rodio `Decodable` output | `audio.md` §A2–A5 | §Test vectors, golden hashes |
+
+**Waits for local RE specs** (spec session, high effort; order is the
+critical path to a first playable scene):
+
+1. `render/sprite-placement.md`, `render/camera.md`, `render/composition.md`
+   (+ frame capture in `tools/trace-recorder`, render §B9): unlocks link 1
+   (original → CPU reference) at all.
+2. `render/unit-composite.md`, `render/draw-order.md`: units in the town.
+3. `render/shading.md`, `render/blend-modes.md`, `render/lighting.md`.
+4. `formats/wav.md`, `audio/triggers.md`, `audio/sound-table.md`
+   (+ `record_sound.py`), then `audio/environment.md`.
+5. `ui/text.md`, `ui/panels.md`, `ui/controls.md`, `ui/inventory.md`,
+   `ui/automap.md`.
 
 > **Current scope ends at Phase 6** (decided 2026-10-05). Phases 7–9 are
 > deferred and not yet planned in detail. The mod is a separate future
