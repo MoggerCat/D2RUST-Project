@@ -138,8 +138,8 @@ pub enum TextOpts {
     Horizontal { s: i32, w: i32 },
     /// Vertical window `0x00501DF0` (§9): its rows are open question 1.
     Vertical { skip: i32, lines: i32 },
-    /// No-color variant `0x00502190` (§9).
-    NoColor,
+    // The no-color variant `0x00502190` (§9) is dead code in 1.14d (no
+    // reference to `0x005023A0`): no counterpart.
 }
 
 impl Default for TextOpts {
@@ -278,10 +278,11 @@ pub fn width_a(g: &GlyphLookup<'_>, text: &[u16]) -> Result<i32, TextError> {
     width_b(g, text, usize::MAX)
 }
 
-/// Width C (`0x00501730`, §6) of the `n` units from `start` (the NUL at
-/// the end counts as a unit): `LF` 0; `ÿ`, `c`, `0`–`6` skipped only when
-/// the code starts at span index `i` with `i + 3 < n`; every other unit
-/// its advance.
+/// Width C (`0x00501730`, §6) of the `n` units from `start`, stopping at
+/// a NUL unit (the NUL at the end counts in `n` but adds nothing, so `n`
+/// past the end adds nothing): `LF` 0; `ÿ`, `c`, `0`–`6` skipped only
+/// when the code starts at span index `i` with `i + 3 < n`; every other
+/// unit its advance.
 pub fn width_c(
     g: &GlyphLookup<'_>,
     text: &[u16],
@@ -293,6 +294,9 @@ pub fn width_c(
     let mut i = 0;
     while i < n {
         let u = at(text, start + i);
+        if u == 0 {
+            break;
+        }
         if u == COLOR_LEAD
             && i + 3 < n
             && at(text, start + i + 1) == u16::from(b'c')
@@ -320,8 +324,8 @@ fn line_extent(g: &GlyphLookup<'_>, text: &[u16], start: usize) -> Result<(i32, 
             if matches!(at(text, i + 1), 0x6D | 0x4D) {
                 w += g.adv(u16::from(b'm'))?;
             }
-            // TODO(spec: ui/text.md §6): a `LF` or the end among the two
-            // skipped units; skipped here, clamped to the string.
+            // The two units are passed over unread: a `LF` among them
+            // does not end the line, a skip past the end ends the walk.
             i = (i + 3).min(text.len());
         } else {
             w += g.adv(text[i])?;
@@ -425,7 +429,6 @@ impl TextRules for OriginalText {
                 ))
             }
             TextOpts::Horizontal { .. } => (false, None),
-            TextOpts::NoColor => (false, None),
         };
         let block = match (centered, block_w) {
             (false, _) => 0,
@@ -439,21 +442,17 @@ impl TextRules for OriginalText {
                 x
             })
         };
-        let step = match opts {
-            TextOpts::NoColor => -15 * g.height() / 10,
-            _ => g.line_step(),
-        };
+        let step = g.line_step();
         let mut pen = Point::new(line_x(0)?, y);
         let mut k = i32::from(style.color);
-        if let TextOpts::NoColor = opts {
-            k = 0;
-        }
         if let TextOpts::Horizontal { s, .. } = *opts {
             pen.x = x + s;
         }
         let mut out = Vec::new();
         let mut i = 0;
         while i < text.len() {
+            // Horizontal window: the stop test runs before every unit
+            // (glyph, `ÿ` code or `LF`), §9.
             if let TextOpts::Horizontal { w, .. } = *opts {
                 if pen.x > x + w {
                     break;
@@ -461,10 +460,6 @@ impl TextRules for OriginalText {
             }
             let u = text[i];
             if u == COLOR_LEAD {
-                if let TextOpts::NoColor = opts {
-                    i += 3;
-                    continue;
-                }
                 match color_code(text, i) {
                     Unit::Color(code, len) => {
                         k = code;

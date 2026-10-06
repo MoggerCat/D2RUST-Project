@@ -9,7 +9,7 @@ updates of `formats/font-tbl.md`. Status: **implemented, unverified**
 
 | Path | What | Spec |
 |---|---|---|
-| `crates/d2-client/src/ui/text.rs` | `NoTextRules` replaced by `OriginalText` (the one `TextRules`): draw call (pen right by `width`, `LF` moves **up** one line step, centering in a block of max width + 8), `ÿc` codes (k = unit − 0x30, ≥ 13 → 0, negative kept, `ÿ`/`ÿc` at the end ends drawing, `ÿ` + other = glyph 255), horizontal window, no-color variant; vertical window returns `Unspecified` (OQ 1) except `skip < 0` (empty). Measures `width_a/b/c`, `line_width`, `max_width`, `text_height`, `line_step`; `centered_span_x` (`0x004A7080`); `framed_text` / `framed_text_tight` (§8); `wrap` (§10). `FONTS` table (+`font_info`). `GlyphLookup::record` is Latin by position (record `c`, or 0 above 0xFF); `AmbiguousGlyph` removed; `MissingGlyph { code, record }` only for a font with fewer records than the position (malformed input). `TextOpts` is now the call kind (`Draw { centered, block_w, mode }`, `Horizontal { s, w }`, `Vertical { skip, lines }`, `NoColor`): no clip rect (CG2, §12). Placement color is `i32`. | §1, §3, §5–§13 |
+| `crates/d2-client/src/ui/text.rs` | `NoTextRules` replaced by `OriginalText` (the one `TextRules`): draw call (pen right by `width`, `LF` moves **up** one line step, centering in a block of max width + 8), `ÿc` codes (k = unit − 0x30, ≥ 13 → 0, negative kept, `ÿ`/`ÿc` at the end ends drawing, `ÿ` + other = glyph 255), horizontal window (the no-color variant is dead code, removed 2026-10-06); vertical window returns `Unspecified` (OQ 1) except `skip < 0` (empty). Measures `width_a/b/c`, `line_width`, `max_width`, `text_height`, `line_step`; `centered_span_x` (`0x004A7080`); `framed_text` / `framed_text_tight` (§8); `wrap` (§10). `FONTS` table (+`font_info`). `GlyphLookup::record` is Latin by position (record `c`, or 0 above 0xFF); `AmbiguousGlyph` removed; `MissingGlyph { code, record }` only for a font with fewer records than the position (malformed input). `TextOpts` is now the call kind (`Draw { centered, block_w, mode }`, `Horizontal { s, w }`, `Vertical { skip, lines }`): no clip rect (CG2, §12). Placement color is `i32`. | §1, §3, §5–§13 |
 | `ui/draw.rs` | `TextRequest` gains `opts: TextOpts`; `at` is the pen (bottom row of the first-drawn line); `clip` stays and is the frame for text (§12) | §12, §13 |
 | `ui/widget.rs` | `Label`/`TextInput` send `TextOpts::default()`; doc updates (Label position → `ui/panels.md`, caret → OQ 3) | §13 |
 | `world_view/ui_bind.rs` | `TextHooks::glyph_look(color: i32, mode: u8)`; `text_sprites` uses `req.opts` and turns the pen into the sprite top-left with `rules::placement::draw_position` (DC6 bottom anchor: `y − h + 1`); `TextColors::push` (PL2 maps 1–12 from offset 439,847 into the `MapTable`); `OriginalTextHooks { colors }`; `original_text_font` (font id → `.tbl` path + DC6 `FrameSetKey` dir 0). `Unspecified` now answers text from the spec (font, rules, color 0); colored glyphs need `OriginalTextHooks` with the frame's PL2 maps. Glyph look: color 0 → no remap, k 1–12 → map k, opaque; mode ≠ 5 → `render/blend-modes.md`; k outside 0–12 → OQ 2 error. | §4, §13 |
@@ -49,22 +49,14 @@ by-code lookup of non-Latin locales (out of scope, English).
 
 ## Open questions (for the spec owner)
 
-1. **Wrap, trailing empty line.** §10 read literally: when the last line
-   ends at `e = L − 1` (the NUL does not fit with it), the next round has
-   `s = L`, and `text[L..=L]` (just the NUL) is emitted as a last, empty
-   line (`ab  cd`, M 15 → `ab `, `cd`, `""`). Implemented and tested
-   that way; confirm with a capture or a Ghidra read of `0x00502970`
-   (does the loop stop at `s ≥ L`, or does the caller drop empty lines?).
-2. **Line width skip over `LF` / end.** §6 line width skips `ÿ` + the next
-   two units; implemented as an unconditional skip clamped at the string
-   end, so an `LF` among the two skipped units does not end the line
-   (and max width continues after where the skip landed). Confirm
-   `0x00501910` for `ÿ⏎…` and `ÿ` at the last two units.
-3. **`LF` in widths A/B/C**: read as "contributes 0" (table column `LF` =
-   0), not `adv` of record 10. Confirm.
-4. **Horizontal window stop test**: implemented as checked before each
-   unit (`pen x > x + w` → stop), including before `ÿc` codes and `LF`.
-   Confirm the order in `0x00501FE0`.
-5. **No-color variant** (`0x00502190`): implemented with §7's centering
-   argument ignored (not centered) and `ÿ` skipping 3 units clamped at the
-   end. No caller known (spec OQ 6).
+Answered 2026-10-06 (spec Provenance: UT1 §10 r4, UT2 / UT3 §6 table,
+UT4 §9 horizontal window, UT5 §9 no color). Code now follows them:
+
+1. Wrap, trailing empty line: width C stops at the NUL, so no empty
+   line after `cd` in `ab  cd` (M 15); empty lines only in the two §10 r4
+   cases (tests `word_wrap`, `word_wrap_empty_lines`).
+2. Line width skip over `LF` / end: as implemented (unread skip, a skip
+   past the end ends the walk).
+3. `LF` in widths A/B/C: 0, as implemented.
+4. Horizontal window stop test before every unit: as implemented.
+5. No-color variant: dead code in 1.14d; `TextOpts::NoColor` removed.

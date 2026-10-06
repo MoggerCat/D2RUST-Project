@@ -885,6 +885,28 @@ mod text {
 
     // Covers: specs/ui/text.md §6
     #[test]
+    fn measures_lf_and_skip_rules() {
+        let f = five();
+        let g = GlyphLookup::new(&f);
+        // `LF` adds 0 in widths A, B and C (not record 10).
+        let t = u("a\nb");
+        assert_eq!(width_a(&g, &t), Ok(10));
+        assert_eq!(width_b(&g, &t, 3), Ok(10));
+        assert_eq!(width_c(&g, &t, 0, 3), Ok(10));
+        // Width C stops at the NUL: `n` past the end adds nothing.
+        assert_eq!(width_c(&g, &t, 0, 9), Ok(10));
+        // Line width: `ÿ` and the next two units are passed over unread, so
+        // the `LF` among them ends nothing: 5 + 0 + 5; max width the same.
+        let skip = u("xÿ\nyz");
+        assert_eq!(line_width(&g, &skip, 0), Ok(10));
+        assert_eq!(max_width(&g, &skip), Ok(10));
+        // A skip past the end ends the walk.
+        assert_eq!(line_width(&g, &u("abÿ"), 0), Ok(10));
+        assert_eq!(max_width(&g, &u("abÿ\n")), Ok(10));
+    }
+
+    // Covers: specs/ui/text.md §6
+    #[test]
     fn text_height_and_line_step() {
         let f = font16();
         let g = GlyphLookup::new(&f);
@@ -1069,11 +1091,25 @@ mod text {
             [('a', 15, 50, 0), ('c', 15, 34, 0)]
         );
         assert_eq!(opts.mode(), 5);
+        // Spec vector: x 0, s 0, w 7: `a` not drawn (pen 0 is not > 0),
+        // `b` at 5, stop before `c` (pen 10 > 7).
+        let w7 = TextOpts::Horizontal { s: 0, w: 7 };
+        assert_eq!(place(&f, "abc", Point::new(0, 9), 0, w7), [('b', 5, 9, 0)]);
+        // The stop test runs before a `LF` and a `ÿc` code too: without it
+        // the `LF` would reset the pen and `e` would draw at 5.
+        assert_eq!(
+            place(&f, "ab\nde", Point::new(0, 9), 0, w7),
+            [('b', 5, 9, 0)]
+        );
+        assert_eq!(
+            place(&f, "abÿc1\nde", Point::new(0, 9), 0, w7),
+            [('b', 5, 9, 0)]
+        );
     }
 
     // Covers: specs/ui/text.md §9
     #[test]
-    fn vertical_window_and_no_color_variants() {
+    fn vertical_window_and_mode_variants() {
         let f = five();
         let g = GlyphLookup::new(&f);
         let at = Point::new(0, 100);
@@ -1089,11 +1125,6 @@ mod text {
         };
         assert_eq!(v(-1), Ok(Vec::new()));
         assert!(matches!(v(0), Err(TextError::Unspecified(_))));
-        // No color: every `ÿ` skips 3 units, color 0, step trunc(−15 × h / 10).
-        assert_eq!(
-            place(&f, "aÿc1b\nc", at, 4, TextOpts::NoColor),
-            [('a', 0, 100, 0), ('b', 5, 100, 0), ('c', 0, 115, 0)]
-        );
         let mode = TextOpts::Draw {
             centered: false,
             block_w: None,
@@ -1121,13 +1152,31 @@ mod text {
         assert_eq!(wrapped(&f, "a\nb", 15), ["a\nb"]);
         // Trailing white space stays; the last span counts the NUL.
         assert_eq!(wrapped(&f, "ab cd ef", 30), ["ab cd ", "ef"]);
-        // A leading white-space unit is dropped (the NUL does not fit
-        // with `cd`: a last, empty line, see below).
-        assert_eq!(wrapped(&f, "ab  cd", 15), ["ab ", "cd", ""]);
-        // Hard break inside a word; a unit wider than M stays alone. When
-        // the NUL does not fit with the last unit, the NUL forms a last,
-        // empty line (§10.2 read literally; queued with the capture).
-        assert_eq!(wrapped(&f, "abcdefgh", 12), ["ab", "cd", "ef", "gh", ""]);
+        // A leading white-space unit is dropped.
+        assert_eq!(wrapped(&f, "ab  cd", 15), ["ab ", "cd"]);
+        // Hard break inside a word.
+        assert_eq!(wrapped(&f, "abcdefgh", 12), ["ab", "cd", "ef", "gh"]);
+        // The break after `ab ` leaves e = s: hard break `␣c` minus its
+        // first unit.
+        assert_eq!(wrapped(&f, "ab cd", 10), ["ab", "c", "d"]);
+    }
+
+    // Covers: specs/ui/text.md §10 r4
+    #[test]
+    fn word_wrap_empty_lines() {
+        let f = five();
+        // Width C stops at the NUL: the span ending at L measures as the one
+        // ending at L − 1, so no empty third line here.
+        assert_eq!(wrapped(&f, "ab  cd", 15), ["ab ", "cd"]);
+        let g = GlyphLookup::new(&f);
+        let t = u("ab  cd");
+        assert_eq!(width_c(&g, &t, 4, 3), Ok(10));
+        // (a) The rest is one white-space unit, dropped: an empty line.
+        assert_eq!(wrapped(&f, "ab ", 10), ["ab", ""]);
+        // (b) A hard break leaves s = L (the last unit alone is wider than
+        // M): the next round copies just the NUL.
+        let wide = font(10, 5, &[('W', 20)]);
+        assert_eq!(wrapped(&wide, "abW", 15), ["ab", "W", ""]);
         assert_eq!(wrapped(&f, "abc", 3), ["a", "b", "c", ""]);
         // Width C skips `ÿc0`–`ÿc6` when deciding the fit.
         assert_eq!(wrapped(&f, "ÿc1ab", 10), ["ÿc1ab"]);

@@ -243,6 +243,30 @@ fn mode_override_last_match_wins() {
     assert_eq!(mode_token(code(b"S1"), 7, &pairs), code(b"S1"));
 }
 
+// Covers: specs/render/unit-composite.md §2 r2
+#[test]
+fn static_mode_override_tables() {
+    let players = mode_overrides(CompositeKind::Player);
+    // Player SQ (18) and KB (19) use the GH COF: `AMGH1hs.COF`.
+    assert_eq!(part(&mode_token(code(b"SQ"), 18, players)), b"gh");
+    assert_eq!(part(&mode_token(code(b"KB"), 19, players)), b"gh");
+    assert_eq!(mode_token(code(b"NU"), 1, players), code(b"NU"));
+    let name = CofName::player(
+        code(b"AM"),
+        19,
+        mode_token(code(b"KB"), 19, players),
+        code(b"1hs"),
+    );
+    assert!(name
+        .full()
+        .eq_ignore_ascii_case("DATA\\GLOBAL\\CHARS\\AM\\COF\\AMGH1hs.COF"));
+    // Monster KB (13) only.
+    let monsters = mode_overrides(CompositeKind::Monster);
+    assert_eq!(part(&mode_token(code(b"KB"), 13, monsters)), b"gh");
+    assert_eq!(mode_token(code(b"SQ"), 18, monsters), code(b"SQ"));
+    assert!(mode_overrides(CompositeKind::Object).is_empty());
+}
+
 fn hand(component: u8, item_type: u16, w: &[u8], w2: &[u8], grip: bool) -> HandItem {
     HandItem {
         component,
@@ -269,6 +293,7 @@ fn weapon_class_rules() {
         base_wclass: HTH,
         loc4: None,
         loc5: None,
+        in_use: None,
     };
     assert_eq!(player_weapon_class(&base), Ok(HTH));
     // Location 4 with component other than 5/6 → location 5.
@@ -284,7 +309,7 @@ fn weapon_class_rules() {
         ..base
     };
     assert_eq!(player_weapon_class(&p), Ok(code(b"2hs")));
-    // Two type-45 items: Assassin ht2; Barbarian is open question 3.
+    // Two type-45 items: Assassin ht2; Barbarian r-dual (below).
     let two = PlayerHands {
         loc4: Some(hand(5, 45, b"ht1", b"ht1", false)),
         loc5: Some(hand(6, 45, b"ht1", b"ht1", false)),
@@ -294,7 +319,10 @@ fn weapon_class_rules() {
         player_weapon_class(&PlayerHands { class: 6, ..two }),
         Ok(HT2)
     );
-    assert!(player_weapon_class(&PlayerHands { class: 4, ..two }).is_err());
+    assert_eq!(
+        player_weapon_class(&PlayerHands { class: 4, ..two }),
+        Ok(code(b"1ss"))
+    );
     assert_eq!(
         player_weapon_class(&PlayerHands { class: 1, ..two }),
         Ok(code(b"ht1"))
@@ -308,14 +336,71 @@ fn weapon_class_rules() {
     assert_eq!(player_cof_weapon_class(1, &p), Ok(code(b"1hs")));
 }
 
+// Covers: specs/render/unit-composite.md §2.1
+#[test]
+fn barbarian_dual_wield_weapon_class() {
+    assert_eq!(
+        [b"bow", b"1hs", b"1ht", b"stf", b"2hs", b"2ht", b"xbw", b"ht1", b"hth"]
+            .map(|w| weapon_type_class(code(w))),
+        [1, 2, 3, 4, 5, 6, 7, 12, 0]
+    );
+    let barb = |r: &[u8], l: &[u8], in_use| PlayerHands {
+        class: 4,
+        base_wclass: HTH,
+        loc4: Some(hand(5, 45, r, r, false)),
+        loc5: Some(hand(6, 45, l, l, false)),
+        in_use,
+    };
+    let wc = |h: PlayerHands| player_weapon_class(&h).unwrap();
+    // (A, B) by the weapon in use: (2, 3) 1js, (3, 3) 1jt, (3, 2) 1st.
+    assert_eq!(wc(barb(b"1hs", b"1ht", Some(HandLoc::Loc4))), code(b"1js"));
+    assert_eq!(wc(barb(b"1hs", b"1ht", Some(HandLoc::Loc5))), code(b"1st"));
+    assert_eq!(wc(barb(b"1ht", b"1ht", Some(HandLoc::Loc5))), code(b"1jt"));
+    assert_eq!(wc(barb(b"1hs", b"1hs", Some(HandLoc::Loc4))), code(b"1ss"));
+    assert_eq!(wc(barb(b"2hs", b"1ht", Some(HandLoc::Loc4))), code(b"1ss"));
+    // No weapon in use: the right-hand item is A, and is written back.
+    let none = barb(b"1ht", b"1hs", None);
+    assert_eq!(wc(none), code(b"1st"));
+    assert_eq!(weapon_in_use_write(&none), Some(HandLoc::Loc4));
+    assert_eq!(
+        weapon_in_use_write(&barb(b"1ht", b"1hs", Some(HandLoc::Loc5))),
+        None
+    );
+    assert_eq!(weapon_in_use_write(&PlayerHands { class: 6, ..none }), None);
+    // COF name in DT/DD stays hth.
+    assert_eq!(player_cof_weapon_class(0, &none), Ok(HTH));
+}
+
 fn player() -> PlayerLook {
     PlayerLook {
         body_armor: None,
         item_gfx: [None; 16],
         holy_shield: false,
         shield_hand_item: false,
-        linked_inventory: false,
     }
+}
+
+// Covers: specs/render/unit-composite.md §1.1
+#[test]
+fn linked_unit_inventory() {
+    assert!(linked_inventory(true, true, true));
+    assert!(!linked_inventory(false, true, true));
+    assert!(!linked_inventory(true, false, true));
+    assert!(!linked_inventory(true, true, false));
+    // The Decoy: drawn wearing its owner's items; the body armor bytes
+    // (`0x004DAAB0`) and the holyshield state stay the unit's.
+    let mut own = player();
+    own.body_armor = Some([1, 1, 1, 1, 1, 1]);
+    own.holy_shield = true;
+    let mut owner = player();
+    owner.body_armor = Some([2, 2, 2, 2, 2, 2]);
+    owner.item_gfx[usize::from(component::HD)] = Some(code(b"cap"));
+    owner.shield_hand_item = true;
+    let look = own.with_linked_items(&owner);
+    let ac = |c| armor_class(ArmorSource::Player(Some(&look)), c, 1, code(b"1hs")).unwrap();
+    assert_eq!(ac(component::HD), Some(code(b"cap")));
+    assert_eq!(ac(component::TR), Some(MED));
+    assert_eq!(ac(component::SH), Some(HSH));
 }
 
 // Covers: specs/render/unit-composite.md §5.1 r3, §5.1 r4, §6 r1
@@ -369,9 +454,12 @@ fn player_armor_classes() {
     assert_eq!(ac(&p, component::TR, 0, b"hth"), Some(LIT));
     // No body armor: index 0.
     assert_eq!(ac(&player(), component::TR, 1, b"hth"), Some(LIT));
-    // Index above 2: the request fails.
+    // Index above 2: the request fails and is reported (§10).
     p.body_armor = Some([3, 0, 0, 0, 0, 0]);
-    assert_eq!(ac(&p, component::TR, 1, b"hth"), None);
+    assert_eq!(
+        armor_class(ArmorSource::Player(Some(&p)), component::TR, 1, HTH),
+        Err(UnitCompositeError::ArmTypeIndex(3))
+    );
     // No inventory: fails.
     assert_eq!(
         armor_class(ArmorSource::Player(None), component::HD, 1, HTH),
@@ -400,7 +488,8 @@ fn monster_and_object_armor_classes() {
         counts: [0; 16],
         codes: [[EMPTY; 12]; 16],
         composite_death: false,
-        override_level: false,
+        act_two: false,
+        base_class: 5,
     };
     m.counts[1] = 2;
     m.choices[1] = 1;
@@ -426,9 +515,132 @@ fn monster_and_object_armor_classes() {
         armor_class(ArmorSource::Monster(&m), 1, 0, HTH),
         Ok(Some(MED))
     );
-    // Override tables: open question 5.
-    m.override_level = true;
-    assert!(armor_class(ArmorSource::Monster(&m), 1, 1, HTH).is_err());
+    // Act II: no table for base class 5.
+    m.act_two = true;
+    assert_eq!(
+        armor_class(ArmorSource::Monster(&m), 1, 1, HTH),
+        Ok(Some(MED))
+    );
+}
+
+// Covers: specs/render/unit-composite.md §5.2, §5.1 r2
+#[test]
+fn act_two_skeleton_armor_classes() {
+    use component::*;
+    // `monstats2` lists of §5.2 as the `compcode` lookup gives them.
+    let list = |names: &[&[u8]]| {
+        let mut codes = [EMPTY; 12];
+        for (d, n) in codes.iter_mut().zip(names) {
+            *d = code(n);
+        }
+        codes
+    };
+    let mut m = MonsterLook {
+        choices: [0; 16],
+        counts: [0; 16],
+        codes: [[EMPTY; 12]; 16],
+        composite_death: false,
+        act_two: true,
+        base_class: BASE_SKELETON1,
+    };
+    let lists: [(u8, &[&[u8]]); 8] = [
+        (
+            HD,
+            &[b"lit", b"lit", b"lit", b"med", b"hvy", b"hvy", b"hvy"],
+        ),
+        (TR, &[b"lit", b"med", b"hvy"]),
+        (LG, &[b"lit", b"med", b"hvy"]),
+        (RA, &[b"lit", b"med", b"hvy"]),
+        (
+            RH,
+            &[
+                b"axe", b"fla", b"hax", b"hax", b"hax", b"mac", b"mac", b"mac", b"scm", b"scm",
+            ],
+        ),
+        (SH, &[b"nil", b"buc", b"lrg", b"kit", b"sml"]),
+        (
+            S1,
+            &[
+                b"nil", b"nil", b"nil", b"nil", b"nil", b"nil", b"nil", b"nil", b"nil", b"lit",
+                b"med", b"hvy",
+            ],
+        ),
+        (LH, &[b"lit"]),
+    ];
+    for (c, names) in lists {
+        m.counts[usize::from(c)] = names.len() as u8;
+        m.codes[usize::from(c)] = list(names);
+    }
+    let ac = |m: &MonsterLook, c: u8, v: u8, mode: u8| {
+        let mut m = *m;
+        m.choices[usize::from(c)] = v;
+        armor_class(ArmorSource::Monster(&m), c, mode, HTH)
+    };
+    let all = |m: &MonsterLook, c: u8| -> Vec<Option<Code>> {
+        (0..m.counts[usize::from(c)])
+            .map(|v| ac(m, c, v, 1).unwrap())
+            .collect()
+    };
+    let some =
+        |names: &[&[u8]]| -> Vec<Option<Code>> { names.iter().map(|n| Some(code(n))).collect() };
+    assert_eq!(
+        all(&m, HD),
+        some(&[b"lit", b"lit", b"des", b"des", b"hvy", b"hvy", b"hvy"])
+    );
+    assert_eq!(all(&m, TR), some(&[b"lit", b"med", b"hvy"]));
+    assert_eq!(all(&m, LG), some(&[b"lit", b"des", b"hvy"]));
+    assert_eq!(all(&m, RA), some(&[b"lit", b"des", b"hvy"]));
+    assert_eq!(
+        all(&m, RH),
+        some(&[b"axe", b"axe", b"fla", b"fla", b"hax", b"hax", b"mac", b"mac", b"scm", b"scm"])
+    );
+    // A zero code: the request fails.
+    assert_eq!(all(&m, SH)[0], None);
+    assert_eq!(all(&m, SH)[1..], some(&[b"buc", b"lrg", b"kit", b"sml"]));
+    let s1 = all(&m, S1);
+    assert!(s1[..9].iter().all(Option::is_none));
+    assert_eq!(s1[9..], some(&[b"lit", b"des", b"hvy"]));
+    // LH has no table: the `compcode` code stands.
+    assert_eq!(all(&m, LH), some(&[b"lit"]));
+    // Not applied for a choice ≥ count, nor in DT without compositeDeath.
+    assert_eq!(ac(&m, LG, 3, 1), Ok(Some(LIT)));
+    assert_eq!(ac(&m, LG, 1, 0), Ok(Some(LIT)));
+    // Elsewhere than act II the `compcode` codes stand.
+    let other = MonsterLook {
+        act_two: false,
+        ..m
+    };
+    assert_eq!(ac(&other, LG, 1, 1), Ok(Some(MED)));
+    assert_eq!(ac(&other, SH, 0, 1), Ok(Some(code(b"nil"))));
+
+    // sk_archer1.
+    let mut a = MonsterLook {
+        base_class: BASE_SK_ARCHER1,
+        ..m
+    };
+    a.counts[usize::from(LH)] = 1;
+    a.codes[usize::from(LH)] = list(&[b"sbw"]);
+    for c in [HD, LG, RA] {
+        a.counts[usize::from(c)] = 3;
+        a.codes[usize::from(c)] = list(&[b"lit", b"med", b"hvy"]);
+    }
+    assert_eq!(all(&a, HD), some(&[b"lit", b"des", b"hvy"]));
+    assert_eq!(all(&a, LG), some(&[b"lit", b"des", b"hvy"]));
+    assert_eq!(all(&a, TR), some(&[b"lit", b"med", b"hvy"]));
+    assert_eq!(all(&a, LH), some(&[b"sbw"]));
+    // RH, SH: no table.
+    assert_eq!(all(&a, RH)[1], Some(code(b"fla")));
+    assert_eq!(all(&a, SH)[0], Some(code(b"nil")));
+    // A count past the reachable entries reads the neighbour: refused.
+    assert_eq!(
+        ac(&a, S1, 0, 1),
+        Err(UnitCompositeError::OverrideTable {
+            component: S1,
+            choice: 0
+        })
+    );
+    assert_eq!(act_two_table(BASE_SKELETON1, 10), None);
+    assert_eq!(act_two_table(BASE_SK_ARCHER1, S2).map(<[_]>::len), Some(0));
 }
 
 // Covers: specs/render/unit-composite.md §5.1 text
@@ -481,6 +693,17 @@ fn dc6_component_files() {
     )
     .unwrap();
     assert_eq!(file_format(&oy, 1, 0), FileFormat::Dc6);
+    // The name compare is ASCII case-insensitive (`_strnicmp`).
+    let oy_lower = ComponentCodes::new(
+        CompositeKind::Object,
+        code(b"oy"),
+        code(b"tr"),
+        Some(LIT),
+        code(b"tn"),
+        HTH,
+    )
+    .unwrap();
+    assert_eq!(file_format(&oy_lower, 1, 0), FileFormat::Dc6);
     assert!(mon.file(FileFormat::Dc6).ends_with("MPTRlitNUhth.dc6"));
 }
 
@@ -656,7 +879,7 @@ fn motion_record_reaches_limits_vector() {
         limit: [10, 10, 10],
         ..MotionRecord::default()
     };
-    r.update().unwrap();
+    r.update(false, None).unwrap();
     assert_eq!(r.flags & motion::DONE, motion::DONE);
     assert_eq!(r.pos, [10 << 11, 10 << 11, 10 << 11]);
     assert_eq!(r.offset, [0, 5, -10]);
@@ -673,7 +896,7 @@ fn done_motion_record_is_not_updated() {
         ..MotionRecord::default()
     };
     let before = r;
-    r.update().unwrap();
+    r.update(false, None).unwrap();
     assert_eq!(r, before);
     assert_eq!(r.draw_offset(), (7, 17));
 }
@@ -689,7 +912,7 @@ fn motion_record_integration_order_and_timer() {
         ticks_left: 1,
         ..MotionRecord::default()
     };
-    r.update().unwrap();
+    r.update(false, None).unwrap();
     // Position moved by the old velocity, velocity by the acceleration.
     assert_eq!(r.pos, [1 << 11, 2 << 11, 4 << 11]);
     assert_eq!(r.vel, [2 << 11, 2 << 11, 3 << 11]);
@@ -697,7 +920,7 @@ fn motion_record_integration_order_and_timer() {
     assert_eq!(r.flags & motion::DONE, 0);
     // a = 1, b = 2: ox = (1 − 2) >> 1 = −1 (arithmetic), oy = 3 >> 2 = 0.
     assert_eq!(r.offset, [-1, 0, -4]);
-    r.update().unwrap();
+    r.update(false, None).unwrap();
     // Ticks 0: done, x and y zeroed.
     assert_eq!(r.flags & motion::DONE, motion::DONE);
     assert_eq!((r.pos[0], r.pos[1]), (0, 0));
@@ -716,23 +939,100 @@ fn motion_record_bounce() {
         bounce_factor: 50,
         ..MotionRecord::default()
     };
-    r.update().unwrap();
+    r.update(false, None).unwrap();
     // z → −2 << 11 ≤ 0: vz = −trunc(50 × vz / 100), z = limit (unshifted).
     assert_eq!(r.vel[2], 3 << 10);
     assert_eq!(r.pos[2], 0);
     assert_eq!(r.bounces_left, 0);
     assert_eq!(r.flags & motion::DONE, 0);
+    // Above the limit: nothing of r3 happens, the count is kept.
+    r.pos[2] = 4 << 11;
+    r.vel[2] = 0;
+    r.bounces_left = 2;
+    r.update(false, None).unwrap();
+    assert_eq!((r.bounces_left, r.flags & motion::DONE), (2, 0));
+    // Hit: the decrement runs inside the hit branch.
+    r.pos[2] = 0;
     r.vel[2] = -1;
-    r.update().unwrap();
+    r.update(false, None).unwrap();
+    assert_eq!((r.bounces_left, r.flags & motion::DONE), (1, 0));
+    r.bounces_left = 0;
+    r.vel[2] = -1;
+    r.update(false, None).unwrap();
     assert_eq!(r.flags & motion::DONE, motion::DONE);
     // −trunc(50 × −1 / 100) = 0 (truncation toward zero).
     assert_eq!(r.vel[2], 0);
-    // Follow branch: open question 7.
-    let mut f = MotionRecord {
+}
+
+// Covers: specs/render/unit-composite.md §8 r4
+#[test]
+fn motion_record_follows_the_linked_unit() {
+    let start = MotionRecord {
         flags: motion::FOLLOW,
+        vel: [1 << 11, 0, 0],
+        offset: [1, 6, 2],
         ..MotionRecord::default()
     };
-    assert!(f.update().is_err());
+    let k = FollowTarget {
+        monster: true,
+        mode: 1,
+        s7_offset: (3, -40),
+        offset: [2, 7, -5],
+    };
+    // No linked unit: nothing more (r6 skipped; r1 still ran).
+    let mut r = start;
+    r.update(false, None).unwrap();
+    assert_eq!((r.pos, r.offset), ([1 << 11, 0, 0], [1, 6, 2]));
+    // ox = a + K.ox = 5, oz = b + K.oz = −45, oy kept (6);
+    // x = (12 + 5) >> 5 = 0, y = (12 − 5) >> 5 = 0, z = 45 × 2,048.
+    let mut r = start;
+    r.update(false, Some(&k)).unwrap();
+    assert_eq!(r.offset, [5, 6, -45]);
+    assert_eq!(r.pos, [0, 0, 45 * 2048]);
+    // Arithmetic shifts: oy 40, ox 5 → x = 85 >> 5 = 2, y = 75 >> 5 = 2;
+    // ox −90 → y = (80 + 90) >> 5 = 5, x = (80 − 90) >> 5 = −1.
+    let mut r = MotionRecord {
+        offset: [0, 40, 0],
+        ..start
+    };
+    r.update(false, Some(&k)).unwrap();
+    assert_eq!((r.pos[0], r.pos[1]), (2, 2));
+    let far = FollowTarget {
+        s7_offset: (-92, 0),
+        ..k
+    };
+    let mut r = MotionRecord {
+        offset: [0, 40, 0],
+        ..start
+    };
+    r.update(false, Some(&far)).unwrap();
+    assert_eq!((r.pos[0], r.pos[1]), (-1, 5));
+    // A missile: oz gets + 10; K must be a monster; K in DT / DD: nothing.
+    let mut r = start;
+    r.update(true, Some(&k)).unwrap();
+    assert_eq!(r.offset, [5, 6, -35]);
+    assert_eq!(r.pos[2], 35 * 2048);
+    let mut r = start;
+    assert_eq!(
+        r.update(
+            true,
+            Some(&FollowTarget {
+                monster: false,
+                ..k
+            })
+        ),
+        Err(UnitCompositeError::FollowTarget)
+    );
+    for mode in [0, 12] {
+        let mut r = start;
+        r.update(true, Some(&FollowTarget { mode, ..k })).unwrap();
+        assert_eq!((r.pos, r.offset), ([1 << 11, 0, 0], [1, 6, 2]));
+    }
+    // A non-missile follows a unit in any mode.
+    let mut r = start;
+    r.update(false, Some(&FollowTarget { mode: 0, ..k }))
+        .unwrap();
+    assert_eq!(r.offset, [5, 6, -45]);
 }
 
 #[test]
