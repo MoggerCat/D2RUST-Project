@@ -333,6 +333,9 @@ pub fn generate(client_tsv: &str, server_tsv: &str) -> Result<String, TsvError> 
 }
 
 #[cfg(test)]
+mod mutant_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::tsv::{CLIENT_TSV, SERVER_TSV};

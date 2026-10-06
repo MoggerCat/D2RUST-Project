@@ -24,6 +24,9 @@ pub mod transport;
 pub mod tsv;
 pub mod wire;
 
+#[cfg(test)]
+mod mutant_tests;
+
 pub use generated::{client, server, CLIENT_MESSAGES, SERVER_MESSAGES};
 pub use wire::{DecodeError, FixedMessage};
 

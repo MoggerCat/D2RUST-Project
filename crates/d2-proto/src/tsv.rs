@@ -531,6 +531,9 @@ pub fn check(client_tsv: &str, server_tsv: &str) -> Result<Vec<String>, TsvError
 }
 
 #[cfg(test)]
+mod mutant_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

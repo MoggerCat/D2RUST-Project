@@ -17,6 +17,8 @@ pub mod states;
 #[cfg(test)]
 mod gap_tests;
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 
 use d2_data::bin::BinTable;
