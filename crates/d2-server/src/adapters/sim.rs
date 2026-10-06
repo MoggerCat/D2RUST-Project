@@ -73,17 +73,8 @@ impl EventDispatch for Unspecified {
     fn run_event(&mut self, _game: &mut Game, _run: &TimerRun) {}
 }
 
-/// The tick hooks: timer events go to `D`; every step body owned by an
-/// unwritten spec keeps its `TickHooks` default (does nothing).
-struct Steps<'a, D>(&'a mut D);
-
-impl<D: EventDispatch> EventDispatch for Steps<'_, D> {
-    fn run_event(&mut self, game: &mut Game, run: &TimerRun) {
-        self.0.run_event(game, run);
-    }
-}
-
-impl<D: EventDispatch> TickHooks for Steps<'_, D> {}
+/// Every step body keeps its `TickHooks` default (does nothing).
+impl TickHooks for Unspecified {}
 
 /// One `d2-sim` game behind the `d2-server` seams.
 ///
@@ -310,11 +301,14 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     }
 }
 
-impl<D: EventDispatch, W> Tick for SimGame<D, W> {
-    /// `d2_sim::tick::tick`. No step sends a message yet: every sender
-    /// belongs to an unwritten spec, so `out` is unused.
+impl<D: TickHooks, W> Tick for SimGame<D, W> {
+    /// `d2_sim::tick::tick` with `D` as the step hooks (`tick.md` §3:
+    /// the wired dispatch's room, DRLG and population steps run; a
+    /// dispatch without them keeps the defaults). No step sends a
+    /// message yet: every sender belongs to an unwritten spec, so `out`
+    /// is unused.
     fn tick(&mut self, _out: &mut dyn MessageSink) {
-        tick::tick(&mut self.game, &mut Steps(&mut self.events));
+        tick::tick(&mut self.game, &mut self.events);
     }
 }
 
