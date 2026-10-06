@@ -57,6 +57,7 @@ fn starters_parse_and_round_trip() {
         names,
         [
             "cast-firebolt",
+            "champion-pack",
             "kill-monster",
             "pickup-drop",
             "run-cold-plains",
@@ -166,7 +167,7 @@ fn perturb(r: &mut Record) -> bool {
 // Covers: specs/tools/scenario.md §5 r3, §5 r4, §5 r5
 #[test]
 fn comparator_finds_every_perturbed_record_of_a_real_run() {
-    for s in [travel(), starters().remove(5).1] {
+    for s in [travel(), starters().remove(6).1] {
         let original = trace_of(&s, data());
         let mut checked = 0;
         for k in 0..original.records.len() {
@@ -194,6 +195,47 @@ fn comparator_finds_every_perturbed_record_of_a_real_run() {
         }
         assert!(checked > 100, "{}: {checked}", s.name);
     }
+}
+
+/// `champion-pack` with the synthetic monster class 1 (ghoul1) for the
+/// fallen of the script.
+fn champion_pack() -> Scenario {
+    let text = std::fs::read_to_string(scenarios_dir().join("champion-pack.scenario")).unwrap();
+    let text = text
+        .replace("spawn 19", "spawn 1")
+        .replace("@1:19", "@1:1")
+        .replace("name champion-pack", "name champion-pack-synthetic");
+    Scenario::parse(&text).unwrap()
+}
+
+// Covers: specs/tools/scenario.md §3.1 r2, §3.1 r3
+#[test]
+fn a_spawned_champion_pack_is_recorded() {
+    let t = trace_of(&champion_pack(), data());
+    let spawned: Vec<&Record> = t.records.iter().filter(|r| matches!(r, Record::Spawn { .. })).collect();
+    let [Record::Spawn { t: 5, i: 0, guid: Ok(Some(leader)) }] = spawned.as_slice() else {
+        panic!("{spawned:?}")
+    };
+    // The leader and its 1–3 minions are monsters of class 1 at the next
+    // snapshot.
+    let pack: Vec<u32> = t
+        .records
+        .iter()
+        .filter_map(|r| match r {
+            Record::Unit { t: 10, ty: 1, class: 1, guid, .. } => Some(*guid),
+            _ => None,
+        })
+        .collect();
+    assert!(pack.contains(leader), "{pack:?}");
+    assert!((2..=4).contains(&pack.len()), "{pack:?}");
+    // The spawn drew from the game seed before the drain of tick 5.
+    let rng5 = t.records.iter().find_map(|r| match r {
+        Record::Rng { t: 5, before, after } => Some((*before, *after)),
+        _ => None,
+    });
+    let (before, after) = rng5.expect("rng at tick 5");
+    assert_ne!(before, after);
+    assert_eq!(t.to_text(), trace_of(&champion_pack(), data()).to_text());
 }
 
 // Covers: specs/tools/scenario.md §4 r10

@@ -81,12 +81,114 @@ pub enum Place {
     Cube(u8, u8),
     Belt(u8),
     Body(u8),
+    /// In socket n of the nearest earlier item not itself in a socket.
+    Socket(u8),
 }
 
+/// Item quality (`items/quality.md`: 1 low … 8 crafted).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Quality {
+    Low = 1,
+    Normal,
+    Superior,
+    Magic,
+    Set,
+    Rare,
+    Unique,
+    Crafted,
+}
+
+impl Quality {
+    pub const ALL: [Quality; 8] = [
+        Self::Low,
+        Self::Normal,
+        Self::Superior,
+        Self::Magic,
+        Self::Set,
+        Self::Rare,
+        Self::Unique,
+        Self::Crafted,
+    ];
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::Superior => "superior",
+            Self::Magic => "magic",
+            Self::Set => "set",
+            Self::Rare => "rare",
+            Self::Unique => "unique",
+            Self::Crafted => "crafted",
+        }
+    }
+}
+
+/// An inline item (§2 item table).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
     pub code: String,
     pub place: Place,
+    pub quality: Option<Quality>,
+    pub ilvl: Option<u8>,
+    /// Magic prefix rows (≤ 3).
+    pub prefixes: Vec<u16>,
+    /// Magic suffix rows (≤ 3).
+    pub suffixes: Vec<u16>,
+    pub unique: Option<u16>,
+    pub set: Option<u16>,
+    pub runeword: Option<u16>,
+    pub sockets: Option<u8>,
+}
+
+impl Item {
+    /// A plain item at `place`.
+    pub fn plain(code: &str, place: Place) -> Self {
+        Self {
+            code: code.to_owned(),
+            place,
+            quality: None,
+            ilvl: None,
+            prefixes: Vec::new(),
+            suffixes: Vec::new(),
+            unique: None,
+            set: None,
+            runeword: None,
+            sockets: None,
+        }
+    }
+}
+
+/// What a `spawn` step creates (§3.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpawnKind {
+    Normal,
+    RandomBoss,
+    Champion,
+    Unique,
+}
+
+impl SpawnKind {
+    pub const ALL: [SpawnKind; 4] = [Self::Normal, Self::RandomBoss, Self::Champion, Self::Unique];
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::RandomBoss => "random-boss",
+            Self::Champion => "champion",
+            Self::Unique => "unique",
+        }
+    }
+}
+
+/// A `spawn` step (§3.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Spawn {
+    /// monstats row.
+    pub class: u32,
+    pub x: Arg,
+    pub y: Arg,
+    pub kind: SpawnKind,
+    /// monumod rows: one for `champion`, 1–9 for `unique`, none else.
+    pub umods: Vec<u8>,
 }
 
 /// `char at`.
@@ -110,6 +212,8 @@ pub struct Inline {
     pub skills: Vec<(u16, u8)>,
     /// Level ids, script order, unique.
     pub waypoints: Vec<u32>,
+    /// (quest index, quest flags) on the game's difficulty, unique.
+    pub quests: Vec<(u8, u16)>,
     pub items: Vec<Item>,
 }
 
@@ -188,6 +292,8 @@ pub enum StepMsg {
         id: u8,
         fields: Vec<(String, Arg)>,
     },
+    /// Not a message: a monster spawned by the server (§3.1).
+    Spawn(Spawn),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -273,15 +379,40 @@ impl Scenario {
                 for w in &c.waypoints {
                     line(format!("char waypoint {w}"));
                 }
+                for (q, f) in &c.quests {
+                    line(format!("char quest {q} {f}"));
+                }
                 for i in &c.items {
-                    let place = match i.place {
-                        Place::Inv(x, y) => format!("inv {x} {y}"),
-                        Place::Stash(x, y) => format!("stash {x} {y}"),
-                        Place::Cube(x, y) => format!("cube {x} {y}"),
-                        Place::Belt(s) => format!("belt {s}"),
-                        Place::Body(b) => format!("body {b}"),
-                    };
-                    line(format!("char item {} {place}", i.code));
+                    let mut l = format!("char item {} ", i.code);
+                    match i.place {
+                        Place::Inv(x, y) => l += &format!("inv {x} {y}"),
+                        Place::Stash(x, y) => l += &format!("stash {x} {y}"),
+                        Place::Cube(x, y) => l += &format!("cube {x} {y}"),
+                        Place::Belt(s) => l += &format!("belt {s}"),
+                        Place::Body(b) => l += &format!("body {b}"),
+                        Place::Socket(n) => l += &format!("socket {n}"),
+                    }
+                    if let Some(q) = i.quality {
+                        let _ = write!(l, " quality {}", q.name());
+                    }
+                    if let Some(v) = i.ilvl {
+                        let _ = write!(l, " ilvl {v}");
+                    }
+                    for v in &i.prefixes {
+                        let _ = write!(l, " prefix {v}");
+                    }
+                    for v in &i.suffixes {
+                        let _ = write!(l, " suffix {v}");
+                    }
+                    for (k, v) in [("unique", i.unique), ("set", i.set), ("runeword", i.runeword)] {
+                        if let Some(v) = v {
+                            let _ = write!(l, " {k} {v}");
+                        }
+                    }
+                    if let Some(v) = i.sockets {
+                        let _ = write!(l, " sockets {v}");
+                    }
+                    line(l);
                 }
             }
         }
@@ -303,6 +434,26 @@ impl Scenario {
                     l.push_str("hex");
                     for x in b {
                         let _ = write!(l, " {x:02x}");
+                    }
+                }
+                StepMsg::Spawn(sp) => {
+                    let arg = |a: &Arg| match a {
+                        Arg::Num(x) => x.to_string(),
+                        Arg::Ref(r) => r.to_string(),
+                    };
+                    let _ = write!(
+                        l,
+                        "spawn {} {} {} {}",
+                        sp.class,
+                        arg(&sp.x),
+                        arg(&sp.y),
+                        sp.kind.name()
+                    );
+                    if !sp.umods.is_empty() {
+                        l.push_str(" umod");
+                        for u in &sp.umods {
+                            let _ = write!(l, " {u}");
+                        }
                     }
                 }
                 StepMsg::Typed { id, fields } => {
@@ -447,6 +598,24 @@ pub fn resolve(r: &Ref, w: &dyn World) -> Result<i64, String> {
     }
 }
 
+/// A spawn step's position (§3.1 rule 2), or the reference that did not
+/// resolve.
+pub fn spawn_position(sp: &Spawn, w: &dyn World) -> Result<(i32, i32), Unresolved> {
+    let one = |a: &Arg| match a {
+        Arg::Num(v) => i32::try_from(*v).map_err(|_| Unresolved {
+            reference: v.to_string(),
+            why: format!("{v} is not a position"),
+        }),
+        Arg::Ref(r) => resolve(r, w)
+            .and_then(|v| i32::try_from(v).map_err(|_| format!("{r}: {v} is not a position")))
+            .map_err(|why| Unresolved {
+                reference: r.to_string(),
+                why,
+            }),
+    };
+    Ok((one(&sp.x)?, one(&sp.y)?))
+}
+
 /// A step that did not resolve (§3 rule 5).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unresolved {
@@ -462,6 +631,12 @@ pub fn encode(msg: &StepMsg, w: &dyn World) -> Result<Vec<u8>, Unresolved> {
     let (id, fields) = match msg {
         StepMsg::Hex(b) => return Ok(b.clone()),
         StepMsg::Typed { id, fields } => (*id, fields),
+        StepMsg::Spawn(_) => {
+            return Err(Unresolved {
+                reference: "spawn".into(),
+                why: "a spawn step is not a message".into(),
+            })
+        }
     };
     let m = message(id);
     // Checked at parse time.
@@ -523,6 +698,7 @@ struct Parser {
     stats: Vec<(u16, i32)>,
     skills: Vec<(u16, u8)>,
     waypoints: Vec<u32>,
+    quests: Vec<(u8, u16)>,
     items: Vec<Item>,
     inline_lines: Option<usize>,
     record: Option<Vec<Stream>>,
@@ -788,7 +964,8 @@ impl Parser {
                         StepMsg::Hex(b)
                     }
                     "msg" => typed(&rest[2..])?,
-                    k => return Err(format!("unknown step kind {k:?}: hex or msg")),
+                    "spawn" => spawn(&rest[2..])?,
+                    k => return Err(format!("unknown step kind {k:?}: hex, msg or spawn")),
                 };
                 self.steps.push((line, Step { tick, msg }));
                 Ok(())
@@ -879,34 +1056,26 @@ impl Parser {
                 self.waypoints.push(l);
                 Ok(())
             }
-            "item" => {
-                let [code, place @ ..] = args else {
-                    return Err("`char item <code> <place>`".into());
-                };
-                if !(3..=4).contains(&code.len())
-                    || !code
-                        .bytes()
-                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
-                {
-                    return Err(format!("item code {code:?}: 3-4 of [a-z0-9]"));
+            "quest" => {
+                want(2)?;
+                let q = ranged::<u8>(args[0], 0, 40, "quest index")?;
+                if self.quests.iter().any(|e| e.0 == q) {
+                    return Err(format!("quest {q} given twice"));
                 }
-                let cell = |t: &str| ranged::<u8>(t, 0, 15, "grid cell");
-                let place = match place {
-                    ["inv", x, y] => Place::Inv(cell(x)?, cell(y)?),
-                    ["stash", x, y] => Place::Stash(cell(x)?, cell(y)?),
-                    ["cube", x, y] => Place::Cube(cell(x)?, cell(y)?),
-                    ["belt", s] => Place::Belt(ranged(s, 0, 15, "belt slot")?),
-                    ["body", b] => Place::Body(ranged(b, 1, 12, "body location")?),
-                    _ => {
-                        return Err(
-                            "item place: inv|stash|cube <x> <y>, belt <slot> or body <loc>".into(),
-                        )
-                    }
-                };
-                self.items.push(Item {
-                    code: (*code).to_owned(),
-                    place,
-                });
+                self.quests.push((q, ranged(args[1], 0, 0xFFFF, "quest flags")?));
+                Ok(())
+            }
+            "item" => {
+                let item = item(args)?;
+                if matches!(item.place, Place::Socket(_))
+                    && !self
+                        .items
+                        .iter()
+                        .any(|i| !matches!(i.place, Place::Socket(_)))
+                {
+                    return Err("a socketed item needs an earlier item to sit in".into());
+                }
+                self.items.push(item);
                 Ok(())
             }
             k => Err(format!("unknown character field {k:?}")),
@@ -944,6 +1113,7 @@ impl Parser {
                     stats: self.stats,
                     skills: self.skills,
                     waypoints: self.waypoints,
+                    quests: self.quests,
                     items: self.items,
                 })
             }
@@ -983,6 +1153,129 @@ impl Parser {
             steps,
         })
     }
+}
+
+/// `char item <code> <place> [<key> <value>]...` (§2 item table).
+fn item(args: &[&str]) -> Result<Item, String> {
+    let [code, rest @ ..] = args else {
+        return Err("`char item <code> <place>`".into());
+    };
+    if !(3..=4).contains(&code.len())
+        || !code
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+    {
+        return Err(format!("item code {code:?}: 3-4 of [a-z0-9]"));
+    }
+    let cell = |t: &str| ranged::<u8>(t, 0, 15, "grid cell");
+    let (place, mut rest) = match rest {
+        ["inv", x, y, r @ ..] => (Place::Inv(cell(x)?, cell(y)?), r),
+        ["stash", x, y, r @ ..] => (Place::Stash(cell(x)?, cell(y)?), r),
+        ["cube", x, y, r @ ..] => (Place::Cube(cell(x)?, cell(y)?), r),
+        ["belt", s, r @ ..] => (Place::Belt(ranged(s, 0, 15, "belt slot")?), r),
+        ["body", b, r @ ..] => (Place::Body(ranged(b, 1, 12, "body location")?), r),
+        ["socket", n, r @ ..] => (Place::Socket(ranged(n, 0, 5, "socket")?), r),
+        _ => {
+            return Err(
+                "item place: inv|stash|cube <x> <y>, belt <slot>, body <loc> or socket <n>".into(),
+            )
+        }
+    };
+    let mut it = Item::plain(code, place);
+    fn once<T>(slot: &mut Option<T>, v: T, what: &str) -> Result<(), String> {
+        if slot.is_some() {
+            return Err(format!("item `{what}` given twice"));
+        }
+        *slot = Some(v);
+        Ok(())
+    }
+    while let [key, value, r @ ..] = rest {
+        let row = || ranged::<u16>(value, 0, 0xFFFF, key);
+        match *key {
+            "quality" => {
+                let q = Quality::ALL
+                    .into_iter()
+                    .find(|q| q.name() == *value)
+                    .ok_or_else(|| format!("unknown quality {value:?}"))?;
+                once(&mut it.quality, q, "quality")?;
+            }
+            "ilvl" => once(&mut it.ilvl, ranged(value, 1, 99, "ilvl")?, "ilvl")?,
+            "prefix" => it.prefixes.push(row()?),
+            "suffix" => it.suffixes.push(row()?),
+            "unique" => once(&mut it.unique, row()?, "unique")?,
+            "set" => once(&mut it.set, row()?, "set")?,
+            "runeword" => once(&mut it.runeword, row()?, "runeword")?,
+            "sockets" => once(&mut it.sockets, ranged(value, 1, 6, "sockets")?, "sockets")?,
+            k => return Err(format!("unknown item field {k:?}")),
+        }
+        rest = r;
+    }
+    if !rest.is_empty() {
+        return Err(format!("item field {:?} without a value", rest[0]));
+    }
+    let q = it.quality;
+    if it.prefixes.len() > 3 || it.suffixes.len() > 3 {
+        return Err("at most 3 prefixes and 3 suffixes".into());
+    }
+    if !(it.prefixes.is_empty() && it.suffixes.is_empty())
+        && !matches!(q, Some(Quality::Magic | Quality::Rare | Quality::Crafted))
+    {
+        return Err("prefix / suffix need quality magic, rare or crafted".into());
+    }
+    if it.unique.is_some() != (q == Some(Quality::Unique)) {
+        return Err("`unique <id>` and quality unique go together".into());
+    }
+    if it.set.is_some() != (q == Some(Quality::Set)) {
+        return Err("`set <id>` and quality set go together".into());
+    }
+    if it.runeword.is_some() && it.sockets.is_none() {
+        return Err("a runeword needs `sockets`".into());
+    }
+    Ok(it)
+}
+
+/// `spawn <class> <x> <y> <kind> [umod <id>...]` (§3.1).
+fn spawn(toks: &[&str]) -> Result<StepMsg, String> {
+    let [class, x, y, kind, rest @ ..] = toks else {
+        return Err("`spawn <class> <x> <y> <kind> [umod <id>...]`".into());
+    };
+    let arg = |t: &str| -> Result<Arg, String> {
+        if t.starts_with('@') {
+            Ok(Arg::Ref(parse_ref(t)?))
+        } else {
+            Ok(Arg::Num(num(t)?))
+        }
+    };
+    let kind = SpawnKind::ALL
+        .into_iter()
+        .find(|k| k.name() == *kind)
+        .ok_or_else(|| format!("unknown spawn kind {kind:?}: normal, random-boss, champion or unique"))?;
+    let umods = match rest {
+        [] => Vec::new(),
+        ["umod", ids @ ..] if !ids.is_empty() => ids
+            .iter()
+            .map(|t| ranged::<u8>(t, 1, 255, "umod"))
+            .collect::<Result<Vec<u8>, _>>()?,
+        _ => return Err("after the kind: `umod <id>...`".into()),
+    };
+    let ok = match kind {
+        SpawnKind::Normal | SpawnKind::RandomBoss => umods.is_empty(),
+        SpawnKind::Champion => umods.len() == 1,
+        SpawnKind::Unique => (1..=9).contains(&umods.len()),
+    };
+    if !ok {
+        return Err(format!(
+            "spawn {}: umods: none for normal and random-boss, one for champion, 1-9 for unique",
+            kind.name()
+        ));
+    }
+    Ok(StepMsg::Spawn(Spawn {
+        class: num(class)?,
+        x: arg(x)?,
+        y: arg(y)?,
+        kind,
+        umods,
+    }))
 }
 
 /// `msg <Name> <field>=<value>...` (§3 rules 1–2).
@@ -1156,6 +1449,53 @@ mod tests {
         assert!(e.message.contains("need `units` or `stats`"), "{e}");
         let e = steps("char save x.d2s\n").unwrap_err();
         assert!(e.message.contains("excludes"), "{e}");
+    }
+
+    // Covers: specs/tools/scenario.md §3.1 r1, §3.1 r2, §3.1 r3
+    #[test]
+    fn spawn_steps_and_rich_items() {
+        let s = steps(concat!(
+            "char quest 3 0x1001\n",
+            "char item rin1 inv 0 0 quality rare ilvl 85 prefix 12 suffix 400 suffix 401\n",
+            "char item ber socket 0\n",
+            "char item uap body 1 quality unique unique 230 sockets 1\n",
+            "char item 7cr body 4 runeword 42 sockets 2 quality normal\n",
+            "at 1 spawn 19 @x+10 @y champion umod 16\n",
+            "at 1 spawn 5 100 200 unique umod 3 7 18\n",
+            "at 2 spawn 63 @x @y-5 random-boss\n",
+        ))
+        .unwrap();
+        let text = s.to_text();
+        assert_eq!(Scenario::parse(&text).unwrap(), s, "{text}");
+        assert!(
+            text.contains("char item 7cr body 4 quality normal runeword 42 sockets 2\n"),
+            "{text}"
+        );
+        assert!(text.contains("at 1 spawn 19 @x+10 @y champion umod 16\n"), "{text}");
+        let StepMsg::Spawn(sp) = &s.steps[0].msg else {
+            panic!()
+        };
+        assert_eq!(spawn_position(sp, &W), Ok((110, 200)));
+        assert!(encode(&s.steps[0].msg, &W).is_err());
+        let Character::Inline(c) = &s.character else {
+            panic!()
+        };
+        assert_eq!(c.quests, [(3, 0x1001)]);
+        assert_eq!(c.items[1].place, Place::Socket(0));
+        for (bad, needle) in [
+            ("at 1 spawn 19 1 2 champion\n", "one for champion"),
+            ("at 1 spawn 19 1 2 normal umod 3\n", "none for normal"),
+            ("at 1 spawn 19 1 2 elite\n", "unknown spawn kind"),
+            ("char item rin1 inv 0 0 prefix 3\n", "magic, rare or crafted"),
+            ("char item rin1 inv 0 0 quality unique\n", "go together"),
+            ("char item 7cr inv 0 0 runeword 3\n", "needs `sockets`"),
+            ("char item ber socket 0\n", "earlier item"),
+            ("char item rin1 inv 0 0 ilvl\n", "without a value"),
+            ("char quest 41 1\n", "quest index"),
+        ] {
+            let e = steps(bad).unwrap_err();
+            assert!(e.message.contains(needle), "{bad:?}: {e}");
+        }
     }
 
     // Covers: specs/tools/scenario.md §2 r6, §edge-cases-original-bugs r4

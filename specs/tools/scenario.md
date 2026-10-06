@@ -24,15 +24,15 @@
 | Outputs / state changes | 63–69 |
 | Rules | 70–71 |
 |   1. Files | 72–81 |
-|   2. Script syntax | 82–151 |
-|   3. Typed messages and references | 152–182 |
-|   4. Run model | 183–233 |
-|   5. Comparison | 234–263 |
-|   6. Masks | 264–284 |
-| Edge cases & original bugs | 285–296 |
-| Test vectors | 297–312 |
-| Provenance | 313–322 |
-| Open questions | 323–341 |
+|   2. Script syntax | 82–169 |
+|   3. Typed messages and references | 170–225 |
+|   4. Run model | 226–277 |
+|   5. Comparison | 278–308 |
+|   6. Masks | 309–329 |
+| Edge cases & original bugs | 330–341 |
+| Test vectors | 342–357 |
+| Provenance | 358–367 |
+| Open questions | 368–391 |
 <!-- /index -->
 
 ## Summary
@@ -128,7 +128,24 @@ the game directory; exclusive with every other `char` line) or inline:
 | `char stat <stat id> <i32>` | per id | — | base value (layer 0) of an itemstatcost row, set after creation; overrides the creation value |
 | `char skill <skill id> <1..255>` | per id | — | hard skill points |
 | `char waypoint <level id>` | per id | — | a known waypoint, on the game's difficulty |
-| `char item <code> <place>` | no | — | an item: `code` 3–4 characters `[a-z0-9]`; place `inv <x> <y>`, `stash <x> <y>`, `cube <x> <y>` (grid cell, 0..15 each), `belt <slot 0..15>` or `body <bodyloc 1..12>` |
+| `char quest <0..40> <u16>` | per index | — | quest flags of quest index n on the game's difficulty |
+| `char item <code> <place> [<key> <value>]...` | no | — | an item (item table below) |
+
+Items: `code` is 3–4 characters `[a-z0-9]`. Place: `inv <x> <y>`,
+`stash <x> <y>`, `cube <x> <y>` (grid cell, 0..15 each), `belt <slot
+0..15>`, `body <bodyloc 1..12>`, or `socket <0..5>`: inside the nearest
+earlier item that is not itself in a socket (an error when there is
+none). Optional keys, any order (canonical: the table order):
+
+| Key | Value | Rule |
+|---|---|---|
+| `quality` | `low`, `normal`, `superior`, `magic`, `set`, `rare`, `unique`, `crafted` | once |
+| `ilvl` | 1..99 | once |
+| `prefix`, `suffix` | magic affix row (u16) | up to 3 each; only with quality `magic`, `rare` or `crafted` |
+| `unique` | uniqueitems row | once; exactly when quality is `unique` |
+| `set` | setitems row | once; exactly when quality is `set` |
+| `runeword` | runes row | once; needs `sockets` |
+| `sockets` | 1..6 | once |
 
 Recording:
 
@@ -148,6 +165,7 @@ Steps:
 |---|---|
 | `at <tick> hex <byte>...` | a raw C→S message: 1 to 516 bytes, two hex digits each |
 | `at <tick> msg <Name> <field>=<value>...` | a typed C→S message (§3) |
+| `at <tick> spawn <class> <x> <y> <kind> [umod <id>...]` | a monster spawned by the server (§3.1) |
 
 ### 3. Typed messages and references
 
@@ -180,6 +198,31 @@ Steps:
    not stop the run: the step is written as an unresolved `c2s` record
    (`traces/FORMAT.md`), nothing is injected, and the run goes on.
 
+#### 3.1 Spawn steps
+
+1. A spawn step makes the server create monsters through the
+   original's own population functions (`monsters/population.md`,
+   `monsters/init.md`), not through a message. `class` is a monstats
+   row; `x`, `y` are sub-tiles (numbers or references, §3 rule 3); the
+   room is the active room that contains the point.
+2. `kind` and the call sequence both runners make:
+
+<!-- rows -->
+| kind | umods | Calls, in order |
+|---|---|---|
+| `normal` | none | one placement `0x005B2A00` at (x, y): mode 1, radius −1, flags 0 (population.md placement) |
+| `random-boss` | none | random boss `0x005A43E0`(room, no coordinate list, class, champion allowed, x, y, no warp check), then champion minions `0x0054E1E0` (population.md §6.2, §6.4; the room-population path) |
+| `champion` | exactly 1 | boss spawn `0x005A09E0` at (x, y) (§6.3), champion pack member `0x005A48C0`(boss, umod) (init.md §16.2), champion minions `0x0054E1E0` (§6.4) |
+| `unique` | 1–9 | boss spawn `0x005A09E0` at (x, y), the umods appended to the boss's list in order, then unique minions and modifier init `0x005A2120`(boss, 3, 6) (§6.5, init.md §18) |
+
+3. The step's `spawn` record (FORMAT.md) holds the GUID of the unit
+   the first call returned, or `failed` when it returned none; the
+   minions and every draw of the calls show in the unit and rng
+   records. Spawns run at (a) of §4 rule 2, in script order with the
+   messages (which only queue), so their draws come before the drain.
+4. A spawn with a reference that does not resolve is written as an
+   unresolved `spawn` record and nothing is spawned (§3 rule 5).
+
 ### 4. Run model
 
 Both runners follow these rules; a runner that cannot follow one says
@@ -206,12 +249,13 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    question 3). d2rs does not place a joining character yet and stands
    it 5 sub-tiles right of and below the area's first waypoint object
    (`test-fixtures` staging), and writes that as a gap.
-4. **c2s.** Every step of tick t, in order: its bytes as injected, or
-   the unresolved reference (§3 rule 5).
+4. **c2s.** Every message step of tick t, in order: its bytes as
+   injected, or the unresolved reference (§3 rule 5); spawn steps write
+   `spawn` records (§3.1 rule 3). Both count in the step index `i`.
 5. **s2c.** Every message queued for the character's client from the
-   start of (b) to the end of (c), in queue order: the O(F) of
+   start of (a) to the end of (c), in queue order: the O(F) of
    `sim/intents-events.md` §6 rule 1 for F = tick t.
-6. **rng.** The game seed (`rng.md` §5.2) before (b) and after (c).
+6. **rng.** The game seed (`rng.md` §5.2) before (a) and after (c).
    A runner that can see single draws also writes each draw of the
    game seed in that window (`draw` records); runners that cannot omit
    them and do not list `rng-draws` in `streams`.
@@ -242,7 +286,8 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    `rng-draws` when both list it. A requested stream missing on a side
    is reported as not compared.
 3. **Order.** Tick by tick from 0; within a tick the streams in the
-   order `c2s`, `s2c`, `rng`, `draw`, `unit`, `stats`; within a stream
+   order `c2s`, `spawn`, `s2c`, `rng`, `draw`, `unit`, `stats` (`spawn`
+   belongs to the `c2s` stream); within a stream
    record by record. The first difference ends the comparison.
 4. **Records.** A record present on one side only is a difference
    (`missing` / `extra`). `s2c`: client, then length, then the bytes
@@ -338,3 +383,8 @@ list with what each answer must state):
    `GameFields::game_type` notes 3).
 5. Whether `dwInitSeed` (game +0x7C, `sim/rng.md` §5.2) reaches any
    outcome in single player (d2rs does not model it).
+6. The conventions of the §3.1 spawn calls outside room population and
+   the monster data field of the umod list (handoff §4 Q12–Q14).
+7. How a joining character gets items of a given quality, affixes,
+   unique / set / runeword id and sockets, and quest flags (handoff §4
+   Q3), for the original side and for `char save`.

@@ -26,7 +26,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use conformance::packets::{DispatchServer, PacketServer};
-use conformance::scenario::script::{encode, Character, Start, Stream, UnitRef, World};
+use conformance::scenario::script::{
+    encode, spawn_position, Character, Spawn, SpawnKind, Start, StepMsg, Stream, UnitRef, World,
+};
 use conformance::scenario::trace::{Header, Record, TraceFile};
 use conformance::scenario::Scenario;
 use d2_data::tables::Objects;
@@ -38,7 +40,8 @@ use d2_server::transport::{Classified, Queue, ServerQueues};
 use d2_sim::combat::vitals::init_player_stats;
 use d2_sim::drlg::DrlgError;
 use d2_sim::game::Game;
-use d2_sim::monsters::init::GameInfo;
+use d2_sim::monsters::init::{self, GameInfo, InitHost};
+use d2_sim::monsters::population::{placement, spawn as pop_spawn};
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillEntry;
 use d2_sim::stats::lists::NoHost;
@@ -489,6 +492,12 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             )),
         }
     }
+    if !c.quests.is_empty() {
+        gaps.push(format!(
+            "char quest: {} quest flag set(s) not applied (TODO(spec: quest flags of a joining character))",
+            c.quests.len()
+        ));
+    }
     if !c.items.is_empty() {
         gaps.push(format!(
             "char item: {} item(s) not created (TODO(spec: item creation from a code and inventory placement))",
@@ -536,6 +545,52 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
         waypoint_classes,
         gaps,
     })
+}
+
+/// A spawn step (`scenario.md` §3.1 rule 2) at (x, y); the GUID of the
+/// unit the first call returned.
+fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
+    let game = &mut sim.game;
+    let ev = &mut sim.events;
+    // The active room that holds the point.
+    let room = game.lists.active_rooms(0).into_iter().find(|&r| {
+        ev.action.sys.hooks.drlg.subtiles(game, r).is_some_and(|s| {
+            x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h
+        })
+    })?;
+    let class = i32::try_from(sp.class).ok()?;
+    let unit = match sp.kind {
+        SpawnKind::Normal => ev.population(game, |cx| {
+            placement::place_at(cx, room, None, x, y, class, 1, -1, 0).unit()
+        })?,
+        SpawnKind::RandomBoss => ev.population(game, |cx| {
+            let b = pop_spawn::random_boss(cx, room, None, class, true, x, y, false)?;
+            pop_spawn::champion_minions(cx, None, b, class);
+            Some(b)
+        })?,
+        SpawnKind::Champion => {
+            let b = ev.population(game, |cx| {
+                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
+            })?;
+            let umod = sp.umods[0];
+            ev.init(game, |cx, h| init::champion_pack_member(cx, h, b, umod));
+            ev.population(game, |cx| pop_spawn::champion_minions(cx, None, b, class));
+            b
+        }
+        SpawnKind::Unique => {
+            let b = ev.population(game, |cx| {
+                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
+            })?;
+            ev.init(game, |_, h| {
+                for &u in &sp.umods {
+                    h.monsters().entry(b).push_umod(u);
+                }
+            });
+            ev.population(game, |cx| pop_spawn::boss_minions_and_init(cx, b, 3, 6, None));
+            b
+        }
+    };
+    game.lists.unit(unit).map(|e| e.guid)
 }
 
 /// Every unit's facts from the sim: act and path position.
@@ -593,7 +648,8 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
         [g.lo, g.hi]
     };
     for t in 0..=s.end {
-        // (a) Resolve and inject the steps of tick t.
+        // (a) Resolve and inject the steps of tick t; spawns run here.
+        let before = seed(&server);
         let mut i = 0;
         while let Some(step) = steps.next_if(|st| st.tick == t) {
             let view = View {
@@ -601,6 +657,24 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                 player,
                 waypoint_classes: &waypoint_classes,
             };
+            if let StepMsg::Spawn(sp) = &step.msg {
+                let guid = match spawn_position(sp, &view) {
+                    Ok((x, y)) => {
+                        let g = spawn(&mut server.game, sp, x, y);
+                        if g.is_none() {
+                            notes.push(format!("tick {t} step {i}: spawn of {} placed nothing", sp.class));
+                        }
+                        Ok(g)
+                    }
+                    Err(u) => {
+                        notes.push(format!("tick {t} step {i}: unresolved: {}", u.why));
+                        Err(u.reference)
+                    }
+                };
+                records.push(Record::Spawn { t, i, guid });
+                i += 1;
+                continue;
+            }
             match encode(&step.msg, &view) {
                 Ok(bytes) => {
                     match queues.send(&ProtoSizes, CLIENT, &bytes) {
@@ -635,7 +709,6 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
             stage_facts(&mut server.game, player, &waypoint_classes);
         }
         // (b) Drain and dispatch; (c) the tick.
-        let before = seed(&server);
         let now = t.wrapping_mul(TICK_MS);
         for d in queues.drain() {
             match d.queue {

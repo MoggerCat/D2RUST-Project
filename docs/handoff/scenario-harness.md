@@ -14,11 +14,11 @@ contract of the original half.
 
 | Piece | Where | Spec |
 |---|---|---|
-| Script format (strict parser, canonical writer, typed messages from `client-messages.tsv`, references `@player`, `@x±N`, `@<type>[:<class>][#n]`, `@wp`) | `crates/conformance/src/scenario/script.rs` | `specs/tools/scenario.md` §1–§3 |
+| Script format (strict parser, canonical writer, typed messages from `client-messages.tsv`, references `@player`, `@x±N`, `@<type>[:<class>][#n]`, `@wp`; `spawn` steps; inline characters with stats, skills, waypoints, quest flags and items with quality, affixes, unique / set / runeword ids, sockets and socketed items) | `crates/conformance/src/scenario/script.rs` | `specs/tools/scenario.md` §1–§3 |
 | Scenario trace (`scenario-trace` 1, JSON lines; strict reader, canonical writer) | `crates/conformance/src/scenario/trace.rs` | `traces/FORMAT.md` §Scenario traces |
 | Comparator (first divergence, masks, summary, verdict) | `crates/conformance/src/scenario/compare.rs` | `scenario.md` §5–§6, `specs/tools/scenario-masks.tsv` |
 | d2rs runner + CLI | `tools/scenario-run` | `scenario.md` §4 |
-| Starter scenarios (7) | `traces/scenarios/*.scenario` | — |
+| Starter scenarios (8) | `traces/scenarios/*.scenario` | — |
 | `GameData::drlg_world_in` (difficulty-aware act 0) | `crates/test-fixtures/src/game.rs` | — |
 
 ```
@@ -53,6 +53,7 @@ that record — 300+ perturbations; unsupported characters are errors).
 | `vendor-buy-sell` | Akara (148): talk, chat, trade, buy, sell the cap | unresolved (no NPC preset spawned); `char item` gap |
 | `waypoint-travel` | operate the town waypoint, travel to level 3 | 0x13 done; 0x49 result 3 (level 3 has no waypoint in the synthetic set); travel to level 1 sends 0x07, 0x0D, 0x15 (test `server_messages_are_captured_at_their_tick`) |
 | `cast-firebolt` | select Fire Bolt (36) right, cast in town, run, cast twice more | dispatched, result 0, no messages |
+| `champion-pack` | level-90 sorceress (stats, 4 skills, waypoints, a quest flag, unique / rare / magic items, a socketed rune), Hell; spawns a champion pack of fallen (19, umod 16) beside her, selects Fire Bolt, casts at the champion and a minion | fallen (19) does not exist in the synthetic set; with class 1 (test `a_spawned_champion_pack_is_recorded`) the leader and 1–3 minions spawn, draws recorded at tick 5; item and quest gaps |
 
 All starters use seed `0x1234` and map 644409375 (the test character's
 map ID, `sim/rng.md` §5.4). Targets are relative to the character
@@ -86,8 +87,10 @@ py tools/trace-recorder/run_scenario.py --selftest
 3. **Tick 0** is the first server tick after the character's client is
    in game (Q5). For each tick t = 0 … `end` (`scenario.md` §4 rule 2):
    at the drain entry of frame t, resolve the steps of tick t against
-   the game state (Q8; references `scenario.md` §3) and inject them in
-   order through the net send (Q4); record what the rules say.
+   the game state (Q8; references `scenario.md` §3) and, in order,
+   inject each message through the net send (Q4) or run each spawn
+   step's call sequence (`scenario.md` §3.1 rule 2; Q12–Q14); record
+   what the rules say.
 4. **Write the trace** exactly as `traces/FORMAT.md` §Scenario traces:
    header `side: "original"`, `data: "1.14d"`, `tool: "run_scenario.py
    <version>"`, `streams` = what it produced (`rng-draws` if it logs the
@@ -96,11 +99,12 @@ py tools/trace-recorder/run_scenario.py --selftest
    sort_keys=True, separators=(",", ":"))`, one per line, LF; the `end`
    record last. A run that cannot finish writes no `end` record (the
    comparator then refuses the trace).
-5. **Records** (`scenario.md` §4 rules 4–8): `c2s` per step (bytes
-   injected or the reference text); `s2c` for every message queued for
+5. **Records** (`scenario.md` §4 rules 4–8): `c2s` per message step
+   (bytes injected or the reference text); `spawn` per spawn step (the
+   first call's unit GUID, `failed`, or the reference text); `s2c` for every message queued for
    client 0 from the drain entry of frame t to the end of tick t (Q6);
-   `rng` = game seed (game +0xD0) at the drain entry and at the tick's
-   end (Q7); `draw` per game-seed draw in that window with `site` = the
+   `rng` = game seed (game +0xD0) before the first step of tick t (the
+   drain entry) and at the tick's end (Q7); `draw` per game-seed draw in that window with `site` = the
    call site `"0x…"` (optional); `unit` and `stats` at the snapshot
    ticks after the tick (Q8, Q9).
 6. **Self-test** (`--selftest`, M08): parse every starter and compare
@@ -133,9 +137,14 @@ evidence, never as code. Each question says what the answer must state.
    position / belt slot / body location, waypoints, map ID) as
    `specs/formats/d2s.md` (d2rs needs the same spec for `char save`),
    or (b) the in-memory route after join: the functions and conventions
-   to set a base stat (stat list set), give hard skill points, create
-   an item by code and place it, set a waypoint bit. Say which route the
-   runner should use and why.
+   to set a base stat (stat list set; level 99 and its experience), give
+   hard skill points per skill id, create an item by code with a
+   quality, item level, given magic prefixes / suffixes (rows), a unique,
+   set or runeword id and a socket count, place it (grid cell, belt
+   slot, body location) and put socket fillers into it, set a waypoint
+   bit and the quest flags of a quest index on the game's difficulty.
+   Say which route the runner should use and why. The full late-game
+   state must be reachable (the `champion-pack` starter uses it).
 4. **C→S injection.** The net send `0x0052AE50(size, 1, message)` in
    local mode (`sim/intents-events.md` §2.1 rule 3): its calling
    convention (registers, stack, cleanup, return), the thread it runs on
@@ -173,7 +182,27 @@ evidence, never as code. Each question says what the answer must state.
     sides; and how to place a character at `char at <x> <y>`.
 11. **Game type** +0x6A of a single-player game (d2rs creates 0;
     `GameFields::game_type` notes 3).
-12. **Masks.** Every S→C builder that leaves message bytes unwritten or
+12. **Spawn: placement.** `0x005B2A00` (`monsters/population.md`
+    placement): calling convention, the arguments `scenario.md` §3.1
+    rule 2 fixes (room, no coordinate list, class, mode 1, x, y, radius
+    −1, flags 0), the return (unit or null), and the game pointer and
+    thread it must run on (the game thread stopped at the drain entry).
+    How to find the active room that holds a sub-tile point.
+13. **Spawn: bosses.** The conventions of the random boss `0x005A43E0`,
+    boss spawn `0x005A09E0`, champion pack member `0x005A48C0`,
+    champion minions `0x0054E1E0` and `0x005A2120` (unique minions and
+    modifier init), with the argument values of §3.1 rule 2, and
+    whether calling them outside room population leaves the region
+    counts and the game in the state the population path would.
+14. **Spawn: explicit umods.** For `unique`: the monster data field
+    that holds the umod list (and its count), so the runner can append
+    the script's umods after the boss spawn and before `0x005A2120`,
+    and whether anything else (`0x005A0760`'s flag writes) must be set
+    by hand when the choose step is skipped. Every draw these calls
+    make is from seeds the game owns (unit seeds, the game seed), so
+    the `rng` and `draw` records cover them; confirm no clock value
+    enters (`sim/rng.md` §5.1).
+15. **Masks.** Every S→C builder that leaves message bytes unwritten or
     fills them from the clock (beyond the four rows of
     `specs/tools/scenario-masks.tsv`), each with its bytes, so the mask
     table is complete before the first comparison.
@@ -190,9 +219,16 @@ until they close):
   and other objects are not), as the server tests stage them.
 - `char item`: not created (TODO(spec: item creation from a code and
   inventory placement)).
+- `char quest`: flags not applied (TODO(spec: quest flags of a joining
+  character)).
 - `char waypoint L` with no waypoint of level L in the data.
 - `record frames`: no renderer in the runner.
 - d2rs faults during a tick (`tick_faults`, `world.faults`, sim errors).
+
+Spawn steps run on d2rs' own population functions
+(`d2_sim::monsters::population::{placement, spawn}`,
+`monsters::init::champion_pack_member`); a point in no active room or a
+class the data does not have gives `failed`.
 
 Errors (no trace): `char save` (TODO(spec: formats/d2s.md)); an area
 other than the act 0 town (the runner creates act 0 only); `char at x y`

@@ -1,0 +1,47 @@
+# A level-90 sorceress with a few skills and items; a champion pack of
+# fallen (monstats 19, specs/monsters/ai.md §9 table) is spawned beside
+# her (scenario.md §3.1: boss spawn, champion member with umod 16,
+# 1-3 champion minions, specs/monsters/population.md §6.3-§6.4); she
+# selects Fire Bolt (36) and casts it at the champion. Stat ids:
+# 0 strength, 1 energy, 2 dexterity, 3 vitality, 12 level, 13 experience,
+# 14 gold (specs/combat/vitals.md, specs/world/npc.md §9).
+scenario 1
+name champion-pack
+game 1.14d
+seed 0x00001234
+map 644409375          # the test character's map ID (specs/sim/rng.md §5.4)
+difficulty hell
+expansion yes
+end 200
+
+char class 1
+char level 90
+char area 0 1
+char at default
+char stat 0 150
+char stat 1 300
+char stat 2 100
+char stat 3 250
+char stat 13 1200000000
+char stat 14 500000
+char skill 36 20       # Fire Bolt
+char skill 47 20       # Fire Ball
+char skill 54 1        # Teleport
+char skill 56 20       # Meteor
+char waypoint 1
+char waypoint 3
+char quest 0 1
+char item oba body 4 quality unique unique 255 ilvl 85
+char item uap body 1 quality rare ilvl 85 prefix 12 suffix 400 sockets 1
+char item ber socket 0
+char item rin inv 0 0 quality magic ilvl 70 prefix 3 suffix 50
+char item hp5 belt 0
+
+record s2c rng units stats
+snapshot every 10
+
+at 5 spawn 19 @x+12 @y champion umod 16
+at 10 msg SelectSkill skill=36 left=0 item=0xFFFFFFFF
+at 20 msg RightSkillOnUnit type=1 id=@1:19
+at 60 msg RightSkillOnUnit type=1 id=@1:19#1
+at 100 msg RightSkill x=@x+12 y=@y

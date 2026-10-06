@@ -165,6 +165,7 @@ impl fmt::Display for Report {
 fn stream_of(kind: &str) -> &str {
     match kind {
         "draw" => "rng-draws",
+        "spawn" => "c2s",
         "unit" => "units",
         k => k,
     }
@@ -266,6 +267,14 @@ fn diff(
                 None,
             )),
         },
+        (Record::Spawn { guid: x, .. }, Record::Spawn { guid: y, .. }) => {
+            let show = |g: &Result<Option<u32>, String>| match g {
+                Ok(Some(g)) => format!("guid {g}"),
+                Ok(None) => "failed".to_owned(),
+                Err(u) => format!("unresolved {u}"),
+            };
+            field("spawned", show(x), show(y))
+        }
         (
             Record::S2c {
                 client: ca,
@@ -773,6 +782,21 @@ mod tests {
         let r = compare(&a, &trace("d2rs", b)).unwrap();
         let text = r.to_string();
         assert!(text.contains("[ee]") && text.contains("[0a]"), "{text}");
+    }
+
+    #[test]
+    fn spawn_records_compare_by_outcome() {
+        let with = |guid| {
+            let mut v = base();
+            v.insert(1, Record::Spawn { t: 0, i: 1, guid });
+            v
+        };
+        let a = trace("original", with(Ok(Some(5))));
+        assert!(compare(&a, &trace("d2rs", with(Ok(Some(5))))).unwrap().first.is_none());
+        for other in [Ok(Some(6)), Ok(None), Err("@1".to_owned())] {
+            let d = compare(&a, &trace("d2rs", with(other))).unwrap().first.unwrap();
+            assert_eq!((d.tick, d.stream.as_str(), d.index, d.at.as_str()), (0, "spawn", 0, "spawned"));
+        }
     }
 
     // Covers: specs/tools/scenario.md §5 r1, §5 r2

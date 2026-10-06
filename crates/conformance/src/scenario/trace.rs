@@ -50,6 +50,14 @@ pub enum Record {
         /// The bytes injected, or the unresolved reference.
         bytes: Result<Vec<u8>, String>,
     },
+    /// A `spawn` step (`scenario.md` §3.1): the spawned unit's GUID
+    /// (the leader for packs), `Err` = the unresolved reference, or
+    /// `Ok(None)` = the game placed nothing.
+    Spawn {
+        t: u32,
+        i: u32,
+        guid: Result<Option<u32>, String>,
+    },
     S2c {
         t: u32,
         client: u32,
@@ -94,6 +102,7 @@ impl Record {
     pub fn tick(&self) -> u32 {
         match *self {
             Self::C2s { t, .. }
+            | Self::Spawn { t, .. }
             | Self::S2c { t, .. }
             | Self::Rng { t, .. }
             | Self::Draw { t, .. }
@@ -107,6 +116,7 @@ impl Record {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::C2s { .. } => "c2s",
+            Self::Spawn { .. } => "spawn",
             Self::S2c { .. } => "s2c",
             Self::Rng { .. } => "rng",
             Self::Draw { .. } => "draw",
@@ -116,8 +126,8 @@ impl Record {
         }
     }
 
-    /// Position of the kind within a tick (FORMAT.md: `c2s`, `s2c`,
-    /// `rng`, `draw`, `unit`, `stats`; `end` last).
+    /// Position of the kind within a tick (FORMAT.md: `c2s`, `spawn`,
+    /// `s2c`, `rng`, `draw`, `unit`, `stats`; `end` last).
     pub fn order(&self) -> usize {
         KINDS
             .iter()
@@ -130,6 +140,11 @@ impl Record {
             Self::C2s { t, i, bytes } => match bytes {
                 Ok(b) => json!({"k": "c2s", "t": t, "i": i, "b": encode_hex(b)}),
                 Err(r) => json!({"k": "c2s", "t": t, "i": i, "unresolved": r}),
+            },
+            Self::Spawn { t, i, guid } => match guid {
+                Ok(Some(g)) => json!({"k": "spawn", "t": t, "i": i, "guid": g}),
+                Ok(None) => json!({"k": "spawn", "t": t, "i": i, "failed": true}),
+                Err(r) => json!({"k": "spawn", "t": t, "i": i, "unresolved": r}),
             },
             Self::S2c { t, client, bytes } => {
                 json!({"k": "s2c", "t": t, "c": client, "b": encode_hex(bytes)})
@@ -189,6 +204,30 @@ impl Record {
                         t: r.u32("t")?,
                         i: r.u32("i")?,
                         bytes,
+                    },
+                    keys,
+                )
+            }
+            "spawn" => {
+                let (guid, key) = match (o.get("guid"), o.get("failed"), o.get("unresolved")) {
+                    (Some(_), None, None) => (Ok(Some(r.u32("guid")?)), "guid"),
+                    (None, Some(Value::Bool(true)), None) => (Ok(None), "failed"),
+                    (None, None, Some(u)) => (
+                        Err(u.as_str().ok_or("unresolved: not a string")?.to_owned()),
+                        "unresolved",
+                    ),
+                    _ => return Err("spawn needs exactly one of guid, failed: true, unresolved".into()),
+                };
+                let keys: &[&str] = match key {
+                    "guid" => &["k", "t", "i", "guid"],
+                    "failed" => &["k", "t", "i", "failed"],
+                    _ => &["k", "t", "i", "unresolved"],
+                };
+                (
+                    Self::Spawn {
+                        t: r.u32("t")?,
+                        i: r.u32("i")?,
+                        guid,
                     },
                     keys,
                 )
@@ -277,7 +316,7 @@ impl Record {
 }
 
 /// Record kinds in their within-tick order.
-pub const KINDS: [&str; 6] = ["c2s", "s2c", "rng", "draw", "unit", "stats"];
+pub const KINDS: [&str; 7] = ["c2s", "spawn", "s2c", "rng", "draw", "unit", "stats"];
 
 struct Fields<'a>(&'a Map<String, Value>);
 
@@ -529,6 +568,21 @@ mod tests {
                     t: 0,
                     i: 1,
                     bytes: Err("@1".into()),
+                },
+                Record::Spawn {
+                    t: 0,
+                    i: 2,
+                    guid: Ok(Some(9)),
+                },
+                Record::Spawn {
+                    t: 0,
+                    i: 3,
+                    guid: Ok(None),
+                },
+                Record::Spawn {
+                    t: 0,
+                    i: 4,
+                    guid: Err("@x".into()),
                 },
                 Record::S2c {
                     t: 0,
