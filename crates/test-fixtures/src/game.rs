@@ -169,6 +169,7 @@ impl GameData {
             monstats_extra: monstats_extra(self.table("monstats")?),
             components: component_counts(self.table("monstats2")?),
             ids: NamedIds::default(),
+            montype_equiv: self.fixed.montype_equiv.clone(),
         })
     }
 

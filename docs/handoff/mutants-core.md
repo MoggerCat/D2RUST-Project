@@ -1,6 +1,6 @@
 # Handoff: mutation testing of the d2-sim core and d2-proto — `claude/mutants-core`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
 
 Cloud test session, 2026-10-06, base `claude/tender-meitner-mphas3`
 `4b5b0bf`. Repo only (M09): no game files, so the conformance replay is the

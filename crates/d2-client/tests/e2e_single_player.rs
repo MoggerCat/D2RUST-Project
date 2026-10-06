@@ -121,9 +121,11 @@ use d2_sim::world::npc::{class, NpcControl};
 use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 
 mod e2e_support;
-use e2e_support::world::*;
+#[path = "e2e_support/world.rs"]
+mod e2e_world;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, tx, vendor_tables, Rest};
 use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
+use e2e_world::*;
 
 // ---- constants -----------------------------------------------------------------------
 

@@ -5,13 +5,13 @@
 //! the NPC / vendor / quest wiring no written spec provides (staged
 //! answers and a call log, never behaviour), and the synthetic item,
 //! vendor and NPC tables, and the item-move seams no d2-sim module
-//! provides ([`InvFx`]); and ([`world`]) the wired single-player
-//! world's seams, sources and tables. `d2-server`'s `prop_handle.rs`
+//! provides ([`InvFx`]); and, in `world.rs` (declared by path beside
+//! this module, it needs `d2-sim`'s `bench-fixtures`), the wired
+//! single-player world's seams, sources and tables. `d2-server`'s
+//! `prop_handle.rs`
 //! includes this module by path (one copy for both crates' tests). Each
 //! test crate uses a part of it.
 #![allow(dead_code)]
-
-pub mod world;
 
 use std::collections::BTreeMap;
 

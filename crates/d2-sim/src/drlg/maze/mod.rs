@@ -28,6 +28,8 @@ pub mod layout;
 pub mod specials;
 
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeMap;

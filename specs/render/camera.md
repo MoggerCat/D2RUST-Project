@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 283–292 |
 | Test vectors | 293–314 |
 | Provenance | 315–333 |
-| Open questions | 334–364 |
+| Open questions | 334–367 |
 <!-- /index -->
 
 ## Summary
@@ -352,6 +352,9 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    tick plus the client's own path step.
 6. How the client's copy of the player unit seed (`unit +0x20`) is
    initialised, so d2rs can reproduce shake offsets without recordings.
+   Partly answered: at a single-player join it is {0x6AC6935F, 0}
+   (`client/model.md` Randomness rule 2); later draws on it are
+   `client/model.md` open question 6.
    The cursor (state 1, wall clock) and the weather step the same seed
    each frame (`capture.md` §3.3), so shake offsets also depend on them;
    captures record the seed at frame start and end.

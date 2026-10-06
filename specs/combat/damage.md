@@ -29,17 +29,17 @@
 |   2. Pipeline | 138–152 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 153–292 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 293–384 |
-|   5. Application | 385–550 |
-|   6. Hit class and hit recovery | 551–581 |
-|   7. Reaction and death trigger | 582–608 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 609–669 |
-|   9. Durability `0x0057D3D0` | 670–689 |
-| Constants & data dependencies | 690–711 |
-| Randomness | 712–744 |
-| Edge cases & original bugs | 745–773 |
-| Test vectors | 774–806 |
-| Provenance | 807–827 |
-| Open questions | 828–860 |
+|   5. Application | 385–551 |
+|   6. Hit class and hit recovery | 552–582 |
+|   7. Reaction and death trigger | 583–609 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 610–670 |
+|   9. Durability `0x0057D3D0` | 671–690 |
+| Constants & data dependencies | 691–712 |
+| Randomness | 713–745 |
+| Edge cases & original bugs | 746–774 |
+| Test vectors | 775–807 |
+| Provenance | 808–828 |
+| Open questions | 829–861 |
 <!-- /index -->
 
 ## Summary
@@ -491,8 +491,9 @@ registered on `unit` for `event` (`events.txt` index: 0 hitbymissile,
 5 domeleedamage, 6 domissiledamage, 7 domeleeattack, 8 domissileattack,
 9 kill, 10 killed, 11 absorbdamage, 12 levelup). Item stats register
 functions through `itemstatcost` `itemevent1/2` + `itemeventfunc1/2`;
-skills register their own. Function table §8. Registration and
-iteration order belong to `sim/units.md` (Open question 4).
+skills register their own. Function table §8. Handler records,
+registration (prepend) and unregistration: `skills/bodies.md` §2.13;
+iteration order belongs to `sim/units.md` (Open question 4).
 
 #### 5.5 Stun `0x0057AAE0`
 

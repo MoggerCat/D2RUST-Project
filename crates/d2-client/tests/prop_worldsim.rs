@@ -23,7 +23,7 @@
 //!    before any handler runs and leave the digest unchanged.
 //!
 //! The fixture (tables, DS1 / DT1 sources, the seams without a provider)
-//! is `e2e_single_player.rs`'s (`e2e_support::world`), used without the
+//! is `e2e_single_player.rs`'s (`e2e_support/world.rs`), used without the
 //! bridge and the cube's item world (a second unit world, `docs/handoff/e2e-next.md`
 //! finding 1); the NPC / vendor rests and tables are `e2e_support`'s.
 //! The world host is `WiredWorld<_, WiredSkills>` (waypoints, the skill
@@ -81,9 +81,11 @@ use proptest::prelude::*;
 use proptest::test_runner::Config;
 
 mod e2e_support;
-use e2e_support::world::*;
+#[path = "e2e_support/world.rs"]
+mod e2e_world;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, vendor_tables, Rest};
 use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
+use e2e_world::*;
 
 /// Proptest config with `default` cases, or `PROPTEST_CASES` when set.
 fn config(default: u32) -> Config {

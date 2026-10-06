@@ -18,6 +18,8 @@ pub mod placement;
 pub mod view;
 
 #[cfg(test)]
+mod gaps_numbered_tests;
+#[cfg(test)]
 mod tests;
 
 pub use camera::{Camera, ClientPos, FrameSize, OpenMode, Shake, TileList, UnitPosition, ViewRect};

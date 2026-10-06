@@ -5,8 +5,17 @@
 //! ([`TestPending`], [`Book`]: staged answers and call logs, never
 //! behaviour), the DS1 / DT1 sources, and the synthetic tables of act
 //! 0's DRLG, the ISLE / GATE preset levels, the sorceress' skills, the
-//! combat, vitals, AnimData, drop and waypoint tables. The positions and
-//! seeds below are the run's; each test builds its own host from them.
+//! drop and waypoint tables. The positions and seeds below are the
+//! run's; each test builds its own host from them. The combat / missile
+//! fixtures (the sorceress' skills and arrow, the monster class, the
+//! combat, vitals and AnimData tables, the COF names) are
+//! `d2_sim::bench_fixtures::combat`'s, re-exported here.
+//!
+//! Declared by path (`#[path = "e2e_support/world.rs"] mod e2e_world;`)
+//! by the tests that use it, beside `e2e_support`: it needs `d2-sim`'s
+//! `bench-fixtures` feature, which `d2-server`'s tests (which include
+//! `e2e_support` too) do not enable.
+#![allow(dead_code)]
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -14,15 +23,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use d2_data::bin::BinTable;
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{
-    Charstats, Difficultylevels, Experience, Itemratio, Itemstatcost, Itemtypes, Levels,
-    Missiles as MissileRow, Monstats, Monstats2, Objects, Record, Skilldesc, Skills,
-};
-use d2_formats::animdata::{self, AnimData, AnimRecord};
+use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Levels, Objects, Record};
 use d2_server::adapters::handlers::skills::LearnRest;
 use d2_server::adapters::handlers::world::Outbox;
-use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::CombatTables;
 use d2_sim::drlg::maze::{MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs};
 use d2_sim::drlg::preset::{
@@ -35,7 +38,7 @@ use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{ty, ItemTables};
 use d2_sim::missiles::{param_flags, MissileParams};
 use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
-use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
+use d2_sim::skills::SkillEntry;
 use d2_sim::stats::{StatData, StatTable};
 use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
 use d2_sim::units::hooks::Sim as USim;
@@ -47,7 +50,11 @@ use d2_sim::wiring::interaction::{skill_events, UseRest};
 use d2_sim::wiring::worldgen::WorldPending;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
-use super::blank;
+pub use d2_sim::bench_fixtures::combat::{
+    anim_data, arrow, combat_tables, monster_class, skills, vitals, MONSTER_DT, MULTI, PLAYER_SC,
+};
+
+use crate::e2e_support::blank;
 
 // ---- constants -----------------------------------------------------------------------
 
@@ -84,7 +91,6 @@ pub const WP_AT: (i32, i32) = (40_024, 40_020);
 /// Skills of the synthetic table: attack, and a right skill (srvst 4,
 /// mana 4 + 1 per level, shift 8; `use.md`'s Multiple Shot vector).
 pub const ATTACK: i32 = 0;
-pub const MULTI: i32 = 1;
 
 // ---- seams without a provider --------------------------------------------------
 
@@ -120,12 +126,6 @@ pub struct TestPending {
     /// The game's drop state (`treasure.md` §3), lent out during a drop.
     pub drops: Option<DeathDrops>,
 }
-
-/// The fixture's COF names (the composer `0x0064F5B0` for units with a
-/// unit is `animdata.md` Open question 2): the sorceress casting (SC)
-/// and the monster dying (DT). Other modes get no name.
-pub const PLAYER_SC: &[u8; 8] = b"SOSCHTH\0";
-pub const MONSTER_DT: &[u8; 8] = b"M0DTHTH\0";
 
 impl Pending for TestPending {
     fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
@@ -694,30 +694,6 @@ pub fn maze_data() -> MazeData {
     }
 }
 
-/// Monster class 0: killable, AI 1 (Idle), no skills, no minions; level
-/// 1, 5 life, 100 experience (`noRatio`: the monstats values as they
-/// are, `monsters/init.md` §8.1); treasure class 1 (Normal).
-pub fn monster_class() -> Monstats {
-    let mut m: Monstats = blank();
-    m.killable = true;
-    m.noratio = true;
-    m.level = 1;
-    (m.minhp, m.maxhp, m.exp) = (5, 5, 100);
-    m.treasureclass1 = 1;
-    m.velocity = 1;
-    (m.drain, m.drain_n, m.drain_h) = (100, 100, 100);
-    m.montype = 0xFFFF;
-    m.ai = 1;
-    (m.aidel, m.aidel_n, m.aidel_h) = (15, 15, 15);
-    (m.skill1, m.skill2, m.skill3) = (0xFFFF, 0xFFFF, 0xFFFF);
-    m.rarity = 1;
-    (m.mingrp, m.maxgrp) = (1, 1);
-    (m.minion1, m.minion2) = (0xFFFF, 0xFFFF);
-    m.enabled = true;
-    m.isspawn = true;
-    m
-}
-
 /// levels.txt: no monsters, act by level id; waypoints at [`ISLE`] and
 /// [`GATE`] only.
 pub fn levels() -> Vec<Levels> {
@@ -784,139 +760,6 @@ pub fn stat_data() -> Arc<StatData> {
         stats: StatTable::from_fixed(&t).expect("itemstatcost"),
         ..StatData::default()
     })
-}
-
-pub fn skill_rec() -> Skills {
-    let mut s: Skills = blank();
-    for f in [
-        &mut s.auralencalc,
-        &mut s.aurarangecalc,
-        &mut s.aurastatcalc1,
-        &mut s.calc1,
-        &mut s.calc2,
-        &mut s.calc3,
-        &mut s.calc4,
-        &mut s.passivecalc1,
-        &mut s.passivecalc2,
-        &mut s.passivecalc3,
-        &mut s.passivecalc4,
-        &mut s.passivecalc5,
-        &mut s.petmax,
-        &mut s.skpoints,
-        &mut s.tohitcalc,
-        &mut s.dmgsympercalc,
-        &mut s.edmgsympercalc,
-        &mut s.elensympercalc,
-        &mut s.delay,
-        &mut s.perdelay,
-    ] {
-        *f = 0xFFFF_FFFF;
-    }
-    s.skilldesc = 0xFFFF;
-    s.charclass = 0xFF;
-    (s.reqskill1, s.reqskill2, s.reqskill3) = (0xFFFF, 0xFFFF, 0xFFFF);
-    s.itypea1 = 0xFFFF;
-    s.srvmissile = 0xFFFF;
-    s.intown = true;
-    s.ingame = true;
-    s
-}
-
-/// Missile 0: an arrow-like row (default flight, one sub-tile per frame,
-/// collide type 3, kill on collision, to-hit), as the action wiring's
-/// tests use.
-pub fn arrow() -> MissileRow {
-    let mut r: MissileRow = blank();
-    r.psrvdofunc = 1;
-    r.vel = 1;
-    r.maxvel = 1;
-    r.range = 50;
-    r.collidetype = 3;
-    r.collidekill = 1;
-    r.lastcollide = true;
-    r.tohit = 1;
-    r.size = 1;
-    r
-}
-
-/// The right skill: start function 4, do function 8 (the Multiple Shot
-/// slot, body catalogued only), `srvmissile` 0 (the generic missile of
-/// `use.md` §5.4 step 7).
-pub fn skills() -> SkillTables {
-    let mut v = vec![skill_rec(), skill_rec()];
-    let m = &mut v[MULTI as usize];
-    (m.srvstfunc, m.mana, m.lvlmana, m.manashift) = (4, 4, 1, 8);
-    (m.srvdofunc, m.srvmissile) = (8, 0);
-    SkillTables {
-        skills: v,
-        skilldesc: vec![blank::<Skilldesc>()],
-        missiles: vec![arrow()],
-        skills_code: Vec::new(),
-        miss_code: Vec::new(),
-        level_cap: LEVEL_CAP_114D,
-        stat_count: 359,
-    }
-}
-
-pub fn combat_tables() -> CombatTables {
-    let mut d: Difficultylevels = blank();
-    (d.monsterfreezedivisor, d.monstercolddivisor) = (1, 1);
-    (d.lifestealdivisor, d.manastealdivisor) = (1, 1);
-    CombatTables {
-        charstats: vec![blank::<Charstats>(); 7],
-        difficultylevels: vec![d; 3],
-        monstats: vec![monster_class()],
-        monstats2: vec![blank::<Monstats2>()],
-        hitclass: vec![*b"none", *b"hth "],
-    }
-}
-
-/// experience.txt: max level 3, thresholds 0, 100, 1500 for every class
-/// (the kill's 100 experience reaches level 2, `vitals.md` §4.3);
-/// charstats: the sorceress (class 1) gets 5 stat points per level (the
-/// other per-level columns 0).
-pub fn vitals() -> VitalsTables {
-    let row = |v: u32| Experience {
-        amazon: v,
-        sorceress: v,
-        necromancer: v,
-        paladin: v,
-        barbarian: v,
-        druid: v,
-        assassin: v,
-        ..blank()
-    };
-    let mut charstats = vec![blank::<Charstats>(); 7];
-    charstats[1].statperlevel = 5;
-    VitalsTables {
-        charstats,
-        experience: vec![row(3), row(0), row(100), row(1500)],
-    }
-}
-
-/// AnimData with the fixture's two names (`animdata.md` §2): the
-/// sorceress' cast, 8 frames at speed 256 with a missile event (2) on
-/// frame 4; the monster's death, 4 frames at speed 256, no events.
-pub fn anim_data() -> AnimData {
-    let mut a = AnimData {
-        buckets: vec![Vec::new(); animdata::BUCKETS],
-    };
-    let mut put = |name: &[u8; 8], frames, event: Option<usize>| {
-        let mut events = [0u8; animdata::EVENTS];
-        if let Some(i) = event {
-            events[i] = 2;
-        }
-        let len = name.iter().position(|&b| b == 0).unwrap();
-        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
-            name: *name,
-            frames,
-            speed: 256,
-            events,
-        });
-    };
-    put(PLAYER_SC, 8, Some(4));
-    put(MONSTER_DT, 4, None);
-    a
 }
 
 /// The drop tables over `items`, whose record `gold` is gold; treasure

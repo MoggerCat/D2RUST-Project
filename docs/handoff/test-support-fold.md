@@ -58,6 +58,41 @@ one inventory per game; `path-update-pass`).
 - Test counts after the merge: `e2e_single_player` 3, `e2e_vendor` 4,
   `prop_worldsim` 4 (as on the base); `prop_handle` 5 + 7.
 
+**Merge with the base at `b435f5a`** (`bench-fight`, `e2e-full-loop` and
+others).
+
+- `bench-fight` moved the combat / missile fixtures into
+  `d2_sim::bench_fixtures::combat`: `monster_class`, `skill_rec`,
+  `arrow`, `skills`, `combat_tables`, `vitals`, `anim_data`, `MULTI`,
+  `PLAYER_SC`, `MONSTER_DT`.
+- They were byte-identical to the shared copies (checked function by
+  function), so `world.rs` re-exports them instead of keeping copies.
+- `bench_fixtures` needs `d2-sim`'s `bench-fixtures` feature, which
+  `d2-server`'s tests do not enable. So `world.rs` is no longer a
+  submodule of `e2e_support`. The two client tests declare it by path:
+  `#[path = "e2e_support/world.rs"] mod e2e_world;`. `prop_handle`
+  includes only `e2e_support/mod.rs` (the rests), as before. No
+  `Cargo.toml` change.
+- **The base is red** (`b435f5a`, reproduced in a worktree of the base):
+  - `specs/client/bridge-dispatch.tsv` gave owner specs to 51 S→C ids
+    (`42118d9`, "client model and first S→C owner specs"), but
+    `d2-client`'s `HANDLERS` registers none for them.
+  - So `Dispatch::from_spec()` returns `Mismatch` (`NoHandler` 0x00–0xAC).
+    Every test that builds the bridge from the spec fails:
+    `e2e_single_player` 3, `e2e_vendor` 4, `e2e_walk`, `e2e_full_loop`,
+    `app_frame_loop`, `prop_bridge`, the bridge unit tests and more.
+  - `d2-sim` also fails `monsters::ai` (catalogue) and the skills
+    table / function-table checks.
+  - In all, 55 tests fail under `cargo nextest run --no-fail-fast -p d2-sim
+    -p d2-client`. None is in a file this branch changes (its diff from
+    the base is test files and tools only). The e2e failures are the
+    identical `Mismatch` on the base.
+  - `prop_worldsim` (no bridge) passes 4 / 4, `prop_handle` 12 / 12, and
+    the d2-server lib tests pass.
+  - The fix belongs to the session that registers those handlers (or to
+    the spec session that reverts the owners). Not done here: it is
+    outside this task's files.
+
 Test names and counts, before → after (same names):
 
 | Test binary | Before | After |
@@ -170,4 +205,7 @@ None (no game files involved).
 
 ## 5. Gate
 
-`sh tools/gate.sh` on this branch, 2026-10-06: every step PASS (spec_index, methods, coverage check / selftest, trace checkers, hook selftest, fmt, depcheck, clippy workspace, tests d2-sim + conformance, rest, d2-client, doc-tests). `GATE: PASS`.
+After the `62fcef6` merge, `sh tools/gate.sh` on this branch, 2026-10-06: every step PASS (spec_index, methods, coverage check / selftest, trace checkers, hook selftest, fmt, depcheck, clippy workspace, tests d2-sim + conformance, rest, d2-client, doc-tests). `GATE: PASS`.
+
+After the `b435f5a` merge: every step passes except `test d2-sim +
+conformance` and `test d2-client`, which fail on the base too (above).

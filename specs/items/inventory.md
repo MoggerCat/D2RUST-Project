@@ -32,23 +32,23 @@
 | Inputs | 68–78 |
 | Outputs / state changes | 79–86 |
 | Rules | 87–88 |
-|   1. Inventory model | 89–172 |
-|   2. Grid placement | 173–251 |
-|   3. Belt | 252–281 |
-|   4. Equipping | 282–381 |
-|   5. Shared checks | 382–425 |
-|   6. Deferred item messages | 426–475 |
-|   7. Intents | 476–762 |
-|   8. Pickup from the ground | 763–828 |
-|   9. Drop to the ground | 829–863 |
-|   10. Gold | 864–894 |
-|   11. Message layouts | 895–919 |
-| Constants & data dependencies | 920–942 |
-| Randomness | 943–955 |
-| Edge cases & original bugs | 956–971 |
-| Test vectors | 972–1019 |
-| Provenance | 1020–1055 |
-| Open questions | 1056–1106 |
+|   1. Inventory model | 89–173 |
+|   2. Grid placement | 174–252 |
+|   3. Belt | 253–282 |
+|   4. Equipping | 283–382 |
+|   5. Shared checks | 383–426 |
+|   6. Deferred item messages | 427–489 |
+|   7. Intents | 490–776 |
+|   8. Pickup from the ground | 777–842 |
+|   9. Drop to the ground | 843–877 |
+|   10. Gold | 878–908 |
+|   11. Message layouts | 909–933 |
+| Constants & data dependencies | 934–956 |
+| Randomness | 957–969 |
+| Edge cases & original bugs | 970–985 |
+| Test vectors | 986–1033 |
+| Provenance | 1034–1069 |
+| Open questions | 1070–1129 |
 <!-- /index -->
 
 ## Summary
@@ -152,9 +152,10 @@ Measured on the 1.14d `inventory.bin` (32 records; the `.txt`
 | 10 / 11 | Guild Vault / Trophy Case | 10 × 4 |
 | 12 | Big Bank Page 1 (expansion stash) | 6 × 8 |
 | 13 | Hireling | 0 × 0 |
-| 16–31 | 800 × 600 copies of 0–15 (record 29: 255 × 255) | client only |
+| 16–31 | 800 × 600 layouts of 0–15: grid sizes of record r − 16, except 29 | client only |
+| 29 | Hireling2 | 255 × 255 (`.txt` `gridX` / `gridY` = −1, stored as u8; record 13 has 0) |
 
-The server uses records 0–15 only. Screen coordinates in the records are
+The server uses records 0–15 only (`0x00621050` returns no other value). Screen coordinates in the records are
 the client's (`client/ui.md` B5).
 
 #### 1.4 Item list and update list
@@ -458,12 +459,25 @@ flag value); `sender`; `d2moo` (D2MOO 1.10f name, a label only).
 
 #### 6.3 Ground items
 
-Item unit update (`0x0055BF30` when unit +0xC4 bit 0; `0x0055BED0`):
-items in mode 3 without unit flag 0x10 send 0x9C action 2 (dropped,
-`0x0053EC90`) when unit flag 0x1000 is set, else action 3 (on ground,
-`0x0053ECF0`). Flag 0x1000 is set by a drop (`0x00558AA0`) and by a
-refused pickup (`0x0055C9A0`) and cleared by the room clean-up
-(`0x00553220`).
+Unit flag 0x10 (unit +0xC4) means "not yet announced": the allocator
+sets it on every unit (`sim/units.md` §3.1 step 5) and the room clean-up
+`0x00553220` clears it together with 0x1. The per-unit update
+`0x0053A500` (`tick.md` §6 step 5) handles an item in two parts:
+
+1. Flag 0x10 set (a new item, announced once): the unit-add messages
+   `0x00571F90`; for an item: mode 3 with unit flag 0x1000 → 0x9C
+   action 2 (dropped, `0x0053EC90`); otherwise → 0x9C action 0 (new,
+   `0x0053EC00`).
+2. Item unit update (`0x0055BF30` when unit +0xC4 bit 0; `0x0055BED0`):
+   items in mode 3 **without** flag 0x10 (already announced) send 0x9C
+   action 2 when unit flag 0x1000 is set, else action 3 (on ground,
+   `0x0053ECF0`).
+
+So a ground item gets one message per tick in which it changed: part 1
+in its first tick, part 2 later. Flag 0x1000 is set by a drop
+(`0x00558AA0`) and by a refused pickup (`0x0055C9A0`) and cleared by the
+room clean-up (`0x00553220`, item case, which also clears item flags
+0x20 and 0x2000).
 
 #### 6.4 Direct sends
 
@@ -1103,3 +1117,12 @@ dual-wield monster classes are 1.14d constants.
 19. Full code-equivalence list and the second list walked by the held
     test `0x0055CA40` (`0x0063D570` / `0x0063D610`). Settle: Ghidra
     disassembly of `0x0055CA40`.
+
+Answered handoff questions (`docs/HANDOFF.md` §7):
+
+- WN1: both statements hold; unit flag 0x10 is the "not yet announced"
+  flag, cleared by the room clean-up; a new ground item is announced by
+  the unit-add path, later changes by `0x0055BED0` (§6.3, from
+  `0x0053A500`, `0x00571F90`, `0x00553220`).
+- GX1: record 29 (Hireling2) is 255 × 255 because its `.txt` grid is −1;
+  records 16–31 are not copies (§1.3 table).

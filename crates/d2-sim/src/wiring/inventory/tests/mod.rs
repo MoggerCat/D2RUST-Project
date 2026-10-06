@@ -12,6 +12,7 @@ mod equip;
 mod gold;
 mod ground;
 mod host;
+mod mutant_tests;
 mod stack;
 
 use std::cell::RefCell;
