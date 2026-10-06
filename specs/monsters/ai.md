@@ -2,7 +2,7 @@
 
 - **Status:** draft: think scheduling, dispatch, AI tables and the
   shared helpers read from the 1.14d `Game.exe` (addresses below; AI
-  tables dumped from the file); 26 AI functions read in full; think
+  tables dumped from the file); 28 AI functions read in full; think
   intervals checked against 4,409 recorded type-2 runs in three tick
   recordings (mode-end re-think: 79/79 at aidel; no rule contradicted).
 - **Target version:** 1.14d
@@ -33,17 +33,17 @@
 |   3. AI control and AI tables | 340–435 |
 |   4. AI parameters | 436–454 |
 |   5. Target selection | 455–537 |
-|   6. Distances and line tests | 538–551 |
-|   7. Tactics helpers | 552–609 |
-|   8. AI commands and minions | 610–631 |
-|   9. Per-AI behaviours | 632–1166 |
-|   10. The catalogue `ai-functions.tsv` | 1167–1187 |
-| Constants & data dependencies | 1188–1211 |
-| Randomness | 1212–1233 |
-| Edge cases & original bugs | 1234–1269 |
-| Test vectors | 1270–1354 |
-| Provenance | 1355–1392 |
-| Open questions | 1393–1430 |
+|   6. Distances and line tests | 538–552 |
+|   7. Tactics helpers | 553–610 |
+|   8. AI commands and minions | 611–632 |
+|   9. Per-AI behaviours | 633–1208 |
+|   10. The catalogue `ai-functions.tsv` | 1209–1229 |
+| Constants & data dependencies | 1230–1253 |
+| Randomness | 1254–1275 |
+| Edge cases & original bugs | 1276–1311 |
+| Test vectors | 1312–1398 |
+| Provenance | 1399–1436 |
+| Open questions | 1437–1474 |
 <!-- /index -->
 
 ## Summary
@@ -544,6 +544,7 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | `0x005DC530` | `AIUTIL_GetDistanceToCoordinates_NoUnitSize` | dx = \|ux − x\|, dy = \|uy − y\|; (2·max + min) / 2, truncated |
 | `0x005DC380` | `…_FullUnitSize(a, b)` | dx, dy as above from a to b's position, each minus a's size (`0x00620510`) and **clamped at 0** (D2MOO uses the absolute value: 1.14d differs); then the same formula |
 | `0x005DC5C0` | `AIUTIL_GetDistanceToCoordinates` | same formula on the path position |
+| `0x00621F20(u)`, wrapper `0x005DD280` | `UNITS_GetCurrentLifePercentage` | life percent: (stat 6 life >> 8) × 100 / (max life (`0x00625D10`) >> 8), signed, truncating; 0 when max life >> 8 is 0 |
 | `0x005DC480(u, x, y)` | `…_HalfUnitSize` | dx = \|ux − x\|, dy = \|uy − y\| (u's position), each minus (size(u) / 2 + 1) (`0x00620510`, unsigned halving) and clamped at 0; then (2·max + min) / 2 |
 | `0x005DC640` | `sub_6FCF14D0` | "can reach directly": offset k = table by distance (2 ×3, 3 ×8, 4 ×14, else 3); tests three points (target, and target ± the perpendicular offset) for collision mask 0x1/0x4/0x400 (D2MOO wall, missile barrier, door); fails only if all three collide |
 | `0x00622AA0(a, b, 4)` | `UNITS_TestCollisionWithUnit` | blocked line between a and b with mask 4 (`sim/units.md`) |
@@ -937,9 +938,9 @@ S = secondary target (`0x005DDC30`) with distance E.
 
 #### 9.14 Other Act 1 AIs (D2MOO-only)
 
-Summaries in `ai-functions.tsv` for Bighead (4) and BloodHawk (5);
-their 1.14d functions are listed but not yet compared. CorruptRogue,
-SkeletonBow, FoulCrowNest and BloodRaven are in §9.15–§9.18.
+None left: the Act 1 AIs that were D2MOO-only are read in 1.14d in
+§9.15–§9.18 (CorruptRogue, SkeletonBow, FoulCrowNest, BloodRaven) and
+§9.23–§9.24 (Bighead, BloodHawk).
 
 #### 9.15 CorruptRogue (10) `0x005F0B00`
 
@@ -1164,6 +1165,47 @@ roll drawn only when its flag and cooldown hold).
 
 1.14d-confirmed; same as D2MOO.
 
+#### 9.23 Bighead (4) `0x005EFF50`
+
+Brackets: bighead1 Normal [88, 40, 0, 60]. A2 is the ranged attack. L =
+own life percent (`0x005DD280`, §6). S = secondary target
+(`0x005DDC30`), searched only where stated; its distance overwrites D
+(not read afterwards).
+
+1. Not C and AI state 3/19 → A2 at T. End.
+2. L ≥ aip1 [88] (healthy):
+   1. C → A1 at T. End.
+   2. D < 15: search S; S and `roll(100)` < aip3 [0] → A2 at T. End.
+   3. Walk to T with flags 7. End.
+3. L < aip1 (hurt):
+   1. D < 3: velocity request (method unchanged, speed 50, steps 0);
+      escape from T by 5 with think delete; not started → A2 at T. End.
+   2. D > 15: walk to T with 6 steps (`0x005DEF80`). End.
+   3. Search S; S and `roll(100)` < aip4 [60] → A2 at T. End.
+   4. `roll(100)` < aip2 [40] → circle 3 at T (no delete); else idle 10.
+
+A2 always targets T, also when S decided it. 1.14d-confirmed.
+
+#### 9.24 BloodHawk (5) `0x005F00E0`
+
+Brackets: foulcrow1 Normal [30, 90, 5, 50, 100]. AI param 0 = "charged
+last think".
+
+1. Param 0 = 1 and C → param 0 := 0, A1 at T. End.
+2. Param 0 := 0.
+3. C: P(aip3) [5] → A1 at T, end; else back off (step 5).
+4. Not C:
+   1. P(aip1) [30] → velocity request (method unchanged, speed aip5
+      [100], steps D, capped by §7.3); param 0 := 1; walk to T (flags 0).
+      End.
+   2. D > 3: P(aip2) [90] → velocity (speed −50) and wander 4; else
+      velocity (0, 0, 0) (writes nothing, §7.3) and wander 3. End.
+   3. D ≤ 3: back off.
+5. Back off: velocity (speed aip4 [50], steps 0); escape from T by 4
+   with think delete; not started → A1 at T.
+
+1.14d-confirmed; same as D2MOO.
+
 ### 10. The catalogue `ai-functions.tsv`
 
 One row per AI table index (148 rows), tab-separated, header row:
@@ -1300,6 +1342,8 @@ think; draws per `rng.md` §2):
 | Arach [§9.20], state 0, not C, AI state 0, params 1, 2 = 0 | 51 ≥ 15; 31 ≥ 20 → idle 15 | 87; 64 → idle 15 | 53; 46 → idle 15 | 0 < 15 → lunge |
 | Fetish [§9.21], state 2, D = 15, param 1 = 0 | 51 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 20 → circle 4 (low byte 46 → method 5) |
 | Vampire [§9.22], state 0, not C, D = 10, L ≥ 33, no S, param 2 = 0 | 51 ≥ 40; 31 < 50 → circle 4 | 87; 64 → idle 10 | 53; 46 → circle 4 | 0 < 40; no F2/F4; no S → walk to T flags 7 |
+| Bighead [§9.23], hurt, D = 10, no S | 51 ≥ 40 → idle 10 | 87 → idle 10 | 53 → idle 10 | 0 < 40 → circle 3 (low byte 46 → method 5) |
+| BloodHawk [§9.24], not C, D = 10, param 0 = 0 | 51 ≥ 30; 31 < 90 → speed −50, wander 4 | 87; 64 → wander 4 | 53; 46 → wander 4 | 0 < 30 → charge: speed 100, steps 10, walk to T |
 | Npc after steps 1–4 (no class case, no interaction, no command), map AI with 3 nodes | 51 < 66; node 0 | 87 ≥ 66 → 0 (then idle 8) | 53; node 0 | 0; node 2 |
 
 Scheduling (no draws):
