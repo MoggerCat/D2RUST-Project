@@ -1584,3 +1584,6 @@ fn real_grid_belt_and_type_tables() {
         assert_eq!(&types[i].code, code, "itemtypes row {i}");
     }
 }
+
+#[path = "mutant_tests.rs"]
+mod mutant_tests;
