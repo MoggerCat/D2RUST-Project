@@ -11,6 +11,7 @@
 pub mod game;
 pub mod items;
 pub mod rng;
+pub mod stats;
 pub mod tick;
 pub mod treasure;
 pub mod units;
