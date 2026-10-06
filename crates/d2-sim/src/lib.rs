@@ -2,15 +2,18 @@
 //!
 //! Input: the previous state plus this tick's player intents.
 //! Output: the new state plus events. Phase 3 so far: the D2 seeded RNG
-//! ([`rng`]), unit lists ([`units`]) and the tick core ([`tick`], [`game`]).
+//! ([`rng`]), unit lists ([`units`]), the tick core ([`tick`], [`game`]),
+//! combat ([`combat`]) and skill levels ([`skills`]).
 //!
 //! Rules (CLAUDE.md rule 6): no I/O, no wall-clock time, no global or thread
 //! RNG, no unordered iteration affecting outcomes, no floating point. Some
 //! of these are enforced by `clippy.toml` and `[lints]` in this crate.
 
+pub mod combat;
 pub mod game;
 pub mod items;
 pub mod rng;
+pub mod skills;
 pub mod stats;
 pub mod tick;
 pub mod treasure;
