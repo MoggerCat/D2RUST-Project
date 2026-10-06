@@ -38,17 +38,17 @@
 |   4. Equipping | 307–460 |
 |   5. Shared checks | 461–585 |
 |   6. Deferred item messages | 586–654 |
-|   7. Intents | 655–950 |
-|   8. Pickup from the ground | 951–1027 |
-|   9. Drop to the ground | 1028–1070 |
-|   10. Gold | 1071–1101 |
-|   11. Message layouts | 1102–1127 |
-| Constants & data dependencies | 1128–1150 |
-| Randomness | 1151–1163 |
-| Edge cases & original bugs | 1164–1179 |
-| Test vectors | 1180–1227 |
-| Provenance | 1228–1263 |
-| Open questions | 1264–1296 |
+|   7. Intents | 655–1031 |
+|   8. Pickup from the ground | 1032–1132 |
+|   9. Drop to the ground | 1133–1175 |
+|   10. Gold | 1176–1206 |
+|   11. Message layouts | 1207–1232 |
+| Constants & data dependencies | 1233–1255 |
+| Randomness | 1256–1268 |
+| Edge cases & original bugs | 1269–1284 |
+| Test vectors | 1285–1332 |
+| Provenance | 1333–1368 |
+| Open questions | 1369–1399 |
 <!-- /index -->
 
 ## Summary
@@ -765,8 +765,33 @@ send 0x9D action 9.
 #### 7.9 0x1E Swap1HWith2H (`0x0054B030` → `0x00561220`)
 
 Cursor item check; location ∉ 1..10 → 2; location ∉ {4, 5} → 3; empty
-location → 1; item-move gate; `0x00561220` (1,144 bytes; body not
-specified: open question 14).
+location → 1; item-move gate; `0x00561220(game, player, N's GUID, L,
+&out)` (the cursor item N goes to hand L; the item T at L to the cursor;
+the item X in the other hand to page 0):
+
+1. out := 0. N must be an item in mode 4, else 0.
+2. §4.3 (L, N, skip 0) ≠ 7 → 0. §4.2 (not equipping) fails → out 1, 0.
+3. r := page-0 grid record (§1.3); O := 4 when L = 5, else 5; X := item
+   at O. `0x0063CB00(inv, N, O, r)` = 0 → out 1, 0. X missing → fatal.
+4. X in mode 1: X leaves the body (`0x0062A360`, stat unlink
+   `0x0063D2B0`, removed from grid 0 (`0x0063AD90`; not found or another
+   item → fatal), slot cleared `0x0063BE30`, deactivation
+   `0x0055C730`); free-position placement on page 0 (`0x0063B950`):
+   placed → link (failure → out 1, 0), page 0, unit flag 0x2 cleared,
+   cursor := none, mode 0, item flag 0x1 when socket-filled, 0x4000
+   cleared, command flag 0x4000, item flag 0x1, update list. Not placed
+   → X stays detached in mode 1 off the grid (original bug).
+5. T := item at L (missing → fatal); T not in mode 1 → out 1, 0.
+   Deactivation of T; §4.2 for N (not equipping) fails → stat refresh,
+   cursor := N, refused-pickup sound `0x0055FB10(N)`, `0x00553380`,
+   owner refresh, 0 (X stays moved).
+6. T leaves the body as X did, cursor := T, unit flag 0x2 cleared, mode
+   4, command flag 0x10, item flag 0x1, 0x4000 cleared, update list.
+7. N put at L (`0x0063BDB0`) and linked (kind 3; either failing → out
+   1, 0): body location L, stat link, stat refresh, unit flag 0x2
+   cleared, mode 1, page 0xFF, item flag 0x8, command flag 0x8, item
+   flag 0x1 (and when socket-filled), 0x4000 cleared, update list,
+   weapon bookkeeping `0x0055C5C0`, inventory pass (§5.7). Result 1.
 
 #### 7.10 0x1F SwapCursorBufferItem (`0x0054B0F0` → `0x00561B00`)
 
@@ -788,8 +813,36 @@ Fields: cursor u32 @1, target u32 @5, x u32 @9, y u32 @13.
 #### 7.11 0x20 UseGridItem (`0x0054B1E0` → `0x0055E170`)
 
 Stored item check; (x u32 @5, y u32 @9) within 50 subtiles of the player
-per axis (`0x00548EF0`), else 1; `0x0055E170` (item use; effects owned by
-the unwritten item-use spec, `world/cube.md` OQ7); refused with out → 3.
+per axis (`0x00548EF0`), else 1; `0x0055E170(game, player, I, x, y,
+&out)` (item use; the effects behind `0x005BF240` are owned by the
+unwritten item-use spec, `world/cube.md` OQ7); refused with out → 3:
+
+1. out := 0; targeting reset. I missing → out 1, 0. I not an item or a
+   cursor item exists → 0. I not in mode 0 or items `useable` = 0 (`0x00628C20`)
+   → out 1, 0.
+2. I of primary type 18 with stat 70 < 1 → 0. Busy test
+   `0x005678A0(1)` ≠ 0 → 0.
+3. `0x005BF240(I, I, x, y)` ≠ 0 (used): primary type 18 with skill S
+   (§7.18 step 6) ≠ −1 and stat 70 > 0 → stat 70 −= 1 (S→C 0x3E), S→C
+   0x7C (I), skill decrement, 1. Type 18 otherwise → 1 (nothing more).
+   Other types: S ≠ −1 and the player has S → S's quantity − 1 (< 1 →
+   0, and S as the right skill → skill 0 on the right), S→C 0x22;
+   targeting reset; consume I (`0x0055E000`); 1.
+4. Not used: by items code, with the player's quest record for the
+   difficulty (`0x00543520`; flag test `0x0065C310`, clear
+   `0x0065C3A0`, set `0x0065C360`; meanings `world/quests.md`):
+   - `ass`: targeting reset; flag (9, 5) set → clear it, stat 5
+     (`newskills`) += 1, `0x005458E0`, consume I, 1.
+   - `xyz`: targeting reset; flag (20, 5) set → clear it, stat 7
+     (`maxhp`) += 0x1400 (20 life, 8.8 fixed), `0x005458E0`, consume I,
+     1.
+   - `tr2`: targeting reset; (37, 8) set and (37, 7) clear → set (37,
+     7), `0x0058A0A0`, `0x005458E0`, consume I, 1.
+   - `toa`: targeting reset, `0x00570360`, `0x00570C80` (skills and
+     stats reset; skills / character owner), consume I, sound
+     `0x00553380`, 1.
+   - Other codes → 0. A failed flag test above → sound `0x00553380`,
+     1.
 
 #### 7.12 0x21 StackItems (`0x0054B300` → `0x0055E7C0`)
 
@@ -854,9 +907,37 @@ skill charge update (`0x0055E050`, `0x006439B0`, S→C 0x22 via
 
 #### 7.18 0x27 UseItemAction (`0x0054B280` → `0x00561ED0`)
 
-Owned item check on target (u32 @1) and used item (u32 @5); `0x00561ED0`
-(identify scroll, repair kit and similar; 891 bytes, body not specified:
-open question 14).
+Owned item check on target (u32 @1) and used item (u32 @5);
+`0x00561ED0(game, player, T, U, &out)` (U = scroll or tome used on item
+T; the effect itself is the item-use dispatcher `0x005BF240`, owned by
+the item-use spec):
+
+1. out := 0. U missing → out 1, 0. T missing or T = U → targeting reset
+   (§5.3), 0.
+2. U in mode 2 (belt) and not type 22 (`scro`) → out 1, 0. Busy test
+   `0x005678A0(1)` ≠ 0 → 0. T or U not an item, or a cursor item exists
+   (`0x0063C1E0`) → 0.
+3. T not in mode 0 or 1: U in mode 2 → targeting reset, consume U from
+   the belt (`0x00561E70`: S→C 0x9C action 0xF with bit-stream flag
+   0x20, then `0x0055ED30(U)`), 0; U in mode 0 of primary type 18 → U's
+   stat 70 := max(stat 70 − 1, 0) with S→C 0x3E, 0; U in mode 0 of
+   another type → 0; else out 1, 0.
+4. U of primary type 18 with stat 70 < 1 → targeting reset, S→C 0x7C
+   (U's type, U's GUID; 6 bytes `0x0053B3D0`), 0.
+5. `0x005BF240(U, T, 0, 0)` = 0 (not used) → result 1.
+6. Item skill S of U (`0x0055E050`: book → books `bookskill`, scroll →
+   `scrollskill`, else −1; no books row → fatal). "Skill decrement"
+   (`0x0055E0D0(S)`): S's quantity − 1; < 1 → 0, and S as the right
+   skill → select skill 0 (owner −1) on the right; S→C 0x22 (§11); U's
+   skill missing → fatal.
+7. U in mode 2: S = −1 → S→C 0x7C (U); else skill decrement and consume
+   U from the belt (`0x00561E70`). Targeting reset, 1.
+8. U not in mode 0 → out 1, 0.
+9. U of primary type 18: S ≠ −1 and stat 70 ≥ 1 → stat 70 −= 1
+   (S→C 0x3E), skill decrement, S→C 0x7C (U); else consume U
+   (`0x0055E000`: S→C via `0x0053D010` with flag 0x20, then
+   `0x0055DF10(U, 0)`). Other U: S ≠ −1 → skill decrement; consume U
+   (`0x0055E000`). Targeting reset, 1.
 
 #### 7.19 0x28 SocketItem (`0x0054B650` → `0x00562660`)
 
@@ -958,8 +1039,32 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
 3. Sound event on the player (`0x00553380`). Gold (type 4) → §10.1.
 4. Special items (`0x00560020`): type 22 (scroll) → into a tome
    (`0x0055FFA0`); type 18 (book) → `0x0055D370`; stackable with
-   auto-stack (`0x006289F0`, `0x0062E790`) → onto existing stacks
-   (`0x0055D0D0`). Handled → 0.
+   auto-stack (`0x006289F0`, itemtypes `autostack` `0x0062E790`) → onto
+   existing stacks (`0x0055D0D0`). Handled → 0. "Tome for P"
+   (`0x0063C3B0`) = the first item of page 0's grid item list (grid list
+   order, item data +0x70 next) of primary type 18 whose spell (item
+   suffix 0, +0x3E) equals P's and whose stat 70 < total max stack.
+   - Scroll (`0x0055FFA0`): a tome T for P → the 0x29 routine
+     `0x0055EF20(P, T, &out)` (§7.20) and its result; none → not handled.
+   - Book (`0x0055D370`): a tome T for P (none → not handled); q_p, q_t
+     = stat 70, m = T's total max stack (any negative → fatal). q_t + q_p
+     > m: T := m, P := q_t + q_p − m (each S→C 0x3E), item-skill add
+     m − q_t (`0x0055C070`: §5.5 skill quantity += n, S→C 0x22), handled
+     (P stays on the ground). Else T := q_t + q_p (0x3E), item-skill add
+     q_p, P leaves its room (`0x0061A270`, `0x00623830`, `0x0064C370`),
+     unit flag 0x2 cleared, P freed (`0x00557FD0`), cursor := none,
+     handled.
+   - Auto-stack (`0x0055D0D0`), while P's stat 70 > 0: candidate D :=
+     the next item, starting at the previous candidate, that passes §4.5
+     with P and has stat 70 < total max stack: from the body-location
+     grid (`0x0063C2F0`) when P's itemtype `quiver` ≠ 0, then (none
+     there, or `quiver` = 0) from page 0's grid (`0x0063C200`). No D →
+     not handled (earlier partial merges stay). q_d + q ≤ m: D's stat
+     72 lowered to P's when P has durability and P's is lower (0x3E), D
+     := q_d + q (0x3E), P := 0, both books → item-skill add q, P leaves
+     its room and is freed as above, cursor := none, handled. Else D :=
+     m (0x3E only for D), P := q + q_d − m, both books → add m − q_d;
+     next candidate.
 5. Auto-equip §4.7 (skip 0) gives L → §4.3(L, item, 0) must be 1, else
    out 1; leave the room; `0x00562E00(item, 0)` equips; success → quest
    hook ITEMPICKEDUP (`0x00543D80`, `world/quests.md`).
@@ -1281,9 +1386,7 @@ dual-wield monster classes are 1.14d constants.
 12. 0x19 for a busy player lifting from page 3/4 (allowed?). Settle:
     R2 (stash and cube use while the panels are open).
 13. Answered: §3 rules 9–10 (from the binary; a recording removing a belt with potions in rows 2–4 would confirm the 0x9C order: R3).
-14. Bodies of `0x00561220` (0x1E), `0x00561ED0` (0x27), `0x0055E170`
-    (0x20), `0x0055FFA0`/`0x0055D370`/`0x0055D0D0` (pickup specials).
-    Settle: Ghidra; item-use spec for 0x20/0x27.
+14. Answered: §7.9 (0x1E), §7.11 (0x20), §7.18 (0x27), §8.1 step 4 (pickup specials). The use effects behind `0x005BF240` stay with the item-use spec (`world/cube.md` OQ7).
 15. Answered: §7.12 (stat 72 = `durability`).
 16. Answered: §7.23 step 2 (used skill).
 17. Answered: §9.2 (reader `0x00558B90`).
