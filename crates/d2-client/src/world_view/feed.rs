@@ -308,6 +308,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for NoCamera<'_, R
         self.rules.component_frame(unit, pose, req)
     }
 
+    fn component_slot_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.rules.component_slot_frame(unit, pose, req)
+    }
+
     fn place(
         &self,
         _: &ClientUnit,

@@ -296,6 +296,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         self.rules.component_frame(unit, pose, req)
     }
 
+    fn component_slot_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.rules.component_slot_frame(unit, pose, req)
+    }
+
     /// Camera §4 then placement §8. A cel whose rasterizer rows differ from
     /// the unit's frame clip (a top-down DC6 cel crossing an edge, §4) is
     /// an error: the unit's components share one clip.
