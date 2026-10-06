@@ -15,6 +15,7 @@ pub mod game;
 pub mod items;
 pub mod missiles;
 pub mod monsters;
+pub mod path;
 pub mod rng;
 pub mod skills;
 pub mod stats;
