@@ -472,6 +472,11 @@ fn player_leaving_with_quest_items() {
         items: vec![(UnitId(0x80), 4), (UnitId(0x81), 99)],
     };
     // Chains 1–6 have bodies (§10.4–§10.8): the chain 1–3 lists lose P1.
+    // So do the Act II chains with bodies (quests-act2.md §1.1 event 10).
+    const BODIES: [u8; 2] = [9, 12];
+    for c in BODIES {
+        ctl.record_mut(c).unwrap().guids.add(1);
+    }
     ctl.record_mut(1).unwrap().guids.add(1);
     ctl.record_mut(2).unwrap().guids.add(1);
     ctl.record_mut(3).unwrap().extra.guids.add(1);
@@ -489,9 +494,15 @@ fn player_leaving_with_quest_items() {
     assert!(!ctl.record(1).unwrap().guids.contains(1));
     assert!(!ctl.record(2).unwrap().guids.contains(1));
     assert!(!ctl.record(3).unwrap().extra.guids.contains(1));
+    for c in BODIES {
+        assert!(!ctl.record(c).unwrap().guids.contains(1), "chain {c}");
+    }
     let mut want = Vec::new();
     for r in &ctl.records {
-        if r.has_callback(event::PLAYER_LEAVES_GAME) && !(1..=6).contains(&r.chain) {
+        if r.has_callback(event::PLAYER_LEAVES_GAME)
+            && !(1..=6).contains(&r.chain)
+            && !BODIES.contains(&r.chain)
+        {
             want.push(format!(
                 "unhandled {} {:#x}",
                 r.chain,
