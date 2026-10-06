@@ -2,6 +2,21 @@
 //! Coordinates: sub-tiles (5 per tile), 16.16 "precise" positions of
 //! dynamic paths, client (drawing) coordinates, square distance.
 
+/// A sub-tile point (§1 rule 1: 5 sub-tiles per tile): path points,
+/// targets and placement positions. Signed, as the original's ints; the
+/// path record stores its points as u16 ([`super::record::PathPoint`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Point {
+    pub const fn new(x: i32, y: i32) -> Point {
+        Point { x, y }
+    }
+}
+
 /// Sub-tiles per tile.
 pub const SUBTILES_PER_TILE: i32 = 5;
 

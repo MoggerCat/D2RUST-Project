@@ -3,9 +3,11 @@
 //! points. No randomness (pathing.md Randomness 1).
 
 use super::geom::{add, octant, path_distance, ray_test, step, Probe, Ray, NO_DIR};
-use super::seams::{flag, PathInfo, PathWorld, Point, WalkError, WalkPath, WalkUnits, MAX_POINTS};
-use super::tables::PathTables;
+use super::seams::{count, index, room_contains, PathInfo, PathWorld, Point, WalkError, WalkUnits};
 use super::velocity::aim;
+use crate::path::collision::find_room;
+use crate::path::record::{flags, path_types, DynamicPath, PathPoint, PATH_POINTS};
+use crate::path::tables::PathTables;
 use crate::units::{UnitId, UnitType};
 
 /// Path range per axis (`0x00649970`).
@@ -19,84 +21,40 @@ pub const ASTAR_CHILDREN: usize = 8;
 /// A* propagation stack.
 pub const ASTAR_STACK: usize = 200;
 
-/// Path types of §2.
-pub mod path_type {
-    pub const ASTAR: u8 = 1;
-    pub const TOWARD: u8 = 2;
-    pub const MISSILE: u8 = 4;
-    pub const STRAIGHT: u8 = 7;
-    pub const KNOCKBACK: u8 = 8;
-    pub const KNOCKBACK_CLIENT: u8 = 11;
-    pub const TOWARD_FINISH: u8 = 13;
-    pub const WALL_FOLLOW: u8 = 15;
-}
-
-/// Set type `0x00648CF0(path, t)` (§2).
-pub fn set_type(
+/// Path type reset `0x00648DC0` (§1.5 step 1). The type sets are the
+/// core's [`DynamicPath::set_path_type`] (`0x00648CF0`, §2).
+pub fn reset_type(
     t: &PathTables,
-    path: &mut WalkPath,
+    path: &mut DynamicPath,
     owner_ty: UnitType,
-    ty: u8,
 ) -> Result<(), WalkError> {
-    if owner_ty == UnitType::Player && ty == path_type::TOWARD {
-        return Err(WalkError::Fatal("player path type 2"));
+    if path.flags & flags::SAVE_VELOCITY != 0 {
+        path.velocity = path.saved_velocity;
     }
-    let Some(&tf) = t.pathtype_flags.get(ty as usize) else {
-        return Err(WalkError::Fatal("path type out of range"));
-    };
-    if tf & flag::SAVE_PREV_TYPE != 0 && path.flags & flag::PREV_TYPE_KEPT == 0 {
-        path.prev_type = path.path_type;
-    }
-    if tf & flag::SAVE_VELOCITY != 0 && path.flags & flag::VELOCITY_KEPT == 0 {
-        path.saved_velocity = path.velocity;
-    }
-    path.flags = (path.flags & !flag::TYPE_BITS) | tf;
-    path.path_type = ty;
-    path.dir_offset = t.pathtype_diroff[ty as usize];
-    if path.prev_type == path_type::KNOCKBACK_CLIENT
-        || path.prev_type == path_type::KNOCKBACK
-        || (ty == path_type::MISSILE && path.max_distance >= 78)
-    {
-        return Err(WalkError::Fatal("path type assert (0x00648CF0)"));
+    if owner_ty == UnitType::Player {
+        path.set_path_type(t, true, path_types::STRAIGHT)?;
+    } else if path.flags & flags::SAVE_PREV_TYPE != 0 {
+        path.set_path_type(t, false, path.prev_path_type)?;
     }
     Ok(())
 }
 
-/// Path type reset `0x00648DC0` (§1.5 step 1).
-pub fn reset_type(
-    t: &PathTables,
-    path: &mut WalkPath,
-    owner_ty: UnitType,
-) -> Result<(), WalkError> {
-    if path.flags & flag::SAVE_VELOCITY != 0 {
-        path.velocity = path.saved_velocity;
-    }
-    if owner_ty == UnitType::Player {
-        set_type(t, path, owner_ty, path_type::STRAIGHT)
-    } else if path.flags & flag::SAVE_PREV_TYPE != 0 {
-        set_type(t, path, owner_ty, path.prev_type)
-    } else {
-        Ok(())
-    }
-}
-
-/// Context of a path function: tables, the collision source and the
-/// unit-side seams.
-pub struct Finder<'a, W: ?Sized, U: ?Sized> {
+/// Context of a path function: tables, the walk context (collision
+/// source and unit-side seams).
+pub struct Finder<'a, C: ?Sized> {
     pub t: &'a PathTables,
-    pub w: &'a W,
-    pub u: &'a mut U,
+    pub c: &'a mut C,
     pub owner_ty: UnitType,
 }
 
 /// Target refresh point (`0x00679250`, §9.5): the target unit's position
 /// plus the lead.
-pub fn refresh_point<U: WalkUnits + ?Sized>(u: &U, path: &WalkPath, unit: UnitId) -> Point {
+pub fn refresh_point<U: WalkUnits + ?Sized>(u: &U, path: &DynamicPath, unit: UnitId) -> Point {
     let p = u.position(unit);
     let ty = u.unit_type(unit);
-    if path.lead != 0 && (ty == UnitType::Player || ty == UnitType::Monster) {
+    if path.target_lead != 0 && (ty == UnitType::Player || ty == UnitType::Monster) {
         // TODO(spec: pathing.md open question 4, x87 target lead)
-        u.target_lead(unit, p, path.lead).unwrap_or(p)
+        u.target_lead(unit, p, path.target_lead).unwrap_or(p)
     } else {
         p
     }
@@ -104,33 +62,32 @@ pub fn refresh_point<U: WalkUnits + ?Sized>(u: &U, path: &WalkPath, unit: UnitId
 
 /// Path compute `0x00649970(path, unit, town access)` (§3). Returns the
 /// point count.
-pub fn compute<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
+pub fn compute<C: PathWorld + WalkUnits + ?Sized>(
     t: &PathTables,
-    w: &mut W,
-    u: &mut U,
-    path: &mut WalkPath,
+    c: &mut C,
+    path: &mut DynamicPath,
     unit: UnitId,
     town_access: bool,
 ) -> Result<i32, WalkError> {
     // Step 1.
-    if path.owner != unit {
+    if path.owner != Some(unit) {
         return Err(WalkError::Fatal("path owner differs (0x00649970)"));
     }
-    let owner_ty = u.unit_type(unit);
-    if path.flags & flag::MISSILE != 0 {
+    let owner_ty = c.unit_type(unit);
+    if path.flags & flags::MISSILE != 0 {
         // Missile path `0x00649760`: owner `missiles/missiles.md`.
-        let info = info_of(path, path.cell(), path.target, None, None, 1);
-        return Ok(u.other_path_function(path, &info));
+        let info = info_of(path, path.cell(), path.target(), None, None, 1);
+        return Ok(c.other_path_function(path, &info));
     }
     // Step 2.
-    path.collided = 0;
+    path.collided_mask = 0;
     if let Some(tu) = path.target_unit {
-        let p = u.position(tu.unit);
+        let p = c.position(tu.unit);
         if p.x == 0 || p.y == 0 {
             return Ok(0);
         }
     }
-    let r = (|| {
+    let r = (|| -> Result<Option<bool>, WalkError> {
         // Step 3.
         let start = path.cell();
         if start == Point::default() {
@@ -139,28 +96,30 @@ pub fn compute<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
         // Step 4.
         let mut slack = 1;
         if let Some(tu) = path.target_unit {
-            let tp = u.position(tu.unit);
-            path.target = tp;
+            let tp = c.position(tu.unit);
+            path.put_target(tp);
             if tp == Point::default() {
                 return Ok(None);
             }
-            match u.unit_type(tu.unit) {
+            match c.unit_type(tu.unit) {
                 UnitType::Player | UnitType::Monster => {
-                    if path.lead != 0 {
+                    if path.target_lead != 0 {
                         // TODO(spec: pathing.md open question 4, x87 target lead)
-                        if let Some(p) = u.target_lead(tu.unit, tp, path.lead) {
-                            path.target = p;
+                        if let Some(p) = c.target_lead(tu.unit, tp, path.target_lead) {
+                            path.put_target(p);
                         }
                     }
                     slack = 1;
                 }
                 UnitType::Object => {
-                    if let Some(orient) = u.door_orientation(tu.unit) {
+                    if let Some(orient) = c.door_orientation(tu.unit) {
+                        let mut tg = path.target();
                         if orient {
-                            path.target.y += if start.y < path.target.y { -2 } else { 2 };
+                            tg.y += if start.y < tg.y { -2 } else { 2 };
                         } else {
-                            path.target.x += if start.x < path.target.x { -2 } else { 2 };
+                            tg.x += if start.x < tg.x { -2 } else { 2 };
                         }
+                        path.put_target(tg);
                     }
                     slack = 2;
                 }
@@ -169,7 +128,7 @@ pub fn compute<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
             }
         }
         // Step 5.
-        let target = path.target;
+        let target = path.target();
         if target == Point::default() || start == target {
             return Ok(None);
         }
@@ -177,84 +136,84 @@ pub fn compute<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
             return Ok(None);
         }
         let start_room = path.room;
-        let target_room = w.cell_room(start_room, target.x, target.y);
+        let target_room = find_room(&*c, start_room, target.x, target.y);
         let (Some(_), Some(troom)) = (start_room, target_room) else {
             return Ok(None);
         };
         if !town_access
             && owner_ty == UnitType::Monster
-            && !u.monster_can_be_in_town(unit)
-            && w.room_in_town(troom)
+            && !c.monster_can_be_in_town(unit)
+            && c.room_in_town(troom)
         {
             return Ok(None);
         }
         // Step 6.
-        w.remove_footprint(unit, false);
+        c.remove_footprint(unit, false);
         let mut target_removed = None;
         if let Some(tu) = path.target_unit {
-            if u.unit_size(tu.unit) != 0 && path.flags & flag::REMOVE_TARGET_FOOTPRINT != 0 {
-                target_removed = Some((tu.unit, w.remove_footprint(tu.unit, false)));
+            if c.unit_size(tu.unit) != 0 && path.flags & flags::REMOVE_TARGET_FOOTPRINT != 0 {
+                target_removed = Some((tu.unit, c.remove_footprint(tu.unit, false)));
             }
         }
         // Step 7.
         let mut info = info_of(path, start, target, start_room, target_room, slack);
         let mut run = true;
-        if path.flags & flag::PREPARE_TARGET != 0
-            && w.collides(start_room, target, path.pattern, path.move_mask)
+        if path.flags & flags::PREPARE_TARGET != 0
+            && c.collides(start_room, target, path.pattern, path.move_mask)
         {
-            run = prepare(t, &*w, owner_ty, path, &mut info)?;
+            run = prepare(t, &*c, owner_ty, path, &mut info)?;
         }
         // Step 8.
-        path.index = 0;
-        path.count = 0;
-        path.final_target = path.target;
+        path.cur_point = 0;
+        path.point_count = 0;
+        path.put_final_target(path.target());
         let n = if run {
-            run_function(t, &*w, u, owner_ty, path, &info)?
+            run_function(t, c, owner_ty, path, &info)?
         } else {
             0
         };
-        path.count = n;
+        path.point_count = n as u32;
         // Step 9.
         if let Some((tunit, true)) = target_removed {
-            w.add_footprint(tunit);
+            c.add_footprint(tunit);
         }
-        w.add_footprint(unit);
+        c.add_footprint(unit);
         if n == 0 {
             return Ok(Some(false));
         }
         // Step 10.
         aim(t, path, owner_ty);
-        if path.index < path.count {
-            room_exit_flag(&*w, path);
-            path.prev_target = path.target;
+        if index(path) < count(path) {
+            room_exit_flag(&*c, path);
+            path.put_prev_target(path.target());
             path.field_38 = 0;
-            if path.flags & flag::KEEP_TARGET == 0 && path.target_unit.is_none() {
-                path.target = path.points[(path.count - 1) as usize];
+            if path.flags & flags::KEEP_TARGET == 0 && path.target_unit.is_none() {
+                path.put_target(path.point((count(path) - 1) as usize));
             }
-            path.flags |= flag::ACTIVE;
+            path.flags |= flags::ACTIVE;
             return Ok(Some(true));
         }
         Ok(None)
     })();
     match r? {
-        Some(true) => Ok(path.count),
+        Some(true) => Ok(count(path)),
         // Step 11 then 12.
         None => {
-            path.index = 0;
-            path.count = 0;
-            path.flags &= !flag::ACTIVE;
+            path.cur_point = 0;
+            path.point_count = 0;
+            path.flags &= !flags::ACTIVE;
             Ok(0)
         }
         // Step 12.
         Some(false) => {
-            path.flags &= !flag::ACTIVE;
+            path.flags &= !flags::ACTIVE;
             Ok(0)
         }
     }
 }
 
 fn info_of(
-    path: &WalkPath,
+    path: &DynamicPath,
     start: Point,
     target: Point,
     start_room: Option<crate::units::RoomId>,
@@ -268,44 +227,42 @@ fn info_of(
         target_room,
         slack,
         max_distance: path.max_distance as i32,
-        idastar_score: path.idastar_score as i32,
+        idastar_score: path.ida_score as i32,
         path_type: path.path_type,
-        size: path.size,
+        size: path.unit_size,
         pattern: path.pattern,
         move_mask: path.move_mask,
     }
 }
 
 /// Room-exit flag `0x00647FB0` (§3 step 10).
-fn room_exit_flag<W: PathWorld + ?Sized>(w: &W, path: &mut WalkPath) {
-    path.flags &= !flag::OUTSIDE_ROOM;
+fn room_exit_flag<W: PathWorld + ?Sized>(w: &W, path: &mut DynamicPath) {
+    path.flags &= !flags::OUTSIDE_ROOM;
     let Some(room) = path.room else { return };
-    let (rx, ry, rw, rh) = w.room_rect(room);
     for p in path.live_points() {
-        if p.x < rx || p.x >= rx + rw || p.y < ry || p.y >= ry + rh {
-            path.flags |= flag::OUTSIDE_ROOM;
+        if !room_contains(w, room, p) {
+            path.flags |= flags::OUTSIDE_ROOM;
             return;
         }
     }
 }
 
 /// Runs the type's function (§2 table).
-fn run_function<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
+fn run_function<C: PathWorld + WalkUnits + ?Sized>(
     t: &PathTables,
-    w: &W,
-    u: &mut U,
+    c: &mut C,
     owner_ty: UnitType,
-    path: &mut WalkPath,
+    path: &mut DynamicPath,
     info: &PathInfo,
 ) -> Result<i32, WalkError> {
-    let mut f = Finder { t, w, u, owner_ty };
+    let mut f = Finder { t, c, owner_ty };
     match info.path_type {
-        path_type::ASTAR => Ok(astar(&f, path, info)?),
+        path_types::ASTAR => Ok(astar(&f, path, info)?),
         // 2, 5, 6, 13 share `0x00679C80`; 5 and 6 have a direction offset.
-        path_type::TOWARD | 5 | 6 | path_type::TOWARD_FINISH => toward(&mut f, path, info),
-        path_type::STRAIGHT => straight(&mut f, path, info),
+        path_types::TOWARD | 5 | 6 | path_types::TOWARD_FINISH => toward(&mut f, path, info),
+        path_types::STRAIGHT => straight(&mut f, path, info),
         4 | 10 | 14 | 17 => Err(WalkError::Fatal("path type without a function")),
-        _ => Ok(f.u.other_path_function(path, info)),
+        _ => Ok(f.c.other_path_function(path, info)),
     }
 }
 
@@ -315,18 +272,19 @@ pub fn prepare<W: PathWorld + ?Sized>(
     t: &PathTables,
     w: &W,
     owner_ty: UnitType,
-    path: &mut WalkPath,
+    path: &mut DynamicPath,
     info: &mut PathInfo,
 ) -> Result<bool, WalkError> {
-    if path.flags & flag::MISSILE != 0 {
+    if path.flags & flags::MISSILE != 0 {
         return Err(WalkError::Fatal("target preparation on a missile path"));
     }
     let start = info.start;
     let room = info.start_room;
     let free = |p: Point| !w.collides(room, p, path.pattern, path.move_mask);
     let (mut p0, mut p1, mut p2) = (info.target, info.target, info.target);
+    // altdir entries are 0..7 or 255 (none).
     let row = t.altdir[octant(info.target, start)];
-    let (mut d0, d1, d2) = (row[0], row[1], row[2]);
+    let (mut d0, d1, d2) = (row[0] as u8, row[1] as u8, row[2] as u8);
     let found = loop {
         if p0 == start {
             return Ok(false);
@@ -345,10 +303,10 @@ pub fn prepare<W: PathWorld + ?Sized>(
                 break p2;
             }
         }
-        d0 = t.altdir[octant(p0, start)][0];
+        d0 = t.altdir[octant(p0, start)][0] as u8;
     };
     info.target = found;
-    path.target = found;
+    path.put_target(found);
     if found == start {
         return Ok(false);
     }
@@ -359,7 +317,7 @@ pub fn prepare<W: PathWorld + ?Sized>(
 }
 
 /// Orthogonal push `0x00648050` (§4 rule 4).
-fn push<W: PathWorld + ?Sized>(t: &PathTables, w: &W, path: &mut WalkPath, info: &mut PathInfo) {
+fn push<W: PathWorld + ?Sized>(t: &PathTables, w: &W, path: &mut DynamicPath, info: &mut PathInfo) {
     let dx = info.target.x - info.start.x;
     let dy = info.target.y - info.start.y;
     if dx.abs() < 5 && dy.abs() < 5 && (dx, dy) != (0, 0) {
@@ -374,24 +332,24 @@ fn push<W: PathWorld + ?Sized>(t: &PathTables, w: &W, path: &mut WalkPath, info:
             info.target = cand;
             c += 1;
         }
-        path.target = info.target;
+        path.put_target(info.target);
     }
 }
 
-fn put(path: &mut WalkPath, n: &mut usize, p: Point) -> Result<(), WalkError> {
-    if *n >= MAX_POINTS {
+fn put(path: &mut DynamicPath, n: &mut usize, p: Point) -> Result<(), WalkError> {
+    if *n >= PATH_POINTS {
         return Err(WalkError::Fatal("path points overflow"));
     }
-    path.points[*n] = p;
+    path.points[*n] = PathPoint::from_point(p);
     *n += 1;
     Ok(())
 }
 
 /// Next-position check `0x00679A60` (§5.1 rule 5): `None` = clear, else
 /// the returned point P.
-fn next_position<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
-    f: &Finder<'_, W, U>,
-    path: &mut WalkPath,
+fn next_position<C: PathWorld + WalkUnits + ?Sized>(
+    f: &Finder<'_, C>,
+    path: &mut DynamicPath,
     info: &PathInfo,
 ) -> Option<Point> {
     if path.velocity == 0 {
@@ -402,7 +360,7 @@ fn next_position<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
         return Some(info.start);
     }
     match ray_test(
-        f.w,
+        &*f.c,
         info.start_room,
         info.pattern,
         info.move_mask,
@@ -415,29 +373,29 @@ fn next_position<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
 }
 
 /// Toward (type 2, `0x00679C80`, §5.2).
-pub fn toward<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
-    f: &mut Finder<'_, W, U>,
-    path: &mut WalkPath,
+pub fn toward<C: PathWorld + WalkUnits + ?Sized>(
+    f: &mut Finder<'_, C>,
+    path: &mut DynamicPath,
     info: &PathInfo,
 ) -> Result<i32, WalkError> {
-    path.index = 0;
-    path.count = 0;
+    path.cur_point = 0;
+    path.point_count = 0;
     if path.dir_offset != 0 {
         // Monster circling `0x00679B30`: pathing.md open question 3.
-        return Ok(f.u.other_path_function(path, info));
+        return Ok(f.c.other_path_function(path, info));
     }
     let t = f.t;
     let start = info.start;
     let target = info.target;
     // Step 1.
-    path.points[0] = target;
+    path.points[0] = PathPoint::from_point(target);
     let Some(p) = next_position(f, path, info) else {
-        path.points[0] = target;
+        path.points[0] = PathPoint::from_point(target);
         return Ok(1);
     };
     // Step 2.
     if path_distance(t, p, target) <= info.slack {
-        path.points[0] = p;
+        path.points[0] = PathPoint::from_point(p);
         return Ok(1);
     }
     // Step 3.
@@ -459,14 +417,16 @@ pub fn toward<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
         turned = false;
         let row = t.testdir[octant(cur, target)];
         let mut d = None;
-        for (k, &c) in row.iter().enumerate() {
+        for (k, &entry) in row.iter().enumerate() {
+            // testdir entries are 0..7 or 255 (none).
+            let c = entry as u8;
             if c == NO_DIR {
                 if k == 2 {
                     return Err(WalkError::Fatal("testdir t2 = 255"));
                 }
                 continue;
             }
-            if !f.w.collides(
+            if !f.c.collides(
                 info.start_room,
                 add(cur, step(t, c)),
                 info.pattern,
@@ -503,16 +463,16 @@ pub fn toward<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
 }
 
 /// Straight (type 7, `0x00679ED0`, §6).
-pub fn straight<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
-    f: &mut Finder<'_, W, U>,
-    path: &mut WalkPath,
+pub fn straight<C: PathWorld + WalkUnits + ?Sized>(
+    f: &mut Finder<'_, C>,
+    path: &mut DynamicPath,
     info: &PathInfo,
 ) -> Result<i32, WalkError> {
-    path.index = 0;
-    path.count = 0;
+    path.cur_point = 0;
+    path.point_count = 0;
     let n = toward(f, path, info)?;
     if n > 0 {
-        let last = path.points[(n - 1) as usize];
+        let last = path.point((n - 1) as usize);
         if path_distance(f.t, last, info.target) <= info.slack && last != info.start {
             return Ok(n);
         }
@@ -593,12 +553,12 @@ const TARGET_PROBES: [(i32, i32); 8] = [
 ];
 
 /// A* (type 1, `0x0067B850`, §7).
-pub fn astar<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
-    f: &Finder<'_, W, U>,
-    path: &mut WalkPath,
+pub fn astar<C: PathWorld + WalkUnits + ?Sized>(
+    f: &Finder<'_, C>,
+    path: &mut DynamicPath,
     info: &PathInfo,
 ) -> Result<i32, WalkError> {
-    let w = f.w;
+    let w = &*f.c;
     let target = info.target;
     let room = info.start_room;
     let collides = |p: Point| w.collides(room, p, info.pattern, info.move_mask);
@@ -717,7 +677,7 @@ pub fn astar<W: PathWorld + ?Sized, U: WalkUnits + ?Sized>(
         return Ok(0);
     }
     for (k, p) in out.iter().rev().enumerate() {
-        path.points[k] = *p;
+        path.points[k] = PathPoint::from_point(*p);
     }
     Ok(n as i32)
 }

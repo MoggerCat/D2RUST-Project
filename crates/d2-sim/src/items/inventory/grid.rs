@@ -53,12 +53,15 @@ pub fn fits(g: &Grid, x: i32, y: i32, w: u8, h: u8) -> bool {
     (y..y + i32::from(h)).all(|yy| (x..x + i32::from(w)).all(|xx| g.cell(xx, yy).is_none()))
 }
 
-/// Bounds of §2.1: x ≥ 0, y ≥ 0, x + w ≤ width, y + h ≤ height.
+/// Bounds of §2.1: x ≥ 0, y ≥ 0, x + w ≤ width, y + h ≤ height. The sums
+/// are taken in i64: x and y can come from a payload (0x18 x, y near
+/// `i32::MAX`), where an i32 sum overflows.
+// TODO(spec: §2.1 does not say how the original's 32-bit x + w behaves near 2^31)
 pub fn in_bounds(g: &Grid, x: i32, y: i32, w: u8, h: u8) -> bool {
     x >= 0
         && y >= 0
-        && x + i32::from(w) <= i32::from(g.width)
-        && y + i32::from(h) <= i32::from(g.height)
+        && i64::from(x) + i64::from(w) <= i64::from(g.width)
+        && i64::from(y) + i64::from(h) <= i64::from(g.height)
 }
 
 /// Weight of a fitting candidate (`0x0063B340`, §2.3): occupied cells just
