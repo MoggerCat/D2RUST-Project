@@ -13,6 +13,9 @@ use crate::bridge::ClientUnit;
 use crate::composite::ComponentFrame;
 use crate::scene::{BlendOp, DrawKey, ShadeChain};
 use crate::world_view::{UnitPose, ViewAssets, ViewError, ViewFeed};
+use d2_sim::rng::Seed;
+
+use super::weather::{FloorContext, Weather};
 
 use super::super::camera::{Camera, ClientPos, OpenMode, TileList, UnitPosition};
 use super::super::view::{BlockRect, MapTile, ViewSource};
@@ -59,6 +62,69 @@ fn open(what: &'static str, message: String) -> ViewError {
         spec: SPEC,
         message,
     }
+}
+
+/// The weather state the floor pass writes (`draw-order-2.md` §11.5),
+/// lent by the feed for one frame: the weather pools, the floor pass's
+/// persistent context, the local player's seed (`unit +0x20`), the client
+/// update count and the level's `Mud`.
+#[derive(Debug)]
+pub struct WeatherFrame<'a> {
+    pub weather: &'a mut Weather,
+    pub floors: &'a mut FloorContext,
+    pub seed: &'a mut Seed,
+    pub update_count: u32,
+    pub mud: bool,
+}
+
+impl WeatherFrame<'_> {
+    /// The floor pass's water effects (§11.5): the frame's context, then
+    /// per drawn water floor in draw order, at its handed (X, Y)
+    /// (`camera.md` §6 floors), one seed draw and the gated spawns.
+    pub fn floor_pass(&mut self, water: &[(i32, i32)]) {
+        self.floors
+            .begin_frame(self.update_count, self.weather, self.mud);
+        for &(x, y) in water {
+            self.weather.water_floor(self.floors, x, y, self.seed);
+        }
+    }
+}
+
+impl WeatherFrame<'_> {
+    /// Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) have no art path in
+    /// the world view yet (overlay cels, lines, the flash rectangle): a
+    /// frame with live pools or a running lightning fails rather than
+    /// dropping them.
+    pub fn unwired_passes(&self) -> Result<(), ViewError> {
+        let w = &*self.weather;
+        let live = [
+            ("splash", w.splashes().live()),
+            ("bubble", w.bubbles().live()),
+            ("particle", w.particles().live()),
+        ];
+        if let Some((what, n)) = live.iter().find(|(_, n)| *n != 0) {
+            return Err(open(
+                "environment pools",
+                format!("{n} live {what} record(s): passes 4 / 9 are not wired to the view"),
+            ));
+        }
+        if w.lightning_on {
+            return Err(open(
+                "lightning",
+                "lightning is on: pass 9 is not wired to the view".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// What [`resolve_drawn`] gives besides the tiles and unit slots: the
+/// records whose draw sets flag 0x20000 (§6 r6) and the handed (X, Y) of
+/// every drawn water floor, in draw order (`draw-order-2.md` §11.5).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DrawEffects {
+    pub drawn: Vec<(usize, TileArray, usize)>,
+    pub water: Vec<(i32, i32)>,
 }
 
 /// A [`ViewSource`] over a feed with the frame's draw order.
@@ -137,15 +203,33 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
             .ok_or_else(|| open("draw order", "the near rooms vanished mid-frame".into()))?;
         order_frame(camera, mode, near, &positions, clock).map_err(order_error)?
     };
-    let (tiles, units, drawn) = {
+    let (tiles, units, effects) = {
         let feed: &F = feed;
         resolve_drawn(camera, &order, |t| feed.tile_art(t, assets))?
     };
+    // `draw-order-2.md` §11.5: the floor pass's water effects.
+    match feed.weather_frame(world)? {
+        Some(mut w) => {
+            w.floor_pass(&effects.water);
+            w.unwired_passes()?;
+        }
+        None if effects.water.is_empty() => {}
+        None => {
+            return Err(open(
+                "water floor",
+                format!(
+                    "floor at {:?} has material 0x2 and the feed lends no weather state \
+                     (draw-order-2.md §11.5: one player-seed draw per drawn water floor)",
+                    effects.water[0]
+                ),
+            ))
+        }
+    }
     // §6 r6: flag 0x20000 after the draws.
     let near = feed
         .near_rooms(world)?
         .ok_or_else(|| open("draw order", "the near rooms vanished mid-frame".into()))?;
-    mark_drawn(near, &drawn);
+    mark_drawn(near, &effects.drawn);
     let feed: &'a F = feed;
     Ok(Some(OrderedSource {
         source: feed,
@@ -155,8 +239,7 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
 }
 
 /// The map tiles and unit slots of an order. Fails on the items whose
-/// draw no spec states yet: unit shadows (open question 3) and drawn
-/// water floors (open question 11: effects and an RNG draw follow).
+/// draw is not wired yet: unit shadows (`render/blend-modes.md` §5).
 pub fn resolve(
     camera: &Camera,
     order: &FrameOrder,
@@ -165,43 +248,28 @@ pub fn resolve(
     resolve_drawn(camera, order, art).map(|(t, u, _)| (t, u))
 }
 
-/// [`resolve`], plus the records whose draw sets flag 0x20000 (§6 r6,
-/// [`sets_drawn_flag`]), for [`mark_drawn`].
-#[allow(clippy::type_complexity)]
+/// [`resolve`], plus the frame's [`DrawEffects`].
 pub fn resolve_drawn(
     camera: &Camera,
     order: &FrameOrder,
     art: impl Fn(&OrderedTile) -> Result<TileArt, ViewError>,
-) -> Result<
-    (
-        Vec<MapTile>,
-        BTreeMap<UnitKey, UnitSlot>,
-        Vec<(usize, TileArray, usize)>,
-    ),
-    ViewError,
-> {
+) -> Result<(Vec<MapTile>, BTreeMap<UnitKey, UnitSlot>, DrawEffects), ViewError> {
     let mut tiles = Vec::new();
     let mut units = BTreeMap::new();
-    let mut drawn = Vec::new();
+    let mut fx = DrawEffects::default();
     for item in &order.items {
         match item {
             Ordered::Tile(t) => {
                 let list = placement_list(t);
-                if let TileKind::Floor { .. } = t.kind {
-                    let handed = camera.tile_handed(list, t.cell.0, t.cell.1);
-                    if t.dt1.material & 0x2 != 0 && camera.floor_roof_visible(handed) {
-                        return Err(open(
-                            "water floor",
-                            format!(
-                                "open question 11: floor {:?} has material 0x2 (water effects)",
-                                t.cell
-                            ),
-                        ));
-                    }
-                }
                 let a = art(t)?;
                 if sets_drawn_flag(camera, t, &a.blocks) {
-                    drawn.push((t.room, t.array, t.record));
+                    fx.drawn.push((t.room, t.array, t.record));
+                    // A drawn floor (whole-tile test passed) with water.
+                    if let TileKind::Floor { .. } = t.kind {
+                        if t.dt1.material & 0x2 != 0 {
+                            fx.water.push(camera.tile_handed(list, t.cell.0, t.cell.1));
+                        }
+                    }
                 }
                 tiles.push(MapTile {
                     cell: t.cell,
@@ -227,5 +295,5 @@ pub fn resolve_drawn(
             }
         }
     }
-    Ok((tiles, units, drawn))
+    Ok((tiles, units, fx))
 }

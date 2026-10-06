@@ -3,7 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use super::source::{ordered_source, placement_list, resolve, TileArt};
+use super::source::{
+    ordered_source, placement_list, resolve, resolve_drawn, TileArt, WeatherFrame,
+};
+use super::weather::{FloorContext, Weather};
 use super::*;
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
@@ -872,19 +875,25 @@ fn map_tiles_carry_kind_list_and_key() {
 // Covers: specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r3
 #[test]
 fn unresolved_items_fail_the_frame() {
-    // A drawn water floor (open question 11).
+    // A drawn water floor is reported with its handed position
+    // (draw-order-2.md §11.5 runs in the feed's weather state).
     let mut r = room();
     let mut water = record((11, 7), 1, 0);
     water.dt1.material = 0x2;
     r.floors.push(water);
     let mut n = near(vec![r]);
     let o = order_frame(&camera(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
-    assert!(resolve(&camera(), &o, art).is_err());
+    let (_, _, fx) = resolve_drawn(&camera(), &o, art).unwrap();
+    let handed = camera().tile_handed(TileList::Floor, 31, 17);
+    assert_eq!(fx.water, [handed]);
+    assert_eq!(fx.drawn, [(0, TileArray::Floor, 0)]);
     // A culled one is not drawn, so no effect starts.
     n.rooms[0].floors[0].tile = (-500, 0);
     let o = order_frame(&camera(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
-    assert_eq!(resolve(&camera(), &o, art).unwrap().0.len(), 1);
-    // A unit shadow (open question 3).
+    let (tiles, _, fx) = resolve_drawn(&camera(), &o, art).unwrap();
+    assert_eq!(tiles.len(), 1);
+    assert!(fx.water.is_empty() && fx.drawn.is_empty());
+    // A unit shadow (blend-modes.md §5, not wired).
     let o = FrameOrder {
         items: vec![Ordered::UnitShadow {
             key: UnitKey {
@@ -906,6 +915,7 @@ fn unresolved_items_fail_the_frame() {
 struct MapFeed {
     near: NearRooms,
     seed: Seed,
+    weather: Option<(Weather, FloorContext)>,
 }
 
 impl ViewSource for MapFeed {
@@ -959,6 +969,16 @@ impl ViewFeed for MapFeed {
     fn tile_art(&self, t: &OrderedTile, _: &ViewAssets) -> Result<TileArt, ViewError> {
         art(t)
     }
+
+    fn weather_frame(&mut self, _: &ClientWorld) -> Result<Option<WeatherFrame<'_>>, ViewError> {
+        Ok(self.weather.as_mut().map(|(weather, floors)| WeatherFrame {
+            weather,
+            floors,
+            seed: &mut self.seed,
+            update_count: 100,
+            mud: false,
+        }))
+    }
 }
 
 fn palette() -> Palette {
@@ -995,6 +1015,7 @@ fn ordered_source_wraps_the_feed() {
     let mut feed = MapFeed {
         near: near(vec![r]),
         seed: Seed::new(1, 0),
+        weather: None,
     };
     let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
     let assets = ViewAssets::new(palette());
@@ -1282,4 +1303,46 @@ fn automap_reveal_distance_and_records() {
     let mut all = Vec::new();
     reveal_room(0, &n.rooms[0], true, &mut all);
     assert_eq!(all.len(), 4);
+}
+
+// Covers: specs/render/draw-order-2.md §11.5 r1; specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r6
+#[test]
+fn water_floor_draws_the_player_seed_through_the_feed() {
+    let world = ClientWorld::default();
+    let at = UnitPosition::Static { sx: 187, sy: 62 }.client();
+    let (tx, ty) = tile_of(at.x, at.y);
+    let mut r = room();
+    let mut water = record((tx - 20, ty - 10), 1, 0);
+    water.dt1.material = 0x2;
+    r.floors.push(water);
+    let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+    let assets = ViewAssets::new(palette());
+    // No weather state: the frame fails, never skips the draw.
+    let mut feed = MapFeed {
+        near: near(vec![r.clone()]),
+        seed: Seed::new(1, 0),
+        weather: None,
+    };
+    let e = ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
+        .err()
+        .unwrap();
+    assert!(e.to_string().contains("water floor"), "{e}");
+    // Rain off (intensity 0, no mud): one roll_range(0, 1000), no spawn.
+    let mut feed = MapFeed {
+        near: near(vec![r]),
+        seed: Seed::new(1, 0),
+        weather: Some((Weather::new(), FloorContext::default())),
+    };
+    assert!(
+        ordered_source(&world, &cam, OpenMode::NONE, &mut feed, &assets)
+            .unwrap()
+            .is_some()
+    );
+    let mut want = Seed::new(1, 0);
+    want.roll_range(0, 1_000);
+    assert_eq!(feed.seed, want);
+    let (w, _) = feed.weather.as_ref().unwrap();
+    assert_eq!((w.splashes().live(), w.bubbles().live()), (0, 0));
+    // The drawn floor got flag 0x20000 after its draw.
+    assert_eq!(feed.near.rooms[0].floors[0].flags & REC_DRAWN, REC_DRAWN);
 }
