@@ -179,7 +179,6 @@ fn leveldefs_position_levels() {
 
 // ---- lvlprest ------------------------------------------------------------------------
 
-// Covers: specs/drlg/preset.md §2 r2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn lvlprest_def_is_the_row_number() {
@@ -242,7 +241,6 @@ fn lvlprest_measurements() {
 
 // ---- lvlmaze -------------------------------------------------------------------------
 
-// Covers: specs/drlg/maze.md §1 r3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn lvlmaze_rows_as_stated() {
@@ -312,7 +310,6 @@ fn lvlsub_rows_as_stated() {
 /// (server copy, init seed 644409375) built by the real level types from
 /// the live tables. The town is not generated (town id 0): step 8 comes
 /// after the placement and needs the town DS1.
-// Covers: specs/drlg/levels.md §3 r2, §3 r3, §4 r1; specs/drlg/preset.md §3.1 r3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn act1_placement_on_live_tables() {

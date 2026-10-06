@@ -67,7 +67,6 @@ fn tsv(text: &str) -> Vec<Vec<&str>> {
 
 /// `waypoints.md` Constants: `waypoints.tsv` is the expected result of
 /// deriving §1 and §7 rule 4 from the live tables.
-// Covers: specs/world/waypoints.md §1 r1, §1 r2, §1 r4, §7 r4
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn waypoint_map_matches_tsv() {
@@ -130,7 +129,6 @@ fn waypoint_map_matches_tsv() {
     }
 }
 
-// Covers: specs/world/waypoints.md §5 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn waypoint_objects() {
@@ -371,7 +369,6 @@ fn cubemain_vector_records() {
 
 // ---- npc -----------------------------------------------------------------------------
 
-// Covers: specs/world/npc.md §1.1 r4, §1.1 r5
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn npc_records_from_live_monstats() {
@@ -592,7 +589,6 @@ fn recorded_stores_fit_live_columns() {
 
 /// `vendors.md` §9.3 (live `npc.txt`) and the `difficultylevels` gamble
 /// odds of Constants.
-// Covers: specs/world/vendors.md §9.3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn npc_txt_multipliers() {

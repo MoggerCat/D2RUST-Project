@@ -11,9 +11,18 @@ DT1 file providers are the `drlg-data` session's (`d2-server`), so nothing
 here reads a DS1.
 
 None of these tests has run: there are no game files in the cloud. They
-compile, pass clippy and are ignored in CI. Their claims count as verified
-only after the local run below passes (`docs/COVERAGE.md` §3); a test that
-fails is fixed or loses its claim in the same session.
+compile, pass clippy and are ignored in CI. **Every expected value is
+unconfirmed** (blind-written, `HANDOFF.md` §8 lesson of 2026-10-06): the
+values come from the specs, not from an observation of the live files, so
+the tests carry **no `// Covers:` claim yet**. The "Claim" columns below
+are the claims to add after the first local run passes (§3); a test that
+fails is corrected from the observation (or the spec fact turned into an
+open question) before any claim is added.
+
+The merged base (`claude/tender-meitner-mphas3` at `5edceb8`, group C
+results) confirms one value used here: `monstats` 734 records in the
+patched set (HANDOFF §5 Done). Nothing else in group C covers these
+tables.
 
 ## 1. Files
 
@@ -32,13 +41,13 @@ its own copy of the 10-line loader (no shared test module). `d2-sim`'s
 
 Every expected value comes from a spec (stated 1.14d fact or measurement,
 recorded vector, or a derived vector the spec lists); none was invented.
-Claims follow `coverage-claims.md` §1: only where the assertions check a
-rule's whole outcome. Tests of data facts in Constants / Test vectors
+Intended claims follow `coverage-claims.md` §1: only where the assertions
+check a rule's whole outcome. Tests of data facts in Constants / Test vectors
 sections, or of a TSV against the tables, carry no claim.
 
 ### `game_world.rs`
 
-| Test | Checks | Source | Claim |
+| Test | Checks | Source | Claim (after the run) |
 |---|---|---|---|
 | `waypoint_map_matches_tsv` | `WaypointMap::new(levels).rows()` = `waypoints.tsv`; 39 indexes each on one level; act ranges; index 10 = 48, 11 = 42; none for a missing record / index 255; towns 1, 40, 75, 103, 109 → 0, 9, 18, 27, 30; code-13 waypoint levels {1, 40, 46, 74, 75, 103, 109}; 133–136 no index | waypoints §1, §7 r4, Constants | §1 r1, §1 r2, §1 r4, §7 r4 |
 | `waypoint_objects` | OperateFn 23 + InitFn 17 classes = the 16 listed; Mode0–2 = 1; FrameCnt1 15 / 20; FrameDelta1 200; Sync | waypoints §5 r1 | §5 r1 |
@@ -53,7 +62,7 @@ sections, or of a TSV against the tables, carry no claim.
 
 ### `game_drlg_tables.rs`
 
-| Test | Checks | Source | Claim |
+| Test | Checks | Source | Claim (after the run) |
 |---|---|---|---|
 | `every_level_drlg_type_dispatches` | level 0 DrlgType 0; every other level 1, 2 or 3; DrlgType 1 has an lvlmaze row; DrlgType 2 claimed by exactly one lvlprest row and the set equals the 35 levels; every warp slot ≠ −1 has an lvlwarp row (`'b'`) | levels §4 r3–r4, §7 r4; maze §1 r1; preset §3.1 r1, Constants | none (invariants from fatal paths) |
 | `leveldefs_position_levels` | `Position` ≠ 0 exactly on the 18 levels listed | levels §10 r2 | none (partial) |
@@ -98,7 +107,8 @@ class):
   item level filter (`level` ≤ 6) and the column first.
 
 Record the result in `HANDOFF.md` §5 Done and §1 (Phase 3 world / DRLG
-rows); drop any claim whose test fails until fixed.
+rows). Then add the `// Covers:` lines of §2 (above the `#[test]` of each
+passing test, same spec IDs) and rerun `py tools/coverage.py --check`.
 
 ## 4. Not done (and why)
 
