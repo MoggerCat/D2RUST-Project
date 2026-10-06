@@ -194,6 +194,24 @@ mod tests {
         );
     }
 
+    // Covers: specs/formats/cof.md §rules text
+    #[test]
+    fn integers_are_little_endian() {
+        let mut data = file(1, 1, 1, &[0], &[0], &[0]);
+        // Header i32 / u32 fields whose big-endian reading differs.
+        data[8..12].copy_from_slice(&[0xFE, 0xFF, 0xFF, 0xFF]);
+        data[12..16].copy_from_slice(&[0x04, 0x03, 0x02, 0x01]);
+        data[16..20].copy_from_slice(&[0x00, 0x00, 0x00, 0x80]);
+        data[20..24].copy_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+        data[24..28].copy_from_slice(&[0x00, 0x01, 0x00, 0x00]);
+        let cof = Cof::parse(&data).unwrap();
+        assert_eq!(cof.x_min, -2);
+        assert_eq!(cof.x_max, 0x0102_0304);
+        assert_eq!(cof.y_min, i32::MIN);
+        assert_eq!(cof.y_max, 1);
+        assert_eq!(cof.animation_rate, 256);
+    }
+
     #[test]
     fn regress_component_at_overflow() {
         // `(d * frames + f) * layers + slot` overflowed for a huge

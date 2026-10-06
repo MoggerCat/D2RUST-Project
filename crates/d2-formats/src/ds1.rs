@@ -442,6 +442,17 @@ mod tests {
         );
     }
 
+    /// The live-data half of the edge-cases section is the game test
+    /// `ds1_layer_limits_and_truncated_trees_groups`, which claims it.
+    #[test]
+    fn four_walls_two_floors_one_shadow() {
+        let ds1 = Ds1::parse(&build(18, 0, 4, 2, 1)).unwrap();
+        assert_eq!((ds1.walls.len(), ds1.orientations.len()), (4, 4));
+        assert_eq!(ds1.floors[1], [900, 901, 902, 903]);
+        assert_eq!(ds1.shadow, [1000, 1001, 1002, 1003]);
+        assert!(Ds1::parse(&build(18, 0, 4, 3, 1)).is_err());
+    }
+
     // Covers: specs/formats/ds1.md §rules r7, §rules r8
     #[test]
     fn version_3_layer_order() {
