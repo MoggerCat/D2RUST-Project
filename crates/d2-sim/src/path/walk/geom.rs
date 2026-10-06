@@ -2,8 +2,10 @@
 //! Pure geometry helpers. Integer arithmetic only; the 1.14d code is
 //! integer here (the x87 use of the target lead is a seam, open question 4).
 
-use super::seams::{Point, WalkPath};
-use super::tables::PathTables;
+use crate::path::collision::{pattern_collides, CollisionRooms};
+use crate::path::coords::Point;
+use crate::path::record::DynamicPath;
+use crate::path::tables::PathTables;
 use crate::units::{RoomId, UnitType};
 
 /// No direction (255) in `altdir`.
@@ -38,7 +40,7 @@ pub fn octant(p: Point, q: Point) -> usize {
 
 /// Step of a direction (`dir8_toward`, §5.1 rule 2).
 pub fn step(t: &PathTables, d: u8) -> Point {
-    let (x, y) = t.dir8_toward[(d & 7) as usize];
+    let [x, y] = t.dir8_toward[(d & 7) as usize];
     Point::new(x, y)
 }
 
@@ -87,12 +89,12 @@ pub fn unit_distance(t: &PathTables, a: Point, size_a: i32, b: Point, size_b: i3
 /// pattern and move mask.
 pub trait Probe {
     /// Pattern query (`0x0064D910`) from `room`.
-    fn collides(&self, room: Option<RoomId>, p: Point, pattern: u8, mask: u16) -> bool;
+    fn collides(&self, room: Option<RoomId>, p: Point, pattern: u32, mask: u16) -> bool;
 }
 
-impl<W: super::seams::PathWorld + ?Sized> Probe for W {
-    fn collides(&self, room: Option<RoomId>, p: Point, pattern: u8, mask: u16) -> bool {
-        self.pattern_collides(room, p.x, p.y, pattern, mask)
+impl<W: CollisionRooms + ?Sized> Probe for W {
+    fn collides(&self, room: Option<RoomId>, p: Point, pattern: u32, mask: u16) -> bool {
+        pattern_collides(self, room, p.x, p.y, pattern, mask)
     }
 }
 
@@ -108,7 +110,7 @@ pub enum Ray {
 pub fn ray_test<P: Probe + ?Sized>(
     w: &P,
     room: Option<RoomId>,
-    pattern: u8,
+    pattern: u32,
     mask: u16,
     s: Point,
     e: Point,
@@ -180,11 +182,6 @@ pub fn ray_test<P: Probe + ?Sized>(
     }
 }
 
-/// Precise cell centre of a sub-tile (`PATH_ToFP16Center`).
-pub fn centre(c: i32) -> u32 {
-    ((c as u32) << 16) | 0x8000
-}
-
 /// Direction vector (`0x0064FC60`, §8.3) from precise (sx, sy) to (tx,
 /// ty): (vector, direction 0..63, before the 0x200 flip).
 pub fn direction_vector(t: &PathTables, s: (u32, u32), e: (u32, u32)) -> ((i32, i32), u8) {
@@ -197,16 +194,16 @@ pub fn direction_vector(t: &PathTables, s: (u32, u32), e: (u32, u32)) -> ((i32, 
         } else {
             127i32.wrapping_mul(lx) / ly
         };
-        let row = t.tan[i as usize];
-        vx = row.x;
-        vy = row.y;
-        a = row.angle;
+        let [x, y, angle] = t.tan[i as usize];
+        vx = x;
+        vy = y;
+        a = angle;
     } else {
         let i = 127i32.wrapping_mul(ly) / lx;
-        let row = t.tan[i as usize];
-        vx = row.y;
-        vy = row.x;
-        a = (-1 - row.angle) & 15;
+        let [x, y, angle] = t.tan[i as usize];
+        vx = y;
+        vy = x;
+        a = (-1 - angle) & 15;
     }
     if e.1 < s.1 {
         vy = -vy;
@@ -222,7 +219,7 @@ pub fn direction_vector(t: &PathTables, s: (u32, u32), e: (u32, u32)) -> ((i32, 
 }
 
 /// Facing (`0x006485F0(path, d)`, §8.5).
-pub fn set_facing(t: &PathTables, path: &mut WalkPath, ty: UnitType, d: i32) {
+pub fn set_facing(t: &PathTables, path: &mut DynamicPath, ty: UnitType, d: i32) {
     let d = (d & 63) as u8;
     match ty {
         UnitType::Object | UnitType::Item => path.direction = d,
@@ -232,7 +229,7 @@ pub fn set_facing(t: &PathTables, path: &mut WalkPath, ty: UnitType, d: i32) {
             if d != path.new_direction {
                 path.new_direction = d;
                 path.turn_step =
-                    t.dirdiff[((d as i32 - path.direction as i32) & 63) as usize] as i8;
+                    t.dirdiff[((d as i32 - path.direction as i32) & 63) as usize] as u8;
             }
         }
     }
