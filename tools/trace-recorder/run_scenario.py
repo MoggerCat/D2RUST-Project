@@ -419,6 +419,8 @@ class ScenarioRecorder(rp.PacketRecorder):
         self.recording = False
         self.failed = None
         self.probe, self.probe_frame = probe, probe_frame
+        if probe == "start":
+            self.recording = True      # §5.2: 0x67 is drained before game creation (the first seed override)
         self.probe_out = []
         self.seeds_done = set()
         self.max_events = 0
@@ -933,7 +935,9 @@ def probe_inject(a):
         c = [r for r in recs if r["type"] == "c2s" and r.get("bytes") == walk.hex()]
         print(f"RESULT inject at {n}: c2s={len(c)} dispatch(frame {n - 1})={len(d)} "
               f"result codes={[r.get('code') for r in res[-1:]]}: "
-              f"{'ANSWERS Q1 yes' if c and d and res and res[-1].get('code') == 0 else 'DOES NOT MATCH'}")
+              f"{'ANSWERS Q1 yes' if c and d and res and res[-1].get('code') in (0, 1, 2, 3) else 'DOES NOT MATCH'} "
+              f"(any code 0-3, intents-events.md §2.3: the fixed target point may be out of range, "
+              f"1 = refused)")
     return probe_run(a, "inject", sc, summarize)
 
 
@@ -949,7 +953,11 @@ def probe_seed(a):
         for r in rng[:6]:
             print({k: v for k, v in r.items() if k not in ("seq", "ms")})
         n = sum(1 for r in rng if r["type"] == "seed_override")
-        h = hashlib.sha256("".join(ScenarioWriter.line(r) for r in rng).encode()).hexdigest()
+        # §2.1: what the runs may differ in is the clock value the override replaces
+        # (`old`) and heap addresses (`seed` pointers); every drawn value must be equal
+        keep = [{k: v for k, v in r.items() if k not in ("seq", "ms", "seed", "old")
+                 or (k == "old" and r["type"] != "seed_override")} for r in rng]
+        h = hashlib.sha256("".join(ScenarioWriter.line(r) for r in keep).encode()).hexdigest()
         hashes.append((n, h))
         print(f"run {len(hashes)}: {n} seed_override records (want 2), {len(rng)} rng records, "
               f"sha256 {h[:16]}")
