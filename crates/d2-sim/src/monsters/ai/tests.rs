@@ -1559,6 +1559,7 @@ fn implemented_matches_catalogue() {
 mod act2;
 mod act3;
 mod act4;
+mod act5;
 mod bodies;
 mod npc;
 mod rules;

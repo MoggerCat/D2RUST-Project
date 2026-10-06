@@ -370,6 +370,23 @@ fn diablo_choice_vectors() {
     w.think_with(None, 0, false);
     assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
     assert_eq!(param_of(&w, 0), 0);
+    // The boundaries: r = 109 is still k = 3, r = 110 is k = 5 (`Skill1`
+    // 40 + 70 = 110; with no `Skill3`, idle 2).
+    for (r, want) in [
+        (109, unit_mode(mode::ATTACK2, w.player)),
+        (110, String::new()),
+    ] {
+        let lo = seed_raw(1, |v| v[0] % 229 == r);
+        let mut w2 = diablo_world();
+        w2.seed(lo);
+        w2.fake.melee.insert(w2.player);
+        w2.think_with(None, 0, false);
+        let got = w2.fake.modes().first().cloned().unwrap_or_default();
+        assert_eq!(got, want, "r {r}");
+        if r == 110 {
+            assert_eq!(w2.thinks(), [2]);
+        }
+    }
     // The home command was made at the own position.
     let c = &w.store.control(w.mon).unwrap().commands;
     assert_eq!(c[0].params, [10, 100, 100, 0, 0]);
