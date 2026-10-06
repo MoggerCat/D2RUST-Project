@@ -4935,6 +4935,7 @@ dependencies = [
  "d2-proto",
  "d2-server",
  "d2-sim",
+ "serde_json",
  "test-fixtures",
  "thiserror 2.0.21",
 ]
