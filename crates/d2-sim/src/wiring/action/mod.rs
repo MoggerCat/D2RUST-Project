@@ -60,7 +60,7 @@ use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
 pub use monsters::MonsterWorld;
-pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView};
+pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall};
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).

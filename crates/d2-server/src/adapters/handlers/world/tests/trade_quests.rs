@@ -23,7 +23,9 @@ use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::action::{
+    ActionHooks, ActionSim, ActionTables, DrlgWorld, ObjectRoute, Pending,
+};
 use d2_sim::wiring::economy::{EconomyQuests, QuestRest};
 use d2_sim::wiring::interaction::{HirelingRest, NpcRest, PlayerQuestsRef, VendorRest};
 use d2_sim::world::npc::{class, HireRow, ImbueMods, InvEntry, ItemFacts, NpcControl};
@@ -51,15 +53,25 @@ const NAME_LAST: u16 = 104;
 
 // ---- seams without a provider -----------------------------------------------------------
 
-/// The action wiring's seams: `Pending`'s defaults; sends kept.
+/// The action wiring's seams: `Pending`'s defaults; sends kept; the
+/// object interact range staged (`in_range`) and the object routes
+/// handed back kept (`quest_objects` tests).
 #[derive(Default)]
 pub struct ActionRest {
     pub sent: Vec<(UnitId, Vec<u8>)>,
+    pub in_range: bool,
+    pub routes: Vec<ObjectRoute>,
 }
 
 impl Pending for ActionRest {
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
+    }
+    fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
+        self.in_range
+    }
+    fn object_route(&mut self, _: &mut Game, route: ObjectRoute) {
+        self.routes.push(route);
     }
 }
 
