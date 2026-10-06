@@ -74,12 +74,12 @@ srvdo	4	0x0056CC20	SrvDo004_Unsummon	mapped	Unsummon	no function at this entry i
 srvdo	5	0x0056F550	SrvDo005_LeftHandThrow	mapped	Left Hand Throw	
 srvdo	6	0x005DB1C0	SrvDo006_InnerSight_SlowMissiles	mapped	Inner Sight,Slow Missiles	
 srvdo	7	0x005DB2D0	SrvDo007_Jab	mapped	Jab	
-srvdo	8	0x005DB410	SrvDo008_MultipleShot_Teeth_ShockWave	mapped	Multiple Shot,Teeth,PrimePoisonball,Shock Wave	
+srvdo	8	0x005DB410	SrvDo008_MultipleShot_Teeth_ShockWave	spec'd-here	Multiple Shot,Teeth,PrimePoisonball,Shock Wave	body: bodies.md §8.6
 srvdo	9	0x005D8E00	SrvDo009_Frenzy	mapped	Frenzy	
 srvdo	10	0x005DB6D0	SrvDo010_GuidedArrow_BoneSpirit	mapped	Guided Arrow,Bone Spirit,MonBoneSpirit	
 srvdo	11	0x005DB850	SrvDo011_ChargedStrike	mapped	Charged Strike	
 srvdo	12	0x005DBA40	SrvDo012_Strafe	mapped	Strafe	
-srvdo	13	0x005DBC60	SrvDo013_Fend_Zeal_Fury	mapped	Fend,Zeal,Fury	
+srvdo	13	0x005DBC60	SrvDo013_Fend_Zeal_Fury	spec'd-here	Fend,Zeal,Fury	body: bodies.md §8.11
 srvdo	14	0x005DBE50	SrvDo014_LightningStrike	mapped	Lightning Strike	
 srvdo	15	0x005DC000	SrvDo015_Dopplezon	mapped	Dopplezon	
 srvdo	16	0x005DC1E0	SrvDo016_Valkyrie	mapped	Valkyrie	
@@ -94,14 +94,14 @@ srvdo	24	0x005C9EA0	SrvDo024_FireWall	mapped	Fire Wall,VampireFirewall,PrimeFire
 srvdo	25	0x005CA030	SrvDo025_Enchant	mapped	Enchant	
 srvdo	26	0x005CA1B0	SrvDo026_ChainLightning	mapped	Chain Lightning	
 srvdo	27	0x005CA360	SrvDo027_Teleport	mapped	Teleport	
-srvdo	28	0x005CA3E0	SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult	mapped	12 skills (e.g. Meteor,Blizzard,VampireMeteor,MonBlizzard)	
+srvdo	28	0x005CA3E0	SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult	spec'd-here	12 skills (e.g. Meteor,Blizzard,VampireMeteor,MonBlizzard)	body: bodies.md §8.12
 srvdo	29	0x005CA4D0	SrvDo029_ThunderStorm	mapped	Thunder Storm	
 srvdo	30	0x005C37C0	SrvDo030_Curse	spec'd-here	10 skills (e.g. Amplify Damage,Dim Vision,Weaken,Iron Maiden)	body: bodies.md §4.4
 srvdo	31	0x005C4B00	SrvDo031_RaiseSkeleton_Mage	mapped	Raise Skeleton,Raise Skeletal Mage	
 srvdo	32	0x005C4CD0	SrvDo032_PoisonDagger	mapped	Poison Dagger	no function at this entry in the Ghidra export (data-only xref)
 srvdo	33	0x005D3140	SrvDo033_PsychicHammer	mapped	Psychic Hammer	
-srvdo	34	0x005D3490	SrvDo034_TigerStrike_CobraStrike_RoyalStrike	mapped	Tiger Strike,Cobra Strike,Royal Strike	
-srvdo	35	0x005D35D0	SrvDo035_FistsOfFire_ClawsOfThunder_BladesOfIce	mapped	Fists of Fire,Claws of Thunder,Blades of Ice	
+srvdo	34	0x005D3490	SrvDo034_TigerStrike_CobraStrike_RoyalStrike	spec'd-here	Tiger Strike,Cobra Strike,Royal Strike	body: bodies.md §8.8
+srvdo	35	0x005D35D0	SrvDo035_FistsOfFire_ClawsOfThunder_BladesOfIce	spec'd-here	Fists of Fire,Claws of Thunder,Blades of Ice	body: bodies.md §8.10
 srvdo	36	0x005D4DB0	SrvDo036_ClawsOfThunder_ProgressiveFn2	mapped	(none)	ItemEffect: Frost Nova,Nova srvprgfunc2: Claws of Thunder
 srvdo	37	0x005D4E70	SrvDo037_ClawsOfThunder_ProgressiveFn3	mapped	(none)	srvprgfunc3: Claws of Thunder
 srvdo	38	0x005D3E80	SrvDo038_FistsOfFire_BladesOfIce_ProgressiveFn2	mapped	(none)	srvprgfunc2: Fists of Fire,Blades of Ice
@@ -122,7 +122,7 @@ srvdo	52	0x005D7850	SrvDo052_DragonFlight	mapped	Dragon Flight
 srvdo	53	0x005D7B60	SrvDo053_Unused	unreferenced	(none)	no 1.14d data row references it
 srvdo	54	0x005D7E10	SrvDo054_BladeShield	mapped	Blade Shield	
 srvdo	55	0x005C4DF0	SrvDo055_CorpseExplosion	mapped	Corpse Explosion,mon death sentry,NihlathakCorpseExplosion	
-srvdo	56	0x005C5100	SrvDo056_Golem	mapped	Clay Golem,BloodGolem,FireGolem	
+srvdo	56	0x005C5100	SrvDo056_Golem	spec'd-here	Clay Golem,BloodGolem,FireGolem	body: bodies.md §8.9
 srvdo	57	0x005C5250	SrvDo057_IronGolem	mapped	IronGolem	
 srvdo	58	0x005C56C0	SrvDo058_Revive	mapped	Revive	
 srvdo	59	0x005C3B90	SrvDo059_Attract	mapped	Attract	
@@ -132,7 +132,7 @@ srvdo	62	0x005C5D00	SrvDo062_BonePrison	mapped	Bone Prison
 srvdo	63	0x005C5E60	SrvDo063_PoisonExplosion	mapped	Poison Explosion	
 srvdo	64	0x005CE8E0	SrvDo064_Sacrifice	mapped	Sacrifice	
 srvdo	65	0x005CF010	SrvDo065_BasicAura	spec'd-here	17 skills (e.g. Might,Prayer,Resist Fire,Thorns)	aura tick: statlist on self/targets, mana via 0x0056C110; body: bodies.md §4.5
-srvdo	66	0x005CF3A0	SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction	mapped	Holy Fire,Holy Shock,Sanctuary,Conviction	
+srvdo	66	0x005CF3A0	SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction	spec'd-here	Holy Fire,Holy Shock,Sanctuary,Conviction	body: bodies.md §8.5
 srvdo	67	0x005CF900	SrvDo067_Charge	mapped	Charge,SerpentCharge	hard-coded in 0x0057EEC0: re-requesting the same skill is always allowed
 srvdo	68	0x005D83E0	SrvDo068_BasicShout	spec'd-here	Shout,Battle Cry,Battle Orders,War Cry,Battle Command	body: bodies.md §8.2
 srvdo	69	0x005D81C0	SrvDo069_FindPotion	mapped	Find Potion	
@@ -181,7 +181,7 @@ srvdo	111	0x005CE670	SrvDo111_FetishAura	mapped	FetishAura
 srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	mapped	MonCurseCast	
 srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	mapped	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	
 srvdo	114	0x005C6910	SrvDo114_Raven	mapped	Raven	
-srvdo	115	0x005C6A80	SrvDo115_Vines	mapped	Plague Poppy,Cycle of Life,Vines	
+srvdo	115	0x005C6A80	SrvDo115_Vines	spec'd-here	Plague Poppy,Cycle of Life,Vines	body: bodies.md §8.7
 srvdo	116	0x005C6EC0	SrvDo116_Wearwolf_Wearbear	mapped	Wearwolf,Wearbear,Delerium Change	hard-coded in mana check 0x00647540/0x0056C160: free while shapeshifted
 srvdo	117	0x005C7160	SrvDo117_Firestorm	mapped	Firestorm	
 srvdo	118	0x005C72F0	SrvDo118_Twister_Tornado	mapped	Twister,Tornado	

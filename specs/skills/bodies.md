@@ -4,8 +4,9 @@
   `Game.exe` disassembly (addresses per rule; `py tools/ghidra/disasm.py`,
   the Ghidra export lacks several entries, `use.md` Open question 1);
   D2MOO 1.10f `Skills.cpp`, `SkillPal.cpp`, `SkillSor.cpp`,
-  `SkillNec.cpp`, `SkillAss.cpp` compared, differences noted. No
-  recording covers these bodies yet (Open questions 1–3).
+  `SkillNec.cpp`, `SkillAss.cpp`, `SkillBar.cpp`, `SkillDruid.cpp`,
+  `SkillAma.cpp` compared, differences noted. No
+  recording covers these bodies yet (Open questions 1–3, 9).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::skills::use_::bodies` (start / do bodies,
   `functions.tsv` status `spec'd-here`); helpers beside them
@@ -25,24 +26,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–60 |
-| Inputs | 61–71 |
-| Outputs / state changes | 72–79 |
-| Rules | 80–81 |
-|   1. Conventions | 82–113 |
-|   2. Shared helpers | 114–427 |
-|   3. Start functions (srvst) | 428–517 |
-|   4. Do functions (srvdo) | 518–701 |
-|   5. `srvmissile` path | 702–717 |
-|   6. Shared helpers, batch 2 | 718–894 |
-|   7. Start functions (srvst), batch 2 | 895–901 |
-|   8. Do functions (srvdo), batch 2 | 902–957 |
-| Constants & data dependencies | 958–1002 |
-| Randomness | 1003–1012 |
-| Edge cases & original bugs | 1013–1033 |
-| Test vectors | 1034–1048 |
-| Provenance | 1049–1062 |
-| Open questions | 1063–1089 |
+| Summary | 49–61 |
+| Inputs | 62–72 |
+| Outputs / state changes | 73–80 |
+| Rules | 81–82 |
+|   1. Conventions | 83–114 |
+|   2. Shared helpers | 115–428 |
+|   3. Start functions (srvst) | 429–518 |
+|   4. Do functions (srvdo) | 519–702 |
+|   5. `srvmissile` path | 703–718 |
+|   6. Shared helpers, batch 2 | 719–947 |
+|   7. Start functions (srvst), batch 2 | 948–954 |
+|   8. Do functions (srvdo), batch 2 | 955–1183 |
+| Constants & data dependencies | 1184–1228 |
+| Randomness | 1229–1247 |
+| Edge cases & original bugs | 1248–1284 |
+| Test vectors | 1285–1305 |
+| Provenance | 1306–1329 |
+| Open questions | 1330–1356 |
 <!-- /index -->
 
 ## Summary
@@ -892,6 +893,58 @@ A recast refreshes the expiry of an existing list (unlike §4.2 step 3).
    change of m to `mode` (`0x005A7E60(m, mode, &req)` then
    `0x005A7C20(game, &req, 1)`, `monsters/ai.md`). Return m.
 
+#### 6.10 Charge add `0x005D3320`
+
+`charge_add(game, unit, skill, L, s, c)` (unit in EBX; stack game,
+skill, L, s, c; `ret 0x14`): s = the charge state (`aurastate`), c = the
+counter stat (`aurastat1`).
+
+1. R invalid → 0.
+2. e = F + `eval(auralencalc)`.
+3. The unit's list of s exists → keep it. Else alloc (game pool, flags 2,
+   expire e, owner the unit; failure → 0), set state s, remove callback
+   `0x005D3310` (state s off, nothing else), attach, list set 350 :=
+   skill, 351 := L.
+4. Expiry := e (`0x006260B0`); timer 12 at e on the unit.
+5. n = list[c]; n' = min(n + 1, 3). n' = n → return 1 (already 3).
+6. List set c := n'. `aurastat2` (+0x56) valid → list **add** (`0x00627030`)
+   `aurastat2` += `eval(aurastatcalc2)`. State s on; mark s changed.
+   Return 1.
+
+Every charging hit refreshes the expiry; the counter stops at 3.
+
+#### 6.11 Golem stats `0x005C50C0`, summon resistance `0x005C40D0`
+
+`golem_stats(game, owner, m, skill, L)`: `base_stats(game, owner, m, 0,
+L)` (§6.4); `skill_stats(game, owner, m, skill, L, 0)` (§6.5);
+`summon_resist(owner, m)`.
+
+`summon_resist(owner, m)` (ECX owner, EDX m; D2MOO
+`D2GAME_SetSummonResistance_6FD0C2E0`): r = owner
+`passive_summon_resist(349)` (unit getter); 0 → nothing. Alloc a list
+(m's pool unit +0x08, flags 0, expire 0, m type / GUID; failure →
+nothing), attach to m. m `item_absorbfire_percent(142)` ≤ 0 → list set
+39 := r; `item_absorblight_percent(144)` ≤ 0 → 41 := r;
+`item_absorbcold_percent(148)` ≤ 0 → 43 := r; always 45 := r.
+
+#### 6.12 Free target point `0x0056E450`
+
+`point_free(game, unit, m)` (ECX game, EDX unit; `ret 4`): missile record
+of m (none → fatal assertion). The unit's room none → 0. Target position
+(§2.4); x or y = 0 → 0. Return 1 when the collision query
+`0x0064D800(room, x, y, Size, Size, mask 5)` is 0 (`Size` missiles
++0x18A, u8; a Size ≤ 1 is a point query, else a Size × Size box,
+`sim/path-placement.md` §4 rules 3–4), else 0.
+
+#### 6.13 Missile at the target point `0x0056EDE0`
+
+`missile_at(game, unit, skill, L, m, tx, ty)` (ECX game, EDX unit; `ret
+0x14`): unit none → none. tx = 0 and ty = 0 → target position (§2.4);
+still both 0 → none. Distance `0x006417F0(unit, tx, ty)` (max(|dx|,
+|dy|) + min(|dx|, |dy|) / 2, `sim/pathing.md`) > 100 (unsigned) → none.
+Record (§R2.1, zeroed): flags 1 (position given), owner the unit, (x, y)
+= (tx, ty), class m, skill, L; no target. Return the creation's result.
+
 ### 7. Start functions (srvst), batch 2
 
 #### 7.1 23 Tiger Strike, Fists of Fire, Cobra Strike, Claws of Thunder, Blades of Ice, Royal Strike `0x005D32F0`
@@ -955,6 +1008,179 @@ skills, `functions.tsv`).
    creator still applies its 75 % factor, `missiles.md` §R2.3 step 7).
    Return 1.
 
+#### 8.5 66 Holy Fire, Holy Shock, Sanctuary, Conviction `0x005CF3A0`
+
+Run by the aura timer like §4.5 (`use.md` §7).
+
+1. R invalid, or `aurastate` not in 0…states count − 1 → 0.
+2. cost = `0x00644B10(skill, L)`; mana = the unit's `mana(8)`; d =
+   `period(…)` − F + 1 (`0x0056CD50`).
+3. Self context (0x50 bytes, zeroed; layout of §4.5 step 3): state =
+   `aurastate`, skill, L, duration d; for i = 1…5: stat i =
+   `passivestat_i`; value i = `eval(passivecalc_i)` when the unit is not
+   a player or mana ≥ cost, else 0. Run the §4.5 callback `0x005CEDC0`
+   on the unit itself (`0x0056B740`; remove callback `0x005CEC50`).
+4. The unit's room is in town (`0x0061AB00`) → return 1 (no scan, no
+   mana, state 85 unchanged).
+5. Target context B (on the stack; D2MOO `D2DamageAuraParamStrc`):
+   state = `auratargetstate`, skill, L, d, stats[6] (+0x10), values[6]
+   (+0x28), count (+0x40) = 0, any (+0x48) = 0, record (+0x4C) = none.
+   `auratargetstate` in 0…count − 1: for i = 1…6: stat i =
+   `aurastat_i`; mana ≥ cost (no player test) → value i =
+   `eval(aurastatcalc_i)`, non-zero → any = 1; else value i = 0.
+6. Zeroed damage record D; `roll_elemental(unit, D, skill, L)`
+   (`levels.md`) ≠ 0 → hit class (+0x60) |= 0xD; `HitClass` ≠ 0 → hit
+   class := it; result (+0x04) |= `ResultFlags` | 0x20; hit flags
+   (+0x00) |= `HitFlags`; B.record := D.
+7. `scan_unit(game, unit, 0, 0, eval(aurarangecalc), aurafilter,
+   0x005CF2A0, B, noaura = 0)` (§2.12).
+8. cost > 0 and a player: B.count > 0 → state 85 on and
+   `0x0056C110(unit, cost)`; else state 85 off. Return 1.
+
+Callback `0x005CF2A0` (ECX scan context, EDX unit U):
+
+1. B.any ≠ 0: a fresh 0x50 context with B's state, skill, L, d, stats and
+   values (count, list, passivestate, callback 0); run `0x005CEDC0` on U
+   with it (§4.5; U is never the source here, so the default remove
+   callback).
+2. B.record set: copy it (0x70 bytes); `apply(game, unit, U, 1, copy)`
+   (`0x0057C6C0`, `combat/damage.md` §5.2); reaction `0x0057CEE0(game,
+   unit, U, copy)` (§7.1).
+3. Return 1.
+
+Nothing increases B.count (the inner context counts instead): a player
+with cost > 0 always ends with state 85 off and pays nothing per run
+(Edge case 9). The element is rolled once per run, shared by all
+targets.
+
+#### 8.6 8 Multiple Shot, Teeth, Shock Wave `0x005DB410`
+
+Also PrimePoisonball (monster).
+
+1. Unit flags |= 0x40.
+2. R invalid → 0.
+3. Target position (§2.4) → (tx, ty); failure → **return 1** (nothing
+   made).
+4. n = `eval(calc1)`.
+5. (dx, dy) = (tx, ty) − unit position. Grow (`0x0056D370`): s = dx² +
+   dy²; s < 4 → dx ×= 4, dy ×= 4, s recomputed; s < 16 → dx ×= 2, dy ×=
+   2. Side step (`0x0056D3B0`): a = −dx, b = dy; while a² + b² > 3: a =
+   a / 2, b = b / 2 (signed, truncating); (px, py) = (b, a).
+6. tx −= px·n / 2, ty −= py·n / 2 (signed, truncating).
+7. m = `srvmissilea` (+0x48); the unit's hand class (`0x00623C60`) ≠ 1
+   (not a bow) and `srvmissileb` (+0x4A) ≥ 0 → m = `srvmissileb`. Not 0
+   ≤ m < missiles count → 0.
+8. c = `eval(calc3)`; c = 0 → c = n.
+9. Record (§R2.1, zeroed): flags 0x820 (target absolute, activate
+   given), owner = origin = the unit, class m, skill, L, activate frames
+   = `eval(calc2)`; flags |= 0x10000.
+10. k = (n − c) / 2 (truncating). Repeat k times: target (tx, ty),
+    create (`0x0059FA30`); tx += px, ty += py.
+11. Flags &= ~0x10000; repeat c times (create, step).
+12. Flags |= 0x10000; repeat n − k − c times (create, step). Return 1.
+
+The c middle missiles lack flag 0x10000 (`missiles.md` §R2.1).
+
+#### 8.7 115 Plague Poppy, Cycle of Life, Vines `0x005C6A80`
+
+1. R invalid → 0.
+2. c = `summon_class(unit, skill, L, &mode)`; < 0 → 0 (mode unused).
+3. pt = `pettype` (signed byte); < 0 or ≥ pettype count → 0.
+4. Unit flags |= 0x40.
+5. m = spawn (§6.2) {flags 0, owner unit, class c, AI state 0, **mode
+   8**, x = y = 0, pt, pet max `eval(petmax)`}; none → 0.
+6. `node_insert(game, m, 0, unit +0xD0)`.
+7. m state 150 (`vine_beast`) on.
+8. m `level(12)` := max(`eval(calc2)`, 1) (`0x00627260`; no monlvl
+   bonuses, §6.4 is not called).
+9. `skill_stats(game, unit, m, skill, L, 0)` (§6.5). Return 1.
+
+#### 8.8 34 Tiger Strike, Cobra Strike, Royal Strike `0x005D3490`
+
+1. T none → 0.
+2. R invalid, `aurastate` not in 0…states count − 1, or `aurastat1` not
+   in 0…itemstatcost count − 1 → 0.
+3. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`; `start_combat(game, unit, T, record, SrcDam, or 128
+   when 0)` (rolls the weapon damage on a hit).
+4. p = `pair_record(unit, T)` (§2.2); p and p's result has hit (1) →
+   `charge_add(game, unit, skill, L, aurastate, aurastat1)` (§6.10).
+5. `apply_melee(game, unit, T)`. Return 1.
+
+This body does not set unit flag 0x40 itself (`§8.10` does before
+calling it).
+
+#### 8.9 56 Clay Golem, BloodGolem, FireGolem `0x005C5100`
+
+1. Unit flags |= 0x40.
+2. skill = 0 → 0 (an out-of-range skill reads a null record: fatal).
+3. c = `summon` (+0xBC); not 0 ≤ c < monstats count → 0 (no
+   `summon_class` fallback).
+4. pt = `pettype` read unsigned; ≥ pettype count → pt = 0. mode =
+   `summode` unsigned; ≥ 16 → 1.
+5. m = spawn (§6.2) {flags 0, owner unit, class c, AI state 0, mode, x =
+   y = 0, pt, pet max `eval(petmax)`}; none → 0.
+6. `golem_stats(game, unit, m, skill, L)` (§6.11).
+7. Message 0x7F (AllyPartyInfo, `sim/server-messages.tsv`) about m to
+   the unit's client (`0x005531C0`, `0x0053CDF0(client, m)`).
+8. `node_insert(game, m, 0, unit +0xD0)`. Return 1.
+
+#### 8.10 35 Fists of Fire, Claws of Thunder, Blades of Ice `0x005D35D0`
+
+1. The unit has an inventory (+0x60): A = item at body location 4, B =
+   at 5 (`0x0063BDE0`). Dual claws when A ≠ B, both exist, both usable
+   (`0x0062A4E0`: not broken, item flag 0x4000 clear,
+   `items/inventory.md`) and both of item type 45 `weap` (`0x00629BB0`).
+2. Dual claws: i = (unit +0x38 bits 8+, the frame event index of
+   `use.md` §5.2) mod 2 (signed). i ≠ 0 → unit flags |= 0x40; i = 0 →
+   unit flags &= ~0x40 (a later frame event runs the do again: the
+   second claw).
+3. Not dual: unit flags |= 0x40.
+4. srvdo 34 body (§8.8) with (game, unit, skill, L). Return 1 (its
+   result is ignored).
+
+#### 8.11 13 Fend, Zeal, Fury `0x005DBC60`
+
+Uses the used skill entry E (`0x00620250`): param 1 (+0x18) hits left,
+param 2 (+0x1C) target type, param 3 (+0x20) target GUID (set by the
+start functions srvst 9 / 37, not in this spec).
+
+1. R invalid → 0. E none → 0.
+2. r = melee range of the unit (`0x00622870`, `combat/hit.md`) + 4.
+3. T = the unit of (E param 2, E param 3) (`0x00552F60`). T none or not
+   in melee range (`0x00622C40(unit, T, 0)`) → T = `next_unit(game, unit,
+   0, 0, r, 0x20003, E param 3, null)` (`missiles.md` §R9.6 item 3;
+   filter 0x20003 | 0xA783); none → 0.
+4. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
+   skill, L), 0)`.
+5. Hit: enhanced damage % (+0x0C) := `eval(calc2)`. `EType` ≠ 0: c =
+   `eval(calc4)`; conversion % (+0x68) := c; c > 0 → conversion element
+   (+0x65) := `EType`; `roll_elemental(unit, record, skill, L)`.
+6. `start_combat(game, unit, T, record, SrcDam or 128)`;
+   `apply_melee(game, unit, T)` (second argument 4, unread).
+7. n = E param 1 − 1; E param 1 := n. n ≤ 0 → 0.
+8. T' = `next_unit(game, unit, 0, 0, r, 0x20003, T's GUID, null)`; none
+   → 0.
+9. E param 2 := T' type; param 3 := T' GUID. Animation rewind
+   `0x0056E210(unit, Param2 of the skill)` = `0x00553B10(game, unit, p)`
+   (`sim/units.md` §4.2 variants). Return 0.
+
+The body always returns 0: the do core charges nothing and sets no
+delay after it (`use.md` §5.4 step 8); mana is paid by the start
+function.
+
+#### 8.12 28 Meteor, Blizzard, Eruption, … `0x005CA3E0`
+
+Class skills: Eruption, Blizzard, Meteor (also 9 monster rows,
+`functions.tsv`).
+
+1. R invalid → 0.
+2. m = `srvmissilea` (+0x48); not 0 ≤ m < missiles count → 0.
+3. Unit flags |= 0x40.
+4. `point_free(game, unit, m)` (§6.12) = 0 → 0.
+5. Return 1 if `missile_at(game, unit, skill, L, m, 0, 0)` (§6.13) made a
+   missile, else 0.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -1010,6 +1236,15 @@ creation (`missiles.md` §R2). The finisher's peek (§2.14 step 3) steps a
 copy and restores the unit seed: no net advance. Aura, curse and buff
 bodies draw nothing.
 
+Batch 2 (§6–§8), same rule: summons draw in monster creation
+(`0x005B2F20`: game seed for the unit seed, placement, `monsters/init.md`)
+and in the equipment step of §6.5 (m's seed); §8.5 calls
+`roll_elemental` once per run on the caster's seed before the scan, then
+`apply` per target; §8.8 and §8.11 draw in `melee_result`,
+`start_combat` and (§8.11) `roll_elemental`; every missile created (64
+per ring, n per Multiple Shot) takes one game-seed step
+(`missiles.md` §R2.3 step 9).
+
 ## Edge cases & original bugs
 
 1. A player whose mana is below an aura's cost still refreshes the
@@ -1030,6 +1265,22 @@ bodies draw nothing.
    skill; a higher level replaces the list (§2.7 step 4).
 8. Srvdo 2 refreshes an existing `auratargetstate` list's stats and
    timer but keeps its old expiry (§4.2 step 3).
+9. Srvdo 66 never counts its targets (§8.5 step 8): Sanctuary (`mana` 1,
+   the only one of the four with a cost) is never charged per run and
+   state 85 stays off. Its target values need mana ≥ cost for monsters
+   too.
+10. §6.5 step 2 looks a stat-event handler up by skill field s but
+    registers it with s << 16: for s ≠ 0 the lookup never matches, so a
+    second `skill_stats` call on one summon adds duplicate handlers.
+11. §6.1 falls back to the AI control's spawn class through a monster's
+    data; for a non-monster caster with an invalid `summon` it reads a
+    null pointer (fatal).
+12. §6.5 step 4 accepts `aurastate` = states count (one past the table).
+13. Srvdo 115 ignores `summode` and spawns in mode 8 (§8.7 step 5).
+14. Srvdo 34 called directly (Tiger, Cobra, Royal Strike) leaves unit
+    flag 0x40 as it was; srvdo 35 sets or clears it first (§8.10).
+15. Srvdo 8 returns 1 without a missile when the target position fails;
+    srvdo 13 returns 0 after a hit (§8.6 step 3, §8.11).
 
 ## Test vectors
 
@@ -1045,6 +1296,12 @@ bodies draw nothing.
 | `dec_quantity`, q = 0 (synthetic) | quantity 0, returns 0: no missile when called from `skill_missile` |
 | Progressive prgdam 2, n = 3, ln12 = 10 (synthetic) | life and mana leech += 20 |
 | Curse resistance 50, duration 200 (synthetic) | duration 100 |
+| Ring offsets (table `0x006E1288` / `0x006E1388`) | i = 0 (30, 0); 8 (21, 21); 16 (0, 30); 40 (−21, −21); 63 (29, −2) |
+| `base_stats` p = 0, owner level 30, L = 5 (synthetic) | p = 5 + 90 / 4 = 27 (< 30); stat 12 = 27 |
+| `base_stats` p = 0, owner level 2, L = 5 (synthetic) | p = 6 ≥ 2 → 2 |
+| Multiple Shot from (0, 0) at (10, 0), n = 5, calc3 = 1 (synthetic) | (px, py) = (0, −1); targets (10, 2), (10, 1) flag 0x10000; (10, 0) without; (10, −1), (10, −2) with |
+| `charge_add`, counter 2 → 3, then again (synthetic) | 3 and `aurastat2` added once more; then unchanged (return 1, expiry refreshed) |
+| Dual claws, frame event index 0 then 1 (synthetic) | flag 0x40 cleared, then set: two srvdo 34 runs per attack |
 
 ## Provenance
 
@@ -1059,6 +1316,16 @@ bodies draw nothing.
   applies the melee (§4.1 step 7); the curse callback's event loop tests
   event 1 each time (as D2MOO); `0x005C3540` resistance scaling and the
   hireling exception are not in D2MOO's curse callback.
+- Batch 2 (§6–§8): every address disassembled (`disasm.py fn|at`);
+  ring tables `0x006E1288` / `0x006E1388` read from the image; use
+  counts from the 1.14d `patch_d2` `skills.txt`. D2MOO names compared:
+  `SrvSt23`, `SrvDo008/013/022/028/034/035/045/056/066/068/115/119`,
+  `D2SummonArgStrc`, `D2GAME_GetSummonIdFromSkill_6FD15580`,
+  `D2GAME_SetSummonPassiveStats_6FD0C530`,
+  `D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10`,
+  `D2GAME_SetSummonResistance_6FD0C2E0`, `sub_6FCF9580`. 1.14d
+  matches D2MOO in the steps above except: §6.5 step 6 skips summon
+  skill 0 (k must be ≥ 1).
 
 ## Open questions
 
