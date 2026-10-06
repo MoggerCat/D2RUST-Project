@@ -1,0 +1,239 @@
+// Spec: specs/render/lighting.md, specs/render/blend-modes.md, specs/render/shading.md
+//! Unit tests of [`super::view`]: the component ops from the frame's light
+//! map and the §3 draw-mode decision, through [`LitRules`].
+
+use d2_formats::cof::{Cof, CofLayer};
+use d2_formats::palette::{Palette, Pl2, Rgb};
+
+use super::super::blend::{cel_ops, OverrideInput, UnitKind};
+use super::super::shading::{hover_light, ShadeTables};
+use super::map::LightMap;
+use super::view::{component_ops, layer_mode, ComponentLook, FrameLight, LitRules, LookFeed};
+use crate::bridge::world::UnitKey;
+use crate::bridge::ClientUnit;
+use crate::composite::{ComponentRequest, CompositeError, Slot};
+use crate::scene::{MapId, MapTable};
+use crate::world_view::{Unspecified, ViewRules};
+
+fn map(f: impl Fn(u32) -> u32) -> [u8; 256] {
+    let mut m = [0u8; 256];
+    for (i, v) in m.iter_mut().enumerate() {
+        *v = (f(i as u32) % 256) as u8;
+    }
+    m
+}
+
+fn table(k: u32) -> Vec<[u8; 256]> {
+    (0..256u32)
+        .map(|d| map(|s| d * (3 + k) + s * (5 + 2 * k) + k + 1))
+        .collect()
+}
+
+fn pl2() -> Pl2 {
+    let mut colors = [Rgb::default(); 256];
+    for (i, c) in colors.iter_mut().enumerate() {
+        *c = Rgb {
+            r: i as u8,
+            g: i as u8,
+            b: i as u8,
+        };
+    }
+    Pl2 {
+        base_palette: Palette { colors },
+        light_levels: (0..32).map(|k| map(move |i| i * (k + 1) / 32)).collect(),
+        inventory_variations: (0..16).map(|k| map(move |i| i + 100 + k)).collect(),
+        selected_unit_shift: map(|i| i + 7),
+        alpha_blend: (0..3).map(table).collect(),
+        additive_blend: table(3),
+        multiplicative_blend: table(4),
+        hue_variations: (0..111).map(|k| map(move |i| i + k + 1)).collect(),
+        red_tones: map(|i| i ^ 0x11),
+        green_tones: map(|i| i ^ 0x22),
+        blue_tones: map(|i| i ^ 0x33),
+        unknown_variations: (0..14).map(|k| map(move |i| i ^ (0x40 + k))).collect(),
+        max_component_blend: table(5),
+        darkened_shift: map(|i| i / 2),
+        text_colors: Vec::new(),
+        text_color_shifts: Vec::new(),
+    }
+}
+
+/// A frame light with the player at sub-tile (100, 100) and cell (101,
+/// 100) at intensity `i`; every other cell 0.
+fn frame_light(i: u8) -> FrameLight {
+    let mut maps = MapTable::new();
+    let tables = ShadeTables::push(&mut maps, &pl2());
+    let mut m = LightMap::new((100, 100));
+    let c = m.cell_mut(101 - m.origin.0, 100 - m.origin.1).unwrap();
+    c.i = i;
+    c.r = 1;
+    FrameLight { tables, map: m }
+}
+
+fn layer(override_translucency: u8, new_translucency: u8) -> CofLayer {
+    CofLayer {
+        component: 0,
+        shadow: 0,
+        selectable: 1,
+        override_translucency,
+        new_translucency,
+        weapon_class: *b"hth\0",
+    }
+}
+
+fn cof(l: CofLayer) -> Cof {
+    Cof {
+        layers_count: 1,
+        frames: 1,
+        directions: 1,
+        version: 20,
+        unknown: [0; 4],
+        x_min: 0,
+        x_max: 0,
+        y_min: 0,
+        y_max: 0,
+        animation_rate: 256,
+        layers: vec![l],
+        events: vec![0],
+        event_padding: Vec::new(),
+        draw_order: vec![0],
+    }
+}
+
+fn request<'a>(cof: &'a Cof) -> ComponentRequest<'a> {
+    ComponentRequest {
+        cof,
+        dir: 0,
+        frame: 0,
+        slot: Slot {
+            slot: 0,
+            component: 0,
+            layer: 0,
+        },
+        layer: &cof.layers[0],
+    }
+}
+
+fn look() -> ComponentLook {
+    ComponentLook {
+        ghostly: false,
+        override_input: None,
+        hovered: false,
+        remap: None,
+    }
+}
+
+// Covers: specs/render/blend-modes.md §3
+#[test]
+fn layer_mode_reads_the_cof_override_bytes() {
+    let plain = cof(layer(0, 3));
+    let over = cof(layer(1, 3));
+    assert_eq!(layer_mode(&look(), &request(&plain)), 5, "byte 3 = 0: lv ignored");
+    assert_eq!(layer_mode(&look(), &request(&over)), 3);
+    let hovered = ComponentLook {
+        hovered: true,
+        ..look()
+    };
+    assert_eq!(layer_mode(&hovered, &request(&plain)), 7);
+    assert_eq!(layer_mode(&hovered, &request(&over)), 3, "override layers are never highlighted");
+    let ghostly = ComponentLook {
+        ghostly: true,
+        ..hovered
+    };
+    assert_eq!(layer_mode(&ghostly, &request(&over)), 1);
+    let faded = ComponentLook {
+        override_input: Some(OverrideInput {
+            kind: UnitKind::Player,
+            fade: 1,
+            monster_has_ethereal: false,
+            item_trans: None,
+            component: 0,
+            item_ethereal: false,
+        }),
+        ..hovered
+    };
+    assert_eq!(layer_mode(&faded, &request(&plain)), 1, "r before the highlight");
+}
+
+// Covers: specs/render/lighting.md §11 r1, §11 text
+#[test]
+fn component_light_is_the_low_byte_of_the_units_cell() {
+    let light = frame_light(0x7F);
+    let plain = cof(layer(0, 0));
+    let remap = Some(MapId(light.tables.remap0.0 + 1));
+    let l = ComponentLook { remap, ..look() };
+    assert_eq!(
+        component_ops(&light, (101, 100), &l, &request(&plain)),
+        cel_ops(&light.tables, 5, remap, 0x7F)
+    );
+    // Another cell: intensity 0 (map 0), not the 0x7F of (101, 100).
+    assert_eq!(
+        component_ops(&light, (100, 100), &l, &request(&plain)),
+        cel_ops(&light.tables, 5, remap, 0)
+    );
+    // Far outside the map: the read clamps to the edge cell (0).
+    assert_eq!(
+        component_ops(&light, (1000, 100), &l, &request(&plain)),
+        cel_ops(&light.tables, 5, remap, 0)
+    );
+    // Mode 7 doubles the light byte (GDI then uses H).
+    let hovered = ComponentLook {
+        hovered: true,
+        ..l
+    };
+    assert_eq!(
+        component_ops(&light, (101, 100), &hovered, &request(&plain)),
+        cel_ops(&light.tables, 7, remap, hover_light(0x7F))
+    );
+}
+
+struct Feed {
+    at: Result<(i32, i32), String>,
+    look: ComponentLook,
+}
+
+impl LookFeed for Feed {
+    fn light_subtile(&self, _: &ClientUnit) -> Result<(i32, i32), String> {
+        self.at.clone()
+    }
+
+    fn look(&self, _: &ClientUnit, _: &ComponentRequest<'_>) -> Result<ComponentLook, String> {
+        Ok(self.look)
+    }
+}
+
+// Covers: specs/render/lighting.md §13
+#[test]
+fn lit_rules_answer_shade_and_blend_and_refuse_without_inputs() {
+    let light = frame_light(0xC8);
+    let c = cof(layer(1, 3));
+    let unit = ClientUnit::new(UnitKey {
+        unit_type: 0,
+        guid: 1,
+    });
+    let feed = Feed {
+        at: Ok((101, 100)),
+        look: look(),
+    };
+    let rules = LitRules {
+        rules: &Unspecified,
+        feed: &feed,
+        light: &light,
+    };
+    let (shade, blend) = cel_ops(&light.tables, 3, None, 0xC8);
+    assert_eq!(rules.shade(&unit, &request(&c)).unwrap(), shade);
+    assert_eq!(rules.blend(&unit, &request(&c)).unwrap(), blend);
+    let missing = Feed {
+        at: Err("no position".into()),
+        look: look(),
+    };
+    let rules = LitRules {
+        rules: &Unspecified,
+        feed: &missing,
+        light: &light,
+    };
+    assert!(matches!(
+        rules.shade(&unit, &request(&c)),
+        Err(CompositeError::Unresolved { what: "unit light", .. })
+    ));
+}
