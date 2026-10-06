@@ -1743,3 +1743,215 @@ fn style_map_rows() {
     assert!(style_map(48, 9, false).is_err());
     assert!(style_map(47, 1, false).is_err());
 }
+
+/// A 7 × 4 file whose one group is (1, 1, 2, 2) with N = 1 (variant 0 at
+/// x offset 3: pattern columns 4..5).
+fn offset_file() -> SubFile {
+    SubFile {
+        method: 2,
+        groups: vec![SubGroup {
+            x: 1,
+            y: 1,
+            w: 2,
+            h: 2,
+            variants: 1,
+        }],
+        floor: Some(CellGrid::new(7, 4)),
+        walls: vec![CellGrid::new(7, 4)],
+        tile_types: vec![CellGrid::new(7, 4)],
+        shadow: Some(CellGrid::new(7, 4)),
+        ..SubFile::default()
+    }
+}
+
+/// `outdoor-tilesub.md` §4.3 with the group away from the file origin:
+/// group cell (i, j) reads pattern (G.x + i, G.y + j) and room (x + i,
+/// y + j); only cells with pattern floor bit 2 or wall bit 1 are checked.
+#[test]
+fn tests_read_the_group_box() {
+    // Fixed test: only group cell (1, 0) (pattern (2, 1)) is checked.
+    let mut file = offset_file();
+    file.floor.as_mut().unwrap().set(2, 1, 0x2);
+    let g = file.groups[0];
+    let mut room = room_side();
+    room.floor.set(4, 3, 0);
+    // (3, 3): cell (1, 0) is room (4, 3): fails; (4, 3) itself is cell
+    // (0, 0) of candidate (4, 3): unchecked.
+    assert!(!fixed_test(&rsub(&mut room), &file, g, 3, 3));
+    assert!(fixed_test(&rsub(&mut room), &file, g, 4, 3));
+    assert!(fixed_test(&rsub(&mut room), &file, g, 3, 2));
+    // Wall bit 1 is checked the same way.
+    let mut file = offset_file();
+    file.walls[0].set(1, 2, 0x1);
+    let mut room = room_side();
+    room.wall.set(3, 5, 0x1);
+    assert!(!fixed_test(&rsub(&mut room), &file, g, 3, 4));
+    assert!(fixed_test(&rsub(&mut room), &file, g, 2, 4));
+    // Random test: tile type of group cell (1, 1) (pattern (2, 2)).
+    let mut file = offset_file();
+    file.tile_types[0].set(2, 2, 5);
+    let mut room = room_side();
+    room.tile_type.set(4, 4, 5);
+    assert!(random_test(&rsub(&mut room), &file, g, 3, 3));
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    assert!(!random_test(&rsub(&mut room), &file, g, 2, 3));
+    // Random test, floor and wall agreement at group cell (0, 1)
+    // (pattern (1, 2)).
+    let mut file = offset_file();
+    file.floor.as_mut().unwrap().set(1, 2, 0x2 | 0x400);
+    file.walls[0].set(1, 2, 0x1 | 0x800);
+    let mut room = room_side();
+    room.floor.set(3, 4, 0x2 | 0x400);
+    room.wall.set(3, 4, 0x1 | 0x800);
+    assert!(random_test(&rsub(&mut room), &file, g, 3, 3));
+    assert!(!random_test(&rsub(&mut room), &file, g, 3, 2));
+    assert!(!random_test(&rsub(&mut room), &file, g, 4, 3));
+}
+
+/// `outdoor-tilesub.md` §4.4 with the group away from the file origin:
+/// values come from pattern (G.x + i + o, G.y + j); roofs counted in the
+/// group box at offset o; units strictly inside the match box (5G.x,
+/// 5(G.x + G.w)) × (5G.y, 5(G.y + G.h)) move to (5x + ux − 5G.x, 5y +
+/// uy − 5G.y).
+#[test]
+fn apply_reads_the_variant_box() {
+    let mut file = offset_file();
+    // Variant 0 cells: pattern columns 4..5, rows 1..2.
+    let f = file.floor.as_mut().unwrap();
+    f.set(4, 1, 0x2 | 0x10);
+    f.set(5, 2, 0x2 | 0x20 | 0x80);
+    f.set(2, 1, 0x2 | 0x40); // match box: not pasted
+    file.walls[0].set(5, 1, 0x1 | 0x500);
+    file.walls[0].set(4, 2, 0x100); // no bit 1
+    file.tile_types[0].set(4, 2, 9);
+    let sh = file.shadow.as_mut().unwrap();
+    sh.set(5, 2, 0x800_0000 | 3);
+    sh.set(4, 1, 0x800_0000);
+    sh.set(6, 1, 0x800_0000); // outside the box
+    sh.set(1, 1, 0x800_0000); // the match box: not counted at o = 3
+    let unit = |class, x, y| PresetUnit {
+        unit_type: 2,
+        class,
+        x,
+        y,
+    };
+    file.units = vec![
+        unit(1, 7, 12),
+        unit(2, 5, 7),
+        unit(3, 14, 14),
+        unit(4, 15, 7),
+        unit(5, 7, 15),
+        unit(6, 7, 5),
+    ];
+    let g = file.groups[0];
+    let mut room = room_side();
+    apply(&mut rsub(&mut room), &file, g, 3, 4, 3);
+    assert_eq!(room.roof_count, 2);
+    assert_eq!(room.floor.get(3, 4), 0x12 | 0x80);
+    assert_eq!(room.floor.get(4, 5), 0x22 | 0x80);
+    assert_eq!(room.floor.get(4, 4), 0x2);
+    assert_eq!(room.floor.get(3, 5), 0x2);
+    assert_eq!(room.wall.get(4, 4), 0x1 | 0x500);
+    assert_eq!(room.wall.get(3, 5), 0);
+    assert_eq!(room.tile_type.get(3, 5), 9);
+    assert_eq!(room.tile_type.get(3, 4), 0);
+    let mut shadows = room.shadows.clone();
+    shadows.sort();
+    assert_eq!(
+        shadows,
+        [(803, 904, 0x800_0000), (804, 905, 0x800_0000 | 3)]
+    );
+    let units: Vec<_> = room.units.iter().map(|u| (u.class, u.x, u.y)).collect();
+    assert_eq!(units, [(1, 17, 27), (3, 24, 29)]);
+}
+
+// ---- vertex.rs: the vertex polygon (§4) -------------------------------------
+
+/// The §4 rules on a plain vertex list (corner tags 0..3, inserted −1).
+fn polygon_model(rect: TileRect, orth: &[Orth]) -> Vec<(i32, i32, u32)> {
+    let (x, y, w, h) = (rect.x, rect.y, rect.w - 1, rect.h - 1);
+    let corners = [(x, y + h), (x, y), (x + w, y), (x + w, y + h)];
+    // (tag, x, y, flags)
+    let mut vs: Vec<(i32, i32, i32, u32)> = corners
+        .iter()
+        .enumerate()
+        .map(|(k, &(cx, cy))| (k as i32, cx, cy, 0))
+        .collect();
+    for e in orth {
+        let b = TileRect::new(e.rect.x, e.rect.y, e.rect.w - 1, e.rect.h - 1);
+        let d = e.direction as usize;
+        let (c, nc) = (corners[d], corners[(d + 1) % 4]);
+        let (on_x, s, p, q) = match d {
+            0 => (false, -1, b.y + b.h, b.y),
+            1 => (true, 1, b.x, b.x + b.w),
+            2 => (false, 1, b.y, b.y + b.h),
+            _ => (true, -1, b.x + b.w, b.x),
+        };
+        let (a, bb) = if on_x { (c.0, nc.0) } else { (c.1, nc.1) };
+        let at = |t: i32| if on_x { (t, c.1) } else { (c.0, t) };
+        let lf = 1 | if e.preset { 2 } else { 0 };
+        let pos = vs.iter().position(|v| v.0 == d as i32).unwrap();
+        if s * p > s * a {
+            if s * p <= s * bb {
+                let (ux, uy) = at(p);
+                vs.insert(pos + 1, (-1, ux, uy, lf));
+                if s * q < s * bb {
+                    let (qx, qy) = at(q);
+                    vs.insert(pos + 2, (-1, qx, qy, 0));
+                }
+            }
+        } else if s * q >= s * a {
+            vs[pos].3 |= lf;
+            if s * q < s * bb {
+                let (qx, qy) = at(q);
+                vs.insert(pos + 1, (-1, qx, qy, 0));
+            }
+        }
+    }
+    vs.iter()
+        .map(|v| (v.1 - rect.x, v.2 - rect.y, v.3))
+        .collect()
+}
+
+/// `outdoor.md` §4: the polygon against the rule text, on deterministic
+/// pseudo-random level rects and neighbour boxes (every direction, inside,
+/// overlapping and outside the edge, preset or not).
+#[test]
+fn vertex_polygon_by_the_rules() {
+    use super::vertex::build_polygon;
+    let mut seed = Seed::init_low(2718);
+    let mut r = |n: i32| seed.roll(n) as i32;
+    for case in 0..400 {
+        let rect = TileRect::new(
+            800 + 8 * r(10),
+            600 + 8 * r(10),
+            8 * (4 + r(12)),
+            8 * (4 + r(12)),
+        );
+        let n = 1 + r(4);
+        let orth: Vec<Orth> = (0..n)
+            .map(|_| {
+                let d = r(4);
+                let span = |base: i32, len: i32, r: &mut dyn FnMut(i32) -> i32| {
+                    base - 40 + 8 * r((len + 80) / 8)
+                };
+                let (bw, bh) = (8 * (1 + r(8)), 8 * (1 + r(8)));
+                let bx = span(rect.x, rect.w, &mut r);
+                let by = span(rect.y, rect.h, &mut r);
+                Orth {
+                    level_id: 1,
+                    direction: d,
+                    init: false,
+                    rect: TileRect::new(bx, by, bw, bh),
+                    preset: r(2) == 1,
+                }
+            })
+            .collect();
+        let got: Vec<(i32, i32, u32)> = build_polygon(rect, &orth)
+            .unwrap()
+            .iter()
+            .map(|v| (v.x, v.y, v.flags))
+            .collect();
+        assert_eq!(got, polygon_model(rect, &orth), "case {case}");
+    }
+}
