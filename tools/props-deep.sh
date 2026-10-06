@@ -1,10 +1,12 @@
 #!/bin/sh
 # Deep property-test hunt: the same runs as .github/workflows/nightly-props.yml.
-#   sh tools/props-deep.sh [sim|wire|worldsim|all] [cases]
+#   sh tools/props-deep.sh [sim|wire|worldsim|wiredpath|all] [cases]
 #     sim       d2-sim state-machine / model / path / timer properties  (default cases 20000)
 #     wire      d2-proto, d2-server, d2-data, d2-formats properties and parsers (20000)
 #     worldsim  d2-client prop_worldsim, the wired game over time (500; needs
 #               the Bevy system libraries, tools/cloud-setup.sh)
+#     wiredpath d2-sim prop_wired_path, the path wiring on the wired sim (300;
+#               ~2 s per case in a debug build, so not in the sim group)
 # Proptest keeps no regression files here (failure_persistence is off), so the
 # counterexample exists only in the output: it is written to
 # target/props-deep/<group>.log and its "minimal failing input" block is
@@ -70,7 +72,11 @@ report() {
 
 case $group in
   sim|all)
-    run sim 20000 -p d2-sim -E 'binary(/^prop_/) | test(/prop_tests::/)' ;;
+    run sim 20000 -p d2-sim -E '(binary(/^prop_/) & !binary(=prop_wired_path)) | test(/prop_tests::/)' ;;
+esac
+case $group in
+  wiredpath|all)
+    run wiredpath 300 -p d2-sim --test prop_wired_path ;;
 esac
 case $group in
   wire|all)

@@ -35,7 +35,8 @@ All integers are little-endian.
 |---|---|---|---|
 | 0 | 4 bytes | magic | `"Woo!"` |
 | 4 | u16 | version | must be 1 |
-| 6 | 4 bytes | unknown | informational |
+| 6 | u16 | unknown | 0 in all 14 1.14d fonts |
+| 8 | u16 | count | number of records the by-code glyph lookup searches (`ui/text.md` §3); 256 in all 14 1.14d fonts |
 | 10 | u8 | height | line height / cell height |
 | 11 | u8 | width | cell width |
 
@@ -53,8 +54,7 @@ expected to have 256 records, CJK fonts more (see survey).
 | 4 | u8 | height |
 | 5 | u8 | unknown2 (usually 1) |
 | 6 | u16 | unknown3 |
-| 8 | u8 | frame: index of the glyph's frame in the font's DC6 |
-| 9 | u8 | unknown4 |
+| 8 | u16 | frame: index of the glyph's frame in the font's DC6 (1.14d reads a u16, `ui/text.md` §3; byte 9 is 0 in all 14 1.14d fonts) |
 | 10 | u32 | unknown5 |
 
 Unknown fields are kept as read. How glyph width, cell size and frame
@@ -70,8 +70,10 @@ None.
 
 ## Edge cases & original bugs
 
-- `frame` is a single byte, so a font can address at most 256 DC6 frames
-  per file, even if it has more than 256 records. See survey.
+- `frame` is a u16 (corrected 2026-10-06 from the 1.14d reader,
+  `ui/text.md` §3). `d2-formats::font` still reads a u8 `frame` plus
+  `unknown4`, and its test `frame_is_one_byte` asserts that reading: to
+  change. The 1.14d Latin fonts are unaffected (byte 9 is always 0).
 
 ## Test vectors
 
@@ -86,9 +88,13 @@ None.
 
 Community documentation of D2 font tables, cross-checked against Riiablo
 (Apache-2.0) `codec/FontTBL.java` (`"Woo!"`, version 1, 12-byte header,
-14-byte records). No Blizzard code or decompiler output was consulted.
+14-byte records). Header `count` and the u16 `frame` confirmed on 1.14d
+`Game.exe` (`0x00501690` reads the count at header byte 8, `0x00501A80`
+the frame as a u16 at record byte 8) and on the 14 font files.
 
 ## Open questions
 
-1. Meaning of the unknown fields, and the layout rules: decide in the UI
-   rendering spec against the original game.
+1. Meaning of the remaining unknown fields (record `unknown1`, `height`,
+   `unknown2`, `unknown3`, `unknown5`; header bytes 6–7): the 1.14d D2Win
+   text path reads none of them (`ui/text.md` §3, OQ 7). Layout rules are
+   `ui/text.md`.

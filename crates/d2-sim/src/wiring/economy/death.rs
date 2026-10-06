@@ -17,9 +17,16 @@
 //! the game's one item store (`ActionHooks::items`, the store every
 //! other item system reads: a dropped item can be picked up, sold and
 //! cubed). Seams
-//! ([`Pending`]): position, superunique index, champion / unique flags,
-//! minion owner, party, the quest TC test; [`FreeSpot`]: the free-spot
-//! search `0x0064E810` (collision spec, `treasure.md` OQ 8).
+//! ([`Pending`]): superunique index, champion / unique flags, minion
+//! owner, party, the quest TC test. Position: the path record's
+//! ([`ActionHooks::path_position`]; [`Pending::position`] without the
+//! path provider). The free-spot search `0x0064E810`: with the path
+//! provider on and its walk-back field loaded
+//! ([`crate::wiring::path::PathState::field`]), the floor drop
+//! [`crate::wiring::path::place::floor_drop`] (`path-placement.md` §7,
+//! §9) on the game's rooms, and the created item gets its static path
+//! and footprint (§2.5) so the next item of the walk sees it; otherwise
+//! the [`FreeSpot`] seam, as before the provider.
 
 use std::sync::Arc;
 
@@ -29,11 +36,13 @@ use super::{
     dropper, recipient, DropPlacer, DropSpot, Economy, EconomyError, GameFields, ItemDrops,
 };
 use crate::items::ItemTables;
+use crate::path::coords::Point;
 use crate::treasure::drop::{monster_drop, monster_drop_gate, MonsterDrop, MonsterRank};
 use crate::treasure::{ItemData, TreasureClasses, TreasureData, TreasureError};
 use crate::units::hooks::Sim;
 use crate::units::{RoomId, UnitId, UnitType};
-use crate::wiring::action::{ActionHooks, Pending};
+use crate::wiring::action::{ActionHooks, Pending, View, WiringError};
+use crate::wiring::path::place::floor_drop;
 
 /// The collision mask of the gate (§3.1, `0x0064CB30`).
 const GATE_MASK: u16 = 0x801;
@@ -91,8 +100,9 @@ impl DeathDrops {
 }
 
 /// Seam: the free-spot search `0x0064E810`(room, start, origin, 1,
-/// 0x3E01, 0x801, 1) of §7 step 2 (collision spec, not written). Items
-/// of one walk are placed one after another.
+/// 0x3E01, 0x801, 1) of §7 step 2, used when the path provider or its
+/// walk-back field is off. Items of one walk are placed one after
+/// another.
 pub trait FreeSpot {
     fn free_spot(
         &mut self,
@@ -109,9 +119,54 @@ struct Spots<'s, F> {
     start: (i32, i32),
 }
 
-impl<F: FreeSpot> DropPlacer for Spots<'_, F> {
-    fn place(&mut self, x: i32, y: i32) -> Option<DropSpot> {
-        self.inner.free_spot(self.room, self.start, (x, y))
+/// Item size of the floor drop (§7 step 2, `path-placement.md` §9).
+const DROP_SIZE: i32 = 1;
+
+impl<X: Pending, F: FreeSpot> DropPlacer<ActionHooks<X>> for Spots<'_, F> {
+    /// With the provider: `0x0064E810` through the floor drop
+    /// (`path-placement.md` §9: its rule 1 is §7 step 2's start offset,
+    /// the same room lookup), size 1, fallback 1. Without: [`FreeSpot`].
+    fn place(
+        &mut self,
+        econ: &mut Economy<'_, ActionHooks<X>>,
+        x: i32,
+        y: i32,
+    ) -> Option<DropSpot> {
+        let h = &mut *econ.hooks;
+        let Some(field) = h.paths.as_ref().and_then(|p| p.field.clone()) else {
+            return self.inner.free_spot(self.room, self.start, (x, y));
+        };
+        match floor_drop(
+            &h.drlg,
+            &field,
+            self.room,
+            Point::new(x, y),
+            DROP_SIZE,
+            true,
+        ) {
+            Ok((Some(room), p)) => Some(DropSpot {
+                room: Some(room),
+                x: p.x,
+                y: p.y,
+            }),
+            Ok((None, _)) => None,
+            Err(e) => {
+                h.errors.push(WiringError::Place(e));
+                None
+            }
+        }
+    }
+
+    /// With the provider: the path part of `SUNIT_Add` (§2.5) for the
+    /// item at its spot (mode 3: static path and footprint, mask 0x200,
+    /// in 0x3E01). Without: nothing (as before the provider).
+    fn placed(&mut self, econ: &mut Economy<'_, ActionHooks<X>>, item: UnitId, spot: DropSpot) {
+        if econ.hooks.paths.as_ref().is_none_or(|p| p.field.is_none()) {
+            return;
+        }
+        let game: &crate::game::Game = econ.game;
+        View::of(econ.units, econ.stats, econ.data, econ.hooks)
+            .path_place(game, item, spot.x, spot.y);
     }
 }
 
@@ -122,7 +177,9 @@ impl<F: FreeSpot> DropPlacer for Spots<'_, F> {
 /// TODO(treasure.md §3.1): the collision word at a position outside
 /// every room grid is read as 0. TODO(treasure.md §7 step 2): the free
 /// spot search gets the room the start-offset search found, else the
-/// monster's room.
+/// monster's room (with the provider, the floor drop's rule 1 finds the
+/// same start from that room: both lookups are the room and its
+/// adjacent rooms).
 pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -138,7 +195,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     if ty != UnitType::Monster {
         return Vec::new();
     }
-    let (x, y) = h.x.position(unit);
+    let (x, y) = h.path_position(unit);
     let room = sim.game.lists.unit(unit).and_then(|e| e.room());
     let collision = room
         .and_then(|rm| h.drlg.collision(sim.game, rm, x, y))

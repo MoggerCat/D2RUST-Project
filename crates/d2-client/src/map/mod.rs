@@ -6,6 +6,9 @@ pub mod cpu;
 pub mod layout;
 pub mod tiles;
 
+#[cfg(test)]
+mod gaps_numbered_tests;
+
 use d2_formats::ds1::Ds1;
 use d2_formats::dt1::Dt1;
 use d2_formats::mpq::ArchiveSet;

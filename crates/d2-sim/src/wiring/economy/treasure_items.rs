@@ -26,10 +26,17 @@ pub struct DropSpot {
 }
 
 /// Seam: §7 step 2, the start offset and the free-spot search
-/// `0x0064E810`. Expected provider: the collision / rooms spec (not
-/// written, `treasure.md` OQ 8).
-pub trait DropPlacer {
-    fn place(&mut self, x: i32, y: i32) -> Option<DropSpot>;
+/// `0x0064E810` (`sim/path-placement.md` §7, §9). It receives the
+/// economy the walk runs on, so a provider reaches the game's rooms and
+/// collision through its hooks (`H`).
+pub trait DropPlacer<H> {
+    /// The spot of the next item dropped by a unit at (`x`, `y`).
+    fn place(&mut self, econ: &mut Economy<'_, H>, x: i32, y: i32) -> Option<DropSpot>;
+
+    /// The item `item` was created at `spot` (§7 step 4): the provider
+    /// puts it on the floor there, so the next search sees it (§7 step
+    /// 2, "each seeing the previous ones"). Default: nothing.
+    fn placed(&mut self, _econ: &mut Economy<'_, H>, _item: UnitId, _spot: DropSpot) {}
 }
 
 /// The walk's [`DropSink`]: each request becomes a real item unit.
@@ -77,18 +84,19 @@ pub fn drop_request(req: &DropRequest<DropSpot>) -> (ItemRequest, ItemSpawn) {
     (rq, spawn)
 }
 
-impl<H: LifecycleHooks, P: DropPlacer> DropSink for ItemDrops<'_, '_, H, P> {
+impl<H: LifecycleHooks, P: DropPlacer<H>> DropSink for ItemDrops<'_, '_, H, P> {
     type Spot = DropSpot;
     type Item = UnitId;
 
     fn place(&mut self, x: i32, y: i32) -> Option<DropSpot> {
-        self.placer.place(x, y)
+        self.placer.place(self.econ, x, y)
     }
 
     fn create(&mut self, req: DropRequest<DropSpot>) -> Option<UnitId> {
         let (mut rq, spawn) = drop_request(&req);
         match self.econ.create_item(&mut rq, false, spawn) {
             Ok(u) => {
+                self.placer.placed(self.econ, u, req.spot);
                 self.placed.push((u, req.spot));
                 Some(u)
             }

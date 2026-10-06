@@ -1264,6 +1264,37 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-06 (local, main `63a706b`, `D2_GAME_DIR` = the reference
+install): `cargo run -p depcheck`: OK (8 crates, d2-sim determinism lint
+clean). `cargo test --workspace --no-fail-fast -- --ignored`: 112 pass,
+**13 fail** (findings for the owners; expected values not changed, rerun
+on the current main before fixing):
+- `d2-formats/tests/game_sweep.rs` (5): `dc6_every_file_decodes` 1,653 vs
+  1,657, `dt1_every_live_file_decodes` 250 vs 254, `ds1_every_file_parses`
+  2,372 vs 2,456, `string_tables_every_key_resolves` 29 vs 33 tables: the
+  sweep enumerates `(listfile)` names only and `patch_d2.mpq` has none; the
+  expected counts are `mpq-tool formats`' (listfile ∪ its known-names list
+  in `tools/mpq-tool/src/formats.rs`). Fix the enumeration, not the
+  numbers. `cof_every_live_file_parses`: asks for
+  `data\global\charsm\cofmblxbw.cof` (not found; the junk file is
+  `amblxbow.cof`).
+- `d2-sim/tests/game_drlg_tables.rs`: `act1_placement_on_live_tables`
+  gives `[5, 27, 6, 7, 26, 39, 17, 1, 2, 3, 4]` (the recorded allocation
+  order 4, 3, 2, 1, 17, 39, 26, 7, 6, 27, 5 reversed); expected has
+  16, 15, …, 8 in front. `lvlprest_measurements`: 1,079 vs 82.
+- `d2-sim/tests/game_world.rs`: `waypoint_objects` FrameCnt1 of object 119
+  = 3,840 vs 15 (= 15 × 256: an 8.8 value read raw);
+  `cubemain_vector_records` 129 vs 130; `vendor_columns_from_live_items`
+  panics on column `weapons.HratliMin`.
+- `d2-sim/tests/game_items.rs` `sweep_create_every_item_every_quality`:
+  570 failures, first "item 39 dgr q 8 ilvl 1: crafted affix 0 with a
+  filled slot (read at 0x5C)" (possible code / spec finding, `quality.md`
+  crafted).
+- `d2-sim/tests/game_treasure.rs` `sweep_drop_quality_every_item`: item
+  520, L 0, M −100: "magic gate".
+- `d2-server` `world_data::tests::game::outdoor_levels_generate_through_the_dispatcher`:
+  97 vs 98.
+
 Done 2026-10-06 (local, captures with the player): render captures with
 `record_frames.py` (branch `claude/spec-render-placement`), 800×600 GDI:
 run 1b Den of Evil (14,823 frames, 15,711 ticks; still segment 1,151
@@ -1656,9 +1687,7 @@ ones, but they need `traces/raw/`, so local):
 
 ### B. Ghidra / spec edits only (no game run, no player)
 
-**From the 2026-10-06 captures:** the player light flicker (find the
-per-frame light-level source of the player's light in the 1.14d client
-light pass; client RNG or time; owner `render/lighting.md`); the cursor
+**From the 2026-10-06 captures:** the cursor
 draw call and its animation counter (owner `render/capture.md` /
 `ui/controls.md`); the weather (rain) particle RNG (owner
 `render/draw-order.md` or a weather spec).
@@ -3819,13 +3848,16 @@ of branch `claude/spec-render-placement`; raw files gitignored:
   under the debugger: of 1,111 town frames, 625 follow 1 tick, 466 follow 2
   ticks, 19 follow 0 ticks (frames dropped, never duplicated): every frame
   carries its tick, so per-tick comparisons stay possible.
-- **`render/lighting.md`** (not written; §B8): in an empty Den of Evil
-  dead end, standing still, comparing the same idle animation frame 16
-  ticks apart, 82 of 84 pairs differ by ~30–300 pixels, all **±1 step on
-  the dark palette ramp** (30↔29, 22↔21, …), mostly on and around the
-  player sprite (x 350–450, y 200–300) and dim floor at the left: the
-  player's light level flickers over time. The spec must state the flicker
-  rule and its source (client RNG or time); Ghidra request in §5 B.
+- **`render/lighting.md`** (not written; §B8): **corrected** by
+  `claude/spec-render-followups` `09c2797`: on run 1b's second still
+  segment (f 14,800–15,600) 772 of 785 same-key pairs differ only inside a
+  33×30 box = the cursor's idle `orotate` image (64-step loop, one step per
+  draw, idle state draws from the player's client seed); no RNG or clock
+  read was found in the light map, so there is no evidence of a light
+  flicker. Unexplained: the first still segment (f 12,543–13,694) differs
+  outside one box (±1 dark-ramp steps around the player and the left
+  floor); the next `stability-0001` with recorder `frames-raw-2` settles it.
+  Partial lighting rules: `capture.md` OQ5.
 - **`render/composition.md`, `blend-modes.md`**: `composition-0001` exists
   (run 2: Town Portal open beside the player, 800×600 GDI, video type 1):
   the input for settling the blend-table orientation (row = destination per

@@ -1187,7 +1187,10 @@ impl<'a> Replay<'a> {
         self.host.removed.clear();
         let before: Vec<ListId> = self.names.keys().copied().collect();
         let (lists, host) = self.split(i)?;
-        lists.expire_lists(host, u, frame);
+        if let Err(e) = lists.expire_lists(host, u, frame) {
+            // The recording finished the walk; 1.14d would still loop.
+            return Err(self.mismatch(i, "expiry", e.to_string()));
+        }
         let cbs = std::mem::take(&mut self.host.callbacks);
         let removed = std::mem::take(&mut self.host.removed);
         let walk = self.walk(i + 1, &cbs, true)?;
