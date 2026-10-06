@@ -21,18 +21,18 @@
 | Rules | 63–64 |
 |   1. The cel draw path | 65–77 |
 |   2. Placement (orientation bit 0 clear: the normal case) | 78–92 |
-|   3. Where the cel fields come from | 93–106 |
-|   4. Orientation bit set (top-down cels) | 107–117 |
-|   5. Clipping | 118–134 |
-|   6. Transparency | 135–146 |
-|   7. DT1 tiles | 147–162 |
-|   8. d2rs mapping (answers the `place` hooks) | 163–181 |
-| Constants & data dependencies | 182–186 |
-| Randomness | 187–190 |
-| Edge cases & original bugs | 191–214 |
-| Test vectors | 215–229 |
-| Provenance | 230–250 |
-| Open questions | 251–267 |
+|   3. Where the cel fields come from | 93–118 |
+|   4. Orientation bit set (top-down cels) | 119–129 |
+|   5. Clipping | 130–146 |
+|   6. Transparency | 147–158 |
+|   7. DT1 tiles | 159–174 |
+|   8. d2rs mapping (answers the `place` hooks) | 175–193 |
+| Constants & data dependencies | 194–198 |
+| Randomness | 199–202 |
+| Edge cases & original bugs | 203–226 |
+| Test vectors | 227–241 |
+| Provenance | 242–262 |
+| Open questions | 263–283 |
 <!-- /index -->
 
 ## Summary
@@ -96,6 +96,18 @@ HANDOFF §7 carried-over #3): the vertical extent is
 |---|---|---|---|---|
 | DC6 frame | none: the file's frame header is the cel (`D2CMP_GetCelFromCelContext` `0x00601840` returns frame `F × dirmap[D][dir] + frame`; the direction map is `unit-composite.md`) | `flip` | `offset_x`, `offset_y` | as stored (`dc6.md` §Pixel decoding) |
 | DCC frame | DCC decoder `0x0060BFF0`, one cel per frame | the frame's `variable0` (copied into the first word) | the frame header's `x offset`, `y offset`, unchanged | re-encoded by `0x0060BDB0`: bottom row first (for bottom-up = 0), index 0 → skip, runs ≤ 127 |
+
+Cache path: when the cel context carries no cel file pointer,
+`0x006001F0` fetches the frame from a store of earlier decoder output
+(built through `0x005FFE90` → `0x005FF760` → `0x005FF6E0` → `0x0060BFF0`)
+as a record with the DC6 frame header layout (records chained by `0x23 +
+length + [+0x14]`). The getter `0x005FEC50` → `0x005FEB80` returns that
+record unchanged as the cel, but only when its orientation word is 0 and
+w, h ≤ 256 (else no cel: nothing drawn); the one-time pass `0x005FEC90`
+only rewrites `+0x18` (`next_block`, not read by the drawer) and ends the
+process with a fatal error (tag `0x58C`, `0x005FEDF4`) on any record
+outside those limits. So a cached
+cel draws exactly like the decoder's cel.
 
 For DCC frames with bottom-up = 0 (all of 1.14d, `dcc.md` OQ1) the cel
 covers exactly the `dcc.md` §Boxes frame box: columns `x_min … x_max`,
@@ -260,7 +272,11 @@ the two candidates; 1.14d code picks the second. No capture yet.
    have offsets (0, 0); end-game rows in §Test vectors (draw positions
    read at `0x0044E8C5`–`0x0044EB2E`). The control panel's draw (X, Y)
    belongs to `client/ui.md`.
-5. Whether the DCC cache path (`0x006001F0` when the cel file pointer is
-   null) can hand the drawer a cel built some other way than `0x0060BFF0`
-   (e.g. a cached copy with changed fields). A Ghidra read of
-   `0x005FEC90`/`0x005FEC50` settles it.
+5. ~~Can the DCC cache path build a cel another way~~: no (§3, cache
+   path). Open: when `0x006001F0` takes the cache branch, and whether
+   the 37 live DCC frames wider or taller than 256 (`GTTRLITA1HTH.dcc` 20
+   frames 345 × 324, `GTTRLITNUHTH.dcc` 4, `THS1LITDTHTH.dcc` 12 with
+   heights 257–274, `RedemptionGhost Big.dcc` 1 at 257 × 214) ever reach
+   it (they would draw nothing). A Ghidra read of `0x005FE990` /
+   `0x0060ACE0` (cache lookup) plus a capture of one of these monsters
+   (`GT`, `THS1`) settles it.

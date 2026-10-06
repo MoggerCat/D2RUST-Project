@@ -21,17 +21,17 @@
 | Rules | 63–64 |
 |   1. Renderers in 1.14d and the reference | 65–104 |
 |   2. Framebuffer | 105–113 |
-|   3. Frame cycle | 114–146 |
-|   4. Palette (one per presented frame) | 147–173 |
-|   5. One pixel write (index domain) | 174–211 |
-|   6. d2rs answers | 212–227 |
-|   7. DirectDraw (display type 3) differences | 228–239 |
-| Constants & data dependencies | 240–245 |
-| Randomness | 246–249 |
-| Edge cases & original bugs | 250–259 |
-| Test vectors | 260–271 |
-| Provenance | 272–291 |
-| Open questions | 292–310 |
+|   3. Frame cycle | 114–161 |
+|   4. Palette (one per presented frame) | 162–188 |
+|   5. One pixel write (index domain) | 189–226 |
+|   6. d2rs answers | 227–242 |
+|   7. DirectDraw (display type 3) differences | 243–254 |
+| Constants & data dependencies | 255–260 |
+| Randomness | 261–264 |
+| Edge cases & original bugs | 265–274 |
+| Test vectors | 275–286 |
+| Provenance | 287–306 |
+| Open questions | 307–326 |
 <!-- /index -->
 
 ## Summary
@@ -139,6 +139,21 @@ The in-game frame (`0x0044C990`), once per client tick (`camera.md` §9):
    `+0x20` = **present**; GDI `0x006C7E30`: `SetDIBColorTable` with all 256
    entries of `0x00989C40`, `StretchBlt` of the W × H DIB to the window's
    client rectangle).
+
+Out-of-game frames start the same way. Every other `StartDraw` caller
+passes `bClear = 1` (same partial GDI clear) except the D2Win control
+drawer:
+
+| Caller | `StartDraw` | extra clear |
+|---|---|---|
+| `0x0044CB60` | 1 (`0x0044CB78`) | `ClearScreen(0)` right after (`0x0044CB88`, wrapper `0x004F63B0` → slot `+0xC4`): whole frame 0 |
+| `0x0044D100` (beta screens, `ui\betascreens\screen01…`) | 1 (`0x0044D126`) | none |
+| `0x0044E770` (end-game screen) | 1 (`0x0044E78E`) | none |
+| `0x004565E0` | 1 (`0x0045661F`) | `ClearScreen(0)` before it (`0x004565F4`) |
+| code at `0x0045FDE0`, `0x00460190`, `0x00460490` | 1 (`0x0045FDEE`, `0x0046019E`, `0x004604A3`) | none |
+| `0x004F98E0` (D2Win controls, only when `[0x007D55D8]` = 0) | 0 (`0x004F9934`) | none: the previous frame stays |
+
+Each skips the frame when `0x004F6070` (`[0x007C9340]`) is non-zero.
 
 The presented frame is exactly the framebuffer at `EndScene` entry.
 Pixels not written in a frame keep the previous frame's index (the
@@ -301,9 +316,10 @@ no palette). No capture yet.
    (inner) rests on the no-`T` case `L[P[s]]`; a capture of a lit,
    remapped, translucent draw confirms it (`composition-0001` if the
    portal is lit).
-3. Out-of-game screens (menus, loading screens, cut-scenes) use other
-   callers of `StartDraw` (`0x0044CB60`, `0x0044D100`, `0x0044E770`,
-   `0x004565E0`, `0x00460190`, `0x004F98E0`): their clear arguments, for
-   `ui/` capture cases.
+3. ~~Clear arguments of the out-of-game `StartDraw` callers~~: answered
+   in §3 (all 1 except the D2Win control drawer, 0). Open: which screen
+   each of `0x0044CB60`, `0x004565E0`, `0x0045FDE0`, `0x00460190`,
+   `0x00460490` draws (Ghidra read of their state-table owners, owner
+   `client/ui.md`), for `ui/` capture cases.
 4. ~~What sets the post-draw clear counter~~: the act load (S→C 0x03,
    §3 step 4).
