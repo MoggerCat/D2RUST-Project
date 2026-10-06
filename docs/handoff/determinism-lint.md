@@ -1,6 +1,6 @@
 # Handoff: determinism lint — `claude/determinism-lint`
 
-> Not yet folded into `docs/HANDOFF.md` / `docs/PLAN.md` (neither is edited here); the coordinator folds it.
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
 
 Cloud tooling session, 2026-10-06, base `main` `edad871`. Repo only (M09).
 Makes CLAUDE.md hard rule 6 machine-checked (M05, M07).

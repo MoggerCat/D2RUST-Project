@@ -1,5 +1,7 @@
 # Handoff: end-to-end single player, remaining spec-owned steps — `claude/e2e-next`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7) and `docs/PLAN.md` as of this commit; this file stays as the detailed record.
+
 Cloud implementation session, 2026-10-06, task class: integration from
 clear specs, medium (METHODS M14). Base: `main` at `edad871`. Repo only,
 synthetic tables, fixed seeds, no game files (M09). For the coordinator
