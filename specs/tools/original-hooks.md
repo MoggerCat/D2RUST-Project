@@ -3,7 +3,8 @@
 - **Status:** draft: every address read from the 1.14d disassembly
   (`tools/ghidra/disasm.py`) or the file image; thread, client id,
   player GUID and message bytes from the existing recordings; the
-  injection and start-up procedures are not yet run (Open questions 1–3).
+  injection, seed and start-up procedures are not yet run (Open
+  questions 1–3).
 - **Target version:** 1.14d
 - **Crate/module:** `tools/trace-recorder/run_scenario.py` (debugger
   recorder, Python; spec-role tool)
@@ -17,21 +18,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 37–49 |
-| Inputs | 50–56 |
-| Outputs / state changes | 57–61 |
-| Rules | 62–63 |
-|   1. Client→server message entry (single player) | 64–128 |
-|   2. Game seed at game creation | 129–172 |
-|   3. Tick boundary | 173–214 |
-|   4. Unit snapshot fields | 215–218 |
-|   5. Starting single player without a human | 219–222 |
-| Constants & data dependencies | 223–230 |
-| Randomness | 231–235 |
-| Edge cases & original bugs | 236–240 |
-| Test vectors | 241–247 |
-| Provenance | 248–255 |
-| Open questions | 256–262 |
+| Summary | 38–50 |
+| Inputs | 51–57 |
+| Outputs / state changes | 58–62 |
+| Rules | 63–64 |
+|   1. Client→server message entry (single player) | 65–129 |
+|   2. Game seed at game creation | 130–173 |
+|   3. Tick boundary | 174–215 |
+|   4. Unit snapshot fields | 216–266 |
+|   5. Starting single player without a human | 267–372 |
+| Constants & data dependencies | 373–385 |
+| Randomness | 386–390 |
+| Edge cases & original bugs | 391–395 |
+| Test vectors | 396–402 |
+| Provenance | 403–417 |
+| Open questions | 418–456 |
 <!-- /index -->
 
 ## Summary
@@ -214,11 +215,160 @@ game). `record_tick.py` (`TICK`) and `record_packets.py` (`tick`,
 
 ### 4. Unit snapshot fields
 
-Written in the next push.
+Read at the snapshot point of §3 rule 3, game = the ESI of `0x0052FD1E`
+(or the ECX of `0x0052D870`). Every offset below is owned by the spec in
+the last column; this table only gathers them.
+
+1. **Walking the units** (`unit-order.md` §2 rule 4): per type, buckets
+   0..127 at game +0x1120 + `offset(type)` + 4·bucket, offsets player
+   0x000, monster 0x200, object 0x400, item 0x600, missile 0x800 (table
+   `0x006E10E0`); each bucket from its head through unit +0xE4. Tiles:
+   one list at game +0x1B20, same link. This is the order
+   `record_tick.py` snapshots use (`HASH_BASE`, `HASH_OFFSETS`,
+   `TILE_LIST`, `U_HASH_NEXT`). Every unit in these lists is a server
+   unit (unit +0xC8 bit 0x4000000, `units.md` §2); a trace should sort
+   by (type, GUID) rather than rely on walk order, unless walk order is
+   itself under test.
+2. **Fields:**
+
+| Field | Read | Owner |
+|---|---|---|
+| type | u32 unit +0x00 | `units.md` §1–§2 |
+| class (txt row) | u32 unit +0x04: player class 0–6, monstats row, objects row, missiles row, item row | `units.md` §2 |
+| GUID | u32 unit +0x0C | `unit-order.md` §1 |
+| mode | u32 unit +0x10 | `units.md` §1, §4 |
+| act | u8 unit +0x18 (act record at unit +0x1C) | `units.md` §2 |
+| flags, flags 2 | u32 unit +0xC4, +0xC8 | `units.md` §2 |
+| path | u32 unit +0x2C; null for items not on the ground and for some units in transit | `path-placement.md` §2.1 |
+| precise x, y (types 0, 1, 3) | u32 dynamic path +0x00, +0x04 (16.16) | `path-placement.md` §1 rule 2, §2.3 |
+| sub-tile x, y (types 0, 1, 3) | u16 dynamic path +0x02, +0x06 (high words of the above) | `path-placement.md` §2.1 |
+| sub-tile x, y (types 2, 4, 5) | u32 static path +0x0C, +0x10 | `path-placement.md` §2.2 |
+| target x, y (types 0, 1, 3) | u16 dynamic path +0x10, +0x12 | `path-placement.md` §2.3 |
+| active room | dynamic path +0x1C; static path +0x00 (`0x00620BB0`) | `path-placement.md` §2.1 |
+| level id | active room +0x10 → DRLG room +0x58 → level +0x1D0 | `drlg/rooms.md` §1, `drlg/levels.md` |
+| unit seed | u32 × 2 unit +0x20 | `rng.md` §5.3 |
+| stat list | u32 unit +0x5C (extended list; null: no stats) | `stat-lists.md` §1 |
+
+3. **Life and mana.** From the extended list at unit +0x5C read the
+   full array (pointer list +0x48, i16 count list +0x4C), entries of 8
+   bytes: u16 layer, u16 stat, i32 value; the first dword is the key
+   `(stat << 16) | layer`, sorted ascending (`stat-lists.md` §1,
+   `stats.md` §1). Keys with layer 0: life 6 (`hitpoints`), max life 7,
+   mana 8, max mana 9, stamina 10, max stamina 11. Their values are 8.8
+   fixed point (`ValShift` 8, `stats.md` §2 rule 2): record the raw i32;
+   points = value >> 8 (arithmetic). An absent key reads 0. The raw
+   full-array value is what the game stores; the unit-total reader
+   `0x00625480` additionally applies the minimum rule (`stats.md` §4.3),
+   so a trace that records "total" must say which one it records.
+4. Player-only: the client record (game +0x88, next +0x4A8) holds the
+   client state at +0x04 (`tick.md` §6); the player unit is found in the
+   player hash list (GUID 1 for the only player, Test vectors).
 
 ### 5. Starting single player without a human
 
-Written in the next push.
+#### 5.1 Command line (1.14d)
+
+1. **Parser** `0x004058A0` (ECX = command line, [ESP+4] = config
+   record): scans for `-`, looks the switch up (`0x00405710`, exact
+   byte compare `0x00405570`, so case-sensitive) in the switch table
+   `0x00705040` (58 records of 0x5C bytes, to `0x00706518`). Record:
+   ini section char[0x1B] +0x00, ini key char[0x1B] +0x1B, switch
+   char[0x1B] +0x36, type u8 +0x51, config offset u32 +0x54, ini default
+   u32 +0x58. Type 0: config byte := 1 (flag, no value); 1: config u32 :=
+   `atol(value)`; 2: string copied into the config.
+2. **Order** (`0x004059A0`, called at `0x0040657F` with the config on the
+   start-up function's stack, `[ebp−0x4D8]`): zero 0x3CD config bytes;
+   read every switch's ini key from `D2.ini` (`0x00405450`, default from
+   the record); then the command line, which overrides.
+3. **Applied at every client-mode start**: client entry `0x0044B8A0`
+   (stdcall; [ESP+8] = config, kept in `0x007A0438`) → `0x0044B6B0` →
+   `0x0044D9F0`, which runs the 52-entry handler table `0x0070F488` on
+   the config. Switches the tool needs:
+
+| Switch | Config | Handler | Effect |
+|---|---|---|---|
+| `-w` (`-window`, `-windowed`) | +0x08 | `0x0044D760` | windowed |
+| `-ns`, `-nosound` | +0x220 | not traced | no sound |
+| `-name S` | +0xBD (string) | `0x0044D890` | character name := first ≤ 15 chars of S into `0x007A05C4` (16 bytes, zeroed first); skipped when S is `0` |
+| `-ama`, `-sor`, `-nec`, `-pal`, `-bar` | +0x85, +0x87, +0x88, +0x86, +0x89 | `0x0044D6B0` | class `0x007A0522` := 0, 1, 2, 3, 4; config +0x8A → 5, +0x8B → 6 exist with no switch; the last set byte in the order +0x85…+0x8B wins |
+| `-seed N` | +0x21A (u32) | `0x0044D860` | N ≠ 0: fixed game seed (§2 rule 3) |
+| `-nosave` | +0x219 | `0x0044D580` | `0x007310CC` := 0 (`0x00530F30`); the server save routines `0x00531EB0` and `0x00532240` return without writing while it is 0 (initial 1) |
+| `-act N` | +0x1FF (u32) | `0x0044D5A0` | 1 ≤ N ≤ 5 else fatal assert; `0x0052DFA0(N − 1)` stores it in `0x00883D44`, read at game creation (`0x00530E17`) |
+| `-gametype N`, `-gamename S` | +0x19, +0x1F | `0x0044D5F0` | client game type `0x007A0610` := N (0 single player); game name `0x007A05DC` |
+| `-txt` | +0x215 | `0x0044D9C0` | `0x006125A0(config +0x215 == 0)` |
+| `-direct` | +0x204 | not traced | file I/O |
+| `-skiptobnet` | +0x35D | none | read by the menu `0x004359D0` (`0x00435BB3`) |
+
+4. **There is no difficulty switch**: no record of the table names one.
+   Difficulty comes from config +0x210 (§5.2), written only by menu code
+   (`0x00439840`, `0x00439AF0`, `0x0043AE30`, `0x0043B080`, `0x00445FF0`).
+
+#### 5.2 Game creation message 0x67
+
+Built by `0x00477CA0` (called at `0x0044F45E` from client state handler
+`0x0044F360` when the client game type is not 3, 7 or 9; ECX = game
+name `0x007A05DC`), sent through `0x0052AE50` (46 bytes) and handled by
+system message 0x67 → `0x00530BF0` (`intents-events.md` §2.5; layout in
+`client-messages.tsv`):
+
+| Byte | Source | Server use (`0x0053F141`–`0x0053F17A` → `0x00530BF0`) |
+|---|---|---|
+| +0x01 | game name (16) | |
+| +0x11 | 3 when the client game type is 0 (2 for 8, 1 for 6, else 0) | game +0x6A |
+| +0x12 | class: `0x00712F00` (the `-ctemp` value) when bit 8 of `0x00712EFC` is set, else `0x007A0522` | |
+| +0x13 | config +0x20D | game +0x6B |
+| +0x14 | **difficulty**, config +0x210 | game +0x6D |
+| +0x15 | character name `0x007A05C4` (16) | save file name (§5.3) |
+| +0x25 | config +0x207 (u16) | |
+| +0x27 | config +0x209 (u32; 0 → 0x100004) | bit 0x100000 tested at `0x00530D05` |
+| +0x2B, +0x2C | config +0x20E, +0x20F | |
+| +0x2D | `0x00525150()` | |
+
+Recorded: `…-015956-packets.jsonl` sends +0x11 = 3, +0x12 = 4, +0x14 =
+0, name `charactertest`; `…-022633` sends class 1, name `werwer`.
+
+#### 5.3 Save load (single player)
+
+1. Player creation calls `0x005345A0` (caller `0x00539804`): with game
+   +0x6A ∉ {1, 2} and no host callbacks (`0x00883D50` = 0, single
+   player) it goes to `0x005344B0` → `0x005343A0`, which reads the save
+   **from disk itself** (no 0x6C upload: none in either recording).
+2. `0x005343A0`: path = `sprintf("%s%s.d2s", save dir, name)` (format
+   `0x006D4230`); save dir from `0x00407050` (registry values
+   `NewSavePath`, then `Save Path`, of the `Diablo II` key, read through
+   `0x00414E50`; the fallback is not traced, Open question 4); `fopen`
+   mode `rb` at `0x00534410`; reads ≤ 0x2000 bytes; then `0x00534330`:
+   needs ≥ 8 bytes and magic 0xAA55AA55 at +0; version (+4) ≤ 0x5B →
+   `0x00534020`, else `0x0056B180`.
+3. The v0x60 loader sets the client's act from save byte +0xA8 +
+   difficulty (low 7 bits, ≥ 5 → 0; `0x0056A1D8`–`0x0056A1F7`) and the
+   map seed of §2.
+
+#### 5.4 Procedure
+
+1. Launch `Game.exe -w -ns -nosave -name <name> -<class>` under the
+   debugger (same reference-hash check as the recorders). `-nosave`
+   keeps the `.d2s` byte-identical across runs and untouched in `game/`.
+2. Force the menu to end as `dump_tables.py` does (README, "When the
+   tables load"): with launcher mode `0x0074C704` = 4, write next mode
+   1 to `0x007795E8` and 0 to the menu-loop flag `0x0072DDD4`.
+3. Breakpoint `0x0044B8A0` (bytes `55 8B EC 56 8B 75`): config = [ESP+8].
+   Write config +0x210 := difficulty (0, 1, 2). For class 5 or 6 write
+   config +0x8A or +0x8B := 1. The handlers of §5.1 rule 3 run after this
+   point and copy name and class.
+4. Arm the seed overrides of §2 (`0x0052C2BB`, `0x0052C2E3`) before
+   0x67 is drained.
+5. The client loads the tables, then its state machine (`0x0070EE4C`,
+   handlers `0x0070EE54`: state 3 `0x0044D080` moves on when
+   `0x0070EF18` = 5; state 2 `0x0044F360`) sends 0x67 (§5.2). The server
+   creates the game and loads the save in the next drain; the first tick
+   (frame 1) follows.
+6. What must hold: the save exists at the path of §5.3 rule 2, version
+   0x60, for that name; the chosen difficulty is one the save has reached
+   (save byte +0xA8 + difficulty bit 7; Open question 6); client game
+   type stays 0 (no `-gametype`); nothing else is needed from a human
+   once 0x67 is sent (the hand-played recordings send nothing but system
+   messages 0x67, 0x6D, 0x6B before the first game message).
 
 ## Constants & data dependencies
 
@@ -227,6 +377,11 @@ Written in the next push.
 | `0x007A0610` | client game type (0 single player) |
 | `0x00882D10`, `0x00882B34` | local mode (1), connected flag |
 | `0x00731004` | fixed game seed (−1 = none) |
+| `0x007A05C4`, `0x007A0522` | character name (16 bytes), class |
+| `0x007310CC` | save enabled (1; `-nosave` → 0) |
+| `0x0074C704`, `0x007795E8`, `0x0072DDD4` | launcher mode, next mode, menu-loop flag (`dump_tables.py`) |
+| `0x00705040` | command-line switch table, 58 × 0x5C bytes |
+| `0x0070F488` | switch handler table, 52 entries |
 
 ## Randomness
 
@@ -250,8 +405,15 @@ of `rng.md` §5.1–§5.2 before the first draw.
 - 1.14d `Game.exe`, disassembly via `tools/ghidra/disasm.py` (`fn`, `at`,
   `xref`) over `re/exports/functions.tsv` and `re/exports/all.asm`;
   instruction bytes read from the file image (pefile).
-- Single thread, client id 0, player GUID 1: the two packet recordings
-  named in Test vectors.
+- Single thread, client id 0, player GUID 1, 0x67 bytes, absence of a
+  0x6C save upload: the two packet recordings named in Test vectors.
+- Switch table: decoded from the file image (58 records, section, key,
+  switch, type, offset, default); parser and handler tables from the
+  disassembly. D2MOO (1.10f) was used only for field names (game +0x6B,
+  +0x6D, +0x7C, +0x84); each read or write named here was located in the
+  1.14d code.
+- Correction made to `sim/rng.md` §5.2: `0x0052C320` has two callers
+  (`0x0044D86B`, `0x00451909`).
 
 ## Open questions
 
@@ -259,3 +421,35 @@ of `rng.md` §5.1–§5.2 before the first draw.
    `0x0052AE50` at `0x0044F136` give `c2s`, `dispatch` and `result` 0 in
    the same drain, with `dispatch.game_frame` = N−1? Probe: inject at a
    known tick with `record_packets.py` hooks armed.
+2. Forced start: after §5.4 steps 1–3, does the client send 0x67 with
+   the given name, class and difficulty, and does tick 1 run with no
+   input? Probe: `record_packets.py` hooks plus the §5.4 writes; expect a
+   `c2s_sys` 0x67 with those bytes and a `tick` with frame 1. If state 3
+   never advances, log `0x0070EF18` per frame.
+3. Seed override: with T and I set, does the game seed at game +0xD0
+   after `0x0052C2C6` equal one step of `{T, 666}`, and do two runs give
+   identical `record_rng.py` chains? Probe: `record_rng.py --no-inline`
+   plus the two overrides, run twice, diff.
+4. Save dir fallback when neither registry value exists: probe a
+   breakpoint at `0x00534410`, read the path string at [ESP].
+5. Second caller of `0x0052C320` at `0x00451909` (code outside the
+   Ghidra function list, near `0x004518E0`): what triggers it, and can
+   it change `0x00731004` during a scenario? Probe: breakpoint on it.
+6. A difficulty the save has not reached (save byte bit 7 clear): does
+   the join fail, or does the game start with the clock-derived +0x7C?
+   Probe: §5.4 with D = 2 on a fresh character.
+7. Does the server use the 0x67 class byte (+0x12) when it loads a save
+   of another class? Probe: start with a mismatched `-<class>`.
+8. `-act N` in single player: the v0x60 load sets the act again
+   (`0x0056A1F7`); does `0x00883D44` have any effect after that? Probe:
+   `-act 2` with an act-1 save.
+9. Does any server path in a scenario call `time_value` (`0x00650DE0`)
+   after game creation (unit-seed fallback, `rng.md` §5.3)? Probe:
+   breakpoint on `0x00650DE0`, log the caller, over a full scenario.
+10. Are client frames skipped (`0x0044EFD9` early return, `0x004F6070`)
+    when the game window is not focused or minimized under the debugger?
+    Probe: count `0x0044F136` hits per second with the window in the
+    background.
+11. Item position for items not on the ground (path null): which fields
+    (owner, inventory grid, body location) a snapshot should read; owned
+    by the item specs.
