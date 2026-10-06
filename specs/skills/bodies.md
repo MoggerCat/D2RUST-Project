@@ -31,19 +31,19 @@
 | Outputs / state changes | 73–80 |
 | Rules | 81–82 |
 |   1. Conventions | 83–114 |
-|   2. Shared helpers | 115–504 |
-|   3. Start functions (srvst) | 505–594 |
-|   4. Do functions (srvdo) | 595–778 |
-|   5. `srvmissile` path | 779–794 |
-|   6. Shared helpers, batch 2 | 795–1133 |
-|   7. Start functions (srvst), batch 2 | 1134–1200 |
-|   8. Do functions (srvdo), batch 2 | 1201–1599 |
-| Constants & data dependencies | 1600–1646 |
-| Randomness | 1647–1665 |
-| Edge cases & original bugs | 1666–1714 |
-| Test vectors | 1715–1735 |
-| Provenance | 1736–1766 |
-| Open questions | 1767–1791 |
+|   2. Shared helpers | 115–524 |
+|   3. Start functions (srvst) | 525–615 |
+|   4. Do functions (srvdo) | 616–812 |
+|   5. `srvmissile` path | 813–828 |
+|   6. Shared helpers, batch 2 | 829–1167 |
+|   7. Start functions (srvst), batch 2 | 1168–1234 |
+|   8. Do functions (srvdo), batch 2 | 1235–1633 |
+| Constants & data dependencies | 1634–1680 |
+| Randomness | 1681–1699 |
+| Edge cases & original bugs | 1700–1749 |
+| Test vectors | 1750–1770 |
+| Provenance | 1771–1808 |
+| Open questions | 1809–1832 |
 <!-- /index -->
 
 ## Summary
@@ -357,8 +357,12 @@ Handler record (0x20 bytes, list head unit +0x90): +0x00 event (u8),
 +0x10 level, +0x14 function, +0x18 previous, +0x1C next.
 
 - Register `0x0056E740(game, unit, event, skill, L, func, type, key)`:
-  func > 49 or table `0x007325B0[func]` null → 0. Else `0x005C0AD0`:
-  allocate the record and **prepend** it to the unit's list.
+  func > 49 (unsigned compare: negative func too) or table
+  `0x007325B0[func]` null → 0. Else `0x005C0AD0`: allocate the record
+  and **prepend** it to the unit's list. The table has 50 u32 slots
+  (0…49, dumped from the file): slot 0 and slots 32…49 are null, 1…31
+  hold functions (addresses `0x005BF670`…`0x005CAD40`), so every func
+  outside 1…31 returns 0 and allocates nothing.
 - Unregister `0x005C0B50(game, unit, type, key)`: for each record with
   this type and key, in list order: flags bit 0 set (running) → flags
   |= 2; else unlink and free it.
@@ -389,9 +393,12 @@ P[`aurastat1`] > 0.
   - 3 `0x005D3880`: `roll_elemental(unit, record, k, lvl)`
     (`levels.md` §3.6); k's `EType` = 4 (cold), n ∈ {2, 3} and `Param2`
     ≠ 0 → freeze length (+0x34) += cold length (+0x30) / `Param2`
-    (signed); result |= 0x4000.
+    (signed). Then result |= 0x4000 whatever the freeze test gave (it
+    follows the clause, not inside it), on every charge that reached
+    the roll.
   - 4 `0x005D3970`: `roll_elemental`; `EType` = 4, n = 3 and `Param5` ≠
-    0 → freeze length += cold length / `Param5`; result |= 0x4000; p =
+    0 → freeze length += cold length / `Param5`; result |= 0x4000
+    (always, as in 3); p =
     `eval(calc1)` > 0 → p = min(p, 100); c = min(pct(physical, p, 100),
     physical); physical −= c; `0x0056C8E0(unit, record, EType, c, 0, 0,
     0)` adds c as that element (`levels.md` §3.6).
@@ -452,6 +459,19 @@ without an inventory.
      location is now free, it is equipped there (`0x00562A30(game,
      player, its GUID, location)`). When that does not happen and the
      `0x0062E830` value was non-zero: `0x0057FF70(game, location)`.
+
+   Helpers: `0x0062A0F0(item)` = an item (type 4) whose quality (item
+   data +0x00) is 4…9 (magic or better); so a normal or superior empty
+   throwing weapon is used up, a magic or better one breaks.
+   `0x0062E830(item)` = the item type's `reequip` (itemtypes +0x12,
+   u8; 0 for a non-item or invalid type). `0x0057FF70(game, location)`
+   (player in EDI): the item whose GUID is in player data +0x90 (the
+   "re-equip" item); if it exists, the player has an inventory, the
+   item's +0x45 byte is 0, it belongs to that inventory (item data
+   +0x5C) and the placement test `0x0055D710(player, item, &location,
+   0)` succeeds: the location must be free (occupied → fatal error),
+   and the item is equipped there (`0x00562A30`). In every case player
+   data +0x90 := 0 (`0x006233A0(player, none)`).
 3. Restore the saved skills, right then left: a saved skill that still
    exists (`0x006439B0(player, id, owner)`), differs from the current
    one of that side and whose `0x00647960` kind is neither 2 nor 7 is
@@ -565,7 +585,8 @@ monstats2 has `corpseSel` (`0x004638A0(class, 7)`), and its monstats
 1. R invalid, T none, or T's room in town → 0.
 2. `0x0056E520(unit, eval(calc3))`: a list (pool 0, flags 4, expire 0,
    owner the unit) attached with `attackrate(68)` := the value, anim
-   refresh. Its removal is not in this body (Open question 4).
+   refresh. The list has no state; it is TEMPONLY, so it goes at the
+   unit's next mode change (`sim/stat-lists.md` §8.9).
 3. Zeroed record; result = `melee_result(game, unit, T, to_hit(unit,
    skill, L), 0)`.
 4. Hit: result |= `ResultFlags`; hit flags |= `HitFlags`; `HitClass`
@@ -675,11 +696,15 @@ Life Tap, Decrepify, Lower Resist, Blood Mana, Defense Curse.
 4. r = `eval(aurarangecalc)`; d = `eval(auralencalc)`. ai → d = d /
    `AiCurseDivisor` (difficultylevels +0x1C of the game's difficulty;
    skipped when 0; 1.14d: 1, 2, 4).
-5. Context (0x68 bytes): game, unit, ai, upd, skill, L, d, stats[6],
-   values[6], state = `auratargetstate`, `auraevent1–3`,
+5. Context (0x68 bytes, zeroed first): game, unit, ai, upd, skill, L,
+   d, stats[6], values[6], state = `auratargetstate`, `auraevent1–3`,
    `auraeventfunc1–3`. For i = 1…6: `aurastat_i` < 0 or ≥ count → stat
    −1, stop; no itemstatcost record → stop; record has `updateanimrate`
    (+0x04 bit 9) → upd = 1; stat = it, value = `eval(aurastatcalc_i)`.
+   Slots after a stop (and slot i after a no-record stop) keep the
+   zeroing: stat 0, value 0. Per unit, stat 0 is "valid" and
+   `scaled(U, 0, 0)` = 0, so such a slot sets nothing (step 6); in slot
+   1 it makes v1 = 0 and the unit is skipped (step 2).
 6. Return `scan_point(game, aurafilter, unit, r, 0x005C35C0, context)`
    (§2.12).
 
@@ -688,8 +713,8 @@ Per unit U (`0x005C35C0`, ECX U, EDX context):
 1. ai: U must be a monster, its alignment (`0x006259B0`) ≠ 1, and
    `can_switch(U, k)` (k = 10 for state 23, 11 for 56; Open question 7);
    else 0.
-2. v1 = 0; stat1 ≥ 0 → v1 = `scaled(U, stat1, value1)` (§2.10); v1 = 0
-   → 0.
+2. v1 = 0; stat1 ≥ 0 → v1 = `scaled(U, stat1, value1)` (§2.10), and
+   v1 = 0 → 0. stat1 = −1 (no `aurastat1`) goes on with v1 = 0.
 3. `0x005C3420(game, unit, U)`: U non-null; a monster U needs a walk
    mode (`0x0046C140(class, 2)`) and no type flag 0x20 (possessed,
    `0x005A0180`); U flags +0xC4 bits 0x4, 0x8 and 0x2 all set; U alive;
@@ -712,8 +737,17 @@ Per unit U (`0x005C35C0`, ECX U, EDX context):
 else `0x005DD480(U, k)`: U a monster, k ≤ 19, no state 54, its class
 switch-capable (`0x00623470`: has a walk mode, not `boss`, `switchai`),
 (unit flags 0x4 set or U alive), no type flag 0x2 or 0x8 (superunique,
-unique); k = 19 → 1; else `0x005B0DA0`: k ∈ {10, 11, 12} → not
-superunique and switch-capable; other k → 1.
+unique); k = 19 → 1; else `0x005B0DA0(U, monstats record of U's
+class, k, 1)`: k ∈ {10, 11, 12} → not superunique (type flag 2) and
+switch-capable; other k → 1. The monstats argument is never read (the
+register is overwritten before any use; the class is re-read from U).
+The per-unit test of step 1 computes k = 10 for state 23, 12 for 27, 11
+for 56, else 0, but only runs when ai = 1 (states 23 and 56): k = 12 is
+never used. Live 1.14d: 543 of 734 monstats rows are switch-capable
+(`switchai` 1, `boss` 0, monstats2 mode WL); Terror and Dim Vision
+switch exactly those classes, minus units that are unique or
+superunique, have state 54, base class 492 with state 143, or fail
+step 3.
 
 #### 4.5 65 Basic aura `0x005CF010`
 
@@ -1669,7 +1703,8 @@ per ring, n per Multiple Shot) takes one game-seed step
    aura state lists on itself and its targets, with no stats (§4.5 step
    4); the passive stats need mana strictly above the cost.
 2. Bash's attack-rate list (§3.8 step 2) is attached on every start and
-   removed elsewhere (Open question 4).
+   removed with the unit's next mode change (TEMPONLY,
+   `sim/stat-lists.md` §8.9).
 3. Srvdo 2 accepts `srvoverlay` = overlay count (one past the table)
    and returns 1 without applying the melee when no combat record
    exists for the target (§4.2 steps 2–3).
@@ -1763,6 +1798,13 @@ Ghidra backlog (2026-10-06): `0x00580310` (`0x005801E0`, `0x00580030`,
 `0x00580280`), `0x00580380`, break `0x0055F850`, breakable test
 `0x00629930`; `0x00575900` with `0x00575850`; `0x005C0C30`. Stat names
 from live `itemstatcost`.
+Implementation questions SB2, SB3, SB6, OQ4, OQ7 (2026-10-06), from
+the asm: `0x0056E740` with the 50-slot table `0x007325B0` dumped from
+the file; `0x005D3880`, `0x005D3970`; `0x005C37C0`, `0x005C35C0`;
+`0x0062A0F0`, `0x0062E830`, `0x0057FF70`, `0x006233A0`, `0x00628250`,
+`0x0063AD50`; `0x005B0DA0`, `0x005DD480`, `0x00623470`, `0x0046C140`
+(monstats +0x18 → monstats2 mode bits +0xF0); the 543 count from the
+`patch_d2` monstats.txt / monstats2.txt.
 
 ## Open questions
 
@@ -1774,14 +1816,13 @@ from live `itemstatcost`.
    §3.8, §4.1.
 3. Recording: Amplify Damage on an immune monster (stat 36 value in the
    list) and Dim Vision in Nightmare (expiry − F).
-4. ~~Attack-mode cleanup bodies~~: answered in §2.16. Open: who
-   removes Bash's flag-4 attack-rate list; the helpers `0x0062A0F0`,
-   `0x0062E830`, `0x0057FF70` (items spec).
+4. ~~Attack-mode cleanup bodies~~: answered in §2.16, with the
+   helpers `0x0062A0F0`, `0x0062E830`, `0x0057FF70`; Bash's list:
+   `sim/stat-lists.md` §8.9.
 5. ~~`0x00575900`~~: answered in §2.17 (pet maxima; no message).
 6. ~~Unit event handler iteration~~: answered in §2.18.
-7. `0x005B0DA0` second argument (monstats) and AI kinds 10–12
-   (`monsters/ai.md` special states): confirm which classes Terror and
-   Dim Vision can switch.
+7. ~~`0x005B0DA0`~~: answered in §4.4 (`can_switch`): the monstats
+   argument is unused; 543 live classes.
 8. Answered: the player pet lists (add `0x00575D90`, lookup
    `0x00574A20`) are specified in `sim/pets.md`.
 9. Recording: Raise a Druid summon and a Clay Golem: confirm stats 12,

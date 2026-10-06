@@ -41,10 +41,10 @@
 |   8. Gold amount | 467–479 |
 | Constants & data dependencies | 480–509 |
 | Randomness | 510–526 |
-| Edge cases & original bugs | 527–542 |
-| Test vectors | 543–571 |
-| Provenance | 572–596 |
-| Open questions | 597–617 |
+| Edge cases & original bugs | 527–550 |
+| Test vectors | 551–580 |
+| Provenance | 581–605 |
+| Open questions | 606–629 |
 <!-- /index -->
 
 ## Summary
@@ -539,6 +539,14 @@ draw only 2–9. Nothing in §1–§4 draws.
 8. D2MOO 1.10f differences: on an exact hit the expansion search returns
    `max(lo − 1, 0)` instead of `m` (1.14d: `m`, §5.5); the act 5 chest
    range ends at level 132 (1.14d: 136); player count lacks `S` (§5.4).
+9. `M` ≤ −100 jumps past the itemtypes `magic` gate (§6 step 5:
+   `0x0055871F` branches to the superior step at `0x00558921`; the gate
+   is at `0x005588B4`), so a `magic` itemtype (rings, amulets, jewels,
+   charms) can get drop quality 3, 2 or 1. Creation does not keep it:
+   the quality dispatch overrides any quality outside 4–9 to 4 for a
+   `magic` itemtype (`items/quality.md` §4 step 3.1, `0x005574E6`–
+   `0x00557513`). The drop quality only changes the draws: steps 1–5
+   draw nothing and the item comes out magic. (Handoff triage Q3.)
 
 ## Test vectors
 
@@ -555,6 +563,7 @@ Synthetic (from the rules; CI-safe). RNG steps per `rng.md` §2.
 | Same with `M` = 100 | unique `f` 171, `b` 28444; set `f` 183, `b` 10491; rare `f` 185; magic `f` 200, `b` 1792 | §6 step 6 |
 | Slot mod magic 1024 (e.g. `Andariel`), magic step reached | chance 0 → 4 without a draw | §6 |
 | Negative picks −2, entries prob 1, 2 | picks give `r` 0 → entry 0, `r` 1 → entry 1; no draw | §5.3 |
+| Quality, `M` = −100, an item of a `magic` itemtype (`amul`; not `normal`, not `unique`, not `quest`), ratio row as above (HiQuality 12/8), `L` 99, item `level` 1 | `D` 98, `h` = (12 − 12) × 128 = 0 → 3, no draw; creation sets quality 4 (`items/quality.md` §4 step 3.1) | §6 step 5, edge case 9 |
 
 Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
 
@@ -614,3 +623,6 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
 7. `0x005541B0` ("living") in the player and party counts is read as
    D2MOO's living check, not confirmed.
 8. Answered: `sim/path-placement.md` §7 (search, no RNG draw) and §9 (floor drop, §7 step 2 here).
+9. Answered (handoff `triage-game-findings` Q3): edge case 9; the d2rs
+   sweep's "`magic` ⇒ q ≥ 4" holds after creation, not for the drop
+   quality when `M` ≤ −100.

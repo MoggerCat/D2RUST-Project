@@ -27,28 +27,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 54–68 |
-| Inputs | 69–77 |
-| Outputs / state changes | 78–83 |
-| Rules | 84–85 |
-|   1. Coordinates | 86–99 |
-|   2. Path records | 100–203 |
-|   3. Size, collision pattern, footprint mask | 204–244 |
-|   4. Collision queries | 245–325 |
-|   5. Footprints | 326–378 |
-|   6. Moving a footprint | 379–411 |
-|   7. Nearest free point (`0x0064DEA0`) | 412–476 |
-|   8. Coarse free-box search (`0x0064E840`) | 477–509 |
-|   9. Floor drop placement (`0x00555DA0`) | 510–532 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 533–582 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 583–624 |
-|   12. Warp tiles and warp arrival | 625–685 |
-| Constants & data dependencies | 686–704 |
-| Randomness | 705–714 |
-| Edge cases & original bugs | 715–750 |
-| Test vectors | 751–788 |
-| Provenance | 789–817 |
-| Open questions | 818–885 |
+| Summary | 55–69 |
+| Inputs | 70–78 |
+| Outputs / state changes | 79–84 |
+| Rules | 85–86 |
+|   1. Coordinates | 87–100 |
+|   2. Path records | 101–204 |
+|   3. Size, collision pattern, footprint mask | 205–245 |
+|   4. Collision queries | 246–326 |
+|   5. Footprints | 327–379 |
+|   6. Moving a footprint | 380–412 |
+|   7. Nearest free point (`0x0064DEA0`) | 413–477 |
+|   8. Coarse free-box search (`0x0064E840`) | 478–510 |
+|   9. Floor drop placement (`0x00555DA0`) | 511–533 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 534–583 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 584–625 |
+|   12. Warp tiles and warp arrival | 626–686 |
+|   13. Where a joining character stands at tick 0 | 687–731 |
+| Constants & data dependencies | 732–750 |
+| Randomness | 751–760 |
+| Edge cases & original bugs | 761–796 |
+| Test vectors | 797–834 |
+| Provenance | 835–869 |
+| Open questions | 870–944 |
 <!-- /index -->
 
 ## Summary
@@ -683,6 +684,51 @@ Arithmetic of §12.1 rule 3 and rule 5 is 32-bit two's complement; the
 Callers: `0x00548C32` (C→S 0x13 on a warp tile), `0x00581F3A`,
 `0x00582027`, `0x0059D9EF`.
 
+### 13. Where a joining character stands at tick 0
+
+Owner of the game-entry position; the search itself is §11.
+
+1. **No saved position.** Game entry `0x005394A0` (ECX = client, EDX =
+   player; stack game, room, x, y) takes a room and point only from its
+   act-change callers `0x0053A2F0`, `0x0053A420`. The join path (C→S
+   0x6B → `0x0052C550` → `0x00530190`, `sim/intents-events.md`) creates
+   the act (`drlg/levels.md` §2, `0x0052C210`) and passes room 0, x 0,
+   y 0, so the point always comes from the §11 spawn search. A loaded
+   save places the player exactly as a new character.
+2. **Act and level.** Act = the client's act byte (client +0x1AC,
+   `0x005382B0`); level = the act's town (act +0x08: 1, 40, 75, 103,
+   109; `drlg/levels.md` §2 rule 2). The byte is written at join:
+   - from the global `0x00883D44` (game creation `0x00530BF0` at
+     `0x00530E17`, join `0x0052FA50` at `0x0052FB90`); the global is 0
+     except through the setter `0x0052DFA0` (no direct caller) and is
+     cleared at shutdown (`0x0052C030`);
+   - from the save (`0x00532690`, the header reader of the save parser
+     `0x00534020`): header byte +0x58 (header: 0x82 bytes, u32
+     0xAA55AA55 at +0x00, u16 0x82 at +0x20), low nibble = act, high
+     nibble = difficulty. Act ≥ 5 or difficulty ≥ 3 takes the error
+     exit (`0x00532BC2`). If that difficulty equals the game's (game
+     +0x6D) the act is used, else act 0. When it matches and game +0x6A
+     = 3 and game +0x84 = 0, the header's map ID (+0x7E) is also copied
+     into game +0x7C.
+   Which write is last on a single-player load of a saved character is
+   open question 8.
+3. **Spawn point.** §11 with tile index 0 and size 2: the town has
+   `Position` ≠ 0, so the §10 rule 2 class pick of `drlg/levels.md`
+   matches spawn-tile records 0–4 and **draws `roll(n)` on the town's
+   level seed** when n > 0; position × 5 + (3, 3); free point (§7,
+   mask 0x1C09); no point → fatal. Then S→C 0x07, placement
+   `0x00554850` and S→C 0x15 (§11). Recorded: Test vectors R1, R2.
+4. Followers (pets, mercenary) are placed by the same search from the
+   act's town with their own size (`0x005352C0`, §11).
+
+**Tools placing a character at a point** (scenario `char at x y`):
+after entry, `0x00554EA0(game, unit, room, x, y, exact, alt)` (§10)
+with the room that holds (x, y) (`monsters/init.md` §25.1 room lookup)
+and exact = 1 places it there without a search; exact = 0 runs the
+§7 free search from (x, y) first. Either sends 0x07, 0x15 and the
+room-change messages of §10 rule 6 like a warp, and moves pets
+(§10 rule 6) as the original would on a teleport.
+
 ## Constants & data dependencies
 
 | Constant | Value | Where |
@@ -788,6 +834,12 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
 
 ## Provenance
 
+- §13: `0x005394A0` and its three callers (`0x00530190` at
+  `0x00530224`–`0x00530237`, `0x0053A2F0`, `0x0053A420`); `0x005382B0`,
+  `0x005382E0` and its callers `0x00530BF0`, `0x00532690`,
+  `0x0053ACC0`, `0x0056A090`; the global `0x00883D44` (writers
+  `0x0052C030`, `0x0052DFA0`; readers `0x0052FA50`, `0x00530BF0`);
+  `0x00532690` header checks `0x00532717`–`0x00532A51`; `0x0061AE80`.
 - 1.14d functions read (decompile exports and `tools/ghidra/disasm.py`):
   path records `0x00649D00`, `0x00620AE0`, `0x006488C0`, `0x00648900`,
   `0x00620BB0`, `0x00648C30`, `0x00649190`; size and masks `0x00620510`,
@@ -856,6 +908,13 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
    recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
    mercenary spec (`world/hirelings.md` §6).
+8. §13 rule 2: on a single-player load of a character saved in Act
+   III, which write of client +0x1AC comes last (the global
+   `0x00883D44` or the save header byte +0x58), and who calls the
+   setter `0x0052DFA0`? Watch writes to client +0x1AC and the global
+   during the load; the S→C 0x03 act byte (§Test vectors) shows the
+   result. Also: how the header's +0x58 byte relates to the `.d2s`
+   difficulty bytes (`formats/d2s.md`, not yet written).
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

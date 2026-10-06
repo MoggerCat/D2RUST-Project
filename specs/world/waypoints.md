@@ -33,18 +33,18 @@
 |   2. Waypoint record ("history") | 115–146 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
-|   5. Waypoint objects | 190–259 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 260–298 |
-|   7. Travel (`0x00584F60`) | 299–346 |
-|   8. Timing and message order | 347–368 |
-|   9. Town portals | 369–374 |
-|   10. Object mode change (consequence used above) | 375–382 |
-| Constants & data dependencies | 383–410 |
-| Randomness | 411–434 |
-| Edge cases & original bugs | 435–471 |
-| Test vectors | 472–511 |
-| Provenance | 512–550 |
-| Open questions | 551–572 |
+|   5. Waypoint objects | 190–263 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–302 |
+|   7. Travel (`0x00584F60`) | 303–350 |
+|   8. Timing and message order | 351–372 |
+|   9. Town portals | 373–378 |
+|   10. Object mode change (consequence used above) | 379–386 |
+| Constants & data dependencies | 387–414 |
+| Randomness | 415–438 |
+| Edge cases & original bugs | 439–475 |
+| Test vectors | 476–515 |
+| Provenance | 516–554 |
+| Open questions | 555–576 |
 <!-- /index -->
 
 ## Summary
@@ -195,6 +195,10 @@ The waypoint section is 80 bytes (writer `0x005693E0`; readers
    156, 157, 237, 238, 288, 323, 324, 398, 402, 429, 494, 496, 511, 539;
    all have `Mode0`–`Mode2` = 1; `FrameCnt1` 15 (20 for 494, 496, 511,
    539); `FrameDelta1` 200; `Sync` 1 except 429, 494, 496, 511, 539 (0).
+   These are the `objects.txt` cell values. The loaded object record
+   holds `FrameCnt0`–`7` shifted left by 8 (`data/fixups.md` §13): record
+   +0xDC = 3,840 (15 << 8) or 5,120 (20 << 8), which §5.1 reads back with
+   `>> 8`.
 2. The level a waypoint object belongs to is the level of its room.
    Which waypoint it activates follows from that level (§1), never from
    its class.

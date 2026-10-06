@@ -32,15 +32,15 @@
 |   6. Level position, size, act number | 206–222 |
 |   7. Vis and warp records | 223–246 |
 |   8. Coordinates to rooms | 247–260 |
-|   9. Level lifecycle: activity and freeing | 261–291 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 292–331 |
-|   11. Logical rooms (coordinate lists) and population queries | 332–519 |
-| Constants & data dependencies | 520–540 |
-| Randomness | 541–559 |
-| Edge cases & original bugs | 560–583 |
-| Test vectors | 584–627 |
-| Provenance | 628–658 |
-| Open questions | 659–683 |
+|   9. Level lifecycle: activity and freeing | 261–309 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 310–349 |
+|   11. Logical rooms (coordinate lists) and population queries | 350–590 |
+| Constants & data dependencies | 591–611 |
+| Randomness | 612–630 |
+| Edge cases & original bugs | 631–654 |
+| Test vectors | 655–698 |
+| Provenance | 699–731 |
+| Open questions | 732–756 |
 <!-- /index -->
 
 ## Summary
@@ -279,6 +279,24 @@ status lists; 1.14d moved it to step 5. No outcome differs (no draws).
    bits has a status < 4 or flag 0x100000; else free those rooms' warp
    links (`0x0066B4F0`) and rooms-near arrays (they are rebuilt on next
    use). After all 8 slots: success.
+   - The mask depends only on L's vis ids, never on warp ids: slots
+     with warp −1 (outdoor neighbours) are included. Their border rooms
+     carry those warp-flag bits and are the only rooms of L whose
+     rooms-near arrays can hold rooms of this level (`drlg/rooms.md`
+     §3 rule 3, W = −1 branch), so after a successful test no room of
+     L keeps a near entry or warp link into this level.
+   - Per slot the order is: test every room of L, then free. A refusal
+     at slot k returns after slots < k have already freed their L
+     rooms' warp links and near arrays (the level is not freed; those
+     arrays are rebuilt on next use).
+   - Per freed room: warp links always (`0x0066B4F0`, list +0x4C := 0);
+     the near array only when non-null (pointer +0x08 and count +0x2C
+     := 0).
+   - Only this level's vis slots are walked: a level L that lists this
+     level in its vis array while this level does not list L is not
+     tested and keeps its arrays.
+   - A missing L is allocated (get-or-allocate inlined); L without
+     rooms is skipped.
 4. **Free rooms, keep level** (`0x00642010` with keep = 1): size the
    populated-room memory (+0x22C) to the room count (allocate once),
    store each room's "other flags" bit 0 in list order, free every room
@@ -334,7 +352,7 @@ town arrival, act change: D2MOO `DUNGEON_FindActSpawnLocation`):
 Owner of the DRLG data the monster population reads
 (`monsters/population.md` §3, §6, §9): coordinate lists, the populated
 level, the populated-room count, warp points and the kind-11 spawn
-location. D2MOO names: `DrlgDrlgLogic.cpp` (`D2DrlgLogicalRoomInfoStrc`,
+location; §11.6 maps every population read to its owner. D2MOO names: `DrlgDrlgLogic.cpp` (`D2DrlgLogicalRoomInfoStrc`,
 `D2RoomCoordListStrc`) and the `DUNGEON_*` wrappers. Every rule below
 is read from the 1.14d functions named; D2MOO matches in structure and
 tables, differences are noted.
@@ -517,6 +535,59 @@ outside the grid.
    streamed (`drlg/rooms.md` §4.3). x, y are tiles, −1 when no room was
    found; the caller scales them ×5.
 
+#### 11.6 Population read map (for hosts)
+
+Every DRLG read the room population makes (`monsters/population.md`
+§3–§9, §11–§12), with its owner. A host that answers each of these
+from the rules named runs room population; nothing else in the DRLG is
+read by it.
+
+| Read | 1.14d | Owner |
+|---|---|---|
+| coordinate list of an active room (first record, then next +0x2C) | `0x0061AD50` | §11.4 (lists built §11.2–§11.3) |
+| coordinate record at a sub-tile point | `0x0061AD30` | §11.4 |
+| coordinate index at a sub-tile point (room or an adjacent room) | `0x0061B130` | §11.4 |
+| populated level (0 for a flag-0x800000 room) | `0x0061A1F0` | §11.5 item 1 |
+| level id of an active room (no flag test; regions, `WarpDist`) | `0x0061A1B0` → `0x0066BAB0` | DRLG room +0x58 → level +0x1D0; null room → 0 |
+| populated-room count of a level | `0x0061ABF0` | §11.5 item 2 |
+| warp points of the room's level | `0x0061AC10` | §11.5 item 3 |
+| kind-11 spawn location | `0x00619E50` → `0x0066B2B0` | §11.5 item 4, §10 |
+| act of a level id | `0x006427F0` | §6 rule 3 |
+| active-room sub-tile box | `0x00619730` | active room +0x4C (x, y, w, h), `drlg/rooms.md` §1 |
+| active-room seed (every placement draw) | — | `drlg/rooms.md` §5 step 4 |
+| room adjacency (cross-room lookups) | `0x00463740` | `drlg/rooms.md` §6 |
+| collision tests and free points | `0x0064D9B0`, `0x0064E7B0`, `0x0064E840` | `sim/path-placement.md` §4, §7, §8 |
+| floor tile records (water placement) | `0x00619660` | `monsters/population.md` §9.2 |
+| room "populated" bit, restore instead of populate | active room +0x34 bit 0 | `drlg/rooms.md` §5 step 3, `sim/tick.md` §4 |
+
+**Which rooms are populated, and in which order** (consequences of the
+owners above; reproduce them, do not model them separately):
+
+1. Only active rooms are populated, each the first time the tick room
+   pass meets it (`monsters/population.md` §1 rule 1). A room becomes
+   active only through a build: a client's room change builds every
+   room of the new room's rooms-near array, depth first
+   (`drlg/rooms.md` §4.1); streaming builds one room (`drlg/rooms.md`
+   §4.3: unit placement at coordinates, the §10 spawn-room choice, and
+   so also the kind-11 query of §11.5 item 4 made during population).
+2. Each build prepends its active room to the act room list
+   (`drlg/rooms.md` §5 step 5) and the room pass walks the list from the
+   head, so rooms built in one burst are populated in the reverse of
+   their build order (recorded: `monsters/population.md` §1 rule 3).
+3. Coordinate indexes come from the level counter at each room's build
+   (§11.3 steps 3, 5, 7; one-record rooms reset it, §11.2 step 2), and
+   `0x0061B130` compares indexes across a room and its adjacent rooms.
+   A host that builds rooms in another order gets other indexes and so
+   accepts or rejects other spawn points (`monsters/population.md` §8
+   step 2.3, §9.3 step 3.2.2).
+4. Entering a level builds only the rooms-near closure of the arrival
+   room (rule 1); populating every room of a level in level-list order
+   right after creation is not an order the original produces. The
+   density draw and every unit allocation use the game seed
+   (`monsters/population.md` §3.2, §9.6), shared with every other
+   game-seed user between creation and that room pass (`sim/rng.md`
+   §5.2), so a population result depends on everything drawn before it.
+
 ## Constants & data dependencies
 
 | Constant | Value | Use |
@@ -638,7 +709,9 @@ first) with each level's seed state, equal the recorded game.
   `0x00666DC8`, `0x0067D794`); `0x0066C6E0` (free); lookups `0x0066CF30`,
   `0x0066CEB0`, `0x0066CE30` and wrappers `0x0061AD50`, `0x0061AD30`,
   `0x0061B130`; `0x0066BB20`, `0x00642BE0`, `0x00642380`, `0x0066B2B0`
-  via `0x00619E50`; the caller `0x0054DB50` for argument order. lvlprest
+  via `0x00619E50`; the caller `0x0054DB50` for argument order; §11.6
+  `0x0061A1B0` → `0x0066BAB0`, `0x00619730` (copies active room
+  +0x4C..+0x68). lvlprest
   `Logicals` counted in patch_d2 `lvlprest.txt`. Callers found by scanning the
   disassembly for direct calls.
 - **D2MOO** (1.10f) `D2Common/src/Drlg/DrlgDrlg.cpp` (`DRLG_AllocDrlg`,

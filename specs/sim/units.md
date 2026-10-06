@@ -28,16 +28,16 @@
 |   1. Unit kinds | 76–95 |
 |   2. Unit record | 96–134 |
 |   3. Lifecycle | 135–296 |
-|   4. Modes and mode schedules | 297–438 |
-|   5. Event dispatch | 439–453 |
-|   6. Events per kind | 454–534 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 535–556 |
-| Constants & data dependencies | 557–573 |
-| Randomness | 574–581 |
-| Edge cases & original bugs | 582–600 |
-| Test vectors | 601–660 |
-| Provenance | 661–700 |
-| Open questions | 701–730 |
+|   4. Modes and mode schedules | 297–439 |
+|   5. Event dispatch | 440–454 |
+|   6. Events per kind | 455–535 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 536–557 |
+| Constants & data dependencies | 558–574 |
+| Randomness | 575–582 |
+| Edge cases & original bugs | 583–601 |
+| Test vectors | 602–661 |
+| Provenance | 662–701 |
+| Open questions | 702–731 |
 <!-- /index -->
 
 ## Summary
@@ -301,8 +301,9 @@ of its list.
 `0x00553570(game, unit, mode)`: drop the unit's own entries from its
 combat list (`0x0057C980`), then `0x00624690(unit, mode)`: tile: nothing;
 a new mode is written to +0x10, the unit is queued for update
-(`unit-order.md` §6.2), flags |= 1, and the animation fields are
-re-initialised (`0x006272E0`, `0x00624390`); the same mode only queues
+(`unit-order.md` §6.2), flags |= 1, the unit's TEMPONLY stat lists are
+removed (`0x006272E0`, `stat-lists.md` §8.9) and the animation fields
+re-initialised (`0x00624390`); the same mode only queues
 the unit and sets flag 1 (not for a monster staying in mode 1). Setting
 a mode schedules nothing by itself. Mode starts that animate then call,
 in this order: prepare animation `0x005533D0` (action frame := 0;

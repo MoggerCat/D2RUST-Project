@@ -1,8 +1,10 @@
 # Spec: Formats — String tables (.tbl)
 
-- **Status:** implemented. All 33 string tables in 1.14d (11 languages)
-  parse, every key resolves to its own slot, all keys are ASCII, and every
-  version byte is 1 (`mpq-tool formats`).
+- **Status:** implemented. All 29 string-table copies in 1.14d (20
+  distinct paths, 10 language folders) parse, all keys are ASCII, every
+  version byte is 1 and every non-ASCII value is valid UTF-8 (2026-10-06
+  survey, §Live tables). Every key resolving to its own slot was checked
+  by the older `mpq-tool formats` run.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::tbl`
 
@@ -69,7 +71,36 @@ The headers must fit in the file. Every index must be < hash_table_size.
   the file size; see Open questions).
 - Strings are raw 8-bit text, kept as bytes here. 1.14d decodes them as
   UTF-8 when the tables load (`ui/text.md` §2; the color-code lead `ÿ` is
-  stored as `C3 BF`); color codes are `ui/text.md` §5.
+  stored as `C3 BF`); color codes are `ui/text.md` §5. The live data
+  agrees (§Live tables): of 63,167 used entries, 16,786 values hold a
+  byte ≥ 0x80 and **all** of them decode as strict UTF-8; none holds a
+  raw `FF` byte; 130 hold `C3 BF`. Read as Windows-1252 instead, all
+  16,786 decode to different text and 7,553 contain a byte 1252 leaves
+  undefined (CHI / JPN / KOR / ESP / ITA / POL tables), so a 1252 reader
+  is wrong for the 1.14d files.
+
+### Live tables (1.14d)
+
+Language folders `data\local\lng\<lang>` (listfile spelling upper case):
+CHI, DEU, ENG, ESP, FRA, ITA, JPN, KOR, POL, POR, plus the subfolder
+ENG\BETA. There is no 11th language: all 17,576 three-letter folder
+codes were probed for the three table names in every 1.14d MPQ, and only
+these ten hit (`d2data`, `d2exp`, `Patch_D2`; none elsewhere).
+
+| Archive | Tables (entries) |
+|---|---|
+| `d2data.mpq` | ENG `string` (5,391); ENG\BETA `string` (5,390) |
+| `d2exp.mpq` | ENG `patchstring` (869), `expansionstring` (2,818); `string` (5,322: DEU, FRA; 5,391: ESP, ITA, CHI, JPN, KOR) and `patchstring` (59) for DEU, FRA, ESP, ITA, CHI, JPN, KOR; `patchstring` only for POL (59) and POR (17) |
+| `Patch_D2.mpq` (no listfile) | `patchstring` (1,179) for ENG, DEU, FRA, ESP, ITA, POL, CHI, JPN, KOR (not POR) |
+
+That is 2 + 18 + 9 = 29 copies of 20 distinct paths. In every one the
+used-entry count equals `num_elements` and the header file size equals
+the file length. The older counts (33 tables, 11 languages) came from the
+case-sensitive `mpq-tool formats` name set: the tool's three lower-case
+`eng\…` extra names were counted again where they exist (`string` in
+`d2data`, `patchstring` in `d2exp` and `Patch_D2`, `expansionstring` in
+`d2exp`: +4) and `eng` became a second folder (+1). POL and POR have no
+`string.tbl` and POR no 1.14d `patchstring.tbl` in `Patch_D2`.
 
 ### Element access
 
@@ -118,13 +149,17 @@ None.
 | hash of `"AB"`, table size 1000 | (0x41 << 4) + 0x42 = 1106 → 106 | §Key lookup |
 | synthetic table built by the test | element and key lookups round-trip | §Rules |
 | `string.tbl`, `expansionstring.tbl`, `patchstring.tbl` (1.14d, eng) | every element's key resolves back to its own slot by key lookup (unless a duplicate key comes earlier in the probe sequence) | survey |
+| every `data\local\lng\*\*.tbl` in `d2data`, `d2exp`, `Patch_D2` (case-insensitive names) | 29 copies, 10 language folders + ENG\BETA, version 1, 63,167 used entries, 16,786 non-ASCII values all valid UTF-8, 0 raw `FF` | §Live tables, 2026-10-06 |
 
 ## Provenance
 
 Community documentation of the TBL format (Phrozen Keep), cross-checked
 against Riiablo (Apache-2.0) `codec/StringTBL.java` (header layout, 17-byte
 entries, hash function, probing). No Blizzard code or decompiler output was
-consulted.
+consulted. §Live tables and the UTF-8 counts: a Python read of the 1.14d
+archives (2026-10-06): names probed case-insensitively by MPQ hash in
+`d2data.mpq`, `d2exp.mpq` and `Patch_D2.mpq` (which has no listfile),
+every used entry's value decoded as strict UTF-8 and as Windows-1252.
 
 ## Open questions
 

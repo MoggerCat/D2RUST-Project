@@ -22,17 +22,17 @@
 | Inputs | 55–61 |
 | Outputs / state changes | 62–66 |
 | Rules | 67–68 |
-|   1. Unit add | 69–201 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 202–208 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 209–240 |
-|   4. Queued movement and action messages | 241–275 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 276–297 |
-| Constants & data dependencies | 298–309 |
-| Randomness | 310–315 |
-| Edge cases & original bugs | 316–330 |
-| Test vectors | 331–360 |
-| Provenance | 361–381 |
-| Open questions | 382–397 |
+|   1. Unit add | 69–224 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 225–234 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 235–271 |
+|   4. Queued movement and action messages | 272–306 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 307–328 |
+| Constants & data dependencies | 329–340 |
+| Randomness | 341–346 |
+| Edge cases & original bugs | 347–361 |
+| Test vectors | 362–395 |
+| Provenance | 396–421 |
+| Open questions | 422–440 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -57,7 +57,7 @@ local player gets 0x15, 0x0D, 0x18, 0x95, 0x96.
 | Name | Type | Source |
 |---|---|---|
 | message | id + bytes | `client/model.md` §4 |
-| tables | `monstats` (row count, `MonStatsEx` link), `monstats2` (component choice counts, byte +0x0E), `itemstatcost` (send bits, send param bits, signed flag) | `data/` (live tables) |
+| tables | `monstats` (row count, `MonStatsEx` link), `monstats2` (component choice counts at +0x15 + i, §1.2 rule 7; path byte +0x0E), `itemstatcost` (send bits, send param bits, signed flag) | `data/` (live tables) |
 
 ## Outputs / state changes
 
@@ -183,6 +183,22 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
       base 301 (`vilechild` family) → `0x0046C570(unit, 0, 0x004AE7B0)`;
       class 351 → 0x18, 353 → 0x28, 352, 357, 344 → 0; then
       `0x006488A0(path, b)`.
+7. **Table inputs of rule 1** (read at `0x0045F1F1`–`0x0045F293`): the
+   class must satisfy 0 ≤ class < `monstats` row count (`[0x00744304]`
+   +0xA80; rows 0x1A8 bytes at +0xA78); that row's `MonStatsEx` link
+   (s16 at row +0x18, the `monstats2` row index) must satisfy 0 ≤ link
+   < `monstats2` row count (+0xA98; rows 0x134 bytes at +0xA90). Then
+   for i = 0…15 the choice count c is the u8 at `monstats2` row
+   +0x15 + i, i.e. byte 21 + i written by the `HDv`, `TRv`, `LGv`,
+   `Rav`, `Lav`, `RHv`, `LHv`, `SHv`, `S1v`…`S8v` columns
+   (`data/callbacks.md` §5; `data/fields.tsv` `monstats2` fields 10–25,
+   `cb(monstats2.composit)`). Bits read for component i: c < 3 → 1;
+   else bit length of c − 1 (`bsr` + 1; c = 1 is covered by c < 3).
+   Either check failing skips the 16 reads (rule 1) and the creation
+   (rule 2). d2rs: the loader fills `ModelInputs::tables` from
+   `d2-data`'s `monstats` rows (`MonStatsEx`) and `monstats2` count
+   bytes; no other column is needed by 0xAC's stream.
+8. The hireling GUID of rule 2 and rule 3: `client/model.md` §14 rule 4.
 
 #### 1.3 0x51 AssignObject (`0x0045CBD0` → `0x00466300`)
 
@@ -198,6 +214,13 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
    {interact}.
+5. **Types 0, 3, 4, 5 are never sent.** The only 1.14d builder of 0x51,
+   `0x0053BD10`, has one caller (`0x00572067` in the add messages,
+   `sim/intents-events.md` §7.2), which passes type 2; all 206 recorded
+   0x51 (both recordings) have type 2. d2rs: a 0x51 with type 0, 3, 4
+   or 5 is a handler error (refused and recorded, `client/bridge.md`
+   §2.4), like type 1; the kind inits of rule 2 are not modelled. This
+   is not an exact-match risk: no 1.14d server input reaches them.
 
 ### 2. 0x0A RemoveUnit (`0x0045CC10`)
 
@@ -205,6 +228,9 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
 2. Type 1 with GUID = the local player's hireling GUID
    (`0x00478F20(local player, 7)`) → nothing. Else remove (`client/model.md`
    §2 rule 5).
+3. The hireling GUID here and in §1.2 rule 2: `client/model.md` §14
+   rule 4 (pet list from 0x7A / 0x81; −1 when there is none, so with no
+   hireling 0x0A always removes and 0xAC always creates).
 
 ### 3. 0x15 ReassignPlayer (`0x0045D160`)
 
@@ -237,6 +263,11 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
       (`0x00650C20`), whose failure is fatal 0x1A9.
    6. `0x00459140`; local player: `0x00472C20(flag)`; `0x00463B80`.
 5. Model: `position` := (x, y) (or the free point of rule 4.5).
+6. For the local player this placement is how the client learns its
+   level: the room of rule 4.2 and its level (`client/model.md` §11
+   rule 3); at a join 0x15 is the first message that gives the player
+   a room. Room of a point, the fatal asserts 0x168 / 0x538 / 0x1A9 and
+   the free-point fallback in d2rs: `client/model.md` §12.
 
 ### 4. Queued movement and action messages
 
@@ -357,6 +388,10 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | 0x15 for a dead monster | position unchanged | synthetic, §3 rule 4.3 |
 | 0x0A type 1, GUID = local player's hireling | nothing | synthetic |
 | 0x96 with dx 0x80 | tx = x + 128 | synthetic |
+| 0xAC component bits for counts 7, 3, 3, 3, 3, 10, 0, 5, 12, 12, 0 × 6 (`skeleton1`, `data/callbacks.md` §5 example) | 3, 2, 2, 2, 2, 4, 1, 3, 4, 4, 1 × 6 = 33 bits | §1.2 rule 7 |
+| 0xAC with class ≥ `monstats` row count, or a row whose `MonStatsEx` is −1 | no component reads, no unit | synthetic, §1.2 rule 7 |
+| 0x51 with type 4 | handler error | synthetic, §1.3 rule 5 |
+| 0x0A type 1, GUID 0x21, pet list empty | (1, 0x21) removed (hireling GUID −1) | synthetic, §2 rule 3 |
 
 ## Provenance
 
@@ -378,6 +413,11 @@ monster update spec).
 Ghidra backlog (2026-10-06): monster set-up `0x004AE8D0` (field offsets
 from `specs/data/fields.tsv`, stat names from `itemstatcost`); source
 link `0x00621CC0` → `0x00621C30`.
+Join-update session (2026-10-06): 0xAC table reads `0x0045F1F1`–
+`0x0045F293` (row sizes 0x1A8 / 0x134 from the `imul`s); 0x51 builder
+`0x0053BD10` and its single caller `0x00572067` (type pushed as 2),
+type bytes counted in both recordings (206 × 2). The code bytes'
+server meaning: `sim/intents-events.md` §7.4.
 
 ## Open questions
 
@@ -394,3 +434,6 @@ link `0x00621CC0` → `0x00621C30`.
    rule 3): what they test.
 6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
+7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
+   confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
+   (`client/model.md` open question 10).

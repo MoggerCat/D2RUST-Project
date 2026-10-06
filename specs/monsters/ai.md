@@ -29,21 +29,21 @@
 | Outputs / state changes | 80–90 |
 | Rules | 91–92 |
 |   1. Think scheduling | 93–224 |
-|   2. Think dispatch `0x005B1740` | 225–339 |
-|   3. AI control and AI tables | 340–435 |
-|   4. AI parameters | 436–454 |
-|   5. Target selection | 455–537 |
-|   6. Distances and line tests | 538–552 |
-|   7. Tactics helpers | 553–610 |
-|   8. AI commands and minions | 611–632 |
-|   9. Per-AI behaviours | 633–1417 |
-|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
-| Constants & data dependencies | 1439–1462 |
-| Randomness | 1463–1484 |
-| Edge cases & original bugs | 1485–1526 |
-| Test vectors | 1527–1615 |
-| Provenance | 1616–1655 |
-| Open questions | 1656–1693 |
+|   2. Think dispatch `0x005B1740` | 225–353 |
+|   3. AI control and AI tables | 354–449 |
+|   4. AI parameters | 450–468 |
+|   5. Target selection | 469–551 |
+|   6. Distances and line tests | 552–566 |
+|   7. Tactics helpers | 567–625 |
+|   8. AI commands and minions | 626–650 |
+|   9. Per-AI behaviours | 651–1450 |
+|   10. The catalogue `ai-functions.tsv` | 1451–1471 |
+| Constants & data dependencies | 1472–1495 |
+| Randomness | 1496–1517 |
+| Edge cases & original bugs | 1518–1559 |
+| Test vectors | 1560–1648 |
+| Provenance | 1649–1697 |
+| Open questions | 1698–1738 |
 <!-- /index -->
 
 ## Summary
@@ -307,6 +307,20 @@ The finders write target, distance and combat into the record.
 else delete thinks and schedule +20 (no mode change).
 
 1.14d-confirmed (`0x005B1650`, `0x005DE890`, `0x005DE9D0`).
+
+**Target 0 in mode-1 and mode-4 bodies.** Modes 1 and 4 stop the think
+when no target is found, so the AI function of a target-mode-1 or -4
+record (the active record: special state or base) never runs with T =
+0. The "T = 0" branches of such bodies (Fetish's life of T, §9.21;
+BloodRaven's h and raise point, §9.18; SkeletonBow's walk in radius,
+§9.16; run near T) are unreachable in 1.14d, and several of the helpers
+they call read T without a null test (`0x005DF680` run near,
+`0x005DE4E0` walk in radius, `0x005DC480` half-size distance read T's
+unit type at once): a T = 0 call there is an access violation in
+1.14d. An implementation treats them as unreachable (assert), not as a
+rule. Null-safe helpers: `0x00621F20` (life percent of 0 → 0, through
+the null-safe stat getters `0x00625480` / `0x00625D10`) and escape
+`0x005DEFE0` / `0x005DF140` (§7.2).
 
 #### 2.4 Precheck C `0x005B13E0`: boss sound, teleport, special walk
 
@@ -584,10 +598,10 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DED00(t, f)` / `0x005DED20(t)` | `RunToTargetUnit(WithFlags)` | 15, unit, 1, f / 0 | none |
 | `0x005DED40(t, f)` | `sub_6FCD0410` | velocity method 13 first; then 2, unit, 1, f | none |
 | `0x005DEF80(t, n)` / `0x005DEFB0(t, n)` | `Walk/RunToTargetUnitWithSteps` | 2 / 15, unit, n (0 → 1), 0 | none |
-| `0x005DED90`, `0x005DEDE0`, `0x005DEE50` | walk / run (decrepify → walk) / walk + delete thinks on failure, to coordinates | | none |
+| `0x005DED90`, `0x005DEDE0`, `0x005DEE50` | walk / run (decrepify → walk) / walk + delete thinks on failure, to coordinates | 2 / 15 (state 60: velocity reset, 2) / 2, coordinates, path step count 1 (`0x00649070(path, 1)`), no flags | none |
 | `0x005DE200(n)` | `AITACTICS_WalkCloseToUnit` ("wander n") | 2, point near itself, 1, 0 | three or four: (a) step, `lo'` bit 0 = 1 → x offset n, y offset `roll(n)`; bit 0 = 0 → x offset `roll(n)`, y offset n; (b) step, bit 0 = 1 → negate x; (c) step, bit 0 = 1 → negate y. `roll(n)` steps only if n ≥ 1 |
 | `0x005DF530(t, n)` | `WanderToTarget` / `WalkToOwner` | same draws, around unit t | as wander |
-| `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
+| `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
 | `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a | none |
@@ -596,7 +610,8 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 
 All draws are from the moving unit's seed (unit +0x20). 1.14d-confirmed
 for `0x005DEB60`, `0x005DE200`, `0x005DF7D0`, `0x005DEFE0`, `0x005DF140`,
-`0x005DED40`, `0x005DF680`, `0x005DEF30`; the walk-in-radius geometry is
+`0x005DED40`, `0x005DF680`, `0x005DEF30`, `0x005DED90`, `0x005DEDE0`,
+`0x005DEE50`; the walk-in-radius geometry is
 D2MOO's.
 
 #### 7.3 Velocity request
@@ -619,16 +634,19 @@ last). Param 0 is the command type.
 | `0x0058EE80` | `GetCurrentAiCommandFromUnit` | current command or 0 |
 | `0x0058ED10` | `FreeCurrentAiCommand` | unlink and free the current one; current := its next |
 | `0x0058EDE0` | `FreeAllAiCommands` | |
-| `0x0058EF40` | `CopyAiCommand` | new command with the given params, inserted before current, becomes current |
-| `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | the first command of that type, searching from current's next round to current; set ≠ 0 makes it current; 0 if none |
-| `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent |
+| `0x0058EF40` | `CopyAiCommand` | new command (`0x0058EC90`) with the given five params; becomes current |
+| `0x0058EC90` | — (allocator) | zeroed 0x1C bytes from the game's pool. Empty ring (last = 0): the only node, next = prev = itself, current = last = it. Else linked between current's prev and current (it is current's new prev); if last = current, last := it |
+| `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
+| `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
 | `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
 minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
 (walk to), 5 (wander) and 7 (mode action) = NPC actions (§9.9). QuillRat reads params 1, 2 as a unit type and
-GUID. 1.14d-confirmed for the functions listed.
+GUID. `0x0058ED10` keeps current and last both 0 or both set (freeing
+the only node clears both; freeing last moves last to its next).
+1.14d-confirmed for the functions listed.
 
 ### 9. Per-AI behaviours
 
@@ -1312,6 +1330,11 @@ param 1 := frame + aip5; state := 3.
       T, wait 20; else circle 6 at T (no delete), state := 2. End.
    6. Wait 12.
 
+A state above 3 (never written by this function; only a value left in
+param 0 by another AI before a re-install, §3.3, could give one) takes
+the above-ground steps of step 3 whatever T and S are: steps 1 and 2
+only branch on state < 3 and state = 3. 1.14d-confirmed (`0x005F1800`).
+
 Alternate `0x005F1750` (the think while the AI was re-installed over a
 running one, §3.3): K = command 14 (`0x0058EFA0(14, 0)`). K's param 4 =
 1 and `Skill1` ≥ 0 → `Skill1` in `Sk1mode` at the unit's path target
@@ -1368,13 +1391,21 @@ Also the think of special state 5 (§3.2).
    idle 10; end.
 3. Draw `lo' % 100` < 20 → wander 5; else idle 10.
 
+The "Else" of step 2 belongs to the first `roll(100)` < 30: both rolls
+happen only when S exists with E < 20. In town, with no S, or with E ≥
+20, the think goes to step 3 (one `lo'` step). A unit with no room
+(`0x00620BB0` returns 0) counts as out of town: `0x0061AB00(0)` returns
+0. 1.14d-confirmed (`0x005E7AC0`, `0x0061AB00`).
+
 1.14d-confirmed.
 
 #### 9.32 NpcOutOfTown (31) `0x005E7880`
 
-Classes cain1 (146, Tristram) and drehyaiced (527). The quest calls are
-seams (`world/quests.md`; D2MOO names), chosen by class: cain1 → Act 1
-quest 4 functions, drehyaiced → Act 5 quest 3 functions:
+Classes cain1 (146, Tristram) and drehyaiced (527); live monstats has
+no other row with AI 31. The quest calls are
+seams (`world/quests.md`; D2MOO names), chosen by class: class 527
+(drehyaiced) → Act 5 quest 3 functions, every other class (cain1, and
+any class given AI 31 by edited data) → Act 1 quest 4 functions:
 
 | Role | cain1 | drehyaiced |
 |---|---|---|
@@ -1389,7 +1420,9 @@ quest 4 functions, drehyaiced → Act 5 quest 3 functions:
 1. Portal setup (`0x005E77A0`): K = command 3 (`0x0058EFA0(3, 0)`). If
    K exists with params 1, 2 = 0: params 1, 2 := own x + 3, own y + 3;
    set up portal coordinates, and if that returns 0, leave; K's params
-   3, 4 := 1, 0; idle 1; end.
+   3, 4 := 1, 0; idle 1; end. The param writes and idle 1 also follow a
+   leave (the mode 12 request does not end the function); a K with
+   params 1, 2 ≠ 0 skips step 1.
 2. drehyaiced: `0x0058AA10(game)`.
 3. Someone talks to the NPC (`0x00572DC0`) → idle 40. End.
 4. K = command 3 (`0x0058EEF0`). Anim mode 12 (dead) → end, nothing
@@ -1428,7 +1461,7 @@ One row per AI table index (148 rows), tab-separated, header row:
 | `alt_1_14d` | alternate function (record +0x0C), `-` if 0 |
 | `target_mode` | record +0x00 (§2.3) |
 | `d2moo_name` | D2MOO 1.10f function name at the same index |
-| `monstats_rows` | count of live monstats rows using the index, then up to three "row Id" pairs |
+| `monstats_rows` | count of live monstats rows using the index, then up to three "row Id" pairs; row = record index (hcIdx) after the `Expansion` separator line is dropped (`data/txt-format.md` §5), so file line − 2 up to druidbear (409) and file line − 3 from wakeofdestruction (410) on |
 | `aip_meaning` | the monai.txt `*aipN` comment headers (hints, not data) |
 | `summary` | one-line behaviour, `-` when unread |
 | `status` | `spec'd-here` (full rules in §9, 1.14d read), `summarized` (top-level order read in 1.14d), `D2MOO-only` (summary from D2MOO 1.10f, 1.14d not compared), `unread` |
@@ -1630,7 +1663,13 @@ Other recorded checks:
   `0x005DC480`, `0x005DF680`, `0x005DEF30`, `0x0058EEF0`,
   `0x00472210`, `0x005FD350`, `0x00573930`, `0x0054CA10`,
   `0x00621F20`, `0x005B0BD0`, `0x0063EA40`, `0x00553540`,
-  `0x00621E40`, `0x00639DB0`, `0x005DDC30`.
+  `0x00621E40`, `0x00639DB0`, `0x005DDC30`; for the implementation
+  questions AI1–AI10 (2026-10-06): `0x005E77A0` (class test
+  `cmp [unit+4], 0x20F` = 527), `0x005E7880`, `0x005E7AC0`,
+  `0x0061AB00`, `0x00620BB0`, `0x0058EC90`, `0x0058ED10`,
+  `0x0058EF40`, `0x0058EFA0`, `0x005DED90`, `0x005DEDE0`,
+  `0x005DEE50`, `0x005DE4E0`, `0x005DE6D0`, `0x005F1800`,
+  `0x00625480`, `0x00625D10`; G's references by a scan of `all.asm`.
 - Tables dumped from the file's .rdata/.data with a PE-section parser:
   AI and special-state tables (`0x0073CA18`, 166 records), monster
   event table `0x006E2490`, mode table `0x006E2260`, inline-think bytes
@@ -1649,6 +1688,9 @@ Other recorded checks:
   copies (indices 1/100, 12/19); special states 10–12 gate on
   `switchai`.
 - Live data: monstats.txt, monai.txt, levels.txt (`patch_d2` layer).
+  `ai-functions.tsv` `monstats_rows` regenerated 2026-10-06 from
+  `patch_d2` monstats.txt (734 records = `monstats.bin` count; all 148
+  counts unchanged, 51 rows' pairs corrected by −1 from record 410).
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
@@ -1686,7 +1728,10 @@ Other recorded checks:
     (`world/npc.md` §2); still open: confirm the 12 recorded "+1"
     schedules between ticks with a recording that logs client messages
     next to timer schedules.
-12. The Npc command counter G (`0x0088CADC`) is process-wide: a
-    conformance trace must start from a fresh process (G = 0) or record
-    G; decide which, and where `d2-sim` keeps it (server state that
-    outlives games).
+12. Answered: G (`0x0088CADC`) has exactly two references in the
+    binary (the read and the `add 1` in `0x005E6AE0`) and no reset, so
+    it counts from 0 at process start across every game of the process.
+    `d2-sim` takes G from its host as a counter that outlives games
+    (the local server process owns it, one per server process, never
+    saved); a new game does not reset it. Conformance traces start from
+    a fresh process (G = 0), or are the first game after one.

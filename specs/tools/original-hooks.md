@@ -18,21 +18,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 38–50 |
-| Inputs | 51–57 |
-| Outputs / state changes | 58–62 |
-| Rules | 63–64 |
-|   1. Client→server message entry (single player) | 65–129 |
-|   2. Game seed at game creation | 130–173 |
-|   3. Tick boundary | 174–215 |
-|   4. Unit snapshot fields | 216–266 |
-|   5. Starting single player without a human | 267–372 |
-| Constants & data dependencies | 373–385 |
-| Randomness | 386–390 |
-| Edge cases & original bugs | 391–395 |
-| Test vectors | 396–402 |
-| Provenance | 403–417 |
-| Open questions | 418–456 |
+| Summary | 39–51 |
+| Inputs | 52–58 |
+| Outputs / state changes | 59–63 |
+| Rules | 64–65 |
+|   1. Client→server message entry (single player) | 66–130 |
+|   2. Game seed at game creation | 131–174 |
+|   3. Tick boundary | 175–216 |
+|   4. Unit snapshot fields | 217–277 |
+|   6. Server-to-client stream | 278–363 |
+|   5. Starting single player without a human | 364–469 |
+| Constants & data dependencies | 470–482 |
+| Randomness | 483–487 |
+| Edge cases & original bugs | 488–494 |
+| Test vectors | 495–501 |
+| Provenance | 502–526 |
+| Open questions | 527–570 |
 <!-- /index -->
 
 ## Summary
@@ -263,6 +264,102 @@ the last column; this table only gathers them.
 4. Player-only: the client record (game +0x88, next +0x4A8) holds the
    client state at +0x04 (`tick.md` §6); the player unit is found in the
    player hash list (GUID 1 for the only player, Test vectors).
+5. **Base stats** (for `stats` records). The base array of the unit's
+   list at unit +0x5C (plain and extended lists alike, `stat-lists.md`
+   §1): pointer list +0x24, i16 count list +0x28 (capacity +0x2A, not
+   needed); count entries of 8 bytes, u16 layer, u16 stat, i32 value,
+   sorted by key `(stat << 16) | layer` ascending, no entry with value 0
+   (`stat-lists.md` §3). Record each entry as `[stat, layer, value]` in
+   array order with the raw i32 (8.8 stats unshifted). This is the array
+   the base reader `0x006253B0` searches (`0x00624ED0`, list +0x24);
+   that reader may adjust the value it returns (`stats.md`), the array
+   does not. A null list (unit +0x5C = 0) records an empty list.
+
+### 6. Server-to-client stream
+
+#### 6.1 Direct sends (`s2c` records)
+
+1. The `s2c` hook at the queue function `0x0053B280`
+   (`sim/intents-events.md` §3.2) sees only buffered messages. Direct
+   sends (`sim/intents-events.md` §3.3 rule 5) never pass it: each calls
+   the net send `0x0052B330(type, client id, data, size)` (stdcall,
+   [ESP+4] type, [ESP+8] client id, [ESP+0xC] data, [ESP+0x10] size)
+   itself. Its 11 call sites: `0x0052B735` (0xAF on), `0x0052B796`
+   (0xAF off), `0x0052CCA6` and `0x0052CEB4` (queue-2 replies),
+   `0x0052E1E0` (0xB3), `0x0052E3B5` (the flush, whole buffers),
+   `0x0053B1A5` (a stub at `0x0053B1A0` with no caller), `0x0053B1EB`
+   (0xB2), `0x0053B231` (0xB0), `0x0053B251` (0x06), `0x0053B276`
+   (0xB4).
+2. **Recording rule.** Hook `0x0052B330` as well and keep a call only
+   when its return address is not `0x0052E3BA` (the flush). Write both
+   hooks' records in hit order into one `s2c` stream (one thread, §1
+   rule 1): that order is the per-frame output O(F) of
+   `sim/intents-events.md` §6 rule 1, direct sends in their position.
+   A direct send reaches the client lists at once, ahead of every
+   message still buffered (those leave at the flush `0x0052FD90` after
+   the tick, §3), so the client sees it first; the trace keeps call
+   order, not delivery order.
+3. **Which can fire inside a scenario window** (from the injection stop
+   to the tick's return, game messages only): only the client drop
+   `0x0052CAF0` (its 0xB0 at `0x0052CB88`, after a 0x5A event message
+   through `0x0054AA40` and before the disconnect `0x0052B570`). Its callers: the 0x41
+   Resurrect handler `0x0054C0E0` (at `0x0054C13B`: a dead player whose
+   client has flag 4, `0x00538670(client, 4)`, the hardcore bit, is
+   dropped instead of resurrected), the heartbeat `0x0052D350` (host
+   callbacks only, not single player), the flush's failed-send drop
+   (`0x0052E432`, after the tick), the 0xB3 path (`0x0052E24C`, game
+   type 1 or 2) and system message 0x6E (`0x005302B1`). Every other
+   direct sender runs from system messages (queue 0: 0x68 join
+   `0x0052FA50`, 0x69 leave `0x005303D0`, 0x6B `0x00530190`, the queue-0
+   handler `0x0053F100` itself), from client-frame code (`0x0052E9C0`,
+   called at `0x0044D04D` and `0x0044F2F9`), from the single-player connect `0x0052A750`, or from
+   `0x005645E0` (not single player): before the scenario's ready tick
+   or after its end.
+
+#### 6.2 Bytes the original leaves unwritten
+
+The table extends the comparison masks (`sim/intents-events.md` §6
+rule 3; d2rs writes 0 in these bytes). Method: a scan of all 113
+callers of `0x0053B280` listing, for every fixed-size builder, the bytes
+of its stack buffer that no instruction of the builder writes; then a
+read of each flagged builder and of the callers of the copying builders
+(`0x0053C850`, `0x0053C8D0`, `0x0053D700`, `0x0053D7E0`, `0x0053D830`,
+`0x0053D840`, `0x0053D8D0`, `0x0053DA10`, `0x0053DFE0`, `0x0053E060`).
+No builder between `0x0053B320` and `0x0053EBD4` reads a clock;
+clock-derived contents come only from arguments (0x8F, already a
+transport row).
+
+| Id | Builder (call sites) | Unwritten bytes | Note |
+|---|---|---|---|
+| 0x21 | `0x0053C4A0` | 11 | |
+| 0x22 | `0x0053C520` | 2, 10 | |
+| 0x27 | `0x005456A0` (one-entry text, 6 call sites in quest code) and `0x005DE330` (`0x005728CF`), both through `0x0053C8D0` | 7, 9, 12–39 | the list forms (`0x00545780`, `0x00572C10`) zero bytes 6–39 first (`0x00661480`) and are fully written |
+| 0x2A | `0x0053D740` | 3–6 | `world/npc.md` §9 |
+| 0x50 | `0x00593CB0` (u16 4 at byte 1) | 13–14 | `world/quests-act1-rest.md` §7 |
+| 0x50 | `0x00579180` (u16 2), `0x0058E120` (u16 0x24), `0x0059D6A0` (u16 13) | 5–14 | through `0x0053D7E0`, which copies 15 bytes |
+| 0x50 | `0x005B4A80` (u16 0x17) | 3–14 | |
+| 0x58 | callers of `0x0053D8D0` (copies 7 bytes) | 6 | `world/npc.md` §8.1 |
+| 0x62 | `0x0053D6D0` (`0x00535294`, `0x005731E4`) | 6 | |
+| 0x7E | `0x0053DB70` (`0x005395BA`) | 1–4 | only the id is written |
+| 0x82 | `0x0053DB90` (`0x005720B1`) | name field 5–20 after its NUL | byte 5 := 0, then `0x004135D0` copies the owner's name (at most 15 characters + NUL) without padding |
+
+1. The 0x50 replies to the status request (`0x00546040`, C→S 0x40) are
+   fully written, so 0x50 masks are keyed by the u16 at bytes 1–2. The
+   0x27 masks are keyed by the sender (the return address into
+   `0x0053C8D0`'s caller), not by the id alone.
+2. Bit-packed builders (0x18 `0x0053C230`, 0x95 `0x0053C320`, 0x96
+   `0x0053C3F0`, 0xAC `0x0053E2E0`, item data) write through
+   `0x00410EB0`, which zeroes each byte when it first enters it; the
+   size sent is the bytes entered, so every sent byte is defined (unused
+   high bits are 0). The content-sized builders 0x26 `0x0053C750`, 0x94
+   `0x0053C5D0`, 0x5B `0x0053C940` (zeroed first), 0x9C `0x0053EAE0`
+   (zeroed first), 0x9D `0x0053CEF0`, 0xA6 and 0xAE (copies) send no
+   unwritten byte. The copying builders' other callers (0x29, 0x52,
+   0x5A, 0x5E, 0x73, 0x89, 0x91) fill their whole buffer.
+3. The forwarders `0x0053DDF0`, `0x0053DE50`, `0x0053DE90`,
+   `0x0053DF00`, `0x0053DF50` (party and relation messages, which need a
+   second player) and the unit-add forwarder `0x0053E8D0` were not
+   traced to their callers (Open question 12).
 
 ### 5. Starting single player without a human
 
@@ -392,6 +489,8 @@ of `rng.md` §5.1–§5.2 before the first draw.
 
 1. A message longer than 0x1FC bytes is truncated by the drain copy
    (`intents-events.md` §2.1 rule 7); only id 0x66 can be that long.
+2. A hardcore character that sends 0x41 while dead is dropped (0xB0
+   sent directly) instead of resurrected (§6.1 rule 3).
 
 ## Test vectors
 
@@ -414,6 +513,16 @@ of `rng.md` §5.1–§5.2 before the first draw.
   1.14d code.
 - Correction made to `sim/rng.md` §5.2: `0x0052C320` has two callers
   (`0x0044D86B`, `0x00451909`).
+- §4 rule 5 and §6 (2026-10-06): `0x006253B0`, `0x00624ED0`;
+  `0x0052B330` and its 11 call sites (callers of `0x0053B1A0` searched
+  as `E8`/`E9` rel32 targets over `.text`: none); `0x0052CAF0`,
+  `0x0054C0E0`; a script over `re/exports/all.asm` for the 113 callers
+  of `0x0053B280` (unwritten buffer bytes per builder), then by hand
+  `0x0053C4A0`, `0x0053C520`, `0x0053D6D0`, `0x0053DB70`, `0x0053DB90`,
+  `0x005456A0`, `0x005DE330`, `0x00545780`, `0x00661480`, `0x00572C10`,
+  `0x00545100`, `0x00544520`, `0x00546270`, `0x00546040`, `0x00579180`,
+  `0x0058E120`, `0x0059D6A0`, `0x005B4A80`, `0x00593CB0`, `0x00410E40`,
+  `0x00410EB0`, `0x004135D0`.
 
 ## Open questions
 
@@ -453,3 +562,8 @@ of `rng.md` §5.1–§5.2 before the first draw.
 11. Item position for items not on the ground (path null): which fields
     (owner, inventory grid, body location) a snapshot should read; owned
     by the item specs.
+12. §6.2 rule 3: the callers of `0x0053DDF0`, `0x0053DE50`,
+    `0x0053DE90`, `0x0053DF00`, `0x0053DF50` and `0x0053E8D0`
+    (`0x005711AC`, `0x005714DF`) still need the unwritten-byte read. Two
+    runs of one scenario with equal seeds, diffed byte by byte over
+    every `s2c` record, would also show any byte §6.2 missed.

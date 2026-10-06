@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 839–886 |
 | Test vectors | 887–924 |
 | Provenance | 925–962 |
-| Open questions | 963–1020 |
+| Open questions | 963–1021 |
 <!-- /index -->
 
 ## Summary
@@ -982,8 +982,9 @@ Real (recordings; message side):
    reader of +0x64 does with it is its owner's (§8.5 list).
 6. Answered: the status messages 0x95 / 0x96 / 0x18 (`0x00548760`) are
    owned by `combat/vitals.md` §5 (§10 rule 5).
-7. Monster movement messages 0x67 / 0x68 and the unit-update pass
-   (`0x00598220`, `0x00571600`, `0x00571F90`): the unit-update spec.
+7. ~~Monster movement messages 0x67 / 0x68 and the unit-update pass~~:
+   answered in `sim/intents-events.md` §7 (`0x00598220` §7.3, mode
+   messages §7.4, add messages `0x00571F90` §7.2).
 8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
    re-path budget at path +0x94 (not the distance budget +0x90); set to
    20 by `0x005A7C20` (§9.10).

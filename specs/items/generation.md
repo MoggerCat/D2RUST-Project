@@ -27,25 +27,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–65 |
-| Inputs | 66–104 |
-| Outputs / state changes | 105–117 |
-| Rules | 118–119 |
-|   1. Conventions | 120–223 |
-|   2. Seeds | 224–242 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 243–264 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 265–312 |
-|   5. Special item kinds | 313–323 |
-|   6. Normal quality and class skill mods | 324–370 |
-|   7. Sockets | 371–402 |
-|   8. Ethereal | 403–423 |
-|   9. Forced requests, ears, names, timers | 424–449 |
-| Constants & data dependencies | 450–472 |
-| Randomness | 473–491 |
-| Edge cases & original bugs | 492–506 |
-| Test vectors | 507–522 |
-| Provenance | 523–544 |
-| Open questions | 545–557 |
+| Summary | 52–66 |
+| Inputs | 67–105 |
+| Outputs / state changes | 106–118 |
+| Rules | 119–120 |
+|   1. Conventions | 121–224 |
+|   2. Seeds | 225–243 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 244–265 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 266–313 |
+|   5. Special item kinds | 314–324 |
+|   6. Normal quality and class skill mods | 325–371 |
+|   7. Sockets | 372–403 |
+|   8. Ethereal | 404–424 |
+|   9. Forced requests, ears, names, timers | 425–450 |
+|   10. Items from a code: the create wrapper and start items | 451–521 |
+| Constants & data dependencies | 522–544 |
+| Randomness | 545–563 |
+| Edge cases & original bugs | 564–578 |
+| Test vectors | 579–594 |
+| Provenance | 595–621 |
+| Open questions | 622–639 |
 <!-- /index -->
 
 ## Summary
@@ -447,6 +448,77 @@ draw. Also used by property function 23 and craft lists
    division) (`sim/tick.md` §5). At creation both stats are normally 0;
    socketing re-runs this (`items/properties.md` §10).
 
+### 10. Items from a code: the create wrapper and start items
+
+#### 10.1 Code lookup (`0x00633640`)
+
+A 4-byte item code (space-padded, as in `items.txt` `code`) → the
+combined items index through the code map (`data/callbacks.md`, linker
+`0x0096BCC4`); unknown code → not found (index 0, null record).
+
+#### 10.2 Create from an index (`0x00559CE0`)
+
+ECX = source unit (may be none), EDX = item index; stack: game, spawn
+mode, quality, no-sockets, never-ethereal, ilvl, use seed, seed, item
+seed (pops 0x24). It zeroes a request (§Inputs) and sets: unit, game,
+item, spawn mode, quality, format := game +0x78, init flags := 1, seed,
+item seed; x, y, room 0; flags2 |= 0x08 if no-sockets ≠ 0, |= 0x02 if
+never-ethereal ≠ 0. ilvl ≤ 0 becomes 1 (its −1 "derive from the
+source unit" branch is therefore never reached). Then the pipeline (§3,
+"use seed" from the argument) and, on success, item flag 0x10
+(identified). Returns the item or none.
+
+#### 10.3 Start items (`0x00534F10`)
+
+Callers: `0x00532590` (from the save parser `0x00534020` when its
+header reader `0x00532690` sets its out flag, and from `0x005345A0`)
+and `0x00569F80` (from `0x0056B180`); D2MOO 1.10f calls the same
+routine (`PLAYER_CreateStartItemsFromCharStatsTxt`) only for a new
+character (open question 4). Charstats row := the player's class
+(player +0x04; no row → nothing). For slot s = 0..9 (charstats
+`item1`…`item10`: code +0x5C + 8s, `item1loc` +0x60 + 8s, `item1count`
++0x61 + 8s):
+
+1. Code lookup (§10.1); not found (e.g. the `0` placeholder) → next
+   slot. Count 0 → next slot.
+2. Count times:
+   1. Create (§10.2): source = the player, spawn mode 4, quality 2
+      (normal), no sockets, never ethereal, ilvl = the player's base
+      stat 12 (level; `0x00558200`, < 2 → 1), no seeds.
+   2. If the item has a stat list with flag 0x40 (the class skill mods
+      of §6.2), remove and free it (`0x006277E0`, `0x00626CD0`).
+   3. Slot 0 only, when charstats `StartSkill` (+0xAC, i16) is a valid
+      skill row: in the flag-0x40 list (created and attached if
+      missing, `0x006251F0`, `0x00626E10`) set stat 107
+      (`item_singleskill`) layer `StartSkill` := 1.
+   4. Stackable (§1.3) → stat 70 (quantity) := total max stack.
+   5. Item flag 0x20000 (start item); body location := the slot's loc.
+   6. Placement (owners in `items/inventory.md`):
+      - beltable (`inventory.md` §3 rule 3): belt placement
+        `0x0055E9B0(item, slot = item x, find 1)` (§7.14 there); on
+        failure → inventory (below);
+      - else loc = 0: inventory (`0x00534B30`: page := 0, then
+        `0x00560200(game, player, item, x, y, find free 1, send 1)`,
+        §2.4 there); then stat 70 := 250 for itemtype 5 (`bowq`, quiver)
+        else stat 72 := max durability (`0x00625E00`); then for a
+        quiver stat 70 := 100 (overrides the 250);
+      - else: equip at loc (`0x005606B0`, §4.6 there; skip 1); on
+        failure → inventory; then stat 70 := 250 for a quiver, else
+        stat 72 := max durability.
+
+Draws: each copy is one item creation (§2: two game-seed steps, then
+the unit-seed and item-seed draws of a normal-quality item, §4, §6).
+The slot order and the count order fix the game-seed order.
+
+#### 10.4 One item from a code (tools)
+
+A scenario's `char item <code>` matches the original when it repeats
+§10.3 for one copy: §10.1, §10.2 with the arguments of §10.3 step 2.1
+(any slot ≠ 0, so no start skill), steps 2.2, 2.4, then the inventory
+placement of step 2.6 (find free). The start-item flag (step 2.5) is
+set only for charstats items. Placement at a given cell uses
+`0x00560200` with find free 0 and (x, y) (`items/inventory.md` §2.4).
+
 ## Constants & data dependencies
 
 | Constant | Value | Where |
@@ -532,7 +604,12 @@ Real 1.14d vectors need the recording in Open questions 2.
   `0x00556B60`, `0x0062BC20`, `0x0062BCB0`; ethereal `0x00556CA0`,
   `0x0065E4D0`; timers `0x00558530`, `0x00558580`; seeds `0x00555230`,
   `0x00552DF0`, `0x00552E90`; format at game creation `0x00530AE0`,
-  `0x00530D55`; data `0x0074638C` (elixir table).
+  `0x00530D55`; data `0x0074638C` (elixir table). §10: `0x00633640`,
+  `0x00559CE0` (request offsets from its stores, `ret 0x24`),
+  `0x00534F10`, `0x00534D60`, `0x00534C70`, `0x00534B30`, `0x00534BB0`,
+  `0x00558200`; charstats offsets checked against `data/fields.tsv`
+  (record 0xC4); itemtype 5 = `bowq` (patch_d2 `itemtypes.txt`). D2MOO
+  `PLAYER_CreateStartItem` (1.10f) has the same steps and order.
 - D2MOO 1.10f (`D2Game/src/ITEMS/Items.cpp`: `D2GAME_CreateItemEx_6FC4ED80`,
   `D2GAME_InitItemStats_6FC4E520`, `sub_6FC4D6B0`, `ITEMS_MakeEthereal`,
   `sub_6FC52410`, `sub_6FC52650`) was the map; every rule above was
@@ -554,3 +631,8 @@ Real 1.14d vectors need the recording in Open questions 2.
    stat list entries).
 3. The meaning of request `spawn mode`/`init flags` values per caller
    belongs to `sim/units.md` and the treasure spec; not checked here.
+4. §10.3: does any 1.14d path create start items for a loaded
+   character? Name the out flag of `0x00532690` that sends the parser to
+   `0x00532590` (D2MOO: the new-character branch), and what
+   `0x005345A0` and `0x0056B180` are (character creation, ladder or
+   realm paths).
