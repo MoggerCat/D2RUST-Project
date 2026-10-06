@@ -6,7 +6,8 @@
 //! Rust too: the draw list and the CPU reference compositor, as is
 //! [`composite`], which turns COF frames into scene draw items.
 //! [`gpu_compositor`] is the GPU twin of the CPU compositor; [`verify`]
-//! runs the render cases (CPU reference vs GPU).
+//! runs the render cases (CPU reference vs GPU). [`world_view`] turns the
+//! bridge's client world into the frame's draw list and composes it.
 
 pub mod app;
 pub mod assets;
@@ -21,3 +22,4 @@ pub mod render;
 pub mod scene;
 pub mod ui;
 pub mod verify;
+pub mod world_view;

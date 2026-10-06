@@ -192,6 +192,11 @@ pub fn run(archives: Arc<ArchiveSet>, map_config: MapConfig, mode: Mode) -> AppE
 
     match mode {
         Mode::View { exit_after } => {
+            // Inert until a bridge and a world view state are inserted.
+            app.add_plugins((
+                crate::bridge::BridgePlugin,
+                crate::world_view::WorldViewPlugin::default(),
+            ));
             app.add_systems(Startup, spawn_window_camera)
                 .add_systems(Update, (camera_controls, center_camera_on_spawn));
             if let Some(frames) = exit_after {
