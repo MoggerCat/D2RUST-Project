@@ -29,6 +29,8 @@ this code; every rule is from the 1.14d disassembly read in the spec).
 | §6 party list | through the existing `QuestWorld::party_members` |
 | §7 0x50 bytes 13–14 | unchanged (0); doc only |
 | §8 items 1–9 | item 2 tree order (already literal), 3 marker object anchor + 21 points + fatal without a room, 4 comment (not reachable), 5 event 0 without a player fatal (A1Q3 `0x005916B3`, A1Q4 `0x005925BB`), 6 A1Q6 event 3 keeps states 3–5, 7 O7 comment, 8 / 9 see below |
+| §8 item 8 Kashya's order | `wiring::economy::QuestDeferred`: after a queued mercenary reward, the quest call's later sends queue behind it; `Desk::quest_message` and `WiredWorld::quests` run the queue in order (0x28, 0x50 + hireling, 0x27, 0x29) |
+| §8 item 9 "every player" order | `wiring::economy::quest_players`: the player list's buckets 0–127, state 7 skipped (`EconomyQuests::players`; `QuestRest::players` is no longer called) |
 | `quests.md` §10.6 stone operate | the fifth stone creates missile 288 (owner the player, skill 0, level 1) through `create_missile`, then `refresh_room` (was `create_object`) |
 
 ## Seams added
@@ -65,6 +67,21 @@ operate's 288 is a missile); it stays in the trait for now.
 | A1Q3 / A1Q4 event 0 without a player | silent return | `QuestError::Fatal` |
 | `Extra4` | `beside_guid`, `beside_known` | `marker_guid`, `marker_known` plus the new §1 fields |
 
+## Tests
+
+- `world/quests/act1_rest_q4_tests.rs`: gibbet operate / event 7, stone
+  init and portal timer, marker init, Cain leaves Tristram, party step,
+  the 0x50 vector.
+- `world/quests/act1_rest_misc_tests.rs` (11): the trap vectors (first
+  try, retry at chest + (5, 5), missing chests, reschedule), the four
+  progression vectors, §8 items 2, 5, 6, 7 (with a failing-drop /
+  failing-portal world).
+- `wiring/interaction/tests/quest_npc.rs`
+  `kashya_reward_messages_precede_the_text_refresh`;
+  `wiring/economy/tests/quest_players.rs`; existing tests corrected to
+  the spec (A1Q5 / A1Q6 logs, stone 288 missile, town Cain at the marker
+  object, the d2-server Burial Grounds and Forgotten Tower sequences).
+
 ## Open questions / readings (none guessed in code)
 
 1. §4 step 2.3.2: the retry's room (`0x00463740` from C's room) is not
@@ -80,7 +97,9 @@ operate's 288 is a missile); it stays in the trait for now.
    progression; 1.14d always has one.
 5. +0x38 (the scroll's GUID, §8 item 1) is not kept: no reader, and the
    drop seam returns no item.
-6. No host provides the new seams yet (the wired host reports them); the
+6. Chain 37's unhandled `0x0058F870` still runs before Kashya's
+   deferred reward (as before).
+7. No host provides the new seams yet (the wired host reports them); the
    gibbet / stone / marker init and operate functions have no host
    dispatcher yet (objects spec not written, `quests-act1-rest.md` open
    question 2).
