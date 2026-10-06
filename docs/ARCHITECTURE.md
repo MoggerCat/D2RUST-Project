@@ -39,10 +39,14 @@ remote. There is no separate "offline mode" code path to maintain.
 - Can be run headless by tests, the server and conformance tools.
 
 **d2-client::bridge**
-- Receives snapshots/events from the server.
-- Spawns/updates/despawns Bevy entities that *mirror* sim units for drawing.
-- Interpolates between ticks for smooth rendering at any frame rate.
-- Converts input into intents (move, attack, cast, pick up, etc.).
+- Receives the server's S→C messages (the 1.14d bytes) and dispatches them
+  into a plain-Rust client world model (`specs/client/bridge.md`).
+- Spawns/updates/despawns Bevy entities that *mirror* that model for
+  drawing.
+- Does not interpolate or predict: how views advance between ticks is the
+  original client's behavior, owned by the Phase 6 render specs.
+- Converts input into intents (move, attack, cast, pick up, etc.): 1.14d
+  C→S messages built with `d2-proto`.
 - Contains no game rules. If you need to know whether an action is legal,
   the server tells you.
 

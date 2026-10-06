@@ -44,6 +44,7 @@ behaviors the engine reproduces exactly.
 | Unspecified table callbacks (Phase 2) | Superseded 2026-10-05: implemented from `specs/data/callbacks.md` | Was: write nothing until specified, with their bytes counted as explained by the cross-check. Now every byte must match. |
 | Data cross-check tool | `tools/data-tool` (`data-tool tables`) | Separate from `mpq-tool`: it depends on `d2-data`. Exit status 1 on any unexplained difference. |
 | Spec process | One writer per spec, then executable checks | Facts confirmed against 1.14d with provenance; one owner spec per rule. Extra LLM review layers proved costly for little gain (2026-10-05). |
+| Client↔game bridge (2026-10-06) | `specs/client/bridge.md` (d2rs design): the bridge carries the 1.14d message bytes both ways; S→C chunks are split with `d2-proto` and dispatched by id into a plain-Rust `ClientWorld`; ids without an owner spec (`specs/client/bridge-dispatch.tsv`, all `TBD` today) are counted, never interpreted; Bevy entities only mirror the model | Server reached through a narrow `ServerLink` trait in `d2-client` (send / pump / receive / protocol version) until `d2-server` is wired; one bridge frame per Bevy frame in `PreUpdate` = the 1.14d client frame (pump: drain → tick → flush, then receive), input later in the frame, so intents of frame k are drained at k+1. No interpolation or prediction in the bridge (supersedes the ARCHITECTURE line): between-tick views are original client behavior, owned by Phase 6 specs. The link must report `d2_proto::PROTOCOL_VERSION`; the bridge persists nothing. Chunks 1.14d asserts on (message > 0x204 or past the chunk end) stop the frame with an error. |
 | Tick core and unwritten specs (2026-10-06) | `d2-sim` owns step order, list iteration and flags; step bodies owned by unwritten specs are `TickHooks` methods (defaults do nothing), timer events go to `EventDispatch` | Lists are index-linked arenas with the original's insert rules, so iteration order is exact without pointers; unit specs plug in without changing the tick. |
 
 ## Phases
@@ -184,10 +185,16 @@ all of them implemented in `d2-data::fixup`, with `AnimData.d2` in
 - [ ] Coverage report (the "99.x%" number)
 
 ### Phase 5 — Local server + bridge
-- [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); d2rs session/snapshot messages for the bridge still to come.*
+- [ ] `d2-proto` message types (versioned). *1.14d message tables and typed fixed layouts done (Phase 3, `PROTOCOL_VERSION` 1); the bridge carries these 1.14d messages unchanged and needs no d2rs-own message so far (`specs/client/bridge.md` §1 rule 4).*
 - [ ] In-process server running `d2-sim`
-- [ ] `d2-client::bridge`: snapshots → Bevy entities, input → intents,
-      tick interpolation
+- [ ] `d2-client::bridge`: S→C messages → client world model → Bevy
+      mirror entities, input → intents. *Design `specs/client/bridge.md`
+      and skeleton done 2026-10-06 (branch `claude/phase5-bridge`):
+      receive split + dispatch by id (all ids unowned until client-model
+      specs exist), intent send path, `ClientWorld`, `BridgePlugin`
+      mirror; synthetic vectors pass. `ServerLink` adapter over the
+      `d2-server` host waits for its wiring. No tick interpolation
+      (decisions log).*
 **Exit:** walk around Act 1 town via the local server.
 
 ### Phase 6 — Full client
