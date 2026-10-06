@@ -430,7 +430,7 @@ as in §2.1 rule 5 and §3.1 rule 1.
 |---|---|
 | `id`, `name` | id; community label (not a 1.14d fact) |
 | `size` | size rule of `0x00730AE8` (§3.1) |
-| `layout` | fields where a 1.14d builder's stores were read; empty = unconfirmed; `bits:` prefix = bit-packed message, fields `name:width` written LSB-first from bit 0 of byte 0 |
+| `layout` | fields where a 1.14d builder's stores were read; empty = unconfirmed (or bit-packed: 0x96, `sim/pathing.md` Messages) |
 | `sender` | 1.14d builder(s) that write the id into a message passed to `0x0053B280` or `0x0052B330`; `-` = not found statically |
 | `client_handler`, `client_unit_handler` | `0x007114D0` columns 1 and 3; system ids: `0x0045C850` targets |
 | `produced_by` | `sim`, `session`, `transport`, `out`, `none` (§4) |

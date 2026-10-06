@@ -37,13 +37,13 @@
 |   7. A* (type 1, `0x0067B850`) | 349–386 |
 |   8. Velocity, direction vector, facing | 387–452 |
 |   9. Per-tick movement | 453–603 |
-|   10. Messages | 604–626 |
-| Constants & data dependencies | 627–663 |
-| Randomness | 664–674 |
-| Edge cases & original bugs | 675–705 |
-| Test vectors | 706–741 |
-| Provenance | 742–777 |
-| Open questions | 778–807 |
+|   10. Messages | 604–631 |
+| Constants & data dependencies | 632–668 |
+| Randomness | 669–679 |
+| Edge cases & original bugs | 680–710 |
+| Test vectors | 711–746 |
+| Provenance | 747–782 |
+| Open questions | 783–812 |
 <!-- /index -->
 
 ## Summary
@@ -328,9 +328,9 @@ Index := 0, count := 0. Direction offset ≠ 0 (types 5, 6, 12) →
       reverse of prev ((d − 4) & 7 = prev) → **tail**.
    3. If d ≠ prev: points[n++] := cur unless cur = start; turned := 1.
    4. cur += step(d); steps += 1; prev := d.
-3. After the loop: turned = 1 → done. Else **tail**: steps ≠ 0 →
+5. After the loop: turned = 1 → done. Else **tail**: steps ≠ 0 →
    points[n++] := cur.
-4. count := n.
+6. count := n.
 
 A turn appends the corner it starts from, so a path is the list of
 corners; after step 3 the first greedy turn appends P a second time
@@ -622,7 +622,12 @@ else type 15 and compute again. Other types: compute (§3).
 5. S→C 0x95 / 0x96 / 0x18 (life, mana, stamina, position) come from the
    player status routine `0x00548760` in the client pass, not from
    movement (owner: open question 6).
-6. Layouts of 0x0D, 0x0F, 0x10, 0x15, 0x96 are in `sim/server-messages.tsv`.
+6. Layouts of 0x0D, 0x0F, 0x10, 0x15 are in `sim/server-messages.tsv`.
+   0x96 (9 bytes, sender `0x0053C3F0`) is bit-packed, which the TSV
+   layout grammar (`intents-events.md` §5) cannot express yet, so its
+   cell stays empty and the layout lives here: fields written LSB-first
+   from bit 0 of byte 0, widths in bits: id 8 (0x96), stamina 15, x 16,
+   y 16, dx 8, dy 8 (71 of 72 bits; the last bit is 0).
 
 ## Constants & data dependencies
 
