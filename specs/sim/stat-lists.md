@@ -31,14 +31,14 @@
 |   7. Value-change notification | 256–290 |
 |   8. Chain operations | 291–380 |
 |   9. States | 381–412 |
-|   10. Timer event handlers | 413–494 |
-|   11. Mod array and stat messages | 495–512 |
-| Constants & data dependencies | 513–524 |
-| Randomness | 525–528 |
-| Edge cases & original bugs | 529–547 |
-| Test vectors | 548–584 |
-| Provenance | 585–608 |
-| Open questions | 609–631 |
+|   10. Timer event handlers | 413–495 |
+|   11. Mod array and stat messages | 496–513 |
+| Constants & data dependencies | 514–525 |
+| Randomness | 526–529 |
+| Edge cases & original bugs | 530–548 |
+| Test vectors | 549–585 |
+| Provenance | 586–609 |
+| Open questions | 610–631 |
 <!-- /index -->
 
 ## Summary
@@ -448,7 +448,8 @@ off → clear it unless another disguise state is still on (`0x0063A7B0`).
    unit's type-3 events (`0x00540E60`, argument 0 = any; including that
    one) and stop.
 4. hp := total(6), m := max life. r < 0 and hp < 256: continue only if
-   the unit's room exists and `0x0061AB00`(room) = 0.
+   the unit's room exists and is not in a town level (`0x0061AB00`:
+   the room's level is 1, 40, 75, 103 or 109, `drlg/levels.md`).
 5. hp += r; hp > m → cancel all type-3 events, hp := m; hp < 1 →
    0; set stat 6 := hp; fraction update as for players (`0x005A5650`).
 6. hp = 0 and mode ∉ {0, 12}: killer := owner of the unit's state-2
@@ -613,8 +614,7 @@ replaces it under the same comparison.
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
    call.
-2. `0x0061AB00`(room) in monster regeneration (§10.1 step 4): what it
-   tests (room/level spec).
+2. Answered: `0x0061AB00`(room) is the town test (§10.1 step 4).
 3. Who sets list flags 0x08, 0x20, 0x40, 0x80, 0x100 and 0x1 (skills,
    curses, items); this spec only needs their tests.
 4. Recording: the whole spec is unverified until `record_stats.py`
