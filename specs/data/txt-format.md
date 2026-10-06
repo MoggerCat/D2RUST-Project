@@ -505,22 +505,22 @@ None.
 
 ## Edge cases & original bugs
 
-- Missing RAW (9) or ASCIITOCODE (10) column: u32 0; an empty bound cell
+1. Missing RAW (9) or ASCIITOCODE (10) column: u32 0; an empty bound cell
   gives `"    "`. Both occur in 1.14d (`weapons.txt` lacks `BetterGem`: 0
   in `weapons.bin`).
-- ASCII writes its NUL at `offset + min(L, len)`, so the field uses
+2. ASCII writes its NUL at `offset + min(L, len)`, so the field uses
   `len + 1` bytes.
-- NAMETOWORD2 (21) stores one byte despite its name (`skills` `pettype` at
+3. NAMETOWORD2 (21) stores one byte despite its name (`skills` `pettype` at
   offset 190; the next field starts at 191).
-- Types 12 and 14 store code bytes, not the index.
-- Type 10 stores the cell's code; a bumped key exists only in the linker.
+4. Types 12 and 14 store code bytes, not the index.
+5. Type 10 stores the cell's code; a bumped key exists only in the linker.
   1.14d `itemtypes.bin` records 1, 14, 17 and 23 hold `20 20 20 20` while
   their keys are 0x20202021–0x20202024.
-- A bumped duplicate can take the key of a later real code, which is then
+6. A bumped duplicate can take the key of a later real code, which is then
   bumped itself (vectors).
-- An empty lookup cell hits an empty key; a missing lookup column is −1
+7. An empty lookup cell hits an empty key; a missing lookup column is −1
   even then.
-- Column map (1.14d): 280 u16 slots, columns first, then missing fields.
+8. Column map (1.14d): 280 u16 slots, columns first, then missing fields.
   Slots 280–407 fall into the 256-byte callback text buffer, which a bound
   type 22–25 cell then overwrites before the record's missing fields are
   processed; later slots overwrite other locals. d2rs: E14. 1.14d lists

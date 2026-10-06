@@ -369,10 +369,10 @@ None.
 
 ## Edge cases & original bugs
 
-- Duplicate columns (`armor` `mindam`/`maxdam` at 63/64 and 161/162,
+1. Duplicate columns (`armor` `mindam`/`maxdam` at 63/64 and 161/162,
   `automap` `Type2`, `chartemplate` `SkillName`): the leftmost binds, so
   `mindam@2` is N02. `weapons` column 18 is `[]`.
-- Appending to `weapons` shifts the combined index of every `armor` and
+2. Appending to `weapons` shifts the combined index of every `armor` and
   `misc` row (`loading.md` §9); links resolve by key.
 
 ## Test vectors

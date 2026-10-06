@@ -186,7 +186,7 @@ None.
 
 ## Edge cases & original bugs
 
-- **Top-down cels clip as bottom-up.** For an orientation-bit-set cel the
+1. **Top-down cels clip as bottom-up.** For an orientation-bit-set cel the
   rasterizer still computes the skipped rows and the row count as if rows
   ran up from `Y + yoff` (§5) while the drawer walks down: a top-down cel
   crossing the frame's top or bottom edge is cut wrongly (rows skipped
@@ -197,15 +197,15 @@ None.
   and a capture case containing such a draw does not count. No live case
   is known to cross an edge (the top-down frames are inventory item cels,
   drawn inside panels).
-- **Orientation bit only.** The drawer tests bit 0 of the orientation word
+2. **Orientation bit only.** The drawer tests bit 0 of the orientation word
   (§1, §4); a DC6 `flip` of 2 would draw bottom-up. d2rs refuses DC6
   frames with `flip ∉ {0, 1}` and DCC frames with an odd `variable0` until
   the game-file counts (Open question 2, C52) show none exist.
-- **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
+3. **No-clip branch.** If `L = R = 0` the rasterizer requires `X + xoff ≥ 0`
   and `Y + yoff` clamped `≥ 0` instead of clipping columns (`0x0060155C`).
   `R` is never 0 after surface creation, so the branch is dead in play.
-- Zero-size frames draw nothing (`dc6.md` Edge cases).
-- `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
+4. Zero-size frames draw nothing (`dc6.md` Edge cases).
+5. `0x006014C0` rejects a DC6 cel file whose version is not 6 or whose
   flags word has bit 2 (fatal errors `0x452`/`0x453`).
 
 ## Test vectors

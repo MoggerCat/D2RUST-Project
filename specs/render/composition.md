@@ -238,12 +238,12 @@ None.
 
 ## Edge cases & original bugs
 
-- The bottom 47 rows are never cleared in GDI; any pixel there not drawn
+1. The bottom 47 rows are never cleared in GDI; any pixel there not drawn
   by the control panel shows an older frame. Reproduce (persistent
   framebuffer).
-- The `[0x0070F2C0]` clear happens after drawing, so that frame is black
+2. The `[0x0070F2C0]` clear happens after drawing, so that frame is black
   (index 0) although everything was drawn.
-- Frame pacing (§3 step 5) uses wall-clock time; it changes only timing,
+3. Frame pacing (§3 step 5) uses wall-clock time; it changes only timing,
   never pixels.
 
 ## Test vectors
