@@ -338,3 +338,36 @@ fn missile_special_shifts() {
         assert_eq!(miss_special(&mut f, &t, None, None, c, 0, 1), want, "{c}");
     }
 }
+
+// §3.2: `ELenSymPerCalc ≠ −1` and `p ≠ 0` → `v += pct(v, p, 100)`.
+#[test]
+fn elem_len_synergy() {
+    let mut r = skill_rec();
+    r.elen = 100;
+    r.elensympercalc = 0;
+    let t = tables_with(vec![r], vec![0x07, 50, 0x00]);
+    let mut f = Fake::default();
+    assert_eq!(elem_len(&mut f, &t, None, 0, 1), 150);
+}
+
+// §3.3 step 3: with `SrcDam`, only a wield-type-2 weapon gives the
+// weapon's own damage; another weapon reads `mindamage(21)` /
+// `maxdamage(22)`.
+#[test]
+fn phys_srcdam_weapon_source() {
+    let mut r = skill_rec();
+    r.srcdam = 128;
+    let t = skill_tables(vec![r]);
+    let mut f = Fake::default();
+    let u = f.add(FUnit::new(UnitType::Player, 0).with(21, 5).with(22, 7));
+    let i = f.add_item(FItem {
+        damage: (10, 20),
+        ..FItem::default()
+    });
+    f.units[u].weapon = Some(i);
+    assert_eq!(phys_min(&mut f, &t, Some(u), 0, 1, true), 5);
+    assert_eq!(phys_max(&mut f, &t, Some(u), 0, 1, true), 7);
+    f.items[i].wield = 2;
+    assert_eq!(phys_min(&mut f, &t, Some(u), 0, 1, true), 10);
+    assert_eq!(phys_max(&mut f, &t, Some(u), 0, 1, true), 20);
+}
