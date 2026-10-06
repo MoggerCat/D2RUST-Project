@@ -28,17 +28,17 @@
 |   4. Allocation and ownership | 150–164 |
 |   5. Base writes | 165–189 |
 |   6. Full values | 190–255 |
-|   7. Value-change notification | 256–284 |
-|   8. Chain operations | 285–374 |
-|   9. States | 375–401 |
-|   10. Timer event handlers | 402–483 |
-|   11. Mod array and stat messages | 484–501 |
-| Constants & data dependencies | 502–513 |
-| Randomness | 514–517 |
-| Edge cases & original bugs | 518–536 |
-| Test vectors | 537–573 |
-| Provenance | 574–597 |
-| Open questions | 598–620 |
+|   7. Value-change notification | 256–290 |
+|   8. Chain operations | 291–380 |
+|   9. States | 381–412 |
+|   10. Timer event handlers | 413–494 |
+|   11. Mod array and stat messages | 495–512 |
+| Constants & data dependencies | 513–524 |
+| Randomness | 525–528 |
+| Edge cases & original bugs | 529–547 |
+| Test vectors | 548–584 |
+| Provenance | 585–608 |
+| Open questions | 609–631 |
 <!-- /index -->
 
 ## Summary
@@ -267,8 +267,14 @@ does (more base writes, attach, detach) happens at that point.
 
 Players and monsters (§4.3). Invalid stat → return. Then:
 
-1. If `itemevent1` (i16 +0x48) > 0: item event registration (new ≠ 0:
-   `0x005C0BE0`, `0x0056E740`; new = 0: `0x005C0B50`), items spec.
+1. If `itemevent1` (i16 +0x48) > 0, item event registration on the
+   owner (`units.md` §6.6), with k the full stat key: new ≠ 0 → if no
+   record (kind 2, key k, v0 k) exists (`0x005C0BE0`), add (`0x0056E740`)
+   event `itemevent1` with function index `itemeventfunc1` (i16 +0x4C),
+   kind 2, key k, v0 k, v1 0; then, if `itemevent2` (i16 +0x4A) > 0,
+   add `itemevent2` with `itemeventfunc2` (+0x4E) the same way (an
+   existing record skips both). new = 0 → remove every record of kind 2
+   and key k (`0x005C0B50`).
 2. By stat:
    - 7, 9, 11 (max life, mana, stamina), with current = 6, 8, 10: if
      new ≠ old and old > 0 and c := unit total(current) > 0: o := old,
@@ -397,7 +403,12 @@ off → clear it unless another disguise state is still on (`0x0063A7B0`).
 - List of a state (`0x00625650`(unit list, s)): first in the active chain
   with list state = s, else first in the parked chain. By flags
   (`0x006256E0`): parked chain when 0x2000 is asked, else active chain;
-  first list with any asked flag. By state and flags `0x006257D0`.
+  first list with any asked flag. By state and flags (`0x006257D0`(unit,
+  s, flags)): the unit's list missing or not extended → none; parked
+  chain when flags has 0x2000, else the active chain; f := flags without
+  0x2000; walking from the head, the first list whose state = s and,
+  when f ≠ 0, whose flags share any bit with f (not every bit); f = 0
+  matches on the state alone. None found → null.
 
 ### 10. Timer event handlers
 

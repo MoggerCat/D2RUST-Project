@@ -30,14 +30,14 @@
 |   3. Lifecycle | 135–178 |
 |   4. Modes and mode schedules | 179–320 |
 |   5. Event dispatch | 321–335 |
-|   6. Events per kind | 336–416 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 417–438 |
-| Constants & data dependencies | 439–455 |
-| Randomness | 456–463 |
-| Edge cases & original bugs | 464–482 |
-| Test vectors | 483–542 |
-| Provenance | 543–569 |
-| Open questions | 570–592 |
+|   6. Events per kind | 336–444 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 445–466 |
+| Constants & data dependencies | 467–483 |
+| Randomness | 484–491 |
+| Edge cases & original bugs | 492–510 |
+| Test vectors | 511–570 |
+| Provenance | 571–597 |
+| Open questions | 598–620 |
 <!-- /index -->
 
 ## Summary
@@ -409,10 +409,38 @@ Object internals are owned by the objects spec; the seed of the rolls
 
 | Type | Handler | Scheduled by (expire) |
 |---|---|---|
-| 3 | `0x00562D30` → `0x00562C40` per replenished stat: if the rate r ≠ 0 and the value is below its maximum, add 1 and reschedule at f + max(2500 / r + 1, 125) | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
+| 3 | `0x00562D30`: (a) item not broken (flag 0x100) and with durability (`0x00629930`): replenish(rate 252, value 72, max = max durability `0x00625E00`); (b) only when (a) did not run or returned 0, and the item is stackable (`0x006289F0`): replenish(rate 253, value 70, max = max stack `0x006295B0`). Replenish `0x00562C40`: r := total(rate); r = 0 → return 0 (no reschedule). v := total(value) + 1; v > max → return 1 (no reschedule: the chain ends when full). Else set base value := v; if the item's owner GUID (`0x00629F20`) ≠ −1 names a player with a client, send the stat update `0x0053D130`(client, item, 1, value stat, v, 0); if v ≥ 1 and the item is broken, `0x0055F900` (repair path, items spec). Reschedule event 3 at f + max(2500 / r + 1, 125) (integer division), args (0, 0); return 1 | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
 | 4 | `0x0055F120` (returns at once) | none found |
 | 12 | `0x0055F130`: `0x00627460(item, f)` | `sim/stat-lists.md` |
 | others | null (fatal) | none |
+
+#### 6.6 Unit event records (unit +0x90)
+
+Not timer events: the hooks `combat/damage.md` §5.4 runs. A unit keeps
+a doubly linked list of 0x20-byte records at +0x90 (prev +0x18, next
++0x1C; null head = none). Record: event id (u8 +0x00, `events.txt`
+index), flags (u16 +0x02: 1 running, 2 remove pending), owner kind
+(+0x04), key (+0x08), two values passed to the function (+0x0C,
++0x10), function (+0x14).
+
+1. Add (`0x005C0AD0`(ECX game, EDX unit; event, v0, v1, function,
+   kind, key)): unit null → 0. Allocate, zero, fill, **prepend** at the
+   head; return the record. By table index (`0x0056E740`, same order
+   with a function index instead of a pointer): index > 0x31 or table
+   `0x007325B0`[index] null → 0, nothing added.
+2. Find (`0x005C0BE0`(unit; kind, key, v0)): the first record from the
+   head with equal kind, key and v0, else null.
+3. Remove (`0x005C0B50`(ECX game, EDX unit; kind, key)): every record
+   with that kind and key: running → set remove pending; else unlink
+   and free.
+4. Trigger (`0x005C0C30`(ECX game, EDX event; unit, other, arg)): unit
+   null → 0. From the head, each record whose event id matches: set
+   running, call function(ECX game; unit, other, arg, v0, v1), clear
+   running; then, if remove pending or kind = 0 (one-shot), unlink and
+   free it. The next record is read after the call (a record the
+   function adds at the head is not visited). Returns the last called
+   function's result, 0 when none ran. Most recent registration runs
+   first.
 
 ### 7. Scheduler inventory (`unit-events.tsv`)
 

@@ -33,19 +33,19 @@
 | Rules | 118–119 |
 |   1. Conventions | 120–223 |
 |   2. Seeds | 224–242 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 243–264 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 265–312 |
-|   5. Special item kinds | 313–323 |
-|   6. Normal quality and class skill mods | 324–370 |
-|   7. Sockets | 371–402 |
-|   8. Ethereal | 403–423 |
-|   9. Forced requests, ears, names, timers | 424–449 |
-| Constants & data dependencies | 450–472 |
-| Randomness | 473–491 |
-| Edge cases & original bugs | 492–506 |
-| Test vectors | 507–522 |
-| Provenance | 523–544 |
-| Open questions | 545–557 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 243–285 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 286–333 |
+|   5. Special item kinds | 334–344 |
+|   6. Normal quality and class skill mods | 345–391 |
+|   7. Sockets | 392–423 |
+|   8. Ethereal | 424–444 |
+|   9. Forced requests, ears, names, timers | 445–470 |
+| Constants & data dependencies | 471–493 |
+| Randomness | 494–512 |
+| Edge cases & original bugs | 513–527 |
+| Test vectors | 528–543 |
+| Provenance | 544–565 |
+| Open questions | 566–578 |
 <!-- /index -->
 
 ## Summary
@@ -261,6 +261,27 @@ seeds).
 8. Primary type `play` (player body part) → §9 step 5.
 9. Flag 0x1000000 (personalized) set → §9 step 5 (name only).
 10. §9 step 6 (replenish timers). Return the item.
+
+**Simple creation** (`0x00559CE0`; vendors, quest rewards, inventory
+gifts): ECX source unit, EDX item index; stack game, spawn mode,
+quality, no-sockets, never-ethereal, level, use seed, seed, item seed
+(`ret 0x24`). Builds a zeroed request: unit, game, item, spawn mode,
+quality, seed, item seed as given; x, y, room 0; init flags 1; format :=
+the game's (+0x78); flags2 := 0x08 when no-sockets ≠ 0, | 0x02 when
+never-ethereal ≠ 0; ilvl := level, where level ≤ 0 becomes 1 at entry
+(`0x00559D08`). The code after that holds a unit-based default for
+level −1 (the level default below, inlined), but
+−1 has already become 1, so it never runs: a caller that wants the
+default computes it first. Then the pipeline (§3) with "use seed"; on
+success the item gets flag 0x10 (identified, `0x006280D0`).
+
+**Level default** (`0x00558200`, ECX unit, EDX level id): monster →
+its `level` total (stat 12); player → its base `level`; any other unit
+→ the area level (`0x0061DCA0`, `items/treasure.md` §4 step 2) of the
+level of the unit's room (`0x00620BB0`, `0x0061A1B0`), with the unit's
+game difficulty and expansion; no unit → EDX = 0 gives 1, EDX ≠ 0 is
+fatal (the game lookup `0x00554010` asserts on the null unit). A result
+< 1 becomes 1.
 
 ### 4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`)
 

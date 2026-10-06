@@ -270,7 +270,7 @@ made for kinds 0–3.
 | Case | Steps |
 |---|---|
 | flags & 0x0001 (`mod`, copy) | it = capture[j].item; page 0xFF, mode 4 (cursor); copy = duplicate(it, fillers = not remove[j]) (`0x0055A2A0`; D2MOO `ITEMS_Duplicate`); class by kind: 0xFC slot item; 0xFD type pick (§7.5) with L; 0xFE capture class if ≥ 0 else 0; 0xFF capture class; other 0. If the copy exists its class := that value. Item init `0x00557AB0(game, &copy, 0, 0)` (owner: items) — out[j] = the result; mode 4; it page := 3 |
-| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (tempered affix rolls, owner: items); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
+| kind 0xFE (`useitem`) | it = capture[j].item; page 0xFF, mode 4; out[j] = duplicate(it, fillers = not remove[j]); mode 4; it page := 3. Capture class (`exc`/`eli`) is **not** used. Quality byte 9: prefix = `0x005C1BC0(out, 1)`, suffix = `0x005C1BC0(out, 0)` (the rare-name pick by format, `items/affixes.md` §5; ECX item, EDX 1 prefix / 0 suffix); both ≠ 0 → quality 9, rare prefix and suffix set (`0x00627EA0`, `0x00628010`, `0x00628070`); else craft := 0 |
 | kind 0xFF, 0xFC, 0xFD | create through an item request (§7.4) |
 | any other kind | nothing (out[j] none) |
 

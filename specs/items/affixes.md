@@ -22,19 +22,19 @@
 |   2. Affix level (alvl) | 78–83 |
 |   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 84–121 |
 |   4. Fit tests | 122–147 |
-|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 148–154 |
-|   6. Magic item (`0x005565E0`) | 155–170 |
-|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 171–190 |
-|   8. Crafted item (`0x005C21D0`) | 191–205 |
-|   9. Tempered item (dispatch case 9) | 206–211 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 212–225 |
-|   11. Automagic (finishing step, `0x00557450`) | 226–232 |
-| Constants & data dependencies | 233–249 |
-| Randomness | 250–265 |
-| Edge cases & original bugs | 266–280 |
-| Test vectors | 281–297 |
-| Provenance | 298–317 |
-| Open questions | 318–323 |
+|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 148–159 |
+|   6. Magic item (`0x005565E0`) | 160–175 |
+|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 176–195 |
+|   8. Crafted item (`0x005C21D0`) | 196–210 |
+|   9. Tempered item (dispatch case 9) | 211–218 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 219–232 |
+|   11. Automagic (finishing step, `0x00557450`) | 233–239 |
+| Constants & data dependencies | 240–256 |
+| Randomness | 257–272 |
+| Edge cases & original bugs | 273–287 |
+| Test vectors | 288–304 |
+| Provenance | 305–324 |
+| Open questions | 325–330 |
 <!-- /index -->
 
 ## Summary
@@ -152,6 +152,11 @@ Candidates: rows of the part that fit (§4.3), in order (≤ 511). None →
 0. Else r := roll(count) (`roll_range(0, count)`); return the rare id of
 candidate r. No weights. (Format 0: `0x005C19A0`, same logic.)
 
+Entry by format (`0x005C1BC0`, ECX item, EDX 1 = prefix / 0 = suffix):
+item format (`0x0062A670`) ≥ 1 → `0x005C1AB0`, else `0x005C19A0`;
+returns the rare id (0 = none). §9 and the cube (`world/cube.md` §7.3)
+call this entry; §7 and §8 call the two pickers directly.
+
 ### 6. Magic item (`0x005565E0`)
 
 p := request prefix[0], s := request suffix[0], forced := false.
@@ -205,8 +210,10 @@ forced.
 
 ### 9. Tempered item (dispatch case 9)
 
-rp := §5(prefix), rs := §5(suffix); both ≠ 0 → rare prefix/suffix := rp,
-rs, success (no affixes, no properties); else downgrade to normal.
+Rare prefix and suffix := 0 first. rp := §5 entry `0x005C1BC0`(item,
+1) (`0x0055782E`), rs := `0x005C1BC0`(item, 0) (`0x0055783A`), in that
+draw order; both ≠ 0 → rare prefix/suffix := rp, rs, success (no
+affixes, no properties); else downgrade to normal.
 (Tempered quality is only reachable by a request quality of 9.)
 
 ### 10. Charm (`0x00556A60`, from the normal routine)
@@ -302,7 +309,7 @@ Synthetic, from the rules:
   `0x005C1500`, fit tests `0x0065E620`, `0x0065E710`, rare names
   `0x005C1AB0`, magic `0x005565E0`, rare `0x005C21A0`/`0x005C1BF0`
   (count table `0x006E3014`), crafted `0x005C21D0`, tempered
-  `0x005C1BC0` (dispatch `0x0055782E`), charm `0x00556A60`, automagic
+  dispatch case 9 at `0x00557801` (rare-name entry `0x005C1BC0`, §5), charm `0x00556A60`, automagic
   `0x005579C6`; affix table root `0x0096CA7C`, rare `0x0096CAA0`.
 - D2MOO 1.10f (`ItemsMagic.cpp`: `ITEMS_RollMagicAffixesNew`,
   `D2GAME_RollRareItem_6FC53360`, `sub_6FC53CD0`, `D2GAME_RollRareAffix`;

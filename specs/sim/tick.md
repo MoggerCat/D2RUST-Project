@@ -31,15 +31,15 @@
 |   3. Tick steps in order | 136–166 |
 |   4. Room pass (step 3) | 167–189 |
 |   5. Timer events (step 4) | 190–342 |
-|   6. Client pass (step 5) | 343–372 |
-|   7. Periodic steps, summary | 373–382 |
-|   8. Wall-clock and host-only parts | 383–395 |
-| Constants & data dependencies | 396–409 |
-| Randomness | 410–417 |
-| Edge cases & original bugs | 418–435 |
-| Test vectors | 436–521 |
-| Provenance | 522–546 |
-| Open questions | 547–563 |
+|   6. Client pass (step 5) | 343–379 |
+|   7. Periodic steps, summary | 380–389 |
+|   8. Wall-clock and host-only parts | 390–402 |
+| Constants & data dependencies | 403–416 |
+| Randomness | 417–424 |
+| Edge cases & original bugs | 425–442 |
+| Test vectors | 443–528 |
+| Provenance | 529–553 |
+| Open questions | 554–570 |
 <!-- /index -->
 
 ## Summary
@@ -363,9 +363,16 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
    adjacent rooms' update queues (`0x0053A620`, `unit-order.md` §6);
    player stat-change messages (`0x006258D0`); inventory refresh when the
    player's flag requires it; `0x0055F4F0`; client counter +0x1B0 += 1;
-   if the player's room differs from the client's: level change (quest
-   hooks `0x00543B90`, NPC proxies `0x00537340`) and room switch
-   (`0x00537B50`); arena sync (`0x0053FC20`); queue the player for
+   if the player's room (`0x00620BB0`) differs from the client's: when
+   the two rooms' level ids (`0x0061A1B0`) differ, from := the client
+   room's level, to := the player room's level, quest event 3
+   CHANGEDLEVEL `0x00543B90`(game, from, to, player) (`world/quests.md` §4.1)
+   then the town-leave refresh `0x00537340`(game, player, from, to)
+   (`world/vendors.md` §6 rule 1); then, levels equal or not, the room
+   switch (`0x00537B50`, new room) (`0x0053815E`–`0x0053819A`). This
+   step has no act logic: an act change happens only through the warp
+   (`0x0053AEC0`, `world/waypoints.md`), which calls `0x00537340` and
+   the act change `0x0053ACC0` itself; arena sync (`0x0053FC20`); queue the player for
    update (`0x0064C040`).
 
 Message contents: `intents-events.md`.

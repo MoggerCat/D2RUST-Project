@@ -40,15 +40,15 @@
 |   6. Status reporting | 426–513 |
 |   7. NPC dialog hooks | 514–546 |
 |   8. Act transitions, warps and portals | 547–603 |
-|   9. Quest items, rewards and helpers | 604–647 |
-|   10. Act I quests | 648–805 |
-|   11. Acts II–V | 806–811 |
-| Constants & data dependencies | 812–826 |
-| Randomness | 827–845 |
-| Edge cases & original bugs | 846–864 |
-| Test vectors | 865–881 |
-| Provenance | 882–903 |
-| Open questions | 904–926 |
+|   9. Quest items, rewards and helpers | 604–662 |
+|   10. Act I quests | 663–820 |
+|   11. Acts II–V | 821–826 |
+| Constants & data dependencies | 827–841 |
+| Randomness | 842–860 |
+| Edge cases & original bugs | 861–879 |
+| Test vectors | 880–896 |
+| Provenance | 897–918 |
+| Open questions | 919–941 |
 <!-- /index -->
 
 ## Summary
@@ -607,7 +607,8 @@ they create nothing.
 
 (game, player, code, level, quality, droppable): look up the item code
 (return none if absent); level = the player-based default
-(`0x00558200`) unless level ≠ 0; ask item creation (`0x00559CE0`,
+(`0x00558200`, `items/generation.md` §3) unless level ≠ 0; ask item
+creation (`0x00559CE0`, `items/generation.md` §3 "simple creation",
 count 1, the given quality) for the item (items spec); if it has max
 durability > 0 set durability to it; inventory page 0; try to place it in
 the inventory (`0x00560200`); on success identify it unless identified
@@ -620,6 +621,20 @@ else free it and return none.
 `0x00544160(game, player, code)` finds the player's item with the code
 (`0x00558110`) and removes it (`0x005440A0`: by item mode: stored →
 update client and remove; equipped → unequip path; on cursor → remove).
+
+Finding the item (`0x00558110`, ECX game, EDX player, stack code): the
+player's inventory (+0x60) missing → none. Code compare: the item's
+code (`0x00628590`, items.txt `code`) = the asked code.
+1. The cursor item (`0x0063C1E0`), if its code matches: returned when its
+   items record is missing, when `quest` (+0x12A) = 0, or when game
+   difficulty (+0x6D) ≤ its stat 356 (`questitemdifficulty`, total);
+   else go on (no `questdiffcheck` test here).
+2. Every item of the inventory list in list order (`0x0063B2C0`,
+   `0x0063DFA0`: stored, equipped, belt and cube items alike), skipping
+   items on page 1 (`0x00628250`): the first whose code matches and that
+   has no items record, or `quest` = 0, or `questdiffcheck` (+0x12B) = 0,
+   or difficulty ≤ stat 356, is returned.
+3. Else none.
 
 #### 9.3 Player GUID lists
 
