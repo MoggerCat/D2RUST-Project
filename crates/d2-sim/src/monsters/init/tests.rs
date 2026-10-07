@@ -207,6 +207,7 @@ struct Fake {
     room: RoomId,
     stats: BTreeMap<(UnitId, u16), i32>,
     log: Vec<String>,
+    ai_flags: BTreeMap<UnitId, u16>,
     inventory: bool,
     items_at: BTreeSet<u8>,
     region: Vec<[u8; 16]>,
@@ -237,6 +238,7 @@ impl Fake {
             room,
             stats: BTreeMap::new(),
             log: Vec::new(),
+            ai_flags: BTreeMap::new(),
             inventory: false,
             items_at: BTreeSet::new(),
             montype_nest: BTreeSet::new(),
@@ -399,6 +401,9 @@ impl InitHost for Fake {
     }
     fn minions(&mut self, boss: UnitId) -> Vec<UnitId> {
         self.minions.get(&boss).cloned().unwrap_or_default()
+    }
+    fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {
+        *self.ai_flags.entry(unit).or_default() |= flag;
     }
     fn give_aura(&mut self, _: UnitId, skill: u16, level: i32) {
         self.log.push(format!("aura {skill} {level}"));
@@ -2274,6 +2279,9 @@ fn real_level_stats() {
 }
 
 mod callbacks;
+mod find;
+mod spawn_tools;
+mod umod_init_bodies;
 
 // Tests written against surviving mutants (METHODS M08); a child module so
 // they share this module's fakes.

@@ -40,6 +40,10 @@ struct Probe {
     /// The mode the next monster mode function sets (a start function).
     start_mode: Option<u32>,
     start_fails: bool,
+    /// The mode-1 umod site schedules a type-7 event at f + 4.
+    umod7: bool,
+    /// Record the umod sites in `log`.
+    log_umods: bool,
     class_record: Option<MonsterModeRecord>,
     /// Life fractions sent (`0x00571A10`).
     fractions: Vec<i32>,
@@ -112,6 +116,18 @@ impl UnitHooks for Probe {
     }
     fn update_trade(&mut self, _: &mut Sim<'_>, _: UnitId, a1: u32, a2: u32) {
         self.push(format!("trade {a1} {a2}"));
+    }
+    fn monster_umods(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u8) {
+        let cur = sim.units.get(unit).map(|r| r.mode);
+        if self.log_umods {
+            self.push(format!("umods {mode} cur {cur:?}"));
+        }
+        if mode == 1 && self.umod7 {
+            let at = sim.game.frame + 4;
+            sim.game
+                .schedule_event(unit, 7, at, None, 0, 0)
+                .expect("event 7");
+        }
     }
     fn monster_mode_bookkeeping(&mut self, _: &mut Sim<'_>, _: UnitId, mode: u32) {
         self.push(format!("book {mode}"));
@@ -870,6 +886,7 @@ fn spec_monster_modes() -> Vec<(u32, MonsterModeRecord, Moves)> {
 /// §4.6: the mode table (from the spec text), the mode set's steps, the
 /// fallback, events 0/1 and the neutral start's pending-AI test.
 // Covers: specs/sim/units.md §4.6
+// Covers: specs/monsters/ai.md §1.3 text
 #[test]
 fn monster_mode_set() {
     let rows = spec_monster_modes();
@@ -1669,4 +1686,58 @@ fn guid_drawn_once_after_seed_before_init() {
         assert_eq!(game.lists.guids.get(ty), before.get(ty));
     }
     assert_eq!(sys.hooks.init_guids.last(), Some(&(1, 1)));
+}
+
+// Covers: specs/monsters/umod-callbacks.md §2 r2, §edge-cases-original-bugs r1
+#[test]
+fn umod_mode_1_site_runs_for_every_mode_after_the_start_and_before_the_cancel() {
+    // Requested mode m from NU (mode 1): the mode-1 site runs after the
+    // start function with the NEW mode in the mode field, for every mode
+    // (GH and the same mode again included), after the animation prepare
+    // and before the cancel of events 0 / 1 and the animation schedule;
+    // mode 0 runs first with the old mode, never for GH.
+    for mode in [0u32, 1, 3, 4, 13] {
+        let (mut game, mut sys) = animated();
+        let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+        // An event 0 / 1 pair from the old mode: cancelled after the site.
+        at(&mut game, m, 0, 150, 0, 0);
+        at(&mut game, m, 1, 151, 0, 0);
+        if mode != 1 {
+            sys.hooks.start_mode = Some(mode);
+        }
+        sys.hooks.umod7 = true;
+        sys.hooks.log_umods = true;
+        sys.hooks.log.clear();
+        sys.with(&mut game, |sim, h| modes::monster_set_mode(sim, h, m, mode))
+            .expect("set");
+        let log = &sys.hooks.log;
+        let one = log
+            .iter()
+            .position(|l| l.starts_with("umods 1"))
+            .expect("mode 1 site ran");
+        assert_eq!(log[one], format!("umods 1 cur Some({mode})"), "mode {mode}");
+        if mode != 1 {
+            let start = log
+                .iter()
+                .position(|l| l.starts_with("mfn"))
+                .expect("start");
+            assert!(start < one, "mode {mode}: after the start function");
+        }
+        let zero = log.iter().position(|l| l.starts_with("umods 0"));
+        assert_eq!(zero.is_some(), mode != 3, "mode {mode}");
+        if let Some(z) = zero {
+            assert_eq!(log[z], "umods 0 cur Some(1)", "old mode still set");
+            assert!(z < one);
+        }
+        // The type-7 event of the site survives the cancel (it is not
+        // event 0 / 1) and the old 0 / 1 pair does not.
+        let types = types_of(&game, m);
+        assert!(types.contains(&7), "mode {mode}: {types:?}");
+        assert!(
+            !pending(&game, m)
+                .iter()
+                .any(|p| (p.0 == 0 || p.0 == 1) && (p.1 == 150 || p.1 == 151)),
+            "mode {mode}"
+        );
+    }
 }

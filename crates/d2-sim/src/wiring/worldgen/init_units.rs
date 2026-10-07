@@ -363,6 +363,13 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn footprint_occupied(&mut self, unit: UnitId) -> bool {
         self.umod_footprint_occupied(unit)
     }
+    /// `0x005DD250(unit, 1)`: AI control flags |= `flag` (`umod-init-bodies.md`
+    /// §4 r4); a unit without an AI control writes nothing.
+    fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {
+        if let Some(c) = self.v.h.ai.as_mut().and_then(|ai| ai.control_mut(unit)) {
+            c.flags |= flag;
+        }
+    }
     fn ai_param0(&mut self, unit: UnitId) -> i32 {
         self.v.h.x.ai_param0(unit)
     }

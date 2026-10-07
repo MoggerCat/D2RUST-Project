@@ -8,7 +8,7 @@ use crate::missiles::bodies_ext2::{scatter_at_target, ORB_C, ORB_S};
 
 /// A world with one live missile of row 0 (`r`, at the owner's (100,
 /// 100), skill 7, level 10) and optional rows from 1.
-fn world(r: MissileRow, extra: &[MissileRow]) -> (World, UnitId) {
+pub(super) fn world(r: MissileRow, extra: &[MissileRow]) -> (World, UnitId) {
     let mut w = World::new(r);
     w.tables.extend_from_slice(extra);
     let mut p = w.params();
@@ -21,7 +21,7 @@ fn world(r: MissileRow, extra: &[MissileRow]) -> (World, UnitId) {
 }
 
 /// A plain sub-missile row.
-fn sub() -> MissileRow {
+pub(super) fn sub() -> MissileRow {
     let mut r = row();
     r.psrvdofunc = 0;
     r
@@ -37,45 +37,45 @@ macro_rules! cx {
     };
 }
 
-fn srv_do(w: &mut World, i: i16, m: UnitId) -> i32 {
+pub(super) fn srv_do(w: &mut World, i: i16, m: UnitId) -> i32 {
     let mut cx = cx!(w);
     catalogue::run_srv_do(&mut w.game, &mut cx, i, m)
 }
 
-fn srv_hit(w: &mut World, i: i16, m: UnitId, u: Option<UnitId>) -> i32 {
+pub(super) fn srv_hit(w: &mut World, i: i16, m: UnitId, u: Option<UnitId>) -> i32 {
     let mut cx = cx!(w);
     catalogue::run_srv_hit(&mut w.game, &mut cx, i, m, u, 0)
 }
 
 /// Missiles other than `m`, in allocation (slot) order.
-fn others(w: &World, m: UnitId) -> Vec<UnitId> {
+pub(super) fn others(w: &World, m: UnitId) -> Vec<UnitId> {
     w.store.missiles().filter(|&u| u != m).collect()
 }
 
-fn tpoint(w: &World, u: UnitId) -> (i32, i32) {
+pub(super) fn tpoint(w: &World, u: UnitId) -> (i32, i32) {
     w.fake.paths[&u].target_point.expect("target point")
 }
 
-fn set_frames(w: &mut World, m: UnitId, total: i16, current: i16) {
+pub(super) fn set_frames(w: &mut World, m: UnitId, total: i16, current: i16) {
     let d = w.store.get_mut(m).unwrap();
     d.total = total;
     d.current = current;
 }
 
-fn set_data(w: &mut World, m: UnitId, a: i32, b: i32) {
+pub(super) fn set_data(w: &mut World, m: UnitId, a: i32, b: i32) {
     w.store.get_mut(m).unwrap().target = (a, b);
 }
 
-fn guid(w: &World, u: UnitId) -> i32 {
+pub(super) fn guid(w: &World, u: UnitId) -> i32 {
     w.game.lists.unit(u).unwrap().guid as i32
 }
 
 /// A skill 7 with (calc1, calc2, aurarange, auralen, calc4).
-fn skill(w: &mut World, v: [i32; 5]) {
+pub(super) fn skill(w: &mut World, v: [i32; 5]) {
     w.fake.mb.skills.insert(7, v);
 }
 
-fn field(w: &mut World, code: u8, v: i32) {
+pub(super) fn field(w: &mut World, code: u8, v: i32) {
     w.fake.mb.fields.insert((7, code), v);
 }
 
@@ -104,7 +104,7 @@ fn cairn_stones_opens_the_portal_once() {
     assert_eq!(w.fake.logged("portal"), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §42 r1, §42 r2
+// Covers: specs/missiles/bodies-2.md §42 r1, §42 r2, §42 text
 #[test]
 fn cairn_stones_expiry_opens_the_portal() {
     let mut r = row();
@@ -117,7 +117,7 @@ fn cairn_stones_expiry_opens_the_portal() {
     assert_eq!(w.fake.logged("portal"), 1);
 }
 
-// Covers: specs/missiles/bodies.md §2 r1, §2 r2, §2 r3, §2 r4, §2 r5
+// Covers: specs/missiles/bodies.md §2 r1, §2 r2, §2 r3, §2 r4, §2 r5, §2 text
 #[test]
 fn volcano_throws_on_its_interval() {
     let mut r = row();
@@ -176,7 +176,7 @@ fn baal_taunt_control_picks_a_slot() {
     assert_eq!(srv_do(&mut w, 34, m), 2);
 }
 
-// Covers: specs/missiles/bodies.md §4 r1, §4 r2, §4 r3, §4 r4, §4 r5
+// Covers: specs/missiles/bodies.md §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 text
 #[test]
 fn chaos_ice_turns() {
     assert_eq!(chaos_turn(8, 0, true), (8, 2));
@@ -283,7 +283,7 @@ fn plague_ring_negative_step_is_flagged() {
     );
 }
 
-// Covers: specs/missiles/bodies.md §7 r1, §7 r2, §7 r3, §7 r4
+// Covers: specs/missiles/bodies.md §7 r1, §7 r2, §7 r3, §7 r4, §7 text
 #[test]
 fn fire_wall_maker_on_new_steps() {
     let mut r = row();
@@ -292,15 +292,18 @@ fn fire_wall_maker_on_new_steps() {
     srv_do(&mut w, 6, m);
     assert_eq!(others(&w, m).len(), 0);
     w.fake.mb.new_step = true;
+    let before = *w.fake.seed(m);
     srv_do(&mut w, 6, m);
     let n = others(&w, m);
     assert_eq!(n.len(), 1);
     assert_eq!(w.fake.pos[&n[0]], (100, 100));
+    // One fire piece per sub-tile entered; no draws.
+    assert_eq!(*w.fake.seed(m), before);
     w.fake.no_path = true;
     assert_eq!(srv_do(&mut w, 6, m), 2);
 }
 
-// Covers: specs/missiles/bodies.md §8 r1, §8 r2, §8 r3, §8 r4, §8 r5, §edge-cases-original-bugs r5, §edge-cases-original-bugs r7
+// Covers: specs/missiles/bodies.md §8 r1, §8 r2, §8 r3, §8 r4, §8 r5, §edge-cases-original-bugs r5, §edge-cases-original-bugs r7, §8 text
 #[test]
 fn exploding_javelin_radius() {
     let mut r = row();
@@ -326,7 +329,7 @@ fn exploding_javelin_radius() {
     assert_eq!(w.fake.logged("scan"), 1);
 }
 
-// Covers: specs/missiles/bodies.md §9 r1, §9 r2, §9 r3, §9 r4, §9 r5, §9 r6, §9 r7, §9 l2 r1, §9 l2 r2, §9 l2 r3
+// Covers: specs/missiles/bodies.md §9 r1, §9 r2, §9 r3, §9 r4, §9 r5, §9 r6, §9 r7, §9 l2 r1, §9 l2 r2, §9 l2 r3, §9 text
 #[test]
 fn meteor_scatter() {
     let mut r = row();
@@ -350,7 +353,7 @@ fn meteor_scatter() {
     assert_eq!(others(&w, m).len(), 6);
 }
 
-// Covers: specs/missiles/bodies.md §10 r1, §10 r2, §10 r3, §10 r4, §10 r5
+// Covers: specs/missiles/bodies.md §10 r1, §10 r2, §10 r3, §10 r4, §10 r5, §10 text
 #[test]
 fn missile_in_air_lands() {
     let mut r = row();
@@ -367,7 +370,7 @@ fn missile_in_air_lands() {
     assert_eq!(w.store.get(n[0]).unwrap().target.0, 42);
 }
 
-// Covers: specs/missiles/bodies.md §11 r1, §11 r2, §11 r3, §11 r4, §11 r5, §11 r6, §11 r7, §11 l2 r1, §11 l2 r2, §11 l2 r3, §11 l3 r1, §11 l3 r2, §11 l3 r4, §11 l3 r5
+// Covers: specs/missiles/bodies.md §11 r1, §11 r2, §11 r3, §11 r4, §11 r5, §11 r6, §11 r7, §11 l2 r1, §11 l2 r2, §11 l2 r3, §11 l3 r1, §11 l3 r2, §11 l3 r4, §11 l3 r5, §11 text
 #[test]
 fn bone_spirit_retargets_once() {
     let mut r = row();
@@ -415,7 +418,7 @@ fn bone_spirit_aims_at_the_found_unit() {
 
 // ---------------------------------------------------------------- §12–§17
 
-// Covers: specs/missiles/bodies.md §12 r1, §12 r2, §12 r3, §12 r4, §12 r5, §12 r6, §12 r7, §12 r8, §12 r9, §12 r10, §12 r11, §edge-cases-original-bugs r8, §30, §edge-cases-original-bugs r15
+// Covers: specs/missiles/bodies.md §12 r1, §12 r2, §12 r3, §12 r4, §12 r5, §12 r6, §12 r7, §12 r8, §12 r9, §12 r10, §12 r11, §edge-cases-original-bugs r8, §30, §edge-cases-original-bugs r15, §12 text
 #[test]
 fn goo_state_first_contact_has_no_values() {
     let (mut w, m) = world(row(), &[]);
@@ -448,7 +451,7 @@ fn goo_state_first_contact_has_no_values() {
     assert_eq!(srv_hit(&mut w, 16, m, Some(mon)), 1);
 }
 
-// Covers: specs/missiles/bodies.md §13 r1, §13 r2, §13 r3
+// Covers: specs/missiles/bodies.md §13 r1, §13 r2, §13 r3, §13 text
 #[test]
 fn shout_on_allies_only() {
     let (mut w, m) = world(row(), &[]);
@@ -460,7 +463,7 @@ fn shout_on_allies_only() {
     assert_eq!(w.fake.logged("shout"), 1);
 }
 
-// Covers: specs/missiles/bodies.md §14 r1, §14 r2, §14 r3, §14 r4, §14 r5
+// Covers: specs/missiles/bodies.md §14 r1, §14 r2, §14 r3, §14 r4, §14 r5, §14 text
 #[test]
 fn grim_ward_start_range() {
     let mut r = row();
@@ -472,7 +475,7 @@ fn grim_ward_start_range() {
     assert_eq!(w.store.get(n[0]).unwrap().total, 5);
 }
 
-// Covers: specs/missiles/bodies.md §15 r1, §15 r2, §15 r3, §15 r4, §15 r5
+// Covers: specs/missiles/bodies.md §15 r1, §15 r2, §15 r3, §15 r4, §15 r5, §15 text
 #[test]
 fn grim_ward_runs_the_skill_function() {
     let mut r = row();
@@ -487,7 +490,7 @@ fn grim_ward_runs_the_skill_function() {
     assert_eq!(srv_hit(&mut w, 27, m, None), 1);
 }
 
-// Covers: specs/missiles/bodies.md §16 r1, §16 r2, §16 r3, §16 r4, §edge-cases-original-bugs r9
+// Covers: specs/missiles/bodies.md §16 r1, §16 r2, §16 r3, §16 r4, §edge-cases-original-bugs r9, §16 text
 #[test]
 fn blade_fury_makes_class_zero() {
     let mut r = row();
@@ -514,7 +517,7 @@ fn blade_fury_makes_class_zero() {
     assert_eq!(w.store.get(n[1]).unwrap().target, (16, 16));
 }
 
-// Covers: specs/missiles/bodies.md §17 r1, §17 r2, §17 r3, §17 r4
+// Covers: specs/missiles/bodies.md §17 r1, §17 r2, §17 r3, §17 r4, §17 text
 #[test]
 fn holy_bolt_heals_or_picks() {
     let mut r = row();
@@ -545,7 +548,7 @@ fn holy_bolt_heals_or_picks() {
 
 // ---------------------------------------------------------------- §18–§23
 
-// Covers: specs/missiles/bodies.md §18 r1, §18 r2, §18 r3, §18 r4, §18 r5
+// Covers: specs/missiles/bodies.md §18 r1, §18 r2, §18 r3, §18 r4, §18 r5, §18 text
 #[test]
 fn trailing_javelin_sides() {
     let mut r = row();
@@ -563,7 +566,7 @@ fn trailing_javelin_sides() {
     assert_eq!(tpoint(&w, n[1]), (50, 40));
 }
 
-// Covers: specs/missiles/bodies.md §19 l2 r1, §19 l2 r2, §19 l2 r3, §19 l3 r1, §edge-cases-original-bugs r10
+// Covers: specs/missiles/bodies.md §19 text, §19 l2 r1, §19 l2 r2, §19 l2 r3, §19 l3 r1, §edge-cases-original-bugs r10
 #[test]
 fn nova_counts() {
     for (n, want) in [
@@ -619,7 +622,7 @@ fn trailing_javelin_explosion_zigzags() {
     assert_eq!(w.fake.logged("ptype"), 0);
 }
 
-// Covers: specs/missiles/bodies.md §19 l3 r1, §19 l3 r2, §19 l3 r3
+// Covers: specs/missiles/bodies.md §19 l2 r4, §19 l3 r1, §19 l3 r2, §19 l3 r3
 #[test]
 fn catapult_charged_ball_count() {
     let mut r = row();
@@ -627,12 +630,12 @@ fn catapult_charged_ball_count() {
     r.hitsubmissile1 = 1;
     let (mut w, m) = world(r, &[sub()]);
     w.store.get_mut(m).unwrap().level = 3;
-    srv_hit(&mut w, 38, m, None);
+    assert_eq!(srv_hit(&mut w, 38, m, None), 1);
     assert_eq!(others(&w, m).len(), 16);
     assert_eq!(w.fake.logged("ptype"), 16);
 }
 
-// Covers: specs/missiles/bodies.md §20 r1, §20 r2, §20 r3, §21 r1, §21 r2, §21 r3, §edge-cases-original-bugs r11
+// Covers: specs/missiles/bodies.md §20 r1, §20 r2, §20 r3, §21 r1, §21 r2, §21 r3, §edge-cases-original-bugs r11, §20 text, §21 text
 #[test]
 fn trail_makers() {
     let mut r = row();
@@ -661,7 +664,7 @@ fn trail_makers() {
     assert_eq!(srv_do(&mut w, 22, m), 2);
 }
 
-// Covers: specs/missiles/bodies.md §22 r1, §22 r2, §22 r3, §22 r4, §edge-cases-original-bugs r12
+// Covers: specs/missiles/bodies.md §22 r1, §22 r2, §22 r3, §22 r4, §edge-cases-original-bugs r12, §22 text
 #[test]
 fn wake_maker() {
     let mut r = row();
@@ -680,7 +683,7 @@ fn wake_maker() {
     assert!(w.fake.log.contains(&format!("clear {}", m.0)));
 }
 
-// Covers: specs/missiles/bodies.md §23 r1, §23 r2, §23 r3, §23 r4, §23 r5, §23 r6, §23 r7
+// Covers: specs/missiles/bodies.md §23 r1, §23 r2, §23 r3, §23 r4, §23 r5, §23 r6, §23 r7, §23 text
 #[test]
 fn armageddon_control() {
     let mut r = row();
@@ -694,7 +697,7 @@ fn armageddon_control() {
 
 // ---------------------------------------------------------------- §24–§30
 
-// Covers: specs/missiles/bodies.md §24 r1, §24 r2, §24 r3
+// Covers: specs/missiles/bodies.md §24 r1, §24 r2, §24 r3, §24 text
 #[test]
 fn blaze_spares_its_caster() {
     let (mut w, m) = world(row(), &[]);
@@ -707,7 +710,7 @@ fn blaze_spares_its_caster() {
     assert_eq!(srv_hit(&mut w, 8, m, Some(mon)), 2);
 }
 
-// Covers: specs/missiles/bodies.md §25 r1, §25 r2, §25 r3, §25 r4, §25 r5, §25 l2 r1, §25 l2 r2, §25 l2 r3, §edge-cases-original-bugs r14
+// Covers: specs/missiles/bodies.md §25 r1, §25 r2, §25 r3, §25 r4, §25 r5, §25 l2 r1, §25 l2 r2, §25 l2 r3, §edge-cases-original-bugs r14, §25 text
 #[test]
 fn immolation_fire_disc() {
     let mut r = row();
@@ -733,9 +736,14 @@ fn immolation_fire_disc() {
     let mut cx = cx!(w);
     fire_disc(&mut w.game, &mut cx, m, 2, 1, 0);
     assert_eq!(others(&w, m).len(), 12);
+    // r < 0 makes nothing.
+    let (mut w, m) = world(row(), &[sub()]);
+    let mut cx = cx!(w);
+    fire_disc(&mut w.game, &mut cx, m, -1, 1, 0);
+    assert_eq!(others(&w, m).len(), 0);
 }
 
-// Covers: specs/missiles/bodies.md §26 r1, §26 r2, §26 r3, §27 r1, §27 r2, §27 r3, §edge-cases-original-bugs r13
+// Covers: specs/missiles/bodies.md §26 r1, §26 r2, §26 r3, §27 r1, §27 r2, §27 r3, §edge-cases-original-bugs r13, §26 text, §27 text
 #[test]
 fn bat_bolt_and_goo_lay() {
     let mut r = row();
@@ -760,7 +768,7 @@ fn bat_bolt_and_goo_lay() {
     );
 }
 
-// Covers: specs/missiles/bodies.md §28 r1, §28 r2, §28 r3, §28 r4, §28 r5, §28 r6, §28 r7
+// Covers: specs/missiles/bodies.md §28 r1, §28 r2, §28 r3, §28 r4, §28 r5, §28 r6, §28 r7, §28 text
 #[test]
 fn howl_level_test() {
     let (mut w, m) = world(row(), &[]);
@@ -787,7 +795,7 @@ fn howl_level_test() {
     assert_eq!(w.fake.logged("terror"), 1);
 }
 
-// Covers: specs/missiles/bodies.md §29 r1, §29 r2, §29 r3, §29 r4, §29 r5, §29 r6
+// Covers: specs/missiles/bodies.md §29 r1, §29 r2, §29 r3, §29 r4, §29 r5, §29 r6, §29 text
 #[test]
 fn finger_mage_spider_steps() {
     let mut r = row();
@@ -809,7 +817,7 @@ fn finger_mage_spider_steps() {
 
 // ---------------------------------------------------------------- §31–§38
 
-// Covers: specs/missiles/bodies-2.md §31 r1, §31 r2, §31 r3, §31 r4
+// Covers: specs/missiles/bodies-2.md §31 r1, §31 r2, §31 r3, §31 r4, §31 text
 #[test]
 fn diablo_wall_maker_needs_an_owner() {
     let mut r = row();
@@ -823,7 +831,7 @@ fn diablo_wall_maker_needs_an_owner() {
     assert_eq!(srv_do(&mut w, 12, m), 2);
 }
 
-// Covers: specs/missiles/bodies-2.md §32 r1, §32 r2, §32 r3, §32 r4, §32 r5
+// Covers: specs/missiles/bodies-2.md §32 r1, §32 r2, §32 r3, §32 r4, §32 r5, §32 text
 #[test]
 fn lightning_fury_first_n() {
     let mut r = row();
@@ -848,7 +856,7 @@ fn lightning_fury_first_n() {
     assert_eq!(tpoint(&w, n[2]), (107, 100));
 }
 
-// Covers: specs/missiles/bodies-2.md §33 r1, §33 r2, §33 r3, §33 r4, §33 r5, §33 r6, §33 r7, §33 r8, §33 r9, §edge-cases-original-bugs r3
+// Covers: specs/missiles/bodies-2.md §33 r1, §33 r2, §33 r3, §33 r4, §33 r5, §33 r6, §33 r7, §33 r8, §33 r9, §edge-cases-original-bugs r3, §33 text
 #[test]
 fn bone_wall_pieces() {
     let (mut w, m) = world(row(), &[]);
@@ -871,7 +879,7 @@ fn bone_wall_pieces() {
     assert_eq!(w.store.get(m).unwrap().target.1, 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §34 r1, §34 r2, §34 r3, §34 r4, §34 r5, §34 r6, §34 r7, §edge-cases-original-bugs r1
+// Covers: specs/missiles/bodies-2.md §34 r1, §34 r2, §34 r3, §34 r4, §34 r5, §34 r6, §34 r7, §edge-cases-original-bugs r1, §34 text
 #[test]
 fn battle_cry_state() {
     let (mut w, m) = world(row(), &[]);
@@ -888,7 +896,7 @@ fn battle_cry_state() {
     assert_eq!(srv_hit(&mut w, 21, m, None), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §35 r1, §35 r2, §35 r3, §35 r4, §35 r5, §35 r6
+// Covers: specs/missiles/bodies-2.md §35 r1, §35 r2, §35 r3, §35 r4, §35 r5, §35 r6, §35 text
 #[test]
 fn fist_delay() {
     let mut r = row();
@@ -911,7 +919,7 @@ fn fist_delay() {
     assert_eq!(others(&w, m).len(), 2);
 }
 
-// Covers: specs/missiles/bodies-2.md §36 r1, §36 r2, §36 r3, §36 r4, §36 r5
+// Covers: specs/missiles/bodies-2.md §36 r1, §36 r2, §36 r3, §36 r4, §36 r5, §36 text
 #[test]
 fn panther_orange() {
     let (mut w, m) = world(row(), &[]);
@@ -920,7 +928,7 @@ fn panther_orange() {
     assert!(w.fake.log.contains(&"scan (100, 100) 4 0x8583".to_string()));
 }
 
-// Covers: specs/missiles/bodies-2.md §37 r1, §37 r2, §37 r3, §37 l2 r1, §37 l2 r2, §37 l2 r3, §edge-cases-original-bugs r4
+// Covers: specs/missiles/bodies-2.md §37 r1, §37 r2, §37 r3, §37 l2 r1, §37 l2 r2, §37 l2 r3, §edge-cases-original-bugs r4, §37 text
 #[test]
 fn panther_green_ring() {
     let mut r = row();
@@ -950,7 +958,7 @@ fn panther_green_ring() {
     );
 }
 
-// Covers: specs/missiles/bodies-2.md §38 r1, §38 r2, §38 r3, §38 r4, §38 r5, §38 r6
+// Covers: specs/missiles/bodies-2.md §38 r1, §38 r2, §38 r3, §38 r4, §38 r5, §38 r6, §38 text
 #[test]
 fn grim_ward_scare_radius() {
     let (mut w, m) = world(row(), &[]);
@@ -974,7 +982,7 @@ fn grim_ward_scare_radius() {
 
 // ---------------------------------------------------------------- §39–§46
 
-// Covers: specs/missiles/bodies-2.md §39 r1, §39 r2, §39 r3, §39 r4, §39 r5
+// Covers: specs/missiles/bodies-2.md §39 r1, §39 r2, §39 r3, §39 r4, §39 r5, §39 text
 #[test]
 fn frozen_orb_bolts() {
     assert_eq!((ORB_C[60], ORB_S[60]), (27, -11));
@@ -999,7 +1007,7 @@ fn frozen_orb_bolts() {
     assert_eq!(w.store.get(m).unwrap().target.0, 25);
 }
 
-// Covers: specs/missiles/bodies-2.md §39 l2 r1, §39 l2 r2, §39 l2 r3, §39 l2 r4, §39 l2 r5, §edge-cases-original-bugs r6
+// Covers: specs/missiles/bodies-2.md §39 l2 r1, §39 l2 r2, §39 l2 r3, §39 l2 r4, §39 l2 r5, §39 text, §edge-cases-original-bugs r6
 #[test]
 fn frozen_orb_nova_at_expiry() {
     let mut r = row();
@@ -1029,7 +1037,7 @@ fn frozen_orb_nova_at_expiry() {
     assert_eq!(others(&w, m).len(), 16);
 }
 
-// Covers: specs/missiles/bodies-2.md §40 r1, §40 r2, §40 r3
+// Covers: specs/missiles/bodies-2.md §40 r1, §40 r2, §40 r3, §40 text
 #[test]
 fn frozen_orb_nova_curls() {
     let mut r = row();
@@ -1043,7 +1051,7 @@ fn frozen_orb_nova_curls() {
     }
 }
 
-// Covers: specs/missiles/bodies-2.md §41 r1, §41 r2, §41 r3, §41 r4
+// Covers: specs/missiles/bodies-2.md §41 r1, §41 r2, §41 r3, §41 r4, §41 text
 #[test]
 fn fire_head_heals_its_owner() {
     let mut r = row();
@@ -1063,7 +1071,7 @@ fn fire_head_heals_its_owner() {
     assert_eq!(srv_hit(&mut w, 31, m, None), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §43 r1, §43 r2, §43 r3, §43 r4, §43 r5, §edge-cases-original-bugs r7
+// Covers: specs/missiles/bodies-2.md §43 r1, §43 r2, §43 r3, §43 r4, §43 r5, §43 text, §edge-cases-original-bugs r7
 #[test]
 fn tower_chest() {
     let mut r = row();
@@ -1090,7 +1098,7 @@ fn tower_chest() {
     assert_eq!(w.fake.logged("refresh"), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §44 r1, §44 r2, §44 l2 r1, §44 l2 r2, §44 l2 r3, §44 l2 r4, §44 l2 r5
+// Covers: specs/missiles/bodies-2.md §44 r1, §44 r2, §44 l2 r1, §44 l2 r2, §44 l2 r3, §44 l2 r4, §44 l2 r5, §44 text
 #[test]
 fn radament_redemption() {
     let (mut w, m) = world(row(), &[]);
@@ -1110,6 +1118,11 @@ fn radament_redemption() {
     srv_do(&mut w, 19, m);
     assert!(w.fake.log.contains(&format!("redeem {} 124 1 true", mon.0)));
     set_frames(&mut w, m, 400, 25);
+    srv_do(&mut w, 19, m);
+    assert_eq!(w.fake.logged("redeem"), 2);
+    // Corpse effect (flags 0x3002) skips town rooms.
+    w.fake.town.insert(room);
+    set_frames(&mut w, m, 400, 10);
     srv_do(&mut w, 19, m);
     assert_eq!(w.fake.logged("redeem"), 2);
 }
@@ -1134,6 +1147,7 @@ fn find(w: &mut World, room: RoomId, flags: u32, r: i32) -> Vec<UnitId> {
     crate::missiles::bodies_ext2::unit_find(&mut w.game, &mut cx, Some(room), &filter)
 }
 
+// Covers: specs/missiles/bodies-2.md §44 l3 r3, §44 l4 r1, §44 l4 r2, §44 l4 r3, §44 l4 r4, §44 l4 r5
 // Covers: specs/monsters/umod-callbacks.md §3.1 r3, §3.1 l2 r1, §3.1 l2 r2, §3.1 l2 r3, §3.1 l2 r4, §3.1 l2 r5
 #[test]
 fn unit_find_default_filter_by_type_mode_and_distance() {
@@ -1169,7 +1183,7 @@ fn unit_find_default_filter_by_type_mode_and_distance() {
     assert_eq!(find(&mut w, room, 0x2, 10), vec![mon]);
 }
 
-// Covers: specs/missiles/bodies-2.md §44 l2 r4
+// Covers: specs/missiles/bodies-2.md §44 l2 r4, §44 l3 r1, §44 l3 r2, §44 l3 r4
 // Covers: specs/monsters/umod-callbacks.md §3.1 r1, §3.1 r2, §3.1 r4
 #[test]
 fn unit_find_rooms_and_found_order() {
@@ -1213,7 +1227,7 @@ fn unit_find_rooms_and_found_order() {
     assert_eq!(find(&mut w, room, 0x1002, 10), vec![far, a, mon]);
 }
 
-// Covers: specs/missiles/bodies-2.md §45 r1, §45 r2, §45 r3, §45 r4, §45 r5
+// Covers: specs/missiles/bodies-2.md §45 r1, §45 r2, §45 r3, §45 r4, §45 r5, §45 text
 #[test]
 fn orb_mist_opens_its_object() {
     let (mut w, m) = world(row(), &[]);
@@ -1232,7 +1246,7 @@ fn orb_mist_opens_its_object() {
     assert_eq!(w.fake.mb.modes[&b], 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §46 r1, §46 r2, §46 r3, §46 r4, §46 l2 r1, §46 l2 r2, §46 l2 r3, §edge-cases-original-bugs r8
+// Covers: specs/missiles/bodies-2.md §46 r1, §46 r2, §46 r3, §46 r4, §46 l2 r1, §46 l2 r2, §46 l2 r3, §edge-cases-original-bugs r8, §46 text
 #[test]
 fn blade_creeper_sits_on_its_owner() {
     let mut r = row();
@@ -1257,7 +1271,7 @@ fn blade_creeper_sits_on_its_owner() {
 
 // ---------------------------------------------------------------- §47–§54
 
-// Covers: specs/missiles/bodies-2.md §47 r1, §47 l2 r1, §47 l2 r2, §47 l2 r3, §47 l2 r4, §47 l2 r5
+// Covers: specs/missiles/bodies-2.md §47 r1, §47 l2 r1, §47 l2 r2, §47 l2 r3, §47 l2 r4, §47 l2 r5, §47 text
 #[test]
 fn imp_spawn_draws_on_the_room_seed() {
     let (mut w, m) = world(row(), &[]);
@@ -1281,7 +1295,7 @@ fn imp_spawn_draws_on_the_room_seed() {
     );
 }
 
-// Covers: specs/missiles/bodies-2.md §48 r1, §48 r2, §48 r3, §48 l2 r1, §48 l2 r2, §48 l2 r3, §48 l2 r4, §48 l2 r5
+// Covers: specs/missiles/bodies-2.md §48 r1, §48 r2, §48 r3, §48 l2 r1, §48 l2 r2, §48 l2 r3, §48 l2 r4, §48 l2 r5, §48 text
 #[test]
 fn spike_scatter_at_target() {
     let (mut w, m) = world(row(), &[sub()]);
@@ -1311,7 +1325,7 @@ fn spike_scatter_at_target() {
     assert_eq!(*w.fake.seed(m), Seed::init_low(50));
 }
 
-// Covers: specs/missiles/bodies-2.md §49 r1, §49 r2, §49 r3, §49 r4, §49 r5, §49 r6
+// Covers: specs/missiles/bodies-2.md §49 r1, §49 r2, §49 r3, §49 r4, §49 r5, §49 r6, §49 text
 #[test]
 fn healing_vortex() {
     let mut r = row();
@@ -1333,7 +1347,7 @@ fn healing_vortex() {
     assert_eq!(w.fake.logged("overlay"), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §50 r1, §50 r2, §50 r3, §50 r4, §50 r5, §50 r6, §50 r7, §edge-cases-original-bugs r10
+// Covers: specs/missiles/bodies-2.md §50 r1, §50 r2, §50 r3, §50 r4, §50 r5, §50 r6, §50 r7, §edge-cases-original-bugs r10, §50 text
 #[test]
 fn molten_boulder_bursts_on_large() {
     let mut r = row();
@@ -1353,7 +1367,7 @@ fn molten_boulder_bursts_on_large() {
     assert_eq!(others(&w, m).len(), 36);
 }
 
-// Covers: specs/missiles/bodies-2.md §51 r1, §51 r2
+// Covers: specs/missiles/bodies-2.md §51 r1, §51 r2, §51 text
 #[test]
 fn molten_boulder_emerge() {
     let mut r = row();
@@ -1365,7 +1379,7 @@ fn molten_boulder_emerge() {
     assert_eq!(tpoint(&w, n[0]), (140, 100));
 }
 
-// Covers: specs/missiles/bodies-2.md §52 r1, §52 r2, §52 r3
+// Covers: specs/missiles/bodies-2.md §52 r1, §52 r2, §52 r3, §52 text
 #[test]
 fn plague_vines_trail() {
     let mut r = row();
@@ -1379,7 +1393,7 @@ fn plague_vines_trail() {
     assert_eq!(srv_hit(&mut w, 50, m, None), 0);
 }
 
-// Covers: specs/missiles/bodies-2.md §53 r1, §53 r2, §53 r3, §53 r4, §53 r5, §edge-cases-original-bugs r13
+// Covers: specs/missiles/bodies-2.md §53 r1, §53 r2, §53 r3, §53 r4, §53 r5, §edge-cases-original-bugs r13, §53 text
 #[test]
 fn tornado_pulses_from_itself() {
     let (mut w, m) = world(row(), &[]);
@@ -1395,7 +1409,7 @@ fn tornado_pulses_from_itself() {
     assert_eq!(w.fake.logged("scan"), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §54 r1, §54 r2, §54 r3
+// Covers: specs/missiles/bodies-2.md §54 r1, §54 r2, §54 r3, §54 text
 #[test]
 fn volcano_debris() {
     let mut r = row();
@@ -1409,7 +1423,7 @@ fn volcano_debris() {
 
 // ---------------------------------------------------------------- §55–§62
 
-// Covers: specs/missiles/bodies-2.md §55 r1, §55 r2, §55 r3, §55 r4
+// Covers: specs/missiles/bodies-2.md §55 r1, §55 r2, §55 r3, §55 r4, §55 text
 #[test]
 fn recycler_heals_at_param1() {
     let mut r = row();
@@ -1437,7 +1451,7 @@ fn recycler_heals_at_param1() {
     assert_eq!(w.fake.stats[&(o, 8)], 18 << 8);
 }
 
-// Covers: specs/missiles/bodies-2.md §56 r1, §56 r2, §56 r3, §56 r4, §56 r5, §56 r6, §56 l2 r1, §56 l2 r2, §56 l2 r3, §56 l2 r4, §edge-cases-original-bugs r12
+// Covers: specs/missiles/bodies-2.md §56 r1, §56 r2, §56 r3, §56 r4, §56 r5, §56 r6, §56 l2 r1, §56 l2 r2, §56 l2 r3, §56 l2 r4, §edge-cases-original-bugs r12, §56 text
 #[test]
 fn rabies_plague_and_contagion() {
     let mut r = row();
@@ -1475,7 +1489,7 @@ fn rabies_plague_and_contagion() {
     assert_eq!(srv_do(&mut w, 30, m), 2);
 }
 
-// Covers: specs/missiles/bodies-2.md §57 r1, §57 r2, §57 r3
+// Covers: specs/missiles/bodies-2.md §57 r1, §57 r2, §57 r3, §57 text
 #[test]
 fn tiger_fury_continues_as_guided_arrow() {
     let mut r = row();
@@ -1487,7 +1501,7 @@ fn tiger_fury_continues_as_guided_arrow() {
     assert_eq!(srv_do(&mut w, 32, m), 2);
 }
 
-// Covers: specs/missiles/bodies-2.md §58 r1, §58 r2, §58 r3, §58 r4
+// Covers: specs/missiles/bodies-2.md §58 r1, §58 r2, §58 r3, §58 r4, §58 text
 #[test]
 fn baal_spawns_the_entry_class() {
     let (mut w, m) = world(row(), &[]);
@@ -1501,7 +1515,7 @@ fn baal_spawns_the_entry_class() {
     assert!(w.fake.log.contains(&"spawn 312 (100, 100) 1".to_string()));
 }
 
-// Covers: specs/missiles/bodies-2.md §59 r1, §59 r2, §59 r3, §59 r4, §59 r5
+// Covers: specs/missiles/bodies-2.md §59 r1, §59 r2, §59 r3, §59 r4, §59 r5, §59 text
 #[test]
 fn baal_inferno_burns_mana() {
     let mut r = row();
@@ -1540,7 +1554,7 @@ fn baal_fx_tyrael_once() {
     assert_eq!(w.fake.logged("refresh"), 1);
 }
 
-// Covers: specs/missiles/bodies-2.md §61 r1, §61 r2
+// Covers: specs/missiles/bodies-2.md §61 r1, §61 r2, §61 text
 #[test]
 fn baal_taunt_poison_ring() {
     let mut r = row();

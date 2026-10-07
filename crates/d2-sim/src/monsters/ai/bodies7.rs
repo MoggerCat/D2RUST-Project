@@ -806,7 +806,7 @@ pub(super) fn pet_test<W: AiHost + ?Sized>(
 }
 
 /// Allowed `0x005EABF0` (§18).
-fn shadow_allowed<W: AiHost + ?Sized>(
+pub(super) fn shadow_allowed<W: AiHost + ?Sized>(
     game: &Game,
     cx: &Ctx<'_, W>,
     o: Option<UnitId>,
@@ -865,7 +865,7 @@ fn mana_cost<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, skill: i32, lvl: i32) -> i32 {
 
 /// Usable `0x005EAD50` (§18).
 #[allow(clippy::too_many_arguments)]
-fn shadow_usable<W: AiHost + ?Sized>(
+pub(super) fn shadow_usable<W: AiHost + ?Sized>(
     game: &Game,
     cx: &mut Ctx<'_, W>,
     u: UnitId,

@@ -87,6 +87,7 @@ fn corrupt_rogue_vectors() {
 // ---- §9.16 SkeletonBow -----------------------------------------------
 
 // Covers: specs/monsters/ai-bodies.md §9.16 text, §9.16 r1, §9.16 r2, §9.16 r3, §9.16 r4
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r16
 #[test]
 fn skeleton_bow_vectors() {
     let setup = || {
@@ -146,6 +147,7 @@ fn skeleton_bow_vectors() {
 // ---- §9.17 FoulCrowNest ----------------------------------------------
 
 // Covers: specs/monsters/ai-bodies.md §9.17 text, §9.17 r1, §9.17 r2, §9.17 r3, §9.17 r4
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r14
 #[test]
 fn foul_crow_nest_vectors() {
     // D ≤ 20, summon not due: idle `lo' % 10` + 20 = 21, 27, 23, 20.
@@ -278,6 +280,7 @@ fn blood_raven_leash_and_moves() {
 // ---- §9.19 SkeletonMage ----------------------------------------------
 
 // Covers: specs/monsters/ai-bodies.md §9.19 text, §9.19 r1, §9.19 r2, §9.19 r3
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r16
 #[test]
 fn skeleton_mage_vectors() {
     let setup = || {

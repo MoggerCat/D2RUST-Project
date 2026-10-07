@@ -632,3 +632,93 @@ fn command_search_and_create() {
     assert!(r.is_some());
     assert_eq!(w.store.control(mon).unwrap().commands.len(), 4);
 }
+
+// Covers: specs/monsters/ai-bodies.md §9.31 r0
+#[test]
+fn good_npc_ranged_without_a_room_counts_as_out_of_town() {
+    // `0x0061AB00(0)` returns 0: a unit with no room takes the
+    // out-of-town step 2 even when every room is a town.
+    let mut w = ranged_world();
+    w.fake.town.insert(w.room);
+    let u = w.game.spawn_unit(UnitType::Monster, None, false).unwrap();
+    w.fake.pos.insert(u, (100, 100));
+    w.fake.seeds.insert(u, Seed::init_low(4_014_346_870)); // first draw 0
+    w.store.entry(u).control = Some(AiControl::default());
+    let s = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.secondary = Some((s, 10));
+    let p = TickParam {
+        target: None,
+        distance: 0,
+        combat: false,
+        class: 0,
+        class2: 0,
+    };
+    w.with(|g, cx| run_function(g, cx, AI_TABLE[60].think, u, &p));
+    // S at E < 20 and roll(100) = 0 < 30 → A1 at S (the in-town path
+    // would not have looked for S).
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, s)]);
+    // The same unit inside the town room: step 3 only (draw 51 → idle
+    // 10), the secondary target is not even looked at.
+    let mut w = ranged_world();
+    w.fake.town.insert(w.room);
+    let s = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.secondary = Some((s, 10));
+    w.seed(1);
+    w.think_with(None, 0, false);
+    assert!(w.fake.modes().is_empty(), "in town: no secondary search");
+    assert_eq!(w.thinks(), [10]);
+}
+
+// Covers: specs/monsters/ai-bodies.md §9 text
+#[test]
+fn body_conventions_p_idle_and_attack_requests() {
+    use super::super::bodies::{a1, a2};
+    // P(aipN) is one unit-seed step tested `lo' % 100 < N` (strict).
+    let mut w = ranged_world();
+    let mon = w.mon;
+    for &lo in &SEEDS {
+        let mut s = Seed::init_low(lo);
+        let draw = (s.step() % 100) as i32;
+        for (n, want) in [(draw, false), (draw + 1, true)] {
+            w.seed(lo);
+            let got = w.with(|_, cx| cx.chance(mon, n));
+            assert_eq!(got, want, "seed {lo} N {n}");
+            assert_eq!(steps_since(&w, lo), 1);
+        }
+    }
+    // A1 / A2 are mode requests 4 / 5 at T; "idle N" schedules a think N
+    // frames out and returns the unit to neutral.
+    let p = w.player;
+    w.fake.log.clear();
+    w.with(|g, cx| a1(g, cx, mon, Some(p)));
+    w.with(|g, cx| a2(g, cx, mon, Some(p)));
+    assert_eq!(
+        w.fake.modes(),
+        [unit_mode(mode::ATTACK1, p), unit_mode(mode::ATTACK2, p)]
+    );
+    let mut w = ranged_world();
+    w.game.frame = 40;
+    let mon = w.mon;
+    w.with(|g, cx| idle(g, cx, mon, 7));
+    assert_eq!(w.thinks(), [47]);
+    // A body that does not reach a test draws nothing: GoodNpcRanged
+    // idles 5 in a non-neutral mode before any draw.
+    let mut w = ranged_world();
+    w.fake.anim.insert(w.mon, mode::WALK);
+    w.seed(1);
+    w.think_with(None, 0, false);
+    assert_eq!(steps_since(&w, 1), 0);
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.7 text
+#[test]
+fn quill_rat_attack_two_is_the_quill() {
+    // QuillRat step 3: AI state 3 / 19 → A2 at T (mode 5, the `spike1`
+    // missile mode), no draw.
+    let mut w = World::new(monstats(14, [10, 35, 0, 2, 0], 15));
+    w.fake.ai_state = 3;
+    w.seed(1);
+    w.think_with(Some(w.player), 20, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
+    assert_eq!(steps_since(&w, 1), 0);
+}

@@ -1308,3 +1308,120 @@ fn any_event7_runs_every_mode2_callback() {
     assert!(f.timers(u).contains(&(7, 1075)));
     let _ = TimerClass::Monster;
 }
+
+// Covers: specs/monsters/umod-callbacks.md §1 r1
+#[test]
+fn unique_is_the_flag_of_the_walked_monster_and_mode_5_uses_the_owner() {
+    // Mode 5: the callback gets the missile, unique is the OWNER's flag
+    // 8 (umod 29 multishot copies only for a unique).
+    for unique in [false, true] {
+        let mut f = cbf();
+        let o = f.monster(0, &[29], unique, 1);
+        f.pos.insert(o, (10, 10));
+        let t = f.add(UnitType::Player, 0, 1, 1);
+        f.pos.insert(t, (20, 10));
+        f.targets.insert(o, t);
+        f.missile_flags.insert(5, 0);
+        let m = f.add(UnitType::Missile, 5, 1, 0);
+        f.owners.insert(m, o);
+        f.run(o, Some(m), 5);
+        assert_eq!(
+            f.missiles().len(),
+            if unique { 2 } else { 0 },
+            "unique {unique}"
+        );
+    }
+    // Mode 2: the walked monster's own flag (umod 41 ... via umod 9 fire
+    // explosion, a unique or not alike; umod 27 spectral hit differs).
+    for unique in [false, true] {
+        let mut f = cbf();
+        let u = f.monster(0, &[18], unique, 1);
+        f.set_mode_of(u, mode::DEATH);
+        f.run(u, None, 1);
+        assert_eq!(
+            f.timers(u).len(),
+            usize::from(unique),
+            "umod 18 unique {unique}"
+        );
+    }
+}
+
+// Covers: specs/monsters/umod-callbacks.md §1 r6
+#[test]
+fn one_u_step_and_roll_below_1_draws_nothing() {
+    // `roll(n)` with n < 1 does not step; the curse callback (umod 7,
+    // unique) takes exactly one U step.
+    let mut s = Seed::init_low(77);
+    let before = s;
+    assert_eq!(s.roll(0), 0);
+    assert_eq!(s.roll(-3), 0);
+    assert_eq!(s, before);
+    let mut f = cbf();
+    let u = f.monster(0, &[7], true, 1);
+    let mut want = f.seed_of(u);
+    let lo = want.step();
+    f.run(u, None, 3);
+    assert_eq!(f.seed_of(u), want, "one generator step, lo' = {lo}");
+    // A unit with no draws leaves the seed alone.
+    let v = f.monster(0, &[10], false, 1);
+    let kept = f.seed_of(v);
+    f.run(v, None, 2);
+    assert_eq!(f.seed_of(v), kept);
+}
+
+// Covers: specs/monsters/umod-callbacks.md §edge-cases-original-bugs r3
+#[test]
+fn fire_and_suicide_hit_players_only_goboom_monsters_too_and_never_the_owners() {
+    let mut ms = mon(2, 5, 100, 32);
+    ms.a1mind = 100;
+    ms.a1maxd = 150;
+    ms.aip1 = 15;
+    ms.aip4 = 4;
+    for (umod, flags) in [(9u8, 0x581u32), (33, 0x581), (31, 0x583)] {
+        let mut f = Cb::new(Tables::new(vec![ms.clone()]));
+        let u = f.monster(0, &[umod], false, 1);
+        let o2 = f.add(UnitType::Player, 0, 1, 1);
+        let p = f.add(UnitType::Player, 0, 1, 1);
+        // The exploding monster u owns the missile; its owner is o2.
+        f.owners.insert(u, o2);
+        f.found = vec![u, o2, p];
+        f.run(u, None, 2);
+        let finds: Vec<_> = f
+            .calls
+            .iter()
+            .filter_map(|c| match c {
+                Call::Find(_, q) => Some(q.flags),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(finds, [flags], "umod {umod}");
+        let hits: Vec<_> = f
+            .calls
+            .iter()
+            .filter_map(|c| match c {
+                Call::Hit(_, v, _) => Some(*v),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(hits, [p], "umod {umod}: owner and owner's owner never hit");
+    }
+}
+
+// Covers: specs/monsters/umod-callbacks.md §26, §edge-cases-original-bugs r6
+#[test]
+fn always_run_ai_chains_and_an_extra_event_starts_a_second_chain() {
+    let mut f = cbf();
+    // Dead: nothing at all.
+    let d = f.monster(0, &[41], false, 1);
+    f.set_mode_of(d, mode::DEAD);
+    f.run(d, None, 2);
+    assert!(f.timers(d).is_empty());
+    // Alive (NU): think restart (event 2 at F + 2), then event 7 at F + 75.
+    let u = f.monster(0, &[41], false, 1);
+    f.run(u, None, 2);
+    assert_eq!(f.timers(u), [(2, 1002), (7, 1075)]);
+    // The event that ran re-schedules itself; a second type-7 event of
+    // the same monster adds a second chain.
+    f.run(u, None, 2);
+    assert_eq!(f.timers(u), [(2, 1002), (7, 1075), (7, 1075)]);
+}
