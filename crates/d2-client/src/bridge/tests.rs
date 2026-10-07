@@ -1022,3 +1022,115 @@ fn the_bevy_frame_hands_the_outputs_over() {
     app.update();
     assert!(app.world().resource::<FrameOutputs>().0.is_empty());
 }
+
+/// The UI layer chooses 0x28's dialog branch case from the NPC text list
+/// of the 0x27 before it, and the dispatcher hands it to the bridge in
+/// the same frame: C→S 0x31 goes out right after the 0x2F, before the
+/// later 0x30 (`msg-ui.md` Test vectors: A seq 37351, 37353; the
+/// recorded client sends `2f 01000000 06000000`, then `31 06000000
+/// 25000000`). A holding case (B0, B1) sends no 0x31; an m the spec does
+/// not give hands no case back, so the 0x30 behind the slot waits for
+/// the next frame and no 0x31 is ever sent.
+// Covers: specs/client/msg-ui.md §5 r2, §16 r4; specs/client/bridge.md §10 r4, §10 r5, §10 r6
+#[test]
+fn ui_answers_npc_dialog_with_0x31_in_order() {
+    use crate::bridge::world::{MonsterClass, MONSTER, PLAYER};
+    use crate::ui::layout::Screen;
+    use crate::ui::original::{OriginalUi, UiConfig};
+    use crate::world_view::present::deliver;
+    fn hexs(s: &str) -> Vec<u8> {
+        let s: String = s.split_whitespace().collect();
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+    let npc_text = |count: u8, kind0: u8| {
+        let mut m = hexs("27 01 06000000");
+        m.extend([count, 0, kind0, 0, 0x25, 0]);
+        m.resize(40, 0);
+        m
+    };
+    let quest = |g: u32| {
+        let mut m = vec![0x28, 1];
+        m.extend(g.to_le_bytes());
+        m.extend([0, 1]);
+        m.resize(103, 0);
+        m
+    };
+    // One run: a bridge with the local player (cursor item or not) and
+    // the NPC (1, 6) class 148; the chunk 0x27, 0x28 (1, 6), 0x28 (1, 7)
+    // absent; one frame and its delivery. Returns the sends of the frame
+    // and of the next (empty) frame.
+    let run = |text: Vec<u8>, b0: u8, cursor: bool| {
+        let (mut b, link) = bridge();
+        let mut tables = b.inputs.tables.clone();
+        tables.monsters = vec![Some(MonsterClass::default()); 200];
+        tables.monsters[148] = Some(MonsterClass {
+            interact: true,
+            npc: true,
+            ..MonsterClass::default()
+        });
+        b.set_tables(tables);
+        let p = UnitKey::new(PLAYER, 1);
+        let mut pu = ClientUnit::new(p);
+        pu.mode = 1;
+        if cursor {
+            let data = crate::bridge::world::PlayerData {
+                cursor_item: Some(9),
+                ..Default::default()
+            };
+            pu.kind = crate::bridge::world::KindData::Player(data);
+        }
+        b.world_mut().units.insert(p, pu);
+        b.world_mut().local_player = Some(p);
+        let k = UnitKey::new(MONSTER, 6);
+        let mut u = ClientUnit::new(k);
+        u.class = 148;
+        b.world_mut().units.insert(k, u);
+        let mut ui = OriginalUi::new(
+            UiConfig {
+                screen: Screen::R800,
+                expansion_installed: true,
+            },
+            None,
+        )
+        .unwrap();
+        ui.set_ui_7c0c68(b0);
+        let chunk = [text, quest(6), quest(7)].concat();
+        link.deliver(false, &[&chunk]);
+        b.frame().unwrap();
+        let outs = b.take_outputs();
+        deliver(&mut b, &outs, Some(&mut ui)).unwrap();
+        let first = sent(&link);
+        link.deliver(false, &[]);
+        b.frame().unwrap();
+        let all = sent(&link);
+        let mode = b.world().units[&k].mode;
+        let next = all[first.len()..].to_vec();
+        (first, next, mode)
+    };
+    let g = |s: &str| (SendQueue::Game, hexs(s));
+    let x2f = g("2f 01000000 06000000");
+    let x30 = g("30 00000000 07000000");
+    // B2: m = 0x25 from the list; 0x31 between 0x2F and 0x30, same frame.
+    let (first, next, mode) = run(npc_text(1, 0), 0, false);
+    assert_eq!(first, [x2f.clone(), g("31 06000000 25000000"), x30.clone()]);
+    assert!(next.is_empty());
+    assert_eq!(mode, 1);
+    // B0 ([0x007C0C68] ≠ 0): no 0x31; the slot is cleared at once.
+    let (first, next, mode) = run(npc_text(1, 0), 1, false);
+    assert_eq!(first, [x2f.clone(), x30.clone()]);
+    assert!(next.is_empty());
+    assert_eq!(mode, 0);
+    // B1 (cursor item): no 0x31; U takes mode 1 (an `interact` class).
+    let (first, _, mode) = run(npc_text(1, 0), 0, true);
+    assert_eq!(first, [x2f.clone(), x30.clone()]);
+    assert_eq!(mode, 1);
+    // A list shape whose m no spec gives: no case, no 0x31; the 0x30
+    // behind the slot goes at the next frame (the slot is dropped).
+    let (first, next, mode) = run(npc_text(2, 0), 0, false);
+    assert_eq!(first, [x2f]);
+    assert_eq!(next, [x30]);
+    assert_eq!(mode, 0);
+}

@@ -43,6 +43,8 @@ use super::root::{Routed, UiError, UiRoot};
 use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::audio::driver::SoundRequest;
+use crate::bridge::msg::ui_npc::DialogCase;
+use crate::bridge::output::NpcDialog;
 use crate::bridge::world::{ClientWorld, PLAYER};
 use crate::controls::Action;
 use crate::rules::camera::OpenMode;
@@ -242,6 +244,12 @@ pub struct OriginalUi {
     outcome: UiOutcome,
     /// The UI globals of the bridge outputs (`client/msg-ui.md`).
     msg: MsgUiState,
+    /// The NPC text list `[0x007BF250]` (`client/msg-ui.md` §5 r2).
+    npc_text: Option<NpcTextList>,
+    /// The case of 0x28's dialog branch this UI chose for the last
+    /// `NpcDialog`, for the bridge (`client/msg-ui.md` §16 r4.3, open
+    /// question 10 decided as A).
+    dialog_answer: Option<(Box<NpcDialog>, DialogCase)>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -256,6 +264,10 @@ pub enum OriginalUiError {
     /// 1.14d, `world/waypoints.md` §2 rule 5).
     #[error(transparent)]
     Waypoint(d2_sim::world::waypoints::WaypointError),
+    /// 0x28's dialog branch found no NPC text list (fatal 0x1060 in
+    /// 1.14d, `client/msg-ui.md` §16 r4.3).
+    #[error("0x28 NPC dialog without an NPC text list (fatal 0x1060)")]
+    NoNpcText,
 }
 
 impl OriginalUi {
@@ -281,6 +293,8 @@ impl OriginalUi {
             shared: Rc::new(RefCell::new(shared)),
             outcome: UiOutcome::default(),
             msg: MsgUiState::default(),
+            npc_text: None,
+            dialog_answer: None,
         })
     }
 
@@ -652,7 +666,7 @@ impl Panel for BorderUi {
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
-pub use msg_ui::{MsgUiState, WaypointMenuState};
+pub use msg_ui::{MsgUiState, NpcTextList, WaypointMenuState};
 
 #[cfg(test)]
 #[path = "original_tests.rs"]

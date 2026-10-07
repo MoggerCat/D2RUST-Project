@@ -1,8 +1,13 @@
-// Spec: specs/client/msg-ui.md (§1 rules 2, 5–7, §2 rule 2, §3 rules 2–3), specs/client/bridge.md (§10 rules 5–6)
+// Spec: specs/client/msg-ui.md (§1 rules 2, 5–7, §2 rule 2, §3 rules 2–3, §5 rule 2, §16 rules 4–5, open question 10), specs/client/bridge.md (§10 rules 5–6)
 //! The UI consumer of the bridge outputs (`client/bridge.md` §10):
 //! [`OriginalUi::apply_output`] runs the 1.14d UI dispatch of S→C 0x5D
 //! (`0x004A2CB0`), 0x63 (`0x0049CF90`) and 0x77 (`0x004B8CF0`) at
-//! delivery, on the UI's own state ([`MsgUiState`]) and flags. Sounds go
+//! delivery, on the UI's own state ([`MsgUiState`]) and flags; it keeps
+//! 0x27's NPC text list (`0x004A1600`) and chooses the case of 0x28's
+//! dialog branch (`0x004B6DD0`), which it hands back to the bridge
+//! ([`OriginalUi::take_dialog_answer`] → `Bridge::npc_dialog_branch`:
+//! the model writes and C→S 0x31 are the bridge's, open question 10
+//! decided as A). Sounds go
 //! through the UI's request path ([`UiOutcome::sounds`]); a part whose
 //! input or callee no spec gives yet is not guessed: it is skipped and
 //! named in [`UiOutcome::skipped`]. Nothing here writes the model (§10
@@ -13,7 +18,8 @@ use d2_sim::world::waypoints::WaypointRecord;
 use super::{OriginalUi, OriginalUiError};
 use crate::audio::driver::SoundRequest;
 use crate::bridge::msg::ui::{quest_row, QuestRow};
-use crate::bridge::output::{Consumer, Output};
+use crate::bridge::msg::ui_npc::DialogCase;
+use crate::bridge::output::{Consumer, NpcDialog, Output};
 use crate::bridge::world::ClientWorld;
 use crate::rules::lighting::environment::act_index;
 
@@ -61,6 +67,88 @@ pub mod skip {
     pub const NOT_APPLIED: &str =
         "a UI output whose dispatch (msg-ui §4–§22, msg-units §8; ui/*) is not written yet";
     pub const CUBE_CHECK: &str = "0x77: 0x00463DF0 before the inventory toggle (unspecified)";
+    pub const NPC_TEXT_SHOW: &str =
+        "0x27: the overhead text, list start 0x006616E0, box 0x004A1510 and panel 0x004A1320 (msg-ui §5 r2; ui/*)";
+    pub const NPC_DIALOG_UI: &str =
+        "0x28: overlay 72 off, [0x007C0D43] := Q, 0x004B2250, 0x0044DA40 and the chosen case's UI calls (msg-ui §16 r4.1–r4.3; ui/*)";
+    pub const NPC_DIALOG_M: &str =
+        "0x28: m = 0x00661400(txt, 0) of this NPC text list is not specified (msg-ui §16 r4.3, OQ 10): no case handed back, no C→S 0x31";
+}
+
+/// The NPC text list `[0x007BF250]` as 0x27 rebuilt it (§5 r2.1): bytes
+/// 6–39 of the message (count u8@0, entry k < 8: kind u8@2+4k, string
+/// id u16@4+4k).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NpcTextList {
+    pub bytes: [u8; 34],
+}
+
+impl NpcTextList {
+    /// The list rebuilt from a 0x27 record (its 40 bytes).
+    pub fn from_record(record: &[u8; 40]) -> Self {
+        let mut bytes = [0; 34];
+        bytes.copy_from_slice(&record[6..40]);
+        Self { bytes }
+    }
+
+    pub fn count(&self) -> u8 {
+        self.bytes[0]
+    }
+
+    /// Entry k's kind (k < 8).
+    pub fn kind(&self, k: usize) -> u8 {
+        self.bytes[2 + 4 * k]
+    }
+
+    /// Entry k's string id (k < 8).
+    pub fn string(&self, k: usize) -> u16 {
+        u16::from_le_bytes([self.bytes[4 + 4 * k], self.bytes[5 + 4 * k]])
+    }
+
+    /// `0x00661400(txt, 0)`, the m of 0x28's dialog branch (§16 r4.3).
+    /// `None`: not specified for this list.
+    ///
+    /// TODO(spec: client/msg-ui.md §16 r4.3 / open question 10): the
+    /// function `0x00661400` (and `0x00661440`, m2) is not specified,
+    /// nor how the list's start `0x006616E0` and the frames since it
+    /// change it. The one point the spec pins is its test vector (A seq
+    /// 37351 → 37353): a list of one entry of kind 0 gives m = that
+    /// entry's string id (0x25 → C→S `31 06000000 25000000`). Only that
+    /// shape is answered; any other list hands no case back.
+    pub fn first_m(&self) -> Option<u16> {
+        (self.count() == 1 && self.kind(0) == 0).then(|| self.string(0))
+    }
+}
+
+/// 0x28's dialog branch (§16 r4.3), the case 1.14d takes (the first that
+/// holds), from the UI state `[0x007C0C68]`, the NPC text list and the
+/// captured inputs. `Ok(None)`: the case depends on an m the spec does
+/// not give ([`NpcTextList::first_m`]). B3–B6 are one case for the
+/// bridge ([`DialogCase::Rest`]): they write the model alike.
+///
+/// Reading taken (as the bridge's): B0 ends the branch, the "(always
+/// next)" rows run only when B0 does not hold.
+pub fn dialog_case(
+    ui_7c0c68: u8,
+    txt: Option<&NpcTextList>,
+    d: &NpcDialog,
+) -> Result<Option<DialogCase>, OriginalUiError> {
+    if ui_7c0c68 != 0 {
+        return Ok(Some(DialogCase::B0));
+    }
+    // txt := `0x0049F900`: none → fatal 0x1060.
+    let txt = txt.ok_or(OriginalUiError::NoNpcText)?;
+    let m = txt.first_m();
+    if d.cursor_item {
+        return Ok(Some(DialogCase::B1));
+    }
+    Ok(m.map(|m| {
+        if m != 0xFFFF {
+            DialogCase::B2 { m: u32::from(m) }
+        } else {
+            DialogCase::Rest
+        }
+    }))
 }
 
 /// The waypoint menu's stored state (§2 rule 2).
@@ -98,6 +186,11 @@ pub struct MsgUiState {
     pub trade_7c0e80: u32,
     /// The inventory mode (`ui/panels.md` §11, §12).
     pub inventory_mode: u8,
+    /// `[0x007C0C68]`, read by 0x28's dialog branch (§16 r4.3, case B0).
+    /// TODO(spec: client/msg-ui.md open question 10; ui/*): no spec
+    /// gives a writer of this UI global, so it keeps its initial 0 (the
+    /// value the recorded 0x28 of A seq 37353 implies: it took B2).
+    pub ui_7c0c68: u8,
 }
 
 impl OriginalUi {
@@ -116,6 +209,13 @@ impl OriginalUi {
             } => self.quest_ui(chain, flags, status, extra, world),
             Output::WaypointMenu { guid, record } => self.waypoint_menu(guid, &record, world),
             Output::TradeAction { code } => self.trade_action(code, world),
+            Output::NpcText {
+                ref bytes, present, ..
+            } => {
+                self.npc_text_record(bytes, present);
+                Ok(())
+            }
+            Output::NpcDialog(ref d) => self.npc_dialog(d),
             // Not UI outputs (`client/bridge.md` §10 rule 5).
             Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
             _ if o.consumer() != Consumer::Ui => Ok(()),
@@ -131,6 +231,52 @@ impl OriginalUi {
     /// The UI globals the outputs wrote.
     pub fn msg_state(&self) -> &MsgUiState {
         &self.msg
+    }
+
+    /// Sets `[0x007C0C68]` (§16 r4.3, case B0): the seam for the UI
+    /// writer no spec gives yet ([`MsgUiState::ui_7c0c68`]).
+    pub fn set_ui_7c0c68(&mut self, v: u8) {
+        self.msg.ui_7c0c68 = v;
+    }
+
+    /// The NPC text list `[0x007BF250]` (§5 r2), `None` when freed.
+    pub fn npc_text(&self) -> Option<&NpcTextList> {
+        self.npc_text.as_ref()
+    }
+
+    /// The case of 0x28's dialog branch chosen since the last call, with
+    /// its output, for `Bridge::npc_dialog_branch` (§16 r4.3, open
+    /// question 10 decided as A). Taken by the output dispatcher right
+    /// after the `NpcDialog` it answers, before the next output.
+    pub fn take_dialog_answer(&mut self) -> Option<(Box<NpcDialog>, DialogCase)> {
+        self.dialog_answer.take()
+    }
+
+    /// §5 r2 at delivery: the list part of `0x004A1600`; what is shown is
+    /// skipped (`ui/*`).
+    fn npc_text_record(&mut self, bytes: &[u8; 40], present: bool) {
+        let list = NpcTextList::from_record(bytes);
+        match bytes[1] {
+            // r2.1: an overhead number, the list stays.
+            1 if present && list.count() == 1 && list.kind(0) == 3 => {}
+            1 => self.npc_text = Some(list),
+            // r2.2: the box or the panel; the list stays.
+            2 => {}
+            // r2.3.
+            _ => self.npc_text = None,
+        }
+        self.skip(skip::NPC_TEXT_SHOW);
+    }
+
+    /// §16 r4 at delivery: the UI-only calls are skipped; the branch case
+    /// is chosen and kept for the bridge.
+    fn npc_dialog(&mut self, d: &NpcDialog) -> Result<(), OriginalUiError> {
+        self.skip(skip::NPC_DIALOG_UI);
+        match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
+            Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
+            None => self.skip(skip::NPC_DIALOG_M),
+        }
+        Ok(())
     }
 
     fn skip(&mut self, what: &'static str) {
