@@ -659,3 +659,164 @@ fn monster_damage_regen_from_max_life() {
     assert_eq!(lists.total(l, 74, 0), (100 * 8) >> 4);
     let _ = NoHost;
 }
+
+// Covers: specs/sim/stat-lists.md §4 r3, §4 r4
+#[test]
+fn allocation_flags_and_freed_handle() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    // Callers pass flags 0: the extended list keeps only EXTENDED.
+    assert_eq!(lists.flags(p), flag::EXTENDED);
+    assert_eq!(
+        (lists.owner_type(p), lists.owner_guid(p)),
+        (owner::PLAYER, 1)
+    );
+    assert_eq!(lists.owner(p), Some(P));
+    // A flags value keeps only bit 0x1 of the allocation flags.
+    let it = lists.alloc_extended(
+        &mut log,
+        ITEM,
+        crate::units::UnitType::Item,
+        7,
+        0,
+        0xFFFF_FFFF,
+        None,
+    );
+    assert_eq!(lists.flags(it), flag::BASIC | flag::EXTENDED);
+    // A freed handle behaves as the null list: reads 0, writes do nothing.
+    let plain = lists.alloc(0, 0, owner::PLAYER, 1);
+    lists.set(&mut log, plain, 0, 5, 0, None);
+    lists.free(&mut log, plain);
+    assert!(!lists.is_live(plain));
+    assert_eq!(lists.base(plain, 0, 0), 0);
+    assert!(!lists.set(&mut log, plain, 0, 9, 0, None));
+    lists.attach(&mut log, P, plain, true);
+    assert_eq!(lists.total(p, 0, 0), 30);
+    lists.detach(&mut log, plain);
+    lists.free(&mut log, plain);
+}
+
+// Covers: specs/sim/stat-lists.md §6.4 text
+#[test]
+fn recompute_per_level_stat_leaves_own_entry_stale() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    // 216 (op 2, entry base 0 = strength 30 > 0) is blocked: a change of
+    // the per-level stat itself leaves its full entry unwritten ...
+    lists.set(&mut log, p, 216, 8, 0, None);
+    assert!(!full(&lists, p).iter().any(|&(s, _)| s == 216));
+    // ... while the stat it targets (7) is still recomputed from it.
+    let item = item_list(&mut lists, &mut log, &[(216, 8)]);
+    lists.attach(&mut log, P, item, true);
+    assert!(!full(&lists, p).iter().any(|&(s, _)| s == 216));
+    assert_eq!(lists.base(p, 6, 0), lists.total(p, 7, 0));
+}
+
+// Covers: specs/sim/stat-lists.md §9.3
+#[test]
+fn state_queries() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let _p = player(&mut lists, &mut log);
+    // Has state: type check, range check, bit.
+    lists.toggle_state(P, 40, true);
+    assert!(lists.has_state(P, 40));
+    assert!(!lists.has_state(P, 41));
+    assert!(!lists.has_state(P, 185));
+    assert!(!lists.has_state(P, 100_000));
+    lists.toggle_state(P, 30, true);
+    // Flag group 16 holds states 40 and 41, group 32 state 50.
+    assert!(lists.has_group(P, 16));
+    assert!(!lists.has_group(P, 32));
+    lists.toggle_state(P, 50, true);
+    assert!(lists.has_group(P, 32));
+    assert!(!lists.has_group(P, 40));
+    assert!(!lists.has_group(ITEM, 16));
+    // Non player/monster/3 unit types never have a state.
+    item_list(&mut lists, &mut log, &[]);
+    lists.toggle_state(ITEM, 40, true);
+    assert!(!lists.has_state(ITEM, 40));
+
+    // List of a state / by state and flags.
+    let r = lists.unit_list(P).unwrap();
+    let a = lists.alloc(0x20, 0, owner::PLAYER, 1);
+    let b = lists.alloc(0x40, 0, owner::PLAYER, 1);
+    let c = lists.alloc(0x40 | flag::SET, 0, owner::PLAYER, 1);
+    for (l, s) in [(a, 30), (b, 30), (c, 41)] {
+        lists.set_state(l, s);
+        lists.attach(&mut log, P, l, true);
+    }
+    // Active chain is newest first: b before a.
+    assert_eq!(lists.list_of_state(r, 30), Some(b));
+    // The parked list is found when the active chain has none.
+    assert_eq!(lists.list_of_state(r, 41), Some(c));
+    assert_eq!(lists.list_of_state(r, 42), None);
+    // f = 0 matches on the state alone.
+    assert_eq!(lists.list_by_state_flags(P, 30, 0), Some(b));
+    // Any shared bit, not every bit.
+    assert_eq!(lists.list_by_state_flags(P, 30, 0x20 | 0x1000), Some(a));
+    assert_eq!(lists.list_by_state_flags(P, 30, 0x1000), None);
+    // The SET bit selects the parked chain and is dropped from f.
+    assert_eq!(lists.list_by_state_flags(P, 41, flag::SET), Some(c));
+    assert_eq!(lists.list_by_state_flags(P, 41, flag::SET | 0x40), Some(c));
+    assert_eq!(lists.list_by_state_flags(P, 41, 0), None);
+    // A unit without a list, or a non-extended one, yields none.
+    assert_eq!(lists.list_by_state_flags(UnitId(99), 30, 0), None);
+}
+
+// Covers: specs/sim/stat-lists.md §8.9
+#[test]
+fn mode_change_frees_temp_only_lists() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    let t = lists.alloc(flag::TEMPONLY, 0, owner::PLAYER, 1);
+    lists.set(&mut log, t, 0, 5, 0, None);
+    lists.set_state(t, 30);
+    lists.attach(&mut log, P, t, true);
+    lists.toggle_state(P, 30, true);
+    let keep = lists.alloc(0, 0, owner::PLAYER, 1);
+    lists.set(&mut log, keep, 0, 2, 0, None);
+    lists.attach(&mut log, P, keep, true);
+    let t2 = lists.alloc(flag::TEMPONLY, 0, owner::PLAYER, 1);
+    lists.set(&mut log, t2, 0, 1, 0, None);
+    lists.attach(&mut log, P, t2, true);
+    assert_ne!(lists.flags(p) & flag::NEWLENGTH, 0);
+    assert_eq!(lists.total(p, 0, 0), 38);
+    lists.remove_temporary_lists(&mut log, P);
+    // Both TEMPONLY lists are gone (state bit off for the first), the
+    // other list stays, NEWLENGTH is cleared.
+    assert!(!lists.is_live(t) && !lists.is_live(t2));
+    assert!(lists.is_live(keep));
+    assert!(!lists.has_state(P, 30));
+    assert_eq!(lists.total(p, 0, 0), 32);
+    assert_eq!(lists.flags(p) & flag::NEWLENGTH, 0);
+    // Without NEWLENGTH nothing is touched.
+    let t3 = lists.alloc(flag::TEMPONLY, 0, owner::PLAYER, 1);
+    lists.attach(&mut log, P, t3, true);
+    lists.set_flags(p, flag::NEWLENGTH, false);
+    lists.remove_temporary_lists(&mut log, P);
+    assert!(lists.is_live(t3));
+}
+
+// Covers: specs/sim/stat-lists.md §edge-cases-original-bugs r5
+#[test]
+fn attach_collects_at_most_16_a53_keys() {
+    let mut log = Log::default();
+    let t = itemstatcost_with(|rs| {
+        for s in 100..120 {
+            rs[s * Itemstatcost::SIZE + 0x53] = 1;
+        }
+    });
+    let mut d = (*data()).clone();
+    d.stats = StatTable::from_fixed(&t).expect("itemstatcost");
+    let mut lists = StatLists::new(Arc::new(d));
+    let _p = player(&mut lists, &mut log);
+    let i = item_list(&mut lists, &mut log, &[]);
+    for s in 100..120 {
+        lists.set(&mut log, i, s, 1, 0, None);
+    }
+    assert_eq!(lists.a53_keys(i).len(), 16);
+}

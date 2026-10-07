@@ -525,3 +525,142 @@ pub fn lookup<W: PetWorld>(w: &mut W, player: W::Unit, guid: i32) -> Result<i32,
     }
     Ok(0)
 }
+
+// ---- §10 creation, free, death and maximum resync ----------------------
+
+/// One skill of the player for the resync (§10): its `pettype` and the
+/// `petmax` calc already evaluated at the skill's level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResyncSkill {
+    /// Skills row `pettype` (+0xBE, i8).
+    pub pettype: i8,
+    /// `eval(petmax)` (`0x00646CA0`).
+    pub petmax: i32,
+}
+
+/// The world the creation, free and resync of §10 need beyond [`PetWorld`].
+pub trait PetLifecycleWorld: PetWorld {
+    /// Stores the pet lists P (player data +0x44; `None` clears them).
+    fn set_pet_lists(&mut self, player: Self::Unit, lists: Option<PetLists>);
+    /// `basemax` (+0x0A, i16) of `pettype` row `t`.
+    fn pettype_basemax(&self, t: i32) -> i32;
+    /// The player's skills in list order (`0x00643910`); `None` without a
+    /// skill list.
+    fn skills(&self, player: Self::Unit) -> Option<Vec<ResyncSkill>>;
+    /// Hireling removal: the unit's room gets a removal notice
+    /// (`0x0061A270(room, 1, GUID)`) and the unit is freed (`0x00555600`).
+    fn free_hireling_unit(&mut self, unit: Self::Unit);
+}
+
+/// Create `0x00575AF0` (+ `0x00575A80`): a new list set with every maximum
+/// set to its row's `basemax`. Lists already present are freed first.
+pub fn create<W: PetLifecycleWorld>(w: &mut W, player: W::Unit) -> Result<(), PetError> {
+    require_data(w, player)?;
+    if w.pet_lists(player).is_some() {
+        free_all(w, player)?;
+    }
+    let count = w.pettype_count();
+    w.set_pet_lists(player, Some(PetLists::new(count.max(0) as usize)));
+    for t in 0..count {
+        let max = w.pettype_basemax(t);
+        set_max(w, player, t, max)?;
+    }
+    Ok(())
+}
+
+/// Walks entry `t` from the head (`0x00574570`): a non-hireling node is
+/// dismissed, a hireling node whose unit exists is announced removed and
+/// freed; count and max drop by one per node.
+fn drain_entry<W: PetLifecycleWorld>(
+    w: &mut W,
+    player: W::Unit,
+    t: i32,
+    hireling: bool,
+) -> Result<(), PetError> {
+    loop {
+        let Some(e) = entry(w, player, t) else {
+            return Ok(());
+        };
+        if e.nodes.is_empty() {
+            return Ok(());
+        }
+        let guid = e.nodes[0].guid;
+        if !hireling {
+            dismiss(w, guid)?;
+        } else if let Some(unit) = w.monster_by_guid(guid) {
+            broadcast_remove(w, guid);
+            w.free_hireling_unit(unit);
+        }
+        if let Some(e) = entry(w, player, t) {
+            e.nodes.remove(0);
+            e.count -= 1;
+            e.max -= 1;
+        }
+    }
+}
+
+/// Free `0x005746D0`: every list drained for t = 1 … count − 1, then the
+/// lists are dropped. P null → nothing.
+pub fn free_all<W: PetLifecycleWorld>(w: &mut W, player: W::Unit) -> Result<(), PetError> {
+    require_data(w, player)?;
+    if w.pet_lists(player).is_none() {
+        return Ok(());
+    }
+    for t in 1..w.pettype_count() {
+        drain_entry(w, player, t, t == PETTYPE_HIREABLE)?;
+    }
+    w.set_pet_lists(player, None);
+    Ok(())
+}
+
+/// Player death `0x00575BC0`: every pet of a type other than 7 is
+/// dismissed and its node freed (count and max decremented), then the
+/// maxima are resynced.
+pub fn player_death<W: PetLifecycleWorld>(w: &mut W, player: W::Unit) -> Result<(), PetError> {
+    require_data(w, player)?;
+    if w.pet_lists(player).is_none() {
+        return Ok(());
+    }
+    for t in 1..w.pettype_count() {
+        if t != PETTYPE_HIREABLE {
+            drain_entry(w, player, t, false)?;
+        }
+    }
+    resync_max(w, player)
+}
+
+/// Resync `0x00575900`: each skill with `0 < pettype < count` raises that
+/// type's maximum to `max(petmax, 1)` when above the highest met so far
+/// (setting it at once, §4 may trim); then every type no skill raised
+/// returns to `basemax`.
+pub fn resync_max<W: PetLifecycleWorld>(w: &mut W, player: W::Unit) -> Result<(), PetError> {
+    if !w.is_player(player) {
+        return Ok(());
+    }
+    require_data(w, player)?;
+    if w.pet_lists(player).is_none() {
+        return Ok(());
+    }
+    let Some(skills) = w.skills(player) else {
+        return Ok(());
+    };
+    let count = w.pettype_count();
+    let mut m = [0i32; 256];
+    for s in skills {
+        let t = i32::from(s.pettype);
+        if t > 0 && t < count {
+            let v = s.petmax.max(1);
+            if v > m[t as usize] {
+                m[t as usize] = v;
+                set_max(w, player, t, v)?;
+            }
+        }
+    }
+    for t in 0..count.min(256) {
+        if m[t as usize] <= 0 {
+            let max = w.pettype_basemax(t);
+            set_max(w, player, t, max)?;
+        }
+    }
+    Ok(())
+}

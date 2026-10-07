@@ -62,11 +62,6 @@ pub enum UnitError {
     /// A timer callback d2rs does not know.
     #[error("unknown timer callback {0:#x}")]
     UnknownCallback(u32),
-    /// Allocation without `SUNIT_Add` (flags bit 1 clear): d2rs units
-    /// always have list entries. TODO(units.md §3.1 step 8): model units
-    /// outside the lists when a caller needs them (items in inventories).
-    #[error("allocation without SUNIT_Add is not modelled")]
-    NotAdded,
     #[error(transparent)]
     Anim(#[from] AnimError),
     #[error(transparent)]
