@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use super::super::fake::{blank_level, blank_object, Call, Fake};
 use super::super::{
-    dispatch, oflags, Dispatch, MiscWorld, ObjectData, ObjectTables, Operator, ShrineWorld,
+    dispatch, oflags, Dispatch, MiscWorld, ObjectData, ObjectTables, Operator, Region, ShrineWorld,
 };
 use super::*;
 use crate::rng::Seed;
@@ -33,11 +33,20 @@ struct H {
     room_units: BTreeMap<RoomId, Vec<UnitId>>,
     within: BTreeSet<(UnitId, UnitId, i32)>,
     in_room: bool,
+    /// Log of the `&self` seams, merged into `others` in call order.
+    calls_log: std::cell::RefCell<Vec<String>>,
 }
 
 impl H {
     fn other(&mut self, s: String) {
+        self.flush();
         self.f.calls.push(Call::Other(s));
+    }
+    fn flush(&mut self) {
+        let logged: Vec<String> = self.calls_log.borrow_mut().drain(..).collect();
+        for l in logged {
+            self.f.calls.push(Call::Other(l));
+        }
     }
     fn others(&self) -> Vec<String> {
         self.f
@@ -47,6 +56,7 @@ impl H {
                 Call::Other(s) => Some(s.clone()),
                 _ => None,
             })
+            .chain(self.calls_log.borrow().iter().cloned())
             .collect()
     }
     fn drop_qs(&self) -> Vec<String> {
@@ -146,6 +156,9 @@ impl ObjectWorld for H {
     fn staff_tomb_level(&self) -> u32 {
         self.f.staff_tomb_level()
     }
+    fn store_mode(&mut self, unit: UnitId, mode: u8) {
+        self.f.store_mode(unit, mode)
+    }
 }
 
 impl ChestWorld for H {
@@ -172,9 +185,18 @@ impl ChestWorld for H {
     fn drop_item_code(&mut self, object: UnitId, code: u32) {
         self.other(format!("dropcode {code:#x} {object:?}"));
     }
-    fn trap_monster_id(&mut self, object: UnitId) -> Option<u32> {
-        self.other(format!("trapid {object:?}"));
-        self.trap_monster
+    /// The scripted region list: the one class `trap_monster`, read by
+    /// the trap monster id (§8.3) on a cache miss.
+    fn monster_region_classes(&self, level: u32) -> Option<Vec<i32>> {
+        self.calls_log.borrow_mut().push(format!("trapid {level}"));
+        Some(
+            self.trap_monster
+                .map(|m| vec![m as i32])
+                .unwrap_or_default(),
+        )
+    }
+    fn monstats_count(&self) -> u32 {
+        1000
     }
     fn spawn_trap_monster(&mut self, object: UnitId, monster: u32, arg: u32) {
         self.other(format!("trapmon {monster} {arg} {object:?}"));
@@ -219,6 +241,7 @@ impl ChestWorld for H {
 }
 impl ShrineWorld for H {}
 impl MiscWorld for H {}
+impl super::super::MechWorld for H {}
 
 // ------------------------------------------------------------------ setup
 
@@ -257,10 +280,23 @@ fn tables() -> ObjectTables {
     }
 }
 
+/// The control with one object region per level 0–129 (acts as
+/// [`tables`]).
 fn ctl(seed: Seed) -> ObjectControl {
+    let regions = (0..130u32)
+        .map(|i| {
+            Some(Region::new(match i {
+                0..=39 => 0,
+                40..=74 => 1,
+                75..=102 => 2,
+                103..=108 => 3,
+                _ => 4,
+            }))
+        })
+        .collect();
     ObjectControl {
         seed,
-        regions: Vec::new(),
+        regions,
         shrine_lists: Default::default(),
         data: BTreeMap::new(),
     }
@@ -613,15 +649,11 @@ fn casket_item_trap_monster_footprint_and_arm() {
     let seed = find_seed(|s| s.roll(10000) >= 8192);
     let (mut c, mut h) = setup(CASKET, 1, seed);
     h.drops.push_back(Some(2));
-    h.trap_monster = Some(77);
+    h.trap_monster = Some(170);
     assert_eq!(operate(&mut c, &t, &mut h, &op(CASKET, 1)).unwrap(), 1);
     assert_eq!(
         h.others(),
-        s(&[
-            "drop 0 UnitId(10)",
-            "trapid UnitId(10)",
-            "trapmon 77 8 UnitId(10)"
-        ])
+        s(&["drop 0 UnitId(10)", "trapid 2", "trapmon 170 8 UnitId(10)"])
     );
     let mut e = seed;
     e.roll(10000);
@@ -643,7 +675,7 @@ fn casket_item_trap_monster_footprint_and_arm() {
     let seed = find_seed(|s| s.roll(10000) < 8192);
     let (mut c, mut h) = setup(CASKET, 0, seed);
     h.drops.push_back(Some(2));
-    h.trap_monster = Some(77);
+    h.trap_monster = Some(170);
     operate(&mut c, &t2, &mut h, &op(CASKET, 1)).unwrap();
     assert_eq!(h.others(), s(&["drop 0 UnitId(10)"]));
     assert!(!h.f.calls.contains(&Call::Free(OBJ)));
@@ -679,12 +711,12 @@ fn barrel_skill_draw_order_and_no_trap_arm() {
     let (mut c, mut h) = setup(BARREL, 3, seed);
     h.trap_monster = Some(5);
     h.drops.push_back(Some(2));
-    assert_eq!(operate(&mut c, &t, &mut h, &op(BARREL, 5)).unwrap(), 1);
+    assert_eq!(operate(&mut c, &t, &mut h, &op(BARREL, 5)).unwrap(), 0);
     assert_eq!(
         h.others(),
         s(&[
             "skill UnitId(20) UnitId(10)",
-            "trapid UnitId(10)",
+            "trapid 2",
             "trapmon 5 8 UnitId(10)",
             "drop 0 UnitId(10)"
         ])
@@ -753,7 +785,7 @@ fn exploding_barrel_damage_and_chain_recursion() {
     h.within.insert((b3, OBJ, 2));
     assert_eq!(
         operate(&mut c, &t, &mut h, &op(EXPLODING_BARREL_CLASS, 7)).unwrap(),
-        1
+        0
     );
     assert_eq!(
         h.others(),
@@ -861,7 +893,7 @@ fn trap_arm_bounds_and_monster_234_in_act_1() {
         }
         // Another monster in act I: armed.
         let (mut c, mut h) = setup(CHEST, ty, seed);
-        h.trap_monster = Some(235);
+        h.trap_monster = Some(0);
         trap_arm(&mut c, &t, &mut h, OBJ).unwrap();
         assert_eq!(h.f.schedules(), vec![(OBJ, oevent::TRAP, 135)]);
     }
@@ -951,9 +983,9 @@ fn trap_event_fire_objects() {
             c.data.insert(UnitId(61), ObjectData::default());
             object_event_trap(&mut c, &t, &mut h);
             let allocs = h.f.calls_of(|x| matches!(x, Call::Allocate(..)));
-            let mut want = vec![Call::Allocate(ROOM, 162, 40, 50, 0)];
+            let mut want = vec![Call::Allocate(ROOM, 162, 40, 50, 1)];
             if inside {
-                want.push(Call::Allocate(ROOM, 160, 41, 50, 0));
+                want.push(Call::Allocate(ROOM, 160, 41, 50, 1));
             }
             assert_eq!(allocs, want);
             assert_eq!(c.get(UnitId(60)).unwrap().spark, 2);
@@ -972,7 +1004,7 @@ fn trap_event_8_9_spawn_one_or_two_by_step() {
             let seed = find_seed(|s| s.step() & 1 == bit);
             let (mut c, mut h) = setup(CHEST, ty, seed);
             h.f.levels.insert(OBJ, 50);
-            h.trap_monster = Some(44);
+            h.trap_monster = Some(274);
             object_event_trap(&mut c, &t, &mut h);
             let n = h
                 .others()
@@ -980,7 +1012,7 @@ fn trap_event_8_9_spawn_one_or_two_by_step() {
                 .filter(|x| x.starts_with("trapmon"))
                 .count();
             assert_eq!(n as u32, 1 + bit);
-            assert!(h.others().contains(&"trapmon 44 8 UnitId(10)".to_string()));
+            assert!(h.others().contains(&"trapmon 274 8 UnitId(10)".to_string()));
             let mut e = seed;
             e.step();
             assert_eq!(c.seed, e);

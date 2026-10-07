@@ -423,12 +423,9 @@ pub fn choose_bird_boss<W: QuestWorld>(
     if !in_act3(w, unit) || !ctl.records[i].not_intro || class == npc::FETISH11 {
         return;
     }
+    // A class with no monstats row fails the whole test (`0x00544ED3`):
+    // nothing is chosen or linked.
     let Some(flags_0d) = flags_0d else {
-        // TODO(quests-act3-2 §11.4): "the test runs only when the monstats
-        // row exists"; whether a class without a row is then still chosen
-        // (flying test skipped) or not (whole test skipped) is not
-        // stated. Reported, nothing linked.
-        w.unhandled(CHAIN, 0x0054_4E80);
         return;
     };
     if flags_0d & FLYING_0D != 0 {

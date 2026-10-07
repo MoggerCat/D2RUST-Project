@@ -702,7 +702,9 @@ fn end_of_game<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bo
         x.ending = false;
         x.end_pending = false;
         if classic {
-            w.end_game();
+            // `0x00530590(game, 0)`: a host request
+            // (`quests-helpers.md` §6).
+            ctl.end_game();
         }
         return true;
     }
@@ -719,7 +721,7 @@ fn end_of_game<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bo
     }
     if ms > 75_000 && !x2(ctl, i).saved {
         x2(ctl, i).saved = true;
-        w.save_pass();
+        ctl.save_pass();
     }
     false
 }
@@ -734,8 +736,9 @@ fn end_warp<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: UnitI
         w.warp_to_level(p, FORTRESS, 0);
         late::s5d(w, p, CHAIN, 1, 0);
     } else {
-        // TODO(quests-act4 OQ3): bytes 3–14 are unwritten stack in
-        // 1.14d; 0 here.
+        // Bytes 3–14 are caller-frame stack in 1.14d, never written and
+        // never read by the client (open question 3, edge case 22): 0
+        // here, masked by the traces.
         let mut m = [0u8; 15];
         m[0] = 0x50;
         m[1..3].copy_from_slice(&u16::from(CHAIN).to_le_bytes());
@@ -824,8 +827,7 @@ pub fn interaction_refused<W: QuestWorld>(ctl: &QuestControl, w: &W) -> bool {
 
 /// `0x005B5210` (§8, `monsters/population.md` §3.1 step 6): +0x13 of
 /// chain 23, the Sanctum cleared (level 108 is no longer populated).
-/// TODO(quests-act4 §8): the spec gives no branch for an absent chain
-/// 23; false here.
+/// Without chain 23 it returns 0 (`0x005B5226`).
 pub fn sanctum_cleared(ctl: &QuestControl) -> bool {
     ctl.record(CHAIN).is_some_and(|r| r.extra.a4.q2.cleared)
 }

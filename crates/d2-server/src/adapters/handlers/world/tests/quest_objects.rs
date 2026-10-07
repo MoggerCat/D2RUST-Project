@@ -42,6 +42,8 @@ fn tables() -> ObjectTables {
         objects: rows,
         shrines: Vec::new(),
         levels: Vec::new(),
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
     }
 }
 

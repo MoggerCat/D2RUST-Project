@@ -494,8 +494,19 @@ impl QuestWorld for Fake3 {
             self.f.spawns.remove(0)
         }
     }
-    fn kill_monster(&mut self, monster: UnitId) {
-        self.f.log.push(format!("kill {}", monster.0));
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        self.f.adjacent_units(room)
+    }
+    fn spawn_missile(&mut self, r: super::helpers::QuestMissile) -> Option<UnitId> {
+        self.f.spawn_missile(r)
+    }
+    fn set_missile_guid(&mut self, m: UnitId, v: u32) {
+        self.f.set_missile_guid(m, v)
+    }
+    fn monster_mode_at(&mut self, monster: UnitId, mode: u8, x: i32, y: i32) {
+        self.f
+            .log
+            .push(format!("mode request {} {mode} {x} {y}", monster.0));
     }
     fn room_covering(&mut self, x: i32, y: i32) -> Option<RoomId> {
         self.f.log.push(format!("room covering {x} {y}"));

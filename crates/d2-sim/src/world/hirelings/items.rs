@@ -1,4 +1,4 @@
-// Spec: specs/world/hirelings.md §11
+// Spec: specs/world/hirelings.md §11; specs/world/hirelings-2.md §17
 //! The hireling item swap `0x0054CED0(game, player, merc, item C)`
 //! (§11), reached from the 0x61 give `0x0054D230`
 //! (`items/inventory-moves.md` §7.23, [`crate::items::moves::handlers`]) when
@@ -7,6 +7,13 @@
 //! through [`HirelingItems`]. Units and items are the 0x61 path's
 //! [`Owner`] / [`Guid`] so that path's `equip_on_merc` seam can be served
 //! by [`swap`].
+//!
+//! TODO(hirelings-2.md §19, C→S 0x61): no provider of [`HirelingItems`]
+//! exists yet, so the 0x61 give's `equip_on_merc` seam
+//! (`wiring::inventory`) is not routed to [`swap`]. The duplicate
+//! `0x0055A2A0` exists (`wiring::inventory::copy`, `InvDesk::copy_of`,
+//! `vendors-2.md` §7.3); the provider belongs to the inventory wiring,
+//! owned by the item interaction session (impl-items-wiring).
 
 use crate::items::moves::{Guid, Owner};
 
@@ -34,10 +41,12 @@ pub const PAGE_BODY: u8 = 3;
 pub const FLAG_10: u32 = 0x10;
 /// Item flag set on the replaced item through `0x006280D0` (§11 rule 4).
 pub const FLAG_20: u32 = 0x20;
-/// First argument of the two item-removal notices `0x00540E60` (§11 rule 3).
-pub const NOTICE_REMOVED: u32 = 9;
-/// The notice `0x00540E60(3, 0)` after the refresh (§11 rule 3).
-pub const NOTICE_3: u32 = 3;
+/// Timer type 9 (periodic stats) cancelled with C's GUID on the merc and
+/// on the player (`0x00540E60`, `hirelings-2.md` §17 rule 1).
+pub const TIMER_STATS: u8 = 9;
+/// Timer type 3 (regeneration) cancelled on the merc, any argument, then
+/// scheduled again at frame + 1 (`0x00540E60`, `0x005417D0`, §17 rule 1).
+pub const TIMER_REGEN: u8 = 3;
 /// Event id queued at frame + 1 (`0x005417D0`, §11 rule 3).
 pub const EVENT_3: u32 = 3;
 
@@ -58,16 +67,20 @@ pub trait HirelingItems {
     fn is_type(&self, item: Guid, ty: u32) -> bool;
     /// The unit's item at a body location.
     fn body_item(&self, unit: Owner, loc: u8) -> Option<Guid>;
-    /// `0x0055A2A0(owner)`: a duplicate of `item` owned by `owner` (new
-    /// GUID, `items/generation.md` duplicate). §11 does not write a failed
-    /// copy.
-    // TODO(spec: hirelings.md §11): the outcome of a failed duplicate.
-    fn duplicate(&mut self, owner: Owner, item: Guid) -> Guid;
+    /// `0x0055A2A0(game, item, owner, 1)` (`vendors-2.md` §7.3): a
+    /// duplicate of `item` owned by `owner` (new GUID; socketed children
+    /// recreated in mode 4 and inserted; flags 0x80000 set, 0x2000
+    /// cleared; the source gets 0x8000000; replenish timers,
+    /// `hirelings-2.md` §17 rule 3). `None`: the creation failed (also
+    /// a socketed child's, §17 rule 2).
+    fn duplicate(&mut self, owner: Owner, item: Guid) -> Option<Guid>;
     /// The item's mode.
     fn set_mode(&mut self, item: Guid, mode: u8);
-    /// `0x00540E60(game, unit, a, b)` (rule 3: `(9, C's GUID)` to the
-    /// merc then to the player, `(3, 0)` to the merc).
-    fn notice(&mut self, unit: Owner, a: u32, b: u32);
+    /// `0x00540E60(game, unit, type, a)` (`hirelings-2.md` §17 rule 1):
+    /// cancel the unit's pending timer events of `ty` whose first
+    /// argument equals `a` (`a` = 0: any). Rule 3: `(9, C's GUID)` on the
+    /// merc then on the player, `(3, 0)` on the merc. Nothing is sent.
+    fn cancel_timers(&mut self, unit: Owner, ty: u8, a: Guid);
     /// `inventory.md` §4.6 `0x005606B0(game, unit, item, loc, skip)`;
     /// §11 does not read its result.
     fn equip_from_cursor(&mut self, unit: Owner, item: Guid, loc: u8, skip: bool);
@@ -99,8 +112,10 @@ pub trait HirelingItems {
     fn leave_inventory(&mut self, unit: Owner, item: Guid);
     /// `0x00621000(unit, arg)`.
     fn call_00621000(&mut self, unit: Owner, arg: u32);
-    /// `0x0055FB10`: the item becomes the player's cursor item.
-    fn become_cursor(&mut self, player: Owner, item: Guid);
+    /// The player's cursor := `item` (`0x0063C180`), then `0x0055FB10`
+    /// with it; `None` (a failed duplicate of old, `hirelings-2.md` §17
+    /// rule 2): cursor := none, `0x0055FB10` with none.
+    fn become_cursor(&mut self, player: Owner, item: Option<Guid>);
     /// Link `item` back into the unit's inventory at `page` and body
     /// location `loc` (rule 4 fail).
     fn put_back(&mut self, unit: Owner, item: Guid, page: u8, loc: u8);
@@ -165,7 +180,14 @@ pub fn swap<W: HirelingItems>(
 }
 
 /// Rule 3, with rule 4's "duplicate of old to the player" when `old` is
-/// given.
+/// given (`hirelings-2.md` §17 rules 1–2).
+///
+/// A failed duplicate of C (§17 rule 2): the mode set is skipped
+/// (`0x00624690` ignores a null unit), the two type-9 cancels run, the
+/// equip runs with GUID −1 and equips nothing (`0x005606B0` finds no
+/// unit: the seam is not called), C is still consumed and the cursor
+/// cleared: the item is lost and the merc's slot stays empty. The tail
+/// and result 1 are unchanged.
 fn equip_copy<W: HirelingItems>(
     w: &mut W,
     player: Owner,
@@ -175,10 +197,14 @@ fn equip_copy<W: HirelingItems>(
     old: Option<Guid>,
 ) {
     let copy = w.duplicate(merc, item);
-    w.set_mode(copy, MODE_CURSOR);
-    w.notice(merc, NOTICE_REMOVED, item);
-    w.notice(player, NOTICE_REMOVED, item);
-    w.equip_from_cursor(merc, copy, target, true);
+    if let Some(copy) = copy {
+        w.set_mode(copy, MODE_CURSOR);
+    }
+    w.cancel_timers(merc, TIMER_STATS, item);
+    w.cancel_timers(player, TIMER_STATS, item);
+    if let Some(copy) = copy {
+        w.equip_from_cursor(merc, copy, target, true);
+    }
     w.consume(item);
     w.clear_cursor(player);
     // Rule 4: the old item's duplicate after "cursor := none", before
@@ -189,6 +215,6 @@ fn equip_copy<W: HirelingItems>(
     }
     w.inventory_pass(merc);
     w.refresh_0055f4f0(merc);
-    w.notice(merc, NOTICE_3, 0);
+    w.cancel_timers(merc, TIMER_REGEN, 0);
     w.event_next_frame(merc, EVENT_3);
 }

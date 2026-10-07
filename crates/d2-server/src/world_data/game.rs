@@ -89,12 +89,15 @@ impl GameTables {
         })
     }
 
-    /// The object code's tables (`objects`, `shrines`, `levels`).
+    /// The object code's tables (`objects`, `shrines`, `levels`,
+    /// `objgroup`, `leveldefs`).
     pub fn object_tables(&self) -> Result<ObjectTables, WorldDataError> {
         Ok(ObjectTables {
             objects: self.rows::<Objects>()?,
             shrines: self.rows::<Shrines>()?,
             levels: self.rows::<Levels>()?,
+            objgroup: self.rows::<d2_data::tables::Objgroup>()?,
+            leveldefs: self.rows::<d2_data::tables::Leveldefs>()?,
         })
     }
 

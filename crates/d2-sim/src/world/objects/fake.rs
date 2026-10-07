@@ -189,4 +189,9 @@ impl ObjectWorld for Fake {
     fn staff_tomb_level(&self) -> u32 {
         self.staff_tomb
     }
+    fn store_mode(&mut self, unit: UnitId, mode: u8) {
+        self.modes.insert(unit, mode);
+        self.calls
+            .push(Call::Other(format!("store {} {mode}", unit.0)));
+    }
 }

@@ -143,11 +143,12 @@ fn baal_gold_hell() {
             "sound 3 83",
             &format!("gold 69 {}", 13500 + r1),
             &format!("gold 69 {}", 13500 + r2),
-            "save pass",
             "missile at 69 625",
             "refresh 153",
         ]
     );
+    // The save pass is a host request (`quests-helpers.md` §6).
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     // FX 19 first, then status 4, S5D(36, 2, 0) to each credited player.
     assert_eq!(f.sent[0].1[0], 0x28);
     assert_eq!(f.sent[1].1, [0x89, 19]);
@@ -168,7 +169,8 @@ fn baal_without_killer_or_credit() {
     let mut f = fake();
     kill_baal(&mut ctl, &mut f, None);
     assert!(!f.flags(P1).get(40, 0));
-    assert_eq!(f.log, ["save pass", "missile at 69 625"]);
+    assert_eq!(f.log, ["missile at 69 625"]);
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     assert_eq!(ctl.records[rec(&ctl)].state, 5);
     // A killer that already has 40.0: credits for the others, no gold.
     let (mut ctl, _) = control();
@@ -274,7 +276,7 @@ fn chat_tables_and_wants_to_talk() {
 
 // Covers: specs/world/quests-act5-2.md §8.4
 #[test]
-fn tyrael_chat_end_reports_the_last_portal() {
+fn tyrael_chat_end_makes_the_last_portal() {
     let (mut ctl, _) = control();
     let mut f = fake();
     let i = rec(&ctl);
@@ -285,21 +287,31 @@ fn tyrael_chat_end_reports_the_last_portal() {
         ev(event::NPC_DEACTIVATE, Some(LARZUK_U), 0, 0),
     );
     assert!(!ctl.records[i].extra.a5.q6.last_portal_made);
-    // Tyrael: `0x0058D7D0` for the player in level 132 (reported: the
-    // free-spot limit is not in the spec); +0x98 := 1.
+    // Tyrael: `0x0058D7D0` for the first player in level 132: object 565
+    // (flags 1, 1, 0) at a free spot from its position + (5, 0) in its
+    // room (size 5, mask 0x400, limit 100); +0x98 := 1.
+    f.pos.insert(P1, (10, 20, RoomId(3)));
+    f.spot = Some((0, 1));
+    f.a5_places = vec![Some(UnitId(0x95))];
     call(
         &mut ctl,
         &mut f,
         ev(event::NPC_DEACTIVATE, Some(TYRAEL_U), 0, 0),
     );
-    assert_eq!(f.log, ["unhandled 36 0x58d7d0"]);
+    assert_eq!(
+        f.log,
+        [
+            "spot at 15 20 5 0x400 18 100",
+            "place 565 15 21 room 3 [1, 1, 0]"
+        ]
+    );
     assert!(ctl.records[i].extra.a5.q6.last_portal_made);
     call(
         &mut ctl,
         &mut f,
         ev(event::NPC_DEACTIVATE, Some(TYRAEL_U), 0, 0),
     );
-    assert_eq!(f.log.len(), 1);
+    assert_eq!(f.log.len(), 2);
     // Nobody in the Chamber: only +0x98.
     let (mut ctl, _) = control();
     let mut f = fake();
@@ -475,10 +487,29 @@ fn throne_and_chamber_portals() {
     f.p(P1).level = Some(129);
     super::portal_operate(&ctl, &mut f, P1);
     assert_eq!(f.log, ["warp 1 132 11", "warp 1 131 0"]);
-    // Tyrael's spawn hook is reported (§8.8: limit and flags open).
+    // Tyrael's spawn `0x0058E920(game, room, unit)` (§8.8): a free spot
+    // from the unit's position − (5, 5) in the given room (size 5, mask
+    // 0x400, limit 100), then tyrael3 there (mode 1, spread 4, 0x42).
     f.log.clear();
-    super::spawn_tyrael(&mut f, BAAL_U);
-    assert_eq!(f.log, ["unhandled 36 0x58e920"]);
+    f.pos.insert(BAAL_U, (40, 50, RoomId(7)));
+    f.spot = Some((1, 2));
+    f.spawns = vec![Some(UnitId(0x77))];
+    assert_eq!(
+        super::spawn_tyrael(&mut f, RoomId(9), BAAL_U),
+        Some(UnitId(0x77))
+    );
+    assert_eq!(
+        f.log,
+        [
+            "spot at 35 45 5 0x400 19 100",
+            "spawn 521 36 47 room 9 mode 1 spread 4 flags 0x42"
+        ]
+    );
+    // No spot: nothing.
+    f.log.clear();
+    f.spot = None;
+    assert_eq!(super::spawn_tyrael(&mut f, RoomId(9), BAAL_U), None);
+    assert_eq!(f.log, ["spot at 35 45 5 0x400 19 100"]);
 }
 
 // Covers: specs/world/quests-act5-2.md §8.8, §11
@@ -487,26 +518,28 @@ fn last_portal() {
     let (mut ctl, _) = control();
     let mut f = fake();
     // Before its init (+0x9C = 1): nothing.
-    assert_eq!(super::last_portal_operate(&ctl, &mut f, P1), 0);
+    assert_eq!(super::last_portal_operate(&mut ctl, &mut f, P1), 0);
     assert!(f.log.is_empty());
     super::last_portal_init(&mut ctl, &mut f, PORTAL_U);
     assert_eq!(f.log, ["mode 70 1"]);
     // Without 40.13: refused.
     f.log.clear();
-    super::last_portal_operate(&ctl, &mut f, P1);
+    super::last_portal_operate(&mut ctl, &mut f, P1);
     assert_eq!(f.log, ["sound 1 19"]);
     // With 40.13, busy: warp and the save pass only.
     f.p(P1).quests.flags[0].set(40, 13);
     f.q2_busy.push(P1);
     f.log.clear();
-    super::last_portal_operate(&ctl, &mut f, P1);
-    assert_eq!(f.log, ["warp 1 109 0", "save pass"]);
+    super::last_portal_operate(&mut ctl, &mut f, P1);
+    assert_eq!(f.log, ["warp 1 109 0"]);
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     assert!(!f.flags(P1).get(40, 10));
     // Not busy: interaction reset, +0x4C := 1, `61 07`, 40.10.
     f.q2_busy.clear();
     f.log.clear();
-    super::last_portal_operate(&ctl, &mut f, P1);
-    assert_eq!(f.log, ["warp 1 109 0", "save pass", "interact 1 None"]);
+    super::last_portal_operate(&mut ctl, &mut f, P1);
+    assert_eq!(f.log, ["warp 1 109 0", "interact 1 None"]);
+    assert_eq!(ctl.take_host_requests(), [HostRequest::SavePass]);
     assert_eq!(f.players[&P1].byte4c, 1);
     assert_eq!(f.sent, [(P1, vec![0x61, 0x07])]);
     assert!(f.flags(P1).get(40, 10));

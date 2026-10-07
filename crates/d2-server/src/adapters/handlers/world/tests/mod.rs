@@ -8,6 +8,7 @@
 
 mod fake;
 mod gaps;
+mod hirelings;
 mod ids;
 mod npc;
 mod objects;
