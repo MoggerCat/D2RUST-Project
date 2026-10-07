@@ -1,4 +1,4 @@
-// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1, §11; specs/world/hirelings-2.md §15, §17, §19
+// Spec: specs/world/npc.md §1.1, §2–§4, §7.5; specs/world/vendors.md §1, §3, §4, §7; specs/world/quests.md §1.7, §6.2, §7.3, §9.1; specs/world/quests-helpers.md §5, §6; specs/world/quests-act1.md §10.2; specs/world/cube.md §1, §2; specs/world/waypoints.md §6; specs/world/hirelings.md §6 r1, §8 r1, §11; specs/world/hirelings-2.md §15, §17, §19
 //! [`WiredWorld`]: the wired single-player host. The NPC, vendor, quest
 //! and cube systems on their `d2-sim` providers
 //! (`d2_sim::wiring::interaction`: [`Desk`] for `NpcWorld +
@@ -49,20 +49,21 @@ use d2_sim::units::{RoomId, UnitId};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
-    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestLoan, QuestRest,
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestInv, QuestInventory,
+    QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
 };
 use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
-use d2_sim::world::quests::QuestControl;
+use d2_sim::world::quests::{HostRequest, QuestControl};
 use d2_sim::world::vendors::{GlobalLists, VendorTables};
 use d2_sim::world::waypoints::{
     ObjectFacts, PlayerFacts, RoomRect, WaypointRecords, WaypointWorld,
 };
 
-use super::super::items::moves::{InvParts, MoveCall};
+use super::super::items::moves::{take_sent as inv_take_sent, InvParts, MoveCall};
 use super::super::items::{CubeCall, CubeParts, InvVendors};
 use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
@@ -224,23 +225,61 @@ impl<R, S> WiredWorld<R, S> {
 
 /// A quest call on the desk's economy and rest ([`HostQuests`]: the
 /// [`EconomyQuests`] calls with the object, level, interaction and
-/// identify calls answered by the action wiring and the NPC rest): the
+/// identify calls answered by the action wiring and the NPC rest, the
+/// NPCs' interaction lists of the interaction state and, when the host
+/// has one, the inventory model, [`QuestInv`]: the reward `0x005466B0`,
+/// `quests.md` §9.1, and the cube close): the
 /// mercenary rewards `0x00579180` an Act I quest grants (`quests-act1.md`
 /// §10.2) are queued during the call with the sends that follow them
 /// ([`d2_sim::wiring::economy::QuestDeferred`]) and run on the NPC
 /// control block right after it, then the queued sends
-/// (`quests-act1-rest.md` §8 item 8). A reward's NPC error goes to the
-/// interaction state's errors.
+/// (`quests-act1-rest.md` §8 item 8). A reward's NPC error, and an item
+/// creation error of the reward, go to the interaction state's errors.
+/// Also returned: what the inventory model sent during the call
+/// (receiving unit, bytes), for [`WorldHost::take_sent`]'s inventory part.
+///
+/// TODO(quests.md §9.1): the order of a reward's inventory messages
+/// against the quest messages of the same call is not written; they
+/// follow the rest's, as the vendor calls' do.
 fn quest_call<X: Pending, R: TradeRest, T>(
     desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
     ctl: &mut NpcControl,
+    mut inv: Option<&mut InvParts>,
     f: impl FnOnce(&mut QuestControl, &mut HostQuests<'_, '_, X, R>) -> T,
-) -> T {
+) -> (T, Vec<(UnitId, Vec<u8>)>) {
     let mut deferred = Vec::new();
+    let mut errors = Vec::new();
     let out = {
-        let mut inner = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
-        inner.deferred = Some(&mut deferred);
-        f(&mut *desk.quests, &mut HostQuests::new(inner))
+        let mut lent = inv
+            .as_deref_mut()
+            .map(|p| QuestInv::new(&p.tables, &mut p.state, p.rest.as_mut()));
+        let out = {
+            let mut inner = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
+            inner.deferred = Some(&mut deferred);
+            let mut w = HostQuests::new(inner);
+            w.chats = Some(&mut desk.state.lists);
+            w.inventory = lent
+                .as_mut()
+                .map(|q| q as &mut dyn QuestInventory<ActionHooks<X>>);
+            f(&mut *desk.quests, &mut w)
+        };
+        if let Some(q) = lent {
+            errors = q.errors;
+        }
+        out
+    };
+    for e in errors {
+        desk.state.errors.push(InteractionError::Economy(e));
+    }
+    let sent = match inv {
+        Some(p) => {
+            let mut d = p.desk(&mut *desk.econ);
+            inv_take_sent(&mut d)
+                .into_iter()
+                .filter_map(|(u, b)| Some((u?, b)))
+                .collect()
+        }
+        None => Vec::new(),
     };
     for d in deferred {
         let Some((p, class)) = d.run(&mut *desk.rest) else {
@@ -250,18 +289,21 @@ fn quest_call<X: Pending, R: TradeRest, T>(
             desk.state.errors.push(InteractionError::Npc(e));
         }
     }
-    out
+    (out, sent)
 }
 
 /// The object module's queued quest routes
 /// (`ActionSim::route_quest_objects`) run on the quest control
 /// (`d2_sim::wiring::economy::quest_objects`) until none is left; the
 /// routes no quest spec states go to the action wiring's
-/// `Pending::object_route`, as without the queue.
+/// `Pending::object_route`, as without the queue. Returns what the
+/// inventory model sent ([`quest_call`]).
 fn quest_objects<X: Pending, R: TradeRest>(
     desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
     ctl: &mut NpcControl,
-) {
+    mut inv: Option<&mut InvParts>,
+) -> Vec<(UnitId, Vec<u8>)> {
+    let mut sent = Vec::new();
     loop {
         let calls = desk
             .econ
@@ -271,9 +313,12 @@ fn quest_objects<X: Pending, R: TradeRest>(
             .map(|s| s.take_quest_calls())
             .unwrap_or_default();
         if calls.is_empty() {
-            return;
+            return sent;
         }
-        let back = quest_call(desk, ctl, |q, w| quest_objects::run_all(q, w, calls));
+        let (back, s) = quest_call(desk, ctl, inv.as_deref_mut(), |q, w| {
+            quest_objects::run_all(q, w, calls)
+        });
+        sent.extend(s);
         for r in back {
             desk.econ.hooks.x.object_route(desk.econ.game, r);
         }
@@ -573,7 +618,8 @@ where
         let out = self.lend_quests(events, |a, ev| {
             WorldHost::<D>::objects(a, game, ev, player, guid)
         });
-        self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        let sent = self.desk(game, events, quest_objects);
+        self.inv_sent.extend(sent);
         out
     }
 
@@ -591,7 +637,8 @@ where
     /// The quest routes queued outside a lent call (a quest call's own
     /// allocations, [`quest_objects`]), before the tick's sends are taken.
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
-        self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        let sent = self.desk(game, events, quest_objects);
+        self.inv_sent.extend(sent);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
@@ -613,12 +660,15 @@ where
     /// The object module's queued quest routes run before the call and
     /// after it ([`quest_objects`]).
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        Some(self.desk(game, events, |desk, ctl, _| {
-            quest_objects(desk, ctl);
-            let out = quest_call(desk, ctl, |q, w| call.call(q, w));
-            quest_objects(desk, ctl);
-            out
-        }))
+        let (out, sent) = self.desk(game, events, |desk, ctl, mut inv| {
+            let mut sent = quest_objects(desk, ctl, inv.as_deref_mut());
+            let (out, s) = quest_call(desk, ctl, inv.as_deref_mut(), |q, w| call.call(q, w));
+            sent.extend(s);
+            sent.extend(quest_objects(desk, ctl, inv));
+            (out, sent)
+        });
+        self.inv_sent.extend(sent);
+        Some(out)
     }
 
     /// The cube on this world's economy and inventory model.
@@ -747,6 +797,14 @@ where
         h.owner_deaths.get_or_insert_with(Vec::new);
         h.hireling_calls.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
+    }
+
+    /// The host calls the quest rules raised since the last take
+    /// (`quests-helpers.md` §6: game end, save pass), in call order,
+    /// from the quest control (a lent control's come back with it,
+    /// [`WiredWorld::lend_quests`]).
+    fn take_host_requests(&mut self) -> Vec<HostRequest> {
+        self.quests.take_host_requests()
     }
 
     fn fault(&mut self, fault: WorldFault) {

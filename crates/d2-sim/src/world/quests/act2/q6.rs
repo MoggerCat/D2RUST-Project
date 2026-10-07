@@ -394,7 +394,13 @@ pub(super) fn status<W: QuestWorld>(
 /// GUID, u8 result, u8 "accepted with effect". Byte 6 is not written by
 /// the original for results 0, 1 and 4 (stale stack data, open question
 /// 1 there): d2rs sends 0.
-fn send_insert<W: QuestWorld>(w: &mut W, player: UnitId, guid: u32, result: u8, effect: u8) {
+fn send_insert<W: QuestWorld + ?Sized>(
+    w: &mut W,
+    player: UnitId,
+    guid: u32,
+    result: u8,
+    effect: u8,
+) {
     let g = guid.to_le_bytes();
     w.send(player, &[0x58, g[0], g[1], g[2], g[3], result, effect]);
 }
@@ -449,6 +455,21 @@ pub const INSERT_CANCEL: u16 = 2;
 /// C→S 0x44 action 3 (insert the cursor item).
 pub const INSERT_ITEM: u16 = 3;
 
+/// `0x005852E0` action 2 (cancel, `quests-act2-2.md` §3.2 step 3) on an
+/// existing object: S→C 0x58 result 1, object mode 0, the interact unit
+/// reset. Also the obelisk close of the interaction end
+/// (`quests-helpers.md` §5 kind 2).
+pub fn insert_cancel<W: QuestWorld + ?Sized>(
+    w: &mut W,
+    player: UnitId,
+    object: UnitId,
+    object_guid: u32,
+) {
+    send_insert(w, player, object_guid, 1, 0);
+    w.set_object_mode(object, 0);
+    w.set_interact_unit(player, None);
+}
+
 /// C→S 0x44 past its size / busy / `0x00549520` checks: `0x005852E0(game,
 /// player, object GUID, item, action)` (`quests-act2-2.md` §3.2 steps
 /// 2–5). `item` is the cursor item (type 4 by its GUID). An object that
@@ -467,11 +488,7 @@ pub fn item_to_object<W: QuestWorld>(
         return;
     };
     match action {
-        INSERT_CANCEL => {
-            send_insert(w, player, object_guid, 1, 0);
-            w.set_object_mode(object, 0);
-            w.set_interact_unit(player, None);
-        }
+        INSERT_CANCEL => insert_cancel(w, player, object, object_guid),
         INSERT_ITEM if class == ORIFICE => {
             if item.and_then(|t| w.item_code(t)) != Some(*b"hst ") {
                 send_insert(w, player, object_guid, 4, 0);

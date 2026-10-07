@@ -380,6 +380,12 @@ pub trait WorldHost<D> {
     /// The host's millisecond clock (`Intents::set_host_tick`): the
     /// object code's `GetTickCount` input (`objects.md` edge case 9).
     fn host_tick(&mut self, events: &mut D, ms: u32) {}
+    /// The host calls the game's quest rules raised since the last take
+    /// (`quests-helpers.md` §6: `QuestControl::take_host_requests`), in
+    /// call order. A host without quests raises none.
+    fn take_host_requests(&mut self) -> Vec<d2_sim::world::quests::HostRequest> {
+        Vec::new()
+    }
     /// Records a fatal path (see [`WorldError`]).
     fn fault(&mut self, fault: WorldFault);
 }
