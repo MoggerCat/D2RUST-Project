@@ -47,6 +47,8 @@ struct Fx {
     /// What the resync writes: (player, t, new max).
     resync_sets: Option<(u32, i32, i32)>,
     log: Vec<Ev>,
+    skills: Option<Vec<ResyncSkill>>,
+    freed_hirelings: Vec<u32>,
 }
 
 impl Fx {
@@ -74,6 +76,8 @@ impl Fx {
             groups,
             resync_sets: None,
             log: Vec::new(),
+            skills: Some(Vec::new()),
+            freed_hirelings: Vec::new(),
         }
     }
 
@@ -208,6 +212,22 @@ impl PetWorld for Fx {
     }
     fn send(&mut self, p: u32, msg: PetMsg) {
         self.log.push(Ev::Send(p, msg));
+    }
+}
+
+impl PetLifecycleWorld for Fx {
+    fn set_pet_lists(&mut self, p: u32, lists: Option<PetLists>) {
+        self.units.get_mut(&p).unwrap().lists = lists;
+    }
+    fn pettype_basemax(&self, t: i32) -> i32 {
+        i32::from(t == PETTYPE_SINGLE || t == PETTYPE_HIREABLE)
+    }
+    fn skills(&self, _p: u32) -> Option<Vec<ResyncSkill>> {
+        self.skills.clone()
+    }
+    fn free_hireling_unit(&mut self, unit: u32) {
+        self.freed_hirelings.push(unit);
+        self.units.get_mut(&unit).unwrap().gone = true;
     }
 }
 
@@ -782,4 +802,121 @@ fn lookup_order_row_zero_and_guards() {
     assert_eq!(lookup(&mut fx, P1, 10), Ok(0));
     fx.units.get_mut(&P1).unwrap().data = false;
     assert_eq!(lookup(&mut fx, P1, 10), Err(PetError::NoPlayerData));
+}
+
+// ---------------------------------------------------------------- §10
+
+fn maxes(fx: &mut Fx) -> Vec<i32> {
+    fx.lists(P1).entries.iter().map(|e| e.max).collect()
+}
+
+// Covers: specs/sim/pets.md §10
+#[test]
+fn create_sets_basemax_and_resync_rules() {
+    let mut fx = Fx::new();
+    create(&mut fx, P1).unwrap();
+    // Only single (1) and hireable (7) start with max 1.
+    assert_eq!(maxes(&mut fx), [0, 1, 0, 0, 0, 0, 0, 1, 0, 0]);
+    // Creating again frees the old lists first (pets dismissed).
+    let a = fx.spawn(10, 7);
+    fx.link(SKELETON, 10);
+    fx.lists(P1).entries[SKELETON as usize].max = 3;
+    create(&mut fx, P1).unwrap();
+    assert!(fx.effects().contains(&Ev::Kill(a)));
+    assert_eq!(maxes(&mut fx), [0, 1, 0, 0, 0, 0, 0, 1, 0, 0]);
+    assert_eq!(fx.entry(SKELETON).count, 0);
+
+    // Resync: the first skill met raises the maximum at once; a later,
+    // lower one does not lower it; the others return to basemax.
+    fx.skills = Some(vec![
+        ResyncSkill {
+            pettype: SKELETON as i8,
+            petmax: 4,
+        },
+        ResyncSkill {
+            pettype: SKELETON as i8,
+            petmax: 2,
+        },
+        ResyncSkill {
+            pettype: WOLF as i8,
+            petmax: 0,
+        },
+        ResyncSkill {
+            pettype: 0,
+            petmax: 9,
+        },
+        ResyncSkill {
+            pettype: COUNT as i8,
+            petmax: 9,
+        },
+    ]);
+    fx.lists(P1).entries[GOLEM as usize].max = 5;
+    resync_max(&mut fx, P1).unwrap();
+    assert_eq!(maxes(&mut fx), [0, 1, 4, 1, 0, 0, 0, 1, 0, 0]);
+    // A lower petmax met first trims, a higher later one does not restore.
+    for g in [20, 21, 22] {
+        fx.spawn(g, 7);
+        fx.link(SKELETON, g);
+    }
+    fx.skills = Some(vec![
+        ResyncSkill {
+            pettype: SKELETON as i8,
+            petmax: 1,
+        },
+        ResyncSkill {
+            pettype: SKELETON as i8,
+            petmax: 3,
+        },
+    ]);
+    resync_max(&mut fx, P1).unwrap();
+    assert_eq!(fx.guids(SKELETON), [22]);
+    assert_eq!(fx.entry(SKELETON).max, 3);
+    // No skill list or no lists: nothing.
+    fx.skills = None;
+    fx.lists(P1).entries[GOLEM as usize].max = 5;
+    resync_max(&mut fx, P1).unwrap();
+    assert_eq!(fx.entry(GOLEM).max, 5);
+    // Not a player: nothing.
+    let m = fx.spawn(30, 1);
+    resync_max(&mut fx, m).unwrap();
+}
+
+// Covers: specs/sim/pets.md §10
+#[test]
+fn free_and_player_death_drain_lists() {
+    let mut fx = Fx::new();
+    create(&mut fx, P1).unwrap();
+    let a = fx.spawn(10, 7);
+    let b = fx.spawn(11, 7);
+    let h = fx.spawn(50, 9);
+    fx.link(SKELETON, 10);
+    fx.link(SKELETON, 11);
+    fx.link(PETTYPE_HIREABLE, 50);
+    fx.lists(P1).entries[SKELETON as usize].max = 2;
+    player_death(&mut fx, P1).unwrap();
+    // Pets dismissed in list order; the hireling is not touched.
+    assert_eq!(
+        fx.effects()
+            .iter()
+            .filter(|e| matches!(e, Ev::Kill(_)))
+            .cloned()
+            .collect::<Vec<_>>(),
+        [Ev::Kill(a), Ev::Kill(b)]
+    );
+    assert!(fx.freed_hirelings.is_empty());
+    let e = fx.entry(SKELETON);
+    assert_eq!((e.count, e.nodes.len()), (0, 0));
+    assert_eq!(fx.entry(PETTYPE_HIREABLE).count, 1);
+    // Free: the hireling node's unit is announced removed and freed, the
+    // lists are dropped.
+    fx.log.clear();
+    free_all(&mut fx, P1).unwrap();
+    assert_eq!(fx.freed_hirelings, [h]);
+    assert!(fx.units[&P1].lists.is_none());
+    assert!(!fx.sends().is_empty());
+    // P null: nothing; no player data: fatal.
+    free_all(&mut fx, P1).unwrap();
+    fx.units.get_mut(&P1).unwrap().data = false;
+    assert_eq!(free_all(&mut fx, P1), Err(PetError::NoPlayerData));
+    assert_eq!(create(&mut fx, P1), Err(PetError::NoPlayerData));
 }

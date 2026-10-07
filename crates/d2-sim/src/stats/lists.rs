@@ -1160,7 +1160,7 @@ impl StatLists {
     // ---- §8 chain operations ---------------------------------------------
 
     /// Keys of L's full array whose stat has A53 (first 16, §8.1.7).
-    fn a53_keys(&self, l: ListId) -> Vec<i32> {
+    pub(super) fn a53_keys(&self, l: ListId) -> Vec<i32> {
         self.ext(l)
             .map(|e| {
                 e.full
@@ -1503,6 +1503,39 @@ impl StatLists {
                 cur = next;
             }
         }
+    }
+
+    /// Temporary lists `0x006272E0`(unit) (§8.9), run by a real mode
+    /// change after the mode is written.
+    pub fn remove_temporary_lists(&mut self, host: &mut dyn StatHost, unit: UnitId) {
+        let Some(r) = self.unit_list(unit) else {
+            return;
+        };
+        if self.l(r).flags & flag::NEWLENGTH == 0 {
+            return;
+        }
+        let mut cur = self.heads(r).0;
+        while let Some(c) = cur {
+            let list = self.l(c);
+            let (temp, state, extended, prev) = (
+                list.flags & flag::TEMPONLY != 0,
+                list.state,
+                list.ext.is_some(),
+                list.prev,
+            );
+            // An extended TEMPONLY list cannot exist (§4: extended lists
+            // keep only bit 0x1), so it is passed over instead of looping.
+            if temp && !extended {
+                if state != 0 {
+                    self.toggle_state(unit, state, false);
+                }
+                self.free(host, c);
+                cur = self.heads(r).0;
+            } else {
+                cur = prev;
+            }
+        }
+        self.lm(r).flags &= !flag::NEWLENGTH;
     }
 
     /// Overlay removal `0x00627410`(unit) (§8.8.2).
