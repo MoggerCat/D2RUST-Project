@@ -5313,6 +5313,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `ui/panels.md` §8.11 (PC 2 spec-ui): character panel of a level-99 character (experience 3,520,485,254) and of a level-1 character: the grouped strings and the next-level value.
 - `ui/menus.md` OQ1 / OQ4 (PC 2 spec-ui): Akara's menu, Charsi's menu and Kashya's hire list at 800 × 600 (box position, item rows, highlight).
 - `ui/menus.md` §1 / `ui/panels.md` §13 (PC 2 spec-ui): the waypoint menu with each tab clicked and a row hovered.
+- `audio/sound-table.md` OQ12 (PC 2 spec-audio): the tick at which one-shot sounds end (1.14d detects it on a 50 ms wall-clock thread `0x00516250`): log request start tick and the tick its slot frees, for several known-length sounds.
+- `audio/sound-table.md` OQ13 (PC 2 spec-audio): how long `Async Only` sound loads take to complete (ticks from request to playable).
+- `audio/triggers.md` OQ3 (PC 2 spec-audio): a write watch on unit +0xB0 (last-hit class) during a fight: who writes it and when.
+- `audio/environment.md` (PC 2 spec-audio, entry 74 rest): the town → wilderness → cave walk and Blood Raven's death with `record_sound.py` (without `-ns`).
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
