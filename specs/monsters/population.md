@@ -674,6 +674,15 @@ class = preset +0x04, x = preset +0x08 + room subtile x (`0x00619730`), y = pres
 (DRLG/AI data; `monsters/ai.md`). `0x005557D0` sets unit flags
 0x3000000 on every unit it creates.
 
+PROVISIONAL: the first pass places the type-2 (object) presets whose
+done bit is clear, in list order, each through `0x00555910` →
+`0x005557D0` with the preset's class, room-offset x / y and mode
+(`world/objects-2.md` §22 r1; classes 574–582 through `0x0054F490`,
+`world/objects.md` §6), flags 0x3000000; presets of other types are
+not placed, and at level 136 the first pass places nothing (because
+the spec names no other type and not the level-136 cases, and the
+monster pass tests the done bit); settled by REC-94.
+
 #### 11.2 Class ranges (`0x0054E600`)
 
 Let M = monstats count and S = superuniques count.

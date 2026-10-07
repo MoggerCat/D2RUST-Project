@@ -319,9 +319,42 @@ fn update_pass_sends_the_state_message() {
     fx.sim.objects(&mut fx.game, |ctl, t, w| {
         obj::set_object_mode(ctl, t, w, o, 1).unwrap();
     });
+    // Announced already (flag 0x10 clear): the update alone.
+    fx.sim.sys.units.get_mut(o).unwrap().flags &= !uflags::SEED_SET;
     crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
     let want = obj::state_message(guid(&fx, o), false, 1);
     assert_eq!(fx.sim.hooks().x.sent, [(p, want.to_vec())]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/intents-events.md §7.1 r2.1, §7.2
+#[test]
+fn update_pass_announces_a_new_object_first() {
+    // A new object (flag 0x10, as allocation leaves it, e.g. a DS1
+    // preset placed after the client's room switch): its add message
+    // S→C 0x51 goes before the object update (§7.1 rule 2.1).
+    let mut fx = fx();
+    let o = create(&mut fx, WAYPOINT, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let c = fx
+        .game
+        .lists
+        .add_client(Some(p), Some(a), crate::units::lists::client_state::IN_GAME);
+    assert_ne!(fx.sim.sys.units.get(o).unwrap().flags & uflags::SEED_SET, 0);
+    fx.sim.objects(&mut fx.game, |ctl, t, w| {
+        obj::set_object_mode(ctl, t, w, o, 1).unwrap();
+    });
+    crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
+    let g = guid(&fx, o);
+    let sent = &fx.sim.hooks().x.sent;
+    assert_eq!(sent.len(), 2, "{sent:02X?}");
+    assert_eq!(sent[0].0, p);
+    assert_eq!(sent[0].1[0], 0x51);
+    assert_eq!(sent[0].1[1], UnitType::Object as u8);
+    assert_eq!(sent[0].1[2..6], g.to_le_bytes());
+    let want = obj::state_message(g, false, 1);
+    assert_eq!(sent[1], (p, want.to_vec()));
     fx.assert_clean();
 }
 

@@ -290,6 +290,24 @@ impl MonsterInit for Fake {
         self.log.push(format!("object {class} {x} {y}"));
     }
 
+    fn create_preset_object(
+        &mut self,
+        _room: RoomId,
+        class: i32,
+        x: i32,
+        y: i32,
+        mode: u8,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("preset object {class} {x} {y} {mode}"));
+        if self.alloc_fail {
+            return None;
+        }
+        let u = self.add_unit(class, x, y, Seed::default());
+        self.units[u.0 as usize].mode = mode;
+        Some(u)
+    }
+
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit) {
         self.log
             .push(format!("preset {} {}", unit.0, preset.has_data));

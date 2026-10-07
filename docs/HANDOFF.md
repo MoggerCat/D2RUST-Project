@@ -5768,6 +5768,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r93-packets.jsonl`.
 - Compare: count of S→C 0x2C event 11 in the opening tick (2 expected by the provisional reading, 1 otherwise). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
+##### REC-94 [NO RUN] population.md §11.1 first pass of `0x005559A0` (object presets)
+- Priority P1 (which units a town room holds, and their order).
+- Settles: population.md §11.1 (PROVISIONAL: the first pass places type-2 presets with the done bit clear, in list order, in the preset mode through `0x005557D0`; no other type; nothing at level 136).
+- Steps: (no game run) Ghidra read of `0x005559A0` and `0x00555910` / `0x005557D0`: the first loop's unit-type and done-bit tests, the level-136 branch, and every type it hands to `0x005557D0`.
+- Output: the first pass's rules as prose for §11.1.
+- Compare: type 2 only, done bit tested, level 136 places nothing. Fold: write the result into the cited rule and drop its PROVISIONAL line.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).

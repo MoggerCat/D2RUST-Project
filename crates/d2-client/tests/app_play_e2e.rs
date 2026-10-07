@@ -348,3 +348,99 @@ fn the_play_preview_draws_walks_and_opens_the_character_panel() {
         "the name text is drawn"
     );
 }
+
+/// The play preview on the user's files, wired as `d2-client play --new
+/// sorceress Test` wires it (no window, no sound): after the join the
+/// town's preset NPCs and objects are in the client model (S→C 0xAC and
+/// 0x51 from the unit update after the presets are placed,
+/// `monsters/population.md` §11.1 through the world state's level
+/// types, `sim/intents-events.md` §7.1 r2.1), the town's waypoint among
+/// them, and the frame draws them beside the player. The local run of
+/// 2026-10-07 had 4 units (the player and 3 items), 1 drawn.
+/// `D2_GAME_DIR=<install> cargo test -p d2-client --test app_play_e2e -- --ignored town_npcs`
+// Covers: specs/monsters/population.md §11.1; specs/sim/intents-events.md §7.1 r2.1
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR"]
+fn the_live_preview_draws_the_town_npcs() {
+    use d2_client::app::ui::UiParts;
+    use d2_client::bridge::world::{MONSTER, OBJECT};
+
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let GameData::Live(live) = &data else {
+        panic!("live data")
+    };
+    let archives = live.archives.clone();
+    let waypoint = single_player::WaypointTables::live(&archives)
+        .unwrap()
+        .object_class;
+    let character = single_player::new_character("sorceress", "Test").unwrap();
+    let speeds = single_player::walk_speeds(&data, &character).unwrap();
+    let drlg = single_player::client_drlg_source(&data);
+    let levels = single_player::client_level_rows(&data);
+    let objects = single_player::client_object_rows(&data);
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (link, _) = single_player::start_with(
+        data,
+        single_player::DEFAULT_SEED,
+        character.clone(),
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>();
+    let (link, tap) = predict_link(Box::new(link));
+    add_game(&mut app, link, false).unwrap();
+    send_create_game_for(&mut app, &character).unwrap();
+    add_client_data(&mut app, drlg, levels.clone());
+    {
+        let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
+        bridge.0.set_object_rows(objects);
+        bridge
+            .0
+            .set_skill_rows(single_player::client_skill_rows(&archives).unwrap());
+        bridge
+            .0
+            .set_class_skills(single_player::client_class_skills(&archives).unwrap());
+        bridge.0.set_skill_tables(Arc::new(
+            single_player::client_skill_tables(&archives).unwrap(),
+        ));
+        bridge
+            .0
+            .set_unit_rows(single_player::client_unit_rows(&archives).unwrap());
+    }
+    let palettes = ActPalettes::live(&archives).unwrap();
+    let tiles = TileAssets::new(Some(archives.clone()), Some(palettes.pl2.clone()));
+    add_preview(&mut app, levels, tiles);
+    add_act_palettes(&mut app, palettes);
+    d2_client::app::ui::add_original_ui(&mut app, UiParts::live(archives).unwrap()).unwrap();
+    add_walk(&mut app, tap, speeds);
+
+    step(&mut app, &ms, 20);
+
+    let (npcs, objects): (Vec<u32>, Vec<u32>) = {
+        let w = app.world().resource::<BridgeResource>().0.world();
+        let of = |ty| {
+            w.units
+                .values()
+                .filter(|u| u.key.unit_type == ty)
+                .map(|u| u.class)
+                .collect()
+        };
+        (of(MONSTER), of(OBJECT))
+    };
+    let stats = app.world().resource::<WorldViewState>().last;
+    eprintln!("town monsters {npcs:?}, objects {objects:?}; last frame {stats:?}");
+    assert!(!npcs.is_empty(), "the join sends the town's preset NPCs");
+    assert!(
+        objects.contains(&waypoint),
+        "the town's preset waypoint (object {waypoint}) is sent (S→C 0x51)"
+    );
+    let stats = stats.expect("a frame was drawn");
+    assert!(
+        stats.units_drawn > 1 + npcs.len().min(2),
+        "NPCs and objects drawn beside the player: {stats:?}"
+    );
+}
