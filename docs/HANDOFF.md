@@ -5187,6 +5187,29 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   steps expected).
 - `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
   over a long run (any timer scheduled without a unit; log the caller).
+- `tools/original-hooks.md` OQ1–OQ4 and `tools/original-hooks-spawn.md`
+  OQ1 (probes, area-5 round 2026-10-07): each OQ names its probe
+  (walk injection at `0x0044F136`, forced start 0x67, seed override
+  chains run twice, save-dir breakpoint `0x00534410`, spawn at
+  `0x0052FD1E` with `record_packets.py`).
+- `render/unit-composite.md` OQ4: a monster's first attack after a mode
+  change to a not-yet-loaded mode; log whether a draw happens before the
+  mode's graphics-ready flag is set. Same session, OQ7: a bone prison, a
+  leaping unit and a missile with creation flag 0x100; log the motion
+  record (gfx +0x30, 0x4C bytes) at creation and per update.
+- `sim/units.md` OQ8: leave and re-enter a wilderness area; log the
+  restore order and GUIDs (`0x00542B40`).
+- `render/camera.md` OQ6: client player seed (`unit +0x20`) at frame
+  start and end over a session with cursor movement and weather.
+- `render/draw-order.md` OQ14: a capture with a panel open (any UI or
+  cursor draw between the world passes `0x00456EE0` … `0x00477980`).
+- `render/lighting.md` OQ10: memory read of `[0x0072DA50]` and
+  `[0x0072A348]` at the first in-game draw, with and without a "Light
+  Quality" registry value.
+- `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen)
+  and OQ9 (captures `text-0001`, `text-0002`).
+- `drlg/rooms.md` OQ13 and `drlg/wall-remap.md` OQ1: dump every built
+  room's link chains (five acts) from the original's memory.
 
 ## 8. Lessons (problems met, fixes)
 

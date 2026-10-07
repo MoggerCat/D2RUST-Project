@@ -41,7 +41,7 @@
 | Edge cases & original bugs | 572–589 |
 | Test vectors | 590–615 |
 | Provenance | 616–657 |
-| Open questions | 658–699 |
+| Open questions | 658–702 |
 <!-- /index -->
 
 ## Summary
@@ -679,7 +679,10 @@ the disassembly). Function map (D2MOO 1.10f names as hints):
    versus §9 (unit transfer at tile build) for rooms built before the
    first activation of their map: confirm with a recording that the
    river/navi units reach their rooms.
-4. Meaning of object ids 580–582 (beyond objects.txt) for the spawner
+4. *Answered* in the owner: `world/objects.md` §6 (`0x0054F490`, the
+   handler table `0x00731D28` for classes 574–582: 580 special chest,
+   581 random chest by act, 582 quest-chosen class).
+   Meaning of object ids 580–582 (beyond objects.txt) for the spawner
    (`claude/phase3-monsters`).
 5. The ~94 DS1s that `Patch_D2.mpq` overrides were not re-surveyed
    (no listfile): re-run the size/pops/unit counts with `mpq-tool
