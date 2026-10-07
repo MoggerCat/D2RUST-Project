@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 494–505 |
 | Test vectors | 506–526 |
 | Provenance | 527–553 |
-| Open questions | 554–593 |
+| Open questions | 554–586 |
 <!-- /index -->
 
 ## Summary
@@ -565,17 +565,10 @@ stat points: three spends succeed, the fourth fails, result 2.
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
-<<<<<<< HEAD
-4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
-   byte +1 as the stat and byte +2 as count − 1.
-   *Message part answered* (997e92a): the row is now `stat:u8@1
-   repeat:u8@2` (repeat = count − 1; `0x0054BD10`: stat ≤ 15, count ≤ 100).
-=======
-4. Answered: the handler (`0x0054BD29`–`0x0054BD3E`) reads the u16 at
-   +1 and splits it: low byte = stat, high byte = count − 1 (§2). The
-   `client-messages.tsv` row 0x3A (`stat:u16@1`) belongs to the message
-   worker: it should read `stat:u8@1 count_minus_1:u8@2`.
->>>>>>> origin/claude/spec-skill-area-4
+4. Answered: the handler (`0x0054BD29`–`0x0054BD3E`) reads byte +1 as
+   the stat and byte +2 as count − 1 (§2); `0x0054BD10`: stat ≤ 15,
+   count ≤ 100. `client-messages.tsv` row 0x3A is `stat:u8@1
+   repeat:u8@2` (repeat = count − 1) since 997e92a.
 5. Answered: monster stats at spawn are `monsters/init.md` §6–§9,
    §13 and §19.
 6. Answered: death penalties are §4.6; the stat reset callers are §2.1
