@@ -216,9 +216,9 @@ pub struct HotKey {
 impl HotKey {
     /// An unbound slot.
     ///
-    /// TODO(spec: intents-events.md §8.2 r3.6): a new client record's slot
-    /// contents (save load) are not stated; d2rs starts every slot
-    /// unbound (skill −1, which the join's 0x7B skips).
+    /// PROVISIONAL (intents-events.md §8.2 r3.6; REC-02): a brand-new
+    /// character's client record holds skill −1 in all 16 slots, so the
+    /// join sends no 0x7B.
     pub const UNBOUND: HotKey = HotKey {
         skill: -1,
         left: false,
@@ -508,8 +508,8 @@ pub fn resurrect<W: PlayerWorld>(w: &mut W, p: UnitId) -> u32 {
         w.drop_client(p, DROP_HARDCORE);
         return 0;
     }
-    // TODO(spec: intents-events.md §9 r6): what `0x0053FDF0` does besides
-    // returning 0 is not stated; its value (0) is the warp's argument.
+    // `0x0053FDF0` (§9 rule 6): its whole body is `return 0`; the value
+    // is the warp's last argument.
     let warp_arg = 0;
     // `0x0056DFA0`: the passive states back on.
     for e in w.skill_entries(p) {
@@ -563,9 +563,8 @@ pub fn merc_command<W: PlayerWorld>(
     if w.hireling(p) != Some(m) {
         return 1;
     }
-    // TODO(spec: intents-events.md §9 r8): the command's fields beyond
-    // {command, a, b} (`0x0058EF40`'s other arguments) are not stated;
-    // they are 0.
+    // §9 rule 8: `0x0058EF40` copies five dwords; params 3 and 4 are
+    // uninitialized stack bytes in 1.14d, and d2rs stores 0, 0.
     w.replace_ai_commands(m, [cmd, a, b, 0, 0]);
     w.sound(m, SOUND_MERC_ACK, Some(p));
     0

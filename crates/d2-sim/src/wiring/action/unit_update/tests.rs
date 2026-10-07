@@ -337,3 +337,55 @@ fn unqueued_monster_bits_send_nothing() {
     fx.tick();
     assert_eq!(sent(&mut fx), vec![]);
 }
+
+/// §7.9 rule 3 with §9 rule 3's record: no hover → 0x76; after
+/// `replace_overhead` (text "yo", byte +8 = 4) the overhead chat 0x26
+/// form 5 carries the kept record (a player the receiver has no
+/// relation to).
+// Covers: specs/sim/intents-events.md §7.9 r3, §9 r3
+#[test]
+fn overhead_message_sends_the_kept_record() {
+    let (mut fx, p, _) = setup();
+    let g = guid(&fx, p);
+    fx.sim.sys.units.get_mut(p).unwrap().hover = None;
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.overhead_message(p, p, 0, g);
+    v.replace_overhead(p, b"yo", 4, 77);
+    v.overhead_message(p, p, 0, g);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().hover, Some(77));
+    let gb = g.to_le_bytes();
+    assert_eq!(
+        sent(&mut fx),
+        vec![
+            (p, vec![0x76, 0, gb[0], gb[1], gb[2], gb[3]]),
+            (p, crate::units::messages::overhead_chat(4, 0, g, b"yo")),
+        ]
+    );
+}
+
+/// `tick.md` §3 step 1 with `render/lighting.md` §9.3 rule 5: the act's
+/// record advances once per tick; the 2176th tick reports and the
+/// in-game client of that act gets `53 02000000 80080000 00`.
+// Covers: specs/sim/tick.md §3; specs/render/lighting.md §9.3 r5
+#[test]
+fn environment_report_sends_0x53_to_the_act_s_clients() {
+    let (mut fx, p, _) = setup();
+    let env = |fx: &mut Fx| {
+        let s: Vec<_> = fx.sim.hooks().x.sent.drain(..).collect();
+        s.into_iter()
+            .filter(|(_, m)| m[0] == 0x53)
+            .collect::<Vec<_>>()
+    };
+    for _ in 1..2175 {
+        fx.tick();
+    }
+    assert_eq!(env(&mut fx), vec![]);
+    fx.tick();
+    assert_eq!(
+        env(&mut fx),
+        vec![(p, vec![0x53, 2, 0, 0, 0, 0x80, 0x08, 0, 0, 0])]
+    );
+    let act = fx.game.lists.room(fx.a).unwrap().act;
+    assert_eq!(fx.game.lists.act(act).unwrap().environment.last_hour, 17);
+}
