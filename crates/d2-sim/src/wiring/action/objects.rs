@@ -157,6 +157,14 @@ pub struct ObjectView<'a, X> {
     pub tables: Arc<ObjectTables>,
 }
 
+/// The Chebyshev distance of two units' path positions (sub-tiles), for
+/// [`Pending::object_preview_range`]. d2rs-own, unverified.
+fn preview_distance<X: Pending>(v: &View<'_, X>, a: UnitId, b: UnitId) -> i32 {
+    let (ax, ay) = v.h.path_position(a);
+    let (bx, by) = v.h.path_position(b);
+    (ax - bx).abs().max((ay - by).abs())
+}
+
 /// A shorter-lived [`View`] over the same parts.
 pub fn reborrow<'b, X>(v: &'b mut View<'_, X>) -> View<'b, X> {
     View {
@@ -536,7 +544,25 @@ impl<X: Pending> View<'_, X> {
         if self.units.get(object).map_or(0, |r| r.mode) >= u32::from(objects::MODE_BOUND) {
             return Some(ObjectCase::Code(3));
         }
-        match self.h.x.object_approach(game, player, object) {
+        let reach = match self.h.x.object_preview_range() {
+            Some(r) => {
+                // d2rs-own, unverified: the preview's reach test.
+                let d = {
+                    let (px, py) = self.h.path_position(player);
+                    let (ox, oy) = self.h.path_position(object);
+                    (px - ox).abs().max((py - oy).abs())
+                };
+                if d > 50 {
+                    ObjectReach::TooFar
+                } else if d > r {
+                    ObjectReach::Walk
+                } else {
+                    ObjectReach::Operate
+                }
+            }
+            None => self.h.x.object_approach(game, player, object),
+        };
+        match reach {
             ObjectReach::TooFar => return Some(ObjectCase::Code(1)),
             ObjectReach::Walk => return Some(ObjectCase::Code(0)),
             ObjectReach::Operate => {}
@@ -835,7 +861,10 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         self.v.h.x.object_key_test(player)
     }
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
-        self.v.h.x.object_in_range(self.game, operator, object)
+        match self.v.h.x.object_preview_range() {
+            Some(r) => preview_distance(&self.v, operator, object) <= r,
+            None => self.v.h.x.object_in_range(self.game, operator, object),
+        }
     }
     /// `0x00554100`: the interact info on the player's unit record.
     fn interact_active(&self, player: UnitId) -> bool {

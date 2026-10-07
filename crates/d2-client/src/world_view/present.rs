@@ -56,7 +56,7 @@ use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
-use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
+use super::ui_bind::{run_ui_with, TextAssetLoader, UiQueue, UiRules};
 use super::walk::PreviewWalk;
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
@@ -89,6 +89,8 @@ pub struct WorldViewState {
     pub last: Option<FrameStats>,
     /// The world-click globals (`ui/controls.md` §6).
     pub click: crate::controls::click::ClickState,
+    /// The pending object interact (`object_click`, d2rs-own, unverified).
+    pub objects: super::object_click::ObjectClick,
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
@@ -118,6 +120,7 @@ impl WorldViewState {
                 .expect("VIEW is taller than the uncleared band"),
             last: None,
             click: Default::default(),
+            objects: Default::default(),
             automap: None,
             preview: false,
             preview_error: None,
@@ -596,8 +599,9 @@ fn world_view_frame(
                 }
                 None => (0, None),
             };
-            for o in world_clicks(
+            for o in super::object_click::world_clicks_objects(
                 &mut bridge.0,
+                &mut state.objects,
                 &mut state.click,
                 view,
                 &frame.unhandled,

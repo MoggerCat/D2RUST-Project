@@ -32,6 +32,7 @@ pub mod feed;
 pub mod model_feed;
 pub mod near_rooms;
 pub mod node;
+pub mod object_click;
 pub mod overlay;
 pub mod panel_art;
 pub mod present;

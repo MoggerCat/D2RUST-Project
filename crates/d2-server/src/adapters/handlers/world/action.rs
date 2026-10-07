@@ -160,6 +160,15 @@ where
         )
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        let hooks = events.action().hooks();
+        units
+            .iter()
+            .filter(|&&u| hooks.path_has(u))
+            .map(|&u| (u, hooks.path_position(u)))
+            .collect()
+    }
+
     /// The 0x13 object case on the action wiring's object state
     /// (`ActionSim::operate_object_message`; `None` until
     /// `ActionSim::create_objects` ran). The object calls' host tick is
