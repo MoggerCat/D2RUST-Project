@@ -493,3 +493,21 @@ specs/world/quests-act3-2.md	§11.7 text	record-layout narration
 specs/skills/descriptions.md	§1 r2	pointer: callers of the tables
 specs/skills/descriptions.md	§1 r3	calling convention, no behaviour
 specs/skills/descriptions.md	§1 r4	calling convention, no behaviour
+specs/render/capture.md	§1	recorder configuration in the original game (recorder-side tooling)
+specs/render/capture.md	§2	recorder hooks in the original game (recorder-side tooling)
+specs/render/draw-order.md	§5 r2	note: not in the reference renderer, no behaviour
+specs/render/lighting.md	§2 r4	pointer to §5
+specs/render/overlay.md	§5	table of create call sites (other specs)
+specs/render/unit-composite.md	§1 text	narration
+specs/render/unit-composite.md	§3 text	narration
+specs/render/unit-composite.md	§8 text	narration
+specs/ui/panels.md	§6 r3	pointer to Open questions 1
+specs/ui/panels.md	§7 r4	pointer to Open questions 1
+specs/ui/panels.md	§9 r1	table naming what other rules draw
+specs/ui/panels.md	§9 r6	draw-order narration of other rules
+specs/ui/panels.md	§9 r7	pointer to §15 and the items spec
+specs/ui/panels.md	§9 r8	pointer to panels-2 §18
+specs/ui/panels.md	§10 r7	pointer to Open questions 4
+specs/ui/panels.md	§10 r9	pointer to panels-2 §19
+specs/ui/panels.md	§11 r6	pointer to panels-2 §21
+specs/ui/panels.md	§13 r8	pointer to menus.md §1

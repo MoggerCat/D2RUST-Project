@@ -42,6 +42,8 @@ mod tests;
 #[cfg(test)]
 mod tests_c2skills;
 #[cfg(test)]
+mod tests_c2ui;
+#[cfg(test)]
 mod tests_fdesc;
 
 pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};

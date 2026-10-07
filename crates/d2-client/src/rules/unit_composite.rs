@@ -519,6 +519,24 @@ pub fn unit_direction(
     })
 }
 
+/// Where a unit's `dir64` comes from (§3 r1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirSource {
+    /// Dynamic path direction (`0x006487F0`): types 0, 1, 3.
+    DynamicPath,
+    /// Static path +0x1C byte (`0x00620100`): types 2, 4.
+    StaticPathByte,
+}
+
+/// §3 r1: the `dir64` source by unit type.
+pub fn dir_source(unit_type: u32) -> Option<DirSource> {
+    match unit_type {
+        0 | 1 | 3 => Some(DirSource::DynamicPath),
+        2 | 4 => Some(DirSource::StaticPathByte),
+        _ => None,
+    }
+}
+
 /// The frame index of a unit frame counter (unit +0x44, 8.8 fixed point,
 /// §3 r2).
 pub fn frame_index(frame_counter: u32) -> usize {
@@ -1320,3 +1338,7 @@ pub fn flippy_file(own: &str, quality: u8, unique: Option<&str>, set: Option<&st
 #[cfg(test)]
 #[path = "unit_composite_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "unit_composite_c2ui_tests.rs"]
+mod tests_c2ui;

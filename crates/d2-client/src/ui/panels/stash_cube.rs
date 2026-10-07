@@ -427,7 +427,8 @@ mod tests {
         );
     }
 
-    // Partial: §12 r3 (art and buttons; the grid is ui/inventory.md).
+    // Covers: specs/ui/panels.md §12 r3
+    // (art and buttons; the grid is ui/inventory.md).
     #[test]
     fn cube_draw_buttons() {
         let t = PanelTables::load().unwrap();
