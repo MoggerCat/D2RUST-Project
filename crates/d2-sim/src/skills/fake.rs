@@ -113,6 +113,9 @@ pub struct Fake {
     pub log: Vec<String>,
     /// The (attacker, defender, result) of every `reaction` call.
     pub reactions: Vec<(usize, usize, u16)>,
+    /// Per-unit override of the monster type flags (`monster_flag`); a
+    /// unit without an entry uses its `flags`.
+    pub mflags: BTreeMap<usize, u32>,
 }
 
 impl Fake {
@@ -242,7 +245,7 @@ impl CombatWorld for Fake {
         self.units[u].moving
     }
     fn monster_flag(&self, u: usize, mask: u32) -> bool {
-        self.units[u].flags & mask != 0
+        self.mflags.get(&u).copied().unwrap_or(self.units[u].flags) & mask != 0
     }
     fn is_boss(&self, u: usize) -> bool {
         self.units[u].boss

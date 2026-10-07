@@ -107,6 +107,8 @@ pub struct BodyFake {
     pub components: BTreeMap<(usize, usize), i32>,
     /// Item stats read by `item_stat_of` (default 0).
     pub item_stats: BTreeMap<(usize, u16), i32>,
+    /// `inventory_busy` answers this.
+    pub busy: bool,
 }
 
 impl BodyFake {
@@ -663,6 +665,12 @@ impl BodyWorld for BodyFake {
     }
     fn path_op(&mut self, u: usize, op: PathOp<usize>) -> i32 {
         self.log(format!("path {u} {op:?}"));
+        if let PathOp::TargetUnit(t) = op {
+            match t {
+                Some(t) => self.targets.insert(u, t),
+                None => self.targets.remove(&u),
+            };
+        }
         i32::from(op == PathOp::Compute)
     }
     fn monlvl(&self) -> &[Monlvl] {
@@ -842,7 +850,7 @@ impl BodyWorld for BodyFake {
         (self.c.unit_type(u) == UnitType::Item).then_some(self.c.units[u].class as usize)
     }
     fn inventory_busy(&self, _: usize) -> bool {
-        false
+        self.busy
     }
     fn has_inventory(&self, _: usize) -> bool {
         self.inventory

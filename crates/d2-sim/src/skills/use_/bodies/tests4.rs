@@ -1315,3 +1315,514 @@ fn jab_of_a_monster_sets_the_s1_damage() {
     assert_eq!(b3_lvl01::jab(&mut f, &t, &ct, m, 1, 1), 1);
     assert_eq!(stats3(&f, l), (50, 60, 120), "mode_damage(unit, 8)");
 }
+
+// ---------------------------------------------------------------- §4
+
+/// Static Field record: lightning, 50 %, floor 512, range 10.
+fn static_rec(c: &mut Code) -> d2_data::tables::Skills {
+    let mut r = body_rec();
+    r.calc1 = c.f(50);
+    r.calc2 = c.f(512);
+    r.aurarangecalc = c.f(10);
+    r.aurafilter = 0x8783;
+    r.etype = 2;
+    r
+}
+
+fn static_world(life: &[i32]) -> (BodyFake, usize, Vec<usize>) {
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    f.c.in_range = true;
+    let ms: Vec<usize> = life
+        .iter()
+        .enumerate()
+        .map(|(i, &l)| {
+            let m = monster(&mut f, (1 + i as i32, 0));
+            f.c.units[m].flags = 0xC;
+            f.c.set(m, 6, l);
+            f.c.set(m, 7, 1000 << 8);
+            m
+        })
+        .collect();
+    f.scan = ms.clone();
+    (f, u, ms)
+}
+
+// Covers: specs/skills/bodies-2.md §4.1 text, §4.1 r1, §4.1 r2, §4.1 r3
+#[test]
+fn static_field_takes_a_percentage_of_the_current_life() {
+    let mut c = Code::new();
+    let r = static_rec(&mut c);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    // h = 100: v = 50 % = 50 → 50 << 8 = 12800. h = 3: v = 3 would leave
+    // 0, so v = h − 1 = 2 → 512 (also the floor). h = 1: v = 0 → the floor
+    // 512 kills. h = 0 (life 100 < 256): skipped, untouched.
+    let (mut f, u, ms) = static_world(&[100 << 8, 3 << 8, 300, 100]);
+    assert_eq!(b3_lvl06::static_field(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.get(ms[0], 6), 100 * 256 - 12800);
+    assert_eq!(f.c.get(ms[1], 6), 256, "h − v < 1: v = h − 1");
+    assert_eq!(f.c.get(ms[2], 6), 0, "v below the floor is raised to it");
+    assert_eq!(f.c.get(ms[3], 6), 100, "h < 1: skipped");
+    assert!(f.c.reactions.iter().any(|&(a, d, _)| (a, d) == (u, ms[0])));
+    assert!(
+        !f.c.reactions.iter().any(|&(_, d, _)| d == ms[3]),
+        "no reaction for the skipped unit"
+    );
+    let res = f.c.reactions.iter().find(|r| r.1 == ms[0]).unwrap().2;
+    assert_eq!(res & 0x4001, 0x4001, "result 0x4001");
+    // A negative resistance does not raise the damage (pre-divided).
+    let (mut f, u, ms) = static_world(&[100 << 8]);
+    f.c.set(ms[0], 41, -50);
+    b3_lvl06::static_field(&mut f, &t, &ct, u, 1, 1);
+    let dealt = 100 * 256 - f.c.get(ms[0], 6);
+    assert!((12798..=12800).contains(&dealt), "dealt {dealt}");
+    // Classic: no cap. Expansion: units with h ≤ pct(max, StaticFieldMin)
+    // are skipped.
+    let mut ct2 = ct.clone();
+    ct2.difficultylevels[0].staticfieldmin = 25;
+    let (mut f, u, ms) = static_world(&[200 << 8, 300 << 8]);
+    b3_lvl06::static_field(&mut f, &t, &ct2, u, 1, 1);
+    assert!(f.c.get(ms[0], 6) < 200 << 8, "classic: cap 0");
+    let (mut f, u, ms) = static_world(&[200 << 8, 300 << 8]);
+    f.c.expansion = true;
+    b3_lvl06::static_field(&mut f, &t, &ct2, u, 1, 1);
+    assert_eq!(f.c.get(ms[0], 6), 200 << 8, "h = 200 ≤ 25 % of 1000");
+    assert!(f.c.get(ms[1], 6) < 300 << 8, "h = 300 > 250");
+    // R invalid: 0.
+    assert_eq!(b3_lvl06::static_field(&mut f, &t, &ct, u, 99, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §4.2 r1, §4.2 r2, §4.2 r3
+#[test]
+fn telekinesis_by_target_type() {
+    let mut r = body_rec();
+    r.mindam = 2;
+    r.maxdam = 2;
+    r.hitshift = 8;
+    r.param2 = 100;
+    r.resultflags = 0x20;
+    r.hitflags = 0x10;
+    r.hitclass = 3;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let m = monster(&mut f, (3, 3));
+    f.c.hostile = true;
+    f.targets.insert(u, m);
+    f.c.set(m, 6, 10_000);
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // Param2 = 100: always knockback; | ResultFlags; the damage is applied.
+    let (_, _, res) = *f.c.reactions.last().unwrap();
+    assert_eq!(res & 0x29, 0x29);
+    assert_eq!(f.c.get(m, 6), 10_000 - 512);
+    // Param2 = 0: no knockback (the draw is still made).
+    let mut r = body_rec();
+    r.param2 = 0;
+    let t0 = tabs(r, Code::new(), 1);
+    let seed0 = f.c.units[u].seed;
+    b3_lvl06::telekinesis(&mut f, &t0, &ct, u, 1, 1);
+    assert_ne!(f.c.units[u].seed, seed0);
+    assert_eq!(f.c.reactions.last().unwrap().2 & 8, 0);
+    // Not hostile / town: 0 (after the 0x40 flag).
+    f.c.units[u].flags = 0;
+    f.c.hostile = false;
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    f.c.hostile = true;
+    f.room_of.insert(m, 2);
+    f.town.insert(2);
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 0);
+    f.town.clear();
+    // An object: operate. An item of type 22: pickup; another: sound 0x13.
+    let o = f.add(FUnit::new(UnitType::Object, 0), (4, 4));
+    f.targets.insert(u, o);
+    f.take_log();
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(
+        f.take_log(),
+        [format!("OperateObject {{ u: {u}, object: {o} }}")]
+    );
+    let scroll = f.c.add_item(FItem {
+        types: vec![22],
+        ..FItem::default()
+    });
+    let sword = f.c.add_item(FItem {
+        types: vec![3],
+        ..FItem::default()
+    });
+    let i1 = f.add(FUnit::new(UnitType::Item, scroll as i32), (5, 5));
+    let i2 = f.add(FUnit::new(UnitType::Item, sword as i32), (5, 5));
+    f.targets.insert(u, i1);
+    b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(
+        f.take_log(),
+        [format!("AutoPickup {{ u: {u}, item: {i1} }}")]
+    );
+    f.targets.insert(u, i2);
+    b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.take_log(), [format!("Sound {{ u: {u}, id: 19 }}")]);
+    // A missile target: 1, nothing. Busy / T none / a monster caster: 0.
+    let ms = f.add(FUnit::new(UnitType::Missile, 0), (6, 6));
+    f.targets.insert(u, ms);
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 1);
+    f.busy = true;
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 0);
+    f.busy = false;
+    f.targets.clear();
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.insert(m, u);
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, m, 1, 1), 0);
+    assert_eq!(b3_lvl06::telekinesis(&mut f, &t, &ct, u, 99, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §4.3 r1, §4.3 r2, §4.3 r3, §4.3 r4, §4.4
+#[test]
+fn poison_dagger_start_and_do() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(30);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m) = hit_world();
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    f.c.units[u].mode = 0;
+    assert_eq!(b3_lvl06::poison_dagger_start(&mut f, &t, &ct, u, 1, 1), 1);
+    let rec = stored_record(&f, u, m).expect("start_combat stored");
+    assert_eq!((rec.result & 1, rec.enh_pct), (1, 30));
+    assert_eq!(rec.conv_pct, 0, "no EType: no conversion");
+    // T none, T in town, R invalid: 0.
+    assert_eq!(b3_lvl06::poison_dagger_start(&mut f, &t, &ct, u, 99, 1), 0);
+    f.room_of.insert(m, 2);
+    f.town.insert(2);
+    assert_eq!(b3_lvl06::poison_dagger_start(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.clear();
+    assert_eq!(b3_lvl06::poison_dagger_start(&mut f, &t, &ct, u, 1, 1), 0);
+    // The do: flag 0x40, T none → 0 (flag set), else apply_melee → 1.
+    let (mut f, u, m) = hit_world();
+    f.c.set(m, 6, 10_000);
+    let rec = DamageRecord {
+        result: 1,
+        physical: 512,
+        total: 512,
+        ..DamageRecord::default()
+    };
+    super::fake::stored(&mut f, u, m, rec);
+    assert_eq!(b3_lvl06::poison_dagger(&mut f, &ct, u), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f.c.units[u].combat.is_empty(), "applied and freed");
+    assert!(f.c.get(m, 6) < 10_000);
+    f.targets.clear();
+    f.c.units[u].flags = 0;
+    assert_eq!(b3_lvl06::poison_dagger(&mut f, &ct, u), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "flag set first");
+}
+
+// Covers: specs/skills/bodies-2.md §4.6 r1, §4.6 r2, §4.6 r3, §4.6 r4, §4.6 r5, §4.6 r6
+#[test]
+fn leap_start_player_reserves_the_landing() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurarangecalc = c.f(10);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let e = f.c.units[u].used.unwrap();
+    // No target position: 0.
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 1, 1), 0);
+    f.tpos.insert(u, (5, 5));
+    f.free_shift = Some((0, 0));
+    f.take_log();
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("PatternStamp") && s.contains("mask: 128")));
+    assert!(f.c.has_state(u, 54), "uninterruptable");
+    assert!(f.c.has_state(u, 18), "skill_move");
+    assert_eq!((f.entry_param(u, &e, 1), f.entry_param(u, &e, 2)), (5, 5));
+    assert_eq!(f.entry_flags(u, &e), 0x80);
+    // The room test fails (no room at the point): 0. The clamp fails: 0.
+    f.point_rooms.insert((5, 5), None);
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 1, 1), 0);
+    f.point_rooms.clear();
+    f.free_shift = None;
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 1, 1), 0);
+    // R invalid / E none: 0.
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 99, 1), 0);
+    f.c.units[u].used = None;
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §4.6 r3
+#[test]
+fn leap_start_monster_jumps_beyond_the_target() {
+    let mut r = body_rec();
+    r.intown = true;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, _p) = world();
+    let m = monster(&mut f, (10, 10));
+    let tg = monster(&mut f, (14, 12));
+    let e = SkillEntry {
+        skill: 1,
+        base: 1,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    };
+    f.c.units[m].used = Some(e);
+    f.c.units[m].skills.push(e);
+    f.targets.insert(m, tg);
+    f.free_shift = Some((0, 0));
+    f.c.hostile = true;
+    f.c.in_range = true;
+    f.c.set(m, 12, 1);
+    f.c.set(tg, 12, 1);
+    f.take_log();
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, m, 1, 1), 1);
+    // (x, y) = 2·T − the unit = (18, 14); params 1–4 and flags 0x80.
+    assert_eq!((f.entry_param(m, &e, 1), f.entry_param(m, &e, 2)), (18, 14));
+    assert_eq!(f.entry_param(m, &e, 3), 1, "T type (monster)");
+    assert_eq!(f.entry_param(m, &e, 4), f.c.units[tg].guid as i32);
+    assert_eq!(f.entry_flags(m, &e), 0x80);
+    // No free point: the used skill is cleared, 0.
+    f.free_shift = None;
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, m, 1, 1), 0);
+    assert!(f.take_log().contains(&format!("used {m} None")));
+    // T none and no target position: used skill none, 0. With a position:
+    // E param 4 := −1.
+    f.c.units[m].used = Some(e);
+    f.targets.clear();
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, m, 1, 1), 0);
+    assert!(f.take_log().contains(&format!("used {m} None")));
+    f.c.units[m].used = Some(e);
+    f.tpos.insert(m, (30, 30));
+    f.free_shift = Some((0, 0));
+    assert_eq!(b3_lvl06::leap_start(&mut f, &t, &ct, m, 1, 1), 1);
+    assert_eq!(f.entry_param(m, &e, 4), -1);
+    assert_eq!((f.entry_param(m, &e, 1), f.entry_param(m, &e, 2)), (30, 30));
+}
+
+// Covers: specs/skills/bodies-2.md §4.7 text, §4.7 r1, §4.7 r2, §4.7 r3
+#[test]
+fn leap_do_by_phase() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(10);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    let e = f.c.units[u].used.unwrap();
+    f.c.hostile = true;
+    let m = monster(&mut f, (3, 0));
+    f.c.units[m].flags = 0xC;
+    f.scan = vec![m];
+    // In flight and landing at the unit's position: landed, area damage.
+    f.set_entry_flags(u, &e, 0x1101);
+    f.set_entry_param_of(u, &e, 1, 0);
+    f.set_entry_param_of(u, &e, 2, 0);
+    f.take_log();
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    assert!(log.contains(&format!("deltimers {u} 1 0")), "type-1 timers");
+    assert_eq!(f.entry_flags(u, &e), 0x200, "landed");
+    assert!(
+        log.contains(&format!("reaction {u} {m}")),
+        "area damage reached the unit within calc1: {log:?}"
+    );
+    // Launch (0x80): the launch result (a path exists → 1; E flags 0x1101).
+    f.set_entry_flags(u, &e, 0x80);
+    f.set_entry_param_of(u, &e, 1, 9);
+    f.set_entry_param_of(u, &e, 2, 9);
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.entry_flags(u, &e), 0x1101);
+    // Otherwise a player's flags are cleared; return 1.
+    f.set_entry_flags(u, &e, 0x200);
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.entry_flags(u, &e), 0);
+    // Not yet landed in flight: 1 without area damage.
+    f.set_entry_flags(u, &e, 0x1101);
+    f.pos.insert(u, (1, 1));
+    f.take_log();
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(!f.take_log().iter().any(|s| s.starts_with("reaction")));
+    // R invalid / no entry: 0.
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 99, 1), 0);
+    f.c.units[u].skills.clear();
+    assert_eq!(b3_lvl06::leap(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §4.8 text, §4.8 r1, §4.8 r2, §4.8 r3, §4.8 r4
+#[test]
+fn double_swing_switches_target_on_odd_events() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m1) = hit_world();
+    let m2 = monster(&mut f, (2, 0));
+    for x in [m1, m2] {
+        f.c.units[x].flags = 0xC;
+        f.c.set(x, 12, 1);
+    }
+    f.scan = vec![m1, m2];
+    f.c.units[u].mode = 0; // keeps the entries after apply_melee
+                           // Even event: no flag change, the swing is at T.
+    f.frame_index.insert(u, 0);
+    assert_eq!(b3_lvl06::double_swing(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert!(stored_record(&f, u, m1).is_some());
+    assert!(stored_record(&f, u, m2).is_none());
+    // Odd event: flag 0x40, the next unit by GUID, path target := it.
+    f.c.units[u].combat.clear();
+    f.frame_index.insert(u, 1);
+    f.take_log();
+    assert_eq!(b3_lvl06::double_swing(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f
+        .take_log()
+        .contains(&format!("path {u} TargetUnit(Some({m2}))")));
+    assert!(stored_record(&f, u, m2).is_some());
+    // Odd event with nobody else in range: the next unit wraps to the
+    // smallest GUID above … only T itself remains → T itself is taken.
+    f.scan = vec![];
+    f.c.units[u].flags = 0;
+    assert_eq!(b3_lvl06::double_swing(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "set before the lookup");
+    // T none: 0.
+    f.targets.clear();
+    assert_eq!(b3_lvl06::double_swing(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// ---------------------------------------------------------------- §4.9
+
+fn taunt_world() -> (BodyFake, SkillTables, CombatTables, usize, usize) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.auratargetstate = 27;
+    r.auralencalc = c.f(100);
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.switchai = true;
+    let mut ct = combat_tables(vec![ms]);
+    ct.monstats2[0].isatt = true;
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    let m = monster(&mut f, (3, 0));
+    f.c.units[m].flags = 0xE; // scan / curse unit flags …
+    f.c.mflags.insert(m, 0); // … but no unique / super unique type flags
+    f.c.set(m, 12, 1);
+    f.targets.insert(u, m);
+    f.scan = vec![m];
+    (f, t, ct, u, m)
+}
+
+// Covers: specs/skills/bodies-2.md §4.9 text, §4.9 r1, §4.9 r2, §4.9 r3, §4.9 r4, §4.9 r5, §4.9 r6, §4.9 r7
+#[test]
+fn taunt_curses_and_retargets() {
+    let (mut f, t, ct, u, m) = taunt_world();
+    f.c.frame = 700;
+    f.take_log();
+    assert_eq!(b3_lvl06::taunt(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    // The curse unit callback: AI state 12 for state 27; state list.
+    assert!(log.contains(&format!("ai {m} 12")), "{log:?}");
+    let l = f.state_list(m, 27).expect("taunt state list");
+    assert_eq!(f.lists[l].callback, callback::AI_CURSE);
+    // AI params unchanged, leash owner none, type-2 timers, path target.
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("AiParams") && s.contains("-666")));
+    assert!(log.iter().any(|s| s.starts_with("LeashOwner")));
+    assert!(log.contains(&format!("deltimers {m} 2 0")));
+    assert!(log.contains(&format!("schedule {m} 2 701 0 0")));
+    assert!(log.contains(&format!("path {m} TargetUnit(Some({u}))")));
+    // A target that fails the taunt test (not a monster) falls back to the
+    // nearest accepted monster within 20.
+    let (mut f, t, ct, u, m) = taunt_world();
+    let p = f.add(FUnit::new(UnitType::Player, 0), (1, 0));
+    f.targets.insert(u, p);
+    f.scan = vec![p, m];
+    assert_eq!(b3_lvl06::taunt(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.state_list(m, 27).is_some(), "the nearest monster");
+    assert!(f.state_list(p, 27).is_none());
+    // Nothing to taunt: 0. State out of range: 0. R invalid: 0.
+    f.scan.clear();
+    f.targets.clear();
+    assert_eq!(b3_lvl06::taunt(&mut f, &t, &ct, u, 1, 1), 0);
+    let mut r = body_rec();
+    r.auratargetstate = 200;
+    let t200 = tabs(r, Code::new(), 1);
+    assert_eq!(b3_lvl06::taunt(&mut f, &t200, &ct, u, 1, 1), 0);
+    assert_eq!(b3_lvl06::taunt(&mut f, &t, &ct, u, 99, 1), 0);
+}
+
+// ---------------------------------------------------------------- §4.11
+
+// Covers: specs/skills/bodies-2.md §4.11 r1, §4.11 r2, §4.11 r3, §4.11 r4, §4.11 r5, §4.11 r6, §4.11 r7, §4.11 r8
+#[test]
+fn blade_sentinel_is_placed_and_commanded() {
+    let mut r = body_rec();
+    r.summon = 0;
+    r.summode = 1;
+    let t = tabs(r, Code::new(), 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u) = world();
+    f.pos.insert(u, (6, 8));
+    f.c.set(u, 12, 17);
+    f.tpos.insert(u, (20, 21));
+    f.c.frame = 300;
+    f.take_log();
+    assert_eq!(b3_lvl06::blade_sentinel(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    let log = f.take_log();
+    let m = 1; // the spawned sentinel
+    assert_eq!(f.c.get(m, 12), 17, "base level := the unit's level");
+    assert!(log.contains(&format!("place {m} Some(1) (6, 8)")));
+    assert!(
+        log.contains(&format!(
+            "AiCommand {{ m: {m}, kind: 0, x: 6, y: 8, tx: 20, ty: 21 }}"
+        )),
+        "{log:?}"
+    );
+    assert!(log.contains(&format!("deltimers {m} 2 0")));
+    assert!(log.contains(&format!("schedule {m} 2 301 0 0")));
+    assert_eq!(f.c.units[m].flags & 0x8, 0, "flags &= ~0x8");
+    // No target position: 0 after the flag. No summon class: 0 before.
+    f.c.units[u].flags = 0;
+    f.tpos.clear();
+    assert_eq!(b3_lvl06::blade_sentinel(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    f.c.units[u].flags = 0;
+    let mut r = body_rec();
+    r.summon = 0xFFFF;
+    let tn = tabs(r, Code::new(), 1);
+    assert_eq!(b3_lvl06::blade_sentinel(&mut f, &tn, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert_eq!(b3_lvl06::blade_sentinel(&mut f, &t, &ct, u, 99, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2.md §4.12, §4.13 r1, §4.13 r2, §4.13 r3, §4.13 r4
+#[test]
+fn dragon_claw_start_and_do() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.calc1 = c.f(35);
+    let t = tabs(r, c, 1);
+    let ct = combat_tables(vec![monster_rec()]);
+    let (mut f, u, m) = hit_world();
+    assert_eq!(b3_lvl06::dragon_claw_start(&mut f, u), 1);
+    f.c.units[u].mode = 0;
+    f.c.units[u].seed = hit_seed(&f, &t, &ct, u, m);
+    f.frame_index.insert(u, 1);
+    assert_eq!(b3_lvl06::dragon_claw(&mut f, &t, &ct, u, 1, 1), 1);
+    let rec = stored_record(&f, u, m).expect("claw entry");
+    assert_eq!(rec.enh_pct, 35, "claw_hit");
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "odd event: flag set");
+    f.frame_index.insert(u, 2);
+    f.c.units[u].combat.clear();
+    b3_lvl06::dragon_claw(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0, "even event: flag cleared");
+    f.targets.clear();
+    assert_eq!(b3_lvl06::dragon_claw_start(&mut f, u), 0);
+    assert_eq!(b3_lvl06::dragon_claw(&mut f, &t, &ct, u, 1, 1), 0);
+}
