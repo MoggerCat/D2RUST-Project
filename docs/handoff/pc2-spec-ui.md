@@ -33,15 +33,26 @@ was at the 60 KB limit).
 | UP-27 rest (color of an unknown selected row) | `panels.md` §13.5 | Always 5: the row hit skips unknown rows, so they are never pressed; 3 = pressed row (close not pressed) or current level. |
 | `panels.md` OQ 7 | `menus.md` §1 | Answered (marked in place). |
 | `panels.md` OQ 4, OQ 8 | §10.3, §10.6; `menus.md` §2–§3 | Partly answered (marked in place). |
+| UP-6 (0 points, damage block, name / class, hovers) | `panels-2.md` §17 | 0 points: nothing drawn, presses nothing; mouse-up stops at the first hit button (corrects §8.5); class line (charstats +0) and name line (font by UTF-8 length); damage block `0x004ED570` entries `0x0072D840`; chance-to-hit / to-be-hit formulas and popups (`0x004A7340`, `0x004A74A0`, `0x004A7AE0`, `0x004A7180`); descdam / descatt functions left to a skills spec (`panels-2.md` OQ 1). |
+| UP-7 | `panels-2.md` §18.1, §18.4 | Yes, `0x00486EF0` clears `[0x007BCE90]` first; inv_* rows not added (slot rectangles, grammar cannot name them; §9.4 is the source). |
+| UP-8 | `panels-2.md` §18.2 | Right edge exclusive, bottom **inclusive** in all 10 copies of the test. |
+| UP-10 | `panels-2.md` §20.1–§20.3 | Stash close press / release strict, hover inclusive; stash gold, cube close, transmute rectangles. |
+| UP-14 rest | `panels-2.md` §14.10 | `0x004B5640` on the transaction result in menu state 10: Cain records 16–19, 38 count := 2, rebuild. |
+| UP-15 rest | `panels-2.md` §14.9 | Talk option sends nothing; 0x2F [type][GUID], 0x30 [1][GUID] / [a4][GUID], 0x31 [GUID][msg id]. |
+| UP-16 | `panels-2.md` §14.7, §14.8 | First record wins, unknown class → record 0; flag byte = reopen the menu after talking. |
+| UP-17 | `panels-2.md` §14.11–§14.13 | Button records per NPC class, mode always 3, `0x004B3500` always 0, tab pages / delay, tab and button hit rects. |
+| UP-21, UP-22, UP-23 | `panels-2.md` §19 | No-points 0x3C [skill][−1] + close; free-points number; tab tool tips (left-aligned bug); press / release order, points re-checked; draw order. |
+| `panels.md` OQ 11, 12, 13 | `panels.md` OQ; `panels-2.md` §17.10, §20.4 | Mode 3 = additive (blend-modes §1); draw order; cube-gone close sends **two** 0x4F 0x17. |
+| `menus.md` OQ 1, 2, 3 | `menus.md` §3.5, §4.4, §4.5 | Hire row text; confirm dialog; click callers (wParam = flags, Shift → 0x32 bit 31 on quick paths). |
+| Split | `panels.md` §14 → `panels-2.md` §14 | panels.md 61.0 → 58.9 KB; §14 had no coverage claims. |
 
 ## Still open
 
-- UP-6 (add buttons with 0 points; damage block, name / class, hovers): no new read (`panels.md` OQ 3).
-- UP-7, UP-8, UP-9, UP-10, UP-16, UP-17, UP-21, UP-22, UP-23, UP-28: not reached in this pass.
-- UP-14 rest: Cain's count reset `0x004B5640` (note: `0x004B4830` itself rewrites the identify record's count to 2 / 3, `menus.md` §2.3).
-- UP-15 rest: talk message bytes (`0x004B6C70` sends nothing; it opens the talk sub-menu `0x004B5890`; the 0x2F / 0x30 senders are `0x004B6E87` / `0x004B6E45`).
-- UP-19 rest: remap `k` per state (`panels.md` OQ 4, capture).
-- New: `panels.md` OQ 11 (mode 3 pixels of the transmute), OQ 12 (value overflow / draw order), OQ 13 (cube-gone close: one or two 0x4F 0x17); `menus.md` OQ 1 (hire row text), OQ 2 (confirm dialog `0x004B2F50`), OQ 3 (callers' flags), OQ 4 (captures).
+- UP-9 (GoldMax font): the stash path sets no font; which font is current needs a read of every font setter before it or a capture (`panels-2.md` §20.5, OQ 4).
+- UP-19 rest: remap `k` per state (capture).
+- UP-28 (control panel overlays): not reached; needs its own spec (`ui/control-panel.md`).
+- `panels-2.md` OQ 1 (descdam / descatt functions), OQ 2 (skill-tree tab captions), OQ 3 (result note caption), OQ 5 (button fields +0x0A, +0x10).
+- `panels.md` OQ 8 rest (runtime inserts), `menus.md` OQ 4 (captures).
 
 ## CODE-TABLE CHANGE commits
 
@@ -50,12 +61,19 @@ None (no TSV changed; the per-class close offsets are prose, the
 
 ## Cross-file requests
 
+- to PC 1 (`ui/text.md`): the wide formatter `0x005269D0` takes one argument for every conversion, `%%` included (caller `0x004A7180` passes (block, chance, name, chance) for "%d%%
+… %s … %d%%"); only `%d`, `%u`, `%s`, `%%` are handled (others fatal). Add as a rule.
+- to PC 1 (skills description spec): `panels-2.md` OQ 1, the `descdam` / `descatt` function tables `0x0072D768` / `0x0072D7F8` drawn by the character panel `0x004ED570`.
+- to PC 1 (`d2-client::ui::panels`): `panels.md` §14 moved to `panels-2.md` §14 (numbers unchanged); `panels.md` §8.5 / §9.3 corrected (release order, no cursor-item action); new §17–§20.
+
 - to PC 1 (`crates/d2-client/tests/game_panels.rs`, C71): `menu\horadric` must not be held to zero offsets: expect frames 0 and 30 = 2 × 2 at (0, 0), frame 1 = 92 × 121 at (−205, 17), frame 15 = 239 × 255 at (−280, 82) (`ui/panels.md` §12.4, §Test vectors); then rerun C71 so the 7 `skltree_?_back` counts are reached.
 - to PC 1 (`d2-client::ui::panels` impl, `impl-ui-panels.md`): `panels.md` §8.7 changed: level (12) uses the cmp color and `%ld`, not the grouping; skill-tree close offsets for all classes (§10.6); cube close and waypoint input now specified (`panels.md` §12.7, `menus.md` §1).
 - to PC 2 vendors (`world/vendors.md` §7.1): the 1.14d client puts the item's mode (unit +0x10) in bits 16–31 of the 0x32 u32 @9 (`0x004B2760`–`0x004B2763`); with store items in mode 0 the bytes are 0, but the "unused (bits 16–30)" wording should say what the client writes. §8.1: the client's 0x35 one-item u32 @13 is the item's stat 72 value (`0x004B27F1`), so bit 31 is clear unless durability ≥ 2³¹.
 - to PC 2 npc / hirelings (`world/npc.md` §4): the client sends 0x38 action 3 when the NPC menu opens for classes 252, 198, 515, 150, with the player's GUID (−1 without a player) in the u32 @9 (`0x004B48C9`–`0x004B48E8`); 0x36 merc id is sent as a u32 (u16 zero-extended, `0x004B1E94`).
 
 ## Recording list
+
+- Stash open at 800 × 600, expansion and classic: the `GoldMax` line, to identify its font (`panels-2.md` OQ 4).
 
 - Transmute in the Horadric Cube at 800 × 600 and 640 × 480: frames with
   animation steps 1, 15, 29 and the step after 29 (no frame), to prove

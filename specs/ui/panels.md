@@ -21,37 +21,38 @@
   0x4C, 0x4F 0x17/0x18), `world/waypoints.md` (0x49, S→C 0x63),
   `combat/vitals.md` §2 (0x3A), `skills/levels.md` §6.4 (0x3B),
   `sim/client-messages.tsv` (layouts). Machine tables: `ui-states.tsv`,
-  `panel-layout.tsv`, `npc-menus.tsv` (this spec, §16).
+  `panel-layout.tsv`, `npc-menus.tsv` (this spec, §16). Continued in
+  `ui/panels-2.md` (§14, §17–§20).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–73 |
-| Inputs | 74–86 |
-| Outputs / state changes | 87–91 |
-| Rules | 92–93 |
-|   1. Screen layout model | 94–130 |
-|   2. UI states and the open/close call | 131–170 |
-|   3. The conflict gate (`0x00453910`) | 171–199 |
-|   4. Slots, open mode and the view shift | 200–251 |
-|   5. UI pass order (`0x00456EE0`) | 252–291 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 292–312 |
-|   7. Shared panel parts | 313–330 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 331–430 |
-|   9. Inventory panel family (`0x0048EDF0`) | 431–485 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 486–546 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 547–581 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 582–630 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 631–683 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 684–752 |
-|   15. Event → intent summary | 753–780 |
-|   16. Machine tables | 781–815 |
-| Constants & data dependencies | 816–836 |
-| Randomness | 837–841 |
-| Edge cases & original bugs | 842–862 |
-| Test vectors | 863–901 |
-| Provenance | 902–942 |
-| Open questions | 943–1001 |
+| Summary | 58–74 |
+| Inputs | 75–87 |
+| Outputs / state changes | 88–92 |
+| Rules | 93–94 |
+|   1. Screen layout model | 95–131 |
+|   2. UI states and the open/close call | 132–171 |
+|   3. The conflict gate (`0x00453910`) | 172–200 |
+|   4. Slots, open mode and the view shift | 201–252 |
+|   5. UI pass order (`0x00456EE0`) | 253–292 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 293–313 |
+|   7. Shared panel parts | 314–331 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 332–434 |
+|   9. Inventory panel family (`0x0048EDF0`) | 435–491 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 492–554 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 555–590 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 591–641 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 642–694 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 695–700 |
+|   15. Event → intent summary | 701–728 |
+|   16. Machine tables | 729–763 |
+| Constants & data dependencies | 764–784 |
+| Randomness | 785–789 |
+| Edge cases & original bugs | 790–810 |
+| Test vectors | 811–849 |
+| Provenance | 850–890 |
+| Open questions | 891–957 |
 <!-- /index -->
 
 ## Summary
@@ -358,7 +359,8 @@ after both.
    (strict). Mouse down there (any stat points left) sets that button's
    pressed field. Mouse up there: count = 1, or, with Shift held
    (`GetKeyState(VK_SHIFT)` < 0), count = current `statpts`; then
-   messages C→S 0x3A are queued in chunks of at most 32:
+   messages C→S 0x3A are queued in chunks of at most 32 (release order:
+   `panels-2.md` §17.2):
    `[0x3A][stat][n − 1]` for each chunk `n` (`0x004A7A15`;
    `combat/vitals.md` §2). Mouse up clears every pressed field first, so
    a release on a button other than the pressed one also spends.
@@ -427,6 +429,8 @@ after both.
     the result does not fit the buffer it is `*` (unreachable with 128).
     Drawn at once: Font16, color 0, centered in [`sx + x1`, `sx + x2`]
     (width A) at y `H + sy − 480 + y`; no Font8 fallback.
+12. Zero points, name / class lines, damage block, chance popups, draw
+    order: `ui/panels-2.md` §17.
 
 ### 9. Inventory panel family (`0x0048EDF0`)
 
@@ -451,7 +455,7 @@ after both.
    [`W − sx − 302`, `W − sx − 270`], y in [`H + sy − 96`, `H + sy − 64`]
    (`0x00486E10`). Mouse down there sets pressed (`0x00489190`); mouse
    up there (`0x00486EF0`) calls `SetUIState(1, off, 0)` without
-   checking pressed; elsewhere it ends a pending cursor action.
+   checking pressed (exact order: `panels-2.md` §18.1).
 4. Empty equipment slots get a background picture (only if no item is
    in that body location, `0x0063BDE0`); position = (slot `left` + dx,
    slot `bottom` + dy), offsets table `0x007220B0`:
@@ -482,6 +486,8 @@ after both.
    `ui/inventory.md` (`client/ui.md` §B5, §Open questions 1).
 7. Clicks on the grid and body locations send the item intents (§15);
    their validation is `items/inventory-moves.md` §7.
+8. Mouse-up order, the area test (bottom inclusive) and the belt test:
+   `ui/panels-2.md` §18.
 
 ### 10. Skill tree (ui 4, right; `0x004AC690`)
 
@@ -543,6 +549,8 @@ after both.
    questions 4.
 8. Clicks at x ≤ W / 2 are not consumed by the skill tree's release
    handler.
+9. Mouse down / up order, the no-points 0x3C, the free-points number,
+   tab tool tips, draw order: `ui/panels-2.md` §19.
 
 ### 11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D)
 
@@ -578,6 +586,7 @@ after both.
    `0x00489CE0` (mode 0x0C, chat ui 5 closed) does the same: `SetUIState`
    then a second send at `0x00489D21` (two), and resets the stash
    selection globals (`0x00721E3C`–`0x00721E50` := −1).
+8. Press / release rectangles: `ui/panels-2.md` §20.1.
 
 ### 12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E)
 
@@ -627,6 +636,8 @@ after both.
    close reaches the hook, the nested `0x0048A050`'s `SetUIState` finds
    the state closed (no hook again) and the latch lets only the first of
    the two calls send: **one** 0x4F 0x17 per open, whichever path closes.
+8. Button rectangles and the cube-gone close (two 0x4F 0x17):
+   `ui/panels-2.md` §20.2–§20.4.
 
 ### 13. Waypoint menu (ui 0x14, left; `0x0049C9C0`)
 
@@ -683,72 +694,9 @@ after both.
 
 ### 14. NPC menu (ui 8) and NPC shop (ui 0x0C)
 
-1. **Option table.** `0x00726C48`, 48 records of 39 bytes: npc class u32
-   @0, count u32 @4 (options + 1 for the trailing cancel), string ids
-   u16 × 5 @8, handler pointers u32 × 5 @0x12, flag u8 @0x26.
-   `npc-menus.tsv` holds the static (file) contents. Handlers:
-
-   | Handler | Option | Sends |
-   |---|---|---|
-   | `0x004B6C70` | talk (3381) | dialog: C→S 0x2F / 0x30 (`0x004B6A30`) |
-   | `0x004B42B0` | trade (3396), trade/repair (3334) | C→S 0x38 action 1, NPC GUID, 0 |
-   | `0x004B3D40` | gamble (3398) | C→S 0x38 action 2, NPC GUID, 0 |
-   | `0x004B5C60` | hire (3397) | opens the hire list (`ui/menus.md` §3); choosing a row sends C→S 0x36 (`0x004B1E9E`). The hire-list request C→S 0x38 action 3 is sent when the menu opens (`ui/menus.md` §2.2) |
-   | `0x004B52C0` | go west (3383) | C→S 0x38 action 0, NPC GUID, 1 |
-   | `0x004B5260` | sail west (3385) | C→S 0x38 action 0, NPC GUID, 0x28 |
-   | `0x004B2020` | Identify Items (4020) | C→S 0x34 NPC GUID |
-   | `0x004B1DD0` | Resurrect (22695) | C→S 0x62 NPC GUID |
-
-2. **Per-interaction edits.** At every interaction start
-   (`0x004B6DD0` → `0x004B2250`) the table is reset: npc 150, 155, 210
-   → count 2, slot 2 cleared; 154 (Charsi) → count 3, slot 3 cleared; 515
-   → count 2 (3 if its slot 1 is Resurrect), slot 2 cleared; 511 → count
-   3, slot 3 cleared; 512 → count 4, slot 4 cleared; 367 → count 2,
-   slots 1–2 cleared; Cain 244, 265, 245, 246, 520 → slot 1 = Identify
-   Items (`0x004B2020`), count 3 (`0x004B5640` later sets their count
-   again). Then the menu builder `0x004B66B0` adds: Kashya (150) with
-   character level (stat 12) > 7 → slot 1 = hire (3397, `0x004B5C60`),
-   count 3 (`0x004B6410`); for 150, 198, 252, 367, 515 in an expansion
-   game `0x004B6440` inserts or removes Resurrect depending on whether
-   the mercenary is dead (`[0x00725494]` ≠ −1). Other additions (imbue,
-   sockets, personalize, act travel east): §Open questions 8.
-   `0x004B6440(record, insert)` does nothing unless the expansion is
-   installed and the game is an expansion game. Insert: if a slot already
-   has handler `0x004B1DD0` (Resurrect), nothing; else if a slot `j` has
-   the hire handler `0x004B5C60`, slots `j … count − 1` move up one and
-   Resurrect goes to `j` (before hire); else Resurrect goes to slot
-   `count − 1`, after the last option (the builder shows slots 0 …
-   `count − 2`, then its own cancel); count += 1. The inserted string id is 0x1507 (5383), a
-   placeholder replaced at build time (`ui/menus.md` §2.3). Remove: the Resurrect
-   slot is taken out, later slots move down one, count −= 1.
-3. **Menu box.** `0x004B4830` builds a menu object (`0x004B7EB0`) with one
-   item per option (`0x004B85F0`); special captions: `NPCHeal` (3337)
-   gets the heal cost, identify (4020) a cost, `0x1507` a quest text.
-   Draw (`0x004B8100`): background either a framed box of the object's
-   size (`0x0046EFD0(w, h, 0, 1)`) or a cel at (x, y + h); items top to
-   bottom, each at its own x and height; the selected item in color 3,
-   or flanked by two `pentspin` frames (`frame = counter % 7`) at
-   (x − 24, y + 4) and (x + w + 2, y + 4). Box position and sizes:
-   §Open questions 8 (answered: `ui/menus.md` §2).
-4. **Shop panel** (ui 0x0C after trade / gamble, `0x00488400`): art
-   `%s\ui\panel\buysell` (`0x004B23E0`) frames 0–3 as left quads; NPC
-   store grid (`0x00483FF0`); action buttons: `[0x00722160]` buttons,
-   frame = base u16 (+0x0A) + state (+0) of table `0x007BC9E4` (stride
-   20), at x = `sx − 1 + X[mode][i]` (table `0x00722168`, 4 × 4: mode 0:
-   273; 1: 169, 273; 2: 169, 221, 273; 3: 116, 169, 221, 273), y =
-   `H + sy − 63`; tabs: `[0x00722158]` tab records `0x00722110` (stride
-   18: x i32, y i32, string u16, active u32 @+0x0A, visible u32 @+0x0E;
-   defaults Armor 4036, Weapons 4037, Weapons 4037, Misc 4039 at x 42,
-   121, 201, 281, y 20); a visible tab draws `Panel\buyselltabs` frame
-   `i` (active) or `i + 4` at (`sx + 80 i`, `H + sy − 449`) and its
-   caption in Font16 at x = `sx + x − width / 2`, y = `H + sy − 480 + y`,
-   color 4 (active) or 0 (not drawn while `0x004B3500()` ≠ 0).
-5. Shop messages: buy C→S 0x32, sell 0x33, repair 0x35 (`0x004B2650`),
-   gamble identify 0x37 (`0x004C0F20`, `0x004C0FF0`), hire 0x36
-   (`0x004B1E80`), closing the shop ends the interaction with C→S 0x30
-   (`0x004B3C20`). Item rules: `world/vendors.md`.
-6. Menu box geometry and items, the hire list and the client fields
-   of 0x32 / 0x33 / 0x35 / 0x36: `ui/menus.md` §2–§4.
+Moved unchanged (rules 1–6, same numbers) to `ui/panels-2.md` §14,
+with rules 7–13 added there (record lookup, flag byte, talk messages,
+Cain reset, shop buttons, tabs and mouse).
 
 ### 15. Event → intent summary
 
@@ -949,14 +897,19 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    `capture.md` §3.3), hover text / item boxes (`0x00502280` queue),
    inventory grid and item drawing (`ui/inventory.md`), automap
    (`ui/automap.md`), quest log, party, mercenary panel, help screen,
-   escape menu, chat. Ghidra reads of the addresses in §5.
+   escape menu, chat. Ghidra reads of the addresses in §5. Quest log
+   states, icons and the 0x58 replay: `world/quests-status.md` §3, §5
+   (`0x004A34F0`, `0x004A3220`, `0x004A23D0`, `0x004A27D0`); only its
+   layout, hit rectangles and draw order belong here.
 2. Which key toggles which state and with which `jump` (CmdTbl
    `0x004A5…`, `default.key`): owner `ui/controls.md` (`client/ui.md`
    §B4). Read of the command table.
-3. Character panel: damage / attack-rating block, name and class lines,
+3. **Answered** (2026-10-07, `panels-2.md` §17; the `descdam` /
+   `descatt` functions: `panels-2.md` OQ 1). Was: Character panel: damage / attack-rating block, name and class lines,
    per-stat hover texts (§8.10). Disassembly of `0x004A7D00` after
    `0x004A818C` and `0x004A7340`–`0x004A7AE0`.
-4. Skill tree (partly answered 2026-10-07: the icon file `CC` §10.3 and
+4. Skill tree (no-points message, free points, tab tool tips answered
+   2026-10-07 in `panels-2.md` §19; partly answered 2026-10-07: the icon file `CC` §10.3 and
    the close offsets per class §10.6 are read from the image; still
    open as below): the free-points box (`0x004AC200`), the tab tool tips
    (`0x004AB310`), the no-points mouse-down message (§10.5), the exact
@@ -973,8 +926,8 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
 8. **Partly answered** (2026-10-07): box position and item metrics,
    the hire sender (C→S 0x36 `0x004B1E9E`; the 0x38 action 3 request
    at menu open `0x004B48E8`) and the Resurrect insert are in
-   `ui/menus.md` §2–§3 and §14.2; still open: the record flag byte and
-   the remaining runtime inserts. Was: NPC menu: box position and item metrics (`0x004B7EB0`, `0x004B85F0`),
+   `ui/menus.md` §2–§3 and §14.2; still open: the remaining runtime inserts
+   (the flag byte: `panels-2.md` §14.8). Was: NPC menu: box position and item metrics (`0x004B7EB0`, `0x004B85F0`),
    the record flag byte, the remaining runtime option inserts (imbue,
    add sockets, personalize, go east / sail east), the hire sender
    (`0x004B5C60`). Ghidra read; check against a capture of Akara's and
@@ -985,15 +938,18 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    panels (0x1B, 0x1C): not specified here.
 10. Pixel proof: capture cases `ui-0001`, `ui-0002` and the inventory
     frames of `placement-0001` (§Test vectors).
-11. The Horadric animation draws with draw mode 3 (§12.4) and light 0xFF:
+11. **Answered** (2026-10-07): mode 3 is the additive blend of
+    `render/blend-modes.md` §1; the pixels stay a capture case
+    (recording list). Was: The Horadric animation draws with draw mode 3 (§12.4) and light 0xFF:
     which blend that is for a cel with these offsets is `render/blend-
     modes.md`'s; confirm the pixels with a capture of a transmute
     (frames 1, 15, 29).
-12. Character panel draw order of the 18 values against the labels and
+12. **Answered** (2026-10-07, `panels-2.md` §17.10; pixels: capture).
+    Was: Character panel draw order of the 18 values against the labels and
     the add buttons when a value is wider than its span (overlap):
     capture `ui-0001` with a level-99 character (experience
     `3,520,485,254`).
-13. Cube-gone close (§12.2): `0x0048F183` sends 0x4F 0x17 directly and
+13. **Answered** (2026-10-07, `panels-2.md` §20.4): two. Was: Cube-gone close (§12.2): `0x0048F183` sends 0x4F 0x17 directly and
     `SetUIState(0x1A, off)` runs the close hook `0x0048A500` → `0x0048A050`
     with its latched send (§12.7): one or two 0x4F 0x17 messages? Read
     whether `[0x007BCC54]` or the inventory mode is changed before the

@@ -23,14 +23,14 @@
 | Rules | 63–64 |
 |   1. Waypoint menu input (ui 0x14) | 65–121 |
 |   2. NPC menu box | 122–197 |
-|   3. Hire list (`0x004B5C60`, NPC option "hire") | 198–226 |
-|   4. Shop transactions | 227–273 |
-| Constants & data dependencies | 274–281 |
-| Randomness | 282–285 |
-| Edge cases & original bugs | 286–297 |
-| Test vectors | 298–309 |
-| Provenance | 310–326 |
-| Open questions | 327–341 |
+|   3. Hire list (`0x004B5C60`, NPC option "hire") | 198–240 |
+|   4. Shop transactions | 241–320 |
+| Constants & data dependencies | 321–328 |
+| Randomness | 329–332 |
+| Edge cases & original bugs | 333–344 |
+| Test vectors | 345–356 |
+| Provenance | 357–373 |
+| Open questions | 374–389 |
 <!-- /index -->
 
 ## Summary
@@ -223,6 +223,20 @@ menu box draws; click sounds (`0x004B9A00(id, 0, 0, 0)`).
    waiting note (§2.7). Otherwise `0x004B3610`: close the list,
    transaction kind `[0x007C0D31]` := 5, confirm dialog `0x004B2F50`
    (§Open questions 2).
+5. **Row text** (`0x004B5E3B`–`0x004B6300`, answers OQ 1). The list
+   widget first gets `0x004B7C00(widget, 0x23, 0x1E)`. Per used record:
+   the hireling's stats for the player's difficulty and game type
+   (`0x00663750`, `0x006637F0`; fails → the builder stops). Left text =
+   the name (record u16 @0; 0x421 → string 11021) + `space` `dash`
+   `space` (3995, 3996, 3995), then four fields, each = the label (cut
+   to 20 units) + `colon` (3997) + `space` + the value as `%2u` + two
+   `space`s: `Level` 3368 ("Lvl", output +4), `HP` 3366 ("Life", +8),
+   `AC` 3367 ("Def", +0x1C), `Cost` 3369 (+0x14) (offsets in the
+   `0x006637F0` output). Right text = two `space`s, then, when the type
+   has a skill (`0x00663720` ≠ 0), the text of `0x0048BE80(buf 150, u16
+   pattern "a0:%0", 0x00663720(0))`. Row added through the widget's
+   vtable +0x30 (left, right, 0, 0, 0, 0, row index, 0, 1, 0x0E). String
+   3370 (`Damage`) is not used.
 
 ### 4. Shop transactions
 
@@ -270,6 +284,39 @@ menu box draws; click sounds (`0x004B9A00(id, 0, 0, 0)`).
    Then `[0x007C0C6B]` := 5, sent time `[0x007C0DF1]` := now, and the
    waiting note (§2.7). For a sell, `[0x007C0D3F]` := whether the item
    is the player's cursor item.
+4. **Confirm dialog** `0x004B2F50` (answers OQ 2): menu state := 4; a box
+   (§2.1) anchored at the current mouse position, p1 = `0x004B2F00`
+   (No), p4 = 1, p5 = 1, p9 = 1; style 1. First item by kind
+   `[0x007C0D31]` (height 21, color 4, font 1, not selectable): 1 `Buy`
+   3348, 2 `Sell` 3347, 3 `Repair` 3351, 4 `Identify` 3350, 5
+   `VerifyTransaction9` 3352 ("This Mercenary will replace your current
+   one."), any other kind fatal. Kinds 1–4, with the pending item found
+   (`0x00463990(GUID, 4)`): the item's name up to its first LF
+   (`0x0048C060`, 191 units), the price (`0x004B2AD0(item, sell = kind ≠
+   1, …)`) as `%d`, items `VerifyTransaction3` 3346 ("Gold:") and the
+   number, all height 15, color 4, font 1, not selectable. Every kind
+   then gets `Yes` (3344, handler `0x004B2E70`) and `No` (3345, handler
+   `0x004B2F00`), height 15, color 0, selectable. Yes: kind 5 → close the
+   box, `0x004B1E80` (0x36, §3.4); menu state 4 → close the box,
+   `0x004B2650(0, 0)` (§4.3, flags 0). No / back: close; kind 5 → the
+   hire list again (`0x004B5C60`); else cancel the pending transaction
+   (`0x00487C20`), menu state 3, `0x00466FE0`.
+5. **Callers of the click** `0x004B3870(unit ECX, item EDX, a1 … a6)`
+   (answers OQ 3; a4 = the window message wParam, bit 2 = `MK_SHIFT`):
+
+   | Caller | Event | a1 | a4 | a5 quick | a6 |
+   |---|---|---|---|---|---|
+   | `0x00491AD0` (WM_RBUTTONDOWN, store grid) | right click | 0 (store item) | wParam | 1 | 0 |
+   | `0x00491D20` (WM_LBUTTONDOWN, cursor item dropped on the store grid) | sell by drop | 1 | wParam | 1 | 0 |
+   | `0x0048FFE0` (grid click) | left click | caller's | 0 | 0 | 0 |
+   | `0x00490780`, `0x00490BA0`, `0x00490FC0` (body locations) | click | 1 | 0 | 0 | 0 |
+   | `0x00488B00` (WM_LBUTTONUP, button with base frame 18) | repair all | ECX value | 0 | ECX | ECX |
+   | `0x00487BA0` (wrapper) | — | its arguments | its | its | 0 |
+
+   ECX in `0x00488B00` is the value the button's state was compared with
+   at `0x00488C14` (pressed). So the 0x32 bit 31 (§4.3) needs a quick
+   right-click or drop with Shift held; left clicks always go through
+   the confirm dialog (rule 4, flags 0).
 
 ## Constants & data dependencies
 
@@ -326,15 +373,16 @@ the repo. No capture yet.
 
 ## Open questions
 
-1. Hire list row text and columns (`0x004B5E3B`–`0x004B6300`: strings
+1. **Answered** (2026-10-07, §3.5; the skill text of `0x0048BE80` and
+   the column metrics of `0x004B7C00` remain unread). Was: Hire list row text and columns (`0x004B5E3B`–`0x004B6300`: strings
    3995–3997, 3366–3370, the `0x004B7C00(…, 0x23, 0x1E)` call, list
    vtable +0x30): read the row builder; check against a capture of
    Kashya's hire list.
-2. The confirm dialog `0x004B2F50` (kinds 1–5): layout, buttons and which
+2. **Answered** (2026-10-07, §4.4). Was: The confirm dialog `0x004B2F50` (kinds 1–5): layout, buttons and which
    answer calls `0x004B2650`. Ghidra read.
-3. Which callers of `0x004B3870` set the `flags` bit 2 of §4.3 (the 0x32
+3. **Answered** (2026-10-07, §4.5). Was: Which callers of `0x004B3870` set the `flags` bit 2 of §4.3 (the 0x32
    bit 31) and the quick flag a5 (`0x00487BA0`, `0x00488B00`,
    `0x0048FFE0`, `0x00490780`, `0x00490BA0`, `0x00490FC0`,
    `0x00491AD0`, `0x00491D20`), and which unit the ECX argument is.
-4. Pixel proof of §1–§3: a capture of the waypoint menu with a hovered
+4. **Needs recording** (recording list). Pixel proof of §1–§3: a capture of the waypoint menu with a hovered
    row, Akara's menu and Kashya's hire list at 800 × 600.
