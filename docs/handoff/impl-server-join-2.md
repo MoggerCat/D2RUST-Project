@@ -70,3 +70,21 @@ now comes from the switch's player update (§7.8 r3.4).
 - Spec questions: the overhead 0x26 text of a set hover (§7.9 r3); the
   app's arena flags (recorded 0x00100004 used).
 - Local queue: C84 can now compare the whole frame-1/frame-2 order.
+
+## 4. Merge of `claude/specs-staging-2` (coordinator task)
+
+Merged (no rebase) with monster-death, client-msgs-3, d2s-load and the
+rest. Kept both sides: `units::{messages, mode_set}`,
+`wiring::action::{switch, unit_update}`, both `WiringError` variants;
+`enter_game_from_save` now builds `Entry::new(act, name)` and is followed
+by the full session sequence. Tests updated to the join's order:
+`e2e_full_loop` (both sides' log counts: 11 handled, 0x0D + 2 × 0x69
+dropped), `synthetic_game` (the save tests see 0x01, 0x00, 0x02, 0x59,
+0xAA, 0x76, 0x0B, 0x95, 0x03), `e2e_night_flows` (0xAA, 0x76, the
+switch's 0x07, 0x7E, 0x04), `e2e_night_world` (the join's AI think at
+203 pending), `wiring::path::mutant_tests` (0x7E).
+Gate: `CARGO_INCREMENTAL=0 cargo test --workspace`: 5,514 passed, 11
+failed (only the allowed ones: skills::* 6, quests tables_parse_and_check,
+3 player::tests::wired, bridge::local_tests::unknown_and_unowned_ids),
+223 ignored; clippy, fmt clean; coverage 8,703 claims, 0 errors;
+spec_index ok.

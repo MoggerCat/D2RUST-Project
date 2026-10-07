@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §5, §22; specs/sim/units.md §3.1, §3.2, §4.6; specs/combat/damage.md §5.2 step 9; specs/missiles/missiles.md rule 28; specs/combat/hit.md; specs/monsters/ai.md §2.4
+// Spec: specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/sim/units.md §3.1, §3.2, §4.6; specs/combat/damage.md §5.2 step 9; specs/missiles/missiles.md rule 28; specs/combat/hit.md; specs/monsters/ai.md §2.4
 //! The monster side of a game as the action hooks reach it: a
 //! [`MonsterWorld`] lent to [`ActionHooks::monster_world`] (the
 //! world-generation state, `wiring::worldgen::WorldState`, implements it;
@@ -37,6 +37,11 @@ pub mod umod_mode {
     pub const EVENT7: u8 = 2;
     /// `0x005A4390`, combat `0x0057C6C0`.
     pub const HIT: u8 = 3;
+    /// `0x005A43A0`, the reaction `0x0057CEE0` (`umod-callbacks.md` §2
+    /// rule 5). Its sites are inside the monster-defender branches of
+    /// the reaction, which stay [`super::Pending::reaction`]'s
+    /// (`damage.md` §7.1 OQ3): the provider of those branches runs it.
+    pub const GET_HIT: u8 = 4;
     /// `0x005A43B0`, missile creation `0x0059FA30`.
     pub const MISSILE: u8 = 5;
 }
@@ -86,6 +91,28 @@ impl<X> ActionHooks<X> {
         self.monster_world_out = false;
         self.monster_world = Some(w);
         Some(r)
+    }
+
+    /// Lends `w` to the hooks from inside a monster route (a umod
+    /// callback's mode set, `umod-callbacks.md` §22.1): the world the
+    /// route holds goes back in for the nested call. Returns the "out"
+    /// state to hand to [`Self::take_relent_monster_world`].
+    pub fn relend_monster_world(&mut self, w: Box<dyn MonsterWorld<X>>) -> bool {
+        let out = self.monster_world_out;
+        self.monster_world = Some(w);
+        self.monster_world_out = false;
+        out
+    }
+
+    /// Takes back the world lent by [`Self::relend_monster_world`] and
+    /// restores the "out" state; `None` when the nested call did not
+    /// return it.
+    pub fn take_relent_monster_world<W: 'static>(&mut self, out: bool) -> Option<W> {
+        self.monster_world_out = out;
+        self.monster_world
+            .take()
+            .and_then(|w| w.into_any().downcast::<W>().ok())
+            .map(|w| *w)
     }
 
     /// The monster data of `unit` in the lent world.

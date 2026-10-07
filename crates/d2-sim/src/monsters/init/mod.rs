@@ -4,7 +4,9 @@
 //! §5) with stats, skills, components, monprop and monequip (§6–§13),
 //! normal and boss mods (§14), boss spawns, umod choice and umod init
 //! functions (§16–§20), restore paths (§21), the umod callback
-//! dispatcher and the type-7 event (§22), and the init-owned pieces of
+//! dispatcher and the type-7 event (§22) with the callback bodies
+//! (`monsters/umod-callbacks.md`, [`callbacks`], [`find`]), and the
+//! init-owned pieces of
 //! the client name draw and the 0xAC monster assign message (§23–§24).
 //!
 //! Every call into a system another spec owns goes through
@@ -14,7 +16,9 @@
 //! [`InitHost::units`]), in the order of the spec's Randomness section.
 
 mod calc;
+pub mod callbacks;
 mod create;
+pub mod find;
 mod message;
 mod seams;
 mod umods;
@@ -32,7 +36,7 @@ use d2_data::tables::{
 use crate::units::UnitId;
 
 pub use calc::{
-    area_level, classic_scaling, hp_regen, monlvl_dm, monster_level, pct, player_bonus,
+    a1_damage, area_level, classic_scaling, hp_regen, monlvl_dm, monster_level, pct, player_bonus,
     stats_by_level, LevelStats, PlayerBonus,
 };
 pub use create::{
@@ -171,6 +175,9 @@ pub struct MonsterData {
     pub name_seed: u16,
     /// +0x16 nTypeFlag ([`type_flag`]).
     pub type_flags: u16,
+    /// +0x18: frame of the last lightning burst (`umod-callbacks.md`
+    /// §10.2).
+    pub last_burst: i32,
     /// +0x1C nMonUmod[], 0-terminated unless full.
     pub umods: [u8; MAX_UMODS],
     /// +0x26 wBossHcIdx (superunique row, §20).
@@ -214,13 +221,16 @@ impl MonsterData {
 /// Work the original does that d2rs has no body for yet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unhandled {
-    /// A umod callback whose body is outside init (open question 8).
+    /// A callback address without a body (none of `umods.tsv`'s).
     Callback {
         addr: u32,
         unit: UnitId,
         umod: u8,
         mode: u8,
     },
+    /// A fatal assertion of a callback body (`umod-callbacks.md` §8
+    /// step 3: umod 14's mode 0 on a unit that is not a monster).
+    Assert { addr: u32, unit: UnitId },
 }
 
 /// The monster data of every monster, by unit.

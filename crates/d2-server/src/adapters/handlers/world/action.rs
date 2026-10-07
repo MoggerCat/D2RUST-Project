@@ -21,6 +21,7 @@ use d2_sim::wiring::economy::GameFields;
 use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData};
 
+use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
 use super::super::walk::{WalkCall, WalkResult};
 use super::{WaypointCall, WorldFault, WorldHost};
@@ -139,6 +140,21 @@ where
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         self.skills.handle(call)
+    }
+
+    /// `handlers::player::action::run` on the action wiring.
+    fn player(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        run: PlayerRun<'_>,
+    ) -> Option<PlayerOutcome> {
+        Some(player::action::run(
+            game,
+            events,
+            &run,
+            HostFacts::default(),
+        ))
     }
 
     /// `handlers::walk::run` (the path provider of the action wiring).

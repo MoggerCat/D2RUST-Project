@@ -500,6 +500,8 @@ pub fn monster_set_mode<H: UnitHooks>(
     }
     if mode != monster_mode::GH {
         hooks.monster_mode_bookkeeping(sim, unit, mode);
+        // `umod-callbacks.md` §2 rule 1: umod mode 0, old mode still set.
+        hooks.monster_umods(sim, unit, 0);
     }
     let start = monster_record(sim, hooks, unit, mode)
         .map(|r| r.start)
@@ -516,6 +518,9 @@ pub fn monster_set_mode<H: UnitHooks>(
     }
     record_mut(sim, unit)?.flags |= flags::MODE_CHANGING;
     prepare_animation(sim, hooks, unit)?;
+    // `umod-callbacks.md` §2 rule 2: umod mode 1, new mode set; before
+    // the cancel of events 0 / 1 and the animation schedule.
+    hooks.monster_umods(sim, unit, 1);
     anim::cancel_mode_events(sim.game, unit);
     let now = record_mut(sim, unit)?.mode;
     if monster_record(sim, hooks, unit, now).is_some_and(|r| r.schedules) {

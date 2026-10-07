@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
+// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
 //! [`ActionSim`]: the one dispatcher the tick runs. Timer events go to
 //! the unit dispatch (`units.md` §5: the per-kind handler tables and the
 //! monster freeze drop of `tick.md` §5.6), whose hooks run the missile
@@ -251,10 +251,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
 
     /// Per-client update (`tick.md` §6.5, `0x0053A5D0`): with the path
     /// provider on, a player's movement messages (`pathing.md` §10 rules
-    /// 2–3, [`crate::wiring::path::walk::update_messages`]). Other units'
-    /// update messages (the unit-update spec) are not written, except
-    /// objects: the object update pass `0x00581AD0` (`objects.md` §14,
-    /// [`View::object_update`]) to the client's player.
+    /// 2–3, [`crate::wiring::path::walk::update_messages`]) and a
+    /// monster's mode message (`intents-events.md` §7.3 rule 2 step 2,
+    /// [`View::monster_update`]); objects: the object update pass
+    /// `0x00581AD0` (`objects.md` §14, [`View::object_update`]) to the
+    /// client's player. Without the provider no unit has a path record,
+    /// so no player or monster message is built.
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let s = &mut self.sys;
         let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
@@ -271,7 +273,22 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         if v.h.paths.is_none() {
             return;
         }
+        if game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty == UnitType::Monster)
+        {
+            v.monster_update(game, client, unit);
+            return;
+        }
         crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+    }
+
+    /// Step 6 (`0x00553220`, `intents-events.md` §7.5): the flag part of
+    /// the room clean-up ([`View::room_cleanup`]).
+    fn unit_update(&mut self, _: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks).room_cleanup(unit);
     }
 
     /// Per-client update (`tick.md` §6.5): the player's room differs from

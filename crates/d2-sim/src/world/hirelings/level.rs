@@ -209,14 +209,14 @@ pub fn exp_delta_message(stat: u8, guid: u32, old: u32, new: u32) -> Vec<u8> {
 }
 
 /// §13 rule 4 (`0x005726C0(game, player, flag)`): the living hireling's
-/// stats to the player's client, in the order 12 (total), 0, 2, 7
-/// (base), 6 (total), 31 (base), 13, 30 (total), 23 + 21, 24 + 22 (base
-/// sums), 39, 41, 43, 45 (base). 1.14d queues them on the merc unit and
-/// the per-unit flush (`0x00571CD0`) sends them; here they are sent at
-/// once. No reader of `flag` was found, so it is not taken.
-///
-/// TODO(hirelings.md OQ7): which clients the flush serves is open; the
-/// owner's client only is served here.
+/// stats queued on the merc unit (`0x005718C0`, [`HirelingWorld::queue_stat`])
+/// in the order 12 (total), 0, 2, 7 (base), 6 (total), 31 (base), 13, 30
+/// (total), then the damage sums under ids **21** (base 23 + base 21) and
+/// **22** (base 24 + base 22), then 39, 41, 43, 45 (base). They are not
+/// sent here: the client pass flushes the merc's queue (`0x00571CD0`, see
+/// [`flush_stats`]) to every client that updates the merc, twice for a
+/// unit new to the client. No reader of `flag` was found, so it is not
+/// taken.
 pub fn send_stats<W: HirelingWorld>(
     w: &mut W,
     st: &HirelingState,
@@ -225,7 +225,6 @@ pub fn send_stats<W: HirelingWorld>(
     let Some(merc) = living(w, st, player) else {
         return Ok(());
     };
-    let guid = w.guid(merc);
     let base = |w: &W, s: u16| w.base_stat(merc, s);
     let values: [(u16, i32); 14] = [
         (stat::LEVEL, w.stat(merc, stat::LEVEL)),
@@ -237,11 +236,11 @@ pub fn send_stats<W: HirelingWorld>(
         (stat::EXPERIENCE, w.stat(merc, stat::EXPERIENCE)),
         (stat::NEXTEXP, w.stat(merc, stat::NEXTEXP)),
         (
-            stat::SECONDARY_MINDAMAGE,
+            stat::MINDAMAGE,
             base(w, stat::SECONDARY_MINDAMAGE).wrapping_add(base(w, stat::MINDAMAGE)),
         ),
         (
-            stat::SECONDARY_MAXDAMAGE,
+            stat::MAXDAMAGE,
             base(w, stat::SECONDARY_MAXDAMAGE).wrapping_add(base(w, stat::MAXDAMAGE)),
         ),
         (stat::FIRERESIST, base(w, stat::FIRERESIST)),
@@ -250,10 +249,23 @@ pub fn send_stats<W: HirelingWorld>(
         (stat::POISONRESIST, base(w, stat::POISONRESIST)),
     ];
     for (s, v) in values {
-        let msg = stat_message(s, guid, v as u32)?;
-        w.send(player, &msg);
+        w.queue_stat(merc, s, v as u32);
     }
     Ok(())
+}
+
+/// The hireling-stat part of the per-unit flush `0x00571CD0(unit,
+/// client)` (§13 rule 4; `sim/intents-events.md` §7.9 rule 2, record id
+/// 0x9E → `0x0053BEE0`): one message per queued `(stat, value)` of the
+/// unit with GUID `guid`, in queue order. The client pass calls it for
+/// every client whose update reaches the unit (once in the full unit
+/// send of a unit new to the client, once in the monster update); the
+/// queue is freed in the room update step, not here.
+pub fn flush_stats(guid: u32, queued: &[(u16, u32)]) -> Result<Vec<Vec<u8>>, HirelingError> {
+    queued
+        .iter()
+        .map(|&(s, v)| stat_message(s, guid, v))
+        .collect()
 }
 
 /// §7.3 (`0x0057E860(game, player, merc_level; gain, merc)`): add a gain
@@ -313,12 +325,8 @@ pub fn add_experience<W: HirelingWorld>(
 
 /// §7.2 (`0x0057E480`, for the hireling unit `merc` owned by `player`):
 /// the gain of a defender experience `exp` for attacker level `alvl` and
-/// defender level `dlvl`.
-///
-/// TODO(hirelings.md §7.2 rule 3): the `ExpRatio` step (`0x0057E390`,
-/// "shift from the `MaxLvl` row") is not specified in this spec or in
-/// `combat/vitals.md` §4.3; the caller supplies it as `exp_ratio(gain,
-/// alvl) -> gain`, applied between the level factor and stat 85.
+/// defender level `dlvl`. The `ExpRatio` step (rule 3, `0x0057E390`) is
+/// [`super::ExpRatios::apply`] on the tables' `experience` column.
 #[allow(clippy::too_many_arguments)]
 pub fn gain<W: HirelingWorld>(
     w: &W,
@@ -329,7 +337,6 @@ pub fn gain<W: HirelingWorld>(
     exp: i32,
     alvl: i32,
     dlvl: i32,
-    exp_ratio: impl Fn(i32, i32) -> i32,
 ) -> i32 {
     // Rule 1.
     if exp <= 0 {
@@ -342,7 +349,7 @@ pub fn gain<W: HirelingWorld>(
     }
     // Rule 3.
     let mut g = level_factor(exp, alvl, dlvl);
-    g = exp_ratio(g, alvl);
+    g = t.exp_ratios.apply(g, alvl);
     let add = w.stat(merc, stat::ADDEXPERIENCE);
     if add != 0 {
         g = g.wrapping_add(pct(g, add, 100));
@@ -367,11 +374,8 @@ pub fn gain<W: HirelingWorld>(
 /// the share of a kill credited to the living hireling of the attacker's
 /// player. `player_owner` is the player owner of a non-player attacker
 /// (`0x0057E7B0`, another owner); the player's own share (rule 3) is
-/// `combat/vitals.md` §4.3's.
-///
-/// TODO(hirelings.md §7.1 rule 2): "dlvl = defender level" does not say
-/// base or total; the base value is read (the same read as "H level
-/// (base)").
+/// `combat/vitals.md` §4.3's. Defender experience, defender level and the
+/// hireling's level are base reads (rule 2, `0x006253B0`).
 pub fn kill_share<W: HirelingWorld>(
     w: &mut W,
     t: &HirelingTables,
@@ -379,7 +383,6 @@ pub fn kill_share<W: HirelingWorld>(
     attacker: UnitId,
     defender: UnitId,
     player_owner: Option<UnitId>,
-    exp_ratio: impl Fn(i32, i32) -> i32,
 ) -> Result<(), HirelingError> {
     // Rule 1.
     let ty = w.unit_type(attacker);
@@ -403,7 +406,7 @@ pub fn kill_share<W: HirelingWorld>(
     };
     let alvl = w.base_stat(h, stat::LEVEL);
     let dlvl = w.base_stat(defender, stat::LEVEL);
-    let mut g = gain(w, t, st, p, h, exp, alvl, dlvl, exp_ratio);
+    let mut g = gain(w, t, st, p, h, exp, alvl, dlvl);
     if attacker != h {
         g = g.wrapping_mul(NON_KILLER_SHARE) / 256;
     }
@@ -434,9 +437,8 @@ pub fn restore_level(t: &HirelingTables, id: u32, experience: u32, expansion: bo
 
 /// §10 rules 5–6 for the restored `merc`: experience (stat 13) := `saved`
 /// if higher (unsigned), the level from it (rule 6) and §4 at that level;
-/// then the stat 13 queued by rule 5 (§13 rule 4, its value at rule 5).
-/// 1.14d queues stat 13 on the unit (flushed at its update), so the §4
-/// speech, sent at once, goes out before it.
+/// stat 13 is queued on the unit by rule 5 (§13 rule 4, its value at
+/// rule 5; flushed by the client pass), the §4 speech is sent at once.
 pub fn restore_experience<W: HirelingWorld>(
     w: &mut W,
     t: &HirelingTables,
@@ -453,10 +455,9 @@ pub fn restore_experience<W: HirelingWorld>(
         w.set_base_stat(merc, stat::EXPERIENCE, saved as i32);
     }
     let exp = w.stat(merc, stat::EXPERIENCE) as u32;
-    let queued = stat_message(stat::EXPERIENCE, w.guid(merc), exp)?;
+    w.queue_stat(merc, stat::EXPERIENCE, exp);
     // Rule 6.
     let level = restore_level(t, node.id, exp, w.expansion());
     apply_level(w, t, st, player, Some(merc), level);
-    w.send(player, &queued);
     Ok(())
 }

@@ -161,6 +161,35 @@ pub fn stats_by_level(
     }
 }
 
+/// `0x006538A0(class, L-flag, d, level, 8)` (§8.1 flag 8): the A1
+/// damage (min, max): `A1MinD` / `A1MaxD` for d with `noRatio`, else
+/// pct(monlvl `DM` / `L-DM` for d, the monstats value, 100). A negative
+/// level (or an empty monlvl) gives (0, 0).
+pub fn a1_damage(
+    m: &Monstats,
+    monlvl: &[Monlvl],
+    l_flag: bool,
+    d: usize,
+    level: i32,
+) -> (i32, i32) {
+    let d = d.min(2);
+    let min = s16([m.a1mind, m.a1mind_n, m.a1mind_h][d]);
+    let max = s16([m.a1maxd, m.a1maxd_n, m.a1maxd_h][d]);
+    if level < 0 || monlvl.is_empty() {
+        return (0, 0);
+    }
+    if m.noratio {
+        return (min, max);
+    }
+    let row = &monlvl[(level as usize).min(monlvl.len() - 1)];
+    let dm = (if l_flag {
+        [row.l_dm, row.l_dm_n, row.l_dm_h]
+    } else {
+        [row.dm, row.dm_n, row.dm_h]
+    })[d] as i32;
+    (pct(dm, min, 100), pct(dm, max, 100))
+}
+
 /// monlvl `DM` / `L-DM` for d at `level` clamped to 1..rows−1 (§19.4
 /// umod 9, §19.6 umod 36).
 pub fn monlvl_dm(monlvl: &[Monlvl], l_flag: bool, d: usize, level: i32) -> i32 {

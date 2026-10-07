@@ -10,6 +10,7 @@ pub mod hooks;
 pub mod lifecycle;
 pub mod lists;
 pub mod messages;
+pub mod mode_set;
 pub mod modes;
 #[cfg(test)]
 mod mutant_tests;

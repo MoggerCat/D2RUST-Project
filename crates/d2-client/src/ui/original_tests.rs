@@ -288,7 +288,10 @@ fn skill_tree_art_tabs_and_close() {
     let tab2 = Point::new(650, 300);
     assert_eq!(skilltree_tab(tab2), Some(2));
     u.click(&w, tab2);
-    assert_eq!(u.ui.take_outcome().sounds, vec![CLICK_SOUND_ID]);
+    assert_eq!(
+        u.ui.take_outcome().sounds,
+        vec![crate::audio::driver::SoundRequest::Ui(CLICK_SOUND_ID)]
+    );
     let art = panel_images(&u.images(&w), "spells\\skltree_a_back");
     assert_eq!(
         art[4..].iter().map(|a| a.0).collect::<Vec<_>>(),

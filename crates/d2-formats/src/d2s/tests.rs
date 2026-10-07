@@ -1188,3 +1188,96 @@ fn missing_hireling_row_fails_on_kf() {
     let e = read(&f, &opts(true), &NoHirelingRow(Tables::v114d())).unwrap_err();
     assert_eq!((e.internal(), e.result()), (Some(23), Some(10)));
 }
+
+// ------------------------------------------------- second pass (C66, DS)
+
+// Covers: specs/formats/d2s.md §8.4 r2, §8.4 r5, §8.5 r3
+#[test]
+fn hireling_without_items_writes_an_empty_list() {
+    // Test vector: expansion, hireling present with no items, no golem →
+    // `6A 66 4A 4D 00 00 6B 66 00` (bdMercTwo).
+    let mut s = sample(true);
+    {
+        let b = s.body.as_mut().unwrap();
+        b.hireling_items = Some(Some(Vec::new()));
+        b.golem = Some(Golem::default());
+    }
+    let t = Tables::v114d();
+    let f = write(&s, &t).unwrap();
+    assert!(f.ends_with(&[0x6A, 0x66, 0x4A, 0x4D, 0x00, 0x00, 0x6B, 0x66, 0x00]));
+    let back = read(
+        &f,
+        &ReadOptions {
+            expansion: true,
+            game: None,
+        },
+        &t,
+    )
+    .unwrap();
+    assert_eq!(back.body.unwrap().hireling_items, Some(Some(Vec::new())));
+}
+
+// Covers: specs/formats/d2s.md §8.2 r7, §edge-cases-original-bugs r17
+#[test]
+fn item_flags_after_a_load() {
+    // Test vectors: 0x00A02010 (compact) and 0x00802010 (full), loaded
+    // and saved again → 0x00A00010 and 0x00800010. The writer clears
+    // 0x80000 and sets 0x800000 (`items/bitstream.md` §2 rule 1).
+    let save = |f: u32| (f & !ITEM_FLAG_LOADED) | 0x80_0000;
+    assert_eq!(item_flags_on_load(0x00A0_2010), 0x00A8_0010);
+    assert_eq!(save(item_flags_on_load(0x00A0_2010)), 0x00A0_0010);
+    assert_eq!(save(item_flags_on_load(0x0080_2010)), 0x0080_0010);
+    // The decode drops a stored 0x80000 and the alt-code bit.
+    assert_eq!(item_flags_on_load(0x0288_2010), 0x0088_0010);
+    // Flags without 0x2000 only gain 0x80000.
+    assert_eq!(item_flags_on_load(0x0080_0010), 0x0088_0010);
+}
+
+// Covers: specs/formats/d2s.md §8.2 r7
+#[test]
+fn record_flags_sit_after_the_marker() {
+    let mut e = ItemEntry {
+        bytes: vec![0x4A, 0x4D, 0x10, 0x20, 0xA0, 0x00, 0x65, 0x00],
+    };
+    assert_eq!(e.record_flags(0), Some(0x00A0_2010));
+    e.set_record_flags(0, 0x00A0_0010).unwrap();
+    assert_eq!(e.bytes, [0x4A, 0x4D, 0x10, 0x00, 0xA0, 0x00, 0x65, 0x00]);
+    // No marker, or too short: none.
+    assert_eq!(e.record_flags(1), None);
+    assert_eq!(e.set_record_flags(4, 0), None);
+    assert_eq!(e.bytes[4..], [0xA0, 0x00, 0x65, 0x00]);
+}
+
+// Covers: specs/formats/d2s.md §2.8 r1, §2.8 r2, §edge-cases-original-bugs r18
+#[test]
+fn appearance_bytes_reset_to_ff() {
+    // Test vector: +0x88..+0x97 = the stub's bytes, no equipped item,
+    // loaded and saved → 32 × FF.
+    let mut s = D2s::new_stub(b"Stub", 2, 0, 1).unwrap();
+    assert_eq!(s.header.components, STUB_COMPONENTS);
+    s.header.colours[3] = 7;
+    s.header.reset_appearance();
+    let b = s.header.to_bytes();
+    assert_eq!(b[0x88..0xA8], [0xFF; 32]);
+}
+
+// Covers: specs/formats/d2s.md §6 r2, §6 r3
+#[test]
+fn field_a_setter_sets_the_first_matching_bit() {
+    // Confirmed on a save: Kashya (class 150, bit 3) in Normal → A of
+    // difficulty 0 is `08 00 …`, B unchanged.
+    let mut n = Npcs::default();
+    n.set_intro_a(0, 150).unwrap();
+    assert_eq!(n.a[0], [0x08, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(n.b, [[0; 8]; 3]);
+    // A range pair: class 177 → bit 9 (byte 1, 0x02); only that bit.
+    n.set_intro_a(1, 177).unwrap();
+    assert_eq!(n.a[1], [0, 0x02, 0, 0, 0, 0, 0, 0]);
+    // No pair matches → bit 0 only.
+    n.set_intro_a(2, 999).unwrap();
+    assert_eq!(n.a[2], [0x01, 0, 0, 0, 0, 0, 0, 0]);
+    // Class 520 → bit 34 (byte 4, 0x04).
+    n.set_intro_a(2, 520).unwrap();
+    assert_eq!(n.a[2], [0x01, 0, 0, 0, 0x04, 0, 0, 0]);
+    assert_eq!(n.set_intro_a(3, 150), None);
+}

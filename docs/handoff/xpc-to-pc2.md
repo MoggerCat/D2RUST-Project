@@ -11,4 +11,4 @@ direction is `xpc-to-pc1.md`.
 
 ## Open
 
-(none yet)
+- `world/cube.md` §1: says `server-messages.tsv` marks 0x77 `out`; since PC 1 commit e2fa8c2 it is `sim` (single player sends it too; `sim/intents-events.md` §4 rule 4). Update the sentence.

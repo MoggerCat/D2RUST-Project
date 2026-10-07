@@ -26,7 +26,7 @@ mod tests;
 use std::collections::BTreeMap;
 
 use d2_data::bin::BinTable;
-use d2_data::tables::{Pettype, Record};
+use d2_data::tables::{Experience, Pettype, Record};
 
 use crate::units::UnitId;
 
@@ -145,10 +145,94 @@ pub struct PetList {
     pub max: i32,
 }
 
+/// The `ExpRatio` column of `experience` as `0x00613E60(L)` reads it
+/// (§7.2 rule 3): the `MaxLvl` row (row 0) gives class 0's `MaxLvl`
+/// (table word 0) and its `ExpRatio` (word 7); row L + 1 holds level L
+/// (word `8·L + 15`). Empty: no table (every ratio 0).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExpRatios {
+    /// Table word 0: class 0 `MaxLvl`.
+    pub max_level: u32,
+    /// Table word 7: the `MaxLvl` row's `ExpRatio`.
+    pub max_row: u32,
+    /// `ExpRatio` of level L at index L (0 ..= `max_level`).
+    pub levels: Vec<u32>,
+}
+
+impl ExpRatios {
+    /// From the `experience` table. Strict: a table without a row for
+    /// every level up to its `MaxLvl` is an error (the 1.14d lookup reads
+    /// those rows unchecked).
+    pub fn from_table(experience: &BinTable) -> Result<Self, HirelingError> {
+        if experience.name != Experience::TABLE || experience.record_size != Experience::SIZE {
+            return Err(HirelingError::Table(format!(
+                "{} ({}-byte records) is not experience",
+                experience.name, experience.record_size
+            )));
+        }
+        let rows: Vec<Experience> = experience.iter().map(Experience::decode).collect();
+        let head = rows
+            .first()
+            .ok_or_else(|| HirelingError::Table("experience has no MaxLvl row".into()))?;
+        let max_level = head.amazon;
+        let levels: Vec<u32> = rows[1..].iter().map(|r| r.expratio).collect();
+        if (levels.len() as u64) <= u64::from(max_level) {
+            return Err(HirelingError::Table(format!(
+                "experience has {} level rows, MaxLvl {max_level}",
+                levels.len()
+            )));
+        }
+        Ok(Self {
+            max_level,
+            max_row: head.expratio,
+            levels,
+        })
+    }
+
+    /// `0x00613E60(L)` (§7.2 rule 3): L < 1 → the `MaxLvl` row's
+    /// `ExpRatio`; 1 ≤ L ≤ `MaxLvl` → level L's; above, or no table → 0.
+    pub fn ratio(&self, level: i32) -> i32 {
+        if self.levels.is_empty() {
+            return 0;
+        }
+        if level < 1 {
+            return self.max_row as i32;
+        }
+        if level as u32 > self.max_level {
+            return 0;
+        }
+        self.levels.get(level as usize).map_or(0, |&r| r as i32)
+    }
+
+    /// The `ExpRatio` step `0x0057E390(e, alvl)` (§7.2 rule 3): e ≤ 0 or
+    /// s − 1 ≥ 31 (unsigned) → e; else with limit = 0x7FFFFFFF >>
+    /// (((r >> s) + s) & 31): e > limit → (e >> s)·r, else (r·e) >> s
+    /// (32-bit signed `imul`, `sar`).
+    pub fn apply(&self, e: i32, alvl: i32) -> i32 {
+        if e <= 0 {
+            return e;
+        }
+        let r = self.ratio(alvl);
+        let s = self.ratio(0);
+        if (s as u32).wrapping_sub(1) >= 31 {
+            return e;
+        }
+        let sh = (r >> s).wrapping_add(s) as u32 & 31;
+        let limit = 0x7FFF_FFFFi32 >> sh;
+        if e > limit {
+            (e >> s).wrapping_mul(r)
+        } else {
+            r.wrapping_mul(e) >> s
+        }
+    }
+}
+
 /// The data this module reads besides the rows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HirelingTables {
     pub rows: HirelingRows,
+    /// `experience` `ExpRatio` (§7.2 rule 3).
+    pub exp_ratios: ExpRatios,
     /// `experience` `MaxLvl` of class 0 (`0x00611830(0)`; 99 in 1.14d).
     pub max_level: i32,
     /// `pettype` row 7 flags byte +4 (warp 0x1, range 0x2) and `basemax`
@@ -163,13 +247,16 @@ impl HirelingTables {
     /// `pettype` row 7 `range` (mask `0x006CE26C`).
     pub const RANGE: u8 = 0x2;
 
-    /// The tables from the fixed-up `hireling` and `pettype` tables and
-    /// the `experience` `MaxLvl` of class 0 (`vitals.md` §4.1).
+    /// The tables from the fixed-up `hireling`, `pettype` and
+    /// `experience` tables; `max_level` is the `experience` `MaxLvl` of
+    /// class 0 (`vitals.md` §4.1, table word 0).
     pub fn from_tables(
         hireling: &BinTable,
         pettype: &BinTable,
-        max_level: i32,
+        experience: &BinTable,
     ) -> Result<Self, HirelingError> {
+        let exp_ratios = ExpRatios::from_table(experience)?;
+        let max_level = exp_ratios.max_level as i32;
         if pettype.name != Pettype::TABLE || pettype.record_size != Pettype::SIZE {
             return Err(HirelingError::Table(format!(
                 "{} ({}-byte records) is not pettype",
@@ -183,6 +270,7 @@ impl HirelingTables {
             .ok_or_else(|| HirelingError::Table("pettype has no row 7".into()))?;
         Ok(Self {
             rows: HirelingRows::from_table(hireling)?,
+            exp_ratios,
             max_level,
             pet_flags: (u8::from(row.warp) * Self::WARP) | (u8::from(row.range) * Self::RANGE),
             pet_basemax: i32::from(row.basemax),
@@ -225,11 +313,18 @@ pub trait HirelingWorld {
     fn players(&self) -> Vec<UnitId>;
     /// A message to the player's client.
     fn send(&mut self, player: UnitId, bytes: &[u8]);
+    /// §13 rule 4 (`0x005718C0`): a stat record (`stat`, `value`) queued
+    /// on the unit's message list (+0xEC) and the unit queued for update.
+    /// The client pass flushes the list ([`level::flush_stats`]) to each
+    /// client updating the unit; the room update frees it.
+    fn queue_stat(&mut self, unit: UnitId, stat: u16, value: u32);
 
     // ---- units
     fn guid(&self, unit: UnitId) -> u32;
     /// `0x00552F60(game, 1, GUID)`: the monster of a GUID.
     fn monster_by_guid(&self, guid: u32) -> Option<UnitId>;
+    /// `0x00552F60(game, 0, GUID)`: the player of a GUID.
+    fn player_by_guid(&self, guid: u32) -> Option<UnitId>;
     /// Unit type (0 player, 1 monster, …).
     fn unit_type(&self, unit: UnitId) -> u8;
     /// Monstats class.
@@ -267,6 +362,12 @@ pub trait HirelingWorld {
     fn skill_reqlevel(&self, skill: u32) -> Option<i16>;
     /// `0x0056DEB0`: the unit's skill level of `skill` := `level`.
     fn set_skill_level(&mut self, unit: UnitId, skill: u32, level: i32);
+    /// §5 rule 3 (`0x00575900`): over the player's skills (skill list
+    /// order) whose `skills` `pettype` (+0xBE) is `pet_type`, the largest
+    /// `petmax` value (`0x00646CA0`, the calc +0xC0 at the skill's level;
+    /// a value below 1 counts as 1). `None`: no such skill (or no skill
+    /// list).
+    fn skill_pet_max(&self, player: UnitId, pet_type: u8) -> Option<i32>;
 
     // ---- other owners (AI, rooms, monsters, items, events)
     /// `0x0058F030(game, merc, GUID, type, 0, 0)` (§5 rule 1); GUID −1

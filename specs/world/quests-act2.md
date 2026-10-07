@@ -6,7 +6,9 @@
   against a trace.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::quests::act2`
-- **Related specs:** `world/quests.md` (owner of the shared machinery:
+- **Related specs:** `world/quests-act2-2.md` (answers to the
+  implementation questions QB-1–QB-20, Jerhyn's spawns §2, the orifice
+  insert and S→C 0x58 §3); `world/quests.md` (owner of the shared machinery:
   flag records §1, quest records §2, game entry §3, events and dispatch
   §4, updater and timers §5, status messages §6, NPC dialog hooks §7,
   act transitions and warp checks §8, quest items and helpers §9; this
@@ -23,26 +25,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 48–61 |
-| Inputs | 62–74 |
-| Outputs / state changes | 75–83 |
-| Rules | 84–85 |
-|   1. Conventions | 86–172 |
-|   2. Act II records | 173–192 |
-|   3. A2Q1 Radament's Lair (chain 8, slot 9) | 193–275 |
-|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 276–377 |
-|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 378–471 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 472–587 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 588–623 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 624–785 |
-|   9. Act II gossip and intro records | 786–794 |
-|   10. Hooks called from other systems | 795–811 |
-| Constants & data dependencies | 812–825 |
-| Randomness | 826–840 |
-| Edge cases & original bugs | 841–873 |
-| Test vectors | 874–894 |
-| Provenance | 895–917 |
-| Open questions | 918–944 |
+| Summary | 50–63 |
+| Inputs | 64–76 |
+| Outputs / state changes | 77–85 |
+| Rules | 86–87 |
+|   1. Conventions | 88–176 |
+|   2. Act II records | 177–196 |
+|   3. A2Q1 Radament's Lair (chain 8, slot 9) | 197–280 |
+|   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 281–383 |
+|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 384–478 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 479–594 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 595–630 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 631–798 |
+|   9. Act II gossip and intro records | 799–807 |
+|   10. Hooks called from other systems | 808–824 |
+| Constants & data dependencies | 825–838 |
+| Randomness | 839–853 |
+| Edge cases & original bugs | 854–887 |
+| Test vectors | 888–908 |
+| Provenance | 909–931 |
+| Open questions | 932–998 |
 <!-- /index -->
 
 ## Summary
@@ -125,10 +127,12 @@ record state to table state are read from the image (§Constants).
 #### 1.3 Chest pattern (scroll, staff and cube chests, Tainted Sun altar)
 
 A quest chest's operate function: passes `0x00545850(op)` (the shared
-quest-chest gate, object spec) or returns 0; sets the object's drop
-code; counts qualifying players (for each player, starting at the
+quest-chest gate, object spec) or returns 0 (the three chests only; the
+altar has its own guards, §5.7, and never calls the gate); sets the
+object's drop code once, before the count; counts qualifying players (for each player, starting at the
 operating player); creates that many quest items with `0x00559A30(game,
-object, quality, &level, 0, −1, droppable)` (item spec); drops the
+object, quality, &level, 0, −1, droppable)` (item spec; `&level` is an
+out parameter, `quests-act2-2.md` §1 item 20); drops the
 chest's own treasure with `0x00585B90(op, 4)` (magic, object spec);
 then one quest-seed step: n = (lo' mod 5) + 5; n times `0x00585970(game,
 object, 'gld ', 2)` (normal-quality gold). The chests return 0.
@@ -234,7 +238,8 @@ Requires chain 8 with not-intro = 1 and (state < 3 or status < 2) and
 the unit in level 49 (Sewers Level 3). Clear callback 2; state < 3 →
 state := 3. If status < 2: flags := 0, status := 2 with iterate =
 (extra +0x09 was 0; it becomes 1), then the §3.3 flag iterate (→ 9.4).
-If status ≥ 2 and the state was already ≥ 3: nothing more. The quest-
+If status ≥ 2: the flag iterate only when the state was just raised
+(no 0x5D); the state already ≥ 3: nothing more. The quest-
 chain link hook for monster 229 (`quests.md` §4.6, `0x005991B0`) is a
 bare `ret 4`.
 
@@ -341,7 +346,8 @@ Wants to talk: NPC 244 and (10.1 or the selector is true).
 - Pick-up (`0x00599A30`; only active records, `quests.md` §4.3): flags
   := 0; by code: `tr1 ` with 10.3 clear → status := 1; `vip ` / `box ` →
   status := 10.3 ? 2 : 6; `msf ` → status := 10.3 ? 2 : 6. Then, for
-  these codes, 0x5D to this player if F holds. The status byte is the
+  these status writes only, 0x5D to this player if F holds (`tr1 ` with
+  10.3 set: nothing beyond flags := 0). The status byte is the
   record's, shared by all players (edge case 3).
 - Drop (`0x00599B30`): `vip ` clears 10.4, `box ` 10.6, `msf ` 10.5 (each
   only when set).
@@ -464,9 +470,10 @@ not fara 178 — or NPC drognan 177 with state 1).
 #### 5.8 Altar init (init 20)
 
 `0x00544910`: chain 10 absent → object mode := 2 unless already 2.
-Else `0x0059A3F0`: +0x05 := 1, +0x0C := GUID; if not-intro and state ≤
+Else `0x0059A3F0`: +0x05 := 1, +0x0C := GUID; if not-intro: (state ≤
 1: darken (success → +0x02 := 1, failure → +0x03 := 1), state := 3,
-flags := 0; if status = 0: status 2 to all. Then mode := +0x08. So the
+flags := 0); then, still inside not-intro, status = 0 → status 2 to all
+(never true in 1.14d, `quests-act2-2.md` §1 item 5). Then mode := +0x08. So the
 quest reaches state 3 when the altar's room is first populated.
 
 ### 6. A2Q4 Arcane Sanctuary (chain 11, slot 12)
@@ -536,8 +543,8 @@ callback 2; flag iterate.
 If the object's mode is 0: mode := 1, end-animation event at frame +
 (objects `FrameCnt1` >> 8) (`0x005417D0` type 1). With chain 11: send
 the player the scroll text 396 (`0x005456A0`: an S→C 0x27 of type 2;
-bytes: Open question 4); +0x08 := the tome's room; if not-intro and
-state ≠ 5: state := 5; for each player: in level 74 without 12.0 and
+bytes: Open question 4); +0x08 := the tome's room; only if not-intro
+and state ≠ 5 (no grants in intro games): state := 5; for each player: in level 74 without 12.0 and
 12.1 (`0x0059B3F0`): set 12.13, 12.1, 12.0, clear bits 2–11
 (`0x0065C3E0`), set 12.8, 12.7, and their party members in Act II
 without 12.0 and 12.1 get the same six changes (`0x0059B360`); then the
@@ -567,15 +574,15 @@ C→S 0x31 (§6.5) to open the portal.
 
 #### 6.10 Jerhyn and the palace guard (spawn side; AI behaviour: AI spec)
 
-`0x0059EF70` (from event 3 and the palace init `0x0059F510`): if Jerhyn
-started (+0x0C) and his unit (+0x3C) exists: with an interact unit
-(`0x00572DC0`) call `0x00573180(0, 1)` (AI spec) and stop; else remove
-him (`0x0052E050`) and clear +0x0C. If
-+0x0D ≠ 1: x += 15, or −10 when chain 13 is not-intro with state < 2; y
-−= 3; free spot (`0x00545340`, size 3, mask 0x100, radius 9, limit 100);
-spawn monster 201 (`0x005B2F20`, mode 1, then mode 2 on failure); unit
-flags |= 0x3000000; +0x0D := 1; first time store the position (+0x15,
-+0x28, +0x2C). AI-facing hooks: §10.
+Moved to `quests-act2-2.md` §2 (1.14d re-read for QB-16): init 18
+`0x0059F380` spawns the start Jerhyn and is the only writer of +0x3C;
+init 19 `0x0059F440` spawns Kaelan (331) at (x + 1, y), schedules the
+object event 7 that creates the harem blocker, and calls the palace
+spawn `0x0059EF70(record, &point, room)` from the palace-Jerhyn object's
+position; event 3 calls it from the harem blocker's position. The
+offsets (x + 15 / x − 10, y − 3) apply to that base point; the spawn is
+mode 1 twice (spread −1, then 2). `0x0059F510` is a predicate (§10), not
+a caller. AI-facing hooks: §10.
 
 #### 6.11 Game start (event 13, `0x0059B530`)
 
@@ -690,10 +697,13 @@ state > 1 → set 14.2.
   mode := 1, S→C 0x58 (`0x0053D8D0`, the insert dialog), return 0;
   without `hst `: sound 19, return 1. Mode 1 and the orifice is the
   player's interact unit: reset it (`0x00554190`), mode := 2, return 0.
-- C→S 0x44 (`0x0054C380` → `0x005852E0`, object spec): orifice (class
-  152) with a cursor item that is not `hst ` → 0x58 result 4. Else the
-  item leaves the cursor (`0x0055EEA0`), 0x58 result 5 with byte 6 = 1;
-  orifice mode := 1 then 2 and `0x0059DD80` (§8.7).
+- C→S 0x44 (`0x0054C380` → `0x005852E0`, object spec; full path and the
+  0x58 layout: `quests-act2-2.md` §3): action 3 on the orifice (class
+  152) with a cursor item that is not `hst ` → 0x58 result 4. With `hst `
+  (no `0x0055EEA0` call for the orifice): reset the interact unit, 0x58
+  result 5 with byte 6 = 1; orifice mode := 1 then 2 and `0x0059DD80`
+  (§8.7). Action 2: result 1, mode 0. A busy player's operate returns 1
+  with no sound.
 
 #### 8.7 Handing in the staff (`0x0059DD80`)
 
@@ -749,8 +759,10 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
     from Tyrael: in level 73 without 14.13, 14.3, 14.4 → set 14.13,
     14.3 and character progression for Act II (`0x00538680(client, 2,
     difficulty)`; save spec) (`0x0059C860`); players with 14.13 → their
-    party members (`0x0059C9A0` → `0x0059C920`: chain 13 present, lacking
-    14.0, … in Act II: same changes; tail per D2MOO, not re-read);
+    party members (`0x0059C9A0` → `0x0059C920`: chain 13 present, member
+    lacks 14.0, 14.3, 14.4 and is in Act II, any level, own 14.13 not
+    tested: the same 14.13, 14.3 and progression via `0x0059C810`;
+    `quests-act2-2.md` §1 item 17);
     completion flag (`0x0059C9F0`: lacks 14.0, 14.3, 14.4 → 14.14 and
     `5D 0D 00 0C 0000`); +0x0F := 1, +0x09 := 1, callback 2 :=
     `0x0059C760`. +0x3C := 0.
@@ -766,7 +778,8 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 - Duriel's death (event 8, `0x0059D050`): if not-intro: state := 3;
   timer period 8 (`0x0059CEE0`: status ∉ {3, 4, 5} → status 3 to all;
   +0x00 := 0; returns 1); a killing player without 14.0, 14.3, 14.4,
-  14.5 gets 14.5 and his party (`0x0059CF20`), then a call of the stub
+  14.5 gets 14.5 and his party (`0x0059CF20`: member lacks 14.0, 14.3,
+  14.4, 14.5 and is in Act II → 14.5), then a call of the stub
   `0x00545990` (`ret 4`). Always: clear callbacks 2 and 8; +0x01 := 1;
   +0x60 := victim room; FX 8; players in level 73 without 14.0, 14.3,
   14.4, 14.5 get 14.5 and their party (`0x0059CFB0`); door (+0x05, GUID
@@ -788,8 +801,8 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 | Record | Rules |
 |---|---|
 | A2Q0 Jerhyn (chain 7, slot 8) | Event 0 (`0x005986B0`): jerhyn 201 with 8.0 clear → table state 0 (msg 253); cain2 244 with 4.14 and not in the extra GUID list → table state 1 (msg 125) and `0x005940A0` (Act I hook, `quests.md`). Event 11 (`0x00598640`): 253 from 201 → 8.0, game 8.13; 125 from 244 → add GUID (extra list). Event 10: remove. Event 13: 8.0 → game 8.13. Wants to talk: 201 with 8.0 clear. Status fn: false |
-| A2Q7 guard (chain 26, slot 30) | Event 0 (`0x0059E140`), NPC act2guard4 (377). 30.0 clear: if 9.0, 9.13, 9.1 or game 9.13 → inline step of the player unit seed, table state (lo' mod 3) + 2; else chain 8 intro → roll(player seed, 3) + 2; else 30.13 clear → roll(player seed, 2); else inline as above. 30.0 set → inline. Event 11 (`0x0059E0E0`): msg 59 or 60 → 30.13, others (61–63) → 30.0. Event 8: `ret`. Wants to talk: 377 and ((30.0, 30.13 clear) or (9.13 and 30.0 clear)) |
-| A2Q8 guard (chain 27, slot 31) | Event 0 (`0x0059E3F0`), act2guard5 (378): chain 13 not-intro, state < 2, chain 10 absent or intro or state ≥ 4, 14.1 and 14.0 clear → table state 0 (msg 303). Event 11: 303 → 31.0. Wants to talk: 378, chain 13 not-intro with state < 2, game 11.13, 14.1 and 14.0 clear |
+| A2Q7 guard (chain 26, slot 30) | Event 0 (`0x0059E140`), NPC act2guard4 (377). 30.0 clear: if 9.0, 9.13, 9.1 or game 9.13 → inline step of the player unit seed, table state (lo' mod 3) + 2; else chain 8 intro → roll(player seed, 3) + 2; else 30.13 clear → roll(player seed, 2); else inline as above. 30.0 set → inline. Event 11 (`0x0059E0E0`, NPC 377 only): msg 59 or 60 → 30.13 and callback 2 := `0x0059E0B0` (inert, `quests-act2-2.md` §1 item 3); any other message → 30.0. Event 8: `ret`. Wants to talk: 377 and ((30.0, 30.13 clear) or (9.13 and 30.0 clear)) |
+| A2Q8 guard (chain 27, slot 31) | Event 0 (`0x0059E3F0`), act2guard5 (378): chain 13 not-intro, state < 2, chain 10 absent or intro or state ≥ 4, 14.1 and 14.0 clear → table state 0 (msg 303). Event 11 (`0x0059E3C0`): 303 from 378 → 31.0. Wants to talk: 378, chain 13 not-intro with state < 2, game 11.13, 14.1 and 14.0 clear |
 | Act II intro (chain 38) | Event 0 (`0x005984C0`): special class per NPC: meshif1 0 (amazon), drognan 1 (sorceress), elzix 2 (necromancer), fara 3 (paladin), geglash 4 (barbarian); warriv2, greiz, lysander none. If the NPC's intro bit is clear (`0x005723C0`): table state 1 when the player's class matches, else 0. Atma and other NPCs: nothing. Event 11 (`0x005983E0`): messages 190, 203/204, 215, 230/231, 241/242, 263/264, 274, 285/286 from their NPC set the intro bit (`0x00572360`) |
 
 ### 10. Hooks called from other systems
@@ -857,8 +870,9 @@ their own item seeds. No other Act II quest code draws.
    her (§9).
 7. Tainted Sun's wants-to-talk list omits fara; the Summoner's omits
    greiz (§5.5, §7.2).
-8. The altar passes the altar's level id as the item-level argument of
-   the amulet drops (§5.7); the item spec decides what that means.
+8. The altar stores the altar room's level id in the item-level
+   variable before the amulet drops (§5.7), but `0x00559A30` overwrites
+   it unread (an out parameter, `quests-act2-2.md` §1 item 20).
 9. Tainted Sun reaches state 3 on the altar room's first population
    (§5.8), not on entering a level.
 10. The orifice timer reads `missiles.txt` row 338 without a range check
@@ -875,7 +889,7 @@ their own item seeds. No other Act II quest code draws.
 
 | Input | Expected | Source |
 |---|---|---|
-| Radament chat, record state 3, 9.0/9.1 clear, 9.13 clear, not GUID listed | table state 2 (msgs 325–334 row 3 of chain 8) | §3.2, index `0x007398FC` |
+| Radament chat, record state 3, 9.0/9.1 clear, 9.13 clear, not GUID listed | table state 2 (msgs 315–324; Atma 317) | §3.2, index `0x007398FC` |
 | Radament chat, state 4, 9.13 clear | nothing | §3.2 |
 | Radament killed; 3 players: A in the kill room, B adjacent, C in town (party of A); all lack 9.0/9.1, none holds `ass ` | A, B, C get 9.13, 9.1, 9.5; 3 books drop; A, B, C get sound 50 | §3.7 |
 | Cain selector: holds `box ` (10.6 set), `vip ` (10.4 clear) | out 9 then 1 → true → table state 1 | §4.3 |
@@ -926,13 +940,14 @@ their own item seeds. No other Act II quest code draws.
    field names: environment spec; record a Tainted Sun start.
 4. Bytes of the 0x27 type-2 scroll text sent by `0x005456A0` (tome
    message 396).
-5. `0x005723C0` / `0x00572360` (intro test / set used by chain 38) vs
-   `quests.md` §6.7's `0x00572470` / `0x00572420`: confirm they act on
-   the same player intro record.
-6. Item-level meaning of the altar's level-id argument (edge case 8):
-   item spec.
-7. `0x00538680(client, 2, difficulty)` (Duriel's portal): which save
-   progression field it changes (save spec).
+5. ~~Chain 38's intro storage~~ Answered: they act on field A (record
+   +0) of the player's NPC record, `quests.md` §6.7's pair on field B
+   (record +4); `quests-act2-2.md` §1 item 15 (`0x00572360`,
+   `0x00572420`).
+6. ~~Altar level-id argument~~ Answered: an out parameter, overwritten
+   at `0x00559AF8` (`quests-act2-2.md` §1 item 20).
+7. ~~`0x00538680(client, 2, difficulty)`~~ Answered:
+   `quests-act1-rest.md` §5 (client +0x0A bits 8–12, step 2).
 8. Init 37 (`0x0059DA50`) has no `objects.txt` user in 1.14d; confirm no
    preset spawns an object through it.
 9. `quests.tsv` column `spec` still says `catalogued` for Act II rows;
@@ -941,3 +956,42 @@ their own item seeds. No other Act II quest code draws.
 10. Record a full Act II run (packets + RNG, `docs/HANDOFF.md` §5) to
     confirm message order: chat-end status, kill timers, Tyrael's
     portal, Meshif's completion.
+11. QB-1 (test vector 1 messages): Answered, typo fixed (315–324);
+    `quests-act2-2.md` §1 item 1.
+12. QB-2 (event-10 bodies of chains 7 / 8, `0x005987B0` / `0x00598980`):
+    Answered, §1 item 2.
+13. QB-3 (NPC class in chains 26 / 27 event 11): Answered, both test it;
+    chain 26 installs `0x0059E0B0`; §1 item 3.
+14. QB-4 (altar gate): Answered, no `0x00545850` call; §1 item 4.
+15. QB-5 (altar init status 0 → 2): Answered, unreachable in 1.14d
+    (`0x0059A43C`); §1 item 5.
+16. QB-6 (game-start status / state): Answered, byte stores only; §1
+    item 6.
+17. QB-7 (§5.6 / §6.7 scope): Answered (`0x0059ED63`, `0x0059B9E4`);
+    §1 item 7.
+18. QB-8 (Summoner +0x09, 13.2 iterate): Answered (`0x0059C1A9`,
+    `0x0059C391`); §1 item 8.
+19. QB-9 (Tyrael chat): Answered (`0x0059C448`); §1 item 9.
+20. QB-10 (msgs 442 / 430): Answered (`0x0059CCFA`, `0x0059CC54`); §1
+    item 10.
+21. QB-11 (0x44 non-orifice, 0x58 layout): Answered (`0x005852E0`,
+    `0x0053D8D0`); §1 item 11, §3.
+22. QB-12 (Duriel kill party credit): Answered (`0x0059CF20`); §1 item
+    12.
+23. QB-13 (`tr1 ` pick-up with 10.3): Answered, no 0x5D (`0x00599AA9`);
+    §1 item 13.
+24. QB-14 (counts per code): Answered, one per code (`0x00558110`); §1
+    item 14.
+25. QB-15 (= open question 5): Answered; §1 item 15.
+26. QB-16 (Jerhyn's palace spawn): Answered (`0x0059EF70`, `0x0059F380`,
+    `0x0059F440`, `0x0059F0C0`); `quests-act2-2.md` §2.
+27. QB-17 (Tyrael's party tail): Answered (`0x0059C920`, `0x0059C810`);
+    §1 item 17.
+28. QB-18 (bodies `0x005940A0`, `0x005985C0`, status fns of 7 / 26 / 27
+    / 38): Answered; §1 item 18.
+29. QB-19 (§3.6 status ≥ 2 with state < 3; busy orifice): Answered
+    (`0x005994C8`, `0x0059DCFC`); §1 item 19.
+30. QB-20 (chest drop code, item level): Answered (`0x00599D08`,
+    `0x00559AF8`); §1 item 20.
+31. Byte 6 of the orifice's S→C 0x58 (results 0, 1, 4) is a stale stack
+    byte: Needs recording (`quests-act2-2.md` open question 1).

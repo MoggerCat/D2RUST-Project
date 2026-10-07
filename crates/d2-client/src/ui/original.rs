@@ -1,4 +1,4 @@
-// Spec: specs/ui/panels.md
+// Spec: specs/ui/panels.md, specs/client/msg-ui.md (via `msg_ui`)
 //! The original panels wired into a [`UiRoot`] (§2–§10): [`OriginalUi`]
 //! owns the 38 UI flags ([`UiStates`], the authority), the loaded panel
 //! tables and the panel state; [`OriginalUi::install`] adds one
@@ -23,6 +23,8 @@
 //! skill list), character (ui 2: art and close button, §8.1–§8.3), the
 //! border and control panel base (§6, every frame). The model holds no
 //! input for the rest; each stays out with its reason in [`PENDING`].
+//! The bridge's UI outputs (S→C 0x5D, 0x63, 0x77; `client/bridge.md`
+//! §10) are applied by [`OriginalUi::apply_output`] (`msg_ui`).
 //! Nothing here decides an outcome: the client sends intents and draws.
 
 use std::cell::RefCell;
@@ -40,6 +42,7 @@ use super::panels::{emit_static_draws, no_extra, PanelEnv, PanelOutput, PanelTab
 use super::root::{Routed, UiError, UiRoot};
 use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
+use crate::audio::driver::SoundRequest;
 use crate::bridge::world::{ClientWorld, PLAYER};
 use crate::controls::Action;
 use crate::rules::camera::OpenMode;
@@ -57,9 +60,11 @@ pub const CLICK_SOUND_ID: i32 = 0;
 pub const PENDING: &[(&str, &str)] = &[
     (
         "character values, labels, stat-point box and add buttons (§8.4–§8.9)",
-        "total stat values (`0x00625480`), base vs total, resist effects, language and \
-         string lookup by id are not in the client model (it holds layer-0 base stats only, \
-         `msg-stats-items.md` §1); add buttons stay inactive (statpts unknown)",
+        "the totals and bases are the model's (`ClientWorld::total` / `base`, \
+         `client/stat-lists.md` §1 r3), but resist effects (`0x0063A570` family), the \
+         expansion resist penalty (`0x00611D30`), the language, the popup width \
+         (`0x00502520`) and the string lookup by id are not wired into the original UI; add \
+         buttons stay inactive",
     ),
     (
         "inventory equipment backgrounds (§9.4)",
@@ -68,20 +73,29 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "skill tree icons and level numbers (§10.3–§10.5)",
-        "the class skill list (S→C 0x94 has no client handler), the icon file prefix `CC` \
-         (spec open), the flag mask `[0x006CE270]`",
+        "the skill list is in the model (`client/msg-skills.md`), but the icon file prefix \
+         `CC` (spec open), the flag mask `[0x006CE270]` and the fields the tree shows \
+         (`msg-skills.md` open question 3) are not",
     ),
     (
-        "waypoint menu (ui 0x14, §13)",
-        "its opener S→C 0x63 has no client handler; tab / row click rectangles (spec OQ 7)",
+        "waypoint menu panel (ui 0x14, §13 r2–r7)",
+        "S→C 0x63 opens it (flag, GUID, record: `msg_ui`), but the row rebuild, the tab \
+         gates (client quest flags, `msg-ui.md` open question 4) and the tab / row click \
+         rectangles (spec OQ 7) are not specified",
     ),
     (
-        "stash, cube, NPC menu, NPC shop (ui 0x19, 0x1A, 8, 0x0C; §11, §12, §14)",
-        "their openers (S→C 0x77 / NPC interaction messages) have no client handler",
+        "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
+        "S→C 0x77 opens and closes them (flag and inventory mode: `msg_ui`); their art, \
+         grids and buttons are not wired",
+    ),
+    (
+        "NPC menu, NPC shop (ui 8, 0x0C; §14)",
+        "their openers (NPC interaction messages) have no client handler",
     ),
     (
         "cursor jump (§4.3, `UiEffect::CursorX`)",
-        "only the waypoint menu and ui 0x0F pass jump 1 (not wired); no cursor-warp edge",
+        "the waypoint menu passes jump 1 (S→C 0x63); the effect is reported but there is \
+         no cursor-warp edge",
     ),
     (
         "hotkeys for other states (escape menu, chat, automap, quests, party)",
@@ -215,14 +229,19 @@ type SharedRef = Rc<RefCell<Shared>>;
 pub struct UiOutcome {
     /// `SetUIState` effects, in call order.
     pub effects: Vec<UiEffect>,
-    /// Sound requests (id) for the audio side, in order.
-    pub sounds: Vec<i32>,
+    /// Sound requests for the audio side, in order.
+    pub sounds: Vec<SoundRequest>,
+    /// Parts of the bridge outputs' UI dispatch not run because no spec
+    /// gives their input or callee (`msg_ui::skip`), in order.
+    pub skipped: Vec<&'static str>,
 }
 
 /// The original UI (`ui/panels.md`): flags, tables and panel state.
 pub struct OriginalUi {
     shared: SharedRef,
     outcome: UiOutcome,
+    /// The UI globals of the bridge outputs (`client/msg-ui.md`).
+    msg: MsgUiState,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -233,6 +252,10 @@ pub enum OriginalUiError {
     Root(#[from] UiError),
     #[error(transparent)]
     State(#[from] UiStateError),
+    /// The waypoint record's load copy refused its magic (fatal in
+    /// 1.14d, `world/waypoints.md` §2 rule 5).
+    #[error(transparent)]
+    Waypoint(d2_sim::world::waypoints::WaypointError),
 }
 
 impl OriginalUi {
@@ -257,6 +280,7 @@ impl OriginalUi {
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
             outcome: UiOutcome::default(),
+            msg: MsgUiState::default(),
         })
     }
 
@@ -301,11 +325,15 @@ impl OriginalUi {
 
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
-        let mut sh = self.shared.borrow_mut();
-        sh.facts = Facts::of(world);
+        self.refresh_facts(world);
         if let Some(p) = e.at() {
-            sh.mouse = p;
+            self.shared.borrow_mut().mouse = p;
         }
+    }
+
+    /// Reads the model facts the gate uses (§2.5, §3).
+    fn refresh_facts(&mut self, world: &ClientWorld) {
+        self.shared.borrow_mut().facts = Facts::of(world);
     }
 
     /// Applies what the routed event asked for (module doc): panel
@@ -325,7 +353,9 @@ impl OriginalUi {
                 PanelOutput::SetUi { ui, mode, jump } => {
                     self.set_ui(u32::from(ui), u32::from(mode), jump)?;
                 }
-                PanelOutput::ClickSound => self.outcome.sounds.push(CLICK_SOUND_ID),
+                PanelOutput::ClickSound => {
+                    self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
+                }
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
@@ -350,6 +380,18 @@ impl OriginalUi {
     /// The effects and sounds since the last call.
     pub fn take_outcome(&mut self) -> UiOutcome {
         std::mem::take(&mut self.outcome)
+    }
+
+    /// The sound requests since the last call (the rest of the outcome
+    /// stays).
+    pub fn take_sounds(&mut self) -> Vec<SoundRequest> {
+        std::mem::take(&mut self.outcome.sounds)
+    }
+
+    /// The skipped parts since the last call (the rest of the outcome
+    /// stays).
+    pub fn take_skipped(&mut self) -> Vec<&'static str> {
+        std::mem::take(&mut self.outcome.skipped)
     }
 }
 
@@ -607,6 +649,10 @@ impl Panel for BorderUi {
         UiResponse::Ignored
     }
 }
+
+#[path = "msg_ui.rs"]
+pub mod msg_ui;
+pub use msg_ui::{MsgUiState, WaypointMenuState};
 
 #[cfg(test)]
 #[path = "original_tests.rs"]

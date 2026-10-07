@@ -185,8 +185,9 @@ impl LevelTypes for Hooks {
         wy: i32,
         cell: u32,
         orientation: u32,
-    ) {
+    ) -> bool {
         self.doors.push((wx, wy, cell, orientation));
+        false
     }
 
     fn warp_unit(&mut self, _: &mut Drlg, _: DrlgRoomId, wx: i32, wy: i32, cell: u32) {

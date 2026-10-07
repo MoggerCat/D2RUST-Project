@@ -170,4 +170,4 @@ every used entry's value decoded as strict UTF-8 and as Windows-1252.
    Check in an RE session. Until then they're treated as unused tool
    leftovers.
 3. String-size limit (§Strings) assumes entries never share key or value
-   bytes: confirm on all 33 1.14d tables (`mpq-tool formats`).
+   bytes: confirm on all 29 1.14d tables (`mpq-tool formats`).

@@ -204,10 +204,10 @@ impl Drlg {
         };
         if let Some(t) = &room.tiles {
             for r in t.walls.iter().filter(|r| blocks(r)) {
-                // TODO(spec: levels.md §11.3 r4): own wall records are
-                // room-relative 0..=W / 0..=H; the original's local grid
-                // (1,024 cells) has no bound check. Out-of-grid records
-                // are skipped here.
+                // §11.3 step 4: own records lie in 0..=W × 0..=H (the
+                // fixed 1,024-cell buffer never overflows in 1.14d), so
+                // this test never skips one.
+                debug_assert!((0..cw as i32).contains(&r.x) && (0..ch as i32).contains(&r.y));
                 if (0..cw as i32).contains(&r.x) && (0..ch as i32).contains(&r.y) {
                     b[r.y as usize * cw + r.x as usize] = true;
                 }
@@ -302,11 +302,20 @@ impl Drlg {
         }
         let (cx, cy) = (x - room.rect.x, y - room.rect.y);
         let cw = room.rect.w + 1;
-        if cx < 0 || cy < 0 || cx >= cw || cy > room.rect.h {
+        // §11.4 table: the record grid is one block of (W+1)(H+1) cells
+        // after H+1 row offsets; with 0 ≤ cy ≤ H a cell index inside the
+        // block reads that cell, so cx outside 0..W wraps into the row
+        // before or after. A negative index reads a row offset as a
+        // record pointer and anything else reads outside the block: not
+        // reproducible, no record here (the spec's choice).
+        if !(0..=room.rect.h).contains(&cy) {
             return None;
         }
-        let k = info.record_grid[(cy * cw + cx) as usize];
-        Some(info.list[k])
+        let k = cy * cw + cx;
+        if !(0..cw * (room.rect.h + 1)).contains(&k) {
+            return None;
+        }
+        Some(info.list[info.record_grid[k as usize]])
     }
 
     /// `0x0066CF30` (§11.4): the record list of the room's info, head
@@ -317,8 +326,9 @@ impl Drlg {
 
     /// `0x0066CEB0` (§11.4): the record at a sub-tile point: one-record
     /// room → its record; else the record grid at (x/5 − X, y/5 − Y)
-    /// (C division). `None` without info or for a point outside the grid
-    /// (the original reads outside it).
+    /// (C division), a column outside 0..W wrapping into the next or
+    /// previous row as in the original's single block. `None` without
+    /// info or where the original reads outside the block (§11.4 table).
     pub fn coord_at(&self, id: DrlgRoomId, x: i32, y: i32) -> Option<CoordRec> {
         self.coord_at_tile(id, x / SUBTILES, y / SUBTILES)
     }
@@ -342,8 +352,8 @@ const OBJECT_WALL: u32 = 0x800;
 
 /// The step-6.3 rule for orientation `o` entered in direction `d`.
 fn rule(o: u32, d: i32) -> u32 {
-    // TODO(spec: levels.md §11.3 r6): orientations above 19 read past
-    // T1 (no bound check, values not given); treated as rule 0 here.
+    // §11.3 step 6: orientations above 19 read past T1 into a string (not
+    // reproducible); no 1.14d DS1 wall layer holds one. Read as rule 0.
     let Some(&t1) = T1.get(o as usize) else {
         return 0;
     };

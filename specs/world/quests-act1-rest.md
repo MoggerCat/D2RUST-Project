@@ -19,24 +19,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–52 |
-| Inputs | 53–63 |
-| Outputs / state changes | 64–71 |
-| Rules | 72–73 |
-|   1. A1Q4 gibbet (Cain's cage, object class 26) | 74–144 |
-|   2. Cairn stones (object classes 17–21) | 145–192 |
-|   3. Town-Cain marker (object class 385, `InitFn` 54) | 193–219 |
-|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 220–258 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 259–282 |
-|   6. Party list as read by the quest code | 283–308 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 309–318 |
-|   8. Act I clarifications (implementation questions, 2026-10-06) | 319–389 |
-| Constants & data dependencies | 390–403 |
-| Randomness | 404–410 |
-| Edge cases & original bugs | 411–427 |
-| Test vectors | 428–450 |
-| Provenance | 451–475 |
-| Open questions | 476–490 |
+| Summary | 43–53 |
+| Inputs | 54–64 |
+| Outputs / state changes | 65–72 |
+| Rules | 73–74 |
+|   1. A1Q4 gibbet (Cain's cage, object class 26) | 75–147 |
+|   2. Cairn stones (object classes 17–21) | 148–195 |
+|   3. Town-Cain marker (object class 385, `InitFn` 54) | 196–222 |
+|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 223–261 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–285 |
+|   6. Party list as read by the quest code | 286–311 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 312–321 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 322–392 |
+|   9. Implementation and wiring questions (2026-10-07) | 393–552 |
+| Constants & data dependencies | 553–568 |
+| Randomness | 569–575 |
+| Edge cases & original bugs | 576–599 |
+| Test vectors | 600–631 |
+| Provenance | 632–665 |
+| Open questions | 666–693 |
 <!-- /index -->
 
 ## Summary
@@ -89,8 +90,10 @@ New chain 4 extra fields (the rest are in `quests-act1.md` §10.6):
 | +0x62 | u8 | Cain could not be spawned in Tristram |
 | +0x66 | u8 | town portal out of Tristram created by §1.2 |
 | +0x74 | u32 | scratch: player unit found in Tristram (§1.2 step 4) |
+| +0x80 | u32 | cain portal event-7 count in the Rogue Encampment (§9 item 10) |
 | +0x84, +0x88 | i32 × 2 | position of the town-Cain marker object (§3) |
-| +0x91 | u8 | set to 1 by `0x005944F0` (§3); no reader in this chain's code |
+| +0x91 | u8 | set to 1 by `0x005944F0` (§3); read by the cain portal's event 7 (§9 item 10) |
+| +0x92 | u8 | the town cain portal may advance to mode 3 (§9 item 10) |
 | +0x96 | u8 | Cain portal object created by `0x005944F0` (§3) |
 | +0xA4 | u32 | GUID of that portal object (§3) |
 
@@ -124,7 +127,7 @@ New chain 4 extra fields (the rest are in `quests-act1.md` §10.6):
    3) (`0x0045ADF0`, `0x0045AE20`); room = the object's room.
    C = spawn cain1 (146) at (room, x, y), mode 1, spread −1, flags 0
    (`0x005B2F20`). C none: free spot from (x, y) in room
-   (`0x00545340`: size 2, mask 0x100, radius 3, limit 100); found →
+   (`0x00545340`: size 2, mask 0x100, radius 3 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); found →
    C = spawn at the free spot in its room with the same arguments.
 4. C none (both tries failed): a debug log (`0x00544070`, no effect);
    X +0x74 := 0; every player `0x00593220` (the first player, in walk
@@ -387,6 +390,166 @@ from the 1.14d disassembly at the addresses given.
    internal error when `fn` fails `IsBadCodePtr`. A host's player list
    must yield exactly this order.
 
+### 9. Implementation and wiring questions (2026-10-07)
+
+Each item answers one question of the `impl-quests-act1-rest` note
+(HANDOFF §7 ninth set, QA-1–QA-6) or of the `wire-world-staging` note
+(§3 item 1, WW-6), read from the 1.14d disassembly at the addresses
+given.
+
+1. **QA-1: monster spawn with a null room (§4 step 2.3.2).** The
+   creation function `0x005B2A00` (through `0x005B2F20`, which builds the
+   request with no coordinate list) first checks the class (monstats and
+   monstats2 rows, table reads only), then reads the room box through
+   `0x00619730`, which returns an all-zero box for a null room
+   (`0x0061975D`), and then returns null when the room is null
+   (`0x005B2B50`). Nothing is allocated and no seed is stepped before that
+   test. The room lookup `0x00463740` itself returns null for a null
+   start room (`0x0046374B`). So the trap retry with no room spawns
+   nothing, draws nothing and goes to the next entry; d2rs's "spawn
+   skipped" is the 1.14d behaviour.
+2. **QA-2: an object or marker without a room.** The room of an object
+   (`0x00620BB0`) is its static path +0x00, read without a test; it is
+   null for a unit left in a freed room (`drlg/rooms.md` §8.2 rule 4:
+   static room := null, the unit stays allocated and keeps its GUID).
+   No site below tests the room itself; 1.14d then does this:
+
+   | Site | With a null room |
+   |---|---|
+   | gibbet event 7 `0x00593290` | both cain1 spawns return null (item 1); the free-spot search `0x00545340` finds nothing (every point's room lookup is null; out room := 0 at `0x005454CE`); §1.2 step 4 runs. Its portal call `0x0056D130` exits with an internal error on a null room (line 0xE42, `0x0056D147`), so the game ends there when a player is in Tristram and X +0x66 = 0; otherwise step 4 sets X +0x52 / +0x62 and step 6 runs normally |
+   | Cain leaves Tristram `0x005944F0` | the marker init re-run (§3 step 2) passes the null room to the town Cain spawn `0x00592960`: every spawn try returns null (item 1): no Cain, X +0x51 stays 0, X +0x52 stays 1, no draw. Step 3: the Cain monster's room is its dynamic path +0x1C (0 without a path); `0x00463740(null)` → null → no portal object |
+   | event-3 town Cain (`quests-act1.md` §10.6 step 3.3, §8 item 3) | as the row above: nothing spawns, nothing is drawn |
+   | trap chest `0x005954F0` | while T is none: both room lookups are null (`0x00595579`, `0x005955C8`), both spawns null → next entry (no missile for that chest). Once T exists the chest's room is not read: the missile is still created at the chest's position (static +0x0C, +0x10), owned by T |
+   | gibbet operate refresh `0x0061AED0(room, 0)` | null room → nothing (`0x0061AED6`) |
+
+   d2rs reproduces these effects instead of reporting a fatal error;
+   only the gibbet portal row is fatal (the original's internal-error
+   exit at `0x0056D147`). This replaces the "invariant violation" reading of
+   §8 item 3 for a marker without a room: the town Cain spawn simply
+   finds no room and spawns nothing.
+3. **QA-3: the L4 party step (`quests-act1.md` §10.6 L4, `0x00593130`).**
+   The party walk (`0x00554630`, then `0x00540510` with `0x005930B0`;
+   `0x00593195`–`0x005931AF`) is inside the test: it runs only after P
+   passed "neither 4.0 nor 4.1, room not null, room level 38" and got
+   4.13, 4.1 and its 0x28. A P that fails any test returns at once. L4
+   always returns 0. The member step `0x005930B0` tests the member the
+   same way, with "room not null, level ≠ 0 and its act (`0x006427F0`) =
+   0" in place of level 38. The reading in §1.1 step 9 and in the
+   `quests-act1.md` §10.6 table is correct.
+4. **QA-4: a player without a client (§5).** The A1Q6 credit
+   `0x00596210` takes the client from `0x005531C0` (player data +0x9C;
+   null only for a null unit or a non-player) and passes it to
+   `0x00538680` with no test; `0x00538680` reads client +0x0A at once
+   (`0x00538684`). A null client would fault, so 1.14d has no "no
+   progression" path. d2rs treats a player without a client here as an
+   invariant violation (fatal), like item 2's fatal row; a host gives
+   every player a client.
+5. **QA-5: extra +0x38 has no reader (§8 item 1).** Chain 4's extra is
+   reachable only through record +0x18 of chain 4. Every constant lookup
+   of chain 4 (`0x00543640` with id 4; an `all.asm` scan of the id
+   argument of every call site, including the `lea edx, [eax + k]`
+   forms) lies in the chain-4 functions `0x005928C0`–`0x00597310`; the
+   sequence walk (`quests-act1.md` §10.1, chain 3's `seq_id` = 4) hands
+   chain 4's record only to chain 4's own sequence function
+   `0x00593D70`; init 7 (item 8) walks the record list itself and calls
+   `0x00594060`. None of these reads +0x38. Confirmed: no reader in
+   1.14d.
+6. **QA-6: chain 37's event 11 `0x0058F870` before Kashya's reward.** Its
+   body is `quests-act1.md` §10.3 (Act I intro, event 11): a jump table
+   on NPC class − 147 (`0x0058F8CC`, 8 entries: 147 gheed → messages 45,
+   46; 148 akara → 11, 12; 150 kashya → 24, 25; 154 charsi → 36, 37; 149
+   and 151–153 nothing); a listed pair sets the player's first-talk bit
+   for that NPC (`0x00572360`; `quests.md` §6.7, record +0x00). It sends
+   nothing, draws nothing and does not read chain 2. For Kashya's reward
+   message 92 it does nothing at all, so running it first (records are
+   visited newest first, `quests.md` §2.3: chain 37 before chain 2) has
+   no observable effect on the reward's messages.
+7. **Quest object init order (wiring note §3 item 1; `sim/rng.md`
+   §5.3).** An object's `InitFn` runs inside its allocation
+   `0x00555230`: after the unit's game-seed step (`0x00552DF0`, called at
+   `0x0055530E`) and before the creator gets the object back
+   (`world/objects.md` §3: before the object is added to the world and
+   before the `PreOperate` draw). For the town-Cain marker (class 385,
+   `InitFn` 54, `0x005940E0`, §3) every draw of the town Cain spawn
+   `0x00592960` therefore happens at that point, before any later draw of
+   the code that creates the marker (the room's next preset object or
+   monster):
+   1. X +0x6C, +0x70, +0x84, +0x88 are written first; the spawn runs
+      only when X +0x52 = 1 and X +0x51 = 0.
+   2. The point and free-spot searches (`0x00619730`, `0x00545340`) draw
+      nothing.
+   3. Each spawn try (`0x005B2F20`, class 265, mode 1; spread 5, then up
+      to 20 tries with spread 10, then one with 15) draws as
+      `monsters/population.md` §9.3 states (the active-room seed of the
+      try's room, for the ring search) and, when the monster is created,
+      as `monsters/init.md` §4 states. Tries stop at the first success.
+   4. The marker is added to the world only after the init returns, so
+      Cain's placement does not see it (row 385 has size 0 × 0 in 1.14d
+      `objects.txt` in any case).
+
+   The same holds for every quest `InitFn` of this file (6, 7, 9, 54,
+   61): its draws, timers (6: the Tristram-portal timer) and object
+   events (61: event 7) happen inside the allocation, so they take their
+   place in the seeds and in the timer lists before the creator's next
+   allocation. Inits 6, 7, 9 and 61 also set the object's mode, which
+   the add-to-world footprint stamp after the init reads
+   (`world/objects.md` §3). A host that runs the init later (the wiring's
+   drained queue) is therefore exact for none of the five.
+8. **WW-6: gibbet init (`InitFn` 7, `0x00544990`, class 26).** Finds
+   chain 4's record by walking the record list from the control's newest
+   record (no assert). Not found (or no quest control): object mode := 2
+   unless it is 2. Found: `0x00594060(record, init args)`: object mode :=
+   X +0x54 (an i32: 3 once the gibbet was opened, else 0); X +0x48 := 1;
+   X +0x34 := the object's GUID (−1 when none). No draw, no message.
+9. **WW-6: Inifuss tree init (`InitFn` 9, `0x00593FC0`, class 30).**
+   Chain 4's record absent: object mode := 2 unless it is 2. Present: X
+   +0x47 := 1 (the tree's GUID at +0x30 is not written here; the tree
+   operate writes it); if not-intro = 0 or X +0x50 ≠ 0: X +0x58 := 1;
+   then object mode := X +0x58 (i32). No draw, no message.
+10. **WW-6: Cain portal (class 189 `Dummy` "cain portal", `InitFn` 61,
+    `0x00594290`).** Init: object mode := 1; object event 7 at frame
+    (game +0xA8) + 25 (`0x005417D0`). Event 7 runs through `quests.md`
+    §9.5 (class 189, room level in Act I → chain 4's record and
+    `0x005942C0(record, object)`; no record → nothing). `0x005942C0`, by
+    the object's mode m (0 when no object):
+    - m = 1: mode := 2.
+    - m = 2: if the object's room level is 1 (Rogue Encampment): X +0x80
+      (u32) += 1, and when it is then > 5, X +0x92 := 1; then if X +0x92
+      ≠ 0: mode := 3. Other levels: mode := 3 when X +0x91 ≠ 0 (set when
+      Cain leaves Tristram, §3).
+    - m = 3: mode := 4.
+    - other modes: nothing.
+
+    In every case event 7 is scheduled again at frame + 25, so the
+    object keeps a 25-frame event for its lifetime. X +0x80 and +0x92
+    are chain-4 fields shared by every Act I cain portal of the game and
+    never reset by this code. No draw, no message.
+11. **WW-6: Wirt's body (class 268).** Live 1.14d `objects.txt` row 268
+    has `InitFn` 0 (no init) and `OperateFn` 33. `InitFn` 37
+    (`0x0059DA50`) is not Wirt's: it looks up chain 13 (A2Q6) and no
+    1.14d row uses it (`object-functions.tsv` "Unused37"; Act II owner).
+    Operate 33 `0x00583E70` (operate args: game, object, player, …,
+    class; returns 1 in every case):
+    1. End if the object exists and its mode ≠ 0.
+    2. Object drop code (+0xB8) := `leg `.
+    3. Drop at the object: `0x00559A30(game, object, 2, &out, 0, −1, 0)`
+       (the same call as the tree operate). No item → end (the drop code
+       stays `leg ` and the mode 0, so the next operate tries again).
+    4. Item dropped: object mode := 1; object event 1 at frame + (D
+       +0xDC >> 8) + 1, D = the `objects.txt` record of the class
+       argument (`0x00640E90`); object event 7 at frame + 10. Event 7
+       then runs the gold piles (`quests-act1.md` §10.6 Wirt's body,
+       `0x00594630`).
+12. **WW-10: `0x0061AED0(room, clear)` ("refresh room").** Room null →
+    nothing. Else, on the room's DRLG room (active room +0x10,
+    `0x0061BAC0`): clear = 0 → flags (+0x28) |= 0x400000; clear ≠ 0 →
+    flags &= ~0x400000. 0x400000 is the flag that makes the room-removal
+    test false (`drlg/rooms.md` §8 rule 1), so the quest calls with 0
+    (gibbet operate §1.1 step 7, trap missile §4 step 2.5, stone missile
+    `quests-act1.md` §10.6) keep that room active for the rest of the
+    game; the missile bodies call it with 1 (`missiles/bodies.md`) and
+    release it. It sends nothing.
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -400,6 +563,8 @@ from the 1.14d disassembly at the addresses given.
 | init / operate tables | `0x00731BC0` (index record +0x1B1, < 0x50), `0x00732D18` (index +0x1B3, < 0x65; classes 22, 121, 122 skipped) | `0x0054F5D0`, `0x00584420` |
 | gibbet delays | event 1 at + (D +0xDC >> 8), event 7 at + 17 frames | §1.1 |
 | Cain offset | +3, +3; portal +6, +6; stone portal +4, +4; chest retry +5, +5 | §1.2, §2.3, §4 |
+| cain portal | object 189, `InitFn` 61; event 7 every 25 frames | §9 item 10 |
+| Wirt's body | object 268, `InitFn` 0, `OperateFn` 33; drop code `leg `; event 7 at + 10 | §9 item 11 |
 
 ## Randomness
 
@@ -424,6 +589,13 @@ from their own seeds as their owners state (`monsters/init.md`,
    makes no portal and no Cain; X +0x52 then lets the town Cain spawn
    (`quests-act1.md` §10.6 step 3.3).
 6. 0x50 bytes 13–14 are stack leftovers (§7).
+7. A roomless gibbet whose Cain spawn fails while a player is in
+   Tristram ends the game with an internal error (portal creation with a
+   null room, §9 item 2).
+8. The cain portal's town counter X +0x80 is shared by every cain portal
+   of the game and never reset (§9 item 10).
+9. A failed Wirt's body drop leaves the drop code `leg ` and mode 0, so
+   the body can be operated again (§9 item 11).
 
 ## Test vectors
 
@@ -447,6 +619,15 @@ from their own seeds as their owners state (`monsters/init.md`,
 | A1Q2 message 92 with 2.1, no hireling | 0x28, then 0x50 (u16 2) and the hireling's messages, then 0x27, 0x29 | §8 item 8 |
 | stone init, not-intro 1, X +0x4C 0, +0x4D 0, +0x50 0 | mode unchanged | §2.2 |
 | stone 17 init, X +0x4C 1, +0x45 0, +0x44 0 | +0x4C 0; +0x40 = GUID; +0x44 1; timer period 1; mode 2 | §2.2 |
+| trap step, T none, chest without a room | no spawn, no draw, no missile for that chest; next entry | §9 items 1, 2 |
+| trap step, T exists, next chest without a room | missile 332 at the chest's position, owner T | §9 item 2 |
+| gibbet init, X +0x54 = 3 | object mode 3; X +0x48 1; X +0x34 = GUID | §9 item 8 |
+| tree init, not-intro 1, X +0x50 0, X +0x58 0 | X +0x47 1; mode 0 | §9 item 9 |
+| tree init, not-intro 0 | X +0x47 1; X +0x58 1; mode 1 | §9 item 9 |
+| cain portal in level 1, mode 2, X +0x80 = 5, +0x92 0 | X +0x80 6; X +0x92 1; mode 3; event 7 at + 25 | §9 item 10 |
+| cain portal in Tristram, mode 2, X +0x91 0 | mode 2; event 7 at + 25 | §9 item 10 |
+| Wirt's body operate, mode 0, drop succeeds, frame f, D +0xDC = 0x100 | drop code `leg `; mode 1; event 1 at f + 2; event 7 at f + 10 | §9 item 11 |
+| `0x0061AED0(room, 0)` then `(room, 1)` | DRLG room flag 0x400000 set, then cleared | §9 item 12 |
 
 ## Provenance
 
@@ -472,6 +653,15 @@ from their own seeds as their owners state (`monsters/init.md`,
 Ghidra backlog (2026-10-06): `0x005944F0` read in full; its selectors
 at `0x005E77F3` (in `0x005E77A0`) and `0x005E7943` (in `0x005E7880`);
 object row 189 from live `objects.txt`.
+- §9 (2026-10-07): `0x005B2F20`, `0x005B2A00` (head to the room test),
+  `0x00619730`, `0x00463740`, `0x00620BB0`, `0x00620870`, `0x00545340`,
+  `0x0056D130` (head), `0x0061AED0`, `0x0061BAC0`, `0x00593130`,
+  `0x005930B0`, `0x00596210`, `0x005531C0`, `0x00538680`, `0x0058F870`
+  (jump table `0x0058F8CC` read from `Game.exe`), `0x00572360`,
+  `0x00555230` (call order), `0x00544990`, `0x00594060`, `0x00593FC0`,
+  `0x00594290`, `0x005942C0`, `0x00583E70`, `0x0059DA50`; chain-id
+  arguments of every `0x00543640` call site in `all.asm` (script outside
+  the repo); live `objects.txt` rows 26, 30, 189, 268, 385.
 
 ## Open questions
 
@@ -487,3 +677,16 @@ object row 189 from live `objects.txt`.
 5. A recording that enters Catacombs 1 after Andariel's kill (state 4)
    would confirm §8 item 6 (no 0x5D, state kept), and one Kashya reward
    with a free hireling slot the §8 item 8 message order.
+6. QA-1 (null room in the trap retry): Answered (§9 item 1).
+7. QA-2 (object or marker without a room): Answered (§9 item 2).
+8. QA-3 (L4 party step placement): Answered (§9 item 3).
+9. QA-4 (player without a client): Answered (§9 item 4).
+10. QA-5 (+0x38 reader): Answered (§9 item 5).
+11. QA-6 (chain 37's `0x0058F870`): Answered (§9 item 6).
+12. Wiring §3 item 1 (quest init order and the town Cain draws): Answered
+    (§9 item 7). A recording of the marker's creation after Cain left
+    Tristram (HANDOFF §5 C79) would confirm it.
+13. WW-6 Act I bodies (gibbet init 7, tree init 9, cain portal init 61,
+    Wirt's body operate 33; init 37 is not Wirt's): Answered (§9 items
+    8–11).
+14. WW-10 (`0x0061AED0`): Answered (§9 item 12).
