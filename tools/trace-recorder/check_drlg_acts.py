@@ -14,7 +14,9 @@ or in the printed log of `autostart.py --try`. For each record:
       after the start-seed step
   D5  acts 0, 3, 4: tombs and jungle bit 0
   D6  every level of type maze (1) or outdoor (3) with no room built has
-      seed {dwStartSeed + id (u32), 666} (§4.3: init_low, no draw)
+      seed {dwStartSeed + id (u32), 666} (§4.3: init_low, no draw); a
+      level seen with rooms in an earlier record of the same act and seed
+      is skipped (the client frees a left level's rooms, not its seed)
   D7  level flags carry 0x10 (client copy) and the drlg flags bit 0
 
   py tools/trace-recorder/check_drlg_acts.py FILE [FILE ...]   # .jsonl raw or a log
@@ -82,7 +84,7 @@ def expected(init_seed, act_no):
     return e
 
 
-def check(rec):
+def check(rec, built=frozenset()):
     """List of (rule, message) failures for one record."""
     bad = []
     if "drlg_seed" not in rec:
@@ -102,7 +104,7 @@ def check(rec):
     for lv in rec.get("levels", []):
         if not lv["flags"] & 0x10:
             bad.append(("D7", f"level {lv['id']} flags {lv['flags']:#x} without 0x10"))
-        if lv["drlg_type"] in (1, 3) and lv["rooms"] == 0:
+        if lv["drlg_type"] in (1, 3) and lv["rooms"] == 0 and lv["id"] not in built:
             want = [(rec["start_seed"] + lv["id"]) & M32, 666]
             if lv["seed"] != want:
                 bad.append(("D6", f"level {lv['id']} seed {lv['seed']}, rule {want}"))
@@ -112,9 +114,15 @@ def check(rec):
 def run(recs, verbose=True):
     errors = 0
     counts = {}
+    built = {}   # (init seed, act) -> level ids seen with rooms: the client frees the
+    #             rooms of a level it left (+0x08 back to 0) but keeps its advanced seed
     for i, r in enumerate(recs):
-        bad = check(r)
-        n6 = sum(1 for lv in r.get("levels", []) if lv["drlg_type"] in (1, 3) and lv["rooms"] == 0)
+        key = (r.get("init_seed"), r.get("act_no"))
+        seen = built.setdefault(key, set())
+        bad = check(r, frozenset(seen))
+        n6 = sum(1 for lv in r.get("levels", [])
+                 if lv["drlg_type"] in (1, 3) and lv["rooms"] == 0 and lv["id"] not in seen)
+        seen.update(lv["id"] for lv in r.get("levels", []) if lv["rooms"])
         counts["D6 levels"] = counts.get("D6 levels", 0) + n6
         counts[f"act {r.get('act_no')}"] = counts.get(f"act {r.get('act_no')}", 0) + 1
         for rule, msg in bad:
@@ -158,6 +166,12 @@ def selftest():
     r = json.loads(json.dumps(recs))
     r[0]["levels"][0]["seed"][0] += 1
     assert run(r, False)[0] == 1
+    r = json.loads(json.dumps(recs))
+    r.append(json.loads(json.dumps(r[0])))
+    r[0]["levels"][0]["rooms"] = 5
+    r[0]["levels"][0]["seed"] = [1, 2]
+    r[-1]["levels"][0]["seed"] = [1, 2]       # freed later, seed kept: not an error
+    assert run(r, False)[0] == 0
     r = json.loads(json.dumps(recs))
     r[3]["levels"][0]["flags"] = 0
     assert run(r, False)[0] == 1
