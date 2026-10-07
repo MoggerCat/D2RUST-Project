@@ -265,6 +265,13 @@ pub struct ActionHooks<X> {
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
     pub session: switch::SessionState,
+    /// The players' server skill lists (unit +0xA8,
+    /// [`crate::skills::list`]): created by the player init
+    /// (`client/msg-skills.md` §2 rule 8) and filled by the character
+    /// load (`formats/d2s.md` §7.2); the join's S→C 0x94 reads them.
+    /// TODO(skills/levels.md): the combat and skill seams
+    /// ([`Pending::skill_list`]) do not read them yet.
+    pub skill_lists: BTreeMap<UnitId, crate::skills::list::SkillList>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -315,6 +322,7 @@ impl<X> ActionHooks<X> {
             sync: None,
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
+            skill_lists: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

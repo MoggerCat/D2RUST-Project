@@ -177,6 +177,25 @@ pub fn set_skill(unit_type: u8, guid: u32, hand: u8, skill: u16, item: u32) -> [
     b
 }
 
+/// S→C 0x94 BaseSkillLevels (`0x0053C5D0`, `client/msg-skills.md` §3
+/// rule 1, `sim/server-messages.tsv` `u8@1*3+6;min=9`): count n u8@1,
+/// player GUID u32@2, then n entries from @6 of skill u16, level u8.
+/// `None` for no entry (below the table's minimum of 9 bytes) or more
+/// than 255 (n is a byte). Which entries and levels the sender takes is
+/// the caller's (`crate::skills::list::SkillList::base_levels`).
+pub fn base_skill_levels(guid: u32, entries: &[(u16, u8)]) -> Option<Vec<u8>> {
+    let n = u8::try_from(entries.len()).ok().filter(|&n| n > 0)?;
+    let mut m = Vec::with_capacity(6 + 3 * entries.len());
+    m.push(0x94);
+    m.push(n);
+    m.extend_from_slice(&guid.to_le_bytes());
+    for &(skill, level) in entries {
+        m.extend_from_slice(&skill.to_le_bytes());
+        m.push(level);
+    }
+    Some(m)
+}
+
 /// S→C 0x7E (`0x0053DB70`, 5 bytes, `path-placement.md` §11): 1.14d
 /// writes only the id byte; bytes 1–4 are uninitialised stack memory
 /// there. d2rs sends zeros (edge case 10; the scenario comparison masks
