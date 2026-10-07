@@ -8,6 +8,7 @@
 //! resume, report, `verify`) is kind-independent.
 
 pub mod convert;
+pub mod ctable;
 pub mod fsutil;
 pub mod kind;
 pub mod kinds;
@@ -16,5 +17,6 @@ pub mod report;
 pub mod verify;
 
 pub use convert::{convert, ConvertError, Options, RunSummary};
+pub use ctable::TableSummary;
 pub use kind::{Failure, Kind, NativeData, Written};
-pub use verify::{verify, VerifyOptions};
+pub use verify::{verify, verify_full, VerifyOptions, VerifyOutcome};

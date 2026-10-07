@@ -22,6 +22,8 @@ pub struct Report<'a> {
     pub rejected_names: usize,
     pub kind_time: &'a BTreeMap<String, Duration>,
     pub wall: Duration,
+    /// C-TABLE step 2.
+    pub tables: Option<&'a crate::ctable::TableSummary>,
 }
 
 pub fn render(r: &Report) -> String {
@@ -46,6 +48,23 @@ pub fn render(r: &Report) -> String {
         );
     }
     let _ = writeln!(s, "total wall time: {:.1}s", r.wall.as_secs_f64());
+    match r.tables {
+        Some(t) => {
+            let _ = writeln!(s, "\nC-TABLE step 2: {}", t.line());
+            for n in &t.identical {
+                let _ = writeln!(s, "  {n}: identical");
+            }
+            for (n, d) in &t.failed {
+                let _ = writeln!(s, "  {n}: FAILED {d}");
+            }
+        }
+        None => {
+            let _ = writeln!(
+                s,
+                "\nC-TABLE step 2: not run (the install has no live .bin tables)"
+            );
+        }
+    }
     let _ = writeln!(s, "\nfailures: {}", r.failures.len());
     for (path, check, detail) in r.failures {
         let _ = writeln!(s, "  {path}: {check}: {detail}");

@@ -3469,14 +3469,24 @@ set the default budgets from them.
   converts excel plus every image and text kind (dc6, dcc, dt1, pal, pl2,
   cof, ds1, tbl, font, animdata, expfield); audio is not converted (OQ3, "no
   sound for now") and `report.txt` lists `.wav` as skipped with that reason.
-  Not yet: C-TABLE step 2 (compile against each live `.bin`; see the wire
-  note), so "73/73 tables" cannot be checked yet. Command (local,
+  C-TABLE step 2 (`native-ctable`, `docs/handoff/native-ctable.md`) runs
+  inside `convert` and `verify --deep`: the native excel set is compiled and
+  compared with every live `.bin`. Command (local,
   `D2_GAME_DIR` = the 1.14d install):
   `cargo run --release -p d2-convert -- convert --install "$D2_GAME_DIR"
   --out "$TMP/d2native"`, then `cargo run --release -p d2-convert -- verify
   --deep --install "$D2_GAME_DIR" --out "$TMP/d2native"` (`--game` /
   `--native` are accepted as the spec's spellings). Expect: exit 0 both;
   stderr ends `done: N files, 0 failed (…s)` and `verify: all files pass`;
+  `report.txt` has `C-TABLE step 2: 73/73 tables identical to the live .bin
+  (1 override)` and one `<table>: identical` line per table; `verify` ends
+  with `verify: C-TABLE 73/73 tables identical to the live .bin (1 override)`;
+  `base/data/global/excel/_bin-overrides.toml` holds exactly one entry,
+  `monstats` record 707 `NameStr` bytes `0x0615` (5382), and `files.tsv` has
+  its row (kind `excel`, archive `-`, no source SHA; `excel` `converted` is
+  the `.txt` count + 1). A different count, a second override or any
+  `failed:C-TABLE` row is a finding (the report names table, record, offset,
+  column).
   `manifest.toml` `complete = true` and `[counts.<kind>]` with `failed = 0`
   in every kind (the 12 kinds above, no `wav`); per-kind `converted` equal to
   the winning copies `mpq-tool formats` finds (minus audio); `report.txt`

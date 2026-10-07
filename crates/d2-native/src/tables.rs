@@ -6,7 +6,7 @@
 
 use d2_data::bin::{BinSet, BinTable};
 use d2_data::compile::Compiled;
-use d2_data::compile_set::CompiledSet;
+use d2_data::compile_set::{compile_all, CompiledSet, TxtReader};
 use d2_data::schema::schema;
 
 use crate::toml_kinds::{hex_bytes, unhex_bytes, Out, Tab, TextError};
@@ -261,6 +261,59 @@ pub fn check_tables(compiled: &CompiledSet, live: &BinSet, overrides: &BinOverri
         }
     }
     out
+}
+
+/// What a C-TABLE step 2 run produced.
+#[derive(Debug)]
+pub struct TableRun {
+    pub overrides: BinOverrides,
+    pub check: TableCheck,
+}
+
+impl TableCheck {
+    /// Tables checked: those that matched plus those that failed.
+    pub fn total(&self) -> usize {
+        self.identical.len() + self.failures.len()
+    }
+}
+
+fn compile_native(live: &BinSet, read: &mut TxtReader<'_>) -> Result<CompiledSet, TextError> {
+    compile_all(read, &live.strings).map_err(|e| TextError::new("excel", e.to_string()))
+}
+
+/// C-TABLE step 2 as the converter runs it (§4.3): compile the native text
+/// set read through `read`, derive the overrides from the live `.bin` set,
+/// compare every runtime table. The caller writes
+/// [`BinOverrides::to_toml`] to [`OVERRIDES_PATH`].
+pub fn run_c_table(live: &BinSet, read: &mut TxtReader<'_>) -> Result<TableRun, TextError> {
+    let compiled = compile_native(live, read)?;
+    let overrides = derive_overrides(&compiled, live)?;
+    let check = check_tables(&compiled, live, &overrides);
+    Ok(TableRun { overrides, check })
+}
+
+/// The same check for an existing native root (`verify --deep`): the
+/// overrides file as written must parse and equal a fresh derivation (no
+/// stale or hand-added entry), then every table is compared.
+pub fn recheck_c_table(
+    live: &BinSet,
+    read: &mut TxtReader<'_>,
+    overrides_text: &str,
+) -> Result<TableCheck, TextError> {
+    let on_disk = BinOverrides::from_toml(OVERRIDES_PATH, overrides_text)?;
+    let compiled = compile_native(live, read)?;
+    let derived = derive_overrides(&compiled, live)?;
+    if derived != on_disk {
+        return Err(TextError::new(
+            OVERRIDES_PATH,
+            format!(
+                "differs from a fresh derivation ({} entries on disk, {} derived)",
+                on_disk.entries.len(),
+                derived.entries.len()
+            ),
+        ));
+    }
+    Ok(check_tables(&compiled, live, &on_disk))
 }
 
 #[cfg(test)]

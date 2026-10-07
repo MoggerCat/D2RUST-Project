@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+d2-data.workspace = true
 d2-formats.workspace = true
 d2-native.workspace = true
 sha2.workspace = true
