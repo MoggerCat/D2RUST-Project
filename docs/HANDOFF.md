@@ -4972,7 +4972,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
   player; log the S→C messages of that frame with callers.
 - `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `render/lighting.md` OQ11 (answered statically 2026-10-07: only
+  `EnvEffect` objects change; fire 39 goes to mode 0 without light in
+  the day, mode 1 with light radius 9 otherwise): a day-period change
+  with a fire 39 in sight confirms the mode and light.
 - `client/msg-skills.md` OQ1: equipping a charged item.
 - `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
 - `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
@@ -5177,6 +5180,13 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
   item (e.g. Dragon) and a charged item; log `0x005BF510` /
   `0x00647320` calls and the type-9 timers they schedule.
+- `render/camera.md` OQ5 (static part answered 2026-10-07): log
+  `0x00650840` calls per client update with caller over monster fights
+  (do `0x004AF4C0` and `0x004B13A0` both step one monster in one
+  update?) and a local player's missile's first client update (two
+  steps expected).
+- `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
+  over a long run (any timer scheduled without a unit; log the caller).
 
 ## 8. Lessons (problems met, fixes)
 

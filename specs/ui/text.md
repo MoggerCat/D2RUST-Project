@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 424–446 |
 | Test vectors | 447–482 |
 | Provenance | 483–513 |
-| Open questions | 514–555 |
+| Open questions | 514–572 |
 <!-- /index -->
 
 ## Summary
@@ -542,6 +542,23 @@ pushed `k` (214 sites).
    `0x00501FE0`, `0x00502190`, `0x00502C60`, `0x00502EF0`); no code
    outside D2Win loads the font pointer itself. Still open: whether one
    of these hands a record pointer to an outside caller.
+   *Partly answered* (static, 1.14d asm): the lookups `0x00501650` /
+   `0x00501690` are referenced only as pointers stored into
+   `[0x00841DA0]` (`0x00502CC5`, `0x00502D17`, `0x00502E16`,
+   `0x00502FE1`, `0x00502FED`), so records come out only through the
+   11 functions' EAX. The measures (`0x00501730`, `0x005017D0`,
+   `0x00501840`, `0x00501910`) return sums of `width`; the font setter
+   `0x00502EF0` returns the previous font number; `0x00502190`,
+   `0x00502C60` return nothing. The three draw loops `0x00501A80`,
+   `0x00501C30`, `0x00501FE0` can leave the last glyph's record pointer
+   in EAX at return. Following EAX from their 335 call paths (through
+   the `DrawText` wrappers `0x00502320`, `0x00502360`, `0x005023B0`,
+   `0x00502480`, `0x005025C0`, up to four return levels): 317 overwrite
+   it unread; the other 18 return it from functions not followed
+   further (`0x004A9260`, the pointer-called UI draw callbacks
+   `0x004EA170`, `0x004EA240`, `0x004EA310`, `0x004EB240`, `0x004EC040`
+   via `0x004E99F0` / `0x004EA010`, and `0x004EDA20`). Still open: those
+   18 return chains.
 8. CRT `isspace` assumes the "C" locale: confirm no `setlocale` call
    changes it (Ghidra xref of `setlocale`).
    *Answered* (static): nothing can change it. The statically linked
