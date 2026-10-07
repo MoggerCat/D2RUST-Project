@@ -117,6 +117,14 @@ pub enum WiringError {
     /// The monster mode message (`sim/intents-events.md` §7.4): a fatal
     /// assert or a message the spec gives no layout for.
     ModeMessage(unit_update::ModeMessageError),
+    /// The lightning fan / ring with a progressive step ≤ 0
+    /// (`skills/bodies-4.md` Edge case 1): an endless loop in 1.14d;
+    /// d2rs stopped it (as `StatListError::EndlessExpiry`).
+    EndlessProgressive {
+        unit: UnitId,
+        skill: i32,
+        step: i32,
+    },
 }
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system

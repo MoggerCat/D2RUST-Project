@@ -881,7 +881,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     // ---- batch 2 and 3
 
+    /// [`Pending::body_effect`]; the d2rs fault
+    /// [`bodies::BodyEffect::EndlessProgressive`] is a
+    /// [`WiringError::EndlessProgressive`] instead.
     fn effect(&mut self, e: bodies::BodyEffect<UnitId, UnitId, RoomId>) {
+        if let bodies::BodyEffect::EndlessProgressive { unit, skill, step } = e {
+            self.error(WiringError::EndlessProgressive { unit, skill, step });
+            return;
+        }
         self.xm().body_effect(e);
     }
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
