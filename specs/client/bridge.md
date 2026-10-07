@@ -9,7 +9,10 @@
   `client/msg-stats-items.md`); their handlers are not registered yet
   (§6), so the world model holds no game facts. The
   in-process link to `d2-server` is a trait until the server's wiring
-  lands (§3, open question 1).
+  lands (§3, open question 1). 2026-10-07: 62 ids have an owner in
+  `bridge-dispatch.tsv` (new: `audio/triggers.md`, `render/lighting.md`,
+  `client/msg-ui.md`, `client/msg-skills.md`); the output channel (§10)
+  is specified, not implemented.
 - **Target version:** 1.14d (the message bytes it carries); the bridge
   itself has no 1.14d counterpart to match.
 - **Crate/module:** `d2-client::bridge` (`link`, `intent`, `receive`,
@@ -24,26 +27,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–63 |
-| Inputs | 64–72 |
-| Outputs / state changes | 73–84 |
-| Rules | 85–86 |
-|   1. Boundary | 87–102 |
-|   2. Receive path | 103–125 |
-|   3. Server link | 126–144 |
-|   4. Send path (intents) | 145–165 |
-|   5. Client world model | 166–185 |
-|   6. Dispatch table | 186–208 |
-|   7. Bevy mirror | 209–227 |
-|   8. Frame pacing | 228–248 |
-|   9. Versioning | 249–259 |
-|   10. Client outputs (bridge → UI and audio) | 260–319 |
-| Constants & data dependencies | 320–334 |
-| Randomness | 335–338 |
-| Edge cases & original bugs | 339–347 |
-| Test vectors | 348–376 |
-| Provenance | 377–387 |
-| Open questions | 388–418 |
+| Summary | 52–66 |
+| Inputs | 67–75 |
+| Outputs / state changes | 76–87 |
+| Rules | 88–89 |
+|   1. Boundary | 90–105 |
+|   2. Receive path | 106–128 |
+|   3. Server link | 129–147 |
+|   4. Send path (intents) | 148–168 |
+|   5. Client world model | 169–188 |
+|   6. Dispatch table | 189–211 |
+|   7. Bevy mirror | 212–230 |
+|   8. Frame pacing | 231–251 |
+|   9. Versioning | 252–262 |
+|   10. Client outputs (bridge → UI and audio) | 263–322 |
+| Constants & data dependencies | 323–337 |
+| Randomness | 338–341 |
+| Edge cases & original bugs | 342–350 |
+| Test vectors | 351–379 |
+| Provenance | 380–390 |
+| Open questions | 391–421 |
 <!-- /index -->
 
 ## Summary
