@@ -37,7 +37,7 @@ rects (town of `bdBar`: level 1 at tiles (1200, 960) 56 × 40, Blood Moor
 | 2 | Countess kill | **blocked** | — | — | needs a character that reaches the Forgotten Tower (Black Marsh, Act I, area level ~ 8–10 Normal) and survives five tower levels: a level ~10+ character; our characters are level 1–2 |
 | 3 | Cain rescue | **blocked** | — | — | needs the Scroll of Inifuss (Dark Wood tree), Akara's decoding, the Cairn Stones order in Stony Field, then Tristram: quest chain plus a level ~8+ character |
 | 4 | act change | **blocked** | — | — | needs Andariel killed (Catacombs level 4, Act I end) or a quest flag; level ~15+ |
-| 5 | hireling game | **blocked** | — | — | Kashya's hire needs Sisters' Burial Grounds (Blood Raven) done plus gold (`local-buddy-saves.md`) |
+| 5 | hireling game | **done (pass 2)** | `merc1-spawn.jsonl`, `merc1-spawn-packets.jsonl`; leveling `merc-lvl1-`, `merc-lvl2-`, `merc-gold-spawn.jsonl` | `check_rng.py` OK (all four); `check_packets.py` **OK** (no 0x3E in the run, so no F1) | see "Pass 2, B" |
 | 9 | Clay Golem | **done (pass 2)** | `golem1-spawn.jsonl`, `golem1-spawn-packets.jsonl` (13,552 events); leveling `golem-lvl1-spawn.jsonl` | `check_rng.py` OK (both); `check_packets.py` **OK** (no 0x3E in this run, so no F1) | see "Pass 2, A" |
 | 10 | Act III entry | **blocked** | — | — | Acts I–II completed (Andariel, Duriel) |
 | 11 | levels 74 and 120 | **blocked** | — | — | Arcane Sanctuary (Act II, via the Palace) and Arreat Summit (Act V, Ancients): far story progression |
@@ -244,3 +244,72 @@ minions, each level 4, 735 experience) killed the level-1 Necromancer in
   no golem (`d2s.md`: only an Iron Golem's item is kept; this confirms a
   Clay Golem is not saved). Also seen: the starting wand has durability 0
   of 15 after the window fights.
+
+### B. Hireling game (queue item 5) and the mercenary save: done
+
+Character `bdMercTwo` (Barbarian, see the name decision above), Kashya's
+level-8 path (`npc.md` §7.3 step 2: at level ≥ 8 no quest is needed).
+
+- Leveling (raw `merc-lvl1-spawn.jsonl`, 1 spawn; `merc-lvl2-spawn.jsonl`,
+  235 spawns): the first spawn, a champion `fallen2` pack (class 20,
+  level 7 + champion), killed the level-1 Barbarian (corpse; Save And Exit
+  put it next to the player in town on reload, picked up). Then normal
+  `window1` units: the Barbarian breaks one in 1–8 s (147 experience;
+  118 from level 7, factor 207/256), ~230 kills, level 1 → 8
+  (experience 32,951 at frame 52,890), about 55 min of game time. Belt
+  potions 1–4 used; each window's death damage costs ~2 life. The hand
+  axe ended at durability 0 (attack damage 1–2), like the Necromancer's
+  wand.
+- Gold (raw `merc-gold-spawn.jsonl`, 14 spawns): 35 stat points spent
+  (25 vitality, 10 strength; life 69 → 169), then 11 champion `fallen1`
+  packs (class 19) plus natural fallen in Blood Moor; their gold piles
+  were clicked from screenshots: 13 → 296 gold.
+- Recording (`spawn.py --packets <merc1-spawn-packets.jsonl> --seconds
+  1500 -- -w -ns -name bdMercTwo -bar`; 3,312 frames):
+  - frame 969: C→S 0x13 `130100000003000000` (interact, NPC GUID 3,
+    Kashya) → S→C 0x4F and **ten 0x4E** (7 bytes: name id, slot seed;
+    name ids 0x0D56, 0x0D5A, 0x0D5B, 0x0D60, 0x0D66, 0x0D67, 0x0D68,
+    0x0D6F, 0x0D70, 0x0D76), then 0x27 (40 bytes, menu); C→S 0x2F at 970.
+  - frame 1236: C→S 0x38 `38030000000300000001000000` (action 3, the
+    hire list) → 0x4F and the same ten 0x4E. The client showed 7 rows
+    (scroll bar), e.g. Diane level 7, life 81, defense 47, cost 160, fire.
+  - frame 1730: C→S 0x36 `3603000000680d0000` (hire, NPC 3, name 0x0D68
+    Diane) → S→C **0x81** `81070f01010000000d000000f83287d1680d0000`
+    (type 7, class 0x10F = 271 `roguehire`, owner GUID 1, mercenary GUID
+    13, seed = the 0x4E slot seed of 0x0D68, name 0x0D68), 0x27 (40
+    bytes), 0x4F + **nine** 0x4E (0x0D68 gone), 0x2A
+    `2a0005049cf61a0d00000088000000` (code 5, GUID 13), and in frame 1731
+    S→C 0x1D `1d0e88` (gold 296 → 136: price 160). The client then sent
+    0x38 action 3 again (frame 1731, list resent). Frame 1751: S→C 0x7F
+    `7f0064000d0000000100` (pet life 100 %, GUID 13). **No 0x7A** for the
+    hire (the Raven / golem summons add themselves with 0x7A; the
+    mercenary is announced by 0x81 only). No separate mercenary-stats
+    message was seen besides the 0x27 of frame 1730.
+  - C→S 0x30 (chat close) at 2011; Blood Moor: the mercenary (class 271,
+    life 81) killed a spawned champion zombie (frame 2480) and a normal
+    fallen pack (3 units) with arrows: S→C 0x4C (unit skill, GUID 13)
+    from frame 2479, e.g. `4c010d00000050010101150000000000`.
+  - Save And Exit with the mercenary alive (life 81): S→C 0x7A
+    `7a00000000000000000d000000` (remove GUID 13) at frame 3311.
+  - `check_rng.py` OK (3 `chain_unexplained`, 10 sites; 2 spawns);
+    `check_packets.py` **OK** (694 S→C, 43 C→S; no 0x3E, so F1 did not
+    show).
+- Save `bdMercTwo.d2s` 1,079 bytes, `d2s_check.py`: **24 pass, 0 fail**.
+  For OQ4 (merc): header hireling block **present = True** (flags 0,
+  seed = the 0x81 / 0x4E seed above, name index 21 = 0x0D68 − first name
+  id, hireling type id 0 (Fire, Normal), experience 39,482), the
+  `+0xBF..+0xCE` rest zero (PASS); `jf` present, hireling item list count
+  0 (PASS, she wears nothing); `kf` g = 0; corpse count 0.
+
+### C. Skipped
+
+Might in a party (no second player single-player) and Kick (no
+`leftskill` / `rightskill` flag) stay blocked as in pass 1; not retried.
+
+### Leveling cost (for later passes)
+
+Level 6 Necromancer ~40 min, level 8 Barbarian ~55 min of game time with
+normal / champion `window1` spawns; a Barbarian (no physical-resist
+answer needed) is about 3× faster per window than a Necromancer with
+Amplify Damage. Unique windows (aura) and level-7 champions kill a
+level-1 character.
