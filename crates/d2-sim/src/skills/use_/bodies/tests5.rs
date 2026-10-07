@@ -962,3 +962,669 @@ fn bash_start_attackrate_list_record_pair_bonus_and_aura_state() {
     assert_eq!(starts::bash(&mut f, &t3, &ct, u, 1, 1), 1);
     assert!(f.lists.iter().all(|l| l.state != 40));
 }
+
+// ---------------------------------------------------------------- §4
+
+fn hit_entry(f: &mut BodyFake, u: usize, m: usize, result: u16) {
+    let e = CombatEntry {
+        attacker: (f.c.units[u].kind, f.c.units[u].guid),
+        defender: (f.c.units[m].kind, f.c.units[m].guid),
+        record: DamageRecord {
+            result,
+            ..DamageRecord::default()
+        },
+    };
+    f.c.units[u].combat.insert(0, e);
+}
+
+fn life_of(f: &BodyFake, u: usize) -> i32 {
+    f.c.get(u, 6)
+}
+
+fn pgsv_list(f: &mut BodyFake, u: usize, state: i32, skill: i32) -> usize {
+    f.state_flags.insert((state, group::PGSV));
+    f.c.units[u].states.push(state as u16);
+    let l = f.alloc_list(0, 0, None).unwrap();
+    f.set_list_state(l, state);
+    f.attach(u, l);
+    f.list_set(l, 350, skill);
+    l
+}
+
+// Covers: specs/skills/bodies.md §4.1 r1, §4.1 r2, §4.1 r3, §4.1 r4
+#[test]
+fn attack_do_flag_potion_bow_and_target() {
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    // r4: no target → 0; r1: unit flags |= 0x40 first.
+    f.targets.remove(&u);
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r2: a missile potion weapon (item type 38) → 0 before any attack.
+    f.targets.insert(u, m);
+    f.c.units[u].flags = 0;
+    let w = f.c.add_item(FItem {
+        types: vec![38],
+        ..FItem::default()
+    });
+    f.c.units[u].weapon = Some(w);
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f.c.units[u].combat.is_empty());
+    f.c.units[u].weapon = None;
+    // r3: a bow shoots: arrows (class 0) cost one quantity (quant = 1);
+    // the call returns 1 whatever the missile creation gave.
+    f.composit_class = 1;
+    f.tpos.insert(u, (40, 50));
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 3, 7), 1);
+    assert!(f.missiles.is_empty(), "no quantity: no missile");
+    let i = player_with_stack(&mut f, u);
+    f.item_stats.insert((i, 70), 2);
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 3, 7), 1);
+    let r = f.missiles[0];
+    assert_eq!((r.class, r.skill, r.level, r.flags), (0, 3, 7, 0x21));
+    assert_eq!((r.target_x, r.target_y), (40, 50));
+    assert_eq!(f.item_stats[&(i, 70)], 1);
+    // Magic arrows (class 27) replace the level and cost nothing.
+    f.c.set(u, 157, 5);
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 3, 7), 1);
+    let r = f.missiles[1];
+    assert_eq!((r.class, r.level), (27, 5));
+    assert_eq!(f.item_stats[&(i, 70)], 1);
+    // Bolts: hand class 7 → class 31.
+    f.c.set(u, 157, 0);
+    f.hand_class = 7;
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 3, 7), 1);
+    assert_eq!(f.missiles[2].class, 31);
+    // A bow never melees.
+    assert!(f.c.units[u].combat.is_empty());
+}
+
+// Covers: specs/skills/bodies.md §4.1 text, §4.1 r5, §4.1 r6, §4.1 r7, §4.1 r8
+#[test]
+fn attack_do_melee_pipeline_and_wolf_bear_path() {
+    use crate::combat::{apply_melee, fill, melee_result, start_combat};
+    let t = tabs(body_rec(), Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    f.c.set(u, 325, 17);
+    f.c.set(m, 6, 100_000);
+    // A progressive-charge list: the finisher detaches and frees it
+    // (record of k missing → step 6) and clears the group.
+    let p = pgsv_list(&mut f, u, 122, 99);
+    // Replay of steps 5–8 by hand on a copy.
+    let mut g = f.clone();
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 17, 0),
+        ..DamageRecord::default()
+    };
+    want.hit_flags |= 2;
+    helpers::charges_before(&mut g, &t, u, &mut want);
+    fill(&mut g.c, &t, &ct, u, m, &mut want, false, 128);
+    helpers::charges_after(&mut g, &t, u, &mut want);
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    let stored = g.c.units[u].combat[0].record;
+    assert_eq!(stored, want);
+    apply_melee(&mut g.c, &ct, u, m);
+    assert!(life_of(&g, m) < 100_000, "the hit lands");
+    f.take_log();
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(life_of(&f, m), life_of(&g, m), "r5–r6, r8: same damage");
+    assert_eq!(f.c.units[u].seed, g.c.units[u].seed);
+    assert!(
+        f.c.units[u].combat.is_empty(),
+        "apply_melee frees the record"
+    );
+    // r8: the finisher ran: flag 0x40, list freed, group cleared.
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f.lists[p].freed);
+    assert!(f.take_log().contains(&format!("cleargroup {u} 4")));
+    // r7: wolf / bear (group 38): the melee is applied at once, with no
+    // finisher.
+    let (mut f, u, m) = duel();
+    f.c.set(m, 6, 100_000);
+    let p = pgsv_list(&mut f, u, 122, 99);
+    f.state_flags.insert((139, group::MELEEONLY));
+    f.c.units[u].states.push(139);
+    f.take_log();
+    assert_eq!(dos::attack(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(life_of(&f, m) < 100_000, "applied at once");
+    assert!(!f.lists[p].freed);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("cleargroup")));
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+}
+
+/// Skills record for the melee-with-state do (§4.2): overlay 9, target
+/// state 30 (length calc 50, aurastat1 25 = 4), self state 31.
+fn melee_state_tables() -> crate::skills::SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvoverlay = 9;
+    r.auratargetstate = 30;
+    r.aurastate = 31;
+    r.auralencalc = c.f(50);
+    r.aurastat1 = 25;
+    r.aurastatcalc1 = c.f(4);
+    tabs(r, c, 1)
+}
+
+// Covers: specs/skills/bodies.md §4.2 text, §4.2 r1, §4.2 r2
+#[test]
+fn melee_state_overlay_and_dispatch() {
+    let t = melee_state_tables();
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    f.c.set(m, 6, 100_000);
+    // Slot 2 is this body (`functions.tsv`).
+    assert_eq!(
+        run_do(&mut f, &t, &ct, 2, u, 99, 1),
+        Some(0),
+        "r1: R invalid"
+    );
+    // r2: no target → 0, flag not set.
+    f.targets.remove(&u);
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    // No pair record → return 1 and the rest is skipped (no flag 0x40,
+    // no state on the unit).
+    f.targets.insert(u, m);
+    assert_eq!(run_do(&mut f, &t, &ct, 2, u, 1, 1), Some(1));
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    assert!(!f.has_state(u, 31));
+    // A pair record that is a miss: no overlay, but the rest goes on.
+    hit_entry(&mut f, u, m, 0);
+    f.take_log();
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("overlay")));
+    assert!(f.has_state(u, 31));
+    // A hit: overlay 9 on the target.
+    f.c.units[u].combat.clear();
+    hit_entry(&mut f, u, m, 1);
+    f.take_log();
+    dos::melee_state(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.take_log().contains(&format!("overlay {m} 9")));
+    // The overlay counts 1…overlay count inclusive.
+    for (ov, shown) in [(0u16, false), (200, true), (201, false)] {
+        let mut t2 = t.clone();
+        t2.skills[1].srvoverlay = ov;
+        t2.skills[1].auratargetstate = 0xFFFF;
+        f.c.units[u].combat.clear();
+        hit_entry(&mut f, u, m, 1);
+        f.take_log();
+        dos::melee_state(&mut f, &t2, &ct, u, 1, 1);
+        let log = f.take_log();
+        assert_eq!(
+            log.contains(&format!("overlay {m} {ov}")),
+            shown,
+            "overlay {ov}"
+        );
+    }
+    // No target with an overlay in range → 0 (also for the target state).
+    f.targets.remove(&u);
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies.md §4.2 r3
+#[test]
+fn melee_state_target_state_list() {
+    let mut t = melee_state_tables();
+    t.skills[1].srvoverlay = 0;
+    t.skills[1].aurastate = 0xFFFF;
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    f.c.frame = 100;
+    // T none → 0.
+    f.targets.remove(&u);
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.insert(u, m);
+    // p none → return 1, nothing done.
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.lists.is_empty());
+    // p a miss: nothing for the target state.
+    hit_entry(&mut f, u, m, 0);
+    dos::melee_state(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.lists.is_empty());
+    // p a hit: a new list (flags 2, expire F + len, owner T), timer 12,
+    // state on, callback default, aura_fill formulas on T.
+    f.c.units[u].combat.clear();
+    hit_entry(&mut f, u, m, 1);
+    f.take_log();
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 1);
+    let l = f.list_of(m, 30).expect("target list").clone();
+    assert_eq!((l.flags, l.expire, l.owner), (2, 150, Some(m)));
+    assert_eq!(
+        (l.callback, l.stats.get(&25)),
+        (callback::DEFAULT, Some(&4))
+    );
+    assert!(f.has_state(m, 30));
+    assert!(f.take_log().contains(&format!("timer {m} 12 150")));
+    // An existing list keeps its old expiry; a length below 1 counts as 1.
+    f.c.frame = 120;
+    f.c.units[u].combat.clear();
+    hit_entry(&mut f, u, m, 1);
+    dos::melee_state(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.list_of(m, 30).unwrap().expire, 150);
+    assert_eq!(f.lists.iter().filter(|l| l.state == 30).count(), 1);
+    let mut c = Code::new();
+    t.skills[1].auralencalc = c.f(-7);
+    t.skills_code = c.0.clone();
+    t.skills[1].aurastat1 = 0xFFFF;
+    let (mut f, u, m) = duel();
+    f.c.frame = 100;
+    hit_entry(&mut f, u, m, 1);
+    dos::melee_state(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.list_of(m, 30).unwrap().expire, 101);
+}
+
+// Covers: specs/skills/bodies.md §4.2 r4, §4.2 r5
+#[test]
+fn melee_state_self_state_and_the_melee() {
+    let mut t = melee_state_tables();
+    t.skills[1].srvoverlay = 0;
+    t.skills[1].auratargetstate = 0xFFFF;
+    let ct = ct3();
+    let (mut f, u, m) = duel();
+    f.c.set(m, 6, 100_000);
+    hit_entry(&mut f, u, m, 1);
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 1);
+    // A self list: flags 4, expire 0, callback default, aura_fill on the
+    // unit, state on; reused by a second run.
+    let l = f.list_of(u, 31).expect("self list");
+    assert_eq!((l.flags, l.expire, l.callback), (4, 0, callback::DEFAULT));
+    assert_eq!((l.owner, l.stats.get(&25)), (Some(u), Some(&4)));
+    assert!(f.has_state(u, 31));
+    // r5: flag 0x40 and apply_melee (the hit pair record is consumed).
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f.c.units[u].combat.is_empty());
+    hit_entry(&mut f, u, m, 1);
+    dos::melee_state(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.lists.iter().filter(|l| l.state == 31).count(), 1);
+    // aurastate outside 1…count − 1: no list (0, count, none).
+    for st in [0u16, 200, 0xFFFF] {
+        let mut t2 = t.clone();
+        t2.skills[1].aurastate = st;
+        let (mut f, u, m) = duel();
+        assert_eq!(dos::melee_state(&mut f, &t2, &ct, u, 1, 1), 1);
+        assert!(f.lists.is_empty(), "aurastate {st}");
+        let _ = m;
+    }
+    // r5: T none → 0 after the self state and the flag.
+    let (mut f, u, _) = duel();
+    f.targets.remove(&u);
+    assert_eq!(dos::melee_state(&mut f, &t, &ct, u, 1, 1), 0);
+    assert!(f.has_state(u, 31));
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+}
+
+// Covers: specs/skills/bodies.md §4.3 r6
+#[test]
+fn buff_registers_up_to_three_aura_events() {
+    let mut r = body_rec();
+    r.aurastate = 20;
+    r.auraevent1 = 5;
+    r.auraeventfunc1 = 3;
+    r.auraevent2 = 6;
+    r.auraeventfunc2 = 4;
+    r.auraevent3 = 0xFFFF;
+    r.auraeventfunc3 = 9;
+    let t = tabs(r, Code::new(), 1);
+    let ct = ct3();
+    let (mut f, u) = world();
+    f.take_log();
+    assert_eq!(dos::buff(&mut f, &t, &ct, u, 1, 1), 1);
+    let log = f.take_log();
+    let at = |s: &str| log.iter().position(|l| l == s);
+    // Unregister (1, state) first, then the pairs in order; the third
+    // (event −1) ends the loop.
+    let (un, h1, h2) = (
+        at(&format!("unhandle {u} 1 20")).expect("unregister"),
+        at(&format!("handler {u} 5 3 20")).expect("first"),
+        at(&format!("handler {u} 6 4 20")).expect("second"),
+    );
+    assert!(un < h1 && h1 < h2);
+    assert_eq!(log.iter().filter(|l| l.starts_with("handler")).count(), 2);
+    assert!(log.contains(&format!("changed {u} 20")));
+    // auraevent1 < 0: nothing is unregistered or registered, even when
+    // events 2 / 3 are set.
+    let mut t2 = t.clone();
+    t2.skills[1].auraevent1 = 0xFFFF;
+    dos::buff(&mut f, &t2, &ct, u, 1, 1);
+    let log = f.take_log();
+    assert!(!log
+        .iter()
+        .any(|l| l.starts_with("handler") || l.starts_with("unhandle {u} 1")));
+    // A function outside 1…31 registers nothing.
+    let mut t3 = t.clone();
+    t3.skills[1].auraeventfunc1 = 40;
+    t3.skills[1].auraeventfunc2 = 0;
+    dos::buff(&mut f, &t3, &ct, u, 1, 1);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("handler")));
+}
+
+/// A curse skill (record 1): state `st`, aurastat1 = 25 (calc 5), length
+/// 40, range 100, filter 3 (players and monsters).
+fn curse_tables(st: u16) -> crate::skills::SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.auratargetstate = st;
+    r.aurastat1 = 25;
+    r.aurastatcalc1 = c.f(5);
+    r.auralencalc = c.f(40);
+    r.aurarangecalc = c.f(100);
+    r.aurafilter = 3;
+    // The other five slots: calc formulas for the tests to enable.
+    for x in [
+        &mut r.aurastatcalc2,
+        &mut r.aurastatcalc3,
+        &mut r.aurastatcalc4,
+        &mut r.aurastatcalc5,
+        &mut r.aurastatcalc6,
+    ] {
+        *x = c.f(7);
+    }
+    tabs(r, c, 1)
+}
+
+fn curse_ct() -> crate::combat::CombatTables {
+    let mut ct = combat_tables(vec![monster_rec(), monster_rec()]);
+    ct.monstats2[0].isatt = true;
+    ct.monstats[0].switchai = true;
+    ct
+}
+
+/// The caster (unit 0) aiming at (10, 10) and one monster there with the
+/// flags 0xE, alive and hostile.
+fn curse_world() -> (BodyFake, usize, usize) {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (10, 10));
+    let mut m = FUnit::new(UnitType::Monster, 0);
+    m.type_flags = Some(0);
+    m.flags = 0xE;
+    let m = f.add(m, (10, 10));
+    f.scan = vec![m];
+    f.c.hostile = true;
+    (f, u, m)
+}
+
+// Covers: specs/skills/bodies.md §4.4 text, §4.4 l2 r3, §4.4 l2 r4, §4.4 l2 r9
+#[test]
+fn curse_unit_conditions_and_state_list() {
+    let (t, ct) = (curse_tables(30), curse_ct());
+    let (mut f, u, m) = curse_world();
+    f.c.frame = 100;
+    // Slot 30 is the curse body.
+    assert_eq!(run_do(&mut f, &t, &ct, 30, u, 1, 1), Some(1));
+    let l = f.list_of(m, 30).expect("curse list").clone();
+    assert_eq!(
+        (l.expire, l.callback, l.skill, l.lvl),
+        (140, callback::DEFAULT, 1, 1)
+    );
+    assert_eq!(l.stats.get(&25), Some(&5), "stat1 = value1");
+    assert!(f.has_state(m, 30));
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r3: flags 0x4, 0x8 and 0x2 must all be set; alive; hostile; a
+    // monster needs a walk mode and no type flag 0x20.
+    let reject = |mut f: BodyFake, why: &str| {
+        let u = 0;
+        assert_eq!(dos::curse(&mut f, &t, &ct, u, 1, 1), 1, "{why}");
+        assert!(f.lists.is_empty(), "{why}");
+    };
+    for bit in [0x4u32, 0x8, 0x2] {
+        let (mut f, _, m) = curse_world();
+        f.c.units[m].flags = 0xE & !bit;
+        reject(f, &format!("flags without {bit:#x}"));
+    }
+    let (mut f, _, m) = curse_world();
+    f.alive.remove(&m);
+    reject(f, "dead");
+    let (mut f, _, _) = curse_world();
+    f.c.hostile = false;
+    reject(f, "not hostile");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].no_walk = true;
+    reject(f, "no walk mode");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].type_flags = Some(0x20);
+    reject(f, "possessed");
+    // A player target needs neither the walk mode nor the type flag.
+    let (mut f, u, _) = curse_world();
+    let mut p = FUnit::new(UnitType::Player, 1);
+    p.flags = 0xE;
+    p.no_walk = true;
+    p.type_flags = Some(0x20);
+    let p = f.add(p, (10, 10));
+    f.scan = vec![p];
+    assert_eq!(dos::curse(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.list_of(p, 30).is_some());
+    // r4: a Monster that cannot be afflicted (apply_state refuses an npc)
+    // gets no list and the scan still returns 1.
+    let mut ct = ct;
+    ct.monstats[1].npc = true;
+    let (mut f, u, m) = curse_world();
+    f.c.units[m].class = 1;
+    assert_eq!(dos::curse(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.lists.is_empty());
+}
+
+// Covers: specs/skills/bodies.md §4.4 l2 r2, §4.4 l2 r6, §4.4 l2 r7
+#[test]
+fn curse_unit_scales_and_sets_stats() {
+    let ct = curse_ct();
+    // r2: stat1 a resistance, value ≤ 0, base ≥ 100 on a non-player →
+    // value / 5; v1 = 0 skips the unit; no aurastat1 goes on with 0.
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.auratargetstate = 30;
+    r.aurastat1 = 39;
+    r.aurastatcalc1 = c.f(-50);
+    r.auralencalc = c.f(40);
+    r.aurarangecalc = c.f(100);
+    r.aurafilter = 3;
+    r.aurastat2 = 26;
+    r.aurastatcalc2 = c.f(7);
+    r.aurastat3 = 27;
+    r.aurastatcalc3 = c.f(0);
+    r.aurastat4 = 28;
+    r.aurastatcalc4 = c.f(-100);
+    r.aurastat5 = 0xFFFF;
+    r.aurastatcalc5 = c.f(9);
+    r.aurastat6 = 29;
+    r.aurastatcalc6 = c.f(9);
+    let t = tabs(r, c, 1);
+    let (mut f, u, m) = curse_world();
+    f.c.set(m, 39, 120);
+    dos::curse(&mut f, &t, &ct, u, 1, 1);
+    let l = f.list_of(m, 30).expect("list");
+    assert_eq!(l.stats.get(&39), Some(&-10), "−50 / 5");
+    // r6: stats 2…6: valid, non-zero values set; a zero value is not
+    // set; an invalid stat (−1) ends the list, so slot 6 is never read.
+    assert_eq!(l.stats.get(&26), Some(&7));
+    assert!(!l.stats.contains_key(&27));
+    assert_eq!(l.stats.get(&28), Some(&-100));
+    assert!(!l.stats.contains_key(&29));
+    // The same value with a base resistance below 100 is unchanged.
+    let (mut f, u, m) = curse_world();
+    f.c.set(m, 39, 99);
+    dos::curse(&mut f, &t, &ct, u, 1, 1);
+    assert_eq!(f.list_of(m, 30).unwrap().stats.get(&39), Some(&-50));
+    // A zero v1 skips the unit.
+    let mut t0 = t.clone();
+    let mut c = Code(t0.skills_code.clone());
+    t0.skills[1].aurastatcalc1 = c.f(0);
+    t0.skills_code = c.0;
+    let (mut f, u, _) = curse_world();
+    dos::curse(&mut f, &t0, &ct, u, 1, 1);
+    assert!(f.lists.is_empty());
+    // aurastat1 = −1 (none) goes on with v1 = 0: the state is applied
+    // with no stat and slots 2…6 are not read (the stop is at slot 1).
+    let mut tn = t.clone();
+    tn.skills[1].aurastat1 = 0xFFFF;
+    let (mut f, u, m) = curse_world();
+    dos::curse(&mut f, &tn, &ct, u, 1, 1);
+    assert!(f.list_of(m, 30).expect("applied").stats.is_empty());
+    // r7: a stat with `updateanimrate` refreshes the target's animation.
+    let (mut f, u, m) = curse_world();
+    f.stat_infos.insert(
+        26,
+        BodyStat {
+            updateanimrate: true,
+            maxstat: -1,
+            ..BodyStat::default()
+        },
+    );
+    f.take_log();
+    dos::curse(&mut f, &t, &ct, u, 1, 1);
+    assert!(f.take_log().contains(&format!("anim {m}")));
+    let (mut f, u, m) = curse_world();
+    f.take_log();
+    dos::curse(&mut f, &t, &ct, u, 1, 1);
+    assert!(!f.take_log().contains(&format!("anim {m}")));
+}
+
+// Covers: specs/skills/bodies.md §4.4 l2 r8
+#[test]
+fn curse_unit_registers_the_first_three_event_pairs() {
+    let ct = curse_ct();
+    let mut t = curse_tables(30);
+    let s = &mut t.skills[1];
+    s.auraevent1 = 5;
+    s.auraeventfunc1 = 3;
+    s.auraevent2 = 6;
+    s.auraeventfunc2 = 0;
+    s.auraevent3 = 7;
+    s.auraeventfunc3 = 4;
+    let (mut f, u, m) = curse_world();
+    f.take_log();
+    dos::curse(&mut f, &t, &ct, u, 1, 1);
+    let log = f.take_log();
+    let at = |s: String| log.iter().position(|l| *l == s);
+    let un = at(format!("unhandle {m} 1 30")).expect("unregister");
+    let a = at(format!("handler {m} 5 3 30")).expect("pair 1");
+    let c = at(format!("handler {m} 7 4 30")).expect("pair 3");
+    assert!(un < a && a < c);
+    // Pair 2 has function 0: refused by register. Three attempts → two
+    // handlers.
+    assert_eq!(log.iter().filter(|l| l.starts_with("handler")).count(), 2);
+    // Event 1 < 0, or function 1 = 0: nothing at all (even for pairs 2
+    // and 3).
+    for (e1, f1) in [(0xFFFFu16, 3u16), (5, 0)] {
+        let mut t2 = t.clone();
+        t2.skills[1].auraevent1 = e1;
+        t2.skills[1].auraeventfunc1 = f1;
+        let (mut f, u, m) = curse_world();
+        f.take_log();
+        dos::curse(&mut f, &t2, &ct, u, 1, 1);
+        let log = f.take_log();
+        assert!(!log.iter().any(|l| l.starts_with("handler")));
+        assert!(!log.contains(&format!("unhandle {m} 1 30")));
+    }
+}
+
+// Covers: specs/skills/bodies.md §4.4 l2 r1, §4.4 l2 r5
+#[test]
+fn curse_unit_ai_curses_switch_the_monster_ai() {
+    let mut ct = curse_ct();
+    ct.difficultylevels[0].aicursedivisor = 4;
+    for (st, k) in [(23u16, 10), (56, 11)] {
+        let t = curse_tables(st);
+        let (mut f, u, m) = curse_world();
+        f.c.frame = 50;
+        f.take_log();
+        assert_eq!(dos::curse(&mut f, &t, &ct, u, 1, 1), 1);
+        let l = f.list_of(m, i32::from(st)).expect("ai curse list");
+        // r5: the AI curse callback; the AI control switched to k.
+        assert_eq!(l.callback, callback::AI_CURSE);
+        assert!(f.take_log().contains(&format!("ai {m} {k}")));
+        // Duration: 40 / AiCurseDivisor.
+        assert_eq!(f.list_of(m, i32::from(st)).unwrap().expire, 60);
+        // A non-AI curse state keeps the full length and sets no AI.
+        let t = curse_tables(30);
+        let (mut f, u, m) = curse_world();
+        f.c.frame = 50;
+        f.take_log();
+        dos::curse(&mut f, &t, &ct, u, 1, 1);
+        assert_eq!(f.list_of(m, 30).unwrap().expire, 90);
+        assert!(!f.take_log().iter().any(|l| l.starts_with("ai ")));
+    }
+    // r1: the unit must be a monster of alignment ≠ 1 that can switch.
+    let t = curse_tables(23);
+    let none = |f: BodyFake, why: &str| {
+        let mut f = f;
+        assert_eq!(dos::curse(&mut f, &t, &ct, 0, 1, 1), 1);
+        assert!(f.lists.is_empty(), "{why}");
+    };
+    let (mut f, u, _) = curse_world();
+    let mut p = FUnit::new(UnitType::Player, 1);
+    p.flags = 0xE;
+    let p = f.add(p, (10, 10));
+    f.scan = vec![p];
+    let _ = u;
+    none(f, "player");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].align = 1;
+    none(f, "alignment 1");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].type_flags = Some(2);
+    none(f, "superunique");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].type_flags = Some(8);
+    none(f, "unique");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].class = 1;
+    none(f, "class without switchai (and npc)");
+    let (mut f, _, m) = curse_world();
+    f.c.units[m].states.push(54);
+    none(f, "uninterruptable");
+}
+
+// Covers: specs/skills/bodies.md §4.4 text
+#[test]
+fn can_switch_follows_the_original_conditions() {
+    let mut ct = curse_ct();
+    let (mut f, _, m) = curse_world();
+    for k in [10, 11, 12, 19, 0, 5] {
+        assert!(dos::can_switch(&mut f, &ct, m, k), "k = {k}");
+    }
+    assert!(!dos::can_switch(&mut f, &ct, m, 20), "k > 19");
+    // Base class 492 with state 143 (attached) → 0.
+    ct.monstats[0].baseid = 492;
+    assert!(dos::can_switch(&mut f, &ct, m, 19));
+    f.c.units[m].states.push(143);
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    f.c.units[m].states.clear();
+    ct.monstats[0].baseid = 0;
+    // State 54, no switchai, boss, no walk mode.
+    f.c.units[m].states.push(54);
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    f.c.units[m].states.clear();
+    ct.monstats[0].switchai = false;
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    ct.monstats[0].switchai = true;
+    ct.monstats[0].boss = true;
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    ct.monstats[0].boss = false;
+    f.c.units[m].no_walk = true;
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    f.c.units[m].no_walk = false;
+    // Unit flag 0x4 unset and dead → 0; alive or flag set → ok.
+    f.c.units[m].flags = 0;
+    f.alive.remove(&m);
+    assert!(!dos::can_switch(&mut f, &ct, m, 19));
+    f.alive.insert(m);
+    assert!(dos::can_switch(&mut f, &ct, m, 19));
+    f.alive.remove(&m);
+    f.c.units[m].flags = 4;
+    assert!(dos::can_switch(&mut f, &ct, m, 19));
+    f.alive.insert(m);
+    // Superunique (2) / unique (8) type flags → 0, for every k.
+    for fl in [2u32, 8] {
+        f.c.units[m].type_flags = Some(fl);
+        for k in [10, 19, 0] {
+            assert!(!dos::can_switch(&mut f, &ct, m, k), "flag {fl} k {k}");
+        }
+    }
+    // A non-monster never switches.
+    let p = f.add(FUnit::new(UnitType::Player, 0), (1, 1));
+    assert!(!dos::can_switch(&mut f, &ct, p, 19));
+}

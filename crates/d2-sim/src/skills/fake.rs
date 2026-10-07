@@ -42,6 +42,10 @@ pub struct FUnit {
     pub combat: Vec<CombatEntry>,
     pub room: RoomKind,
     pub guid: u32,
+    /// Monster type flags (`monster_flag`); `None` reads `flags`.
+    pub type_flags: Option<u32>,
+    pub align: i32,
+    pub no_walk: bool,
 }
 
 impl FUnit {
@@ -74,6 +78,9 @@ impl FUnit {
             combat: Vec::new(),
             room: RoomKind::Field,
             guid: 0,
+            type_flags: None,
+            align: 0,
+            no_walk: false,
         }
     }
 
@@ -240,7 +247,7 @@ impl CombatWorld for Fake {
         self.units[u].moving
     }
     fn monster_flag(&self, u: usize, mask: u32) -> bool {
-        self.units[u].flags & mask != 0
+        self.units[u].type_flags.unwrap_or(self.units[u].flags) & mask != 0
     }
     fn is_boss(&self, u: usize) -> bool {
         self.units[u].boss
@@ -260,8 +267,8 @@ impl CombatWorld for Fake {
     fn is_revived(&self, u: usize) -> bool {
         self.units[u].revived
     }
-    fn alignment(&self, _u: usize) -> i32 {
-        0
+    fn alignment(&self, u: usize) -> i32 {
+        self.units[u].align
     }
     fn hostile(&self, _a: usize, _d: usize) -> bool {
         self.hostile
@@ -293,8 +300,8 @@ impl CombatWorld for Fake {
     fn is_dead(&self, _u: usize) -> bool {
         false
     }
-    fn monster_has_mode(&self, _u: usize, _mode: i32) -> bool {
-        true
+    fn monster_has_mode(&self, u: usize, _mode: i32) -> bool {
+        !self.units[u].no_walk
     }
     fn converted_type(&self, u: usize) -> i32 {
         self.units[u].kind as i32

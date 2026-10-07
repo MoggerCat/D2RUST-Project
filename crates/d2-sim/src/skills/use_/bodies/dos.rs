@@ -275,7 +275,8 @@ pub fn curse<W: BodyWorld>(
         skill,
         lvl,
         duration: d,
-        stats: [-1; 6],
+        // Zeroed first (§4.4 step 5): slots after a stop keep stat 0.
+        stats: [0; 6],
         values: [0; 6],
         state: ts,
         events: ev,
