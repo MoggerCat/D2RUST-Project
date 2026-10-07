@@ -129,8 +129,8 @@ index, rows, section:
 | CycleOfLife (111) | 2 | §25 |
 | NpcBarb (127) | 2 | §26 |
 
-(Continued as the bodies are written; the remaining `unread` rows stay
-listed in `ai-functions.tsv`.)
+The AIs used by one live row (and ShadowMasterNoInit, by none) continue
+in `ai-bodies-7.md`, same order.
 
 ### 2. Shared pet helpers
 
