@@ -112,7 +112,26 @@ clean.
 | `sim/intents-events.md` | §7.3 r2 steps 5–10 | 0x0C's fields (`0x00597CF0`), `0x00571740` (unit +0x6E), `0x00639F20`, `0x005711D0`, `0x00625A20` / `0x005715A0`, 0x57 (`0x00597C70`) |
 | `sim/intents-events.md` / `monsters/init.md` | §7.1 r2.1, §7.2, §24 | a monster's add messages (0xAC server fields past §24): an unannounced monster and the room switch's monsters still get none (SJ-8) |
 
+| `render/lighting.md` / `sim/intents-events.md` | §9.2 r4.2 / §8.3 | `-022633` seq 228 is a second 0x53 in frame 2 (after §8.3's seq 157–224); §8.3 names no sender for it (tick step 1's `environment_changed` sends it only on a period change). Not sent here |
+
+## Results
+
+At `e2ff3be` (`CARGO_INCREMENTAL=0`, `--workspace --exclude d2-client`):
+`cargo fmt --all --check` clean; `cargo clippy … --all-targets -- -D
+warnings` clean; `cargo nextest run --no-fail-fast`: 4,607 run, 4,602
+passed, 5 failed (the 5 known on the base: `monsters::ai::tests::
+specd_here_*` × 2, `scenario-run::scenarios` × 3), 198 skipped;
+`py tools/coverage.py --check` 8,908 claims, 0 errors;
+`py tools/spec_index.py --check` clean. `d2-client` not built (broken on
+the base); its 0x53 handler (`bridge/msg/lighting.rs`) ignores a 0x53
+that arrives before the player is placed, so the join's new 0x53 needs
+no client change.
+
 ## Left (not done here)
+
+- HANDOFF §1 rows 3ao and "3 not implemented", §7 MB-8 and SJ-2–SJ-5:
+  fold this note (not edited here, to avoid conflicts with the parallel
+  sessions).
 
 - The §8.3 join sequence messages and the stat messages (gaps above).
 - 0x73 (gap above); item 0x9C add messages (item world: impl-items-rest).
