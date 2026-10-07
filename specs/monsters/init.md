@@ -44,22 +44,22 @@
 |   16. Boss spawns | 396–431 |
 |   17. Choosing umods (`0x005A0760`) | 432–475 |
 |   18. Boss minions and umod init (`0x005A2120`) | 476–493 |
-|   19. Umod init functions | 494–573 |
-|   20. Superuniques (`0x005A49B0`) | 574–597 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 598–612 |
-|   22. Umod callbacks and the type-7 event | 613–660 |
-|   23. Unique names (client) | 661–670 |
-|   24. Monster assign message | 671–683 |
-|   25. Calling the spawn functions outside population (tools) | 684–774 |
-| Constants & data dependencies | 775–796 |
-| Randomness | 797–832 |
-| Edge cases & original bugs | 833–858 |
-| Test vectors | 859–860 |
-|   Synthetic (CI-safe) | 861–883 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 884–914 |
-|   Recorded checks (monster assign 0xAC) | 915–927 |
-| Provenance | 928–990 |
-| Open questions | 991–1018 |
+|   19. Umod init functions | 494–579 |
+|   20. Superuniques (`0x005A49B0`) | 580–603 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 604–618 |
+|   22. Umod callbacks and the type-7 event | 619–666 |
+|   23. Unique names (client) | 667–676 |
+|   24. Monster assign message | 677–689 |
+|   25. Calling the spawn functions outside population (tools) | 690–780 |
+| Constants & data dependencies | 781–802 |
+| Randomness | 803–838 |
+| Edge cases & original bugs | 839–864 |
+| Test vectors | 865–866 |
+|   Synthetic (CI-safe) | 867–889 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 890–920 |
+|   Recorded checks (monster assign 0xAC) | 921–933 |
+| Provenance | 934–997 |
+| Open questions | 998–1031 |
 <!-- /index -->
 
 ## Summary
@@ -544,7 +544,7 @@ fewer than 2:
 | 5 strong | damagepercent += K[15] (unique) or K[14] × B / 100, halved for BaseId 118; item_tohit_percent += K[13] or K[12] × B / 100 |
 | 6 fast | velocitypercent += clamp(2048 / `Velocity` − 128, 10, 100) if `Velocity` > 0; any unique value |
 | 9 fire | DM = monlvl `DM`/`L-DM` (L-flag of §8.1) for d at the level clamped to 1..rows−1; firemindam += DM × K[d+28] / 100, firemaxdam += DM × K[d+31] / 100 (unique) or K[d+16], K[d+19] (unique = 0); then 19.3 |
-| 17, 18, 23, 25 | same pattern for light, cold (+ coldlength 5 × level + 100), poison (+ poisonlength 2 × (5 × level + 150)), mana drain (× 256); then 19.3 (pattern from D2MOO; table entries 1.14d-confirmed) |
+| 17, 18, 23, 25 | same body for light, cold (+ coldlength 5 × r + 100), poison (+ poisonlength 2 × (5 × r + 150)), mana drain (× 256), r = the clamped monlvl row; then 19.3 (bodies of 9, 17, 18, 23, 25: `monsters/umod-init-bodies.md` §2–§3) |
 
 #### 19.5 Aura enchanted (umod 30, `0x005A1650`)
 
@@ -568,8 +568,14 @@ multiplier / divisor, 1, 99); the skill is given and assigned
 | 37 fanatic | item_armor_percent = −70; champion function (velocity rule of 37) |
 | 38 possessed | type flag 0x20; maxhp and hitpoints += 100 %; champion function |
 | 39 berserk | maxhp and hitpoints += pct(maxhp, −75); damagepercent += 300 × B / 100 (halved for BaseId 118); item_tohit_percent += 300 × B / 100; no champion function |
-| 26 teleport | skill monteleport level 1, mode 4, AI flag 0x20 (D2MOO; open question 7) |
+| 26 teleport | unique only: skill MonTeleport (184) level 1, skill mode 4, AI flag 0x20 (`monsters/umod-init-bodies.md` §4) |
 | 41 always_run_ai | schedule a type-7 event at frame + 75 (`0x005417D0`), any unique value |
+
+#### 19.7 Bodies owned elsewhere
+
+The full step lists of umods 9, 17, 18, 23, 25 (elemental body) and 26
+(teleport) are in `monsters/umod-init-bodies.md`; §19.4 and §19.6 keep
+the summary.
 
 ### 20. Superuniques (`0x005A49B0`)
 
@@ -967,8 +973,9 @@ Bosses, Normal, Blood Moor (L-flag 1):
   above was re-read on 1.14d. Differences found: 16 components (not 12),
   champion experience rounding, the BaseId 118 halving, the empty skill
   bonus stub, uber cases in boss mods, the always-present unique flag on
-  `0x005A09E0` bosses (as in D2MOO), umod 41 handler details. Rows marked
-  "D2MOO" in `umods.tsv` were not re-read.
+  `0x005A09E0` bosses (as in D2MOO), umod 41 handler details. The init
+  bodies of umods 17, 18, 23, 25, 26 were re-read 2026-10-07
+  (`umod-init-bodies.md`); no `umods.tsv` row is D2MOO-only.
 - §17.3 rule 2: asm of `0x005A0070` (unit in ECX, exclude in EDX; row
   = EDX, column = monstats +0x1C; matrix count / words / width at data
   tables +0xC40 / +0xC44 / +0xC48, filled by `0x006C2110`). 1.14d live
@@ -1003,8 +1010,9 @@ Bosses, Normal, Blood Moor (L-flag 1):
 5. Position finder `0x0054DC40` (x = y = 0) draws: `population.md`.
 6. Per-case details of boss mods `0x005B1CF0` and superunique hcIdx cases
    in `0x005A49B0` beyond those listed: read the asm case by case.
-7. Umods 17, 18, 23, 25, 26 init bodies follow D2MOO; read
-   `0x005A1B00`, `0x005A1C70`, `0x005A1E00`, `0x005A1F90`, `0x005A1600`.
+7. Answered (2026-10-07): umods 17, 18, 23, 25, 26 init bodies read on
+   1.14d (`0x005A1B00`, `0x005A1C70`, `0x005A1E00`, `0x005A1F90`,
+   `0x005A1600`): `monsters/umod-init-bodies.md`.
 8. Behaviour of the mode 0/1/3/4/5 and type-7 callbacks other than those
    in §22 (death explosions, curses, hit effects): owner to be decided
    (monster death/combat spec); catalogue in `umods.tsv`.
@@ -1015,3 +1023,8 @@ Bosses, Normal, Blood Moor (L-flag 1):
 Answered 2026-10-07: 8 → every callback body is in
 `monsters/umod-callbacks.md` (owner). 9 → `0x00573780` draws nothing
 (`umod-callbacks.md` §3.5).
+
+Answered 2026-10-07: 7 → read on 1.14d; bodies in
+`monsters/umod-init-bodies.md` (one difference from the old summary: the
+cold / poison length stats use the clamped monlvl row, not the level);
+no `umods.tsv` row is D2MOO-only any more.
