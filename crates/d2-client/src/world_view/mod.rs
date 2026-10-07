@@ -36,6 +36,8 @@ pub mod overlay;
 pub mod panel_art;
 pub mod present;
 pub mod ui_bind;
+pub mod unit_assets;
+pub mod unit_rules;
 
 #[cfg(test)]
 mod tests;
