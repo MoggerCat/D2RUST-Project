@@ -48,7 +48,7 @@
 | Edge cases & original bugs | 976–1016 |
 | Test vectors | 1017–1088 |
 | Provenance | 1089–1111 |
-| Open questions | 1112–1134 |
+| Open questions | 1112–1158 |
 <!-- /index -->
 
 ## Summary
@@ -1117,17 +1117,41 @@ unique with 3 minions), and placement points.
 2. Draw-level check of §3–§10: record room-seed and game-seed draws
    (call site and `lo'`) during the first population of a Blood Moor room,
    then replay.
-3. Object ids created for barricadedoor1/2 in `0x0054E490` (the push
-   before `0x00555230`): read the asm.
-4. `0x005B24E0` (D2MOO `sub_6FC6A230`) argument meaning (count versus
-   radius) for the Shenk, Nihlathak and Baal-subject spawns: read the
-   function.
-5. `0x005B2700` with n = 1: s becomes 1, which is out of range. Does the
-   modulo loop test any tile? Read the loop exit with n = 1.
-6. `0x00547DD0` alignment value 4 (excluded as "old"): what alignment is
-   4? Read `0x005543B0` / the alignment setter.
-7. `0x005B1990(game, unit, 0, 8)` for wanderers: what does mode 8 mean
-   (alignment conversion)? Belongs to `monsters/init.md` or `monsters/ai.md`.
-8. Does monster init (`0x005B1CF0`, `0x005B21B0`) draw from the room
-   seed? It decides whether §Randomness step 4.3 is complete; settled by
-   `monsters/init.md`.
+3. Answered (2026-10-07): class 432 (barricadedoor1; raw class test,
+   only when the class is below the monstats count) creates object 571
+   and class 433 (barricadedoor2; through the bounds helper
+   `0x00463900`) object 572 (`0x00555230(type 2, class 0x23B / 0x23C)`
+   at the monster's position from `0x0045ADF0` / `0x0045AE20`); both
+   objects.txt rows are `Dummy` "door blocker".
+4. Answered (2026-10-07): `0x005B24E0(game, boss, class, mode, r,
+   count, flags)` (`ret 0x14`; boss none → 0) runs `count` times
+   `0x005B23C0(game, boss, class, mode, r, flags)`; each created unit
+   gets owner data with the boss GUID (`0x0058F030(game, unit, GUID, 1,
+   0, 0)`) and joins the boss's minion list (`0x0058F100`); returns 1
+   when at least one was created. So §11.4: Shenk mode 1, r 20, 20
+   spawns, flags 0; Nihlathak r 10, 20 spawns, 0x40; Baal subject 2
+   r 20, 10 spawns, 0x40.
+5. Answered (2026-10-07): the loop tests index s first, then (i + 1)
+   mod n until that equals s − 1 (never tested). With n = 1 it tests
+   exactly one record, index 1, one past the end of the list (the next
+   0x30 bytes in memory; original bug), then stops; index 0 is never
+   tested. For n ≥ 2 with s = 1, index 0 is never tested either.
+6. Answered (2026-10-07): 4 is not an alignment. The setter
+   `0x005543B0(unit, new)` (new ≥ 3 fatal) passes old = 4 when the unit
+   has no alignment state list (state 105) yet, else old = stat 172 of
+   that list; `0x00554340` then calls `0x00547DD0(old, new)`. So "old ≠
+   4" skips the first alignment set, which `0x00547D90` already counted
+   at creation.
+7. Answered (2026-10-07): not an alignment change. `0x005B1990(game,
+   unit, a, slot)` (`ret 8`): only when unit +0xD0 = 11 (in no
+   target-node list), slot ∈ {8, 9} and the unit is a player or monster:
+   a 0x10-byte node {unit, a, next = old head, prev 0} becomes the head
+   of the game's target-node list `slot` (game +0x10F8 + 4·slot; the old
+   head's prev := it) and unit +0xD0 := slot. Slot 8 units are targets
+   for evil monsters (`monsters/ai.md` §5.2 step 5.2), so §12's rogue2
+   wanderers are attacked by the area's monsters. §12 step 6's
+   "alignment change" wording is wrong; this answer supersedes it.
+8. Answered (2026-10-07): no. `0x005B1CF0` and `0x005B21B0` and their
+   callees (2 call levels) contain no generator step (constant
+   0x6AC690C5) and no `rng.md` helper call, on any seed; §Randomness
+   step 4.3 is complete for them (superunique extra spawns: §11.4).

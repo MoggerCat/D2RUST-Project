@@ -59,7 +59,7 @@
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 890–920 |
 |   Recorded checks (monster assign 0xAC) | 921–933 |
 | Provenance | 934–997 |
-| Open questions | 998–1031 |
+| Open questions | 998–1037 |
 <!-- /index -->
 
 ## Summary
@@ -1000,14 +1000,20 @@ Bosses, Normal, Blood Moor (L-flag 1):
 1. The value of game +0x6A in other modes (classic SP, TCP/IP, realm);
    settle by recording client message 0x67 in each mode. Rules use the
    L-columns only through §8.1's test.
-2. The first AI setup `0x005B0E00` may draw from the unit seed at init;
-   `monsters/ai.md` to state its draws; settle with an RNG trace of one
-   spawn.
+2. Answered (2026-10-07): `0x005B0E00` (`ai.md` §3.3) draws nothing
+   itself; the only draws are the AI record's init function
+   (`ai-functions.tsv` `init_1_14d`). Of the 16 init functions, Raven
+   `0x005ECB70`, NpcBarb `0x005EDC40` and Nihlathak `0x005EE5C0` step a
+   seed and BaalThrone `0x005EF310` creates monsters (their draws); the
+   other 12 draw nothing (scan for the generator constant 0x6AC690C5 and
+   the `rng.md` helpers, 3 call levels deep). Ordinary room monsters
+   (AIs without init) draw nothing at step 8 of Randomness.
 3. Draws taken by the allocator after the type init (room insert, path
    init) are not listed here; `sim/units.md` to confirm none.
 4. No RNG trace of a spawn exists: record one population pass (rng hook
    with caller addresses) to confirm the order in Randomness.
-5. Position finder `0x0054DC40` (x = y = 0) draws: `population.md`.
+5. Answered (2026-10-07): `0x0054DC40` and its draws are owned by
+   `monsters/population.md` §8.
 6. Per-case details of boss mods `0x005B1CF0` and superunique hcIdx cases
    in `0x005A49B0` beyond those listed: read the asm case by case.
 7. Answered (2026-10-07): umods 17, 18, 23, 25, 26 init bodies read on
