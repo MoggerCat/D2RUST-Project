@@ -1798,8 +1798,8 @@ fn akara_respec() {
         w.log,
         [
             "respec offer",
-            "reset stats",
             "reset skills",
+            "reset stats",
             "respec sound",
             "respec done"
         ]

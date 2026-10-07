@@ -468,9 +468,9 @@ pub trait NpcWorld {
     fn act_completion(&mut self, player: UnitId, npc: UnitId, level: u32, from: u32);
 
     // Player [player spec].
-    /// `0x00570360`.
+    /// Stat reset `0x00570C80` (`combat/vitals.md` §2.1).
     fn reset_stats(&mut self, player: UnitId);
-    /// `0x00570C80`.
+    /// Skill reset `0x00570360` (`skills/levels.md` §6.5).
     fn reset_skills(&mut self, player: UnitId);
     /// The respec sound (`0x00553380`; the id is not written).
     fn respec_sound(&mut self, player: UnitId);

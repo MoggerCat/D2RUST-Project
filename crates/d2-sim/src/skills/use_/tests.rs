@@ -890,6 +890,8 @@ fn can_change_mode_table() {
         (mode::S2, mode::A1, true),
         (mode::S4, mode::A1, true),
         (mode::KB, mode::A1, true),
+        // Any current mode above 18: past the jump table, yes.
+        (20, mode::A1, true),
         (mode::DT, mode::A1, false),
         (mode::GH, mode::A1, false),
         (mode::BL, mode::A1, false),
@@ -1020,6 +1022,12 @@ fn interrupt_gate_concentration_roll() {
     f.units[p]
         .state_stats
         .insert((state::CONCENTRATION, CONCENTRATION_STAT), r2);
+    assert!(interrupt_gate(&mut f, &t, p, mode::A1, &native(1, 1)));
+    expect.roll(100);
+    assert_eq!(f.units[p].seed, expect);
+    // No stat list: stat 164 reads 0; the draw is still made and never
+    // blocks (§4 step 4).
+    f.units[p].state_stats.clear();
     assert!(interrupt_gate(&mut f, &t, p, mode::A1, &native(1, 1)));
     expect.roll(100);
     assert_eq!(f.units[p].seed, expect);
@@ -1244,6 +1252,9 @@ fn start_core_steps() {
     assert_eq!(start(&mut f, &t, q), 1);
     f.los = false;
     assert_eq!(start(&mut f, &t, q), 0);
+    // No target position: the line test is skipped (passes).
+    f.units[q].target = None;
+    assert_eq!(start(&mut f, &t, q), 1);
     f.los = true;
     let q = caster(&mut f, 6, 1, 0);
     assert_eq!(start(&mut f, &t, q), 0);
@@ -1389,6 +1400,8 @@ fn do_core_gates() {
     // Level 0 and no entry with a level: 0.
     let p = caster(&mut f, 4, 0, 0);
     assert_eq!(do_core(&mut f, &t, p, 4, 0, true, false, false), 0);
+    // L > 0 does not pass by itself: the used entry's level is read.
+    assert_eq!(do_core(&mut f, &t, p, 4, 1, true, false, false), 0);
     f.units[p].skills[0].base = 2;
     assert_eq!(do_core(&mut f, &t, p, 4, 0, true, false, false), 1);
     // srvdofunc past the table: 0.

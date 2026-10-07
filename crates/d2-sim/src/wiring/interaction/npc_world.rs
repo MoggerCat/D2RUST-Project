@@ -47,7 +47,8 @@ pub trait NpcRest: super::HirelingRest {
     fn pet(&self, player: UnitId, kind: u8, arg: u8) -> Option<UnitId>;
     fn pets(&self, player: UnitId) -> Vec<UnitId>;
     fn player_name(&self, player: UnitId) -> Vec<u8>;
-    /// `0x00570360`, `0x00570C80` (see [`NpcWorld::reset_stats`]).
+    /// Stat reset `0x00570C80`, skill reset `0x00570360` (see
+    /// [`NpcWorld::reset_stats`]).
     fn reset_stats(&mut self, player: UnitId);
     fn reset_skills(&mut self, player: UnitId);
     fn act_change(&mut self, player: UnitId, level: u32, arg: u32);
@@ -349,10 +350,11 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
 
     // ---- player
 
-    /// TODO(npc.md §8.2 vs vitals.md §2.1): npc.md names `0x00570360`
-    /// the stat reset and `0x00570C80` the skill reset; vitals.md names
-    /// `0x00570C80` the stat reset. Until the addresses agree neither is
-    /// wired to `combat::vitals::reset_stats`.
+    /// The stat reset `0x00570C80` (`npc.md` §8.2, `vitals.md` §2.1; the
+    /// addresses now agree). TODO(wiring): not yet run through
+    /// `combat::vitals::reset_stats`: the desk holds no `VitalsTables`,
+    /// and the skill reset `0x00570360` (`levels.md` §6.5) that runs just
+    /// before it has no d2-sim body yet; both stay on the rest.
     fn reset_stats(&mut self, player: UnitId) {
         self.rest.reset_stats(player);
     }

@@ -1123,7 +1123,8 @@ fn mode_start_clears_flag_0x40() {
 // ---- use.md §5.3: start --------------------------------------------------------------------
 
 /// Step 6.4: `lineofsight` 4 tests the line to the target position with
-/// mask 0x804; no position or a blocked line → 0 (neutral).
+/// mask 0x804; a blocked line → 0 (neutral); no position skips the test
+/// (passes).
 // Covers: specs/skills/use.md §5.3 r6
 #[test]
 fn start_line_of_sight() {
@@ -1140,7 +1141,7 @@ fn start_line_of_sight() {
     };
     let at = (37, 41);
     assert_eq!(go(&mut fx, Some(at), Some((at, 0x804))), (mode::SC, 1));
-    assert_eq!(go(&mut fx, None, Some((at, 0x804))), (mode::TN, 0));
+    assert_eq!(go(&mut fx, None, Some((at, 0x804))), (mode::SC, 1));
     assert_eq!(go(&mut fx, Some(at), Some((at, 0x805))), (mode::TN, 0));
 }
 

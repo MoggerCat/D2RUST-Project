@@ -187,8 +187,7 @@ pub fn init_player_stats<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit
         (stat::VELOCITYPERCENT, 100),
         (stat::OTHER_ANIMRATE, 100),
     ] {
-        // TODO(vitals.md §1): the write order of the table is not given;
-        // d2rs writes in table order (no write has a side effect here).
+        // The table's row order, left column first (§1).
         w.set_base_stat(u, s, v);
     }
     if act > 0 {
@@ -201,16 +200,19 @@ pub fn init_player_stats<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit
     }
 }
 
-/// `0x0057EB10` (§1, D2MOO `SUNITDMG_SetExperienceForTargetLevel`): add
-/// `threshold(class, target) − experience` if positive, through §4.3.
-// TODO(vitals.md §1): threshold(class, target) is the experience of level
-// target + 1 under §4.1; the spec states it so, unconfirmed by a trace.
+/// `0x0057EB10` (§1, D2MOO `SUNITDMG_SetExperienceForTargetLevel`): only
+/// when `target` > the base level, add `threshold(class, target) −
+/// experience` if positive, through §4.5. `threshold(class, target)` is
+/// row target + 1 (§4.1): the player ends at level target + 1.
 pub fn set_experience_for_target_level<W: VitalsUnits>(
     w: &mut W,
     t: &VitalsTables,
     u: W::Unit,
     target: u32,
 ) {
+    if w.base_stat(u, stat::LEVEL) >= target as i32 {
+        return;
+    }
     let class = w.class_id(u);
     let need = t.threshold(class, target);
     let have = w.base_stat(u, stat::EXPERIENCE) as u32;
@@ -270,9 +272,7 @@ pub fn spend<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit, s: u8) -> 
 }
 
 /// `gain_energy(unit, n)` = `0x00570A80` (§2).
-// TODO(vitals.md §2): the rule text could put both mana additions under
-// `n > 0`; d2rs reads the condition as covering the current mana only, as
-// the closing paragraph states ("lowers the maximum but not the current").
+// The `n > 0` test guards the current-mana add only (§2).
 pub fn gain_energy<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit, n: i32) {
     let per = t
         .charstats(w.class_id(u))
