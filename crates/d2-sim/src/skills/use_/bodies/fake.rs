@@ -34,6 +34,9 @@ pub struct FList {
     pub freed: bool,
 }
 
+/// One `unit_find` call: (centre, radius, flags).
+pub type FindCall = ((i32, i32), i32, u32);
+
 /// The fake body world.
 #[derive(Debug, Clone, Default)]
 pub struct BodyFake {
@@ -112,7 +115,7 @@ pub struct BodyFake {
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
     /// The (centre, radius, flags) of every `unit_find` call.
-    pub finds: std::cell::RefCell<Vec<((i32, i32), i32, u32)>>,
+    pub finds: std::cell::RefCell<Vec<FindCall>>,
 }
 
 impl BodyFake {

@@ -2104,6 +2104,15 @@ fn component_tabs(m: u16, lob: bool) -> SkillTables {
     tab1(r, Code::new(), 10)
 }
 
+/// srvdo `index` (148 / 149) on skill 1 at level 2.
+fn do_component(f: &mut BodyFake, t: &SkillTables, u: usize, index: u16, skill: i32) -> i32 {
+    run_do(f, t, &ct_ids(2), index, u, skill, 2).unwrap()
+}
+
+// Monster data +0x0E / +0x0F are the component bytes 10 / 11 (+0x04 + k).
+const S3: usize = 10;
+const S4: usize = 11;
+
 // Covers: specs/skills/bodies-4.md §3.25 r1, §3.25 r2
 #[test]
 fn doom_knight_missile_refusals() {
@@ -2111,25 +2120,15 @@ fn doom_knight_missile_refusals() {
     f.tpos.insert(u, (30, 40));
     let tg = mon(&mut f, 0, (2, 2));
     let t = component_tabs(2, false);
-    assert_eq!(
-        b4_more::component_missile(&mut f, &t, u, 99, 1, 3),
-        0,
-        "R invalid"
-    );
-    assert_eq!(
-        b4_more::component_missile(&mut f, &t, u, 1, 1, 3),
-        0,
-        "T none"
-    );
+    assert_eq!(do_component(&mut f, &t, u, 148, 99), 0, "R invalid");
+    assert_eq!(do_component(&mut f, &t, u, 148, 1), 0, "T none");
     f.targets.insert(u, tg);
     // m < 0.
-    assert_eq!(
-        b4_more::component_missile(&mut f, &component_tabs(0xFFFF, false), u, 1, 1, 3),
-        0
-    );
-    // m + S3 ≥ count.
-    f.components.insert((u, 3), 8);
-    assert_eq!(b4_more::component_missile(&mut f, &t, u, 1, 1, 3), 0);
+    let neg = component_tabs(0xFFFF, false);
+    assert_eq!(do_component(&mut f, &neg, u, 148, 1), 0);
+    // m + S3 ≥ count (no missiles record).
+    f.components.insert((u, S3), 8);
+    assert_eq!(do_component(&mut f, &t, u, 148, 1), 0);
     assert!(f.missiles.is_empty());
     assert_eq!(f.c.units[u].flags & 0x40, 0);
 }
@@ -2141,27 +2140,25 @@ fn doom_knight_missile_adds_the_component_byte() {
     f.tpos.insert(u, (30, 40));
     let tg = mon(&mut f, 0, (2, 2));
     f.targets.insert(u, tg);
-    f.components.insert((u, 3), 3);
+    f.components.insert((u, S3), 3);
+    f.components.insert((u, S4), 6);
     assert_eq!(
-        b4_more::component_missile(&mut f, &component_tabs(2, false), u, 1, 2, 3),
+        do_component(&mut f, &component_tabs(2, false), u, 148, 1),
         1
     );
     assert_eq!(f.c.units[u].flags & 0x40, 0x40);
     let q = &f.missiles[0];
     assert_eq!((q.class, q.flags, q.skill, q.level), (5, 0x21, 1, 2));
     // `lob` → the lob missile.
-    assert_eq!(
-        b4_more::component_missile(&mut f, &component_tabs(2, true), u, 1, 2, 3),
-        1
-    );
+    assert_eq!(do_component(&mut f, &component_tabs(2, true), u, 148, 1), 1);
     assert_eq!((f.missiles[1].class, f.missiles[1].flags), (5, 0x420));
     // A player adds no component byte.
     let (mut f, p) = world();
     f.tpos.insert(p, (30, 40));
     let tg = mon(&mut f, 0, (2, 2));
     f.targets.insert(p, tg);
-    f.components.insert((p, 3), 3);
-    b4_more::component_missile(&mut f, &component_tabs(2, false), p, 1, 2, 3);
+    f.components.insert((p, S3), 3);
+    do_component(&mut f, &component_tabs(2, false), p, 148, 1);
     assert_eq!(f.missiles[0].class, 2);
 }
 
@@ -2172,11 +2169,940 @@ fn necromage_missile_uses_component_s4() {
     f.tpos.insert(u, (30, 40));
     let tg = mon(&mut f, 0, (2, 2));
     f.targets.insert(u, tg);
-    f.components.insert((u, 3), 3);
-    f.components.insert((u, 4), 6);
+    f.components.insert((u, S3), 3);
+    f.components.insert((u, S4), 6);
     assert_eq!(
-        b4_more::component_missile(&mut f, &component_tabs(2, false), u, 1, 2, 4),
+        do_component(&mut f, &component_tabs(2, false), u, 149, 1),
         1
     );
     assert_eq!(f.missiles[0].class, 8, "m + S4, not S3");
+}
+
+// ================================================================ §4
+
+// ---------------------------------------------------------------- §4.1
+
+fn thunder_tabs(m: u16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.calc1 = c.f(5);
+    let mut t = tab1(r, c, 4);
+    t.missiles[2].vel = 10;
+    t.missiles[2].vellev = 16;
+    t
+}
+
+// Covers: specs/skills/bodies-4.md §4.1 r1
+#[test]
+fn claws_of_thunder_ring_refusals() {
+    let (mut f, u) = world();
+    let tg = mon(&mut f, 0, (20, 30));
+    let t = thunder_tabs(2);
+    // T none.
+    assert_eq!(b4_more::thunder_ring(&mut f, &t, u, 1, 3), 0);
+    f.targets.insert(u, tg);
+    // L ≤ 0.
+    assert_eq!(b4_more::thunder_ring(&mut f, &t, u, 1, 0), 0);
+    // R invalid.
+    assert_eq!(b4_more::thunder_ring(&mut f, &t, u, 99, 3), 0);
+    // m ≤ 0.
+    assert_eq!(b4_more::thunder_ring(&mut f, &thunder_tabs(0), u, 1, 3), 0);
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §4.1 r2, §4.1 r3
+#[test]
+fn claws_of_thunder_ring_surrounds_the_target() {
+    let (mut f, u) = world();
+    let tg = mon(&mut f, 0, (20, 30));
+    f.targets.insert(u, tg);
+    let t = thunder_tabs(2);
+    assert_eq!(b4_more::thunder_ring(&mut f, &t, u, 1, 3), 1);
+    // v = Vel + trunc(VelLev × L / 8) + calc1 = 10 + 6 + 5.
+    assert_eq!(f.missiles.len(), 64);
+    for (i, q) in f.missiles.iter().enumerate() {
+        assert_eq!((q.flags, q.owner, q.class, q.velocity), (7, u, 2, 21));
+        assert_eq!((q.x, q.y, q.skill, q.level), (20, 30, 1, 3), "around T");
+        assert_eq!((q.target_x, q.target_y), ring_offset(i));
+    }
+}
+
+// ---------------------------------------------------------------- §4.2, §4.7
+
+fn lightning_tabs(m: u16, prg: i16, range: i16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.prgcalc1 = c.f(prg);
+    r.aurarangecalc = c.f(range);
+    let mut t = tab1(r, c, 600);
+    t.skills.resize(281, body_rec());
+    t.skills[280].param2 = 7;
+    t
+}
+
+// Covers: specs/skills/bodies-4.md §4.2 r1, §4.2 r2
+#[test]
+fn lightning_ring_refusals_still_step_the_seed() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (40, 50));
+    let t = lightning_tabs(2, 16, 32);
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 99, 1, true), 0);
+    let mut s = Seed::new(1, 0);
+    s.step();
+    assert_eq!(f.c.units[u].seed, s, "the step comes first");
+    // m ≤ 0.
+    assert_eq!(
+        b4_more::lightning(&mut f, &lightning_tabs(0, 16, 32), u, 1, 1, true),
+        0
+    );
+    // Target position fails.
+    f.tpos.insert(u, (0, 50));
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 1, 1, true), 0);
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §4.2 r3, §4.2 r4
+#[test]
+fn lightning_ring_steps_by_the_count_or_the_range() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (40, 50));
+    // prog_count 16: i = 0, 16, 32, 48.
+    let t = lightning_tabs(2, 16, 32);
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 1, 2, true), 1);
+    assert_eq!(f.missiles.len(), 4);
+    let mut s = Seed::new(1, 0);
+    let mut sm = Seed::init_low(s.step());
+    for (n, i) in [0usize, 16, 32, 48].into_iter().enumerate() {
+        let q = &f.missiles[n];
+        assert_eq!(
+            (q.flags, q.owner, q.class, q.skill, q.level),
+            (3, u, 2, 1, 2)
+        );
+        assert_eq!((q.x, q.y), (40, 50));
+        assert_eq!((q.target_x, q.target_y), ring_offset(i));
+        assert_eq!(q.init, Some((init_cb::ZIGZAG_RING, sm.step())));
+    }
+    // The count 0 falls back to eval(aurarangecalc) = 32: i = 0, 32.
+    f.missiles.clear();
+    let t = lightning_tabs(2, 0, 32);
+    b4_more::lightning(&mut f, &t, u, 1, 2, true);
+    assert_eq!(f.missiles.len(), 2);
+}
+
+// Covers: specs/skills/bodies-4.md §4.7 r1, §4.7 r2, §4.7 r3, §4.7 r4
+#[test]
+fn lightning_fan_uses_the_fan_callback() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (40, 50));
+    let t = lightning_tabs(568, 16, 32);
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 99, 1, false), 0);
+    f.missiles.clear();
+    f.c.units[u].seed = Seed::new(1, 0);
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 1, 2, false), 1);
+    assert_eq!(f.missiles.len(), 4);
+    let mut s = Seed::new(1, 0);
+    let mut sm = Seed::init_low(s.step());
+    for q in &f.missiles {
+        assert_eq!(q.init, Some((init_cb::ZIGZAG, sm.step())));
+        assert_eq!((q.flags, q.class), (3, 568));
+    }
+    // Class 568: Royal Strike Param2 + 1 on each missile.
+    let log = f.take_log();
+    assert_eq!(
+        log.iter()
+            .filter(|l| l.starts_with("MissileData28"))
+            .count(),
+        4
+    );
+    // m ≤ 0 and a failed target position refuse (the seed stepped first).
+    assert_eq!(
+        b4_more::lightning(&mut f, &lightning_tabs(0, 16, 32), u, 1, 1, false),
+        0
+    );
+    f.tpos.insert(u, (40, 0));
+    assert_eq!(b4_more::lightning(&mut f, &t, u, 1, 1, false), 0);
+    // The count 0 falls back to the range.
+    f.tpos.insert(u, (40, 50));
+    f.missiles.clear();
+    b4_more::lightning(&mut f, &lightning_tabs(568, 0, 16), u, 1, 1, false);
+    assert_eq!(f.missiles.len(), 4);
+}
+
+// Covers: specs/skills/bodies-4.md §edge-cases-original-bugs r8
+#[test]
+fn lightning_ring_survives_a_failed_creation() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (40, 50));
+    f.no_missiles = true;
+    // The original reads M without a null test (fatal); d2rs skips the
+    // data write.
+    assert_eq!(
+        b4_more::lightning(&mut f, &lightning_tabs(2, 32, 32), u, 1, 1, true),
+        1
+    );
+    assert_eq!(f.missiles.len(), 2);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("MissileData28")));
+    // Every created missile of a ring gets the data, whatever its class.
+    f.no_missiles = false;
+    f.missiles.clear();
+    b4_more::lightning(&mut f, &lightning_tabs(2, 32, 32), u, 1, 1, true);
+    let n = f
+        .take_log()
+        .iter()
+        .filter(|l| l.starts_with("MissileData28"))
+        .count();
+    assert_eq!(n, 2);
+}
+
+// ---------------------------------------------------------------- §4.3
+
+fn burst_tabs(prg: i16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.mindam = 10;
+    r.maxdam = 40;
+    r.prgcalc1 = c.f(prg);
+    r.aurarangecalc = c.f(30);
+    tab1(r, c, 1)
+}
+
+/// A burst world: target position (100, 100), a near unit 3 away, a far
+/// one 20 away.
+fn burst_world() -> (BodyFake, usize, usize, usize) {
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    f.tpos.insert(u, (100, 100));
+    let near = mon(&mut f, 0, (103, 100));
+    let far = mon(&mut f, 0, (120, 100));
+    for x in [near, far] {
+        f.c.units[x].flags = 0xE;
+        f.c.set(x, 6, 1 << 20);
+    }
+    f.scan = vec![near, far];
+    (f, u, near, far)
+}
+
+// Covers: specs/skills/bodies-4.md §4.3 r1, §4.3 r2, §4.3 r3
+#[test]
+fn prog_burst_refusals_and_melee() {
+    let ct = ct_ids(2);
+    let (mut f, u, near, _) = burst_world();
+    assert_eq!(
+        b4_more::prog_burst(&mut f, &burst_tabs(0), &ct, u, 99, 1),
+        0
+    );
+    // T exists: apply_melee runs even when the position then fails (out
+    // of range: the pair's records are freed).
+    f.targets.insert(u, near);
+    stored(&mut f, u, near, hit_record(5));
+    f.tpos.insert(u, (0, 100));
+    assert_eq!(b4_more::prog_burst(&mut f, &burst_tabs(0), &ct, u, 1, 1), 0);
+    assert!(f.c.units[u].combat.is_empty(), "apply_melee ran");
+    assert_eq!(f.c.units[u].seed, Seed::new(1, 0), "nothing rolled");
+}
+
+// Covers: specs/skills/bodies-4.md §4.3 r4, §4.3 r5, §4.3 r6
+#[test]
+fn prog_burst_hits_the_units_in_the_count_radius() {
+    let ct = ct_ids(2);
+    // prog_count 0 → eval(aurarangecalc) = 30: both units; count 5: near.
+    let (mut f, u, near, far) = burst_world();
+    assert_eq!(b4_more::prog_burst(&mut f, &burst_tabs(0), &ct, u, 1, 1), 1);
+    let phys = 10 + Seed::new(1, 0).roll(30) as i32;
+    assert_eq!(f.c.get(near, 6), (1 << 20) - phys, "result |= 1 hits");
+    assert_eq!(f.c.get(far, 6), (1 << 20) - phys);
+    assert!(logged(&mut f, &format!("reaction {u} {near}")));
+    let (mut f, u, near, far) = burst_world();
+    assert_eq!(b4_more::prog_burst(&mut f, &burst_tabs(5), &ct, u, 1, 1), 1);
+    assert_eq!(f.c.get(near, 6), (1 << 20) - phys);
+    assert_eq!(f.c.get(far, 6), 1 << 20, "outside the count radius");
+}
+
+// ---------------------------------------------------------------- §4.4
+
+fn scatter_tabs(m: u16, prg: i16, range: i16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.prgcalc1 = c.f(prg);
+    r.aurarangecalc = c.f(range);
+    tab1(r, c, 4)
+}
+
+// Covers: specs/skills/bodies-4.md §4.4 r1, §4.4 r2
+#[test]
+fn prog_scatter_refusals_step_the_seed_first() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (100, 100));
+    assert_eq!(
+        b4_more::prog_scatter(&mut f, &scatter_tabs(2, 3, 3), u, 99, 1),
+        0
+    );
+    let mut s = Seed::new(1, 0);
+    s.step();
+    assert_eq!(f.c.units[u].seed, s);
+    f.tpos.insert(u, (0, 100));
+    assert_eq!(
+        b4_more::prog_scatter(&mut f, &scatter_tabs(2, 3, 3), u, 1, 1),
+        0
+    );
+    f.tpos.insert(u, (100, 100));
+    assert_eq!(
+        b4_more::prog_scatter(&mut f, &scatter_tabs(0, 3, 3), u, 1, 1),
+        0
+    );
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §4.4 r3, §4.4 r4, §4.4 r5, §4.4 r6
+#[test]
+fn prog_scatter_drops_missiles_inside_the_circle() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (100, 100));
+    let t = scatter_tabs(2, 3, 9);
+    // The hand run: S = init_low(v), r = 3 → 9 tries with a, b = r −
+    // roll_S(2r).
+    let v = Seed::new(1, 0).step();
+    let mut s = Seed::init_low(v);
+    let mut want = Vec::new();
+    for _ in 0..9 {
+        let a = 3 - s.roll(6) as i32;
+        let b = 3 - s.roll(6) as i32;
+        if a * a + b * b <= 9 {
+            want.push((100 + a, 100 + b));
+        }
+    }
+    assert!(want.len() >= 3, "the vector exercises the circle test");
+    // A point with no room is skipped.
+    f.point_rooms.insert(want[1], None);
+    let skipped = want.remove(1);
+    assert!(!want.contains(&skipped));
+    assert_eq!(b4_more::prog_scatter(&mut f, &t, u, 1, 2), 1);
+    let got: Vec<(i32, i32)> = f.missiles.iter().map(|q| (q.x, q.y)).collect();
+    assert_eq!(got, want);
+    for q in &f.missiles {
+        assert_eq!(
+            (q.flags, q.owner, q.class, q.skill, q.level),
+            (1, u, 2, 1, 2)
+        );
+    }
+    // prog_count 0 → the range (9 → r = 9 → 81 tries).
+    let mut s2 = Seed::init_low(v);
+    let mut inside = 0;
+    for _ in 0..81 {
+        let a = 9 - s2.roll(18) as i32;
+        let b = 9 - s2.roll(18) as i32;
+        inside += i32::from(a * a + b * b <= 81);
+    }
+    f.missiles.clear();
+    f.point_rooms.clear();
+    f.c.units[u].seed = Seed::new(1, 0);
+    b4_more::prog_scatter(&mut f, &scatter_tabs(2, 0, 9), u, 1, 2);
+    assert_eq!(f.missiles.len() as i32, inside);
+}
+
+// ---------------------------------------------------------------- §4.5
+
+// Covers: specs/skills/bodies-4.md §4.5
+#[test]
+fn royal_meteor_drops_a_missile_at_the_target() {
+    let (mut f, u) = world();
+    let t = scatter_tabs(2, 0, 0);
+    // Target position fails, L ≤ 0, m ≤ 0: 0.
+    assert_eq!(b4_more::royal_meteor(&mut f, &t, u, 1, 3), 0);
+    f.tpos.insert(u, (60, 40));
+    assert_eq!(b4_more::royal_meteor(&mut f, &t, u, 1, 0), 0);
+    assert_eq!(
+        b4_more::royal_meteor(&mut f, &scatter_tabs(0, 0, 0), u, 1, 3),
+        0
+    );
+    assert!(f.missiles.is_empty());
+    assert_eq!(b4_more::royal_meteor(&mut f, &t, u, 1, 3), 1);
+    let q = &f.missiles[0];
+    assert_eq!((q.flags, q.owner, q.class), (1, u, 2));
+    assert_eq!((q.x, q.y, q.skill, q.level), (60, 40, 1, 3));
+    // Out of reach (distance > 100): no missile, still 1.
+    f.tpos.insert(u, (300, 5));
+    assert_eq!(b4_more::royal_meteor(&mut f, &t, u, 1, 3), 1);
+    assert_eq!(f.missiles.len(), 1);
+}
+
+// ---------------------------------------------------------------- §4.6
+
+/// A unit seed whose S (`init_low` of its next step) draws the two
+/// values 20 and 20 (mod 40) first.
+fn seed_for_zero_pair() -> Seed {
+    (1u32..)
+        .map(|lo| Seed::new(lo, 0))
+        .find(|u| {
+            let mut s = Seed::init_low(u.clone().step());
+            s.step() % 40 == 20 && s.step() % 40 == 20
+        })
+        .unwrap()
+}
+
+// Covers: specs/skills/bodies-4.md §4.6 r1, §4.6 r2
+#[test]
+fn royal_shards_refusals() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (60, 40));
+    assert_eq!(
+        b4_more::royal_shards(&mut f, &scatter_tabs(2, 3, 0), u, 99, 1),
+        0
+    );
+    let mut s = Seed::new(1, 0);
+    s.step();
+    assert_eq!(f.c.units[u].seed, s, "one step before the tests");
+    f.tpos.insert(u, (0, 40));
+    assert_eq!(
+        b4_more::royal_shards(&mut f, &scatter_tabs(2, 3, 0), u, 1, 1),
+        0
+    );
+    f.tpos.insert(u, (60, 40));
+    assert_eq!(
+        b4_more::royal_shards(&mut f, &scatter_tabs(0, 3, 0), u, 1, 1),
+        0
+    );
+    // n = 0: 0 (no fallback to the range).
+    assert_eq!(
+        b4_more::royal_shards(&mut f, &scatter_tabs(2, 0, 30), u, 1, 1),
+        0
+    );
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-4.md §4.6 r3, §4.6 r4, §4.6 r5
+#[test]
+fn royal_shards_scatter_around_the_target() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (60, 40));
+    let t = scatter_tabs(2, 4, 0);
+    assert_eq!(b4_more::royal_shards(&mut f, &t, u, 1, 2), 1);
+    assert_eq!(f.missiles.len(), 4);
+    let mut s = Seed::init_low(Seed::new(1, 0).step());
+    let log = f.take_log();
+    for (i, q) in f.missiles.iter().enumerate() {
+        let mut a = (s.step() % 40) as i32 - 20;
+        let b = (s.step() % 40) as i32 - 20;
+        if a == 0 && b == 0 {
+            a = 20;
+        }
+        assert_eq!((q.flags, q.owner, q.class, q.x, q.y), (3, u, 2, 60, 40));
+        assert_eq!((q.target_x, q.target_y), (a, b));
+        let mm = 1 + i;
+        assert!(log.contains(&fx(Fx::MissileData28 {
+            missile: mm,
+            v: s.lo as i32
+        })));
+        let packed = ((b as u32 & 0xFFFF) << 16) | (a as u32 & 0xFFFF);
+        assert!(log.contains(&fx(Fx::MissileData2C {
+            missile: mm,
+            v: packed as i32
+        })));
+    }
+}
+
+// Covers: specs/skills/bodies-4.md §4.6 r4
+#[test]
+fn royal_shards_zero_offset_becomes_twenty() {
+    let (mut f, u) = world();
+    f.c.units[u].seed = seed_for_zero_pair();
+    f.tpos.insert(u, (60, 40));
+    // S draws 20 and 20 → a = b = 0 → a := 20: offset (20, 0).
+    b4_more::royal_shards(&mut f, &scatter_tabs(2, 1, 0), u, 1, 1);
+    let q = &f.missiles[0];
+    assert_eq!((q.target_x, q.target_y), (20, 0));
+    let log = f.take_log();
+    assert!(
+        log.contains(&fx(Fx::MissileData2C { missile: 1, v: 20 })),
+        "(0 << 16) | 20"
+    );
+    // A failed creation writes no data.
+    f.no_missiles = true;
+    f.c.units[u].seed = seed_for_zero_pair();
+    b4_more::royal_shards(&mut f, &scatter_tabs(2, 1, 0), u, 1, 1);
+    assert!(!f.take_log().iter().any(|l| l.starts_with("MissileData")));
+}
+
+// ---------------------------------------------------------------- §4.8
+
+fn state_tabs(intown: bool) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 88;
+    r.aurarangecalc = c.f(30);
+    r.mindam = 10;
+    r.maxdam = 40;
+    r.resultflags = 1;
+    r.param4 = 12;
+    r.srvmissilea = 2;
+    r.intown = intown;
+    tab1(r, c, 4)
+}
+
+/// A state-function world: the unit carries the state; a hostile monster
+/// 10 away and one 50 away are in the room.
+fn state_world() -> (BodyFake, usize, usize, usize) {
+    let (mut f, u) = world();
+    f.c.hostile = true;
+    f.c.units[u].states.push(88);
+    f.c.frame = 200;
+    let near = mon(&mut f, 0, (10, 0));
+    let far = mon(&mut f, 0, (50, 0));
+    for x in [near, far] {
+        f.c.units[x].flags = 0xE;
+        f.c.set(x, 6, 1 << 20);
+    }
+    f.scan = vec![near, far];
+    (f, u, near, far)
+}
+
+fn end_log(u: usize, skill: i32) -> Vec<String> {
+    vec![format!("deltimers {u} 5 {skill}")]
+}
+
+// Covers: specs/skills/bodies-4.md §4.8 text, §4.8 r1
+#[test]
+fn hurricane_ends_on_invalid_input() {
+    let ct = ct_ids(2);
+    let t = state_tabs(true);
+    // R invalid.
+    let (mut f, u, _, _) = state_world();
+    assert_eq!(b4_more::hurricane_state(&mut f, &t, &ct, u, 99, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 99));
+    // L ≤ 0.
+    assert_eq!(b4_more::hurricane_state(&mut f, &t, &ct, u, 1, 0), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+    // aurastate invalid.
+    let mut r = body_rec();
+    r.aurastate = 300;
+    let tb = tab1(r, Code::new(), 1);
+    assert_eq!(b4_more::hurricane_state(&mut f, &tb, &ct, u, 1, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+}
+
+// Covers: specs/skills/bodies-4.md §4.8 r2, §4.8 r3, §4.8 r4
+#[test]
+fn hurricane_ends_without_the_state_in_town_or_without_range() {
+    let ct = ct_ids(2);
+    // r2: the unit lacks the state.
+    let (mut f, u, _, _) = state_world();
+    f.c.units[u].states.clear();
+    assert_eq!(
+        b4_more::hurricane_state(&mut f, &state_tabs(true), &ct, u, 1, 1),
+        0
+    );
+    assert_eq!(f.take_log(), end_log(u, 1));
+    // r3: no `InTown` and the room is in town: the list freed, the state
+    // off, the end.
+    let (mut f, u, _, _) = state_world();
+    f.town.insert(1);
+    f.lists.push(super::fake::FList {
+        unit: Some(u),
+        state: 88,
+        ..Default::default()
+    });
+    assert_eq!(
+        b4_more::hurricane_state(&mut f, &state_tabs(false), &ct, u, 1, 1),
+        0
+    );
+    let log = f.take_log();
+    assert!(log.contains(&format!("free {u} 0")));
+    assert!(log.contains(&format!("state {u} 88 false")));
+    assert_eq!(log.last(), Some(&format!("deltimers {u} 5 1")));
+    assert!(!f.c.units[u].states.contains(&88));
+    // r4: eval(aurarangecalc) ≤ 0.
+    let (mut f, u, _, _) = state_world();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 88;
+    r.aurarangecalc = c.f(0);
+    let t0 = tab1(r, c, 1);
+    assert_eq!(b4_more::hurricane_state(&mut f, &t0, &ct, u, 1, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+}
+
+// Covers: specs/skills/bodies-4.md §4.8 r5, §4.8 r6
+#[test]
+fn hurricane_rearms_and_returns_0_in_town() {
+    let ct = ct_ids(2);
+    let (mut f, u, near, _) = state_world();
+    f.town.insert(1);
+    // `InTown` set: the room in town is fine for step 3, but step 6
+    // returns 0 after the re-arm.
+    assert_eq!(
+        b4_more::hurricane_state(&mut f, &state_tabs(true), &ct, u, 1, 3),
+        0
+    );
+    let log = f.take_log();
+    assert_eq!(
+        log,
+        [
+            format!("deltimers {u} 5 1"),
+            format!("schedule {u} 5 212 1 3")
+        ],
+        "type-5 timer at F + Param4 with (skill, L)"
+    );
+    assert_eq!(f.c.get(near, 6), 1 << 20, "no damage");
+    // The unit's room none: the same.
+    let (mut f, u, _, _) = state_world();
+    f.room_of.remove(&u);
+    assert_eq!(
+        b4_more::hurricane_state(&mut f, &state_tabs(true), &ct, u, 1, 3),
+        0
+    );
+    assert!(f.take_log().contains(&format!("schedule {u} 5 212 1 3")));
+}
+
+// Covers: specs/skills/bodies-4.md §4.8 r7, §4.8 r8
+#[test]
+fn hurricane_damages_the_area_around_the_unit() {
+    let ct = ct_ids(2);
+    let (mut f, u, near, far) = state_world();
+    assert_eq!(
+        b4_more::hurricane_state(&mut f, &state_tabs(true), &ct, u, 1, 3),
+        1
+    );
+    let phys = 10 + Seed::new(1, 0).roll(30) as i32;
+    assert_eq!(f.c.get(near, 6), (1 << 20) - phys);
+    assert_eq!(f.c.get(far, 6), 1 << 20, "range 30");
+    assert!(logged(&mut f, &format!("schedule {u} 5 212 1 3")));
+    // ResultFlags 0: the record has no hit, nothing happens to the units.
+    let (mut f, u, near, _) = state_world();
+    let mut t = state_tabs(true);
+    t.skills[1].resultflags = 0;
+    assert_eq!(b4_more::hurricane_state(&mut f, &t, &ct, u, 1, 3), 1);
+    assert_eq!(f.c.get(near, 6), 1 << 20);
+}
+
+// ---------------------------------------------------------------- §4.9
+
+// Covers: specs/skills/bodies-4.md §4.9 text
+#[test]
+fn armageddon_shares_the_hurricane_head() {
+    let ct = ct_ids(2);
+    let t = state_tabs(true);
+    let _ = &ct;
+    // Steps 1–3 and "end" as §4.8: R invalid, no state, in town.
+    let (mut f, u, _, _) = state_world();
+    assert_eq!(b4_more::armageddon_state(&mut f, &t, u, 99, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 99));
+    assert_eq!(b4_more::armageddon_state(&mut f, &t, u, 1, 0), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+    f.c.units[u].states.clear();
+    assert_eq!(b4_more::armageddon_state(&mut f, &t, u, 1, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+    let (mut f, u, _, _) = state_world();
+    f.town.insert(1);
+    assert_eq!(
+        b4_more::armageddon_state(&mut f, &state_tabs(false), u, 1, 1),
+        0
+    );
+    assert!(!f.c.units[u].states.contains(&88));
+}
+
+// Covers: specs/skills/bodies-4.md §4.9 r4
+#[test]
+fn armageddon_ends_without_missile_entry_or_range() {
+    // m ≤ 0.
+    let (mut f, u, _, _) = state_world();
+    let mut t = state_tabs(true);
+    t.skills[1].srvmissilea = 0;
+    assert_eq!(b4_more::armageddon_state(&mut f, &t, u, 1, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+    // The unit has no entry of the skill.
+    let (mut f, u, _, _) = state_world();
+    f.c.units[u].skills.clear();
+    assert_eq!(
+        b4_more::armageddon_state(&mut f, &state_tabs(true), u, 1, 1),
+        0
+    );
+    assert_eq!(f.take_log(), end_log(u, 1));
+    // eval(aurarangecalc) ≤ 0.
+    let (mut f, u, _, _) = state_world();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 88;
+    r.srvmissilea = 2;
+    r.aurarangecalc = c.f(0);
+    let t0 = tab1(r, c, 4);
+    assert_eq!(b4_more::armageddon_state(&mut f, &t0, u, 1, 1), 0);
+    assert_eq!(f.take_log(), end_log(u, 1));
+}
+
+// Covers: specs/skills/bodies-4.md §4.9 r5, §4.9 r6
+#[test]
+fn armageddon_rearms_and_returns_0_in_town() {
+    let (mut f, u, _, _) = state_world();
+    f.town.insert(1);
+    assert_eq!(
+        b4_more::armageddon_state(&mut f, &state_tabs(true), u, 1, 3),
+        0
+    );
+    assert_eq!(
+        f.take_log(),
+        [
+            format!("deltimers {u} 5 1"),
+            format!("schedule {u} 5 212 1 3")
+        ]
+    );
+    // Returned before the reseed: E param 1 untouched.
+    let e = entry(&f, u);
+    assert_eq!(f.entry_param(u, &e, 1), 0);
+    assert_eq!(f.c.units[u].seed, Seed::new(1, 0));
+}
+
+/// The first three tries of an Armageddon with E param 1 = `p1`, range
+/// 30 at a unit in (0, 0): (rolled param, points).
+fn armageddon_oracle(p1: u32, tries: usize) -> (i32, Vec<(i32, i32)>, Seed) {
+    let mut s = Seed::init_low(p1);
+    let v = s.roll(1_000_000) as i32;
+    let mut pts = Vec::new();
+    for _ in 0..tries {
+        let x = s.roll(61) as i32 - 30;
+        let y = s.roll(61) as i32 - 30;
+        pts.push((x, y));
+    }
+    (v, pts, s)
+}
+
+// Covers: specs/skills/bodies-4.md §4.9 r7, §4.9 r8, §4.9 r9
+#[test]
+fn armageddon_drops_a_missile_on_a_clear_point() {
+    let (mut f, u, _, _) = state_world();
+    let e = entry(&f, u);
+    f.set_entry_param_of(u, &e, 1, 4242);
+    let (v, pts, s) = armageddon_oracle(4242, 1);
+    assert_eq!(
+        b4_more::armageddon_state(&mut f, &state_tabs(true), u, 1, 3),
+        1
+    );
+    // E param 1 := roll(1000000) on the unit's re-seeded seed.
+    assert_eq!(f.entry_param(u, &e, 1), v);
+    assert_eq!(f.c.units[u].seed, s);
+    let (x, y) = pts[0];
+    let q = &f.missiles[0];
+    assert_eq!((q.flags, q.owner, q.class), (1, u, 2));
+    assert_eq!((q.x, q.y, q.skill, q.level), (x, y, 1, 3));
+    let log = f.take_log();
+    assert!(log.contains(&fx(Fx::MsgA3 {
+        u,
+        target: None,
+        skill: 1,
+        lvl: 3,
+        x,
+        y,
+        v: 0
+    })));
+}
+
+// Covers: specs/skills/bodies-4.md §4.9 r8
+#[test]
+fn armageddon_retries_up_to_five_times() {
+    let state = |blocked: bool, collide: bool| {
+        let (mut f, u, _, _) = state_world();
+        let e = entry(&f, u);
+        f.set_entry_param_of(u, &e, 1, 4242);
+        f.blocked = blocked;
+        f.point_collide = collide;
+        (f, u)
+    };
+    // The line test blocked, or a point collision: five tries, 0.
+    for (b, c) in [(true, false), (false, true)] {
+        let (mut f, u) = state(b, c);
+        assert_eq!(
+            b4_more::armageddon_state(&mut f, &state_tabs(true), u, 1, 3),
+            0
+        );
+        let (_, _, s) = armageddon_oracle(4242, 5);
+        assert_eq!(f.c.units[u].seed, s, "1 + 2 × 5 draws");
+        assert!(f.missiles.is_empty());
+    }
+    // A point with no room is skipped: the third try is taken.
+    let (mut f, u) = state(false, false);
+    let (_, pts, _) = armageddon_oracle(4242, 3);
+    f.point_rooms.insert(pts[0], None);
+    f.point_rooms.insert(pts[1], None);
+    assert_ne!(pts[2], pts[0]);
+    assert_eq!(
+        b4_more::armageddon_state(&mut f, &state_tabs(true), u, 1, 3),
+        1
+    );
+    assert_eq!((f.missiles[0].x, f.missiles[0].y), pts[2]);
+    let (_, _, s3) = armageddon_oracle(4242, 3);
+    assert_eq!(f.c.units[u].seed, s3);
+}
+
+// ---------------------------------------------------------------- §4.10
+
+// Covers: specs/skills/bodies-4.md §4.10
+#[test]
+fn attached_state_follows_the_source() {
+    let (mut f, imp) = mworld();
+    let tower = mon(&mut f, 0, (5, 5));
+    // No source: nothing, 1.
+    assert_eq!(b4_more::attached_state(&mut f, imp), 1);
+    assert!(f.c.log.is_empty());
+    f.c8.insert(imp, 0x400);
+    f.missile_owners.insert(imp, tower);
+    assert_eq!(b4_more::attached_state(&mut f, imp), 1);
+    assert_eq!(
+        f.take_log(),
+        [fx(Fx::PathFollow {
+            u: imp,
+            from: tower
+        })]
+    );
+}
+
+// ---------------------------------------------------------------- §4.11
+
+fn chain_tabs(m: u16) -> SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = m;
+    r.calc1 = c.f(4);
+    tab1(r, c, 4)
+}
+
+// Covers: specs/skills/bodies-4.md §4.11 r1
+#[test]
+fn chain_lightning_item_refusals() {
+    let (mut f, u) = world();
+    f.tpos.insert(u, (30, 40));
+    assert_eq!(
+        b4_more::chain_lightning_item(&mut f, &chain_tabs(2), u, 99, 1),
+        0
+    );
+    assert_eq!(
+        b4_more::chain_lightning_item(&mut f, &chain_tabs(4), u, 1, 1),
+        0
+    );
+    assert_eq!(
+        b4_more::chain_lightning_item(&mut f, &chain_tabs(0xFFFF), u, 1, 1),
+        0
+    );
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+}
+
+// Covers: specs/skills/bodies-4.md §4.11 r2, §4.11 r3, §4.11 r4, §4.11 r5
+#[test]
+fn chain_lightning_item_starts_on_the_target_and_counts_jumps() {
+    let (mut f, u) = world();
+    f.pos.insert(u, (10, 20));
+    let tg = mon(&mut f, 0, (13, 26));
+    f.targets.insert(u, tg);
+    let mm = f.c.units.len();
+    // m = 0 is allowed (0 ≤ m).
+    assert_eq!(
+        b4_more::chain_lightning_item(&mut f, &chain_tabs(0), u, 1, 2),
+        1
+    );
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    let q = &f.missiles[0];
+    // Start (unit + (dx, dy)) = T; aim at the target position.
+    assert_eq!((q.class, q.flags, q.skill, q.level), (0, 0x21, 1, 2));
+    assert_eq!((q.x, q.y, q.target_x, q.target_y), (13, 26, 13, 26));
+    assert!(f
+        .take_log()
+        .contains(&fx(Fx::MissileData28 { missile: mm, v: 4 })));
+    // Without T: the offset is (0, 0) and the aim the target position.
+    f.targets.clear();
+    f.tpos.insert(u, (30, 40));
+    b4_more::chain_lightning_item(&mut f, &chain_tabs(2), u, 1, 2);
+    let q = &f.missiles[1];
+    assert_eq!((q.x, q.y, q.target_x, q.target_y), (10, 20, 30, 40));
+    // No missile: 0 after the flag.
+    f.no_missiles = true;
+    assert_eq!(
+        b4_more::chain_lightning_item(&mut f, &chain_tabs(2), u, 1, 2),
+        0
+    );
+}
+
+// ---------------------------------------------------------------- §3.22 (Baal)
+
+// Covers: specs/skills/bodies-4.md §edge-cases-original-bugs r7
+#[test]
+fn baal_tentacle_class_ignores_the_uninitialised_incoming_class() {
+    let mut rows = vec![monster_rec(); 600];
+    for (i, m) in rows.iter_mut().enumerate() {
+        m.baseid = i as u16;
+        m.nextinclass = 0xFFFF;
+    }
+    rows[562].nextinclass = 570;
+    rows[570].nextinclass = 571;
+    rows[571].nextinclass = 572;
+    rows[50].baseid = 544;
+    let ct = combat_tables(rows);
+    let (mut f, _) = world();
+    f.c.difficulty = 1;
+    let u = f.add(FUnit::new(UnitType::Monster, 50), (100, 100));
+    let mut s = f.c.units[u].seed;
+    let n = (s.step() % 3) as usize + 1 + 2;
+    // c = chain(562, roll(2) + difficulty), the class never compared with
+    // 570: mode 4; then two roll(24) for the unused x, y.
+    let k = s.roll(2) as i32 + 1;
+    s.roll(24);
+    s.roll(24);
+    let c = [562, 570, 571, 572][k as usize];
+    assert_eq!(b4_more::baal_tentacle(&mut f, &ct, u), 1);
+    let log = f.take_log();
+    let at: Vec<&String> = log.iter().filter(|l| l.starts_with("At")).collect();
+    assert_eq!(at.len(), n);
+    for (i, l) in at.iter().enumerate() {
+        let x = 100 + (s.step() % 18) as i32 - 9;
+        let y = 100 + (s.step() % 18) as i32 - 9;
+        let want =
+            format!("At {{ room: 1, x: {x}, y: {y}, class: {c}, mode: 4, spread: -1, flags: 0 }}");
+        assert_eq!(**l, want, "tentacle {i}");
+    }
+    assert_eq!(f.c.units[u].seed, s);
+}
+
+// ---------------------------------------------------------------- dispatch
+
+/// The srvdo slots of this spec reach their bodies: the first missile
+/// request each makes names the body.
+#[test]
+fn bodies_4_slots_route_to_their_bodies() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 2;
+    r.prgcalc1 = c.f(32);
+    r.aurarangecalc = c.f(32);
+    r.calc1 = c.f(3);
+    let mut t = tab1(r, c, 600);
+    t.skills.resize(281, body_rec());
+    let ct = ct_ids(2);
+    // (index, missiles made, flags, init callback of the first)
+    let want: [(u16, usize, u32, Option<u32>); 11] = [
+        (36, 64, 7, None),
+        (37, 2, 3, Some(init_cb::ZIGZAG_RING)),
+        (143, 2, 3, Some(init_cb::ZIGZAG)),
+        (40, 1, 1, None),
+        (41, 32, 3, None),
+        (125, 1, 2, None),
+        (130, 3, 3, Some(init_cb::JITTER)),
+        (132, 1, 0x21, None),
+        (136, 1, 1, None),
+        (139, 1, 0x21, None),
+        (151, 1, 0x21, None),
+    ];
+    for (idx, n, flags, init) in want {
+        let (mut f, u) = world();
+        f.tpos.insert(u, (40, 50));
+        let tg = mon(&mut f, 0, (20, 30));
+        f.targets.insert(u, tg);
+        assert_eq!(
+            run_do(&mut f, &t, &ct, idx, u, 1, 2),
+            Some(1),
+            "srvdo {idx}"
+        );
+        assert_eq!(f.missiles.len(), n, "srvdo {idx}");
+        assert_eq!(f.missiles[0].flags, flags, "srvdo {idx}");
+        assert_eq!(f.missiles[0].init.map(|i| i.0), init, "srvdo {idx}");
+    }
 }
