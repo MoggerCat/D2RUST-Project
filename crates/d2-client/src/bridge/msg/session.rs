@@ -104,6 +104,29 @@ pub fn game_exit(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerEr
     Ok(())
 }
 
+/// The client loop's result after the game (`client/msg-ui.md` OQ 8,
+/// `0x0044B8A0`): `[0x0070EE8C]` ≠ 0 → 0; else by the session record's
+/// game type: 2, 3, 6, 7 → 3, any other → 4 (also `[0x007A0440]`).
+/// Front-end state (where the program goes after the game), not model.
+pub fn end_of_game_result(flag_70ee8c: bool, game_type: u32) -> u32 {
+    if flag_70ee8c {
+        0
+    } else if matches!(game_type, 2 | 3 | 6 | 7) {
+        3
+    } else {
+        4
+    }
+}
+
+// Covers: specs/client/msg-ui.md §8
+#[cfg(test)]
+#[test]
+fn end_of_game_result_by_game_type() {
+    assert_eq!(end_of_game_result(true, 3), 0);
+    let r: Vec<u32> = (0..12).map(|t| end_of_game_result(false, t)).collect();
+    assert_eq!(r, [4, 4, 3, 3, 4, 4, 3, 3, 4, 4, 4, 4]);
+}
+
 /// The error number of `0x0044E380(n)` for a 0xB4 code c (§7 r8.1,
 /// jump table `0x0045C7E8`): c = 0 or c > 26 → 9.
 pub fn join_refused_error(c: u32) -> u8 {

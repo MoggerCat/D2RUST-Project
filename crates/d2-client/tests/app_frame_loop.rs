@@ -108,6 +108,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
+    // Skill 0's row: the join's two S→C 0x23 select it
+    // (`formats/d2s-load.md` §8 r3; synthetic data has no skills table).
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_skill_rows(vec![Default::default()]);
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -190,15 +196,16 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (4, 3));
-    // Twenty applied at receive over frames 2–4: the three of game
-    // creation, twelve of the join (0x76, 0x7E and 0xAA have owner specs
+    // Twenty-three applied at receive over frames 2–4: the three of game
+    // creation, fifteen of the join (with the new character's 0x5F and two
+    // 0x23, `formats/d2s-load.md` §8 r3) (0x76, 0x7E and 0xAA have owner specs
     // and handlers now: `msg-ui.md` §22, `msg-units.md` §7, §6; the join's
     // 0x53 after 0x03, `intents-events.md` §8.2 rule 4, goes to its
     // handler too), five of the travel; the 0x0D waits on its unit's queue
     // for the update pass (`client/model.md` §4, §5); nothing is unowned
     // (`client/bridge.md` §6 rule 3).
-    assert_eq!(joined, 15);
-    assert_eq!((b.log().handled, b.log().queued), (20, 1));
+    assert_eq!(joined, 18);
+    assert_eq!((b.log().handled, b.log().queued), (23, 1));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b

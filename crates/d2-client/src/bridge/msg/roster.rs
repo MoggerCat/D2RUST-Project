@@ -57,8 +57,9 @@ pub fn player_joined(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     let s1 = cstr(msg.bytes, 0x22);
     let s2 = cstr(msg.bytes, 0x22 + s1.len() + 1);
     // Found by GUID or by name (`0x00479360`, active list), updated in
-    // place. TODO(spec: msg-units.md §8 r3): the name comparison of
-    // `0x00479360` (case, length) is not stated; bytes up to the NUL.
+    // place. PROVISIONAL (client/msg-units.md §8 r3): the name comparison
+    // of `0x00479360` is an exact byte compare up to the NUL; settled by
+    // a Ghidra read of 0x00479360.
     let found = w
         .roster
         .iter()

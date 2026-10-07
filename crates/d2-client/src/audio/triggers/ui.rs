@@ -35,36 +35,39 @@ pub fn ui_sound(cx: &mut Ctx, id: i32) {
 }
 
 /// S→C 0x5D sound actions (`0x004A2CB0`, §11): flags f, code c, value v.
-///
-/// TODO(spec: audio/triggers.md open question 9): when f has both bit 0
-/// and bit 1 set, d2rs applies both parts in the listed order.
+/// First match wins (`client/msg-ui.md` §1 r2): with f bit 0 set only c =
+/// 33 plays (237) and the bit-1 rows are not reached (f = 3, c = 33 plays
+/// 237 only); the bit-1 rows need bit 0 clear; the f = 0x10 rows need
+/// bits 0 and 1 clear.
 pub fn ui_action(cx: &mut Ctx, f: u8, c: u8, v: i16) {
-    if f & 1 != 0 && c == 33 {
-        cx.req(237, None, 0);
-    }
-    if f & 2 != 0 {
-        let id = match c {
+    let id = if f & 1 != 0 {
+        if c == 33 {
+            237
+        } else {
+            0
+        }
+    } else if f & 2 != 0 {
+        match c {
             4 => 241,
             8 | 15 | 18 | 22 | 35 => 7,
             32 => 217,
             33 => 243,
             _ => 0,
-        };
-        if id != 0 {
-            cx.req(id, None, 0);
         }
-    }
-    if f == 0x10 {
+    } else if f == 0x10 {
         match c {
             10 => {
                 cx.req(2456, None, 0);
-                cx.req(2474, None, 0);
+                2474
             }
-            33 => {
-                cx.req(v as i32, None, 0);
-            }
-            _ => {}
+            33 => i32::from(v),
+            _ => 0,
         }
+    } else {
+        0
+    };
+    if id != 0 {
+        cx.req(id, None, 0);
     }
 }
 

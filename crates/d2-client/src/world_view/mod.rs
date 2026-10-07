@@ -20,7 +20,7 @@
 //! key ([`scene::order`], stable). Every rule of the original (which COF
 //! and frame a unit shows, where a sprite goes, draw keys, shading, blend,
 //! map tiles, UI art and text layout) is a method of [`ViewRules`] or
-//! [`ui_bind::UiRules`], each a `TODO(spec: …)` hook. [`Unspecified`]
+//! [`ui_bind::UiRules`], each naming its owner spec. [`Unspecified`]
 //! answers them with the narrowest neutral behavior: nothing the model
 //! does not state is drawn, and anything that would need a rule to draw
 //! is an error, never a default.
@@ -123,7 +123,7 @@ impl ViewError {
         ViewError::Unresolved {
             what,
             spec,
-            message: "no rule until the owner spec exists".into(),
+            message: "the neutral rules draw no unit component".into(),
         }
     }
 }
@@ -207,26 +207,27 @@ pub struct TileDraw {
 }
 
 /// The original-behavior questions of the world view, one hook per
-/// question. Each method is a `TODO(spec: …)` hook named on it.
+/// question; each method names the owner spec it follows.
 pub trait ViewRules {
-    /// TODO(spec: render/draw-order.md, render/camera.md, DRLG) (§B6, §B7,
-    /// §B10): the map tiles to draw and how. The client world model holds
-    /// no map yet (`bridge.md` §5: no S→C message has an owner spec), so
-    /// every answer comes from the rule.
+    /// The map tiles to draw and how: which records (`render/draw-order.md`
+    /// §9, §10; the near rooms and tile records of the client DRLG,
+    /// `drlg/rooms.md` §9), their screen position and culling
+    /// (`render/camera.md` §6, §7). `rules::OriginalView` answers it from
+    /// its `ViewSource`.
     fn tiles(&self, world: &ClientWorld, assets: &ViewAssets) -> Result<Vec<TileDraw>, ViewError>;
 
-    /// TODO(spec: render/unit-composite.md) (§B4) and the owner specs of
-    /// the S→C messages that state a unit's mode, direction and frame:
-    /// which COF, COF direction and frame the unit shows. `None` = the
-    /// unit is not drawn.
+    /// `render/unit-composite.md` §2, §3, §4, §10 (with the unit's mode,
+    /// direction and frame from the S→C message specs): which COF, COF
+    /// direction and frame the unit shows. `None` = the unit is not drawn.
     fn unit_pose(
         &self,
         world: &ClientWorld,
         unit: &ClientUnit,
     ) -> Result<Option<UnitPose>, ViewError>;
 
-    /// TODO(spec: render/draw-order.md, render/camera.md) (§B6, §B7):
-    /// pass/major/minor and clip shared by the unit's components.
+    /// `render/draw-order.md` §10 (pass/major/minor) and
+    /// `render/camera.md` §10 (clip: the frame) shared by the unit's
+    /// components.
     fn unit_params(
         &self,
         world: &ClientWorld,
@@ -234,7 +235,7 @@ pub trait ViewRules {
         pose: &UnitPose,
     ) -> Result<UnitParams, ViewError>;
 
-    /// TODO(spec: render/unit-composite.md) (§B4): the component's frame
+    /// `render/unit-composite.md` §5.1, §6, §10: the component's frame
     /// set (file path from token, variant, mode, weapon class; file
     /// direction) and frame.
     fn component_frame(
@@ -257,8 +258,8 @@ pub trait ViewRules {
         self.component_frame(unit, pose, req).map(Some)
     }
 
-    /// TODO(spec: render/sprite-placement.md, render/camera.md) (§B1,
-    /// §B7): screen top-left of the component image from the unit's
+    /// `render/camera.md` §4, §10, then `render/sprite-placement.md` §2,
+    /// §8: screen top-left of the component image from the unit's
     /// position and the frame's own offsets (`image.x_off/y_off`).
     fn place(
         &self,
@@ -268,15 +269,17 @@ pub trait ViewRules {
         image: &IndexFrame,
     ) -> Result<(i32, i32), CompositeError>;
 
-    /// TODO(spec: render/shading.md, render/unit-composite.md,
-    /// render/lighting.md) (§B3, §B4, §B8).
+    /// `render/shading.md` §6, §10, `render/unit-composite.md` §7,
+    /// `render/lighting.md` §11 r1, §13: the component's remap `P` and
+    /// light map `L` (`rules::lighting::view::LitRules`).
     fn shade(
         &self,
         unit: &ClientUnit,
         req: &ComponentRequest<'_>,
     ) -> Result<ShadeChain, CompositeError>;
 
-    /// TODO(spec: render/blend-modes.md) (§B5).
+    /// `render/blend-modes.md` §3, §7: the component's draw mode (with the
+    /// COF layer override) as a blend op.
     fn blend(
         &self,
         unit: &ClientUnit,
@@ -284,8 +287,9 @@ pub trait ViewRules {
     ) -> Result<BlendOp, CompositeError>;
 }
 
-/// The neutral rules until the owner specs exist: no map tiles, no unit
-/// drawn (the model states nothing a unit looks like), and every hook that
+/// The neutral rules while the model lacks the inputs the owner specs
+/// read: no map tiles, no unit drawn (the model states nothing a unit
+/// looks like: equipped items, component choices), and every hook that
 /// would be needed to draw something is an error. A frame built with these
 /// is the empty list (plus nothing from the UI unless a panel draws, which
 /// is then an error).
@@ -297,7 +301,7 @@ fn component_unresolved(req: &ComponentRequest<'_>, what: &'static str) -> Compo
         slot: req.slot.slot,
         component: req.slot.component,
         what,
-        message: "no rule until the owner spec exists".into(),
+        message: "the neutral rules draw no unit component".into(),
     }
 }
 
@@ -535,9 +539,9 @@ fn check_cycle(cycle: &FrameCycle) -> Result<(), ViewError> {
 /// id order, so `slots[n]` is the slot of `FrameId(n)` (the
 /// [`FrameStore::atlas`] numbering). The store is append-only, so frames
 /// added since the last call are packed on top (C3 packer); packed frames
-/// never move. TODO(spec: none, design C2): page eviction on
-/// `AtlasError::Full` is the residency cache's (`assets.md` §A5); until it
-/// is wired, a full atlas is an error.
+/// never move. Design note (C2, no original behavior): page eviction on
+/// `AtlasError::Full` belongs to the residency cache (`assets.md` §A5);
+/// this atlas never evicts, so a full atlas is an error.
 #[derive(Debug, Clone)]
 pub struct GpuAtlas {
     atlas: Atlas,

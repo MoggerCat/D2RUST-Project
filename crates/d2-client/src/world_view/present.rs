@@ -339,7 +339,8 @@ fn init_gpu(mut commands: Commands, wanted: Res<GpuWanted>, mut tried: Local<boo
 }
 
 /// Window input → UI events (§A4): cursor in frame coordinates, pointer
-/// buttons routed as-is (their meaning is `TODO(spec: ui/controls.md)`).
+/// buttons routed as-is (their meanings: `ui/controls.md` §7 r5,
+/// [`crate::ui::PointerButton`]).
 /// Keyboard actions come from the controls layer (C9), not wired here.
 fn ui_input(
     ui: Option<NonSendMut<WorldViewUi>>,

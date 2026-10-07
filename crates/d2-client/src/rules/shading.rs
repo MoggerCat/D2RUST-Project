@@ -27,7 +27,7 @@ const HIGHLIGHT_DEN: u32 = 100;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ShadingError {
     #[error(
-        "unit palette index {0} is past the 128 remap maps (TODO(spec: render/shading.md §6 r1))"
+        "unit palette index {0} is past the 128 remap maps (render/shading.md §6 r1: p = 1…128 → map p − 1)"
     )]
     RemapIndex(u8),
     #[error("floor light grid of {len} cells has no cell {need} for block ({gx}, {gy})")]

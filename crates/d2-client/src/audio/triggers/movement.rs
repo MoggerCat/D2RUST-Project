@@ -23,22 +23,26 @@ pub fn footstep_called(unit_type: u8, class: i32, mode: u8) -> bool {
     }
 }
 
-/// Circular distance `0x004E4180` of `x` and `o` modulo `step` (§5 r4):
-/// both reduced mod step (masked when step is a power of two), then the
-/// minimum of |b − a|, |b − a − step|, |a − b − step|.
-pub fn circular_distance(x: u32, o: u32, step: u32) -> u32 {
-    let red = |v: u32| {
-        if step.is_power_of_two() {
-            v & (step - 1)
+/// Circular distance `0x004E4180` of `x` and `o` modulo `step` (§5 r4,
+/// integer types of r9): when step is a power of two or 0, both are masked
+/// with step − 1 (two's complement; step 0 masks with 0xFFFFFFFF, no
+/// reduction); otherwise both are reduced by signed division (the
+/// remainder has the sign of the value). Then the minimum, by signed
+/// compares, of |b − a|, |b − a − step|, |a − b − step| in signed 32-bit
+/// wrapping arithmetic.
+pub fn circular_distance(x: i32, o: u32, step: u32) -> i32 {
+    let red = |v: i32| {
+        if step == 0 || step.is_power_of_two() {
+            (v as u32 & step.wrapping_sub(1)) as i32
         } else {
-            v % step
+            v.wrapping_rem(step as i32)
         }
     };
-    let (a, b, st) = (red(x) as i64, red(o) as i64, step as i64);
-    (b - a)
-        .abs()
-        .min((b - a - st).abs())
-        .min((a - b - st).abs()) as u32
+    let (a, b, st) = (red(x), red(o as i32), step as i32);
+    let d1 = b.wrapping_sub(a).wrapping_abs();
+    let d2 = b.wrapping_sub(a).wrapping_sub(st).wrapping_abs();
+    let d3 = a.wrapping_sub(b).wrapping_sub(st).wrapping_abs();
+    d1.min(d2).min(d3)
 }
 
 /// Floor lookup result for the material rule (§5 r8, `0x004CADB0`).
@@ -82,19 +86,18 @@ pub fn footstep_material(material1: i32, floor: Floor) -> u8 {
 }
 
 /// Footstep `0x004CAF60(U)` (§5 r2–r7), material `k` from
-/// [`footstep_material`].
-///
-/// TODO(spec: audio/triggers.md §5 r4): the signedness of `f ± s` before
-/// the reduction is not stated; u32 wrapping is used (exact when step is
-/// a power of two).
+/// [`footstep_material`], with the integer types of §5 r9: s = U+0x4C as
+/// signed 16-bit; `n × s` a 32-bit product used as an unsigned divisor;
+/// step = F / n unsigned; `f ± s` signed 32-bit wrapping sums; the step
+/// test signed; the elapsed tests unsigned.
 pub fn footstep(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, k: u8) -> Result<(), TriggerError> {
     // r2.
-    let s = u.speed as u32;
+    let s = i32::from(u.speed as i16);
     if s == 0 {
         return Ok(());
     }
     let (mut n, mut o, mut layer, mut p) = (2u32, 0u32, 0i32, 100u32);
-    let monster = u.unit_type() == MONSTER;
+    let monster = u.identity_type == MONSTER;
     if monster {
         if let Some(r) = u.monsounds {
             n = r.fscnt;
@@ -108,18 +111,19 @@ pub fn footstep(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, k: u8) -> Result<(),
     }
     // r3.
     let frames = u.frame_count;
-    let f = u.frame;
-    let period = frames / n.wrapping_mul(s).max(1);
+    let f = u.frame as i32;
+    let divisor = n.wrapping_mul(s as u32);
+    if divisor == 0 {
+        return Err(TriggerError::FootstepStep { frames, count: n });
+    }
+    let period = frames / divisor;
     let elapsed = cx.c.wrapping_sub(us.last_footstep);
-    if n > 1 && elapsed < 2 * period / 3 {
+    if n > 1 && elapsed < period.wrapping_mul(2) / 3 {
         return Ok(());
     }
     // r4.
     let step = frames / n;
-    if step == 0 {
-        return Err(TriggerError::FootstepStep { frames, count: n });
-    }
-    let d = |x: u32| circular_distance(x, o, step);
+    let d = |x: i32| circular_distance(x, o, step);
     if !(d(f) < d(f.wrapping_add(s)) && d(f) < d(f.wrapping_sub(s))) {
         return Ok(());
     }
@@ -143,7 +147,7 @@ pub fn footstep(cx: &mut Ctx, u: &Unit, us: &mut UnitSound, k: u8) -> Result<(),
     let h = cx.req(id, Some(u.key), 0);
     if h != 0 {
         let mut v = if u.is_local { 255 } else { 200 };
-        if elapsed > 3 * period / 2 {
+        if elapsed > period.wrapping_mul(3) / 2 {
             v = v * 160 / 255;
         }
         cx.s.set_volume(h, v);
@@ -198,8 +202,11 @@ pub fn neutral(cx: &mut Ctx, u: &Unit, us: &mut UnitSound) {
     cx.g.idle_gap = uniform_gap(cx);
 }
 
-/// `Init` voice (`0x004CC380`, §6 r2). TODO(spec: audio/triggers.md open
-/// question 11): who calls it (assign or first sight) is the caller's.
+/// `Init` voice (`0x004CC380`, §6 r2). Called once per client monster
+/// creation, at the end of `0x00466360` (S→C 0xAC AssignMonster and the
+/// other creations through `0x00466730`); no path plays it on first sight
+/// (open question 11, answered). Which creations reach it is
+/// `client/model.md`'s.
 pub fn init_voice(cx: &mut Ctx, u: &Unit, us: &mut UnitSound) {
     let Some(r) = u.monsounds else {
         return;
@@ -223,7 +230,7 @@ pub fn flee(cx: &mut Ctx, u: &Unit, us: &mut UnitSound) {
     let Some(r) = u.monsounds else {
         return;
     };
-    if u.unit_type() != MONSTER || cx.c.wrapping_sub(cx.g.last_voice_any) < FLEE_GAP {
+    if u.identity_type != MONSTER || cx.c.wrapping_sub(cx.g.last_voice_any) < FLEE_GAP {
         return;
     }
     let d = 6 + cx.s.roll(3);

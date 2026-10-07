@@ -124,6 +124,7 @@ fn shade_chain_order() {
 }
 
 // Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots
+// Covers: specs/render/shading.md §7
 #[test]
 fn zero_is_tested_before_the_chain() {
     let mut maps = MapTable::new();
@@ -140,7 +141,9 @@ fn zero_is_tested_before_the_chain() {
     assert_eq!(at(10, 10), 1); // transparent: underlying item shows
     assert_eq!(at(11, 11), 1);
     assert_eq!(at(11, 10), 5);
-    assert_eq!(at(10, 11), 0); // TODO(spec: render/shading.md)
+    // render/shading.md §7: a drawn pixel mapped to 0 is written as
+    // opaque index 0.
+    assert_eq!(at(10, 11), 0);
 }
 
 // Covers: specs/client/render-pipeline.md §a4-shade-chain-and-palette-slots

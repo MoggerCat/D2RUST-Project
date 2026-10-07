@@ -501,9 +501,13 @@ mod tests {
     #[test]
     fn a_question_the_model_cannot_answer_fails_the_frame() {
         let mut d = driver();
-        // Id 2 heads a group: the variant roll needs the client seed.
+        // Id 2 heads a group: the variant roll needs the client seed (a
+        // local player exists: a draw without one is an internal error,
+        // `sound-table.md` §4 r6).
+        let mut w = at_tick(1);
+        w.local_player = Some(UnitKey::new(PLAYER, 1));
         assert_eq!(
-            d.frame(&at_tick(1), &[], &[SoundRequest::Ui(2)]),
+            d.frame(&w, &[], &[SoundRequest::Ui(2)]),
             Err(DriverError::Pending(
                 "local player client seed (§4 r5): read-only model seed"
             ))

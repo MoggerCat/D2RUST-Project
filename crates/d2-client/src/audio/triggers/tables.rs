@@ -1,7 +1,8 @@
-// Spec: specs/audio/triggers.md §7 (object-sounds.tsv), §10 r2 (npc-speech.tsv)
+// Spec: specs/audio/triggers.md §7 (object-sounds.tsv), §10 r2 (npc-speech.tsv), §10 r5 (npc-greetings.tsv)
 // Spec: specs/audio/object-sounds.tsv
 // Spec: specs/audio/npc-speech.tsv
-//! The two static `Game.exe` tables of `triggers.md`, read from the spec
+// Spec: specs/audio/npc-greetings.tsv
+//! The three static `Game.exe` tables of `triggers.md`, read from the spec
 //! TSVs (d2rs-own data, M05) with a strict parser: an unknown header, a
 //! bad cell or an out-of-range value is an error naming its line and
 //! column (M07).
@@ -12,6 +13,14 @@ use std::sync::OnceLock;
 pub const OBJECT_SOUNDS_TSV: &str = include_str!("../../../../../specs/audio/object-sounds.tsv");
 /// `specs/audio/npc-speech.tsv` (§10 r2).
 pub const NPC_SPEECH_TSV: &str = include_str!("../../../../../specs/audio/npc-speech.tsv");
+
+/// `specs/audio/npc-greetings.tsv` (§10 r5).
+pub const NPC_GREETINGS_TSV: &str = include_str!("../../../../../specs/audio/npc-greetings.tsv");
+
+/// Header of `npc-greetings.tsv` (§10 r5).
+pub const GREETING_HEADER: [&str; 7] = [
+    "class", "monstats", "record", "greet", "inactive", "time", "return",
+];
 
 /// Header of `object-sounds.tsv`.
 pub const OBJECT_HEADER: [&str; 14] = [
@@ -119,6 +128,89 @@ pub struct NpcSpeechRow {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NpcSpeech {
     rows: Vec<NpcSpeechRow>,
+}
+
+/// One `npc-greetings.tsv` row (§10 r5): an NPC class and its greeting
+/// record (`0x004E0370`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NpcGreetingRow {
+    /// `monstats` row.
+    pub class: i32,
+    /// Its `monstats` `Id` (for reading only).
+    pub monstats: String,
+    /// The record's address in `Game.exe`: classes with the same address
+    /// share the record's `last` / `tick`.
+    pub record: u32,
+    pub greet: i32,
+    pub inactive: i32,
+    pub time: i32,
+    pub ret: i32,
+}
+
+/// The class → greeting record map (35 classes, 28 records).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NpcGreetings {
+    rows: Vec<NpcGreetingRow>,
+}
+
+impl NpcGreetings {
+    pub fn parse(text: &str) -> Result<Self, TableError> {
+        const T: &str = "npc-greetings.tsv";
+        let mut out: Vec<NpcGreetingRow> = Vec::new();
+        for (line, c) in rows(T, text, &GREETING_HEADER)? {
+            let id = |col: usize| int(T, line, col, c[col], 0..=SOUND_COUNT - 1);
+            let class = int(T, line, 0, c[0], 0..=i32::MAX)?;
+            if out.last().is_some_and(|r| r.class >= class) {
+                return Err(TableError::Order {
+                    table: T,
+                    line,
+                    key: class,
+                });
+            }
+            let bad = |col: usize| TableError::Value {
+                table: T,
+                line,
+                col,
+                value: c[col].to_owned(),
+            };
+            if c[1].is_empty() {
+                return Err(bad(1));
+            }
+            let hex = c[2].strip_prefix("0x").ok_or_else(|| bad(2))?;
+            if hex.is_empty() || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err(bad(2));
+            }
+            let record = u32::from_str_radix(hex, 16).map_err(|_| bad(2))?;
+            out.push(NpcGreetingRow {
+                class,
+                monstats: c[1].to_owned(),
+                record,
+                greet: id(3)?,
+                inactive: id(4)?,
+                time: id(5)?,
+                ret: id(6)?,
+            });
+        }
+        Ok(NpcGreetings { rows: out })
+    }
+
+    /// The spec table, parsed once. The parse is checked by the tests.
+    pub fn spec() -> &'static NpcGreetings {
+        static T: OnceLock<NpcGreetings> = OnceLock::new();
+        T.get_or_init(|| NpcGreetings::parse(NPC_GREETINGS_TSV).expect("npc-greetings.tsv"))
+    }
+
+    /// The row of NPC class `class`; `None` = no record (§10 r1: 0).
+    pub fn get(&self, class: i32) -> Option<&NpcGreetingRow> {
+        self.rows
+            .binary_search_by_key(&class, |r| r.class)
+            .ok()
+            .map(|i| &self.rows[i])
+    }
+
+    pub fn rows(&self) -> &[NpcGreetingRow] {
+        &self.rows
+    }
 }
 
 fn rows<'a>(

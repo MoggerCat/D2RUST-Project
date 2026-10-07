@@ -136,9 +136,9 @@ pub struct ObjectData {
     /// +0x28: the owner name of a portal (0x82, 16 bytes).
     pub owner_name: Option<[u8; 16]>,
     /// The shrine record's `Code` (shrine data +0x08, `model.md` §15
-    /// rule 1); `None`: no shrine record. TODO(spec: msg-units.md open
-    /// question 5): its writer `0x004BD6B0` (0x51 rule 3) is not
-    /// specified, so no model rule sets it.
+    /// rule 1); `None`: no shrine record. Set by 0x51 for a shrine
+    /// (`msg-units.md` §1.3 r3, `0x004BD6B0`: the shrines record of
+    /// index interact).
     pub shrine: Option<u8>,
 }
 
@@ -200,6 +200,23 @@ pub struct ClientUnit {
     /// `0x00648730` (path flag 0x20 cleared, point count := 0) was called
     /// on the unit's path by a model rule (`msg-ui.md` §16 r4.3).
     pub path_stopped: bool,
+    /// The unit whose path direction this unit's path took
+    /// (`0x006487F0` → `0x006488A0`; `msg-units.md` §7 r7.2: a corpse
+    /// takes its player's). The model holds no client path record, so
+    /// the source is kept, not the direction.
+    pub direction_of: Option<UnitKey>,
+    /// Unit flag-ex `+0xC8` bits as written by model rules
+    /// (`msg-units.md` §1.2 r3, r4: 0x40000 cleared for a hireling in
+    /// mode 1, 0x400 the source-unit link; 0x20 set by the client room
+    /// free, `drlg/rooms.md` §8 r4).
+    pub flags_ex: u32,
+    /// Unit flag `+0xC4` 0x800000: set only by the client room free
+    /// `0x0061A840` (`model.md` §5 r5, `drlg/rooms.md` §8 r4).
+    pub room_freed: bool,
+    /// Unit flag `+0xC4` 0x200: set by the client hireling setup of 0x81
+    /// (`model.md` §14 r3); 0xAB skips such a unit (`msg-units.md` §7
+    /// r11).
+    pub flag_200: bool,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -229,6 +246,10 @@ impl ClientUnit {
             state_lists: BTreeMap::new(),
             turned_toward: None,
             path_stopped: false,
+            direction_of: None,
+            flags_ex: 0,
+            room_freed: false,
+            flag_200: false,
         }
     }
 
@@ -243,8 +264,11 @@ impl ClientUnit {
     }
 
     /// Dead (§6 rule 2): player mode 0 or 0x11, monster mode 0 or 0xC.
-    /// TODO(spec: model.md open question 4 area): unit flag 0x10000 is not
-    /// in the model; no rule sets it on the client yet.
+    /// PROVISIONAL (client/msg-ui.md OQ 2 → client/msg-units.md, unit
+    /// flag word +0xC4): unit flag 0x10000 is set only by the dead-state
+    /// flow the server sync carries (0x15's flag), which the model keeps
+    /// as the mode, so the test reads the mode alone; settled by a Ghidra
+    /// xref of all +0xC4 writers.
     pub fn is_dead(&self) -> bool {
         match self.key.unit_type {
             PLAYER => matches!(self.mode, 0 | 0x11),
@@ -319,8 +343,10 @@ pub struct PetRecord {
     /// +0x20.
     pub gone: bool,
     /// +0x24…: the three values of 0x81 (§14 rule 3); `None` until a 0x81
-    /// sets them. TODO(spec: model.md open question 10): the fields past
-    /// +0x24 and who reads them.
+    /// sets them. PROVISIONAL (client/model.md §14, OQ 10): only the three
+    /// 0x81 values are stored (no other field past +0x24, no reader of
+    /// +0x1C modelled); settled by a recording with a hireling (0x7A /
+    /// 0x81; HANDOFF §7 PC 2 recording list).
     pub extra: Option<[u32; 3]>,
 }
 
@@ -493,10 +519,16 @@ pub struct ClientWorld {
     /// (`rooms.md` §4.6, last paragraph: += 1 first, level free on every
     /// multiple of 13).
     pub drlg_updates: u32,
+    /// The allied count (+0x28) of each client room as stat 172 changes
+    /// it (`client/stat-lists.md` §3 r2; `sim/unit-order.md` §5 r2).
+    pub room_allied: BTreeMap<DrlgRoomId, i32>,
     /// The environment record of the client act (act +0x04,
     /// `render/lighting.md` §9.1, §9.2 r4): created with the act by 0x03,
     /// set by 0x53.
     pub environment: Option<Environment>,
+    /// The day-period cache `[0x007A6A74]` of the 0x53 object refresh
+    /// (`render/lighting.md` §9.2 r4.4); a zero-initialised global.
+    pub env_period_cache: i32,
     /// The eclipse pending flag `[0x007A060E]` (`render/lighting.md`
     /// §9.2 r3): set by 0x5D without a client act.
     pub eclipse_pending: bool,
@@ -616,7 +648,15 @@ impl ClientWorld {
         let now = self.active_rooms.as_deref().unwrap_or(&[]);
         for r in &old {
             if !now.iter().any(|n| n.room == r.room) {
-                self.room_units.free_room(r.room);
+                // `drlg/rooms.md` §8 r4: each unit of the freed room
+                // (server units: no flag 0x400000) gets flags-2 0x20,
+                // then flag 0x800000, then leaves the room.
+                for k in self.room_units.free_room(r.room) {
+                    if let Some(u) = self.units.get_mut(&k) {
+                        u.flags_ex |= 0x20;
+                        u.room_freed = true;
+                    }
+                }
             }
         }
         let created = self
@@ -812,6 +852,15 @@ pub struct ObjectRow {
     pub subclass: u8,
     /// `ShrineFunction` (+0x16F).
     pub shrine_function: u8,
+    /// `EnvEffect` (+0x139): the day/night refresh changes the object
+    /// (`render/lighting.md` OQ 11).
+    pub env_effect: bool,
+    /// `Lit0`…`Lit7` (+0x110 + mode): light radius × 2.
+    pub lit: [u8; 8],
+    /// `Selectable0`…`Selectable7`.
+    pub selectable: [bool; 8],
+    /// `Red`, `Green`, `Blue`: the light color.
+    pub rgb: (u8, u8, u8),
 }
 
 /// One `states` row as the state messages read it
@@ -843,10 +892,35 @@ pub struct StatSend {
     pub signed: bool,
 }
 
-/// The tables the message rules read (`msg-units.md` Inputs).
-/// TODO(spec: which `monstats2` columns hold the component choice counts
-/// in the 1.14d `.bin`): until a spec names them, the app supplies no
-/// rows and 0xAC creates nothing (§1.2 rule 2).
+/// The unit-message rows the app loads from the user's tables
+/// ([`crate::bridge::Bridge::set_unit_rows`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct UnitRows {
+    pub monsters: Vec<Option<MonsterClass>>,
+    pub stats: Vec<StatSend>,
+    pub objects: Vec<ObjectRow>,
+    pub shrines: Vec<u8>,
+}
+
+impl MonsterClass {
+    /// The row of a `monstats` class from its `monstats2` record bytes
+    /// (`msg-units.md` §1.2 r7): the choice count of component i is the
+    /// u8 at record +0x15 + i (the `HDv` … `S8v` columns); `None` when
+    /// the record is shorter.
+    pub fn from_record(monstats2: &[u8], npc: bool, interact: bool) -> Option<Self> {
+        let mut components = [0u8; 16];
+        components.copy_from_slice(monstats2.get(0x15..0x25)?);
+        Some(MonsterClass {
+            components,
+            npc,
+            interact,
+        })
+    }
+}
+
+/// The tables the message rules read (`msg-units.md` Inputs). The
+/// `monstats2` choice counts are record +0x15 + i (§1.2 r7,
+/// [`MonsterClass::from_record`]).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientTables {
     /// One entry per `monstats` row: `None` = no `monstats2` row.
@@ -862,6 +936,10 @@ pub struct ClientTables {
     pub skilldesc: Vec<SkillDescRow>,
     /// One entry per `objects.txt` row, by class (`model.md` §15).
     pub objects: Vec<ObjectRow>,
+    /// The `Code` byte (+0) of each `shrines.txt` row, by index
+    /// (`msg-units.md` §1.3 r3: table `[0x0096D468]`, count
+    /// `[0x0096D46C]`).
+    pub shrines: Vec<u8>,
     /// One entry per `states` row, by state id
     /// (`client/stat-lists.md` §3).
     pub states: Vec<StateRow>,
@@ -921,4 +999,8 @@ pub struct ModelInputs {
     pub drlg: Option<DrlgSource>,
     /// The `d2exp.mpq` check `0x00408F20` (`msg-stats-items.md` §5 r6).
     pub expansion_installed: bool,
+    /// `0x00410A80()`: wall-clock seconds (`render/lighting.md` §10 r4:
+    /// a `time()` base plus elapsed `GetTickCount` / 1000; client-only, a
+    /// host input). 0 when the host gives none.
+    pub wall_seconds: Option<fn() -> i32>,
 }

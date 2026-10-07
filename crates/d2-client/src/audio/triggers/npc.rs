@@ -1,19 +1,20 @@
 // Spec: specs/audio/triggers.md §10 (NPC speech)
+// Spec: specs/audio/triggers-2.md §19 r4 (N's skill voices)
 // Spec: specs/audio/npc-speech.tsv
+// Spec: specs/audio/npc-greetings.tsv
 //! NPC greetings `0x004E0590`, dialog lines `0x004A10E0` and the NPC
 //! Speech option `0x0047CEF0`.
 
-use super::tables::NpcSpeech;
+use std::collections::BTreeMap;
+
+use super::tables::{NpcGreetings, NpcSpeech};
 use super::{detach_skill_voices, Ctx, Unit};
 use crate::audio::calls::{Handle, FLAG_EXACT};
 use crate::bridge::world::UnitKey;
 
 /// One NPC greeting record (`0x004E0370`, 6 dwords: greet, inactive,
-/// time, return, last, tick).
-///
-/// TODO(spec: audio/triggers.md §10 r1): the class → record table (35
-/// classes, 28 records at `0x0072AE28`–`0x0072B0C8`) is not in the spec as
-/// data; the caller supplies the record.
+/// time, return, last, tick). The records are `npc-greetings.tsv` (§10
+/// r5), held at run time by [`GreetingRecords`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NpcGreeting {
     pub greet: i32,
@@ -24,6 +25,55 @@ pub struct NpcGreeting {
     pub last: i32,
     /// C of the last pick.
     pub tick: u32,
+}
+
+/// The greeting records of `npc-greetings.tsv` (§10 r5) with their run
+/// time `last` / `tick`: one per record address, so classes that share a
+/// record (e.g. the six Cain classes) share them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GreetingRecords {
+    by_class: BTreeMap<i32, u32>,
+    records: BTreeMap<u32, NpcGreeting>,
+}
+
+impl GreetingRecords {
+    pub fn new(table: &NpcGreetings) -> Self {
+        let mut by_class = BTreeMap::new();
+        let mut records = BTreeMap::new();
+        for r in table.rows() {
+            by_class.insert(r.class, r.record);
+            records.entry(r.record).or_insert(NpcGreeting {
+                greet: r.greet,
+                inactive: r.inactive,
+                time: r.time,
+                ret: r.ret,
+                last: 0,
+                tick: 0,
+            });
+        }
+        GreetingRecords { by_class, records }
+    }
+
+    /// The records of the spec table.
+    pub fn spec() -> Self {
+        Self::new(NpcGreetings::spec())
+    }
+
+    /// The record of NPC class `class` (`0x004E0370`); `None` = no record
+    /// (the greeting is then id 0, §10 r1).
+    pub fn for_class(&mut self, class: i32) -> Option<&mut NpcGreeting> {
+        let addr = *self.by_class.get(&class)?;
+        self.records.get_mut(&addr)
+    }
+
+    /// Distinct records.
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 /// Greeting attempts (§10 r1).
@@ -41,10 +91,9 @@ pub enum GreetMode {
 }
 
 /// Greeting pick `0x004E0590(N, mode)` (§10 r1). Returns the id the
-/// caller requests with flags 1 (exact).
-///
-/// TODO(spec: audio/triggers.md §10 r1): whether mode 2 also updates
-/// last / tick is not stated; d2rs updates them only after the attempts.
+/// caller requests with flags 1 (exact). §10 r7: mode 2 returns `return`
+/// before the attempt loop and writes neither `last` nor `tick`; modes 0
+/// and 1 set them after the last attempt.
 pub fn greet(cx: &mut Ctx, g: &mut NpcGreeting, mode: GreetMode, day_phase: u8) -> i32 {
     if mode == GreetMode::Return {
         return g.ret;
@@ -87,7 +136,7 @@ pub fn interact_greeting(
     mode: GreetMode,
     day_phase: u8,
 ) -> Handle {
-    detach_skill_voices(cx.s, npc.key, npc.monsounds);
+    detach_skill_voices(cx.s, npc);
     let pick = greet(cx, g, mode, day_phase);
     cx.s.request(pick, local, 0, FLAG_EXACT, 0)
 }
@@ -134,7 +183,7 @@ pub fn dialog_line(
     }
     let s = table.sound(key);
     if s != 0 {
-        detach_skill_voices(cx.s, npc.key, npc.monsounds);
+        detach_skill_voices(cx.s, npc);
         st.handle = cx.req(s, local, DIALOG_DELAY);
         st.id = s;
     }

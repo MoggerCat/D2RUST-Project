@@ -197,7 +197,7 @@ fn npc_interact_b1563() {
                 unit: k,
                 present: true,
                 class: 148,
-                mdata_3c: None,
+                mdata_3c: Some(-1),
                 blocker_open: false,
             },
             Output::NpcInteract {
@@ -472,4 +472,18 @@ fn video_overhead_and_hotkey() {
         ]
     );
     assert_eq!(m.w.units.len(), 0);
+}
+
+// Covers: specs/ui/panels-2.md §14 r8
+#[test]
+fn f4b1a10_class_list() {
+    use super::super::output::f4b1a10;
+    for c in [
+        146, 251, 266, 331, 377, 378, 406, 408, 521, 527, 537, 538, 539,
+    ] {
+        assert_eq!(f4b1a10(c), 1, "{c}");
+    }
+    for c in [0, 145, 148, 540] {
+        assert_eq!(f4b1a10(c), 0, "{c}");
+    }
 }

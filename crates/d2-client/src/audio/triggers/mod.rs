@@ -1,4 +1,5 @@
 // Spec: specs/audio/triggers.md
+// Spec: specs/audio/triggers-2.md (§18 sound identity, §19 a unit's request list)
 // Spec: specs/audio/object-sounds.tsv
 // Spec: specs/audio/npc-speech.tsv
 //! Sound triggers: which code path requests which sound (`triggers.md`).
@@ -48,8 +49,9 @@ pub trait TriggerSound: SoundCalls {
     fn group_base(&self, id: i32) -> i32;
     /// The sound row's `Loop` column (§7 r4, `0x004CAA10`).
     fn looping(&self, id: i32) -> bool;
-    /// U+0x78: the requests attached to U that have not ended, in list
-    /// order, as (handle, requested id) (§1 r6).
+    /// U+0x78 (§1 r6, `triggers-2.md` §19): U's request list, newest
+    /// first, as (handle, current id): waiting, playing and
+    /// ended-not-yet-freed requests; a freed handle reads id 0.
     fn unit_requests(&self, unit: UnitKey) -> Vec<(Handle, i32)>;
     /// Number of units in a request's unit list (+0x28; §4.3 r2.2).
     fn unit_count(&self, h: Handle) -> usize;
@@ -68,7 +70,9 @@ pub enum TriggerError {
     SwingIndex(u8),
     #[error("object class {0} > 572 (§7 r1)")]
     ObjectClass(i32),
-    #[error("footstep step F / n = 0 (F = {frames}, n = {count}; §5 r4 division by zero)")]
+    #[error("object mode {0} >= 8 (§7 r7)")]
+    ObjectMode(u8),
+    #[error("footstep divisor n × s = 0 (F = {frames}, n = {count}; §5 r9 division by zero)")]
     FootstepStep { frames: u32, count: u32 },
 }
 
@@ -77,6 +81,9 @@ pub enum TriggerError {
 #[derive(Clone, Copy, Debug)]
 pub struct Unit<'a> {
     pub key: UnitKey,
+    /// The sound identity's type (`triggers-2.md` §18 r1): the raw type,
+    /// except a player transformed into a monster form reads 1.
+    pub identity_type: u8,
     /// Player class, monstats row, object class or item row (+0x04).
     pub class: i32,
     /// Monster `BaseId` (`0x00463860`; §6 r1).
@@ -115,6 +122,7 @@ impl<'a> Unit<'a> {
     pub fn new(key: UnitKey, class: i32) -> Self {
         Unit {
             key,
+            identity_type: key.unit_type,
             class,
             base_class: class,
             mode: 0,
@@ -134,6 +142,7 @@ impl<'a> Unit<'a> {
         }
     }
 
+    /// The raw unit type (+0x00).
     pub fn unit_type(&self) -> u8 {
         self.key.unit_type
     }
@@ -324,17 +333,26 @@ fn detach_groups(s: &mut dyn TriggerSound, unit: UnitKey, ids: &[i32]) {
     }
 }
 
-/// The skill voices of a monster record (`Skill1..4`).
+/// The skill voices of a monster record (`Skill1..4`, +0x44 … +0x50).
 fn skill_voices(r: &Monsounds) -> [i32; 4] {
     [sid(r.skill1), sid(r.skill2), sid(r.skill3), sid(r.skill4)]
 }
 
-/// `0x004CB190(N)`: detach N's skill voices with force (§10 r1, r2).
-/// TODO(spec: audio/triggers.md §10 r1): "skill voices" read as the
-/// groups of `monsounds.Skill1..4` of N's record.
-pub fn detach_skill_voices(s: &mut dyn TriggerSound, unit: UnitKey, rec: Option<&Monsounds>) {
-    if let Some(r) = rec {
-        detach_groups(s, unit, &skill_voices(r));
+/// `0x004CB190(N)`: detach N's skill voices with force (§10 r1, r2;
+/// `triggers-2.md` §19 r4). Only when N's identity type is 1 and N has a
+/// record: every handle of N's list whose request's current id has a group
+/// base **equal to** one of the raw `Skill1` … `Skill4` cells (not reduced
+/// to their group bases); a freed handle has base 0 and matches a 0 cell.
+pub fn detach_skill_voices(s: &mut dyn TriggerSound, npc: &Unit) {
+    let Some(r) = npc.monsounds else { return };
+    if npc.identity_type != MONSTER {
+        return;
+    }
+    let cells = skill_voices(r);
+    for (h, id) in s.unit_requests(npc.key) {
+        if cells.contains(&s.group_base(id)) {
+            s.detach(h, npc.key, true);
+        }
     }
 }
 

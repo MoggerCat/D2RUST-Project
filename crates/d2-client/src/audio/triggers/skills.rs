@@ -1,9 +1,10 @@
 // Spec: specs/audio/triggers.md §8 (skills, missiles, states), §9 (items)
+// Spec: specs/audio/triggers-2.md §16 (ProgSound conditions)
 //! Sound columns of `skills`, `missiles`, `states` and the item tables.
 //! Inputs are the columns as signed plain values (the rules test `> 0` /
 //! `≥ 0`); the callers read them from the typed tables.
 
-use super::{swing, swing_entry, Ctx, TriggerError, Unit, PLAYER};
+use super::{sid, swing, swing_entry, Ctx, TriggerError, Unit, MONSTER, PLAYER};
 use crate::bridge::world::UnitKey;
 
 /// The `skills` columns of §8 r1.
@@ -73,9 +74,8 @@ pub fn skill_start(
 
 /// Skill do / target sounds (§8 r2), after the client do function
 /// returned non-zero: `dosound` > 0 on the caster, `tgtsound` > 0 on the
-/// target if any.
-///
-/// TODO(spec: audio/triggers.md open question 5): `dosound a` / `dosound b`.
+/// target if any. `dosound a` / `dosound b` are [`jab_do`] and
+/// [`charge_start`] (open question 5).
 pub fn skill_do(
     cx: &mut Ctx,
     caster: UnitKey,
@@ -88,6 +88,44 @@ pub fn skill_do(
     }
     if let (true, Some(t)) = (tgtsound > 0, target) {
         cx.req(tgtsound, Some(t), 0);
+    }
+}
+
+/// `cltdofunc` 16 (`0x004F4590`, open question 5; live: Jab): when the
+/// caster's action frame event (U +0x4E) is 3, a player caster requests
+/// `dosound a` (+0x102) and a monster caster `dosound b` (+0x104), on the
+/// caster, delay 0, when > 0. Returns 1 either way.
+pub fn jab_do(cx: &mut Ctx, caster: &Unit, frame_event: u8, dosound_a: i32, dosound_b: i32) -> i32 {
+    if frame_event == 3 {
+        let id = match caster.unit_type() {
+            PLAYER => dosound_a,
+            MONSTER => dosound_b,
+            _ => 0,
+        };
+        if id > 0 {
+            cx.req(id, Some(caster.key), 0);
+        }
+    }
+    1
+}
+
+/// `cltstfunc` 25 (`0x004C9B40`, open question 5; live: Charge,
+/// SerpentCharge), when it does not hand over to `0x004C7630` and its
+/// entry checks pass (the caller's): a player requests `dosound a` (> 0);
+/// a monster the `monsounds` skill voice of the monstats skill slot
+/// holding this skill (`0x004F4F40`: slots 0–3 → `Skill1`–`Skill4`;
+/// another slot or none → nothing); on the caster, delay 0.
+pub fn charge_start(cx: &mut Ctx, caster: &Unit, dosound_a: i32, skill_slot: Option<usize>) {
+    let id = match caster.unit_type() {
+        PLAYER => dosound_a,
+        MONSTER => match (skill_slot, caster.monsounds) {
+            (Some(slot @ 0..=3), Some(r)) => sid([r.skill1, r.skill2, r.skill3, r.skill4][slot]),
+            _ => 0,
+        },
+        _ => 0,
+    };
+    if id > 0 {
+        cx.req(id, Some(caster.key), 0);
     }
 }
 
@@ -117,11 +155,69 @@ pub fn missile_hit(cx: &mut Ctx, missile: UnitKey, hit_sound: i32) {
     }
 }
 
-/// Missile `ProgSound` (§8 r3). TODO(spec: audio/triggers.md open
-/// question 6): the conditions per client progressive function are the
-/// caller's.
-pub fn missile_prog(cx: &mut Ctx, missile: UnitKey, prog_sound: i32) {
-    cx.req(prog_sound, Some(missile), 0);
+/// Missile `ProgSound` of client missile function 9 (`0x004D39C0`,
+/// `triggers-2.md` §16; its `CltSubMissile1` / skill-row precondition is
+/// the caller's): at elapsed = max(P1, 1) − 2 the missile's first attached
+/// request (its list head, `0x004CA990`) is detached with force, then
+/// `ProgSound` > 0 is requested on the missile, delay 0.
+pub fn missile_prog_fn9(cx: &mut Ctx, missile: UnitKey, elapsed: i32, p1: i32, prog_sound: i32) {
+    if elapsed != p1.max(1) - 2 {
+        return;
+    }
+    if let Some(&(h, _)) = cx.s.unit_requests(missile).first() {
+        cx.s.detach(h, missile, true);
+    }
+    if prog_sound > 0 {
+        cx.req(prog_sound, Some(missile), 0);
+    }
+}
+
+/// Function 29 (`0x004D5310` → `0x004CE850`, `triggers-2.md` §16):
+/// elapsed > 10, the sub missile S = `CltSubMissile1` > 0 and elapsed =
+/// 315 → S's `ProgSound` > 0 on the missile's **owner**, delay 0.
+pub fn missile_prog_fn29(
+    cx: &mut Ctx,
+    owner: Option<UnitKey>,
+    elapsed: i32,
+    sub_missile: i32,
+    sub_prog_sound: i32,
+) {
+    if elapsed > 10 && sub_missile > 0 && elapsed == 315 && sub_prog_sound > 0 {
+        cx.req(sub_prog_sound, owner, 0);
+    }
+}
+
+/// Function 47 (`0x004D5950`, `triggers-2.md` §16): with `ProgSound` > 0,
+/// a = missile data +0x28 and b = its client motion record +0x40: a ≠ 0
+/// and a ≠ b → request on the missile, delay 0; then data +0x28 := b.
+///
+/// PROVISIONAL (specs/audio/triggers-2.md §16, function 47): the update
+/// of data +0x28 is read as part of the `ProgSound` > 0 branch (the live
+/// missile 452 has `ProgSound` 2,416, so the reading is not observable in
+/// 1.14d data); settled by the request log of `triggers.md` open question 1.
+pub fn missile_prog_fn47(
+    cx: &mut Ctx,
+    missile: UnitKey,
+    prog_sound: i32,
+    data_28: &mut i32,
+    b: i32,
+) {
+    if prog_sound <= 0 {
+        return;
+    }
+    if *data_28 != 0 && *data_28 != b {
+        cx.req(prog_sound, Some(missile), 0);
+    }
+    *data_28 = b;
+}
+
+/// Function 51 (`0x004D5DD0`, `triggers-2.md` §16): the client missile
+/// `CltSubMissile2` created at elapsed = P2 (the caller's); created and
+/// `ProgSound` > 0 → request on the **new** missile, delay 0.
+pub fn missile_prog_fn51(cx: &mut Ctx, created: Option<UnitKey>, prog_sound: i32) {
+    if let (Some(m), true) = (created, prog_sound > 0) {
+        cx.req(prog_sound, Some(m), 0);
+    }
 }
 
 /// State on (S→C 0xA7/0xA8/0xAA, `0x004D9B20`, §8 r4). `had` = U had the

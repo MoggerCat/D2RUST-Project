@@ -12,10 +12,19 @@ use super::movement::{
     circular_distance, flee, footstep, footstep_called, footstep_material, init_voice, neutral,
     Floor,
 };
-use super::npc::{dialog_line, greet, set_npc_speech_option, DialogState, GreetMode, NpcGreeting};
+use super::npc::{
+    dialog_line, greet, interact_greeting, set_npc_speech_option, DialogState, GreetMode,
+    GreetingRecords, NpcGreeting,
+};
 use super::objects::object_mode;
-use super::skills::{item_drop, skill_start, ItemRows, ItemSounds, SkillStart};
-use super::tables::{NpcSpeech, ObjectSounds, TableError, NPC_SPEECH_TSV, OBJECT_SOUNDS_TSV};
+use super::skills::{
+    charge_start, item_drop, jab_do, missile_prog_fn29, missile_prog_fn47, missile_prog_fn51,
+    missile_prog_fn9, skill_start, ItemRows, ItemSounds, SkillStart,
+};
+use super::tables::{
+    NpcGreetings, NpcSpeech, ObjectSounds, TableError, NPC_GREETINGS_TSV, NPC_SPEECH_TSV,
+    OBJECT_SOUNDS_TSV,
+};
 use super::ui::{ui_action, UI_SOUNDS};
 use super::*;
 use crate::audio::calls::Handle;
@@ -1516,4 +1525,305 @@ fn unit_sound_fields_and_globals_start_at_zero() {
         ),
         (0, 0, 0, 0, 0)
     );
+}
+
+// ---- 2026-10-07 answers (TR-1 … TR-7, open questions 4, 5, 9, 11) ----
+
+// Covers: specs/audio/triggers.md §5 r9
+#[test]
+fn footstep_integer_types() {
+    // Step not a power of two: signed remainders, so f − s < 0 reduces to a
+    // negative value (|b − a| uses it as is).
+    assert_eq!(circular_distance(-2, 0, 12), 2);
+    assert_eq!(circular_distance(-14, 0, 12), 2);
+    // Power of two: two's-complement mask.
+    assert_eq!(circular_distance(-256, 0, 1024), 256);
+    // Step 0 masks with 0xFFFFFFFF: no reduction.
+    assert_eq!(circular_distance(7, 3, 0), 4);
+    // s is U+0x4C as signed 16-bit: 0x10000 reads 0 → nothing.
+    let mut r = zero_sounds();
+    r.fscnt = 2;
+    r.footstep = 700;
+    let mut u = monster(&r);
+    u.frame_count = 2048;
+    u.frame = 1024;
+    u.mode = 2;
+    u.speed = 0x10000;
+    let mut g = Globals::default();
+    let mut us = UnitSound::default();
+    let mut f = Fake::default();
+    run(&mut f, &mut g, 1000, |cx| footstep(cx, &u, &mut us, 1)).unwrap();
+    assert!(f.log.is_empty());
+    // F < n (step 0) is not fatal: dist is |o − x| and the step test fails
+    // at f = 0 with s = 256.
+    u.speed = 256;
+    u.frame_count = 1;
+    u.frame = 0;
+    let mut f = Fake::default();
+    assert!(run(&mut f, &mut g, 1000, |cx| footstep(cx, &u, &mut us, 1)).is_ok());
+}
+
+// Covers: specs/audio/triggers.md §7 r7, §7 r8
+#[test]
+fn objects_without_a_record_and_cairn_loops() {
+    let t = ObjectSounds::spec();
+    let no_record = (0..=572).find(|&c| t.get(c).is_none()).unwrap();
+    let mut g = Globals::default();
+    // No record: all-zero row; loop 0 detaches the looping requests, and
+    // the fields are still updated.
+    let mut u = Unit::new(O, no_record);
+    u.mode = 1;
+    let mut us = UnitSound::default();
+    let mut f = Fake::default();
+    f.loops.insert(77);
+    f.unit_reqs.insert(O, vec![(4, 77)]);
+    run(&mut f, &mut g, 0, |cx| object_mode(cx, t, &u, &mut us)).unwrap();
+    assert_eq!(f.log, vec![Call::Detach(4, O, false)]);
+    assert_eq!((us.obj_seen, us.obj_prev_mode), (true, 1));
+    // Mode ≥ 8 is fatal.
+    u.mode = 8;
+    assert_eq!(
+        run(&mut f, &mut g, 0, |cx| object_mode(cx, t, &u, &mut us)),
+        Err(TriggerError::ObjectMode(8))
+    );
+    // Cairn stone (61) in mode 1–5 loops cairn_stone_<m> (413–417).
+    for m in 1..=5u8 {
+        let mut c = Unit::new(O, 61);
+        c.mode = m;
+        let mut us = UnitSound::default();
+        let mut f = Fake::default();
+        run(&mut f, &mut g, 0, |cx| object_mode(cx, t, &c, &mut us)).unwrap();
+        assert_eq!(f.reqs(), vec![(412 + i32::from(m), Some(O), 0)]);
+    }
+}
+
+// Covers: specs/audio/triggers.md §10 r5
+#[test]
+fn greeting_records_from_the_tsv() {
+    let t = NpcGreetings::parse(NPC_GREETINGS_TSV).unwrap();
+    assert_eq!(t.rows().len(), 35);
+    let mut recs = GreetingRecords::new(&t);
+    assert_eq!(recs.len(), 28);
+    // Akara (148).
+    let a = *recs.for_class(148).unwrap();
+    assert_eq!(
+        (a.greet, a.inactive, a.time, a.ret),
+        (3480, 3482, 3485, 3484)
+    );
+    // No record → none (the greeting is id 0).
+    assert!(recs.for_class(0).is_none());
+    // The Cain classes share one record's last / tick.
+    let cains: Vec<i32> = t
+        .rows()
+        .iter()
+        .filter(|r| r.record == 0x0072_AE88)
+        .map(|r| r.class)
+        .collect();
+    assert_eq!(cains.len(), 6);
+    recs.for_class(cains[0]).unwrap().last = 3644;
+    assert_eq!(recs.for_class(cains[5]).unwrap().last, 3644);
+    // Strict parse.
+    assert!(NpcGreetings::parse(
+        "class\tmonstats\trecord\tgreet\tinactive\ttime\treturn\n1\tx\t72AE88\t0\t0\t0\t0"
+    )
+    .is_err());
+}
+
+// Covers: specs/audio/triggers.md §10 r7
+#[test]
+fn greeting_mode_2_writes_nothing() {
+    let mut g = Globals::default();
+    let mut rec = NpcGreeting {
+        greet: 100,
+        ret: 130,
+        last: 7,
+        tick: 3,
+        ..Default::default()
+    };
+    let mut f = Fake::default();
+    let pick = run(&mut f, &mut g, 50, |cx| {
+        greet(cx, &mut rec, GreetMode::Return, 1)
+    });
+    assert_eq!(pick, 130);
+    assert_eq!((rec.last, rec.tick), (7, 3));
+}
+
+// Covers: specs/audio/triggers-2.md §19 r4
+#[test]
+fn skill_voices_match_raw_cells() {
+    let mut r = zero_sounds();
+    r.skill1 = 541; // not a group base: compared raw
+    let mut npc = monster(&r);
+    let mut g = Globals::default();
+    let mut rec = NpcGreeting::default();
+    let mut f = Fake::default();
+    // Handle 1: id 542 in group 541 (base 541 = cell); handle 2: id 541
+    // whose base is 540 (≠ cell); handle 3: freed (id 0, base 0 = the 0
+    // cells).
+    f.bases.insert(542, 541);
+    f.bases.insert(541, 540);
+    f.unit_reqs.insert(M, vec![(1, 542), (2, 541), (3, 0)]);
+    run(&mut f, &mut g, 0, |cx| {
+        interact_greeting(cx, &mut rec, &npc, Some(P), GreetMode::Return, 1)
+    });
+    let detached: Vec<Handle> = f
+        .log
+        .iter()
+        .filter_map(|c| match c {
+            Call::Detach(h, M, true) => Some(*h),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(detached, vec![1, 3]);
+    // Identity type not 1 (a player NPC unit): nothing detached.
+    npc.identity_type = PLAYER;
+    let mut f = Fake::default();
+    f.unit_reqs.insert(M, vec![(1, 541)]);
+    run(&mut f, &mut g, 0, |cx| {
+        interact_greeting(cx, &mut rec, &npc, Some(P), GreetMode::Return, 1)
+    });
+    assert!(!f.log.iter().any(|c| matches!(c, Call::Detach(..))));
+}
+
+// Covers: specs/audio/triggers.md §3 r2
+#[test]
+fn player_class_is_checked_before_the_dead_test() {
+    let mut g = Globals::default();
+    let mut dead = player(9);
+    dead.mode = 17;
+    let mut f = Fake::default();
+    assert_eq!(
+        run(&mut f, &mut g, 0, |cx| player_event(cx, &dead, 2)),
+        Err(TriggerError::PlayerClass(9))
+    );
+    // Another (non-local) dead player still plays.
+    let mut other = Unit::new(UnitKey::new(PLAYER, 2), 0);
+    other.mode = 17;
+    let mut f = Fake::default();
+    run(&mut f, &mut g, 0, |cx| player_event(cx, &other, 2)).unwrap();
+    assert_eq!(f.made(), vec![(7, None, 0)]);
+}
+
+// Covers: specs/audio/triggers-2.md §18 r2
+#[test]
+fn server_events_read_the_sound_identity() {
+    let mut r = zero_sounds();
+    r.taunt = 600;
+    // A player transformed into a monster form: identity type 1.
+    let mut u = player(0);
+    u.identity_type = MONSTER;
+    u.monsounds = Some(&r);
+    let mut g = Globals::default();
+    let mut us = UnitSound::default();
+    let mut f = Fake::default();
+    let extra = EventExtra {
+        local: Some(P),
+        event12_stsound: 0,
+        greeting: None,
+        day_phase: 0,
+    };
+    run(&mut f, &mut g, 0, |cx| {
+        server_event(cx, &u, &mut us, 16, extra)
+    })
+    .unwrap();
+    assert_eq!(f.made(), vec![(600, Some(P), 0)]);
+    // Not a player for the player-event fall-through.
+    let mut f = Fake::default();
+    let extra = EventExtra {
+        local: Some(P),
+        event12_stsound: 0,
+        greeting: None,
+        day_phase: 0,
+    };
+    run(&mut f, &mut g, 0, |cx| {
+        server_event(cx, &u, &mut us, 2, extra)
+    })
+    .unwrap();
+    assert!(f.made().is_empty());
+}
+
+// Covers: specs/audio/triggers.md §11
+#[test]
+fn ui_action_first_match_wins() {
+    let mut g = Globals::default();
+    let mut f = Fake::default();
+    run(&mut f, &mut g, 0, |cx| {
+        ui_action(cx, 3, 33, 0); // bit 0: 237 only
+        ui_action(cx, 1, 4, 0); // bit 0, c ≠ 33: nothing
+        ui_action(cx, 0x12, 33, 5); // bit 1: 243, not the 0x10 rows
+    });
+    let ids: Vec<i32> = f.reqs().iter().map(|r| r.0).collect();
+    assert_eq!(ids, vec![237, 243]);
+}
+
+// Covers: specs/audio/triggers.md §8
+#[test]
+fn dosound_a_and_b() {
+    let mut g = Globals::default();
+    // cltdofunc 16 (Jab): frame event 3 only; player a, monster b.
+    let p = player(0);
+    let mut f = Fake::default();
+    let ret = run(&mut f, &mut g, 0, |cx| {
+        jab_do(cx, &p, 2, 286, 292);
+        jab_do(cx, &p, 3, 286, 292)
+    });
+    assert_eq!(ret, 1);
+    assert_eq!(f.reqs(), vec![(286, Some(P), 0)]);
+    let mut r = zero_sounds();
+    r.skill3 = 610;
+    let m = monster(&r);
+    let mut f = Fake::default();
+    run(&mut f, &mut g, 0, |cx| {
+        jab_do(cx, &m, 3, 286, 292);
+        // cltstfunc 25: a monster plays its skill slot's voice (slot 2 →
+        // Skill3); slot 4 or none → nothing; a player its dosound a.
+        charge_start(cx, &m, 0, Some(2));
+        charge_start(cx, &m, 0, Some(4));
+        charge_start(cx, &m, 0, None);
+        charge_start(cx, &p, 0, None);
+        charge_start(cx, &p, 77, None);
+    });
+    assert_eq!(
+        f.reqs(),
+        vec![(292, Some(M), 0), (610, Some(M), 0), (77, Some(P), 0)]
+    );
+}
+
+// Covers: specs/audio/triggers-2.md §16
+#[test]
+fn prog_sound_functions() {
+    let mut g = Globals::default();
+    let mis = UnitKey::new(3, 40);
+    let new = UnitKey::new(3, 41);
+    let owner = UnitKey::new(MONSTER, 42);
+    let mut f = Fake::default();
+    f.unit_reqs.insert(mis, vec![(5, 2438), (4, 9)]);
+    let mut data = 0;
+    run(&mut f, &mut g, 0, |cx| {
+        // 9: elapsed = max(P1, 1) − 2 only; the head handle is detached
+        // with force first.
+        missile_prog_fn9(cx, mis, 5, 8, 2438);
+        missile_prog_fn9(cx, mis, 6, 8, 2438);
+        // 29: elapsed 315 only, on the owner.
+        missile_prog_fn29(cx, Some(owner), 314, 310, 451);
+        missile_prog_fn29(cx, Some(owner), 315, 310, 451);
+        // 47: a = 0 → no request, a := b; then a ≠ b → request.
+        missile_prog_fn47(cx, mis, 2416, &mut data, 3);
+        missile_prog_fn47(cx, mis, 2416, &mut data, 3);
+        missile_prog_fn47(cx, mis, 2416, &mut data, 4);
+        // 51: on the created missile.
+        missile_prog_fn51(cx, None, 2458);
+        missile_prog_fn51(cx, Some(new), 2458);
+    });
+    assert_eq!(
+        f.log,
+        vec![
+            Call::Detach(5, mis, true),
+            Call::Req(2438, Some(mis), 0, 0),
+            Call::Req(451, Some(owner), 0, 0),
+            Call::Req(2416, Some(mis), 0, 0),
+            Call::Req(2458, Some(new), 0, 0),
+        ]
+    );
+    assert_eq!(data, 4);
 }

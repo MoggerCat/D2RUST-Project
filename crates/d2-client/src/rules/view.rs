@@ -73,24 +73,30 @@ pub struct MapTile {
     pub frame: ComponentFrame,
     /// The tile's blocks (`BlockRect::of_tile`), for wall culling.
     pub blocks: Vec<BlockRect>,
-    /// TODO(spec: render/shading.md, render/lighting.md).
+    /// The tile's shade (`render/shading.md` §4, §10: `[L]` per block;
+    /// light values `render/lighting.md` §11 r2–r4), for the whole tile
+    /// when [`ViewSource::tile_blocks`] gives no blocks.
     pub shade: ShadeChain,
-    /// TODO(spec: render/blend-modes.md) (roof fade, translucent walls).
+    /// The tile's blend (`render/blend-modes.md` §6: roof fade, translucent
+    /// walls), for the whole tile when no blocks are given.
     pub blend: BlendOp,
     /// `draw-order.md` §10 (`rules::draw_order::source`).
     pub key: DrawKey,
 }
 
-/// The inputs placement needs that the client world model does not hold
-/// yet. Each method is answered by its owner spec once written; until then
-/// an implementation returns an error, never a default.
+/// The inputs placement reads from the client world model. Each method
+/// names its owner spec; an implementation whose inputs the model does not
+/// hold returns an error, never a default.
 pub trait ViewSource {
-    /// TODO(spec: the S→C owner specs of unit positions; units path spec):
-    /// the unit's position as the client keeps it (camera §2).
+    /// The unit's position as the client keeps it (camera §2: 16.16
+    /// subtiles of a moving unit, integer subtiles of a static one;
+    /// `client/model.md` §2, §3, §5 state where the messages place it).
     fn unit_position(&self, unit: &ClientUnit) -> Result<UnitPosition, String>;
 
-    /// TODO(spec: render/unit-composite.md) (camera §4, open question 3):
-    /// the per-unit extra offsets `(ox, oy)`.
+    /// The per-unit extra offsets `(ox, oy)` of camera §4:
+    /// `render/unit-composite.md` §8 (`(ox, oy + oz)` of the client motion
+    /// record, plus the object and missile offsets;
+    /// `rules::unit_composite::unit_offset`).
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String>;
 
     /// The tiles of the frame, each with its list and draw key. A feed
@@ -110,9 +116,9 @@ pub trait ViewSource {
         UnitSlot::Unordered
     }
 
-    /// TODO(spec: render/lighting.md §11 r2–r4, render/shading.md §4,
-    /// render/blend-modes.md §6): the per-block shade and blend of a tile
-    /// (`rules::lighting::draws` and `rules::shading` answer them from the
+    /// The per-block shade and blend of a tile (`render/lighting.md` §11
+    /// r2–r4, `render/shading.md` §4, `render/blend-modes.md` §6;
+    /// `rules::lighting::draws` and `rules::shading` answer them from the
     /// frame's light map). Empty (the default) = the tile's own `shade`
     /// and `blend` for the whole tile.
     fn tile_blocks(&self, _tile: &MapTile) -> Result<Vec<BlockShade>, ViewError> {

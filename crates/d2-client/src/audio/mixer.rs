@@ -105,15 +105,25 @@ impl Gains {
 
 /// Volume and pan curves: integer `vol`/`pan` to Q8 gains.
 ///
-/// TODO(spec: audio/sound-table.md): the original's curves as tables
-/// (`audio.md` §A4, §B3, §B8). Not formulas we invent.
+/// The original's curves are `audio/sound-table.md` §8.3: r1 volume
+/// amplitude `v / 255`, r2 pan as one side scaled by `pan / 127` or
+/// `(255 − pan) / 127`, r3 the device gain `G` and the occlusion applied
+/// to the volume before r1, r4 `G` = 255 at every send of a game sound
+/// tick ([`crate::audio::sound_table::DeviceGain`]).
 pub trait GainCurve {
     fn gains(&self, vol: i32, pan: i32) -> Result<Gains, AudioError>;
+
+    /// The gains of a voice whose occlusion is `occlusion` (§8.3 r3). A
+    /// curve without occlusion ignores it.
+    fn gains_occluded(&self, vol: i32, pan: i32, occlusion: f32) -> Result<Gains, AudioError> {
+        let _ = occlusion;
+        self.gains(vol, pan)
+    }
 }
 
-/// Placeholder curve: unity on both sides for every `vol` and `pan`. The
-/// narrowest neutral choice until §B3 gives the tables; the voice log still
-/// records the integer `vol` and `pan` the trigger carried.
+/// Neutral curve: unity on both sides for every `vol` and `pan`, used by
+/// the hook-only play mode; the voice log still records the integer `vol`
+/// and `pan` the trigger carried.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UnityGain;
 
@@ -139,6 +149,10 @@ pub struct Voice {
     phase: u64,
     /// Phase advance per output frame: `(rate << 32) / R`, truncated.
     step: u64,
+    /// Frame a looped voice wraps to (`sound-table.md` §7 r4).
+    loop_start: u64,
+    /// Device occlusion (§8.3 r3).
+    occlusion: f32,
 }
 
 impl Voice {
@@ -158,7 +172,35 @@ impl Voice {
             gains,
             phase: 0,
             step,
+            loop_start: 0,
+            occlusion: 0.0,
         }
+    }
+
+    /// Device state (`sound-table.md` §7 r4, r8, §8.3 r3): a start frame
+    /// moves the read position (taken modulo the frame count), a loop
+    /// start past the end loops to frame 0.
+    pub(super) fn set_device(&mut self, start: Option<u64>, loop_start: Option<u64>, occ: f32) {
+        let frames = self.sound.frames() as u64;
+        if let Some(f) = start {
+            self.phase = (f % frames) << 32;
+        }
+        if let Some(l) = loop_start {
+            self.loop_start = if l < frames { l } else { 0 };
+        }
+        self.occlusion = occ;
+    }
+
+    pub fn occlusion(&self) -> f32 {
+        self.occlusion
+    }
+
+    pub fn loop_start(&self) -> u64 {
+        self.loop_start
+    }
+
+    pub(super) fn set_gains(&mut self, gains: Gains) {
+        self.gains = gains;
     }
 
     pub fn id(&self) -> CueId {
@@ -184,8 +226,8 @@ impl Voice {
     }
 
     /// Add this voice into `acc`; returns false once a one-shot voice has
-    /// played its last frame. A looped voice wraps to frame 0 (loop points
-    /// are §B3).
+    /// played its last frame. A looped voice wraps to its loop start
+    /// (`sound-table.md` §7 r4; frame 0 unless set).
     fn render(&mut self, acc: &mut [i32; BLOCK_SAMPLES]) -> bool {
         let frames = self.sound.frames() as u64;
         let g = self.gains;
@@ -195,7 +237,9 @@ impl Voice {
                 if !self.params.looped {
                     return false;
                 }
-                self.phase %= frames << 32;
+                let start = self.loop_start << 32;
+                let span = (frames << 32) - start;
+                self.phase = start + (self.phase - start) % span;
                 i = self.phase >> 32;
             }
             let (l, r) = self.sound.frame(i as usize);

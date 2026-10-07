@@ -45,9 +45,12 @@ fn table(rows: Vec<SoundRow>) -> SoundTableData {
 }
 
 /// Every id has a 1-second mono 1,000 Hz sample (25 sound ticks) except
-/// the `missing` ones.
+/// the `missing` ones; `stereo` ids have a stereo file; `sizes` are file
+/// sizes for the cache (others: the data plus 44 bytes).
 struct Bank {
     missing: BTreeSet<u32>,
+    stereo: BTreeSet<u32>,
+    sizes: BTreeMap<u32, u64>,
     frames: usize,
 }
 
@@ -59,18 +62,27 @@ impl SoundBank for Bank {
         if self.missing.contains(&id.0) {
             return None;
         }
+        let ch = if self.stereo.contains(&id.0) { 2 } else { 1 };
         Some(Arc::new(
-            Sound::new(1_000, 1, vec![0; self.frames]).unwrap(),
+            Sound::new(1_000, ch, vec![0; self.frames * usize::from(ch)]).unwrap(),
         ))
+    }
+    fn file_size(&self, id: SoundId) -> Option<u64> {
+        self.sizes.get(&id.0).copied()
     }
 }
 
 fn bank() -> Box<Bank> {
     Box::new(Bank {
         missing: BTreeSet::new(),
+        stereo: BTreeSet::new(),
+        sizes: BTreeMap::new(),
         frames: 1_000,
     })
 }
+
+/// Mono channels of mixer mode 0 (slots 4–15, §7 r7).
+const MONO_SLOTS: usize = 12;
 
 fn system(rows: Vec<SoundRow>) -> SoundSystem {
     SoundSystem::new(table(rows), bank())
@@ -358,9 +370,14 @@ fn request_fields_and_pool_limit() {
         (q.flags, q.start_offset, q.state),
         (2, 64, RequestState::Waiting)
     );
-    assert_eq!(q.pos, [100.0, 100.0, 0.0]);
+    // §8.1 r1: unit requests have z = 640.0.
+    assert_eq!(q.pos, [100.0, 100.0, 640.0]);
     assert_eq!(q.dist2, 20_000.0);
-    for _ in 1..REQUEST_SLOTS {
+    // §5 r3: without a unit, (0, 0, 320.0) and distance² 0.
+    let n = sys.request(&mut w, 1, None, 0, 0, 0);
+    let q = sys.request_by_handle(n).unwrap();
+    assert_eq!((q.pos, q.dist2), ([0.0, 0.0, 320.0], 0.0));
+    for _ in 2..REQUEST_SLOTS {
         assert_ne!(sys.request(&mut w, 1, None, 0, 0, 0), 0);
     }
     assert_eq!(sys.request(&mut w, 1, None, 0, 0, 0), 0);
@@ -448,16 +465,31 @@ fn fade_call() {
             t1: 9
         }
     );
+    // §5 r7: a fade-out cannot be turned around.
     sys.fade(h, 40, 0, 0);
-    assert_eq!(sys.request_by_handle(h).unwrap().volume, 40);
-    sys.fade(h, 40, 3, 0);
+    assert_eq!(sys.request_by_handle(h).unwrap().volume, 100);
+    assert!(sys.take_errors().is_empty());
+    // Without a running fade: len 0 sets the volume at once; with a delay
+    // it is fatal (0x25C).
+    let h2 = sys.request(&mut w, 2, None, 0, 0, 0);
+    sys.fade(h2, 40, 0, 0);
+    assert_eq!(sys.request_by_handle(h2).unwrap().volume, 40);
+    sys.fade(h2, 40, 3, 0);
     assert_eq!(
         sys.take_errors(),
         [SoundError::FadeDelay {
-            handle: h,
+            handle: h2,
             delay: 3
         }]
     );
+    // Same target and the new end not before the running fade's end:
+    // nothing (the running fade ends no later); an earlier end replaces it.
+    let h3 = sys.request(&mut w, 2, None, 0, 0, 0);
+    sys.fade(h3, 100, 0, 10);
+    sys.fade(h3, 100, 2, 10);
+    assert_eq!(sys.request_by_handle(h3).unwrap().fade.unwrap().t1, 10);
+    sys.fade(h3, 100, 0, 5);
+    assert_eq!(sys.request_by_handle(h3).unwrap().fade.unwrap().t1, 5);
 }
 
 // --- §6 sound tick ---------------------------------------------------------
@@ -528,7 +560,8 @@ fn stop_flag_stops_and_frees() {
     let mut q = TriggerQueue::new();
     let h = sys.request(&mut w, 1, None, 0, 0, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
-    assert!(matches!(&cues(&mut q)[..], [Cue::Start(_)]));
+    // §6.3 r6: the update that started it sends volume and pan again.
+    assert!(matches!(&cues(&mut q)[..], [Cue::Start(_), Cue::Param(_)]));
     sys.stop_handle(h);
     ticks(&mut sys, &mut w, &mut q, 1);
     let c = cues(&mut q);
@@ -565,7 +598,8 @@ fn fade_to_zero_runs_before_the_stop() {
             _ => None,
         })
         .collect();
-    assert_eq!(vols, [192, 128, 64, 0]);
+    // 255 is the §6.3 r6 send of the start tick.
+    assert_eq!(vols, [255, 192, 128, 64, 0]);
     ticks(&mut sys, &mut w, &mut q, 2); // fade ends at 6, stop at 7
     assert!(cues(&mut q).iter().any(|c| matches!(c, Cue::Stop(_))));
 }
@@ -668,16 +702,23 @@ fn instance_rules() {
     let mut sys = system(r);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
-    // Defer Inst without a unit at (0,0,0): the second gets the stop flag.
-    let a = sys.request(&mut w, 1, None, 0, FLAG_EXACT, 0);
+    // Defer Inst with a unit list: the second gets the stop flag.
+    let a = sys.request(&mut w, 1, Some(MONSTER), 0, FLAG_EXACT, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
-    let b = sys.request(&mut w, 1, None, 0, FLAG_EXACT, 0);
+    let b = sys.request(&mut w, 1, Some(MONSTER), 0, FLAG_EXACT, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
     assert!(sys.request_by_handle(b).unwrap().stop);
     assert_eq!(
         sys.request_by_handle(a).unwrap().state,
         RequestState::Playing
     );
+    // §6.3 r9: without a unit list (position (0, 0, 320.0), never (0, 0,
+    // 0)) a Defer Inst request starts alongside the found one.
+    let x = sys.request(&mut w, 1, None, 0, FLAG_EXACT, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let xr = sys.request_by_handle(x).unwrap();
+    assert_eq!((xr.state, xr.stop), (RequestState::Playing, false));
+    assert!(!sys.request_by_handle(a).unwrap().stop);
     // Stop Inst: the old one gets the stop flag, the new one starts.
     let c = sys.request(&mut w, 3, None, 0, 0, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
@@ -753,10 +794,7 @@ fn tracking_and_occlusion() {
     r[2].falloff = 4;
     r[202].group_size = 3;
     let mut sys = system(r);
-    sys.set_settings(SoundSettings {
-        tracking_option: true,
-        ..SoundSettings::default()
-    });
+    assert!(sys.settings().game_loaded);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
     w.blocked.insert(MONSTER);
@@ -772,8 +810,16 @@ fn tracking_and_occlusion() {
     w.positions.insert(MONSTER, (1010, 1000));
     ticks(&mut sys, &mut w, &mut q, 1);
     let r = sys.request_by_handle(h).unwrap();
-    assert_eq!(r.pos, [10.0, 0.0, 0.0]);
+    assert_eq!(r.pos, [10.0, 0.0, 640.0]);
     assert_eq!(r.occlusion, 0.45);
+    // Not game-loaded: no tracking.
+    sys.set_settings(SoundSettings {
+        game_loaded: false,
+        ..SoundSettings::default()
+    });
+    w.positions.insert(MONSTER, (1020, 1000));
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.request_by_handle(h).unwrap().pos, [10.0, 0.0, 640.0]);
 }
 
 // Covers: specs/audio/sound-table.md §6.5 r1, §6.5 r2, §6.5 text
@@ -802,7 +848,7 @@ fn ducks() {
 
 // --- §7 channels -----------------------------------------------------------
 
-// Covers: specs/audio/sound-table.md §7 r3, §7 text
+// Covers: specs/audio/sound-table.md §7 r3, §7 r7, §7 text, §6.6 r1
 #[test]
 fn sixteen_channels_and_stealing() {
     let mut r = rows(30);
@@ -814,11 +860,13 @@ fn sixteen_channels_and_stealing() {
     let mut sys = system(r);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
-    let low: Vec<_> = (1..=CHANNELS as i32)
+    // Mode 0: mono requests take slots 4–15 only.
+    let low: Vec<_> = (1..=MONO_SLOTS as i32)
         .map(|id| sys.request(&mut w, id, None, 0, 0, 0))
         .collect();
     ticks(&mut sys, &mut w, &mut q, 1);
-    assert_eq!(starts(&mut q).len(), CHANNELS);
+    assert_eq!(starts(&mut q).len(), MONO_SLOTS);
+    assert!((0..4).all(|c| sys.channel_request(c).is_none()));
     // Equal priority, higher slot: steals the least important (slot 0).
     let eq = sys.request(&mut w, 20, None, 0, 0, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
@@ -830,16 +878,12 @@ fn sixteen_channels_and_stealing() {
         RequestState::Playing
     );
     let victim = sys.request_by_handle(low[0]).unwrap();
-    // Stolen, then (looping) waiting again in the same update (§6.3 r1);
-    // its start attempt moved the resume offset (1 tick at 1,000 Hz: 40
-    // frames, mono 16-bit: 80 bytes) to the start offset with a 3-tick
-    // fade-in (r3.3) and found no channel.
+    // Stolen (ended), then (looping) waiting again by §6.3 r1, which is
+    // all an ended request does in that update (§6.3 r6). A non-stream
+    // voice saves no position (§7 r8: resume offset 0 = none).
     assert_eq!(victim.state, RequestState::Waiting);
-    assert_eq!((victim.resume_offset, victim.start_offset), (None, 80));
-    assert_eq!(
-        victim.fade.map(|f| (f.start, f.end, f.t1 - f.t0)),
-        Some((0, 255, 3))
-    );
+    assert_eq!((victim.resume_offset, victim.start_offset), (0, 0));
+    assert!(victim.fade.is_none());
     // Higher priority steals too.
     let hi = sys.request(&mut w, 21, None, 0, 0, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
@@ -849,14 +893,68 @@ fn sixteen_channels_and_stealing() {
     );
     // `hi` took low[1]'s channel (the least important busy one now). When
     // it stops, the freed channel goes to the first waiting request in list
-    // order: low[1] (higher slot) before low[0], from its saved offset.
+    // order: low[1] (higher slot) before low[0].
     sys.stop_handle(hi);
     ticks(&mut sys, &mut w, &mut q, 1);
     let v = sys.request_by_handle(low[1]).unwrap();
     assert_eq!(v.state, RequestState::Playing);
-    assert_eq!(v.start_offset, 160);
     let v = sys.request_by_handle(low[0]).unwrap();
-    assert_eq!((v.state, v.start_offset), (RequestState::Waiting, 80));
+    assert_eq!(v.state, RequestState::Waiting);
+}
+
+// Covers: specs/audio/sound-table.md §7 r7
+#[test]
+fn mode0_has_four_stereo_channels() {
+    let mut r = rows(10);
+    for row in r.iter_mut().skip(1) {
+        row.looped = 1;
+        row.priority = 10;
+    }
+    let mut b = bank();
+    b.stereo.extend(1..=5);
+    let mut sys = SoundSystem::new(table(r), b);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    // Five stereo requests at once, equal priority: four take slots 0–3;
+    // the fifth (lowest slot, so not more important) cannot use 4–15.
+    let hs: Vec<_> = (1..=5)
+        .map(|id| sys.request(&mut w, id, None, 0, 0, 0))
+        .collect();
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(starts(&mut q).len(), 4);
+    assert_eq!(
+        sys.request_by_handle(hs[0]).unwrap().state,
+        RequestState::Waiting
+    );
+    assert!((0..4).all(|c| sys.channel_request(c).is_some()));
+    assert!((4..CHANNELS).all(|c| sys.channel_request(c).is_none()));
+}
+
+// Covers: specs/audio/sound-table.md §7 r7
+#[test]
+fn stereo_comes_from_the_file_of_a_loaded_sample() {
+    // `Stereo` 1 in the row but a mono file: the format check (0x004DF630)
+    // overwrites it at the load, so the voice is mono (slot 4).
+    let mut r = rows(3);
+    r[1].stereo = 1;
+    r[1].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.table().get(1).unwrap().row.stereo, 0);
+    assert!(sys.channel_request(4).is_some());
+    // A `Stream` row keeps its cell (no load).
+    let mut r = rows(3);
+    r[1].stereo = 1;
+    r[1].stream = 1;
+    r[1].looped = 1;
+    let mut sys = system(r);
+    sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.table().get(1).unwrap().row.stereo, 1);
+    assert!(sys.channel_request(0).is_some());
 }
 
 // Covers: specs/audio/sound-table.md §7 r3
@@ -872,7 +970,7 @@ fn lower_priority_does_not_steal() {
     let mut sys = system(r);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
-    for id in 1..=CHANNELS as i32 {
+    for id in 1..=MONO_SLOTS as i32 {
         sys.request(&mut w, id, None, 0, 0, 0);
     }
     ticks(&mut sys, &mut w, &mut q, 1);
@@ -925,21 +1023,29 @@ fn missing_file_never_retried() {
     );
 }
 
-// Covers: specs/audio/sound-table.md §10 text, §6.3 r4, §7 r2, §1 t2 row9
+// Covers: specs/audio/sound-table.md §10 text, §10 r6, §6.3 r4, §7 r2, §1 t2 row9
 #[test]
-fn async_only_is_deferred_one_tick() {
+fn async_only_waits_for_the_next_preload_pass() {
     let mut r = rows(3);
     r[1].async_only = 1;
     let mut sys = system(r);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
     let h = sys.request(&mut w, 1, None, 0, 0, 0);
+    // T 0: the start attempt starts the async read and fails; the one-shot
+    // is kept while its sample loads (§6.3 r4).
     ticks(&mut sys, &mut w, &mut q, 1);
     assert!(starts(&mut q).is_empty());
     assert_eq!(sys.table().get(1).unwrap().load, LoadState::Pending);
+    assert_eq!(sys.cache().pending, 1);
     assert!(sys.request_by_handle(h).is_some());
+    // Collected only by the preload pass at T 25, which runs before the
+    // update of T 25 (§10 r6).
+    ticks(&mut sys, &mut w, &mut q, 24);
+    assert!(starts(&mut q).is_empty());
     ticks(&mut sys, &mut w, &mut q, 1);
-    assert_eq!(starts(&mut q).len(), 1);
+    assert_eq!(starts(&mut q), [(25, 1, 255, 128)]);
+    assert_eq!(sys.cache().pending, 0);
 }
 
 // Covers: specs/audio/sound-table.md §10 r3, §10 r4, §1 t2 row10
@@ -1052,8 +1158,9 @@ fn positional_start_and_unchanged_sends_nothing() {
     w.positions.insert(MONSTER, (1160, 1000)); // x = 160: X = 0.5
     sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
     ticks(&mut sys, &mut w, &mut q, 1);
-    // d = 160 > 60: (700 − 160) × 255 / 640 = 215; X = 0.5 → pan 178.
-    assert_eq!(starts(&mut q), [(0, 1, 215, 178)]);
+    // d = 160 > 60: (700 − 160) × 255 / 640 = 215; position (160, 0,
+    // 640): X = 0.5, Z = 2 → gain 247, 215 × 247 / 255 = 208; pan 178.
+    assert_eq!(starts(&mut q), [(0, 1, 208, 178)]);
     ticks(&mut sys, &mut w, &mut q, 3);
     assert!(cues(&mut q).is_empty());
     sys.set_settings(SoundSettings {
@@ -1062,15 +1169,16 @@ fn positional_start_and_unchanged_sends_nothing() {
     });
     ticks(&mut sys, &mut w, &mut q, 1);
     let c = cues(&mut q);
-    assert!(matches!(&c[..], [Cue::Param(p)] if p.vol == 107 && p.pan == 178));
+    // 127 → (700 − 160) × 127 / 640 = 107 → × 247 / 255 = 103.
+    assert!(matches!(&c[..], [Cue::Param(p)] if p.vol == 103 && p.pan == 178));
 }
 
 // Covers: specs/audio/sound-table.md §8.2 r10
 #[test]
 fn stereo_voices_get_no_pan_or_gain() {
-    let mut r = rows(3);
-    r[1].stereo = 1;
-    let mut sys = system(r);
+    let mut b = bank();
+    b.stereo.insert(1);
+    let mut sys = SoundSystem::new(table(rows(3)), b);
     let mut w = World::new();
     let mut q = TriggerQueue::new();
     w.positions.insert(MONSTER, (1040, 1000));
@@ -1260,6 +1368,8 @@ fn engine_voice_log() {
         log,
         [
             (0, VoiceKind::Start, "DATA\\GLOBAL\\SFX\\s1.wav", 255, 128),
+            // §6.3 r6: sent a second time by the start's update.
+            (0, VoiceKind::Param, "DATA\\GLOBAL\\SFX\\s1.wav", 255, 128),
             (1, VoiceKind::Stop, "DATA\\GLOBAL\\SFX\\s1.wav", 255, 128),
         ]
     );
@@ -1273,6 +1383,7 @@ fn env_and_trigger_surfaces() {
     use crate::audio::triggers::TriggerSound;
     let mut r = rows(4700);
     r[4657].looped = 1;
+    r[4657].stream = 1;
     r[4657].blocks = [10, 20, -1];
     r[10].group_size = 4;
     r[10].looped = 1;
@@ -1299,9 +1410,12 @@ fn env_and_trigger_surfaces() {
     assert_eq!(ctx.variant(10), 13);
     ctx.run_tick(&mut q);
     ctx.run_tick(&mut q);
-    // Two sound ticks at 1,000 Hz mono: 80 frames = 160 bytes.
-    assert_eq!(ctx.play_position(4657), Some(160));
-    assert_eq!(ctx.sys.request_by_handle(m).unwrap().pos, [3.0, 4.0, 5.0]);
+    // Two sound ticks at 1,000 Hz mono: 80 frames = 160 bytes = 40 units
+    // of 4 bytes (§7 r8).
+    assert_eq!(ctx.play_position(4657), Some(40));
+    // §5 r8: z + 640, distance² from x, y.
+    let r = ctx.sys.request_by_handle(m).unwrap();
+    assert_eq!((r.pos, r.dist2), ([3.0, 4.0, 645.0], 25.0));
 }
 
 // --- game files ---------------------------------------------------------------
@@ -1409,7 +1523,9 @@ fn runtime_fields_sample_load_state_and_last_use() {
     ticks(&mut sys, &mut w, &mut q, 1);
     let e = sys.table().get(1).unwrap();
     assert_eq!((e.load, e.sample.is_some()), (LoadState::Pending, false));
-    ticks(&mut sys, &mut w, &mut q, 1);
+    // The load start stamps the use (sound-table-2.md §16 r1).
+    assert_eq!((e.last_use, e.size), (0, 2_044));
+    ticks(&mut sys, &mut w, &mut q, 25);
     let e = sys.table().get(1).unwrap();
     assert_eq!((e.load, e.sample.is_some()), (LoadState::Loaded, true));
     assert_eq!(starts(&mut q).len(), 1);
@@ -1589,4 +1705,358 @@ fn draw_helpers_on_the_client_seed() {
     assert_eq!(uniform(&mut ctx, 450, 750), 450 + want.roll(301) as i32);
     assert_eq!(jitter(&mut ctx, 100), want.roll(201) as i32 - 100);
     assert_eq!(w.seed, Some(want));
+}
+
+// --- 2026-10-07 corrections: requests, variants, streams, cache ------------
+
+// Covers: specs/audio/sound-table.md §5 r2, §5 r6; specs/audio/triggers-2.md §19 r1, §19 r2, §19 r6
+#[test]
+fn compound_merge_attaches_its_unit() {
+    let mut r = rows(4);
+    r[1].compound = -1;
+    r[1].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    w.positions.insert(MONSTER2, (1000, 1000));
+    let h = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    assert_eq!(sys.request(&mut w, 1, Some(MONSTER2), 0, 0, 0), h);
+    // One request, unit list newest first; the handle in both units' lists.
+    assert_eq!(sys.request_by_handle(h).unwrap().units, [MONSTER2, MONSTER]);
+    assert_eq!(sys.unit_requests(MONSTER), [(h, 1)]);
+    assert_eq!(sys.unit_requests(MONSTER2), [(h, 1)]);
+    // The same unit again: held twice, no duplicate check.
+    sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    assert_eq!(sys.unit_requests(MONSTER), [(h, 1), (h, 1)]);
+    // With several units the fade call does nothing (§5 r5).
+    sys.fade(h, 0, 0, 5);
+    assert!(!sys.request_by_handle(h).unwrap().stop);
+}
+
+// Covers: specs/audio/sound-table.md §5 r2
+#[test]
+fn compound_window_is_unsigned() {
+    let mut r = rows(3);
+    r[1].compound = 4;
+    let mut sys = system(r);
+    let mut w = World::new();
+    // Start tick in the future (delay 5): now − start wraps, no merge.
+    let h = sys.request(&mut w, 1, None, 5, 0, 0);
+    assert_ne!(sys.request(&mut w, 1, None, 0, 0, 0), h);
+}
+
+// Covers: specs/audio/triggers-2.md §19 r1, §19 r2, §19 r6
+#[test]
+fn unit_request_list_order_and_lifetime() {
+    let mut r = rows(4);
+    r[3].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let a = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    let b = sys.request(&mut w, 3, Some(MONSTER), 0, 0, 0);
+    assert_eq!(sys.unit_requests(MONSTER), [(b, 3), (a, 1)]);
+    // Ended but not yet freed requests stay listed.
+    sys.stop_handle(b);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.unit_requests(MONSTER), [(a, 1)]);
+    // A detach drops the unit's node and one unit; a one-shot keeps
+    // playing (`triggers.md` §1 r3).
+    let c = sys.request(&mut w, 2, Some(MONSTER2), 0, 0, 0);
+    sys.detach(c, MONSTER2, false);
+    assert!(sys.unit_requests(MONSTER2).is_empty());
+    let cr = sys.request_by_handle(c).unwrap();
+    assert!(cr.units.is_empty() && !cr.stop);
+}
+
+// Covers: specs/audio/sound-table.md §7 r6, §4 r4
+#[test]
+fn the_variant_overwrites_the_request_id() {
+    let mut r = rows(110);
+    r[100].group_size = 4;
+    // Every row of the group loops (the variant's record is read, §7 r6).
+    for x in &mut r[100..104] {
+        x.looped = 1;
+    }
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let h = sys.request(&mut w, 100, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    // Seed {1, 666}: roll(4) = 3 → 103; history on the requested id's record.
+    assert_eq!(sys.request_by_handle(h).unwrap().id, 103);
+    assert_eq!(sys.table().get(100).unwrap().history, [103, 0]);
+    // A loop restart picks relative to 103 (size 1): no draw, stays 103.
+    sys.set_settings(SoundSettings {
+        master_volume: 0,
+        ..SoundSettings::default()
+    });
+    ticks(&mut sys, &mut w, &mut q, 2);
+    sys.set_settings(SoundSettings::default());
+    let seed = w.seed;
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let r = sys.request_by_handle(h).unwrap();
+    assert_eq!((r.id, r.state), (103, RequestState::Playing));
+    assert_eq!(w.seed, seed);
+}
+
+// Covers: specs/audio/sound-table.md §6.3 r7, §6.3 r3
+#[test]
+fn a_failed_start_after_fade_in_leaves_volume_0() {
+    let mut r = rows(3);
+    r[1].looped = 1;
+    r[1].fade_in = 4;
+    let mut b = bank();
+    b.missing.insert(1);
+    let mut sys = SoundSystem::new(table(r), b);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let h = sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 3);
+    let r = sys.request_by_handle(h).unwrap();
+    assert_eq!(
+        (r.state, r.volume, r.fade),
+        (RequestState::Waiting, 0, None)
+    );
+    assert!(starts(&mut q).is_empty());
+}
+
+// Covers: specs/audio/sound-table.md §7 r4, §7 r8, §6.6 r1, §6.3 r3; specs/audio/sound-table-2.md §17 r1
+#[test]
+fn stream_offsets_resume_and_loop_start() {
+    use crate::audio::DeviceChange;
+    let mut r = rows(4);
+    r[1].stream = 1;
+    r[1].looped = 1;
+    r[2].looped = 1;
+    r[2].blocks = [100, -1, -1];
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    // Start offset 0xFFFFFFFF: × 4 wraps to 0xFFFFFFFC, mod the 2,000 data
+    // bytes = 1,292, frame 646.
+    let h = sys.request(&mut w, 1, None, 0, 0, 0xFFFF_FFFF);
+    // Block count 1: loop start `Block 1` × 2 bytes = frame 100 (mono).
+    sys.request(&mut w, 2, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    let dev: Vec<DeviceChange> = cues(&mut q)
+        .into_iter()
+        .filter_map(|c| match c {
+            Cue::Device(d) => Some(d),
+            _ => None,
+        })
+        .collect();
+    let mut got: Vec<(Option<u64>, Option<u64>)> =
+        dev.iter().map(|d| (d.start_frame, d.loop_start)).collect();
+    got.sort();
+    assert_eq!(got, [(Some(0), Some(100)), (Some(646), None)]);
+    let c = (0..CHANNELS)
+        .find(|&c| sys.channel_request(c).is_some_and(|r| r.id == 2))
+        .unwrap();
+    assert_eq!(sys.channel_loop_start(c), Some(200));
+    // Stopped at T 1 (inaudible): the stream saves its position in 4-byte
+    // units: (646 + 40) frames × 2 bytes / 4 = 343.
+    sys.set_settings(SoundSettings {
+        master_volume: 0,
+        ..SoundSettings::default()
+    });
+    ticks(&mut sys, &mut w, &mut q, 2);
+    assert_eq!(sys.request_by_handle(h).unwrap().resume_offset, 343);
+    sys.set_settings(SoundSettings::default());
+    ticks(&mut sys, &mut w, &mut q, 1);
+    // Resumed from there with a 3-tick fade-in.
+    let r = sys.request_by_handle(h).unwrap();
+    assert_eq!(
+        (r.state, r.start_offset, r.resume_offset),
+        (RequestState::Playing, 343, 0)
+    );
+    assert_eq!(r.fade.map(|f| f.t1 - f.t0), Some(3));
+}
+
+// Covers: specs/audio/sound-table-2.md §17 r2
+#[test]
+fn a_stream_that_fails_to_open_retries() {
+    let mut r = rows(3);
+    r[1].stream = 1;
+    r[1].looped = 1;
+    let mut b = bank();
+    b.missing.insert(1);
+    let mut sys = SoundSystem::new(table(r), b);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let h = sys.request(&mut w, 1, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 2);
+    // No file-failed flag: the loop waits and is tried again.
+    assert!(!sys.table().get(1).unwrap().failed);
+    assert_eq!(
+        sys.request_by_handle(h).unwrap().state,
+        RequestState::Waiting
+    );
+    assert!((0..CHANNELS).all(|c| sys.channel_request(c).is_none()));
+}
+
+// Covers: specs/audio/sound-table.md §8.1 r1
+#[test]
+fn river_projection() {
+    use super::system::river_point;
+    // P (0, 0), U (10, 5): the foot of P on the slope −1/2 line through U.
+    assert_eq!(river_point((0, 0), (10, 5)), (4, 8));
+    assert_eq!(river_point((100, 50), (100, 50)), (100, 50));
+    let mut r = rows(2600);
+    r[2599].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    w.positions.insert(PLAYER, (0, 0));
+    w.positions.insert(MONSTER, (10, 5));
+    let h = sys.request(&mut w, 2599, Some(MONSTER), 0, 0, 0);
+    // x = 4 − 0, y = 2 × (8 − 0).
+    assert_eq!(sys.request_by_handle(h).unwrap().pos, [4.0, 16.0, 640.0]);
+}
+
+// Covers: specs/audio/sound-table.md §6.4 r1
+#[test]
+fn tracking_takes_the_strictly_nearest_unit() {
+    let mut r = rows(3);
+    r[1].tracking = 1;
+    r[1].looped = 1;
+    r[1].compound = -1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    w.positions.insert(MONSTER, (1100, 1000));
+    w.positions.insert(MONSTER2, (900, 1000));
+    let h = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    sys.request(&mut w, 1, Some(MONSTER2), 0, 0, 0);
+    // A tie: the earlier unit in the list (the newest, MONSTER2) wins.
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.request_by_handle(h).unwrap().pos, [-100.0, 0.0, 640.0]);
+    w.positions.insert(MONSTER, (1050, 1000));
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.request_by_handle(h).unwrap().pos, [50.0, 0.0, 640.0]);
+}
+
+// Covers: specs/audio/sound-table-2.md §16 r1, §16 r2, §16 r3
+#[test]
+fn eviction_vectors() {
+    let run = |async_only: bool| {
+        let mut r = rows(9);
+        r[7].cache = 1;
+        r[3].async_only = u8::from(async_only);
+        let mut b = bank();
+        b.sizes.extend([(3, 30), (5, 20), (7, 25)]);
+        let mut sys = SoundSystem::new(table(r), b);
+        let mut w = World::new();
+        let mut q = TriggerQueue::new();
+        // T 0 preloads 7 (Cache) synchronously; then the stage: limit 100,
+        // total 90, LRU [5 (20, unlocked), 7 (25, Cache)].
+        ticks(&mut sys, &mut w, &mut q, 1);
+        let e = sys.table_mut().get_mut(5).unwrap();
+        e.load = LoadState::Loaded;
+        e.size = 20;
+        e.sample = Some(Arc::new(Sound::new(1_000, 1, vec![0; 10]).unwrap()));
+        let c = sys.cache_mut();
+        c.limit = 100;
+        c.total = 90;
+        c.lru = vec![5, 7];
+        sys.request(&mut w, 3, None, 0, 0, 0);
+        ticks(&mut sys, &mut w, &mut q, 1);
+        let loaded: Vec<bool> = [5, 7]
+            .iter()
+            .map(|&i| sys.table().get(i).unwrap().load == LoadState::Loaded)
+            .collect();
+        (sys.cache().total, loaded, sys.cache().lru.clone())
+    };
+    // Sync: need 20, target 70; walk 0 unloads 5 (70), walk 1 unloads 7
+    // (45); the load: 75.
+    assert_eq!(run(false), (75, vec![false, false], vec![3]));
+    // Async: walk 0 only: 5 (70); the read starts: 100.
+    assert_eq!(run(true), (100, vec![false, true], vec![7, 3]));
+}
+
+// Covers: specs/audio/sound-table-2.md §16 r2, §16 r4; specs/audio/sound-table.md §10 r5
+#[test]
+fn failed_eviction_holds_the_preload() {
+    let mut r = rows(9);
+    r[3].async_only = 1;
+    r[7].cache = 1;
+    let mut b = bank();
+    b.sizes.insert(3, 30);
+    let mut sys = SoundSystem::new(table(r), b);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    ticks(&mut sys, &mut w, &mut q, 400);
+    // Nothing evictable (7 is `Cache`, async: walk 0 only).
+    let c = sys.cache_mut();
+    c.limit = c.total + 10;
+    sys.request(&mut w, 3, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.cache().failed_eviction, 400);
+    assert_eq!(sys.table().get(3).unwrap().load, LoadState::None);
+    // A locked row is not preloaded before T 650.
+    sys.cache_mut().limit = u32::MAX;
+    sys.lock(5, 1).unwrap();
+    while sys.tick() < 650 {
+        ticks(&mut sys, &mut w, &mut q, 1);
+        assert_eq!(sys.table().get(5).unwrap().load, LoadState::None);
+    }
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.table().get(5).unwrap().load, LoadState::Pending);
+}
+
+// Covers: specs/audio/sound-table-2.md §16 r4
+#[test]
+fn an_abandoned_read_keeps_its_pending_count() {
+    let mut r = rows(9);
+    r[3].async_only = 1;
+    let mut b = bank();
+    b.sizes.extend([(3, 30), (4, 60)]);
+    let mut sys = SoundSystem::new(table(r), b);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    ticks(&mut sys, &mut w, &mut q, 1);
+    sys.cache_mut().limit = 80;
+    sys.request(&mut w, 3, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.cache().pending, 1);
+    // A sync load of 60 evicts the pending 3 (walk 0).
+    sys.request(&mut w, 4, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.table().get(3).unwrap().load, LoadState::None);
+    assert_eq!(sys.cache().pending, 1);
+}
+
+// Covers: specs/audio/sound-table-2.md §16 r1
+#[test]
+fn use_order_moves_to_the_tail() {
+    let mut r = rows(10);
+    for i in [5, 7, 9] {
+        r[i].looped = 1;
+    }
+    let mut sys = system(r);
+    let mut w = World::new();
+    let mut q = TriggerQueue::new();
+    let mut hs = Vec::new();
+    for id in [5, 9, 7] {
+        hs.push(sys.request(&mut w, id, None, 0, 0, 0));
+        ticks(&mut sys, &mut w, &mut q, 1);
+        sys.stop_handle(*hs.last().unwrap());
+        ticks(&mut sys, &mut w, &mut q, 1);
+    }
+    assert_eq!(sys.cache().lru, [5, 9, 7]);
+    let h = sys.request(&mut w, 9, None, 0, 0, 0);
+    ticks(&mut sys, &mut w, &mut q, 1);
+    assert_eq!(sys.cache().lru, [5, 7, 9]);
+    let _ = h;
+}
+
+// Covers: specs/audio/sound-table.md §8.3 r3, §12 r2
+#[test]
+fn device_gain_applies_occlusion() {
+    let g = DeviceGain;
+    // v 200, G 255, occlusion 0.5: amplitude 100 / 255.
+    assert_eq!(device_occluded(200, 0.5), 100);
+    let a = g.gains_occluded(200, 128, 0.5).unwrap();
+    let b = g.gains(100, 128).unwrap();
+    assert_eq!(a, b);
+    // A negative send (§12 r2) is silent, not an error.
+    assert_eq!(g.gains(-8_421_504, 128).unwrap().vol, 0);
 }

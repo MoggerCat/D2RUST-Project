@@ -266,6 +266,23 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.tables = tables;
     }
 
+    /// The unit-message rows (`msg-units.md` §1.2 r7, §1.3 r3,
+    /// `model.md` §15 r1): `monstats` / `monstats2`, `itemstatcost` send
+    /// columns, `objects.txt` and `shrines.txt`; the other tables stay.
+    pub fn set_unit_rows(&mut self, rows: world::UnitRows) {
+        let t = &mut self.inputs.tables;
+        t.monsters = rows.monsters;
+        t.stats = rows.stats;
+        t.objects = rows.objects;
+        t.shrines = rows.shrines;
+    }
+
+    /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
+    /// §10 r4).
+    pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
+        self.inputs.wall_seconds = Some(f);
+    }
+
     /// The `skills` rows of the client skill list (`msg-skills.md`
     /// Inputs); the other tables stay.
     pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {

@@ -906,3 +906,41 @@ mod pool {
         assert_eq!(pool.decodes(), 4);
     }
 }
+
+// Covers: specs/audio/sound-table.md §7 r4, §7 r8, §8.3 r3
+#[test]
+fn device_change_sets_start_loop_and_occlusion_without_a_log_record() {
+    // Samples 0, 1, 2, …, 9 at the output rate: one source frame per output
+    // frame.
+    let s = Sound::new(OUTPUT_RATE, 1, (0..10).collect()).unwrap();
+    let bank = FakeBank::default().with(1, "a.wav", Some(s));
+    let mut e = AudioEngine::new(
+        Box::new(bank),
+        Box::new(crate::audio::sound_table::DeviceGain),
+        Box::new(Unlimited),
+    );
+    let a = e.queue_mut().push(start(1, 1, params(255, 128, true), "a"));
+    e.queue_mut().push(Cue::Device(DeviceChange {
+        tick: 1,
+        target: a,
+        start_frame: Some(7),
+        loop_start: Some(4),
+        occlusion: 0.5f32.to_bits(),
+    }));
+    e.present(1).unwrap();
+    let out = e.mix_block();
+    // Gains: v 255, occlusion 0.5 → 127 / 255 of unity (Q8 127).
+    let g = e.voices()[0].gains();
+    assert_eq!((g.vol, g.pan_l, g.pan_r), (127, 256, 256));
+    assert_eq!(e.voices()[0].loop_start(), 4);
+    // Frames 7, 8, 9, then the loop 4 … 9.
+    let left: Vec<i16> = out.iter().step_by(2).take(10).copied().collect();
+    let scale = |x: i32| ((x * 127 * 256) >> 16) as i16;
+    let want: Vec<i16> = [7, 8, 9, 4, 5, 6, 7, 8, 9, 4]
+        .into_iter()
+        .map(scale)
+        .collect();
+    assert_eq!(left, want);
+    // Only the start is logged.
+    assert_eq!(e.log().events.len(), 1);
+}
