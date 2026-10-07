@@ -1666,6 +1666,8 @@ latter for the gate).
 
 ## 5. Local run queue
 
+- **stitch-save** (`docs/handoff/stitch-save.md`): `play --new sorceress Tester`, close; `play --save <Tester.d2s>` shows the same character; second close makes `.bak`. Record any `NOT saved` line.
+
 Ordered, copy-pasteable guide to running this queue: `docs/LOCAL-RUN.md`.
 
 Cloud sessions add checks here (command + what to look for); a local
