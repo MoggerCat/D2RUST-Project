@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 
 use d2_sim::game::Game;
 use d2_sim::tick::timer::TimerRun;
-use d2_sim::tick::{self, EventDispatch, TickHooks};
+use d2_sim::tick::{EventDispatch, TickHooks};
 use d2_sim::units::{ClientId as SimClient, RoomId, UnitId, UnitType};
 
 use super::handlers;
@@ -363,7 +363,8 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
 }
 
 impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
-    /// `d2_sim::tick::tick` with `D` as the step hooks (`tick.md` §3:
+    /// `d2_sim::tick::tick` with `D` as the step hooks, through
+    /// [`WorldHost::run_tick`] (`tick.md` §3:
     /// the wired dispatch's room, DRLG and population steps run; a
     /// dispatch without them keeps the defaults), then the host's
     /// [`WorldHost::after_tick`]. What the host's seams
@@ -374,7 +375,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
-        tick::tick(&mut self.game, &mut self.events);
+        self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
             if let Some(c) = self.client_of(unit) {

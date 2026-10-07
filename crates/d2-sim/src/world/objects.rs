@@ -479,9 +479,32 @@ pub struct Created {
 
 /// `0x0054F5D0` (§3): the init dispatch of a freshly allocated object
 /// whose unit already holds `mode` (the allocation mode). Runs before the
-/// unit is added to the world.
+/// unit is added to the world. [`create_init`] then [`create_rest`]; a
+/// caller that runs a quest init itself calls them apart, the init
+/// between them (rule 6, `quests-act1-rest.md` §9 item 7).
 #[allow(clippy::too_many_arguments)]
 pub fn create<W: ObjectWorld>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    obj: UnitId,
+    class: u16,
+    guid: u32,
+    room: Option<RoomId>,
+    mode: u8,
+    x: i32,
+    y: i32,
+) -> Result<Created, ObjectError> {
+    let created = create_init(ctl, t, w, obj, class, guid, room, mode, x, y)?;
+    create_rest(ctl, t, w, obj, mode)?;
+    Ok(created)
+}
+
+/// §3 rules 1–6: the object data, the flags, the timers and the init
+/// function this spec owns; any other init's route is returned for the
+/// caller, who runs it before [`create_rest`].
+#[allow(clippy::too_many_arguments)]
+pub fn create_init<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
@@ -505,7 +528,6 @@ pub fn create<W: ObjectWorld>(
     if mode >= MODE_BOUND {
         return Err(ObjectError::Mode(mode));
     }
-    let m0 = mode;
     // Rule 5 (class) before the record is read.
     if class >= CLASS_BOUND {
         return Err(ObjectError::Class(class));
@@ -525,6 +547,23 @@ pub fn create<W: ObjectWorld>(
     if route == Route::Here {
         run_init(ctl, t, w, obj, init_fn, room, x, y)?;
     }
+    Ok(Created {
+        init: route,
+        init_fn,
+    })
+}
+
+/// §3 rules 7–9 after the init: selectable (by the allocation mode
+/// `m0`), the `PreOperate` draw, the owner.
+pub fn create_rest<W: ObjectWorld>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    obj: UnitId,
+    m0: u8,
+) -> Result<(), ObjectError> {
+    let class = ctl.get(obj)?.class;
+    let o = t.object(class)?;
     // Rule 7.
     set_flag(w, obj, oflags::SELECTABLE, selectable(o, m0) != 0);
     // Rule 8.
@@ -533,10 +572,7 @@ pub fn create<W: ObjectWorld>(
     }
     // Rule 9.
     ctl.get_mut(obj)?.owner = Some(-1);
-    Ok(Created {
-        init: route,
-        init_fn,
-    })
+    Ok(())
 }
 
 /// The init functions this spec owns (§5).

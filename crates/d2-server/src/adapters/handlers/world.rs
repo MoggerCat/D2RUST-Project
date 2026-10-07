@@ -326,6 +326,16 @@ pub trait WorldHost<D> {
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         Vec::new()
     }
+    /// The tick's steps (`d2_sim::tick::tick` with `events` as the step
+    /// hooks); a host may lend its own parts to the hooks around them
+    /// (`WiredWorld`: the quest control, so quest object inits run inside
+    /// their allocation).
+    fn run_tick(&mut self, game: &mut Game, events: &mut D)
+    where
+        D: EventDispatch + d2_sim::tick::TickHooks,
+    {
+        d2_sim::tick::tick(game, events);
+    }
     /// Runs after the tick's steps, before its sends are taken (the
     /// quest routes the tick queued, `WiredWorld`).
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {}

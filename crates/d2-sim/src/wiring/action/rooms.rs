@@ -89,6 +89,29 @@ impl DrlgWorld {
             .find(|&r| self.subtiles(game, r).is_some_and(|t| t.contains(x, y)))
     }
 
+    /// `0x0061AED0(room, clear)` → `0x0061BAC0`
+    /// (`quests-act1-rest.md` §9 item 12): the DRLG room's flag 0x400000
+    /// (the one that makes the removal test false) set for `clear` false,
+    /// cleared for true. `false`: `room` has no DRLG room here.
+    pub fn refresh_room(&mut self, game: &Game, room: RoomId, clear: bool) -> bool {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return false;
+        };
+        let Ok(drlg) = self.act_mut(act) else {
+            return false;
+        };
+        let Some(id) = drlg.drlg_room_of(room) else {
+            return false;
+        };
+        let f = &mut drlg.room_mut(id).flags;
+        if clear {
+            *f &= !crate::drlg::room_flags::PORTAL;
+        } else {
+            *f |= crate::drlg::room_flags::PORTAL;
+        }
+        true
+    }
+
     /// Tick step 9 `0x0061A790`: the room's inactivity counter.
     pub fn room_inactivity(&mut self, game: &Game, room: RoomId) -> Result<u32, WiringError> {
         let act = game.lists.room(room).map_or(0, |r| r.act);

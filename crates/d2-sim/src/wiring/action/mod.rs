@@ -60,7 +60,9 @@ use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
 pub use monsters::MonsterWorld;
-pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall};
+pub use objects::{
+    ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
+};
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -162,6 +164,20 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// The quest control lent by the host that holds it
+    /// ([`objects::QuestObjectHost`]): a quest init, operate or object
+    /// event 7 the object module hands back runs on it at once, inside the
+    /// allocation, dispatch or event (`quests-act1-rest.md` §9 item 7).
+    /// `None`: queued for the host ([`ObjectState::route_quests`]) or
+    /// handed to [`Pending::object_route`], as before.
+    pub quest_host: Option<Box<dyn objects::QuestObjectHost<X>>>,
+    /// The quest host is running a route: routes it raises are queued and
+    /// run right after it.
+    quest_host_out: bool,
+    /// Objects allocated by [`View::allocate`] whose per-kind init waits
+    /// for the allocation's game-seed step to be written back (`None`
+    /// outside such an allocation).
+    deferred_inits: Option<Vec<UnitId>>,
     /// The unit path records and tables ([`crate::wiring::path`]).
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
@@ -207,6 +223,9 @@ impl<X> ActionHooks<X> {
             mode_target: None,
             monster_world: None,
             monster_world_out: false,
+            quest_host: None,
+            quest_host_out: false,
+            deferred_inits: None,
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),

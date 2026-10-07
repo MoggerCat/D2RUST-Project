@@ -138,7 +138,7 @@ fn tables_parse_and_check() {
 
 /// The Act V intro's own init and table (`act5::intro`) equal row 40
 /// and the table `0x00732FF8` of the TSVs (M05).
-// Covers: specs/world/quests.md §2.4, specs/world/quests-act5-2.md §9
+// Covers: specs/world/quests.md §2.4
 #[test]
 fn act5_intro_matches_its_rows() {
     use super::act5::intro;

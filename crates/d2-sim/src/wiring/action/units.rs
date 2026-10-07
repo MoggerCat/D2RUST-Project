@@ -290,6 +290,12 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
+            // Inside `View::allocate`: run once its seed step is back in
+            // the hooks (the init may allocate and draw itself).
+            if let Some(q) = self.deferred_inits.as_mut() {
+                q.push(unit);
+                return;
+            }
             View::of(sim.units, sim.stats, sim.data, self).object_init(sim.game, unit);
         }
     }
@@ -430,6 +436,7 @@ impl<X: Pending> View<'_, X> {
         y: i32,
     ) -> Option<UnitId> {
         let mut seed = self.h.game_seed;
+        let outer = self.h.deferred_inits.replace(Vec::new());
         let r = {
             let mut sim = Sim {
                 game,
@@ -440,6 +447,13 @@ impl<X: Pending> View<'_, X> {
             crate::units::lifecycle::allocate(&mut sim, &mut *self.h, &mut seed, req)
         };
         self.h.game_seed = seed;
+        // The object init is the allocation's last step (`units.md` §3.1;
+        // `quests-act1-rest.md` §9 item 7: after the unit's seed step):
+        // run it now that the step is in the hooks.
+        let inits = std::mem::replace(&mut self.h.deferred_inits, outer).unwrap_or_default();
+        for u in inits {
+            self.object_init(game, u);
+        }
         match r {
             Ok(Some(u)) => {
                 self.path_place(game, u, x, y);

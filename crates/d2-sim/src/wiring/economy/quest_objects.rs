@@ -1,4 +1,4 @@
-// Spec: specs/world/object-functions.tsv; specs/world/objects.md §3, §7.2; specs/world/quests.md §9.5; specs/world/quests-act1-rest.md §1–§3, §9; specs/world/quests-act2.md §1.5
+// Spec: specs/world/object-functions.tsv; specs/world/objects.md §3, §7.2; specs/world/quests.md §9.5; specs/world/quests-act1-rest.md §1–§3, §9; specs/world/quests-act2.md §1.5; specs/world/quests-act2-2.md §2, §3
 //! The quest routes of the object module ([`QuestObjectCall`], queued by
 //! the action wiring when the host holds the quest control,
 //! `ObjectState::route_quests`) run on the quest control: the init and
@@ -21,7 +21,12 @@
 //! come after the rest of that hook's allocations; a recording of a
 //! quest object's creation decides whether that order shows (HANDOFF §5).
 
-use crate::wiring::action::{ObjectRoute, QuestObjectCall};
+use crate::game::Game;
+use crate::items::{ItemTables, UniqueBits};
+use crate::wiring::action::{ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View};
+use crate::wiring::interaction::NpcRest;
+
+use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::{self, act1, act2, QuestControl, QuestWorld};
 
@@ -34,6 +39,64 @@ pub enum QuestObjectRun {
     /// The function's body is not stated by a quest spec, or only a part
     /// of it is (operate 34): hand the route to `Pending::object_route`.
     HandBack(ObjectRoute),
+}
+
+/// The host's quest parts lent to the action hooks for a call
+/// ([`QuestObjectHost`], `ActionHooks::quest_host`): the quest control,
+/// the quests' rest, the item tables and the unique bits. A route runs on
+/// [`HostQuests`] over an economy built from the call's view (its item
+/// store and game seed lent and written back, as `with_economy` does),
+/// without the deferred mercenary rewards (no object quest function
+/// grants one).
+pub struct QuestLoan<R> {
+    pub quests: QuestControl,
+    pub rest: R,
+    pub tables: ItemTables,
+    pub uniques: UniqueBits,
+}
+
+impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestLoan<R> {
+    fn run(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        call: QuestObjectCall,
+    ) -> Option<ObjectRoute> {
+        let h = &mut *v.h;
+        let mut fields = GameFields::from_action(
+            h.game_seed,
+            &h.ai_info,
+            v.data.expansion,
+            std::mem::take(&mut self.uniques),
+        );
+        let mut items = std::mem::take(&mut h.items);
+        let out = {
+            let mut econ = Economy {
+                game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+                hooks: &mut *v.h,
+                fields: &mut fields,
+                tables: &self.tables,
+                items: &mut items,
+            };
+            let inner = EconomyQuests::new(&mut econ, &mut self.rest);
+            let mut w = HostQuests::new(inner);
+            run(&mut self.quests, &mut w, &call)
+        };
+        v.h.items = items;
+        v.h.game_seed = fields.seed;
+        self.uniques = fields.uniques;
+        match out {
+            QuestObjectRun::Ran => None,
+            QuestObjectRun::HandBack(r) => Some(r),
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
 }
 
 /// Runs the queued routes in order; returns those handed back.
@@ -89,6 +152,10 @@ pub fn init_fn(n: u8) -> Option<u32> {
         9 => 0x0059_3FC0,
         // MalusStand (`quests-act1.md` §10.5).
         15 => 0x0054_4950,
+        // JerhynPosition → `0x0059F380` (`quests-act2-2.md` §2).
+        18 => 0x0054_48B0,
+        // JerhynPositionEx → `0x0059F440` (`quests-act2-2.md` §2).
+        19 => 0x0054_48E0,
         // TaintedAltar → `0x0059A3F0` (`quests-act2.md` §5.8).
         20 => 0x0054_4910,
         // HoradricOrifice (§8.8).
@@ -163,6 +230,8 @@ fn init<W: QuestWorld>(
         7 => act1::q4::gibbet_init(ctl, w, object),
         9 => act1::q4::tree_init(ctl, w, object),
         15 => act1::malus_init(ctl, w, object),
+        18 => act2::q4::start_jerhyn_init(ctl, w, object),
+        19 => act2::q4::palace_jerhyn_init(ctl, w, object),
         20 => act2::q3::altar_init(ctl, w, object),
         21 => act2::q6::orifice_init(ctl, w, object),
         29 => act2::q4::portal_init(ctl, w, object),
@@ -203,8 +272,9 @@ fn operate<W: QuestWorld>(
         24 => {
             act2::q3::altar_operate(ctl, w, o, player);
         }
+        // With the "no chain 13 record → 0" step (`quests-act2-2.md` §3).
         25 => {
-            act2::q6::orifice_operate(w, o, player);
+            act2::q6::orifice_operate_checked(ctl, w, o, player);
         }
         // Only the `0x0059BAF0(level)` call is stated; the rest of the
         // operate (the object spec's) is handed back.

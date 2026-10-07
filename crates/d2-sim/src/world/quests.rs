@@ -1252,6 +1252,24 @@ impl QuestControl {
         })
     }
 
+    /// An empty control with this one's tables (a placeholder while the
+    /// host lends the control out, `wiring::economy::QuestLoan`).
+    pub fn emptied(&self) -> Self {
+        Self {
+            records: Vec::new(),
+            executing: false,
+            picked: false,
+            game: QuestFlags::default(),
+            timers: Vec::new(),
+            tick: 0,
+            seed: self.seed,
+            fx: 0,
+            rows: Vec::new(),
+            messages: Vec::new(),
+            faults: Vec::new(),
+        }
+    }
+
     /// `0x00543640`: the record index of `chain`.
     pub fn find(&self, chain: u8) -> Option<usize> {
         self.records.iter().position(|r| r.chain == chain)
@@ -2135,12 +2153,6 @@ fn true_tomb_clue<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, player: Unit
 /// `0x005449E0` (§9.5): object timer event 7 by object class. The Act
 /// II–V functions are catalogued only (§11) and reported.
 pub fn object_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId, class: u16) {
-    // "Record c": no record → nothing.
-    let record = |ctl: &QuestControl, w: &mut W, chain: u8, f: u32| {
-        if ctl.find(chain).is_some() {
-            w.unhandled(chain, f);
-        }
-    };
     match class {
         // Cain's gibbet (`quests-act1-rest.md` §1.2).
         0x1A => act1::q4::gibbet_event(ctl, w, object),
