@@ -109,6 +109,10 @@ pub struct BodyFake {
     pub found: Vec<usize>,
     pub point_collide: bool,
     pub components: BTreeMap<(usize, usize), i32>,
+    /// Selected skill per (unit, left hand) (`stat_cb` tests).
+    pub sel: BTreeMap<(usize, bool), SkillEntry>,
+    /// Pettype row → skill ids (`stat_cb` tests).
+    pub pet_skills: BTreeMap<i32, Vec<i32>>,
 }
 
 impl BodyFake {

@@ -407,6 +407,12 @@ impl LearnUnits for Fake {
     fn add_skill_level(&mut self, u: usize, skill: i32, cost: i32) {
         self.log.push(format!("addskill {u} {skill} {cost}"));
     }
+    fn send_attack_reset(&mut self, u: usize) {
+        self.log.push(format!("msg21 {u}"));
+    }
+    fn point_client_updates(&mut self, u: usize) {
+        self.log.push(format!("pointupdates {u}"));
+    }
 }
 
 impl KickItems for Fake {
