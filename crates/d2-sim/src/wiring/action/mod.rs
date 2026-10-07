@@ -200,6 +200,9 @@ pub struct ActionHooks<X> {
     /// for the allocation's game-seed step to be written back (`None`
     /// outside such an allocation).
     deferred_inits: Option<Vec<UnitId>>,
+    /// Units between allocation steps 7 and 8 (`units.md` §3.1 r7.1),
+    /// with the allocation's room argument (r7.2), innermost last.
+    alloc_rooms: Vec<(UnitId, Option<crate::units::RoomId>)>,
     /// The unit path records and tables ([`crate::wiring::path`]).
     /// `None` (the default): the path seams keep their [`Pending`]
     /// answers; [`ActionHooks::enable_paths`] turns the provider on.
@@ -263,6 +266,7 @@ impl<X> ActionHooks<X> {
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,
+            alloc_rooms: Vec::new(),
             paths: None,
             bodies: None,
             handlers: BTreeMap::new(),

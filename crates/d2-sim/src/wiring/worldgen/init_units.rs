@@ -35,9 +35,13 @@ use crate::units::UnitId;
 use super::{View, WiringError, WorldHost, WorldPending, WorldgenError};
 
 impl<X: WorldPending> WorldHost<'_, X> {
-    /// The level id of the unit's room.
+    /// The level id of the unit's room: during the type init the
+    /// allocation's room (`units.md` §3.1 r7.2), the unit being in no
+    /// room until step 8.
     fn unit_room_level(&self, unit: UnitId) -> i32 {
-        self.room_of(unit).map_or(0, |r| self.room_level_id(r))
+        self.v
+            .init_room(self.game, unit)
+            .map_or(0, |r| self.room_level_id(r))
     }
 
     /// `0x00547BC0` (`population.md` §2.5) for the unit's class in its

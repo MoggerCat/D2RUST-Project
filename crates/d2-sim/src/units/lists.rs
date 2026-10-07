@@ -347,7 +347,7 @@ impl UnitLists {
     /// `SUNIT_Add` `0x00554850` (§3.1): place the unit in `room` (§5.2),
     /// insert it in its hash list (§2.1), queue it for update (§6). The
     /// GUID comes from [`GuidCounters::alloc`] or, for restored units, the
-    /// caller (§1.4).
+    /// caller (§1.4). [`Self::reserve_unit`] then [`Self::link_unit`].
     pub fn add_unit(
         &mut self,
         ty: UnitType,
@@ -359,10 +359,26 @@ impl UnitLists {
             self.room(r).ok_or(ListError::UnknownRoom(r))?;
         }
         // Checked first so a fatal duplicate leaves no partial insert.
+        self.check_guid_free(ty, guid)?;
+        let id = self.reserve_unit(ty, guid, allied);
+        self.link_unit(id, room)?;
+        Ok(id)
+    }
+
+    /// The fatal duplicate GUID of `SUNIT_Add` (§2.1), tested alone.
+    pub fn check_guid_free(&self, ty: UnitType, guid: u32) -> Result<(), ListError> {
         if self.hash_bucket_of(ty, guid).any(|(_, e)| e.guid == guid) {
             return Err(ListError::DuplicateGuid { ty, guid });
         }
-        let id = UnitId(self.units.insert(UnitEntry {
+        Ok(())
+    }
+
+    /// A unit entry in no list (`sim/units.md` §3.1 r7.1: the record
+    /// between allocation and `SUNIT_Add`): no room, not in its hash
+    /// list or the update queue, so hash lookups do not find it. It owns
+    /// timers like any entry. [`Self::link_unit`] adds it.
+    pub fn reserve_unit(&mut self, ty: UnitType, guid: u32, allied: bool) -> UnitId {
+        UnitId(self.units.insert(UnitEntry {
             ty,
             guid,
             allied,
@@ -371,13 +387,26 @@ impl UnitLists {
             room_next: None,
             update_next: None,
             queued: false,
-        }));
+        }))
+    }
+
+    /// The list part of `SUNIT_Add` for a [`Self::reserve_unit`] entry:
+    /// room insert (§5.2), hash insert (§2.1), update queue (§6).
+    pub fn link_unit(&mut self, id: UnitId, room: Option<RoomId>) -> Result<(), ListError> {
+        let (ty, guid) = {
+            let e = self.unit_ok(id)?;
+            (e.ty, e.guid)
+        };
+        if let Some(r) = room {
+            self.room(r).ok_or(ListError::UnknownRoom(r))?;
+        }
+        self.check_guid_free(ty, guid)?;
         if let Some(r) = room {
             self.room_insert(id, r)?;
         }
         self.hash_insert(id);
         self.queue_update(id)?;
-        Ok(id)
+        Ok(())
     }
 
     /// The list part of unit removal `0x00555580` (§3.2): room list and
