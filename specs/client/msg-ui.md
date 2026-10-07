@@ -8,7 +8,8 @@
   way; their UI consumers' display rules are PC 2's (`ui/*`).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::bridge` handlers for 0x5D, 0x63, 0x77,
-  0x26, 0x27, 0x4E, 0x4F, 0x50, 0x58, 0x78, 0x8A, 0x91;
+  0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5E, 0x78, 0x8A, 0x91,
+  0x9B;
   their outputs are applied by `d2-client::ui::original`.
 - **Related specs:** `client/bridge.md` §10 (output channel);
   `client/model.md` §1 (model fields), §2 (unit sets); `ui/panels.md` §2
@@ -22,31 +23,35 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–66 |
-| Inputs | 67–74 |
-| Outputs / state changes | 75–85 |
-| Rules | 86–87 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 88–160 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 161–184 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 185–222 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 223–273 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 274–293 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 294–306 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 307–330 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 331–350 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 351–369 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 370–380 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 381–389 |
-| Constants & data dependencies | 390–401 |
-| Randomness | 402–406 |
-| Edge cases & original bugs | 407–418 |
-| Test vectors | 419–455 |
-| Provenance | 456–485 |
-| Open questions | 486–518 |
+| Summary | 56–71 |
+| Inputs | 72–79 |
+| Outputs / state changes | 80–92 |
+| Rules | 93–94 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 95–167 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 168–191 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 192–229 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 230–280 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 281–300 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 301–313 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 314–337 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 338–357 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 358–376 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 377–387 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 388–396 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 397–406 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 407–417 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 418–425 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 426–436 |
+| Constants & data dependencies | 437–448 |
+| Randomness | 449–453 |
+| Edge cases & original bugs | 454–465 |
+| Test vectors | 466–505 |
+| Provenance | 506–538 |
+| Open questions | 539–578 |
 <!-- /index -->
 
-Owned ids: 0x26, 0x27, 0x4E, 0x4F, 0x50, 0x58, 0x5D, 0x63, 0x77, 0x78,
-0x8A, 0x91.
+Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
+0x63, 0x77, 0x78, 0x8A, 0x91, 0x9B.
 
 ## Summary
 
@@ -80,7 +85,9 @@ layer.
 - Outputs: `QuestUi` (0x5D), `WaypointMenu` (0x63), `TradeAction`
   (0x77), `ChatLine` (0x26), `NpcText` (0x27), `HireOffer` (0x4E),
   `HireListReset` (0x4F), `QuestSpecial` (0x50), `OpenUi` (0x58),
-  `NpcInteract` (0x8A), `NpcIntro` (0x91), `TradePartner` (0x78), each
+  `NpcInteract` (0x8A), `NpcIntro` (0x91), `TradePartner` (0x78),
+  `GameQuestFlags` (0x29), `QuestLog` (0x52), `QuestAvailability`
+  (0x5E), `MercRevive` (0x9B), each
   applied by the UI layer.
 
 ## Rules
@@ -387,6 +394,46 @@ layer.
    text into `[0x007C0E84]` (`0x00526F20`); `[0x007C0E60]` := GUID (the
    partner §3 code 0x0A plays its sound on).
 
+### 12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`)
+
+1. Layout (97 bytes; server `0x0053D700`, `world/quests.md` §1): the
+   game's quest record, 96 bytes @1. Model state written: none. One
+   `GameQuestFlags` output {96 bytes}.
+2. The UI layer: the game quest record `[0x007C0D47]` := the 96 bytes
+   (`0x0065C4D0(record, bytes, 0x60, 0)`, the quest-record load of
+   `world/quests.md` §1). The player's record `[0x007C0D43]` (read by
+   §1 r7, §2 r2.3, §9) is written by 0x28 (open question 4).
+
+### 13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`)
+
+1. Layout (42 bytes; server `0x0053D840`): 41 status bytes @1, one per
+   quest-log entry (§1 r6). Model state written: none. One `QuestLog`
+   output {41 bytes}.
+2. The UI layer: bytes 0–41 of the message are copied to `0x007BF355`
+   (so entry i's status byte `[0x007BF356 + i]` := byte @1+i);
+   `[0x007BF2B0]` := 0; then, when `0x00483350()` is 0: latch
+   `[0x007BF298]` = 2 → `0x004A23D0`; and `0x004A3220([0x007C0255],
+   1)` (the act tab shown). The quest log: `ui/*` (PC 2).
+
+### 14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`)
+
+1. Layout (38 bytes; server `0x0053D830`): 37 bytes @1. Model state
+   written: none. One `QuestAvailability` output {37 bytes}.
+2. The UI layer: `[0x007C0EA4..0x007C0EC8]` := the 37 bytes,
+   `[0x007C0ECC]` := 1. Their meaning: `ui/*` (PC 2) and
+   `world/quests.md`.
+
+### 15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`)
+
+1. Layout (7 bytes; server `0x0053E0E0`, `world/npc.md` §7.3): u16@1,
+   u16@3 (the handler reads 16 bits; the sender writes u32@3). Model
+   state written: none. One `MercRevive` output {u16@1, u16@3}.
+2. The UI layer: `[0x00725494]` := u16@1 (−1: the hireling is alive,
+   `ui/panels.md` §14), `[0x007C0DD0]` := u16@3; when u16@1 = 0xFFFF,
+   `0x004B6440` runs with EAX = 11, 8, 24, 21, 43 in that order (each
+   with stack argument 0; the NPC-menu Resurrect edit of `ui/panels.md`
+   §14).
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -452,6 +499,9 @@ Synthetic unless a recording is named ("A" = `-015956`, "B" =
 | `58 ffffffff 02 00` | handler error (fatal 0x354) | §8 r2 |
 | `8a 01 07000000`, (1, 7) class 148 present | `NpcInteract` {(1, 7), present, 148}; UI: overlay 72 on (1, 7) when not the interact NPC | B seq 1563 |
 | `91 00 9400 ffff …` (10 × `ffff`) | `NpcIntro`; UI: intro entries of class 148 flag := 1 | §10 |
+| `29` + 96 bytes | `GameQuestFlags`; UI: `[0x007C0D47]` record loaded | §12 |
+| `52` + 41 × `00` | `QuestLog`; UI: 41 status bytes 0 | §13 |
+| `9b ffff 0000 0000` | `MercRevive`; UI: `[0x00725494]` = 0xFFFF, the five menu edits | `world/npc.md` §7.3 |
 
 ## Provenance
 
@@ -479,7 +529,10 @@ the image), `0x004A28A0`, `0x004B3340`, `0x004939B0`, `0x004B25C0`,
 0x58 `0x0045E490`, `0x004C0550` (table `0x004C05F8`), `0x004C0380`,
 `0x0063C180`, `0x0063AAF0`; 0x8A `0x0045EA40`, `0x004B3380`,
 `0x004AE130`, `0x004649D0`, `0x004B3360`; 0x91 `0x0045E580`,
-`0x004B3510`; 0x78 `0x0045E810`, `0x004B9010`. Classes 331, 534 and
+`0x004B3510`; 0x78 `0x0045E810`, `0x004B9010`; 0x29 `0x0045D3A0`,
+`0x004B2620`; 0x52 `0x0045CC00`, `0x004A40D0`; 0x5E `0x0045E570`,
+`0x004B92B0`; 0x9B `0x0045EAC0`, `0x004B6980`; 0x28 (open question 4)
+`0x0045D370`, `0x004B6DD0`. Classes 331, 534 and
 object 318 from `patch_d2` `monstats.txt` / `objects.txt`. Recorded:
 0x27 × 7 (A), 0x8A (A, B).
 
@@ -496,7 +549,14 @@ object 318 from `patch_d2` `monstats.txt` / `objects.txt`. Recorded:
    (Phase 6 quest-log spec).
 4. The client quest flags record `[0x007C0D43]`: which messages write it
    (0x28 / 0x29 / 0x52 / 0x5E are unowned) — needed by §1 r7 and §2
-   r2.3.
+   r2.3. *Partly answered* (§12–§14): 0x29 writes the game record
+   `[0x007C0D47]`, 0x52 and 0x5E write quest-log bytes, not the record.
+   `[0x007C0D43]` is written by 0x28 (`0x0045D370` → `0x004B6DD0`: type
+   6, and the NPC-interaction path with a unit, both
+   `0x0065C4D0([0x007C0D43], bytes @7, 0x60, 0)`); 0x28 stays unowned:
+   its NPC path also writes the model (unit flag +0xC4 bit 2, the unit's
+   path `0x00648730`, a send `0x004786A0`) between UI calls, so its
+   split into model part and output needs that path read in full.
 5. The trade helpers `0x004B8BF0`, `0x004B85E0`, `0x004B8AD0`,
    `0x00489360`, `0x004897E0`, `0x00487B30` (trade screen; out of Phase
    0–6 single-player scope except code 0x0C's close path).

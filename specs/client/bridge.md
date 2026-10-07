@@ -44,13 +44,13 @@
 |   7. Bevy mirror | 234–252 |
 |   8. Frame pacing | 253–273 |
 |   9. Versioning | 274–284 |
-|   10. Client outputs (bridge → UI and audio) | 285–357 |
-| Constants & data dependencies | 358–372 |
-| Randomness | 373–376 |
-| Edge cases & original bugs | 377–385 |
-| Test vectors | 386–416 |
-| Provenance | 417–427 |
-| Open questions | 428–463 |
+|   10. Client outputs (bridge → UI and audio) | 285–361 |
+| Constants & data dependencies | 362–376 |
+| Randomness | 377–380 |
+| Edge cases & original bugs | 381–389 |
+| Test vectors | 390–420 |
+| Provenance | 421–431 |
+| Open questions | 432–467 |
 <!-- /index -->
 
 ## Summary
@@ -352,6 +352,10 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `TradePartner` | name 16 bytes, GUID u32 | 0x78 | UI | `client/msg-ui.md` §11 |
 | `NpcInteract` | unit key; present; class; monster-data +0x3C; blocker-open flag | 0x8A | UI | `client/msg-ui.md` §9 |
 | `NpcIntro` | 12 class slots u16 | 0x91 | UI | `client/msg-ui.md` §10 |
+| `GameQuestFlags` | 96 bytes | 0x29 | UI | `client/msg-ui.md` §12 |
+| `QuestLog` | 41 bytes | 0x52 | UI | `client/msg-ui.md` §13 |
+| `QuestAvailability` | 37 bytes | 0x5E | UI | `client/msg-ui.md` §14 |
+| `MercRevive` | u16, u16 | 0x9B | UI | `client/msg-ui.md` §15 |
 | `SkillEvent` | unit key, skill, level, target key or point, w | 0x99, 0x9A | effects | `client/msg-skills.md` §7 |
 | `SkillDo` | unit key, target key or none, skill, level, x, y, v | 0xA3 | effects | `client/msg-skills.md` §8 |
 
