@@ -1,13 +1,12 @@
-// Spec: specs/combat/damage.md §7.1, §7.2; specs/combat/vitals.md §4.2, §4.3; specs/sim/units.md §4.6
+// Spec: specs/combat/damage.md §7.1, §7.2; specs/combat/vitals.md §4.2–§4.5; specs/sim/units.md §4.6
 //! The reaction `0x0057CEE0` after a hit and the kill `0x0057CCB0`
 //! (`damage.md` §7), as far as the spec states them: an uninterruptible
 //! defender (state 54) only gets `death_delay` (92) when the hit will
 //! kill it; a monster defender the hit will kill (result 2) is killed:
 //! the kill's guards, its death mode change toward the attacker
 //! (`units.md` §4.6, the death start `0x005A6FF0` through
-//! [`Pending::monster_death_start`]) and the attacker's experience
-//! (`vitals.md` §4.2–§4.3 through
-//! [`crate::wiring::interaction::vitals::kill_experience`]).
+//! [`Pending::monster_death_start`]) and the experience distribution
+//! (`vitals.md` §4.4, [`distribute`]).
 //!
 //! Everything §7 checks at call level only stays a seam:
 //! [`Pending::reaction`] (town rule, hit class store, the player
@@ -15,12 +14,12 @@
 //! changes) and [`Pending::kill_step`] (pet credit, attacker
 //! bookkeeping, facing, quest kill, barricade doors).
 
+use crate::combat::vitals::experience::{distribute, ExpShare};
 use crate::combat::vitals::VitalsUnits;
 use crate::combat::DamageRecord;
 use crate::stats::states::state;
-use crate::units::modes::monster_mode;
+use crate::units::modes::{monster_mode, player_mode};
 use crate::units::{UnitId, UnitType};
-use crate::wiring::interaction::vitals::kill_experience;
 
 use super::combat::CombatView;
 use super::units::STATE_DEATH_DELAY;
@@ -62,24 +61,33 @@ pub fn reaction<X: Pending>(
     }
 }
 
-/// The kill `0x0057CCB0`(game, defender, attacker, 1) of a monster
-/// (`damage.md` §7.2): nothing for a monster already dying or dead
-/// (DT, DD) or not `killable` (nor for other unit types: the player
-/// kill belongs to the reaction's player branch); else the steps in the spec's order, the
-/// death mode change (`0x005A7C20` with mode DT and the attacker as
-/// target) among them.
+/// Unit flag 0x04000000: no experience for this victim (`damage.md`
+/// §7.2 step 2, `0x005A4EF0`).
+pub const UNIT_FLAG_NO_EXPERIENCE: u32 = 0x0400_0000;
+
+/// The kill `0x0057CCB0(game, D, A, 1)` (`damage.md` §7.2):
 ///
-/// TODO(damage.md OQ7, vitals.md OQ2): where the experience is given in
-/// the kill is not stated (D2MOO structure); it is given last, to the
-/// attacker as [`kill_experience`] computes it (players only, no pet
-/// credit, party share or `ExpRatio`). No draw is involved, so only the
-/// order of its stat writes against the other steps can differ.
+/// 1. Guards: a player victim in mode 0 or 17, a monster in mode 0 or 12
+///    or not `killable`, any other type → stop. A monster victim then
+///    gets the pet death bookkeeping `0x005751A0` (flag 1).
+/// 2. The experience distribution `0x0057E990` (`vitals.md` §4.4) unless
+///    D has unit flag 0x04000000; the arena kill event `0x0053F720`. The
+///    call `0x0066A220(A, D's class)` is an empty stub (`ret 8`) and is
+///    omitted.
+/// 3. A monster victim: the death mode request toward A, the quest kill
+///    parse unless D has unit flag 0x80000000, the barricade doors.
 pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
     let Some(r) = cv.v.units.get(d) else {
         return;
     };
-    let (ty, class, mode) = (r.ty, r.class, r.mode);
+    let (ty, class, mode, flags) = (r.ty, r.class, r.mode, r.flags);
+    // Step 1.
     match ty {
+        UnitType::Player => {
+            if mode == player_mode::DT || mode == player_mode::DD {
+                return;
+            }
+        }
         UnitType::Monster => {
             if mode == monster_mode::DT || mode == monster_mode::DD {
                 return;
@@ -93,23 +101,32 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
             {
                 return;
             }
+            // `hirelings.md` §8 rule 1: flag 1 here, so a hireling with a
+            // player owner gets `0x005751A0` (on the host that holds the
+            // hireling lists, `ActionHooks::pet_deaths`); the other pet
+            // types stay on the seam.
+            if let Some(q) = cv.v.h.pet_deaths.as_mut() {
+                q.push(d);
+            }
+            let game = &mut *cv.game;
+            cv.v.h.x.kill_step(game, KillStep::PetCredit, d, a);
         }
-        // The player kill (§7.1 "will die → death mode", §7.2's player
-        // guard) is the reaction's player branch: [`Pending::reaction`].
         _ => return,
     }
-    let game = &mut *cv.game;
-    // `hirelings.md` §8 rule 1: flag 1 here, so a hireling with a player
-    // owner gets `0x005751A0` (on the host that holds the hireling
-    // lists, `ActionHooks::pet_deaths`); the other pet types stay on the
-    // seam.
-    if let Some(q) = cv.v.h.pet_deaths.as_mut() {
-        q.push(d);
+    // Step 2: A is present at every caller here.
+    if flags & UNIT_FLAG_NO_EXPERIENCE == 0 {
+        if let Some(t) = cv.v.h.vitals.clone() {
+            distribute(&mut cv.v, &t, a, d);
+        }
     }
-    cv.v.h.x.kill_step(game, KillStep::PetCredit, d, a);
+    let game = &mut *cv.game;
     cv.v.h
         .x
         .kill_step(game, KillStep::AttackerBookkeeping, d, a);
+    if ty != UnitType::Monster {
+        return;
+    }
+    // Step 3.
     cv.v.h.x.kill_step(game, KillStep::FaceAttacker, d, a);
     cv.v.h.mode_target = Some(a);
     cv.v.monster_set_mode(game, d, monster_mode::DT);
@@ -118,8 +135,23 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
         cv.v.h.x.kill_step(game, KillStep::QuestKill, d, a);
     }
     cv.v.h.x.kill_step(game, KillStep::BarricadeDoors, d, a);
-    if let Some(t) = cv.v.h.vitals.clone() {
-        kill_experience(&mut cv.v, &t, a, d);
+}
+
+/// The distribution's world calls (`vitals.md` §4.4) on the action
+/// wiring: the credited player, the hireling share and the party stay
+/// [`Pending`] seams (single player: no party, so the solo path).
+impl<X: Pending> ExpShare for View<'_, X> {
+    fn credited_player(&self, attacker: UnitId, defender: UnitId) -> Option<UnitId> {
+        self.h.x.kill_credited_player(attacker, defender)
+    }
+    fn hireling_share(&mut self, p: UnitId, attacker: UnitId, defender: UnitId, e: i32) {
+        self.h.x.kill_hireling_share(p, attacker, defender, e);
+    }
+    fn in_party(&self, p: UnitId) -> bool {
+        self.h.x.kill_in_party(p)
+    }
+    fn party_members(&self, p: UnitId, defender: UnitId) -> Vec<UnitId> {
+        self.h.x.kill_party_members(p, defender)
     }
 }
 

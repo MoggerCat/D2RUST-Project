@@ -36,6 +36,7 @@ sh_step() { name=$1; shift; step "$name" sh -c "$*"; }
 # ---- tools job
 step "spec_index --check"      $PY tools/spec_index.py --check
 step "methods check"           $PY tools/methods.py check
+sh_step "conflict markers (+selftest)" "$PY tools/conflict_markers.py && $PY tools/conflict_markers.py --selftest"
 sh_step "coverage --check/--selftest" "$PY tools/coverage.py --check && $PY tools/coverage.py --selftest"
 sh_step "trace checkers" "
   $PY tools/trace-recorder/check_tick.py --selftest &&

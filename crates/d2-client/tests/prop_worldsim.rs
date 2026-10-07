@@ -836,7 +836,7 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
         }
         Msg::Stat(n) => bytes(&AddStatPoint {
             stat: *n % 8,
-            count_minus_one: 0,
+            repeat: 0,
         }),
         Msg::Travel(isle) => {
             let wp = fx.units().into_iter().find_map(|u| {
@@ -869,8 +869,8 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
             bytes(&BuyItem {
                 npc: fx.guid(fx.npc),
                 item: fx.guid(item),
-                mode: 0,
-                cost: 0,
+                transaction: 0,
+                client_price: 0,
             })
         }
         Msg::Sell(n) => {
@@ -880,8 +880,8 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
             bytes(&SellItem {
                 npc: fx.guid(fx.npc),
                 item: fx.guid(item),
-                tab: 0,
-                cost: 0,
+                item_mode: 0,
+                client_price: 0,
             })
         }
         Msg::Any(g) => {

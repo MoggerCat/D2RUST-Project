@@ -1,8 +1,10 @@
 # Spec: DRLG — Wall-remap table (`wall-remap.tsv`)
 
-- **Status:** draft; every value read from the 1.14d `Game.exe` file
-  image (tables `0x006EF620`, `0x006EF578`, dword `0x006EF574`). No
-  check against a recording yet (`drlg/rooms.md` open question 8).
+- **Status:** implemented: `DrlgData::wall_remap` parses this file
+  (test `wall_remap_is_the_transcribed_table` holds every test vector);
+  every value read from the 1.14d `Game.exe` file image (tables
+  `0x006EF620`, `0x006EF578`, dword `0x006EF574`). No check against a
+  recording yet (`drlg/rooms.md` open question 8).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::drlg` (`DrlgData::wall_remap`, embedded
   with `include_str!`)

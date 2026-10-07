@@ -37,6 +37,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
+use d2_client::bridge::world::MonsterClass;
 use d2_client::bridge::{Bridge, FrameReport, UnitKey};
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
@@ -1084,9 +1085,12 @@ impl Clock for Ms {
 type Link = LocalLink<Sim, ProtoSizes, PendingSession, Ms>;
 
 /// The local link, recording every S→C chunk the bridge receives.
+/// `inject` holds chunks delivered after the server's at the next
+/// receive, not recorded (Akara's add, [`akara_add`]).
 struct Tap {
     inner: Link,
     chunks: Vec<Vec<u8>>,
+    inject: Vec<Vec<u8>>,
 }
 
 impl ServerLink for Tap {
@@ -1100,10 +1104,31 @@ impl ServerLink for Tap {
         self.inner.pump()
     }
     fn receive(&mut self) -> Vec<Vec<u8>> {
-        let got = self.inner.receive();
+        let mut got = self.inner.receive();
         self.chunks.extend(got.iter().cloned());
+        got.append(&mut self.inject);
         got
     }
+}
+
+/// Akara's monster add S→C 0xAC as the client reads it
+/// (`client/msg-units.md` §1.2): mode 1, no components, no type flags, no
+/// source unit, no stat list. d2-sim does not build monster adds yet (the
+/// server-side fields past `monsters/init.md` §24 are not specified,
+/// `wiring::action::switch` module docs), so the harness delivers the
+/// add of an NPC without any of those parts; the client needs her unit
+/// for 0x28 (`client/msg-ui.md` §16 r4).
+fn akara_add(guid: u32, class: u16, (x, y): (i32, i32)) -> Vec<u8> {
+    let mut m = vec![0xAC];
+    m.extend(guid.to_le_bytes());
+    m.extend(class.to_le_bytes());
+    m.extend((x as u16).to_le_bytes());
+    m.extend((y as u16).to_le_bytes());
+    m.push(128);
+    m.push(14);
+    // Bits, low first: mode 1 (4 bits), then five 0 presence bits.
+    m.push(0x01);
+    m
 }
 
 const ALIVE: PlayerGate = PlayerGate {
@@ -1285,6 +1310,7 @@ impl Fx {
             v.set_base(player, STAT_STAMINA + 1, STAMINA);
         });
         let wp = game.lists.unit(object).unwrap().guid;
+        let npc_guid = game.lists.unit(npc).unwrap().guid;
 
         // The world host: waypoints and skills (`ActionWorld`), the NPC /
         // vendor / quest systems on the same units (`WiredWorld`).
@@ -1386,8 +1412,19 @@ impl Fx {
         let tap = Tap {
             inner: link,
             chunks: Vec::new(),
+            inject: vec![akara_add(npc_guid, class::AKARA, NPC_AT)],
         };
-        let bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        let mut bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        // Akara's class row in the client tables (an `interact` NPC), so
+        // her add creates the unit.
+        let mut tables = bridge.inputs().tables.clone();
+        tables.monsters = vec![None; usize::from(class::AKARA) + 1];
+        tables.monsters[usize::from(class::AKARA)] = Some(MonsterClass {
+            npc: true,
+            interact: true,
+            ..MonsterClass::default()
+        });
+        bridge.set_tables(tables);
         let mut fx = Fx {
             bridge,
             player,
@@ -1924,9 +1961,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // 0, result 3 (`damage.md` §5.2 steps 11–15: events 10, 9), the
     // missile removed (collide-kill). The reaction (§7.1) kills the
     // monster (§7.2): its seam steps in order, the death mode change with
-    // the player as target (mode DT 0, the death start `0x005A6FF0`), the
+    // the player as target (mode DT 0, the death start `0x005A6FF0`); the
     // player's experience (`vitals.md` §4.2: equal levels → 100) and its
-    // level-up event (§4.3).
+    // level-up event (§4.5) come in §7.2 step 2, before the arena event.
     let f_hit = fx.sim_ref().game.frame;
     assert_eq!(f_hit, f0 + 10);
     assert!(fx.missiles().is_empty());
@@ -1944,12 +1981,14 @@ fn run_with(game_seed: u32) -> Transcript {
             format!("event 9 Some({p})"),
             format!("reaction {p} {m} 0x3"),
             format!("kill PetCredit {m} {p}"),
+            // §7.2 step 2: the experience distribution, then the arena
+            // kill event.
+            format!("level up {p}"),
             format!("kill AttackerBookkeeping {m} {p}"),
             format!("kill FaceAttacker {m} {p}"),
             format!("death start {m} target Some({p})"),
             format!("kill QuestKill {m} {p}"),
             format!("kill BarricadeDoors {m} {p}"),
-            format!("level up {p}"),
         ]
     );
     assert_eq!(fx.stat(player, 13), 100);
@@ -2162,13 +2201,18 @@ fn run_with(game_seed: u32) -> Transcript {
     // stream (`items/bitstream.md`; placement from the stream is not
     // wired in the model yet). 0x47 / 0x48 name
     // the player, which the model does not hold (no 0x59): no change. The
-    // waypoint is there since the join's room switch sent its 0x51.
+    // waypoint is there since the join's room switch sent its 0x51;
+    // Akara from the harness's add (`akara_add`).
     {
-        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM, OBJECT};
+        use d2_client::bridge::world::{ItemData, ItemRecord, KindData, ITEM, MONSTER, OBJECT};
         let w = fx.bridge.world();
         assert_eq!(
             w.units.keys().copied().collect::<Vec<_>>(),
-            [UnitKey::new(OBJECT, wp), UnitKey::new(ITEM, cg)]
+            [
+                UnitKey::new(MONSTER, fx.guid(fx.npc)),
+                UnitKey::new(OBJECT, wp),
+                UnitKey::new(ITEM, cg)
+            ]
         );
         let item = &w.units[&UnitKey::new(ITEM, cg)];
         assert_eq!(item.position, None);
@@ -2190,6 +2234,7 @@ fn run_with(game_seed: u32) -> Transcript {
                         .to_vec(),
                 }),
                 flags4: false,
+                ..ItemData::default()
             })
         );
     }
@@ -2246,6 +2291,14 @@ fn run_with(game_seed: u32) -> Transcript {
         frames.last().unwrap().2,
         [npc_info, game_quests, quest_info]
     );
+    // The client holds Akara (`akara_add`): its 0x28 handler sets her flag
+    // 0x2 and queues C→S 0x2F, then the dialog branch's 0x31 slot
+    // (`client/msg-ui.md` §16 r4; OQ10 decided as A). No UI answers the
+    // branch here, so the next frame drops the slot and sends the 0x2F.
+    assert_eq!(
+        fx.bridge.world().units[&UnitKey::new(1, ng)].flag_2,
+        Some(true)
+    );
 
     // 11. Trade (C→S 0x38 action 1, `vendors.md` §4 → §3): the store
     // generated (1–3 bucklers, then the permanent cap). No message.
@@ -2258,7 +2311,7 @@ fn run_with(game_seed: u32) -> Transcript {
             item: 0,
         })],
     );
-    assert_eq!(frames.last().unwrap().1.codes, [(0x38, done)]);
+    assert_eq!(frames.last().unwrap().1.codes, [(0x2F, done), (0x38, done)]);
     assert_eq!(streams(&fx, &frames.last().unwrap().2), none);
     let store = {
         let w = &fx.sim_ref().world;
@@ -2288,8 +2341,8 @@ fn run_with(game_seed: u32) -> Transcript {
         vec![bytes(&SellItem {
             npc: ng,
             item: cg,
-            tab: 0,
-            cost: 0,
+            item_mode: 0,
+            client_price: 0,
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
@@ -2313,8 +2366,8 @@ fn run_with(game_seed: u32) -> Transcript {
         vec![bytes(&BuyItem {
             npc: ng,
             item: store_cap,
-            mode: 0,
-            cost: 0,
+            transaction: 0,
+            client_price: 0,
         })],
     );
     assert_eq!(
@@ -2474,13 +2527,11 @@ fn run_with(game_seed: u32) -> Transcript {
     // unit is not in the model); every 0x07 and 0x08 rejected (no client
     // act: this staged game sends no 0x03, fatal 0x58A / 0x59E): the
     // join's four 0x07, the warp's one and the six of its room switch,
-    // the switch's four 0x08; the NPC / quest / trade ids have no owner
-    // spec yet.
-    assert_eq!(
-        log.unowned,
-        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 2)])
-    );
-    assert_eq!(log.handled, 11);
+    // the switch's four 0x08. The NPC / quest / trade ids are handled
+    // now (`client/msg-ui.md` §5, §12, §16, §18: 0x27, 0x29, 0x28, 0x2A
+    // ×2), and Akara's harness add (0xAC) too: 11 + 6.
+    assert!(log.unowned.is_empty(), "{:?}", log.unowned);
+    assert_eq!(log.handled, 17);
     assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
     assert_eq!((log.queued, log.drained), (0, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");

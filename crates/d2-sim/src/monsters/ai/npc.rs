@@ -409,7 +409,11 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
 }
 
 /// §9.9 the command handler `0x005E6AE0`. True = handled.
-fn npc_commands<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+pub(super) fn npc_commands<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+) -> bool {
     // 1. Command 4: walk to (x, y), tries n, delay t.
     if let Some(k) = find_command(cx, u, cmd::WALK_TO, false) {
         let [_, x, y, n, t] = params(cx, u, k);
@@ -546,7 +550,11 @@ fn map_walk<W: AiHost + ?Sized>(
 }
 
 /// §9.9 the map AI `0x005E7080`. True = handled.
-fn npc_map_ai<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+pub(super) fn npc_map_ai<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+) -> bool {
     // 1.
     let Some(nodes) = cx.store.control(u).and_then(|c| c.map_ai.clone()) else {
         return false;

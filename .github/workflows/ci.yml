@@ -157,6 +157,16 @@ jobs:
     needs: [tools, clippy-core, test-sim, test-rest, client]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      # Merge-conflict markers in specs/, docs/, crates/ (docs/HANDOFF.md
+      # §8: an integration merge once committed them; the index and claim
+      # checks do not see them). Runs even when another job failed.
+      - name: Conflict markers
+        run: |
+          python3 tools/conflict_markers.py
+          python3 tools/conflict_markers.py --selftest
+
       - name: All jobs passed
         run: |
           test "${{ needs.tools.result }}" = success

@@ -147,6 +147,12 @@ pub struct ActionHooks<X> {
     pub objects: Option<ObjectState>,
     /// The object state is lent out for a call.
     objects_out: bool,
+    /// The drop state of the object code's chest drop `D(Q)`
+    /// (`treasure.md` §4, [`crate::wiring::economy::object_chest_drop`];
+    /// the `levels` rows are the object tables'). `None` (the default):
+    /// no drop (`ChestWorld::chest_drop` answers none, as before the
+    /// provider).
+    pub object_drops: Option<Box<crate::wiring::economy::DeathDrops>>,
     /// Players whose pets follow them after a placement
     /// (`path-placement.md` §10 rule 6, `0x005754B0`), for the host that
     /// holds the pet lists (`hirelings.md` §6 rule 1). `None` (the
@@ -234,6 +240,7 @@ impl<X> ActionHooks<X> {
             waypoints: BTreeMap::new(),
             objects: None,
             objects_out: false,
+            object_drops: None,
             pet_follows: None,
             pet_deaths: None,
             anim_data: None,

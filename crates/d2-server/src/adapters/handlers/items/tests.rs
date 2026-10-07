@@ -530,11 +530,22 @@ fn click(button: u16) -> [u8; 7] {
 
 const NO_BYTES: Vec<Vec<u8>> = Vec::new();
 
+/// S→C 0x3F (code 0xFF, the item's GUID, 0xFFFF) of the targeting reset
+/// (`inventory.md` §5.3: the owner, a player, is the probed unit, so
+/// every flagged item sends one).
+fn untarget(guid: u32) -> Vec<Vec<u8>> {
+    let mut m = vec![0x3F, 0xFF];
+    m.extend_from_slice(&guid.to_le_bytes());
+    m.extend_from_slice(&[0xFF, 0xFF]);
+    vec![m]
+}
+
 /// 0x2A with the cursor item: checks pass, the targeting reset clears
-/// flag 0x4 on the inventory items, the item gets page 3 and is placed
-/// by `inventory.md` §2.4 into the cube's grid (mode 0, the cursor
-/// cleared, linked after the cube); result 0, nothing sent now (the
-/// placement's message is the deferred update pass's).
+/// flag 0x4 on the inventory items (S→C 0x3F for the flagged cube), the
+/// item gets page 3 and is placed by `inventory.md` §2.4 into the cube's
+/// grid (mode 0, the cursor cleared, linked after the cube); result 0,
+/// nothing else sent now (the placement's message is the deferred update
+/// pass's).
 // Covers: specs/world/cube.md §2 r1, §2 r2, §2 r3, §2 r4
 #[test]
 fn item_to_cube_puts_the_cursor_item_in() {
@@ -543,7 +554,8 @@ fn item_to_cube_puts_the_cursor_item_in() {
     t.inventory().set_cursor(Some(ring));
     t.items().get_mut(cube).unwrap().flags |= 0x4 | flag::IDENTIFIED;
     let m = t.put_msg();
-    assert_eq!(t.frame(&m), (ResultCode::Done, NO_BYTES));
+    let sent = untarget(t.guid(cube));
+    assert_eq!(t.frame(&m), (ResultCode::Done, sent));
     assert_eq!(t.page(ring), CUBE_PAGE);
     assert_eq!(t.items().get(cube).unwrap().flags & 0x14, flag::IDENTIFIED);
     assert_eq!(t.mode(ring), 0);
@@ -562,7 +574,7 @@ fn item_to_cube_puts_the_cursor_item_in() {
 
 /// V25: the item stored in the backpack (mode 0) passes step 1 and is
 /// refused at step 3.4 → 3 after the targeting reset ran (flag 0x4
-/// cleared); nothing moves.
+/// cleared, S→C 0x3F for it); nothing moves.
 // Covers: specs/world/cube.md §2 r3, §2 r4
 #[test]
 fn item_to_cube_stored_item_is_refused() {
@@ -571,7 +583,8 @@ fn item_to_cube_stored_item_is_refused() {
     t.store(ring, 0);
     t.items().get_mut(cube).unwrap().flags |= 0x4;
     let m = t.put_msg();
-    assert_eq!(t.frame(&m), (ResultCode::Malformed, NO_BYTES));
+    let sent = untarget(t.guid(cube));
+    assert_eq!(t.frame(&m), (ResultCode::Malformed, sent));
     assert_eq!(t.page(ring), 0);
     assert_eq!(t.mode(ring), 0);
     assert_eq!(t.inventory().items(), [cube, ring]);

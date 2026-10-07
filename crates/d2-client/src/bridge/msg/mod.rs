@@ -1,29 +1,41 @@
-// Spec: specs/client/bridge-dispatch.tsv (owner rows), specs/client/model.md, specs/client/msg-units.md, specs/client/msg-stats-items.md, specs/client/msg-skills.md, specs/client/msg-ui.md, specs/audio/triggers.md (§2 r4), specs/render/lighting.md (§9.2 r4)
+// Spec: specs/client/bridge-dispatch.tsv (owner rows), specs/client/bridge.md (§6 rule 6), specs/client/model.md, specs/client/msg-units.md, specs/client/msg-stats-items.md, specs/client/msg-skills.md, specs/client/msg-ui.md, specs/audio/triggers.md (§2 r4), specs/render/lighting.md (§9.2 r4, §10 r4)
 //! The S→C handlers of the client world model, one per owned id of
 //! `bridge-dispatch.tsv`, registered in [`HANDLERS`]:
 //!
 //! - [`session`]: `client/model.md` (0x00–0x08, 0x0B);
 //! - [`pets`]: `client/model.md` §14 (0x7A, 0x81);
 //! - [`units`]: `client/msg-units.md` (unit add, remove, place, queued
-//!   movement and action messages, the local player's vitals);
-//! - [`stats_items`]: `client/msg-stats-items.md` (stats, items);
-//! - [`skills`]: `client/msg-skills.md` (0x21, 0x22, 0x23, 0x94);
-//! - [`ui`]: `client/msg-ui.md` (0x5D, 0x63, 0x77: outputs to the UI);
+//!   movement and action messages with `client/model.md` §15, the local
+//!   player's vitals, 0x09);
+//! - [`unit_misc`], [`roster`], [`states`]: `client/msg-units.md` §6–§8;
+//! - [`stats_items`], [`items`]: `client/msg-stats-items.md`;
+//! - [`skills`] (`client/msg-skills.md`);
+//! - [`ui`], [`ui_text`], [`ui_npc`], [`ui_quest`]: `client/msg-ui.md`
+//!   (outputs to the UI and their model parts);
 //! - [`sound`]: `audio/triggers.md` §2 r4 (0x2C: output to the audio);
-//! - [`lighting`]: `render/lighting.md` §9.2 r4 (0x53, the act's
-//!   environment record).
+//! - [`lighting`]: `render/lighting.md` §9.2 r4, §10 r4 (0x53, 0x89);
+//! - [`no_op`]: the `client/bridge.md` §6 rule 6 ids.
 
+pub mod items;
 pub mod lighting;
 pub mod pets;
+pub mod roster;
 pub mod session;
 pub mod skills;
 pub mod sound;
+pub mod states;
 pub mod stats_items;
 pub mod ui;
+pub mod ui_npc;
+pub mod ui_quest;
+pub mod ui_text;
+pub mod unit_misc;
 pub mod units;
 
 #[cfg(test)]
 mod tests_drlg;
+#[cfg(test)]
+mod tests_items_skills;
 #[cfg(test)]
 mod tests_model;
 #[cfg(test)]
@@ -31,9 +43,16 @@ mod tests_outputs;
 #[cfg(test)]
 mod tests_stats_items;
 #[cfg(test)]
+mod tests_ui_more;
+#[cfg(test)]
 mod tests_units;
+#[cfg(test)]
+mod tests_units_more;
 
-use super::dispatch::{Handle, Handler, HandlerError, HandlerFn, UnitHandlerFn};
+use super::dispatch::{
+    Handle, Handler, HandlerError, HandlerFn, Message, UnitHandlerFn, UnitMessage,
+};
+use super::world::ClientWorld;
 
 pub const MODEL: &str = "specs/client/model.md";
 pub const UNITS: &str = "specs/client/msg-units.md";
@@ -42,6 +61,7 @@ pub const SKILLS: &str = "specs/client/msg-skills.md";
 pub const UI: &str = "specs/client/msg-ui.md";
 pub const TRIGGERS: &str = "specs/audio/triggers.md";
 pub const LIGHTING: &str = "specs/render/lighting.md";
+pub const BRIDGE: &str = "specs/client/bridge.md";
 
 const fn general(id: u8, owner: &'static str, f: HandlerFn) -> Handler {
     Handler {
@@ -59,6 +79,22 @@ const fn unit(id: u8, f: UnitHandlerFn) -> Handler {
     }
 }
 
+/// The shared no-op handler of the `bridge.md` ids (§6 rule 6): size-0
+/// ids (never called), bare-`ret` handlers and never-produced ids.
+pub fn no_op(_: &mut ClientWorld, _: &Message<'_>) -> Result<(), HandlerError> {
+    Ok(())
+}
+
+/// The no-op of 0x17, the one `bridge.md` id with a receive-table unit
+/// handler (size 0: never called).
+pub fn no_op_unit(_: &mut ClientWorld, _: &UnitMessage<'_>) -> Result<(), HandlerError> {
+    Ok(())
+}
+
+const fn none(id: u8) -> Handler {
+    general(id, BRIDGE, no_op)
+}
+
 /// Every owned id's handler, in id order.
 pub const HANDLERS: &[Handler] = &[
     general(0x00, MODEL, session::game_loading),
@@ -70,6 +106,7 @@ pub const HANDLERS: &[Handler] = &[
     general(0x06, MODEL, session::game_exit),
     general(0x07, MODEL, session::map_reveal),
     general(0x08, MODEL, session::map_hide),
+    general(0x09, UNITS, units::assign_level_warp),
     general(0x0A, UNITS, units::remove_unit),
     general(0x0B, MODEL, session::game_handshake),
     unit(0x0C, units::queued),
@@ -77,7 +114,17 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x0E, units::queued),
     unit(0x0F, units::queued),
     unit(0x10, units::queued),
+    general(0x11, UNITS, unit_misc::unit_overlay),
+    none(0x12),
+    none(0x13),
+    none(0x14),
     general(0x15, UNITS, units::reassign_player),
+    none(0x16),
+    Handler {
+        id: 0x17,
+        owner: BRIDGE,
+        handle: Handle::Unit(no_op_unit),
+    },
     general(0x18, UNITS, units::vitals),
     general(0x19, STATS_ITEMS, stats_items::local_stat),
     general(0x1A, STATS_ITEMS, stats_items::local_stat),
@@ -90,18 +137,73 @@ pub const HANDLERS: &[Handler] = &[
     general(0x21, SKILLS, skills::update_item_oskill),
     general(0x22, SKILLS, skills::update_item_skill),
     general(0x23, SKILLS, skills::set_skill),
+    none(0x24),
+    none(0x25),
+    general(0x26, UI, ui_text::chat),
+    general(0x27, UI, ui_text::npc_text),
+    general(0x28, UI, ui_npc::quest_info),
+    general(0x29, UI, ui_quest::game_quest_flags),
+    general(0x2A, UI, ui_npc::npc_transaction),
+    none(0x2B),
     general(0x2C, TRIGGERS, sound::play_sound),
+    none(0x2D),
+    none(0x2E),
+    none(0x2F),
+    none(0x30),
+    none(0x31),
+    none(0x32),
+    none(0x33),
+    none(0x34),
+    none(0x35),
+    none(0x36),
+    none(0x37),
+    none(0x38),
+    none(0x39),
+    none(0x3A),
+    none(0x3B),
+    none(0x3C),
+    none(0x3D),
+    general(0x3E, STATS_ITEMS, items::update_item_stats),
     general(0x3F, STATS_ITEMS, stats_items::use_stackable_item),
+    general(0x40, STATS_ITEMS, items::item_flags),
+    none(0x41),
     general(0x42, STATS_ITEMS, stats_items::clear_cursor),
+    none(0x43),
+    none(0x44),
+    none(0x45),
+    none(0x46),
     general(0x47, STATS_ITEMS, stats_items::relator),
     general(0x48, STATS_ITEMS, stats_items::relator),
+    none(0x49),
+    none(0x4A),
+    none(0x4B),
     unit(0x4C, units::queued),
     unit(0x4D, units::queued),
+    general(0x4E, UI, ui_npc::hire_offer),
+    general(0x4F, UI, ui_npc::hire_list_reset),
+    general(0x50, UI, ui_quest::quest_special),
     general(0x51, UNITS, units::assign_object),
+    general(0x52, UI, ui_quest::quest_log),
     general(0x53, LIGHTING, lighting::darkness),
+    none(0x54),
+    none(0x55),
+    none(0x56),
+    general(0x57, UNITS, unit_misc::npc_enchants),
+    general(0x58, UI, ui_quest::open_ui),
     general(0x59, UNITS, units::assign_player),
+    general(0x5A, UI, ui_text::event_text),
+    general(0x5B, UNITS, roster::player_joined),
+    general(0x5C, UNITS, roster::player_left),
     general(0x5D, UI, ui::quest_status),
+    general(0x5E, UI, ui_quest::quest_availability),
+    general(0x5F, UNITS, unit_misc::portal_flags),
+    general(0x60, UNITS, unit_misc::town_portal_state),
+    general(0x61, UI, ui_text::act_video),
+    general(0x62, UI, ui_npc::dialog_end),
     general(0x63, UI, ui::waypoint_menu),
+    none(0x64),
+    general(0x65, UNITS, roster::player_kill_count),
+    none(0x66),
     unit(0x67, units::queued),
     unit(0x68, units::queued),
     unit(0x69, units::queued),
@@ -114,15 +216,58 @@ pub const HANDLERS: &[Handler] = &[
     unit(0x70, units::no_effect),
     unit(0x71, units::no_effect),
     unit(0x72, units::no_effect),
+    general(0x73, UNITS, unit_misc::client_missile),
+    general(0x74, UNITS, unit_misc::player_corpse_assign),
+    general(0x76, UI, ui_text::overhead_clear),
     general(0x77, UI, ui::trade_action),
+    general(0x78, UI, ui_text::trade_partner),
     general(0x7A, MODEL, pets::pet_action),
+    general(0x7B, UI, ui_text::hotkey),
+    general(0x7C, STATS_ITEMS, items::use_scroll),
+    general(0x7D, STATS_ITEMS, items::set_item_state),
+    general(0x7E, UNITS, unit_misc::common_cof),
+    none(0x80),
     general(0x81, MODEL, pets::assign_merc),
+    general(0x82, UNITS, roster::portal_ownership),
+    none(0x83),
+    none(0x84),
+    none(0x85),
+    none(0x86),
+    none(0x87),
+    none(0x88),
+    general(0x89, LIGHTING, lighting::unique_event),
+    general(0x8A, UI, ui_npc::npc_interact),
+    general(0x8E, UNITS, roster::corpse_assign),
+    general(0x91, UI, ui_npc::npc_intro),
+    general(0x92, STATS_ITEMS, items::remove_items_display),
+    general(0x93, SKILLS, skills::skill_bonus),
     general(0x94, SKILLS, skills::base_skill_levels),
     general(0x95, UNITS, units::vitals),
     general(0x96, UNITS, units::vitals),
+    general(0x97, STATS_ITEMS, items::weapon_switch),
+    general(0x98, UNITS, unit_misc::monster_f40),
+    general(0x99, SKILLS, skills::skill_event_unit),
+    general(0x9A, SKILLS, skills::skill_event_point),
+    general(0x9B, UI, ui_npc::merc_revive),
     general(0x9C, STATS_ITEMS, stats_items::item_action),
     general(0x9D, STATS_ITEMS, stats_items::item_action),
+    general(0x9E, STATS_ITEMS, items::merc_stat),
+    general(0x9F, STATS_ITEMS, items::merc_stat),
+    general(0xA0, STATS_ITEMS, items::merc_stat),
+    general(0xA1, STATS_ITEMS, items::merc_stat),
+    general(0xA2, STATS_ITEMS, items::merc_stat),
+    general(0xA3, SKILLS, skills::skill_do),
+    general(0xA4, UNITS, unit_misc::baal_wave),
+    general(0xA5, SKILLS, skills::skill_end),
+    general(0xA6, STATS_ITEMS, items::item_table_entry),
+    general(0xA7, UNITS, states::delayed_or_end_state),
+    general(0xA8, UNITS, states::set_state),
+    general(0xA9, UNITS, states::delayed_or_end_state),
+    general(0xAA, UNITS, states::add_unit_states),
+    general(0xAB, UNITS, unit_misc::npc_heal),
     general(0xAC, UNITS, units::assign_monster),
+    none(0xAD),
+    none(0xB1),
 ];
 
 /// Little-endian field reads with a handler error for a short message.

@@ -3258,7 +3258,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x1F, name: "SetStatDword", size: SizeRule::Fixed(6), layout: &[Field { name: "stat", ty: FieldType::U8, offset: Some(1) }, Field { name: "value", ty: FieldType::U32, offset: Some(2) }], senders: &[0x0053BE40, 0x0053E9B0], client_handler: Some(0x0045D780), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x20, name: "StatUpdate", size: SizeRule::Fixed(10), layout: &[], senders: &[0x0053C1D0], client_handler: Some(0x0045D880), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x21, name: "UpdateItemOSkill", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053C4A0], client_handler: Some(0x0045DCD0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x22, name: "UpdateItemSkill", size: SizeRule::Fixed(12), layout: &[], senders: &[0x0053C520], client_handler: Some(0x0045DDB0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x22, name: "UpdateItemSkill", size: SizeRule::Fixed(12), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "unit", ty: FieldType::U32, offset: Some(3) }, Field { name: "skill", ty: FieldType::U16, offset: Some(7) }, Field { name: "quantity", ty: FieldType::U8, offset: Some(9) }, Field { name: "body_state", ty: FieldType::U8, offset: Some(11) }], senders: &[0x0053C520], client_handler: Some(0x0045DDB0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x23, name: "SetSkill", size: SizeRule::Fixed(13), layout: &[Field { name: "type", ty: FieldType::U8, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(2) }, Field { name: "hand", ty: FieldType::U8, offset: Some(6) }, Field { name: "skill", ty: FieldType::U16, offset: Some(7) }, Field { name: "item", ty: FieldType::U32, offset: Some(9) }], senders: &[0x0053C590], client_handler: Some(0x0045DE10), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x24, name: "Unknown24", size: SizeRule::Fixed(90), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x25, name: "Unknown25", size: SizeRule::Fixed(90), layout: &[], senders: &[], client_handler: Some(0x0045C900), client_unit_handler: None, produced_by: ProducedBy::None, confirmed: Confirmed::Yes },
@@ -4332,6 +4332,53 @@ pub mod server {
         /// The message bytes; unlisted bytes are 0.
         pub fn encode(&self) -> [u8; 6] {
             let mut b = [0; 6];
+            self.write(&mut b);
+            b
+        }
+    }
+
+    /// 0x22 UpdateItemSkill (12 bytes).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct UpdateItemSkill {
+        /// `u8` at 1.
+        pub type_: u8,
+        /// `u32` at 3.
+        pub unit: u32,
+        /// `u16` at 7.
+        pub skill: u16,
+        /// `u8` at 9.
+        pub quantity: u8,
+        /// `u8` at 11.
+        pub body_state: u8,
+    }
+
+    impl FixedMessage for UpdateItemSkill {
+        const ID: u8 = 0x22;
+        const SIZE: usize = 12;
+        fn decode(b: &[u8]) -> Result<Self, DecodeError> {
+            check(b, Self::ID, Self::SIZE)?;
+            Ok(Self {
+                type_: u8_at(b, 1),
+                unit: u32_at(b, 3),
+                skill: u16_at(b, 7),
+                quantity: u8_at(b, 9),
+                body_state: u8_at(b, 11),
+            })
+        }
+        fn write(&self, out: &mut [u8]) {
+            start(out, Self::ID, Self::SIZE);
+            put_u8(out, 1, self.type_);
+            put_u32(out, 3, self.unit);
+            put_u16(out, 7, self.skill);
+            put_u8(out, 9, self.quantity);
+            put_u8(out, 11, self.body_state);
+        }
+    }
+
+    impl UpdateItemSkill {
+        /// The message bytes; unlisted bytes are 0.
+        pub fn encode(&self) -> [u8; 12] {
+            let mut b = [0; 12];
             self.write(&mut b);
             b
         }

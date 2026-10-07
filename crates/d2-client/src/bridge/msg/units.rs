@@ -1,4 +1,4 @@
-// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, §11, §12 rules 2–3, §14 rule 4, Randomness), specs/sim/unit-order.md (§5 rule 6)
+// Spec: specs/client/msg-units.md, specs/client/model.md (§2 rule 6, §8, §11, §12 rules 2–3, §14 rule 4, §15, Randomness), specs/sim/unit-order.md (§5 rule 6)
 //! Unit messages: add (0x59 players, 0xAC monsters, 0x51 objects),
 //! remove (0x0A), re-place (0x15), the queued movement and action
 //! messages (0x0C–0x10, 0x4C, 0x4D, 0x67–0x72: a position check, then a
@@ -16,6 +16,7 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::output::{Output, ShrineFxKind};
 use super::super::skills::SkillList;
 use super::super::world::{
     ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
@@ -103,7 +104,7 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     name.copy_from_slice(b.slice(6, 16)?);
     u.kind = KindData::Player(PlayerData {
         name,
-        cursor_item: None,
+        ..PlayerData::default()
     });
     c.add(w);
     Ok(())
@@ -260,6 +261,7 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         u.mode = u32::from(b.u8(0xC)?);
         u.kind = KindData::Object(ObjectData {
             interact: b.u8(0xD)?,
+            ..ObjectData::default()
         });
     } else {
         // TODO(spec: msg-units.md §1.2 rule 2): types 0, 3, 4, 5 take
@@ -269,6 +271,28 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
             "msg-units.md §1.3 rule 2: 0x51 for a unit type other than 2",
         ));
     }
+    c.add(w);
+    Ok(())
+}
+
+/// 0x09 AssignLevelWarp (§7 r1): type u8@1, GUID u32@2, class u8@6,
+/// x u16@7, y u16@9. Created with the common fields (the room seed
+/// step at a point other than (0, 0)) and added; the kind inits are not
+/// modelled (the model of §7 r1 is a unit with `class` and `position`).
+/// TODO(spec: msg-units.md §7 r1): `0x00470B70` for a type-1 unit (no
+/// 1.14d sender passes type 1).
+pub fn assign_level_warp(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+    let b = Bytes(msg.bytes);
+    if msg.bytes.len() != 11 {
+        return Err(HandlerError::Invalid("0x09 is 11 bytes"));
+    }
+    let ty = b.u8(1)?;
+    if ty > 5 {
+        return Err(HandlerError::Invalid("0x09: unit type past 5"));
+    }
+    let key = UnitKey::new(ty, b.u32(2)?);
+    let (x, y) = (b.u16(7)?, b.u16(9)?);
+    let c = create(w, key, u32::from(b.u8(6)?), x, y)?;
     c.add(w);
     Ok(())
 }
@@ -464,9 +488,13 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
         let (x, y) = (b.u16(xo)?, b.u16(yo)?);
         check(w, msg.inputs, msg.unit, x, y, 0, 0, 0)?;
     }
-    // Rule 2 (0x0D, type 0): the party roster's life percent.
-    // TODO(spec: msg-units.md open question 4): the roster is the 0x5B
-    // owner's; not in the model.
+    // Rule 2 (0x0D, type 0): the party roster's life percent (§8 r6).
+    if msg.id == 0x0D && msg.unit.unit_type == PLAYER {
+        let life = b.u8(0xC)?;
+        if let Some(i) = w.roster_find(msg.unit.guid) {
+            w.roster[i].life = u32::from(life);
+        }
+    }
     if msg.id == 0x6D {
         // Rule 3: stat 328 := base(328) + 1.
         if let Some(u) = w.units.get_mut(&msg.unit) {
@@ -480,6 +508,148 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
         *slot = read(&b, f)?;
     }
     mode_request(w, msg.unit, code, record);
+    // Objects (rule 5, `model.md` §15): the shrine part of codes 3 and
+    // 0x15, after the stored request.
+    if msg.unit.unit_type == OBJECT {
+        match code {
+            3 => shrine_on_mode(w, msg)?,
+            0x15 => shrine_on_use(w, msg, record[0] as u32)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// One entry of the shrine table `0x006DA8C0` (`model.md` §15 rule 2).
+#[derive(Clone, Copy)]
+struct Shrine {
+    on_mode: bool,
+    on_use: bool,
+    overlays: [i32; 2],
+    sound: u32,
+}
+
+/// The shrine count `[0x0072779C]`.
+const SHRINES: u8 = 23;
+
+/// The shrine table (`model.md` §15 rule 2), by shrine code.
+fn shrine(code: u8) -> Shrine {
+    const N: [i32; 2] = [-1, -1];
+    let (on_mode, on_use, overlays, sound) = match code {
+        0 => (false, false, N, 0),
+        1 | 2 => (false, false, N, 0xA71),
+        3 => (false, false, N, 0xA70),
+        4 | 5 => (false, false, N, 0xA6A),
+        6 => (true, false, [0x3B, 0x39], 0xA68),
+        7 => (true, false, [0x3C, 0x39], 0xA69),
+        8 => (true, false, [0x3E, 0x39], 0xA73),
+        9 => (true, false, [0x3F, 0x3A], 0xA72),
+        10 => (true, false, [0x3D, 0x3A], 0xA74),
+        11 => (true, false, [0x40, 0x3A], 0xA75),
+        12 => (true, false, [0x41, 0x39], 0xA77),
+        13 => (true, false, [0x42, 0x3A], 0xA70),
+        14 => (true, false, [0x43, 0x3A], 0xA70),
+        15 => (true, false, [0x44, 0x39], 0xA6B),
+        16 => (false, true, N, 0xA76),
+        17 | 20 => (false, false, N, 0xA6F),
+        18 => (false, false, N, 0xA6D),
+        19 => (false, true, N, 0xA78),
+        21 => (false, true, N, 0xA6C),
+        _ => (false, true, N, 0xA6E),
+    };
+    Shrine {
+        on_mode,
+        on_use,
+        overlays,
+        sound,
+    }
+}
+
+/// The object's `objects.txt` row and its shrine code (`model.md` §15
+/// rule 1): `(is shrine, shrine data Code, ShrineFunction)`. `None` when
+/// the client tables hold no row for the class: TODO(spec:
+/// client/model.md §15 rule 1): the app supplies no `objects.txt` rows
+/// yet, so (as 0xAC without `monstats2` rows) the shrine part is
+/// skipped.
+fn shrine_facts(w: &ClientWorld, msg: &UnitMessage<'_>) -> Option<(bool, Option<u8>, u8)> {
+    let u = w.units.get(&msg.unit)?;
+    let row = msg.inputs.tables.objects.get(u.class as usize)?;
+    let data = match &u.kind {
+        KindData::Object(d) => d.shrine,
+        _ => None,
+    };
+    Some((row.subclass & 1 != 0, data, row.shrine_function))
+}
+
+/// Code 3 for an object (`model.md` §15 rule 3): after the mode change
+/// (the stored request), a shrine's on-mode function `0x004BD650`.
+fn shrine_on_mode(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerError> {
+    let Some((is_shrine, data, _)) = shrine_facts(w, msg) else {
+        return Ok(());
+    };
+    if !is_shrine {
+        return Ok(());
+    }
+    let code = data.ok_or(HandlerError::Fatal(0x37A))?;
+    if code >= SHRINES {
+        return Err(HandlerError::Fatal(0x37B));
+    }
+    let e = shrine(code);
+    if e.on_mode {
+        msg.out.push(Output::ShrineFx {
+            kind: ShrineFxKind::OnMode,
+            code,
+            object: msg.unit,
+            player: None,
+            overlays: e.overlays,
+        });
+    }
+    Ok(())
+}
+
+/// Code 0x15 for an object (`0x004BD5C0`, `model.md` §15 rule 4): r0 is
+/// the operator's GUID.
+fn shrine_on_use(
+    w: &mut ClientWorld,
+    msg: &UnitMessage<'_>,
+    operator: u32,
+) -> Result<(), HandlerError> {
+    // Step 1.
+    let Some((is_shrine, data, function)) = shrine_facts(w, msg) else {
+        return Ok(());
+    };
+    let (code, data) = if is_shrine {
+        let code = data.ok_or(HandlerError::Invalid(
+            "model.md §15 rule 4.1: a shrine without shrine data (a null read in 1.14d)",
+        ))?;
+        (code, data)
+    } else {
+        (function, None)
+    };
+    // Step 2.
+    let player = UnitKey::new(PLAYER, operator);
+    if !w.units.contains_key(&player) {
+        return Ok(());
+    }
+    // Step 3.
+    if code > 0 && code < SHRINES && shrine(code).on_use {
+        msg.out.push(Output::ShrineFx {
+            kind: ShrineFxKind::OnUse,
+            code,
+            object: msg.unit,
+            player: Some(player),
+            overlays: shrine(code).overlays,
+        });
+    }
+    // Step 4 (`0x004BD550`).
+    let code = data.ok_or(HandlerError::Fatal(0x34D))?;
+    if code >= SHRINES {
+        return Err(HandlerError::Fatal(0x34E));
+    }
+    let sound = shrine(code).sound;
+    if sound != 0 {
+        msg.out.push(Output::ShrineSound { sound, player });
+    }
     Ok(())
 }
 

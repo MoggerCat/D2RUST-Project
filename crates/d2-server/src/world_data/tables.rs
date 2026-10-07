@@ -1,9 +1,10 @@
-// Spec: specs/drlg/preset.md §5.3, §13; specs/drlg/levels.md; specs/drlg/maze.md §1; specs/drlg/outdoor-tilesub.md §1
+// Spec: specs/drlg/preset.md §5.3, §13; specs/drlg/levels.md; specs/drlg/maze.md §1; specs/drlg/outdoor-tilesub.md §1; specs/world/hirelings.md Inputs (the `hireling`, `pettype`, `experience` tables)
 //! The table views of the level types, from the fixed-up table set
 //! (`d2_data::fixup::FixedSet`): each view's own `from_tables` /
 //! `from_record`, plus the preset counts of `preset.md` §5.3 (monstats
 //! and superuniques row counts, monpreset rows and act ranges, the item
-//! class of `hdm `).
+//! class of `hdm `). Also the hireling tables of the interaction desk
+//! ([`hireling_tables`]).
 
 use d2_data::bin::BinTable;
 use d2_data::fixup::FixedSet;
@@ -14,6 +15,7 @@ use d2_sim::drlg::maze::MazeData;
 use d2_sim::drlg::outdoor::OutdoorData;
 use d2_sim::drlg::preset::{MonPresetRow, PresetData, PresetDef, PresetTables};
 use d2_sim::drlg::DrlgData;
+use d2_sim::world::hirelings::HirelingTables;
 
 use super::WorldDataError;
 
@@ -66,6 +68,23 @@ impl LevelTables {
             preset,
         })
     }
+}
+
+/// The hireling tables (`hirelings.md` Inputs: `hireling` rows, `pettype`
+/// row 7, `experience` `MaxLvl` and `ExpRatio`) from the fixed-up set,
+/// for `InteractionState::hireling_tables`. A missing or malformed table
+/// is an error (M07).
+pub fn hireling_tables(set: &FixedSet) -> Result<HirelingTables, WorldDataError> {
+    hireling_tables_by(|name| set.table(name))
+}
+
+/// [`hireling_tables`] over a table lookup.
+pub fn hireling_tables_by<'a>(
+    lookup: impl Fn(&str) -> Option<&'a BinTable>,
+) -> Result<HirelingTables, WorldDataError> {
+    let get = |name: &str| lookup(name).ok_or_else(|| table_err(name, "not loaded"));
+    HirelingTables::from_tables(get("hireling")?, get("pettype")?, get("experience")?)
+        .map_err(|e| table_err("hireling", e))
 }
 
 fn table_err(table: &str, detail: impl ToString) -> WorldDataError {

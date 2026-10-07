@@ -174,7 +174,10 @@ fn assign_object_b160() {
             37,
             Some((0x1214, 0x11C0)),
             2,
-            &KindData::Object(ObjectData { interact: 0 })
+            &KindData::Object(ObjectData {
+                interact: 0,
+                ..ObjectData::default()
+            })
         )
     );
     // Type 1: fatal 0x202.

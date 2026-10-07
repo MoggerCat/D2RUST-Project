@@ -9,8 +9,9 @@ use super::place_seams::{
 };
 use super::search::free_point;
 
-/// Exit cell type of a left warp (§12.1 rule 1); any other type is 'r'.
-pub const EXIT_LEFT: u32 = 11;
+/// Exit cell type of a left warp (§12.1 rule 1); the other type (11) is
+/// 'r'.
+pub const EXIT_LEFT: u32 = 10;
 /// Preset unit type of a warp tile (§12.1 rule 3).
 pub const TILE_UNIT_TYPE: u8 = 5;
 /// Destination levels with a quest warp gate (§12.2 rule 3).
@@ -198,10 +199,11 @@ mod tests {
             ..Drlg::default()
         };
         let v = 3 << 20 | 0x1234;
-        assert_eq!(warp_tile_preset(&mut d, 0, 11, 103, 52, v), Ok(true));
+        // Type 10 → 'l'.
+        assert_eq!(warp_tile_preset(&mut d, 0, 10, 103, 52, v), Ok(true));
         assert_eq!(d.added, [(5, 17, 0, 5 * 3 + 2, 5 * 2 - 1)]);
-        // Type 10 → 'r'.
-        assert_eq!(warp_tile_preset(&mut d, 0, 10, 100, 50, v), Ok(true));
+        // Type 11 → 'r'.
+        assert_eq!(warp_tile_preset(&mut d, 0, 11, 100, 50, v), Ok(true));
         assert_eq!(d.added[1], (5, 18, 0, 0, 4));
         // Far column or far row alone: nothing.
         assert_eq!(warp_tile_preset(&mut d, 0, 10, 108, 52, v), Ok(false));

@@ -14,7 +14,10 @@
 //! - the level of a unit in a DRLG room (`DrlgWorld::level_id`);
 //! - the player's interaction (`0x00554120` / `0x00554190`) on the
 //!   host's one owner, the NPC rest (`NpcRest`);
-//! - `0x006280D0(item, 0x10)` on an item of the game's item store.
+//! - `0x006280D0(item, 0x10)` on an item of the game's item store;
+//! - `missiles.txt` `Range` from the action tables;
+//! - the chest treasure `0x00585B90(op, kind)` on the object drop state
+//!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]).
 //!
 //! An object without object data, a unit outside a DRLG room and an item
 //! outside the store keep the rest's answer, as before.
@@ -476,8 +479,44 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     ) -> Option<UnitId> {
         self.inner.quest_drop(unit, code, quality, level, droppable)
     }
-    fn object_treasure(&mut self, object: UnitId, kind: u8) {
-        self.inner.object_treasure(object, kind)
+    /// `0x00585B90(op, kind)` on an object with object data when the
+    /// game holds the object drop state (`ActionHooks::object_drops`,
+    /// [`super::object_chest_drop`] with the object tables' `levels`).
+    fn object_treasure(&mut self, object: UnitId, operator: UnitId, kind: u8) {
+        let known = self.known(object);
+        let e = &mut *self.inner.econ;
+        let tables = e.hooks.objects.as_ref().map(|s| s.tables.clone());
+        let (true, Some(t), true) = (known, tables, e.hooks.object_drops.is_some()) else {
+            return self.inner.object_treasure(object, operator, kind);
+        };
+        let Some(mut d) = e.hooks.object_drops.take() else {
+            return;
+        };
+        // The economy holds the game's item store, game seed and unique
+        // bits for this call: hand them to the drop and take them back.
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.hooks.game_seed = e.fields.seed;
+        d.fields.uniques = std::mem::take(&mut e.fields.uniques);
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        super::object_chest_drop(
+            &mut *e.hooks,
+            &mut sim,
+            &mut d,
+            &t.levels,
+            &mut super::NoSpot,
+            object,
+            Some(operator),
+            kind,
+        );
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut d.fields.uniques);
+        e.hooks.object_drops = Some(d);
     }
     fn drop_gold(&mut self, object: UnitId) {
         self.inner.drop_gold(object)
@@ -494,8 +533,11 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     fn open_insert_dialog(&mut self, player: UnitId, object: UnitId) {
         self.inner.open_insert_dialog(player, object)
     }
+    /// `missiles.txt` `Range` (u16 +0x96) of the action tables' row
+    /// (`quests-act2.md` §8.7); a row outside the table is `None`.
     fn missile_range(&mut self, row: u32) -> Option<i32> {
-        self.inner.missile_range(row)
+        let t = &self.inner.econ.hooks.tables.missiles;
+        Some(i32::from(t.get(row as usize)?.range))
     }
     fn is_trading(&mut self, player: UnitId) -> bool {
         self.inner.is_trading(player)

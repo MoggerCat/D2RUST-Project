@@ -27,7 +27,6 @@
 //! rule 3: the link owns it; Bevy time never reaches the server). Rules,
 //! fonts, sounds and cues here are test fixtures, not original rules.
 
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -164,14 +163,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    // Sixteen applied at receive; the 0x0D waits on its unit's queue for
-    // the update pass (`client/model.md` §4, §5); 0x76, 0x7E and 0xAA
-    // have no client handler (`client/bridge.md` §6 rule 3).
-    assert_eq!((b.log().handled, b.log().queued), (16, 1));
-    assert_eq!(
-        b.log().unowned,
-        BTreeMap::from([(0x76, 1), (0x7E, 1), (0xAA, 1)])
-    );
+    // Nineteen applied at receive (0x76, 0x7E and 0xAA have owner specs
+    // and handlers now: `msg-ui.md` §22, `msg-units.md` §7, §6); the 0x0D
+    // waits on its unit's queue for the update pass (`client/model.md`
+    // §4, §5); nothing is unowned (`client/bridge.md` §6 rule 3).
+    assert_eq!((b.log().handled, b.log().queued), (19, 1));
+    assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.world().in_game, "0x04 received");
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     assert_eq!(

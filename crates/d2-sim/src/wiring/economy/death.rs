@@ -113,10 +113,10 @@ pub trait FreeSpot {
 }
 
 /// §7 step 2 with the start offset done by the caller.
-struct Spots<'s, F> {
-    inner: &'s mut F,
-    room: Option<RoomId>,
-    start: (i32, i32),
+pub(super) struct Spots<'s, F> {
+    pub(super) inner: &'s mut F,
+    pub(super) room: Option<RoomId>,
+    pub(super) start: (i32, i32),
 }
 
 /// Item size of the floor drop (§7 step 2, `path-placement.md` §9).

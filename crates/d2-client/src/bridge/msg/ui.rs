@@ -121,6 +121,7 @@ pub fn quest_status(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handle
             for u in w.units.values_mut() {
                 if u.key.unit_type == MONSTER && u.class == class {
                     u.quest_untargetable = true;
+                    u.flag_2 = Some(false);
                 }
             }
         }

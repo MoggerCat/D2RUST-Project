@@ -13,7 +13,7 @@ use d2_sim::world::waypoints::WaypointRecord;
 use super::{OriginalUi, OriginalUiError};
 use crate::audio::driver::SoundRequest;
 use crate::bridge::msg::ui::{quest_row, QuestRow};
-use crate::bridge::output::Output;
+use crate::bridge::output::{Consumer, Output};
 use crate::bridge::world::ClientWorld;
 use crate::rules::lighting::environment::act_index;
 
@@ -58,6 +58,8 @@ pub mod skip {
         "0x77 code 0x0A: the trade partner [0x007C0E60] has no writer in the specs";
     pub const NO_LOCAL_PLAYER: &str = "0x77 code 9: no local player";
     pub const TRADE_CLOSE_HELPER: &str = "0x77: the trade close helper 0x00487B30 (msg-ui OQ 5)";
+    pub const NOT_APPLIED: &str =
+        "a UI output whose dispatch (msg-ui §4–§22, msg-units §8; ui/*) is not written yet";
     pub const CUBE_CHECK: &str = "0x77: 0x00463DF0 before the inventory toggle (unspecified)";
 }
 
@@ -114,7 +116,15 @@ impl OriginalUi {
             } => self.quest_ui(chain, flags, status, extra, world),
             Output::WaypointMenu { guid, record } => self.waypoint_menu(guid, &record, world),
             Output::TradeAction { code } => self.trade_action(code, world),
-            Output::ServerSound { .. } => Ok(()),
+            // Not UI outputs (`client/bridge.md` §10 rule 5).
+            Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
+            _ if o.consumer() != Consumer::Ui => Ok(()),
+            // The UI dispatches of `client/msg-ui.md` §4–§22 and
+            // `client/msg-units.md` §8 (PC 2's `ui/*`) are not written yet.
+            _ => {
+                self.skip(skip::NOT_APPLIED);
+                Ok(())
+            }
         }
     }
 

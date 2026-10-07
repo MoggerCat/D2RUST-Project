@@ -44,14 +44,13 @@ pub enum SkillEvent {
     },
 }
 
-/// A step of the kill `0x0057CCB0` with no written body (`damage.md`
-/// §7.2 lists them at call level only), in the order the spec lists
-/// them.
+/// A step of the kill `0x0057CCB0` (`damage.md` §7.2) whose callee has
+/// no body in d2-sim, in the kill's order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KillStep {
-    /// Pet kill credit to a player owner.
+    /// Pet death bookkeeping `0x005751A0` (step 1).
     PetCredit,
-    /// Attacker bookkeeping and the arena kill event.
+    /// The arena kill event `0x0053F720` (step 2).
     AttackerBookkeeping,
     /// The death mode faces the attacker (path direction, path spec).
     FaceAttacker,
@@ -872,6 +871,24 @@ pub trait Pending {
 
     /// A step of the kill with no written body ([`KillStep`]).
     fn kill_step(&mut self, game: &mut Game, step: KillStep, defender: UnitId, attacker: UnitId) {}
+    /// `0x0057E7B0` for a monster attacker (`vitals.md` §4.4 step 2):
+    /// its owner, or the owner of a flag-0x800 stat list on A, then D.
+    /// Default: none (no experience).
+    fn kill_credited_player(&self, attacker: UnitId, defender: UnitId) -> Option<UnitId> {
+        None
+    }
+    /// `vitals.md` §4.4 step 3: player `p`'s hireling share
+    /// (`world/hirelings.md` §7.1 rule 2). Default: nothing.
+    fn kill_hireling_share(&mut self, p: UnitId, attacker: UnitId, defender: UnitId, e: i32) {}
+    /// `0x00554630(P)` ≠ 0xFFFF. Default: not in a party (single player).
+    fn kill_in_party(&self, p: UnitId) -> bool {
+        false
+    }
+    /// The party share's kept members (`vitals.md` §4.4 rule 6).
+    /// Default: P only.
+    fn kill_party_members(&self, p: UnitId, defender: UnitId) -> Vec<UnitId> {
+        vec![p]
+    }
     /// `0x005A03A0`: the monster's superunique index (hcIdx ≠ −1).
     /// Monster data (`monsters/init.md`).
     fn superunique(&self, unit: UnitId) -> Option<u16> {
