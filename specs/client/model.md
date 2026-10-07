@@ -24,33 +24,34 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–73 |
-| Inputs | 74–82 |
-| Outputs / state changes | 83–89 |
-| Rules | 90–91 |
-|   1. Model contents | 92–131 |
-|   2. Unit table | 132–177 |
-|   3. Local player | 178–200 |
-|   4. Receive and the unit message queue | 201–238 |
-|   5. Client update pass | 239–275 |
-|   6. Position check (`0x004804E0`) | 276–315 |
-|   7. Session messages | 316–392 |
-|   8. Mode requests | 393–444 |
-|   9. Room-in-sight messages | 445–479 |
-|   10. Bit reader | 480–494 |
-|   11. Current act and level (join and later) | 495–540 |
-|   12. Client DRLG and the room of a point | 541–582 |
-|   13. Visibility predicate (`0x004DBF20`) | 583–610 |
-|   14. Pet list and the hireling GUID | 611–637 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 638–704 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 705–739 |
-|   17. Model writes made by 1.14d UI code | 740–857 |
-| Constants & data dependencies | 858–870 |
-| Randomness | 871–882 |
-| Edge cases & original bugs | 883–891 |
-| Test vectors | 892–939 |
-| Provenance | 940–998 |
-| Open questions | 999–1081 |
+| Summary | 57–74 |
+| Inputs | 75–84 |
+| Outputs / state changes | 85–91 |
+| Rules | 92–93 |
+|   1. Model contents | 94–135 |
+|   2. Unit table | 136–181 |
+|   3. Local player | 182–204 |
+|   4. Receive and the unit message queue | 205–242 |
+|   5. Client update pass | 243–291 |
+|   6. Position check (`0x004804E0`) | 292–331 |
+|   7. Session messages | 332–408 |
+|   8. Mode requests | 409–493 |
+|   9. Room-in-sight messages | 494–528 |
+|   10. Bit reader | 529–543 |
+|   11. Current act and level (join and later) | 544–589 |
+|   12. Client DRLG and the room of a point | 590–631 |
+|   13. Visibility predicate (`0x004DBF20`) | 632–659 |
+|   14. Pet list and the hireling GUID | 660–686 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 687–753 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 754–788 |
+|   17. Model writes made by 1.14d UI code | 789–906 |
+|   18. Audio driver inputs and the client object functions | 907–937 |
+| Constants & data dependencies | 938–950 |
+| Randomness | 951–962 |
+| Edge cases & original bugs | 963–971 |
+| Test vectors | 972–1019 |
+| Provenance | 1020–1086 |
+| Open questions | 1087–1169 |
 <!-- /index -->
 
 ## Summary

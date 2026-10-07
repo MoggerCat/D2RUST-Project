@@ -24,16 +24,16 @@
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
 |   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–210 |
-|   3. Other item messages | 211–281 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 282–297 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 298–383 |
-| Constants & data dependencies | 384–392 |
-| Randomness | 393–396 |
-| Edge cases & original bugs | 397–416 |
-| Test vectors | 417–455 |
-| Provenance | 456–479 |
-| Open questions | 480–507 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–230 |
+|   3. Other item messages | 231–301 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 302–317 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 318–403 |
+| Constants & data dependencies | 404–412 |
+| Randomness | 413–416 |
+| Edge cases & original bugs | 417–436 |
+| Test vectors | 437–475 |
+| Provenance | 476–505 |
+| Open questions | 506–533 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,

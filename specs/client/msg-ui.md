@@ -42,19 +42,19 @@
 |   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
 |   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–519 |
 |   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 520–530 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–585 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 586–598 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 599–609 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 610–629 |
-|   20. 0x61 act video (`0x0045E660`) | 630–637 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 638–645 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 646–655 |
-| Constants & data dependencies | 656–667 |
-| Randomness | 668–672 |
-| Edge cases & original bugs | 673–689 |
-| Test vectors | 690–737 |
-| Provenance | 738–788 |
-| Open questions | 789–885 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–607 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 608–620 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 621–631 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 632–651 |
+|   20. 0x61 act video (`0x0045E660`) | 652–659 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 660–667 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 668–677 |
+| Constants & data dependencies | 678–689 |
+| Randomness | 690–694 |
+| Edge cases & original bugs | 695–711 |
+| Test vectors | 712–759 |
+| Provenance | 760–815 |
+| Open questions | 816–914 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
