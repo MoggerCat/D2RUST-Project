@@ -40,26 +40,26 @@
 | Rules | 96–97 |
 |   1. Object data and unit fields | 98–128 |
 |   2. Object control (game +0x10F0) | 129–151 |
-|   3. Creation and init dispatch (`0x0054F5D0`) | 152–176 |
-|   4. Object animation at a mode change | 177–208 |
-|   5. Init functions | 209–283 |
-|   6. Preset object classes 574–582 (`0x0054F490`) | 284–320 |
-|   7. Operate dispatch | 321–368 |
-|   8. Chests and breakables | 369–502 |
-|   9. Shrines | 503–611 |
-|   10. Doors, operate 8 (`0x00581D40`) | 612–635 |
-|   11. Wells, operate 22 (`0x005858A0`) | 636–667 |
-|   12. Portals, operate 15 (`0x00584870`) | 668–734 |
-|   13. Torch, operate 11 (`0x005843D0`) | 735–739 |
-|   14. Client messages | 740–767 |
-|   15. Not covered yet | 768–782 |
-|   16.–18. Moved | 783–789 |
-| Constants & data dependencies | 790–836 |
-| Randomness | 837–882 |
-| Edge cases & original bugs | 883–949 |
-| Test vectors | 950–988 |
-| Provenance | 989–1046 |
-| Open questions | 1047–1095 |
+|   3. Creation and init dispatch (`0x0054F5D0`) | 152–179 |
+|   4. Object animation at a mode change | 180–211 |
+|   5. Init functions | 212–286 |
+|   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
+|   7. Operate dispatch | 324–374 |
+|   8. Chests and breakables | 375–508 |
+|   9. Shrines | 509–617 |
+|   10. Doors, operate 8 (`0x00581D40`) | 618–641 |
+|   11. Wells, operate 22 (`0x005858A0`) | 642–673 |
+|   12. Portals, operate 15 (`0x00584870`) | 674–740 |
+|   13. Torch, operate 11 (`0x005843D0`) | 741–745 |
+|   14. Client messages | 746–773 |
+|   15. Not covered yet | 774–788 |
+|   16.–18. Moved | 789–795 |
+| Constants & data dependencies | 796–842 |
+| Randomness | 843–888 |
+| Edge cases & original bugs | 889–955 |
+| Test vectors | 956–994 |
+| Provenance | 995–1052 |
+| Open questions | 1053–1101 |
 <!-- /index -->
 
 ## Summary
@@ -165,6 +165,9 @@ static path are set, and **before** the unit is added to the world
 6. If table `0x00731BC0`[`InitFn`] is non-null: call it with the init
    record {game, object, room, control, objects record, x, y}
    (`object-functions.tsv`, kind `init`).
+   Null in 1.14d (`0x0054F6AE` test → skip): init 35, 36, 40, used by
+   rows 338 guild vault, 339 trophy case, 340 message board; they get
+   no init and continue at rule 7.
 7. `Selectable[M0]` ≠ 0 → flag 0x2 set, else cleared. **M0**, the mode
    before the init function, decides (edge case 1).
 8. If `PreOperate` ≠ 0 and flag 0x80 is clear: `roll(14)` on the control
@@ -342,6 +345,9 @@ Skills call §7.2 directly (`0x005C9B13`, skills spec).
    Monsters and no operator skip these tests.
 3. `OperateFn` ≥ 101 → fatal. Class 121, 122 or 22 → return 0. Table
    `0x00732D18`[`OperateFn`] null (0, 35–38, 60, 74–100) → return 0.
+   Of the tabled slots (`0x005844CF` test): operate 35 steeg stone
+   (row 337), 36 guild vault (338), 37 trophy case (339), 38 message
+   board (340); 60 has no row. Operating those rows does nothing.
 4. Call it with {game, object, operator, control, class id} and the
    `OperateFn` number; return its result.
 
