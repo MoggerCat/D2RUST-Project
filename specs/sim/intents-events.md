@@ -36,17 +36,17 @@
 |   1. Loop order (single player) | 87–108 |
 |   2. Client → server | 109–278 |
 |   3. Server → client | 279–378 |
-|   4. d2rs mapping and scope | 379–406 |
-|   5. Machine-readable tables | 407–443 |
-|   6. Exact-match comparison | 444–529 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 530–891 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 892–1008 |
-| Constants & data dependencies | 1009–1027 |
-| Randomness | 1028–1033 |
-| Edge cases & original bugs | 1034–1067 |
-| Test vectors | 1068–1131 |
-| Provenance | 1132–1207 |
-| Open questions | 1208–1264 |
+|   4. d2rs mapping and scope | 379–410 |
+|   5. Machine-readable tables | 411–447 |
+|   6. Exact-match comparison | 448–533 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 534–895 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 896–1012 |
+| Constants & data dependencies | 1013–1031 |
+| Randomness | 1032–1037 |
+| Edge cases & original bugs | 1038–1071 |
+| Test vectors | 1072–1135 |
+| Provenance | 1136–1211 |
+| Open questions | 1212–1268 |
 <!-- /index -->
 
 ## Summary
@@ -392,8 +392,12 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    Their bytes are still part of the comparison (§6).
 4. **Out of scope** (Phases 7–9 or never):
    - multiplayer only: C→S 0x5D, 0x5E (party/hostility), 0x68 (join a
-     hosted game); S→C 0x75, 0x77–0x79, 0x7F, 0x8B–0x8D, 0x90 (party,
-     trade, relations): need a second player (Phase 7 multiplayer);
+     hosted game); S→C 0x75, 0x78, 0x79, 0x7F, 0x8B–0x8D, 0x90 (party,
+     trade, relations): need a second player (Phase 7 multiplayer).
+     S→C 0x77 is a `sim` row: its builder `0x0053CAB0` (2 bytes, code
+     u8@1) has 41 call sites, among them the single-player cube paths
+     (`world/cube.md` §1: codes 0x0C, 0x11, 0x15); the trade codes are
+     the same message;
    - Battle.net / realm / anti-cheat: C→S 0x66 (warden response, handler
      does nothing), 0x6D (ping), queue 2 (0xFF); S→C 0x8F (pong), 0xAE
      (warden request), 0xAF–0xB4 (connection, game list, save download,
