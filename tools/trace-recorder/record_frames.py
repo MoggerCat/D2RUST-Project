@@ -34,7 +34,7 @@ import zlib
 
 sys.dont_write_bytecode = True
 
-TOOL = "trace-recorder record_frames 0.2.0"
+TOOL = "trace-recorder record_frames 0.2.1"
 FORMAT = "frames-raw-2"
 
 # capture.md §2: hooks and the in-game caller
@@ -89,6 +89,8 @@ CUR_LAST_STEP, CUR_IDLE_SINCE = 0x7A6AEC, 0x7A6AE8
 LIGHT_QUALITY, DRAW_RATE, LIGHT_OPT_A, LIGHT_OPT_B, RENDER_KIND = (0x7B567C, 0x7A04A8, 0x72DA50,
                                                                   0x72A348, 0x712CCC)
 RAIN_ON, SNOW_ON, LIGHTNING, FLASH, WEATHER_UPDATE = 0x7A8A44, 0x7A8A40, 0x7A89E8, 0x7BB390, 0x7A8A0C
+# render/lighting.md §12 r3 (OQ 9): the light map at frame end, 18,432 bytes
+LIGHT_MAP, LIGHT_MAP_SIZE = 0x7B0E68, 18432
 
 
 def png_bytes(width, height, pixels, palette_rgb):
@@ -186,6 +188,42 @@ def read_weather(mem):
             "flash": i32(mem, FLASH), "update": u32(mem, WEATHER_UPDATE)}
 
 
+# render/draw-order-2.md §11.1: environment pools (global -> pool; +0x110 highest used
+# index, +0x114 live count) and the weather scalars, for --weather (weather-0001)
+WEATHER_POOLS = {"particles": (0x7A8A04, 256, 0x28), "splashes": (0x7A89FC, 512, 0x18),
+                 "bubbles": (0x7A8A00, 128, 0x18)}
+WEATHER_SCALARS = {"snow_mode": 0x7A8A14, "rain_phase": 0x7A8A24, "rain_len": 0x7A8A38,
+                   "rain_countdown": 0x7A8A3C, "peak": 0x7A89C0, "target": 0x7A89E0,
+                   "intensity_f32": 0x7A89A0, "wind": 0x7A89C4, "wind_goal": 0x7A89F8,
+                   "wind_countdown": 0x7A89E4, "lightning_on": 0x7A8A08}
+POOL_HEADER = 0x118
+
+
+def read_weather_pools(mem, probe=False):
+    """draw-order-2.md §11.1: scalars, and per pool the pointer, highest used index, live
+    count and the raw header (probe: the slot layout is read from it)."""
+    out = {k: u32(mem, a) for k, a in WEATHER_SCALARS.items()}
+    for name, (glob, slots, size) in WEATHER_POOLS.items():
+        p = u32(mem, glob)
+        rec = {"ptr": f"{p:#x}"}
+        if p:
+            hdr = mem.read(p, POOL_HEADER)
+            rec["hi"], rec["live"] = struct.unpack_from("<ii", hdr, 0x110)
+            if probe:
+                rec["hdr"] = hdr.hex()
+            # header (seen 2026-10-07): name +0x00 (0x100 bytes), slot count +0x100, record
+            # size +0x104, +0x108, lowest free +0x10C, highest used +0x110, live +0x114;
+            # the records follow the header inline (+0x118)
+            rec["n"], rec["size"], rec["low"] = struct.unpack_from("<IIi", hdr, 0x100)[0:2] + \
+                struct.unpack_from("<i", hdr, 0x10C)
+            if (rec["n"], rec["size"]) == (slots, size) and 0 <= rec["hi"] < slots:
+                raw = mem.read(p + POOL_HEADER, size * (rec["hi"] + 1))
+                rec["slots"] = {i: raw[i * size:(i + 1) * size].hex() for i in range(rec["hi"] + 1)
+                                if raw[i * size:i * size + 2] != b"\0\0"}
+        out[name] = rec
+    return out
+
+
 def read_unit(mem, unit):
     """capture.md §3.5: the raw unit fields a unit draw reads (meaning: unit-composite.md)."""
     t = u32(mem, unit + U_TYPE)
@@ -280,6 +318,7 @@ def make_recorder(rt):
             self.start = None      # state read at the in-game draw entry
             self.draws = None      # draw log of the current frame, or None
             self.armed = set()
+            self.weather_pools = None
             self.meta = {"k": "capture", "images": os.path.basename(img_dir) if img_dir else None,
                          "every": every, "draws_every": draws_every, "state_key": list(STATE_KEY)}
 
@@ -370,6 +409,8 @@ def make_recorder(rt):
                   "shake": [self.u32(SHAKE_AMP), self.i32(SHAKE_DX), self.i32(SHAKE_DY)],
                   "clear_counter": self.i32(CLEAR_COUNTER), "res_mode": self.u32(RES_MODE),
                   "light": read_light(self), "weather": read_weather(self)}
+            if self.weather_pools:
+                st["weather_pools"] = read_weather_pools(self, self.weather_pools == "probe")
             view = self.u32(VIEW)
             if view:
                 st["view_rect"] = list(struct.unpack("<4i", self.read(view + 4, 16)))
@@ -391,7 +432,9 @@ def make_recorder(rt):
                 st["cursor"] = c
                 st["cursor_key"] = [c["visible"], c["type"], c["frame"] >> 8, c["x"], c["y"], c["adj"],
                                     c["item"]]
-            st["light_key"] = st["light"]["quality"]
+            # lighting.md §12 r3: the key holds the light map itself (SHA-256 at frame end) and q
+            st["light_map_sha256"] = hashlib.sha256(self.read(LIGHT_MAP, LIGHT_MAP_SIZE)).hexdigest()
+            st["light_key"] = [st["light"]["quality"], st["light_map_sha256"]]
             return st
 
         def handle(self, addr, ctx):
@@ -523,6 +566,10 @@ def main():
                     help="with --draws-every: store tile light arrays in full, not as digests")
     ap.add_argument("--no-save", action="store_true", help="hashes and state only, no PNG files")
     ap.add_argument("--allow-any-size", action="store_true", help="also capture at 640x480")
+    ap.add_argument("--weather", nargs="?", const="on", default=None, choices=["on", "probe"],
+                    help="add the weather scalars and the three environment pools to every "
+                         "captured frame (draw-order-2.md §11.1; weather-0001); probe: also the raw "
+                         "pool headers")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-frames.jsonl)")
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
@@ -544,6 +591,7 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds,
                           a.ticks, img_dir, max(1, a.every), a.max_frames, a.allow_any_size,
                           max(0, a.draws_every), a.draws_light)
+    r.weather_pools = a.weather
     try:
         r.run()
     except KeyboardInterrupt:

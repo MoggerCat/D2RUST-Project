@@ -2,8 +2,10 @@
 
 - **Status:** draft: every entry point, convention and draw site was read
   from the 1.14d disassembly (`tools/ghidra/disasm.py`, `re/exports/all.asm`);
-  the call procedure of §5 is run by `tools/trace-recorder/spawn.py`
-  (results in Test vectors).
+  the call procedure of §5 ran six times in a 1.14d single-player game
+  with `tools/trace-recorder/spawn.py` (normal, party, champion, unique,
+  random boss, superunique); every recorded draw site is in §4 and every
+  draw passed `check_rng.py` (Test vectors).
 - **Target version:** 1.14d
 - **Crate/module:** `tools/trace-recorder/spawn.py` (debugger tool, Python;
   spec-role tool)
@@ -19,21 +21,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–52 |
-| Inputs | 53–62 |
-| Outputs / state changes | 63–70 |
-| Rules | 71–72 |
-|   1. Entry points | 73–104 |
-|   2. Pointers and preconditions | 105–130 |
-|   3. Kinds of monster | 131–148 |
-|   4. RNG draw sites | 149–195 |
-|   5. Calling an entry from the debugger | 196–225 |
-| Constants & data dependencies | 226–236 |
-| Randomness | 237–241 |
-| Edge cases & original bugs | 242–250 |
-| Test vectors | 251–257 |
-| Provenance | 258–270 |
-| Open questions | 271–276 |
+| Summary | 41–54 |
+| Inputs | 55–64 |
+| Outputs / state changes | 65–72 |
+| Rules | 73–74 |
+|   1. Entry points | 75–106 |
+|   2. Pointers and preconditions | 107–132 |
+|   3. Kinds of monster | 133–150 |
+|   4. RNG draw sites | 151–209 |
+|   5. Calling an entry from the debugger | 210–239 |
+| Constants & data dependencies | 240–250 |
+| Randomness | 251–255 |
+| Edge cases & original bugs | 256–264 |
+| Test vectors | 265–288 |
+| Provenance | 289–305 |
+| Open questions | 306–311 |
 <!-- /index -->
 
 ## Summary
@@ -163,6 +165,9 @@ address a recorder hooks. The order within one creation is
 | water point start `roll(n)` | R | call at `0x005B2737` | helper `0x0045C3E0` | `population.md` §9.2 (frogs only) |
 | room point x, y | R | `0x0054DCA9`, `0x0054DCEE` | inline | `population.md` §8 step 2.1 (x = y = 0 only) |
 | unit seed | G | `0x00552E31`, then `init_low` at `0x00552E50` | inline + setter | `sim/rng.md` §5.3 |
+| appearance variants, variant 0 | U | call at `0x005BDBF1` (per slot with a count > 1) | helper `0x0045C390` | `population.md` §2.4 step 3, via §2.5 (first monster of its class in the level's region only) |
+| appearance variants, slot pair | U | calls at `0x005BDC57`, `0x005BDC74` | helper `0x0045C390` | `population.md` §2.4 step 4 |
+| appearance variants, new variant | U | `0x005BDCEE` (slot a), `0x005BDD48` (slot b) | inline | `population.md` §2.4 step 5 |
 | components, variant set | U | call at `0x00573A03` | helper `0x0045C3E0` | `init.md` §10 step 1 |
 | components, per slot | U | `0x00573A8E` | inline | `init.md` §10 step 2 |
 | doomknight components | U | calls at `0x00573D6E`, `0x00573D9B` | helper `0x0045C390` | `init.md` §6 step 2 |
@@ -180,7 +185,9 @@ address a recorder hooks. The order within one creation is
 | superunique minion count | U | call at `0x005A4CD9` | helper `0x0045C390` | `init.md` §20, `population.md` §11.4 |
 
 1. These are all the helper calls and inline steps inside the functions
-   of `init.md` Provenance that the five entries reach directly. The
+   of `init.md` Provenance that the five entries reach directly, plus
+   the appearance-variant builder `0x005BDB20` reached through the
+   region lookup `0x00547BC0` (found by the recordings). The
    first AI setup `0x005B0E00` and item creation from monequip are owned
    elsewhere (`init.md` Open questions 2, 4); a recorder logs every draw
    on the calling thread between the call and its return, so draws from
@@ -192,6 +199,13 @@ address a recorder hooks. The order within one creation is
    give U's address before its first draw.
 3. A creation that fails placement makes only R draws (or none when the
    spread is 0; `population.md` §9.3); a refused class makes none.
+4. A ring with d = 0 (spread −1, the boss and superunique placements)
+   still calls the helper at `0x005B2C20` / `0x005B2C38` with n = 0: a
+   recorder sees the call, but the seed does not step (`sim/rng.md` §3
+   detail 1). Byte-for-byte comparisons count steps, not helper calls.
+5. In the recordings the first AI setup `0x005B0E00` made no draw for
+   zombie1, fallen1 and fallenshaman1 (Test vectors), and no thread other
+   than the calling one drew during any call.
 
 ### 5. Calling an entry from the debugger
 
@@ -252,6 +266,23 @@ The tool draws nothing. The call makes the draws of §4, in the order
 
 | Input | Expected | Source |
 |---|---|---|
+Recorded with `spawn.py` (`traces/raw/20261007-0230*-spawn.jsonl`,
+gitignored): save `bdAma` (fresh amazon, Rogue Encampment, Normal),
+`-nosave`, tick 60, player at subtile (5473, 4708), target (5477, 4712),
+spread 4 unless noted, room seed before = {3856415219, 178918734} in
+every run. Draw sequences in site order (×n = repeated):
+
+| Request | Created | Draws (helper calls / seed steps) and order |
+|---|---|---|
+| entry 1, zombie1 (5) | 1: GUID 8 at (5479, 4715), level 1, maxhp 11 × 256, xp 33, components [1,1,2,1,0,0,0,0,1,0,2,…] | 21 / 21: R `0x005B2BEC`, `0x005B2C20`(3), `0x005B2C60`, `0x005B2C8A`; G `0x00552E31`; U `0x005BDBF1`(3) ×8, `0x005BDC57`(8), `0x005BDC74`(7), (`0x005BDCEE`, `0x005BDD48`) ×2, `0x00573A03`(3), `0x00573F8F`(6) |
+| entry 1, fallen1 (19) | 4: leader + party of 3 (`0x004CC7A9`(2) after the leader's HP roll), all type flags 0 | 38 / 38: leader as zombie1 (variant counts 3, 4, 2); then per member R ring (d = 3), G, U `0x00573A03`(3), `0x00573F8F`(4) |
+| entry 1 fallen1 + entry 5 (umod 16) | 3: leader type flags 0xD, umods [16], level 3, maxhp 3 × base, xp 54, name seed drawn at `0x005A0CF0`; its 2 party members level 4, xp 90 (they are in its minion list, `init.md` §18 step 2) | 32 / 32: as the normal fallen1 spawn with 2 members, then U `0x005A0CF0` |
+| entry 3, fallen1, champion allowed 0 | 5: boss type flags 9, umods [17], level 4; 4 minions type flags 0x10, umods [17] (xfer), level 4 | 50 / 49: R d = 0 ring (`0x005B2C20`(0) no step); G; U variants (3 new), `0x00573A03`(3), `0x00573F8F`(4), `0x005A0876`(1), `0x005A06D8`, `0x005A0C50`(4); per minion R ring d = 3, G, U `0x00573A03`, `0x00573F8F`; last U `0x005A0CF0` |
+| entry 3, fallenshaman1 (58), champion allowed 1 | 4: unique (roll at `0x005A0825`(100) ≥ 20), umods [9], level 5; 3 fallen1 minions | 43 / 42: R d = 0; G; U `0x00573A8E` ×2 (no variant entry), `0x00573F8F`(5), `0x005A0825`(100), `0x005A0876`(1), `0x005A06D8`, `0x005A0C50`(4); minions (the first builds fallen1's variants); U `0x005A0CF0` |
+| entry 4, row 0 (Bishibosh, AutoPos) | 3: fallenshaman1 type flags 0xB, umods [8, 9, 22], at (5460, 4716); 2 minions umods [8, 9] | 45 / 42: R `0x0054DCA9`, `0x0054DCEE` + probe ring d = 0, twice; placement ring d = 0; G; U `0x00573A8E` ×2, `0x00573F8F`(5), `0x005A0C50`(1); 2 minions; U `0x005A0CF0` |
+
+| Input | Expected | Source |
+|---|---|---|
 | entry 1, spread 0 | EAX 0, no draw | `population.md` §9.3 (r = 0) |
 | entry 1, valid class, free point, spread −1, flags 0x40 | draws in the order: R `0x005B2BEC`, `0x005B2C20`/`0x005B2C38`, `0x005B2C60`, `0x005B2C8A`; G `0x00552E31`; then U only | §4, `init.md` Randomness |
 
@@ -263,6 +294,10 @@ The tool draws nothing. The call makes the draws of §4, in the order
   `0x00463740`, `0x00619730`; draw sites from `re/exports/all.asm` (every
   `mov reg, 0x6AC690C5` and every call of `0x0045C390`, `0x0045C3E0`,
   `0x00650E30`, `0x00650E40` inside the functions of `init.md` Provenance).
+- Confirmed by six `spawn.py` runs (2026-10-07, Test vectors): every
+  entry returned a unit with the expected ESP after the callee's `ret`,
+  the game ran 25 more ticks after each call, and `check_rng.py` passed
+  every recorded draw.
 - D2MOO (1.10f) names only (`D2GAME_SpawnMonster_6FC69F10`,
   `D2GAME_SpawnSuperUnique`, as in `init.md` §1); every convention above
   was read on 1.14d, where several entries pass the game in ECX or EDI
