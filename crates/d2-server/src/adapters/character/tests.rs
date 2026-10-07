@@ -352,3 +352,10 @@ fn gold_limit_vectors() {
 fn loaded_item_flags() {
     assert_eq!(loaded_flags(0x00A0_2010), 0x00A8_0010);
 }
+
+// Covers: specs/formats/d2s.md §10 r1
+#[test]
+fn load_errors_map_to_their_results() {
+    // Internal 23 (golem) → result 10.
+    assert_eq!(LoadError::GolemSkill.result(), 10);
+}

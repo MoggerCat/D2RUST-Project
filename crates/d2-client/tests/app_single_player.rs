@@ -33,27 +33,30 @@ fn a_failing_builder_is_an_error() {
 fn the_build_is_deterministic_and_runs_on_its_thread() {
     let units = |seed| {
         let g = single_player::build(&GameData::Synthetic, seed).unwrap();
-        (g.player, g.waypoint, g.waypoint_guid)
+        (g.waypoint, g.waypoint_guid)
     };
     assert_eq!(units(DEFAULT_SEED), units(DEFAULT_SEED));
 
     let (mut link, started) =
         single_player::start(GameData::Synthetic, DEFAULT_SEED, SystemClock::default()).unwrap();
     assert_eq!(link.protocol_version(), PROTOCOL_VERSION);
-    let (player, guid) = (started.player, started.waypoint_guid);
+    let guid = started.waypoint_guid;
     // The game behind the link is the one built: its waypoint unit has the
-    // GUID the start reported, and the local client is joined.
+    // GUID the start reported, the session flow is set, and no client
+    // record or player exists before the client's C→S 0x67 / 0x6B
+    // (`intents-events.md` §8).
     let seen = link
         .with(move |l| {
             let sim = &l.host().game;
             (
                 sim.game.lists.unit(started.waypoint).map(|u| u.guid),
+                sim.session().is_some(),
                 sim.sim_client(d2_client::bridge::LOCAL_CLIENT).is_some(),
-                sim.player_fields(player).is_some(),
+                single_player::local_player(sim),
             )
         })
         .unwrap();
-    assert_eq!(seen, (Some(guid), true, true));
+    assert_eq!(seen, (Some(guid), true, false, None));
     // A pump on the server thread: the first frame starts the host clock.
     assert!(!link.pump().unwrap().ticked);
 }
@@ -72,6 +75,117 @@ fn a_link_built_elsewhere_runs_unchanged() {
     })
     .unwrap();
     assert!(link.receive().is_empty());
+}
+
+/// The host clock, advanced by the test.
+struct StepClock(std::sync::Arc<std::sync::atomic::AtomicU32>);
+
+impl d2_server::seams::Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// The app's session sequence on the link (`intents-events.md` §8): the
+/// client's 0x67 (`single_player::create_request`) is drained in the
+/// first frame and answered with 0x01, 0x00, 0x02 at tick 1's flush; the
+/// loader runs only at the 0x6B: it creates a player of the request's
+/// class (sorceress), knowing Cold Plains' waypoint, with its player
+/// fields; the join's 0x59 … 0x7E and 0x04 follow with tick 2's flush.
+// Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3
+#[test]
+fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let ids = |chunks: Vec<Vec<u8>>| -> Vec<u8> { chunks.iter().map(|c| c[0]).collect() };
+    let req = single_player::create_request();
+    assert_eq!(req.encode()[0], 0x67);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    assert!(!link.pump().unwrap().ticked);
+    assert!(link.receive().is_empty());
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    assert_eq!(ids(link.receive()), [0x01, 0x00, 0x02]);
+    let before = link
+        .with(|l| {
+            let sim = &l.host().game;
+            (
+                sim.sim_client(d2_client::bridge::LOCAL_CLIENT).is_some(),
+                single_player::local_player(sim),
+            )
+        })
+        .unwrap();
+    assert_eq!(before, (true, None), "the character loads at the join");
+
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let got = ids(link.receive());
+    assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
+    assert_eq!(got.last(), Some(&0x04), "{got:02X?}");
+    let (class, fields, knows, faults, log) = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            let class = sim.events.sys.units.get(p).map(|u| u.class);
+            let fields = sim.player_fields(p).is_some();
+            let faults = sim.session().map(|f| f.faults.len());
+            let h = sim.events.hooks();
+            let knows = h
+                .waypoints
+                .get_mut(&p)
+                .map(|r| r.get_mut(0).test(1).unwrap_or(false));
+            (class, fields, knows, faults, h.x.log.clone())
+        })
+        .unwrap();
+    assert_eq!(class, Some(single_player::PLAYER_CLASS));
+    assert!(fields);
+    assert_eq!(
+        knows,
+        Some(true),
+        "the synthetic Cold Plains waypoint (index 1)"
+    );
+    assert_eq!(faults, Some(0));
+    assert!(log.is_empty(), "{log:?}");
+}
+
+/// M08 for the test above: the same 0x67 without flag bits 1 and 2 is
+/// refused by the server's checks (§2.5): no client record, nothing
+/// sent, a 0x6B after it finds no record and no player is loaded.
+// Covers: specs/sim/intents-events.md §2.5, §8.2 r1
+#[test]
+fn a_refused_create_request_starts_nothing() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let mut req = single_player::create_request();
+    req.flags &= !0x6;
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    assert!(link.receive().is_empty());
+    let (client, player, faults) = link
+        .with(|l| {
+            let sim = &l.host().game;
+            (
+                sim.sim_client(d2_client::bridge::LOCAL_CLIENT).is_some(),
+                single_player::local_player(sim),
+                sim.session().map(|f| f.faults.len()),
+            )
+        })
+        .unwrap();
+    assert_eq!((client, player, faults), (false, None, Some(2)));
 }
 
 /// `waypoints.md` §5.1 rule 1 on the user's own tables: the chosen

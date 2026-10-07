@@ -34,7 +34,7 @@ use bevy::app::PluginGroup;
 use bevy::prelude::*;
 use bevy::render::gpu_readback::{Readback, ReadbackComplete};
 use bevy::window::ExitCondition;
-use d2_client::app::play::add_game;
+use d2_client::app::play::{add_game, send_create_game};
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData, Link, Started, COLD_PLAINS, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio, SoundTable};
@@ -69,6 +69,9 @@ use d2_proto::client::TakeOrCloseWp;
 use d2_server::seams::Clock;
 use d2_sim::rng::Seed;
 
+mod app_support;
+use app_support::SharedLink;
+
 /// The host clock, advanced by the test.
 struct StepClock(Arc<AtomicU32>);
 
@@ -78,23 +81,9 @@ impl Clock for StepClock {
     }
 }
 
-/// The app's game on clock `ms`, with the waypoint menu of the player
-/// open (staged as the bridge's end-to-end test does).
+/// The app's game on clock `ms` (no client until its C→S 0x67).
 fn game(ms: &Arc<AtomicU32>) -> (ThreadLink<Link<StepClock>>, Started) {
-    let (mut link, started) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
-    let (player, guid) = (started.player, started.waypoint_guid);
-    link.with(move |l| {
-        l.host_mut()
-            .game
-            .events
-            .hooks()
-            .x
-            .interact
-            .insert(player, (2, guid));
-    })
-    .unwrap();
-    (link, started)
+    single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap()
 }
 
 fn bridge(app: &App) -> &BridgeResource {
@@ -108,25 +97,29 @@ fn stats(app: &App) -> FrameStats {
         .expect("a world view frame")
 }
 
-// Covers: specs/client/bridge.md §8 r1, §8 r2, §8 r3
+// Covers: specs/client/bridge.md §8 r1, §8 r2, §8 r3; specs/sim/intents-events.md §8.1, §8.2; specs/client/model.md §7 r3
 #[test]
 fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, started) = game(&ms);
+    let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
-    add_game(&mut app, Box::new(link), true).unwrap();
+    add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
         .resource_mut::<WorldViewState>()
         .feed
         .set_ui_open_mode(OpenMode::new(0).unwrap());
+    // The client's C→S 0x67, before frame 1 (`intents-events.md` §8).
+    send_create_game(&mut app).unwrap();
 
-    // Frame 1 at 1000 ms: the host starts its clock, no tick; nothing is
-    // drawn (camera.md §9: the draw follows a server tick).
+    // Frame 1 at 1000 ms: the drain runs game creation; the host starts
+    // its clock, no tick; nothing is drawn (camera.md §9: the draw follows
+    // a server tick).
     app.update();
     let w = &bridge(&app).0.world();
     assert_eq!((w.frames, w.server_ticks), (1, 0));
@@ -136,25 +129,56 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         None
     );
 
-    // An intent sent between frames 1 and 2 is drained by frame 2's pump;
-    // the tick's flush reaches the bridge in the same frame, after the
-    // session sequence queued at build time (`intents-events.md` §8: 0x01,
-    // 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x03, then game entry's 0x07,
-    // its room switch's 0x07 and the waypoint's 0x51, 0x15, 0x7E: the
-    // player in the town): the waypoint travel to Cold Plains (0x07 of the
-    // destination room, the arrival 0x0D, `waypoints.md` §7), then the
-    // first tick's room switch (§7.8: 0x07 for Cold Plains, the town's
-    // leave: 0x0A for the waypoint, 0x08, the player update's 0x15) and,
-    // the room being ready, 0x04 (`tick.md` §6 rule 6). The 0x0D is a
-    // unit-handler message (`client/msg-units.md` §4) for the local
-    // player, known from 0x59. The world view composes the model of tick
-    // 1 on the CPU (no render world).
+    // Frame 2: tick 1's flush carries 0x01, 0x00, 0x02 (§8.1); the
+    // bridge answers 0x02 with C→S 0x6B (`client/model.md` §7 rule 3).
+    // No player yet.
+    ms.fetch_add(40, Ordering::SeqCst);
+    app.update();
+    let b = &bridge(&app).0;
+    assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
+    assert_eq!((b.log().handled, b.log().queued), (3, 0));
+    assert!(b.world().local_player.is_none() && !b.world().in_game);
+    assert_eq!(app_support::local_player(&server), None);
+
+    // Frame 3: the drain runs the join (§8.2: the loader's player, its
+    // 0x59, 0xAA, 0x76, 0x0B, 0x03, 0x53, game entry's 0x07, its room
+    // switch's 0x07 and the waypoint's 0x51, 0x15, 0x7E: the player in
+    // the town), tick 2's flush carries it and, the room being ready,
+    // 0x04 (`tick.md` §6 rule 6).
+    ms.fetch_add(40, Ordering::SeqCst);
+    app.update();
+    let (player, player_guid) = app_support::local_player(&server).expect("joined");
+    let b = &bridge(&app).0;
+    assert_eq!((b.world().frames, b.world().server_ticks), (3, 2));
+    assert!(b.world().in_game, "0x04 received");
+    assert_eq!(b.world().local_player.map(|k| k.guid), Some(player_guid));
+    let joined = b.log().handled;
+
+    // The waypoint menu of the player open (staged as the bridge's
+    // end-to-end test does), then an intent sent between frames 3 and 4
+    // is drained by frame 4's pump: the waypoint travel to Cold Plains
+    // (0x07 of the destination room, the arrival 0x0D, `waypoints.md`
+    // §7), then tick 3's room switch (§7.8: 0x07 for Cold Plains, the
+    // town's leave: 0x0A for the waypoint, 0x08, the player update's
+    // 0x15). The 0x0D is a unit-handler message (`client/msg-units.md`
+    // §4) for the local player, known from 0x59. The world view composes
+    // the model of tick 3 on the CPU (no render world).
+    let wp = started.waypoint_guid;
+    app_support::with(&server, move |l| {
+        l.host_mut()
+            .game
+            .events
+            .hooks()
+            .x
+            .interact
+            .insert(player, (2, wp));
+    });
     let sent = app
         .world_mut()
         .resource_mut::<BridgeResource>()
         .0
         .send(&TakeOrCloseWp {
-            wp: started.waypoint_guid,
+            wp,
             level: COLD_PLAINS as u16,
         })
         .unwrap();
@@ -162,19 +186,18 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
     let b = &bridge(&app).0;
-    assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    // Nineteen applied at receive (0x76, 0x7E and 0xAA have owner specs
-    // and handlers now: `msg-ui.md` §22, `msg-units.md` §7, §6); the 0x0D
-    // waits on its unit's queue for the update pass (`client/model.md`
-    // §4, §5); nothing is unowned (`client/bridge.md` §6 rule 3).
-    assert_eq!((b.log().handled, b.log().queued), (19, 1));
+    assert_eq!((b.world().frames, b.world().server_ticks), (4, 3));
+    // Twenty applied at receive over frames 2–4: the three of game
+    // creation, twelve of the join (0x76, 0x7E and 0xAA have owner specs
+    // and handlers now: `msg-ui.md` §22, `msg-units.md` §7, §6; the join's
+    // 0x53 after 0x03, `intents-events.md` §8.2 rule 4, goes to its
+    // handler too), five of the travel; the 0x0D waits on its unit's queue
+    // for the update pass (`client/model.md` §4, §5); nothing is unowned
+    // (`client/bridge.md` §6 rule 3).
+    assert_eq!(joined, 15);
+    assert_eq!((b.log().handled, b.log().queued), (20, 1));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
-    assert!(b.world().in_game, "0x04 received");
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
-    assert_eq!(
-        b.world().local_player.map(|k| k.guid),
-        Some(started.player_guid)
-    );
     let sight: Vec<_> = b
         .world()
         .rooms_in_sight
@@ -195,8 +218,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     assert_eq!(
         stats(&app),
         FrameStats {
-            bridge_frame: 2,
-            server_tick: 1,
+            bridge_frame: 4,
+            server_tick: 3,
             items: 0,
             // The local player: placeable, but the placeholder rules
             // (`world_view::Unspecified`) draw nothing for it.
@@ -209,17 +232,17 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     );
 
     // A frame shorter than a tick pumps without ticking, and draws
-    // nothing: the presented frame stays tick 1's (no interpolation).
+    // nothing: the presented frame stays tick 3's (no interpolation).
     app.update();
     let w = bridge(&app).0.world();
-    assert_eq!((w.frames, w.server_ticks), (3, 1));
-    assert_eq!(stats(&app).bridge_frame, 2);
+    assert_eq!((w.frames, w.server_ticks), (5, 3));
+    assert_eq!(stats(&app).bridge_frame, 4);
 
     // A frame much longer than a tick still runs one tick: no catch-up.
     ms.fetch_add(200, Ordering::SeqCst);
     app.update();
     let w = bridge(&app).0.world();
-    assert_eq!((w.frames, w.server_ticks), (4, 2));
+    assert_eq!((w.frames, w.server_ticks), (6, 4));
 
     // N frames of 40 ms: one tick each, and the world view follows. 300
     // ticks run past the DRLG's room inactivity removal (tick step 9): the
@@ -229,13 +252,13 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         app.update();
     }
     let w = bridge(&app).0.world();
-    assert_eq!((w.frames, w.server_ticks), (304, 302));
+    assert_eq!((w.frames, w.server_ticks), (306, 304));
     assert_eq!(
         (stats(&app).bridge_frame, stats(&app).server_tick),
-        (304, 302)
+        (306, 304)
     );
     // Nothing dropped. The client update pass runs only while in game
-    // (`client/model.md` §5 rule 1); tick 1's 0x04 put the client in
+    // (`client/model.md` §5 rule 1); tick 2's 0x04 put the client in
     // game, so the queued 0x0D was drained by the update pass.
     let log = bridge(&app).0.log();
     assert_eq!((log.queued, log.drained), (1, 1));
@@ -1116,6 +1139,8 @@ fn frame_loop_runs_on_the_users_levels() {
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(link), true).unwrap();
+    // The session sequence: 0x67 now, 0x6B after the flush with 0x02.
+    send_create_game(&mut app).unwrap();
     app.update();
     for _ in 0..100 {
         ms.fetch_add(40, Ordering::SeqCst);
@@ -1123,4 +1148,5 @@ fn frame_loop_runs_on_the_users_levels() {
     }
     let w = bridge(&app).0.world();
     assert_eq!((w.frames, w.server_ticks), (101, 100));
+    assert!(w.in_game && w.local_player.is_some());
 }

@@ -239,6 +239,17 @@ pub enum LoadError {
     GolemSkill,
 }
 
+impl LoadError {
+    /// The load result of the error (§10 rule 1's table, `0x006E1208`):
+    /// the code §8.2 rule 2's join reports.
+    pub fn result(&self) -> u32 {
+        match self {
+            // Internal 23 → 10.
+            LoadError::GolemSkill => 10,
+        }
+    }
+}
+
 /// What the load did.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LoadReport {

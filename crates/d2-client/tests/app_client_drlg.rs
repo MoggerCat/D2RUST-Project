@@ -1,9 +1,10 @@
 // Spec: specs/client/model.md (§9, §11, §12), specs/render/composition.md (§4), specs/sim/path-placement.md (§13)
 //! The client DRLG in the play mode's wiring, headless: `add_game` +
 //! `add_client_data` over the app's own single-player game, whose
-//! session join (`d2_server::adapters::session::enter_game`) sends 0x59,
-//! 0x0B, 0x03, 0x07 and 0x15 with the first tick, followed by the room
-//! switch's 0x07s. The client builds its own act DRLG from 0x03 and the
+//! session flow (`d2_server::adapters::session_flow`) answers the
+//! client's C→S 0x67 with 0x01, 0x00, 0x02 and its 0x6B (the bridge's
+//! answer to 0x02) with the join: 0x59, 0x0B, 0x03, 0x07 and 0x15,
+//! followed by the room switch's 0x07s. The client builds its own act DRLG from 0x03 and the
 //! rooms 0x07 brings in sight; the local player's level is the level of
 //! its room. The recorded join (ignored test) is delivered by a scripted
 //! link in the recorded order (0x01, 0x03, 0x59 at (0, 0), 0x0B, 0x07,
@@ -11,10 +12,10 @@
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use d2_client::app::play::{add_client_data, add_game};
+use d2_client::app::play::{add_client_data, add_game, send_create_game};
 use d2_client::app::single_player::{self, GameData};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::world::{ClientTables, ClientWorld};
@@ -23,6 +24,9 @@ use d2_client::rules::OpenMode;
 use d2_client::world_view::WorldViewState;
 use d2_proto::PROTOCOL_VERSION;
 use d2_server::seams::Clock;
+
+mod app_support;
+use app_support::SharedLink;
 
 /// Delivers one chunk list per pump (each pump a tick).
 struct Script(VecDeque<Vec<Vec<u8>>>, Vec<Vec<u8>>);
@@ -98,27 +102,26 @@ impl Clock for StepClock {
 #[test]
 fn the_join_builds_the_client_drlg_in_the_app() {
     let data = GameData::Synthetic;
-    // The app's own game on its server thread: game creation and the
-    // session join queue 0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x03,
-    // then game entry's 0x07, its room switch's 0x07s (and the add
-    // messages of the rooms' units), 0x15 and 0x7E for the first flush;
-    // the first tick adds 0x04 (`intents-events.md` §8).
+    // The app's own game on its server thread, entered through the
+    // session flow (`intents-events.md` §8): the client's 0x67 → 0x01,
+    // 0x00, 0x02 with tick 1's flush; the client's 0x6B → 0x59, 0xAA,
+    // 0x76, 0x0B, 0x03, 0x53, game entry's 0x07, its room switch's 0x07s
+    // (and the add messages of the rooms' units), 0x15 and 0x7E with tick
+    // 2's flush, which adds 0x04.
     let ms = Arc::new(AtomicU32::new(1000));
-    let (mut link, started) = single_player::start(
+    let (link, _) = single_player::start(
         data.clone(),
         single_player::DEFAULT_SEED,
         StepClock(ms.clone()),
     )
     .unwrap();
-    let player = started.player;
-    let server_pos = link
-        .with(move |l| l.host_mut().game.events.hooks().path_position(player))
-        .unwrap();
+    let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
-    add_game(&mut app, Box::new(link), false).unwrap();
+    add_game(&mut app, Box::new(SharedLink(server.clone())), false).unwrap();
+    send_create_game(&mut app).unwrap();
     add_client_data(
         &mut app,
         single_player::client_drlg_source(&data),
@@ -130,7 +133,8 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         .resource_mut::<WorldViewState>()
         .feed
         .set_ui_open_mode(OpenMode::new(0).unwrap());
-    // Frame 1 starts the host's tick clock (no tick, nothing received).
+    // Frame 1 drains the 0x67 (game creation) and starts the host's tick
+    // clock (no tick, nothing received).
     app.update();
     assert!(app
         .world()
@@ -139,8 +143,22 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         .world()
         .act
         .is_none());
+    // Frame 2: tick 1's flush carries 0x01, 0x00, 0x02; the bridge
+    // answers 0x02 with 0x6B. No player yet.
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
+    {
+        let w = app.world().resource::<BridgeResource>().0.world();
+        assert!(w.act.is_none() && w.local_player.is_none() && !w.in_game);
+    }
+    assert_eq!(app_support::local_player(&server), None);
+    // Frame 3: the drain runs the join (0x6B), tick 2's flush carries it.
+    ms.fetch_add(40, Ordering::SeqCst);
+    app.update();
+    let (player, guid) = app_support::local_player(&server).expect("joined");
+    let server_pos = app_support::with(&server, move |l| {
+        l.host_mut().game.events.hooks().path_position(player)
+    });
     let b = &app.world().resource::<BridgeResource>().0;
     let w = b.world();
     assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
@@ -153,7 +171,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     assert!(d.drlg.on_client);
     // 0x59 + 0x0B: the local player; 0x15: placed where the server put it.
     let me = w.local_player.expect("0x0B named the local player");
-    assert_eq!(me.guid, started.player_guid);
+    assert_eq!(me.guid, guid);
     let own = w
         .local_room()
         .expect("the local player is in an active room");
@@ -175,8 +193,8 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         Some(1),
         "the one room of the town"
     );
-    // The first tick populated the town room, so the client's room was
-    // ready and the client pass sent 0x04 (`tick.md` §6 rule 6): the
+    // Tick 2 populated the town room, so the client's room was ready and
+    // the client pass sent 0x04 (`tick.md` §6 rule 6): the
     // client is in game.
     assert!(w.in_game);
     // The feed answers BlankScreen from the player's level's row (the
@@ -243,25 +261,33 @@ fn the_session_join_on_the_install() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
     let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
-    let (mut link, started) = single_player::start(
+    let (link, _) = single_player::start(
         data.clone(),
         single_player::DEFAULT_SEED,
         StepClock(ms.clone()),
     )
     .unwrap();
-    let player = started.player;
-    let server_pos = link
-        .with(move |l| l.host_mut().game.events.hooks().path_position(player))
-        .unwrap();
     let mut bridge = Bridge::new(link).unwrap();
     bridge.set_drlg_source(Some(single_player::client_drlg_source(&data)));
     bridge.set_tables(ClientTables {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The session sequence: 0x67, then 0x6B after the flush with 0x02.
+    bridge.send(&single_player::create_request()).unwrap();
     bridge.frame().unwrap();
-    ms.fetch_add(40, Ordering::SeqCst);
-    bridge.frame().unwrap();
+    for _ in 0..2 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        bridge.frame().unwrap();
+    }
+    let server_pos = bridge
+        .link_mut()
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (player, _) = single_player::local_player(sim).expect("joined");
+            sim.events.hooks().path_position(player)
+        })
+        .unwrap();
     assert!(
         bridge.log().rejected.is_empty(),
         "{:?}",
