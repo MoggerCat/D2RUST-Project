@@ -48,17 +48,17 @@
 |   3. Checksum (`0x00411130`) | 378–388 |
 |   4. Quest section (298 bytes at 0x14F) | 389–409 |
 |   5. Waypoint section (80 bytes at 0x279) | 410–415 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 416–461 |
-|   7. Stats and skills | 462–554 |
-|   8. Item sections | 555–739 |
-|   9. Load sequence (`0x0056B180`) | 740–764 |
-|   10. Errors | 765–811 |
-| Constants & data dependencies | 812–831 |
-| Randomness | 832–836 |
-| Edge cases & original bugs | 837–903 |
-| Test vectors | 904–943 |
-| Provenance | 944–1023 |
-| Open questions | 1024–1149 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 416–472 |
+|   7. Stats and skills | 473–565 |
+|   8. Item sections | 566–750 |
+|   9. Load sequence (`0x0056B180`) | 751–775 |
+|   10. Errors | 776–822 |
+| Constants & data dependencies | 823–842 |
+| Randomness | 843–847 |
+| Edge cases & original bugs | 848–914 |
+| Test vectors | 915–954 |
+| Provenance | 955–1034 |
+| Open questions | 1035–1163 |
 <!-- /index -->
 
 ## Summary
@@ -458,6 +458,17 @@ Read failures are internal code 16.
    size at +2 is not read.
 5. Measured on the fresh saves (no NPC talked to): all 48 bytes of A
    and B are zero.
+6. Which talks set A (the five rule 3 calls; class from the event
+   +0x14, u16 message id from +0x18; class → bit by rule 2): Act I
+   `0x0058F870`: 147 (0x2D, 0x2E), 148 (0x0B, 0x0C), 150 (0x18, 0x19),
+   154 (0x24, 0x25). Act II `0x005983E0`: 175 (0xD7), 177 (0x11D,
+   0x11E), 178 (0x107, 0x108), 198 (0xBE), 199 (0xCB, 0xCC), 200 (0xE6,
+   0xE7), 202 (0x112), 210 (0xF1, 0xF2). Act III `0x005B6C60`: 245
+   (0x1CA), 252 (0x1EA, 0x1EB), 254 (0x1F5, 0x1F6), 255 (0x202, 0x203),
+   264 (0x1DE, 0x1DF), 297 (0x1C5). `0x0058E990` (Act V): 512 (0x4E2E),
+   513 (0x4E45–0x4E47; then quest record 31 byte +0xC := 1 when it is 0
+   and +9 ≠ 0), 514 (0x4E55–0x4E57), 515 (0x4E61–0x4E63), 520
+   (0x4E23). No other class or message sets A.
 
 ### 7. Stats and skills
 
@@ -1086,6 +1097,9 @@ and prints every field; it holds no save data.
     her bit set in A. Still
     unmeasured: the other Act I NPCs' bits (expected from the same
     table, §6 rule 2).
+    **Answered** (§6 rule 6, switch tables `0x0058F8CC`, `0x00598490`,
+    `0x005B6CF4`, `0x0058EA2C`): the NPCs and message ids per act; the
+    measured Kashya bit matches. Other bits unmeasured.
 11. Item unit +0xC8 bit 0x8000 (items skipped by the writer, §8.1
     rule 4): which items carry it.
     **Answered**: none. Of all writes to +0xC8/+0xC9 in `all.asm`, no
