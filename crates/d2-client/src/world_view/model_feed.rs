@@ -8,6 +8,11 @@
 //! weather) goes to the wrapped feed, [`NoFeed`] by default; why the model
 //! cannot answer them yet is [`PENDING`].
 //!
+//! With a [`Preview`] (the play preview, decision D1) the map is on and
+//! the tile art, unit facts and unit offsets are the labelled fills of
+//! [`preview`] (`d2rs-own, unverified`); without one every answer above
+//! is the strict one.
+//!
 //! Positions are the model's cells (`ClientUnit::position`). A moving
 //! unit (players, monsters, missiles) is on a dynamic path: its 16.16
 //! position is the cell centre after every placement the message specs
@@ -28,6 +33,7 @@ use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 
 use super::feed::{NoFeed, RunningShake, ViewFeed};
 use super::near_rooms::MapState;
+use super::preview::{self, Preview};
 use super::{UnitPose, ViewAssets, ViewError};
 
 /// The 16.16 position of a dynamic path at the centre of cell `c`
@@ -111,6 +117,10 @@ pub struct ModelFeed<F = NoFeed> {
     /// while tile art is pending: with near rooms every drawn tile needs
     /// [`ViewFeed::tile_art`] (`PENDING`).
     pub map: Option<MapState>,
+    /// The play preview's fills (decision D1, [`preview`]): tile art,
+    /// unit facts and offsets the model lacks, each `d2rs-own,
+    /// unverified`. `None` (the default): the strict path.
+    pub preview: Option<Preview>,
 }
 
 impl<F> ModelFeed<F> {
@@ -120,7 +130,16 @@ impl<F> ModelFeed<F> {
             levels: None,
             ui_open_mode: None,
             map: None,
+            preview: None,
         }
+    }
+
+    /// The feed with the map and the play preview's fills
+    /// ([`preview`]).
+    pub fn with_preview(mut self, preview: Preview) -> Self {
+        self.map.get_or_insert_with(MapState::default);
+        self.preview = Some(preview);
+        self
     }
 
     /// The feed with the client DRLG's near rooms (`draw-order.md` §9).
@@ -135,7 +154,12 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
         unit_position(unit)
     }
 
+    /// Preview: `(0, 0)` ([`preview::unit_offset`]); else the inner
+    /// feed's.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
+        if self.preview.is_some() {
+            return Ok(preview::unit_offset());
+        }
         self.inner.unit_offset(unit, pose)
     }
 
@@ -216,26 +240,66 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
     /// `draw-order.md` §9 from the client DRLG when the map is on
     /// ([`MapState`]); the unit facts the model holds (type, mode, local
     /// player) over the inner feed's for the rest.
+    /// Preview: the facts are [`preview::unit_facts`], the floors are
+    /// dried ([`preview::dry_floors`]) and a build that fails is logged
+    /// once and leaves the frame without the map.
     fn near_rooms(&mut self, world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
         let Self {
-            inner, levels, map, ..
+            inner,
+            levels,
+            map,
+            preview,
+            ..
         } = self;
         let Some(map) = map.as_mut() else {
             return inner.near_rooms(world);
         };
-        let inner = &*inner;
-        map.near_rooms(world, levels.as_deref(), |u| {
-            Ok(UnitFacts {
-                unit_type: u.key.unit_type,
-                mode: u.mode,
-                local: world.local_player == Some(u.key),
-                ..inner.unit_facts(world, u)?
-            })
-        })
+        let Some(preview) = preview.as_ref() else {
+            let inner = &*inner;
+            return map.near_rooms(world, levels.as_deref(), |u| {
+                Ok(UnitFacts {
+                    unit_type: u.key.unit_type,
+                    mode: u.mode,
+                    local: world.local_player == Some(u.key),
+                    ..inner.unit_facts(world, u)?
+                })
+            });
+        };
+        match map.near_rooms(world, levels.as_deref(), |u| {
+            Ok(preview::unit_facts(world, u))
+        }) {
+            Ok(Some(near)) => {
+                preview::dry_floors(near);
+                Ok(Some(near))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => {
+                preview.log_once(format!("the map this frame: {e}"));
+                Ok(None)
+            }
+        }
     }
 
     fn unit_facts(&self, world: &ClientWorld, unit: &ClientUnit) -> Result<UnitFacts, ViewError> {
+        if self.preview.is_some() {
+            return Ok(preview::unit_facts(world, unit));
+        }
         self.inner.unit_facts(world, unit)
+    }
+
+    /// Preview: the act's shade tables, the skip frame and the near rooms'
+    /// DT1 tiles resident ([`Preview::prepare`]); else the inner feed's.
+    fn prepare(&mut self, world: &ClientWorld, assets: &mut ViewAssets) -> Result<(), ViewError> {
+        if self.preview.is_none() {
+            return self.inner.prepare(world, assets);
+        }
+        let counts = preview::record_counts(self.near_rooms(world)?.as_deref());
+        let entries = match &self.map {
+            Some(m) => preview::entries(m, &counts),
+            None => Vec::new(),
+        };
+        let preview = self.preview.as_mut().expect("checked above");
+        preview.prepare(world, &entries, assets)
     }
 
     fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {
@@ -261,7 +325,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         tile: &crate::rules::draw_order::OrderedTile,
         assets: &ViewAssets,
     ) -> Result<crate::rules::draw_order::source::TileArt, ViewError> {
-        self.inner.tile_art(tile, assets)
+        match &self.preview {
+            Some(p) => Ok(p.tile_art(self.map.as_ref(), tile)),
+            None => self.inner.tile_art(tile, assets),
+        }
     }
 }
 

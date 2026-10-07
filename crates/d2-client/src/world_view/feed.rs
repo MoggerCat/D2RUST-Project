@@ -94,6 +94,13 @@ pub trait ViewFeed: ViewSource {
         Ok(None)
     }
 
+    /// Before the frame's build (`present.rs`): makes the assets the
+    /// feed's answers name resident (the map's DT1 tiles, the act's shade
+    /// tables; `client/assets.md` §A4). The default needs none.
+    fn prepare(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) -> Result<(), ViewError> {
+        Ok(())
+    }
+
     /// The facts of a room unit the draw order reads (`draw-order.md` §3
     /// r4, §5) that the client model does not hold: unit flags (+0xC4),
     /// flag-ex (+0xC8), monstats2 `unflatDead`, objects `DrawUnder`, states

@@ -35,6 +35,8 @@ pub mod node;
 pub mod overlay;
 pub mod panel_art;
 pub mod present;
+pub mod preview;
+pub mod tile_assets;
 pub mod ui_bind;
 
 #[cfg(test)]
