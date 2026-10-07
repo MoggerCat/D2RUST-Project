@@ -246,7 +246,7 @@ layer.
    | 0x06 | ui 23 open: C→S 0x4F button 8 (p1 = u16 `[0x007C0E6A]`, p2 = u16 `[0x007C0E68]`), `[0x007C0E70]` := −1, `0x00489360(1)`; state 1 → `[0x007C0E78]` := 0, `0x004897E0(0, 0)`, state 3, free the list `[0x007C0E6C]` (`0x004B8020`) if any; 2 → refuse; 3–7 → `0x004897E0(0, 0)`, state 3; other → refuse | – |
    | 0x09 | player event sound 23 on the local player (`0x004CB9C0`, `audio/triggers.md` §3) | – |
    | 0x0A | player (0, `[0x007C0E60]`) in S → player event sound 23 on it | – |
-   | 0x0C | state := 0, close trade(0) | `world/cube.md` §1 (C→S 0x4F with no interaction) |
+   | 0x0C | state := 0, close trade(0) | `world/cube.md` §1, `world/vendors-2.md` §10.1 (C→S 0x4F with no active interaction: handler `0x0054C7C0` → `0x00568060` sends 0x77 code 0x0C and returns 0 before the button is examined) |
    | 0x0D | state := 0, close trade(1) | – |
    | 0x0E | `[0x007BCE28]` := 1 | – |
    | 0x0F | `[0x007BCE28]` := 0 | – |
