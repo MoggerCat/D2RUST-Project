@@ -46,6 +46,10 @@ use super::{Pending, View, WiringError};
 #[derive(Debug, Clone)]
 pub struct ObjectState {
     pub control: ObjectControl,
+    /// `dwObjSeed`, game +0x80: the result `lo'` of `0x00546C60`
+    /// (`objects.md` §2 rule 2, `rng.md` §5.2; S→C 0x03 u32@8,
+    /// `client/model.md` §11 rule 1).
+    pub obj_seed: u32,
     pub tables: Arc<ObjectTables>,
     /// The host's `GetTickCount` (edge case 9: an input the host sets,
     /// [`super::ActionHooks::set_host_tick`]).
@@ -179,9 +183,10 @@ fn log<T, X>(v: &mut View<'_, X>, r: Result<T, ObjectError>) -> Option<T> {
 impl ObjectState {
     /// `0x00546C60` (§2) on `game_seed` (one step).
     pub fn new(game_seed: &mut Seed, tables: Arc<ObjectTables>) -> Self {
-        let (control, _) = ObjectControl::new(game_seed, &tables);
+        let (control, obj_seed) = ObjectControl::new(game_seed, &tables);
         Self {
             control,
+            obj_seed,
             tables,
             host_tick: 0,
             alloc_at: None,

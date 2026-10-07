@@ -48,10 +48,10 @@ generator and are only re-exported here).
   already do), ignored by `decode`; a comparison against a recording must
   mask them (`intents-events.md` §6 says nothing is ignored by default:
   a spec session should state the mask there).
-- Built types (`s2c::messages`): `PlayerStop` 0x0D, `QuestInfo` 0x28,
+- Built types (`s2c::messages`): `GameHandshake` 0x0B, `PlayerStop` 0x0D, `QuestInfo` 0x28,
   `GameQuestInfo` 0x29, `NpcTransaction` 0x2A, `MercForHire` 0x4E,
   `QuestSpecial` 0x50 (quest form only), `QuestLogInfo` 0x52, `OpenUi`
-  0x58, `QuestItemState` 0x5D, `WaypointMenu` 0x63, `TradeAction` 0x77,
+  0x58, `AssignPlayer` 0x59, `QuestItemState` 0x5D, `WaypointMenu` 0x63, `TradeAction` 0x77,
   `UniqueEvent` 0x89, `NpcWantsInteract` 0x8A, `NpcGossipAct` 0x91,
   `Unknown9B` 0x9B, `WardenRequest` 0xAE (variable; transport row, out of
   scope, built because its layout is complete). Constants
@@ -96,7 +96,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x08 | MapHide | 6 | unspecified | - | size rule only |
 | 0x09 | AssignLevelWarp | 11 | unspecified | - | size rule only |
 | 0x0A | RemoveUnit | 6 | unspecified | - | size rule only |
-| 0x0B | GameHandshake | 6 | unspecified | - | size rule only |
+| 0x0B | GameHandshake | 6 | built | `GameHandshake` | model.md §3 r1 (type, GUID) |
 | 0x0C | MonsterHit | 9 | generated | `MonsterHit` | TSV layout |
 | 0x0D | PlayerStop | 13 | built | `PlayerStop` | waypoints.md §7 r7 values + recorded widths |
 | 0x0E | ObjectState | 12 | partial | - | unit address only (type u8 @1, GUID u32 @2; §3.4 r3) |
@@ -174,7 +174,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x56 | - | 0 | never | - | size 0: never receivable (§3.1 r3) |
 | 0x57 | NpcEnchants | 14 | unspecified | - | size rule only |
 | 0x58 | OpenUi | 7 | built | `OpenUi` | npc.md §8.1; byte 6 unwritten |
-| 0x59 | AssignPlayer | 26 | unspecified | - | size rule only |
+| 0x59 | AssignPlayer | 26 | built | `AssignPlayer` | msg-units.md §1.1 r1 offsets, intents-events.md §7.2 fields |
 | 0x5A | EventMessage | 40 | partial | - | prefix only (`5A 0E 01 …`, use.md OQ9) |
 | 0x5B | PlayerJoined | u16@1;min=34 | unspecified | - | size rule only |
 | 0x5C | PlayerLeft | 5 | unspecified | - | size rule only |
