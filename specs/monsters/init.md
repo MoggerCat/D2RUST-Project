@@ -61,7 +61,7 @@
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1142–1172 |
 |   Recorded checks (monster assign 0xAC) | 1173–1185 |
 | Provenance | 1186–1264 |
-| Open questions | 1265–1312 |
+| Open questions | 1265–1321 |
 <!-- /index -->
 
 ## Summary
@@ -1309,3 +1309,12 @@ no `umods.tsv` row is D2MOO-only any more.
 11. After a class reinit (§27), unit +0xA4 still points at the freed
     hover record (Edge cases 13): find every reader of +0xA4 on a
     monster and whether one can run before a new record is written.
+12. Size: this spec is ~71 KB, over the 60 KB guideline. Split
+    proposal (not done; needs every inbound `init.md` §N link updated in
+    the same change): move §14–§22 (normal and boss mods, boss spawns,
+    umod choice and init, superuniques, restore paths, umod callbacks;
+    ~25 KB with their test vectors and provenance) to a new
+    `monsters/bosses.md`, keeping section numbers as a stub table here;
+    optionally move §25–§26 (tool spawns, making an existing monster
+    unique; ~11 KB) to `monsters/init-tools.md`. §1–§13, §23, §24 and
+    §27 (plain creation, the class reinit) stay.
