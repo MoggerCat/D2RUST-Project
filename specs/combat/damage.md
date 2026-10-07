@@ -674,8 +674,8 @@ ECX game, EDX victim D; stack killer A, flag (1 at every caller except
 `0x00574450` at `0x005744D3`, `world/hirelings.md` §8 rule 1).
 
 1. D a player: D in mode 0 or 17 → stop. D a monster: mode 0 or 12, or
-   monstats `killable` false (`0x00457490(class, 15)`, bit 15) → stop;
-   then flag ≠ 0 and D's owner (`0x0058F0D0`) is a player → pet death
+   monstats `killable` false (`0x00457490(class, 15)` at `0x0057CCF4`,
+   bit 15) → stop; then flag ≠ 0 and D's owner (`0x0058F0D0`) is a player → pet death
    bookkeeping `0x005751A0(game, owner, D)` (`world/hirelings.md` §8
    rule 1, `sim/pets.md`). Other types (and no D) → stop.
 2. A present: experience `0x005A4EF0`: D unit flags lack 0x04000000 →

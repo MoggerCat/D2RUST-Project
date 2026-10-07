@@ -16,6 +16,25 @@
   actions); `client/msg-skills.md` §2 rule 4 (passive-state lists);
   `client/msg-units.md` §1.2 (monster umod lists, 0xAC).
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 38–49 |
+| Inputs | 50–58 |
+| Outputs / state changes | 59–63 |
+| Rules | 64–65 |
+|   1. The list of a client unit | 66–101 |
+|   2. Items | 102–142 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 143–180 |
+|   4. Skills | 181–212 |
+| Constants & data dependencies | 213–223 |
+| Randomness | 224–228 |
+| Edge cases & original bugs | 229–236 |
+| Test vectors | 237–248 |
+| Provenance | 249–261 |
+| Open questions | 262–291 |
+<!-- /index -->
+
 ## Summary
 
 1.14d is one executable: the client units use the same stat-list code
@@ -51,7 +70,7 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    readers (`sim/stats.md` §4.2). The value-change callback of a client
    player's list is the client callback `0x004609F0` (installed by the
    player init, `0x00460C39`; `sim/stat-lists.md` §7.2 last line), not
-   the server's `0x0055B800` (its effects: open question 1).
+   the server's `0x0055B800` (its effects: rule 4).
 2. d2rs: the client holds, per unit with stats, a `d2-sim` stat list
    (the `sim/stat-lists.md` implementation, built with the client
    callback of rule 1), as `client/model.md` §12 does for the client
@@ -62,6 +81,23 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    `total(local player, stat, 0)` (`0x00625480`, full array of +0x5C),
    base = `base(local player, stat, 0)` (`0x006253B0`). They equal the
    base until rules 2–4 have attached lists.
+4. **Client callback** `0x004609F0` (2026-10-08). Called as
+   `sim/stat-lists.md` §7.1 says (only for stats with `fCallback`):
+   ECX game, EDX owner O (list +0x44), stack unit I (the propagation's
+   unit, e.g. the item), key k, old, new; `ret 0x10`. O none → nothing.
+   By stat = k >> 16 (jump tables `0x00460B70` / `0x00460B5C`, stats
+   89…204); layer = k & 0xFFFF:
+
+   | Stat | Effect |
+   |---|---|
+   | 89 `item_lightradius` | `0x00460930(O, new)`: O a player or monster with a light (+0x64): radius := base + new, 0 when ≤ 0 (`0x004742D0`); base 13 for a player, for a monster max(`monstats2` `Light` +0x11E, the component light `0x0063EBD0`) (no monstats2 row → nothing); `render/lighting.md` §6.2 |
+   | 90 `item_lightcolor` | `0x004609A0(O, new)`: O a player or monster with a light: new = 0 → R = G = B = 255, else R, G, B = bits 16–23, 8–15, 0–7 (`0x00474390`) |
+   | 97 `item_nonclassskill`, 107 `item_singleskill` | O a player only; s = layer; E = O's native entry of s (`0x006439B0(O, s, −1)`). new = 0: E exists and `skill_level(O, E, 0)` < 1 → remove s (`0x006470F0(O, s)`). new ≠ 0: no E, and (stat 97, or s's skills record (`0x0045C4B0`) exists with `charclass` (+0x0C) = O's class) → assign `0x00647280(O, s, 0, 0)` (`client/msg-skills.md` §2 r2). No refresh, no message, no pet maximum, no left / right reselect (the server's `skills/levels.md` §7.1 does those) |
+   | 204 `item_charged_skill` | O a player only; I none → nothing; s = layer >> shift, l = layer & mask (data +0xC6C / +0xC70); c := total(I, 204, layer) & 0xFF; c > 0 and I's list hangs under O (`0x00625820(I, 0)` = O) → `0x00647530(O, I's GUID, s, l, c, 0)` (set charges); else `0x00647530(O, I's GUID, s, l, 0, 1)` (remove); as `skills/levels.md` §7.6 without the pet maximum |
+   | every other stat | nothing (no life / mana / stamina clamp, no state, class-skill or aura handling on the client) |
+
+   The callback reads only O's type, class, light and skill list, so the
+   client list needs no other client state to call it.
 
 ### 2. Items
 
@@ -150,6 +186,29 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
 2. Item-granted skill levels (stats 97, 107, 126, 127, 188 …) reach the
    skill list through the client callback (rule 1.1 and
    `client/msg-skills.md` open question 2), not through this spec.
+3. **Passive state list** `0x00643620(L)` (2026-10-08; EDI unit U, EBX
+   state p, stack L; `ret 4`; one caller, the refresh `0x00646D60` at
+   `0x00646E30` with L = the skill level): list := U's child list of
+   state p (`0x006256B0(U, p)`; none when U has no extended list).
+   - L ≠ 0, list found → return it unchanged.
+   - L ≠ 0, none → allocate `0x006251F0(pool = U +0x08, flags 0,
+     expire 0, owner type = U's type, owner GUID = U +0x0C)` (U none:
+     pool 0, type 6, GUID −1), set its state to p (`0x006252D0`),
+     attach `0x00626E10(U, list, reset 1)` (`sim/stat-lists.md` §8.1:
+     DYNAMIC cleared, every entry propagates, damage-related included;
+     a U without an extended list attaches nothing), return it. The
+     list is then filled by the refresh (`client/msg-skills.md` §2 r4).
+   - L = 0: a found list is detached (`0x006277E0(U, list)`) and freed
+     (`0x00626CD0`); return 0.
+4. **State bits without a state list.** A state's on / off bit is not
+   in the state's list: it is bit s of the state bit array of U's own
+   extended list (unit +0x5C, list +0x58, `sim/stat-lists.md` §9.1).
+   State on `0x00639DB0` (§3 r3, `client/msg-skills.md` §2 r1) sets it
+   whether or not a list of that state exists; the list (rule 3, §3 r2)
+   only carries the state's stats. A unit without an extended list has
+   no state bits: the toggle `0x00625A70` does nothing (the update-queue
+   insert still runs, `sim/stat-lists.md` §9.2). d2rs: keep the bits on
+   the unit's own list object (§1 r2), independent of child lists.
 
 ## Constants & data dependencies
 
@@ -196,12 +255,17 @@ from `tools/ghidra/disasm.py xref` of `0x00626E10` and `0x00627910`;
 `0x004D9E60`, `0x00643620`, client callback `0x004609F0` (installed at
 `0x00460C39`). Item type rows from `patch_d2` `ItemTypes.txt`.
 
+2026-10-08: `all.asm` of `0x004609F0` (jump tables decoded from the
+code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
+`0x006256B0`, `0x00625A70`; mask table `0x006CE268` read with `pefile`.
+
 ## Open questions
 
-1. The client callback `0x004609F0`: its per-stat effects (a switch on
-   the stat id: light radius 89 / 90, skill stats, …); needed before the
-   client list's values match the original after item and skill
-   changes.
+1. Answered (2026-10-08, `docs/handoff/impl-client-msgs-3.md` Q10):
+   the callback's effects are §1 r4. So build the client list now with
+   the client callback (`ValueCallback::Client` implementing §1 r4);
+   no waiting is needed. Its light effects go to the render light of
+   the unit; its skill effects to the client skill list.
 2. The item stream's stat section (which lists an item gets: base,
    magic, set, runeword) — `items/inventory.md` open question 1 and
    `client/msg-stats-items.md` open question 3.
@@ -211,8 +275,16 @@ from `tools/ghidra/disasm.py xref` of `0x00626E10` and `0x00627910`;
    handlers detach the list and when.
 5. The flag masks `[0x006CE26C]`, `[0x006CE274]`, `[0x006CE278]`,
    `[0x006CE284]` (itemstatcost / states flag bits read through globals):
-   dump their values.
+   dump their values. *Partly answered* (2026-10-08): the table
+   `0x006CE268` holds 1 << i (dumped: 1, 2, 4, …), so they are 2, 8,
+   0x10, 0x80; itemstatcost +0x04 & 2 = `signed`, +0x05 & 2 =
+   `updateanimrate` (`data/fields.tsv`); the states +0x14 bit names
+   remain.
 6. The rest of the state on / off paths (`0x004D97F0`, `0x004D9920`,
    `0x004D9AD0`, `0x004D9F40`, `0x004D9C30`) and their owner (a client
    states spec taking 0xA7–0xA9). A recording with a buff (e.g. a
    shrine) gives 0xA8 bytes to check the stream rule.
+7. Answered (2026-10-08, `docs/handoff/impl-client-msgs-3.md` Q5): the
+   `0x00643620` arguments (pool, flags 0, expire 0, U's type and GUID),
+   the attach with reset 1, and where the state bits live before a
+   state list exists are §4 rules 3–4.

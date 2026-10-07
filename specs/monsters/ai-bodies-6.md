@@ -728,7 +728,7 @@ No owner checks and no random emerge (unlike §17). 1.14d-confirmed.
 ### 19. Hydra (86) `0x005E9E60`
 
 Target mode 2. Rows hydra1–3; `Skill1` HydraMissile (`A1`). AI param 0
-is the expiry frame set by the Hydra skill (`skills/bodies-2.md` §8.5).
+is the expiry frame set by the Hydra skill (`skills/bodies-2b.md` §8.5).
 
 1. frame > param 0 → mode 0 (death) at (0, 0). End.
 2. T ≠ 0, D < 25 and draw < 60 → `Skill1` at T. End.

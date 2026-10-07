@@ -29,16 +29,16 @@
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
 |   4. Mode change gates | 170–203 |
-|   5. Start and do | 204–324 |
-|   6. Cooldown | 325–338 |
-|   7. Periodic skills and auras | 339–388 |
-|   8. Function tables | 389–408 |
-| Constants & data dependencies | 409–429 |
-| Randomness | 430–439 |
-| Edge cases & original bugs | 440–461 |
-| Test vectors | 462–475 |
-| Provenance | 476–492 |
-| Open questions | 493–533 |
+|   5. Start and do | 204–327 |
+|   6. Cooldown | 328–341 |
+|   7. Periodic skills and auras | 342–391 |
+|   8. Function tables | 392–411 |
+| Constants & data dependencies | 412–432 |
+| Randomness | 433–442 |
+| Edge cases & original bugs | 443–464 |
+| Test vectors | 465–478 |
+| Provenance | 479–495 |
+| Open questions | 496–539 |
 <!-- /index -->
 
 ## Summary
@@ -221,7 +221,10 @@ player type-0 handler `0x005811D0` dispatches by mode (table
 
 1. Store arg2 in unit +0x38 bits 8+ (`0x006212C0`).
 2. Skill flags bit 0 (moving skills): step the path (`0x00553490`,
-   `0x00554CA0`); finished (2) → flags |= 2 and run the do.
+   `0x00554CA0`); finished (2) → flags |= 2 and run the do. "Skill
+   flags" (E flags) are the skill entry's word +0x0C (get `0x006446A0`,
+   set `0x00644660`): value 1 = moving skill, mask 2 = the move ended
+   (`0x005804B3`). Bodies test mask 2 (`test al, 2`) and clear the word.
 3. Otherwise run the do only if unit flag 0x40 is clear and arg1 ∈ {1,
    2}.
 4. Return 1, or 2 when the unit died (ENDANIM runs at once).
@@ -503,7 +506,7 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    `functions.tsv` (open question 10), so no re-export is needed.
 2. Answered: srvdo slot 121 holds `0x005C8AD0`, and Rabies (id 238) is
    the only 1.14d `skills.txt` row with `srvdofunc` 121; its body is
-   `skills/bodies-2.md` §6.14. The 1.14d body does not follow D2MOO's
+   `skills/bodies-2b.md` §6.14. The 1.14d body does not follow D2MOO's
    SrvDo121 (used-skill param check, `0x005C8980`, `apply_melee`
    `0x0057D4F0`, `elem_len` `0x00644F20`, `0x005C7DB0`, `0x005C7C20`).
 3. Recording: hook `0x0056FAF0` entry/return and `0x0056F7F0` entry; cast
@@ -530,3 +533,6 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 10. Answered: every `functions.tsv` row is `spec'd-here` (bodies in
     `skills/bodies.md`, `bodies-2.md`, `bodies-3.md`, `bodies-4.md`),
     except the null slots and the 3 `unreferenced` rows.
+11. Answered (2026-10-08, `docs/handoff/impl-monster-skill-slots.md`): the
+    E flags "bit 2" of monster bodies is mask 2, the move-ended flag
+    (§5.2 rule 2).

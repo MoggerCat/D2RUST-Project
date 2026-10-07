@@ -24,32 +24,33 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 55–72 |
-| Inputs | 73–81 |
-| Outputs / state changes | 82–88 |
-| Rules | 89–90 |
-|   1. Model contents | 91–129 |
-|   2. Unit table | 130–175 |
-|   3. Local player | 176–198 |
-|   4. Receive and the unit message queue | 199–236 |
-|   5. Client update pass | 237–273 |
-|   6. Position check (`0x004804E0`) | 274–313 |
-|   7. Session messages | 314–350 |
-|   8. Mode requests | 351–402 |
-|   9. Room-in-sight messages | 403–437 |
-|   10. Bit reader | 438–452 |
-|   11. Current act and level (join and later) | 453–498 |
-|   12. Client DRLG and the room of a point | 499–540 |
-|   13. Visibility predicate (`0x004DBF20`) | 541–568 |
-|   14. Pet list and the hireling GUID | 569–595 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 596–662 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 663–697 |
-| Constants & data dependencies | 698–710 |
-| Randomness | 711–722 |
-| Edge cases & original bugs | 723–731 |
-| Test vectors | 732–775 |
-| Provenance | 776–824 |
-| Open questions | 825–892 |
+| Summary | 56–73 |
+| Inputs | 74–82 |
+| Outputs / state changes | 83–89 |
+| Rules | 90–91 |
+|   1. Model contents | 92–130 |
+|   2. Unit table | 131–176 |
+|   3. Local player | 177–199 |
+|   4. Receive and the unit message queue | 200–237 |
+|   5. Client update pass | 238–274 |
+|   6. Position check (`0x004804E0`) | 275–314 |
+|   7. Session messages | 315–351 |
+|   8. Mode requests | 352–403 |
+|   9. Room-in-sight messages | 404–438 |
+|   10. Bit reader | 439–453 |
+|   11. Current act and level (join and later) | 454–499 |
+|   12. Client DRLG and the room of a point | 500–541 |
+|   13. Visibility predicate (`0x004DBF20`) | 542–569 |
+|   14. Pet list and the hireling GUID | 570–596 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 597–663 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 664–698 |
+|   17. Model writes made by 1.14d UI code | 699–778 |
+| Constants & data dependencies | 779–791 |
+| Randomness | 792–803 |
+| Edge cases & original bugs | 804–812 |
+| Test vectors | 813–860 |
+| Provenance | 861–919 |
+| Open questions | 920–1000 |
 <!-- /index -->
 
 ## Summary
@@ -695,6 +696,86 @@ teleport while the hireling walked; server answer
    room stays in sight). Which of these applied at the recording's
    second teleport is open question 14.
 
+### 17. Model writes made by 1.14d UI code
+
+Several 1.14d UI functions write the client world. Each is stated here
+as a model rule; the bridge reproduces it as a `ClientWorld` operation
+with exactly this effect, at the point of 1.14d order where the UI
+function runs. Rules 1–3 run when the UI layer performs the 1.14d UI
+function that contains them (`client/msg-ui.md` §16, `ui/messages.md`
+§11, §13, §14); the UI request reaches the model through the
+bridge (`client/bridge.md` §10 r10: the UI layer returns the write as a
+request, the bridge applies it before the next message; §10 r6 stands). Rule 4 is model-side and decided here. "Flag bit n" is
+the unit flag word +0xC4 (`client/msg-ui.md` OQ2 owns the full word;
+bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
+
+1. **Interaction end** `E(G)` (`0x004B3C20`, NPC GUID G in ECX; 23
+   call sites, all UI: menu cancel, dialog ends, town exit, the 0x28
+   dialog branch). In 1.14d order, model parts in bold:
+   1. **the local player (type 0, with player data) gets data +0x150,
+      +0x154, +0x158, +0x15C := 0** (`0x004B3C42`–`0x004B3C60`; the
+      same write as 0x04, §7 rule 5);
+   2. U := the monster (1, G) of S (`0x00463990`, `0x004B3C6D`); U
+      present → **stock discard of U** (rule 3, `0x004B3790` at
+      `0x004B3C78`);
+   3. greeting stop (`[0x007C0DB4]` set → `0x004BA840([0x007C0DB8])`;
+      both := 0): UI / audio;
+   4. U present → **U flag bit 0x2 := 1** (`0x004B3CAE`);
+   5. C→S **0x30** [u32 1][u32 G] (`0x004786A0` at `0x004B3CBD`): send
+      path (`client/bridge.md` §4);
+   6. `0x004A1730` (NPC text list freed), interact NPC active
+      `[0x007C0D29]` := 0, `SetUIState(8, off, 0)`: UI;
+   7. U present: **U's monster data +0x28 bit 0 := 0** (`0x004B3CEB`;
+      U is always type 1 here), then **the mode set `0x00480E70(U, 1)`:
+      flag bit 0x40 := 0, mode := 1 (`0x00624690`)**; when the mode set
+      returns non-zero, the client graphics, overlay and mode-sound
+      refresh of U (`0x00470610`, `0x00480D20`, `0x004CC5B0`; effects,
+      open question 1).
+2. **NPC menu open** `M(U, a)` (`0x004B66B0`, NPC unit in ESI; callers
+   the 0x28 branch B6 and `0x004B6A30`). With U absent and a = 0: `E`
+   of the interact NPC GUID and `SetUIState(8, off, 0)` (rule 1). Else,
+   after the UI fields (interact NPC := U, `ui/messages.md` §14):
+   **U flag bit 0x2 := 0** (`0x004B6794`). `SetUIState(8, on, 0)`
+   refused (`0x004B687E` returns 0): `[0x007C0C6B]` := 0 (UI), **U flag
+   bit 0x2 := 1** (`0x004B6890`), C→S **0x30** [u32 1][U's GUID]
+   (`0x004B689F`), interact NPC active := 0 (UI), then `0x004B3830`(U's
+   GUID): **stock discard** of (1, GUID) when present (rule 3) and the
+   greeting stop.
+3. **Stock discard** of an NPC U (`0x004B3790`; from rule 1.2 and from
+   `0x004B3830`, which is also the `NpcGone` output of 0x28,
+   `client/msg-ui.md` §16 r3). The UI hire table's used flags (10 × 16
+   bytes from `0x007C0C8D`) := 0 (UI state, `client/msg-ui.md` §6).
+   Model: when U has an inventory (+0x60), every item of its item list
+   (first item inventory +0xC, next = item data +0x64, read before the
+   item is removed) **is removed from S and freed** (`0x00465EE0(item
+   GUID, type 4)`, the table remove of §2), then **U's inventory list
+   is emptied** (`0x0063CB70`). These are the NPC's shop items (S→C
+   0x9C into the NPC's store, `client/msg-stats-items.md`).
+4. **Skill fallback** (`0x00496CF0`, the control panel's skill-button
+   draw; `ui/control-panel.md` §7 r1). For the local player P (none →
+   nothing), first the left skill (`0x00620190(P)`, +8 of the skill
+   list), then the right skill (`0x006201D0(P)`, +0xC): when the entry
+   exists and its level with bonuses `0x006442A0(P, entry, 1)` ≤ 0: the
+   native entry of that skill id (`0x00643CE0`) is removed with d = 1
+   (`0x006470F0` → `0x00646FD0`, `client/msg-skills.md` §2 rule 5),
+   then left (right) := the entry (0, owner −1) (`0x00643BC0` /
+   `0x00643C50`, `client/msg-skills.md` §2 rule 3; not found →
+   unchanged). 1.14d runs it in every frame's UI draw (`0x0044C990` →
+   `0x00456EE0` → `0x00499450` at `0x0045709E`, unconditional; →
+   `0x00496CF0` at `0x004994C4`). **d2rs:** the bridge runs it as the
+   last step of `bridge_frame` (`client/bridge.md` §8 rule 1). Nothing
+   writes `ClientWorld` between that point and the UI draw (§10 r6
+   there), so the draw sees the same model as in 1.14d; frames that
+   1.14d draws more or fewer times than it receives are open question
+   17.
+5. **Town exit** (`0x004B3E10`, UI): called by the local player's
+   room-change step `0x00460E70` (from the player update `0x00463390`
+   at `0x004636D5`, §5) when the town flag `[0x007A5260]` (`0x0061AB00`
+   of the new room) goes from 1 to 0. It re-arms the NPC greetings and,
+   with an active interaction whose NPC is present, runs `E` (rule 1)
+   (`ui/messages.md` §13 r4). It is reached from a model update, not
+   from a message output: open question 16.
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -772,6 +853,10 @@ marked synthetic.
 | same, operator GUID 7 unknown | no output | synthetic, §15 rule 4 step 2 |
 | shrine object, `Code` 6; 0x0E `0e 02 09000000 03 00 01000000` drained, U mode 0 | `0x004BCF60` mode change; outputs [`ShrineFx` on-mode code 6, overlays 0x3B, 0x39] | synthetic, §15 rule 3 |
 | hireling (1, 1) in a client room whose last 0x08 drops it to status 4; next ticked update pass | `outgoing` += `4b 01000000 01000000`; hireling skipped, both bits cleared | §16; PC 2 `tp80-packets.jsonl` after tick 2919 |
+| `E(6)`, NPC (1, 6) present in mode 3 with items (4, 20), (4, 21) in its inventory, local player data +0x150 = 5 | items (4, 20), (4, 21) gone from S, NPC inventory empty; NPC flag bit 0x2 set, bit 0x40 clear, monster data +0x28 bit 0 clear, mode 1; player data +0x150…+0x15C = 0; `outgoing` += `30 01000000 06000000` | synthetic, §17 rule 1 |
+| `E(6)`, (1, 6) absent | player data cleared; `outgoing` += `30 01000000 06000000`; nothing else in the model | synthetic, §17 rule 1 |
+| end of `bridge_frame`, local player left skill = native entry of skill 36 with base 0 and no bonus; skill 0 native entry present | entry 36 unlinked; left = skill 0 entry; right unchanged | synthetic, §17 rule 4 |
+| same, entry 36 base 2 with a −2 bonus (level 0) | entry 36 base 1, kept; left = skill 0 entry | synthetic, §17 rule 4 |
 
 ## Provenance
 
@@ -821,6 +906,16 @@ Area 4 session (2026-10-07, PC 2 requests): object requests
 offsets from `data/fields.tsv`. Room free paths: `0x0061B560`,
 `0x0066F1A0` (call `0x0066F1CA`), `0x0061AFD0` (callers `0x0044C8A9`,
 `0x0044E11A`, and the server's `0x0052C887`), `0x0061A840`.
+§17 (2026-10-08, PC 2 requests from spec-ui pass 3, re-read on the
+1.14d export with `tools/ghidra/disasm.py`): `0x004B3C20` (whole),
+`0x004B3790`, `0x004B3830`, `0x00480E70`, `0x00465EE0` → `0x00465E80`,
+`0x0063B2C0`, `0x0063DFA0`, `0x0063DFD0`, `0x0063CB70`; `0x004B66B0`
+(`0x004B66B5`–`0x004B68B7`); `0x00496CF0`, `0x00643CE0`, `0x006470F0`,
+`0x00646FD0`, caller chain `0x00456EE0` (`0x0045709E`), `0x00499450`
+(`0x004994C4`); `0x00460E70` (call `0x00460EDE`), `0x00463390`
+(`0x004636D5`). The export adds to PC 2's list: rule 1 also runs the
+stock discard, clears monster data +0x28 bit 0, flag bit 0x40 and sets
+mode 1; rule 2's refusal also runs the stock discard.
 
 ## Open questions
 
@@ -889,3 +984,16 @@ offsets from `data/fields.tsv`. Room free paths: `0x0061B560`,
 15. The on-mode / on-use shrine functions (`0x004BD4A0`, `0x004BD090`,
     `0x004BD0C0`, `0x004BD220`, `0x004BD360`) and the overlay calls
     `0x0046F0C0` / `0x00470390` (§15): Phase 6 effects spec.
+16. §17 rule 5: the town exit runs UI code (greeting re-arm, interaction
+    end with model writes) from the local player's update, outside any
+    message output. d2rs needs a way for the update pass to hand it to
+    the UI layer in 1.14d order (e.g. a new `client/bridge.md` §10
+    output variant emitted by the update pass; a code-table change) —
+    (`client/msg-ui.md` open question 10 is answered by
+    `client/bridge.md` §10 r10, which covers the model writes; the hand-off
+    of the update pass to the UI layer stays open.)
+17. §17 rule 4: whether 1.14d ever runs the in-game UI draw
+    (`0x0044C990` → `0x00456EE0`) a different number of times than
+    the receive per frame (frame skip, minimized window). It matters
+    only when the fallback repeats (a skill-0 entry with level ≤ 0).
+    Settle by reading `0x0044C990`'s callers.
