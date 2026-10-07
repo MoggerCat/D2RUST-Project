@@ -122,13 +122,30 @@ decompiler output was consulted.
 ## Open questions
 
 1. Meaning of the unknown bytes (steps 6 and 10).
+   *Answered* (static, 1.14d parser `0x00665950`): no meaning in 1.14d.
+   The parser skips both without reading them: 8 bytes when 9 ≤ v ≤ 13
+   (`0x00665A06`), 4 bytes before the group count when v ≥ 18
+   (`0x00665DC3`). d2rs keeps them only for round-tripping.
 2. Exact empty-cell rule and flag bits for map building: map spec.
+   *Answered* in the owners: what the parser keeps is `drlg/preset.md`
+   §5.2; the cell bits, hidden / empty handling and tile choice are
+   `drlg/rooms.md` §9.4–§9.5.
 3. What the original game uses for the missing fields of a truncated group
    (0, or whatever follows in memory): check in an RE session. It only
    affects `trees.ds1`'s 14th group.
+   Partly answered (static): the parser reads past the file end into the
+   0x320 bytes of uninitialized slack the loader allocates after the
+   buffer (`drlg/preset.md` §5.2, OQ 2); so the value is not 0 by rule.
+   `trees.ds1` is v12, so even its whole groups have no variant value
+   (`drlg/outdoor-tilesub.md` OQ 4). A memory read settles both (PC 2
+   recording list).
 4. **Trailing data in v12–13 files.** 54 files (v12/v13) end with 4 zero
    bytes after the last documented section. `ACT1\OUTDOORS\swamp2.ds1` (v13,
    tag_type 1) ends with the u32s `[1, 5, 3, 3, 0, 15, 0, 0, 0, 0, 0, 0]`.
    Hypothesis: these versions already carry an NPC-path count (0, or one
    path cut short in swamp2). It's unconfirmed, so the bytes are kept as
    `trailing`. Check in an RE session against the DS1 loader.
+   *Answered* (static): the 1.14d parser reads paths only when v ≥ 14
+   (`0x00665E46`) and ignores anything after the last section
+   (`drlg/preset.md` §5.2 rules 10–11), so the trailing bytes of v12/v13
+   files are never read: no NPC paths for those versions.

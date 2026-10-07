@@ -42,7 +42,7 @@
 | d2-data policy | 696–722 |
 | Test vectors | 723–756 |
 | Provenance | 757–845 |
-| Open questions | 846–899 |
+| Open questions | 846–903 |
 <!-- /index -->
 
 ## Summary
@@ -874,7 +874,11 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
    by the load-all routine's inputs, which its only caller sets to
    input 2 = 0 and input 3 = (config byte +0x19 == 6). Input 2 also gates
    a `lvltypes` tile step between steps 60 and 61 (`0x0061FAE0`), which
-   therefore never runs.
+   therefore never runs. *Partly answered* (static): the `lvlprest`
+   DS1 preload never runs either: `0x0061EBB0` receives input 2 in EDX
+   (call `0x0061941D`) and calls the DS1 loader `0x00665F40` only when it
+   is non-zero (`0x0061EFAD`; `drlg/preset.md` OQ 6). The `lvlsub` loader
+   (`0x0061F130`) takes no such input; its abort 0x3C8 is still open.
 10. `0x00653DB0`, a generic 2-byte-record loader, has no callers (dead
     code); not part of the load.
 11. Record layouts of the sound tables (142 and 88 bytes). Answered for

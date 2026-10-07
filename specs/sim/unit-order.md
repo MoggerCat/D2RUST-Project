@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 299–309 |
 | Test vectors | 310–343 |
 | Provenance | 344–361 |
-| Open questions | 362–380 |
+| Open questions | 362–384 |
 <!-- /index -->
 
 ## Summary
@@ -364,6 +364,10 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
 1. Client list (§7) with more than one client: needs a hosted game.
 2. Adjacent-room array order (§9): owned by the DRLG spec; record it in
    the same trace (room +0x00 / +0x24) to fix it (the snapshots already hold the arrays).
+   *Answered* in the owner: `drlg/rooms.md` §6 (fill `0x0066BD00` =
+   rooms-near order restricted to active rooms, refilled at each
+   neighbouring activation; removal `0x0061A910` swaps the last entry
+   into the hole). Its trace confirmation is `drlg/rooms.md` OQ 3.
 3. Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
    order in which restored units re-enter the room list and whether they
    keep their GUIDs (observed: GUIDs are reused after removal, §1.4).

@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 606–631 |
 | Test vectors | 632–646 |
 | Provenance | 647–699 |
-| Open questions | 700–719 |
+| Open questions | 700–725 |
 <!-- /index -->
 
 ## Summary
@@ -702,14 +702,20 @@ sites; level seed writes at 0x642B62 for levels 8–12).
 1. Trace confirmation: no recording yet generates a maze level; record
    entering Den of Evil (8) and Cave Level 1 (9) and compare with the
    vectors above.
-2. Whether the Act 3 and Act 5 DRLGs use the same dwStartSeed as Act 1
-   (assumed for the Spider Cavern vector; `drlg/levels.md` owns it).
-3. `0x00673FF0` (just after the maze functions; returns a bit for level
-   ids in an 8-entry list from `0x0066C040`) is not referenced by maze
-   code; its owner is unknown.
-4. The level rect used by normalization and by the first-cell centring
-   (`0x00642D10`, `drlg/levels.md`) must give Den of Evil (1500, 1000,
-   200, 200) for the first vector; confirm there.
+2. *Answered* (static): yes. Every act's DRLG takes `dwStartSeed` from
+   the first step of `{init seed, 666}` (`drlg/levels.md` §3 steps 2–3,
+   before any act-specific draw), and the init seed is game +0x7C for
+   every act (`levels.md` §2 rule 2), which nothing writes after the join
+   (`levels.md` OQ 5 lists the three writers). So Acts I–V share one
+   `dwStartSeed`.
+3. *Answered* (static): `0x00673FF0` is not maze code. Its only caller
+   is `0x00674106` in the outdoor link vis flag `0x00674040`
+   (`drlg/outdoor.md` §5.5): it returns `1 << (j + 4)` for the vis slot
+   j (vis array from `0x0066C040`) holding the neighbour level's id, or
+   0 if none. Owner: `outdoor.md` §5.5.
+4. *Answered* (static): Den of Evil (8) has `Depend` 0, `SizeX`/`SizeY`
+   200 in all three difficulties and offset (1500, 1000) in 1.14d
+   `levels.txt`, so `levels.md` §6 rule 1 gives (1500, 1000, 200, 200).
 5. *Answered* (`impl-drlg-act3-5` Q10): the cross-level sorted insert
    puts a record that precedes no later record at the tail (§7.1).
 6. *Answered* (`impl-drlg-act3-5` Q13): the spiral's branches are never

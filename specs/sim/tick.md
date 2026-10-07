@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 468–499 |
 | Test vectors | 500–588 |
 | Provenance | 589–617 |
-| Open questions | 618–635 |
+| Open questions | 618–648 |
 <!-- /index -->
 
 ## Summary
@@ -276,7 +276,7 @@ callers in 1.14d (all through `0x00541650`):
 |---|---|---|
 | `0x00553F00` (D2MOO `sub_6FCBD3A0`: start per-tick mode updates of a player or monster) | type 0, args 0, 0 | cancels the unit's type-0 events (`0x00540E60(type 0, any arg)`) |
 | `0x0059F8A0` (missile setup) | type 0, args 0, 0 | cancels all the missile's timers (`0x00540F30`) |
-| `0x005D18E0` (a druid skill, D2MOO `SkillDruid.cpp`) | type 5, args skill id, level | cancels the unit's type-5 events with that skill id |
+| `0x005D18E0` (imp possess helper: acts only when the first unit is monster class 492 `imp1`; only caller `0x005D1BCD` in srvdo 129 Imp Teleport `0x005D1AB0`, `skills/bodies-4.md` §3.24 "Possess"; not a druid skill as D2MOO's file placement suggested) | type 5, args skill id, level | cancels the unit's type-5 events with that skill id |
 
 #### 5.4 Cancelling
 
@@ -630,5 +630,18 @@ equal the implementation's lists (`unit-order.md`, Test vectors).
    step-9 pass; its only caller is step 9).
 5. Does the character save every 8192 frames write the `.d2s` in single
    player (host callbacks `0x00883D50` absent)? Observe a save timestamp.
-6. `0x0055F4F0` in the per-client update: what it does (no D2MOO 1.10f
-   counterpart identified).
+   *Answered* (static): yes. `0x0052D440` runs `0x0052CA10` on frame
+   % 8192 = 0 (no heartbeat drop); it calls the save `0x00532400` for
+   every client whatever the host callbacks (only the report after it
+   needs `[0x00883D50]`). `0x00532400` branches on game +0x6A: 1 or 2 →
+   `0x00532340` (save sent through the client code); otherwise, with no
+   host callbacks → `0x00532240`, which builds the save (`0x00569AD0`,
+   0x2000-byte buffer) and writes it with `fopen(path, "wb")` /
+   `fwrite` / `fclose`, path `"%s%s.d2s"` (save directory + name;
+   failure logs "Unable to open player save file %s"); with host
+   callbacks → `0x00531EB0`. Single player is game type 3 with no host
+   callbacks, so the file is written. `0x00532240` and `0x00531EB0`
+   return without writing while `[0x007310CC]` = 0 (`-nosave`,
+   `tools/original-hooks.md` §5.1; initial 1).
+6. *Answered* (static): `0x0055F4F0` is an empty function (`ret 4`, 3
+   bytes; 8 callers). It does nothing in 1.14d.
