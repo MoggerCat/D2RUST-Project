@@ -15,6 +15,7 @@ use crate::compile::CodeLinker;
 use crate::schema::{schema, CalcBuffer, FieldType, Link, TableDef};
 use crate::strings::{StringTables, StringsError};
 use crate::txt::{TxtError, TxtTable};
+use d2_formats::tbl::StringTable;
 
 /// `DATA\GLOBAL\EXCEL\` (§1).
 pub const EXCEL_DIR: &str = "data\\global\\excel\\";
@@ -33,6 +34,9 @@ pub enum LoadError {
     Mpq { file: String, source: MpqError },
     #[error("{file}: not found in any archive")]
     Missing { file: String },
+    /// A read error from a non-archive [`TableFiles`] source (native).
+    #[error("{file}: {detail}")]
+    Source { file: String, detail: String },
     #[error("{file}: {len} bytes, shorter than the 4-byte count")]
     TooShort { file: String, len: usize },
     #[error("{file}: {len} bytes, expected 4 + {count} x {record_size} = {expected}")]
@@ -62,6 +66,42 @@ fn check(table: &str, rule: impl Into<String>) -> LoadError {
     LoadError::Check {
         table: table.to_owned(),
         rule: rule.into(),
+    }
+}
+
+/// Where the table loader reads its files: the archive set (`Mpq`, today)
+/// or a converted native folder (`native-assets.md` §5.3, implemented in
+/// `d2-native::source`). Both give the loader the same bytes: the native
+/// source serves each `.bin` as the compile of its native `.txt` with the
+/// overrides and mod patches applied.
+pub trait TableFiles {
+    /// `(origin, bytes)` of the excel file `file` (`armor.bin`), or `None`
+    /// when the source has none.
+    fn read_excel(&self, file: &str) -> Result<Option<(String, Vec<u8>)>, LoadError>;
+    /// `d2exp.mpq` is present (or the native conversion is of LoD).
+    fn lod(&self) -> bool;
+    /// The string table at `path` (`data\local\lng\eng\string.tbl`).
+    fn string_table(&self, path: &str) -> Result<StringTable, StringsError>;
+}
+
+impl TableFiles for ArchiveSet {
+    fn read_excel(&self, file: &str) -> Result<Option<(String, Vec<u8>)>, LoadError> {
+        read_excel(self, file)
+    }
+
+    fn lod(&self) -> bool {
+        self.has_archive("d2exp.mpq")
+    }
+
+    fn string_table(&self, path: &str) -> Result<StringTable, StringsError> {
+        let bytes = self.read(path).map_err(|source| StringsError::Mpq {
+            file: path.to_owned(),
+            source,
+        })?;
+        StringTable::parse(&bytes).map_err(|source| StringsError::Format {
+            file: path.to_owned(),
+            source,
+        })
     }
 }
 
@@ -189,9 +229,9 @@ fn server_files(table: &str) -> &'static [&'static str] {
 
 /// The §3.3 check made before `table` loads: any of its server-only files
 /// present in the archive set is fatal.
-fn check_server_files(set: &ArchiveSet, table: &str) -> Result<(), LoadError> {
+fn check_server_files(set: &dyn TableFiles, table: &str) -> Result<(), LoadError> {
     for file in server_files(table) {
-        if set.contains(&excel_path(file)) {
+        if set.read_excel(file)?.is_some() {
             return Err(LoadError::ServerFile {
                 file: excel_path(file),
                 table: table.to_owned(),
@@ -226,10 +266,12 @@ impl BinSet {
     }
 }
 
-fn load_bin(set: &ArchiveSet, def: &TableDef) -> Result<BinTable, LoadError> {
-    let (source, bytes) = read_excel(set, &def.bin_name)?.ok_or_else(|| LoadError::Missing {
-        file: excel_path(&def.bin_name),
-    })?;
+fn load_bin(set: &dyn TableFiles, def: &TableDef) -> Result<BinTable, LoadError> {
+    let (source, bytes) = set
+        .read_excel(&def.bin_name)?
+        .ok_or_else(|| LoadError::Missing {
+            file: excel_path(&def.bin_name),
+        })?;
     BinTable::parse(
         &def.name,
         &source,
@@ -241,8 +283,13 @@ fn load_bin(set: &ArchiveSet, def: &TableDef) -> Result<BinTable, LoadError> {
 
 /// Loads and validates the live `.bin` set (§3.1, §4, §6, §8, §10.8).
 pub fn load(set: &ArchiveSet, language: &str) -> Result<BinSet, LoadError> {
-    let lod = set.has_archive("d2exp.mpq");
-    let strings = StringTables::load(set, language, lod)?;
+    load_from(set, language)
+}
+
+/// [`load`] over any [`TableFiles`] source (`native-assets.md` §5.3).
+pub fn load_from(set: &dyn TableFiles, language: &str) -> Result<BinSet, LoadError> {
+    let lod = set.lod();
+    let strings = StringTables::load_from(set, language, lod)?;
     let mut tables: Vec<BinTable> = Vec::new();
     let mut code = BTreeMap::new();
     for def in schema().runtime() {
@@ -252,7 +299,7 @@ pub fn load(set: &ArchiveSet, language: &str) -> Result<BinSet, LoadError> {
         tables.push(table);
         for &buffer in buffers_after(&def.name) {
             let file = format!("{}.bin", buffer.name());
-            let (source, bytes) = read_excel(set, &file)?.ok_or_else(|| LoadError::Missing {
+            let (source, bytes) = set.read_excel(&file)?.ok_or_else(|| LoadError::Missing {
                 file: excel_path(&file),
             })?;
             code.insert(
@@ -293,7 +340,7 @@ pub fn load(set: &ArchiveSet, language: &str) -> Result<BinSet, LoadError> {
     let hitclass = load_bin(set, hitclass_def)?;
 
     let read_txt = |file: &str| -> Result<TxtTable, LoadError> {
-        let (_, bytes) = read_excel(set, file)?.ok_or_else(|| LoadError::Missing {
+        let (_, bytes) = set.read_excel(file)?.ok_or_else(|| LoadError::Missing {
             file: excel_path(file),
         })?;
         Ok(TxtTable::parse(&excel_path(file), &bytes)?)

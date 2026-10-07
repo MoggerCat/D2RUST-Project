@@ -27,3 +27,5 @@ pub mod asset;
 pub mod manifest;
 
 // ---- N4: runtime source and mod layers (source, layers)
+pub mod layers;
+pub mod source;

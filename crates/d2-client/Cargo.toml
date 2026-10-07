@@ -11,6 +11,7 @@ license.workspace = true
 # The only crate allowed to depend on Bevy (enforced by tools/depcheck).
 bevy.workspace = true
 d2-formats.workspace = true
+d2-native.workspace = true
 d2-proto.workspace = true
 d2-net.workspace = true
 # The in-process server of single player (`bridge::local`). Never the

@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME]
+//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -77,6 +77,10 @@ struct Options {
     save: Option<PathBuf>,
     /// `play --new CLASS NAME`: a new character (decision D3).
     new: Option<(String, String)>,
+    /// `play --native DIR`: a converted native folder (`native-assets.md` §3.4).
+    native: Option<PathBuf>,
+    /// `play --source native|mpq` (`mpq`: debug builds only, §5 r5).
+    source: Option<String>,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -112,6 +116,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
         synthetic: false,
         save: None,
         new: None,
+        native: None,
+        source: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -131,6 +137,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--seed" => o.seed = value()?.parse().context("--seed")?,
             "--synthetic" => o.synthetic = true,
             "--save" => o.save = Some(PathBuf::from(value()?)),
+            "--native" => o.native = Some(PathBuf::from(value()?)),
+            "--source" => o.source = Some(value()?.clone()),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -357,8 +365,43 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
+/// `play` on a native folder (`native-assets.md` §3.4, §5): opens and
+/// checks the root and loads the table set from it. The play app still
+/// reads levels, UI art and sound through the archive set, so it stops
+/// there with the seams named (`docs/handoff/native-n4.md`).
+fn play_native(dir: &std::path::Path) -> Result<()> {
+    let src = d2_native::source::NativeSource::open(dir)?;
+    println!(
+        "play: native folder {} (converter {}, {} mod layer(s))",
+        dir.display(),
+        src.manifest.converter_version,
+        src.layers.layers.len() - 1
+    );
+    let tables = src.tables(d2_data::bin::DEFAULT_LANGUAGE)?;
+    let bins = d2_data::bin::load_from(&tables, d2_data::bin::DEFAULT_LANGUAGE)?;
+    println!(
+        "play: native tables loaded ({} runtime tables)",
+        bins.tables.len()
+    );
+    bail!(
+        "play on a native folder: the source and tables load, but the play app still reads its levels, UI and sound through the archive set (seams in docs/handoff/native-n4.md); run with D2_GAME_DIR for now"
+    )
+}
+
 fn play(o: Options) -> Result<()> {
     use d2_client::app::{play, single_player};
+    let choice = d2_client::assets::choose_source(
+        o.native.as_deref(),
+        o.source.as_deref(),
+        |k| std::env::var(k).ok(),
+        d2_client::assets::default_native_dir(),
+    )
+    .map_err(anyhow::Error::msg)?;
+    if let d2_client::assets::SourceChoice::Native(dir) = &choice {
+        if !o.synthetic {
+            return play_native(dir);
+        }
+    }
     let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
     let data = single_player::GameData::select(dir.as_deref(), o.synthetic)?;
     match &data {
@@ -405,7 +448,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--save FILE.d2s | --new CLASS NAME] [--native DIR] [--source native|mpq]"),
     }
 }
 
