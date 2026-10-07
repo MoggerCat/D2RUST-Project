@@ -40,17 +40,17 @@
 |   3. Game entry: picking the quest set | 336–368 |
 |   4. Events and dispatch | 369–453 |
 |   5. Quest updater and timers (tick step 8) | 454–475 |
-|   6. Status reporting | 476–580 |
-|   7. NPC dialog hooks | 581–613 |
-|   8. Act transitions, warps and portals | 614–695 |
-|   9. Quest items, rewards and helpers | 696–859 |
-|   11. Acts II–V | 860–868 |
-| Constants & data dependencies | 869–883 |
-| Randomness | 884–910 |
-| Edge cases & original bugs | 911–929 |
-| Test vectors | 930–961 |
-| Provenance | 962–990 |
-| Open questions | 991–1052 |
+|   6. Status reporting | 476–585 |
+|   7. NPC dialog hooks | 586–618 |
+|   8. Act transitions, warps and portals | 619–706 |
+|   9. Quest items, rewards and helpers | 707–871 |
+|   11. Acts II–V | 872–887 |
+| Constants & data dependencies | 888–902 |
+| Randomness | 903–929 |
+| Edge cases & original bugs | 930–948 |
+| Test vectors | 949–980 |
+| Provenance | 981–1009 |
+| Open questions | 1010–1071 |
 <!-- /index -->
 
 ## Summary
@@ -517,7 +517,12 @@ Handler `0x0054C0C0` (size must be 1) calls `0x00546040(game, player)`:
 player's room's act = record act. Message (6 bytes, `0x0053D710`): u8
 0x5D, u8 chain, u8 record flags (+0x14), u8 status (status_fn, or the
 default rule), u16 extra = Den of Evil monsters left for filter 1,
-barbarians left for filter 36, else 0. Quest code sends it per player
+barbarians left for filter 36, else 0. Status byte exactly
+(`0x00544236`–`0x005442B6`): it starts at 0; no status_fn → the default
+rule (`0x00543F90`); a status_fn gets an out byte preset to 0 and the
+status byte takes it only when the function returns 1 (`0x005442AF`),
+so a status_fn returning 0 sends status **0**, not the record's status.
+No player room, or a room without a level → nothing sent. Quest code sends it per player
 through `0x00544300(record, status, unit, iterate_fn, iterate)`: status
 byte = status; if iterate = 1 (iterate_fn null → fatal), call
 iterate_fn(game, player, unit) for every player through `0x005537D0`
@@ -616,7 +621,11 @@ args: player, NPC class (0 if none), message; dispatch event 11 (1, 1).
 #### 8.1 Act completion (`0x005467E0(game, player, npc)`)
 
 Called by the NPC travel action (`world/npc.md`, from `0x00579D60`)
-before the act change; only for a monster NPC:
+**after** the act change: at each of the three travel sites the act
+change `0x0054B830` runs first (`0x0057A67A`, `0x0057A6FF`,
+`0x0057A786`), then `0x005467E0` (`0x0057A688`, `0x0057A70D`,
+`0x0057A794`), then the waypoint step (`0x00660E00`; corrected
+2026-10-07, disassembly); only for a monster NPC:
 
 | NPC (class) | Condition | Sets (player record) | Then |
 |---|---|---|---|
@@ -688,7 +697,9 @@ the Cow King); or (classic game) the player lacks slot 26 bit 0, or
 Encampment). Else free spot near the player (`0x00545340`, size 3,
 collision mask 0x400, radius 4 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); if found and a portal object
 of class 60 to level 39 is created (`0x0056D130`), set game slot 4 bit 11
-and return 1. Its only route is the cube output-kind table `0x006E11C8`
+and return 1. Every other outcome (a refusal test, no free spot at
+`0x00594211`, no portal at `0x0059422F`) takes the same exit
+`0x0059424B`: the player sound `0x00553380`, return 0. Its only route is the cube output-kind table `0x006E11C8`
 through `jmp` thunks (`world/cube.md` §9). The Pandemonium portal functions
 `0x00594270` and `0x00594280` are `xor eax, eax; ret` stubs in 1.14d:
 they create nothing.
@@ -699,8 +710,9 @@ they create nothing.
 
 (game, player, code, level, quality, droppable): look up the item code
 (return none if absent); level = the player-based default
-(`0x00558200`) unless level ≠ 0; ask item creation (`0x00559CE0`,
-count 1, the given quality) for the item (items spec); if it has max
+(`0x00558200`, `quests-act5.md` open question 2: the player's base
+stat 12, at least 1) unless level ≠ 0; ask item creation (`0x00559CE0`,
+`items/generation.md` §10.2; count 1, the given quality) for the item (items spec); if it has max
 durability > 0 set durability to it; inventory page 0; try to place it in
 the inventory (`0x00560200`); on success identify it unless identified
 and return it; else if droppable: drop it at a free spot near the player
@@ -710,7 +722,7 @@ else free it and return none.
 #### 9.2 Deleting a quest item
 
 `0x00544160(game, player, code)` finds the player's item with the code
-(`0x00558110`) and removes it (`0x005440A0`: by item mode: stored →
+(`0x00558110`, search order `quests-helpers.md` §8) and removes it (`0x005440A0`: by item mode: stored →
 update client and remove; equipped → unequip path; on cursor → remove).
 
 #### 9.3 Player GUID lists
@@ -861,10 +873,17 @@ Returns 0 in every non-fatal case. No draw of its own.
 
 Catalogued in `quests.tsv` (records, callbacks, tables) and `quest-messages.tsv`.
 Hooks other specs rely on are specified above (§8.1–§8.4, §9.4, §9.5).
-Their state machines are not yet specified (Open question 8). Now specified
+Their state machines (Open question 8, answered) are in the per-act files
 (2026-10-07): Act II `quests-act2.md`, `quests-act2-2.md`; Act III
 `quests-act3.md`, `quests-act3-2.md`; Act IV `quests-act4.md`; Act V
 `quests-act5.md`, `quests-act5-2.md`; quest object functions §9.6.
+The client's copy of the quest state (S→C 0x52 / 0x5D / 0x5E / 0x28 /
+0x29 / 0x50) and the client quest check `0x004A4180` that the
+level-entry lines use: `quests-status.md` §1 and §12.
+Shared helper functions the act files call (free-spot search
+`0x00545340`, critical spawn `0x005459A0`, superunique spawn
+`0x00545C30`, quest missiles, interaction end, game end):
+`quests-helpers.md`.
 
 ## Constants & data dependencies
 

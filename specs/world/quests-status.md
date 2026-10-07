@@ -20,27 +20,28 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–57 |
-| Inputs | 58–68 |
-| Outputs / state changes | 69–76 |
-| Rules | 77–78 |
-|   1. Client state the quest log reads | 79–110 |
-|   2. The quest-log entry table `0x00723F30` | 111–139 |
-|   3. Status tables and the tab build | 140–168 |
-|   4. Row derivation (`0x004A1950`) | 169–215 |
-|   5. Icon states (`0x004A34F0`, jump table `0x004A3E28`) | 216–237 |
-|   6. Per-quest special cases (summary) | 238–267 |
-|   7. Act I status tables | 268–372 |
-|   8. Act II status tables | 373–481 |
-|   9. Act III status tables | 482–595 |
-|   10. Act IV status tables | 596–647 |
-|   11. Act V status tables | 648–765 |
-| Constants & data dependencies | 766–782 |
-| Randomness | 783–786 |
-| Edge cases & original bugs | 787–804 |
-| Test vectors | 805–825 |
-| Provenance | 826–840 |
-| Open questions | 841–847 |
+| Summary | 47–58 |
+| Inputs | 59–70 |
+| Outputs / state changes | 71–78 |
+| Rules | 79–80 |
+|   1. Client state the quest log reads | 81–112 |
+|   2. The quest-log entry table `0x00723F30` | 113–141 |
+|   3. Status tables and the tab build | 142–170 |
+|   4. Row derivation (`0x004A1950`) | 171–217 |
+|   5. Icon states (`0x004A34F0`, jump table `0x004A3E28`) | 218–239 |
+|   6. Per-quest special cases (summary) | 240–269 |
+|   7. Act I status tables | 270–374 |
+|   8. Act II status tables | 375–483 |
+|   9. Act III status tables | 484–597 |
+|   10. Act IV status tables | 598–649 |
+|   11. Act V status tables | 650–767 |
+|   12. Client quest check `0x004A4180(c)` (level-entry lines) | 768–814 |
+| Constants & data dependencies | 815–831 |
+| Randomness | 832–835 |
+| Edge cases & original bugs | 836–853 |
+| Test vectors | 854–880 |
+| Provenance | 881–895 |
+| Open questions | 896–902 |
 <!-- /index -->
 
 ## Summary
@@ -65,6 +66,7 @@ speech string id.
 | counters D, Y, B | i32 `[0x007BF2A4]`, `[0x007BF2A8]`, `[0x007BF2AC]` | S→C 0x50 (§1 rule 2); D and B also from 0x5D (`client/msg-ui.md` §1 r2, r7) |
 | last shown status `last[0..40]` | u8 × 41 at `[0x007BF380]` | written by §4 |
 | game type | `[0x007A0610]` (0 = single player) | `sim/tick.md` |
+| quest availability `A[0..36]` | u8 × 37 at `[0x007C0EA4]`, valid flag `[0x007C0ECC]` | S→C 0x5E (`client/msg-ui.md` §14); read only by §12 |
 
 ## Outputs / state changes
 
@@ -763,6 +765,53 @@ Chain 36, filter 40; tab 5 slot 5; icon `a5q6` (index 26); table `0x00723E64`; t
 
 Statuses 6, 7, 8, 9: 3725 / 3725 (null).
 
+### 12. Client quest check `0x004A4180(c)` (level-entry lines)
+
+The only caller is the level-entry line machine `0x004CC270`
+(`0x004CC322`, `audio/environment.md` §4 r2), which passes the record's
+q (record +0x28) when it is ≠ 0. `c` arrives in ECX. Result 1 = "the
+quest is open and not done for this player"; 0 otherwise. Steps, first
+failing test returns 0:
+
+1. **0x5E byte:** `0x004B92E0(0, c)` reads byte c of the last S→C 0x5E
+   (`[0x007C0EA4 + c]`, `client/msg-ui.md` §14). Before any 0x5E
+   (`[0x007C0ECC]` = 0) it is fatal (error string 0x60); c ≥ 37 is
+   fatal (0x65). The byte must be ≠ 0. The 0x5E bytes are in
+   init-table row order (`world/quests.md` §3 step 5: byte r = the
+   not-intro byte of row r's chain record), but c indexes them
+   directly, so for c ≥ 8 the byte read is row c's (`quests.tsv`
+   `index` = c), not chain c's. Reproduced.
+2. **Entry:** the first entry i of §2 (i = 0…40) whose server chain
+   (entry +8) = c; none → 0. q := entry +0xC (= i). q = 42 → 0 (no
+   1.14d entry has it).
+3. **Game record:** G must have been received (`0x004B32E0` ≠ null)
+   and G.13 (slot q) must be clear.
+4. **Player record:** P must have been received (`0x004B32D0` ≠ null);
+   P.1, P.0 and P.14 (slot q, tested in that order) must all be clear.
+5. **Den of Evil (c = 1 only):** a zeroed 0x26A-byte row with quest id
+   q at +1 is built by §4 (`0x004A1950`); its shown status (+0x265)
+   must be < 5. §4's side effect stands: `last[1]` is rewritten by this
+   check (so the quest log's "changed" mark for Den of Evil can be
+   consumed by a level entry). Other c skip this step.
+6. Return 1.
+
+Per caller value (the 11 q of `audio/environment.md` §4; c, the 0x5E
+byte read, the entry whose bits are tested):
+
+| c | 0x5E byte = not-intro of chain | Entry q tested |
+|---|---|---|
+| 1, 2, 3, 5, 6 | c | c (Act I) |
+| 12 | 11 Arcane Sanctuary | 13 The Summoner |
+| 13 | 12 The Summoner | 14 The Seven Tombs |
+| 31 | 31 Siege on Harrogath | 35 Siege on Harrogath |
+| 34 | 34 Betrayal of Harrogath | 38 Betrayal of Harrogath |
+| 35 | 35 Rite of Passage | 39 Rite of Passage |
+| 36 | 36 Eve of Destruction | 40 Eve of Destruction |
+
+(Rows 31–36 hold chains 31–36, so the Act V lines read the matching
+byte; the two Act II lines read the byte of the chain one below the
+entry they test. Reproduced as read.)
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -822,6 +871,12 @@ Synthetic (computed from §4 and the image tables; no recording).
 | q 35, L 0, P {35: 0x0002} | text 21786, speech 20090, shown 0, state 3 | 1 |
 | q 5, L 12 | text 3729 (3727 replaced), state 3 | 7.2 |
 | q 9, L 0, P {}, G {} | state 2 | 8 |
+| §12: c 1, 0x5E byte 1 = 1, P {1: 0x0004}, L 1, G {} | 1 (row shown 1 < 5) | 12 |
+| §12: c 1, 0x5E byte 1 = 1, P {1: 0x0004}, L 5 | 0 (shown 5) | 12 |
+| §12: c 2, 0x5E byte 2 = 0 | 0 | 12 r1 |
+| §12: c 12, 0x5E byte 12 = 1, P {13: 0x0001} | 0 (Summoner's P.0) | 12 r4 |
+| §12: c 34, byte 34 = 1, G {38: 0x2000} | 0 (G.13) | 12 r3 |
+| §12: c 5, byte 5 = 1, P {5: 0x4000} | 0 (P.14) | 12 r4 |
 
 ## Provenance
 
@@ -833,7 +888,7 @@ exports (spec session 2026-10-07): 0x52 `0x0045CC00` → `0x004A40D0`;
 the disassembly: the export drops the ECX string id of `0x00524A30`);
 tab build `0x004A3220`; draw `0x004A34F0`; cels `0x004A23D0`; replay
 `0x004A27D0`; acknowledge `0x004A2760`; chain lookup `0x004A1910`;
-resets `0x004A3020`, `0x004A3410`. Tables `0x00723F30`, the 27 status
+resets `0x004A3020`, `0x004A3410`; quest check `0x004A4180` (caller `0x004CC322`), 0x5E byte read `0x004B92E0` (copy `0x004B92B0`). Tables `0x00723F30`, the 27 status
 tables, `0x006DA2C8`, `0x00723F08` dumped from the image with a script
 outside the repo; string keys from the 1.14d English `.tbl` files
 (`d2data.mpq`, `d2exp.mpq`, `Patch_D2.mpq`). D2MOO not used.

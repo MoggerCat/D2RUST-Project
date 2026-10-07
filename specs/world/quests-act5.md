@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 673–707 |
 | Test vectors | 708–722 |
 | Provenance | 723–747 |
-| Open questions | 748–793 |
+| Open questions | 748–798 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,7 @@ level, quality 2, droppable) unless stated; "delete `code`" = `quests.md`
 `5D c f 00 v` (u16 v, normally 0) sent to that player only
 (`0x005531C0` client of the player, `0x0053D710`); its status byte is 0
 and the record's status byte is not touched. "Critical spawn of class C at
-(x, y)" = `0x005459A0(game, x, y, room, 1, C)` (monster spec). "Kill in
+(x, y)" = `0x005459A0(game, x, y, room, 1, C)` (`quests-helpers.md` §2). "Kill in
 place" = the unit's interaction is ended, it is put in mode 12 (dead) and
 removed (monster spec; `0x005A7E60`, `0x005A7C20`, `0x0061A270`,
 `0x00623830`, `0x0064C370`). "Drop inactive node of C" =
@@ -779,6 +779,11 @@ other Act V part-1 quest code draws.
    `monsters/ai-bodies.md` §9.32 (NpcOutOfTown). The prisoner hooks are
    §4.10.
 5. Siege Boss state 118 set at creation (part 2 §10): states spec.
+   **Answered** (2026-10-07): state 118 is `states.txt` row 118
+   `corpse_noselect`, turned on with `0x00639DB0(unit, 118, 1)` as for
+   Blood Raven and the Countess (`monsters/init.md` §14.3 row 267); its client use
+   (a dead target with it cannot be a skill target) is
+   `client/msg-skills.md` §7. Nothing quest-side reads it.
 6. `quests.tsv` column `spec` still says `catalogued` for rows 31–36;
    switch it to `specified` (with a link to these files) once
    `quests.md` §2.4 documents owner files per act. Row 40's `?` cells

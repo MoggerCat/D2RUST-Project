@@ -46,7 +46,7 @@
 | Edge cases & original bugs | 796–854 |
 | Test vectors | 855–872 |
 | Provenance | 873–910 |
-| Open questions | 911–994 |
+| Open questions | 911–997 |
 <!-- /index -->
 
 ## Summary
@@ -556,7 +556,7 @@ player with 26.14, else the status byte.
   | 396 | +0x34 | (+32, +16) | 15 | 38 Grand Vizier of Chaos |
 
 - Dummy event 7 (`0x005B5750`, class 131 in level 108): its position
-  equals a pair → `0x00545C30(game, dummy, &pair, 2, id)` with id = the
+  equals a pair → `0x00545C30(game, dummy, &pair, 2, id)` (`quests-helpers.md` §3) with id = the
   u16 entry 36 / 37 / 38 of the data-tables array at +0xAE0 (+0xB28,
   +0xB2A, +0xB2C; read elsewhere by `0x00586B30`, ≤ 0x41 entries);
   spawn fails → event 7 again at f + 10. No pair → nothing. The array
@@ -635,13 +635,13 @@ With +0x02 clear: +0x03 clear → return 1. Else with now =
 updater ticks):
 
 1. +0x04 set and now > t0 + 95000: +0x01, +0x03, +0x04 := 0; classic →
-   `0x00530590(game, 0)` (host: end the game). Return 1.
+   `0x00530590(game, 0)` (host: end the game, `quests-helpers.md` §6). Return 1.
 2. Else now > t0 + 90000: +0x05 set → classic: for each player
    `0x005B4A80`; +0x05 := 0. Return 0.
 3. Else now > t0 + 75000 and +0x15 = 0: +0x15 := 1; `0x0052E2A0(game)`
    (host save pass, game types 1 and 2 only). Return 0.
 
-`0x005B4A80` per player: end its interaction (`0x005351C0`); player
+`0x005B4A80` per player: end its interaction (`0x005351C0`, `quests-helpers.md` §5); player
 data +0x4C := 1; extra +0x20 := player; 26.13 set → level warp to 103
 (`0x0053AEC0(game, player, 103, 0)`, `drlg/levels.md`) and `5D 17 01 00
 0000`; else 0x50 with byte 0 = 0x50, u16 23 at 1, bytes 3–14 unwritten
@@ -727,7 +727,7 @@ reward-pending bit). Single player has no party (party id 0xFFFF).
 | monster creation, base-id switch `0x005B1CF0` | `0x005436B0` | base 243 → chain 23 unless class 705; 256 → chain 22 unless 706; 409 → chain 24; bases 340–343 (`boneprison1`–`4`): unit flags \|= 0x20000, no link. Bases 243 / 256 also get `0x005A4850(…, 22, 1)` (monster spec) |
 | superunique creation `0x005A4440`, `0x005A49B0` | `0x005436B0` | hcIdx 36, 37, 38 → chain 23 (`0x005A49B0` then `0x005A4850(…, 22, 1)`) |
 | item creation `0x00555D20` | `0x005436B0` | `hfh ` → chain 24, `mss ` → chain 22 (`quests-act3.md` §10) |
-| room population `0x0054EBC0`; inactive-unit restore `0x005424F0` | `0x005B5210` | +0x13 of chain 23 (§5.5) |
+| room population `0x0054EBC0`; inactive-unit restore `0x005424F0` | `0x005B5210` | +0x13 of chain 23 (§5.5); chain 23 absent → 0 (`0x005B5226`) |
 | NpcStationary AI `0x005E73A0` | `0x005B43F0`, `0x005B4440` | §3.6 |
 | Izual AI `0x005F89B0` | `0x005B4390` | §3.6 |
 | object event 7 `0x005449E0` | `0x005B5750`, `0x005B6710` | §5.4, §4.7 |
@@ -974,7 +974,10 @@ Act IV quest code draws.
    character; never lowered). The call is classic-only (`0x005B4D3F`
    skips it in expansion games) and sits after 26.6 / 26.7 (`0x005B4D77`).
 10. `0x00530590` (game end) and `0x0052E2A0` (save pass) are host
-    code: decide whether `d2-server` or `d2-sim` owns them.
+    code: decide whether `d2-server` or `d2-sim` owns them. **Answered**
+    (2026-10-07): `d2-server` owns both; `d2-sim` raises them as host
+    requests and changes no state (`quests-helpers.md` §6; the save
+    pass's effect is `quests-act5-2.md` open question 3).
 11. `quests-act3.md` §8.6 says level 104 is The Pandemonium Fortress;
     live `levels.txt` has 103 = The Pandemonium Fortress, 104 = Outer
     Steppes (`0x005BCBF0` compares 104). Settle in that spec. **Answered**

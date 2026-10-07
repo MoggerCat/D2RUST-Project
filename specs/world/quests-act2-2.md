@@ -18,20 +18,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 37–46 |
-| Inputs | 47–52 |
-| Outputs / state changes | 53–57 |
-| Rules | 58–59 |
-|   1. Answers (QB-1–QB-20) | 60–238 |
-|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 239–295 |
-|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 296–341 |
-|   4. `quests.tsv` addresses not named in part 1 | 342–358 |
-| Constants & data dependencies | 359–368 |
-| Randomness | 369–373 |
-| Edge cases & original bugs | 374–392 |
-| Test vectors | 393–407 |
-| Provenance | 408–420 |
-| Open questions | 421–428 |
+| Summary | 38–47 |
+| Inputs | 48–53 |
+| Outputs / state changes | 54–58 |
+| Rules | 59–60 |
+|   1. Answers (QB-1–QB-20) | 61–239 |
+|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–300 |
+|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 301–346 |
+|   4. `quests.tsv` addresses not named in part 1 | 347–363 |
+|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 364–448 |
+| Constants & data dependencies | 449–458 |
+| Randomness | 459–463 |
+| Edge cases & original bugs | 464–482 |
+| Test vectors | 483–501 |
+| Provenance | 502–514 |
+| Open questions | 515–522 |
 <!-- /index -->
 
 ## Summary
@@ -250,6 +251,10 @@ blocker GUID, +0x3C start Jerhyn's GUID.
    0x100, sixth argument 10, limit 100); spawn jerhyn (201) there
    (`0x005B2F20`: the free spot's room, x, y, class 201, mode 1, spread
    −1, flags 0); created → +0x0C := 1, +0x3C := its GUID (`0x0059F42F`).
+   No free spot: the spawn is still made, with room 0 and the object's
+   own (x, y) (the search leaves the point as passed and returns room 0,
+   `quests-helpers.md` §1 rule 3); the null-room outcome is
+   `monsters/init.md`'s (as Edge case 5).
    This is the only writer of +0x3C.
 2. **Init 19, palace Jerhyn object 122 (`0x005448E0` → `0x0059F440`).**
    Chain 11 absent → nothing. Else:
@@ -356,6 +361,91 @@ of `quests.tsv` (rows 8–16, 38) is accounted for; with these the rows are
 | `0x005987D0`, `0x00598780`, `0x0059E2C0`, `0x0059E4B0` | 8, 8, 15, 16 | chain 7's event 13 and the three active fns ("wants to talk") of `quests-act2.md` §9 |
 | `0x00738FC8`, `0x0073B8C0`, `0x0073BD58`, `0x00738D60` | 8, 15, 16, 38 | NPC message tables (`quest-messages.tsv`) |
 
+### 5. Helpers the Act II–III quest code calls (QuestWorld seams)
+
+#### 5.1 Quest-chest gate (`0x00545850(op)`)
+
+Callers: the Act II chests (operates 39–41, `0x00599DF0`, `0x00599C10`,
+`0x00599CF0`) and the Act III chests (operates 57, 58, `0x005B8860`,
+`0x005B8940`); the altar and every other quest object do not call it.
+`op` is the operate record (+0x00 game, +0x04 object, +0x10 object
+class id). In order:
+
+1. Object present and its mode (+0x10) ≠ 0 → return 0 (already open;
+   the chest does nothing more).
+2. The object's position is read (`0x00620870`; the result is unused).
+3. R := the `objects.txt` record of the class (`0x00640E90(op +0x10)`).
+4. `Mode1` (R +0x140) ≠ 0: object mode := 1 (`0x00624690`, a mode set
+   of `world/objects.md` §4) and one ENDANIM event (event 1) on the
+   object at game frame + (`FrameCnt1` (R +0xDC) >> 8)
+   (`0x005417D0(game, object, 1, frame, 0, 0)` at `0x005458AB`;
+   `sim/unit-events.tsv` row `0x005458ab`). Note: no "+ 1", unlike the
+   chest open of `world/objects.md` §8.1 rule 7. `Mode1` = 0: mode := 2
+   (no event).
+5. Object flags (+0xC4) &= ~0x2.
+6. Return 1. No RNG draw, no message of its own (the mode set's
+   update is the objects spec's).
+
+A null object (never passed by the callers) skips step 1 and reaches
+the position read with no unit (`0x00620870(null)`); not reproduced.
+
+#### 5.2 Tainted Sun start / end (`0x0061C450(act)`, `0x0061C4D0(act)`)
+
+Both act on the act's environment record E (act +0x04, `0x0061AA60`;
+a null act is fatal 0x547; layout `render/lighting.md` §9.1). They
+write the server's record only; clients learn of it from the 0x53 /
+0x5D the quest code sends (`quests-act2.md` §5.2, §5.7). "Intensity" and
+"color" are `render/lighting.md` §9.3 r4 and §9.4, run here with L = 0
+and A = 0 (`0x006427F0(0)`).
+
+Start (`0x0061C450`, called by Darken with game +0xC0):
+1. E+0x2C := 1; speed E+0x28 := `[0x007443E8]` = 4 (ticks per degree).
+2. Period index E+0x00 := 0; ticks E+0x08 := 0; type E+0x04 := the
+   eclipse table's entry-0 type (`[0x00744484]` = 3).
+3. Intensity (eclipse flag still 0: the sine branch with ticks 0, so
+   I := 128).
+4. Eclipse flag E+0x30 := 1.
+5. Period reset (`0x0061BDF0`): eclipse entry 0 → type 3, ticks := 300 ×
+   4 = 1,200.
+6. Intensity again (eclipse branch: 128 → 120).
+7. Color (eclipse table, index 0 → next index 1; t = 0): R, G, B := 0,
+   30, 243.
+
+End (`0x0061C4D0`, called by the altar operate on Act II):
+1. E+0x2C := 0; speed := `[0x007443E4]` = 128.
+2. Index := 2; ticks := 0; type := the normal table's entry-2 type
+   (`[0x0074440C]` = 0).
+3. Intensity with the eclipse flag **still set** (I −= 8 when > 32,
+   then at least 32).
+4. Eclipse flag := 0. No period reset and no color: the next advance
+   (`sim/tick.md` §3 step 1, `render/lighting.md` §9.2 r1) recomputes
+   them.
+
+From then on the record runs the ordinary advance; with speed 4 and
+the eclipse table the eclipse cycle is 360 × 4 = 1,440 ticks long. The
+two functions draw nothing.
+
+#### 5.3 Remove a unit for everyone (`0x0052E050(game, unit)`)
+
+1. For each client of the game (list game +0x88, next client +0x4A8)
+   in state 4 (client +0x04, in game; `0x0052DED0`, callback
+   `0x0052DFB0`): the client's room (client +0x1B4; null → fatal
+   0x15BE) gives its adjacent-room list (`0x00619790`, the room itself
+   included); when the unit's room (`0x00620BB0`) is in it (first
+   match), S→C 0x0A RemoveUnit (type, GUID; `0x0053BDA0`, none for a
+   missile, type 3) to that client. A null unit sends nothing.
+2. Then the unit is freed (`0x00555600`, `sim/units.md`).
+
+Used by chain 7's event 3 (§2 item 3.1).
+
+#### 5.4 Scroll text (`0x005456A0(player, object, string)`)
+
+S→C 0x27 to the player's client (`0x005531C0`, then `0x0053C8D0`):
+unit type 2, the object's GUID, count 1, entry 0 kind 0 with the string
+id; bytes 7, 9 and 12–39 are not written (layout and masking:
+`sim/intents-events.md` §3.5 "0x27"). Callers: the Act II tome (string
+396), Act I (`quests-act1.md` §10, 127) and Act V (`quests-act5.md`).
+
 ## Constants & data dependencies
 
 | Item | Value | Source |
@@ -394,6 +484,10 @@ draws once on the player's seed in `0x00585240` (object spec).
 
 | Input | Expected | Source |
 |---|---|---|
+| quest chest (class 355 scroll, `Mode1` 1, `FrameCnt1` 0x1100) at mode 0, frame 1000 | mode 1, event 1 at frame 1017, flag 0x2 cleared, return 1 | §5.1 |
+| quest chest at mode 1 | return 0, nothing changed | §5.1 |
+| Tainted Sun start on a record at index 3 | index 0, type 3, ticks 1,200, speed 4, I 120, eclipse 1, R G B 0 30 243 | §5.2 |
+| Tainted Sun end (I 120) | index 2, type 0, ticks 0, speed 128, I 112, eclipse 0 | §5.2 |
 | chain 8 chat, record state 3, 9.0/9.1/9.13 clear, not listed | table state 2 (msgs 315–324) | §1 item 1 |
 | pick-up `tr1 `, 10.3 set | flags := 0; status and 0x5D unchanged / none | §1 item 13 |
 | chain 26: msg 61 from NPC 377 | 30.0 set; callback 2 unchanged | §1 item 3 |
