@@ -431,7 +431,7 @@ fn towner_runs_the_commands_then_the_map_ai_then_idles_12() {
     // wanders and ends the think (no idle 12).
     let (mut w, lo) = seeded(act_row(41, &[]), 1, |_| true);
     w.store.control_mut(w.mon).unwrap().commands = vec![
-        home.clone(),
+        home,
         AiCommand {
             params: [5, 1, 3, 0, 0],
         },
@@ -449,7 +449,7 @@ fn towner_runs_the_commands_then_the_map_ai_then_idles_12() {
     for (draw_lt_66, handled) in [(true, true), (false, false)] {
         let (mut w, _) = seeded(act_row(41, &[]), 1, |v| (v[0] < 66) == draw_lt_66);
         let c = w.store.control_mut(w.mon).unwrap();
-        c.commands = vec![home.clone()];
+        c.commands = vec![home];
         c.map_ai = Some(nodes.clone());
         w.think_with(None, 0, false);
         if handled {
