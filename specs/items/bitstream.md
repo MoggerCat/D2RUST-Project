@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 321–357 |
 | Test vectors | 358–380 |
 | Provenance | 381–405 |
-| Open questions | 406–431 |
+| Open questions | 406–449 |
 <!-- /index -->
 
 ## Summary
@@ -414,17 +414,35 @@ with `Save Add` 0 in 8 bits → 0xFF.
    action 0x0B from the store check `0x0053EF30`) can pass 1: an
    unidentified quality 4–9 item shown to the trading client, i.e. a
    gamble list item; all others push 0.
-2. No recorded stream covers set, unique, rare, runeword, ear, gold,
-   book or a filled socket. Settle: a recording that picks up and stashes
-   such items (inventory R2/R5 scenarios).
+2. Needs recording. The rules for these records are read from the
+   1.14d writer and reader (§3–§5); the binary cannot confirm its own
+   reading. The recording must show, for each of a set, unique, rare,
+   runeword, ear, gold pile, tome and an item with a filled socket: the
+   S→C 0x9C / 0x9D bytes when it is picked up and when it is stored
+   (inventory R2 / R5 scenarios), so each stream decodes to the end with
+   §3–§5 and re-encodes byte for byte (the 0x9D child stream included).
 3. Answered (handoff `pc2-spec-d2s` DS-5): §5 rule 2. Item data +0x1C
    and +0x20 (D2MOO `dwRealmData`), written only when +0x20 ≠ 0; read only
    when the save version > 0x56, with one discarded u32 when > 0x5D; the
    setter `0x00629EA0` is called only by the two save readers.
-4. Edge case 7: that every caller of the name setter `0x00628370`
-   (`0x0055903B`, `0x005590A4`, `0x0055910E`, `0x00567086`,
-   `0x005670CC`, `0x0057A12B`, `0x0057A625`) passes a name of at most 15
-   characters. Settle: read the source buffer of each call site.
+4. Partly answered (source of each call site, disassembled):
+   `0x005590A4` and `0x0057A625` copy the player's name (player data
+   +0x00, `0x006221A0`), which the character load bounds to 15
+   characters (`formats/d2s.md` load rule 4: byte +0x23 := 0, and it must
+   equal the client name); `0x00567086` and `0x005670CC` (`0x00567070`)
+   copy another item's name (`0x00628340`, item data +0x4A); `0x0057A12B`
+   copies a name that `0x00579D60` first copied from the same item
+   (`0x0057A073`–`0x0057A08C`, unbounded byte loop into a stack buffer
+   at ebp−0x68). So those five pass at most 15 characters whenever the
+   names already held are. Open: `0x0055903B` (ear, forced request) and
+   `0x0055910E` (personalized, forced request) copy the request's name
+   field +0x58 (16 bytes; `items/generation.md` Inputs); the request
+   builders seen zero the request (`0x00681EF0`); a first scan of the
+   21 callers of `0x00558D90` found no direct store to +0x58, which does
+   not rule out a copy through a pointer. Settle: find the writer
+   of request +0x58 for an ear (player death drop) and check its bound.
+   Original text: Edge case 7: that every caller of the name setter
+   `0x00628370` passes a name of at most 15 characters.
 5. Answered (handoff `impl-bitstream-vitals` BV1-BV4, BV5, BV7, BV9,
    LB1): §3 rules 1-2, §4.3 rule 7, §4.6 rule 4.3, §4.4 rule 1
    (`items/properties.md` §10.1), edge cases 7-8, Constants.

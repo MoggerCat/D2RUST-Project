@@ -31,15 +31,15 @@
 |   7. Uniques (mode 3) | 204–207 |
 |   8. Set items | 208–218 |
 |   9. Socket fillers (`0x0055C2C0`) | 219–234 |
-|   10. Runewords | 235–283 |
-|   11. Set bonuses (`0x00660120`) | 284–296 |
-|   12. Craft property lists (`0x00660240`) | 297–302 |
-| Constants & data dependencies | 303–312 |
-| Randomness | 313–318 |
-| Edge cases & original bugs | 319–328 |
-| Test vectors | 329–347 |
-| Provenance | 348–367 |
-| Open questions | 368–406 |
+|   10. Runewords | 235–288 |
+|   11. Set bonuses (`0x00660120`) | 289–301 |
+|   12. Craft property lists (`0x00660240`) | 302–307 |
+| Constants & data dependencies | 308–317 |
+| Randomness | 318–323 |
+| Edge cases & original bugs | 324–333 |
+| Test vectors | 334–352 |
+| Provenance | 353–372 |
+| Open questions | 373–411 |
 <!-- /index -->
 
 ## Summary
@@ -271,6 +271,11 @@ rune c + 1 with class-id slot c, which step 2 never wrote (a stack value
 left from earlier calls; c ≤ 5 here, as at most 6 runes are read). It
 matches only if that stale value equals the rune's class id; d2rs
 treats the unset slot as "no class" (no match), Open question 4.
+
+Load: a top-level item with item flag 0x4000000 (runeword) that fails
+this match when its character is loaded is deleted when stored or on the
+cursor and unequipped when equipped (`0x00563470`, `formats/d2s-load.md`
+§6).
 
 #### 10.2 Activation (`0x00562660` → `0x006600A0`)
 
