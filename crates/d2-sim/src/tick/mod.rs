@@ -427,3 +427,5 @@ mod gaps_tests;
 mod tests;
 #[cfg(test)]
 mod tests_fsim;
+#[cfg(test)]
+mod tests_lsim;
