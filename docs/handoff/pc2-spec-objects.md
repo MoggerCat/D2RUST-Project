@@ -58,7 +58,7 @@ set" OB-1 … OB-24, and `objects.md` open questions.
 
 ## CODE-TABLE CHANGE commits
 
-(see git log: "CODE-TABLE CHANGE: specs/world/object-functions.tsv")
+- `d44907e` specs/world/object-functions.tsv: init 13 → §17, init 51 and operate 48 → §18.4
 
 ## Cross-file requests
 
