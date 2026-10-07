@@ -35,17 +35,17 @@
 |   6. Light records | 179–261 |
 |   7. Contribution of one record | 262–341 |
 |   8. Light sources | 342–406 |
-|   9. Environment (day and night) | 407–488 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 489–542 |
-|   11. Light values handed to the draws | 543–573 |
-|   12. Captures (answers `capture.md` Open question 5) | 574–611 |
-|   13. d2rs answers | 612–622 |
-| Constants & data dependencies | 623–634 |
-| Randomness | 635–641 |
-| Edge cases & original bugs | 642–656 |
-| Test vectors | 657–689 |
-| Provenance | 690–732 |
-| Open questions | 733–764 |
+|   9. Environment (day and night) | 407–517 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 518–571 |
+|   11. Light values handed to the draws | 572–602 |
+|   12. Captures (answers `capture.md` Open question 5) | 603–640 |
+|   13. d2rs answers | 641–651 |
+| Constants & data dependencies | 652–663 |
+| Randomness | 664–670 |
+| Edge cases & original bugs | 671–685 |
+| Test vectors | 686–718 |
+| Provenance | 719–761 |
+| Open questions | 762–797 |
 <!-- /index -->
 
 ## Summary
@@ -437,8 +437,8 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
    advance (§9.3 r1–r3), intensity (§9.3 r4), color (§9.4), then `L` =
    120 → R, G, B := 245, 240, 255.
 2. S→C 0x53 (10 bytes: u32 @1 period index, u32 @5 ticks, u8 @9 eclipse;
-   handler `0x0045E300`, only when the message act equals the player's
-   act) → `0x0061C240`: index > 5 or < 0, ticks < 0 → fatal; ticks >
+   handler `0x0045E300`, only when the client act is the local player's
+   act, r4) → `0x0061C240`: index > 5 or < 0, ticks < 0 → fatal; ticks >
    speed × 360 → 0; set index, ticks, type (normal or eclipse table by the
    flag); intensity (§9.3 r4); set the eclipse flag; when it is set, also
    `0x0061BDF0`, intensity again and color; `L` = 120 override. The server
@@ -451,6 +451,35 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
    pending flag `[0x007A060E]`, which the act load (S→C 0x03,
    `0x0044E142`) turns into the eclipse when the loaded act is act 2
    (byte 1).
+4. **Dispatch owner of 0x53** (`client/bridge-dispatch.tsv`). Client
+   model state: the environment record (§9.1) of the client DRLG act
+   (`[0x007A0634]` +0x04; d2rs: the act of `client/model.md` §1 `act`,
+   built by §12 there) and the day-period cache `[0x007A6A74]`. Handler
+   `0x0045E300`, in order:
+   1. P := the local player (`0x00463DD0`); no local player → 1.14d
+      reads P +0x1C through a null pointer (crash); bridge: handler error.
+   2. The client act `[0x007A0634]` ≠ P's act pointer (unit +0x1C: set
+      by creation at a point, `client/model.md` §2 rule 6, and by the
+      0x15 placement, `client/msg-units.md` §3 rule 2) → nothing more.
+      A player created at (0, 0) and not yet placed has none, so a 0x53
+      then is ignored. Recorded joins send 0x53 in frame 2, after 0x15
+      (frame 1): `53 02000000 00000000 00` (`20261006-022633` seq 228)
+      applies index 2, ticks 0; `53 02000000 80080000 00` (seq 146616,
+      frame 2177) index 2, ticks 0x880.
+   3. The setter of r2 with (act, P's room (`0x004646A0` → `0x00620BB0`;
+      none → null), index u32@1, ticks u32@5, eclipse u8@9).
+   4. Day-period refresh `0x004646C0`: `p` := the act's day period
+      (`0x0061C100(act, 0)`, 0–3, `sim/stats.md` §8); `p` = the
+      cache → nothing; else cache := `p` and every object unit (type 2)
+      of the client's sets S and C, bucket order, gets `0x004BC5E0(obj,
+      0)` (object day/night refresh; owner: the client object spec,
+      open question 11); a non-object found in those type-2 buckets →
+      fatal 0x88C.
+   5. P still present → the requirement refresh of S→C 0x47 on P
+      (`0x004C1BC0` with a built `47 <P type> <P GUID>`,
+      `client/msg-stats-items.md` §3 rule 3).
+   No output (`client/bridge.md` §10): lighting and objects read the
+   record each frame.
 
 #### 9.3 Advance and intensity (`0x0061BEE0`, `0x0061BB80`)
 
@@ -761,3 +790,7 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
    the light list (`[0x007B5668]`) at those frames.
 10. Where the lighting-quality option is loaded at start (registry or
     settings) and its default.
+11. `0x004BC5E0(object, 0)` (the object refresh of §9.2 r4 step 4 when
+    the day period changes): which object classes change (lights,
+    torches, mode) and how; owner: the client object spec. A recording
+    across a day-period change with objects in sight settles it.

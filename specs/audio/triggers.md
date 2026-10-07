@@ -28,24 +28,24 @@
 | Outputs / state changes | 79–84 |
 | Rules | 85–86 |
 |   1. Conventions and shared state | 87–138 |
-|   2. Server sound events (S→C 0x2C) | 139–174 |
-|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 175–235 |
-|   4. Mode sounds | 236–330 |
-|   5. Footsteps (`0x004CAF60(U)`) | 331–366 |
-|   6. Monster idle voices | 367–393 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 394–421 |
-|   8. Skills, missiles, states | 422–458 |
-|   9. Items | 459–482 |
-|   10. NPC speech | 483–518 |
-|   11. UI sounds | 519–542 |
-|   12. Other fixed requests | 543–560 |
-| Constants & data dependencies | 561–577 |
-| Randomness | 578–597 |
-| Edge cases & original bugs | 598–614 |
-| Test vectors | 615–644 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 645–658 |
-| Provenance | 659–677 |
-| Open questions | 678–705 |
+|   2. Server sound events (S→C 0x2C) | 139–187 |
+|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 188–248 |
+|   4. Mode sounds | 249–343 |
+|   5. Footsteps (`0x004CAF60(U)`) | 344–379 |
+|   6. Monster idle voices | 380–406 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 407–434 |
+|   8. Skills, missiles, states | 435–471 |
+|   9. Items | 472–495 |
+|   10. NPC speech | 496–531 |
+|   11. UI sounds | 532–555 |
+|   12. Other fixed requests | 556–573 |
+| Constants & data dependencies | 574–590 |
+| Randomness | 591–610 |
+| Edge cases & original bugs | 611–627 |
+| Test vectors | 628–657 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 658–671 |
+| Provenance | 672–690 |
+| Open questions | 691–719 |
 <!-- /index -->
 
 ## Summary
@@ -171,6 +171,19 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    88, 89, ≥ 94) go on to: if U is a player, the player event sound
    (§3). Events 84–87 first show the overhead text of their id
    (`0x004A0200`, `client/ui.md`).
+4. **Dispatch owner of 0x2C** (`client/bridge-dispatch.tsv`). Client
+   model state written: none (`0x0045E110` and `0x004CBDE0` write no
+   unit or global the model holds). The handler looks U up (r1; set S,
+   `client/model.md` §2 rule 2); none → nothing. Else it emits one
+   `ServerSound` output (`client/bridge.md` §10) with U's key (type
+   u8@1, GUID u32@2), U's class and the event u16@6, captured at
+   receive. The audio layer applies r2–r3 to it, with P = the local
+   player at delivery. Events 84–87's overhead text is part of the
+   same output: the audio consumer makes the overhead-text request
+   (`0x004A0200`, `client/ui.md`) as `0x004CBDE0` does
+   (`client/bridge.md` §10 rule 5). Recorded: `2c 01 26000000 1200`
+   (`20261006-015956` seq 293508, event 18, an NPC) and `2c 00 01000000
+   0200` (`-022633` seq 46370, event 2 on the player → §3).
 
 ### 3. Player event sounds (`0x004CB9C0(U, event e)`)
 
@@ -692,8 +705,9 @@ Riiablo not used (no client sound code there for these paths).
    `[0x0072AE24]` (memory read after start with the option at 1).
 8. Conditions of `0x004B3380`, `0x004B4380` (Act II guard, Act V
    soldiers, Nihlathak).
-9. What the server sends in S→C 0x5D (`sim/server-messages.tsv` names
-   it `QuestItemState`; the client treats it as UI/sound actions).
+9. Answered by `client/msg-ui.md` §1 (full `0x004A2CB0` dispatch; the
+   message is `world/quests.md` §6.3's one-quest status: code = chain,
+   value = extra). §11's 0x5D paragraph is the sound subset of it.
 10. Conditions of the §12 call sites.
 11. Who calls `0x00466360` (monster Init voice, §6 r2): on assign
     (S→C 0xAC) or on first sight.
