@@ -67,6 +67,10 @@ pub struct Fake {
     /// Stats per unit (for extension fakes).
     pub stats: BTreeMap<(UnitId, u16), i32>,
     pub calls: Vec<Call>,
+    /// Box queries seen by the population fake: (x, y, sx, sy, mask).
+    pub box_log: std::cell::RefCell<Vec<(i32, i32, u32, u32, u32)>>,
+    /// Predicate for the population fake's box query: `true` = blocked.
+    pub block: Option<fn(i32, i32, u32, u32, u32) -> bool>,
 }
 
 impl Fake {
