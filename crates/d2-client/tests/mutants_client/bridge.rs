@@ -129,9 +129,13 @@ fn dispatch_check_duplicate_handler_and_matching_owner() {
 #[test]
 fn unowned_messages_are_counted_per_id() {
     let mut bridge = Bridge::new(VersionLink(PROTOCOL_VERSION)).unwrap();
-    // 0x61 (2 bytes, no owner spec) twice, then 0x5F (5 bytes) once.
+    // 0x8B (6 bytes, out of scope: no owner spec) twice, then 0x79 (6
+    // bytes) once. (0x61 / 0x5F are owned now: `client/msg-ui.md` §20,
+    // `msg-units.md` §7.)
     bridge
-        .receive_chunk(&[0x61, 0x07, 0x61, 0x07, 0x5F, 1, 2, 3, 4])
+        .receive_chunk(&[
+            0x8B, 1, 2, 3, 4, 5, 0x8B, 1, 2, 3, 4, 5, 0x79, 1, 2, 3, 4, 5,
+        ])
         .unwrap();
     let counts: Vec<(u8, u64)> = bridge
         .log()
@@ -139,7 +143,7 @@ fn unowned_messages_are_counted_per_id() {
         .iter()
         .map(|(&id, &n)| (id, n))
         .collect();
-    assert_eq!(counts, vec![(0x5F, 1), (0x61, 2)]);
+    assert_eq!(counts, vec![(0x79, 1), (0x8B, 2)]);
 }
 
 /// §6 rules 2 and 4: messages a registered handler applies are counted as

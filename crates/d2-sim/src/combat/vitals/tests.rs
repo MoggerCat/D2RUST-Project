@@ -422,7 +422,7 @@ fn add_experience_caps_and_levels() {
     add_experience(&mut f, &t, (), 1);
     assert_eq!(get(&f, stat::LEVEL), 2);
     assert_eq!(f.log, ["notify", "event12"]);
-    add_experience(&mut f, &t, (), u32::MAX);
+    add_experience(&mut f, &t, (), i32::MAX as u32);
     assert_eq!(get(&f, stat::EXPERIENCE) as u32, t.threshold(AMAZON, 98));
     assert_eq!(get(&f, stat::LEVEL), 99);
 }

@@ -42,6 +42,7 @@ use std::sync::Arc;
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
+use d2_client::bridge::world::MonsterClass;
 use d2_client::bridge::Bridge;
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
@@ -164,10 +165,33 @@ impl Clock for Ms {
 
 type Link = LocalLink<Sim, ProtoSizes, PendingSession, Ms>;
 
+/// Akara's monster add S→C 0xAC as the client reads it
+/// (`client/msg-units.md` §1.2): mode 1, no components, no type flags, no
+/// source unit, no stat list. d2-sim does not build monster adds yet (the
+/// server-side fields past `monsters/init.md` §24 are not specified,
+/// `wiring::action::switch` module docs), so the harness delivers the
+/// add of an NPC without any of those parts; the client needs her unit
+/// for 0x28 (`client/msg-ui.md` §16 r4).
+fn akara_add(guid: u32, class: u16, (x, y): (i32, i32)) -> Vec<u8> {
+    let mut m = vec![0xAC];
+    m.extend(guid.to_le_bytes());
+    m.extend(class.to_le_bytes());
+    m.extend((x as u16).to_le_bytes());
+    m.extend((y as u16).to_le_bytes());
+    m.push(128);
+    m.push(14);
+    // Bits, low first: mode 1 (4 bits), then five 0 presence bits.
+    m.push(0x01);
+    m
+}
+
 /// The local link, recording every S→C chunk the bridge receives.
 struct Tap {
     inner: Link,
     chunks: Vec<Vec<u8>>,
+    /// Chunks delivered after the server's at the next receive, not
+    /// recorded (Akara's add, [`akara_add`]).
+    inject: Vec<Vec<u8>>,
 }
 
 impl ServerLink for Tap {
@@ -181,8 +205,9 @@ impl ServerLink for Tap {
         self.inner.pump()
     }
     fn receive(&mut self) -> Vec<Vec<u8>> {
-        let got = self.inner.receive();
+        let mut got = self.inner.receive();
         self.chunks.extend(got.iter().cloned());
+        got.append(&mut self.inject);
         got
     }
 }
@@ -278,6 +303,7 @@ impl Fx {
         };
         let npc = alloc(UnitType::Monster, u32::from(class::AKARA));
         let player = alloc(UnitType::Player, 1);
+        let npc_guid = game.lists.unit(npc).unwrap().guid;
         // Players are allocated in mode 0; neutral (`units.md` §2).
         events.sys.units.get_mut(player).unwrap().mode = 1;
         events.with(&mut game, |_, v| {
@@ -354,8 +380,19 @@ impl Fx {
         let tap = Tap {
             inner: link,
             chunks: Vec::new(),
+            inject: vec![akara_add(npc_guid, class::AKARA, (0, 0))],
         };
-        let bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        let mut bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        // Akara's class row in the client tables (an `interact` NPC), so
+        // her add creates the unit.
+        let mut tables = bridge.inputs().tables.clone();
+        tables.monsters = vec![None; usize::from(class::AKARA) + 1];
+        tables.monsters[usize::from(class::AKARA)] = Some(MonsterClass {
+            npc: true,
+            interact: true,
+            ..MonsterClass::default()
+        });
+        bridge.set_tables(tables);
         Fx {
             bridge,
             player,
@@ -541,7 +578,10 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     want.extend_from_slice(&ng.to_le_bytes());
     assert_eq!(chat, want);
     let f = fx.step(&[chat]);
-    assert_eq!(f.codes, [(0x2F, done)]);
+    // The client's own 0x2F (T 1, its 0x28 handler, `client/msg-ui.md`
+    // §16 r4; held behind the unanswered dialog slot until this frame)
+    // comes first, then this one.
+    assert_eq!(f.codes, [(0x2F, done), (0x2F, done)]);
     frames.push(f);
 
     // 3. C→S 0x38 action 1 (trade): `vendors.md` §4 → §3. The store is
@@ -610,8 +650,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let buy = bytes(&BuyItem {
         npc: ng,
         item: cg,
-        mode: 0,
-        cost: 0,
+        transaction: 0,
+        client_price: 0,
     });
     let mut want = vec![0x32];
     for v in [ng, cg, 0, 0] {
@@ -651,8 +691,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let sell = bytes(&SellItem {
         npc: ng,
         item: pg,
-        tab: STORED as u16,
-        cost: 0,
+        item_mode: STORED as u16,
+        client_price: 0,
     });
     let mut want = vec![0x33];
     want.extend_from_slice(&ng.to_le_bytes());
@@ -680,8 +720,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let sell = bytes(&SellItem {
         npc: ng,
         item: eg,
-        tab: STORED as u16,
-        cost: 0,
+        item_mode: STORED as u16,
+        client_price: 0,
     });
     let f = fx.step(&[sell]);
     assert_eq!(f.codes, [(0x33, done)]);

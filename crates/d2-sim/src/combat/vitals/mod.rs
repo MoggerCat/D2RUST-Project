@@ -1,9 +1,9 @@
 // Spec: specs/combat/vitals.md
 //! Vitals: player creation values (§1), spending stat points and the
 //! stat reset (§2), level-up (§3), the experience table lookups (§4.1),
-//! the experience-on-kill level factor (§4.2) and the add-experience path
-//! the creation uses (§4.3, partly confirmed) and the client vitals sync
-//! (§5, [`sync`]).
+//! the experience-on-kill level factor (§4.2), the gain, distribution,
+//! add, death penalties and corpse experience (§4.3–§4.7, [`experience`])
+//! and the client vitals sync (§5, [`sync`]).
 //!
 //! Status: implemented, unverified (the spec is a draft; its checks are
 //! queued in `docs/handoff/impl-skilluse-vitals.md`). No randomness.
@@ -12,6 +12,9 @@
 //! units/stats, `sim/stats.md` §4.2 getters and setters); table data
 //! comes from `d2_data` typed records ([`VitalsTables`]).
 
+pub mod experience;
+#[cfg(test)]
+mod experience_tests;
 pub mod sync;
 #[cfg(test)]
 mod tests;
@@ -420,22 +423,28 @@ pub fn level_factor(exp: i32, alvl: i32, dlvl: i32) -> i32 {
     }
 }
 
-/// The add function of §4.3 (D2MOO `SUNITDMG_AddExperienceForPlayer`,
-/// partly confirmed): experience capped at `threshold(class, max_level −
-/// 1)`; level-up (§3) and unit event 12 when the level changes.
-// TODO(vitals.md OQ2): not confirmed in 1.14d. `lastexp` (stat 29) is set
-// by this function in D2MOO with a value the spec does not give; d2rs
-// leaves it. The gain on a kill (`ExpRatio`, stat 85, hireling cap, party
-// share) is not implemented until OQ2 is answered.
+/// The add `0x0057E510` (§4.5) at the gainer's base level, for callers
+/// without their own level argument (§1 `0x0057EB10`).
 pub fn add_experience<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit, gain: u32) {
+    let l0 = w.base_stat(u, stat::LEVEL);
+    add_experience_at(w, t, u, l0, gain as i32);
+}
+
+/// The add `0x0057E510(game, L0, g)` (§4.5): players only; new := old + g
+/// (32-bit), capped at `threshold(class, max_level − 1)` (unsigned);
+/// `lastexp` (29) := new − old; experience (13) := new; a level from the
+/// new experience ≠ `l0` → level-up (§3) and unit event 12.
+pub fn add_experience_at<W: VitalsUnits>(w: &mut W, t: &VitalsTables, u: W::Unit, l0: i32, g: i32) {
+    if w.unit_type(u) != UnitType::Player {
+        return;
+    }
     let class = w.class_id(u);
+    let old = w.base_stat(u, stat::EXPERIENCE) as u32;
     let cap = t.threshold(class, t.max_level(class).saturating_sub(1));
-    let exp = (w.base_stat(u, stat::EXPERIENCE) as u32)
-        .saturating_add(gain)
-        .min(cap);
-    w.set_base_stat(u, stat::EXPERIENCE, exp as i32);
-    let level = w.base_stat(u, stat::LEVEL);
-    if t.level_from_exp(class, exp) as i32 != level {
+    let new = old.wrapping_add(g as u32).min(cap);
+    w.set_base_stat(u, stat::LASTEXP, new.wrapping_sub(old) as i32);
+    w.set_base_stat(u, stat::EXPERIENCE, new as i32);
+    if t.level_from_exp(class, new) as i32 != l0 {
         level_up(w, t, u);
         w.level_up_event(u);
     }

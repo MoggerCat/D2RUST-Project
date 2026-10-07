@@ -79,7 +79,8 @@ fn item_actions() {
                 owner: None,
                 stream: hex("10 00 a2 00 65 08 00 80 06 17 03 02"),
             }),
-            flags4: false
+            flags4: false,
+            flags: 0,
         })
     );
     // A fatal action and an ignored one.

@@ -517,16 +517,11 @@ fn carrion<W: AiHost + ?Sized>(
 pub fn vulture<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
     let mut pv = param(cx, u, 0);
     // 1.
-    let Some(t) = p.target else {
-        // TODO(spec: ai-bodies-2.md §11 step 1): with T = 0 1.14d lands
-        // and then reads a null unit on failure; read as stop.
-        if pv < 1 {
-            wait(game, cx, u, 12);
-        } else if land(game, cx, u) {
-            touch_down(game, cx, u);
-        }
-        return;
-    };
+    // T = 0 is unreachable (target mode 1, `ai-bodies-2.md` open
+    // question 6): asserted, not handled.
+    let t = p
+        .target
+        .expect("Vulture think without a target (ai-bodies-2.md OQ6)");
     let far = sq_dist(cx, u, t) > 144;
     // 2.
     if room_of(game, t) != room_of(game, u) && far {
@@ -774,12 +769,14 @@ pub fn sand_maggot_queen<W: AiHost + ?Sized>(
         }
         return;
     }
-    // 3.
-    let class = cx.world.queen_spawn_class(u);
-    let (ox, oy) = cx.world.position(u);
-    let (x, y) = (ox.wrapping_add(8), oy);
+    // 3. The spawn info (§13.1): chain(68 sandmaggot1) at (x + 8, y), mode 8.
+    let info = spawn_info(game, cx, u, 0);
+    let (class, x, y) = (info.class, info.x, info.y);
     if let Some(room) = cx.world.room_at(game, u, x, y) {
-        if let Some(m) = cx.world.spawn_monster(game, room, x, y, class, 8, 2, 0x42) {
+        if let Some(m) = cx
+            .world
+            .spawn_monster(game, room, x, y, class, info.mode, 2, 0x42)
+        {
             cx.world.set_unit_flag(m, FLAG_NO_XP);
             set_param(cx, u, 0, param(cx, u, 0).wrapping_add(1));
         }

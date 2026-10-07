@@ -126,10 +126,22 @@ pub trait InitHost {
 
     // ---- bosses (§14, §16–§21) ----
 
-    /// §14.2: quest chain record `0x005436B0` (quests spec).
+    /// §14.3: quest chain record `0x005436B0` (quests spec).
     fn quest_chain(&mut self, unit: UnitId, chain: u32) {}
-    /// §14.2 bloodraven: state corpse_noselect (states spec).
+    /// §14.3 bloodraven: state 118 corpse_noselect on
+    /// (`0x00639DB0(unit, 118, 1)`).
     fn set_corpse_noselect(&mut self, unit: UnitId) {}
+    /// §14.3 ancient barbarian equipment: difficulty 1 replaces `code`
+    /// by its items row's `ubercode` (+0x88), 2 by `ultracode` (+0x8C)
+    /// (row found with `0x00633640`). Default: unchanged.
+    fn item_tier_code(&mut self, code: [u8; 4], difficulty: u8) -> [u8; 4] {
+        code
+    }
+    /// §14.3 `0x00573B20(game, unit, &entry, level, 4)`: create `code`
+    /// as a magic item (spawn mode 4) at item level `level` and equip it
+    /// at body location `loc` (`items/generation.md` §10.2; game- and
+    /// item-seed draws). Default: nothing.
+    fn create_boss_item(&mut self, unit: UnitId, code: [u8; 4], loc: u8, level: i32) {}
     /// `0x005A09E0` steps 1–4 (`population.md` §6.3): placement and
     /// creation of a boss. Step 5 is [`super::mark_boss`].
     fn boss_spawn(
@@ -175,9 +187,24 @@ pub trait InitHost {
     fn give_aura(&mut self, unit: UnitId, skill: u16, level: i32) {}
     /// §19.6 umod 26: set AI control flag 0x20.
     fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {}
-    /// §20 step 5: quest records by `hcIdx` (quests spec).
-    fn superunique_quest(&mut self, unit: UnitId, hc_idx: u32) {}
-    /// §20 step 5: state 118 on the Countess (states spec).
+    /// §20.1: `0x005B23C0(game, unit, class, mode, spread, flags)`, a
+    /// monster near the unit (`population.md`).
+    fn spawn_near_unit(&mut self, unit: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {}
+    /// §20.1 "spawn(c, r, n, f)": `0x005B24E0(game, boss, c, mode 1, r,
+    /// n, f)` (`population.md` Open question 4).
+    fn spawn_group(&mut self, boss: UnitId, class: u32, r: i32, n: i32, flags: u32) {}
+    /// §20.1 `0x00545B50(game, unit)`: the quest preset-boss hook
+    /// (`world/quests-act3.md`, `world/quests-act5.md`).
+    fn quest_preset_boss(&mut self, unit: UnitId) {}
+    /// §20.1 hcIdx 60: owner data `0x0058F030(game, unit, own GUID, 1,
+    /// 1, 0)`.
+    fn owner_data_self(&mut self, unit: UnitId) {}
+    /// `0x0063EC70(room, class)`: the class remapped for the unit's
+    /// room level. Default: unchanged.
+    fn class_for_level(&mut self, unit: UnitId, class: u32) -> u32 {
+        class
+    }
+    /// §20.1: a state on (`0x00639DB0(unit, state, 1)`).
     fn set_state(&mut self, unit: UnitId, state: u16) {}
     /// §21 minion restore: `0x005B30E0` with the GUID, flags 0x62
     /// (`population.md` §6.3 step 4 retries).
@@ -210,6 +237,21 @@ pub trait InitHost {
     /// `data/runtime-maps.md` §4).
     fn has_state_in_group(&self, unit: UnitId, group: u8) -> bool {
         false
+    }
+    /// §27 step 4, the monster teardown `0x005736A0`: drop the unit's own
+    /// combat-list entries (`0x0057C980`); with `free_inventory` remove
+    /// the inventory's items (`0x00555AE0`) and free it (`0x0063AC40`);
+    /// return the hover record (`0x006611A0`, pointer kept); free AI
+    /// control, AI params and the interaction block (`0x0058F810`,
+    /// `0x005A64D0`, `0x00572BC0`). The timers are cancelled by the
+    /// caller. Default: nothing.
+    fn monster_teardown(&mut self, unit: UnitId, free_inventory: bool) {}
+    /// §27 step 7: the plain mode set `0x00624690` (`sim/units.md` §4.1).
+    /// Default: the unit record's mode.
+    fn set_mode_plain(&mut self, unit: UnitId, mode: u32) {
+        if let Some(r) = self.units().get_mut(unit) {
+            r.mode = mode;
+        }
     }
     /// "Mode set m": `0x005A7E60` + `0x005A7C20(game, &rec, 1)`
     /// (`units.md` §4.6), which runs the umod dispatcher again.
@@ -303,9 +345,29 @@ pub trait InitHost {
     /// Pet remove `0x005750E0(game, owner, GUID, kill 1)` (`sim/pets.md`
     /// §6).
     fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {}
-    /// A quest death call (ECX game, EDX unit) at its 1.14d address
-    /// (§15; owner: the quests specs, `umod-callbacks.md` OQ4).
-    fn quest_death(&mut self, unit: UnitId, call: u32) {}
+    /// `umod-callbacks.md` §15.1: `0x0063E990` undead.
+    fn is_undead(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// missiles row `class` `Range`; `None` without a row (§15.2: the
+    /// original then reads through a null record).
+    fn missile_range(&self, class: i32) -> Option<i32> {
+        None
+    }
+    /// §15.2 `0x005E0070`: set the uber death flag of `slot` (0 = game
+    /// +0x1DF0 ubermephisto, 1 = +0x1DEC uberdiablo, 2 = +0x1DE8
+    /// uberbaal); true when all three are set. Default: never all set.
+    fn set_uber_death(&mut self, slot: usize) -> bool {
+        false
+    }
+    /// §15.2: game +0x8C.
+    fn game_8c(&self) -> i32 {
+        0
+    }
+    /// §15.2: the unit's item code (+0xB8) := `code`, then the drop
+    /// helper `0x00559A30(game, unit, arg, …)` (`world/quests-act1-rest.md`
+    /// item 1); with `announce` also `0x0055FE80(game, 0, item)`.
+    fn quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {}
     /// Umod 24's steal (§17 steps 3–4: belt slot, copy, drop; items
     /// spec seams). Unreachable in 1.14d.
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {}

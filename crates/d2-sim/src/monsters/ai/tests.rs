@@ -87,6 +87,45 @@ struct Fake {
     cain_town: Option<(i32, i32)>,
     /// The Act II–V seams (`AiActs`).
     x: Acts,
+    /// The `ai-bodies-6/7` seams (`AiSummons`).
+    y: Summ,
+}
+
+/// Knobs of the `AiSummons` fake; actions go to `Fake::log`.
+#[derive(Default)]
+struct Summ {
+    final_point: BTreeMap<UnitId, (i32, i32)>,
+    target_point: BTreeMap<UnitId, (i32, i32)>,
+    dir: i32,
+    coord: BTreeMap<(i32, i32), i32>,
+    free_spot: Option<(i32, i32)>,
+    free_point: Option<(i32, i32)>,
+    room_box: Option<(i32, i32, i32, i32)>,
+    dead_at: BTreeSet<(i32, i32)>,
+    slot: Option<i32>,
+    trap_kind: Option<i32>,
+    regions: Vec<i32>,
+    history: (usize, [(i32, i32); 20]),
+    last_placed: (i32, i32),
+    pets: Vec<UnitId>,
+    pet_count: i32,
+    hire_id: Option<i32>,
+    hire_row: Option<HireRow>,
+    calc: i32,
+    entry_mode: BTreeMap<i32, u8>,
+    unit_skills: Vec<(i32, i32)>,
+    skill_list: bool,
+    class_skills: Vec<i32>,
+    missile: Option<UnitId>,
+    corpse: Option<UnitId>,
+    group_active: bool,
+    pgsv: bool,
+    hooks: BTreeSet<String>,
+    palace: Option<(i32, i32)>,
+    wanderer: Option<(i32, i32)>,
+    portal: Option<Option<UnitId>>,
+    blocked6: bool,
+    path_points: bool,
 }
 
 /// Knobs of the `AiActs` fake; actions go to `Fake::log`.
@@ -122,7 +161,6 @@ struct Acts {
     path_points: bool,
     direction: i32,
     spawn: Option<UnitId>,
-    queen_class: i32,
     wisps: Vec<UnitId>,
     waves: BTreeMap<i32, (i32, i32)>,
     quests: BTreeSet<String>,
@@ -652,9 +690,6 @@ impl AiActs for Fake {
             .push(format!("spawn {class} {x} {y} {m} {spread} {flags:#x}"));
         self.x.spawn
     }
-    fn queen_spawn_class(&self, _: UnitId) -> i32 {
-        self.x.queen_class
-    }
     fn kill(&mut self, _: &mut Game, unit: UnitId, killer: Option<UnitId>) {
         self.log
             .push(format!("kill {} {:?}", unit.0, killer.map(|k| k.0)));
@@ -690,6 +725,170 @@ impl AiActs for Fake {
         let name = format!("{call:?}");
         self.log.push(format!("quest {name}"));
         self.x.quests.contains(&name)
+    }
+}
+
+impl AiSummons for Fake {
+    fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
+        self.y.final_point.get(&unit).copied().unwrap_or((0, 0))
+    }
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        self.y.target_point.get(&unit).copied().unwrap_or((0, 0))
+    }
+    fn set_path_target_point(&mut self, _: UnitId, x: i32, y: i32) {
+        self.log.push(format!("pathpoint {x} {y}"));
+    }
+    fn direction64_to(&self, _: UnitId, _: i32, _: i32) -> i32 {
+        self.y.dir
+    }
+    fn snap_direction(&mut self, _: UnitId, dir: i32) {
+        self.log.push(format!("snap {dir}"));
+    }
+    fn line_blocked_mask(&self, _: &Game, _: UnitId, _: UnitId, mask: u16) -> bool {
+        mask == 6 && self.y.blocked6
+    }
+    fn coord_index(&self, _: &Game, _: Option<RoomId>, x: i32, y: i32) -> i32 {
+        self.y.coord.get(&(x, y)).copied().unwrap_or(0)
+    }
+    fn free_spot(
+        &mut self,
+        _: &mut Game,
+        _: Option<RoomId>,
+        cl: i32,
+        class: i32,
+    ) -> Option<(i32, i32)> {
+        self.log.push(format!("freespot2 {cl} {class}"));
+        self.y.free_spot
+    }
+    fn free_point_masked(
+        &mut self,
+        _: &mut Game,
+        _: Option<RoomId>,
+        x: i32,
+        y: i32,
+        size: i32,
+        mask: u16,
+        n: i32,
+    ) -> Option<(i32, i32)> {
+        self.log
+            .push(format!("freepoint2 {x} {y} {size} {mask:#x} {n}"));
+        self.y.free_point
+    }
+    fn room_box(&self, _: &Game, _: RoomId) -> Option<(i32, i32, i32, i32)> {
+        self.y.room_box
+    }
+    fn class_dead_at(&self, _: &Game, _: RoomId, x: i32, y: i32, _: i32) -> bool {
+        self.y.dead_at.contains(&(x, y))
+    }
+    fn target_slot(&self, _: UnitId) -> i32 {
+        self.y.slot.unwrap_or(11)
+    }
+    fn register_target_node(&mut self, _: &mut Game, _: UnitId, slot: i32) {
+        self.log.push(format!("node {slot}"));
+        self.y.slot = Some(slot);
+    }
+    fn set_unit_flags2(&mut self, _: UnitId, mask: u32) {
+        self.log.push(format!("flag2 {mask:#x}"));
+    }
+    fn trap_kind(&self, _: &Game, _: UnitId) -> i32 {
+        self.y.trap_kind.unwrap_or(-1)
+    }
+    fn set_trap_kind(&mut self, _: &mut Game, _: UnitId, kind: i32) {
+        self.log.push(format!("trapkind {kind}"));
+        self.y.trap_kind = Some(kind);
+    }
+    fn region_classes(&self, _: &Game, _: UnitId) -> Vec<i32> {
+        self.y.regions.clone()
+    }
+    fn position_history(&self, _: UnitId) -> (usize, [(i32, i32); 20]) {
+        self.y.history
+    }
+    fn last_placed_point(&self, _: UnitId) -> (i32, i32) {
+        self.y.last_placed
+    }
+    fn pets(&self, _: &Game, _: UnitId) -> Vec<UnitId> {
+        self.y.pets.clone()
+    }
+    fn pet_count(&self, _: UnitId) -> i32 {
+        self.y.pet_count
+    }
+    fn hireling_id(&self, _: &Game, _: UnitId, _: UnitId) -> Option<i32> {
+        self.y.hire_id
+    }
+    fn hireling_row(&self, _: &Game, _: i32, _: i32) -> Option<HireRow> {
+        self.y.hire_row
+    }
+    fn skill_calc(&self, _: UnitId, skill: i32, _: u32, level: i32) -> i32 {
+        let _ = (skill, level);
+        self.y.calc
+    }
+    fn entry_mode(&self, _: UnitId, skill: i32) -> Option<u8> {
+        self.y.entry_mode.get(&skill).copied()
+    }
+    fn unit_skills(&self, _: UnitId) -> Vec<(i32, i32)> {
+        self.y.unit_skills.clone()
+    }
+    fn has_skill_list(&self, _: UnitId) -> bool {
+        self.y.skill_list
+    }
+    fn class_skills(&self, _: i32) -> Vec<i32> {
+        self.y.class_skills.clone()
+    }
+    fn make_right_skill(&mut self, _: &mut Game, _: UnitId, skill: i32) {
+        self.log.push(format!("rightskill {skill}"));
+    }
+    fn set_hand_skill(&mut self, _: UnitId, skill: i32, right: bool) {
+        self.log.push(format!("hand {skill} {right}"));
+    }
+    fn skill_missile(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        skill: i32,
+        level: i32,
+        missile: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        self.log
+            .push(format!("missile {skill} {level} {missile} {x} {y}"));
+        self.y.missile
+    }
+    fn link_owner(&mut self, _: &mut Game, a: UnitId, b: UnitId) {
+        self.log.push(format!("link {} {}", a.0, b.0));
+    }
+    fn corpse_find(&mut self, _: &mut Game, _: UnitId, n: i32) -> Option<UnitId> {
+        self.log.push(format!("corpsefind {n}"));
+        self.y.corpse
+    }
+    fn state_group_active(&self, _: UnitId, _: i32) -> bool {
+        self.y.group_active
+    }
+    fn has_pgsv_state(&self, _: UnitId) -> bool {
+        self.y.pgsv
+    }
+    fn quest_hook(&mut self, _: &mut Game, _: UnitId, _: Option<UnitId>, hook: QuestHook) -> bool {
+        let name = format!("{hook:?}");
+        self.log.push(format!("hook {name}"));
+        self.y.hooks.contains(&name)
+    }
+    fn palace_guard_point(&mut self, _: &mut Game, x: i32, y: i32) -> (bool, i32, i32) {
+        match self.y.palace {
+            Some((px, py)) => (true, px, py),
+            None => (false, x, y),
+        }
+    }
+    fn dark_wanderer_target(&mut self, _: &mut Game, _: UnitId) -> Option<(i32, i32)> {
+        self.y.wanderer
+    }
+    fn rescue_portal(&mut self, _: &mut Game, _: UnitId) -> Option<Option<UnitId>> {
+        self.y.portal
+    }
+    fn npc_wants_interact(&mut self, _: &mut Game, _: UnitId, _: UnitId) {
+        self.log.push("0x8a".into());
+    }
+    fn path_has_points_no_target(&mut self, _: &mut Game, _: UnitId) -> bool {
+        self.y.path_points
     }
 }
 
@@ -1386,8 +1585,8 @@ fn install_sets_think_and_alternate() {
     w.with(|g, cx| install(g, cx, mon, 0));
     let c = w.store.control(mon).unwrap();
     assert_eq!((c.function, c.params), (0x005F_1750, [1, 2, 3]));
-    // An init function runs (FoulCrowNest's, §9.17: param 0 := frame);
-    // one without a body is a logged stub (BoneWall, 84).
+    // An init function runs (FoulCrowNest's, §9.17: param 0 := frame;
+    // BoneWall's, `ai-bodies-7.md` §9: param 0 := frame + `Param2`).
     let mut w = World::new(monstats(43, [0; 5], 15));
     let mon = w.mon;
     assert!(w.store.unhandled.is_empty());
@@ -1395,11 +1594,17 @@ fn install_sets_think_and_alternate() {
     w.store.control_mut(mon).unwrap().function = 0;
     w.with(|g, cx| install(g, cx, mon, 0));
     assert_eq!(w.store.control(mon).unwrap().params, [77, 0, 0]);
-    let w = World::new(monstats(84, [0; 5], 15));
-    assert!(w.store.unhandled.contains(&Unhandled::Function {
-        addr: 0x005E_0390,
-        unit: w.mon
-    }));
+    let mut w = World::new(monstats(84, [0; 5], 15));
+    let mon = w.mon;
+    w.monstats[0].skill1 = 1;
+    let mut sk = Skills::decode(&vec![0u8; Skills::SIZE]);
+    sk.param2 = 30;
+    w.skills = vec![sk.clone(), sk];
+    w.game.frame = 10;
+    w.store.control_mut(mon).unwrap().function = 0;
+    w.with(|g, cx| install(g, cx, mon, 0));
+    assert!(w.store.unhandled.is_empty());
+    assert_eq!(w.store.control(mon).unwrap().params, [40, 0, 0]);
     let mut w = World::new(monstats(3, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| install(g, cx, mon, 18)); // state ≥ 18: nothing
@@ -1430,13 +1635,22 @@ fn special_states_10_to_12_need_switchai() {
 
 #[test]
 fn stub_ai_logged() {
-    let mut w = World::new(monstats(41, [0; 5], 15)); // Towner (unread)
-    w.run(false, 0);
+    // Every AI table think has a body now; a special-state think without
+    // one (state 6 `0x005E7C10`) is a logged stub.
+    let mut w = World::new(monstats(41, [0; 5], 15));
     let mon = w.mon;
+    let p = TickParam {
+        target: None,
+        distance: 0,
+        combat: false,
+        class: 0,
+        class2: 0,
+    };
+    w.with(|g, cx| run_function(g, cx, 0x005E_7C10, mon, &p));
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7540,
+            addr: 0x005E_7C10,
             unit: mon
         }]
     );
@@ -1540,9 +1754,18 @@ fn specd_here_check_catches_perturbations() {
     fewer.retain(|&i| i != 60);
     let err = check_specd_here(AI_FUNCTIONS_TSV, &fewer).unwrap_err();
     assert!(err.starts_with("index 60:"), "{err}");
+    // Every row is spec'd-here: an added index is out of range or out of
+    // order.
+    let mut more = SPECD_HERE.to_vec();
+    more.push(148);
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &more).unwrap_err();
+    assert!(err.starts_with("index 148:"), "{err}");
     let mut more = SPECD_HERE.to_vec();
     more.push(147);
     let err = check_specd_here(AI_FUNCTIONS_TSV, &more).unwrap_err();
+    assert_eq!(err, "SPECD_HERE not ascending");
+    // A row dropped while its status stays spec'd-here, at the end.
+    let err = check_specd_here(AI_FUNCTIONS_TSV, &SPECD_HERE[..147]).unwrap_err();
     assert!(err.starts_with("index 147:"), "{err}");
 }
 
@@ -1561,6 +1784,8 @@ mod act2;
 mod act3;
 mod act4;
 mod act5;
+mod act6;
+mod act7;
 mod bodies;
 mod npc;
 mod rules;
