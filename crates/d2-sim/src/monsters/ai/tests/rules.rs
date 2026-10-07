@@ -1653,7 +1653,7 @@ fn andariel_world() -> World {
     w
 }
 
-// Covers: specs/monsters/ai-bodies.md §9.12 r1, §9.12 r2, §9.12 r3, §9.12 r4
+// Covers: specs/monsters/ai-bodies.md §9.12 text, §9.12 r1, §9.12 r2, §9.12 r3, §9.12 r4
 #[test]
 fn andariel_steps() {
     let set = |w: &mut World, aips: [u16; 4]| {

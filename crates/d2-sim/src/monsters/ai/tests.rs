@@ -1630,7 +1630,7 @@ fn freeing_the_last_command_wraps_to_its_next() {
 
 // ---- §3 install and tables ----------------------------------------------
 
-// Covers: specs/monsters/ai.md §3.3 r2, §3.3 r3, §3.3 r4
+// Covers: specs/monsters/ai.md §3.3 text, §3.3 r2, §3.3 r3, §3.3 r4
 #[test]
 fn install_sets_think_and_alternate() {
     let mut w = World::new(monstats(15, [0; 5], 15));
