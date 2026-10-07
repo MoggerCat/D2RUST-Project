@@ -96,3 +96,18 @@ statements is wrong; resolve with a recording (open question).
 - `cube.md` §8 l2 r3 — sound event queue (see `objects.md` §14 r2).
 - `cube.md` §10 — statement about C→S 0x4C (stub test exists in
   `d2-server` items tests; exempt per sort).
+
+## Gate
+
+`CARGO_INCREMENTAL=0 sh tools/gate.sh` on the final tree: spec_index,
+methods, conflict markers, coverage --check, trace checkers, hook
+selftest, fmt, depcheck, doc-tests, `test d2-sim + conformance` PASS;
+`clippy -p d2-sim --all-targets -D warnings` clean (after the first run's
+four lints, fixed). Still failing, not from this branch (same on the base
+bf602bf for the first; the second is client/bridge wiring):
+
+- `test rest`: `d2-server --test world_data_tables` (3 tests,
+  "not an MPQ archive" from the synthetic install fixture).
+- `test d2-client`: 130 bridge/world_view tests, `NoHandler { id: 117,
+  121, 127, 139, … }` in the protocol table (client C wiring in progress
+  in another session).
