@@ -35,14 +35,14 @@
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
 |   7. Room clients and the inactivity counter | 446–466 |
 |   8. Deactivation (tick step 9) | 467–530 |
-|   9. Room tile grid | 531–1105 |
-|   10. Collision map from tiles | 1106–1184 |
-| Constants & data dependencies | 1185–1199 |
-| Randomness | 1200–1217 |
-| Edge cases & original bugs | 1218–1235 |
-| Test vectors | 1236–1283 |
-| Provenance | 1284–1327 |
-| Open questions | 1328–1435 |
+|   9. Room tile grid | 531–1119 |
+|   10. Collision map from tiles | 1120–1198 |
+| Constants & data dependencies | 1199–1213 |
+| Randomness | 1214–1231 |
+| Edge cases & original bugs | 1232–1249 |
+| Test vectors | 1250–1297 |
+| Provenance | 1298–1341 |
+| Open questions | 1342–1449 |
 <!-- /index -->
 
 ## Summary
@@ -629,7 +629,21 @@ room's level type (level +0x1C0), in this order:
 3. Set room flag `0x1000000`.
 
 A slot load (`0x00604A40`) is fatal (error 0x2A) when all 32 slots are
-full. DT1 files are cached process-wide by path (`0x00600710`), so rooms
+full.
+
+**Empty `File` name for a set mask bit.** Rule 1 does not test the
+name. The `LvlTypes` field address (row + 0x3C·i, never null) goes
+to the slot load, which takes the next free slot. Its cache lookup by
+path (`0x00600710`) misses, and the file is opened by that path:
+`0x005FDF80` gives size 0 when the open fails. The load then continues
+on a zero-size buffer (`0x00600790`). *Pending*:
+- whether that load is fatal or leaves an empty library slot;
+- whether any 1.14d `LvlTypes` row has an empty `File` under a mask bit
+  that a lvlprest / lvlmaze / outdoor source sets. The survey is
+  `data-tool tables` over `LvlTypes` `File1`–`File32` against every
+  `Dt1Mask`.
+d2rs skips such a bit (unverified). With 1.14d data only the second
+point decides whether this path ever runs. DT1 files are cached process-wide by path (`0x00600710`), so rooms
 share library objects. Example (Act 1 town, `LvlTypes` "Act 1 - Town",
 lvlprest Dt1Mask 959 = bits 0–5, 7–9): slots = Floor, Objects, Fence
 (Town), River, stonewall, trees, Objects (Outdoors), TreeGroups, Bridge,
