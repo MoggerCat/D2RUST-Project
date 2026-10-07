@@ -82,3 +82,16 @@ one sentence of evidence, e.g. "verified: `data-tool tables` reproduces all
 | `data/schema.md` + `fields.tsv` | machine-readable layouts with mechanical checks |
 | `formats/tbl.md` | a small, complete format spec with test vectors |
 | `render/map-preview.md` | rules decided from evidence (renders, probes) |
+
+## Index
+
+Specs are grouped by folder (`audio/`, `client/`, `combat/`, `data/`,
+`drlg/`, `formats/`, `items/`, `missiles/`, `monsters/`, `render/`, `sim/`,
+`skills/`, `tools/`, `ui/`, `world/`). d2rs-own designs (no 1.14d
+behavior to reproduce; their rules are ours) are listed here so they are
+not mistaken for original-behavior specs:
+
+| Spec | Design |
+|---|---|
+| `data/patch-layers.md` | mod table patches (`d2patch 1`) |
+| `formats/native-assets.md` | native asset formats, the local converter, runtime source switch, mod layering |
