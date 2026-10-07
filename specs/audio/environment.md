@@ -10,31 +10,32 @@
   range, §2 table layout, §6 sound tick, §9 settings), `audio/triggers.md`
   (§1 conventions and helpers used here, §3 player event lines),
   `client/audio.md` §B4, §B5, `data/fields.tsv` (`levels.SoundEnv`
-  u8 +0x21C), `world/quests.md` (who sends quest events), a future
-  `render/lighting.md` (day cycle) and weather spec.
+  u8 +0x21C), `world/quests.md` (who sends quest events),
+  `render/lighting.md` §9 (day cycle), `render/draw-order-2.md` §11
+  (weather).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–57 |
-| Inputs | 58–69 |
-| Outputs / state changes | 70–74 |
-| Rules | 75–76 |
-|   1. Sound environment | 77–91 |
-|   2. Music (`0x004DCAA0(T)`) | 92–131 |
-|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 132–182 |
-|   4. Level-entry lines (`0x004CC270`) | 183–217 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 218–232 |
-|   6. Rain (`0x004E42E0`, second part) | 233–248 |
-|   7. Event cues (`0x004E42E0`, third part) | 249–266 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 267–274 |
-| Constants & data dependencies | 275–284 |
-| Randomness | 285–293 |
-| Edge cases & original bugs | 294–303 |
-| Test vectors | 304–325 |
-|   Checks (hook addresses for `record_sound.py`) | 326–335 |
-| Provenance | 336–349 |
-| Open questions | 350–368 |
+| Summary | 41–58 |
+| Inputs | 59–70 |
+| Outputs / state changes | 71–75 |
+| Rules | 76–77 |
+|   1. Sound environment | 78–103 |
+|   2. Music (`0x004DCAA0(T)`) | 104–147 |
+|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 148–198 |
+|   4. Level-entry lines (`0x004CC270`) | 199–238 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 239–253 |
+|   6. Rain (`0x004E42E0`, second part) | 254–269 |
+|   7. Event cues (`0x004E42E0`, third part) | 270–287 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 288–295 |
+| Constants & data dependencies | 296–305 |
+| Randomness | 306–314 |
+| Edge cases & original bugs | 315–324 |
+| Test vectors | 325–346 |
+|   Checks (hook addresses for `record_sound.py`) | 347–356 |
+| Provenance | 357–370 |
+| Open questions | 371–397 |
 <!-- /index -->
 
 ## Summary
@@ -63,8 +64,8 @@ left or right of the listener.
 | client update counter C | `[0x007A0498]` | `audio/triggers.md` §1 r5 |
 | level L | local player's room → level id (`0x00481780`) | client model |
 | environment E | `soundenviron` row `levels[L].SoundEnv` (`0x004817A0`, `0x00481920`) | `data/fields.tsv` |
-| day phase | first dword of the client act's environment (`0x0061C220([0x007A0634])`) | open question 3 |
-| weather | active (`0x00473C40`), intensity f32 `[0x007A89A0]` | open question 4 |
+| day phase | first dword of the client act's environment (`0x0061C220([0x007A0634])`): the period index 0–5 | `render/lighting.md` §9.1 (+0x00), §9.2–§9.3 |
+| weather | active (`0x00473C40`), intensity f32 `[0x007A89A0]` (`0x00473C80`) | `render/draw-order-2.md` §11 (§1 r5 here) |
 | settings | Master Volume, Music Volume | `sound-table.md` §9 |
 
 ## Outputs / state changes
@@ -82,12 +83,23 @@ sounds; the state variables named in each section.
    row (ambience fields read as 0; music song 0).
 3. **Day**: phase ∈ {1, 2, 3}; any other phase is night (`0x004E4317`).
    NPC time greetings use the same phase (`audio/triggers.md` §10 r1).
+   The phase is the period index of the act environment
+   (`0x0061C220` returns dword +0x00 of the record at act +0x04,
+   `0x0061AA60`); `render/lighting.md` §9 owns how it is set (S→C 0x53)
+   and advanced. All six indices occur; with the normal table day is
+   the periods starting at 340°, 0° and 160° (`render/env-periods.tsv`).
 4. Live data (P `soundenviron.txt`, `levels.txt`): 50 rows; 48 are used
    by levels, rows 11 (`ANDARIEL_LAIR`) and 35 (`GUILD`) by none; 13
    rows have different day and night ambience ids (36 the same non-zero
    id), 13 different day and night event ids; 6 rows have no event
    (both 0); `Event Delay` 150–800 (250 in 28 rows); `Indoors` = 1 in
    26 rows.
+5. **Weather** (`0x00473C40`, `0x00473C80`): active when the snow-mode
+   flag `[0x007A8A14]` is 0 and the local player's level has `Rain`
+   (levels record +0x05, `0x0061DBA0`; no player → inactive); the
+   intensity is the float `[0x007A89A0]` = rain target / 256, moved by
+   the rain cycle (`render/draw-order-2.md` §11.1, §11.3 r3). Snow mode
+   (`[0x007A8A14]` ≠ 0, Act V, `0x004726F0`) makes it inactive.
 
 ### 2. Music (`0x004DCAA0(T)`)
 
@@ -119,9 +131,13 @@ announced level `[0x007C8A04]`, resume table `resume[song]`
    2`, `Block 3` if `Block 2` ≤ p < `Block 3`, else 0 (−1 cells never
    match); resume[cur] := r, Ts := T. Coming back to a song starts it
    at the next block boundary after where it was (or at 0).
-9. **Reset** (`0x004DCA30`, from sound init `0x00482260` and
-   `0x00482EF0`, when `[0x007A0438]` +0x220 is 0): every variable of §2
-   and §3 and the resume table := 0.
+9. **Reset** (`0x004DCA30`, from sound init `0x00482260` at every game
+   start and from the video player `0x00482EF0` before a video, when
+   `[0x007A0438]` +0x220 is 0): every variable of §2 and §3 and the
+   resume table := 0. `[0x007A0438]` is the start-up config; +0x220 is
+   the `-ns` / `-nosound` switch byte (`tools/original-hooks.md` §5.1
+   switch table; test at `0x004DCA38`), so the reset runs whenever
+   sound is enabled.
 10. Live: 28 song rows, all `Loop`, `Stream`, `Stereo`, `Music Vol`,
     `Defer Inst`, `Volume` 110, `Fade In`/`Fade Out` 125, `Priority`
     255; `Block 1` set on 19 of them, `Block 2` on 4
@@ -212,8 +228,13 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
    player event e on P (`audio/triggers.md` §3 r4: the class line base
    + e − 33, delay per that rule).
 3. The flags are set even when r2 plays nothing, so a line skipped
-   because the hero spoke within 62 updates is lost for that game
-   (flags cleared: open question 6).
+   because the hero spoke within 62 updates is lost for that game.
+4. **Reset** (`0x004CA280`, from sound init `0x00482260`, which the
+   client game state `0x0044F360` calls once per game start): the
+   1,024 level flags `[0x007C78B8]` := 0 (and `[0x007C88B8]`,
+   `[0x007C88BC]`, `[0x007C88C4]`, `[0x007C88C8]` := 0, `[0x007C88C0]` :=
+   90). The last level checked `[0x007C88CC]` is never reset: 0 at
+   process start, it carries over from game to game.
 
 ### 5. Ambience loop (`0x004E42E0(T)`, first part)
 
@@ -349,19 +370,27 @@ used (no client sound code).
 
 ## Open questions
 
-1. Confirm §2–§7 with a recording (Checks): walk town → wilderness →
+1. ~~Confirm §2–§7 with a recording (Checks): walk town → wilderness →
    cave and back; stand through a day change in the wilderness; kill
-   Blood Raven.
-2. Units of the play position `0x004DF900` versus `Block` values
-   (bytes or sample frames of the stream).
-3. The day cycle: what sets the act environment's phase and when
-   (owner: a future lighting spec); which phase values occur.
-4. Weather: when it is active (`0x00473C40`: `[0x007A8A14]` = 0 and
-   the level's weather flag) and how the intensity moves (owner: a
-   future weather spec; thunder 202 is `audio/triggers.md` §12).
-5. Front-end music (`Options Music` setting, `music_options`,
+   Blood Raven.~~ Moved to the recording list
+   (`docs/handoff/pc2-rec-pc2-render-audio.md` RA-E1).
+2. ~~Units of the play position `0x004DF900` versus `Block` values
+   (bytes or sample frames of the stream).~~ Partly static:
+   `0x004DF900` → `0x005159B0` returns the Storm stream position
+   (`0x00418140`, stream record +0x2C) shifted right by 2; the unit of
+   +0x2C is set by the Storm refill thread (not read). Moved to the
+   recording list (RA-E2).
+3. *Answered* (`0x0061C220`, `0x0061AA60`): the phase is the act
+   environment's period index, owned by `render/lighting.md` §9; all of
+   0–5 occur (§1 r3).
+4. *Answered* (`0x00473C40`, `0x00473C80`, `0x0061DBA0`): §1 r5; the
+   weather state machine is `render/draw-order-2.md` §11 (thunder 202
+   is `audio/triggers.md` §12).
+5. ~~Front-end music (`Options Music` setting, `music_options`,
    `0x00514D80` callers `0x0042FB20`–`0x004FA160`): out of game, owner
-   a front-end spec.
-6. When the level-entry flags `[0x007C78B8]` and `[0x007C88CC]` are
-   cleared (new game?).
-7. What `[0x007A0438]` +0x220 means for the music reset (§2 r9).
+   a front-end spec.~~ Needs more than two function reads (many
+   callers); moved to the recording list (RA-E3).
+6. *Answered* (`0x004CA280`, `0x00482260`, `0x0044F360`): §4 r4. The
+   flags are cleared at every game start; `[0x007C88CC]` never.
+7. *Answered* (`0x004DCA38`, `tools/original-hooks.md` §5.1): +0x220 is
+   the `-ns` switch; §2 r9.
