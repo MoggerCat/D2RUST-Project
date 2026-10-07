@@ -31,13 +31,13 @@
 |   2. Spending stat points (message 0x3A) | 96–145 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 146–167 |
 |   4. Experience | 168–335 |
-|   5. Client vitals sync (`0x00548760`) | 336–447 |
-| Constants & data dependencies | 448–464 |
-| Randomness | 465–468 |
-| Edge cases & original bugs | 469–480 |
-| Test vectors | 481–501 |
-| Provenance | 502–528 |
-| Open questions | 529–560 |
+|   5. Client vitals sync (`0x00548760`) | 336–472 |
+| Constants & data dependencies | 473–489 |
+| Randomness | 490–493 |
+| Edge cases & original bugs | 494–505 |
+| Test vectors | 506–526 |
+| Provenance | 527–553 |
+| Open questions | 554–586 |
 <!-- /index -->
 
 ## Summary
@@ -367,8 +367,33 @@ link here.
    head buffer B (`0x005392E0`), the client's unit and client +0x1B0 ≥
    10 all required; n = (499 − B's size, B +0x00) / 9 (signed,
    truncating); n ≤ 0 → nothing; n > 55 → fatal; else `0x00537FD0(client,
-   n)` (a scan of the units around the client's room) and `0x0053E130`
-   (Open question 7).
+   n)` and `0x0053E130`:
+   1. **Nearest players** `0x00537FD0` (ECX client, EDX n): client room
+      (+0x1B4) null → fatal. C := the client's unit; none → nothing.
+      (px, py) := C's sub-tile position. A list of up to n nodes {unit,
+      d, next} is built from every unit of every room in the client
+      room's room list (`0x00619790`, `drlg/rooms.md` §10.4), rooms in
+      list order, units in room-list order (room +0x74, next +0xE8);
+      only players (type 0, C included) count, d := |x − px| + |y −
+      py| (`0x00537D10`). The list is kept sorted by ascending d: a new
+      player with d below the first node's becomes the first node;
+      otherwise it goes before the first node after the first whose d
+      ≥ its own (so it ties after the first node but before any other),
+      else at the end; once n are held, a
+      player with d ≥ the current maximum is skipped, else the last
+      node is dropped and its slot reused. Then `0x00537EE0` copies the
+      list from its first node into client +0x1CC as 9-byte records
+      {u8 type, u32 GUID, u16 x, u16 y} (players: path position) and
+      the count into client +0x3BC, stopping **before** the node whose
+      next is none: the farthest kept player is never copied, except
+      when the list holds one player.
+   2. **Send** `0x0053E130` (ECX client): count c = client +0x3BC; c = 0
+      → nothing. Appends to the head buffer: u8 0x16, u16 size @1 =
+      9c + 13, u8 c @3, then the c records from @4; the buffer length
+      grows by 9c + 13, so the last 9 bytes of the message are left
+      unwritten (whatever the buffer held).
+   1.14d-confirmed (`0x0052DA00`, `0x00537FD0`, `0x00537D10`,
+   `0x00537EE0`, `0x0053E130`).
 
 #### 5.2 Values
 
@@ -540,8 +565,10 @@ stat points: three spends succeed, the fourth fails, result 2.
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
-4. `client-messages.tsv` row 0x3A says `stat:u16@1`; the handler reads
-   byte +1 as the stat and byte +2 as count − 1.
+4. Answered: the handler (`0x0054BD29`–`0x0054BD3E`) reads the u16 at
+   +1 and splits it: low byte = stat, high byte = count − 1 (§2). The
+   `client-messages.tsv` row 0x3A (`stat:u16@1`) belongs to the message
+   worker: it should read `stat:u8@1 count_minus_1:u8@2`.
 5. Answered: monster stats at spawn are `monsters/init.md` §6–§9,
    §13 and §19.
 6. Answered: death penalties are §4.6; the stat reset callers are §2.1
@@ -550,10 +577,9 @@ stat points: three spends succeed, the fourth fails, result 2.
    loss in client +0x508, which the corpse turns into 75 % recoverable
    experience (§4.7); the client learns the new experience through the
    ordinary stat updates.
-7. §5.1 rule 4: the setting is answered (registry `PlayerPos`, off in a
-   standard install). Still unread, only for `PlayerPos` ≠ 0:
-   `0x00537FD0(client, n)` and `0x0053E130`; not needed for
-   `Ruleset::Original`.
+7. Answered: §5.1 rule 4 (registry `PlayerPos`, off in a standard
+   install; `0x00537FD0` and `0x0053E130` specified there; not run by
+   `Ruleset::Original`).
 8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
    any recording with damage, potions and running: every 0x18 / 0x95 /
    0x96 / 0x1A–0x1C byte and its tick.

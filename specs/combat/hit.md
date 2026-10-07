@@ -31,7 +31,7 @@
 | Edge cases & original bugs | 393–413 |
 | Test vectors | 414–438 |
 | Provenance | 439–464 |
-| Open questions | 465–483 |
+| Open questions | 465–486 |
 <!-- /index -->
 
 ## Summary
@@ -471,9 +471,12 @@ Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
 2. Block: hook `0x0057E04B` (EDI = r, EBX = chance, ESI = defender) to
    confirm the /3 rule and the zero-chance draw (Edge case 1).
 3. Answered: hostility `0x00554200` is §7.1, melee range `0x00622C40`
-   / `0x00622870` are §7.2 / §7.3 (owned here). Still unowned: the
-   collision-line test `0x00622AA0` used by §7.2 (owner `sim/units.md`
-   per `monsters/ai.md`).
+   / `0x00622870` are §7.2 / §7.3 (owned here). The collision-line test
+   `0x00622AA0(a, b, mask)` used by §7.2 is specified in
+   `render/draw-order-2.md` §15 rule 2 (unit line: sizes, end pull-in)
+   and §16 (the line walk `0x0064E260`); checked against `0x00622AA0`
+   / `0x00622920` (a or b missing is a fatal assert, lines 0x1290 /
+   0x1291).
 4. Answered: §7.4 lists every caller of `hit_test` and
    `block_or_dodge` with the bonus and flags each passes.
 5. Answered (impl-combat item 7): weapon block with no matching entry
