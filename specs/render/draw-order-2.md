@@ -25,14 +25,14 @@
 |   12. Level backgrounds (pass 1) | 312–351 |
 |   13. Pass 8 (`0x00475B20`) | 352–360 |
 |   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 361–386 |
-|   15. Sight test (`draw-order.md` §5 r3) | 387–403 |
-|   16. Line test (`0x0064E260`) | 404–433 |
-| Constants & data dependencies | 434–444 |
-| Randomness | 445–456 |
-| Edge cases & original bugs | 457–473 |
-| Test vectors | 474–495 |
-| Provenance | 496–524 |
-| Open questions | 525–582 |
+|   15. Sight test (`draw-order.md` §5 r3) | 387–396 |
+|   16. Line test (`0x0064E260`) | 397–426 |
+| Constants & data dependencies | 427–437 |
+| Randomness | 438–449 |
+| Edge cases & original bugs | 450–466 |
+| Test vectors | 467–488 |
+| Provenance | 489–517 |
+| Open questions | 518–575 |
 <!-- /index -->
 
 ## Summary
@@ -390,16 +390,9 @@ order and each reads the extents as left by the strips before it.
    player's level (`levels.txt`; 83 levels in 1.14d, all indoor: caves,
    crypts, Monastery and Catacombs, sewers, tombs, Arcane Sanctuary,
    Act III dungeons and temples, Act V ice caves). 0 → every unit passes.
-2. **Unit line** `0x00622AA0(a = local player, b = unit, mask 2)`: no
-   room for `a` → passes (0). Else with sub-tile positions (`0x0045ADF0`,
-   `0x0045AE20`) `(ax, ay)`, `(bx, by)` and sizes `sa`, `sb`
-   (`sim/path-placement.md` §3 size, values ≥ 3 → 2): `dx` = |`bx − ax`|,
-   `dy` = |`by − ay`|; `dx + dy` < `sa + sb` → passes. Otherwise, unless
-   both sizes are 0, the ends are pulled toward each other: if `dy` ≤
-   `dx`, `ax` moves `sa` toward `bx` and `bx` moves `sb` toward `ax`; if
-   `dy` ≥ `dx`, the same on y (both when `dx` = `dy`). The result is the
-   line test (§16) from `a`'s room, `(ax, ay)` → `(bx, by)`, mask 2
-   (collision bit 0x0002, `drlg/rooms.md` §10.6): blocked → hidden.
+2. **Unit line** `0x00622AA0(a = local player, b = unit, mask 2)`
+   (`sim/units.md` §8; mask 2 = collision bit 0x0002, `drlg/rooms.md`
+   §10.6): blocked → hidden.
 
 ### 16. Line test (`0x0064E260`)
 

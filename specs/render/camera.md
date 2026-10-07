@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 307–316 |
 | Test vectors | 317–338 |
 | Provenance | 339–358 |
-| Open questions | 359–404 |
+| Open questions | 359–406 |
 <!-- /index -->
 
 ## Summary
@@ -368,8 +368,10 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    Still open: the capture under a roof that decides between the two y
    formulas.
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
-   `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
-   `0x00642840` test (line of sight vs room; owner `draw-order.md`).
+   `0x004DC710`). *Answered* (static): `0x00642840` is the level's
+   `LOSDraw` gate (`render/draw-order-2.md` §15 r1) and
+   `0x00622AA0(player, unit, 2)` the unit collision line with mask 2
+   (`sim/units.md` §8).
 3. *Answered* in `unit-composite.md` §8: the three getters read the
    unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
    and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/
