@@ -1484,6 +1484,9 @@ pub trait Pending {
     /// contents (hover/chat spec, S→C 0x26 §7.9) live here. Default:
     /// nothing kept.
     fn replace_overhead(&mut self, player: UnitId, text: &[u8], byte8: u8, end: i32) {}
+    /// The items refresh `0x0055FDE0` of tick step 1 (`sim/tick.md` §3:
+    /// an act's environment report, before its 0x53). Default: nothing.
+    fn environment_refresh_items(&mut self, player: UnitId) {}
     /// The room clean-up's client part for a player (`intents-events.md`
     /// §7.5 step 7, `0x0053FA90`: the client record's +0x34 → +4 := 0).
     /// Default: nothing (no client record model).

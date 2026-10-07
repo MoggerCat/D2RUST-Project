@@ -282,11 +282,8 @@ pub(super) fn find_mode1<W: AiHost + ?Sized>(
     false
 }
 
-/// `0x005DE9D0` (§2.3), target modes 4 and 5.
-// PROVISIONAL (monsters/ai.md §2.3): "same collision test → wander 5" is
-// the collision test only (no can-walk test of 0x005DE890); settled by a
-// bin read of 0x005DE9D0 and a wander-draw recording. HIGH-PRIORITY
-// CAPTURE (RNG draw order: wander 5 draws).
+/// `0x005DE9D0` (§2.3), target modes 4 and 5: the collision test **and**
+/// the class can walk → wander 5; otherwise idle 20 without a mode change.
 fn find_mode45<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -298,7 +295,7 @@ fn find_mode45<W: AiHost + ?Sized>(
     if s.target.is_some() {
         return true;
     }
-    if cx.world.collides(game, unit, 0x40) {
+    if cx.world.collides(game, unit, 0x40) && cx.can_walk(unit) {
         wander(game, cx, unit, 5);
     } else {
         idle_keep_mode(game, cx, unit, 20);

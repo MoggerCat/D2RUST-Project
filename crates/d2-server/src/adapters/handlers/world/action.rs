@@ -14,6 +14,7 @@
 //! written from the same values there.
 
 use d2_sim::game::Game;
+use d2_sim::monsters::ai::AiStore;
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::{ClientId as SimClient, UnitId};
 use d2_sim::wiring::action::{vitals_sync, ActionSim, ObjectCase, Pending};
@@ -56,6 +57,41 @@ pub trait ActionEvents: EventDispatch {
         a.sys.hooks.ai_info = fields.ai_info();
         a.sys.data.difficulty = fields.difficulty;
         a.sys.data.expansion = fields.expansion;
+    }
+}
+
+/// The server process's state that outlives its games: the Npc command
+/// counter G (`0x0088CADC`, `monsters/ai.md` §9.9 commands step 1). G is
+/// process-wide in 1.14d: zero at process start, counted across every
+/// game of the process, never reset or saved (`ai.md` open question 12).
+/// One per server process: [`Self::start_game`] hands G to each new
+/// game's AI store, [`Self::end_game`] reads back what the game left.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ProcessState {
+    pub npc_walk_counter: u32,
+}
+
+impl ProcessState {
+    /// A fresh process (G = 0).
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// A new game of this process: its AI store continues from G
+    /// (`AiStore::with_npc_walk_counter`). A game without an AI store
+    /// (`ActionHooks::ai` `None`) gets one.
+    pub fn start_game<D: ActionEvents>(&self, d: &mut D) {
+        let hooks = &mut d.action().sys.hooks;
+        match hooks.ai.as_mut() {
+            Some(store) => store.npc_walk_counter = self.npc_walk_counter,
+            None => hooks.ai = Some(AiStore::with_npc_walk_counter(self.npc_walk_counter)),
+        }
+    }
+    /// The game ends: G as the game left it, for the process's next game.
+    /// A game without an AI store leaves G unchanged.
+    pub fn end_game<D: ActionEvents>(&mut self, d: &mut D) {
+        if let Some(store) = d.action().sys.hooks.ai.as_ref() {
+            self.npc_walk_counter = store.npc_walk_counter;
+        }
     }
 }
 

@@ -31,7 +31,7 @@ mod wired;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use action::{ActionEvents, ActionWorld, Outbox};
+pub use action::{ActionEvents, ActionWorld, Outbox, ProcessState};
 pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;

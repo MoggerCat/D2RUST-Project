@@ -1176,3 +1176,57 @@ fn specials_check_catches_perturbations() {
         .unwrap_err()
         .starts_with("line 4: va"));
 }
+
+/// The shipped specials restricted to `kinds`.
+fn specials_only(kinds: &[&str]) -> Specials {
+    let text: Vec<&str> = SPECIALS_TSV
+        .lines()
+        .enumerate()
+        .filter(|(i, l)| *i == 0 || kinds.contains(&l.split('\t').next().unwrap_or("")))
+        .map(|(_, l)| l)
+        .collect();
+    Specials::parse(&text.join("\n")).unwrap()
+}
+
+// Covers: specs/drlg/maze.md §6
+#[test]
+fn builders_stamp_the_unlisted_levels_of_their_type() {
+    type Builder = fn(&mut Gen<'_>) -> Result<(), MazeError>;
+    let cases: &[(u32, Builder, &[&str])] = &[
+        (13, layout::cave, &["cave_prev", "cave_down"]),
+        (14, layout::cave, &["cave_prev", "cave_down"]),
+        (15, layout::cave, &["cave_prev", "cave_down"]),
+        (16, layout::cave, &["cave_prev", "cave_down"]),
+        (25, layout::crypt, &["crypt_prev"]),
+        (37, layout::catacombs, &["catacombs_next"]),
+        (90, layout::dungeon, &["dungeon_prev", "dungeon_next"]),
+        (91, layout::dungeon, &["dungeon_prev", "dungeon_next"]),
+        (93, layout::act3_sewers, &["a3sewer_drain", "a3sewer_chest"]),
+        (132, layout::baal, &["baal_next"]),
+    ];
+    for &(id, build, kinds) in cases {
+        // With only the first i tables present, the builder fails on
+        // stamp i (row r + i mod 4); with all of them it succeeds.
+        for i in 0..=kinds.len() {
+            let md = MazeData {
+                specials: specials_only(&kinds[..i]),
+                ..MazeData::default()
+            };
+            let (mut d, l, _) = world(1, id, 3, TileRect::new(0, 0, 400, 400));
+            let (mut g, f) = gen_with_f(&mut d, l, row(id, 1, 10, 0), &md, 200, 200);
+            g.cell_mut(f).lock = true;
+            let mut s = g.drlg.level(l).seed;
+            let r = (s.step() & 3) as usize;
+            let got = build(&mut g);
+            if i < kinds.len() {
+                assert_eq!(
+                    got,
+                    Err(MazeError::NoSpecialRow(kinds[i], (r + i) % 4)),
+                    "level {id} stamp {i}"
+                );
+            } else {
+                assert_eq!(got, Ok(()), "level {id}");
+            }
+        }
+    }
+}

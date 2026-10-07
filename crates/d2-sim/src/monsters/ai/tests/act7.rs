@@ -458,6 +458,34 @@ fn shadow_warrior_mimics_its_owner() {
     );
 }
 
+// Covers: specs/monsters/ai-bodies-7.md §18 text
+#[test]
+fn shadow_warrior_pet_test_reads_pettype_as_a_signed_index() {
+    use crate::monsters::ai::bodies7::pet_test;
+    // summon ≠ 0 and ≠ the unit's class; pettype valid (≥ 0 and below the
+    // pettype row count 10) and O ≠ 0 → pass when the unit's pet type ≠
+    // pettype; an invalid pettype (negative, or ≥ the count) → pass.
+    // (pettype byte, the unit's pet type, pass)
+    for (pettype, pet_type, pass) in [
+        (3u8, 3, false),
+        (3, 2, true),
+        (12, 12, true),
+        (0xFF, -1, true),
+        (0x80, -128, true),
+    ] {
+        let mut w = world(act_row(105, &[40, 30, 60, 1]));
+        let mut sk = Skills::decode(&vec![0u8; Skills::SIZE]);
+        sk.summon = 999;
+        sk.pettype = pettype;
+        w.skills = vec![sk];
+        w.fake.y.pettype_count = 10;
+        w.fake.y.pet_type = pet_type;
+        let (u, o) = (w.mon, w.player);
+        let r = w.with(|g, cx| pet_test(g, cx, Some(o), u, 0));
+        assert_eq!(r, pass, "pettype {pettype:#x}, pet type {pet_type}");
+    }
+}
+
 // ---- §19 Raven, §20 Vines, §21 DruidBear -------------------------------------
 
 // Covers: specs/monsters/ai-bodies-7.md §19 text, §19 r1, §19 r2, §19 r3
