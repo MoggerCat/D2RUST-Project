@@ -2,9 +2,10 @@
 //! Tests of the batch 3 bodies of required level 18 and 24 (the rules
 //! `tests3` does not claim) on [`super::fake::BodyFake`].
 
-use super::fake::BodyFake;
+use super::fake::{stored, BodyFake};
 use super::tests2::{body_rec, monster, tabs, world, Code};
 use super::*;
+use crate::combat::DamageRecord;
 use crate::skills::fake::{blank, combat_tables, monster_rec, FUnit};
 use crate::skills::SkillUnits;
 use crate::units::UnitType;
@@ -868,4 +869,124 @@ fn blade_fury_start_while_channelling() {
     assert_eq!(b3_lvl18::blade_fury_start(&mut f, &t, &ct, u, 1, 1), 1);
     assert_eq!(f.missiles.len(), 1);
     assert_eq!(f.entry_param(u, &e, 1), 112);
+}
+
+// ---------------------------------------------------------------- §6.18
+
+fn tail_world(
+    edit: impl Fn(&mut d2_data::tables::Skills, &mut Code),
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+) {
+    rabies_world(edit)
+}
+
+// Covers: specs/skills/bodies-2b.md §6.18 r1, §6.18 r2, §6.18 r3
+#[test]
+fn dragon_tail_start_attack_rate_list_and_refusals() {
+    let (t, ct, mut f, u, _) = tail_world(|r, _| r.param4 = 40);
+    assert_eq!(b3_lvl18::dragon_tail_start(&mut f, &t, &ct, u, 9, 1), 0);
+    assert!(f.lists.is_empty(), "R invalid: before the list");
+    // T none: the attack-rate list is made, the result 0.
+    f.targets.clear();
+    f.tpos.clear();
+    assert_eq!(b3_lvl18::dragon_tail_start(&mut f, &t, &ct, u, 1, 1), 0);
+    let l = f.lists.last().expect("attack rate list");
+    assert_eq!(l.flags, 4);
+    assert_eq!(l.unit, Some(u));
+    assert_eq!(l.stats.get(&(stat::ATTACKRATE as i32)), Some(&40));
+    assert!(f.take_log().contains(&format!("anim {u}")));
+}
+
+// Covers: specs/skills/bodies-2b.md §6.18 r4, §6.18 r5
+#[test]
+fn dragon_tail_start_hit_stores_the_kick() {
+    let (t, ct, mut f, u, m) = tail_world(|r, _| r.srcdam = 0);
+    let (mut hit, mut miss) = (false, false);
+    f.c.set(u, 19, 0);
+    f.c.set(m, 31, 100_000);
+    for _ in 0..400 {
+        f.c.units[u].combat.clear();
+        let r = b3_lvl18::dragon_tail_start(&mut f, &t, &ct, u, 1, 1);
+        if r == 1 {
+            hit = true;
+            assert_eq!(f.c.units[u].combat.len(), 1);
+            assert_eq!(f.c.units[u].combat[0].record.result & 1, 1);
+        } else {
+            miss = true;
+            assert!(f.c.units[u].combat.is_empty());
+        }
+    }
+    assert!(hit && miss);
+}
+
+// ---------------------------------------------------------------- §6.19
+
+fn tail_do_world() -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    usize,
+    usize,
+) {
+    let (t, ct, mut f, u, m) = tail_world(|r, c| {
+        r.calc1 = c.f(30);
+        r.aurarangecalc = c.f(10);
+        r.aurafilter = 0;
+    });
+    let rec = DamageRecord {
+        result: 1,
+        physical: 1000,
+        ..DamageRecord::default()
+    };
+    stored(&mut f, u, m, rec);
+    let m2 = monster(&mut f, (2, 0));
+    f.c.units[m2].mode = 1;
+    f.c.units[m2].flags = 0xC;
+    f.c.set(m2, 12, 1);
+    f.c.set(m2, 6, 10_000_000);
+    f.c.set(m, 6, 10_000_000);
+    f.scan = vec![m2];
+    (t, ct, f, u, m, m2)
+}
+
+// Covers: specs/skills/bodies-2b.md §6.19 r1
+#[test]
+fn dragon_tail_do_refusals() {
+    let (t, ct, mut f, u, _, _) = tail_do_world();
+    assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 9, 1), 0);
+    // No pair record.
+    f.c.units[u].combat.clear();
+    assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 0);
+    // T none.
+    let (t, ct, mut f, u, _, _) = tail_do_world();
+    f.targets.clear();
+    f.tpos.clear();
+    assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §6.19 r2, §6.19 r3
+#[test]
+fn dragon_tail_do_finishes_and_splashes_fire() {
+    let (t, ct, mut f, u, m, m2) = tail_do_world();
+    f.c.set(u, 329, 20);
+    f.take_log();
+    assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 1);
+    // The pair record was applied to T (apply_melee).
+    assert!(f.c.units[u].combat.is_empty());
+    let log = f.take_log();
+    // The finisher ran (it clears the pgsv group) before the melee hit.
+    assert!(log.contains(&"cleargroup 0 4".to_string()));
+    // D fire = pct(1000, 30 + 20, 100) = 500 on the unit in range.
+    assert_eq!(f.c.get(m2, 6), 10_000_000 - 500);
+    // T dead after the hit: no splash.
+    let (t, ct, mut f, u, m, m2) = tail_do_world();
+    f.alive.remove(&m);
+    assert_eq!(b3_lvl18::dragon_tail(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.get(m2, 6), 10_000_000);
 }
