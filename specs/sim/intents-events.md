@@ -41,13 +41,13 @@
 |   6. Exact-match comparison | 514–604 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 605–987 |
 |   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 988–1132 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1133–1245 |
-| Constants & data dependencies | 1246–1264 |
-| Randomness | 1265–1270 |
-| Edge cases & original bugs | 1271–1304 |
-| Test vectors | 1305–1391 |
-| Provenance | 1392–1493 |
-| Open questions | 1494–1580 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1133–1277 |
+| Constants & data dependencies | 1278–1296 |
+| Randomness | 1297–1302 |
+| Edge cases & original bugs | 1303–1336 |
+| Test vectors | 1337–1423 |
+| Provenance | 1424–1525 |
+| Open questions | 1526–1623 |
 <!-- /index -->
 
 ## Summary
@@ -259,13 +259,13 @@ ECX = buffer (client id, message), EDX = size. Switch on the id:
 
 | Id | Does (1.14d) |
 |---|---|
-| 0x67 | if `0x0052C330` allows: create a game with a client (`0x00530BF0`) from the fields in the TSV layout |
+| 0x67 | `0x0052C330` refuses (nothing happens) when host callbacks exist and u8@0x11 ≠ 0, the character name (cstr16@0x15) or the game name (cstr16@1) fails `0x0053EFC0(name, 16)`, u8@0x2D > 14, u32@0x27 has neither bit 1 nor bit 2, the name checks `0x00538B70` / `0x00538C60` fail, or class u8@0x12 ≥ 7. Else `0x00530BF0(client, game name, u8@0x11 → game +0x6A (type), class u8@0x12, character name, u16@0x25 (arena, `0x0053F4B0`), u32@0x27 (bit 20 → game +0x70 expansion, bit 21 → +0x74 ladder), u8@0x13 → game +0x6B, u8@0x2B, u8@0x2C (passed, never read), u8@0x14 → game +0x6D (difficulty), u8@0x2D → client +0x50C)` |
 | 0x68 | join: optional check `0x0053EFF0` when host callbacks `0x00883D50` are absent; `0x0052C690` validates, `0x0052FA50` joins |
 | 0x69 | leave (`0x0052C8E0` → `0x005303D0`, which flushes the client) |
 | 0x6A | `0x0052DAF0` → `0x0052E9B0` |
 | 0x6B | `0x0052C550` → `0x00530190` |
-| 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` (save upload chunk) |
-| 0x6D | `0x0052C400(u32 at +5, 0)` (ping) |
+| 0x6C | total (u32 at +2) ≥ 0x2000 → fatal assert; `0x0052DB00` → `0x0052DB10` → `0x00538CE0(client, data @6, len u8@1, total, 0, 0, 0)` (save upload chunk) |
+| 0x6D | `0x0052C400` → `0x005389A0(client, tick u32@1, value u32@5)`: the client's game found → `GetTickCount` − tick − value goes into a 16-entry ring (client +0x4B4, count +0x500), the mean of the stored entries → client +0x4F8 (64-bit), S→C 0x8F (`0x0053E020`, with tick), client +0x3D8 := now (ping) |
 | 0x6E | `0x0052CBE0` → `0x00530270` |
 | 0x70 | client record +0x504 = 1, `0x005377A0` |
 | others | ignored |
@@ -1144,12 +1144,13 @@ owned it yet, and states the handlers that are only message handling.
    |---|---|
    | 0x12 EndInferno | rule 2 |
    | 0x14 OverheadChat | rule 3 |
-   | 0x15 Chat | §2.4 rule 6 (checks); relay: open question 14 |
+   | 0x15 Chat | §2.4 rule 6 (checks); relay: rule 16 |
    | 0x3D HighlightDoor | rule 4 (message part); `0x005845D0`: open question 15 |
    | 0x3E ActivateInifussScroll | `world/quests.md` §9.4 |
    | 0x3F PlayAudio | rule 5; the event's sound: `audio/triggers.md` §3 rule 3 |
    | 0x41 Resurrect | rule 6 |
    | 0x44 StaffInOrifice | `world/quests-act2.md` §8.6 (entry: rule 7) |
+   | 0x4F ClickButton | rule 15 (entry); the buttons: `0x00568060` (trade and UI buttons, `ui/panels.md`) |
    | 0x46 MercInteract, 0x47 MoveMerc | rule 8; the command: `monsters/ai.md` (commands `0x005E6AE0`) |
    | 0x48 TurnOffBusyState | rule 9 |
    | 0x4B RequestEntityUpdate | rule 10 |
@@ -1203,6 +1204,11 @@ owned it yet, and states the handlers that are only message handling.
 7. **0x44** (`0x0054C380`): size 17 else 3; busy (`0x00535060`) and
    trading (`0x005678A0(…, 1)`) → 3; else `0x00549520(game, player,
    u32@5, u32@9, u16@13)` and its result (`world/quests-act2.md` §8.6).
+   u16@13 is an action code (`0x00549520`): the orifice unit test
+   (`0x00548F80`, type 2, range 50) non-zero → that code; action 2 →
+   0 and `0x005852E0` runs; action 3 → the cursor-item check
+   `0x005490E0`, and `0x005852E0` runs when it returns 0; any other
+   action → 2, nothing runs.
 8. **0x46** (`0x0054C4B0`): size 13 else 3; merc GUID u32@1, target
    GUID u32@5, target type u32@9 (≥ 6 → 2); the unit test `0x00548F80`
    (range 50) non-zero → that code. **0x47** (`0x0054C520`): size 13
@@ -1242,6 +1248,32 @@ owned it yet, and states the handlers that are only message handling.
 14. **0x60** (`0x0054CE70`): size 1 else 3; classic game → 3; a used
     skill (`0x00620250`) or dead (`0x005541B0`) → 0; else `0x005616A0(game,
     player, &fail)`: 0, or 3 when it returns 0 with fail ≠ 0.
+15. **0x4F** (`0x0054C7C0`): size 7 else 3; `0x00568060(game, player,
+    button u16@1, (p1 u16@3 << 16) | p2 u16@5)` and its result: the
+    two words reach the button handler as one u32, p1 high.
+16. **0x15 relay** (`0x0054A5D0`, after §2.4 rule 6): u8@1 is copied
+    and never read. Target t = the cstr after the text (≤ 15 chars
+    kept). The text test `0x00413490(text, −1)` ≠ 0 → 0, nothing sent.
+    The line: 0x26 with u8@1 = 2 (whisper) when 1 ≤ strlen(t) ≤ 15,
+    else 1 (broadcast); u8@2 = message u8@2 (lang); u8@3 = 2; u32@4 =
+    0; u8@8 = 0; u8@9 = the sender's stat 12 (level, `0x00625480`);
+    name @10 = the sender's client name (`0x00538830`); then the text.
+    Every client c of the game is visited (`0x0052DED0`) with s = the
+    sender's player unit (type 0, GUID unit +0x0C; none if the sender
+    is not a player) and p = c's player:
+    - broadcast (`0x0054A470`): sent to c unless s and p both exist,
+      s ≠ p and one of the relation tests holds (`0x0055B300(p, s, 4)`,
+      `0x0055B300(s, p, 2)`, `0x0054A420(game, s, p)`,
+      `0x0054A420(game, p, s)`);
+    - whisper (`0x0054A510`): only a c whose client name equals t
+      (`0x00413590`); s, p exist and `0x0055B300(p, s, 4)` or
+      `0x0055B300(s, p, 2)` → not sent, flag `[0x008846E0]` := 1;
+      else sent, flag `[0x008846E4]` := 1.
+    A whisper then answers the sender (both flags cleared before the
+    visit): `[0x008846E0]` set → S→C 0x5A code 0x0D (`0x0053C850`, name
+    @8 = t); else `[0x008846E4]` clear (no client named t) → 0x5A code
+    4 with t; else 0x26 form 6 to the sender (`0x0053C750`: u8@1 6,
+    u8@2 0, u8@3 2, u32@4 0, u8@8 0, name @10 = t, the text). 0.
 
 ## Constants & data dependencies
 
@@ -1530,7 +1562,14 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
    `transaction`@9, `client_price`@13; 0x33 `item_mode`@9,
    `client_price`@13; 0x35 `unread`@9, `repair_flags`@13; 0x32, 0x33,
    0x35 now `yes`. Open: 0x14 / 0x15 `lang`@2, 0x15 `type`@1, 0x44,
-   0x4F.
+   0x4F. *Answered* (2026-10-07, TSV, every row `yes`): `lang`@2 is a
+   language id: the server copies it into S→C 0x26 u8@2 (§9 rules 3,
+   16) and the client compares it with its own language id
+   (`0x00525150`, 0–13) to pick the text conversion (`0x0049E280`,
+   `client/msg-ui.md` §4); 0x15 u8@1 is copied and never read (§9
+   rule 16), renamed `unread`; 0x44 u16@13 renamed `action` (§9 rule
+   7); 0x4F (§9 rule 15); system ids 0x67 (adds `game_name`@1), 0x6C,
+   0x6D (adds `tick`@1): §2.5.
 7. The odd third term of the C→S chat size rule (§2.1 rule 5): does the
    1.14d client ever send a non-zero byte there?
 8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
@@ -1564,6 +1603,10 @@ Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
 14. C→S 0x15 Chat (`0x0054A5D0`) after its checks: which messages it
     sends (0x26 through `0x0053C750`, `0x0053C850`) and to whom; one
     chat line in a recording settles the single-player case.
+    *Answered statically* (§9 rule 16): single player gets its own line
+    back as 0x26 form 1 (or form 2 and the form-6 echo for a whisper to
+    its own name, 0x5A code 4 for any other name). The recording (PC 2
+    list) confirms it.
 15. `0x005845D0` (0x3D, §9 rule 4): what a door highlight does to the
     object (object spec).
 16. `0x005616A0` (0x60, §9 rule 14): the weapon switch and its fail
