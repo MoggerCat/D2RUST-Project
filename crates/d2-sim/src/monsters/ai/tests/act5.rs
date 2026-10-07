@@ -640,7 +640,7 @@ fn baal_choice_weights_in_melee() {
     assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
 }
 
-// Covers: specs/monsters/ai-bodies-5.md §21.3
+// Covers: specs/monsters/ai-bodies-5.md §21.3; specs/monsters/ai-bodies-2.md §13.1
 #[test]
 fn baal_clone_spawns_a_third() {
     let mut w = world(act_row(135, &[]));
@@ -653,11 +653,16 @@ fn baal_clone_spawns_a_third() {
     w.fake.x.spawn = Some(c);
     w.fake.x.max_life.insert(mon, 3000);
     w.fake.stats.insert((mon, 6), 1500);
+    // The spawn info keys on `BaseId` 544 with class 570: two `roll(24)`
+    // steps spent and discarded first (`ai-bodies-2.md` §13.1).
+    w.monstats[0].baseid = 544;
     set_param_of(&mut w, 0, 15);
     let lo = 77;
     w.seed(lo);
     w.think_with(None, 0, false);
     let mut s = Seed::init_low(lo);
+    s.step();
+    s.step();
     let x = 100 + (s.step() % 24) as i32 - 12;
     let y = 100 + (s.step() % 24) as i32 - 12;
     assert!(logged(&w, &format!("spawn 570 {x} {y} 1 -1 0x0")));
@@ -755,7 +760,7 @@ fn nihlathak_alternate() {
     assert_eq!(w.thinks(), [1]);
 }
 
-// Covers: specs/monsters/ai-bodies-5.md §3 text, §3 l2 r2, §3 l2 r4, §3 l2 r5
+// Covers: specs/monsters/ai-bodies-5.md §3 text, §3 l2 r2, §3 l2 r4, §3 l2 r5, §3 l2 r6
 #[test]
 fn imp_combat_and_fire() {
     let setup = || {
@@ -798,17 +803,28 @@ fn imp_combat_and_fire() {
     w.fake.secondary = Some((s, 15));
     w.think_with(Some(w.player), 15, false);
     assert!(logged(&w, "steps 4"));
-    // E = 12 < 13: the I4 draw < 60 → fire at S.
-    let lo = seed_raw(3, |v| {
-        v[0] % 100 >= 40 && v[1] % 100 >= 25 && v[2] % 100 < 60
-    });
+    // E = 12 < I3.aip3 22: only the I3 draw; it fails (≥ 25) → step 6
+    // even though E < I4.aip3 and the next draw is < 60 (open question 4).
+    let lo = seed_raw(2, |v| v[0] % 100 >= 25 && v[1] % 100 < 60);
     let mut w = setup();
     give_skill(&mut w, 4, 265, 8);
     w.seed(lo);
     let s = w.add_unit(UnitType::Player, (112, 100));
     w.fake.secondary = Some((s, 12));
     w.think_with(Some(w.player), 15, false);
+    assert!(!w.fake.modes().contains(&unit_mode(8, s)));
+    // E ≥ I3.aip3 (synthetic 10) and E = 12 < I4.aip3 13: the I4 draw < 60
+    // → fire at S (one draw).
+    let lo = seed_raw(1, |v| v[0] % 100 < 60);
+    let mut w = setup();
+    w.monstats[494].aip3 = 10;
+    give_skill(&mut w, 4, 265, 8);
+    w.seed(lo);
+    let s = w.add_unit(UnitType::Player, (112, 100));
+    w.fake.secondary = Some((s, 12));
+    w.think_with(Some(w.player), 15, false);
     assert_eq!(w.fake.modes(), [unit_mode(8, s)]);
+    assert_eq!(steps_since(&w, lo), 1);
 }
 
 // Covers: specs/monsters/ai-bodies-5.md §7 r4, §7 r7

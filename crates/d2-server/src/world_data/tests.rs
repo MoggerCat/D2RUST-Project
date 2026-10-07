@@ -1,4 +1,4 @@
-// Spec: specs/drlg/preset.md §5; specs/drlg/outdoor-tilesub.md §1; specs/drlg/rooms.md §9.3; specs/data/fixups.md §12
+// Spec: specs/drlg/preset.md §5; specs/drlg/outdoor-tilesub.md §1; specs/drlg/rooms.md §9.3; specs/data/fixups.md §12; specs/world/hirelings.md Inputs
 //! Synthetic DS1 / DT1 bytes through the providers (CI), and the Act I
 //! levels generated from the live tables through
 //! `wiring::worldgen::levels::WorldTypes` (`#[ignore]`, `D2_GAME_DIR`).
@@ -11,6 +11,7 @@ use d2_sim::drlg::outdoor::{SubDefs, SubFiles, SubRow};
 use d2_sim::drlg::preset::{Ds1File, Ds1Source, PresetData, PresetDef, PresetTables};
 use d2_sim::drlg::tiles::FIXED_LIBRARY;
 use d2_sim::drlg::TileSource;
+use d2_sim::world::hirelings::HirelingTables;
 
 use super::*;
 
@@ -480,4 +481,64 @@ fn world_files_a_missing_named_file_is_an_error() {
     )
     .unwrap_err();
     assert!(matches!(err, WorldDataError::Parse { .. }), "{err:?}");
+}
+
+// ---- hireling tables ------------------------------------------------------------
+
+fn bin(
+    name: &str,
+    size: usize,
+    count: usize,
+    fill: impl Fn(usize, &mut [u8]),
+) -> d2_data::bin::BinTable {
+    let mut records = vec![0u8; size * count];
+    for (i, r) in records.chunks_mut(size).enumerate() {
+        fill(i, r);
+    }
+    d2_data::bin::BinTable {
+        name: name.into(),
+        source: "patch_d2.mpq".into(),
+        count,
+        record_size: size,
+        records,
+    }
+}
+
+// Covers: specs/world/hirelings.md §6 r2, §7.2 r3
+#[test]
+fn hireling_tables_load_from_the_three_tables() {
+    use d2_data::tables::{Experience, Hireling, Pettype, Record};
+    // One hireling row; pettype row 7 with warp (bit 0 at +4) and
+    // basemax 1 (u16 +10); experience MaxLvl 2 (Amazon of row 0) and
+    // ExpRatio (+28) 1024 (the MaxLvl row) / 1100 / 1000 / 900 (levels
+    // 0–2).
+    let hireling = bin(Hireling::TABLE, Hireling::SIZE, 1, |_, r| {
+        r[0..2].copy_from_slice(&100u16.to_le_bytes());
+    });
+    let pettype = bin(Pettype::TABLE, Pettype::SIZE, 8, |i, r| {
+        if i == 7 {
+            r[4] = 1;
+            r[10..12].copy_from_slice(&1u16.to_le_bytes());
+        }
+    });
+    let experience = bin(Experience::TABLE, Experience::SIZE, 4, |i, r| {
+        if i == 0 {
+            r[0..4].copy_from_slice(&2u32.to_le_bytes());
+        }
+        let ratio = [1024u32, 1100, 1000, 900][i];
+        r[28..32].copy_from_slice(&ratio.to_le_bytes());
+    });
+    let all = [hireling, pettype, experience];
+    let find = |n: &str| all.iter().find(|t| t.name == n);
+    let t = tables::hireling_tables_by(find).expect("loads");
+    assert_eq!(t.max_level, 2);
+    assert_eq!(t.pet_flags, HirelingTables::WARP);
+    assert_eq!(t.pet_basemax, 1);
+    assert_eq!(t.rows.rows.len(), 1);
+    assert_eq!(t.exp_ratios.ratio(2), 900);
+    assert_eq!(t.exp_ratios.ratio(0), 1024);
+    // A missing table is an error naming it (M07, M08).
+    let two = &all[..2];
+    let e = tables::hireling_tables_by(|n| two.iter().find(|t| t.name == n)).unwrap_err();
+    assert!(e.to_string().contains("experience"), "{e}");
 }

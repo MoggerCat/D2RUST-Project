@@ -244,7 +244,8 @@ pub enum DeliverError {
 /// The output dispatcher (`client/bridge.md` §10 rules 4–5): the last
 /// bridge frame's outputs in list order, UI outputs to the original UI
 /// (its sounds appended at once, so the request order is the call order),
-/// sound outputs to [`UiSounds`]. Without the original UI the UI outputs
+/// sound outputs to [`UiSounds`], effect outputs to the (not yet
+/// written) effect layer. Without the original UI the UI outputs
 /// have no consumer and are dropped with a log line.
 pub fn deliver_outputs(
     bridge: Res<BridgeResource>,
@@ -282,7 +283,15 @@ pub fn deliver_outputs(
                 requests
                     .borrow_mut()
                     .push(SoundRequest::Server { unit, class, event });
+            } else {
+                debug!("audio output {o:?}: no consumer yet");
             }
+            Ok(())
+        },
+        &mut |o| {
+            // The client effect layer is Phase 6 (`client/bridge.md` §10
+            // rule 5): no consumer yet.
+            debug!("effects output {o:?}: no effect layer");
             Ok(())
         },
     )?;

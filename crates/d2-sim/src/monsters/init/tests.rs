@@ -367,6 +367,10 @@ impl InitHost for Fake {
     fn quest_chain(&mut self, _: UnitId, chain: u32) {
         self.log.push(format!("quest_chain {chain}"));
     }
+    fn create_boss_item(&mut self, _: UnitId, code: [u8; 4], loc: u8, _: i32) {
+        let c = String::from_utf8_lossy(&code).trim_end().to_string();
+        self.log.push(format!("boss_item {c} {loc}"));
+    }
     fn set_corpse_noselect(&mut self, _: UnitId) {
         self.log.push("corpse_noselect".into());
     }
@@ -393,8 +397,24 @@ impl InitHost for Fake {
     fn give_aura(&mut self, _: UnitId, skill: u16, level: i32) {
         self.log.push(format!("aura {skill} {level}"));
     }
-    fn superunique_quest(&mut self, _: UnitId, hc: u32) {
-        self.log.push(format!("su_quest {hc}"));
+    fn spawn_near_unit(&mut self, _: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {
+        self.log
+            .push(format!("near {class} {mode} {spread} {flags:#x}"));
+    }
+    fn spawn_group(&mut self, _: UnitId, class: u32, r: i32, n: i32, flags: u32) {
+        self.log.push(format!("group {class} {r} {n} {flags:#x}"));
+    }
+    fn quest_preset_boss(&mut self, _: UnitId) {
+        self.log.push("preset_boss".into());
+    }
+    fn owner_data_self(&mut self, _: UnitId) {
+        self.log.push("owner_self".into());
+    }
+    fn class_for_level(&mut self, _: UnitId, class: u32) -> u32 {
+        class + 1
+    }
+    fn monster_teardown(&mut self, _: UnitId, free_inventory: bool) {
+        self.log.push(format!("teardown {free_inventory}"));
     }
     fn set_state(&mut self, _: UnitId, state: u16) {
         self.log.push(format!("state {state}"));
@@ -981,13 +1001,12 @@ fn creation_sequence_and_normal_mods() {
     }
 }
 
-// Covers: specs/monsters/init.md §14.2
+// Covers: specs/monsters/init.md §14.2, §14.3
 #[test]
 fn boss_mods_bloodraven() {
     let mut ms = vec![mon(1, 1, 1, 1); 2];
-    ms[1].baseid = 250;
-    let mut t = Tables::new(ms);
-    t.ids.bloodraven = Some(250);
+    ms[1].baseid = 267;
+    let t = Tables::new(ms);
     let mut f = fake_with(t);
     let cx = f.cx;
     let u = create(
@@ -1005,6 +1024,120 @@ fn boss_mods_bloodraven() {
     assert_eq!(f.region_bosses, 1);
     assert!(f.log.contains(&"quest_chain 2".to_string()));
     assert!(f.log.contains(&"corpse_noselect".to_string()));
+}
+
+// Covers: specs/monsters/init.md §14.3
+#[test]
+fn boss_mods_case_table() {
+    use super::create::{boss_mods_for, BossStep::*};
+    // Uber classes take their own branch of the shared BaseId.
+    assert_eq!(
+        boss_mods_for(156, 707),
+        [Umod(23, true), Umod(6, true), Umod(29, true)]
+    );
+    assert_eq!(boss_mods_for(156, 156), [Umod(22, true), Chain(6)]);
+    assert_eq!(boss_mods_for(211, 211), [Chain(13), Chain(9)]);
+    assert_eq!(boss_mods_for(211, 708), [Umod(6, true), Umod(18, true)]);
+    assert_eq!(
+        boss_mods_for(242, 704),
+        [
+            Umod(22, true),
+            Umod(30, true),
+            Umod(17, true),
+            Umod(8, true),
+            Umod(6, true)
+        ]
+    );
+    assert_eq!(boss_mods_for(242, 242), [Chain(20), Umod(22, true)]);
+    assert_eq!(boss_mods_for(243, 243), [Umod(22, true), Chain(23)]);
+    assert_eq!(
+        boss_mods_for(250, 250),
+        [Chain(12), UnitFlags(0x800), DataFlag1]
+    );
+    assert_eq!(boss_mods_for(292, 292), [Umod(31, false)]);
+    assert_eq!(boss_mods_for(343, 343), [UnitFlags(0x20000)]);
+    assert_eq!(
+        boss_mods_for(366, 366),
+        [Chain(19), UnitFlags(0x20000), Umod(22, true)]
+    );
+    assert_eq!(boss_mods_for(540, 541), [AncientEquip]);
+    assert_eq!(
+        boss_mods_for(544, 709),
+        [Umod(22, true), Umod(18, true), Umod(8, true), Umod(6, true)]
+    );
+    // warriv2's hook acts only for 201 / 331; no other BaseId has a case.
+    assert!(boss_mods_for(175, 175).is_empty());
+    assert!(boss_mods_for(24, 24).is_empty());
+    // No case assigns umods 40 or 41.
+    for b in 0..800 {
+        for c in [b as u32, 704, 705, 706, 707, 708, 709] {
+            assert!(!boss_mods_for(b, c)
+                .iter()
+                .any(|s| matches!(s, Umod(40 | 41, _))));
+        }
+    }
+}
+
+// Covers: specs/monsters/init.md §14.3
+#[test]
+fn boss_mods_summoner_and_ancient_equipment() {
+    let mut ms = vec![mon(1, 1, 1, 1); 542];
+    ms[1].baseid = 250;
+    ms[2].baseid = 540;
+    ms[541].baseid = 540;
+    let mut f = fake_with(Tables::new(ms));
+    let cx = f.cx;
+    let u = create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 1,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(f.data(u).data_flag1);
+    assert_ne!(f.units.get(u).unwrap().flags & 0x800, 0);
+    assert!(f.log.contains(&"quest_chain 12".to_string()));
+    // Class 2 has BaseId 540 but the equipment table is keyed by the
+    // class: only 540–542 read a row, so nothing is created.
+    create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 2,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(!f.log.iter().any(|l| l.starts_with("boss_item")));
+    // Class 541 (BaseId 540) reads its own row, in k order.
+    create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 541,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    let items: Vec<_> = f
+        .log
+        .iter()
+        .filter(|l| l.starts_with("boss_item"))
+        .collect();
+    assert_eq!(
+        items,
+        [
+            "boss_item tax 4",
+            "boss_item tax 5",
+            "boss_item hgl 10",
+            "boss_item hbt 9"
+        ]
+    );
 }
 
 // ---- §19 ----
@@ -1498,6 +1631,7 @@ fn superunique() {
     let cx = f.cx;
     let u = f.monster(0, 1);
     f.store.entry(u).type_flags |= type_flag::SUPERUNIQUE;
+    f.log.clear();
     superunique_init(&cx, &mut f, u, 3, 0, 0);
     let d = f.data(u);
     assert_eq!(d.boss_hc_idx, 3);
@@ -1509,14 +1643,187 @@ fn superunique() {
     let auras: Vec<&String> = f.log.iter().filter(|l| l.starts_with("aura")).collect();
     assert_eq!(auras.len(), 2);
     assert_eq!(auras[0], auras[1]);
-    assert!(f.log.contains(&"su_quest 3".to_string()));
-    // Countess: mods stop at the first 0; state 118 and AI state 13.
+    // hcIdx 3 has no §20.1 case.
+    assert!(!f.log.iter().any(|l| l.starts_with("quest_chain")));
+    // Countess: mods stop at the first 0; state 118, chain 5, AI state 13
+    // in that order (§20.1).
     let v = f.monster(0, 1);
+    f.log.clear();
     superunique_init(&cx, &mut f, v, 6, 0, 0);
     assert_eq!(f.data(v).umod_list()[0], 5);
     assert!(!f.data(v).has_umod(30));
-    assert!(f.log.contains(&"state 118".to_string()));
-    assert!(f.log.contains(&format!("ai_install {} 13", v.0)));
+    let pos = |s: String| f.log.iter().position(|l| *l == s).unwrap();
+    let (a, b, c) = (
+        pos("state 118".into()),
+        pos("quest_chain 5".into()),
+        pos(format!("ai_install {} 13", v.0)),
+    );
+    assert!(a < b && b < c);
+}
+
+// Covers: specs/monsters/init.md §20.1
+#[test]
+fn superunique_hcidx_cases() {
+    let mut t = boss_tables();
+    t.superuniques = (0..63).map(|i| su_row(0, i, [0, 0, 0])).collect();
+    let mut f = fake_with(t);
+    let cx = f.cx;
+    // Radament (10): roll(5) + 2 class-4 spawns on the unit seed, then
+    // 276, 382, 385, 389.
+    let u = f.monster(0, 1);
+    f.log.clear();
+    superunique_init(&cx, &mut f, u, 10, 0, 0);
+    let near: Vec<&String> = f.log.iter().filter(|l| l.starts_with("near")).collect();
+    let n = near.len() - 4;
+    assert!((2..=6).contains(&n), "{n}");
+    assert!(near[..n].iter().all(|l| *l == "near 4 1 4 0x40"));
+    assert_eq!(
+        near[n..],
+        [
+            "near 276 1 4 0x40",
+            "near 382 1 4 0x40",
+            "near 385 1 4 0x40",
+            "near 389 1 4 0x40"
+        ]
+    );
+    // Siege boss (42): group, chain 31, preset hook, state 118.
+    let v = f.monster(0, 1);
+    f.log.clear();
+    superunique_init(&cx, &mut f, v, 42, 0, 0);
+    let want = [
+        "group 453 20 20 0x0",
+        "quest_chain 31",
+        "preset_boss",
+        "state 118",
+    ];
+    let got: Vec<&String> = f
+        .log
+        .iter()
+        .filter(|l| want.iter().any(|w| l == w))
+        .collect();
+    assert_eq!(got, want);
+    // Nihlathak (60): owner data, the class for the level, chain 34.
+    let w = f.monster(0, 1);
+    f.log.clear();
+    superunique_init(&cx, &mut f, w, 60, 0, 0);
+    let i = f.log.iter().position(|l| l == "owner_self").unwrap();
+    assert_eq!(f.log[i + 1], "group 454 10 20 0x40");
+    assert_eq!(f.log[i + 2], "quest_chain 34");
+    // Every case ends with umod 22 (unique).
+    assert_eq!(*f.data(w).umod_list().last().unwrap(), 22);
+}
+
+// Covers: specs/monsters/init.md §26
+#[test]
+fn make_unique_and_the_warping_pick() {
+    let t = boss_tables();
+    let mut f = fake_with(t);
+    let cx = f.cx;
+    let u = f.monster(0, 1);
+    super::make_unique(&cx, &mut f, u);
+    let d = f.data(u);
+    assert!(d.has_flag(type_flag::BOSS) && d.has_flag(type_flag::UNIQUE));
+    assert!(d.data_flag1);
+    assert_ne!(f.units.get(u).unwrap().flags & 0x800, 0);
+    assert_eq!(f.region_bosses, 1);
+    // No minions are spawned (spawn minions 0).
+    assert!(!f.log.iter().any(|l| l.starts_with("minion")));
+    use super::{nearest_eligible, warp_eligible, WarpCandidate};
+    let ok = WarpCandidate {
+        monster: true,
+        mode: 1,
+        has_walk: true,
+        m2_byte_0b: Some(1),
+        has_data: true,
+        ..WarpCandidate::default()
+    };
+    assert!(warp_eligible(&ok));
+    for bad in [
+        WarpCandidate {
+            is_operator: true,
+            ..ok
+        },
+        WarpCandidate {
+            monster: false,
+            ..ok
+        },
+        WarpCandidate { relation: 1, ..ok },
+        WarpCandidate { alignment: 2, ..ok },
+        WarpCandidate {
+            test_63ea40: true,
+            ..ok
+        },
+        WarpCandidate { mode: 3, ..ok },
+        WarpCandidate {
+            has_walk: false,
+            ..ok
+        },
+        WarpCandidate {
+            m2_byte_0b: Some(0),
+            ..ok
+        },
+        WarpCandidate {
+            m2_byte_0b: None,
+            ..ok
+        },
+        WarpCandidate {
+            has_data: false,
+            ..ok
+        },
+        WarpCandidate { boss: true, ..ok },
+        WarpCandidate {
+            prime_evil: true,
+            ..ok
+        },
+        WarpCandidate {
+            type_flags: 0x10,
+            ..ok
+        },
+    ] {
+        assert!(!warp_eligible(&bad), "{bad:?}");
+    }
+    assert!(warp_eligible(&WarpCandidate {
+        mode: 2,
+        type_flags: 0x20,
+        ..ok
+    }));
+    // The nearest eligible one; the first of equal distances; limit 0 is
+    // 0x10000 but the best starts at 0xFFFF.
+    assert_eq!(
+        nearest_eligible([(1, 9, true), (2, 5, false), (3, 7, true), (4, 7, true)], 0),
+        Some(3)
+    );
+    assert_eq!(nearest_eligible([(1, 0xFFFF, true)], 0), None);
+    assert_eq!(nearest_eligible([(1, 0xFFFE, true)], 0), Some(1));
+    assert_eq!(nearest_eligible([(1, 10, true)], 10), None);
+}
+
+// Covers: specs/monsters/init.md §27
+#[test]
+fn class_reinit() {
+    let mut ms = vec![mon(1, 1, 1, 1); 4];
+    ms[2].interact = true;
+    ms[3].enabled = false;
+    let mut f = fake_with(Tables::new(ms));
+    let cx = f.cx;
+    let u = f.monster(2, 1);
+    f.store.entry(u).umods[0] = 5;
+    f.log.clear();
+    // A disabled or out-of-range class changes nothing.
+    assert!(!reinit(&cx, &mut f, u, 3, 1));
+    assert!(!reinit(&cx, &mut f, u, 4, 1));
+    assert!(!reinit(&cx, &mut f, u, -1, 1));
+    assert!(f.log.is_empty());
+    // The old class (2) is `interact`: the inventory is kept; the class,
+    // the type init and the plain mode set follow; umods stay.
+    assert!(reinit(&cx, &mut f, u, 1, 3));
+    assert_eq!(f.log[0], "teardown false");
+    assert_eq!(f.units.get(u).unwrap().class, 1);
+    assert_eq!(f.units.get(u).unwrap().mode, 3);
+    assert_eq!(f.data(u).class, 1);
+    assert_eq!(f.data(u).umod_list(), [5]);
+    assert!(reinit(&cx, &mut f, u, 0, 1));
+    assert!(f.log.contains(&"teardown true".to_string()));
 }
 
 // Covers: specs/monsters/init.md §21, §edge-cases-original-bugs r10

@@ -362,6 +362,49 @@ pub fn monequip<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, lev
     }
 }
 
+/// Class reinit `0x00574370(game, unit, class, mode)` (§27): the monster
+/// becomes `class` in place. False (nothing changed) for a non-monster
+/// or a class outside monstats or without `enabled`.
+pub fn reinit<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    class: i32,
+    mode: u32,
+) -> bool {
+    // Step 1.
+    let monster = h
+        .units()
+        .get(unit)
+        .is_some_and(|r| r.ty == crate::units::UnitType::Monster);
+    if !monster {
+        return false;
+    }
+    // Step 2.
+    let Some(row) = u32::try_from(class).ok().and_then(|c| cx.monstats(c)) else {
+        return false;
+    };
+    if !row.enabled {
+        return false;
+    }
+    // Step 4 with the old class: an `interact` monster keeps its
+    // inventory.
+    let old = class_of(h, unit);
+    let keep = cx.monstats(old).is_some_and(|m| m.interact);
+    h.monster_teardown(unit, !keep);
+    h.game().timers.cancel_unit_timers(unit);
+    // Step 5.
+    if let Some(r) = h.units().get_mut(unit) {
+        r.class = class as u32;
+    }
+    // Step 6: the type init (§5 with §6) on the unit's room and GUID; §5
+    // step 7 reads the old mode.
+    type_init(cx, h, unit);
+    // Step 7.
+    h.set_mode_plain(unit, mode);
+    true
+}
+
 /// Normal mods `0x005B21B0` by `BaseId` (§14.1): (umod, unique arg).
 pub fn normal_mods_for(base_id: u16) -> &'static [(u8, bool)] {
     match base_id {
@@ -390,20 +433,111 @@ pub fn normal_mods<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) 
     }
 }
 
-/// Boss mods `0x005B1CF0` (§14.2). Only the Act 1 case the spec states
-/// (bloodraven) is reproduced.
-/// TODO(spec: monsters/init.md open question 6): the other cases
-/// (act bosses, quest monsters, uber 704–709) are not stated per case.
+/// One step of a boss-mods case (§14.3), in code order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BossStep {
+    /// `0x005A4850(game, unit, n, unique)`.
+    Umod(u8, bool),
+    /// `0x005436B0(game, unit, n)`: quest chain record.
+    Chain(u32),
+    /// Unit flags (+0xC4) |= mask (skipped for a null unit).
+    UnitFlags(u32),
+    /// Monster data +0x5C |= 1 (`0x00573570(unit, 1, set)`).
+    DataFlag1,
+    /// State 118 corpse_noselect on (`0x00639DB0(unit, 118, 1)`).
+    CorpseNoselect,
+    /// The ancient barbarian equipment `0x005B1C50`.
+    AncientEquip,
+}
+
+/// The boss-mods steps of `0x005B1CF0` (§14.3) for a class with
+/// `BaseId` `base_id`, in code order. The warriv2 (175) case's class
+/// hook acts only for classes 201 and 331, so it has no step.
+pub fn boss_mods_for(base_id: i32, class: u32) -> &'static [BossStep] {
+    use BossStep::*;
+    match base_id {
+        156 if class == 707 => &[Umod(23, true), Umod(6, true), Umod(29, true)],
+        156 => &[Umod(22, true), Chain(6)],
+        211 if class == 708 => &[Umod(6, true), Umod(18, true)],
+        211 => &[Chain(13), Chain(9)],
+        229 => &[Chain(8)],
+        242 if class == 704 => &[
+            Umod(22, true),
+            Umod(30, true),
+            Umod(17, true),
+            Umod(8, true),
+            Umod(6, true),
+        ],
+        242 => &[Chain(20), Umod(22, true)],
+        243 if class == 705 => &[Umod(22, true), Umod(8, true), Umod(6, true)],
+        243 => &[Umod(22, true), Chain(23)],
+        250 => &[Chain(12), UnitFlags(0x800), DataFlag1],
+        256 if class == 706 => &[Umod(6, true), Umod(18, true)],
+        256 => &[Umod(22, true), Chain(22)],
+        267 => &[Umod(12, true), Umod(22, true), Chain(2), CorpseNoselect],
+        284 => &[Umod(23, true), Umod(22, true)],
+        292 => &[Umod(31, false)],
+        340..=343 => &[UnitFlags(0x20000)],
+        366 => &[Chain(19), UnitFlags(0x20000), Umod(22, true)],
+        402 => &[Umod(22, true)],
+        407 => &[Chain(17)],
+        409 => &[Chain(24)],
+        434 => &[Chain(32)],
+        526 => &[Chain(34), Umod(22, true)],
+        540 => &[AncientEquip],
+        544 if class == 709 => &[Umod(22, true), Umod(18, true), Umod(8, true), Umod(6, true)],
+        544 => &[Chain(36), Umod(22, true)],
+        _ => &[],
+    }
+}
+
+/// Boss mods `0x005B1CF0` (§14.3): the switch key is the class's
+/// `BaseId` (the class itself when its monstats row is missing).
 pub fn boss_mods<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
     let class = class_of(h, unit);
-    let Some(m) = cx.monstats(class) else {
+    let base = cx
+        .monstats(class)
+        .map_or(class as i32, |m| i32::from(m.baseid));
+    for &step in boss_mods_for(base, class) {
+        match step {
+            BossStep::Umod(n, unique) => assign_umod(cx, h, unit, n, unique),
+            BossStep::Chain(n) => h.quest_chain(unit, n),
+            BossStep::UnitFlags(mask) => {
+                if let Some(r) = h.units().get_mut(unit) {
+                    r.flags |= mask;
+                }
+            }
+            BossStep::DataFlag1 => h.monsters().entry(unit).data_flag1 = true,
+            BossStep::CorpseNoselect => h.set_corpse_noselect(unit),
+            BossStep::AncientEquip => ancient_equip(h, unit, class),
+        }
+    }
+}
+
+/// Table `0x006E1BB0`: (item code, body location) for k = 0..3 of the
+/// ancient barbarians 540–542 (§14.3).
+const ANCIENT_EQUIP: [[(&[u8; 4], u8); 4]; 3] = [
+    [(b"bsd ", 4), (b"tow ", 5), (b"fld ", 3), (b"hbt ", 9)],
+    [(b"tax ", 4), (b"tax ", 5), (b"hgl ", 10), (b"hbt ", 9)],
+    [(b"vou ", 4), (b"rin ", 6), (b"fld ", 3), (b"crn ", 1)],
+];
+
+/// The ancient barbarian equipment `0x005B1C50` (§14.3): per entry the
+/// code, upgraded to `ubercode` / `ultracode` on difficulty 1 / 2, then
+/// the monster equip helper `0x00573B20` at ilvl = the unit's level.
+/// The table is keyed by the class, so only 540–542 read a row.
+fn ancient_equip<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, class: u32) {
+    let Some(row) = class
+        .checked_sub(540)
+        .and_then(|i| ANCIENT_EQUIP.get(i as usize))
+    else {
         return;
     };
-    if cx.tables.ids.bloodraven == Some(m.baseid) {
-        assign_umod(cx, h, unit, 12, true);
-        assign_umod(cx, h, unit, 22, true);
-        h.quest_chain(unit, 2);
-        h.set_corpse_noselect(unit);
+    let level = h.stat(unit, stat::LEVEL);
+    let difficulty = h.info().difficulty;
+    for &(code, loc) in row {
+        let code = h.item_tier_code(*code, difficulty);
+        h.create_boss_item(unit, code, loc, level);
     }
 }
 

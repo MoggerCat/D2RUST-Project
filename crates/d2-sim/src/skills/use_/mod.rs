@@ -966,16 +966,42 @@ pub(crate) fn start_core_of<W: UseWorld>(
     }
 }
 
+/// Start core `0x0056F640(game, unit, skill, L, 1)` of the item cast
+/// (`combat/events.md` §3 step 5): `noManaCheck = 1`, so §5.3 step 6.2
+/// is skipped and no entry is needed.
+pub(crate) fn start_core_no_mana<W: UseWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    skill: i32,
+    l: i32,
+) -> i32 {
+    start_core_with(w, t, u, skill, None, l)
+}
+
 /// Start core `0x0056F640` (`noManaCheck = 0`, §5.3 step 6).
 fn start_core<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, e: &SkillEntry, l: i32) -> i32 {
-    let Some(r) = rec(t, e.skill) else {
+    start_core_with(w, t, u, e.skill, Some(e), l)
+}
+
+/// The start core; `mana` = the entry for the mana check (step 6.2),
+/// `None` with `noManaCheck = 1`.
+fn start_core_with<W: UseWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    skill: i32,
+    mana: Option<&SkillEntry>,
+    l: i32,
+) -> i32 {
+    let Some(r) = rec(t, skill) else {
         return 0;
     };
     let room = w.room(u);
     if room == RoomKind::None {
         return 0;
     }
-    if !mana_check(w, t, u, e, l) {
+    if mana.is_some_and(|e| !mana_check(w, t, u, e, l)) {
         return 0;
     }
     if !r.intown && room == RoomKind::Town {
@@ -1002,10 +1028,10 @@ fn start_core<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, e: &SkillEntr
     }
     let res = match bodies::start(r.srvstfunc) {
         Some(v) => v,
-        None => w.srvst(r.srvstfunc, u, e.skill, l),
+        None => w.srvst(r.srvstfunc, u, skill, l),
     };
     if res != 0 && !r.usemanaondo {
-        consume_mana(w, t, Some(u), e.skill, l);
+        consume_mana(w, t, Some(u), skill, l);
     }
     if res != 0 && r.periodic {
         w.delete_timers(u, event::PERIODIC_SKILLS, 0);

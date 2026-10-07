@@ -149,6 +149,9 @@ pub struct ObjectView<'a, X> {
     pub v: View<'a, X>,
     /// [`ObjectState::host_tick`] of the call.
     pub host_tick: u32,
+    /// The object tables of the call (the `levels` rows of the chest
+    /// drop).
+    pub tables: Arc<ObjectTables>,
 }
 
 /// A shorter-lived [`View`] over the same parts.
@@ -182,6 +185,7 @@ pub fn with_objects<X: Pending, R>(
             game,
             v: reborrow(v),
             host_tick: st.host_tick,
+            tables: t.clone(),
         };
         f(&mut st.control, &t, &mut ov)
     };
@@ -701,6 +705,145 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     }
 }
 
-impl<X: Pending> ChestWorld for ObjectView<'_, X> {}
-impl<X: Pending> ShrineWorld for ObjectView<'_, X> {}
-impl<X: Pending> MiscWorld for ObjectView<'_, X> {}
+/// The chest seams on the providers the action wiring holds: the chest
+/// drop on [`super::ActionHooks::object_drops`]
+/// ([`crate::wiring::economy::object_chest_drop`]), unit type (unit
+/// records), item quality (the game's item store), the room's units (the
+/// room unit list). The rest keep their defaults (no spec body or no
+/// provider: the key test, code drop `0x00585970` and drop item code
+/// `0x00559A30` (items specs), trap monsters and monster spawns
+/// (monsters specs), the free-spot search with mask 0x3F11, the player's
+/// skill start, the range test's metric, trap damage, the "inside the
+/// room" bound).
+impl<X: Pending> ChestWorld for ObjectView<'_, X> {
+    /// `0x00585B90` with the operate record (`treasure.md` §4). Without
+    /// the path provider's field the free-spot search finds nothing
+    /// ([`crate::wiring::economy::NoSpot`]): the walk still draws, no item
+    /// is created.
+    fn chest_drop(&mut self, op: &Operate, q: u8) -> Option<UnitId> {
+        let mut d = self.v.h.object_drops.take()?;
+        let t = self.tables.clone();
+        let out = {
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::object_chest_drop(
+                &mut *self.v.h,
+                &mut sim,
+                &mut d,
+                &t.levels,
+                &mut crate::wiring::economy::NoSpot,
+                op.object,
+                op.operator,
+                q,
+            )
+        };
+        self.v.h.object_drops = Some(d);
+        out
+    }
+    fn unit_type(&self, unit: UnitId) -> Option<u8> {
+        self.v.units.get(unit).map(|r| r.ty as u8)
+    }
+    fn item_quality(&self, item: UnitId) -> Option<u8> {
+        self.v.h.items.get(item).map(|i| i.quality)
+    }
+    fn room_units(&self, room: RoomId) -> Vec<UnitId> {
+        self.game.lists.room_units(room)
+    }
+}
+/// The shrine seams on the unit's stat list (`sim/stats.md`: getter
+/// `0x00625480`, set `0x00627260`, add `0x006272B0`, the maxima
+/// `0x00625D10` / `0x00625D60` / `0x00625DB0`, level = stat 12). The rest
+/// keep their defaults (hovers, the timed-state helper and its list
+/// writer, skill refresh, to-hit, two-handed test, gems and item drops,
+/// the units in range (metric not stated), missiles, the free spot,
+/// portals, the unique monster).
+///
+/// TODO(objects.md §9, sim/stats.md): "set with its client update": the
+/// update message is not stated beyond the stat-list hooks; the set runs
+/// through the stat list's host ([`super::ActionHooks`]) only.
+impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
+    fn stat(&self, unit: UnitId, id: u16) -> i32 {
+        self.v.stat(unit, id)
+    }
+    fn set_stat(&mut self, unit: UnitId, id: u16, value: i32) {
+        self.v.set_base(unit, id, value);
+    }
+    fn add_base_stat(&mut self, unit: UnitId, id: u16, delta: i32) {
+        self.v.stats.unit_add(&mut *self.v.h, unit, id, delta, 0);
+    }
+    fn max_life(&self, unit: UnitId) -> i32 {
+        self.v.stats.max_life(unit)
+    }
+    fn max_mana(&self, unit: UnitId) -> i32 {
+        self.v.stats.max_mana(unit)
+    }
+    fn max_stamina(&self, unit: UnitId) -> i32 {
+        self.v.stats.max_stamina(unit)
+    }
+    fn player_level(&self, player: UnitId) -> i32 {
+        self.v.stat(player, STAT_LEVEL)
+    }
+}
+
+/// Stat 12 `level` (`sim/stats.md`).
+const STAT_LEVEL: u16 = 12;
+
+/// The door, well and portal seams on the unit's stat lists: the vitals
+/// and their maxima (getters `0x00625D10`, `0x00625D60`, `0x00625DB0`),
+/// the vital set (`0x00627260`), the state list removal (`0x006256B0`,
+/// free) and `0x00578C20` (`world/npc.md` §5 step 4: every curable state
+/// with a list). The rest keep their defaults (portal creation, update
+/// extras, the footprint test, the pet heal, players, hostility, portal
+/// travel).
+///
+/// TODO(objects.md §11 rule 2): the client update of the vital set is
+/// the stat list host's; no separate message is sent here.
+impl<X: Pending> MiscWorld for ObjectView<'_, X> {
+    fn vital_stat(&self, unit: UnitId, id: u16) -> u32 {
+        let st = &*self.v.stats;
+        (match id {
+            7 => st.max_life(unit),
+            9 => st.max_mana(unit),
+            11 => st.max_stamina(unit),
+            _ => st.unit_total(unit, id, 0),
+        }) as u32
+    }
+    fn set_vital_stat(&mut self, unit: UnitId, id: u16, value: u32) {
+        self.v.set_base(unit, id, value as i32);
+    }
+    fn remove_state_list(&mut self, unit: UnitId, state: u16) -> bool {
+        if self.v.state_list(unit, state).is_none() {
+            return false;
+        }
+        self.v
+            .stats
+            .free_state_list(&mut *self.v.h, unit, u32::from(state));
+        true
+    }
+    fn cure_states(&mut self, unit: UnitId) -> bool {
+        let count = self.v.stats.data().states.count();
+        let mut changed = false;
+        for s in 0..count {
+            let Ok(s16) = u16::try_from(s) else {
+                break;
+            };
+            let st = u32::from(s16);
+            let curable = self
+                .v
+                .stats
+                .data()
+                .states
+                .has_flag(st, crate::wiring::interaction::npc_world::STATE_CURABLE);
+            if self.v.stats.has_state(unit, st) && curable && self.v.state_list(unit, s16).is_some()
+            {
+                self.v.stats.free_state_list(&mut *self.v.h, unit, st);
+                changed = true;
+            }
+        }
+        changed
+    }
+}

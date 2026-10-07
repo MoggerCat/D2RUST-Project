@@ -1,4 +1,4 @@
-// Spec: specs/combat/vitals.md §1–§4; specs/sim/stats.md §4.2; specs/sim/stat-lists.md §7.2, §10.1
+// Spec: specs/combat/vitals.md §1–§4.5; specs/sim/stats.md §4.2; specs/sim/stat-lists.md §7.2, §10.1
 //! [`VitalsUnits`] on the real providers: unit records (type, class),
 //! the stat lists (base and unit getters, base set and add, the maxima
 //! `0x00625D10` / `0x00625D60` / `0x00625DB0`); the refresh and the
@@ -10,13 +10,12 @@
 //! [`VitalsView`] reads, so a level-up's new maximum is what the next
 //! regeneration tick fills up to.
 //!
-//! Experience on a kill: [`kill_experience`] composes what the specs
-//! write (`vitals.md` §4.2 level factor on the defender's base
-//! experience, §4.3 add with its cap and level-up); the kill path that
-//! calls it (`damage.md` §7.2 `0x0057CCB0`) has no provider in d2-sim
-//! (the action wiring's `Pending::reaction`).
+//! Experience on a kill: [`kill_experience`] is the distribution's solo
+//! path (`vitals.md` §4.3–§4.5); the kill on the action wiring runs the
+//! whole distribution (`wiring::action::reaction::kill`).
 
-use crate::combat::vitals::{add_experience, level_factor, stat, VitalsTables, VitalsUnits};
+use crate::combat::vitals::experience::player_gain;
+use crate::combat::vitals::{add_experience_at, stat, VitalsTables, VitalsUnits};
 use crate::stats::{StatHost, StatLists};
 use crate::units::record::Units;
 use crate::units::{UnitId, UnitType};
@@ -87,16 +86,12 @@ impl<H: StatHost, R: VitalsRest> VitalsUnits for VitalsView<'_, H, R> {
     }
 }
 
-/// Experience for `attacker` killing `defender`: the level factor
-/// `0x0057E2F0` (`vitals.md` §4.2) on the defender's base experience
-/// (stat 13, set at monster init, `monsters/init.md` §6) and both
-/// levels (stat 12), then the add function (§4.3: cap, level-up §3,
-/// event 12). Returns the gain added; players only.
-///
-/// TODO(vitals.md OQ2, damage.md OQ7): the rest of `0x0057E480` and the
-/// distribution (`ExpRatio`, stat 85, hireling cap, pet credit, party
-/// share) are D2MOO structure, not confirmed in 1.14d: not applied.
-/// The levels are read as unit totals (the spec says "both levels").
+/// Experience for a player `attacker` killing `defender`: the solo
+/// path of the distribution `0x0057E990` (`vitals.md` §4.4 steps 1, 4):
+/// the gain §4.3 of the defender's base experience at both base levels,
+/// then the add §4.5 at the player's base level. Returns the gain added
+/// (0 for a non-player attacker). The full distribution (credited player,
+/// hireling and party shares) is [`crate::combat::vitals::experience::distribute`].
 pub fn kill_experience<W: VitalsUnits>(
     w: &mut W,
     t: &VitalsTables,
@@ -106,15 +101,13 @@ pub fn kill_experience<W: VitalsUnits>(
     if w.unit_type(attacker) != UnitType::Player {
         return 0;
     }
-    let exp = w.base_stat(defender, stat::EXPERIENCE);
-    let gain = level_factor(
-        exp,
-        w.stat(attacker, stat::LEVEL),
-        w.stat(defender, stat::LEVEL),
-    );
-    if gain <= 0 {
+    let e = w.base_stat(defender, stat::EXPERIENCE);
+    if e <= 0 {
         return 0;
     }
-    add_experience(w, t, attacker, gain as u32);
+    let dl = w.base_stat(defender, stat::LEVEL);
+    let pl = w.base_stat(attacker, stat::LEVEL);
+    let gain = player_gain(w, t, e, attacker, pl, dl);
+    add_experience_at(w, t, attacker, pl, gain);
     gain as u32
 }

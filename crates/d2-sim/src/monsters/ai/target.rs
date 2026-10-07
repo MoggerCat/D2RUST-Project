@@ -80,6 +80,19 @@ pub fn main_search<W: AiHost + ?Sized>(
     cx: &mut Ctx<'_, W>,
     unit: UnitId,
 ) -> Search {
+    main_search_with(game, cx, unit, unit)
+}
+
+/// The main search `0x005DD7F0` run for `unit` with the AI control of
+/// `ctl` (the pets' "owner view", `ai-bodies-6.md` §3: the search for the
+/// owner with the pet's control record). Control flags 0x40 / 0x08 are
+/// read and written on `ctl`'s control; everything else is `unit`'s.
+pub fn main_search_with<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ctl: UnitId,
+) -> Search {
     let none = Search {
         target: None,
         distance: 0,
@@ -90,9 +103,9 @@ pub fn main_search<W: AiHost + ?Sized>(
         return none;
     };
     // 2. Line-of-sight flag T.
-    let flags = cx.store.control(unit).map_or(0, |c| c.flags);
+    let flags = cx.store.control(ctl).map_or(0, |c| c.flags);
     let los = if flags & flag::FORCE_LOS != 0 {
-        if let Some(c) = cx.store.control_mut(unit) {
+        if let Some(c) = cx.store.control_mut(ctl) {
             c.flags &= !flag::FORCE_LOS;
         }
         true
@@ -105,22 +118,15 @@ pub fn main_search<W: AiHost + ?Sized>(
     } else {
         false
     };
-    // 3. Forced target.
-    // TODO(ai.md open question 6): whether step 7 (flags, combat) applies
-    // to a forced target; here combat is the melee test, nothing else.
+    // 3. Forced target: it takes step 7 like any target (§5.1 end).
+    let align = cx.world.alignment(unit);
     if let Some((t, d)) = cx.world.forced_target(game, unit) {
-        let combat = cx.world.in_melee_range(game, unit, t);
-        return Search {
-            target: Some(t),
-            distance: d,
-            combat,
-        };
+        return finish(game, cx, unit, ctl, align, t, d);
     }
     // 4. Not evil.
-    let align = cx.world.alignment(unit);
     if align != 0 {
         return match cx.world.good_target_search(game, unit, los) {
-            Some((t, d)) => finish(game, cx, unit, align, t, d),
+            Some((t, d)) => finish(game, cx, unit, ctl, align, t, d),
             None => Search {
                 target: None,
                 distance: NO_DISTANCE,
@@ -213,19 +219,20 @@ pub fn main_search<W: AiHost + ?Sized>(
         };
     };
     // 7.
-    finish(game, cx, unit, align, t, best)
+    finish(game, cx, unit, ctl, align, t, best)
 }
 
 fn finish<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
     unit: UnitId,
+    ctl: UnitId,
     align: u8,
     t: UnitId,
     d: i32,
 ) -> Search {
     if align != 2 {
-        if let Some(c) = cx.store.control_mut(unit) {
+        if let Some(c) = cx.store.control_mut(ctl) {
             c.flags |= flag::TARGET_SEEN;
         }
         cx.world.mark_seen(unit);

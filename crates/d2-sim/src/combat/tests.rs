@@ -336,7 +336,7 @@ fn block_edge_cases() {
     assert_eq!(f.units[sor].seed, s0);
 }
 
-// Covers: specs/combat/hit.md §6.2 r1, §6.2 r2, §6.4
+// Covers: specs/combat/hit.md §6.2 r1, §6.2 r2, §6.4, §6.4 r1, §6.4 r2, §6.4 r3, §edge-cases-original-bugs r8
 #[test]
 fn dodge_avoid_evade_weapon_block() {
     let mut f = world();
@@ -369,9 +369,24 @@ fn dodge_avoid_evade_weapon_block() {
     f.units[d].items.insert(4, claw);
     f.units[d]
         .entries
-        .insert(348, vec![(67, 20), (99, 60), (0, 10)]);
+        .insert(348, vec![(0, 10), (67, 20), (99, 60)]);
     assert_eq!(weapon_block(&f, Some(d)), 20);
     assert_eq!(weapon_block(&f, None), 0);
+    // §6.4 rule 1 / Edge cases 8: a layer-0 entry after a larger typed
+    // entry lowers the value; the spec's three vectors.
+    f.units[d]
+        .entries
+        .insert(348, vec![(67, 20), (99, 60), (0, 10)]);
+    assert_eq!(weapon_block(&f, Some(d)), 10);
+    f.units[d].entries.insert(348, vec![(0, 20), (67, 35)]);
+    assert_eq!(weapon_block(&f, Some(d)), 35);
+    f.units[d].entries.insert(348, vec![(67, 35), (0, 20)]);
+    assert_eq!(weapon_block(&f, Some(d)), 20);
+    f.units[d].entries.insert(348, vec![(27, 35)]);
+    assert_eq!(weapon_block(&f, Some(d)), 0);
+    f.units[d]
+        .entries
+        .insert(348, vec![(0, 10), (67, 20), (99, 60)]);
     f.units[d].weapon_class = 13;
     f.units[d].seed = seed_giving(19);
     assert_eq!(dodge(&mut f, a, d, false), BlockResult::WeaponBlock);

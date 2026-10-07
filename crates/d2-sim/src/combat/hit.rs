@@ -472,26 +472,29 @@ pub fn dodge<W: CombatWorld>(w: &mut W, _a: W::Unit, d: W::Unit, avoid: bool) ->
     BlockResult::None
 }
 
-/// `weapon_block(unit)` = `0x0057DCA0` (§6.4): the largest
-/// `passive_weaponblock` among at most 32 entries whose layer is ≤ 0 or
-/// matches the right- or left-hand item's type. No draws.
+/// `weapon_block(unit)` = `0x0057DCA0` (§6.4): walk at most 32
+/// `passive_weaponblock` entries in copy order from w = 0; a layer-0
+/// entry sets w unconditionally, a typed entry matching the left- or
+/// right-hand item's type raises w to its value (signed max). No draws.
 pub fn weapon_block<W: CombatWorld>(w: &W, u: Option<W::Unit>) -> i32 {
     let Some(u) = u else {
         return 0;
     };
     let right = w.item_at(u, 4);
     let left = w.item_at(u, 5);
-    let mut best: Option<i32> = None;
+    let mut wb = 0;
     for (layer, v) in w.stat_entries(u, PASSIVE_WEAPONBLOCK, 32) {
-        let l = i32::from(layer as i16);
-        let ok = l <= 0
-            || right.is_some_and(|i| w.item_is(i, l))
-            || left.is_some_and(|i| w.item_is(i, l));
-        if ok {
-            best = Some(best.map_or(v, |b| b.max(v)));
+        if layer == 0 {
+            // Rule 1 (Edge cases 8): even when smaller than w.
+            wb = v;
+        } else {
+            let l = i32::from(layer);
+            let typed =
+                left.is_some_and(|i| w.item_is(i, l)) || right.is_some_and(|i| w.item_is(i, l));
+            if typed && v > wb {
+                wb = v;
+            }
         }
     }
-    // TODO(hit.md §6.4): the result with no matching entry is not stated;
-    // the narrowest reading is 0 (no weapon block, no draw).
-    best.unwrap_or(0)
+    wb
 }

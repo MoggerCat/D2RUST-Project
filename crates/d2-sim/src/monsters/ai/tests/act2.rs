@@ -561,7 +561,7 @@ fn bat_demon_alternate() {
 
 // ---- §13 SandMaggotQueen -----------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-2.md §13 text, §13 r1, §13 r2, §13 r3, §edge-cases-original-bugs r2
+// Covers: specs/monsters/ai-bodies-2.md §13 text, §13 r1, §13 r2, §13 r3, §13.1, §edge-cases-original-bugs r2
 #[test]
 fn sand_maggot_queen_lays_and_rests() {
     let queen = [7, 12];
@@ -574,7 +574,12 @@ fn sand_maggot_queen_lays_and_rests() {
     assert_eq!((w.thinks(), param_of(&w, 1)), (vec![12], 1));
     // Spawn at (x + 8, y), mode 8, spread 2, flags 0x42; NOXP flag.
     w.fake.x.room_at = Some(room);
-    w.fake.x.queen_class = 68;
+    // The spawn info (§13.1) keys on `BaseId` 284 (maggotqueen1): chain(68
+    // sandmaggot1), 0 steps for chain position 0.
+    let r = w.monstats[0].clone();
+    w.monstats.resize(300, r);
+    w.monstats[0].baseid = 284;
+    w.monstats[68].baseid = 68;
     let child = w.add_unit(UnitType::Monster, (108, 100));
     w.fake.x.spawn = Some(child);
     w.think_with(None, 0, false);
@@ -825,10 +830,15 @@ fn vulture_carrion_and_rooms() {
     w.fake.pos.insert(t, (120, 100));
     w.think_with(Some(t), 20, false);
     assert!(logged(&w, "radius 9 0"));
-    // T = 0 with p < 1: wait 12.
-    let mut w = world(act_row(23, &vulture1));
+}
+
+// T = 0 is unreachable (target mode 1) and asserted (open question 6).
+// Covers: specs/monsters/ai-bodies-2.md §11 r1
+#[test]
+#[should_panic(expected = "Vulture think without a target")]
+fn vulture_asserts_a_target() {
+    let mut w = world(act_row(23, &[70, 8, 75, 30, 40]));
     w.think_with(None, 0, false);
-    assert_eq!(w.thinks(), [12]);
 }
 
 // Covers: specs/monsters/ai-bodies-2.md §12 r3

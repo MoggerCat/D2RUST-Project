@@ -78,12 +78,14 @@ pub fn imp_init<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId) {
     set_param(cx, u, 0, -1);
 }
 
-/// §3 Imp (122) `0x005E2FF0`.
-///
-/// TODO(spec: ai-bodies-5.md §3): a missing row I1..I4 is read through a
-/// null pointer in 1.14d; its aips read 0 here.
+/// §3 Imp (122) `0x005E2FF0`. A missing row I1..I4 is a null read in
+/// 1.14d; live data has all four, so they are asserted (open question 4).
 pub fn imp<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p: &TickParam) {
     let t = p.target;
+    assert!(
+        cx.tables.monstats.len() > IMP_ROWS[3] as usize,
+        "Imp think without monstats rows 492..495 (ai-bodies-5.md OQ4)"
+    );
     let i = |cx: &Ctx<'_, W>, row: usize, n: usize| cx.class_aip(IMP_ROWS[row - 1], n);
     let (s1, m1) = cx.skill(p, 1);
     // 1.
@@ -136,14 +138,16 @@ pub fn imp<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
         escape(game, cx, u, t, 5, false, false);
         return;
     }
-    // 5. The I4 test runs when the I3 draw fails.
-    // TODO(spec: ai-bodies-5.md §3 step 5): "else" is read as the I3
-    // draw failing (E < I4.aip3 implies E < I3.aip3 with live data).
+    // 5. The "else" is the distance test E ≥ I3.aip3; a failed I3 draw
+    // goes to step 6 (open question 4).
     if cx.skill(p, 4).0 >= 0 {
         if let (Some(s), e, _) = cx.world.secondary_target(game, u) {
-            if e < i(cx, 3, 3)
-                && (pct(cx, u) < i(cx, 3, 4) || (e < i(cx, 4, 3) && pct(cx, u) < i(cx, 4, 4)))
-            {
+            let fire = if e < i(cx, 3, 3) {
+                pct(cx, u) < i(cx, 3, 4)
+            } else {
+                e < i(cx, 4, 3) && pct(cx, u) < i(cx, 4, 4)
+            };
+            if fire {
                 skill_k(game, cx, u, p, 4, Some(s));
                 return;
             }
@@ -272,8 +276,7 @@ pub fn succubus_witch<W: AiHost + ?Sized>(
         return;
     }
     // 3.1.
-    // TODO(spec: ai-bodies-5.md §6 step 3.1): the second draw is read as
-    // made only when S was found.
+    // The second draw only when S was found (§6 step 3.1, open question 5).
     let (s5, _) = cx.skill(p, 5);
     let aip8 = cx.aip(p, 8);
     if s5 >= 0 && aip8 > 0 && pct(cx, u) < cx.aip(p, 5) {
@@ -429,8 +432,7 @@ pub fn overseer<W: AiHost + ?Sized>(
         }
     }
     // 4.
-    // TODO(spec: ai-bodies-5.md §7 step 4): a draw ≥ aip6 with C is read
-    // as going on to step 5.
+    // A draw ≥ aip6 with C goes on to step 5 (§7 step 4, open question 6).
     if p.combat && pct(cx, u) < cx.aip(p, 6) {
         if pct(cx, u) >= cx.aip(p, 7) {
             a1(game, cx, u, t);
@@ -873,6 +875,43 @@ pub fn frozen_horror<W: AiHost + ?Sized>(
 /// imp1 (`BaseId` of the rider scan).
 const IMP1: i32 = 492;
 
+/// The rider scan of §15 step 2 (scan 1, callback `0x005E1720`, arg
+/// {max}): the first free imp1-based monster within squared distance
+/// `max` is assigned to this beast or tower (`0x005E17E0(U, unit)`): its
+/// mount param 0 := this unit's GUID unless its current mount still
+/// exists and is strictly nearer by squared distance (`0x005B0BD0`; ties
+/// reassign). Also SiegeTower (`ai-bodies-7.md` §22 step 2). True when one
+/// was found.
+pub(super) fn rider_scan<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    max: i32,
+) -> bool {
+    let rider = scan_units(game, u).into_iter().find(|&v| {
+        v != u
+            && is_monster(game, v)
+            && !dying(cx, v)
+            && unit_base(cx, v) == IMP1
+            && pairing(cx, u, v)
+            && cx.world.alignment(v) == 0
+            && cx.world.owner(game, v).is_none()
+            && param(cx, v, 0) == -1
+            && sq_dist(cx, u, v) <= max
+    });
+    let Some(v) = rider else {
+        return false;
+    };
+    let cur = game
+        .lists
+        .find_unit(UnitType::Monster, param(cx, v, 0) as u32);
+    let keep = cur.is_some_and(|c| sq_dist(cx, v, c) < sq_dist(cx, v, u));
+    if !keep {
+        set_param(cx, v, 0, guid_of(game, Some(u)));
+    }
+    true
+}
+
 /// §15 SiegeBeast (115) `0x005E1900`.
 pub fn siege_beast<W: AiHost + ?Sized>(
     game: &mut Game,
@@ -888,30 +927,7 @@ pub fn siege_beast<W: AiHost + ?Sized>(
     // 2.
     if cx.world.owner(game, u).is_none() && cx.world.alignment(u) == 0 {
         let aip1 = cx.aip(p, 1);
-        let max = aip1.wrapping_mul(aip1);
-        let rider = scan_units(game, u).into_iter().find(|&v| {
-            v != u
-                && is_monster(game, v)
-                && !dying(cx, v)
-                && unit_base(cx, v) == IMP1
-                && pairing(cx, u, v)
-                && cx.world.alignment(v) == 0
-                && cx.world.owner(game, v).is_none()
-                && param(cx, v, 0) == -1
-                && sq_dist(cx, u, v) <= max
-        });
-        if let Some(v) = rider {
-            // `0x005E17E0(U, beast)`.
-            // TODO(spec: ai-bodies-5.md §15 step 2): "nearer" is read as
-            // the squared distance `0x005B0BD0`.
-            let cur = game
-                .lists
-                .find_unit(UnitType::Monster, param(cx, v, 0) as u32);
-            let keep = cur.is_some_and(|c| sq_dist(cx, v, c) < sq_dist(cx, v, u));
-            if !keep {
-                set_param(cx, v, 0, guid_of(game, Some(u)));
-            }
-        }
+        rider_scan(game, cx, u, aip1.wrapping_mul(aip1));
     }
     let (s1, m1) = cx.skill(p, 1);
     let stomp = |game: &mut Game, cx: &mut Ctx<'_, W>| {
@@ -1183,8 +1199,8 @@ pub fn baal_throne<W: AiHost + ?Sized>(
     }
     // 7. The spawn wave `0x005EF210`.
     cx.world.assign_skill(game, u, SKILL_MONSTER_SPAWN, 1);
-    // TODO(spec: ai-bodies-5.md §20 step 7): a missing wave record here
-    // (none → fatal for the skill entry) passes −1.
+    // A missing record returned in step 5 before flag 1 was set, so it is
+    // never reached here (§20 step 7, open question 9); −1 is unreachable.
     let id = cx.world.wave(w).map_or(-1, |r| r.0);
     cx.world.set_skill_param(u, SKILL_MONSTER_SPAWN, id);
     let (x, y) = cx.world.position(u);
@@ -1357,10 +1373,11 @@ fn baal_clone<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
     if living_minion || living_owner {
         return;
     }
-    // TODO(spec: ai-bodies-5.md open question 2): the spawn info
-    // `0x0063EFA0` may change class, point or mode and has its own draws;
-    // class 570, mode 1 and the point below are used as given.
-    let class = fixed_class(cx, BAALCLONE);
+    // The spawn info (`ai-bodies-2.md` §13.1, key 544): for class 570 it
+    // keeps the class and mode 1 and spends two `roll(24)` steps on a point
+    // overwritten below (open questions 2, 10).
+    let info = spawn_info(game, cx, u, fixed_class(cx, BAALCLONE));
+    let (class, m) = (info.class, info.mode);
     let base = cx
         .world
         .path_target(u)
@@ -1370,10 +1387,7 @@ fn baal_clone<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitI
     let Some(room) = cx.world.room_at(game, u, x, y) else {
         return;
     };
-    let Some(c) = cx
-        .world
-        .spawn_monster(game, room, x, y, class, mode::NEUTRAL, -1, 0)
-    else {
+    let Some(c) = cx.world.spawn_monster(game, room, x, y, class, m, -1, 0) else {
         return;
     };
     cx.world.set_unit_flag(c, 0x0402_0000);

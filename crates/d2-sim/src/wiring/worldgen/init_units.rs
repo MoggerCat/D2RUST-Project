@@ -337,8 +337,20 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {
         self.v.h.x.remove_pet(owner, pet);
     }
-    fn quest_death(&mut self, unit: UnitId, call: u32) {
-        self.v.h.x.quest_death(unit, call);
+    fn is_undead(&self, unit: UnitId) -> bool {
+        self.v.h.x.umod_is_undead(unit)
+    }
+    fn missile_range(&self, class: i32) -> Option<i32> {
+        self.v.h.x.umod_missile_range(class)
+    }
+    fn set_uber_death(&mut self, slot: usize) -> bool {
+        self.v.h.x.umod_set_uber_death(slot)
+    }
+    fn game_8c(&self) -> i32 {
+        self.v.h.x.umod_game_8c()
+    }
+    fn quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {
+        self.v.h.x.umod_quest_drop(unit, code, arg, announce);
     }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);

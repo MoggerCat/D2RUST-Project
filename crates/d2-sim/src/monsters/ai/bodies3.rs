@@ -211,8 +211,8 @@ pub fn zakarum_zealot<W: AiHost + ?Sized>(
     // 1.
     if let Some(tt) = t {
         let mut q = Some(tt);
-        // TODO(spec: ai-bodies-3.md §4 step 1): a monster without an owner
-        // record is read as keeping Q = T.
+        // A monster without a minion owner keeps Q = T, which is not a
+        // player: no flight (§4 step 1, open question 9).
         if is_monster(game, tt) {
             if let Some((0, guid)) = cx.world.owner_record(tt) {
                 q = game.lists.find_unit(UnitType::Player, guid);
@@ -308,8 +308,8 @@ pub fn zakarum_priest<W: AiHost + ?Sized>(
             let (tx, ty) = t.map_or((0, 0), |t| cx.world.position(t));
             let x = tx.wrapping_add(k * tx.wrapping_sub(ox));
             let y = ty.wrapping_add(k * ty.wrapping_sub(oy));
-            // TODO(spec: ai-bodies-3.md §5 step 1.1): when the check fails
-            // the think goes on to step 1.2 (the cooldown stays spent).
+            // A failed check goes on to step 1.2; the cooldown stays spent
+            // (§5 step 1.1, open question 5).
             if cx.world.skill_check(game, u, s3, None, x, y) {
                 use_skill(game, cx, u, m3, s3, ModeTarget::Point(x, y));
                 return;
@@ -607,8 +607,8 @@ pub fn high_priest<W: AiHost + ?Sized>(
         }
         // 1.2.
         if cx.skill(p, 2).0 >= 0 && frame > param(cx, u, 1) && pct(cx, u) < cx.aip(p, 2) {
-            // TODO(spec: ai-bodies-3.md §8 step 1.2): the callback does
-            // not exclude the scanner; read as written.
+            // The callback does not exclude the scanner (§8 step 1.2, open
+            // question 6).
             let mut best = None;
             let mut best_life = 75;
             for v in scan_units(game, u) {
@@ -826,17 +826,12 @@ const RITUAL_B: [[(i32, i32); 4]; 7] = [
 const BAPTISM_C: [(i32, i32); 5] = [(-5, -5), (3, -5), (6, 3), (3, 6), (-5, 3)];
 const BAPTISM_E: [(i32, i32); 5] = [(6, 3), (3, 6), (-5, 3), (-5, -5), (3, -5)];
 
-/// A table entry by slot (1-based); slot 0 is not initialised in 1.14d
-/// (unreachable).
-///
-/// TODO(spec: ai-bodies-3.md §10): slot ≤ 0 reads an uninitialised
-/// stack entry; (0, 0) is used.
+/// A table entry by slot (1-based). Slots ≤ 0 would read below the
+/// tables in 1.14d; they are unreachable and asserted (§10, open question
+/// 7).
 fn slot<const N: usize>(t: &[(i32, i32); N], r: i32) -> (i32, i32) {
-    usize::try_from(r - 1)
-        .ok()
-        .and_then(|i| t.get(i))
-        .copied()
-        .unwrap_or((0, 0))
+    let i = usize::try_from(r - 1).expect("ritual slot ≤ 0 (ai-bodies-3.md OQ7)");
+    t.get(i).copied().unwrap_or((0, 0))
 }
 
 /// "Approach P": true = near.
@@ -872,9 +867,11 @@ pub fn will_o_wisp<W: AiHost + ?Sized>(
     let mut s = param(cx, u, 0);
     let n = param(cx, u, 1);
     let r = param(cx, u, 2);
-    // TODO(spec gap): the ritual points around target 0 (target mode 1
-    // always has one) use the own position.
-    let (tx, ty) = cx.world.position(t.unwrap_or(u));
+    // T = 0 never reaches the ritual points (target mode 1, open question
+    // 7): asserted.
+    let (tx, ty) = cx
+        .world
+        .position(t.expect("WillOWisp think without a target (ai-bodies-3.md OQ7)"));
     // 0. The draw only when the first four hold.
     if let Some(tt) = t {
         let dl = i32::from(cx.info.difficulty) + 2;
@@ -1143,10 +1140,12 @@ pub fn mephisto<W: AiHost + ?Sized>(
                 let x = mephisto_pick(game, cx, u, p);
                 let n = (1..=8).take_while(|&i| cx.skill(p, i).0 >= 0).count() as i32;
                 if n == 0 {
-                    // TODO(spec: ai-bodies-3.md §11 case 2): whether the
-                    // closing c draw follows the wander is not stated; it
-                    // does not here.
+                    // The closing draw follows the wander (§11 case 2, open
+                    // question 8).
                     wander(game, cx, u, 6);
+                    if pct(cx, u) < 50 - k {
+                        set_param(cx, u, 1, 0);
+                    }
                 } else {
                     let q = 100 / n;
                     let r = pct(cx, u);
