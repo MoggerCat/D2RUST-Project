@@ -95,6 +95,49 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
     }
 
     /// Runs `f` on the action wiring's view over the economy's parts.
+    /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
+    /// (`ActionHooks::object_drops`) lent out and the action tables'
+    /// `levels`; the economy's item store, game seed and unique bits go
+    /// back to the hooks for the call (as [`Self::object_treasure`]).
+    /// `None`: no drop state.
+    fn with_drop_state<T>(
+        &mut self,
+        f: impl FnOnce(
+            &mut crate::wiring::action::ActionHooks<X>,
+            &mut crate::units::hooks::Sim<'_>,
+            &mut super::DeathDrops,
+            &[d2_data::tables::Levels],
+            &mut super::NoSpot,
+        ) -> T,
+    ) -> Option<T> {
+        let e = &mut *self.inner.econ;
+        let mut d = e.hooks.object_drops.take()?;
+        let at = e.hooks.tables.clone();
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
+        let out = {
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *e.game,
+                units: &mut *e.units,
+                stats: &mut *e.stats,
+                data: e.data,
+            };
+            f(
+                &mut *e.hooks,
+                &mut sim,
+                &mut d,
+                &at.levels,
+                &mut super::NoSpot,
+            )
+        };
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
+        e.hooks.object_drops = Some(d);
+        Some(out)
+    }
+
     fn view<T>(&mut self, f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T) -> T {
         let e = &mut *self.inner.econ;
         let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
@@ -380,8 +423,17 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         }
         self.reward_on_host(player, code, level, quality, droppable)
     }
+    /// `0x00559A30(game, unit, quality, …, −1, 0)` with `code` as the
+    /// drop code ([`super::drop_helpers::source_drop`]) on the game's
+    /// drop state; without one, the rest's answer.
     fn drop_item_at(&mut self, unit: UnitId, code: [u8; 4], quality: u8) -> bool {
-        self.inner.drop_item_at(unit, code, quality)
+        let c = u32::from_le_bytes(code);
+        match self.with_drop_state(|h, sim, d, levels, spots| {
+            super::drop_helpers::source_drop(h, sim, d, levels, spots, unit, c, quality, -1, false)
+        }) {
+            Some((item, _)) => item.is_some(),
+            None => self.inner.drop_item_at(unit, code, quality),
+        }
     }
     fn quest_items(&self, player: UnitId) -> Vec<(UnitId, u8)> {
         self.inner.quest_items(player)
@@ -614,7 +666,17 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         level: Option<i32>,
         droppable: bool,
     ) -> Option<UnitId> {
-        self.inner.quest_drop(unit, code, quality, level, droppable)
+        // `level` is the out-parameter `0x00559A30` overwrites before it
+        // reads it (`quests-act3-2.md` §11.3): not an input here.
+        let c = u32::from_le_bytes(code);
+        match self.with_drop_state(|h, sim, d, levels, spots| {
+            super::drop_helpers::source_drop(
+                h, sim, d, levels, spots, unit, c, quality, -1, droppable,
+            )
+        }) {
+            Some((item, _)) => item,
+            None => self.inner.quest_drop(unit, code, quality, level, droppable),
+        }
     }
     /// `0x00585B90(op, kind)` on an object with object data when the
     /// game holds the object drop state (`ActionHooks::object_drops`,
@@ -656,8 +718,18 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
         e.hooks.object_drops = Some(d);
     }
+    /// `0x00585970(game, object, 'gld ', 2)`
+    /// ([`super::drop_helpers::code_drop`], PROVISIONAL there).
     fn drop_gold(&mut self, object: UnitId) {
-        self.inner.drop_gold(object)
+        let gold = u32::from_le_bytes(*b"gld ");
+        if self
+            .with_drop_state(|h, sim, d, levels, spots| {
+                super::drop_helpers::code_drop(h, sim, d, levels, spots, object, gold, 2)
+            })
+            .is_none()
+        {
+            self.inner.drop_gold(object)
+        }
     }
     fn set_room_portal(&mut self, room: RoomId, on: bool) {
         self.inner.set_room_portal(room, on)

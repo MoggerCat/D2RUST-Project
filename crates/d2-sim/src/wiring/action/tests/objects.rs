@@ -726,3 +726,54 @@ fn source_and_code_drops_use_the_unit_seed_and_level() {
     );
     assert_eq!(d.placed.len(), 1);
 }
+
+// Covers: specs/world/quests-act2.md §1.3; specs/world/objects-2.md §20.4
+#[test]
+fn host_quests_drop_gold_and_quest_drops_through_the_drop_helpers() {
+    // `0x00585970(game, object, 'gld ', 2)` and `0x00559A30` with a drop
+    // code from a quest call: the items land in the economy's store.
+    use crate::wiring::economy::{Economy, EconomyQuests, GameFields, HostQuests, ItemStore};
+    use crate::world::quests::QuestWorld;
+    let mut fx = picks_fx(0);
+    let o = create(&mut fx, CHEST, 20);
+    let tables = fx
+        .sim
+        .hooks()
+        .object_drops
+        .as_ref()
+        .unwrap()
+        .tables
+        .items
+        .clone();
+    let mut rest = crate::wiring::interaction::tests::Rest::new();
+    let s = &mut fx.sim.sys;
+    let mut fields = GameFields::new(s.hooks.game_seed, false);
+    let mut items = std::mem::replace(&mut s.hooks.items, ItemStore::new());
+    let (a, b) = {
+        let mut econ = Economy {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+            hooks: &mut s.hooks,
+            fields: &mut fields,
+            tables: &tables,
+            items: &mut items,
+        };
+        let mut w = HostQuests::new(EconomyQuests::new(&mut econ, &mut rest));
+        w.drop_gold(o);
+        let b = w.quest_drop(o, *b"gld ", 2, None, false);
+        (w.drop_item_at(o, *b"gld ", 2), b)
+    };
+    assert!(a);
+    let d = s.hooks.object_drops.as_ref().unwrap();
+    assert!(d.failures.is_empty() && d.pick_errors.is_empty());
+    assert_eq!(d.placed.len(), 3);
+    assert_eq!(Some(d.placed[1].0), b);
+    for (item, _) in &d.placed {
+        assert!(items.get(*item).is_some());
+        assert!(s.hooks.items.get(*item).is_none());
+    }
+    s.hooks.items = items;
+    fx.assert_clean();
+}
