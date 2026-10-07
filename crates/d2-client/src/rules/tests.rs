@@ -821,6 +821,25 @@ fn a_cut_top_down_unit_cel_is_an_error() {
     assert!(matches!(err, ViewError::Unit { guid: OBJECT, .. }), "{err}");
 }
 
+// The play preview's edge clip (decision D1, d2rs-own, unverified): the
+// same cut cel is placed and left to the frame clip; the strict view
+// above still fails.
+#[test]
+fn the_preview_edge_clip_places_a_cut_cel() {
+    let (world, assets, mut scene) = golden_scene_with(one(
+        filled(3, 20, 0, -340, 6).with_anchor(FrameAnchor::TopDown)
+    ));
+    scene.tiles.clear();
+    let view = OriginalView::new(camera(0, pos(1000, 2000)), &Fixture, &scene).with_edge_clip(true);
+    let frame = world_view::build(&world, &[], &view, &assets).unwrap();
+    let object = frame
+        .items
+        .iter()
+        .find(|i| i.tag == ItemTag::Unit(OBJECT))
+        .expect("the cut cel is drawn");
+    assert_eq!(object.clip, Rect::FRAME);
+}
+
 // Per-block shade (shading §4, lighting §11 r2: each 32-pixel block has
 // its own light): one draw per block clipped to it, the gradient moved to
 // the block's screen position; a culled block (camera §7) draws nothing.

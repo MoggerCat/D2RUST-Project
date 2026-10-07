@@ -135,6 +135,11 @@ pub struct OriginalView<'a, R: ?Sized, S: ?Sized> {
     pub camera: Camera,
     pub rules: &'a R,
     pub source: &'a S,
+    /// Play preview (decision D1, `// d2rs-own, unverified`): a unit cel
+    /// cut by the frame edge is placed and left to the frame clip instead
+    /// of failing the frame (`sprite-placement.md` §4 TODO). Off by
+    /// default: the strict path.
+    pub edge_clip: bool,
 }
 
 const CAMERA: &str = "render/camera.md";
@@ -167,7 +172,14 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
             camera,
             rules,
             source,
+            edge_clip: false,
         }
+    }
+
+    /// This view with the preview edge clip on or off ([`Self::edge_clip`]).
+    pub fn with_edge_clip(mut self, on: bool) -> Self {
+        self.edge_clip = on;
+        self
     }
 
     /// The draw of one map tile, or `None` when culled (camera §6, §7).
@@ -399,7 +411,8 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         let (x, y) = self.camera.unit_draw(at, extra);
         let frame = self.camera.size.rect();
         let placed = placement::place(image, x, y, frame);
-        if !placed.same_as_frame(image.width, image.height, frame) {
+        // d2rs-own, unverified (D1): the preview clips at the frame edge.
+        if !self.edge_clip && !placed.same_as_frame(image.width, image.height, frame) {
             return Err(component_error(
                 req,
                 "placement",

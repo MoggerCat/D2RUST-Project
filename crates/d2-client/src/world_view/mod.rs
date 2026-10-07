@@ -38,6 +38,8 @@ pub mod present;
 pub mod preview;
 pub mod tile_assets;
 pub mod ui_bind;
+pub mod unit_assets;
+pub mod unit_rules;
 
 #[cfg(test)]
 mod tests;
