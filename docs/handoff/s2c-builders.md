@@ -67,7 +67,7 @@ generator and are only re-exported here).
   (`client/bridge.md` §6): a handler can match on `Message` instead of
   reading bytes.
 - `AUDIT: [Audit; 0xB5]`, `audit(id)`: `Status::{Built, Generated,
-  Partial, Unspecified, Never}`, builder name, note.
+  Partial, IdOnly, Unspecified, Never}`, builder name, note.
 
 Field names: TSV labels for types; a field without a stated meaning is
 named by offset (`f6`, as the generator names unnamed fields). 0x0D's
@@ -80,7 +80,7 @@ u8).
 
 `built` = type in `s2c::messages`; `generated` = TSV layout, type in
 `generated::server`; `partial` = some bytes given (what is missing in the
-note); `unspecified` = size rule only; `never` = size 0. Checked row for
+note); `unspecified` = size rule only; `idonly` = empty layout that is complete; `never` = size 0. Checked row for
 row against `s2c::AUDIT` by `note_table_matches_audit`.
 
 | Id | Name | Size | Status | Builder | Note |
@@ -211,7 +211,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x7B | AssignHotkey | 8 | generated | `AssignHotkey` | TSV layout |
 | 0x7C | UseScroll | 6 | generated | `UseScroll` | TSV layout |
 | 0x7D | SetItemState | 18 | generated | `SetItemState` | TSV layout; senders: impl-moves (inventory-moves.md §11) |
-| 0x7E | Unknown7E | 5 | unspecified | - | size rule only |
+| 0x7E | Unknown7E | 5 | idonly | - | empty layout complete (id only; bytes 1-4 unwritten) |
 | 0x7F | AllyPartyInfo | 10 | generated | `AllyPartyInfo` | TSV layout |
 | 0x80 | - | 0 | never | - | size 0 (client expects 4; never receivable, §3.1 r2) |
 | 0x81 | AssignMerc | 20 | generated | `AssignMerc` | TSV layout |

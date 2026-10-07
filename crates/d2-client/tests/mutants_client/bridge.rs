@@ -128,10 +128,13 @@ fn dispatch_check_duplicate_handler_and_matching_owner() {
 /// §6 rule 3: unowned messages are counted per id in the receive log.
 #[test]
 fn unowned_messages_are_counted_per_id() {
-    let mut bridge = Bridge::new(VersionLink(PROTOCOL_VERSION)).unwrap();
-    // 0x8B (6 bytes, out of scope: no owner spec) twice, then 0x79 (6
-    // bytes) once. (0x61 / 0x5F are owned now: `client/msg-ui.md` §20,
-    // `msg-units.md` §7.)
+    use d2_client::bridge::dispatch::Dispatch;
+
+    // Every id of the spec table has a handler now (`bridge.md` §6 r7),
+    // so the count is taken over an empty table: 0x8B (6 bytes) twice,
+    // then 0x79 (6 bytes) once.
+    let mut bridge =
+        Bridge::with_dispatch(VersionLink(PROTOCOL_VERSION), Dispatch::empty()).unwrap();
     bridge
         .receive_chunk(&[
             0x8B, 1, 2, 3, 4, 5, 0x8B, 1, 2, 3, 4, 5, 0x79, 1, 2, 3, 4, 5,

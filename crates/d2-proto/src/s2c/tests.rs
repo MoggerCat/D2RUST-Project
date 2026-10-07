@@ -121,7 +121,7 @@ fn audit_errors(rows: &[Audit]) -> Vec<u8> {
         let parsed_ok = match a.status {
             Status::Built | Status::Generated => parsed,
             Status::Partial => parsed == (a.id == 0x50),
-            Status::Unspecified | Status::Never => !parsed,
+            Status::Unspecified | Status::IdOnly | Status::Never => !parsed,
         };
         let builder_ok = match a.status {
             Status::Built if a.id == 0xAE => a.builder == Some("WardenRequest"),
@@ -130,7 +130,7 @@ fn audit_errors(rows: &[Audit]) -> Vec<u8> {
                 a.builder == Some(m.name) && (!m.layout.is_empty() || m.size.fixed() == Some(1))
             }
             Status::Partial => a.builder == (a.id == 0x50).then_some("QuestSpecial"),
-            Status::Unspecified | Status::Never => a.builder.is_none(),
+            Status::Unspecified | Status::IdOnly | Status::Never => a.builder.is_none(),
         };
         let ok = a.id as usize == i
             && (a.status == Status::Never) == m.size.is_never()
@@ -141,6 +141,28 @@ fn audit_errors(rows: &[Audit]) -> Vec<u8> {
         }
     }
     bad
+}
+
+/// Rows whose empty `layout` is complete (`intents-events.md` §3.5 r4).
+const ID_ONLY: [u8; 9] = [0x00, 0x02, 0x04, 0x05, 0x06, 0x4F, 0x97, 0xB0, 0x7E];
+
+// Covers: specs/sim/intents-events.md §3.5 r4
+#[test]
+fn empty_layout_rows_are_complete() {
+    for id in ID_ONLY {
+        let m = server_message(id).unwrap();
+        assert!(m.layout.is_empty(), "0x{id:02X}");
+        let done = matches!(audit(id).status, Status::Generated | Status::IdOnly);
+        assert!(done, "0x{id:02X} counted as a gap");
+    }
+    // Every other empty-layout row with a size is a real gap or never.
+    for id in 0..=0xB4u8 {
+        let m = server_message(id).unwrap();
+        let s = audit(id).status;
+        if m.layout.is_empty() && !ID_ONLY.contains(&id) && !m.size.is_never() {
+            assert_ne!(s, Status::IdOnly, "0x{id:02X}");
+        }
+    }
 }
 
 #[test]
