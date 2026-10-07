@@ -95,12 +95,9 @@ fn parse_key(t: &str) -> Option<Option<Key>> {
     if t == "-" {
         return Some(None);
     }
-    let (width, rest, max) = if let Some(r) = t.strip_prefix("u8@") {
-        (1, r, 0xFF)
-    } else if let Some(r) = t.strip_prefix("u16@") {
-        (2, r, 0xFFFF)
-    } else {
-        return None;
+    let (width, rest, max) = match t.strip_prefix("u8@") {
+        Some(r) => (1, r, 0xFF),
+        None => (2, t.strip_prefix("u16@")?, 0xFFFF),
     };
     let (off, v) = rest.split_once('=')?;
     Some(Some(Key {
