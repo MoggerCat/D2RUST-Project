@@ -322,6 +322,9 @@ fn game_entry_places_the_player_in_the_town_and_sends_0x07_then_0x15() {
     });
     assert_eq!(r, Ok(true));
     let (x, y, room) = pos(&mut fx, p);
+    // `0x00554850(flag 0)` sets the room-changed flag (path flag 0x2).
+    let d = fx.sim.hooks().paths.as_ref().unwrap().dynamic(p).unwrap();
+    assert_eq!(d.flags & 0x2, 0x2);
     let c = room.expect("placed");
     assert_ne!(c, fx.a);
     assert_ne!(c, fx.b);
@@ -615,5 +618,21 @@ fn a_fatal_type_set_in_a_walk_request_is_reported() {
         vec![WiringError::Walk(WalkError::Path(PathError::PathType(7)))]
     );
     assert_eq!(pos(&mut fx, p), (10, 10, Some(fx.a)));
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/path-placement.md §10 r5
+#[test]
+fn placing_a_unit_in_its_own_room_queues_it_for_update() {
+    // Rule 5: queue for update (`0x0064C040`) even without a room change
+    // (the room list does not queue the unit then).
+    let mut fx = fx();
+    let a = fx.a;
+    let m = fx.spawn(UnitType::Monster, 0, a, 30, 10);
+    fx.game.lists.clear_update_queue(a).unwrap();
+    assert_eq!(fx.game.lists.update_queue(a), Vec::<UnitId>::new());
+    assert!(place(&mut fx, m, Some(a), 33, 12, true, false));
+    assert_eq!(pos(&mut fx, m), (33, 12, Some(a)));
+    assert_eq!(fx.game.lists.update_queue(a), vec![m]);
     fx.assert_clean();
 }
