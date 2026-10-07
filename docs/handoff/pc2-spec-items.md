@@ -80,17 +80,66 @@ addresses in the specs.
   + stat 254 (cap 511) on every restored copy.
 - `server-items` SI1 -> `cube.md` §2 step 1: the range test returns 1.
 
+### Second pass (worktree `w-spec-items2`, 2026-10-07)
+
+- `impl-vendors` V2 → `vendors.md` §9.2 rule 4: an affix id 0 or above
+  the count has no record (`0x00633EE0`), adds nothing, slot by slot.
+- V3 → §9.2 (A), (B): (A) and (B) encode 1 skip a skill id ≥ the count;
+  (B) encode 2/3 read through a null record (fault, unreachable).
+- V4 → §9.2 (B) encode 4: min = ((v>>2)&0x3FF)−256, max =
+  ((v>>12)&0x3FF)−256, u = (min+max)/2 toward zero (`0x0065CA30`).
+- V5 → §9.2 rule 6: the filler's record `cost` / 2 (`0x006292F0`).
+- V6 → §9.4: normal code = `normcode` else `code` (`0x006287D0`);
+  missing → null read / fatal 0xB1A (all 508 live normcodes exist);
+  literal tests confirmed.
+- V7 → §3.1 step 2 **corrected**: a round-2 mismatch returns null; a
+  missing upgrade code requests class 0 and ends null; a null creation is
+  a fatal assert (0x61A), not a failed try. §3.3 updated.
+- V8 → §3: list codes always found (unreachable).
+- V9 → §5.1: gamble index never none; rin/amu missing → item 0.
+- V10 → §7.1 rule 2: GUID and kind of every 0x2A (refusals GUID −1
+  kind 0, except §7.1 rules 1–2: requested GUID).
+- V12 → §8.1 rule 7: handler `0x0054BB60` returns 0 for every 17-byte
+  message; the routine's own results listed.
+- V13 → §3.1 step 5, §7.1 rule 12: item flags 0x10 / 0x1 / 0x2;
+  "store item" = the named source item.
+- V14 → §4 step 3: inventory link order.
+- `impl-treasure` 1, 3, 4, 7, 9–12, 14 → `treasure.md` OQ12 (strtol
+  saturation; SSE2 `cvttsd2si` → 0x80000000; null TC fault; idiv fault;
+  act table 0–4; +0x30/+0x32 = 0 in all 853 bin rows; quote cut; empty
+  search → none; fatal list). 13 → OQ7 answered (`0x005541B0` = dead).
+- `treasure.md` OQ10 → new §9.1: the three sub-pickers (armor
+  `0x00555E70`, weapons `0x00555FB0`, misc `0x005560F0`), filter
+  `0x00555E00` (rarity roll against `0x006427F0(L)`), `p6` = type filter,
+  `p7` = skip the rarity roll; n = 0 returns an uninitialised slot.
+- `server-items` SI2 → `cube.md` §8 "Exact" 1: `0x00557FD0` = unlink
+  from any player list / cursor, then `0x00555600`; nothing else.
+- SI3 → `cube.md` §2 step 3.1: argument = the player; 0x3F bytes
+  `3F FF <GUID> FF FF`; cursor item not reset.
+- SI4 / `cube.md` OQ1, OQ2 → answered from the code (§8 "Exact"):
+  0x9D action 5 at once; removal and free send nothing; 0x9C action 4
+  per placed item in the player update; S→C 0x2C to the actor's client.
+- `cube.md` OQ4: item init / request → `generation.md` Randomness;
+  free-spot `0x00545340` draws nothing. OQ5 → link order.
+- `impl-world` C1 → §6.4 (`eli` only when `exc` clear); C2, C3 → §7.3
+  null cases are fatal asserts; C4 → §7.6 step 2 (no bound, 18 = max);
+  C5 → §7.5 (**correction**: the scan ends at 256 candidates; N = 0
+  loops).
+- `impl-world` W1 → `waypoints.md` §6.2: no room = act 0.
+- `bitstream.md` OQ4 partly (5 of 7 sites bounded).
+- Relay: `properties.md` §10.1 load rule for broken runewords
+  (`0x00563470`); `generation.md` §1.4 callers were already listed.
+
 ## Still open
 
-- `bitstream.md` OQ2 (no recording of set / unique / rare / runeword / ear
-  / gold / book / filled socket streams), OQ4 (name setter callers).
-- `treasure.md` OQ10 (new): sub-pickers of the quest drop with no drop
-  code.
-- `cube.md` OQ4: item init, item request, free-spot, portal draws.
-- Not taken up this session (readings in their notes, no answer yet):
-  `impl-vendors` V2–V10, V12–V14; `impl-treasure` 1, 3, 4, 7, 9–14;
-  `server-items` SI2–SI4; `impl-world` W1–, C1–C5; `impl-items` "stat vs
-  base" readings; `gaps-items-stats` 3–6 (not items specs).
+- `bitstream.md` OQ2: Needs recording (see Recording list). OQ4: the
+  two request-name sites (`0x0055903B`, `0x0055910E`): writer of
+  request +0x58.
+- `cube.md` OQ4: portal creation `0x0056D130` draws.
+- `treasure.md` OQ5 (x87 precision control), OQ12 tail (d2rs value for
+  the sub-picker n = 0 result: a Ruleset choice).
+- Not items: `impl-items` "stat vs base" readings; `gaps-items-stats`
+  3–6.
 
 ## CODE-TABLE CHANGE commits
 
@@ -102,4 +151,6 @@ None.
 
 ## Recording list
 
-None new.
+- `bitstream.md` OQ2: pick up and store a set, unique, rare, runeword,
+  ear, gold pile, tome and a socket-filled item; record S→C 0x9C / 0x9D;
+  each stream must decode to its end and re-encode byte for byte.
