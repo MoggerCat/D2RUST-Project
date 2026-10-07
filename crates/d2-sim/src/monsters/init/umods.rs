@@ -7,7 +7,7 @@
 //! and checked against it by `tests::umods_match_tsv` (METHODS M05).
 
 use crate::rng::Seed;
-use crate::units::UnitId;
+use crate::units::{UnitId, UnitType};
 
 use super::calc::{monlvl_dm, pct};
 use super::create::seed;
@@ -266,6 +266,11 @@ fn flags_or<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, f: u16) {
 }
 
 fn add<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, s: u16, d: i32) {
+    // `stat-lists.md` §5 rule 3: an add of 0 changes nothing and creates
+    // no entry.
+    if d == 0 {
+        return;
+    }
     let v = h.stat(unit, s);
     h.set_stat(unit, s, v.wrapping_add(d));
 }
@@ -280,6 +285,14 @@ fn schedule<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, n: i32) {
 
 fn class_of<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) -> u32 {
     h.units().get(unit).map_or(0, |r| r.class)
+}
+
+/// `monsters/umod-init-bodies.md` §2 r1, §4 r1: the unit exists and is a
+/// monster (unit type 1).
+fn is_monster<H: InitHost + ?Sized>(h: &mut H, unit: UnitId) -> bool {
+    h.units()
+        .get(unit)
+        .is_some_and(|r| r.ty == UnitType::Monster)
 }
 
 fn base_id<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) -> Option<u16> {
@@ -721,6 +734,11 @@ fn elemental<H: InitHost + ?Sized>(
     unique: bool,
     d: usize,
 ) {
+    // Step 1: a null unit or a unit that is not a monster returns before
+    // anything (no resistance tail).
+    if !is_monster(h, unit) {
+        return;
+    }
     // Step 3: d' = min(d, 2); o = the L-flag.
     let dp = d.min(2);
     let o = h.info().l_flag();
@@ -810,7 +828,7 @@ fn ghostly<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: usize
 /// Umod 26 teleport `0x005A1600` (`monsters/umod-init-bodies.md` §4):
 /// bosses only; skill 184 at level 1, its mode 4, AI flag 0x20.
 fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, unique: bool) {
-    if !unique {
+    if !unique || !is_monster(h, unit) {
         return;
     }
     if let Some(sk) = cx.tables.ids.monteleport {
