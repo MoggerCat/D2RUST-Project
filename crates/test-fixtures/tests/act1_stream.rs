@@ -5,6 +5,9 @@
 //! rooms of both levels, and the Blood Moor's monsters added to the
 //! client (S→C 0xAC) once they spawn.
 //!
+//! The town gets one NPC preset here (DS1 type 1, a `keeper` row added
+//! to `monpreset` act 1), as the Rogue Encampment's NPCs are (G17).
+//!
 //! The set's `monstats` rows get `isSpawn` here (the shared set leaves it
 //! empty, so `population.md` §2.3 draws no region entry and no monster
 //! ever spawns). No `Covers:` claim on the data: it is made up.
@@ -13,8 +16,10 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use d2_formats::ds1::Ds1Object;
 use d2_sim::units::UnitType;
 use test_fixtures::act1::{self, BLOOD_MOOR, TOWN};
+use test_fixtures::drlg::archive_name;
 use test_fixtures::game::{ActCreation, GameData};
 use test_fixtures::host::{border_goals, Session, Setup};
 use test_fixtures::install;
@@ -43,8 +48,31 @@ fn spawning_act1() -> Synthetic {
     for i in rows {
         s.tables.set("monstats", i, "isSpawn", "1");
     }
+    // The town NPC: act 1's `monpreset` rows are beast1, Warden 0, then
+    // this one (DS1 id 2).
+    s.tables
+        .row("monpreset", &[("Act", "1"), ("Place", "keeper")]);
+    let mut town = act1::town();
+    let (_, _, x, y) = act1::TOWN_WAYPOINT;
+    town.objects.push(Ds1Object {
+        kind: 1,
+        id: NPC_DS1_ID,
+        x: x + 5,
+        y: y + 5,
+        flags: 0,
+    });
+    let name = archive_name(act1::TOWN_DS1);
+    let f = s
+        .files
+        .iter_mut()
+        .find(|f| f.0 == name)
+        .expect("the town file");
+    f.1 = test_fixtures::ds1::write(&town);
     s
 }
+
+/// The NPC's DS1 id (its `monpreset` act 1 row).
+const NPC_DS1_ID: u32 = 2;
 
 fn data() -> &'static GameData {
     static D: OnceLock<GameData> = OnceLock::new();
@@ -112,6 +140,42 @@ fn the_walk_into_the_blood_moor_streams_its_rooms_and_monsters() {
         added.is_subset(&guids),
         "0xAC for unknown monsters: {added:?} vs {guids:?}"
     );
+}
+
+#[test]
+fn the_town_npc_reaches_the_client() {
+    let mut fx = Session::new(data(), &setup());
+    for _ in 0..10 {
+        fx.frame();
+    }
+    fx.assert_clean("town");
+    // The class is the `monstats` row (the compiled `.bin` keeps the
+    // `.txt` order).
+    let set = spawning_act1();
+    let f = set.tables.file("monstats.txt");
+    let id = f.columns.iter().position(|c| c == "Id").unwrap();
+    let keeper = f
+        .rows
+        .iter()
+        .position(|r| r[id] == "keeper")
+        .expect("keeper row") as u32;
+    let sim = &fx.host.game;
+    let npcs: Vec<u32> = sim
+        .game
+        .lists
+        .units_of_type(UnitType::Monster)
+        .into_iter()
+        .filter(|&u| sim.events.action.sys.units.get(u).unwrap().class == keeper)
+        .map(|u| sim.game.lists.unit(u).unwrap().guid)
+        .collect();
+    assert_eq!(npcs.len(), 1, "the preset NPC spawned in the town");
+    let added: Vec<u32> = fx
+        .transcript
+        .iter()
+        .filter(|m| m[0] == 0xAC && m.len() >= 5)
+        .map(|m| u32::from_le_bytes([m[1], m[2], m[3], m[4]]))
+        .collect();
+    assert!(added.contains(&npcs[0]), "0xAC of the NPC: {added:?}");
 }
 
 /// Determinism (CLAUDE.md rule 6): two walks give the same transcript.
