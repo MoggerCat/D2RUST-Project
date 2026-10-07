@@ -53,14 +53,14 @@ srvst	51	0x005CC1D0	SrvSt51_Submerge	spec'd-here	Submerge	no function at this en
 srvst	52	0x005CC220	SrvSt52_Emerge	spec'd-here	Emerge	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.23
 srvst	53	0x005CC240	SrvSt53_MonInferno	spec'd-here	FetishInferno,DiabLight,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	body: bodies-3.md §4.1
 srvst	54	0x005CD2C0	SrvSt54_DiabRun	spec'd-here	DiabRun	body: bodies-3.md §5.29
-srvst	55	0x005CD910	SrvSt55_Mosquito	mapped	Mosquito	
+srvst	55	0x005CD910	SrvSt55_Mosquito	spec'd-here	Mosquito	body: bodies-4.md §3.1
 srvst	56	0x005C7690	SrvSt56_FeralRage_Maul	spec'd-here	Feral Rage,Maul	body: bodies.md §7.7
 srvst	57	0x005C79E0	SrvSt57_Rabies	spec'd-here	Rabies	body: bodies-2.md §6.13
 srvst	58	0x005C7E00	SrvSt58_FireClaws	spec'd-here	Fire Claws	body: bodies-2.md §6.15
-srvst	59	0x005D1280	SrvSt59_ImpInferno	mapped	Imp Inferno	
-srvst	60	0x005D1570	SrvSt60_SuckBlood	mapped	Suck Blood	
-srvst	61	0x005D1BF0	SrvSt61_SelfResurrect	mapped	Self-resurrect	no function at this entry in the Ghidra export (data-only xref)
-srvst	62	0x005D2420	SrvSt62_MinionSpawner	mapped	MinionSpawner	
+srvst	59	0x005D1280	SrvSt59_ImpInferno	spec'd-here	Imp Inferno	body: bodies-4.md §3.6
+srvst	60	0x005D1570	SrvSt60_SuckBlood	spec'd-here	Suck Blood	body: bodies-4.md §3.9
+srvst	61	0x005D1BF0	SrvSt61_SelfResurrect	spec'd-here	Self-resurrect	no function at this entry in the Ghidra export (data-only xref); body: bodies-4.md §3.12
+srvst	62	0x005D2420	SrvSt62_MinionSpawner	spec'd-here	MinionSpawner	body: bodies-4.md §3.18
 srvst	63	0x005D2A10	SrvSt63_Corpse_VineCycler	spec'd-here	CorpseCycler,VineCycler	body: bodies-3.md §4.8
 srvst	64	0x005CDF00	SrvSt25_64_DragonClaw_MonFrenzy	spec'd-here	MonFrenzy	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §4.12
 srvst	65	0x0056CAB0	SrvSt65_Throw_LeftHandThrow	spec'd-here	Throw,Left Hand Throw	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.4
@@ -102,12 +102,12 @@ srvdo	32	0x005C4CD0	SrvDo032_PoisonDagger	spec'd-here	Poison Dagger	no function 
 srvdo	33	0x005D3140	SrvDo033_PsychicHammer	spec'd-here	Psychic Hammer	body: bodies-2.md §3.9
 srvdo	34	0x005D3490	SrvDo034_TigerStrike_CobraStrike_RoyalStrike	spec'd-here	Tiger Strike,Cobra Strike,Royal Strike	body: bodies.md §8.8
 srvdo	35	0x005D35D0	SrvDo035_FistsOfFire_ClawsOfThunder_BladesOfIce	spec'd-here	Fists of Fire,Claws of Thunder,Blades of Ice	body: bodies.md §8.10
-srvdo	36	0x005D4DB0	SrvDo036_ClawsOfThunder_ProgressiveFn2	mapped	(none)	ItemEffect: Frost Nova,Nova srvprgfunc2: Claws of Thunder
-srvdo	37	0x005D4E70	SrvDo037_ClawsOfThunder_ProgressiveFn3	mapped	(none)	srvprgfunc3: Claws of Thunder
-srvdo	38	0x005D3E80	SrvDo038_FistsOfFire_BladesOfIce_ProgressiveFn2	mapped	(none)	srvprgfunc2: Fists of Fire,Blades of Ice
-srvdo	39	0x005D3F90	SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3	mapped	(none)	srvprgfunc3: Fists of Fire,Blades of Ice
-srvdo	40	0x005D5010	SrvDo040_RoyalStrike_ProgressiveFn1	mapped	(none)	srvprgfunc1: Royal Strike
-srvdo	41	0x005D5080	SrvDo041_RoyalStrike_ProgressiveFn3	mapped	(none)	srvprgfunc3: Royal Strike
+srvdo	36	0x005D4DB0	SrvDo036_ClawsOfThunder_ProgressiveFn2	spec'd-here	(none)	ItemEffect: Frost Nova,Nova srvprgfunc2: Claws of Thunder; body: bodies-4.md §4.1
+srvdo	37	0x005D4E70	SrvDo037_ClawsOfThunder_ProgressiveFn3	spec'd-here	(none)	srvprgfunc3: Claws of Thunder; body: bodies-4.md §4.2
+srvdo	38	0x005D3E80	SrvDo038_FistsOfFire_BladesOfIce_ProgressiveFn2	spec'd-here	(none)	srvprgfunc2: Fists of Fire,Blades of Ice; body: bodies-4.md §4.3
+srvdo	39	0x005D3F90	SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3	spec'd-here	(none)	srvprgfunc3: Fists of Fire,Blades of Ice; body: bodies-4.md §4.4
+srvdo	40	0x005D5010	SrvDo040_RoyalStrike_ProgressiveFn1	spec'd-here	(none)	srvprgfunc1: Royal Strike; body: bodies-4.md §4.5
+srvdo	41	0x005D5080	SrvDo041_RoyalStrike_ProgressiveFn3	spec'd-here	(none)	srvprgfunc3: Royal Strike; body: bodies-4.md §4.6
 srvdo	42	0x005D5A30	SrvDo042_DragonTalon	spec'd-here	Dragon Talon	body: bodies-2.md §3.11
 srvdo	43	0x005D5D70	SrvDo043_ShockField	spec'd-here	Shock Field	body: bodies-2.md §4.10
 srvdo	44	0x005D6020	SrvDo044_BladeSentinel	spec'd-here	Blade Sentinel	body: bodies-2.md §4.11
@@ -173,12 +173,12 @@ srvdo	103	0x005CD380	SrvDo103_DiabRun	spec'd-here	DiabRun	body: bodies-3.md §5.
 srvdo	104	0x005CD5D0	SrvDo104_DiabPrison	spec'd-here	DiabPrison	body: bodies-3.md §5.31
 srvdo	105	0x005CD6A0	SrvDo105_DesertTurret	spec'd-here	DesertTurret	body: bodies-3.md §5.32
 srvdo	106	0x005CD870	SrvDo106_ArcaneTower	spec'd-here	ArcaneTower	body: bodies-3.md §5.33
-srvdo	107	0x005CDA00	SrvDo107_Mosquito	mapped	Mosquito	
-srvdo	108	0x005CDC10	SrvDo108_RegurgitatorEat	mapped	RegurgitatorEat	
+srvdo	107	0x005CDA00	SrvDo107_Mosquito	spec'd-here	Mosquito	body: bodies-4.md §3.2
+srvdo	108	0x005CDC10	SrvDo108_RegurgitatorEat	spec'd-here	RegurgitatorEat	body: bodies-4.md §3.4
 srvdo	109	0x005CDF10	SrvDo109_MonFrenzy	spec'd-here	MonFrenzy,BloodLordFrenzy	body: bodies-3.md §4.13
 srvdo	110	0x005CE1B0	SrvDo110_Hireable_RogueMissile	spec'd-here	MissileSkill1,HireableMissile,RogueMissile	body: bodies-3.md §4.5
 srvdo	111	0x005CE670	SrvDo111_FetishAura	spec'd-here	FetishAura	body: bodies-3.md §5.22
-srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	mapped	MonCurseCast	
+srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	spec'd-here	MonCurseCast	body: bodies-4.md §3.3
 srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	spec'd-here	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	body: bodies-3.md §4.4
 srvdo	114	0x005C6910	SrvDo114_Raven	spec'd-here	Raven	body: bodies-2.md §3.6
 srvdo	115	0x005C6A80	SrvDo115_Vines	spec'd-here	Plague Poppy,Cycle of Life,Vines	body: bodies.md §8.7
@@ -191,32 +191,32 @@ srvdo	121	0x005C8AD0	SrvDo121_Rabies	spec'd-here	Rabies	only entry whose 1.14d a
 srvdo	122	0x005C7F10	SrvDo122_Hunger	spec'd-here	Hunger	body: bodies-2.md §7.17
 srvdo	123	0x005C8080	SrvDo123_Volcano	spec'd-here	Volcano	body: bodies-2.md §7.18
 srvdo	124	0x005C8190	SrvDo124_Armageddon_Hurricane	spec'd-here	Armageddon,Hurricane,Diablogeddon	body: bodies.md §8.22
-srvdo	125	0x005D1170	SrvDo125_WakeOfDestruction	mapped	Wake Of Destruction Sentry	
-srvdo	126	0x005D1350	SrvDo126_ImpInferno	mapped	Imp Inferno	
-srvdo	127	0x005D16A0	SrvDo127_SuckBlood	mapped	Suck Blood	
-srvdo	128	0x005D1800	SrvDo128_CryHelp	mapped	Cry Help	
-srvdo	129	0x005D1AB0	SrvDo129_ImpTeleport	mapped	Imp Teleport	
-srvdo	130	0x005D1CD0	SrvDo130_VineAttack	mapped	Vine Attack	
-srvdo	131	0x005D1F70	SrvDo131_OverseerWhip	mapped	Overseer Whip	
-srvdo	132	0x005D2090	SrvDo132_ImpFireMissile	mapped	Imp Fire Missile	
-srvdo	133	0x005D2250	SrvDo133_Impregnate	mapped	Impregnate	
-srvdo	134	0x005D2320	SrvDo134_SiegeBeastStomp	mapped	Siege Beast Stomp	
-srvdo	135	0x005D2490	SrvDo135_MinionSpawner	mapped	MinionSpawner	
-srvdo	136	0x005D25B0	SrvDo136_DeathMaul	mapped	DeathMaul	
-srvdo	137	0x005D26F0	SrvDo137_FenrisRage	mapped	fenris rage	
+srvdo	125	0x005D1170	SrvDo125_WakeOfDestruction	spec'd-here	Wake Of Destruction Sentry	body: bodies-4.md §3.5
+srvdo	126	0x005D1350	SrvDo126_ImpInferno	spec'd-here	Imp Inferno	body: bodies-4.md §3.7
+srvdo	127	0x005D16A0	SrvDo127_SuckBlood	spec'd-here	Suck Blood	body: bodies-4.md §3.10
+srvdo	128	0x005D1800	SrvDo128_CryHelp	spec'd-here	Cry Help	body: bodies-4.md §3.11
+srvdo	129	0x005D1AB0	SrvDo129_ImpTeleport	spec'd-here	Imp Teleport	body: bodies-4.md §3.24
+srvdo	130	0x005D1CD0	SrvDo130_VineAttack	spec'd-here	Vine Attack	body: bodies-4.md §3.13
+srvdo	131	0x005D1F70	SrvDo131_OverseerWhip	spec'd-here	Overseer Whip	body: bodies-4.md §3.14
+srvdo	132	0x005D2090	SrvDo132_ImpFireMissile	spec'd-here	Imp Fire Missile	body: bodies-4.md §3.15
+srvdo	133	0x005D2250	SrvDo133_Impregnate	spec'd-here	Impregnate	body: bodies-4.md §3.16
+srvdo	134	0x005D2320	SrvDo134_SiegeBeastStomp	spec'd-here	Siege Beast Stomp	body: bodies-4.md §3.17
+srvdo	135	0x005D2490	SrvDo135_MinionSpawner	spec'd-here	MinionSpawner	body: bodies-4.md §3.19
+srvdo	136	0x005D25B0	SrvDo136_DeathMaul	spec'd-here	DeathMaul	body: bodies-4.md §3.20
+srvdo	137	0x005D26F0	SrvDo137_FenrisRage	spec'd-here	fenris rage	body: bodies-4.md §3.21
 srvdo	138	0x005D27B0	SrvDo138_Unused	unreferenced	(none)	no 1.14d data row references it
-srvdo	139	0x005D2940	SrvDo139_BaalColdMissiles	mapped	Baal Cold Missiles	
-srvdo	140	0x005D2C20	SrvDo140_BaalTentacle	mapped	Baal Tentacle	
-srvdo	141	0x005D2E80	SrvDo141_BaalCorpseExplode	mapped	Baal Corpse Explode	
+srvdo	139	0x005D2940	SrvDo139_BaalColdMissiles	spec'd-here	Baal Cold Missiles	body: bodies-4.md §3.23
+srvdo	140	0x005D2C20	SrvDo140_BaalTentacle	spec'd-here	Baal Tentacle	body: bodies-4.md §3.22
+srvdo	141	0x005D2E80	SrvDo141_BaalCorpseExplode	spec'd-here	Baal Corpse Explode	body: bodies-4.md §3.8
 srvdo	142	0x005D7CE0	SrvDo142_Unused	unreferenced	(none)	no 1.14d data row references it; called directly by srvdo 54 (Blade Shield pulse), body: bodies-2.md §2.26
-srvdo	143	0x005D4F40	SrvDo143_FistsOfFire_RoyalStrike_ProgressiveFn	mapped	(none)	srvprgfunc1: Fists of Fire srvprgfunc2: Royal Strike
+srvdo	143	0x005D4F40	SrvDo143_FistsOfFire_RoyalStrike_ProgressiveFn	spec'd-here	(none)	srvprgfunc1: Fists of Fire srvprgfunc2: Royal Strike; body: bodies-4.md §4.7
 srvdo	144	0x005CA910	SrvDo144_Hydra	spec'd-here	Hydra	body: bodies-2.md §8.5
-srvdo	145	0x005C8380	SrvDo145_Unused	mapped	(none)	states.txt srvactivefunc of state hurricane (type-5 event); D2MOO name "Unused" is wrong
-srvdo	146	0x005C8520	SrvDo146_Unused	mapped	(none)	states.txt srvactivefunc of state armageddon (type-5 event); D2MOO name "Unused" is wrong
-srvdo	147	0x005D2B20	SrvDo147_Unused	mapped	(none)	states.txt srvactivefunc of state attached (type-5 event); D2MOO name "Unused" is wrong; no function at this entry in the Ghidra export (data-only xref)
-srvdo	148	0x005CDFB0	SrvDo148_DoomKnightMissile	mapped	DoomKnightMissile	
-srvdo	149	0x005CE0B0	SrvDo149_NecromageMissile	mapped	NecromageMissile	
+srvdo	145	0x005C8380	SrvDo145_Unused	spec'd-here	(none)	states.txt srvactivefunc of state hurricane (type-5 event); D2MOO name "Unused" is wrong; body: bodies-4.md §4.8
+srvdo	146	0x005C8520	SrvDo146_Unused	spec'd-here	(none)	states.txt srvactivefunc of state armageddon (type-5 event); D2MOO name "Unused" is wrong; body: bodies-4.md §4.9
+srvdo	147	0x005D2B20	SrvDo147_Unused	spec'd-here	(none)	states.txt srvactivefunc of state attached (type-5 event); D2MOO name "Unused" is wrong; no function at this entry in the Ghidra export (data-only xref); body: bodies-4.md §4.10
+srvdo	148	0x005CDFB0	SrvDo148_DoomKnightMissile	spec'd-here	DoomKnightMissile	body: bodies-4.md §3.25
+srvdo	149	0x005CE0B0	SrvDo149_NecromageMissile	spec'd-here	NecromageMissile	body: bodies-4.md §3.26
 srvdo	150	0x005CE9F0	SrvDo150_Smite	spec'd-here	Smite	body: bodies-2.md §3.4
-srvdo	151	0x005CA260	SrvDo151_Unused	mapped	(none)	ItemEffect: Chain Lightning
+srvdo	151	0x005CA260	SrvDo151_Unused	spec'd-here	(none)	ItemEffect: Chain Lightning; body: bodies-4.md §4.11
 srvdo	152	0x005CC690	SrvDo152_DiabLight	spec'd-here	DiabLight	body: bodies-3.md §5.25
 srvdo	153-190	null	-	null	(none)	table has 191 slots (bound check < 0xBF)
