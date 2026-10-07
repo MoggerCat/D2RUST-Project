@@ -1731,6 +1731,16 @@ all from main `0472619`; spec edits pass `spec_index --check` and
 - `claude/live-c20-treasure-dump` `6209859`: C20 pass after fixing TC 0
   picks 1 → 0 (code + `treasure.md` §1.1–§1.2); 1,012 other TCs, 4,167
   entries, 45 chest slots identical (C20 done).
+- `claude/fuzz-parsers` `a704a89`: wave E. Property tests at
+  `PROPTEST_CASES=200000` (release): d2-formats lib 173 pass, `prop_more_formats`
+  8 pass, no failure. New `fuzz/` cargo-fuzz crate (own workspace; nightly,
+  libFuzzer + ASan on MSVC; `fuzz/README.md`: the ASan DLL dir must be on
+  PATH; a panic hook writes the input because Windows panics abort without
+  a crash file), feature `fuzz` on d2-formats, 18 targets (every
+  d2-formats parser and decompressor, `.txt`, `.bin`, patch layer) 1 h each,
+  ~1.59 G execs. One crash, fixed: DT1 RLE zero-length run past the block
+  (`dt1::tests::regress_rle_empty_run_past_block`, `dt1.md` edge case).
+  Thin coverage: `mpq_archive` 2.5 M, `patch_layer` 2.2 M, `txt` 5.5 M.
 - C2: no new code needed; `game_core::itemstatcost_ops_as_stated` and
   `itemstatcost_columns_as_stated` pass on live data (perturbation of
   record 214 byte 0x53 caught). C2's `StatData` part is covered.
@@ -6003,5 +6013,6 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 | `mpq-tool formats` counted a file twice when two listfiles spell it in different case (DC6 1,657 vs 1,653, DT1 260 vs 256), and those counts became `game_sweep`'s expected values and a HANDOFF explanation (caught 2026-10-06 by a spec session's own count) | case-insensitive name sets wherever MPQ names are collected; a count copied into a test names the tool and the method that produced it (M21) |
 | A spec's prose count drifted from the tool (`mpq.md` / `audio.md`: "5,008" `.wav`, `mpq-tool check` 4,992) | counts in spec prose name the command that measures them (README bar 1) |
 | Writers on one PC shared one scratchpad directory; one writer's helper script was overwritten by another's mid-run (2026-10-06) | give each writer its own scratch subfolder in the prompt (M21) |
+| DT1 `decode_rle` built a slice index for a skip-only `(skip, 0)` pair past the 32 × 32 block; the bounds check ran only for `count > 0` (panic; found 2026-10-06 by libFuzzer within minutes, missed by the 200k-case proptests) | the `dt1` fuzz target and the regress test; audit other parsers for a bounds check guarded by `count > 0` (M07, M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 
