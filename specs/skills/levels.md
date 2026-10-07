@@ -25,17 +25,17 @@
 | Rules | 70–71 |
 |   1. Skill level | 72–133 |
 |   2. Special values | 134–179 |
-|   3. Skill damage | 180–300 |
-|   4. Mana cost | 301–340 |
-|   5. To-hit | 341–348 |
-|   6. Learning a skill | 349–406 |
-|   7. Skill stat callbacks | 407–566 |
-| Constants & data dependencies | 567–589 |
-| Randomness | 590–601 |
-| Edge cases & original bugs | 602–624 |
-| Test vectors | 625–676 |
-| Provenance | 677–713 |
-| Open questions | 714–745 |
+|   3. Skill damage | 180–306 |
+|   4. Mana cost | 307–346 |
+|   5. To-hit | 347–354 |
+|   6. Learning a skill | 355–412 |
+|   7. Skill stat callbacks | 413–572 |
+| Constants & data dependencies | 573–595 |
+| Randomness | 596–607 |
+| Edge cases & original bugs | 608–630 |
+| Test vectors | 631–682 |
+| Provenance | 683–719 |
+| Open questions | 720–751 |
 <!-- /index -->
 
 ## Summary
@@ -195,11 +195,17 @@ Formula functions (`data/calc-expressions.md` §3.4), 1.14d:
    `EMaxLev`).
 3. Synergy: `EDmgSymPerCalc ≠ −1` → `p = eval(EDmgSymPerCalc)`; `p ≠ 0`
    → `v += pct(v, p, 100)`. **Min only**: applied only if `v > 256` or
-   `EMinLev1 ≠ 0` (Edge case 1).
+   `EMinLev1 ≠ 0` (Edge case 1). The min's gate is tested **before**
+   the formula: a gated-out min does not evaluate `EDmgSymPerCalc` (no
+   draw from a `rand` in it). The formula runs only when the skills
+   calc table exists and the offset is below its size
+   (1.14d-confirmed, `0x00644DB3`–`0x00644E02`).
 4. `mastery ≠ 0` and a unit: `v += pct(v, stat, 100)`, stat by EType
-   (byte table `0x00644D38`, jump `0x00644D24`): 1 fire → 329, 2
-   lightning → 330, 4 cold → 331, 5 poison → 332, 12 freeze → 331, any
-   other → none. Magic mastery (357) is not read here.
+   (`0x00644C90`, byte table `0x00644D38`, jump `0x00644D24`): 1 fire →
+   329, 2 lightning → 330, 4 cold → 331, 5 poison → 332, 12 freeze →
+   331, any other → none. Magic mastery (357) is not read here. The
+   stat is the unit getter's total `0x00625480(unit, stat, 0)`; 0 adds
+   nothing (1.14d-confirmed).
 
 #### 3.2 Elemental length
 

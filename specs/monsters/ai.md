@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 243–372 |
 |   3. AI control and AI tables | 373–544 |
 |   4. AI parameters | 545–563 |
-|   5. Target selection | 564–689 |
-|   6. Distances and line tests | 690–704 |
-|   7. Tactics helpers | 705–822 |
-|   8. AI commands and minions | 823–847 |
-|   10. The catalogue `ai-functions.tsv` | 848–868 |
-| Constants & data dependencies | 869–892 |
-| Randomness | 893–914 |
-| Edge cases & original bugs | 915–956 |
-| Test vectors | 957–1045 |
-| Provenance | 1046–1102 |
-| Open questions | 1103–1206 |
+|   5. Target selection | 564–695 |
+|   6. Distances and line tests | 696–710 |
+|   7. Tactics helpers | 711–828 |
+|   8. AI commands and minions | 829–853 |
+|   10. The catalogue `ai-functions.tsv` | 854–874 |
+| Constants & data dependencies | 875–898 |
+| Randomness | 899–920 |
+| Edge cases & original bugs | 921–962 |
+| Test vectors | 963–1051 |
+| Provenance | 1052–1108 |
+| Open questions | 1109–1212 |
 <!-- /index -->
 
 ## Summary
@@ -632,6 +632,12 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
       chosen.
    3. Slot 9: the nearest same-act node passing the test becomes an
       alternative; `0x005DD510` decides whether it replaces the choice.
+      Its d is the no-size distance `0x005DC530`; no 55 or B limit
+      applies, a node replaces the alternative only when strictly
+      nearer (ties keep the earlier node), and the collision test runs
+      only when T ≠ 0. Accepted: target := the alternative and B := its
+      d, so step 7 reports the alternative's own distance
+      (1.14d-confirmed, `0x005DDA85`–`0x005DDB1D`).
 6. No target: combat := 0, distance := M (0x7FFFFFFF when no player
    qualified). Return 0.
 7. Target: if alignment ≠ good (2): set control flag 0x08 and vision

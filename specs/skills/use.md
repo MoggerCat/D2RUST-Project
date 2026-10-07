@@ -28,17 +28,17 @@
 |   1. Messages | 77–108 |
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–150 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 151–169 |
-|   4. Mode change gates | 170–203 |
-|   5. Start and do | 204–327 |
-|   6. Cooldown | 328–341 |
-|   7. Periodic skills and auras | 342–391 |
-|   8. Function tables | 392–411 |
-| Constants & data dependencies | 412–432 |
-| Randomness | 433–442 |
-| Edge cases & original bugs | 443–464 |
-| Test vectors | 465–478 |
-| Provenance | 479–495 |
-| Open questions | 496–539 |
+|   4. Mode change gates | 170–209 |
+|   5. Start and do | 210–340 |
+|   6. Cooldown | 341–354 |
+|   7. Periodic skills and auras | 355–404 |
+|   8. Function tables | 405–424 |
+| Constants & data dependencies | 425–445 |
+| Randomness | 446–455 |
+| Edge cases & original bugs | 456–477 |
+| Test vectors | 478–491 |
+| Provenance | 492–508 |
+| Open questions | 509–552 |
 <!-- /index -->
 
 ## Summary
@@ -177,7 +177,10 @@ yes. Else by current mode: NU, WL, RN, TN, TW, S2, S4, KB (19) → yes;
 DT, GH, BL, DD → no; A1, A2, SC, TH → yes if `frame ≤ E + 5` or the new
 mode is GH or BL; KK → `frame ≤ E + 5`; S1 → no for an Amazon (class 0),
 else yes; S3 → no for a Druid (5), else yes; SQ → yes if the used skill's
-`seqinput` > 0, else `frame ≤ E + 5`. `E` = smallest positive expire
+`seqinput` > 0, else `frame ≤ E + 5`; any current mode above 18 (KB 19 and beyond) → yes
+(the current-mode jump table covers 0–18 only, bound at `0x0057EE0B`).
+A new mode above 17 goes to the current-mode test, like 2–4 and 6–16.
+`E` = smallest positive expire
 frame of the unit's type-1 timers, 0 if none (`0x005415A0`).
 
 **`interrupt_gate` `0x0057EEC0`:**
@@ -191,7 +194,10 @@ frame of the unit's type-1 timers, 0 if none (`0x005415A0`).
    5`.
 4. Used skill with `interrupt`: if state 42 (concentration) is on, draw
    `roll(100)` (unit seed, `0x0045C390`); `r < stat 164` of state 42's
-   stat list → blocked. Not blocked and state 15 (concentrate) on →
+   stat list → blocked. The value is the list's base value
+   (`0x00625D00` → `0x00625350(list, 164, 0)`), read before the draw; a
+   missing list (`0x006256B0` → null) gives 0, so the draw is still made
+   and never blocks (1.14d-confirmed, `0x0057EF51`–`0x0057EF83`). Not blocked and state 15 (concentrate) on →
    blocked. Blocked: current mode NU → set NU, yes; else no.
 
 Then the used skill is set (`0x00620210`) and the mode's start runs
@@ -207,14 +213,21 @@ unit's type-0/1 timers (`0x00553990`), schedule frame events
 
 Fixed when the skill entry is created (entry +8): players `anim`; the
 Assassin's Left Hand Swing 16 (S4); monsters `monanim`; item-charge
-skills `anim` if A1/A2/SC/TH/SQ, else SC. 1.14d `anim`: SC 141, SQ 116,
+skills `anim` if A1/A2/SC/TH/SQ, else SC. The native-skill add
+`0x00647110` decides by unit type only: type 1 → `monanim` (record
++0x11, signed byte); type 0 with class 6 and skill 5 → 16; **every other
+unit** (players, objects, missiles, items, tiles) → `anim` (+0x10,
+signed byte) (1.14d-confirmed, `0x006471C0`–`0x006471EB`). 1.14d `anim`: SC 141, SQ 116,
 A1 48, none 23, S2 9, S1 6, TH 5, S3 4. `seqtrans`, `seqnum` and
 shapeshift mode conversion are animation (`sim/units.md`).
 
 #### 5.2 Frame events
 
 `0x005539B0` schedules a type-0 timer at each animation frame whose
-frame code `c` is 1–4 (args `c`, running index for 1, 2, 4; 0 for 3),
+frame code `c` is 1–4 (args `c`, running index for 1, 2, 4; 0 for 3;
+the index is **one** counter shared by codes 1, 2 and 4, from 0, +1
+after each such timer in frame order: jump table `0x00553AFC` sends 1,
+2, 4 to `0x00553A82` and 3 to `0x00553A9A`; 1.14d-confirmed),
 then the type-1 ENDANIM timer (`sim/units.md` owns frame data). The
 player type-0 handler `0x005811D0` dispatches by mode (table
 `0x00732C10`); attack-type modes (7, 8, 10–16, 18) use `0x00580460`:

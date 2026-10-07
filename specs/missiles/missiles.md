@@ -41,10 +41,10 @@
 |   R11. `missiles.txt` columns and their server use | 928–968 |
 | Constants & data dependencies | 969–995 |
 | Randomness | 996–1028 |
-| Edge cases & original bugs | 1029–1052 |
-| Test vectors | 1053–1132 |
-| Provenance | 1133–1175 |
-| Open questions | 1176–1245 |
+| Edge cases & original bugs | 1029–1055 |
+| Test vectors | 1056–1135 |
+| Provenance | 1136–1178 |
+| Open questions | 1179–1248 |
 <!-- /index -->
 
 ## Summary
@@ -1037,7 +1037,10 @@ one `roll(SubStop − SubStart)` on the missile seed at frame SubStart − 1).
 4. Creation that fails at "no path" (R2.3 step 14) leaves an allocated
    missile with an active every-tick event; it then behaves per R3/R4.
 5. A missile with no room passes the town tests (R3.2, R3.6) and is
-   removed by R4 step 5 on its first collision-active run.
+   removed by R4 step 5 on its first run that reaches step 5, that is
+   the first run with `CollideType` ≠ 0 that survives steps 1–3.
+   `Activate` does not delay it: the activate-frame test is step 7,
+   after step 5.
 6. `MaxVel` below the creation speed is not a cap (R4.1.4).
 7. Pierce is all-or-nothing per owner counter value: the first draw
    decides whether any pierce happens; with counter 0 the draws are 66,

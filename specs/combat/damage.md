@@ -28,19 +28,19 @@
 |   0. Shared integer helpers | 82–104 |
 |   1. Damage record | 105–138 |
 |   2. Pipeline | 139–153 |
-|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–293 |
-|   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
-|   5. Application | 386–576 |
-|   6. Hit class and hit recovery | 577–607 |
-|   7. Reaction and death trigger | 608–699 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 700–763 |
-|   9. Durability `0x0057D3D0` | 764–785 |
-| Constants & data dependencies | 786–807 |
-| Randomness | 808–840 |
-| Edge cases & original bugs | 841–875 |
-| Test vectors | 876–908 |
-| Provenance | 909–934 |
-| Open questions | 935–984 |
+|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–296 |
+|   4. Totals and resistances: `totals` = `0x0057C1E0` | 297–398 |
+|   5. Application | 399–589 |
+|   6. Hit class and hit recovery | 590–620 |
+|   7. Reaction and death trigger | 621–712 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 713–776 |
+|   9. Durability `0x0057D3D0` | 777–798 |
+| Constants & data dependencies | 799–820 |
+| Randomness | 821–853 |
+| Edge cases & original bugs | 854–888 |
+| Test vectors | 889–921 |
+| Provenance | 922–947 |
+| Open questions | 948–997 |
 <!-- /index -->
 
 ## Summary
@@ -218,7 +218,9 @@ Fastcall ECX game, EDX attacker; stack defender, record, `SrcDam`.
    - unless 4: life leech += `lifedrainmindam(60)`; unless 8: mana leech
      += `manadrainmindam(62)` (unit getter, plain percents);
    - hit flags |= 0x100 if `skill_bypass_undead(103)`, 0x200 if
-     `skill_bypass_demons(104)`, 0x400 if `skill_bypass_beasts(106)`.
+     `skill_bypass_demons(104)`, 0x400 if `skill_bypass_beasts(106)`
+     (unit getter `0x00625480(attacker, s, 0)`, each ≠ 0; the flags are
+     record +0x00; 1.14d-confirmed, `0x0057BB24`–`0x0057BB56`).
    Other attackers: nothing.
 7. Poison: `min = poisonmindam(57)`, `max = poisonmaxdam(58)` (not
    shifted: these stats are already <<8); `m = passive_pois_mastery(332)`
@@ -248,7 +250,8 @@ Fastcall ECX game, EDX attacker; stack defender, record, `SrcDam`.
     mod 100`); `r < Crit` → physical, fire, lightning, magic, cold and
     poison × 2; then if the defender exists and the hit class high
     nibble is free (`0x00554650(record, 0x10)` sets it), overlay 54 on
-    the defender.
+    the defender. `0x00554650(record, h)`: `(+0x60 & 0xF0) ≠ 0` → return
+    0, nothing written; else `+0x60 |= h`, return 1 (1.14d-confirmed).
 14. `0x00535E20(attacker, offhand)` restores step 1.
 
 #### 3.2 `bonuses(unit, get, item, min, max, pct, current, s)` = `0x0057B420`
@@ -367,6 +370,16 @@ If ≠ 100: every row of §4.3 marked *scaled* whose value is > 0 becomes
    - resist stat 36, attacker has state 47 (`sanctuary`), defender is
      undead: `r = 0`.
    `r ≤ 0`: `r = max(r, −100)`.
+
+Leech rows 9–11 (resist stat −1; they run only for an `att_mon`
+attacker, §4.4 step 5) take this path too: step 1 gives 0, step 3
+compares −1 with 36 and 37 and so applies the difficulty penalty when
+the defender is not `def_mon` (a player or a hireling): `r` = 0, −40,
+−100 (expansion) or 0, −20, −50 (classic), and §4.6 step 4 then scales
+the leech by `100 − r`: × 1.4 / × 2 (expansion Nightmare / Hell)
+against players and hirelings, unchanged against monsters.
+1.14d-confirmed (`0x0057BE00`: the −1 test at `0x0057BE06` skips only
+the stat read; the 0x24 / 0x25 compares at `0x0057BE47`–`0x0057BE4F`).
 
 #### 4.6 Applying a row `0x0057BF80`
 

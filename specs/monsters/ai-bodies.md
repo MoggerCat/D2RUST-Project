@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–834 |
+|   9. Per-AI behaviours | 29–836 |
 <!-- /index -->
 
 ## Summary
@@ -293,7 +293,9 @@ Navi (Flavie, target mode 0):
    busy (`0x00535060`), `roll(3)` ≠ 0, and P is closer than 4: AI param 1
    = 0 → param 1 := 60, sound 18 to P, idle 20; else clamp param 1 at 0
    and count it down, idle 20. End. (`roll(3)` is drawn only when P is a
-   non-busy player.)
+   non-busy player.) "Clamp and count down", exactly: param 1 < 0 →
+   param 1 := 0 (and stays 0); param 1 > 0 → param 1 − 1
+   (1.14d-confirmed, `0x005E7ED4`–`0x005E7EE7`).
 3. S = secondary target (`0x005DDC30`); S and distance < 25 → A1 at S
    (arrow `rogue1`). Else idle 50.
 
