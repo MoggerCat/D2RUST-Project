@@ -54,6 +54,28 @@ unverified** (no trace or game-file run).
 | Cold Plains 97 vs 98 | not changed: `outdoor.md` pins the 98-room build, not our 97's cause; needs the C92 output (local queue) | — |
 | Conflict markers in CI | `tools/conflict_markers.py` (+ `--selftest`), `tools/gate.sh` step, CI `check` job step | selftest |
 
+## Tests corrected after the staging-5 merge (gate)
+
+- `traces/scenarios/vendor-buy-sell.scenario`: BuyItem / SellItem
+  fields renamed (`transaction`, `item_mode`, `client_price`).
+- `app_frame_loop`, `e2e_full_loop`, `e2e_single_player`, mutant
+  `unowned_messages_are_counted_per_id`: ids 0x27–0x2A, 0x5F, 0x61, 0x76,
+  0x7E, 0xAA are owned now (handled counts up, unowned empty; the mutant
+  uses out-of-scope 0x79 / 0x8B).
+- `e2e_full_loop`, `e2e_single_player`: the kill's log has the
+  experience (level up) in §7.2 step 2, before the arena event.
+- `e2e_full_loop`, `e2e_single_player`, `e2e_vendor`: d2-sim sends no
+  monster add (0xAC: server-side fields past `init.md` §24 unspecified),
+  so the client never held Akara and its 0x28 handler answered C→S 0x30
+  (NPC gone, §16 r3), which ended the interaction. The harnesses now
+  deliver Akara's add as the client reads it for an NPC without
+  components, umods, source unit or stat list (`akara_add`, every
+  presence bit 0; not recorded in the tapped S→C stream) with her class
+  row in the client tables; the client then sends its own 0x2F (T 1)
+  before the scenario's 0x2F, which the expectations now show.
+  **Server follow-up:** build 0xAC for monsters once its server-side
+  fields are specified (`wiring::action::switch` module docs).
+
 ## Open items
 
 1. `combat::events` has no caller on the action wiring yet:

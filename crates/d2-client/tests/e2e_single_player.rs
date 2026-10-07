@@ -82,6 +82,7 @@ use std::sync::{Arc, Mutex};
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
+use d2_client::bridge::world::MonsterClass;
 use d2_client::bridge::{Bridge, FrameReport};
 use d2_data::tables::{Difficultylevels, Monlvl};
 use d2_proto::client::{
@@ -278,10 +279,33 @@ impl Clock for Ms {
 
 type Link = LocalLink<Sim, ProtoSizes, PendingSession, Ms>;
 
+/// Akara's monster add S→C 0xAC as the client reads it
+/// (`client/msg-units.md` §1.2): mode 1, no components, no type flags, no
+/// source unit, no stat list. d2-sim does not build monster adds yet (the
+/// server-side fields past `monsters/init.md` §24 are not specified,
+/// `wiring::action::switch` module docs), so the harness delivers the
+/// add of an NPC without any of those parts; the client needs her unit
+/// for 0x28 (`client/msg-ui.md` §16 r4).
+fn akara_add(guid: u32, class: u16, (x, y): (i32, i32)) -> Vec<u8> {
+    let mut m = vec![0xAC];
+    m.extend(guid.to_le_bytes());
+    m.extend(class.to_le_bytes());
+    m.extend((x as u16).to_le_bytes());
+    m.extend((y as u16).to_le_bytes());
+    m.push(128);
+    m.push(14);
+    // Bits, low first: mode 1 (4 bits), then five 0 presence bits.
+    m.push(0x01);
+    m
+}
+
 /// The local link, recording every S→C chunk the bridge receives.
 struct Tap {
     inner: Link,
     chunks: Vec<Vec<u8>>,
+    /// Chunks delivered after the server's at the next receive, not
+    /// recorded (Akara's add, [`akara_add`]).
+    inject: Vec<Vec<u8>>,
 }
 
 impl ServerLink for Tap {
@@ -295,8 +319,9 @@ impl ServerLink for Tap {
         self.inner.pump()
     }
     fn receive(&mut self) -> Vec<Vec<u8>> {
-        let got = self.inner.receive();
+        let mut got = self.inner.receive();
         self.chunks.extend(got.iter().cloned());
+        got.append(&mut self.inject);
         got
     }
 }
@@ -471,6 +496,7 @@ impl Fx {
             v.set_base(player, DEXTERITY, 25);
         });
         let wp = game.lists.unit(object).unwrap().guid;
+        let npc_guid = game.lists.unit(npc).unwrap().guid;
 
         // The world host: waypoints and skills (`ActionWorld`), the NPC /
         // vendor / quest systems and the cube on the same units
@@ -601,8 +627,19 @@ impl Fx {
         let tap = Tap {
             inner: link,
             chunks: Vec::new(),
+            inject: vec![akara_add(npc_guid, class::AKARA, NPC_AT)],
         };
-        let bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        let mut bridge = Bridge::with_dispatch(tap, Dispatch::from_spec().unwrap()).unwrap();
+        // Akara's class row in the client tables (an `interact` NPC), so
+        // her add creates the unit.
+        let mut tables = bridge.inputs().tables.clone();
+        tables.monsters = vec![None; usize::from(class::AKARA) + 1];
+        tables.monsters[usize::from(class::AKARA)] = Some(MonsterClass {
+            npc: true,
+            interact: true,
+            ..MonsterClass::default()
+        });
+        bridge.set_tables(tables);
         Fx {
             bridge,
             player,
@@ -1098,13 +1135,14 @@ fn run_with(game_seed: u32) -> Transcript {
             format!("event 9 Some({p})"),
             format!("reaction {p} {m} 0x3"),
             format!("kill PetCredit {m} {p}"),
+            // `damage.md` §7.2 step 2: the experience distribution (its
+            // level-up event, `vitals.md` §4.5), then the arena event.
+            format!("level up {p}"),
             format!("kill AttackerBookkeeping {m} {p}"),
             format!("kill FaceAttacker {m} {p}"),
             format!("death start {m} target Some({p})"),
             format!("kill QuestKill {m} {p}"),
             format!("kill BarricadeDoors {m} {p}"),
-            // The experience last (C2), its level-up event (§4.3).
-            format!("level up {p}"),
         ]
     );
     assert_eq!(fx.stat(player, 13), 100);
@@ -1233,7 +1271,10 @@ fn run_with(game_seed: u32) -> Transcript {
         &mut frames,
         vec![bytes(&InitEntityChat { id: ng })],
     );
-    assert_eq!(frames[18].1.codes, [(0x2F, done)]);
+    // The client's own 0x2F (T 1, its 0x28 handler, `client/msg-ui.md`
+    // §16 r4; held behind the unanswered dialog slot until this frame)
+    // comes first, then the scenario's.
+    assert_eq!(frames[18].1.codes, [(0x2F, done), (0x2F, done)]);
     assert_eq!(frames[18].2, none);
 
     // 10. Trade (C→S 0x38 action 1, `vendors.md` §4 → §3): the store is
@@ -1597,8 +1638,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.inv.with(|r| r.log.clone()), Vec::<String>::new());
 
     // The client: 37 frames, 36 server ticks. The S→C messages it got:
-    // 0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31) have no
-    // client owner yet (unowned); 0x9C seven times (frames 20, 21, 26,
+    // 0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31), handled
+    // (`client/msg-ui.md` §5, §12, §16, §18), and Akara's harness add
+    // (0xAC, `akara_add`); 0x9C seven times (frames 20, 21, 26,
     // 27, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and 0x48
     // ten times each are applied (`client/msg-stats-items.md`). The 0x9C
     // made the three items it names; 0x9D needs the local player, which
@@ -1609,11 +1651,17 @@ fn run_with(game_seed: u32) -> Transcript {
     // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 4));
+    assert_eq!(client, (37, 36, 5));
     assert_eq!(w.local_player, None);
     let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
     assert!(w.units.contains_key(&object));
-    for (k, u) in w.units.iter().filter(|(k, _)| **k != object) {
+    let akara = d2_client::bridge::world::UnitKey::new(1, fx.guid(fx.npc));
+    assert!(w.units.contains_key(&akara));
+    for (k, u) in w
+        .units
+        .iter()
+        .filter(|(k, _)| **k != object && **k != akara)
+    {
         assert_eq!(k.unit_type, d2_client::bridge::world::ITEM);
         let d2_client::bridge::world::KindData::Item(d) = &u.kind else {
             panic!("item data");
@@ -1621,11 +1669,9 @@ fn run_with(game_seed: u32) -> Transcript {
         assert_eq!(d.last.as_ref().map(|r| r.id), Some(0x9C));
     }
     let log = fx.bridge.log();
-    assert_eq!(
-        log.unowned,
-        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
-    );
-    assert_eq!(log.handled, 32);
+    assert!(log.unowned.is_empty(), "{:?}", log.unowned);
+    // 32 before + 0x27, 0x28, 0x29, 0x2A ×4 + Akara's 0xAC.
+    assert_eq!(log.handled, 40);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()
