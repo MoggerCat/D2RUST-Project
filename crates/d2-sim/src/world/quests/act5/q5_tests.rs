@@ -487,14 +487,28 @@ fn altar() {
     let i = rec(&ctl);
     ctl.records[i].state = 1;
     ctl.records[i].flags = 0x21;
-    ctl.records[i].extra.a5.q5.portals = 1;
+    ctl.records[i].extra.a5.q5.portals = 2;
+    // P1's town portal (class 59) in level 120 with its partner
+    // (`0x0058D2C0` → `0x00535430`, `quests-helpers.md` §7): chain 35's
+    // hook runs for each, then each is freed.
+    let (tp, partner) = (UnitId(0x90), UnitId(0x91));
+    f.h_tp.insert(P1, 0x90);
+    f.objects.insert(tp, (0x90, 59, 0));
+    f.unit_levels.insert(tp, 120);
+    f.h_partner.insert(tp, partner);
     super::altar_init(&mut ctl, &mut f, ALTAR_U);
     f.log.clear();
     assert_eq!(super::altar_operate(&mut ctl, &mut f, ALTAR_U, P1), 0);
     assert_eq!(
         f.log,
-        ["close portal 1 120", "message 1 83 20002", "mode 83 1",]
+        [
+            "free portal 144",
+            "free portal 145",
+            "message 1 83 20002",
+            "mode 83 1",
+        ]
     );
+    assert_eq!(ctl.records[i].extra.a5.q5.portals, 0);
     let r = &ctl.records[i];
     // Edge case 6: status 3 sent with the flags byte kept.
     assert_eq!((r.state, r.status, r.flags), (2, 3, 0x21));
@@ -603,7 +617,7 @@ fn summit_door() {
     assert_eq!(f.log, ["mode 85 1"]);
     assert_eq!(ctl.records[i].extra.a5.q5.door_mode, 2);
     // Defeated: 1 → 0; 2 (fight started) → 0 twice; 0 → the warp
-    // (reported: no function named).
+    // `0x0059D9D0` (`0x0058D758`).
     ctl.records[i].extra.a5.q5.defeated = true;
     f.log.clear();
     super::summit_door_operate(&mut ctl, &mut f, SUMMIT_DOOR_U, P1);
@@ -616,7 +630,7 @@ fn summit_door() {
     assert_eq!(f.log, ["mode 85 0", "mode 85 0"]);
     f.log.clear();
     super::summit_door_operate(&mut ctl, &mut f, SUMMIT_DOOR_U, P1);
-    assert_eq!(f.log, ["unhandled 35 0x58d6a0"]);
+    assert_eq!(f.log, ["stairs 1 85"]);
     // Entering the summit closes a seen door with +0x60 = 0 (mode 1).
     let (mut ctl, _) = control();
     let mut f = fake();

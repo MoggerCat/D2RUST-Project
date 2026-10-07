@@ -35,8 +35,6 @@ const FRAME_CNT1: i32 = 22;
 const FRAME_CNT3: i32 = 22;
 /// Frames between gem rounds (§4.7).
 const ROUND_DELAY: i32 = 20;
-/// The level slot of the gem and rune drops (§4.7).
-const DROP_LEVEL: i32 = 50;
 /// Item qualities of `0x00559A30`: normal, unique.
 const NORMAL: u8 = 2;
 const UNIQUE: u8 = 7;
@@ -343,8 +341,8 @@ fn hephasto_killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, a
         return;
     }
     let Some(v) = args.target else { return };
-    // TODO(quests-act4 OQ4): `0x00559A30` gets an uninitialised level
-    // slot here; whether the item code reads it is open.
+    // `0x00559A30`'s `&level` is an output (open question 4): the level
+    // comes from the dropping unit (§4.7), so none is passed.
     if w.drop_item_at(v, HAMMER, UNIQUE) {
         x(ctl, i).hammers += 1;
     }
@@ -479,10 +477,9 @@ pub fn forge_event<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: Uni
     if !x(ctl, i).gems_pending || x(ctl, i).sets <= 0 {
         return;
     }
-    // TODO(quests-act4 OQ4): the level slot (50, one for the whole call,
-    // edge case 16) is passed to `0x00559A30` by address; whether the
-    // item code reads or writes it is open, so it is not passed on.
-    let _level = DROP_LEVEL;
+    // The level slot (50, edge case 16) is passed by address, but
+    // `0x00559A30` writes it from the dropping unit before reading it
+    // (`0x00559AF8`, open question 4): the 50 has no effect.
     let mut count = 0;
     for _ in 0..x(ctl, i).sets {
         let table = match x(ctl, i).tier {

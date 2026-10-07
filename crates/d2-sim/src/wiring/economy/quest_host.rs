@@ -24,10 +24,15 @@
 //!
 //! Status: wired, unverified.
 
+use crate::drlg::TileRect;
+use crate::missiles::{self, MissileParams};
+use crate::path::place_seams::CollisionView;
 use crate::rng::Seed;
-use crate::units::{RoomId, UnitId};
+use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::{ActionHooks, Pending, View};
 use crate::wiring::interaction::NpcRest;
+use crate::wiring::path::place::Rooms;
+use crate::world::quests::helpers::{self, QuestMissile};
 use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 
 use super::{EconomyQuests, QuestRest};
@@ -51,6 +56,12 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             .objects
             .as_ref()
             .is_some_and(|s| s.control.data.contains_key(&object))
+    }
+
+    /// The active room has a DRLG room on this host.
+    fn drlg_room(&self, room: RoomId) -> bool {
+        let e = &*self.inner.econ;
+        e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
     /// Runs `f` on the action wiring's view over the economy's parts.
@@ -285,6 +296,9 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     fn true_tomb_level(&self) -> u32 {
         self.inner.true_tomb_level()
     }
+    /// `0x00545340` from the player's path position and room
+    /// ([`helpers::free_spot`]) when the player is in a DRLG room; else
+    /// the rest's.
     fn free_spot(
         &mut self,
         player: UnitId,
@@ -293,6 +307,11 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         radius: u32,
         limit: u32,
     ) -> Option<(i32, i32)> {
+        if let Some((x, y, room)) = self.unit_position(player) {
+            if self.drlg_room(room) {
+                return helpers::free_spot(self, room, x, y, size, mask, limit).map(|p| (p.0, p.1));
+            }
+        }
         self.inner.free_spot(player, size, mask, radius, limit)
     }
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool {
@@ -344,6 +363,8 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         }
         self.inner.room_at(room, x, y)
     }
+    /// `0x00545340` ([`helpers::free_spot`]) from a DRLG room; else the
+    /// rest's.
     #[allow(clippy::too_many_arguments)]
     fn free_spot_at(
         &mut self,
@@ -355,6 +376,9 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         radius: u32,
         limit: u32,
     ) -> Option<(i32, i32, RoomId)> {
+        if self.drlg_room(room) {
+            return helpers::free_spot(self, room, x, y, size, mask, limit);
+        }
         self.inner
             .free_spot_at(room, x, y, size, mask, radius, limit)
     }
@@ -421,6 +445,8 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         self.inner
             .open_portal(owner, room, x, y, level, class, exact)
     }
+    /// `0x0056EDE0` ([`helpers::missile_at_point`]) on the missile
+    /// store when the action wiring holds one; else the rest's.
     fn create_missile(
         &mut self,
         owner: UnitId,
@@ -430,9 +456,24 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
         x: i32,
         y: i32,
     ) -> Option<UnitId> {
+        if self.inner.econ.hooks.missiles.is_some() {
+            return helpers::missile_at_point(self, owner, skill, level, class, x, y);
+        }
         self.inner.create_missile(owner, skill, level, class, x, y)
     }
+    /// `0x0064A710` / `0x0064A760` on a missile of the store.
     fn set_missile_target(&mut self, missile: UnitId, a: u32, b: u32) {
+        if let Some(d) = self
+            .inner
+            .econ
+            .hooks
+            .missiles
+            .as_mut()
+            .and_then(|s| s.get_mut(missile))
+        {
+            d.target = (a as i32, b as i32);
+            return;
+        }
         self.inner.set_missile_target(missile, a, b)
     }
     /// `0x0061AED0(room, 0)` on the unit's room
@@ -562,16 +603,133 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     ) -> Option<(i32, i32, RoomId)> {
         self.inner.free_spot_near(room, x, y, size, mask, radius)
     }
-    fn unit_distance(&mut self, a: UnitId, b: UnitId) -> i32 {
-        self.inner.unit_distance(a, b)
-    }
-    fn living_player_within(&mut self, unit: UnitId, radius: i32) -> bool {
-        self.inner.living_player_within(unit, radius)
-    }
     fn npc_intro_heard(&mut self, player: UnitId, class: u16) -> bool {
         self.inner.npc_intro_heard(player, class)
     }
     fn set_npc_intro(&mut self, player: UnitId, class: u16) {
         self.inner.set_npc_intro(player, class)
+    }
+
+    // -- The helpers' narrow seams (`quests-helpers.md`) on the action
+    // wiring.
+
+    /// `0x00619730`: the DRLG room's sub-tile box.
+    fn room_box(&mut self, room: RoomId) -> Option<TileRect> {
+        let e = &*self.inner.econ;
+        match e.hooks.drlg.subtiles(e.game, room) {
+            Some(t) => Some(t),
+            None => self.inner.room_box(room),
+        }
+    }
+    /// `0x0064D800(room, x, y, size, size, mask)` on the DRLG collision
+    /// (`sim/path-placement.md` §4, [`Rooms`]).
+    fn box_collides(&mut self, room: RoomId, x: i32, y: i32, size: i32, mask: u32) -> bool {
+        if self.drlg_room(room) {
+            let e = &*self.inner.econ;
+            let n = size as u32;
+            return Rooms(&e.hooks.drlg).box_query(room, x, y, n, n, mask) != 0;
+        }
+        self.inner.box_collides(room, x, y, size, mask)
+    }
+    /// `0x0059FA30` (`missiles/missiles.md` §R2.3) on the action wiring's
+    /// missile store; no store: the rest's answer.
+    fn spawn_missile(&mut self, rec: QuestMissile) -> Option<UnitId> {
+        let e = &mut *self.inner.econ;
+        let Some(mut store) = e.hooks.missiles.take() else {
+            return self.inner.spawn_missile(rec);
+        };
+        let p = MissileParams {
+            flags: rec.flags,
+            owner: Some(rec.owner),
+            origin: rec.origin,
+            class: i32::from(rec.class),
+            x: rec.x,
+            y: rec.y,
+            target_x: rec.target_x,
+            target_y: rec.target_y,
+            skill: i32::from(rec.skill),
+            level: i32::from(rec.level),
+            ..MissileParams::default()
+        };
+        let t = e.hooks.tables.clone();
+        let made = {
+            let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut v,
+            };
+            missiles::create_missile(&mut *e.game, &mut cx, &p)
+        };
+        e.hooks.missiles = Some(store);
+        made
+    }
+    /// `0x0064A710`: data +0x28 of a missile of the store.
+    fn set_missile_guid(&mut self, missile: UnitId, v: u32) {
+        if let Some(d) = self
+            .inner
+            .econ
+            .hooks
+            .missiles
+            .as_mut()
+            .and_then(|s| s.get_mut(missile))
+        {
+            d.target.0 = v as i32;
+            return;
+        }
+        self.inner.set_missile_guid(missile, v)
+    }
+    /// `0x00552F60(game, kind, guid)` on the game's unit lists.
+    fn unit_by_guid(&mut self, kind: u8, guid: u32) -> Option<UnitId> {
+        let ty = UnitType::ALL.into_iter().find(|&t| t as u8 == kind)?;
+        self.inner.econ.game.lists.find_unit(ty, guid)
+    }
+    /// `objects.txt` `Mode1` of an object with object data.
+    fn object_mode1(&mut self, object: UnitId) -> Option<bool> {
+        if let Some(st) = self.inner.econ.hooks.objects.as_ref() {
+            if let Some(d) = st.control.data.get(&object) {
+                if let Ok(o) = st.tables.object(d.class) {
+                    return Some(o.mode1 != 0);
+                }
+            }
+        }
+        self.inner.object_mode1(object)
+    }
+    /// Unit +0xC4 &= !`flags` on a unit record.
+    fn clear_unit_flags(&mut self, unit: UnitId, flags: u32) {
+        match self.inner.econ.units.get_mut(unit) {
+            Some(r) => r.flags &= !flags,
+            None => self.inner.clear_unit_flags(unit, flags),
+        }
+    }
+    /// The type-5 units of the object's room unit list, in list order.
+    fn room_warp_tiles(&mut self, object: UnitId) -> Vec<UnitId> {
+        let lists = &self.inner.econ.game.lists;
+        let Some(room) = lists.unit(object).and_then(|u| u.room()) else {
+            return Vec::new();
+        };
+        lists
+            .room_units(room)
+            .into_iter()
+            .filter(|&u| lists.unit(u).is_some_and(|e| e.ty == UnitType::Tile))
+            .collect()
+    }
+    /// `0x005550B0(game, player, tile)` (`sim/path-placement.md` §12.2,
+    /// [`crate::wiring::path::place::warp_player`]).
+    fn warp_through(&mut self, player: UnitId, tile: UnitId) {
+        let e = &*self.inner.econ;
+        let room = e.game.lists.unit(tile).and_then(|u| u.room());
+        let class = e.units.get(tile).map(|r| r.class);
+        let (Some(room), Some(class)) = (room, class) else {
+            return;
+        };
+        self.view(|g, v| {
+            crate::wiring::path::place::warp_player(
+                crate::wiring::path::PathCtx::of(v, g),
+                player,
+                room,
+                class,
+            )
+        });
     }
 }
