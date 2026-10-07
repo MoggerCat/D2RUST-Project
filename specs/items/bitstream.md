@@ -26,16 +26,16 @@
 | Outputs / state changes | 64–69 |
 | Rules | 70–71 |
 |   1. Writer | 72–88 |
-|   2. Header (`0x006312B0`) | 89–101 |
-|   3. Compact record (`0x0062AF80`) | 102–121 |
-|   4. Full record (`0x0062FFF0`) | 122–245 |
-|   5. Save-format extras (never on the wire) | 246–251 |
-| Constants & data dependencies | 252–275 |
-| Randomness | 276–279 |
-| Edge cases & original bugs | 280–306 |
-| Test vectors | 307–329 |
-| Provenance | 330–354 |
-| Open questions | 355–372 |
+|   2. Header (`0x006312B0`) | 89–117 |
+|   3. Compact record (`0x0062AF80`) | 118–137 |
+|   4. Full record (`0x0062FFF0`) | 138–274 |
+|   5. Save-format extras (never on the wire) | 275–292 |
+| Constants & data dependencies | 293–316 |
+| Randomness | 317–320 |
+| Edge cases & original bugs | 321–357 |
+| Test vectors | 358–380 |
+| Provenance | 381–405 |
+| Open questions | 406–431 |
 <!-- /index -->
 
 ## Summary
@@ -98,6 +98,22 @@ quality 2 into the item (§4.3 rule 6).
 5. Save format with children: each item of the item's own inventory
    (list order) follows as a complete stream (§2, recursively). Never
    on the wire.
+   Exact condition (`0x00631382`–`0x006313CC`): alt-code flag = 0,
+   children ≠ 0 and the unit's inventory (unit +0x60) ≠ none; then for
+   every item of that inventory (`0x0063B2C0` first, `0x0063DFA0` next,
+   `0x0063DFD0` the item), compact or full parent alike and whatever the
+   parent's `hasinv`: the writer first pads to a whole byte
+   (`0x00411070`: when the bit position is inside a byte, skip to the
+   next byte), then writes the child through `0x006312B0(child, buffer,
+   save, children, alt 0)`. A child therefore goes through the same
+   `0x0062FFF0` / `0x0062AF80`, so the write-backs of §4.1 rule 8 (item
+   level < 1 → 1) and §4.3 rule 7 (quality outside 1–9 → 2) are applied
+   to every child item too. Reader side: the header peek `0x0062AE20`
+   gives the child count as 3 bits read after the item code only when
+   the flags lack both 0x200000 (compact) and 0x2000000 (alt-code), else
+   0; that count is the filled-socket field of §4.1 rule 6 (written from
+   the inventory count only when `hasinv` ≠ 0), and the game never checks
+   it against the number of child streams that follow.
 
 ### 3. Compact record (`0x0062AF80`)
 
@@ -132,6 +148,19 @@ quality 2 into the item (§4.3 rule 6).
    capped at 15); 3 bits page + 1 (+0x45; page 0xFF → 0).
 4. Alt-code flag ≠ 0: 32 bits items +0x84 (the base code; `code` when
    0; `0x006287D0`) and the record **ends**.
+   Items +0x84 is the `normcode` column (`data/fields.tsv` `weapons`
+   offset 132), so the alt code is the item's normal-tier code. The only
+   sender with alt ≠ 0 is the store check of the dispatcher
+   (`items/inventory-moves.md` §6.2): `0x0053EF30` with 0x38 (item +0xC8
+   bit 2, the vendor item flag of `world/vendors.md` §4) sends S→C 0x9C
+   action 0x0B to the trading client with alt = 1 exactly when the item's
+   quality is 4–9 (`0x0062A0F0`) and it lacks item flag 0x10
+   (`0x006280A0`, `0x0053EF84`–`0x0053EFB1`): the unidentified items of a
+   gamble list (`world/vendors.md` §5.1 rule 7). Every other caller passes
+   0 (Open question 1). Reader (`0x0062E430`): the flags word is stored
+   with 0x2000000 and 0x80000 removed; `0x0062CBE0` with alt reads the
+   32-bit code, sets the class from it (`0x00633680`), item level 1 and
+   quality 1, and returns (no unit +0x28, no further field, no trailer).
 5. 32 bits item code (`code`).
 6. 3 bits filled sockets: the number of items in the item's own
    inventory when items `hasinv` ≠ 0, else 0 (`0x0062A900`).
@@ -248,6 +277,18 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 1. §2 rule 2 (the "JM" marker), §4.1 rule 7, children (§2 rule 5).
 2. Trailer (`0x00629E40`, after §3 rule 5 and after §4.4): 1 bit 0, or
    1 bit 1 followed by two 32-bit values and then 32 bits 0.
+   The two values are item data +0x1C and +0x20 (`dwRealmData[0..1]` in
+   the D2MOO naming; getter `0x00629E40`). The bit is 1 exactly when
+   +0x20 ≠ 0; then 32 bits +0x1C, 32 bits +0x20, 32 bits 0 (compact
+   `0x0062B341`–`0x0062B387`, full `0x006309CD`–`0x00630A19`). Reader
+   (save format only, and only when the save version argument > 0x56:
+   compact `0x0062ABF9`–`0x0062AC34`, full `0x0062D2A9`–`0x0062D2EA`):
+   1 bit; when 1: 32 bits a, 32 bits b, then when the version > 0x5D 32
+   more bits that are discarded; a → +0x1C, b → +0x20 through the setter
+   `0x00629EA0`, whose only two callers are these readers (`0x0062AC26`,
+   `0x0062D2EA`). No other code path of the exports calls the setter, so
+   in a game every item has +0x20 = 0 unless it was read from a save that
+   carried the values, and its trailer is the single 0 bit.
 
 ## Constants & data dependencies
 
@@ -304,6 +345,16 @@ None.
    §3 rule 5 never applies to an ear: a reader writes no quest
    difficulty for it (handoff BV9).
 
+9. A gamble list item reaches its client as an alt-code record (§4.1
+   rule 4): the client's copy has the normal-tier code, item level 1,
+   quality 1 and no affixes, whatever the server item is (an
+   exceptional or elite upgrade of `world/vendors.md` §5.1 rule 5 shows
+   as its `normcode` base).
+10. The header peek `0x0062AE20` replaces the item code `nec ` by `neg `
+    when the version argument is < 0x5D (`0x0062AF03`–`0x0062AF10`); the
+    full reader `0x0062CBE0` then sets the class from the code it reads
+    itself, without that replacement.
+
 ## Test vectors
 
 Real (recorded on 1.14d; stream = message bytes from 8 for 0x9C, from 13
@@ -354,14 +405,22 @@ with `Save Add` 0 in 8 bits → 0xFF.
 
 ## Open questions
 
-1. Which callers pass the alt-code flag (§4.1 rule 4, header bit
-   0x2000000): none of the dispatcher's senders do. Settle: xrefs of
-   `0x0053EAE0` / `0x0053CEF0` with a non-zero last argument.
+1. Answered (handoff `pc2-spec-d2s` DS-2a; re-read for this answer): §4.1
+   rule 4. The save-format callers of `0x006313E0` all pass 0
+   (`0x00531712`, `0x00531899`, `0x005318C3`, `0x005318F0`,
+   `0x00531929`, `0x0053195A`, `0x00541B5C`, `0x0055A2E1`), so a game
+   save never holds an alt-code record. Of the 25 network callers
+   (`0x0053EAE0` 13 sites, `0x0053CEF0` 12) only `0x0053EFB1` (0x9C
+   action 0x0B from the store check `0x0053EF30`) can pass 1: an
+   unidentified quality 4–9 item shown to the trading client, i.e. a
+   gamble list item; all others push 0.
 2. No recorded stream covers set, unique, rare, runeword, ear, gold,
    book or a filled socket. Settle: a recording that picks up and stashes
    such items (inventory R2/R5 scenarios).
-3. The save-format trailer values (`0x00629E40`) are not named.
-   Settle: Ghidra on `0x00629E40` (save spec).
+3. Answered (handoff `pc2-spec-d2s` DS-5): §5 rule 2. Item data +0x1C
+   and +0x20 (D2MOO `dwRealmData`), written only when +0x20 ≠ 0; read only
+   when the save version > 0x56, with one discarded u32 when > 0x5D; the
+   setter `0x00629EA0` is called only by the two save readers.
 4. Edge case 7: that every caller of the name setter `0x00628370`
    (`0x0055903B`, `0x005590A4`, `0x0055910E`, `0x00567086`,
    `0x005670CC`, `0x0057A12B`, `0x0057A625`) passes a name of at most 15

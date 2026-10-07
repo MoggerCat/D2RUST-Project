@@ -18,23 +18,23 @@
 | Inputs | 51–58 |
 | Outputs / state changes | 59–63 |
 | Rules | 64–65 |
-|   1. Affix ids and slots | 66–77 |
-|   2. Affix level (alvl) | 78–83 |
-|   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 84–121 |
-|   4. Fit tests | 122–147 |
-|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 148–154 |
-|   6. Magic item (`0x005565E0`) | 155–170 |
-|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 171–190 |
-|   8. Crafted item (`0x005C21D0`) | 191–212 |
-|   9. Tempered item (dispatch case 9) | 213–218 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 219–232 |
-|   11. Automagic (finishing step, `0x00557450`) | 233–239 |
-| Constants & data dependencies | 240–256 |
-| Randomness | 257–272 |
-| Edge cases & original bugs | 273–304 |
-| Test vectors | 305–323 |
-| Provenance | 324–346 |
-| Open questions | 347–358 |
+|   1. Affix ids and slots | 66–88 |
+|   2. Affix level (alvl) | 89–94 |
+|   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 95–132 |
+|   4. Fit tests | 133–158 |
+|   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 159–165 |
+|   6. Magic item (`0x005565E0`) | 166–181 |
+|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 182–201 |
+|   8. Crafted item (`0x005C21D0`) | 202–223 |
+|   9. Tempered item (dispatch case 9) | 224–229 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 230–243 |
+|   11. Automagic (finishing step, `0x00557450`) | 244–250 |
+| Constants & data dependencies | 251–267 |
+| Randomness | 268–283 |
+| Edge cases & original bugs | 284–322 |
+| Test vectors | 323–341 |
+| Provenance | 342–364 |
+| Open questions | 365–388 |
 <!-- /index -->
 
 ## Summary
@@ -74,6 +74,17 @@ Affix slots, the identified flag (cleared on success), property stats
 3. "Part" = the prefix part, the suffix part or the automagic part of the
    magic array; "index in part" = combined index − the part's first index.
    The request's preferred affix p > 0 means index in part p − 1.
+4. Exception: on an item of type `scro` (22) or `book` (18) suffix slot 0
+   is **not** a magic affix id. The normal-quality routine
+   (`items/generation.md` §6.1 rules 4–5, `0x00556E80`) stores there the
+   index of the `books` row whose `ScrollSpellCode` (`scro`, EDX = 1 at
+   `0x00556EEE`) or `BookSpellCode` (`book`, EDX = 0 at `0x00556F0F`)
+   equals the item code (`0x005C2540`), or the `books` row count when
+   none does, through the suffix-slot setter `0x00627FB0`. With 1.14d
+   `books.txt` (3 rows): `tsc`, `tbk` → 0; `isc`, `ibk` → 1; `0sc` (type
+   `scro`, no row) → 3. The bit stream sends it as the 5-bit field of
+   `items/bitstream.md` §4.3 rule 7. A check that reads suffix slots as
+   affix ids (fit, group, part) must skip slot 0 of these types.
 
 ### 2. Affix level (alvl)
 
@@ -289,6 +300,13 @@ magic items roll the prefix's values before the suffix is chosen.
    all share a group with a filled slot, which is common at low alvl on
    bases with few fitting rows; d2rs reproduces it as a fatal error
    (`Ruleset::Original`).
+   Measured on the live tables (`local-buddy-tri-sim` 2026-10-07, the
+   creation sweep over every item, qualities 0–9, ilvl 1 / 30 / 60 / 99,
+   difficulty 0 / 2, both game kinds): 10 crafted requests end here, all
+   at ilvl 1 (4 classic d 0, 1 classic d 2, 3 expansion d 0, 2 expansion
+   d 2). So "common" holds only for item level 1 requests; the 560
+   other sweep failures (`affix 1 does not fit` on `ibk`) are not this
+   edge case but rule 4 of §1 (a books index in suffix slot 0).
 4. Charm with no fitting affix exits the game process.
 5. The charm's prefix roll passes the suffix preference (harmless: it is ≤ 0).
 6. The coin step is drawn even when force is set.
@@ -355,3 +373,15 @@ Synthetic, from the rules:
    The d2rs creation sweep's ~570 crafted requests ending in edge case
    3 are expected 1.14d behavior for those bases; a live craft at a low
    resulting ilvl on a base with one fitting group would show it.
+   Corrected 2026-10-07 (local sweep `local-buddy-tri-sim`): only 10 of
+   those requests are edge case 3 (all ilvl 1); see the edge case.
+4. Answered (local sweep `local-buddy-tri-sim`, "affix 1 does not fit",
+   item 519 `ibk`): §1 rule 4. Suffix slot 0 of `scro` / `book` items is
+   a `books` row index, set by `0x00556E80` through `0x005C2540` and
+   `0x00627FB0`; the item is correct 1.14d output, the sweep's affix
+   check is what must skip it. Expected from the rule: every created
+   `ibk`, `isc` (value 1) and `0sc` (value 3, expansion only) fails that
+   check, 160 + 160 + 80 = 400 requests if every request quality ends in
+   the normal routine for these bases. The remaining sweep failures, if
+   any after the check skips the slot, need the next local run to print
+   all failures grouped by (item, error).

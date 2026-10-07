@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
 |   5. Gambling | 254–309 |
 |   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–517 |
-|   8. Repair | 518–554 |
-|   9. Prices | 555–706 |
-| Constants & data dependencies | 707–726 |
-| Randomness | 727–742 |
-| Edge cases & original bugs | 743–772 |
-| Test vectors | 773–795 |
-| Provenance | 796–834 |
-| Open questions | 835–865 |
+|   7. Buying and selling | 342–525 |
+|   8. Repair | 526–562 |
+|   9. Prices | 563–714 |
+| Constants & data dependencies | 715–734 |
+| Randomness | 735–750 |
+| Edge cases & original bugs | 751–780 |
+| Test vectors | 781–803 |
+| Provenance | 804–842 |
+| Open questions | 843–873 |
 <!-- /index -->
 
 ## Summary
@@ -506,8 +506,16 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
 What carries over is exactly what the save stream carries
 (`items/bitstream.md` §2–§5): stats with `Save Bits` 0, values the clamp
 changes (§1 rule 3) and unit state outside the item record (timers
-other than step 7, owner links, unit flags) are not copied. No RNG draw
-(the stream holds the seeds, §4.1 rule 7). The decode rules of
+other than step 7, owner links, unit flags) are not copied. No draw
+decides any property of the copy (the stream holds the seeds, §4.1 rule
+7), but the **game seed does advance**: each unit allocation of steps 3
+and 5 (`0x00555230`, type 4) makes one game-seed step for the unit seed
+(`0x00552DF0` at `0x0055530E`) and one for the item seed (`0x00552E90`
+at `0x0055532A`), both on game +0xD0 (`sim/units.md` §2 rule 4,
+`sim/rng.md` §5.3); the decode then overwrites the item's seeds from the
+stream. So a copy with k fillers read costs 2 · (1 + k) game-seed steps,
+copy first, children in stream order; the GUID (`0x00552EE0`) and the
+rest of the routine draw nothing. The decode rules of
 `0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
 of `items/bitstream.md`; their differences are Open question 8.
 

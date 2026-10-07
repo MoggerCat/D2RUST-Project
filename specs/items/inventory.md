@@ -38,11 +38,11 @@
 |   4. Equipping | 336–520 |
 |   5. Shared checks | 521–645 |
 | Constants & data dependencies | 646–668 |
-| Randomness | 669–681 |
-| Edge cases & original bugs | 682–726 |
-| Test vectors | 727–775 |
-| Provenance | 776–832 |
-| Open questions | 833–922 |
+| Randomness | 669–682 |
+| Edge cases & original bugs | 683–727 |
+| Test vectors | 728–776 |
+| Provenance | 777–833 |
+| Open questions | 834–923 |
 <!-- /index -->
 
 ## Summary
@@ -674,7 +674,8 @@ happen only inside the systems these paths call, in handler order:
 1. 0x50 drop gold and `inventory-moves.md` §10.1 rest piles: item creation of each `gld` pile
    (`items/generation.md` §3), pile by pile.
 2. 0x61 take from hireling: the duplicate `0x0055A2A0`
-   (`world/cube.md` OQ4).
+   (`world/cube.md` OQ4): two game-seed steps per item unit it allocates,
+   2 · (1 + k) with k fillers (`world/vendors.md` §7.3).
 3. Item use (0x20, 0x26, potions on the hireling): item-use spec.
 4. Free-spot searches (`inventory-moves.md` §9.1, §10.2): `sim/path-placement.md` (whether
    `0x0064E810` draws is that spec's to state).

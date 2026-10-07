@@ -183,11 +183,11 @@ specified (open question 1).
 | 0x100 | broken | forced (§9) |
 | 0x800 | socketed | §7 |
 | 0x1000 | nosell | forced |
-| 0x2000 | instore | every non-forced creation (§3 step 5) |
+| 0x2000 | instore | every non-forced creation (§3 step 5); **cleared** on every item created from a save-format record: the loader's item create `0x00558CB0` (`0x00558D44`–`0x00558D4C`; callers `0x005335E0` player / corpse / hireling lists, `0x0056ACE0` golem, `0x00541990`) and the item copy `0x0055A2A0` (copy and each child, `world/vendors.md` §7.3) |
 | 0x8000 | named | ears (§9) |
 | 0x10000 | is ear | ears (§6) |
 | 0x20000 | start item | forced |
-| 0x80000 | init | every creation |
+| 0x80000 | init | every creation; also **set** on every item created from a save-format record (`0x00558CB0`, `0x00558D37`–`0x00558D3F`; the same callers and the copy `0x0055A2A0`), after the reader `0x0062E430` stored the record's flags with 0x80000 removed. So a saved 0x00A02010 loads as 0x00A80010 in the item and is written back as 0x00A00010 (the writer drops 0x80000 and forces 0x800000, `items/bitstream.md` §2 rule 1) |
 | 0x400000 | ethereal | §8 |
 | 0x1000000 | personalized | (read: §9 step 5) |
 | 0x4000000 | runeword | `items/properties.md` §10 |

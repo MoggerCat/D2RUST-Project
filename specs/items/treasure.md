@@ -27,24 +27,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–60 |
-| Inputs | 61–77 |
-| Outputs / state changes | 78–84 |
-| Rules | 85–86 |
-|   1. TC runtime form (load step 46) | 87–215 |
-|   2. TC by id and level (`0x00654E00`) | 216–222 |
-|   3. Monster drop | 223–275 |
-|   4. Chest drop (`0x00585B90`) | 276–302 |
-|   5. The TC walk (`0x0055A6D0`) | 303–409 |
-|   6. Drop quality (`0x00558640`) | 410–441 |
-|   7. Creation inputs and placement (`0x0055A550`) | 442–466 |
-|   8. Gold amount | 467–479 |
-| Constants & data dependencies | 480–509 |
-| Randomness | 510–526 |
-| Edge cases & original bugs | 527–550 |
-| Test vectors | 551–580 |
-| Provenance | 581–605 |
-| Open questions | 606–629 |
+| Summary | 51–61 |
+| Inputs | 62–78 |
+| Outputs / state changes | 79–85 |
+| Rules | 86–87 |
+|   1. TC runtime form (load step 46) | 88–216 |
+|   2. TC by id and level (`0x00654E00`) | 217–223 |
+|   3. Monster drop | 224–276 |
+|   4. Chest drop (`0x00585B90`) | 277–303 |
+|   5. The TC walk (`0x0055A6D0`) | 304–410 |
+|   6. Drop quality (`0x00558640`) | 411–442 |
+|   7. Creation inputs and placement (`0x0055A550`) | 443–467 |
+|   8. Gold amount | 468–480 |
+|   9. Quest drop helper (`0x00559A30`) | 481–522 |
+| Constants & data dependencies | 523–552 |
+| Randomness | 553–569 |
+| Edge cases & original bugs | 570–593 |
+| Test vectors | 594–623 |
+| Provenance | 624–648 |
+| Open questions | 649–682 |
 <!-- /index -->
 
 ## Summary
@@ -477,6 +478,48 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
 
 Setting gold (`0x00530EA0`): a negative value stores 0.
 
+### 9. Quest drop helper (`0x00559A30`)
+
+The drop of the quest and object code (`world/objects.md`,
+`world/quests-*.md`; 25 call sites). Fastcall: ECX game, EDX source unit
+`U`; stack: quality `q`, `&level` (output), `&request` (output, may be
+none), then two values `p6`, `p7` passed on to the class pick of step 3
+(the quest specs give −1 and 0, or −1 and a value they call
+"droppable", `world/quests-act2.md`); `ret 0x14`. Returns the
+created item, or none.
+
+1. Game none → fatal 0x9C7.
+2. Item level `L`: `U` none → 1; monster → total stat 12; player → base
+   stat 12; else the area level of `U`'s room level (`0x0061DCA0` with
+   game +0x6D, +0x70, as §7 rule 3); `L` < 2 → 1. Written to `*&level`
+   (`0x00559AF8`) before any read (`world/quests-act3-2.md` §11.3).
+3. Item class `c`:
+   - `U` +0xB8 (the unit's drop item code, `world/objects.md` Inputs)
+     ≠ 0 → `c` := the items index of that code (`0x00633680`); no such
+     code → fatal 0x9EA. No draw.
+   - Else `c` := the random class pick `0x00556240(L, U's unit seed +0x20,
+     p6, p7, U is a monster)`; when `q` = 4 (magic), while the record of
+     `c` is missing or its items `bitfield1` (+0xDC) bit 0 is clear: the
+     first 11 retries call `0x00556240` again, every later one calls
+     `0x00555FB0(L, unit seed, p6, p7)`; there is no retry limit.
+     `0x00556240`: `L` > 65 → fatal 0x180; else one `roll(100)` r on
+     `U`'s unit seed (`0x00472280`): r < 65 − `L` → gold (`gld `, its index
+     cached once, `0x008846EC`); r < (65 − `L`) + `L`/2 + 5 →
+     `0x00555E70`; r < that + `L`/2 + 10 (+ 1 when `L` is odd) →
+     `0x00555FB0`; r < 100 → `0x005560F0`; else fatal 0x1BA. The three
+     sub-pickers are Open question 10.
+4. Position: `U`'s unit coordinates (`0x00620870`) and room
+   (`0x00620BB0`) into the floor drop `0x00555DA0`(room, position, size 1,
+   fallback 1), as §7 rule 2; no spot → return none (no request is
+   written out, nothing created).
+5. Request (0x84 bytes, zeroed; `items/generation.md` Inputs): unit `U`,
+   +0x04 0, game, ilvl `L`, item `c`, spawn mode 3, the found x, y and
+   room, init flags 1, format game +0x78, quality `q`; every other field
+   0 (not forced, no index, no flags). Create through `0x00558D90` with
+   "use seed" 0 (`items/generation.md` §3). When `&request` ≠ none the
+   whole request is copied there (after the pipeline, so with the
+   written-back ilvl). Return the pipeline's item.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -626,3 +669,13 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
 9. Answered (handoff `triage-game-findings` Q3): edge case 9; the d2rs
    sweep's "`magic` ⇒ q ≥ 4" holds after creation, not for the drop
    quality when `M` ≤ −100.
+10. §9 rule 3 (quest drop with no drop code): the sub-pickers
+    `0x00555E70`, `0x00555FB0` (a candidate list over the items records
+    between table +0x08 and +0x10, filtered by `0x00555E00`, expansion
+    or `version` < 100, then one unit-seed step: mask for a power-of-two
+    count, else mod) and `0x005560F0` are not specified, nor the meaning
+    of items `bitfield1` bit 0 and of `p6` / `p7` inside them. The quest
+    specs set the drop code before their calls (e.g. Wirt's body `gld `,
+    `world/quests-act1.md`), so the path matters only for a caller that
+    leaves +0xB8 at 0; settle with `disasm.py fn` on the three
+    functions.

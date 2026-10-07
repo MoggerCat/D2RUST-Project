@@ -21,22 +21,22 @@
 | Inputs | 54–66 |
 | Outputs / state changes | 67–77 |
 | Rules | 78–79 |
-|   1. Routing | 80–95 |
-|   2. Put an item into the cube (C→S 0x2A) | 96–128 |
-|   3. Transmute entry (`0x005665F0`) | 129–141 |
-|   4. Recipe eligibility | 142–156 |
-|   5. Ops | 157–176 |
-|   6. Input matching | 177–241 |
-|   7. Outputs | 242–345 |
-|   8. Commit | 346–373 |
-|   9. Portals | 374–393 |
-|   10. C→S 0x4C is not the cube | 394–408 |
-| Constants & data dependencies | 409–432 |
-| Randomness | 433–451 |
-| Edge cases & original bugs | 452–486 |
-| Test vectors | 487–531 |
-| Provenance | 532–570 |
-| Open questions | 571–596 |
+|   1. Routing | 80–96 |
+|   2. Put an item into the cube (C→S 0x2A) | 97–129 |
+|   3. Transmute entry (`0x005665F0`) | 130–142 |
+|   4. Recipe eligibility | 143–157 |
+|   5. Ops | 158–177 |
+|   6. Input matching | 178–242 |
+|   7. Outputs | 243–346 |
+|   8. Commit | 347–374 |
+|   9. Portals | 375–394 |
+|   10. C→S 0x4C is not the cube | 395–409 |
+| Constants & data dependencies | 410–433 |
+| Randomness | 434–452 |
+| Edge cases & original bugs | 453–487 |
+| Test vectors | 488–532 |
+| Provenance | 533–571 |
+| Open questions | 572–602 |
 <!-- /index -->
 
 ## Summary
@@ -90,8 +90,9 @@ C→S 0x4C is **not** the cube (§10).
 
 `0x0055FA40` (inventory pass over stored items) and the 0x77 byte values
 belong to the UI/inventory owner; listed here for message order only.
-`server-messages.tsv` marks 0x77 `out` (trade), but these paths send it in
-single player.
+`server-messages.tsv` marks 0x77 `sim` (since PC 1 `e2fa8c2`: single
+player sends it too, `sim/intents-events.md` §4 rule 4); these paths send
+it in single player.
 
 ### 2. Put an item into the cube (C→S 0x2A)
 
@@ -584,6 +585,11 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    request `0x00558D90`, free-spot `0x00545340` and portal creation
    `0x0056D130`. Settle: rng trace (`check_rng.py`) of V1, record 19 and
    V22; the owners' specs.
+   Partly answered (duplicate only): `0x0055A2A0` makes exactly two
+   game-seed steps per item unit it allocates (unit seed `0x00552DF0`,
+   item seed `0x00552E90`, inside `0x00555230`), i.e. 2 · (1 + k) for a
+   copy with k fillers read, and no other draw (`world/vendors.md` §7.3).
+   The other four functions stay open.
 5. Inventory list order of `0x0063B2C0`/`0x0063DFA0` (decides capture
    with quantity > 1 and removal order). Owner: inventory spec.
 6. Answered: `0x00560200` changes nothing on a failed placement
