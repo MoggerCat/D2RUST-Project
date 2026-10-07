@@ -1040,6 +1040,9 @@ pub struct ClientTables {
     pub states: Vec<StateRow>,
     /// The overlay count (data tables +0xBC0, `msg-units.md` §7 r2).
     pub overlay_count: u32,
+    /// One entry per `charstats` row, by class: its `Skill 1`…`Skill 10`
+    /// (record +0xAE, i16 as u16; `msg-skills.md` §2 rule 8).
+    pub class_skills: Vec<[u16; 10]>,
 }
 
 /// The `skills` fields the client skill list reads (`msg-skills.md`

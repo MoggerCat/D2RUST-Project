@@ -342,6 +342,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.tables.skills = rows;
     }
 
+    /// Each class's `charstats` Skill 1–10 (`msg-skills.md` §2 rule 8);
+    /// the other tables stay.
+    pub fn set_class_skills(&mut self, class_skills: Vec<[u16; 10]>) {
+        self.inputs.tables.class_skills = class_skills;
+    }
+
     /// What the client DRLG of 0x03 is built from (`model.md` §12 rule
     /// 1); `None`: no client DRLG.
     pub fn set_drlg_source(&mut self, source: Option<drlg::DrlgSource>) {

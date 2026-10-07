@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–258 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 259–268 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 269–311 |
-|   4. Queued movement and action messages | 312–355 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 356–377 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 378–408 |
-|   7. Other unit messages (general handlers, act at receive) | 409–524 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 525–629 |
-| Constants & data dependencies | 630–641 |
-| Randomness | 642–649 |
-| Edge cases & original bugs | 650–672 |
-| Test vectors | 673–723 |
-| Provenance | 724–766 |
-| Open questions | 767–805 |
+|   1. Unit add | 77–260 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 261–270 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 271–313 |
+|   4. Queued movement and action messages | 314–357 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 358–379 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 380–410 |
+|   7. Other unit messages (general handlers, act at receive) | 411–526 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 527–631 |
+| Constants & data dependencies | 632–643 |
+| Randomness | 644–651 |
+| Edge cases & original bugs | 652–674 |
+| Test vectors | 675–725 |
+| Provenance | 726–768 |
+| Open questions | 769–807 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -84,7 +84,9 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    `client/model.md` §2 rule 6 (at (0, 0): no room, seed {1, 666}).
 3. Player init (`0x00460BF0(unit, room, x, y)`): dynamic path at (x, y)
    (`0x00649D00`, `sim/path-placement.md` §2.4); an inventory if none
-   (`0x0063ABD0`); a skill list (`0x006438B0`, +0xA8); stats 68, 67, 69
+   (`0x0063ABD0`); a skill list (`0x006438B0`, +0xA8) and at once its
+   native skills (`0x00647EE0`, call `0x00460C31`; `client/msg-skills.md`
+   §2 rule 8); stats 68, 67, 69
    := 100 (set, layer 0); `[0x007A5260]` := `0x0061AB00(room)`; mode :=
    5 (`0x00624690`); unit flags := (flags & ~0x20) | 0xE; light and
    overlay set-up (`0x00474160`, Phase 6); then, unless the unit is

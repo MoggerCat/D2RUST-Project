@@ -184,6 +184,39 @@ pub fn add(
     Ok(Some(i))
 }
 
+/// The native skills of a player `0x00647EE0` (§2 rule 8), right after
+/// its list is created: unless the native entry of skill 0 exists, a
+/// player of a valid class (`class_skills` is its `charstats` Skill 1–10,
+/// `None` for a class outside the table → nothing at all) gets skill 0
+/// and each of the ten ids that is a skill (0 ≤ id < row count), in
+/// order; then an empty left / right hand selects (0, native).
+pub fn init_player(
+    list: &mut SkillList,
+    rows: &[SkillRow],
+    unit: Owner,
+    class_skills: Option<&[u16; 10]>,
+) -> Result<(), SkillError> {
+    if list.native(0).is_none() {
+        let Some(class_skills) = class_skills else {
+            return Ok(());
+        };
+        add(list, rows, unit, 0)?;
+        for &id in class_skills {
+            let id = id as i16;
+            if id >= 0 && (id as usize) < rows.len() {
+                add(list, rows, unit, id as u16)?;
+            }
+        }
+    }
+    if list.left.is_none() {
+        select(list, rows, true, 0, NATIVE)?;
+    }
+    if list.right.is_none() {
+        select(list, rows, false, 0, NATIVE)?;
+    }
+    Ok(())
+}
+
 /// Select `0x00643BC0` (left) / `0x00643C50` (right) (§2 rule 3).
 pub fn select(
     list: &mut SkillList,

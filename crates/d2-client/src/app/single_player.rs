@@ -71,7 +71,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::tables::{
-    decode_all, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Record, Shrines, Skills,
+    decode_all, Charstats, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Record,
+    Shrines, Skills,
 };
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
@@ -884,6 +885,25 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
             enhanceable: s.enhanceable,
             skilldesc: s.skilldesc,
             etype: s.etype,
+        })
+        .collect())
+}
+
+/// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
+/// §2 rule 8), one entry per `charstats` row, from the user's table.
+pub fn client_class_skills(archives: &ArchiveSet) -> Result<Vec<[u16; 10]>, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = set
+        .table("charstats")
+        .ok_or_else(|| BuildError::Tables("charstats not loaded".to_owned()))?;
+    let rows: Vec<Charstats> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
+    Ok(rows
+        .iter()
+        .map(|c| {
+            [
+                c.skill_1, c.skill_2, c.skill_3, c.skill_4, c.skill_5, c.skill_6, c.skill_7,
+                c.skill_8, c.skill_9, c.skill_10,
+            ]
         })
         .collect())
 }

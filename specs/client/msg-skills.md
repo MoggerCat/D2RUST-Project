@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–215 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 216–225 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 226–235 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 236–245 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 246–252 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 253–296 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 297–310 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 311–339 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 340–354 |
-| Constants & data dependencies | 355–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–380 |
-| Test vectors | 381–406 |
-| Provenance | 407–427 |
-| Open questions | 428–460 |
+|   2. Shared skill-list operations | 100–235 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 236–245 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 246–255 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 256–265 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 266–272 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 273–316 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 317–330 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 331–359 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 360–374 |
+| Constants & data dependencies | 375–386 |
+| Randomness | 387–390 |
+| Edge cases & original bugs | 391–400 |
+| Test vectors | 401–426 |
+| Provenance | 427–447 |
+| Open questions | 448–480 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -212,6 +212,26 @@ handlers (the server specs link here for the steps).
    own skill start only in step (a) (the entry (S, o) missing); a
    remote unit's through every skill start, set-function-3 states and
    0x93.
+
+8. **Native skills of a player** `0x00647EE0(unit)` (2026-10-08; called
+   right after the list is created by the client player init
+   `0x00460BF0` at `0x00460C31` and by the server player init
+   `0x005348C0` at `0x0053490E`):
+   1. The list already holds the native entry of skill 0 (skill id 0,
+      owner +0x34 = −1) → skip to step 3.
+   2. The unit's class (+0x04) outside 0 … charstats count − 1 (data
+      tables +0xBC8; record 0xC4 bytes at +0xBC4) → nothing (no select
+      either). Else add skill 0 (rule 1), then for each of the ten
+      `charstats` words `Skill 1`…`Skill 10` (record +0xAE, i16, in
+      order): 0 ≤ id < skill count (data tables +0xBA0) → add it (rule
+      1); others are skipped.
+   3. Left (+8) empty (`0x00620190`) → select left (0, −1) (rule 3);
+      right (+0xC) empty (`0x006201D0`) → select right (0, −1).
+   So every player starts with Attack (0) and its class's ten
+   `charstats` skills (1.14d: Kick, Throw, Unsummon, Left Hand Throw,
+   Left Hand Swing and the scroll / book skills), each base 1 owner −1,
+   with Attack in both hands, before any S→C 0x94 / 0x23. Without it a
+   click has no left skill and sends nothing (`ui/controls.md` §6 r8).
 
 ### 3. 0x94 BaseSkillLevels (`0x0045DD60`)
 
