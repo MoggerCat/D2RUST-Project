@@ -1128,10 +1128,9 @@ fn ui_answers_npc_dialog_with_0x31_in_order() {
     let (first, _, mode) = run(npc_text(1, 0), 0, true);
     assert_eq!(first, [x2f.clone(), x30.clone()]);
     assert_eq!(mode, 1);
-    // A list shape whose m no spec gives: no case, no 0x31; the 0x30
-    // behind the slot goes at the next frame (the slot is dropped).
+    // PROVISIONAL (first-entry m): a 2-entry list answers as B2 too.
     let (first, next, mode) = run(npc_text(2, 0), 0, false);
-    assert_eq!(first, [x2f]);
-    assert_eq!(next, [x30]);
-    assert_eq!(mode, 0);
+    assert_eq!(first, [x2f, g("31 06000000 25000000"), x30]);
+    assert!(next.is_empty());
+    assert_eq!(mode, 1);
 }

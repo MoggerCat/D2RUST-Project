@@ -398,10 +398,8 @@ fn unspecified_rules_draw_nothing_and_refuse_ui() {
     assert!(
         matches!(
             e,
-            ViewError::Unresolved {
-                spec: "render/draw-order.md",
-                ..
-            }
+            ViewError::Ui { index: 0, ref error }
+                if matches!(**error, ViewError::Unresolved { spec: "ui/panels.md", .. })
         ),
         "{e}"
     );

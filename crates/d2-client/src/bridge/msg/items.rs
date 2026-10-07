@@ -79,11 +79,12 @@ pub fn update_item_stats(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), H
         return Ok(());
     };
     if stat == 204 {
-        // Rule 1.1. TODO(spec: client/stat-lists.md §2 r1): the item's
-        // stat lists with flag 0x40 (and the stat-204 entries keyed by
-        // layer) come from the item stream (open question 3); the model
-        // holds none, and no item has an inventory, so nothing is
-        // written.
+        // Rule 1.1 (`client/stat-lists.md` §2 r1): stat 204 goes to the
+        // item's flag-0x40 list entry keyed by the layer. PROVISIONAL
+        // (client/msg-stats-items.md OQ 3): the model holds no item stat
+        // lists (they come from the item stream), so nothing is written;
+        // settled by a Ghidra read of 0x0062E410 plus a join / trade
+        // packet recording with items (HIGH-PRIORITY CAPTURE).
         return Ok(());
     }
     // Rule 1.2.
@@ -158,9 +159,13 @@ pub fn set_item_state(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
 }
 
 /// 0x92 RemoveItemsDisplay (§5 r5): type u8@1, GUID u32@2. Only a unit
-/// with an inventory changes; the model holds no inventories yet
-/// (`msg-stats-items.md` open question 3), so nothing changes.
-/// TODO(spec: msg-stats-items.md open question 3): the inventory nodes.
+/// with an inventory changes: its items are unlinked and re-added (the
+/// item units stay in S), body slots cleared and stats re-linked.
+/// PROVISIONAL (client/msg-stats-items.md OQ 3): the model holds no
+/// inventory nodes, body slots or item stat links, so no model field
+/// changes; settled by a Ghidra read of 0x0062E410 plus a join / trade
+/// packet recording with items (HIGH-PRIORITY CAPTURE: wire byte
+/// layout).
 pub fn remove_items_display(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     if msg.bytes.len() != 6 {
         return Err(HandlerError::Invalid("0x92 is 6 bytes"));

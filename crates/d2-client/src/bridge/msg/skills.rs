@@ -12,6 +12,7 @@ use super::super::skills::{self, Owner, SkillEntry, SkillError, SkillList, NATIV
 use super::super::world::{ClientWorld, SkillDescRow, SkillRow, UnitKey, PLAYER};
 use super::states::state_bit_off;
 use super::Bytes;
+use d2_sim::skills::LEVEL_CAP_114D;
 
 impl From<SkillError> for HandlerError {
     fn from(e: SkillError) -> Self {
@@ -182,9 +183,8 @@ fn bonus_level(
 }
 
 /// `skill_level(unit, entry, 1)` (`0x006442A0`, `skills/levels.md` §1)
-/// clamped below at 0. TODO(spec: skills/levels.md §1 r3): the cap is the
-/// `experience` `MaxLvl` (not a client table); 0x93 only tests the level
-/// against 0, which the cap does not change.
+/// clamped to `0 ≤ L ≤ cap` (§1 r3): cap = `experience.txt` `MaxLvl`,
+/// Amazon column (99 in 1.14d, [`LEVEL_CAP_114D`]).
 fn level_with_bonuses(
     w: &ClientWorld,
     key: UnitKey,
@@ -196,7 +196,7 @@ fn level_with_bonuses(
     if e.owner == NATIVE {
         l += bonus_level(w, key, rows, desc, e);
     }
-    l.max(0)
+    l.clamp(0, LEVEL_CAP_114D)
 }
 
 /// 0x93 (§9): player GUID u32@1, bonus u8@5 (> 0x80 → − 0x100), element

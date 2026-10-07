@@ -45,7 +45,7 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
             sy: i32::from(y),
         }),
         (true, None) => Err(format!(
-            "unit ({}, {}) has no cell: TODO(spec: msg-stats-items.md open question 3, item placement)",
+            "unit ({}, {}) has no cell (an item off the ground has no world position, msg-stats-items.md §2 r4)",
             unit.key.unit_type, unit.key.guid
         )),
         (false, p) => {
@@ -304,8 +304,8 @@ mod tests {
                 y16: 0x8000
             })
         );
-        // The other hooks are still the placeholder's.
-        assert!(feed.open_mode(&w).is_err());
+        // Open mode without the UI: 0 (ui/panels-2.md §22 r5).
+        assert_eq!(feed.open_mode(&w).unwrap(), OpenMode::NONE);
     }
 
     // Covers: specs/ui/panels.md §4 r2
@@ -313,8 +313,9 @@ mod tests {
     fn open_mode_is_the_uis_once_handed_over() {
         let mut feed = ModelFeed::<NoFeed>::default();
         let w = ClientWorld::default();
-        assert!(
-            feed.open_mode(&w).is_err(),
+        assert_eq!(
+            feed.open_mode(&w).unwrap(),
+            OpenMode::NONE,
             "no UI: the inner feed's answer"
         );
         feed.set_ui_open_mode(OpenMode::new(3).unwrap());
@@ -322,7 +323,7 @@ mod tests {
         // A feed that ignores the UI keeps its own answer.
         let mut inner = NoFeed;
         inner.set_ui_open_mode(OpenMode::new(1).unwrap());
-        assert!(inner.open_mode(&w).is_err());
+        assert_eq!(inner.open_mode(&w).unwrap(), OpenMode::NONE);
     }
 
     /// The pending hooks answer "nothing" through the app's feed, never a

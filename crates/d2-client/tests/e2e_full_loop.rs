@@ -77,7 +77,8 @@ use d2_sim::items::{flag, ty, ItemRequest, ItemTables};
 use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
-use d2_sim::path::CollisionRooms;
+use d2_sim::path::walk::geom::unit_distance;
+use d2_sim::path::{CollisionRooms, PathTables, Point as PathPoint};
 use d2_sim::rng::Seed;
 use d2_sim::skills::use_::{ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::{SkillEntry, SkillTables, LEVEL_CAP_114D};
@@ -2152,10 +2153,14 @@ fn run_with(game_seed: u32) -> Transcript {
     // → §8.2) → 0x9C action 1 in the tick's update pass, then 0x47,
     // 0x48 (§6, §11; the item bit stream is OQ1's: empty). The distance
     // test reads the item-move seam `InvRest::distance` (`0x00641530`),
-    // a staged 3: it is not routed to the path positions yet.
-    // TODO(spec/wiring: inventory-moves.md §8.1 rule 4): answer the item
-    // distance from the path provider (the walk above put the player on
-    // the cap's sub-tile).
+    // answered here from the path positions: the unit distance of
+    // `pathing.md` §9.5 between the player (size 2) and the item (size 1,
+    // `path-placement.md` §3) after the walk above put the player on the
+    // cap's sub-tile.
+    let paths = PathTables::spec().unwrap();
+    let at = |p: (i32, i32)| PathPoint { x: p.0, y: p.1 };
+    let d = unit_distance(&paths, at(fx.pos(player)), 2, at(CAP_AT), 1);
+    fx.inv.with(|r| r.distance = d);
     let pg = fx.guid(player);
     let cg = fx.guid(cap);
     let x9c = |action: u8, g: u32| {
@@ -2254,8 +2259,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // setter (0: `pathing.md` §9.5 rule 3 never stops early) and the
     // player's move mask 0x1C09 (`path-placement.md` §2.4) does not hold
     // the monster footprint bit 0x100, so the run ends on Akara's own
-    // sub-tile. TODO(spec: pathing.md §9.5 rule 3): the stop distance a
-    // walk / run to a unit sets.
+    // sub-tile (`pathing.md` §9.5 rule 3: no player walk / run path sets
+    // the stop distance, so it stays 0).
     let ng = fx.guid(npc);
     let w = walk(
         &mut fx,

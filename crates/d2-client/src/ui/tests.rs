@@ -40,6 +40,8 @@ impl TestPanel {
                     file: u32::from(id),
                     frame: 0,
                 }),
+                pressed_image: None,
+                pressed: false,
             },
             answer,
             log: log.clone(),
@@ -528,6 +530,8 @@ fn widgets_emit_requests_and_hit_by_rect() {
         id: WidgetId(1),
         rect: Rect::new(5, 6, 7, 8),
         image: None,
+        pressed_image: None,
+        pressed: false,
     };
     let f = FrameImage {
         id: WidgetId(2),
@@ -537,6 +541,7 @@ fn widgets_emit_requests_and_hit_by_rect() {
     let l = Label {
         id: WidgetId(3),
         rect: Rect::new(0, 50, 100, 10),
+        pen: Point::new(4, 59),
         text: vec![0x48, 0x69],
         style,
     };
@@ -554,7 +559,7 @@ fn widgets_emit_requests_and_hit_by_rect() {
             }),
             UiDraw::Text(TextRequest {
                 text: vec![0x48, 0x69],
-                at: Point::new(0, 50),
+                at: Point::new(4, 59),
                 style,
                 opts: TextOpts::default(),
                 clip: FRAME
@@ -1260,6 +1265,42 @@ mod text {
             }
         );
     }
+
+    // Covers: specs/ui/text.md §15 r1–r3
+    #[test]
+    fn text_input_caret_blinks_after_the_text() {
+        let f = five();
+        let g = GlyphLookup::new(&f);
+        let mut t = super::TextInput::new(
+            super::WidgetId(1),
+            Rect::new(10, 20, 50, 10),
+            TextStyle::default(),
+            8,
+        );
+        // Blink: on when focused and tick / 1000 is odd.
+        assert!(!super::TextInput::caret_visible(true, 999));
+        assert!(super::TextInput::caret_visible(true, 1000));
+        assert!(!super::TextInput::caret_visible(true, 2000));
+        assert!(!super::TextInput::caret_visible(false, 1000));
+        let caret = |t: &super::TextInput, tick| {
+            let mut out = Vec::new();
+            t.draw_caret(&g, true, tick, &mut out).unwrap();
+            out
+        };
+        assert!(caret(&t, 2500).is_empty());
+        // Empty text: the caret at the text origin.
+        let at = |out: Vec<UiDraw>| match &out[..] {
+            [UiDraw::Text(r)] => (r.text.clone(), r.at),
+            _ => panic!("one text"),
+        };
+        assert_eq!(at(caret(&t, 1500)), (vec![0x5F], Point::new(10, 20)));
+        t.insert(u16::from(b'a'));
+        t.insert(u16::from(b'b'));
+        assert_eq!(at(caret(&t, 1500)), (vec![0x5F], Point::new(20, 20)));
+        // Line fit: width(line) + wc <= inner width.
+        assert_eq!(super::TextInput::fits(&g, &u("abc"), 20), Ok(true));
+        assert_eq!(super::TextInput::fits(&g, &u("abc"), 19), Ok(false));
+    }
 }
 
 // Covers: specs/ui/panels.md §2 r1
@@ -1280,4 +1321,87 @@ fn root_mirrors_the_original_ui_flags() {
     states.force(1, true);
     root.sync_states(&states);
     assert_eq!(root.open_panels(), vec![PanelId(1), PanelId(40)]);
+}
+
+// Covers: specs/ui/panels-2.md §22 r1
+#[test]
+fn button_image_changes_only_with_pressed() {
+    let up = ImageRef { file: 7, frame: 10 };
+    let down = ImageRef { file: 7, frame: 11 };
+    let mut b = Button {
+        id: WidgetId(1),
+        rect: Rect::new(0, 0, 10, 10),
+        image: Some(up),
+        pressed_image: Some(down),
+        pressed: false,
+    };
+    assert_eq!(b.current_image(), Some(up));
+    b.pressed = true;
+    assert_eq!(b.current_image(), Some(down));
+    let mut out = Vec::new();
+    b.draw(&mut out);
+    assert!(matches!(&out[..], [UiDraw::Image(r)] if r.image == down));
+    // No pressed frame: the image stays.
+    b.pressed_image = None;
+    assert_eq!(b.current_image(), Some(up));
+}
+
+// Covers: specs/ui/panels-2.md §22 r3
+#[test]
+fn wheel_scrolls_zero_rows() {
+    let mut s = ScrollList::new(WidgetId(1), Rect::new(0, 0, 100, 50), 10).unwrap();
+    s.set_len(20);
+    s.wheel(120);
+    s.wheel(-120);
+    s.wheel(1200);
+    assert_eq!(s.first(), 0);
+    s.scroll(3);
+    s.wheel(-120);
+    assert_eq!(s.first(), 3);
+}
+
+// Covers: specs/ui/inventory.md §1 r3–r4, §5 r1, r3, §8 r4
+#[test]
+fn cell_grid_inventory_geometry() {
+    // Inventory 10 × 4 cells of 29 × 29 at (100, 200).
+    let g = CellGrid::new(WidgetId(1), Point::new(100, 200), 10, 4, 29, 29).unwrap();
+    assert_eq!(g.mouse_cell(Point::new(129, 229)), (1, 1));
+    // Left of the grid: the unsigned wrap gives a huge column.
+    assert!(g.mouse_cell(Point::new(99, 229)).0 > 1000);
+    // Footprint: cells whose top-left corner is outside the clip are cut.
+    assert_eq!(
+        g.footprint(0, 0, 2, 1, 800, 600),
+        vec![Rect::new(100, 200, 29, 29), Rect::new(129, 200, 29, 29)]
+    );
+    assert_eq!(
+        g.footprint(0, 0, 2, 1, 129, 600),
+        vec![Rect::new(100, 200, 29, 29)]
+    );
+    // Hover anchor of a 2 × 3 item at (1, 0).
+    assert_eq!(g.hover_anchor(1, 0, 2, 3), (100 + 29 + 29, 200, 200 + 87));
+    // Item cel point: (x, top + frame height).
+    assert_eq!(g.item_draw_point(2, 1, 58), Point::new(158, 229 + 58));
+    // Cursor cell: 1 × 1 at the mouse cell.
+    assert_eq!(
+        g.cursor_cell(Point::new(129, 229), 1, 1, 28, 28),
+        Some((1, 1))
+    );
+    // 2 × 2 (even): c = ((gw >> 2) - left + mx) / cellW - 1.
+    // ((56 >> 2) - 100 + 160) / 29 = 74 / 29 = 2; minus 1 = 1.
+    assert_eq!(
+        g.cursor_cell(Point::new(160, 260), 2, 2, 56, 56),
+        Some((1, 1))
+    );
+    // 3 wide at the left edge: 0 - 1 clamps to 0.
+    assert_eq!(
+        g.cursor_cell(Point::new(100, 200), 3, 1, 84, 28),
+        Some((0, 0))
+    );
+    // 2 wide over the right edge: (14 - 100 + 389) / 29 = 10 - 1 = 9; 9 + 2 > 10.
+    assert_eq!(g.cursor_cell(Point::new(389, 200), 2, 1, 56, 28), None);
+    // Full-height item: r = gridY >> 1 = 2, minus 2 = 0.
+    assert_eq!(
+        g.cursor_cell(Point::new(100, 300), 1, 4, 28, 112),
+        Some((0, 0))
+    );
 }

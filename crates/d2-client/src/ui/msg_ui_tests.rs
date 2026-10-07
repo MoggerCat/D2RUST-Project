@@ -340,9 +340,14 @@ fn npc_dialog_case() {
         dialog_case(0, Some(&list(1, 0, 0xFFFF)), &d).unwrap(),
         Some(DialogCase::Rest)
     );
-    // An m no spec gives: no case; B1 does not need m.
+    // PROVISIONAL: a longer list gives its first entry's string id; B1
+    // does not need m; an empty list gives 0xFFFF.
     let l2 = list(2, 0, 0x25);
-    assert_eq!(dialog_case(0, Some(&l2), &d).unwrap(), None);
+    assert_eq!(
+        dialog_case(0, Some(&l2), &d).unwrap(),
+        Some(DialogCase::B2 { m: 0x25 })
+    );
+    assert_eq!(list(0, 0, 0x25).first_m(), Some(0xFFFF));
     assert_eq!(
         dialog_case(0, Some(&l2), &npc_dialog(true)).unwrap(),
         Some(DialogCase::B1)
@@ -371,13 +376,14 @@ fn npc_dialog_answer_is_kept_for_the_bridge() {
     );
     assert_eq!(u.take_dialog_answer(), None);
     assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
-    // A list whose m is not given: no answer, named.
+    // PROVISIONAL: a 2-entry list gives its first entry's m.
     u.apply_output(&npc_text(1, 2, 0, 0x25), &w).unwrap();
     u.take_outcome();
-    u.apply_output(&Output::NpcDialog(Box::new(d)), &w).unwrap();
-    assert_eq!(u.take_dialog_answer(), None);
+    u.apply_output(&Output::NpcDialog(Box::new(d.clone())), &w)
+        .unwrap();
     assert_eq!(
-        u.take_outcome().skipped,
-        [skip::NPC_DIALOG_UI, skip::NPC_DIALOG_M]
+        u.take_dialog_answer(),
+        Some((Box::new(d), DialogCase::B2 { m: 0x25 }))
     );
+    assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
 }

@@ -703,11 +703,9 @@ where
         sent
     }
 
-    /// The action wiring's object host tick. [`WiredWorld::now`] (the
-    /// vendors' clock) stays the caller's.
-    ///
-    /// TODO(vendors.md edge case 10): both read the host's millisecond
-    /// clock; `now` gets its value here once the callers stop pinning it.
+    /// The action wiring's object host tick, and [`WiredWorld::now`] (the
+    /// vendors' clock): both read the host's millisecond clock
+    /// (`GetTickCount`, `vendors.md` edge case 10), once per host frame.
     ///
     /// This host holds the quest control, so the object module's quest
     /// routes are queued for it from here on
@@ -719,6 +717,7 @@ where
         h.pet_follows.get_or_insert_with(Vec::new);
         h.pet_deaths.get_or_insert_with(Vec::new);
         WorldHost::<D>::host_tick(&mut self.action, events, ms);
+        self.now = ms;
     }
 
     fn fault(&mut self, fault: WorldFault) {

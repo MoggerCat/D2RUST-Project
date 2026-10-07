@@ -70,13 +70,15 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{decode_all, Levels, Monstats, Objects, Record, Skills};
+use d2_data::tables::{
+    decode_all, Itemstatcost, Leveldefs, Levels, Monstats, Objects, Record, Shrines, Skills,
+};
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
-use d2_server::adapters::session::{load_save, Entry, GameSetup};
+use d2_server::adapters::session::{load_save, Entry, GameSetup, PlayerRecord, SkillHand};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -111,7 +113,7 @@ use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldStat
 use d2_sim::world::hirelings::HirelingTables;
 use d2_sim::world::npc::HireRow;
 use d2_sim::world::objects::ObjectTables;
-use d2_sim::world::quests::{PlayerQuests, QuestTables};
+use d2_sim::world::quests::{PlayerQuests, QuestFlags, QuestTables};
 use d2_sim::world::vendors::VendorTables;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
@@ -122,7 +124,7 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
-use crate::bridge::world::{LevelRow, SkillRow};
+use crate::bridge::world::{LevelRow, MonsterClass, ObjectRow, SkillRow, StatSend, UnitRows};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
@@ -170,10 +172,10 @@ pub const GAME_SETUP: GameSetup = GameSetup {
 /// expansion (flags bit 20) with bit 2 set, locale 0; passes the server's
 /// stated checks.
 ///
-/// TODO(spec: the client's 0x67 sender, the character-select / game
-/// menus): the game name, template, arena and the bytes 43–44
-/// the original client fills are not specified; they are zero here (no
-/// server rule d2rs runs reads them, `session_flow` module docs).
+/// PROVISIONAL (ui/menus.md, client sender of C→S 0x67): the game name,
+/// template, arena and bytes 43–44 are zeros (no server rule d2rs runs
+/// reads them, `session_flow` module docs); settled by a packet capture
+/// of a real 0x67 from the menus (HANDOFF §7 PC 2 recording list).
 pub fn create_request() -> CreateGame {
     create_request_for(&Character::New)
 }
@@ -208,9 +210,10 @@ pub enum Character {
     /// loader leaves a player (no room, at (0, 0), mode 1), knowing Cold
     /// Plains' waypoint on Normal (the server tests' staging).
     ///
-    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the new
-    /// character's record (`0x00532590`) is not specified, so its entry
-    /// carries no player record (no 0x5F / 0x23 at the join).
+    /// Its entry carries the new-character record
+    /// ([`new_character_record`], `formats/d2s-load.md` §8 r1, r3): the
+    /// join sends 0x5F with the portal flags and the two 0x23 of the
+    /// zero-filled hands.
     #[default]
     New,
     /// A parsed `.d2s` loaded onto the new player
@@ -377,7 +380,15 @@ pub struct WaypointTables {
     pub levels: Vec<Levels>,
     pub objects: Vec<Objects>,
     pub object_class: u32,
+    /// The portal level list (`data/runtime-maps.md` leveldefs: the
+    /// level indices whose `Portal` ≠ 0, in order).
+    pub portal_levels: Vec<u32>,
 }
+
+/// The 1.14d portal level list (`data/runtime-maps.md` leveldefs), for
+/// the synthetic tables.
+pub const PORTAL_LEVELS_114D: [u32; 16] =
+    [1, 3, 5, 7, 27, 29, 33, 36, 40, 43, 45, 46, 53, 54, 74, 134];
 
 impl WaypointTables {
     /// The bridge test's rows: 150 levels (act 1 from level 40),
@@ -400,6 +411,7 @@ impl WaypointTables {
             levels,
             objects: vec![o],
             object_class: 0,
+            portal_levels: PORTAL_LEVELS_114D.to_vec(),
         }
     }
 
@@ -421,10 +433,19 @@ impl WaypointTables {
             .iter()
             .position(|o| o.operatefn == 23 && o.initfn == 17)
             .ok_or(BuildError::NoWaypointObject)? as u32;
+        let leveldefs: Vec<Leveldefs> =
+            decode_all(table("leveldefs")?).map_err(|e| BuildError::Tables(e.to_string()))?;
+        let portal_levels = leveldefs
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| l.portal != 0)
+            .map(|(i, _)| i as u32)
+            .collect();
         Ok(WaypointTables {
             levels,
             objects,
             object_class,
+            portal_levels,
         })
     }
 
@@ -432,6 +453,37 @@ impl WaypointTables {
     fn waypoint(&self, level: u32) -> Option<u8> {
         let wp = self.levels.get(level as usize)?.waypoint;
         (wp != NO_WAYPOINT).then_some(wp)
+    }
+
+    /// Player data +0x2C of a new player record, `0x0061AE30(1)`
+    /// (`formats/d2s-load.md` §8 r1): 1 << i, i = the position of level 1
+    /// in the portal level list ([`WaypointTables::portal_levels`]); 0
+    /// when level 1 is not in it. 1.14d: level 1 is the first, so 1.
+    pub fn portal_flags(&self) -> u32 {
+        self.portal_levels
+            .iter()
+            .position(|&l| l == 1)
+            .and_then(|i| 1u32.checked_shl(i as u32))
+            .unwrap_or(0)
+    }
+}
+
+/// The player record of a new character at the join
+/// (`formats/d2s-load.md` §8 r3): +0x2C = `portal_flags` (r1); hand 1 =
+/// (skill 0, item 0); hand 0 = (`right` or 0, item 0): the hand items
+/// (+0x78, +0x7C) are never written on this path and keep the zero fill.
+/// `right` is the `StartSkill` load §1 r1 selects (client act 0, the
+/// class's `StartSkill` ≠ 0 and owned by the unit).
+pub fn new_character_record(portal_flags: u32, right: Option<u16>) -> PlayerRecord {
+    PlayerRecord {
+        portal_flags,
+        hands: [
+            SkillHand {
+                skill: right.unwrap_or(0),
+                item: 0,
+            },
+            SkillHand { skill: 0, item: 0 },
+        ],
     }
 }
 
@@ -750,6 +802,72 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
         .collect())
 }
 
+/// The unit-message rows of the client (`client/msg-units.md` §1.2 r7:
+/// each `monstats` row's `MonStatsEx` link into `monstats2`, whose record
+/// bytes +0x15… hold the component choice counts; §1.2 r4: the
+/// `itemstatcost` send columns; §1.3 r3 and `client/model.md` §15 r1,
+/// `render/lighting.md` OQ 11: `objects.txt` and the `shrines.txt`
+/// codes), from the user's tables.
+pub fn client_unit_rows(archives: &ArchiveSet) -> Result<UnitRows, BuildError> {
+    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    let table = |name: &str| {
+        set.table(name)
+            .ok_or_else(|| BuildError::Tables(format!("{name} not loaded")))
+    };
+    let err = |e: d2_data::tables::WrongTable| BuildError::Tables(e.to_string());
+    let monstats: Vec<Monstats> = decode_all(table("monstats")?).map_err(err)?;
+    let monstats2 = table("monstats2")?;
+    let monsters = monstats
+        .iter()
+        .map(|m| {
+            let link = m.monstatsex as i16;
+            if link < 0 || link as usize >= monstats2.count {
+                return None;
+            }
+            MonsterClass::from_record(monstats2.record(link as usize), m.npc, m.interact)
+        })
+        .collect();
+    let isc: Vec<Itemstatcost> = decode_all(table("itemstatcost")?).map_err(err)?;
+    let stats = isc
+        .iter()
+        .map(|r| StatSend {
+            bits: r.send_bits,
+            param_bits: r.send_param_bits,
+            signed: r.signed,
+        })
+        .collect();
+    let objects: Vec<Objects> = decode_all(table("objects")?).map_err(err)?;
+    let objects = objects
+        .iter()
+        .map(|o| ObjectRow {
+            subclass: o.subclass,
+            shrine_function: o.shrinefunction,
+            env_effect: o.enveffect != 0,
+            lit: [
+                o.lit0, o.lit1, o.lit2, o.lit3, o.lit4, o.lit5, o.lit6, o.lit7,
+            ],
+            selectable: [
+                o.selectable0 != 0,
+                o.selectable1 != 0,
+                o.selectable2 != 0,
+                o.selectable3 != 0,
+                o.selectable4 != 0,
+                o.selectable5 != 0,
+                o.selectable6 != 0,
+                o.selectable7 != 0,
+            ],
+            rgb: (o.red, o.green, o.blue),
+        })
+        .collect();
+    let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
+    Ok(UnitRows {
+        monsters,
+        stats,
+        objects,
+        shrines: shrines.iter().map(|s| s.code).collect(),
+    })
+}
+
 /// A built game and the units the app and tests address. The player
 /// exists only after the join (C→S 0x6B): [`local_player`].
 pub struct LocalGame {
@@ -1046,8 +1164,9 @@ pub fn build_with(
         expansion: GAME_SETUP.expansion,
         ..AppRest::default()
     };
-    // TODO(spec: the host clock of store generation, `vendors.md` edge
-    // case 10): `WiredWorld::now` stays 0; nothing in the app updates it.
+    // `WiredWorld::now` (store generation and refresh, `vendors.md` edge
+    // case 10) is the host clock in ms, set by each host frame
+    // (`host_tick`); 0 until the first frame.
     let mut world = WiredWorld::new(
         action,
         parts.items,
@@ -1068,7 +1187,7 @@ pub fn build_with(
     let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
     s.set_session(SessionFlow::new(
         GAME_SETUP.arena_flags,
-        loader(character, cold_plains_wp),
+        loader(character, cold_plains_wp, wp_tables.portal_flags()),
     ));
     Ok(LocalGame {
         sim: s,
@@ -1085,6 +1204,7 @@ pub fn build_with(
 fn loader(
     character: Character,
     cold_plains_wp: Option<u8>,
+    portal_flags: u32,
 ) -> CharacterLoader<WorldSim<LocalSeams>, World> {
     Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
         let req = AllocRequest {
@@ -1112,7 +1232,7 @@ fn loader(
         if let Some(u) = s.events.action.sys.units.get_mut(player) {
             u.mode = 1;
         }
-        let entry = match &character {
+        let (entry, quests) = match &character {
             Character::New => {
                 if let Some(index) = cold_plains_wp {
                     let set = s
@@ -1133,7 +1253,13 @@ fn loader(
                             .push(format!("join: waypoint {index}: {e:?}"));
                     }
                 }
-                Entry::new(0, r.char_name)
+                // Load §1 r1: this player gets no start stats, items or
+                // skill entries (the d2rs new character is not the stub
+                // path), so it does not own its `StartSkill` and no
+                // right skill is selected (no extra 0x23 in the load).
+                let mut entry = Entry::new(0, r.char_name);
+                entry.record = Some(new_character_record(portal_flags, None));
+                (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((entry, report)) => {
@@ -1144,11 +1270,20 @@ fn loader(
                             .iter()
                             .map(|u| format!("join: save load: {u:?}")),
                     );
-                    // TODO(spec: formats/d2s-load.md, the quest section
-                    // onto the quest record): the save's quest flags are
-                    // not applied; the record starts new.
-                    log.push("join: save load: quest records start new".into());
-                    entry
+                    // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
+                    // `world/quests.md` §1.6): each 96-byte record copied
+                    // into the player's quest record with normalisation.
+                    // A stub (no body) keeps the new record (load §1).
+                    let mut quests = PlayerQuests::default();
+                    if let Some(body) = &save.body {
+                        for (d, rec) in body.quests.records.iter().enumerate() {
+                            match QuestFlags::copy_in(rec, true) {
+                                Ok(f) => quests.flags[d] = f,
+                                Err(e) => log.push(format!("join: save load: quests {d}: {e}")),
+                            }
+                        }
+                    }
+                    (entry, quests)
                 }
                 Err(e) => {
                     s.events
@@ -1164,7 +1299,7 @@ fn loader(
         let name = r.char_name;
         let n = name.iter().position(|&b| b == 0).unwrap_or(name.len());
         let rest = &mut s.world.rest;
-        rest.quests.insert(player, PlayerQuests::default());
+        rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
         s.set_player(
             player,
@@ -1230,4 +1365,25 @@ pub fn start_with<C: Clock + Send + 'static>(
         .recv()
         .map_err(|_| BuildError::Setup("game not started".into()))?;
     Ok((link, started))
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::*;
+
+    // Covers: specs/formats/d2s-load.md §8 r1, §8 r3
+    #[test]
+    fn new_character_record_and_portal_flags() {
+        let t = WaypointTables::synthetic();
+        assert_eq!(t.portal_flags(), 1);
+        let mut t2 = t.clone();
+        t2.portal_levels = vec![3, 5, 1];
+        assert_eq!(t2.portal_flags(), 4);
+        t2.portal_levels.clear();
+        assert_eq!(t2.portal_flags(), 0);
+        let r = new_character_record(1, None);
+        assert_eq!(r.portal_flags, 1);
+        assert_eq!(r.hands, [SkillHand { skill: 0, item: 0 }; 2]);
+        assert_eq!(new_character_record(1, Some(36)).hands[0].skill, 36);
+    }
 }

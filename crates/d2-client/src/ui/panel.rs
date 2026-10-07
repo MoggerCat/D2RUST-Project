@@ -23,8 +23,13 @@ pub struct WidgetId(pub u16);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActionId(pub u16);
 
-/// Pointer buttons the UI routes. Which button means what (left/right,
-/// shift/alt modifiers) is `TODO(spec: ui/controls.md §B4)`.
+/// Pointer buttons the UI routes (`ui/controls.md` §7 r5): Left and
+/// Right are the fixed world buttons of §6 (never rebindable); Middle
+/// (and the X buttons) run the command bound to keys 0x100–0x102 (§4.2;
+/// default middle = command 7, automap). Shift / Ctrl / Alt meanings
+/// come only from the bindings of commands 36 / 34 / 37 (§3, §4.3),
+/// except right up, which reads the event's MK_SHIFT / MK_CONTROL (§6
+/// r1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PointerButton {
     Left,

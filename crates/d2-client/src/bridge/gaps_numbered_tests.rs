@@ -208,6 +208,8 @@ fn client_world_holds_only_stated_fields() {
         environment,
         eclipse_pending,
         skill_tree_flag,
+        // `render/lighting.md` §9.2 r4.4.
+        env_period_cache,
         // `render/lighting.md` §10 r4; `client/msg-units.md` §8 r9;
         // `client/msg-stats-items.md` §5 r6–r7.
         overrides,
@@ -222,6 +224,7 @@ fn client_world_holds_only_stated_fields() {
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
     assert!(drlg.is_none());
     assert!(environment.is_none() && !eclipse_pending && skill_tree_flag.is_none());
+    assert_eq!(env_period_cache, 0);
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
@@ -253,9 +256,14 @@ fn client_world_holds_only_stated_fields() {
         // `client/msg-ui.md` §16 r4.3 (open question 10 decided as A).
         turned_toward,
         path_stopped,
+        // `client/msg-units.md` §7 r7.2, §1.2 r3–r4.
+        direction_of,
+        flags_ex,
+        room_freed,
     } = ClientUnit::new(key);
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);
+    assert!(direction_of.is_none() && flags_ex == 0 && !room_freed);
     assert!(flag_2.is_none() && states.is_empty() && state_lists.is_empty());
     assert_eq!(k, key);
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));

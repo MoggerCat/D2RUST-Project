@@ -71,9 +71,10 @@ pub fn state_off(w: &mut ClientWorld, key: UnitKey, state: u8) {
 /// (`client/stat-lists.md` §3 r2): the unit's list of the state (made
 /// and attached when it has none), then the set `0x00627150`
 /// (`sim/stat-lists.md` §5 r1: a value 0 removes the entry).
-/// TODO(spec: client/stat-lists.md §3 r2): stat 172's `0x00463C00(value)`
-/// and the stats refresh `0x00623F50` change no model field the specs
-/// name.
+/// PROVISIONAL (client/stat-lists.md §3 r2): stat 172's
+/// `0x00463C00(value)` changes no model field (the stats refresh
+/// `0x00623F50` is `sim/units.md` §4.7's and has no client model field);
+/// settled by a Ghidra read of 0x00463C00.
 pub fn state_stat(w: &mut ClientWorld, key: UnitKey, state: u8, stat: u16, param: u16, value: i32) {
     if let Some(u) = w.units.get_mut(&key) {
         let list = u.state_lists.entry(state).or_default();

@@ -1,4 +1,4 @@
-// Spec: specs/client/ui.md
+// Spec: specs/client/ui.md, specs/ui/panels-2.md §22 r1–r3, specs/ui/inventory.md §1, §5, §8, §B5, specs/ui/text.md §15
 //! Widgets (spec §A2): plain structs with integer rects that emit draw
 //! requests and answer hit tests. No retained GPU state.
 //!
@@ -9,7 +9,7 @@
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect, FRAME};
 use super::panel::WidgetId;
-use super::text::TextOpts;
+use super::text::{width_a, width_b, GlyphLookup, TextError, TextOpts};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum WidgetError {
@@ -29,13 +29,28 @@ pub trait Widget {
     }
 }
 
-/// A clickable rect with an optional image. Pressed/hover frames are
-/// `TODO(spec: ui/panels.md §B1)`: the image does not change here.
+/// A clickable rect with an optional image. The image changes only with
+/// the pressed flag, never on hover (`ui/panels-2.md` §22 r1: e.g. close
+/// buttons frame 10 released / 11 pressed): `pressed_image` (when set) is
+/// drawn while `pressed`, else `image`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Button {
     pub id: WidgetId,
     pub rect: Rect,
     pub image: Option<ImageRef>,
+    pub pressed_image: Option<ImageRef>,
+    pub pressed: bool,
+}
+
+impl Button {
+    /// The image drawn now (§22 r1): the pressed frame while pressed.
+    pub fn current_image(&self) -> Option<ImageRef> {
+        if self.pressed {
+            self.pressed_image.or(self.image)
+        } else {
+            self.image
+        }
+    }
 }
 
 impl Widget for Button {
@@ -46,7 +61,7 @@ impl Widget for Button {
         self.rect
     }
     fn draw(&self, out: &mut dyn UiDrawSink) {
-        if let Some(image) = self.image {
+        if let Some(image) = self.current_image() {
             out.push(UiDraw::Image(ImageRequest {
                 image,
                 at: self.rect.origin(),
@@ -80,13 +95,16 @@ impl Widget for FrameImage {
     }
 }
 
-/// A text label. The request's pen is the bottom row of the first-drawn
-/// line (`ui/text.md` §4.2); where it sits in the rect per panel is
-/// `TODO(spec: ui/panels.md)`: the request carries the rect origin.
+/// A text label. The pen is never the rect origin (`ui/panels-2.md` §22
+/// r2): each text rule gives it, y being the bottom row of the glyph cell
+/// (`ui/text.md` §4 r2) and x given or centered over a span
+/// (`panels.md` §1.6). `rect` is only the hit / clip area.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Label {
     pub id: WidgetId,
     pub rect: Rect,
+    /// The pen (x, y) of the text rule.
+    pub pen: Point,
     pub text: Vec<u16>,
     pub style: TextStyle,
 }
@@ -101,7 +119,7 @@ impl Widget for Label {
     fn draw(&self, out: &mut dyn UiDrawSink) {
         out.push(UiDraw::Text(TextRequest {
             text: self.text.clone(),
-            at: self.rect.origin(),
+            at: self.pen,
             style: self.style,
             opts: TextOpts::default(),
             clip: FRAME,
@@ -116,9 +134,13 @@ pub struct Cell {
     pub row: u16,
 }
 
-/// A grid of equal cells (inventory, stash, cube, belt). Cell sizes,
-/// gaps, item placement and highlight are `TODO(spec: ui/inventory.md
-/// §B5)`: here cells are adjacent, and the grid draws nothing itself.
+/// A grid of equal cells (inventory, stash, cube, belt), from a grid
+/// layout record (`ui/inventory.md` §1 r1: gridX × gridY cells of cellW ×
+/// cellH at (left, top)). §B5: cells are adjacent (pitch = cell size) and
+/// have no art of their own (§7: the grid lines are panel background), so
+/// the grid draws nothing itself; the tints (§2–§4, §6) and item graphics
+/// (§8) are drawn by the grid's owner from [`CellGrid::footprint`] and
+/// [`CellGrid::item_draw_point`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CellGrid {
     id: WidgetId,
@@ -182,6 +204,100 @@ impl CellGrid {
         })
     }
 
+    /// The cell under `p` by `ui/inventory.md` §1 r4 (no cursor item):
+    /// c = (mouseX − left) / cellW, r = (mouseY − top) / cellH, unsigned
+    /// division of the wrapped difference (a point left of or above the
+    /// grid gives a huge, out-of-grid value). The pair is returned as is;
+    /// [`CellGrid::cell_at`] is the in-grid test.
+    pub fn mouse_cell(&self, p: Point) -> (u32, u32) {
+        let c = (p.x.wrapping_sub(self.origin.x) as u32) / u32::from(self.cell_w);
+        let r = (p.y.wrapping_sub(self.origin.y) as u32) / u32::from(self.cell_h);
+        (c, r)
+    }
+
+    /// The cells of a w × h footprint at (c, r) that get a tint
+    /// (`ui/inventory.md` §1 r3: a cell is tinted only when its top-left
+    /// corner is inside [0, clipW) × [0, clipH)), in row-major order.
+    pub fn footprint(&self, c: u16, r: u16, w: u16, h: u16, clip_w: i32, clip_h: i32) -> Vec<Rect> {
+        let mut out = Vec::new();
+        for dr in 0..h {
+            for dc in 0..w {
+                let x = self.origin.x + i32::from(c + dc) * i32::from(self.cell_w);
+                let y = self.origin.y + i32::from(r + dr) * i32::from(self.cell_h);
+                if (0..clip_w).contains(&x) && (0..clip_h).contains(&y) {
+                    out.push(Rect::new(x, y, self.cell_w, self.cell_h));
+                }
+            }
+        }
+        out
+    }
+
+    /// The hover anchor of an item at (c, r) of w × h cells
+    /// (`ui/inventory.md` §5 r1): x = left + cellW · c + (w · cellW) / 2,
+    /// top = top + cellH · r, bottom = top + cellH · (r + h).
+    pub fn hover_anchor(&self, c: u16, r: u16, w: u16, h: u16) -> (i32, i32, i32) {
+        let cw = i32::from(self.cell_w);
+        let ch = i32::from(self.cell_h);
+        let x = self.origin.x + cw * i32::from(c) + (i32::from(w) * cw) / 2;
+        let top = self.origin.y + ch * i32::from(r);
+        let bottom = self.origin.y + ch * (i32::from(r) + i32::from(h));
+        (x, top, bottom)
+    }
+
+    /// The cursor cell of a w × h cursor item whose inventory graphic is
+    /// gw × gh (`ui/inventory.md` §5 r3). `None`: the handler returns
+    /// without change (the footprint would pass the grid's right or
+    /// bottom edge); the caller keeps its previous cursor cell.
+    pub fn cursor_cell(&self, p: Point, w: u16, h: u16, gw: u32, gh: u32) -> Option<(i32, i32)> {
+        let (cw, ch) = (u32::from(self.cell_w), u32::from(self.cell_h));
+        let (mut c, mut r) = self.mouse_cell(p);
+        let left = self.origin.x as u32;
+        let top = self.origin.y as u32;
+        if w % 2 == 0 {
+            c = (gw >> 2).wrapping_sub(left).wrapping_add(p.x as u32) / cw;
+        }
+        if h % 2 == 0 {
+            r = (gh >> 2).wrapping_sub(top).wrapping_add(p.y as u32) / ch;
+        }
+        if w == self.cols {
+            c = u32::from(self.cols >> 1);
+        }
+        if h == self.rows {
+            r = u32::from(self.rows >> 1);
+        }
+        let mut c = c as i32;
+        let mut r = r as i32;
+        if w > 1 {
+            c -= i32::from(w >> 1);
+            if c < 0 {
+                c = 0;
+            }
+            if i64::from(w) + i64::from(c) > i64::from(self.cols) {
+                return None;
+            }
+        }
+        if h > 1 {
+            r -= i32::from(h >> 1);
+            if r < 0 {
+                r = 0;
+            }
+            if i64::from(h) + i64::from(r) > i64::from(self.rows) {
+                return None;
+            }
+        }
+        Some((c, r))
+    }
+
+    /// The cel draw point of an item graphic whose footprint's top-left
+    /// cell is (c, r) (`ui/inventory.md` §3 r1, §8 r1, r4): (x, top + h),
+    /// h = the frame height, so the frame's top-left sits at the cell
+    /// corner for offsets 0.
+    pub fn item_draw_point(&self, c: u16, r: u16, frame_h: u32) -> Point {
+        let x = self.origin.x + i32::from(c) * i32::from(self.cell_w);
+        let top = self.origin.y + i32::from(r) * i32::from(self.cell_h);
+        Point::new(x, top + frame_h as i32)
+    }
+
     /// A cell's rect; `None` outside the grid.
     pub fn cell_rect(&self, c: Cell) -> Option<Rect> {
         (c.col < self.cols && c.row < self.rows).then(|| {
@@ -207,16 +323,15 @@ impl Widget for CellGrid {
             self.rows * self.cell_h,
         )
     }
-    fn draw(&self, _out: &mut dyn UiDrawSink) {
-        // TODO(spec: ui/inventory.md §B5): cell art, item graphics,
-        // hover highlight.
-    }
+    /// Nothing: cells have no art (`ui/inventory.md` §7, §B5).
+    fn draw(&self, _out: &mut dyn UiDrawSink) {}
 }
 
 /// A vertical list of equal rows showing `rows_visible()` rows from
 /// `first`. The owning panel draws the rows; the list answers which row
-/// is under a point and keeps `first` in range. How far one wheel step
-/// scrolls is `TODO(spec: ui/panels.md §B2)`: the caller passes rows.
+/// is under a point and keeps `first` in range. No original-UI panel
+/// scrolls with the mouse wheel (`ui/panels-2.md` §22 r3): a wheel event
+/// moves the list by [`ScrollList::WHEEL_STEP`] = 0 rows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollList {
     id: WidgetId,
@@ -266,6 +381,15 @@ impl ScrollList {
         self.first = self.first.min(self.max_first());
     }
 
+    /// Rows one wheel event scrolls an original-UI list (§22 r3).
+    pub const WHEEL_STEP: i64 = 0;
+
+    /// A mouse-wheel event (§22 r3): moves by [`Self::WHEEL_STEP`] rows
+    /// per event whatever the delta, so the list does not move.
+    pub fn wheel(&mut self, delta: i32) {
+        self.scroll(Self::WHEEL_STEP * i64::from(delta.signum()));
+    }
+
     /// Moves `first` by `rows` (negative: up), clamped to the range.
     pub fn scroll(&mut self, rows: i64) {
         let f = i64::from(self.first)
@@ -296,8 +420,10 @@ impl Widget for ScrollList {
 
 /// A single-line text field holding UTF-16 code units. Which characters
 /// are accepted and the maximum length come from the owner of the field
-/// (chat: spec open question 3); caret drawing is
-/// `TODO(spec: ui/text.md open question 3)`.
+/// (chat: spec open question 3). The caret is `ui/text.md` §15
+/// ([`TextInput::draw_caret`]); the text pointer is the end of the text
+/// (this field only appends and deletes at the end) and the field keeps
+/// no selection (§15 r4 applies only to boxes with E +0x00 = 1).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextInput {
     pub id: WidgetId,
@@ -339,6 +465,49 @@ impl TextInput {
     /// Returns the text and empties the field.
     pub fn take(&mut self) -> Vec<u16> {
         std::mem::take(&mut self.text)
+    }
+
+    /// The caret glyph `_` (`ui/text.md` §15 r1).
+    pub const CARET: u16 = 0x5F;
+
+    /// Whether the caret blinks on at host time `tick_ms`
+    /// (`GetTickCount`, §15 r1): visible when focused and `tick_ms / 1000`
+    /// is odd (1 s on, 1 s off; client-only wall clock).
+    pub fn caret_visible(focused: bool, tick_ms: u32) -> bool {
+        focused && (tick_ms / 1000) % 2 == 1
+    }
+
+    /// The caret draw (§15 r1–r2), after [`Widget::draw`]: `_` at x +
+    /// width of the units before the text pointer (width B, §6), x for
+    /// an empty text; nothing when the blink is off.
+    pub fn draw_caret(
+        &self,
+        g: &GlyphLookup<'_>,
+        focused: bool,
+        tick_ms: u32,
+        out: &mut dyn UiDrawSink,
+    ) -> Result<(), TextError> {
+        if !Self::caret_visible(focused, tick_ms) {
+            return Ok(());
+        }
+        let before = width_b(g, &self.text, self.text.len())?;
+        let at = self.rect.origin();
+        out.push(UiDraw::Text(TextRequest {
+            text: vec![Self::CARET],
+            at: Point::new(at.x + before, at.y),
+            style: self.style,
+            opts: TextOpts::default(),
+            clip: FRAME,
+        }));
+        Ok(())
+    }
+
+    /// The caret width `wc` (§15 r1, width A of `_`) and the line-fit test
+    /// of §15 r3: a unit is added while `width(line) + wc` ≤ the inner
+    /// width.
+    pub fn fits(g: &GlyphLookup<'_>, line: &[u16], inner_w: i32) -> Result<bool, TextError> {
+        let wc = width_a(g, &[Self::CARET])?;
+        Ok(width_a(g, line)? + wc <= inner_w)
     }
 }
 

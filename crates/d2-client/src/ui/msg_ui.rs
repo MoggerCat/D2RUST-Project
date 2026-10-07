@@ -106,24 +106,28 @@ impl NpcTextList {
     }
 
     /// `0x00661400(txt, 0)`, the m of 0x28's dialog branch (§16 r4.3).
-    /// `None`: not specified for this list.
+    /// The spec pins one point (A seq 37351 → 37353): a list of one entry
+    /// of kind 0 gives m = that entry's string id (0x25 → C→S
+    /// `31 06000000 25000000`).
     ///
-    /// TODO(spec: client/msg-ui.md §16 r4.3 / open question 10): the
-    /// function `0x00661400` (and `0x00661440`, m2) is not specified,
-    /// nor how the list's start `0x006616E0` and the frames since it
-    /// change it. The one point the spec pins is its test vector (A seq
-    /// 37351 → 37353): a list of one entry of kind 0 gives m = that
-    /// entry's string id (0x25 → C→S `31 06000000 25000000`). Only that
-    /// shape is answered; any other list hands no case back.
+    /// PROVISIONAL (ui/messages.md §14 / client/msg-ui.md §16 r4.3): any
+    /// list gives its first entry's string id (whatever its kind and the
+    /// list start `0x006616E0`), an empty list 0xFFFF; settled by a
+    /// capture of NPC dialogs with 2+ list entries (HANDOFF §7 PC 2
+    /// recording list).
     pub fn first_m(&self) -> Option<u16> {
-        (self.count() == 1 && self.kind(0) == 0).then(|| self.string(0))
+        Some(if self.count() == 0 {
+            0xFFFF
+        } else {
+            self.string(0)
+        })
     }
 }
 
 /// 0x28's dialog branch (§16 r4.3), the case 1.14d takes (the first that
 /// holds), from the UI state `[0x007C0C68]`, the NPC text list and the
-/// captured inputs. `Ok(None)`: the case depends on an m the spec does
-/// not give ([`NpcTextList::first_m`]). B3–B6 are one case for the
+/// captured inputs. `Ok(None)`: the case depends on an m
+/// [`NpcTextList::first_m`] does not give. B3–B6 are one case for the
 /// bridge ([`DialogCase::Rest`]): they write the model alike.
 ///
 /// Reading taken (as the bridge's): B0 ends the branch, the "(always
@@ -187,9 +191,10 @@ pub struct MsgUiState {
     /// The inventory mode (`ui/panels.md` §11, §12).
     pub inventory_mode: u8,
     /// `[0x007C0C68]`, read by 0x28's dialog branch (§16 r4.3, case B0).
-    /// TODO(spec: client/msg-ui.md open question 10; ui/*): no spec
-    /// gives a writer of this UI global, so it keeps its initial 0 (the
-    /// value the recorded 0x28 of A seq 37353 implies: it took B2).
+    /// PROVISIONAL (ui/messages.md §14 / client/msg-ui.md §16): no spec
+    /// gives a writer of this UI global, so it stays 0 (the value the
+    /// recorded 0x28 of A seq 37353 implies: it took B2); settled by a
+    /// Ghidra xref scan of `[0x007C0C68]` writers.
     pub ui_7c0c68: u8,
 }
 

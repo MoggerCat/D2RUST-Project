@@ -173,3 +173,58 @@ fn relators_change_no_field() {
     assert_eq!(m.w, before);
     assert_eq!((m.log.handled, m.log.rejected.len()), (2, 0));
 }
+
+// Covers: specs/client/msg-stats-items.md §2 r4, §2 r5 (PROVISIONAL header, OQ 3)
+#[test]
+fn item_header_and_cursor_writes() {
+    use super::stats_items::ItemHeader;
+    // B 123's stream: version 101, mode 2 (belt, the 0x0E PutInBelt).
+    let h = ItemHeader::peek(&hex("10 00 a2 00 65 08 00 80 06 17 03 02")).unwrap();
+    assert_eq!((h.flags, h.mode, h.page), (0x00A2_0010, 2, 0xFF));
+    assert_eq!(ItemHeader::peek(&hex("10 00 a2")), None);
+    // A synthetic ground header: mode 3, x 0x1234, y 0x5678.
+    let ground = |action: u8, mode: u32, guid: u8| {
+        let mut b = vec![0x9C, action, 0, 0x10, guid, 0, 0, 0];
+        let mut bits: Vec<(u32, u32)> = vec![(0x10, 32), (101, 10), (mode, 3)];
+        if mode == 3 {
+            bits.extend([(0x1234, 16), (0x5678, 16)]);
+        } else {
+            bits.extend([(0, 4), (0, 4), (0, 4), (0, 3)]);
+        }
+        let mut out = Vec::new();
+        let mut pos = 0usize;
+        for (v, n) in bits {
+            for i in 0..n {
+                if pos / 8 == out.len() {
+                    out.push(0);
+                }
+                out[pos / 8] |= (((v >> i) & 1) as u8) << (pos % 8);
+                pos += 1;
+            }
+        }
+        b.extend(out);
+        b[2] = b.len() as u8;
+        b
+    };
+    let mut m = with_local();
+    m.recv(&ground(0x03, 3, 5));
+    assert_eq!(
+        m.unit(UnitKey::new(ITEM, 5)).position,
+        Some((0x1234, 0x5678))
+    );
+    // GroundToCursor with a mode-4 header: the local player's cursor.
+    m.recv(&ground(0x01, 4, 6));
+    let cursor = |m: &Model| match &m.unit(P1).kind {
+        KindData::Player(p) => p.cursor_item,
+        _ => None,
+    };
+    assert_eq!(cursor(&m), Some(6));
+    assert_eq!(m.unit(UnitKey::new(ITEM, 6)).position, None);
+    // GroundToCursor with another mode: nothing.
+    m.recv(&ground(0x01, 3, 7));
+    assert!(!m.w.units.contains_key(&UnitKey::new(ITEM, 7)));
+    // PutInBelt always clears.
+    m.recv(&ground(0x0E, 2, 6));
+    assert_eq!(cursor(&m), None);
+    assert!(m.log.rejected.is_empty());
+}

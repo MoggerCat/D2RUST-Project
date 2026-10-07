@@ -9,6 +9,7 @@
 use super::super::dispatch::{HandlerError, Message};
 use super::super::output::Output;
 use super::super::world::{ClientWorld, KindData, UnitKey, MONSTER, OBJECT, PLAYER};
+use super::stats_items::ItemHeader;
 use super::Bytes;
 use crate::rules::lighting::environment::act_index;
 
@@ -147,9 +148,8 @@ pub fn player_corpse_assign(w: &mut ClientWorld, msg: &Message<'_>) -> Result<()
     if !w.units[&p].is_dead() {
         w.units.get_mut(&p).expect("checked above").mode = 0;
     }
-    // Step 2: the corpse placed at P's position, in P's room.
-    // TODO(spec: msg-units.md §7 r7.2): the path direction copy
-    // (`0x006487F0`) has no model field.
+    // Step 2: the corpse placed at P's position, in P's room, then its
+    // path direction := P's (`0x006487F0` → `0x006488A0`).
     if w.local_player == Some(p) {
         let k = UnitKey::new(PLAYER, b.u32(6)?);
         if w.units.contains_key(&k) {
@@ -157,15 +157,34 @@ pub fn player_corpse_assign(w: &mut ClientWorld, msg: &Message<'_>) -> Result<()
             let room = w.room_units.room_of(p);
             if let Some(u) = w.units.get_mut(&k) {
                 u.position = at;
+                u.direction_of = Some(p);
             }
             if w.active_rooms.is_some() {
                 w.room_units.place(k, room);
             }
         }
     }
-    // Step 3. TODO(spec: msg-stats-items.md open question 3): P's
-    // inventory (the body nodes taken off and their item units removed)
-    // is not in the model until the item stream is specified.
+    // Step 3: P's body items are taken off and their item units removed
+    // from S. PROVISIONAL (client/msg-stats-items.md OQ 3): the model
+    // holds no inventory nodes, so the body items are the item units
+    // whose last item record (0x9C / 0x9D) names P as owner with stream
+    // header mode 1 (body; header peek of `ItemHeader`), in GUID order;
+    // settled by a Ghidra read of 0x0062E410 plus a join / trade packet
+    // recording with items (HIGH-PRIORITY CAPTURE: wire byte layout).
+    let body: Vec<UnitKey> = w
+        .units
+        .values()
+        .filter(|u| match &u.kind {
+            KindData::Item(d) => d.last.as_ref().is_some_and(|r| {
+                r.owner == Some(p) && ItemHeader::peek(&r.stream).is_some_and(|h| h.mode == 1)
+            }),
+            _ => false,
+        })
+        .map(|u| u.key)
+        .collect();
+    for k in body {
+        w.remove(k);
+    }
     Ok(())
 }
 
@@ -205,8 +224,10 @@ pub fn baal_wave(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerEr
 }
 
 /// 0xAB NpcHeal (§7 r11): type u8@1, GUID u32@2, life u8@6 (of 128).
-/// TODO(spec: client/msg-ui.md open question 2): unit flag 0x200 is not
-/// in the model, so the flag test is taken as clear.
+/// PROVISIONAL (client/msg-ui.md OQ 2 → client/msg-units.md, unit flag
+/// word +0xC4): unit flag 0x200 has no client writer the specs name, so
+/// the flag test is taken as clear; settled by a Ghidra xref of all
+/// +0xC4 writers.
 pub fn npc_heal(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 7, "0xAB is 7 bytes")?;
     let b = Bytes(msg.bytes);

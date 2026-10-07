@@ -42,9 +42,13 @@ pub struct UiSprite {
 
 /// The original-behavior questions of UI drawing, one hook per question.
 pub trait UiRules {
-    /// TODO(spec: ui/panels.md) (§B1, §B6): the DC6 file and frame an
-    /// [`crate::ui::ImageRef`] names, how the frame offsets combine with
-    /// `req.at`, shading and blend. `image` reads a resident frame.
+    /// The sprite of an image request (`ui/panels-2.md` §22 r4): the DC6
+    /// file (under `data\global\ui\` or its rule's path) and frame an
+    /// [`crate::ui::ImageRef`] names, direction 0; `req.at` is the cel draw
+    /// point (X, Y), the frame covering columns `X + xoff …`, rows
+    /// `Y + yoff − h + 1 … Y + yoff` (`render/sprite-placement.md` §2);
+    /// the plain cel draw (mode 5, light 0xFF) has no shade and blend
+    /// `Opaque`. [`super::panel_art::panel_sprite`] answers it.
     fn ui_image(&self, req: &ImageRequest, assets: &ViewAssets) -> Result<UiSprite, ViewError>;
 
     /// One sprite per drawn glyph, in drawing order (`ui/text.md`).
@@ -52,9 +56,10 @@ pub trait UiRules {
     /// [`TextHooks`]; [`Unspecified`] does so.
     fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError>;
 
-    /// TODO(spec: render/draw-order.md) (§B6): the pass number of UI items.
-    /// Every UI item gets key `(pass, 0, 0, 0)`, so the stable sort keeps
-    /// emission order (draw order = list order).
+    /// The pass number of UI items: 11, everything after `0x00476BC0`
+    /// (`render/draw-order.md` §10). Every UI item gets key
+    /// `(pass, 0, 0, 0)`, so the stable sort keeps emission order (draw
+    /// order = list order).
     fn ui_pass(&self) -> Result<u32, ViewError>;
 }
 
@@ -252,6 +257,8 @@ impl TextHooks for Unspecified {
 }
 
 impl UiRules for Unspecified {
+    /// No panel file registry here: [`super::panel_art::PanelArtRules`]
+    /// names the files (§22 r4).
     fn ui_image(&self, _: &ImageRequest, _: &ViewAssets) -> Result<UiSprite, ViewError> {
         Err(ViewError::unresolved("UI image", "ui/panels.md"))
     }
@@ -260,8 +267,9 @@ impl UiRules for Unspecified {
         text_sprites(self, req, assets)
     }
 
+    /// Pass 11 (`render/draw-order.md` §10).
     fn ui_pass(&self) -> Result<u32, ViewError> {
-        Err(ViewError::unresolved("UI pass", "render/draw-order.md"))
+        Ok(crate::scene::order::pass::UI)
     }
 }
 
@@ -318,8 +326,12 @@ impl UiInput for UiQueue {
 /// What one UI frame did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UiFrame {
-    /// Events no panel took, in order. Turning them into world intents is
-    /// TODO(spec: ui/controls.md) (§B4): they are reported, never acted on.
+    /// Events no panel took, in order. Each becomes a world-click
+    /// dispatch (`ui/controls.md` §6, §7 r5). TODO(spec: ui/controls.md
+    /// §6 — answered, not built): the dispatcher's action (§6 r5, r8–r11)
+    /// needs the client path compute (`0x00649970`) and collision maps,
+    /// which the client model does not hold; they are reported, never
+    /// acted on.
     pub unhandled: Vec<UiEvent>,
     /// Intents handed to the bridge this frame.
     pub sent: usize,
