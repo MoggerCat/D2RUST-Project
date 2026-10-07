@@ -1,12 +1,31 @@
-// Spec: specs/client/bridge.md (§3), specs/world/waypoints.md (§5.1, §6), specs/sim/path-placement.md (§13)
+// Spec: specs/client/bridge.md (§3), specs/world/waypoints.md (§5.1, §6), specs/sim/path-placement.md (§13), specs/sim/rng.md (§5.2), specs/world/objects.md (§2), specs/world/npc.md (§1.1), specs/world/quests.md (§2), specs/items/treasure.md (§4), specs/world/hirelings.md (Inputs)
 //! The single-player game of the app: `d2-server`'s [`SimGame`] on the
-//! wired `d2-sim` ([`ActionSim`] with the waypoint world [`ActionWorld`]),
-//! behind the in-process host ([`LocalLink`]), started on its own thread
-//! ([`ThreadLink`], see there why).
+//! full wired `d2-sim` world ([`WorldSim`]: the action systems with the
+//! world-generation state, population and monster init) with the wired
+//! host ([`WiredWorld`]: waypoints, the NPC, vendor, quest and cube
+//! systems, the interaction state), behind the in-process host
+//! ([`LocalLink`]), started on its own thread ([`ThreadLink`], see there
+//! why).
+//!
+//! Game creation (`rng.md` §5.2) runs at build, before any unit: the
+//! creation fields written to their home (`ActionEvents::create_game`:
+//! Normal, expansion, the `--seed` as the game seed `{N, 666}` unstepped,
+//! the fixed-seed branch of §5.2), then `WorldSim::create_game`'s four
+//! game-seed derivations in order (monster regions, object control, NPC
+//! control, quest control); the NPC and quest controls go to the wired
+//! host. The object control makes S→C 0x03 carry its `dwObjSeed` (game
+//! +0x80). With the user's files the drop state of the chest drop
+//! (`ActionHooks::object_drops`, `treasure.md` §4: the item, treasure and
+//! superunique tables of `d2_server::world_data::tables::drop_tables`)
+//! and the hireling tables (`InteractionState::hireling_tables`) are
+//! installed too. The game has one store of unique bits (+0x1B24,
+//! `ActionHooks::uniques`): the chest drops and the host's economy share
+//! it.
 //!
 //! What runs is what the wiring has providers for (`docs/HANDOFF.md` §1
-//! rows 3j, 3k): the tick driver, the timer queue, the path provider, and
-//! the intents whose handler runs on a real provider (0x49 waypoints). Two
+//! rows 3j, 3k): the tick driver with population, the timer queue, the
+//! path provider, and the intents whose handler runs on a real provider
+//! (0x49 waypoints, the wired host's ids). Two
 //! acts are created and one room is streamed in Cold Plains (act 0) and
 //! Lut Gholein (act 1). The local player enters through the server's
 //! session flow (`d2_server::adapters::session_flow`,
@@ -24,32 +43,39 @@
 //! own DRLG and is in game.
 //!
 //! [`GameData::Live`] (with `D2_GAME_DIR`, [`LiveData::load`]) takes
-//! everything from the user's own files: the `levels` and `objects` tables
-//! (`d2_data::bin::load`; the waypoint object is the first `objects` row
+//! everything from the user's own files: every table view of the game
+//! (`d2_server::world_data::game::GameTables`: the loaded and fixed-up
+//! sets; the waypoint object is the first `objects` row
 //! with operate function 23 and init function 17, `waypoints.md` §5.1
-//! rule 1), and the level generation data of `d2_server::world_data`
+//! rule 1), the drop, hireling and save tables
+//! (`d2_server::world_data::tables`), and the level generation data of `d2_server::world_data`
 //! (drlg-data: the level-type table views, every lvlprest / lvlsub DS1
 //! and lvltypes DT1, parsed), so the acts are generated through
 //! `d2_sim::wiring::worldgen::levels::WorldTypes` (the Maze / Presets /
 //! Outdoor dispatcher) with the server's town level ids (`levels.md` §2
 //! step 2: 1, 40). [`GameData::Synthetic`] (no game files) uses the
 //! bridge test's rows and its synthetic two-act DRLG
-//! (`bridge/local_tests.rs`: one 8×8-tile floor room per level).
+//! (`bridge/local_tests.rs`: one 8×8-tile floor room per level), with
+//! empty skill, combat, monster, item and vendor tables, no drop state
+//! and no hireling tables.
 //!
-//! Seams without a provider are [`LocalSeams`]: the narrowest answers
-//! (`Pending`'s defaults) plus a store of what the sim itself sets
-//! (positions, the interaction target) and the transport outbox. Nothing
+//! Seams without a provider are [`LocalSeams`] (the action and world
+//! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
+//! defaults) plus a store of what the sim itself sets (positions, the
+//! interaction target) and the transport outbox; and
+//! [`super::rest::AppRest`] (the wired host's). Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{decode_all, Levels, Objects, Record, Skills};
-use d2_formats::d2s::D2s;
+use d2_data::tables::{decode_all, Levels, Monstats, Objects, Record, Skills};
+use d2_formats::animdata::AnimData;
+use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox};
+use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
 use d2_server::adapters::session::{load_save, Entry, GameSetup};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
@@ -58,29 +84,41 @@ use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
-use d2_server::world_data::tables::LevelTables;
+use d2_server::world_data::game::GameTables;
+use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
 use d2_server::world_data::{archive as world_archive, Dt1Files, WorldFiles};
+use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::combat::CombatTables;
-use d2_sim::drlg::maze::Maze;
+use d2_sim::drlg::maze::{Maze, MazeData};
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
     LevelTypes, RoomGrids, RoomKind, TileInfo, TileRect, TileSource,
 };
 use d2_sim::game::Game;
+use d2_sim::items::ItemTables;
+use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
 use d2_sim::units::hooks::UnitData;
 use d2_sim::units::lifecycle::AllocRequest;
-use d2_sim::units::{RoomId, UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables, DrlgWorld, Pending};
+use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
+use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldState, WorldTables};
+use d2_sim::world::hirelings::HirelingTables;
+use d2_sim::world::npc::HireRow;
+use d2_sim::world::objects::ObjectTables;
+use d2_sim::world::quests::{PlayerQuests, QuestTables};
+use d2_sim::world::vendors::VendorTables;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
-use d2_sim::drlg::outdoor::{SubFile, SubFiles};
-use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
+use d2_sim::drlg::outdoor::{OutdoorData, SubFile, SubFiles};
+use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData};
 
+use super::rest::{AppRest, Interactions};
 use super::server_thread::{ThreadLink, ThreadStopped};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
@@ -88,7 +126,10 @@ use crate::bridge::world::{LevelRow, SkillRow};
 use crate::bridge::LOCAL_CLIENT;
 
 /// The game's dispatch and world host.
-pub type Sim = SimGame<ActionSim<LocalSeams>, ActionWorld>;
+pub type Sim = SimGame<WorldSim<LocalSeams>, World>;
+
+/// The wired host of the app's game.
+pub type World = WiredWorld<AppRest>;
 
 /// The local link over [`Sim`] with clock `C`.
 pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
@@ -101,6 +142,9 @@ pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
+/// Game +0x6A of a single-player game: 3 (`rng.md` §5 open question,
+/// answered: the client's create message carries 3, stored at +0x6A).
+pub const GAME_TYPE: u8 = 3;
 /// Sub-tile x and y of the waypoint object from the origin of the town's
 /// first room (inside the synthetic 8 × 8-tile room, 40 sub-tiles square).
 pub const WAYPOINT_X: i32 = 20;
@@ -121,18 +165,33 @@ pub const GAME_SETUP: GameSetup = GameSetup {
 };
 
 /// The local client's C→S 0x67 (`intents-events.md` §2.5): the
-/// character class and name above, Normal, expansion (flags bit 20) with
-/// bit 2 set, locale 0; passes the server's stated checks.
+/// character class and name above, game type 3 (single player's create
+/// message, `rng.md` §5 open question answered: `0x00477CDF`), Normal,
+/// expansion (flags bit 20) with bit 2 set, locale 0; passes the server's
+/// stated checks.
 ///
 /// TODO(spec: the client's 0x67 sender, the character-select / game
-/// menus): the game name, game type, template, arena and the bytes 43–44
+/// menus): the game name, template, arena and the bytes 43–44
 /// the original client fills are not specified; they are zero here (no
 /// server rule d2rs runs reads them, `session_flow` module docs).
 pub fn create_request() -> CreateGame {
+    create_request_for(&Character::New)
+}
+
+/// The local client's C→S 0x67 for `character`: [`create_request`]'s,
+/// with a save's class (+0x28) and name (+0x14) for
+/// [`Character::Save`] (the client sends the selected character's,
+/// `intents-events.md` §2.5).
+pub fn create_request_for(character: &Character) -> CreateGame {
+    let (class, name) = match character {
+        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME),
+        Character::Save(save, _) => (save.header.class, save.header.name_bytes()),
+    };
     let mut char_name = [0u8; 16];
-    char_name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
+    char_name[..name.len()].copy_from_slice(name);
     CreateGame {
-        class: PLAYER_CLASS as u8,
+        game_type: GAME_TYPE,
+        class,
         difficulty: GAME_SETUP.difficulty,
         char_name,
         flags: create_flags::EXPANSION | 0x4,
@@ -155,9 +214,8 @@ pub enum Character {
     #[default]
     New,
     /// A parsed `.d2s` loaded onto the new player
-    /// (`d2_server::adapters::session::load_save`). The app has no
-    /// production `d2s::SaveTables` yet, so only callers that parse a save
-    /// themselves give one.
+    /// (`d2_server::adapters::session::load_save`); `d2-client play
+    /// --save` reads one with [`LiveData::read_save`].
     Save(Box<D2s>, LoadContext),
 }
 
@@ -184,18 +242,28 @@ pub enum BuildError {
     Archives { dir: String, message: String },
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
+    /// Game creation's NPC or quest control (`rng.md` §5.2).
+    #[error("game creation: {0}")]
+    Creation(#[from] d2_sim::wiring::worldgen::CreationError),
+    /// `--save`: the file could not be read, or it is not a save the
+    /// reader takes (`formats/d2s.md` §1, §10).
+    #[error("save {path}: {message}")]
+    Save { path: String, message: String },
     #[error(transparent)]
     Thread(#[from] ThreadStopped),
 }
 
-/// The action wiring's seams without a provider. Positions and the
-/// interaction target are stored as the sim sets them; messages the sim
+/// The action and world wiring's seams without a provider. Positions
+/// and the interaction target are stored as the sim sets them (the
+/// interaction in the store shared with the wired host's rest,
+/// [`Interactions`]); messages the sim
 /// sends wait in `sent` for the world handlers ([`Outbox`]); warp and
-/// arrival mode, whose bodies are unwritten specs, are logged.
+/// arrival mode, whose bodies are unwritten specs, are logged. The world
+/// wiring's seams keep `WorldPending`'s defaults.
 #[derive(Debug, Default)]
 pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
-    pub interact: BTreeMap<UnitId, (u8, u32)>,
+    pub interact: Interactions,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
 }
@@ -208,13 +276,16 @@ impl Pending for LocalSeams {
         self.pos.insert(unit, (x, y));
     }
     fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
-        self.interact.entry(player).or_insert((unit_type, guid));
+        self.interact
+            .borrow_mut()
+            .entry(player)
+            .or_insert((unit_type, guid));
     }
     fn reset_interact(&mut self, player: UnitId) {
-        self.interact.remove(&player);
+        self.interact.borrow_mut().remove(&player);
     }
     fn interact_guid(&self, player: UnitId) -> Option<u32> {
-        self.interact.get(&player).map(|i| i.1)
+        self.interact.borrow().get(&player).map(|i| i.1)
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -227,6 +298,8 @@ impl Pending for LocalSeams {
         self.log.push(format!("arrival mode {}", player.0));
     }
 }
+
+impl WorldPending for LocalSeams {}
 
 impl Outbox for LocalSeams {
     fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
@@ -384,24 +457,101 @@ pub struct LiveData {
     pub levels: LevelTables,
     /// Every DS1 / DT1 the level types read, parsed.
     pub files: WorldFiles,
+    /// The loaded and fixed-up sets and `AnimData.d2`: every other table
+    /// view of the game.
+    pub tables: GameTables,
+    /// The chest drop's tables (`ActionHooks::object_drops`).
+    pub drops: Arc<DropTables>,
+    /// `InteractionState::hireling_tables`.
+    pub hirelings: HirelingTables,
+    /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
+    pub save: SaveData,
     /// The archive set itself (the client's other readers: sounds).
     pub archives: Arc<ArchiveSet>,
 }
 
 impl LiveData {
-    /// Loads the waypoint tables and the level data (`world_data::archive::
-    /// load`: a named file that is missing or does not parse is an error;
-    /// nothing falls back to synthetic data).
+    /// Loads the table sets, the waypoint, drop, hireling and save tables
+    /// and the level data (a table or a named file that is missing or does
+    /// not parse is an error; nothing falls back to synthetic data).
     pub fn load(archives: Arc<ArchiveSet>) -> Result<Self, BuildError> {
         let waypoints = WaypointTables::live(&archives)?;
-        let (levels, files) = world_archive::load(&archives)?;
+        let tables = GameTables::load(&archives)?;
+        let levels = LevelTables::from_fixed(&tables.fixed)?;
+        let files = WorldFiles::load(
+            &levels.drlg,
+            &levels.preset,
+            &levels.outdoor,
+            world_archive::reader(&archives),
+        )?;
         Ok(LiveData {
             waypoints,
             levels,
             files,
+            drops: Arc::new(drop_tables(&tables.fixed)?),
+            hirelings: hireling_tables(&tables.fixed)?,
+            save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
+            tables,
             archives,
         })
     }
+
+    /// Reads and checks the save `bytes` on the app's game
+    /// (`d2s::read`, `formats/d2s.md` §1–§8, with the header checks of
+    /// §2.2 rules 4–5 against [`GAME_SETUP`]: Normal, expansion, not
+    /// hardcore). The client's name is the save's own: the client sends
+    /// the selected character's name in its C→S 0x67
+    /// ([`create_request_for`]).
+    pub fn read_save(&self, bytes: &[u8]) -> Result<D2s, d2s::D2sError> {
+        let opts = ReadOptions {
+            expansion: GAME_SETUP.expansion,
+            game: Some(d2s::GameContext {
+                client_name: save_name(bytes).to_vec(),
+                expansion: GAME_SETUP.expansion,
+                hardcore: false,
+                difficulty: GAME_SETUP.difficulty,
+            }),
+        };
+        d2s::read(bytes, &opts, &self.save)
+    }
+}
+
+/// The character name of a save's bytes (`formats/d2s.md` §2.1: +0x14,
+/// 16 bytes, +0x23 read as 0 (§2.2 rule 4), up to the first NUL); empty
+/// for a file shorter than the header.
+pub fn save_name(bytes: &[u8]) -> &[u8] {
+    let Some(field) = bytes.get(0x14..0x23) else {
+        return &[];
+    };
+    let end = field.iter().position(|&b| b == 0).unwrap_or(field.len());
+    &field[..end]
+}
+
+/// The character of `d2-client play --save <file.d2s>`: the file read
+/// and checked with the user's tables ([`LiveData::read_save`]), loaded
+/// at the join with [`LoadContext`] of the app's game (Normal; the saved
+/// map seed does not apply: the app's game runs on a fixed seed, game
+/// +0x84 = 1, `formats/d2s.md` §2.2 rule 8, `rng.md` §5.2). Synthetic
+/// data has no save tables: an error.
+pub fn load_character(data: &GameData, path: &std::path::Path) -> Result<Character, BuildError> {
+    let err = |message: String| BuildError::Save {
+        path: path.display().to_string(),
+        message,
+    };
+    let GameData::Live(d) = data else {
+        return Err(err(
+            "reading a save needs the game's tables (D2_GAME_DIR)".into()
+        ));
+    };
+    let bytes = std::fs::read(path).map_err(|e| err(e.to_string()))?;
+    let save = d.read_save(&bytes).map_err(|e| err(e.to_string()))?;
+    Ok(Character::Save(
+        Box::new(save),
+        LoadContext {
+            difficulty: GAME_SETUP.difficulty,
+            map_seed_applies: false,
+        },
+    ))
 }
 
 /// Where the game's tables and levels come from.
@@ -623,9 +773,144 @@ pub struct LocalGame {
     pub waypoint_guid: u32,
 }
 
-/// Builds the game on `seed`: the DRLG of both acts, one room streamed
+/// The tables game creation and the wired host read beyond the DRLG's.
+struct GameParts {
+    action: ActionTables,
+    stats: StatData,
+    units: UnitData,
+    world: WorldTables,
+    /// The level-type handle of the world state (preset lookups).
+    world_types: SharedTypes,
+    objects: ObjectTables,
+    monstats: Vec<Monstats>,
+    hire_rows: Vec<HireRow>,
+    items: ItemTables,
+    vendors: VendorTables,
+    anim: Option<Arc<AnimData>>,
+    vitals: Option<Arc<VitalsTables>>,
+    /// The chest drop's tables; `None`: no drop (synthetic).
+    drops: Option<Arc<DropTables>>,
+    /// `None`: the mercenary calls report no tables (synthetic).
+    hirelings: Option<HirelingTables>,
+}
+
+impl GameParts {
+    /// No game files: the waypoint rows, everything else empty; the world
+    /// state's level types over the synthetic DRLG view with no preset,
+    /// outdoor or maze data.
+    fn synthetic(wp: &WaypointTables) -> Result<Self, BuildError> {
+        let presets = PresetData {
+            defs: Vec::new(),
+            monpreset_acts: Default::default(),
+            monpreset: Vec::new(),
+            monstats_count: 0,
+            superuniques_count: 0,
+            hdm_item: -1,
+            tables: d2_sim::drlg::preset::PresetTables::spec()
+                .map_err(|e| BuildError::Tables(format!("preset-tables.tsv: {e}")))?,
+        };
+        let world_types = SharedTypes::new(WorldTypes::new(
+            Arc::new(synthetic_drlg_data()),
+            Maze::new(MazeData::default()),
+            presets,
+            OutdoorData::default(),
+            Box::new(d2_server::world_data::Ds1Files::default()),
+            Box::new(d2_sim::drlg::outdoor::SubFileMap::default()),
+        ));
+        Ok(GameParts {
+            action: empty_action_tables(),
+            stats: StatData::default(),
+            units: UnitData {
+                expansion: GAME_SETUP.expansion,
+                ..UnitData::default()
+            },
+            world: WorldTables {
+                levels: wp.levels.clone(),
+                ..WorldTables::default()
+            },
+            world_types,
+            objects: ObjectTables {
+                objects: wp.objects.clone(),
+                shrines: Vec::new(),
+                levels: wp.levels.clone(),
+            },
+            monstats: Vec::new(),
+            hire_rows: Vec::new(),
+            items: ItemTables::default(),
+            vendors: VendorTables::default(),
+            anim: None,
+            vitals: None,
+            drops: None,
+            hirelings: None,
+        })
+    }
+
+    /// The user's tables (`GameTables`), the drop and hireling tables of
+    /// [`LiveData`], the world state's level types over the live data.
+    fn live(d: &LiveData) -> Result<Self, BuildError> {
+        let t = &d.tables;
+        Ok(GameParts {
+            action: t.action_tables()?,
+            stats: t.stat_data()?,
+            units: t.unit_data(GAME_SETUP.expansion)?,
+            world: t.world_tables()?,
+            world_types: live_types(d),
+            objects: t.object_tables()?,
+            monstats: t.rows()?,
+            hire_rows: t.hire_rows()?,
+            items: t.item_tables()?,
+            vendors: t.vendor_tables()?,
+            anim: Some(Arc::new(t.anim.clone())),
+            vitals: Some(Arc::new(t.vitals()?)),
+            drops: Some(d.drops.clone()),
+            hirelings: Some(d.hirelings.clone()),
+        })
+    }
+}
+
+/// Action tables with no rows (the synthetic game reads none).
+fn empty_action_tables() -> ActionTables {
+    ActionTables {
+        missiles: Vec::new(),
+        skills: SkillTables {
+            skills: Vec::new(),
+            skilldesc: Vec::new(),
+            missiles: Vec::new(),
+            skills_code: Vec::new(),
+            miss_code: Vec::new(),
+            level_cap: 0,
+            stat_count: 0,
+        },
+        combat: CombatTables {
+            charstats: Vec::new(),
+            difficultylevels: Vec::new(),
+            monstats: Vec::new(),
+            monstats2: Vec::new(),
+            hitclass: Vec::new(),
+        },
+        levels: Vec::new(),
+        skill_modes: Vec::new(),
+    }
+}
+
+/// The level-type dispatcher over the live data (`WorldTypes`, as
+/// drlg-data's game-file tests build it).
+fn live_types(d: &LiveData) -> SharedTypes {
+    SharedTypes::new(WorldTypes::new(
+        Arc::new(d.levels.drlg.clone()),
+        Maze::new(d.levels.maze.clone()),
+        d.levels.preset.clone(),
+        d.levels.outdoor.clone(),
+        Box::new(d.files.ds1.clone()),
+        Box::new(d.files.subs.clone()),
+    ))
+}
+
+/// Builds the game on `seed`: the DRLG of both acts, game creation
+/// (`rng.md` §5.2, module docs), one room streamed
 /// in the Rogue Encampment, Cold Plains and Lut Gholein, the waypoint
-/// object in the town's room, the path provider on, and the session flow
+/// object in the town's room, the path provider on, the wired host on
+/// the created controls, and the session flow
 /// set: no client record and no player until the client's C→S 0x67 and
 /// 0x6B are drained (the loader creates a [`Character::New`]).
 pub fn build(data: &GameData, seed: u32) -> Result<LocalGame, BuildError> {
@@ -639,9 +924,9 @@ pub fn build_with(
     character: Character,
 ) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
-    let mut levels = match data {
-        GameData::Synthetic => LevelSource::synthetic(),
-        GameData::Live(d) => LevelSource::live(d, seed),
+    let (mut levels, parts) = match data {
+        GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
+        GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
     };
     let mut dungeon = Dungeon::default();
     for (act, init_seed, town) in levels.acts {
@@ -664,39 +949,59 @@ pub fn build_with(
         tiles: levels.tiles,
         types: levels.types,
     };
-    let tables = ActionTables {
-        missiles: Vec::new(),
-        skills: SkillTables {
-            skills: Vec::new(),
-            skilldesc: Vec::new(),
-            missiles: Vec::new(),
-            skills_code: Vec::new(),
-            miss_code: Vec::new(),
-            level_cap: 0,
-            stat_count: 0,
-        },
-        combat: CombatTables {
-            charstats: Vec::new(),
-            difficultylevels: Vec::new(),
-            monstats: Vec::new(),
-            monstats2: Vec::new(),
-            hitclass: Vec::new(),
-        },
-        levels: Vec::new(),
-        skill_modes: Vec::new(),
-    };
+    let interact = Interactions::default();
+    // `rng.md` §5.2, the fixed-seed branch (`--seed N`): the game seed
+    // is `{N, 666}`, unstepped.
     let mut hooks = ActionHooks::new(
-        Arc::new(tables),
+        Arc::new(parts.action),
         world,
         Seed::init_low(seed),
-        LocalSeams::default(),
+        LocalSeams {
+            interact: interact.clone(),
+            ..LocalSeams::default()
+        },
     );
+    hooks.anim_data = parts.anim;
+    hooks.vitals = parts.vitals;
     // Game entry places through the path provider; on before any unit is
     // allocated.
     hooks
         .enable_paths()
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
-    let mut sim = ActionSim::new(Arc::new(StatData::default()), UnitData::default(), hooks);
+    let info = GameInfo {
+        expansion: GAME_SETUP.expansion,
+        difficulty: GAME_SETUP.difficulty,
+        game_type: GAME_TYPE,
+        ladder: GAME_SETUP.ladder,
+        ..GameInfo::default()
+    };
+    let state = WorldState::new(parts.world_types, Arc::new(parts.world), info);
+    let mut sim = WorldSim::new(Arc::new(parts.stats), parts.units, hooks, state);
+    // Game creation (`rng.md` §5.2): the creation fields to their home,
+    // then the four seeded controls in order, before any unit.
+    let fields = GameFields {
+        difficulty: GAME_SETUP.difficulty,
+        game_type: GAME_TYPE,
+        ladder: GAME_SETUP.ladder,
+        ..GameFields::new(Seed::init_low(seed), GAME_SETUP.expansion)
+    };
+    ActionEvents::create_game(&mut sim, &fields);
+    let quest_tables =
+        QuestTables::load().map_err(|e| BuildError::Tables(format!("quest tables: {e}")))?;
+    let created = sim.create_game(CreationTables {
+        objects: Arc::new(parts.objects),
+        monstats: &parts.monstats,
+        hirelings: parts.hire_rows,
+        quests: &quest_tables,
+    })?;
+    // The chest drop's state (`treasure.md` §4): its seed, creation
+    // fields and unique bits are the action wiring's.
+    sim.action.hooks().object_drops = parts.drops.map(|t| {
+        Box::new(DeathDrops::new(
+            t,
+            GameFields::new(Seed::init_low(0), false),
+        ))
+    });
     let mut game = Game::new();
     let mut rooms = Vec::new();
     for (act, level) in [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)] {
@@ -704,6 +1009,7 @@ pub fn build_with(
             .ensure_act(act)
             .map_err(|e| BuildError::Setup(format!("act {act}: {e:?}")))?;
         let r = sim
+            .action
             .hooks()
             .drlg
             .with_act(act, &mut game.lists, |d, svc| {
@@ -729,33 +1035,49 @@ pub fn build_with(
     // §1), as the server tests stage it.
     let (room0, rect0) = rooms[0];
     let (ox, oy) = (rect0.x * 5, rect0.y * 5);
-    let mut spawn = |ty: UnitType, class: u32, room: Option<RoomId>, x: i32, y: i32| {
-        let req = AllocRequest {
-            ty,
-            class,
-            room,
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: ty == UnitType::Player,
-        };
-        sim.with(&mut game, |g, v| v.allocate(g, &req, x, y))
-            .ok_or_else(|| BuildError::Setup(format!("allocating {ty:?} {class} failed")))
+    let req = AllocRequest {
+        ty: UnitType::Object,
+        class: wp_tables.object_class,
+        room: Some(room0),
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
     };
-    let waypoint = spawn(
-        UnitType::Object,
-        wp_tables.object_class,
-        Some(room0),
-        ox + WAYPOINT_X,
-        oy + UNIT_Y,
-    )?;
+    let waypoint = sim
+        .action
+        .with(&mut game, |g, v| {
+            v.allocate(g, &req, ox + WAYPOINT_X, oy + UNIT_Y)
+        })
+        .ok_or_else(|| BuildError::Setup("allocating the waypoint object failed".into()))?;
     let waypoint_guid = game
         .lists
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
-    let mut s: Sim = SimGame::with_events(game, sim);
-    s.world.waypoints = Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects));
+    // The wired host on the created controls.
+    let action = ActionWorld {
+        waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
+        ..ActionWorld::default()
+    };
+    let rest = AppRest {
+        interact,
+        expansion: GAME_SETUP.expansion,
+        ..AppRest::default()
+    };
+    // TODO(spec: the host clock of store generation, `vendors.md` edge
+    // case 10): `WiredWorld::now` stays 0; nothing in the app updates it.
+    let mut world = WiredWorld::new(
+        action,
+        parts.items,
+        created.quests,
+        created.npc,
+        parts.vendors,
+        rest,
+        0,
+    );
+    world.state.hireling_tables = parts.hirelings;
+    let mut s: Sim = SimGame::with_world(game, sim, world);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add
@@ -776,12 +1098,13 @@ pub fn build_with(
 
 /// The character load of the session flow (§8.2 rule 2): the player of
 /// the request's class, as the save loader leaves it (no room, at (0, 0),
-/// mode 1), then the [`Character`]'s values. What did not apply is
-/// logged in [`LocalSeams::log`].
+/// mode 1), then the [`Character`]'s values; the player's quest record
+/// (a new one: `quests.md` §1.7) and name go to the wired host's rest.
+/// What did not apply is logged in [`LocalSeams::log`].
 fn loader(
     character: Character,
     cold_plains_wp: Option<u8>,
-) -> CharacterLoader<ActionSim<LocalSeams>, ActionWorld> {
+) -> CharacterLoader<WorldSim<LocalSeams>, World> {
     Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
         let req = AllocRequest {
             ty: UnitType::Player,
@@ -792,15 +1115,20 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s.events.with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0)) else {
+        let Some(player) = s
+            .events
+            .action
+            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
+        else {
             s.events
+                .action
                 .hooks()
                 .x
                 .log
                 .push(format!("join: allocating player class {} failed", r.class));
             return Err(LOAD_FAILED);
         };
-        if let Some(u) = s.events.sys.units.get_mut(player) {
+        if let Some(u) = s.events.action.sys.units.get_mut(player) {
             u.mode = 1;
         }
         let entry = match &character {
@@ -808,6 +1136,7 @@ fn loader(
                 if let Some(index) = cold_plains_wp {
                     let set = s
                         .events
+                        .action
                         .hooks()
                         .waypoints
                         .entry(player)
@@ -816,6 +1145,7 @@ fn loader(
                         .set(u32::from(index));
                     if let Err(e) = set {
                         s.events
+                            .action
                             .hooks()
                             .x
                             .log
@@ -826,17 +1156,22 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((entry, report)) => {
-                    let log = &mut s.events.hooks().x.log;
+                    let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report
                             .unapplied
                             .iter()
                             .map(|u| format!("join: save load: {u:?}")),
                     );
+                    // TODO(spec: formats/d2s-load.md, the quest section
+                    // onto the quest record): the save's quest flags are
+                    // not applied; the record starts new.
+                    log.push("join: save load: quest records start new".into());
                     entry
                 }
                 Err(e) => {
                     s.events
+                        .action
                         .hooks()
                         .x
                         .log
@@ -845,6 +1180,11 @@ fn loader(
                 }
             },
         };
+        let name = r.char_name;
+        let n = name.iter().position(|&b| b == 0).unwrap_or(name.len());
+        let rest = &mut s.world.rest;
+        rest.quests.insert(player, PlayerQuests::default());
+        rest.names.insert(player, name[..n].to_vec());
         s.set_player(
             player,
             PlayerFields {
@@ -881,9 +1221,19 @@ pub fn start<C: Clock + Send + 'static>(
     seed: u32,
     clock: C,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with(data, seed, Character::New, clock)
+}
+
+/// [`start`] with the character the join loads.
+pub fn start_with<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build(&data, seed)?;
+        let g = build_with(&data, seed, character)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,

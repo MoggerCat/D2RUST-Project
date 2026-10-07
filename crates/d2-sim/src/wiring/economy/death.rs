@@ -67,12 +67,14 @@ pub struct DropTables {
 #[derive(Debug)]
 pub struct DeathDrops {
     pub tables: Arc<DropTables>,
-    /// The unique bits (+0x1B24) the drops read and set. The game seed
-    /// and the creation fields of a drop are the action wiring's
+    /// The fields of the last drop, written back after it. Nothing here
+    /// is read: the game seed, the creation fields and the unique bits
+    /// (+0x1B24) of a drop are the action wiring's
     /// (`ActionHooks::game_seed`, `ActionHooks::ai_info`,
-    /// `UnitData::expansion`, [`GameFields::from_action`]); only
-    /// `uniques` is read here, and the drop's fields are written back
-    /// (the seed to the action wiring).
+    /// `UnitData::expansion`, `ActionHooks::uniques`,
+    /// [`GameFields::from_action`]), and the seed and the unique bits
+    /// go back there (one unique-bit store per game, shared with the
+    /// host's economy); `uniques` here is left empty.
     pub fields: GameFields,
     /// Living players and the `players` setting (`treasure.md` Inputs).
     pub living_players: i32,
@@ -245,7 +247,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         h.game_seed,
         &h.ai_info,
         sim.data.expansion,
-        d.fields.uniques.clone(),
+        std::mem::take(&mut h.uniques),
     );
     let facts = fields.treasure_facts(d.living_players, d.players_setting);
     let data = TreasureData {
@@ -295,6 +297,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     };
     h.items = items;
     h.game_seed = fields.seed;
+    h.uniques = std::mem::take(&mut fields.uniques);
     d.fields = fields;
     if let Some(r) = sim.units.get_mut(unit) {
         r.seed = seed;

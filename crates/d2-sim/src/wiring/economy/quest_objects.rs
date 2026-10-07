@@ -22,7 +22,7 @@
 //! quest object's creation decides whether that order shows (HANDOFF §5).
 
 use crate::game::Game;
-use crate::items::{ItemTables, UniqueBits};
+use crate::items::ItemTables;
 use crate::wiring::action::{ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View};
 use crate::wiring::interaction::NpcRest;
 
@@ -43,16 +43,17 @@ pub enum QuestObjectRun {
 
 /// The host's quest parts lent to the action hooks for a call
 /// ([`QuestObjectHost`], `ActionHooks::quest_host`): the quest control,
-/// the quests' rest, the item tables and the unique bits. A route runs on
+/// the quests' rest and the item tables (the unique bits are the hooks'
+/// own, `ActionHooks::uniques`). A route runs on
 /// [`HostQuests`] over an economy built from the call's view (its item
-/// store and game seed lent and written back, as `with_economy` does),
+/// store, game seed and unique bits lent and written back, as
+/// `with_economy` does),
 /// without the deferred mercenary rewards (no object quest function
 /// grants one).
 pub struct QuestLoan<R> {
     pub quests: QuestControl,
     pub rest: R,
     pub tables: ItemTables,
-    pub uniques: UniqueBits,
 }
 
 impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestLoan<R> {
@@ -67,7 +68,7 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestL
             h.game_seed,
             &h.ai_info,
             v.data.expansion,
-            std::mem::take(&mut self.uniques),
+            std::mem::take(&mut h.uniques),
         );
         let mut items = std::mem::take(&mut h.items);
         let out = {
@@ -87,7 +88,7 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static> QuestObjectHost<X> for QuestL
         };
         v.h.items = items;
         v.h.game_seed = fields.seed;
-        self.uniques = fields.uniques;
+        v.h.uniques = fields.uniques;
         match out {
             QuestObjectRun::Ran => None,
             QuestObjectRun::HandBack(r) => Some(r),

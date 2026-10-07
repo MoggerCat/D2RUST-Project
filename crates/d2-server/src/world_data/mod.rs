@@ -18,6 +18,7 @@
 //! or does not parse is a load error (M07); nothing falls back.
 
 pub mod archive;
+pub mod game;
 pub mod tables;
 
 #[cfg(test)]

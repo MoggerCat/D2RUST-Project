@@ -56,7 +56,7 @@ pub fn object_chest_drop<X: Pending, F: FreeSpot>(
         h.game_seed,
         &h.ai_info,
         sim.data.expansion,
-        d.fields.uniques.clone(),
+        std::mem::take(&mut h.uniques),
     );
     let facts = fields.treasure_facts(d.living_players, d.players_setting);
     let area = area_level(levels, level, fields.difficulty, fields.expansion);
@@ -119,6 +119,7 @@ pub fn object_chest_drop<X: Pending, F: FreeSpot>(
     };
     h.items = items;
     h.game_seed = fields.seed;
+    h.uniques = std::mem::take(&mut fields.uniques);
     d.fields = fields;
     if let Some(r) = sim.units.get_mut(object) {
         r.seed = seed;

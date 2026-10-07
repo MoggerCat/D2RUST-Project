@@ -168,9 +168,11 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         l.host_mut()
             .game
             .events
+            .action
             .hooks()
             .x
             .interact
+            .borrow_mut()
             .insert(player, (2, wp));
     });
     let sent = app

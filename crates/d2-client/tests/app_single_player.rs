@@ -10,9 +10,11 @@ use d2_client::app::single_player::{
 };
 use d2_client::bridge::link::ServerLink;
 use d2_client::bridge::local::{LocalLink, PendingSession};
-use d2_proto::PROTOCOL_VERSION;
+use d2_proto::server::LoadAct;
+use d2_proto::{FixedMessage, PROTOCOL_VERSION};
 use d2_server::adapters::ProtoSizes;
 use d2_server::host::{Host, SystemClock};
+use d2_sim::rng::Seed;
 
 fn send_sync<T: Send + Sync>() {}
 
@@ -124,17 +126,39 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     link.send(SendQueue::System, &[0x6B]).unwrap();
     ms.fetch_add(40, Ordering::SeqCst);
     assert!(link.pump().unwrap().ticked);
-    let got = ids(link.receive());
+    let chunks = link.receive();
+    // S→C 0x03 carries game +0x80, the object control's `dwObjSeed`
+    // (`intents-events.md` §8.2, `rng.md` §5.2).
+    let load = chunks
+        .iter()
+        .find(|c| c[0] == LoadAct::ID)
+        .map(|c| LoadAct::decode(c).unwrap())
+        .expect("0x03 at the join");
+    let obj_seed = link
+        .with(|l| {
+            l.host_mut()
+                .game
+                .events
+                .action
+                .hooks()
+                .objects
+                .as_ref()
+                .map(|o| o.obj_seed)
+        })
+        .unwrap();
+    assert_eq!(Some(load.f8), obj_seed);
+    assert_ne!(load.f8, 0);
+    let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
     assert_eq!(got.last(), Some(&0x04), "{got:02X?}");
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;
             let (p, _) = single_player::local_player(sim).expect("joined");
-            let class = sim.events.sys.units.get(p).map(|u| u.class);
+            let class = sim.events.action.sys.units.get(p).map(|u| u.class);
             let fields = sim.player_fields(p).is_some();
             let faults = sim.session().map(|f| f.faults.len());
-            let h = sim.events.hooks();
+            let h = sim.events.action.hooks();
             let knows = h
                 .waypoints
                 .get_mut(&p)
@@ -244,8 +268,8 @@ fn live_data_generates_the_levels_from_the_users_files() {
     let data = GameData::select(Some(dir.as_ref()), false).unwrap();
     assert!(matches!(data, GameData::Live(_)));
     let mut g = single_player::build(&data, DEFAULT_SEED).unwrap();
-    assert!(g.sim.world.waypoints.is_some());
-    let dungeon = &g.sim.events.hooks().drlg.dungeon;
+    assert!(g.sim.world.action.waypoints.is_some());
+    let dungeon = &g.sim.events.action.hooks().drlg.dungeon;
     for (act, level) in [(0, 1), (0, COLD_PLAINS), (1, ACT2_TOWN)] {
         let d = dungeon.acts[act].as_ref().expect("act created");
         let l = d.find_level(level).expect("level allocated");
@@ -273,4 +297,117 @@ fn data_selection_falls_back_only_without_game_files() {
     ));
     let e = GameData::select(Some(missing), false).unwrap_err();
     assert!(e.to_string().contains("d2rs-no-game-dir"), "{e}");
+}
+
+/// Game creation at build (`rng.md` §5.2): on the `--seed` game seed
+/// `{N, 666}` (unstepped, the fixed-seed branch), the regions, the object
+/// control (`dwObjSeed` = the second step's lo', `objects.md` §2 rule 2),
+/// the NPC control and the quest control each take one step, before any
+/// unit; then the waypoint object's allocation takes one (§5.3). The
+/// controls are the wired host's. The synthetic game has no drop state
+/// and no hireling tables, and one unique-bit store (the hooks').
+// Covers: specs/sim/rng.md §5.2, §5.3; specs/world/objects.md §2
+#[test]
+fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
+    let mut g = single_player::build(&GameData::Synthetic, DEFAULT_SEED).unwrap();
+    let mut want = Seed::init_low(DEFAULT_SEED);
+    want.step();
+    let obj_seed = want.step();
+    want.step();
+    want.step();
+    want.step(); // the waypoint object's allocation
+    let h = g.sim.events.action.hooks();
+    assert_eq!(h.game_seed, want);
+    assert_eq!(h.objects.as_ref().map(|o| o.obj_seed), Some(obj_seed));
+    assert!(h.object_drops.is_none());
+    assert_eq!(h.uniques, Default::default());
+    let w = &g.sim.world;
+    assert!(w.quests.record(1).is_some(), "the quest control's records");
+    assert!(w.state.hireling_tables.is_none());
+    // M08: another seed gives another object seed.
+    let mut other = single_player::build(&GameData::Synthetic, DEFAULT_SEED + 1).unwrap();
+    let o = other
+        .sim
+        .events
+        .action
+        .hooks()
+        .objects
+        .as_ref()
+        .unwrap()
+        .obj_seed;
+    assert_ne!(o, obj_seed);
+}
+
+/// `--save` needs the user's tables: the synthetic data refuses it
+/// (no fallback), and the character name of a save is its header's
+/// (`formats/d2s.md` §2.1: +0x14, up to the NUL; +0x23 not read).
+// Covers: specs/formats/d2s.md §2.1, §2.2 r4
+#[test]
+fn a_save_needs_the_users_tables_and_names_its_character() {
+    let e = single_player::load_character(&GameData::Synthetic, "x.d2s".as_ref()).unwrap_err();
+    assert!(e.to_string().contains("D2_GAME_DIR"), "{e}");
+    let mut b = vec![0u8; 0x14F];
+    b[0x14..0x18].copy_from_slice(b"Kara");
+    assert_eq!(single_player::save_name(&b), b"Kara");
+    b[0x14..0x23].fill(b'a');
+    b[0x23] = b'z';
+    assert_eq!(single_player::save_name(&b), &[b'a'; 15][..]);
+    assert_eq!(single_player::save_name(&b[..0x20]), b"");
+}
+
+/// The game on the user's files: game creation's NPC control holds the
+/// `interact` NPCs' records, the chest drop's state and the hireling
+/// tables are installed, and the join runs.
+// Covers: specs/sim/rng.md §5.2; specs/world/npc.md §1.1; specs/items/treasure.md §4; specs/world/hirelings.md §10 r2
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR"]
+fn live_game_creation_installs_the_drops_and_the_hireling_tables() {
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let mut g = single_player::build(&data, DEFAULT_SEED).unwrap();
+    let h = g.sim.events.action.hooks();
+    assert!(h.object_drops.is_some());
+    assert!(h.objects.is_some());
+    let w = &g.sim.world;
+    assert!(w.state.hireling_tables.is_some());
+    assert!(!w.npc.records.is_empty(), "the interact NPCs' records");
+    assert_eq!(w.state.vendors.len(), w.npc.records.len());
+}
+
+/// `--save`: a save read with the user's tables joins (the class and
+/// name of its header in the 0x67, the load at the 0x6B). The save is
+/// `$D2_SAVE` (an expansion, softcore character saved on Normal).
+// Covers: specs/formats/d2s.md §1, §2.2, §9; specs/sim/intents-events.md §8.2 r2
+#[test]
+#[ignore = "needs the game files in D2_GAME_DIR and a save in D2_SAVE"]
+fn a_save_from_the_command_line_joins() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
+    let save = std::env::var("D2_SAVE").expect("D2_SAVE");
+    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let character = single_player::load_character(&data, save.as_ref()).unwrap();
+    let req = single_player::create_request_for(&character);
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start_with(data, DEFAULT_SEED, character, StepClock(ms.clone())).unwrap();
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    let (player, faults, log) = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let p = single_player::local_player(sim);
+            let faults = sim.session().map(|f| format!("{:?}", f.faults));
+            (p, faults, sim.events.action.hooks().x.log.clone())
+        })
+        .unwrap();
+    eprintln!("load log: {log:#?}");
+    assert!(player.is_some(), "joined; faults {faults:?}");
 }
