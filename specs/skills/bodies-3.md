@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–188 |
 |   3. Shared helpers, batch 4 | 189–340 |
 |   4. Bodies used by several monster skills | 341–529 |
-|   5. Bodies used by one monster skill | 530–713 |
-| Constants & data dependencies | 714–748 |
-| Randomness | 749–762 |
-| Edge cases & original bugs | 763–787 |
-| Test vectors | 788–802 |
-| Provenance | 803–821 |
-| Open questions | 822–832 |
+|   5. Bodies used by one monster skill | 530–943 |
+| Constants & data dependencies | 944–979 |
+| Randomness | 980–996 |
+| Edge cases & original bugs | 997–1036 |
+| Test vectors | 1037–1051 |
+| Provenance | 1052–1070 |
+| Open questions | 1071–1090 |
 <!-- /index -->
 
 ## Summary
@@ -711,6 +711,236 @@ The jump differs from Leap (`bodies-2.md` §2.13): the hit is rolled at
 the start and applied at action frame 2; the sandleaper hop aims from
 K's position, not the unit's.
 
+#### 5.15 srvst 48 Swarm Move `0x005CBBF0`
+
+No Ghidra function at this entry. Skill and L are not read.
+
+1. T none → 0. P none → 0. E none → 0.
+2. P step counts := 5 (`0x00648E70`); path type := 2 (toward); compute
+   the path; P's point count (`0x00648780`, P +0x28) ≠ 0 → step 4.
+3. Path type := 1 (A*); compute; point count = 0 → return 0.
+4. E flags := 1 (moving skill, `use.md` §5.2). Return 1.
+
+#### 5.16 srvdo 90 Swarm Move `0x005CBC80`
+
+1. R invalid → 0. E none → 0.
+2. E flags bit 2 set (the move ended): E flags := 0; v = `eval(calc2)`.
+   Else v = `eval(calc1)`.
+3. Frame event index (unit +0x38 bits 8+) := v. Return 1.
+
+#### 5.17 srvst 50 Quick Strike `0x005CBF30`
+
+T none → 0. Zeroed record (no roll: result 0); `start_combat(game, unit,
+T, record, 128)`. Return 1.
+
+#### 5.18 srvdo 92 Quick Strike `0x005CBF90`
+
+The Ghidra function ends at `0x005CBFC7`; the body runs to `0x005CC04D`.
+
+1. R invalid → 0. T none → 0.
+2. `apply_melee(game, unit, T)`; free T's combat records.
+3. m = `srvmissilea`. m < 0 and the unit is a monster → m = the
+   monstats missile of the unit's mode `0x0063E6B0(unit, 1)`: −1 when
+   the action frame (+0x4E) is 0 or no action event (1 or 2,
+   `0x00621920`) lies in the frames ((cur − speed) >> 8, cur >> 8] of the
+   raw current frame +0x44 and speed +0x4C; else the monstats column for
+   the mode by table `0x006EA938` (A1 `MissA1` +0x3A, A2 +0x3C, SC `MissC`
+   +0x46, S1–S4 +0x3E–+0x44, SQ +0x48; other modes −1).
+4. m < 0 or ≥ missiles count → 0.
+5. Straight `skill_missile(game, m, unit, skill, L, 0, 0, 0, 0, quant
+   1)`. Return 1.
+
+#### 5.19 srvdo 93 GargoyleTrap `0x005CC050`
+
+1. R invalid → 0. m = `srvmissilea`; not 0 ≤ m < count → 0.
+2. Unit flags |= 0x40. T none → 0.
+3. (tx, ty) = T's position, (ux, uy) the unit's. |tx − ux| < |ty − uy|:
+   x' = ux moved one step toward tx four times (stopping at tx), y' =
+   ty. Else x' = tx, y' = uy moved four steps toward ty.
+4. Record: flags 3 (position given, target relative), owner the unit,
+   class m, skill, L; start (ux + trunc((x' − ux) / 6) − 1, uy +
+   trunc((y' − uy) / 6) − 1); target offset (x' − ux, y' − uy). Create
+   (result not read). Return 1.
+
+#### 5.20 srvst 51 Submerge `0x005CC1D0`
+
+No Ghidra function at this entry. Unit flags &= ~0xE. Return 1.
+
+#### 5.21 srvdo 94 Submerge `0x005CC1F0`
+
+Action frame (+0x4E) := 0; current frame (+0x44 >> 8) ≤ 0 → unit +0x3C
+:= 0. Return 1. (No R, T or E test.)
+
+#### 5.22 srvdo 111 FetishAura `0x005CE670`
+
+1. Target position (tx, ty) fails → 0.
+2. Unit flags |= 0x40.
+3. r = R `Param4` (+0x154) + 2L (an invalid skill reads a null record:
+   fatal).
+4. Unit find around (tx, ty) radius r with filter 0x583 (`0x0056C210`:
+   `0x0065A950` / `0x0065AC70`, the finder no spec owns; freed by
+   `0x0056C2A0`). For each found U in order: U must not be hostile
+   (`0x00554200` = 0), must be of class 141…145 or 396…400, and must pass
+   `0x005C3420` (`bodies.md` §4.4 step 3, which requires hostile) →
+   `0x0056EBE0` apply_state {source the unit, target U, skill, L,
+   duration `Param2`·L, stat 68 (`attackrate`), value `Param1` + (L − 1)
+   ·`Param3`, state 25 (`fetishaura`), default callback}.
+5. Return 1.
+
+The two hostility tests exclude each other: no unit ever receives the
+state (Edge case 9).
+
+#### 5.23 srvst 52 Emerge `0x005CC220`
+
+No Ghidra function at this entry. Unit flags |= 0xE. Return 1.
+
+#### 5.24 srvdo 99 PrimePoisonNova `0x005CCD10`
+
+1. R invalid → 0. m = `srvmissilea` without a missiles record → 0.
+2. Unit flags |= 0x40.
+3. Record: flags 0x1F (position given, target relative, velocity
+   given, loops, velocity fixed point), owner = origin = the unit,
+   class m, position the unit's, level L (skill field 0), loops :=
+   `eval(calc1)`, velocity := missiles `Param1` (+0x38) << 6.
+4. n = max(`eval(calc2)`, 1).
+5. Ring 1: for i = 0, 2, …, 14: target offset (X[i], Y[i]); create.
+6. Velocity := `Param2` (+0x3C) << 6. n > 1: for i = 0, n, 2n, … while i
+   < 15: offset (X[i + 1], Y[i + 1]); create. Return 1.
+
+X, Y = the 16-entry offsets of `bodies-2.md` §2.16 (a second copy at
+`0x006E31E8` / `0x006E31A8`, same values). Unlike `burst` the
+velocities are << 6 and ring 1 always takes every second entry.
+
+#### 5.25 srvdo 152 DiabLight `0x005CC690`
+
+The same body as srvdo 95 (§4.2), instruction for instruction.
+
+#### 5.26 srvdo 100 DiabCold `0x005CCE80`
+
+1. R invalid → 0. Unit flags |= 0x40. T none → **return 1**.
+2. Zeroed record: result := 1 | `ResultFlags`; hit flags |= `HitFlags`;
+   `HitClass` ≠ 0 → hit class := it.
+3. Freeze length (+0x34) := `elem_len(unit, skill, L, 1)` (`0x00644F20`,
+   `levels.md`).
+4. `roll_elemental(unit, record, skill, L)`.
+5. `apply(game, unit, T, 1, record)` (`combat/damage.md` §5.2). T's
+   `hitpoints(6)` (raw getter) = 0 → result |= 2. Reaction
+   `0x0057CEE0(game, unit, T, record)`.
+6. `srvoverlay` in 1…overlay count (the count itself accepted) → overlay
+   on T. Return 1.
+
+#### 5.27 srvdo 101 FingerMageSpider `0x005CCFA0`
+
+1. R invalid → 0. m = `srvmissilea` without a record → 0.
+2. Unit flags |= 0x40.
+3. Record: flags 3 (position given, target relative), owner = origin =
+   the unit, class m, position the unit's, skill, L, loops :=
+   `eval(calc1)` (flag 8 is not set: unread).
+4. T exists: P turns toward T (`0x00649EF0(P, Tx, Ty, 0)` → turn,
+   `0x006485F0`); offset := T's position − the unit's. No T: offset :=
+   P's target point − the unit's position.
+5. Create (result not read). Return 1.
+
+#### 5.28 srvdo 102 DiabWall `0x005CD1C0`
+
+1. R invalid → 0. m = `srvmissilea`; not 0 ≤ m < count → 0.
+2. Unit flags |= 0x40.
+3. n = `eval(calc1)`.
+4. Record: flags 0x21 (position given, target absolute), owner the
+   unit, position the unit's, class m, level L (skill field 0), init
+   callback `0x005CD110`.
+5. Target position into the record target; failure → 0.
+6. For i = 0…n − 1: callback argument := i; create. Return 1.
+
+Callback `0x005CD110` (ECX missile M, EDX argument a; M none →
+nothing): as the jitter callback (`bodies-2.md` §2.3 steps 1–2: frames
+capped at 77, M's seed := `init_low(P target x + a)`), then one draw of
+M's seed, r = `lo' mod 100`; r ≥ 20 → path type 10, step counts := the
+frame count, compute the path; r < 20 → the straight path stays. About
+one wall missile in five flies straight.
+
+#### 5.29 srvst 54 DiabRun `0x005CD2C0`
+
+1. E none → 0. T none → 0.
+2. E flags := 0; E param 1 := T GUID; param 2 := T type.
+3. P target unit := none (`0x00648B90`); P target point := T's
+   position (`0x00648AD0`). Return 1.
+
+#### 5.30 srvdo 103 DiabRun `0x005CD380`
+
+Skill columns used: `Param1`…`Param6` (1.14d DiabRun: 8, 14, 5, 13, 16,
+6), `calc1`.
+
+1. R invalid → 0. E none → 0.
+2. E flags bit 2 set (the run ended): E flags := 0; frame count
+   (+0x48) := `Param1` << 8; frame event index := `Param2`. Return 1.
+3. cur = current frame (+0x44 >> 8).
+4. cur = `Param3`: P none → 0. v = max(`eval(calc1)` << 8, 0x100); P
+   velocity := pct(v, the unit's `velocitypercent(67)` (raw getter),
+   100); path type := 1 (A*); compute the path; E flags := 1. Return 1.
+5. cur = `Param4`: frame count := `Param5` << 8; frame event index :=
+   `Param6`. Return 1.
+6. Action frame (+0x4E) = 1: K = the unit of (type E param 2, GUID E
+   param 1); K exists and is in melee range (`0x00622C40(unit, K, 0)`):
+   1. Action frame := 0. Zeroed record; `skill_result(game, unit, K, R,
+      skill, L, record, 0)` (`bodies-2.md` §2.17).
+   2. Hit: hit flags := `HitFlags` | 0x20; `HitClass` ≠ 0 → hit class
+      := it; `roll_physical`, `roll_elemental` (`levels.md` §3.6);
+      `apply(game, unit, K, 1, record)`; K's life (raw stat 6) = 0 →
+      result |= 2; reaction `0x0057CEE0(game, unit, K, record)`.
+7. Return 1.
+
+The run loops its animation: frames `Param3` (start running) and
+`Param4` (loop back) re-arm the sequence, and the hit lands at action
+frame 1 when the target is in reach.
+
+#### 5.31 srvdo 104 DiabPrison `0x005CD5D0`
+
+1. R invalid → 0. c = `summon_class(unit, skill, L, &mode)`
+   (`bodies.md` §6.1); c < 0 → 0.
+2. K = T. No T: P exists and P's target y (+0x12, `0x00648A10`) = 2 → K
+   := the object (type 2) whose GUID is P's target x (+0x10); otherwise
+   → 0 (Open question 6).
+3. K's room none or in town (`0x0061AB00`) → 0.
+4. Prison spawn `0x005B34C0(game, K's room, 0, 0, K, c, 0)`: c ≠ 340
+   (`boneprison1`) or K none → nothing. Else the pattern spawn
+   `0x005B3270(game, room, Kx, Ky, 0, 340, mode 8, table 0x0073D4F0,
+   0)`: the table holds 4 pieces with "class + 1 per piece": (+1, +1)
+   kind 1, (+1, −1), (−1, −1), (−1, +1) kind 3; classes 340, 341, 342,
+   343 (`boneprison1`–`4`). Kind 1 spawns a leader (`0x005B3130(game,
+   room, x, y, class, 8, −1, 0, 0)`); kind 3, when a leader exists,
+   spawns its minion (`0x005B31B0(game, leader, x, y, class, 8, −1, 1,
+   0)`) (`monsters/init.md` §1 table).
+5. Return 1 (whatever the spawn gave).
+
+#### 5.32 srvdo 105 DesertTurret `0x005CD6A0`
+
+1. R invalid → 0. m = `srvmissilea`; not 0 ≤ m < count → 0.
+2. Unit flags |= 0x40. Target position (tx, ty) fails → 0.
+3. (dx, dy) = (tx − ux, ty − uy); both 0 → 0.
+4. Side step (a, b) by the signs of (dx, dy):
+
+   | dx \ dy | < 0 | 0 | > 0 |
+   |---|---|---|---|
+   | < 0 | (2, −2) | (0, −2) | (−2, −2) |
+   | 0 | (2, 0) | — | (−2, 0) |
+   | > 0 | (2, 2) | (0, 2) | (−2, 2) |
+
+5. n = `eval(calc1)`; h = trunc(n / 2). dx -= h·a, dy -= h·b.
+6. Record: flags 3 (position given, target relative), owner the unit,
+   class m, level L (skill field 0).
+7. n times: start := (ux + q, uy + q) with q = trunc(dx / 6) (the **x**
+   quotient for both coordinates, Edge case 14); target offset := (dx,
+   dy); create; dx += a, dy += b. Return 1.
+
+#### 5.33 srvdo 106 ArcaneTower `0x005CD870`
+
+1. R invalid → 0. m = `srvmissilea`; not 0 ≤ m < count → 0.
+2. Unit flags |= 0x40. T none → 0.
+3. v = missiles `Vel` + trunc(`VelLev` × L / 8) of m (`0x00663270`).
+4. `ring(game, unit, unit, m, skill, L, v)` (`bodies.md` §6.7: 64
+   missiles). Return 1.
+
 ## Constants & data dependencies
 
 | Item | Value | Where |
@@ -739,12 +969,13 @@ names last, by kind and index.
 | 5 | do 95 (the same without DiabLight) |
 | 4 | do 98 (MonTeleport …), do 113 (scrolls and books) |
 | 3 | do 110 (MissileSkill1, HireableMissile, RogueMissile) |
-| 2 | st 49, do 91 (Nest, EvilHutSpawner), st 63 (CorpseCycler, VineCycler), do 85 (UnHolyBolt, ShamanFire), do 96 (ZakarumHeal, Bestow), do 97 (Resurrect, Resurrect2), st 64 / do 109 (MonFrenzy; do 109 also BloodLordFrenzy) |
+| 2 | st 49, do 91 (Nest, EvilHutSpawner), st 63 (CorpseCycler, VineCycler), do 85 (UnHolyBolt, ShamanFire), do 96 (ZakarumHeal, Bestow), do 97 (Resurrect, Resurrect2), do 109 (MonFrenzy, BloodLordFrenzy; its start st 64, count 1, is placed beside it) |
 | 1 | do 3 (Throw 2), do 4 (Unsummon 3), do 5 (Left Hand Throw 4), st 42 + do 83 (Fire Hit 156), st 43 + do 84 (MaggotEgg 159), st 44 (MagottUp 161), st 45 + do 86 (MagottDown 162), do 87 (MagottLay 163), do 88 (AndrialSpray 164), st 47 + do 89 (Jump 165), st 48 + do 90 (Swarm Move 166), st 50 + do 92 (Quick Strike 168), do 93 (GargoyleTrap 172), st 51 + do 94 (Submerge 176), do 111 (FetishAura 177), st 52 (Emerge 180), do 99 (PrimePoisonNova 192), do 152 (DiabLight 193), do 100 (DiabCold 194), do 101 (FingerMageSpider 196), do 102 (DiabWall 197), st 54 + do 103 (DiabRun 198), do 104 (DiabPrison 199), do 105 (DesertTurret 203), do 106 (ArcaneTower 204), st 55 + do 107 (Mosquito 206), do 112 (MonCurseCast 212), do 108 (RegurgitatorEat 214), do 125 (Wake Of Destruction Sentry 281), st 59 + do 126 (Imp Inferno 282), do 141 (Baal Corpse Explode 285), st 60 + do 127 (Suck Blood 289), do 128 (Cry Help 290), st 61 (Self-resurrect 293), do 130 (Vine Attack 294), do 131 (Overseer Whip 295), do 132 (Imp Fire Missile 299), do 133 (Impregnate 300), do 134 (Siege Beast Stomp 301), st 62 + do 135 (MinionSpawner 302), do 136 (DeathMaul 308), do 137 (fenris rage 314), do 140 (Baal Tentacle 315), do 139 (Baal Cold Missiles 318), do 129 (Imp Teleport 330), do 148 (DoomKnightMissile 335), do 149 (NecromageMissile 338) |
 | 0 | do 36–41, 143 (progressive functions), 145–147 (state functions), 151 (item effect) |
 
-83 slots: 13 of count ≥ 2, 59 of count 1, 11 of count 0. Bodies past
-§5.14 are in `bodies-4.md`.
+83 slots: 12 of count ≥ 2, 60 of count 1, 11 of count 0. srvst 64
+(count 1) is placed beside its do, srvdo 109 (count 2), in §4. Bodies
+past §5.33 are in `bodies-4.md`.
 
 ## Randomness
 
@@ -758,6 +989,9 @@ steps call them (`bodies.md` Randomness).
 | §4.6, §4.7, §5.7, §5.11 | game / new monster | monster creation (`monsters/init.md`) |
 | §5.4 | unit | `melee_result`, then `start_combat` (and `mode_damage` element draws, `bodies-2.md` §2.1, between them) |
 | §5.13 | unit | `melee_result`, `roll_elemental` on a hit, `start_combat` |
+| §5.17 | unit | `start_combat` only (no `melee_result`) |
+| §5.26 | unit | `roll_elemental`, then `apply` |
+| §5.28 callback | missile | re-seeded from the target x + i, then one step (`lo' mod 100`) |
 | every missile created | game | `missiles.md` §R2.3 step 9 |
 
 ## Edge cases & original bugs
@@ -766,8 +1000,8 @@ steps call them (`bodies.md` Randomness).
    `sim/pathing.md` §2; the image bytes there give flags 0 and direction
    offset 0 (`0x006EB690` / `0x006EB648` + 4·101 read 0). The path is not
    computed with it here (a later AI path type replaces it).
-2. srvdo 95 and srvdo 88 leave the missile's skill field 0 (Attack); the
-   level is set. Damage formulas of those missiles that read the skill
+2. srvdo 95 / 152, 88, 99 and 102 leave the missile's skill field 0
+   (Attack); the level is set. Damage formulas of those missiles that read the skill
    see skill 0.
 3. `next_event` (§3.5) with a sequence reads the event byte of the
    current frame on every loop step: it returns that byte or 0, never a
@@ -784,6 +1018,21 @@ steps call them (`bodies.md` Randomness).
 8. srvdo 113 stops at the first matching scroll / book; a match in a
    node kind other than 1 or 2 returns 0 without looking further
    (§4.4).
+9. FetishAura (§5.22) requires a found unit to be both not hostile and
+   hostile (`0x005C3420` ends with the hostility test): it never applies
+   state 25. Only the unit find runs (allocation, no draw).
+10. DiabCold returns 1 without a target and accepts `srvoverlay` = the
+    overlay count; srvdo 97 and srvdo 91 accept 0 (§5.26, §4.11, §4.7).
+11. FingerMageSpider sets the record's loops without flag 8: the value
+    is ignored by missile creation (§5.27).
+12. DiabWall's callback leaves about 20 % of its missiles on a straight
+    path, decided by each missile's own re-seeded RNG (§5.28).
+13. srvdo 92 can take a monster's mode missile only when the current
+    tick passed an action event; otherwise it returns 0 after applying
+    the melee (§5.18).
+14. DesertTurret starts every missile at (ux + q, uy + q) with q the x
+    offset / 6: the y start ignores dy (§5.32). GargoyleTrap uses each
+    axis's own quotient (§5.19).
 
 ## Test vectors
 
@@ -829,3 +1078,12 @@ steps call them (`bodies.md` Randomness).
    per do (§5.13, §5.14).
 4. Recording: a Maggot Queen / Sand Maggot egg cast: egg count and
    modes (§5.7).
+5. The unit finder `0x0065A950` / `0x0065AC70` (FetishAura) has no
+   owning spec (`missiles/bodies-2.md` Open question 3); FetishAura's
+   result does not depend on it (Edge case 9).
+6. DiabPrison without a target reads P +0x10 / +0x12 as (GUID, type 2)
+   of an object: which caller stores an object target that way (AI
+   `0x005FD55B` also calls `0x005B34C0`).
+7. `0x005B3270` (pattern spawn with a coordinate table; also called by
+   population `0x0054E1CB`): owner `monsters/init.md`; only the kinds
+   1 and 3 used by DiabPrison are stated here.
