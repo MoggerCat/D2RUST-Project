@@ -32,11 +32,11 @@
 |   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 505–522 |
 |   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 523–555 |
 | Constants & data dependencies | 556–569 |
-| Randomness | 570–605 |
-| Edge cases & original bugs | 606–631 |
-| Test vectors | 632–646 |
-| Provenance | 647–699 |
-| Open questions | 700–725 |
+| Randomness | 570–606 |
+| Edge cases & original bugs | 607–632 |
+| Test vectors | 633–664 |
+| Provenance | 665–717 |
+| Open questions | 718–748 |
 <!-- /index -->
 
 ## Summary
@@ -597,7 +597,8 @@ Allocate = L step + R(new) step (rooms.md). In generation order:
    (preset.md), then possibly maze file-rotation `roll(Files)` on L,
    then the preset build's own draws (preset.md).
 
-Recording status: the Act 1 recording (`traces/raw/20261005-232125-rng.jsonl`)
+Recording status (see also Test vectors, `pc2rec-d3-rng` builds of 28,
+29, 34, 35): the Act 1 recording (`traces/raw/20261005-232125-rng.jsonl`)
 initializes the level seeds of 8–12 (seq 2441–2445 server, 13390–13394
 client; Den of Evil = {4014346877, 666}) but contains no draw at any
 maze site (0x670C70–0x673FE0): no maze level is generated on entering
@@ -643,6 +644,23 @@ Level seed = {dwStartSeed + id, 666}, dwStartSeed 4014346869 (rng.md
 | Grow-tree target | Tal Rasha tomb with lvlmaze Rooms 6: 18 if staff tomb, 12 if boss tomb, else 6 | §5.2 |
 | ring(2) | 3 grows: N, W, S of F; F ends NW-shaped (mask 9), the three others SW/SE/NE; exactly one merge draw (on F, when the S cell is placed) | §5.1 |
 | Theme pass need | room count 9 → need 2, tries 18; count 16 → need 4, tries 32 | §8 |
+
+Recorded maze builds (`pc2rec-d3-rng`, TestSor, `-seed` 644409375,
+sha256 d51c14093db95195…; reached by waypoint, `check_rng` OK,
+`check_drlg_acts` 0 errors; `dwStartSeed` 4014346869, level seed
+{4014346869 + id, 666}). Den of Evil (8) and Cave Level 1 (9) have no
+waypoint and are not in it.
+
+| Level | Rect (x, y, w, h) | Rooms on arrival (client copy) |
+|---|---|---|
+| Barracks (28) | (3012, 890, 60, 70) | 48 |
+| Jail Level 1 (29) | (3500, 1000, 200, 200) | 14 |
+| Catacombs Level 1 (34) | (4500, 1000, 200, 200) | 12 |
+| Catacombs Level 2 (35) | (4500, 1300, 200, 200) | 14 |
+
+Maze-code draws start at seq 71170: `0x006711C1` and `0x00671273` 112
+each, `0x00673757` and `0x00673791` 120 each, `0x006739C9` 50, and
+others. No per-level §3–§9 simulation is compared yet.
 
 ## Provenance
 
@@ -702,6 +720,11 @@ sites; level seed writes at 0x642B62 for levels 8–12).
 1. Trace confirmation: no recording yet generates a maze level; record
    entering Den of Evil (8) and Cave Level 1 (9) and compare with the
    vectors above.
+   *Answered (2026-10-08, recorded: `pc2rec-d3-rng`)* in part: maze
+   levels 28, 29, 34 and 35 are generated (rects, room counts, draw
+   sites in Test vectors, "Recorded maze builds"). Still open: the 8
+   and 9 vectors (no waypoint, not reached unattended) and a §3–§9
+   simulation of 28, 29, 34, 35 to compare draw by draw.
 2. *Answered* (static): yes. Every act's DRLG takes `dwStartSeed` from
    the first step of `{init seed, 666}` (`drlg/levels.md` §3 steps 2–3,
    before any act-specific draw), and the init seed is game +0x7C for

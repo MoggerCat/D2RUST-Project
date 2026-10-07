@@ -42,19 +42,19 @@
 |   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
 |   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–519 |
 |   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 520–530 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–585 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 586–598 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 599–609 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 610–629 |
-|   20. 0x61 act video (`0x0045E660`) | 630–637 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 638–645 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 646–655 |
-| Constants & data dependencies | 656–667 |
-| Randomness | 668–672 |
-| Edge cases & original bugs | 673–689 |
-| Test vectors | 690–737 |
-| Provenance | 738–788 |
-| Open questions | 789–885 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–633 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 634–646 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 647–657 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 658–677 |
+|   20. 0x61 act video (`0x0045E660`) | 678–685 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 686–693 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 694–703 |
+| Constants & data dependencies | 704–715 |
+| Randomness | 716–720 |
+| Edge cases & original bugs | 721–737 |
+| Test vectors | 738–785 |
+| Provenance | 786–846 |
+| Open questions | 847–945 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -556,8 +556,8 @@ layer.
 
       | Case (first that holds) | 1.14d effect |
       |---|---|
-      | B0: `[0x007C0C68]` ≠ 0 | `[0x007C0C69]` := 1; `0x004B1640(U)`; **unit flag 0x2 := 0** |
-      | (always next) | txt := the NPC text record (`0x0049F900`, §5; none → fatal 0x1060); m := `0x00661400(txt, 0)`; class has `interact` and is not 537, 538, 539 or 527 → **U's mode := 1 and U faces the local player** (`0x00464420`: `0x00624690(U, 1)`, `0x00649EF0` on U's path) |
+      | B0: `[0x007C0C68]` ≠ 0 (never in 1.14d, r8) | `[0x007C0C69]` := 1; `0x004B1640(U)`; **unit flag 0x2 := 0** |
+      | (always next) | txt := the NPC text record (`0x0049F900`, §5; none → fatal 0x1060); m := `0x00661400(txt, 0)` (r9); class has `interact` and is not 537, 538, 539 or 527 → **U's mode := 1 and U faces the local player** (`0x00464420`: `0x00624690(U, 1)`, `0x00649EF0` on U's path) |
       | B1: the local player has a cursor item | `[0x007C0D29]` := 1, `[0x007C0D25]` := G, `[0x007C0D2D]` := class; `0x004B3C20`; `0x00455F20(8, 1, 0)` |
       | B2: m ≠ 0xFFFF | `[0x007C0DAE]` := 0; `0x00456300(0, 0)`; `[0x007C0C77]` := m; `0x004A10E0(U, m, 1)`; `0x004B1980(m)`; `[0x007C0C79]` := `0x004B1830()`; **C→S 0x31** (`31`, u32 G, u32 m; the server reads u16@5, `client-messages.tsv`); `[0x007C0C69]` := 1; `0x0049E7E0(0x004B6A30, 0)`; `0x004B1640(U)`; `[0x007C0DB0]` := 0 |
       | (next) | m2 := `0x00661440(txt, 0)`; class ≠ 527 → **the local player faces U** when its mode is 1 or 5 (`0x004644E0`); U has a path → **U's path stops** (`0x00648730`: path flag 0x20 cleared, point count +0x28 := 0) |
@@ -582,6 +582,54 @@ layer.
    mode, the local player's data +0x150…+0x15C. They are stated as
    model rules in `client/model.md` §17; the UI layer's request reaches
    the model through the bridge (`client/bridge.md` §10 r10).
+7. **The client quest record `[0x007C0D43]`, all writers** (2026-10-08,
+   open question 4; read by `0x004B32D0` for `ui/panels-3.md` §26 r4 and
+   `ui/inventory.md` §9 r5). The global holds a pointer to a 96-byte
+   quest flag record (`0x0065C430`: allocated, all bytes 0). Every
+   instruction of `Game.exe` that writes or passes it is one of:
+   - **create** (`0x004B23E0`, UI-state init): pointer := a new zeroed
+     record (with the game record `[0x007C0D47]`); run by the game UI
+     start `0x00456970` and by `0x004B32F0`;
+   - **destroy** (`0x004B24A0`): both records freed (`0x0065C490`),
+     pointers := 0; run by the game UI end `0x00456D80` and by
+     `0x004B32F0`;
+   - **reset** `0x004B32F0` = destroy then create (so all 96 bytes 0),
+     run only from `0x00453DE0`, i.e. when the local player is replaced
+     or freed (`client/model.md` §2 rule 5, §3 rule 1);
+   - **copy** of 0x28's Q (r2 with T = 6, r4 with T ≠ 6 and U present:
+     `0x0065C4D0(record, Q, 0x60, 0)`).
+   Every other reference (`0x004B1680`, `0x004B2AD0`, `0x004B3380`,
+   `0x004B3870`, `0x004B4830`, `0x004B66B0`, `0x004B32D0`) only reads
+   it, through the flag test `0x0065C310`. No other S→C message writes
+   it (0x29 writes `[0x007C0D47]`; 0x52 / 0x5E write quest-log bytes).
+   d2rs: the UI layer's 96-byte quest record, zeroed at game UI start and
+   on a local-player change, overwritten only by 0x28 as above.
+8. **`[0x007C0C68]` has no writer** (2026-10-08). The byte is the first
+   of the 0x160-byte UI-state block cleared by the UI-state init
+   `0x004B23E0` (`memset(0x007C0C68, 0, 0x160)` at `0x004B2404`); no
+   other instruction of `Game.exe` stores to it (`all.asm`: the only
+   other reference is the B0 test at `0x004B6E93`; no store to
+   `0x007C0C65`–`0x007C0C68` of any width, no base register built from
+   those addresses). So B0 never holds in 1.14d: d2rs keeps the byte
+   constant 0 and the B0 row is dead.
+9. **NPC text list walk** (2026-10-08; `0x00661510`, `0x006616E0`,
+   `0x006615F0`, `0x006615D0`, `0x00661400`, `0x00661440`). The list
+   that 0x27 builds (§5 r2.1) and the dialog branch reads:
+   1. Build `0x00661510`: count byte (message byte 6) ≥ 8 → fatal
+      assertion (`0x00661557`). For k = 0 … count − 1 a node {string id
+      = u16@10+4k, kind = u8@8+4k} is **prepended**, so the list is in
+      reverse message order.
+   2. Start `0x006616E0`, list of ≥ 2 nodes: stable insertion sort by
+      string id, ascending (comparator `0x006615D0`, unsigned u16), the
+      result written back in list order.
+   3. `0x00661400(list, i)`: the i-th (from 0) node of kind 0 in list
+      order → its string id; none → 0xFFFF. `0x00661440` the same for
+      kind 1. Other kinds are skipped by both.
+   So m = the smallest string id among the kind-0 entries of the last
+   type-1 0x27 (0xFFFF when none or count 0), m2 the smallest kind-1
+   string id. Example: entries (kind 0, 300), (kind 1, 50), (kind 0,
+   120) → m = 120, m2 = 50. The 1-entry kind-3 overhead case of §5 r2.1
+   does not rebuild the list, so m / m2 come from the previous list.
 
 ### 17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
 
@@ -785,6 +833,16 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
 `0x00478700`; §9 r4 `0x004B3380`; OQ7 all.asm scan of the writes of
 `0x007C0D25` / `0x007C0D29`; OQ9 `0x0049E3A0` (`0x0049E4D9`–
 `0x0049E52D`).
+§16 r7 (2026-10-08, PC 2 request from spec-ui-s4): all.asm scan of
+`[0x007C0D43]` (19 references in 10 functions, the call after each
+read), `0x004B23E0`, `0x004B24A0`, `0x004B32F0`, `0x0065C430`,
+`0x0065C310`, `0x004B6DD0`; callers `0x00456995`, `0x00456E22`,
+`0x00453DF9`, `0x004B32F9`, `0x004B32FE`.
+§16 r8–r9 (2026-10-08, `docs/handoff/impl-pc1-wiring.md` seams):
+all.asm scan of `0x7c0c6?` / `0x7c0c5?` operands (stores and
+immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
+`0x00661510`, `0x00661270`, `0x006616E0`, `0x006615F0`, `0x006615D0`,
+`0x0049F900` (= `[0x007BF250]`).
 
 ## Open questions
 
@@ -800,7 +858,9 @@ re-read on the 1.14d export): §5 r3 `0x004A1600` (`0x004A167A`,
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
-4. The client quest flags record `[0x007C0D43]`: which messages write it
+4. ~~The client quest flags record `[0x007C0D43]`~~: answered in §16
+   r7 (all writers: create / destroy / reset on a local-player change,
+   0x28 copies). Original text: which messages write it
    (0x28 / 0x29 / 0x52 / 0x5E are unowned) — needed by §1 r7 and §2
    r2.3. *Partly answered* (§12–§14): 0x29 writes the game record
    `[0x007C0D47]`, 0x52 and 0x5E write quest-log bytes, not the record.

@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 958–976 |
 | Test vectors | 977–1008 |
 | Provenance | 1009–1037 |
-| Open questions | 1038–1106 |
+| Open questions | 1038–1108 |
 <!-- /index -->
 
 ## Summary
@@ -1041,6 +1041,7 @@ item and path-placement specs).
    from the client's quest log code (`0x0045CC00` 0x52 handler). **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); per-quest tables §7–§11, Act I in §7, special cases §6.
 2. ~~Does Flavie's chat really draw twice from the player seed and list
    two lines? Settle with an RNG + packets recording of one Flavie chat.~~
+   PROVISIONAL: Flavie's chat draws twice from the player seed and lists two lines (because that is the reading of the handling records, §9 and `quests-act1.md` §10.3); settled by REC-11.
    Needs recording: R-PQ-1 (`docs/handoff/pc2-rec-pc2-quests.md`).
 3. ~~(Settled: the cow portal is reached through the cube's thunk table,
    `world/cube.md` §9.) A recording of a cow-portal transmute would still
@@ -1094,6 +1095,7 @@ item and path-placement specs).
 13. (Answered: `quests-act1-rest.md` §5: it raises the character
     progression in the client save flags; future owner the save spec.)
 14. ~~Which bits a played completion of each quest leaves (§1.8 rule 3).~~
+    PROVISIONAL: a played completion leaves exactly the bits §1.8 rule 3 and the per-quest tables give (because those are read from the quest handlers and no other writer is known); settled by REC-34.
     Needs recording (R-PQ-5, = HANDOFF §7 R-QC-1): a 1.14d character that completed every quest on
     Normal (expansion), saved after the last one and loaded once; dump
     the quest section (`d2s-tool dump`) and list, per slot, the bits

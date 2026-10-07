@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–369 |
-|   5. Client vitals sync (`0x00548760`) | 370–506 |
-| Constants & data dependencies | 507–523 |
-| Randomness | 524–527 |
-| Edge cases & original bugs | 528–539 |
-| Test vectors | 540–560 |
-| Provenance | 561–587 |
-| Open questions | 588–624 |
+|   4. Experience | 179–475 |
+|   5. Client vitals sync (`0x00548760`) | 476–612 |
+| Constants & data dependencies | 613–629 |
+| Randomness | 630–633 |
+| Edge cases & original bugs | 634–645 |
+| Test vectors | 646–666 |
+| Provenance | 667–702 |
+| Open questions | 703–739 |
 <!-- /index -->
 
 ## Summary
@@ -310,7 +310,7 @@ Caller `0x00580F59` (player death). In order:
      single-player traces, `sim/intents-events.md`): keep < base → q :=
      max(T − base, 0). Then q := min(q, gi).
    - pvp, q > gi (other game types only): stat 15 := gs − (q − gi) (0
-     when < 0 or above the stash limit `0x00623460`); stat 14 := q (0
+     when < 0 or above the stash limit `0x00623460`, a constant 2 500 000); stat 14 := q (0
      when < 0 or above the gold limit `0x00622E70`). Then (pvp, any q)
      drop q gold (`0x00535510(game, P, P's GUID, q)`,
      `items/inventory.md` §7.22).
@@ -341,17 +341,66 @@ rule 2 (`0x005391E0`, one caller `0x00535A8A`); its only reader is the
 getter `0x00539210` (one caller, `0x0057F80F`). 1.14d-confirmed (the
 three `+0x508` references to the client record in `all.asm`).
 
-1. **Corpse creation** `0x0057F700` (from the mode-17 `DD` start
-   `0x0057FCA0` at `0x0057FD1C`, `sim/units.md` §4.5): the corpse C is a new player-type
-   unit of P's class in mode 17 holding P's items (`items/inventory.md`).
-   v := client +0x508; C's stat 13 (`experience`) := `pct(v, 75, 100)`
+1. **Corpse creation** `0x0057F700(game, P, x, y, room)` (from the
+   mode-17 `DD` start `0x0057FCA0` at `0x0057FD1C`, §4.8 rule 2): the
+   corpse C is a new player-type unit of P's class in mode 17 holding
+   P's cursor and equipped items. v := client +0x508; C's stat 13
+   (`experience`) := `pct(v, 75, 100)`
    (`combat/damage.md` §0; inline at `0x0057F816`–`0x0057F86C`: v >
    0x100000 → (v / 100) × 75, else v × 75 / 100, 32-bit, toward
    zero); then client +0x508 := 0. A death with no experience loss
    (pvp killer, level 1, `DeathExpPenalty` 0) leaves the field 0, so
-   C holds 0.
+   C holds 0. In order (1.14d-read 2026-10-08):
+   1. Prune (`0x0057F690`, EAX P): every corpse record of P's
+      inventory (`0x0063D570`, next `0x0063D610`, GUID `0x0063D630`)
+      whose GUID no longer resolves to a player (`0x00552F60(game, 0,
+      GUID)`) is removed (`0x0063D4E0(inv, GUID, 1)`).
+   2. **No corpse**: P's corpse count (inventory +0x3C, `0x0063D5F0`)
+      > 15 → `0x0057F540(game, P)` and result none. That function
+      takes the cursor item, then body locations 0–12, off P (cursor:
+      client notice `0x0053D2E0`, cursor := none `0x0063C180`,
+      `0x00628170(item, 1, 1)`, `0x0063CC70`, `0x00621000(P, 1)`; a
+      body item must be in mode 1, else fatal, and is unequipped
+      `0x0057F410`), removes each from P (`0x0055A2A0(game, item, P,
+      1)`) and drops it at a free spot near P (`0x00555DA0`,
+      `0x00558AA0`); then g := P's gold (stat 14), stat 14 := 0, and g
+      is dropped (`0x00535510(game, P, P's GUID, g)`,
+      `items/inventory.md` §7.22). **Client +0x508 is not cleared**
+      on this path: the loss stays until the next death's §4.6 rule 2
+      overwrites it or a later corpse reads it.
+   3. Room null → fatal 0x2FD; cell lookup of (x, y) from it
+      (`0x00463740`) none → fatal 0x2FF. C := `0x00555230` (type 0, P's
+      class; x, y, game, cell room, flags 1, mode 17, GUID 0) (`sim/units.md`
+      §3.1); none → fatal 0x304.
+   4. C flags (+0xC4) &= ~0x4; C bound to P's client (`0x00553180`);
+      C's name := the client's character name (`0x00538830`,
+      `0x006220F0`); C's seed from game +0xD0 (`0x00552DF0`); C mode :=
+      17 (`0x00624690`); state 7 (`playerbody`) on (`0x00639DB0(C, 7,
+      1)`); C +0xC8 |= 0x1000; C +0xC4 |= 0x2.
+   5. Experience as above (read, clear `0x005391E0(client, 0)`, set C's
+      stat 13).
+   6. P's inventory records C (`0x0063D470(inv, C's GUID, 0, 1)`); C's
+      GUID = P's → fatal 0x31A; C's inventory owner GUID := P's
+      (`0x0063D430`).
+   7. Items, cursor first, then body locations 0–12 (a body item not in
+      mode 1 → fatal 0x339): cursor `0x0057F4F0`, body unequip
+      `0x0057F410(game, loc)`; `0x00628280(item, 0)`; removed from P
+      (`0x0055A2A0(game, item, P, 1)`). The cursor item goes into C's
+      grid (page `0x00621050(C, 0, game +0x70)`, `0x0063B950`, then
+      `0x0063B210(inv, item, 1)`; item flags &= ~0x2 and ~0x2000000,
+      mode 0, `0x00628170(item, 2, 1)`); a body item onto the same
+      location of C (`0x0063BDB0`, `0x0063B210(inv, item, 3)`, 4 for
+      locations 11 and 12; `0x00627D70(item, loc)`, flags as above,
+      mode 1, `0x00628280(item, 0xFF)`, `0x00628170(item, 8, 1)`).
+      Placed → `0x0063CC70(inv, item)`, `0x00621000(C, 1)`,
+      `0x00543D80(item)`. Not placed → dropped near P as in step 2.
+      Grid and belt items stay on P.
+   8. g := P's gold (stat 14); stat 14 := 0; `0x0057F390(game, C, g,
+      1)` (g > 0: gold piles for g, `0x0055A090`, each tagged with C);
+      corpse notice `0x0053DF80(C's GUID, 1)`. Result C.
 2. **Corpse pickup** `0x0057FB70(game, player P, corpse C)` (the item
-   take-back `0x00562F30`: `items/inventory-moves.md` §12)
+   take-back `0x00562F30`: `items/inventory-moves.md` §8.5: body pass,
+   stored-item passes, slot test `0x0055F2D0`, corpse removal)
    (the 0x16 PickItem path on a dead player, `items/inventory.md`
    §7.1 rule 2): C must have state 7
    (`playerbody`) and P must be allowed to take it (`0x0057FAF0`: C's
@@ -366,6 +415,63 @@ three `+0x508` references to the client record in `all.asm`).
 So a recovered corpse returns 75 % of the last death's loss, capped by
 §4.5; a second death before pickup overwrites the field, and the
 earlier corpse keeps its own stat 13.
+
+#### 4.8 Player death start and dead start (1.14d-read 2026-10-08)
+
+Who starts them: `combat/damage.md` §7.1 rule 5.4 (the only mode-0
+request); `sim/units.md` §4.5 table `0x006E1740` row 0 (unit form only)
+and the event-1 DT → DD change. Both take ECX game, EDX P; stack mode,
+target unit K (resolved by `0x00580A70`).
+
+1. **DT start** `0x00580EC0`:
+   1. Disguise check: `0x00646020(P)`: P lacks the shapeshift flag
+      (+0xC8 bit 0x8, `0x0063A400`) → 0; else every state of the
+      `disguise` list (data tables +0x17C, count +0x180) that P has
+      loses its stat list (`0x006256B0`, `0x006277E0`, `0x00626CD0`)
+      and is cleared (`0x00639DB0(P, s, 0)`), result 1. It runs for
+      every P.
+   2. Result 1 and P a Druid (type 0, class 5): game null → fatal
+      0x805; P has a cursor item (`0x0063C1E0` on +0x60) → return;
+      else the neutral start (table position form of row 1, `0x0057F020(game,
+      P, 1, 0, 0)`; a bad pointer → fatal 0x812) and return. **The
+      Druid does not die here**: no penalty, no mode 0, hit points
+      unchanged. Clearing the last `disguise` state also clears +0xC8
+      bit 0x8 (`0x00625A70` at `0x00625B56`), so the next death request
+      runs this start in full. Other classes go on at once.
+   3. Death penalties `0x00535AB0(game, P, K)` (§4.6).
+   4. Set mode 0 (`0x00553570`); P's client flag word (+0x0A) |= 8
+      (`0x00538650(client, 8, 1)`); prepare animation `0x005533D0`.
+   5. Dead clean-up `0x0057F330` (ESI P, EDI game): base stat 6
+      (`hitpoints`) := 0 (`0x00627260(P, 6, 0, 0)`); `0x00627540(P)`;
+      states cleared but the keep mask (`0x00639FB0(P, 0)`,
+      `sim/units.md` §4.6 rule 1.3.1: `plrstaydeath`); client +0x3D4
+      &= ~0x2 (`0x00538260(client, 0)`); dead-body footprint
+      `0x00649F70(P, 1)`; cancel event types 8, 9 (`0x00540E60`); cancel
+      0/1 (`0x00553990`).
+   6. Cancel 0/1 again (`0x00553990`), animation schedule `0x005539B0`
+      (`sim/units.md` §4.2).
+   7. P lacks state 7 (`playerbody`) → P flags (+0xC4) &= ~0x2.
+   8. K present: P ≠ K and (K a player, or K a monster whose owner
+      `0x0058F0D0` is a player other than P) → ear drop `0x0055A200(game,
+      P)` (item code `ear `, P's level, at a free spot near P); then the
+      0x5A death notice `0x0054D8A0(game, K, P)` (type 6, killer
+      resolved to its player owner, sent to every client `0x0054AA40`;
+      `sim/intents-events.md`) and the arena kill event
+      `0x0053F720(game, K, P)`.
+   9. End P's interaction `0x005350F0(game, P)`: unit +0x6C set and
+      the partner (+0x68 type, +0x64 GUID) found: player → trade end
+      `0x00568640`; monster → `0x00579130`; object → `0x005854D0`; item
+      of code `box ` → cube close `0x00567330`; then always the quest
+      hook `0x0058D560` (`world/quests-act5-2.md`).
+2. **DD start** `0x0057FCA0`: (x, y) := P's position (dynamic path,
+   `0x006488C0` / `0x00648900`); corpse creation `0x0057F700(game, P,
+   x, y, P's room)` (§4.7 rule 1); hireling death handling
+   `0x00575BC0` (`world/hirelings-2.md` §15); client flag word |= 8;
+   **character save** `0x00532400(game, P, name)` (`sim/tick.md`; the
+   condition "`[0x00883D50]` = 0 or client flag 4" is always true,
+   `formats/d2s.md` open question 8); set mode 17; prepare animation;
+   dead clean-up `0x0057F330` (rule 1.5); cancel 0/1. Nothing is
+   scheduled.
 
 ### 5. Client vitals sync (`0x00548760`)
 
@@ -584,6 +690,15 @@ stat points: three spends succeed, the fourth fails, result 2.
   `0x0052DA00`, `0x00530690`, `0x00414F10`, `0x00414B00` (strings
   `Diablo II`, `PlayerPos` at `0x006CC8B8`, `0x006E08A0`; imports
   `RegOpenKeyExA` / `RegQueryValueExA`).
+- §4.6 stash limit, §4.7 rule 1, §4.8 (2026-10-08, seams of
+  `docs/handoff/impl-pc1-wiring.md`): `disasm.py fn` on `0x00580EC0`,
+  `0x0057FCA0`, `0x0057F330`, `0x00646020`, `0x00538650`,
+  `0x00538260`, `0x005350F0` (jump table `0x005351AC` dumped),
+  `0x0057F690`, `0x0057F540`, `0x0057F390`, `0x0054D8A0`,
+  `0x0055A200`, `0x00580A70`; decompile of `0x0057F700`,
+  `0x00623460` (returns 2 500 000); table `0x006E1740` dumped (row 1
+  position form = `0x0057F020`); `0x00625A70` for the +0xC8 bit 0x8
+  clear.
 
 ## Open questions
 
@@ -595,7 +710,7 @@ stat points: three spends succeed, the fourth fails, result 2.
    `0x005405A0`, `0x0057E510`, `0x0057E860`. The hireling part (86/256
    share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
    `world/hirelings.md` §7. Open: the x87 party share's
-   precision-control word in force (§4.4 rule 6, as
+   precision-control word in force (PROVISIONAL: 53-bit, because `Game.exe` sets it once at start-up; settled by REC-21) (§4.4 rule 6, as
    `sim/stat-lists.md` open question 1); settle with a party recording
    (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
    players). The hireling level-up body (`0x00572840`) is the mercenary

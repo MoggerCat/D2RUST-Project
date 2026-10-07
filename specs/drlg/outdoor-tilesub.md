@@ -27,9 +27,9 @@
 | Constants & data dependencies | 242–258 |
 | Randomness | 259–266 |
 | Edge cases & original bugs | 267–278 |
-| Test vectors | 279–293 |
-| Provenance | 294–311 |
-| Open questions | 312–346 |
+| Test vectors | 279–294 |
+| Provenance | 295–313 |
+| Open questions | 314–353 |
 <!-- /index -->
 
 ## Summary
@@ -287,6 +287,7 @@ Recorded (`20261005-232125-rng.jsonl`):
 | Blood Moor room, room seed {223305360, 666} (alloc seq 6644), init step 2795816810 | sub-theme draws lo' 310527139, 1584266672, 2804909076, 4172721383, 3426375614, 3941659325 → r 39, 72, 76, 83, 14, 25 vs Prob0 30, 50, 90, 0, 50, 20 → mask 0b010100 (Puddles, Swamp Small); DT1 mask 0x44103 \| 0x40001 \| 0x400001 | seq 6646–6651 |
 | same room, client copy, reset seq 32973 {2795816810, 666} | scattered: Puddles `Max0` 8 then Swamp Small `Max0` 2 → 10 group rolls (`0x006701DB`); trials per pick 1, 14, 7, 20, 20, 20, 5, 20 (Trials0 20) and 3, 5 (Trials0 5); 115 (x, y) pairs | seq 32974–33381 |
 | per level copy | 198 (Blood Moor) and 222 (Cold Plains) sub-theme draws = 6 rows × 33 / 37 outdoor rooms | `outdoor.md` §Test vectors |
+| Cold Plains waypoint room, `Trials` −1 path (`pc2rec-d3-rng`, TestSor, `-seed` 644409375, sha256 d51c14093db95195…; waypoint Rogue Encampment → Cold Plains) | room-seed reset `init_low` {2333965949, 666} at `0x0066EE49` (seq 33772); one group roll `0x006701DB` (33773); 36 shuffle pairs `0x006702A4` / `0x006702EB` (33774–33845; aw·ah = 36); the other copy repeats it (72 pairs in all, up to seq 47852); no draw at `0x006702C3`; later rooms take the `Trials` > 0 path (`0x00670408` / `0x0067044D`, 65 each) | §4.2 steps 1, 3, 4 |
 
 Comparison (exact): the (site, seed after) sequence of every draw, and
 the resulting tile grids (via the tile-fill check of `rooms.md`).
@@ -307,7 +308,8 @@ the resulting tile grids (via the tile-fill check of `rooms.md`).
   replacement; the row loop then stops for `BordType` 0.
 - **Recorded**: as §Test vectors; the room vector (mask, Max/Trials
   structure) was predicted from the rules and patch_d2 `LvlSub.txt`
-  before counting.
+  before counting. The waypoint-room `Trials` −1 row is from
+  `pc2rec-d3-rng` (PC 2 recording lane, kept on PC 2).
 
 ## Open questions
 
@@ -321,6 +323,11 @@ the resulting tile grids (via the tile-fill check of `rooms.md`).
 2. Waypoint and shrine substitution (types 4/5, `Trials` −1 shuffles,
    theme 0) are not in the recording (no Act 1 waypoint/shrine room
    built): record entering Cold Plains far enough to build those rooms.
+   *Answered (2026-10-08, recorded: `pc2rec-d3-rng`)*: the waypoint
+   room's `Trials` −1 path draws as §4.2 (one group roll, then aw·ah =
+   36 shuffle pairs; Test vectors, last row). The first pair member came
+   from `0x006702A4` throughout (no `0x006702C3` draw). The per-draw
+   values are not yet compared with a §4.2 simulation of that room.
 3. *Answered* (data): patch_d2 `lvlsub.txt` (35 rows) has `CheckAll`
    only 0 or empty, so 1.14d never takes the §4.1 CheckAll path; it is
    kept for mods and tested with synthetic data only.

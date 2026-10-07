@@ -30,15 +30,15 @@
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
 |   25. Client object function dispatch | 77–166 |
-|   26. The client object functions | 167–364 |
-|   27. Client latches of the zoo and the preloads | 365–375 |
-|   28. What d2rs must model for §25–§27 | 376–388 |
-| Constants & data dependencies | 389–410 |
-| Randomness | 411–424 |
-| Edge cases & original bugs | 425–442 |
-| Test vectors | 443–469 |
-| Provenance | 470–491 |
-| Open questions | 492–498 |
+|   26. The client object functions | 167–365 |
+|   27. Client latches of the zoo and the preloads | 366–376 |
+|   28. What d2rs must model for §25–§27 | 377–389 |
+| Constants & data dependencies | 390–411 |
+| Randomness | 412–425 |
+| Edge cases & original bugs | 426–443 |
+| Test vectors | 444–470 |
+| Provenance | 471–492 |
+| Open questions | 493–499 |
 <!-- /index -->
 
 ## Summary
@@ -325,6 +325,7 @@ tests, `0x0046E100`), so in mode 0 a new overlay record is added every
 
 Mode = 1 and frame = `Start1` × 256 exactly (+0x12A, shifted) → write
 mode 2, frame := 0, `refresh(U)`, `reinit(U)`. Returns 1.
+PROVISIONAL: the generic step reaches mode 2 itself at the end of mode 1 (because the rule cannot hold after the step has advanced the frame at a non-zero speed); settled by REC-45.
 Pending: at call site A the generic step `0x004BCBB0` has already
 advanced the frame in the same update, so with a non-zero speed the
 frame is past `Start1` × 256 (live `Start1` 0, `FrameDelta1` 256) and

@@ -59,7 +59,7 @@
 | Edge cases & original bugs | 811–837 |
 | Test vectors | 838–857 |
 | Provenance | 858–889 |
-| Open questions | 890–931 |
+| Open questions | 890–934 |
 <!-- /index -->
 
 ## Summary
@@ -912,8 +912,11 @@ Created missiles and monsters draw on their own seeds.
    §56 server-hit step 4 points there.
 6. Server-do 32 (§57): confirm with a Tiger Strike / Royal Strike
    recording that no tigerfurytrail missile is ever created.
-7. `0x0058E920` (Tyrael's spawn in the Worldstone Chamber) and the quest
-   test `0x005444B0`: the quests spec should own both.
+7. Answered (2026-10-08): the quest test `0x005444B0(game, chain)` is
+   `world/quests.md` §2.3 (fatal 0x7C3 on a null game, 0x7C5 when the set
+   is not picked; no record → true; else not-intro byte +0x09 = 1) and
+   Tyrael's spawn `0x0058E920` is `world/quests-act5-2.md` §8.8 (its hook
+   table §10 names both Baal FX control bodies).
 8. *Answered* (`impl-missile-bodies-2` Q2): `elem_roll` returns the
    rolled amount (`missiles.md` §R9.6 return list), so the fire head
    heals by the fire roll (§41 step 2).

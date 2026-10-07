@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–558 |
-|   7. Starting on a channel | 559–641 |
-|   8. Volume and pan | 642–777 |
-|   9. Settings | 778–797 |
-|   10. Sample cache | 798–846 |
-|   11. Live data (1.14d) | 847–863 |
-|   12. Edge cases kept | 864–879 |
-|   13. d2rs mapping | 880–890 |
-| Constants & data dependencies | 891–898 |
-| Randomness | 899–909 |
-| Edge cases & original bugs | 910–914 |
-| Test vectors | 915–959 |
-| Provenance | 960–1004 |
-| Open questions | 1005–1085 |
+|   6. Sound tick | 311–559 |
+|   7. Starting on a channel | 560–642 |
+|   8. Volume and pan | 643–778 |
+|   9. Settings | 779–798 |
+|   10. Sample cache | 799–847 |
+|   11. Live data (1.14d) | 848–864 |
+|   12. Edge cases kept | 865–880 |
+|   13. d2rs mapping | 881–891 |
+| Constants & data dependencies | 892–899 |
+| Randomness | 900–910 |
+| Edge cases & original bugs | 911–915 |
+| Test vectors | 916–960 |
+| Provenance | 961–1005 |
+| Open questions | 1006–1086 |
 <!-- /index -->
 
 ## Summary
@@ -535,6 +535,7 @@ At the end of the update, if the tick advanced:
    `docs/handoff/impl-audio.md` ST4); whether the original's
    end tick fits that model (and by how much it jitters) is open
    question 12 (Needs recording).
+   PROVISIONAL: a one-shot ends in the first upkeep at which elapsed ticks × 40 ms ≥ the sample's duration (because it is the reading the spec gives as most plausible and the implementation's choice); settled by REC-19.
 4. **Device side of the natural end** (ST-4 remainder, `0x005153C0`,
    `0x005155D0`, `0x00515180`, `0x00515300`, `0x00516250`). Each
    in-memory voice is a looping DirectSound buffer of 0x20000 bytes

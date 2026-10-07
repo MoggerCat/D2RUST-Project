@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 464–482 |
 | Test vectors | 483–501 |
 | Provenance | 502–514 |
-| Open questions | 515–523 |
+| Open questions | 515–524 |
 <!-- /index -->
 
 ## Summary
@@ -518,5 +518,6 @@ draws once on the player's seed in `0x00585240` (object spec).
    recording of an orifice operate (result 0), a cancel (1) and a wrong
    item (4) shows what the client receives.~~ Until recorded d2rs sends 0
    and the conformance comparison masks byte 6 for these results.
+   PROVISIONAL: byte 6 of the 0x58 for results 0, 1, 4 is sent as 0 (because the original byte is stale stack data with no readable source); settled by REC-27.
    **Needs recording:** R-PQ-9 (`docs/handoff/pc2-rec-pc2-quests.md`, =
    HANDOFF §7 PC 2 list, `quests-act2-2.md` OQ1 line).

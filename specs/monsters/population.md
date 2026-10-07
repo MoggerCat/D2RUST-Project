@@ -676,7 +676,7 @@ Let M = monstats count and S = superuniques count.
 #### 11.3 Regular preset monster
 
 1. Swaps before the spawn: class 498 (catapult2) → 499 and 517
-   (catapultspotter2) → 518, when quest flag 0x1F (`0x005444B0`; Act 5
+   (catapultspotter2) → 518, when quest flag 0x1F (`0x005444B0`, `world/quests.md` §2.3; Act 5
    Shenk; quests spec) is set and the level is 110 (Bloody Foothills).
    In Nightmare and Hell, classes 453 (minion1) and 529 (deathmauler1) in
    level 110 are not placed.
