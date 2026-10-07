@@ -38,13 +38,13 @@
 |   R8. Pierce | 573–598 |
 |   R9. Server-do and server-hit catalogues | 599–828 |
 |   R10. Behaviour of the recorded missiles | 829–862 |
-|   R11. `missiles.txt` columns and their server use | 863–897 |
-| Constants & data dependencies | 898–924 |
-| Randomness | 925–957 |
-| Edge cases & original bugs | 958–981 |
-| Test vectors | 982–1061 |
-| Provenance | 1062–1104 |
-| Open questions | 1105–1157 |
+|   R11. `missiles.txt` columns and their server use | 863–903 |
+| Constants & data dependencies | 904–930 |
+| Randomness | 931–963 |
+| Edge cases & original bugs | 964–987 |
+| Test vectors | 988–1067 |
+| Provenance | 1068–1110 |
+| Open questions | 1111–1163 |
 <!-- /index -->
 
 ## Summary
@@ -894,6 +894,12 @@ functions that index the missile table: only client functions
 0x004C…–0x004D… read `InitSteps`; `Qty` and `SpecialSetup` have no
 reader; `ExplosionMissile` none) and no D2MOO server read. A heuristic
 search; open question 7.
+
+`ProgSound` is read only by client missile functions (`pCltDoFunc`
+table `0x0072A398`) 9, 29, 47 and 51; their conditions are owned by
+`audio/triggers-2.md` §16. Function 29 (`0x004D5310` → `0x004CE850`)
+tests the elapsed-frame argument against 315 (`cmp` with 0x13B at
+`0x004CE8AE`), not the missile id 315.
 
 ## Constants & data dependencies
 
