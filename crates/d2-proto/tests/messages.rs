@@ -3,7 +3,7 @@
 
 use d2_proto::client::{BindHotkey, CreateGame, EquipItem, SelectSkill, Walk, WalkToUnit};
 use d2_proto::schema::{FieldType, Gate, HandlerSize, Kind, Scope, SizeRule};
-use d2_proto::server::{LoadAct, SetStatWord};
+use d2_proto::server::{LoadAct, QuestInfo, SetStatWord};
 use d2_proto::{DecodeError, FixedMessage, CLIENT_MESSAGES, SERVER_MESSAGES};
 
 // Covers: specs/sim/intents-events.md §2.4 r7
@@ -186,4 +186,28 @@ fn descriptors() {
         let m = &SERVER_MESSAGES[id];
         assert!(m.size.is_never() && !m.senders.is_empty());
     }
+}
+
+/// S→C 0x28 recorded at an NPC (`client/msg-ui.md` §16 r1):
+/// `28 01 06000000 00 01 00…`, the 96-byte quest record at 7.
+#[test]
+fn quest_info_carries_its_record_whole() {
+    let mut b = [0u8; 103];
+    b[0] = 0x28;
+    b[1] = 1;
+    b[2] = 6;
+    b[7] = 1;
+    b[102] = 0xAB;
+    let m = QuestInfo::decode(&b).unwrap();
+    assert_eq!((m.type_, m.guid, m.f6), (1, 6, 0));
+    assert_eq!((m.flags[0], m.flags[95]), (1, 0xAB));
+    assert_eq!(m.encode(), b);
+    assert_eq!(QuestInfo::default().flags, [0; 96]);
+    assert_eq!(
+        QuestInfo::decode(&b[..102]),
+        Err(DecodeError::WrongSize {
+            expected: 103,
+            found: 102
+        })
+    );
 }

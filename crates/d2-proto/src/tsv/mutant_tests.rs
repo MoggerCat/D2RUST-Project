@@ -83,3 +83,25 @@ fn bits_layout_needs_fields() {
         assert!(layout(bad, &fixed).is_err(), "{bad:?}");
     }
 }
+
+#[test]
+fn byte_arrays_have_a_plain_length_and_fit_the_size() {
+    assert_eq!(field_type("bytes96"), Ok(FieldType::Bytes(96)));
+    assert_eq!(field_type("bytes1"), Ok(FieldType::Bytes(1)));
+    for bad in [
+        "bytes",
+        "bytes0",
+        "bytes096",
+        "bytes+1",
+        "bytes9x",
+        "bytes70000",
+    ] {
+        assert!(field_type(bad).is_err(), "{bad}");
+    }
+    let fixed = SizeRule::Fixed(42);
+    assert!(layout("s:bytes41@1", &fixed).is_ok());
+    let e = layout("s:bytes42@1", &fixed).unwrap_err();
+    assert!(e.contains("past the fixed size"), "{e}");
+    let e = layout("s:bytes4@1 a:u8@4", &fixed).unwrap_err();
+    assert!(e.contains("overlap"), "{e}");
+}

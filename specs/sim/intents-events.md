@@ -286,7 +286,8 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    ignored. D2MOO 1.10f declares them u32.
 10. Layouts: `layout` column, `name:type@offset`; types `u8`, `u16`,
     `u32` little-endian, `cstr` NUL-terminated, `cstr16` 16-byte field,
-    `uN@k` / `bitN@k` = bit fields of the u32 at k. Only offsets a 1.14d
+    `bytesN` N raw bytes (S→C records carried whole: 0x28, 0x29, 0x52,
+    0x5E), `uN@k` / `bitN@k` = bit fields of the u32 at k. Only offsets a 1.14d
     handler reads are listed.
 
 #### 2.5 System messages `0x0053F100`
