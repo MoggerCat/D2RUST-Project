@@ -343,3 +343,205 @@ fn confuse_remove_callback_restores_the_alignment() {
     assert!(log.contains(&format!("Alignment {{ u: {m}, a: 0, v: 1 }}")));
     assert!(log.contains(&format!("NodeRemove({m})")));
 }
+
+// ---------------------------------------------------------------- §6.9
+
+fn hammer_tables(c: &mut Code) -> crate::skills::SkillTables {
+    let mut r = body_rec();
+    r.srvmissilea = 1;
+    r.param1 = 16;
+    tabs(r, Code(c.0.clone()), 2)
+}
+
+// Covers: specs/skills/bodies-2b.md §6.9 r1, §6.9 r2
+#[test]
+fn blessed_hammer_refuses() {
+    let t = hammer_tables(&mut Code::new());
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 6));
+    // R invalid.
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 9, 1), 0);
+    // m <= 0: missile 0 is refused, too.
+    let mut t0 = t.clone();
+    t0.skills[1].srvmissilea = 0;
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t0, u, 1, 1), 0);
+    t0.skills[1].srvmissilea = 0xFFFF;
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t0, u, 1, 1), 0);
+    // No target position.
+    f.tpos.clear();
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & FLAG_40, 0);
+    assert!(f.missiles.is_empty());
+}
+
+// Covers: specs/skills/bodies-2b.md §6.9 r3, §6.9 r4, §6.9 r5
+#[test]
+fn blessed_hammer_missile_and_path() {
+    let t = hammer_tables(&mut Code::new());
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 6));
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 1, 3), 1);
+    assert_eq!(f.c.units[u].flags & FLAG_40, FLAG_40);
+    let m = f.missiles[0];
+    assert_eq!(
+        (m.flags, m.owner, m.origin, m.class, m.target_x, m.target_y),
+        (0x20, u, Some(u), 1, 5, 6)
+    );
+    assert_eq!((m.skill, m.level), (1, 3));
+    let log = f.take_log();
+    let at = log
+        .iter()
+        .position(|s| s.ends_with("Type(14)"))
+        .expect("type 14");
+    assert!(log[at + 1].ends_with("Compute"));
+    // No missile created: 0.
+    f.no_missiles = true;
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 1, 3), 0);
+}
+
+// Covers: specs/skills/bodies-2b.md §6.9 r6
+#[test]
+fn blessed_hammer_scales_with_concentration() {
+    let t = hammer_tables(&mut Code::new());
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 6));
+    f.missile_base = vec![(52, 10), (53, 20)];
+    // No Concentration: untouched.
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 1, 1), 1);
+    let m = f.c.units.len() - 1;
+    assert_eq!((f.c.get(m, 52), f.c.get(m, 53)), (10, 20));
+    // State 42 with damagepercent 40, Param1 16: c = 40 * 16 / 8 = 80.
+    let l = f.alloc_list(0, 0, None).unwrap();
+    f.set_list_state(l, 42);
+    f.list_set(l, 25, 40);
+    f.attach(u, l);
+    f.state_on(u, 42, true);
+    assert_eq!(b3_lvl18::blessed_hammer(&mut f, &t, u, 1, 1), 1);
+    let m = f.c.units.len() - 1;
+    assert_eq!((f.c.get(m, 52), f.c.get(m, 53)), (18, 36));
+}
+
+// ---------------------------------------------------------------- §6.10
+
+fn freeze_world(
+    lo: [u32; 2],
+) -> (
+    crate::skills::SkillTables,
+    crate::combat::CombatTables,
+    BodyFake,
+    usize,
+    [usize; 2],
+) {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 50;
+    r.auratargetstate = 51;
+    r.aurastat1 = 20;
+    r.aurastatcalc1 = c.f(7);
+    r.passivestat1 = 21;
+    r.passivecalc1 = c.f(3);
+    r.aurarangecalc = c.f(10);
+    r.auralencalc = c.f(100);
+    r.aurafilter = 0x103;
+    let t = tabs(r, c, 1);
+    let mut ms = monster_rec();
+    ms.coldeffect = 0xFF;
+    let mut ms2: Monstats2 = blank();
+    ms2.isatt = true;
+    let mut ct = combat_tables(vec![ms]);
+    ct.monstats2 = vec![ms2];
+    let (mut f, u) = world();
+    f.tpos.insert(u, (2, 0));
+    f.c.hostile = true;
+    let mut ms = [0; 2];
+    for (i, m) in ms.iter_mut().enumerate() {
+        *m = monster(&mut f, (2, i as i32));
+        f.c.units[*m].mode = 1;
+        f.c.units[*m].seed = crate::rng::Seed::new(lo[i], 0);
+        f.c.set(*m, 12, 1);
+    }
+    f.scan = ms.to_vec();
+    (t, ct, f, u, ms)
+}
+
+fn seed_with(want: std::ops::Range<u32>) -> u32 {
+    (0u32..)
+        .find(|&lo| want.contains(&(crate::rng::Seed::new(lo, 0).step() % 100)))
+        .unwrap()
+}
+
+// Covers: specs/skills/bodies-2b.md §6.10 text, §6.10 r1
+#[test]
+fn holy_freeze_self_list_has_its_own_remove_callback() {
+    let (t, ct, mut f, u, _) = freeze_world([0, 0]);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, true), 1);
+    let l = f.list_of(u, 50).expect("self list");
+    assert_eq!(l.callback, callback::HOLY_FREEZE);
+    // The srvdo 66 form keeps the default self callback.
+    let (t, ct, mut f, u, _) = freeze_world([0, 0]);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, false), 1);
+    assert_ne!(f.list_of(u, 50).unwrap().callback, callback::HOLY_FREEZE);
+}
+
+// Covers: specs/skills/bodies-2b.md §6.10 r2, §6.10 l2 r1
+#[test]
+fn holy_freeze_only_affects_cold_affected_monsters() {
+    let (t, mut ct, mut f, u, [m, other]) = freeze_world([0, 0]);
+    f.c.units[other].class = 1;
+    let mut ms = monster_rec();
+    ms.coldeffect = 0;
+    ct.monstats.push(ms);
+    ct.monstats2.push(blank());
+    let p = f.add(FUnit::new(UnitType::Player, 0), (2, 5));
+    f.c.units[p].mode = 1;
+    f.scan.push(p);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, true), 1);
+    assert!(f.list_of(m, 51).is_some(), "ColdEffect < 0");
+    assert!(f.list_of(other, 51).is_none(), "ColdEffect >= 0");
+    assert!(f.list_of(p, 51).is_some(), "other unit types pass");
+    // The plain form has no such test.
+    let (t, mut ct, mut f, u, [m, other]) = freeze_world([0, 0]);
+    f.c.units[other].class = 1;
+    ct.monstats.push(monster_rec());
+    ct.monstats2.push(blank());
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, false), 1);
+    assert!(f.list_of(m, 51).is_some() && f.list_of(other, 51).is_some());
+}
+
+// Covers: specs/skills/bodies-2b.md §6.10 l2 r2, §6.10 l2 r3
+#[test]
+fn holy_freeze_applies_the_aura_state_and_the_hit() {
+    let (t, ct, mut f, u, [m, _]) = freeze_world([0, 0]);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, true), 1);
+    let l = f.list_of(m, 51).expect("target state");
+    assert_eq!(l.stats.get(&20), Some(&7));
+    assert_eq!((l.skill, l.lvl), (1, 1));
+    // The hit record goes through apply and the reaction on the monster.
+    assert!(f.take_log().iter().any(|s| s.contains(&format!("{m}"))));
+}
+
+// Covers: specs/skills/bodies-2b.md §6.10 l2 r4
+#[test]
+fn holy_freeze_shatter_is_a_one_in_five_draw() {
+    let (t, ct, mut f, u, [a, b]) = freeze_world([seed_with(0..20), seed_with(20..100)]);
+    assert_eq!(dos2::damage_aura(&mut f, &t, &ct, u, 1, 1, true), 1);
+    assert!(f.has_state(a, 107), "draw < 20: shatter on");
+    assert!(!f.has_state(b, 107), "draw >= 20: shatter off");
+}
+
+// Covers: specs/skills/bodies-2b.md §6.10 text
+#[test]
+fn holy_freeze_remove_callback() {
+    let (_, _, mut f, _, [a, _]) = freeze_world([0, 0]);
+    f.state_on(a, 50, true);
+    f.state_on(a, 107, true);
+    helpers3::remove_holy_freeze(&mut f, a, 50);
+    assert!(!f.has_state(a, 50) && !f.has_state(a, 107));
+    assert!(f.take_log().contains(&format!("anim {a}")));
+    // Dead (and not "stay on death"): the state goes off, shatter stays.
+    f.state_on(a, 50, true);
+    f.state_on(a, 107, true);
+    f.alive.remove(&a);
+    helpers3::remove_holy_freeze(&mut f, a, 50);
+    assert!(!f.has_state(a, 50) && f.has_state(a, 107));
+}
