@@ -243,7 +243,7 @@ fn game_send_limit() {
     assert_eq!(super::intent::route(&ok), Ok(SendQueue::Game));
 }
 
-// Covers: specs/client/bridge.md §2 r2, §6 r3
+// Covers: specs/client/bridge.md §2 r2, §6 r3; specs/client/msg-ui.md §11 r3
 #[test]
 fn split_and_unowned() {
     let (mut b, _) = bridge();
@@ -891,7 +891,7 @@ fn errors_stop_the_frame_records_do_not() {
     assert_eq!((r.unowned, r.rejected, r.discarded_bytes), (1, 1, 2));
 }
 
-// Covers: specs/client/bridge.md §edge-cases-original-bugs
+// Covers: specs/client/bridge.md §edge-cases-original-bugs r1, §edge-cases-original-bugs r2, §edge-cases-original-bugs r3
 #[test]
 fn size_zero_ids_end_the_split_and_one_byte_unit_ids_address_nothing() {
     for id in [0x83u8, 0x84, 0x88, 0x80] {
