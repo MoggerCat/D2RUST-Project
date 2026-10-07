@@ -13,6 +13,31 @@
   `items/inventory-moves.md` §7 (click validation), `ui/controls.md`
   (show-belt and belt keys), `ui/text.md` §8 (hover boxes)
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 41–50 |
+| Inputs | 51–61 |
+| Outputs / state changes | 62–68 |
+| Rules | 69–70 |
+|   1. Grid geometry | 71–87 |
+|   2. Tint colours | 88–106 |
+|   3. Grid items (`0x00483FF0`) | 107–132 |
+|   4. Placement tint (cursor item over a grid) | 133–149 |
+|   5. Hover state (`0x00487000`) | 150–163 |
+|   6. Equipment boxes (`0x004845A0`) | 164–193 |
+|   7. Not drawn here | 194–200 |
+|   8. Grid click → C→S message (`0x0048FFE0`) | 201–263 |
+|   9. Gold amount dialog (`0x00454150`) | 264–292 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 293–299 |
+| Constants & data dependencies | 300–305 |
+| Randomness | 306–309 |
+| Edge cases & original bugs | 310–317 |
+| Test vectors | 318–338 |
+| Provenance | 339–349 |
+| Open questions | 350–382 |
+<!-- /index -->
+
 ## Summary
 
 Inside the inventory panel family (`ui/panels.md` §9) the client draws,
@@ -21,7 +46,7 @@ coloured cell tint, then the equipped items centred in their body-location
 boxes with their own tint, and, while an item is on the cursor, a
 placement tint showing where it would go (fits, swap, or refused). The
 hovered item gets a different tint and shows its sockets; its footprint
-is the anchor of the hover box.
+is the anchor of the hover box. A left click on a grid becomes one C→S item message chosen from the cursor state, the cursor item and the item under it (§8); the gold button opens an amount dialog whose OK sends the gold message (§9).
 
 ## Inputs
 
@@ -173,6 +198,98 @@ panel art: `ui/panels.md` §9.3–§9.5. The belt panel (ui 0x1F, toggled by
 `ui/controls.md` command 22) and the cursor item graphic: §Open
 questions 4 and 5.
 
+### 8. Grid click → C→S message (`0x0048FFE0`)
+
+Left mouse down on a page grid (callers: the inventory, stash, cube and
+trade-page down handlers; `ui/panels.md` §15). Arguments: owner unit,
+inventory, page (low byte of EAX; 0xFF → nothing), mouse (x, y), the
+message's key state (wParam; bit 2 = `MK_SHIFT`), grid record (§1). The
+mouse cell is ((x − left) / cellW, (y − top) / cellH), unsigned. "Ready"
+below = the busy test `0x004C2240` = 0 and the send throttle `0x00486D10`
+≠ 0; a send is followed by `0x004C21F0` and, for the place / swap /
+stack / socket / scroll / cube sends, `0x004C1D60(0, 0, 0)` and the click
+sound `0x004B9A00(0, 0, 0)`. Server rules: `items/inventory-moves.md` §7.
+Messages are sent through `0x004786A0` (two u32), `0x00478680` (one
+u32) and `0x00478700` (u32 + three u32); field order is the layout in
+`sim/client-messages.tsv`.
+
+1. **Cursor state 6** (`0x00468830` = 6, an item is being used on
+   another, e.g. a scroll of identify): the item under the cell
+   (`0x0063BD10`) and the used item (`0x004680A0`) both exist, ready, the
+   owner is the local player and the page is not 1 or 2 → **0x27**
+   (target, used). Consumed whenever an item is under the cell.
+2. **Cursor state 8**: item under the cell, ready, own player, page not 1
+   or 2 → **0x4C** [item] (`world/cube.md` §10).
+3. **No cursor item**, item under the cell:
+   1. Not the player's own inventory context (`0x00486B30` = 0 or its
+      ECX result ≠ 1): when the inventory mode ≤ 0x12, the NPC store
+      click `0x004B3870(…, x, y, 0, 0, 0)` (`ui/menus.md` §4.5); a
+      handled click sets the inventory mode to 5. No message here.
+   2. Not ready → nothing.
+   3. **Ctrl** down (`GetAsyncKeyState(VK_CONTROL)` < 0): with a store
+      open (`0x004B3230`) and its NPC (`0x00463990`): sellable item
+      (`0x0062A130`) → **0x33** sell (`world/vendors.md`, price
+      `0x0062FDC0`); else the "cannot" note `0x004CB9C0`. Without a store
+      or NPC: nothing is sent, the click is consumed (Ctrl-click never lifts).
+   4. **Shift** (wParam bit 2) and the item fits the belt (`0x0062BAD0`)
+      and lies on page 0 → **0x63** [item] (to belt), click sound.
+   5. Else **0x19** [item] (lift to the cursor); `[0x007BCBEC]` := 1.
+4. **Cursor item present**: placement test at the cursor cell
+   (`0x0063B9D0` with `[0x00721E4C]`, `[0x00721E50]`) gives the item
+   under it `u` and the overlap count `n`.
+   1. `n` ≥ 2: if `0x0063BB20` finds a cube (code `box`) under the
+      footprint → rule 4.4 with `u` = that cube; else as `n` ≤ 1.
+   2. `n` = 0, or `u` none: on page 3 a cursor item that is itself a cube
+      is refused (consumed, no message). Else the drop cell from the
+      mouse (`0x00486BD0`), placement test there, ready → **0x18** [item,
+      x, y, page].
+   3. `n` = 1 with `u`:
+      - stackable onto `u` (`0x0062C850` ≠ 0): ready, inventory mode ≠
+        0x0B, page ≠ 2 → **0x21** (cursor, `u`);
+      - else, if the cursor item can fill a socket of `u` (`0x004843E0`,
+        §6 r5) and ready → **0x28** (cursor, `u`);
+      - a scroll (item type 22 `scro`) on a book (type 18 `book`) of the
+        same kind (`0x00627F80` equal), ready, mode ≠ 0x0B →
+        `0x004A9DF0`, **0x29** (cursor, `u`);
+      - `u` is a cube → rule 4.4;
+      - else, unless 0x28 / 0x29 was just sent: swap — `0x0063BB20`
+        (single overlap) ready, page ≠ 2 → **0x1F** (cursor, `u`, cell x,
+        cell y).
+   4. **Into the cube**: ready; free space found on page 3 of the cube's
+      grid (`0x0063B850`, record of page 3) → **0x2A** (cursor, cube);
+      none → the "cannot" note `0x004CB9C0`.
+5. Return value 1 = consumed. Equipment clicks (`0x00490780`,
+   `0x00490BA0`, `0x00490FC0`): `ui/panels.md` §15 (not read here).
+
+### 9. Gold amount dialog (`0x00454150`)
+
+1. **Openers** (kind = ECX): inventory gold button release
+   (`0x00486EF0`, `ui/panels-2.md` §18 r1) → 1; the same with the stash
+   open (`0x00489AC0`) → 3, the stash gold button (`0x00489AC0`) → 4;
+   with the cube open (`0x0048A190`) → 1; player trade (`0x00489580`) →
+   2; kind 0 from `0x004A7A90`. Only when the player exists, has no
+   cursor item and no other dialog is open (`[0x007A27A0]` = 0).
+2. Opening: hot-key mode 0 with key-up kept and the latch `[0x007A27B4]`
+   := 1 (`ui/controls.md` §4.1); `[0x007A279C]` := kind; amount
+   `[0x007A2A68]` := 0; the box `0x004B7CD0`; the limit `m` = stat 14
+   (gold) of the player, stat 15 (stash gold) for kind 4. Controls
+   (positions as passed, 640 × 480 frame: §Open questions 7): spinner
+   at (0xDF, 0xDB) (`0x004BC480`), number field at (0x102, 0xE4), width
+   100, max 10 digits, limit `m` (`0x004BBD80`), OK button at (0xFA,
+   0x11F) and Cancel at (0x163, 0x11F) (`0x004BB0F0`). Kinds 3, 6, 7
+   pre-fill the field with `m`; kind 2 also calls `0x004B90B0`.
+3. Spinner (`0x00453FE0`): step `s` from the spinner; up: amount := min(
+   amount + s, `m`); down: amount := amount − s, or 0 when s > amount.
+4. **OK** (`0x00454080`): close (`0x00453EE0`: latch cleared, hot-key
+   mode 1, controls freed). Amount 0: kind 2 → `0x004B9110`; others
+   nothing. Else by kind: 0, 1 → C→S **0x50** [player GUID, amount]
+   (`items/inventory-moves.md` §7.22); 2 → `0x004B9110` (trade gold,
+   `ui/panels.md` §15); 3 → **0x4F** button 0x14, p1 = amount >> 16, p2
+   = amount & 0xFFFF; 4 → **0x4F** button 0x13, same split; kinds 2–4
+   then play sound 0xDD (`0x004B9A00`). Server meaning of 0x4F 0x13 /
+   0x14 (withdraw / deposit): `ui/panels.md` §Open questions 6.
+5. Cancel (`0x00454140`) and the box close (`0x00453FC0`): close only.
+
 ### B5. `CellGrid` answers (`client/ui.md` §B5)
 
 Cell size and origin: §1 (no gaps: cells are adjacent, pitch = cell
@@ -209,25 +326,56 @@ None.
 | cursor item over one item it can swap with | tint 3 over that item | §4 r3 |
 | two-handed weapon in right hand | left box tint 0 + ghost item | §6 r3 |
 | capture: inventory with the cases above, 800 × 600 | identical pixels | (to record) |
+| no cursor item, left click on a potion, Shift held, page 0 | C→S `63` [item GUID] | §8 r3.4 |
+| no cursor item, left click on an item | C→S `19` [item GUID] | §8 r3.5 |
+| cursor 1 × 1 item over an empty cell (3, 1), page 0 | C→S `18` [item, 3, 1, 0] | §8 r4.2 |
+| cursor item over one other item, not stackable | C→S `1F` [cursor, target, cell x, cell y] | §8 r4.3 |
+| cursor gem over a socketed item with a free socket | C→S `28` [gem, item] | §8 r4.3 |
+| cursor item over the cube with room | C→S `2A` [item, cube] | §8 r4.4 |
+| gold dialog kind 1, typed 123, OK | C→S `50` [player GUID, 123] | §9 r4 |
+| gold dialog kind 4, amount 70000, OK | C→S `4F 13 00 01 00 70 11` (p1 = 1, p2 = 0x1170) | §9 r4 |
+| gold dialog, spinner down with step 1000 at amount 300 | amount 0 | §9 r3 |
 
 ## Provenance
 
 1.14d `Game.exe` `.\UI\inv.cpp` functions `0x00483960`–`0x004845A0`,
 `0x00487000`, palette match `0x00605210`, fill `0x004F6300`; register
-arguments checked with `tools/ghidra/disasm.py`. No D2MOO code used.
+arguments checked with `tools/ghidra/disasm.py`. §8: `0x0048FFE0`
+(message ids from the `mov cl` before each send in `all.asm`); §9:
+`0x00454150`, `0x00453EE0`, `0x00453FC0`–`0x00454140` (jump table
+`0x00454124` read from the binary), opener call sites `0x00486FAD`,
+`0x004896CA`, `0x00489BE9`, `0x00489C0A`, `0x0048A2F1` (2026-10-07,
+`claude/pc2-ui`). No D2MOO code used.
 
 ## Open questions
 
-1. Palette entry byte order at `0x0081E668` (is byte 0 red?) and the
-   blend of fill mode 0 (opaque or translucent). Needs recording: a
-   capture of an inventory with a blue-tinted item, read the tint pixel.
+1. **Answered** (2026-10-07): byte 0 of a `0x0081E668` entry is red
+   (`render/composition.md` §4: the act's `pal.pl2`, R, G, B), so the
+   triples of §2 are (R, G, B); the tints are recomputed whenever an
+   act palette loads (`0x004547B0` → `0x00483960`). Fill mode 0 is the
+   rectangle's `k` = 2 blend, `d' = T[256·d + color]`
+   (`render/blend-modes.md` §8 r2). Pixel proof: capture `inv-0001`.
 2. Item graphic draw `0x0046EE80`: which `invfile` / unique / set graphic
    and frame, the draw position (arguments in registers), and the palette
    shift / colour map for coloured items. Disassembly of `0x0046EE80`.
 3. Cursor-cell formula with a cursor item (`0x00487000` second branch,
    `0x004DBEA0` graphic size, the even / odd size handling).
 4. Belt panel drawing (ui 0x1F, belt rows) and its slot tint.
-5. Cursor item drawing (position, hotspot) and the gold / other buttons
-   (`ui/panels.md` §Open questions 5).
+5. ~~Cursor item drawing (position, hotspot)~~: capture `inv-0001`
+   (`docs/handoff/pc2-rec-pc2-ui.md`). The gold dialog is §9; the
+   inventory gold button's art and the gold amount text: capture
+   `inv-0003`.
 6. The checks `0x004C2240`, `0x0062A4E0`, `0x0062A0A0`, `0x0062E6F0`,
    `0x0062E740`, cursor state 8, and the quest test `0x00483F80`.
+7. ~~Gold dialog control positions (§9 r2) at 800 × 600: the values are
+   passed unshifted; does the box code (`0x004B7CD0`, `0x004BBD80`) add
+   the panel shift?~~ Capture `inv-0003`.
+8. Item graphic draw `0x0046EE80` (partial answer to OQ 2, 2026-10-07):
+   the cel is drawn with its top-left at the cell's top-left (draw y =
+   top + cel height, `0x004F6480`), draw mode 5, or 1 when item flag
+   0x400000 (ethereal) is set, palette from `0x0062C100`; a gold pile
+   (`0x0062B400` = 4) uses graphic variant 0 below 100 gold, 1 below 500,
+   2 below 5000, else 3 (`0x004DBB50` second argument); then
+   `0x0046E300(item, 0xFF, 0, x + celW / 2, y + celH / 2)`. Still open:
+   which file `0x004DBB50` picks (invfile / unique / set) and what
+   `0x0046E300` draws.
