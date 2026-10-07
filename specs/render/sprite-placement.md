@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 187–210 |
 | Test vectors | 211–224 |
 | Provenance | 225–237 |
-| Open questions | 238–279 |
+| Open questions | 238–289 |
 <!-- /index -->
 
 ## Summary
@@ -253,6 +253,16 @@ the two candidates; 1.14d code picks the second. No capture yet.
    null) can hand the drawer a cel built some other way than `0x0060BFF0`
    (e.g. a cached copy with changed fields). A Ghidra read of
    `0x005FEC90`/`0x005FEC50` settles it.
+   *Answered* (static): no. A DCC pool block is filled only by the
+   loader callback `0x005FF6E0`, the single caller of `0x0060BFF0`
+   (`0x005FF71E`). Both cache paths (`0x006001F0` at `0x006003A2`,
+   `0x005FFE90` at `0x005FFF7C`) run `0x005FEC90` once per block (block
+   +0x28 = 0): it walks the decoder's cels (cel size 0x23 + cel +0x14 +
+   cel +0x1C), checks first dword = 0, w ≤ 256, h ≤ 256 (else a fatal
+   error) and stores in cel +0x18 a pointer to a zeroed 0x2C-byte side
+   entry. Then `0x005FEC50` → `0x005FEB80` returns a pointer to the
+   chosen cel. No field §1 reads (+0x00 … +0x10, rows) is changed, so
+   the drawer sees exactly the `0x0060BFF0` cel.
 
 Answers 1–4 (game-file read, 2026-10-07: every `.dt1`, `.dc6` and `.dcc`
 that `d2data.mpq`, `d2exp.mpq` and `d2char.mpq` list, extracted with

@@ -34,15 +34,15 @@
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 345–378 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 379–394 |
 |   7. Room clients and the inactivity counter | 395–415 |
-|   8. Deactivation (tick step 9) | 416–461 |
-|   9. Room tile grid | 462–1025 |
-|   10. Collision map from tiles | 1026–1104 |
-| Constants & data dependencies | 1105–1119 |
-| Randomness | 1120–1137 |
-| Edge cases & original bugs | 1138–1155 |
-| Test vectors | 1156–1203 |
-| Provenance | 1204–1242 |
-| Open questions | 1243–1319 |
+|   8. Deactivation (tick step 9) | 416–479 |
+|   9. Room tile grid | 480–1043 |
+|   10. Collision map from tiles | 1044–1122 |
+| Constants & data dependencies | 1123–1137 |
+| Randomness | 1138–1155 |
+| Edge cases & original bugs | 1156–1173 |
+| Test vectors | 1174–1221 |
+| Provenance | 1222–1265 |
+| Open questions | 1266–1343 |
 <!-- /index -->
 
 ## Summary
@@ -455,9 +455,27 @@ A populated room that is removed and built again starts with flag bit 0:
      path room (+0x1C) itself is not cleared.
    - object, item, tile (static path): if its room (static +0x00) is
      set: room-list remove (`0x0064C370`); static room := null.
-   The units are not freed; who reads bits 0x800000 / flags-2 0x20
-   afterwards is open question 12. On the server this only runs for
-   units step 2's compression left behind.
+   The units are not freed. The only reader of the two bits is the
+   client unit update `0x00480810` (`client/model.md` §5 rule 5: C→S
+   0x4B, then both bits cleared at `0x0048084D`/`0x00480857`); no server
+   code tests them. Unit flag 0x400000 is set only together with
+   0x200000 on client-only units (`0x00466437`, `0x004667BF`), so on the
+   server every unit left here also gets flags-2 0x20.
+5. **Which server units step 2 leaves in the room** (per-unit compress
+   `0x005433F0`, called by the tick-step-9 loop at `0x0052D0A8`; type
+   dispatch table `0x00543504`):
+
+   | Type | Exit |
+   |---|---|
+   | 0 player | if `0x00639DF0(unit, 7)` ≠ 0: compressed, flags-2 \|= 0x100, saved (`0x00542E10`), leaves the room (`0x0064C450`), kept; else freed (`0x00555600`) |
+   | 1 monster | `0x005431F0`: saved and leaves the room (kept), or saved and freed |
+   | 2 object | class 59 or 60: as the kept player exit; else compressed, saved when the keep flag holds, freed |
+   | 3 missile | freed |
+   | 4 item | saved (`0x00542E10`) only: neither freed nor removed from the room |
+   | 5 tile | saved, freed |
+
+   So on the server rule 4 runs for the room's items (and nothing
+   else): each gets 0x800000 and flags-2 0x20 and leaves the room.
 
 ### 9. Room tile grid
 
@@ -1233,6 +1251,11 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 - **Entry identity (§9.3)**: `0x0060A440` (stride 0x60 over +0x110,
   count +0x10C) → `0x0060CFA0` (stores the header pointer);
   `0x0060D040` (lookup copies the stored pointers).
+- **Units left after compression (§8 rules 4–5)**: `all.asm` scan for
+  tests of unit +0xC4 bit 23 / +0xC8 bit 5 (`shr 0x17`, `0xC6` & 0x80,
+  `shr 5`) and writers of +0xC4 0x400000 (`or 0x600000` only);
+  `0x005433F0` disassembly with its table `0x00543504` read from the file
+  image.
 - **Flag 0x400000 setter (§8 rule 1)**: asm of `0x0061AED0` (null test, active room +0x10, `ret 8`) and `0x0061BAC0` (`edx` = clear; `and 0xFFBFFFFF` / `or 0x400000` on +0x28); `disasm.py xref`: `0x0061BAC0` has the single caller `0x0061AEE0`, `0x0061AED0` has 31 call sites. Requested by PC 2 (`world/quests-act1-rest.md` §9 item 12 links here).
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
@@ -1279,11 +1302,12 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     +0x20). The new room's own header therefore exists when the loop
     reaches it; every other listed room is an active room, whose grid
     was made at its own creation (§10.2).
-12. §8.2 rule 4: which code reads unit flag 0x800000 and flags-2 0x20
-    after a room free, whether any server unit has flag 0x400000, and
-    whether step 2's compression (`0x005433F0`) can leave a unit in the
-    room at all. Settle: xref bit tests of unit +0xC4 / +0xC8 (byte
-    forms `+0xC6` & 0x80, `+0xC8` & 0x20) and of `0x005433F0`'s exits.
+12. *Answered* (static, `all.asm` bit-test scan and `0x005433F0`
+    exits): §8 rule 4 (readers: client `0x00480810` only; server units
+    never have 0x400000) and rule 5 (items are the units compression
+    leaves in the room). Open inside it: whether `0x005421A0` (the item
+    save) unlinks the item some other way; a server memory read of a
+    freed room's +0x74 after an item was dropped there settles it.
 13. Merge corner case (§9.6 step 3): can R be a type-3 record with no
     successor in its chain (R +0x20 null) when the merged type is not 3?
     1.14d then writes through a null pointer. A dump of every link chain
