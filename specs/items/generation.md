@@ -47,7 +47,7 @@
 | Edge cases & original bugs | 621–635 |
 | Test vectors | 636–651 |
 | Provenance | 652–678 |
-| Open questions | 679–756 |
+| Open questions | 679–769 |
 <!-- /index -->
 
 ## Summary
@@ -708,6 +708,19 @@ Real 1.14d vectors need the recording in Open questions 2.
    stat list entries).
 3. The meaning of request `spawn mode`/`init flags` values per caller
    belongs to `sim/units.md` and the treasure spec; not checked here.
+   Answered (2026-10-07, the stores to request +0x18 and +0x28 in all
+   20 callers of `0x00558D90` and in the builders they use): init flags
+   (+0x28) are 1 in every request. Spawn mode (+0x18) is 3 (ground) for
+   `0x00559130`, `0x00559300`, `0x005594C0`, `0x00559630`,
+   `0x00559830`, `0x00559A30`, `0x0055A550`, `0x0056DAB0`,
+   `0x00582AC0`, `0x005830E0`, `0x00583410`, `0x00585970`,
+   `0x00585A80`, `0x005AF300`; 4 (inventory) for `0x00565AB0` (cube),
+   `0x0056D5F0`, `0x00563FE0` (builder `0x0055E8E0`) and `0x00559CE0`
+   (its second argument, 4 from all seven callers); the source item's
+   mode (unit +0x10, builder `0x00558270`) for `0x00579D60`; the legacy
+   record's byte +0x0A for `0x00530F40`. What mode 3 / 4 with init flag
+   1 do at allocation is `sim/units.md` §3.1 (step 8 for mode 3, as
+   `items/treasure.md` §7 rule 4 quotes).
 4. §10.3: does any 1.14d path create start items for a loaded
    character? Name the out flag of `0x00532690` that sends the parser to
    `0x00532590` (D2MOO: the new-character branch), and what
