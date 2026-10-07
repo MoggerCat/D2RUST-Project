@@ -46,7 +46,7 @@
 | Edge cases & original bugs | 796–854 |
 | Test vectors | 855–872 |
 | Provenance | 873–910 |
-| Open questions | 911–989 |
+| Open questions | 911–994 |
 <!-- /index -->
 
 ## Summary
@@ -977,11 +977,16 @@ Act IV quest code draws.
     code: decide whether `d2-server` or `d2-sim` owns them.
 11. `quests-act3.md` §8.6 says level 104 is The Pandemonium Fortress;
     live `levels.txt` has 103 = The Pandemonium Fortress, 104 = Outer
-    Steppes (`0x005BCBF0` compares 104). Settle in that spec.
+    Steppes (`0x005BCBF0` compares 104). Settle in that spec. **Answered**
+    (2026-10-07): `quests-act3.md` §8.6 already says Outer Steppes
+    (`levels.txt` Act 4 - Mesa 1); re-read `cmp eax, 0x68` at
+    `0x005BCC0B`.
 12. `quests.tsv` column `spec` still says `catalogued` for rows 25–28
     and 30; switch it to `specified` (with a link to this file) once
     `quests.md` §2.4 documents owner files per act. No TSV rows were
-    missing for Act IV.
+    missing for Act IV. **Answered** (2026-10-07): rows 25–28 and 30 switched to
+    `specified` (quests-fixups CODE-TABLE commit; every address of these
+    rows is named in this file).
 13. Record a full Act IV run (packets + RNG, `docs/HANDOFF.md` §5):
     Izual and the ghost, the Hellforge drops, the seals and seal
     bosses, Diablo's spawn and death in classic and expansion, the

@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 673–707 |
 | Test vectors | 708–722 |
 | Provenance | 723–747 |
-| Open questions | 748–772 |
+| Open questions | 748–793 |
 <!-- /index -->
 
 ## Summary
@@ -750,10 +750,27 @@ other Act V part-1 quest code draws.
 1. Status meanings per Act V quest (client quest log): settle with
    `quests.md` open question 1.
 2. `0x00558200(player, 0)`, the item level of Anya's rare item: item
-   spec.
+   spec. **Answered** (2026-10-07): `0x00558200(unit, level)` (ECX unit,
+   EDX level id): player → base stat 12 (`0x006253B0`), monster → total
+   stat 12 (`0x00625480`), any other unit → `levels.txt` `MonLvl` /
+   `MonLvlEx` (by difficulty, game +0x6D / +0x70) of its room's level
+   (`0x0061DCA0`); null unit with level id 0 → 1, with a level id ≠ 0 →
+   fatal (the game lookup `0x00554010` asserts a unit); a result ≤ 1 → 1 (`0x00558256`). So Anya's item level
+   is the player's character level (base stat 12), at least 1; the same
+   helper as `items/generation.md` §10 and `items/treasure.md` §7.
 3. Does a second `0x0058A0A0` stat list (scroll used again in a later
    difficulty, or at load) stack with or replace the first? Settle with
-   the stat-list spec (owner ids of `0x006251F0`) and a recording.
+   the stat-list spec (owner ids of `0x006251F0`) and a recording. **Answered** (2026-10-07): it stacks. `0x0058A0A0` →
+   `0x00589FF0(game, player, v)` always allocates a new list
+   (`0x006251F0(memory, flags 0, state 0, owner = the player's type and
+   GUID)`), attaches it
+   (`0x00626E10(player, list, 1)`), writes the four stats with
+   `0x00627150(list, stat, v, 0)` and sends them (`0x00548520`); it
+   never looks for or frees an earlier list. Attached lists add into the
+   totals (`sim/stat-lists.md` §6). So in one game: load with k
+   difficulties done gives one list of 10·k; using the scroll then adds
+   a second list of 10·(k + 1) (totals 10·(2k + 1)) until the next load
+   rebuilds a single list. A recording would still confirm it.
 4. Prisoner AI and Anya AI callers (`0x005EE3DB`…`0x005EE562`,
    `0x005E7806`…`0x005E7A49`) and what they do with the returned values:
    AI spec (another owner). **Answered** (2026-10-07) for Anya: every
@@ -765,7 +782,11 @@ other Act V part-1 quest code draws.
 6. `quests.tsv` column `spec` still says `catalogued` for rows 31–36;
    switch it to `specified` (with a link to these files) once
    `quests.md` §2.4 documents owner files per act. Row 40's `?` cells
-   and the intro message rows: part 2 open question 8.
+   and the intro message rows: part 2 open question 8. **Answered**
+   (2026-10-07): rows 31–36 switched to `specified` (quests-fixups
+   CODE-TABLE commit; every address of these rows is named in
+   `quests-act5.md` / `-2`); row 40 and the intro rows were done by
+   quests-core (part 2 open question 8).
 7. Record a full Act V run (packets + RNG, `docs/HANDOFF.md` §5): Shenk,
    the rescue portals, the rune reward, Anya's thaw, the scroll and
    Anya's item draw.
