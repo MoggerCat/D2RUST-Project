@@ -713,7 +713,7 @@ pub(super) fn weighted<W: AiHost + ?Sized>(
 }
 
 /// Player-count record difficulty field (+0xC): game +0x6D clamped to 2
-/// (`ai.md` §9.15).
+/// (`ai-bodies.md` §9.15).
 pub(super) fn record_difficulty<W: AiHost + ?Sized>(cx: &Ctx<'_, W>) -> i32 {
     i32::from(cx.info.difficulty.min(2))
 }

@@ -1,5 +1,6 @@
 // Spec: specs/world/quests.md (Test vectors, Edge cases); quests.tsv,
 // quest-messages.tsv
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
 use std::collections::BTreeMap;
 
 use super::act1;
@@ -1219,7 +1220,7 @@ fn default_status_rule() {
     );
 }
 
-// Covers: specs/world/quests.md §6.3, §7.2, §7.3, §10.4
+// Covers: specs/world/quests.md §6.3, §7.2, §7.3; specs/world/quests-act1.md §10.4
 #[test]
 fn akara_start_and_chat_end() {
     // `015956` frames 1729–1751.
@@ -1407,7 +1408,7 @@ fn kill_parse_force_and_chain() {
     assert!(ctl.record(1).unwrap().extra.guids.contains(1));
 }
 
-// Covers: specs/world/quests.md §3 r8, §10.4
+// Covers: specs/world/quests.md §3 r8; specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_cleared() {
     let (mut ctl, _) = control();
@@ -1454,7 +1455,7 @@ fn den_of_evil_cleared() {
     assert_eq!(f.sent_ids(), [0x5E, 0x28, 0x29, 0x89]);
 }
 
-// Covers: specs/world/quests.md §10.4
+// Covers: specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_few_left() {
     let (mut ctl, _) = control();
@@ -1467,7 +1468,7 @@ fn den_of_evil_few_left() {
     assert_eq!(f.sent[0].1, hex("5d 01 20 04 0500"));
 }
 
-// Covers: specs/world/quests.md §10.4
+// Covers: specs/world/quests-act1.md §10.4
 #[test]
 fn den_of_evil_reward() {
     let (mut ctl, _) = control();
@@ -1489,7 +1490,7 @@ fn den_of_evil_reward() {
 
 // ------------------------------------------------------------ Act I
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn cairn_stone_order_vector() {
     let mut seq = [2u32, 2, 0, 4, 1, 3].into_iter();
@@ -1505,7 +1506,7 @@ fn cairn_stone_order_vector() {
     assert_eq!(ctl.seed, seed);
 }
 
-// Covers: specs/world/quests.md §10.8
+// Covers: specs/world/quests-act1.md §10.8
 #[test]
 fn andariel_gem_vector() {
     assert_eq!(&act1::gem_code(&act1::CHIPPED_GEMS, 9), b"gcb ");
@@ -1543,7 +1544,7 @@ fn andariel_gem_vector() {
     assert!(!f.log.iter().any(|l| l.starts_with("drop")));
 }
 
-// Covers: specs/world/quests.md §10.3, §edge-cases-original-bugs r2
+// Covers: specs/world/quests.md §edge-cases-original-bugs r2; specs/world/quests-act1.md §10.3
 #[test]
 fn flavie_draws_per_record() {
     // Edge case 2: chains 25 and 30 both handle event 0: two draws.
@@ -1566,7 +1567,7 @@ fn flavie_draws_per_record() {
     assert_eq!(list[0], line(a));
 }
 
-// Covers: specs/world/quests.md §10.3
+// Covers: specs/world/quests-act1.md §10.3
 #[test]
 fn warriv_gossip() {
     let (mut ctl, _) = control();
@@ -1582,7 +1583,7 @@ fn warriv_gossip() {
     assert!(f.flags(P1).get(0, 0));
 }
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn cain_rewards() {
     let (mut ctl, _) = control();
@@ -1611,7 +1612,7 @@ fn cain_rewards() {
     }
 }
 
-// Covers: specs/world/quests.md §10.6
+// Covers: specs/world/quests-act1.md §10.6
 #[test]
 fn wirt_body_gold() {
     let (mut ctl, _) = control();
@@ -1639,7 +1640,7 @@ fn wirt_body_gold() {
     );
 }
 
-// Covers: specs/world/quests.md §10.5 l2 r2, §edge-cases-original-bugs r7
+// Covers: specs/world/quests.md §edge-cases-original-bugs r7; specs/world/quests-act1.md §10.5 l2 r2
 #[test]
 fn malus_level_gate() {
     let (mut ctl, _) = control();
@@ -1739,7 +1740,7 @@ fn warp_and_portal_checks() {
     assert_eq!(portal_check(74), WarpCheck::Open);
 }
 
-// Covers: specs/world/quests.md §10.3
+// Covers: specs/world/quests-act1.md §10.3
 #[test]
 fn respec_flags() {
     let (mut ctl, _) = control();
@@ -1752,7 +1753,7 @@ fn respec_flags() {
     assert!(!ctl.record(30).unwrap().active);
 }
 
-// Covers: specs/world/quests.md §3 r2, §10.1
+// Covers: specs/world/quests.md §3 r2; specs/world/quests-act1.md §10.1
 #[test]
 fn restore_from_bits() {
     let (mut ctl, _) = control();

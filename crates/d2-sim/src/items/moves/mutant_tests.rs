@@ -1,4 +1,5 @@
-// Spec: specs/items/inventory.md (§6–§11)
+// Spec: specs/items/inventory-moves.md (§6–§11)
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! Tests added from a `cargo mutants` pass over `items::moves` (METHODS
 //! M08; `docs/handoff/mutants-inventory.md`): each one kills a surviving
 //! mutant with an outcome the spec states, on the shared fake world of
@@ -37,7 +38,7 @@ fn run(f: &mut Fake, msg: &[u8]) -> u32 {
 
 // ---------------------------------------------------------------- §6
 
-// Rule (one clause; no claim): specs/items/inventory.md §6.1 r1
+// Rule (one clause; no claim): specs/items/inventory-moves.md §6.1 r1
 #[test]
 fn mark_keeps_a_flag_already_set() {
     let mut f = Fake::new();
@@ -46,7 +47,7 @@ fn mark_keeps_a_flag_already_set() {
     assert_eq!(f.it(10).cmd, 0x80);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §6.1 r3
+// Rule (one clause; no claim): specs/items/inventory-moves.md §6.1 r3
 #[test]
 fn item_update_list_needs_its_bit_0() {
     let mut f = Fake::new();
@@ -65,7 +66,7 @@ fn item_update_list_needs_its_bit_0() {
     assert_eq!(heads, vec![[0x9D, 6], [0x47, 0], [0x48, 0]]);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §11
+// Rule (one clause; no claim): specs/items/inventory-moves.md §11
 #[test]
 fn category_monster_classes() {
     let mut f = Fake::new();
@@ -88,7 +89,7 @@ fn category_monster_classes() {
 
 // ---------------------------------------------------------------- §7
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.3 r2
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.3 r2
 #[test]
 fn insert_item_missing_player_or_existing_non_player() {
     // Player missing: page ≤ 4 goes on to step 4 (page 1 too).
@@ -109,7 +110,7 @@ fn insert_item_missing_player_or_existing_non_player() {
     }
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.6
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.6
 #[test]
 fn swap_2handed_left_hand() {
     let mut f = Fake::new();
@@ -125,7 +126,7 @@ fn swap_2handed_left_hand() {
     assert_eq!(f.unit_flags(Owner::item(11)), 0x4);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.8
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.8
 #[test]
 fn swap_cursor_with_body_belt_needs_the_belt_check() {
     let mut f = Fake::new();
@@ -141,7 +142,7 @@ fn swap_cursor_with_body_belt_needs_the_belt_check() {
     assert_eq!(f.it(11).mode, mode::EQUIPPED);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.8
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.8
 #[test]
 fn swap_cursor_with_body_sets_flags_on_set_flags() {
     let mut f = Fake::new();
@@ -154,7 +155,7 @@ fn swap_cursor_with_body_sets_flags_on_set_flags() {
     assert_eq!(f.it(10).iflags, 0x41);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.12
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.12
 #[test]
 fn stack_items_exact_fit_merges() {
     let mut f = Fake::new();
@@ -176,7 +177,7 @@ fn stack_items_exact_fit_merges() {
     assert!(f.log.iter().all(|l| !l.starts_with("book")));
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.14
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.14
 #[test]
 fn to_belt_needs_the_cursor_mode() {
     let mut f = Fake::new();
@@ -197,7 +198,7 @@ fn socket_setup(target_mode: u8, target_flags: u32, filler: bool, filler_flags: 
     f
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.19 r2, §7.19 r3
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.19 r2, §7.19 r3
 #[test]
 fn socket_item_conditions() {
     let ok = iflag::IDENTIFIED | iflag::SOCKETED;
@@ -225,7 +226,7 @@ fn socket_item_conditions() {
     assert!(f.it(11).fillers.is_empty());
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.20
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.20
 #[test]
 fn scroll_to_book_ground_scroll_and_book_type() {
     let mut f = Fake::new();
@@ -245,7 +246,7 @@ fn scroll_to_book_ground_scroll_and_book_type() {
     assert_eq!(f.stat(Owner::item(11), 70), 0);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.22
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.22
 #[test]
 fn drop_gold_bounds_are_inclusive() {
     // amount = gold.
@@ -260,7 +261,7 @@ fn drop_gold_bounds_are_inclusive() {
     assert_eq!(f.stat(me(), 14), 0);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §7.23 r3
+// Rule (one clause; no claim): specs/items/inventory-moves.md §7.23 r3
 #[test]
 fn merc_give_act5_axe_must_be_one_handed() {
     use crate::items::moves::handlers::merc_give;
@@ -287,7 +288,7 @@ fn ground(f: &mut Fake, g: u32) -> &mut super::FItem {
     f.item(g, mode::GROUND)
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.1 r1, §8.2
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.1 r1, §8.2
 #[test]
 fn pickup_refused_while_busy_without_cursor() {
     let mut f = Fake::new();
@@ -299,7 +300,7 @@ fn pickup_refused_while_busy_without_cursor() {
     assert_eq!(f.inv().cursor, None);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.1 r6, §8.1 r7
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.1 r6, §8.1 r7
 #[test]
 fn auto_pickup_page_path_leaves_the_room_and_skips_the_belt() {
     let mut f = Fake::new();
@@ -313,7 +314,7 @@ fn auto_pickup_page_path_leaves_the_room_and_skips_the_belt() {
     }
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.2
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.2
 #[test]
 fn pickup_to_cursor_flag_arithmetic() {
     let mut f = Fake::new();
@@ -327,7 +328,7 @@ fn pickup_to_cursor_flag_arithmetic() {
     assert_eq!(f.unit_flags(Owner::item(10)), 0x4);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.3
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.3
 #[test]
 fn refused_pickup_keeps_unit_flag_0x1000() {
     let mut f = Fake::new();
@@ -350,7 +351,7 @@ fn quest_pick(held: &[u8; 4], code: &[u8; 4]) -> bool {
     can_pick(&f, me(), 10)
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.4 r6
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.4 r6
 #[test]
 fn held_test_codes_and_pairs() {
     assert!(quest_pick(b"xxx ", b"yyy "));
@@ -363,7 +364,7 @@ fn held_test_codes_and_pairs() {
     assert!(!quest_pick(b"msf ", b"hst "));
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.4 r2
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.4 r2
 #[test]
 fn carry_one_needs_a_unique() {
     // Magic (quality 4) items with a file index and the carry-one bit are
@@ -378,7 +379,7 @@ fn carry_one_needs_a_unique() {
     assert!(can_pick(&f, me(), 10));
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §8.4 r4
+// Rule (one clause; no claim): specs/items/inventory-moves.md §8.4 r4
 #[test]
 fn g33_needs_both_flags_clear() {
     let mut f = Fake::new();
@@ -395,7 +396,7 @@ fn g33_needs_both_flags_clear() {
 
 // ---------------------------------------------------------------- §10
 
-// Rule (one clause; no claim): specs/items/inventory.md §10.1
+// Rule (one clause; no claim): specs/items/inventory-moves.md §10.1
 #[test]
 fn gold_pickup_sums_and_owner_kinds() {
     // g + p within the limit: add.
@@ -421,7 +422,7 @@ fn gold_pickup_sums_and_owner_kinds() {
     assert_eq!(f.stat(me(), 14), 0);
 }
 
-// Rule (one clause; no claim): specs/items/inventory.md §10.3
+// Rule (one clause; no claim): specs/items/inventory-moves.md §10.3
 #[test]
 fn gold_message_boundary_0xff() {
     // new = 0xFF is not < 0xFF: 0x1E with a u16.

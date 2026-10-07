@@ -70,7 +70,7 @@ None. Every new test passed against the existing code.
   by every grid test).
 - §2.4 text: argument list; the "optional inventory (default: the
   owner's)" argument is not modelled (`place_in_page` always takes one).
-- §6.1 r4: not implemented (`moves/deferred.rs` `TODO(spec: inventory.md
+- §6.1 r4: not implemented (`moves/deferred.rs` `TODO(spec: inventory-moves.md
   §6.1 rule 4, OQ9)`).
 
 ### `sim/path-placement.md` §7–§12 (4)

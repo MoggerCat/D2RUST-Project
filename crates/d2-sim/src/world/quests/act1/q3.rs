@@ -1,5 +1,6 @@
-// Spec: specs/world/quests.md §10.5 (A1Q3 Tools of the Trade, chain 3)
+// Spec: specs/world/quests-act1.md §10.5 (A1Q3 Tools of the Trade, chain 3)
 // Spec: specs/world/quests-act1-rest.md §8 item 5
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q3 callback by callback: the Malus object's init and operate
 //! functions, events 0, 2, 3, 4, 6, 9, 10, 11, 13, 14, the status and
 //! active functions, the reset `0x005918D0` and the imbue grant

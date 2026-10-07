@@ -1,4 +1,5 @@
-// Spec: specs/items/bitstream.md (Inputs); specs/items/inventory.md §11
+// Spec: specs/items/bitstream.md (Inputs); specs/items/inventory-moves.md §11
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! The item bit stream of the deferred item messages on the real item:
 //! [`InvDesk::stream_item`] reads the fields the writer
 //! (`items::bitstream`) names from their owners (unit record: mode; item
@@ -20,7 +21,7 @@ const SET_FLAGS: u32 = 0x2040;
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// The writer's view of `item` with the sender's flag argument OR-ed
-    /// into the item flags and `page` as the page (`inventory.md` §11).
+    /// into the item flags and `page` as the page (`inventory-moves.md` §11).
     /// `None`: no item unit, record or item data.
     pub fn stream_item(&self, item: Guid, flags: u32, page: u8) -> Option<StreamItem> {
         let u = self.item_unit(item)?;

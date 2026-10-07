@@ -70,7 +70,7 @@ a seam default, or waiting on a spec.
 - `crates/d2-sim/src/wiring/inventory/tests/mutant_tests.rs` (1 test),
   declared in `tests/mod.rs` (`mod mutant_tests;`).
   `fillers_are_the_items_own_inventory_list`: an item's own inventory
-  (`inventory.md` §1, §7.19 step 3) with two fillers linked. `fillers`
+  (`inventory.md` §1, `inventory-moves.md` §7.19 step 3) with two fillers linked. `fillers`
   reads them back in link order, and they are not the player's items.
 - `crates/d2-server/src/adapters/handlers/items/mutant_tests.rs` (8
   tests), declared as a child of `items/tests.rs` (`#[path =

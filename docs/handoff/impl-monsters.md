@@ -55,7 +55,7 @@ the two `pub mod` lines in `crates/d2-sim/src/lib.rs`.
 | `crates/d2-sim/src/missiles/catalogue.rs` | server-do/server-hit tables (copied from the TSVs, test-checked), dispatch, stubs, `0x005A9820` helper | `missiles.md` §R9, `srvdo.tsv`, `srvhit.tsv` |
 | `crates/d2-sim/src/missiles/seams.rs` | `MissileUnits`, `MissilePath`, `MissileRooms`, `MissileCombat`, `MissileHooks` (= `MissileWorld`) | |
 | `crates/d2-sim/src/monsters/ai/mod.rs` | `AiControl`, `AiStore`, `Ctx`, aip/aidel/aidist, scheduling helpers, install, `think`, `MonsterDispatch` (`EventDispatch`) | `monsters/ai.md` §1–§4 |
-| `crates/d2-sim/src/monsters/ai/{target,tactics,functions}.rs` | prechecks + main search; distances, velocity, movement, commands; per-AI functions by address | `ai.md` §2, §5–§9 |
+| `crates/d2-sim/src/monsters/ai/{target,tactics,functions}.rs` | prechecks + main search; distances, velocity, movement, commands; per-AI functions by address | `ai.md` §2, §5–§8, `ai-bodies.md` §9 |
 | `crates/d2-sim/src/monsters/ai/table.rs` | `AI_TABLE` (copied from `ai-functions.tsv`, test-checked), `SPECIAL_TABLE` | `ai.md` §3.2, §10 |
 | `crates/d2-sim/src/monsters/ai/seams.rs` | `AiUnits`, `AiModes`, `AiWorld`, `AiTargets`, `AiSkills` (= `AiHost`) | |
 

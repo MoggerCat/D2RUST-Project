@@ -100,7 +100,7 @@ several (`skills::use_::bodies::helpers` `scan_unit`, `aura_fill`,
    `Partial`, no builder; no sender in `d2-server` / `d2-sim`). Adding
    code 8 / 9 needs that pass first; it is not a small fix. Next step
    below.
-2. **A1Q6 Catacombs entry keeps states 4 and 5** (`quests.md` §10.8
+2. **A1Q6 Catacombs entry keeps states 4 and 5** (`quests-act1.md` §10.8
    event 3 step 1): fixed in `world/quests/act1/q6.rs` (state := 3 only
    below 3; otherwise unchanged and not "changed"); the slaughter test
    enters Catacombs 1 at states 4 and 5.

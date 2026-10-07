@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory.md §7 (mutation tests of the item-move handler module, METHODS M08)
+// Spec: specs/items/inventory-moves.md §7 (mutation tests of the item-move handler module, METHODS M08)
 //! Mutation-testing gaps (`docs/handoff/mutants-wiring-inventory.md`) in
 //! `adapters::handlers::items::moves`: the id test that routes a message
 //! to the item-move handlers.

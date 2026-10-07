@@ -54,8 +54,8 @@ reads it. Each section answers one `quests.md` open question (5, 7, 11,
 
 | Name | Type | Source |
 |---|---|---|
-| chain 4 record and extra | quest record, 0x1BC bytes | `quests.md` §10.6 |
-| chain 5 record and extra | quest record, 0x120 bytes | `quests.md` §10.7 |
+| chain 4 record and extra | quest record, 0x1BC bytes | `quests-act1.md` §10.6 |
+| chain 5 record and extra | quest record, 0x120 bytes | `quests-act1.md` §10.7 |
 | object init args | dwords: game, object, room, ?, `objects.txt` record, x, y | init dispatcher `0x0054F5D0` (table `0x00731BC0`, index `objects.txt` `InitFn`, record +0x1B1) |
 | object operate args | dwords: game, object, player, ?, object class | operate dispatcher `0x00584420` (table `0x00732D18`, index `OperateFn`, record +0x1B3) |
 | client save flags | u16 at client +0x0A | client of a player (`0x005531C0`: player data +0x9C) |
@@ -64,7 +64,7 @@ reads it. Each section answers one `quests.md` open question (5, 7, 11,
 ## Outputs / state changes
 
 Player quest bits of slot 4 and 6 (via the iterate functions of
-`quests.md` §10.6 / §10.8), chain 4 / 5 extra bytes, object modes,
+`quests-act1.md` §10.6 / §10.8), chain 4 / 5 extra bytes, object modes,
 spawned monsters (cain1 146, trap-firebolt 326), portal objects (59, 60),
 missiles (332), timers, S→C 0x28 / 0x5D, sound events, the client's
 progression field.
@@ -76,7 +76,7 @@ progression field.
 `objects.txt` row 26 `Gibbet` has `OperateFn` 10 (pointer `0x00732D40` →
 `0x00593480`) and `InitFn` 7 (not quest code).
 
-New chain 4 extra fields (the rest are in `quests.md` §10.6):
+New chain 4 extra fields (the rest are in `quests-act1.md` §10.6):
 
 | Extra | Type | Field |
 |---|---|---|
@@ -84,7 +84,7 @@ New chain 4 extra fields (the rest are in `quests.md` §10.6):
 | +0x40 | u32 | GUID of the class-17 stone that carries the Tristram portal (§2) |
 | +0x44 | u8 | Tristram-portal timer pending |
 | +0x45 | u8 | Tristram portal created |
-| +0x4C, +0x4D | u8 | quest already done for the game (event 13, `quests.md` §10.6 step 10) |
+| +0x4C, +0x4D | u8 | quest already done for the game (event 13, `quests-act1.md` §10.6 step 10) |
 | +0x5C–+0x60 | u8 × 5 | per-stone reset bytes, index = stone class − 17 (§2; zeroed by the init, never set) |
 | +0x62 | u8 | Cain could not be spawned in Tristram |
 | +0x66 | u8 | town portal out of Tristram created by §1.2 |
@@ -112,7 +112,7 @@ New chain 4 extra fields (the rest are in `quests.md` §10.6):
 7. Refresh the object's room (`0x0061AED0(room, 0)`).
 8. R: set 4.13, then 4.1; 0x28 to the player (`quests.md` §6.6).
 9. Party id of the player (§6) ≠ 0xFFFF: for each party member (§6.2)
-   run `0x005930B0` (`quests.md` §10.6 L4 member step: member lacking
+   run `0x005930B0` (`quests-act1.md` §10.6 L4 member step: member lacking
    4.0 and 4.1 whose room's level is ≠ 0 and in Act I gets 4.13, 4.1 and
    0x28).
 
@@ -136,17 +136,17 @@ New chain 4 extra fields (the rest are in `quests.md` §10.6):
    +0x51 = 0: X +0x52 := 1 (Cain still to spawn in town). X +0x62 := 1.
 5. C exists: C unit +0xC4 |= 0x3000000; P = the player with GUID X +0x3C
    (`0x00552F60`, type 0); P exists → sound event 48 on P, target none.
-6. Both cases: every player L4, then every player L5 (`quests.md`
+6. Both cases: every player L4, then every player L5 (`quests-act1.md`
    §10.6); flags (+0x14) := 0; broadcast(6, 0) with iterate L1.
 
 State (+0x0C) is not changed here; the gibbet's quest state was set by
-the stones (`quests.md` §10.6 stone operate, state 5).
+the stones (`quests-act1.md` §10.6 stone operate, state 5).
 
 ### 2. Cairn stones (object classes 17–21)
 
 `objects.txt` rows 17–21 (`StoneAlpha`, `StoneBeta`, `StoneGamma`,
 `StoneDelta`, `StoneLambda`) have `InitFn` 6 (pointer `0x00731BD8` →
-`0x005935E0`) and `OperateFn` 9 (`0x00593710`, `quests.md` §10.6).
+`0x005935E0`) and `OperateFn` 9 (`0x00593710`, `quests-act1.md` §10.6).
 
 #### 2.1 Stone value
 
@@ -196,13 +196,13 @@ class-60 portal (`missiles/bodies.md`).
 `0x005940E0`). Init: chain 4's record must exist (else nothing). X +0x6C
 := the object's GUID (−1 when none); X +0x70 := 1; X +0x84, +0x88 :=
 init args x, y. If X +0x52 = 1 and X +0x51 = 0: town Cain spawn
-(`quests.md` §10.6 step 15) at (x, y) in the init args' room. The
-event-3 spawn of `quests.md` §10.6 step 3.3 looks X +0x6C up as an
+(`quests-act1.md` §10.6 step 15) at (x, y) in the init args' room. The
+event-3 spawn of `quests-act1.md` §10.6 step 3.3 looks X +0x6C up as an
 object (type 2).
 
 **Cain leaves Tristram** `0x005944F0(game, unit)` is the "spawn the town
 portal" call of the NpcOutOfTown AI for class 146 `cain1`
-(`monsters/ai.md` §9.32, `0x005E7880` / portal set-up `0x005E77A0`;
+(`monsters/ai-bodies.md` §9.32, `0x005E7880` / portal set-up `0x005E77A0`;
 the code pointers at `0x005E77F3` and `0x005E7943` select it by class):
 
 1. Chain 4's record must exist (`0x00543640`), else nothing; X = its
@@ -220,7 +220,7 @@ the code pointers at `0x005E77F3` and `0x005E7943` select it by class):
 ### 4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`)
 
 Called by the Countess's event 8, by the chest init `0x00595A50` and by
-the chest's event 7 `0x005956C0` (`quests.md` §10.7). E = extra; list =
+the chest's event 7 `0x005956C0` (`quests-act1.md` §10.7). E = extra; list =
 the chest GUIDs at E +0x68 (u16 count at E +0x88).
 
 1. End unless killed (E +0x118) ≠ 0, trapped (E +0x119) = 0 and the
@@ -258,7 +258,7 @@ create (`0x0059FA30`) and return the missile.
 
 ### 5. Character progression (`0x00538680(client, step, difficulty)`)
 
-Called by the A1Q6 credit (`quests.md` §10.8, `0x00596210`: client of P
+Called by the A1Q6 credit (`quests-act1.md` §10.8, `0x00596210`: client of P
 via `0x005531C0`, step 1, game difficulty +0x6D) and by six Act II–V
 sites (`0x0058DCE2`, `0x0058DD65`, `0x0058E4F1`, `0x0059C848`,
 `0x005B4D77`, `0x005BC182`).
@@ -318,7 +318,7 @@ bytes 13–14 of this message (and bytes 5–14 of the `trs ` form,
 
 ### 8. Act I clarifications (implementation questions, 2026-10-06)
 
-Each item settles a reading of `quests.md` §10 that the Act I
+Each item settles a reading of `quests-act1.md` §10 that the Act I
 implementation left open (`impl-quests-act1` note, items 4–10). Read
 from the 1.14d disassembly at the addresses given.
 
@@ -422,7 +422,7 @@ from their own seeds as their owners state (`monsters/init.md`,
    exists and creation fails.
 5. The gibbet without a player in Tristram and with a failed Cain spawn
    makes no portal and no Cain; X +0x52 then lets the town Cain spawn
-   (`quests.md` §10.6 step 3.3).
+   (`quests-act1.md` §10.6 step 3.3).
 6. 0x50 bytes 13–14 are stack leftovers (§7).
 
 ## Test vectors
@@ -433,16 +433,16 @@ from their own seeds as their owners state (`monsters/init.md`,
 | progression: 0x0000 (classic), step 1, difficulty 1 | 0x0500 | §5 |
 | progression: 0xE720 (exp, p 7), step 1, difficulty 0 | unchanged (7 > 1) | §5 |
 | progression: 0x0120 (exp, p 1), step 1, difficulty 0 | 0x0120 rewritten (p = n) | §5 |
-| stone 0x50 with order [18, 20, 17, 21, 19] | `50 0400 0100 0300 0000 0400 0200 ?? ??` (bytes 13–14 masked) | §7, `quests.md` §10.6 |
+| stone 0x50 with order [18, 20, 17, 21, 19] | `50 0400 0100 0300 0000 0400 0200 ?? ??` (bytes 13–14 masked) | §7, `quests-act1.md` §10.6 |
 | gibbet operate, R slot 4 = 0x0002 (4.1) | sound 19; nothing else | §1.1 step 2 |
 | gibbet operate, state 6 | nothing | §1.1 step 1 |
 | gibbet operate, R slot 4 = 0, object mode 0, single player | object mode 1; events 1 and 7 scheduled; X +0x54 = 3; R slot 4 = 0x2002; 0x28 | §1.1 |
-| gibbet event 7, Cain spawned, player P in Tristram lacking 4.0/4.1, status default rule (state 5, init_no 6) | P: 4.13, 4.1, 0x28; then `5d 04 00 06 0000` | §1.2, `quests.md` §6.1, §10.6 L1, L4 |
+| gibbet event 7, Cain spawned, player P in Tristram lacking 4.0/4.1, status default rule (state 5, init_no 6) | P: 4.13, 4.1, 0x28; then `5d 04 00 06 0000` | §1.2, `quests.md` §6.1, `quests-act1.md` §10.6 L1, L4 |
 | same, a second player Q in Act I outside Tristram | Q: 4.14, `5d 04 00 0c 0000` (L5), then `5d 04 00 0c 0000` (L1, now → 12) | §1.2, `quests.md` §6.1 |
 | trap step, 2 chests, killed 1, trapped 0, first spawn at the death position succeeds | 1 monster 326; 2 missiles 332 (one per chest, data +0x28 = chest GUID); E +0x119 = 1 | §4 |
 | trap step again | nothing | §4 step 1 |
 | A1Q6 event 3, b = 34, not-intro 1, state 4, status 2 | state stays 4; no O2 walk, nothing sent | §8 item 6 |
-| A1Q6 event 3, b = 37, state 1, status 2 | state 3; every player O2; nothing broadcast | §8 item 6, `quests.md` §10.8 |
+| A1Q6 event 3, b = 37, state 1, status 2 | state 3; every player O2; nothing broadcast | §8 item 6, `quests-act1.md` §10.8 |
 | tree operate, drop fails, state 3 | state 4; no 0x5D; object mode 0; +0x47 1; +0x30 = object GUID | §8 item 2 |
 | A1Q2 message 92 with 2.1, no hireling | 0x28, then 0x50 (u16 2) and the hireling's messages, then 0x27, 0x29 | §8 item 8 |
 | stone init, not-intro 1, X +0x4C 0, +0x4D 0, +0x50 0 | mode unchanged | §2.2 |
@@ -476,8 +476,8 @@ object row 189 from live `objects.txt`.
 ## Open questions
 
 1. ~~`0x005944F0`~~: answered in §3 (caller: the `cain1`
-   NpcOutOfTown AI, `monsters/ai.md` §9.32).
-2. Object modes set here (gibbet 1 / 3, stones 0 / 2, `quests.md` §10.6)
+   NpcOutOfTown AI, `monsters/ai-bodies.md` §9.32).
+2. Object modes set here (gibbet 1 / 3, stones 0 / 2, `quests-act1.md` §10.6)
    and object events 1 / 7 belong to the objects spec (not written).
 3. A recording of a Cain rescue (gibbet operate → event 7 17 frames
    later: 0x28, 0x5D, Cain spawn) and of a Countess kill (trap monster,

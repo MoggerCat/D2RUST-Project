@@ -1,5 +1,6 @@
-// Spec: specs/world/quests.md §10.8 (A1Q6 Sisters to the Slaughter, chain 6), §8.1
+// Spec: specs/world/quests-act1.md §10.8 (A1Q6 Sisters to the Slaughter, chain 6), §8.1
 // Spec: specs/world/quests-act1-rest.md §5, §8 items 6, 7
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q6 callback by callback: events 0, 2, 3, 8 (Andariel), 10, 11, 13,
 //! the portal timer `0x00596500`, the active function and the credit,
 //! with the iterate functions O2–O7 (O1 is the shared status iterate).

@@ -120,5 +120,5 @@ passing test, same spec IDs) and rerun `py tools/coverage.py --check`.
   spec).
 - No check for `lvlwarp` row names (`levels.md` §7.4 vector names the
   row): `Lvlwarp` has no decoded name field.
-- Monstats names of the quest NPC classes (`quests.md` §10.2) are not
+- Monstats names of the quest NPC classes (`quests-act1.md` §10.2) are not
   checked: the typed `Monstats.id` is the string-table id, not the text.

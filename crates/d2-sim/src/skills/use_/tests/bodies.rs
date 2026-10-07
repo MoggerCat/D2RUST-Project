@@ -44,8 +44,8 @@ fn bodies_mismatches(tsv: &str) -> Vec<String> {
 /// through the table): srvdo 142 = [`bodies::blade_pulse`].
 const HELPER_SLOTS: &[(&str, u16)] = &[("srvdo", 142)];
 
-/// Every `spec'd-here` row must name its section ("body: bodies.md §" or
-/// "body: bodies-2.md §")
+/// Every `spec'd-here` row must name its section ("body: bodies.md §",
+/// "body: bodies-2.md §" or "body: bodies-2b.md §")
 /// and be in [`START_BODIES`] / [`DO_BODIES`]; every slot there must be
 /// such a row. Returns the mismatches.
 fn specd_mismatches(tsv: &str) -> Vec<String> {
@@ -62,9 +62,11 @@ fn specd_mismatches(tsv: &str) -> Vec<String> {
             _ => continue,
         };
         let specd = c.get(4) == Some(&"spec'd-here");
-        let noted = c
-            .get(6)
-            .is_some_and(|n| n.contains("body: bodies.md §") || n.contains("body: bodies-2.md §"));
+        let noted = c.get(6).is_some_and(|n| {
+            n.contains("body: bodies.md §")
+                || n.contains("body: bodies-2.md §")
+                || n.contains("body: bodies-2b.md §")
+        });
         // An `unreferenced` slot whose note names a body is a helper the
         // bodies call directly (srvdo 142, the Blade Shield pulse of
         // `bodies-2.md` §2.26): no slot body, but the helper must exist.
@@ -99,7 +101,7 @@ fn bodies_match_tsv_notes() {
     assert_eq!(bodies_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
     assert_eq!(specd_mismatches(FUNCTIONS_TSV), Vec::<String>::new());
     assert_eq!(PURE_START, [18]);
-    // `bodies.md` §3–§4 (16), §7–§8 (29), `bodies-2.md` (85).
+    // `bodies.md` §3–§4 (16), §7–§8 (29), `bodies-2.md` + `bodies-2b.md` (85).
     assert_eq!(START_BODIES.len() + DO_BODIES.len(), 130);
     assert_eq!((START_BODIES.len(), DO_BODIES.len()), (45, 85));
     for &i in PURE_START.iter().chain(START_BODIES) {
@@ -136,8 +138,8 @@ fn bodies_check_reports_perturbations() {
     let bad = FUNCTIONS_TSV.replacen("body: bodies.md §4.4", "body: elsewhere", 1);
     assert_ne!(bad, FUNCTIONS_TSV);
     assert_eq!(specd_mismatches(&bad), ["srvdo 30"]);
-    // A bodies-2.md row without its section note.
-    let bad = FUNCTIONS_TSV.replacen("body: bodies-2.md §8.14", "body: elsewhere", 1);
+    // A bodies-2b.md row without its section note.
+    let bad = FUNCTIONS_TSV.replacen("body: bodies-2b.md §8.14", "body: elsewhere", 1);
     assert_ne!(bad, FUNCTIONS_TSV);
     assert_eq!(specd_mismatches(&bad), ["srvdo 54"]);
     // A helper note on an unreferenced slot the code has no helper for.

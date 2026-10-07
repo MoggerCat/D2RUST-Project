@@ -1,4 +1,5 @@
-// Spec: specs/world/quests.md §10.5 (A1Q2 Sisters' Burial Grounds, chain 2)
+// Spec: specs/world/quests-act1.md §10.5 (A1Q2 Sisters' Burial Grounds, chain 2)
+// Spec: specs/world/quests.md (the sections other than §10)
 //! A1Q2 callback by callback: events 0, 2, 3, 8, 10, 11, 13, the timer
 //! `0x00590BF0` and the active function, with the iterate functions
 //! J2–J7 (J1 is the shared status iterate). Slot 2 is a constant in each.

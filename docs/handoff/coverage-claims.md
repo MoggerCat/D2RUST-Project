@@ -51,7 +51,7 @@ unit's main behavior but not every branch. Examples:
 - rooms.md §4 text, §9.5 text;
 - levels.md §4 r3;
 - cube.md §4, §5, §6.2, §7.3, §7.4;
-- quests.md §10.1, §10.4, §10.6;
+- quests-act1.md §10.1, §10.4, §10.6;
 - assets.md §A1, §A2, §A5;
 - map-preview §tile-files, §screen-position, §what-is-drawn, §cells.
 

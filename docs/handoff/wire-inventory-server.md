@@ -40,7 +40,7 @@ R1–R6 exists; no rule is added here, the server maps a message to
   (reading, §5 R1). Failures → `SimGame::tick_faults`.
 - **Id table.** `MOVE_IDS` (id, `client-messages.tsv` name, owner
   section §7.x); `handlers::items::ITEM_IDS` now names
-  `specs/items/inventory.md §7.x` for each of them.
+  `specs/items/inventory-moves.md §7.x` for each of them.
 - **Tests.** `handlers/items/moves/tests.rs`: 22 host-frame tests (send
   → drain → handle → tick → flush → receive) on `SimGame<ActionSim,
   WiredWorld>` with a barbarian in a generated field room, real item
@@ -73,8 +73,8 @@ R1–R6 exists; no rule is added here, the server maps a message to
 
 | Path | What | Spec |
 |---|---|---|
-| `crates/d2-server/src/adapters/handlers/items/moves.rs` | `MOVE_IDS`, `is_move_id`, `MoveRest` (`InvRest` + `take_sent`), `InvParts` (inventory tables, `InvState`, the rest), `MoveCall`, `handle`, `update_pass` | `inventory.md` §6–§11; `intents-events.md` §2.3–§2.4, §3.2 |
-| `crates/d2-server/src/adapters/handlers/items/moves/tests.rs` | host-frame tests per id, the id table check + M08 | `inventory.md` §7 |
+| `crates/d2-server/src/adapters/handlers/items/moves.rs` | `MOVE_IDS`, `is_move_id`, `MoveRest` (`InvRest` + `take_sent`), `InvParts` (inventory tables, `InvState`, the rest), `MoveCall`, `handle`, `update_pass` | `inventory-moves.md` §6–§11; `intents-events.md` §2.3–§2.4, §3.2 |
+| `crates/d2-server/src/adapters/handlers/items/moves/tests.rs` | host-frame tests per id, the id table check + M08 | `inventory-moves.md` §7 |
 | `crates/d2-server/src/adapters/handlers/world/wired.rs` | `WiredWorld::inventory: Option<InvParts>`; `moves` (parts lent out for the call) | |
 | `crates/d2-client/tests/e2e_support/mod.rs` | `InvFx` (the e2e's `MoveRest`) | |
 

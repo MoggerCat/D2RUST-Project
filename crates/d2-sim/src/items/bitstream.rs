@@ -113,7 +113,7 @@ pub struct Kind {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StreamItem {
     /// Item flags (item data +0x18), already OR-ed with the sender's flag
-    /// argument (`inventory.md` §11).
+    /// argument (`inventory-moves.md` §11).
     pub flags: u32,
     /// The alt-code argument (§4.1 rule 4; no sender passes it, OQ1).
     pub alt: bool,

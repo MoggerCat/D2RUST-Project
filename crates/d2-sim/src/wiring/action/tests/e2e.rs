@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5, §6.5; specs/missiles/missiles.md §R7; specs/monsters/ai.md §9; specs/drlg/rooms.md §7
+// Spec: specs/sim/tick.md §3, §5, §6.5; specs/missiles/missiles.md §R7; specs/monsters/ai-bodies.md §9; specs/drlg/rooms.md §7
 //! End to end: `d2_sim::tick::tick` runs the combined dispatcher for a
 //! few ticks — a client in game, a monster thinking, its missile flying
 //! through the room grid and hitting the player — twice from the same

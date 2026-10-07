@@ -9,7 +9,7 @@
   (Open question 1).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::monsters::ai` (per-AI functions beside the
-  `ai.md` §9 bodies)
+  `ai-bodies.md` §9 bodies)
 - **Related specs:** `monsters/ai.md` (owner of scheduling §1, dispatch
   §2, AI control and tables §3, aip reads §4, target search §5,
   distances §6, tactics helpers §7, commands §8, the conventions of §9);

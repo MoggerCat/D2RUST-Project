@@ -1,4 +1,5 @@
 // Spec: specs/skills/bodies-2.md §2
+// Spec: specs/skills/bodies-2b.md (§6–§8, split out of `bodies-2.md`)
 //! The shared helpers of the batch 3 bodies (§2): monster mode damage
 //! and minion skill damage, the jitter callback, potion codes, kick
 //! damage and kick hits, the knockback column, the uninterruptable

@@ -1,4 +1,5 @@
 // Spec: specs/items/inventory.md §1–§5; specs/items/generation.md §1.3; specs/world/cube.md §4.1 (item getters); specs/sim/unit-order.md §5
+// Spec: specs/items/inventory-moves.md (§6–§11, split out of `inventory.md`)
 //! [`InvWorld`] on [`InvDesk`]: item data from the state's copies, unit
 //! kinds and acts from the unit records, stats from the stat lists, room
 //! removal from the unit lists, item getters from the item store; the

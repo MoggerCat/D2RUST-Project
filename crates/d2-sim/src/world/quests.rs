@@ -1,4 +1,5 @@
 // Spec: specs/world/quests.md
+// Spec: specs/world/quests-act1.md (§10, split out of `quests.md`)
 //! The quest system: flag records (§1), quest control and records (§2),
 //! game entry (§3), event dispatch (§4), the updater and its timers (§5),
 //! status messages (§6), NPC dialog hooks (§7), act transitions and
@@ -107,7 +108,7 @@ pub enum QuestError {
     Table(#[from] crate::world::TsvError),
     #[error("quests.tsv: {0}")]
     TableShape(&'static str),
-    /// A fatal assert inside a quest callback (`quests.md` §10): the
+    /// A fatal assert inside a quest callback (`quests-act1.md` §10): the
     /// function's 1.14d address.
     #[error("quest callback {0:#x}: fatal assert")]
     Fatal(u32),

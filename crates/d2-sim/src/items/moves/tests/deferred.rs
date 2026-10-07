@@ -11,7 +11,7 @@ fn one(f: &mut Fake, client: u32, g: u32) -> Vec<Vec<u8>> {
     dispatch(f, client, me(), g).unwrap()
 }
 
-// Covers: specs/items/inventory.md §6.1 r1
+// Covers: specs/items/inventory-moves.md §6.1 r1
 #[test]
 fn mark_sets_flags_list_and_refresh_bits() {
     let mut f = Fake::new();
@@ -28,7 +28,7 @@ fn mark_sets_flags_list_and_refresh_bits() {
     assert_eq!(f.update_bits(m), 1);
 }
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn first_matching_row_wins() {
     let mut f = Fake::new();
@@ -48,7 +48,7 @@ fn first_matching_row_wins() {
     assert_eq!(one(&mut f, 2, 10).len(), 1);
 }
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn owner_rows_skip_other_clients_and_end_the_walk() {
     let mut f = Fake::new();
@@ -60,7 +60,7 @@ fn owner_rows_skip_other_clients_and_end_the_walk() {
     assert!(one(&mut f, 2, 10).is_empty());
 }
 
-// Covers: specs/items/inventory.md §6.2
+// Covers: specs/items/inventory-moves.md §6.2
 #[test]
 fn item_flag_rows() {
     let mut f = Fake::new();
@@ -93,7 +93,7 @@ fn item_flag_rows() {
     assert_eq!(one(&mut f, 2, 10).len(), 1);
 }
 
-// Covers: specs/items/inventory.md §6.2, §11
+// Covers: specs/items/inventory-moves.md §6.2, §11
 #[test]
 fn fillers_follow_their_parent() {
     let mut f = Fake::new();
@@ -115,7 +115,7 @@ fn fillers_follow_their_parent() {
     assert_eq!(m[2][..5], [0x9D, 0x13, 16, 0, 12]);
 }
 
-// Covers: specs/items/inventory.md §6.1 r2, §6.1 r3
+// Covers: specs/items/inventory-moves.md §6.1 r2, §6.1 r3
 #[test]
 fn player_update_walks_lists_then_relators() {
     let mut f = Fake::new();
@@ -141,7 +141,7 @@ fn player_update_walks_lists_then_relators() {
     assert_eq!(m[4], layouts::relator2(0, 0, P));
 }
 
-// Covers: specs/items/inventory.md §6.3
+// Covers: specs/items/inventory-moves.md §6.3
 #[test]
 fn ground_items() {
     let mut f = Fake::new();
@@ -155,7 +155,7 @@ fn ground_items() {
     assert_eq!(ground_update(&f, 11).unwrap(), None);
 }
 
-// Covers: specs/items/inventory.md §6.3 text, §6.3 r1, §6.3 r2
+// Covers: specs/items/inventory-moves.md §6.3 text, §6.3 r1, §6.3 r2
 #[test]
 fn item_unit_update_announces_once_then_updates() {
     let mut f = Fake::new();
@@ -182,7 +182,7 @@ fn item_unit_update_announces_once_then_updates() {
     assert_eq!(item_unit_update(&f, 11).unwrap(), None);
 }
 
-// Covers: specs/items/inventory.md §11
+// Covers: specs/items/inventory-moves.md §11
 #[test]
 fn category_rule() {
     let mut f = Fake::new();
@@ -221,7 +221,7 @@ fn category_rule() {
     assert_eq!(category(&f, 10), 6);
 }
 
-// Covers: specs/items/inventory.md §11
+// Covers: specs/items/inventory-moves.md §11
 #[test]
 fn item_message_size_limit() {
     assert!(layouts::item_world(1, 0, 1, &[0; 0xF4]).is_ok());

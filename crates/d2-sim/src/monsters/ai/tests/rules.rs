@@ -1,4 +1,5 @@
-// Spec: specs/monsters/ai.md (rules §1.7–§10 and the edge cases, one test
+// Spec: specs/monsters/ai.md (rules §1.7–§8, §10 and the edge cases),
+// specs/monsters/ai-bodies.md (rules §9) (one test
 // per rule group; fakes from the parent test module)
 use super::*;
 
@@ -958,7 +959,7 @@ fn mode_requests() {
 
 // ---- §9 per-AI --------------------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.3 text
+// Covers: specs/monsters/ai-bodies.md §9.3 text
 #[test]
 fn zombie_never_schedules() {
     let row = || monstats(3, [30, 10, 0, 20, 0], 15);
@@ -990,7 +991,7 @@ fn fallen_world() -> World {
     World::new(monstats(6, [30, 10, 50, 20, 0], 15))
 }
 
-// Covers: specs/monsters/ai.md §9.4 r2
+// Covers: specs/monsters/ai-bodies.md §9.4 r2
 #[test]
 fn fallen_corpse_check() {
     let sound0 = seed_where(1, |v| v[0] % 20 == 0);
@@ -1052,7 +1053,7 @@ fn fallen_corpse_check() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.4 r3, §9.4 r4
+// Covers: specs/monsters/ai-bodies.md §9.4 r3, §9.4 r4
 #[test]
 fn fallen_mode_and_command() {
     // 3. Not neutral: idle 10 (via neutral), no draws.
@@ -1106,7 +1107,7 @@ fn fallen_mode_and_command() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.4 r5
+// Covers: specs/monsters/ai-bodies.md §9.4 r5
 #[test]
 fn fallen_without_command() {
     // 5.1: not C, AI state 3: walk to T, no draws.
@@ -1182,7 +1183,7 @@ fn fallen_without_command() {
     assert_eq!(draws(&w, 1), 1);
 }
 
-// Covers: specs/monsters/ai.md §9.4 text, §edge-cases-original-bugs r5
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r5; specs/monsters/ai-bodies.md §9.4 text
 #[test]
 fn fallen_failed_walk_leaves_only_aidel() {
     // Steps 4 and 5.1: the fallen deleted its thinks; the failed start
@@ -1216,7 +1217,7 @@ fn fallen_failed_walk_leaves_only_aidel() {
     assert_eq!(w.thinks(), [102]);
 }
 
-// Covers: specs/monsters/ai.md §9.5 r1, §9.5 text, §edge-cases-original-bugs r6
+// Covers: specs/monsters/ai.md §edge-cases-original-bugs r6; specs/monsters/ai-bodies.md §9.5 r1, §9.5 text
 #[test]
 fn brute_tests_aip3_twice() {
     let row = |aip2, aip3| monstats(7, [0, aip2, aip3, 45, 0], 15);
@@ -1259,7 +1260,7 @@ fn shaman_world() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.6 r1, §9.6 r2, §9.6 r3, §9.6 r4, §9.6 r5, §9.6 r6, §9.6 r7
+// Covers: specs/monsters/ai-bodies.md §9.6 r1, §9.6 r2, §9.6 r3, §9.6 r4, §9.6 r5, §9.6 r6, §9.6 r7
 #[test]
 fn fallen_shaman_steps() {
     // 1. C and P(aip3) → A1; not C: no step-1 draw.
@@ -1341,7 +1342,7 @@ fn fallen_shaman_steps() {
     assert_eq!(w.thinks(), [10]);
 }
 
-// Covers: specs/monsters/ai.md §9.6 text
+// Covers: specs/monsters/ai-bodies.md §9.6 text
 #[test]
 fn fallen_shaman_draw_order() {
     // Not C, every test reached: 3, 4, 5, 6, 7 and the circle.
@@ -1369,7 +1370,7 @@ fn fallen_shaman_draw_order() {
     assert_eq!(w.thinks(), [10]);
 }
 
-// Covers: specs/monsters/ai.md §9.7 r1, §9.7 r2, §9.7 r3, §9.7 r7
+// Covers: specs/monsters/ai-bodies.md §9.7 r1, §9.7 r2, §9.7 r3, §9.7 r7
 #[test]
 fn quill_rat_steps() {
     let row = || monstats(14, [10, 0, 0, 2, 0], 15);
@@ -1417,7 +1418,7 @@ fn lancer_world() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.8 r2, §9.8 text
+// Covers: specs/monsters/ai-bodies.md §9.8 r2, §9.8 text
 #[test]
 fn corrupt_lancer_combat() {
     // No skills: one draw at most.
@@ -1471,7 +1472,7 @@ fn navi_world() -> World {
     World::new(monstats(58, [0; 5], 15))
 }
 
-// Covers: specs/monsters/ai.md §9.10 r1, §9.10 r2, §9.10 r3
+// Covers: specs/monsters/ai-bodies.md §9.10 r1, §9.10 r2, §9.10 r3
 #[test]
 fn navi_steps() {
     // 1. Interacting: idle 10.
@@ -1535,7 +1536,7 @@ fn navi_steps() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.10 text
+// Covers: specs/monsters/ai-bodies.md §9.10 text
 #[test]
 fn navi_target_mode_and_town_rogue() {
     assert_eq!(AI_TABLE[58].target_mode, 0);
@@ -1558,7 +1559,7 @@ fn navi_target_mode_and_town_rogue() {
     }
 }
 
-// Covers: specs/monsters/ai.md §9.11
+// Covers: specs/monsters/ai-bodies.md §9.11
 #[test]
 fn skeleton_pattern() {
     // (AI, aip1, aip3, aip4, combat, seed, expected last mode / idle)
@@ -1622,7 +1623,7 @@ fn andariel_world() -> World {
     w
 }
 
-// Covers: specs/monsters/ai.md §9.12 r1, §9.12 r2, §9.12 r3, §9.12 r4
+// Covers: specs/monsters/ai-bodies.md §9.12 r1, §9.12 r2, §9.12 r3, §9.12 r4
 #[test]
 fn andariel_steps() {
     let set = |w: &mut World, aips: [u16; 4]| {
@@ -1686,7 +1687,7 @@ fn archer_world() -> (World, UnitId) {
     (w, s)
 }
 
-// Covers: specs/monsters/ai.md §9.13 text, §9.13 r1, §9.13 r2, §9.13 r3, §9.13 r4, §9.13 r5, §9.13 r6, §9.13 r7
+// Covers: specs/monsters/ai-bodies.md §9.13 text, §9.13 r1, §9.13 r2, §9.13 r3, §9.13 r4, §9.13 r5, §9.13 r6, §9.13 r7
 #[test]
 fn corrupt_archer_steps() {
     // 1. No S: lo' % 100 > 49 → idle aip3; else circle 3 at T.
@@ -1780,7 +1781,7 @@ fn corrupt_archer_circles_toward_no_target() {
 
 // ---- §9.14, §10 catalogue ---------------------------------------------
 
-// Covers: specs/monsters/ai.md §9.14
+// Covers: specs/monsters/ai-bodies.md §9.14
 #[test]
 fn no_act1_ai_is_d2moo_only() {
     // §9.14 ("None left"): the Act 1 AIs that were D2MOO-only are read in

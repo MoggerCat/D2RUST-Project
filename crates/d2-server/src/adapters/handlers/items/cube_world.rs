@@ -1,4 +1,4 @@
-// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3, §6.4; specs/sim/intents-events.md §2.4
+// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
 //! for items, stats, unit records and creation; the player's
 //! interaction owner ([`Interact`]); the game's one inventory model
@@ -415,7 +415,7 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
         self.ec_mut().free_item(item)
     }
     /// `cube.md` §8 step 1 for one item: S→C 0x9D action 5 now
-    /// (`0x0053D010`, `inventory.md` §6.4: item flags | 0x20, the stored
+    /// (`0x0053D010`, `inventory-moves.md` §6.4: item flags | 0x20, the stored
     /// page set to 3 and shown), then removed from the inventory and freed
     /// (`0x0055DF10` → `0x00557FD0`: the §1.4 unlink, then the inventory
     /// wiring's free).

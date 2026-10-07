@@ -1,4 +1,5 @@
-// Spec: specs/items/inventory.md
+// Spec: specs/items/inventory-moves.md
+// Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! Deferred item messages (§6): marking (§6.1), the per-client dispatcher
 //! `0x005973F0` driven by `items/item-actions.tsv` (§6.2), ground items
 //! (§6.3) and the direct sends of §6.4. Message bytes per §11

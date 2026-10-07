@@ -125,7 +125,7 @@ tick, so only the handler's effect is compared.
 | `prop_handle::vendor_refusals_change_nothing` | 0x33 item missing → 1, no message (`vendors.md` §7.2 r1); 0x37 item missing → 2, not the last bought → 3 (§5.5) |
 | `prop_handle::quest_refusal_changes_nothing` | 0x58 quest ≥ 0x2A → 2 (`quests.md` §1.7) |
 | `prop_handle::refusal_check_sees_a_late_refusal` | M08: the cube's §2 step 3.4 refusal (after the 3.1 targeting reset) fails the check |
-| `handlers::items::moves::tests::early_refusals_change_nothing` | `inventory.md` §7.1–§7.24: 0x16 own player → 3, missing / too far → 1; 0x17, 0x18, 0x1A, 0x28 cursor check → 1; 0x18 page 1 → 2, page 2 → 3; 0x19, 0x20, 0x63 stored check → 1; 0x1A–0x1D location 11 → 2; 0x1B / 0x1E not a hand → 3; 0x1D / 0x1E empty → 1; 0x21 same item → 3; 0x22 → 3; 0x27 owned check → 1; 0x50 amount / unit → 3; 0x61 classic → 3 |
+| `handlers::items::moves::tests::early_refusals_change_nothing` | `inventory-moves.md` §7.1–§7.24: 0x16 own player → 3, missing / too far → 1; 0x17, 0x18, 0x1A, 0x28 cursor check → 1; 0x18 page 1 → 2, page 2 → 3; 0x19, 0x20, 0x63 stored check → 1; 0x1A–0x1D location 11 → 2; 0x1B / 0x1E not a hand → 3; 0x1D / 0x1E empty → 1; 0x21 same item → 3; 0x22 → 3; 0x27 owned check → 1; 0x50 amount / unit → 3; 0x61 classic → 3 |
 | `handlers::walk::tests::early_refusals_change_nothing` | 0x02 / 0x04 target missing (`pathing.md` §1.2 r1), 0x01 / 0x03 in mode DT (§1.3): result 0, nothing changed or queued |
 
 Left out on purpose, because the spec orders a write before the refusal:

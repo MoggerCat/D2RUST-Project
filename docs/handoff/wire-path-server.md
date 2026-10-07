@@ -102,7 +102,7 @@ Tests:
    client's room before the update walk, or `0x0053A5D0` also covers
    the client's own player outside the adjacency.
 2. **Flags 2 0x10000 / 0x800 and unit flag 0x1 are never cleared**:
-   step 6's `0x00553220` "clears per-unit flags" (`items/inventory.md`
+   step 6's `0x00553220` "clears per-unit flags" (`items/inventory-moves.md`
    §6.3 r4) without naming them. So any later queueing of the player
    (e.g. the next walk's mode set) sends 0x15 again, and a later
    queueing in a walk mode sends 0x0F again. Test

@@ -197,7 +197,7 @@ float arithmetic must be reproduced exactly once confirmed.
 
 Sends a player's own client its life, mana, stamina, position, gold and
 experience (S→C 0x18, 0x95, 0x96, 0x19–0x1F). Owner of these messages;
-`items/inventory.md` §10.3 (gold bytes) and `sim/pathing.md` §10 rule 5
+`items/inventory-moves.md` §10.3 (gold bytes) and `sim/pathing.md` §10 rule 5
 link here.
 
 #### 5.1 When it runs
@@ -287,7 +287,7 @@ Current values (stat totals, `0x00625480`; `>>` arithmetic):
    5. Else nothing: quiet counter += 1.
    After a message: cache x, y, dx, dy := X, Y, dx, dy; quiet counter :=
    0.
-4. Gold: total(14) ≠ cache → `0x0053E9B0(new, old)` (`items/inventory.md`
+4. Gold: total(14) ≠ cache → `0x0053E9B0(new, old)` (`items/inventory-moves.md`
    §10.3 bytes); cache := new.
 5. Experience: total(13) ≠ cache → `0x0053BDD0(new, old)`: δ = new − old
    (32-bit): δ unsigned > 0xFFFE → 0x1C [new u32]; δ ≥ 0xFF → 0x1B [δ

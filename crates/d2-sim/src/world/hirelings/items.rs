@@ -1,7 +1,7 @@
 // Spec: specs/world/hirelings.md §11
 //! The hireling item swap `0x0054CED0(game, player, merc, item C)`
 //! (§11), reached from the 0x61 give `0x0054D230`
-//! (`items/inventory.md` §7.23, [`crate::items::moves::handlers`]) when
+//! (`items/inventory-moves.md` §7.23, [`crate::items::moves::handlers`]) when
 //! C is allowed. Item placement, requirements (§4.2), the cursor equip
 //! (§4.6), duplication and messages are other specs' and are reached
 //! through [`HirelingItems`]. Units and items are the 0x61 path's
@@ -74,7 +74,7 @@ pub trait HirelingItems {
     fn consume(&mut self, item: Guid);
     /// The player's cursor item := none.
     fn clear_cursor(&mut self, player: Owner);
-    /// `0x0055DF00` (the hireling inventory pass, `inventory.md` §7.23).
+    /// `0x0055DF00` (the hireling inventory pass, `inventory-moves.md` §7.23).
     fn inventory_pass(&mut self, player: Owner, merc: Owner);
     /// `0x0055F4F0(0)`.
     fn refresh_0055f4f0(&mut self, player: Owner, merc: Owner);

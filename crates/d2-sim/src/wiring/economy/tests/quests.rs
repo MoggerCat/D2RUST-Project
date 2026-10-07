@@ -1,5 +1,5 @@
 //! Quests → items and unit fields: Act I callbacks reading real item
-//! data and stats and writing real stats (`quests.md` §10.1–§10.3).
+//! data and stats and writing real stats (`quests-act1.md` §10.1–§10.3).
 
 use super::*;
 use crate::items::{q, ItemRequest};
