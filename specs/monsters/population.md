@@ -1152,6 +1152,7 @@ unique with 3 minions), and placement points.
    for evil monsters (`monsters/ai.md` §5.2 step 5.2), so §12's rogue2
    wanderers are attacked by the area's monsters. §12 step 6's
    "alignment change" wording is wrong; this answer supersedes it.
+   Slot 9 (bone wall): `missiles/bodies-2.md` Open question 2.
 8. Answered (2026-10-07): no. `0x005B1CF0` and `0x005B21B0` and their
    callees (2 call levels) contain no generator step (constant
    0x6AC690C5) and no `rng.md` helper call, on any seed; §Randomness

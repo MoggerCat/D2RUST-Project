@@ -1142,9 +1142,11 @@ Reading:
    `ExplosionMissile` were searched heuristically only (functions that
    index the missile table). Settle: a full xref of record offsets
    +0x135, +0x18E, +0x190, +0x16 through every missile-record pointer.
-8. Server-do and server-hit functions marked D2MOO-only or summarized
-   need their 1.14d bodies read (done: server-do 2, 3, 5, 7, server-hit
-   1, 4, 12, 13, §R9.5–R9.6).
+8. Answered (2026-10-08), R9.2 `status`: none is left. Every row of
+   `srvdo.tsv` (53) and `srvhit.tsv` (71) is `spec'd-here`; the bodies
+   are §R9.5–R9.6 (server-do 2, 3, 5, 7, server-hit 1, 4, 12, 13) and
+   `missiles/bodies.md` §6 onward with `missiles/bodies-2.md` (the rest,
+   1.14d-read). No status change was needed.
 9. The level passed by monster attacks for spike1 (VelLev 8 makes its
    speed level-dependent) is the AI/skills spec's; a recording with
    positions would confirm the speed formula.

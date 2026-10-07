@@ -152,7 +152,8 @@ Row: bonewallmaker (207). Data +0x28 = GUID of an anchor monster, +0x2C
    minion list (`0x0058F100(game, M, P)`); umod 15 (`partydead`,
    `0x005A4850(game, P, 15, 0)`, `monsters/init.md`); `skill_stats(game,
    O, P, k, L, 0)` (`0x005C4470`, `skills/bodies.md` §6.5); P's stored
-   owner := O (`0x00621CE0`); `0x005B1990(game, P, 0, 9)` (Open
+   owner := O (`0x00621CE0`); `0x005B1990(game, P, 0, 9)` (P joins
+   target-node slot 9, alternative targets: `monsters/ai.md` §5.2; Open
    question 2).
 9. Data +0x2C −= 1. Return flight.
 
@@ -890,9 +891,14 @@ Created missiles and monsters draw on their own seeds.
 
 1. No recording covers these bodies: record Lightning Fury, Bone Wall,
    Battle Cry, Fist of the Heavens and the panther potions.
-2. `0x005B1990(game, P, 0, 9)` on a bone-wall piece: the meaning of
-   mode 9 (`monsters/population.md` Open question 7 asks the same for
-   mode 8).
+2. Answered (2026-10-08): 9 is not a mode but a target-node slot.
+   `0x005B1990(game, unit, a, slot)` prepends the unit to the game's
+   target-node list `slot` (game +0x10F8 + 4·slot; only slots 8, 9,
+   only a player or monster in no list, unit +0xD0 := slot). Slot 9
+   holds alternative targets that monster AI may switch to
+   (`monsters/ai.md` §5.2 "Target-node lists" and step 5.3), so a
+   bone-wall piece becomes something monsters attack. Slot 8 is
+   `monsters/population.md` Open question 7 (answered 2026-10-07).
 3. *Answered* (`impl-missile-bodies-2` Q6): the unit find (rooms,
    found order, default filter) is owned by `monsters/umod-callbacks.md`
    §3.1; flags 0x3002 = dead monsters (mode 12) outside towns within r.
