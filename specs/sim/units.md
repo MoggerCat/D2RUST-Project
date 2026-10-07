@@ -34,10 +34,10 @@
 |   7. Scheduler inventory (`unit-events.tsv`) | 668–689 |
 | Constants & data dependencies | 690–706 |
 | Randomness | 707–714 |
-| Edge cases & original bugs | 715–733 |
-| Test vectors | 734–793 |
-| Provenance | 794–844 |
-| Open questions | 845–895 |
+| Edge cases & original bugs | 715–735 |
+| Test vectors | 736–795 |
+| Provenance | 796–846 |
+| Open questions | 847–908 |
 <!-- /index -->
 
 ## Summary
@@ -729,7 +729,9 @@ handlers (owned by their specs).
    entry for them is fatal, for players and monsters silent.
 6. The neutral AI delay uses the difficulty's `aidel` column only when
    game +0x6A or game +0x74 is non-zero, else the Normal column on every
-   difficulty (§4.6; meaning of the two fields: open question 7).
+   difficulty (§4.6). +0x6A is the game type (3 in single player) and
+   +0x74 the ladder flag (open question 7), so single player uses the
+   difficulty's column.
 
 ## Test vectors
 
@@ -879,9 +881,20 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`. The
    78 rows left `file` (state timers, damage, missile hits, item use,
    most trade sites) need their callers traced; each names its owner.
-7. Game +0x6A and +0x74 (§4.6, edge case 6): which game types set them;
-   a Nightmare single-player recording settles which `aidel` column
-   single player uses.
+7. Answered (2026-10-07): both are written once, by game creation
+   `0x00530BF0` from C→S message 0x67 (`tools/original-hooks.md` §5.2,
+   caller `0x0053F17A`). Game +0x6A (u8) is the game type, message
+   byte +0x11 (`0x00530CFF`); the client sets it from its own game type
+   `[0x007A0610]` (`0x00477CA0`): 0 (single player) → 3, 6 → 1, 8 → 2,
+   any other → 0; the single-player recording sends 3. Game +0x74
+   (u32) is the ladder flag, bit 21 (0x200000) of the creation flags
+   (message dword +0x27, `0x00530D4C`–`0x00530D59`); the client's
+   default flags 0x100004 have it clear. So single player has +0x6A = 3
+   and the neutral AI delay reads the difficulty's `aidel` column
+   (`0x005A7446`–`0x005A745C`: +0x4F + difficulty +0x6D); only a game
+   with type 0 and no ladder bit uses the Normal column on every
+   difficulty. A Nightmare single-player recording (U10 delays) still
+   confirms it.
 8. Inactive storage: records and restore answered in §3.4 (monster
    GUIDs are kept; other units come back with new GUIDs; restore order
    monsters, items, others, each newest first). Answered 2026-10-07:

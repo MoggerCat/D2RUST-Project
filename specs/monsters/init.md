@@ -61,7 +61,7 @@
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1142–1172 |
 |   Recorded checks (monster assign 0xAC) | 1173–1185 |
 | Provenance | 1186–1264 |
-| Open questions | 1265–1309 |
+| Open questions | 1265–1312 |
 <!-- /index -->
 
 ## Summary
@@ -1264,9 +1264,12 @@ Bosses, Normal, Blood Moor (L-flag 1):
 
 ## Open questions
 
-1. The value of game +0x6A in other modes (classic SP, TCP/IP, realm);
-   settle by recording client message 0x67 in each mode. Rules use the
-   L-columns only through §8.1's test.
+1. Answered (2026-10-07): game +0x6A is the game type from C→S 0x67
+   byte +0x11, which the client sets to 3 for single player (client game
+   type 0), 1 for type 6, 2 for type 8, else 0 (`0x00477CA0`); +0x74 is
+   the ladder flag (creation flags bit 21). Owner: `sim/units.md` OQ7.
+   Single player (client game type 0) therefore takes the L-columns
+   in §8.1's test.
 2. Answered (2026-10-07): `0x005B0E00` (`ai.md` §3.3) draws nothing
    itself; the only draws are the AI record's init function
    (`ai-functions.tsv` `init_1_14d`). Of the 16 init functions, Raven
