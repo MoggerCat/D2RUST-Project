@@ -166,10 +166,10 @@ id	name	owner
 0xA4	BaalWave	TBD
 0xA5	UnknownA5	TBD
 0xA6	UnknownA6	TBD
-0xA7	DelayedState	TBD
-0xA8	SetState	TBD
-0xA9	EndState	TBD
-0xAA	AddUnit	TBD
+0xA7	DelayedState	specs/client/msg-units.md
+0xA8	SetState	specs/client/msg-units.md
+0xA9	EndState	specs/client/msg-units.md
+0xAA	AddUnit	specs/client/msg-units.md
 0xAB	NpcHeal	TBD
 0xAC	AssignMonster	specs/client/msg-units.md
 0xAD	-	TBD
