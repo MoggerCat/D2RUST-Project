@@ -2149,3 +2149,147 @@ fn shadow_stats_use_the_second_formula_on_the_shadow() {
         .take_log()
         .contains(&format!("Umod {{ m: {m}, umod: 5, arg: 1 }}")));
 }
+
+// ---------------------------------------------------------------- §7
+
+// Covers: specs/skills/bodies.md §7.2 text, §7.2 r1, §7.2 r2, §7.2 r3, §7.2 r4
+#[test]
+fn power_strike_start_record_and_combat() {
+    use crate::combat::{melee_result, start_combat};
+    let ct = ct3();
+    for (etype, c4, src) in [(3u8, 30i16, 64u8), (3, -5, 0), (0, 30, 0)] {
+        let mut c = Code::new();
+        let mut r = body_rec();
+        r.calc1 = c.f(40);
+        r.calc4 = c.f(c4);
+        r.etype = etype;
+        r.srcdam = src;
+        let t = tabs(r, c, 1);
+        let (mut f, u, m) = duel();
+        // r1: no target / invalid skill → 0.
+        assert_eq!(starts2::power_strike(&mut f, &t, &ct, u, 99, 1), 0);
+        f.targets.remove(&u);
+        assert_eq!(starts2::power_strike(&mut f, &t, &ct, u, 1, 1), 0);
+        f.targets.insert(u, m);
+        assert!(f.c.units[u].combat.is_empty());
+        // r2–r4 replayed by hand.
+        let mut g = f.clone();
+        let mut want = DamageRecord {
+            result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), 0, 0),
+            ..DamageRecord::default()
+        };
+        assert_eq!(want.result & 1, 1);
+        want.enh_pct = 40;
+        if etype != 0 {
+            want.conv_pct = i32::from(c4);
+            if c4 > 0 {
+                want.conv_elem = etype as i8;
+            }
+        }
+        crate::skills::roll_elemental(&mut g, &t, u, &mut want, 1, 1);
+        start_combat(
+            &mut g.c,
+            &t,
+            &ct,
+            Some(u),
+            Some(m),
+            &mut want,
+            i32::from(src),
+        );
+        assert_eq!(starts2::power_strike(&mut f, &t, &ct, u, 1, 1), 1);
+        let e = last_entry(&mut f, u);
+        assert_eq!(e.record, want, "etype {etype} calc4 {c4}");
+        assert_eq!(e.record.enh_pct, 40);
+        assert_eq!(f.c.units[u].seed, g.c.units[u].seed);
+        // A miss stores the bare record.
+        f.c.hostile = false;
+        f.c.units[u].combat.clear();
+        assert_eq!(starts2::power_strike(&mut f, &t, &ct, u, 1, 1), 1);
+        let e = last_entry(&mut f, u);
+        assert_eq!(
+            (e.record.result, e.record.enh_pct, e.record.conv_pct),
+            (0, 0, 0)
+        );
+    }
+}
+
+// Covers: specs/skills/bodies.md §7.5
+#[test]
+fn corpse_explosion_start_needs_a_corpse_in_the_field() {
+    let (mut f, u, m, mut ct) = corpse_world();
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 1);
+    // No Velocity test, unlike Raise (§3.6).
+    ct.monstats[0].velocity = 0;
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 1);
+    assert_eq!(starts::raise(&mut f, &ct, u), 0);
+    ct.monstats[0].velocity = 1;
+    f.town.insert(1);
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 0, "town");
+    f.town.clear();
+    f.c.units[m].mode = 1;
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 0, "not dead");
+    f.c.units[m].mode = 12;
+    f.state_flags.insert((77, group::UDEAD));
+    f.c.units[m].states.push(77);
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 0, "udead");
+    f.c.units[m].states.clear();
+    ct.monstats2[0].corpsesel = false;
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 0, "no corpseSel");
+    ct.monstats2[0].corpsesel = true;
+    let p = f.add(FUnit::new(UnitType::Player, 1), (4, 4));
+    f.targets.insert(u, p);
+    assert_eq!(
+        starts2::corpse_explosion(&mut f, &ct, u),
+        0,
+        "not a monster"
+    );
+    f.targets.remove(&u);
+    assert_eq!(starts2::corpse_explosion(&mut f, &ct, u), 0);
+}
+
+// Covers: specs/skills/bodies.md §7.7 r1, §7.7 r2, §7.7 r3, §7.7 r4, §7.7 r5
+#[test]
+fn feral_rage_start_records_the_hit_in_param_one() {
+    use crate::combat::{melee_result, start_combat};
+    let ct = ct3();
+    let (t, _) = strike_tables(0, 2, 0);
+    let (mut f, u, m) = duel();
+    // r1: invalid skill, no used entry, no target → 0.
+    assert_eq!(starts2::feral_rage(&mut f, &t, &ct, u, 99, 1), 0);
+    let used = f.c.units[u].used.take();
+    assert_eq!(starts2::feral_rage(&mut f, &t, &ct, u, 1, 1), 0);
+    f.c.units[u].used = used;
+    f.targets.remove(&u);
+    assert_eq!(starts2::feral_rage(&mut f, &t, &ct, u, 1, 1), 0);
+    f.targets.insert(u, m);
+    assert!(f.entries.is_empty() && f.c.units[u].combat.is_empty());
+    // r2–r5 replayed by hand: conversion (EType 3, calc4 30), enhanced
+    // damage 40, SrcDam 0 → 128, param 1 := 1 on a hit.
+    let mut g = f.clone();
+    let bonus = crate::skills::to_hit(&mut g, &t, Some(u), 1, 1);
+    let mut want = DamageRecord {
+        result: melee_result(&mut g.c, &t, &ct, Some(u), Some(m), bonus, 0),
+        ..DamageRecord::default()
+    };
+    want.conv_pct = 30;
+    want.conv_elem = 3;
+    want.enh_pct = 40;
+    start_combat(&mut g.c, &t, &ct, Some(u), Some(m), &mut want, 128);
+    assert_eq!(starts2::feral_rage(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(last_entry(&mut f, u).record, want);
+    assert_eq!(f.entries[&(u, 1, 1)], 1);
+    // No roll_elemental: the seed is untouched by the body beyond the
+    // replay (which made no such draw either).
+    assert_eq!(f.c.units[u].seed, g.c.units[u].seed);
+    // A miss: param 1 := 0 and the record has no conversion or damage
+    // percent.
+    f.c.hostile = false;
+    f.c.units[u].combat.clear();
+    assert_eq!(starts2::feral_rage(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.entries[&(u, 1, 1)], 0);
+    let e = last_entry(&mut f, u);
+    assert_eq!(
+        (e.record.enh_pct, e.record.conv_pct, e.record.result),
+        (0, 0, 0)
+    );
+}
