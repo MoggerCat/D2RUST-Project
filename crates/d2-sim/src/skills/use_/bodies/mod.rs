@@ -161,6 +161,9 @@ pub struct BodyStat {
     pub send_bits: u8,
     pub send_param_bits: u8,
     pub signed: bool,
+    /// `send other` (+0x04 bit 0): read by the monster assign 0xAC
+    /// (`monsters/init.md` §24 rule 6).
+    pub send_other: bool,
 }
 
 /// The table data the bodies read beyond [`SkillTables`] and
@@ -219,6 +222,7 @@ impl BodyTables {
                     send_bits: r.send_bits,
                     send_param_bits: r.send_param_bits,
                     signed: r.signed,
+                    send_other: r.send_other,
                 })
                 .collect(),
             state_group: states.iter().map(|r| i32::from(r.group as i16)).collect(),

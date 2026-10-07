@@ -421,10 +421,9 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     fn seed(&mut self, unit: UnitId) -> &mut Seed {
         self.v.seed(unit)
     }
-    /// `0x00620250` ([`Pending::used_skill`]) and its skills.txt row.
-    ///
-    /// TODO(spec: pathing.md §8.1, `0x006446A0`): which skills.txt field
-    /// skill +0x0C is is not stated; its flags read as 0.
+    /// `0x00620250` ([`Pending::used_skill`]) and its skills.txt row. The
+    /// flags (`0x006446A0`, skill +0x0C) are the used skill entry's
+    /// runtime E-flags word, not a skills.txt column (`pathing.md` §8.1).
     fn used_skill(&self, unit: UnitId) -> Option<UsedSkill> {
         let e = self.v.h.x.used_skill(unit)?;
         let row = self.v.h.tables.skills.skills.get(e.skill as usize)?;
@@ -433,7 +432,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
             seq_input: i32::from(row.seqinput),
             srvdofunc: i32::from(row.srvdofunc),
             interrupt: row.interrupt,
-            skill_flags: 0,
+            skill_flags: self.v.h.x.entry_flags(unit, &e),
         })
     }
     /// Mode set `0x00553570` (`units.md` §4.1) through the unit system.

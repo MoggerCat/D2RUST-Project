@@ -418,6 +418,10 @@ fn code_to_id_table() {
     assert_eq!(code_to_id(0x32), Err(OutdoorError::Crash(CRASH_EXIT_ID)));
     assert_eq!(code_to_id(0x92), Err(OutdoorError::Crash(CRASH_EXIT_ID)));
     assert_eq!(code_to_id(0xF1), Err(OutdoorError::Fatal(0x78C)));
+    // Row 15 (L = 15 with any attach bit) reads four zeros: fatal 0x78C.
+    for d in [0x1F, 0x2F, 0x4F, 0x8F, 0xFF] {
+        assert_eq!(code_to_id(d), Err(OutdoorError::Fatal(0x78C)), "D {d:#x}");
+    }
     // Edge case 2: S[0] = 256 is never produced.
     for d in 1..256 {
         assert_ne!(code_to_id(d), Ok(256));

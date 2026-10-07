@@ -357,8 +357,10 @@ proptest! {
                     p1.repath_budget,
                     (i32::from(p0.repath_budget) - p0.cur_point as i32).clamp(0, 255) as u8
                 );
+                // §9.10: type 13, and when that compute gives 0, type 15
+                // and a second compute, which may still move the unit.
                 let ty_ok = if chaser_monster {
-                    if s == Step::Moving { p1.path_type == 13 } else { matches!(p1.path_type, 13 | 15) }
+                    matches!(p1.path_type, 13 | 15)
                 } else {
                     p1.path_type == 7
                 };

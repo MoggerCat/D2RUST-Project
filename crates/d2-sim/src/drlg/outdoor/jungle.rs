@@ -315,10 +315,13 @@ pub fn code_to_id(d: i32) -> Result<u32, OutdoorError> {
                 1..=14 => EXIT_IDS[r as usize - 1][slot],
                 // `0x006F13F0`..`0x006F13FC` (S[13..16]): all 0.
                 0 => 0,
+                // Row 15 (L = 15 with an attach bit) reads the four zero
+                // dwords after row 14 (`0x006F14E0`..`0x006F14EC`), so it
+                // ends fatal 0x78C (§2.7 "Lookups outside rows 1..14").
+                15 => 0,
                 545..=572 if slot % 2 == 0 => 0,
                 545..=572 => return Err(OutdoorError::Crash(CRASH_EXIT_ID)),
-                // TODO(spec §2.7): row 15 (L = 15 with an attach bit) is
-                // not in the table of reads outside rows 1..14.
+                // A stored V(r) read again: outside the module image (§2.7).
                 _ => return Err(OutdoorError::Fatal(fatal::EXIT_ID)),
             };
         }

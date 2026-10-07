@@ -1543,6 +1543,29 @@ impl StatLists {
             .find(|&c| self.l(c).flags & flags != 0)
     }
 
+    /// By state and flags `0x006257D0`(unit, s, flags) (§9.3): the unit's
+    /// list missing or not extended → none; the parked chain when flags
+    /// has SET, else the active chain; the first list whose state is `s`
+    /// and, when the flags without SET are non-zero, whose flags share a
+    /// bit with them.
+    pub fn list_by_state_flags(&self, unit: UnitId, state: u32, flags: u32) -> Option<ListId> {
+        let r = self.unit_list(unit)?;
+        if !self.is_extended(r) {
+            return None;
+        }
+        let (active, parked) = self.heads(r);
+        let head = if flags & flag::SET != 0 {
+            parked
+        } else {
+            active
+        };
+        let f = flags & !flag::SET;
+        self.chain(head).into_iter().find(|&c| {
+            let l = self.l(c);
+            l.state == state && (f == 0 || l.flags & f != 0)
+        })
+    }
+
     /// The owner (type, GUID) of the unit's list of `state`, if any.
     pub fn state_list_owner(&self, unit: UnitId, state: u32) -> Option<(u32, u32)> {
         let r = self.unit_list(unit)?;

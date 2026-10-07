@@ -128,10 +128,10 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
             r.interact.reset();
         }
     }
-    /// `0x00554D00`: the GUID of the player's interact unit.
-    // TODO(spec: world/waypoints.md §6.3 rule 1): `0x00554D00` has no
-    // written body; read as the record's GUID while the info is active
-    // (`0x00554100`'s answer), the reading every caller compares with.
+    /// `0x00554D00`: the player's interact unit (`world/objects-2.md`
+    /// §16.3: P +0x6C ≠ 0 → the unit with GUID P +0x64, else none), as
+    /// its GUID; every caller compares it with an existing unit's GUID
+    /// (`world/waypoints.md` §6.3 rule 1).
     fn interact_guid(&self, player: UnitId) -> Option<u32> {
         let (_, guid) = self.v.units.get(player)?.interact.get()?;
         Some(guid)
