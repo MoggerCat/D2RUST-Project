@@ -1161,7 +1161,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // count − 1 = 0 (Open question 4 reads byte +2 so): one `spend`:
     // stat points 5 → 4, strength 0 → 1, result 0. No message (none is
     // written for it).
-    let point = bytes(&AddStatPoint { stat: STRENGTH });
+    let point = bytes(&AddStatPoint {
+        stat: STRENGTH as u8,
+        repeat: 0,
+    });
     assert_eq!(point, [0x3A, 0, 0]);
     record(&mut fx, &mut frames, vec![point]);
     let done = Some(ResultCode::Done);
@@ -1413,8 +1416,8 @@ fn run_with(game_seed: u32) -> Transcript {
         bytes(&SellItem {
             npc: ng,
             item,
-            tab: 0,
-            cost: 0,
+            item_mode: 0,
+            client_price: 0,
         })
     };
     let sold = (100 * fx.stat(cap, ARMORCLASS) / 5) * 512 / 1024;
@@ -1438,8 +1441,8 @@ fn run_with(game_seed: u32) -> Transcript {
     let buy = bytes(&BuyItem {
         npc: ng,
         item: store_cap,
-        mode: 0,
-        cost: 0,
+        transaction: 0,
+        client_price: 0,
     });
     record(&mut fx, &mut frames, vec![buy]);
     assert_eq!(frames[29].1.codes, [(0x32, Some(ResultCode::Refused))]);

@@ -126,10 +126,22 @@ pub trait InitHost {
 
     // ---- bosses (§14, §16–§21) ----
 
-    /// §14.2: quest chain record `0x005436B0` (quests spec).
+    /// §14.3: quest chain record `0x005436B0` (quests spec).
     fn quest_chain(&mut self, unit: UnitId, chain: u32) {}
-    /// §14.2 bloodraven: state corpse_noselect (states spec).
+    /// §14.3 bloodraven: state 118 corpse_noselect on
+    /// (`0x00639DB0(unit, 118, 1)`).
     fn set_corpse_noselect(&mut self, unit: UnitId) {}
+    /// §14.3 ancient barbarian equipment: difficulty 1 replaces `code`
+    /// by its items row's `ubercode` (+0x88), 2 by `ultracode` (+0x8C)
+    /// (row found with `0x00633640`). Default: unchanged.
+    fn item_tier_code(&mut self, code: [u8; 4], difficulty: u8) -> [u8; 4] {
+        code
+    }
+    /// §14.3 `0x00573B20(game, unit, &entry, level, 4)`: create `code`
+    /// as a magic item (spawn mode 4) at item level `level` and equip it
+    /// at body location `loc` (`items/generation.md` §10.2; game- and
+    /// item-seed draws). Default: nothing.
+    fn create_boss_item(&mut self, unit: UnitId, code: [u8; 4], loc: u8, level: i32) {}
     /// `0x005A09E0` steps 1–4 (`population.md` §6.3): placement and
     /// creation of a boss. Step 5 is [`super::mark_boss`].
     fn boss_spawn(

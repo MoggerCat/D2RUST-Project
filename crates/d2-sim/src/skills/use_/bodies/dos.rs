@@ -153,7 +153,7 @@ pub fn melee_state<W: BodyWorld>(
 // ---------------------------------------------------------------- §4.3
 
 /// `auraevent1–3` / `auraeventfunc1–3` of a record (i16 views).
-fn events(r: &d2_data::tables::Skills) -> [(i32, i32); 3] {
+pub(crate) fn events(r: &d2_data::tables::Skills) -> [(i32, i32); 3] {
     [
         (s16(r.auraevent1), s16(r.auraeventfunc1)),
         (s16(r.auraevent2), s16(r.auraeventfunc2)),

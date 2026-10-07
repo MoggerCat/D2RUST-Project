@@ -899,7 +899,8 @@ fn apply_melee_out_of_range_frees_and_returns() {
 #[test]
 fn apply_melee_hit_steps() {
     let c = ct();
-    // 4.1: a player attacker in mode 0 frees and returns.
+    // 4.1: a player attacker in mode 0 returns at once; the combat
+    // record is not freed (`0x0057D5AC`).
     let (mut w, a, d) = spy_pair();
     let hit = DamageRecord {
         result: hit::result::HIT,
@@ -909,7 +910,7 @@ fn apply_melee_hit_steps() {
     w.f.units[a].combat = vec![entry(&w, a, d, hit)];
     w.f.units[a].mode = 0;
     apply_melee(&mut w, &c, a, d);
-    assert!(w.f.units[a].combat.is_empty());
+    assert_eq!(w.f.units[a].combat.len(), 1);
     assert!(w.log().is_empty());
     assert_eq!(w.f.get(d, 6), 100_000);
     // 4.2: hit flags replaced by 0x20, so a stored "ignore hostility" is

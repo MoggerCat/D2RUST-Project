@@ -367,6 +367,10 @@ impl InitHost for Fake {
     fn quest_chain(&mut self, _: UnitId, chain: u32) {
         self.log.push(format!("quest_chain {chain}"));
     }
+    fn create_boss_item(&mut self, _: UnitId, code: [u8; 4], loc: u8, _: i32) {
+        let c = String::from_utf8_lossy(&code).trim_end().to_string();
+        self.log.push(format!("boss_item {c} {loc}"));
+    }
     fn set_corpse_noselect(&mut self, _: UnitId) {
         self.log.push("corpse_noselect".into());
     }
@@ -981,13 +985,12 @@ fn creation_sequence_and_normal_mods() {
     }
 }
 
-// Covers: specs/monsters/init.md §14.2
+// Covers: specs/monsters/init.md §14.2, §14.3
 #[test]
 fn boss_mods_bloodraven() {
     let mut ms = vec![mon(1, 1, 1, 1); 2];
-    ms[1].baseid = 250;
-    let mut t = Tables::new(ms);
-    t.ids.bloodraven = Some(250);
+    ms[1].baseid = 267;
+    let t = Tables::new(ms);
     let mut f = fake_with(t);
     let cx = f.cx;
     let u = create(
@@ -1005,6 +1008,120 @@ fn boss_mods_bloodraven() {
     assert_eq!(f.region_bosses, 1);
     assert!(f.log.contains(&"quest_chain 2".to_string()));
     assert!(f.log.contains(&"corpse_noselect".to_string()));
+}
+
+// Covers: specs/monsters/init.md §14.3
+#[test]
+fn boss_mods_case_table() {
+    use super::create::{boss_mods_for, BossStep::*};
+    // Uber classes take their own branch of the shared BaseId.
+    assert_eq!(
+        boss_mods_for(156, 707),
+        [Umod(23, true), Umod(6, true), Umod(29, true)]
+    );
+    assert_eq!(boss_mods_for(156, 156), [Umod(22, true), Chain(6)]);
+    assert_eq!(boss_mods_for(211, 211), [Chain(13), Chain(9)]);
+    assert_eq!(boss_mods_for(211, 708), [Umod(6, true), Umod(18, true)]);
+    assert_eq!(
+        boss_mods_for(242, 704),
+        [
+            Umod(22, true),
+            Umod(30, true),
+            Umod(17, true),
+            Umod(8, true),
+            Umod(6, true)
+        ]
+    );
+    assert_eq!(boss_mods_for(242, 242), [Chain(20), Umod(22, true)]);
+    assert_eq!(boss_mods_for(243, 243), [Umod(22, true), Chain(23)]);
+    assert_eq!(
+        boss_mods_for(250, 250),
+        [Chain(12), UnitFlags(0x800), DataFlag1]
+    );
+    assert_eq!(boss_mods_for(292, 292), [Umod(31, false)]);
+    assert_eq!(boss_mods_for(343, 343), [UnitFlags(0x20000)]);
+    assert_eq!(
+        boss_mods_for(366, 366),
+        [Chain(19), UnitFlags(0x20000), Umod(22, true)]
+    );
+    assert_eq!(boss_mods_for(540, 541), [AncientEquip]);
+    assert_eq!(
+        boss_mods_for(544, 709),
+        [Umod(22, true), Umod(18, true), Umod(8, true), Umod(6, true)]
+    );
+    // warriv2's hook acts only for 201 / 331; no other BaseId has a case.
+    assert!(boss_mods_for(175, 175).is_empty());
+    assert!(boss_mods_for(24, 24).is_empty());
+    // No case assigns umods 40 or 41.
+    for b in 0..800 {
+        for c in [b as u32, 704, 705, 706, 707, 708, 709] {
+            assert!(!boss_mods_for(b, c)
+                .iter()
+                .any(|s| matches!(s, Umod(40 | 41, _))));
+        }
+    }
+}
+
+// Covers: specs/monsters/init.md §14.3
+#[test]
+fn boss_mods_summoner_and_ancient_equipment() {
+    let mut ms = vec![mon(1, 1, 1, 1); 542];
+    ms[1].baseid = 250;
+    ms[2].baseid = 540;
+    ms[541].baseid = 540;
+    let mut f = fake_with(Tables::new(ms));
+    let cx = f.cx;
+    let u = create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 1,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(f.data(u).data_flag1);
+    assert_ne!(f.units.get(u).unwrap().flags & 0x800, 0);
+    assert!(f.log.contains(&"quest_chain 12".to_string()));
+    // Class 2 has BaseId 540 but the equipment table is keyed by the
+    // class: only 540–542 read a row, so nothing is created.
+    create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 2,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(!f.log.iter().any(|l| l.starts_with("boss_item")));
+    // Class 541 (BaseId 540) reads its own row, in k order.
+    create(
+        &cx,
+        &mut f,
+        &CreateRequest {
+            class: 541,
+            ..CreateRequest::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    let items: Vec<_> = f
+        .log
+        .iter()
+        .filter(|l| l.starts_with("boss_item"))
+        .collect();
+    assert_eq!(
+        items,
+        [
+            "boss_item tax 4",
+            "boss_item tax 5",
+            "boss_item hgl 10",
+            "boss_item hbt 9"
+        ]
+    );
 }
 
 // ---- §19 ----

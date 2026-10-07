@@ -186,6 +186,9 @@ pub struct MonsterData {
     pub level_id: i32,
     /// +0x5C bit 2: summoner "not counted" (§4 step 2).
     pub not_counted: bool,
+    /// +0x5C bit 0: set by the summoner's boss mods (§14.3,
+    /// `0x00573570(unit, 1, set)`).
+    pub data_flag1: bool,
 }
 
 impl MonsterData {
@@ -329,8 +332,6 @@ pub fn component_counts(t: &BinTable) -> Vec<[u8; 16]> {
 pub struct NamedIds {
     /// skills `monteleport` (umod 26, §19.6).
     pub monteleport: Option<u16>,
-    /// monstats `BaseId` of bloodraven (§14.2).
-    pub bloodraven: Option<u16>,
 }
 
 /// The tables init reads, typed `d2-data` records (`data/loading.md`).

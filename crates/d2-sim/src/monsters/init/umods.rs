@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2
+// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2; specs/monsters/umod-init-bodies.md
 //! Boss spawns after the spawn (§16), umod choice (§17), boss minions
 //! and umod init (§18), the umod init functions (§19), superuniques
 //! (§20), restore paths (§21), and the umod callback dispatcher with the
@@ -552,7 +552,7 @@ pub fn run_umod_init<H: InitHost + ?Sized>(
         8 | 27 | 28 => resist(h, unit, umod),
         9 | 17 | 18 | 23 | 25 => elemental(cx, h, unit, umod, unique, d),
         16 => champion_fn(cx, h, unit, 16, d),
-        26 => teleport(cx, h, unit),
+        26 => teleport(cx, h, unit, unique),
         30 => aura(cx, h, unit),
         36 => ghostly(cx, h, unit, d),
         37 => {
@@ -709,10 +709,8 @@ fn resist<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, umod: u8) {
     }
 }
 
-/// Umods 9, 17, 18, 23, 25 (§19.4).
-/// TODO(spec: monsters/init.md open question 7): 17, 18, 23, 25 follow
-/// D2MOO; the constants are read "as fire" (`umods.tsv`), the mana
-/// drain ×256 is applied to the added value.
+/// Umods 9, 17, 18, 23, 25: the shared elemental body
+/// (`monsters/umod-init-bodies.md` §2, values §3).
 fn elemental<H: InitHost + ?Sized>(
     cx: &Ctx<'_>,
     h: &mut H,
@@ -721,27 +719,65 @@ fn elemental<H: InitHost + ?Sized>(
     unique: bool,
     d: usize,
 ) {
+    // Step 3: d' = min(d, 2); o = the L-flag.
+    let dp = d.min(2);
+    let o = h.info().l_flag();
+    // Step 4: the monlvl row, clamped to 1..rows − 1 (never rejected).
     let level = h.stat(unit, stat::LEVEL);
-    let dm = monlvl_dm(cx.tables.monlvl, h.info().l_flag(), d, level);
-    let (kmin, kmax) = if unique {
-        (cx.k(d + 28), cx.k(d + 31))
+    let rows = cx.tables.monlvl.len() as i32;
+    let r = if level.max(1) >= rows - 1 {
+        rows - 1
+    } else if level <= 1 {
+        1
     } else {
-        (cx.k(d + 16), cx.k(d + 19))
+        level
     };
-    let (smin, smax, mul) = match umod {
+    // Steps 4–5: an empty table returns before the stats and the tail.
+    let Some(row) = usize::try_from(r)
+        .ok()
+        .and_then(|i| cx.tables.monlvl.get(i))
+    else {
+        return;
+    };
+    // Step 6: `DM` / `L-DM` of difficulty d'.
+    let v = if o {
+        [row.l_dm, row.l_dm_n, row.l_dm_h]
+    } else {
+        [row.dm, row.dm_n, row.dm_h]
+    }[dp] as i32;
+    // Step 7.
+    let (kmin, kmax) = if unique {
+        (cx.k(dp + 28), cx.k(dp + 31))
+    } else {
+        (cx.k(dp + 16), cx.k(dp + 19))
+    };
+    let (smin, smax, scale) = match umod {
         9 => (stat::FIREMINDAM, stat::FIREMAXDAM, 1),
         17 => (stat::LIGHTMINDAM, stat::LIGHTMAXDAM, 1),
         18 => (stat::COLDMINDAM, stat::COLDMAXDAM, 1),
         23 => (stat::POISONMINDAM, stat::POISONMAXDAM, 1),
         _ => (stat::MANADRAINMINDAM, stat::MANADRAINMAXDAM, 256),
     };
-    add(h, unit, smin, dm.wrapping_mul(kmin) / 100 * mul);
-    add(h, unit, smax, dm.wrapping_mul(kmax) / 100 * mul);
+    // Steps 8–9: divide, then scale (shift left 8 after the division).
+    add(
+        h,
+        unit,
+        smin,
+        (kmin.wrapping_mul(v) / 100).wrapping_mul(scale),
+    );
+    add(
+        h,
+        unit,
+        smax,
+        (kmax.wrapping_mul(v) / 100).wrapping_mul(scale),
+    );
+    // Step 10: the length stat of the clamped row r, not the level.
     match umod {
-        18 => add(h, unit, stat::COLDLENGTH, 5 * level + 100),
-        23 => add(h, unit, stat::POISONLENGTH, 2 * (5 * level + 150)),
+        18 => add(h, unit, stat::COLDLENGTH, 5 * r + 100),
+        23 => add(h, unit, stat::POISONLENGTH, 2 * (5 * r + 150)),
         _ => {}
     }
+    // Step 11: the resistance tail does nothing for a minion.
     if unique {
         resist(h, unit, umod);
     }
@@ -769,10 +805,12 @@ fn ghostly<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: usize
     add(h, unit, stat::COLDLENGTH, 150);
 }
 
-/// Umod 26 teleport (§19.6).
-/// TODO(spec: monsters/init.md open question 7): body `0x005A1600`
-/// unread; D2MOO's effect as the spec states it.
-fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+/// Umod 26 teleport `0x005A1600` (`monsters/umod-init-bodies.md` §4):
+/// bosses only; skill 184 at level 1, its mode 4, AI flag 0x20.
+fn teleport<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, unique: bool) {
+    if !unique {
+        return;
+    }
     if let Some(sk) = cx.tables.ids.monteleport {
         h.give_skill(unit, sk, 1, Some(4));
     }

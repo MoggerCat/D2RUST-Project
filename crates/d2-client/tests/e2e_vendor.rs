@@ -610,8 +610,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let buy = bytes(&BuyItem {
         npc: ng,
         item: cg,
-        mode: 0,
-        cost: 0,
+        transaction: 0,
+        client_price: 0,
     });
     let mut want = vec![0x32];
     for v in [ng, cg, 0, 0] {
@@ -651,8 +651,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let sell = bytes(&SellItem {
         npc: ng,
         item: pg,
-        tab: STORED as u16,
-        cost: 0,
+        item_mode: STORED as u16,
+        client_price: 0,
     });
     let mut want = vec![0x33];
     want.extend_from_slice(&ng.to_le_bytes());
@@ -680,8 +680,8 @@ fn run_with(game_seed: u32, gold: i32) -> Transcript {
     let sell = bytes(&SellItem {
         npc: ng,
         item: eg,
-        tab: STORED as u16,
-        cost: 0,
+        item_mode: STORED as u16,
+        client_price: 0,
     });
     let f = fx.step(&[sell]);
     assert_eq!(f.codes, [(0x33, done)]);

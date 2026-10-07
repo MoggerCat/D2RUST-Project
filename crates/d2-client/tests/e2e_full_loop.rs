@@ -2190,6 +2190,7 @@ fn run_with(game_seed: u32) -> Transcript {
                         .to_vec(),
                 }),
                 flags4: false,
+                ..ItemData::default()
             })
         );
     }
@@ -2288,8 +2289,8 @@ fn run_with(game_seed: u32) -> Transcript {
         vec![bytes(&SellItem {
             npc: ng,
             item: cg,
-            tab: 0,
-            cost: 0,
+            item_mode: 0,
+            client_price: 0,
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x33, done)]);
@@ -2313,8 +2314,8 @@ fn run_with(game_seed: u32) -> Transcript {
         vec![bytes(&BuyItem {
             npc: ng,
             item: store_cap,
-            mode: 0,
-            cost: 0,
+            transaction: 0,
+            client_price: 0,
         })],
     );
     assert_eq!(

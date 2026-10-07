@@ -657,7 +657,7 @@ mod tests {
     fn check_reports_exactly_a_changed_row() {
         let c = replace_line(CLIENT_TSV, "0x05\t", "\t5\t==5\t", "\t6\t==6\t");
         assert_eq!(check(&c, SERVER_TSV).unwrap(), vec!["client 0x05"]);
-        let c = replace_line(CLIENT_TSV, "0x3A\t", "stat:u16@1", "stat:u8@1");
+        let c = replace_line(CLIENT_TSV, "0x3A\t", "stat:u8@1 repeat:u8@2", "stat:u16@1");
         assert_eq!(check(&c, SERVER_TSV).unwrap(), vec!["client 0x3A"]);
         let s = replace_line(SERVER_TSV, "0x1A\t", "\t2\t", "\t3\t");
         assert_eq!(check(CLIENT_TSV, &s).unwrap(), vec!["server 0x1A"]);
