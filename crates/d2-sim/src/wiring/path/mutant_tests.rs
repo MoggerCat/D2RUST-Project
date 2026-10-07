@@ -719,3 +719,56 @@ fn the_wired_game_entry_reports_placed_or_a_missing_spawn_room() {
     assert_eq!(sent(&mut fx), vec![]);
     fx.assert_clean();
 }
+
+// Covers: specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0 r6
+#[test]
+fn a_moving_missile_reads_the_collision_word_its_step_cached() {
+    // §R4 step 6 (`0x00648EB0`): with velocity ≠ 0 the collision word is
+    // the one the step cached in the path (+0x54), the move test masked
+    // by the mode's mask (0x184, no wall bit). A missile flying over
+    // wall cells therefore keeps flying: the cached word has no bit 0.
+    // (Recomputed with all bits at the position it would read the wall
+    // and remove the missile without a hit, step 6.)
+    use crate::missiles::{create_missile, param_flags, MissileParams};
+    let mut fx = fx();
+    {
+        let t = Arc::make_mut(&mut fx.sim.hooks().tables);
+        t.missiles[0].vel = 4;
+        t.missiles[0].maxvel = 4;
+        t.missiles[0].collision = 1;
+    }
+    let a = fx.a;
+    for x in 11..=30 {
+        set_cell(&mut fx, a, x, 10, bits::WALL);
+    }
+    let owner = fx.spawn(UnitType::Monster, 0, a, 10, 10);
+    let p = MissileParams {
+        owner: Some(owner),
+        origin: Some(owner),
+        class: 0,
+        flags: param_flags::TARGET_ABSOLUTE,
+        target_x: 30,
+        target_y: 10,
+        ..MissileParams::default()
+    };
+    let m = fx
+        .sim
+        .missiles(&mut fx.game, |g, cx| create_missile(g, cx, &p))
+        .unwrap()
+        .expect("created");
+    let mut over_wall = 0;
+    for _ in 0..4 {
+        fx.frame();
+        let d = fx.sim.hooks().paths.as_ref().unwrap().dynamic(m).cloned();
+        let d = d.expect("still flying");
+        assert_ne!(d.velocity, 0);
+        assert_eq!(d.collided_mask & 0x5, 0);
+        if d.x() > 10 {
+            over_wall += 1;
+            assert_ne!(cell(&mut fx, d.x(), d.y()) & bits::WALL, 0);
+        }
+    }
+    assert!(over_wall > 0, "the missile left its start cell");
+    assert!(fx.sim.hooks().missile_store().get(m).is_some());
+    fx.assert_clean();
+}
