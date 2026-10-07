@@ -18,34 +18,35 @@
   `skills/use.md`, `skills/bodies.md` (skill functions; not restated),
   `missiles/missiles.md`, `monsters/ai.md` (who sends events 16–18),
   `world/quests.md` (who sends quest events), `world/npc.md`,
-  `items/inventory.md` (who sends item events), `client/ui.md` §B8.
+  `items/inventory.md` (who sends item events), `client/ui.md` §B8,
+  `audio/triggers-2.md` (part 2: §13–§17).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–65 |
-| Inputs | 66–78 |
-| Outputs / state changes | 79–84 |
-| Rules | 85–86 |
-|   1. Conventions and shared state | 87–155 |
-|   2. Server sound events (S→C 0x2C) | 156–204 |
-|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 205–265 |
-|   4. Mode sounds | 266–371 |
-|   5. Footsteps (`0x004CAF60(U)`) | 372–423 |
-|   6. Monster idle voices | 424–450 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 451–492 |
-|   8. Skills, missiles, states | 493–529 |
-|   9. Items | 530–553 |
-|   10. NPC speech | 554–616 |
-|   11. UI sounds | 617–640 |
-|   12. Other fixed requests | 641–705 |
-| Constants & data dependencies | 706–722 |
-| Randomness | 723–746 |
-| Edge cases & original bugs | 747–763 |
-| Test vectors | 764–795 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 796–809 |
-| Provenance | 810–837 |
-| Open questions | 838–927 |
+| Summary | 52–66 |
+| Inputs | 67–79 |
+| Outputs / state changes | 80–85 |
+| Rules | 86–87 |
+|   1. Conventions and shared state | 88–156 |
+|   2. Server sound events (S→C 0x2C) | 157–205 |
+|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 206–266 |
+|   4. Mode sounds | 267–372 |
+|   5. Footsteps (`0x004CAF60(U)`) | 373–424 |
+|   6. Monster idle voices | 425–451 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 452–493 |
+|   8. Skills, missiles, states | 494–531 |
+|   9. Items | 532–555 |
+|   10. NPC speech | 556–618 |
+|   11. UI sounds | 619–642 |
+|   12. Other fixed requests | 643–708 |
+| Constants & data dependencies | 709–725 |
+| Randomness | 726–749 |
+| Edge cases & original bugs | 750–766 |
+| Test vectors | 767–798 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 799–812 |
+| Provenance | 813–840 |
+| Open questions | 841–950 |
 <!-- /index -->
 
 ## Summary
@@ -519,7 +520,8 @@ line indices, 0 = none. Dumped from `Game.exe`.
    sites); `HitSound` (+0x14) ≥ 0 on the missile when its client hit
    function returns non-zero (`0x004D2D70`); `ProgSound` (+0x34) on the
    missile from the client progressive functions `0x004CE850` (missile
-   315 only), `0x004D39C0`, `0x004D5950`, `0x004D5DD0` (conditions:
+   315 only; corrected: elapsed 315 of function 29, `triggers-2.md`
+   §16), `0x004D39C0`, `0x004D5950`, `0x004D5DD0` (conditions:
    open question 6).
 4. **States** (S→C 0xA7, 0xA8, 0xAA → `0x004D9B20`; 0xA9 →
    `0x004D9C30`): state on: if `notondead` and U is a dead monster
@@ -689,7 +691,8 @@ Conditions found (third pass, partly answers open question 10):
 Still open: 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
 through tables `0x0072509C`, `0x00724EE4` and `0x004D93A0`), the
 `0x004AFF60` death sounds, 2,517 (`0x004C8970`) and 1,830
-(`0x004E2D40`, from `0x004807E9`).
+(`0x004E2D40`, from `0x004807E9`). Answered (fourth pass):
+`audio/triggers-2.md` §13.
 
 **Thunder, draws** (`0x00473910`, weather; the timer and when it runs
 are the weather spec's): at a thunder step (`0x004739B4`) the code draws
@@ -839,8 +842,19 @@ entry 74 (id-0 requests).
 
 1. Every rule: confirm with the request log (Checks) on a recorded
    session (town walk, a fight, an NPC talk, item moves).
+   Needs recording: the Checks hooks (every `0x004B9A00` call with
+   caller, id, unit type/GUID, delay, flags, T, C) plus each S→C 0x2C,
+   0xA9 and code-8 mode request with T, over: town walk on two floor
+   materials, a fight with a melee and a caster monster (hits, a
+   death, a block), an NPC talk and greeting, item pickup / drop /
+   identify, a waypoint, a Leap, a fire-enchanted unique's death, the
+   options menu sliders; each logged request must match one rule's
+   site, id, unit and delay.
 2. Where the 0x2C events come from per id and tick (server senders);
    compare the request log's C against the 0x2C packet tick.
+   Answered (static, `triggers-2.md` §14): all 78 sites by event; the
+   unit keeps one pending event (last wins), flushed in the
+   per-client unit update; the client requests at receive.
 3. Who writes client unit +0xB0 (hit class of the last hit; read by
    §4.2, §4.4); a write watch during a fight. Partly answered: +0xB0
    is a dword, written only by the client mode machines: player
@@ -881,7 +895,9 @@ entry 74 (id-0 requests).
    skill flag bit 0 set, `0x006446A0`). Both live skills have no
    `dosound a`.
 6. ProgSound conditions per client progressive function (owner: the
-   client part of `missiles/missiles.md`).
+   client part of `missiles/missiles.md`). Answered (`triggers-2.md`
+   §16): functions 9, 29, 47, 51; 29 tests elapsed 315 (not missile
+   315).
 7. Answered (§10 r6): no; only the options menu calls the setter.
 8. Conditions of `0x004B3380`, `0x004B4380` (Act II guard, Act V
    soldiers, Nihlathak). Answered: `0x004B3380` is the S→C 0x8A
@@ -910,7 +926,8 @@ entry 74 (id-0 requests).
 9. Answered by `client/msg-ui.md` §1 (full `0x004A2CB0` dispatch; the
    message is `world/quests.md` §6.3's one-quest status: code = chain,
    value = extra). §11's 0x5D paragraph is the sound subset of it.
-10. Conditions of the §12 call sites.
+10. Conditions of the §12 call sites. Answered: §12 r1–r6 and
+    `triggers-2.md` §13 (2,458, the death sounds, 2,517, 1,830).
 11. Answered: on client creation. `0x004CC380` is called once, at the
     end of the client monster create `0x00466360` (`0x00466716`), whose
     callers are the S→C 0xAC AssignMonster handler `0x0045F190`
@@ -920,7 +937,13 @@ entry 74 (id-0 requests).
     plays `Init` on first sight; which client creations reach
     `0x00466730` belongs to `client/model.md`.
 12. UI control → site mapping for §11 (owner `client/ui.md` §B8).
+    Partly answered: the seven options-menu sites (`triggers-2.md`
+    §17, `sound-table-2.md` §15 r5); the rest is `client/ui.md`'s
+    (cross-file request).
 13. COF/AnimData frame event 3 ("sound", `formats/cof.md`): none of
     the 222 request sites reads it; mode sounds use the fixed delays of
     §4. A request log of an attack whose animation has event 3 settles
-    whether any other path plays it.
+    whether any other path plays it. Answered (`triggers-2.md` §15):
+    event 3 is stored in U +0x4E by the frame advance; it runs the
+    skill do (with `dosound` / `tgtsound`) like events 1–2, and
+    `cltdofunc` 16 and 37 act on it alone; nothing else reads it.

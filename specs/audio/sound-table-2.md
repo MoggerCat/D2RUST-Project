@@ -1,11 +1,13 @@
-# Spec: Audio — Sound table part 2 (other users of the sound seed)
+# Spec: Audio — Sound table part 2 (other users of the sound seed; options sliders)
 
 - **Status:** draft: static answer to `audio/sound-table.md` open
   question 3, from the 1.14d `Game.exe` call graph and disassembly
   (addresses inline); not yet compared with a seed trace. Part of
   `audio/sound-table.md`, split off to keep that spec under 60 KB (its
   §1–§13 are claimed by code, so no section was moved; this part adds
-  §14).
+  §14). §15 (fourth pass): static answer to `audio/sound-table.md` open
+  question 9 (options-menu slider mapping), from the option records
+  and handlers read in the image.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::audio` (variant picks, `client/audio.md`
   §A3) and every client system listed in §14.3.
@@ -15,6 +17,17 @@
   `render/capture.md` §3.3, `render/camera.md` §8–§9,
   `render/draw-order-2.md` §11, `render/lighting.md` §10,
   `audio/triggers.md` Randomness, `audio/environment.md` §7.
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 32–42 |
+| Rules | 43–44 |
+|   14. Other users of the local player's client unit seed | 45–142 |
+|   15. Options-menu sliders (`audio/sound-table.md` open question 9) | 143–205 |
+| Test vectors | 206–220 |
+| Provenance | 221–239 |
+<!-- /index -->
 
 ## Summary
 
@@ -127,6 +140,69 @@ return `[0x007A6A70]`) and step its +0x20 (inline, or through
    systems share it is the d2rs design's choice (`client/audio.md`
    §A3).
 
+### 15. Options-menu sliders (`audio/sound-table.md` open question 9)
+
+The in-game options menu keeps its entries as 0x550-byte records
+(array `[0x007BC940]`, selected index `[0x007BC938]`; static records,
+e.g. `Sound` at `0x00716218`): +0x00 kind (0 action, 1 choice, 2
+slider, −1 skipped), +0x0C name, +0x110 enabled test, +0x114 apply,
++0x118 init, +0x120 position count n, +0x124 position p. This section
+owns how the three audio sliders turn into the §9 settings of
+`audio/sound-table.md`; the menu layout and drawing are `client/ui.md`'s.
+
+1. **Audio sliders** (n = 21, positions 0–20):
+
+   <!-- rows -->
+   | Entry | Record | Enabled (`+0x110`) | Apply (`+0x114`) | Init (`+0x118`) | Setter |
+   |---|---|---|---|---|---|
+   | `Sound` (Master Volume) | `0x00716218` | `0x0047CD90` | `0x0047CDA0` | `0x0047CDC0` | `0x00514CD0` |
+   | `Music` (Music Volume) | `0x00716768` | `0x0047CDE0` | `0x0047CDF0` | `0x0047CE10` | `0x00514D00` |
+   | `3DBias` (Positional Bias) | `0x00717758` | `0x0047CE60` | `0x0047CE70` | `0x0047CE90` | `0x00514D30` |
+
+   `Sound` and `Music` are enabled while the sound device is up
+   (`0x004DF880`: `[0x007C8C78]`); `3DBias` only when, in addition,
+   the mixer mode is 1 or 2 (`0x004DF980`). A disabled entry ignores
+   every input (each handler calls the enabled test first).
+2. **Init** (menu open): p := trunc((n − 1) × (v − 0 + 1) / (100 − 0))
+   = ⌊(v + 1) / 5⌋ for the stored value v 0–100 (`0x0047CC90`, x87,
+   truncating control word 0xC00; the result is exact for every v
+   because 20 × (v + 1) / 100 = (v + 1) / 5). Opening the menu writes
+   nothing.
+3. **Apply** (every position change): v := trunc(0 + (100 − 0) /
+   (n − 1) × p) = 5 × p (`0x0047CD00`), then the setter stores v and
+   writes it to the settings store (`0x004150E0`, key of §9). So a
+   setting is a multiple of 5 once its slider has moved; a stored value
+   that is not (e.g. 37 from the settings store) stays as it is until
+   then, and shows at p = ⌊38 / 5⌋ = 7.
+4. **Inputs** (handler table `0x006D6034`–`0x006D6090`): left arrow
+   (`0x0047D9A0`): p − 1, clamped at 0 (unsigned test against n − 1);
+   right arrow (`0x0047DA90`): p + 1, clamped at n − 1; mouse button
+   down (`0x0047D7F0`): selects the entry under the pointer
+   (`0x0047D520`) and starts a drag; while dragging (`0x0047D670`,
+   also from the menu update `0x0047E3D0`), with W = screen width
+   `[0x0071146C]`, h = W / 2 (truncating) and x0 = h − 133 (h − 48
+   when the record's +0x53C is non-zero; the audio sliders have 0):
+   x < x0 → p = 0; x > x0 + 265 → p = n − 1; else p =
+   trunc(trunc((x − x0) / f + 1.0) / 2) with f = (f32)(265 / (n − 1) ×
+   0.5) = 6.625 (`0x006D73F8` 265.0, `0x006CEF10` 0.5, `0x006CEEF0`
+   1.0, `_ftol2` `0x00682FD0`), i.e. the nearest of the 21 stops 13.25
+   pixels apart. A drag starts only with h − 144 < x < h + 145 (h − 59
+   … h + 230 for the other layout).
+5. **Sounds**: after an input changes p (compared with the value
+   before the input), the apply runs and then 1 `cursor_pass` is
+   requested (no unit, delay 0: `0x0047DA69`, `0x0047DB59`,
+   `0x0047D7E1`); no change → no apply, no sound. Up / down arrow
+   (`0x0047D8A0`, `0x0047D920`: next / previous enabled entry, kinds −1
+   skipped, wrapping) request 1 as well (`0x0047D8F6`, `0x0047D971`).
+   Enter or a click released on the selected entry (`0x0047DB80`,
+   `0x0047D840` → `0x0047D5C0`): kind 1 → p + 1 wrapping to 0 past n −
+   1, apply, request 1 (`0x0047D646`); kind 0 → apply, request 2
+   `cursor_select` (`0x0047D667`); kind 2 → nothing.
+6. d2rs: the settings are integers 0–100; a d2rs options UI that copies
+   the original gives 21 stops of 5 and runs the setter on each change.
+   The volume chain (`audio/sound-table.md` §8.2) reads the setting
+   every update, so a change is heard from the next sound tick.
+
 ## Test vectors
 
 | Input | Expected | Source |
@@ -134,6 +210,13 @@ return `[0x007A6A70]`) and step its +0x20 (inline, or through
 | sound tick with no starts, ambience off, `soundchaosdebug` off | seed unchanged across `0x00482C20` | §14.1 r1 |
 | local player casts a skill with `cltdofunc` 34 | the sound seed steps during the receive of the S→C 0xA3 that starts it | §14.3 r2 |
 | item with overlay of type 6, a = 8 created on the client | 2 steps of the sound seed (`roll(frames)`, `roll(2048)`) | §14.3 table |
+| menu opened with Music Volume 50 / 100 / 0 / 37 / 4 | slider position 10 / 20 / 0 / 7 / 1 | §15 r2 |
+| right arrow on `Sound` at position 20 | position stays 20; no apply, no sound | §15 r4, r5 |
+| left arrow on `Music` at position 7 | position 6, Music Volume := 30, then request 1 | §15 r3, r5 |
+| drag on `3DBias`, W = 800, x = 267 (h 400, x0 267) | position trunc(trunc(0 / 6.625 + 1) / 2) = 0 | §15 r4 |
+| drag on `Sound`, W = 800, x = 300 | trunc(trunc(33 / 6.625 + 1) / 2) = trunc(5 / 2) = 2 → Master Volume 10 | §15 r4 |
+| drag on `Sound`, W = 800, x = 533 (x0 + 266) | position 20 | §15 r4 |
+| `3DBias` with mixer mode 0 | every input ignored | §15 r1 |
 
 ## Provenance
 
@@ -145,3 +228,11 @@ read by hand in `tools/ghidra/disasm.py`); function-pointer tables read
 from the image with `pefile` (`0x00727BA8`, 130 entries). Client loop
 order `0x0044EFA0` (`0x0044F167`, `0x0044F19A`, `0x0044F28B`,
 `0x0044F2B5`). D2MOO not used.
+§15: option records `0x00716218`, `0x00716768`, `0x00717758` and the
+handler table `0x006D6034`–`0x006D6090` read from the image with
+`pefile`; `tools/ghidra/disasm.py` of `0x0047CC90`, `0x0047CD00`,
+`0x0047CDA0`–`0x0047CE90`, `0x0047D5C0`, `0x0047D670`, `0x0047D7F0`,
+`0x0047D840`, `0x0047D8A0`, `0x0047D920`, `0x0047D9A0`, `0x0047DA90`,
+`0x004DF880`, `0x004DF980`, setters `0x00514CD0`, `0x00514D00`,
+`0x00514D30` (each has no direct caller: only the apply thunks jump to
+them).

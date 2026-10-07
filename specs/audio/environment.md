@@ -16,25 +16,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–57 |
-| Inputs | 58–69 |
-| Outputs / state changes | 70–74 |
-| Rules | 75–76 |
-|   1. Sound environment | 77–107 |
-|   2. Music (`0x004DCAA0(T)`) | 108–163 |
-|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 164–223 |
-|   4. Level-entry lines (`0x004CC270`) | 224–270 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 271–292 |
-|   6. Rain (`0x004E42E0`, second part) | 293–323 |
-|   7. Event cues (`0x004E42E0`, third part) | 324–348 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 349–356 |
-| Constants & data dependencies | 357–366 |
-| Randomness | 367–375 |
-| Edge cases & original bugs | 376–385 |
-| Test vectors | 386–412 |
-|   Checks (hook addresses for `record_sound.py`) | 413–422 |
-| Provenance | 423–442 |
-| Open questions | 443–469 |
+| Summary | 41–58 |
+| Inputs | 59–70 |
+| Outputs / state changes | 71–75 |
+| Rules | 76–77 |
+|   1. Sound environment | 78–108 |
+|   2. Music (`0x004DCAA0(T)`) | 109–164 |
+|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 165–224 |
+|   4. Level-entry lines (`0x004CC270`) | 225–271 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 272–293 |
+|   6. Rain (`0x004E42E0`, second part) | 294–324 |
+|   7. Event cues (`0x004E42E0`, third part) | 325–349 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 350–357 |
+|   9. Front-end music (`Options Music`; answers open question 5) | 358–407 |
+| Constants & data dependencies | 408–417 |
+| Randomness | 418–426 |
+| Edge cases & original bugs | 427–436 |
+| Test vectors | 437–463 |
+|   Checks (hook addresses for `record_sound.py`) | 464–473 |
+| Provenance | 474–497 |
+| Open questions | 498–534 |
 <!-- /index -->
 
 ## Summary
@@ -354,6 +355,56 @@ When L ≠ `[0x007C8C7C]`: clear the locks of the footstep groups
 Cache only (`sound-table.md` §10 r4); d2rs: no observable effect
 except through async loading (`sound-table.md` open question 10).
 
+### 9. Front-end music (`Options Music`; answers open question 5)
+
+Out of game the music is a jukebox of the device layer, not the sound
+table: one stream voice `[0x00881794]` created at device init
+(`0x00514780` → `0x00515530(1, …)`), served by the 50 ms service
+thread `0x00516250` (`sound-table.md` §6.6), all under the device
+lock `0x0088174C`.
+
+1. **Playlists** (8 entries each, a "played" flag per entry; tables
+   `0x0072F878` and `0x0072F8B8`, count `[0x0072F874]` = 8, checked
+   against `[0x0072F8F8]`; paths under `data\global\music\`): list A
+   `common\options.wav`, `act1\caves.wav`, `act1\monastery.wav`,
+   `act1\crypt.wav`, `act2\harem.wav`, `act2\tombs.wav`,
+   `act3\spider.wav`, `act3\kurastsewer.wav`; list B `introedit.wav`,
+   `act5\icecaves.wav`, `act5\xtemple.wav`, `act2\desert.wav`,
+   `act2\sewer.wav`, `act3\kurast.wav`, `act3\kurastsewer.wav`,
+   `act4\diablo.wav`. List B is used when `[0x00881790]` ≠ 0, latched
+   on first use (`0x00513AE0`, `[0x008817A8]`); `[0x00881790]` is the
+   ECX of the device init `0x00514530`, passed from `0x00405C30` (the
+   start-up configuration); its act 5 tracks make it read as the
+   expansion flag.
+2. **Start** `0x005148F0(1)`: if not already wanted (`[0x00881798]` =
+   0): clear every played flag (`0x00514860`) and set first-track
+   (`[0x0088179C]` := 1); then wanted := 1. Called when a front-end
+   screen opens with `Options Music` ≠ 0 (`0x0042FB20`, `0x004336C0`,
+   `0x00435330`, `0x0043AE30`, `0x0043B080`, `0x00441B70`).
+3. **Pick** `0x00514990`, from the service pass while wanted and the
+   voice is not playing (`0x00514840`: voice +0x48 = 0); needs the
+   voice and a device (`0x00515D60`). If every entry is played: the
+   first time in this call clear all flags and go on, the second time
+   wanted := 0 and stop. First-track set → entry 0 (first-track :=
+   0); else i = CRT `rand()` mod 8 (`0x00687461`), then forward with
+   wrap to the first entry not played. Mark it played; reset the voice
+   (`0x00516140`), volume 110 (`0x005157B0`; Music Volume is not
+   applied), start the stream at offset 0 without loop (`0x00515D70`);
+   a failed start picks again.
+4. **Toggle** (front-end options entry `0x004FA160`): on → stop
+   (`0x00514960`: wanted := 0; a playing voice fades to volume 0 over
+   200 ms of wall clock, `0x00515C60`) and `Options Music` := 0; off →
+   start (r2) and `Options Music` := 1 (`0x00514D90`, stored at once).
+5. **Leaving the front end**: the Battle.net entry `0x00431600` and
+   every in-game client loop pass while the voice plays (`0x0044F256`):
+   device fade `0x00515F50(180)`, stop `0x00514930` (wanted := 0,
+   `0x00515EE0`), then G := 255 (`sound-table.md` §8.3 r4).
+6. Wall clock and CRT `rand()` drive it: there is no tick rule. d2rs
+   reproduces the lists, the order rule (entry 0 first, then a random
+   unplayed entry with forward wrap, all flags cleared once when the
+   list is used up), volume 110 and the 200 ms fade, with its own
+   random source.
+
 ## Constants & data dependencies
 
 `soundenviron` columns `Song`, `Day/Night Ambience`, `Day/Night Event`,
@@ -439,12 +490,22 @@ Second pass (2026-10-07, EN-A–EN-E of `docs/handoff/impl-audio.md`):
 Recordings: `docs/handoff/local-buddy-q-rec.md` entries 69 (one day of
 period indices) and 74 (ambience / roll / cue logs, raw
 `snd74b-sound.jsonl`, read locally).
+Fourth pass (§9): `0x005148F0`, `0x00514860`, `0x00514990`,
+`0x00514960`, `0x00514930`, `0x00514780`, `0x00514710`, `0x00513AE0`,
+`0x00516250`, `0x004FA160`, `0x0044F244`–`0x0044F273`; playlist tables
+`0x0072F874`–`0x0072F8F8` read from the image with `pefile`.
 
 ## Open questions
 
 1. Confirm §2–§7 with a recording (Checks): walk town → wilderness →
    cave and back; stand through a day change in the wilderness; kill
    Blood Raven.
+   Needs recording: the Checks hooks over town → Blood Moor → Den of
+   Evil (cave) → town, one day change in the wilderness, Blood Raven's
+   death (stinger event 34) and a rain level with weather on and off;
+   each `0x004DCAA0`, `0x004DCD40`, `0x004E42E0` call with T, C and its
+   requests, compared with §2–§7 per T (entry 74 has the wilderness
+   and a day change only).
 2. Answered (`sound-table.md` §7 r8): 4-byte units of the stream's
    `data`, i.e. sample frames for the (all stereo 16-bit) songs.
 3. Answered (§1 r3): the period index of `render/lighting.md` §9;
@@ -464,5 +525,9 @@ period indices) and 74 (ambience / roll / cue logs, raw
 5. Front-end music (`Options Music` setting, `music_options`,
    `0x00514D80` callers `0x0042FB20`–`0x004FA160`): out of game, owner
    a front-end spec.
+   Answered (§9): a device-layer jukebox of two 8-track lists, entry 0
+   first, then CRT `rand()` mod 8 forward to an unplayed track, volume
+   110, toggled by the front-end option; stopped with a 180 ms fade on
+   entering a game.
 6. Answered (§4 r4): flags at every game start; last checked never.
 7. Answered (§2 r9): the `-ns` switch.
