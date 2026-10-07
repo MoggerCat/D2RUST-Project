@@ -25,23 +25,23 @@
 |   1. Property record and slots | 75–83 |
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–103 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 104–113 |
-|   4. Shared helpers | 114–163 |
-|   5. Property functions | 164–218 |
-|   6. Superior (mode 1) and affixes (mode 0) | 219–223 |
-|   7. Uniques (mode 3) | 224–227 |
-|   8. Set items | 228–238 |
-|   9. Socket fillers (`0x0055C2C0`) | 239–258 |
-|   10. Runewords | 259–317 |
-|   11. Set bonuses (`0x00660120`) | 318–330 |
-|   12. Craft property lists (`0x00660240`) | 331–336 |
-|   13. Set-item state update (`0x00663CC0`) | 337–392 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 393–460 |
-| Constants & data dependencies | 461–470 |
-| Randomness | 471–476 |
-| Edge cases & original bugs | 477–486 |
-| Test vectors | 487–505 |
-| Provenance | 506–525 |
-| Open questions | 526–609 |
+|   4. Shared helpers | 114–167 |
+|   5. Property functions | 168–222 |
+|   6. Superior (mode 1) and affixes (mode 0) | 223–227 |
+|   7. Uniques (mode 3) | 228–231 |
+|   8. Set items | 232–242 |
+|   9. Socket fillers (`0x0055C2C0`) | 243–262 |
+|   10. Runewords | 263–321 |
+|   11. Set bonuses (`0x00660120`) | 322–334 |
+|   12. Craft property lists (`0x00660240`) | 335–340 |
+|   13. Set-item state update (`0x00663CC0`) | 341–396 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 397–464 |
+| Constants & data dependencies | 465–474 |
+| Randomness | 475–480 |
+| Edge cases & original bugs | 481–490 |
+| Test vectors | 491–509 |
+| Provenance | 510–529 |
+| Open questions | 530–616 |
 <!-- /index -->
 
 ## Summary
@@ -139,9 +139,13 @@ first stack argument with I in ECX, flags in EDX, state as its last
 argument. `0x0065CBF0`(EAX O, EBX flags, I, state): the unit is O when
 O ≠ none, else I; its list of (state, flags) (`0x00625790`: state ≠ 0 →
 the list of that state, state 0 → the first list with those flags);
-none → a new list (that unit's pool, flags, expiry 0, owner type 4,
-that unit's GUID; GUID −1 when I is none too), attached with reset 1,
-state set; a null list is fatal (0x201). Who is O: modes 0–5 and 7 pass
+none → a new list (`0x006251F0`(that unit's pool unit +0x08, flags,
+expiry 0, owner type **4** as a constant, that unit's GUID unit +0x0C):
+the type is 4 whatever the unit's own type, so §11's lists on the
+player carry type 4 with the player's GUID (`0x0065CC17`,
+`0x0065CC55`); GUID −1 when I is none too), attached to that unit with
+reset 1 (`0x00626E10`), state := the state argument (`0x006252D0`); a
+null list is fatal (0x201). Who is O: modes 0–5 and 7 pass
 O = none (the wrapper's second argument is 0; the mode's extra unit
 goes to the dispatcher's last argument), so they write I's own list
 (for a gem or rune: the filler's); §11 passes O = the player; mode 6
@@ -449,7 +453,7 @@ Functions (code → stat as stored in the table):
 | `0x0065D950` | 29 | format 0: `0x0065CF40`(17, kind 1), then (18, kind 1): two rolls, base reset each |
 | `0x0065D310` | 41 | format 0: `0x0065CF40`(39), (41), (43), (45), kind 0: four rolls |
 | `0x0065D4B0` | 42 | format 0: `0x0065CF40`(40), (42), (44), (46), kind 0 |
-| `0x0065D220` | 133 → 194 | set flag 0x800 and the socket count := `param` (`0x0062BE00`; no cap, unlike §5 rule 6) |
+| `0x0065D220` | 133 → 194 | set flag 0x800 and the socket count := `param` through `0x0062BE00`, which caps it as §5 rule 6 (min(max(`param`, 1), min(`invwidth` × `invheight`, 6), max sockets); flag 0x800 is set first in every case, w × h = 0 → no count; corrected 2026-10-07, disassembly `0x0062BE4E`–`0x0062BE9E`) |
 | `0x0065D270` | 242 | the extra unit if it is an item, else the item: base stats 73 and 72 := 0 |
 | `0x0065DBC0` | 243 → 204 | function 19 (§5 rule 9) with the same formulas (charges, level, roll(c − c / 8)), list set; returns 1 |
 | `0x0065E440` | 124–132, 178, 182–194, 231–241 | nothing (returns 1) |
@@ -579,6 +583,9 @@ Synthetic, from the rules:
    loops possibly the filler class ids of a previous item matched at
    the same depth); settle with a stack trace at `0x0062BFBA` on those
    paths, or keep d2rs's "no match" as a Ruleset choice.
+   Status (2026-10-07): Pending for fidelity only; d2rs keeps "no match"
+   for the unwritten slot on every path (§10.1 Edge), so no code waits
+   on it.
 5. Answered (handoff `impl-items` OQ-P1): §5 rules 8 and 9 "**set**" is
    not §4.2. Functions 18 (`0x0065F870`) and 19 (`0x0065F6A0`) take the
    list through the same owner-or-item lookup as §4.2 (`0x0065CBF0`,

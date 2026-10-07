@@ -35,14 +35,14 @@
 |   1. Inventory model | 89–181 |
 |   2. Grid placement | 182–277 |
 |   3. Belt | 278–335 |
-|   4. Equipping | 336–520 |
-|   5. Shared checks | 521–645 |
-| Constants & data dependencies | 646–668 |
-| Randomness | 669–682 |
-| Edge cases & original bugs | 683–727 |
-| Test vectors | 728–776 |
-| Provenance | 777–833 |
-| Open questions | 834–933 |
+|   4. Equipping | 336–521 |
+|   5. Shared checks | 522–715 |
+| Constants & data dependencies | 716–738 |
+| Randomness | 739–752 |
+| Edge cases & original bugs | 753–801 |
+| Test vectors | 802–850 |
+| Provenance | 851–910 |
+| Open questions | 911–1013 |
 <!-- /index -->
 
 ## Summary
@@ -420,7 +420,7 @@ neither has sockets (`0x006299B0` = 0). Used by 0x21 and hand result 6.
    {11, 12} → stat link `0x0063D1D0` and stat refresh. Cursor := none,
    unit flag 0x2 cleared, mode 1, page 0xFF, command flag 0x8, item flag
    0x1, item flag 0x4000 cleared, update list += item, refresh, weapon
-   bookkeeping `0x0055C5C0`, inventory pass (§5.7) `0x0055DBC0(0)`. Result 1.
+   bookkeeping `0x0055C5C0` (§5.8), inventory pass (§5.7) `0x0055DBC0(0)`. Result 1.
 
 #### 4.7 Auto-equip on pickup (`0x0055D710`, unit, item, &L, skip)
 
@@ -503,7 +503,7 @@ vendor buy §7.1 rule 9.7 of `world/vendors.md` (`0x00577D90`), and
    none (§1.4 rule 3); stat refresh `0x0055C2C0(U, 0)`; unit flag 0x2
    cleared; mode 1; command flag 0x200 (`item-actions.tsv` row 5: 0x9D
    action 6 to every client); unit flag 0x2000000 cleared; update list +=
-   I; owner refresh; page := 0xFF; weapon bookkeeping `0x0055C5C0`.
+   I; owner refresh; page := 0xFF; weapon bookkeeping `0x0055C5C0` (§5.8).
    Result 1.
 
 Differences from §4.6: no mode test and no §4.3 (the caller's), no
@@ -516,7 +516,8 @@ are the whole routine. Neither game nor U's inventory (unit +0x60) is
 tested for none; L is written into the skip argument's slot after step
 1. When each caller tries it: `inventory-moves.md` §8.1 step 5 (after §4.3), `world/vendors.md`
 §7.1.1 (buy), and `0x00562F30` (the corpse take-back of `0x0057FB70`,
-`inventory-moves.md` §7.1 step 2; corpse spec, not specified here).
+`inventory-moves.md` §7.1 step 2; the take-back is `inventory-moves.md`
+§12).
 
 ### 5. Shared checks
 
@@ -643,6 +644,75 @@ hirelings). U without an inventory → nothing (after step 1).
    client, or for a non-player to its owner's (`0x0058F0D0`) client when
    that owner is a player.
 
+#### 5.8 Weapon bookkeeping (`0x0055C5C0`, EAX = unit U)
+
+Keeps the mouse skills consistent with the hands after an equipment
+change. The only argument is U (no item; game and items are not passed).
+It reads U's inventory, its player data mouse-skill slots and its
+skills; it writes only player data +0x70..+0x7C and the selected mouse
+skills. No stat list, item field or message of its own; whatever a
+skill selection does (`0x005701B0`) is that routine's.
+
+Player data (+0x14) slots used (the same ones the save loads,
+`formats/d2s.md` mouse skills): saved left skill id +0x74 / owner GUID
++0x7C, saved right skill id +0x70 / owner +0x78. Save left
+(`0x00622F10`): +0x74 := the current left skill's id (`0x00643CE0`),
++0x7C := its owner GUID (`0x00643AD0`; −1 native). Save right
+(`0x00622EA0`): the same from the right skill into +0x70 / +0x78.
+
+1. U none or not a player (unit type ≠ 0) → nothing.
+2. Hands (`0x0055C470`): U without an inventory (+0x60) → W = O = none.
+   Else W := the weapon in use (inventory +0x1C, `0x0063BEF0`); A, B :=
+   the items at body locations 4 and 5 (`0x0063BDE0`); O := B when W = A,
+   else A; O not is-a 45 `weap` (`0x00629BB0`, equivalence incl. the
+   item's second type) → O := none.
+3. W none → nothing more (the right-hand part is skipped too, even with
+   an O).
+4. Left: "throw-only" T := W is-a 48 `thro` and not is-a 46 `mele` (in
+   1.14d data only type 38 `tpot` qualifies: every other `thro` type
+   is a `comb`, which is `mele`). S := U's left skill (`0x00620190`).
+   T and S not a ranged throw skill (below) → save left, select skill 2
+   (Throw) with owner −1 on the left (`0x005701B0`, ECX U, EDX 1), S :=
+   the new left skill.
+5. use_state(U, S) (`0x00647960`, `skills/use.md` §2) = 2 (no
+   quantity) or 7 (no level) → restore left (below). S is passed
+   unchecked: a missing mouse skill reaches `0x00647960` with a null
+   entry, which is its fatal assert.
+6. Right: the same as 4–5 with O in place of W (O none → not
+   throw-only), the right skill (`0x006201D0`), save right, skill 4
+   (Left Hand Throw) on the right (EDX 0), restore right.
+
+**Ranged throw skill** (`0x0055C560`, skill S, unit U): S exists, its
+skills.txt row (skill +0, `0x00644140`) has `itypea1` > 0 and is-a 48
+`thro` (`0x00629B50`, type-to-type equivalence), its `range` byte
+(row +0x14) = 2 (`rng`), and use_state(U, S) is neither 2 nor 7
+(`0x0055C4D0`). Else false.
+
+**Restore** (`0x0055C4F0`, ESI U, EDI current skill C, EBX side 1 left /
+0 right): C none → nothing. (id, owner) := the saved slot of that side
+(left +0x74 / +0x7C via `0x006230C0`, right +0x70 / +0x78 via
+`0x00623060`). R := U's skill (id, owner) (`0x006439B0`, ECX U, EDX id).
+R exists, R ≠ C and use_state(U, R) ∉ {2, 7} → select (id, owner) on
+that side (`0x005701B0`, EDX = side). Else nothing (C stays selected).
+
+Callers (all pass U in EAX after the item move is done): repair
+`0x0055F900` (`generation.md` §12.1 step 5), equip from the cursor
+`0x005606B0` (§4.6), 0x1C `0x00560CD0`, 0x1D `0x00560F00`, 0x1E
+`0x00561220`, 0x1B `0x00563D20` (`inventory-moves.md` §7.6–§7.9), the
+weapon switch `0x005616A0` (0x60, `sim/intents-events.md` open
+question 16), the skill-body re-equip `0x00562A30` (`skills/bodies.md`),
+equip without the cursor `0x00562E00` (§4.9), corpse take-back
+`0x00562F30` (`inventory-moves.md` §12.2).
+
+Examples. (a) Equip a throwing potion in the weapon-in-use hand while
+the left skill is Attack: Attack (id 0, owner −1) is saved to +0x74 /
++0x7C, Throw is selected; Throw is usable → no restore. (b) The potion
+is thrown away / unequipped (W now none): step 3 stops, Throw stays
+selected (the restore runs only while some W exists). (c) W is a sword
+and the left skill is Throw: no switch (not throw-only); Throw's
+use_state is 2 or 7 → the saved skill (Attack) is selected again when
+it still exists.
+
 ## Constants & data dependencies
 
 | Constant | Value | Use |
@@ -724,6 +794,10 @@ happen only inside the systems these paths call, in handler order:
     (step 2 refuses mode 3; `world/cube.md` edge case 15).
 13. A cube spill item whose drop search finds no room stays in mode 4,
     in no grid and not the cursor (`inventory-moves.md` §9.3).
+14. Weapon bookkeeping (§5.8) does nothing while no weapon is in use
+    (inventory +0x1C none), so a Throw / Left Hand Throw it selected
+    stays selected after the last weapon leaves the hands (until a
+    later call with a weapon in use finds it unusable and restores).
 
 ## Test vectors
 
@@ -777,7 +851,10 @@ Recordings (conformance; none recorded yet):
 ## Provenance
 
 Read from the 1.14d `Game.exe` (Ghidra exports and `tools/ghidra/disasm.py`
-for register arguments): handlers `0x0054AAD0`–`0x0054B710`, `0x0054C800`,
+for register arguments): weapon bookkeeping `0x0055C5C0`, `0x0055C470`,
+`0x0055C4D0`, `0x0055C4F0`, `0x0055C560`, `0x00622EA0`, `0x00622F10`,
+`0x00623060`, `0x006230C0` (disassembled: EAX/EBX/ESI/EDI operands, push
+order of `0x005701B0`); handlers `0x0054AAD0`–`0x0054B710`, `0x0054C800`,
 `0x0054D430`, `0x0054D520`; checks `0x005490E0`–`0x00549350`; grid code
 `0x0063A8A0`, `0x0063AFD0`, `0x0063B340`–`0x0063B950` (disassembled: loop
 orders, weight sides, the four-way split), `0x0063ADD0`, `0x0063AF20`,
@@ -899,10 +976,13 @@ Answered handoff questions (`docs/HANDOFF.md` §7):
   N missing or not in mode 4 → out 0; `inventory-moves.md` §7.10 target not in mode 0 →
   nothing (out 0), C's link failing → out 1; `inventory-moves.md` §7.16 C's link failing →
   fatal assert (line 0x12D4); `inventory-moves.md` §7.19 only "filler missing / not in mode
-  4 / target missing" set out, every other check → 0 with out 0. Not
-  re-read here: `inventory-moves.md` §7.17, §7.23 copy, `inventory-moves.md` §8.1 rules 5 and 7, §9.3 unlink,
-  `inventory-moves.md` §10.2 pile creation (Ghidra on `0x00562390`, `0x0054D130`,
-  `0x0055D0D0`, `0x00563840`, `0x0055A090`).
+  4 / target missing" set out, every other check → 0 with out 0. The
+  sites first left out are answered in place (2026-10-07): §7.17 no
+  hireling → the potion is used on the player; §7.23 a failed copy →
+  fatal assert; §8.1 rule 5 (§4.9 result 0 unreachable; were it 0:
+  result 0, out 0) and rule 7 (link failure fatal); §9.3 unlink failure
+  fatal; §10.2 a failed pile creation skips that pile and goes on; §7.8
+  failure outcomes (E's unlink fatal) in its own paragraph.
 - MV5: type tests through `0x00629BB0` use itemtypes equivalence; those
   through `0x0062B400` compare the primary type only (§4.7 type 38;
   `inventory-moves.md` §7.6–§7.8 type 19; `inventory-moves.md` §7.12 and §7.20 the book type 18); `inventory-moves.md` §7.12 reads the

@@ -33,19 +33,19 @@
 | Rules | 86–87 |
 |   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–282 |
-|   4. Chest drop (`0x00585B90`) | 283–309 |
-|   5. The TC walk (`0x0055A6D0`) | 310–416 |
-|   6. Drop quality (`0x00558640`) | 417–448 |
-|   7. Creation inputs and placement (`0x0055A550`) | 449–473 |
-|   8. Gold amount | 474–489 |
-|   9. Quest drop helper (`0x00559A30`) | 490–571 |
-| Constants & data dependencies | 572–601 |
-| Randomness | 602–618 |
-| Edge cases & original bugs | 619–642 |
-| Test vectors | 643–672 |
-| Provenance | 673–697 |
-| Open questions | 698–854 |
+|   3. Monster drop | 224–293 |
+|   4. Chest drop (`0x00585B90`) | 294–320 |
+|   5. The TC walk (`0x0055A6D0`) | 321–427 |
+|   6. Drop quality (`0x00558640`) | 428–459 |
+|   7. Creation inputs and placement (`0x0055A550`) | 460–490 |
+|   8. Gold amount | 491–506 |
+|   9. Quest drop helper (`0x00559A30`) | 507–592 |
+| Constants & data dependencies | 593–622 |
+| Randomness | 623–639 |
+| Edge cases & original bugs | 640–663 |
+| Test vectors | 664–693 |
+| Provenance | 694–718 |
+| Open questions | 719–878 |
 <!-- /index -->
 
 ## Summary
@@ -236,6 +236,17 @@ Exact order in `0x005A6830` (handoff `impl-treasure` question 8): no unit
 the collision test (so a bone wall on a blocked spot is fatal too);
 collision ≠ 0 → no drop; the monster has no room → fatal 0x1FF; its
 monstats record missing (`0x00451F80`) → fatal 0x204; else §3.2.
+
+Collision word (`0x0064CB30`(room R, x, y, mask), R = the monster's room
+`0x00620BB0`; read 2026-10-07): the room containing (x, y) is looked up
+among R and R's adjacent rooms (`0x00463740`, `drlg/rooms.md` §6). No
+such room (also when R is none), the room has no collision record
+(`0x0061A010`), or the record has no grid (+0x20) → the value **0x27**
+(non-zero: no drop). Else the grid word at ((y − record y0) × record
+width − record x0 + x) (+0x04, +0x08, +0x00) AND mask. So a monster
+outside every room grid drops nothing, and the "no room → fatal 0x1FF"
+test after it is unreachable (a monster without a room already
+returned at the collision test).
 
 #### 3.2 Which TC (`0x005A6600`)
 
@@ -465,6 +476,12 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
    item level, room and position, spawn type 3, init flags 1, the game's
    item format (game +0x78), drop flags `d`, plus 0x01 when `U` is
    monster class 391 (`hellbovine`).
+   Exact request (`0x0055A550`, zeroed 0x84 bytes, `items/generation.md`
+   Inputs): +0x00 unit := `U` (none when `U` is none), +0x04 := 0, +0x08
+   game, +0x0C item level (step 3), +0x14 id, +0x18 spawn mode 3, +0x1C /
+   +0x20 the position and +0x24 the room the search of step 2 returned,
+   +0x28 init flags 1, +0x2A format, +0x30 quality, +0x40 index, +0x80
+   drop flags (`d` | 0x01 for `hellbovine`); every other field 0.
    Spawn type 3 with init flag 1 makes the allocation add the item to the
    world at the request's room and position (`sim/units.md` §3.1 step 8 →
    `sim/path-placement.md` §2.5: static path, footprint, room list) inside
@@ -562,7 +579,11 @@ Pick: count n > 0 → one step of the seed; n a power of two → `lo'` &
 start of 0 returns −1 at once. n = 0 → the routine returns the
 **uninitialised** first slot of its candidate array (a stack value),
 reachable whenever every record is filtered out (for example all rarity
-rolls reject at a low `L`) — d2rs: Open question 12. `p6` = item type filter (−1 = any), `p7` = skip
+rolls reject at a low `L`). d2rs (Ruleset choice, Open question 12):
+the n = 0 result is −1, as for a part start of 0; the caller then
+treats it as a missing record (§9 rule 3: the magic loop retries;
+otherwise the request item −1 fails `items/generation.md` §3 step 2,
+no item). `p6` = item type filter (−1 = any), `p7` = skip
 the rarity roll; the quest specs pass `p6` = −1. Draws: one `roll(d)`
 per record that reaches the rarity test with d > 0, in index order, then
 the pick step. `bitfield1` (+0xDC) bit 0, tested by the §9 magic retry
@@ -788,7 +809,7 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     `0x00555E70`, `0x00555FB0` (a candidate list over the items records
     between table +0x08 and +0x10, filtered by `0x00555E00`, expansion
     or `version` < 100, then one unit-seed step: mask for a power-of-two
-    count, else mod) and `0x005560F0` are not specified, nor the meaning
+    count, else mod) and `0x005560F0` were not written, nor the meaning
     of items `bitfield1` bit 0 and of `p6` / `p7` inside them. The quest
     specs set the drop code before their calls (e.g. Wirt's body `gld `,
     `world/quests-act1.md`), so the path matters only for a caller that
@@ -849,5 +870,8 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
       > 65,534 TCs) are the original's asserts (process exit); how d2rs
       reports them is a Ruleset choice, not a fidelity fact.
-    Still open: §9.1's n = 0 result (an uninitialised stack value; d2rs
-    must pick a value: settle only by choosing, e.g. treat as no item).
+    §9.1's n = 0 result (an uninitialised stack value): Pending for
+    fidelity (only a stack capture at the pick of `0x00555E70` /
+    `0x00555FB0` / `0x005560F0` with every record filtered could show
+    the 1.14d value, and it depends on earlier calls); d2rs's choice is
+    recorded in §9.1 (−1, no item), so no code waits on it.

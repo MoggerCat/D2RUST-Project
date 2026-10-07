@@ -13,14 +13,15 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 26–32 |
-| Rules | 33–34 |
-|   6. Deferred item messages | 35–128 |
-|   7. Intents | 129–540 |
-|   8. Pickup from the ground | 541–647 |
-|   9. Drop to the ground | 648–695 |
-|   10. Gold | 696–735 |
-|   11. Message layouts | 736–765 |
+| Summary | 27–33 |
+| Rules | 34–35 |
+|   6. Deferred item messages | 36–129 |
+|   7. Intents | 130–556 |
+|   8. Pickup from the ground | 557–663 |
+|   9. Drop to the ground | 664–711 |
+|   10. Gold | 712–751 |
+|   11. Message layouts | 752–781 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 782–909 |
 <!-- /index -->
 
 ## Summary
@@ -141,14 +142,15 @@ Every handler checks its exact size first (→ 3, `intents-events.md`
    distance > 50 → 1; distance > 8 → walk to P (`0x00548A50`, as below)
    → 0; P in mode 17 (dead) and the player passes the busy test
    `0x005678A0(1)` = 0 → corpse pickup `0x0057FB70(game, player, P)`
-   (needs P's state 7 `playerbody`; corpse spec, not specified here) →
+   (needs P's state 7 `playerbody`; §12) →
    0; else `0x00566E60` (player-to-player interaction, wall-clock
    throttled with `GetTickCount`; multiplayer, out of scope) → 0. Type 5
    (tile): missing or distance > 50 → 1; distance < 5 → warp
    `0x005550B0` (`sim/path-placement.md` §12.2) → 0; else walk to it →
    0. Type 3 → 1. Type 4 (item):
    1. Item missing or mode ≠ 3, or distance (`0x00641530`, unit to unit;
-      `sim/path-placement.md`) > 50 → 1.
+      formula: `sim/pathing.md` §9.5 "Unit distance")
+      > 50 → 1.
    2. Distance ≥ 5, or a collision between player and item
       (`0x00622B50`, mask 0x804) → walk to the item (`0x00548A50`:
       player mode 3 toward (type 4, GUID) and interaction data −1, or
@@ -244,6 +246,18 @@ command flag 0x20, item flag 0x1, update list. N: placed at the location,
 body location set, stat link, mode 1, page 0xFF, item flags 0x40 and 0x1,
 command flag 0x20; update list; weapon bookkeeping; inventory pass. Both
 send 0x9D action 9.
+
+Failure outcomes (`0x00560F00` re-read 2026-10-07): game or player none
+→ fatal assert; location > 10 → 0 with out untouched (set only after
+this test); cursor item missing, not an item, or not in mode 4 → out 0,
+0; E none or E's mode ≠ 1 → out 1, 0 (nothing changed). The unlink of E
+(`0x0063AD90`) not returning E → fatal assert (`0x00560F18`; the
+handler never sees it). N's put at the location (`0x0063BDB0`) failing
+→ out 1, 0 after E is already the cursor item (N is then neither
+cursor nor placed); unreachable, since §4.3's 5 means the location
+fits N once E has left. The link check (kind 3) failing → out 1, 0;
+unreachable for a player (`0x0063B210` passes when the owner is not
+an item, §12.2 phase 1 step 5).
 
 #### 7.9 0x1E Swap1HWith2H (`0x0054B030` → `0x00561220`)
 
@@ -355,7 +369,9 @@ dst item flag 0x8; else (when `0x00629930(src)`) dst stat 72 (`durability`, live
 to src's if src's is lower (0x3E; throwing weapons keep the worse
 durability), dst := q_s + q_d
 (0x3E), both books → `0x0055C070(q_s)`, cursor := none, S→C 0x42 for
-src, src freed (`0x00557FD0`). Then dst command flag 0x100 (0x9C action
+src, src freed (`0x00557FD0`: the unit is taken off any player's
+inventory list or cursor still holding it, then freed by `0x00555600`
+(`sim/units.md` §3.2); nothing else, `world/cube.md` §8 "Exact" rule 1). Then dst command flag 0x100 (0x9C action
 0xA), update list, refresh. (Different classes never pass `inventory.md` §4.5.)
 
 #### 7.13 0x22 UnstackItems (`0x0054B380`)
@@ -762,3 +778,131 @@ Category ([3], `0x00623D60`): items `component` (+0x115); except an item
 of body location 4 or 5 when both hands hold non-broken items, neither
 two-handed, the owner is a player of class 4 or 6 or a monster of class
 0x1A1/0x1A2, and the item is not the weapon in use → 6.
+
+### 12. Corpse take-back (`0x0057FB70` → `0x00562F30`)
+
+Reached from 0x16 PickItem type 0 (§7.1 rule 2) on a dead player's
+corpse C by player U (`0x0057FB70`, ECX game, EDX U, stack C; read
+from the 1.14d disassembly, 2026-10-07). The experience part is
+`combat/vitals.md` §4.7 rule 2 (owner).
+
+#### 12.1 Outer routine (`0x0057FB70`)
+
+1. C lacks state 7 (`playerbody`, `0x00639DF0`) → nothing (no sound,
+   no message). The take permission `0x0057FAF0` (`combat/vitals.md`
+   §4.7 rule 2) fails → nothing.
+2. Experience return (owner GUID = U's only, `combat/vitals.md`).
+3. r := §12.2(game, U, C).
+4. r ≠ 0: C is taken off U's corpse list (`0x0063D4E0`(U's inventory,
+   C's GUID, 1): the node with that GUID and kind 1 of the list at
+   inventory +0x34, §8.4 rule 6; none → nothing), C leaves its room
+   (`0x0061A270`), S→C 0x8E `CorpseAssign` [1] 0, [2..5] U's GUID,
+   [6..9] C's GUID to every player (`0x0053DF80` → `0x005538D0`),
+   `0x00623830`(C), C is freed (`0x00555600`), then sound event 93
+   (`object_corpse_loot`) on U (`0x00553380`).
+5. r = 0: sound event 23 (`cantcarry`) on U; C stays with whatever
+   items §12.2 could not move.
+
+#### 12.2 Items (`0x00562F30`, ECX game, EDX U, stack C)
+
+U, C, U's inventory or C's inventory none → result 0, nothing moved.
+"Grid put" below is `0x005600A0`(EDI U, ESI X; game, leave-room 0,
+page 0): §8.1 step 7's free-position placement on page 0 without the
+room step (result 0 when §2.3 finds no position; its link failure is
+fatal), i.e. item-skill link, stat refresh, cursor := none, unit flag
+0x2 cleared, mode 0, command flag 0x80 (0x9C action 4), update list,
+owner refresh, unit flag 0x2000000 cleared, page := 0, quest hook
+ITEMPICKEDUP, inventory pass when `0x0062FF70` holds. Every put of an
+item into U (`0x0063AFD0`) first unlinks it from C's inventory
+(`inventory.md` §1.4).
+
+**Phase 1, body locations** (repeated):
+
+1. present := 0, moved := 0. For b = 1 … 12: X := C's item at body
+   location b (`0x0063BDE0`); none → next b. present += 1.
+2. `inventory.md` §4.2(X, U, equipping 0) fails → next b.
+3. D := U's item at b. c := pair(b) (`0x0055F240`): 4 ↔ 5, 6 ↔ 7,
+   11 ↔ 12, every other location 0. A := U's item at c when c ≠ 0,
+   else A := D. L := b. fit := §12.3(U, X, D, A, L) (which can change
+   D, A, L).
+4. fit = 0: grid put; result 0 → next b. Result 1 → replenish timers
+   (`0x00558530`, `0x00558580`, `items/generation.md` §9 step 6), step 7.
+5. fit ≠ 0: U's item at L present → fatal assert (`ItemMode.cpp` line
+   0x1775; unreachable, §12.3 only returns 1 for an empty L). Put X at
+   L on grid 0 (`0x0063BDB0`) fails → next b. Link check
+   `0x0063B210`(kind k) with k = 4 for L = 11 or 12, else 3; failure →
+   U's location L emptied (`0x0063BE30`), next b. (`0x0063B210` returns
+   1 for any item when the inventory's owner is not an item
+   (`0x0063B24A`–`0x0063B24F`), so for U this failure is unreachable.)
+6. Success: cursor := none (`0x0063C180`(U's inventory, none):
+   **a cursor item U holds is detached**, `inventory.md` §1.4 rule 3;
+   reproduce), body location := L, unit flag 0x2 cleared, mode 1,
+   command flag 0x8, update list += X, owner refresh
+   (`0x00621000`(U, 1)), unit flag 0x2000000 cleared, page := 0xFF;
+   k = 3 only: stat link `0x0063D1D0`, stat refresh `0x0055C2C0`(X;
+   U, 0), item-skill link `0x0055C270`(U, X), weapon bookkeeping
+   `0x0055C5C0`(U). Then quest hook ITEMPICKEDUP (`0x00543D80`(game,
+   U, X)) and the replenish timers.
+7. Tail (steps 4 and 6): item flag 0x1 on X; `0x0063AD90`(C's
+   inventory, X) (X is no longer C's: returns none, ignored); C's body
+   location b cleared (`0x0063BE30`); present −= 1; moved := 1.
+8. After b = 12: present ≠ 0 and moved ≠ 0 → step 1 again; else phase 2.
+
+**Phase 2, every item left in C** (C's item list in list order, the
+next node read before the item is handled; body items that phase 1
+did not move are in it too): pass := 0.
+
+1. placed := 0, r := 1. For each item X:
+   1. Can pick §8.4(game, U, X) fails → r := 0; next.
+   2. `inventory.md` §4.9(game, U, X, skip 0) = 1 → placed += 1, item
+      flag 0x1; next.
+   3. X beltable (§3 rule 3 of `inventory.md`) and the belt free-slot
+      place `0x0063C790` succeeds (`inventory.md` §3 rules 5 and 7 on U:
+      the slot of rule 5, then put at (slot, 0) of grid 1) → link check
+      `0x0063B210`(kind 2) (always passes for U, phase 1 step 5; were
+      it 0: next, X left in U's belt cells with no further step). Then: cursor := none
+      (as phase 1 step 6), U a player (type 0) → item-skill link
+      (`inventory.md` §5.5, add 1), unit flag 0x2 cleared, stat refresh
+      `0x0055C2C0`(X; U, 0) when `0x0062FF70`(X, U) holds, mode 2, unit
+      flag 0x2000000 cleared, command flag 0x2000 (0x9C action 0xE),
+      page := 0xFF, update list += X, owner refresh; placed += 1, item
+      flag 0x1; next. (No ITEMPICKEDUP, no replenish timers here.)
+   4. Else (not beltable, or no slot): pass ≠ 0 → grid put; 1 →
+      placed += 1, item flag 0x1; 0 → r := 0. pass = 0 → nothing.
+2. After the walk: placed ≠ 0 → step 1 again (same pass); placed = 0
+   and pass = 0 → pass := 1, step 1 again; placed = 0 and pass ≠ 0 →
+   end. A walk that starts on an empty list ends at once with r = 1.
+3. Inventory pass `0x0055DBC0`(game, U, 0) (`inventory.md` §5.7);
+   result r.
+
+So equipment goes back to its own slots first (repeated while slots
+free up), then auto-equip, belt, and only in the second sweep the
+inventory grid; the corpse is removed only when the last sweep met no
+item that can-pick refused and no grid put that failed.
+
+#### 12.3 Corpse slot fit (`0x0055F2D0`, ECX U, EDX X, &D, &A, &L)
+
+1. U none, X none or not an item → 0.
+2. D none and A none → 1 (L unchanged). D and A both present → 0.
+3. D present (A none): D := none, A := the old D, L := pair(L) (the
+   free partner slot). (D none, A present: unchanged.)
+4. L ∉ {4, 5, 11, 12} → 1 when D is none (always here, rings move to
+   the free finger), else 0.
+5. Hands, with O := A (the item in the other hand, present here); "of
+   type t" = itemtypes equivalence `0x00629BB0`; s(·) = the ammo type
+   (`0x0062E6F0`, itemtypes `shoots`), q(·) = the quiver type
+   (`0x0062E740`):
+   1. s(X) > 0 → 1 if O is none or of type s(X), else 0.
+   2. Else q(X) ≠ 0 → O none → 1; s(O) ≤ 0 → 0; else 1 if X is of
+      type s(O), else 0.
+   3. Else s(O) > 0 → 1 if X is of type s(O), else 0.
+   4. Else q(O) > 0 → 1 if X is of type q(O), else 0.
+   5. X two-handed (`0x006289C0`) and not usable one-or-two-handed by
+      U (`0x0062A1E0`) → 0; the same for O.
+   6. wX, wO := X, O of type 45 (`weap`). Neither → 0. Exactly one →
+      1. Both: U a monster (type 1) → 1; U's class (unit +4) 4 → 1;
+      class 6 and both of type 67 (`h2h`) → 1; else 0.
+
+Differences from `inventory.md` §4.4: a quiver next to a bow passes
+(rule 5.2), two non-weapons (two shields) fail, any monster passes
+two weapons.
