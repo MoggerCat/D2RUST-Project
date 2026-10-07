@@ -44,13 +44,13 @@
 |   7. NPC dialog hooks | 581–613 |
 |   8. Act transitions, warps and portals | 614–695 |
 |   9. Quest items, rewards and helpers | 696–859 |
-|   11. Acts II–V | 860–868 |
-| Constants & data dependencies | 869–883 |
-| Randomness | 884–910 |
-| Edge cases & original bugs | 911–929 |
-| Test vectors | 930–961 |
-| Provenance | 962–990 |
-| Open questions | 991–1052 |
+|   11. Acts II–V | 860–871 |
+| Constants & data dependencies | 872–886 |
+| Randomness | 887–913 |
+| Edge cases & original bugs | 914–932 |
+| Test vectors | 933–964 |
+| Provenance | 965–993 |
+| Open questions | 994–1055 |
 <!-- /index -->
 
 ## Summary
@@ -861,10 +861,13 @@ Returns 0 in every non-fatal case. No draw of its own.
 
 Catalogued in `quests.tsv` (records, callbacks, tables) and `quest-messages.tsv`.
 Hooks other specs rely on are specified above (§8.1–§8.4, §9.4, §9.5).
-Their state machines are not yet specified (Open question 8). Now specified
+Their state machines (Open question 8, answered) are in the per-act files
 (2026-10-07): Act II `quests-act2.md`, `quests-act2-2.md`; Act III
 `quests-act3.md`, `quests-act3-2.md`; Act IV `quests-act4.md`; Act V
 `quests-act5.md`, `quests-act5-2.md`; quest object functions §9.6.
+The client's copy of the quest state (S→C 0x52 / 0x5D / 0x5E / 0x28 /
+0x29 / 0x50) and the client quest check `0x004A4180` that the
+level-entry lines use: `quests-status.md` §1 and §12.
 
 ## Constants & data dependencies
 
