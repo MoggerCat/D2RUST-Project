@@ -1843,6 +1843,7 @@ mod act5;
 mod act6;
 mod act6_cov;
 mod act7;
+mod act7_cov;
 mod bodies;
 mod npc;
 mod rules;

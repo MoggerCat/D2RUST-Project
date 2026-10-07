@@ -401,7 +401,7 @@ fn death_sentry_explodes_corpses() {
 
 // ---- §18 ShadowWarrior ------------------------------------------------------
 
-// Covers: specs/monsters/ai-bodies-7.md §18 text, §18 r1, §18 r2, §18 r6, §edge-cases-original-bugs r6
+// Covers: specs/monsters/ai-bodies-7.md §18 text, §18 r1, §18 r2, §18 r4, §18 r6, §edge-cases-original-bugs r6
 #[test]
 fn shadow_warrior_rules() {
     // No owner: idle 100.
