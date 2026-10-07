@@ -111,8 +111,8 @@ pub struct Fake {
     /// Every unit is shapeshifted (`ManaUnits::shapeshifted`).
     pub shifted: bool,
     pub log: Vec<String>,
-    /// The (attacker, defender, result) of every `reaction` call.
-    pub reactions: Vec<(usize, usize, u16)>,
+    /// The (attacker, defender, record) of every `reaction` call.
+    pub reactions: Vec<(usize, usize, DamageRecord)>,
     /// Per-unit override of the monster type flags (`monster_flag`); a
     /// unit without an entry uses its `flags`.
     pub mflags: BTreeMap<usize, u32>,
@@ -385,7 +385,7 @@ impl CombatWorld for Fake {
     }
     fn reaction(&mut self, a: usize, d: usize, r: &mut DamageRecord) {
         self.log.push(format!("reaction {a} {d}"));
-        self.reactions.push((a, d, r.result));
+        self.reactions.push((a, d, *r));
     }
 }
 
