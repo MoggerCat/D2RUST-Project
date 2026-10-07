@@ -1,4 +1,4 @@
-// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4
+// Spec: specs/world/cube.md §1, §2, §8; specs/items/inventory.md §1.4, §2.4, §5.1, §5.3; specs/items/inventory-moves.md §6.4; specs/sim/intents-events.md §2.4; specs/world/vendors.md §7.3 (the item copy)
 //! [`CubeWorld`] for the server: the economy wiring's [`EconomyCube`]
 //! for items, stats, unit records and creation (the player's interact
 //! info on the unit record too); the game's one inventory model
@@ -6,7 +6,8 @@
 //! checks (`0x00549350`, `0x00549150`: `inventory.md` §5.1), the
 //! targeting reset (`0x0055BF50`, §5.3), placement (`0x00560200`, §2.4)
 //! and removal (§8 step 1: the direct 0x9D of §6.4, the §1.4 unlink, the
-//! free); the staged date and sounds; and [`ItemPending`] for the calls
+//! free) and the item copy (`0x0055A2A0`, `vendors.md` §7.3,
+//! `InvDesk::copy_of`); the staged date and sounds; and [`ItemPending`] for the calls
 //! no written spec owns.
 
 use std::cell::RefCell;
@@ -324,8 +325,14 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
             .as_deref()
             .map_or_else(Vec::new, |p| p.state.fillers(item))
     }
+    /// `0x0055A2A0` (`world/vendors.md` §7.3) on the inventory model
+    /// (`InvDesk::copy_of`), as the vendors' copy; without inventory
+    /// parts: [`ItemPending::duplicate`].
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId> {
-        self.pending.duplicate(item, fillers)
+        if self.inv.get_mut().is_none() {
+            return self.pending.duplicate(item, fillers);
+        }
+        self.with_desk(|d| d.copy_of(item, fillers)).flatten()
     }
     fn item_init(&mut self, item: UnitId) -> Option<UnitId> {
         self.ec_mut().item_init(item)

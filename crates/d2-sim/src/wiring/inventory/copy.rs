@@ -5,8 +5,9 @@
 //! unit (`Economy::item_from_record`), then the steps of §7.3 after it.
 //! Callers: the vendors' buy and sell, the cube outputs, the hireling
 //! take and the NPC socketing hand their source here (fillers as their
-//! rule says); the interaction wiring's NPC socketing still asks its
-//! rest.
+//! rule says); the server's cube copies here too; the interaction
+//! wiring's NPC socketing and the economy cube's own `CubeRest` still
+//! ask their rests.
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::{self, read, BitWriter, StreamItem};

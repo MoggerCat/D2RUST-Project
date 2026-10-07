@@ -120,7 +120,8 @@ pub struct Staged {
 pub trait ItemPending {
     /// `0x0055FA40` (inventory / UI owner, `cube.md` OQ 8).
     fn inventory_pass(&mut self, player: UnitId, out: &mut Vec<Vec<u8>>);
-    /// `0x0055A2A0` (no items spec writes it).
+    /// `0x0055A2A0` for a host without inventory parts (with them the
+    /// cube copies on the model, `vendors.md` §7.3).
     fn duplicate(&mut self, item: UnitId, fillers: bool) -> Option<UnitId>;
     /// `0x005C1BC0(item, prefix)` (open question WE6 of the economy
     /// wiring).
