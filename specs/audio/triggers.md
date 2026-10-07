@@ -39,14 +39,14 @@
 |   9. Items | 543–566 |
 |   10. NPC speech | 567–636 |
 |   11. UI sounds | 637–663 |
-|   12. Other fixed requests | 664–729 |
-| Constants & data dependencies | 730–746 |
-| Randomness | 747–770 |
-| Edge cases & original bugs | 771–787 |
-| Test vectors | 788–819 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 820–833 |
-| Provenance | 834–861 |
-| Open questions | 862–971 |
+|   12. Other fixed requests | 664–727 |
+| Constants & data dependencies | 728–744 |
+| Randomness | 745–768 |
+| Edge cases & original bugs | 769–785 |
+| Test vectors | 786–817 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 818–831 |
+| Provenance | 832–868 |
+| Open questions | 869–980 |
 <!-- /index -->
 
 ## Summary
@@ -656,7 +656,7 @@ S→C 0x5D (`0x004A2CB0`, flags byte f, code c, value v): f bit 0 and c
 = 33 → 237 `item_potion`; f bit 1: c = 4 → 241 `item_ring`; c ∈ {8,
 15, 18, 22, 35} → 7 `cursor_level_up`; c = 32 → 217 `item_gem`; c = 33
 → 243 `item_scroll`; f = 0x10: c = 10 → 2,456 then 2,474; c = 33 → id
-v. All none (open question 9). Only the first matching row of
+v. All none (full dispatch: `client/msg-ui.md` §1; open question 9). Only the first matching row of
 `client/msg-ui.md` §1 r2 runs: with f bit 0 set the bit-1 rows are not
 reached (f = 3, c = 33 plays 237 only), and f = 0x10 rows only when bits
 0 and 1 are clear.
@@ -677,9 +677,8 @@ reached (f = 3, c = 33 plays 237 only), and f = 0x10 rows only when bits
 | 2,517 | `barbarian_leap_land` (+ a running footstep) | `0x004C8970` | yes |
 | 1,830 | `spider_web_1` | `0x004E2D40` | yes |
 
-Their conditions are the owning features' (open question 10).
-
-Conditions found (third pass, partly answers open question 10):
+Their conditions (open question 10, answered here and in
+`triggers-2.md` §13):
 
 1. 396 / 397: `0x00464E50(U, overlay o, n)` (from the monster mode
    machine `0x004AFF60`, 5 sites) first creates overlay o on U (type 1
@@ -709,11 +708,10 @@ Conditions found (third pass, partly answers open question 10):
    `0x0072A398`, missile 372 `diablo appears`): at frames left 150 a
    screen shake (`0x00476A80`), at frames left 50 the request, no unit.
 
-Still open: 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
+The rest — 2,458 (`0x004AD0C0`, `0x004AD1A0`, `0x004ADCE0`, reached
 through tables `0x0072509C`, `0x00724EE4` and `0x004D93A0`), the
 `0x004AFF60` death sounds, 2,517 (`0x004C8970`) and 1,830
-(`0x004E2D40`, from `0x004807E9`). Answered (fourth pass):
-`audio/triggers-2.md` §13.
+(`0x004E2D40`, from `0x004807E9`) — is `audio/triggers-2.md` §13.
 
 **Thunder, draws** (`0x00473910`, weather; the timer and when it runs
 are the weather spec's): at a thunder step (`0x004739B4`) the code draws
@@ -832,6 +830,15 @@ log; voices then follow from `sound-table.md`. A static scene recorded
 twice must give identical logs first (`client/audio.md` §B7).
 
 ## Provenance
+
+Both TSVs re-checked against the 1.14d file image (second pass,
+2026-10-07, scratch script): `npc-speech.tsv` equals the 864 8-byte
+entries at `0x0072B0E0` (sound u32 at +0, key u32 at +4; entry 864 has
+sound 0, the end); `object-sounds.tsv` equals, for each of the 453
+classes with a non-null pointer at `[0x007295F8 + 4·c]` (the same 453
+classes), the record's 12 dwords (`mode0`–`mode7`, `loop_a`,
+`loop_a_mode`, `loop_b`, `loop_b_mode`), with `ordered` = 1 exactly when
+the pointer is the well record `0x00729328`. 0 rows differ.
 
 1.14d `Game.exe` (sha256 631066c1…adaaf), Ghidra decompile export and
 `tools/ghidra/disasm.py` (register arguments: ECX = id, EDX = unit, three
@@ -959,8 +966,10 @@ entry 74 (id-0 requests).
     `0x00466730` belongs to `client/model.md`.
 12. UI control → site mapping for §11 (owner `client/ui.md` §B8).
     Partly answered: the seven options-menu sites (`triggers-2.md`
-    §17, `sound-table-2.md` §15 r5); the rest is `client/ui.md`'s
-    (cross-file request).
+    §17, `sound-table-2.md` §15 r5). ~~The other 65 sites of §11~~
+    (more than two reads): moved to the recording list
+    (`docs/handoff/pc2-rec-pc2-render-audio.md` RA-T1); the result goes
+    to `client/ui.md` §B8 and the panel specs.
 13. COF/AnimData frame event 3 ("sound", `formats/cof.md`): none of
     the 222 request sites reads it; mode sounds use the fixed delays of
     §4. A request log of an attack whose animation has event 3 settles
