@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 619–642 |
 | Test vectors | 643–672 |
 | Provenance | 673–697 |
-| Open questions | 698–844 |
+| Open questions | 698–854 |
 <!-- /index -->
 
 ## Summary
@@ -758,6 +758,16 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
      value means the evaluation is not binary64 there.
 6. Meaning of drop flags 0x04/0x10 (D2MOO: superior / normal) and their
    effect in creation: items spec.
+   Answered (2026-10-07, `0x0055A550` disassembled): §7 stores `d`
+   (its fourth stack argument) OR-ed into request flags2 (+0x80,
+   `0x0055A69B`–`0x0055A69E`; 0x01 first for `hellbovine`), so they
+   are `items/generation.md` §1.5 bits: 0x04 = always ethereal (§8.1
+   there: the ethereal roll is drawn, then applied regardless, on
+   eligible items), 0x10 = always sockets (§7.1 step 6: p := 0, so the
+   socket count is applied). Not superior / normal quality. In 1.14d
+   slot mods 5 and 6 come from record +0x30 / +0x32, which no column
+   fills (§1.4, OQ12 item 10: 0 in all 853 rows), so a TC drop never
+   sets either bit.
 7. Answered (handoff `impl-treasure` 13): "living" = not dead by
    `0x005541B0` (`sim/units.md` §2: unit flag 0x10000, a player in mode
    0 or 17, a monster in mode 0 or 12; any other unit type counts as
