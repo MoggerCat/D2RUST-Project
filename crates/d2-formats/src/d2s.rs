@@ -19,6 +19,8 @@ pub mod appearance;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_c2fmt;
+#[cfg(test)]
 mod tests_fitems;
 
 /// File magic (§2.1, `0x00568F20`).
