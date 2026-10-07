@@ -5250,6 +5250,7 @@ GitHub runners may be 1.5–2× slower than the measured 670 s.
 Spec writers append here (one line: spec + open question, what to record,
 what to log); PC 2 (Local2) records them and moves each line to §5 Done
 with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
+- `world/hirelings.md` R2-27 rest / OQ7 / OQ2 (PC 2 spec-hirelings, 2026-10-07): with `bdMercTwo`: level-up (0xA1 / 0xA2 and the second stats batch), death (0x9B name id + cost, 0x7A remove), resurrect at an NPC (0x9B `ffff 00000000`, 0x81, 0x2A code 5), give / take an item (two 0x540E60 notices, new GUIDs); a two-player game where the second client sees the owner's hireling level up (expect 0x9E–0xA0 stats there, not 0xA1 / 0xA2); die, change level, return and resurrect (OQ2).
 
 - `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
   update over a level load.
