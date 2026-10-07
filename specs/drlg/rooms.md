@@ -1499,6 +1499,6 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
 23. *Answered (2026-10-08)* (`impl-client-drlg-2` Q3): a freed cursor
     room reads "not status 2" in d2rs; this equals 1.14d unless the
     freed block is reallocated with byte +0x44 = 2 before the read
-    (§4.6 rule 11). Open inside it: a client recording that logs the
+    (§4.6 rule 11). PROVISIONAL: a freed cursor room reads "not status 2" (because 1.14d does so unless the block is reused); settled by REC-04. Open inside it: a client recording that logs the
     cursor +0x460 and the byte at its +0x44 at each timed step across
     a level free (PC 2 recording list) shows whether reuse happens.

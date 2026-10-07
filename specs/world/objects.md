@@ -59,7 +59,7 @@
 | Edge cases & original bugs | 883–949 |
 | Test vectors | 950–988 |
 | Provenance | 989–1046 |
-| Open questions | 1047–1093 |
+| Open questions | 1047–1094 |
 <!-- /index -->
 
 ## Summary
@@ -1072,6 +1072,7 @@ lists of §2 from the live `shrines.txt`.
    (`world/objects-2.md` §19).
 10. **Needs recording**: fire event 0's direct mode write (§18.1): confirm with a packets
     trace that clients see no 1 → 2 update for fires.
+    PROVISIONAL: clients see no 1 → 2 update for fires (because event 0 writes the mode directly, §18.1); settled by REC-07.
 11. **Answered**: owner cells of init 51 and operate 48 are §18.4, init
     13 is §17 (CODE-TABLE CHANGE commit).
 12. **Answered** for this spec: the 0x58 builder is `0x0053D8D0`; the

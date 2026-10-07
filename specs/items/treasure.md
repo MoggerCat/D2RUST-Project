@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 640–663 |
 | Test vectors | 664–693 |
 | Provenance | 694–718 |
-| Open questions | 719–881 |
+| Open questions | 719–882 |
 <!-- /index -->
 
 ## Summary
@@ -764,6 +764,7 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
      normal range), and the `fstp`
      to a double is exact. So with the startup word §5.4 equals the
      IEEE binary64 evaluation d2rs uses, bit for bit.
+   - PROVISIONAL: the evaluation is binary64, PC = 53 (because Game.exe sets 53-bit at start-up and every game `fldcw` leaves precision alone); settled by REC-21.
    - Not settled by the binary: single player runs the server inline
      on the client frame thread (`sim/tick.md` §1 rule 4), the same
      thread as the renderer. Game.exe passes neither `DDSCL_FPUSETUP`
