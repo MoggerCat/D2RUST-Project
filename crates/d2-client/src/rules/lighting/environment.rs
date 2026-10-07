@@ -134,10 +134,6 @@ pub enum EnvError {
     BadIndex(i32),
     #[error("S→C 0x53: negative ticks {0} (fatal)")]
     NegativeTicks(i32),
-    /// The eclipse branch calls `0x0061BDF0`, which the spec does not
-    /// describe (Pending; the state is left unchanged).
-    #[error("S→C 0x53 with the eclipse flag: 0x0061BDF0 is not specified (Pending)")]
-    EclipsePending,
 }
 
 /// The environment record (act `+0x04`, 0x38 bytes, `0x0061BE40`, §9.1).
@@ -318,15 +314,14 @@ impl Environment {
 
     /// The S→C 0x53 setter (`0x0061C240`, §9.2 r2): index > 5 or < 0,
     /// ticks < 0 → fatal; ticks > speed × 360 → 0; index, ticks and type
-    /// (normal table) set; intensity; the level-120 color.
+    /// (normal or eclipse table by the received flag) set; intensity with
+    /// the **previous** eclipse flag; the flag set; with it, the period
+    /// reset ([`Self::period_reset`]), intensity again and color; then
+    /// the level-120 color. Without the flag no color is recomputed.
     ///
     /// `a`, `level`: the act index and level the intensity step uses. The
     /// spec does not name the setter's `A` / `L` arguments; the caller
     /// passes those of the player's room (§9.2 r1), an open question.
-    ///
-    /// `eclipse` ≠ 0 returns [`EnvError::EclipsePending`] with the state
-    /// unchanged: that branch calls `0x0061BDF0`, which the spec leaves
-    /// undescribed.
     pub fn set_from_server(
         &mut self,
         tables: &PeriodTables,
@@ -342,16 +337,38 @@ impl Environment {
         if ticks < 0 {
             return Err(EnvError::NegativeTicks(ticks));
         }
-        if eclipse != 0 {
-            return Err(EnvError::EclipsePending);
-        }
+        let flag = eclipse != 0;
         self.index = index;
         self.ticks = if ticks > self.day_ticks() { 0 } else { ticks };
-        self.kind = tables.normal[index as usize].kind;
+        let t = if flag {
+            &tables.eclipse
+        } else {
+            &tables.normal
+        };
+        self.kind = t[index as usize].kind;
         self.intensity(a, level);
-        self.eclipse = false;
+        self.eclipse = flag;
+        if flag {
+            self.period_reset(tables);
+            self.intensity(a, level);
+            self.color(tables, a);
+        }
         self.level_override(level);
         Ok(())
+    }
+
+    /// The period reset `0x0061BDF0` (§9.2 r2): by the record's eclipse
+    /// flag, the normal or eclipse table entry of the current index gives
+    /// the type and the ticks (its start × speed).
+    pub fn period_reset(&mut self, tables: &PeriodTables) {
+        let t = if self.eclipse {
+            &tables.eclipse
+        } else {
+            &tables.normal
+        };
+        let p = t[self.index as usize];
+        self.kind = p.kind;
+        self.ticks = p.start.wrapping_mul(self.speed);
     }
 
     /// The ambient this environment gives a room (§3.1 r3): `I` = `+0x0C`,

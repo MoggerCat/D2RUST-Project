@@ -616,4 +616,15 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         let mut cv = self.combat(game);
         crate::missiles::bodies::area_hit(&mut cv, &t.combat, owner, unit, record);
     }
+    /// The active room's seed (+0x6C) on the DRLG (`bodies-2.md` §47
+    /// step 2).
+    fn room_seed(&mut self, _: &mut Game, room: RoomId) -> Option<&mut crate::rng::Seed> {
+        self.h.drlg.active_seed_mut(room)
+    }
+    /// The active room's sub-tile rectangle on the DRLG (`bodies-2.md`
+    /// §44 unit find step 2).
+    fn room_subtiles(&self, _: &Game, room: RoomId) -> Option<(i32, i32, i32, i32)> {
+        use crate::path::CollisionRooms;
+        self.h.drlg.subtile_rect(room).map(|t| (t.x, t.y, t.w, t.h))
+    }
 }

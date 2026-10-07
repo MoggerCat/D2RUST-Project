@@ -496,13 +496,14 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
 }
 
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
-/// rules 3–4: `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
+/// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.
 pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
     data.tables()
         .levels
         .iter()
         .map(|l| LevelRow {
+            pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
             sound_env: l.soundenv,

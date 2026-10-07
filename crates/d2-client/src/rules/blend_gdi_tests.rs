@@ -252,10 +252,30 @@ fn line_steps_in_all_octants() {
     );
     // Zero length: one pixel.
     assert_eq!(blend::gdi_line_pixels(5, 5, 5, 5), Ok(vec![(5, 5)]));
-    // |Δx| = |Δy| > 0: the spec does not say which axis is major.
+    // |Δx| = |Δy| > 0 is x-major: one straight step first, ending one
+    // short on the minor axis (§8 r1 vectors).
+    assert_eq!(
+        blend::gdi_line_pixels(0, 0, 3, 3),
+        Ok(vec![(0, 0), (1, 0), (2, 1), (3, 2)])
+    );
     assert_eq!(
         blend::gdi_line_pixels(0, 0, -3, 3),
-        Err(BlendError::LineMajorAxisTie(3))
+        Ok(vec![(0, 0), (-1, 0), (-2, 1), (-3, 2)])
+    );
+    assert_eq!(
+        blend::gdi_line_pixels(10, 10, 8, 15),
+        Ok(vec![
+            (10, 10),
+            (10, 11),
+            (10, 12),
+            (9, 13),
+            (9, 14),
+            (9, 15)
+        ])
+    );
+    assert_eq!(
+        blend::gdi_line_pixels(4, 4, 4, 0),
+        Ok(vec![(4, 4), (4, 3), (4, 2), (4, 1), (4, 0)])
     );
 }
 
