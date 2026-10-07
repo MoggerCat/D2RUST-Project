@@ -737,7 +737,7 @@ fn click_button_other_interaction() {
 /// with the cube's interaction (type 4) → result 1, nothing sent, the
 /// gold unchanged; with a type-2 interaction whose GUID is no stash
 /// object, the common checks fail: result 0, nothing (§10.2).
-// Covers: specs/world/vendors-2.md §10.1 r3, §10.2 text
+// Covers: specs/world/vendors-2.md §10.1 r3
 #[test]
 fn stash_buttons_through_the_handler() {
     let mut t = setup(4);

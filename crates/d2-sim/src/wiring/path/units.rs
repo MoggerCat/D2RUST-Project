@@ -407,3 +407,29 @@ impl<X: Pending> View<'_, X> {
             })
     }
 }
+
+impl<X: Pending> View<'_, X> {
+    /// `0x00622AA0(a, b, mask)` (`render/draw-order-2.md` §15.1,
+    /// [`crate::path::line::units_line_blocked`]) on the path records and
+    /// the DRLG rooms: `a`'s room (`0x00620BB0`), the path positions
+    /// (§2.1) and sizes (§3). `None` without the path provider (the
+    /// caller keeps its [`Pending`] answer).
+    pub fn units_line_blocked(&self, game: &Game, a: UnitId, b: UnitId, mask: u16) -> Option<bool> {
+        self.h.paths.as_ref()?;
+        let end = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::line::LineUnit {
+                room: game.lists.unit(u).and_then(|e| e.room()),
+                x,
+                y,
+                size: self.path_size(u),
+            }
+        };
+        Some(crate::path::line::units_line_blocked(
+            &self.h.drlg,
+            &end(a),
+            &end(b),
+            mask,
+        ))
+    }
+}

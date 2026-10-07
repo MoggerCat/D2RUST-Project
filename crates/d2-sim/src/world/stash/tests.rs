@@ -90,7 +90,7 @@ impl StashWorld for Fake {
 /// §10.4 vectors 1–3: over the carried cap → sound 19 on P with target
 /// P, nothing moves; in range → gold += v, goldbank −= v; v > goldbank →
 /// nothing.
-// Covers: specs/world/vendors-2.md §10.2 r2, §10.4 text
+// Covers: specs/world/vendors-2.md §10.2 r2
 #[test]
 fn withdraw_vectors() {
     let mut f = Fake::at_stash(60_000, 100_000);
@@ -115,7 +115,7 @@ fn withdraw_vectors() {
 
 /// §10.4 vectors 4–6: a deposit over the cap fills the stash (partial);
 /// a full stash takes nothing; v = 0x00010000 (p1 1, p2 0) moves 65,536.
-// Covers: specs/world/vendors-2.md §10.2 r3, §10.4 text
+// Covers: specs/world/vendors-2.md §10.2 r3
 #[test]
 fn deposit_vectors() {
     let mut f = Fake::at_stash(30_000, 2_490_000);
@@ -169,7 +169,7 @@ fn close_twice() {
 
 /// §10.1 rule 2 comes before the button test: any button with no
 /// interaction gets 0x77 0x0C, result 0, the cube's too.
-// Covers: specs/world/vendors-2.md §10.1 r2, §10 text
+// Covers: specs/world/vendors-2.md §10.1 r2
 #[test]
 fn no_interaction_any_button() {
     for b in [0, BUTTON_WITHDRAW, BUTTON_CUBE_TRANSMUTE, 0x30] {
@@ -217,7 +217,7 @@ fn dispatch_routes() {
 /// §10.2 common checks: no stash object, another class, P or the stash
 /// out of town → nothing at all; §10.4 rule 1: a 0x12 then leaves the
 /// interaction set.
-// Covers: specs/world/vendors-2.md §10.2 text, §10.4 r1
+// Covers: specs/world/vendors-2.md §10.4 r1
 #[test]
 fn common_checks() {
     type Break = fn(&mut Fake);

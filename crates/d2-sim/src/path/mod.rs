@@ -23,6 +23,7 @@ pub mod collision;
 pub mod coords;
 pub mod footprint;
 pub mod history;
+pub mod line;
 pub mod place;
 pub mod place_seams;
 pub mod record;

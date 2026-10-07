@@ -1039,7 +1039,13 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
         self.x().box_collides(r, at, size, mask)
     }
+    /// `0x0064E260` (`draw-order-2.md` §16, [`crate::path::line::line_test`])
+    /// on the DRLG rooms with the path provider; else [`Pending`].
     fn line_blocked(&self, r: RoomId, from: (i32, i32), to: (i32, i32), mask: u32) -> bool {
+        if self.cv.v.h.paths.is_some() {
+            return crate::path::line::line_test(&self.cv.v.h.drlg, Some(r), from, to, mask as u16)
+                .is_err();
+        }
         self.x().body_line_blocked(r, from, to, mask)
     }
     fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {

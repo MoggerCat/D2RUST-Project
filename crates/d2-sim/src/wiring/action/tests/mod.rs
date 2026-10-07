@@ -14,6 +14,8 @@ mod death;
 mod e2e;
 pub mod fight;
 #[cfg(test)]
+mod inactive;
+#[cfg(test)]
 mod missiles;
 #[cfg(test)]
 mod objects;

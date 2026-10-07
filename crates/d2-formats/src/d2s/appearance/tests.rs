@@ -329,7 +329,7 @@ fn vector_broken_axe_not_in_use_draws_as_the_left_hand() {
     assert_eq!(c[part::RH], 0xFF);
 }
 
-// Covers: specs/formats/d2s-appearance.md §rules text, §5 r1, §5 r2, §6 r2, §edge-cases-original-bugs r5
+// Covers: specs/formats/d2s-appearance.md §5 r1, §5 r2, §6 r2, §edge-cases-original-bugs r5
 #[test]
 fn vector_quilted_armour_parts() {
     let t = tables();

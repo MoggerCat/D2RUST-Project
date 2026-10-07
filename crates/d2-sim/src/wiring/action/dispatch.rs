@@ -279,6 +279,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         self.log(r);
     }
 
+    /// Step 9 `0x005433F0` (`units.md` §3.3) on the inactive store
+    /// ([`ActionSim::compress`]; nothing while the store is off).
+    fn compress_unit(&mut self, game: &mut Game, unit: UnitId) {
+        self.compress(game, unit);
+    }
+
     /// Step 10 `0x0061AA20` (`levels.md` §9.2).
     fn free_inactive_rooms(&mut self, _: &mut Game, act: u8) {
         let r = self.sys.hooks.drlg.free_inactive_rooms(act);

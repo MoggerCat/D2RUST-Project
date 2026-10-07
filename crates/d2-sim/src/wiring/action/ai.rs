@@ -280,6 +280,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     }
 }
 
+/// The AI's line-of-sight mask (`draw-order-2.md` §15.1 caller table).
+const LINE_MASK_AI: u16 = 4;
+
 impl<X: Pending> AiWorld for View<'_, X> {
     fn in_town(&self, game: &Game, room: RoomId) -> bool {
         self.h.drlg.in_town(game, room)
@@ -308,8 +311,11 @@ impl<X: Pending> AiWorld for View<'_, X> {
             .and_then(|r| self.h.drlg.collision(game, r, x, y))
             .is_some_and(|m| m & mask != 0)
     }
+    /// `0x00622AA0(a, b, 4)` (`draw-order-2.md` §15.1) with the path
+    /// provider ([`View::units_line_blocked`]); else [`Pending`].
     fn line_blocked(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
-        self.h.x.line_blocked(game, a, b)
+        self.units_line_blocked(game, a, b, LINE_MASK_AI)
+            .unwrap_or_else(|| self.h.x.line_blocked(game, a, b))
     }
     fn in_melee_range(&self, _: &Game, a: UnitId, b: UnitId) -> bool {
         self.h.x.in_melee_range(a, b, 0)
@@ -682,6 +688,11 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// `0x00622AA0(a, b, mask)` with the path provider; else the seam's
+    /// default (clear).
+    fn line_blocked_mask(&self, game: &Game, a: UnitId, b: UnitId, mask: u16) -> bool {
+        self.units_line_blocked(game, a, b, mask).unwrap_or(false)
+    }
     fn set_unit_flags2(&mut self, unit: UnitId, mask: u32) {
         if let Some(r) = self.units.get_mut(unit) {
             r.flags2 |= mask;

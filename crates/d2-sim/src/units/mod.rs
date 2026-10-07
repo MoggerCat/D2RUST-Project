@@ -7,6 +7,7 @@ pub mod dispatch;
 #[cfg(test)]
 mod gap_tests;
 pub mod hooks;
+pub mod inactive;
 pub mod lifecycle;
 pub mod lists;
 pub mod messages;
