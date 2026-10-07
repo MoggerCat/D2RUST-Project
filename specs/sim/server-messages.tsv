@@ -33,7 +33,7 @@ id	name	size	layout	sender	client_handler	client_unit_handler	produced_by	confir
 0x1F	SetStatDword	6	stat:u8@1 value:u32@2	0x0053BE40 0x0053E9B0	0x0045D780	-	sim	yes
 0x20	StatUpdate	10		0x0053C1D0	0x0045D880	-	sim	yes
 0x21	UpdateItemOSkill	12		0x0053C4A0	0x0045DCD0	-	sim	yes
-0x22	UpdateItemSkill	12		0x0053C520	0x0045DDB0	-	sim	yes
+0x22	UpdateItemSkill	12	type:u8@1 unit:u32@3 skill:u16@7 quantity:u8@9 body_state:u8@11	0x0053C520	0x0045DDB0	-	sim	yes
 0x23	SetSkill	13	type:u8@1 guid:u32@2 hand:u8@6 skill:u16@7 item:u32@9	0x0053C590	0x0045DE10	-	sim	yes
 0x24	Unknown24	90		-	0x0045C900	-	none	yes
 0x25	Unknown25	90		-	0x0045C900	-	none	yes
