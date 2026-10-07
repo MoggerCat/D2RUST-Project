@@ -411,6 +411,22 @@ fn shrine_on_mode_overlays() {
     let mut m = shrine(Some(6));
     m.hex("0e 02 09 00 00 00 03 00 01 00 00 00");
     m.drain();
+    // The object mode change (model §8 r5) sets mode 1 and makes its mode
+    // sound call inside the change (`audio/triggers-2.md` §20 r3), before
+    // the shrine's on-mode function.
+    assert_eq!(
+        m.out[0],
+        Output::ObjectSound(super::super::objects::ObjSound::Mode {
+            unit: super::super::objects::ObjUnit {
+                key: UnitKey::new(OBJECT, 9),
+                client_only: false,
+            },
+            class: 3,
+            mode: 1,
+            local_dist: super::super::objects::NO_LOCAL_DISTANCE,
+        })
+    );
+    m.out.remove(0);
     assert_eq!(
         m.out,
         [Output::ShrineFx {

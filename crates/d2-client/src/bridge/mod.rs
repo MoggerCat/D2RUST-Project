@@ -15,15 +15,22 @@
 
 pub mod bits;
 pub mod check;
+pub mod click;
 pub mod dispatch;
 pub mod drlg;
 pub mod intent;
 pub mod link;
 pub mod local;
 pub mod mirror;
+pub mod modes;
+#[cfg(test)]
+mod modes_tests;
 pub mod msg;
 pub mod objects;
 pub mod output;
+pub mod passive;
+#[cfg(test)]
+mod passive_tests;
 pub mod receive;
 pub mod skills;
 pub mod update;
@@ -65,6 +72,9 @@ pub enum BridgeError {
     /// A chunk 1.14d asserts on (spec §2 rule 4).
     #[error("S→C chunk refused: {0}")]
     Split(#[from] SplitError),
+    /// A world click the original asserts on (`ui/controls.md` §6).
+    #[error("world click: {0}")]
+    Click(dispatch::HandlerError),
 }
 
 /// One bridge frame (spec §8 rule 1).
@@ -241,6 +251,39 @@ impl<L: ServerLink> Bridge<L> {
         Ok(out.len())
     }
 
+    /// One world click (`ui/controls.md` §6 r1–r2, [`click`]): the
+    /// dispatcher against the model, its C→S messages sent at once
+    /// (`client/bridge.md` §4). Returns the outputs the UI layer applies
+    /// (sounds, hover calls, the pending record) and the interact
+    /// sender's outputs.
+    pub fn world_click(
+        &mut self,
+        st: &mut crate::controls::click::ClickState,
+        view: click::ClickView,
+        kind: crate::controls::click::Kind,
+        at: Option<(i32, i32)>,
+        mods: u32,
+    ) -> Result<(Vec<crate::controls::click::ClickOut>, Vec<output::Output>), BridgeError> {
+        let r = click::world_click(&mut self.world, &self.inputs, st, view, kind, at, mods)
+            .map_err(BridgeError::Click)?;
+        self.send_outgoing()?;
+        Ok(r)
+    }
+
+    /// The held repeat of a loop pass (`ui/controls.md` §6 r6), its
+    /// messages sent at once.
+    pub fn click_repeat(
+        &mut self,
+        st: &mut crate::controls::click::ClickState,
+        view: click::ClickView,
+        mods: u32,
+    ) -> Result<(Vec<crate::controls::click::ClickOut>, Vec<output::Output>), BridgeError> {
+        let r = click::held_repeat(&mut self.world, &self.inputs, st, view, mods)
+            .map_err(BridgeError::Click)?;
+        self.send_outgoing()?;
+        Ok(r)
+    }
+
     /// The UI layer's answer to an `NpcDialog` output (`msg-ui.md` §16
     /// r4.3; open question 10 decided as A, `bridge.md` §10 r6): the
     /// bridge applies the branch's model writes and C→S 0x31 in 1.14d
@@ -273,6 +316,7 @@ impl<L: ServerLink> Bridge<L> {
     pub fn set_unit_rows(&mut self, rows: world::UnitRows) {
         let t = &mut self.inputs.tables;
         t.monsters = rows.monsters;
+        t.monster_skill_bonus = rows.monster_skill_bonus;
         t.stats = rows.stats;
         t.objects = rows.objects;
         t.shrines = rows.shrines;
@@ -282,6 +326,11 @@ impl<L: ServerLink> Bridge<L> {
     /// §10 r4).
     pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
         self.inputs.wall_seconds = Some(f);
+    }
+
+    /// The skills tables of the passive refresh (`msg-skills.md` §2 r4).
+    pub fn set_skill_tables(&mut self, tables: std::sync::Arc<d2_sim::skills::SkillTables>) {
+        self.inputs.skill_tables = Some(tables);
     }
 
     /// The `skills` rows of the client skill list (`msg-skills.md`

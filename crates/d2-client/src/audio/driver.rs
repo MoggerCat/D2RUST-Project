@@ -23,6 +23,10 @@ use std::cell::RefCell;
 
 use crate::audio::sound_table::{SoundSystem, SoundWorld};
 use crate::audio::triggers::events::{player_event, server_event, EventExtra, Followup};
+use std::collections::BTreeMap;
+
+use crate::audio::triggers::objects::object_mode;
+use crate::audio::triggers::tables::ObjectSounds;
 use crate::audio::triggers::{ui, Ctx, Globals, TriggerError, Unit, UnitSound};
 use crate::audio::{CueSource, TriggerQueue};
 use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, MONSTER};
@@ -45,11 +49,6 @@ pub const PENDING: &[(&str, &str)] = &[
         "mode sounds, footsteps, idle voices (§4–§6)",
         "per-unit animation frame / speed, weapon hit class, states, monsounds rows and the \
          floor material under the unit are not in the client model",
-    ),
-    (
-        "object mode sounds (§7)",
-        "object mode changes are not reported by the bridge as events; distance needs the \
-         client unit positions per type (`sound-table.md` open question 2)",
     ),
     (
         "skills, missiles, states, items (§8, §9)",
@@ -90,8 +89,24 @@ pub enum SoundRequest {
         event: u16,
     },
     /// A player event sound `0x004CB9C0(unit, event)` (§3) the UI asked
-    /// for (S→C 0x77 code 9 on the local player, `client/msg-ui.md` §3).
+    /// for (S→C 0x77 code 9 on the local player, `client/msg-ui.md` §3),
+    /// or the client object code (`client/model.md` §8 rule 7).
     PlayerEvent { unit: UnitKey, event: u16 },
+    /// The object mode sound call `0x004CB460(U)` (§7) of an
+    /// `ObjectSound::Mode` output: U's key (`client_only`: in set C), its
+    /// class, mode and path distance to P at the call
+    /// (`audio/triggers-2.md` §20).
+    ObjectMode {
+        unit: UnitKey,
+        client_only: bool,
+        class: u32,
+        mode: u32,
+        local_dist: i32,
+    },
+    /// A sound request `0x004B9A00(id, U, 0, 0, 0)` (§1 r1): the client
+    /// object functions (`world/objects-client.md` §26.18) and the shrine
+    /// sound of 0x4D (`client/model.md` §15 rule 4 step 4).
+    UnitRequest { id: i32, unit: UnitKey },
 }
 
 /// A rule part the driver skipped (its input is not held), named.
@@ -203,6 +218,11 @@ pub struct SoundDriver {
     last_server_tick: Option<u64>,
     /// Rule parts skipped since the last [`SoundDriver::take_skipped`].
     skipped: Vec<&'static str>,
+    /// The per-unit sound fields +0x70 … +0x88 (`client/model.md` §18
+    /// rule 1: zero at creation, written only by the audio rules), by
+    /// (unit, in set C); a unit gone from the model drops its fields
+    /// (§18 rule 2, the unit free).
+    unit_sounds: BTreeMap<(UnitKey, bool), UnitSound>,
 }
 
 impl SoundDriver {
@@ -214,6 +234,7 @@ impl SoundDriver {
             cues: TriggerQueue::new(),
             last_server_tick: None,
             skipped: Vec::new(),
+            unit_sounds: BTreeMap::new(),
         }
     }
 
@@ -244,6 +265,13 @@ impl SoundDriver {
             None => 1,
             Some(last) => now.saturating_sub(last),
         };
+        self.unit_sounds.retain(|&(k, c), _| {
+            if c {
+                world.objclient.set_c.contains_key(&k)
+            } else {
+                world.units.contains_key(&k)
+            }
+        });
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
         if !requests.is_empty() {
             // C: one client update per server tick (§1 r5).
@@ -251,7 +279,7 @@ impl SoundDriver {
             let mut ctx = self.system.with(&mut sw);
             let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
             for r in requests {
-                request(&mut cx, world, r, &mut self.skipped)?;
+                request(&mut cx, world, r, &mut self.unit_sounds, &mut self.skipped)?;
             }
         }
         for _ in 0..ticks {
@@ -306,10 +334,27 @@ fn request(
     cx: &mut Ctx,
     world: &ClientWorld,
     r: &SoundRequest,
+    unit_sounds: &mut BTreeMap<(UnitKey, bool), UnitSound>,
     skipped: &mut Vec<&'static str>,
 ) -> Result<(), DriverError> {
     match *r {
         SoundRequest::Ui(id) => ui::ui_sound(cx, id),
+        SoundRequest::ObjectMode {
+            unit,
+            client_only,
+            class,
+            mode,
+            local_dist,
+        } => {
+            let mut u = Unit::new(unit, class as i32);
+            u.mode = u8::try_from(mode).unwrap_or(u8::MAX);
+            u.local_dist = local_dist;
+            let us = unit_sounds.entry((unit, client_only)).or_default();
+            object_mode(cx, ObjectSounds::spec(), &u, us)?;
+        }
+        SoundRequest::UnitRequest { id, unit } => {
+            cx.unit_request(id, unit);
+        }
         SoundRequest::Server { unit, class, event } => {
             let u = event_unit(world, unit, class);
             let skip = match event {
@@ -531,7 +576,7 @@ mod tests {
         assert!(sw.asked.borrow().is_empty());
         assert!(!sw.blocked(key) && !sw.indoors() && sw.client_seed().is_none());
         assert_eq!(sw.asked.borrow().len(), 3);
-        assert!(PENDING.len() >= 7);
+        assert!(PENDING.len() >= 6);
     }
 
     // Covers: specs/audio/sound-table.md §6.4 r2; specs/audio/environment.md §1 r2

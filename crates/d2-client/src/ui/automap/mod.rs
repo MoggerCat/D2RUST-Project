@@ -19,9 +19,12 @@ pub mod options;
 pub mod persist;
 pub mod picker;
 pub mod place;
+pub mod session;
 pub mod town;
 pub mod view;
 
+#[cfg(test)]
+mod session_tests;
 #[cfg(test)]
 mod tests;
 

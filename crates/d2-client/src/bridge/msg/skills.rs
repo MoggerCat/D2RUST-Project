@@ -8,6 +8,7 @@
 
 use super::super::dispatch::{HandlerError, Message};
 use super::super::output::{Output, SkillTarget};
+use super::super::passive;
 use super::super::skills::{self, Owner, SkillEntry, SkillError, SkillList, NATIVE};
 use super::super::world::{ClientWorld, SkillDescRow, SkillRow, UnitKey, PLAYER};
 use super::states::state_bit_off;
@@ -18,10 +19,6 @@ impl From<SkillError> for HandlerError {
     fn from(e: SkillError) -> Self {
         match e {
             SkillError::BadSkill(_) => HandlerError::Fatal(0x668),
-            SkillError::PassiveState { .. } => HandlerError::Unspecified(
-                "client/msg-skills.md §2 r4, client/stat-lists.md §1 r2: a passive state needs \
-                 the client state bits and stat list",
-            ),
             SkillError::Dangling => {
                 HandlerError::Invalid("skill list: a hand references the removed entry")
             }
@@ -54,24 +51,28 @@ pub fn base_skill_levels(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), H
         return Err(HandlerError::Invalid("0x94 is 6 + 3 n bytes"));
     }
     let key = UnitKey::new(PLAYER, b.u32(2)?);
-    let Some((owner, list)) = unit_list(w, key) else {
-        return Ok(());
-    };
-    let Some(list) = list else {
-        return Ok(());
-    };
-    // Every entry is assigned; the first pending part is reported after
-    // the loop, as the original runs them all.
-    let mut first = Ok(());
+    match unit_list(w, key) {
+        Some((_, Some(_))) => {}
+        _ => return Ok(()),
+    }
+    // Every entry is assigned (with its passive-state parts, §2 r4); the
+    // first error is reported after the loop, as the original runs them
+    // all.
+    let mut first: Result<(), HandlerError> = Ok(());
     for i in 0..n {
         let at = 6 + 3 * i;
         let (skill, level) = (b.u16(at)?, b.u8(at + 2)?);
-        let r = skills::assign(list, rows(msg), owner, skill, i32::from(level), false);
+        let (owner, list) = unit_list(w, key).expect("checked above");
+        let list = list.expect("checked above");
+        let r = skills::assign(list, rows(msg), owner, skill, i32::from(level), false)
+            .map_err(HandlerError::from);
+        let fx = std::mem::take(&mut list.fx);
+        let r = r.and(passive::apply(w, msg.inputs, key, fx));
         if first.is_ok() {
             first = r;
         }
     }
-    Ok(first?)
+    first
 }
 
 /// 0x21 UpdateItemOSkill (§4): unit type u8@1, remove u8@2, GUID u32@3,
@@ -88,12 +89,17 @@ pub fn update_item_oskill(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), 
         return Ok(());
     };
     let result = match list {
-        Some(list) => skills::assign(list, rows(msg), owner, skill, i32::from(level), remove),
+        Some(list) => {
+            let r = skills::assign(list, rows(msg), owner, skill, i32::from(level), remove)
+                .map_err(HandlerError::from);
+            let fx = std::mem::take(&mut list.fx);
+            r.and(passive::apply(w, msg.inputs, key, fx))
+        }
         None => Ok(()),
     };
     // `0x004AA8F0` runs after the assign returns.
     w.skill_tree_flag = Some(0);
-    Ok(result?)
+    result
 }
 
 /// 0x22 UpdateItemSkill (§5): flag u8@11 ≠ 0 → nothing; else the player
@@ -185,7 +191,7 @@ fn bonus_level(
 /// `skill_level(unit, entry, 1)` (`0x006442A0`, `skills/levels.md` §1)
 /// clamped to `0 ≤ L ≤ cap` (§1 r3): cap = `experience.txt` `MaxLvl`,
 /// Amazon column (99 in 1.14d, [`LEVEL_CAP_114D`]).
-fn level_with_bonuses(
+pub(crate) fn level_with_bonuses(
     w: &ClientWorld,
     key: UnitKey,
     rows: &[SkillRow],
@@ -222,7 +228,7 @@ pub fn skill_bonus(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     }
     let t = &msg.inputs.tables;
     let (rows, desc) = (&t.skills[..], &t.skilldesc[..]);
-    let mut first = Ok(());
+    let mut first: Result<(), HandlerError> = Ok(());
     let mut i = 0;
     while let Some(e) = w.units[&key]
         .skills
@@ -249,7 +255,10 @@ pub fn skill_bonus(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         let now = list.entries[i];
         if level_with_bonuses(w, key, rows, desc, &now) == 0 {
             let list = w.units.get_mut(&key).and_then(|u| u.skills.as_mut());
-            let r = skills::remove(list.expect("checked above"), rows, e.skill);
+            let list = list.expect("checked above");
+            let r = skills::remove(list, rows, e.skill).map_err(HandlerError::from);
+            let fx = std::mem::take(&mut list.fx);
+            let r = r.and(passive::apply(w, msg.inputs, key, fx));
             if first.is_ok() {
                 first = r;
             }
@@ -258,20 +267,9 @@ pub fn skill_bonus(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         i += 1;
     }
     // Rule 4: `0x00646F20`, the passive skills the unit has whose state
-    // is on are refreshed (`§2` rule 4: pending in the model).
-    let u = &w.units[&key];
-    for (s, r) in rows.iter().enumerate() {
-        let has = u.skills.as_ref().is_some_and(|l| {
-            l.entries
-                .iter()
-                .any(|e| usize::from(e.skill) == s && !e.has_charges)
-        });
-        let state = r.passivestate as i16;
-        if state > 0 && has && u.states.contains(&(state as u8)) && first.is_ok() {
-            first = skills::refresh(rows, s as u16);
-        }
-    }
-    Ok(first?)
+    // is on are refreshed.
+    let r = passive::refresh_all(w, msg.inputs, key);
+    first.and(r)
 }
 
 /// 0x99 (§7 r1): unit type u8@1, GUID u32@2, skill u16@6, level u8@8,

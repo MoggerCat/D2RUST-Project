@@ -205,6 +205,13 @@ impl<'a> Ctx<'a> {
         self.s.request(id, unit, delay, 0, 0)
     }
 
+    /// request(id, U, 0, 0, 0) (§1 r1) on behalf of a model rule outside
+    /// the trigger functions (`0x004B9A00` from the client object code and
+    /// the shrine sound, `client/model.md` §15 rule 4).
+    pub fn unit_request(&mut self, id: i32, unit: UnitKey) -> Handle {
+        self.req(id, Some(unit), 0)
+    }
+
     /// U+0x7C := C, `[0x007C88BC]` := C.
     fn voiced(&mut self, us: &mut UnitSound) {
         us.last_voice = self.c;

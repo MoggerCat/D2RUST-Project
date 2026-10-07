@@ -16,13 +16,14 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
+use super::super::modes::mode_request;
 use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
 use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
 use super::super::skills::SkillList;
 use super::super::world::{
-    ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
-    INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
+    ClientUnit, ClientWorld, KindData, MonsterData, MonsterSetup, ObjectData, PlayerData, UnitKey,
+    INIT_SEED, MONSTER, OBJECT, PLAYER,
 };
 use super::Bytes;
 
@@ -202,16 +203,27 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
         if u.position.is_none() {
             u.seed = Some((0, INIT_SEED.1));
         }
-        // Rule 6.4: the mode argument is the 4-bit mode. The rest of the
-        // set-up `0x004AE8D0` (rule 6: table stats, path, the frame and
-        // direction draws on the unit seed, unit flags, light, skills
-        // from the `monstats` Skill columns) reads `monstats` columns
-        // and animation data the client tables do not hold: not run
-        // (`docs/handoff/impl-triage-client.md`).
+        // Rule 6: the monster set-up `0x004AE8D0`.
+        let setup = class_row.and_then(|c| c.setup);
+        if let Some(s) = &setup {
+            setup_stats(u, s, w.difficulty, w.expansion != 0);
+        }
+        // Rule 6.4: the mode argument is the 4-bit mode.
         u.mode = mode;
+        // Rules 6.5 and 6.9 (the frame draw on the unit seed with range
+        // +0x48 and the direction draw) need the mode's animation frame
+        // count and `0x0046C140`, which the client tables do not hold:
+        // not run (`docs/handoff/impl-c-client.md` §4).
+        if let Some(s) = &setup {
+            setup_flags(u, s);
+        }
         // Rule 6.7: `+0xA8` := a skill list (`0x006438B0(0)`).
         u.skills = Some(SkillList::default());
         u.kind = KindData::Monster(Box::new(data));
+        if let Some(s) = &setup {
+            let bonus = tables.monster_skill_bonus[usize::from(w.difficulty.min(2))];
+            setup_skills(u, s, &tables.skills, bonus)?;
+        }
         created = Some(c);
     }
     // Rule 3 on U (the new unit, or the re-initialised hireling).
@@ -285,11 +297,77 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             apply3(&mut c.unit);
             apply4(&mut c.unit);
             c.add(w);
+            // Rule 6.8's assigns owe the passive-state parts of a passive
+            // skill (`msg-skills.md` §2 r4), applied on the added unit.
+            let fx = w
+                .units
+                .get_mut(&key)
+                .and_then(|u| u.skills.as_mut())
+                .map(|l| std::mem::take(&mut l.fx))
+                .unwrap_or_default();
+            super::super::passive::apply(w, msg.inputs, key, fx)?;
         }
         None => {
             let u = w.units.get_mut(&key).expect("checked above");
             apply3(u);
             apply4(u);
+        }
+    }
+    Ok(())
+}
+
+/// Rule 6.1 (`0x004AE8D0` first part): the base stats of the set-up, `d`
+/// = the difficulty; the classic scaling `0x0063EEF0`
+/// (`monsters/init.md` §13) in a classic game with d > 0 and `Align` ≠ 1
+/// gives level += 25·d (maxhp, armor and experience are not in the
+/// model; rule 3 overwrites 6 and 7).
+fn setup_stats(u: &mut ClientUnit, s: &MonsterSetup, difficulty: u8, expansion: bool) {
+    let d = usize::from(difficulty.min(2));
+    let mut level = i32::from(s.level[d]);
+    if !expansion && d > 0 && s.align != 1 {
+        level += 25 * d as i32;
+    }
+    u.stats.insert(12, level);
+    u.stats.insert(68, 100);
+    u.stats.insert(67, 75);
+    u.stats.insert(69, 100);
+    for (stat, res) in [36u16, 37, 39, 41, 43, 45].into_iter().zip(s.res) {
+        u.stats.insert(stat, i32::from(res[d] as i16));
+    }
+    u.stats.insert(7, 0x6400);
+    u.stats.insert(6, 0x6400);
+}
+
+/// Rule 6.6: the unit flags from `monstats2`: 0x2 := `isSel`, 0x20 :=
+/// not `shadow` (no model field: the shadow is render state), 0x8 set
+/// (render), 0x4 := `isAtt`.
+fn setup_flags(u: &mut ClientUnit, s: &MonsterSetup) {
+    u.flag_2 = Some(s.is_sel);
+    u.flag_4 = s.is_att;
+}
+
+/// Rule 6.8: `Skill`i ≥ 0 with level byte > 0 → assign at level byte +
+/// the act level bonus (`0x00647280`), the entry's mode := `Sk`i`mode`
+/// (`0x00644340`).
+fn setup_skills(
+    u: &mut ClientUnit,
+    s: &MonsterSetup,
+    rows: &[super::super::world::SkillRow],
+    bonus: i32,
+) -> Result<(), HandlerError> {
+    let owner = super::super::skills::Owner {
+        unit_type: MONSTER,
+        class: u.class,
+    };
+    let list = u.skills.get_or_insert_with(SkillList::default);
+    for (skill, lvl, mode) in s.skills {
+        if skill < 0 || lvl == 0 {
+            continue;
+        }
+        let skill = skill as u16;
+        super::super::skills::assign(list, rows, owner, skill, i32::from(lvl) + bonus, false)?;
+        if let Some(i) = list.native(skill) {
+            list.entries[i].mode = u32::from(mode);
         }
     }
     Ok(())
@@ -600,7 +678,7 @@ pub fn queued(w: &mut ClientWorld, msg: &UnitMessage<'_>) -> Result<(), HandlerE
     for (slot, f) in record.iter_mut().zip(row.record) {
         *slot = read(&b, f)?;
     }
-    mode_request(w, msg.unit, code, record);
+    mode_request(w, msg.inputs, msg.unit, code, record, msg.out)?;
     // Player code 0x02 (model §8 rule 4): the interact sender
     // `0x00480930(r0 & 0xFFFF, r1)` (§8 rule 7).
     if msg.unit.unit_type == PLAYER && code == CODE_INTERACT && w.units.contains_key(&msg.unit) {
@@ -750,18 +828,6 @@ fn shrine_on_use(
         msg.out.push(Output::ShrineSound { sound, player });
     }
     Ok(())
-}
-
-/// The mode request `0x00480C10` (model §8): stored on the unit until the
-/// mode machines are specified (open question 1). A missile's request
-/// does nothing in 1.14d; it is not stored.
-fn mode_request(w: &mut ClientWorld, key: UnitKey, code: u8, record: [i32; 7]) {
-    if key.unit_type == MISSILE {
-        return;
-    }
-    if let Some(u) = w.units.get_mut(&key) {
-        u.last_mode_request = Some(ModeRequest { code, record });
-    }
 }
 
 /// 0x6E–0x72 (§4 rule 4): a bare `ret`.

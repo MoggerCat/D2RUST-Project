@@ -56,7 +56,7 @@ use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
-use super::ui_bind::{run_ui_with, UiQueue, UiRules};
+use super::ui_bind::{run_ui_with, world_clicks, UiQueue, UiRules};
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
 
@@ -86,6 +86,11 @@ pub struct WorldViewState {
     pub cycle: FrameCycle,
     /// Counts of the last frame, for logs and tests.
     pub last: Option<FrameStats>,
+    /// The world-click globals (`ui/controls.md` §6).
+    pub click: crate::controls::click::ClickState,
+    /// The game's automap (`ui/automap.md`), when the app supplied its
+    /// tables; `None`: no automap.
+    pub automap: Option<crate::ui::automap::session::AutomapSession>,
 }
 
 impl WorldViewState {
@@ -101,6 +106,8 @@ impl WorldViewState {
             cycle: FrameCycle::new(VIEW.width, VIEW.height)
                 .expect("VIEW is taller than the uncleared band"),
             last: None,
+            click: Default::default(),
+            automap: None,
         }
     }
 }
@@ -309,12 +316,9 @@ pub fn deliver<L: ServerLink>(
             Ok(())
         },
         &mut |o| {
-            if let Output::ServerSound { unit, class, event } = *o {
-                requests
-                    .borrow_mut()
-                    .push(SoundRequest::Server { unit, class, event });
-            } else {
-                debug!("audio output {o:?}: no consumer yet");
+            match audio_request(o) {
+                Some(r) => requests.borrow_mut().push(r),
+                None => debug!("audio output {o:?}: no consumer yet"),
             }
             Ok(())
         },
@@ -326,6 +330,67 @@ pub fn deliver<L: ServerLink>(
         },
     )?;
     Ok(requests.into_inner())
+}
+
+/// The automap's frame facts (`ui/automap.md` §9): the d2rs frame, the
+/// open mode, the unit origin of the local player's camera.
+fn automap_facts(
+    world: &crate::bridge::world::ClientWorld,
+    open_mode: u8,
+) -> crate::ui::automap::FrameFacts {
+    use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
+    let at = world.local().map_or(Default::default(), |p| {
+        let (x, y) = p.cell();
+        moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
+    });
+    let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
+    let cam = Camera::new(FrameSize::D2RS, mode, at, (0, 0));
+    crate::ui::automap::FrameFacts {
+        width: FrameSize::D2RS.width,
+        height: FrameSize::D2RS.height,
+        open_mode,
+        mini_down: false,
+        unit_origin: cam.unit,
+    }
+}
+
+/// The sound request of an audio output (`client/bridge.md` §10 rule 5),
+/// in list order: S→C 0x2C events, the client object code's calls
+/// (`world/objects-client.md` §28 r3: mode sounds, requests, player
+/// event sounds) and the 0x4D shrine sound (`client/model.md` §15 rule
+/// 4 step 4: request(id, P)). `None`: no sound consumer for it.
+pub fn audio_request(o: &Output) -> Option<SoundRequest> {
+    use crate::bridge::objects::ObjSound;
+    Some(match o {
+        &Output::ServerSound { unit, class, event } => SoundRequest::Server { unit, class, event },
+        Output::ObjectSound(ObjSound::Mode {
+            unit,
+            class,
+            mode,
+            local_dist,
+        }) => SoundRequest::ObjectMode {
+            unit: unit.key,
+            client_only: unit.client_only,
+            class: *class,
+            mode: *mode,
+            local_dist: *local_dist,
+        },
+        Output::ObjectSound(ObjSound::Request { id, unit }) => SoundRequest::UnitRequest {
+            id: *id,
+            unit: unit.key,
+        },
+        &Output::ObjectSound(ObjSound::PlayerEvent { player, event }) => {
+            SoundRequest::PlayerEvent {
+                unit: player,
+                event: u16::from(event),
+            }
+        }
+        &Output::ShrineSound { sound, player } => SoundRequest::UnitRequest {
+            id: sound as i32,
+            unit: player,
+        },
+        _ => return None,
+    })
 }
 
 /// Creates the GPU path once, when the node exists.
@@ -462,6 +527,33 @@ fn world_view_frame(
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;
             }
+            let mouse = match ui.cursor {
+                Some(FramePos::Inside(p)) => (p.x, p.y),
+                _ => (0, 0),
+            };
+            let view = crate::bridge::click::ClickView {
+                size: crate::rules::camera::FrameSize::D2RS,
+                open_mode: ui.original.as_ref().map_or(0, |o| o.open_mode().get()),
+                // `[0x007A521C]` = H − 40 (`ui/automap.md` §9).
+                right_panel_bottom: crate::rules::camera::FrameSize::D2RS.play_height(),
+                // PROVISIONAL (ui/controls.md §6 r7; controls-0001):
+                // `0x00454970()` is not specified: the play area H − 40.
+                skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
+                mouse,
+                game_menu_open: false,
+            };
+            for o in world_clicks(&mut bridge.0, &mut state.click, view, &frame.unhandled)? {
+                debug!("world click: {o:?}");
+            }
+            // `ui/automap.md` §8 r2: the toggle command no panel took.
+            let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
+            if let Some(a) = state.automap.as_mut() {
+                for e in &frame.unhandled {
+                    if *e == UiEvent::Action(crate::ui::ActionId(toggle)) {
+                        a.toggle(&automap_facts(bridge.0.world(), view.open_mode));
+                    }
+                }
+            }
             Some(frame)
         }
         None => None,
@@ -474,6 +566,13 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     )?;
+    // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
+    // marked its records (from the frame `0x0044C7EB`).
+    if let Some(a) = state.automap.as_mut() {
+        let world = bridge.0.world();
+        let near = state.feed.near_rooms(world)?;
+        a.frame(world, near)?;
+    }
     // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
     // client's room lists.
     for (room, order) in state.feed.take_unit_orders() {

@@ -13,9 +13,11 @@
 //! in [`OriginalTextHooks`].
 
 use crate::assets::path::CanonicalPath;
+use crate::bridge::click::ClickView;
 use crate::bridge::link::ServerLink;
 use crate::bridge::{Bridge, BridgeError};
 use crate::composite::ComponentFrame;
+use crate::controls::click::{ClickOut, ClickState, Kind};
 use crate::frames::{FramePart, FrameSetKey};
 use crate::rules::placement::draw_position;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, MapId, MapTable, Rect, ShadeChain};
@@ -23,8 +25,8 @@ use crate::ui::original::{OriginalUi, OriginalUiError};
 use crate::ui::text::{TEXT_COLORS, TEXT_COLOR_MAP_OFFSET, TEXT_DRAW_MODE};
 use crate::ui::Routed;
 use crate::ui::{
-    font_info, layout_text, ImageRequest, OriginalText, StringLookup, TextRequest, TextRules,
-    TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
+    font_info, layout_text, ImageRequest, OriginalText, PointerButton, StringLookup, TextRequest,
+    TextRules, TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
 };
 
 use super::{Unspecified, ViewAssets, ViewError};
@@ -326,12 +328,9 @@ impl UiInput for UiQueue {
 /// What one UI frame did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UiFrame {
-    /// Events no panel took, in order. Each becomes a world-click
-    /// dispatch (`ui/controls.md` §6, §7 r5). TODO(spec: ui/controls.md
-    /// §6 — answered, not built): the dispatcher's action (§6 r5, r8–r11)
-    /// needs the client path compute (`0x00649970`) and collision maps,
-    /// which the client model does not hold; they are reported, never
-    /// acted on.
+    /// Events no panel took, in order. Left / right presses and releases
+    /// become world-click dispatches ([`world_clicks`], `ui/controls.md`
+    /// §6, §7 r5).
     pub unhandled: Vec<UiEvent>,
     /// Intents handed to the bridge this frame.
     pub sent: usize,
@@ -413,6 +412,50 @@ pub fn run_ui_with<L: ServerLink>(
         sent,
         draws,
     })
+}
+
+/// The world clicks of one loop pass (`ui/controls.md` §6 r1, r6; §7 r5):
+/// each left / right press or release no panel took becomes its click
+/// kind at the event position (left up at the current mouse), in event
+/// order; then the held repeat (kinds 1 and 4); then the per-pass latch
+/// is cleared (`0x00462920`). Returns what the UI layer applies (sounds,
+/// hover calls, the pending record).
+pub fn world_clicks<L: ServerLink>(
+    bridge: &mut Bridge<L>,
+    st: &mut ClickState,
+    view: ClickView,
+    unhandled: &[UiEvent],
+) -> Result<Vec<ClickOut>, BridgeError> {
+    let mut rest = Vec::new();
+    for e in unhandled {
+        let (kind, at) = match *e {
+            UiEvent::Press {
+                button: PointerButton::Left,
+                at,
+            } => (Kind::LeftDown, Some((at.x, at.y))),
+            UiEvent::Release {
+                button: PointerButton::Left,
+                ..
+            } => (Kind::LeftUp, None),
+            UiEvent::Press {
+                button: PointerButton::Right,
+                at,
+            } => (Kind::RightDown, Some((at.x, at.y))),
+            UiEvent::Release {
+                button: PointerButton::Right,
+                at,
+            } => (Kind::RightUp, Some((at.x, at.y))),
+            _ => continue,
+        };
+        // `mods`: the Stand Still / Run commands (§4.3 r1) are not bound
+        // to the d2rs input yet.
+        let (r, _) = bridge.world_click(st, view, kind, at, 0)?;
+        rest.extend(r);
+    }
+    let (r, _) = bridge.click_repeat(st, view, 0)?;
+    rest.extend(r);
+    st.end_pass();
+    Ok(rest)
 }
 
 #[cfg(test)]
