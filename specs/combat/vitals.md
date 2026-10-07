@@ -27,17 +27,17 @@
 | Inputs | 58–66 |
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
-|   1. Creation values | 73–95 |
-|   2. Spending stat points (message 0x3A) | 96–146 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 147–168 |
-|   4. Experience | 169–358 |
-|   5. Client vitals sync (`0x00548760`) | 359–495 |
-| Constants & data dependencies | 496–512 |
-| Randomness | 513–516 |
-| Edge cases & original bugs | 517–528 |
-| Test vectors | 529–549 |
-| Provenance | 550–576 |
-| Open questions | 577–613 |
+|   1. Creation values | 73–103 |
+|   2. Spending stat points (message 0x3A) | 104–156 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
+|   4. Experience | 179–368 |
+|   5. Client vitals sync (`0x00548760`) | 369–505 |
+| Constants & data dependencies | 506–522 |
+| Randomness | 523–526 |
+| Edge cases & original bugs | 527–538 |
+| Test vectors | 539–559 |
+| Provenance | 560–586 |
+| Open questions | 587–623 |
 <!-- /index -->
 
 ## Summary
@@ -87,11 +87,19 @@ the class's charstats record (none → nothing), set base stats:
 | 30 nextexp | `threshold(class, 1)` (§4.1) |
 | 68 attackrate, 67 velocitypercent, 69 other_animrate | 100 |
 
+The base sets run in the table's row order, left column first (0, 1, 2,
+3, 19, 20, 6, 7, 8, 9, 10, 11, 12, 30, 68, 67, 69; `0x00570728`–
+`0x0057080E`, 1.14d-confirmed).
+
 Then, if `act > 0` (and `act <` the table count 5 at `0x007326B4`,
 else index 0): raise experience to the target level of table
 `0x006E1520` {1, 15, 20, 26, 32} by index `act` (`0x0057EB10`, D2MOO
 `SUNITDMG_SetExperienceForTargetLevel`: add `threshold(class, target) −
 experience` if positive, through the add §4.5, which levels up).
+For a player: only when target > base level (stat 12); the call is
+`0x00611800(class, target)`, row target + 1 of §4.1, so the player ends
+at level target + 1 (16, 21, 27, 33), not at target (1.14d-confirmed,
+`0x0057EB34`–`0x0057EB7E`).
 
 ### 2. Spending stat points (message 0x3A)
 
@@ -111,8 +119,10 @@ splits it, `0x0054BD29`.)
 - any other id (4…15): fail.
 
 `gain_energy(unit, n)`: `statpts −= n`; `energy += n`; if `n > 0`: `mana
-+= (ManaPerMagic × n) << 6`; `maxmana += (ManaPerMagic × n) << 6`; if
-the unit's mana (unit getter) > its max mana: set mana = max mana.
++= (ManaPerMagic × n) << 6`; then, whatever `n`, `maxmana +=
+(ManaPerMagic × n) << 6`; if the unit's mana (unit getter) > its max
+mana: set base mana := the max mana total. The `n > 0` test guards the
+current-mana add only (1.14d-confirmed, `0x00570AD7`–`0x00570B25`).
 
 `gain_vitality(unit, n)`: `statpts −= n`; `vitality += n`; `maxhp +=
 (LifePerVitality × n) << 6`; if `n > 0`: `hitpoints += (LifePerVitality
