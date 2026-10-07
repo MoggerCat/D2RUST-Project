@@ -35,6 +35,7 @@ import time
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import record_rng as rr  # noqa: E402  (the shared Win32 debugger definitions)
+import autostart  # noqa: E402  (unattended start, input script)
 
 TOOL = "trace-recorder record_tick 0.2.0"
 FORMAT = "tick-raw-1"
@@ -101,6 +102,8 @@ EXPECT = {  # first bytes at each hook: refuses any other executable layout
 
 
 class TickRecorder:
+    auto = None  # autostart.AutoStart (unattended start, input script)
+
     def __init__(self, exe, args, out_path, seconds, snap_every, max_ticks):
         self.exe, self.args, self.out_path, self.seconds = exe, args, out_path, seconds
         self.snap_every, self.max_ticks = snap_every, max_ticks
@@ -410,6 +413,9 @@ class TickRecorder:
     def loop(self, deadline):
         ev = rr.DEBUG_EVENT()
         while not self.done:
+            if self.auto is not None and self.auto.poll(self):
+                self.notes.append("autostart: input script ended the recording")
+                return
             if time.perf_counter() > deadline:
                 self.notes.append(f"time limit {self.seconds}s reached")
                 return
@@ -478,11 +484,14 @@ def main():
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-tick.jsonl)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
+    autostart.add_options(ap)
     a = ap.parse_args()
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-tick.jsonl")
-    r = TickRecorder(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds,
+    r = TickRecorder(os.path.abspath(a.game), gargs, out, a.seconds,
                      a.snap_every, a.ticks)
+    r.auto = auto
     try:
         r.run()
     except KeyboardInterrupt:

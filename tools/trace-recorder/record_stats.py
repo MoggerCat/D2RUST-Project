@@ -30,6 +30,7 @@ import sys
 
 sys.dont_write_bytecode = True
 import record_tick as rt  # noqa: E402  (the shared tick recorder; not modified)
+import autostart  # noqa: E402  (unattended start, input script)
 
 TOOL = "trace-recorder record_stats 0.1.0"
 FORMAT = "stats-raw-1"
@@ -402,15 +403,18 @@ def main():
     ap.add_argument("--snap-monsters", type=int, default=24, help="monsters per snapshot (default 24)")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-stats.jsonl)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
+    autostart.add_options(ap)
     a = ap.parse_args()
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-stats.jsonl")
     # keep only the base recorder's tick and step hooks, add ours
     rt.EXPECT = {k: v for k, v in rt.EXPECT.items() if k == rt.TICK or k in rt.STEPS}
     rt.EXPECT.update(STATS_EXPECT)
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
-    r = StatsRecorder(os.path.abspath(a.game), a.game_args or ["-w", "-ns"], out, a.seconds, a.ticks,
+    r = StatsRecorder(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                       a.snap_every, a.snap_monsters)
+    r.auto = auto
     try:
         r.run()
     except KeyboardInterrupt:
