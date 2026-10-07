@@ -2293,3 +2293,523 @@ fn feral_rage_start_records_the_hit_in_param_one() {
         (0, 0, 0)
     );
 }
+
+// ---------------------------------------------------------------- §8
+
+/// A summon skill (record 1): class 1, mode 5, pet type 3, pet max 2,
+/// `calc2` = `c2`, a state 40 of length 100 and a missile row.
+fn summon_tabs(
+    edit: impl Fn(&mut d2_data::tables::Skills, &mut Code),
+) -> crate::skills::SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.summon = 1;
+    r.summode = 5;
+    r.pettype = 3;
+    r.petmax = c.f(2);
+    r.calc2 = c.f(20);
+    edit(&mut r, &mut c);
+    tabs(r, c, 1)
+}
+
+/// The player (unit 0, level 30, node slot 5) aiming at (30, 40).
+fn druid() -> (BodyFake, usize) {
+    let (mut f, u) = world();
+    f.c.set(u, 12, 30);
+    f.node.insert(u, 5);
+    f.tpos.insert(u, (30, 40));
+    (f, u)
+}
+
+fn has(log: &[String], s: String) -> bool {
+    log.contains(&s)
+}
+
+/// The monster the last summon made (the highest unit id).
+fn newest(f: &BodyFake) -> usize {
+    f.c.units.len() - 1
+}
+
+// Covers: specs/skills/bodies.md §8.1 text, §8.1 r1, §8.1 r2, §8.1 r3, §8.1 r4, §8.1 r5, §8.1 r6, §8.1 r7, §8.1 r8, §8.1 r9
+#[test]
+fn druid_summon_steps() {
+    let ct = ct3();
+    let t = summon_tabs(|_, _| {});
+    // r1: R invalid. r2: no summon class. r3: pet type outside the count
+    // (signed byte: 0xFF is −1).
+    let (mut f, u) = druid();
+    assert_eq!(dos2::druid_summon(&mut f, &t, &ct, u, 99, 1), 0);
+    let bad = |e: &dyn Fn(&mut d2_data::tables::Skills)| {
+        let mut t2 = t.clone();
+        e(&mut t2.skills[1]);
+        t2
+    };
+    let (mut f2, u2) = druid();
+    let t2 = bad(&|r| r.summon = 0xFFFF);
+    assert_eq!(dos2::druid_summon(&mut f2, &t2, &ct, u2, 1, 1), 0);
+    for pet in [15u8, 0xFF] {
+        let (mut f3, u3) = druid();
+        let t3 = bad(&|r| r.pettype = pet);
+        assert_eq!(
+            dos2::druid_summon(&mut f3, &t3, &ct, u3, 1, 1),
+            0,
+            "pet {pet}"
+        );
+        assert_eq!(f3.c.units[u3].flags & 0x40, 0, "r4 comes after r3");
+    }
+    // r4–r5: the flag is set; the target position failing → 0.
+    let (mut f4, u4) = druid();
+    f4.tpos.remove(&u4);
+    assert_eq!(dos2::druid_summon(&mut f4, &t, &ct, u4, 1, 1), 0);
+    assert_eq!(f4.c.units[u4].flags & 0x40, 0x40);
+    // r6: the spawn failing → 0.
+    f.no_monsters = true;
+    assert_eq!(dos2::druid_summon(&mut f, &t, &ct, u, 1, 1), 0);
+    f.no_monsters = false;
+    // r6–r9: a pet of class 1 at the owner's target point (flags 0: no
+    // position given), pet type 3 / max 2, then the node insert, base
+    // stats with p = max(calc2, 1) and the skill stats.
+    f.take_log();
+    assert_eq!(dos2::druid_summon(&mut f, &t, &ct, u, 1, 3), 1);
+    let m = newest(&f);
+    assert_eq!((f.c.units[m].class, f.pos[&m]), (1, (30, 40)));
+    let log = f.take_log();
+    let at = |s: String| {
+        log.iter()
+            .position(|l| *l == s)
+            .unwrap_or_else(|| panic!("{s}"))
+    };
+    let pet = at(format!("PetAdd {{ owner: {u}, pet: {m}, t: 3, max: 2 }}"));
+    let node = at(format!("NodeInsert {{ m: {m}, slot: 5 }}"));
+    let eq = log.iter().position(|l| l.starts_with("Equipment")).unwrap();
+    assert!(pet < node && node < eq);
+    assert_eq!(f.c.get(m, 12), 20, "calc2 = 20 is the base level p");
+    // calc2 ≤ 0 → p = 1.
+    let mut c = Code::new();
+    let t0 = {
+        let mut r = t.skills[1].clone();
+        r.calc2 = c.f(-4);
+        r.petmax = c.f(2);
+        tabs(r, c, 1)
+    };
+    let (mut f, u) = druid();
+    dos2::druid_summon(&mut f, &t0, &ct, u, 1, 3);
+    assert_eq!(f.c.get(newest(&f), 12), 1);
+}
+
+// Covers: specs/skills/bodies.md §8.3 text, §8.3 r1, §8.3 r2, §8.3 r3, §8.3 r4
+#[test]
+fn sentry_do_flag_target_point_and_result() {
+    let ct = ct3();
+    let t = summon_tabs(|r, _| r.intown = true);
+    let (mut f, u) = druid();
+    assert_eq!(dos2::sentry_do(&mut f, &t, &ct, u, 99, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0, "r1 before r2");
+    // r3: no target position → 0 (flag set).
+    f.tpos.remove(&u);
+    assert_eq!(dos2::sentry_do(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r4: 1 when the sentry made a unit, at the target point.
+    f.tpos.insert(u, (30, 40));
+    assert_eq!(dos2::sentry_do(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.pos[&newest(&f)], (30, 40));
+    f.no_monsters = true;
+    assert_eq!(dos2::sentry_do(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies.md §8.4 text, §8.4 r1, §8.4 r2, §8.4 r3, §8.4 r4, §8.4 r5
+#[test]
+fn nova_attack_ring_velocity() {
+    let mut t = summon_tabs(|r, c| {
+        r.calc1 = c.f(5);
+        r.srvmissilea = 0;
+    });
+    t.missiles[0].vel = 10;
+    t.missiles[0].vellev = 3;
+    let (mut f, u) = druid();
+    // r1: the flag is set first; r2: R invalid → 0.
+    assert_eq!(dos2::nova(&mut f, &t, u, 99, 9), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r3: no missile (srvmissilea = none) → 0.
+    let mut t2 = t.clone();
+    t2.skills[1].srvmissilea = 0xFFFF;
+    assert_eq!(dos2::nova(&mut f, &t2, u, 1, 9), 0);
+    assert!(f.missiles.is_empty());
+    // r4–r5: v = Vel + VelLev·L / 8 + calc1 = 10 + 27/8 + 5 = 18; the
+    // ring of 64 missiles carries flag 4 and the velocity.
+    assert_eq!(dos2::nova(&mut f, &t, u, 1, 9), 1);
+    assert_eq!(f.missiles.len(), 64);
+    assert!(f.missiles.iter().all(|m| m.flags == 7 && m.velocity == 18));
+}
+
+// Covers: specs/skills/bodies.md §8.7 r1, §8.7 r2, §8.7 r3, §8.7 r4, §8.7 r5, §8.7 r6, §8.7 r7, §8.7 r8, §8.7 r9
+#[test]
+fn vines_summon_in_mode_8_with_the_vine_state() {
+    let ct = ct3();
+    let t = summon_tabs(|_, _| {});
+    let (mut f, u) = druid();
+    assert_eq!(dos2::vines(&mut f, &t, &ct, u, 99, 1), 0);
+    let mut t2 = t.clone();
+    t2.skills[1].summon = 0xFFFF;
+    assert_eq!(dos2::vines(&mut f, &t2, &ct, u, 1, 1), 0);
+    let mut t3 = t.clone();
+    t3.skills[1].pettype = 15;
+    assert_eq!(dos2::vines(&mut f, &t3, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0, "r4 after r2 and r3");
+    f.no_monsters = true;
+    assert_eq!(dos2::vines(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40, "r4");
+    f.no_monsters = false;
+    f.take_log();
+    assert_eq!(dos2::vines(&mut f, &t, &ct, u, 1, 1), 1);
+    let m = newest(&f);
+    let log = f.take_log();
+    // r5: the mode is 8 whatever `summode` says (5 here).
+    assert!(
+        has(&log, "monster 1 (30, 40) 1 8 -1".to_string()),
+        "{log:?}"
+    );
+    // r6: node insert; r7: state 150 on m.
+    assert!(has(&log, format!("NodeInsert {{ m: {m}, slot: 5 }}")));
+    assert!(f.has_state(m, 150));
+    // r8: level := max(calc2, 1) with no monlvl bonuses; r9: skill stats.
+    assert_eq!(f.c.get(m, 12), 20);
+    assert!(log.iter().any(|l| l.starts_with("Equipment")));
+    assert_eq!(f.c.get(m, 31), 0, "no base_stats AC");
+    let mut c = Code::new();
+    let mut r = t.skills[1].clone();
+    r.calc2 = c.f(0);
+    r.petmax = c.f(2);
+    let t0 = tabs(r, c, 1);
+    let (mut f, u) = druid();
+    dos2::vines(&mut f, &t0, &ct, u, 1, 1);
+    assert_eq!(f.c.get(newest(&f), 12), 1);
+}
+
+// Covers: specs/skills/bodies.md §8.9 r1, §8.9 r2, §8.9 r3, §8.9 r4, §8.9 r5, §8.9 r6, §8.9 r7, §8.9 r8
+#[test]
+fn golem_summon_steps() {
+    let ct = ct3();
+    let t = summon_tabs(|_, _| {});
+    // r2: skill 0 → 0, after the flag (r1).
+    let (mut f, u) = druid();
+    assert_eq!(dos2::golem(&mut f, &t, &ct, u, 0, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r2: an out-of-range skill is refused too.
+    assert_eq!(dos2::golem(&mut f, &t, &ct, u, 99, 1), 0);
+    // r3: class outside 0…count − 1; no summon_class fallback.
+    f.spawn_class = Some(1);
+    let mut t2 = t.clone();
+    t2.skills[1].summon = 2;
+    assert_eq!(dos2::golem(&mut f, &t2, &ct, u, 1, 1), 0);
+    t2.skills[1].summon = 0xFFFF;
+    assert_eq!(dos2::golem(&mut f, &t2, &ct, u, 1, 1), 0);
+    // r5: the spawn failing → 0.
+    f.no_monsters = true;
+    assert_eq!(dos2::golem(&mut f, &t, &ct, u, 1, 1), 0);
+    f.no_monsters = false;
+    // r4–r8.
+    f.c.set(u, 349, 25);
+    f.take_log();
+    assert_eq!(dos2::golem(&mut f, &t, &ct, u, 1, 4), 1);
+    let m = newest(&f);
+    let log = f.take_log();
+    let at = |s: &str| {
+        log.iter()
+            .position(|l| l.starts_with(s))
+            .unwrap_or(usize::MAX)
+    };
+    assert!(has(
+        &log,
+        format!("PetAdd {{ owner: {u}, pet: {m}, t: 3, max: 2 }}")
+    ));
+    // r6: golem_stats (base level 4 + 22 = 26, the skill stats, the
+    // summon resistance list), r7: the ally message, r8: the node insert.
+    assert_eq!(f.c.get(m, 12), 26);
+    assert!(f.lists.iter().any(|l| l.stats.get(&45) == Some(&25)));
+    assert!(has(&log, format!("AllyInfo {{ u: {u}, m: {m} }}")));
+    assert!(at("Equipment") < at("AllyInfo") && at("AllyInfo") < at("NodeInsert"));
+    assert!(has(&log, format!("NodeInsert {{ m: {m}, slot: 5 }}")));
+    // r4: pet type unsigned: ≥ count → 0 (signed −1 would also be ≥); a
+    // mode ≥ 16 → 1.
+    let mut t3 = t.clone();
+    t3.skills[1].pettype = 0xFF;
+    t3.skills[1].summode = 16;
+    f.take_log();
+    dos2::golem(&mut f, &t3, &ct, u, 1, 4);
+    let log = f.take_log();
+    let m = newest(&f);
+    assert!(has(
+        &log,
+        format!("PetAdd {{ owner: {u}, pet: {m}, t: 0, max: 2 }}")
+    ));
+    assert!(
+        has(&log, "monster 1 (30, 40) 1 1 -1".to_string()),
+        "{log:?}"
+    );
+}
+
+/// A formula giving the skill level the evaluation runs at (parameter 16).
+fn level_formula(c: &mut Code) -> u32 {
+    let at = c.0.len() as u32;
+    c.0.extend([0x04, 16, 0x00]);
+    at
+}
+
+// Covers: specs/skills/bodies.md §8.16
+#[test]
+fn inferno_cast_checks_the_missile_then_runs_inferno_do() {
+    let ct = ct3();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.srvmissilea = 0;
+    r.calc1 = c.f(5);
+    let t = tabs(r, c, 1);
+    let (mut f, u) = world();
+    f.tpos.insert(u, (5, 5));
+    assert_eq!(
+        dos2::inferno_cast(&mut f, &t, &ct, u, 99, 1),
+        0,
+        "R invalid"
+    );
+    let mut t2 = t.clone();
+    t2.skills[1].srvmissilea = 3;
+    assert_eq!(
+        dos2::inferno_cast(&mut f, &t2, &ct, u, 1, 1),
+        0,
+        "m out of range"
+    );
+    t2.skills[1].srvmissilea = 0xFFFF;
+    assert_eq!(dos2::inferno_cast(&mut f, &t2, &ct, u, 1, 1), 0, "m = −1");
+    assert!(f.missiles.is_empty());
+    // The first call after a fresh start (param 1 = 0) creates nothing,
+    // the next one a missile of class 0 with range max(calc1, 1).
+    assert_eq!(dos2::inferno_cast(&mut f, &t, &ct, u, 1, 1), 1);
+    assert!(f.missiles.is_empty());
+    assert_eq!(dos2::inferno_cast(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!((f.missiles[0].class, f.missiles[0].range), (0, 5));
+}
+
+fn blaze_tabs(edit: impl Fn(&mut d2_data::tables::Skills)) -> crate::skills::SkillTables {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 40;
+    r.aurastat1 = 26;
+    r.aurastatcalc1 = c.f(3);
+    r.auralencalc = c.f(100);
+    r.passivestat1 = 30;
+    r.passivecalc1 = c.f(7);
+    r.auraevent1 = 5;
+    r.auraeventfunc1 = 3;
+    edit(&mut r);
+    tabs(r, c, 1)
+}
+
+// Covers: specs/skills/bodies.md §8.17 text, §8.17 r1, §8.17 r2, §8.17 r3, §8.17 r4
+#[test]
+fn blaze_buff_without_flag_or_group_removal() {
+    let ct = ct3();
+    let t = blaze_tabs(|_| {});
+    let (mut f, u) = world();
+    // r1: R invalid, aurastat1 outside −1…count − 1, aurastate invalid.
+    assert_eq!(dos2::blaze(&mut f, &t, &ct, u, 99, 1), 0);
+    for (a1, st) in [(0xFFFEu16, 40u16), (359, 40), (26, 0xFFFF), (26, 200)] {
+        let mut t2 = t.clone();
+        t2.skills[1].aurastat1 = a1;
+        t2.skills[1].aurastate = st;
+        assert_eq!(dos2::blaze(&mut f, &t2, &ct, u, 1, 1), 0, "{a1} {st}");
+    }
+    assert!(f.lists.is_empty());
+    // r2–r4. aurastat1 = −1 is valid; no same-group removal; no 0x40.
+    let mut t3 = t.clone();
+    t3.skills[1].aurastat1 = 0xFFFF;
+    f.state_groups.insert(40, 9);
+    f.state_groups.insert(41, 9);
+    f.c.units[u].states.push(41);
+    f.c.frame = 10;
+    f.take_log();
+    assert_eq!(dos2::blaze(&mut f, &t3, &ct, u, 1, 3), 1);
+    let l = f.list_of(u, 40).expect("list").clone();
+    assert_eq!(
+        (l.flags & 2, l.expire, l.callback),
+        (2, 110, callback::DEFAULT)
+    );
+    // passive_fill, 350 / 351; the aura stat is not filled.
+    assert_eq!(l.stats.get(&30), Some(&7));
+    assert_eq!((l.stats.get(&350), l.stats.get(&351)), (Some(&1), Some(&3)));
+    assert!(!l.stats.contains_key(&26));
+    assert!(f.has_state(u, 41), "no group removal");
+    assert_eq!(f.c.units[u].flags & 0x40, 0);
+    // r4: unregister (1, state) then the events.
+    let log = f.take_log();
+    assert!(has(&log, format!("unhandle {u} 1 40")));
+    assert!(has(&log, format!("handler {u} 5 3 40")));
+    // apply_state refusing (a curse state with full resistance) → 0.
+    let (mut f, u) = world();
+    f.state_flags.insert((40, group::CURSE));
+    f.c.set(u, 109, 100);
+    assert_eq!(dos2::blaze(&mut f, &t, &ct, u, 1, 1), 0);
+}
+
+// Covers: specs/skills/bodies.md §8.18 r1, §8.18 r2, §8.18 r3, §8.18 r4, §8.18 r5, §8.18 r6, §8.18 r7, §8.18 r8
+#[test]
+fn feral_rage_do_charges_up_to_calc2() {
+    let ct = ct3();
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.aurastate = 40;
+    r.auralencalc = c.f(50);
+    r.calc2 = c.f(2);
+    r.aurastat1 = 26;
+    r.aurastatcalc1 = level_formula(&mut c);
+    let t = tabs(r, c, 1);
+    let (mut f, u, m) = duel();
+    // r1: R invalid, aurastate invalid, no used entry / another skill.
+    assert_eq!(dos2::feral_rage(&mut f, &t, &ct, u, 99, 1), 0);
+    let mut t2 = t.clone();
+    t2.skills[1].aurastate = 0xFFFF;
+    assert_eq!(dos2::feral_rage(&mut f, &t2, &ct, u, 1, 1), 0);
+    f.c.units[u].used = Some(SkillEntry {
+        skill: 0,
+        ..f.c.units[u].used.unwrap()
+    });
+    assert_eq!(dos2::feral_rage(&mut f, &t, &ct, u, 1, 1), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0, "r2 comes after r1");
+    let skill1 = SkillEntry {
+        skill: 1,
+        base: 1,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    };
+    f.c.units[u].used = Some(skill1);
+    // r2–r4: the flag, the melee on the target, the start missed → 1.
+    f.c.set(m, 6, 100_000);
+    hit_entry(&mut f, u, m, 1);
+    assert_eq!(dos2::feral_rage(&mut f, &t, &ct, u, 1, 1), 1);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    assert!(f.c.units[u].combat.is_empty(), "apply_melee ran");
+    assert!(f.lists.is_empty(), "param 1 = 0: nothing else");
+    // r5–r8 with the start hit: the list (flags 2, expire F + 50), the
+    // timer, the state change, the count n = min(calc2 = 2, count + 1)
+    // and aura_fill at level n.
+    f.entries.insert((u, 1, 1), 1);
+    f.c.frame = 7;
+    f.targets.remove(&u);
+    for (run, n) in [(1, 1), (2, 2), (3, 2)] {
+        f.take_log();
+        assert_eq!(dos2::feral_rage(&mut f, &t, &ct, u, 1, 5), 1, "run {run}");
+        let l = f.list_of(u, 40).expect("list").clone();
+        assert_eq!((l.flags & 2, l.expire), (2, 57));
+        assert_eq!(l.callback, callback::DEFAULT);
+        assert_eq!(l.stats.get(&169), Some(&n), "run {run}");
+        assert_eq!((l.stats.get(&350), l.stats.get(&351)), (Some(&1), Some(&5)));
+        assert_eq!(l.stats.get(&26), Some(&n), "the level is the charge count");
+        let log = f.take_log();
+        assert!(has(&log, format!("timer {u} 12 57")));
+        assert!(has(&log, format!("changed {u} 40")));
+    }
+    assert_eq!(f.lists.iter().filter(|l| l.state == 40).count(), 1);
+}
+
+// Covers: specs/skills/bodies.md §8.21 text, §8.21 r1, §8.21 r2, §8.21 r3, §8.21 r4, §8.21 r5, §8.21 r6, §8.21 r7, §8.21 r8, §8.21 r9, §8.21 r10, §8.21 r11, §8.21 r12
+#[test]
+fn shadow_warrior_steps() {
+    let ct = ct3();
+    let mk = |edit: &dyn Fn(&mut d2_data::tables::Skills, &mut Code)| {
+        let mut c = Code::new();
+        let mut r = body_rec();
+        r.summon = 1;
+        r.summode = 5;
+        r.pettype = 3;
+        r.petmax = c.f(2);
+        r.aurastate = 40;
+        r.auralencalc = c.f(60);
+        r.param1 = 10;
+        r.param5 = 3;
+        r.param6 = 2;
+        edit(&mut r, &mut c);
+        tabs(r, c, 1)
+    };
+    let t = mk(&|_, _| {});
+    let (mut f, u) = druid();
+    // r1: the flag is set even for an invalid skill.
+    assert_eq!(dos2::shadow(&mut f, &t, &ct, u, 99, 4), 0);
+    assert_eq!(f.c.units[u].flags & 0x40, 0x40);
+    // r2: no class. r3: pet type ≥ count (unsigned). r4: spawn fails.
+    let none = mk(&|r, _| r.summon = 0xFFFF);
+    assert_eq!(dos2::shadow(&mut f, &none, &ct, u, 1, 4), 0);
+    let pet = mk(&|r, _| r.pettype = 0xFF);
+    assert_eq!(dos2::shadow(&mut f, &pet, &ct, u, 1, 4), 0);
+    f.no_monsters = true;
+    assert_eq!(dos2::shadow(&mut f, &t, &ct, u, 1, 4), 0);
+    f.no_monsters = false;
+    f.c.frame = 100;
+    f.c.set(u, 12, 30);
+    f.take_log();
+    assert_eq!(dos2::shadow(&mut f, &t, &ct, u, 1, 4), 1);
+    let m = newest(&f);
+    let log = f.take_log();
+    assert!(
+        has(&log, "monster 1 (30, 40) 1 5 -1".to_string()),
+        "{log:?}"
+    );
+    // r5: m's level := the owner's. r6: shadow stats (Param1 = 10:
+    // 200 → no maxhp in the fake, so check the list instead).
+    assert_eq!(f.c.get(m, 12), 30);
+    // r7: ilvl = Param5 + (L − 1)·Param6 = 3 + 6 = 9, a single
+    // Equipment (no skill_stats).
+    let eq: Vec<_> = log.iter().filter(|l| l.starts_with("Equipment")).collect();
+    assert_eq!(
+        eq,
+        [&format!(
+            "Equipment {{ owner: {u}, m: {m}, skill: 1, lvl: 4, ilvl: 9 }}"
+        )]
+    );
+    // r8: type-2 timers deleted, then a type-2 timer at F + 20.
+    let at = |s: String| {
+        log.iter()
+            .position(|l| *l == s)
+            .unwrap_or_else(|| panic!("{s}"))
+    };
+    assert!(at(format!("deltimers {m} 2 0")) < at(format!("schedule {m} 2 120 0 0")));
+    // r9: aurastate 40 on m. r10: the source link. r11: d = 60 → a type-7
+    // timer at F + 60 and umod 21 (argument 0). r12: the node insert.
+    assert!(f.has_state(m, 40));
+    assert!(has(
+        &log,
+        format!("SourceFields {{ m: {m}, owner: Some({u}) }}")
+    ));
+    assert!(has(&log, format!("schedule {m} 7 160 0 0")));
+    assert!(has(&log, format!("Umod {{ m: {m}, umod: 21, arg: 0 }}")));
+    assert!(has(&log, format!("NodeInsert {{ m: {m}, slot: 5 }}")));
+    // No base_stats: no armor class from the (absent) monlvl rows and the
+    // level is the owner's, not the formula.
+    assert_eq!(f.c.get(m, 31), 0);
+    // ilvl bounds: L ≤ 0 gives 0 → 1; above the level cap → the cap.
+    for (edit_l, lvl, want) in [(3u32, 0, 1), (500, 4, 99)] {
+        let t2 = mk(&|r, _| r.param5 = edit_l);
+        let (mut f, u) = druid();
+        dos2::shadow(&mut f, &t2, &ct, u, 1, lvl);
+        let m = newest(&f);
+        assert!(
+            f.take_log().contains(&format!(
+                "Equipment {{ owner: {u}, m: {m}, skill: 1, lvl: {lvl}, ilvl: {want} }}"
+            )),
+            "lvl {lvl}"
+        );
+    }
+    // aurastate outside 1…count − 1 sets no state; a length ≤ 0 sets no
+    // timer / umod 21.
+    let t3 = mk(&|r, c| {
+        r.aurastate = 0;
+        r.auralencalc = c.f(0);
+    });
+    let (mut f, u) = druid();
+    dos2::shadow(&mut f, &t3, &ct, u, 1, 4);
+    let m = newest(&f);
+    let log = f.take_log();
+    assert!(!f.has_state(m, 0));
+    assert!(!log
+        .iter()
+        .any(|l| l.starts_with(&format!("schedule {m} 7")) || l.contains("umod: 21")));
+}
