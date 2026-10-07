@@ -303,6 +303,9 @@ fn audio_frame(
             requests.as_deref().unwrap_or_default(),
         )
         .map_err(AudioFrameError::from)?;
+        for s in d.take_skipped() {
+            debug!("sound layer skipped: {s}");
+        }
         for e in d.take_errors() {
             warn!("sound layer: {e}");
         }

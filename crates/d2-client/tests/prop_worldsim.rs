@@ -1070,19 +1070,25 @@ fn fixture_reaches_the_wired_paths() {
         y: y as u16,
     }));
     assert_eq!(code, ResultCode::Done);
+    let mode_of = |fx: &Fx| {
+        fx.sim
+            .events
+            .action
+            .sys
+            .units
+            .get(monsters[0])
+            .map(|r| r.mode)
+    };
+    // Killed (DT), then the end of the death animation sets DD
+    // (`intents-events.md` §7.7 rule 3).
+    let mut killed = false;
     for _ in 0..40 {
         fx.tick();
+        killed |= mode_of(&fx) == Some(0);
     }
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
-    let mode = fx
-        .sim
-        .events
-        .action
-        .sys
-        .units
-        .get(monsters[0])
-        .map(|r| r.mode);
-    assert_eq!(mode, Some(0), "killed (DT)");
+    assert!(killed, "killed (DT)");
+    assert_eq!(mode_of(&fx), Some(12), "dead (DD)");
     assert_eq!(
         fx.sim
             .events

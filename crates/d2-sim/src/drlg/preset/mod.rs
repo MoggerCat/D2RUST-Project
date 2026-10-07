@@ -150,9 +150,10 @@ pub struct PresetMap {
     pub picked_file: i32,
     /// Tiles.
     pub rect: TileRect,
-    /// Per-8×8-cell link values set by outdoor code (+0x20), indexed like
-    /// the area cell grid of §6 (row-major, `w/8 + 1` per row); `None` =
-    /// no link grid (every room's link 0).
+    /// Per-8×8-cell link values (+0x24, read only when +0x20 is set),
+    /// indexed like the area cell grid of §6 (row-major, `w/8 + 1` per
+    /// row); `None` = no link grid (every room's link 0). 1.14d never
+    /// sets it (§6 step 10), so production maps keep `None`.
     pub link_grid: Option<Vec<u32>>,
     /// Preset units, head first.
     pub units: Vec<PresetUnit>,
@@ -231,8 +232,7 @@ impl Presets {
             .ok_or(PresetError::UnknownMap(id))
     }
 
-    /// Mutable map: outdoor code sets `picked_file` (`0x00666EC0`) and
-    /// `link_grid` here.
+    /// Mutable map: outdoor code sets `picked_file` (`0x00666EC0`) here.
     pub fn map_mut(&mut self, id: MapId) -> Result<&mut PresetMap, PresetError> {
         self.maps
             .get_mut(id.0 as usize)

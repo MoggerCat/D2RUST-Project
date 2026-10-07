@@ -14,6 +14,7 @@
 //! until the spec owner settles the layout (PC 1, item I-1) and one side
 //! changes. No code is changed here.
 use d2_client::bridge::dispatch::{Dispatch, Handle, Message};
+use d2_client::bridge::output::Outputs;
 use d2_client::bridge::world::{ClientWorld, ModelInputs, PET_HIRELING};
 use d2_sim::world::hirelings::pets::{pet_action, ACTION_ADD, ACTION_REMOVE};
 
@@ -28,11 +29,13 @@ fn receive(w: &mut ClientWorld, bytes: &[u8]) {
         panic!("0x7A is a general handler");
     };
     let inputs = ModelInputs::default();
+    let out = Outputs::default();
     let msg = Message {
         id: bytes[0],
         bytes,
         unit: None,
         inputs: &inputs,
+        out: &out,
     };
     handle(w, &msg).expect("handled");
 }

@@ -923,6 +923,30 @@ pub trait Pending {
         true
     }
 
+    // ---- the monster mode message and the death end (`intents-events.md` §7.4, §7.7)
+
+    /// Unit +0xB0, read as e of a mode-0 and mode-3 message and f of a
+    /// mode-13 message (§7.4 rule 5). Its writers are not specified
+    /// (`stat-lists.md` §10: the regeneration kill sets it to 0;
+    /// `audio/triggers.md` OQ3 reads the client copy as the hit class of
+    /// the last hit). Default: 0.
+    fn unit_b0(&self, unit: UnitId) -> u8 {
+        0
+    }
+    /// `0x005A0180(unit, 0x100)`, which sets bit 0x80 of a mode-3
+    /// message's d (§7.4 rule 5; not specified). Default: false.
+    fn monster_flag_100(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// The animation refresh `0x00623E00` of the stepping death (§7.7
+    /// rule 3, base id 78; not specified).
+    fn refresh_animation(&mut self, game: &mut Game, unit: UnitId) {}
+    /// The `monstats` `SplEndDeath` action of the death end (§7.7 rule
+    /// 3): 1 → `0x00574370(game, unit, minion, 1)` then `0x00573780`; 2 →
+    /// the kill `0x0057CCB0` of `0x00552FD0(unit)`. Neither callee is
+    /// specified. Default: nothing.
+    fn death_end_action(&mut self, game: &mut Game, unit: UnitId, action: u8, minion: u16) {}
+
     // ---- skill bodies (`skills/bodies.md`; their other systems) ---------
 
     /// `0x00554DE0`: allies (same unit after the monster owner

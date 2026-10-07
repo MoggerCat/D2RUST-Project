@@ -204,12 +204,10 @@ pub fn build_path<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId
 /// [`Pending::send`] to the client's player. Units other than players
 /// with a dynamic path, and clients without a player, get nothing.
 ///
-/// TODO(spec: tick.md §3 step 6, `0x00553220`): the room clean-up is
-/// not wired. `items/inventory-moves.md` §6.3 names unit flags 0x1 and 0x10
-/// (and, for items, 0x1000 and item flags 0x20 / 0x2000); whether it
-/// clears flags 2 bits 0x10000 / 0x800 is still not written, so they are
-/// sent again whenever the unit is queued later
-/// (`docs/handoff/wire-path-server.md` §4 finding 2).
+/// The room clean-up (`tick.md` §3 step 6, `0x00553220`;
+/// `intents-events.md` §7.5 step 3, [`crate::wiring::action::View::room_cleanup`])
+/// clears unit flag 0x1 and flags 2 bits 0x10000 / 0x800 after the client
+/// pass, so each message goes out once per change.
 pub fn update_messages<X: Pending>(
     v: &mut View<'_, X>,
     game: &Game,
