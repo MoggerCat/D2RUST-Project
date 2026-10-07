@@ -24,33 +24,34 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–73 |
-| Inputs | 74–82 |
-| Outputs / state changes | 83–89 |
-| Rules | 90–91 |
-|   1. Model contents | 92–131 |
-|   2. Unit table | 132–177 |
-|   3. Local player | 178–200 |
-|   4. Receive and the unit message queue | 201–238 |
-|   5. Client update pass | 239–275 |
-|   6. Position check (`0x004804E0`) | 276–315 |
-|   7. Session messages | 316–392 |
-|   8. Mode requests | 393–444 |
-|   9. Room-in-sight messages | 445–479 |
-|   10. Bit reader | 480–494 |
-|   11. Current act and level (join and later) | 495–540 |
-|   12. Client DRLG and the room of a point | 541–582 |
-|   13. Visibility predicate (`0x004DBF20`) | 583–610 |
-|   14. Pet list and the hireling GUID | 611–637 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 638–704 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 705–739 |
-|   17. Model writes made by 1.14d UI code | 740–857 |
-| Constants & data dependencies | 858–870 |
-| Randomness | 871–882 |
-| Edge cases & original bugs | 883–891 |
-| Test vectors | 892–939 |
-| Provenance | 940–998 |
-| Open questions | 999–1081 |
+| Summary | 57–74 |
+| Inputs | 75–84 |
+| Outputs / state changes | 85–91 |
+| Rules | 92–93 |
+|   1. Model contents | 94–135 |
+|   2. Unit table | 136–181 |
+|   3. Local player | 182–204 |
+|   4. Receive and the unit message queue | 205–242 |
+|   5. Client update pass | 243–291 |
+|   6. Position check (`0x004804E0`) | 292–331 |
+|   7. Session messages | 332–408 |
+|   8. Mode requests | 409–493 |
+|   9. Room-in-sight messages | 494–528 |
+|   10. Bit reader | 529–543 |
+|   11. Current act and level (join and later) | 544–589 |
+|   12. Client DRLG and the room of a point | 590–631 |
+|   13. Visibility predicate (`0x004DBF20`) | 632–659 |
+|   14. Pet list and the hireling GUID | 660–686 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 687–753 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 754–788 |
+|   17. Model writes made by 1.14d UI code | 789–906 |
+|   18. Audio driver inputs and the client object functions | 907–937 |
+| Constants & data dependencies | 938–950 |
+| Randomness | 951–962 |
+| Edge cases & original bugs | 963–971 |
+| Test vectors | 972–1019 |
+| Provenance | 1020–1086 |
+| Open questions | 1087–1169 |
 <!-- /index -->
 
 ## Summary
@@ -79,6 +80,7 @@ position check of the local player.
 | loop pass tick flag | whether the server ticked in this client loop pass | `client/bridge.md` §8 |
 | unit visibility | whether a unit's sprite at a pixel point is drawable (`0x004DBF20`) | Phase 6 render seam (§6 rule 7) |
 | mode machines | per unit type, consume a mode request (`0x00480C10`) | Phase 6 seam (§8) |
+| `now: u32` | wrapping milliseconds (1.14d `GetTickCount`); host clock live, scripted in tests / replays | bridge; read by §5 rule 2, §8 rule 7 (`world/objects-client.md` §25 r6) |
 
 ## Outputs / state changes
 
@@ -127,6 +129,8 @@ position check of the local player.
    | `seed: (u32, u32)` | +0x20 / +0x24 | client copy of the unit seed (§2 rule 6) |
    | `queue: Vec<Vec<u8>>` | +0xD8 message queue | §4 |
    | `last_mode_request: Option<ModeRequest>` | — (d2rs) | §8 rule 3 |
+   | `interact_ms: u32` | +0xD4 | monster interact gate (§8 rule 7); objects' `ClientFn` timer T (`world/objects-client.md` §25 r5) |
+   | audio inputs | +0x30 … +0x88, +0xB0, monster data +0x16 / +0x26 | §18 rule 1 |
    | kind data | +0x14 type data | per kind, owned by `msg-units.md` §1 and `msg-stats-items.md` §2–§3 |
 
 ### 2. Unit table
@@ -250,12 +254,24 @@ position check of the local player.
    missile `0x004D2C70`, item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
    drain its queue (§4 rule 5).
+   The object update `0x004BDFF0` is the generic object step
+   `0x004BCBB0` (`render/lighting.md` §8), then the `ClientFn` / mode
+   sound step of `world/objects-client.md` §25 r2 (dispatch `0x004BDEE0`,
+   table `0x007277F0`; bodies §26 there; ownership §18 rule 3). The
+   update pass takes `now: u32` (wrapping milliseconds, the 1.14d
+   `GetTickCount`) from the bridge and hands it to that step
+   (`world/objects-client.md` §25 r6); the only other reader in this
+   spec is §8 rule 7.
 3. Order (`0x00465AA0`, the first part; buckets 0..127, each chain in
    its order, i.e. descending GUID): S missiles, C missiles, C objects,
    S players, S monsters, S objects, S items, C monsters. The S sets are
    walked by `0x00463C90` (next link read before the unit runs, so a
    unit may free itself); the C sets by `0x00463CC0`. The rest of
    `0x00465AA0` and of `0x0044C790` runs no handler (Phase 6).
+   `0x00463CC0` runs rule 2's per-unit step (`0x00480810`), then looks
+   the unit up again in its C set; still present: type 2 →
+   `0x004BDEE0` once more, result ignored (`world/objects-client.md`
+   §25 r3), type 1 → `0x0046D780` (Phase 6); other types nothing.
 4. d2rs order for the queue drains: types in the order above (S only:
    missiles 3, players 0, monsters 1, objects 2, items 4), then
    `GUID & 0x7F` ascending, then GUID descending.
@@ -417,7 +433,7 @@ position check of the local player.
    |---|---|
    | 0x00 | `0x00480780(U, r0, r1)`; mode := walk (`0x00480E70`) |
    | 0x01 | `0x004804A0(U, r0, r1)`; mode := walk |
-   | 0x02 | `0x00480930(r0 & 0xFFFF, r1)` |
+   | 0x02 | `0x00480930(r0 & 0xFFFF, r1)`: the interact sender, rule 7 |
    | 0x06 | `+0xB0` := r2; mode := 4; `check(U, r0, r1, 1, 0, 0)` |
    | 0x07 | was-dead := `0x00464820(U)`; `0x004647D0(U)`; flag 0x2 set; mode := neutral; with a record `0x00480EF0(U, r0, r1, was-dead)` |
    | 0x08 | local player → `0x00456300(1, 0)`; `+0xB0` := r2; U the hover target (`0x00467A10`) → `0x00466FE0` unless `0x0044BF00` or `0x0044BF10` has bit 8, else `0x0044DA40` + `0x00467A70(0)`; `check(U, r0, r1, 0, 0, 0)`; mode := 0; `0x00461010(U)`; `0x0045C470(U)` |
@@ -441,6 +457,39 @@ position check of the local player.
    Both codes in detail, with the shrine table: §15.
 6. **Item** (`0x004C1B80`): code 2 → mode := r1 (`0x00624690`), unit
    flag 0x2 := (r0 ≠ 0); other codes do nothing.
+7. **Interact sender** `0x00480930(type, GUID)` (ECX = type u16, EDX =
+   GUID; callers: rule 4 code 0x02 and `ClientFn` 13,
+   `world/objects-client.md` §26.13). P := the local player
+   (`0x00463DD0`), U := (type, GUID) looked up in S (`0x00463990`); no U
+   → nothing. "send 0x13" = append C→S 0x13 {0x13 u8, type u32, GUID
+   u32}, 9 bytes (`0x004786A0`, CL = 0x13; `outgoing`, bridge send path).
+   By type:
+   - 0 (player): P faces U (`0x00621C00(P, x, y)` with U's client point
+     `0x0045AE20` / `0x0045ADF0`); send 0x13.
+   - 1 (monster): when `now` − U+0xD4 < 200 (u32 wrapping, unsigned;
+     `0x00480AA7`) nothing; else U+0xD4 := `now`, send 0x13. d2rs: U+0xD4
+     is `ClientUnit.interact_ms: u32`, 0 at creation.
+   - 2 (object): P's path reset `0x00648B90(P path, 0)`. U's flag +0xC4
+     bit 0x4 clear → send 0x13. Set → P faces U as for type 0; a
+     7-value record R := 0, R[0] := the id (`0x00643CE0`) of P's skill
+     on side 1 (`0x006439F0`). By U's class: 404 in mode 0 and 376 in
+     mode 2 test the code of P's item in hand (`0x0063BEF0(P+0x60)`,
+     `0x00628590`) against `qf2 ` (404) / `hfh ` (376): no item or
+     another code → the player event sound `0x004CB9C0(P, 0x13)`
+     (`audio/triggers.md` §3) and nothing sent; equal → R[0] := the id
+     of P's skill 0 (`0x006439B0(P, 0, −1)`). 376 in mode 0 → send 0x13
+     only (no skill start). Every other case continues: R[1] := −1,
+     R[2] := 2, R[3] := GUID; the client skill start `0x004C6EB0(P, R)`
+     (`render/lighting.md` §8 r3); send 0x13.
+   - 4 (item): append C→S 0x16 {0x16 u8, 4 u32, GUID u32, b u32}, 13
+     bytes (`0x004786D0`), b = the byte `0x004538D0(1)` zero-extended.
+   - other types: nothing.
+   The code-0x13 mode request (rule 4) sends nothing itself: `0x00480D20`
+   only adds overlays (`0x00470390`) and `0x004CC5B0` and the functions
+   it calls (`0x004CA2C0`, `0x004CA320`, `0x004CA380`, `0x004CA410`,
+   `0x004CB2C0`, `0x004CB6A0`, `0x004CB860`, `0x004CB890`, `0x004CC410`,
+   `0x004B9A00`) do not reach the send path `0x00478350`. The C→S 0x13
+   of an interact is this rule's (`ui/controls.md` §6 r8–r11).
 
 ### 9. Room-in-sight messages
 
@@ -855,6 +904,37 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    before the pass continues, so later units' updates and queue drains
    see the writes as in 1.14d.
 
+### 18. Audio driver inputs and the client object functions
+
+1. **Per-unit audio inputs.** `ClientUnit` holds, beside §1 rule 2, the
+   fields the sound triggers read (`audio/triggers-2.md` §21, which
+   names the owner of each value): sequence mode +0x30 / +0x40; flag-ex
+   +0xC8 (bit 3) and the transform states; frame +0x44, frame count
+   +0x48, speed +0x4C (i16), frame event +0x4E; last hit class +0xB0
+   (written by the mode machines, §8 rule 4); for monsters the monster
+   data +0x16 (type flags) and +0x26 (superunique row) from S→C 0xAC
+   (`client/msg-units.md`); the unit sound fields +0x70, +0x74, +0x78
+   (request list), +0x7C, +0x80, +0x84, +0x88, zero at creation and
+   written only by the audio rules; and, through U's room, the floor
+   material (`drlg/rooms.md`, `formats/dt1.md`). The model stores them;
+   it decides none of them.
+2. **Order of the audio calls inside the model passes.** The object
+   update of §5 rule 2 and the C-set second call of §5 rule 3 make their
+   mode sound calls in the order of `audio/triggers-2.md` §20 r1, r2,
+   r4; an object mode change (§8 rule 5, code 3, `0x004BCF60`) makes its
+   mode sound call inside the change (§20 r3). The model hands each call
+   to the audio driver at that point of the pass, so the driver sees
+   them in 1.14d order. **Unit free** (§2 rule 5, `0x00465870`): before
+   the per-type frees, every request handle of U is detached without
+   force and U's sample locks released (`audio/triggers-2.md` §19 r5);
+   the per-type branches' second detach finds the list empty.
+3. **`ClientFn` owner** (answer to PC 2): the bodies of `ClientFn`
+   1–18 (table `0x007277F0`, 19 entries) and the per-call-site rules
+   are owned by `world/objects-client.md` §25–§26; `client/model.md`
+   owns where the dispatch `0x004BDEE0` is called from (§5 rules 2–3,
+   once per object update and once more for C objects) and the `now`
+   input it reads (§5 rule 2).
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -995,6 +1075,14 @@ offsets from `data/fields.tsv`. Room free paths: `0x0061B560`,
 (`0x004636D5`). The export adds to PC 2's list: rule 1 also runs the
 stock discard, clears monster data +0x28 bit 0, flag bit 0x40 and sets
 mode 1; rule 2's refusal also runs the stock discard.
+§5 r2–r3, §8 r7, §18 (2026-10-08, PC 2 requests from spec-objects-client
+and spec-audio-s4): `0x004BDFF0`, `0x00463CC0` (type 1 / 2 branches),
+`0x00480930` whole (disassembly: CL / EDX / stack of the `0x004786A0`
+and `0x004786D0` calls, the 200 ms compare at `0x00480AB5`, record
+build `0x004809A2`–`0x00480A34`), `0x004786A0`, `0x004786D0`,
+`0x006439B0`; code-0x13 path `0x00480D20`, `0x004CC5B0` and its direct
+callees (no call of `0x00478350`). §18 r1–r2 restate
+`audio/triggers-2.md` §19–§21 (PC 2, read there).
 
 ## Open questions
 
@@ -1002,7 +1090,7 @@ mode 1; rule 2's refusal also runs the stock discard.
    answered in §8 rules 4–6. Open: the monster machine `0x004AFF60`
    (3,678 bytes, 10 callers) per code, and the effects of the helpers
    the tables name (`0x00480E70` mode set, `0x004804A0` / `0x00480780`,
-   `0x00480930`, `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
+   `0x00480930` (answered: §8 rule 7), `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
    client unit-modes spec.
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
