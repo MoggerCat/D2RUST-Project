@@ -30,19 +30,19 @@
 |   2. VileMother (68) `0x005FA010` | 108–145 |
 |   3. VileDog (69) `0x005FA280` | 146–155 |
 |   4. FingerMage (70) `0x005FA380` | 156–179 |
-|   5. Regurgitator (71) `0x005FA710` | 180–214 |
-|   6. Megademon (89) `0x005E0C80` | 215–231 |
-|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 232–361 |
-|   8. Izual (55) `0x005F89B0` | 362–382 |
-|   9. DoomKnight (72) `0x005FAA90` | 383–392 |
-|   10. AbyssKnight (73) `0x005FAB80` | 393–414 |
-|   11. OblivionKnight (74) `0x005FAF00` | 415–448 |
-| Constants & data dependencies | 449–461 |
-| Randomness | 462–470 |
-| Edge cases & original bugs | 471–487 |
-| Test vectors | 488–503 |
-| Provenance | 504–528 |
-| Open questions | 529–540 |
+|   5. Regurgitator (71) `0x005FA710` | 180–215 |
+|   6. Megademon (89) `0x005E0C80` | 216–232 |
+|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 233–368 |
+|   8. Izual (55) `0x005F89B0` | 369–389 |
+|   9. DoomKnight (72) `0x005FAA90` | 390–399 |
+|   10. AbyssKnight (73) `0x005FAB80` | 400–421 |
+|   11. OblivionKnight (74) `0x005FAF00` | 422–455 |
+| Constants & data dependencies | 456–468 |
+| Randomness | 469–477 |
+| Edge cases & original bugs | 478–494 |
+| Test vectors | 495–510 |
+| Provenance | 511–535 |
+| Open questions | 536–557 |
 <!-- /index -->
 
 ## Summary
@@ -188,8 +188,9 @@ g)`). "Reset" = s, g, k := 0. "Go to corpse U" = walk to U with 1 step
 1. s = 5: escape from T by 16 with think delete; s := 0. End.
 2. s = 2: K exists and is in mode 12 (+0x10): squared distance unit→K
    (`0x005B0BD0`) > 4 → k ≥ 6 → reset, wander 8, end; else walk to K
-   with 1 step, k += 1. Then s := 3; idle 8 (both requests are made, in
-   this order). End. K missing or not in mode 12 → reset; wander 8.
+   with 1 step, k += 1. Then, after the walk and also when the squared
+   distance is ≤ 4: s := 3; idle 8 (after a walk both requests are
+   made, in this order). End. K missing or not in mode 12 → reset; wander 8.
 3. s = 3: `Skill1` ≥ 0 and K exists in mode 12 → `Skill1` at K; s := 4.
    End. Else reset; wander 8.
 4. s = 4: not C → A2 at T, s := 5. C → escape from T by 8 with delete.
@@ -293,7 +294,13 @@ count := 0; "take U" = if s > max: max := s, best := U.
    best (`0x00622C40(boss, best, 0)` = 0): set the boss's path target
    to best (`0x00648B90`), path type 2 (`0x00648CF0`), compute the path
    (`0x00649970(path, boss, 0)`, `sim/pathing.md` §3); no path points
-   (`0x00648780` = 0) → best := A, max := s(A).
+   (`0x00648780` = 0) → best := A, max := s(A). With best = 0 (no
+   slot 0–8 node scored > 0) the melee test is false (null-safe), the
+   path target unit is set to 0 (`0x00648B90(path, 0)` leaves the
+   stored type and GUID), and the compute runs toward the path's
+   current target point (+0x10 / +0x12, no target refresh without a
+   target unit; `sim/pathing.md` §3); 0 points → best := A. The
+   boss's path is overwritten either way (type 2, new points).
 4. Write max and count; return best (0 possible). No draws.
 
 **Diablo cull** `0x005E8EB0(boss, U)`: same act, and the no-size
@@ -318,8 +325,8 @@ distance from U to the boss's position < 1020 (D2MOO 1.10f: 55).
 5. U a monster whose class has no monstats row or `threat` < 2 → score
    0.
 6. score := (300·low + (r43 + 4·(r36 + 2·r37) + r41 + r39) / 15 +
-   5·(B + G) + 2·(K / 4 + 200·cold + (d58 >> 8 + d55 + d53 + d51 + d49
-   + d22) / 2)) / 22, with low and cold as 0/1, all divisions signed and
+   5·(B + G) + 2·(K / 4 + 200·cold + ((d58 >> 8) + d55 + d53 + d51 +
+   d49 + d22) / 2)) / 22 (d58 >> 8 arithmetic, alone), with low and cold as 0/1, all divisions signed and
    truncating; 0 → 1.
 
 #### 7.3 Choice `0x005E8810(control, boss, X, M, n, H)`
@@ -537,3 +544,13 @@ Game-file vectors: Open question 1.
    §7 case 15: owner is the skills spec (how the skill resolves it).
 4. Who calls the Diablo alternate (`ai.md` §3.3 re-install while
    running).
+5. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 8): §5 step 2
+   sets s := 3 and idles 8 after the walk and in the near case alike;
+   only the k ≥ 6 case resets and wanders. 1.14d-confirmed
+   (`0x005FA710`).
+6. Answered (reading 9): §7.1 step 3 with best = 0 is not "swap to the
+   alternative": the path is computed toward the stored target point
+   and A replaces only when that gives no points; §7.1 now says so.
+7. Answered (reading 10): only d58 is shifted: ((d58 >> 8) + d55 + d53
+   + d51 + d49 + d22) / 2 (`0x005E8530`, the shift is applied to the
+   stat 58 value before the sum).
