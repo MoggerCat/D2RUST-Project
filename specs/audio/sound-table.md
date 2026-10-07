@@ -1,8 +1,14 @@
 # Spec: Audio — Sound table (sound id → playable voice)
 
-- **Status:** draft; every rule below names its 1.14d `Game.exe` address
-  or live measurement; nothing is confirmed by a trace yet (open
-  questions 1–3 say which recordings settle the rest).
+- **Status:** implemented against the 2026-10-06 draft (`d2_client::audio`,
+  `docs/handoff/impl-audio.md`); the 2026-10-07 corrections (§5 r2, r3,
+  §6.3 r6–r9, §7 r6–r8, §8.1 r1, §8.3 r3, §10 r5–r6) are not in the code
+  yet. The table layer is verified: `sound_table::tests::game` (C73) passes on
+  the 1.14d files (4,699 records, song range, path / group / block rows,
+  4,508 / 157 / 34 / 698 / 7; `docs/handoff/local-buddy-q-data.md` entry
+  73). Every rule names its 1.14d `Game.exe` address or live
+  measurement; the request / channel / volume rules are not yet
+  confirmed by a voice log (open questions 1, 3, 12, 13).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::audio` (`SoundTable`, `SoundBank`,
   `VoicePolicy`, `GainCurve` hooks of `client/audio.md` §A2–§A4; §13
@@ -21,29 +27,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–63 |
-| Inputs | 64–74 |
-| Outputs / state changes | 75–82 |
-| Rules | 83–84 |
-|   1. Loading the table | 85–147 |
-|   2. Sound environment table (load only) | 148–159 |
-|   3. File path | 160–176 |
-|   4. Groups and variants | 177–212 |
-|   5. Requests | 213–252 |
-|   6. Sound tick | 253–338 |
-|   7. Starting on a channel | 339–368 |
-|   8. Volume and pan | 369–430 |
-|   9. Settings | 431–450 |
-|   10. Sample cache | 451–476 |
-|   11. Live data (1.14d) | 477–493 |
-|   12. Edge cases kept | 494–502 |
-|   13. d2rs mapping | 503–513 |
-| Constants & data dependencies | 514–521 |
-| Randomness | 522–529 |
-| Edge cases & original bugs | 530–534 |
-| Test vectors | 535–570 |
-| Provenance | 571–589 |
-| Open questions | 590–614 |
+| Summary | 55–69 |
+| Inputs | 70–80 |
+| Outputs / state changes | 81–88 |
+| Rules | 89–90 |
+|   1. Loading the table | 91–153 |
+|   2. Sound environment table (load only) | 154–173 |
+|   3. File path | 174–190 |
+|   4. Groups and variants | 191–233 |
+|   5. Requests | 234–310 |
+|   6. Sound tick | 311–485 |
+|   7. Starting on a channel | 486–567 |
+|   8. Volume and pan | 568–685 |
+|   9. Settings | 686–705 |
+|   10. Sample cache | 706–753 |
+|   11. Live data (1.14d) | 754–770 |
+|   12. Edge cases kept | 771–786 |
+|   13. d2rs mapping | 787–797 |
+| Constants & data dependencies | 798–805 |
+| Randomness | 806–813 |
+| Edge cases & original bugs | 814–818 |
+| Test vectors | 819–863 |
+| Provenance | 864–899 |
+| Open questions | 900–948 |
 <!-- /index -->
 
 ## Summary
@@ -151,8 +157,16 @@ Free: `0x004828B0`.
 (`0x58`), one per data line. All 22 read columns are `i32` except
 `Indoors` (`u8`): `Song` 0x00, `Day Ambience` 0x04, `Night Ambience`
 0x08, `Day Event` 0x0C, `Night Event` 0x10, `Event Delay` 0x14,
-`Indoors` 0x18, `Material 1` 0x1C, `Material 2` 0x20, then the 12
-`EAX …` columns at 0x24, 0x28, …, 0x50 in header order. `Handle` and
+`Indoors` 0x18, `Material 1` 0x1C, `Material 2` 0x20, then the 13
+`EAX …` columns at 0x24, 0x28, …, 0x54 in header order: `EAX Environ`
+0x24, `EAX Env Size` 0x28, `EAX Env Diff` 0x2C, `EAX Room Vol` 0x30,
+`EAX Room HF` 0x34, `EAX Decay Time` 0x38, `EAX Decay HF` 0x3C, `EAX
+Reflect` 0x40, `EAX Reflect Delay` 0x44, `EAX Reverb` 0x48, `EAX Rev
+Delay` 0x4C, `EAX Room Roll` 0x50, `EAX Air Absorb` 0x54 (9 + 13 = 22;
+field list entries of 20 bytes built at `0x00481CA6`–`0x00481FDA`, the
+last two offsets from `edi` = 0x50 and `esi` = 0x54 set at
+`0x00481BA5`; corrected: an earlier draft said 12 EAX columns ending at
+0x50). Only mixer mode 2 reads them (`0x004DF6C0`). `Handle` and
 `Index` are not read. The sound columns hold sound ids (line indices of
 `sounds.txt`). What they mean is `audio/environment.md`; this spec uses
 only the song range (§1 r5) and `Indoors` (§6.4 r3).
@@ -209,6 +223,13 @@ case-insensitive).
    (`audio/triggers.md` §10 r1), which retries up to 20 times while the
    pick equals that NPC's last greeting; ambience cues use the same
    seed through their own draws (`audio/environment.md` §7).
+6. **No local player** (answers ST-8): `0x004E40A0` has no guard. With
+   `[0x007A6A70]` = 0 a draw with n ≥ 1 reads and writes the seed at
+   address 0x20 (an access violation, the game crashes); n < 1 returns
+   0 before touching it. So no 1.14d path draws without a local
+   player; d2rs treats a draw without one as an internal error (debug
+   assert), and returning 0 with no step is only a release fallback,
+   not a fidelity rule.
 
 ### 5. Requests
 
@@ -229,12 +250,25 @@ end volume, +0x51 / +0x55 fade start / end tick.
 2. **Compound** (`Compound ≠ 0`, `0x004B9760`): if an active request
    whose id has the same group base is not stopping and (`Compound < 0`
    or `now − its start tick ≤ Compound`), no new request is made: the
-   call returns that request's handle (after r4).
+   call returns that request's handle (after r4). The window test is
+   unsigned (`0x004B97AD`): a request whose start tick is still in the
+   future (a delay) gives a huge difference and does not merge unless
+   `Compound < 0`. The merged call still attaches its unit, as a new
+   request does (`0x004B9AF1`–`0x004B9B04`): the unit is pushed onto the
+   request's unit list (+0x28) and the handle onto the unit's request
+   list (unit +0x78), both at the list head, with no duplicate check. So
+   a compound request can hold several units, or one unit twice, and
+   the multi-unit guards (r5, `audio/triggers.md` §1 r3, §4.3 r2.2)
+   apply to it.
 3. Otherwise a new request: flags (bit 0 = exact id, no variant; bit 1
    = no fade-in), offset, id, start tick = now + delay, volume 255,
    priority = the record's `Priority`. With a unit: position and
    distance² from the unit (§8 r1) and initial occlusion (§6.4 r2);
-   without: position (0, 0, 0).
+   without: position (0, 0, 320.0) (`0x004B9AC6`, f32 320.0 at
+   `0x006DA6A0`) and distance² 0 (corrected: an earlier draft said
+   (0, 0, 0)). So every request made without a unit counts as
+   positional in §6.3 r3.2 and gets the mode-0 gain of r = 1.0, i.e.
+   255, pan 128 (§8.2 r10).
 4. If the unit is the local player, the request's priority gets +80,
    wrapping as a byte (255 → 79). On the compound path this adds 80 to
    the *existing* request again on every merged call. Reproduce.
@@ -249,6 +283,30 @@ end volume, +0x51 / +0x55 fade start / end tick.
    already set the stop flag, so the next update stops it). Nothing
    happens when the request has more than one unit attached
    (`audio/triggers.md` §1 r3).
+6. **List order** (`0x00516950`, the shared list push): a new request is
+   pushed at the **head** of the active list (`0x004B9424`), a unit at
+   the head of a request's unit list and a handle at the head of a
+   unit's request list (`0x004CA8A0`). The active list is re-sorted by
+   a total order before use (§6.2 r1), so only the unit lists keep
+   insertion order: newest first.
+7. **Fade, exact order** (`0x004B9EF0(h, target, delay, len)`, refines
+   r5): find h (none → nothing); more than one unit → nothing. Then
+   `len` is raised unconditionally: target 255 → max(len, `Fade In`),
+   target 0 → max(len, `Fade Out`) (of the request's current id, a
+   variant after a start, §7 r6). If a fade is running: same target and
+   `now + delay + len ≥` its end tick → nothing (the running fade ends
+   no later); running fade to 0 and target ≠ 0 → nothing (a fade-out
+   cannot be turned around). Then target 0 sets the stop flag. `len =
+   0`: `delay ≠ 0` fatal (`0x25C`), else volume := target. `len > 0`:
+   fade from the current volume (+0x1C) to target over `[now + delay,
+   now + delay + len]`.
+8. **Set position** (`0x004B99A0(h, x, y, z)`, integers; answers ST-11):
+   if a request with handle h exists, its position := (f32 x, f32 y,
+   f32(z + 640.0)) (double 640.0 at `0x006DA698`) and its distance² is
+   recomputed from x, y as §8.1 r1 (`0x004B98F0`, clamped to ±2,000).
+   It writes no unit. Callers: the ambience cue
+   (`audio/environment.md` §7 r3, z = 0) and the thunder of the weather
+   code (`0x00473A2B`, `audio/triggers.md` §12, z = 0).
 
 ### 6. Sound tick
 
@@ -261,6 +319,21 @@ end volume, +0x51 / +0x55 fade start / end tick.
 §9) ran, and at `0x0044F01D` on another path (open question 4). All
 tick counts in the table (`Fade In`, `Fade Out`, `Duration`,
 `Compound`) are in these ticks.
+
+Exact order inside `0x00482C20` (each call gets ECX = the current tick
+T): nothing unless the channels are up (`0x004DF870`); ambience
+`0x004E42E0(T)`, music `0x004DCAA0(T)` (`audio/environment.md`),
+preload `0x00482B40(T)` (§10 r3), request update `0x004BA020(T)`,
+channel upkeep `0x004DF890` (§6.6), T += 1, `Sleep(0)`.
+
+The second call site (`0x0044F01D`, answers open question 4) is the
+**paused** path of the client loop: single player (game type
+`[0x007A0610]` 0 or 1), the frame not skipped (`0x004F6070` = 0,
+`render/capture.md`), the ESC menu (UI state 9) or the options panel
+(UI state 11) open (`0x00453A90`, `ui/ui-states.tsv`), a local player
+with a room (`0x004646A0`). Then the loop only draws and runs one sound
+tick per loop pass, with no client update. So while paused, T keeps
+advancing once per loop pass (frame rate, not 40 ms); C does not.
 
 #### 6.2 Order
 
@@ -310,6 +383,32 @@ when Music Volume is 0. `max` = the falloff maximum (§8 r2).
 5. **Playing**: stopped when `Duration > 0` and `now − start tick >
    Duration`, or not `audible`, or distance² > `max²`; else volume and
    pan are recomputed (§8) and a loaded sample's last-use tick is set.
+6. **Reading order** (`0x004BA020`). Per request, r1 and r2–r5 are
+   exclusive: an ended request (state 2) only does r1, so a loop
+   restarted by r1 waits for the next update before r3 can start it.
+   For any other state, in order: tracking (§6.4 r1), r2, r3–r4, then
+   r5 for every request that is playing at that point, **including one
+   started by r3 in the same pass** (its volume and pan are then sent a
+   second time this tick, after the values `0x004E01B0` sent). In r4
+   and r5 the record is that of the request's current id, which r3 may
+   have changed to the variant (§7 r6). The `Duration` test of r5 is
+   unsigned: `now − start tick > Duration` on u32.
+7. **Fade-in on a failed start** (original bug, reproduce): r3.3 saves
+   the volume and writes 0 before the start; only a successful start
+   sets the fade back to the saved volume. A start that fails leaves
+   the volume 0. A one-shot is then removed by r4 anyway; a `Loop`
+   request stays waiting with volume 0 and r3 never tries it again
+   (it needs volume ≠ 0), until a volume set (`audio/triggers.md` §1
+   r2) or a fade gives it a volume again.
+8. A stored resume offset is "none" when 0: r3.3 tests +0x41 ≠ 0, so a
+   resume offset of 0 (every non-stream voice, §7 r8) gives the normal
+   `Fade In` path.
+9. **Position (0, 0, 0) never occurs** in r3.2: a request without a
+   unit has (0, 0, 320.0) (§5 r3) and one with a unit has z = 640.0
+   (§8.1 r1); a cue position has z = 640.0 too. So for `Defer Inst = 1`
+   the r3.2 condition reduces to "the request has a unit list": with a
+   unit list the `Stop Inst` rule applies; without one it starts
+   alongside the found request.
 
 #### 6.4 Tracking and occlusion
 
@@ -317,6 +416,18 @@ when Music Volume is 0. `max` = the falloff maximum (§8 r2).
    request has units, each tick the position becomes that of the
    nearest unit and the occlusion target is the mean of the units'
    values (r2); occlusion moves toward it by at most 0.05 per tick.
+   (Answered, ST-6: `0x007A061C` is not an option but the client's
+   **game-loaded** flag: set to 1 only by the S→C 0x04 LoadComplete
+   handler (`0x0045C9A3`), cleared by 0x05 UnloadComplete
+   (`0x0045CA3F`), client game init `0x0044E36C`, game end
+   `0x0044E3DF`, `0x004539BB`, `0x00477F2F`. Every request update runs
+   in game, so tracking is on whenever the other two conditions hold.)
+   Nearest: each unit's position is computed as §8.1 r1 (with the
+   request's current id, for the river rule) and its squared length
+   (`0x004E4160`, unclamped) compared; a unit replaces the best one
+   only when strictly nearer, so on a tie the earlier unit in the list
+   (the most recently attached, §5 r6) wins. Then position and
+   distance² are written as for a new request (`0x004B98F0`).
 2. A unit's occlusion value: 0 if `Falloff = 4`; for group base 202
    (`event_thunder_*`) 0.5 if the current environment is `Indoors`,
    else 0; otherwise 0.5 if `0x00622AA0(player, unit, 2)` is non-zero,
@@ -334,7 +445,43 @@ At the end of the update, if the tick advanced:
 2. **State duck** `0x00727564` (0–100): −5 per tick while the
    condition at `0x004BA640` (`0x0044DB30`, `0x00453A90`) holds, +5
    otherwise (open question 6). Scales every voice except ids 1–15,
-   52–71 and 4657–4698.
+   52–71 and 4657–4698. (Answered: the condition is the pause of
+   §6.1: game type `[0x007A0610]` is 0 or 1 (single player) and UI
+   state 9 (ESC menu) or 11 (options) is open (`[0x007A27E4]` or
+   `[0x007A27EC]` ≠ 0, `ui/ui-states.tsv`). Bounds: the −5 step floors
+   at 0, the +5 step caps at 100. Both ducks move only when the update's
+   tick is greater than the previous update's (`[0x007C5464]`).)
+
+#### 6.6 Channel end and stop (ST-4)
+
+1. **Stop** (`0x004DF7B0(slot)`, used by §6.2 r2 and §6.3 r5): saves the
+   voice's play position as the request's resume offset (+0x41, §7
+   r8), stops the voice, sets the request to ended (state 2, channel
+   0) and frees the slot. A steal (§7 r3) does the same. So a playing
+   **streamed** `Loop` request that goes out of range or inaudible
+   restarts later from where it was, with a 3-tick fade-in (§6.3 r3.3);
+   a non-stream one restarts from 0.
+2. **Natural end** (`0x004DF890`, after the update in every sound tick):
+   for each busy slot whose request's row is not `Loop`, if the voice's
+   playing flag (voice +0x1C) is clear, the voice is stopped (with r1's
+   save if it is a stream), the request set to ended and the slot
+   freed; §6.3 r1 frees it in the next update. `Loop` voices are played
+   with DirectSound looping (`0x005156A0` always passes the looping
+   flag; `0x00515D70` passes the stream loop flag), so they never end
+   by themselves.
+3. The playing flag is cleared by the voice service thread
+   (`0x00516250`, woken every 50 ms of wall-clock time by
+   `WaitForSingleObject(…, 50)`): for an in-memory voice when the bytes
+   played (play cursor accumulated, voice +0x20) pass the data size
+   (+0x18); for a stream when the Storm stream reports its end
+   (`0x00418140` fails). So in 1.14d the sound tick at which a one-shot
+   ends depends on real audio time, not on sound ticks: it is the
+   first upkeep after the service thread saw the end. d2rs models it as
+   "ended in the first upkeep at which elapsed ticks × 40 ms ≥ the
+   sample's duration" (the implementation's choice,
+   `docs/handoff/impl-audio.md` ST4); whether the original's
+   end tick fits that model (and by how much it jitters) is open
+   question 12 (Needs recording).
 
 ### 7. Starting on a channel
 
@@ -365,6 +512,58 @@ At the end of the update, if the tick advanced:
 5. **Stream** (`Stream = 1`): path (§3), start offset (+0x24) and
    `Loop` go to the stream player (`0x00515D70`); no cache. Whether
    `Block 1/2` reach it is open question 7.
+6. **Variant and records** (answers ST-3). The pick (r1) runs on the
+   request's current id and **overwrites the request's id** (+0x04)
+   with the variant (`0x004E01D5`), before the duplicate test; a
+   duplicate failure keeps the overwritten id. The history (r2, §4 r4)
+   is written on the record of the id the request had *before* the
+   pick. Everything after the pick reads the **variant's** record: the
+   duplicate test (`0x004DF9D0` on the variant id), `Stream` (+0x4F),
+   load state (+0x86), `Async Only` (+0x4D, sync/async load), the
+   file-failed flag (+0x81), `Stereo` (+0x50), `Loop` (+0x3E), block
+   count (+0x80), `Block 1` (+0x54), sample (+0x6C, +0x70), `Reverb`
+   (+0x4B), the path (§3) and the volume chain (§8.2 r1, `Volume`,
+   `Music Vol`, `Solo`, falloff). Consequences: a request that starts
+   again later (a `Loop` restart, §6.3 r1, or an `Async Only` retry,
+   §6.3 r4) picks relative to the variant, whose `Group Size` is 1
+   after the group pass unless it is a group opener (§4 r1), so a
+   looping group sound keeps its first variant; and every retry of a
+   deferred start draws the RNG again when the current id opens a
+   group.
+7. **Channel kinds** (answers ST-2; `0x004DFAA0`, called from
+   `0x004E0050` with the mixer mode, which falls back to mode 0 and
+   writes 0 to the `Sound Mixer` setting when mode 1 or 2 cannot be set
+   up): slots 0–3 are kind 1 (stereo, 2-channel buffers); slots 4–15
+   are kind 0 in mode 0 (plain mono buffers), kind 2 in mode 1, kind 6
+   in mode 2 (`0x005153C0` makes a 2-channel buffer for kind bit 0,
+   else 1 channel). A request's kind (`0x004E025D`–`0x004E0285`) is 1
+   when the variant's `Stereo` is set, else 0 / 2 / 6 by mixer mode;
+   slots match by equal kind only. So in mode 0: **4 stereo voices and
+   12 mono voices**; a stereo request can only take or steal slots 0–3,
+   a mono one slots 4–15. A slot is idle when it has no request and its
+   voice's playing flag is clear (`0x00515710`): a slot whose voice
+   still sounds after its request left is skipped. The `Stereo` byte
+   read here is not always the cell: every load of a non-stream sample
+   (sync `0x00482AAB`, async completion `0x0048176D`) runs the format
+   check `0x004DF630`, which overwrites the record's `Stereo` (+0x50)
+   with (file channels = 2) (`0x004DF695`). The load happens in r2,
+   before the kind is computed, so a non-stream sound always plays on a
+   voice with the file's channel count (the 30 rows with `Stereo` = 0
+   and a stereo file, `formats/wav.md` Survey, play on stereo slots). A
+   `Stream` row keeps its cell value (no load).
+8. **Resume offset and stream offsets** (answers ST-11 / environment OQ
+   2). The saved play position (`0x005159B0`) is the stream's position
+   in **4-byte units**: bytes of `data` played (bytes written to the
+   circular buffer minus the bytes still ahead of the play cursor,
+   capped at the data size, `0x00415760`) shifted right by 2. A voice
+   with no stream (every non-`Stream` sound) gives 0. The start offset
+   (+0x24) is passed to the stream as `offset × 4` bytes
+   (`0x00515DD1`, u32 wrapping), which the stream reduces modulo the
+   `data` size (`0x0041B4B5`). All 28 songs are 16-bit stereo, so for
+   them one unit is one sample frame and the `Block` cells are frame
+   indices (e.g. `music_caves` 5,129,472 frames, `Block 1` 1,478,063).
+   The non-stream loop start of r4 (`Block 1` × 2 bytes) is a frame
+   index for 16-bit mono only.
 
 ### 8. Volume and pan
 
@@ -372,9 +571,28 @@ At the end of the update, if the tick advanced:
 
 1. With a unit (`0x004B97D0`): from the client positions of player
    `P` and unit `U`, `x = U.x − P.x`, `y = 2 × (U.y − P.y)` (f32),
-   `z = 0`. Distance² for ordering and range = clamp(x, ±2000)² +
-   clamp(y, ±2000)² (`0x004B98F0`). Sound 2599 (`object_river`) uses a
-   projected position (open question 8).
+   `z = 640.0` (f32 at `0x006DA67C`, `0x004B986A`; corrected: an
+   earlier draft said z = 0). Distance² for ordering and range =
+   clamp(x, ±2000)² + clamp(y, ±2000)² (`0x004B98F0`, bounds f32 ±2000
+   at `0x006D9104`/`0x006DA694`; z is not in it). Sound 2599
+   (`object_river`) uses a projected position (open question 8).
+   The differences are integer (`U.x − P.x`, `U.y − P.y` as i32, then
+   converted; y doubled in f32).
+   **Positions** (answers open question 2; `0x00620900`): unit types 0
+   (player), 1 (monster) and 3 (missile) give their dynamic path's
+   +0x08 / +0x0C (`0x006489C0`, `0x006489D0`); types 2 (object), 4
+   (item) and 5 (tile) their static path's +0x04 / +0x08. These are the
+   unit's client **pixel point** (the same values `client/model.md` §8
+   rule 6 calls U's client pixel point), so x, y are world pixels and
+   the doubling undoes the 2:1 isometric y.
+   **River** (2599, answers open question 8): with P = (a, b) and U =
+   (c, e) as integers, t = f32((b − 2a − c/2 − e) / −2.5) (x87, `−2.0`
+   at `0x006DA688`, `0.5` at `0x006CEF10`, `−2.5` at `0x006DA680`);
+   U' = (trunc(t), trunc(f32(b − 2·(a − t)))) (`0x00682FD0`), then x,
+   y as above from U'. U' is the point where the line through P with
+   slope 2 meets the line through U with slope −1/2 (perpendicular in
+   pixel space): the foot of P on a river running along that diagonal
+   through the river object.
 2. **Falloff** (`0x004825B0` min, `0x00482610` max):
 
 <!-- rows -->
@@ -413,6 +631,28 @@ Integer, each division truncating toward zero:
     Then `v = gain × v / 255` and `pan` is sent. Stereo voices get no
     pan or gain.
 11. `v` (0–255) is sent as the channel volume.
+12. **Exact float steps** (answers ST-10). r8: `d` = f32(√(f32(x² +
+    y²))) (`0x004E4130`, CRT `__CIsqrt`); `v = trunc(f32(max − d) × v
+    / f32(max − min))` with the product and quotient on the x87 stack
+    (`0x004DFEE1`–`0x004DFEFD`). r10 (`0x00516830`): X, Y, Z = f32(p ×
+    0.0031250000465661287) (the double at `0x006DBA00`, i.e. f32
+    0.003125 widened); r = f32(√ f32(X² + Y² + Z²)); r > 100 → 100; r <
+    2 → t = 0; else t = f32(6 × f32(f32(ln f32(r × 0.5)) /
+    0.6931471824645996)) (CRT `log` `0x00687AC0`; the divisor is f32
+    ln 2 widened, not the exact ln 2); then f32(t / 20), p = f32(CRT
+    `pow(10, ·)`) (`0x00687C10`), gain = trunc(255.0 / p) with
+    negatives → 0 and > 255 → 255; pan = trunc(f32(X × 127 / 1.25 +
+    128)), clamped 0–255. Every `trunc` is `0x00682FD0`, which on an
+    SSE2 CPU is `cvttsd2si` (truncation; ±inf and NaN give
+    0x80000000). The CRT `log` / `pow` take their SSE2 paths when SSE2
+    is present and the FPU control word is the default (`0x00687AC0`).
+    d2rs: the same sequence in f64 with f32 rounding at each store
+    above; any remaining difference is a CRT-vs-Rust last-ulp case at a
+    truncation boundary, settled by the voice log (open question 1).
+    Worked values (unit sounds have z = 640, so Z = 2): (320, 0, 640) →
+    gain 228, pan 229; (1280, 0, 640) → 114, 255; (−640, 200, 640) →
+    176, 0; (0, 0, 640) → 255, 128; a no-unit request (0, 0, 320) →
+    255, 128.
 
 #### 8.3 Device curves
 
@@ -427,6 +667,21 @@ of a dB with `x ≤ 0.0001` → −10,000 and `x ≥ full − 0.0001` → 0:
 
 `GainCurve` (`client/audio.md` §A4) uses these ratios, not the dB
 values.
+
+3. **Occlusion and global gain at the device** (answers open question
+   5). The volume setter `0x005157B0(voice, v)` stores v, then computes
+   `v1 = trunc(v × G / 255)` (integer, `G` = `[0x0072F9B0]`, 0–255,
+   image value 255, set to 255 by sound init `0x00482287` and by the
+   client loop `0x0044F26E`; other writers through `0x00515CE0` are
+   front-end / focus paths, open question 14), then, unless the voice
+   is an EAX voice (kind bit 4) in mixer mode 2, `v2 = trunc((1 −
+   occ) × v1)` with occ = the voice's occlusion (voice +0x3C, written
+   by `0x00515A90` from request +0x20 each §8.2 send). The amplitude is
+   `v2 / 255` (r1). So in mode 0 an occluded unit (§6.4 r2, 0.5) plays
+   at half volume: v 200 → v1 200 → v2 100. The occlusion value is
+   sent every update that sends a volume (§8.2 r7 compares it too).
+   The voice log keeps `v` (the argument); `GainCurve` must apply G
+   and occlusion.
 
 ### 9. Settings
 
@@ -467,6 +722,28 @@ and EAX hardware paths).
 4. **Locks** (`0x004822B0(id, ±1)` over the id's whole group,
    `0x00482370` clears): taken by the unit code at `0x004CC160` and
    `0x004E4240`; unlocking a zero count is fatal (`0x1DC`).
+5. **Preload pass, exact** (answers ST-7; `0x00482B40(T)`): runs when T
+   = 0 or T − last pass ≥ 25 (unsigned), then last pass := T; so at T =
+   0, 25, 50, … from sound init. It walks ids **1–2,933 only** (a fixed
+   bound, `0x00482C01`; speech and music rows are never preloaded or
+   collected here). Per row: state 0 and (lock > 0 or `Cache`) → start
+   an async load, at T = 0 unconditionally, else only while fewer than
+   15 loads are pending and T − last failed eviction ≥ 250; then (also
+   for rows not started now) state 1 and the read finished
+   (`0x0040A7F0`, non-blocking) → collect it (`0x00481720`: sample,
+   size, state 2, format check `0x004DF630`, pending − 1).
+6. **Async completion** (ST-7). A start attempt of an `Async Only` row
+   in state 0 starts an async read (state 1) and fails (§7 r2); a later
+   attempt in state 1 does nothing. The row reaches state 2 only in a
+   preload pass that finds the read finished, so its earliest start is
+   the first update **after** the next pass at T ≡ 0 (mod 25) whose
+   read had completed by then (the pass runs before the update in the
+   same tick, §6.1, so a pass at T lets the update of T start it). A
+   non-`Async Only` row in state 1 (a pending preload) is finished
+   synchronously at its start (`0x004829D9`). All 356 live `Async
+   Only` rows are ids 72–2,226, inside the preload range. Whether a
+   read is finished at a given pass is disk / Storm timing: d2rs
+   assumes it is always finished by the next pass (open question 13).
 
 The cache decides only *when* a sample is available, which matters
 through §6.3 r4 (one-shots dropped while not loaded). d2rs decodes
@@ -496,7 +773,14 @@ deferred, a sync one starts at once (open question 10).
 1. Priority wrap for the local player (§5 r4).
 2. Falloff 4 with `d > 2000` but clamped distance² ≤ 2000²: §8.2 r8
    divides by `max − min = 0` (f32 → ±inf; `0x00682FD0` then gives
-   0x80000000). Open question 11.
+   0x80000000). Open question 11 (answered: `0x00682FD0` is
+   `cvttsd2si` on SSE2 CPUs, so r8 gives v = −2,147,483,648 (also for
+   v·(max − d) = NaN); r9 and r10 continue in 32-bit signed integer
+   arithmetic with wrapping products and truncating division, e.g.
+   `Volume` 255: 255 × −2³¹ wraps to −2³¹, / 255 → −8,421,504. The
+   final sent value is negative, so the device amplitude is ≤ 0.0001
+   and the voice is silent (−10,000, §8.3). Reachable only when one
+   axis is beyond ±2,000 and the other offset is exactly 0.)
 3. Group variants run past the group when a mid-group id is requested
    with its own non-zero size (nested groups, §4 r1).
 
@@ -550,6 +834,15 @@ Synthetic (CI):
 | same, `Falloff` 1, d = 380 | 127 → 63 → 51 | §8.2 r8 |
 | mode 0 pan/gain, position (320, 0, 0) / (−320, 0, 0) / (1280, 0, 0) | gain 255 pan 229 / gain 255 pan 26 / gain 127 pan 255 | §8.2 r10 |
 | device volume 255 / 0 | 0 / −10,000 hundredths dB | §8.3 |
+| request without a unit | position (0, 0, 320.0), distance² 0; mode-0 gain 255, pan 128 | §5 r3, §8.2 r12 |
+| unit request, unit 160 px right of P, same y | position (160, 0, 640.0); X 0.5, Z 2.0 | §8.1 r1 |
+| mode 0 gain/pan at (320, 0, 640) / (1280, 0, 640) / (−640, 200, 640) | 228, 229 / 114, 255 / 176, 0 | §8.2 r12 |
+| device: v 200, G 255, occlusion 0.5 | amplitude 100 / 255 | §8.3 r3 |
+| compound id with `Compound` −1, request on unit A then unit B | one request, unit list [B, A], handle in both units' lists | §5 r2, r6 |
+| mode 0: 5 stereo requests at once, 4 slots of kind 1 busy with equal or higher priority | 5th fails (cannot use slots 4–15) | §7 r7 |
+| `Loop` request, start fails after `Fade In` set the volume to 0 | stays waiting with volume 0, never started | §6.3 r7 |
+| group opener 100 (`Group Size` 4) picked → 102, then a `Loop` restart | restart picks from 102 (size 1): no draw, stays 102 | §7 r6 |
+| stream start offset 0xFFFFFFFF, `data` size 20,517,888 | starts at byte 0xFFFFFFFC mod 20,517,888 = 6,728,700 | §7 r8 |
 
 Real (`#[ignore]`, `D2_GAME_DIR`):
 
@@ -587,27 +880,68 @@ file presence by MPQ hash-table lookup in all 11 archives (our script,
 2026-10-06; listfiles are incomplete, so `mpq-tool list` was not used
 for presence). D2MOO not used.
 
+Second pass (2026-10-07, ST-1–ST-11 of `docs/handoff/impl-audio.md`,
+disassembly only): channel set-up `0x004E0050`, `0x004DFAA0`,
+`0x004DFB50`, stop `0x004DF7B0`, upkeep `0x004DF890`, voice service
+thread `0x00516250`, voice calls `0x005153C0`, `0x005155D0`,
+`0x005156A0`, `0x00515710`, `0x005157B0`, `0x005159B0`, `0x00515A90`,
+`0x00515CE0`, `0x00515D70`, Storm stream `0x0041B280`, `0x00418140`,
+`0x00415760`; positions `0x004B97D0`, `0x004B98F0`, `0x004B99A0`,
+`0x00620900`; list push `0x00516950`; loads `0x00482970`,
+`0x00481720`, `0x004DF630`; game-loaded flag writers `0x0045C9A3`,
+`0x0045CA3F`; client loop `0x0044EFA0`. Constants: 320.0
+`0x006DA6A0`, 640.0 `0x006DA67C`, river −2.0 / 0.5 / −2.5
+`0x006DA688` / `0x006CEF10` / `0x006DA680`, ln 2 (f32) `0x006DEB60`,
+6.0 / 20.0 / 10.0 / 255.0 `0x006DEB58` / `0x006DEB50` / `0x006CD040` /
+`0x006DBD68`. Music frame counts from `d2music.mpq` extracted with
+`mpq-tool` (scratch). Recording facts: `docs/handoff/local-buddy-q-rec.md`
+entry 74 (roll interleave, open question 3).
+
 ## Open questions
 
 1. Voice-log conformance: record 0x004E01B0 starts and the values passed
    to `0x005157B0`/`0x00515890` with the sound tick (`client/audio.md`
    §B7) in a scene with known unit positions; settles §6–§8 as a whole.
-2. Which client positions `0x00620900` returns (units of `x`, `y` in
-   §8.1 r1) for each unit type; a trace of `0x004B97D0` inputs.
+2. Answered (§8.1 r1): the client pixel point (dynamic path +0x08 /
+   +0x0C for types 0, 1, 3; static path +0x04 / +0x08 for 2, 4, 5).
 3. Whether variant draws interleave with other users of the player's
    client unit seed within one tick (draw order across systems); an
    RNG trace (`sim/rng.md` tooling) filtered on seed address player+0x20.
-4. When the second sound-tick call (`0x0044F01D`) runs (pause? menu?);
-   decides tick counting while paused.
-5. Effect of the occlusion value (`0x00515A90`) in mixer mode 0.
-6. The state-duck condition (`0x0044DB30`, `0x00453A90` at `0x004BA640`):
-   which game state (likely a menu or pause) lowers it.
-7. Whether streamed music uses `Block 1/2` (loop window) inside the
-   stream player or elsewhere (`0x004DCAA0`, `0x004DCD40` read sound
-   records).
-8. The `object_river` (2599) position projection in `0x004B97D0`.
+   Partly answered by the request log of `docs/handoff/local-buddy-q-rec.md`
+   entry 74 (`record_sound.py`, roll hook at `0x004E40A0` with the seed
+   before/after): they do interleave. Of consecutive sound draws, 767 of
+   1,502 (part 1) and 2,539 of 5,750 (part 2) found the seed already
+   stepped by another user in between. Which users, and their order
+   within a tick, still needs the seed-address trace above.
+4. Answered (§6.1): the paused path (single player, ESC menu or options
+   open); one sound tick per loop pass, no client update.
+5. Answered (§8.3 r3): volume × (1 − occlusion) at the device in modes
+   0–1 (and in mode 2 for non-EAX voices).
+6. Answered (§6.5 r2): single player and UI state 9 or 11 open.
+7. Answered: no. The stream player gets only the path, the start offset
+   (× 4 bytes) and the loop flag (`0x00515D70`, §7 r5, r8); `Block 1–3`
+   of songs are read only by the music resume points
+   (`audio/environment.md` §2 r8, §3 r1), and `Block 1` of a non-stream
+   row only as its loop start (§7 r4).
+8. Answered (§8.1 r1, "River").
 9. Options-menu slider → 0–100 mapping (owner `client/ui.md`).
 10. Whether async-load latency changes which one-shots play in practice
     (d2rs has no load latency); compare voice logs for a fresh start.
-11. Falloff-4 division by zero result (§12 r2); a debugger read at
-    `0x004DFEFD` with a unit beyond 2,000 on one axis.
+11. Answered (§12 r2): −2³¹ from `cvttsd2si`, then wrapping integer
+    steps; silent at the device.
+12. Needs recording (ST-4, §6.6 r3): the sound tick at which one-shots
+    end. Record, for a set of known one-shots (e.g. `cursor_pass` 1,124
+    frames, footsteps, `item_pickup`), the tick of the `0x004E01B0`
+    start and the tick of the `0x004DF890` natural end (hook the store of
+    state 2 at `0x004DF8D2`, with T), over a few hundred starts; settles
+    whether end tick − start tick = ceil(frames / 882) (40 ms of 22,050
+    Hz) or something else, and its spread.
+13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
+    the first start attempt (async read started, `0x00482AE4` path) and
+    of the collecting preload pass (`0x00482BF0`, T); settles whether the
+    read is always finished by the next pass at T ≡ 0 (mod 25).
+14. Writers of the device gain `G` (`[0x0072F9B0]`, §8.3 r3) other than
+    sound init and the client loop: `0x00515CE0` callers `0x00431600`,
+    `0x004DF800`, `0x0050FDF0`, `0x005137E0`, `0x00514060` (front end,
+    cinematics, focus?); a memory read of `G` during a game (expected
+    255 throughout).
