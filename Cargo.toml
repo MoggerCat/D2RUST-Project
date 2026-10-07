@@ -11,6 +11,7 @@ members = [
     "crates/d2-verify",
     "crates/conformance",
     "crates/test-fixtures",
+    "crates/d2-native",
     "tools/depcheck",
     "tools/hash-manifest",
     "tools/mpq-tool",
@@ -37,6 +38,7 @@ d2-net = { path = "crates/d2-net" }
 d2-server = { path = "crates/d2-server" }
 d2-verify = { path = "crates/d2-verify" }
 test-fixtures = { path = "crates/test-fixtures" }
+d2-native = { path = "crates/d2-native" }
 conformance = { path = "crates/conformance" }
 
 # Bevy is pinned to one exact version and may only be used by d2-client.
