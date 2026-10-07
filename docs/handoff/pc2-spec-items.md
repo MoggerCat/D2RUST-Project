@@ -147,10 +147,26 @@ addresses in the specs.
   (PC = 53, RC = nearest, masked) at startup; game code never changes
   the precision (14 local RC-chop `fldcw` pairs); §5.4 then equals
   binary64. The runtime word after the video layer: Needs recording.
+- `vendors.md` OQ1 → Answered (definition: `sim/stats.md` §4.2,
+  total − base); OQ2 → Answered (gamble items take game +0x78 via
+  `0x00559CE0`, never format 0); OQ9 → Answered (no reader of item flag
+  0x8000000 in 1.14d).
+- `waypoints.md` OQ4 → Answered (`0x00581490` disassembled); OQ5 →
+  Answered (player data zeroed by `0x00621F90`, only writer
+  `0x0055B720`); OQ7 → Answered (no expansion masking on load).
+- `generation.md` OQ1 → Partly answered (format 0 only from the
+  version-0x47 path `0x00530F40`); OQ4 → Answered (start items: stub,
+  legacy status bit 0, dead act-change callers).
+- `quality.md` OQ2 → Partly answered (constant 0 / 2 / 6 writers of
+  request +0x30 listed; parameterised callers stay with their owners).
 
 ## Still open
 
 - `bitstream.md` OQ2: Needs recording (see Recording list).
+- `quality.md` OQ2 tail: quality values of the parameterised callers
+  (owners: treasure, cube, NPC, quest, object specs).
+- `generation.md` OQ1 tail: the format-0 branches themselves (legacy
+  items only).
 - `treasure.md` OQ5: Needs recording (x87 control word at `0x0055A935`
   under each video mode), OQ12 tail (d2rs value for
   the sub-picker n = 0 result: a Ruleset choice).
