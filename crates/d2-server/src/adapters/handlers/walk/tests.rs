@@ -664,7 +664,13 @@ fn without_the_path_provider_the_ids_stay_stubs() {
 /// the town and Cold Plains, the menu open; C→S 0x49 to `level`.
 fn travel(fx: &mut Fx, level: u32) -> (UnitId, (ResultCode, Queued)) {
     let a = fx.a;
-    let o = fx.alloc(UnitType::Object, a, 20, 20);
+    travel_from(fx, a, level)
+}
+
+/// [`travel`] with the waypoint object in `wp_room` (the player in A).
+fn travel_from(fx: &mut Fx, wp_room: RoomId, level: u32) -> (UnitId, (ResultCode, Queued)) {
+    let a = fx.a;
+    let o = fx.alloc(UnitType::Object, wp_room, 20, 20);
     let p = fx.player(0, a, 22, 20);
     let wp = fx.guid(o);
     let h = fx.sim.events.hooks();
@@ -775,13 +781,16 @@ fn waypoint_to_the_town_places_the_player_and_sends_0x0d() {
 // Covers: specs/sim/pathing.md §10 r3; specs/sim/path-placement.md §10 r6; specs/sim/intents-events.md §7.5 r3
 #[test]
 fn a_warp_within_the_level_sends_0x15_in_the_next_update_pass() {
-    // Travel to Cold Plains itself: placed in room A (the client's room),
-    // so tick 1's update pass sends 0x15 (flags 2 bit 0x10000 → flag 1)
-    // at the player's cell. The arrival's room test fails (the spawn
+    // Travel to Cold Plains, the player's level, from the town's waypoint
+    // (travel to the waypoint's own level only closes the menu,
+    // `waypoints.md` §7 r2): placed in room A (the client's room), so
+    // tick 1's update pass sends 0x15 (flags 2 bit 0x10000 → flag 1) at
+    // the player's cell. The arrival's room test fails (the spawn
     // search's room is not A: `wire-path-sim.md` §6), so no 0x0D.
     let mut fx = Fx::new();
     let a = fx.a;
-    let (p, r) = travel(&mut fx, COLD_PLAINS);
+    let c = fx.c;
+    let (p, r) = travel_from(&mut fx, c, COLD_PLAINS);
     let guid = fx.guid(p);
     let reveal = MapReveal {
         x: 0,
