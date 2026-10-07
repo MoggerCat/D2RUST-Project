@@ -38,7 +38,7 @@ rects (town of `bdBar`: level 1 at tiles (1200, 960) 56 × 40, Blood Moor
 | 3 | Cain rescue | **blocked** | — | — | needs the Scroll of Inifuss (Dark Wood tree), Akara's decoding, the Cairn Stones order in Stony Field, then Tristram: quest chain plus a level ~8+ character |
 | 4 | act change | **blocked** | — | — | needs Andariel killed (Catacombs level 4, Act I end) or a quest flag; level ~15+ |
 | 5 | hireling game | **blocked** | — | — | Kashya's hire needs Sisters' Burial Grounds (Blood Raven) done plus gold (`local-buddy-saves.md`) |
-| 9 | Clay Golem | **blocked** | — | — | Clay Golem reqlevel 6 (`skills.txt`); a level-6 Necromancer is ~14,000 experience from level 1 (champion packs give ~80 each here) |
+| 9 | Clay Golem | **done (pass 2)** | `golem1-spawn.jsonl`, `golem1-spawn-packets.jsonl` (13,552 events); leveling `golem-lvl1-spawn.jsonl` | `check_rng.py` OK (both); `check_packets.py` **OK** (no 0x3E in this run, so no F1) | see "Pass 2, A" |
 | 10 | Act III entry | **blocked** | — | — | Acts I–II completed (Andariel, Duriel) |
 | 11 | levels 74 and 120 | **blocked** | — | — | Arcane Sanctuary (Act II, via the Palace) and Arreat Summit (Act V, Ancients): far story progression |
 | 12 | weather-0001 (Rogue Encampment in rain) | **done (recorded; it rained)** | `wx1-frames.jsonl` (frames-raw-2 + `weather_pools`), PNGs `captures\20261007-084753\` (1,851) | `record_frames.py --selftest` ok; recorder verdict `stability: 0 state keys seen twice or more … NOT ENOUGH` (expected: rain, cursor and the player seed change every frame); no `weather-0001` case file exists to verify against | see "Item 12" |
@@ -180,3 +180,67 @@ camera-only capture.
 - `check_rng.py` reports 7 `chain_unexplained` draws on an OK verdict
   (five spawn calls in one game; the spawn-only runs of
   `local-buddy-spawn.md` had none listed): worth a look by the RNG owner.
+
+## Pass 2 (task `rec-2`, branch `claude/local-buddy-recordings-2026-10-07`)
+
+Decisions: new characters `bdGolem` (Necromancer) and **`bdMercTwo`**
+(Barbarian) instead of `bdMerc2`: the character-name field takes no
+digits (screenshot: the typed `bdMerc2` stays `bdMerc`, an existing name,
+so nothing was created). Created by `make_saves.py`'s `Game.create` from
+a scratch script, Save And Exit at once (958 / 980 bytes). Driving: a
+scratch driver (`out-rec2\drive.py`, not committed) reads the `--status`
+snapshot, writes `--trigger` files and holds left clicks on the target's
+screen position (the pass-1 formula). All leveling was real kills of
+monsters placed by `spawn.py` 0.2.0 in Blood Moor (`--level 2`); no
+memory writes other than spawn.py's own call.
+
+### Leveling method (finding)
+
+In Normal a monster's level is the monstats `Level` column wherever it is
+spawned (`monsters/init.md` §7), so the experience of a spawned row does
+not depend on the area. `window1` (row 392, Act V barricade window, AI
+`Idle`, no attack) has `Level` 1 and `Exp` 491: 147 experience as a normal
+unit, **441 as a champion** (level 3, 9–18 life), and no level penalty up
+to character level 8 (`combat/vitals.md` §4.2). It has 90 % physical
+resistance, `DamageRegen` 2 and `deathDmg` 1 (a few life points to the
+killer when it breaks), so the Necromancer took Amplify Damage (skill 66,
+level-2 point) and cursed each window before hitting it. Measured: a
+normal window ~18 s per 147, a champion ~45 s per 441 (8.3–80 s). A
+**unique** window pack (boss umods `[30]` aura enchanted plus four
+minions, each level 4, 735 experience) killed the level-1 Necromancer in
+90 s (corpse in Blood Moor; the save's status now has the died bit, d2s
+`status` 0x28): avoided afterwards.
+
+### A. Clay Golem (queue item 9): done
+
+- `skills.txt` (patch_d2): Clay Golem id 75, `reqlevel` 6, **no
+  `reqskill`** (Raise Skeleton is not a prerequisite).
+- Leveling run (`spawn.py --level 2 --trigger --status --seconds 3000
+  -- -w -ns -name bdGolem -nec`, raw `golem-lvl1-spawn.jsonl`): 35 spawns
+  (2 normal and 1 unique window at the start, then 32 champion windows),
+  experience 0 → 14,406, level 1 → 6 in about 40 min of game time (frame
+  43,920). Save And Exit. `check_rng.py`: OK (268 inline draws, 0
+  unresolved, 11 `chain_unexplained`, 13 draw sites).
+- Recording run (`spawn.py ... --packets <golem1-spawn-packets.jsonl>
+  --seconds 1200 -- -w -ns -name bdGolem -nec`): walked to Blood Moor,
+  C→S 0x3B `4b00` (point into skill 75) at frame 1271; 0x3C
+  `4b000000ffffffff` (right skill) at 1572; cast C→S 0x0C `0ca1138610`
+  (right skill at location (5025, 4230)) at 1613. Frame 1621: S→C 0x7A
+  `7a01032101010000001b000000` (pet list add, GUID 27), 0x7F
+  `7f0064001b0000000200` (pet life 100 %, GUID 27) and 0xAC
+  `ac1b0000002101a1138610800e08` (new monster GUID 27, class 289
+  `claygolem`, at the cast point). The golem killed a natural fallen pack
+  (4) and a spawned normal zombie (class 5, spawn frame 2397; one spawn
+  record, 7 draws in the call); the kills credited the Necromancer (xp
+  14,406 → 14,511). Save And Exit with the golem alive (life 100): S→C
+  0x7A `7a00000000000000001b000000` (remove GUID 27) at frame 3087.
+  `check_rng.py` OK (2 `chain_unexplained`, 7 sites); `check_packets.py`
+  **OK** (13,552 events; the run had no 0x3E, so F1 did not show).
+- Save `bdGolem.d2s` 967 bytes, `d2s_check.py` (from
+  `origin/claude/spec-d2s-buddy`): **23 pass, 0 fail**; level 6, skills
+  {66: 1, 75: 1}, 3 unspent skill points; hireling block zero
+  (present = False); `jf` present (no corpse, count 0); **`kf` g = 0**: a
+  Clay Golem alive at Save And Exit writes the same empty `kf` section as
+  no golem (`d2s.md`: only an Iron Golem's item is kept; this confirms a
+  Clay Golem is not saved). Also seen: the starting wand has durability 0
+  of 15 after the window fights.
