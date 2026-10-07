@@ -30,7 +30,7 @@
 | Edge cases & original bugs | 664–688 |
 | Test vectors | 689–699 |
 | Provenance | 700–710 |
-| Open questions | 711–724 |
+| Open questions | 711–726 |
 <!-- /index -->
 
 ## Summary
@@ -719,5 +719,7 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
 4. `0x0063EFA0` spawn info for Baal: owner `monsters/ai-bodies-2.md`
    (its Open question 4); the 570 comparison and its draws are read here
    only for §3.22.
-5. `0x0056B9C0` (area-damage unit step) and `0x0064CB30` (point
-   collision): owners `missiles.md` / `sim/path-placement.md`.
+5. Answered: `0x0056B9C0` (area-damage unit step) is specified in
+   `missiles/missiles.md` (`area_damage` callback) and `0x0064CB30`
+   (point collision) in `sim/path-placement.md` §4 (query table, rule
+   5, masked value rule 2).

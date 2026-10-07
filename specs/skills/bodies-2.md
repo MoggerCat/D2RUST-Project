@@ -25,19 +25,19 @@
 | Outputs / state changes | 58–63 |
 | Rules | 64–65 |
 |   1. Conventions | 66–77 |
-|   2. Shared helpers, batch 3 | 78–652 |
-|   3. Bodies, required level 1 | 653–828 |
-|   4. Bodies, required level 6 | 829–1038 |
-|   5. Bodies, required level 12 | 1039–1212 |
-|   6. Bodies, required level 18 | 1213–1511 |
-|   7. Bodies, required level 24 | 1512–1797 |
-|   8. Bodies, required level 30 | 1798–2034 |
-| Constants & data dependencies | 2035–2069 |
-| Randomness | 2070–2108 |
-| Edge cases & original bugs | 2109–2178 |
-| Test vectors | 2179–2216 |
-| Provenance | 2217–2232 |
-| Open questions | 2233–2262 |
+|   2. Shared helpers, batch 3 | 78–655 |
+|   3. Bodies, required level 1 | 656–831 |
+|   4. Bodies, required level 6 | 832–1041 |
+|   5. Bodies, required level 12 | 1042–1215 |
+|   6. Bodies, required level 18 | 1216–1514 |
+|   7. Bodies, required level 24 | 1515–1802 |
+|   8. Bodies, required level 30 | 1803–2039 |
+| Constants & data dependencies | 2040–2074 |
+| Randomness | 2075–2113 |
+| Edge cases & original bugs | 2114–2183 |
+| Test vectors | 2184–2221 |
+| Provenance | 2222–2237 |
+| Open questions | 2238–2272 |
 <!-- /index -->
 
 ## Summary
@@ -274,7 +274,10 @@ L).
 `set_uninterruptable(unit, v)` (ECX unit, EDX v): state 54
 (`uninterruptable`) := v (`0x00639DB0`). A null unit is a fatal
 assertion. The unit's game (+0x80) none → done. v = 0 and the unit has
-state 92 (`death_delay`): state 92 off; K = `0x00553010(game, unit)`; K
+state 92 (`death_delay`): state 92 off; K = the unit's last attacker
+(`0x00553010(game, unit)`: when unit flag 0x20000 (+0xC8) is set, the
+unit of type +0x9C and GUID +0xA0 (`0x00552F60`), else none; stored by
+`0x00621D50`, `combat/damage.md` §5.2 rule 4); K
 → reaction `0x0057CEE0(game, K, unit, record)` with a zeroed record whose
 result is 2 (will die); no K → kill `0x0057CCB0(game, unit, 0, 1)`
 (`combat/damage.md` §7.2). Then a monster has its type-2 timers deleted
@@ -1658,8 +1661,10 @@ max `eval(petmax)`}; none → none. `skill_stats(game, unit, m, skill, L,
 #### 7.11 srvst 20 Iron Golem `0x005C32A0`
 
 Return 1 when T is an item (type 4) in mode 3 (on the ground), its item
-class has `bitfield1` bit 1 (items +0xDC, `0x00629CC0`), item flag 0x10
-is set (`0x006280A0`, `items/generation.md` §1.4), and the item is not
+class has `bitfield1` bit 1 (items +0xDC, `0x00629CC0`: the metal
+flag; 1.14d `armor.txt` `bitfield1` is 3 on 116 rows, chain / plate /
+metal helms, and 1 on 86 leather and cloth rows), item flag 0x10
+(identified) is set (`0x006280A0`, `items/generation.md` §1.4), and the item is not
 active on a unit (`0x00625820(T, 0)` = 0). Else 0.
 
 #### 7.12 srvdo 57 Iron Golem `0x005C5250`
@@ -2243,18 +2248,23 @@ steps call them (`bodies.md` Randomness). Draws named here:
    E flags per do, landing frame, area knockback, the 0xA5 message.
 5. Recording: Shock Field: caster seed before / after (re-seed from the
    target x, §2.10).
-6. `0x00553010` (the killer looked up by `set_uninterruptable`) and
-   message 0xA5 layout: owner `sim/server-messages.tsv`.
+6. Answered: `0x00553010` is the last-attacker lookup (§2.8). Message
+   0xA5 (`0x0053C190(client, EDX unit type, GUID, skill)`) is 8 bytes:
+   `A5`, unit type u8@1, GUID u32@2, skill u16@6; the field names in
+   `sim/server-messages.tsv` (row 0xA5, layout empty) belong to its
+   owner.
 7. Recording: Conversion on a higher-level monster: stats 12, 6, 7 while
    converted and after the state expires (Edge case 22).
 8. Recording: Holy Freeze on cold-affected monsters: state 107 per pulse
    (draw on the target seed, §6.10).
-9. `items` `bitfield1` bit 1 (Iron Golem start, §7.11) and item flag 0x10:
-   name both from the items specs.
-10. `0x0063C050(inventory, 6 / 5)` (Whirlwind two-weapon test, §2.25):
-    which equipped items it returns; owner `items/inventory.md`.
-11. `0x00643C50(T, 0, −1)` in Revive (§8.7 step 4.3): what it changes on
-    a monster with a right skill.
+9. Answered in §7.11: `bitfield1` bit 1 is set on the metal armor
+   rows; item flag 0x10 is "identified".
+10. Answered (owner `render/unit-composite.md` §5.1, the component
+    lookup): `0x0063C050(inventory, 5)` is the primary weapon
+    (`0x0063BEF0`) when it is equipped, `(inventory, 6)` the first
+    other equipped item whose `0x00629FE0` value is 2, 3 or 12;
+    other components match the item's `component`.
+11. Answered in `skills/bodies-3.md` §2 answer 13.
 12. Recording: Whirlwind with one and two weapons: E param 4 and hits per
     do (§2.25 pacing).
 

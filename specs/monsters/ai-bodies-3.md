@@ -29,20 +29,20 @@
 |   1. Scope and order | 88–115 |
 |   2. Mosquito (24) `0x005F3730` | 116–138 |
 |   3. ThornHulk (27) `0x005F4850` | 139–161 |
-|   4. ZakarumZealot (48) `0x005F6E60` | 162–196 |
-|   5. ZakarumPriest (49) `0x005F72D0` | 197–234 |
-|   6. FrogDemon (52) `0x005F8260`, alternate `0x005F81D0` | 235–276 |
-|   7. FetishShaman (65) `0x005F9A80`, alternate `0x005F9950` | 277–315 |
-|   8. HighPriest (85) `0x005E0490` | 316–351 |
-|   9. FetishBlowgun (96) `0x005E1250` | 352–382 |
-|   10. WillOWisp (25) `0x005F39B0` | 383–458 |
-|   11. Mephisto (50) `0x005F78B0` | 459–514 |
-| Constants & data dependencies | 515–532 |
-| Randomness | 533–543 |
-| Edge cases & original bugs | 544–563 |
-| Test vectors | 564–582 |
-| Provenance | 583–608 |
-| Open questions | 609–622 |
+|   4. ZakarumZealot (48) `0x005F6E60` | 162–201 |
+|   5. ZakarumPriest (49) `0x005F72D0` | 202–240 |
+|   6. FrogDemon (52) `0x005F8260`, alternate `0x005F81D0` | 241–282 |
+|   7. FetishShaman (65) `0x005F9A80`, alternate `0x005F9950` | 283–321 |
+|   8. HighPriest (85) `0x005E0490` | 322–359 |
+|   9. FetishBlowgun (96) `0x005E1250` | 360–390 |
+|   10. WillOWisp (25) `0x005F39B0` | 391–466 |
+|   11. Mephisto (50) `0x005F78B0` | 467–522 |
+| Constants & data dependencies | 523–540 |
+| Randomness | 541–551 |
+| Edge cases & original bugs | 552–571 |
+| Test vectors | 572–590 |
+| Provenance | 591–616 |
+| Open questions | 617–647 |
 <!-- /index -->
 
 ## Summary
@@ -170,7 +170,12 @@ the same formula).
 1. Quest flight (T ≠ 0). Q := T; T a monster → its owner record
    (`0x0058F090(T, &GUID, &type)`); owner type 0 → Q := the player with
    that GUID (`0x00552F60(game, 0, GUID)`, may be 0); any other owner
-   type keeps Q = T. If Q is a player, the act of the unit's level
+   type keeps Q = T. `0x0058F090` reads the minion owner (control
+   +0x2C / +0x30) only when minion bookkeeping is active (control +0x28
+   ≠ 0); otherwise it writes GUID −1 and leaves the type word unwritten
+   (an uninitialised stack word in 1.14d). Either way Q is then not a
+   player (no player has GUID −1; a nonzero garbage type keeps the
+   monster T), so a T without a minion owner never triggers the flight. If Q is a player, the act of the unit's level
    (`0x006427F0(0x0061A1B0(room))`, `drlg/levels.md`) is 2 (Act III),
    and Q's quest record of the difficulty (player data +0x10 + 4 ×
    difficulty, `0x006221A0`) has quest 21 (A3Q5 The Blackened Temple)
@@ -207,7 +212,8 @@ AI params: 0 = teleport cooldown frame, 1 = blizzard cooldown frame, 2
       with k = 4 when C, else 1 (a shift by 2 or 0). Skill check
       `0x005FD470(Skill3, 0, x, y)` ≠ 0 → `0x005DEAD0(Sk3mode, Skill3,
       0, x, y)` (the teleport past the target). End. The cooldown is
-      set even when the check fails.
+      set even when the check fails, and the think then goes on to step 1.2
+      (as it does when L ≥ 33 or the cooldown is running).
    2. C and P(aip1) [25] → A1 at T. End.
 2. Heal scan: scan 1 (`ai.md` §5.4), callback `0x005F7240`, arg {best
    0, count 0, 0x7FFFFFFF, max aip6² [1296]}. A unit U is taken when it
@@ -328,7 +334,9 @@ engaged e, 1 = spell cooldown frame.
       the scanner's alignment pairing, alignment 0, squared distance ≤
       2500 and life percent ≤ 75 and strictly below the best so far
       (best := U, best life := its percent; lowest wins, ties keep the
-      earlier). Found → param 1 := frame + aip3 [125]; `Skill2` at it.
+      earlier). The scanner itself is **not** excluded: a HighPriest
+      below 75 % life with alignment 0 can pick itself. Found → param 1
+      := frame + aip3 [125]; `Skill2` at it.
       End.
    3. `Skill1` ≥ 0, frame > param 1, D < aip8 [30] and draw < aip4
       [40]: k := `0x00472210(seed, 4)` (one step, `lo' & 3`); point :=
@@ -491,11 +499,11 @@ found and draw < aip2 [25] → it; else the nearest-player branch
      delete (`0x005DF7D0(T, 3, 1)`); not started → wander 12; end.
      Else c += 1; X := pick; n := the number of leading `Skill1`..
      `Skill8` ≥ 0 (stop at the first negative; Mephisto 6). n = 0 →
-     wander 6. Else q := 100 / n [16]; draw r; then the first that
+     wander 6, then the closing draw below. Else q := 100 / n [16]; draw r; then the first that
      holds: difficulty > 0 and (X blocked from the unit,
      `0x00622AA0(unit, X, 4)` ≠ 0, or D > 30) → `Skill6` at X; D < 15,
      r < q and difficulty > 0 → `Skill5` at X; r < 2q → `Skill4` at X;
-     r < 3q → `Skill2` at X; else `Skill1` at X. Then draw < 50 − K →
+     r < 3q → `Skill2` at X; else `Skill1` at X. Then (after the wander too) draw < 50 − K →
      c := 0. End.
    - 3: s := 0; draw < K + 80: draw < 80 − K → A1 at T, else `Skill3`
      at T. Else velocity (0, 50, 0); circle 3 at T with delete; not
@@ -613,9 +621,26 @@ Game-file vectors: Open question 1.
    schedules and draws with §2–§11.
 2. FrogDemon §6: confirm the submerged footprint (Vulture helpers) and
    the emerge timing with a recording that logs modes and collision.
-3. The unit-find `0x0065A950` / `0x0065AC70` (flags 0x583, size 32):
-   which rooms and which order it returns units in (it sets the wisps'
-   slots). No spec owns it yet.
+3. Answered (2026-10-07): the unit find `0x0065A950` / `0x0065AC70`
+   (rooms, found order, filter) is owned by `monsters/umod-callbacks.md`
+   §3.1.
 4. Who calls the FrogDemon and FetishShaman alternates (`ai.md` §3.3
    re-install while running): the skill or event paths that re-install
    AIs 52 and 65.
+5. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 3): §5 step
+   1.1 with a failed skill check goes on to step 1.2; the cooldown stays
+   spent. 1.14d-confirmed (`0x005F72D0`).
+6. Answered (reading 4): the HighPriest heal callback `0x005E0430` has
+   no scanner test (the ZakarumPriest callback `0x005F7240` has one);
+   §8 step 1.2 now says so.
+7. Answered (reading 5): ritual slots are compared signed (`r > 4`,
+   `r > 5`), so r ≤ 0 would index the stack tables at s·4 + r (A[s][0]
+   = A[s − 1][4]; s = 6 reads below the tables). Unreachable: params
+   are cleared on install, and s ≥ 5 is only set by the gather with r
+   = 1..5. WillOWisp is target mode 1, so T = 0 never reaches the ritual
+   points either. An implementation asserts both.
+8. Answered (reading 6): Mephisto case 2 with n = 0 wanders 6 **and
+   then** makes the closing `50 − K` draw (`0x005F7D55` falls into
+   `0x005F7D60`); §11 now says so.
+9. Answered (reading 7): see §4 step 1; a monster T without a minion
+   owner never gives the flight.

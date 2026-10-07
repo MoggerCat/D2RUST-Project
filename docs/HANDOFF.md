@@ -5013,6 +5013,56 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   is stack garbage except code 5; 0x26 bytes 8-9 with form 5).
 - `sim/pets.md` OQ3 (count part): summon a 4th skeleton over max 3; expect
   three 0x7A action 0 for the removed one (§6 table).
+- `monsters/ai-bodies-6.md` OQ1 (spec area 1, AI): a necromancer game
+  with golem, skeletons and a skeleton mage, a hireling following and
+  fighting, an Act II town walk, a MinionSpawner, an EvilHole and a
+  desert turret; log per think: type-2 schedule frame, unit-seed steps,
+  mode requests (mode, target, point), AI params 0–2.
+- `monsters/ai-bodies-7.md` OQ1 (AI): arrow / poison / nova traps, the
+  Act II palace guard before and after the door opens, the Dark
+  Wanderer, druid summons (wolves, bear, ravens, vines) and assassin
+  shadows; same log.
+- `monsters/ai-bodies-7.md` OQ2 (AI): Uber Tristram: for Uber Mephisto,
+  Diablo and Baal log the AI control's function (+0x04) and special
+  state (+0x00) after creation and at each think, and every type-2
+  schedule (their table thinks are empty in 1.14d).
+- `monsters/umod-init-bodies.md` OQ1: 0xAC assign + stat messages of a
+  lightning, cold or mana-burn unique with minions (expect the §2
+  values; minions on Normal get no damage stats, cold minions still get
+  coldlength).
+- `monsters/init.md` OQ1 / OQ4 / OQ10: client message 0x67 game type in
+  classic SP and TCP/IP; one population pass with rng hook + callers; a
+  unique's client name draws.
+- `sim/stat-lists.md` OQ1: read the x87 control word (precision bits) at
+  the §7.2 max-rescale call during a max-life change (a D3D device may
+  set 24-bit).
+- `sim/units.md` OQ6 (78 rows left `proof = file`): a `site` recording
+  over combat with skills, a trade and an item use, to confirm the
+  scheduled unit kinds of the state-timer, damage and trade sites.
+- `skills/use.md` OQ3–7: hook `0x0056FAF0` (entry/return) and
+  `0x0056F7F0` (entry), cast a non-`TargetAlly` skill on a party member
+  (does the do run after start returned 0); hook `0x0056BFE0` for
+  Teleport at level ≥ 25 with < 1 mana (cast free?); two C→S 0x06 two
+  frames apart (does the second restart A1); hook `0x005A7670` (arg1,
+  arg2, unit +0x4E) on monsters; log arg1 of `0x005539B0` per type-0
+  timer during Strafe / Zeal.
+- `skills/levels.md` OQ1: hook `0x00646460`, `0x00644D50` /
+  `0x00644E40` (entry/return) with known skill levels, and
+  `0x0056BFE0` (mana before/after) for a few skills.
+- `skills/bodies.md` OQ1–3, OQ9: Paladin Might in a party (hook
+  `0x005CF010`, `0x0056E970`: duration, expiry, count, state 85 per
+  tick); Kick, Bash, Attack on a monster (`0x0057DBF0` record before /
+  after); Amplify Damage on an immune monster and Dim Vision in
+  Nightmare (expiry − F); a Druid summon and a Clay Golem (stats 12,
+  31, 19, 7, 6 on the summon, AI think at F + 25).
+- `skills/bodies-2.md` OQ1–5, 7, 8, 12: Jab / Smite monsters (stats
+  21, 22, 19 and element stats around `mode_damage`); Dragon Talon L6 /
+  L12 (kicks, last-kick knockback, E param 1); Find Potion per act and
+  difficulty (codes, seed draws); Leap and monster Leap (E flags,
+  landing frame, knockback, 0xA5); Shock Field (caster seed before /
+  after); Conversion on a higher-level monster (stats 12, 6, 7 during
+  and after); Holy Freeze pulses (state 107, target seed); Whirlwind
+  with one and two weapons (E param 4, hits per do).
 
 ## 8. Lessons (problems met, fixes)
 

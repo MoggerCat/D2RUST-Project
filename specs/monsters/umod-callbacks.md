@@ -31,39 +31,39 @@
 | Rules | 97–98 |
 |   1. Scope, order and conventions | 99–131 |
 |   2. Where the dispatcher runs | 132–169 |
-|   3. Shared helpers | 170–283 |
-|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 284–293 |
-|   5. Umod 7 curse: mode 3 `0x005A2530` | 294–323 |
-|   6. Umod 9 fire | 324–349 |
-|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 350–355 |
-|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 356–374 |
-|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 375–384 |
-|   10. Umod 17 lightning | 385–405 |
-|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 406–412 |
-|   12. Umod 19 hireable | 413–428 |
-|   13. Umod 20 scarab | 429–439 |
-|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 440–450 |
-|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 451–470 |
-|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 471–475 |
-|   17. Umod 24 thief: mode 3 `0x005A30E0` | 476–492 |
-|   18. Umod 27 spectralhit | 493–513 |
-|   19. Umod 29 multishot: mode 5 `0x005A3610` | 514–535 |
-|   20. Umod 31 goboom: mode 2 `0x005A2840` | 536–542 |
-|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 543–553 |
-|   22. Umod 33 suicideminion_explode | 554–578 |
-|   23. Umod 34 ai_after_death | 579–604 |
-|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 605–608 |
-|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 609–615 |
-|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 616–621 |
-|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 622–635 |
-| Constants & data dependencies | 636–651 |
-| Randomness | 652–670 |
-| Edge cases & original bugs | 671–700 |
-| Test vectors | 701–702 |
-|   Synthetic (CI-safe) | 703–727 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 728–735 |
-| Provenance | 736–775 |
-| Open questions | 776–798 |
+|   3. Shared helpers | 170–322 |
+|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 323–332 |
+|   5. Umod 7 curse: mode 3 `0x005A2530` | 333–362 |
+|   6. Umod 9 fire | 363–388 |
+|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 389–394 |
+|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 395–413 |
+|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 414–423 |
+|   10. Umod 17 lightning | 424–444 |
+|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 445–451 |
+|   12. Umod 19 hireable | 452–467 |
+|   13. Umod 20 scarab | 468–478 |
+|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 479–489 |
+|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 490–509 |
+|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 510–514 |
+|   17. Umod 24 thief: mode 3 `0x005A30E0` | 515–531 |
+|   18. Umod 27 spectralhit | 532–552 |
+|   19. Umod 29 multishot: mode 5 `0x005A3610` | 553–574 |
+|   20. Umod 31 goboom: mode 2 `0x005A2840` | 575–581 |
+|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 582–592 |
+|   22. Umod 33 suicideminion_explode | 593–617 |
+|   23. Umod 34 ai_after_death | 618–643 |
+|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 644–647 |
+|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 648–654 |
+|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 655–660 |
+|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 661–674 |
+| Constants & data dependencies | 675–690 |
+| Randomness | 691–709 |
+| Edge cases & original bugs | 710–739 |
+| Test vectors | 740–741 |
+|   Synthetic (CI-safe) | 742–766 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 767–774 |
+| Provenance | 775–814 |
+| Open questions | 815–842 |
 <!-- /index -->
 
 ## Summary
@@ -171,41 +171,80 @@ sites, in engine order:
 
 #### 3.1 Unit find `0x0065A950` / `0x0065AC70` / `0x0065AA40`
 
-Callers here build a 0x38-byte context (zeroed): +0x00 flags F, +0x08
-excluded unit E, +0x0C x, +0x10 y, +0x14 radius r; init `0x0065A950`
-(start room R, a list of capacity 15, grown by 15 when full) collects,
-`0x0065AA00` frees.
+This spec owns the unit find for every caller (area damage §3.2,
+`missiles/bodies-2.md` §44 corpse effect, `monsters/ai-bodies-3.md`
+wisps, and the other callers listed below).
 
-1. R none → nothing found.
-2. Rooms: if the circle lies strictly inside R (`0x0065A6B0`: room box
-   (x0, y0, w, h) from `0x00619730`; x0 < x − r, y0 < y − r, x + r <
-   x0 + w, y + r < y0 + h) → R only; else R's adjacency array
-   (`0x00619790`, `drlg/rooms.md` §6, R included), in array order.
-3. Per room: F & 0x2000 and the room is in town (`0x0061AB00`) → skip.
-   The room-box test `0x0065A710` passes for every r ≥ 0 and room of
-   non-negative size (both of its "no" branches need a coordinate both
-   left of and right of the box).
-4. Per unit of the room's list (head +0x74, next +0xE8), in list order,
-   the filter `0x0065AA40`; accepted units are appended.
+**Finder record** (on the caller's stack). Init `0x0065A950(pool,
+finder, room R, x, y, r, cb, A)` (`ret 0x20`; finder null → fatal):
++0x00 pool, +0x04 result array (0x3C bytes = 15 unit pointers,
+allocated from the pool; failure → fatal), +0x08 R, +0x0C cb, +0x10 A,
++0x14 room flags G := 0, +0x18 found count := 0, +0x1C capacity := 15,
++0x20 x, +0x24 y, +0x28 r. The caller may then write G (+0x14); collect
+`0x0065AC70(finder)` (`ret 4`); free `0x0065AA00`.
 
-Filter `0x0065AA40(unit, ctx)`:
+**Filter record A** (built by the caller, 0x38 bytes, zeroed): +0x00
+flags F, +0x08 excluded unit E, +0x0C x, +0x10 y, +0x14 radius r,
++0x18 limit, +0x1C accepted count, +0x20 line iterator (F & 0x200),
++0x24 extra test (F & 0x800).
 
-1. F & 0x40 and count (+0x1C) ≥ limit (+0x18) → no.
-2. d² = (uy − y)² + (ux − x)² (unit position, 32-bit) > r² → no.
-3. By type: player needs F & 1; F & 0x1000 → mode 17 only, else not
-   mode 0 or 17; the unit = E → no. Monster needs F & 2; F & 0x1000 →
-   mode 12 only, else not mode 0 or 12; F & 4 → must be undead
-   (`0x0063E990`). Object needs F & 0x10. Missile needs F & 8 and a
-   missiles row (`0x0046ACE0`) **without** `Explosion` (+0x04 bit 1).
-   Item needs F & 0x20. Other types → no.
-4. F & 0x80 → unit flags +0xC4 bit 0x4 set; F & 0x400 → bit 0x8 set;
-   F & 0x100 → the unit's room not in town; F & 0x200 → the line from
-   the context's line start to the unit is not blocked (`0x0066A5D0`
-   steps, `0x0064CB30(room, x, y, 4)` = 4 blocks); F & 0x800 → the
-   context callback (+0x24) must return 0. Accept; count += 1.
+Collect `0x0065AC70`:
+
+1. R none → found count := 0, return 0.
+2. Rooms: if the square x ± r, y ± r lies strictly inside R
+   (`0x0065A6B0`: R's subtile box (x0, y0, w, h) from `0x00619730`,
+   active room +0x4C; x0 < x − r, y0 < y − r, x + r < x0 + w, y + r <
+   y0 + h) → R only; else R's adjacency array (`0x00619790`, active room
+   +0x00, count +0x24, `drlg/rooms.md` §1 / §6, R included), in array
+   order.
+3. Per room: G & 0x2000 and the room is in a town (`0x0061AB00` →
+   `0x006426A0`: the room's level id is 1, 40, 75, 103 or 109; byte
+   table `0x006426C8`) → skip. Then the overlap test `0x0065A710`, which
+   rejects only when x + r < x0 and x − r > x0 + w, or y + r < y0 and
+   y − r > y0 + h: for r ≥ 0 and a box of non-negative size it never
+   rejects (original bug; distance is left to the filter).
+4. Per unit U of the room's list (head +0x74, next +0xE8, the next link
+   read before the test), in list order: cb set → it must be a valid
+   code pointer (`IsBadCodePtr`, else fatal) and cb(ECX U, EDX A) ≠ 0
+   accepts; cb none → the filter `0x0065AA40(U, A)` ≠ 0 accepts.
+   Accepted units are appended; when the count reaches the capacity the
+   array grows by 15 (`0x0065A900`), without limit.
+5. Found count (+0x18) := the number appended; return it. **Found
+   order** = room order, then each room's list order.
+
+G (+0x14) is set only by the callers `0x0056DCC0` (G := the request's
+flags, so corpse effects with 0x2000 skip town rooms), and the callers
+at `0x004675C2` and `0x004F1524`; `0x0057E090` (§3.2), `0x0056DC61`,
+`0x0056E418`, `0x00582E6D`, `0x005D302D`, `0x005DFCCB`, `0x005F3F14`
+leave G = 0 (no town-room skip; the filter's own 0x100 test still
+applies). `0x0056C282` is a wrapper that passes the caller's finder.
+
+Filter `0x0065AA40(U, A)` (`ret 8`):
+
+1. A none → reject. F & 0x40 and accepted count (+0x1C) ≥ limit
+   (+0x18) → reject.
+2. Position of U (static path for types 2, 4, 5; else the dynamic
+   path); d² = (uy − y)² + (ux − x)² (32-bit) > r² → reject (distance
+   ≤ r passes).
+3. By U's type: player (0) needs F & 1; F & 0x1000 → mode 17 (dead)
+   only, else mode 0 or 17 rejects; U = E rejects. Monster (1) needs
+   F & 2; F & 0x1000 → mode 12 only, else mode 0 or 12 rejects; F & 4 →
+   must be undead (`0x0063E990`). Object (2) needs F & 0x10. Missile
+   (3) needs F & 8 and a missiles row (`0x0046ACE0`) **without**
+   `Explosion` (+0x04 bit 1). Item (4) needs F & 0x20. Tile (5) and
+   other types reject.
+4. F & 0x80 → unit flag 0x4 (+0xC4, `0x00451F30(U, 4)`) required;
+   F & 0x400 → unit flag 0x8 required; F & 0x100 → U's room in a town
+   (as collect step 3) rejects; F & 0x200 and U has a room → step the
+   line iterator at A +0x20 (`0x0066A5D0`); any point whose collision in
+   U's room (`0x0064CB30(room, px, py, mask 4)`) equals 4 rejects;
+   F & 0x800 → the extra test A +0x24 (ECX U, EDX A) non-zero rejects.
+5. Accept: accepted count += 1, return 1.
 
 Flags used in this spec: 3 (players, monsters), 0x581 (players only,
 live, unit flags 4 and 8, not in town), 0x583 (the same plus monsters).
+Corpse effect (`missiles/bodies-2.md` §44) passes 0x3002: monsters in
+mode 12 only, outside towns, within r.
 
 #### 3.2 Area damage `0x0057E090`
 
@@ -781,9 +820,14 @@ Per callback, in order (U = the monster's seed unless named):
 2. Edge case 5: whether the death start or the event handler drops the
    second suicide-minion event 7; settle with a recording of a suicide
    minion hit into GH.
-3. The unit find (§3.1) is owned here; `missiles/bodies-2.md` Open
-   question 3 and `monsters/ai-bodies-3.md` Open question 3 can link
-   to it once their callers' flags are checked against §3.1.
+3. Answered (2026-10-07): §3.1 is the single owner of the unit find;
+   `missiles/bodies-2.md` §44 and `monsters/ai-bodies-3.md` Open
+   question 3 point to it. Merged from bodies-2 §44 and re-read on
+   1.14d: the finder callback that replaces the filter, the finder
+   record layout, the room-flag field +0x14 (written by the caller after
+   init, not the filter flags), the town level ids, the overlap test
+   that never rejects, filter rule 1 (A none) and the F & 0x200 line
+   iterator.
 4. Quest death effects `0x005DFD90`, `0x005DFDB0`, `0x005DFE00`,
    `0x005DFE20`, `0x005E0020`, `0x005E0040`, `0x005E0060`,
    `0x005E0070` (§15) have no spec: the quests specs should own them.

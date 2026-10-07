@@ -47,7 +47,7 @@
 | Edge cases & original bugs | 583–597 |
 | Test vectors | 598–615 |
 | Provenance | 616–643 |
-| Open questions | 644–660 |
+| Open questions | 644–664 |
 <!-- /index -->
 
 ## Summary
@@ -657,3 +657,7 @@ Game-file vectors: Open question 1.
    `monsters/population.md`; read them.
 5. Who calls the BatDemon alternate (`ai.md` §3.3 re-install while
    running): the skill or event path that re-installs AI 29.
+6. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 1): Vulture
+   with T = 0 is unreachable (target mode 1, `ai.md` §2.3); the 1.14d
+   null read in §11 step 1 is not a rule. An implementation asserts T
+   ≠ 0 rather than stopping.
