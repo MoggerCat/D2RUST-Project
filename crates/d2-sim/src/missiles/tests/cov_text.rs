@@ -127,7 +127,11 @@ fn plague_javelin_live_rows() {
     cloud.param2 = 0;
     let (mut w, m) = world(r, &[cloud]);
     srv_hit(&mut w, 2, m, None);
-    assert!(w.fake.calls.iter().all(|c| !c.starts_with("vel ") || c == "vel 0"));
+    assert!(w
+        .fake
+        .calls
+        .iter()
+        .all(|c| !c.starts_with("vel ") || c == "vel 0"));
     assert_eq!(others(&w, m).len(), 8);
 }
 
@@ -186,4 +190,120 @@ fn spawn_for_level_dies_on_empty_or_unspawnable_lists() {
             missile: m
         }]
     );
+}
+
+// Covers: specs/missiles/missiles.md §r9-3-seeded-sub-missile-helper-0x005a9820-d2moo-missmode-createmissilewithcollisioncheck-1-14d-confirmed text, §r9-5-server-do-bodies-1-14d-confirmed text
+#[test]
+fn server_do_8_10_17_25_all_run_the_seeded_helper() {
+    // Each body reads the level and skill of the missile data and its
+    // frames left, then asks the helper for a sub-missile: the helper
+    // re-seeds {x + elapsed, 666} and draws dx, dy of roll(2(r - 1)).
+    // (range, interval) per body: 8 from Param1..3 and the level (q =
+    // 10 / 4 = 2: range 3 + 2, interval max(4 - 2, 3)); 10 and 25 from
+    // the skill's calc1 / calc2; 17 from Param3 / Param2.
+    for (body, range, interval) in [(8i16, 5i32, 3i32), (10, 5, 3), (25, 5, 3), (17, 5, 3)] {
+        let mut r = row();
+        (r.param1, r.param2, r.param3) = (3, 4, 4);
+        r.submissile1 = 1;
+        if body == 17 {
+            (r.param1, r.param2, r.param3) = (0, interval as _, range as _);
+            r.range = 300;
+        }
+        let (mut w, m) = world(r, &[sub()]);
+        skill(&mut w, [range, interval, 0, 0, 0]);
+        let total = if body == 17 { 300 } else { 50 };
+        // Elapsed 6: a multiple of 3 (frames left 44 / 294: inside the
+        // window of body 17).
+        set_frames(&mut w, m, total, total - 6);
+        let x = w.fake.pos[&m].0;
+        srv_do(&mut w, body, m);
+        assert_eq!(others(&w, m).len(), 1, "body {body}");
+        let mut s = Seed::init_low((x + 6) as u32);
+        s.roll(2 * (range - 1));
+        s.roll(2 * (range - 1));
+        assert_eq!(*w.fake.seed(m), s, "body {body}");
+    }
+}
+
+// Covers: specs/missiles/missiles.md §r2-2-entry-points
+#[test]
+fn only_create_missile_allocates_missiles() {
+    // `0x0059FA30` is the only creator: outside the seam trait, the real
+    // implementation and the test fake, `alloc_missile` is called from
+    // `create.rs` alone.
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for e in std::fs::read_dir(dir).unwrap() {
+            let p = e.unwrap().path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.push(p);
+            }
+        }
+    }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    walk(&root, &mut files);
+    let mut callers = Vec::new();
+    for f in files {
+        if f.ends_with("cov_text.rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&f).unwrap();
+        for (i, line) in text.lines().enumerate() {
+            let t = line.trim_start();
+            if t.starts_with("//") || t.starts_with("fn ") || t.starts_with("pub fn ") {
+                continue;
+            }
+            if t.contains("alloc_missile(") {
+                callers.push(format!(
+                    "{}:{}",
+                    f.strip_prefix(&root).unwrap().display(),
+                    i + 1
+                ));
+            }
+        }
+    }
+    assert_eq!(callers.len(), 1, "{callers:?}");
+    assert!(callers[0].starts_with("missiles/create.rs"), "{callers:?}");
+}
+
+// Covers: specs/missiles/bodies-2.md §edge-cases-original-bugs r5
+#[test]
+fn fire_head_heal_roll_and_damage_stage_roll_are_different() {
+    let rows = || {
+        let mut r = row();
+        r.etype = 1;
+        r.collidekill = 0;
+        r.psrvhitfunc = 31;
+        r.collidetype = 3;
+        r
+    };
+    let setup = |w: &mut World, m: UnitId| {
+        let o = w.owner;
+        w.fake.stats.insert((o, 6), 100);
+        w.fake.mb.max_life.insert(o, 5000);
+        w.fake.stats.insert((m, 48), 40);
+        w.fake.stats.insert((m, 49), 50);
+        w.fake.stats.insert((m, 21), 256);
+        w.fake.stats.insert((m, 22), 512);
+    };
+    // The body alone: one roll of roll(50 - 40) on the missile seed.
+    let (mut w, m) = world(rows(), &[]);
+    setup(&mut w, m);
+    let mon = w.monster;
+    let before = *w.fake.seed(m);
+    assert_eq!(srv_hit(&mut w, 31, m, Some(mon)), 2);
+    let mut one = before;
+    let v = 40 + one.roll(10) as i32;
+    assert_eq!(*w.fake.seed(m), one);
+    assert_eq!(w.fake.stats[&(w.owner, 6)], 100 + v);
+    // Through the hit handler the damage stage (result 2) then rolls the
+    // hit's damage again on the same seed: more draws than the heal's.
+    let (mut w, m) = world(rows(), &[]);
+    setup(&mut w, m);
+    let mon = w.monster;
+    w.hit(m, Some(mon), false);
+    assert_eq!(w.fake.stats[&(w.owner, 6)], 100 + v);
+    assert_ne!(*w.fake.seed(m), one, "the damage stage drew again");
 }
