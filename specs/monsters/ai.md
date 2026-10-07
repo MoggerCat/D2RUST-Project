@@ -32,18 +32,18 @@
 |   2. Think dispatch `0x005B1740` | 239–368 |
 |   3. AI control and AI tables | 369–510 |
 |   4. AI parameters | 511–529 |
-|   5. Target selection | 530–649 |
-|   6. Distances and line tests | 650–664 |
-|   7. Tactics helpers | 665–782 |
-|   8. AI commands and minions | 783–807 |
-|   9. Per-AI behaviours | 808–1613 |
-|   10. The catalogue `ai-functions.tsv` | 1614–1634 |
-| Constants & data dependencies | 1635–1658 |
-| Randomness | 1659–1680 |
-| Edge cases & original bugs | 1681–1722 |
-| Test vectors | 1723–1811 |
-| Provenance | 1812–1868 |
-| Open questions | 1869–1956 |
+|   5. Target selection | 530–655 |
+|   6. Distances and line tests | 656–670 |
+|   7. Tactics helpers | 671–788 |
+|   8. AI commands and minions | 789–813 |
+|   9. Per-AI behaviours | 814–1619 |
+|   10. The catalogue `ai-functions.tsv` | 1620–1640 |
+| Constants & data dependencies | 1641–1664 |
+| Randomness | 1665–1686 |
+| Edge cases & original bugs | 1687–1728 |
+| Test vectors | 1729–1817 |
+| Provenance | 1818–1874 |
+| Open questions | 1875–1978 |
 <!-- /index -->
 
 ## Summary
@@ -531,8 +531,10 @@ headers are comments, not data.
 
 #### 5.1 Forced targets `0x005DD610`
 
-D2MOO `sub_6FCF2920` (EAX game, ESI unit; stack: scan argument a, test
-flag T, &target, &distance). Runs first. The override is monster data
+D2MOO `sub_6FCF2920` (EAX game, ESI unit; stack: a, s, &target,
+&distance). Callers: the main search §5.2 step 3 with (a = its
+line-of-sight flag T, s = 0), and `0x005DDC30` (§5.3) with (a = 0, s =
+1). Runs first. The override is monster data
 kind k (+0x38) and GUID g (+0x34). Setter `0x00573090(unit, k, g)`:
 monsters whose monstats `switchai` bit is set, k < 5; callers: terror
 special-state init `0x005E80E0` (k by the type of its path target
@@ -546,19 +548,23 @@ failure below.
 1. Not a monster, or k = 0 → return 0.
 2. k = 1 / 2 / 4: U := the unit of type 0 / 1 / 3 with GUID g
    (`0x00552F60`); none → clear, 0. d := full-size distance U→unit
-   (`0x005DC380`, §6). T ≠ 0 and the collision test `0x00622AA0(U,
+   (`0x005DC380`, §6). s ≠ 0 and the collision test `0x00622AA0(U,
    unit, 4)` hits → clear, 0.
 3. k = 3: A := the unit's alignment (`0x006259B0`); r := one raw step
    of the unit seed, `& 1` (`0x00472210(seed, 2)`). Temporary
    alignment (`0x005543B0(unit, value, 1)`): A = 1 → r ? 2 : 0; A = 0
-   and r → 2; A = 2 and r → 0; else unchanged. Then scan 5 (T = 0;
+   and r → 2; A = 2 and r → 0; else unchanged. Then scan 5 (s = 0;
    context {best 0, d 0x7FFFFFFF, a, 35, coordinate index of the
-   unit's position `0x0061B130`, 0, 0x7FFFFFFF}) or scan 6 (T ≠ 0;
+   unit's position `0x0061B130`, 0, 0x7FFFFFFF}) or scan 6 (s ≠ 0;
    context {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}) (§5.4); U := best, d := its
    distance; restore alignment A (`0x005543B0(unit, A, 1)`).
 4. Accept U when it is a player or monster that is not dead
    (`0x005541B0`), or a missile (type 3): target := U, distance := d,
    return 1. Anything else (none, object, item, tile, dead) → clear, 0.
+
+From the main search the accepted U then takes §5.2 step 7 like any
+target (control flag 0x08 and vision +0x24 unless the unit is good,
+combat := melee-range test, distance := d).
 
 The k = 3 draw is the only one, and it is made on every think while
 the override holds. 1.14d-confirmed (`0x005DD610`, jump table
@@ -1953,3 +1959,19 @@ Other recorded checks:
     `ai-functions.tsv`; the last 55 bodies are `ai-bodies-6.md` and
     `ai-bodies-7.md` (the Uber Mephisto, Diablo and Baal thinks are
     empty in 1.14d: `ai-bodies-7.md` §26 and its open question 2).
+17. Answered (2026-10-07), the implementation questions of
+    `docs/handoff/impl-ai-act1.md` §4 and `gaps-combat-ai.md`, all
+    settled in the text: AI1 drehyaiced is class 527 (§9.32,
+    `0x005E77A0` compares 0x20F; the catalogue row pairs were corrected,
+    Provenance); AI2 and AI3 §9.31 (the "Else" belongs to the first
+    30 % roll; no room counts as out of town); AI4 and AI5 §9.32 (the
+    param writes and idle 1 follow a leave; any class other than 527
+    with AI 31 takes cain1's Act 1 functions, it does not do nothing);
+    AI6 §8 (`0x0058EFA0` creates through `0x0058EF40`, which makes the
+    new command current; `0x0058EEF0` with no current returns 0); AI7
+    §7.2 table (coordinate walk / run: path step count 1); AI8 OQ12 (G
+    is per server process, not per game or per AI store: the code's
+    per-store G matches only the first game of a process); AI9 §9.26
+    (states through `0x00639DB0`); AI10 §9.28 (a state above 3 takes the
+    above-ground steps; the function never writes one). Forced-target combat and flags: §5.1 end
+    (§5.2 step 7 applies).
