@@ -25,18 +25,18 @@
 | Inputs | 55–66 |
 | Outputs / state changes | 67–72 |
 | Rules | 73–74 |
-|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 75–161 |
-|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 162–206 |
-|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 207–242 |
-|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 243–277 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 278–351 |
-|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 352–512 |
-| Constants & data dependencies | 513–527 |
-| Randomness | 528–533 |
-| Edge cases & original bugs | 534–547 |
-| Test vectors | 548–571 |
-| Provenance | 572–599 |
-| Open questions | 600–616 |
+|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 75–180 |
+|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 181–225 |
+|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 226–261 |
+|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 262–296 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 297–370 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 371–531 |
+| Constants & data dependencies | 532–546 |
+| Randomness | 547–552 |
+| Edge cases & original bugs | 553–566 |
+| Test vectors | 567–591 |
+| Provenance | 592–619 |
+| Open questions | 620–636 |
 <!-- /index -->
 
 ## Summary
@@ -158,6 +158,25 @@ waypoint row table `[0x007BF03C]`.
     0x700) back to `protate`; a press shows `ppress` until the release.
     The seed draws of r8 change the client player seed (`render/capture.md`
     §7: recorded per frame).
+
+14. **Which messages reach the cursor** (answers §Open questions 4).
+    The init registers the 3 entries of table `0x00711FEC` on the game
+    window (kind 0 = window message): `WM_MOUSEMOVE` (0x200) → the move
+    r4; `WM_NCMOUSEMOVE` (0xA0) → `0x00467EF0`: drawn := 0 (the cursor
+    is not drawn while the mouse is over the non-client area), and when
+    the hit-test code (event +8) is 2 (`HTCAPTION`) the OS cursor call
+    `0x004F59F0(0)` (video-mode dependent; an app edge); the event is
+    left unconsumed (+0x18, +0x1C := 0); `WM_LBUTTONUP` (0x202) → the up
+    r6. The press r5 is **not** a window handler: only three panel
+    presses call it, the character panel's button press (`0x004A7720`,
+    a stat button or the close button armed) and the control panel's
+    new-stats / new-skills press (`0x004A66E0`, `0x004A6790`,
+    `ui/control-panel.md` §8 r4). So a world click, a right click or any
+    other panel press leaves the cursor type unchanged; the `ppress`
+    animation shows only on those buttons. The up transition is also
+    called directly by `0x0048B7C0`, `0x004A6840`, `0x004A6920`,
+    `0x004A78C0` (a second call is harmless: s is 1 by then). No
+    right-button message reaches the cursor.
 
 ### 24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values)
 
@@ -550,6 +569,7 @@ Reproduced by default.
 | Input | Expected output | Source |
 |---|---|---|
 | init, no input for 4,999 ms | type 5 `protate`, state 1 | §23 r3, r8 |
+| s = 1, left down on open ground, then left up | t stays 5, s stays 1 (no press transition; the up acts only in s 5); idle restarts | §23 r14 |
 | idle > 5,000 ms | state 2, type 2 `ohand`, frame 0; after 32 steps state 4, type 3 | §23 r8 |
 | `ohand` frame 0 (32 × 26, offsets (−1, 24)) at mouse (100, 100), adj 0 | covers columns 99–130, rows 99–124 | §23 r10, `sprite-placement.md` §2 |
 | mouse at (900, 50) at 800 × 600, no clip test | drawn at x 799 | §23 r10 |
@@ -610,6 +630,6 @@ numbers of `data/fields.tsv` for all ten wrappers. No D2MOO code used.
 3. Player trade panel (ui 0x17, §27 r6): art, both players' names and
    gold, buttons 2, 4, 7, 8 (`0x004B8730`–`0x004B9110`). Multiplayer
    only; not needed for Phases 0–6.
-4. The cursor handler table of `0x00451DB0(3)` (§23 r3): which window
+4. **Answered** (2026-10-07, §23 r14). Was: The cursor handler table of `0x00451DB0(3)` (§23 r3): which window
    messages reach `0x00468840`, `0x00467F20`, `0x00467FA0` (move; left /
    right down; up), read from the table the call registers.
