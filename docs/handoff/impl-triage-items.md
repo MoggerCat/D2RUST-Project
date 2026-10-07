@@ -167,4 +167,17 @@ Each is in code (`// PROVISIONAL (…)`) and in its spec (`PROVISIONAL:`).
 
 ## Gate
 
-See the coordinator message / commit for the gate result.
+`CARGO_INCREMENTAL=0 sh tools/gate.sh`: every step PASS except "test
+d2-sim + conformance", whose only failures are the two known
+`world::objects::tests` route tests (impl-pc2-s4-world). nextest stops
+there, so the rest of d2-sim was run with `--no-fail-fast`: all pass
+except `d2-sim::prop_walk_motion chase_a_moving_target`, a random
+proptest that also fails on the base 740449b (3 of 12 runs; "type 15
+after re-path (Moving)", pathing.md §9.10, impl-triage-sim's area).
+
+d2-client tests changed by the sell's new 0x9D (vendors.md §7.2 r9; the
+client e2e harness sees it): `e2e_full_loop` (step 12 streams; handled
+20 → 21), `e2e_single_player` (steps 19, 21, 22 via the new
+`e2e_support::assert_stored_sale`; handled 46 → 49), `e2e_vendor` (two
+sales; the gold diff indices (5, 0, 11), (6, 0, 11) → (5, 1, 11),
+(6, 1, 11)).
