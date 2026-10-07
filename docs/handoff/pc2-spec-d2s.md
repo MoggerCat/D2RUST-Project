@@ -58,14 +58,46 @@ spec.
   the first matching pair's bit (bit 0 only when no pair matches).
   `formats/d2s-load.md` had no "no caller" claim; unchanged.
 
+- Third pass (2026-10-07, worktree `w-spec-d2s7`, exports + disasm.py
+  only; saves read with `tools/d2s_check.py`):
+  - OQ17 -> new `formats/d2s-appearance.md` (split, d2s.md at its size
+    limit): token table `0x0063D710` (255 entries from the item tables,
+    simulated over the 1.14d tables: reproduces all 8 measured component
+    values), hand owners `0x0063C050`, body armour parts via `armtype`,
+    colour byte `0x0062C100` = (Transform × 32 + colour) mod 256 + 1.
+    Broken weapons draw in the left hand (bdMercTwo, bdGolem).
+  - OQ5 -> d2s-load §4: reloaded list is file order; indices move once.
+  - OQ7 -> +0xCF only from/to the file; realm-only readers.
+  - OQ8 -> dead: `0x0052C0E0` (only writer of `[0x00883D50/54]`) is
+    unreferenced.
+  - OQ9 -> d2s-load §7: single player game type 3 (`0x00477CDF`), seed
+    restored when loaded in the saved difficulty.
+  - OQ10 -> §6 rule 6: the NPC classes and message ids that set field A
+    in each act's callback.
+  - OQ11 -> no code sets unit +0xC8 0x8000 on a server unit.
+  - OQ12 -> cache flag = interacting with a player (`0x00532400`),
+    blob = player data +0x5C (`pTrade`).
+  - OQ13 (partial) -> d2s-load §6: stored / cursor non-matching runeword
+    item deleted; equipped one unequipped (end place open).
+  - OQ14 -> no reader in Game.exe.
+  - OQ15 -> d2s-load §3: GUID in client +0x484; on join `0x005394A0`
+    re-casts Iron Golem (`0x0056F7F0`) on the item.
+  - OQ16 -> d2s-load §5: S→C 0xB4 -> client index -> string ids
+    (`0x0070F384`).
+
 ## Still open
 
-- d2s OQ1, 2, 5, 7, 8, 9, 11–16 unchanged (no new evidence).
-- OQ4 (dead hireling, hireling items), OQ6 (path null vs zero), OQ10
-  (other NPC bits): partial as before.
-- OQ17 (new): which bytes each equipped item writes into +0x88..+0xA7
-  (`0x0063DA70` and the composite branch of `0x0063E510`); needs Ghidra
-  plus saves with several equipped items.
+- OQ1 (legacy loader) and OQ2 (item records below version 0x60, owner
+  `items/bitstream.md`): out of scope, unchanged.
+- OQ4 (dead hireling, hireling items), OQ6 (corpse path null vs zero):
+  partial as before; OQ4 needs local saves.
+- OQ13: where the equipped non-matching runeword item ends up
+  (d2s-load OQ2).
+- d2s-appearance OQ1 (state-colour list builder), OQ2 (no measured
+  colour / armour / helm byte yet); d2s-load OQ3 (index confirmation).
+- `formats/d2s.md` is 65 KB (over ~60 KB): splitting §8 would move
+  rules that code `Covers:` claims cite; left for the orchestrator to
+  decide.
 
 ## CODE-TABLE CHANGE commits
 
@@ -101,8 +133,34 @@ None.
   callers `0x005335E0` (player, corpse, hireling lists), `0x0056ACE0`
   (golem), `0x00541990`. Change: add to the 0x2000 / 0x80000 rows.
 
+- to PC 1 (`sim/rng.md` Open question 2): single-player game type is
+  3 (`0x00477CDF` -> `0x0053F17A` -> `0x00530CFF`), +0x84 = 0 without
+  `-seed`, so the .d2s map seed (+0xAB) is restored on every load whose
+  town byte for the game's difficulty has 0x80 (`formats/d2s-load.md`
+  §7). Change: answer the question from the binary.
+- to PC 2 quests-core (`world/quests.md` §10.3): the field-A setter's
+  callers with their NPC classes and message ids (`formats/d2s.md` §6
+  rule 6); `0x0058E990` also sets quest record 31 byte +0xC := 1 (when 0
+  and +9 ≠ 0) on class 513 messages 0x4E45–0x4E47. Change: add both.
+- to PC 1 (`skills/bodies*.md`, Iron Golem): on join, `0x005394A0`
+  re-casts skill 90 through `0x0056F7F0`(game, player, 90, L, 1, 0, 0)
+  on the saved golem item, placed at the player and set as the
+  player's target (`formats/d2s-load.md` §3). Change: mention that
+  caller.
+- to PC 2 items (`items/properties.md` §10.1): on load a top-level item
+  with flag 0x4000000 that fails `0x0062BED0` is deleted when stored or
+  on the cursor and unequipped when equipped (`0x00563470`,
+  `formats/d2s-load.md` §6). Change: link it.
+
 ## Recording list
 
-None needed. OQ17 needs local saves (not a recording): one character
-saved with weapon, shield, helm, body armour, belt, gloves, boots
-equipped, and again with a different set, to compare +0x88..+0xA7.
+No recording needed. Local saves (not recordings) that would confirm:
+- d2s-appearance OQ2: one character with a helm, a body armour and a
+  coloured (magic / set / unique) item equipped: +0x88..+0xA7 against
+  `formats/d2s-appearance.md` rules 4–6.
+- d2s-appearance OQ1: a save while Enchant is active on the weapon
+  (colour byte 5 = 0x00 expected for `Transform` 1, 2 or 5–8).
+- OQ4: a dead hireling (flags 0x10000) and a hireling carrying items.
+- OQ15: a Necromancer with an Iron Golem made from an item.
+- d2s-load OQ3: a hotkeyed tome linked after the equipped weapon,
+  saved, reloaded, saved.

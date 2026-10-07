@@ -34,17 +34,17 @@
 |   3. Save field layout (owner of the save format: the character-save spec) | 147–169 |
 |   4. Which waypoints are known without operating one | 170–189 |
 |   5. Waypoint objects | 190–263 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–302 |
-|   7. Travel (`0x00584F60`) | 303–350 |
-|   8. Timing and message order | 351–372 |
-|   9. Town portals | 373–378 |
-|   10. Object mode change (consequence used above) | 379–386 |
-| Constants & data dependencies | 387–414 |
-| Randomness | 415–438 |
-| Edge cases & original bugs | 439–475 |
-| Test vectors | 476–515 |
-| Provenance | 516–554 |
-| Open questions | 555–576 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 264–308 |
+|   7. Travel (`0x00584F60`) | 309–356 |
+|   8. Timing and message order | 357–378 |
+|   9. Town portals | 379–384 |
+|   10. Object mode change (consequence used above) | 385–392 |
+| Constants & data dependencies | 393–420 |
+| Randomness | 421–444 |
+| Edge cases & original bugs | 445–481 |
+| Test vectors | 482–521 |
+| Provenance | 522–560 |
+| Open questions | 561–608 |
 <!-- /index -->
 
 ## Summary
@@ -292,6 +292,12 @@ value stays 0 and this branch never fires (open question 6).
 
 Not checked: that `wp` is a waypoint object, that the menu is open or
 the interact info names `wp`, the destination act, expansion, quests.
+
+Step 2 without a room (handoff `impl-world` W1, `0x00549597`–
+`0x005495BC`): the act is `0x006427F0(0x0061A1B0(room))`; with no room
+`0x0061A1B0` returns level id 0 and `0x006427F0(0)` is act 0. So a
+player or object without a room counts as **act 0**, not "no act": a
+roomless unit passes step 2 against any Act I unit.
 
 #### 6.3 After validation
 
@@ -566,10 +572,36 @@ Save: the test character with Cold Plains has the section `5753
 4. Object ENDANIM handler `0x00581490` (not in the exports): D2MOO sets
    mode 1 → 2 directly when `Mode2` ≠ 0, without the anim setup. Settle:
    Ghidra function at `0x00581490`.
+   Answered (2026-10-07, `disasm.py at 0x581490`; `sim/units.md` §6.4
+   event 1): null object → nothing; the u16 mode at +0x10 ≠ 1 →
+   nothing; objects record byte +0x141 (`Mode2`) = 0 → nothing; else a
+   direct dword write of 2 to +0x10 (`0x005814B0`; no `0x00624690`, no
+   update queued, no animation setup, no draw), then, when record byte
+   +0x122 (`HasCollision2`) = 0, the footprint is freed (`0x00623830`).
+   Waypoint classes have `Mode2` = 1, so a waypoint in mode 1 is in mode
+   2 after its ENDANIM fires.
 5. Is player data +0x160 zero for a fresh player in 1.14d (allocation
    zeroes it)? Settle: read it in a running single-player game.
+   Answered (2026-10-07): yes. Player data (0x16C bytes) is allocated
+   and zeroed by `0x00621F90` (`_memset` at `0x00621FEC`; callers the
+   player init `0x00534922` and the client `0x00460D0D`), and the only
+   server write to +0x160 is `0x0055B76B` in `0x0055B720`
+   (`GetTickCount`), reached only from `0x005A5F51` (hostility). The
+   other `mov [reg + 0x160]` sites are client code (`0x00421E10`,
+   `0x004B83A0`).
 6. Multiplayer conversion of the 10 s wall-clock hostile delay to ticks
    (Phase 7 decision, not a fidelity fact).
 7. Classic (non-expansion) games: nothing in the waypoint path blocks an
    act-5 index; whether a classic record can ever hold one. Settle: grep
    the save-load path for expansion masking.
+   Answered (2026-10-07): the load path masks nothing. Both section
+   readers (`0x0056A3E0`, legacy `0x00532C70`) check only "WS" and the
+   three magics and pass each record to the load copy `0x00661030`,
+   which copies all 16 bytes, applies only the magic rule (§2 rule 5)
+   and sets bit 0; neither reads the game's or the character's
+   expansion flag. So a classic character keeps every act-5 bit its
+   file holds, and travel to such an index is then not blocked by the
+   waypoint path (this question's premise). The in-game setters are the
+   six callers of `0x00660EC0` (`0x0057A6B4`, `0x0057A739`, `0x0057A7BC`,
+   `0x005847FC`, `0x00584E7C`, `0x005B501C`); whether a classic game can
+   reach one with an act-5 index belongs to their owners.

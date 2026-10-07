@@ -33,20 +33,20 @@
 | Inputs | 67–77 |
 | Outputs / state changes | 78–89 |
 | Rules | 90–91 |
-|   1. Conventions | 92–145 |
-|   2. Act IV records | 146–167 |
-|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 168–272 |
-|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 273–401 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 402–611 |
-|   6. Act IV gossip records | 612–636 |
-|   7. Multiplayer and party rules | 637–649 |
-|   8. Hooks called from other systems | 650–667 |
-| Constants & data dependencies | 668–688 |
-| Randomness | 689–702 |
-| Edge cases & original bugs | 703–745 |
-| Test vectors | 746–760 |
-| Provenance | 761–788 |
-| Open questions | 789–828 |
+|   1. Conventions | 92–158 |
+|   2. Act IV records | 159–180 |
+|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 181–301 |
+|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 302–449 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 450–682 |
+|   6. Act IV gossip records | 683–709 |
+|   7. Multiplayer and party rules | 710–722 |
+|   8. Hooks called from other systems | 723–760 |
+| Constants & data dependencies | 761–781 |
+| Randomness | 782–795 |
+| Edge cases & original bugs | 796–854 |
+| Test vectors | 855–872 |
+| Provenance | 873–910 |
+| Open questions | 911–994 |
 <!-- /index -->
 
 ## Summary
@@ -103,6 +103,11 @@ triggers on leaving The Pandemonium Fortress (level 103). "Same or
 adjacent room as R" = the player's room is R or R is in the player's
 room's adjacent-room list (`0x00619790`). Time "f" = the game frame.
 
+"Radius" of a free-spot search: `0x00545340`'s sixth argument (stack
++0x14) is never read in 1.14d (body `0x00545340`–`0x0054547F`, `ret 0x14`); the ring
+search is bounded by the seventh argument (limit) only. Every "radius n"
+below is recorded for completeness and has no effect.
+
 #### 1.2 Message-list selection (event 0)
 
 As `world/quests-act2.md` §1.2: event-0 callbacks add a table state of
@@ -142,6 +147,14 @@ Object event 7 (`quests.md` §9.5) reaches `0x005B5750` for class 131
 (the seal-boss dummy) in level 108 (§5.4) and record 24's `0x005B6710`
 for class 376 (§4.7). Live `objects.txt` values used: Seal `FrameCnt1`
 20; Hellforge `FrameCnt1` 22, `FrameCnt3` 22.
+
+Frame counts are read at each call, not cached: the operate / event
+function looks up the object's own `objects.txt` record by its class
+(`0x00640E90(class)`, class −1 for a missing unit; Hellforge at
+`0x005B5C7D`) and takes the u32 at +0xDC (`FrameCnt1`) or +0xE4
+(`FrameCnt3`), stored · 256, shifted right 8 (`0x005B5E2B`,
+`0x005B5DC6`; `sim/units.md` §6.4). An implementation reads the column
+of the object's row, never a constant.
 
 ### 2. Act IV records
 
@@ -249,6 +262,21 @@ is 706 (`uberizual`) (§8). Izual is not a forced kill (`quests.md`
   `0x005E7350` agrees (AI spec), the AI removes the ghost
   (`0x005DDFC0`) and calls `0x005B4440`: for each player `0x005B3D30`
   (25.13 set → sound 74).
+  - Distance `0x006416D0(a, b)` is the size-adjusted unit distance
+    owned by `missiles/missiles.md` §R9.5 item 4 (dx, dy minus half
+    sizes, floored at 0, (2·max + min) / 2); it takes two units and no
+    radius (callback `0x005B43D0` compares the result with 5).
+  - The removal path, read in NpcStationary (`0x005E73A0`): it is
+    taken only when `0x005DDF20` finds no interacting player (returns
+    none or the NPC itself, `monsters/ai.md` §5.3) and the unit's class
+    is 406 (`0x005E74EA`). Then `0x005B43F0` true → `0x005E7350(game,
+    ghost)`: when nobody talks to the ghost (interaction list monster
+    data +0x30 empty, `0x00572DC0` = 0) it sets the ghost to mode 0
+    (death) at (0, 0) (`0x005DDFC0(game, ghost, 0, 0, 0)` =
+    `0x005A7E60` request + `0x005A7C20(game, request, 1)`) and returns
+    1; else returns 0 and the AI idles 20 (`0x005DE080(…, 20)`). On 1
+    the AI sets mode 0 at (0, 0) a second time (`0x005E7521`), then
+    `0x005B4440`. The ghost is never removed while someone talks to it.
 - Izual's AI (`0x005F89B0`, row 55), on its first think (AI data +0x14
   = 0 → 1), calls `0x005B4390`: chain 22 not-intro with status < 2 →
   flags := 0, status 2 to all.
@@ -257,7 +285,8 @@ is 706 (`uberizual`) (§8). Izual is not a forced kill (`quests.md`
 
 - Event 3 (`0x005B4140`): old level 103 only: quick remove; state 2 and
   the player lacks 25.0 → state := 3; flag iterate for all; status 0 →
-  flags := 0, status 1 (silent).
+  flags := 0, status 1 (silent). The status test sits inside the
+  state-2 / 25.0 test (both branch to the same exit `0x005B41C4`).
 - Event 10 (`0x005B3E30`): remove the player's GUID (−1 without a
   player) from the record list.
 - Event 13 (`0x005B4220`): 25.0 or 25.15 → nothing. Else the first set
@@ -362,7 +391,9 @@ Chat end (event 2, `0x005B6440`): cain4 with +0x02 = 1: status (4 when
 
 1. +0x04 set → object mode 4.
 2. Unless +0x03 and +0x14 > 0: stop. Level slot := 50 (one i32 for
-   the whole call, passed as `&level`).
+   the whole call, passed as `&level`). The 50 is never used: `&level`
+   is an out-parameter of `0x00559A30` (below), overwritten before it
+   is read.
 3. Round: for i = 0 … +0x14 − 1: table by tier +0x08 (4 → perfect, 3 or
    2 → flawless, 1 → standard, anything else → stop the whole call);
    one quest-seed step, code = table[lo' mod 7]; drop code := code;
@@ -391,12 +422,29 @@ So each credited player adds one gem per round: rounds give perfect,
 flawless, flawless, standard gems, 20 frames apart, the first at f +
 `FrameCnt3` after the smash; the gem tier does not depend on difficulty.
 
+Item level of these drops (`0x00559A30(game, unit, quality, &level,
+out, −1, 0)`, args read at `0x00559A43`–`0x00559AF8`): before any
+read, the function computes a level from the dropping unit and stores
+it through `&level`: player (type 0) → stat 12 (`0x006253B0(unit, 12,
+0)`); monster (type 1) → stat 12 (`0x00625480(unit, 12, 0)`); any other
+unit → the `levels.txt` monster level of the unit's room's level for
+the game difficulty (`0x0061DCA0(level, difficulty, game +0x70)`:
+`MonLvl1`–`3` at +0x10, or `MonLvl1Ex`–`3Ex` at +0x16 in an expansion
+game; difficulty ≥ 3 or a bad level → 1); no unit → 1; any result ≤ 1
+→ 1. That value is the item level (request +0x0C, `0x00559C66`). The
+drop code at unit +0xB8 (written by the quest before each call) selects
+the item (`0x00633680`, fatal when unknown). For the forge (object 376,
+River of Flame 107) the gems and the rune get level 27 / 52 / 77
+(classic) or 27 / 57 / 85 (expansion) on normal / nightmare / hell
+(live `levels.txt`). The item-creation internals are the item spec's.
+
 #### 4.8 Hephasto's hammer (event 8, `0x005B65D0`)
 
 Monster creation links base 409 (`hephasto`) to chain 24 (§8); the kill
 is not forced, so the record must be active. Not-intro: drop code `hfh
 `; one `0x00559A30(game, victim, 7, &level, 0, −1, 0)` (unique quality;
-`level` is an uninitialised stack slot); created → +0x10 += 1. The
+`level` is an uninitialised stack slot, written by the call before use:
+the item level is Hephasto's stat 12, §4.7); created → +0x10 += 1. The
 callback stays installed and nothing limits the count.
 
 ### 5. A4Q2 Terror's End (chain 23, slot 26)
@@ -482,11 +530,24 @@ player with 26.14, else the status byte.
   394), 56 (`0x005B6C10`, 396). Object mode 0 and chain 23 present:
   boss spot := the seal's position + offset, written to its pair; then
   `0x005B6AD0`: the room covering the spot (`0x00463740`); free spot
-  (`0x00545340`, size 3, mask 0x3F11, radius r, limit 100; the spot is
+  (`0x00545340`, size 3, mask 0x3F11, radius r (unused), limit 100; the spot is
   updated in place); found → object 131 there (`0x00555230`, flags 1,
   0, 0); created → `0x0061AED0(room, 0)` and the seal activation above.
   No spot or no object → the seal stays in mode 0 (it can be operated
   again; the spot is recomputed from the seal).
+  - `0x0061AED0(room, 0)` sets flag 0x400000 on the room's DRLG room
+    (+0x10, flags +0x28; `0x0061BAC0`; with a nonzero second argument
+    it clears it). That flag makes the room-removal test fail
+    (`0x0061BA30`, `drlg/rooms.md` §8 step 1), so the dummy's room is
+    never deactivated; no Act IV code clears it again.
+  - The dummy schedules its own first event 7 in its init (object 131
+    `InitFn` 59 = `0x0054FE10`, run when it is created): only when its
+    mode is 0, mode := 1, then object event 7 at f + 27 and event 1 at
+    f + `FrameCnt1` + 1 (Dummy 131 `FrameCnt1` 20). So the boss spawn
+    first runs 27 frames after the seal is opened; the retry of a
+    failed spawn is f + 10 (below).
+
+  Column r is the unused radius argument (§1.1).
 
   | Seal | Pair | Offset | r | Boss (data tables +0xAE0 entry) |
   |---|---|---|---|---|
@@ -498,7 +559,12 @@ player with 26.14, else the status byte.
   equals a pair → `0x00545C30(game, dummy, &pair, 2, id)` with id = the
   u16 entry 36 / 37 / 38 of the data-tables array at +0xAE0 (+0xB28,
   +0xB2A, +0xB2C; read elsewhere by `0x00586B30`, ≤ 0x41 entries);
-  spawn fails → event 7 again at f + 10. No pair → nothing.
+  spawn fails → event 7 again at f + 10. No pair → nothing. The array
+  is the hcIdx → `superuniques.txt` row map built by the superuniques
+  loader `0x006552E0` (`data/loading.md` §8 superuniques row: every hcIdx
+  0–65 must occur, first row wins; fill `0x0065560F`–`0x0065565C`, fatal
+  check `0x0065565E`). In live data entries 36–38 are rows 36–38
+  (the `Expansion` separator is txt line 42, after them).
 - Superunique creation (`0x005A4440`, `0x005A49B0`) links hcIdx 36, 37,
   38 to chain 23 (§8); their kills are forced (`quests.md` §4.4).
 
@@ -528,7 +594,12 @@ Timer (`0x005B4BE0`), spawn part (+0x02 set): +0x18 += 1; below 10, or
 2, GUID +0x08) at its x, y and room: `0x005B4B60` spawns monster 243 in
 mode 1 (`0x005B2F20`, p = −1, then 5, then 10); created → unit flags |=
 0x3000000, +0x11 := 1; +0x02 := 0, +0x01 := 0, return 1 (timer freed).
-Failure → return 0 (retried every firing).
+Failure → return 0 (retried every firing). The three tries use the same
+x, y and room (the start point's, read once per firing; the last
+`0x005B2F20` argument before the flags is the placement spread,
+`monsters/init.md` §2); a start-point GUID that no longer finds an
+object (`0x00552F60` null, `0x005B4C22`) also returns 0, so it counts
+as a failed spawn and is retried at the next firing.
 
 So Diablo appears at the 10th firing (`quests.md` §5: the 10th firing of
 a period-1 timer made at updater tick T is at T + 20, 400 frames) or at
@@ -581,7 +652,7 @@ no caller.
 #### 5.9 The portal to Harrogath (object 566, expansion)
 
 - Spawn (`0x005B45E0`, from msg 20000): spot := Tyrael's position + (5,
-  0); free spot near it (`0x00545340`, size 2, mask 0x400, radius 12,
+  0); free spot near it (`0x00545340`, size 2, mask 0x400, radius 12 (unused),
   limit 100); found → object 566 (`0x00555230`, flags 1, 1, 0); created
   → +0x44 := 0, +0x45 := 1, unit flags |= 0x3000000. At most one per
   game; nothing retries a failed spawn except the next 20000.
@@ -624,7 +695,9 @@ Event 0 (`0x005B6940`): Hadriel with 27.0, 27.1 and 27.13 all clear →
 table state 0 (msg 668); else chain 23 absent or Diablo not yet killed
 in this game (extra +0x14 = 0) → table state 1 (msg 669). Wants to talk
 (`0x005B69F0`): Hadriel and (27.0, 27.1, 27.13 clear, or 26.13 and 26.0
-clear). No event 11: nothing is ever set in slot 33.
+clear). No event 11: nothing is ever set in slot 33. Re-read: the second
+branch tests 26.13 (`0x005B6A46`) then 26.0 (`0x005B6A53`) and is true
+only when both are clear.
 
 #### 6.3 Halbu, Jamella and the rest
 
@@ -660,6 +733,26 @@ reward-pending bit). Single player has no party (party id 0xFFFF).
 | object event 7 `0x005449E0` | `0x005B5750`, `0x005B6710` | §5.4, §4.7 |
 | interaction / trade `0x00566E60`, `0x00567620`, `0x00568060` | `0x005B5810` | §5.10 |
 | Mephisto's death (`quests-act3.md` §8.5) | `0x005B6930` | `ret` stub |
+
+Every "→ chain c" above is the generic link `0x005436B0(game, unit, c)`
+(`quests.md` §4: prepend a link to unit +0x74 unless the record is
+already linked; chains 4, 8, 12 have special cases, Act IV chains none),
+the same for chains 22, 23 and 24. Call sites, all in creation code
+(the caller makes the link, not quest code):
+
+| Chain | Site | Function / condition |
+|---|---|---|
+| 23 | `0x005B1E36` | `0x005B1CF0` BaseId 243, class ≠ 705; umod 22 first (`0x005B1E2B`) |
+| 22 | `0x005B1F5C` | `0x005B1CF0` BaseId 256, class ≠ 706; umod 22 first (`0x005B1F51`) |
+| 24 | `0x005B1F32` | `0x005B1CF0` BaseId 409 |
+| 23 | `0x005A466D` | `0x005A4440`, hcIdx 36–38 (hcIdx − 6 through byte table `0x005A46A0` → case 2 of `0x005A4680`); no umod |
+| 23 | `0x005A4C7D` | `0x005A49B0`, hcIdx 36–38; umod 22 after (`0x005A4C8A`) |
+
+`0x005A4850(game, monster, 22, 1)` (`monsters/init.md` §14.1, §19)
+marks the monster unique (`0x005A0320`) and appends umod 22
+`questcomplete` to the first free byte of its 9-byte umod list (monster
+data +0x1C); umod 22 has no init function (entry 22 of `0x0073C008` is
+null), so nothing else changes.
 
 `0x005B3130`–`0x005B3690` (monster group spawn helpers, callers in skill
 and AI code) sit in the same block but are not quest code (monster
@@ -737,11 +830,27 @@ Act IV quest code draws.
     Tyrael offers the portal again (§5.3).
 16. The level slot of the gem and rune drops is set to 50 once per
     event and reused for every drop of that event (D2MOO resets it per
-    gem) (§4.7, Open question 5).
+    gem) (§4.7, Open question 5). Answered (Open question 4): the slot
+    is an out-parameter, overwritten by every `0x00559A30` call with the
+    forge's area level before it is read, so neither the 50 nor the
+    reuse changes any outcome.
 17. Hadriel's text tests game state (+0x14) but his wish to talk tests
     the player's bits (§6.2).
 18. `0x005B4A30`, `0x005B5730` and the stub `0x00545990` have no effect
     or no caller in 1.14d.
+19. The ghost's removal sets mode 0 (death) twice in one AI call: once
+    inside `0x005E7350`, once right after it (§3.6). An implementation
+    issues both mode requests.
+20. Each seal-boss dummy pins its room active for the rest of the game
+    (room flag 0x400000, §5.4).
+21. The gem and rune item levels follow the forge's area level and the
+    game type, not the quest: an expansion hell forge drops level-85
+    gems and rune (§4.7).
+22. The 12 unwritten bytes of the uncredited 0x50 (§5.8) are never read
+    by the client: `0x0045E370` copies the 15 bytes and `0x004B9210`
+    switches on the u16 at 1 only (23 → case 4, `0x004B924B`, which
+    calls client code with no payload). Trace comparisons mask bytes
+    3–14 of that message; `d2-sim` writes zeros there.
 
 ## Test vectors
 
@@ -757,6 +866,9 @@ Act IV quest code draws.
 | seal 392 at (1000, 1000), free | dummy 131 at (988, 948); its event 7 spawns superunique 36 | §5.4 |
 | Diablo killed, classic, killer in his room | killer credited (26.13, 26.0, 26.6, 26.7), status 13, sound 75, FX 13; 75 s later save pass, 90 s warp to 103, 95 s game end | §5.7, §5.8 |
 | expansion, Tyrael 20000 | 26.9 set; portal 566 at Tyrael + (5, 0) or the nearest free spot | §5.9 |
+| forge gem / rune drops, forge in level 107; classic normal / nightmare / hell; expansion normal / nightmare / hell | item level 27 / 52 / 77; 27 / 57 / 85 | §4.7 (live `levels.txt`) |
+| seal 392 operated at frame f, dummy created | dummy mode 1; its event 7 at f + 27 (boss spawn), event 1 at f + 21; spawn failure → next try f + 37 | §5.4 |
+| `0x006416D0`: units of size 2 and 2 at (0, 0) and (6, 3) | dx 4, dy 1 → (8 + 1) / 2 = 4 (< 5: "near the ghost") | §3.6, `missiles.md` §R9.5 |
 
 ## Provenance
 
@@ -785,42 +897,96 @@ Act IV quest code draws.
   §3.3, the expansion messages 20000 / 20001 and bits 26.8 / 26.9, the
   level slot of §4.7.
 - No packet or RNG recording of Act IV exists yet.
+- 2026-10-07 answers to the implementation's questions (QD-*): read
+  with `disasm.py fn` / `at` on `0x00559A30`, `0x0061DCA0`,
+  `0x005A4850`, `0x005E73A0`, `0x005E7350`, `0x005DDFC0`, `0x00572DC0`,
+  `0x006416D0`, `0x0061AED0`, `0x0061BAC0`, `0x0054FE10`, `0x005B4A80`,
+  `0x0045E370`, `0x004B9210`, `0x00538680`, `0x005B4D20`, `0x005B4B60`,
+  `0x005B4BE0`, `0x005B4140`, `0x005B69F0`, `0x005B5C10`, `0x005436B0`,
+  `0x005435C0`; `all.asm` for the link sites in `0x005B1CF0`,
+  `0x005A4440`, `0x005A49B0` and the loader `0x006552E0`; raw bytes of
+  `0x0073C008`, `0x00731BC0`, `0x005A46A0`, `0x004B9284`; live
+  `levels.txt`, `objects.txt`, `monumod.txt`, `superuniques.txt`.
 
 ## Open questions
 
 1. Status meanings per Act IV quest (client quest log): settle with
-   `quests.md` open question 1.
+   `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act IV tables §10; Fallen Angel and Hell's Forge exceptions §6.
 2. The classic end-of-game schedule reads `GetTickCount` (§5.8), an
    outcome driven by wall-clock time, against `sim/tick.md` §8. Chosen
    until settled: `d2-sim` uses elapsed game time = 40 ms × frames since
    the kill; confirm with a recording (warp and end frames after a
    classic Diablo kill) and record the exception in `sim/tick.md`.
+   **Needs recording** (re-read 2026-10-07: the three tests at
+   `0x005B4C79` (+95000), `0x005B4CB0` (+90000), `0x005B4CEC` (+75000)
+   are unsigned "t0 + delay < now" with `GetTickCount` through the
+   import `0x006CC260`; there is no frame-based path, so only a
+   recording can show the frame offsets). The recording must show, for
+   one classic Diablo kill with game frames logged: the kill frame
+   (0x89 FX 13 and `5D 17 02` to credited players), the frame of the
+   `5D 17 01` / level warp to 103 of each credited player, the frame of
+   the uncredited player's 0x50 (`50 17 00`), and the frame the server
+   ends the game; ideally two runs (one on an idle machine, one under
+   load) to show whether the offsets drift from 2250 / 2375 frames (90 /
+   95 s at 40 ms) with wall-clock time. Settles the `sim/tick.md`
+   exception wording.
 3. Bytes 3–14 of the 0x50 sent to uncredited players (§5.8) and its
    client meaning: record one classic Diablo kill with an uncredited
-   player.
+   player. **Answered** (2026-10-07): the bytes are the caller-frame
+   slots `ebp−0x11`…`ebp−0x06` of `0x005B4A80`, which only writes byte 0
+   (`0x005B4B33`) and the u16 at 1 (`0x005B4B37`), so they hold whatever
+   an earlier call left on the stack (not reproducible). The client
+   handler `0x0045E370` → `0x004B9210` reads only the u16 at 1 (id 23 →
+   case 4 at `0x004B924B`), so they have no client effect. Rule: Edge
+   case 22 (d2-sim zeros, traces mask them). The client action of case
+   23 is the client spec's.
 4. `0x00559A30`'s `&level` argument (with `quests-act3.md` open question
    2): whether the item code reads 50 (gems, runes) or the uninitialised
    slot (hammer), and whether it writes back (Edge case 16).
+   **Answered** (2026-10-07): neither. `0x00559A30` writes the level
+   through the pointer before reading it (`0x00559AF8`) and uses that
+   value (`0x00559C66`); the level comes from the dropping unit (§4.7).
+   So `&level` is an output; a `drop_item_at` without it is exact when
+   it derives the level from the dropping unit as §4.7 says.
 5. `0x005A4850(…, 22, 1)` on Diablo, Izual and the seal bosses: what it
-   sets (monster spec).
+   sets (monster spec). **Answered** (2026-10-07): unique mark plus umod
+   22 `questcomplete` in the umod list, no init function (§8, owner
+   `monsters/init.md` §14.1 / §19; `0x005A4850`, table `0x0073C008`).
 6. `0x005E7350` (the ghost's removal condition) and the remove call
    `0x005DDFC0` arguments: AI spec (`ai-functions.tsv` row 54 is
-   unread).
+   unread). **Answered** (2026-10-07): §3.6 (`0x005E7350`: nobody talking
+   → mode 0 at (0, 0), return 1; `0x005DDFC0(game, unit, mode, x, y)`;
+   called with (0, 0, 0) twice). The rest of NpcStationary is the AI
+   spec's (row 54).
 7. `0x0061AED0(room, 0)` after a seal-boss dummy is created, and the
    dummy's own event-7 scheduling (object init 59): object spec.
+   **Answered** (2026-10-07): §5.4 (room flag 0x400000 set, blocks room
+   removal, `drlg/rooms.md` §8; init 59 `0x0054FE10`: event 7 at f + 27,
+   event 1 at f + `FrameCnt1` + 1).
 8. The data-tables u16 array at +0xAE0 (entries 36–38): confirm the
    loader fills it by `superuniques.txt` hcIdx (data spec).
+   **Answered** (2026-10-07): yes, `0x006552E0` (§5.4; owner
+   `data/loading.md` §8).
 9. `0x00538680(client, 4, difficulty)` in the classic credit: save
    progression field (with `quests-act3.md` open question 5).
+   **Answered** (2026-10-07): the rule is `quests-act1-rest.md` §5
+   (client +0x0A bits 8–12 raised to 4 · difficulty + 4 for a classic
+   character; never lowered). The call is classic-only (`0x005B4D3F`
+   skips it in expansion games) and sits after 26.6 / 26.7 (`0x005B4D77`).
 10. `0x00530590` (game end) and `0x0052E2A0` (save pass) are host
     code: decide whether `d2-server` or `d2-sim` owns them.
 11. `quests-act3.md` §8.6 says level 104 is The Pandemonium Fortress;
     live `levels.txt` has 103 = The Pandemonium Fortress, 104 = Outer
-    Steppes (`0x005BCBF0` compares 104). Settle in that spec.
+    Steppes (`0x005BCBF0` compares 104). Settle in that spec. **Answered**
+    (2026-10-07): `quests-act3.md` §8.6 already says Outer Steppes
+    (`levels.txt` Act 4 - Mesa 1); re-read `cmp eax, 0x68` at
+    `0x005BCC0B`.
 12. `quests.tsv` column `spec` still says `catalogued` for rows 25–28
     and 30; switch it to `specified` (with a link to this file) once
     `quests.md` §2.4 documents owner files per act. No TSV rows were
-    missing for Act IV.
+    missing for Act IV. **Answered** (2026-10-07): rows 25–28 and 30 switched to
+    `specified` (quests-fixups CODE-TABLE commit; every address of these
+    rows is named in this file).
 13. Record a full Act IV run (packets + RNG, `docs/HANDOFF.md` §5):
     Izual and the ghost, the Hellforge drops, the seals and seal
     bosses, Diablo's spawn and death in classic and expansion, the

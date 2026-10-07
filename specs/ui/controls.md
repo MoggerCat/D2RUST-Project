@@ -1,328 +1,337 @@
-# Spec: UI — Controls (key configuration, default bindings, input → command)
+# Spec: UI — Controls (command table, default keys, key files, input dispatch)
 
-- **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe`, the 1.14d
-  `default.key` files and 16 per-character `.key` files of a 1.14d
-  install; no input trace yet). The command list, the default table and
-  the file formats are read from data and checked byte for byte
-  (§Provenance); the world mouse-click path (which C→S message a click
-  sends, hold repeat) is §Open questions 1.
-- **Target version:** 1.14d, English install
-- **Crate/module:** `d2-client::controls` (preset `original`, `.key`
-  import), `d2-client::input` (key / button → command dispatch)
-- **Related specs:** `client/ui.md` §A4, §A6, §B4 (design this answers),
-  `ui/panels.md` §2–§4 (`SetUIState`, conflict gate, cursor jump), §15
-  (panel event → message), `skills/use.md` §1 (0x05–0x11 server side),
-  `items/inventory-moves.md` (belt use), `sim/client-messages.tsv`
-  (0x26, 0x3C, 0x3F, 0x51, 0x53, 0x54, 0x60 layouts), `formats/tbl.md`
-  (string ids). Machine table: `key-commands.tsv` (§7).
+- **Status:** draft (2026-10-07, RE on 1.14d `Game.exe` and the 1.14d
+  `default.key` / `string.tbl` files; no capture, no packet trace yet).
+  The default table is a byte read of the binary; behaviour is from the
+  disassembly; unverified until the §Test vectors checks run.
+- **Target version:** 1.14d
+- **Crate/module:** `d2-client::controls` (the `original` preset and the
+  `Action` list, `client/ui.md` §A6), `d2-client::input` (event → command)
+- **Related specs:** `client/ui.md` §A4 / §A6 / §B4 (the d2rs design this
+  answers: this whole spec is the owner of row §B4; code TODOs that say
+  `ui/controls.md §B4` mean this spec, and the original-defaults check is
+  §B4 below), `ui/panels.md` (§2 `SetUIState`, ui ids; its §Open
+  questions 2 is answered here), `ui/ui-states.tsv`, `ui/inventory.md`
+  (belt and grid clicks), `items/inventory.md` §3 (belt slots),
+  `formats/tbl.md` (labels)
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–55 |
-| Inputs | 56–64 |
-| Outputs / state changes | 65–70 |
-| Rules | 71–72 |
-|   1. Key codes | 73–98 |
-|   2. Binding table and files | 99–127 |
-|   3. Load, defaults and save | 128–160 |
-|   4. Rebinding rules (key configuration panel) | 161–185 |
-|   5. Dispatch | 186–234 |
-|   6. Commands | 235–279 |
-|   7. `key-commands.tsv` | 280–296 |
-|   8. Hard-wired input (not configurable) | 297–315 |
-| Constants & data dependencies | 316–326 |
-| Randomness | 327–330 |
-| Edge cases & original bugs | 331–350 |
-| Test vectors | 351–375 |
-| Provenance | 376–398 |
-| Open questions | 399–415 |
+| Summary | 39–50 |
+| Inputs | 51–59 |
+| Outputs / state changes | 60–67 |
+| Rules | 68–69 |
+|   1. Binding table | 70–88 |
+|   2. Key files | 89–121 |
+|   3. Commands and default keys | 122–223 |
+|   4. Dispatch | 224–293 |
+|   5. Key-config screen assignment | 294–309 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 310–328 |
+| Constants & data dependencies | 329–335 |
+| Randomness | 336–339 |
+| Edge cases & original bugs | 340–352 |
+| Test vectors | 353–371 |
+| Provenance | 372–383 |
+| Open questions | 384–408 |
 <!-- /index -->
 
 ## Summary
 
-The 1.14d client has 57 configurable commands (ids 0–56). Each command
-has two binding records (key one, key two); a record holds one key code
-(a Windows virtual-key code, or 0x100–0x104 for the middle button, the
-two extra buttons and the wheel). A key may be bound to one record only.
-The table lives in memory as 114 records of 10 bytes, is loaded per
-character from `<save>\<name>.key` at game start, falls back to a
-default table, and is written back on save. Key presses run the
-command's press handler, releases its release handler; auto-repeat is
-ignored. Left and right mouse buttons are not configurable. This spec
-owns the command list, the default bindings, the file formats, the
-binding rules and the key → command dispatch.
+The 1.14d client binds 57 commands (ids 0–56) to keys or mouse buttons
+through a table of 114 bindings (two per command). The table is loaded at
+game start from the character's `.key` file, else from `default.key`,
+else from a default table compiled into `Game.exe`; it is written back to
+both files when the defaults were used. Keyboard events reach the commands
+through one key-down and one key-up window handler; the middle and X
+buttons and the wheel through per-button handlers; the left and right
+buttons are not configurable. Three held/toggled modifiers (Run, Toggle
+Run/Walk, Stand Still) become flag bits on every world click.
 
 ## Inputs
 
 | Name | Type | Source |
 |---|---|---|
-| key / button events | Windows message, code, lParam bit 30 (repeat) | window message chain (`0x00712944` handler table) |
-| per-character key file | `<save>\<name>.key`, 1142 bytes | §2.3 |
-| default key file | `<dir>\default.key`, 1146 bytes; `data\local\cmd\<lng>\default.key` in the archives | §2.2 |
-| expansion game flag | `[0x007A04F4]` (`0x0044DCC0`) | `client/model.md` |
+| Win32 key messages | `WM_KEYDOWN`/`WM_SYSKEYDOWN` (0x100/0x104), `WM_KEYUP`/`WM_SYSKEYUP` (0x101/0x105); VK in wParam, repeat bit 30 of lParam | game window, handler table `0x00712944` |
+| Win32 mouse messages | 0x201/0x202 left, 0x204/0x205 right, 0x207/0x208 middle, 0x20B/0x20C X buttons, 0x20A wheel | handler table `0x0070F2C4` |
+| character `.key` file | 0x476 bytes (§2.1) | save directory |
+| `default.key` | 0x47A bytes (§2.2) | save directory, then archive `DATA\LOCAL\CMD\<lang>\default.key` |
 
 ## Outputs / state changes
 
-The current binding table `0x007A6F90` (114 × 10 bytes); the mouse
-dispatch slots (§3.4); calls of the command handlers (§6), which change
-UI states (`ui/panels.md` §2) or queue C→S messages.
+Live binding table `0x007A6F90` (114 × 10 bytes, ends `0x007A7404`);
+mouse-button handler slots (`0x007A6B10` … `0x007A7414`, §4.2); modifier
+flags `0x007A065C` (Run held), `0x007A0660` (run lock), `0x007A0664`
+(Stand Still held); UI state changes through `SetUIState` and the command
+effects of §3; files of §2.
 
 ## Rules
 
-### 1. Key codes
+### 1. Binding table
 
-1. A key code is a u16. Codes below 0x100 are Windows virtual-key codes
-   (`VK_*`: 0x08 Backspace, 0x09 Tab, 0x0D Enter, 0x10 Shift, 0x11
-   Ctrl, 0x12 Alt, 0x1B Esc, 0x20 Space, 0x2C PrintScreen, 0x30–0x39
-   digits, 0x41–0x5A letters, 0x60–0x69 numpad 0–9, 0x70–0x87 F1–F24,
-   0xC0 backquote, …). 0xFFFF = no key.
-2. Mouse codes (`0x004694A0`, `0x0044C400`–`0x0044C520`):
+1. One binding is 10 bytes: i32 command id (0–56), u16 key, i32 slot
+   (0 or 1). Key 0xFFFF = unbound. The table has 114 entries
+   (0x474 bytes); the live copy is at `0x007A6F90`, the compiled defaults
+   at `0x00712220` (initialised data; overwritten in memory by a valid
+   `default.key`, §2.3).
+2. Key values below 0x100 are Windows virtual-key codes. 0x100 = middle
+   button, 0x101 = X button 1, 0x102 = X button 2, 0x103 = wheel up
+   (positive delta), 0x104 = wheel down (§4.2).
+3. Lookups: key of (command, slot) `0x00469AA0` (first entry with that
+   command and slot; 0xFFFF if none); "is bound" `0x00469D90`; unbind
+   (command, slot) `0x00469D70` (every matching entry). The key-config
+   screen snapshots the live table to `0x007A6B18` on open (`0x00469D20`)
+   and restores it on cancel (`0x00469D50`).
+4. The command table `0x00712698` has 57 records of 12 bytes: key-down
+   handler, key-up handler (either may be null), and a flag (u32) that
+   lets the command run in key mode 2 (§4.1 r4). §3 lists them.
 
-   | Code | Input | Window message |
-   |---|---|---|
-   | 0x100 | middle button | WM_MBUTTONDOWN / UP (`0x0044C4A0` / `0x0044C470`) |
-   | 0x101 | extra button 1 | WM_XBUTTONDOWN / UP, high word of wParam = 1 (`0x0044C4D0` / `0x0044C520`) |
-   | 0x102 | extra button 2 | same, high word = 2 |
-   | 0x103 | wheel forward (positive delta) | WM_MOUSEWHEEL (`0x0044C400`) |
-   | 0x104 | wheel backward (negative delta) | WM_MOUSEWHEEL |
+### 2. Key files
 
-3. **Bindable codes** (`0x00469AE0`): 0x100–0x104; the codes 0x08, 0x09,
-   0x0C, 0x0D, 0x10–0x14, 0x20–0x24, 0x2A, 0x2C–0x2F, 0x60–0x87, 0x91,
-   0xBA–0xC0, 0xDB–0xDE; and any other code < 0x105 for which the C
-   `isalpha` or `isdigit` is true (0x30–0x39, 0x41–0x5A, 0x61–0x7A).
-   Every other code is refused, among them 0x01–0x04 (left, right,
-   cancel, middle as virtual keys), 0x15, 0x17–0x19, 0x1B (Esc),
-   0x1C–0x1F, 0x25–0x29 (arrows, select), 0x2B, 0x5B–0x5D (Windows and
-   menu keys), 0x90 (NumLock), and every code ≥ 0x105.
+1. **Character file** `<save>\<name>.key` (`0x00469650`): when the account
+   string `0x007A0500` is non-empty the path `<save><account>\<name>.key`
+   is tried first, then `<save><name>.key` (name `0x007A05C4`). Content:
+   u16 version 0x25, then the 114-entry table (0x476 bytes, no magic).
+2. **`default.key`**: u16 magic 0x5357 (`"WS"`), u16 version 0x25, u16
+   size 0x47A, then the table (0x47A bytes in total).
+3. **Load at game start** (`0x0046AAE0`, from `0x0046AC70`):
+   - Read the character file. It is accepted when exactly 0x476 bytes are
+     read, the version is 0x25, every command 0–56 occurs as the command
+     of at least one entry, and no two entries hold the same key other
+     than 0xFFFF. The slot field is not checked. Accepted: the table
+     becomes the live table; done (nothing is written).
+   - Otherwise (`0x004698D0` with 1): open `<save>default.key`; if it
+     opens and 0x47A bytes are read, that buffer is used, else the archive
+     file `DATA\LOCAL\CMD\<lang>\default.key` (`<lang>` from
+     `0x00525260`). A buffer with magic 0x5357, version 0x25 and size
+     0x47A is copied over the compiled defaults `0x00712220`; any other
+     buffer is dropped (the save-directory file, once read, is never
+     followed by the archive file).
+   - The live table := `0x00712220`; the mouse slots are rebuilt (§4.2);
+     then both files are written (§2.4).
+4. **Write** (`0x00469780`): only when the character file can be created
+   (`CREATE_ALWAYS`): it gets version 0x25 + the live table; then
+   `<save>default.key` is created with the 6-byte header + the live
+   table. So the last character that fell back to the defaults defines
+   the defaults of the next new character.
+5. The 1.14d archives' `default.key` files carry version 0x22
+   (`d2data.mpq`, 886 bytes) and 0x24 (`d2exp.mpq`, 1126 bytes) (measured):
+   both fail the header test, so on a clean install the compiled table of
+   §3 is the default.
 
-### 2. Binding table and files
+### 3. Commands and default keys
 
-1. **Record** (10 bytes, little-endian, packed): `cmd` u32 (0–56), `key`
-   u16 (§1, 0xFFFF none), `slot` u32 (1 = key one, 0 = key two). The
-   table is 114 records = 1140 (0x474) bytes; every command has exactly
-   one record per slot. Record order is the file order of §7 column
-   `file_pos` (record `2p` = slot 1, `2p + 1` = slot 0 of the command at
-   position `p`). The display order sorts by `cmd`, slot 1 first
-   (comparator `0x00469450`).
-2. **Default file** (`default.key`, 1146 = 0x47A bytes): u16 `0x5357`
-   ("WS"), u16 version `0x25`, u16 size `0x47A`, then the 1140-byte
-   table. A file is accepted only with all three header values and a
-   read size of exactly 0x47A (`0x004698D0`, `0x004699E6`).
-3. **Per-character file** (`<save>\<name>.key`, 1142 = 0x476 bytes): u16
-   version `0x25`, then the 1140-byte table. Measured: all 16 `.key`
-   files of the test install are this layout and their tables equal
-   the default table.
-4. Archive copies (measured): `d2data.mpq`
-   `data\local\cmd\eng\default.key` is 886 bytes, version 0x22, 88
-   records (commands 0–43, F5–F8 on commands 8–11); `d2exp.mpq`
-   `data\local\cmd\eng\default.key` is 1126 bytes, version 0x24, 112
-   records (no command 55 / 56). Both fail the 1.14d header check
-   (§2.2), so neither is ever used by 1.14d (§3.2).
-5. **The 1.14d default table** is compiled into `Game.exe` at
-   `0x00712220` (`.data`, file offset 0x312220, 1140 bytes, SHA-256
+Read from `0x00712220` (bindings) and `0x00712698` (handlers). "Gate"
+= the handler does nothing while `0x0044DA30` or `0x00463DF0` returns
+non-zero: `0x0044DA30` returns the client's exit flag `[0x007A0620]`
+(`client/model.md` §1), `0x00463DF0` is true when there is no local
+player or its mode is 0x11 (dead). `0x0044DB30` (command 2) returns the
+game type `[0x007A0610]` (0 = single player, `client/msg-ui.md`), so the
+party screen key works only in multiplayer games; `0x0044DCC0` is the
+expansion flag `[0x007A04F4]`. `SetUIState(ui, mode, jump)` modes
+0 on / 1 off / 2 toggle (`ui/panels.md` §2). Labels are the string keys
+of the key-config screen's menu tables (§3.3). Keys in slot 1 / slot 0;
+"—" = unbound. M2 = flag of §1 r4. The same data in machine form:
+`key-commands.tsv` (§3.4).
+
+<!-- rows -->
+| Cmd | Label (tbl key) | Slot 1 | Slot 0 | Down handler → effect | Up handler | M2 |
+|---|---|---|---|---|---|---|
+| 0 | CfgCharacter | A | C | `0x00468940`: SetUIState(2, toggle, 1) | — | 0 |
+| 1 | CfgInventory | I | B | `0x00468950`: SetUIState(1, toggle, 1) | — | 0 |
+| 2 | CfgParty | P | — | `0x00468960`: if `0x0044DB30`: SetUIState(0x16, toggle, 1) | — | 0 |
+| 3 | CfgMessageLog | M | — | `0x00468980`: SetUIState(0x18, toggle, 0) | — | 0 |
+| 4 | CfgQuestLog | Q | — | `0x00468990`: gate; `0x004A3FE0(1)` | — | 0 |
+| 5 | CfgChat | Enter | — | `0x004689B0`: if not `0x0044DA30`: SetUIState(5, toggle, 0) | — | 1 |
+| 6 | CfgHelp | H | — | `0x004689D0`: gate; SetUIState(0x21, toggle, 0); registry `Diablo II\Help Menu` := 1 if absent or 0 | — | 0 |
+| 7 | CfgAutoMap | Tab | middle button | `0x00468A30`: SetUIState(0xA, toggle, 0); if ui 0xA is now closed: `0x00457640(0)` | — | 0 |
+| 8 | CfgAutoMapCenter | F9 | — | `0x00468A60`: `0x00457640(1)` | — | 0 |
+| 9 | CfgAutoMapFade | F10 | — | `0x00468A70`: value `0x004576C0` := (value + 1) mod 4 (`0x004576F0`) | — | 0 |
+| 10 | CfgAutoMapParty | F11 | — | `0x00468A90`: toggle `0x004577B0` / `0x004577C0` | — | 0 |
+| 11 | CfgAutoMapNames | F12 | — | `0x00468AB0`: toggle `0x004577E0` / `0x004577F0` | — | 0 |
+| 12 | CfgSkillTree | T | — | `0x00468AF0`: SetUIState(4, toggle, 1) | — | 0 |
+| 13 | CfgSkillPick | S | — | `0x00468B00`: SetUIState(3, toggle, 0); `0x004A8CE0(0)` | — | 0 |
+| 14–21 | CfgSkill1–8 | F1–F8 | — | `0x00468B90` + 0x30·k (k = 0–7; cmd 21 at `0x00468CE0`): gate; hotkey k (§3.1) | — | 0 |
+| 22 | CfgBeltShow | ` (0xC0) | — | `0x00468F00`: if the player has an item at body location 8 and `0x00629BB0(item, 0x13)`: SetUIState(0x1F, toggle, 0) | — | 1 |
+| 23–26 | CfgBelt1–4 | 1–4 | — | `0x00468F40`/`F50`/`F60`/`F70` → `0x00498C50`/`C90`/`CD0`/`D10`: use belt column 0–3 (§3.2) | — | 0 |
+| 27–33 | CfgSay0–6 | NumPad 0–6 | — | `0x00468F80` + 0x10·k: send C→S 0x3F with value 0x19 + k (`0x004785B0`) | — | 1 |
+| 34 | CfgRun | Ctrl | — | `0x00469000`: Run held := 1; if the player is in mode 2 (walk) and `0x00625480(P, 0xA, 0)`: mode 3, send C→S 0x53 | `0x004691C0`: Run held := 0; if run lock off and the player is in mode 3: mode 2, send C→S 0x54 | 0 |
+| 35 | CfgRunLock | R | X button 2 | `0x00469060`: run lock := not run lock | — | 0 |
+| 36 | CfgStandStill | Shift | — | `0x00469080`: Stand Still := 1 | `0x00469200`: Stand Still := 0 | 0 |
+| 37 | CfgShowItems | Alt | X button 1 | `0x00469090`: SetUIState(0xD, on, 0) | `0x00469210`: SetUIState(0xD, off, 0); `0x00466FE0` | 0 |
+| 38 | CfgClearScreen | Space | — | `0x004690A0` → `0x0044C6B0` | — | 0 |
+| 39 | Cfgskillup | wheel up | — | `0x00469100`: gate; `0x004AA740(−1)` | — | 0 |
+| 40 | Cfgskilldown | wheel down | — | `0x00469120`: gate; `0x004AA740(+1)` | — | 0 |
+| 41 | Cfgcleartextmsg | N | — | `0x004691B0` → `0x004A01E0` | — | 1 |
+| 42 | CfgSnapshot | Print Screen | — | none | `0x004FA7A0` | 1 |
+| 43 | CfgTogglePortraits | Z | — | `0x00493840` | — | 0 |
+| 44 | Cfgswapweapons | W | — | `0x00469140`: unless ui 0xC, 0x17 or 0x19 is open: `0x0048A730` | — | 1 |
+| 45 | CfgToggleminimap | V | — | `0x00468AD0`: toggle `0x00457770` / `0x00457780` | — | 1 |
+| 46–53 | CfgSkill9–16 | — | — | `0x00468D10` + 0x40·k (k = 0–7): expansion only (`0x0044DCC0`); gate; hotkey 8 + k | — | 0 |
+| 54 | Cfghireling | O | — | `0x00469170`: expansion only; if the player has a hireling (`0x00478F20(P, 7)` ≠ −1) and `0x00408F20`: SetUIState(0x24, toggle, 1) | — | 0 |
+| 55 | CfgSay7X | NumPad 7 | — | `0x00468FF0`: send C→S 0x3F with value 0x20 | — | 1 |
+| 56 | — (not listed) | Esc | — | `0x004690B0`: unless `0x004B34A0` or `0x004A0000`: if ui 9 is open `0x0047E200(1)`; else if `0x00456300(0, 1)` = 0: `0x0047E090(1, 0)` | — | 0 |
+
+Every slot-0 entry not named above is 0xFFFF. In table order the bindings
+of command 21 (F8) sit at entries 90–91, after command 45; order is not
+otherwise significant except for the first-match rules of §4.1.
+
+#### 3.1 Skill hotkeys
+
+1. Hotkey k (0–15) with ui 3 (skill speed bar) open: `0x004A9E60(k)`
+   assigns the hovered skill to k; otherwise `0x004AA030(k)` uses it.
+2. Use (`0x004AA030`): if the skill of k (`0x007C06C8[k]`) is not −1 and
+   `0x004A9FC0` allows: last hotkey `0x007C0708` := k, `0x004786A0` with
+   `0x007C0768[k]`, then the skill becomes the left skill
+   (`0x00643BC0`) when `0x007C07B8[k]` ≠ 0, else the right skill
+   (`0x00643C50`).
+3. Commands 46–53 (hotkeys 9–16) have no default key in 1.14d.
+
+#### 3.2 Belt keys
+
+1. Use belt column c (`0x00498C50` + 0x40·c): gate; only when the byte
+   `0x007BEFB0` = 1; calls `0x00498A90` with the player, its inventory,
+   column c and "Shift down" = `GetAsyncKeyState(VK_SHIFT) & 0x8000`.
+   Which item of the column is used and what Shift does: §Open
+   questions 4 (belt slot numbering: `items/inventory.md` §3).
+
+#### 3.3 Key-config menu tables
+
+The key-config screen lists commands from one of two tables of 10-byte
+rows (i32 command, u16 string id, i32 0; command 57 = separator row with
+no text), chosen by `0x004A43E0`: expansion game → `0x00724468`, 62 rows
+(separators at rows 7, 28, 35, 42, 49, 58); classic → `0x00724268`, 51
+rows (separators at 6, 19, 25, 32, 38, 47); the row count goes to
+`[0x007C0274]` and the table pointer to `[0x00724264]`. Commands 44–54
+are listed only in the expansion table; command 56 (Esc) is in neither.
+String ids: `string.tbl` 3924–3985, `patchstring.tbl` (1.14d
+`Patch_D2.mpq` copy) 10833 `CfgSkillPick` and 11083 `CfgSay7X`,
+`expansionstring.tbl` 22717–22727 (decoded from the English 1.14d
+tables). `CfgMiniMap` ("Micromap", 3932), `CfgSkill*`-free ids 3951–3958
+(`CfgBelt5`–`12`) and 21804 `CfgSay7` are in no menu row: unused.
+
+#### 3.4 `key-commands.tsv`
+
+One row per command 0–56: `cmd`; `string_id`, `string_key` (§3.3, `-`
+for 56); `key1`, `key2` (default key of slot 1 / slot 0 as
+`0xNNN:Name`, `-` = none); `down`, `up` (handler addresses of
+`0x00712698`, `-` = none); `full_ok` (the M2 flag); `file_pos` (position
+of the command's two entries in the default table: entries 2p (slot 1)
+and 2p + 1 (slot 0)); `menu_classic`, `menu_exp` (row in the §3.3
+tables, `-` = not listed). Generated from the 1.14d binary; the §B4
+check reads it.
+
+### 4. Dispatch
+
+#### 4.1 Keyboard
+
+1. The key handlers `0x0046A840` (down, messages 0x100 and 0x104) and
+   `0x0046A940` (up, 0x101 and 0x105) are registered while the key mode
+   `0x007A7418` (set by `0x0046AA20`) is non-zero. Mode 0 with the
+   "keep key-up" argument set registers the key-up handler alone
+   (table `0x00712974`), so held commands can still be released.
+2. Key down: ignored when lParam bit 30 is set (auto-repeat: a held key
+   fires once). Otherwise the first entry (table order) whose key equals
+   the VK, whose command is < 0x39 and whose command has a down handler
+   is taken; if its key is F4 (0x73) and Alt is down
+   (`GetAsyncKeyState(VK_MENU)` < 0), nothing happens.
+3. Key up: the first entry whose key equals the VK and whose command has
+   an up handler; the repeat bit is not tested.
+4. In key mode 2 only commands whose M2 flag is 1 run (both directions).
+   A handler address that fails `IsBadCodePtr` is a fatal error.
+5. Key mode changes (UI open / close hooks, `ui/panels.md` §2 r6):
+   - game start `0x0046AC70`: 1; game end `0x0046ACB0`: 0;
+   - ui 5 (chat) opens: 0, key-up kept; ui 23 (player trade) opens: 0,
+     key-up kept;
+   - ui 12 (NPC shop), 25 (stash), 26 (cube) open: 2;
+   - ui 12, 23, 25, 26 close: 1; ui 5 closes: 1 unless one of ui 12, 23,
+     25, 26, 27, 28, 29, 30, 32 is open;
+   - the key-config screen opens (`0x004A5200`): 0, key-up not kept;
+   - `0x00453EE0` / `0x00454150` around the latch `0x007A27B4`: 1 / 0
+     (§Open questions 5).
+6. Windows keys (VK 0x5B, 0x5C, 0x5D) are swallowed (`0x0044C5C0`).
+   `WM_SYSCOMMAND` `SC_KEYMENU` and `SC_SCREENSAVE` are swallowed; `SC_MOVE`
+   when `0x004F5A30` is non-zero (`0x0044C570`).
+
+#### 4.2 Configurable mouse buttons and wheel
+
+1. After every table change `0x004694A0` scans the live table: for each
+   entry with key 0x100–0x104 and command < 0x39 it stores the command's
+   handlers in the button slot: 0x100 down `0x007A6B10` / up `0x007A740C`;
+   0x101 `0x007A7414` / `0x007A6B14`; 0x102 `0x007A7410` / `0x007A6F8C`;
+   0x103 `0x007A7404`; 0x104 `0x007A7408` (wheel: down handler only). A
+   wheel binding to a command that has an up handler is removed (key
+   := 0xFFFF). Several entries on one button: the last in table order
+   wins.
+2. Middle down / up (0x207 / 0x208, `0x0044C4A0` / `0x0044C470`) and X
+   button down / up (0x20B / 0x20C, `0x0044C4D0` / `0x0044C520`; high word
+   of wParam 1 → 0x101, 2 → 0x102) call the stored handler; only while
+   `0x007A061C` ≠ 0. No key-mode test applies to mouse buttons.
+3. Wheel (`0x0044C400`): while `0x007A061C` ≠ 0, the signed wheel delta
+   is added to an accumulator `0x007A06F8`; when |acc| > 0x77 the 0x103
+   handler runs if acc > 0, the 0x104 handler if acc < 0, and acc := 0
+   (one action per event, however large the delta).
+
+#### 4.3 Left and right buttons, modifiers
+
+1. Left (0x201 `0x0044BF40`, 0x202 `0x0044C0F0`) and right (0x204
+   `0x0044C180`, 0x205 `0x0044C370`) are fixed. Each world action passes
+   a flag word to `0x00462D00`: 8 when Run held or run lock is set (no
+   inversion: Run with the lock on still runs), plus 4 when Stand Still
+   is held (`0x0044BEC0`).
+2. Stand Still is also re-sampled from the keys bound to command 36
+   (both slots, `GetAsyncKeyState`) by `0x0044CE90` (caller `0x0044EFA0`).
+3. On `WM_ACTIVATEAPP` (`0x0044C5E0`): wParam ≠ 0 calls `0x00455F20`
+   (register arguments not read), clears Stand Still and calls
+   `0x00466FE0` and `0x004FB130`; wParam = 0 clears Run held when the
+   key of command 34 is bound and not physically down, and runs the
+   left-button release (`0x0044C060`) when the left button state
+   `0x0070F234` ≠ 0x10 (the right one likewise from `0x0070F2BC`).
+4. What each button does on the world, its repeat while held (the
+   right-button repeat `0x0044C2C0`, caller `0x0044F046`) and the C→S
+   messages: §Open questions 2.
+
+### 5. Key-config screen assignment
+
+1. Assign key K to (command c, slot s) (`0x00469C20`): c must be < 0x38
+   (command 56, Esc, cannot be reassigned). K must be allowed
+   (`0x00469AE0`): any value ≥ 0x100; letters and digits; and VK 8, 9,
+   0xC, 0xD, 0x10–0x14, 0x20–0x24, 0x2A, 0x2C–0x2F, 0x60–0x87, 0x91,
+   0xBA–0xC0, 0xDB–0xDE; VK 1–4, 0x15, 0x17–0x19, 0x1B–0x1F, 0x25–0x29,
+   0x2B, 0x5B–0x5D, 0x90 are refused. Else error string 3979
+   `CantAssignKey`.
+2. Wheel (0x103 / 0x104) on a command with an up handler: error 3978
+   `CantAssignMW`. Print Screen (0x2C) on a command with a down handler:
+   error 3979.
+3. Then the first other entry holding K is unbound, and K is written to
+   the (c, s) entry (if no such entry exists, K is written back where it
+   was).
+
+### B4. Original-defaults check (`client/ui.md` §B4)
+
+The `original` preset of `d2-client::controls` must list the 57 commands
+of §3 with exactly the slot-1 / slot-0 keys of the §3 table (114
+bindings, compiled table `0x00712220`), mapping VK codes and 0x100–0x104
+to the portable `Key` names; our `Action` names are the `string_key`
+column of `key-commands.tsv` (command 56: `GameMenu`). Runnable check:
+
+1. Unit (CI): build the 1140-byte table from `key-commands.tsv` (entries
+   in `file_pos` order, slot 1 then slot 0; i32 cmd, u16 key or 0xFFFF,
+   i32 slot) and compare with the preset's bindings.
+2. Game file (`#[ignore]`, `D2_GAME_DIR`): the same 1140 bytes equal
+   `Game.exe` bytes at file offset 0x312220 (`.data` raw offset 0x305000
+   + 0xD220; SHA-256
    `a711045f3efb1de993c3890c6dbf1f7dad5750df857370cfe1fb0f1d1241cfdd`).
-   Its bindings are `key-commands.tsv` columns `key1` / `key2`. The
-   install's `default.key` equals header + this table (measured).
-
-### 3. Load, defaults and save
-
-1. **Game start** (`0x0046AC70` → `0x0046AAE0`): open
-   `<save dir>\<character name>.key` (`0x00469650`, name
-   `[0x007A05C4]`; it tries the sub-folder `[0x007A0500]` first when
-   that string is non-empty). The file is accepted when the read
-   returns exactly 0x476 bytes, the version is 0x25, every command id
-   0–56 occurs in at least one record, and no key other than 0xFFFF
-   occurs in two records. Accepted: the current table := the file's
-   table. Then §3.4.
-2. Otherwise (no file or a failed check): load defaults
-   (`0x004698D0(1)`): read `<dir>\default.key` (`0x00406BA0` gives
-   `<dir>`; the install folder on the test machine); if accepted (§2.2)
-   its table replaces the default table `0x00712220`. Else read
-   `DATA\LOCAL\CMD\<lng>\default.key` from the archives (`<lng>` from
-   `0x00525260`, "eng"); in 1.14d this fails the header check (§2.4)
-   and the compiled table stays. Then current := default table, §3.4,
-   and save (§3.3).
-3. **Save** (`0x00469780`): write the version + current table to the
-   per-character file (1142 bytes), then `<dir>\default.key` with the
-   header (1146 bytes, `0x4697F2`–`0x004698AE`).
-4. **Mouse slots** (`0x004694A0`): clear the five mouse slots, then for
-   each record in table order whose key is ≥ 0xE0 and whose `cmd` < 57:
-   key 0x100 → middle press := press handler, middle release := release
-   handler; 0x101 / 0x102 → the extra button's press and release; 0x103
-   / 0x104 → wheel forward / backward := press handler, unless the
-   command has a release handler, in which case the record's key is
-   cleared to 0xFFFF. Later records overwrite earlier ones.
-5. "Default" in the key configuration panel copies the default table
-   into the current table (`0x00469D50` → §3.4); "Cancel" restores the
-   copy taken when the panel opened (`0x00469D20` keeps it at
-   `0x007A6B18`). Panel layout and its other buttons: §Open questions 3.
-
-### 4. Rebinding rules (key configuration panel)
-
-`Rebind(cmd, slot, key)` (`0x00469C20`) returns 1 when the key was
-placed, 0 otherwise, with an optional message string id:
-
-1. `cmd` ≥ 56 → refused (command 56, Esc / game menu, is fixed).
-2. Key not bindable (§1.3) → refused, message 3979 `CantAssignKey`.
-3. Key 0x103 / 0x104 (wheel) and the command has a release handler
-   (commands 34, 36, 37, 42) → refused, message 3978 `CantAssignMW`
-   (`0x00469420`).
-4. Key 0x2C (PrintScreen) and the command has a press handler → refused,
-   message 3979 (PrintScreen can go only to command 42, the only one
-   without a press handler).
-5. Otherwise: the first record holding `key` loses it (key := 0xFFFF);
-   then the record (`cmd`, `slot`) gets `key`, return 1. If no record
-   (`cmd`, `slot`) exists, the key goes back to the record it was taken
-   from and the call returns 0.
-6. Clearing a slot (`0x00469D70`, string 3980 `CfgClearKey`): key :=
-   0xFFFF on every record (`cmd`, `slot`).
-7. Commands 44–54 appear in the panel only in an expansion game
-   (`key-commands.tsv` `menu_classic` = `-`; `0x004A43E0` picks the menu
-   table and its row count: 51 classic, 62 expansion, separators
-   included). Their bindings stay active in a classic game; their
-   handlers check the game type themselves (§6).
-
-### 5. Dispatch
-
-1. **Hot-key mode** `[0x007A7418]` (`0x0046AA20(mode, swap)`,
-   `0x0046AC70` sets 1 at game start, `0x0046ACB0` sets 0 at game end):
-
-   | Mode | Window handlers registered | Effect |
-   |---|---|---|
-   | 1 | press and release (`0x00712944`: WM_KEYDOWN / WM_SYSKEYDOWN → `0x0046A840`, WM_KEYUP / WM_SYSKEYUP → `0x0046A940`) | all commands |
-   | 2 | same | only commands with `full_ok` = 1 (§7) run, on press and on release |
-   | 0 | release only (`0x00712974`) | presses do nothing; release handlers still run |
-
-   Set by the UI open / close hooks (`ui/panels.md` §2.6): opening ui 5
-   (chat) or 0x17 (player trade) → 0; opening 0x0C (NPC shop), 0x19
-   (stash) or 0x1A (cube) → 2; closing 0x0C, 0x19, 0x1A or 0x17 → 1;
-   closing ui 5 → 1 only if none of the states 0x0C, 0x17, 0x19, 0x1A,
-   0x1B, 0x1C, 0x1D, 0x1E, 0x20 is open (else unchanged). The key
-   configuration panel (ui 0x0B) sets 0 while it waits for a key and 1
-   otherwise (`0x004A5200`).
-2. **Press** (`0x0046A840`): ignored when lParam bit 30 is set (key
-   already down: auto-repeat never repeats a command). Find the first
-   record, in table order, with `key` = the virtual-key code, `cmd` <
-   57 and a press handler. None → not consumed. If the key is 0x73
-   (F4) and Alt is down (`GetKeyState(0x12)` < 0) → nothing (Alt+F4 is
-   left to Windows). If mode = 2 and the command's `full_ok` = 0 →
-   nothing. Else call the press handler and consume the message.
-3. **Release** (`0x0046A940`): the same search for a record with a
-   release handler (no repeat test, no F4 test), the mode-2 filter,
-   then the release handler.
-4. **Mouse codes** (§1.2) are dispatched from the mouse messages while
-   in game (`[0x007A061C]` ≠ 0) through the slots of §3.4; the hot-key
-   mode does not apply to them. The wheel adds the message's delta to an
-   accumulator `[0x007A06F8]`; when |accumulator| ≥ 120 the slot of its
-   sign (forward ≥ 120, backward ≤ −120) runs once and the accumulator
-   resets to 0 (the remainder is dropped; a delta of 240 runs once).
-5. Release handlers are what make three commands "held": Run (34), Stand
-   Still (36), Show Items (37); Screen Shot (42) acts on release.
-6. **Stand-still polling**: every pass of the client loop
-   (`0x0044EFA0` at `0x0044F04C`) sets the stand-still flag to 1 if a
-   key bound to command 36 (slot 1, then slot 0) is down by
-   `GetAsyncKeyState`, else 0 (`0x0044CE90`). The press / release
-   handlers of command 36 are therefore overridden at the next loop
-   pass.
-7. **WM_ACTIVATEAPP** (`0x0044C5E0`): wParam ≠ 0 → `SetUIState(0x0D,
-   off, 0)` (item labels), stand-still flag := 0, `0x00466FE0`,
-   `0x004FB130(0)`. wParam = 0 → the run flag := 0 unless the slot-1
-   key of command 34 is down (`GetAsyncKeyState`), then the pending
-   left / right button handlers are closed (`0x0044C060` when
-   `[0x0070F234]` ≠ 0x10, likewise for `[0x0070F2BC]`).
-
-### 6. Commands
-
-"Guard" = the handler does nothing while the client's exit flag
-`[0x007A0620]` is set or the local player is missing or dead (mode 0x11)
-(`0x0044DA30`, `0x00463DF0`). `SetUIState(ui, mode, jump)` is
-`ui/panels.md` §2 (mode 2 = toggle). Handlers by command id:
-
-| Cmd | Name | Action |
-|---|---|---|
-| 0 | Character Screen | `SetUIState(2, toggle, jump 1)` |
-| 1 | Inventory Screen | `SetUIState(1, toggle, 1)` |
-| 2 | Party Screen | multiplayer only (game type `[0x007A0610]` ≠ 0): `SetUIState(0x16, toggle, 1)` |
-| 3 | Message Log | `SetUIState(0x18, toggle, 0)` |
-| 4 | Quest Log | guard; `0x004A3FE0(1)` (quest panel; owner `ui/panels.md` OQ 1) |
-| 5 | Chat | not while exiting: `SetUIState(5, toggle, 0)` |
-| 6 | Help Screen | guard; `SetUIState(0x21, toggle, 0)`; then registry value `Diablo II\Help Menu` := 1 if it is missing or 0 (`0x00414F10` / `0x004150E0`) |
-| 7 | Automap | `SetUIState(0x0A, toggle, 0)`; if the automap is now closed, `0x00457640(0)` |
-| 8 | Center Automap | `0x00457640(1)` |
-| 9 | Fade Automap | fade level := (level + 1) mod 4 (`0x004576C0` / `0x004576F0`) |
-| 10 | Party on Automap | flag `0x004577B0` toggled (`0x004577C0`) |
-| 11 | Names on Automap | flag `0x004577E0` toggled (`0x004577F0`) |
-| 12 | Skill Tree | `SetUIState(4, toggle, 1)` |
-| 13 | Skill Speed Bar | `SetUIState(3, toggle, 0)`; `0x004A8CE0(0)` |
-| 14–21 | Skill 1–8 | guard; hot-key slot k = cmd − 14: if ui 3 (skill speed bar) is open, `0x004A9E60(k)` (bind the hovered skill, C→S 0x51), else `0x004AA030(k)` (select the slot's skill, C→S 0x3C) (`ui/panels.md` §15) |
-| 46–53 | Skill 9–16 | as 14–21 with k = cmd − 38 (8–15), expansion game only |
-| 22 | Show Belt | if the player has an item in body location 8 (belt) of item type 0x13 (`0x0063BDE0`, `0x00629BB0`): `SetUIState(0x1F, toggle, 0)` |
-| 23–26 | Use Belt 1–4 | guard; only while `[0x007BEFB0]` = 1: use belt column cmd − 23 with "shift" = Shift down (`GetKeyState(0x10)` bit 15) (`0x00498C50` + 0x40 × column → `0x00498A90`; C→S 0x26, `items/inventory-moves.md`) |
-| 27–33, 55 | Say 'Help' … 'Retreat' | C→S 0x3F with sound 0x19 + n, n = cmd − 27 (cmd 55: n = 7, 0x20) (`0x004785B0`) |
-| 34 | Run (held) | press: run flag `[0x007A065C]` := 1; if the player is a player unit in mode 2 (walk) and `0x00625480(player, 0x0A, 0)` ≠ 0 (guard as above): `0x00480E70(player, 3)` and C→S 0x53. Release: flag := 0; if run-lock is off and the player is in mode 3 (run): `0x00480E70(player, 2)` and C→S 0x54 |
-| 35 | Toggle Run/Walk | run-lock `[0x007A0660]` := not run-lock (no message) |
-| 36 | Stand Still (held) | press: stand-still flag `[0x007A0664]` := 1; release: := 0 |
-| 37 | Show Items (held) | press: `SetUIState(0x0D, on, 0)`; release: `SetUIState(0x0D, off, 0)` |
-| 38 | Clear Screen | in game: close every closable open state (`0x00456300(0, jump 1)`, closable = table `0x006D6378`, §Constants); if none was closed: `0x00457640(0)` and close again including the automap (`0x00456300(1, 0)`) |
-| 39 / 40 | Select Previous / Next Skill | guard; `0x004AA740(−1)` / `0x004AA740(1)` |
-| 41 | Clear Messages | `0x004A01E0` |
-| 42 | Screen Shot | release only: `0x004FA7A0` |
-| 43 | Show Portraits | `0x00493840` |
-| 44 | Swap Weapons | unless ui 0x0C, 0x17 or 0x19 is open: `0x0048A730` (C→S 0x60, `ui/panels.md` §15) |
-| 45 | Toggle MiniMap | flag `0x00457770` toggled (`0x00457780`) |
-| 54 | Hireling Screen | expansion game, the player has a hireling (`0x00478F20(player, 7)` ≠ −1) and `0x00408F20()` ≠ 0: `SetUIState(0x24, toggle, 1)` |
-| 56 | Esc (fixed) | unless `0x004B34A0()` or a modal text screen (`0x004A0000`): if ui 9 (game menu) is open, close it (`0x0047E200(1)`); else close the closable states (`0x00456300(0, 1)`) and, if none was closed, open the game menu (`0x0047E090(1, 0)`) |
-
-The run and stand-still flags are read by the left / right mouse
-handlers (§8.2).
-
-### 7. `key-commands.tsv`
-
-One row per command 0–56. Columns:
-
-| Column | Meaning |
-|---|---|
-| `cmd` | command id |
-| `string_id`, `string_key` | label in the key configuration panel (`formats/tbl.md` id; 10833 and 11083 are 1.14d `Patch_D2.mpq` `patchstring.tbl` ids); `-` for 56 (not listed) |
-| `key1`, `key2` | default key of slot 1 / slot 0: `0xNNN:Name` (§1) or `-` |
-| `down`, `up` | 1.14d press / release handler (`0x00712698` + 12 × cmd, +0 / +4), `-` = none |
-| `full_ok` | +8 of the same entry: 1 = runs in hot-key mode 2 (§5.1) |
-| `file_pos` | position in the record order of the default table (§2.1) |
-| `menu_classic`, `menu_exp` | row in the panel's menu table (`0x00724268`, 51 rows, separators at rows 6, 19, 25, 32, 38, 47; `0x00724468`, 62 rows, separators at 7, 28, 35, 42, 49, 58); `-` = not listed |
-
-Our `Action` names for the `original` preset (`client/ui.md` §A6) are
-the `string_key` values; command 56 is `GameMenu`.
-
-### 8. Hard-wired input (not configurable)
-
-1. Left and right mouse buttons, the cursor and Esc's binding are fixed
-   (§1.3 refuses 0x01, 0x02, 0x04 and 0x1B).
-2. **World clicks** (`0x0044BF40` and the other button handlers
-   `0x0044C060`; `0x0044C2C0` runs from the client loop while
-   `[0x007A0654]` ≠ 0, the held-button path): in game, the handler builds a flag word
-   from the held commands: 8 when the run flag (§6 cmd 34) or the
-   run-lock (cmd 35) is set, | 4 when the stand-still flag (cmd 36) is
-   set, and passes it with the message's key state to `0x00462D00` for a
-   player unit. Which C→S message (0x01–0x04 walk / run, 0x05–0x11
-   skill, `skills/use.md` §1) and the hold repeat follow from that
-   function: §Open questions 1.
-3. Inside an open panel the click goes to the panel (`ui/panels.md`
-   §4.4); Shift-clicks on items and stat buttons are the owners' rules
-   (`ui/inventory.md`, `ui/panels.md` §8.5).
-4. Text entry (chat box, ui 5) receives WM_CHAR while the hot-key mode
-   is 0 (§5.1); the edit control is `ui/text.md` / §Open questions 4.
+   Measured 2026-10-07: equal; the install's `default.key` equals header
+   + table, and the 16 character `.key` files of the test machine equal
+   version + table.
 
 ## Constants & data dependencies
 
-- 57 commands, 114 records of 10 bytes, table 0x474 bytes; version 0x25;
-  default file header "WS" / 0x25 / 0x47A.
-- Closable states for Clear Screen / Esc (`0x006D6378`, 38 u32, 1 =
-  closable): 1, 2, 3, 4, 5, 9, 11, 12, 13, 15, 16, 18, 20, 22–33, 36, 37.
-  Not closable: 0, 6, 7, 8, 10 (automap, unless asked), 14, 17, 19, 21,
-  34, 35.
-- Strings: 3921–3985 (`Cfg*`), 3975–3980 (panel messages), 10833, 11083,
-  22717–22727.
+Version 0x25, magic 0x5357, sizes 0x476 / 0x47A, 114 entries, 57
+commands; wheel threshold 0x77; labels from `string.tbl` 3921–3977 and
+`expansionstring.tbl` (`CfgSay7`, `CfgSkill9`–`16`, `CfgToggleminimap`,
+`Cfgswapweapons`, `Cfghireling`).
 
 ## Randomness
 
@@ -330,85 +339,69 @@ None.
 
 ## Edge cases & original bugs
 
-Reproduced by default.
-
-- Auto-repeat never repeats a command (§5.2).
-- Alt+F4 is ignored only for the key code 0x73 itself, whatever command
-  F4 is bound to (§5.2).
-- Chat opened over the stash, shop or cube leaves hot keys off after
-  the chat closes (§5.1: closing ui 5 does not restore mode 2).
-- Release handlers run in mode 0: releasing Ctrl or Alt while the chat
-  box is open still ends running or the item labels. Stand Still
-  follows the polled key state in every mode (§5.6), so Shift works
-  while typing.
-- The wheel drops the remainder of its accumulator (§5.4).
-- Rebinding a key steals it from its first holder before checking that
-  the target record exists (§4.5).
-- Toggle Run/Walk sends nothing; the change shows at the next move
-  click (§8.2).
-- The archive `default.key` copies are dead data in 1.14d (§2.4).
+1. A held key never repeats a command (bit 30 test); a key that is bound
+   twice runs only the first entry's command.
+2. Several bindings on one mouse button: the last table entry wins (§4.2
+   r1), the opposite of the keyboard's first match.
+3. A valid character file is never rewritten at load; `default.key` in
+   the save directory silently replaces the compiled defaults for every
+   later character with no valid file.
+4. The wheel accumulator is reset to 0, not reduced by 120: one event of
+   delta 240 is one step.
+5. Alt+F4 never reaches a command bound to F4.
 
 ## Test vectors
 
 | Input | Expected output | Source |
 |---|---|---|
-| `key-commands.tsv` `key1`/`key2` written as records in `file_pos` order, slot 1 then slot 0 | 1140 bytes equal to `Game.exe` bytes at file offset 0x312220 (SHA-256 `a711045f…cfdd`) | §2.5; game test (`#[ignore]`, `D2_GAME_DIR`) |
-| same table with header `57 53 25 00 7A 04` | equals `<D2_GAME_DIR>\default.key` when the user never rebound keys (1146 bytes) | §2.2 |
-| record 0 | `00 00 00 00 41 00 01 00 00 00` (cmd 0, 'A', slot 1) | §2.1 |
-| record 90 (`file_pos` 45) | cmd 21, F8 (0x77), slot 1 | §7 |
-| default file with version 0x24 (the `d2exp.mpq` copy, 1126 bytes) | rejected; compiled table used | §2.2, §2.4 |
-| per-character file of 1142 bytes, version 0x25, command 13 missing from every record | rejected; defaults loaded and both files rewritten | §3.1, §3.2 |
-| per-character file where 'A' is bound to commands 0 and 3 | rejected (duplicate key) | §3.1 |
-| `Rebind(56, 1, 'K')` | 0 | §4.1 |
-| `Rebind(36, 1, 0x103)` | 0, message 3978 | §4.3 |
-| `Rebind(0, 1, 0x2C)` | 0, message 3979 | §4.4 |
-| `Rebind(3, 0, 'C')` on the default table | 1; command 0 slot 0 now none; command 3 slot 0 = 'C' | §4.5 |
-| `Rebind(0, 1, 0x25)` (left arrow) | 0, message 3979 | §1.3 |
-| WM_KEYDOWN 'I', lParam bit 30 clear, mode 1 | `SetUIState(1, toggle, 1)` | §5.2, §6 |
-| same with bit 30 set | nothing | §5.2 |
-| stash open (mode 2), WM_KEYDOWN 'I' | nothing; WM_KEYDOWN 'W' swaps nothing either (ui 0x19 open, §6 cmd 44) | §5.1, §6 |
-| mode 2, WM_KEYDOWN Numpad0 | C→S `3F 19 00` | §6 cmd 27 |
-| WM_MOUSEWHEEL +60, +60 | Select Previous Skill once, after the second | §5.4 |
-| WM_MOUSEWHEEL −240 | Select Next Skill once | §5.4 |
-| Ctrl down while walking, Ctrl up (run-lock off) | C→S `53`, then `54` | §6 cmd 34 |
-| trace `controls-0001` (§Open questions 5) | identical C→S messages and ticks | trace, queued |
+| fresh install, no `.key` files | live table = `0x00712220`; character `.key` (0x476 bytes) and `<save>default.key` (0x47A bytes) written | §2.3 |
+| `.key` with version 0x24 | rejected → defaults | §2.3 |
+| `.key` with I bound to commands 0 and 1 | rejected (duplicate key) | §2.3 |
+| archive `d2exp.mpq` `default.key` | header version 0x24 → dropped | §2.5 |
+| key A down, held, auto-repeat messages | ui 2 toggled once | §4.1 r2 |
+| wheel delta +240 in one message | command 39 once | §4.2 r3 |
+| Ctrl down with run lock on, then left click | flags 8 | §4.3 r1 |
+| Shift + left click | flags 4 (| 8 if running) | §4.3 r1 |
+| NPC shop open, press I | nothing (M2 = 0) | §4.1 r4 |
+| chat open, press I | nothing (key-down not registered) | §4.1 r5 |
+| `original` preset vs `0x00712220` | identical 114 bindings | §B4 |
+| `key-commands.tsv` written as a table (§B4 r1) | 1140 bytes, SHA-256 `a711045f…cfdd`; entry 0 = `00 00 00 00 41 00 01 00 00 00`; entries 90–91 = command 21 (F8, slot 1; none, slot 0) | §B4, §3.4 |
+| expansion game, key-config menu | 62 rows, row 3 = `Cfghireling` (command 54) | §3.3 |
+| classic game, key-config menu | 51 rows, no Swap Weapons / Hireling / Skill 9–16 rows | §3.3 |
 
 ## Provenance
 
-1.14d `Game.exe` (Ghidra export, `tools/ghidra/disasm.py`, `all.asm`):
-`CmdTbl.cpp` functions `0x00469650` (per-character path), `0x00469780`
-(save), `0x004698D0` (default load), `0x00469AE0` (bindable keys),
-`0x00469C20` (rebind), `0x00469420`, `0x00469450`, `0x00469AA0`,
-`0x00469D20`–`0x00469D90`, `0x004694A0` (mouse slots), `0x0046AAE0`
-(game-start load and checks), `0x0046AA20` / `0x0046AC70` /
-`0x0046ACB0` (hot-key mode), `0x0046A840` / `0x0046A940` (dispatch),
-handler table `0x00712698` (57 × 12 bytes), window handler tables
-`0x00712944`, `0x00712974`; mouse messages `0x0044C400`–`0x0044C520`,
-`0x0044BF40`; command handlers `0x00468940`–`0x00469220` (disassembled
-in full); UI hooks `0x00455720` (jump table `0x00455A40`), `0x00455AE0`
-(`0x00455E80`); menu tables `0x00724268`, `0x00724468` (selector
-`0x004A43E0`); closable table `0x006D6378`. Game files: `Game.exe`
-`.data` (default table), `default.key` of the install, the
-`default.key` copies in `d2data.mpq` / `d2exp.mpq`, 16 per-character
-`.key` files (Saved Games, 2026-10-07), English `string.tbl`,
-`expansionstring.tbl`, `patchstring.tbl` (`Patch_D2.mpq`); probes with
-Python, outputs outside the repo. D2MOO (1.10f) gave only the record
-struct name `D2KeyConfigStrc`; every field was confirmed from the 1.14d
-code and files.
+1.14d `Game.exe`: `.\UI\CmdTbl.cpp` functions `0x004694A0`–`0x0046ACB0`,
+handler bodies `0x00468940`–`0x00469210` (disassembly,
+`tools/ghidra/disasm.py`), window handler tables `0x00712944` and
+`0x0070F2C4` read from the binary, command and binding tables dumped with a
+script (outside the repo). Mouse handlers `0x0044BEC0`–`0x0044CE90`.
+UI hooks `0x00455720` / `0x00455AE0` (jump tables `0x00455A40` /
+`0x00455E80` read from the binary; `index/switches.tsv` renumbers their
+cases). Labels from the 1.14d `string.tbl` / `expansionstring.tbl`;
+archive `default.key` headers measured. Menu tables `0x00724268` / `0x00724468` and selector `0x004A43E0`, string ids decoded from the English 1.14d `string.tbl`, `expansionstring.tbl` and the `Patch_D2.mpq` `patchstring.tbl`; the compiled table compared byte for byte with the install's `default.key` and 16 character `.key` files (2026-10-07, `claude/pc2-ui`). No D2MOO code used.
 
 ## Open questions
 
-1. World mouse clicks: how `0x00462D00` and the other button handlers
-   (`0x0044C060`, `0x0044C2C0`) turn the flag word (§8.2) into C→S
-   0x01–0x11, and the hold-repeat timing (recording 015956 shows 0x10
-   every 13 frames). Needs more than two function reads: recording
-   `controls-0001` (`docs/handoff/pc2-rec-pc2-ui.md`).
-2. Whether the in-game key panel shows slot 1 in the "Key/Button One"
-   column (comparator order §2.1 suggests so): capture `controls-0002`.
-3. Key configuration panel (ui 0x0B, `0x004A5270`, `0x004A5A40`–
-   `0x004A63B0`): row layout, scroll, highlight and the
-   accept / default / cancel buttons. Owner of its pixels: this spec,
-   capture `controls-0002`.
-4. Chat edit box (caret, selection, `ui/text.md` OQ 3 / 4): owner
-   `ui/text.md` (PC 1); listed so it is not lost.
-5. Input trace `controls-0001` settles §5 and §6 end to end.
+1. **Answered** (2026-10-07, §3.3: the menu tables `0x00724268` /
+   `0x00724468` give every label; `CfgMiniMap` is unused). Was: command
+   → label mapping of the key-config screen.
+2. ~~Left / right button semantics: `0x00462D00`'s first argument, what a
+   click on a unit / the ground / with Shift does, the held-button repeat
+   and its tick; which C→S messages go out.~~ More than two reads
+   (`0x00462D00`, `0x0044C2C0`, `0x0044F046`): recording `controls-0001`
+   (`docs/handoff/pc2-rec-pc2-ui.md`).
+3. **Answered** (2026-10-07, §3 intro): `0x0044DA30` = exit flag,
+   `0x00463DF0` = no player or player dead, `0x0044DB30` = game type
+   (multiplayer).
+4. Belt use `0x00498A90`: which slot of column c, the Shift branch
+   (give to hireling?), and the byte `0x007BEFB0`.
+5. **Answered** (2026-10-07): the latch `[0x007A27B4]` marks the gold
+   amount dialog (`0x00454150` opens it and sets key mode 0, key-up
+   kept; `0x00453EE0` closes it and sets 1; `ui/inventory.md` §9).
+6. ~~When the key-config screen's Accept writes the files (no caller of
+   `0x00469780` other than the load path).~~ Recording `controls-0002`
+   (file times of `<save>\<name>.key` and `default.key` after Accept).
+7. ~~Which of slot 0 / slot 1 the config screen shows as "Key/Button
+   One" (`CfgPrimaryKey`).~~ The display sort `0x00469450` puts slot ≠ 0
+   first; the column is settled by capture `controls-0002`.

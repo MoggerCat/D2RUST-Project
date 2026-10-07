@@ -30,19 +30,19 @@
 | Rules | 83–84 |
 |   1. Vendor columns and per-NPC store lists | 85–125 |
 |   2. Store item level | 126–131 |
-|   3. Store generation (`0x00576980(npc, player, record)`) | 132–228 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
-|   5. Gambling | 254–309 |
-|   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–517 |
-|   8. Repair | 518–554 |
-|   9. Prices | 555–706 |
-| Constants & data dependencies | 707–726 |
-| Randomness | 727–742 |
-| Edge cases & original bugs | 743–772 |
-| Test vectors | 773–795 |
-| Provenance | 796–834 |
-| Open questions | 835–865 |
+|   3. Store generation (`0x00576980(npc, player, record)`) | 132–242 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 243–272 |
+|   5. Gambling | 273–339 |
+|   6. Refresh | 340–371 |
+|   7. Buying and selling | 372–622 |
+|   8. Repair | 623–669 |
+|   9. Prices | 670–846 |
+| Constants & data dependencies | 847–866 |
+| Randomness | 867–882 |
+| Edge cases & original bugs | 883–912 |
+| Test vectors | 913–935 |
+| Provenance | 936–974 |
+| Open questions | 975–1038 |
 <!-- /index -->
 
 ## Summary
@@ -135,7 +135,10 @@ Runs when trade opens and the record's +0x20 (store generated) is 0
 (§4), or on a pending refresh (§6). Seed: the NPC-control seed. Record
 +0x28 := `GetTickCount()` (host value, §6). fails := 0.
 
-For each item-list entry e, in list order:
+For each item-list entry e, in list order (every list code and
+permanent code is the `code` of an item record, §1 rule 2, so the code
+map always finds it; a missing one would be read through a null record
+at `0x005769F7` — handoff `impl-vendors` V8, unreachable):
 
 1. rec = item record of e.code. rec `level` (u8 +253) > ilvl → next
    entry, no draw.
@@ -186,7 +189,15 @@ Arguments: code, quality q, ilvl, L_p.
    result is inferior with the low-quality name `Cracked` is destroyed
    (5 such tries → return null). If the created item's base code ≠ the
    chosen code: destroy it, set q := 2 and run the second round; equal
-   → done. (After round 2 the item is kept whatever its code.)
+   → done. Exact (handoff `impl-vendors` V7, `0x0057652B`–`0x0057655B`):
+   a mismatch in round 2 also destroys the item, and the result is null
+   (the earlier sentence "after round 2 the item is kept whatever its
+   code" was wrong). The chosen code is the upgrade code even when the
+   code map lacks it: the lookup `0x00633640` then writes class index 0
+   (`hax`), so both rounds create class 0, mismatch, and return null. A
+   null result of the creation call itself is not a failed try: the
+   quality test `0x00627E70` reads quality 2 for none, the try loop ends,
+   and the code read `0x00628590(none)` is a fatal assert (line 0x61A).
 3. Store page = `itemtypes.storepage` of the item's type (u8 +34;
    `storepage.txt` rows: 0 armo, 1 weap, 2 mag, 3 misc); 0xFF → destroy,
    null.
@@ -197,7 +208,10 @@ Arguments: code, quality q, ilvl, L_p.
 5. Mark it (`0x005762C0`): flag 0x10 (identified); vendor item (unit
    +0xC8 |= 4); flag 1 when it has filled sockets (`0x0055F590`); add to
    the NPC's trade inventory (`0x0063CC70`; the client sees 0x9C action
-   11).
+   11). "Flag 0x10", "flag 1" and "flag 2" in this spec are item flags
+   (item data +0x18, `0x006280D0`): values 0x10, 0x1, 0x2 (handoff
+   `impl-vendors` V13). Between the socket flag and the trade-inventory
+   add, `0x005762C0` refreshes the NPC unit (`0x00621000(npc, 1)`).
 
 #### 3.2 What item creation is asked for
 
@@ -214,8 +228,8 @@ NPC-control seed.
 #### 3.3 Failures
 
 Normal and permanent items stop the generation after 33 null results;
-magic items never stop it. A null is: 5 cracked tries, no store page,
-or no room (§3.1).
+magic items never stop it. A null is: 5 cracked tries, a code mismatch
+in both rounds, no store page, or no room (§3.1).
 
 #### 3.4 NPC event list (record +0x14)
 
@@ -246,7 +260,12 @@ From `npc.md` §4 (actions 1, 2):
      (gamble): vendor item flag (unit +0xC8 |= 4), flag 1 if it has
      filled sockets, add to the NPC's trade inventory
      (`0x00576C30`); the client receives one 0x9C action 11 per item
-     (recorded, frame 899).
+     (recorded, frame 899). Order (handoff `impl-vendors` V14): the
+     walk is the NPC's (or the gamble node's) inventory item list, first
+     `0x0063B2C0`, next `0x0063DFA0`, which is link order
+     (`items/inventory.md` §1.4 rule 1): items in the order they were
+     placed, a sold copy appended when §7.2 rule 8 places it, a bought
+     item unlinked by §7.1 rule 12.
 
 D2MOO 1.10f inverts the class test of step 3 (only kashya / greiz /
 qual-kehk continue); 1.14d excludes them.
@@ -283,6 +302,17 @@ list (+0x08). L_p = player level. c := 0. Loop:
    (unidentified), place in the node's inventory; no room → destroy and
    stop.
 8. Stop after c reaches 14.
+
+Exact (handoff `impl-vendors` V9, `0x00578790`): the gamble index
+`0x00638CC0` is the fixed block `0x0096CAB0` and is never none; with a
+gamble count of 0 every threshold is 0, idx = 0 and the read of index
+list[0] goes through the absent (null) list (a fault; 1.14d has 125
+rows). idx < T[L_g] ≤ count always (`runtime-maps.md` §7), so no index
+runs past the list. The `rin` / `amu` ids are cached by `0x00633640`,
+which stores 0 when the code is missing: the first two passes then use
+item 0 (`hax`), and the lookup is retried on the next list. An expansion
+game never tests the record (step 3 is classic only); the upgrade
+`0x005786A0` returns the drawn id unchanged when its record is missing.
 
 #### 5.2 Price
 
@@ -345,14 +375,26 @@ timer only matters while another player stays in town.
 
 Layout: NPC GUID u32 @1, item GUID u32 @5, u32 @9 = transaction t (bits
 0–15) | unused (bits 16–30) | fill (bit 31), u32 @13 = client price
-(**never read**). Handler `0x0054BAC0` → `0x00577F30`: NPC missing or
+(**never read**). What the 1.14d client writes in bits 16–31: the
+item's mode (unit +0x10, u16) shifted left 16 (`0x004B2713`,
+`0x004B2760`–`0x004B2763`), then bit 31 OR-ed for fill; store items are
+in mode 0, so bits 16–30 arrive 0 (the server never reads them either
+way). Handler `0x0054BAC0` → `0x00577F30`: NPC missing or
 not the player's interact unit → 0x2A code 9, result 1. Then
 `0x00577830`:
 
 1. Item missing → code 7, GUID = requested, result 1.
 2. t = 0: item must be in the NPC's inventory; t = 2: the player's
-   gamble list here must exist and hold the item; else code 7, result 1.
-   Other t values skip this test (edge case 3).
+   gamble list here must exist and hold the item; else code 7, result 1,
+   GUID = requested. Other t values skip this test (edge case 3).
+
+   GUIDs and kinds of every 0x2A of buy, sell and repair (handoff
+   `impl-vendors` V10, pushes before each `0x0053D740` call in
+   `0x00577830`, `0x00577F30`, `0x00579510`, `0x00578050`): rules 1–2 of
+   §7.1 carry the requested item GUID; the successes carry the GUIDs
+   named in §7.1 (kind 4 / 5), §7.2 rule 10 (kind 3) and the repair code
+   2 (kind 1, GUID −1); every other 0x2A (codes 7 cursor, 9, 10, 11, 12
+   in buy, sell and repair) has kind 0 and GUID −1.
 3. price = cost(t) (§9) with the NPC's class.
 4. gold + stash < price → code 12, GUID −1, result 0.
 5. Player has a cursor item → code 7, GUID −1, result 1.
@@ -397,7 +439,9 @@ not the player's interact unit → 0x2A code 9, result 1. Then
     list (`0x00576650`), done. Else permanent items (step 6 set) stay;
     any other store item is taken out of the NPC grid (`0x005766D0`:
     removed, unit +0xC8 |= 0x10, re-added to the trade inventory so the
-    client drops it).
+    client drops it). "Store item" is the item the 0x32 named (the hook
+    gets the source, not the copy), whatever list holds it; "permanent"
+    is exactly `0x00576ED0` (handoff `impl-vendors` V13).
 
 ##### 7.1.1 Equip try at buy (`0x00577D18`–`0x00577D9A`)
 
@@ -440,13 +484,22 @@ client price (not read). Handler `0x0054BB20` → `0x00579510`:
    (ear); personalized (0x1000000); ethereal (0x400000); filled
    sockets; a unique whose `uniqueitems` flag byte +0x2C has the bit
    of mask `0x006CE270` (`0x00575FA0`); the player's vendor-chain node
-   at this NPC is in gamble mode.
+   at this NPC is in gamble mode. The mask is entry 2 of the bit table
+   `0x006CE268` (1, 2, 4, 8, …; read from the image): value 4, the
+   `carry1` bit of the flag byte (`data/fields.tsv` uniqueitems
+   `carry1`, bit 2 of +0x2C), so a carry-one unique (in 1.14d `uniqueitems.txt`: Gheed's Fortune,
+   Annihilus, Hellfire Torch) is not re-stocked (handoff `impl-vendors` V1).
 8. Re-sellable and not a permanent item / NM-Hell hp4-5 mp4-5
    (`0x00576ED0`): copy into the NPC (§7.3, `0x0055A2A0`, fillers 1; null → code 9,
    result 3); mode 4; store page (§3.1 step 3; 0xFF → destroy, no
    copy); place, page 1 → 2 retry (fail → destroy); placed: mark
    (§3.1 step 5), durability := max, quantity := max stack, and price
    := min(price, cost(1) of the restored copy).
+   Exact (handoff `impl-vendors` V11, `0x00579510` after the placement
+   `0x00560200`): stat 72 := the max durability (`0x00625E00`) and stat
+   70 := `0x006295B0` = items `maxstack` (+0xE8) + total stat 254, capped
+   at 511, for **every** placed copy, stackable or not (a non-stack item
+   with `maxstack` 0 gets stat 70 = its stat 254, usually 0).
 9. Take the item from the player by mode: 4 (cursor) → `0x0055EEA0`
    (fail → code 9, result 1); 0 (stored): scroll (type 22) lowers the
    matching scroll skill quantity by 1, a book (type 18) by its
@@ -506,10 +559,62 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
 What carries over is exactly what the save stream carries
 (`items/bitstream.md` §2–§5): stats with `Save Bits` 0, values the clamp
 changes (§1 rule 3) and unit state outside the item record (timers
-other than step 7, owner links, unit flags) are not copied. No RNG draw
-(the stream holds the seeds, §4.1 rule 7). The decode rules of
+other than step 7, owner links, unit flags) are not copied. No draw
+decides any property of the copy (the stream holds the seeds, §4.1 rule
+7), but the **game seed does advance**: each unit allocation of steps 3
+and 5 (`0x00555230`, type 4) makes one game-seed step for the unit seed
+(`0x00552DF0` at `0x0055530E`) and one for the item seed (`0x00552E90`
+at `0x0055532A`), both on game +0xD0 (`sim/units.md` §2 rule 4,
+`sim/rng.md` §5.3); the decode then overwrites the item's seeds from the
+stream. So a copy with k fillers read costs 2 · (1 + k) game-seed steps,
+copy first, children in stream order; the GUID (`0x00552EE0`) and the
+rest of the routine draw nothing. The decode rules of
 `0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
-of `items/bitstream.md`; their differences are Open question 8.
+of `items/bitstream.md` except for the fields of §7.3.1.
+
+#### 7.3.1 Fields the decoder rebuilds (Open question 8)
+
+The copy passes save version 0x60 (`0x0055A2FE`), so none of the
+decoder's old-version conversions apply. The decoder entry (`0x0062E430`)
+stores the stream's flags without 0x2000000 and 0x80000 and zeroes the
+affix and rare-name slots before the record is read. Not read from the
+stream but rebuilt:
+
+1. Full record (`0x0062CBE0`), weapon (type `weap`): stat 68 := −items
+   `speed`; stats 22, 21, 24, 23 :=
+   `maxdam`, `mindam`, `2handmaxdam`, `2handmindam`, and, when
+   `maxmisdam` ≠ 0, 159 := `minmisdam`, 160 := `maxmisdam` (unit base
+   set `0x00627260`). Quality 1: each is ⌊3v / 4⌋ instead, then 22, 24,
+   160 at least 2 and 21, 23, 159 raised from 0 to 1. Item flag
+   0x400000 (`0x0062A8D0`): each of the six := base × 3 / 2 (signed).
+   Durability (73, then 72 when 73 ≠ 0) is read.
+2. Full record, armor (type `armo`): stat 20 := items `block`, 67 :=
+   −items `speed`; defense (31) and durability are read.
+3. While the stat lists are read: an entry for stat 17 (read with its
+   pair 18) first raises base 22, 24 and, for a throwable item
+   (`0x0062BA80`), 160 to the items column when the base is below it,
+   and before 18 raises 21, 23, 159 the same way (`0x0062C9F0`, a
+   "raise when below" form of `items/properties.md` §4.3); an entry for
+   stat 57 (read with 58 and 59) sets stat 326 (`poison_count`) := 1 in
+   that list.
+4. Item level: a read value < 1 → 1. Unique (quality 7): a file index ≥
+   the uniqueitems count → −1.
+5. Compact record (`0x0062A970`): item level := 1, quality := 2, unit
+   seed field +0x28 := 0 and the item seed initialised from it
+   (`0x00650E40`), suffix slot 0 := 0 for `tsc ` and 1 for `isc `.
+
+So a copy differs from S (whose base values come from
+`items/generation.md` §6 and `items/quality.md` §6) in: the item level
+and item seed of a compact item; stat 326 when S's list holds a value ≥
+2 (two poison properties added to one list, `items/properties.md` §4.2);
+the base damage of a low-quality weapon whose runeword list holds stat
+17 or 18 (the runeword's own reset acts on the filler, §10.2 there, so S
+keeps ⌊3v / 4⌋ while the copy gets the full column); any weapon base
+damage S holds other than the values of rule 1 (e.g. the craft list
+re-applying × 3 / 2 to an ethereal weapon, `items/properties.md` §12).
+The low-quality missile floors differ from creation (creation 159 ≥ 2,
+160 ≥ 1; decode 159 ≥ 1, 160 ≥ 2), but no live `weapons.txt` row with
+`maxmisdam` ≠ 0 reaches a floor.
 
 Recorded: the buy of rule 10 creates the copy GUID 0x36 from store item
 0x12; the sell of §7.2 creates GUID 0x35 from GUID 7 (each the next
@@ -520,7 +625,10 @@ item GUID; `sim/units.md` numbering).
 #### 8.1 C→S 0x35 (17 bytes)
 
 Layout: NPC GUID u32 @1, item GUID u32 @5, u16 @9 (not read), u32 @13:
-bit 31 = repair all. Handler `0x0054BB60` → `0x00578050`:
+bit 31 = repair all. For a one-item repair the 1.14d client writes the
+item's mode at @9 and the item's total stat 72 (durability, `0x00625480`
+at `0x004B27F1`) as the u32 @13, so bit 31 is clear unless the
+durability is ≥ 2^31. Handler `0x0054BB60` → `0x00578050`:
 
 1. NPC missing or not the interact unit → code 9.
 2. Class not charsi 154, fara 178, hratli 253, halbu 257, larzuk 511 →
@@ -543,6 +651,13 @@ bit 31 = repair all. Handler `0x0054BB60` → `0x00578050`:
    and the item is not broken: pay g (inventory gold only), durability
    := min(max, durability + g·1024 / per), S→C 0x3E (stat 72), code 2,
    kind 1. Otherwise code 12, kind 0.
+7. Results (handoff `impl-vendors` V12): the handler `0x0054BB60`
+   returns 3 for a size ≠ 17 and **0 for every 17-byte message**: it
+   drops the result of `0x00578050`. That routine's own results (not
+   seen by the host): 1 for rules 1, 2, 4's "not repairable" and
+   "nothing to repair" refusals and repair-all's failed payment; 3 for
+   rule 4's "missing or not in the inventory"; 0 for every repair and
+   every rule 6 outcome. Every 0x2A of this section has GUID −1.
 
 #### 8.2 Repairing an item (`0x005761C0(item, player)`)
 
@@ -610,9 +725,16 @@ signed division truncating toward zero; "guard(x, m)" means: if x ≥
    "apply": S += dS/div, B += dB/div, R += dR/div (signed); (B) adds to
    S, B, R before the deltas are applied. mt → item-skill costs (A)
    after.
+   Empty slots (handoff `impl-vendors` V2): every affix slot (auto,
+   prefix i, suffix i) is looked up with `0x00633EE0`, which returns none
+   for id 0 or an id above the affix count; a slot without a record adds
+   nothing (no `add` either), slot by slot, and the other slots still
+   count.
 5. —
 6. Sockets: for each item in I's inventory, cost/2 is added to S, B, R
-   (`0x006292F0`).
+   (`0x006292F0`). "cost" is the filler's items record `cost` (+0xE0 of
+   the record of its class, unit +4), halved with signed truncation; no
+   price of the filler is computed (handoff `impl-vendors` V5).
 7. Ethereal: B /= 4. `itemtypes.class` (u8 +33) < 7: B /= 4.
 8. t = 1: ethereal, durability-applicable, durability < 1 → B := 0.
    t = 3, not ammunition, not throwable, durability-applicable: max = 0
@@ -644,7 +766,9 @@ v·p/d, else d ≤ p >> 4 → (p/d)·v; v > 0x100000 and d ≤ v >> 4 →
 value), with `skills` cost mult m (+564) and cost add a (+568), k = 2v −
 1: S < 0x10000 or m = 0: dS += (m·S/1024 + a)·k, dB += (B·m/4096 + a)·k,
 dR += (R·m/1024 + a)·k; else dS += ((m/1024)·S + a)·k, dB += ((m/4096)·B
-+ a)·k, dR += (R·(m/1024) + a)·k. Then X += dX / div, **unsigned**.
++ a)·k, dR += (R·(m/1024) + a)·k. Then X += dX / div, **unsigned**. An entry whose skill id (the layer,
+u16) is ≥ the `skills` count is skipped: it adds nothing, not even `a`
+(handoff `impl-vendors` V3).
 
 **(B) Bonus-stat costs** (`0x00628E70`): for each stat entry (up to 511)
 with bonus b = `0x00625560(I, stat, layer)` ≠ 0 and a valid stat: b >>=
@@ -656,9 +780,18 @@ with bonus b = `0x00625560(I, stat, layer)` ≠ 0 and a valid stat: b >>=
   same formulas with u in place of b, guard S·u > 0xFFFF.
 - 4: (min, max) of the by-time value (`0x0065CA30`), u = (min + max)/2;
   `itemstatcost` multiply m (+16), add a (+20); all three /1024; guard
-  on S·u.
+  on S·u. Exact (handoff `impl-vendors` V4): with v = b after the
+  valshift, min = ((v >> 2) & 0x3FF) − 256 and max = ((v >> 12) & 0x3FF)
+  − 256 (arithmetic shifts); u = (min + max) / 2, signed, toward zero
+  (`0x0062914B`–`0x0062915E`).
 - other: m, a from `itemstatcost`, all three /1024, guard on S·b.
 Then X += dX / div, unsigned.
+Missing `skills` row (handoff `impl-vendors` V3): encode 1 with skill
+id ≥ the `skills` count → the entry is skipped (`0x00628F48`); encode 2
+/ 3 with skill = layer >> shift ≥ the count → the record pointer is 0
+and the next read (+0x234) faults (`0x00629070`, `0x00629084`): the
+original crashes; unreachable with the 1.14d tables (the skill ids come
+from the item's own stat list).
 
 **(C) Charged skills** (`0x00628D30(I, base)`): for each stat 204 entry
 with current = value & 0xFF < max = value >> 8: skill = layer >> shift,
@@ -691,6 +824,13 @@ discount from then on in that difficulty (edge case 6).
 t = 2 (rule 1): if the item's format field (item data +0x30) is 0 →
 `gamble cost` (u32 +212) of the item's normal-code record. Else the
 record of the item's normal code (`0x00629370`), L = player level:
+("normal code" = `0x006287D0`: items `normcode` (+0x84) when ≠ 0, else
+`code`. Handoff `impl-vendors` V6: a normal code missing from the code
+map gives no record; the format-0 branch then reads `gamble cost`
+through a null record (fault) and `0x00629370` exits with the fatal
+assert 0xB1A; the 1.14d normal codes are all present. The uber and
+ultra tests are literally "≠ 0, ≠ `0   ` (0x20202030) and found"; the
+store upgrade of §3.1 tests "≠ 0 and ≠ 4 spaces" instead.)
 
 - `rin` or `amu` → `gamble cost`.
 - st = max((minstack + maxstack)/2, 1) (u32 +228, +232).
@@ -837,9 +977,23 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 1. `0x00625560` (stat "bonus" used by §9.2 (B)): exact definition
    belongs to the stat-list spec; confirm with one recorded magic-item
    price.
+   Answered (definition; 2026-10-07): `sim/stats.md` §4.2 "unit
+   bonus": `0x00625560(unit, s, layer)` = 0 when unit +0x5C (the stat
+   list) is null, else the list total `0x00625420` minus the list base
+   `0x00625350`, both with layer and each with its own minimum rule
+   (disassembled). The recorded price check stays under OQ6.
 2. Item format field (item data +0x30) that selects the gamble-cost
    column (§9.4): when it is 0 in an expansion game; check items created
    by §5.1.
+   Answered (2026-10-07): never for a gamble-list item. §5.1 creates
+   each item through `0x00559CE0` (`0x005789F9`, game = the list
+   builder's ECX), which zeroes its request and stores the game's
+   format (u16 game +0x78) at request +0x2A (`0x00559D28`–`0x00559D2E`);
+   the creation pipeline copies +0x2A to item data +0x30
+   (`items/bitstream.md` §3 rule 1), i.e. 101 in an expansion game, 2
+   in a classic game (`items/generation.md` §1.2). So §9.4's format-0
+   branch (`gamble cost`) is taken only for a format-0 item (one decoded
+   from an old save), which no store list holds.
 3. Answered from the code: §7.1.1 (`0x00577D18`). A recording still
    confirms it: buy `aqv` with a bow, then with a crossbow equipped, and
    a helm with the head slot empty (expect 0x9D action 6, no 0x9C
@@ -859,6 +1013,25 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
    stats from the item record, list values after the clamp) would make
    the copy differ from S. Settle: Ghidra on `0x0062CBE0`, or a buy of
    a socketed magic item compared stat by stat with the store item.
+   Answered (2026-10-07, the exported decompile of `0x0062E430`,
+   `0x0062CBE0`, `0x0062A970`, `0x0062C9F0`, register uses checked in
+   the disassembly; the copy's version 0x60 at `0x0055A2FE`): §7.3.1.
+   Rebuilt instead of read: weapon base damage / speed and armor block
+   / speed from the items row (× 3 / 4 low quality, × 3 / 2 ethereal),
+   the stat-17/18 base raise, stat 326 := 1 with stat 57, item level ≥
+   1, a unique index past the table → −1, and for compact items item
+   level 1, quality 2 and a seed from 0. The differences from S that
+   follow are listed there; a recorded buy still confirms them.
 9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
    has no name in `items/generation.md` §1.4. Settle: the readers of
    item flag 0x8000000.
+   Answered (2026-10-07): 1.14d has no reader. The only use of the
+   immediate 0x8000000 on an item is this setter (`0x0055A476`,
+   `0x006280D0(S, 0x8000000, 1)`); a scan of `all.asm` finds every other
+   0x8000000 operand in MPQ / file-open flags (`0x00412E97`,
+   `CreateFile` pushes), DRLG room flags (`0x0066D290`–`0x0066FC7B`)
+   and the CRT, and no `test` / `and` / `push` immediate with bit 27
+   set in the server range `0x00530000`–`0x0063FFFF` other than
+   `0x0055A476` and masks that keep every high bit (`0x0053E66D` and
+   0x8FFFFFFF). The bit is only carried in the item flags word (saved
+   and streamed with it). d2rs keeps it as an opaque flag bit.

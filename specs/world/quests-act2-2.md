@@ -18,19 +18,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 36–45 |
-| Inputs | 46–51 |
-| Outputs / state changes | 52–56 |
-| Rules | 57–58 |
-|   1. Answers (QB-1–QB-20) | 59–237 |
-|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 238–294 |
-|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 295–340 |
-| Constants & data dependencies | 341–350 |
-| Randomness | 351–355 |
-| Edge cases & original bugs | 356–374 |
-| Test vectors | 375–389 |
-| Provenance | 390–402 |
-| Open questions | 403–410 |
+| Summary | 37–46 |
+| Inputs | 47–52 |
+| Outputs / state changes | 53–57 |
+| Rules | 58–59 |
+|   1. Answers (QB-1–QB-20) | 60–238 |
+|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 239–295 |
+|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 296–341 |
+|   4. `quests.tsv` addresses not named in part 1 | 342–358 |
+| Constants & data dependencies | 359–368 |
+| Randomness | 369–373 |
+| Edge cases & original bugs | 374–392 |
+| Test vectors | 393–407 |
+| Provenance | 408–420 |
+| Open questions | 421–428 |
 <!-- /index -->
 
 ## Summary
@@ -337,6 +338,23 @@ Chain 13 absent → return 0. Object mode (object +0x10; no object → 0):
 | 1–4 | u32 object GUID (the orifice; for 0x44 the GUID the client sent) |
 | 5 | result: 0 open the insert dialog, 1 cancelled, 4 refused, 5 accepted |
 | 6 | accepted with effect (1 for the orifice); not written for results 0, 1 and 4 (open question 1) |
+
+### 4. `quests.tsv` addresses not named in part 1
+
+Read 2026-10-07 (quests-fixups) so that every address of the Act II rows
+of `quests.tsv` (rows 8–16, 38) is accounted for; with these the rows are
+`specified`.
+
+| Address | Row (chain) | What it is |
+|---|---|---|
+| `0x00598810`, `0x0059E330`, `0x0059E530`, `0x005985D0` | 8 (7), 15 (26), 16 (27), 38 (38) | init functions: zero the 15 callbacks, store the callbacks / table / filter that the row lists, active := 1, state and status := 0 (`quests.md` §2.3), and allocate the extra block (+0x18) that `quests-act2.md` §2 lists; 38 stores +0x18 := 0 and filter 42 |
+| `0x00599A10`, `0x0059AD40`, `0x0059BF70`, `0x0059C6B0` | 10 (9), 12 (11), 13 (12), 14 (13) | event 10: a jump to `0x00545530` (remove the leaving player, §1 item 2) |
+| `0x00599FB0` | 11 (10) | event 10: `0x00545530`, then remove the player's GUID (−1 when no player) from the extra +0x14 list (`0x00545240`); `quests-act2.md` §5.6 "Event 10" |
+| `0x0059E2A0` | 15 (26) | event 8: a bare `ret` |
+| `0x00598770`, `0x0059E2B0`, `0x0059E4A0` | 8, 15, 16 | status fn: return false, writes nothing |
+| `0x005985B0` | 38 | status fn: writes 0 to its third argument, returns false (§1 item 18) |
+| `0x005987D0`, `0x00598780`, `0x0059E2C0`, `0x0059E4B0` | 8, 8, 15, 16 | chain 7's event 13 and the three active fns ("wants to talk") of `quests-act2.md` §9 |
+| `0x00738FC8`, `0x0073B8C0`, `0x0073BD58`, `0x00738D60` | 8, 15, 16, 38 | NPC message tables (`quest-messages.tsv`) |
 
 ## Constants & data dependencies
 
