@@ -27,25 +27,25 @@
 | Inputs | 66–78 |
 | Outputs / state changes | 79–84 |
 | Rules | 85–86 |
-|   1. Conventions and shared state | 87–152 |
-|   2. Server sound events (S→C 0x2C) | 153–201 |
-|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 202–262 |
-|   4. Mode sounds | 263–368 |
-|   5. Footsteps (`0x004CAF60(U)`) | 369–420 |
-|   6. Monster idle voices | 421–447 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 448–489 |
-|   8. Skills, missiles, states | 490–526 |
-|   9. Items | 527–550 |
-|   10. NPC speech | 551–613 |
-|   11. UI sounds | 614–637 |
-|   12. Other fixed requests | 638–667 |
-| Constants & data dependencies | 668–684 |
-| Randomness | 685–704 |
-| Edge cases & original bugs | 705–721 |
-| Test vectors | 722–753 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 754–767 |
-| Provenance | 768–795 |
-| Open questions | 796–829 |
+|   1. Conventions and shared state | 87–155 |
+|   2. Server sound events (S→C 0x2C) | 156–204 |
+|   3. Player event sounds (`0x004CB9C0(U, event e)`) | 205–265 |
+|   4. Mode sounds | 266–371 |
+|   5. Footsteps (`0x004CAF60(U)`) | 372–423 |
+|   6. Monster idle voices | 424–450 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 451–492 |
+|   8. Skills, missiles, states | 493–529 |
+|   9. Items | 530–553 |
+|   10. NPC speech | 554–616 |
+|   11. UI sounds | 617–640 |
+|   12. Other fixed requests | 641–670 |
+| Constants & data dependencies | 671–687 |
+| Randomness | 688–707 |
+| Edge cases & original bugs | 708–724 |
+| Test vectors | 725–756 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 757–770 |
+| Provenance | 771–798 |
+| Open questions | 799–832 |
 <!-- /index -->
 
 ## Summary
@@ -119,8 +119,11 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    `sound-table.md` §10 r4); +0xB0 last hit class taken (u8, open
    question 3). Globals: `[0x007C88B8]` last idle voice of any monster
    (C), `[0x007C88BC]` last voice of any unit (C), `[0x007C88C0]` idle
-   gap (C, starts 0), `[0x007C88C4]`/`[0x007C88C8]` time (C) and id of
-   the last player speech line (§3 r6).
+   gap (C), `[0x007C88C4]`/`[0x007C88C8]` time (C) and id of
+   the last player speech line (§3 r6). All five are reset at every
+   game start by sound init (`0x004CA280` from `0x00482282`): 0, 0,
+   **90** (corrected: an earlier draft said the gap starts at 0), 0,
+   0.
 7. **Draw helpers** on the client RNG (`sound-table.md` §4 r5,
    `0x004E40A0`): `roll(n)`; `uniform(lo, hi)` = lo + roll(hi − lo +
    1) (`0x004E4100`); `jitter(r)` = roll(2r + 1) − r (`0x004E4120`).
