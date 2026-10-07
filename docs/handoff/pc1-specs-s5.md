@@ -33,6 +33,10 @@ Branch `claude/pc1-s5` = `origin/claude/specs-staging-5` (merged in twice, lates
   - `missile.rs` does not set the room-exit flag when a path has no room (`pathing.md` §11.1).
   - `skills/bodies-4.md` Edge case 1: with a zigzag step ≤ 0 the original loops forever, while the code creates nothing.
   - Stale `TODO(spec…)` markers in the code have answers in the specs. See `damage.md` §3.1 and §4.5, `levels.md` §3.1, `use.md` §4 and §5, `vitals.md` §1 and §2, `tick.md` §6.5, `rng.md` §5.2 and `path-placement.md` §5.1.
+- **impl-pc2-fixes seams (answered):**
+  - `sim/units.md` §3.1 r7.1–r7.5. The unit is linked only at `SUNIT_Add`, after its per-kind init. Room and level come from the allocation's room argument. CountessChest must still miss its own GUID after the reorder.
+  - `monsters/ai.md` §7.5. Every mode request except GH sets the path target, then sets the re-path budget to 20 (`0x006490E0`).
+  - `drlg/rooms.md` §9.6 C1–C7. The corner hides P = R+0x20, never R's half, so `linked_found` hiding `r.half` is wrong.
 - **Settled contradictions:**
   - `vitals.md` §4.4 r2: the gate is the `exp` state flag, which is PC 2's reading.
   - `camera.md` §9: players take 0–1 client path steps per update and monsters 0–2. `[0x007A04C4]` is always 0, so every step uses 0x400.
