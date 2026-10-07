@@ -34,16 +34,16 @@
 |   4. AI parameters | 450–468 |
 |   5. Target selection | 469–551 |
 |   6. Distances and line tests | 552–566 |
-|   7. Tactics helpers | 567–625 |
-|   8. AI commands and minions | 626–650 |
-|   9. Per-AI behaviours | 651–1450 |
-|   10. The catalogue `ai-functions.tsv` | 1451–1471 |
-| Constants & data dependencies | 1472–1495 |
-| Randomness | 1496–1517 |
-| Edge cases & original bugs | 1518–1559 |
-| Test vectors | 1560–1648 |
-| Provenance | 1649–1697 |
-| Open questions | 1698–1738 |
+|   7. Tactics helpers | 567–684 |
+|   8. AI commands and minions | 685–709 |
+|   9. Per-AI behaviours | 710–1509 |
+|   10. The catalogue `ai-functions.tsv` | 1510–1530 |
+| Constants & data dependencies | 1531–1554 |
+| Randomness | 1555–1576 |
+| Edge cases & original bugs | 1577–1618 |
+| Test vectors | 1619–1707 |
+| Provenance | 1708–1756 |
+| Open questions | 1757–1825 |
 <!-- /index -->
 
 ## Summary
@@ -570,11 +570,36 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 
 | 1.14d | D2MOO | Effect |
 |---|---|---|
-| `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit |
-| `0x005DDFC0(mode, x, y)` | `…ChangeModeAndTargetCoordinates` | mode change at coordinates |
+| `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit; request flag 1; the path step count is not set |
+| `0x005DDFC0(mode, x, y)` | `…ChangeModeAndTargetCoordinates` | mode change at coordinates; request flag 1; the path step count is not set (like `0x005DE490`) |
 | `0x005DE000(skill, target, x, y)` | `AITACTICS_UseSequenceSkill` | skill id in range: mode 14 (sequence), current skill := skill, path step 1, no fallback |
-| `0x005DEAD0(mode, skill, target, x, y)` | `AITACTICS_UseSkill` | mode < 16: current skill := skill, unit flag 0x40, path step 1; if the mode change fails: idle 10 |
+| `0x005DEAD0(mode, skill, target, x, y)` | `AITACTICS_UseSkill` | mode < 16: current skill := the unit's skill entry with that id and owner −1 (`0x006439B0`, 0 when none; `0x00620210`), unit flag 0x40, path step 1; request with target unit, point (x, y) and flag 0; returns 1 when the mode change succeeds; else idle 10 and returns 0. Mode ≥ 16: nothing, returns 0 |
 | `0x005DE190(method, speed, steps)` | `AITACTICS_SetVelocity` | §7.3 |
+
+**Mode request record** (built by `0x005A7E60(unit, mode, &req)`,
+consumed by `0x005A7C20(game, &req, flag)`; 0x20 bytes on the caller's
+stack): +0x00 mode, +0x04 unit, +0x08 target unit, +0x0C x, +0x10 y,
++0x14 dword whose byte +0x15 is the path type, +0x18, +0x1C. The
+builder clears the current skill (`0x00620210(unit, 0)`), zeroes
++0x08..+0x1C, and sets byte +0x15 := 101 when the mode is a moving mode
+of the monster mode table (`0x005A6B10`: table `0x006E23D0`, 12-byte
+rows by mode, first word nonzero; or second word 0, third nonzero and
+the class's monstats2 mode bit set: byte +0x104 + mode / 8, bit mode %
+8, through `0x00451FE0`), else 100. The request holds a
+target unit **and** a point at once; for every mode except 3 the mode
+set uses the unit when +0x08 ≠ 0 (path target unit, `0x00648B90`) and
+the point (+0x0C, +0x10) only when +0x08 = 0 (`0x00648AD0`). So
+`0x005DEAD0(mode, skill, T, x, y)` with T ≠ 0 aims at T; the point is
+stored and ignored. Byte +0x15 reaches the movement set-up
+`0x005A63F0` with +0x18 and byte +0x1C: a pending velocity request
+(AI param record +0x18 method, +0x1C speed, §7.3) replaces them and is
+cleared; then path type 100 = no path (path type 0, nothing computed),
+101 = path type 13, any other value is the path type computed
+(`0x005A6290`; a failed compute of types 2, 7, 9 or 13 retries with
+type 15). Flag ≠ 0: when the unit's mode after the change equals the
+requested mode, the current skill is cleared again. 1.14d-confirmed
+(`0x005A7E60`, `0x005A7C20`, `0x005A63F0`, `0x005A6290`,
+`0x005A6B10`).
 
 Mode numbers: 1 neutral, 2 walk, 4 attack1 (A1), 5 attack2 (A2), 8
 skill1 (S1), 9 skill2 (S2), 14 sequence, 15 run (`sim/units.md`).
@@ -622,6 +647,40 @@ maps method 1 to 7, and writes into the monster's AI param record
 overwrites its field (+0x18 method, +0x1C speed bonus, +0x20 steps, steps
 capped at 77). The record is consumed by the movement code
 (`sim/units.md`). 1.14d-confirmed.
+
+#### 7.4 Monster skill check `0x005FD470`
+
+`0x005FD470(game, unit, skill, T, x, y)` (ECX game, EDX unit, four
+stack words) → 1 when the skill may be used now, else 0. No draws.
+Positions are the units' path positions (`0x0045ADF0` / `0x0045AE20`);
+"pattern free at (x, y) in room R" = `0x0064D910(R, x, y, pattern of
+the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
+`0x00645910(ux, uy, x, y, R, mask)` ≠ 0 (`sim/path-placement.md`).
+
+1. The skills row is missing (id < 0 or ≥ the count) or the skill is
+   167 → 0.
+2. The row's `TgtPlaceCheck` bit (flag bit 32: byte +8 bit 0) set: T
+   ≠ 0, T has unit flag 0x2 (+0xC4) and T's pattern is free at T's
+   position in T's room (pattern and mask 0x3C01 of T) → 1; else 0.
+3. Skill 164 → T ≠ 0.
+4. `srvdofunc` (+0x2E) 77 or 78: T ≠ 0 and the unit not in mode 0 or 12
+   (`0x0063EA40`); P := 2 × T's position − the unit's position (the
+   point mirrored through T); free-point search
+   `0x0064E7B0(unit's room, &P, unit size, 0x3C01, 0)`
+   (`sim/path-placement.md`) gives room R (none → 0); R not in town
+   (`0x0061AB00`); the unit's pattern free at the **original** P in R;
+   line clear from the unit to P in R with mask 0xC01 → 1; else 0.
+5. Skill 199 → `0x005B34C0(game, room of T, 0, 0, T, 0x154, 1)` (the
+   DiabPrison placement test, skills spec).
+6. Skill 184 (monster teleport): unit ≠ 0; R := room at (x, y) from the
+   unit's room (`0x00463740`), not in town; the unit's pattern free at
+   (x, y) in R; line clear from the unit to (x, y) with mask 0xC01.
+7. `srvdofunc` 67: unit ≠ 0; R as in 6, not in town; line clear with
+   mask 0xC01 (no pattern test).
+8. Skill 203: as 7 with mask 0x805.
+9. Any other skill → 1.
+
+1.14d-confirmed (`0x005FD470`, register use in the disassembly).
 
 ### 8. AI commands and minions
 
@@ -1735,3 +1794,31 @@ Other recorded checks:
     (the local server process owns it, one per server process, never
     saved); a new game does not reset it. Conformance traces start from
     a fresh process (G = 0), or are the first game after one.
+13. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 2):
+    `0x005DEAD0(mode, skill, T, x, y)` with both a unit and a point.
+    The mode request holds both (§7.1 "Mode request record"); the mode
+    set aims at T whenever T ≠ 0 and uses the point only when T = 0.
+    Summoner (`ai-bodies-2.md` §15), Izual (`ai-bodies-4.md` §8) and
+    the HighPriest hydra (`ai-bodies-3.md` §8 step 1.3) all pass T ≠ 0,
+    so all three aim at T; the hydra's offset point is stored and not
+    used by the mode set.
+14. Answered (reading 18): `0x005DDFC0` (mode at a point) and
+    `0x005DDF90` (mode at a unit) do not set the path step count; both
+    request with flag 1 (§7.1).
+15. Answered (reading 19), owners of the AI seams that `d2-sim` routes
+    through `Pending::ai_*`: skill check `0x005FD470` → §7.4 here; skill
+    entries, levels, add `0x0056DEB0`, right skill `0x005701B0`, assign
+    `0x00647280` → `skills/bodies.md` / `skills/use.md`; patterns,
+    placement `0x00554EA0`, stamps `0x0064EA90`, free points
+    `0x0064E7B0`, cell bits → `sim/path-placement.md`; path target,
+    compute, path type → `sim/pathing.md`; free spot `0x0054DC40`,
+    spawn `0x005B2F20`, spawn class `0x0054DA60`, player-count record
+    `0x00573930` → `monsters/init.md`, `monsters/population.md`; kill
+    `0x0057CCB0` → `combat/damage.md` §7.2; stat lists `0x006251F0`,
+    curse flag `0x00625760` → `sim/stat-lists.md`; quest seams →
+    `world/quests.md` and its act files. Still without an owner: the
+    reinit-as-class `0x00574370` (named only in
+    `sim/intents-events.md`), the unit find `0x0065A950`
+    (`ai-bodies-3.md` OQ3), the client preload `0x00571C00` (S→C 0xA4)
+    and the spawn info `0x0063EFA0` beyond the cases read in
+    `ai-bodies-2.md` §13 and `ai-bodies-5.md` §21.3.

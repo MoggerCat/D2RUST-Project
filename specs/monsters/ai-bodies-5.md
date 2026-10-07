@@ -29,33 +29,33 @@
 | Rules | 101–102 |
 |   1. Scope and order | 103–139 |
 |   2. Minion (116) `0x005E1B60` | 140–156 |
-|   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–187 |
-|   4. Succubus (118) `0x005E1E00` | 188–207 |
-|   5. BloodLord (125) `0x005E36F0` | 208–218 |
-|   6. SuccubusWitch (119) `0x005E2120` | 219–243 |
-|   7. Overseer (120) `0x005E27A0` | 244–278 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 279–292 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 293–310 |
-|   10. DeathMauler (130) `0x005EE260` | 311–321 |
-|   11. PutridDefiler (137) `0x005EFA90` | 322–339 |
-|   12. Ancient (133) `0x005EF1A0` | 340–393 |
-|   13. AncientStatue (132) `0x005EEAA0` | 394–401 |
-|   14. FrozenHorror (124) `0x005E3530` | 402–416 |
-|   15. SiegeBeast (115) `0x005E1900` | 417–442 |
-|   16. SuicideMinion (117) `0x005E1D30` | 443–454 |
-|   17. BaalMinion (141) `0x005EF910` | 455–466 |
-|   18. BaalTaunt (136) `0x005EF710` | 467–483 |
-|   19. BaalToStairs (138) `0x005EF620` | 484–499 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 500–539 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 540–643 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 644–654 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 655–692 |
-| Constants & data dependencies | 693–711 |
-| Randomness | 712–720 |
-| Edge cases & original bugs | 721–735 |
-| Test vectors | 736–750 |
-| Provenance | 751–776 |
-| Open questions | 777–787 |
+|   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–189 |
+|   4. Succubus (118) `0x005E1E00` | 190–209 |
+|   5. BloodLord (125) `0x005E36F0` | 210–220 |
+|   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
+|   7. Overseer (120) `0x005E27A0` | 246–280 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 281–294 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 295–312 |
+|   10. DeathMauler (130) `0x005EE260` | 313–323 |
+|   11. PutridDefiler (137) `0x005EFA90` | 324–341 |
+|   12. Ancient (133) `0x005EF1A0` | 342–396 |
+|   13. AncientStatue (132) `0x005EEAA0` | 397–404 |
+|   14. FrozenHorror (124) `0x005E3530` | 405–419 |
+|   15. SiegeBeast (115) `0x005E1900` | 420–447 |
+|   16. SuicideMinion (117) `0x005E1D30` | 448–459 |
+|   17. BaalMinion (141) `0x005EF910` | 460–471 |
+|   18. BaalTaunt (136) `0x005EF710` | 472–488 |
+|   19. BaalToStairs (138) `0x005EF620` | 489–504 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 505–544 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 545–656 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 657–667 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 668–705 |
+| Constants & data dependencies | 706–724 |
+| Randomness | 725–733 |
+| Edge cases & original bugs | 734–748 |
+| Test vectors | 749–763 |
+| Provenance | 764–789 |
+| Open questions | 790–824 |
 <!-- /index -->
 
 ## Summary
@@ -178,8 +178,10 @@ Teleport, `Skill4` Imp Fire Missile.
    delete; end.
 5. `Skill4` ≥ 0 and S, E := secondary target and distance
    (`0x005DDC30`, second argument 0): E < I3.aip3 [22] → draw < I3.aip4
-   [25] → `Skill4` at S, end; else E < I4.aip3 [13] and draw < I4.aip4
-   [60] → `Skill4` at S, end.
+   [25] → `Skill4` at S, end (a failed draw goes to step 6). E ≥
+   I3.aip3 → E < I4.aip3 [13] and draw < I4.aip4 [60] → `Skill4` at S,
+   end. (Live I4.aip3 13 < I3.aip3 22 on every difficulty: the second
+   branch never fires.)
 6. Draw < 33 → walk to T with 4 steps (`0x005DEF80`); else draw < 20 →
    wander 8; else idle 10.
 
@@ -359,7 +361,8 @@ target used; m := melee range unit→X; d := `0x006416D0(unit, X)`
    x) / s, aip4 × (ty − own y) / s) (signed); mode request built for
    `Sk1mode` (`0x005A7E60`), current skill := the unit's highest
    `Skill1` entry (`0x006439F0` → `0x00620210`), path step count 1,
-   request point (tx + ox, ty + oy), request byte +0x15 := 100,
+   request point (tx + ox, ty + oy), request byte +0x15 := 100 (path
+   type "no path", `ai.md` §7.1 mode request record),
    requested with flag 0 (`0x005A7C20(game, req, 0)`). End.
 4. Not m → walk to X; wait 10. End.
 5. Draw < aip3 [75] → `roll(2)` ≠ 0 → A1 at X, else A2 at X. Else idle
@@ -427,8 +430,10 @@ Stomp, `Skill2` Charge (not used here); minion imp1. "Stomp" =
    with `BaseId` 492 (imp1), the scanner's alignment pairing, alignment
    0, no owner, its AI param 0 = −1, and squared distance ≤ 625. Found
    → assign (`0x005E17E0(U, beast)`): U's current beast (its param 0)
-   still exists (`0x00552F60(game, 1, ·)`) and is nearer U than this
-   beast → keep; else U's param 0 := this beast's GUID.
+   still exists (`0x00552F60(game, 1, ·)`) and is strictly nearer U
+   than this beast by squared distance (`0x005B0BD0(U, old) <
+   0x005B0BD0(U, this)`) → keep; else (ties included) U's param 0 :=
+   this beast's GUID.
 3. C: `Skill1` ≥ 0 and draw < aip3 [1] → stomp. End. Draw < aip2 [50]
    → A1 at T; else idle aip4 [15]. End.
 4. `Skill1` ≥ 0, D < `Param5` of the `Skill1` skills row
@@ -630,6 +635,14 @@ living one (`0x0058F380` with callback `0x005FC830`) or the unit has a
 living owner (`0x00552FD0`). Class := 570 (baalclone; −1 when monstats
 has ≤ 570 rows), mode 1, through the spawn info `0x0063EFA0(unit,
 &class, &x, &y, &mode, difficulty, 0)` (`monsters/population.md`).
+For the unit's `BaseId` 544 (baalcrab; uberbaal shares it) and class
+570 the spawn info keeps the class, draws x := own x + `roll(24)` −
+12, then y := own y + `roll(24)` − 12 (two unit-seed steps,
+`0x0045C390`) and sets mode 1; the clone overwrites x and y below, so
+those two steps are spent and discarded. (For another class it would
+draw `roll(2)` + difficulty into `0x0054DA60(562, …)`, then the same
+two point draws, mode 4.) Any other `BaseId` not in its table gives
+class 0, point (0, 0), mode 1 with no draws.
 Base := the position of the unit's path target unit (`0x00553540`),
 else its own. x := base.x + `lo' % 24` − 12, then y := base.y + `lo' %
 24` − 12 (two steps, x first). Room at (x, y) (`0x00463740`); found →
@@ -784,3 +797,27 @@ Game-file vectors: Open question 1.
    the clone (owner `monsters/population.md`).
 3. Who sets the Imp mount (§3 AI param 0) besides SiegeBeast §15, and
    the client side of message 0xA4 (§20).
+4. Answered (`docs/handoff/impl-ai-acts2-5.md` reading 11): §3 step 5's
+   "else" is the distance test (E ≥ I3.aip3), not a failed I3 draw; a
+   failed I3 draw goes to step 6 (`0x005E2FF0`). A missing imp row
+   (monstats count ≤ 492..495) is a null read in 1.14d; live data has
+   all four rows, so an implementation asserts them.
+5. Answered (reading 12): §6 step 3.1 draws aip8 only when S was found
+   (the tests run left to right and stop at the first failure;
+   `0x005E2120`).
+6. Answered (reading 13): §7 step 4, C with a draw ≥ aip6 goes on to
+   the minion scan of step 5 (`0x005E27A0`).
+7. Answered (reading 14): request byte +0x15 is the path type of the
+   move (`ai.md` §7.1 mode request record): 100 = no path computed. A
+   pending velocity request's method replaces it.
+8. Answered (reading 15): "nearer" is squared distance, strict: equal
+   distances reassign the imp to the scanning beast (`0x005E17E0`).
+9. Answered (reading 16): §20 step 7 reads no wave record: the skill
+   param is `0x00659B80(2, 0x00586B30(table[w]))` (superunique map +
+   the monstats count) whatever the record. A missing record already
+   returns in step 5 before flag 1 is set, so step 7 is never reached
+   for it; no −1 and no fatal path exists (`0x005EF320`, `0x005EF210`).
+10. Answered (reading 17, half of OQ2): the clone's spawn info for base
+    544 draws two `roll(24)` steps (discarded) and keeps class 570 and
+    mode 1 (§21.3 Clone). The free-point search draws of case 14
+    remain `ai.md` open question 4.
