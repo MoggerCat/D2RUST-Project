@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–135 |
-|   3. Lifecycle | 136–303 |
-|   4. Modes and mode schedules | 304–635 |
-|   5. Event dispatch | 636–650 |
-|   6. Events per kind | 651–773 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 774–795 |
-|   8. Collision line between two units | 796–800 |
-| Constants & data dependencies | 801–817 |
-| Randomness | 818–825 |
-| Edge cases & original bugs | 826–846 |
-| Test vectors | 847–906 |
-| Provenance | 907–963 |
-| Open questions | 964–1037 |
+|   3. Lifecycle | 136–316 |
+|   4. Modes and mode schedules | 317–678 |
+|   5. Event dispatch | 679–693 |
+|   6. Events per kind | 694–816 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 817–838 |
+|   8. Collision line between two units | 839–843 |
+| Constants & data dependencies | 844–860 |
+| Randomness | 861–868 |
+| Edge cases & original bugs | 869–889 |
+| Test vectors | 890–949 |
+| Provenance | 950–1006 |
+| Open questions | 1007–1086 |
 <!-- /index -->
 
 ## Summary
@@ -248,10 +248,14 @@ of its list.
    0x400 node index (`+0xD0`) ≠ 11 (node index < 8 is fatal 0x56A),
    0x800 superunique; `+0x1C` / `+0x20` owner GUID and value
    (`0x0058F440`, kept when the owner exists and is of type 1; else
-   `+0x1C` = −1); `+0x28` `0x005B0D60(monster data +0x28)`; `+0x2C`
-   `0x00573520`; `+0x30` u16 `0x005A0140`; `+0x32..+0x3A` the 9 umod
-   bytes; `+0x3C` u16 superunique index; `+0x40` stat 13, `+0x44`
-   `0x00625D10`, `+0x48` stat 6 (life); `+0x54` the game frame; `+0x58`
+   `+0x1C` = −1); `+0x28` the AI special state (AI control +0x00,
+   `monsters/ai.md` §3.1; `0x005B0D60(monster data +0x28)`); `+0x2C`
+   monster data +0x58, the level id (`monsters/init.md` §5 step 6;
+   `0x00573520`, 0 without monster data); `+0x30` u16 the name seed
+   (monster data +0x14; `0x005A0140`, 0x1506 without monster data);
+   `+0x32..+0x3A` the 9 umod bytes; `+0x3C` u16 superunique index;
+   `+0x40` stat 13, `+0x44` max life (stat 7 total, layer 0;
+   `0x00625D10`, 0 without a stat list), `+0x48` stat 6 (life); `+0x54` the game frame; `+0x58`
    next.
 2. **Item** (`0x00542E30` → `0x00541B10`): the item is serialized with
    the item bit stream in save form (`0x006313E0(item, buf, 0x400, 1,
@@ -285,7 +289,16 @@ of its list.
       restored.
    2. items (`0x00541AC0`): a record whose expiry ≠ 0 and < the current
       frame is dropped; others are re-created from their stream
-      (`0x00541990`).
+      (`0x00541990`) by the record reader `0x00558CB0`
+      (`world/vendors.md` §7.3 step 3), which allocates a **new item
+      unit (new GUID)**. The item's ground expiry (item data +0x24) :=
+      the stored expiry when it is 0 or ≥ frame (game +0xA8) + 15,000,
+      else frame + 15,000. A record with socketed items (filled-socket
+      count from the header peek `0x0062E410`) reads each child record
+      in turn (a missing child is fatal 0x10C), puts it in the item's
+      inventory (+0x60, created with `0x0063ABD0` when absent;
+      `0x0063B210(inv, child, 1)`) and refreshes the item
+      (`0x0055FE60`).
    3. other records: flag-ex 0x100 (kept units: player bodies, portals
       59/60) → the unit of that type and GUID is placed again
       (`0x00554A30`) and gets unit flag 0x10; a type-0 one must be in
@@ -466,6 +479,36 @@ start; `0x005A7C20` never writes it itself.
    3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1);
       evil-killed counter `0x00547E50` (`monsters/population.md`);
       `0x0061AFA0(U's room, U's GUID)`.
+   3.1. Helpers of steps 1.2–1.3 (read 2026-10-08):
+      - `0x0058F6C0(U)` (ECX U), pack-leader handover. C := U's AI
+        control (`monsters/ai.md` §3.1). C flags (+0x08) bit 0x1 clear
+        → nothing. Bit 0x1 set, 0x2 clear (tail at `0x0058F660`): every
+        GUID of C's minion list (+0x34, next at +4) that resolves
+        (`0x00552F60`) to a monster gets owner-ex (+0x2C, +0x30) :=
+        (−1, 1) and +0x28 := C +0x28 (the pack is released). Both set
+        → `0x0058F530`: N := the first list entry that resolves to a
+        unit (none → nothing); N a monster → N's control flags |= 0x2,
+        |= 0x1 (`0x005DD230`), owner-ex := (N's GUID, 1), +0x28 := C
+        +0x28. Then C's owner-ex := (N's GUID, 1), +0x28 := C +0x28,
+        and U joins its owner's minion list (`0x0058F100(U)`). Then,
+        from the list head, every entry resolving to a unit other than
+        N: a monster gets owner-ex (N's GUID, 1) and +0x28 := C +0x28;
+        each such unit joins its owner's list (`0x0058F100`).
+      - `0x005B1A90(game, U)`: U leaves its target-node list, +0xD0 :=
+        11 (`skills/bodies-2.md`, the slot-list paragraph).
+      - `0x00639FB0(U, boss)`: over the W words of U's state bits
+        (`stat-lists.md` §9.1; nothing without an extended list): every
+        set bit not in the keep mask is cleared and marked in the
+        changed half. Keep mask = states `bossstaydeath` (bitset 15,
+        data tables +0x108) when boss ≠ 0, else `plrstaydeath`
+        (bitset 13, +0x100) for a player, else `monstaydeath` (bitset
+        14, +0x104). U is then queued for update (`0x0064C040`). The
+        state lists are not touched here.
+      - `0x005738D0(game, U)` (ECX game, EDX U): cancel U's type-2 and
+        type-3 events (`0x00540E60(2, 0)`, `(3, 0)`).
+      - `0x0061AFA0(room, GUID)`: room +0x38 + 4 · (room byte +0x14) :=
+        GUID, then byte +0x14 := (byte + 1) & 3: a ring of the room's
+        last four dead GUIDs (null room → nothing).
    4. U's monstats `deathDmg` (+0x0E bit 4) clear → done. Else by
       `BaseId` (row +0x02; a non-monster takes the last branch):
       - 212 `bonefetish1`: (x, y) = U's position; m =
@@ -963,10 +1006,10 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
 
 ## Open questions
 
-1. A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
+1. ~~A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
    U4 with `anim` records and U11 with `site` on every schedule, and
    reach the unobserved combinations (combat with skills, shrines,
-   wells, a trade, a cooldown skill).
+   wells, a trade, a cooldown skill).~~ → PC 2 recording list.
 2. Answered (2026-10-07): §4.7 (owner: this spec), read from the 1.14d
    asm with its tables; still to be checked against the logged +0x4C
    and bonus of `anim` records (Open question 1).
@@ -981,8 +1024,8 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    earlier frame, and a walk step in the frame of a teleport write is
    gated, as it is in real time. A recording that moves a player with a
    hireling (positions of the 20 entries per frame) confirms it.
-4. Object delays rolled from the object-control seed (events 0, 8):
-   confirm the draw with an RNG + tick recording.
+4. ~~Object delays rolled from the object-control seed (events 0, 8):
+   confirm the draw with an RNG + tick recording.~~ → PC 2 recording list.
 5. Answered (2026-10-07): the only type-4 site of the 269
    (`0x00582595`, trap arm `0x00582510`) schedules on objects (unit +4
    of the operate record; `unit-events.tsv`, proof code); no 1.14d path
@@ -995,9 +1038,10 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    the quest event-7 sites schedule on objects except `0x0059584E`
    (the Countess, a monster); `0x0054D11F` on the hireling (monster);
    freeze `0x0057B216`, `0x0057B3E9` on monsters only; the wisp buff
-   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`. The
-   78 rows left `file` (state timers, damage, missile hits, item use,
-   most trade sites) need their callers traced; each names its owner.
+   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`.
+   ~~The 78 rows left `file` (state timers, damage, missile hits, item
+   use, most trade sites) need their callers traced; each names its
+   owner.~~ → PC 2 recording list.
 7. Answered (2026-10-07): both are written once, by game creation
    `0x00530BF0` from C→S message 0x67 (`tools/original-hooks.md` §5.2,
    caller `0x0053F17A`). Game +0x6A (u8) is the game type, message
@@ -1022,15 +1066,20 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    (`0x005B1880`); its attached units go right after the head
    (`0x005B1900`, `skills/bodies.md` §6.3); slots 8 and 9 are filled
    newest first by `0x005B1990`. Each insert requires node index 11
-   and sets it to the slot. Open: the meaning of the fields from `0x005B0D60`,
-   `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
-   keeps its GUID (`0x00541990`); a recording leaving and re-entering a
-   wilderness area confirms the order (`unit-order.md` OQ3).
+   and sets it to the slot. Answered (2026-10-08): the fields from
+   `0x005B0D60`, `0x00573520`, `0x005A0140`, `0x00625D10` are the AI
+   special state, level id, name seed and max life (§3.4 rule 1); a
+   restored item does **not** keep its GUID (`0x00541990` →
+   `0x00558CB0` allocates a new unit; §3.4 rule 4.2, with the expiry
+   floor). ~~A recording leaving and re-entering a wilderness area
+   confirms the order (`unit-order.md` OQ3).~~ → PC 2 recording list.
 9. Answered (2026-10-08, `docs/handoff/e2e-night-flows.md` and
    `docs/handoff/impl-monster-death.md` Left 5): the bodies of the DT
    start `0x005A6FF0`, DT event 1 `0x005A72B0` and DD start `0x005A7390`
    and the mode-12 setter (`0x00553570`, never `0x005A7C20` itself) are
-   §4.6 "Death and dead functions". Open inside them: `0x0058F6C0`,
-   `0x005B1A90`, `0x00639FB0`, `0x0061AFA0`, `0x005738D0` and the
-   R +0x14 byte (named by address only); a recorded kill of a
-   bonefetish1 (area damage at death) confirms branch 1.4.
+   §4.6 "Death and dead functions". Answered (2026-10-08): `0x0058F6C0`,
+   `0x005B1A90`, `0x00639FB0`, `0x0061AFA0`, `0x005738D0` are §4.6 DT
+   start step 3.1. ~~The R +0x14 byte (passed to `0x005A6520` and
+   `0x006488A0`; its writer is the mode-request builder, 54 callers of
+   `0x005A7C20`) and a recorded kill of a bonefetish1 (area damage at
+   death) confirming branch 1.4.~~ → PC 2 recording list.

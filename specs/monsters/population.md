@@ -1115,9 +1115,9 @@ unique with 3 minions), and placement points.
 1. Answered (§1 r2): `0x0052D0F0` runs from portal and arrival paths
    outside the tick room step. A recording that logs population calls
    with their step would confirm it on the running game.
-2. Draw-level check of §3–§10: record room-seed and game-seed draws
+2. ~~Draw-level check of §3–§10: record room-seed and game-seed draws
    (call site and `lo'`) during the first population of a Blood Moor room,
-   then replay.
+   then replay.~~ → PC 2 recording list.
 3. Answered (2026-10-07): class 432 (barricadedoor1; raw class test,
    only when the class is below the monstats count) creates object 571
    and class 433 (barricadedoor2; through the bounds helper

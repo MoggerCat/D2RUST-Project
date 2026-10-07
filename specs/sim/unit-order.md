@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 299–309 |
 | Test vectors | 310–343 |
 | Provenance | 344–361 |
-| Open questions | 362–405 |
+| Open questions | 362–406 |
 <!-- /index -->
 
 ## Summary
@@ -362,18 +362,19 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
 ## Open questions
 
 1. Client list (§7) with more than one client: needs a hosted game.
+   Out of Phase 0–6 scope (multiplayer, Phase 7).
 2. Adjacent-room array order (§9): owned by the DRLG spec; record it in
    the same trace (room +0x00 / +0x24) to fix it (the snapshots already hold the arrays).
    *Answered* in the owner: `drlg/rooms.md` §6 (fill `0x0066BD00` =
    rooms-near order restricted to active rooms, refilled at each
    neighbouring activation; removal `0x0061A910` swaps the last entry
    into the hole). Its trace confirmation is `drlg/rooms.md` OQ 3.
-3. Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
+3. ~~Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
    order in which restored units re-enter the room list and whether they
    keep their GUIDs (observed: GUIDs are reused after removal, §1.4).
    Room-lifecycle spec. Which units are freed, stored or kept by the
    compress: answered in `sim/units.md` §3.3; the restore stays open
-   there (OQ8).
+   there (OQ8).~~ → PC 2 recording list.
 4. Which systems iterate hash lists rather than rooms (inventory of
    `0x005537D0` / `0x005538D0` callers by system), for the unit specs.
    *Answered* (static, 1.14d `disasm.py xref`, call sites mapped to

@@ -321,8 +321,8 @@ None.
 2. Answered (2026-10-07): §10 resync; it sends nothing of its own, and
    for type 7 (hireable) the maximum returns to `basemax` 1 and is never
    trimmed (`world/hirelings.md` §5 rule 3).
-3. Recording: summon pets past their maximum and across a group; compare
-   the 0x7A messages and which units die.
+3. ~~Recording: summon pets past their maximum and across a group; compare
+   the 0x7A messages and which units die.~~ → PC 2 recording list.
 4. Answered (2026-10-07): the only other append path is
    `0x00575E90(game, player, pet, 7, extra)` from the hireling init
    `0x00573270` (call `0x00573394`), extra = {seed, name, row `Id`}

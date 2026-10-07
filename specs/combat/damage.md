@@ -934,14 +934,14 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
 
 ## Open questions
 
-1. No trace confirms any number here. Request (recording): hook
+1. ~~No trace confirms any number here. Request (recording): hook
    `0x0057DBF0` entry and exit (EBX record before/after: +0x08…+0x4C) and
    `0x0057C6C0` entry/exit (defender life stat 6 before/after) during
    melee and missile play; log the attacker's and defender's seeds at
-   entry. Compare with §3–§5 recomputed from logged stats.
-2. Leech: hook `0x0057C420` entry (EAX record, EBX attacker, [EBP+8]
+   entry. Compare with §3–§5 recomputed from logged stats.~~ → PC 2 recording list.
+2. ~~Leech: hook `0x0057C420` entry (EAX record, EBX attacker, [EBP+8]
    defender) and the calls `0x0057A980` / `0x0057AA00` (amounts) to
-   confirm rules H/M and Edge case 6.
+   confirm rules H/M and Edge case 6.~~ → PC 2 recording list.
 3. Answered: §7.1 and §7.2 are read branch by branch from the 1.14d
    disassembly (block frame test, soft-hit path, sand leaper knockback,
    barricade doors). `0x005734C0` is the AI-state setter
