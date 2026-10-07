@@ -6,7 +6,7 @@ Branch `claude/c2-client-audio`. Scope: `specs/client/*.md`, `specs/audio/*.md`.
 
 | | before | after |
 |---|---|---|
-| client + audio specs | 131 | see `python3 tools/coverage.py` |
+| client + audio specs | 131 | about 90 (after) |
 
 (Before = 131 unclaimed leaves at session start; the final figure is in the
 last commit message / coordinator gate.)
@@ -54,6 +54,6 @@ specs/client/audio.md	§b-original-behavior-to-reproduce-owners	pointers to othe
 
 ## Unverified
 
-The tests added in this session (`unit_visibility`, `tests_c2cli`) were
+The new tests (`unit_visibility`, `tests_c2cli`) were compiled and run: pass; clippy -D warnings clean for d2-client.
 written against the spec but compiled/run only if the final commit message
 says so.

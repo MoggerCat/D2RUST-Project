@@ -112,7 +112,7 @@ mod tests {
             w: 20,
             h: 10,
             ox: -10,
-            oy: -20,
+            oy: -5,
         });
         // Origin at (400, 300), a = b = origin: X = shift, Y = 8.
         assert!(unit_visible(&c, cel, 400, 300, (400, 300), 0, 800, 600));
