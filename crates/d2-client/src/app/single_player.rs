@@ -1459,9 +1459,24 @@ fn loader(
                 // so the join sends 0x5F and the two 0x23.
                 // Then the start items (`items/generation.md` §10.3) on
                 // the wired host. Their queued 0x9C / 0x9D (`items.sent`)
-                // are dropped: the join sends no item messages yet
-                // (rule 3.5; the item stream decode is G16).
+                // are the join's item messages (rule 3.5), sent after the
+                // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
+                let own: Vec<Vec<u8>> = items
+                    .sent
+                    .iter()
+                    .filter(|(u, _)| *u == player)
+                    .map(|(_, b)| b.clone())
+                    .collect();
+                if !own.is_empty() {
+                    s.events
+                        .action
+                        .sys
+                        .hooks
+                        .session
+                        .join_items
+                        .insert(player, own);
+                }
                 let has_inventory = s.world.inventory.is_some();
                 let log = &mut s.events.action.hooks().x.log;
                 log.extend(

@@ -46,6 +46,7 @@ use super::panels::char_inputs;
 use super::panels::character::{
     self, CharacterPanel, CharacterView, ResistEffect, STAT_STATPTS, UI_CHARACTER,
 };
+use super::panels::inv_items::{InvLayout, ItemsUi};
 use super::panels::inventory::{InventoryPanel, UI_INVENTORY};
 use super::panels::skilltree::{SkillEntry, SkillTreePanel, SkillTreeView, UI_SKILLTREE};
 use super::panels::{
@@ -57,6 +58,7 @@ use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::assets::path::FileSource;
 use crate::audio::driver::SoundRequest;
+use crate::bridge::items::ItemArtRows;
 use crate::bridge::msg::ui_npc::DialogCase;
 use crate::bridge::output::NpcDialog;
 use crate::bridge::world::{ClientWorld, KindData, UnitKey, PLAYER};
@@ -208,6 +210,8 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The inventory panel's item facts (`inv_items`).
+    items: ItemsUi,
 }
 
 impl Shared {
@@ -317,6 +321,7 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            items: ItemsUi::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -370,6 +375,28 @@ impl OriginalUi {
     /// (§8.9 expansion penalty, `0x00611D30`; `panels-2.md` §24 r2).
     pub fn set_resist_penalties(&mut self, penalties: Vec<i32>) {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
+    }
+
+    /// Item-table art rows (`inv_items`): the inventory panel draws the
+    /// local player's items and the cursor item with them; empty draws
+    /// nothing. Registers their graphics in [`Self::files`], so call it
+    /// before handing the files to the art loader.
+    pub fn set_item_art(&mut self, art: ItemArtRows) {
+        let mut sh = self.shared.borrow_mut();
+        sh.items.art = art;
+        let Shared { items, tables, .. } = &mut *sh;
+        items.register_files(&mut tables.files);
+    }
+
+    /// `inventory.bin` layouts by record (`inv_items::inv_layout` of each
+    /// row); without them the grid is the spec's measured record.
+    pub fn set_inv_layouts(&mut self, layouts: Vec<InvLayout>) {
+        self.shared.borrow_mut().items.layouts = Some(layouts);
+    }
+
+    /// Measured item graphic frame sizes by `invfile` (lower case).
+    pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
+        self.shared.borrow_mut().items.frame_sizes = sizes;
     }
 
     /// The flags.
@@ -506,23 +533,34 @@ impl Panel for InventoryUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         self.panel.draw(&sh.tables, &sh.env(), out);
+        let class = Facts::of(ctx.world).class;
+        if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
         None
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if !is_click(e) {
             return UiResponse::Ignored;
         }
         let mut sh = self.sh.borrow_mut();
         let s = sh.config.screen;
         match left(e) {
-            Some((true, at)) => self.panel.press(&sh.tables, &s, at),
+            Some((true, at)) => {
+                self.panel.press(&sh.tables, &s, at);
+                let class = Facts::of(ctx.world).class;
+                if let Some(l) = sh.items.layout(class, &s) {
+                    let out = sh.items.press(ctx.world, &sh.tables.files, &l, at);
+                    sh.outputs.extend(out);
+                }
+            }
             Some((false, at)) => {
                 let out = self.panel.release(&sh.tables, &s, at);
                 sh.outputs.extend(out);
@@ -876,9 +914,12 @@ impl Panel for BorderUi {
         EMPTY
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         draw_border_and_ctrlpnl(&sh.tables, &sh.env(), out);
+        // The cursor item last (`panels-3.md` §23 r9).
+        sh.items
+            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

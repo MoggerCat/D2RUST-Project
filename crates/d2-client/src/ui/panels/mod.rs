@@ -13,6 +13,7 @@ pub mod char_details;
 pub mod char_inputs;
 pub mod character;
 pub mod control;
+pub mod inv_items;
 pub mod inventory;
 pub mod menu_box;
 pub mod npc;
@@ -85,6 +86,17 @@ impl UiFiles {
             .iter()
             .position(|n| *n == name)
             .and_then(|i| u32::try_from(i).ok())
+    }
+
+    /// Adds `name` (lower case) when it is not a name yet; its id. For
+    /// files outside `panel-layout.tsv` (item graphics,
+    /// [`inv_items::ITEMS_PREFIX`]).
+    pub fn add(&mut self, name: &str) -> u32 {
+        if let Some(id) = self.id(name) {
+            return id;
+        }
+        self.names.push(name.to_ascii_lowercase());
+        (self.names.len() - 1) as u32
     }
 
     /// The name of an id.

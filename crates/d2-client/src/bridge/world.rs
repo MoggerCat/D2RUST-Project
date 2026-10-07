@@ -528,6 +528,10 @@ pub struct ClientWorld {
     /// Palette level of pet monsters set by the 0x75 pet pass (render
     /// state, `msg-units.md` §8 r10; PROVISIONAL).
     pub pet_palette: BTreeMap<UnitKey, u8>,
+    /// The belt column-ready bytes `[0x007BEFB0 + c]`
+    /// (`msg-stats-items.md` §2 r6), written only by 0x9C 0x0E, 0x0F and
+    /// 0x15 mode 2.
+    pub belt_ready: [bool; 4],
     pub rooms_in_sight: Vec<RoomSight>,
     /// C→S messages the client sends on its own (§6 rule 8, §7 rule 3),
     /// until the bridge hands them to its send path. An empty entry is a

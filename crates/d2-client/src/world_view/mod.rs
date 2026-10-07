@@ -29,6 +29,7 @@
 //! reads the model.
 
 pub mod feed;
+pub mod ground_items;
 pub mod model_feed;
 pub mod near_rooms;
 pub mod node;

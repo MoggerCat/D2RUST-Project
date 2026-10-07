@@ -13,12 +13,14 @@
 //!
 //! Everything except [`mirror`] is plain Rust without Bevy types.
 
+pub mod belt;
 pub mod bits;
 pub mod check;
 pub mod click;
 pub mod dispatch;
 pub mod drlg;
 pub mod intent;
+pub mod items;
 pub mod link;
 pub mod local;
 pub mod mirror;
