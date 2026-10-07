@@ -42,17 +42,17 @@
 |   3. Server link | 135–153 |
 |   4. Send path (intents) | 154–174 |
 |   5. Client world model | 175–194 |
-|   6. Dispatch table | 195–236 |
-|   7. Bevy mirror | 237–255 |
-|   8. Frame pacing | 256–276 |
-|   9. Versioning | 277–287 |
-|   10. Client outputs (bridge → UI and audio) | 288–445 |
-| Constants & data dependencies | 446–460 |
-| Randomness | 461–464 |
-| Edge cases & original bugs | 465–473 |
-| Test vectors | 474–504 |
-| Provenance | 505–515 |
-| Open questions | 516–553 |
+|   6. Dispatch table | 195–246 |
+|   7. Bevy mirror | 247–265 |
+|   8. Frame pacing | 266–286 |
+|   9. Versioning | 287–297 |
+|   10. Client outputs (bridge → UI and audio) | 298–455 |
+| Constants & data dependencies | 456–470 |
+| Randomness | 471–474 |
+| Edge cases & original bugs | 475–483 |
+| Test vectors | 484–514 |
+| Provenance | 515–525 |
+| Open questions | 526–563 |
 <!-- /index -->
 
 ## Summary
@@ -222,14 +222,24 @@ receive).
      id (§2 rule 3), so the handler is never called.
    - Handlers that do nothing: 0x12, 0x13, 0x14, 0x45, 0x66 (a bare
      `ret`: `0x0045D130`, `0x0045D140`, `0x0045D150`, `0x0045E290`,
-     `0x0045E6C0`); 0x24, 0x25 (the empty handler `0x0045C900`).
+     `0x0045E6C0`); 0x24, 0x25 (the empty handler `0x0045C900`); 0xB2
+     GameList (system handler `0x0045C850`, jump table `0x0045C894`
+     entry 3 = `0x0045C876`, a bare `ret`; 2026-10-08 read).
    - Never produced (no 1.14d function queues them,
      `sim/intents-events.md` §3.5 rule 2, so their handlers never run):
      0x16 (`0x0045D2E0`), 0x54 (`0x0045E3B0` → `0x00473CA0`).
 7. **Out of scope** (`sim/intents-events.md` §4 rule 4: multiplayer,
-   Battle.net, transport): 0x75, 0x79, 0x7F, 0x8B–0x8D, 0x8F, 0x90,
-   0xAE–0xB0, 0xB2, 0xB3 keep owner `TBD` and stay unowned (rule 3)
-   until Phase 7. 0xB4 is also the single-player load refusal
+   Battle.net, transport) and unused-in-single-player ids are owned by
+   the spec that carries their one-line scope note; the implementation
+   registers the shared no-op handler of rule 6 for each until Phase 7
+   (2026-10-08, replaces `TBD`): 0x79 (`client/msg-ui.md` §11 r3);
+   0x7F, 0x8B–0x8D, 0x90 (`client/msg-units.md` §8 r11); 0xB3
+   (`client/model.md` §7 r12); 0xAE WardenRequest (handler
+   `0x0045F5F0`): **Out of scope (Phases 0–6): Battle.net anti-cheat**
+   (`sim/intents-events.md` §4 rule 4; no record in either recording).
+   0x75, 0x8F, 0xAF and 0xB0 are sent in single player (recorded) and
+   have behaviour rules: `client/msg-units.md` §8 r10, `client/model.md`
+   §7 r10–r11. 0xB4 is also the single-player load refusal
    (`sim/intents-events.md` §8.2 rule 2; client `0x0045C6D0` maps its
    code to `0x0044E380(n)`): owner `client/model.md` §7 rule 8
    (2026-10-08, open question 7).
@@ -497,7 +507,7 @@ Synthetic, run as unit tests in `crates/d2-client/src/bridge/tests.rs`.
 | test handlers add units (1, 7), (2, 9); Bevy `App` update | 2 `UnitView` entities in key order; after removing (1, 7) and one update, 1 entity | §7 rule 3 |
 | dispatch TSV with one owner changed | check reports exactly that id | §6 rule 5 |
 | chunk `12 …` (26 bytes) | no-op handler runs; nothing recorded as unowned | §6 rule 6 |
-| chunk `75 …` (13 bytes) | unowned count for 0x75 = 1 | §6 rules 3, 7 |
+| chunk `79 …` (6 bytes) | no-op handler runs; nothing recorded as unowned | §6 rules 6, 7 |
 | chunk [0x2C for (1, 0x26) event 18; 0x77 code 0x10] | outputs = [`ServerSound` (1, 0x26) 18, `TradeAction` 0x10], in that order, delivered once after the frame | §10 rules 2, 4 |
 | frame with no outputs | dispatcher not called; list empty | §10 rule 4 |
 | 0x2C for (1, 0x26), then 0x0A removing (1, 0x26), same chunk | `ServerSound` still delivered with the class captured at receive | §10 rule 3 |
