@@ -127,7 +127,7 @@ New chain 4 extra fields (the rest are in `quests-act1.md` §10.6):
    3) (`0x0045ADF0`, `0x0045AE20`); room = the object's room.
    C = spawn cain1 (146) at (room, x, y), mode 1, spread −1, flags 0
    (`0x005B2F20`). C none: free spot from (x, y) in room
-   (`0x00545340`: size 2, mask 0x100, radius 3, limit 100); found →
+   (`0x00545340`: size 2, mask 0x100, radius 3 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); found →
    C = spawn at the free spot in its room with the same arguments.
 4. C none (both tries failed): a debug log (`0x00544070`, no effect);
    X +0x74 := 0; every player `0x00593220` (the first player, in walk

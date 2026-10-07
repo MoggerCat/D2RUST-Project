@@ -685,7 +685,7 @@ game record has slot 4 bit 11, or the player record slot 4 bit 10 (killed
 the Cow King); or (classic game) the player lacks slot 26 bit 0, or
 (expansion) slot 40 bit 0; or the player is not in level 1 (Rogue
 Encampment). Else free spot near the player (`0x00545340`, size 3,
-collision mask 0x400, radius 4, limit 100); if found and a portal object
+collision mask 0x400, radius 4 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); if found and a portal object
 of class 60 to level 39 is created (`0x0056D130`), set game slot 4 bit 11
 and return 1. Its only route is the cube output-kind table `0x006E11C8`
 through `jmp` thunks (`world/cube.md` §9). The Pandemonium portal functions
@@ -703,7 +703,7 @@ count 1, the given quality) for the item (items spec); if it has max
 durability > 0 set durability to it; inventory page 0; try to place it in
 the inventory (`0x00560200`); on success identify it unless identified
 and return it; else if droppable: drop it at a free spot near the player
-(`0x00545340`, size 1, mask 0x3E01, radius 5, limit 100) and return it;
+(`0x00545340`, size 1, mask 0x3E01, radius 5 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100) and return it;
 else free it and return none.
 
 #### 9.2 Deleting a quest item
