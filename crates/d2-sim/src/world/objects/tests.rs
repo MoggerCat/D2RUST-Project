@@ -871,7 +871,9 @@ fn route_mismatches(text: &str) -> Result<Vec<(String, u32)>, TsvError> {
         let index = tsv_num(tn, line, "index", c[1])?;
         let address = tsv_num(tn, line, "address", c[2])?;
         let want = match (c[5], address) {
-            ("-", 0) => Some(Route::Null),
+            // Null slots (address 0): owner `-`, or the section that
+            // names the null entry (e44dcaa1).
+            (o, 0) if o == "-" || o.starts_with('§') => Some(Route::Null),
             (o, a) if o.starts_with("world/quests") && a != 0 => Some(Route::Quest),
             ("world/waypoints.md", a) if a != 0 => Some(Route::Waypoint),
             ("todo", a) if a != 0 => Some(Route::NotCovered),
@@ -916,7 +918,7 @@ fn route_check_catches_perturbations() {
     assert!(FUNCS_TSV.contains(wp));
     let text = FUNCS_TSV.replace(wp, "init\t17\t0");
     assert_eq!(route_mismatches(&text), Ok(vec![("init".into(), 17)]));
-    let null = "init\t35\t0\t-\t1\t-";
+    let null = "init\t35\t0\t-\t1\t§3";
     assert!(FUNCS_TSV.contains(null));
     let text = FUNCS_TSV.replace(null, "init\t35\t0\t-\t1\tworld/quests.md");
     assert_eq!(route_mismatches(&text), Ok(vec![("init".into(), 35)]));

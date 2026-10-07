@@ -8,7 +8,20 @@ use super::super::{
 use super::*;
 use crate::rng::Seed;
 
-impl ChestWorld for Fake {}
+impl ChestWorld for Fake {
+    fn room_units(&self, room: RoomId) -> Vec<UnitId> {
+        self.room_unit_lists.get(&room).cloned().unwrap_or_default()
+    }
+    fn unit_type(&self, unit: UnitId) -> Option<u8> {
+        self.unit_types.get(&unit).copied()
+    }
+    fn unit_class(&self, unit: UnitId) -> Option<u32> {
+        self.unit_classes.get(&unit).copied().or_else(|| match self.operator(unit) {
+            Operator::Player(c) => Some(u32::from(c)),
+            _ => None,
+        })
+    }
+}
 
 mod mutant_tests;
 

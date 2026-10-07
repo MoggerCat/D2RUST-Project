@@ -67,6 +67,13 @@ pub struct Fake {
     /// Stats per unit (for extension fakes).
     pub stats: BTreeMap<(UnitId, u16), i32>,
     pub calls: Vec<Call>,
+    /// Units of a room in room-list order (mech / chest fakes).
+    pub room_unit_lists: BTreeMap<RoomId, Vec<UnitId>>,
+    /// Unit type / class of a unit (mech / chest fakes).
+    pub unit_types: BTreeMap<UnitId, u8>,
+    pub unit_classes: BTreeMap<UnitId, u32>,
+    /// Adjacency arrays of a room.
+    pub adjacent: BTreeMap<RoomId, Vec<RoomId>>,
     /// Box queries seen by the population fake: (x, y, sx, sy, mask).
     pub box_log: std::cell::RefCell<Vec<(i32, i32, u32, u32, u32)>>,
     /// Predicate for the population fake's box query: `true` = blocked.
