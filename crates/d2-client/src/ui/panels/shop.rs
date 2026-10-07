@@ -97,6 +97,73 @@ pub const DEFAULT_TABS: [ShopTab; 4] = [
     },
 ];
 
+/// One button record of `0x007BC9E0 + 20 i` (§14.11).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ButtonRec {
+    pub enabled: bool,
+    pub state: u32,
+    pub string: u16,
+    pub base_frame: u16,
+}
+
+/// The shop setup's buttons (`0x00487ED0`, §14.11): count = `len()`, mode
+/// 3 for the NPC classes that have buttons.
+pub fn shop_button_records(npc: u32) -> Vec<ButtonRec> {
+    let b = |enabled, string, base_frame| ButtonRec {
+        enabled,
+        state: 0,
+        string,
+        base_frame,
+    };
+    match npc {
+        147 | 148 | 177 | 199 | 202 | 252 | 254 | 255 | 405 | 512 | 513 => vec![
+            b(true, 3335, 2),
+            b(true, 3336, 4),
+            b(false, 0, 0),
+            b(true, 4144, 10),
+        ],
+        154 | 178 | 253 | 257 | 511 => vec![
+            b(true, 3335, 2),
+            b(true, 3336, 4),
+            b(true, 3338, 6),
+            b(true, 10095, 18),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// The start page of the shop (`0x00491940`, §14.12): the page and whether
+/// the 500 ms delay `[0x007BCC08]` is set.
+pub fn shop_start_page(npc: u32) -> (u8, bool) {
+    match npc {
+        147 | 512 => (0, false),
+        154 | 511 => (1, false),
+        148 | 177 | 178 | 202 | 252 | 253 | 255 | 257 | 405 | 513 => (3, true),
+        _ => (0, false),
+    }
+}
+
+/// Shop tabs (`0x00487A10`, §14.12): `counts` are the store items per page
+/// 0–4, `max_page` is `[0x007BCC05]`. Returns the tab records' (active,
+/// visible) and the current page. Pages > 4 are read as 0.
+pub fn shop_tabs(page: u8, counts: [u32; 5], max_page: u8) -> ([(bool, bool); 4], u8) {
+    let mut cur = if page > 4 { 0 } else { page };
+    let mut tabs = [(false, false); 4];
+    for (i, t) in tabs.iter_mut().enumerate() {
+        t.1 = counts[i] > 0;
+    }
+    for _ in 0..4 {
+        if counts.get(cur as usize).copied().unwrap_or(0) > 0 {
+            break;
+        }
+        cur = if cur == 0xFF || cur + 1 > max_page { 0 } else { cur + 1 };
+    }
+    if let Some(t) = tabs.get_mut(cur as usize) {
+        t.0 = true;
+    }
+    (tabs, cur)
+}
+
 /// One action button record of `0x007BC9E4` (stride 20): state u16 @0,
 /// base frame u16 @0x0A.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -649,6 +716,9 @@ pub fn caller_args(c: Caller, wparam: u32) -> (u8, u32, bool, bool) {
         Caller::RepairAll(e) => (e, 0, e != 0, e != 0),
     }
 }
+
+#[cfg(test)]
+mod tests_c2ui;
 
 #[cfg(test)]
 mod tests {

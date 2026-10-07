@@ -963,7 +963,7 @@ mod tests {
         assert_eq!(col(&s, &cursor_item(true, false), false), None);
     }
 
-    // Covers: specs/ui/control-panel.md §5 r6
+    // Covers: specs/ui/control-panel.md §5 r6, specs/ui/panels-2.md §18 r3
     #[test]
     fn hit_area() {
         let r = rec();
