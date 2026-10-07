@@ -33,18 +33,18 @@
 |   R3. Per-tick dispatch | 285–314 |
 |   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 315–445 |
 |   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 446–498 |
-|   R6. Damage stage (missile-owned part) | 499–612 |
-|   R7. Lifetime and expiry | 613–636 |
-|   R8. Pierce | 637–663 |
-|   R9. Server-do and server-hit catalogues | 664–894 |
-|   R10. Behaviour of the recorded missiles | 895–928 |
-|   R11. `missiles.txt` columns and their server use | 929–969 |
-| Constants & data dependencies | 970–996 |
-| Randomness | 997–1029 |
-| Edge cases & original bugs | 1030–1056 |
-| Test vectors | 1057–1136 |
-| Provenance | 1137–1179 |
-| Open questions | 1180–1249 |
+|   R6. Damage stage (missile-owned part) | 499–619 |
+|   R7. Lifetime and expiry | 620–643 |
+|   R8. Pierce | 644–670 |
+|   R9. Server-do and server-hit catalogues | 671–901 |
+|   R10. Behaviour of the recorded missiles | 902–935 |
+|   R11. `missiles.txt` columns and their server use | 936–976 |
+| Constants & data dependencies | 977–1003 |
+| Randomness | 1004–1036 |
+| Edge cases & original bugs | 1037–1063 |
+| Test vectors | 1064–1143 |
+| Provenance | 1144–1186 |
+| Open questions | 1187–1256 |
 <!-- /index -->
 
 ## Summary
@@ -519,6 +519,13 @@ the **missile's** seed (`0x0045C390`), < `KnockBack` → knockback flag
 (1.14d `0x005AD7CB`). Then block/dodge (`0x0057DFB0`, skills spec);
 hit class from `HitClass`; missile data flags 1, 2 → hit flags; pierce
 percent = stat 327; events and damage execution (skills spec).
+Every result-flag write here ORs into the u16 at R +0x04 (the only
+clears are the block/dodge ones of the skills spec, bit 0), so §R6.3
+functions 3 and 14 keep their bits. The hit class merges: R +0x60 :=
+`HitClass` | (R +0x60 & 0xF0), and R byte +0x64 := 1 when either has a
+bit in 0xF0 (`0x005AD863`–`0x005AD87A`); §R6.3 functions 7 and 9's 0x60
+therefore survive as `HitClass` | 0x60 with +0x64 = 1. Confirmed
+2026-10-08 (impl-pc1-s5): OR; hit class corrected (not an overwrite).
 
 #### R6.2 Damage rolls (`0x005A89A0`, 1.14d-confirmed)
 
@@ -597,9 +604,9 @@ helpers:
 | 4 | `0x005AD290` | iceblast | no checks: R freeze +0x34 := R cold length +0x30; cold length := 0 |
 | 5 | `0x005AD2F0` | blessedhammer | row valid: e := `elem_roll(game, M, U, R)`; `dParam1` > 0 and U undead (`0x0063E990`) → `add_elem(M, R, pct(e, dParam1, 100))`; then `dParam2` > 0 and U demon (`0x0063E940`) → `add_elem(M, R, pct(e, dParam2, 100))` |
 | 6 | `0x005AD3A0` | none (no live row) | owner O of M; O, O flags +0xC4 bit 0x200 clear, U present → U flags +0xC4 |= 0x20000 |
-| 7 | `0x005AD3E0` | warcry, shockwave | row valid: R stun +0x44 := `dParam1` if > 0, else `0x004E6CA0(skill, level)` (M data +0x0A / +0x0C, `0x0064A280` / `0x0064A210`; `missiles/bodies-2.md` §38 step 4 formula); R hit class +0x60 := 0x60 |
+| 7 | `0x005AD3E0` | warcry, shockwave | row valid: R stun +0x44 := `dParam1` if > 0, else `0x004E6CA0(skill, level)` (M data +0x0A / +0x0C, `0x0064A280` / `0x0064A210`; `missiles/bodies-2.md` §38 step 4 formula); R hit class +0x60 := 0x60 (kept as `HitClass` \| 0x60, §R6.1) |
 | 8 | `0x005AD450` | erruption crack 1, 2 | row valid, U present, `ProgOverlay` (+0x36, i16) > 0 → overlay on U (`0x00621E40(U, ProgOverlay, 0)`) |
-| 9 | `0x005AD4A0` | twister | row valid: k := M's skill; R stun := `dParam1` if > 0; else k's skills row (`0 ≤ k <` count) `Param2` (+0x14C); else 0. R hit class := 0x60 |
+| 9 | `0x005AD4A0` | twister | row valid: k := M's skill; R stun := `dParam1` if > 0; else k's skills row (`0 ≤ k <` count) `Param2` (+0x14C); else 0. R hit class := 0x60 (kept as `HitClass` \| 0x60, §R6.1) |
 | 10 | `0x005AD2B0` | bladesoficecubes | row valid: R freeze +0x34 := R cold length +0x30 (cold length kept) |
 | 11 | `0x005AD530` | rabiescontagion | O := owner; O or U none → R poison +0x28, poison length +0x2C := 0. Else t := M data +0x28 (`0x0064A730`) − game frame (game +0xA8); 10 ≤ t ≤ `elem_len(O, k, L, 1)` (`0x00644F20`, `skills/levels.md` §3.2; k, L = M's skill, level) → R poison length := t; else poison and its length := 0 |
 | 12 | `0x005AD0F0` | lightningjavelin | row valid; c > 0: c := min(c, 100); f := min(pct(R phys, c, 100), R phys); e := `elem_roll(game, M, U, R)`; `clear_elems(M, R)`; `add_elem(M, R, f + e)` |

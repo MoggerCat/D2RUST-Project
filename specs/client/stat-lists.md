@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–188 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–419 |
-|   4. Skills | 420–451 |
-| Constants & data dependencies | 452–462 |
-| Randomness | 463–467 |
-| Edge cases & original bugs | 468–475 |
-| Test vectors | 476–487 |
-| Provenance | 488–500 |
-| Open questions | 501–540 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–423 |
+|   4. Skills | 424–455 |
+| Constants & data dependencies | 456–466 |
+| Randomness | 467–471 |
+| Edge cases & original bugs | 472–479 |
+| Test vectors | 480–491 |
+| Provenance | 492–504 |
+| Open questions | 505–544 |
 <!-- /index -->
 
 ## Summary
@@ -233,7 +233,11 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    events) carried by one `StateFx` output per call of rules 6.1–6.3
    (`client/bridge.md` §10 table; captured: unit key, state, the phase,
    whether the bit was set before, the unit's dead test); the effect
-   layer runs the named 1.14d calls for it.
+   layer runs the named 1.14d calls for it. Confirmed 2026-10-08
+   (impl-pc1-s5): table bounds setfunc < 31 (`0x004D9ED3`) and remfunc
+   < 30 (`0x004D9F79`), setfunc 11 / 12 and remfunc 8 bodies (each tests
+   U ≠ none first) as below; nothing here is open, so the `StateFx`
+   emission and the bold writes are owed by code.
    1. On (`0x004D9B20`, after rule 3's notondead exit and list empty):
       bit already clear and onsound ≥ 0 → sound (`0x004B9A00`); **bit
       := 1**; colorshift ≠ 0 → `0x004D97F0` (color); `0x004D9920`
