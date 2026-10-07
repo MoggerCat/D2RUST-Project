@@ -39,6 +39,7 @@ pub mod widget;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
 mod tests_c2skills;
 #[cfg(test)]
 mod tests_fdesc;
