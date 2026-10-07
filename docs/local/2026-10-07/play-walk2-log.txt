@@ -1,0 +1,1011 @@
+﻿cargo :     Finished `release` profile [optimized] target(s) in 0.75s
+At line:1 char:607
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.75s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:44:34.232926Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:44:34.324398Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:44:34.813377Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:44:34.813445Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:44:34.814204Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:44:35.013864Z DEBUG d2_client::world_view::present: effects output CommonCof { act: 0 }: no effect layer
+2026-10-07T22:44:35.033052Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:44:39.724553Z  INFO d2_client::app::play: frame 250: 106 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 105, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 82; audio Some(AudioStats { frame: 250, presented: 106, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:44:43.886950Z  INFO d2_client::app::play: frame 500: 210 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 499, server_tick: 209, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 164; audio Some(AudioStats { frame: 500, presented: 210, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:44:48.055187Z  INFO d2_client::app::play: frame 750: 314 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 748, server_tick: 313, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 248; audio Some(AudioStats { frame: 750, presented: 314, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:44:52.220795Z  INFO d2_client::app::play: frame 1000: 418 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1000, server_tick: 418, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 331; audio Some(AudioStats { frame: 1000, 
+presented: 418, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:44:56.383423Z  INFO d2_client::app::play: frame 1250: 522 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1249, server_tick: 522, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 414; audio Some(AudioStats { frame: 1250, 
+presented: 522, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:00.573952Z  INFO d2_client::app::play: frame 1500: 627 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1497, server_tick: 626, items: 129, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 498; audio Some(AudioStats { frame: 1500, 
+presented: 627, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:03.781960Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:03.781985Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:03.803884Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitWLhth.dcc: in no archive
+2026-10-07T22:45:03.831305Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:03.880245Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:03.939428Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:03.980700Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.031257Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.081477Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.131292Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.181714Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.231181Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.281804Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.330609Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.381401Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.432119Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.479600Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.530339Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.580393Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.630952Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.681686Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.730472Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.734327Z  INFO d2_client::app::play: frame 1750: 731 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1750, server_tick: 731, items: 123, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 581; audio Some(AudioStats { frame: 1750, 
+presented: 731, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:04.781415Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.831146Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.881703Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.931035Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:04.981074Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.030511Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.080601Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.131392Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.181160Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.231993Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.280335Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.348330Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.381279Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.429907Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.480942Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.531325Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.580721Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.630078Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.681261Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.730223Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.780414Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.829414Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.879847Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.930185Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:05.980134Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.029585Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.079786Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.131049Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.180903Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.229878Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.280757Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.329659Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.380985Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.430077Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.480267Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.529911Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.580094Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.629066Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.679125Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.729318Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.780565Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.829959Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.880717Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.929863Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:06.980505Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.029901Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.079690Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.130816Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.180062Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.229908Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.729252Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.779271Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.829752Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.880392Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.929432Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:07.979597Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.029467Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.078707Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.129376Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.179119Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.229758Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.279848Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.329462Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.379889Z DEBUG d2_client::world_view::present: ui: Opened(2)
+2026-10-07T22:45:08.379910Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(2))
+2026-10-07T22:45:08.385262Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:08.429758Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:08.896096Z  INFO d2_client::app::play: frame 2000: 835 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 1999, server_tick: 835, items: 157, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 664; audio Some(AudioStats { frame: 2000, 
+presented: 835, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:09.428434Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:09.428468Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:09.478356Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:09.528743Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:09.578438Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:09.828502Z DEBUG d2_client::world_view::present: ui: Closed(2)
+2026-10-07T22:45:09.828539Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(0))
+2026-10-07T22:45:10.378524Z DEBUG d2_client::world_view::present: ui: Opened(2)
+2026-10-07T22:45:10.378547Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(2))
+2026-10-07T22:45:10.829600Z DEBUG d2_client::world_view::present: ui: Closed(2)
+2026-10-07T22:45:10.829622Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(0))
+2026-10-07T22:45:11.028756Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:11.028780Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.079207Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.129419Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.178400Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.228611Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.278888Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.328930Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.398825Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.444218Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.494525Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.545249Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.595498Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.645807Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.695319Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.744422Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.794766Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.844853Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.895010Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.945781Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:11.995112Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.045510Z DEBUG d2_client::world_view::present: ui: Opened(1)
+2026-10-07T22:45:12.045555Z DEBUG d2_client::world_view::present: ui: InventoryHook
+2026-10-07T22:45:12.045575Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(1))
+2026-10-07T22:45:12.045638Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.095093Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.145117Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.194890Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.245002Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.294533Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.344768Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.395544Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.444377Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.495191Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.544573Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.594780Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.645189Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.694578Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.744567Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.793890Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.844738Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.893296Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.944011Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:12.994230Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.044460Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.079739Z  INFO d2_client::app::play: frame 2250: 939 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2248, server_tick: 939, items: 123, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 748; audio Some(AudioStats { frame: 2250, 
+presented: 939, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:13.094735Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.144342Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.194117Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.244861Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.294860Z DEBUG d2_client::world_view::present: ui: Closed(1)
+2026-10-07T22:45:13.294881Z DEBUG d2_client::world_view::present: ui: InventoryHook
+2026-10-07T22:45:13.294887Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(0))
+2026-10-07T22:45:13.294983Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.344534Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.400836Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.444375Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.494451Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.543938Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.592498Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.644178Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.694271Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.744314Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.794615Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.844024Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.894149Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.944748Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:13.994083Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.044932Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.095379Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.143821Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.193864Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.243801Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.294179Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.343730Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.393984Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.444026Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.494166Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.545415Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:14.596480Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:15.510680Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:15.510709Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.560628Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.610399Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.660261Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.709605Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.761158Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.810424Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.859798Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.909588Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:15.959220Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.009973Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.060732Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.109525Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.159797Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.210691Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.260449Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.310041Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.359340Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.410035Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.460186Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.510580Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.560191Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.610357Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.660459Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.710956Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.761159Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.810091Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.860293Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.909168Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:16.959650Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.009789Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.058790Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.109972Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.161125Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.210704Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.259370Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.263083Z  INFO d2_client::app::play: frame 2500: 1044 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2500, server_tick: 1044, items: 79, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 831; audio Some(AudioStats { frame: 2500, 
+presented: 1044, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:17.309228Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.359880Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.407220Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.459835Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.510184Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.560860Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.609359Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.659880Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.709529Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.760050Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.810097Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.860924Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.909651Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:17.959061Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.009129Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.059244Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.109244Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.159797Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.209435Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.259045Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.309263Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.358977Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.408675Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.460058Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.510040Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.559469Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.609484Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.659829Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.709425Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.758982Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.808886Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.859102Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.908986Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:18.959281Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.008628Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.059140Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.108978Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.159623Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.208733Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.259108Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.309192Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.360643Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.417612Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.458849Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.509053Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.563328Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.609607Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.659203Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.708683Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.758563Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.808817Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.858679Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.907831Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:19.959076Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.008924Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.059322Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.108827Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.158208Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.208739Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.258059Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.309326Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.358581Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.409472Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.458614Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.508539Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.558331Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.608522Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.658032Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.708395Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.758876Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.809454Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.858131Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.907696Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:20.958599Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.008613Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.058385Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.108149Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.157391Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.208263Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.257531Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.308391Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.358138Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.408064Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.441118Z  INFO d2_client::app::play: frame 2750: 1149 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2749, server_tick: 1148, items: 6, units_drawn: 0, units_hidden: 
+4, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 914; audio Some(AudioStats { frame: 2750, presented: 1149, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:21.458000Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.508340Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.558007Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.607484Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.657438Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.708488Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.758333Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.808207Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.857339Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.907732Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:21.958141Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.007686Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.057516Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.107099Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.158210Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.208123Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.257105Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.307816Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.359558Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.407653Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.457963Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.508601Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.556847Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.608046Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:22.657416Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:25.603263Z  INFO d2_client::app::play: frame 3000: 1253 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 2998, server_tick: 1252, items: 11, units_drawn: 0, 
+units_hidden: 4, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 998; audio Some(AudioStats { frame: 3000, 
+presented: 1253, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:29.305697Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:29.305734Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.356640Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.406649Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.456347Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.505842Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.556878Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.605938Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.655724Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.705514Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:29.754957Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:29.758543Z  INFO d2_client::app::play: frame 3250: 1356 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3250, server_tick: 1356, items: 14, units_drawn: 0, 
+units_hidden: 4, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 1081; audio Some(AudioStats { frame: 3250, 
+presented: 1356, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:29.905302Z DEBUG d2_client::world_view::present: ui: Opened(2)
+2026-10-07T22:45:29.905325Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(2))
+2026-10-07T22:45:30.956189Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:30.956211Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.005828Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.055624Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.105555Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.154745Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.205915Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.255325Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.305412Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.354906Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.405707Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.456279Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.504767Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.556060Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.605553Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.655423Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.705237Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.755194Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.805676Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.856073Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.904807Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:31.954414Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.004965Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.055466Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.104985Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.154865Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.204936Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.256088Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:32.505188Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:32.505218Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.555466Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:32.605147Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:33.905403Z DEBUG d2_client::world_view::present: ui: Closed(2)
+2026-10-07T22:45:33.905425Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(0))
+2026-10-07T22:45:33.920275Z  INFO d2_client::app::play: frame 3500: 1461 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3499, server_tick: 1460, items: 87, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 1164; audio Some(AudioStats { frame: 3500, 
+presented: 1461, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:34.753110Z DEBUG d2_client::world_view::present: ui: Opened(1)
+2026-10-07T22:45:34.753131Z DEBUG d2_client::world_view::present: ui: InventoryHook
+2026-10-07T22:45:34.753136Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(1))
+2026-10-07T22:45:38.088983Z  INFO d2_client::app::play: frame 3750: 1565 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 3748, server_tick: 1564, items: 93, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1248; audio Some(AudioStats { frame: 3750, 
+presented: 1565, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:39.602690Z DEBUG d2_client::world_view::present: ui: Closed(1)
+2026-10-07T22:45:39.602725Z DEBUG d2_client::world_view::present: ui: InventoryHook
+2026-10-07T22:45:39.602729Z DEBUG d2_client::world_view::present: ui: OpenMode(OpenMode(0))
+2026-10-07T22:45:42.264514Z  INFO d2_client::app::play: frame 4000: 1669 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4000, server_tick: 1669, items: 87, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1331; audio Some(AudioStats { frame: 4000, 
+presented: 1669, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:43.668617Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:43.668648Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.717570Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.767986Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.817948Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.867112Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.917363Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:43.967146Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.017550Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.066967Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.118507Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.168167Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.218194Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.267414Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.318332Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.367513Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.417485Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.467712Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.516361Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.567420Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.617576Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.667877Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.717904Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.767194Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.817597Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.867819Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.917468Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:44.967798Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.017528Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.067432Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.117230Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.167921Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.217797Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.266397Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.317363Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.366963Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.416751Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.467650Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:45.583153Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:45.583175Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.632617Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:45.683897Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:46.032636Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:46.032660Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:46.083832Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:46.418975Z  INFO d2_client::app::play: frame 4250: 1773 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4248, server_tick: 1772, items: 122, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 1414; audio Some(AudioStats { frame: 4250, 
+presented: 1773, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:46.482582Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:46.482605Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:46.533496Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:47.184007Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:47.184034Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:47.233310Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:47.282430Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:47.732419Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:47.732440Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:47.782685Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:50.602708Z  INFO d2_client::app::play: frame 4500: 1878 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4500, server_tick: 1878, items: 114, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 3, gpu: true }); node frames 1501; audio Some(AudioStats { frame: 4500, 
+presented: 1878, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:50.699180Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:50.699202Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:50.749885Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:50.998527Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:50.998549Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:51.048138Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:51.096979Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:51.497958Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:51.497982Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:51.547940Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:51.598503Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.048430Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.048453Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:52.096789Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:52.148387Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.448822Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.448877Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:52.500111Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.897735Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:52.897758Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:52.947774Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:54.774794Z  INFO d2_client::app::play: frame 4750: 1982 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 4750, server_tick: 1982, items: 131, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1584; audio Some(AudioStats { frame: 4750, 
+presented: 1982, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:56.430064Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:45:56.430086Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.480476Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.529623Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.580075Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.604342Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitRNhth.dcc: in no archive
+2026-10-07T22:45:56.630630Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.680631Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.729946Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.779426Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.829601Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.880219Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.930682Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:56.980049Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.029822Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.079061Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.129698Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.179351Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.229386Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.279720Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.329573Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.379172Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.428880Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.479611Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.529344Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.579938Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.630107Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.680289Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.729573Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.779571Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.829725Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.879185Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.929772Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:57.979245Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.029504Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.079145Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.129301Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.179692Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.229745Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.279463Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.329436Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.379922Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.429656Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.479467Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.529240Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.580632Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.629920Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.680322Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.728889Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.780764Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.829420Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.879389Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.929727Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:58.933937Z  INFO d2_client::app::play: frame 5000: 2086 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5000, server_tick: 2086, items: 117, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1667; audio Some(AudioStats { frame: 5000, 
+presented: 2086, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:45:58.978885Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.029026Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.079233Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.129530Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.179289Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.230653Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.279500Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.329462Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.378858Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.429286Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.479245Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.529042Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.608875Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.644329Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.695890Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.746402Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.795553Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.847539Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.896234Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.945886Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:45:59.995581Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.045592Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.095784Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.145388Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.195104Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.244910Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.294780Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.345208Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.394972Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.444784Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.495115Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.545198Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.594828Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.645187Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.695575Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.744785Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.794872Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.844763Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.895763Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.945497Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:00.994554Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.045213Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.095187Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.145661Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.195911Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.244814Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.295464Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.345259Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.395600Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.445673Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.495223Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.545296Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.594844Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.644634Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.694695Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.744951Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.793777Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.844626Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.895170Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.944897Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:01.994814Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.045134Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.094259Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.144524Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.194863Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.244497Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.294415Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.344587Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.394529Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.443993Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.494617Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.543887Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.594429Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.644690Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.694506Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.744193Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.794342Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.844527Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.894839Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.944081Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:02.994430Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.044653Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.094272Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.098241Z  INFO d2_client::app::play: frame 5250: 2190 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5250, server_tick: 2190, items: 118, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1750; audio Some(AudioStats { frame: 5250, 
+presented: 2190, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:03.144432Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.193413Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.244390Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.293968Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.344203Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.393604Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.444706Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.494978Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.544830Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.629889Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.678055Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.727860Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.777451Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.828539Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.878581Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.927309Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:03.977090Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.027810Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.077013Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.127652Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.177369Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.227395Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.277711Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.327348Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.377514Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.427063Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.477216Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.527705Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.577831Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.627741Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.677956Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.726974Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.776421Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.827275Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.876946Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.927701Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:04.977676Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.027590Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.077135Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.127190Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.177160Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.227357Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.277360Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.327387Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.378201Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.426449Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.476924Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.527272Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.577960Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.626091Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.678269Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.727662Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.777072Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.826757Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.877342Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.927143Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:05.977511Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.026911Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.077132Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.126289Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.176312Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.225422Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.276530Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.327013Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.376791Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.426255Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.477476Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.526396Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.577336Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.626267Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.676460Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.724924Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.775457Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.827123Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.876889Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.926439Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:06.976211Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.025664Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.075663Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.126698Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.175999Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.225995Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.277184Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.280893Z  INFO d2_client::app::play: frame 5500: 2294 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5500, server_tick: 2294, items: 134, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 1, gpu: true }); node frames 1833; audio Some(AudioStats { frame: 5500, 
+presented: 2294, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:07.326191Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.375675Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.427478Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.476422Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.527578Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.575911Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.625331Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.676118Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.725516Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:07.775587Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:46:08.126774Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:46:08.126795Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.176749Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.225926Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.276233Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.326553Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.376420Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.426349Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.476114Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.525912Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.575406Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.625154Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.676012Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.726879Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.775204Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.825733Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.875641Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.926007Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:08.975294Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.025146Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.076706Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.126314Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.175143Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.225517Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.276159Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.325920Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.375946Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.425917Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.475761Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.525947Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.574821Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.626224Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.675474Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.725922Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.776021Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.825154Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.874809Z DEBUG d2_client::world_view::present: world click: HoverCall(4618864)
+2026-10-07T22:46:09.925100Z DEBUG d2_client::world_view::present: world click: HoverCall(4616160)
+2026-10-07T22:46:11.450664Z  INFO d2_client::app::play: frame 5750: 2399 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5749, server_tick: 2398, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 1916; audio Some(AudioStats { frame: 5750, 
+presented: 2399, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:15.634422Z  INFO d2_client::app::play: frame 6000: 2503 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 5998, server_tick: 2503, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2000; audio Some(AudioStats { frame: 6000, 
+presented: 2503, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:19.805484Z  INFO d2_client::app::play: frame 6250: 2608 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6250, server_tick: 2608, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2083; audio Some(AudioStats { frame: 6250, 
+presented: 2608, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:23.966982Z  INFO d2_client::app::play: frame 6500: 2712 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6499, server_tick: 2711, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2166; audio Some(AudioStats { frame: 6500, 
+presented: 2712, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:28.152349Z  INFO d2_client::app::play: frame 6750: 2816 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 6749, server_tick: 2816, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2252; audio Some(AudioStats { frame: 6750, 
+presented: 2816, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:32.333903Z  INFO d2_client::app::play: frame 7000: 2921 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7000, server_tick: 2921, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2342; audio Some(AudioStats { frame: 7000, 
+presented: 2921, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:36.531532Z  INFO d2_client::app::play: frame 7250: 3026 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7250, server_tick: 3026, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2436; audio Some(AudioStats { frame: 7250, 
+presented: 3026, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:40.697819Z  INFO d2_client::app::play: frame 7500: 3130 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7500, server_tick: 3130, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2540; audio Some(AudioStats { frame: 7500, 
+presented: 3130, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:44.861194Z  INFO d2_client::app::play: frame 7750: 3234 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7749, server_tick: 3234, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2645; audio Some(AudioStats { frame: 7750, 
+presented: 3234, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:49.001240Z  INFO d2_client::app::play: frame 8000: 3338 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 7999, server_tick: 3337, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2738; audio Some(AudioStats { frame: 8000, 
+presented: 3338, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:53.201778Z  INFO d2_client::app::play: frame 8250: 3443 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8248, server_tick: 3442, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2827; audio Some(AudioStats { frame: 8250, 
+presented: 3443, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:46:57.366213Z  INFO d2_client::app::play: frame 8500: 3547 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8498, server_tick: 3546, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2910; audio Some(AudioStats { frame: 8500, 
+presented: 3547, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:01.593114Z  INFO d2_client::app::play: frame 8750: 3652 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 8749, server_tick: 3652, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 2996; audio Some(AudioStats { frame: 8750, 
+presented: 3652, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:05.711548Z  INFO d2_client::app::play: frame 9000: 3755 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9000, server_tick: 3755, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3092; audio Some(AudioStats { frame: 9000, 
+presented: 3755, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:09.892545Z  INFO d2_client::app::play: frame 9250: 3860 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9249, server_tick: 3859, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3175; audio Some(AudioStats { frame: 9250, 
+presented: 3860, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:14.080549Z  INFO d2_client::app::play: frame 9500: 3964 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9498, server_tick: 3964, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3270; audio Some(AudioStats { frame: 9500, 
+presented: 3964, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:18.250393Z  INFO d2_client::app::play: frame 9750: 4069 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 9750, server_tick: 4069, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3374; audio Some(AudioStats { frame: 9750, 
+presented: 4069, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:22.416355Z  INFO d2_client::app::play: frame 10000: 4173 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10000, server_tick: 4173, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3478; audio Some(AudioStats { frame: 10000, 
+presented: 4173, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:26.583481Z  INFO d2_client::app::play: frame 10250: 4277 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10250, server_tick: 4277, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3582; audio Some(AudioStats { frame: 10250, 
+presented: 4277, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:30.747137Z  INFO d2_client::app::play: frame 10500: 4381 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10499, server_tick: 4381, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3687; audio Some(AudioStats { frame: 10500, 
+presented: 4381, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:34.914557Z  INFO d2_client::app::play: frame 10750: 4485 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10749, server_tick: 4485, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3791; audio Some(AudioStats { frame: 10750, 
+presented: 4485, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:39.101400Z  INFO d2_client::app::play: frame 11000: 4590 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 10999, server_tick: 4590, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3895; audio Some(AudioStats { frame: 11000, 
+presented: 4590, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:43.269449Z  INFO d2_client::app::play: frame 11250: 4694 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 11249, server_tick: 4694, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 3999; audio Some(AudioStats { frame: 11250, 
+presented: 4694, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:47.435609Z  INFO d2_client::app::play: frame 11500: 4798 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 11499, server_tick: 4798, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4103; audio Some(AudioStats { frame: 11500, 
+presented: 4798, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:51.601583Z  INFO d2_client::app::play: frame 11750: 4902 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 11748, server_tick: 4902, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4191; audio Some(AudioStats { frame: 11750, 
+presented: 4902, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:55.767987Z  INFO d2_client::app::play: frame 12000: 5007 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 11998, server_tick: 5006, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4274; audio Some(AudioStats { frame: 12000, 
+presented: 5007, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:47:59.942585Z  INFO d2_client::app::play: frame 12250: 5111 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 12250, server_tick: 5111, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4357; audio Some(AudioStats { frame: 12250, 
+presented: 5111, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:04.129369Z  INFO d2_client::app::play: frame 12500: 5216 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 12500, server_tick: 5216, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4460; audio Some(AudioStats { frame: 12500, 
+presented: 5216, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:08.297557Z  INFO d2_client::app::play: frame 12750: 5320 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 12750, server_tick: 5320, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4564; audio Some(AudioStats { frame: 12750, 
+presented: 5320, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:12.464276Z  INFO d2_client::app::play: frame 13000: 5424 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 13000, server_tick: 5424, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4668; audio Some(AudioStats { frame: 13000, 
+presented: 5424, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:16.693280Z  INFO d2_client::app::play: frame 13250: 5529 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 13248, server_tick: 5529, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4773; audio Some(AudioStats { frame: 13250, 
+presented: 5529, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:20.865095Z  INFO d2_client::app::play: frame 13500: 5634 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 13500, server_tick: 5634, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4877; audio Some(AudioStats { frame: 13500, 
+presented: 5634, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:25.030986Z  INFO d2_client::app::play: frame 13750: 5738 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 13750, server_tick: 5738, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 4981; audio Some(AudioStats { frame: 13750, 
+presented: 5738, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:29.217724Z  INFO d2_client::app::play: frame 14000: 5842 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 13998, server_tick: 5842, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5086; audio Some(AudioStats { frame: 14000, 
+presented: 5842, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:33.387850Z  INFO d2_client::app::play: frame 14250: 5947 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 14250, server_tick: 5947, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5190; audio Some(AudioStats { frame: 14250, 
+presented: 5947, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:37.554993Z  INFO d2_client::app::play: frame 14500: 6051 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 14500, server_tick: 6051, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5294; audio Some(AudioStats { frame: 14500, 
+presented: 6051, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:41.718368Z  INFO d2_client::app::play: frame 14750: 6155 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 14749, server_tick: 6155, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5399; audio Some(AudioStats { frame: 14750, 
+presented: 6155, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:45.884783Z  INFO d2_client::app::play: frame 15000: 6259 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 14999, server_tick: 6259, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5503; audio Some(AudioStats { frame: 15000, 
+presented: 6259, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:50.051834Z  INFO d2_client::app::play: frame 15250: 6363 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 15249, server_tick: 6363, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5607; audio Some(AudioStats { frame: 15250, 
+presented: 6363, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:54.220691Z  INFO d2_client::app::play: frame 15500: 6467 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 15500, server_tick: 6467, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5692; audio Some(AudioStats { frame: 15500, 
+presented: 6467, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:48:58.390146Z  INFO d2_client::app::play: frame 15750: 6572 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 15750, server_tick: 6572, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5776; audio Some(AudioStats { frame: 15750, 
+presented: 6572, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:49:02.678150Z  INFO d2_client::app::play: frame 16000: 6678 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 15998, server_tick: 6678, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5882; audio Some(AudioStats { frame: 16000, 
+presented: 6678, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:49:06.848228Z  INFO d2_client::app::play: frame 16250: 6783 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 16250, server_tick: 6783, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 5986; audio Some(AudioStats { frame: 16250, 
+presented: 6783, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:49:11.015807Z  INFO d2_client::app::play: frame 16500: 6887 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 16500, server_tick: 6887, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 6090; audio Some(AudioStats { frame: 16500, 
+presented: 6887, decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:49:15.180906Z  INFO d2_client::app::play: frame 16750: 6991 server ticks, 4 units in the model, unowned 
+S→C ids {}; last view Some(FrameStats { bridge_frame: 16750, server_tick: 6991, items: 132, units_drawn: 1, 
+units_hidden: 3, ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 6194; audio Some(AudioStats { frame: 16750, 
+presented: 6991, decodes: 9, load_errors: 0, engine_errors: 0 })

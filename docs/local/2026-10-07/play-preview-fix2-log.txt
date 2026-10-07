@@ -1,0 +1,49 @@
+﻿cargo :    Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+At line:1 char:569
++ ...  "sccache"; cargo run -p d2-client --release -- play --new sorceress  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...ates\d2-client):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `release` profile [optimized] target(s) in 1m 31s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --new sorceress Test 
+--frames 400`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+play: new character Test (sorceress), not saved
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T22:19:38.926751Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T22:19:39.035386Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T22:19:39.452035Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T22:19:39.452116Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T22:19:39.452967Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T22:19:39.714779Z  WARN d2_client::app::ui: unit art: DATA\GLOBAL\CHARS\SO\SH\SOSHlitTNhth.dcc: in no archive
+2026-10-07T22:19:41.714107Z DEBUG d2_client::bridge::click: click LeftDown at Some((505, 347)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs 
+[HoverCall(4616160)]
+2026-10-07T22:19:41.814406Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs [HoverCall(4616160)]
+2026-10-07T22:19:42.962850Z DEBUG d2_client::bridge::click: click LeftDown at Some((205, 258)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs 
+[HoverCall(4616160)]
+2026-10-07T22:19:43.023443Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs [HoverCall(4616160)]
+2026-10-07T22:19:43.861789Z DEBUG d2_client::bridge::click: click LeftDown at Some((502, 78)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs 
+[HoverCall(4616160)]
+2026-10-07T22:19:43.961689Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs [HoverCall(4616160)]
+2026-10-07T22:19:44.496375Z  INFO d2_client::app::play: frame 250: 105 server ticks, 4 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 104, items: 129, units_drawn: 1, units_hidden: 3, 
+ui_sent: 0, ui_unhandled: 2, gpu: true }); node frames 82; audio Some(AudioStats { frame: 250, presented: 105, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+2026-10-07T22:19:44.763669Z DEBUG d2_client::bridge::click: click LeftDown at Some((528, 372)): local Some(UnitKey { 
+unit_type: 0, guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs 
+[HoverCall(4616160)]
+2026-10-07T22:19:44.861262Z DEBUG d2_client::bridge::click: click LeftUp at None: local Some(UnitKey { unit_type: 0, 
+guid: 1 }) mode Some(5) class Some(1) cursor false skills Some((None, None, [])) outs [HoverCall(4616160)]
+2026-10-07T22:19:46.993330Z  INFO d2_client::app::play: play: exiting after 400 frames
