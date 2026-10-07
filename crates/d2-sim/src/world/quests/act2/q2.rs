@@ -323,7 +323,7 @@ fn chest<W: QuestWorld>(
             }
         }
     }
-    w.object_treasure(object, 4);
+    w.object_treasure(object, player, 4);
     chest_gold(ctl, w, object);
     0
 }

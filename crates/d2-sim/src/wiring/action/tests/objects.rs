@@ -480,3 +480,48 @@ fn refill_and_life_shrines_act_on_the_players_stat_list() {
     assert_eq!(fx.stat(p, 6), 40 << 8);
     fx.assert_clean();
 }
+
+// Covers: specs/world/quests-act2.md §1.3; specs/items/treasure.md §4 r6
+#[test]
+fn a_quest_chests_treasure_drops_through_the_lent_economy() {
+    // `0x00585B90(op, 4)` from a quest chest (`HostQuests`): the item
+    // store and game seed are the economy's while a quest call runs; the
+    // item lands in that store and the seed step is the economy's.
+    use crate::wiring::economy::{Economy, EconomyQuests, GameFields, HostQuests, ItemStore};
+    use crate::world::quests::QuestWorld;
+    let mut fx = drop_fx();
+    let o = create(&mut fx, CHEST, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    let mut want_game = fx.sim.hooks().game_seed;
+    want_game.step();
+    want_game.step();
+    let tables = super::death::drop_tables().items;
+    let mut rest = crate::wiring::interaction::tests::Rest::new();
+    let s = &mut fx.sim.sys;
+    let mut fields = GameFields::new(s.hooks.game_seed, false);
+    let mut items = std::mem::replace(&mut s.hooks.items, ItemStore::new());
+    {
+        let mut econ = Economy {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+            hooks: &mut s.hooks,
+            fields: &mut fields,
+            tables: &tables,
+            items: &mut items,
+        };
+        let mut w = HostQuests::new(EconomyQuests::new(&mut econ, &mut rest));
+        w.object_treasure(o, p, 4);
+    }
+    let d = s.hooks.object_drops.as_ref().unwrap();
+    assert!(d.failures.is_empty() && d.errors.is_empty());
+    assert_eq!(d.placed.len(), 1);
+    let item = d.placed[0].0;
+    assert!(items.get(item).is_some());
+    assert!(s.hooks.items.get(item).is_none());
+    assert_eq!(fields.seed, want_game);
+    s.hooks.items = items;
+    fx.assert_clean();
+}
