@@ -28,30 +28,30 @@
 | Inputs | 75–84 |
 | Outputs / state changes | 85–91 |
 | Rules | 92–93 |
-|   1. Model contents | 94–135 |
-|   2. Unit table | 136–181 |
-|   3. Local player | 182–204 |
-|   4. Receive and the unit message queue | 205–242 |
-|   5. Client update pass | 243–291 |
-|   6. Position check (`0x004804E0`) | 292–331 |
-|   7. Session messages | 332–442 |
-|   8. Mode requests | 443–527 |
-|   9. Room-in-sight messages | 528–562 |
-|   10. Bit reader | 563–577 |
-|   11. Current act and level (join and later) | 578–623 |
-|   12. Client DRLG and the room of a point | 624–665 |
-|   13. Visibility predicate (`0x004DBF20`) | 666–693 |
-|   14. Pet list and the hireling GUID | 694–733 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 734–800 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 801–835 |
-|   17. Model writes made by 1.14d UI code | 836–953 |
-|   18. Audio driver inputs and the client object functions | 954–984 |
-| Constants & data dependencies | 985–997 |
-| Randomness | 998–1009 |
-| Edge cases & original bugs | 1010–1018 |
-| Test vectors | 1019–1066 |
-| Provenance | 1067–1138 |
-| Open questions | 1139–1231 |
+|   1. Model contents | 94–137 |
+|   2. Unit table | 138–183 |
+|   3. Local player | 184–206 |
+|   4. Receive and the unit message queue | 207–244 |
+|   5. Client update pass | 245–293 |
+|   6. Position check (`0x004804E0`) | 294–334 |
+|   7. Session messages | 335–493 |
+|   8. Mode requests | 494–578 |
+|   9. Room-in-sight messages | 579–613 |
+|   10. Bit reader | 614–628 |
+|   11. Current act and level (join and later) | 629–674 |
+|   12. Client DRLG and the room of a point | 675–716 |
+|   13. Visibility predicate (`0x004DBF20`) | 717–744 |
+|   14. Pet list and the hireling GUID | 745–784 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 785–851 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 852–886 |
+|   17. Model writes made by 1.14d UI code | 887–1004 |
+|   18. Audio driver inputs and the client object functions | 1005–1035 |
+| Constants & data dependencies | 1036–1048 |
+| Randomness | 1049–1060 |
+| Edge cases & original bugs | 1061–1072 |
+| Test vectors | 1073–1120 |
+| Provenance | 1121–1199 |
+| Open questions | 1200–1298 |
 <!-- /index -->
 
 ## Summary
@@ -109,6 +109,8 @@ position check of the local player.
    | `in_game: bool` | `[0x007A061C]` | 0x04 (1), 0x05 (0), 0xB4 through the UI (0, §7 rule 8) |
    | `unloaded: bool` | `[0x007A0624]` | 0x04 (0), 0x05 (1) |
    | `exit_requested: bool` | `[0x007A0620]` | 0x06; 0xB4 through the UI (§7 rule 8) |
+   | `connected: bool` | `[0x007A0618]` | 0xAF (1), 0xB0 (0), 0xB4 through the UI (0) (§7 rule 10) |
+   | `ping: PingState` | `[0x007A04A0]` … `[0x007A04F0]` | the ping timer and 0x8F (§7 rule 11) |
    | `town_flag: bool` | `[0x007A5260]` | player creation (`msg-units.md` §1.1 r3), §17 rule 6 |
    | `rooms_in_sight: Vec<RoomSight>` | client DRLG room status (`drlg/rooms.md` §4) | 0x07, 0x08 (§9) |
    | `outgoing: Vec<Vec<u8>>` | client send path | §6 rule 8, §7 rule 3 |
@@ -302,9 +304,10 @@ position check of the local player.
    static-path kinds 2, 4, 5 read the static path).
 4. Tolerance T: kind 1 → 10; kind 2 → 0; any other kind: U is the local
    player → mode 1 → 3 + L, mode 3 → 7 + L, other modes → 5 + L, with
-   L = (`[0x007A04A4]` + 0x32) >> 7 (L = 0: the global is only ever
-   zeroed, by the `0x007A0480` block clears of `0x0044E200` and
-   `0x0044C890`; no other writer); U is a
+   L = (`ping.rtt` + 0x32) >> 7 (§7 rule 11: the last ping round trip
+   in ms, `[0x007A04A4]`, read through `0x0044CE60`; 0 until the first
+   0x8F and after the `0x007A0480` block clears of `0x0044E200` and
+   `0x0044C890`; L = 1 from a round trip of 78 ms); U is a
    monster in mode 3–5 → 5, mode 6–11 → 7; otherwise 15.
 5. far := |x − cx| > T. If far or |y − cy| > T: if kind = 0 and tx > 0
    (signed): d1 := (cx − x)² + (cy − y)² (`0x006492A0`); d1 ≥ 100 →
@@ -391,7 +394,7 @@ position check of the local player.
       panel is closed (`0x00456300(1, 0)`); the timer is started
       (`GetTickCount`, 0x9C4 ms); **`exit_requested` := true**
       (`[0x007A0620]`); **`in_game` := false** (`[0x007A061C]`); the
-      connection flag `[0x007A0618]` (0xAF / 0xB0, out of scope) := 0;
+      connection flag `[0x007A0618]` (`connected`, rule 10) := 0;
       `[0x0070EE8C]` := 0 (`0x0044B880`, the flag of `client/msg-ui.md`
       open question 8). The error screen
       (`0x0044CB60`: the string of error n; codes 0x14 / 0x15 add a line
@@ -439,6 +442,54 @@ position check of the local player.
    REC-46. Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
+10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
+    handler `0x0045C850`, jump table `0x0045C894` indexed by id − 0xAF;
+    2026-10-08 read): 0xAF (`0x0045C86C`) → `connected` := 1; u8@1 is
+    not read. 0xB0 (`0x0045C877`) → `connected` := 0. Both are direct
+    sends (`sim/intents-events.md` §3.3 rule 5) and occur in single
+    player: `af 00` twice (the first at the join) and `b0` once in each
+    of both recordings (`-015956`, `-022633`; senders `0x0052B780`,
+    `0x0053B220`). Other writers of 0: `0x0044E380` (rule 8.2), the
+    exit send `0x00477EE0` (`client/msg-ui.md` §3 code 23) and
+    `0x00453910`. Readers (UI / start-up, Phase 6): the system-message
+    pump `0x0044BAD0` returns `connected` ≠ 0 after each message,
+    `0x0044BD20` returns `connected` = 0, and the watchdog
+    `0x0044EEC0` calls `0x0044E380(6)` when `connected`, `in_game`,
+    `exit_requested` and `unloaded` are all 0 only for game types 7
+    and 9 (hosted, out of scope), so never in single player.
+11. **0x8F** Pong (`0x0045EB00` → `0x0044CDB0`, 33 bytes; 2026-10-08
+    read) and the ping timer. `PingState` fields: `next_ms`
+    `[0x007A049C]`, `sent_ms` `[0x007A04A0]`, `rtt` `[0x007A04A4]`,
+    `samples` `[0x007A04CC]`, `mean` `[0x007A04D0]`, `pong: [u32; 8]`
+    `[0x007A04D4]`…`[0x007A04F0]`.
+    1. Timer (`0x0044CD70`, and the same code inline in the game loop
+       `0x0044EFA0`): now := `GetTickCount()`; `next_ms` < now → the
+       C→S 0x6D builder `0x00477DD0` runs (reads `pong[5..8]`, Battle.net
+       / transport, `sim/intents-events.md` §4 rule 4), `sent_ms` :=
+       now, `next_ms` := now + 5000.
+    2. 0x8F: `pong[i]` := u32@(1 + 4i), i = 0…7; then `pong[4]` :=
+       `GetTickCount()` (overwrites u32@17); `rtt` := `GetTickCount()` −
+       `sent_ms`; while `samples` < 10: `mean` := (`mean` · `samples` +
+       `rtt`) / (`samples` + 1) (u32, truncating), `samples` += 1. Read
+       by §6 rule 4 (`rtt`, `0x0044CE60`) and `0x0044CE70` (`mean`).
+    3. Single player (both recordings, 33 and 32 records): every 0x8F is
+       33 zero bytes, sent 2.7–48.7 ms after the matching C→S 0x6D
+       (server send time; the client's receive time is not recorded).
+    4. d2rs: the in-process link has no transport delay, so the bridge
+       sends no 0x6D and receives no 0x8F; `rtt` stays 0 and §6 rule 4
+       uses L = 0. A 1.14d single-player round trip of 78 ms or more
+       (one client frame plus one server tick can exceed it) gives L =
+       1 there: open question 18.
+12. **0xB3** DownloadSave (handler `0x0045C620`, which appends the
+    chunk to a client buffer and at `total` calls the save writer
+    `0x0045C520`, `formats/d2s.md` §2.7 rule 3): **unused in single
+    player: never sent by the 1.14d server in a single-player game.**
+    Its only sender `0x0052E110` runs for game type 1 or 2
+    (`sim/intents-events.md` §3.2 rule 5; the leave drain of §2.5
+    rule 2 there is gated the same way); the single-player game type is
+    3 (§2.5 rule 2 there). No record in either recording. The d2rs
+    handler is
+    the no-op of `client/bridge.md` §6 rule 7.
 
 ### 8. Mode requests
 
@@ -1014,7 +1065,10 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
   (`msg-units.md` §4); the model uses 0.
 - A replacing add (§2 rule 4) of the local player clears
   `local_player` until the next 0x0B.
-- `[0x007A04A4]` has no direct writer (§6 rule 4, open question 3).
+- `[0x007A04A4]` (`ping.rtt`) is written only by the 0x8F handler
+  `0x0044CDB0` (§7 rule 11), code the `all.asm` export does not cover
+  (it is reached by the jump at `0x0045EB00`), which is why open
+  question 3 first found no writer.
 
 ## Test vectors
 
@@ -1094,6 +1148,13 @@ Ghidra backlog (2026-10-06): mode machines `0x00461250` (jump tables
 (only `0x0061A840` sets bit 23), update `0x00480810`, C→S 0x4B
 `0x004786A0`; `[0x007A04A4]`: all references (reader `0x0044CE60`,
 block clears `0x0044E200` / `0x0044C890`).
+Dispatch owners session (2026-10-08, `tools/ghidra/disasm.py fn` over the
+image, since `all.asm` lacks the code at `0x0044CDB0`): 0x8F
+`0x0045EB00` → `0x0044CDB0`, ping timer `0x0044CD70` / `0x0044EFA0`,
+0x6D builder `0x00477DD0`; system handler `0x0045C850` and its jump
+table (0xAF, 0xB0, 0xB2, 0xB3 `0x0045C620`); `[0x007A0618]` writers and
+readers in `all.asm`; packet counts and 0x6D → 0x8F delays from both
+`traces/raw/*-packets.jsonl` recordings.
 Join-update session (2026-10-06): 0x03 builder `0x0053ABE0` (callers
 `0x0052C210`, `0x0053ACC0`), `0x0053B390`, `0x005382B0`, `0x0061AE80`,
 `0x0061C330`; act lookup `0x00619DA0`, room level `0x0061A1B0`;
@@ -1155,8 +1216,9 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    at the last server-sent position (the message rules of §8 /
    `client/msg-units.md`), no local prediction (because d2rs runs client and server in one
    process with no latency); settled by REC-51.
-3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 (only zeroed; L = 0). A
-   memory read during play confirms.
+3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
+   (2026-10-08 correction: the ping round trip written by 0x8F, not
+   only zeroed); the single-player value is open question 18.
 4. ~~Unit flag 0x800000~~: answered in §5 rule 5 (room free
    `0x0061A840`).
 5. ~~The client DRLG as a d2rs component~~: answered in §12 (the
@@ -1228,3 +1290,8 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
     the receive per frame (frame skip, minimized window). It matters
     only when the fallback repeats (a skill-0 entry with level ≤ 0).
     Settle by reading `0x0044C990`'s callers.
+18. §7 rule 11.4: how often a 1.14d single-player ping round trip
+    (`ping.rtt`) reaches 78 ms, giving the local player's position
+    tolerance L = 1 in §6 rule 4 where d2rs uses 0. Settle with a memory
+    read of `[0x007A04A4]` during play, or by recording the client's
+    receive time of 0x8F beside the 0x6D send time.

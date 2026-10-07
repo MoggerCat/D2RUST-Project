@@ -37,24 +37,24 @@
 |   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 408–441 |
 |   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–470 |
 |   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 471–481 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 482–490 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 491–500 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 501–513 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 514–522 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 523–533 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 534–636 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 637–649 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 650–660 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 661–680 |
-|   20. 0x61 act video (`0x0045E660`) | 681–688 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 689–696 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 697–706 |
-| Constants & data dependencies | 707–718 |
-| Randomness | 719–723 |
-| Edge cases & original bugs | 724–740 |
-| Test vectors | 741–788 |
-| Provenance | 789–849 |
-| Open questions | 850–969 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 482–494 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 495–504 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 505–517 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 518–526 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 527–537 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 538–640 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 641–653 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 654–664 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 665–684 |
+|   20. 0x61 act video (`0x0045E660`) | 685–692 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 693–700 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 701–710 |
+| Constants & data dependencies | 711–722 |
+| Randomness | 723–727 |
+| Edge cases & original bugs | 728–744 |
+| Test vectors | 745–792 |
+| Provenance | 793–853 |
+| Open questions | 854–973 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -487,6 +487,10 @@ layer.
 2. The UI layer: the name (byte 15 forced to 0) is converted to wide
    text into `[0x007C0E84]` (`0x00526F20`); `[0x007C0E60]` := GUID (the
    partner §3 code 0x0A plays its sound on).
+3. **0x79** GoldInTrade (`0x0045E850`, 6 bytes): **Out of scope
+   (Phases 0–6): multiplayer only** (trade gold, `sim/intents-events.md`
+   §4 rule 4; no record in either recording). The d2rs handler is the
+   no-op of `client/bridge.md` §6 rule 7.
 
 ### 12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`)
 
