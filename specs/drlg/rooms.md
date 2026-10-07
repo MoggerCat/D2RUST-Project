@@ -35,14 +35,14 @@
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
 |   7. Room clients and the inactivity counter | 446–466 |
 |   8. Deactivation (tick step 9) | 467–530 |
-|   9. Room tile grid | 531–1119 |
-|   10. Collision map from tiles | 1120–1198 |
-| Constants & data dependencies | 1199–1213 |
-| Randomness | 1214–1231 |
-| Edge cases & original bugs | 1232–1249 |
-| Test vectors | 1250–1297 |
-| Provenance | 1298–1341 |
-| Open questions | 1342–1449 |
+|   9. Room tile grid | 531–1172 |
+|   10. Collision map from tiles | 1173–1251 |
+| Constants & data dependencies | 1252–1266 |
+| Randomness | 1267–1284 |
+| Edge cases & original bugs | 1285–1302 |
+| Test vectors | 1303–1353 |
+| Provenance | 1354–1397 |
+| Open questions | 1398–1505 |
 <!-- /index -->
 
 ## Summary
@@ -934,11 +934,64 @@ tile record in a neighbour. `0x0066E940` (args: type, packed v, wx, wy):
      record (step 1), R +0x20 is the record chained into N's list just
      before R, not R's own half (D2MOO: same); if R is the oldest record
      of its chain (+0x20 null) 1.14d writes through a null pointer
-     (open question 12).
+     (open question 13).
      R type ≠ 3 and m = 3: R gets flags 0xC008 (layer 3,
      hidden), collision update, then **choose (3, v) on this room's
      seed** and add a new type-3 wall record (plus its type-4 half, a
      second draw) to this room's non-floor link list.
+     Exact rules (`0x0066E7FD`–`0x0066E8B6`; they run once m is fixed by
+     rules 1–4, rule 2 included, and before the type change below). Names:
+     H = R's own type-4 half (only when R has type 3), P = R +0x20.
+     - C1. **Chain shape.** A link chain grows only by prepends: `0x0066E620`
+       passes the node's chain head (`0x0066E703`), and `0x0066DC50`
+       passes the **same** head to its own type-4 call (`0x0066DD0A`).
+       Head first, a corner pair therefore reads `…, H, R, P, …` with
+       H +0x20 = R. P is the record prepended to the same chain just
+       before R was made (a wall, a shadow, or an older pair's type-4
+       half; any cell of N), or null if R was the first record of that
+       chain. Wall warp tile records never enter a link chain (they go to
+       the warp entry's chain, `0x0066E337`). Find (step 1) skips type 4,
+       so it never returns H.
+     - C2. **When m ≠ 3 can meet R type 3.** Every `table` row maps R
+       type 3 to 3 (column `r3`), so m ≠ 3 with R type 3 only comes from
+       rule 1 (v bit 7, m = t), rule 2 (door t at this room's top/left
+       edge) or `keep` (t 4, 10–12, 14–19; t 0 searches the floor list).
+     - C3. **R type 3, m ≠ 3.** One write: P flags |= 0x8 (`0x0066E8A7`).
+       Then `0x0064C860`(N's active room N +0x30, P, 0) (`0x0066E8B6`),
+       called even when N +0x30 is 0, where it returns at once
+       (`0x0064C86A`). R and H are not written by this rule. H is never
+       reached by any rule of §9.6: it keeps type 4, its tile and its
+       flags, so after the type change the cell holds R (type m) and H
+       (type 4, still shown unless its own flags hide it). d2rs must
+       model the chain order (C1) and hide P, never H.
+     - C4. **R type 3, m ≠ 3, P null.** 1.14d faults at `0x0066E8A7`
+       (write to address 0x14); whether 1.14d data ever reaches it is
+       open question 13. d2rs: fatal DRLG error (no outcome to match).
+     - C5. **R type ≠ 3, m = 3**, in this order:
+       1. R flags |= 0xC008 (`0x0066E810`).
+       2. `0x0064C860`(N +0x30, R, 0) (`0x0066E822`), no null test (as C3).
+       3. This room's non-floor node: the first node in this room's node
+          list (tile grid +0x00) with floor flag 0; if none, a new node
+          {0, null, old head} becomes the list head (`0x0066E827`–
+          `0x0066E86F`).
+       4. Choose (3, v) on **this room's** seed (`0x0066E87C`).
+       5. `0x0066DC50`(this room, that node's chain, wx, wy, v, tile, 3)
+          (`0x0066E895`): new record S3 prepended, its flag rules with v,
+          then choose (4, v) on this room's seed and S4 prepended, its
+          flags. This room's chain then reads `S4, S3, …`. S3 and S4 are
+          new records at (wx, wy) of this room; R is not linked to them.
+     - C6. **R type 3, m = 3** and **R type ≠ 3, m ≠ 3**: no corner write.
+     - C7. **After the corner rules.** The type-change bullet below runs
+       next for every case: in C5 R's type (≠ 3) differs from m, so R is
+       re-chosen as type 3 on **N's** seed after the two draws of C5 and
+       becomes a type-3 record with no half of its own; in C3 R becomes
+       type m. The closing flag re-run acts on R only: its cell-bit-31
+       rule clears 0x8 unless v has bit 31 (bit 26 sets it again, 0x20C),
+       so R's 0x8 from C5.1 survives only with v bit 31 or 26; 0xC000
+       stays (flags are OR'd). P's 0x8 from C3 is never cleared here.
+       Draw order for one found cell: C5's draws (3, then 4; this room's
+       seed), then the type-change draw (N's seed).
+     Synthetic vectors: §Test vectors (rows "§9.6 C3", "§9.6 C5").
    - If m differs from R's type, or R is a floor showing
      key (30, 0): **choose (merged type, v) on N's seed** (the
      neighbour's room seed, `0x0066E8F7` passes N), set R's type to m and
@@ -1260,6 +1313,9 @@ Synthetic (rules; CI-safe):
 | list [A=(0,0,8,8), B=(8,8,8,8), C=(8,0,8,8)] | [A,C,B] | §3.2 |
 | adjacency [R, X, Y, Z]; remove X | [R, Z, Y] | §6.3 |
 | counter 0, no client, 11 passes, test true | removed on pass 11 | §7.3 |
+| §9.6 C3. N filled linked non-floor cells A = (20,10) type 1 (record W), then B = (20,11) type 3 (R, half H): N's chain H → R → W → null. This room fills B: linked + wall bits, t = 12 (`keep`), v bits 7, 26, 31 clear, layer 0, no doors | find returns R (H skipped); m = 12; W flags \|= 0x8 (W is at A, not B); collision update for W (none if N inactive); choose (12, v) on N's seed, R type 12; flag re-run on R (0x8 clear); H unchanged (type 4, visible); 0 draws on this room's seed | §9.6 C1, C3, C7 |
+| §9.6 C5. N's chain W → null, W type 1 at B = (20,11). This room fills B: t = 3 (`table`, column r1 = 3), same v | m = 3; W flags \|= 0xC008, collision update for W; this room: non-floor node, choose (3, v), S3, choose (4, v), S4 (2 draws, this room's seed; chain S4 → S3); then choose (3, v) on N's seed, W type 3; flag re-run clears W's 0x8 (v bit 31 clear), W keeps 0xC000 | §9.6 C5, C7 |
+| §9.6 C4. N's chain H → R → null (R type 3 first in its chain); this room fills R's cell with t = 12 | 1.14d faults (null P); d2rs fatal error | §9.6 C4 |
 
 Recorded:
 
