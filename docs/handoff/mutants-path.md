@@ -9,21 +9,41 @@ files (M09). Tool: `cargo-mutants` 27.1.0, `-p d2-sim --file
 (`CARGO_PROFILE_DEV_DEBUG=0`). **Stopped early on the coordinator's
 budget call**: the run is incomplete (below) and no "after" run was made.
 
-## 0. Status after the base merge (2026-10-06, later)
+## 0. Status (2026-10-07, test-hardening session)
 
-Merged `origin/claude/tender-meitner-mphas3`; the walk module there was
-reworked (core `DynamicPath` records and `PathTables`, one context
-object for `PathWorld` + `WalkUnits`, new `tests/fake.rs`). The 50 tests
-of §1 no longer compile against it (61 errors) and the port was not
-close, so on the coordinator's budget call they were **removed from the
-tree** in the merge commit; they live at `e7c10b5`
-(`crates/d2-sim/src/path/mutant_tests.rs`,
-`crates/d2-sim/src/path/walk/mutant_tests.rs`). Next session: restore
-both from `e7c10b5` (`git show e7c10b5:<path>`), port them to the new
-API without weakening any assertion (same scenarios and expected
-values), add the `mod` lines back (`path/mod.rs` keeps `gap_tests` too),
-gate, then the steps of §4. Sections 1–3 describe the tests as written
-at `e7c10b5`.
+The merge `6b6aa1b` took the 50 tests of §1 out of the tree (they no
+longer compiled against the reworked walk API). This session merged
+`origin/main` (clean; at `674996d` the branch differed from main only
+by this note, so no test of main was disabled, ignored or weakened by
+this branch) and **restored all 50 tests** from `e7c10b5`, ported to the
+current API:
+
+- `path/mutant_tests.rs` (7): `TileRect` / `Point` for the removed
+  `RoomRect` / `SubPoint`; the test rooms implement `PathMotion`
+  (teleport now takes one context).
+- `walk/mutant_tests.rs` (43): uses the walk tests' `fake` module
+  directly (`tests/mod.rs`: `pub(super) mod fake`) instead of the
+  `#[path]` re-include; one `Ctx` for world + units + game; `WalkPath`
+  → `DynamicPath` (`set_path_type`, `put_target`, `final_target()`,
+  `cur_point` / `point_count`); `request` / `interrupt_check` /
+  `mode_check` take the context. `tests/fake.rs` gains two seams the
+  old wrapper overrode: `FakeUnits::door` (door orientation) and
+  `FakeUnits::no_town` (`monster_can_be_in_town` false).
+- Same scenarios and expected values everywhere except the two lead
+  tests (`refresh_point_lead_only_for_players_and_monsters`,
+  `compute_target_lead`): pathing.md §3 "Target lead" now states the
+  lead byte has no writer in 1.14d, so the lead is 0 and the code
+  dropped the lead seam. Both now assert the spec's value (target =
+  the unit's position); the old lead offsets (22, 21) have no spec
+  basis any more.
+
+Gate on this branch: `CARGO_INCREMENTAL=0 cargo test -p d2-sim -p
+d2-server` all pass (d2-sim lib 3,195 pass; ignored ones are the
+game-file tests, as on main), `cargo clippy -p d2-sim -p d2-server
+--all-targets -D warnings`, `cargo fmt --check`, `coverage.py --check`
+(0 errors), `spec_index.py --check`, `methods.py check`. No test
+disabled. Next: §4 (measure kills; `step.rs` survivors). Sections 1–3
+describe the tests as written at `e7c10b5`.
 
 ## 1. State
 

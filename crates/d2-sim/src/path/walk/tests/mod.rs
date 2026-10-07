@@ -2,7 +2,7 @@
 //! fakes of [`fake`].
 
 mod answers;
-mod fake;
+pub(super) mod fake;
 mod gaps;
 mod messages;
 

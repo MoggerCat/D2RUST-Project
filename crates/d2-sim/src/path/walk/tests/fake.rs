@@ -236,6 +236,10 @@ pub struct FakeUnits {
     pub ring: ResyncRing,
     pub game_type: u8,
     pub type15_reaches: bool,
+    /// Door orientation of every unit (`None`: not a door).
+    pub door: Option<bool>,
+    /// Monsters may not be in town (`0x0063E860` false).
+    pub no_town: bool,
 }
 
 impl FakeUnits {
@@ -360,6 +364,12 @@ impl WalkUnits for Ctx {
     }
     fn torso_speed(&self, unit: UnitId) -> Option<i32> {
         self.u.units[&unit].torso_speed
+    }
+    fn door_orientation(&self, _unit: UnitId) -> Option<bool> {
+        self.u.door
+    }
+    fn monster_can_be_in_town(&self, _unit: UnitId) -> bool {
+        !self.u.no_town
     }
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.u.client_players.get(&client).copied()

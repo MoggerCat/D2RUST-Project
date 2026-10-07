@@ -34,6 +34,8 @@ pub mod warp;
 #[cfg(test)]
 mod gap_tests;
 #[cfg(test)]
+mod mutant_tests;
+#[cfg(test)]
 mod tests;
 
 pub use collision::CollisionRooms;
