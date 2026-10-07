@@ -142,6 +142,12 @@ impl<T: Copy> Pool<T> {
             .filter_map(|(i, s)| s.as_ref().map(|r| (i, r)))
     }
 
+    fn set(&mut self, i: usize, rec: T) {
+        if let Some(slot) = self.slots.get_mut(i).filter(|s| s.is_some()) {
+            *slot = Some(rec);
+        }
+    }
+
     fn slot_mut(&mut self, i: usize) -> Option<&mut T> {
         self.slots.get_mut(i).and_then(Option::as_mut)
     }
@@ -474,6 +480,9 @@ pub struct Weather {
     pub thunder: bool,
     /// Weather update mark `[0x007A8A0C]`.
     pub mark: u32,
+    /// The particle-move counter `F` (`[0x007A8A34]`, §11.9 r3): `.bss`,
+    /// never reset.
+    pub move_counter: u32,
     resources: Option<ActResources>,
 }
 
@@ -517,6 +526,7 @@ impl Weather {
             lightning_trigger: 0,
             thunder: true,
             mark: 0,
+            move_counter: 0,
             resources: None,
         }
     }
@@ -745,11 +755,13 @@ impl Weather {
             // §11.2 r3: intensity := 0.0, the target is kept.
             self.intensity_256 = 0;
         } else {
+            // PROVISIONAL (render/draw-order-2.md §11.2 r3 vs §11.9 r3; REC-??):
+            // the move runs only when particles are live (§11.2 r3), so `F`
+            // counts those calls; §11.9 r3's "even with an empty pool" is
+            // read as a pool emptied during the call. Settled by a weather
+            // capture with the rain / snow state per frame (capture.md §3.4).
             if self.particles.live() != 0 {
-                return Err(WeatherError::Open {
-                    question: 3,
-                    what: "particle move 0x004732C0",
-                });
+                self.move_particles(seed, input)?;
             }
             let frames = self.resources.ok_or(WeatherError::NotLoaded)?.splash_frames;
             update_pool(&mut self.splashes, &frames, input.camera_delta);
@@ -760,6 +772,73 @@ impl Weather {
             let frames = self.resources.ok_or(WeatherError::NotLoaded)?.bubble_frames;
             update_pool(&mut self.bubbles, &frames, input.camera_delta);
         }
+        Ok(())
+    }
+
+    /// The particle move `0x004732C0` (§11.9), once per weather update
+    /// while particles are live. Landed particles with no bounce left are
+    /// freed and replaced by one spawn on the player seed while the live
+    /// count is under the target.
+    fn move_particles(&mut self, seed: &mut Seed, input: &UpdateInput) -> Result<(), WeatherError> {
+        let (wc, ws) = drop_direction(self.wind);
+        // Step 1: the speed factor, float32.
+        let f: f32 = if self.snow_mode {
+            (wc.abs() as f32).max(0.25)
+        } else {
+            let intensity = (self.intensity_256 as f32) * (1.0 / 256.0);
+            (f64::from(intensity) * 0.15 + 0.85) as f32
+        };
+        let (dx, dy) = input.camera_delta;
+        let width = input.frame.width;
+        let sine = sine_table();
+        let mut i = 0;
+        // Step 2: slots 0 … highest used index, in order.
+        while i < self.particles.end() {
+            let Some(mut p) = self.particles.get(i).copied() else {
+                i += 1;
+                continue;
+            };
+            let a = (f64::from(p.shape_14) * f64::from(f)) as i32;
+            let mut ux = (wc * f64::from(a)) as i32;
+            let uy = (ws * f64::from(a)) as i32;
+            p.y += uy - dy;
+            if p.y > p.ground_y {
+                p.landed = true;
+            }
+            self.particles.set(i, p);
+            if p.landed {
+                if p.bounces == 0 {
+                    self.particles.free(i);
+                    if (self.particles.live() as u64) < u64::from(self.target) {
+                        self.spawn_particle(seed, input)?;
+                    }
+                } else {
+                    ux = 0;
+                    p.shape_14 = 0;
+                    p.bounces -= 1;
+                    self.particles.set(i, p);
+                }
+            }
+            // Step 2.4 on whatever now lives in the slot (the spawn can
+            // reuse the slot just freed; it keeps the freed `ux`).
+            if let Some(mut q) = self.particles.get(i).copied() {
+                if self.snow_mode && !q.landed {
+                    let arg = (self.move_counter.wrapping_mul(512) / 25).wrapping_add(q.phase);
+                    ux += (2.0 * f64::from(sine[(arg & 511) as usize])) as i32;
+                }
+                q.x += ux - dx;
+                if q.x >= width {
+                    q.x -= width;
+                }
+                if q.x < 0 {
+                    q.x += width;
+                }
+                self.particles.set(i, q);
+            }
+            i += 1;
+        }
+        // Step 3.
+        self.move_counter = self.move_counter.wrapping_add(1);
         Ok(())
     }
 

@@ -214,11 +214,11 @@ fn line_switches_rooms() {
     );
 }
 
-fn unit(room: Option<RoomId>, x: i32, y: i32, size: u32) -> SightUnit {
+fn unit(room: Option<RoomId>, x: i32, y: i32, size: i32) -> SightUnit {
     SightUnit { room, x, y, size }
 }
 
-// Covers: specs/render/draw-order-2.md §15 r2
+// Covers: specs/render/draw-order-2.md §15 r2, §15.1 r4, §15.1 r5
 #[test]
 fn sight_vectors() {
     let a = unit(R0, 10, 10, 2);
@@ -229,7 +229,7 @@ fn sight_vectors() {
     assert_eq!(sight_line(&a, &unit(None, 11, 11, 1)), None);
 }
 
-// Covers: specs/render/draw-order-2.md §15 r2
+// Covers: specs/render/draw-order-2.md §15 r2, §15.1 r3, §15.1 r4, §15.1 r5
 #[test]
 fn sight_sizes_and_pulling() {
     // Sizes ≥ 3 read as 2: 3 + 1 → 3, so dx + dy = 3 is not < 3.
@@ -275,4 +275,20 @@ fn sight_hidden_gates_and_line() {
     h.set(0, 0, bits::VISIBLE);
     h.set(6, 0, bits::VISIBLE);
     assert_eq!(sight_hidden(true, &a, &b, &h), Ok(false));
+}
+
+// Covers: specs/render/draw-order-2.md §15.1 r3, §15.1 r5
+#[test]
+fn sight_negative_sizes_are_kept_and_equal_coordinates_pull_backwards() {
+    // A negative size is kept (not clamped to 0): sa + sb = 0, so
+    // dx + dy = 0 < 0 is false and a line is made. Equal coordinates take
+    // the "else" branch of the pull (a −= sa, b += sb): (5 − (−1), 5 + 1).
+    let a = unit(R0, 5, 5, -1);
+    let b = unit(None, 5, 5, 1);
+    assert_eq!(sight_line(&a, &b), Some(((6, 6), (6, 6))));
+    // A large size is capped at 2 whichever end it is on.
+    assert_eq!(
+        sight_line(&unit(R0, 0, 0, 1), &unit(None, 10, 0, 9)),
+        Some(((1, 0), (8, 0)))
+    );
 }

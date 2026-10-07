@@ -277,3 +277,54 @@ fn reader_errors() {
         Err(ReadError::UnknownCode(*b"zzz "))
     );
 }
+
+/// The decoder's rebuilt fields (`vendors-2.md` §7.3.1 rules 4, 5): a
+/// compact record gets item level 1, quality 2, seed field 0 and the
+/// suffix slot 0 of its scroll / tome code; a full record's level below
+/// 1 reads as 1 and a unique's index at or above the `uniqueitems` count
+/// as −1.
+// Covers: specs/world/vendors-2.md §7.3.1 r4, §7.3.1 r5
+#[test]
+fn decoder_rebuilds_level_quality_and_unique_index() {
+    let mut c = codes();
+    push_item(&mut c.t, item_rec(ty::BOOK, b"isc "));
+    let compact = |code: &[u8; 4]| StreamItem {
+        flags: 0x10,
+        compact: true,
+        version: 101,
+        code: *code,
+        unit28: 0x1234,
+        ..StreamItem::default()
+    };
+    let (bytes, _) = write_save(&compact(b"tsc "), &c.t.isc).unwrap();
+    let r = read_save_entry(&bytes, &c.t).unwrap().item.item;
+    assert_eq!((r.ilvl, r.quality, r.unit28, r.suffix[0]), (1, 2, 0, 0));
+    let (bytes, _) = write_save(&compact(b"isc "), &c.t.isc).unwrap();
+    assert_eq!(
+        read_save_entry(&bytes, &c.t).unwrap().item.item.suffix[0],
+        1
+    );
+    let (bytes, _) = write_save(&compact(b"hp1 "), &c.t.isc).unwrap();
+    let r = read_save_entry(&bytes, &c.t).unwrap().item.item;
+    assert_eq!((r.ilvl, r.quality, r.suffix[0]), (1, 2, 0));
+    // Full record: level 0 reads as 1.
+    let mut cap = full(&c, b"cap ");
+    cap.ilvl = 0;
+    let (bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    assert_eq!(read_save_entry(&bytes, &c.t).unwrap().item.item.ilvl, 1);
+    // Unique: index below the count is kept, at the count it is −1.
+    let n = c.t.uniques.len() as i32;
+    let mut u = full(&c, b"cap ");
+    u.quality = 7;
+    for (idx, want) in [(n - 1, n - 1), (n, -1), (n + 40, -1)] {
+        if idx < 0 {
+            continue;
+        }
+        u.file_index = idx;
+        let (bytes, _) = write_save(&u, &c.t.isc).unwrap();
+        assert_eq!(
+            read_save_entry(&bytes, &c.t).unwrap().item.item.file_index,
+            want
+        );
+    }
+}

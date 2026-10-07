@@ -21,7 +21,7 @@ mod tests;
 pub const SIGHT_MASK: u16 = bits::VISIBLE;
 
 /// Sizes at or above this read as [`SIZE_CAP`] (§15 r2).
-const SIZE_CAP: u32 = 2;
+const SIZE_CAP: i32 = 2;
 
 /// Result of the line test (§16).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,7 +60,9 @@ pub struct SightUnit {
     pub room: Option<RoomId>,
     pub x: i32,
     pub y: i32,
-    pub size: u32,
+    /// Signed (a monster's `SizeX` is): negative values are kept
+    /// (`draw-order-2.md` §15.1 r3).
+    pub size: i32,
 }
 
 /// Line test `0x0064E260` (§16): room `room`, `from` → `to` in sub-tiles,
@@ -152,8 +154,8 @@ pub fn line_test<R: CollisionRooms + ?Sized>(
 /// test and the end pulling, or `None` when the units are close enough to
 /// pass without a line test.
 pub fn sight_line(a: &SightUnit, b: &SightUnit) -> Option<((i32, i32), (i32, i32))> {
-    let sa = a.size.min(SIZE_CAP) as i32;
-    let sb = b.size.min(SIZE_CAP) as i32;
+    let sa = a.size.min(SIZE_CAP);
+    let sb = b.size.min(SIZE_CAP);
     let (mut ax, mut ay, mut bx, mut by) = (a.x, a.y, b.x, b.y);
     let dx = (bx - ax).abs();
     let dy = (by - ay).abs();
@@ -164,12 +166,12 @@ pub fn sight_line(a: &SightUnit, b: &SightUnit) -> Option<((i32, i32), (i32, i32
         // Each end moves its size toward the other on the pulled axis;
         // the axis distance is non-zero there (dx = dy = 0 passed above).
         if dy <= dx {
-            let s = if bx < ax { -1 } else { 1 };
+            let s = if ax < bx { 1 } else { -1 };
             ax += s * sa;
             bx -= s * sb;
         }
         if dy >= dx {
-            let s = if by < ay { -1 } else { 1 };
+            let s = if ay < by { 1 } else { -1 };
             ay += s * sa;
             by -= s * sb;
         }

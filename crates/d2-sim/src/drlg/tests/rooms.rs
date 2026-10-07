@@ -615,3 +615,33 @@ fn client_build_timer_skips_after_two_builds_and_wraps_from_zero() {
     let s = Drlg::create(0, INIT, 0, 1, false, &w.data, &mut w.types).unwrap();
     assert_eq!(s.build_timer_reset(), 7);
 }
+
+// Covers: specs/drlg/rooms.md §4.6 r11
+#[test]
+fn client_build_timer_cursor_on_a_room_not_at_status_2_restarts_at_the_first_room() {
+    let (mut w, mut d, r) = row_world();
+    let mut svc = w.svc();
+    d.set_in_sight_at(&mut svc, 2, 8, 0, None).unwrap();
+    let two = d.status_list(2).to_vec();
+    // A cursor whose room is not at status 2 (a freed room reads so, rule
+    // 11; status 4 here) restarts at the first room of the list.
+    d.build_cursor = BuildCursor::Room(r[4]);
+    d.build_timer = 1;
+    d.builds_since_update = 0;
+    let mut svc = w.svc();
+    assert_eq!(d.client_build_timer(&mut svc).unwrap(), [two[0]]);
+}
+
+// Covers: specs/drlg/levels.md §11.6 r2
+#[test]
+fn rooms_built_in_one_burst_head_the_act_list_newest_first() {
+    let (mut w, mut d, r) = row_world();
+    let mut built = Vec::new();
+    for &id in &r[..3] {
+        let mut svc = w.svc();
+        built.push(d.stream_room(&mut svc, id).unwrap().unwrap());
+    }
+    // The room pass walks from the head: the reverse of the build order.
+    let walk = w.lists.active_rooms(0);
+    assert_eq!(walk, [built[2], built[1], built[0]]);
+}

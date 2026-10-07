@@ -14,7 +14,9 @@ struct Rest {
     player: UnitId,
     quests: PlayerQuests,
     inventory: Vec<UnitId>,
+    cursor: Option<UnitId>,
     log: Vec<String>,
+    sent: Vec<(UnitId, Vec<u8>)>,
 }
 
 impl Rest {
@@ -23,7 +25,9 @@ impl Rest {
             player,
             quests: PlayerQuests::default(),
             inventory: Vec::new(),
+            cursor: None,
             log: Vec::new(),
+            sent: Vec::new(),
         }
     }
 }
@@ -66,12 +70,16 @@ impl QuestRest for Rest {
     fn attach_sound(&mut self, _: UnitId, sound: u16) {
         self.log.push(format!("sound {sound}"));
     }
-    fn send(&mut self, _: UnitId, msg: &[u8]) {
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.log.push(format!("send {:02x}", msg[0]));
+        self.sent.push((player, msg.to_vec()));
     }
     fn send_text_list(&mut self, _: UnitId, _: UnitId, _: &[(u16, u32)]) {}
     fn inventory(&self, _: UnitId) -> Vec<UnitId> {
         self.inventory.clone()
+    }
+    fn quest_cursor_item(&self, _: UnitId) -> Option<UnitId> {
+        self.cursor
     }
     fn delete_item(&mut self, _: UnitId, code: [u8; 4]) {
         self.log
@@ -402,4 +410,119 @@ fn quest_updater_runs_at_tick_step_8() {
     run(&mut game, &mut ctl, &mut rest, 100);
     assert_eq!(ctl.tick, 5);
     assert_eq!(rest.log, ["send 5d"]);
+}
+
+/// `quests-helpers.md` §8 (`0x00558110`): the cursor item first (its
+/// record's `quest` and stat 356 against the difficulty,
+/// `questdiffcheck` not tested), then the inventory list in order with
+/// page 1 skipped (`quest`, `questdiffcheck` and stat 356 tested); none
+/// otherwise.
+// Covers: specs/world/quests-helpers.md §8 r2, §8 r3, §8 r4
+#[test]
+fn find_item_by_code_cursor_then_list() {
+    let mut w = World::new();
+    let p = w.spawn(UnitType::Player, 0);
+    w.fields.difficulty = 1;
+    let make = |w: &mut World| {
+        let mut rq = ItemRequest {
+            item: HORADRIC_MALUS as i32,
+            format: 101,
+            quality: q::NORMAL,
+            ..ItemRequest::default()
+        };
+        let spawn = ItemSpawn {
+            room: None,
+            mode: 0,
+            init_flags: 1,
+        };
+        w.econ().create_item(&mut rq, false, spawn).unwrap()
+    };
+    let a = make(&mut w);
+    let b = make(&mut w);
+    let mut rest = Rest::new(p);
+    let find = |w: &mut World, rest: &mut Rest| {
+        let mut e = w.econ();
+        EconomyQuests::new(&mut e, rest).find_item(p, *b"hdm ")
+    };
+    // Rule 4: nothing anywhere.
+    assert_eq!(find(&mut w, &mut rest), None);
+    // The malus record is a quest item; with questdiffcheck set, stat 356
+    // (0) < difficulty (1) skips the list entry.
+    assert_ne!(w.tables.items[HORADRIC_MALUS].quest, 0);
+    w.tables.items[HORADRIC_MALUS].questdiffcheck = 1;
+    rest.inventory = vec![a, b];
+    assert_eq!(find(&mut w, &mut rest), None);
+    // Stat 356 ≥ difficulty on the second item: it is the one found.
+    w.set_stat(b, 356, 1);
+    assert_eq!(find(&mut w, &mut rest), Some(b));
+    // Items on page 1 (trade) are skipped.
+    w.items.get_mut(b).unwrap().inv_page = 1;
+    assert_eq!(find(&mut w, &mut rest), None);
+    w.items.get_mut(b).unwrap().inv_page = 0;
+    // Rule 2: the cursor item is tried first (stat test applies since
+    // `quest` ≠ 0).
+    rest.cursor = Some(a);
+    assert_eq!(find(&mut w, &mut rest), Some(b), "a: stat 0 < 1, skipped");
+    w.set_stat(a, 356, 1);
+    assert_eq!(find(&mut w, &mut rest), Some(a), "cursor before the list");
+    // Without questdiffcheck the list does not test the stat.
+    w.tables.items[HORADRIC_MALUS].questdiffcheck = 0;
+    w.set_stat(a, 356, 0);
+    rest.cursor = None;
+    assert_eq!(find(&mut w, &mut rest), Some(a), "first in list order");
+}
+
+/// `quests-act2-2.md` §5.3 (`0x0052E050`): S→C 0x0A (type, GUID) to every
+/// in-game client whose room's adjacent list holds the unit's room (the
+/// client's own room included), then the unit is freed.
+// Covers: specs/world/quests-act2-2.md §5.3 r1, §5.3 r2
+#[test]
+fn remove_unit_for_everyone_nearby() {
+    use crate::units::lists::client_state;
+    let mut w = World::new();
+    w.game.lists.ensure_act(0).unwrap();
+    let rooms: Vec<_> = (0..3)
+        .map(|_| w.game.lists.create_room(0).unwrap())
+        .collect();
+    let [ra, rb, rc] = [rooms[0], rooms[1], rooms[2]];
+    // Room A sees room B; room C sees nothing.
+    w.game.lists.room_mut(ra).unwrap().adjacent = vec![ra, rb];
+    w.game.lists.room_mut(rb).unwrap().adjacent = vec![rb, ra];
+    w.game.lists.room_mut(rc).unwrap().adjacent = vec![rc];
+    let p1 = w.spawn(UnitType::Player, 0);
+    let p2 = w.spawn(UnitType::Player, 0);
+    let p3 = w.spawn(UnitType::Player, 0);
+    w.game
+        .lists
+        .add_client(Some(p1), Some(ra), client_state::IN_GAME);
+    w.game
+        .lists
+        .add_client(Some(p2), Some(rc), client_state::IN_GAME);
+    w.game
+        .lists
+        .add_client(Some(p3), Some(ra), client_state::JOINING);
+    let m = w.spawn(UnitType::Monster, MONSTER_CLASS);
+    w.game.lists.room_insert(m, rb).unwrap();
+    let g = w.units.get(m).unwrap().guid;
+    let mut rest = Rest::new(p1);
+    {
+        let mut e = w.econ();
+        let mut qw = EconomyQuests::new(&mut e, &mut rest);
+        qw.remove_unit(m);
+    }
+    // Only the in-game client near the unit's room is told.
+    assert_eq!(
+        rest.sent,
+        [(p1, crate::units::messages::remove_unit(1, g).to_vec())]
+    );
+    assert!(!rest.log.iter().any(|l| l.starts_with("unhandled")));
+    assert!(w.game.lists.unit(m).is_none(), "freed");
+    // A null unit sends nothing.
+    rest.sent.clear();
+    {
+        let mut e = w.econ();
+        let mut qw = EconomyQuests::new(&mut e, &mut rest);
+        qw.remove_unit(m);
+    }
+    assert!(rest.sent.is_empty());
 }

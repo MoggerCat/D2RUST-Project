@@ -22,12 +22,15 @@ use super::item_stats::{StatCtx, UnitStats};
 use super::{Economy, EconomyError};
 use crate::items::bitstream::read::ReadItem;
 use crate::items::bitstream::{hflag, StatEntry, RUNEWORD_STATE, SET_STATES};
-use crate::items::{flag, replenish_timer, stat, Item, ItemStats, ListKey};
+use crate::items::tables::ItemRec;
+use crate::items::{flag, replenish_timer, stat, ty, Item, ItemStats, ListKey};
 use crate::rng::Seed;
 use crate::units::hooks::Sim;
 use crate::units::lifecycle::{self, AllocRequest, LifecycleHooks};
 use crate::units::{RoomId, UnitId, UnitType};
 
+/// Stat 57 `poisonmindam` (§7.3.1 rule 3).
+const POISONMINDAM: u16 = 57;
 /// Item timer event 3: replenish (`units.md` §6, `generation.md` §9 step 6).
 const EVENT_REPLENISH: u32 = 3;
 /// Flags of a set list read back (`items/bitstream.md` §4.6 rule 6:
@@ -104,7 +107,14 @@ impl<H: LifecycleHooks> Economy<'_, H> {
         let event3_at = {
             let ctx = RefCell::new(StatCtx::new(self.stats, self.hooks));
             let mut s = UnitStats::new(&ctx, unit);
-            set_record_stats(&mut s, it);
+            let t = self.tables;
+            let rebuild = t.item(rec.record).map(|r| Rebuild {
+                rec: r.clone(),
+                weapon: t.is_type(rec.record, ty::WEAP as i16),
+                armor: t.is_type(rec.record, ty::ARMO as i16),
+                throwable: t.itype_of(rec.record).is_some_and(|y| y.throwable != 0),
+            });
+            set_record_stats(&mut s, it, rebuild.as_ref());
             replenish_timer(&s, false, frame)
         };
         self.items.insert(unit, item);
@@ -118,8 +128,76 @@ impl<H: LifecycleHooks> Economy<'_, H> {
     }
 }
 
+/// The items-table facts the decoder rebuilds base stats from
+/// (`vendors-2.md` §7.3.1).
+struct Rebuild {
+    rec: ItemRec,
+    weapon: bool,
+    armor: bool,
+    throwable: bool,
+}
+
+/// §7.3.1 rule 1: the weapon's base speed and damage of the decoder
+/// (`0x0062CBE0`): the items columns, ⌊3v / 4⌋ with floors for quality 1,
+/// × 3 / 2 for item flag 0x400000.
+fn rebuild_weapon(s: &mut impl ItemStats, rb: &Rebuild, quality: u8, flags: u32) {
+    let r = &rb.rec;
+    s.set_base(stat::ATTACKRATE, 0, r.speed.wrapping_neg());
+    let missile = r.maxmisdam != 0;
+    let mut six = [
+        (stat::MAXDAMAGE, i32::from(r.maxdam), true, 2),
+        (stat::MINDAMAGE, i32::from(r.mindam), true, 1),
+        (stat::SECONDARY_MAXDAMAGE, i32::from(r.maxdam2), true, 2),
+        (stat::SECONDARY_MINDAMAGE, i32::from(r.mindam2), true, 1),
+        (stat::THROW_MINDAMAGE, i32::from(r.minmisdam), missile, 1),
+        (stat::THROW_MAXDAMAGE, i32::from(r.maxmisdam), missile, 2),
+    ];
+    for (id, v, set, floor) in &mut six {
+        if !*set {
+            continue;
+        }
+        if quality == 1 {
+            *v = (v.wrapping_mul(3) / 4).max(*floor);
+        }
+        if flags & flag::ETHEREAL != 0 {
+            *v = v.wrapping_mul(3) / 2;
+        }
+        s.set_base(*id, 0, *v);
+    }
+}
+
+/// §7.3.1 rule 3: an entry for stat 17 raises the base maximum damages,
+/// one for stat 18 the base minimum damages, to the items column when
+/// below it (the throw damage only for a throwable item).
+fn raise_damage(s: &mut impl ItemStats, rb: &Rebuild, max: bool) {
+    let r = &rb.rec;
+    let cols = if max {
+        [
+            (stat::MAXDAMAGE, r.maxdam, true),
+            (stat::SECONDARY_MAXDAMAGE, r.maxdam2, true),
+            (stat::THROW_MAXDAMAGE, r.maxmisdam, rb.throwable),
+        ]
+    } else {
+        [
+            (stat::MINDAMAGE, r.mindam, true),
+            (stat::SECONDARY_MINDAMAGE, r.mindam2, true),
+            (stat::THROW_MINDAMAGE, r.minmisdam, rb.throwable),
+        ]
+    };
+    for (id, col, go) in cols {
+        let col = i32::from(col);
+        if go && s.base(id, 0) < col {
+            s.set_base(id, 0, col);
+        }
+    }
+}
+
 /// The values the record carries, where the writer read them.
-fn set_record_stats(s: &mut impl ItemStats, it: &crate::items::bitstream::StreamItem) {
+fn set_record_stats(
+    s: &mut impl ItemStats,
+    it: &crate::items::bitstream::StreamItem,
+    rebuild: Option<&Rebuild>,
+) {
     if it.compact {
         if it.kind.gold {
             s.set_base(stat::GOLD, 0, it.total_gold);
@@ -149,9 +227,31 @@ fn set_record_stats(s: &mut impl ItemStats, it: &crate::items::bitstream::Stream
     if it.flags & hflag::SOCKETED != 0 {
         s.set_base(stat::NUMSOCKETS, 0, it.base_sockets);
     }
+    // §7.3.1 rules 1–2: the base values the stream does not carry.
+    if let Some(rb) = rebuild {
+        if rb.weapon {
+            rebuild_weapon(s, rb, it.quality, it.flags);
+        } else if rb.armor {
+            s.set_base(stat::TOBLOCK, 0, i32::from(rb.rec.block));
+            s.set_base(stat::VELOCITYPERCENT, 0, rb.rec.speed.wrapping_neg());
+        }
+    }
     let mut put = |key: ListKey, list: &Option<Vec<StatEntry>>| {
         for e in list.iter().flatten() {
+            if let Some(rb) = rebuild {
+                // Rule 3: before the entry is stored.
+                match e.stat {
+                    stat::MAXDAMAGE_PERCENT => raise_damage(s, rb, true),
+                    stat::MINDAMAGE_PERCENT => raise_damage(s, rb, false),
+                    _ => {}
+                }
+            }
             s.list_set(key, e.stat, e.param, e.value);
+            // Rule 3: an entry for stat 57 (read with 58, 59) sets
+            // `poison_count` to 1 in that list.
+            if e.stat == POISONMINDAM {
+                s.list_set(key, stat::POISON_COUNT, 0, 1);
+            }
         }
     };
     put(ListKey::ITEM, &it.main);
