@@ -1516,6 +1516,6 @@ fn slot_item_class_or_any() {
     assert!(run(0xFFFF, HAX));
     assert!(run(0xFFFF, GCV));
     // Otherwise the item's class must be the slot's.
-    assert!(run(u32::from(HAX), HAX));
-    assert!(!run(u32::from(GCV), HAX));
+    assert!(run(HAX, HAX));
+    assert!(!run(GCV, HAX));
 }

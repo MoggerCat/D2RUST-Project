@@ -24,6 +24,11 @@ pub fn blank_level() -> Levels {
     Levels::decode(&[0; Levels::SIZE])
 }
 
+/// A recorded box query: (x, y, sx, sy, mask).
+pub type BoxQuery = (i32, i32, u32, u32, u32);
+/// Predicate over a box query: `true` = blocked.
+pub type BlockFn = fn(i32, i32, u32, u32, u32) -> bool;
+
 /// One recorded seam call, in call order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
@@ -79,9 +84,9 @@ pub struct Fake {
     pub room_at_fn: Option<fn(i32, i32) -> bool>,
     pub free_all: bool,
     /// Box queries seen by the population fake: (x, y, sx, sy, mask).
-    pub box_log: std::cell::RefCell<Vec<(i32, i32, u32, u32, u32)>>,
+    pub box_log: std::cell::RefCell<Vec<BoxQuery>>,
     /// Predicate for the population fake's box query: `true` = blocked.
-    pub block: Option<fn(i32, i32, u32, u32, u32) -> bool>,
+    pub block: Option<BlockFn>,
 }
 
 impl Fake {
