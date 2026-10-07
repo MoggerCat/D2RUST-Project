@@ -909,6 +909,7 @@ fn staff_tables() -> (ItemTables, usize) {
     t.skill_lists.lists[30] = 36;
     t.skills = (0..50)
         .map(|k| SkillRec {
+            charclass: 0xFF,
             itypea1: match k % 3 {
                 0 => ty::HELM as i16,
                 1 => ty::STAF as i16,

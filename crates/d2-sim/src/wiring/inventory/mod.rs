@@ -39,6 +39,7 @@ pub mod host;
 pub mod inv_world;
 pub mod ops;
 pub mod pending;
+pub mod queries;
 pub mod units;
 
 #[cfg(test)]
@@ -153,7 +154,8 @@ pub trait InvRest: MovePending {
     fn socket_filler(&self, item: Guid) -> bool {
         false
     }
-    /// Book / scroll spell (`0x00627F80`). Default: 0.
+    /// Book / scroll spell (`0x00627F80`). Not asked by [`InvDesk`]
+    /// (`queries`: item data +0x3E). Default: 0.
     fn spell(&self, item: Guid) -> i32 {
         0
     }
@@ -171,15 +173,23 @@ pub trait InvRest: MovePending {
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool;
     /// The item's own contribution to a unit stat (`0x0062B450`).
     fn own_contribution(&self, item: Guid, unit: Owner, stat: u16) -> i32;
-    /// Level requirement (`0x0062B5B0`, §4.8): the provider gathers the
-    /// values and runs `items::inventory::level_requirement`.
-    fn level_requirement(&self, item: Guid, unit: Owner) -> i32;
-    /// Two-handed (`0x006289C0`).
-    fn two_handed(&self, item: Guid) -> bool;
+    /// Level requirement (`0x0062B5B0`, §4.8). Not asked by [`InvDesk`]
+    /// (`queries` gathers the values). Default: 0.
+    fn level_requirement(&self, item: Guid, unit: Owner) -> i32 {
+        0
+    }
+    /// Two-handed (`0x006289C0`). Not asked by [`InvDesk`] (`queries`:
+    /// items `2handed`). Default: no.
+    fn two_handed(&self, item: Guid) -> bool {
+        false
+    }
     /// One-or-two-handed for the unit (`0x0062A1E0`).
     fn one_or_two_handed(&self, unit: Owner, item: Guid) -> bool;
-    /// Ammo type (`0x0062E6F0`): an itemtypes row.
-    fn ammo_type(&self, item: Guid) -> Option<i16>;
+    /// Ammo type (`0x0062E6F0`): an itemtypes row. Not asked by
+    /// [`InvDesk`] (`queries`: the primary type's `shoots`). Default: none.
+    fn ammo_type(&self, item: Guid) -> Option<i16> {
+        None
+    }
     /// Allowed location (`0x0062FDF0`).
     fn has_allowed_location(&self, item: Guid) -> bool;
     /// Quiver-type item (`0x00628480`).

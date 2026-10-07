@@ -153,6 +153,8 @@ pub fn item_tables() -> ItemTables {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
             t.staffmods = 0xFF;
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t.rare = 1;
             t
         })

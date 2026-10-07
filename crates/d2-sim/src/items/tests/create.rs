@@ -217,6 +217,7 @@ fn staffmods_last_rejected_skill() {
     // Every skill demands itype "helm": all tries rejected.
     t.skills = vec![
         SkillRec {
+            charclass: 0xFF,
             itypea1: ty::HELM as i16,
             reqlevel: 1,
             maxlvl: 20,

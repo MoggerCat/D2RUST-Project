@@ -211,8 +211,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InventoryOps for InvDesk<'_, '_, H,
         })?;
         Some(self.guid_of(u))
     }
+    /// `0x006289C0` ([`InvDesk::is_two_handed`]).
     fn two_handed(&self, item: Guid) -> bool {
-        self.rest.two_handed(item)
+        self.item_unit(item).is_some_and(|u| self.is_two_handed(u))
     }
     fn requirements(&self, item: Guid, unit: Owner, equipping: bool) -> bool {
         match self.unit_of(unit) {

@@ -374,6 +374,8 @@ fn item_tables() -> ItemTables {
                 let mut t: Itemtypes = blank();
                 t.class = 0xFF;
                 t.staffmods = 0xFF;
+                // Empty `shoots`: the link miss (link16 −1).
+                t.shoots = 0xFFFF;
                 t.rare = 1;
                 t
             })

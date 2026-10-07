@@ -319,11 +319,20 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
         self.rest.equip_picked(player, item)
     }
+    /// The filler's properties (`properties.md` §9,
+    /// [`InvDesk::apply_filler_properties`]), then the owner link
+    /// `0x006276C0` on the rest.
     fn filler_linked(&mut self, filler: Guid, target: Guid) {
+        if let (Some(f), Some(t)) = (self.item_unit(filler), self.item_unit(target)) {
+            self.apply_filler_properties(f, t);
+        }
         self.rest.filler_linked(filler, target)
     }
-    fn runeword(&mut self, player: Owner, target: Guid) -> bool {
-        self.rest.runeword(player, target)
+    /// §7.19 step 3's runeword ([`InvDesk::activate_runeword_on`]); the
+    /// rest's default is not asked.
+    fn runeword(&mut self, _player: Owner, target: Guid) -> bool {
+        self.item_unit(target)
+            .is_some_and(|t| self.activate_runeword_on(t))
     }
     fn hireling(&self, player: Owner) -> Option<Owner> {
         self.rest.hireling(player)

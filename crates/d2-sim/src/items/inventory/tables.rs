@@ -38,6 +38,10 @@ pub struct InvItemRec {
     pub useable: u8,
     pub stackable: u8,
     pub maxstack: u32,
+    /// `2handed` (`0x006289C0`, §4.7).
+    pub twohanded: u8,
+    /// `levelreq` (`0x006335F0`, §4.8).
+    pub levelreq: u8,
 }
 
 macro_rules! inv_item_rec {
@@ -59,6 +63,8 @@ macro_rules! inv_item_rec {
                     useable: r.useable,
                     stackable: r.stackable,
                     maxstack: r.maxstack,
+                    twohanded: r.f_2handed,
+                    levelreq: r.levelreq,
                 }
             }
         }

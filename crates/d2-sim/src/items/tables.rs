@@ -152,6 +152,11 @@ pub struct AffixRec {
     pub itype: [i16; 7],
     pub etype: [i16; 5],
     pub mods: [PropRec; 3],
+    /// `levelreq`, `class` (0xFF none) and `classlevelreq`
+    /// (`inventory.md` §4.8 "affix value").
+    pub levelreq: i32,
+    pub class: u8,
+    pub classlevelreq: i32,
 }
 
 macro_rules! affix_rec {
@@ -175,6 +180,9 @@ macro_rules! affix_rec {
                         PropRec::of(r.mod2code, r.mod2param, r.mod2min, r.mod2max),
                         PropRec::of(r.mod3code, r.mod3param, r.mod3min, r.mod3max),
                     ],
+                    levelreq: i32::from(r.levelreq),
+                    class: r.class,
+                    classlevelreq: i32::from(r.classlevelreq),
                 }
             }
         }
@@ -254,6 +262,8 @@ pub struct UniqueRec {
     /// Read as 32 bits at +0x30 (u16 plus two bytes that are 0 in 1.14d).
     pub rarity: u32,
     pub lvl: u16,
+    /// `lvl req` read as i16 (`inventory.md` §4.8, `0x00483470`).
+    pub lvl_req: i16,
     pub props: [PropRec; 12],
 }
 
@@ -279,6 +289,7 @@ impl From<&Uniqueitems> for UniqueRec {
             nolimit: r.nolimit,
             rarity: u32::from(r.rarity),
             lvl: r.lvl,
+            lvl_req: r.lvl_req as i16,
             props: [
                 PropRec::of(r.prop1, r.par1, r.min1, r.max1),
                 PropRec::of(r.prop2, r.par2, r.min2, r.max2),
@@ -304,6 +315,8 @@ pub struct SetItemRec {
     pub item: [u8; 4],
     pub set: i16,
     pub lvl: u16,
+    /// `lvl req` read as i16 (`inventory.md` §4.8, `0x00483440`).
+    pub lvl_req: i16,
     pub rarity: u32,
     pub add_func: u8,
     pub version: u16,
@@ -320,6 +333,7 @@ impl SetItemRec {
             item: r.item,
             set: r.set as i16,
             lvl: r.lvl,
+            lvl_req: r.lvl_req as i16,
             rarity: r.rarity,
             add_func: r.add_func,
             version: u16::from_le_bytes([raw[0x22], raw[0x23]]),
@@ -555,6 +569,8 @@ pub struct SkillRec {
     pub itypea1: i16,
     pub reqlevel: i32,
     pub maxlvl: i32,
+    /// `charclass` (a playerclass row; 0xFF none; `inventory.md` §4.8).
+    pub charclass: u8,
 }
 
 impl From<&Skills> for SkillRec {
@@ -563,6 +579,7 @@ impl From<&Skills> for SkillRec {
             itypea1: r.itypea1 as i16,
             reqlevel: i32::from(r.reqlevel),
             maxlvl: i32::from(r.maxlvl),
+            charclass: r.charclass,
         }
     }
 }
