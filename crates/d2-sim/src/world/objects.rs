@@ -23,6 +23,7 @@ use crate::units::{RoomId, UnitId};
 pub mod chests;
 #[cfg(test)]
 pub(crate) mod fake;
+pub mod mech;
 pub mod misc;
 pub mod populate;
 pub mod shrines;
@@ -30,6 +31,7 @@ pub mod shrines;
 mod tests;
 
 pub use chests::ChestWorld;
+pub use mech::MechWorld;
 pub use misc::MiscWorld;
 pub use shrines::ShrineWorld;
 
@@ -111,6 +113,8 @@ pub enum ObjectError {
     ShrineNoOperator,
     #[error("portal operated with no player (0x0058494F)")]
     PortalOperator,
+    #[error("object {0:?}: no warp tile in its room (fatal)")]
+    NoWarpTile(UnitId),
     #[error("key test with no unit (0x0055F173)")]
     KeyTestNoUnit,
     #[error("room {0:?} has no active room seed")]
@@ -399,11 +403,38 @@ pub trait ObjectWorld {
     ) -> Option<UnitId>;
     /// `0x0061AEB0`: the act II staff-tomb level (quest spec).
     fn staff_tomb_level(&self) -> u32;
+    /// Unit +0x10 := `mode` written directly: no mode set, no animation
+    /// setup, no queue, no changed flag (`objects-2.md` §18.1, §18.6).
+    fn store_mode(&mut self, unit: UnitId, mode: u8);
+    /// Init 13 (`objects-2.md` §17): quest chain `chain`'s record exists
+    /// (`0x00543640`) → link the object to it (`0x005436B0`,
+    /// `world/quests.md` §4.6) and return `true`. Default: no record.
+    fn quest_link(&mut self, object: UnitId, chain: u8) -> bool {
+        let _ = (object, chain);
+        false
+    }
+    /// `0x00463740(room, x, y)`: the room holding the point among `room`
+    /// and its adjacency array.
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        let _ = (room, x, y);
+        None
+    }
+    /// `0x00559300` (`objects-2.md` §20.3): a gold drop at (x, y) in
+    /// `room`. Default: nothing.
+    fn gold_drop(&mut self, room: RoomId, x: i32, y: i32) {
+        let _ = (room, x, y);
+    }
+    /// `0x0064D800(room, x, y, 1, 1, mask)` = 0: the point is free of
+    /// `mask`. Default: not free.
+    fn point_free(&self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        let _ = (room, x, y, mask);
+        false
+    }
 }
 
 /// Every seam the dispatchers need.
-pub trait ObjectHost: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld {}
-impl<T: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld> ObjectHost for T {}
+pub trait ObjectHost: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld + MechWorld {}
+impl<T: ObjectWorld + ChestWorld + ShrineWorld + MiscWorld + MechWorld> ObjectHost for T {}
 
 // ------------------------------------------------------------------ §4
 
@@ -497,7 +528,7 @@ pub fn init_route(n: u8) -> Route {
         0 | 35 | 36 | 40 => Route::Null,
         1 | 2 | 3 | 5 | 11 | 12 | 16 | 57 => Route::Here,
         17 => Route::Waypoint,
-        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 37 | 58 => Route::NotCovered,
+        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => Route::Here,
         n if n < INIT_FN_BOUND => Route::Quest,
         _ => Route::Null,
     }
@@ -508,10 +539,11 @@ pub fn operate_route(n: u8) -> Route {
     match n {
         0 | 35..=38 | 60 | 74..=100 => Route::Null,
         1 | 2 | 3 | 4 | 5 | 7 | 8 | 11 | 14 | 15 | 22 | 68 => Route::Here,
-        23 => Route::Waypoint,
-        13 | 16 | 17 | 18 | 19 | 20 | 26 | 27 | 29 | 30 | 32 | 47 | 50 | 51 | 61 => {
-            Route::NotCovered
+        // `objects-2.md` §16, §18.4.
+        13 | 16 | 17 | 18 | 19 | 20 | 26 | 27 | 29 | 30 | 32 | 47 | 48 | 50 | 51 | 61 => {
+            Route::Here
         }
+        23 => Route::Waypoint,
         n if n < OPERATE_FN_BOUND => Route::Quest,
         _ => Route::Null,
     }
@@ -634,9 +666,9 @@ fn run_init<W: ObjectWorld>(
     w: &mut W,
     obj: UnitId,
     n: u8,
-    _room: Option<RoomId>,
-    _x: i32,
-    _y: i32,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
 ) -> Result<(), ObjectError> {
     let level = w.level(obj).unwrap_or(0);
     match n {
@@ -660,6 +692,9 @@ fn run_init<W: ObjectWorld>(
         5 => Ok(()),
         11 => init_town_portal(ctl, t, w, obj, level),
         12 => init_permanent_portal(ctl, t, w, obj, level),
+        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => {
+            mech::init(ctl, t, w, obj, n, room, x, y)
+        }
         _ => Ok(()),
     }
 }
@@ -1080,6 +1115,9 @@ fn run_operate<W: ObjectHost>(
         11 => misc::torch(ctl, t, w, op).map(Some),
         15 => misc::portal(ctl, t, w, op),
         22 => misc::well(ctl, t, w, op).map(Some),
+        13 | 16..=20 | 26 | 27 | 29 | 30 | 32 | 47 | 48 | 50 | 51 | 61 => {
+            mech::operate(ctl, t, w, op).map(Some)
+        }
         _ => Ok(Some(0)),
     }
 }
@@ -1092,7 +1130,7 @@ pub enum EventRun {
     Done,
     /// Event 7: the quest object event (`world/quests.md`).
     Quest,
-    /// Events 0, 3, 8, 9, 10 (§15): not specified yet.
+    /// An event type no spec gives a handler.
     NotCovered(u8),
 }
 
@@ -1112,17 +1150,17 @@ pub fn object_event<W: ObjectHost>(
         oevent::HOVER => shrines::hover_event(ctl, t, w, obj)?,
         oevent::QUEST => return Ok(EventRun::Quest),
         oevent::DELAYED_PORTAL => delayed_portal(ctl, t, w, obj)?,
+        // `objects-2.md` §18.
+        0 | 3 | 8 | 9 | 10 => mech::event(ctl, t, w, obj, ev)?,
         e => return Ok(EventRun::NotCovered(e)),
     }
     Ok(EventRun::Done)
 }
 
-/// Event 1 `0x00581490` (`sim/units.md` §6.4): mode 1 → 2 when `Mode2` ≠
-/// 0 (no update queued), then, if `HasCollision2` = 0, free the
+/// Event 1 `0x00581490` (`objects-2.md` §18.6): mode 1 and `Mode2` ≠ 0 →
+/// the mode field := 2 written directly (no setup, draw, queue or
+/// changed flag); inside that branch, `HasCollision2` = 0 → free the
 /// footprint.
-///
-/// TODO(units.md §6.4 type 1): the footprint step is read as part of the
-/// mode-1 branch.
 fn end_anim<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
@@ -1132,7 +1170,7 @@ fn end_anim<W: ObjectWorld>(
     let class = ctl.get(obj)?.class;
     let o = t.object(class)?;
     if w.mode(obj) == 1 && o.mode2 != 0 {
-        set_mode(t, w, obj, class, 2, false)?;
+        w.store_mode(obj, 2);
         if o.hascollision2 == 0 {
             w.free_footprint(obj);
         }

@@ -723,7 +723,11 @@ impl<W: PopulateWorld> Cx<'_, W> {
         let mut k = 2 * j;
         let mut c = 0;
         while j > 0 && k > 0 {
-            let mut class = if self.c_step().is_multiple_of(3) { 11 } else { 7 };
+            let mut class = if self.c_step().is_multiple_of(3) {
+                11
+            } else {
+                7
+            };
             let (x0, y0, w, h) = self.rect();
             let mut x = x0 + self.c_roll(w);
             let mut y = y0 + self.c_roll(h);

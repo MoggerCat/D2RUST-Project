@@ -269,7 +269,7 @@ fn create_routes_inits_owned_elsewhere() {
     assert_eq!(ctl.seed, Seed::init(), "a quest init draws nothing here");
     for (n, route) in [
         (17, Route::Waypoint),
-        (8, Route::NotCovered),
+        (8, Route::Here),
         (0, Route::Null),
         (35, Route::Null),
     ] {
@@ -831,7 +831,7 @@ fn dispatch_table_rules() {
         (100, Dispatch::Done(0)),
         (23, Dispatch::Waypoint(op(23))),
         (6, Dispatch::Quest(op(6))),
-        (13, Dispatch::NotCovered(op(13))),
+        (13, Dispatch::Done(0)),
         (11, Dispatch::Done(1)),
     ] {
         t.objects[100].operatefn = n;
@@ -873,7 +873,7 @@ fn route_mismatches(text: &str) -> Result<Vec<(String, u32)>, TsvError> {
         let address = tsv_num(tn, line, "address", c[2])?;
         let want = match (c[5], address) {
             ("-", 0) => Some(Route::Null),
-            ("world/quests.md", a) if a != 0 => Some(Route::Quest),
+            (o, a) if o.starts_with("world/quests") && a != 0 => Some(Route::Quest),
             ("world/waypoints.md", a) if a != 0 => Some(Route::Waypoint),
             ("todo", a) if a != 0 => Some(Route::NotCovered),
             (o, a) if o.starts_with('§') && a != 0 => Some(Route::Here),
@@ -938,7 +938,12 @@ fn end_anim_and_delayed_portal_events() {
         Ok(EventRun::Done)
     );
     assert_eq!(f.modes[&O], 2);
-    assert_eq!(f.calls[0], Call::Mode(O, 2, false), "no update queued");
+    // `objects-2.md` §18.6: a direct write (no mode set, no queue).
+    assert_eq!(
+        f.calls[0],
+        Call::Other(format!("store {} 2", O.0)),
+        "no update queued"
+    );
     assert_eq!(f.calls.last(), Some(&Call::Free(O)));
     // HasCollision2 ≠ 0: footprint kept; not mode 1: nothing.
     t.objects[TORCH as usize].hascollision2 = 1;
@@ -968,12 +973,15 @@ fn end_anim_and_delayed_portal_events() {
         object_event(&mut ctl, &t, &mut f, O, oevent::QUEST),
         Ok(EventRun::Quest)
     );
+    // Events 0, 3, 8, 9, 10 run `objects-2.md` §18 (`mech` tests); an
+    // event type with no handler is handed back.
     for e in [0, 3, 8, 9, 10] {
-        assert_eq!(
-            object_event(&mut ctl, &t, &mut f, O, e),
-            Ok(EventRun::NotCovered(e))
-        );
+        assert_eq!(object_event(&mut ctl, &t, &mut f, O, e), Ok(EventRun::Done));
     }
+    assert_eq!(
+        object_event(&mut ctl, &t, &mut f, O, 13),
+        Ok(EventRun::NotCovered(13))
+    );
 }
 
 // ------------------------------------------------------------------ §14

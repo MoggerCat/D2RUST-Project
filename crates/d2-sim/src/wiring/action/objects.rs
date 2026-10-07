@@ -718,6 +718,93 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()
     }
+    /// Unit +0x10 only (`objects-2.md` §18.1, §18.6).
+    fn store_mode(&mut self, unit: UnitId, mode: u8) {
+        if let Some(r) = self.record(unit) {
+            r.mode = u32::from(mode);
+        }
+    }
+    /// `0x00463740` on the act DRLG (`path-placement.md` §4 rule 1).
+    fn room_at(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.v.h.drlg.find_room(self.game, room, x, y)
+    }
+    /// `0x0064D800` with sizes 1, 1: the point query.
+    fn point_free(&self, room: RoomId, x: i32, y: i32, mask: u32) -> bool {
+        crate::path::collision::point_value(&self.v.h.drlg, Some(room), x, y, mask as u16) == 0
+    }
+}
+
+/// The part-2 seams (`objects-2.md` §16–§18) on the unit lists, records,
+/// the act DRLG and the path provider: interact (the waypoint seam's
+/// [`Pending`] interact), messages ([`Pending::send`]), adjacency, free
+/// point and placement (`sim/path-placement.md` §7, §10), the 0x07 room
+/// reveal, flags 2, the town test and the player lookup. Item drops (the
+/// §20 helpers), trap damage, the gem test, the tome recount, the warp
+/// tile, the day period keep their defaults.
+impl<X: Pending> objects::MechWorld for ObjectView<'_, X> {
+    fn interact_unit(&self, player: UnitId) -> Option<UnitId> {
+        let g = self.v.h.x.interact_guid(player)?;
+        self.game.lists.find_unit(UnitType::Object, g)
+    }
+    fn set_interact(&mut self, player: UnitId, unit_type: u8, guid: u32) {
+        self.v.h.x.set_interact(player, unit_type, guid);
+    }
+    fn clear_interact(&mut self, player: UnitId) {
+        self.v.h.x.reset_interact(player);
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.v.h.x.send(player, msg);
+    }
+    fn adjacent_rooms(&self, room: RoomId) -> Vec<RoomId> {
+        use crate::path::collision::CollisionRooms;
+        let d = &self.v.h.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .collect()
+    }
+    fn free_point(
+        &self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        size: i32,
+        mask: u32,
+    ) -> Option<(RoomId, i32, i32)> {
+        let mut p = crate::path::coords::Point::new(x, y);
+        let rooms = crate::wiring::path::place::Rooms(&self.v.h.drlg);
+        match crate::path::search::free_point(&rooms, Some(room), &mut p, size, mask, false) {
+            Ok(Some(r)) => Some((r, p.x, p.y)),
+            _ => None,
+        }
+    }
+    fn place_unit(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) -> bool {
+        if self.v.h.paths.is_none() {
+            return false;
+        }
+        let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+        crate::wiring::path::place::place_unit(c, unit, Some(room), x, y, false, false)
+    }
+    fn send_room_reveal(&mut self, player: UnitId, room: RoomId) {
+        let Some((d, r)) = self.v.h.drlg.drlg_room(self.game, room) else {
+            return;
+        };
+        let dr = d.room(r);
+        let level = d.level(dr.level).id;
+        let msg =
+            crate::wiring::path::place::map_reveal(dr.rect.x as u16, dr.rect.y as u16, level as u8);
+        self.v.h.x.send(player, &msg);
+    }
+    fn set_flags2(&mut self, unit: UnitId, bits: u32) {
+        if let Some(r) = self.record(unit) {
+            r.flags2 |= bits;
+        }
+    }
+    fn in_town(&self, room: RoomId) -> bool {
+        self.v.h.drlg.in_town(self.game, room)
+    }
+    fn find_player(&self, guid: u32) -> Option<UnitId> {
+        self.game.lists.find_unit(UnitType::Player, guid)
+    }
 }
 
 /// The population seams on the act DRLG: the active room seed (+0x6C),

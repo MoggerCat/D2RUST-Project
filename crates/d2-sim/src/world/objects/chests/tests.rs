@@ -156,6 +156,9 @@ impl ObjectWorld for H {
     fn staff_tomb_level(&self) -> u32 {
         self.f.staff_tomb_level()
     }
+    fn store_mode(&mut self, unit: UnitId, mode: u8) {
+        self.f.store_mode(unit, mode)
+    }
 }
 
 impl ChestWorld for H {
@@ -238,6 +241,7 @@ impl ChestWorld for H {
 }
 impl ShrineWorld for H {}
 impl MiscWorld for H {}
+impl super::super::MechWorld for H {}
 
 // ------------------------------------------------------------------ setup
 
