@@ -33,20 +33,20 @@
 | Inputs | 67–77 |
 | Outputs / state changes | 78–89 |
 | Rules | 90–91 |
-|   1. Conventions | 92–153 |
-|   2. Act IV records | 154–175 |
-|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 176–296 |
-|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 297–444 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 445–675 |
-|   6. Act IV gossip records | 676–702 |
-|   7. Multiplayer and party rules | 703–715 |
-|   8. Hooks called from other systems | 716–753 |
-| Constants & data dependencies | 754–774 |
-| Randomness | 775–788 |
-| Edge cases & original bugs | 789–847 |
-| Test vectors | 848–865 |
-| Provenance | 866–903 |
-| Open questions | 904–982 |
+|   1. Conventions | 92–158 |
+|   2. Act IV records | 159–180 |
+|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 181–301 |
+|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 302–449 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 450–682 |
+|   6. Act IV gossip records | 683–709 |
+|   7. Multiplayer and party rules | 710–722 |
+|   8. Hooks called from other systems | 723–760 |
+| Constants & data dependencies | 761–781 |
+| Randomness | 782–795 |
+| Edge cases & original bugs | 796–854 |
+| Test vectors | 855–872 |
+| Provenance | 873–910 |
+| Open questions | 911–989 |
 <!-- /index -->
 
 ## Summary
@@ -102,6 +102,11 @@ X)", "party of P", "refresh", "send flags", "add GUID", "GUID listed",
 triggers on leaving The Pandemonium Fortress (level 103). "Same or
 adjacent room as R" = the player's room is R or R is in the player's
 room's adjacent-room list (`0x00619790`). Time "f" = the game frame.
+
+"Radius" of a free-spot search: `0x00545340`'s sixth argument (stack
++0x14) is never read in 1.14d (body `0x00545340`–`0x0054547F`, `ret 0x14`); the ring
+search is bounded by the seventh argument (limit) only. Every "radius n"
+below is recorded for completeness and has no effect.
 
 #### 1.2 Message-list selection (event 0)
 
@@ -525,7 +530,7 @@ player with 26.14, else the status byte.
   394), 56 (`0x005B6C10`, 396). Object mode 0 and chain 23 present:
   boss spot := the seal's position + offset, written to its pair; then
   `0x005B6AD0`: the room covering the spot (`0x00463740`); free spot
-  (`0x00545340`, size 3, mask 0x3F11, radius r, limit 100; the spot is
+  (`0x00545340`, size 3, mask 0x3F11, radius r (unused), limit 100; the spot is
   updated in place); found → object 131 there (`0x00555230`, flags 1,
   0, 0); created → `0x0061AED0(room, 0)` and the seal activation above.
   No spot or no object → the seal stays in mode 0 (it can be operated
@@ -541,6 +546,8 @@ player with 26.14, else the status byte.
     f + `FrameCnt1` + 1 (Dummy 131 `FrameCnt1` 20). So the boss spawn
     first runs 27 frames after the seal is opened; the retry of a
     failed spawn is f + 10 (below).
+
+  Column r is the unused radius argument (§1.1).
 
   | Seal | Pair | Offset | r | Boss (data tables +0xAE0 entry) |
   |---|---|---|---|---|
@@ -590,7 +597,7 @@ mode 1 (`0x005B2F20`, p = −1, then 5, then 10); created → unit flags |=
 Failure → return 0 (retried every firing). The three tries use the same
 x, y and room (the start point's, read once per firing; the last
 `0x005B2F20` argument before the flags is the placement spread,
-`monsters/init.md` §1); a start-point GUID that no longer finds an
+`monsters/init.md` §2); a start-point GUID that no longer finds an
 object (`0x00552F60` null, `0x005B4C22`) also returns 0, so it counts
 as a failed spawn and is retried at the next firing.
 
@@ -645,7 +652,7 @@ no caller.
 #### 5.9 The portal to Harrogath (object 566, expansion)
 
 - Spawn (`0x005B45E0`, from msg 20000): spot := Tyrael's position + (5,
-  0); free spot near it (`0x00545340`, size 2, mask 0x400, radius 12,
+  0); free spot near it (`0x00545340`, size 2, mask 0x400, radius 12 (unused),
   limit 100); found → object 566 (`0x00555230`, flags 1, 1, 0); created
   → +0x44 := 0, +0x45 := 1, unit flags |= 0x3000000. At most one per
   game; nothing retries a failed spawn except the next 20000.
