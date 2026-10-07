@@ -53,15 +53,16 @@
 //! view = [l, t, w, h]         # optional, default the whole map
 //!
 //! # scene (a 1.14d capture, render/capture.md; capture-cases/)
-//! raw = "latest"              # or a frames-raw-1 path (repo-relative or
+//! raw = "latest"              # or a frames-raw-1/-2 path (repo-relative or
 //!                             # absolute); "latest" = newest
 //!                             # traces/raw/*-frames.jsonl
 //! images = 'game/captures/…'  # optional; default game/captures/<stamp>
 //!                             # for a raw file named <stamp>-frames.jsonl
 //! check = "compare"           # or "stability" (capture.md §7)
-//! draws = [1201, 1202]        # optional, compare only: these draw
-//!                             # counters; default every captured frame
-//!                             # but the first (capture.md edge cases)
+//! seqs = [1201, 1202]         # optional, compare only: these frames
+//!                             # by the recorder's seq (capture.md §4;
+//!                             # never the draw counter); default every
+//!                             # captured frame but the first
 //! ```
 
 use std::fmt;
@@ -204,11 +205,12 @@ pub struct SceneCase {
     pub raw: RawRef,
     pub images: Option<String>,
     pub check: CaptureCheck,
-    /// Draw counters to compare; empty = the default selection.
-    pub draws: Vec<u32>,
+    /// Frames (`seq`, capture.md §4) to compare; empty = the default
+    /// selection.
+    pub seqs: Vec<u32>,
 }
 
-/// Which `frames-raw-1` file a scene case reads.
+/// Which raw capture file a scene case reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawRef {
     /// The newest `traces/raw/*-frames.jsonl` (file names start with the
@@ -324,7 +326,7 @@ pub fn parse(name: &str, text: &str) -> Result<Case, CaseError> {
             only_keys(
                 root,
                 "",
-                &[&common[..], &["raw", "images", "check", "draws"]].concat(),
+                &[&common[..], &["raw", "images", "check", "seqs"]].concat(),
             )?;
             CaseKind::Scene(scene(root)?)
         }
@@ -412,44 +414,44 @@ fn scene(root: &Table) -> Result<SceneCase, CaseError> {
         "stability" => CaptureCheck::Stability,
         _ => return Err(err("check", CaseErrorKind::UnknownValue(check))),
     };
-    let draws = match root.get("draws") {
+    let seqs = match root.get("seqs") {
         None => Vec::new(),
         Some(item) => {
             let arr = item
                 .as_array()
-                .ok_or_else(|| err("draws", CaseErrorKind::WrongType("an array of integers")))?;
-            let mut draws = Vec::with_capacity(arr.len());
+                .ok_or_else(|| err("seqs", CaseErrorKind::WrongType("an array of integers")))?;
+            let mut seqs = Vec::with_capacity(arr.len());
             for (i, v) in arr.iter().enumerate() {
-                let at = format!("draws[{i}]");
+                let at = format!("seqs[{i}]");
                 let d = value_int(v, &at, 0, u32::MAX.into())? as u32;
-                if draws.contains(&d) {
+                if seqs.contains(&d) {
                     return Err(err(
                         at,
-                        CaseErrorKind::Invalid(format!("draw {d} is listed twice")),
+                        CaseErrorKind::Invalid(format!("frame {d} is listed twice")),
                     ));
                 }
-                draws.push(d);
+                seqs.push(d);
             }
-            if draws.is_empty() {
+            if seqs.is_empty() {
                 return Err(err(
-                    "draws",
+                    "seqs",
                     CaseErrorKind::Invalid("empty; omit it for the default".into()),
                 ));
             }
             if check == CaptureCheck::Stability {
                 return Err(err(
-                    "draws",
+                    "seqs",
                     CaseErrorKind::Invalid("the stability check uses every frame".into()),
                 ));
             }
-            draws
+            seqs
         }
     };
     Ok(SceneCase {
         raw,
         images: string(root, "", "images")?,
         check,
-        draws,
+        seqs,
     })
 }
 

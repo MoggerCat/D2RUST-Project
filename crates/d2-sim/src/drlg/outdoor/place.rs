@@ -11,6 +11,7 @@ use super::super::level::Drlg;
 use super::super::room::near_gaps;
 use super::super::seams::LevelTypes;
 use super::super::{LevelIdx, TileRect};
+use super::jungle::place_jungles;
 use super::{Orth, Outdoor, OutdoorData, OutdoorError, DRLG_OUTDOOR};
 
 /// Rows per link table (§2.2).
@@ -486,22 +487,22 @@ impl Outdoor {
             0 => {
                 self.drive(drlg, data, types, &A1W, Check::A1W, true)?;
                 self.drive(drlg, data, types, &A1M, Check::A1M, true)?;
-                self.neighbours(drlg, data, 1, 17)?;
+                self.neighbours(drlg, data, types, 1, 17)?;
             }
             1 => {
                 self.drive(drlg, data, types, &A2, Check::Simple, false)?;
                 self.drive(drlg, data, types, &A2C, Check::Simple, false)?;
-                self.neighbours(drlg, data, 40, 46)?;
+                self.neighbours(drlg, data, types, 40, 46)?;
             }
             2 => {
                 let l = drlg.get_or_alloc_level(data, types, 75)?;
                 let def = data.level(75)?;
                 let (w, h) = def.size[(drlg.difficulty as usize).min(2)];
                 drlg.level_mut(l).rect = TileRect::new(def.offset.0, def.offset.1, w, h);
-                self.jungles(drlg, data, types)?;
-                self.kurast_chain(drlg, data, types)?;
+                let l78 = self.jungles(drlg, data, types)?;
+                self.kurast_chain(drlg, data, types, l78)?;
                 self.adjacency(drlg, data, 75, 83)?;
-                self.neighbours(drlg, data, 75, 83)?;
+                self.neighbours(drlg, data, types, 75, 83)?;
             }
             3 => {
                 let t1 = self.drive(drlg, data, types, &A4, Check::Simple, false)?;
@@ -510,13 +511,13 @@ impl Outdoor {
                 if let Some(l) = drlg.find_level(104) {
                     self.info_mut(l).flags |= t1.transition;
                 }
-                self.neighbours(drlg, data, 103, 106)?;
+                self.neighbours(drlg, data, types, 103, 106)?;
             }
             4 => {
                 self.drive(drlg, data, types, &A5, Check::None, false)?;
                 self.drive(drlg, data, types, &A5T, Check::None, false)?;
                 self.adjacency(drlg, data, 111, 112)?;
-                self.neighbours(drlg, data, 111, 112)?;
+                self.neighbours(drlg, data, types, 111, 112)?;
                 self.adjacency(drlg, data, 110, 111)?;
                 self.adjacency(drlg, data, 109, 110)?;
                 self.drive(drlg, data, types, &A5U, Check::Simple, false)?;
@@ -649,18 +650,21 @@ impl Outdoor {
         &mut self,
         drlg: &mut Drlg,
         data: &DrlgData,
+        types: &mut dyn LevelTypes,
         a: u32,
         b: u32,
     ) -> Result<(), OutdoorError> {
         for id in a..=b {
-            if data.level(id)?.drlg_type != DRLG_OUTDOOR {
+            // Each id is looked up by get-or-allocate before its type is
+            // tested (`levels.md` §4.2: every lookup by id allocates). The
+            // recorded Act I creation (`levels.md` Test vectors, seq
+            // 2425–2452) allocates 8, 9, …, 16 here, after the A1M row 5
+            // and before the town: the levels of 1..17 no driver row
+            // allocated, in ascending order.
+            let l = drlg.get_or_alloc_level(data, types, id)?;
+            if drlg.level(l).drlg_type != DRLG_OUTDOOR {
                 continue;
             }
-            // TODO(outdoor.md §2.7): an unallocated outdoor level or
-            // neighbour is not described; skipped.
-            let Some(l) = drlg.find_level(id) else {
-                continue;
-            };
             let vis = drlg.vis_array(data, id)?;
             let warp = drlg.warp_array(data, id)?;
             for j in 0..8 {
@@ -687,82 +691,60 @@ impl Outdoor {
         Ok(())
     }
 
-    /// Jungle placer `0x00677880` (§9.1), on the DRLG seed itself.
+    /// Jungle placer `0x00677880` (§9.1; `outdoor-act3-act5.md` §2), on
+    /// the DRLG seed itself. Returns level 78 (§2.8 step 4).
     fn jungles(
         &mut self,
         drlg: &mut Drlg,
         data: &DrlgData,
         types: &mut dyn LevelTypes,
-    ) -> Result<(), OutdoorError> {
+    ) -> Result<LevelIdx, OutdoorError> {
         let diff = (drlg.difficulty as usize).min(2);
         let (sx, sy) = data.level(76)?.size[diff];
         let docks = drlg
             .find_level(75)
             .map(|l| drlg.level(l).rect)
             .ok_or(OutdoorError::LevelMissing(75))?;
-        let (y1, y3) = jungle_offsets(sy);
-        // TODO(outdoor.md §9.1, OQ 7): "measured in 32-tile blocks" is not
-        // used by the rules given; blocks are kept in tiles.
-        let mut blocks = vec![TileRect::new(docks.x, docks.y - sy, sx, sy)];
-        for k in 1..=2i32 {
-            loop {
-                let base = drlg.seed.roll(k) as usize;
-                let case = drlg.seed.step() % 5;
-                let (ox, oy) = match case {
-                    0 => (0, -sy),
-                    1 => (-sx, y1),
-                    2 => (sx, y1),
-                    3 => (-sx, y3),
-                    _ => (sx, y3),
-                };
-                let b = blocks[base];
-                let nb = TileRect::new(b.x + ox, b.y + oy, sx, sy);
-                if blocks.iter().any(|e| overlaps(e, &nb)) {
-                    continue;
-                }
-                blocks.push(nb);
-                break;
-            }
-        }
-        // TODO(outdoor.md §9.1, OQ 7): the attach-point grid (draws
-        // roll(2), roll(3), roll(count), roll(4), roll(2), roll(4) at sites
-        // 0x00677C43..0x006784D9) and the per-level jungle preset ids are
-        // not specified; not drawn here, so Act III creation draws fewer
-        // times than 1.14d.
-        let mut order: Vec<TileRect> = blocks;
-        order.sort_by_key(|a| std::cmp::Reverse(a.y));
-        for (n, r) in order.into_iter().enumerate() {
+        let j = place_jungles(&mut drlg.seed, docks, sx, sy)?;
+        // §2.8 step 3: levels 76..78 in the sorted order.
+        let mut last = None;
+        for (n, &k) in j.order.iter().enumerate() {
+            let rec = &j.recs[k];
             let l = drlg.get_or_alloc_level(data, types, 76 + n as u32)?;
-            drlg.level_mut(l).rect = r;
+            let info = self.info_mut(l);
+            info.jungle_ids = Some(rec.ids.clone());
+            info.jungle_clearings = rec.clearings;
+            drlg.level_mut(l).rect = rec.rect;
+            last = Some(l);
         }
-        Ok(())
+        // Step 4: level 78.
+        last.ok_or(OutdoorError::LevelMissing(78))
     }
 
-    /// Kurast chain `0x00678910` (§9.2).
+    /// Kurast chain `0x00678910` (§9.2), anchored on level 78 (the jungle
+    /// placer's return value).
     fn kurast_chain(
         &mut self,
         drlg: &mut Drlg,
         data: &DrlgData,
         types: &mut dyn LevelTypes,
+        anchor: LevelIdx,
     ) -> Result<(), OutdoorError> {
         let diff = (drlg.difficulty as usize).min(2);
-        let docks = drlg
-            .find_level(75)
-            .map(|l| drlg.level(l).rect)
-            .ok_or(OutdoorError::LevelMissing(75))?;
+        let a = drlg.level(anchor).rect;
         let mut y = 0;
         for id in 79..=83 {
             let (w, h) = data.level(id)?.size[diff];
             y -= h;
             let l = drlg.get_or_alloc_level(data, types, id)?;
-            drlg.level_mut(l).rect =
-                TileRect::new(docks.x + docks.w / 2 - w / 2, docks.y + y, w, h);
+            drlg.level_mut(l).rect = TileRect::new(a.x + a.w / 2 - w / 2, a.y + y, w, h);
         }
         Ok(())
     }
 }
 
-/// The jungle case offsets y1, y3 of §9.1 for a block height SY:
+/// The jungle case offsets y1, y3 (`outdoor-act3-act5.md` §2.2 step
+/// 2.3) for a jungle height SY:
 /// y1 := ⌊(⌊SY·0x55555555 / 2³²⌋ − SY) / 2⌋, plus 1 if negative;
 /// y3 := −2SY/3 truncated toward zero.
 pub fn jungle_offsets(sy: i32) -> (i32, i32) {

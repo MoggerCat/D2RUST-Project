@@ -1,5 +1,6 @@
 //! Tests of `items::moves` on a fake world implementing the three seams.
 
+mod answers;
 mod deferred;
 mod gaps;
 mod ground;
@@ -47,6 +48,9 @@ pub struct FItem {
     pub two_handed: bool,
     pub beltable: bool,
     pub carry_one: bool,
+    pub stackable: bool,
+    pub autostack: bool,
+    pub quiver: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -56,6 +60,7 @@ pub struct FUnit {
     pub y: i32,
     pub uflags: u32,
     pub c8: u32,
+    pub mode: u32,
     pub stats: BTreeMap<u16, i32>,
 }
 
@@ -65,6 +70,7 @@ pub struct FInv {
     pub cursor: Option<Guid>,
     pub update: Vec<Guid>,
     pub body: BTreeMap<u8, Guid>,
+    pub belt: BTreeMap<u8, Guid>,
     pub weapon: Option<Guid>,
 }
 
@@ -97,14 +103,17 @@ pub struct Knobs {
     pub consume: bool,
     pub use_ok: bool,
     pub equip_picked: bool,
-    pub special: bool,
     pub hireling: Option<Owner>,
     pub alive: bool,
-    pub not_dead: bool,
     pub owns: bool,
     pub q44: bool,
     pub bits: Vec<u8>,
-    pub filler_owner: Option<Owner>,
+    /// `numboxes` of any belt (§3 rule 9).
+    pub boxes: u8,
+    /// Item skill of a scroll / tome (§7.18 step 6).
+    pub item_skill: i32,
+    pub has_skill: bool,
+    pub used_skill: bool,
 }
 
 impl Default for Knobs {
@@ -140,14 +149,15 @@ impl Default for Knobs {
             consume: false,
             use_ok: true,
             equip_picked: true,
-            special: false,
             hireling: None,
             alive: true,
-            not_dead: true,
             owns: true,
             q44: false,
             bits: Vec::new(),
-            filler_owner: None,
+            boxes: 16,
+            item_skill: -1,
+            has_skill: false,
+            used_skill: false,
         }
     }
 }
@@ -276,6 +286,7 @@ impl InventoryOps for Fake {
             inv.cursor = None;
         }
         inv.body.retain(|_, g| *g != item);
+        inv.belt.retain(|_, g| *g != item);
         had
     }
     fn update_list(&self, owner: Owner) -> Vec<Guid> {
@@ -288,6 +299,11 @@ impl InventoryOps for Fake {
         let inv = self.invs.entry(owner).or_default();
         if !inv.update.contains(&item) {
             inv.update.push(item);
+        }
+    }
+    fn update_list_free(&mut self, owner: Owner) {
+        if let Some(inv) = self.invs.get_mut(&owner) {
+            inv.update.clear();
         }
     }
     fn weapon_in_use(&self, owner: Owner) -> Option<Guid> {
@@ -372,10 +388,31 @@ impl InventoryOps for Fake {
         let inv = self.invs.entry(owner).or_default();
         inv.list.retain(|&g| g != item);
         inv.list.push(item);
+        inv.belt.insert(slot as u8, item);
         let u = self.units.entry(Owner::item(item)).or_default();
         u.x = slot as i32;
         u.y = 0;
         true
+    }
+    fn belt_item(&self, owner: Owner, slot: u8) -> Option<Guid> {
+        self.invs
+            .get(&owner)
+            .and_then(|i| i.belt.get(&slot).copied())
+    }
+    fn belt_boxes(&self, _belt: Option<Guid>) -> u8 {
+        self.k.boxes
+    }
+    fn page_items(&self, owner: Owner, pg: u8) -> Vec<Guid> {
+        self.items(owner)
+            .into_iter()
+            .filter(|g| self.it(*g).page == pg && self.it(*g).mode == mode::STORED)
+            .collect()
+    }
+    fn body_items(&self, owner: Owner) -> Vec<Guid> {
+        self.invs
+            .get(&owner)
+            .map(|i| i.body.values().copied().collect())
+            .unwrap_or_default()
     }
     fn belt_compact(&mut self, _owner: Owner, slot: u8) {
         self.note(format!("compact {slot}"));
@@ -474,6 +511,9 @@ impl MoveUnits for Fake {
     fn unit_class(&self, u: Owner) -> u32 {
         self.units.get(&u).map_or(0, |x| x.class)
     }
+    fn unit_mode(&self, u: Owner) -> u32 {
+        self.units.get(&u).map_or(0, |x| x.mode)
+    }
     fn pos(&self, u: Owner) -> (i32, i32) {
         self.units.get(&u).map_or((0, 0), |x| (x.x, x.y))
     }
@@ -553,6 +593,19 @@ impl MoveUnits for Fake {
     }
     fn is_type(&self, item: Guid, ty: u16) -> bool {
         self.it(item).types.contains(&ty)
+    }
+    /// The first listed type is the primary one.
+    fn primary_type(&self, item: Guid) -> u16 {
+        self.it(item).types.first().copied().unwrap_or(0)
+    }
+    fn stackable(&self, item: Guid) -> bool {
+        self.it(item).stackable
+    }
+    fn autostack(&self, item: Guid) -> bool {
+        self.it(item).autostack
+    }
+    fn quiver(&self, item: Guid) -> bool {
+        self.it(item).quiver
     }
     fn code(&self, item: Guid) -> [u8; 4] {
         self.it(item).code
@@ -661,9 +714,6 @@ impl MovePending for Fake {
     fn inventory_pass(&mut self, _owner: Owner) {
         self.note("inventory_pass".into());
     }
-    fn belt_unequip(&mut self, _owner: Owner, item: Guid) {
-        self.note(format!("belt_unequip {item}"));
-    }
     fn sound(&mut self, _u: Owner, id: u32) {
         self.note(format!("sound {id:#x}"));
     }
@@ -750,9 +800,6 @@ impl MovePending for Fake {
     fn remove_used(&mut self, _p: Owner, item: Guid) {
         self.note(format!("remove_used {item}"));
     }
-    fn pickup_special(&mut self, _p: Owner, _item: Guid) -> bool {
-        self.k.special
-    }
     fn equip_picked(&mut self, _p: Owner, item: Guid) -> bool {
         self.note(format!("equip_picked {item}"));
         self.k.equip_picked
@@ -764,9 +811,6 @@ impl MovePending for Fake {
     fn hireling(&self, _p: Owner) -> Option<Owner> {
         self.k.hireling
     }
-    fn not_dead(&self, _p: Owner) -> bool {
-        self.k.not_dead
-    }
     fn alive(&self, _u: Owner) -> bool {
         self.k.alive
     }
@@ -776,11 +820,56 @@ impl MovePending for Fake {
     fn equip_on_merc(&mut self, _m: Owner, item: Guid) {
         self.note(format!("equip_on_merc {item}"));
     }
-    fn resync(&mut self, _p: Owner) {
-        self.note("resync".into());
-    }
     fn send(&mut self, _p: Owner, bytes: Vec<u8>) {
         self.sent.push(bytes);
+    }
+    fn walk_to_unit(&mut self, _p: Owner, t: Owner, cursor: bool) {
+        self.note(format!("walk_unit {}:{} {cursor}", t.ty, t.guid));
+    }
+    fn tile_warp(&mut self, _p: Owner, t: Owner) {
+        self.note(format!("warp {}", t.guid));
+    }
+    fn corpse_pickup(&mut self, _p: Owner, c: Owner) {
+        self.note(format!("corpse {}", c.guid));
+    }
+    fn player_interact(&mut self, _p: Owner, o: Owner) {
+        self.note(format!("interact {}", o.guid));
+    }
+    fn use_item_at(&mut self, _p: Owner, item: Guid, x: i32, y: i32) -> bool {
+        self.note(format!("use_at {item} {x},{y}"));
+        self.k.use_ok
+    }
+    fn consume_item(&mut self, _p: Owner, item: Guid) {
+        self.note(format!("consume_item {item}"));
+    }
+    fn item_skill(&self, _item: Guid) -> i32 {
+        self.k.item_skill
+    }
+    fn has_skill(&self, _p: Owner, _s: i32) -> bool {
+        self.k.has_skill
+    }
+    fn skill_decrement(&mut self, _p: Owner, s: i32) {
+        self.note(format!("skill_dec {s}"));
+    }
+    fn set_quest_flag(&mut self, _p: Owner, q: u8, f: u8, on: bool) {
+        self.note(format!("quest_flag {q} {f} {on}"));
+        if on {
+            self.k.quest_flags.insert((q, f));
+        } else {
+            self.k.quest_flags.remove(&(q, f));
+        }
+    }
+    fn quest_item_used(&mut self, _p: Owner) {
+        self.note("quest_used".into());
+    }
+    fn quest_tr2_used(&mut self, _p: Owner) {
+        self.note("tr2".into());
+    }
+    fn reset_skills_stats(&mut self, _p: Owner) {
+        self.note("reset_skills_stats".into());
+    }
+    fn has_used_skill(&self, _p: Owner) -> bool {
+        self.k.used_skill
     }
     fn send_item_stat(&mut self, _p: Owner, item: Guid, stat: u16) {
         self.note(format!("3E {item} {stat}"));
@@ -793,8 +882,5 @@ impl MovePending for Fake {
             b.push(page);
         }
         b
-    }
-    fn filler_owner(&self, parent: Guid) -> Owner {
-        self.k.filler_owner.unwrap_or(Owner::item(parent))
     }
 }

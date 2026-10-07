@@ -1197,6 +1197,41 @@ fn monster_events() {
     assert_eq!(run(&mut game, &mut sys, 8, 1, 1), ["pskills 1 1"]);
 }
 
+/// tick.md §5.6: the freeze gate only skips the call. A gated due timer
+/// (AI think) is freed like any run bucket timer and nothing reschedules
+/// it; a gated every-tick timer stays in its list and dispatches again
+/// once the gate lifts.
+// Covers: specs/sim/tick.md §5.6
+#[test]
+fn freeze_gate_frees_due_timers_and_keeps_every_tick() {
+    let mut game = Game::new();
+    game.frame = 100;
+    let mut sys = system();
+    let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+    sys.units.get_mut(m).expect("m").mode = 4;
+    game.timers.cancel_unit_timers(m);
+    sys.with(&mut game, |sim, _| {
+        sim.stats.toggle_state(m, state::FREEZE, true);
+    });
+    at(&mut game, m, event::AI_THINK, 101, 7, 8);
+    at(&mut game, m, event::MODE_CHANGE, -1, 1, 2);
+    step(&mut game, &mut sys);
+    assert!(sys.hooks.log.is_empty(), "{:?}", sys.hooks.log);
+    assert!(sys.errors.is_empty(), "{:?}", sys.errors);
+    // The AI think is gone; the every-tick event is still listed.
+    assert_eq!(pending(&game, m), [(0, -1, 1, 2)]);
+    step(&mut game, &mut sys);
+    assert!(sys.hooks.log.is_empty(), "{:?}", sys.hooks.log);
+    assert_eq!(pending(&game, m), [(0, -1, 1, 2)]);
+    // Gate lifted: the every-tick event dispatches; no AI think returns.
+    sys.with(&mut game, |sim, _| {
+        sim.stats.toggle_state(m, state::FREEZE, false);
+    });
+    step(&mut game, &mut sys);
+    assert_eq!(sys.hooks.log, ["mfn 0x5a7670"]);
+    assert_eq!(pending(&game, m), [(0, -1, 1, 2)]);
+}
+
 fn game_frame_plus(sim: &Sim<'_>, d: i32) -> i32 {
     sim.game.frame + d
 }

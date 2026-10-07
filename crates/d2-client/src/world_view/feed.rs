@@ -1,14 +1,17 @@
-// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/render/composition.md (§3 steps 1, 3), specs/client/render-pipeline.md (A1 stage 1)
+// Spec: specs/render/camera.md (§3, §8, §9, §10), specs/render/composition.md (§3 steps 1–3), specs/client/render-pipeline.md (A1 stage 1), specs/render/draw-order.md (§9)
 //! The camera of a drawn frame, fed from the client world, and the frame
 //! built through the original's view rules ([`rules::OriginalView`]).
 //!
 //! A [`ViewFeed`] answers what the client world model does not hold yet:
 //! the local player's position (camera §3), the screen open mode (§1),
-//! the running screen shake and the player seed it draws from (§8), and
-//! (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
+//! the running screen shake and the player seed it draws from (§8), the
+//! BlankScreen flag of the player's level (`composition.md` §3 step 2),
+//! and (as a [`ViewSource`]) unit positions, unit offsets and the map tiles.
 //! Each is a `TODO(spec: …)` hook of its owner; [`NoFeed`] is the
 //! placeholder: no local player, no map, no shake, and an error for
-//! anything that would need a rule.
+//! anything that would need a rule. A feed that states the near rooms
+//! (`draw-order.md` §9) has its frame ordered by `rules::draw_order`:
+//! map tiles and unit draw keys then come from the order.
 //!
 //! [`frame_camera`] computes the camera once per drawn frame (§3) with
 //! the d2rs time base of §9: the shake envelope runs on `t = 40 × (server
@@ -19,6 +22,7 @@
 //! [`NoCamera`], which refuses every tile and unit (nothing can be placed
 //! without the §3 origins) and passes the UI through.
 
+use d2_data::tables::Levels;
 use d2_sim::rng::Seed;
 
 use crate::bridge::world::ClientWorld;
@@ -26,6 +30,9 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
+use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
+use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile};
+use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
@@ -56,6 +63,12 @@ pub trait ViewFeed: ViewSource {
     /// TODO(spec: ui/panels.md) (camera §1): the screen open mode.
     fn open_mode(&self, world: &ClientWorld) -> Result<OpenMode, ViewError>;
 
+    /// The screen open mode the UI set for this frame (`ui/panels.md`
+    /// §4.2, [`crate::ui::original::OriginalUi::open_mode`]), handed over
+    /// by the world view before each build when the original UI runs. The
+    /// default ignores it: the feed answers [`Self::open_mode`] itself.
+    fn set_ui_open_mode(&mut self, _mode: OpenMode) {}
+
     /// TODO(spec: the effect specs that call `0x00476A80`) (camera §8):
     /// the shake running at this frame, if any.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError>;
@@ -64,6 +77,74 @@ pub trait ViewFeed: ViewSource {
     /// the local player unit's seed (`unit +0x20`), advanced by the two
     /// draws of each shaking frame.
     fn player_seed(&mut self, world: &ClientWorld) -> Result<&mut Seed, ViewError>;
+
+    /// TODO(spec: the DRLG → client owner spec; `drlg/rooms.md` §3, §6,
+    /// §9) (`draw-order.md` §9): the near-room array of the local player's
+    /// active room with its tile records and unit lists; the draw order
+    /// writes the frame's flag and fade changes back. `None` (the default)
+    /// = the model states no map, and `map_tiles` answers alone.
+    fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
+        Ok(None)
+    }
+
+    /// The weather state of the frame (`draw-order-2.md` §11; pools,
+    /// floor context, the local player's seed, update count, `Mud`).
+    /// `None` (the default): no weather state; a frame that draws a water
+    /// floor then fails (§11.5 draws the player's seed per such floor).
+    fn weather_frame(
+        &mut self,
+        _world: &ClientWorld,
+    ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
+        Ok(None)
+    }
+
+    /// TODO(spec: render/blend-modes.md, render/lighting.md)
+    /// (`draw-order.md` §8): the fade clock of the frame.
+    fn fade_clock(&self, _world: &ClientWorld) -> Result<FadeClock, ViewError> {
+        Err(ViewError::unresolved(
+            "wall fade clock",
+            "render/blend-modes.md",
+        ))
+    }
+
+    /// TODO(spec: render/draw-order.md open question 12, render/shading.md,
+    /// render/lighting.md, render/blend-modes.md): the DT1 frame, blocks,
+    /// shading and blend of an ordered tile.
+    fn tile_art(&self, _tile: &OrderedTile, _assets: &ViewAssets) -> Result<TileArt, ViewError> {
+        Err(ViewError::unresolved(
+            "tile art",
+            "render/draw-order.md open question 12",
+        ))
+    }
+
+    /// TODO(spec: the S→C owner spec of the player's current level)
+    /// (`composition.md` §3 step 2): BlankScreen of the player's current
+    /// level, i.e. [`blank_screen`] of its `Levels.txt` row; it decides
+    /// the frame's start-of-frame clear ([`crate::scene::FrameCycle::plan`]).
+    fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError>;
+
+    /// TODO(spec: client/model.md light records, `render/lighting.md` §8):
+    /// the frame's light (`lighting.md` §1 r3: the light map rebuilt per
+    /// drawn frame, the act's shade tables) and the per-unit look inputs.
+    /// `Some` makes [`build_frame`] answer unit `shade` / `blend` through
+    /// [`LitRules`]; `None` (the default) leaves them to the rules.
+    fn light(&self, _world: &ClientWorld) -> Result<Option<FeedLight<'_>>, ViewError> {
+        Ok(None)
+    }
+}
+
+/// What [`ViewFeed::light`] hands the frame build.
+#[derive(Clone, Copy)]
+pub struct FeedLight<'a> {
+    pub light: &'a FrameLight,
+    pub look: &'a dyn LookFeed,
+}
+
+/// BlankScreen of a `Levels.txt` row (record `+0x218`, `composition.md`
+/// §3 step 2): the `bClear` argument of `StartDraw`, which clears when
+/// non-zero.
+pub fn blank_screen(level: &Levels) -> bool {
+    level.blankscreen != 0
 }
 
 /// The placeholder feed: the client world states no local player, no map
@@ -102,6 +183,14 @@ impl ViewFeed for NoFeed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Err(ViewError::unresolved("local player seed", CAMERA))
     }
+
+    /// The model states no level for the player. All 137 rows of the live
+    /// `levels.txt` have BlankScreen = 1 (`composition.md` §3 step 2), so
+    /// every level of the original data clears; the placeholder answers
+    /// that until the level is in the model.
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 fn camera_error(what: &'static str, message: String) -> ViewError {
@@ -135,11 +224,7 @@ pub fn frame_shake<F: ViewFeed + ?Sized>(
         })?;
     let ticks = u32::try_from(ticks)
         .map_err(|_| camera_error("screen shake", format!("{ticks} ticks exceed 32 bits")))?;
-    let a = running
-        .shake
-        .amplitude(Shake::time_of(ticks))
-        .map_err(|e| camera_error("screen shake", e.to_string()))?;
-    match a {
+    match running.shake.amplitude(Shake::time_of(ticks)) {
         None | Some(0) => Ok((0, 0)),
         Some(a) => Ok(shake_offsets(a, feed.player_seed(world)?)),
     }
@@ -174,7 +259,8 @@ fn camera_and_mode<F: ViewFeed + ?Sized>(
 const NO_WORLD_MODE: u8 = 3;
 
 /// Builds the frame through the original's view rules: the camera once
-/// (§3), then [`OriginalView`] over `rules` and `feed`; without a local
+/// (§3), then [`OriginalView`] over `rules` and `feed` (ordered by
+/// `draw-order.md` when the feed states the near rooms); without a local
 /// player, through [`NoCamera`]. In screen open mode 3 the camera (and its
 /// shake draws) is still computed, but the world is skipped and only the
 /// UI is built ([`NoWorld`], `render/composition.md` §3 steps 1 and 3).
@@ -198,7 +284,10 @@ where
             },
             assets,
         ),
-        Some((camera, _)) => build(world, ui, &OriginalView::new(camera, rules, &*feed), assets),
+        Some((camera, mode)) => match ordered_source(world, &camera, mode, feed, assets)? {
+            Some(source) => build_lit(world, ui, rules, camera, &source, source.source, assets),
+            None => build_lit(world, ui, rules, camera, &*feed, &*feed, assets),
+        },
         None => build(
             world,
             ui,
@@ -208,6 +297,35 @@ where
             },
             assets,
         ),
+    }
+}
+
+/// [`build`] through [`OriginalView`], with unit `shade` / `blend` from
+/// the feed's light ([`LitRules`]) when it states one.
+fn build_lit<R, S, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    camera: Camera,
+    source: &S,
+    feed: &F,
+    assets: &ViewAssets,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    S: ViewSource + ?Sized,
+    F: ViewFeed + ?Sized,
+{
+    match feed.light(world)? {
+        Some(l) => {
+            let lit = LitRules {
+                rules,
+                feed: l.look,
+                light: l.light,
+            };
+            build(world, ui, &OriginalView::new(camera, &lit, source), assets)
+        }
+        None => build(world, ui, &OriginalView::new(camera, rules, source), assets),
     }
 }
 
@@ -265,6 +383,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for NoCamera<'_, R
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError> {
         self.rules.component_frame(unit, pose, req)
+    }
+
+    fn component_slot_frame(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        req: &ComponentRequest<'_>,
+    ) -> Result<Option<ComponentFrame>, CompositeError> {
+        self.rules.component_slot_frame(unit, pose, req)
     }
 
     fn place(

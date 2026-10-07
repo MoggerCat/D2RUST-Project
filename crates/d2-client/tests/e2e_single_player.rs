@@ -39,8 +39,9 @@
 //!    cursor (0x16), placed in the grid (0x18), lifted (0x19), equipped
 //!    (0x1A), unequipped (0x1C), dropped (0x17), picked and placed
 //!    again; each frame's tick sends the deferred item messages (§6,
-//!    §11: 0x9C / 0x9D with an empty item bit stream, OQ1) and 0x47,
-//!    0x48;
+//!    §11: 0x9C / 0x9D with the item bit stream, `items/bitstream.md`:
+//!    decoded with `d2-proto`'s reader and cut off by `streams`) and
+//!    0x47, 0x48;
 //! 10. (steps 19–22) the vendor on the same inventory: the cap placed by
 //!     0x18 is sold (0x33: removed, freed, the price received: S→C 0x2A
 //!     kind 3), a buy (0x32) **stops at the item copy** `0x0055A2A0`
@@ -74,15 +75,13 @@
 //! The whole run is repeated: same seed → byte-identical transcript.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use d2_client::bridge::dispatch::Dispatch;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::{Bridge, FrameReport};
-use d2_data::bin::BinTable;
-use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{Difficultylevels, Itemstatcost, Levels, Monlvl, Objects, Record};
+use d2_data::tables::{Difficultylevels, Monlvl};
 use d2_proto::client::{
     AddStatPoint, BuyItem, ClickButton, DropItem, EntityAction, EquipItem, InitEntityChat,
     InsertItemInBuffer, InteractWithEntity, ItemToCube, PickItem, RemoveBodyItem,
@@ -90,820 +89,57 @@ use d2_proto::client::{
 };
 use d2_server::adapters::handlers::items::{CubeParts, ItemPending};
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
-use d2_server::adapters::handlers::skills::LearnRest;
-use d2_server::adapters::handlers::world::{ActionWorld, Outbox, WiredWorld};
+use d2_server::adapters::handlers::world::{ActionWorld, WiredWorld};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::dispatch::Outcome;
 use d2_server::host::{Handled, Host};
 use d2_server::seams::{Clock, PlayerGate, Pos, ResultCode};
-use d2_sim::bench_fixtures::combat::{
-    anim_data, arrow, combat_tables, monster_class, skills, vitals, MONSTER_DT, MULTI, PLAYER_SC,
-};
 use d2_sim::drlg::collision::bits;
-use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
-use d2_sim::drlg::outdoor::{OutdoorData, PresetDef as OutdoorPreset, SubDefs, SubFileMap};
-use d2_sim::drlg::preset::{
-    Ds1Input, Ds1ObjectInput, Ds1Source, PresetData, PresetDef, PresetTables,
-};
-use d2_sim::drlg::tiles::{cell, FIXED_LIBRARY};
-use d2_sim::drlg::{Drlg, DrlgData, DrlgRoomId, Dungeon, LevelDef, TileInfo, TileSource};
+use d2_sim::drlg::maze::Maze;
+use d2_sim::drlg::outdoor::SubFileMap;
+use d2_sim::drlg::{Drlg, DrlgRoomId, Dungeon};
 use d2_sim::game::Game;
 use d2_sim::items::inventory::InvItem;
 use d2_sim::items::moves::Owner;
 use d2_sim::items::tables::ItemRec;
 use d2_sim::items::{flag, q, ty, ItemRequest, ItemTables};
-use d2_sim::missiles::{param_flags, unit_flag, MissileParams};
+use d2_sim::missiles::unit_flag;
 use d2_sim::monsters::init::{GameInfo, MonstatsExtra};
 use d2_sim::monsters::population::PopTables;
 use d2_sim::rng::Seed;
-use d2_sim::skills::use_::{MissileAim, ModeTarget, ServerMsg, UseState};
 use d2_sim::skills::SkillEntry;
-use d2_sim::stats::{StatData, StatTable};
-use d2_sim::treasure::{ItemData, TcEntry, TreasureClass, TreasureClasses};
-use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
+use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
-use d2_sim::units::modes;
 use d2_sim::units::{RoomId, UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, KillStep, Pending, SkillEvent};
-use d2_sim::wiring::economy::{
-    monster_death_drop, DeathDrops, DropSpot, DropTables, FreeSpot, GameFields, ItemSpawn,
-    ItemStore,
-};
-use d2_sim::wiring::interaction::{skill_events, UseRest};
-use d2_sim::wiring::worldgen::{
-    SharedTypes, WorldPending, WorldSim, WorldState, WorldTables, WorldTypes,
-};
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::economy::{DeathDrops, DropSpot, DropTables, GameFields, ItemSpawn, ItemStore};
+use d2_sim::wiring::worldgen::{SharedTypes, WorldSim, WorldState, WorldTables, WorldTypes};
 use d2_sim::world::cube::{
     input_flags, kind, CraftMod, CubeData, InputSlot, ItemRecord, OutputSlot, Recipe, CUBE_PAGE,
 };
 use d2_sim::world::npc::{class, NpcControl};
 use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
-use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
 mod e2e_support;
+#[path = "e2e_support/world.rs"]
+mod e2e_world;
 use e2e_support::{blank, item_tables, monstats as npc_monstats, tx, vendor_tables, Rest};
 use e2e_support::{inv_parts, inv_tables, store, InvFx, BUC, CAP, N_MONSTATS};
+use e2e_world::*;
 
 // ---- constants -----------------------------------------------------------------------
 
-/// The DRLG init seed of `outdoor.md`'s recorded Act I placement
-/// (`dwStartSeed` 4014346869): act 0's levels are allocated by the real
-/// level types from it.
-const DRLG_SEED: u32 = 644_409_375;
-/// The game seed (`rng.md` §5.3).
-const GAME_SEED: u32 = 1234;
-/// A preset level outside the Act I chain (40 × 18 tiles at (8000,
-/// 8000)): the player's level, with a waypoint and the DS1 monster.
-const ISLE: u32 = 30;
-const ISLE_DEF: u32 = 1104;
-/// The preset level the waypoint travels to: also outside the Act I
-/// chain (40 × 18 at (9000, 9000)). A chain level (e.g. the Monastery
-/// Gate) would generate its outdoor neighbours, which need `lvlsub` rows
-/// this fixture does not have.
-const GATE: u32 = 31;
-const GATE_DEF: u32 = 1105;
-/// Akara's position, beside the player.
-const NPC_AT: (i32, i32) = (40_022, 40_022);
 /// The player's gold before the trade.
 const PLAYER_GOLD: i32 = 5000;
-/// Stat ids (`itemstatcost`).
+/// Stat ids (`itemstatcost`; `GOLD` is the shared fixture's).
 const STATPTS: u16 = 4;
 const NEWSKILLS: u16 = 5;
 const STRENGTH: u16 = 0;
 const DEXTERITY: u16 = 2;
 const LEVEL: u16 = 12;
-const GOLD: u16 = 14;
 const NEXTEXP: u16 = 30;
 const ARMORCLASS: u16 = 31;
-/// Waypoint indices (`levels.txt` `Waypoint`).
-const ISLE_WP: u8 = 2;
-const GATE_WP: u8 = 1;
-/// The ISLE DS1's monster: DS1 sub-tile (12, 10), class 0.
-const ISLE_MONSTER: (u32, u32) = (12, 10);
-/// The player's position: room (8000, 8000)'s sub-tiles start at
-/// (40000, 40000) (`rooms.md` §9.2, 5 sub-tiles per tile).
-const PLAYER_AT: (i32, i32) = (40_020, 40_020);
-/// The waypoint object's position.
-const WP_AT: (i32, i32) = (40_024, 40_020);
-/// Skills of the synthetic table: attack, and a right skill (srvst 4,
-/// mana 4 + 1 per level, shift 8; `use.md`'s Multiple Shot vector).
-const ATTACK: i32 = 0;
-
-// ---- seams without a provider --------------------------------------------------
-
-/// The action and world-generation seams no written spec provides yet
-/// (positions and a straight-line path, warp, arrival mode, transport,
-/// the DRLG population reads, the COF-name composer and the animation
-/// rate, the monster death start's body), the skill use pipeline's rest
-/// ([`UseRest`]: the player's skill state in [`Book`], for the message
-/// and the timer paths alike), the drop state, and a log of the calls
-/// that change something. The answers are the narrowest ones
-/// (`Pending`'s defaults) except those the test stages (see each). The
-/// player's interaction is the server host's (the NPC rest, `Rest`).
-#[derive(Default)]
-struct TestPending {
-    pos: BTreeMap<UnitId, (i32, i32)>,
-    sent: Vec<(UnitId, Vec<u8>)>,
-    log: Vec<String>,
-    /// Missile target points (`0x00648AD0`) and the sub-tiles each step
-    /// crossed.
-    aim: BTreeMap<UnitId, (i32, i32)>,
-    crossed: BTreeMap<UnitId, Vec<(i32, i32)>>,
-    velocity: BTreeMap<UnitId, i32>,
-    /// The point the cast aims its missile at (the skill missile
-    /// helpers' record fill, `use.md` §5.4 step 7, is not specified).
-    aim_at: (i32, i32),
-    book: Book,
-    /// The game's drop state (`treasure.md` §3), lent out during a drop.
-    drops: Option<DeathDrops>,
-}
-
-impl Pending for TestPending {
-    fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
-        match (ty, mode) {
-            (UnitType::Player, 10) => Some(*PLAYER_SC),
-            (UnitType::Monster, 0) => Some(*MONSTER_DT),
-            _ => None,
-        }
-    }
-    /// The rate formula `0x00623F50` is not written: the AnimData speed
-    /// as is (no rate stats in this game).
-    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
-        speed.map_or(0, |s| s as i16)
-    }
-    fn position(&self, unit: UnitId) -> (i32, i32) {
-        self.pos.get(&unit).copied().unwrap_or_default()
-    }
-    fn place(&mut self, unit: UnitId, x: i32, y: i32) {
-        self.pos.insert(unit, (x, y));
-    }
-    fn size(&self, _: UnitId) -> i32 {
-        1
-    }
-    fn has_path(&self, _: UnitId) -> bool {
-        true
-    }
-    fn set_velocity(&mut self, unit: UnitId, v: i32) {
-        self.velocity.insert(unit, v);
-    }
-    fn velocity(&self, unit: UnitId) -> i32 {
-        self.velocity.get(&unit).copied().unwrap_or(0)
-    }
-    fn set_target_point(&mut self, unit: UnitId, x: i32, y: i32) {
-        self.aim.insert(unit, (x, y));
-    }
-    fn target_distance(&self, _: UnitId) -> i32 {
-        10
-    }
-    /// One sub-tile toward the target point on each axis.
-    fn step(&mut self, _: &mut Game, unit: UnitId) -> bool {
-        let (x, y) = self.position(unit);
-        let (tx, ty) = self.aim.get(&unit).copied().unwrap_or((x + 1, y));
-        let p = (x + (tx - x).signum(), y + (ty - y).signum());
-        self.pos.insert(unit, p);
-        self.crossed.insert(unit, vec![p]);
-        true
-    }
-    fn crossed_subtiles(&self, unit: UnitId) -> Vec<(i32, i32)> {
-        self.crossed.get(&unit).cloned().unwrap_or_default()
-    }
-    fn may_attack(&self, a: UnitId, d: UnitId) -> bool {
-        a != d
-    }
-    fn class_has_mode(&self, _: i32, _: u8) -> bool {
-        true
-    }
-    fn skill_list(&self, _: UnitId) -> Vec<SkillEntry> {
-        self.book.get().list.clone()
-    }
-    fn used_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.book.get().used
-    }
-    fn unit_event(
-        &mut self,
-        event: u8,
-        unit: Option<UnitId>,
-        _: Option<UnitId>,
-        _: Option<&mut d2_sim::combat::DamageRecord>,
-    ) {
-        self.log
-            .push(format!("event {event} {:?}", unit.map(|u| u.0)));
-    }
-    fn reaction(&mut self, a: UnitId, d: UnitId, r: &mut d2_sim::combat::DamageRecord) {
-        self.log
-            .push(format!("reaction {} {} {:#x}", a.0, d.0, r.result));
-    }
-    fn kill_step(&mut self, _: &mut Game, step: KillStep, d: UnitId, a: UnitId) {
-        self.log.push(format!("kill {step:?} {} {}", d.0, a.0));
-    }
-    fn send(&mut self, player: UnitId, msg: &[u8]) {
-        self.sent.push((player, msg.to_vec()));
-    }
-    fn warp(&mut self, _: &mut Game, player: UnitId, level: u32, tile_code: u8) {
-        self.log
-            .push(format!("warp {} {level} {tile_code}", player.0));
-    }
-    fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
-        self.log.push(format!("arrival mode {}", player.0));
-    }
-    fn level_up_event(&mut self, unit: UnitId) {
-        self.log.push(format!("level up {}", unit.0));
-    }
-    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, ev: SkillEvent) {
-        skill_events::route(h, sim, ev);
-    }
-    fn action_frame(
-        h: &mut ActionHooks<Self>,
-        sim: &mut USim<'_>,
-        u: UnitId,
-        a1: u32,
-        a2: u32,
-    ) -> u32 {
-        h.x.log.push(format!("action frame {} {a1} {a2}", u.0));
-        skill_events::action_frame(h, sim, u, a1, a2)
-    }
-    /// The death start's body is not written: the fixture sets mode DT
-    /// (a start function sets its mode, monster spec) and runs the drop
-    /// gate and drop it is known to call (`treasure.md` §3.1).
-    fn monster_death_start(
-        h: &mut ActionHooks<Self>,
-        sim: &mut USim<'_>,
-        unit: UnitId,
-        target: Option<UnitId>,
-    ) -> bool {
-        h.x.log.push(format!(
-            "death start {} target {:?}",
-            unit.0,
-            target.map(|t| t.0)
-        ));
-        modes::set_mode(sim, h, unit, 0).expect("mode DT");
-        if let Some(mut d) = h.x.drops.take() {
-            monster_death_drop(h, sim, &mut d, &mut Spot, unit, target);
-            h.x.drops = Some(d);
-        }
-        true
-    }
-}
-
-/// The free-spot search `0x0064E810` (collision spec, not written): the
-/// start spot as is.
-struct Spot;
-
-impl FreeSpot for Spot {
-    fn free_spot(
-        &mut self,
-        room: Option<RoomId>,
-        start: (i32, i32),
-        _: (i32, i32),
-    ) -> Option<DropSpot> {
-        Some(DropSpot {
-            room,
-            x: start.0,
-            y: start.1,
-        })
-    }
-}
-
-impl WorldPending for TestPending {
-    fn preset_created(&mut self, unit: UnitId, p: &d2_sim::monsters::population::PresetUnit) {
-        self.log.push(format!(
-            "preset {} class {} at {},{}",
-            unit.0, p.class, p.x, p.y
-        ));
-    }
-}
-
-impl Outbox for TestPending {
-    fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-        std::mem::take(&mut self.sent)
-    }
-}
-
-/// The skill use pipeline's rest (the message path through the server's
-/// skill handlers, the action frame on the timer path): the player's
-/// skill state from [`Book`], the rest narrowest.
-impl UseRest for TestPending {
-    fn send(&mut self, u: UnitId, msg: ServerMsg) {
-        self.log.push(format!("send {} {msg:?}", u.0));
-    }
-    fn has_player_data(&self, _: UnitId) -> bool {
-        true
-    }
-    fn last_point_frame(&self, _: UnitId) -> i32 {
-        0
-    }
-    fn set_last_point_frame(&mut self, _: UnitId, _: i32) {}
-    fn cursor_item(&self, _: UnitId) -> bool {
-        false
-    }
-    fn in_own_inventory(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn within_reach(&self, _: UnitId, _: UnitId) -> bool {
-        true
-    }
-    fn owner(&self, _: UnitId) -> Option<UnitId> {
-        None
-    }
-    fn is_pet(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn is_ally(&self, _: UnitId, _: UnitId) -> bool {
-        false
-    }
-    fn left_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        None
-    }
-    fn right_skill(&self, _: UnitId) -> Option<SkillEntry> {
-        self.book.get().right
-    }
-    fn set_left_skill(&mut self, _: UnitId, _: SkillEntry) {}
-    fn set_right_skill(&mut self, _: UnitId, e: SkillEntry) {
-        self.book.get().right = Some(e);
-    }
-    fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
-        self.book.find_entry(u, skill)
-    }
-    fn find_entry_owned(&self, _: UnitId, _: i32, _: i32) -> Option<SkillEntry> {
-        None
-    }
-    fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
-        self.book.find_entry(u, skill).is_some()
-    }
-    fn set_used_skill(&mut self, _: UnitId, e: Option<SkillEntry>) {
-        self.book.get().used = e;
-    }
-    fn used_skill_flags(&self, _: UnitId) -> u32 {
-        0
-    }
-    fn set_used_skill_flags(&mut self, _: UnitId, _: u32) {}
-    fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
-        self.book.entry_mode(u, e)
-    }
-    fn attack_param4(&self, _: UnitId) -> i32 {
-        0
-    }
-    fn set_attack_param4(&mut self, _: UnitId, _: i32) {}
-    fn use_state(&mut self, _: UnitId, _: &SkillEntry) -> UseState {
-        UseState::Usable
-    }
-    fn dec_quantity(&mut self, _: UnitId, _: i32) {}
-    fn shapeshifted(&self, _: UnitId) -> bool {
-        false
-    }
-    fn consume_charges(&mut self, _: UnitId, _: &SkillEntry) -> bool {
-        true
-    }
-    fn pay_life(&mut self, _: UnitId, _: i32) -> bool {
-        true
-    }
-    fn can_dual_wield(&self, _: UnitId) -> bool {
-        false
-    }
-    fn equippable(&self, _: UnitId) -> bool {
-        false
-    }
-    fn bow_equipped(&self, _: UnitId) -> bool {
-        false
-    }
-    fn state_mask(&self, _: UnitId, _: u32) -> bool {
-        false
-    }
-    fn start_mode(&mut self, _: &mut Game, _: UnitId, _: u32, _: ModeTarget<UnitId>) {}
-    fn run_to(&mut self, _: UnitId, _: UnitId, _: SkillEntry) {}
-    fn target(&self, _: UnitId) -> Option<UnitId> {
-        None
-    }
-    fn clear_target(&mut self, _: UnitId) {}
-    fn event_arg(&self, _: UnitId) -> i32 {
-        0
-    }
-    fn set_event_arg(&mut self, _: UnitId, _: i32) {}
-    fn step_path(&mut self, _: UnitId) -> i32 {
-        0
-    }
-    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
-        Some(self.aim_at)
-    }
-    fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
-        true
-    }
-    fn set_aura_state(&mut self, _: UnitId, _: u16, _: i32, _: i32) {}
-    /// The helpers' record fill is not specified: aimed at the cast's
-    /// target point, absolute.
-    fn skill_missile_fill(&self, _: UnitId, _: bool, _: MissileAim, p: &mut MissileParams) {
-        p.flags |= param_flags::TARGET_ABSOLUTE;
-        (p.target_x, p.target_y) = self.aim_at;
-    }
-    fn srvst(&mut self, index: u16, u: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.book.srvst(index, u, skill, lvl)
-    }
-    fn srvdo(&mut self, i: u16, u: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
-        self.book.srvdo(i, u, s, l, c, it, a)
-    }
-}
-
-/// The skill-point calls (`levels.md` §6.4): not reached in this run.
-impl LearnRest for TestPending {
-    fn is_class_skill(&self, _: UnitId, _: i32) -> bool {
-        false
-    }
-    fn add_skill_level(&mut self, _: UnitId, _: i32, _: i32) {}
-    fn after_skill_point(&mut self, _: UnitId) {}
-}
-
-/// The skill pipeline's state without a provider (skill list, skill
-/// bodies: `use.md` OQ10): the player's skill list and a call log,
-/// shared with the test.
-#[derive(Default)]
-struct Inner {
-    list: Vec<SkillEntry>,
-    right: Option<SkillEntry>,
-    used: Option<SkillEntry>,
-    log: Vec<String>,
-}
-
-#[derive(Clone, Default)]
-struct Book(Arc<Mutex<Inner>>);
-
-impl Book {
-    fn get(&self) -> MutexGuard<'_, Inner> {
-        self.0.lock().unwrap()
-    }
-    fn find_entry(&self, _: UnitId, skill: i32) -> Option<SkillEntry> {
-        self.get().list.iter().copied().find(|e| e.skill == skill)
-    }
-    fn entry_mode(&self, _: UnitId, e: &SkillEntry) -> u32 {
-        // Skill entry +8 (`use.md` §4): attack 7 (A1), the right skill
-        // 10 (SC).
-        if e.skill == MULTI {
-            10
-        } else {
-            7
-        }
-    }
-    fn srvst(&self, index: u16, _: UnitId, skill: i32, lvl: i32) -> i32 {
-        self.get().log.push(format!("srvst {index} {skill} {lvl}"));
-        1
-    }
-    /// The do bodies are catalogued only (`use.md` OQ10): logged, result
-    /// 0 (the generic `srvmissile` creation of §5.4 step 7 still runs).
-    #[allow(clippy::too_many_arguments)]
-    fn srvdo(&self, i: u16, _: UnitId, s: i32, l: i32, c: bool, it: bool, a: bool) -> i32 {
-        self.get()
-            .log
-            .push(format!("srvdo {i} {s} {l} {c} {it} {a}"));
-        0
-    }
-}
-
-// ---- DS1 / DT1 sources ---------------------------------------------------------------
-
-#[derive(Default)]
-struct Ds1s(BTreeMap<Vec<u8>, Ds1Input>);
-
-impl Ds1Source for Ds1s {
-    fn ds1(&self, path: &[u8]) -> Option<&Ds1Input> {
-        self.0.get(path)
-    }
-}
-
-/// A v18 DS1 of `w × h` tiles: one layer of plain floors, an empty
-/// shadow layer, monsters (id = class) at DS1 sub-tile positions.
-fn ds1(w: u32, h: u32, monsters: &[(u32, u32, u32)]) -> Ds1Input {
-    let cells = ((w + 1) * (h + 1)) as usize;
-    Ds1Input {
-        version: 18,
-        width: w,
-        height: h,
-        act: 0,
-        tag_type: 0,
-        walls: Vec::new(),
-        orientations: Vec::new(),
-        floors: vec![vec![cell::FLOOR; cells]],
-        shadow: vec![0; cells],
-        objects: monsters
-            .iter()
-            .map(|&(id, x, y)| Ds1ObjectInput {
-                kind: 1,
-                id,
-                x,
-                y,
-                flags: 0,
-            })
-            .collect(),
-        paths: Vec::new(),
-    }
-}
-
-fn ds1s() -> Ds1s {
-    let (x, y) = ISLE_MONSTER;
-    Ds1s(BTreeMap::from([
-        (
-            format!("def{ISLE_DEF}.ds1").into_bytes(),
-            ds1(40, 18, &[(0, x, y)]),
-        ),
-        (format!("def{GATE_DEF}.ds1").into_bytes(), ds1(40, 18, &[])),
-    ]))
-}
-
-fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
-    TileInfo {
-        orientation: o,
-        main,
-        sub,
-        rarity,
-        material: 0,
-        subtile_flags: [0; 25],
-    }
-}
-
-struct Tiles(BTreeMap<Vec<u8>, Vec<TileInfo>>);
-
-impl TileSource for Tiles {
-    fn dt1(&self, path: &[u8]) -> Option<&[TileInfo]> {
-        self.0.get(path).map(Vec::as_slice)
-    }
-}
-
-fn tiles() -> Tiles {
-    let mut t = BTreeMap::new();
-    t.insert(b"floor.dt1".to_vec(), vec![tile(0, 0, 0, 1); 4]);
-    let blank_tile = |sub| {
-        let mut x = tile(0, 30, sub, 0);
-        x.subtile_flags = [0x20; 25];
-        x
-    };
-    t.insert(
-        FIXED_LIBRARY[0].to_vec(),
-        vec![blank_tile(0), blank_tile(1)],
-    );
-    t.insert(FIXED_LIBRARY[1].to_vec(), vec![]);
-    t.insert(FIXED_LIBRARY[2].to_vec(), vec![tile(10, 0, 0, 0)]);
-    Tiles(t)
-}
-
-// ---- tables -----------------------------------------------------------------------------
-
-/// Act I sizes, offsets and Vis of `outdoor.md`'s recorded placement,
-/// plus [`ISLE`] and the maze level 8; level types 1 and 3 with one DT1.
-fn drlg_data() -> DrlgData {
-    let mut d = DrlgData {
-        levels: vec![LevelDef::default(); 150],
-        ..DrlgData::default()
-    };
-    for l in &mut d.levels {
-        l.warp = [-1; 8];
-        l.level_type = 1;
-    }
-    let set = |d: &mut DrlgData, id: usize, ty: u32, size: (i32, i32), off: (i32, i32)| {
-        d.levels[id].drlg_type = ty;
-        d.levels[id].size = [size; 3];
-        d.levels[id].offset = off;
-    };
-    set(&mut d, 1, 2, (56, 40), (0, 0));
-    set(&mut d, 2, 3, (56, 96), (0, 0));
-    set(&mut d, 3, 3, (80, 80), (0, 0));
-    set(&mut d, 4, 3, (80, 80), (1000, 1000));
-    set(&mut d, 5, 3, (80, 80), (0, 0));
-    set(&mut d, 6, 3, (80, 80), (0, 0));
-    set(&mut d, 7, 3, (80, 80), (0, 0));
-    set(&mut d, 8, 1, (200, 200), (1500, 1000));
-    set(&mut d, 17, 3, (40, 48), (0, 0));
-    set(&mut d, 26, 2, (40, 18), (3000, 1000));
-    set(&mut d, 27, 2, (40, 40), (0, 0));
-    set(&mut d, 39, 3, (64, 64), (5000, 1148));
-    set(&mut d, ISLE as usize, 2, (40, 18), (8000, 8000));
-    set(&mut d, GATE as usize, 2, (40, 18), (9000, 9000));
-    d.levels[8].level_type = 3;
-    d.levels[2].vis = [1, 3, 0, 0, 0, 0, 0, 0];
-    d.levels[3].vis = [2, 4, 17, 0, 0, 0, 0, 0];
-    d.levels[1].vis = [2, 0, 0, 0, 0, 0, 0, 0];
-    d.levels[4].vis = [3, 0, 0, 0, 0, 0, 0, 0];
-    d.levels[17].vis = [3, 0, 0, 0, 0, 0, 0, 0];
-    let mut files = vec![Vec::new(); 32];
-    files[0] = b"floor.dt1".to_vec();
-    d.lvltypes = vec![
-        vec![Vec::new(); 32],
-        files.clone(),
-        vec![Vec::new(); 32],
-        files,
-    ];
-    d
-}
-
-/// lvlprest rows 0..1199 (`Files` 1, DT1 mask 1), the preset levels'
-/// rows (town Files 0, Monastery Gate, Outer Cloister Files 3, ISLE, the
-/// travel level) and
-/// the outdoor cell row 1103 (16 × 16, Files 2).
-fn preset_data() -> PresetData {
-    let mut defs: Vec<PresetDef> = (0..1200)
-        .map(|i| PresetDef {
-            def: i,
-            files: 1,
-            dt1_mask: 1,
-            populate: 1,
-            file: Default::default(),
-            ..PresetDef::default()
-        })
-        .collect();
-    for d in &mut defs {
-        d.file[0] = format!("def{}.ds1", d.def).into_bytes();
-    }
-    for (i, level, files) in [
-        (1100, 1, 0),
-        (1101, 26, 1),
-        (GATE_DEF, GATE, 1),
-        (1102, 27, 3),
-        (ISLE_DEF, ISLE, 1),
-        (1103, 0, 2),
-    ] {
-        defs[i as usize].level_id = level;
-        defs[i as usize].files = files;
-    }
-    defs[1103].size_x = 16;
-    defs[1103].size_y = 16;
-    PresetData {
-        defs,
-        monpreset_acts: Default::default(),
-        monpreset: Vec::new(),
-        monstats_count: 1,
-        superuniques_count: 0,
-        hdm_item: -1,
-        tables: PresetTables::spec().expect("preset-tables.tsv"),
-    }
-}
-
-fn outdoor_data(pd: &PresetData) -> OutdoorData {
-    OutdoorData {
-        levels: vec![
-            SubDefs {
-                sub_type: -1,
-                sub_theme: -1,
-                sub_waypoint: -1,
-                sub_shrine: -1,
-            };
-            150
-        ],
-        presets: pd
-            .defs
-            .iter()
-            .map(|d| OutdoorPreset {
-                size_x: d.size_x as i32,
-                size_y: d.size_y as i32,
-                files: d.files,
-            })
-            .collect(),
-        subs: Vec::new(),
-    }
-}
-
-fn maze_data() -> MazeData {
-    MazeData {
-        rows: vec![MazeRow {
-            level: 8,
-            rooms: [1; 3],
-            size_x: 24,
-            size_y: 24,
-            merge: 0,
-        }],
-        prest_files: (0..1200).map(|d| (d, 1)).collect(),
-        specials: Specials::shipped(),
-    }
-}
-
-/// levels.txt: no monsters, act by level id; waypoints at [`ISLE`] and
-/// [`GATE`] only.
-fn levels() -> Vec<Levels> {
-    let mut v: Vec<Levels> = vec![blank(); 150];
-    for (i, l) in v.iter_mut().enumerate() {
-        for m in [
-            &mut l.mon1,
-            &mut l.mon2,
-            &mut l.mon3,
-            &mut l.mon4,
-            &mut l.mon5,
-            &mut l.mon6,
-            &mut l.mon7,
-            &mut l.mon8,
-            &mut l.mon9,
-            &mut l.mon10,
-            &mut l.mon11,
-            &mut l.mon12,
-            &mut l.mon13,
-            &mut l.mon14,
-            &mut l.mon15,
-            &mut l.mon16,
-            &mut l.mon17,
-            &mut l.mon18,
-            &mut l.mon19,
-            &mut l.mon20,
-            &mut l.mon21,
-            &mut l.mon22,
-            &mut l.mon23,
-            &mut l.mon24,
-            &mut l.mon25,
-            &mut l.nmon1,
-            &mut l.umon1,
-        ] {
-            *m = 0xFFFF;
-        }
-        l.act = d2_sim::drlg::act_of_level(i as u32);
-        l.waypoint = NO_WAYPOINT;
-    }
-    v[ISLE as usize].waypoint = ISLE_WP;
-    v[GATE as usize].waypoint = GATE_WP;
-    v
-}
-
-/// A synthetic itemstatcost: 359 stats, no ops, fixed up.
-fn stat_data() -> Arc<StatData> {
-    let (n, size) = (359, Itemstatcost::SIZE);
-    let mut records = vec![0u8; n * size];
-    for (s, r) in records.chunks_mut(size).enumerate() {
-        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
-            r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        }
-        r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
-    }
-    let mut t = BinTable {
-        name: "itemstatcost".into(),
-        source: "synthetic".into(),
-        count: n,
-        record_size: size,
-        records,
-    };
-    stat_ops(&mut t);
-    Arc::new(StatData {
-        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
-        ..StatData::default()
-    })
-}
-
-/// Items: gold only (`ty::GOLD`, a child of `ty::MISC`); treasure class
-/// 1: one pick of gold.
-fn drop_tables() -> DropTables {
-    // The game's one item table (gold among the vendor and cube items):
-    // the drop creates into the game's one item store, which every item
-    // system reads with these records.
-    let items = game_item_tables();
-    let treasure_items = items
-        .items
-        .iter()
-        .map(|r| ItemData {
-            code: r.code,
-            ubercode: r.ubercode,
-            ultracode: r.ultracode,
-            version: r.version,
-            level: r.level,
-            type_: r.type_ as u16,
-            type2: r.type2 as u16,
-            unique: r.unique,
-            quest: r.quest,
-            spawnable: 1,
-        })
-        .collect();
-    let tc = |name: &[u8], entries: Vec<TcEntry>, total| TreasureClass {
-        name: name.to_vec(),
-        group: 0,
-        level: 0,
-        total_classic: total,
-        total_expansion: total,
-        picks: 1,
-        nodrop: 0,
-        mods: [0; 6],
-        entries,
-    };
-    let gold_entry = TcEntry {
-        start_classic: 0,
-        start_expansion: 0,
-        id: GOLD_REC as _,
-        row: 0,
-        flags: 0,
-        mods: [0; 6],
-    };
-    DropTables {
-        items,
-        tcs: TreasureClasses {
-            tcs: vec![tc(b"none", Vec::new(), 0), tc(b"gold", vec![gold_entry], 1)],
-            group_offset: 0,
-            chest: [None; 45],
-            notes: Vec::new(),
-        },
-        treasure_items,
-        superuniques: Vec::new(),
-    }
-}
-
-/// One waypoint object class (0): operate 23, init 17.
-fn waypoint_data() -> WaypointData {
-    let mut o: Objects = blank();
-    o.operatefn = 23;
-    o.initfn = 17;
-    o.framecnt1 = 15 << 8;
-    WaypointData::new(&levels(), &[o])
-}
 
 // ---- the cube's item world --------------------------------------------------------------
 
@@ -918,6 +154,13 @@ const RING: usize = 3;
 const AMULET: usize = 4;
 /// The gold pile's record (`gld `), the drop's item.
 const GOLD_REC: usize = 5;
+
+/// The drop tables over the game's one item table (gold among the
+/// vendor and cube items): the drop creates into the game's one item
+/// store, which every item system reads with these records.
+fn drop_tables() -> DropTables {
+    drop_tables_from(game_item_tables(), GOLD_REC)
+}
 
 /// The game's item tables: the vendor items (`e2e_support::item_tables`:
 /// cap, buckler) and the cube's items (`box `, a ring, an amulet; each
@@ -1114,7 +357,7 @@ impl Fx {
             skills: skills(),
             combat: combat_tables(),
             levels: levels(),
-            skill_modes: vec![[0; 3]],
+            skill_modes: vec![[0; 8]],
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1654,16 +897,66 @@ struct Transcript {
 }
 
 /// A recording bridge frame.
+/// S→C 0x07 MapReveal of the room at tile (x, y) of `level`
+/// (`server-messages.tsv`: x u16 @1, y u16 @3, level u8 @5).
+fn map_reveal(x: u16, y: u16, level: u32) -> Vec<u8> {
+    let mut b = vec![0x07];
+    b.extend(x.to_le_bytes());
+    b.extend(y.to_le_bytes());
+    b.push(level as u8);
+    b
+}
+
 fn record(fx: &mut Fx, frames: &mut Vec<Frame>, msgs: Vec<Vec<u8>>) {
-    let before = fx.bridge.log().unowned.values().sum::<u64>();
     let step = fx.step(&msgs);
-    // The bridge has no S→C handler yet (`bridge-dispatch.tsv`: every id
-    // TBD), so each received message is counted unowned; the chunks are
-    // taken from the host's flush report.
+    // Each received message is accounted once (`bridge.md` §6,
+    // `client/model.md` §4 rule 1): applied, queued on its unit, dropped
+    // (unit-handler message for a unit the model does not hold), unowned
+    // or rejected. No 0x04 arrives, so no update pass runs.
     let chunks = std::mem::take(&mut fx.bridge.link_mut().chunks);
-    let after = fx.bridge.log().unowned.values().sum::<u64>();
-    assert_eq!(after - before, step.report.messages as u64);
+    let r = &step.report;
+    assert_eq!(
+        r.handled + r.queued + r.dropped + r.unowned + r.rejected,
+        r.messages
+    );
+    assert_eq!(r.drained, 0);
     frames.push((msgs, step, chunks));
+}
+
+/// A frame's received messages with each 0x9C / 0x9D item bit stream
+/// (`items/bitstream.md`) checked and cut off (size byte = header size),
+/// so the steps state the §11 headers: the stream must decode to its
+/// exact length with `d2-proto`'s reader on the game's item tables and
+/// carry the item's code when the item is still in the game.
+fn streams(fx: &Fx, msgs: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    use d2_server::adapters::item_bits::TablesLookup;
+    let sim = fx.sim_ref();
+    msgs.iter()
+        .map(|m| {
+            let head = match m[0] {
+                0x9C => 8,
+                0x9D => 13,
+                _ => return m.clone(),
+            };
+            assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+            let bits = d2_proto::item_bits::decode(&m[head..], &TablesLookup(&sim.world.tables))
+                .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"));
+            let guid = u32::from_le_bytes(m[4..8].try_into().unwrap());
+            let unit = sim
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid);
+            if let Some(it) = unit.and_then(|u| sim.events.action.sys.hooks.items.get(u)) {
+                assert_eq!(
+                    bits.code, sim.world.tables.items[it.record].code,
+                    "code of {guid}"
+                );
+            }
+            let mut h = m[..head].to_vec();
+            h[2] = head as u8;
+            h
+        })
+        .collect()
 }
 
 fn run() -> Transcript {
@@ -1690,11 +983,17 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(!r.ticked);
 
     // Frame 2 (tick 1): the client's room change activates the rooms
-    // near the player's (`rooms.md` §4.1: 4 rooms); the room pass
-    // creates the DS1's preset monster at its sub-tile (`population.md`
-    // §11.1). No step sends.
+    // near the player's (`rooms.md` §4.1: 4 rooms) and sends one S→C 0x07
+    // per room of the player's adjacency array, in its order
+    // (`path-placement.md` §11 "Recipients"); the room pass creates the
+    // DS1's preset monster at its sub-tile (`population.md` §11.1).
     record(&mut fx, &mut frames, vec![]);
-    assert_eq!(frames[0].2, none);
+    assert_eq!(
+        frames[0].2,
+        [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
+            .map(|(x, y)| map_reveal(x, y, ISLE))
+            .to_vec()
+    );
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
     assert_eq!(monsters.len(), 1, "the DS1 preset monster");
@@ -1727,12 +1026,12 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames[1].2, none);
     assert_eq!(fx.mode(player), 10);
     assert_eq!(fx.stat(player, 8), 4000 - 3328);
-    assert_eq!(fx.book.get().log, ["srvst 4 1 10"]);
+    assert_eq!(fx.book.get().log, ["srvst 42 1 10"]);
     assert_eq!(fx.player_timers(), [(0, 5), (1, 9)]);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Frames 3–5. On frame 5 the action frame `0x00580460` runs the used
-    // skill's do function (`use.md` §5.2, §5.4): srvdo 8 (body
+    // skill's do function (`use.md` §5.2, §5.4): srvdo 3 (body
     // catalogued only, `use.md` OQ10: the seam), then the generic
     // `srvmissile` 0 through the real missile creation (`missiles.md`
     // §R2) at the player, aimed at the cast point.
@@ -1746,7 +1045,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     assert_eq!(
         fx.book.get().log,
-        ["srvst 4 1 10", "srvdo 8 1 10 true false false"]
+        ["srvst 42 1 10", "srvdo 3 1 10 true false false"]
     );
     assert_eq!(fx.player_timers(), [(1, 9)]);
     let shot = fx.missiles();
@@ -2001,7 +1300,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![pick_cap.clone()]);
     assert_eq!(frames[20].1.codes, [(0x16, done)]);
-    assert_eq!(frames[20].2, pass(vec![x9c(0x01, cg)]));
+    assert_eq!(streams(&fx, &frames[20].2), pass(vec![x9c(0x01, cg)]));
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), None);
 
@@ -2018,7 +1317,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![insert.clone()]);
     assert_eq!(frames[21].1.codes, [(0x18, done)]);
-    assert_eq!(frames[21].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(streams(&fx, &frames[21].2), pass(vec![x9c(0x04, cg)]));
     assert_eq!(fx.mode(cap), 0);
     assert_eq!(fx.items().get(cap).unwrap().inv_page, 0);
 
@@ -2027,7 +1326,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let lift = bytes(&RemoveItemFromBuffer { item: cg });
     record(&mut fx, &mut frames, vec![lift]);
     assert_eq!(frames[22].1.codes, [(0x19, done)]);
-    assert_eq!(frames[22].2, pass(vec![x9d(0x05, cg)]));
+    assert_eq!(streams(&fx, &frames[22].2), pass(vec![x9d(0x05, cg)]));
     assert_eq!(fx.mode(cap), 4);
 
     // 14. Equip on the head (C→S 0x1A location 1, §7.5 → §4.6): mode 1
@@ -2038,7 +1337,7 @@ fn run_with(game_seed: u32) -> Transcript {
     });
     record(&mut fx, &mut frames, vec![equip]);
     assert_eq!(frames[23].1.codes, [(0x1A, done)]);
-    assert_eq!(frames[23].2, pass(vec![x9d(0x06, cg)]));
+    assert_eq!(streams(&fx, &frames[23].2), pass(vec![x9d(0x06, cg)]));
     assert_eq!(fx.mode(cap), 1);
 
     // 15. Unequip (C→S 0x1C location 1, §7.7): to the cursor → 0x9D
@@ -2046,7 +1345,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let unequip = bytes(&RemoveBodyItem { bodyloc: 1 });
     record(&mut fx, &mut frames, vec![unequip]);
     assert_eq!(frames[24].1.codes, [(0x1C, done)]);
-    assert_eq!(frames[24].2, pass(vec![x9d(0x08, cg)]));
+    assert_eq!(streams(&fx, &frames[24].2), pass(vec![x9d(0x08, cg)]));
     assert_eq!(fx.mode(cap), 4);
 
     // 16. Drop (C→S 0x17, §7.2 → §9.1): no room at (x + 2, y + 3) (the
@@ -2076,10 +1375,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // inventory model, as the vendor sees it next.
     record(&mut fx, &mut frames, vec![pick_cap]);
     assert_eq!(frames[26].1.codes, [(0x16, done)]);
-    assert_eq!(frames[26].2, pass(vec![x9c(0x01, cg)]));
+    assert_eq!(streams(&fx, &frames[26].2), pass(vec![x9c(0x01, cg)]));
     record(&mut fx, &mut frames, vec![insert]);
     assert_eq!(frames[27].1.codes, [(0x18, done)]);
-    assert_eq!(frames[27].2, pass(vec![x9c(0x04, cg)]));
+    assert_eq!(streams(&fx, &frames[27].2), pass(vec![x9c(0x04, cg)]));
     assert_eq!(fx.mode(cap), 0);
     assert!(fx.inventory().contains(&cap));
     assert!(fx.inv.with(|r| r.log.len()) == 2);
@@ -2172,7 +1471,7 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames[32].1.codes, [(0x16, done)]);
-    assert_eq!(frames[32].2, pass(vec![x9c(0x01, rg)]));
+    assert_eq!(streams(&fx, &frames[32].2), pass(vec![x9c(0x01, rg)]));
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
     assert_eq!(
@@ -2201,7 +1500,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     record(&mut fx, &mut frames, vec![put]);
     assert_eq!(frames[33].1.codes, [(0x2A, done)]);
-    assert_eq!(frames[33].2, pass(vec![x9c(0x04, rg)]));
+    assert_eq!(streams(&fx, &frames[33].2), pass(vec![x9c(0x04, rg)]));
     assert_eq!(fx.items().get(ring).unwrap().inv_page, CUBE_PAGE);
     assert_eq!(fx.mode(ring), 0);
     assert_eq!(fx.inventory(), [fx.buckler, cube, ring]);
@@ -2230,7 +1529,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let ag = fx.guid(amulet);
     let mut want = vec![x9d(0x05, rg)];
     want.extend(pass(vec![x9c(0x04, ag)]));
-    assert_eq!(frames[34].2, want);
+    assert_eq!(streams(&fx, &frames[34].2), want);
     assert!(!fx.items().contains(ring));
     assert!(fx.sim_ref().game.lists.unit(ring).is_none(), "freed");
     let it = fx.items().get(amulet).unwrap().clone();
@@ -2276,31 +1575,41 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
     assert_eq!(fx.inv.with(|r| r.log.clone()), Vec::<String>::new());
 
-    // The client: 37 frames, 36 server ticks. The S→C messages it got
-    // (0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31); 0x9C seven
-    // times (frames 20, 21, 26, 27, 32, 33, 34), 0x9D four times (22, 23,
-    // 24, 34), 0x47 and 0x48 ten times each, one per update pass) have no client owner
-    // yet (`bridge-dispatch.tsv`: every id TBD), so they are counted
-    // unowned and no unit is in the model; nothing rejected or
-    // discarded.
+    // The client: 37 frames, 36 server ticks. The S→C messages it got:
+    // 0x27, 0x29, 0x28 once, 0x2A four times (frames 28–31) have no
+    // client owner yet (unowned); 0x9C seven times (frames 20, 21, 26,
+    // 27, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and 0x48
+    // ten times each are applied (`client/msg-stats-items.md`). The 0x9C
+    // made the three items it names; 0x9D needs the local player, which
+    // this staged game never announces (no 0x59 / 0x0B), so it changes
+    // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
+    // fatal 0x58A (no client act: this staged game sends no 0x03);
+    // nothing discarded.
     let w = fx.bridge.world();
     let client = (w.frames, w.server_ticks, w.units.len());
-    assert_eq!(client, (37, 36, 0));
+    assert_eq!(client, (37, 36, 3));
+    assert_eq!(w.local_player, None);
+    for (k, u) in &w.units {
+        assert_eq!(k.unit_type, d2_client::bridge::world::ITEM);
+        let d2_client::bridge::world::KindData::Item(d) = &u.kind else {
+            panic!("item data");
+        };
+        assert_eq!(d.last.as_ref().map(|r| r.id), Some(0x9C));
+    }
     let log = fx.bridge.log();
     assert_eq!(
         log.unowned,
-        BTreeMap::from([
-            (0x27, 1),
-            (0x28, 1),
-            (0x29, 1),
-            (0x2A, 4),
-            (0x47, 10),
-            (0x48, 10),
-            (0x9C, 7),
-            (0x9D, 4),
-        ])
+        BTreeMap::from([(0x27, 1), (0x28, 1), (0x29, 1), (0x2A, 4)])
     );
-    assert!(log.rejected.is_empty() && log.discarded.is_empty());
+    assert_eq!(log.handled, 31);
+    let rejected: Vec<(u8, String)> = log
+        .rejected
+        .iter()
+        .map(|r| (r.id, r.error.to_string()))
+        .collect();
+    assert_eq!(rejected, vec![(0x07, "fatal assert 0x58A".to_owned()); 4]);
+    assert!(log.discarded.is_empty());
+    assert!(log.dropped.is_empty() && log.queued == 0);
 
     let player_mana = fx.stat(player, 8);
     let player_exp = fx.stat(player, 13);

@@ -7,9 +7,10 @@
 //! real field room. Only [`MoveRest`] (the seams no d2-sim module
 //! provides) is a fake: it answers what the test sets and logs.
 //!
-//! The bytes are exact: the 0x9C / 0x9D headers of §11 (the item bit
-//! stream is the open seam `item_bits`, empty here: inventory.md OQ1),
-//! 0x47 / 0x48 after each update pass, and the direct sends.
+//! The bytes are exact: the 0x9C / 0x9D headers of §11 (each item bit
+//! stream is decoded with `d2-proto`'s reader and checked against the
+//! item, then cut off: `T::streams`), 0x47 / 0x48 after each update
+//! pass, and the direct sends.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -43,10 +44,12 @@ use crate::adapters::handlers::items::ITEM_IDS;
 use crate::adapters::handlers::world::tests::trade_quests::{ActionRest, Rest};
 use crate::adapters::handlers::world::tests::waypoints::{field_drlg, field_room};
 use crate::adapters::handlers::world::{ActionEvents, ActionWorld, WiredWorld};
+use crate::adapters::item_bits::TablesLookup;
 use crate::adapters::{PlayerData, PlayerFields, ProtoSizes};
 use crate::dispatch::Outcome;
 use crate::host::{Handled, Host};
 use crate::seams::{Clock, PlayerGate, SessionHandler};
+use d2_proto::item_bits::decode;
 
 const N_STATS: usize = 359;
 const N_TYPES: usize = 80;
@@ -94,7 +97,7 @@ fn set_u16(r: &mut [u8], o: usize, v: u16) {
     r[o..o + 2].copy_from_slice(&v.to_le_bytes());
 }
 
-fn stat_data() -> Arc<StatData> {
+pub(crate) fn stat_data() -> Arc<StatData> {
     let size = Itemstatcost::SIZE;
     let mut records = vec![0u8; N_STATS * size];
     for s in 0..N_STATS {
@@ -323,18 +326,6 @@ impl MovePending for MRest {
     fn set_owner(&mut self, item: Guid, owner: Owner) {
         self.log(format!("set_owner {item} {}", owner.guid));
     }
-    fn use_grid_item(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> (bool, bool) {
-        self.log(format!("use_grid_item {} {item} {x} {y}", player.guid));
-        (false, false)
-    }
-    fn use_item_action(&mut self, player: Owner, target: Guid, used: Guid) -> (bool, bool) {
-        self.log(format!("use_item_action {} {target} {used}", player.guid));
-        (false, false)
-    }
-    fn swap_1h_with_2h(&mut self, player: Owner, item: Guid, loc: u8) -> (bool, bool) {
-        self.log(format!("swap_1h_with_2h {} {item} {loc}", player.guid));
-        (false, false)
-    }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         self.log(format!("use_item {} {} {item}", player.guid, target.guid));
         self.with(|r| r.use_ok)
@@ -369,9 +360,6 @@ impl InvRest for MRest {
     fn spell(&self, item: Guid) -> i32 {
         self.with(|r| r.spells.get(&item).copied().unwrap_or(0))
     }
-    fn percent_of(&self, value: i32, p: i32) -> i32 {
-        value * p / 100
-    }
     fn item_active_on(&self, _: Guid, _: Owner) -> bool {
         false
     }
@@ -390,17 +378,11 @@ impl InvRest for MRest {
     fn ammo_type(&self, _: Guid) -> Option<i16> {
         None
     }
-    fn stack_quality_ok(&self, _: Guid) -> bool {
-        true
-    }
     fn has_allowed_location(&self, _: Guid) -> bool {
         true
     }
     fn quiver_kind(&self, _: Guid) -> bool {
         false
-    }
-    fn auto_equip_allows(&self, _: Owner, _: Guid, _: u8) -> bool {
-        true
     }
     fn interaction(&self, _: Owner) -> InteractionTarget {
         InteractionTarget::None
@@ -665,7 +647,53 @@ impl T {
         let Handled::Game(Outcome::Dispatched(code)) = r.messages[0].handled else {
             panic!("{:?}", r.messages[0]);
         };
-        (code, self.host.receive(0))
+        let got = self.host.receive(0);
+        (code, self.streams(got))
+    }
+
+    /// Checks the item bit stream of each 0x9C / 0x9D
+    /// (`items/bitstream.md`) and returns the messages with it cut off
+    /// (size byte = header size), so the tests state the headers of §11.
+    /// The stream must decode to its exact length with `d2-proto`'s
+    /// reader on the host's tables (`adapters::item_bits`), carry the
+    /// item's code and, for an item still in the game, its mode in the
+    /// item's last message of the batch (a message sent "now", §6.4,
+    /// carries the mode of its moment).
+    fn streams(&mut self, msgs: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        let guid_of = |m: &[u8]| u32::from_le_bytes(m[4..8].try_into().unwrap());
+        let last: BTreeMap<Guid, usize> = msgs
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m[0] == 0x9C || m[0] == 0x9D)
+            .map(|(i, m)| (guid_of(m), i))
+            .collect();
+        msgs.into_iter()
+            .enumerate()
+            .map(|(i, mut m)| {
+                let head = match m[0] {
+                    0x9C => 8,
+                    0x9D => 13,
+                    _ => return m,
+                };
+                assert_eq!(usize::from(m[2]), m.len(), "size byte {m:?}");
+                let guid = guid_of(&m);
+                let bits = {
+                    let tables = &self.sim().world.tables;
+                    decode(&m[head..], &TablesLookup(tables))
+                        .unwrap_or_else(|e| panic!("stream of {m:?}: {e}"))
+                };
+                if let Some(u) = self.unit(guid) {
+                    let record = self.sim().events.sys.hooks.items.get(u).unwrap().record;
+                    assert_eq!(bits.code, ROWS[record].0, "code of {guid}");
+                    if last[&guid] == i {
+                        assert_eq!(u32::from(bits.mode), self.mode(guid), "mode of {guid}");
+                    }
+                }
+                m.truncate(head);
+                m[2] = head as u8;
+                m
+            })
+            .collect()
     }
 
     /// A frame without a message (the next tick's update pass).
@@ -674,7 +702,8 @@ impl T {
         let r = self.host.frame().unwrap();
         assert!(r.ticked);
         self.no_errors();
-        self.host.receive(0)
+        let got = self.host.receive(0);
+        self.streams(got)
     }
 
     fn no_errors(&mut self) {
@@ -712,15 +741,16 @@ impl T {
     }
 }
 
-/// 0x9C with an empty bit stream (§11): [id, action, size 8, category 0,
-/// GUID].
+/// 0x9C header (§11; stream cut off by `T::streams`): [id, action,
+/// size 8, category 0, GUID].
 fn x9c(action: u8, item: Guid) -> Vec<u8> {
     let mut b = vec![0x9C, action, 8, 0];
     b.extend_from_slice(&item.to_le_bytes());
     b
 }
 
-/// 0x9D with an empty bit stream (§11): size 13, category 0, owner.
+/// 0x9D header (§11; stream cut off by `T::streams`): size 13,
+/// category 0, owner.
 fn x9d(action: u8, item: Guid, owner_type: u8, owner: Guid) -> Vec<u8> {
     let mut b = vec![0x9D, action, 13, 0];
     b.extend_from_slice(&item.to_le_bytes());
@@ -850,7 +880,8 @@ fn pick_item_to_the_cursor() {
     assert_eq!(bytes, t.pass(&[x9c(0x01, k)]));
     assert_eq!(t.data(k).cmd_flags, 0, "clean-up");
     let p = t.player;
-    assert_eq!(t.sim().events.sys.units.get(p).unwrap().flags2 & 3, 0);
+    // The reset clears +0xC8 bit 0; bit 1 ("save pending") stays (IS1).
+    assert_eq!(t.sim().events.sys.units.get(p).unwrap().flags2 & 3, 2);
     assert_eq!(t.idle(), NO_BYTES);
     let me = t.pguid();
     assert_eq!(t.rest.take_log(), [format!("pickup_sound {me} {k}")]);
@@ -884,7 +915,8 @@ fn pick_item_auto_and_refusals() {
 /// 0x17 (§7.2, §9.1): the cursor item dropped at the free spot: mode 3,
 /// in the room, at the spot, expiry frame + 15000. §9.1 runs no owner
 /// refresh and no update list, so the tick sends nothing to the owner;
-/// the ground message (§6.3) is not built on real units (WV1). An item
+/// the ground message (§6.3) is not sent: the per-unit update that would
+/// send it is not wired (see `update_pass`). An item
 /// that is not the cursor item → 1.
 // Covers: specs/items/inventory.md §7.2 r1, §9.1
 #[test]
@@ -938,7 +970,10 @@ fn lift_and_insert() {
     assert_eq!((d.page, d.x, d.y), (0, 0, 0));
     assert_eq!(bytes, t.pass(&[x9c(0x04, k)]));
     let _c = t.cursor_item(KEY);
-    assert_eq!(t.frame(&msg(0x19, &[k])), (Invalid, NO_BYTES));
+    // A cursor item: "can't do that" (S→C 0x5A, §7.4 step 2), 2.
+    let (code, bytes) = t.frame(&msg(0x19, &[k]));
+    assert_eq!(code, Invalid);
+    assert_eq!(bytes, [d2_sim::items::moves::layouts::cant_do_that()]);
     assert_eq!(t.mode(k), 0);
 }
 
@@ -1031,9 +1066,9 @@ fn swap_cursor_with_body() {
     assert_eq!(bytes, t.pass(&m));
 }
 
-/// 0x1E (§7.9): the swap itself is the item-use spec's (`MovePending`
-/// seam `swap_1h_with_2h`, logged; its default "nothing" → 0). Location
-/// 3 → 3; an empty location 4 → 1.
+/// 0x1E (§7.9): location 3 → 3; an empty location 4 → 1; a two-hander
+/// onto a sword with the other hand empty: §4.3 gives 0, not 7 → 0 with
+/// nothing moved.
 // Covers: specs/items/inventory.md §7.9
 #[test]
 fn swap_one_handed_with_two_handed() {
@@ -1044,17 +1079,14 @@ fn swap_one_handed_with_two_handed() {
     assert_eq!(t.frame(&body(0x1A, n, 4)).0, Done);
     assert_eq!(t.mode(n), 1);
     let n2 = t.cursor_item(TWO_HANDER);
-    t.rest.take_log();
     assert_eq!(t.frame(&body(0x1E, n2, 4)), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("swap_1h_with_2h {me} {n2} 4")]);
     assert_eq!((t.mode(n), t.mode(n2)), (1, 4));
 }
 
 // ---- 0x20–0x22: use, stack -------------------------------------------------------------
 
-/// 0x20 (§7.11): a stored item used at a point in range: the use is the
-/// item-use spec's (seam, logged; "nothing" → 0). A ground item → 1.
+/// 0x20 (§7.11): a key is not `useable` → out 1 (step 1) → 3. A ground
+/// item → 1.
 // Covers: specs/items/inventory.md §7.11
 #[test]
 fn use_grid_item() {
@@ -1062,10 +1094,7 @@ fn use_grid_item() {
     let k = t.picked(KEY);
     let g = t.ground_item(KEY, 12, 12);
     assert_eq!(t.frame(&msg(0x20, &[g, 10, 10])), (Refused, NO_BYTES));
-    t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("use_grid_item {me} {k} 11 10")]);
+    assert_eq!(t.frame(&msg(0x20, &[k, 11, 10])), (Malformed, NO_BYTES));
 }
 
 /// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
@@ -1173,8 +1202,8 @@ fn item_to_belt_shift_sends_now() {
 
 // ---- 0x27–0x29: item use, sockets, tomes -----------------------------------------------
 
-/// 0x27 (§7.18): both items owned → the item-use seam (logged; "nothing"
-/// → 0). A ground target → 1.
+/// 0x27 (§7.18): both items owned, but a cursor item exists → 0 (step
+/// 2). A ground target → 1.
 // Covers: specs/items/inventory.md §7.18
 #[test]
 fn use_item_action() {
@@ -1183,10 +1212,7 @@ fn use_item_action() {
     let u = t.cursor_item(KEY);
     let g = t.ground_item(KEY, 12, 12);
     assert_eq!(t.frame(&msg(0x27, &[g, u])), (Refused, NO_BYTES));
-    t.rest.take_log();
     assert_eq!(t.frame(&msg(0x27, &[k, u])), (Done, NO_BYTES));
-    let me = t.pguid();
-    assert_eq!(t.rest.take_log(), [format!("use_item_action {me} {k} {u}")]);
 }
 
 /// 0x28 (§7.19): the filler is not a socket filler (seam
@@ -1321,4 +1347,116 @@ fn without_inventory_parts_the_ids_stay_stubs() {
     t.sim().world.inventory = parts;
     assert_eq!(t.frame(&msg(0x17, &[k])).0, Refused);
     assert_eq!(t.sim().unhandled.len(), 1);
+}
+
+// ---- early refusals ---------------------------------------------------------------------
+
+impl T {
+    /// Everything a refusal could touch, as text: the game, the units,
+    /// stats and items, the inventory state, the player's fields, the
+    /// stubs, and the seams' logs and outboxes.
+    fn digest(&mut self) -> String {
+        let p = self.player;
+        let (log, sent) = self.rest.with(|r| (r.log.clone(), r.sent.clone()));
+        let sim = self.sim();
+        let s = &sim.events.sys;
+        let w = &sim.world;
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}{:?}{:?}|{:?}{:?}{:?}{:?}{:?}|{log:?}{sent:?}",
+            sim.game,
+            s.units,
+            s.stats,
+            s.hooks.items,
+            w.inventory.as_ref().map(|i| &i.state),
+            sim.player_fields(p),
+            sim.unhandled,
+            sim.resyncs,
+            s.hooks.x.sent,
+            w.rest.sent,
+            w.rest.log,
+            w.rest.interact,
+            w.action.faults,
+        )
+    }
+
+    /// `m` through the dispatcher alone (no tick, so the digest compares
+    /// the handler's effect only): result `code`, nothing changed,
+    /// nothing queued for client 0.
+    fn refused(&mut self, m: &[u8], code: ResultCode, what: &str) {
+        let before = self.digest();
+        let mut out = crate::buffers::ClientBuffers::new();
+        out.add_client(0);
+        let got =
+            crate::dispatch::dispatch(self.sim(), &ProtoSizes, &mut out, 0, ALIVE.gate, m, m.len());
+        assert_eq!(got, code, "{what}: {m:02X?}");
+        assert_eq!(out.pop(0), None, "{what}: {m:02X?} sent a message");
+        let after = self.digest();
+        assert!(
+            before == after,
+            "{what}: {m:02X?} changed the host:\n{before}\n{after}"
+        );
+    }
+}
+
+/// The refusals `inventory.md` §7 orders before any effect (the item,
+/// cursor, stored, owned and location checks of §5.1, before the
+/// targeting reset and the placement; `docs/HANDOFF.md` PK1) leave the
+/// game, the inventories and the outgoing messages unchanged. The
+/// refusals after a write are left out (§7.3 placement → 3 after the
+/// page and the reset; §7.5 §4.6 → 3 after the reset; §7.10 after T
+/// moved; §7.14, §7.19 after the reset; the item-move gate's 0, §5.4).
+// Covers: specs/items/inventory.md §5.1
+#[test]
+fn early_refusals_change_nothing() {
+    let mut t = setup();
+    let k = t.picked(KEY);
+    let g = t.ground_item(KEY, 12, 12);
+    let c = t.cursor_item(CAP);
+    let me = t.pguid();
+    t.rest.take_log();
+    // 0x16 (§7.1): the own player → 3; a missing item → 1; too far → 1.
+    t.refused(&msg(0x16, &[0, me, 0]), Malformed, "§7.1 own player");
+    t.refused(&pick(0xDEAD, 0), Refused, "§7.1 missing");
+    t.rest.with(|r| r.distance = 51);
+    t.refused(&pick(g, 0), Refused, "§7.1 distance");
+    t.rest.with(|r| r.distance = 1);
+    // 0x17 (§7.2): not the cursor item → 1.
+    t.refused(&msg(0x17, &[k]), Refused, "§7.2 cursor");
+    // 0x18 (§7.3): not the cursor item → 1; page 1 → 2; page 2 without
+    // a trade → 3.
+    t.refused(&msg(0x18, &[k, 0, 0, 0]), Refused, "§7.3 cursor");
+    t.refused(&msg(0x18, &[c, 0, 0, 1]), Invalid, "§7.3 page 1");
+    t.refused(&msg(0x18, &[c, 0, 0, 2]), Malformed, "§7.3 page 2");
+    // 0x19 (§7.4): not stored → 1.
+    t.refused(&msg(0x19, &[g]), Refused, "§7.4 stored");
+    // 0x1A (§7.5): not the cursor item → 1; location 11 → 2.
+    t.refused(&body(0x1A, k, 1), Refused, "§7.5 cursor");
+    t.refused(&body(0x1A, c, 11), Invalid, "§7.5 location");
+    // 0x1B (§7.6): location 11 → 2; location 3 → 3.
+    t.refused(&body(0x1B, c, 11), Invalid, "§7.6 location");
+    t.refused(&body(0x1B, c, 3), Malformed, "§7.6 not a hand");
+    // 0x1C (§7.7): location 11 → 2.
+    t.refused(&loc16(0x1C, 11), Invalid, "§7.7 location");
+    // 0x1D (§7.8): location 11 → 2; an empty location → 1.
+    t.refused(&body(0x1D, c, 11), Invalid, "§7.8 location");
+    t.refused(&body(0x1D, c, 1), Refused, "§7.8 empty");
+    // 0x1E (§7.9): location 3 → 3; an empty hand → 1.
+    t.refused(&body(0x1E, c, 3), Malformed, "§7.9 not a hand");
+    t.refused(&body(0x1E, c, 4), Refused, "§7.9 empty");
+    // 0x20 (§7.11): a ground item → 1.
+    t.refused(&msg(0x20, &[g, 10, 10]), Refused, "§7.11 stored");
+    // 0x21 (§7.12): source = destination → 3; 0x22 (§7.13) → 3.
+    t.refused(&msg(0x21, &[k, k]), Malformed, "§7.12 same item");
+    t.refused(&msg(0x22, &[k]), Malformed, "§7.13");
+    // 0x27 (§7.18): a ground item → 1; 0x28 (§7.19): not the cursor → 1.
+    t.refused(&msg(0x27, &[g, k]), Refused, "§7.18 owned");
+    t.refused(&msg(0x28, &[g, k]), Refused, "§7.19 cursor");
+    // 0x50 (§7.22): more than the gold → 3; another unit → 3.
+    t.refused(&msg(0x50, &[me, 1]), Malformed, "§7.22 amount");
+    t.refused(&msg(0x50, &[me + 1, 1]), Malformed, "§7.22 unit");
+    // 0x63 (§7.24): not stored → 1.
+    t.refused(&msg(0x63, &[g]), Refused, "§7.24 stored");
+    // 0x61 (§7.23): a classic game → 3.
+    let mut t = setup_with(false);
+    t.refused(&loc16(0x61, 1), Malformed, "§7.23 classic");
 }

@@ -15,6 +15,21 @@ pub const QUEST_LOG_ENTRIES: usize = 41;
 pub const GOSSIP_SLOTS: usize = 12;
 
 s2c_message! {
+    /// 0x0B GameHandshake (6 bytes), sender `0x0053B3D0`: the unit's type
+    /// and GUID (`client/model.md` §3 rule 1, the receive layout;
+    /// `items/inventory.md` §9.1, the builder). At a single-player join it
+    /// names the joining player (`client/model.md` §11 rule 3).
+    0x0B GameHandshake 6 {
+        /// `u8` at 1.
+        unit_type: u8 = 1,
+        /// `u32` at 2.
+        unit_guid: u32 = 2,
+    }
+    consts []
+    unwritten []
+}
+
+s2c_message! {
     /// 0x0D PlayerStop (13 bytes), sender `0x0053B4B0`. Values from
     /// `world/waypoints.md` §7 rule 7 (unit type, GUID, 1, x, y, 0, 0);
     /// widths from its recorded bytes `0d 00 01000000 01 2013 8413 00 00`.
@@ -133,6 +148,27 @@ s2c_message! {
     }
     consts []
     unwritten [6]
+}
+
+s2c_message! {
+    /// 0x59 AssignPlayer (26 bytes), sender `0x0053E8F0`: part A of the
+    /// player's add messages (`intents-events.md` §7.2: GUID, class u8
+    /// (unit +0x04), name (player data), x, y (the unit's position)) at the
+    /// offsets of the receive handler (`client/msg-units.md` §1.1 rule 1).
+    0x59 AssignPlayer 26 {
+        /// `u32` at 1.
+        guid: u32 = 1,
+        /// `u8` at 5.
+        class: u8 = 5,
+        /// 16 bytes at 6 (zero-padded).
+        name: [u8; 16] = 6,
+        /// `u16` at 0x16.
+        x: u16 = 0x16,
+        /// `u16` at 0x18.
+        y: u16 = 0x18,
+    }
+    consts []
+    unwritten []
 }
 
 s2c_message! {

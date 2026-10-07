@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md, specs/combat/*, specs/missiles/missiles.md, specs/monsters/ai.md, specs/drlg/rooms.md, specs/world/waypoints.md (integration of the wired modules)
+// Spec: specs/sim/tick.md, specs/combat/*, specs/missiles/missiles.md, specs/monsters/ai.md, specs/drlg/rooms.md, specs/world/waypoints.md, specs/world/objects.md (integration of the wired modules)
 //! Integration tests: the real modules run together through the action
 //! adapters, on synthetic tables and a synthetic DRLG level (two 8×8
 //! preset rooms, streamed). Only the seams without a provider
@@ -15,6 +15,8 @@ mod e2e;
 pub mod fight;
 #[cfg(test)]
 mod missiles;
+#[cfg(test)]
+mod objects;
 #[cfg(test)]
 mod rooms;
 #[cfg(test)]
@@ -58,6 +60,10 @@ pub struct TestPending {
     /// COF names per (unit type, mode) for the AnimData lookup.
     pub names: BTreeMap<(UnitType, u32), [u8; 8]>,
     pub log: Vec<String>,
+    /// Messages sent to players' clients, in order.
+    pub sent: Vec<(UnitId, Vec<u8>)>,
+    /// (operator, object) of every interact-range test, in order.
+    pub ranged: std::cell::RefCell<Vec<(UnitId, UnitId)>>,
 }
 
 impl Pending for TestPending {
@@ -144,6 +150,20 @@ impl Pending for TestPending {
     }
     fn set_object_mode(&mut self, _: &mut Game, object: UnitId, mode: u8) {
         self.log.push(format!("object mode {} {mode}", object.0));
+    }
+    /// Every operator is in interact range of every object (logged).
+    fn object_in_range(&self, _: &Game, operator: UnitId, object: UnitId) -> bool {
+        self.ranged.borrow_mut().push((operator, object));
+        true
+    }
+    fn object_route(&mut self, _: &mut Game, route: crate::wiring::action::ObjectRoute) {
+        self.log.push(format!("object route {route:?}"));
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.sent.push((player, msg.to_vec()));
+    }
+    fn object_free_footprint(&mut self, _: &mut Game, object: UnitId) {
+        self.log.push(format!("free footprint {}", object.0));
     }
 }
 
@@ -300,7 +320,7 @@ fn tables() -> ActionTables {
         skills: skill_tables(vec![skill_rec()]),
         combat: combat_tables(vec![monster_class()]),
         levels: vec![blank::<Levels>(); 150],
-        skill_modes: vec![[0; 3]],
+        skill_modes: vec![[0; 8]],
     }
 }
 

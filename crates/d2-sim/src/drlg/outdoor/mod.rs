@@ -28,8 +28,12 @@
 //! - [`rooms`]: cells to rooms, outdoor room grids (§12);
 //! - [`tilesub`]: lvlsub substitution (`outdoor-tilesub.md`).
 
+pub mod act3;
+pub mod act5;
 pub mod acts;
 pub mod grid;
+pub mod jungle;
+pub mod kurast;
 pub mod place;
 pub mod rooms;
 pub mod tilesub;
@@ -38,6 +42,8 @@ pub mod wild;
 
 #[cfg(test)]
 mod gaps_tests;
+#[cfg(test)]
+mod mutant_tests;
 #[cfg(test)]
 mod tests;
 
@@ -89,6 +95,8 @@ pub enum OutdoorError {
     DriverUnderflow,
     #[error("level {0} is not allocated")]
     LevelMissing(u32),
+    #[error("fatal error {0:#x} (outdoor-act3-act5.md)")]
+    Fatal(u32),
 }
 
 // ---- data ----------------------------------------------------------------
@@ -357,6 +365,11 @@ pub struct OutdoorLevel {
     pub orth: Vec<Orth>,
     /// Build list (level +0x1CC), head first.
     pub build_list: Vec<BuildNode>,
+    /// Act III jungle block ids (level +0x1BC, `outdoor-act3-act5.md`
+    /// §2.8), row-major from the top-left block; written at act creation.
+    pub jungle_ids: Option<Vec<u32>>,
+    /// Act III jungle clearing count (level +0x1B8, §2.8).
+    pub jungle_clearings: i32,
 }
 
 impl OutdoorLevel {

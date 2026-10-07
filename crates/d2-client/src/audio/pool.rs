@@ -1,5 +1,6 @@
 // Spec: specs/client/audio.md
 // Spec: specs/client/assets.md (§A5 sound pool budget)
+// Spec: specs/formats/wav.md (§4 format check, [`D2Wav`])
 //! Sound pool (`audio.md` §A1 decode path, `assets.md` §A5 pool
 //! `sounds`): each `.wav` is read once from the archive set
 //! ([`FileSource`], `ArchiveSet` in the client), decoded once by a
@@ -8,9 +9,9 @@
 //! Residency follows the shared [`Pool`] rules (budget in bytes =
 //! samples × 2, LRU by last frame used, current frame never evicted).
 //!
-//! The RIFF/WAVE parse itself is original behavior:
-//! TODO(spec: formats/wav.md §B1). Nothing here implements [`WavDecoder`];
-//! the client gets one when `d2-formats::wav` exists.
+//! The RIFF/WAVE parse itself is original behavior (`formats/wav.md`):
+//! [`D2Wav`] decodes with `d2_formats::wav` and applies the sound-start
+//! format check of `wav.md` §4.
 
 use std::sync::Arc;
 
@@ -22,12 +23,29 @@ use super::Sound;
 /// Pool name in cache events.
 pub const POOL_NAME: &str = "sounds";
 
-/// RIFF bytes → [`Sound`].
-///
-/// TODO(spec: formats/wav.md §B1): the WAV subset of the 1.14d archives
-/// and the samples 1.14d hands to its sound output.
+/// RIFF bytes → [`Sound`] (`formats/wav.md`; the real one is [`D2Wav`]).
 pub trait WavDecoder: Send + Sync {
     fn decode(&self, path: &CanonicalPath, bytes: &[u8]) -> Result<Sound, String>;
+}
+
+/// The 1.14d WAV decode (`formats/wav.md` §1–§3) with the sound-start
+/// check of §4: only tag 1, 16-bit, 22,050 Hz, mono or stereo plays; any
+/// other file fails to load, as 0x4DF630 marks it failed. The samples are
+/// the `data` bytes unchanged (no resampling).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct D2Wav;
+
+impl WavDecoder for D2Wav {
+    fn decode(&self, _path: &CanonicalPath, bytes: &[u8]) -> Result<Sound, String> {
+        let w = d2_formats::wav::Wav::parse(bytes).map_err(|e| e.to_string())?;
+        if !w.is_playable() {
+            return Err(format!(
+                "not playable: tag {}, {} channels, {} Hz, {} bits (wav.md §4)",
+                w.format_tag, w.channels, w.rate, w.bits
+            ));
+        }
+        Sound::new(w.rate, w.channels, w.samples).map_err(|e| e.to_string())
+    }
 }
 
 /// A failed sound load. Every variant names the path (`assets.md` §A1: no
@@ -126,5 +144,40 @@ impl SoundPool {
     /// Takes the pool's events (evictions, overruns), oldest first.
     pub fn drain_events(&mut self) -> Vec<CacheEvent> {
         self.pool.drain_events()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wav(channels: u16, rate: u32, data: &[u8]) -> Vec<u8> {
+        let mut v = b"RIFF\0\0\0\0WAVEfmt ".to_vec();
+        v.extend_from_slice(&16u32.to_le_bytes());
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&channels.to_le_bytes());
+        v.extend_from_slice(&rate.to_le_bytes());
+        v.extend_from_slice(&(rate * 2 * u32::from(channels)).to_le_bytes());
+        v.extend_from_slice(&(2 * channels).to_le_bytes());
+        v.extend_from_slice(&16u16.to_le_bytes());
+        v.extend_from_slice(b"data");
+        v.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        v.extend_from_slice(data);
+        v
+    }
+
+    // Covers: specs/formats/wav.md §3, §4
+    #[test]
+    fn d2wav_decodes_and_checks_format() {
+        let p = CanonicalPath::new(r"data\global\sfx\x.wav").unwrap();
+        let s = D2Wav
+            .decode(&p, &wav(2, 22_050, &[1, 0, 2, 0, 3, 0, 4, 0]))
+            .unwrap();
+        assert_eq!((s.rate(), s.channels()), (22_050, 2));
+        assert_eq!(s.samples(), &[1, 2, 3, 4]);
+        // 11,025 Hz: rejected at sound start (the one live case, block 118).
+        assert!(D2Wav.decode(&p, &wav(1, 11_025, &[1, 0])).is_err());
+        // Not RIFF.
+        assert!(D2Wav.decode(&p, &[0; 72]).is_err());
     }
 }

@@ -143,8 +143,10 @@ pub fn room_step<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, room: RoomId, first: 
 }
 
 /// `0x0052D0F0` minus the ambient call: presets, restore, objects,
-/// population. TODO(spec: population.md open question 1): what triggers
-/// the out-of-tick callers.
+/// population. The off-tick entry `0x0052D0F0` itself (ambient first,
+/// then this) is `crate::tick::populate_room` (`tick.md` §4 r5); its
+/// callers are the portal and A2Q6 arrival paths of §1 r2, which run it
+/// inside the caller's step.
 pub fn populate_once<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, room: RoomId) {
     preset::place_presets(cx, room);
     cx.host.restore_inactive_units(room);

@@ -394,7 +394,8 @@ impl Model {
     }
 
     /// §5.1 pattern stamp / clear with the §3 cells and marker (marker
-    /// only when the mask is not 0).
+    /// only when the mask is not 0); pattern 0 and patterns above 5 do
+    /// nothing.
     fn pattern(
         &mut self,
         room: Option<RoomId>,
@@ -405,7 +406,8 @@ impl Model {
         set: bool,
     ) {
         let (cells, marker): (Cells, Option<(u16, Cells)>) = match pattern {
-            0 => (&POINT, None),
+            // Pattern 0 stamps and clears nothing (§5.1).
+            0 => return,
             1 => (&PLUS, Some((0x1000, &POINT))),
             2 => (&BOX3, Some((0x1000, &PLUS))),
             3 => (&PLUS, Some((0x2000, &POINT))),

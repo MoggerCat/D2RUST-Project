@@ -118,6 +118,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(link), true).unwrap();
+    // No original UI here: the open mode it would hand over with every
+    // panel closed (`ui/panels.md` §4.2), so the world view can place.
+    app.world_mut()
+        .resource_mut::<WorldViewState>()
+        .feed
+        .set_ui_open_mode(OpenMode::new(0).unwrap());
 
     // Frame 1 at 1000 ms: the host starts its clock, no tick; nothing is
     // drawn (camera.md §9: the draw follows a server tick).
@@ -131,10 +137,14 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     );
 
     // An intent sent between frames 1 and 2 is drained by frame 2's pump;
-    // the tick's flush reaches the bridge in the same frame: S→C 0x0D,
-    // which has no owner spec yet, so it is recorded as unowned. The world
-    // view composes the (empty) model of tick 1 on the CPU (no render
-    // world).
+    // the tick's flush reaches the bridge in the same frame, after the
+    // session join queued at build time (0x59, 0x0B, 0x03, 0x07, 0x15:
+    // the player in the town): the waypoint travel to Cold Plains (0x07
+    // of the destination room, the arrival 0x0D, `waypoints.md` §7), then
+    // the first tick's room switch (0x07). The 0x0D is a unit-handler
+    // message (`client/msg-units.md` §4) for the local player, known
+    // from 0x59. The world view composes the model of tick 1 on the CPU
+    // (no render world).
     let sent = app
         .world_mut()
         .resource_mut::<BridgeResource>()
@@ -149,7 +159,22 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (2, 1));
-    assert_eq!(b.log().unowned.get(&0x0D), Some(&1));
+    // Seven applied at receive; the 0x0D waits on its unit's queue for
+    // the update pass (`client/model.md` §4, §5).
+    assert_eq!((b.log().handled, b.log().queued), (7, 1));
+    assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
+    assert_eq!(
+        b.world().local_player.map(|k| k.guid),
+        Some(started.player_guid)
+    );
+    let sight: Vec<_> = b
+        .world()
+        .rooms_in_sight
+        .iter()
+        .map(|r| (r.level, r.x, r.y))
+        .collect();
+    assert_eq!(sight, [(1, 16, 0), (3, 0, 0), (3, 0, 0)]);
+    assert!(b.log().unowned.is_empty());
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
     assert_eq!(
         stats(&app),
@@ -157,8 +182,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             bridge_frame: 2,
             server_tick: 1,
             items: 0,
+            // The local player: placeable, but the placeholder rules
+            // (`world_view::Unspecified`) draw nothing for it.
             units_drawn: 0,
-            units_hidden: 0,
+            units_hidden: 1,
             ui_sent: 0,
             ui_unhandled: 0,
             gpu: false,
@@ -191,11 +218,22 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         (stats(&app).bridge_frame, stats(&app).server_tick),
         (304, 302)
     );
-    assert_eq!(bridge(&app).0.log().unowned.get(&0x0D), Some(&1));
+    // Nothing dropped. The client update pass runs only while in game
+    // (`client/model.md` §5 rule 1), which takes S→C 0x04; the session
+    // join sends none (TODO(spec: tick.md §6 rule 4)), so the queued 0x0D
+    // still waits and the model keeps the player at its game-entry point.
+    let log = bridge(&app).0.log();
+    assert_eq!((log.queued, log.drained), (1, 0));
+    assert!(log.dropped.is_empty());
+    let w = bridge(&app).0.world();
+    assert!(!w.in_game);
+    // 0x03 arrived; without a DRLG source (`add_client_data` is not
+    // called here) the client builds no DRLG, so no room and no level.
+    assert_eq!(w.act.map(|a| a.act), Some(0));
+    assert_eq!(w.player_level(), None);
 
     // The presented image is the CPU reference of the empty list (the
-    // app's placeholder feed states no local player: no camera, nothing
-    // placeable, nothing listed).
+    // placeholder rules draw neither the local player nor anything else).
     let state = app.world().resource::<WorldViewState>();
     let frame = build_frame(
         &ClientWorld::default(),
@@ -485,6 +523,9 @@ impl ViewFeed for TestFeed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 /// Fixture rules: no tile of their own (the original's placement answers
@@ -643,6 +684,27 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
         .filter(|(g, w)| g != w)
         .count();
     assert_eq!(differ, 0, "pixels differing from the CPU reference");
+
+    // Each next frame waits for the previous frame's indices (the frame
+    // cycle's base, composition.md §3): the node keeps composing only if
+    // the readback reaches the cycle.
+    for _ in 0..120 {
+        if app.world().resource::<NodeRuns>().get() >= 4 {
+            break;
+        }
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+    }
+    assert!(
+        app.world().resource::<NodeRuns>().get() >= 4,
+        "the frame cycle advanced through the index readback"
+    );
+    let cycle = app.world().resource::<WorldViewState>().cycle.clone();
+    assert_eq!(
+        cycle.pixels(),
+        &d2_client::scene::compose(&frame.items, &a.frames, &a.maps, VIEW).unwrap()[..],
+        "a static frame over its own previous frame"
+    );
 }
 
 // ---- integration: frame store, text layout, sound pool (synthetic) ---------------------
@@ -663,15 +725,15 @@ fn glyph(code: u8, frame: u8) -> Glyph {
         height: 8,
         unknown2: 0,
         unknown3: 0,
-        frame,
-        unknown4: 0,
+        frame: u16::from(frame),
         unknown5: 0,
     }
 }
 
-/// [`assets`] plus a two-glyph font: its glyph DC6 is inserted after the
-/// tile, so the glyph frames are store ids 1 and 2. `H` is frame 1 of the
-/// DC6 but record 0, `i` frame 0 but record 1 (record ≠ frame).
+/// [`assets`] plus a 256-record font (records by position, `ui/text.md`
+/// §3): its two-frame glyph DC6 is inserted after the tile, so the glyph
+/// frames are store ids 1 and 2. `H` is record 72 and frame 1, `i`
+/// record 105 and frame 0 (record ≠ frame).
 fn text_assets() -> ViewAssets {
     let mut a = assets();
     let frame = |v: u8| IndexFrame::new(6, 8, 0, 0, vec![v; 48]).unwrap();
@@ -687,10 +749,11 @@ fn text_assets() -> ViewAssets {
         font_path(),
         FontTable {
             version: 1,
-            unknown: [0; 4],
+            unknown: 0,
+            count: 256,
             height: 8,
             width: 6,
-            glyphs: vec![glyph(b'H', 1), glyph(b'i', 0)],
+            glyphs: (0..=255u8).map(|c| glyph(c, u8::from(c == b'H'))).collect(),
         },
     );
     a
@@ -778,7 +841,7 @@ impl TextHooks for TextTestRules {
     fn text_rules(&self) -> &dyn TextRules {
         &FixedAdvance
     }
-    fn glyph_look(&self, _: u16) -> Result<(ShadeChain, BlendOp), ViewError> {
+    fn glyph_look(&self, _: i32, _: u8) -> Result<(ShadeChain, BlendOp), ViewError> {
         Ok((ShadeChain::EMPTY, BlendOp::Opaque))
     }
 }
@@ -800,6 +863,7 @@ fn hi() -> UiDraw {
         text: "Hii".encode_utf16().collect(),
         at: Point::new(300, 200),
         style: TextStyle::default(),
+        opts: TextOpts::default(),
         clip: d2_client::ui::Rect::new(0, 0, 800, 600),
     })
 }
@@ -990,8 +1054,9 @@ fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
     );
 }
 
-// M08: the default hooks refuse: with the app's own placeholders, text is
-// an error naming ui/text.md and a sound start fails (no table file).
+// M08: the default hooks refuse: with the app's own hooks, text needs the
+// `ui/text.md` font (font 0, not loaded here) and a sound start fails (no
+// table file).
 #[test]
 fn placeholder_hooks_refuse_text_and_sounds() {
     let a = text_assets();
@@ -999,7 +1064,10 @@ fn placeholder_hooks_refuse_text_and_sounds() {
         unreachable!()
     };
     let e = Unspecified.ui_text(&req, &a).unwrap_err();
-    assert!(e.to_string().contains("ui/text.md"), "{e}");
+    assert!(
+        matches!(&e, ViewError::FontMissing(p) if p.as_str() == "data/local/font/latin/font8.tbl"),
+        "{e}"
+    );
 
     let mut parts = AudioParts::empty();
     parts.cues = Box::new(TwoStarts(false));

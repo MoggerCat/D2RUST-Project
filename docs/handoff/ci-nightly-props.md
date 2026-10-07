@@ -1,5 +1,7 @@
 # Handoff: nightly deep property runs — `claude/ci-nightly-props`
 
+> Folded into `docs/HANDOFF.md` (§1–§5, §7, §8) and `docs/PLAN.md` as of the eighth fold (`claude/docs-fold-8`); this file stays as the detailed record.
+
 Cloud tooling session, 2026-10-06, base `main` (`a9115fd`). Repo only.
 Answers HANDOFF §8 (two counterexamples found only on CI's random seed).
 

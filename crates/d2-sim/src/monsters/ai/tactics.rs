@@ -84,7 +84,9 @@ pub fn mode_at<W: AiHost + ?Sized>(
 }
 
 /// `0x005DEAD0` `AITACTICS_UseSkill` (§7.1): mode < 16: current skill,
-/// unit flag 0x40, path step 1, mode change; on failure idle 10.
+/// unit flag 0x40, path step 1, mode change; on failure idle 10. True
+/// when the mode change succeeded (the result Diablo's aura and the
+/// Ancients test, `ai-bodies-4.md` §7, `ai-bodies-5.md` §12).
 pub fn use_skill<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
@@ -92,16 +94,18 @@ pub fn use_skill<W: AiHost + ?Sized>(
     m: u8,
     skill: i32,
     target: ModeTarget,
-) {
+) -> bool {
     if m >= 16 {
-        return;
+        return false;
     }
     cx.world.set_current_skill(unit, skill);
     cx.world.set_skill_flag(unit);
     cx.world.set_path_steps(unit, 1);
     if !cx.world.change_mode(game, unit, m, target) {
         idle(game, cx, unit, 10);
+        return false;
     }
+    true
 }
 
 /// `0x005DE000` `AITACTICS_UseSequenceSkill` (§7.1): skill id in range:
@@ -373,4 +377,147 @@ pub fn command_minions<W: AiHost + ?Sized>(
             copy_command(cx, m, cmd);
         }
     }
+}
+
+/// `0x0058EEF0(type, set)` `GetAiCommandFromParam`: the index of the first
+/// command of type `ty`, searching from the current one's next round to
+/// the current one; `set` makes it current.
+///
+/// TODO(spec: ai.md §8): the search start when the current command is
+/// gone (current past the end of the ring) is not stated; the list is
+/// searched from its first command.
+pub fn find_command<W: AiHost + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ty: i32,
+    set: bool,
+) -> Option<usize> {
+    let c = cx.store.control_mut(unit)?;
+    let len = c.commands.len();
+    if len == 0 {
+        return None;
+    }
+    // With no current command, start before the first one.
+    let base = if c.cur < len { c.cur } else { len - 1 };
+    let at = (1..=len)
+        .map(|i| (base + i) % len)
+        .find(|&i| c.commands[i].params[0] == ty)?;
+    if set {
+        c.cur = at;
+    }
+    Some(at)
+}
+
+/// `0x0058EFA0(type, set)` `SetCurrentAiCommand`: [`find_command`], or a
+/// new command (type, 0, 0, 0, 0) when there is none. `None` only
+/// without an AI control.
+///
+/// TODO(spec: ai.md §8): where the new command goes is not stated; it is
+/// inserted as [`copy_command`] does (before the current one, becoming
+/// current).
+pub fn get_or_create_command<W: AiHost + ?Sized>(
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ty: i32,
+    set: bool,
+) -> Option<usize> {
+    if let Some(i) = find_command(cx, unit, ty, set) {
+        return Some(i);
+    }
+    cx.store.control(unit)?;
+    copy_command(
+        cx,
+        unit,
+        AiCommand {
+            params: [ty, 0, 0, 0, 0],
+        },
+    );
+    cx.store.control(unit).map(|c| c.cur)
+}
+
+/// The command at `index` of the unit's list.
+pub fn command_mut<'a, W: AiHost + ?Sized>(
+    cx: &'a mut Ctx<'_, W>,
+    unit: UnitId,
+    index: usize,
+) -> Option<&'a mut AiCommand> {
+    cx.store.control_mut(unit)?.commands.get_mut(index)
+}
+
+/// `0x005DC5C0` `AIUTIL_GetDistanceToCoordinates` (§6): the no-size
+/// formula from the unit's path position (the seam's position) to (x, y).
+pub fn path_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId, x: i32, y: i32) -> i32 {
+    distance_no_size(cx.world.position(unit), (x, y))
+}
+
+/// `0x005DED90`: walk to coordinates (§7.2).
+///
+/// TODO(spec: ai.md §7.2): the step count of the coordinate walks is not
+/// given in the table; 1 is used, as for the unit walks.
+pub fn walk_to_point<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 1, 0)
+}
+
+/// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):
+/// mode 2 at (x, y), step 0, no flags; the mode-change result.
+pub fn walk_step0<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 0, 0)
+}
+
+/// `0x005DC480` half-size distance from the unit to (x, y) (§6): each
+/// axis distance minus (size / 2 + 1) (unsigned halving), clamped at 0.
+pub fn half_size_distance<W: AiHost + ?Sized>(
+    cx: &Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> i32 {
+    let (ux, uy) = cx.world.position(unit);
+    let cut = ((cx.world.size(unit) as u32) / 2) as i32 + 1;
+    let dx = (ux.wrapping_sub(x).wrapping_abs() - cut).max(0);
+    let dy = (uy.wrapping_sub(y).wrapping_abs() - cut).max(0);
+    distance_formula(dx, dy)
+}
+
+/// `0x005DEDE0`: run to coordinates (walk with the velocity reset under
+/// state 60, §7.2).
+///
+/// TODO(spec: ai.md §7.2): the step count of the coordinate runs is not
+/// given in the table; 1 is used, as for the unit runs.
+pub fn run_to_point<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    x: i32,
+    y: i32,
+) -> bool {
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::RUN, 1, 0)
+}
+
+/// `0x005DF680` `AITACTICS_RunCloseToTargetUnit` ("run near t n", §7.2):
+/// the wander draws around t with n as a byte, then a run (a walk with
+/// the velocity reset under state 60) there, step 1, no flags.
+pub fn run_near<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    t: Option<UnitId>,
+    n: i32,
+) -> bool {
+    // TODO(spec gap): running near target 0 uses the own position.
+    let center = cx.world.position(t.unwrap_or(unit));
+    let (x, y) = wander_point(cx.world.seed(unit), center, i32::from(n as u8));
+    move_to(game, cx, unit, ModeTarget::Point(x, y), mode::RUN, 1, 0)
 }

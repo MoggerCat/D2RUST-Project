@@ -29,21 +29,21 @@
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
 |   1. NPC control and records | 84–138 |
-|   2. Starting an interaction (C→S 0x13) | 139–178 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 179–197 |
-|   4. Menu actions (C→S 0x38) | 198–219 |
-|   5. Healing on chat open | 220–244 |
-|   6. Cain identify (C→S 0x34) | 245–262 |
-|   7. Mercenaries | 263–360 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 361–418 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 419–452 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 453–464 |
-| Constants & data dependencies | 465–477 |
-| Randomness | 478–490 |
-| Edge cases & original bugs | 491–517 |
-| Test vectors | 518–536 |
-| Provenance | 537–563 |
-| Open questions | 564–577 |
+|   2. Starting an interaction (C→S 0x13) | 139–200 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 201–219 |
+|   4. Menu actions (C→S 0x38) | 220–241 |
+|   5. Healing on chat open | 242–266 |
+|   6. Cain identify (C→S 0x34) | 267–284 |
+|   7. Mercenaries | 285–382 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 383–440 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 441–474 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 475–486 |
+| Constants & data dependencies | 487–499 |
+| Randomness | 500–512 |
+| Edge cases & original bugs | 513–546 |
+| Test vectors | 547–565 |
+| Provenance | 566–601 |
+| Open questions | 602–625 |
 <!-- /index -->
 
 ## Summary
@@ -148,9 +148,31 @@ Handler `0x0054AA90`: size 9 else 3; unit type (u32 @1) > 5 → 2; then
    monster spec), cancel its AI-think events (type 2) and schedule one
    at frame + 1 (`tick.md` §5.2–5.4). This happens for every distance
    ≤ 50.
-3. Distance 9..50: result 0, no interaction. Distance 7..8:
-   `0x00548A50` (player movement toward the target; movement spec),
-   result 0.
+3. Distance 9..50: result 0, no interaction. Distance 7..8: approach
+   (`0x00548A50`), result 0:
+   1. Run request to the NPC: `0x00580A70(no skill, mode 3, type 1,
+      GUID, 0)` (`sim/pathing.md` §1.2; it clears player data +0x150
+      and +0x154; a stamina-less run becomes a walk, §1.5). Its result
+      is not read.
+   2. Then, whether or not the mode started, the queued interaction
+      (`0x00641F20` → `0x00460780`, player units with player data
+      only): player data +0x150 := 1, +0x154 := −1 (0x13 passes flag
+      0; a caller passing flag ≠ 0 stores −2), +0x158 := unit type,
+      +0x15C := GUID.
+   3. The run stops by the arrival check (`sim/pathing.md` §9.5 rule
+      3) at unit distance ≤ the stop distance, which is 0 for a player
+      path: the allocation writes +0x93 := 0 (`0x00649D00`) and its
+      setter `0x00649070` (+0x93 := v − 1 for v in 1..19, else 0) has
+      no caller on the player request path (callers: client code and
+      monster AI / quest functions only). So the player stops at the
+      first step where the unit distance is 0, short of the NPC's own
+      sub-tile for any NPC size ≥ 2 (Akara: monstats2 `SizeX` 2).
+   4. On the stop (step result 2 in `0x00580C20`): +0x150 ≠ 0 and
+      +0x154 < 0 → neutral start (`0x0057F020`), then `0x00548B00`
+      runs again with (player, +0x158, +0x15C, flag = (+0x154 = −2)):
+      this 0x13 handling from rule 1, now normally at distance ≤ 6;
+      then +0x150 := 0. This is the server-side "talk on arrival";
+      the client sends no second 0x13.
 4. Distance ≤ 6: if the player is free (`0x00535060` returns 0: no
    interact unit, no cursor item, player data +0x4C = 0): clear the
    player's path and start (`0x00573020` → `0x00572C10`).
@@ -385,7 +407,7 @@ Gate bit clear or predicate false → refuse.
   `vendors.md` §8.2), `0x0055FE00`, inventory page 0, name restored,
   place in the inventory or drop at a free spot near the player; quest
   reward hook `0x00591790` (`quests.md`); result 6.
-- **Socket**: duplicate the input into the player (`0x0055A2A0`) and
+- **Socket**: duplicate the input into the player (`0x0055A2A0`, `vendors.md` §7.3) and
   remove the input from the cursor (`0x0055EEA0`); either fails →
   refuse. Flag 0x800; s = max sockets (`0x0062BC20`); quality 4: s :=
   roll(item seed of the duplicate, min(s, 2)) + 1 (`rng.md` §7); quality
@@ -514,6 +536,13 @@ Reproduced by default.
 9. Nihlathak (514) owns a store but no trade action; he can still be
    sold to while gambling (`vendors.md` §7.2).
 10. 0x58 byte 6 is not written (stack), like 0x2A bytes 3–6.
+11. §7.4 step 2 uses `0x00574EC0(7, 1)`, which returns the first
+    hireling node whether dead or alive: a crafted 0x62 with a living
+    hireling is charged and reaches the revive (`world/hirelings.md`
+    §9, edge case 5).
+12. The §7.3 step 1 cap (12, 20, 28, 36, 45) only feeds the Kashya
+    `lvl < 8` gate; the offer level and price use the uncapped player
+    level (`world/hirelings.md` §2).
 
 ## Test vectors
 
@@ -548,6 +577,15 @@ records in row order; the 43 table entries (`vendors.tsv`) attach.
   instructions); 0x4E `0x0053D7B0`; 0x9B `0x0053E0E0`. The NPC table and
   the switch targets were read from the `Game.exe` image (data at
   `0x00731184`, jump tables `0x00536454`/`0x00536488`).
+- Approach (§2 rule 3): `0x00548A50` (asm: pushes skill 0, mode 3,
+  type, GUID, 0 to `0x00580A70`, then `0x00641F20(player, action,
+  type, GUID)`), `0x00460780` (writes player data +0x150..+0x15C), the
+  arrival branch of `0x00580C20` (asm `0x00580D94`–`0x00580E88`); stop
+  distance: every write of path +0x93 in `all.asm` (`0x00649D00`,
+  `0x00649070`, `0x005893E0`, `0x005921B0`, client `0x00465070`) and
+  every `call 0x649070` site (26: client `0x00466360`, `0x004AFF60`,
+  `0x004C8750`; the rest in `0x005C07A0`–`0x005F5D50`, AI / quest
+  code).
 - Dead code: no call and no 32-bit pointer to `0x00578ED0`,
   `0x00579090`, `0x005368F0`, `0x005367B0` in `Game.exe`.
 - D2MOO 1.10f `SUnitNpc.cpp` / `SUnitProxy.cpp` were used as a map
@@ -574,3 +612,13 @@ records in row order; the 43 table entries (`vendors.tsv`) attach.
 5. 0x9B bytes: confirm `9b ffff 00000000` with a resurrect recording.
 6. Hire / resurrect / heal / Cain / services: record one of each
    (`packets-0002`, HANDOFF §5) to confirm message order.
+7. Talk on arrival (§2 rule 3.4) contradicts `sim/pathing.md` §9.2
+   rule 6 ("no 1.14d server code stores a non-zero value" at player
+   data +0x150): `0x00460780` stores 1 (callers `0x00641F20` ←
+   `0x00548A50`). The movement spec owns the arrival branch
+   (`0x00580C20`, +0x154 < 0 → `0x00548B00`; ≥ 0 → skill id: skill
+   `0x006439F0` found → `0x00580A70(skill, mode `0x00643860`, type,
+   GUID, 0)`, result 1; not found → neutral start) and should restate
+   it; confirm with a recording that clicks an NPC from 7–8 sub-tiles
+   (expected: run frames, then 0x27 / 0x29 / 0x28 with no second C→S
+   0x13).

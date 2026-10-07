@@ -1,8 +1,8 @@
-// Spec: specs/render/camera.md (§3, §8, §9)
+// Spec: specs/render/camera.md (§3, §8, §9), specs/render/composition.md (§3 step 2)
 //! The camera feed: no local player → no camera, and nothing placeable;
 //! the frame camera from the feed (§3); the shake on the tick time base
 //! (§8, §9: `t = 40 × ticks since the start`, two seed draws per drawn
-//! frame while `a ≠ 0`).
+//! frame while `a ≠ 0`); BlankScreen from a `Levels.txt` row.
 
 use d2_sim::rng::Seed;
 
@@ -61,6 +61,9 @@ impl ViewFeed for Feed {
     fn player_seed(&mut self, _: &ClientWorld) -> Result<&mut Seed, ViewError> {
         Ok(&mut self.seed)
     }
+    fn blank_screen(&self, _: &ClientWorld) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 }
 
 fn at_tick(ticks: u64) -> ClientWorld {
@@ -98,7 +101,7 @@ fn no_player_no_camera_and_nothing_placeable() {
         unit_type: 0,
         guid: 1,
     };
-    world.units.insert(key, ClientUnit { key });
+    world.units.insert(key, ClientUnit::new(key));
     let view = NoCamera {
         rules: &Unspecified,
         source: &NoFeed,
@@ -175,14 +178,31 @@ fn shake_runs_on_the_tick_time_base() {
     assert_eq!(frame_shake(&at_tick(11), &mut feed(0)).unwrap(), (0, 0));
     // A shake that starts after the frame's tick is an error, not a guess.
     assert!(frame_shake(&at_tick(3), &mut feed(4)).is_err());
-    // The original's division by zero (t3 = 0 in the release) is an error.
+    // t3 = 0: the release row (t = t1 + t2 only) gives a = 0, no draw.
     let mut f = Feed {
         shake: Some(RunningShake {
             shake: Shake::start(10, 0, 40, 0).unwrap(),
             start_tick: 0,
         }),
+        seed,
         ..Feed::default()
     };
-    let e = frame_shake(&at_tick(1), &mut f).unwrap_err();
-    assert!(e.to_string().contains("divides by zero"), "{e}");
+    assert_eq!(frame_shake(&at_tick(1), &mut f).unwrap(), (0, 0));
+    assert_eq!(f.seed, seed);
+}
+
+// BlankScreen is the Levels record's +0x218 word: `bClear` clears when
+// non-zero; the placeholder feed answers the live data's 1.
+// Covers: specs/render/composition.md §3 r2
+#[test]
+fn blank_screen_from_the_levels_row() {
+    use d2_data::tables::{Levels, Record};
+    let mut bytes = vec![0u8; Levels::SIZE];
+    assert!(!blank_screen(&Levels::decode(&bytes)));
+    bytes[0x218] = 1;
+    assert!(blank_screen(&Levels::decode(&bytes)));
+    bytes[0x218] = 0;
+    bytes[0x21B] = 0x80;
+    assert!(blank_screen(&Levels::decode(&bytes)));
+    assert!(NoFeed.blank_screen(&ClientWorld::default()).unwrap());
 }

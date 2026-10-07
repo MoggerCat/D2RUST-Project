@@ -1,0 +1,29 @@
+# Select Fire Bolt (skill 36, specs/data/calc-expressions.md; server
+# body: specs/skills/bodies.md §5, srvmissile) as the right skill and
+# cast it at a point. In town the cast is refused (behaviour compared);
+# outside town after the runs.
+scenario 1
+name cast-firebolt
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 300
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+char skill 36 1
+
+record s2c rng units stats
+snapshot every 25
+
+at 2 msg SelectSkill skill=36 left=0 item=0xFFFFFFFF
+at 10 msg RightSkill x=@x+10 y=@y
+at 20 msg Run x=@x+30 y=@y
+at 60 msg Run x=@x+30 y=@y+10
+at 100 msg Run x=@x+30 y=@y+10
+at 150 msg RightSkill x=@x+10 y=@y
+at 200 msg RightSkill x=@x y=@y+10

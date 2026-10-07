@@ -137,6 +137,9 @@ impl DrlgWorld {
 
     /// The server room change of a client (`0x00537B50`; `rooms.md` §4.1,
     /// `levels.md` §9.1) from `old` to `new` active rooms of one act.
+    /// Returns, for each room the client joined (new adjacency order), the
+    /// fields of its S→C 0x07 (`sim/path-placement.md` §11 "Recipients":
+    /// the DRLG room's tile x, tile y and level id, builder `0x0053BC50`).
     pub fn client_changes_room(
         &mut self,
         lists: &mut UnitLists,
@@ -144,11 +147,18 @@ impl DrlgWorld {
         client: ClientId,
         old: Option<RoomId>,
         new: Option<RoomId>,
-    ) -> Result<(), WiringError> {
+    ) -> Result<Vec<(i32, i32, u32)>, WiringError> {
         self.with_act(act, lists, |d, svc| {
             let old = old.and_then(|r| d.drlg_room_of(r));
             let new = new.and_then(|r| d.drlg_room_of(r));
-            d.client_changes_room(svc, client, old, new)
+            let joined = d.client_changes_room(svc, client, old, new)?;
+            Ok(joined
+                .into_iter()
+                .map(|r| {
+                    let room = d.room(r);
+                    (room.rect.x, room.rect.y, d.level(room.level).id)
+                })
+                .collect())
         })
         .unwrap_or(Err(crate::drlg::DrlgError::NotActive))
         .map_err(WiringError::Drlg)

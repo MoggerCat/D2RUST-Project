@@ -16,6 +16,7 @@
 //!   `game.rs` / units).
 
 pub mod affixes;
+pub mod bitstream;
 pub mod create;
 pub mod inventory;
 pub mod moves;

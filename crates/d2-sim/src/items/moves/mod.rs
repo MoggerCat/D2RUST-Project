@@ -28,8 +28,9 @@ mod prop_tests;
 mod tests;
 
 pub use deferred::{
-    category, dispatch, ground_update, mark, owner_refresh, player_update, Cond, ItemAction, Test,
-    To, ITEM_ACTIONS,
+    announce_item, category, dispatch, ground_update, item_reset, item_unit_update, mark,
+    owner_refresh, player_update, room_cleanup, update_list_reset, Cond, ItemAction, Test, To,
+    ITEM_ACTIONS,
 };
 pub use handlers::{handle, HANDLED};
 pub use seams::{InventoryOps, MovePending, MoveUnits, MoveWorld, Spot};
@@ -111,6 +112,7 @@ pub mod cmd {
     pub const FROM_BELT: u32 = 0x800;
     pub const SWAP_BELT: u32 = 0x1000;
     pub const PICKED_TO_BELT: u32 = 0x2000;
+    pub const AUTO_UNEQUIP: u32 = 0x4000;
     pub const INDIRECT_SWAP: u32 = 0x10000;
     pub const SWAP_IN_PAGE: u32 = 0x40000;
 }
@@ -134,8 +136,12 @@ pub mod iflag {
 
 /// Unit flags (unit +0xC4) used here.
 pub mod uflag {
+    /// Changed this tick (set by every mode set).
+    pub const CHANGED: u32 = 0x1;
     pub const TARGETABLE: u32 = 0x2;
-    pub const NO_GROUND_MSG: u32 = 0x10;
+    /// New, not yet announced to clients (§6.3; cleared with 0x1 by the
+    /// room clean-up `0x00553220`).
+    pub const NOT_ANNOUNCED: u32 = 0x10;
     pub const DROPPED: u32 = 0x1000;
     pub const GROUND_PLACED: u32 = 0x1002;
     pub const ON_GROUND: u32 = 0x200_0000;
@@ -221,6 +227,12 @@ pub enum MoveFatal {
     /// A link that the spec calls fatal failed (0x28 filler, pickup belt).
     #[error("item link failed")]
     Link,
+    /// An item the spec asserts on is missing (§7.9 step 5: no item at L).
+    #[error("item missing")]
+    Missing,
+    /// A book pickup met a negative quantity or max stack (§8.1 step 4).
+    #[error("negative book quantity")]
+    NegativeQuantity,
     /// An item message reached 0xFD bytes (§11).
     #[error("item message of {0} bytes")]
     MessageSize(usize),

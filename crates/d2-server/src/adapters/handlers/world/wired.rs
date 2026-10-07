@@ -45,11 +45,15 @@
 use d2_sim::game::Game;
 use d2_sim::items::{ItemTables, UniqueBits};
 use d2_sim::units::{RoomId, UnitId};
-use d2_sim::wiring::action::ActionHooks;
-use d2_sim::wiring::economy::{Economy, EconomyQuests, GameFields, QuestRest};
+use d2_sim::wiring::action::Pending;
+use d2_sim::wiring::action::{ActionHooks, ObjectCase};
+use d2_sim::wiring::economy::{
+    quest_objects, Economy, EconomyQuests, GameFields, HostQuests, QuestRest,
+};
 use d2_sim::wiring::interaction::{
     Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
 };
+use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::QuestControl;
 use d2_sim::world::vendors::{GlobalLists, VendorTables};
@@ -215,6 +219,97 @@ impl<R, S> WiredWorld<R, S> {
             };
             f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
         })
+    }
+}
+
+/// A quest call on the desk's economy and rest ([`HostQuests`]: the
+/// [`EconomyQuests`] calls with the object, level, interaction and
+/// identify calls answered by the action wiring and the NPC rest): the
+/// mercenary rewards `0x00579180` an Act I quest grants (`quests.md`
+/// §10.2) are queued during the call with the sends that follow them
+/// ([`d2_sim::wiring::economy::QuestDeferred`]) and run on the NPC
+/// control block right after it, then the queued sends
+/// (`quests-act1-rest.md` §8 item 8). A reward's NPC error goes to the
+/// interaction state's errors.
+fn quest_call<X: Pending, R: TradeRest, T>(
+    desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
+    ctl: &mut NpcControl,
+    f: impl FnOnce(&mut QuestControl, &mut HostQuests<'_, '_, X, R>) -> T,
+) -> T {
+    let mut deferred = Vec::new();
+    let out = {
+        let mut inner = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
+        inner.deferred = Some(&mut deferred);
+        f(&mut *desk.quests, &mut HostQuests::new(inner))
+    };
+    for d in deferred {
+        let Some((p, class)) = d.run(&mut *desk.rest) else {
+            continue;
+        };
+        if let Err(e) = ctl.quest_mercenary(desk, p, class) {
+            desk.state.errors.push(InteractionError::Npc(e));
+        }
+    }
+    out
+}
+
+/// The object module's queued quest routes
+/// (`ActionSim::route_quest_objects`) run on the quest control
+/// (`d2_sim::wiring::economy::quest_objects`) until none is left; the
+/// routes no quest spec states go to the action wiring's
+/// `Pending::object_route`, as without the queue.
+fn quest_objects<X: Pending, R: TradeRest>(
+    desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
+    ctl: &mut NpcControl,
+) {
+    loop {
+        let calls = desk
+            .econ
+            .hooks
+            .objects
+            .as_mut()
+            .map(|s| s.take_quest_calls())
+            .unwrap_or_default();
+        if calls.is_empty() {
+            return;
+        }
+        let back = quest_call(desk, ctl, |q, w| quest_objects::run_all(q, w, calls));
+        for r in back {
+            desk.econ.hooks.x.object_route(desk.econ.game, r);
+        }
+    }
+}
+
+impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The pet follows `0x005754B0` the placements queued
+    /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
+    /// from the first frame): `hirelings.md` §6 rule 1 on the hireling
+    /// list ([`life::follow`]; the other pet types have no list in
+    /// `d2-sim` yet, `sim/pets.md`). A game without hireling tables has
+    /// no hireling: the queue is dropped.
+    ///
+    /// TODO(path-placement.md §10 r6): in 1.14d the follow runs inside the
+    /// placement; here it runs when the handler or tick that placed the
+    /// player returns (the hireling state is the host's).
+    pub fn pet_follows<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let q = events
+            .action()
+            .sys
+            .hooks
+            .pet_follows
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        if q.is_empty() || self.state.hireling_tables.is_none() {
+            return;
+        }
+        self.desk(game, events, |desk, _, _| {
+            desk.with_hirelings(|w, t, st| {
+                for p in q {
+                    life::follow(w, t, st, p);
+                }
+            })
+        });
     }
 }
 
@@ -389,30 +484,54 @@ where
             rest: &mut self.rest,
             difficulty,
         };
-        WorldHost::<D>::waypoints(&mut self.action, game, events, run)
+        let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        self.pet_follows(game, events);
+        out
+    }
+
+    /// The action wiring's 0x13 object case ([`ActionWorld`]); a quest
+    /// operate it queued runs right after the dispatch, on this world's
+    /// quest control ([`quest_objects`]: nothing follows the operate in
+    /// the handler, `waypoints.md` §5.2).
+    fn objects(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<ObjectCase> {
+        let out = WorldHost::<D>::objects(&mut self.action, game, events, player, guid);
+        self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        out
+    }
+
+    /// The quest routes the tick's allocations and object events queued
+    /// ([`quest_objects`]), before the tick's sends are taken.
+    fn after_tick(&mut self, game: &mut Game, events: &mut D) {
+        self.desk(game, events, |desk, ctl, _| quest_objects(desk, ctl));
+        self.pet_follows(game, events);
     }
 
     /// The quest control on the desk's economy and rest
     /// ([`EconomyQuests`]). The mercenary rewards `0x00579180` an Act I
-    /// quest grants (`quests.md` §10.2) are collected during the call and
-    /// run on the NPC control block right after it (`npc.md` §7.5,
+    /// quest grants (`quests.md` §10.2) are queued during the call, with
+    /// the sends that follow them
+    /// ([`d2_sim::wiring::economy::QuestDeferred`]), and run on the NPC
+    /// control block right after it (`npc.md` §7.5,
     /// [`d2_sim::world::npc::NpcControl::quest_mercenary`] with the desk
-    /// as its world), before the result is returned: the order of
+    /// as its world), then the queued sends, before the result is
+    /// returned: the reward's 0x50 precedes the text refresh's 0x27 / 0x29
+    /// (`quests-act1-rest.md` §8 item 8). The order of
     /// `Desk::quest_message`, here for every quest call. A reward's NPC
     /// error goes to the interaction state's errors, as there.
+    ///
+    /// The object module's queued quest routes run before the call and
+    /// after it ([`quest_objects`]).
     fn quests<C: QuestCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         Some(self.desk(game, events, |desk, ctl, _| {
-            let mut rewards = Vec::new();
-            let out = {
-                let mut w = EconomyQuests::new(&mut *desk.econ, &mut *desk.rest);
-                w.mercenaries = Some(&mut rewards);
-                call.call(&mut *desk.quests, &mut w)
-            };
-            for (p, class) in rewards {
-                if let Err(e) = ctl.quest_mercenary(desk, p, class) {
-                    desk.state.errors.push(InteractionError::Npc(e));
-                }
-            }
+            quest_objects(desk, ctl);
+            let out = quest_call(desk, ctl, |q, w| call.call(q, w));
+            quest_objects(desk, ctl);
             out
         }))
     }
@@ -437,12 +556,43 @@ where
         Some(out)
     }
 
+    /// The skill handlers, then the pet follows their placements queued
+    /// ([`WiredWorld::pet_follows`]).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
-        WorldHost::<D>::skill(&mut self.action, call)
+        let SkillCall {
+            game,
+            events,
+            client,
+            msg,
+            staged,
+        } = call;
+        let call = SkillCall {
+            game: &mut *game,
+            events: &mut *events,
+            client,
+            msg,
+            staged,
+        };
+        let out = WorldHost::<D>::skill(&mut self.action, call);
+        self.pet_follows(game, events);
+        out
     }
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
-        WorldHost::<D>::walk(&mut self.action, game, events, call)
+        let out = WorldHost::<D>::walk(&mut self.action, game, events, call);
+        self.pet_follows(game, events);
+        out
+    }
+
+    fn vitals_sync(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        client: d2_sim::units::ClientId,
+        staged: (u16, u16),
+        queued: bool,
+    ) -> Option<Vec<Vec<u8>>> {
+        WorldHost::<D>::vitals_sync(&mut self.action, game, events, client, staged, queued)
     }
 
     /// The action wiring's sends (waypoints, tick paths), then the rest's
@@ -458,6 +608,23 @@ where
         sent.extend(self.rest.take_sent());
         sent.append(&mut self.inv_sent);
         sent
+    }
+
+    /// The action wiring's object host tick. [`WiredWorld::now`] (the
+    /// vendors' clock) stays the caller's.
+    ///
+    /// TODO(vendors.md edge case 10): both read the host's millisecond
+    /// clock; `now` gets its value here once the callers stop pinning it.
+    ///
+    /// This host holds the quest control, so the object module's quest
+    /// routes are queued for it from here on
+    /// (`ActionSim::route_quest_objects`; the game's creator turns it on
+    /// at creation, before the first object).
+    fn host_tick(&mut self, events: &mut D, ms: u32) {
+        events.action().route_quest_objects();
+        let h = &mut events.action().sys.hooks;
+        h.pet_follows.get_or_insert_with(Vec::new);
+        WorldHost::<D>::host_tick(&mut self.action, events, ms);
     }
 
     fn fault(&mut self, fault: WorldFault) {

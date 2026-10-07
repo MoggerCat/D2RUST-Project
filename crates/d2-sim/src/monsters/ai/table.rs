@@ -3,7 +3,9 @@
 //! `0x0073D358` (18 records). `AI_TABLE` is copied from `ai-functions.tsv`
 //! columns `index`, `think_1_14d`, `init_1_14d`, `alt_1_14d`,
 //! `target_mode` and checked against it by `tests::ai_table_matches_tsv`
-//! (METHODS M05); the special-state records are the §3.2 table.
+//! (METHODS M05); [`SPECD_HERE`] mirrors the `status` column, checked row
+//! by row by `tests::specd_here_matches_tsv`; the special-state records
+//! are the §3.2 table.
 
 /// One 16-byte AI table record (D2MOO `D2AiTableStrc`). Functions are
 /// their 1.14d addresses; 0 = none.
@@ -33,6 +35,16 @@ pub const IDLE_FN: u32 = 0x005B_0CD0;
 
 /// The catalogue text, for the consistency test.
 pub const AI_FUNCTIONS_TSV: &str = include_str!("../../../../../specs/monsters/ai-functions.tsv");
+
+/// The AI indices whose catalogue `status` is `spec'd-here` (full rules
+/// in `ai.md` §9 or an `ai-bodies-*.md` file, 1.14d read), ascending.
+pub const SPECD_HERE: [u8; 93] = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 43, 44, 48, 49, 50, 51, 52, 53, 55,
+    58, 59, 60, 62, 64, 65, 66, 68, 69, 70, 71, 72, 73, 74, 85, 89, 90, 95, 96, 98, 100, 114, 115,
+    116, 117, 118, 119, 120, 122, 124, 125, 128, 130, 132, 133, 134, 135, 136, 137, 138, 140, 141,
+    142,
+];
 
 /// AI table `0x0073CA18`, by monstats `AI` index.
 pub const AI_TABLE: [AiRecord; 148] = [

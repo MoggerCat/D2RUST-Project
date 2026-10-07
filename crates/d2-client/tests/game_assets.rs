@@ -591,8 +591,10 @@ fn real_scene(set: &ArchiveSet) -> RealScene {
 
 /// §A8 evaluated directly, pixel by pixel: items in list order; frame
 /// pixels inside clip ∩ view; index 0 transparent before the chain;
-/// `i' = m_k[…m_0[i]]` (§A4); `Opaque` or `dest = map[base + i'][dest]`
-/// (§A5). Independent of `scene` (no bins, no resolve).
+/// `i' = m_k[…m_0[i]]` (§A4); `Opaque` or `dest = map[base + dest][i']`
+/// (§A5 `IndexTable`: row = destination, column = source;
+/// `render/composition.md` §5, `render/blend-modes.md` §2). Independent of
+/// `scene` (no bins, no resolve).
 fn evaluate(s: &RealScene, view: Rect) -> Vec<u8> {
     let mut out = vec![0u8; view.width as usize * view.height as usize];
     for item in &s.items {
@@ -620,6 +622,9 @@ fn evaluate(s: &RealScene, view: Rect) -> Vec<u8> {
                 out[at] = match item.blend {
                     BlendOp::Opaque => i,
                     BlendOp::IndexTable(base) => {
+                        s.maps.get(MapId(base.0 + u32::from(out[at]))).unwrap()[usize::from(i)]
+                    }
+                    BlendOp::IndexTableSrcRow(base) => {
                         s.maps.get(MapId(base.0 + u32::from(i))).unwrap()[usize::from(out[at])]
                     }
                 };

@@ -41,6 +41,10 @@ pub const SPAWN_TILE_CLASSES: [(u32, u32); 14] = [
     (0, 5),
 ];
 
+/// Spawn-tile index of the population's warp-distance location (§11.5
+/// item 4).
+pub const KIND11_TILE: u32 = 11;
+
 /// Spawn-tile index that means "the waypoint room" (§10.2).
 pub const SPAWN_WAYPOINT: u32 = 13;
 
@@ -69,6 +73,9 @@ pub struct Level {
     pub warp_centres: Vec<(i32, i32)>,
     /// Populated-room memory (+0x22C), one entry per room in list order.
     pub populated_memory: Option<Vec<bool>>,
+    /// Coordinate-list counter (+0x1DC, §11.1): zero at allocation, not
+    /// reset by §9.4.
+    pub coord_counter: u32,
     pub(super) first_room: Option<DrlgRoomId>,
     pub(super) room_count: u32,
     pub(super) next: Option<LevelIdx>,
@@ -280,6 +287,7 @@ impl Drlg {
             spawn_tiles: Vec::new(),
             warp_centres: Vec::new(),
             populated_memory: None,
+            coord_counter: 0,
             first_room: None,
             room_count: 0,
             next: None,
@@ -667,6 +675,57 @@ impl Drlg {
         lv.room_count = 0;
         lv.spawn_tiles.clear();
         lv.warp_centres.clear();
+    }
+
+    // ---- population queries (§11.5) ---------------------------------------
+
+    /// `0x0066BB20` (§11.5 item 1): the level id of a room, 0 for a room
+    /// with flag 0x800000 (no population).
+    pub fn populated_level(&self, id: DrlgRoomId) -> u32 {
+        let r = self.room(id);
+        if r.flags & room_flags::NO_POPULATION != 0 {
+            return 0;
+        }
+        self.level(r.level).id
+    }
+
+    /// `0x00642BE0` (§11.5 item 2): the level of `level_id`, allocated if
+    /// absent (§4.3; no rooms are generated), and the number of its rooms
+    /// without flag 0x800000.
+    pub fn populated_room_count(
+        &mut self,
+        data: &DrlgData,
+        types: &mut dyn LevelTypes,
+        level_id: u32,
+    ) -> Result<u32, DrlgError> {
+        let l = self.get_or_alloc_level(data, types, level_id)?;
+        Ok(self
+            .level_rooms(l)
+            .into_iter()
+            .filter(|&r| self.room(r).flags & room_flags::NO_POPULATION == 0)
+            .count() as u32)
+    }
+
+    /// `0x00642380` (§11.5 item 3): the warp-room centres (§5.4) of the
+    /// room's own level, sub-tiles.
+    pub fn warp_points(&self, id: DrlgRoomId) -> &[(i32, i32)] {
+        &self.level(self.room(id).level).warp_centres
+    }
+
+    /// `0x00619E50(act, level, 11)` → `0x0066B2B0` (§11.5 item 4): the
+    /// §10 spawn-room choice with tile index 11 and all its effects
+    /// (generation, the level-seed draws, the streamed room); the tile
+    /// position, (−1, −1) when no room was found.
+    pub fn kind11_location(
+        &mut self,
+        svc: &mut Services<'_>,
+        level_id: u32,
+    ) -> Result<(i32, i32), DrlgError> {
+        match self.spawn_room(svc, level_id, KIND11_TILE) {
+            Ok(p) => Ok((p.x, p.y)),
+            Err(DrlgError::NoSpawnRoom) => Ok((-1, -1)),
+            Err(e) => Err(e),
+        }
     }
 
     // ---- spawn room (§10) ------------------------------------------------

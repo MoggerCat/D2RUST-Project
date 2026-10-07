@@ -12,6 +12,7 @@
 //! | [`packets`] | `traces/raw/*-packets.jsonl` (`packets-raw-1`) | a [`packets::PacketServer`] (`d2-server`) |
 //! | [`movement`] | `traces/raw/*-packets.jsonl` (`packets-raw-1`: C→S 0x01–0x04, S→C 0x0D/0x0F/0x10/0x15/0x96) | a [`movement::Mover`] |
 //! | [`placement`] | `traces/raw/*-packets.jsonl` (players: S→C 0x07 + 0x15) | a [`placement::PlacementModel`] |
+//! | [`scenario`] | `traces/scenarios/*.scenario`, `traces/raw/*.trace.jsonl` (`scenario-trace` 1) | compared with each other (the d2rs side: `tools/scenario-run`) |
 //!
 //! [`needs`] lists the recordings these wait for (`cargo run -p
 //! conformance --bin recordings-needed`).
@@ -23,6 +24,7 @@ pub mod placement;
 pub mod raw;
 pub mod rng;
 pub mod rooms;
+pub mod scenario;
 pub mod stats;
 pub mod tick;
 mod trace;

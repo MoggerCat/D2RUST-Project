@@ -1,0 +1,30 @@
+# kill-monster, then pick up the first item on the ground (lowest GUID
+# item unit) to the inventory (cursor 0).
+scenario 1
+name pickup-drop
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 450
+
+char save ScnAma     # the save the original side loads (handoff §3)
+char class 0
+char level 5
+char area 0 1
+char at default
+
+record s2c rng units
+snapshot every 25
+
+at 2 msg Run x=@x+30 y=@y
+at 40 msg Run x=@x+30 y=@y+10
+at 80 msg Run x=@x+30 y=@y+10
+at 120 msg LeftSkillOnUnit type=1 id=@1:19
+at 160 msg LeftSkillOnUnit type=1 id=@1:19
+at 200 msg LeftSkillOnUnit type=1 id=@1:19
+at 240 msg LeftSkillOnUnit type=1 id=@1:19
+at 280 msg LeftSkillOnUnit type=1 id=@1:19
+at 330 msg RunToUnit type=4 id=@4
+at 380 msg PickItem type=4 id=@4 cursor=0

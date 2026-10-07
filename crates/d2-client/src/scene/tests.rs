@@ -270,6 +270,53 @@ fn index_table_every_src_and_dest() {
     }
 }
 
+/// §A5 `IndexTableSrcRow`: the same table read transposed, `dest =
+/// table[src][dest]` (the lit translucent wall drawer).
+// Covers: specs/client/render-pipeline.md §a5-blend-ops
+// Covers: specs/render/blend-modes.md §2
+#[test]
+fn index_table_src_row_every_src_and_dest() {
+    let table = blend_table();
+    let mut maps = MapTable::new();
+    maps.push(map_with(&[]));
+    let base = maps.push_table(&table);
+    let dest = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p / 256) as u8).collect(),
+    };
+    let src = FrameImage {
+        width: 256,
+        height: 256,
+        pixels: (0..256 * 256).map(|p| (p % 256) as u8).collect(),
+    };
+    let mut over = DrawItem::new(FrameId(1), 0, 0);
+    over.blend = BlendOp::IndexTableSrcRow(base);
+    let view = Rect::new(0, 0, 256, 256);
+    let items = [DrawItem::new(FrameId(0), 0, 0), over];
+    let out = compose(&items, &vec![dest, src], &maps, view).unwrap();
+    for d in 0..256usize {
+        for s in 0..256usize {
+            let want = if s == 0 { d as u8 } else { table[s][d] };
+            assert_eq!(out[d * 256 + s], want, "src {s} dest {d}");
+        }
+    }
+    // A table past the map table is refused like `IndexTable`.
+    let mut bad = DrawItem::new(FrameId(1), 0, 0);
+    bad.blend = BlendOp::IndexTableSrcRow(MapId(2));
+    assert!(compose(
+        &[bad],
+        &vec![FrameImage {
+            width: 1,
+            height: 1,
+            pixels: vec![1]
+        }],
+        &maps,
+        view
+    )
+    .is_err());
+}
+
 // Covers: specs/client/render-pipeline.md §a5-blend-ops, §a4-shade-chain-and-palette-slots
 #[test]
 fn chain_applies_before_blend() {
@@ -792,6 +839,87 @@ fn pixel_write_vectors() {
     )
     .unwrap();
     assert_eq!(binned, out);
+}
+
+/// §5 with all three tables: `T[256 × d + L[s]]`, the remap dropped;
+/// each other combination as its row of §5.
+// Covers: specs/render/composition.md §5
+#[test]
+fn lit_blend_drops_the_remap() {
+    let mut maps = MapTable::new();
+    let p = maps.push(map_with(&[(7, 9)]));
+    let l = maps.push(map_with(&[(7, 4), (9, 3)]));
+    let mut table = Box::new([[0u8; 256]; 256]);
+    for (d, row) in table.iter_mut().enumerate() {
+        for (s, v) in row.iter_mut().enumerate() {
+            *v = (d * 3 + s * 5 + 11) as u8;
+        }
+    }
+    let t = maps.push_table(&table);
+    let frames = vec![FrameImage {
+        width: 1,
+        height: 1,
+        pixels: vec![7],
+    }];
+    let cases = [
+        (PixelTables::default(), 7),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: Some(l),
+                blend: None,
+            },
+            3,
+        ),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: None,
+                blend: Some(t),
+            },
+            table[200][9],
+        ),
+        (
+            PixelTables {
+                remap: Some(p),
+                light: Some(l),
+                blend: Some(t),
+            },
+            table[200][4],
+        ),
+        (
+            PixelTables {
+                remap: None,
+                light: Some(l),
+                blend: Some(t),
+            },
+            table[200][4],
+        ),
+    ];
+    let items: Vec<DrawItem> = cases
+        .iter()
+        .enumerate()
+        .map(|(i, (tables, _))| {
+            let mut item = DrawItem::new(FrameId(0), i as i32, 0);
+            (item.shade, item.blend) = tables.ops();
+            item
+        })
+        .collect();
+    let view = Rect::new(0, 0, cases.len() as u32, 1);
+    let out = compose_frame(&items, &frames, &maps, view, &[200; 5], FramePlan::NONE).unwrap();
+    let want: Vec<u8> = cases.iter().map(|&(_, v)| v).collect();
+    assert_eq!(out, want);
+    // With the remap applied the lit blend would read column L[P[s]] = 3.
+    assert_ne!(table[200][4], table[200][3]);
+    assert_eq!(
+        PixelTables {
+            remap: Some(p),
+            light: Some(l),
+            blend: Some(t),
+        }
+        .ops(),
+        (ShadeChain::new(&[l]).unwrap(), BlendOp::IndexTable(t))
+    );
 }
 
 /// Test vector 6: PL2 bytes `01 02 03 xx 10 20 30 xx` → index 0 (1, 2, 3),

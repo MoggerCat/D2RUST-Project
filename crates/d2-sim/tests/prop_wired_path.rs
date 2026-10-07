@@ -253,7 +253,6 @@ fn host(s: &Setup) -> Host {
         t.combat.charstats[0].runvelocity = 9;
         let ex = usize::from(t.combat.monstats[0].monstatsex);
         t.combat.monstats2[ex].sizex = s.monster_size;
-        h.x.populate = true;
     }
     let (_, drlg_rooms) = fx.generate(ISLE).expect("ISLE");
     let rooms = fx.stream(&drlg_rooms).expect("streamed");
@@ -449,6 +448,10 @@ fn feet(fx: &Fx) -> BTreeMap<UnitId, Foot> {
 
 impl Foot {
     fn cells(&self) -> Vec<(i32, i32, u16)> {
+        // Pattern 0 stamps nothing (§5.1).
+        if self.pattern == 0 {
+            return Vec::new();
+        }
         footprint(self.pattern, self.mask, self.x, self.y)
     }
 
@@ -479,8 +482,8 @@ impl Foot {
 
 /// Cells whose unit bits may be missing (a shared bit cleared by
 /// another owner, §5.1), and units whose footprint is not known to be
-/// stamped (after a teleport whose stamp room is the old room: the core
-/// reading of §6 rule 4, `wire-path-sim.md` §6).
+/// stamped (none since §6 rule 4 stamps a teleport from the destination
+/// room; the set stays for the checks that skip such units).
 #[derive(Default)]
 struct Model {
     tainted: BTreeSet<(i32, i32)>,
@@ -646,7 +649,7 @@ fn check_grid(
         }
         // A unit warped without its stamp (`Model::unstamped`) has no
         // marker in the grid, so placements and moves cannot see it
-        // (`regress_second_warp_lands_on_an_unstamped_player`).
+        // (`regress_second_warp_sees_the_first_player`).
         if m.unstamped.contains(&u) {
             continue;
         }
@@ -1069,7 +1072,6 @@ fn run(s: &Setup, ops: &[Op]) -> Result<Vec<Digest>, TestCaseError> {
                 let r = warp(&mut h, p);
                 prop_assert!(r.is_some(), "{}: same act", at);
                 if r == Some(true) {
-                    m.unstamped.insert(p);
                     // The spawn room is made active (`levels.md` §10.5).
                     h.refresh(&mut m);
                     let f = feet(&h.fx)[&p].clone();
@@ -1150,6 +1152,26 @@ fn monsters(h: &Host) -> Vec<UnitId> {
     v
 }
 
+/// The monsters created from the DS1's preset (the pending log's
+/// `preset` lines); room population (`population.md` §3) places the
+/// others.
+fn preset_monsters(h: &Host) -> Vec<UnitId> {
+    monsters(h)
+        .into_iter()
+        .filter(|u| {
+            let tag = format!("preset {} ", u.0);
+            h.fx.sim
+                .action
+                .sys
+                .hooks
+                .x
+                .log
+                .iter()
+                .any(|l| l.starts_with(&tag))
+        })
+        .collect()
+}
+
 /// Counterexample 1: without a client the player's rooms are
 /// deactivated after 10 counts of tick step 9 (`rooms.md` §7.2: the
 /// inactivity counter is reset only by clients), with the player in
@@ -1185,7 +1207,7 @@ fn regress_a_size_one_monster_is_placed_by_its_cell_not_its_plus() {
     let wall = vec![(12, 11, bits::WALL)];
     let mut h = host(&plain(1, 1, wall.clone()));
     tick(&mut h.fx);
-    let m = monsters(&h);
+    let m = preset_monsters(&h);
     assert_eq!(m.len(), 1);
     let f = feet(&h.fx)[&m[0]].clone();
     assert_eq!((f.x, f.y, f.size, f.pattern), (40012, 40010, 1, 1));
@@ -1205,7 +1227,7 @@ fn regress_a_size_one_monster_is_placed_by_its_cell_not_its_plus() {
 fn regress_population_tests_the_size_shape() {
     let mut h = host(&plain(1, 2, vec![(12, 11, bits::WALL)]));
     tick(&mut h.fx);
-    let m = monsters(&h);
+    let m = preset_monsters(&h);
     assert_eq!(m.len(), 1);
     let f = feet(&h.fx)[&m[0]].clone();
     assert_ne!((f.x, f.y), (40012, 40010));
@@ -1234,30 +1256,30 @@ fn regress_a_deactivated_room_leaves_its_monster_path_record() {
     assert_eq!(dynamic(&h.fx, m).unwrap().room, Some(r));
 }
 
-/// Counterexample 4: two players warped to the same level both land on
-/// its spawn point. The first warp's teleport stamps its footprint with
-/// cells looked up from the old room (the path core's reading of
-/// `path-placement.md` §6 rule 4; open point in `wire-path-sim.md` §6:
-/// which room `0x00650910` passes to `0x0064EFA0`); the spawn room is
-/// not adjacent to it, so nothing is stamped, and the second warp's free
-/// search (§7) does not see the first player. A spec answer that stamps
-/// from the destination room changes this test.
+/// Counterexample 4, after `path-placement.md` §6 rule 4's answer: the
+/// teleport stamps the footprint from the destination room (the forced
+/// move's room2), so the first warped player is stamped at the spawn
+/// point and the second warp's free search (§7) places the second player
+/// elsewhere.
 #[test]
-fn regress_second_warp_lands_on_an_unstamped_player() {
+fn regress_second_warp_sees_the_first_player() {
     let mut h = host(&plain(2, 0, Vec::new()));
     let (p0, p1) = (h.players[0], h.players[1]);
     assert_eq!(warp(&mut h, p0), Some(true));
     let a = feet(&h.fx)[&p0].clone();
     let g = grid(&h.fx, &active(&h.fx));
-    assert_eq!(g.get(a.x, a.y), Some(0), "no footprint at the destination");
+    assert_eq!(
+        g.get(a.x, a.y),
+        Some(bits::PLAYER | bits::NO_PATH),
+        "footprint at the destination"
+    );
     assert_eq!(g.get(SPAWNS[0].0, SPAWNS[0].1), Some(0), "old one cleared");
     assert_eq!(warp(&mut h, p1), Some(true));
     let b = feet(&h.fx)[&p1].clone();
-    assert_eq!((b.x, b.y), (a.x, a.y));
-    // The second player came from a room adjacent to the spawn room: its
-    // footprint is stamped.
+    assert_ne!((b.x, b.y), (a.x, a.y));
     let g = grid(&h.fx, &active(&h.fx));
     assert_eq!(g.get(b.x, b.y), Some(bits::PLAYER | bits::NO_PATH));
+    assert_eq!(g.get(a.x, a.y), Some(bits::PLAYER | bits::NO_PATH));
 }
 
 /// Counterexample 5 (a test-side mistake, kept as the fixed input): after
@@ -1278,9 +1300,12 @@ fn regress_a_warp_streams_its_spawn_room_back_in() {
     assert!(!before.contains(&r), "the spawn room was streamed out");
     assert!(active(&h.fx).contains(&r));
     assert_eq!(h.fx.game.lists.unit(p).and_then(|e| e.room()), Some(r));
+    // Free apart from its own footprint (stamped from the destination
+    // room, §6 rule 4).
     let g = grid(&h.fx, &active(&h.fx));
-    for (x, y, _) in f.cells() {
-        assert!(g.get(x, y).is_some_and(|v| v & PLAYER_MOVE == 0));
+    for (x, y, b) in f.cells() {
+        assert!(g.get(x, y).is_some_and(|v| v & !b & PLAYER_MOVE == 0));
+        assert_eq!(g.get(x, y).map(|v| v & b), Some(b));
     }
 }
 
@@ -1321,4 +1346,19 @@ fn regress_coarse_box_room_need_not_hold_the_point() {
         MONSTER_PLACE,
     );
     assert_eq!((r, pt.x, pt.y), (Some(above), 40007, 40079));
+}
+
+/// `path-placement.md` §10 rule 6: a placed player's pets follow
+/// (`0x005754B0`), queued for the host holding the pet lists
+/// (`ActionHooks::pet_follows`); without the queue nothing is recorded.
+// Covers: specs/sim/path-placement.md §10 r6
+#[test]
+fn a_warped_player_queues_its_pet_follow() {
+    let mut h = host(&plain(2, 0, Vec::new()));
+    let (p0, p1) = (h.players[0], h.players[1]);
+    assert_eq!(warp(&mut h, p0), Some(true));
+    assert_eq!(h.fx.sim.action.sys.hooks.pet_follows, None);
+    h.fx.sim.action.sys.hooks.pet_follows = Some(Vec::new());
+    assert_eq!(warp(&mut h, p1), Some(true));
+    assert_eq!(h.fx.sim.action.sys.hooks.pet_follows, Some(vec![p1]));
 }

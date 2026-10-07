@@ -225,6 +225,9 @@ pub struct DynamicPath {
     pub max_distance: u8,
     pub ida_score: u8,
     pub stop_distance: u8,
+    /// +0x94: monster re-path budget (`pathing.md` §9.10; read by
+    /// `0x00649120`, adjusted by `0x00649140`, set by `0x006490E0`).
+    pub repath_budget: u8,
     /// +0x98.
     pub dir_offset: i32,
     /// +0x9C.
@@ -280,6 +283,7 @@ impl Default for DynamicPath {
             max_distance: 0,
             ida_score: 0,
             stop_distance: 0,
+            repath_budget: 0,
             dir_offset: 0,
             points: [PathPoint::default(); PATH_POINTS],
             saved_count: 0,
@@ -373,6 +377,19 @@ impl DynamicPath {
         self.target_x = x;
         self.target_y = y;
         self.target_unit = None;
+    }
+
+    /// Re-path budget setter `0x006490E0` (`pathing.md` §9.10): a value
+    /// above 255 is the original's fatal assert.
+    pub fn set_repath_budget(&mut self, value: u32) -> Result<(), PathError> {
+        self.repath_budget = u8::try_from(value).map_err(|_| PathError::RepathBudget(value))?;
+        Ok(())
+    }
+
+    /// Re-path budget adjust `0x00649140` (`pathing.md` §9.10): budget +=
+    /// `delta`, clamped to 0..=255.
+    pub fn add_repath_budget(&mut self, delta: i32) {
+        self.repath_budget = (i32::from(self.repath_budget) + delta).clamp(0, 255) as u8;
     }
 
     /// Set the path type (`0x00648CF0`, `pathing.md` §2). Fatal asserts
@@ -496,9 +513,11 @@ pub struct ObjectShape {
 }
 
 impl ObjectShape {
-    /// `HasCollision[mode]` ≠ 0 (modes outside 0..7 read as 0).
-    // TODO(spec: path-placement.md §5.2): object modes above 7 are not
-    // specified; they read as no collision here.
+    /// `HasCollision[mode]` ≠ 0 (`0x006219C0`: objects byte +0x120 +
+    /// mode, no bound check, §5.2). `ObjMode.txt` has modes 0–7 only, so
+    /// a mode above 7 does not occur in 1.14d; the original would read the
+    /// next objects.txt fields (`IsAttackable0`, `Start0`, …), which this
+    /// shape does not hold: such a mode reads as 0 here.
     pub fn collides_in(&self, mode: u32) -> bool {
         self.has_collision
             .get(mode as usize)
@@ -668,10 +687,9 @@ pub fn alloc_dynamic_path<R: CollisionRooms + ?Sized>(
         DynamicKind::Missile { .. } => {
             p.foot_mask = 0;
             p.move_mask = 0;
-            // TODO(spec: path-placement.md §2.4 r4): "type 4" is stored
-            // directly; whether the type table's flags (0x60000, incl.
-            // 0x40000 missile path) are applied here is not stated.
-            p.path_type = path_types::MISSILE;
+            // Type 4 through set type `0x00648CF0`: flags get the table's
+            // 0x60000 (missile path, saved steps), direction offset 0.
+            p.set_path_type(tables, false, path_types::MISSILE)?;
         }
     }
     // Rule 5: footprint (§5.2: players and monsters by pattern, missiles

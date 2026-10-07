@@ -16,38 +16,39 @@
   (what happens inside one monster's creation: level, stats, boss
   modifiers, superunique init, events); `monsters/ai.md` (spawns started
   by AI functions); `sim/units.md` (claude/phase3-units: unit
-  allocation, modes, collision primitives); DRLG spec
-  (claude/phase3-drlg: rooms, coordinate lists, presets, warps); skills
+  allocation, modes, collision primitives); `drlg/levels.md` §11
+  (coordinate lists, populated level, room count, warp points, kind-11
+  location), `drlg/rooms.md` (rooms, tile records); skills
   spec (summons); quests spec (quest flags read here);
   `monsters/preset-monsters.tsv` (§11 table, machine-readable).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–69 |
-| Inputs | 70–80 |
-| Outputs / state changes | 81–90 |
-| Rules | 91–92 |
-|   1. Entry points and order within a room | 93–112 |
-|   2. Monster regions | 113–232 |
-|   3. Room population (`0x0054EC90(game, room)`) | 233–289 |
-|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 290–316 |
-|   5. Boss or pack (`0x005BE020(region, room)`) | 317–334 |
-|   6. Random boss (champion or unique) | 335–407 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 408–431 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 432–459 |
-|   9. Placement search and creation call (`0x005B2A00`) | 460–573 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 574–617 |
-|   11. Preset monsters (DS1 presets) | 618–749 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 750–773 |
-|   13. Region bookkeeping | 774–806 |
-|   14. Other table-driven and AI spawns | 807–831 |
-| Constants & data dependencies | 832–885 |
-| Randomness | 886–929 |
-| Edge cases & original bugs | 930–970 |
-| Test vectors | 971–1042 |
-| Provenance | 1043–1065 |
-| Open questions | 1066–1089 |
+| Summary | 54–70 |
+| Inputs | 71–81 |
+| Outputs / state changes | 82–91 |
+| Rules | 92–93 |
+|   1. Entry points and order within a room | 94–132 |
+|   2. Monster regions | 133–252 |
+|   3. Room population (`0x0054EC90(game, room)`) | 253–309 |
+|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 310–336 |
+|   5. Boss or pack (`0x005BE020(region, room)`) | 337–354 |
+|   6. Random boss (champion or unique) | 355–427 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–451 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 452–487 |
+|   9. Placement search and creation call (`0x005B2A00`) | 488–602 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 603–646 |
+|   11. Preset monsters (DS1 presets) | 647–778 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 779–802 |
+|   13. Region bookkeeping | 803–835 |
+|   14. Other table-driven and AI spawns | 836–860 |
+| Constants & data dependencies | 861–931 |
+| Randomness | 932–975 |
+| Edge cases & original bugs | 976–1016 |
+| Test vectors | 1017–1088 |
+| Provenance | 1089–1111 |
+| Open questions | 1112–1134 |
 <!-- /index -->
 
 ## Summary
@@ -73,7 +74,7 @@ wandering monster to any active room.
 |---|---|---|
 | game | game record | difficulty u8 game +0x6D, expansion flag game +0x70, game seed +0xD0, region array +0xF0, superunique flags +0x1D30 |
 | room | active room | active room seed +0x6C, client count +0x78, populated bits +0x34 (`sim/tick.md` §4), DRLG room +0x10 |
-| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (DRLG spec) |
+| coordinate list | DRLG room coordinate rectangles (D2MOO `D2RoomCoordListStrc`) | `0x0061AD50(room)`; clipped rect (tiles) +0x10, node flag +0x20, index +0x28, next +0x2C (`drlg/levels.md` §11; every DRLG read of this spec: §11.6 there) |
 | preset units | DS1 preset list of the room | `0x00619FD0(room)` (DRLG spec) |
 | tables | levels, monstats, monstats2, superuniques, monumod | Constants & data dependencies |
 | monster-region seed | seed | derived at game creation (§2.1, `rng.md` §5.2) |
@@ -99,9 +100,28 @@ wandering monster to any active room.
    unit restore `0x00542B40` (`sim/units.md`), object population
    `0x00552610` (objects spec), and room monster population `0x0054EC90`
    (§3).
-2. `0x0052D0F0(game, room)` runs the same sequence for one room. Its
-   callers are `0x00553720`, `0x0056CF40` and `0x0059DFD0` (D2MOO
-   1.10f `sub_6FC385A0`). What triggers them is Open question 1.
+2. `0x0052D0F0(game, room)` runs the same sequence for one room,
+   including the ambient spawns `0x0054F060` of rule 1 (first, for every
+   call), without the tick's act-flag test (`sim/tick.md` §4 r5). D2MOO
+   1.10f `sub_6FC385A0`. It runs outside the tick room step, inside the
+   caller's step (1.14d callers, read from the disassembly):
+   - `0x00553720(game, portal)`: resolves a portal object's partner. It
+     reads the destination level (object data +0x04) and point (+0x18,
+     +0x1C), looks for an active room of that act containing the point
+     (`0x00619DA0`); if none, it streams the room there (`0x0061A140`,
+     `drlg/rooms.md` §4.3) and, if that returns a room, populates it at
+     once. Callers: `0x00535430`, `0x00571F90`, `0x00584870`,
+     `0x00585580` and the town-portal cast `0x005BE290`.
+   - `0x0056CF40(game, level, …)`: creates a portal object in the
+     destination level: spawn point of tile index 11 (`0x0061B060`,
+     `sim/path-placement.md` §11), then populates that room **before**
+     testing it for null (a level with no such spawn room would pass a
+     null room: the first read in `0x0054F060` faults). Callers: object
+     event 11 `0x00581410` (`sim/units.md` §6.4), `0x0056D130`,
+     `0x00585580`.
+   - `0x0059DFD0`: A2Q6 arrival (`0x00545830` for level 73): spawn point
+     of tile index 12 in level 40 (act 1), populated when found, then a
+     free point (`0x0064E7E0`, step 7).
 3. Recording-confirmed (all three tick recordings, 292 new monsters): every
    new monster unit appears during the `rooms` step and none during
    `events`. Rooms activated together are filled in the reverse of their
@@ -139,7 +159,7 @@ wandering monster to any active room.
 | +0x000 | u8 | act | levels `Act` (+0x03) |
 | +0x004 | i32 | rooms visited | +1 per population attempt (§3.1); boss chance (§5) |
 | +0x008 | i32 | rooms with spawns | +1 per room where population created something (§3.4) |
-| +0x00C | i32 | room count | −1 at init; set on first use to the level's populated-room count `0x0061ABF0(act, level)` (DRLG spec) |
+| +0x00C | i32 | room count | −1 at init; set on first use to the level's populated-room count `0x0061ABF0(act, level)` (`drlg/levels.md` §11.5) |
 | +0x010 | u8 | monster count (`nMonCount`) | entries the picker may choose (§2.3, §4) |
 | +0x011 | u8 | total rarity | sum of entry rarities (u8, wraps) |
 | +0x012 | u8 | entry count (`nSpawnCount`) | entries in use, including ones added by §2.5 |
@@ -367,7 +387,7 @@ Arguments: game, room, cl, x, y, GUID, class, warp check.
 4. Without cl, with a GUID (restore paths, not population): flags 0x62,
    r = −1, then r = 5. Then a §8 search without warp check and r = −1.
    Last, the nearest free point from `0x0064E840` (mask 0x3C01, size 1;
-   `sim/units.md`) with r = −1.
+   `sim/path-placement.md` §8) with r = −1.
 5. On success, `0x005A0320(boss, game)`: if the boss has no type flag 8,
    bosses spawned (+0x2C8) of the region of the boss's level id
    (`0x00573520`) += 1. Then type flag 8 is set, and `0x005A09E0` sets
@@ -443,10 +463,18 @@ Draws use the active room seed of `room`.
       step when w or h < 1).
    2. Warp check (only when asked, `0x0054DB50`): reject if
       dx² + dy² < levels `WarpDist` (+0x0C) for any warp point of the room
-      (`0x0061AC10(room)`: x at +4·i, y at +0x24 + 4·i, count at +0x48).
-      Also reject if dx² + dy² < WarpDist for the level's spawn location
-      of kind 11 (`0x006427F0`, tile coordinates × 5), when that location
-      has x > 0 and y > 0. 1.14d Act 1 WarpDist is 2025 (45 subtiles).
+      (`0x0061AC10(room)`: x at +4·i, y at +0x24 + 4·i, count at +0x48;
+      `drlg/levels.md` §11.5 item 3). Only when no warp point rejects:
+      also reject if dx² + dy² < WarpDist for the level's spawn location
+      of kind 11 (`0x00619E50` with the act of the level from
+      `0x006427F0`; tile coordinates × 5), when that location has x > 0
+      and y > 0. That query is the spawn-room choice of `drlg/levels.md`
+      §11.5 item 4: it is made again on every such try, can draw on the
+      **level seed** and streams the chosen room. `WarpDist` is the
+      row of the room's own level (`0x0061A1B0`: level id with no
+      flag-0x800000 test, then the levels record `0x0061DB70`); the
+      same row serves both tests. 1.14d values in Constants (most rows
+      2025 = 45²).
    3. With cl: reject if the coordinate index at (x, y)
       (`0x0061B130`) ≠ cl index.
    4. Probe placement: §9 at (x, y), mode 1, r = −1, flags 1 (test only,
@@ -491,7 +519,8 @@ the ring search is skipped.
 (0x30 bytes each; DRLG spec); n = 0 or no list → none. s = `roll(n)`
 (room seed); s = 0 → s = 1. Then visit indices s, s+1, … mod n until
 back at s − 1 (never visiting s − 1 itself). For a tile record with tile
-data (+0x18) whose `0x00604BC0` flags have bit 2: the point is
+data (+0x18) whose material flags (`0x00604BC0`, DT1 header +0x06,
+`drlg/rooms.md` §9.3) have bit 0x2: the point is
 x = (rec+8 + room tile x) × 5 + 3, y = (rec+0xC + room tile y) × 5 + 3.
 The point must pass `0x0064CB30(room, x, y, 0x100)` = 0, and at least one
 of (x, y) + (0,−3), (3,0), (0,3), (−3,0) (table `0x006E2D50`) must be
@@ -883,6 +912,23 @@ and `SetBoss` both use 0x10, on bytes +0x0F and +0x0C.
 | ambient gate | `lo' & 0x7FFF` = 0, then `lo' mod 100` < 3, max 3 per level | §12 |
 | wanderer table | `0x00731B2C` = {270}; act table `0x00731B30` | §12 |
 
+`WarpDist` in 1.14d (patch_d2 `levels.txt`, column `WarpDist`; the
+live `levels.bin` agrees for level 15 = 3800, `game_monsters::
+real_levels_rows`). 2025 for every row not listed:
+
+| Value | Levels |
+|---|---|
+| 0 | 0 (Null), 120 Rocky Summit, 132 Worldstone Chamber |
+| 100 | 20, 21, 23, 25 (Forgotten Tower, Tower Cellar 1, 3, 5); 47 Sewers 1; 94–99 (Kurast temples) |
+| 1000 | 55–61 (Stony Tomb, Halls of the Dead, Claw Viper Temple); 86–91 (Swampy Pit, Flayer Dungeon); 124 Halls of Vaught; 131 Throne of Destruction |
+| 3000 | 122 Halls of Anguish |
+| 3700 | 101 Durance of Hate 2 |
+| 3800 | 15 Hole Level 2; 44 Lost City; 46 Canyon of the Magi; 74 Arcane Sanctuary; 100, 102 Durance of Hate 1, 3; 107 River of Flame; 125–127 (Hell1–3); 134, 135 (Pandemonium Run 2, 3) |
+| 3900 | 104 Outer Steppes; 111 Rigid Highlands |
+
+Act I (0): 2025 except 15 (3800) and 20, 21, 23, 25 (100). With 0 no
+point is ever rejected (dx² + dy² < 0 never holds).
+
 ## Randomness
 
 Draws in order. "Room seed" = active room seed of the room being
@@ -1009,7 +1055,7 @@ Real (1.14d tables, `game/extracted/patch_d2`; `#[ignore]`, needs
 | levels 8 Den of Evil | MonDen 600; U 0/0 all difficulties; Quest 1; MonWndr 0 | levels.txt |
 | levels 18/19 Crypt / Mausoleum | MonDen 1056 | levels.txt |
 | levels 1 Act 1 town | MonDen 0 → guard stops population (rooms visited still +1) | §3.1 |
-| Act 1 WarpDist | 2025 | levels.txt |
+| Act 1 WarpDist | 2025 for levels 1–14, 16–19, 22, 24, 26–39; 3800 for 15; 100 for 20, 21, 23, 25 (full table: Constants) | levels.txt |
 | monstats Rarity | zombie1 2, fallen1 2, quillrat1 2, brute1 1, cr_lancer1 1, corruptrogue1 2, fallenshaman1 2 → Blood Moor list total 6 | monstats.txt |
 | monstats groups | zombie1 1/2, fallen1 2/3 (forced 1/1), quillrat1 1/2, brute1 1/1, fallenshaman1 1/1, cr_lancer1 1/2, corruptrogue1 2/3 | monstats.txt |
 | monstats parties | fallen1: minion1 fallen1, Party 2/3, SetBoss, BossXfer; fallenshaman1: fallen1, 2/6, SetBoss | monstats.txt |
@@ -1065,10 +1111,9 @@ unique with 3 minions), and placement points.
 
 ## Open questions
 
-1. What triggers the per-room population `0x0052D0F0` (callers
-   `0x00553720`, `0x0056CF40`, `0x0059DFD0`), and does it run outside the
-   tick room step? Settled by reading the callers, or by a recording that
-   logs population calls with the step.
+1. Answered (§1 r2): `0x0052D0F0` runs from portal and arrival paths
+   outside the tick room step. A recording that logs population calls
+   with their step would confirm it on the running game.
 2. Draw-level check of §3–§10: record room-seed and game-seed draws
    (call site and `lo'`) during the first population of a Blood Moor room,
    then replay.

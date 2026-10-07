@@ -1,0 +1,308 @@
+// Spec: specs/client/model.md (§3 rule 3, §1 rule 2, §11 rules 3, 5), specs/render/camera.md (§2, §3)
+//! [`ModelFeed`]: the [`ViewFeed`] hooks the client world model answers
+//! (RW2): the local player's position (camera §3) and unit positions
+//! (camera §2), given the `Levels.txt` rows, BlankScreen of the local
+//! player's level (`model.md` §11 rule 5), and, once the world view hands
+//! it over, the original UI's open mode (`ui/panels.md` §4.2). Every
+//! other hook (shake, player seed, unit offsets, map tiles, light,
+//! weather) goes to the wrapped feed, [`NoFeed`] by default; why the model
+//! cannot answer them yet is [`PENDING`].
+//!
+//! Positions are the model's cells (`ClientUnit::position`). A moving
+//! unit (players, monsters, missiles) is on a dynamic path: its 16.16
+//! position is the cell centre after every placement the message specs
+//! state (`model.md` §3 rule 3); a unit created at (0, 0) has its path at
+//! (0, 0). The walk prediction between messages is not a message rule
+//! (`model.md` open question 2), so the position changes only when a
+//! message places the unit. Static units (objects, items, tiles) are at
+//! their cell; an item without a cell (not on the ground, until the item
+//! stream is specified) has no position.
+
+use d2_sim::rng::Seed;
+
+use crate::bridge::world::{ClientWorld, LevelRow, ITEM, OBJECT, TILE};
+use crate::bridge::ClientUnit;
+use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
+
+use super::feed::{NoFeed, RunningShake, ViewFeed};
+use super::{UnitPose, ViewAssets, ViewError};
+
+/// The 16.16 position of a dynamic path at the centre of cell `c`
+/// (`sim/path-placement.md` §1 rule 2).
+fn centre(c: u16) -> u32 {
+    (u32::from(c) << 16) | 0x8000
+}
+
+/// The position of `unit` as the client keeps it (camera §2).
+pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
+    let static_kind = matches!(unit.key.unit_type, OBJECT | ITEM | TILE);
+    match (static_kind, unit.position) {
+        (true, Some((x, y))) => Ok(UnitPosition::Static {
+            sx: i32::from(x),
+            sy: i32::from(y),
+        }),
+        (true, None) => Err(format!(
+            "unit ({}, {}) has no cell: TODO(spec: msg-stats-items.md open question 3, item placement)",
+            unit.key.unit_type, unit.key.guid
+        )),
+        (false, p) => {
+            let (x, y) = p.unwrap_or((0, 0));
+            Ok(UnitPosition::Moving {
+                x16: centre(x),
+                y16: centre(y),
+            })
+        }
+    }
+}
+
+/// The [`ViewFeed`] / model hooks the client model cannot fill yet, each
+/// with the input it lacks (M02: named, never guessed). [`ModelFeed`]
+/// leaves them to `inner` ([`NoFeed`]: none).
+pub const PENDING: &[(&str, &str)] = &[
+    (
+        "ViewFeed::near_rooms (room unit lists)",
+        "the near-room array (`draw-order.md` §3, §9) lists each room's units (room +0x74) in the \
+         client's list order; which client code links a client unit into a room, and the Y sort \
+         `0x0064C0C0` the draw path calls through `0x00619EA0` (`sim/unit-order.md` §5 r5), are \
+         not specified (`unit-order.md` §5 is the server's lists)",
+    ),
+    (
+        "ViewFeed::near_rooms, ViewSource::map_tiles (tile records)",
+        "the client DRLG builds the rooms in sight and their tile records (`model.md` §12 r1), \
+         but a record's DT1 roof height (+0x04) and height (+0x08) (`draw-order.md` §9) are not \
+         in `d2_sim::drlg::TileInfo`, and the record → DT1 file mapping is `draw-order.md` open \
+         question 12",
+    ),
+    (
+        "ViewFeed::tile_art, ViewSource::tile_blocks",
+        "no ordered map tiles (above); walls also need the wall direction and fade state",
+    ),
+    (
+        "ViewFeed::light",
+        "the light map needs the act environment (S→C 0x53 has no client handler), light \
+         records and the per-unit look inputs (fade, ghostly, hover, items, remaps); none is in \
+         the model",
+    ),
+    (
+        "ViewFeed::weather_frame",
+        "the player's level is known now (`model.md` §11 r5), but no water floor is drawn \
+         without the near rooms (above) and passes 4 / 9 have no art path yet",
+    ),
+    (
+        "ViewFeed::player_seed, ViewFeed::shake",
+        "the local player's client seed is read-only in the model (`camera.md` open question 6); \
+         no effect spec starts a shake",
+    ),
+];
+
+/// The client world model's answers, over `inner` for the rest.
+#[derive(Debug, Clone, Default)]
+pub struct ModelFeed<F = NoFeed> {
+    pub inner: F,
+    /// The `Levels.txt` rows by level id. `None`: BlankScreen goes to
+    /// `inner` (the app supplies no rows yet).
+    pub levels: Option<Vec<LevelRow>>,
+    /// The original UI's open mode (`ui/panels.md` §4.2), once the world
+    /// view has handed one over; `None`: `open_mode` goes to `inner`.
+    pub ui_open_mode: Option<OpenMode>,
+}
+
+impl<F> ModelFeed<F> {
+    pub fn new(inner: F) -> Self {
+        Self {
+            inner,
+            levels: None,
+            ui_open_mode: None,
+        }
+    }
+}
+
+impl<F: ViewSource> ViewSource for ModelFeed<F> {
+    fn unit_position(&self, unit: &ClientUnit) -> Result<UnitPosition, String> {
+        unit_position(unit)
+    }
+
+    fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
+        self.inner.unit_offset(unit, pose)
+    }
+
+    fn map_tiles(
+        &self,
+        world: &ClientWorld,
+        assets: &ViewAssets,
+    ) -> Result<Vec<MapTile>, ViewError> {
+        self.inner.map_tiles(world, assets)
+    }
+
+    fn tile_blocks(&self, tile: &MapTile) -> Result<Vec<crate::rules::BlockShade>, ViewError> {
+        self.inner.tile_blocks(tile)
+    }
+}
+
+impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
+    /// `model.md` §3 rule 3: the local player's position; no local player
+    /// → `None`.
+    fn player(&self, world: &ClientWorld) -> Result<Option<UnitPosition>, ViewError> {
+        let Some(unit) = world.local() else {
+            return Ok(None);
+        };
+        unit_position(unit)
+            .map(Some)
+            .map_err(|message| ViewError::Unresolved {
+                what: "local player position",
+                spec: "client/model.md",
+                message,
+            })
+    }
+
+    /// `ui/panels.md` §4.2: the UI flags' open mode (camera §1); without
+    /// the original UI, the inner feed's answer.
+    fn open_mode(&self, world: &ClientWorld) -> Result<OpenMode, ViewError> {
+        match self.ui_open_mode {
+            Some(m) => Ok(m),
+            None => self.inner.open_mode(world),
+        }
+    }
+
+    fn set_ui_open_mode(&mut self, mode: OpenMode) {
+        self.ui_open_mode = Some(mode);
+    }
+
+    fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
+        self.inner.shake(world)
+    }
+
+    fn player_seed(&mut self, world: &ClientWorld) -> Result<&mut Seed, ViewError> {
+        self.inner.player_seed(world)
+    }
+
+    /// `model.md` §11 rules 3, 5: BlankScreen of the level of the local
+    /// player's room; no room → no level, BlankScreen 0. The level never
+    /// comes from 0x03 u16@6 or a 0x07 level byte.
+    fn blank_screen(&self, world: &ClientWorld) -> Result<bool, ViewError> {
+        let Some(levels) = &self.levels else {
+            return self.inner.blank_screen(world);
+        };
+        let Some(level) = world.player_level() else {
+            return Ok(false);
+        };
+        levels
+            .get(usize::from(level))
+            .map(|r| r.blank_screen)
+            .ok_or(ViewError::Unresolved {
+                what: "player level BlankScreen",
+                spec: "client/model.md",
+                message: format!("level {level} past the Levels rows"),
+            })
+    }
+
+    fn light(&self, world: &ClientWorld) -> Result<Option<super::feed::FeedLight<'_>>, ViewError> {
+        self.inner.light(world)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::world::{MONSTER, PLAYER};
+    use crate::bridge::UnitKey;
+
+    fn unit(unit_type: u8, position: Option<(u16, u16)>) -> ClientUnit {
+        let mut u = ClientUnit::new(UnitKey::new(unit_type, 1));
+        u.position = position;
+        u
+    }
+
+    // Covers: specs/client/model.md §3 r3
+    #[test]
+    fn local_player_position_is_the_cell_centre() {
+        let feed = ModelFeed::<NoFeed>::default();
+        let mut w = ClientWorld::default();
+        assert_eq!(feed.player(&w).unwrap(), None);
+        let key = UnitKey::new(PLAYER, 1);
+        w.units.insert(key, unit(PLAYER, Some((0x1241, 0x11C4))));
+        // A unit, but not the local player: no camera.
+        assert_eq!(feed.player(&w).unwrap(), None);
+        w.local_player = Some(key);
+        assert_eq!(
+            feed.player(&w).unwrap(),
+            Some(UnitPosition::Moving {
+                x16: 0x1241_8000,
+                y16: 0x11C4_8000
+            })
+        );
+        // Created at (0, 0): the path is at (0, 0).
+        w.units.get_mut(&key).unwrap().position = None;
+        assert_eq!(
+            feed.player(&w).unwrap(),
+            Some(UnitPosition::Moving {
+                x16: 0x8000,
+                y16: 0x8000
+            })
+        );
+        // The other hooks are still the placeholder's.
+        assert!(feed.open_mode(&w).is_err());
+    }
+
+    // Covers: specs/ui/panels.md §4 r2
+    #[test]
+    fn open_mode_is_the_uis_once_handed_over() {
+        let mut feed = ModelFeed::<NoFeed>::default();
+        let w = ClientWorld::default();
+        assert!(
+            feed.open_mode(&w).is_err(),
+            "no UI: the inner feed's answer"
+        );
+        feed.set_ui_open_mode(OpenMode::new(3).unwrap());
+        assert_eq!(feed.open_mode(&w).unwrap().get(), 3);
+        // A feed that ignores the UI keeps its own answer.
+        let mut inner = NoFeed;
+        inner.set_ui_open_mode(OpenMode::new(1).unwrap());
+        assert!(inner.open_mode(&w).is_err());
+    }
+
+    /// The pending hooks answer "nothing" through the app's feed, never a
+    /// guess (M02).
+    // Covers: specs/client/model.md §9 r4
+    #[test]
+    fn pending_hooks_answer_nothing() {
+        let mut feed = ModelFeed::<NoFeed>::default();
+        let w = ClientWorld::default();
+        assert!(w.active_rooms.is_none());
+        assert!(feed.light(&w).unwrap().is_none());
+        assert!(feed.weather_frame(&w).unwrap().is_none());
+        assert!(feed.near_rooms(&w).unwrap().is_none());
+        assert!(feed
+            .map_tiles(
+                &w,
+                &ViewAssets::new(crate::app::play::unspecified_palette())
+            )
+            .unwrap()
+            .is_empty());
+        assert!(feed.player_seed(&w).is_err());
+        assert!(PENDING.len() >= 6);
+    }
+
+    // Covers: specs/client/model.md §1 r2
+    #[test]
+    fn unit_positions_by_path_kind() {
+        let feed = ModelFeed::<NoFeed>::default();
+        assert_eq!(
+            feed.unit_position(&unit(MONSTER, Some((0x121A, 0x11B9))))
+                .unwrap(),
+            UnitPosition::Moving {
+                x16: 0x121A_8000,
+                y16: 0x11B9_8000
+            }
+        );
+        assert_eq!(
+            feed.unit_position(&unit(OBJECT, Some((0x1214, 0x11C0))))
+                .unwrap(),
+            UnitPosition::Static {
+                sx: 0x1214,
+                sy: 0x11C0
+            }
+        );
+        assert!(feed.unit_position(&unit(ITEM, None)).is_err());
+    }
+}

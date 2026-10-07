@@ -1,5 +1,6 @@
 // Spec: specs/sim/pathing.md
-//! Walk and run: the mode request (C→S 0x01–0x04), path types 1, 2 and 7,
+//! Walk and run: the mode request (C→S 0x01–0x04), the position resync
+//! (C→S 0x5F, §1.6), path types 1, 2 and 7, missile paths (§11),
 //! path compute, target preparation, toward / straight / A*, velocity,
 //! direction and facing, per-tick movement, and the S→C byte builders of
 //! §10.
@@ -11,14 +12,19 @@
 //! grids and path store together). Records, tables, collision queries
 //! and footprint moves are the path core's (`sim/path-placement.md`
 //! §1–§6).
-//! Integer and 16.16 fixed-point arithmetic only (CLAUDE.md rule 6); the
-//! x87 target lead (pathing.md open question 4) is a seam.
+//! Integer and 16.16 fixed-point arithmetic only (CLAUDE.md rule 6): the
+//! x87 target lead adds 0 in 1.14d (pathing.md §3), and the blessed
+//! hammer's float32 products are computed exactly from the sine table's
+//! bit patterns ([`sine`]).
 
 pub mod find;
 pub mod geom;
 pub mod messages;
+pub mod missile;
 pub mod request;
+pub mod resync;
 pub mod seams;
+pub mod sine;
 pub mod step;
 pub mod velocity;
 

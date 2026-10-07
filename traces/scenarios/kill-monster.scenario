@@ -1,0 +1,29 @@
+# Run out of town and attack the first fallen (monstats 19, fallen1,
+# specs/monsters/ai.md §9 table) until it dies. While no fallen exists
+# the attack steps stay unresolved on that side (scenario.md §3 rule 5).
+scenario 1
+name kill-monster
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 400
+
+char save ScnAma     # the save the original side loads (handoff §3)
+char class 0          # amazon
+char level 5
+char area 0 1
+char at default
+
+record s2c rng units stats
+snapshot every 25
+
+at 2 msg Run x=@x+30 y=@y
+at 40 msg Run x=@x+30 y=@y+10
+at 80 msg Run x=@x+30 y=@y+10
+at 120 msg LeftSkillOnUnit type=1 id=@1:19
+at 160 msg LeftSkillOnUnit type=1 id=@1:19
+at 200 msg LeftSkillOnUnit type=1 id=@1:19
+at 240 msg LeftSkillOnUnit type=1 id=@1:19
+at 280 msg LeftSkillOnUnit type=1 id=@1:19
