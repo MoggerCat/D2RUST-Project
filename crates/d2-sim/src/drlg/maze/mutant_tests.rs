@@ -501,7 +501,15 @@ fn special_stamps_by_level() {
         (86, 24, "dungeon_", &["dungeon_prev", "dungeon_next"]),
         (89, 24, "dungeon_", &["dungeon_prev", "dungeon_next"]),
         (92, 25, "a3sewer_", &["a3sewer_drain", "a3sewer_chest"]),
-        (93, 25, "a3sewer_", &[]),
+        // §6: the builder stamps both unconditionally (was `&[]`).
+        (93, 25, "a3sewer_", &["a3sewer_drain", "a3sewer_chest"]),
+        (13, 3, "cave_", &["cave_prev", "cave_down"]),
+        (16, 3, "cave_", &["cave_prev", "cave_down"]),
+        (25, 4, "crypt_", &["crypt_prev"]),
+        (37, 10, "catacombs_", &["catacombs_next"]),
+        (90, 24, "dungeon_", &["dungeon_prev", "dungeon_next"]),
+        (91, 24, "dungeon_", &["dungeon_prev", "dungeon_next"]),
+        (132, 34, "baal_", &["baal_next"]),
         (100, 22, "meph_", &["meph_prev", "meph_next"]),
         (
             101,

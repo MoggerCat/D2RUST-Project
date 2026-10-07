@@ -328,29 +328,30 @@ pub(super) fn stamps(gen: &mut Gen<'_>, kinds: &[&'static str]) -> Result<(), Ma
     Ok(())
 }
 
-// PROVISIONAL (drlg/maze.md §6): a level of a type the spec's table does
-// not list draws r and stamps nothing; settled by none (no such maze level
-// in 1.14d data).
-
 /// Cave `0x00672550`.
 pub(super) fn cave(gen: &mut Gen<'_>) -> Result<(), MazeError> {
-    let kinds: &[&'static str] = match gen.level_id {
-        8 => &["cave_prev", "cave_doe"],
-        9 => &["cave_prev", "cave_down", "cave_coldcrow"],
-        10 => &["cave_prev", "cave_down", "cave_next"],
-        11 | 12 => &["cave_prev", "cave_down"],
-        _ => &[],
-    };
-    stamps(gen, kinds)
+    // The builder tests level ids (§6): cave_prev always; cave_doe if 8
+    // else cave_down; cave_coldcrow if 9; cave_next if 10 (so 13–16 get
+    // cave_prev, cave_down).
+    let id = gen.level_id;
+    let mut kinds = vec!["cave_prev", if id == 8 { "cave_doe" } else { "cave_down" }];
+    if id == 9 {
+        kinds.push("cave_coldcrow");
+    }
+    if id == 10 {
+        kinds.push("cave_next");
+    }
+    stamps(gen, &kinds)
 }
 
 /// Crypt `0x00672610`.
 pub(super) fn crypt(gen: &mut Gen<'_>) -> Result<(), MazeError> {
+    // crypt_prev always (so 25 gets crypt_prev only, §6).
     let kinds: &[&'static str] = match gen.level_id {
         18 => &["crypt_prev", "crypt_bonebreak"],
         19 | 133 => &["crypt_prev", "crypt_chest"],
         21..=24 => &["crypt_prev", "crypt_next"],
-        _ => &[],
+        _ => &["crypt_prev"],
     };
     stamps(gen, kinds)
 }
@@ -369,9 +370,9 @@ pub(super) fn jail(gen: &mut Gen<'_>) -> Result<(), MazeError> {
 /// Catacombs `0x006727A0`.
 pub(super) fn catacombs(gen: &mut Gen<'_>) -> Result<(), MazeError> {
     let kinds: &[&'static str] = match gen.level_id {
-        34 | 36 => &["catacombs_next"],
+        // catacombs_next always (so 37 gets it, §6).
         35 => &["catacombs_next", "catacombs_waypoint"],
-        _ => &[],
+        _ => &["catacombs_next"],
     };
     stamps(gen, kinds)
 }
@@ -387,20 +388,14 @@ pub(super) fn arcane(gen: &mut Gen<'_>) -> Result<(), MazeError> {
 
 /// Flayer / Swampy dungeons `0x00672EA0`.
 pub(super) fn dungeon(gen: &mut Gen<'_>) -> Result<(), MazeError> {
-    let kinds: &[&'static str] = match gen.level_id {
-        86..=89 => &["dungeon_prev", "dungeon_next"],
-        _ => &[],
-    };
-    stamps(gen, kinds)
+    // Both stamps unconditionally (86–91, §6).
+    stamps(gen, &["dungeon_prev", "dungeon_next"])
 }
 
 /// Act 3 sewer `0x00672F00`.
 pub(super) fn act3_sewers(gen: &mut Gen<'_>) -> Result<(), MazeError> {
-    let kinds: &[&'static str] = match gen.level_id {
-        92 => &["a3sewer_drain", "a3sewer_chest"],
-        _ => &[],
-    };
-    stamps(gen, kinds)
+    // Both stamps unconditionally (92, 93, §6).
+    stamps(gen, &["a3sewer_drain", "a3sewer_chest"])
 }
 
 /// Durance `0x00672F60`.
@@ -416,9 +411,9 @@ pub(super) fn durance(gen: &mut Gen<'_>) -> Result<(), MazeError> {
 /// Worldstone Keep `0x006730B0`.
 pub(super) fn baal(gen: &mut Gen<'_>) -> Result<(), MazeError> {
     let kinds: &[&'static str] = match gen.level_id {
-        128 | 130 => &["baal_next"],
+        // baal_next always (so 132 gets it, §6).
         129 => &["baal_next", "baal_waypoint"],
-        _ => &[],
+        _ => &["baal_next"],
     };
     stamps(gen, kinds)
 }
