@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–194 |
 |   4. Dispatch | 195–264 |
 |   5. Key-config screen assignment | 265–280 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 281–394 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 395–436 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 437–446 |
-| Constants & data dependencies | 447–453 |
-| Randomness | 454–457 |
-| Edge cases & original bugs | 458–470 |
-| Test vectors | 471–492 |
-| Provenance | 493–511 |
-| Open questions | 512–547 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 281–596 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 597–638 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 639–648 |
+| Constants & data dependencies | 649–655 |
+| Randomness | 656–659 |
+| Edge cases & original bugs | 660–672 |
+| Test vectors | 673–697 |
+| Provenance | 698–716 |
+| Open questions | 717–758 |
 <!-- /index -->
 
 ## Summary
@@ -392,6 +392,208 @@ otherwise significant except for the first-match rules of §4.1.
    path). So a left click on the ground without Stand Still is a walk
    (code 1 / 3), never 0x05.
 
+8. **Decision order of `0x004625B0(C)`** (answers OQ 8 for the action;
+   notation: P = C+4, U = C+8, skill = C+0x1C, F = C+0 flags, T / g =
+   U's type / GUID, row = the skill's `skills.txt` record (skill entry
+   +0, `0x00644140`), rng = `range(P, skill)` (`0x00645460`,
+   `skills/use.md` §3 r6: 0 none, 1 h2h, 2 rng, 4 loc; `both` already
+   resolved), SS = F & 0x20 (Stand Still), R = F & 2 (right button).
+   Flag columns by `skills.txt` bit (`data/fields.tsv`; mask table
+   `0x006CE268`, entry n = 1 << n): `passive` 4, `InTown` 8,
+   `SearchEnemyXY` 21, `SearchEnemyNear` 22, `SearchOpenXY` 23,
+   `TargetCorpse` 24, `TargetPet` 25, `TargetAlly` 26, `TargetItem` 27,
+   `AttackNoMana` 28, `interrupt` 31.
+   1. Set-up `0x004621D0` (r5 first part): with a skill, R and rng ≠ 1:
+      no row → stop; row lacks `InTown` and P's room is in town → event
+      sound, stop; `passive` → stop. Walk codes (r5). Pending
+      interaction cleared (r5). **No skill → stop** (so the action below
+      always has a skill). Re-pick (r10) into U. Cursor state 6 → C→S
+      0x27 (as kind 0); state 8 → C→S 0x4C [−1]; either way the action
+      goes on.
+   2. **Unit or point.** No row, or no U → *point* (step 4). Else, when
+      R and rng ≠ 1: U an object or item (type 2 / 4): with `TargetItem`
+      remember "item skill" (b := 1) and go on to the corpse test below;
+      without it → *point*. U type 5 (a tile / warp): F |= 0x100, →
+      *point*. Then (all other cases): U a monster (type 1) that is dead
+      (`0x00464820`: flag 0x10000, or mode 0 / 12) and the row lacks
+      `TargetCorpse` → *point*; else → *unit* (step 3).
+   3. **Unit** (T, g):
+      1. Not b, U of type 2, 4 or 5, R and rng ≠ 1 → nothing.
+      2. Skill mode (entry +8, `0x00643860`) = 0: SS → nothing; else
+         go to 3.6.
+      3. Row has `TargetItem`: the use check (r9.1) fails → nothing;
+         else **skill on unit** (`0x00461700(1)`, r7).
+      4. "Act on it" := U's flag +0xC4 bit 2 is set and (row has
+         `TargetPet` or `TargetAlly`, or the hostility test r9.7 is
+         true). When true: T = 2 → SS: nothing, else the object sender
+         (r9.4); T = 0 → both U's and P's rooms in town: the town
+         player sender (r9.5), else the attack sender r9.3 with type 0;
+         other T → U's room in town and the row (by id, `0x00462560`)
+         lacks `InTown` → nothing; else the attack sender r9.3 (T, g).
+      5. Not "act on it": SS → the use check, then **skill at the
+         point** (`0x00461700(0)`); no SS → 3.6.
+      6. T ≠ 1 → the interact sender r9.2 (T, g). T = 1 (monster): only
+         on a press (F & 4): its `monstats` row has `interact` (byte
+         +0xD bit 1) → the interact sender (1, g); else **walk** to it:
+         code C+0x18 (2 walk / 4 run to unit) with (1, g). A held or
+         released click on a monster here sends nothing.
+   4. **Point.** When SS, or R and rng ≠ 1: the use check (r9.1) with
+      its use-state output s; fails → nothing; then **skill at the
+      point** (`0x00461700(0)`, then `0x00467A70(0)`) unless the skill
+      (after the r9.1 fallback) is id 0 (Attack), s = 1 (no mana) and
+      not SS, which falls through to the walk. Walk: the step clamp
+      r9.6 passes → `0x00461840` (r9.8) with walk code C+0x14 (1 / 3)
+      to the clamped point, then `0x00467A70(0)`; else nothing.
+
+   So: left on ground → walk / run; Stand Still + left / right on ground
+   → skill at point; right with an h2h skill on ground → walk; right
+   with a ranged skill on ground → skill at point; left on a hostile
+   monster → attack sender; left on an NPC (`interact`) → interact
+   sender; left on a non-hostile, non-interact monster → walk to unit.
+9. **Senders** (each ends in `0x00481030(code, P, type, GUID)`, r7, or
+   in nothing):
+   1. **Use check** `0x004610C0(&s)` (EDI = P, EBX = &skill): P not the
+      local player → passes. No skill or no row → fails. s := use_state
+      (`0x004D9FC0` = `skills/use.md` §2 `0x00647960`, plus code 8 for
+      the local player while `[0x007A0498]` < `[0x007A04FC]`). s ∈ {1,
+      2, 4} and the row has `AttackNoMana` → the skill becomes the
+      Attack entry (`0x006439F0`) and the state is recomputed. Final
+      state 0 or 5 → passes; else the refusal sound of that state in
+      table `0x00711DDC` (u16 per state, count `[0x00711EF0]`, else fatal
+      0x2CB) plays when non-zero (`0x004CB9C0`), fails.
+   2. **Interact** `0x00461DC0(T, g)`, by U's type (jump table
+      `0x004621AC`: 0 → `0x00461F61`, 1 → `0x00462030`, 2 →
+      `0x00461DF2`, 3 → `0x00462057`, 4 → `0x00461EE5`, 5 →
+      `0x00461FB7`); d = unit distance (`0x00641530`), "clear" =
+      `0x00622B50(P, U, 0x804)` = 0; "pend" = pending interaction
+      (player data +0x150..+0x15C := 1, 0x13, T, g; `0x00460780`);
+      "stop repeat" = `[0x007A0658]` := 1 (`0x0044BEF0`, r6); code
+      **0x13** = the interact mode request (`client/model.md` §8; the
+      C→S 0x13 leaves from the mode machine, `0x00480930`):
+      - player: d ≤ 4 and clear → 0x13; else code C+0x18 (T, g), pend.
+      - monster: reach 2 when its `monstats` row has `interact`, else 5;
+        then the tail.
+      - missile / other / none: reach 5, the tail.
+      - tail: a monster with `npc` and `interact` (byte +0xD bits 0, 1):
+        its path stops (`0x00648730`), C→S **0x59** [type][g][x][y] with
+        its current position (`0x00478700`, `MakeEntityMove`), its
+        monster data +0x28 |= 1, `0x00480E70(U, 1)`. Then d > reach →
+        code C+0x18 (T, g) and pend; else 0x13 (T, g).
+      - object: held (F & 8) → nothing. notify := 1, except class 59
+        (town portal) while P has state 102 (`just_portaled`) → 0.
+        `0x00623660(P, U)` (P stands at the object) and clear → notify:
+        0x13 and stop repeat; else nothing. Otherwise: already pending
+        on the same (T, g) (`0x00461D60`) → nothing; else walk
+        (`0x00461840`, code C+0x14) to the object's position, then when
+        notify: pend and stop repeat.
+      - item: held → nothing. d ≤ 4 and clear → 0x13 and stop repeat.
+        Else already pending (T, g) → nothing; else code C+0x18 (T, g),
+        pend, stop repeat.
+      - tile (warp, type 5): `[0x007A048C]` < `[0x007A04C8]` → nothing.
+        d > 4 → code C+0x18 (T, g) and pend; else 0x13 (T, g). Then
+        `[0x007A04C8]` := `[0x007A048C]` + 500.
+   3. **Attack** `0x00461C70(T, g)`: use check fails → nothing. The
+      target by (g, T) (`0x00463990`); none → nothing. P in melee range
+      of U (`0x00622C40(P, U, 1 if U is moving)`, moving =
+      `0x00622D00`) → skill on unit. Else: the row's `srvdofunc` (+0x2E)
+      = 0x13 (Inferno, Arctic Blast) → the approach r9.9. rng 1 or 4:
+      SS → skill at the point; else code C+0x18 (T, g), then pending
+      (6, T, g) when F & 1 and pending (0xD, T, g) when F & 2. Other rng
+      → skill on unit.
+   4. **Object with a skill** `0x00461890(g)`: object (g, 2) lookup;
+      none → nothing; no `objects.txt` row → fatal 0x4C4. notify as in
+      r9.2; P at the object and clear → notify: code 0x13 (2, g); else
+      walk (code C+0x14) to the object and, when notify, pending (0x13,
+      2, g).
+   5. **Player in town** `0x004619E0` (EDI = g): d < 3 and clear → code
+      0x13 (0, g); else code C+0x18 (0, g) and pending (0x13, 0, g).
+   6. **Walk clamp** `0x004623C0(P)` (EBX = C): p = P's position (static
+      position for types 2, 4, 5, else the path position); dx, dy =
+      C+0xC − px, C+0x10 − py. |dx| ≥ 0x100 or |dy| ≥ 0x100 → fail; dx =
+      dy = 0 → fail. len := `0x00474080(dx, dy)` = (max(|dx|, |dy|) ×
+      0x3D7 + min × 0x197) >> 10, at least 1. Minimum t: press with
+      run 5; press without run 3; held 4, or 5 with run; release 0.
+      len < t → f := (float32)(t / len), dx := trunc(dx × f), dy :=
+      trunc(dy × f) (x87, `__ftol2` truncation). C+0xC, C+0x10 := p +
+      (dx, dy). Then with n = `[0x007A0498]` (client update counter):
+      P a player, F & 8 (held), P's mode 2, 3 or 6 and n −
+      `[0x007A5268]` < 7 (unsigned) → fail; else `[0x007A5268]` := n,
+      pass. So a held walk re-sends at most every 7 client updates.
+   7. **Hostility** `0x00465C60(P, U)` → 1 "act on it". a / b := (type,
+      GUID) of P / U (P none → (6, −1)).
+      - P's room in town: U a dead player (flag 0x10000, mode 0 or
+        0x11) and `0x0047A4F0(a GUID, U GUID)` = 0 → 0. P a player, U a
+        monster with an owner in the pet list (`0x00479150`,
+        `[0x007BB5BC]`, `client/model.md` §14) → 1 only when
+        `0x00464EC0(P, U)` (P's left or right skill row has `TargetPet`
+        and U's owner is P's GUID). Else 1.
+      - not in town: a monster side with a pet-list owner becomes (0,
+        owner); P with flag-2 (+0xC8) bit 10 and U +0x94 = 0 → a := (0,
+        P +0x98) (the code tests U's +0x94 here); U likewise with its own
+        +0x94 / +0x98. a = b → 0. Both type 0: U dead (`0x00464820`) and
+        `0x0047A4F0(a GUID, U GUID)` ≠ 0 → 1; else the relation flag
+        8 (hostile) of `0x004DC440(a GUID, b GUID, 8)`. b a monster:
+        `monstats2` `alSel` (`0x004638A0(class, 4)`) → 1; `noSel` (bit 5)
+        → 0. a a player and b an object or item → 1. Else 1 when the
+        alignments differ (`0x00650D70(P, U)` = 0).
+   8. **Walk to a point** `0x00461840(x, y, code)` (EDI = P): P's path
+      target := (x, y) (`0x00648AD0`), path compute (`0x00649970(path,
+      P, 0)`, `sim/pathing.md` §3); no path → nothing; else code with
+      the path's end point (`0x00648A40`, `0x00648A60`).
+   9. **Approach** `0x00461B40` (`srvdofunc` 0x13): SS → skill on unit.
+      range := `0x00646CA0(P, row +0x64, row id, skill level
+      0x006442A0(P, skill, 1))`, dist := `0x006416D0(P, U)`; dist ≤
+      range → skill on unit. Else pending (6, T, g) when F & 1, (0xD,
+      T, g) when F & 2; then walk (r9.8, code C+0x14) to p + (U − p) ×
+      (dist − range) / dist (per axis, integer, truncating).
+10. **Target re-pick** `0x00467880(&x, &y, F, force)` (force = SS, or R
+    without U): with U: a dead player → keep U. U dead and the row lacks
+    `TargetCorpse` → the hover is dropped (`0x00466DE0`), (x, y) := U's
+    position, U := none. With no U and (x, y) = P's position →
+    `0x004C51E0(&y)`. Held left without SS while P moves
+    (`0x00622D00`) → keep. Then only when use_state = 0: row
+    `SearchEnemyNear` → `0x00467490`; no U, `SearchEnemyXY` and force →
+    `0x00467660`; `SearchOpenXY` → `0x004677B0(&x)`; these return the
+    new U (their search rules: §Open questions 8).
+
+11. **Re-pick searches** (r10; answers the rest of OQ 8). Positions are
+    a unit's position as in r9.6; d = P's direction (`0x00620100`) & 0xFF,
+    shifted right by 3 (0–7).
+    1. **Nudge** `0x004C51E0(P, &x, &y)`: x := px + A[d], y := py + B[d]
+       with A = (0, −1, −2, −1, 0, 1, 2, 1), B = (2, 1, 0, −1, −2, −1,
+       0, 1) (so a click on P's own position becomes a point two
+       subtiles ahead in P's facing).
+    2. **`SearchEnemyNear`** `0x00467490(skill, U, &x, &y)` (EAX = the
+       row): with U: the row has `TargetCorpse` and U is dead → keep U;
+       else (x, y) := U's position. Search flags m := 0x3002 with
+       `TargetCorpse`, else 0x2003; skill id 90 (Iron Golem): an item
+       U whose base record has flag +0xDC bit 1 (`0x00629CC0`) → keep U;
+       else m := 0x20 with the filter `0x00467470`. Then every unit
+       found by the area search around (x, y) with radius 9 in P's room
+       (`0x0065A950`, `0x0065AC70`, freed by `0x0065AA00`; search record
+       m, local player id `0x00463DE0`) is ranked by its distance to (x,
+       y) (`0x006417F0`); the first with distance < 10 and below every
+       earlier one that passes the hover selectability test
+       (`0x00466870`, `client/model.md` hover) becomes U; none → U is
+       unchanged.
+    3. **`SearchEnemyXY`** `0x00467660(row)` (EBX = P): for the offsets
+       k = 0, −1, 1, −2, 2 (table `0x006D6B34`) in that order: j = (k +
+       d) & 7; point = P's position + (DX[j], DY[j]) with DX =
+       `0x006D6B14` (0, −2, −3, −2, 0, 2, 3, 2), DY = `0x006D6AF4` (3,
+       2, 0, −2, −3, −2, 0, 2); the point must pass the room test
+       `0x0064D9B0(room, x, y, 1, 0x180)` and hold a unit
+       (`0x00641CB0(room, x, y, filter 0x00467640, 0, 1)`) with flag
+       +0xC4 bit 2, and either the row lacks `TargetableOnly` (bit 20),
+       or the unit is a monster with the `monstats2` flag tested by
+       `0x004638A0`, or the hostility test r9.7 holds → P's target :=
+       that unit (`0x00620C10`) and it becomes U. No point qualifies →
+       U := none.
+    4. **`SearchOpenXY`** `0x004677B0(&x)` (EBX = &y, ESI = U): the
+       point is U's position (U given) or (x, y); when P's room
+       (`0x004646A0`) blocks it (`0x0064CB30(room, x, y, 1)` ≠ 0) and a
+       free point is found nearby (`0x0064E780(room, &pt, 1, 1, 0, 7)`),
+       (x, y) := that point and U := none; else U unchanged.
+
 ### 7. Gates and belt use (answers OQ 3, OQ 4, OQ 5)
 
 1. **Gates** of §3: `0x0044DA30` = `[0x007A0620]`, the game-exit flag
@@ -484,6 +686,9 @@ None.
 | chat open, press I | nothing (key-down not registered) | §4.1 r5 |
 | `original` preset vs `0x00712220` | identical 114 bindings | §B4 |
 | left down on open ground, no modifier | a walk (code 1, C→S 0x01 `[x][y]`), not 0x05 (path through §6 r5: to confirm with OQ 8 / the OQ 2 trace) | §6 r7 |
+| left down on open ground 1 subtile east of P (dx = 1, dy = 0), no run | walk clamp: len 1 < t 3 → f = 3, target dx = 3 | §6 r9.6 |
+| left held on ground while P walks, 3 client updates after the last walk send | nothing sent (n − last < 7) | §6 r9.6 |
+| left down on an `interact` NPC 8 subtiles away | C→S 0x59 [1][g][x][y], then walk-to-unit code 2 and a pending interaction (0x13, 1, g) | §6 r9.2 |
 | right button held on open ground, P standing | press code 0x0C, then code 0x0F on each client loop pass that passes §6 r2–r3 (to confirm, OQ 2) | §6 r6, r7 |
 | right down at (100, 200), open mode 2 (character panel) | not dispatched, not consumed | §6 r1 |
 | left down with an item on the cursor over the ground | C→S 0x17 `[item GUID]` | §6 r4 |
@@ -543,4 +748,10 @@ archive `default.key` headers measured. No D2MOO code used.
    interact, melee range, the town and `0x00645460` / `0x00643860` /
    `0x00465C60` / `0x004610C0` / `0x00462560` / `0x004623C0` tests), and
    the target re-pick `0x00467880`. Disassembly read; then the packet
-   trace of OQ 2.
+   trace of OQ 2. **Answered** (2026-10-07, §6 r8–r11; the send ticks
+   stay OQ 2). Earlier *partly answered* (2026-10-07, §6 r8–r10: the full
+   order of `0x004625B0`, every sender, the hostility test, the walk
+   clamp and the re-pick). Open: the three searches of the re-pick
+   (`0x00467490` `SearchEnemyNear`, `0x00467660` `SearchEnemyXY`,
+   `0x004677B0` `SearchOpenXY`) and the nudge `0x004C51E0`; read
+   them.

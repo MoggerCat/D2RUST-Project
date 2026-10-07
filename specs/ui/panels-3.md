@@ -21,21 +21,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 41–53 |
-| Inputs | 54–65 |
-| Outputs / state changes | 66–71 |
-| Rules | 72–73 |
-|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 74–160 |
-|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 161–205 |
-|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 206–241 |
-|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 242–276 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 277–324 |
-| Constants & data dependencies | 325–339 |
-| Randomness | 340–345 |
-| Edge cases & original bugs | 346–359 |
-| Test vectors | 360–378 |
-| Provenance | 379–398 |
-| Open questions | 399–414 |
+| Summary | 42–54 |
+| Inputs | 55–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 75–180 |
+|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 181–225 |
+|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 226–261 |
+|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 262–296 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 297–370 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 371–531 |
+| Constants & data dependencies | 532–546 |
+| Randomness | 547–552 |
+| Edge cases & original bugs | 553–566 |
+| Test vectors | 567–591 |
+| Provenance | 592–619 |
+| Open questions | 620–636 |
 <!-- /index -->
 
 ## Summary
@@ -157,6 +158,25 @@ waypoint row table `[0x007BF03C]`.
     0x700) back to `protate`; a press shows `ppress` until the release.
     The seed draws of r8 change the client player seed (`render/capture.md`
     §7: recorded per frame).
+
+14. **Which messages reach the cursor** (answers §Open questions 4).
+    The init registers the 3 entries of table `0x00711FEC` on the game
+    window (kind 0 = window message): `WM_MOUSEMOVE` (0x200) → the move
+    r4; `WM_NCMOUSEMOVE` (0xA0) → `0x00467EF0`: drawn := 0 (the cursor
+    is not drawn while the mouse is over the non-client area), and when
+    the hit-test code (event +8) is 2 (`HTCAPTION`) the OS cursor call
+    `0x004F59F0(0)` (video-mode dependent; an app edge); the event is
+    left unconsumed (+0x18, +0x1C := 0); `WM_LBUTTONUP` (0x202) → the up
+    r6. The press r5 is **not** a window handler: only three panel
+    presses call it, the character panel's button press (`0x004A7720`,
+    a stat button or the close button armed) and the control panel's
+    new-stats / new-skills press (`0x004A66E0`, `0x004A6790`,
+    `ui/control-panel.md` §8 r4). So a world click, a right click or any
+    other panel press leaves the cursor type unchanged; the `ppress`
+    animation shows only on those buttons. The up transition is also
+    called directly by `0x0048B7C0`, `0x004A6840`, `0x004A6920`,
+    `0x004A78C0` (a second call is harmless: s is 1 by then). No
+    right-button message reaches the cursor.
 
 ### 24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values)
 
@@ -304,7 +324,7 @@ waypoint row table `[0x007BF03C]`.
    mode 3. `X1`, `Y1` (`0x00722EB8`): (242, 104), (255, 222), (148, 310),
    (47, 222), (75, 104); `X2`, `Y2` (`0x00722EE0`): (303, 161), (322,
    242), (254, 290), (190, 238), (211, 162). The writers of
-   `[0x007BF098]` and `[0x007BF254]`: §Open questions 1.
+   `[0x007BF098]` and `[0x007BF254]`: §Open questions 1 (answered: r7).
 4. **Recipe scroll** (ui 0x25, left; `0x0048BC10`, expansion game and ui
    0x25 open): `0x0048BBE0(text, color)` (from the 0x26 type 7 consumer
    `0x0049F490`, `ui/messages.md` §4) copies the text to `[0x007BCEA8]`,
@@ -316,11 +336,198 @@ waypoint row table `[0x007BF03C]`.
 5. **Guild states** 0x1B, 0x1C, 0x1D, 0x20 (full slot, `panels.md` §4.1)
    have no draw call of their own in the UI pass (`panels.md` §5); 0x1C
    and 0x1D only make the inventory family draw (§5 step 5). No opener
-   of them was found: §Open questions 2.
+   of them was found: §Open questions 2 (answered: r8).
 6. **Anvil** (ui 0x0E, `0x004C01E0`) is the item-socket dialog of
    `ui/messages.md` §11. **Player trade** (ui 0x17, inventory mode 0x0B,
    `%s\ui\panel\trade`, `0x004B8730`) is multiplayer only and not
    specified (Phases 7+): §Open questions 3.
+
+7. **Scroll reading and the symbol slots** (answers §Open questions 1).
+   The scroll item is set only by `0x0049FF90(u ECX, item EDX)` (callers: the
+   inventory use `0x00487963` and the belt use `0x00498A77`):
+   `[0x007BF228]` := item; ui 0x10 is toggled (`SetUIState(0x10, toggle, 0)`);
+   `0x0044DA40`; then for code `bkd ` the flag `[0x007BF254]` := 1, C→S
+   **0x3E** [u's GUID u32, −1 when u is none] (`0x00478680`,
+   `ActivateInifussScroll`) and `[0x007BF1E0]` := 0; any other code:
+   flag := 0, `[0x007BF1E0]` := 1. No other instruction writes the flag
+   (its only reader is the r1 test), and no instruction writes the
+   symbol slots `[0x007BF098]`–`[0x007BF0A1]` (scan of every absolute
+   reference in the image; the one block clear of the area, `0x0049D440`,
+   zeroes `0x007BF1B0`–`0x007BF24E`, item and counters included, not the
+   slots or the flag). The slots are zero-initialized data, so every
+   slot reads 0. Consequence in 1.14d: a `bkd` scroll is always drawn
+   with flag 1, i.e. the base only; `bks` draws the base only (r1); the
+   symbol pass of r3 is unreachable. d2rs draws the base for both and
+   keeps r3 only for fidelity of the code path (slots 0).
+8. **Guild states 0x1B, 0x1C, 0x1D, 0x20 are never opened** (answers
+   §Open questions 2). All 136 `SetUIState` call sites resolve to a
+   constant ui id (register tracking over each call's set-up) except the
+   gate's own close (`0x00453A4F`, mode 1 off, `panels.md` §3). None
+   passes 0x1B, 0x1C, 0x1D or 0x20; the only other writer of their flags
+   (`0x007A282C`, `0x007A2830`, `0x007A2834`, `0x007A2840`) is the
+   reset `0x00456970` (stores 0). They stay closed in 1.14d; d2rs need
+   not draw or open them.
+
+### 28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6)
+
+The controls are the UI classes `ButtonImplementation`,
+`EditBoxImplementation`, `SpinnerImplementation` of `.\UI\`, each behind
+a wrapper object whose method k calls the implementation's method k
+(method tables `0x006DA6F4`, `0x006DA77C`, `0x006DA83C`). Coordinates
+are the 640 × 480 values passed (`panels-2.md` §21 r6); "inside" is
+inclusive unless noted.
+
+1. **Box** `0x004B7CD0(x 215, y 140, p1 0x00453FC0, p2 0, art 0, p6
+   1)`: a menu box object (`ui/menus.md` §2.1 layout; creation time
+   +0 := `GetTickCount`, style 2, nothing selected) whose art is
+   `data\global\ui\menu\` + table `0x007274AC`[art] (0 →
+   `dialogbackground`, 210 × 158, 1 frame, offsets 0; d2data,
+   measured); size := the cel size; it is drawn by `ui/menus.md`
+   §2.5 (frame 0 at (215, 140 + 158), mode 5), then the controls,
+   then the prompt items. More than one box at a time is fatal
+   0x3C8; no cel is fatal 0x3B3. Controls are kept in a list that
+   `0x004B7C00` **prepends** to, so with the add order spinner, edit
+   box, OK, Cancel the list (draw and offer order) is Cancel, OK,
+   edit box, spinner.
+2. **Box input** (window handlers: 14 entries of `0x007273F0` on the
+   game window, plus the wheel entry `0x007273E4` (0x20A →
+   `0x004B7610`); kind 0 = window message, kind 3 = key down by VK).
+   "Offer" = call that method of each control in list order and stop
+   at the first that returns 1 (WM_CHAR: non-zero). Every event
+   within 80 ms of the box's creation is only consumed.
+   - mouse down (0x201 / 0x204): offer method 3; taken → consumed.
+     Else the box's pressed flag (+0x10) := 1, the hovered item is
+     re-picked (`0x004B7200`); outside the box grown by 4 pixels on
+     each side: when ui 0x15 (mini panel) is open and the mouse is in
+     its strip (W/2 − 74 < x < W/2 + 71, H − 69 < y < H − 50,
+     `0x0047F190`) the event passes on untouched; else p1 runs
+     (`0x00453FC0` = close, `panels-2.md` §21 r7: a click outside cancels). Consumed.
+   - mouse up (0x202 / 0x205): passes on when ui 0x15 is open and the
+     mouse is in that strip; else consumed; box not pressed → offer
+     method 4; pressed → the item path (`ui/menus.md`; the gold box
+     has no selectable item) and pressed := 0.
+   - mouse move (0x200): offer method 5; taken → consumed; else the
+     hovered item update.
+   - wheel: |delta| ≥ 120 → offer method 2; none → the item step
+     `0x004B7100` (nothing with < 2 selectable items). Consumed.
+   - Esc key down (two entries; at each box creation `0x004B7C60`
+     rewrites their VKs to the keys of command 38 `CfgClearScreen`,
+     slot 1 then slot 0, when bound and < 0xE0, so by default Space
+     and Esc): nothing while ui 5 (chat) is open; else consumed and,
+     once the box was drawn more than 4 times (+0x54 > 4), p1 runs
+     (close) and `0x00453AE0`. A third Esc entry (`0x004B76D0`) does
+     the same without the chat test.
+   - arrow keys Up 0x26 / Down 0x28 / Right 0x27 / Left 0x25:
+     consumed; offer methods 7 / 8 / 9 / 10; none → the item step.
+   - Enter key down 0x0D: consumed; acts only on a selected item (none
+     here).
+   - WM_CHAR (0x102): offer method 6 (non-zero stops). Else, unless
+     the character is one of command 38's keys (`0x004B7970`): CR →
+     the Enter key path; Esc → the third Esc path; any other →
+     consumed (p6 = 1).
+3. **Buttons** `0x004BB0F0(x, y, type, callback)`: art
+   `data\global\ui\panel\buysellbtn` (`0x00454600`, cached in
+   `[0x007A287C]`; d2exp copy, 23 frames of 32 × 32, offsets 0,
+   measured); frame and caption from table `0x007275A8` (u16 frame,
+   u16 string id per type): type 0 = frame 16, 3401 `ok`; type 1 =
+   frame 10, 4142 `lowercasecancel`. OK = (250, 287, 0, `0x00454080`)
+   with Enter enabled (method 12 := 1); Cancel = (355, 287, 1,
+   `0x00454140`). Size (w, h) = the frame's size. Rectangle: x in
+   [x, x + w], y in [y − h, y].
+   - draw (method 1): frame + pressed (OK 16 / 17, Cancel 10 / 11) at
+     (x, y), light 0xFF, mode 5 (bottom-left anchor); while the cursor
+     (`0x00468730`, `0x00468740`) is in the rectangle: font 1, the
+     caption at (x + (w − width A) / 2 (C division), y − h − 5),
+     color 0, then the previous font.
+   - mouse down (method 3): in the rectangle → pressed := 1, UI sound
+     4 (`0x004B9A00(4, 0, 0, 0)`), taken.
+   - mouse up (method 4): not pressed → 0; in the rectangle →
+     pressed := 0 and the callback (its result is returned); outside
+     → pressed := 0, 0.
+   - WM_CHAR (method 6): Enter enabled, not a repeat (lParam bit 30
+     clear) and character 0x0D → the callback. So Enter = OK.
+   - methods 2, 5, 7–10: 0.
+4. **Edit box** `0x004BBD80(258, 228, width 100, lines 1, max, cap
+   10, callback 0x00453FD0, font 1)`: text buffer of cap + 1 u16
+   units (+0x28), caret (+0x36), length (+0x3A), digits-only flag
+   (+0x20, set by the constructor), key repeat allowed (+0x24, set
+   to 1 after creation, method 17), caret blink counter (+0x46) and
+   visible flag (+0x4A, starts 1). Lines ≤ 0 would draw a frame
+   (`0x0046EFD0(x − 9, y − 16, width, 18, 0, 2)`; not here). The
+   constructor also loads `ui\menu\textslid` (12 × 13, 17 frames,
+   measured), unused by the gold dialog.
+   - draw (method 1): counter += 1; visible: toggled to 0 when
+     counter % 20 = 0; hidden: toggled to 1 when counter % 10 = 0
+     (so the caret shows for the first 19 draws, then 10 off / 10
+     on). Font 1. First visible character k: the smallest k with
+     width A of text[k..] ≤ width (0 when the text fits). The text
+     from k at (x + 1, y), color 0. Caret `_` when caret < cap,
+     visible and caret ≤ length: at (x + 1 + width A of the first
+     `caret` units of the **whole** text, y), color 0 (with k > 0 the
+     caret is misplaced; the gold amounts never scroll).
+   - WM_CHAR (method 6), c = the character:
+     - a repeat while key repeat is off → 1 (nothing); c > 0x7F →
+       consumed, 1.
+     - ok := isdigit(c) (digits-only; else the font has the glyph,
+       `0x00502550`, and CR / Esc call the callback).
+     - Backspace (8): when length > 0: if caret ≠ length and caret ≠
+       0 the units from caret − 1 shift left by one; then the last
+       unit is cleared and length −= 1 (so Backspace with the caret
+       at 0 deletes the **last** character); caret −= 1 when > 0.
+       Consumed.
+     - `.` (0x2E): when length > 0 and caret ≠ length: the unit at
+       the caret is deleted (shift left), length −= 1. Consumed (so
+       `.` acts as Delete and is never typed).
+     - not ok: space, Esc, CR → 0 (left to the box); any other →
+       consumed, 1.
+     - ok and length < cap − 1 (at most 9 digits): caret = length →
+       append, caret += 1, length += 1; else the units from the caret
+       shift right, c is written at the caret, length += 1 (the caret
+       does **not** advance). Then, when the text wraps to more lines
+       than `lines` at `width` (`0x00502970`), the last unit is
+       removed (length −= 1, caret −= 1). Then v := `atol(text)`; v >
+       max (unsigned) → the text := `%d` of max, caret := length :=
+       its length. Consumed, 1.
+   - mouse down (method 3): pressed := 1, returns 0 (not taken);
+     mouse up (method 4): when pressed: blink counter := 0, pressed
+     := 0; returns 0.
+   - Right / Left (methods 9 / 10): caret += 1 (≤ length) / −= 1 (≥
+     0); taken. Up / Down, wheel, move: 0.
+   - value (method 11, read by `panels-2.md` §21 r7): empty → 0; else `atol(text)`, 0
+     when > max. Set value (method 15): `%d`, cut to cap units,
+     caret := length := its length. Kind 3's pre-fill (`panels-2.md` §21 r6) uses it.
+5. **Spinner** `0x004BC480(223, 219, 0, callback 0x00453FE0)`: art
+   `ui\menu\spinner` (4 frames 15 × 12, offsets 0, measured); (w, h)
+   = frame 0's size. Orientation 0 (vertical): up arrow at (x + 1,
+   y) = (224, 219), down arrow at (x + 1, y + h + 1) = (224, 232)
+   (orientation ≠ 0: down at (x + w, y)). Up / down pressed flags,
+   held count n, press time t0, last step time t1, wheel pulse flag.
+   - draw (method 1): when up or down is pressed: n += 1 and the
+     callback runs (before drawing); then frame 2 × up at the up
+     point and 2 × down + 1 at the down point, mode 5.
+   - mouse down (method 3): mouse-held := 1; up rectangle x in (ux,
+     ux + w), y in (uy − h, uy] → t0 := now, up := 1, the callback
+     runs once with "first" set, taken; down rectangle x in (dx, dx +
+     w), y in (dy − h, dy) (exclusive) → the same with down; else 0.
+   - mouse up (method 4): when mouse-held: n := 0, mouse-held := 0;
+     clears up (else down) and returns 1 when one was set.
+   - wheel (method 2): delta > 0 → up := 1, down := 0; delta < 0 →
+     down := 1, up := 0; either → pulse := 1; consumed, 1.
+   - direction (method 11): 1 up, 2 down, 0 none. Step (method 12,
+     `0x004BBFB0`): none pressed → 0; pulse → clears up, down and
+     pulse, 1; "first" → t1 := now, 1; now − t1 < 70 ms → 0; else
+     t1 := now and, with d = now − t0: d > 4096 → (d >> 11) × n; d >
+     3000 → n >> 2; d > 2000 → n >> 4; d > 1000 → n >> 5; else 1
+     (times: `GetTickCount`; n counts draws since the press).
+   - callback `0x00453FE0`: dir, step as above; v := the edit box
+     value (into `[0x007A2A68]`); m := P's full stat 15 (kind 4) or
+     14; dir 1: v := min(v + step, m) (unsigned); dir 2: step > v →
+     0, else v − step; `[0x007A2A68]` := v and the edit box's set
+     value (v).
+6. **Keys and close summary.** Enter (WM_CHAR CR) → OK (`panels-2.md` §21 r8); Esc →
+   close only (as Cancel); the Clear Screen key (default Space) →
+   close; a click outside the box → close; typing digits edits the
+   amount, clamped to the max as typed.
 
 ## Constants & data dependencies
 
@@ -362,6 +569,7 @@ Reproduced by default.
 | Input | Expected output | Source |
 |---|---|---|
 | init, no input for 4,999 ms | type 5 `protate`, state 1 | §23 r3, r8 |
+| s = 1, left down on open ground, then left up | t stays 5, s stays 1 (no press transition; the up acts only in s 5); idle restarts | §23 r14 |
 | idle > 5,000 ms | state 2, type 2 `ohand`, frame 0; after 32 steps state 4, type 3 | §23 r8 |
 | `ohand` frame 0 (32 × 26, offsets (−1, 24)) at mouse (100, 100), adj 0 | covers columns 99–130, rows 99–124 | §23 r10, `sprite-placement.md` §2 |
 | mouse at (900, 50) at 800 × 600, no clip test | drawn at x 799 | §23 r10 |
@@ -375,6 +583,11 @@ Reproduced by default.
 | skill base 20, `maxlvl` 20 | state −1, remap 5 | §25 r2 |
 | act 1 waypoint menu, record with indices 0, 1 known, P in Rogue Encampment | row 0 (level 1) used 0, row 1 used 1; other-known 1; title `waypointsheader` | §26 r2, `panels.md` §13.6 |
 | deciphered scroll, `n` = 13 | stone 0 at `d` 13 (mode 2), stone 1 at `d` 1 (mode 0, sound 0) | §27 r3 |
+| gold dialog, max 500, type `9`, `9`, `9` | text `99`, then `500` (clamped at the third digit) | §28 r4 |
+| gold dialog text `123`, caret 0, Backspace | text `12` (the last digit goes), caret 0 | §28 r4 |
+| gold dialog, Enter (WM_CHAR 0x0D) | OK callback `0x00454080` | §28 r3 |
+| gold dialog, mouse down at (100, 100) | close (cancel), consumed | §28 r2 |
+| spinner up held, draws n = 40, 2,500 ms after press, 70 ms since last step | step 40 >> 4 = 2 | §28 r5 |
 
 ## Provenance
 
@@ -391,23 +604,32 @@ cursor `0x004680B0`, `0x00468170`, `0x00468840`, `0x00467F20`,
 `0x006439B0`, mask table `0x006CE268`; waypoint `0x0049CF90`,
 `0x0049C7F0`, table `0x007224AC`; scrolls `0x0049FF10`, `0x0049FA10`,
 `0x0049FBA0`, tables `0x00722EB8`, `0x00722EE0`, `0x00722F08`; recipe
-`0x0048BC10`, `0x0048BBE0`. DC6 headers of the cursor and scroll files
+`0x0048BC10`, `0x0048BBE0`; gold dialog box `0x004B7CD0`,
+`0x004B7C00`, `0x004B7C60`, handlers `0x004B7270`–`0x004B7A90` (tables
+`0x007273E4` / `0x007273F0` read from the image), buttons
+`0x004BAF20`, `0x004BB000`, `0x004BAC70`, `0x004BACD0`, `0x004BAD40`
+(table `0x007275A8`), edit box `0x004BBBB0`, `0x004BB210`, `0x004BB620`,
+`0x004BB560`, `0x004BB4D0`, spinner `0x004BC340`, `0x004BBE70`,
+`0x004BC050`–`0x004BC160`, `0x004BBF90`, `0x004BBFB0`, callbacks
+`0x00453FC0`–`0x00454140`; `dialogbackground`, `buysellbtn`, `spinner`,
+`textslid` DC6 headers (`mpq-tool extract`). DC6 headers of the cursor and scroll files
 (d2data / d2exp) and `difficultylevels.txt` read with Python scripts
 outside the repo. The state-mask offsets match the `states.txt` flag bit
 numbers of `data/fields.tsv` for all ten wrappers. No D2MOO code used.
 
 ## Open questions
 
-1. Who writes the deciphered-scroll symbol slots `[0x007BF098]` (5 × u16)
+1. **Answered** (2026-10-07, §27 r7: no writer; the flag is set to 1
+   for every `bkd` read, so the symbol pass is unreachable). Was: Who writes the deciphered-scroll symbol slots `[0x007BF098]` (5 × u16)
    and the flag `[0x007BF254]` (§27 r3): no direct store was found;
    likely a block copy in a quest message handler. Read the S→C quest /
    0x5D-family handlers for a copy into `0x007BF090`–`0x007BF260`.
-2. Whether any 1.14d path opens ui 0x1B, 0x1C, 0x1D or 0x20 (§27 r5):
+2. **Answered** (2026-10-07, §27 r8: none does). Was: Whether any 1.14d path opens ui 0x1B, 0x1C, 0x1D or 0x20 (§27 r5):
    the 136 `SetUIState` call sites pass most ui ids in registers set
    earlier; a register-tracking scan settles it.
 3. Player trade panel (ui 0x17, §27 r6): art, both players' names and
    gold, buttons 2, 4, 7, 8 (`0x004B8730`–`0x004B9110`). Multiplayer
    only; not needed for Phases 0–6.
-4. The cursor handler table of `0x00451DB0(3)` (§23 r3): which window
+4. **Answered** (2026-10-07, §23 r14). Was: The cursor handler table of `0x00451DB0(3)` (§23 r3): which window
    messages reach `0x00468840`, `0x00467F20`, `0x00467FA0` (move; left /
    right down; up), read from the table the call registers.

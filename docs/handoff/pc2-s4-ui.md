@@ -82,3 +82,46 @@ None.
   from the stash) and 0x14 (deposit `v`), p1 = `v >> 16`, p2 = `v &
   0xFFFF` (`ui/panels-2.md` §21 r8), and 0x12 (stash close,
   `ui/panels.md` OQ 6).
+
+## Follow-up (lane `ui-2`, branch `claude/spec-ui-s4`)
+
+### Written
+
+| Spec § | Behaviour | 1.14d addresses |
+|---|---|---|
+| `controls.md` §6 r8–r11 (OQ 8 answered) | world-click decision order (unit / point split, corpse and item-skill tests, "act on it", town gates, press-only monster walk), every sender (interact by unit type with reach 4 / 2 / 5 / 3, NPC stop C→S 0x59, town-portal `just_portaled` gate, warp 500-unit throttle; attack with melee test, Inferno / Arctic Blast approach; object; town player), use check and refusal sound, walk clamp (min step, 7-update held throttle), client hostility test, target re-pick and its searches (nudge, `SearchEnemyNear`, `SearchEnemyXY`, `SearchOpenXY`) | `0x004625B0`, `0x004621D0`, `0x004610C0`, `0x00461DC0` (table `0x004621AC`), `0x00461C70`, `0x00461B40`, `0x00461890`, `0x004619E0`, `0x00461840`, `0x004623C0`, `0x00465C60`, `0x00467880` |
+| `panels.md` OQ 6; `panels-2.md` §21 r8 | links to `world/vendors-2.md` §10.2 (orchestrator relay) | — |
+| `panels-3.md` §28 (`panels-2.md` §21 r9 pointer; OQ 6 answered) | gold dialog box (art, control list order, 80 ms guard, outside click = cancel, Esc / Clear Screen keys, WM_CHAR routing), OK / Cancel buttons (`buysellbtn` frames, caption hover, press sound 4, Enter = OK), numeric edit box (blink, scroll, digit entry, Backspace / `.` quirks, 9-digit cap, max clamp, value), spinner (art, hit rectangles, accelerating step, wheel ±1, value clamp) | `0x004B7CD0`, `0x004B7270`–`0x004B7A90`, `0x004BAF20`–`0x004BB000`, `0x004BBBB0`–`0x004BB620`, `0x004BC340`–`0x004BBFB0`, `0x00453FE0` |
+| `panels-3.md` §27 r7 (OQ 1 answered) | scroll reading `0x0049FF90` (toggle ui 0x10, `bkd` → flag 1 + C→S 0x3E); no writer of the symbol slots `[0x007BF098]` or of the flag elsewhere → the symbol pass is unreachable in 1.14d | `0x0049FF90`, `0x0049FF10`, `0x0049D440` |
+| `panels-3.md` §27 r8 (OQ 2 answered) | ui 0x1B–0x1D, 0x20 never opened: all 136 `SetUIState` sites resolved | `0x00455F20` call sites, `0x00456970` |
+| `panels-3.md` §23 r14 (OQ 4 answered) | cursor handlers: WM_MOUSEMOVE, WM_NCMOUSEMOVE (hide), WM_LBUTTONUP; the press transition only from the character-panel and control-panel button presses | table `0x00711FEC`, `0x00467EF0`, callers of `0x00467F20` / `0x00467FA0` |
+| `inventory.md` §8 r6 (OQ 7 answered) | gold picture: the amount class is the cel direction; `invgld` has 1 direction × 1 frame → frame 0 always | `0x0046EE80`, `0x004DBB50`, `0x00601840`, table `0x006E45A0` |
+| `control-panel.md` §10 r3 (OQ 5 answered) | `0x004B3470` = NPC menu up (interaction active, NPC present, menu state 1); `[0x007BEFD4]` has no reader | `0x004B3470`, `0x00499AC9` |
+
+### Pending
+
+- `panels-3.md` §27 r7: "no writer" of the symbol slots rests on the
+  absolute-reference scan; a pointer-based write cannot be excluded
+  without a capture of reading the `bkd` scroll (expected: base only).
+- Skipped by the task: the trade panel (multiplayer), the held-button
+  send ticks (recording).
+
+### CODE-TABLE CHANGE commits
+
+None.
+
+### Cross-file requests
+
+- `client/model.md` (PC 1); §8 mode requests: the interact code 0x13
+  is requested by `ui/controls.md` §6 r9.2 / r9.4 / r9.5 with (type,
+  GUID), and the mode request with code 0x13 sends nothing itself
+  (`0x00480B40`); the unit-code sends of `0x00480930` (`0x004786A0`,
+  caller `0x00461250`, the `client/model.md` §8 code-0x02 row) look
+  like the C→S 0x13 sender: please confirm and state which path sends
+  C→S 0x13 and when.
+- `sim/client-messages.tsv` (code-mirrored; owner of `sim/`): 0x59
+  `MakeEntityMove` is sent by the client when interacting with an
+  `npc` + `interact` monster (`ui/controls.md` §6 r9.2, `0x00461DC0`
+  tail at `0x004620F1`): [type u32][GUID u32][x u32][y u32] with the
+  NPC's current position; add the client sender to its note if the
+  TSV grammar has one.

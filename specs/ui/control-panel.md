@@ -30,13 +30,13 @@
 |   7. Skill buttons | 298–320 |
 |   8. New-stats and new-skills buttons | 321–369 |
 |   9. Mini panel (state 0x15) | 370–430 |
-|   10. Control panel mouse input | 431–460 |
-| Constants & data dependencies | 461–469 |
-| Randomness | 470–473 |
-| Edge cases & original bugs | 474–486 |
-| Test vectors | 487–505 |
-| Provenance | 506–522 |
-| Open questions | 523–548 |
+|   10. Control panel mouse input | 431–471 |
+| Constants & data dependencies | 472–480 |
+| Randomness | 481–484 |
+| Edge cases & original bugs | 485–497 |
+| Test vectors | 498–516 |
+| Provenance | 517–533 |
+| Open questions | 534–559 |
 <!-- /index -->
 
 ## Summary
@@ -457,6 +457,17 @@ draw mode 5 unless a rule says otherwise.
    - Always: `[0x007BEFA4]` := `[0x007BEFD0]` := `[0x007BEFD8]` := 0.
    Release tests do not check that the press was on the same button
    (reproduce, as `ui/panels.md` §7 r3).
+3. **The two leftovers of §8 r4 and r2** (answer §Open questions 5).
+   `0x004B3470()` = "an NPC menu is up": an NPC interaction is active
+   (`[0x007C0D29]` ≠ 0), its NPC exists (`0x00463990([0x007C0D25], 1)`)
+   and the NPC menu state `[0x007C0C6B]` = 1 (the menu box of
+   `ui/menus.md` §2.2; `ui/panels-2.md` §14). So with the NPC menu up a
+   press on the new-stats button in open mode 2 (or new-skills in
+   mode 1) still arms the button and plays the sound but leaves the
+   event to the next handler. `[0x007BEFD4]` has no reader: its only
+   accesses are the read-and-toggle at `0x00499AC9` / `0x00499AD2` in
+   r2 (scan of every reference); it changes nothing observable and d2rs
+   may omit it.
 
 ## Constants & data dependencies
 
@@ -537,7 +548,7 @@ with Python scripts outside the repo. No capture yet.
    `0x004AA7E0`): Ghidra read; owner this spec or a skill-select spec.
 4. `[0x007BEFEC]` (set to 60 on a level change): its reader (level name
    display) and units.
-5. *Partly answered* (2026-10-07, §8 r4–r5: the press and release
+5. **Answered** (2026-10-07, §10 r3: `0x004B3470` = NPC menu up; `[0x007BEFD4]` is never read). Earlier *partly answered* (2026-10-07, §8 r4–r5: the press and release
    handlers; still open: `[0x007BEFD4]`, toggled by the menu-button
    release, and `0x004B3470`). Was: New-stats / new-skills press and
    release handlers (writers of `[0x007C02E4]` `0x004A66E0`,
