@@ -138,6 +138,13 @@ pub fn map_reveal(x: u16, y: u16, level: u8) -> [u8; 6] {
 }
 
 impl<X: Pending> PlaceHost<UnitId> for Shared<'_, '_, X> {
+    /// `0x005754B0`: queued for the host holding the pet lists
+    /// ([`super::super::action::ActionHooks::pet_follows`]); none → nothing.
+    fn pets_follow(&mut self, player: UnitId) {
+        if let Some(q) = self.0.borrow_mut().v.h.pet_follows.as_mut() {
+            q.push(player);
+        }
+    }
     fn is_player(&self, unit: UnitId) -> bool {
         self.0
             .borrow()

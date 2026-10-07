@@ -256,6 +256,11 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         self.game.frame
     }
 
+    /// The host world's object host tick ([`WorldHost::host_tick`]).
+    fn set_host_tick(&mut self, ms: u32) {
+        self.world.host_tick(&mut self.events, ms);
+    }
+
     /// `None` without player data, or without a staged position.
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
@@ -360,7 +365,8 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
 impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// `d2_sim::tick::tick` with `D` as the step hooks (`tick.md` §3:
     /// the wired dispatch's room, DRLG and population steps run; a
-    /// dispatch without them keeps the defaults). What the host's seams
+    /// dispatch without them keeps the defaults), then the host's
+    /// [`WorldHost::after_tick`]. What the host's seams
     /// sent during the tick ([`WorldHost::take_sent`]) is queued to the
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
@@ -369,6 +375,7 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
         tick::tick(&mut self.game, &mut self.events);
+        self.world.after_tick(&mut self.game, &mut self.events);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
             if let Some(c) = self.client_of(unit) {
                 if let Err(e) = out.queue(c, &bytes) {

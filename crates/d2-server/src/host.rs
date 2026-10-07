@@ -217,6 +217,7 @@ where
     /// tick ran. The clock is read once.
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
+        self.game.set_host_tick(now);
         let mut report = FrameReport {
             messages: self.drain(now)?,
             ..FrameReport::default()

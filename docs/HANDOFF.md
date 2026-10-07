@@ -2825,6 +2825,41 @@ the dev-dependency) and record results here.
     DirectSound buffer after `0x515180` (and a `Stream`=1 sound such as
     `music\act1\crypt.wav`) for the C65 files; expect byte equality with
     our `data`.
+76. Original UI on game files (`wire-client-staging`): `D2_GAME_DIR=<install>
+    cargo test -p d2-client --test app_original_ui -- --ignored`. Expect the
+    test to pass: `inventory.bin` has 32 records, record 0 `inv` = (320,
+    640, 0, 441), record 16 = (400, 720, 60, 501) (`ui/panels.md` §Test
+    vectors); `sounds.txt` / `soundenviron.txt` compile; for every class
+    0–6 with character + inventory and character + skill tree open, every
+    DC6 the root draws loads (`PanelArtLoader::ensure`). A file in no
+    archive or a frame past a file's end is a finding for
+    `panel-layout.tsv` / `client/assets.md`, not a reason to skip it.
+77. `play` smoke with the UI and sound layer (`wire-client-staging`):
+    `D2_GAME_DIR=<install> cargo run -p d2-client --release -- play
+    --frames 500`, pressing I, C, T a few times. Expect: no error from the
+    world view or audio frames (a `UI image file`, `sound world: …
+    (pending …)` or `SetUIState` error is a finding); the panels toggle per
+    the conflict table (I then T closes the inventory); the image is still
+    black (the frame palette is `unspecified_palette` until the act
+    palette is wired, `play.rs`), so judge by the log only. Then the
+    capture cases `ui-0001` / `ui-0002` (`ui/panels.md` §Test vectors)
+    once a palette is presented.
+78. Quest objects on the wired host (`docs/handoff/wire-world-staging.md`
+    §4; player, Act I, `record_packets.py` + `record_rng.py`): operate a
+    Cairn stone, Cain's gibbet and the Forgotten Tower tome. Expect the
+    S→C 0x0E mode messages at the same tick numbers and bytes as
+    `world/tests/quest_objects.rs` derives (gibbet: mode 1 at the
+    operate, event 7 → mode 3 at operate frame + 17).
+79. Quest init order (`wire-world-staging.md` §3 item 1; `rng.md` §5.3
+    draws): record the RNG while the town-Cain marker object (class 385,
+    init 54) is created after Cain left Tristram. Expect Cain's spawn
+    draw right after the marker's allocation; if other objects of the same
+    room are allocated between them in 1.14d, the drained init order is
+    exact, else the quest control must be lent into the action wiring.
+80. Hireling teleport follow (`hirelings.md` §6 r1, `path-placement.md`
+    §10 r6; packets): teleport with a living hireling; record where the
+    hireling's warp messages fall against the player's room / 0x15
+    messages (d2rs runs the follow when the handler returns).
 
 Kept entries (unchanged):
 

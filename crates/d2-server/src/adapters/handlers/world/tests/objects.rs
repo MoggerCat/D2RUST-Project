@@ -246,3 +246,29 @@ fn without_object_state_type_2_stays_a_stub() {
     assert_eq!((code, got), (ResultCode::Done, vec![]));
     assert_eq!(fx.host.game.unhandled, vec![(0, 0x13, 9)]);
 }
+
+// Covers: specs/world/objects.md §edge-cases-original-bugs r9
+#[test]
+fn the_object_host_tick_is_the_frames_host_clock() {
+    let mut fx = fixture(true);
+    // `host` ran one frame at 1000 ms.
+    let tick = |fx: &mut Fx| {
+        fx.host
+            .game
+            .events
+            .hooks()
+            .objects
+            .as_ref()
+            .unwrap()
+            .host_tick
+    };
+    assert_eq!(tick(&mut fx), 1000);
+    fx.host.clock.0 = 7_777;
+    fx.host.frame().unwrap();
+    assert_eq!(tick(&mut fx), 7_777);
+    // An operate in that frame reads it (door debounce, `objects.md`
+    // §10): the next message's frame moves it again.
+    let g = fx.guid(fx.objects[1]);
+    send(&mut fx.host, &msg(g));
+    assert_eq!(tick(&mut fx), 7_817);
+}

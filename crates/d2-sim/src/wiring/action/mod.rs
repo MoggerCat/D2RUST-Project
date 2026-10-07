@@ -60,7 +60,7 @@ use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
 pub use monsters::MonsterWorld;
-pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView};
+pub use objects::{ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall};
 pub use pending::{KillStep, NoPending, Pending, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
@@ -137,6 +137,12 @@ pub struct ActionHooks<X> {
     pub objects: Option<ObjectState>,
     /// The object state is lent out for a call.
     objects_out: bool,
+    /// Players whose pets follow them after a placement
+    /// (`path-placement.md` §10 rule 6, `0x005754B0`), for the host that
+    /// holds the pet lists (`hirelings.md` §6 rule 1). `None` (the
+    /// default): the call does nothing (no pet list in the action
+    /// wiring).
+    pub pet_follows: Option<Vec<UnitId>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -195,6 +201,7 @@ impl<X> ActionHooks<X> {
             waypoints: BTreeMap::new(),
             objects: None,
             objects_out: false,
+            pet_follows: None,
             anim_data: None,
             vitals: None,
             mode_target: None,

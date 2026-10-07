@@ -125,11 +125,8 @@ where
 
     /// The 0x13 object case on the action wiring's object state
     /// (`ActionSim::operate_object_message`; `None` until
-    /// `ActionSim::create_objects` ran).
-    ///
-    /// TODO(objects.md edge case 9): the host tick of the object calls
-    /// (`ActionHooks::set_host_tick`) is not set here: the handler has no
-    /// clock (`Intents::handle`).
+    /// `ActionSim::create_objects` ran). The object calls' host tick is
+    /// the frame's ([`WorldHost::host_tick`]).
     fn objects(
         &mut self,
         game: &mut Game,
@@ -164,6 +161,11 @@ where
 
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         events.action().hooks().x.take_sent()
+    }
+
+    /// `ActionHooks::set_host_tick` (no object state: nothing).
+    fn host_tick(&mut self, events: &mut D, ms: u32) {
+        events.action().sys.hooks.set_host_tick(ms);
     }
 
     fn fault(&mut self, fault: WorldFault) {

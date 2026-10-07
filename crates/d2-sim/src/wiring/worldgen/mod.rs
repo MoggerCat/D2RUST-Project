@@ -27,6 +27,7 @@
 //! Calls with no provider yet go to [`WorldPending`] (defaults: nothing).
 //! Nothing here decides game behaviour: every rule stays in its module.
 
+pub mod creation;
 pub mod dispatch;
 pub mod events;
 pub mod init_units;
@@ -63,6 +64,7 @@ use crate::units::{RoomId, UnitId};
 
 use super::action::{Pending, View, WiringError};
 
+pub use creation::{CreatedControls, CreationError, CreationTables};
 pub use dispatch::WorldSim;
 pub use levels::{SharedTypes, WorldTypes};
 

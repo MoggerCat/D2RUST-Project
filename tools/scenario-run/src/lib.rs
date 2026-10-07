@@ -336,7 +336,7 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     // Single player: 0x67 byte +0x11 = 3 → game +0x6A (original-hooks
     // §5.2).
     fields.game_type = 3;
-    sim.create_game(&fields);
+    ActionEvents::create_game(&mut sim, &fields);
     sim.create_regions();
 
     // The area generated and every room streamed.

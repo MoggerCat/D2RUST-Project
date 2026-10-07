@@ -19,7 +19,9 @@ use crate::composite::ComponentFrame;
 use crate::frames::{FramePart, FrameSetKey};
 use crate::rules::placement::draw_position;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, MapId, MapTable, Rect, ShadeChain};
+use crate::ui::original::{OriginalUi, OriginalUiError};
 use crate::ui::text::{TEXT_COLORS, TEXT_COLOR_MAP_OFFSET, TEXT_DRAW_MODE};
+use crate::ui::Routed;
 use crate::ui::{
     font_info, layout_text, ImageRequest, OriginalText, StringLookup, TextRequest, TextRules,
     TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
@@ -335,15 +337,56 @@ pub fn run_ui<L: ServerLink>(
     bridge: &mut Bridge<L>,
     strings: &dyn StringLookup,
 ) -> Result<UiFrame, BridgeError> {
-    let unhandled = {
+    run_ui_with(root, input, bridge, strings, None).map_err(|e| match e {
+        UiRunError::Bridge(e) => e,
+        UiRunError::Original(_) => unreachable!("no original UI"),
+    })
+}
+
+/// Errors of [`run_ui_with`].
+#[derive(Debug, thiserror::Error)]
+pub enum UiRunError {
+    #[error(transparent)]
+    Bridge(#[from] BridgeError),
+    #[error(transparent)]
+    Original(#[from] OriginalUiError),
+}
+
+/// [`run_ui`] with the original UI (`ui/panels.md`, [`OriginalUi`]): each
+/// event is routed by the root, then the original UI applies what it
+/// asked for (panel outputs in order, a hotkey action no panel took) and
+/// the root mirrors the UI flags, before the next event. Intents still
+/// leave only through the root and the bridge.
+pub fn run_ui_with<L: ServerLink>(
+    root: &mut UiRoot,
+    input: &mut dyn UiInput,
+    bridge: &mut Bridge<L>,
+    strings: &dyn StringLookup,
+    mut original: Option<&mut OriginalUi>,
+) -> Result<UiFrame, UiRunError> {
+    let mut unhandled = Vec::new();
+    {
         let world = bridge.world();
         let ctx = UiCtx {
             tick: world.frames,
             world,
             strings,
         };
-        root.pump(input, &ctx)
-    };
+        let mut events = Vec::new();
+        input.drain(&mut events);
+        for e in events {
+            if let Some(o) = original.as_deref_mut() {
+                o.before_event(e, world);
+            }
+            let routed = root.dispatch(e, &ctx);
+            if let Some(o) = original.as_deref_mut() {
+                o.after_event(root, e, routed)?;
+            }
+            if routed == Routed::Unhandled {
+                unhandled.push(e);
+            }
+        }
+    }
     let sent = root.forward(bridge)?;
     let mut draws = Vec::new();
     let world = bridge.world();

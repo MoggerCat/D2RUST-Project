@@ -19,6 +19,7 @@ pub mod edge;
 pub mod frame;
 pub mod geom;
 pub mod layout;
+pub mod original;
 pub mod panel;
 pub mod panels;
 pub mod root;
