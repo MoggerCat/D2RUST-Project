@@ -27,32 +27,32 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 58–74 |
-| Inputs | 75–87 |
-| Outputs / state changes | 88–92 |
-| Rules | 93–94 |
-|   1. Screen layout model | 95–131 |
-|   2. UI states and the open/close call | 132–171 |
-|   3. The conflict gate (`0x00453910`) | 172–200 |
-|   4. Slots, open mode and the view shift | 201–252 |
-|   5. UI pass order (`0x00456EE0`) | 253–292 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 293–313 |
-|   7. Shared panel parts | 314–331 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 332–434 |
-|   9. Inventory panel family (`0x0048EDF0`) | 435–495 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 496–559 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 560–595 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 596–646 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 647–699 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 700–705 |
-|   15. Event → intent summary | 706–733 |
-|   16. Machine tables | 734–768 |
-| Constants & data dependencies | 769–789 |
-| Randomness | 790–794 |
-| Edge cases & original bugs | 795–815 |
-| Test vectors | 816–854 |
-| Provenance | 855–895 |
-| Open questions | 896–972 |
+| Summary | 58–77 |
+| Inputs | 78–90 |
+| Outputs / state changes | 91–95 |
+| Rules | 96–97 |
+|   1. Screen layout model | 98–134 |
+|   2. UI states and the open/close call | 135–174 |
+|   3. The conflict gate (`0x00453910`) | 175–203 |
+|   4. Slots, open mode and the view shift | 204–255 |
+|   5. UI pass order (`0x00456EE0`) | 256–295 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 296–316 |
+|   7. Shared panel parts | 317–334 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 335–437 |
+|   9. Inventory panel family (`0x0048EDF0`) | 438–498 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 499–562 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 563–598 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 599–649 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 650–702 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 703–708 |
+|   15. Event → intent summary | 709–736 |
+|   16. Machine tables | 737–771 |
+| Constants & data dependencies | 772–792 |
+| Randomness | 793–797 |
+| Edge cases & original bugs | 798–818 |
+| Test vectors | 819–857 |
+| Provenance | 858–898 |
+| Open questions | 899–975 |
 <!-- /index -->
 
 ## Summary
@@ -70,7 +70,10 @@ every panel coordinate is the 640 × 480 one plus (80, 60), and a stone
 border fills the rest of the half screen. This spec owns the state table
 and open/close rules, the open mode, the panel art placement, the hit
 rectangles and which C→S message each panel click sends. What the server
-does with the message is the owner spec named in §15.
+does with the message is the owner spec named in §15. Code hooks
+`TODO(spec: ui/panels.md §B1 / §B2 / §B6)` (`client/ui.md` §B): button
+frames, label pens, wheel step, image requests, shading and blend, open
+mode: `panels-2.md` §22; cursor: `panels-3.md` §23.
 
 ## Inputs
 

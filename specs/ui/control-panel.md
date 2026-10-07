@@ -25,18 +25,18 @@
 |   2. Art files | 101–114 |
 |   3. Life and mana globes | 115–160 |
 |   4. Experience and stamina bars | 161–186 |
-|   5. Belt | 187–253 |
-|   6. Run / walk and menu buttons | 254–272 |
-|   7. Skill buttons | 273–295 |
-|   8. New-stats and new-skills buttons | 296–323 |
-|   9. Mini panel (state 0x15) | 324–384 |
-|   10. Control panel mouse input | 385–414 |
-| Constants & data dependencies | 415–423 |
-| Randomness | 424–427 |
-| Edge cases & original bugs | 428–440 |
-| Test vectors | 441–457 |
-| Provenance | 458–474 |
-| Open questions | 475–495 |
+|   5. Belt | 187–278 |
+|   6. Run / walk and menu buttons | 279–297 |
+|   7. Skill buttons | 298–320 |
+|   8. New-stats and new-skills buttons | 321–348 |
+|   9. Mini panel (state 0x15) | 349–409 |
+|   10. Control panel mouse input | 410–439 |
+| Constants & data dependencies | 440–448 |
+| Randomness | 449–452 |
+| Edge cases & original bugs | 453–465 |
+| Test vectors | 466–484 |
+| Provenance | 485–501 |
+| Open questions | 502–524 |
 <!-- /index -->
 
 ## Summary
@@ -249,7 +249,32 @@ draw mode 5 unless a rule says otherwise.
    popped and inside the strip x W/2 + 23…W/2 + 145, y H − 39…H − 10 →
    unless `0x00453A90(9)`, popped := `[0x007BEF9C]` := 1 and hover
    tracking; consumed; elsewhere `[0x007BEF94]` := 0. Hover tracking
-   details: §Open questions 2.
+   details: r12.
+
+10. **Box hit** `0x004987E0(x EDI, y)`: the first box `i` (0 … count −
+    1) of the current belt record (r1) with left ≤ x ≤ right and top ≤ y
+    ≤ bottom (inclusive); none → −1.
+11. **Belt click** `0x00498870(inventory, x, y)` (from §10 r2): box `b`
+    (r10), none → nothing; cursor item `c` (`0x0063C1E0`), belt item `e`
+    = slot `b` (`0x0063C7F0`). Cursor state 6 → nothing. When `c` exists
+    and fits a belt (`0x0062BAD0`): unless `c` is blocked
+    (`ui/inventory.md` §9 r2), C→S **0x25** [`c` GUID][`e` GUID] when
+    `e` exists, else C→S **0x23** [`c` GUID][`b` u32], then
+    `0x004C21F0(c)`; in every case of this branch the item's put sound
+    `0x004B9A00(0x004C1D60(c, 0, 0, 0), 0, 0, 0)`. Otherwise (no `c`, or
+    `c` does not fit): only with `e`, no `c` and `e` not blocked: C→S
+    **0x24** [`e` GUID] (`0x00478680`), `0x004C21F0(e)`.
+12. **Hover tracking** `0x00498930(inventory, x, y)` (§5 r9): box `b`
+    (r10), none → nothing; cursor state 6 or 8 → nothing. With a cursor
+    item: hovered box `[0x0072235C]` := `b`, belt hovered `[0x007BEF94]`
+    := 1, hovered item `[0x007BEFA8]` := last `[0x007BEFAC]` := 0. Else
+    `e` = slot `b`: hovered box := `b`; no `e` → belt hovered := 0,
+    hovered := last := 0; `e` → belt hovered := 1 and, when `e` ≠ last:
+    hovered := last := `e`, text position (`[0x00722360]`,
+    `[0x00722364]`) := (box.left + 14, box.top) of `e`'s own box
+    (`0x00660D10` with `e`'s x position `0x0045ADF0`). Reset
+    `0x00498D60`: hovered box and text position := −1, belt hovered,
+    hovered, last := 0; `0x00498E80`: hovered, last := 0.
 
 ### 6. Run / walk and menu buttons
 
@@ -454,6 +479,8 @@ Synthetic (rules as cited).
 | single player, 800 × 600, layout 2 | art at (323, 553); buttons at x 326, 347, 368, 389 (f 4), 410, 431, 452 | §9 r3, r4 |
 | multiplayer, 640 × 480, layout 1 | buttons x 118 + 21 i, y 430 | §9 r4 |
 | 640 × 480 belt type 0 popped | rows at y 439, 407 | §5 r3 |
+| belt click on box 2 (empty), 1 × 1 potion on the cursor | C→S 0x23 `[potion GUID][2]` and the put sound | §5 r11 |
+| belt click on box 0 holding a potion, no cursor item | C→S 0x24 `[potion GUID]` | §5 r11 |
 
 ## Provenance
 
@@ -478,10 +505,12 @@ with Python scripts outside the repo. No capture yet.
    the process's x87 precision control truncates exactly like the
    integer `(e + 1) · Δ / d` (cases like d = 3, Δ = 3); a recording of a
    globe refilling (frame by frame) settles it.
-2. Belt hover tracking `0x00498930` / `0x00498A90` / `0x00498D60` /
-   `0x00498E80` (hovered box `[0x0072235C]`, item `[0x007BEFA8]`, text
-   position `[0x00722360]`, `[0x00722364]`) and the belt click
-   `0x00498870`: Ghidra read.
+2. **Answered** (2026-10-07, §5 r10–r12; belt use by key
+   `0x00498A90`: `ui/controls.md` §7 r3). Was: Belt hover tracking
+   `0x00498930` / `0x00498A90` / `0x00498D60` / `0x00498E80` (hovered
+   box `[0x0072235C]`, item `[0x007BEFA8]`, text position
+   `[0x00722360]`, `[0x00722364]`) and the belt click `0x00498870`:
+   Ghidra read.
 3. The skill icon overlays (`0x004AA1F0`, `0x004A8D50`, `0x004A9300`,
    `0x004A8ED0`, `0x004A9260`, used also by the skill select panel
    `0x004AA7E0`): Ghidra read; owner this spec or a skill-select spec.

@@ -29,13 +29,13 @@
 |   5. Key-config screen assignment | 265–280 |
 |   6. World clicks (left / right button; answers OQ 2 in part) | 281–394 |
 |   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 395–436 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 437–444 |
-| Constants & data dependencies | 445–451 |
-| Randomness | 452–455 |
-| Edge cases & original bugs | 456–468 |
-| Test vectors | 469–490 |
-| Provenance | 491–509 |
-| Open questions | 510–545 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 437–446 |
+| Constants & data dependencies | 447–453 |
+| Randomness | 454–457 |
+| Edge cases & original bugs | 458–470 |
+| Test vectors | 471–492 |
+| Provenance | 493–511 |
+| Open questions | 512–547 |
 <!-- /index -->
 
 ## Summary
@@ -440,7 +440,9 @@ The `original` preset of `d2-client::controls` must list the 57 commands
 of §3 with exactly the slot-1 / slot-0 keys of the §3 table (114
 bindings, compiled table `0x00712220`), mapping VK codes and 0x100–0x104
 to the portable `Key` names. The check compares the preset with a fresh
-read of `0x00712220` (§Test vectors).
+read of `0x00712220` (§Test vectors). The other §B4 items: pointer
+button meanings and modifiers §7 r5; events no panel takes → world
+intents §6; repeat while held §6 r6 (send ticks: §Open questions 2).
 
 ## Constants & data dependencies
 
