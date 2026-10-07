@@ -334,7 +334,7 @@ Passives: learning (0x3B, `skills/levels.md` §6.4) and refreshes call
 `skills/functions.tsv`, columns: `kind` (srvst / srvdo), `index`,
 `address` (1.14d, `null` = empty slot), `d2moo_name`, `status`
 (`spec'd-here` = body specified in `skills/bodies.md`; `mapped` = 1.14d
-table entry identified, body not specified; `null`; `unreferenced` = no
+table entry identified, body in another spec (no row has it); `null`; `unreferenced` = no
 1.14d data uses it), `skills_using` (from `skills.txt` 1.14d), `notes`. Ranges `66-90` and `153-190` are one row
 each (all null).
 

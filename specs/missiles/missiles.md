@@ -31,20 +31,20 @@
 |   R1. Data the server keeps per missile | 96–140 |
 |   R2. Creation | 141–283 |
 |   R3. Per-tick dispatch | 284–313 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 314–434 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 435–484 |
-|   R6. Damage stage (missile-owned part) | 485–550 |
-|   R7. Lifetime and expiry | 551–574 |
-|   R8. Pierce | 575–600 |
-|   R9. Server-do and server-hit catalogues | 601–831 |
-|   R10. Behaviour of the recorded missiles | 832–865 |
-|   R11. `missiles.txt` columns and their server use | 866–906 |
-| Constants & data dependencies | 907–933 |
-| Randomness | 934–966 |
-| Edge cases & original bugs | 967–990 |
-| Test vectors | 991–1070 |
-| Provenance | 1071–1113 |
-| Open questions | 1114–1183 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 314–444 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 445–497 |
+|   R6. Damage stage (missile-owned part) | 498–611 |
+|   R7. Lifetime and expiry | 612–635 |
+|   R8. Pierce | 636–662 |
+|   R9. Server-do and server-hit catalogues | 663–893 |
+|   R10. Behaviour of the recorded missiles | 894–927 |
+|   R11. `missiles.txt` columns and their server use | 928–968 |
+| Constants & data dependencies | 969–995 |
+| Randomness | 996–1028 |
+| Edge cases & original bugs | 1029–1052 |
+| Test vectors | 1053–1132 |
+| Provenance | 1133–1175 |
+| Open questions | 1176–1245 |
 <!-- /index -->
 
 ## Summary
@@ -370,7 +370,7 @@ The path code is `units.md`'s; what the missile fields mean there
 #### R4.2 Collide types (missile modes)
 
 Table `0x0073C720`, 9 entries of (unit callback, mask), dumped from
-`Game.exe`; callback semantics from D2MOO (open question 2):
+`Game.exe`; callbacks 1.14d-read (open question 2, answered 2026-10-08):
 
 | Mode | Callback | Mask | Units accepted | Rows |
 |---|---|---|---|---|
@@ -390,6 +390,16 @@ missile/unit footprint, 0x80 player, 0x100 monster. Shared unit filter
 (`NextHit` and unit has state 86); not the last-collided unit; and, if
 the missile has an owner, the owner may attack the unit
 (`0x00554200`, D2MOO `sub_6FCBD900`, `units.md`) or `CollideFriend` ≠ 0.
+
+Callbacks (ECX unit, EDX the collide context, whose +0x0C must be
+non-null; result 1 = accept, else 0): `0x005A87B0` unit type 1 →
+filter; `0x005A87F0` type 0 → filter, type 1 with alignment
+`0x006259B0` = 2 → filter, no unit or other types → 0; `0x005A8850`
+type 0 or 1 → filter; `0x005A8890` (no context test, no filter) type 3
+whose class is valid and has `CanDestroy` (flags bit 4, mask table
+`0x006CE278` = 0x10) → 1. A null unit → 0 in all four. A `CollideType` ≥ 9
+would read past the table; no live row has one, and d2rs treats it as
+mode 0 (design choice).
 
 #### R4.3 Missile path compute (`0x00649760`, 1.14d-confirmed)
 
@@ -439,7 +449,10 @@ barrier). Locals: result `c`, pierce word `p`. 1.14d-confirmed, in
 order:
 
 1. Owner = `SUNIT_GetOwner`. `c = 2` (deal direct damage), or 0 with
-   `Explosion`. `p = 3`.
+   `Explosion`. `p = 3`. A missile with no record (class out of range) reads
+   flags at address 4 (`0x005ADF61`, a null read in 1.14d); unreachable,
+   since creation fails without a record (§R2.3 step 1), so an
+   implementation asserts the record.
 2. With a unit:
    1. `NextHit` and the unit has state 86 → return 1.
    2. Unit is the last-collided unit (`LastCollide` only) → return 1.
@@ -490,8 +503,8 @@ stage, 4 = ignore this contact (keep flying, no exit test).
 2. `pSrvDmgFunc` in 1…30 (table `0x0073C960`, count 31 at
    `0x0073C95C`, entries 1–14 non-null, 15–30 null, no null check):
    adjusts the record (`srvdmg` functions: fire/magic/cold arrows, ice
-   arrow, fire wall, ice blast, blessed hammer, …; D2MOO names; skills
-   spec owns their formulas).
+   arrow, fire wall, ice blast, blessed hammer, …; D2MOO names; rules
+   in §R6.3).
 3. `0x005ADCD0`: result flags (`0x005AD730`, below), then damage
    application (skills spec), then, for a monster that is not a
    hireling, armor −= missile stat 120 (`item_damagetargetac`, clamped
@@ -521,7 +534,8 @@ order, as `min + roll(max − min)` after reading max then min:
 | 6 | poison | 57, 58 | 332 |
 | 7 | burning | 316, 317 | 329 |
 
-Per element (`0x005A8910`): max ≤ 0 → 0, no draw; min ≤ 0 → 0, no
+Per element (`0x005A8910`; every stat, the mastery included, is the
+missile's own total `0x00625480(missile, s, 0)`): max ≤ 0 → 0, no draw; min ≤ 0 → 0, no
 draw; if min > max swap; mastery m ≠ 0 → `min += pct(min, m)`, `max +=
 pct(max, m)`; result `min + roll(max − min)` — `roll(0)` does not step
 (`rng.md` §3), so equal bounds draw nothing. `pct(a, b) = a × b / 100`
@@ -533,7 +547,8 @@ rule; damages are 8.8 fixed point).
 After the rolls (no draws): cold length 56, poison length 59 divided by
 poison count 326 when > 1, drains 62/60/64, burn length 315, stun 66;
 with a unit: damage percent 25 (+121 demon, +122 undead, +180 by monster
-type), floored at −90, `phys += phys × pct / 100`; deadly strike 141 ≠ 0
+type), floored at −90, `phys += phys × pct / 100` (32-bit `imul`,
+wrapping, then signed ÷ 100 truncating, `0x005A8BE8`); deadly strike 141 ≠ 0
 → crit flag and phys × 2; 103/104/106 bypass flags.
 
 The record is the 0x70-byte damage record itself (`combat/damage.md`
@@ -547,6 +562,52 @@ flags (u16 +0x04) |= 0x2000 and +0x08 × 2. Bypass: stat 103 → hit flags
 (+0x00) |= 0x100, 104 → 0x200, 106 → 0x400 (`combat/damage.md` §1:
 undead / demons / beasts). Nothing else is set (freeze length +0x34
 stays 0).
+
+#### R6.3 Server-damage functions (`pSrvDmgFunc`, 1.14d-confirmed 2026-10-08)
+
+Table `0x0073C960` (§R6.1 step 2). Each is called as (ECX game, EDX
+missile M, stack unit U, record R) and returns nothing. "Row" = M's
+`missiles.txt` record; "row valid" = class in range and record found
+(§R1 rule 1); functions that test it do nothing without it. Shared
+helpers:
+
+- `add_elem(M, R, a)` = `0x005A9270`: adds a to R's field for the
+  row's `EType` (`0x0064B0C0`): 0 physical +0x08, 1 fire +0x10, 2
+  lightning +0x1C, 3 magic +0x20, 4 cold +0x24, 5 poison +0x28, 6 / 7 /
+  8 life / mana / stamina leech +0x38 / +0x3C / +0x40, 9 stun +0x44,
+  11 burn +0x14; 12 **sets** cold +0x24 := a; 10 and > 12 nothing.
+  M none → nothing.
+- `clear_elems(M, R)` = `0x005A91C0`: hit flags &= ~0x700 (bypass
+  bits); physical, fire, burn, lightning, magic, cold, poison, the three
+  leeches and stun := 0; then by `EType`: 4 or 12 → poison length +0x2C
+  and burn length +0x18 := 0 (cold / freeze lengths kept); 5 → cold
+  length +0x30, freeze +0x34, burn length := 0 (poison length kept); 11
+  → cold length, poison length, freeze := 0 (burn length kept); any
+  other → all four lengths and freeze := 0. M none → nothing.
+- `c` = missiles evaluator `0x0064B7C0(M, owner, DmgCalc1 (+0x90), −1,
+  −1)` (owner `0x00552FD0`); `pct` = `0x00483360` (`combat/damage.md`
+  §0). `elem_roll` = `0x005A8C70` (§R5 helpers).
+
+| # | Address | Rows (1.14d) | Rule |
+|---|---|---|---|
+| 1 | `0x005AD050` | firearrow, magicarrow, coldarrow | row valid; c > 0: c := min(c, 100); f := min(pct(R phys, c, 100), R phys); R phys −= f; `add_elem(M, R, f)` |
+| 2 | `0x005AD1B0` | icearrow, royalstrikechaosice | row valid: R freeze +0x34 := pct(M's total stat 56 `coldlength` (`0x00625480(M, 56, 0)`), max(`dParam1`, 0), 100); R cold length +0x30 := 0 |
+| 3 | `0x005AD220` | blaze, firewall, vampirefirewall, immolationfire, meteorfire, vampiremeteorfire | row valid: one step of M's unit seed (unit +0x20; seed := lo × 0x6AC690C5 + hi, inline, no `0x0045C390`); (new lo & 0x7F) < `dParam1` → R result flags |= 0x4000 (soft hit) |
+| 4 | `0x005AD290` | iceblast | no checks: R freeze +0x34 := R cold length +0x30; cold length := 0 |
+| 5 | `0x005AD2F0` | blessedhammer | row valid: e := `elem_roll(game, M, U, R)`; `dParam1` > 0 and U undead (`0x0063E990`) → `add_elem(M, R, pct(e, dParam1, 100))`; then `dParam2` > 0 and U demon (`0x0063E940`) → `add_elem(M, R, pct(e, dParam2, 100))` |
+| 6 | `0x005AD3A0` | none (no live row) | owner O of M; O, O flags +0xC4 bit 0x200 clear, U present → U flags +0xC4 |= 0x20000 |
+| 7 | `0x005AD3E0` | warcry, shockwave | row valid: R stun +0x44 := `dParam1` if > 0, else `0x004E6CA0(skill, level)` (M data +0x0A / +0x0C, `0x0064A280` / `0x0064A210`; `missiles/bodies-2.md` §38 step 4 formula); R hit class +0x60 := 0x60 |
+| 8 | `0x005AD450` | erruption crack 1, 2 | row valid, U present, `ProgOverlay` (+0x36, i16) > 0 → overlay on U (`0x00621E40(U, ProgOverlay, 0)`) |
+| 9 | `0x005AD4A0` | twister | row valid: k := M's skill; R stun := `dParam1` if > 0; else k's skills row (`0 ≤ k <` count) `Param2` (+0x14C); else 0. R hit class := 0x60 |
+| 10 | `0x005AD2B0` | bladesoficecubes | row valid: R freeze +0x34 := R cold length +0x30 (cold length kept) |
+| 11 | `0x005AD530` | rabiescontagion | O := owner; O or U none → R poison +0x28, poison length +0x2C := 0. Else t := M data +0x28 (`0x0064A730`) − game frame (game +0xA8); 10 ≤ t ≤ `elem_len(O, k, L, 1)` (`0x00644F20`, `skills/levels.md` §3.2; k, L = M's skill, level) → R poison length := t; else poison and its length := 0 |
+| 12 | `0x005AD0F0` | lightningjavelin | row valid; c > 0: c := min(c, 100); f := min(pct(R phys, c, 100), R phys); e := `elem_roll(game, M, U, R)`; `clear_elems(M, R)`; `add_elem(M, R, f + e)` |
+| 13 | `0x005AD5C0` | blessedhammerex | U present and a monster (type 1): O := owner; O → R phys += R phys × O's total stat 25 (`0x00625480(O, 25, 0)`) / 100 (signed, truncating); then function 5 (O or not). Other U: nothing |
+| 14 | `0x005AD630` | moltenboulder | M type 3 and row valid, U present. p by U: player → `dParam2` when `dParam1` ≥ 1, else none; monster (class flags `0x004638A0(class, 10)` small, `(class, 11)` large): `dParam1` < 1 → `dParam2` if small, else none; = 1 → small 2 × `dParam2`, large none, other `dParam2`; > 1 → small 3 × `dParam2`, large `dParam2`, other 2 × `dParam2`; other types none. p > 0: `roll(100)` on M's seed (`0x0045C390`) < p → R result flags |= 8 (knockback) |
+
+Draws: function 3 one inline seed step and function 14 one `roll(100)`,
+both on the missile's seed; 5, 12 and 13 make `elem_roll`'s draws.
+Entries 15–30 are null and never reached by live data (§R6.1).
 
 ### R7. Lifetime and expiry
 
@@ -586,7 +647,8 @@ and the row has `Pierce` (60 rows):
    owner's base pierce_idx is a counter incremented by attack/skill
    messages (D2MOO `PlrMsg.cpp`, `MonsterMsg.cpp`; skills spec).
 3. n = 0; up to 4 times: draw `lo' % 100` (inline step); if ≥ P stop;
-   else n += 1.
+   else n += 1. The compare is signed (`0x0059F9FB` `jge`): a negative P
+   stops at the first draw (one step, n = 0).
 4. Missile stat 328 (`pierce_idx`) = n: the number of units it may pass
    through.
 
@@ -1117,9 +1179,9 @@ Reading:
    collision words? Settle: record per missile run the R4 exit path
    (hook `0x005AE1F0` returns and `0x005ADF10` arguments) in a combat
    recording.
-2. Collide-type callbacks `0x005A87B0`, `0x005A87F0`, `0x005A8850`,
-   `0x005A8890` are not in the disassembly export; their unit tests are
-   D2MOO's. Settle: disassemble them.
+2. Answered (2026-10-08), §R4.2 "Callbacks": disassembled from
+   `Game.exe`; they match D2MOO (mode 7 tests `CanDestroy` without the
+   shared filter).
 3. Answered (2026-10-08), R4.1 rule 3: yes to both. The direction
    vector comes from the 128-row `tan` table with x² + y² ≈ 4096²
    (`sim/pathing.md` §8.3, `0x0064FC60`); the position is two u32 16.16
