@@ -18,26 +18,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–54 |
-| Inputs | 55–61 |
-| Outputs / state changes | 62–66 |
-| Rules | 67–68 |
-|   1. Unit add | 69–225 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 226–235 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 236–277 |
-|   4. Queued movement and action messages | 278–312 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 313–334 |
-| Constants & data dependencies | 335–346 |
-| Randomness | 347–354 |
-| Edge cases & original bugs | 355–369 |
-| Test vectors | 370–405 |
-| Provenance | 406–435 |
-| Open questions | 436–454 |
+| Summary | 43–55 |
+| Inputs | 56–62 |
+| Outputs / state changes | 63–67 |
+| Rules | 68–69 |
+|   1. Unit add | 70–226 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 227–236 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 237–278 |
+|   4. Queued movement and action messages | 279–313 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 314–335 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 336–366 |
+| Constants & data dependencies | 367–378 |
+| Randomness | 379–386 |
+| Edge cases & original bugs | 387–401 |
+| Test vectors | 402–441 |
+| Provenance | 442–477 |
+| Open questions | 478–496 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
 0x51, 0x59, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F, 0x70,
-0x71, 0x72, 0x95, 0x96, 0xAC.
+0x71, 0x72, 0x95, 0x96, 0xA7, 0xA8, 0xA9, 0xAA, 0xAC.
 
 ## Summary
 
@@ -332,6 +333,37 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
    (dead): `0x00480E70` and `0x004647D0` (leave the dead mode; Phase 6
    player modes, `client/model.md` open question 1).
 
+### 6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA
+
+1. Dispatch owner of 0xA7, 0xA8, 0xA9 and 0xAA (general handlers, act
+   at receive). 0xA7 DelayedState, 0xA8 SetState, 0xA9 EndState: the
+   rules of `client/stat-lists.md` §3 rules 1–4 (layouts, state on /
+   off, state stats, hooks); this section adds only 0xAA. Server side:
+   `sim/intents-events.md` §3.5 rule 6 (0xA7–0xA9), §7.9 rule 1 (0xAA).
+2. **0xAA** (`0x0045EFA0`; size u8@6): unit (type u8@1, GUID u32@2) not
+   in S → nothing. Bit reader (`client/model.md` §10) over bytes 7 …
+   size − 1. Loop:
+   1. s := 8 bits; s ≥ 255 → end (the server's closing 0xFF).
+   2. State on (`0x004D9B20(unit, s)`, `client/stat-lists.md` §3 rule
+      3); list := none.
+   3. 1 bit = 1 → stats: id := 9 bits; id = 0x1FF ends the stats. An id
+      outside the itemstatcost table, or with `Send Bits` (+0x08) = 0,
+      **ends the whole message** (no hooks for s, later states lost).
+      Else param := the next `Send Param Bits` (+0x09) bits read signed,
+      kept as u16, when that is > 0, else 0; value := `Send Bits` bits,
+      read signed when `Send Bits` < 32 and the row's flags (+0x04) have
+      bit `[0x006CE26C]`, else unsigned; list := the state stat call
+      (`0x004D9D70(unit, list, s, id, value, param)`, §3 rule 2 there:
+      the first stat makes the list, later ones reuse it).
+   4. Hooks `0x004D9E60(unit, s)` (state on hooks, §3 rule 1 there);
+      next s.
+3. The reader's overflow flag is never tested; past the end it returns
+   0 bits (`client/model.md` §10 rule 2), so a stream without its
+   closing 0xFF would read state 0 over and over. 1.14d servers always
+   close it (`sim/intents-events.md` §7.9 rule 1 step 4). d2rs: when a
+   state read overflows, the handler stops and returns an error
+   (`client/bridge.md` §6 rule 4); the states applied before stay.
+
 ## Constants & data dependencies
 
 | Item | Value | Use |
@@ -393,6 +425,10 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | `95 1c 80 0a 80 12 a0 5b 22 72 c2 bf 00` | life 0x1C, mana 0x15, stamina 0x4A, check (0x12DD, 0x1391) target (0x12DB, 0x1396) | B 32694 |
 | `18 24 80 0c 80 12 80 0c e8 98 08 9c 00 00 00` | stats 6 := 0x2400, 8 := 0x1900, 10 := 0x4A00, 74 := 0x64, 26 := 0; check (0x131D, 0x1381) | B 12323 |
 | 0x6D for (1, 7) not in S | dropped at receive | synthetic |
+| `aa 00 01000000 0c 69 59 f9 ff 1f`, player (0, 1) in S | state 105 on; its list: stat 172 := 2 (param 0); hooks for 105; then 8 bits 0xFF end | B 103, §6 rule 2 |
+| `aa 01 08000000 0c 69 59 f9 ff 1f` | the same on monster (1, 8) | A 184 |
+| 0xAA with state 5, list bit 1, first stat id with `Send Bits` 0 | state 5 on, no stat, no hooks; rest ignored | synthetic, §6 rule 2.3 |
+| 0xAA whose stream lacks the closing 0xFF | states before applied; handler error | synthetic, §6 rule 3 |
 | 0x15 for a dead monster | position unchanged | synthetic, §3 rule 4.3 |
 | 0x0A type 1, GUID = local player's hireling | nothing | synthetic |
 | 0x96 with dx 0x80 | tx = x + 128 | synthetic |
@@ -428,6 +464,12 @@ Join-update session (2026-10-06): 0xAC table reads `0x0045F1F1`–
 `0x0053BD10` and its single caller `0x00572067` (type pushed as 2),
 type bytes counted in both recordings (206 × 2). The code bytes'
 server meaning: `sim/intents-events.md` §7.4.
+States session (2026-10-07, spec-senders-area-2): 0xAA `0x0045EFA0`
+read in full (`0x0045EFC3`–`0x0045F104`: the 8-bit state loop, the
+list bit at `0x0045F003`, 0x1FF → hooks at `0x0045F030`, the table and
+send-bits exits at `0x0045F038`–`0x0045F067` jumping to the return); 0xA7–0xA9 left to
+`client/stat-lists.md` §3; the recorded 0xAA bytes decode as in the
+table (269 records, both recordings).
 Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 (byte +2 of both `0x0061DB70` records compared, CL = new +2 into
 `0x004FB480`, whose palette act is CL + 1); `levels` offsets from

@@ -19,22 +19,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 40–52 |
-| Inputs | 53–63 |
-| Outputs / state changes | 64–68 |
-| Rules | 69–70 |
-|   1. Skill level | 71–125 |
-|   2. Special values | 126–171 |
-|   3. Skill damage | 172–288 |
-|   4. Mana cost | 289–310 |
-|   5. To-hit | 311–318 |
-|   6. Learning a skill | 319–346 |
-| Constants & data dependencies | 347–369 |
-| Randomness | 370–381 |
-| Edge cases & original bugs | 382–404 |
-| Test vectors | 405–441 |
-| Provenance | 442–461 |
-| Open questions | 462–483 |
+| Summary | 41–53 |
+| Inputs | 54–64 |
+| Outputs / state changes | 65–69 |
+| Rules | 70–71 |
+|   1. Skill level | 72–133 |
+|   2. Special values | 134–179 |
+|   3. Skill damage | 180–300 |
+|   4. Mana cost | 301–340 |
+|   5. To-hit | 341–348 |
+|   6. Learning a skill | 349–382 |
+|   7. Skill stat callbacks | 383–542 |
+| Constants & data dependencies | 543–565 |
+| Randomness | 566–577 |
+| Edge cases & original bugs | 578–600 |
+| Test vectors | 601–652 |
+| Provenance | 653–689 |
+| Open questions | 690–721 |
 <!-- /index -->
 
 ## Summary
@@ -82,8 +83,12 @@ function `0x00643B70`).
 2. `L = base`. If `bonus ≠ 0` and owner GUID = −1: `L += bonus_level
    (unit, skill)`. Item-granted (charge) entries never get bonuses.
 3. Clamp `0 ≤ L ≤ cap`, cap = entry 0 of the max-level table
-   `[0x0096C8A8]` (`0x00611830(0)`), 99 in 1.14d, for every unit
-   (Open question 2).
+   `[0x0096C8A8]` (`0x00611830(0)`), 99 in 1.14d, for every unit.
+   `[0x0096C8A8]` is the `experience` table (32-byte records: 7 class
+   columns, `ExpRatio` at +0x1C), written only by its loader
+   (`0x00613D30`, store at `0x00613E46`); record 0 is the `MaxLvl` row,
+   so the cap is `experience.txt` `MaxLvl`, Amazon column.
+   `0x00611830(c)` reads column c (c outside 0…6 → column 0).
 
 `bonus = 1` means "with bonuses" (answers `data/calc-expressions.md`
 Open question 8): the formula function `skill(s, c)` passes 1; the
@@ -113,8 +118,11 @@ getter with the stated layer:
 
 There is no "base > 0" condition: any native entry gets bonuses. Class
 skills without hard points have no entry, so `+skills` cannot reach
-them; entries with base 0 come from the level bonus (+0x2C) path (Open
-question 3).
+them; entries with base 0 are created by the stat 97 / 107 callback
+(§7.1). On the server the level bonus +0x2C is always 0: entries are
+allocated zeroed (`0x00647110`) and its only writers, set `0x00647AA0`
+and add `0x00647B20`, are called from client code alone (`0x004C6140`,
+`0x004D88A0`, `0x004C7990`; `client/msg-skills.md` Open question 2).
 
 **`highest_entry(unit, skill)`** = `0x00643810` (wrapper `0x006439F0`):
 walk the unit's skill list (unit +0xA8 → +0x04 first, +0x04 next);
@@ -211,9 +219,13 @@ Formula functions (`data/calc-expressions.md` §3.4), 1.14d:
    8`, max = `(x / 3) << 8` (`0x00644C20`).
 3. Otherwise: `s = 0`; if `SrcDam ≠ 0` (u8, +0x1A5) and `use_srcdam`:
    weapon `0x00623990(unit, 0)`; with a weapon and wield type 2
-   (`0x0063D340`): `w` = weapon min `0x00625EF0(item, 1)` (max:
-   `0x00625E60(item, 24)`); else `w = mindamage(21)` (max:
-   `maxdamage(22)`); `s = (SrcDam × w) / 128`.
+   (`0x0063D340`): `w` = the weapon's `secondary_mindamage(23)` (max:
+   `secondary_maxdamage(24)`), total of the item's own stat list
+   (item +0x5C, `0x00624F60`, `sim/stats.md`) through
+   `0x00625EF0(item, two)` / `0x00625E60(item, two)` (two ≠ 0 → stat
+   23 / 24, two = 0 → 21 / 22; no item or list → 0; called here with 1
+   and 0x18); else `w = mindamage(21)` (max: `maxdamage(22)`) of the
+   unit; `s = (SrcDam × w) / 128`.
    `v = s + MinDam + bracket(lvl, MinLevDam1…5)` (max: MaxDam,
    MaxLevDam). `DmgSymPerCalc ≠ −1` and `p ≠ 0` → `v += pct(v, p, 100)`.
    Return `v << HitShift`. No `lvl ≤ 0` guard; synergy before the shift;
@@ -306,6 +318,24 @@ are below the maximum by at least one 1/256 point.
   `blood_mana` → pay with life (`0x005D2B60(unit, c)`); else `mana < c`
   → 0, nothing deducted; else `mana −= c` → 1. (D2MOO's "cost 0 at level
   1" does not hold in 1.14d.) When it runs: `skills/use.md`.
+- **Blood-mana payment** `pay_with_life(unit, c)` = `0x005D2B60` (ECX
+  unit, EDX c in 1/256 points; returned by `consume_mana`, ignored by
+  the aura tick `0x0056C110`, `bodies.md` §4.5 step 6). L = the unit's
+  state-114 list (`0x006256B0(unit, 114)`), k = L's skill id (list
+  +0x1C, `0x006260E0`; no null test: the callers test the state first).
+  1. life total (stat 6, `0x00625480(unit, 6, 0)`) < c (signed): L, if
+     any, is detached and freed (`sim/stat-lists.md` §8.2, §8.3 plain
+     free `0x00626CD0`; the state's remove callback ends `blood_mana`),
+     then base life := 256 (1 point; set `0x00627260(unit, 6, 0x100,
+     0)`); return 0 (nothing paid, the skill fails).
+  2. Else base life += −c (`0x006272B0(unit, 6, −c, 0)`). Then, with
+     k's skills record (k outside 0…count − 1 → none; a none record is
+     read anyway, a fault: unreachable since the list always carries
+     the casting curse's id): life total < `Param5` (+0x158) << 8 → L,
+     if any, is detached and freed as in step 1 (the curse breaks once
+     life falls under `Param5` points). Return 1.
+  In 1.14d the only state-114 skill is Blood Mana (id 310, `Param5` =
+  40), so the curse ends when the cursed unit's life drops below 40.
 - There is no mana-cost-reduction stat in 1.14d.
 
 ### 5. To-hit
@@ -342,7 +372,173 @@ are below the maximum by at least one 1/256 point.
    (`0x00643690` → `0x00639DB0`) and calls `0x00646D60`.
 5. The handler then calls `0x0055F4F0(…, 1)` and `0x0056DE40(unit)`.
 
-Return codes 2/3 and their messages to the client: Open question 5.
+Replies and results (`0x0054BD90`): validator 2 (bad id) and step 3
+(at max level) send message 0x21 to the player's client (`0x0053C4A0`,
+skill 0, base level 1, remove 0: the client re-assigns Attack at level
+1, `client/msg-skills.md` §4) and return 2; validator 3 sends nothing
+and returns 3; a failed spend (step 4) sends nothing and returns 2;
+success returns 0. The dispatcher ignores the result
+(`sim/intents-events.md` §2.2 rule 5).
+
+### 7. Skill stat callbacks
+
+The server stat callback `0x0055B800` (`sim/stat-lists.md` §7.2) runs,
+for these stats, a skill or state handler (jump table `0x0055BDD8`,
+index bytes `0x0055BE04`, by stat − 7). Arguments: ECX game, EDX unit
+(the list's owner), the propagation unit I (`sim/stat-lists.md` §7.1;
+the item whose stats propagate, or none), the stat id with its layer
+(low 16 bits = layer), old and new value. G := I's GUID (unit +0x0C),
+0 when there is no I. The handlers do not test new ≠ old.
+
+| Stat | Handler |
+|---|---|
+| 97 `item_nonclassskill`, 107 `item_singleskill` | §7.1 |
+| 83 `item_addclassskills`, 188 `item_addskill_tab` | §7.2 |
+| 126 `item_elemskill`, 127 `item_allskills` | refresh all (§7.2) |
+| 98 `state` | §7.3 |
+| 151 `item_aura` | §7.5 |
+| 204 `item_charged_skill` | §7.6 |
+
+#### 7.1 Oskill entries (stats 97, 107)
+
+s = the layer.
+
+1. s = 0 → nothing. Stat 107 only: the unit must be a player whose
+   class (unit +0x04) equals s's `charclass` (+0x0C); else nothing.
+   Stat 97 has no class test.
+2. E = the native entry of s (owner −1, `0x006439B0`). None: E = add
+   (`0x00647110`, `client/msg-skills.md` §2 rule 1: a new entry, base
+   1), then assign (s, level 0, remove 0) (`0x00647280`, same §2 rule
+   2.3: base := 0), then message 0x21 (`0x0053C4A0`, skill s, remove 0,
+   level argument 0; layout `client/msg-skills.md` §4) to the unit's
+   client: a player's own client (`0x005531C0`); otherwise none given,
+   and the sender uses the owning player's client of a monster
+   (`0x0058F0D0`) and sends nothing for other units.
+3. Refresh (`0x00646D60(unit, s)`), then the pet maximum of s (§7.4).
+4. New value > 0 → done. Else r := 1; if `skill_level(unit, E, 0)` ≠ 0
+   (hard points): r := 0, and `skill_level(unit, E, 1)` ≠ 0 → done.
+   (With base 0 the entry is removed even when other bonuses still give
+   it a level.)
+5. The left skill is E (`0x00620190`) → select Attack (skill 0, owner
+   −1) on the left (`0x005701B0`, EDX 1); the right skill is E
+   (`0x006201D0`) → Attack on the right (EDX 0).
+6. r ≠ 0: assign (s, level 0, remove 1) (`0x00647280`, `client/msg-
+   skills.md` §2 rule 2.2: the native entry is removed). No message is
+   sent for the removal.
+
+#### 7.2 Class and tab bonuses (stats 83, 188)
+
+c = the layer (stat 83) or layer >> 3 (stat 188). Refresh all when the
+unit is a player of class c, or a hireling (`0x0063EE90`), or its draw
+identity (`0x00645270(unit, &type, &class, &mode)` on unit type, class
+and mode +0x10; `render/unit-composite.md` §1.1) is type 0 with class c;
+else nothing.
+
+**Refresh all** `0x0056DFA0` (ECX unit; needs a skill list): for each
+entry in list order (`0x00643910`, next `0x006438F0`) whose skill has a
+`passivestate` p > 0 (`0x00643690`): state p on (`0x00639DB0(unit, p,
+1)`), refresh (`0x00646D60(unit, skill)`).
+
+#### 7.3 Item states (stat 98)
+
+s = the layer; s outside 0…states count − 1 → nothing. New ≠ 0: the
+unit has s → nothing; else clear s's group keeping s, state s on
+(`0x00639DB0(unit, s, 1)`). New = 0: the unit lacks s → nothing; else
+clear s's group including s, state s off (`0x00639DB0(unit, s, 0)`).
+Both then mark s for update (`0x00639E30(unit, s, 1)`).
+
+**Clear group** `0x0056C740(ECX unit, EDX s, incl)`: g = `states`
+`group` (u16, +0x1E) of s; g = 0 → return 0. For each state i in
+0…count − 1 in order (i = s skipped when incl = 0) with group g that
+the unit has: state i off, its state list (`0x006256B0`) detached and
+freed (`sim/stat-lists.md` §8.2, §8.3). Return 1 when any was cleared.
+
+#### 7.4 Pet maximum of one skill `0x0056BD90`
+
+ECX game, EDX unit, stack skill s. Players only; s valid; t = s's
+`pettype` (+0xBE, i8) with 0 < t < pettype count, and its row P
+(`0x00478A20`); else nothing. m := 0. For each skill k of P's skill
+list (count +0xBC, u16 ids from +0xC0): with a record and an entry E =
+`highest_entry(unit, k)` (`0x006439F0`): L = `skill_level(unit, E, 1)`;
+v = L > 0 ? max(`eval(petmax` (+0xC0)`, k, L)` (`0x00646CA0`), 1) : 0;
+m := max(m, v). Then `set_max(game, unit, t, m)` (`0x00575850`,
+`sim/pets.md` §4); m = 0 removes every pet of type t (t ≠ 7).
+
+P's skill list is built after loading (`0x00613F80`, at `0x00617BB2`):
+every `skills` row in id order whose `pettype` p is in 0…count − 1 is
+appended to row p's list while it holds fewer than 15. In 1.14d
+`pettype.bin` leaves these bytes unwritten (`data/tables.tsv`).
+
+#### 7.5 Item auras (stat 151)
+
+s = the layer, L = new. New ≠ 0 → aura on `0x005BF510(game, unit, G,
+s, L)`; new = 0 → aura off `0x005BF5D0(game, unit, G, s)`. Both do
+nothing unless: unit present; s in 0…skills count − 1 with a record;
+s has `aura` (flags bit 5, mask byte `0x006CE27C`); its `aurastate`
+(i16 +0x80) is in 0…states count − 1.
+
+**On:**
+1. Cancel the unit's type-9 timers whose arg1 is G, all type-9 timers
+   when G = 0 (`0x00540E60(unit, 9, G)`, `sim/tick.md` §5.4).
+2. Schedule a type-9 timer (arg1 G, arg2 s) at `period(s, L)`
+   (`0x0056CD50`, `use.md` §7; `0x005417D0`, `sim/tick.md` §5.2). Its
+   handler re-applies the aura each period (`sim/stat-lists.md` §10.3).
+3. s has `immediate` (flags bit 15, mask byte `0x006CE284`): do core
+   `0x0056F7F0(game, unit, s, L, charge 1, item 1, aim 0)` (`use.md`
+   §5.4) now.
+
+**Off:**
+1. State `aurastate` off (`0x00639DB0(unit, state, 0)`); its state list
+   (`0x006256B0`), if any, detached and freed (`0x006277E0`,
+   `0x00626CD0`; `sim/stat-lists.md` §8.2, §8.3).
+2. Cancel type-9 timers as in On step 1.
+
+Consequences: a level change (new ≠ 0 after new ≠ 0) restarts the
+period and, for `immediate` skills, re-applies at once. Two items with
+the same aura: removing one turns the state off and cancels only its
+own timer; the other's timer re-applies at its next period (total of
+151 still > 0). A null I (G = 0) cancels every type-9 timer of the unit.
+
+1.14d data: 26 `skills.txt` rows have `aura`; 10 also `immediate`
+(Might, Resist Fire, Defiance, Resist Cold, Blessed Aim, Resist
+Lightning, Concentration, Vigor, Fanaticism, Salvation). Sword, Axe
+and Mace Mastery have `aura` but no `aurastate`: the handler ignores
+them. Oak Sage, Wolverine and Barbs Aura have no `perdelay`: period 5.
+
+#### 7.6 Item charged skills (stat 204)
+
+Needs I present; otherwise nothing. s = layer >> shift, l = layer &
+mask (shift, mask: data +0xC6C / +0xC70; `items/properties.md` §5 rule
+9). c := (I's own total of 204 at this layer (`0x00625480(I, 204,
+layer)`)) & 0xFF: the current charges. The value argument is not read.
+
+1. c > 0 and I's stats are attached to the unit (`0x00625820(I)`: I's
+   list's parent is extended and owned by the unit): **set charges**
+   (unit, G, s, l, c).
+2. Else: **remove charges** (unit, G, s, l), then the pet maximum of s
+   (§7.4).
+
+`0x00647320(unit, G, s, l, c, remove)` (also via `0x00647530`). Does
+nothing unless: unit is a player (type 0); l > 0; s in 0…count − 1
+with a record; the unit has a skill list. Entries match on skill and
+owner GUID (+0x34) = G; the level is not compared.
+
+- **Set** (remove = 0): the first matching entry in list order gets
+  base (+0x28) := l, charges (+0x38) := c, has-charges (+0x3C) := 1.
+  None: a new 0x40-byte zeroed entry, skill s, mode := `anim` when it
+  is 7 A1, 8 A2, 10 SC, 11 TH or 18 SQ, else 10 SC (jump table
+  `0x00647518`, index bytes `0x00647520`); base l, charges c,
+  has-charges 1, owner G; appended at the tail.
+- **Remove** (remove = 1): old left / right read first. Left has skill s
+  and owner G → left := Attack (skill 0, owner −1, `0x00643BC0`). Right
+  has skill s and owner G → right := Attack (`0x00643C50`). Current
+  skill (+0x10) has skill s (owner not compared) → current := none.
+  Then the first matching entry is unlinked and freed.
+
+Neither path turns passive states on or off, refreshes (`0x00646D60`)
+or sends a message. Monsters and hirelings never get charge entries.
+A charge used up (current 0) removes the entry, and the selected
+left / right falls back to Attack.
 
 ## Constants & data dependencies
 
@@ -435,6 +631,21 @@ Synthetic: `DM(1, 25, 70)`: q = 110/7 = 15, r = 15 × 45 / 100 = 6, 31.
 `bracket(29, 1, 2, 3, 4, 5)` = 7 + 16 + 18 + 24 + 5 = 70. Mastery and
 synergy use `pct` (`combat/damage.md` vectors).
 
+Synthetic `pay_with_life` (Blood Mana, `Param5` 40 → threshold 10,240):
+life 100 pt (25,600), c = 1,280 → life 24,320, curse kept, 1; life 45
+pt (11,520), c = 1,280 → 10,240, kept (not below), 1; c = 1,536 →
+9,984 < 10,240, curse removed, 1; life 4 pt (1,024), c = 1,280 → curse
+removed, base life := 256, 0.
+
+Synthetic stat callbacks (§7.5, §7.6; 1.14d `skills.txt` rows): item
+GUID 7 gives 151 Might (98) = 5 at frame 1000 → type-9 timers with arg1
+7 cancelled, a type-9 timer (7, 98) at frame 1001 (`perdelay` 50:
+((1000 + 49) / 50) × 50 + 1), do core now (`immediate`); the same with
+Prayer (99) → timer only, no do. 204 on GUID 7 with layer (54 << shift)
++ 3 and item value 0x0F0A (max 15, current 10), item attached → entry
+(Teleport, owner 7) base 3, charges 10, has-charges 1; value 0x0F00 →
+entry removed, left / right on it → Attack. A monster owner → no entry.
+
 Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 `misscalc.tsv` index/code columns equal the 1.14d `skillcalc.bin` /
 `misscalc.bin` code order (`data/calc-expressions.md` §5).
@@ -458,25 +669,52 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 - 1.14d `skills.txt`, `skilldesc.txt`, `missiles.txt` (`patch_d2`) for
   counts and examples; 13,720 sampled (level, params) cases differ
   between the 1.14d and D2MOO DM orders.
+- `pay_with_life` read from `0x005D2B60`–`0x005D2C1D` (callers
+  `0x0056C0CA`, `0x0056C131`); 1.14d `skills.txt` row Blood Mana (310):
+  `auratargetstate` `blood_mana`, `Param5` 40; `states.txt` row 114
+  `blood_mana` is referenced by no other skill row.
+- §7.5 read from `0x005BF510`, `0x005BF5D0`, `0x00540E60`; §7.6 from
+  `0x0055BCF9`–`0x0055BD7B`, `0x00625820`, `0x00647320` (jump table
+  `0x00647518` / `0x00647520` decoded from the image); flag masks from
+  the bit table at `0x006CE268` (bit n at +4n) and `data/fields.tsv`
+  (`aura` bit 5, `immediate` bit 15); counts from 1.14d `patch_d2`
+  `skills.txt`.
+- §7 read from `0x0055B800` (jump table decoded from the image),
+  `0x0056DFA0`, `0x0056C740`, `0x0056BD90`, `0x00617BB2`–`0x00617C17`;
+  §1 cap from `0x00613D30` (strings `experience`, `ExpRatio` in the
+  image); §6.4 replies from `0x0054BD90`; +0x2C writers found by a scan
+  of `all.asm` for stores to +0x2C in `0x00643000`–`0x00648FFF`.
+- DM `b < a` count: scan of the 1.14d `patch_d2` `skills.txt`,
+  `skilldesc.txt` and `missiles.txt` calc cells.
 
 ## Open questions
 
 1. No trace check. Request (recording): hook `0x00646460` and
    `0x00644D50`/`0x00644E40` entry/return during play with known skill
    levels; and `0x0056BFE0` (mana before/after) for a few skills.
-2. Max-level table `[0x0096C8A8]` (`0x00611830`): confirm it is filled
-   from `experience.txt` `MaxLvl`. Ghidra: find writers of `0x0096C8A8`.
-3. Who writes the entry level bonus (+0x2C) and how oskill entries are
-   created. Ghidra: writers of `[entry+0x2C]` near `0x00643000`–
-   `0x00648FFF` (D2MOO `D2Common_11030/11031`).
+2. Answered: `[0x0096C8A8]` is the `experience` table; record 0 is
+   `MaxLvl` (§1 rule 3).
+3. Answered: the server never writes +0x2C (§1, after `bonus_level`);
+   oskill entries are created and removed by the stat 97 / 107
+   callback (§7.1).
 4. Answered: `0x0056C8E0` is `add_element` (§3.6).
-5. Results 2/3 of the 0x3B validator and what the client sees:
-   `sim/intents-events.md`.
-6. Skills `range` getter (D2MOO `SKILLS_GetRange`) not located;
-   `0x00645720` reads +0x14 = 2 directly.
-7. `0x00623990`, `0x0063D340`, `0x00625EF0`, `0x00625E60` (weapon,
-   wield type, item damage getters) named from D2MOO use: stats/items
-   specs.
-8. Blood-mana life payment `0x005D2B60`: rule unspecified.
-9. DM with `b < a` overshoots below `b`; whether any 1.14d dm user has
-   `Param_b < Param_a` was not measured.
+5. Answered: results of the 0x3B handler and the 0x21 reply: §6.4.
+6. Answered: the raw getter is `0x00643890(entry)` (entry → record,
+   `range` i8 +0x14; no direct caller in the export); the effective
+   range used by the game is `0x00645460(unit, entry)` (`skills/use.md`
+   §3 step 6: value 3 resolves to 1 or 2).
+7. Answered: `0x00625EF0` / `0x00625E60` are specified in §3.3;
+   `0x0063D340` (grip / wield type) is owned by
+   `render/unit-composite.md` and `combat/damage.md`; the attack weapon
+   `0x00623990(unit, flag)` (by the skill's `weapsel` +0x168) is
+   `sim/units.md` §4.7, with the dual-wield stat toggle `0x00623C80`
+   and the frame bonus `0x00623B10` there.
+8. Answered: blood-mana life payment `0x005D2B60` is specified in §4
+   (`pay_with_life`).
+9. Answered: no 1.14d user has `b < a`. `skills.txt` uses dm 86 times
+   (dm12 28, dm34 37, dm56 21, dm78 0) and `skilldesc.txt` 44 times,
+   all with `Param_b ≥ Param_a`; no 1.14d `missiles.txt` calc uses a
+   missile DM (sd12, sd34, cd12, cd34, shd1, chd1, dd12). The
+   overshoot stays reproduced for mod data.
+10. Answered: stat 151 `item_aura` is §7.5, stat 204
+    `item_charged_skill` is §7.6.

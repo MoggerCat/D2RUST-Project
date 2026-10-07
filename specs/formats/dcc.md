@@ -231,6 +231,13 @@ consulted.
 2. ~~Exact screen placement~~: 1.14d covers the §Boxes frame box offset
    by the draw position; owner `render/sprite-placement.md` §2–§3.
 3. Meaning of variable0 and the optional bytes.
+   *Partly answered* (game-file read, 2026-10-07, all 21,717 DCCs of
+   d2data, d2exp and d2char, 3,305,132 frames): variable0 is 0 in every
+   frame and no frame has optional bytes, so neither changes any 1.14d
+   decode or draw (`render/sprite-placement.md` OQ 2: an odd variable0
+   would flip the frame). Their intended meaning stays unknown.
 4. Whole-file direction-box limit (64M pixels, §Boxes) is an
    implementation limit, not observed original behavior: confirm every
    1.14d `.dcc` stays under it (`mpq-tool formats`).
+   *Answered* (same read): the largest file's direction boxes total
+   1,083,392 pixels.

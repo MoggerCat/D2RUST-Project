@@ -3422,6 +3422,7 @@ Carried-over open questions not yet in a spec's list:
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
+   Answered: never read by 1.14d (`formats/ds1.md` OQ4).
 3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
 4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
@@ -5956,6 +5957,177 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   0x2FD, `jf` / `kf` (OQ3; C66 (1)).
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
+- `sim/intents-events.md` §3.5 (static senders, no record yet): open a
+  shop and the hire list (0x58 codes, 0x4E), talk to an NPC with a quest
+  line (0x27 count > 1, 0x50, 0x91, 0x89), a monster casting at the
+  player from outside the player's rooms (0x4D) and a pet summon with a
+  pending skill (0x99 / 0x9A); log caller and bytes (check 0x58 byte 6
+  is stack garbage except code 5; 0x26 bytes 8-9 with form 5).
+- `sim/pets.md` OQ3 (count part): summon a 4th skeleton over max 3; expect
+  three 0x7A action 0 for the removed one (§6 table).
+- `monsters/ai-bodies-6.md` OQ1 (spec area 1, AI): a necromancer game
+  with golem, skeletons and a skeleton mage, a hireling following and
+  fighting, an Act II town walk, a MinionSpawner, an EvilHole and a
+  desert turret; log per think: type-2 schedule frame, unit-seed steps,
+  mode requests (mode, target, point), AI params 0–2.
+- `monsters/ai-bodies-7.md` OQ1 (AI): arrow / poison / nova traps, the
+  Act II palace guard before and after the door opens, the Dark
+  Wanderer, druid summons (wolves, bear, ravens, vines) and assassin
+  shadows; same log.
+- `monsters/ai-bodies-7.md` OQ2 (AI): Uber Tristram: for Uber Mephisto,
+  Diablo and Baal log the AI control's function (+0x04) and special
+  state (+0x00) after creation and at each think, and every type-2
+  schedule (their table thinks are empty in 1.14d).
+- `monsters/umod-init-bodies.md` OQ1: 0xAC assign + stat messages of a
+  lightning, cold or mana-burn unique with minions (expect the §2
+  values; minions on Normal get no damage stats, cold minions still get
+  coldlength).
+- `monsters/init.md` OQ1 / OQ4 / OQ10: client message 0x67 game type in
+  classic SP and TCP/IP; one population pass with rng hook + callers; a
+  unique's client name draws.
+- `sim/stat-lists.md` OQ1: read the x87 control word (precision bits) at
+  the §7.2 max-rescale call during a max-life change (a D3D device may
+  set 24-bit).
+- `sim/units.md` OQ6 (78 rows left `proof = file`): a `site` recording
+  over combat with skills, a trade and an item use, to confirm the
+  scheduled unit kinds of the state-timer, damage and trade sites.
+- `skills/use.md` OQ3–7: hook `0x0056FAF0` (entry/return) and
+  `0x0056F7F0` (entry), cast a non-`TargetAlly` skill on a party member
+  (does the do run after start returned 0); hook `0x0056BFE0` for
+  Teleport at level ≥ 25 with < 1 mana (cast free?); two C→S 0x06 two
+  frames apart (does the second restart A1); hook `0x005A7670` (arg1,
+  arg2, unit +0x4E) on monsters; log arg1 of `0x005539B0` per type-0
+  timer during Strafe / Zeal.
+- `skills/levels.md` OQ1: hook `0x00646460`, `0x00644D50` /
+  `0x00644E40` (entry/return) with known skill levels, and
+  `0x0056BFE0` (mana before/after) for a few skills.
+- `skills/bodies.md` OQ1–3, OQ9: Paladin Might in a party (hook
+  `0x005CF010`, `0x0056E970`: duration, expiry, count, state 85 per
+  tick); Kick, Bash, Attack on a monster (`0x0057DBF0` record before /
+  after); Amplify Damage on an immune monster and Dim Vision in
+  Nightmare (expiry − F); a Druid summon and a Clay Golem (stats 12,
+  31, 19, 7, 6 on the summon, AI think at F + 25).
+- `skills/bodies-2.md` OQ1–5, 7, 8, 12: Jab / Smite monsters (stats
+  21, 22, 19 and element stats around `mode_damage`); Dragon Talon L6 /
+  L12 (kicks, last-kick knockback, E param 1); Find Potion per act and
+  difficulty (codes, seed draws); Leap and monster Leap (E flags,
+  landing frame, knockback, 0xA5); Shock Field (caster seed before /
+  after); Conversion on a higher-level monster (stats 12, 6, 7 during
+  and after); Holy Freeze pulses (state 107, target seed); Whirlwind
+  with one and two weapons (E param 4, hits per do).
+- DRLG act entries (one run, RNG hooks on): enter Act 2 and Act 3
+  (`drlg/levels.md` OQ1: drlg +0x94/+0x484/+0x474; `outdoor.md` OQ3/OQ4,
+  `outdoor-act3-act5.md` OQ1: levels 76..78 +0x1C..+0x28, +0x1B8,
+  +0x1BC), Act 4 (Outer Steppes flag) and Act 5 levels 111, 112, 117
+  (`outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3: stamps, room counts of
+  76..78); after Act I creation read level +0x1C..+0x28 of 1–7, 17, 26,
+  39 and preset direction of 1 and 27 (`outdoor.md` OQ1).
+- `drlg/levels.md` OQ3: a town arrival and an act change, draws at
+  `0x0066ACB0`–`0x0066ACE0` on the level seed.
+- `drlg/levels.md` OQ7: a crypt level (`Logicals` 1) and an outdoor
+  level, dump DRLG room +0x64 records after activation.
+- `drlg/maze.md` OQ1: enter Den of Evil (8) and Cave Level 1 (9) with
+  RNG hooks; compare with the maze vectors.
+- `drlg/outdoor.md` OQ5: Stony Field, Dark Wood, Black Marsh, Tamoe
+  builds (sites `0x00680251`, `0x0068034F`).
+- `drlg/outdoor-tilesub.md` OQ2 + OQ4: Cold Plains far enough to build a
+  waypoint and a shrine room; also read the `Trees` substitution DS1's
+  group records (+0x14 of each 0x18-byte group) after its first load.
+- `drlg/preset.md` OQ3: a level whose river/navi units are added at
+  first activation; log §8 adds versus §9 transfers per room.
+- `drlg/rooms.md` OQ7: the entry `0x0066D820` returns for seq
+  6822–6835 of the RNG recording's run.
+- `render/camera.md` OQ1: a capture standing under a roof (decides the
+  roof y formula; roof blocks y 0…64 from the files).
+- `render/camera.md` OQ8 + `render/capture.md` OQ8: `frames-raw-2` with
+  the client-update counter per frame (draws with no tick between).
+- `render/blend-modes.md` OQ2 + OQ3: a ghostly / ethereal unit or a
+  blended shadow over a known background, static camera; log
+  `[0x0072DA5C]` (Blended Shadows).
+- `render/lighting.md` OQ6 + OQ10: a game join; log whether S→C 0x53
+  precedes the first world draw, and `[0x0072DA50]` / `[0x0072A348]` at
+  that draw.
+- `render/capture.md` OQ7 + `render/lighting.md` OQ9: rerun of run 1b
+  f 13,486–14,636 with `--draws-every` and the light-map digest.
+- `sim/rng.md` OQ2: a brand-new character's first game and a
+  save-and-exit reload; log game +0x7C and the S→C 0x03 map seed.
+- `sim/path-placement.md` OQ8: load a character saved in Act III; log
+  writes of client +0x1AC (sites `0x0052FB97`, `0x00530E17`,
+  `0x00532690` path) in order.
+- `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
+  Hammer's per-tick positions).
+- `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2: after the Trees
+  substitution DS1 loads, dump its 14 group records (0x18 bytes each)
+  and the 0x320 slack after the file buffer.
+- `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
+  scenario; log the allocating caller (unit-seed fallback).
+- `client/model.md` OQ8 (static answer 13) + OQ9: a waypoint to another
+  act (log S→C 0x05, 0x03, 0x53 bytes), and a monster's client +0x20
+  seed after 0xAC against the server unit's seed.
+- `client/msg-ui.md` §4–§11 (client side, no new play beyond the
+  §3.5 line above): in the same session log the client handlers'
+  inputs: type one chat line and one whisper to the own name (0x26
+  forms 1, 2, 6; overhead form 5 from C→S 0x14), talk to Akara (0x27
+  count, kinds), open and close the hire list (0x4F, 0x4E × n, 0x50
+  code 2); breakpoint `0x0049F410` (overhead set: unit, text, lang) and
+  `0x004A1600` (record bytes).
+- `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7: a pet summon with
+  a pending skill (0x99 / 0x9A, line above) — log whether any later
+  message of the same receive changes the 0x99 unit (0x0A, 0x15,
+  0xA8 / 0xA9 state 118).
+- `sim/units.md` §4.7 (OQ1, OQ2 answered statically): log unit +0x4C,
+  +0x3C and the §4.2 start index per `anim` record for a player with
+  IAS / FCR / FHR / FBR / FRW items in every mode (dual-wield
+  Assassin or Barbarian, a were-form, Holy Shield block) and for a
+  monster walking, running, attacking, casting and knocked back.
+- `sim/units.md` OQ3: move a player with a hireling following (20
+  history entries of player data +0xA8 per frame, and a town-portal
+  teleport frame).
+- `monsters/init.md` §4.1, §14.3, §26 (OQ4): rng hook with caller
+  addresses during one Act 5 ancient-barbarian spawn (four item
+  creations after the boss mods) and one warping-shrine use (§17 draws
+  on the chosen monster).
+- `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
+  lower a `petmax` skill level (resync trims), and leave the game with
+  a hireling (free path: 0x7A removes).
+- `monsters/ai.md` OQ1 / OQ2 / OQ3 (AI, spec area 1): freeze a monster
+  (cold damage with freeze) and knock back a fallen and a sand leaper;
+  play one Nightmare area; log type-2 schedules (site, frame), timer
+  type 12, state 1 on / off, mode changes. Expect: a think at freeze
+  apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback
+  end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays =
+  `aidel(N)` (zombie1 14).
+- `monsters/ai.md` OQ8 / OQ9 / OQ11 (AI): a town walk clicking NPCs
+  (C→S 0x13, 0x59) and an Act I fight with a fallen shaman; log command
+  4 next to each NPC think, every client message next to type-2
+  schedules, and mode changes of fallens (death end, resurrect).
+- `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2,
+  `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (AI): one run per act
+  II–V (Far Oasis, Arcane Sanctuary, Spider Forest, Durance, Chaos
+  Sanctuary with Diablo, Arreat Summit, Worldstone Chamber); log per
+  think the type-2 schedule, unit-seed steps with caller, mode requests
+  (mode, target, point), AI params 0–2; for vultures, bat demons and
+  frog demons also modes 8–11 / 14 and collision; for Diablo the mode
+  chosen per think with the player's resistances.
+- `monsters/ai-bodies-7.md` OQ2 (AI, refined 2026-10-07): the static
+  read finds no driver for Uber Mephisto / Diablo / Baal (§26). In the
+  Uber Tristram run also log every mode change of the three with its
+  caller and every `0x005B0E00` call on them; expect no attack or skill
+  mode started by AI code (only gethit / knockback / death).
+- `sim/units.md` OQ7 (answered statically 2026-10-07: single player has
+  game +0x6A = 3, so the difficulty's `aidel` column): a Nightmare
+  single-player game; log monster event-2 sets (U10) and check the
+  delay = Nightmare `aidel` (0 → 15).
+- `monsters/init.md` §27: kill a fetish shaman (Act III); log the
+  `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
+  with callers.
+- `combat/events.md` OQ1: items with knockback, freeze, slow,
+  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
+  in play. Log each event function's entry / return (table
+  `0x007325B0` targets), H's seed before / after, and the record.
+- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
+  item (e.g. Dragon) and a charged item; log `0x005BF510` /
+  `0x00647320` calls and the type-9 timers they schedule.
 
 ## 8. Lessons (problems met, fixes)
 

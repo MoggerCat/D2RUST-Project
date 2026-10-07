@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 279–291 |
 | Test vectors | 292–340 |
 | Provenance | 341–373 |
-| Open questions | 374–388 |
+| Open questions | 374–409 |
 <!-- /index -->
 
 ## Summary
@@ -177,7 +177,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 <!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
-| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: `time_value(counter)`, counter `0x008846E8` incremented per use. |
+| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: v := `time_value(2·c)` with c the counter `0x008846E8` before its increment (`0x00552E5C`–`0x00552E78`; c starts at 0: `.bss`, no other writer), `dwInitSeed` := v, seed := `init_low(v)`. |
 | item seed, item data +0x04 (data pointer at unit +0x14); start seed at data +0x10 [`ITEMS_InitItemSeed`] | `0x00552E90` | reset to `{1, 666}` (`0x00627DC0`), then derived from the game seed |
 | item seed re-init | `0x005572A0`–`0x00557450` (quality downgrade chain) | `init_low(start seed)`: the item rolls again from its start |
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
@@ -379,9 +379,30 @@ and applies each `op` in order; `value` and `state` must match.
    trace before relying on them.
 2. Map seed source in single player: observed equal to the `.d2s` map
    ID. Confirm for a brand-new character and after save-and-exit.
-3. Object seed derivation (D2MOO: `lo % 65534 + 1`) is not visible at
-   `0x0054FCB0`; record an object spawn to settle it.
-4. Initial value of the unit-seed fallback counter `0x008846E8` (D2MOO:
-   GetTickCount); matters only for units without a parent seed.
+   Static part answered in `drlg/levels.md` OQ 5: the join routine
+   `0x00532690` copies the join record's +0x7E into game +0x7C (game
+   type 3, no `-seed`, same difficulty); the recording question stays.
+   *Answered* (static, 1.14d asm): single player's client game type
+   `0x007A0610` is 0, so the create message (`0x00477CA0`) carries game
+   type 3 (`0x00477CDF`), which `0x0053F17A` passes to `0x00530BF0` and
+   `0x00530CFF` stores at game +0x6A. Game +0x84 is 0 unless `-seed`
+   ran (§5 table, game seed row). The header read `0x0056A090` then sets
+   game +0x7C := `.d2s` +0xAB when game +0x6A = 3, game +0x84 = 0 and the
+   town byte `.d2s` +0xA8 + difficulty (game +0x6D) has bit 0x80
+   (`0x0056A1D4`–`0x0056A217`). So every single-player load in the
+   difficulty the save was written in restores the saved map seed; in
+   another difficulty that byte lacks 0x80 and the game keeps its own
+   new seed (owner of the load rule: `formats/d2s-load.md` §7, PC 2).
+3. *Answered* (static, disassembly of `0x0054FCB0`): the D2MOO form is
+   there, inline: the last step of the object-control seed (`0x0054FD32`)
+   gives `lo'`, reduced `lo' mod 65534` by a multiply-shift (magic
+   0x20005, `imul 0xFFFE` at `0x0054FD5E`), plus 1, then `init_low` of
+   the object's unit seed (unit +0x20) with it (`0x00650E40`). Owner of
+   the rule and its draw order: `world/objects.md` §5.2 (init 3, chest;
+   init 57 runs it too).
+4. *Answered* (static): 0. `0x008846E8` lies in `.data` beyond the
+   file's raw data (zero-filled at load) and its only writer is the
+   increment at `0x00552E67`; no GetTickCount. The argument to the time
+   value is twice the pre-increment counter (§5.3 table).
 5. Do other threads draw in hosted multiplayer games? In single player
    only the main thread drew.

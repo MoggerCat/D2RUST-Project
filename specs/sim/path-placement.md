@@ -49,7 +49,7 @@
 | Edge cases & original bugs | 767–802 |
 | Test vectors | 803–840 |
 | Provenance | 841–875 |
-| Open questions | 876–957 |
+| Open questions | 876–965 |
 <!-- /index -->
 
 ## Summary
@@ -921,6 +921,14 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
    during the load; the S→C 0x03 act byte (§Test vectors) shows the
    result. Also: how the header's +0x58 byte relates to the `.d2s`
    difficulty bytes (`formats/d2s.md`, not yet written).
+   *Partly answered* (static): the setter's only reference is a jump at
+   `0x0044D5DD` in the `-act N` switch handler `0x0044D5A0`
+   (`tools/original-hooks.md` §5.1), so without `-act` the global stays
+   0 and its two writes of client +0x1AC store act 0. Still open: the
+   order of the join write (`0x0052FB90`, system-message path
+   `0x0053F270`) against the save-header write (`0x00532690`, reached
+   through `0x00534330` from `0x00534475` / `0x005345EC`) on a live
+   load, and the header byte's relation to the `.d2s` bytes.
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 457–473 |
 | Test vectors | 474–495 |
 | Provenance | 496–524 |
-| Open questions | 525–561 |
+| Open questions | 525–582 |
 <!-- /index -->
 
 ## Summary
@@ -529,12 +529,33 @@ Encampment): splash ripples on the river, drop lines.
    lightning countdown; add the three pools) checks §11 pixel for pixel.
 2. The act edge record (act `+0x18`, 0x30 bytes): who fills it and with
    which DT1 tile; Ghidra search for writes of act `+0x30`.
+   *Answered* (static): act allocation `0x006194A0` passes act +0x18 to
+   `0x00642A30(drlg, record)` right after the environment
+   (`drlg/levels.md` §2 rule 3). It zeroes the 0x30 bytes, looks up
+   (`0x00604AE0`, `drlg/rooms.md` §9.3, at most 40 entries) the key
+   (orientation 0, main, sub) in the act's base tile library (drlg +0x0C,
+   `levels.md` §3 step 5) by act (drlg +0x480): Act I (0, 0, 0), Act II
+   (0, 0, 1), Act III (0, 29, 12); no match is fatal 0x44C. The first
+   entry of the result is written into the record by the tile-record
+   fill `0x0066DDE0` (position arguments 0). Acts IV and V do no lookup:
+   their record stays zero (no tile; the base libraries of acts 4–5 are
+   empty). No draw on any seed.
 3. Partly answered (`impl-draw-order-2` W2–W5): f₁, f₂, f of §11.4 r5,
    the drop vector of §11.7 r3 and the splash threshold of §11.5 are
    now exact. Open: the particle move `0x004732C0` (its FPU values from
    `0x0040B330` / `0x0040B350`); an asm read of it settles it.
 4. Which event calls `0x004E3C50` (lightning start, sound flag 0) — a
    table-dispatched client handler; search the pointer tables for it.
+   *Answered* (static): its only reference is entry 84 (`0x00727CF8`) of
+   the client skill function table `0x00727BA8` (entry 30 = `0x004F3530`,
+   `lighting.md` §9.2), the table both `cltdofunc` and `cltprgfunc1` index.
+   `0x004C6930` calls entry `cltprgfunc1` (skills +0xF6) of the skill it
+   is given; its caller is the S→C 0xA3 handler `0x0045D5E0`
+   (`audio/triggers.md`, rule "Skill do / target"). The only 1.14d skill with
+   any client function 84 is Thunder Storm (57, `cltprgfunc1` 84; patch_d2
+   `skills.txt`), so lightning flashes start from a Thunder Storm
+   progress event; validation inside `0x004E3C50`: skill id in 0 …
+   count − 1.
 5. *Answered* (`impl-draw-order-2` W1): `[0x007A8A20]` has no writer
    (no store to it in `Game.exe`; `.bss`), so it is always 0 (§11.1,
    §11.3).

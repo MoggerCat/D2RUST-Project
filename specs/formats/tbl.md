@@ -169,5 +169,16 @@ every used entry's value decoded as strict UTF-8 and as Windows-1252.
 2. Does the game read the plain-text `DEFAULT.TBL` / `FONTER.TBL` at all?
    Check in an RE session. Until then they're treated as unused tool
    leftovers.
+   *Answered* (static): no. `Game.exe` holds no string naming either
+   file (case-insensitive search of the image for `default.tbl` and
+   `fonter`); its only `.tbl` names are the three string tables
+   (`data\local\lng\%s\string.tbl`, `expansionstring.tbl`,
+   `patchstring.tbl`) and the font table pattern `%s%s%s.tbl` used with
+   the prefix `Font` (`formats/font-tbl.md`, `ui/text.md`). They are
+   unused leftovers.
 3. String-size limit (§Strings) assumes entries never share key or value
    bytes: confirm on all 29 1.14d tables (`mpq-tool formats`).
+   *Answered* for the 20 string tables d2data and d2exp list (game-file
+   read, 2026-10-07): no two used entries' key or value byte ranges
+   overlap, and every table's string total is below its length. The
+   copies in `Patch_D2.mpq` (no listfile) were not read.

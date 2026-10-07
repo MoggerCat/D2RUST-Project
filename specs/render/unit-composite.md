@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 532–546 |
 | Test vectors | 547–567 |
 | Provenance | 568–615 |
-| Open questions | 616–654 |
+| Open questions | 616–664 |
 <!-- /index -->
 
 ## Summary
@@ -628,23 +628,33 @@ gfxclass / bossinv columns of `patch_d2`.
 5. ~~Monster armor-class override tables~~: answered in §5.2 (act II,
    base classes `skeleton1` / `sk_archer1`). A capture of an act II
    skeleton (e.g. Halls of the Dead) confirms the `des` files.
-6. S8 blood map: `0x0044DC60` (an option?) and `0x00477680`; owner
-   `render/shading.md`.
+6. *Answered* in the owner: `render/shading.md` §6 r3 (blood map
+   `0x00477680`) and r7 (`0x0044DC60` = the green-blood switch
+   `[0x007A05FC]`, its OQ 3).
 7. Motion record creators and their initial values (16 sites; the
    follow branch is answered in §8 r4). Open: what the loaded-COF field
    `+0x14` tested by `0x004706E0` means. Ghidra reads; a capture of a
    knockback or item drop.
+   *Answered* (static) for `+0x14`: the gfx mode node (+0x00 mode,
+   +0x08 loaded COF, +0x10 next; `0x0046E740`) points at a loaded-COF
+   record whose `+0x14` is the pointer to the COF file bytes. Records
+   loaded one by one (`0x0046DCC0`, store `0x007A8100`: 0x1C bytes,
+   +0x04 flag 1, +0x08 size, +0x0C name) get it from the file read and
+   are linked only when the read succeeded; records of the per-act
+   bundle `DATA\GLOBAL\cmncof_a1.d2` … (`0x0046F310` → `0x0046DDF0`,
+   store `0x007A78F0`) are 0x18-byte headers inside the bundle and get
+   header + 0x18. So in every linked record `+0x14` ≠ 0 and the test in
+   `0x004706E0` never fails; d2rs drops it. Open: the 16 creator sites.
 8. ~~`[0x007A8928]`~~: set once per game (`0x00470200` →
    `0x004FAC90`): 0 when `d2char.mpq` is found (install directory or
    current directory, `GetFileAttributesA`), else 1 unless `[0x0074C82C]`
    ≠ 0. A full install has it, so the local player uses 16 directions.
-9. Draw mode inputs `0x004DB360`, `0x00464370`, the shadow argument:
-   owner `render/blend-modes.md`.
-10. Cross-spec (`camera.md`, not edited here): §4 answers camera OQ2 for
-    types 0–2 and §8 answers camera OQ3; camera §4's object and missile
-    offset sentence should link here.
-11. Cross-spec (`formats/cof.md`): the game's row offset ignores event
-    padding (§3 r6); `cof.md` keeps the file-format reading.
+9. *Answered* in the owner: `render/blend-modes.md` draw-mode inputs
+   `r` (unit override `0x004DB360`) and `h` (hover `0x00464370`).
+10. *Answered*: `camera.md` §4 now links §8 for the object, missile and
+    motion offsets; camera OQ 3 is marked answered by §8.
+11. *Answered*: `formats/cof.md` Edge cases ("Game read of the draw
+    order") links §3 r6.
 12. `CompressedData` = 0 (every composite part DC6): never the case in the
     reference install; d2rs supports 1 only until a capture needs 0.
 13. Overlay files and their back/front split: the split, order,

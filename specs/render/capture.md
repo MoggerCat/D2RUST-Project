@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 382–393 |
 | Test vectors | 394–404 |
 | Provenance | 405–424 |
-| Open questions | 425–461 |
+| Open questions | 425–471 |
 <!-- /index -->
 
 ## Summary
@@ -434,9 +434,16 @@ re-hashing and diffing the PNG indices. Recorder design follows
 3. Which DT1 file a drawn tile header belongs to: the tile library loader
    (D2CMP `LoadTileLibrarySlot` in 1.10f) and where 1.14d keeps the file
    name per tile. Ghidra read of the tile library load path.
+   *Answered* (`draw-order.md` OQ 12, `drlg/rooms.md` §9.3 "Entry
+   identity"): a record's tile pointer is exactly (file, tile index); a
+   recorder maps it through the room's 32 library slots (room +0x68): the
+   slot whose file's tile array (+0x110, count +0x10C) contains it.
 4. Where unit component cel files load (not through `0x004788B0`): the
    composite path `0x004DB7B0` → `0x004DA720` (`unit-composite.md`); a
    `celfile`-style hook there names the DCC files.
+   *Answered* (`unit-composite.md` §6 r1–r2): the name is composed by
+   `0x005FE2B0` and the path by `0x005FE610` (`%s\%s\%s\%s.dcc`, or
+   `.dc6`); a hook on `0x005FE610`'s result names every component file.
 5. ~~Light-map rules and the light flicker of run 1b.~~ Answered in
    `render/lighting.md`: build and sources §1–§8, quality and draw rate §5,
    what a capture must record §12 r1–r3 (light-map digest at frame end, not
@@ -450,6 +457,9 @@ re-hashing and diffing the PNG indices. Recorder design follows
    use the seed the cursor and shake also step. A town case
    needs either the weather rules (owner to name: a weather spec) or a
    mask; until then town frames do not count for §7.
+   *Answered* (owner named): the weather rules are `draw-order-2.md`
+   §11; what remains is its OQ 1 (a capture with the per-frame player
+   seed and weather pools, on the PC 2 recording list).
 7. Unexplained small changes in run 1 f 13,486–14,636 (black ↔ index 172
    at x 0–125, y 125–275 — lighting, `render/lighting.md` §12 r5 — and
    x 150–200, y 575–600): rerun with `--draws-every` and read the draw log

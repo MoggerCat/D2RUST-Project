@@ -34,7 +34,7 @@ attaches what, so the client list can be built the same way.
 |---|---|---|
 | base writes | stat, value | `client/msg-stats-items.md` §1 (0x19–0x20), `client/msg-units.md` §1 (creation) |
 | item units and their placement | item action messages | `client/msg-stats-items.md` §2 |
-| state messages | 0xA7, 0xA8, 0xA9 | this spec §3 (layouts); ids unowned |
+| state messages | 0xA7, 0xA8, 0xA9 | this spec §3 (layouts); owner `client/msg-units.md` §6 |
 | skill assignments | 0x21, 0x94 | `client/msg-skills.md` |
 
 ## Outputs / state changes
