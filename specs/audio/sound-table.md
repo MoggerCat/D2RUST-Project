@@ -37,20 +37,20 @@
 |   3. File path | 175–191 |
 |   4. Groups and variants | 192–234 |
 |   5. Requests | 235–311 |
-|   6. Sound tick | 312–519 |
-|   7. Starting on a channel | 520–601 |
-|   8. Volume and pan | 602–737 |
-|   9. Settings | 738–757 |
-|   10. Sample cache | 758–805 |
-|   11. Live data (1.14d) | 806–822 |
-|   12. Edge cases kept | 823–838 |
-|   13. d2rs mapping | 839–849 |
-| Constants & data dependencies | 850–857 |
-| Randomness | 858–868 |
-| Edge cases & original bugs | 869–873 |
-| Test vectors | 874–918 |
-| Provenance | 919–963 |
-| Open questions | 964–1044 |
+|   6. Sound tick | 312–559 |
+|   7. Starting on a channel | 560–641 |
+|   8. Volume and pan | 642–777 |
+|   9. Settings | 778–797 |
+|   10. Sample cache | 798–845 |
+|   11. Live data (1.14d) | 846–862 |
+|   12. Edge cases kept | 863–878 |
+|   13. d2rs mapping | 879–889 |
+| Constants & data dependencies | 890–897 |
+| Randomness | 898–908 |
+| Edge cases & original bugs | 909–913 |
+| Test vectors | 914–958 |
+| Provenance | 959–1003 |
+| Open questions | 1004–1084 |
 <!-- /index -->
 
 ## Summary
@@ -448,6 +448,46 @@ when Music Volume is 0. `max` = the falloff maximum (§8 r2).
    else 0 (`0x004B9890`).
 3. Occlusion reaches the output only as the buffer's occlusion value
    (`0x00515A90`); in mixer mode 0 its effect is open question 5.
+4. **Step arithmetic** (`0x004BA333`–`0x004BA398`; `client/audio.md`
+   OQ4). Occlusion `occ` is an f32 (request +0x20); a unit request
+   starts at its unit's value (`0x004B9ABC`). Target `t` = f32(sum of
+   the units' values, added in f32 in list order, divided by the unit
+   count). `occ` < `t` → `occ` := min(f32(`occ` + `s`), `t`); otherwise
+   `occ` := max(f32(`occ` − `s`), `t`); `s` = the double at
+   `0x006DA6B0`, 0.05000000074505806 (= f32 0.05); f32() rounds to
+   nearest even. The sum of `s` and an f32 `occ` of this range is exact
+   in 53 bits, so the x87 precision control changes nothing (checked at
+   24, 53 and 64 bits). With targets 0 and 0.5 only (one unit, thunder)
+   the reachable values are these 23 f32 (bit patterns; one step toward
+   0.5 / toward 0):
+
+   | `occ` | toward 0.5 | toward 0 |
+   |---|---|---|
+   | `00000000` | `3d4ccccd` | — |
+   | `32000000` | `3d4ccccf` | `00000000` |
+   | `3d4cccc3` | `3dccccc8` | `00000000` |
+   | `3d4ccccd` | `3dcccccd` | `00000000` |
+   | `3d4ccccf` | `3dccccce` | `32000000` |
+   | `3dccccc8` | `3e199997` | `3d4cccc3` |
+   | `3dcccccd` | `3e19999a` | `3d4ccccd` |
+   | `3dccccce` | `3e19999a` | `3d4ccccf` |
+   | `3e199997` | `3e4cccca` | `3dccccc8` |
+   | `3e19999a` | `3e4ccccd` | `3dccccce` |
+   | `3e4cccca` | `3e7ffffd` | `3e199997` |
+   | `3e4ccccd` | `3e800000` | `3e19999a` |
+   | `3e7ffffd` | `3e999998` | `3e4cccca` |
+   | `3e800000` | `3e99999a` | `3e4ccccd` |
+   | `3e999998` | `3eb33332` | `3e7ffffd` |
+   | `3e99999a` | `3eb33334` | `3e800000` |
+   | `3eb33332` | `3ecccccc` | `3e999998` |
+   | `3eb33334` | `3eccccce` | `3e99999a` |
+   | `3ecccccc` | `3ee66666` | `3eb33332` |
+   | `3eccccce` | `3ee66668` | `3eb33334` |
+   | `3ee66666` | `3f000000` | `3ecccccc` |
+   | `3ee66668` | `3f000000` | `3eccccce` |
+   | `3f000000` | — | `3ee66666` |
+
+   Mean targets of several units add values.
 
 #### 6.5 Ducking
 

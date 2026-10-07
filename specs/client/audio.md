@@ -19,14 +19,14 @@
 | Inputs | 44–53 |
 | Outputs / state changes | 54–57 |
 | Rules | 58–59 |
-|   A. d2rs design (ours) | 60–202 |
-|   B. Original behavior to reproduce (owned by the specs named) | 203–215 |
-| Constants & data dependencies | 216–220 |
-| Randomness | 221–225 |
-| Edge cases & original bugs | 226–232 |
-| Test vectors | 233–245 |
-| Provenance | 246–256 |
-| Open questions | 257–276 |
+|   A. d2rs design (ours) | 60–186 |
+|   B. Original behavior to reproduce (owned by the specs named) | 187–199 |
+| Constants & data dependencies | 200–204 |
+| Randomness | 205–209 |
+| Edge cases & original bugs | 210–216 |
+| Test vectors | 217–229 |
+| Provenance | 230–240 |
+| Open questions | 241–260 |
 <!-- /index -->
 
 ## Summary
@@ -154,28 +154,12 @@ Trigger { tick: u32, source: TriggerSource, sound: SoundId,
   §6.4, §8.3 rule 3). The product is x87 arithmetic on the f32 `1 −
   occ` and is truncated (`0x00682FD0`), so an integer rewrite in
   hundredths is not equal by construction ((1 − 0.05f) × 200 truncates
-  to 189, not 190). **Occlusion state** (answers open question 4,
-  `0x004BA333`–`0x004BA398`): `occ` is an f32 (request +0x20). Each
-  tracking update computes the target `t` = f32(sum of the units'
-  values, added in f32 in list order) / unit count (f32), then: `occ` <
-  `t` → `occ` := min(f32(`occ` + `s`), `t`); otherwise `occ` :=
-  max(f32(`occ` − `s`), `t`), with `s` the double `0x006DA6B0` =
-  0.05000000074505806 (= f32 0.05) and f32() round to nearest even. A
-  unit request starts at its unit's value (`0x004B9ABC`). The sum of an
-  f32 `occ` in this range and `s` is exact in 53 bits, so the x87
-  precision control does not change any state (checked for 24, 53 and
-  64 bits). With targets 0 and 0.5 only (one unit, or thunder) the
-  reachable states are 23 f32 values: up from 0 the f32 nearest
-  0.05, 0.1, …, 0.45 (`3d4ccccd`, `3dcccccd`, `3e19999a`, `3e4ccccd`,
-  `3e800000`, `3e99999a`, `3eb33334`, `3eccccce`, `3ee66668`), then 0.5;
-  down from 0.5 `3ee66666`, `3ecccccc`, `3eb33332`, `3e999998`,
-  `3e7ffffd`, `3e4cccca`, `3e199997`, `3dccccc8`, `3d4cccc3`, then 0;
-  and after a turn on the way down from `3d4ccccf` the value
-  7.45 × 10⁻⁹ (`32000000`). Mean targets of several units add more
-  states, so `GainCurve` keeps the f32 state and computes the product
-  exactly (`floor((1 − occ) × v1)`; `1 − occ` and the product are exact
-  in f64 for v1 ≤ 255), not a table. 492 of the 23 × 256 (state, v1)
-  cells differ from an integer hundredths rewrite.
+  to 189, not 190). The occlusion state is an f32 whose exact step rule and reachable
+  values are `audio/sound-table.md` §6.4 r4 (answers open question 4):
+  `GainCurve` keeps that f32 state and computes `floor((1 − occ) × v1)`
+  exactly (both factors and the product are exact in f64 for v1 ≤ 255),
+  not a table; 492 of the 23 × 256 (state, v1) cells of the one-unit
+  states differ from an integer hundredths rewrite.
 - The mixer is pure: `mix(voices, block) -> [i16; 1024]`; golden tests
   hash the output of scripted voice sets (determinism, not fidelity).
 - Output: one custom `rodio::Source` registered through Bevy's
