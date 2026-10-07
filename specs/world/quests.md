@@ -22,8 +22,9 @@
   imbue, respec, hire; it calls the hooks of §7 and §8.1);
   `world/vendors.md` (npc.txt quest multipliers read §1 flags);
   `world/waypoints.md`; `world/cube.md` (cube outputs that call §8.4);
-  item, monster, object and save specs (Phase 3, not written: they own
-  item creation, monster spawning, object modes and the save header).
+  `items/generation.md` (item creation), `monsters/init.md` (monster
+  spawning), `world/objects.md` (object modes), `formats/d2s.md` (the
+  save header and quest section).
   Machine tables: `world/quests.tsv` (§2.4), `world/quest-messages.tsv`
   (§7.1). `world/quests-act1-rest.md` (A1Q4 gibbet, Cairn stone init,
   A1Q5 chest trap, act progression, party reads).
@@ -31,26 +32,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 56–74 |
-| Inputs | 75–86 |
-| Outputs / state changes | 87–93 |
-| Rules | 94–95 |
-|   1. Quest flag records | 96–237 |
-|   2. Quest control and quest records | 238–335 |
-|   3. Game entry: picking the quest set | 336–383 |
-|   4. Events and dispatch | 384–468 |
-|   5. Quest updater and timers (tick step 8) | 469–490 |
-|   6. Status reporting | 491–598 |
-|   7. NPC dialog hooks | 599–631 |
-|   8. Act transitions, warps and portals | 632–713 |
-|   9. Quest items, rewards and helpers | 714–893 |
-|   11. Acts II–V | 894–902 |
-| Constants & data dependencies | 903–917 |
-| Randomness | 918–944 |
-| Edge cases & original bugs | 945–963 |
-| Test vectors | 964–995 |
-| Provenance | 996–1024 |
-| Open questions | 1025–1093 |
+| Summary | 57–75 |
+| Inputs | 76–87 |
+| Outputs / state changes | 88–94 |
+| Rules | 95–96 |
+|   1. Quest flag records | 97–238 |
+|   2. Quest control and quest records | 239–345 |
+|   3. Game entry: picking the quest set | 346–393 |
+|   4. Events and dispatch | 394–478 |
+|   5. Quest updater and timers (tick step 8) | 479–500 |
+|   6. Status reporting | 501–608 |
+|   7. NPC dialog hooks | 609–641 |
+|   8. Act transitions, warps and portals | 642–723 |
+|   9. Quest items, rewards and helpers | 724–903 |
+|   11. Acts II–V | 904–912 |
+| Constants & data dependencies | 913–927 |
+| Randomness | 928–955 |
+| Edge cases & original bugs | 956–974 |
+| Test vectors | 975–1006 |
+| Provenance | 1007–1035 |
+| Open questions | 1036–1104 |
 <!-- /index -->
 
 ## Summary
@@ -302,6 +303,15 @@ The record list therefore runs newest → oldest: chain 40, 39, 38, 37 (the
 intros), then rows 36, 35, …, 0. Every "for each quest record" below
 uses this order. Lookup by chain id (`0x00543640`) walks it and returns
 the first match (chain ids are unique), asserting id ≥ 0.
+
+Not-intro test `0x005444B0(game, chain)` (callers outside quest code:
+monster population `0x0054E4CE`, `0x0054E6A2`, `0x0054E6E0`
+(`monsters/population.md`), missile bodies `0x005AD99D`, `0x005B0A71`
+(`missiles/bodies-2.md`, chain 36 before Tyrael's spawn
+`quests-act5-2.md` §8.8)): game null → fatal 0x7C3; quest set not
+picked (control +0x08 = 0) → fatal 0x7C5; walk the list (newest →
+oldest, +0xF4); no record with that chain id → true; else true iff its
+not-intro byte (+0x09) = 1 (`0x005444B0`–`0x00544518`). No draw.
 
 #### 2.4 `quests.tsv`
 
@@ -928,7 +938,8 @@ In order of occurrence; no other quest draws exist in Act I.
 | Andariel kill (`quests-act1.md` §10.8) | quest seed | 3, each followed by an item drop's own draws | gem codes |
 
 Item drops, monster and missile spawns draw from their own seeds (items,
-monster specs). Quest-seed sites outside Act I (for later specs):
+monster specs). Quest-seed sites outside Act I (their draws are in the
+act files' Randomness sections):
 `0x00589580`, `0x0058DF20`, `0x0058E830`, `0x00599C10`, `0x00599CF0`,
 `0x00599DF0`, `0x0059A7E0`, `0x0059B1C0`, `0x0059EDC0`, `0x005B6710`,
 `0x005B8860`, `0x005B8940`, `0x005B8A20`, `0x005BD390`. A2Q7 gossip

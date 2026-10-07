@@ -22,29 +22,30 @@
   calling §3.9 here), §7 (Qual-Kehk's
   hire list gated by 36.0); `world/hirelings.md` (the act 5 hireling rows
   Qual-Kehk sells); `sim/rng.md` §3; `sim/tick.md` §5 (object events);
-  `sim/unit-order.md` §7 (player iteration order); item, object, monster,
-  AI and save specs (not written: item creation, object modes, monster
-  spawning, NPC map AI, the barbarian prisoner and Anya AI that call the
-  hooks of part 2 §10, save progression).
+  `sim/unit-order.md` §7 (player iteration order); `items/generation.md`
+  (item creation), `world/objects.md` (object modes), `monsters/init.md`
+  (spawning), `monsters/ai-bodies.md` §9.32 and `monsters/ai*.md` (NPC
+  map AI, the barbarian prisoner and Anya AI that call the hooks of
+  part 2 §10), `formats/d2s.md` §2.3 (save progression).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–64 |
-| Inputs | 65–75 |
-| Outputs / state changes | 76–84 |
-| Rules | 85–86 |
-|   1. Conventions | 87–169 |
-|   2. Act V records | 170–197 |
-|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 198–284 |
-|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 285–409 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 410–644 |
-| Constants & data dependencies | 645–662 |
-| Randomness | 663–672 |
-| Edge cases & original bugs | 673–707 |
-| Test vectors | 708–722 |
-| Provenance | 723–747 |
-| Open questions | 748–793 |
+| Summary | 51–65 |
+| Inputs | 66–76 |
+| Outputs / state changes | 77–85 |
+| Rules | 86–87 |
+|   1. Conventions | 88–170 |
+|   2. Act V records | 171–198 |
+|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–285 |
+|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 286–410 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 411–645 |
+| Constants & data dependencies | 646–663 |
+| Randomness | 664–673 |
+| Edge cases & original bugs | 674–708 |
+| Test vectors | 709–723 |
+| Provenance | 724–748 |
+| Open questions | 749–799 |
 <!-- /index -->
 
 ## Summary
@@ -778,7 +779,11 @@ other Act V part-1 quest code draws.
    stores `0x0058AD80` / `0x0058AE10`); the AI's use of the returns is
    `monsters/ai-bodies.md` §9.32 (NpcOutOfTown). The prisoner hooks are
    §4.10.
-5. Siege Boss state 118 set at creation (part 2 §10): states spec.
+5. ~~Siege Boss state 118 set at creation (part 2 §10): states spec.~~
+   **Answered** (2026-10-07): row 118 of 1.14d `states.txt` (patch_d2)
+   is `corpse_noselect`, the same state the boss mods give Blood Raven
+   (`monsters/init.md` §14.2–§14.3); turning a state on is
+   `sim/stat-lists.md`'s, and the corpse's selectability the client's.
 6. `quests.tsv` column `spec` still says `catalogued` for rows 31–36;
    switch it to `specified` (with a link to these files) once
    `quests.md` §2.4 documents owner files per act. Row 40's `?` cells
@@ -787,6 +792,7 @@ other Act V part-1 quest code draws.
    CODE-TABLE commit; every address of these rows is named in
    `quests-act5.md` / `-2`); row 40 and the intro rows were done by
    quests-core (part 2 open question 8).
-7. Record a full Act V run (packets + RNG, `docs/HANDOFF.md` §5): Shenk,
+7. ~~Record a full Act V run (packets + RNG, `docs/HANDOFF.md` §5): Shenk,
    the rescue portals, the rune reward, Anya's thaw, the scroll and
-   Anya's item draw.
+   Anya's item draw.~~ Needs recording: R-PQ-13
+   (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act V).

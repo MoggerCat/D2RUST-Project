@@ -14,29 +14,31 @@
   `world/quests.tsv` rows 34–36, 40; `world/quest-messages.tsv` chains
   34–36; `world/npc.md` §8.1 (Anya's personalize service gated by
   38.1, calling §6.11 here); `world/waypoints.md` (the waypoint record
-  read in §6.8); `sim/rng.md` §3; monster, object, AI, missile, stat and
-  save specs (not written: Baal's throne waves, the Ancients' AI,
-  missile 541 / 625, level-up and character progression).
+  read in §6.8); `sim/rng.md` §3; `monsters/init.md`, `monsters/ai.md`
+  and `monsters/ai-bodies*.md` (spawning, Baal's throne waves, the
+  Ancients' AI), `missiles/missiles.md` (missiles 541 / 625),
+  `sim/stats.md` (level-up), `formats/d2s.md` §2.3 (progression),
+  `world/objects.md` (object modes).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–52 |
-| Inputs | 53–62 |
-| Outputs / state changes | 63–71 |
-| Rules | 72–73 |
-|   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 74–176 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 177–346 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 347–473 |
-|   9. Act V intro (chain 40, slot 42) | 474–500 |
-|   10. Hooks called from other systems | 501–522 |
-|   11. NPC services and game completion | 523–536 |
-| Constants & data dependencies | 537–556 |
-| Randomness | 557–568 |
-| Edge cases & original bugs | 569–604 |
-| Test vectors | 605–619 |
-| Provenance | 620–642 |
-| Open questions | 643–698 |
+| Summary | 44–54 |
+| Inputs | 55–64 |
+| Outputs / state changes | 65–73 |
+| Rules | 74–75 |
+|   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–354 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 355–483 |
+|   9. Act V intro (chain 40, slot 42) | 484–510 |
+|   10. Hooks called from other systems | 511–532 |
+|   11. NPC services and game completion | 533–546 |
+| Constants & data dependencies | 547–566 |
+| Randomness | 567–578 |
+| Edge cases & original bugs | 579–614 |
+| Test vectors | 615–629 |
+| Provenance | 630–652 |
+| Open questions | 653–718 |
 <!-- /index -->
 
 ## Summary
@@ -243,7 +245,12 @@ Chat end (`0x0058BE80`): qual-kehk with +0x01 = 1 → status 1 to all, +0x01
   is not in mode 4 and spawned < 3. 474 → superunique 45 (index 1), 475 →
   43 (index 0), 476 → 44 (index 2) (ids from datatables +0xB36..+0xB3A).
   A town portal open in level 120 (+0x0C > 0) → reset (below), stop.
-  Spawn (`0x00545C30(position, 2, superunique)`, monster spec): none →
+  Spawn (`0x00545C30(game, statue, &position, 2, superunique)`: the
+  preset class M + superunique (`0x00659B80(2, ·)`, M = monstats
+  count), the room holding the position (`0x00620BB0` of the statue,
+  then `0x00463740(room, x, y)`; none → no spawn, 0), then
+  `0x0054E600(game, room, class, x, y, mode 1)`, the preset superunique
+  path of `monsters/population.md` §11.2 / §11.4; `0x00545C30`–`0x00545C87`): none →
   event 7 again at frame + 10. Made → statue mode 4 (stored), Ancient
   slot [spawned] := 1 with its GUID, spawned += 1, alive += 1, +0x48 :=
   1.
@@ -252,7 +259,8 @@ Chat end (`0x0058BE80`): qual-kehk with +0x01 = 1 → status 1 to all, +0x01
   open. +0x04 = 0 → +0x04 := 1, timer period 2 `0x0058BD50`. Victim 540
   → +0x3E (statue 475), 541 → +0x3C (476), 542 → +0x3D (474); other
   victims stop. Missile 541 flies from the victim to its statue
-  (`0x0058C8D0`, flags 0x420, level 1; missile spec). FX 18. alive −= 1;
+  (`0x0058C8D0`, flags 0x420, level 1; row 541 `ancient death center`:
+server-do 1, the default flight of `missiles/missiles.md` R4). FX 18. alive −= 1;
   reaching 0: +0x00 := 1 (defeated); then with not-intro: a killing
   player lacking 39.0 and passing G → set 39.0, 39.13, experience reward
   (§7.7). For each player from the victim: `0x0058C7E0` (in level 120,
@@ -412,7 +420,9 @@ class 544 kills are forced. FX 19 (always).
    − min) at the victim (`0x0055B030`; min = 6000·d + 1500, max = 6000·d
    + 3000 capped at 0xFFFF, d = difficulty; `0x004BC500` on the quest
    seed). Then `0x0052E2A0(game)` (Open question 3). state := 5.
-2. Always: missile 625 at the victim (`0x0056EDE0`, missile spec); made
+2. Always: missile 625 at the victim (`0x0056EDE0`; row `baalfx
+   control`: server-do 36, server-hit 57, `missiles/bodies-2.md`, which
+   call Tyrael's spawn `0x0058E920` below); made
    → its room's portal flag cleared.
 
 #### 8.6 Level changes (event 3, `0x0058E190`)
@@ -518,7 +528,7 @@ yet in `quest-messages.tsv` (Open question 8):
 | socket / personalize (`world/npc.md` §8.1) | `0x005877C0`, `0x0058BC00` | part 1 §3.9, §6.11 |
 | object event 7 (`quests.md` §9.5) | part 1 §1.4 | classes 189, 459–461, 474–476 |
 | warp checks (`quests.md` §8.2) | `0x0058D090`, `0x0058E640` | §7.8, §8.8 |
-| monster code `0x005AD952`, `0x005AD9AB`, `0x005B0A7F` | `0x0058E920` | §8.8 |
+| baalfx control missile (625) server-hit 57 `0x005AD970` (sites `0x005AD952`, `0x005AD9AB`) and server-do 36 `0x005B0A40` (site `0x005B0A7F`), each after the not-intro test `0x005444B0(game, 36)` (`quests.md` §2.3) | `0x0058E920` | §8.8; `missiles/bodies-2.md` |
 
 ### 11. NPC services and game completion
 
@@ -665,12 +675,22 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    lays it out as `bit(22)` of the flags dword at offset 12, i.e. byte
    +0x0E mask 0x40; `0x0058E8B8` reads that byte and ANDs it with the
    mask table entry `0x006CE280` (= 0x40, read from the image).
-5. The Baal throne AI condition that calls `0x0058E600` and the callers
-   of `0x0058E920`: AI / monster specs.
-6. `0x00545C30(position, 2, superunique)` (Ancient spawn) and missile
-   541 / 625 parameters: monster and missile specs.
-7. Record an Act V run: Nihlathak's kill and portal, the Ancients (with
-   a town portal reset), Baal's gold draws and the zoo id 0x50.
+5. ~~The Baal throne AI condition that calls `0x0058E600` and the callers
+   of `0x0058E920`: AI / monster specs.~~ **Answered** (2026-10-07): the
+   condition is `monsters/ai-bodies-5.md` §19 rule 2 (BaalToStairs, AI
+   138: within aip1 of the Worldstone Chamber portal object 563); the
+   callers of `0x0058E920` are the baalfx control missile's bodies (§10
+   hook table; `0x005AD970`, `0x005B0A40`).
+6. ~~`0x00545C30(position, 2, superunique)` (Ancient spawn) and missile
+   541 / 625 parameters: monster and missile specs.~~ **Answered**
+   (2026-10-07): §7.6 statue event 7 (`0x00545C30`–`0x00545C87`: preset
+   superunique spawn through `monsters/population.md` §11.4); missile
+   541 = `ancient death center` (server-do 1), 625 = `baalfx control`
+   (server-do 36, server-hit 57); their behaviour is the missile specs'
+   (§7.6, §8.5).
+7. ~~Record an Act V run: Nihlathak's kill and portal, the Ancients (with
+   a town portal reset), Baal's gold draws and the zoo id 0x50.~~ Needs
+   recording: R-PQ-13 (= HANDOFF §5 S9-A3 Act V).
 8. `quests.tsv` row 40 still has `?` cells; its values are §9's (filter
    42, callbacks `0:0x00586B50 11:0x0058E990`, status fn `0x00586C40`,
    active fn `0x00586C50`, msgs `0x00732FF8`). The 15 table rows of §9
