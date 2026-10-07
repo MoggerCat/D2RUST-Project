@@ -40,19 +40,19 @@
 |   7. Shared panel parts | 314–331 |
 |   8. Character panel (ui 2, left; `0x004A7D00`) | 332–434 |
 |   9. Inventory panel family (`0x0048EDF0`) | 435–495 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 496–558 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 559–594 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 595–645 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 646–698 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 699–704 |
-|   15. Event → intent summary | 705–732 |
-|   16. Machine tables | 733–767 |
-| Constants & data dependencies | 768–788 |
-| Randomness | 789–793 |
-| Edge cases & original bugs | 794–814 |
-| Test vectors | 815–853 |
-| Provenance | 854–894 |
-| Open questions | 895–970 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 496–559 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 560–595 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 596–646 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 647–699 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 700–705 |
+|   15. Event → intent summary | 706–733 |
+|   16. Machine tables | 734–768 |
+| Constants & data dependencies | 769–789 |
+| Randomness | 790–794 |
+| Edge cases & original bugs | 795–815 |
+| Test vectors | 816–854 |
+| Provenance | 855–895 |
+| Open questions | 896–972 |
 <!-- /index -->
 
 ## Summary
@@ -522,7 +522,8 @@ after both.
    0 and a point would not be accepted) or 0 (learnable / learned,
    `0x004AC4D0`), 3 if the mouse is strictly inside the icon, 1 if the
    skill's flag byte (+5) has no bit of `[0x006CE270]`, 3 if the player
-   has no free points and the skill has a level and is not pressed.
+   has no free points and the skill has a level and is not pressed
+   (exact order and last clause: `panels-3.md` §25 r4).
 4. Level number (if level > 0 or the hard points ≠ 0): `%d`, Font16
    (Font formal10 for ≥ 10, then x − 4) at (`X + 48`, `Y + 12`), color 3
    when the bonus part (`0x00644300`) > 0, 1 when < 0, else 0.
@@ -945,7 +946,8 @@ repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
    add sockets, personalize, go east / sail east), the hire sender
    (`0x004B5C60`). Ghidra read; check against a capture of Akara's and
    Charsi's menus.
-9. Trade panel (ui 0x17, inventory mode 0x0B: `%s\ui\panel\trade`
+9. *Partly answered* (`panels-3.md` §27: scroll, recipe, guild,
+   anvil; trade stays open). Trade panel (ui 0x17, inventory mode 0x0B: `%s\ui\panel\trade`
    `[0x007BCB04]`, both players' names and gold at `0x1B − sy` /
    `0xF2 − sy`), anvil (ui 0x0E), Inifuss scroll, recipe scroll, guild
    panels (0x1B, 0x1C): not specified here.
