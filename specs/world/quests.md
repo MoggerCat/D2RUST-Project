@@ -285,7 +285,7 @@ generated from the 1.14d tables above and the init functions:
 | status_fn, active_fn, seq_fn | +0xE8, +0xEC, +0xF0 (0 = null) |
 | msgs | NPC message table (+0xDC) |
 | name | quest name (D2MOO naming) |
-| spec | `specified` (`quests-act1.md` §10) or `catalogued` (row only) |
+| spec | `specified` (the state machine is written in the act's owner file: Act I `quests-act1.md` §10 and `quests-act1-rest.md`; Act II `quests-act2.md`; Act III `quests-act3.md` and `quests-act3-2.md`; Act IV `quests-act4.md`; Act V `quests-act5.md` and `quests-act5-2.md`) or `catalogued` (row only) |
 
 Values are what the init function stores (`-` = not stored, so 0 from
 the zeroed record). Row 40 (Act V intro, init `0x0058EA50`) is not
