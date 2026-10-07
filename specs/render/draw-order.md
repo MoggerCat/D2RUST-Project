@@ -24,20 +24,20 @@
 | Rules | 73–74 |
 |   1. Frame passes | 75–100 |
 |   2. The draw-cell grid (`0x004DCE60`, `0x004DDB70`) | 101–130 |
-|   3. Filling the grid (`0x004DD7C0` per room) | 131–172 |
-|   4. List insertion | 173–183 |
-|   5. Which units draw | 184–206 |
-|   6. The passes | 207–285 |
-|   7. Tile records that never draw | 286–299 |
-|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 300–356 |
-|   9. Map-tile feed | 357–377 |
-|   10. d2rs mapping | 378–427 |
-| Constants & data dependencies | 428–436 |
-| Randomness | 437–442 |
-| Edge cases & original bugs | 443–460 |
-| Test vectors | 461–489 |
-| Provenance | 490–526 |
-| Open questions | 527–603 |
+|   3. Filling the grid (`0x004DD7C0` per room) | 131–175 |
+|   4. List insertion | 176–186 |
+|   5. Which units draw | 187–209 |
+|   6. The passes | 210–288 |
+|   7. Tile records that never draw | 289–302 |
+|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 303–359 |
+|   9. Map-tile feed | 360–380 |
+|   10. d2rs mapping | 381–430 |
+| Constants & data dependencies | 431–439 |
+| Randomness | 440–445 |
+| Edge cases & original bugs | 446–463 |
+| Test vectors | 464–492 |
+| Provenance | 493–529 |
+| Open questions | 530–606 |
 <!-- /index -->
 
 ## Summary
@@ -163,7 +163,10 @@ View rectangle in client pixels: `left = cx_t`, `top = cy_t`,
    filed. Then (`0x00464860` true or unit flag 0x100000) → shadow list,
    append, kind 0 (a **flat** unit); else unit list, append, kind 0, and,
    when flag-ex 0x80 is set, a kind-2 entry (the unit's shadow) appended
-   to the shadow list. Units have no rectangle test here.
+   to the shadow list. Units have no rectangle test here. The room's
+   list is first sorted by y in place (`0x00619EA0`, `sim/unit-order.md`
+   §5 rule 7); which client code links units into room lists:
+   `sim/unit-order.md` §5 rule 6.
 
 Flat units (`0x00464860`): players in mode 17 (dead); monsters in mode 12
 (dead) without monstats2 `unflatDead` (bit 20); objects with `DrawUnder`
