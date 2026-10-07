@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 279–291 |
 | Test vectors | 292–340 |
 | Provenance | 341–373 |
-| Open questions | 374–398 |
+| Open questions | 374–409 |
 <!-- /index -->
 
 ## Summary
@@ -382,6 +382,17 @@ and applies each `op` in order; `value` and `state` must match.
    Static part answered in `drlg/levels.md` OQ 5: the join routine
    `0x00532690` copies the join record's +0x7E into game +0x7C (game
    type 3, no `-seed`, same difficulty); the recording question stays.
+   *Answered* (static, 1.14d asm): single player's client game type
+   `0x007A0610` is 0, so the create message (`0x00477CA0`) carries game
+   type 3 (`0x00477CDF`), which `0x0053F17A` passes to `0x00530BF0` and
+   `0x00530CFF` stores at game +0x6A. Game +0x84 is 0 unless `-seed`
+   ran (§5 table, game seed row). The header read `0x0056A090` then sets
+   game +0x7C := `.d2s` +0xAB when game +0x6A = 3, game +0x84 = 0 and the
+   town byte `.d2s` +0xA8 + difficulty (game +0x6D) has bit 0x80
+   (`0x0056A1D4`–`0x0056A217`). So every single-player load in the
+   difficulty the save was written in restores the saved map seed; in
+   another difficulty that byte lacks 0x80 and the game keeps its own
+   new seed (owner of the load rule: `formats/d2s-load.md` §7, PC 2).
 3. *Answered* (static, disassembly of `0x0054FCB0`): the D2MOO form is
    there, inline: the last step of the object-control seed (`0x0054FD32`)
    gives `lo'`, reduced `lo' mod 65534` by a multiply-shift (magic

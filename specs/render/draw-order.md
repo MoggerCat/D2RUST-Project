@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 446–463 |
 | Test vectors | 464–492 |
 | Provenance | 493–529 |
-| Open questions | 530–614 |
+| Open questions | 530–616 |
 <!-- /index -->
 
 ## Summary
@@ -544,6 +544,8 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
    fixed blend (`render/blend-modes.md` §5, branch
    `claude/spec-shading-blend`). Open: block placement (X, Y) of
    orientation-13 tiles (`camera.md` OQ4).
+   *Answered* (static): `camera.md` §6 shadow-tile row (wall position,
+   wall block placement; `camera.md` OQ4).
 5. Who reads cell flag 4 (§3 r2). Search the export for reads of the cell
    word.
 6. ~~Fade group mode~~: answered in §8: the group mode is the only live
