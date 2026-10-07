@@ -265,8 +265,10 @@ fn expected(a: &Answers, msg: &[u8], size: usize) -> Option<ResultCode> {
                 _ => {}
             }
         }
+        // §2.4 rule 6: strlen 0 is done with no effect; strlen ≥ 256 → 2.
         0x14 => match msg[3..].iter().position(|&c| c == 0) {
-            Some(n) if (1..256).contains(&n) => {}
+            Some(0) => return Some(Done),
+            Some(n) if n < 256 => {}
             _ => return Some(Invalid),
         },
         _ => {}
