@@ -697,9 +697,11 @@ pub trait QuestWorld {
         let _ = item;
         self.unhandled(0xFF, 0x0062_80D0);
     }
-    /// `0x00585B90(op, kind)`: the chest's own treasure (object spec).
-    fn object_treasure(&mut self, object: UnitId, kind: u8) {
-        let _ = (object, kind);
+    /// `0x00585B90(op, kind)`: the chest's own treasure (`items/treasure.md`
+    /// §4) with the operate record: the object and its operator (the
+    /// recipient `R`).
+    fn object_treasure(&mut self, object: UnitId, operator: UnitId, kind: u8) {
+        let _ = (object, operator, kind);
         self.unhandled(0xFF, 0x0058_5B90);
     }
     /// `0x00585970(game, object, 'gld ', 2)`: one normal gold pile.

@@ -700,7 +700,7 @@ impl QuestWorld for Fake {
     fn identify_item(&mut self, item: UnitId) {
         self.log.push(format!("identify {}", item.0));
     }
-    fn object_treasure(&mut self, o: UnitId, kind: u8) {
+    fn object_treasure(&mut self, o: UnitId, _: UnitId, kind: u8) {
         self.log.push(format!("treasure {} {kind}", o.0));
     }
     fn drop_gold(&mut self, o: UnitId) {

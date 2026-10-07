@@ -15,22 +15,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 36–48 |
-| Inputs | 49–66 |
-| Outputs / state changes | 67–74 |
-| Rules | 75–76 |
-|   1. Attack rating | 77–88 |
-|   2. Defense | 89–113 |
-|   3. Chance to hit | 114–193 |
-|   4. Melee result flags | 194–218 |
-|   5. Block chance | 219–241 |
-|   6. Block, weapon block, dodge, avoid, evade | 242–288 |
-| Constants & data dependencies | 289–305 |
-| Randomness | 306–317 |
-| Edge cases & original bugs | 318–335 |
-| Test vectors | 336–357 |
-| Provenance | 358–376 |
-| Open questions | 377–392 |
+| Summary | 37–49 |
+| Inputs | 50–67 |
+| Outputs / state changes | 68–75 |
+| Rules | 76–77 |
+|   1. Attack rating | 78–89 |
+|   2. Defense | 90–114 |
+|   3. Chance to hit | 115–194 |
+|   4. Melee result flags | 195–219 |
+|   5. Block chance | 220–242 |
+|   6. Block, weapon block, dodge, avoid, evade | 243–300 |
+|   7. Hostility and melee range | 301–363 |
+| Constants & data dependencies | 364–380 |
+| Randomness | 381–392 |
+| Edge cases & original bugs | 393–413 |
+| Test vectors | 414–438 |
+| Provenance | 439–464 |
+| Open questions | 465–486 |
 <!-- /index -->
 
 ## Summary
@@ -199,12 +200,12 @@ attacker; stack defender, bonus, range offset. Returns the u16 flags.
 
 1. Return 0 unless both units exist, each is a player or a monster, and
    the hostility test `0x00554200(game, attacker, defender)` passes
-   (`sim/units.md`). A monster defender also passes `0x005A4EE0` (true
+   (§7.1). A monster defender also passes `0x005A4EE0` (true
    for every monster; kept for fidelity).
 2. Defender is a player in mode 3 (run): flags = hit (no hit test).
 3. `range = 1 + 2 × (attacker is a monster)`; if `range_offset ≠ 0`:
-   `range −= range_offset + melee_range(attacker)` (`0x00622870`).
-   If `0x00622C40(attacker, defender, range)` (in melee range) fails:
+   `range −= range_offset + melee_range(attacker)` (`0x00622870`, §7.3).
+   If `0x00622C40(attacker, defender, range)` (in melee range, §7.2) fails:
    return 0 (no draw).
 4. If not yet hit: `hit_test(attacker, defender, bonus, missile = 0)`;
    hit → flags |= `0x0001`.
@@ -281,10 +282,84 @@ loses its hit flag and sets nothing else. The missile path maps it to
 
 #### 6.4 `weapon_block(unit)` = `0x0057DCA0`
 
-Copy the unit's `passive_weaponblock(348)` stats (`0x006261D0`, at most
-32). Result = the largest value among entries whose layer (an item type)
-is ≤ 0, or matches the type of the right-hand (bodyloc 4) or left-hand
-(bodyloc 5) item (`0x00629BB0`). No unit: 0. No draws.
+No unit: 0. Otherwise take the right-hand (bodyloc 4) and left-hand
+(bodyloc 5) items from the unit's inventory (+0x60, `0x0063BDE0`; no
+inventory: both none) and copy the unit's `passive_weaponblock(348)`
+entries (`0x006261D0`, at most 32, each an 8-byte {u16 layer, u16 stat,
+i32 value}). `w` starts at 0; walk the entries in copy order:
+
+1. Layer (u16, an item type) = 0: `w := value` (unconditional, even
+   when smaller than `w`).
+2. Layer ≠ 0: if the left item is of that type (`0x00629BB0`), or else
+   the right item is: `w := value` when `value > w` (signed).
+3. Neither: unchanged.
+
+Result `w`; no matching entry gives 0 (1.14d-confirmed, `0x0057DCA0`–
+`0x0057DD50`). A layer-0 entry after a larger typed entry lowers `w`
+(Edge cases 8). No draws.
+
+### 7. Hostility and melee range
+
+#### 7.1 Hostility `0x00554200` (ECX game, EDX attacker A; stack defender D)
+
+Returns 1 when A may attack D. No draws.
+
+1. A' := A. A is a monster with an owner (`0x0058F0D0`) → A' := the
+   owner. A is a missile with the source-unit link (flag-ex +0xC8 bit
+   0x400; `skills/bodies.md` §6.20) and the unit of type +0x94 / GUID
+   +0x98 exists (`0x00552F60`) → A' := that unit.
+2. D' := D; while D' is a monster whose owner exists and is not D'
+   itself: D' := the owner.
+3. A' = D' (also both none) → 0.
+4. A' and D' both players: the relation entry of D' in A's player
+   data (`0x006221A0`, list at +0x38: entries GUID +0x00, flags +0x04,
+   next +0x10; first entry with GUID = D's GUID) → its flags & 8 (the
+   hostile bit) ≠ 0; no entry → 0. Nothing writes this list in single
+   player (relations are multiplayer, Phase 7), so players never attack
+   players there.
+5. Otherwise: 1 unless A' and D' are on the same side (`0x00650D70`):
+   both evil (alignment 0) or both good (2). A neutral unit (1) is
+   hostile to everyone.
+
+Alignment `0x006259B0(unit)`: none, or no stat holder (+0x5C) → 0;
+players and monsters → stat 172 `alignment` in the unit's state-105
+(`alignment`) list (`0x006256B0`, `0x00625420`), 0 without the list;
+other unit types → 2. Players carry state 105 with 172 = 2
+(`client/msg-units.md` test vector); monsters by monstats `Align`
+(`monsters/population.md` §9.6 rule 4).
+
+#### 7.2 In melee range `0x00622C40(a, b, extra)`
+
+1. a or b none → 0.
+2. b is a monster whose `BaseId` (`0x00463860`) is 258 (`tentacle1`) or
+   261 (`tentaclehead1`): d := unit distance(a, b) (`0x00641530`,
+   `sim/pathing.md` §9.5); `melee_range(a)` + 8 > d → 1; else go on.
+3. r := `melee_range(a)` + extra + 1; d := unit distance(a, b). d ≤ 0
+   → 1. r < d → 0. Else 1 when the collision line a → b with mask
+   0x804 is clear (`0x00622AA0(a, b, 0x804)` = 0, `monsters/ai.md`
+   function table), else 0.
+
+#### 7.3 Melee range `0x00622870(unit)`
+
+1. Unit none → fatal (assert line 0x11BE).
+2. Player: the weapon pick `0x0063C9B0` (`skills/bodies-3.md` §3.3
+   step 2: body location 4, else 5, usable, type `weap`) → that item's
+   `rangeadder` (weapons +0x104, u8; `0x006288D0`); none → 0.
+3. Monster: monstats2 row of its class (`0x00451FE0`; none → 0).
+   `MeleeRng` (u8 +0x0E) ≠ 255 → `MeleeRng`. 255 → 2 when the unit's
+   weapon class in its current mode (`0x0064F380(unit, inventory, &c,
+   mode −1, 1)`) is 6 (`2ht`), else 0.
+4. Other unit types → 0.
+
+#### 7.4 Callers of `hit_test` and `block_or_dodge`
+
+| Caller | Call |
+|---|---|
+| `0x0057EC10` melee result (§4) | `hit_test(…, bonus, missile 0)`; `block_or_dodge(avoid 0, block 1)` |
+| `0x005ADF10` missile hit handler (`0x005AE06F`) | `hit_test(owner, unit, missile stat 19 `tohit`, missile 1)` (`missiles/missiles.md` §R5 step 5) |
+| `0x005A88E0` (no direct caller; ECX missile) | `hit_test(attacker, defender, missile total stat 19 (0 without a missile), missile 1)`; returns 1 on hit |
+| `0x005AD730` missile result flags (`0x005AD806`) | `block_or_dodge(avoid 1, block = record physical +0x08 ≠ 0)` |
+| `0x0056B9C0` area damage (`0x0056BA0D`) | `block_or_dodge(avoid 1, block 0)` (`missiles/missiles.md`, `area_damage`) |
 
 ## Constants & data dependencies
 
@@ -332,6 +407,9 @@ Melee (`melee_result`), in order; a draw that is not reached is skipped:
 6. The montype loop reads at most 128 `attack_vs_montype` entries; the
    weapon-block loop at most 32.
 7. Evade in melee clears the hit with no result flag (§6.3).
+8. Weapon block (§6.4): a layer-0 `passive_weaponblock` entry replaces
+   the running value instead of taking the maximum, so the result
+   depends on entry order. Reproduce.
 
 ## Test vectors
 
@@ -350,6 +428,9 @@ Synthetic (CI-safe), from the formulas above:
 | defense: armorclass 100, dex 50, armor% 50 | base 112, bonus 56, 168 |
 | defense: armorclass −32, dex 50, armor% 50 | base −20, bonus 10, −10 |
 | defense 168, armor_override_percent 10 | 168 + 16 = 184 |
+| weapon block: entries (layer 0, 20), (layer 27, 35); right item type 27 | 35 |
+| weapon block: entries (layer 27, 35), (layer 0, 20); right item type 27 | 20 (Edge cases 8) |
+| weapon block: entry (layer 27, 35); no item of type 27 | 0 |
 | draw: seed (1, 0) attacker, chance 83 | step gives lo′ = 0x6AC690C5 = 1791398085; mod 100 = 85 → miss |
 
 Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
@@ -372,6 +453,13 @@ Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
   (`0x0057D8A0`); the monster block rule is restructured into
   `0x006225F0` with the same outcome; D2MOO's "can never succeed"
   monster check in `GetResultFlags` is `0x005A4EE0` (always true).
+- §7 read from `0x00554200`, `0x006221A0`, `0x0055B300`, `0x00650D70`,
+  `0x006259B0`, `0x00622C40`, `0x00622870`, `0x006288D0`, `0x0064F380`,
+  `0x00463860`; callers by `disasm.py xref 0x57D9B0 0x57DFB0`
+  (`0x0057ECCD`, `0x005A88FB`, `0x005AE06F`; `0x0056BA0D`, `0x0057ECE8`,
+  `0x005AD806`); 1.14d `monstats.txt` rows 258 / 261, `WeaponClass.txt`
+  order (`2ht` = 6 counting `hth` as 0), `states.txt` row 105 and
+  `itemstatcost.txt` row 172 (`alignment`).
 - charstats values: `game/extracted/patch_d2/.../charstats.txt` (1.14d).
 
 ## Open questions
@@ -382,10 +470,16 @@ Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
    with §3–§6 recomputed from logged stats.
 2. Block: hook `0x0057E04B` (EDI = r, EBX = chance, ESI = defender) to
    confirm the /3 rule and the zero-chance draw (Edge case 1).
-3. `0x00554200` (hostility) and `0x00622C40` / `0x00622870` (melee
-   range) belong to `sim/units.md`; until written, d2rs has no rule for
-   them.
-4. The missile path (`0x0056B9C0`, `0x005AD730`, `0x005ADF10`,
-   `0x005A88E0`) calls `hit_test` with `missile = 1` and
-   `block_or_dodge` with `avoid = 1`: which bonus it passes is the
-   monsters branch's to specify.
+3. Answered: hostility `0x00554200` is §7.1, melee range `0x00622C40`
+   / `0x00622870` are §7.2 / §7.3 (owned here). The collision-line test
+   `0x00622AA0(a, b, mask)` used by §7.2 is specified in
+   `render/draw-order-2.md` §15 rule 2 (unit line: sizes, end pull-in)
+   and §16 (the line walk `0x0064E260`); checked against `0x00622AA0`
+   / `0x00622920` (a or b missing is a fatal assert, lines 0x1290 /
+   0x1291).
+4. Answered: §7.4 lists every caller of `hit_test` and
+   `block_or_dodge` with the bonus and flags each passes.
+5. Answered (impl-combat item 7): weapon block with no matching entry
+   is 0, confirmed at `0x0057DCF8` (`w` starts at 0). The "largest value"
+   reading was corrected: layer-0 entries assign unconditionally (§6.4,
+   Edge cases 8).

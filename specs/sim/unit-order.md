@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 299–309 |
 | Test vectors | 310–343 |
 | Provenance | 344–361 |
-| Open questions | 362–380 |
+| Open questions | 362–405 |
 <!-- /index -->
 
 ## Summary
@@ -364,6 +364,10 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
 1. Client list (§7) with more than one client: needs a hosted game.
 2. Adjacent-room array order (§9): owned by the DRLG spec; record it in
    the same trace (room +0x00 / +0x24) to fix it (the snapshots already hold the arrays).
+   *Answered* in the owner: `drlg/rooms.md` §6 (fill `0x0066BD00` =
+   rooms-near order restricted to active rooms, refilled at each
+   neighbouring activation; removal `0x0061A910` swaps the last entry
+   into the hole). Its trace confirmation is `drlg/rooms.md` OQ 3.
 3. Inactive-unit storage (compress `0x005433F0`, restore `0x00542B40`):
    order in which restored units re-enter the room list and whether they
    keep their GUIDs (observed: GUIDs are reused after removal, §1.4).
@@ -372,6 +376,27 @@ replay runs on the committed traces `traces/sim/tick/sim-0006`–`0008`
    there (OQ8).
 4. Which systems iterate hash lists rather than rooms (inventory of
    `0x005537D0` / `0x005538D0` callers by system), for the unit specs.
+   *Answered* (static, 1.14d `disasm.py xref`, call sites mapped to
+   `functions.tsv` and to the specs citing each function):
+   - `0x005537D0` (search with early stop): 180 call sites, all in quest
+     code (`0x00544300`–`0x005BD390`: 83 functions plus 29 sites in
+     code Ghidra left without a function, all inside the quest ranges;
+     owners `world/quests*.md`, a few shared with `items/treasure.md`,
+     `monsters/ai-bodies-*.md`, `world/npc.md`). Type argument: 0
+     (players) at every site read except `0x00589790` (type 1,
+     monsters, in `0x00589580`, act 5) and `0x00596D33` (register).
+   - `0x005538D0` (players, no stop): 34 sites in 28 functions:
+     game / client code `0x00535730`–`0x0053DF80` (13 sites: client
+     add / remove notices, `world/objects.md`, `world/vendors.md`,
+     `sim/tick.md`), inventory and cube (`0x00557FD0`, `0x00558B90`, 2
+     unattached sites; `items/inventory.md`), intents (`0x0055B620`,
+     `0x0055B790`), `0x005678F0`, vitals (`0x00570880`), pets and
+     hirelings (`0x00574450`–`0x00575E90`, 8 functions;
+     `sim/pets.md`, `world/hirelings.md`), and quest / AI helpers
+     `0x0059DF50`, `0x005A5A30`, `0x005A5FF0`, `0x005B43F0`.
+   Tick step 11 reaches `0x005538D0` through `0x00558B90`
+   (`sim/tick.md` §3). Inline walks of the buckets (+0x1120 + 4·i without a helper) are not in
+   this inventory.
 5. *Answered:* client room unit lists (`impl-client-drlg` §3 Q6): §5
    rules 6–8 (same list code on the client DRLG's rooms, the client
    call sites, the draw's stable Y sort). Open inside it: a client

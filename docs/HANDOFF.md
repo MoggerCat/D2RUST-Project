@@ -1731,6 +1731,16 @@ all from main `0472619`; spec edits pass `spec_index --check` and
 - `claude/live-c20-treasure-dump` `6209859`: C20 pass after fixing TC 0
   picks 1 → 0 (code + `treasure.md` §1.1–§1.2); 1,012 other TCs, 4,167
   entries, 45 chest slots identical (C20 done).
+- `claude/fuzz-parsers` `a704a89`: wave E. Property tests at
+  `PROPTEST_CASES=200000` (release): d2-formats lib 173 pass, `prop_more_formats`
+  8 pass, no failure. New `fuzz/` cargo-fuzz crate (own workspace; nightly,
+  libFuzzer + ASan on MSVC; `fuzz/README.md`: the ASan DLL dir must be on
+  PATH; a panic hook writes the input because Windows panics abort without
+  a crash file), feature `fuzz` on d2-formats, 18 targets (every
+  d2-formats parser and decompressor, `.txt`, `.bin`, patch layer) 1 h each,
+  ~1.59 G execs. One crash, fixed: DT1 RLE zero-length run past the block
+  (`dt1::tests::regress_rle_empty_run_past_block`, `dt1.md` edge case).
+  Thin coverage: `mpq_archive` 2.5 M, `patch_layer` 2.2 M, `txt` 5.5 M.
 - C2: no new code needed; `game_core::itemstatcost_ops_as_stated` and
   `itemstatcost_columns_as_stated` pass on live data (perturbation of
   record 214 byte 0x53 caught). C2's `StatData` part is covered.
@@ -3443,6 +3453,7 @@ Carried-over open questions not yet in a spec's list:
 1. 8 unflagged invisible collision tiles in `townN1.ds1` draw as blue
    patches (`map-preview.md` OQ3; needs RE of the client tile draw path).
 2. DS1 v12/13 trailing bytes (possibly an early NPC-path section).
+   Answered: never read by 1.14d (`formats/ds1.md` OQ4).
 3. DC6/DCC vertical placement (one-row disagreement between sources). Owner: `render/sprite-placement.md` (`specs/client/render-pipeline.md` §B1).
 4. Meaning of the PL2 rendering tables (Phase 6). Owner: `render/shading.md` (`render-pipeline.md` §B3).
 5. `client-messages.tsv` repeats the field name `unk` in one layout
@@ -5292,7 +5303,10 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
   player; log the S→C messages of that frame with callers.
 - `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
-- `render/lighting.md` OQ11: a day-period change with objects in sight.
+- `render/lighting.md` OQ11 (answered statically 2026-10-07: only
+  `EnvEffect` objects change; fire 39 goes to mode 0 without light in
+  the day, mode 1 with light radius 9 otherwise): a day-period change
+  with a fire 39 in sight confirms the mode and light.
 - `client/msg-skills.md` OQ1: equipping a charged item.
 - `client/stat-lists.md` OQ6: a buff (0xA8 bytes).
 - `client/model.md` OQ10: a game with a hireling (0x7A / 0x81).
@@ -5326,6 +5340,222 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
   imps on a barricade tower (state 143, type-5 event, release below 10 %
   life, `0x005D1AB0`).
+- `sim/intents-events.md` §3.5 (static senders, no record yet): open a
+  shop and the hire list (0x58 codes, 0x4E), talk to an NPC with a quest
+  line (0x27 count > 1, 0x50, 0x91, 0x89), a monster casting at the
+  player from outside the player's rooms (0x4D) and a pet summon with a
+  pending skill (0x99 / 0x9A); log caller and bytes (check 0x58 byte 6
+  is stack garbage except code 5; 0x26 bytes 8-9 with form 5).
+- `sim/pets.md` OQ3 (count part): summon a 4th skeleton over max 3; expect
+  three 0x7A action 0 for the removed one (§6 table).
+- `monsters/ai-bodies-6.md` OQ1 (spec area 1, AI): a necromancer game
+  with golem, skeletons and a skeleton mage, a hireling following and
+  fighting, an Act II town walk, a MinionSpawner, an EvilHole and a
+  desert turret; log per think: type-2 schedule frame, unit-seed steps,
+  mode requests (mode, target, point), AI params 0–2.
+- `monsters/ai-bodies-7.md` OQ1 (AI): arrow / poison / nova traps, the
+  Act II palace guard before and after the door opens, the Dark
+  Wanderer, druid summons (wolves, bear, ravens, vines) and assassin
+  shadows; same log.
+- `monsters/ai-bodies-7.md` OQ2 (AI): Uber Tristram: for Uber Mephisto,
+  Diablo and Baal log the AI control's function (+0x04) and special
+  state (+0x00) after creation and at each think, and every type-2
+  schedule (their table thinks are empty in 1.14d).
+- `monsters/umod-init-bodies.md` OQ1: 0xAC assign + stat messages of a
+  lightning, cold or mana-burn unique with minions (expect the §2
+  values; minions on Normal get no damage stats, cold minions still get
+  coldlength).
+- `monsters/init.md` OQ1 / OQ4 / OQ10: client message 0x67 game type in
+  classic SP and TCP/IP; one population pass with rng hook + callers; a
+  unique's client name draws.
+- `sim/stat-lists.md` OQ1: read the x87 control word (precision bits) at
+  the §7.2 max-rescale call during a max-life change (a D3D device may
+  set 24-bit).
+- `sim/units.md` OQ6 (78 rows left `proof = file`): a `site` recording
+  over combat with skills, a trade and an item use, to confirm the
+  scheduled unit kinds of the state-timer, damage and trade sites.
+- `skills/use.md` OQ3–7: hook `0x0056FAF0` (entry/return) and
+  `0x0056F7F0` (entry), cast a non-`TargetAlly` skill on a party member
+  (does the do run after start returned 0); hook `0x0056BFE0` for
+  Teleport at level ≥ 25 with < 1 mana (cast free?); two C→S 0x06 two
+  frames apart (does the second restart A1); hook `0x005A7670` (arg1,
+  arg2, unit +0x4E) on monsters; log arg1 of `0x005539B0` per type-0
+  timer during Strafe / Zeal.
+- `skills/levels.md` OQ1: hook `0x00646460`, `0x00644D50` /
+  `0x00644E40` (entry/return) with known skill levels, and
+  `0x0056BFE0` (mana before/after) for a few skills.
+- `skills/bodies.md` OQ1–3, OQ9: Paladin Might in a party (hook
+  `0x005CF010`, `0x0056E970`: duration, expiry, count, state 85 per
+  tick); Kick, Bash, Attack on a monster (`0x0057DBF0` record before /
+  after); Amplify Damage on an immune monster and Dim Vision in
+  Nightmare (expiry − F); a Druid summon and a Clay Golem (stats 12,
+  31, 19, 7, 6 on the summon, AI think at F + 25).
+- `skills/bodies-2.md` OQ1–5, 7, 8, 12: Jab / Smite monsters (stats
+  21, 22, 19 and element stats around `mode_damage`); Dragon Talon L6 /
+  L12 (kicks, last-kick knockback, E param 1); Find Potion per act and
+  difficulty (codes, seed draws); Leap and monster Leap (E flags,
+  landing frame, knockback, 0xA5); Shock Field (caster seed before /
+  after); Conversion on a higher-level monster (stats 12, 6, 7 during
+  and after); Holy Freeze pulses (state 107, target seed); Whirlwind
+  with one and two weapons (E param 4, hits per do).
+- DRLG act entries (one run, RNG hooks on): enter Act 2 and Act 3
+  (`drlg/levels.md` OQ1: drlg +0x94/+0x484/+0x474; `outdoor.md` OQ3/OQ4,
+  `outdoor-act3-act5.md` OQ1: levels 76..78 +0x1C..+0x28, +0x1B8,
+  +0x1BC), Act 4 (Outer Steppes flag) and Act 5 levels 111, 112, 117
+  (`outdoor.md` OQ9, `outdoor-act3-act5.md` OQ3: stamps, room counts of
+  76..78); after Act I creation read level +0x1C..+0x28 of 1–7, 17, 26,
+  39 and preset direction of 1 and 27 (`outdoor.md` OQ1).
+- `drlg/levels.md` OQ3: a town arrival and an act change, draws at
+  `0x0066ACB0`–`0x0066ACE0` on the level seed.
+- `drlg/levels.md` OQ7: a crypt level (`Logicals` 1) and an outdoor
+  level, dump DRLG room +0x64 records after activation.
+- `drlg/maze.md` OQ1: enter Den of Evil (8) and Cave Level 1 (9) with
+  RNG hooks; compare with the maze vectors.
+- `drlg/outdoor.md` OQ5: Stony Field, Dark Wood, Black Marsh, Tamoe
+  builds (sites `0x00680251`, `0x0068034F`).
+- `drlg/outdoor-tilesub.md` OQ2 + OQ4: Cold Plains far enough to build a
+  waypoint and a shrine room; also read the `Trees` substitution DS1's
+  group records (+0x14 of each 0x18-byte group) after its first load.
+- `drlg/preset.md` OQ3: a level whose river/navi units are added at
+  first activation; log §8 adds versus §9 transfers per room.
+- `drlg/rooms.md` OQ7: the entry `0x0066D820` returns for seq
+  6822–6835 of the RNG recording's run.
+- `render/camera.md` OQ1: a capture standing under a roof (decides the
+  roof y formula; roof blocks y 0…64 from the files).
+- `render/camera.md` OQ8 + `render/capture.md` OQ8: `frames-raw-2` with
+  the client-update counter per frame (draws with no tick between).
+- `render/blend-modes.md` OQ2 + OQ3: a ghostly / ethereal unit or a
+  blended shadow over a known background, static camera; log
+  `[0x0072DA5C]` (Blended Shadows).
+- `render/lighting.md` OQ6 + OQ10: a game join; log whether S→C 0x53
+  precedes the first world draw, and `[0x0072DA50]` / `[0x0072A348]` at
+  that draw.
+- `render/capture.md` OQ7 + `render/lighting.md` OQ9: rerun of run 1b
+  f 13,486–14,636 with `--draws-every` and the light-map digest.
+- `sim/rng.md` OQ2: a brand-new character's first game and a
+  save-and-exit reload; log game +0x7C and the S→C 0x03 map seed.
+- `sim/path-placement.md` OQ8: load a character saved in Act III; log
+  writes of client +0x1AC (sites `0x0052FB97`, `0x00530E17`,
+  `0x00532690` path) in order.
+- `sim/pathing.md` OQ9: FPU control word at `0x0067A140` (or a Blessed
+  Hammer's per-tick positions).
+- `formats/ds1.md` OQ3 + `drlg/preset.md` OQ2: after the Trees
+  substitution DS1 loads, dump its 14 group records (0x18 bytes each)
+  and the 0x320 slack after the file buffer.
+- `tools/original-hooks.md` OQ9: breakpoint on `0x00552E6C` over a full
+  scenario; log the allocating caller (unit-seed fallback).
+- `client/model.md` OQ8 (static answer 13) + OQ9: a waypoint to another
+  act (log S→C 0x05, 0x03, 0x53 bytes), and a monster's client +0x20
+  seed after 0xAC against the server unit's seed.
+- `client/msg-ui.md` §4–§11 (client side, no new play beyond the
+  §3.5 line above): in the same session log the client handlers'
+  inputs: type one chat line and one whisper to the own name (0x26
+  forms 1, 2, 6; overhead form 5 from C→S 0x14), talk to Akara (0x27
+  count, kinds), open and close the hire list (0x4F, 0x4E × n, 0x50
+  code 2); breakpoint `0x0049F410` (overhead set: unit, text, lang) and
+  `0x004A1600` (record bytes).
+- `client/msg-skills.md` OQ4 / `client/msg-ui.md` OQ7: a pet summon with
+  a pending skill (0x99 / 0x9A, line above) — log whether any later
+  message of the same receive changes the 0x99 unit (0x0A, 0x15,
+  0xA8 / 0xA9 state 118).
+- `client/model.md` OQ14 (§16) + OQ15 (§15): from `tp80-packets.jsonl`
+  (PC 2) list the S→C messages between the town-portal use and the C→S
+  0x4B after tick 2919 (expected: the 0x08 dropping the hireling's room,
+  no 0x0A / 0x15 / 0xAC for GUID 1 before it), and the same window at
+  the second teleport; one shrine use (any shrine) logging 0x0E / 0x4D
+  bytes and the `0x004B9A00` request (id = table +0x10 for the code).
+- `sim/units.md` §4.7 (OQ1, OQ2 answered statically): log unit +0x4C,
+  +0x3C and the §4.2 start index per `anim` record for a player with
+  IAS / FCR / FHR / FBR / FRW items in every mode (dual-wield
+  Assassin or Barbarian, a were-form, Holy Shield block) and for a
+  monster walking, running, attacking, casting and knocked back.
+- `sim/units.md` OQ3: move a player with a hireling following (20
+  history entries of player data +0xA8 per frame, and a town-portal
+  teleport frame).
+- `monsters/init.md` §4.1, §14.3, §26 (OQ4): rng hook with caller
+  addresses during one Act 5 ancient-barbarian spawn (four item
+  creations after the boss mods) and one warping-shrine use (§17 draws
+  on the chosen monster).
+- `sim/pets.md` §10 (OQ3): summon two pet types of one group, then
+  lower a `petmax` skill level (resync trims), and leave the game with
+  a hireling (free path: 0x7A removes).
+- `monsters/ai.md` OQ1 / OQ2 / OQ3 (AI, spec area 1): freeze a monster
+  (cold damage with freeze) and knock back a fallen and a sand leaper;
+  play one Nightmare area; log type-2 schedules (site, frame), timer
+  type 12, state 1 on / off, mode changes. Expect: a think at freeze
+  apply + len + 1 and one at expiry + `aidel` (`0x0057B170`); knockback
+  end +1 / 15 / gethit (`0x005A8520`); Nightmare mode-end delays =
+  `aidel(N)` (zombie1 14).
+- `monsters/ai.md` OQ8 / OQ9 / OQ11 (AI): a town walk clicking NPCs
+  (C→S 0x13, 0x59) and an Act I fight with a fallen shaman; log command
+  4 next to each NPC think, every client message next to type-2
+  schedules, and mode changes of fallens (death end, resurrect).
+- `monsters/ai-bodies-2.md` OQ1 / OQ2, `ai-bodies-3.md` OQ1 / OQ2,
+  `ai-bodies-4.md` OQ1 / OQ2, `ai-bodies-5.md` OQ1 (AI): one run per act
+  II–V (Far Oasis, Arcane Sanctuary, Spider Forest, Durance, Chaos
+  Sanctuary with Diablo, Arreat Summit, Worldstone Chamber); log per
+  think the type-2 schedule, unit-seed steps with caller, mode requests
+  (mode, target, point), AI params 0–2; for vultures, bat demons and
+  frog demons also modes 8–11 / 14 and collision; for Diablo the mode
+  chosen per think with the player's resistances.
+- `monsters/ai-bodies-7.md` OQ2 (AI, refined 2026-10-07): the static
+  read finds no driver for Uber Mephisto / Diablo / Baal (§26). In the
+  Uber Tristram run also log every mode change of the three with its
+  caller and every `0x005B0E00` call on them; expect no attack or skill
+  mode started by AI code (only gethit / knockback / death).
+- `sim/units.md` OQ7 (answered statically 2026-10-07: single player has
+  game +0x6A = 3, so the difficulty's `aidel` column): a Nightmare
+  single-player game; log monster event-2 sets (U10) and check the
+  delay = Nightmare `aidel` (0 → 15).
+- `monsters/init.md` §27: kill a fetish shaman (Act III); log the
+  `0x00574370` call (class 278–282 → 141–145, mode 1) and its rng draws
+  with callers.
+- `combat/events.md` OQ1: items with knockback, freeze, slow,
+  skill-on-hit, damage-to-mana; Energy Shield, Bone Armor, Iron Maiden
+  in play. Log each event function's entry / return (table
+  `0x007325B0` targets), H's seed before / after, and the record.
+- `skills/levels.md` §7.5 / §7.6 (no OQ, unverified): equip an aura
+  item (e.g. Dragon) and a charged item; log `0x005BF510` /
+  `0x00647320` calls and the type-9 timers they schedule.
+- `combat/vitals.md` §4.7 (static, unverified): a level ≥ 2 character
+  dies to a monster (Nightmare or Hell), then picks up its corpse; log
+  stat 13 before death, after death, on the corpse at `0x0057F875`, and
+  after pickup (expect + `pct(loss, 75, 100)`); also a Token of
+  Absolution use (§2.1, `skills/levels.md` §6.5: 0x21 per class skill,
+  stat 5 and 4 after).
+- `combat/hit.md` §6.4 / Edge case 8 (static): a player with two
+  `passive_weaponblock` entries (layer 0 and a matching type) blocking
+  in melee; log `0x0057DCA0`'s return.
+- `render/camera.md` OQ5 (static part answered 2026-10-07): log
+  `0x00650840` calls per client update with caller over monster fights
+  (do `0x004AF4C0` and `0x004B13A0` both step one monster in one
+  update?) and a local player's missile's first client update (two
+  steps expected).
+- `sim/tick.md` OQ2 (breakpoint, no new play): `0x005416B0` with EDX = 0
+  over a long run (any timer scheduled without a unit; log the caller).
+- `tools/original-hooks.md` OQ1–OQ4 and `tools/original-hooks-spawn.md`
+  OQ1 (probes, area-5 round 2026-10-07): each OQ names its probe
+  (walk injection at `0x0044F136`, forced start 0x67, seed override
+  chains run twice, save-dir breakpoint `0x00534410`, spawn at
+  `0x0052FD1E` with `record_packets.py`).
+- `render/unit-composite.md` OQ4: a monster's first attack after a mode
+  change to a not-yet-loaded mode; log whether a draw happens before the
+  mode's graphics-ready flag is set. Same session, OQ7: a bone prison, a
+  leaping unit and a missile with creation flag 0x100; log the motion
+  record (gfx +0x30, 0x4C bytes) at creation and per update.
+- `sim/units.md` OQ8: leave and re-enter a wilderness area; log the
+  restore order and GUIDs (`0x00542B40`).
+- `render/camera.md` OQ6: client player seed (`unit +0x20`) at frame
+  start and end over a session with cursor movement and weather.
+- `render/draw-order.md` OQ14: a capture with a panel open (any UI or
+  cursor draw between the world passes `0x00456EE0` … `0x00477980`).
+- `render/lighting.md` OQ10: memory read of `[0x0072DA50]` and
+  `[0x0072A348]` at the first in-game draw, with and without a "Light
+  Quality" registry value.
+- `ui/text.md` OQ5 (memory read of `0x007D6268` on a loading screen)
+  and OQ9 (captures `text-0001`, `text-0002`).
+- `drlg/rooms.md` OQ13 and `drlg/wall-remap.md` OQ1: dump every built
+  room's link chains (five acts) from the original's memory.
 
 **Ninth set (2026-10-07; the 22 notes `impl-ai-acts2-5`, `impl-skill-slots-2`,
 `impl-missile-bodies-2`, `impl-quests-act1-rest`, `impl-quests-act2`,
@@ -5982,6 +6212,7 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 | The coordinator's union merge of `pub mod` conflicts interleaved two branches' module doc comments (`d2-client/src/lib.rs`, `d2-sim/src/wiring/mod.rs`; 2026-10-06), once leaving a `//!` after an item; caught reading the merged file before the gate | after any union resolve, read the whole resolved file, not only the `mod` lines; inner docs (`//!`) must precede every item (METHODS M21) |
 | A coverage claim on a test that checks only part of a rule overstates the unit tier (10 claims dropped on review, 2026-10-06; rules that are one unit make this easy to repeat) | claim a rule only when the assertions check its outcome, with the narrowest ID that is fully true; consistency checks against a TSV and M08 perturbation tests get no claim (`docs/handoff/coverage-claims.md` §1) |
 | A software Vulkan adapter (Mesa llvmpipe) passes every GPU case, which says nothing about a real driver's integer and texture paths (2026-10-06) | the GPU half of every Phase 6 check stays "unverified" until the local run on a real adapter records its name, backend and driver (§5 C15, C16; METHODS M02) |
+| PC 1's integration merge committed conflict markers in `specs/combat/vitals.md` OQ4 (6a77d80, 2026-10-07): the auto-resolver handled only append lists and section indexes, then committed whatever was left; `spec_index --check` and `coverage --check` do not see markers (caught by a grep after the push; fixed d841c3e) | the fold script (`C:\d2orchold.sh` on PC 1) greps `specs docs crates tools` for `<<<<<<<` / `>>>>>>>` after auto-resolution and aborts before committing; a marker check belongs in CI next to `spec_index --check` (proposal for the cloud; METHODS M07, M21) |
 | Five game-file assertions written without game files (`gaps-data-formats`, 2026-10-06) and two spec facts stated without a measurement (`animdata.md` "second copy in all 9", `dc6.md` "zero-size frames occur") failed on the first local run of C17 | a blind-written game assertion is marked "expected value unconfirmed" in its handoff and is not claimed (`COVERAGE.md` §3) until its first local run; a spec fact names its measurement or is an open question (`specs/README.md` bar 1; METHODS M21) |
 | Both spec branches of 2026-10-06 would have failed a merge gate: `spec-inventory` edited `server-messages.tsv` without `gen-proto`; `spec-path-placement` repeated two rule ids (`coverage.py --check`) and added a `bits:` layout syntax the d2-proto parser rejects (caught by the cloud coordinator) | `specs/README.md` Process: the pre-push checks and the TSV-grammar rule; the local coordinator runs them on every writer branch before reporting it (fixed on `claude/spec-path-placement` `3fe068b`: 0x96 layout moved to `pathing.md` prose; METHODS M21) |
 | Three parallel d2-server handler branches each added `[dev-dependencies] d2-data` and a field/generic to `SimGame`; git merged the two `Cargo.toml` sections silently into a duplicate key and the `SimGame` generics conflicted (2026-10-06, caught by the coordinator's build before the gate) | parallel sessions that extend a shared struct get one named owner per field in their prompts; the coordinator builds the touched crate after each merge, not only after the last (METHODS M21) |
@@ -6003,5 +6234,6 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 | `mpq-tool formats` counted a file twice when two listfiles spell it in different case (DC6 1,657 vs 1,653, DT1 260 vs 256), and those counts became `game_sweep`'s expected values and a HANDOFF explanation (caught 2026-10-06 by a spec session's own count) | case-insensitive name sets wherever MPQ names are collected; a count copied into a test names the tool and the method that produced it (M21) |
 | A spec's prose count drifted from the tool (`mpq.md` / `audio.md`: "5,008" `.wav`, `mpq-tool check` 4,992) | counts in spec prose name the command that measures them (README bar 1) |
 | Writers on one PC shared one scratchpad directory; one writer's helper script was overwritten by another's mid-run (2026-10-06) | give each writer its own scratch subfolder in the prompt (M21) |
+| DT1 `decode_rle` built a slice index for a skip-only `(skip, 0)` pair past the 32 × 32 block; the bounds check ran only for `count > 0` (panic; found 2026-10-06 by libFuzzer within minutes, missed by the 200k-case proptests) | the `dt1` fuzz target and the regress test; audit other parsers for a bounds check guarded by `count > 0` (M07, M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 

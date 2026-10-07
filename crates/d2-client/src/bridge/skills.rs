@@ -199,7 +199,7 @@ pub fn select(
 /// Remove `0x00646FD0` (§2 rule 2.2): the native entry's passive state
 /// off, a left / right reference to it reset to (skill 0, native), a
 /// current reference cleared, then the entry is unlinked.
-fn remove(list: &mut SkillList, rows: &[SkillRow], skill: u16) -> Result<(), SkillError> {
+pub fn remove(list: &mut SkillList, rows: &[SkillRow], skill: u16) -> Result<(), SkillError> {
     let Some(i) = list.native(skill) else {
         return Ok(());
     };

@@ -133,3 +133,6 @@ Riiablo (Apache-2.0) `file/Dc6.java`, `file/Dc6Decoder.java`,
 3. Whole-file pixel limit (64M, §Frame) is an implementation limit, not
    observed original behavior: confirm every 1.14d `.dc6` stays under it
    (`mpq-tool formats`).
+   *Answered* (game-file read, 2026-10-07, the 1,651 DC6s d2data and
+   d2exp list; `Patch_D2.mpq` unlisted): the largest file's frames total
+   3,190,514 pixels, far under 64M; every file has `encoding` 0.

@@ -12,6 +12,7 @@
 //! Table data comes from `d2_data` typed records ([`CombatTables`]).
 
 pub mod damage;
+pub mod events;
 pub mod hit;
 pub mod vitals;
 
@@ -269,6 +270,8 @@ impl CombatTables {
 
 #[cfg(test)]
 mod damage_tests;
+#[cfg(test)]
+mod events_tests;
 #[cfg(test)]
 mod hit_gap_tests;
 #[cfg(test)]

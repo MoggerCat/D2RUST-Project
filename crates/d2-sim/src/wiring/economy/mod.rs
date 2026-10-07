@@ -23,6 +23,9 @@
 //!   provider's floor drop when it is on with its field, else a seam
 //!   ([`FreeSpot`]); [`DropPlacer`] receives the economy (its hooks
 //!   hold the rooms).
+//! - [`chest_drop`]: the chest drop `D(Q)` of the object code
+//!   (`treasure.md` §4) the same way, the object the dropper
+//!   ([`object_chest_drop`]).
 //! - [`quest_host`]: the quests' world on the wired host ([`HostQuests`]:
 //!   [`EconomyQuests`] with the object, level, interaction and identify
 //!   calls the action wiring provides).
@@ -33,6 +36,7 @@
 //!
 //! Status: wired, unverified (every spec involved is a draft).
 
+pub mod chest_drop;
 pub mod cube_items;
 pub mod death;
 pub mod game_fields;
@@ -47,6 +51,7 @@ pub mod treasure_items;
 #[cfg(test)]
 mod tests;
 
+pub use chest_drop::{object_chest_drop, NoSpot};
 pub use cube_items::{CubeRest, EconomyCube};
 pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;

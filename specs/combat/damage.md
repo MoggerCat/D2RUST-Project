@@ -15,31 +15,32 @@
   evaluator); `sim/rng.md` (draw helpers; unit seed at unit +0x20);
   `sim/stats.md`, `sim/stat-lists.md` (getters, stat lists, states,
   curses); `sim/units.md` (modes, unit events, overlays); `sim/tick.md`
-  §5 (timer events 3 STATREGEN, 12 REMOVESTATE, 2 AITHINK).
+  §5 (timer events 3 STATREGEN, 12 REMOVESTATE, 2 AITHINK); `combat/events.md`
+  (event functions other than 15 and 16).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 45–57 |
-| Inputs | 58–70 |
-| Outputs / state changes | 71–78 |
-| Rules | 79–80 |
-|   0. Shared integer helpers | 81–103 |
-|   1. Damage record | 104–137 |
-|   2. Pipeline | 138–152 |
-|   3. Rolling: `start_combat` = `0x0057DBF0` | 153–292 |
-|   4. Totals and resistances: `totals` = `0x0057C1E0` | 293–384 |
-|   5. Application | 385–551 |
-|   6. Hit class and hit recovery | 552–582 |
-|   7. Reaction and death trigger | 583–609 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 610–670 |
-|   9. Durability `0x0057D3D0` | 671–690 |
-| Constants & data dependencies | 691–712 |
-| Randomness | 713–745 |
-| Edge cases & original bugs | 746–774 |
-| Test vectors | 775–807 |
-| Provenance | 808–828 |
-| Open questions | 829–861 |
+| Summary | 46–58 |
+| Inputs | 59–71 |
+| Outputs / state changes | 72–79 |
+| Rules | 80–81 |
+|   0. Shared integer helpers | 82–104 |
+|   1. Damage record | 105–138 |
+|   2. Pipeline | 139–153 |
+|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–293 |
+|   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
+|   5. Application | 386–576 |
+|   6. Hit class and hit recovery | 577–607 |
+|   7. Reaction and death trigger | 608–699 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 700–763 |
+|   9. Durability `0x0057D3D0` | 764–785 |
+| Constants & data dependencies | 786–807 |
+| Randomness | 808–840 |
+| Edge cases & original bugs | 841–875 |
+| Test vectors | 876–908 |
+| Provenance | 909–934 |
+| Open questions | 935–984 |
 <!-- /index -->
 
 ## Summary
@@ -393,19 +394,27 @@ If ≠ 100: every row of §4.3 marked *scaled* whose value is > 0 becomes
    (attacker is a monster))`): free the attacker's combat records for
    this defender (`0x0057C9F0`), return.
 4. If the copy has hit (1):
-   1. A player or monster attacker in mode 0 (death): free and return.
+   1. A player or monster attacker in mode 0 (death): return at once
+      (`0x0057D5AC`), **without** freeing the combat record, without
+      events, thorns or reaction. The record stays on the attacker
+      until freed elsewhere.
    2. Hit flags = 0x20 (replaces all); `apply(game, attacker, defender,
       missile = 0, copy)` (§5.2).
    3. Overlay +0x6C > 0 → on the defender (`0x00621E40`).
-   4. Hit class: if +0x64 = 0 and the low nibble is 0: OR in the
-      attacker's weapon hit class (`0x00623C20`).
+   4. Hit class: if the byte +0x64 = 0 and the low nibble of +0x60 is
+      0: OR in the attacker's weapon hit class (`0x00623C20`).
    5. Durability (§9).
 5. Unit event 7 (`domeleeattack`) on the attacker, then event 3
-   (`attackedinmelee`) on the defender.
-6. If hit: attacker is an object, or a non-player non-monster, or not
-   in mode 0 → thorns (`0x005D10C0`, skills spec).
+   (`attackedinmelee`) on the defender (both with the copy).
+6. If the copy has hit: attacker type 2 (object) or a type other than
+   0 / 1 → thorns (`0x005D10C0`, skills spec). A player or monster
+   attacker: in mode 0 (it died during steps 4–5, e.g. from an event
+   function) → return at once (`0x0057D63F`), as in step 4.1: no
+   thorns, no reaction, record not freed; any other mode → thorns.
+   Without a hit: no thorns.
 7. Reaction `0x0057CEE0` (§7.1).
-8. Free the combat records for this attacker/defender pair.
+8. Free the combat records for this attacker/defender pair
+   (`0x0057C9F0`).
 
 #### 5.2 `apply(game, attacker, defender, missile, record)` = `0x0057C6C0`
 
@@ -477,6 +486,14 @@ Runs when life leech or mana leech ≠ 0.
 6. The leech fields keep their shifted values; step 12 of §5.2 then
    subtracts the (shifted, divided) mana and stamina leech from the
    defender (Edge case 6).
+7. **No attacker** (1.14d-confirmed, `0x0057C5AB`–`0x0057C67D`): the
+   mode conversion `0x00645270` returns at once for a missing unit and
+   leaves the preset type 6, so the monster rule runs: the fields are
+   stored back as `(x << 6) / 64` (= `x` unless the shift overflowed),
+   `T` is computed from the defender's mana and stamina, the drain
+   scaling applies, then the attacker's max life and life read 0 for a
+   missing unit (`0x00625D10`, `0x00625480`), `T = min(T, 0)` ≤ 0 and
+   the leech stops: nothing healed, no overlay, no draw.
 
 Rule H `heal(unit, x)` = `0x0057A980`: `x ≤ 0`, unit dead, or state 92
 (`death_delay`) → 0. Else life = `min(life + x, max life)`; return the
@@ -493,7 +510,8 @@ registered on `unit` for `event` (`events.txt` index: 0 hitbymissile,
 functions through `itemstatcost` `itemevent1/2` + `itemeventfunc1/2`;
 skills register their own. Function table §8. Handler records,
 registration (prepend) and unregistration: `skills/bodies.md` §2.13;
-iteration order belongs to `sim/units.md` (Open question 4).
+iteration: §2.18 there, and `sim/units.md` §6.6 (newest first). The
+functions also receive EDX = the event id.
 
 #### 5.5 Stun `0x0057AAE0`
 
@@ -529,12 +547,19 @@ Length `n` = stun length; `n ≤ 0` → nothing.
 
 `length ≤ 0` → nothing. Player defender → cold (§5.6) with this
 length. Monster: state 54 → nothing; boss, unique (flag 8) or hireling →
-cold with this length. Otherwise: cold effect ≥ 0 (`0x0057AF30`) →
-nothing; monster: `length /= MonsterFreezeDivisor` (zero is a fatal
-assertion). End `e = frame + length`; existing freeze list (state 1)
-keeps the later expiry, else a new list with state 1; timer 12 at the
-final expiry; cancel the monster's type-2 (AI) timers and schedule type
-2 at frame + length + 1. No draws.
+cold with this length. Otherwise (other monsters, and any other
+defender type): cold effect ≥ 0 (`0x0057AF30`; −50 for a non-monster)
+→ nothing; monster: `length /= MonsterFreezeDivisor` (zero is a fatal
+assertion). End `e = frame + length` (game of the attacker). Existing
+freeze list (state 1, `0x006256B0`): its expiry becomes `max(expiry,
+e)`. No list (1.14d-confirmed, `0x0057B337`–`0x0057B37E`): switch
+state 1 on (`0x00639DB0(def, 1, 1)`) **first**, then create a list
+(expiry `e`, owner attacker or (6, −1)), give it state 1, set its
+remove callback `0x0057B170` (freeze end, `monsters/ai.md` §1.1 rule
+2) and attach it. Timer 12 at the final expiry. Then a monster
+defender: cancel its type-2 (AI) timers and schedule type 2 at frame +
+length + 1 (length after the divisor); a non-monster defender here is
+a fatal assertion (line 0x276). No draws.
 
 #### 5.8 Poison and burn `0x0057AC50`, `0x0057ADD0`
 
@@ -584,28 +609,93 @@ Draws 5 and 6 are taken only when their size test passes.
 
 #### 7.1 Reaction `0x0057CEE0` (D2MOO `SUNITDMG_ExecuteMissileDamage`)
 
-Checked at the call level only (callees match D2MOO; Open question 3):
-town rule as §5.2 step 2; on a hit, compute the hit class (§6.1) unless
-fixed, store it on the unit; uninterruptible defender (state 54):
-`death_delay` (92) on if result has 2, stop. Player defender: dodge /
-avoid → skill mode with the passive's skill; evade → sound only; block
-or weapon block → block mode if the last block frame is more than
-`item_fasterblockrate(102) / 8 + 15` frames ago; will die → death mode;
-knockback → knockback mode; get-hit → get-hit mode unless §6.2 says no
-(stun forces it). Monster defender: knockback without the `KB` mode
-becomes get-hit; will die → `kill(game, defender, attacker, 1)` (§7.2);
-then knockback, block (Diablo and the clone never play it), get-hit
-(§6.2), soft hit. Mode changes belong to `sim/units.md`.
+ECX game, EDX attacker A; stack defender D, record R. F = R result
+flags (u16 +0x04). "Mode request m" for a monster = `0x005A7E60(D, m, &req)`
+then `0x005A7C20(game, &req, 1)` (`monsters/ai.md` mode request record);
+for a player = `0x005809D0` / `0x00580A70` (`sim/pathing.md` §1.2).
+"Soft" = queue D for update (`0x0064C040`) and D unit flags (+0xC4) |=
+0x8000. (tA, gA) = A's type and GUID, (6, −1) without A. No draws here
+except inside the get-hit test (§6.2).
+
+1. D has a room and it is in town (`0x0061AB00`): continue only when A
+   is a monster with monstats `inTown` (flag bit 10); else return.
+2. F has 1 (hit): if R +0x64 = 0 and (R +0x60 & 0xF0) = 0: R +0x60 :=
+   element hit class (§6.1). Then D +0xB0 := R +0x60.
+3. D has state 54 (`uninterruptable`): F has 2 → state 92
+   (`death_delay`) on. Return.
+4. **Monster D** (not in mode 0 or 12, else return):
+   1. F has 8 and the class lacks mode 13 `KB` (`0x0046C140(class,
+      13)`) → F := F − 8 + 4 (stored in R).
+   2. Sand leaper rule `0x005A54F0`: F has 4, D's `BaseId` is 78
+      (`sandleaper1`) and D lacks state 1 (`freeze`) → F |= 8 (stored).
+   3. F has 2 → `kill(game, D, A, 1)` (§7.2); return.
+   4. F has 8 → mode request 13 (`KB`) with req +0x08 := A; return.
+   5. F has 0x10 (block): F has 0x4000, or D's class is 243 (`diablo`),
+      333 (`diabloclone`) or 705 (`uberdiablo`), or the class lacks mode
+      6 (`BL`) → AI state := 19 (`0x005734C0(D, 19)` at `0x0057D083`,
+      `monsters/ai.md` §3 "AI state"; no block mode); else mode request
+      6. Return.
+   6. F has 4: D has a state-21 (`stunned`) list (`0x006256B0`), or the
+      get-hit test (§6.2, `0x0057CB00(D, R, R +0x60)`) is false → mode
+      request 3 (`GH`), then `0x005A43A0(game, D)` (umod mode 4,
+      `monsters/umod-callbacks.md` §2 rule 5). Test true → step 4.7's
+      soft path. Return.
+   7. F has 0x4000: soft, AI state := 19 (`0x005734C0(D, 19)` at
+      `0x0057D119`), `0x005A43A0(game, D)`.
+      Return.
+   8. F has 1 and total (R +0x4C) > 0: b := low byte of D's stat 352
+      (`last_sent_hp_pct`, total); c := D's life percent byte
+      (`0x005A5650`); |b − c| > 4 → soft. Return.
+5. **Player D** (first matching flag wins):
+   1. F has 0x80 (dodge) → state 65 (`dodge`) list; else F has 0x100
+      (avoid) → state 66 (`avoid`) list. No list → return. s := stat
+      350 of that list (`0x00625D00`); E := `highest_entry(D, s)`; none
+      → return. E flags (+0x0C, `0x006446A0` / `0x00644660`) |= 4; unit
+      form request (E, mode 13, tA, gA, 0). Return.
+   2. F has 0x200 (evade): state 68 (`evade`) list; s, E as above;
+      skill `stsound` (+0xFC, i16) > 0 → sound event 12 (`0x00553380(D,
+      12, D)`, `audio/triggers.md`). Return.
+   3. F has 0x10 or 0x8000 (block / weapon block): F has 0x4000 →
+      return. frame − stat 95 (`lastblockframe`) > `item_fasterblockrate`
+      (102) / 8 (toward zero) + 15 → point form (no skill, mode 9 `BL`,
+      0, 0, 0), then stat 95 := frame (game +0xA8). Return.
+   4. F has 2: D in mode 0 or 17 → return; else unit form (no skill,
+      mode 0, tA, gA, 0). Return.
+   5. F has 8: unit form (no skill, mode 19 `KB`, tA, gA, 0). Return.
+   6. F has 4: no state-21 list and the get-hit test true → soft;
+      else point form (no skill, mode 4 `GH`, x = R +0x4C, 0, 0).
+      Return.
+   7. F has 0x4000 → soft.
+6. Other unit types: nothing.
 
 #### 7.2 Kill `0x0057CCB0` (D2MOO `SUNITDMG_KillMonster`)
 
-Checked at the call level only: player already in death modes → stop;
-monster already dying or dead, or not `killable` → stop; pet kill
-credit to a player owner; attacker bookkeeping and arena kill event;
-monster: death mode facing the attacker, quest kill parse unless
-revived, the act 5 barricade doors (`objCol` monsters open object 571 /
-572 at the same spot). Experience distribution, drops and corpse rules
-are not specified here (Open question 7).
+ECX game, EDX victim D; stack killer A, flag (1 at every caller except
+`0x00574450` at `0x005744D3`, `world/hirelings.md` §8 rule 1).
+
+1. D a player: D in mode 0 or 17 → stop. D a monster: mode 0 or 12, or
+   monstats `killable` false (`0x00457490(class, 15)`, bit 15) → stop;
+   then flag ≠ 0 and D's owner (`0x0058F0D0`) is a player → pet death
+   bookkeeping `0x005751A0(game, owner, D)` (`world/hirelings.md` §8
+   rule 1, `sim/pets.md`). Other types (and no D) → stop.
+2. A present: experience `0x005A4EF0`: D unit flags lack 0x04000000 →
+   distribution `0x0057E990(game, A, D)` (`combat/vitals.md` §4.4). Arena
+   kill event `0x0053F720(game, A, D)` (`sim/intents-events.md`). D's
+   class < monstats count (unsigned; a player victim's class 0–6 passes
+   too) and A a player → `0x0066A220(A, D's class)`: an empty stdcall
+   stub (its whole body is `ret 8`; one caller, `0x0057CD78`), so the
+   call has no effect. d2rs omits it.
+3. D a monster: mode request 0 (death) with direction (req byte +0x14)
+   toward A (`0x00621DC0(D, A x, A y)`), or D's current direction
+   without A (`0x006487F0`), req +0x08 := A, flag 1. D unit flags lack
+   bit 31 → quest kill parse `0x00543A30(game, D, A)` (`world/
+   quests.md` §4.4). monstats2 `objCol` (bit 18): class 432
+   (`barricadedoor1`) → object 571, class 433 (`barricadedoor2`) →
+   object 572: the first object of that class in D's room's unit list
+   (room +0x74, next +0xE8) at D's exact position gets mode 2
+   (`0x00624690`) and `0x00623830`.
+
+Drops are not started here (`items/treasure.md`).
 
 ### 8. Event functions (table `0x007325B0`, 32 entries)
 
@@ -646,14 +736,17 @@ are not specified here (Open question 7).
 
 Signature (D2MOO): (game, event, attacker, unit, record, stat id <<16 |
 layer, level); the chance stat is read with the item/skill getter from
-`(arg >> 16, arg)`. Two are specified here; the rest are Open question 5.
+`(arg >> 16, arg)`. 15 and 16 are specified here; every other function is
+`combat/events.md`.
 
 **Crushing blow (16)**: `c` = chance stat; `c ≤ 0` → 0. Draw (attacker
 seed, inline `lo′ mod 100`); `r ≥ c` → 0. Divisor: player defender 10;
-monster: hireling 10; else 4, or 8 if boss or superunique (flag 2); then
-`h = 0x005738F0(max(monster_playercount(100), 1))` (player-count life
-bonus, monsters branch) and `div += pct(div, h, 100)` if `h ≠ 0`. Other
-defenders 4. Event 6 (missile) doubles it. `x = life / div`; `dr =
+monster: hireling 10 and nothing more (the jump at `0x005C0055` skips
+the player-count term); any other monster 4, or 8 if boss or
+superunique (flag 2), then `h = 0x005738F0(max(monster_playercount
+(100), 1))` (player-count life bonus, monsters branch) and `div +=
+pct(div, h, 100)` if `h ≠ 0` (1.14d-confirmed, `0x005C0046`–
+`0x005C00A0`). Other defenders 4. Event 6 (missile) doubles it. `x = life / div`; `dr =
 min(damageresist(36), 100)`; `dr > 0` → `x −= pct(x, dr, 100)`. Life =
 `max(life − x, 0)`; life ≤ 0 → record result |= 2; `x > 0` → overlay 147.
 Return 1.
@@ -672,8 +765,10 @@ frames, skill 0, level 1, owner attacker.
 
 1. Attacker is a player with a current weapon: `durability_hit(game,
    attacker, weapon)` (`0x00559E30`).
-2. Defender is a player with an inventory: candidates from the weight
-   table `0x00732B90` (7 rows, count at `0x00732BC8`): (bodyloc 1 head,
+2. Defender is a player whose inventory pointer (+0x60) is non-null
+   (every server player: the player type init `0x005348C0` creates it
+   unconditionally at `0x005348F9`; 1.14d-confirmed): candidates from
+   the weight table `0x00732B90` (7 rows, count at `0x00732BC8`): (bodyloc 1 head,
    3), (3 torso, 5), (4 right arm, 4), (5 left arm, 4), (8 belt, 2), (9
    feet, 2), (10 gloves, 2); keep each slot holding an item of type 50
    (any armor); `W` = sum of kept weights. `W > 0`: `i = roll(7)`, `w =
@@ -771,6 +866,12 @@ armor piece (order of §9).
    and its combat record holds no damage.
 10. Leech requires physical > 0 for player attackers; monster leech
     uses the amounts themselves.
+11. Leech rows (9–11) have no resist stat, so §4.5 starts from r = 0
+    and step 3 still applies (the test is "not 36 or 37", and −1 is
+    neither; `0x0057BE44`–`0x0057BE6D`): against a non-monster defender
+    in an expansion game r := `ResistPenalty`, and §4.6 step 4 scales
+    the leech by (100 − r) / 100: a monster draining a Hell player
+    takes ×2 (Nightmare ×1.4; classic −20 / −50 → ×1.2 / ×1.5).
 
 ## Test vectors
 
@@ -780,7 +881,7 @@ Synthetic (CI-safe):
 |---|---|
 | `pct(0x200000, 50, 100)` | `(2097152 / 100) × 50` = 1,048,550 (exact 1,048,576) |
 | `pct(1000, 0x20000, 100)` | `(131072 / 100) × 1000` = 1,310,000 |
-| `pct(0x200000, 50, 0x30000)` | 64-bit: 34 |
+| `pct(0x200000, 50, 0x30000)` | d > v >> 4 (0x20000) → 64-bit 104,857,600 / 196,608 = 533 |
 | `pct(−50, 30, 100)` | −15 |
 | `pct(7, 9, 0)` | 0 |
 | `bonuses`: weapon 2–7 (min/max stats 2, 7), StrBonus 100, str 30, no other stats, s 128, current 0 | `pct` 30; min 512 → 665; max 1792 → 2329; result 665 + roll(1664) |
@@ -825,6 +926,11 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
   counter is a byte.
 - `elemtypes.txt`, `events.txt`, `HitClass.txt`, `difficultylevels.txt`,
   `itemstatcost.txt` (1.14d `patch_d2`) for indices and values.
+- §7 read from `0x0057CEE0`, `0x005A54F0`, `0x0057CCB0`, `0x005A4EF0`,
+  `0x0057CC30`, `0x00457490`, `0x00451F80`; `0x005D6410` (OQ10); class
+  and state names from 1.14d `monstats.txt` (ids after skipping the
+  `Expansion` row: 78, 243, 333, 432, 433, 705), `states.txt` (21, 54,
+  65, 66, 68, 92, 153), `itemstatcost.txt` (95, 102, 350, 352).
 
 ## Open questions
 
@@ -836,25 +942,42 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
 2. Leech: hook `0x0057C420` entry (EAX record, EBX attacker, [EBP+8]
    defender) and the calls `0x0057A980` / `0x0057AA00` (amounts) to
    confirm rules H/M and Edge case 6.
-3. §7.1 / §7.2 were checked only by callee sets. Ghidra request: read
-   `0x0057CEE0` (size 1,254) and `0x0057CCB0` (375) branch by branch
-   against §7, especially the block-animation frame test and the soft-hit
-   path.
-4. Unit-event registration and iteration order (`0x005C0C30`, D2MOO
-   `SUNITEVENT_Trigger`/`Register`): owner `sim/units.md`.
-5. Event functions other than 15 and 16 (table §8): behaviour and draws
-   unspecified. Ghidra request: each address in §8.
-6. Hosted games: confirm the element hit-class counter is shared across
-   games (it is a single global byte at `0x0088CAD0`).
-7. Experience on kill (`0x0057E2F0` level-difference scaling with tables
-   `0x006E1668` / `0x006E1694`, 11 entries each; D2MOO
-   `SUNITDMG_ComputeExperienceGain`), party sharing, drops and player
-   death penalties: not specified; owner to be decided (vitals or a
-   death/experience spec).
-8. How `hpregen` (stat 74) from poison, burn and open wounds removes life
-   each frame (regeneration, timer type 3): `combat/vitals.md`, not yet
-   written.
-9. `0x0062BA80` (durability predicate for non-armor items) and
-   `0x00629930` (has durability): items spec.
-10. `0x005D6410` (called after a non-lethal hit on a monster) and
-    `0x005A4390` (after a monster's hit): monsters branch.
+3. Answered: §7.1 and §7.2 are read branch by branch from the 1.14d
+   disassembly (block frame test, soft-hit path, sand leaper knockback,
+   barricade doors). `0x005734C0` is the AI-state setter
+   (`monsters/ai.md` §3). `0x0066A220(killer, class)` is an empty stub
+   (`ret 8`, §7.2 step 2).
+4. Answered: registration, unregistration and iteration of unit events
+   are `skills/bodies.md` §2.13 and §2.18; the record list
+   (`0x005C0C30`, add `0x005C0AD0`, newest first) is also
+   `sim/units.md` §6.6.
+5. Answered: every event function other than 15 and 16 is
+   `combat/events.md`.
+6. Answered statically: `0x0088CAD0` is read and written only by
+   `0x0057CE30` (the two direct references in `all.asm`), lies in the
+   zero-filled part of `.data` (past the section's raw data) and is
+   never reset: one counter per process, starting at 0, shared by every
+   game.
+7. Answered: experience on kill, party share and the add function are
+   `combat/vitals.md` §4.2–§4.5; player death penalties §4.6; drops
+   `items/treasure.md`.
+8. Answered: life change from stat 74 each frame is the event-3
+   regeneration handler, `sim/stat-lists.md` §10.1.
+9. Answered: `0x0062BA80` is "itemtype `throwable`" and `0x00629930`
+   "has durability" (`items/generation.md` predicate table).
+10. Answered: `0x005A4390` is umod mode 3 (`monsters/umod-callbacks.md`
+    §2 rule 4). `0x005D6410(ECX unit)`: for every state the unit has
+    (state bitset `0x0063A100`, nothing when `0x0063A360` = 0; lowest
+    index first, over a copy of the bitset) that has the `states`
+    `remhit` flag (bitset 6, data tables +0xE4): its state list, if any,
+    is detached and freed, then the state is turned off. 1.14d: only
+    state 153 `cloak_of_shadows` has `remhit`.
+11. Answered (`docs/handoff/impl-combat.md` items 11–15, checked against
+    the 1.14d disassembly): item 11 corrected, §5.1 steps 4.1 and 6 (a
+    dead attacker returns without freeing the record; the mode-0 test
+    at `0x0057D63B` ends the whole function, not just thorns); item 12
+    specified, §5.3 step 7 (no attacker: monster rule, nothing healed);
+    item 13 confirmed, §5.7 (`0x0057B33C` switches state 1 on before the
+    list is created; remove callback `0x0057B170` added); item 14
+    confirmed, §8 (`0x005C0055`); item 15 confirmed, §9 (inventory
+    pointer +0x60, created for every server player at `0x005348F9`).

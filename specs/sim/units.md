@@ -21,23 +21,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 43–58 |
-| Inputs | 59–67 |
-| Outputs / state changes | 68–73 |
-| Rules | 74–75 |
-|   1. Unit kinds | 76–95 |
-|   2. Unit record | 96–134 |
-|   3. Lifecycle | 135–296 |
-|   4. Modes and mode schedules | 297–439 |
-|   5. Event dispatch | 440–454 |
-|   6. Events per kind | 455–543 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 544–565 |
-| Constants & data dependencies | 566–582 |
-| Randomness | 583–590 |
-| Edge cases & original bugs | 591–609 |
-| Test vectors | 610–669 |
-| Provenance | 670–709 |
-| Open questions | 710–739 |
+| Summary | 44–59 |
+| Inputs | 60–68 |
+| Outputs / state changes | 69–74 |
+| Rules | 75–76 |
+|   1. Unit kinds | 77–96 |
+|   2. Unit record | 97–135 |
+|   3. Lifecycle | 136–303 |
+|   4. Modes and mode schedules | 304–564 |
+|   5. Event dispatch | 565–579 |
+|   6. Events per kind | 580–702 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 703–724 |
+|   8. Collision line between two units | 725–729 |
+| Constants & data dependencies | 730–746 |
+| Randomness | 747–754 |
+| Edge cases & original bugs | 755–775 |
+| Test vectors | 776–835 |
+| Provenance | 836–886 |
+| Open questions | 887–952 |
 <!-- /index -->
 
 ## Summary
@@ -125,12 +126,12 @@ offset seen in the 1.14d code named in the last column):
 | +0xAC | combat list | own entries dropped at every mode set | `0x0057C980` |
 | +0xC4 | flags | bit 0x1 changed (set by every mode set), 0x2 tile, 0x10 new, not yet announced to clients (every allocation; cleared with 0x1 by the room clean-up `0x00553220`; `items/inventory-moves.md` §6.3; D2MOO `INITSEEDSET`), 0x40 cleared by attack-mode starts, 0x100 hover freed, 0x2000 queued (`unit-order.md` §6), 0x10000 dead, 0x80000 monster mode changing | `0x00555230`, `0x00624690`, `0x0057FED8`, `0x005541B8`, `0x005A7C20` |
 | +0xC8 | flags 2 | 0x2000000 expansion (game +0x70 ≠ 0), 0x4000000 server unit (every allocation) | `0x005552B6` |
-| +0xD0 | node index | 11 at allocation | `0x00555339` |
+| +0xD0 | node index: target-node list slot 0–9 (`monsters/ai.md` §5.2), 11 = in no list | 11 at allocation | `0x00555339` |
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |
 | +0xE0, +0xE4, +0xE8 | update, hash, room links | `unit-order.md` | — |
 
-"Dead" (`0x005541B0`): flag 0x10000, or a player in mode 0 or 17, or a
-monster in mode 0 or 12.
+"Dead" (`0x005541B0`): a null unit, flag 0x10000, a player in mode 0 or
+17, a monster in mode 0 or 12, or any unit of another type.
 
 ### 3. Lifecycle
 
@@ -152,11 +153,17 @@ fixed GUID):
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
 7. Per-kind init (§1 table).
-8. Flags bit 1: `SUNIT_Add` `0x00554850(unit, x, y, game, room, 1)`
-   (`unit-order.md` §3.1). Then a player in mode 0 or 17, or a monster
-   for which `0x0063EA40` holds and `0x004638A0(class, 0x13)` does not,
-   gets path settings (`0x00649560(1)`, `0x00649190(5)`,
+8. Flags & 0x1 (`0x00555443`): `SUNIT_Add` `0x00554850(unit, x, y,
+   game, room, 1)` (`unit-order.md` §3.1), after the per-kind init of
+   step 7; its result is not tested. Then a player in mode 0 or 17, or a
+   monster for which `0x0063EA40` holds and `0x004638A0(class, 0x13)`
+   does not, gets path settings (`0x00649560(1)`, `0x00649190(5)`,
    `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3).
+9. Flags & 0x1 clear: no `SUNIT_Add` and no path settings; the unit is
+   returned as it is after step 7 (seeds drawn, GUID taken, per-kind
+   init done), in no room list, hash list or update queue. This is not
+   a failure: the allocator returns the unit in both cases, and null
+   only from step 1.
 
 Events scheduled by a per-kind init are listed in §6 (missile: §6.3;
 objects: their init functions, §6.4).
@@ -358,8 +365,8 @@ Speed 0 gives event 1 at f + 1 in all forms. Callers: `0x00553B10` from
 Speed +0x4C is computed by `0x00623F50` from the AnimData speed (+0x0C)
 and percentages from stats 67, 68, 69 and states (clamps 15–175 %); the
 frame bonus `0x00623B10` is non-zero only for some player modes (table
-`0x006E8E60`, by class and weapon type). Both are owned by a future
-animation-rate spec (open question 2); §4.2 takes them as inputs.
+`0x006E8E60`, by class and weapon type). Both are §4.7 (answered
+2026-10-07); §4.2 takes them as inputs.
 
 #### 4.4 Every-tick movement (event 0, every tick)
 
@@ -437,6 +444,124 @@ none), schedules event 2: f + 45 with state 21, else f + `aidel`
 (monstats +0x4F, the Normal column, or +0x4F + difficulty (game +0x6D)
 when game +0x6A or game +0x74 is non-zero; 0 → 15).
 
+#### 4.7 Animation rate `0x00623F50` and frame bonus `0x00623B10`
+
+**Rate** `0x00623F50(unit U, file, line)` (`ret 0xC`; 23 callers: every
+mode start and animation re-init, `0x00624390`, `0x005735A0`). It
+writes the speed U +0x4C (and in the cast and attack cases also the
+sequence speed +0x3C) and, in two cases, the path velocity
+(`sim/pathing.md` §8.1 owns the velocity rules; this section owns the
+speed).
+
+Definitions:
+
+- (T, C, M) = the draw identity of (type, class, mode +0x10) after the
+  disguise substitution `0x00645270` (`render/unit-composite.md` §1.1).
+- s = the AnimData speed (+0x0C) of the record that `0x00620F00(U, T,
+  C, M)` stores in U +0x50 (`formats/animdata.md` §5).
+- E(r), the diminished item bonus of row r of table `0x006E8E24`
+  ({flag, c, stat}, 12 bytes): v = the unit's item/skill value of the
+  stat (`0x00625500(U, stat, 0)`); flag = 1 and v ≠ 0 → v := c·v / (c
+  + v) (i32, truncating; every 1.14d row has flag 1). Rows: 0 stat 93
+  `item_fasterattackrate`, c 120; 1 stat 99 `item_fastergethitrate`,
+  120; 2 stat 105 `item_fastercastrate`, 120; 3 stat 102
+  `item_fasterblockrate`, 120; 4 stat 96 `item_fastermovevelocity`, 150.
+- total(k) = the unit total of stat k (`0x00625480(U, k, 0)`).
+- D(x, f) = s·f / 100 as unsigned 32-bit (the product is taken as i32,
+  then divided unsigned), then 0 if ≤ 0 (signed) and at most 0x7FFF.
+  A negative f therefore gives 0x7FFF.
+- Mode tables (`0x006E8A00` players by mode 0–19; monsters by mode 0–15:
+  `0x006E8B90` for class < 410, `0x006E8CD0` for class ≥ 410), 5 i32 per
+  mode: V-skill, V, A-skill, A, fixed. 1.14d: players V = 2, 3, 6; A = 7,
+  8, 11, 12; V-skill = A-skill = 13–16, 18; fixed = 0, 17. Monsters
+  (< 410): V = 2, 8–11, 15; A = 4, 5; V-skill = A-skill = 8–11, 14;
+  fixed = 0, 12. Monsters ≥ 410: as < 410 without V for 8–11.
+
+Steps, first match wins:
+
+1. U none, type 4 (item) or type ≥ 5 → nothing.
+2. Look up A (above).
+3. **Cast** (`0x006216E0`): T = 0 and M = 10 (SC), or T = 0, M = 18 (SQ)
+   and the used skill's (`0x00620250`) skills `seqtrans` (+0x12) is 10;
+   or T = 1 and M = 7 (SC). Speed := D(s, min(100 + E(2), 175)); +0x3C :=
+   the same. No lower clamp.
+4. **Block**: (T, M) = (0, 9) or (1, 6). f = 50, or 100 when U has state
+   101 `holyshield`; q = D(s, f + E(3)), at least 1. Speed := q.
+5. **Get hit**: (T, M) = (0, 4) or (1, 3). Speed := D(s, 50 + E(1)).
+6. **Knockback**: (T, M) = (0, 19) or (1, 13). Speed := w clamped to
+   0..0x7FFF, w = `0x006213D0(T, C, M)`: player: 101 when M = 3, else
+   213; monster: monstats run speed u16 +0x38 when M = 15, else walk
+   speed u16 +0x36 (`data/fixups.md` §8). Velocity := 0x1000.
+7. **Velocity modes** (`0x006214A0`, `sim/pathing.md` §8.1 rule 2): U
+   without a path (+0x2C) → nothing at all. p = max(E(4) + total(67
+   `velocitypercent`), 25). Speed := w·p / 100 (i32, truncating; then 0
+   if ≤ 0, at most 0x7FFF), w as in step 6; velocity := base·p / 100
+   (`sim/pathing.md` §8.1).
+8. **Attack modes** (`0x00621580`): the mode row's A ≠ 0, or A-skill ≠ 0
+   and the used skill's skills row has `UseAttackRate` (bit 19 of the
+   flags at +0x04). Then:
+   1. Dual-wield stat toggle `0x00623C80(U, 1)` (below).
+   2. v = E(0) + total(68 `attackrate`).
+   3. U can dual-wield (`0x006235A0`: player class 4 or 6, monster class
+      417 or 418) and the items at body locations 4 and 5
+      (`0x0063BDE0`), each counted only when usable (`0x0062A4E0`), are
+      both of item type 45 `weap`: v += (a4 + a5) / 2 − a4 (i32, the
+      halving truncates toward 0), a_k = the item's total(68).
+   4. U itself (not T) is a player in mode 18 (+0x10): v −= 30.
+   5. v := clamp(v, 15, 175).
+   6. b = `0x00646170(U)` when U has a state of group 38 (`meleeonly`,
+      `0x0063A7B0`) and that value is ≠ 0; else s. `0x00646170`: only a
+      player in a were-form (`0x0063A400`): W = the attack weapon
+      (below, flag 0); n = W's attack frames `0x0062A710(U, W)`
+      (`skills/bodies-2.md` §2.25), or 19 without W; n ≤ 0 → 0; result
+      = (U +0x48 with the low byte cleared) / n (i32, truncating).
+   7. Speed := +0x3C := D with b in place of s and f = v.
+9. **Fixed** (`0x00621630`, the row's fixed ≠ 0): speed := s clamped to
+   0..0x7FFF.
+10. Otherwise: speed := D(s, clamp(total(69 `other_animrate`), 15,
+    175)).
+
+Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
+an object or missile (objects take `0x00624390`'s own branch,
+`world/objects.md`). The rate draws nothing.
+
+**Dual-wield stat toggle** `0x00623C80(U, flag)` (dual-capable units
+only): S = the attack weapon (flag), W = the weapon in use
+(`0x0063BEF0`). "Active" = `0x00625820(item, 0)` ≠ 0; "on / off" =
+`0x00627910(U, item, 1 / 0)` (`sim/stat-lists.md` §8.4).
+S none: W active → W on. S = W: W active → W on; the other weapon
+(`0x0063BF90`) active → off. S ≠ W: S active → S on; W active → W off.
+
+**Attack weapon** `0x00623990(U, flag)` (`ret 8`): no inventory → none.
+D = the weapon pick `0x0063C9B0` (`skills/bodies-3.md` §3.3: location
+4, else 5, usable and type `weap`). U not dual-capable → D. Used skill
+(`0x006439A0`) or its skills row missing → D. q(k) =
+`0x0063C050(inventory, k)`: the first of the 11 equip slots whose item
+is, for type classes 2, 3, 12 (`1hs`, `1ht`, `ht1`; `0x00629FE0`): with
+k = 5 the weapon in use, with k = 6 not the weapon in use; for other
+items: its items `component` (+0x115) = k. By the skill's `weapsel`
+(+0x168):
+
+| weapsel | X |
+|---|---|
+| 1 | q(6) |
+| 2 | A = q(5), B = q(6); A of type `weap`, B of type `weap` and the skill flag 0x2000 (`0x006446A0`) → B; A `weap` otherwise → A; A none or not `weap` → B |
+| 3 | n = U +0x38 >> 8 (arithmetic); odd = n mod 2 (signed) for a server unit (+0xC8 bit 0x4000000), else n > 5; n = 0 → q(5); flag = 0 → q(6); odd ≠ 0 → q(6); else q(5) |
+| 4 | none, and D := none |
+| other | A = q(5) when of type `weap`, else q(6) |
+
+Result: X when it is of type `weap` and usable (`0x0062A4E0`), else D.
+
+**Frame bonus** `0x00623B10(U)` (`ret 4`; start index of §4.2): (T, C,
+M) as above; T ≠ 0 → 0. M = 7 or 8 (A1, A2), or M = 15 or 16 (S3, S4)
+when `0x006235A0(U)` holds: W = `0x00623990(U, 1)`; c = W's type class
+(`0x00629FE0`; 0 without W); bonus = i32 table `0x006E8E60`[7·c + C].
+Every other mode → 0. 1.14d table (84 entries, 12 type classes × 7
+player classes): Amazon (0) and Sorceress (1): 1 for type class 0, 2
+for type classes 2–6 (`1hs`, `1ht`, `stf`, `2hs`, `2ht`); everything
+else 0. Type class 12 (`ht1`) indexes past the table into zero bytes
+(`0x006E8FB0`…): 0.
+
 ### 5. Event dispatch
 
 Class dispatchers and run order: `tick.md` §5.5–§5.6. Handler per (kind,
@@ -463,7 +588,7 @@ becomes f + 1 (`tick.md` §5.2). Sites: `unit-events.tsv`.
 |---|---|---|---|
 | 0 | §4.2, §4.4; skills `0x005C8CA0` (f + 2, a1 4), `0x005CF900` (f + 1, a1 1), `0x005D1350` (f + 3) | §4 | §4.5 |
 | 1 | §4.2; skills `0x005CF900`, `0x005C8C10`, `0x005CC3B0`, `0x005DA120`, `0x005DA7E0` | §4.2 or per skill | §4.5 |
-| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead and `0x00580610`, regenerate (`0x00580500`, `0x005806F0`; `sim/stats.md`). So a player has a regen event every frame from its join on |
+| 3 | join `0x00534AD0`; handler itself; damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`; `0x0054CED0` | f + 1, (0, 0) | `0x00580810`: reschedule at f + 1 with the same args **first**, then, if not dead, life (`0x00580610`), and when it returns non-zero, stamina and mana (`0x00580500`, `0x005806F0`); `0x00580610` always returns 1, so all three run (`sim/stat-lists.md` §10.1). So a player has a regen event every frame from its join on |
 | 5, 8, 9, 12 | states, skills, shrines, items (`unit-events.tsv`) | per scheduler | `0x0056D790`, `0x0056FCB0`, `0x0056FE40`, `0x00580800` (remove expired states, `0x00627460(unit, f)`): `sim/stat-lists.md` |
 | 6 | hover text set `0x0054A290`; handler | the hover's timeout | `0x00580B70`: timeout (`0x006611D0`) ≤ f → free the hover, +0xA4 := 0, queue for update, flags \|= 0x100; else reschedule at the timeout |
 | 11 | join `0x00534AD0` (f + 250); handler (f + 30) | (0, 0) | `0x00580BE0`: party refresh (`0x005406A0`), pet refresh (`0x00575630`), reschedule f + 30. D2MOO calls it DELAYEDPORTAL; in 1.14d it is a 30-frame refresh |
@@ -479,7 +604,7 @@ event 3 at f + 1, then event 11 at f + 250.
 | Type | Scheduled by | Expire, args | Handler does |
 |---|---|---|---|
 | 0, 1 | §4.6; skills `0x005CC4E0`, `0x005CC690`, `0x005CC3B0`; AI `0x005ECEE0`, `0x005ED2A0`, `0x005F6B70` | §4.2 / §4.4; per caller | mode functions, §4.6 |
-| 2 | neutral start `0x005A73E0`; `0x005A74E0` (f + 15); `0x005A8520` (f + 1, or f + 15 / f + 45 for base id 78); NPC talk `0x00548B00`, `0x0054CA10` (f + 1); restore `0x00542B40`; damage `0x0057B170`, `0x0057B230`; `0x00573780` (f + 2); AI and skill code (30 sites) | §4.6 or per AI | `0x005B1740`: AI think (AI spec; per-class AI record from monster data +0x28, pre-checks `0x005B10E0`, `0x005B1650`, `0x005B13E0`, then the AI function at record +4) |
+| 2 | neutral start `0x005A73E0`; `0x005A74E0` (f + 15); `0x005A8520` (f + 1, or f + 15 / f + 45 for base id 78); NPC talk `0x00548B00`, `0x0054CA10` (f + 1); damage `0x0057B170`, `0x0057B230`; `0x00573780` (f + 2); AI and skill code (30 sites) | §4.6 or per AI | `0x005B1740`: AI think (AI spec; per-class AI record from monster data +0x28, pre-checks `0x005B10E0`, `0x005B1650`, `0x005B13E0`, then the AI function at record +4) |
 | 3 | damage `0x0057AC50`, `0x0057ADD0`, `0x0057C6C0`; skill items; handler | f + 1, (0, 0) | `0x005A6920`: life regeneration (stat 74, `sim/stats.md`); reschedules at f + 1 unless state 52 holds and the rate is ≥ 0; a zero rate cancels its type-3 events |
 | 6 | `0x005DE330`; handler | timeout | `0x005A7F00`, as the player's |
 | 7 | monster unique mods `0x005A1330`–`0x005A4230`, quests, skills | per caller | `0x005A4370` (monster spec) |
@@ -489,6 +614,12 @@ event 3 at f + 1, then event 11 at f + 250.
 
 Types 0, 1, 2, 6, 7, 9, 10, 11, 13, 14 are dropped for a frozen monster
 (`tick.md` §5.6).
+
+Restore `0x00542B40` schedules no monster event (corrected
+2026-10-07): its only two timer sites, `0x00542C87` (type 5) and
+`0x00542D89` (type 2), sit after its saved-record type test = 2
+(object; `0x00542C33`), so they schedule on restored objects only
+(§6.4; `unit-events.tsv`, proof `code`).
 
 Type 7 (`0x005A4370`) runs every mode-2 umod callback of the monster,
 whoever scheduled the event; the bodies, the type-7 and type-2 sites of
@@ -515,11 +646,11 @@ column value), `Parm0` +0x178, `Parm1` +0x17C.
 | Type | Handler | Scheduled by (expire) |
 |---|---|---|
 | 0 | `0x00581700` (trap tick, D2MOO) | object inits `0x0054F860`, `0x0054FB40` (f + 25); handler (f + 15 + roll mod 35) |
-| 1 | `0x00581490`: mode 1 (OP) → 2 (ON) when `Mode2` ≠ 0 (no update queued), then, if `HasCollision2` = 0, `0x00623830` | operate and init functions: f + fc1 + 1 (29 sites), f + fc1 (17 sites, e.g. `0x00545850`, quest objects `0x0058BD50`…), f + 2·fc1 (`0x005B5630`) |
-| 2 | `0x00581510` (D2MOO: well refill) | `0x005858A0`: f + `Parm0` + 1 |
+| 1 | `0x00581490` (corrected 2026-10-07): only when the mode (u16 at +0x10) is 1 (OP) and objects `Mode2` (+0x141) ≠ 0: the mode field := 2 (ON) by a direct write (no mode set, no update queued, flags unchanged), then, still inside that branch, `HasCollision2` (+0x122) = 0 → footprint free `0x00623830`; otherwise nothing | operate and init functions: f + fc1 + 1 (29 sites), f + fc1 (17 sites, e.g. `0x00545850`, quest objects `0x0058BD50`…), f + 2·fc1 (`0x005B5630`) |
+| 2 | `0x00581510` (D2MOO: well refill) | `0x005858A0`: f + `Parm0` + 1; restore `0x00542B40` (site `0x00542D89`) |
 | 3 | `0x005818B0` | `0x0054FB90` (f + 25); handler (f + 15, f + fc1 + 1) |
 | 4 | `0x005817A0` (trap) | `0x00582510` (f + 35) |
-| 5 | `0x005814D0` (shrine reset: mode 0, data +0x0C := 0) | shrine operate `0x00583C70` (f + 1200·minutes + 1); restore `0x00542B40` |
+| 5 | `0x005814D0` (shrine reset: mode 0, data +0x0C := 0) | shrine operate `0x00583C70` (f + 1200·minutes + 1); restore `0x00542B40` (site `0x00542C87`) |
 | 6 | `0x00581620` (hover) | `0x00583C70` (f + 300) |
 | 7 | `0x00581A10` → `0x005449E0` (quest object event) | quest code (`unit-events.tsv`) |
 | 8 | `0x00581250` | `0x0054F860` (f + 60), `0x0054FDB0` (f + 25 + roll mod 250); handler (f + 25 + roll mod 250, f + 1000, f + 600; and event 1 at f + fc1 + 1) |
@@ -536,10 +667,38 @@ Object internals are owned by the objects spec; the seed of the rolls
 
 | Type | Handler | Scheduled by (expire) |
 |---|---|---|
-| 3 | `0x00562D30` → `0x00562C40` per replenished stat: if the rate r ≠ 0 and the value is below its maximum, add 1 and reschedule at f + max(2500 / r + 1, 125) | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
+| 3 | `0x00562D30`: (a) item not broken (flag 0x100) and with durability (`0x00629930`): replenish(rate 252, value 72, max = max durability `0x00625E00`); (b) only when (a) did not run or returned 0, and the item is stackable (`0x006289F0`): replenish(rate 253, value 70, max = max stack `0x006295B0`). Replenish `0x00562C40`: r := total(rate); r = 0 → return 0 (no reschedule). v := total(value) + 1; v > max → return 1 (no reschedule: the chain ends when full). Else set base value := v; if the item's owner GUID (`0x00629F20`) ≠ −1 names a player with a client, send the stat update `0x0053D130`(client, item, 1, value stat, v, 0); if v ≥ 1 and the item is broken, `0x0055F900` (repair path, items spec). Reschedule event 3 at f + max(2500 / r + 1, 125) (integer division), args (0, 0); return 1 | start `0x00558530` (stat 252, durability), `0x00558580` (stat 253, quantity), `0x0055A2A0`: if r ≠ 0 and no type-3 event is pending, f + 2500 / r + 1 (integer division, no minimum) |
 | 4 | `0x0055F120` (returns at once) | none found |
 | 12 | `0x0055F130`: `0x00627460(item, f)` | `sim/stat-lists.md` |
 | others | null (fatal) | none |
+
+#### 6.6 Unit event records (unit +0x90)
+
+Not timer events: the hooks `combat/damage.md` §5.4 runs. A unit keeps
+a doubly linked list of 0x20-byte records at +0x90 (prev +0x18, next
++0x1C; null head = none). Record: event id (u8 +0x00, `events.txt`
+index), flags (u16 +0x02: 1 running, 2 remove pending), owner kind
+(+0x04), key (+0x08), two values passed to the function (+0x0C,
++0x10), function (+0x14).
+
+1. Add (`0x005C0AD0`(ECX game, EDX unit; event, v0, v1, function,
+   kind, key)): unit null → 0. Allocate, zero, fill, **prepend** at the
+   head; return the record. By table index (`0x0056E740`, same order
+   with a function index instead of a pointer): index > 0x31 or table
+   `0x007325B0`[index] null → 0, nothing added.
+2. Find (`0x005C0BE0`(unit; kind, key, v0)): the first record from the
+   head with equal kind, key and v0, else null.
+3. Remove (`0x005C0B50`(ECX game, EDX unit; kind, key)): every record
+   with that kind and key: running → set remove pending; else unlink
+   and free.
+4. Trigger (`0x005C0C30`(ECX game, EDX event; unit, other, arg)): unit
+   null → 0. From the head, each record whose event id matches: set
+   running, call function(ECX game; unit, other, arg, v0, v1), clear
+   running; then, if remove pending or kind = 0 (one-shot), unlink and
+   free it. The next record is read after the call (a record the
+   function adds at the head is not visited). Returns the last called
+   function's result, 0 when none ran. Most recent registration runs
+   first.
 
 ### 7. Scheduler inventory (`unit-events.tsv`)
 
@@ -562,6 +721,11 @@ All 269 call sites of the public scheduling functions in 1.14d
 
 Counts by type: 0: 20, 1: 60, 2: 30, 3: 18, 4: 1, 5: 6, 6: 6, 7: 45,
 8: 7, 9: 7, 10: 3, 11: 3, 12: 42, 13: 20, 14: 1.
+
+### 8. Collision line between two units
+
+Owned by `render/draw-order-2.md` §15.1 (`0x00622AA0`, every caller
+and mask) and §16 (the line test).
 
 ## Constants & data dependencies
 
@@ -605,7 +769,9 @@ handlers (owned by their specs).
    entry for them is fatal, for players and monsters silent.
 6. The neutral AI delay uses the difficulty's `aidel` column only when
    game +0x6A or game +0x74 is non-zero, else the Normal column on every
-   difficulty (§4.6; meaning of the two fields: open question 7).
+   difficulty (§4.6). +0x6A is the game type (3 in single player) and
+   +0x74 the ladder flag (open question 7), so single player uses the
+   difficulty's column.
 
 ## Test vectors
 
@@ -707,32 +873,79 @@ Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
 `0x00541AC0`; `0x0063A770` → state-flag list 33 (`udead`, live
 `states.txt`).
 
+§4.7 (2026-10-07): 1.14d asm of `0x00623F50`, `0x00623B10`,
+`0x00623990`, `0x00623C80`, `0x006216E0`, `0x006214A0`, `0x00621580`,
+`0x00621630`, `0x00621740`, `0x006213D0`, `0x00621360`, `0x006235A0`,
+`0x00646170`, `0x0063C050`, `0x00628660`; tables read from
+`game/Game.exe`: `0x006E8E24` (animstat rows), `0x006E8A00`,
+`0x006E8B90`, `0x006E8CD0` (mode rows), `0x006E8E60` (frame bonus,
+checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
+`0x00623C10`, `0x00623AFC`; stat and state names from live
+`itemstatcost.txt` / `states.txt`. Open question 3: scan of all.asm for
+`+0xA8 + 8·i` accesses.
+
 ## Open questions
 
 1. A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
    U4 with `anim` records and U11 with `site` on every schedule, and
    reach the unobserved combinations (combat with skills, shrines,
    wells, a trade, a cooldown skill).
-2. Animation rate `0x00623F50` and frame bonus `0x00623B10` (inputs of
-   §4.2): owner spec and formulas; to be checked against the logged
-   +0x4C and bonus of `anim` records.
-3. Player position history read from `GetTickCount` (edge case 4): does
-   it feed any outcome (client correction, anti-cheat), and what does
-   `d2-sim` use instead?
+2. Answered (2026-10-07): §4.7 (owner: this spec), read from the 1.14d
+   asm with its tables; still to be checked against the logged +0x4C
+   and bonus of `anim` records (Open question 1).
+3. Answered (2026-10-07): it feeds pet movement. The only readers of
+   the entries (scan of every `+0xA8 + 8·i` access) are the pet AI
+   helpers `0x005E3930` and `0x005E3EA0` (`monsters/ai-bodies-6.md`,
+   pet and hireling move); the timestamp +0xA4 is read only by the walk
+   step's 25 ms gate (`0x00580C20`) and written there and by the
+   teleport write `0x00554FD0` (`sim/path-placement.md` §10 rule 7).
+   `d2-sim` uses now = frame · 40 ms: one walk step per frame at 25
+   frames per second is always more than 25 ms after a write of an
+   earlier frame, and a walk step in the frame of a teleport write is
+   gated, as it is in real time. A recording that moves a player with a
+   hireling (positions of the 20 entries per frame) confirms it.
 4. Object delays rolled from the object-control seed (events 0, 8):
    confirm the draw with an RNG + tick recording.
-5. Item event 4 has a no-op handler and no scheduler: confirm no 1.14d
-   path schedules it (none among the 269 sites).
-6. `proof = file` rows of `unit-events.tsv` (kind assigned from the
-   source-file family): each is settled by a `site` observation or by
-   reading its function.
-7. Game +0x6A and +0x74 (§4.6, edge case 6): which game types set them;
-   a Nightmare single-player recording settles which `aidel` column
-   single player uses.
+5. Answered (2026-10-07): the only type-4 site of the 269
+   (`0x00582595`, trap arm `0x00582510`) schedules on objects (unit +4
+   of the operate record; `unit-events.tsv`, proof code); no 1.14d path
+   schedules item event 4.
+6. Partly answered (2026-10-07): 130 of the 208 `file` rows were read
+   and are now `code`. Corrections: restore `0x00542B40` schedules types
+   5 and 2 on objects only (saved type-2 records; §6.2's "restore" entry
+   for monster type 2 was wrong, and object type 2 also comes from it;
+   §6.2 and §6.4 corrected 2026-10-07);
+   the quest event-7 sites schedule on objects except `0x0059584E`
+   (the Countess, a monster); `0x0054D11F` on the hireling (monster);
+   freeze `0x0057B216`, `0x0057B3E9` on monsters only; the wisp buff
+   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`. The
+   78 rows left `file` (state timers, damage, missile hits, item use,
+   most trade sites) need their callers traced; each names its owner.
+7. Answered (2026-10-07): both are written once, by game creation
+   `0x00530BF0` from C→S message 0x67 (`tools/original-hooks.md` §5.2,
+   caller `0x0053F17A`). Game +0x6A (u8) is the game type, message
+   byte +0x11 (`0x00530CFF`); the client sets it from its own game type
+   `[0x007A0610]` (`0x00477CA0`): 0 (single player) → 3, 6 → 1, 8 → 2,
+   any other → 0; the single-player recording sends 3. Game +0x74
+   (u32) is the ladder flag, bit 21 (0x200000) of the creation flags
+   (message dword +0x27, `0x00530D4C`–`0x00530D59`); the client's
+   default flags 0x100004 have it clear. So single player has +0x6A = 3
+   and the neutral AI delay reads the difficulty's `aidel` column
+   (`0x005A7446`–`0x005A745C`: +0x4F + difficulty +0x6D); only a game
+   with type 0 and no ladder bit uses the Normal column on every
+   difficulty. A Nightmare single-player recording (U10 delays) still
+   confirms it.
 8. Inactive storage: records and restore answered in §3.4 (monster
    GUIDs are kept; other units come back with new GUIDs; restore order
-   monsters, items, others, each newest first). Open: the meaning of
-   node index (`+0xD0`) 11 and of the fields from `0x005B0D60`,
+   monsters, items, others, each newest first). Answered 2026-10-07:
+   node index (`+0xD0`) is the unit's target-node list (game +0x10F8,
+   lists 0–7 per player, 8 and 9 special); 11 = in no list.
+   Answered 2026-10-07 (the inserts, owner `monsters/ai.md` §5.2 with
+   its slot table): a player gets the first empty slot 0–7 at join
+   (`0x005B1880`); its attached units go right after the head
+   (`0x005B1900`, `skills/bodies.md` §6.3); slots 8 and 9 are filled
+   newest first by `0x005B1990`. Each insert requires node index 11
+   and sets it to the slot. Open: the meaning of the fields from `0x005B0D60`,
    `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
    keeps its GUID (`0x00541990`); a recording leaving and re-entering a
    wilderness area confirms the order (`unit-order.md` OQ3).

@@ -27,13 +27,13 @@
 |   4. Setting and reading seeds | 127–143 |
 |   5. Where seeds come from | 144–214 |
 |   6. Inlined draws | 215–235 |
-|   7. Which systems draw from which seed | 236–262 |
-| Constants & data dependencies | 263–273 |
-| Randomness | 274–278 |
-| Edge cases & original bugs | 279–291 |
-| Test vectors | 292–340 |
-| Provenance | 341–373 |
-| Open questions | 374–388 |
+|   7. Which systems draw from which seed | 236–266 |
+| Constants & data dependencies | 267–277 |
+| Randomness | 278–282 |
+| Edge cases & original bugs | 283–295 |
+| Test vectors | 296–344 |
+| Provenance | 345–382 |
+| Open questions | 383–418 |
 <!-- /index -->
 
 ## Summary
@@ -177,13 +177,13 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 <!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
-| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: `time_value(counter)`, counter `0x008846E8` incremented per use. |
+| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: v := `time_value(2·c)` with c the counter `0x008846E8` before its increment (`0x00552E5C`–`0x00552E78`; c starts at 0: `.bss`, no other writer), `dwInitSeed` := v, seed := `init_low(v)`. |
 | item seed, item data +0x04 (data pointer at unit +0x14); start seed at data +0x10 [`ITEMS_InitItemSeed`] | `0x00552E90` | reset to `{1, 666}` (`0x00627DC0`), then derived from the game seed |
-| item seed re-init | `0x005572A0`–`0x00557450` (quality downgrade chain) | `init_low(start seed)`: the item rolls again from its start |
+| item seed re-init | `0x005572A0`–`0x00557450` (quality downgrade chain, after a failed quality routine) | `init_low(s)`, s = the item seed's low word saved by the dispatch before the failed routine; s is also written as the new start seed (`items/quality.md` §5) |
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
 | item seed from a save | `0x0062CBE0` (`0x0062A970` sets 0) | 32 bits from the item bit stream |
 | client unit seeds | `0x00465FD0`, `0x00466200`, `0x00466360` | derived from the client room seed (+0x6C); stays `{1, 666}` without a room |
-| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005AC040`, `0x005D5BF0`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
+| missile seeds | `0x005A9820`, `0x005ACDF0`, `0x005AFB80`, `0x005B04A0`, `0x005B0640`, `0x005C9290`, `0x005CD110`, `0x005D40F0`, `0x005D4680` | `init_low` of geometry (unit x, target x, first path point x, plus frames left; per missile function); pierce test `0x0059F940` uses a pierce stat |
 
 #### 5.4 DRLG
 
@@ -239,8 +239,10 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | System | Seed | 1.14d sites |
 |---|---|---|
 | treasure-class picks, drop quality | dropping unit's seed | `0x0055A6D0`, `0x00558640` |
-| item base stats, affixes, rare/set/unique, sockets, property values | item seed | `0x00557AB0`, `0x005C0D70`–`0x005C2D40`, `0x0065CF40`–`0x0065F6A0` |
-| room population / monster density | game seed | `0x0054EC90` |
+| item base stats (gold, quantity, durability, defense, variable values) and low-quality durability | the item's **unit** seed (unit +0x20) | `0x00557AB0` (`items/generation.md` §2 r3, §4), low quality `0x005C2D40` (`items/quality.md` §6) |
+| affixes, rare/set/unique, sockets, property values | item seed | `0x005C0D70`–`0x005C2D40` (low quality: unit seed, row above), `0x0065CF40`–`0x0065F6A0` |
+| room monster population: density tests and the `sparsePopulate` roll | game seed | `0x0054EC90` (`monsters/population.md` §3, §7) |
+| room monster population: class picks, boss type, spawn points | active room seed | `monsters/population.md` §3–§11 |
 | ambient spawns, spawn positions | active room seed | `0x0054F060`, `0x005B2A00` |
 | region monster lists | monster-region seed | `0x005475E0`, `0x005BDB20` (sim-0004) |
 | AI decisions (largest group: 314 inline sites) | monster's unit seed | `0x005E0490`, `0x005E6320`, `0x005F1800` |
@@ -249,10 +251,12 @@ Offset forms are computed in 32-bit wrapping arithmetic and read as i32.
 | skills | caster's unit seed | `0x005BE3F0`–`0x005DFBF0` |
 | unique monster names | unit seed | `0x00653ED0`–`0x00653F50` |
 | objects (shrines, chests) | object / object-control seed | `0x0054F5D0`–`0x00552B50` |
-| DRLG layouts, mazes, outdoor presets | level seed | `0x006714D0`–`0x006735F0`, `0x006744F0`–`0x00674E40`, `0x0067EED0`–`0x00681240` |
-| DRLG tiles | DRLG room seed | `0x0066D820`, `0x0066F690`, `0x00670170` |
+| DRLG layouts, mazes, outdoor presets | level seed | maze draws `0x006711A0`–`0x00673EC9` (`drlg/maze.md`), `0x006744F0`–`0x00674E40`, `0x0067EED0`–`0x00681240` |
+| DRLG tile substitution (lvlsub shuffle and pick; lvlsub start index) | level seed (level +0x1C4) | `0x0066F690`, `0x0066F990` (`drlg/rooms.md` §9.8) |
+| DRLG tiles: weighted tile choice, door units, per-room substitution | DRLG room seed (room +0x14), after the reset | `0x0066D820`, `0x0066D9E0`, `0x00670170` (`drlg/rooms.md` §9.8) |
+| DRLG sub-theme pick | DRLG room seed **before** the reset | `0x006706D7` in `0x006706A0` (`drlg/rooms.md` §9.8) |
 | client weather, particles, missiles, light colour | client seeds (§5.3, §5.5) | `0x00473090`, `0x00476190`, `0x004CDDB0`–`0x004D8260`, `0x004ACC70` |
-| sound variants, NPC greetings, unit sound timers, ambience cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590` and the trigger code; owners `audio/sound-table.md` §4, `audio/triggers.md` Randomness, `audio/environment.md` §7 |
+| sound variants, NPC greetings, unit sound timers, ambience cues | local player's client unit seed (unit `[0x007A6A70]` +0x20, §5.3) | `0x004E40A0` (a third copy of `roll`) from `0x00482680`, `0x004E0590` and the trigger code; owners `audio/sound-table.md` §4, `audio/triggers.md` Randomness, `audio/environment.md` §7. The same seed is also stepped outside audio (full list and order: `audio/sound-table-2.md` §14, PC 2): the overlay create `0x00470390` for **any** unit's overlay (it takes the local player from `0x00463DD0`; type 6: `roll(frames)` at `0x004704DD`; argument a ≠ 0: `roll(a × 256)` at `0x004705B6`; argument b ≠ 0: `roll(b × 16)` at `0x004705D7`; owner `render/unit-composite.md` OQ 13); the client skill do functions of table `0x00727BA8` (`cltdofunc`) entries 5, 24, 32, 34, 54, 56, 63, 71, 77, 82, 86, 87, 89, 90, which step the caster's seed, so a cast by the local player steps it; and draw-phase users (cursor step `0x004681C0` on `GetTickCount` time, screen shake `0x00476D40`, weather `0x00473F50`, water floors `0x004DE410`, lightning `0x00473910`), whose count depends on drawn frames |
 
 Helper call sites: `roll` 476 (mostly AI, skills, items, missiles),
 `roll_range` 37, `mask` 14 (server AI/skills), `step` 1, `mask_range` 0.
@@ -370,6 +374,11 @@ and applies each `op` in order; `value` and `state` must match.
   match D2MOO.
 - **Static survey** of all 428 drawing functions and their callers
   (seed owners, offsets, consumer forms) for §5–§7.
+- §7 sound-seed row, non-audio users (PC 2 request, 2026-10-07):
+  `0x00470390` read in `tools/ghidra/disasm.py` (`0x004703E1` local
+  player, steps at `0x004704DD`, `0x004705B6`, `0x004705D7`); table
+  `0x00727BA8` entries read from the image with `pefile`; the rest as
+  surveyed in `audio/sound-table-2.md` §14.
 
 ## Open questions
 
@@ -379,9 +388,30 @@ and applies each `op` in order; `value` and `state` must match.
    trace before relying on them.
 2. Map seed source in single player: observed equal to the `.d2s` map
    ID. Confirm for a brand-new character and after save-and-exit.
-3. Object seed derivation (D2MOO: `lo % 65534 + 1`) is not visible at
-   `0x0054FCB0`; record an object spawn to settle it.
-4. Initial value of the unit-seed fallback counter `0x008846E8` (D2MOO:
-   GetTickCount); matters only for units without a parent seed.
+   Static part answered in `drlg/levels.md` OQ 5: the join routine
+   `0x00532690` copies the join record's +0x7E into game +0x7C (game
+   type 3, no `-seed`, same difficulty); the recording question stays.
+   *Answered* (static, 1.14d asm): single player's client game type
+   `0x007A0610` is 0, so the create message (`0x00477CA0`) carries game
+   type 3 (`0x00477CDF`), which `0x0053F17A` passes to `0x00530BF0` and
+   `0x00530CFF` stores at game +0x6A. Game +0x84 is 0 unless `-seed`
+   ran (§5 table, game seed row). The header read `0x0056A090` then sets
+   game +0x7C := `.d2s` +0xAB when game +0x6A = 3, game +0x84 = 0 and the
+   town byte `.d2s` +0xA8 + difficulty (game +0x6D) has bit 0x80
+   (`0x0056A1D4`–`0x0056A217`). So every single-player load in the
+   difficulty the save was written in restores the saved map seed; in
+   another difficulty that byte lacks 0x80 and the game keeps its own
+   new seed (owner of the load rule: `formats/d2s-load.md` §7, PC 2).
+3. *Answered* (static, disassembly of `0x0054FCB0`): the D2MOO form is
+   there, inline: the last step of the object-control seed (`0x0054FD32`)
+   gives `lo'`, reduced `lo' mod 65534` by a multiply-shift (magic
+   0x20005, `imul 0xFFFE` at `0x0054FD5E`), plus 1, then `init_low` of
+   the object's unit seed (unit +0x20) with it (`0x00650E40`). Owner of
+   the rule and its draw order: `world/objects.md` §5.2 (init 3, chest;
+   init 57 runs it too).
+4. *Answered* (static): 0. `0x008846E8` lies in `.data` beyond the
+   file's raw data (zero-filled at load) and its only writer is the
+   increment at `0x00552E67`; no GetTickCount. The argument to the time
+   value is twice the pre-increment counter (§5.3 table).
 5. Do other threads draw in hosted multiplayer games? In single player
    only the main thread drew.

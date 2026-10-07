@@ -25,17 +25,17 @@
 |   3. Camera origins (once per drawn frame) | 118–133 |
 |   4. Units | 134–152 |
 |   5. Panel shift for floors | 153–158 |
-|   6. Tiles | 159–182 |
-|   7. View culling | 183–216 |
-|   8. Screen shake | 217–248 |
-|   9. Time base: no interpolation | 249–275 |
-|   10. What d2rs hooks get | 276–284 |
-| Constants & data dependencies | 285–291 |
-| Randomness | 292–297 |
-| Edge cases & original bugs | 298–307 |
-| Test vectors | 308–329 |
-| Provenance | 330–348 |
-| Open questions | 349–382 |
+|   6. Tiles | 159–198 |
+|   7. View culling | 199–248 |
+|   8. Screen shake | 249–280 |
+|   9. Time base: no interpolation | 281–323 |
+|   10. What d2rs hooks get | 324–332 |
+| Constants & data dependencies | 333–339 |
+| Randomness | 340–345 |
+| Edge cases & original bugs | 346–355 |
+| Test vectors | 356–377 |
+| Provenance | 378–401 |
+| Open questions | 402–494 |
 <!-- /index -->
 
 ## Summary
@@ -143,8 +143,8 @@ Y = py + oy − cy_u + 8
 
 `(ox, oy)` are per-unit extra offsets owned by `unit-composite.md`
 (objects: `objects.txt` Xoffset/Yoffset and skipped when Draw = 0, record
-`+0x148/+0x14C/+0x150`; missiles and the offsets of `0x004DA0B0`–
-`0x004DA0F0`; Open question 3). Each component cel is then placed at
+`+0x148/+0x14C/+0x150`; missiles and the motion-record offsets of
+`0x004DA0B0`–`0x004DA0F0`: `unit-composite.md` §8). Each component cel is then placed at
 (X, Y) by `sprite-placement.md` §2.
 
 So the local player (offsets 0, no shake) is drawn at
@@ -164,7 +164,16 @@ With `left` from §1 and `top = 0`, tile cell `(tx, ty)` is drawn at:
 |---|---|---|---|
 | floors | `0x004DE730` → `0x004DE410` → `DrawGroundTile 0x004F68E0` (driver slot `+0x7C`: floor drawer, DirectDraw `0x005132C0`, GDI `0x006C95D0`) | `(sx − cx_t, sy − cy_t)` | `(sx − 80 + bx − cx_t + left, sy + by − cy_t)` |
 | walls (wall-layer list) | `0x004DF1C0` → `DrawWallTile 0x004F6920` (slot `+0x9C`: wall drawer, DirectDraw `0x005131B0`, GDI `0x006C94B0`) / translucent `0x004F6950` (slot `+0xA0`, DirectDraw `0x005130A0`, GDI `0x006C93A0`) | `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | `(sx − 80 + bx − cx_t + left, sy + 80 + by − cy_t)` |
+| shadow tiles (shadow pass kind 1) | `0x004DF510` → `0x004F6980` (slot `+0xA4`, GDI `0x006C9290`) | as walls: `(sx − 80 − cx_t + left, sy + 80 − cy_t + top)` | as walls |
 | roofs (fading list) | `0x004DEA70` → `DrawGroundTile 0x004F68E0` (the floor drawer, as floors) | `(sx − cx_t, sy − roof_height − cy_t)` | `(sx − 80 + bx − cx_t + left, sy − roof_height + by − cy_t)` |
+
+Shadow tiles take the wall position by the same expression: in GDI
+(`0x004F51D0` = 0) `0x004DF5C6`–`0x004DF5D8` add the view offsets to the
+tile record's +0x00 / +0x04 exactly as the wall walk does
+(`0x004DF145`–`0x004DF156`); with a 3D renderer both pass the list
+item's own +0x04 / +0x08. The GDI drawer places block `i` at (X + block
+x, Y + block y) (s16 pair at block +0x00 / +0x02), as the wall drawer
+`0x006C94B0`.
 
 Roofs go through the floor drawer (`0x004DEA70` calls `0x004F68E0`
 only), so they take its −80 and panel shift (§5) and its whole-tile
@@ -174,7 +183,14 @@ orientations are in which list, the order, shadows and the fade alpha are
 `draw-order.md` / `blend-modes.md`. The floor/wall alignment equals
 `map-preview.md` (walls 80 below floors, `WALL_BASE`); the absolute x is
 80 left of its `sx`. Roofs differ from `map-preview.md` (no `+WALL_BASE`):
-Open question 1.
+live roof blocks lie where floor blocks do (all 15,432 blocks of the 715
+orientation-15 tiles in the 250 used DT1 files have y in {0, 8, …, 64},
+the floor diamond rows), so a roof is its cell's floor diamond raised by
+`roof_height` rows; `map-preview.md`'s `sy + y0 + WALL_BASE − roof_height`
+puts it `WALL_BASE` (80) rows lower than 1.14d. `roof_height` is read
+unsigned (`0x004DEBA6`, 16-bit zero-extended); live values 0, 80, 100,
+120, 156, 160, 190, 230, 240 and once 56,376 (`expansion\Siege\
+temptile.dt1` tile 15: drawn 56,376 rows up, so always culled by §7).
 
 Tile vs unit: a unit at the exact top vertex of cell `(tx, ty)`
 (`px = sx`, `py = sy`) is drawn 12 rows below the floor's top vertex:
@@ -195,9 +211,12 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   is drawn whole even where it reaches past the bound (up to 31 pixels).
   It equals one clip of the assembled tile image to the union of the kept
   blocks only when no culled block overlaps a kept one; with 32-wide
-  blocks whose x lies on a 32 grid of the tile that always holds (count
-  of live wall blocks: Open question 7). In modes 0/3 a culled block has
-  no pixel in the frame, so culling changes no pixel there.
+  blocks whose x and y lie on a 32 grid of the tile that always holds,
+  and it does for the live data: all 104,767 blocks of non-floor,
+  non-shadow, non-roof tiles (orientation ∉ {0, 13, 15}) of the 250 used
+  DT1 files have x ≡ 0 and y ≡ 0 (mod 32) (both block formats are 32
+  wide). In modes 0/3 a culled block has no pixel in the frame, so
+  culling changes no pixel there.
 - Units: no view-rectangle test. The world unit draw `0x004DC7B0` skips a
   unit only (a) by the unit flags and states it checks (owner
   `draw-order.md`), (b) in perspective mode (not GDI) by `0x004F66E0`, and
@@ -205,7 +224,20 @@ units use `H / 2 − 8`, tiles `(H − 40) / 2` (§3, §4).
   local one) alive, monsters alive (mode ≠ 0, 12), missiles and items
   are hidden when `0x00622AA0(local player, unit, 2)` is non-zero, unless
   the player's level has `0x00642840` = 0 (that test is skipped); objects
-  and dead units always pass. Unit tiles (type 5) are never drawn
+  and dead units always pass. `0x00642840` is the level's `LOSDraw`
+  (LevelDefs record of 0x9C bytes at `[0x0096C890]` via `0x0061E470`,
+  field `+0x98`; D2MOO `dwLOSDraw`): in the live `levels.txt` 83 levels
+  have 1 and 54 have 0 (all towns and outdoor areas, e.g. Act 1 –
+  Wilderness 1–6, Act 5 – Siege 1), so outdoors nothing is hidden by
+  sight. `0x00622AA0(a, b, mask)` (D2MOO `UNITS_TestCollisionWithUnit`)
+  takes both units' positions (`0x0045ADF0`/`0x0045AE20`) and sizes
+  (`0x00620510`, `sim/path-placement.md`), moves each end toward the other
+  by its size (capped at 2, `0x00622920`; 0 = not blocked when |dx| + |dy|
+  is below the two sizes' sum) and tests the line between them
+  against the collision map of `a`'s room with `mask` (`0x0064E260`);
+  mask 2 is D2MOO `COLLIDE_VISIBLE` (obstacles one cannot see or shoot
+  over). The line walk itself belongs to the collision spec (to write;
+  `monsters/ai.md` uses the same test with mask 4). Unit tiles (type 5) are never drawn
   (`0x00471EC0`). Pixels outside the frame are cut by the cel clip
   (`sprite-placement.md` §5), whose pre-test only rejects cels with no
   visible pixel.
@@ -256,6 +288,22 @@ loop falls behind, draws are skipped, never interpolated. While a single
 player game is paused the draw runs every pass with no tick. Every
 position above is the integer state at draw time; no sub-tick time enters
 any formula except the shake envelope (§8, wall clock).
+
+Client path step: each client update (`0x0044C790`) runs the per-unit
+update `0x00480810` once per client unit (`0x00465AA0` walks the client
+unit tables with it). A player steps its path once there through
+`0x004807C0` → `0x00650840(unit, base)` (`sim/pathing.md` §9.4) when its
+mode's class (`[0x00711E00 + 12 × mode]`) is 1, or when it is 2 and the
+mode's skill has flag bit 0 (`0x006446A0`); the two cases exclude each
+other (`0x00463390`). A monster steps once when its mode record's class is
+1 (`0x004B13A0`). `base` is `[0x007A04C4]` (`0x0044DB10`), a zero-filled
+global with no direct writer in the binary, so the step uses the
+server's 0x400 (`0x006502D0`: base ≤ 0 → 0x400). So a client unit moves
+exactly one server step per client update, never more. PC 1 read (owner,
+Open question 5): not exactly once for every unit (a monster can step
+in `0x004AF4C0` and again in its update; a local player's missile steps
+twice on its first client update), and `[0x007A04C4]` is +0x5C of the
+client record at `0x007A0468` — to reconcile (staging-5 merge).
 
 For d2rs: one frame per presented tick, positions from the snapshot of
 that tick, no interpolation. The shake envelope uses `t = 40 × (ticks since
@@ -329,7 +377,8 @@ not touch server RNG.
 
 ## Provenance
 
-1.14d `Game.exe`: draw frame `0x0044C990`, client loop `0x0044EFA0`,
+1.14d `Game.exe`: shadow tiles `0x004DF510`/`0x004F51D0`/`0x006C9290`;
+draw frame `0x0044C990`, client loop `0x0044EFA0`,
 view `0x00476000`/`0x00476070`/`0x004760A0`, open mode `0x0045AEA0`,
 unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
 `0x004DE730`/`0x004DE410`/`0x004DF1C0`/`0x004DEA70`, tile entries
@@ -344,7 +393,11 @@ unit origin `0x0045B440`, unit draw `0x00471EC0`/`0x004DC7B0`, tile lists
 `0x004F68E0` (`+0x7C`), `0x004F6920` (`+0x9C`), `0x004F6950` (`+0xA0`) and
 the driver tables `0x0072F6D0` / `0x0074C4A8`; unit visibility
 `0x004DC710`, `0x004DC7B0`; shake arithmetic `0x00476D40`. §1–§3 confirmed
-by the `frames-raw-1` capture runs (`capture.md` Test vectors).
+by the `frames-raw-1` capture runs (`capture.md` Test vectors). Roof
+block y's, roof heights and wall block grid counted 2026-10-06 over the
+DT1 files `mpq-tool extract` wrote from `d2data.mpq` / `d2exp.mpq`
+(`patch_d2.mpq` holds no listed DT1; the 6 known-unused files of
+`formats/dt1.md` excluded); roof height read `0x004DEBA6`.
 
 ## Open questions
 
@@ -352,30 +405,89 @@ by the `frames-raw-1` capture runs (`capture.md` Test vectors).
    (§6); `map-preview.md` places roofs at `sy + 80 − roof_height`. Which
    y range do live roof (orientation 15) blocks use? A game-file read of
    roof block y's plus a capture under a roof settles it.
+   *Partly answered* (game-file read, d2data + d2exp DT1s, the 6 unused
+   ones excluded): the 13,432 orientation-15 blocks have block y in
+   0 … 64 (multiples of 8 almost always) and block x on a 16-pixel grid.
+   §6 concludes from it that 1.14d's `sy − roof_height` stands and
+   `map-preview.md` is 80 rows low. Still open: the capture under a roof
+   that decides between the two y formulas (the pixel proof: a roof in
+   view, e.g. the Rogue Encampment, player under a tent edge, roofs not
+   faded). PC 2 read: 15,432 blocks of 715 orientation-15 tiles in the
+   250 used DT1 files, all with y in {0, 8, …, 64} — to reconcile
+   (staging-5 merge).
 2. ~~Unit culling~~: answered in §7 (no view test; visibility test
-   `0x004DC710`). Open: what `0x00622AA0(player, unit, 2)` and
-   `0x00642840` test (line of sight vs room; owner `draw-order.md`).
-3. The extra unit offsets of `0x004DA0B0`/`0x004DA0D0`/`0x004DA0F0`
-   (record of `0x0046F060`, fields `+0x34/+0x38/+0x3C`) and the missile
-   offsets (`0x0046ACE0` record `+0xA2/+0xA4/+0xA6`): what they are and
-   when non-zero. Owner `unit-composite.md`; Ghidra read of `0x0046F060`.
-4. Shadows (orientation 13 list, `0x004DF510`): their (X, Y). Owner
-   `draw-order.md`; Ghidra read of `0x004DF510`/`0x004DEF80`.
+   `0x004DC710`). *Answered* (static): `0x00642840` is the level's
+   `LOSDraw` gate (`render/draw-order-2.md` §15 r1) and
+   `0x00622AA0(player, unit, 2)` the unit collision line with mask 2
+   (`render/draw-order-2.md` §15.1; also §7). Open: the line walk of
+   `0x0064E260` (owner: a collision spec, to write; Ghidra read).
+3. *Answered* in `unit-composite.md` §8: the three getters read the
+   unit's client motion record (gfx +0x30, `0x0046F060`; 0 without one),
+   and missiles add `missiles` xoffset / yoffset + zoffset (+0xA2/+0xA4/
+   +0xA6). §4 now links there.
+4. *Answered* (static, asm of `0x004DF510`, `0x004DEF80`, `0x006C9290`):
+   §6 shadow-tile row, the wall position and wall block placement.
+   Shadow pass kind 0 / 2 units are placed as units (§4,
+   `render/blend-modes.md` §5).
 5. The client update between server tick and draw (`0x0044C790`): confirm
    that unit path positions advance exactly once per tick there (Ghidra
    read), so a capture's state equals the server state after the same
    tick plus the client's own path step.
-6. How the client's copy of the player unit seed (`unit +0x20`) is
-   initialised, so d2rs can reproduce shake offsets without recordings.
-   Partly answered: at a single-player join it is {0x6AC6935F, 0}
-   (`client/model.md` Randomness rule 2); later draws on it are
-   `client/model.md` open question 6.
-   The cursor (state 1, wall clock) and the weather step the same seed
-   each frame (`capture.md` §3.3), so shake offsets also depend on them;
-   captures record the seed at frame start and end.
+   *Partly answered* (static, 1.14d asm): not exactly once for every
+   unit. The
+   update itself runs once per server tick (`client/model.md` §5 r1);
+   the client calls the path step `0x00650840` (`sim/pathing.md` §9.4,
+   base `[0x007A04C4]`, which no instruction writes by absolute address
+   — it is +0x5C of the client record at `0x007A0468`; ≤ 0 → 0x400)
+   from three places:
+   - Players (`0x00463390`, via `0x004807C0`): at most once. Mode-table
+     `0x00711E00` entry 1 → step; entry 2 with a used skill
+     (`0x00620250`) whose flags +0x0C bit 0 is set → step. The two are
+     exclusive.
+   - Monsters (`0x004B13A0`): `0x004AF4C0` steps when the used skill's
+     flags bit 0 is set, then the update steps again when the monster
+     mode table (`0x004AF400`) entry is 1. Both in one update only when
+     both hold (no reader excludes it).
+   - Missiles: each client missile function (table `0x0072A398`) ends
+     in at most one call of the missile step `0x004D30C0` (all 82 call
+     sites are on exclusive return paths). It steps once, then loops a
+     second time in the same update when the missile's owner
+     (`0x004639D0`) is the local player in game types 0, 1, 6, 8, its
+     elapsed frames (`0x0064A3B0`) are 1 and it still has a path: a
+     local player's missile moves two steps (and its frames left drop
+     by 2) on its first client update.
+   Still open (recording): whether a monster ever meets both step
+   conditions in one update, and whether client updates and server
+   ticks are 1:1 in single player (the `frames-raw-2` `client_update`
+   counter against the server tick count over one run settles it;
+   OQ8). PC 2 read (§9): every client unit steps exactly once per
+   client update (players by mode class 1 or 2 + skill flag, monsters
+   by mode class 1 only), and `[0x007A04C4]` is a zero-filled global
+   with no writer, so the step always uses 0x400 — to reconcile
+   (staging-5 merge).
+6. ~~Client player seed init~~: `sim/rng.md` §5.3 (one step of the
+   client room seed at the player's creation position, `0x00465FD0`).
+   At a single-player join it is {0x6AC6935F, 0} (`client/model.md`
+   Randomness rule 2); later draws on it are `client/model.md` open
+   question 6.
+   Outside that case, not reproducible without recordings: the room seed
+   has already been stepped once per client unit created in that room
+   before the player (S→C message order at join), and the cursor (state
+   1, wall clock) and the weather step the same seed each frame
+   (`capture.md` §3.3), so shake offsets also depend on them. Captures
+   keep recording `seed_start` / `seed_end`; a join trace of the S→C
+   unit-add messages plus the first frame's `seed_start` would check
+   the init rule.
 7. Wall blocks: is every live wall block 32 pixels wide with an x on a 32
    grid of its tile (§7 clip equivalence)? Game-file count with the C52
    DT1 counts.
+   *Answered* (game-file read, 2026-10-07, 251 used DT1s of d2data +
+   d2exp; `Patch_D2.mpq` unlisted): yes. Every block is 32 pixels wide
+   by format (`formats/dt1.md`), and all 104,780 blocks of orientations
+   1–12, 14 and 16–19 have x ≡ 0 (mod 32). (The six unused DT1s are the
+   only files with off-grid wall blocks.) PC 2 read (§7): all 104,767
+   blocks of orientations ∉ {0, 13, 15} in the 250 used DT1 files, with
+   x ≡ 0 and y ≡ 0 (mod 32) — to reconcile (staging-5 merge).
 8. Draws with no server tick between them (118 frames of run 1 while not
    paused, `capture.md` §4, OQ8) against §9's "passes without a tick do
    not draw"; the `frames-raw-2` client-update counter settles it.

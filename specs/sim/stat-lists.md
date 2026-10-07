@@ -23,22 +23,22 @@
 | Outputs / state changes | 67–73 |
 | Rules | 74–75 |
 |   1. Records | 76–124 |
-|   2. Flags (+0x10) | 125–141 |
-|   3. Stat arrays | 142–157 |
-|   4. Allocation and ownership | 158–181 |
-|   5. Base writes | 182–206 |
-|   6. Full values | 207–265 |
-|   7. Value-change notification | 266–294 |
-|   8. Chain operations | 295–394 |
-|   9. States | 395–426 |
-|   10. Timer event handlers | 427–502 |
-|   11. Mod array and stat messages | 503–520 |
-| Constants & data dependencies | 521–532 |
-| Randomness | 533–536 |
-| Edge cases & original bugs | 537–555 |
-| Test vectors | 556–592 |
-| Provenance | 593–616 |
-| Open questions | 617–632 |
+|   2. Flags (+0x10) | 125–162 |
+|   3. Stat arrays | 163–178 |
+|   4. Allocation and ownership | 179–202 |
+|   5. Base writes | 203–227 |
+|   6. Full values | 228–293 |
+|   7. Value-change notification | 294–330 |
+|   8. Chain operations | 331–438 |
+|   9. States | 439–475 |
+|   10. Timer event handlers | 476–563 |
+|   11. Mod array and stat messages | 564–581 |
+| Constants & data dependencies | 582–593 |
+| Randomness | 594–597 |
+| Edge cases & original bugs | 598–621 |
+| Test vectors | 622–658 |
+| Provenance | 659–682 |
+| Open questions | 683–709 |
 <!-- /index -->
 
 ## Summary
@@ -137,7 +137,28 @@ prev.
 | 0x80000000 | EXTENDED | the 0x64-byte form |
 
 Callers pass other bits (e.g. 0x08, 0x20, 0x40) for their own lookups
-(§9.3); this spec gives them no rule.
+(§9.3); this spec gives them no rule. Who sets each bit (1.14d, every
+allocation site of `0x006251F0` (70) and `0x00626D40` (9), and every
+store to list +0x10 in `0x00625000`–`0x00628000`):
+
+| Bit | Set by |
+|---|---|
+| 0x1 | the monster base list only (`0x00573CB0` at `0x0057407D`, `monsters/init.md` §6) |
+| 0x2 | expiry setters `0x00625310` (4 callers) and `0x006260B0` (26), always on a plain list just allocated or found as a state's list (`0x006256B0`); allocations with 2 / 0x802; attach rule 4 on the unit's own list |
+| 0x4 | allocations by `0x0056E520`, `0x0056F1F0`, `0x005D7EA0`, `0x00620E80` (server), `0x004C7BE0`, `0x004C7950` (client); `0x005A6380` with 0x4004 |
+| 0x8 | `apply_state` `0x0056E970` for a state with `aura` (`skills/bodies.md` §2.7 step 6) |
+| 0x20 | `apply_state` for a curse state (step 3) |
+| 0x40 | item class-skill lists: `0x00557AB0` (generation), `0x0062A970` (load), `0x005C0D70`, `0x005C0F90` (staffmods, `items/generation.md` §6.2), `0x00534C70` (start items); client `0x0045F190`, `0x004C1910` |
+| 0x80 | the overlay list `0x00621E40` (§8.8) |
+| 0x100 | `0x00625A00(unit)` on the unit's own list, called only from `0x00621E40`; cleared by `0x00627410` |
+| 0x800 | `apply_state` for a state with `exp` (step 6); allocations 0x802 by `0x005D0350` and `0x005D7430` (Conversion) |
+| 0x4000 | `0x005A6380` only (with TEMPONLY) |
+
+Variable flags: `0x0056E970` (above), item property lists
+`0x0065CBF0` (flags from its 14 callers, `items/properties.md`),
+item load `0x0062CBE0` (its argument), `0x005543B0` and `0x00621C30`
+(0: they allocate only when no list was found). Every extended list is
+allocated with flags 0.
 
 ### 3. Stat arrays
 
@@ -257,11 +278,18 @@ and not `keepzero` → remove. Notify (always; d ≠ 0 so new ≠ old).
    (≤ 64): set-full(d, recompute(L, d)).
 6. Return v.
 
-Consequences (reproduce): when update is false, T's own full entry keeps
-its previous value. For op-2 stats (e.g. 216) on a player, entry j of
-the stat's own target table is unused (base 0 = strength), so any
-strength > 0 blocks: per-level stats never appear in a player's full
-array, only their targets do. When v = 0 the deps are not recomputed.
+Consequences (reproduce): when update is false, this call does not
+write T's own full entry. Its callers decide what happens next: a
+recompute reached from rule 4 (T an op stat of another stat) or rule 5
+(T a dependency) is followed by the caller's set-full(T, returned v)
+(`0x00626786`, `0x006268CF`), so T's entry is written there; a recompute
+reached from propagate (§6.1) or from attach/detach (§8.1.7, §8.2.4) has
+no such write, and T's entry keeps its previous value. For op-2 stats
+(e.g. 216) on a player, entry j of the stat's own target table is unused
+(base 0 = strength), so any strength > 0 blocks: a change of the
+per-level stat itself leaves its full entry stale, but a recompute of a
+stat that lists it as a dependency writes it. When v = 0 the deps are
+not recomputed.
 
 ### 7. Value-change notification
 
@@ -277,8 +305,14 @@ does (more base writes, attach, detach) happens at that point.
 
 Players and monsters (§4.3). Invalid stat → return. Then:
 
-1. If `itemevent1` (i16 +0x48) > 0: item event registration (new ≠ 0:
-   `0x005C0BE0`, `0x0056E740`; new = 0: `0x005C0B50`), items spec.
+1. If `itemevent1` (i16 +0x48) > 0, item event registration on the
+   owner (`units.md` §6.6), with k the full stat key: new ≠ 0 → if no
+   record (kind 2, key k, v0 k) exists (`0x005C0BE0`), add (`0x0056E740`)
+   event `itemevent1` with function index `itemeventfunc1` (i16 +0x4C),
+   kind 2, key k, v0 k, v1 0; then, if `itemevent2` (i16 +0x4A) > 0,
+   add `itemevent2` with `itemeventfunc2` (+0x4E) the same way (an
+   existing record skips both). new = 0 → remove every record of kind 2
+   and key k (`0x005C0B50`).
 2. By stat:
    - 7, 9, 11 (max life, mana, stamina), with current = 6, 8, 10: if
      new ≠ old and old > 0 and c := unit total(current) > 0: o := old,
@@ -288,7 +322,9 @@ Players and monsters (§4.3). Invalid stat → return. Then:
      §5.2). For stat 7 on a monster whose monstats `DamageRegen` (u32
      +0x1A0) ≠ 0: set stat 74 := ((new >> 8) · DamageRegen) >> 4.
    - 83, 97, 98, 107, 126, 127, 151, 188, 204: skill and state handlers
-     (skills spec).
+     (skills spec). Stats 97 / 107, 83 / 188 / 126 / 127 and 98 and the
+     pet-maximum helper `0x0056BD90` are `skills/levels.md` §7 "Skill
+     stat callbacks" (owner; dispatch inside `0x0055B800`).
 
 The client callback `0x004609F0` is client-only.
 
@@ -365,10 +401,18 @@ set-full(U's list, S, eval(U's list, S), unit U). Caller `0x005627F4`.
 
 #### 8.8 Death and overlay
 
-1. `0x00627540`(unit): walk the unit's active chain; a list whose owner
-   type is not 4, whose flags have none of 0x181 and whose state is not
-   "stay on death" for the unit (`0x0063A4A0`) is freed if plain (then
-   the walk restarts at the head). Callers `0x0057F33D`, `0x005A659A`.
+1. `0x00627540`(unit): unit null, or its list missing or not extended
+   → nothing. Walk the unit's active chain from the head (next := prev,
+   read before the test); a list whose owner type is not 4, whose flags
+   have none of 0x181 and whose state does not stay on death (below) is
+   freed if plain; in both cases (freed or extended) the walk restarts
+   at the head. Callers `0x0057F33D`, `0x005A659A`.
+   **Stays on death** (`0x0063A4A0`(unit, state)): state < 0 or ≥ the
+   states count → no. Unit a monster (type 1) → the state has flag
+   `monstaydeath` (states flag bit 14, bitset 14 of `runtime-maps.md`
+   §4, read at data tables +0x104); any other unit, a null unit included
+   → flag `plrstaydeath` (bit 13, data tables +0x100). `bossstaydeath`
+   is not read here.
 2. `0x00627410`(unit): clear 0x100 on the unit's list, then remove all
    (§5.4) from the first active child with OVERLAY (`0x006256E0`).
    Called from the room update queue step (`tick.md` §3 step 6,
@@ -422,7 +466,12 @@ changed. 1.14d-confirmed (asm of `0x00639DB0`).
 - List of a state (`0x00625650`(unit list, s)): first in the active chain
   with list state = s, else first in the parked chain. By flags
   (`0x006256E0`): parked chain when 0x2000 is asked, else active chain;
-  first list with any asked flag. By state and flags `0x006257D0`.
+  first list with any asked flag. By state and flags (`0x006257D0`(unit,
+  s, flags)): the unit's list missing or not extended → none; parked
+  chain when flags has 0x2000, else the active chain; f := flags without
+  0x2000; walking from the head, the first list whose state = s and,
+  when f ≠ 0, whose flags share any bit with f (not every bit); f = 0
+  matches on the state alone. None found → null.
 
 ### 10. Timer event handlers
 
@@ -439,6 +488,14 @@ changed. 1.14d-confirmed (asm of `0x00639DB0`).
    256; set stat 6 := hp. Then f := life fraction (`stats.md` §9.3); if
    |f − (stat 352 & 0xFF)| > 4: message `0x00571A10`(unit, f) and set
    stat 352 := f.
+   Both the life write and the fraction update are inside "r ≠ 0" (r =
+   0 jumps straight to the return). `0x00580610` returns 1 on every
+   path (`0x005806DD`), so the "regenerate if `0x00580610`" test of
+   `units.md` §6.1 never stops steps 4 and 5 (2026-10-07, implementation
+   question in `docs/handoff/impl-units-stats.md` §5 item 3). The handler
+   runs steps 4 and 5 only when it returns non-zero (`0x00580844`), so
+   stamina and mana run on every frame the unit is not dead, whatever r
+   is.
 4. Stamina (`0x00580500`): s := total(10), b := total(28). By unit mode:
    1, 5 → shift 8; 2 → shift 9, but only if s & 0xFFFFFF00 ≠ 0; 6 →
    shift 9; any other mode → only if b ≥ 1000, shift 8. Else stop.
@@ -459,7 +516,8 @@ changed. 1.14d-confirmed (asm of `0x00639DB0`).
    unit's type-3 events (`0x00540E60`, argument 0 = any; including that
    one) and stop.
 4. hp := total(6), m := max life. r < 0 and hp < 256: continue only if
-   the unit's room exists and `0x0061AB00`(room) = 0.
+   the unit's room exists and is not in a town level (`0x0061AB00`:
+   the room's level is 1, 40, 75, 103 or 109, `drlg/levels.md`).
 5. hp += r; hp > m → cancel all type-3 events, hp := m; hp < 1 →
    0; set stat 6 := hp; fraction update as for players (`0x005A5650`).
 6. hp = 0 and mode ∉ {0, 12}: killer := owner of the unit's state-2
@@ -490,10 +548,13 @@ Handlers: player `0x00580800`, monster `0x005A7EF0`, item `0x0055F130`;
 each passes the game frame. With the unit's list extended, walk its
 active chain from the head (next := prev, read before the test): a list
 with NEWLENGTH and expire ≤ frame (signed) is freed if plain, and the
-walk restarts at the head. An expired extended list is not freed and
-the restart finds it again: an endless loop (no 1.14d caller creates
-one). Parked lists never expire. Frame 0 (client): each NEWLENGTH list's
-expire −= 1 first; expired at ≤ 0.
+walk restarts at the head. An expired extended list is not freed, but
+the restart happens all the same (`0x006274A9`): the walk finds it again
+and, with the frame unchanged, never ends (confirmed in the 1.14d code;
+whether any 1.14d path creates such a list: open question 5). Parked
+lists never expire. Frame 0 (client): each NEWLENGTH list's expire −= 1
+first; expired at ≤ 0 (the restart decrements every NEWLENGTH list
+again on each pass).
 
 The event only triggers the walk: every due list of the unit goes,
 whichever event was scheduled for it. State code schedules type 12 at
@@ -537,13 +598,18 @@ None.
 ## Edge cases & original bugs
 
 1. Base setters store invalid stat ids (`stats.md` §1.1).
-2. Recompute leaves T's own full entry stale when update is false
-   (§6.4); per-level stats never appear in a player's full array.
+2. Recompute leaves T's own full entry stale when update is false and
+   the recompute was not reached as an op stat or dependency (§6.4
+   consequences); per-level stats reach a player's full array only
+   through such a caller.
 3. A plain DYNAMIC child's damage-related base changes still reach its
    parent (§6.1).
-4. Expiry of an extended list loops forever (§10.4). The state it
-   spins in is fixed: every expired plain list met before it in the
-   walk is freed, nothing behind it changes. d2rs stops there instead
+4. Expiry of an extended list loops forever (§10.4); the death walk
+   (§8.8 rule 1) loops the same way on an extended child whose owner
+   type is not 4, without 0x181 and with a state that does not stay on
+   death (item lists have owner type 4 and are skipped). The state the
+   expiry spins in is fixed: every expired plain list met before it in
+   the walk is freed, nothing behind it changes. d2rs stops there instead
    of hanging and reports `StatListError::EndlessExpiry(list)` with the
    lists in that state; a recording that finished the walk contradicts
    the loop and is a mismatch.
@@ -621,11 +687,22 @@ replaces it under the same comparison.
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
    call.
-2. `0x0061AB00`(room) in monster regeneration (§10.1 step 4): what it
-   tests (room/level spec).
-3. Who sets list flags 0x08, 0x20, 0x40, 0x80, 0x100 and 0x1 (skills,
-   curses, items); this spec only needs their tests.
+2. Answered (2026-10-07): `0x0061AB00(room)` (§10.1 step 4) is "room in a town": the
+   room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
+   byte table `0x006426C8`); null room → 0. Also used by the unit find
+   (`monsters/umod-callbacks.md` §3.1).
+3. Answered (2026-10-07): §2, table after the flag list (every
+   allocation site and flag store of 1.14d).
 4. Recording: the whole spec is unverified until `record_stats.py`
    passes `check_stats.py` (queued).
-5. Is an extended list ever given NEWLENGTH (would hang §10.4)? None
-   found statically.
+5. Answered (2026-10-07): no. All 9 extended allocations pass flags 0;
+   the expiry setters `0x00625310` / `0x006260B0` are called only on
+   plain lists (a fresh `0x006251F0` list or a state's list, which
+   `apply_state` allocates plain); attach rule 4 sets NEWLENGTH only on
+   the unit's own list, the root, which is never in an active chain;
+   and every TEMPONLY list (§2 table) is attached to a player or monster,
+   never to an item's extended list. The loop
+   itself is confirmed (§10.4). The TEMPONLY allocations (flags 4) are
+   at `0x0056E53C`, `0x0056F3D4`, `0x005A63AE`, `0x005D8058` and
+   `0x00620E9E` (`0x00620E80` attaches to a player or monster unit,
+   whose own list is never walked).

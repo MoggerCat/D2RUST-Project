@@ -167,8 +167,24 @@ pub trait WorldPending: Pending {
     /// Pet remove `0x005750E0(game, owner, GUID, 1)` (`sim/pets.md` §6;
     /// §14).
     fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {}
-    /// A quest death call (§15; `umod-callbacks.md` OQ4).
-    fn quest_death(&mut self, unit: UnitId, call: u32) {}
+    /// `0x0063E990` undead (`umod-callbacks.md` §15.1).
+    fn umod_is_undead(&self, unit: UnitId) -> bool {
+        false
+    }
+    /// missiles `Range` of `class` (§15.2).
+    fn umod_missile_range(&self, class: i32) -> Option<i32> {
+        None
+    }
+    /// §15.2: set an uber death flag; true when all three are set.
+    fn umod_set_uber_death(&mut self, slot: usize) -> bool {
+        false
+    }
+    /// §15.2: game +0x8C.
+    fn umod_game_8c(&self) -> i32 {
+        0
+    }
+    /// §15.2: item code + drop helper `0x00559A30`.
+    fn umod_quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {}
     /// Umod 24's belt steal (§17 steps 3–4; unreachable in 1.14d).
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {}
     /// `0x005B2490(game, unit, class, mode, spread, flags)` (§25).

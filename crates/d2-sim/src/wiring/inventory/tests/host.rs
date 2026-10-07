@@ -134,9 +134,16 @@ fn checks_and_targeting_reset() {
 
     let u = w.unit(k).unwrap();
     w.items.get_mut(u).unwrap().flags |= 0x4;
+    w.rest.sent.clear();
     w.desk(|d| d.reset_targeting(p));
     assert_eq!(w.items.get(u).unwrap().flags & 0x4, 0);
-    assert!(w.rest.sent.is_empty(), "the probe answers 1: no 0x3F");
+    // The probed unit is the owner, a player: 0x3F (code 0xFF, the GUID,
+    // 0xFFFF) to it.
+    let mut want = vec![0x3F, 0xFF];
+    want.extend_from_slice(&k.to_le_bytes());
+    want.extend_from_slice(&[0xFF, 0xFF]);
+    let me = w.desk(|d| d.owner_of(p)).unwrap();
+    assert_eq!(w.rest.sent, [(me, want)]);
 }
 
 /// The direct 0x9D action 5 (§6.4) of the cube's removal: the stored

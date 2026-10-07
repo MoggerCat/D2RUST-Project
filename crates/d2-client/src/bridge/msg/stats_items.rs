@@ -110,7 +110,7 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         k => {
             *k = KindData::Item(ItemData {
                 last: Some(record),
-                flags4: false,
+                ..ItemData::default()
             })
         }
     }
@@ -148,8 +148,9 @@ pub fn use_stackable_item(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), 
         }
     };
     if m.arg == 0xFFFF && m.code == 0xFF {
-        // Rule 2.1.
+        // Rule 2.1 (with `0x004C2180`, §5 r3).
         set_flag(w, false);
+        super::items::clear_scroll_state(w, key);
         w.use_cursor = None;
         return Ok(());
     }

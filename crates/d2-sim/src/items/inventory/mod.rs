@@ -626,8 +626,9 @@ pub trait InvWorld {
     fn quiver_kind(&self, item: UnitId) -> bool;
 
     // --- Targeting reset (§5.3).
-    /// `0x0044BE50` of the item (0 → queue 0x3F).
-    fn targeting_probe(&self, item: UnitId) -> u32;
+    /// `0x0044BE50` of the targeted unit: the inventory's owner, never the
+    /// item (unit type, 6 for a missing unit; 0 → queue 0x3F).
+    fn targeting_probe(&self, unit: UnitId) -> u32;
     /// Queue S→C 0x3F (code 0xFF, the item's GUID, 0xFFFF; §11).
     fn queue_untarget(&mut self, player: UnitId, item_guid: u32);
 

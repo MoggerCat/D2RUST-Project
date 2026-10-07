@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 488–494 |
 | Test vectors | 495–501 |
 | Provenance | 502–526 |
-| Open questions | 527–570 |
+| Open questions | 527–588 |
 <!-- /index -->
 
 ## Summary
@@ -544,6 +544,18 @@ of `rng.md` §5.1–§5.2 before the first draw.
 5. Second caller of `0x0052C320` at `0x00451909` (code outside the
    Ghidra function list, near `0x004518E0`): what triggers it, and can
    it change `0x00731004` during a scenario? Probe: breakpoint on it.
+   *Answered* (static): `0x004518E0` is the "p" (playback) entry of a
+   developer command table at `0x006D5C00` (16-byte records: name,
+   handler, flags, −1; names `h`, `help`, `set`, `mode`, `c`, `r`, `p`;
+   "p" → `0x0044B5B0` → `0x004518E0`, "r" → `0x0044B5A0` → `0x004519A0`
+   toggles input recording). A first "p" opens `Record.dr1`
+   (`0x00451710`: read a 4-byte value, then a 20-byte header to
+   `0x007A2768`; header word 0 must be 1) and passes the header's u32
+   at `0x007A2778` (+0x10) to `0x0052C320`, i.e. a fixed game seed from
+   the recording; a second "p" just clears the flag. No direct code
+   reference to the table base was found, so a scenario reaches it only
+   through that console; without a `Record.dr1` in the working
+   directory nothing is set. Scenarios never type it.
 6. A difficulty the save has not reached (save byte bit 7 clear): does
    the join fail, or does the game start with the clock-derived +0x7C?
    Probe: §5.4 with D = 2 on a fresh character.
@@ -555,6 +567,12 @@ of `rng.md` §5.1–§5.2 before the first draw.
 9. Does any server path in a scenario call `time_value` (`0x00650DE0`)
    after game creation (unit-seed fallback, `rng.md` §5.3)? Probe:
    breakpoint on `0x00650DE0`, log the caller, over a full scenario.
+   *Partly answered* (static): `0x00650DE0` has five call sites: the
+   client particle globals (`0x004762B7`, `0x00476822`), game creation
+   (`0x0052C2B6`, `0x0052C2DD`) and the unit-seed fallback
+   (`0x00552E6C`, taken only for a unit allocated without a parent
+   seed). So the only server path after creation is that fallback; which
+   allocation paths reach it in a scenario is still for the probe.
 10. Are client frames skipped (`0x0044EFD9` early return, `0x004F6070`)
     when the game window is not focused or minimized under the debugger?
     Probe: count `0x0044F136` hits per second with the window in the

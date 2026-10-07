@@ -31,10 +31,10 @@
 | Randomness | 407–410 |
 | Edge cases & original bugs | 411–420 |
 | Archive set (D2-specific) | 421–427 |
-| Observations (1.14d install) | 428–452 |
-| Test vectors | 453–466 |
-| Provenance | 467–484 |
-| Open questions | 485–498 |
+| Observations (1.14d install) | 428–459 |
+| Test vectors | 460–473 |
+| Provenance | 474–491 |
+| Open questions | 492–505 |
 <!-- /index -->
 
 ## Summary
@@ -440,6 +440,13 @@ use, all decoded, 0 errors.
 - Sector compression masks seen: `0x08` (PKWARE), `0x40`/`0x80` (ADPCM
   alone), `0x41`/`0x81` (Huffman + ADPCM). zlib, bzip2, LZMA and sparse are
   never used, so they stay unimplemented.
+- Compressed sector counts over all 11 archives (block-table walk, §13
+  key recovery for every encrypted block, 0 failures): mask 0x08 123,593,
+  0x41 174,997, 0x81 175,546, 0x40 21, 0x80 8. Every one of the 350,543
+  Huffman + ADPCM sectors (0x41 / 0x81) selects Huffman weight table 8
+  (§11 byte 0); tables 0–7 never occur. 89.4 % of them contain at least
+  one escape (symbol 0x101), PC 2's full-decode check (`formats/wav.md`
+  Survey mirrors this).
 - Encrypted + FIX_KEY is used for `.wav` files and a few special files.
 - `(listfile)`: present in all archives except `patch_d2.mpq`, but often
   incomplete. `d2sfx.mpq` lists only 31 of its 2,360 files. §13 key recovery

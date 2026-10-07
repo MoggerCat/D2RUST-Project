@@ -156,11 +156,6 @@ pub trait InvRest: MovePending {
 
     /// Trade hook `0x00568770` (page 2; multiplayer trade).
     fn trade_hook(&mut self, owner: Owner, item: Guid) {}
-    /// `0x0044BE50` of an item in the targeting reset (§5.3; 0 → S→C
-    /// 0x3F). Default: 1 (nothing queued).
-    fn targeting_probe(&self, item: Guid) -> u32 {
-        1
-    }
     /// The item is active on the unit (`0x00625820`).
     fn item_active_on(&self, item: Guid, unit: Owner) -> bool;
     /// The item's own contribution to a unit stat (`0x0062B450`).

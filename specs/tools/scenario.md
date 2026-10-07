@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 347–358 |
 | Test vectors | 359–374 |
 | Provenance | 375–384 |
-| Open questions | 385–401 |
+| Open questions | 385–407 |
 <!-- /index -->
 
 ## Summary
@@ -391,6 +391,12 @@ rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
 1. Where 1.14d places a character entering a level (`levels.md` §10),
    so `char at default` means the same on both sides (a save loads at
    its town start; `char at <x> <y>` needs a placement write).
+   *Answered* in the owners: game entry places the joining character by
+   `sim/path-placement.md` §13 (act and town from the save header, town
+   spawn tile via `drlg/levels.md` §10 with its `roll(n)` on the town's
+   level seed, free point §7, mask 0x1C09) and §11; a level warp
+   arrival by §12. `char at default` therefore means §13's point on both
+   sides for the same map seed and level seed.
 2. The conventions of the §3.1 spawn calls outside room population and
    the monster data field of the umod list (handoff §4 Q12–Q14).
 3. How a joining character gets items of a given quality, affixes,

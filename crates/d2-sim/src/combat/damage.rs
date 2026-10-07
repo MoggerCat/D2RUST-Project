@@ -1466,8 +1466,9 @@ pub fn apply_melee<W: CombatWorld>(w: &mut W, ct: &CombatTables, a: W::Unit, d: 
     let a_type = w.unit_type(a);
     let pm = matches!(a_type, UnitType::Player | UnitType::Monster);
     if hit {
+        // Step 4.1 (`0x0057D5AC`): a dead attacker returns at once; the
+        // combat record is not freed, no events, thorns or reaction.
         if pm && w.mode(a) == 0 {
-            free_records(w, a, d);
             return;
         }
         rec.hit_flags = hitflag::ROLLED;
@@ -1482,9 +1483,13 @@ pub fn apply_melee<W: CombatWorld>(w: &mut W, ct: &CombatTables, a: W::Unit, d: 
     }
     w.unit_event(EV_DOMELEEATTACK, a, d, &mut rec);
     w.unit_event(EV_ATTACKEDINMELEE, d, a, &mut rec);
-    // TODO(damage.md §5.1 step 6): read literally ("an object, or a
-    // non-player non-monster, or not in mode 0").
-    if hit && (a_type == UnitType::Object || !pm || w.mode(a) != 0) {
+    // Step 6: a player or monster attacker that died during steps 4–5
+    // returns at once (`0x0057D63F`), as step 4.1; other types (objects
+    // included) and live attackers take thorns.
+    if hit {
+        if pm && w.mode(a) == 0 {
+            return;
+        }
         w.thorns(a, d, &mut rec);
     }
     w.reaction(a, d, &mut rec);

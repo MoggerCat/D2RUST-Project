@@ -33,7 +33,7 @@
 | Edge cases & original bugs | 326–340 |
 | Test vectors | 341–373 |
 | Provenance | 374–402 |
-| Open questions | 403–425 |
+| Open questions | 403–428 |
 <!-- /index -->
 
 ## Summary
@@ -418,6 +418,9 @@ rectangle's unchecked negative width read in the disassembly of
    GDI ignores that argument (§5). `unit-composite.md` §7 r1 says
    "shift table row +0x6C"; the row is `+0x6C − 1` (`shading.md` §6 r1).
    Both on branch `claude/spec-unit-draw`, edit when merged.
+   *Answered*: both are merged and already say so (`draw-order.md` §6 r3:
+   mode 4 passed but never read by `0x006C9290`; `unit-composite.md` §7
+   r1: row `p − 1`).
 6. *Answered* (`impl-lighting-blend` "Not wired" 3): a 45° GDI line is
    x-major (§8 r1, with the closed form and vectors); a GDI rectangle
    with x1 < x0 crashes in 1.14d and is fatal in d2rs (§8 r2). A weather

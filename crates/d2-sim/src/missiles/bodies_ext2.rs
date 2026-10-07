@@ -616,8 +616,10 @@ pub fn corpse_effect<W: MissileWorld + ?Sized>(
     let Some(room) = cx.world.find_room(game, near, at.0, at.1) else {
         return;
     };
+    // G := the request's flags (`umod-callbacks.md` §3.1).
     let filter = FindFilter {
         flags,
+        room_flags: flags,
         source: Some(unit),
         at,
         r,
@@ -629,12 +631,14 @@ pub fn corpse_effect<W: MissileWorld + ?Sized>(
 }
 
 /// The filter record of the default filter `0x0065AA40` as `0x0056DCC0`
-/// builds it (§44 "Unit find"): flags F (+0x00), unit S (+0x08), centre
-/// (+0x0C, +0x10), radius (+0x14); limit, accepted count, coordinate
-/// list and extra test are zero.
+/// builds it (`monsters/umod-callbacks.md` §3.1): flags F (+0x00), unit E
+/// (+0x08), centre (+0x0C, +0x10), radius (+0x14); limit, accepted count,
+/// line iterator and extra test are zero. `room_flags` is the finder's
+/// G (+0x14), which the caller writes after init (0 unless set).
 #[derive(Clone, Copy, Debug)]
 pub struct FindFilter {
     pub flags: u32,
+    pub room_flags: u32,
     pub source: Option<UnitId>,
     pub at: (i32, i32),
     pub r: i32,
@@ -679,7 +683,8 @@ pub fn unit_find<W: MissileWorld + ?Sized>(
     for rm in rooms {
         // Step 3: town rooms skipped under 0x2000; the overlap test
         // `0x0065A710` never rejects for r ≥ 0 and is left to the filter.
-        if a.flags & 0x2000 != 0 && cx.world.in_town(game, rm) {
+        // The skip tests the finder's room flags G, not the filter's F.
+        if a.room_flags & 0x2000 != 0 && cx.world.in_town(game, rm) {
             continue;
         }
         if r < 0 {
@@ -700,7 +705,8 @@ pub fn unit_find<W: MissileWorld + ?Sized>(
     found
 }
 
-/// The default filter `0x0065AA40` (§44 steps 1–5).
+/// The default filter `0x0065AA40` (`monsters/umod-callbacks.md` §3.1
+/// filter steps 1–5).
 fn default_filter<W: MissileWorld + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
