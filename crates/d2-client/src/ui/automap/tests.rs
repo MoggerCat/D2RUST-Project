@@ -1679,3 +1679,22 @@ fn init_state() {
     let p = MarkerPalette::new(|r, _, _| r);
     assert_eq!(p.get(MarkerColor::B1), 255);
 }
+
+// Covers: specs/ui/automap.md §11 r1, §9 r1
+#[test]
+fn dead_gate_and_mini_down_follow_their_answers() {
+    use super::markers::{unit_dead, DeadKind};
+    use super::view::mini_down;
+    assert!(unit_dead(DeadKind::Player, 17, 0));
+    assert!(unit_dead(DeadKind::Player, 0, 0));
+    assert!(!unit_dead(DeadKind::Player, 12, 0));
+    assert!(unit_dead(DeadKind::Monster, 12, 0));
+    assert!(unit_dead(DeadKind::Monster, 0, 0));
+    assert!(!unit_dead(DeadKind::Monster, 17, 0));
+    // Other types: only the flag (bit 16).
+    assert!(!unit_dead(DeadKind::Other, 0, 0));
+    assert!(unit_dead(DeadKind::Other, 1, 0x1_0000));
+    assert!(unit_dead(DeadKind::Player, 1, 0x1_0000));
+    assert!(!unit_dead(DeadKind::Player, 1, 0x2_0000));
+    assert!(mini_down(0) && mini_down(1) && !mini_down(2));
+}

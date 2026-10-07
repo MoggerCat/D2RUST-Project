@@ -494,7 +494,7 @@ pub struct PassInput<'a> {
     pub player_byte_18: u8,
     pub markers: &'a [markers::MarkerUnit],
     pub local_party: i16,
-    /// `0x00464820` ≠ 0 (§11 r1).
+    /// `0x00464820` ≠ 0 for the player ([`markers::unit_dead`], §11 r1).
     pub player_gate: bool,
     pub palette: markers::MarkerPalette,
     pub roster: &'a [markers::RosterEntry],

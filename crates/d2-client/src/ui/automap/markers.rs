@@ -93,7 +93,8 @@ pub enum MarkerSubject {
         /// Disguised as a player (state 0x25 and an owner): whether the
         /// owner is in the local player's party.
         disguised: Option<bool>,
-        /// `0x00478D90` relation code (open question 2).
+        /// `0x00478D90` relation code (§11 r3: roster relation; in
+        /// single player the local player's own pets and hireling give 1).
         relation: u8,
         name: Vec<u16>,
     },
@@ -121,7 +122,7 @@ pub struct MarkerCtx {
     /// `AutoMap Party`, `AutoMap Party Names`.
     pub party: bool,
     pub names: bool,
-    /// `0x00464820` ≠ 0 (open question 1).
+    /// `0x00464820` ≠ 0 for the player ([`unit_dead`], §11 r1).
     pub player_gate: bool,
     pub mini: bool,
     pub div: i32,
@@ -365,4 +366,24 @@ pub fn roster_markers(
             name(&e.name, x, y, u16::from(idx), out);
         }
     }
+}
+
+/// Unit types `0x00464820` distinguishes (§11 r1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeadKind {
+    Player,
+    Monster,
+    Other,
+}
+
+/// `0x00464820` (§11 r1): "dead" = flag +0xC4 bit 16 (0x10000) set, or
+/// a player in mode 0 / 17, or a monster in mode 0 / 12; other types:
+/// only the flag. Gives [`MarkerCtx::player_gate`] for a player unit.
+pub fn unit_dead(kind: DeadKind, mode: u32, flags: u32) -> bool {
+    flags & 0x1_0000 != 0
+        || match kind {
+            DeadKind::Player => matches!(mode, 0 | PLAYER_DEAD),
+            DeadKind::Monster => matches!(mode, 0 | MONSTER_DEAD),
+            DeadKind::Other => false,
+        }
 }

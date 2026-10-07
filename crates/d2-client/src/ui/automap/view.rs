@@ -17,8 +17,8 @@ pub struct FrameFacts {
     pub height: i32,
     /// The screen open mode 0–3 (`ui/panels.md` §4).
     pub open_mode: u8,
-    /// `0x00492C10` ≠ 0: the mini map moves down 96 px (open question 1:
-    /// what the call reads is pending, so the caller supplies it).
+    /// `0x00492C10` ≠ 0: the mini map moves down 96 px ([`mini_down`],
+    /// §9 r1).
     pub mini_down: bool,
     /// The unit origin (cx, cy) (`render/camera.md` §3).
     pub unit_origin: ClientPos,
@@ -195,4 +195,12 @@ impl View {
             i32::from(y) * 10 / self.div - a.1,
         )
     }
+}
+
+/// `0x00492C10` (§9 r1): the party-portrait state `[0x007BEECC]` ≠ 2
+/// (`ui/messages.md`: the portrait pass is skipped at 2), so the left mini
+/// map moves down 96 px whenever the portraits are not hidden. Gives
+/// [`FrameFacts::mini_down`].
+pub fn mini_down(portrait_state: u32) -> bool {
+    portrait_state != 2
 }

@@ -79,7 +79,19 @@ wall follow, hit class, bodies-4 EC1) and `claude/impl-pc1-s7-automap`
     the i = 0 missile, stops the loop, creates nothing more and reports
     `BodyEffect::EndlessProgressive` → `WiringError::EndlessProgressive`
     (before: silently nothing). Tests: step 0 and negative, fan and ring.
-11. **Automap** (`ui/automap.md`): AUTOMAP_PLACEHOLDER
+11. **Automap** (`ui/automap.md`): automap branch, `crates/d2-client/src/ui/automap/`
+    (`cells`, `picker`, `place`, `town`, `persist`, `options`, `view`,
+    `draw`, `markers`, `header`): §1 AVL cell store and layers, §2 picker
+    on `fixup::maps::Automap` (seed {0, 666}), §3–§4 tile / unit cells,
+    §5 reveal by leveldefs `Layer`, §6 town art, §7 `.map` / `.ma<k>`
+    files (in memory + thin fs wrapper), §8 options (`OptionStore`), §9
+    view, §10 draw pass (`AutomapDraw` commands), §11–§12 markers, §13
+    header, §14 lifetime; 42 tests; ignored game-file tests in
+    `tests/game_automap.rs`. After merging the final spec pass, the
+    answered OQ1/OQ2 gates are functions: `markers::unit_dead`
+    (`0x00464820`, §11 r1), `view::mini_down` (`0x00492C10`, §9 r1).
+    **Not wired** into the app / Bevy (needs bridge + `world_view`
+    inputs, owned by the client triage session); unverified.
 
 ## 2. Changed test expectations
 
@@ -106,7 +118,15 @@ wall follow, hit class, bodies-4 EC1) and `claude/impl-pc1-s7-automap`
   (`intents-events.md` §2.5 r3; no REC).
 - `crates/d2-client/src/app/single_player.rs` `CREATE_FLAGS_CLASSIC`
   (`client/model.md` §7 r9; REC-46).
-- Automap: AUTOMAP_PROVISIONAL
+- Automap (spec-marked): `persist.rs` §7 r2/r3 header order, chain link
+  = 8th u32, table entry = first record offset (automap-0003);
+  `markers.rs` §11 r7 / OQ7 name colour = palette byte (automap-0004);
+  `draw.rs` §10 r4 / OQ6 fade 3 reads player +0x18 as-is (automap-0001).
+  Readings marked "Reading" in code (worth a spec answer): §7 r4 / EC5
+  where an out-of-range cel cuts the chain; §9 r2 Left saved / restored
+  once; §11 r6 disguised monster names; town art under v = 1 uses mode 5;
+  a save always appends a record; load checks the town blob against the
+  record's town kind; cels outside 0–2047 are group −1.
 
 ## 4. Left, with reason
 
@@ -126,7 +146,20 @@ wall follow, hit class, bodies-4 EC1) and `claude/impl-pc1-s7-automap`
   0xA0) needs Pending setters; `Pending::body_line_blocked` callers still
   answer "blocked"; d2-server / d2-client / test-fixtures hosts do not
   wire `monster_skill_start` / `monster_sequence_frame` (SQ goes neutral).
-- Automap: AUTOMAP_LEFT
+- Automap: not wired (nothing consumes `ToggleAutomap` / UI state 0x0A;
+  needs unit class / mode / position and leveldefs Layer / LevelType /
+  act from the bridge, DRLG callbacks +0x454 / +0x488, 0x03 act values,
+  the 0x90 roster, a draw sink for cels with draw modes and lines, the
+  save directory and character name); the §11 r3 relation code
+  (`0x00478D90`) stays a caller input; `rules::draw_order::AutomapReveal`
+  (level filter) is superseded by `ui::automap` but left with its test;
+  the `.map` sub-directory fallback of §7 is not done.
+- Local run queue (add to HANDOFF §5):
+  `D2_GAME_DIR=<install> cargo test -p d2-client --test game_automap -- --ignored --nocapture`:
+  `picker_first_record_vector` (range[1] = (0, 83); LevelType 1, `fl`,
+  main 0, sub 5 → cel 2, seed {666, 0}); `cel_files_open` (the eight
+  `MaxiMap` / `Act2Map` / `Act4Map` / `ExTnMap` [+ `S`] files open as
+  DC6 with `.dc6` appended; record the cel counts = load limits).
 
 ## 5. Gate
 
