@@ -595,6 +595,7 @@ fn recorded_stores_fit_live_columns() {
 
 /// `vendors.md` §9.3 (live `npc.txt`) and the `difficultylevels` gamble
 /// odds of Constants.
+// Covers: specs/world/vendors.md §9.3
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn npc_txt_multipliers() {

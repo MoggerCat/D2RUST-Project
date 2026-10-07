@@ -10,9 +10,8 @@
   range, §2 table layout, §6 sound tick, §9 settings), `audio/triggers.md`
   (§1 conventions and helpers used here, §3 player event lines),
   `client/audio.md` §B4, §B5, `data/fields.tsv` (`levels.SoundEnv`
-  u8 +0x21C), `world/quests.md` (who sends quest events),
-  `render/lighting.md` §9 (day cycle), `render/draw-order-2.md` §11
-  (weather).
+  u8 +0x21C), `world/quests.md` (who sends quest events), a future
+  `render/lighting.md` (day cycle) and weather spec.
 
 <!-- index -->
 | Section | Lines |
@@ -21,21 +20,22 @@
 | Inputs | 59–70 |
 | Outputs / state changes | 71–75 |
 | Rules | 76–77 |
-|   1. Sound environment | 78–103 |
-|   2. Music (`0x004DCAA0(T)`) | 104–147 |
-|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 148–198 |
-|   4. Level-entry lines (`0x004CC270`) | 199–238 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 239–253 |
-|   6. Rain (`0x004E42E0`, second part) | 254–269 |
-|   7. Event cues (`0x004E42E0`, third part) | 270–287 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 288–295 |
-| Constants & data dependencies | 296–305 |
-| Randomness | 306–314 |
-| Edge cases & original bugs | 315–324 |
-| Test vectors | 325–346 |
-|   Checks (hook addresses for `record_sound.py`) | 347–356 |
-| Provenance | 357–370 |
-| Open questions | 371–397 |
+|   1. Sound environment | 78–108 |
+|   2. Music (`0x004DCAA0(T)`) | 109–164 |
+|   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 165–224 |
+|   4. Level-entry lines (`0x004CC270`) | 225–271 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 272–293 |
+|   6. Rain (`0x004E42E0`, second part) | 294–324 |
+|   7. Event cues (`0x004E42E0`, third part) | 325–349 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 350–357 |
+|   9. Front-end music (`Options Music`; answers open question 5) | 358–407 |
+| Constants & data dependencies | 408–417 |
+| Randomness | 418–426 |
+| Edge cases & original bugs | 427–436 |
+| Test vectors | 437–463 |
+|   Checks (hook addresses for `record_sound.py`) | 464–473 |
+| Provenance | 474–497 |
+| Open questions | 498–534 |
 <!-- /index -->
 
 ## Summary
@@ -64,8 +64,8 @@ left or right of the listener.
 | client update counter C | `[0x007A0498]` | `audio/triggers.md` §1 r5 |
 | level L | local player's room → level id (`0x00481780`) | client model |
 | environment E | `soundenviron` row `levels[L].SoundEnv` (`0x004817A0`, `0x00481920`) | `data/fields.tsv` |
-| day phase | first dword of the client act's environment (`0x0061C220([0x007A0634])`): the period index 0–5 | `render/lighting.md` §9.1 (+0x00), §9.2–§9.3 |
-| weather | active (`0x00473C40`), intensity f32 `[0x007A89A0]` (`0x00473C80`) | `render/draw-order-2.md` §11 (§1 r5 here) |
+| day phase | first dword of the client act's environment (`0x0061C220([0x007A0634])`) | open question 3 |
+| weather | active (`0x00473C40`), intensity f32 `[0x007A89A0]` | open question 4 |
 | settings | Master Volume, Music Volume | `sound-table.md` §9 |
 
 ## Outputs / state changes
@@ -80,26 +80,31 @@ sounds; the state variables named in each section.
 1. L = 0 (no local player or no room) → neither machine does anything
    this tick.
 2. E = row `SoundEnv` of level L; an index outside the 50 rows → no
-   row (ambience fields read as 0; music song 0).
+   row (ambience fields read as 0; music song 0). In the ambience
+   machine a missing row is safe only while the current bed is 0 and L
+   does not change: a bed change reads `Day/Night Ambience` of the
+   missing row (`0x004E43B9`) and a level change its `Material 1/2`
+   (`0x004E45F3`), both through a null pointer (crash). Live levels all
+   name a valid row, so this never happens in 1.14d.
 3. **Day**: phase ∈ {1, 2, 3}; any other phase is night (`0x004E4317`).
    NPC time greetings use the same phase (`audio/triggers.md` §10 r1).
-   The phase is the period index of the act environment
-   (`0x0061C220` returns dword +0x00 of the record at act +0x04,
-   `0x0061AA60`); `render/lighting.md` §9 owns how it is set (S→C 0x53)
-   and advanced. All six indices occur; with the normal table day is
-   the periods starting at 340°, 0° and 160° (`render/env-periods.tsv`).
+   The phase is the **period index** (+0x00) of the client act's
+   environment record (`0x0061C220` → `0x0061AA60`), i.e.
+   `render/lighting.md` §9.1–§9.2 (answers open question 3). Recorded:
+   one day is 35,844 client updates with period starts 3 at C 20,479, 4
+   at 23,040, 5 at 25,601, 0 at 33,282, 1 at 35,843 (one update), 2 at
+   35,844 (`docs/handoff/local-buddy-q-rec.md` entry 69); so audio
+   "day" (1–3) runs from the start of period 1 to the end of period 3,
+   and the request log of entry 74 shows the Blood Moor bed switching
+   70 `scene_wilderness_day` → 71 `scene_wilderness_night` at T 23,040
+   (C 23,041, the first update of period 4), with the event id 192 →
+   197 and the r2 draws of §7 in the same tick.
 4. Live data (P `soundenviron.txt`, `levels.txt`): 50 rows; 48 are used
    by levels, rows 11 (`ANDARIEL_LAIR`) and 35 (`GUILD`) by none; 13
    rows have different day and night ambience ids (36 the same non-zero
    id), 13 different day and night event ids; 6 rows have no event
    (both 0); `Event Delay` 150–800 (250 in 28 rows); `Indoors` = 1 in
    26 rows.
-5. **Weather** (`0x00473C40`, `0x00473C80`): active when the snow-mode
-   flag `[0x007A8A14]` is 0 and the local player's level has `Rain`
-   (levels record +0x05, `0x0061DBA0`; no player → inactive); the
-   intensity is the float `[0x007A89A0]` = rain target / 256, moved by
-   the rain cycle (`render/draw-order-2.md` §11.1, §11.3 r3). Snow mode
-   (`[0x007A8A14]` ≠ 0, Act V, `0x004726F0`) makes it inactive.
 
 ### 2. Music (`0x004DCAA0(T)`)
 
@@ -131,19 +136,31 @@ announced level `[0x007C8A04]`, resume table `resume[song]`
    2`, `Block 3` if `Block 2` ≤ p < `Block 3`, else 0 (−1 cells never
    match); resume[cur] := r, Ts := T. Coming back to a song starts it
    at the next block boundary after where it was (or at 0).
-9. **Reset** (`0x004DCA30`, from sound init `0x00482260` at every game
-   start and from the video player `0x00482EF0` before a video, when
-   `[0x007A0438]` +0x220 is 0): every variable of §2 and §3 and the
-   resume table := 0. `[0x007A0438]` is the start-up config; +0x220 is
-   the `-ns` / `-nosound` switch byte (`tools/original-hooks.md` §5.1
-   switch table; test at `0x004DCA38`), so the reset runs whenever
-   sound is enabled.
+9. **Reset** (`0x004DCA30`, from sound init `0x00482260` and
+   `0x00482EF0`, when `[0x007A0438]` +0x220 is 0): every variable of §2
+   and §3 and the resume table := 0.
+   `[0x007A0438]` is the start-up configuration and +0x220 its `-ns`
+   (no sound) switch (`tools/original-hooks.md` §5.1; answers open
+   question 7): the reset runs whenever sound is on. Sound init runs at
+   every game start (client state 2 handler `0x0044F360` at
+   `0x0044F4DB`, before the client game init `0x0044F4E0`), and
+   `0x00482EF0` at its two exits (`0x0044F637`, `0x0044F687`) and from
+   `0x004B9324`.
 10. Live: 28 song rows, all `Loop`, `Stream`, `Stereo`, `Music Vol`,
     `Defer Inst`, `Volume` 110, `Fade In`/`Fade Out` 125, `Priority`
     255; `Block 1` set on 19 of them, `Block 2` on 4
     (`sound-table.md` §11). Row 4,668 `music_options` (front end,
     open question 5) is in the range but no environment names it; the
     other 27 songs are each named by at least one row.
+11. **Time tests, exact** (answers EN-D). Unsigned differences: r3 `T −
+    Tl ≥ 75` (`jb` at `0x004DCB34`), r7 `T − Tl ≥ 62` (`0x004DCC8F`).
+    Unsigned absolute compares, no difference: r8 `T > Ts + 125`
+    (`jbe` at `0x004DCCBB`, the sum wrapping), §3 r4 `C ≥ tM`, `C ≥ tS`,
+    `C < tH` (`jb` at `0x004DCB8B`, `0x004DCBBE`, `0x004DCBF7`). Signed:
+    the play-position compares of r8 (`jl`/`jge`, so −1 cells never
+    match and a negative position matches nothing). Ambience §7 r3 `T −
+    last ≥ gap` is an unsigned difference (`0x004E456F`); §4 r2 `C −
+    P+0x7C > 62` unsigned (`0x004CC35E`).
 
 ### 3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`)
 
@@ -152,6 +169,15 @@ pending, S and its time tS, S pending, hold end tH. Times are in **C**.
 
 1. If cur ≠ 0 and cur's request is playing: resume[cur] := `Block k`
    of cur's row if k ≠ 0, else 0; Ts := T (`sound-table` tick).
+   Exact (answers EN-C; `0x004DCD76`–`0x004DCD9C`): the cell is read
+   raw (record +0x50 + 4k; live k is 0 or 1), so a song whose `Block k`
+   is −1 gets resume −1. The next song request (§2 r6) then passes
+   offset 0xFFFFFFFF with flags 0 (o ≠ 0); the stream start multiplies
+   by 4 (u32 wrap: 0xFFFFFFFC bytes) and reduces it modulo the song's
+   `data` size (`sound-table.md` §7 r8), so the song starts at byte
+   0xFFFFFFFC mod size, a deterministic mid-song point (e.g.
+   `music_caves`, size 20,517,888: byte 6,728,700, frame 1,682,175).
+   Reproduce.
 2. Stop all songs (fades out over 125).
 3. active := 1; M pending, tM := C + dM; S pending := play, tS := C +
    dS; tH := C + H.
@@ -221,6 +247,10 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
 1. Called from §2 r7. Nothing if L ≥ the level count, or L equals the
    last level checked (`[0x007C88CC]`, then set to L), or L is already
    flagged (`[0x007C78B8 + 4·L]`).
+   Order (answers EN-E; `0x004CC2A2`–`0x004CC2BB`): L is P's room's
+   level (no room → nothing, nothing set); L ≥ count → nothing; L =
+   last checked → nothing; otherwise last checked := L **first**, then
+   the flag test (a flagged L still updates last checked).
 2. The first record holding L: flag every level of that record. Then,
    if q = 0 or the client quest check `0x004A4180(q)` passes (quest q
    open and not done in the client quest state, owner
@@ -228,13 +258,16 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
    player event e on P (`audio/triggers.md` §3 r4: the class line base
    + e − 33, delay per that rule).
 3. The flags are set even when r2 plays nothing, so a line skipped
-   because the hero spoke within 62 updates is lost for that game.
-4. **Reset** (`0x004CA280`, from sound init `0x00482260`, which the
-   client game state `0x0044F360` calls once per game start): the
-   1,024 level flags `[0x007C78B8]` := 0 (and `[0x007C88B8]`,
-   `[0x007C88BC]`, `[0x007C88C4]`, `[0x007C88C8]` := 0, `[0x007C88C0]` :=
-   90). The last level checked `[0x007C88CC]` is never reset: 0 at
-   process start, it carries over from game to game.
+   because the hero spoke within 62 updates is lost for that game
+   (flags cleared: open question 6).
+4. **Reset** (answers open question 6): sound init (§2 r9, every game
+   start) calls `0x004CA280`, which zeroes 4,096 bytes from
+   `0x007C78B8` (the 1,024 level flags) and the idle globals of
+   `audio/triggers.md` §1 r6. `[0x007C88CC]` (last checked) is **never
+   reset**: it keeps the previous game's last level, so if a new game's
+   first announced level equals it, r1 returns at once for it until L
+   changes once (e.g. a game left in level 2 and the next one entering
+   level 2 first: no `find_wilderness` for that entry). Reproduce.
 
 ### 5. Ambience loop (`0x004E42E0(T)`, first part)
 
@@ -246,8 +279,15 @@ State: current bed id `[0x007C8C88]`, its handle `[0x007C8C80]`.
    (`0x004B9EF0`). Not swap → stop ambience beds 52–71 except groups a
    and 64 (`scene_rain`, when raining, else 0), and event cues 72–201
    except E's current event id (`audio/triggers.md` §1 r4).
+   Exact (answers EN-A): the calls are `0x004BA950(a, r)` with r = 64
+   when the weather is active this tick (`0x00473C40` ≠ 0, whatever the
+   intensity), else 0, and `0x004BA9D0(ev, 0)` with ev = this tick's
+   E event id for the current day/night (§7 r1, 0 if none): the second
+   exception is always 0 (`0x004E4403`).
 3. Then a = 0 → current := 0, handle := 0. Else handle := request(a,
    none); swap → volume 0 and fade to 255 over 250; current := a.
+   current := a also when the request returned 0 (no retry; the handle
+   is then 0 and the volume / fade calls find nothing).
 4. A bed that is the same id by day and night (36 rows, e.g. caves)
    keeps playing across the day change.
 
@@ -266,6 +306,21 @@ State: rain handle `[0x007C8C84]`, previous rain id `[0x007C8C8C]`.
    Then with a handle: w = its volume; w moves toward v by at most 6
    (w < v: min(w + 6, v); w > v: max(w − 6, v)); w = 0 → stop it,
    handle := 0; else volume w. previous := r.
+4. **Exact** (`0x004E4462`–`0x004E450C`; answers EN-B). previous := r
+   on every tick with r ≠ 0, also when v = 0 or the request returned 0;
+   so if the weather was already active with intensity 0, the first
+   tick with v ≠ 0 requests 64 at once (only a weather start and a
+   non-zero intensity in the same tick give the one-tick delay of r3;
+   the ambience log of `docs/handoff/local-buddy-q-rec.md` entry 74
+   shows previous = 64 from the first tick, in town, weather active,
+   intensity 0). w is read with `0x004B9B20`, which returns 0 for a
+   handle whose request is gone. Then with v > 0 the new w = min(6, v)
+   > 0 is written to the missing request (nothing happens) and the
+   stale handle is kept: rain stays silent until v reaches 0 (w = 0 →
+   stop, handle 0) or the weather ends (r2); only then can a new rain
+   request be made. With v = 0 the stale handle is cleared at once. The
+   rain request (`Loop`) disappears only after a stop, so this is an
+   edge case. The step compares are signed (`jle`/`jl`).
 
 ### 7. Event cues (`0x004E42E0`, third part)
 
@@ -282,8 +337,15 @@ State: event id `[0x007C8C90]`, gap `[0x007C8C94]`, last cue
    from x, y as `sound-table.md` §8.1 r1, z only in the mode-0 gain);
    last := T; gap := D + jitter(⌊D/3⌋).
 4. A failed request (0) draws nothing and retries next tick.
-5. After §5–§7: EAX room settings (`0x004DF6C0`, mixer mode 2 only;
-   not reproduced, `sound-table.md` §9).
+5. EAX room settings (`0x004DF6C0`, mixer mode 2 only; not
+   reproduced, `sound-table.md` §9) run after §6 and **before** §7
+   (`0x004E450F`; corrected: not after §7). No effect in mode 0.
+6. **Recorded** (entry 74, part 2, T 1,418): request(192, none) → h;
+   roll(2) = 1 → s = +1; roll(301) = 281 → x = 731; roll(201) = 168 →
+   y = 68; position(h, 731, 68, 0); roll(167) for the next gap
+   (`Event Delay` 250). T 23,040: event id change 192 → 197 drew
+   roll(167) = 82 (gap 250 + 82 − 83 = 249) then roll(249) = 226 (last
+   = 22,814), as r2 says.
 
 ### 8. Sample pins on level change (`0x004E42E0`, last part)
 
@@ -292,6 +354,56 @@ When L ≠ `[0x007C8C7C]`: clear the locks of the footstep groups
 `Material 1` and of `Material 2` (`0x004E4240`); `[0x007C8C7C]` := L.
 Cache only (`sound-table.md` §10 r4); d2rs: no observable effect
 except through async loading (`sound-table.md` open question 10).
+
+### 9. Front-end music (`Options Music`; answers open question 5)
+
+Out of game the music is a jukebox of the device layer, not the sound
+table: one stream voice `[0x00881794]` created at device init
+(`0x00514780` → `0x00515530(1, …)`), served by the 50 ms service
+thread `0x00516250` (`sound-table.md` §6.6), all under the device
+lock `0x0088174C`.
+
+1. **Playlists** (8 entries each, a "played" flag per entry; tables
+   `0x0072F878` and `0x0072F8B8`, count `[0x0072F874]` = 8, checked
+   against `[0x0072F8F8]`; paths under `data\global\music\`): list A
+   `common\options.wav`, `act1\caves.wav`, `act1\monastery.wav`,
+   `act1\crypt.wav`, `act2\harem.wav`, `act2\tombs.wav`,
+   `act3\spider.wav`, `act3\kurastsewer.wav`; list B `introedit.wav`,
+   `act5\icecaves.wav`, `act5\xtemple.wav`, `act2\desert.wav`,
+   `act2\sewer.wav`, `act3\kurast.wav`, `act3\kurastsewer.wav`,
+   `act4\diablo.wav`. List B is used when `[0x00881790]` ≠ 0, latched
+   on first use (`0x00513AE0`, `[0x008817A8]`); `[0x00881790]` is the
+   ECX of the device init `0x00514530`, passed from `0x00405C30` (the
+   start-up configuration); its act 5 tracks make it read as the
+   expansion flag.
+2. **Start** `0x005148F0(1)`: if not already wanted (`[0x00881798]` =
+   0): clear every played flag (`0x00514860`) and set first-track
+   (`[0x0088179C]` := 1); then wanted := 1. Called when a front-end
+   screen opens with `Options Music` ≠ 0 (`0x0042FB20`, `0x004336C0`,
+   `0x00435330`, `0x0043AE30`, `0x0043B080`, `0x00441B70`).
+3. **Pick** `0x00514990`, from the service pass while wanted and the
+   voice is not playing (`0x00514840`: voice +0x48 = 0); needs the
+   voice and a device (`0x00515D60`). If every entry is played: the
+   first time in this call clear all flags and go on, the second time
+   wanted := 0 and stop. First-track set → entry 0 (first-track :=
+   0); else i = CRT `rand()` mod 8 (`0x00687461`), then forward with
+   wrap to the first entry not played. Mark it played; reset the voice
+   (`0x00516140`), volume 110 (`0x005157B0`; Music Volume is not
+   applied), start the stream at offset 0 without loop (`0x00515D70`);
+   a failed start picks again.
+4. **Toggle** (front-end options entry `0x004FA160`): on → stop
+   (`0x00514960`: wanted := 0; a playing voice fades to volume 0 over
+   200 ms of wall clock, `0x00515C60`) and `Options Music` := 0; off →
+   start (r2) and `Options Music` := 1 (`0x00514D90`, stored at once).
+5. **Leaving the front end**: the Battle.net entry `0x00431600` and
+   every in-game client loop pass while the voice plays (`0x0044F256`):
+   device fade `0x00515F50(180)`, stop `0x00514930` (wanted := 0,
+   `0x00515EE0`), then G := 255 (`sound-table.md` §8.3 r4).
+6. Wall clock and CRT `rand()` drive it: there is no tick rule. d2rs
+   reproduces the lists, the order rule (entry 0 first, then a random
+   unplayed entry with forward wrap, all flags cleared once when the
+   list is used up), volume 110 and the 200 ms fade, with its own
+   random source.
 
 ## Constants & data dependencies
 
@@ -338,6 +450,11 @@ Synthetic (CI):
 | rain intensity 0.5, two ticks | tick 1: request(0) → no handle; tick 2: request(64), volume 127 | §6 r3 |
 | rain volume 20 → target 0 | 14, 8, 2, then stop | §6 r3 |
 | D = 250, seed known | gap = 250 + roll(167) − 83 | §7 r2 |
+| weather active at intensity 0 for one tick, then intensity 0.5 | tick 1: no request, previous := 64; tick 2: request(64), volume 127 | §6 r4 |
+| rain handle stale (request gone), v = 100 | volume 6 sent to nothing; handle kept; no new rain request while v > 0 | §6 r4 |
+| stinger k = 1 while a song with `Block 1` = −1 plays | resume −1; next request of that song: offset 0xFFFFFFFF, flags 0 | §3 r1 |
+| new game whose first level equals the previous game's last checked level | no entry line on that first entry | §4 r4 |
+| Blood Moor at period 3 → 4 (recorded, entry 74, T 23,040) | request(71) → h, volume(h, 0), fade 250; roll(167) = 82, roll(249) = 226 | §1 r3, §5, §7 r6 |
 
 Real (`#[ignore]`, `D2_GAME_DIR`): the §1 r4 counts from P
 `soundenviron.txt`/`levels.txt`; every `Song` lies in 4,657–4,684 or is
@@ -367,30 +484,50 @@ image: 250 (`0x004E43E6`), 255.0 (`0x006DBD68`), 640.0 (`0x006DA698`),
 tables `0x0072A2C4`, `0x0072A024`–`0x0072A2C0`. Live facts from P
 `soundenviron.txt`, `levels.txt`, `sounds.txt` (our script). D2MOO not
 used (no client sound code).
+Second pass (2026-10-07, EN-A–EN-E of `docs/handoff/impl-audio.md`):
+`0x004E42E0`, `0x004DCAA0`, `0x004DCD40`, `0x004DCE10`, `0x004CC270`,
+`0x004CA280`, `0x004DCA30`, `0x00482260`, `0x0061C220`, `0x004B9B20`.
+Recordings: `docs/handoff/local-buddy-q-rec.md` entries 69 (one day of
+period indices) and 74 (ambience / roll / cue logs, raw
+`snd74b-sound.jsonl`, read locally).
+Fourth pass (§9): `0x005148F0`, `0x00514860`, `0x00514990`,
+`0x00514960`, `0x00514930`, `0x00514780`, `0x00514710`, `0x00513AE0`,
+`0x00516250`, `0x004FA160`, `0x0044F244`–`0x0044F273`; playlist tables
+`0x0072F874`–`0x0072F8F8` read from the image with `pefile`.
 
 ## Open questions
 
-1. ~~Confirm §2–§7 with a recording (Checks): walk town → wilderness →
+1. Confirm §2–§7 with a recording (Checks): walk town → wilderness →
    cave and back; stand through a day change in the wilderness; kill
-   Blood Raven.~~ Moved to the recording list
-   (`docs/handoff/pc2-rec-pc2-render-audio.md` RA-E1).
-2. ~~Units of the play position `0x004DF900` versus `Block` values
-   (bytes or sample frames of the stream).~~ Partly static:
-   `0x004DF900` → `0x005159B0` returns the Storm stream position
-   (`0x00418140`, stream record +0x2C) shifted right by 2; the unit of
-   +0x2C is set by the Storm refill thread (not read). Moved to the
-   recording list (RA-E2).
-3. *Answered* (`0x0061C220`, `0x0061AA60`): the phase is the act
-   environment's period index, owned by `render/lighting.md` §9; all of
-   0–5 occur (§1 r3).
-4. *Answered* (`0x00473C40`, `0x00473C80`, `0x0061DBA0`): §1 r5; the
-   weather state machine is `render/draw-order-2.md` §11 (thunder 202
-   is `audio/triggers.md` §12).
-5. ~~Front-end music (`Options Music` setting, `music_options`,
+   Blood Raven.
+   Needs recording: the Checks hooks over town → Blood Moor → Den of
+   Evil (cave) → town, one day change in the wilderness, Blood Raven's
+   death (stinger event 34) and a rain level with weather on and off;
+   each `0x004DCAA0`, `0x004DCD40`, `0x004E42E0` call with T, C and its
+   requests, compared with §2–§7 per T (entry 74 has the wilderness
+   and a day change only).
+2. Answered (`sound-table.md` §7 r8): 4-byte units of the stream's
+   `data`, i.e. sample frames for the (all stereo 16-bit) songs.
+3. Answered (§1 r3): the period index of `render/lighting.md` §9;
+   values 0–5, day = 1–3 (recorded, entries 69 and 74).
+4. Weather: when it is active (`0x00473C40`: `[0x007A8A14]` = 0 and
+   the level's weather flag) and how the intensity moves (owner: a
+   future weather spec; thunder 202 is `audio/triggers.md` §12).
+   Answered: active = snow mode `[0x007A8A14]` = 0 and the `Rain` byte
+   (`levels.txt` record +5, `0x0061DBA0`) of the local player's level is
+   non-zero (`0x00620BB0` → `0x0061A1B0`); no player → not active
+   (`0x00473C40`; the flag `[0x007A8A14]` is the one
+   `render/draw-order-2.md` §11.1 calls snow mode). The
+   intensity `[0x007A89A0]` (target particle count / 256) and the rain
+   cycle that moves it are owned by `render/draw-order-2.md` §11.1–§11.3
+   (which is the weather spec); it is zeroed in every weather update of
+   a level without `Rain` (§11.2 r3 there).
+5. Front-end music (`Options Music` setting, `music_options`,
    `0x00514D80` callers `0x0042FB20`–`0x004FA160`): out of game, owner
-   a front-end spec.~~ Needs more than two function reads (many
-   callers); moved to the recording list (RA-E3).
-6. *Answered* (`0x004CA280`, `0x00482260`, `0x0044F360`): §4 r4. The
-   flags are cleared at every game start; `[0x007C88CC]` never.
-7. *Answered* (`0x004DCA38`, `tools/original-hooks.md` §5.1): +0x220 is
-   the `-ns` switch; §2 r9.
+   a front-end spec.
+   Answered (§9): a device-layer jukebox of two 8-track lists, entry 0
+   first, then CRT `rand()` mod 8 forward to an unplayed track, volume
+   110, toggled by the front-end option; stopped with a 180 ms fade on
+   entering a game.
+6. Answered (§4 r4): flags at every game start; last checked never.
+7. Answered (§2 r9): the `-ns` switch.

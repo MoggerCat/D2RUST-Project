@@ -23,7 +23,7 @@
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `formats/d2s-load.md` (new-character start and load
+- **Related specs:** `formats/d2s-appearance.md` (header +0x88..+0xA7, §2.8); `formats/d2s-load.md` (new-character start and load
   effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
@@ -44,21 +44,21 @@
 | Outputs / state changes | 89–94 |
 | Rules | 95–96 |
 |   1. File layout and framing | 97–142 |
-|   2. Header (335 bytes) | 143–374 |
-|   3. Checksum (`0x00411130`) | 375–385 |
-|   4. Quest section (298 bytes at 0x14F) | 386–406 |
-|   5. Waypoint section (80 bytes at 0x279) | 407–412 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 413–458 |
-|   7. Stats and skills | 459–551 |
-|   8. Item sections | 552–736 |
-|   9. Load sequence (`0x0056B180`) | 737–761 |
-|   10. Errors | 762–808 |
-| Constants & data dependencies | 809–828 |
-| Randomness | 829–833 |
-| Edge cases & original bugs | 834–900 |
-| Test vectors | 901–940 |
-| Provenance | 941–1020 |
-| Open questions | 1021–1095 |
+|   2. Header (335 bytes) | 143–377 |
+|   3. Checksum (`0x00411130`) | 378–388 |
+|   4. Quest section (298 bytes at 0x14F) | 389–409 |
+|   5. Waypoint section (80 bytes at 0x279) | 410–415 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 416–472 |
+|   7. Stats and skills | 473–565 |
+|   8. Item sections | 566–750 |
+|   9. Load sequence (`0x0056B180`) | 751–775 |
+|   10. Errors | 776–822 |
+| Constants & data dependencies | 823–842 |
+| Randomness | 843–847 |
+| Edge cases & original bugs | 848–914 |
+| Test vectors | 915–954 |
+| Provenance | 955–1034 |
+| Open questions | 1035–1163 |
 <!-- /index -->
 
 ## Summary
@@ -371,6 +371,9 @@ character's file was also 335 bytes before its first save).
    recompute these bytes from the equipped items, not copy them from
    the loaded file. The per-item byte mapping (`0x0063DA70` and the
    composite branch of `0x0063E510`) is Open question 17.
+4. The per-item mapping (token table, hand owners, body armour parts,
+   colour byte) is `formats/d2s-appearance.md` (Open question 17,
+   answered).
 
 ### 3. Checksum (`0x00411130`)
 
@@ -455,6 +458,17 @@ Read failures are internal code 16.
    size at +2 is not read.
 5. Measured on the fresh saves (no NPC talked to): all 48 bytes of A
    and B are zero.
+6. Which talks set A (the five rule 3 calls; class from the event
+   +0x14, u16 message id from +0x18; class → bit by rule 2): Act I
+   `0x0058F870`: 147 (0x2D, 0x2E), 148 (0x0B, 0x0C), 150 (0x18, 0x19),
+   154 (0x24, 0x25). Act II `0x005983E0`: 175 (0xD7), 177 (0x11D,
+   0x11E), 178 (0x107, 0x108), 198 (0xBE), 199 (0xCB, 0xCC), 200 (0xE6,
+   0xE7), 202 (0x112), 210 (0xF1, 0xF2). Act III `0x005B6C60`: 245
+   (0x1CA), 252 (0x1EA, 0x1EB), 254 (0x1F5, 0x1F6), 255 (0x202, 0x203),
+   264 (0x1DE, 0x1DF), 297 (0x1C5). `0x0058E990` (Act V): 512 (0x4E2E),
+   513 (0x4E45–0x4E47; then quest record 31 byte +0xC := 1 when it is 0
+   and +9 ≠ 0), 514 (0x4E55–0x4E57), 515 (0x4E61–0x4E63), 520
+   (0x4E23). No other class or message sets A.
 
 ### 7. Stats and skills
 
@@ -1045,6 +1059,10 @@ and prints every field; it holds no save data.
    item records).
 5. Item index stability (edge case 3): a save with a hotkeyed Tome of
    Town Portal and an equipped weapon, saved, reloaded and saved again.
+   **Answered from the binary** (`formats/d2s-load.md` §4): linking
+   appends, so the reloaded list is in file order (hands last); an
+   index can resolve to another item once, then stays stable until an
+   item is relinked. The save above is that file's Open question 3.
 6. **Answered** (§8.3 rules 6–7, edge case 12; bdDead, 1.14d): a
    dead softcore character whose corpse is on the ground at save time
    writes n = 1, a non-zero first u32 (stack data), x = y = 0, and its
@@ -1054,11 +1072,22 @@ and prints every field; it holds no save data.
 7. Header +0xCF (client +0x480): any save with a non-zero byte there
    (Battle.net-style emblem) or Ghidra on `0x00539BE0`. Every save of
    this PC has 0.
+   **Answered**: set only from the file (setter `0x005391C0`, callers
+   `0x0056A343`, legacy `0x00532997`), written back by `0x005692A9`;
+   other readers are realm-only (`0x0052C9AB`, `0x0052CA84` need
+   `[0x00883D50]`; summary `0x00539BE0`). Kept as found.
 8. Ladder checks (§2.2 rule 5.2): the service object `[0x00883D54]`
    and player +400 are not traced; single player never runs them.
+   **Answered**: dead. `[0x00883D50]`/`[0x00883D54]` (zeroed .data)
+   are written only by `0x0052C0E0`, which nothing calls, jumps to,
+   points to or exports; rule 5.2 never runs, results 25/26 never occur.
 9. Map seed restore needs game +0x6A = 3 and +0x84 = 0: confirm that a
    single-player game has type 3 (`sim/rng.md` Open question 2): two
    loads of one save produce the same map.
+   **Answered** (`formats/d2s-load.md` §7): single player has client
+   game type 0 → create message byte 3 (`0x00477CDF`) → game +0x6A = 3
+   (`0x00530CFF`); +0x84 = 0 without `-seed`. The seed is restored on
+   every load in the difficulty the save was written in.
 10. **Answered** (§6 rule 3): field A is the act intro quests'
     first-talk bits (D2MOO `pQuestIntroFlags`), set by `0x00572360`
     from its five direct calls `0x0058E9D4`, `0x0058EA25`,
@@ -1068,22 +1097,52 @@ and prints every field; it holds no save data.
     her bit set in A. Still
     unmeasured: the other Act I NPCs' bits (expected from the same
     table, §6 rule 2).
+    **Answered** (§6 rule 6, switch tables `0x0058F8CC`, `0x00598490`,
+    `0x005B6CF4`, `0x0058EA2C`): the NPCs and message ids per act; the
+    measured Kashya bit matches. Other bits unmeasured.
 11. Item unit +0xC8 bit 0x8000 (items skipped by the writer, §8.1
     rule 4): which items carry it.
+    **Answered**: none. Of all writes to +0xC8/+0xC9 in `all.asm`, no
+    immediate is 0x8000, server register writes are 0x200 / 0x800000
+    (`0x00542903`, `0x005679E0`, `0x00567B00`, `0x00567C70`), setter
+    `0x0045C430` is unreferenced, the rest are client code. The skip
+    never happens.
 12. Cache flag and the uploaded item blob (§8.1 rule 6): which callers
     pass the flag (C→S 0x6C upload path).
+    **Answered**: the flag = "interacting with a player": `0x00532400`
+    (`0x00532437`–`0x00532464`) sets it when unit +0x6C ≠ 0 and interact
+    type +0x68 = 0, for all three writers (`0x00531EB0`, `0x00532240`,
+    `0x00532340`); then player data +0x5C (D2MOO `pTrade`: u32 size,
+    pointer) is copied (`0x00531BB0` → `0x005675E0`). Its filler (trade
+    code) is not traced; single player never sets the flag.
 13. `0x00563470` behaviour on a runeword item that no longer matches
     (§8.2 rule 5).
+    **Answered except the equipped case** (`formats/d2s-load.md` §6):
+    a stored or cursor item is unlinked and freed (deleted); an
+    equipped one is unequipped by `0x00560CD0` with flag 0x20; its end
+    place is that file's Open question 2.
 14. Corpse first u32: whether any reader (client, realm) uses it; d2rs
     writes 0.
+    **Answered** (`Game.exe`): unused. Readers: the loader skips it
+    (`0x0056A830`); `0x0043C8A0` reads the header, `0x0043CAA0` only
+    checksums, `0x0045C520` copies. Comparisons must mask these 4 bytes.
 15. Iron Golem item on load: how `0x00538700` and the re-summon use it.
     Settle: a Necromancer with an Iron Golem made from an item. Still
     missing: that save; none was produced automatically because it
     needs a Necromancer able to cast Iron Golem (skill points and
     level well past a fresh character). A Clay Golem save (`bdGolem`)
     writes `kf` count 0 (§8.5 rule 4), so it does not settle this.
+    **Answered from the binary** (`formats/d2s-load.md` §3): the loader
+    keeps only the item's GUID (client +0x484); on joining,
+    `0x005394A0` finds that item, places it at the player and casts
+    Iron Golem on it at the skill's level with bonuses (`0x0056F7F0`),
+    then clears +0x484. Still unmeasured (needs that save).
 16. Result texts: the strings shown for results 1–26 (character
     select error dialog).
+    **Answered** (`formats/d2s-load.md` §5): S→C 0xB4 carries the
+    result; the client maps it (`0x0045C7E8`) to a message index and
+    shows string `0x0070F384`[index]: ids 5359–5381, 10101, 10102 per
+    result (table there). Texts come from the user's string tables.
 17. Appearance byte mapping (§2.8 rule 3): which of the 16 component
     and 16 colour bytes each equipped item sets, and to what value
     (`0x0063DA70`, the composite branch of `0x0063E510` via
@@ -1092,3 +1151,12 @@ and prints every field; it holds no save data.
     against saves with a weapon, a shield, a helm, a body armour and
     dyed or coloured items equipped. Needed for a d2rs writer to
     reproduce +0x88..+0xA7; the loader never reads them.
+    **Answered** (`formats/d2s-appearance.md`, from `0x0063E510`,
+    `0x0063DA70`, `0x0063D710`/`0x0063D900`, `0x0062C100`): component
+    byte = index of the item's `alternategfx`/`code` (body armour: the
+    `armtype` token of each of its six part bytes) in a 255-entry token
+    table built once from the item tables; helm → part 0, the hand items
+    → 5 (one-hander in use, or `component` 5) / 6, others their
+    `component`; colour = (`Transform` × 32 + colour) mod 256 + 1, or
+    0xFF. The rule reproduces all eight measured component values;
+    colours and armour still unmeasured (that file's Open question 2).
