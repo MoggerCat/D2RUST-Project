@@ -10,17 +10,20 @@
 //! What the window shows is what the specs allow: the S→C handlers of
 //! `client/model.md`, `msg-units.md` and `msg-stats-items.md` fill the
 //! client world model, and every rule of how a unit, tile or panel looks
-//! is a `TODO(spec: …)` hook answered by `world_view::Unspecified` (draw
-//! nothing). Placement is the original's: the world view builds each
+//! is a world-view hook (each names its owner spec) answered here by
+//! `world_view::Unspecified` (draw nothing: the model lacks their inputs,
+//! `model_feed::PENDING`). Placement is the original's: the world view builds each
 //! frame through `rules::OriginalView` with the camera of
 //! `render/camera.md` §3, fed by `world_view::ModelFeed` (the local
-//! player's position and unit positions from the model; the open mode,
-//! the shake and the map stay `NoFeed`'s until their owners land). No
-//! player in the model: no camera, nothing placeable.
+//! player's position, unit positions and BlankScreen from the model; the
+//! open mode is the original UI's, else 0, `ui/panels-2.md` §22 r5; the
+//! shake and the map stay `NoFeed`'s, `model_feed::PENDING`). No player
+//! in the model: no camera, nothing placeable.
 //! One frame per server tick (§9). The frame is the composed empty list: palette index 0 over
 //! the whole view. The frame palette is the act's `pal.pl2`
-//! (`render/composition.md` §4, `ViewAssets::from_pl2`); the model states
-//! no level, so no act: all zeros until it does.
+//! (`render/composition.md` §4) of the model's palette act
+//! (`client/model.md` §11), presented by [`super::palette`] when the
+//! user's archives are read; without them it is [`unspecified_palette`].
 //!
 //! Frames come from the frame store (`ViewAssets::frames`, the store of
 //! verify-map; empty until a rule names a frame set to load), UI text goes
@@ -56,10 +59,12 @@ use crate::world_view::{
 /// Frames between two progress lines in the log.
 const LOG_EVERY: u64 = 250;
 
-/// The frame palette while the model states no level for the player:
-/// all zeros (black). TODO(spec: the S→C owner spec of the player's
-/// level): then the act's `pal.pl2` (`render/composition.md` §4,
-/// `ViewAssets::from_pl2`).
+/// The frame palette before an act palette is presented: all zeros
+/// (black). With the user's archives [`super::palette`] replaces it with
+/// the `pal.pl2` of the model's palette act (`render/composition.md` §4,
+/// `client/model.md` §11 rules 2, 4); without them (synthetic data) there
+/// is no palette file and it stays. Index 0, the only index an empty
+/// frame shows, is black in every act palette (`composition.md` §4).
 pub fn unspecified_palette() -> Palette {
     Palette {
         colors: [Rgb { r: 0, g: 0, b: 0 }; 256],
@@ -207,6 +212,11 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .resource_mut::<BridgeResource>()
             .0
             .set_skill_rows(skills);
+        let units = single_player::client_unit_rows(&archives)?;
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_unit_rows(units);
         let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
         palette::add_act_palettes(&mut app, palettes);
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;

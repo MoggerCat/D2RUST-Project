@@ -42,9 +42,10 @@ pub enum DrawLightError {
         "wall direction {0} is outside the point tables (1…9) of render/wall-light-points.tsv"
     )]
     WallDirection(u32),
-    /// A block column whose `c + 1` is not one of the six points (§11 r2
-    /// does not say what the draw reads there).
-    #[error("wall block x {0}: column c = x >> 5 needs points c and c + 1 of 0…5 (TODO(spec: render/lighting.md §11 r2))")]
+    /// A block column whose `c + 1` is not one of the six points: §11 r2
+    /// reads points `c` and `c + 1` of the 0…5 a wall has (a 160-pixel
+    /// wall has columns 0…4); a block past them is malformed input.
+    #[error("wall block x {0}: column c = x >> 5 needs points c and c + 1 of 0…5 (render/lighting.md §11 r2)")]
     BlockColumn(i32),
     /// A malformed row of `wall-light-points.tsv`.
     #[error("wall-light-points.tsv line {line}: {msg}")]
@@ -265,8 +266,8 @@ impl WallPass {
 /// The corners `c0…c3` of the wall block at block x `block_x` (§11 r2):
 /// column `c = block_x >> 5`, `c0 = c3 = I_c`, `c1 = c2 = I_{c+1}` (low
 /// bytes of the words). A column whose `c + 1` is past point 5 (block x ≥
-/// 160) or negative is [`DrawLightError::BlockColumn`]: the spec does not
-/// say what the draw reads there.
+/// 160) or negative is [`DrawLightError::BlockColumn`]: a wall is 160
+/// pixels wide (columns 0…4), so such a block is malformed input.
 pub fn wall_block_corners(
     words: &[u32; WALL_POINTS],
     block_x: i32,
