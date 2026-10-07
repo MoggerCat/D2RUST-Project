@@ -23,30 +23,31 @@
   (Chaos Sanctum population guard); `monsters/ai-functions.tsv` rows 54
   NpcStationary, 55 Izual; `sim/units.md` §6.4 (object event types 1
   and 7, `fc1`); `sim/unit-events.tsv`; `sim/rng.md` §3, §6;
-  `sim/tick.md` §8 (wall clock); item, object, monster spawning and
-  save specs (not written).
+  `sim/tick.md` §8 (wall clock); `items/generation.md` (item creation),
+  `world/objects.md` (object modes), `monsters/init.md` (spawning),
+  `formats/d2s.md` §2.3 (save progression).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–66 |
-| Inputs | 67–77 |
-| Outputs / state changes | 78–89 |
-| Rules | 90–91 |
-|   1. Conventions | 92–158 |
-|   2. Act IV records | 159–180 |
-|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 181–301 |
-|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 302–449 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 450–682 |
-|   6. Act IV gossip records | 683–709 |
-|   7. Multiplayer and party rules | 710–722 |
-|   8. Hooks called from other systems | 723–760 |
-| Constants & data dependencies | 761–781 |
-| Randomness | 782–795 |
-| Edge cases & original bugs | 796–854 |
-| Test vectors | 855–872 |
-| Provenance | 873–910 |
-| Open questions | 911–997 |
+| Summary | 53–67 |
+| Inputs | 68–78 |
+| Outputs / state changes | 79–90 |
+| Rules | 91–92 |
+|   1. Conventions | 93–159 |
+|   2. Act IV records | 160–181 |
+|   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 182–302 |
+|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 303–450 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 451–698 |
+|   6. Act IV gossip records | 699–725 |
+|   7. Multiplayer and party rules | 726–738 |
+|   8. Hooks called from other systems | 739–776 |
+| Constants & data dependencies | 777–797 |
+| Randomness | 798–811 |
+| Edge cases & original bugs | 812–870 |
+| Test vectors | 871–888 |
+| Provenance | 889–926 |
+| Open questions | 927–1016 |
 <!-- /index -->
 
 ## Summary
@@ -635,7 +636,7 @@ With +0x02 clear: +0x03 clear → return 1. Else with now =
 updater ticks):
 
 1. +0x04 set and now > t0 + 95000: +0x01, +0x03, +0x04 := 0; classic →
-   `0x00530590(game, 0)` (host: end the game, `quests-helpers.md` §6). Return 1.
+   `0x00530590(game, 0)` (host: end the game; see below and `quests-helpers.md` §6). Return 1.
 2. Else now > t0 + 90000: +0x05 set → classic: for each player
    `0x005B4A80`; +0x05 := 0. Return 0.
 3. Else now > t0 + 75000 and +0x15 = 0: +0x15 := 1; `0x0052E2A0(game)`
@@ -648,6 +649,21 @@ data +0x4C := 1; extra +0x20 := player; 26.13 set → level warp to 103
 stack (Open question 3). Expansion games run the timer to step 1 too but
 skip the warp and the game end. `0x005B4A30` (warp and `5D 17 01`) has
 no caller.
+
+Host calls. `0x00530590(game, flag)` (only caller `0x005B4C9D`, flag
+0) looks the game up in the host's game list (`0x0052DED0`) and closes
+it (`0x00538590`, `0x005303D0`): host game teardown; the timer then
+returns 1. `0x0052E2A0(game)` (the
+Act V save pass, `quests-act5-2.md` open question 3) saves and uploads
+characters: host save / transport code. Both are owned by `d2-server`
+(hard rule 6: `d2-sim` has no I/O); `d2-sim` emits a host request (end
+game; save pass) at the 1.14d call point, in call order with the
+frame's other outputs, and continues as if the call returned.
+`quests-helpers.md` §6 gives the more specific 1.14d read of
+`0x00530590` (drops one client: the last in-game client passing
+`0x00539030`, else the first in-game one; not a whole-game teardown).
+Other PC 2 session read: "looks the game up and closes it (host game
+teardown)" — to reconcile (staging-6 merge).
 
 #### 5.9 The portal to Harrogath (object 566, expansion)
 
@@ -912,8 +928,9 @@ Act IV quest code draws.
 
 1. Status meanings per Act IV quest (client quest log): settle with
    `quests.md` open question 1. **Answered** (2026-10-07): `world/quests-status.md`: the client (0x52 `0x0045CC00` → `0x004A40D0` stores the list; row build `0x004A1950`, tables `0x00723F30` and the per-quest status tables) maps each status to a description string id, a replay speech id and an icon state (§4, §5); Act IV tables §10; Fallen Angel and Hell's Forge exceptions §6.
-2. The classic end-of-game schedule reads `GetTickCount` (§5.8), an
-   outcome driven by wall-clock time, against `sim/tick.md` §8. Chosen
+2. ~~The classic end-of-game schedule reads `GetTickCount` (§5.8), an
+   outcome driven by wall-clock time, against `sim/tick.md` §8.~~
+   Recording R-PQ-12 (`docs/handoff/pc2-rec-pc2-quests.md`). Chosen
    until settled: `d2-sim` uses elapsed game time = 40 ms × frames since
    the kill; confirm with a recording (warp and end frames after a
    classic Diablo kill) and record the exception in `sim/tick.md`.
@@ -973,11 +990,13 @@ Act IV quest code draws.
    (client +0x0A bits 8–12 raised to 4 · difficulty + 4 for a classic
    character; never lowered). The call is classic-only (`0x005B4D3F`
    skips it in expansion games) and sits after 26.6 / 26.7 (`0x005B4D77`).
-10. `0x00530590` (game end) and `0x0052E2A0` (save pass) are host
-    code: decide whether `d2-server` or `d2-sim` owns them. **Answered**
-    (2026-10-07): `d2-server` owns both; `d2-sim` raises them as host
-    requests and changes no state (`quests-helpers.md` §6; the save
-    pass's effect is `quests-act5-2.md` open question 3).
+10. ~~`0x00530590` (game end) and `0x0052E2A0` (save pass) are host
+    code: decide whether `d2-server` or `d2-sim` owns them.~~
+    **Answered** (2026-10-07): `d2-server` owns both; `d2-sim` raises
+    each as a host request at the 1.14d call point, in order, and goes
+    on as if it returned, changing no state (rule: §5.8 "Host calls";
+    also `quests-helpers.md` §6; the save pass's effect is
+    `quests-act5-2.md` open question 3).
 11. `quests-act3.md` §8.6 says level 104 is The Pandemonium Fortress;
     live `levels.txt` has 103 = The Pandemonium Fortress, 104 = Outer
     Steppes (`0x005BCBF0` compares 104). Settle in that spec. **Answered**
@@ -990,7 +1009,7 @@ Act IV quest code draws.
     missing for Act IV. **Answered** (2026-10-07): rows 25–28 and 30 switched to
     `specified` (quests-fixups CODE-TABLE commit; every address of these
     rows is named in this file).
-13. Record a full Act IV run (packets + RNG, `docs/HANDOFF.md` §5):
+13. ~~Record a full Act IV run (packets + RNG, `docs/HANDOFF.md` §5):
     Izual and the ghost, the Hellforge drops, the seals and seal
     bosses, Diablo's spawn and death in classic and expansion, the
-    portal.
+    portal.~~ Needs recording: R-PQ-11 (= HANDOFF §5 S9-A3 Act IV).

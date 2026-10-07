@@ -895,7 +895,7 @@ outside the repo; string keys from the 1.14d English `.tbl` files
 
 ## Open questions
 
-1. Confirm with a recording of one quest-log open per state (e.g. Den of
+1. ~~Confirm with a recording of one quest-log open per state (e.g. Den of
    Evil: started, D = 3, rewarded now, rewarded earlier): the drawn
-   text, icon frame and the C→S 0x58 after the completion animation.
-   Needs recording.
+   text, icon frame and the C→S 0x58 after the completion animation.~~
+   Needs recording: R-PQ-14 (`docs/handoff/pc2-rec-pc2-quests.md`).
