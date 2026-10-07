@@ -1,5 +1,5 @@
 // Spec: specs/monsters/ai-bodies-7.md (rules the first pass left unclaimed); fakes from the parent test module
-use super::act2::{act_row, logged, param_of, set_param_of, world};
+use super::act2::{act_row, give_skill, logged, param_of, point_mode, set_param_of, world};
 use super::act6::{own, sentry_world};
 use super::npc::{seed_with, steps_since, unit_mode};
 use super::*;
@@ -274,4 +274,369 @@ fn shadow_warrior_drops_a_far_target() {
     let (far_o, thinks) = run((131, 100), 40);
     assert!(!far_o, "dO > aip2 drops T");
     let _ = thinks;
+}
+
+// ---- §19 Raven, §20 Vines, §21 DruidBear, §23 ------------------------------
+
+/// A druidhawk (107) owned by the player, brackets [10, 6, 5, 75, 35], hits
+/// left c = 2, next attack frame 1000, orbit side σ = 1; owner at `at`.
+fn raven_world(at: (i32, i32)) -> World {
+    let mut w = world(act_row(107, &[10, 6, 5, 75, 35]));
+    own(&mut w);
+    w.fake.pos.insert(w.player, at);
+    w.fake.y.final_point.insert(w.player, at);
+    w.fake.y.target_point.insert(w.player, at);
+    w.fake.y.last_placed = (300, 300);
+    set_param_of(&mut w, 0, 2);
+    set_param_of(&mut w, 1, 1000);
+    set_param_of(&mut w, 2, 1);
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §19 r4
+#[test]
+fn raven_runs_to_a_far_owner_at_the_run_ratio() {
+    // v := Run × 100 / Velocity − 100; 100 when Velocity ≤ 0 or v ≥ 100
+    // (negative kept). dO > 28 → pet move k 0 (run 0, speed v, n 0).
+    for (run, vel, v) in [(9, 6, 50), (3, 6, -50), (12, 6, 100), (9, 0, 100)] {
+        let mut w = raven_world((130, 100));
+        w.monstats[0].run = run;
+        w.monstats[0].velocity = vel;
+        w.think_with(Some(w.player), 5, false);
+        assert_eq!(
+            w.fake.modes(),
+            [point_mode(mode::WALK, 130, 108)],
+            "run {run}"
+        );
+        assert_eq!(w.vel_request().speed, v, "run {run} velocity {vel}");
+    }
+    // dO = 28 is not far: no pet move k 0 to Q.
+    let mut w = raven_world((129, 100));
+    w.think_with(Some(w.player), 5, false);
+    assert!(!w.fake.modes().contains(&point_mode(mode::WALK, 129, 108)));
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §19 r5
+#[test]
+fn raven_looks_at_the_owners_target_without_using_it() {
+    // The owner-view search runs (its result is computed and unused): the
+    // good-target search is asked for O, and the think goes on as if it had
+    // found nothing.
+    let mut w = raven_world((120, 100));
+    w.fake.align = 1;
+    let e = w.add_unit(UnitType::Monster, (115, 100));
+    w.fake.good_for.insert(w.player, (e, 5));
+    w.think_with(None, 0, false);
+    assert!(w.fake.log.iter().any(|l| l.starts_with("good")));
+    assert!(!w.fake.modes().contains(&unit_mode(mode::WALK, e)));
+    assert!(!w.fake.modes().contains(&unit_mode(mode::ATTACK1, e)));
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §19 r6, §19 r9
+#[test]
+fn raven_walks_to_the_mid_radius_of_its_owner_or_retraces() {
+    // mid := (aip2 + aip1) / 2 and the point O + (U − O) × mid / d: raven
+    // at (100, 100), O 24 away (outside the orbit band).
+    for (aips, mid) in [([10i16, 6, 5, 75, 35], 8), ([20, 2, 5, 75, 35], 11)] {
+        let mut w = world(act_row(107, &aips));
+        own(&mut w);
+        let at = (124, 100);
+        w.fake.pos.insert(w.player, at);
+        w.fake.y.final_point.insert(w.player, at);
+        w.fake.y.target_point.insert(w.player, at);
+        w.fake.y.last_placed = (300, 300);
+        set_param_of(&mut w, 0, 2);
+        set_param_of(&mut w, 1, 1000);
+        w.think_with(Some(w.player), 5, false);
+        assert_eq!(
+            w.fake.modes(),
+            [point_mode(mode::WALK, 124 - mid, 100)],
+            "aips {aips:?}"
+        );
+    }
+    // d = 0 (on top of the owner): not started → pet move k 1 (velocity
+    // (15, 0, 0), a wander' of radius 4 after the history draw).
+    let lo = seed_with(1, |_| true);
+    let mut w = raven_world((100, 100));
+    w.seed(lo);
+    w.think_with(Some(w.player), 5, false);
+    let mut s = Seed::init_low(lo);
+    s.step();
+    let (x, y) = wander_point(&mut s, (100, 100), 4);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, x, y)]);
+    assert_eq!(w.vel_request().method, 15);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §19 r7
+#[test]
+fn raven_attacks_or_chases_its_target_when_due() {
+    let due = |lo: u32, d: i32, c: bool, f: i32| {
+        let mut w = raven_world((103, 100));
+        set_param_of(&mut w, 1, f);
+        w.game.frame = 10;
+        w.seed(lo);
+        w.think_with(Some(w.player), d, c);
+        w
+    };
+    let hit = seed_with(1, |v| v[0] < 75);
+    let miss = seed_with(1, |v| v[0] >= 75);
+    // C: A1 at T, c −= 1, f := frame + aip3 × 10.
+    let w = due(hit, 5, true, 5);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+    assert_eq!((param_of(&w, 0), param_of(&w, 1)), (1, 60));
+    // Not C: walk to T (flags 0), counters untouched.
+    let w = due(hit, 5, false, 5);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, w.player)]);
+    assert_eq!((param_of(&w, 0), param_of(&w, 1)), (2, 5));
+    // f ≥ frame: not due, no draw; roll ≥ aip4: no attack (one draw); D ≥
+    // aip5 [35]: the roll is drawn and no attack.
+    let w = due(hit, 5, true, 10);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::ATTACK1, w.player)));
+    assert_eq!(steps_since(&w, hit), 0);
+    let w = due(miss, 5, true, 5);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::ATTACK1, w.player)));
+    assert_eq!(steps_since(&w, miss), 1);
+    let w = due(hit, 35, true, 5);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::ATTACK1, w.player)));
+    assert_eq!(steps_since(&w, hit), 1);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §19 r8
+#[test]
+fn raven_orbits_its_owner_inside_the_band_and_flips_sides_when_refused() {
+    // Band aip2 [6] ≤ dO ≤ aip1 [10]: velocity (σ ? 5 : 6, 0, 4) and mode 2
+    // toward O.
+    for (sigma, method) in [(1, 5), (0, 6)] {
+        let mut w = raven_world((108, 100));
+        set_param_of(&mut w, 2, sigma);
+        w.think_with(Some(w.player), 40, false);
+        assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, w.player)]);
+        assert_eq!((w.vel_request().method, w.vel_request().steps), (method, 4));
+        assert_eq!(param_of(&w, 2), sigma);
+    }
+    // Refused: σ := ¬σ and one more try with the new side.
+    let mut w = raven_world((108, 100));
+    w.fake.walk_fails = true;
+    w.think_with(Some(w.player), 40, false);
+    let m = w.fake.modes();
+    let orbit = unit_mode(mode::WALK, w.player);
+    assert_eq!(m[..2], [orbit.clone(), orbit]);
+    assert_eq!(param_of(&w, 2), 0);
+    // Outside the band (dO = 11 > aip1): no orbit request toward O at all.
+    let mut w = raven_world((112, 100));
+    w.think_with(Some(w.player), 40, false);
+    assert!(!w.fake.modes().contains(&unit_mode(mode::WALK, w.player)));
+}
+
+/// A plaguepoppy (110), brackets [100, 20, 25, 10, 35], owned by the player.
+fn vines_world(owner_at: (i32, i32)) -> World {
+    let mut w = world(act_row(110, &[100, 20, 25, 10, 35]));
+    own(&mut w);
+    w.fake.pos.insert(w.player, owner_at);
+    w.fake.y.final_point.insert(w.player, owner_at);
+    w.fake.y.target_point.insert(w.player, owner_at);
+    w.fake.y.last_placed = (300, 300);
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §20 r2
+#[test]
+fn vines_far_from_the_owner_teleport_to_it() {
+    let mut w = vines_world((136, 100));
+    let room = w.room;
+    w.fake.y.free_spot = Some((110, 110));
+    w.fake.x.room_at = Some(room);
+    w.fake.x.place_ok = true;
+    w.think_with(None, 0, false);
+    assert!(logged(&w, "place 110 110"));
+    assert_eq!(w.thinks(), [5]);
+    // 34 < aip5: no catch-up teleport.
+    let mut w = vines_world((134, 100));
+    w.fake.y.free_spot = Some((110, 110));
+    w.fake.x.room_at = Some(room);
+    w.fake.x.place_ok = true;
+    w.think_with(None, 0, false);
+    assert!(!logged(&w, "place 110 110"));
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §20 r3
+#[test]
+fn vines_in_town_follow_or_idle() {
+    // Far (> 50): the follow's k 3 fails (no free spot) → idle aip3 [25].
+    let mut w = vines_world((170, 100));
+    let room = w.room;
+    w.fake.town.insert(room);
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [25]);
+    // Near: the follow loiters (idle 15) and ends the think.
+    let mut w = vines_world((103, 100));
+    w.fake.town.insert(room);
+    w.seed(seed_with(1, |v| v[0] >= 10));
+    w.think_with(None, 0, false);
+    assert_eq!(w.thinks(), [15]);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §20 r4, §20 r5
+#[test]
+fn vines_forget_a_far_secondary_target_then_follow() {
+    // E ≥ aip2 [20] → S := 0: the follow (no S, O beside it) loiters and
+    // ends the think (r5); with E = 19 the target stays, the follow returns
+    // 0 (S set, D ≤ 80) and the poisoned target is escaped (step 6).
+    let setup = |e: i32| {
+        let mut w = vines_world((103, 100));
+        let s = w.add_unit(UnitType::Monster, (110, 100));
+        w.fake.secondary = Some((s, e));
+        w.fake.states.insert((s, 2));
+        w.seed(seed_with(1, |v| v[0] >= 10));
+        w.think_with(None, 0, false);
+        w
+    };
+    let w = setup(19);
+    assert_eq!(w.fake.modes(), [point_mode(mode::WALK, 90, 100)]);
+    let w = setup(20);
+    assert_eq!(w.thinks(), [15]);
+    assert!(w.fake.modes().is_empty());
+}
+
+/// A druidbear (112), brackets [15, 40, 50], owned by the player; good
+/// alignment.
+fn bear_world(owner_at: (i32, i32)) -> World {
+    let mut w = world(act_row(112, &[15, 40, 50]));
+    own(&mut w);
+    w.fake.align = 1;
+    w.fake.pos.insert(w.player, owner_at);
+    w.fake.y.final_point.insert(w.player, owner_at);
+    w.fake.y.target_point.insert(w.player, owner_at);
+    w.fake.y.last_placed = (300, 300);
+    w
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §21 r2
+#[test]
+fn druid_bear_remembers_its_owner() {
+    let mut w = bear_world((103, 100));
+    w.think_with(None, 0, false);
+    let g = w.game.lists.unit(w.player).unwrap().guid as i32;
+    assert_eq!(param_of(&w, 2), g);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §21 r5
+#[test]
+fn druid_bear_catches_up_with_a_walking_or_running_owner() {
+    // dO > 18 (≤ 28): O walking (2) or town-walking (6) → k 0 (0, 0, 0); O
+    // running (3) → k 0 (0, 100, 0). Otherwise the think goes on.
+    for (om, speed) in [(2u8, 0), (6, 0), (3, 100)] {
+        let mut w = bear_world((122, 100));
+        w.fake.anim.insert(w.player, om);
+        w.think_with(None, 0, false);
+        assert_eq!(
+            w.fake.modes(),
+            [point_mode(mode::WALK, 122, 108)],
+            "O mode {om}"
+        );
+        assert_eq!(w.vel_request().speed, speed, "O mode {om}");
+    }
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §21 r6
+#[test]
+fn druid_bear_target_from_its_own_search_or_the_owner_view() {
+    let lo = seed_with(1, |v| v[0] < 40);
+    let walks_to = |w: &World, t: UnitId| w.fake.modes().contains(&unit_mode(mode::WALK, t));
+    // S from its own capped search (28): E = 28 kept, 29 dropped.
+    for (e, kept) in [(28, true), (29, false)] {
+        let mut w = bear_world((103, 100));
+        let t = w.add_unit(UnitType::Monster, (110, 100));
+        w.fake.good_for.insert(w.mon, (t, e));
+        w.seed(lo);
+        w.think_with(None, 0, false);
+        assert_eq!(walks_to(&w, t), kept, "E {e}");
+    }
+    // S not directly reachable → 0 (and T0 equally unreachable).
+    let mut w = bear_world((103, 100));
+    let t = w.add_unit(UnitType::Monster, (110, 100));
+    w.fake.good_for.insert(w.mon, (t, 10));
+    w.fake.reach_fails = true;
+    w.seed(lo);
+    w.think_with(None, 0, false);
+    assert!(!walks_to(&w, t));
+    // S = 0: T0 (the owner's search) within 28 and reachable → S := T0.
+    for (tx, reach_fails, taken) in [(115, false, true), (115, true, false), (130, false, false)] {
+        let mut w = bear_world((103, 100));
+        let t = w.add_unit(UnitType::Monster, (tx, 100));
+        w.fake.good_for.insert(w.player, (t, 10));
+        w.fake.reach_fails = reach_fails;
+        w.seed(lo);
+        w.think_with(None, 0, false);
+        assert_eq!(
+            walks_to(&w, t),
+            taken,
+            "T0 at {tx} reach_fails {reach_fails}"
+        );
+    }
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §21 r7
+#[test]
+fn druid_bear_closes_on_a_target_out_of_contact() {
+    // M = 0, S: `roll(100)` < aip2 [40] → velocity (0, v, 40) and walk to S;
+    // a draw ≥ 40 → no walk (step 9: dO < 17 → idle 15).
+    let setup = |lo: u32| {
+        let mut w = bear_world((103, 100));
+        w.monstats[0].run = 9;
+        w.monstats[0].velocity = 6;
+        let t = w.add_unit(UnitType::Monster, (110, 100));
+        w.fake.good_for.insert(w.mon, (t, 10));
+        w.seed(lo);
+        w.think_with(None, 0, false);
+        (w, t)
+    };
+    let (w, t) = setup(seed_with(1, |v| v[0] < 40));
+    assert_eq!(w.fake.modes(), [unit_mode(mode::WALK, t)]);
+    assert_eq!((w.vel_request().speed, w.vel_request().steps), (50, 40));
+    let (w, _) = setup(seed_with(1, |v| v[0] >= 40));
+    assert!(w.fake.modes().is_empty());
+    assert_eq!(w.thinks(), [15]);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §21 r8
+#[test]
+fn druid_bear_in_contact_smites_or_strikes() {
+    // M ≠ 0, S: `roll(100)` < aip3 [50] → sequence skill `Skill1` at S;
+    // else A1 at S and wait aip1 [15].
+    let setup = |lo: u32| {
+        let mut w = bear_world((103, 100));
+        give_skill(&mut w, 1, 77, 14);
+        let t = w.add_unit(UnitType::Monster, (105, 100));
+        w.fake.good_for.insert(w.mon, (t, 5));
+        w.fake.melee.insert(t);
+        w.seed(lo);
+        w.think_with(None, 0, false);
+        (w, t)
+    };
+    let (w, t) = setup(seed_with(1, |v| v[0] < 50));
+    assert_eq!(w.fake.modes(), [unit_mode(mode::SEQUENCE, t)]);
+    assert!(logged(&w, "skill 77"));
+    let (w, t) = setup(seed_with(1, |v| v[0] >= 50));
+    assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, t)]);
+    assert_eq!(w.thinks(), [15]);
+}
+
+// Covers: specs/monsters/ai-bodies-7.md §23 r3
+#[test]
+fn generic_spawner_far_target_idles_20() {
+    // D ≥ 21 → idle 20 even when the nest is due and under its cap; D = 20
+    // goes on to the nest.
+    let hut = [80, 0, 15];
+    for (d, nests) in [(21, false), (20, true)] {
+        let mut w = world(act_row(129, &hut));
+        w.fake.footprint = true;
+        w.game.frame = 80;
+        w.think_with(Some(w.player), d, false);
+        assert_eq!(w.fake.modes().len(), usize::from(nests), "D {d}");
+        if !nests {
+            assert_eq!(w.thinks(), [100]);
+            assert_eq!(param_of(&w, 1), 0);
+        }
+    }
 }
