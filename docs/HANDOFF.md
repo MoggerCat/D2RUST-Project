@@ -3414,6 +3414,14 @@ the dev-dependency) and record results here.
     `cpu_compositor_on_real_frames`; `game_wired_host`). Confirm the
     `mpq-tool formats` counts after the case fix (DC6 1,653, DT1 256) and
     re-derive `game_sweep`'s expected values (buddy note G1).
+99. Save appearance token table on live data (`formats/d2s-appearance.md`
+    §1 r3, Open question 3): `D2_GAME_DIR=<install> cargo test -p
+    d2-server --test character_save -- --ignored`
+    (`token_positions_on_the_users_install`): expect `hax` 4 … `ktr` 45,
+    `cap` 57, `buc` 79, `sst`→`bst` 0x25 with the PROVISIONAL reference
+    slots (`ReferenceSlots::provisional_1_14d`). A miss means the
+    reconstruction is wrong; then read the 256 × 8 bytes at `0x00744CA8`
+    of the 1.14d image into the spec (settles Open question 3).
 
 Kept entries (unchanged):
 

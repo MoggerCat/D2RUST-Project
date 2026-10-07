@@ -1,4 +1,4 @@
-// Spec: specs/drlg/preset.md §5.3, §13; specs/drlg/levels.md; specs/drlg/maze.md §1; specs/drlg/outdoor-tilesub.md §1; specs/world/hirelings.md Inputs (the `hireling`, `pettype`, `experience` tables), §1.2 r2, §10 r2; specs/items/treasure.md Inputs, §1; specs/formats/d2s.md Inputs, §2.5 r2, §8.1 r2, §8.4 r2
+// Spec: specs/drlg/preset.md §5.3, §13; specs/drlg/levels.md; specs/drlg/maze.md §1; specs/drlg/outdoor-tilesub.md §1; specs/world/hirelings.md Inputs (the `hireling`, `pettype`, `experience` tables), §1.2 r2, §10 r2; specs/items/treasure.md Inputs, §1; specs/formats/d2s.md Inputs, §2.5 r2, §8.1 r2, §8.4 r2; specs/formats/d2s-appearance.md Inputs, Constants
 //! The table views of the level types, from the fixed-up table set
 //! (`d2_data::fixup::FixedSet`): each view's own `from_tables` /
 //! `from_record`, plus the preset counts of `preset.md` §5.3 (monstats
@@ -6,13 +6,18 @@
 //! class of `hdm `). Also the hireling tables of the interaction desk
 //! ([`hireling_tables`]), the drop tables of the treasure walk
 //! ([`drop_tables`], `ActionHooks::object_drops`) and the tables of the
-//! `.d2s` reader and writer ([`SaveData`], `d2s::SaveTables`).
+//! `.d2s` reader and writer ([`SaveData`], `d2s::SaveTables`) and the
+//! columns of the save's appearance bytes ([`appearance_tables`]).
 
 use d2_data::bin::BinTable;
 use d2_data::fixup::FixedSet;
 use d2_data::tables::{
-    decode_all, Armor, Itemstatcost, Itemtypes, Leveldefs, Lvlmaze, Lvlprest, Lvlsub, Lvltypes,
-    Lvlwarp, Misc, Objects, Record, Setitems, Superuniques, Treasureclassex, Uniqueitems, Weapons,
+    decode_all, Armor, Armtype, Automagic, Gems, Itemstatcost, Itemtypes, Leveldefs, Lvlmaze,
+    Lvlprest, Lvlsub, Lvltypes, Lvlwarp, Magicprefix, Magicsuffix, Misc, Objects, Record, Setitems,
+    States, Superuniques, Treasureclassex, Uniqueitems, Weapons,
+};
+use d2_formats::d2s::appearance::{
+    link8_signed, AppearanceTables, ColourTables, IsA, ItemGfx, ReferenceSlots, StateColour,
 };
 use d2_formats::d2s::{self, Hireling, StatSave};
 use d2_sim::drlg::maze::MazeData;
@@ -183,6 +188,90 @@ impl d2s::SaveTables for SaveData {
                 .row_at(self.expansion, u32::from(h.id), 1)
                 .is_some()
     }
+}
+
+macro_rules! item_gfx {
+    ($r:expr) => {{
+        let r = $r;
+        ItemGfx {
+            code: r.code,
+            alternategfx: r.alternategfx,
+            item_type: i32::from(r.type_ as i16),
+            component: r.component,
+            arm: [r.torso, r.legs, r.rarm, r.larm, r.rspad, r.lspad],
+            hasinv: r.hasinv,
+            transform: r.transform,
+            gemoffset: r.gemoffset as i32,
+            wclass: r.wclass,
+        }
+    }};
+}
+
+/// The columns of the save's appearance bytes (`formats/d2s-appearance.md`
+/// Inputs) from the fixed-up set: the items records in record order
+/// (weapons, armor, misc), the `armtype` tokens, the itemtypes is-a
+/// matrix, the colour columns (magic affixes in the combined order
+/// suffixes, prefixes, automagic; `setitems`, `uniqueitems`, `gems`) and
+/// the state-colour list (every `states` row whose `itemtype`, read as a
+/// signed 16-bit value, is > 0, in row order: Constants). The token table
+/// is built over `reference` (§1). A missing or malformed table is an
+/// error (M07).
+pub fn appearance_tables(
+    set: &FixedSet,
+    reference: &ReferenceSlots,
+) -> Result<AppearanceTables, WorldDataError> {
+    let mut items: Vec<ItemGfx> = records::<Weapons>(set)?
+        .iter()
+        .map(|r| item_gfx!(r))
+        .collect();
+    items.extend(records::<Armor>(set)?.iter().map(|r| item_gfx!(r)));
+    items.extend(records::<Misc>(set)?.iter().map(|r| item_gfx!(r)));
+    let armtype = records::<Armtype>(set)?.iter().map(|r| r.token).collect();
+    let eq = &set.itemtypes_equiv;
+    let types = IsA::from_fn(eq.n, |i, j| eq.get(i, j));
+    let mut affix: Vec<i32> = records::<Magicsuffix>(set)?
+        .iter()
+        .map(|r| link8_signed(r.transformcolor))
+        .collect();
+    affix.extend(
+        records::<Magicprefix>(set)?
+            .iter()
+            .map(|r| link8_signed(r.transformcolor)),
+    );
+    affix.extend(
+        records::<Automagic>(set)?
+            .iter()
+            .map(|r| link8_signed(r.transformcolor)),
+    );
+    let states = records::<States>(set)?
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| (r.itemtype as i16) > 0)
+        .map(|(row, r)| StateColour {
+            state: row as u32,
+            item_type: i32::from(r.itemtype as i16),
+            itemtrans: link8_signed(r.itemtrans),
+        })
+        .collect();
+    let colours = ColourTables {
+        affix,
+        set: records::<Setitems>(set)?
+            .iter()
+            .map(|r| link8_signed(r.chrtransform))
+            .collect(),
+        unique: records::<Uniqueitems>(set)?
+            .iter()
+            .map(|r| link8_signed(r.chrtransform))
+            .collect(),
+        gem: records::<Gems>(set)?
+            .iter()
+            .map(|r| i32::from(r.transform))
+            .collect(),
+        states,
+    };
+    Ok(AppearanceTables::new(
+        items, armtype, types, colours, reference,
+    ))
 }
 
 fn table_err(table: &str, detail: impl ToString) -> WorldDataError {

@@ -565,5 +565,7 @@ pub fn loaded_flags(stored: u32) -> u32 {
     d2s::item_flags_on_load(stored)
 }
 
+pub mod save;
+
 #[cfg(test)]
 mod tests;
