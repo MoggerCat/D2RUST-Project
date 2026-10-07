@@ -29,7 +29,7 @@
 | Edge cases & original bugs | 267–278 |
 | Test vectors | 279–294 |
 | Provenance | 295–313 |
-| Open questions | 314–353 |
+| Open questions | 314–352 |
 <!-- /index -->
 
 ## Summary
@@ -344,9 +344,8 @@ the resulting tile grids (via the tile-fill check of `rooms.md`).
    keeps an earlier block's bytes) or falls back to `0x00409770` (CRT
    `malloc` of size + 4; no clear). Neither path writes the block, and
    the parser writes no +0x14 for v12 (OQ1). So N of each `trees.ds1`
-   group is heap history: not derivable from the binary. *Pending*: a
-   memory read of the Trees group records (+0x50, 24-byte records, +0x14)
-   after the first `0x006704E0` load in a recorded Act 1 run. The
-   recorder reads DS1 +0x4C / +0x50 of the file whose name is
-   `ACT1\OUTDOORS\trees.ds1`. Until then d2rs keeps N = 0 for v12
-   groups (no variant draw), unverified.
+   group is heap history: not derivable from the binary. PROVISIONAL: N = 0 for
+   v12 groups, no variant draw (because the binary gives no value and 0
+   is the only value that draws nothing); settled by REC-35 (memory read
+   of the Trees group records, +0x50, 24-byte records, +0x14, after the
+   first `0x006704E0` load of `ACT1\OUTDOORS\trees.ds1` in an Act 1 run).

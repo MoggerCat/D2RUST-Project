@@ -27,16 +27,16 @@
 |   3. Cell primitives | 123–242 |
 |   4. Generation sequence (`0x00673B30`, D2MOO `DRLGMAZE_GenerateLevel`) | 243–285 |
 |   5. Layout builders | 286–369 |
-|   6. Special cells by level | 370–452 |
-|   7. Placement against a neighbouring preset level | 453–504 |
-|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 505–522 |
-|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 523–555 |
-| Constants & data dependencies | 556–569 |
-| Randomness | 570–606 |
-| Edge cases & original bugs | 607–632 |
-| Test vectors | 633–664 |
-| Provenance | 665–717 |
-| Open questions | 718–748 |
+|   6. Special cells by level | 370–469 |
+|   7. Placement against a neighbouring preset level | 470–521 |
+|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 522–539 |
+|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 540–572 |
+| Constants & data dependencies | 573–586 |
+| Randomness | 587–623 |
+| Edge cases & original bugs | 624–649 |
+| Test vectors | 650–681 |
+| Provenance | 682–734 |
+| Open questions | 735–765 |
 <!-- /index -->
 
 ## Summary
@@ -399,6 +399,23 @@ each stamp. Tables are the `kind` values of `maze-specials.tsv`.
 
 The crypt special table has 8 rows in the binary (Bonebreak N/E/S/W
 then Portal N/E/S/W); r ≤ 3 so the Portal rows are never used.
+
+The builders test level ids, not a list, so a level of the type that
+the table does not name still gets the unconditional stamps (1.14d asm
+of each builder):
+- Cave: cave_prev; then cave_doe if level 8 else cave_down
+  (`0x0067259B`); cave_coldcrow if 9; cave_next if 10. So the second
+  levels 13–16 (Cave Level 2 … Pit Level 2) get cave_prev, cave_down.
+- Crypt: crypt_prev; crypt_bonebreak if 18; crypt_chest if 19 or 133;
+  crypt_next if 21–24. So level 25 gets crypt_prev only.
+- Catacombs: catacombs_next; catacombs_waypoint if 35. So 37 gets
+  catacombs_next.
+- Dungeon (`0x00672EA0`), Act 3 Sewer (`0x00672F00`): both stamps
+  unconditionally, so 90, 91 get dungeon_prev, dungeon_next and 93 gets
+  a3sewer_drain, a3sewer_chest.
+- Baal: baal_next; baal_waypoint if 129 (`0x006730F5`). So 132 gets
+  baal_next.
+A level type not in the builder table above is fatal (row "other").
 
 **6.1 Lair** (`0x00672DC0`, Maggot Lair 62–64): r = level-seed step
 & 3. Maggot Lair 3 (64): stamp the single row lair_tightspot (Lair S →
