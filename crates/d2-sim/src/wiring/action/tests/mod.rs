@@ -22,6 +22,8 @@ mod player_death;
 #[cfg(test)]
 mod rooms;
 #[cfg(test)]
+mod sound;
+#[cfg(test)]
 mod waypoints;
 
 use std::collections::BTreeMap;

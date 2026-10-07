@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
+// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5; specs/audio/triggers-2.md §14; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
 //! [`ActionSim`]: the one dispatcher the tick runs. Timer events go to
 //! the unit dispatch (`units.md` §5: the per-kind handler tables and the
 //! monster freeze drop of `tick.md` §5.6), whose hooks run the missile
@@ -303,6 +303,10 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         {
             if let Some(receiver) = game.lists.client(client).and_then(|c| c.player) {
                 v.object_update(game, receiver, unit);
+                // `objects.md` §14 rule 2: flag 0x400 → `0x00571740`.
+                if let Some(m) = crate::units::sound::sound_message(game, unit, receiver) {
+                    v.h.x.send(receiver, &m);
+                }
             }
             return;
         }
@@ -321,8 +325,20 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     }
 
     /// Step 6 (`0x00553220`, `intents-events.md` §7.5): the flag part of
-    /// the room clean-up ([`View::room_cleanup`]).
-    fn unit_update(&mut self, _: &mut Game, unit: UnitId) {
+    /// the room clean-up ([`View::room_cleanup`]) and unit flag 0x400, the
+    /// sound slot (step 3, [`crate::units::sound`]). A player's slot is
+    /// read by its unit update `0x00580860` after the item messages
+    /// (`cube.md` §8 rule 3), which the server runs after the tick
+    /// (`d2-server` `handlers::items::moves::update_pass`); that pass
+    /// clears it.
+    fn unit_update(&mut self, game: &mut Game, unit: UnitId) {
+        if game
+            .lists
+            .unit(unit)
+            .is_some_and(|e| e.ty != UnitType::Player)
+        {
+            game.sounds.clear(unit);
+        }
         let s = &mut self.sys;
         View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks).room_cleanup(unit);
     }

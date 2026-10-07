@@ -885,6 +885,33 @@ fn pick_item_to_the_cursor() {
     assert_eq!(t.rest.take_log(), [format!("pickup_sound {me} {k}")]);
 }
 
+/// `cube.md` §8 rule 3, `audio/triggers-2.md` §14 rule 2: a sound queued
+/// on the player (`0x00553380`; here event 1 with the player as target)
+/// leaves as S→C 0x2C (the `d2-proto` PlaySound layout) in the player's
+/// unit update, after the item messages and 0x47 / 0x48; the clean-up
+/// clears it, so the next tick sends nothing.
+// Covers: specs/world/cube.md §8 l2 r3; specs/audio/triggers-2.md §14 r2; specs/sim/intents-events.md §3.5 r4
+#[test]
+fn player_sound_follows_the_item_messages() {
+    let mut t = setup();
+    let k = t.ground_item(KEY, 12, 11);
+    let p = t.player;
+    d2_sim::units::sound::queue_sound(&mut t.sim().game, p, 1, Some(p)).unwrap();
+    let (code, bytes) = t.frame(&pick(k, 1));
+    assert_eq!(code, Done);
+    let me = t.pguid();
+    let mut want = t.pass(&[x9c(0x01, k)]);
+    let sound = d2_proto::server::PlaySound {
+        type_: 0,
+        guid: me,
+        event: 1,
+    };
+    want.push(sound.encode().to_vec());
+    assert_eq!(bytes, want);
+    assert_eq!(t.sim().game.sounds.get(p), None);
+    assert_eq!(t.idle(), NO_BYTES);
+}
+
 /// 0x16 auto pickup (§8.1 step 7): the first free page-0 position of
 /// the 10 × 4 grid, (9, 3); 0x9C action 4. Refusals: distance > 50 → 1;
 /// distance ≥ 5 → walk, 0; type > 5 → 2; the own player → 3.

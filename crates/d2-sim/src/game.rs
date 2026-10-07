@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §2, §5; specs/sim/unit-order.md §2.5, §3
+// Spec: specs/sim/tick.md §2, §5; specs/sim/unit-order.md §2.5, §3; specs/audio/triggers-2.md §14
 //! One game's simulation state as far as Phase 3 has specified it: the
 //! frame counter, the unit/room/client lists and the timer queue, plus the
 //! operations that touch more than one of them.
@@ -6,6 +6,7 @@
 use thiserror::Error;
 
 use crate::tick::timer::{CallbackId, TimerError, TimerId, TimerOwner, TimerQueue};
+use crate::units::sound::SoundEvents;
 use crate::units::{ListError, RoomId, UnitId, UnitLists, UnitType};
 
 /// Errors of the game-level operations.
@@ -25,6 +26,9 @@ pub struct Game {
     pub frame: i32,
     pub lists: UnitLists,
     pub timers: TimerQueue,
+    /// Unit sound-event slots, unit flag 0x400 (`audio/triggers-2.md`
+    /// §14, [`crate::units::sound`]).
+    pub sounds: SoundEvents,
 }
 
 impl Game {
@@ -51,6 +55,7 @@ impl Game {
     pub fn remove_unit(&mut self, unit: UnitId) -> Result<(), GameError> {
         self.lists.remove_unit(unit)?;
         self.timers.remove_unit(unit);
+        self.sounds.clear(unit);
         Ok(())
     }
 

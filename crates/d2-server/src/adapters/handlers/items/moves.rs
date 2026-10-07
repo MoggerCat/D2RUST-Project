@@ -1,4 +1,4 @@
-// Spec: specs/items/inventory-moves.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6
+// Spec: specs/items/inventory-moves.md §6–§11; specs/sim/intents-events.md §2.3, §2.4, §3.2; specs/sim/tick.md §6; specs/audio/triggers-2.md §14; specs/world/cube.md §8
 // Spec: specs/items/inventory.md (the sections other than §6–§11)
 //! The item-move intents (C→S 0x16–0x29, 0x50, 0x61, 0x63; `inventory-moves.md`
 //! §7) and the deferred item messages (§6, §11) on the wired host.
@@ -22,10 +22,12 @@
 //! stream) is the host's [`MoveRest`] (`d2_sim::wiring::inventory::InvRest`
 //! with its `MovePending` part).
 
+use d2_sim::game::Game;
 use d2_sim::items::inventory::InvTables;
 use d2_sim::items::moves::{self as sim_moves, MoveFatal, MoveUnits, Owner, HANDLED};
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::lifecycle::LifecycleHooks;
+use d2_sim::units::sound::sound_message;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::Economy;
 use d2_sim::wiring::inventory::{InvDesk, InvRest, InvState};
@@ -239,6 +241,7 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
 
 /// One client's part of the update pass: the client's own player (the
 /// owner test of §6.2) and the players whose unit update it processes.
+#[derive(Clone)]
 struct Receiver {
     client: ClientId,
     own: UnitId,
@@ -246,10 +249,36 @@ struct Receiver {
 }
 
 /// The update pass of one tick.
+#[derive(Clone)]
 struct UpdateRun {
     receivers: Vec<Receiver>,
     /// Every player of the pass, for the clean-up.
     players: Vec<UnitId>,
+}
+
+impl UpdateRun {
+    /// The S→C 0x2C of each (receiver, player) of the pass, in pass order
+    /// (`audio/triggers-2.md` §14 rule 2: target none or the receiver's
+    /// player).
+    fn sounds(&self, game: &Game) -> Vec<Option<[u8; 8]>> {
+        self.receivers
+            .iter()
+            .flat_map(|r| {
+                r.players
+                    .iter()
+                    .map(move |&p| sound_message(game, p, r.own))
+            })
+            .collect()
+    }
+
+    /// Unit flag 0x400 of every player of the pass := 0 (the room
+    /// clean-up's step 3, `intents-events.md` §7.5, for the players; the
+    /// tick wiring's clean-up leaves players' slots to this pass).
+    fn clear_sounds(&self, game: &mut Game) {
+        for &p in &self.players {
+            game.sounds.clear(p);
+        }
+    }
 }
 
 type UpdateOut = (Vec<(ClientId, Vec<u8>)>, Vec<(ClientId, MoveFatal)>);
@@ -257,8 +286,12 @@ type UpdateOut = (Vec<(ClientId, Vec<u8>)>, Vec<(ClientId, MoveFatal)>);
 impl MoveCall for UpdateRun {
     type Out = UpdateOut;
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> UpdateOut {
+        // The sound of each (receiver, player), read before the pass: the
+        // item messages do not touch the sound slots.
+        let sounds = self.sounds(econ.game);
         let mut d = parts.desk(econ);
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
+        let mut sounds = sounds.into_iter();
         for r in &self.receivers {
             let own = d.guid_of(r.own);
             for &p in &r.players {
@@ -266,6 +299,11 @@ impl MoveCall for UpdateRun {
                 match sim_moves::player_update(&mut d, own, guid) {
                     Ok(msgs) => sent.extend(msgs.into_iter().map(|m| (r.client, m))),
                     Err(e) => fatal.push((r.client, e)),
+                }
+                // `cube.md` §8 rule 3: after the item messages and 0x47 /
+                // 0x48, flag 0x400 → `0x00571740` (S→C 0x2C).
+                if let Some(m) = sounds.next().flatten() {
+                    sent.push((r.client, m.to_vec()));
                 }
             }
         }
@@ -285,6 +323,8 @@ impl MoveCall for UpdateRun {
             }
             d.update_done(o);
         }
+        // The desk's borrow of the economy ends here.
+        self.clear_sounds(econ.game);
         (sent, fatal)
     }
 }
@@ -355,7 +395,22 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
         players: players.iter().map(|&(p, _)| p).collect(),
     };
     let (game, events) = (&mut sim.game, &mut sim.events);
+    let sound_only = run.clone();
     let Some((sent, fatal)) = sim.world.moves(game, events, run) else {
+        // A host without inventory parts: no item messages; the players'
+        // sounds still leave (`cube.md` §8 rule 3) and are cleared.
+        let mut sounds = sound_only.sounds(&sim.game).into_iter();
+        for r in &sound_only.receivers {
+            for _ in &r.players {
+                let Some(m) = sounds.next().flatten() else {
+                    continue;
+                };
+                if let Err(e) = out.queue(r.client, &m) {
+                    sim.tick_faults.push((r.client, WorldError::from(e)));
+                }
+            }
+        }
+        sound_only.clear_sounds(&mut sim.game);
         return;
     };
     for (c, bytes) in sent {
