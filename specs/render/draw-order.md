@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 446–463 |
 | Test vectors | 464–492 |
 | Provenance | 493–529 |
-| Open questions | 530–606 |
+| Open questions | 530–610 |
 <!-- /index -->
 
 ## Summary
@@ -584,10 +584,14 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
     `draw-order-2.md` §11.5: one `roll_range(0, 1000)` on the local
     player's seed per drawn water floor, then splash (`Rain3`/`Rain4`)
     and bubble (`bubble3`) spawns.
-12. A tile record holds no DT1 file: the feed must map the DT1 tile
-    pointer to (file, index) through the room's tile library
-    (`drlg/rooms.md` §9.3); for a recorder, read the library slots of the
-    room. Ghidra read of `0x00604AE0`'s data layout.
+12. ~~A tile record holds no DT1 file~~: answered in `drlg/rooms.md`
+    §9.3 "Entry identity" (`impl-client-drlg` §3 Q7): the record's DT1
+    tile pointer (+0x18) is one header of one loaded DT1's tile array,
+    so it is exactly (file, tile index); roof height (+0x04) and height
+    (+0x08) are read from that same header, and d2rs carries them in
+    the tile source's per-tile record. A recorder maps a pointer to
+    (file, index) through the room's 32 library slots (room +0x68):
+    the slot whose file's tile array (+0x110, count +0x10C) contains it.
 13. Cross-spec (`render/sprite-placement.md` §7, not edited here): roofs
     go through the floor drawer (§6 r5), not with the wall drawer
     `0x005131B0` (RC1).

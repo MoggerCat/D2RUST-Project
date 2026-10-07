@@ -35,14 +35,14 @@
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 369–384 |
 |   7. Room clients and the inactivity counter | 385–405 |
 |   8. Deactivation (tick step 9) | 406–441 |
-|   9. Room tile grid | 442–978 |
-|   10. Collision map from tiles | 979–1057 |
-| Constants & data dependencies | 1058–1072 |
-| Randomness | 1073–1090 |
-| Edge cases & original bugs | 1091–1108 |
-| Test vectors | 1109–1156 |
-| Provenance | 1157–1187 |
-| Open questions | 1188–1243 |
+|   9. Room tile grid | 442–995 |
+|   10. Collision map from tiles | 996–1074 |
+| Constants & data dependencies | 1075–1089 |
+| Randomness | 1090–1107 |
+| Edge cases & original bugs | 1108–1125 |
+| Test vectors | 1126–1173 |
+| Provenance | 1174–1211 |
+| Open questions | 1212–1273 |
 <!-- /index -->
 
 ## Summary
@@ -564,6 +564,23 @@ returns the u16 material flags at +0x06, then the u32 fields +0x14,
 fatal on a null entry). The monster population's water-point search
 tests material bit 0x2: `0x00604BC0(entry) & 2`
 (`0x005B2789`, `monsters/population.md` §9.2).
+
+**Entry identity.** The index stores pointers into the loaded file's
+own tile-header array (`0x0060A440`: header `i` at the file's first-tile
+pointer (file header +0x110) + 0x60·i, i = 0 … count (+0x10C) − 1,
+each passed to the insert `0x0060CFA0`). So an entry, and the DT1 tile
+pointer of every tile record built from it (record +0x18, §9.5), is
+exactly one **(DT1 file, tile index in file order)**, and every other
+header field the client reads comes from that same header:
+light direction +0x00, roof height +0x04 (u16), height +0x08 (i32),
+the block list (`formats/dt1.md`). Files are cached process-wide by
+path, so equal pointers mean equal (file, index). d2rs: the tile choice
+(§9.4) returns the entry as (library slot's DT1 path, index); the tile
+source's per-tile record carries roof height and height next to the
+fields above (`d2_sim::drlg::TileInfo`: `roof_height: u16`, `height:
+i32`), and the client keeps (path, index) per record to reach the block
+data. No DRLG outcome reads roof height or height (they matter only to
+the draw, `render/draw-order.md` §3 rule 2).
 
 #### 9.4 Packed cell and tile choice
 
@@ -1179,6 +1196,13 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
   `0x0061B2D0` (reset after build), caller `0x0044C790` (single call
   at `0x0044C7E6`; every-13th free at `0x0044C7F0`–`0x0044C817`); the
   only writers of +0x45C / +0x460 in `all.asm` are these two functions.
+- **Act callback (§5 rule 9)**: `0x00619954` (`call edi` on act +0x4C;
+  no other indirect call through +0x4C in `all.asm`), `0x0061AF60`,
+  `0x00475B40` (pushes `0x00475930`; single caller `0x0044E1B6` in the
+  0x03 act load `0x0044E100`).
+- **Entry identity (§9.3)**: `0x0060A440` (stride 0x60 over +0x110,
+  count +0x10C) → `0x0060CFA0` (stores the header pointer);
+  `0x0060D040` (lookup copies the stored pointers).
 - **Room free, units left (§8.2 rule 4)**: asm of `0x0061A840`
   (`0x0061A851`–`0x0061A87F` loop), `0x0064C450` (unit leaves room),
   `0x0064FC20` (dynamic path reset), `0x0064C370` (room-list remove);
@@ -1240,3 +1264,9 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     unset callback `[0x00744398]`" of `client/model.md` §9 rule 2 is
     entry 1 of the unset-handler table at `0x00744394` (§4, unset
     handler 1), not an act field.
+17. *Answered:* DT1 roof height and height for the client draw
+    (`impl-client-drlg` §3 Q7, `render/draw-order.md` OQ 12): §9.3
+    "Entry identity". Test vector (synthetic): a DT1 with 3 tiles whose
+    tile 2 has key (1, 0, 0), roof height 0, height −80, loaded into
+    slot 0 → the lookup for (1, 0, 0) returns (slot 0's path, index 2)
+    and the record reads roof height 0, height −80 from it.
