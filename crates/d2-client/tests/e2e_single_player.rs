@@ -1163,7 +1163,7 @@ fn run_with(game_seed: u32) -> Transcript {
     // written for it).
     let point = bytes(&AddStatPoint {
         stat: STRENGTH as u8,
-        count_minus_one: 0,
+        repeat: 0,
     });
     assert_eq!(point, [0x3A, 0, 0]);
     record(&mut fx, &mut frames, vec![point]);
