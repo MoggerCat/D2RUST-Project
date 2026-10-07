@@ -4968,6 +4968,19 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   0x65 in a kill tick).
 - `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
   0x48 in frame 2.
+- `monsters/ai-bodies-6.md` OQ1 (spec area 1, AI): a necromancer game
+  with golem, skeletons and a skeleton mage, a hireling following and
+  fighting, an Act II town walk, a MinionSpawner, an EvilHole and a
+  desert turret; log per think: type-2 schedule frame, unit-seed steps,
+  mode requests (mode, target, point), AI params 0–2.
+- `monsters/ai-bodies-7.md` OQ1 (AI): arrow / poison / nova traps, the
+  Act II palace guard before and after the door opens, the Dark
+  Wanderer, druid summons (wolves, bear, ravens, vines) and assassin
+  shadows; same log.
+- `monsters/ai-bodies-7.md` OQ2 (AI): Uber Tristram: for Uber Mephisto,
+  Diablo and Baal log the AI control's function (+0x04) and special
+  state (+0x00) after creation and at each think, and every type-2
+  schedule (their table thinks are empty in 1.14d).
 
 ## 8. Lessons (problems met, fixes)
 

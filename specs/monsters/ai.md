@@ -43,7 +43,7 @@
 | Edge cases & original bugs | 1577–1618 |
 | Test vectors | 1619–1707 |
 | Provenance | 1708–1756 |
-| Open questions | 1757–1825 |
+| Open questions | 1757–1829 |
 <!-- /index -->
 
 ## Summary
@@ -1822,3 +1822,7 @@ Other recorded checks:
     (`ai-bodies-3.md` OQ3), the client preload `0x00571C00` (S→C 0xA4)
     and the spawn info `0x0063EFA0` beyond the cases read in
     `ai-bodies-2.md` §13 and `ai-bodies-5.md` §21.3.
+16. Answered (open question 10): no `unread` row is left in
+    `ai-functions.tsv`; the last 55 bodies are `ai-bodies-6.md` and
+    `ai-bodies-7.md` (the Uber Mephisto, Diablo and Baal thinks are
+    empty in 1.14d: `ai-bodies-7.md` §26 and its open question 2).
