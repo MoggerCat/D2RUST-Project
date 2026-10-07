@@ -5277,6 +5277,7 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
 - `world/quests-act2-2.md` OQ1 (PC 2 spec-quests-act2, 2026-10-07): orifice insert (Act II, Horadric Staff assembled): operate the orifice (S→C 0x58 result 0), cancel the dialog (C→S 0x44 action 2 → 0x58 result 1), insert a wrong cursor item (result 4), then the staff (result 5, byte 6 = 1); log the 7 bytes of each 0x58, especially byte 6 for results 0, 1, 4.
 - `world/quests.md` OQ14 (PC 2 spec-quests-core, R-QC-1): a 1.14d expansion character that completed every Normal quest; save right after the last one, then after one more game; dump both quest sections and list the set bits per slot.
 - `world/quests-act1-rest.md` OQ12 (PC 2 spec-quests-core, R-QC-2, = §5 C79): creation of the town-Cain marker (class 385) after Cain left Tristram, packets + RNG: Cain's spawn draws must come between the marker's unit-seed step and the next preset unit's.
+- `skills/descriptions.md` OQ1 + OQ2 (PC 1 spec-xpc3-skills, 2026-10-07): character panel damage / attack-rating lines for one skill per `descdam` 1–24 and `descatt` 1–5 (kick: expect `v-(v+1)`; smite; dual-wield assassin for `descatt` 5), log the drawn strings, colors and the player's stats 0, 2, 17–25, 48–59, 119, 159, 160; and the title string of a skill whose skilldesc `str name` ≠ `str alt`.
 
 - `drlg/rooms.md` OQ15: client build timer (B, T, cursor) per client
   update over a level load.
