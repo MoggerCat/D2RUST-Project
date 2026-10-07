@@ -103,7 +103,8 @@ fn dispatch_zero_and_out_of_range() {
         [Output::ObjectSound(ObjSound::Mode {
             unit: S,
             class: 0,
-            mode: 0
+            mode: 0,
+            local_dist: super::local_distance(&w, &i, S),
         })]
     );
     // ClientFn 19 in a modded row: fatal 0x546.

@@ -4,11 +4,9 @@
 //! and the level formula are `skills/levels.md` §1 (single owner).
 //!
 //! The passive-state parts of add, remove and refresh (§2 rules 1, 2.2,
-//! 4) need the unit's state bits and stat list on the client
-//! (`client/stat-lists.md` §1 rule 2), which the model does not hold yet:
-//! a skill with a passive state makes the operation fail with
-//! [`SkillError::PassiveState`] after the list itself is updated (M07:
-//! loud, not guessed).
+//! 4) act on the unit's state bits and state lists, not on the list: the
+//! operations record them in [`SkillList::fx`] in call order and the
+//! message handler applies them ([`super::passive::apply`]).
 
 use super::world::{SkillRow, MONSTER, PLAYER};
 
@@ -45,6 +43,21 @@ pub struct SkillList {
     pub left: Option<usize>,
     pub right: Option<usize>,
     pub current: Option<usize>,
+    /// What the list operations owe the unit (passive state bits and
+    /// refreshes, §2 rules 1, 2.2, 4), in call order; the handler applies
+    /// and drains them ([`super::passive::apply`]).
+    pub fx: Vec<SkillFx>,
+}
+
+/// An effect of a list operation on its unit (§2 rules 1, 2.2, 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillFx {
+    /// The passive state on (`0x00643690`, `0x00639DB0(unit, state, 1)`).
+    StateOn(u8),
+    /// The passive state off (`0x00639DB0(unit, state, 0)`).
+    StateOff(u8),
+    /// The refresh `0x00646D60(unit, skill)`.
+    Refresh(u16),
 }
 
 /// A skill-list operation the original does not complete.
@@ -53,13 +66,6 @@ pub enum SkillError {
     /// Select with a skill outside the table (fatal 0x668, §2 rule 3).
     #[error("fatal assert 0x668 (select: skill {0} outside the skills table)")]
     BadSkill(u16),
-    /// The skill's passive state would be switched or refreshed: the
-    /// client state bits and stat lists are not in the model.
-    #[error(
-        "TODO(spec: client/stat-lists.md §1 r2, client/msg-skills.md §2 r4): passive state {state} \
-         of skill {skill} needs the client state bits and stat list"
-    )]
-    PassiveState { skill: u16, state: u16 },
     /// Remove would leave a hand pointing at the freed entry (no entry of
     /// skill 0, or skill 0's own entry removed): a dangling pointer in
     /// 1.14d.
@@ -121,13 +127,14 @@ fn passive_state(rows: &[SkillRow], skill: u16) -> Option<u16> {
         .filter(|&p| p as i16 > 0)
 }
 
-/// Refresh `0x00646D60` (§2 rule 4): nothing unless the skill has a
-/// passive state; with one, the client state list is needed.
-pub fn refresh(rows: &[SkillRow], skill: u16) -> Result<(), SkillError> {
-    match passive_state(rows, skill) {
-        None => Ok(()),
-        Some(state) => Err(SkillError::PassiveState { skill, state }),
+/// Refresh `0x00646D60` (§2 rule 4): owed to the unit when the skill has
+/// a passive state (the state list lives on the unit,
+/// [`super::passive::refresh`]).
+pub fn refresh(list: &mut SkillList, rows: &[SkillRow], skill: u16) -> Result<(), SkillError> {
+    if passive_state(rows, skill).is_some() {
+        list.fx.push(SkillFx::Refresh(skill));
     }
+    Ok(())
 }
 
 /// Add `0x00647110` (§2 rule 1). Returns the entry, or none for a skill
@@ -142,8 +149,6 @@ pub fn add(
     let Some(r) = row(rows, skill) else {
         return Ok(None);
     };
-    // The passive state on (`0x00643690`, `0x00639DB0(unit, state, 1)`).
-    let state_on = refresh(rows, skill);
     let i = match list.native(skill) {
         Some(i) => {
             let e = &mut list.entries[i];
@@ -170,8 +175,12 @@ pub fn add(
             list.entries.len() - 1
         }
     };
-    state_on?;
-    refresh(rows, skill)?;
+    // The passive state on (`0x00643690`, `0x00639DB0(unit, state, 1)`),
+    // then the refresh.
+    if let Some(p) = passive_state(rows, skill) {
+        list.fx.push(SkillFx::StateOn(p as u8));
+    }
+    refresh(list, rows, skill)?;
     Ok(Some(i))
 }
 
@@ -211,10 +220,13 @@ pub fn remove(
     d: bool,
 ) -> Result<(), SkillError> {
     let Some(i) = list.native(skill) else {
-        return refresh(rows, skill);
+        return refresh(list, rows, skill);
     };
-    let state_off = refresh(rows, skill);
     let mut w = list.clone();
+    // The passive state off (§2 r4), owed to the unit.
+    if let Some(p) = passive_state(rows, skill) {
+        w.fx.push(SkillFx::StateOff(p as u8));
+    }
     if w.left == Some(i) {
         select(&mut w, rows, true, 0, NATIVE)?;
     }
@@ -245,8 +257,7 @@ pub fn remove(
         }
     }
     *list = w;
-    state_off?;
-    refresh(rows, skill)
+    refresh(list, rows, skill)
 }
 
 /// Assign `0x00647280(unit, skill, level, remove)` (§2 rule 2).
@@ -266,7 +277,7 @@ pub fn assign(
         if let Some(i) = e {
             list.entries[i].base = level;
         }
-        return refresh(rows, skill);
+        return refresh(list, rows, skill);
     }
     if remove_flag {
         // `0x00646FD0` with d = the remove flag (§2 rule 5); it refreshes.
@@ -283,7 +294,7 @@ pub fn assign(
         return Ok(());
     };
     list.entries[i].base = 0;
-    refresh(rows, skill)
+    refresh(list, rows, skill)
 }
 
 /// The native entry after the add path of the level-bonus writers
@@ -304,7 +315,7 @@ fn add_for_bonus(
     }
     if let Some(i) = e {
         list.entries[i].base = 0;
-        r = r.and(refresh(rows, skill));
+        r = r.and(refresh(list, rows, skill));
     }
     (e, r)
 }
@@ -353,7 +364,7 @@ fn bonus_write(
     if let Some(i) = e {
         list.entries[i].level_bonus = f(list.entries[i].level_bonus, v);
         if refresh_after {
-            r = r.and(refresh(rows, skill));
+            r = r.and(refresh(list, rows, skill));
         }
     }
     r
@@ -509,16 +520,28 @@ mod tests {
 
     // Covers: specs/client/msg-skills.md §2 r4
     #[test]
-    fn a_passive_skill_needs_the_client_state_list() {
+    fn a_passive_skill_owes_its_state_and_refreshes() {
         let mut t = rows(3);
         t[1].passivestate = 5;
         let mut l = SkillList::default();
+        assert_eq!(assign(&mut l, &t, PLAYER0, 1, 1, false), Ok(()));
+        assert_eq!((l.entries.len(), l.entries[0].base), (1, 1));
+        // Add: state on, refresh; then assign's own refresh.
         assert_eq!(
-            assign(&mut l, &t, PLAYER0, 1, 1, false),
-            Err(SkillError::PassiveState { skill: 1, state: 5 })
+            l.fx,
+            [
+                SkillFx::StateOn(5),
+                SkillFx::Refresh(1),
+                SkillFx::Refresh(1)
+            ]
         );
-        assert_eq!(l.entries.len(), 1, "the list itself is updated");
-        assert_eq!(refresh(&t, 2), Ok(()));
+        l.fx.clear();
+        assert_eq!(refresh(&mut l, &t, 2), Ok(()));
+        assert!(l.fx.is_empty(), "no passive state: nothing owed");
+        // Remove: state off, then assign's refresh (no entry: the list of
+        // the state is freed by the refresh).
+        assign(&mut l, &t, PLAYER0, 1, 0, true).unwrap();
+        assert_eq!(l.fx, [SkillFx::StateOff(5), SkillFx::Refresh(1)]);
     }
 
     fn entry(skill: u16, base: i32, owner: u32) -> SkillEntry {
@@ -557,6 +580,7 @@ mod tests {
             left: hand,
             right: hand,
             current: hand,
+            fx: Vec::new(),
         };
         // d = 0: unlinked and freed whatever the base; hands reset to
         // skill 0, current cleared.
@@ -582,15 +606,14 @@ mod tests {
         let mut l = list(None);
         remove(&mut l, &t, 9, true).unwrap();
         assert_eq!(l, list(None));
-        // A passive state: the list is updated, then the error.
+        // A passive state: the list is updated, and the state off then the
+        // refresh are owed to the unit (§2 r4, `SkillFx`).
         let mut tp = rows(40);
         tp[7].passivestate = 3;
         let mut l = list(None);
-        assert_eq!(
-            remove(&mut l, &tp, 7, true),
-            Err(SkillError::PassiveState { skill: 7, state: 3 })
-        );
+        remove(&mut l, &tp, 7, true).unwrap();
         assert_eq!(l.entries[1].base, 2);
+        assert_eq!(l.fx, [SkillFx::StateOff(3), SkillFx::Refresh(7)]);
         // No list entries at all: nothing.
         let mut e = SkillList::default();
         remove(&mut e, &t, 7, true).unwrap();
@@ -607,6 +630,7 @@ mod tests {
             left: Some(0),
             right: Some(1),
             current: Some(0),
+            fx: Vec::new(),
         };
         let mut l = l0.clone();
         assert_eq!(remove(&mut l, &t, 7, false), Err(SkillError::Dangling));
@@ -617,6 +641,7 @@ mod tests {
             left: Some(0),
             right: Some(1),
             current: None,
+            fx: Vec::new(),
         };
         let mut l = l1.clone();
         assert_eq!(remove(&mut l, &t, 0, false), Err(SkillError::Dangling));

@@ -9,17 +9,17 @@
 //! runs: the build timer and, every 13th update, the level free
 //! (`drlg/rooms.md` §4.6).
 //!
-//! PROVISIONAL (client/model.md OQ 1, OQ 2): the other per-type unit
-//! updates that run before each drain (player, monster, missile, item
-//! mode machines `0x004AFF60` etc.; local walk prediction `0x00463390`)
-//! change no model field: the client keeps no modes beyond what messages
-//! state and the local player follows the server position. Settled by
-//! the Phase 6 unit-modes spec plus a frames-raw `client_update` counter
-//! vs server tick recording (`render/camera.md` OQ 5 / 8; HIGH-PRIORITY
-//! CAPTURE: client seed draws in animation).
+//! The mode machines themselves run inside the queued messages' mode
+//! requests ([`super::modes`], `model.md` §8). The other per-type unit
+//! updates that run before each drain (player `0x00463390`, monster
+//! `0x004B13A0`, missile, item) change no model field:
+//! PROVISIONAL (client/model.md OQ 1, OQ 2; REC-51): no client-side mode
+//! steps, no client seed draws in the animation and no local walk
+//! prediction (the local player follows the server position).
 
 use super::dispatch::{Dispatch, Handle, HandlerError, UnitMessage};
-use super::objects::{self, ObjUnit};
+use super::msg::lighting::object_light_of;
+use super::objects::{self, ObjFx, ObjUnit};
 use super::output::{Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
 use super::world::{update_order, ClientWorld, ModelInputs, OBJECT};
@@ -74,9 +74,11 @@ pub fn update_pass(
                 key,
                 client_only: false,
             };
+            let start = outputs.len();
             if let Err(error) = objects::object_update(world, inputs, unit, outputs) {
                 log.rejected.push(Rejected { id: 0, error });
             }
+            apply_object_lights(world, &outputs[start..]);
         }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).
@@ -144,10 +146,25 @@ fn c_objects(
             key,
             client_only: true,
         };
+        let start = outputs.len();
         let r = objects::object_update(world, inputs, unit, outputs)
             .and_then(|()| objects::site_b(world, inputs, key, outputs));
         if let Err(error) = r {
             log.rejected.push(Rejected { id: 0, error });
+        }
+        apply_object_lights(world, &outputs[start..]);
+    }
+}
+
+/// The object lights the client object code asked for
+/// (`ObjFx::Light`, `0x004BC580`; `render/lighting.md` §8 object row):
+/// the light list is model state, so the update pass applies them at
+/// once, in call order; the output stays in the list for the effects
+/// layer.
+fn apply_object_lights(world: &mut ClientWorld, new: &[Output]) {
+    for o in new {
+        if let Output::ObjectFx(ObjFx::Light { unit, lit, rgb }) = *o {
+            object_light_of(world, unit.key, unit.client_only, lit, rgb);
         }
     }
 }
