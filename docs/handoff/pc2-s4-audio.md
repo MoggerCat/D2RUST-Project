@@ -106,3 +106,25 @@ None.
    this session); every § is cited by code `Covers:` lines, so it was not
    split. Moving its Provenance or Open questions to a part file would
    bring it under 60 KB.
+
+## Follow-up (legacy items)
+
+Applied the items lane's requests (`docs/handoff/pc2-s4-items.md`
+"Follow-up 2"), each checked with `tools/ghidra/disasm.py` on
+`0x00533350`:
+
+- `formats/d2s.md` Open question 2: Answered by
+  `items/bitstream-legacy.md` §1–§5 (cross-file request 5 above is done).
+- `formats/d2s-legacy.md` Open question 1: Answered by
+  `items/bitstream-legacy.md` §6–§8; §8 rule 1 now points to §1–§5.
+- `formats/d2s-legacy.md` §8 rule 2 corrected in place: the duplicate
+  skip of `0x00533350` never fires (count starts at 0 `0x005333B2`,
+  compare/store loop entered only for count > 0 `0x005333FE`), so every
+  record is placed. Added the failures: no "JM" → 14 (`0x005335C2`);
+  failed top-level player item → next entry (`0x0053352F` →
+  `0x005334EB`), its children read as top-level entries; failed child
+  or any corpse item → 0xC / 0xD at once, byte count not written
+  (`0x005335A9`, `0x00533497`); no length check. New edge case 5.
+
+Pending: none new. CODE-TABLE CHANGE commits: none. Cross-file requests:
+none.
