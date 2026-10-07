@@ -405,7 +405,7 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    |---|---|---|---|---|
    | 0x26 | `0x0053C750` | `0x0054A5D0` (`0x0054A895`, u8@1 := 6), `0x00571620` (`0x005716A4`, u8@1 := 5); `0x0054A470`, `0x0054A510` pass a built message | 0 | the builder copies u8@1–3, u32@4, u8@8–9, the name (≤ 15 chars + NUL, `0x004135D0`) at 10 and the text (length ≥ 256 → fatal 0x5BA) after the name's NUL. Form 5 (overhead, §7.9 r3): u8@2 = the overhead record's byte +8 (C→S 0x14 u8@2), u8@3 unit type, u32@4 GUID, empty name; bytes 8–9 never written. Form 6 (chat, open question 14): u8@2 0, u8@3 2, u32@4 = ESI, u8@8 0; byte 9 never written |
    | 0x27 | `0x0053C8D0` | §6 rule 6 | 7 | |
-   | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369` |
+   | 0x2C | `0x0053D780` | `0x00571740` (`0x00571775`) | 4 | unit type, GUID (+0x0C), event = unit u16 +0x6E; only when unit +0x70 is 0 or the client's player; callers `0x00580917`, `0x00581B07`, `0x00586000`, `0x00598369`; the event setter `0x00553380` (78 call sites by event, last event before the flush wins: u16 +0x6E overwritten) is owned by `audio/triggers-2.md` §14 |
    | 0x4C, 0x99 | `0x0053D530` | itself | 2, 0 | rule 5 |
    | 0x4D, 0x9A | `0x0053D4D0`, `0x0053D530` | itself | 0 | rule 5 |
    | 0x4E | `0x0053D7B0` | `0x00576770` (BL 0x4E, `0x0057686C`) | 0 | `world/npc.md` §7.2 |

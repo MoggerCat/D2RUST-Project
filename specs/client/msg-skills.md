@@ -25,21 +25,21 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–141 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 142–151 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 152–161 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 162–171 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 172–178 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 179–222 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 223–236 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 237–265 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 266–280 |
-| Constants & data dependencies | 281–292 |
-| Randomness | 293–296 |
-| Edge cases & original bugs | 297–306 |
-| Test vectors | 307–332 |
-| Provenance | 333–353 |
-| Open questions | 354–381 |
+|   2. Shared skill-list operations | 100–153 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 154–163 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 164–173 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 174–183 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 184–190 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 191–234 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 235–248 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 249–277 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 278–292 |
+| Constants & data dependencies | 293–304 |
+| Randomness | 305–308 |
+| Edge cases & original bugs | 309–318 |
+| Test vectors | 319–344 |
+| Provenance | 345–365 |
+| Open questions | 366–393 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -138,6 +138,18 @@ handlers (the server specs link here for the steps).
    (`0x00639E30`). Otherwise (no E, or the aura state is on) the state
    list of p, if any, is detached and freed (`0x006277E0`,
    `0x00626CD0`). L = 0 removes the list (`0x00643620` with level 0).
+5. **Remove in detail** `0x00646FD0` (unit in EBX, skill id s, flag d;
+   2026-10-08, read for `client/model.md` §17 r4; rule 2.2 passes its
+   `remove` argument as d, `0x006470F0(unit, s)` passes d = 1). No unit,
+   no skill list (+0xA8) or an empty list → nothing. In order: the
+   passive state of s, if any, off (`0x00639DB0(unit, state, 0)`); left
+   (+8) is the native entry of s (skill id = s, owner +0x34 = −1) →
+   select left (0, −1) (rule 3); same for right (+0xC, `0x00643C50`);
+   current (+0x10) is that entry → current := none. Then the native
+   entry of s in the list: none → refresh (rule 4) only; else with d = 0
+   it is unlinked and freed; with d ≠ 0 its base (+0x28) −= 1 and it is
+   unlinked and freed only when the base is now < 1; then refresh
+   (rule 4) for s.
 
 ### 3. 0x94 BaseSkillLevels (`0x0045DD60`)
 

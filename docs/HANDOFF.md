@@ -6182,6 +6182,14 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
 
+*`client/ui.md`, `client/model.md` (PC 1, 2026-10-08)*
+- R2-39 a UI-sound request log while clicking each control of
+  `client/ui.md` §B8.1 once (popups, configure controls, stash / cube /
+  trade buttons, NPC menu, text list) and an NPC talk → cancel with a
+  memory read of the NPC's unit flags, mode and the store items in S
+  (`client/model.md` §17 r1–r3); a character whose left skill drops to
+  level 0 (§17 r4).
+
 ## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |

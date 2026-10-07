@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 236–254 |
 |   8. Frame pacing | 255–275 |
 |   9. Versioning | 276–286 |
-|   10. Client outputs (bridge → UI and audio) | 287–381 |
-| Constants & data dependencies | 382–396 |
-| Randomness | 397–400 |
-| Edge cases & original bugs | 401–409 |
-| Test vectors | 410–440 |
-| Provenance | 441–451 |
-| Open questions | 452–487 |
+|   10. Client outputs (bridge → UI and audio) | 287–403 |
+| Constants & data dependencies | 404–418 |
+| Randomness | 419–422 |
+| Edge cases & original bugs | 423–431 |
+| Test vectors | 432–462 |
+| Provenance | 463–473 |
+| Open questions | 474–509 |
 <!-- /index -->
 
 ## Summary
@@ -337,6 +337,28 @@ model state: 1.14d's handler calls a UI or sound function directly
 8. Mechanical check (with §6 rule 5): every variant in code has exactly
    one row in the table below with the same producer id, and every row
    has a variant.
+9. **UI-keyed lookups** (2026-10-08; answers `client/msg-ui.md` open
+   question 7). Some 1.14d handlers look a unit up by a key held in UI
+   state; the interact NPC (`[0x007C0D25]` GUID, `[0x007C0D29]` active)
+   is written only by UI code (`ui/messages.md` §14), so it is UI state
+   in d2rs. Such a lookup is made by the UI layer when it applies the
+   output, from its own fields at that moment and the facts captured in
+   the payload (rule 3); the handler never reads UI state and the UI
+   layer never reads the model. This is exact because every UI write
+   that 1.14d makes before the handler runs is, in d2rs, either an
+   earlier output of the same list (rule 2 keeps their order) or made by
+   input between frames, as in 1.14d. A lookup whose unit is not the
+   message's own (so its presence cannot be captured at receive) is
+   allowed only when its result has no observable effect; otherwise the
+   owner spec must add a captured field. Cases:
+   - 0x8A (`client/msg-ui.md` §9 r4): exact; the test compares the
+     message key with the UI fields, presence is captured.
+   - 0x50 code 3 (`client/msg-ui.md` §7 r5): the unit is not the
+     message's; its only effect writes two fields that nothing reads,
+     so the UI layer may skip it.
+   One UI writer runs outside any output: the town exit `0x004B3E10`
+   from the local player's update (`client/model.md` §17 r5, open
+   question 16 there).
 
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
