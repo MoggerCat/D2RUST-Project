@@ -40,9 +40,9 @@
 | Constants & data dependencies | 874–896 |
 | Randomness | 897–918 |
 | Edge cases & original bugs | 919–940 |
-| Test vectors | 941–1060 |
-| Provenance | 1061–1101 |
-| Open questions | 1102–1151 |
+| Test vectors | 941–1066 |
+| Provenance | 1067–1107 |
+| Open questions | 1108–1162 |
 <!-- /index -->
 
 ## Summary
@@ -1045,6 +1045,12 @@ cave entrance 51 at (2, 4) (seq 9481 build roll; margin 1 rules out
 (8, 1)); type 3 (Border - Border) seq 10204 and 10499 `0x0066F905`
 (N 1): group 8 at (3, 6) and group 11 at (0, 5), neither with a blank;
 then 48, 44, 29, 30 (§7.4, build rolls seq 11622, 11752, 11881, 12009).
+Every "group g" above is the group index G of `outdoor-tilesub.md`
+§2.2 step 3: the 0-based index into that lvlsub row's DS1 group list
+(DS1 +0x50, 24-byte entries in file order; the group pointer is +0x50 +
+24·G, `0x0066F9D5`–`0x0066F9E9`). Types 2 and 3 (`BordType` 1, 2) start
+at g0 = 0 with no draw, so G = j there; type 1 (`BordType` 0) has g0 =
+the roll (0 here). "Variant v" is §2.2's `roll(N)` result.
 Room count rule: with every Cold Plains preset 8 × 8 (one cell), rooms
 = 100 − blank cells; blanks come only from §6 step 5 (none here: every
 corner holds a piece) and from blank pattern cells of a border
@@ -1148,3 +1154,8 @@ recording; level rects and outdoor flags equal a level-coordinate probe
     opposite ties (§11 steps 5, 9).
 16. *Answered* (`impl-drlg-act3-5` Q9): the prisons helper `0x0045C390`
     is `roll` (`sim/rng.md` §3) on the level seed (§11 step 8).
+17. *Answered (2026-10-08)* (`fix-drlg-answers` Q3): yes, "group 8",
+    "group 11" (type 3) and "group 1" (type 2) in the Cold Plains test
+    vector are 0-based indexes into the lvlsub row's DS1 group list
+    (Test vectors, sentence after the Cold Plains derivation;
+    `0x0066F9D5`–`0x0066F9E9`).

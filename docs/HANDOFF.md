@@ -5961,6 +5961,7 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   0x2FD, `jf` / `kf` (OQ3; C66 (1)).
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
+- `drlg/rooms.md` OQ23 (PC 1 spec-cloudq-area5, 2026-10-08): client build timer across a client level free: per client update log `[0x007A0498]`, client DRLG +0x98, +0x45C, +0x460 and the byte at (+0x460)+0x44, plus every room free address; shows whether a freed cursor room is reallocated before the next timed step (§4.6 rule 11).
 
 ## 8. Lessons (problems met, fixes)
 

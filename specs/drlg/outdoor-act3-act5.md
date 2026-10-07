@@ -24,16 +24,16 @@
 | Outputs / state changes | 67–75 |
 | Rules | 76–81 |
 |   1. Level map | 82–102 |
-|   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–294 |
-|   3. Jungle stamping (`0x0067E910`, levels 76..78) | 295–324 |
-|   4. Act III rooms and links | 325–346 |
-|   5. Act V outdoor levels | 347–368 |
-| Constants & data dependencies | 369–390 |
-| Randomness | 391–425 |
-| Edge cases & original bugs | 426–449 |
-| Test vectors | 450–503 |
-| Provenance | 504–528 |
-| Open questions | 529–550 |
+|   2. Jungle placer (`0x00677880`, D2MOO `DRLG_GenerateJungles`) | 103–295 |
+|   3. Jungle stamping (`0x0067E910`, levels 76..78) | 296–325 |
+|   4. Act III rooms and links | 326–347 |
+|   5. Act V outdoor levels | 348–369 |
+| Constants & data dependencies | 370–391 |
+| Randomness | 392–426 |
+| Edge cases & original bugs | 427–450 |
+| Test vectors | 451–504 |
+| Provenance | 505–529 |
+| Open questions | 530–557 |
 <!-- /index -->
 
 ## Summary
@@ -266,6 +266,7 @@ image is the run-time value):
 | r | Slots 0..3 read | Result |
 |---|---|---|
 | 0 (an earlier lookup gave 0) | 0, 0, 0, 0 (`0x006F13F0`–`0x006F13FC`, i.e. S[13..16]) | stays 0 → fatal 0x78C |
+| 15 (L = 15, "Jungle NSEW", with any attach bit: the first lookup) | 0, 0, 0, 0 (`0x006F14E0`–`0x006F14EC`, the 16 bytes after row 14; `.rdata` file image) | 0 → fatal 0x78C for every attach bit (a later bit then reads row 0) |
 | 545..572 (an earlier lookup hit) | slots 0 and 2: 0; slots 1 and 3: a value V(r) in 1,071,743,488 .. 1,072,087,552 (not an lvlprest id) | 0 → fatal 0x78C; V is stored as the block id |
 | V(r) (a third set bit after V) | the address `0x006F13F0` + 4k + 16V wraps into `0xFE8733F0`–`0xFEDB33FC`, outside the module image | reads memory outside the module (not reproducible) |
 
@@ -547,3 +548,9 @@ stamp list and draw sequence equal the recording.
 6. *Answered* (`impl-drlg-act3-5` Q3): the jungle id array is never
    short at build (§3: same leveldefs row 76 and difficulty byte at
    creation and build).
+7. *Answered (2026-10-08)* (`fix-drlg-answers` Q1): row 15 of T (L =
+   15 with an attach bit) reads four zeros from the 1.14d file image
+   (`0x006F14E0`–`0x006F14EF`), so every such block is fatal 0x78C
+   (§2.7 table "Lookups outside rows 1..14", row 15). Open inside it:
+   whether any seed gives an L = 15 block an attach bit; settle with
+   the enumeration of OQ 2.
