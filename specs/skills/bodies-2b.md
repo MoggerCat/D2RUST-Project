@@ -17,8 +17,8 @@
 | Summary | 24–30 |
 | Rules | 31–32 |
 |   6. Bodies, required level 18 | 33–331 |
-|   7. Bodies, required level 24 | 332–617 |
-|   8. Bodies, required level 30 | 618–854 |
+|   7. Bodies, required level 24 | 332–632 |
+|   8. Bodies, required level 30 | 633–891 |
 <!-- /index -->
 
 ## Summary
@@ -478,8 +478,10 @@ max `eval(petmax)`}; none → none. `skill_stats(game, unit, m, skill, L,
 #### 7.11 srvst 20 Iron Golem `0x005C32A0`
 
 Return 1 when T is an item (type 4) in mode 3 (on the ground), its item
-class has `bitfield1` bit 1 (items +0xDC, `0x00629CC0`), item flag 0x10
-is set (`0x006280A0`, `items/generation.md` §1.4), and the item is not
+class has `bitfield1` bit 1 (items +0xDC, `0x00629CC0`: the metal
+flag; 1.14d `armor.txt` `bitfield1` is 3 on 116 rows, chain / plate /
+metal helms, and 1 on 86 leather and cloth rows), item flag 0x10
+(identified) is set (`0x006280A0`, `items/generation.md` §1.4), and the item is not
 active on a unit (`0x00625820(T, 0)` = 0). Else 0.
 
 #### 7.12 srvdo 57 Iron Golem `0x005C5250`
@@ -500,6 +502,19 @@ active on a unit (`0x00625820(T, 0)` = 0). Else 0.
    0x7F about m to the unit's client (`0x005531C0`, `0x0053CDF0`, as
    `bodies.md` §8.9 step 7); `node_insert(game, m, 0, unit +0xD0)`.
    Return 1.
+
+Second caller, game join (added 2026-10-07): when a loaded save carried
+an Iron Golem item, the join step `0x005394A0` (`0x005396C8`–
+`0x0053974C`) finds that item unit, makes it the player's target
+(`0x00620C10`) at the player's position, and calls the do core
+`0x0056F7F0(game, player, 90, L, charge 1, item 0, aim 0)` directly
+(`use.md` §5.4; no start function, no `schedule_periodic`), L = the
+player's skill-90 level with bonuses (`0x006442A0(player, entry, 1)`).
+This body then runs as above with T = the saved item; step 1 re-tests
+§7.11 on it. Iron Golem has a start function and no `usemanaondo` or
+`delay` in 1.14d `skills.txt`, so the join cast spends no mana and sets
+no cooldown (`use.md` §5.4 step 9). Which item, and the client field
+that holds its GUID: `formats/d2s-load.md` §3 (PC 2).
 
 #### 7.13 srvdo 79 Conversion `0x005D0350`
 
@@ -761,6 +776,28 @@ caster):
 
 Unlike srvdo 66 (`bodies.md` Edge case 9) the count is kept: a player
 pays the mana cost for every run that redeems something.
+
+**Per-corpse effect** `0x005D0C40` (D2MOO
+`SKILLS_ApplyRedemptionEffect`): `redeem(game, S, U, skill, L, last)`
+(ECX game, unused; EDX source S; `ret 0x10`). The only callers are the
+radament-death missile callbacks `0x005AD8F0` (last 0) and `0x005AD910`
+(last 1) (`missiles/bodies-2.md` §44), so S is that missile and skill
+is 124:
+
+1. skill not in 0…skills count − 1, U none, or `0x006456D0(U)` fails
+   (the corpse test of callback step 1) → 0.
+2. last = 0: p = `eval(S, calc1)` (skills +0x138); one draw `roll(100)`
+   on **S's** seed (S + 0x20, `0x0045C390`); draw ≥ p → 0. last ≠ 0: no
+   draw, the corpse is always taken.
+3. S life (stat 6) := min(life + `eval(S, calc2)` << 8, maximum life
+   `0x00625D10`); S mana (stat 8) := min(mana + `eval(S, calc3)` << 8,
+   maximum mana `0x00625D60`) (`0x00625480` / `0x00627260`).
+4. U state 99 (`redeemed`) on (`0x00639DB0`); U flags (+0xC4) &= ~6.
+   Return 1.
+
+Steps 2–4 are callback steps 2–4 with the caster replaced by S and the
+roll skipped on the last frame; no count and no mana cost. The heal of
+step 3 goes to the missile, not to Radament.
 
 #### 8.10 srvst 38 Whirlwind `0x005D8F50`
 

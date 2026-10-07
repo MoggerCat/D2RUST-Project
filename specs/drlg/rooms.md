@@ -30,19 +30,19 @@
 |   1. Structures (1.14d layout, for recorders and checks) | 80–128 |
 |   2. DRLG room creation and seeds (`0x0066B3E0`) | 129–161 |
 |   3. Rooms-near arrays (`0x0066C370`) | 162–205 |
-|   4. Status and activation | 206–344 |
-|   5. Active room creation (`0x006422A0`, `0x00619890`) | 345–378 |
-|   6. Adjacency array order (owner of `unit-order.md` §9) | 379–394 |
-|   7. Room clients and the inactivity counter | 395–415 |
-|   8. Deactivation (tick step 9) | 416–479 |
-|   9. Room tile grid | 480–1043 |
-|   10. Collision map from tiles | 1044–1122 |
-| Constants & data dependencies | 1123–1137 |
-| Randomness | 1138–1155 |
-| Edge cases & original bugs | 1156–1173 |
-| Test vectors | 1174–1221 |
-| Provenance | 1222–1265 |
-| Open questions | 1266–1355 |
+|   4. Status and activation | 206–395 |
+|   5. Active room creation (`0x006422A0`, `0x00619890`) | 396–429 |
+|   6. Adjacency array order (owner of `unit-order.md` §9) | 430–445 |
+|   7. Room clients and the inactivity counter | 446–466 |
+|   8. Deactivation (tick step 9) | 467–530 |
+|   9. Room tile grid | 531–1172 |
+|   10. Collision map from tiles | 1173–1251 |
+| Constants & data dependencies | 1252–1266 |
+| Randomness | 1267–1284 |
+| Edge cases & original bugs | 1285–1302 |
+| Test vectors | 1303–1353 |
+| Provenance | 1354–1397 |
+| Open questions | 1398–1505 |
 <!-- /index -->
 
 ## Summary
@@ -209,7 +209,8 @@ Statuses: 0 client in room, 1 client in sight, 2 client out of sight,
 3 tiles loaded ("untile"), 4 none. A room's status is the lowest status
 whose reference count is non-zero (4 if none). The DRLG keeps one
 circular doubly-linked list per status 0..3 (heads at drlg +0xA0 +
-0xEC·s, `0x0061B7E0`); **force status s** (`0x0061B210`): if s differs
+0xEC·s, `0x0061B7E0`, which also writes s into each head node's status
+byte +0x44, §4.6 rule 9); **force status s** (`0x0061B210`): if s differs
 from the room's status: unlink the room (if linked), and for s < 4 link
 it at the **tail** of list s; status := s.
 
@@ -317,9 +318,11 @@ The server never runs it: on the server only status 1 builds rooms.
 4. If B > 1: B := 0 and stop (no timer step).
 5. Else T := T − 1 (u8 wrap). T ≠ 0 → stop; **B is kept** (it carries
    into the next call).
-6. T = 0: T := R. If C is none or C's status (+0x44) ≠ 2, C := the
-   first room of the status-2 list (the next pointer of the list head,
-   drlg +0x294; the head node itself is at drlg +0x278, §4).
+6. T = 0: T := R. If C is none or C's status byte (+0x44, `0x0061B99E`)
+   ≠ 2, C := the first room of the status-2 list (the next pointer of
+   the list head, drlg +0x294; the head node itself is at drlg +0x278,
+   §4; with an empty list that pointer is the head node). The head node
+   reads status 2 (rule 9), so a cursor on the head node is kept.
 7. Walk from S = C along the status-2 list (next +0x1C, circular through
    the head node): for each room N: if N is not the head node, has no
    active room (+0x30) and no flag 0x100000, build it (§4.4, which adds
@@ -328,6 +331,53 @@ The server never runs it: on the server only status 1 builds rooms.
    already 1 on entry it examines only the first room (building it if
    eligible).
 8. C := the room after the last one examined; B := 0.
+9. **Cursor on the head node.** `0x0061B7E0` (called once, by the DRLG
+   allocation at `0x00642F23`) sets head s's status byte +0x44 := s, so
+   the status-2 head reads 2 in rule 6 and stays the cursor (it is
+   neither "none" nor "status ≠ 2"). C is the head node after: a walk
+   whose last examined room is the list tail (C := tail's next), a walk
+   from S = head that builds nothing (it stops back at S), and rule 6 on
+   an empty list. A walk from S = head examines the head first (never
+   built: rule 7's head test, `0x0061B9C9`), then N := the first room:
+   - B = 1 on entry: B ≥ 1 stops the walk at once: **no build this
+     call**, C := the first room, B := 0. Resetting C to the first room
+     instead would examine (and maybe build) it in this call.
+   - B = 0 on entry: the walk goes on from the first room exactly as if
+     it had started there, ending on the head (C := head) when nothing
+     is built.
+
+   Test vector (synthetic, client copy, R = 5): status-2 list [X, Y],
+   both without active room and flag 0x100000; C = head, T = 1. A call
+   with B = 1: T → 0, T := 5, C kept, the walk examines the head only →
+   no build, C = X, B = 0. The same state with B = 0: X is built (B =
+   1), the walk stops at Y → C = Y, B = 0.
+10. **The level-free counter** `[0x007A0498]` (below) is a client game
+    global. Writers (every reference in the 1.14d export): += 1 at
+    `0x0044C806` (the client update); 0 at the game start (`0x0044E200`,
+    called by the client game loop `0x0044F360` at `0x0044F4E0` before
+    its first update: the memset of `0x007A0480`..`0x007A04FF` at
+    `0x0044E20A` and the store at `0x0044E30A`); 0 at the game end
+    (`0x0044C890`, memset at `0x0044C904`, called at `0x0044F735`).
+    Other readers: getters `0x0044DA90`, `0x0044DB00` (other owners).
+    An act change (S→C 0x03), a level load or a new client DRLG does
+    not reset it. So it counts client updates from 0 per game; the
+    first client level free runs on the 13th update of the game.
+11. **Cursor on a freed room.** C has no writer besides rules 6 and 8
+    (`0x0061B9AA`, `0x0061B9F4`); freeing a room (§2.1, `drlg/levels.md`
+    §9 rule 4) does not clear it. A room is freed only at status 4
+    (`drlg/levels.md` §9 rule 3), so it is in no list and its status
+    byte was 4 at the free. 1.14d's rule 6 then reads +0x44 of the freed
+    block: unchanged → 4 ≠ 2 → C := the first room; reallocated before
+    the read → whatever the new owner wrote there (allocator layout,
+    not reproducible). d2rs: a cursor whose room was freed reads "not
+    status 2" (equivalently: clear C when its room is freed), so the
+    next rule 6 sets C := the first room. That matches every case in
+    which the freed block's byte +0x44 is not 2 at the read, including
+    every case without a reallocation in between. The one divergent
+    case is a reallocation that leaves 2 there (for example a new DRLG
+    room at the same address that is in the status-2 list: 1.14d then
+    walks from that room); it depends on allocator addresses and is not
+    modelled (open question 23).
 
 Consequences: on a client, a status-2 room (two rooms-near steps from a
 room in sight, §4) is built at most one per call, at the earliest R
@@ -340,7 +390,8 @@ unit-creation results (`client/model.md` §2 rule 6, §12 rule 3).
 
 The same client update also runs the level free of `drlg/levels.md`
 §9 rule 2 on the client DRLG (`0x0061AA20`) on every 13th call (counter
-`[0x007A0498]` += 1 first; free when it is a multiple of 13).
+`[0x007A0498]` += 1 first; free when it is a multiple of 13; reset per
+game, rule 10).
 
 ### 5. Active room creation (`0x006422A0`, `0x00619890`)
 
@@ -578,7 +629,21 @@ room's level type (level +0x1C0), in this order:
 3. Set room flag `0x1000000`.
 
 A slot load (`0x00604A40`) is fatal (error 0x2A) when all 32 slots are
-full. DT1 files are cached process-wide by path (`0x00600710`), so rooms
+full.
+
+**Empty `File` name for a set mask bit.** Rule 1 does not test the
+name. The `LvlTypes` field address (row + 0x3C·i, never null) goes
+to the slot load, which takes the next free slot. Its cache lookup by
+path (`0x00600710`) misses, and the file is opened by that path:
+`0x005FDF80` gives size 0 when the open fails. The load then continues
+on a zero-size buffer (`0x00600790`). *Pending*:
+- whether that load is fatal or leaves an empty library slot;
+- whether any 1.14d `LvlTypes` row has an empty `File` under a mask bit
+  that a lvlprest / lvlmaze / outdoor source sets. The survey is
+  `data-tool tables` over `LvlTypes` `File1`–`File32` against every
+  `Dt1Mask`.
+d2rs skips such a bit (unverified). With 1.14d data only the second
+point decides whether this path ever runs. DT1 files are cached process-wide by path (`0x00600710`), so rooms
 share library objects. Example (Act 1 town, `LvlTypes` "Act 1 - Town",
 lvlprest Dt1Mask 959 = bits 0–5, 7–9): slots = Floor, Objects, Fence
 (Town), River, stonewall, trees, Objects (Outdoors), TreeGroups, Bridge,
@@ -840,6 +905,17 @@ tile record in a neighbour. `0x0066E940` (args: type, packed v, wx, wy):
 3. **Found** (`0x0066E740`, existing record R in neighbour N):
    - R has flag 0x1 (layer above): if R is a door (type 8/9), re-run the
      flag rules on R with v; stop.
+   - **Arguments of both flag-rule re-runs of this step** (this one,
+     `0x0066E769`–`0x0066E776`, and the last bullet, `0x0066E91E`–
+     `0x0066E92E`): room = **this room** (the one whose grid is being
+     filled, not N), position = the cell (wx, wy), packed value = this
+     room's v, record = R. So for a door R without flag 0x20 the door
+     unit (`drlg/preset.md` §11) is looked up in this room's level with
+     this v and right = (R's type = 9), placed at ((wx − this room's
+     x)·5 + dx, (wy − this room's y)·5 + dy) and range-checked against
+     this room's size, added to this room's preset-unit list, and its
+     `roll(3)` (ids 91–92) draws on this room's seed; flag 0x20 goes on
+     R (in N's chain).
    - Merged type m, starting from m = t (the new cell's type):
      1. v has bit 7: m = t (no table, no edge test).
      2. Else t is a door (8/9) and wx = this room's x or wy = this
@@ -858,11 +934,64 @@ tile record in a neighbour. `0x0066E940` (args: type, packed v, wx, wy):
      record (step 1), R +0x20 is the record chained into N's list just
      before R, not R's own half (D2MOO: same); if R is the oldest record
      of its chain (+0x20 null) 1.14d writes through a null pointer
-     (open question 12).
+     (open question 13).
      R type ≠ 3 and m = 3: R gets flags 0xC008 (layer 3,
      hidden), collision update, then **choose (3, v) on this room's
      seed** and add a new type-3 wall record (plus its type-4 half, a
      second draw) to this room's non-floor link list.
+     Exact rules (`0x0066E7FD`–`0x0066E8B6`; they run once m is fixed by
+     rules 1–4, rule 2 included, and before the type change below). Names:
+     H = R's own type-4 half (only when R has type 3), P = R +0x20.
+     - C1. **Chain shape.** A link chain grows only by prepends: `0x0066E620`
+       passes the node's chain head (`0x0066E703`), and `0x0066DC50`
+       passes the **same** head to its own type-4 call (`0x0066DD0A`).
+       Head first, a corner pair therefore reads `…, H, R, P, …` with
+       H +0x20 = R. P is the record prepended to the same chain just
+       before R was made (a wall, a shadow, or an older pair's type-4
+       half; any cell of N), or null if R was the first record of that
+       chain. Wall warp tile records never enter a link chain (they go to
+       the warp entry's chain, `0x0066E337`). Find (step 1) skips type 4,
+       so it never returns H.
+     - C2. **When m ≠ 3 can meet R type 3.** Every `table` row maps R
+       type 3 to 3 (column `r3`), so m ≠ 3 with R type 3 only comes from
+       rule 1 (v bit 7, m = t), rule 2 (door t at this room's top/left
+       edge) or `keep` (t 4, 10–12, 14–19; t 0 searches the floor list).
+     - C3. **R type 3, m ≠ 3.** One write: P flags |= 0x8 (`0x0066E8A7`).
+       Then `0x0064C860`(N's active room N +0x30, P, 0) (`0x0066E8B6`),
+       called even when N +0x30 is 0, where it returns at once
+       (`0x0064C86A`). R and H are not written by this rule. H is never
+       reached by any rule of §9.6: it keeps type 4, its tile and its
+       flags, so after the type change the cell holds R (type m) and H
+       (type 4, still shown unless its own flags hide it). d2rs must
+       model the chain order (C1) and hide P, never H.
+     - C4. **R type 3, m ≠ 3, P null.** 1.14d faults at `0x0066E8A7`
+       (write to address 0x14); whether 1.14d data ever reaches it is
+       open question 13. d2rs: fatal DRLG error (no outcome to match).
+     - C5. **R type ≠ 3, m = 3**, in this order:
+       1. R flags |= 0xC008 (`0x0066E810`).
+       2. `0x0064C860`(N +0x30, R, 0) (`0x0066E822`), no null test (as C3).
+       3. This room's non-floor node: the first node in this room's node
+          list (tile grid +0x00) with floor flag 0; if none, a new node
+          {0, null, old head} becomes the list head (`0x0066E827`–
+          `0x0066E86F`).
+       4. Choose (3, v) on **this room's** seed (`0x0066E87C`).
+       5. `0x0066DC50`(this room, that node's chain, wx, wy, v, tile, 3)
+          (`0x0066E895`): new record S3 prepended, its flag rules with v,
+          then choose (4, v) on this room's seed and S4 prepended, its
+          flags. This room's chain then reads `S4, S3, …`. S3 and S4 are
+          new records at (wx, wy) of this room; R is not linked to them.
+     - C6. **R type 3, m = 3** and **R type ≠ 3, m ≠ 3**: no corner write.
+     - C7. **After the corner rules.** The type-change bullet below runs
+       next for every case: in C5 R's type (≠ 3) differs from m, so R is
+       re-chosen as type 3 on **N's** seed after the two draws of C5 and
+       becomes a type-3 record with no half of its own; in C3 R becomes
+       type m. The closing flag re-run acts on R only: its cell-bit-31
+       rule clears 0x8 unless v has bit 31 (bit 26 sets it again, 0x20C),
+       so R's 0x8 from C5.1 survives only with v bit 31 or 26; 0xC000
+       stays (flags are OR'd). P's 0x8 from C3 is never cleared here.
+       Draw order for one found cell: C5's draws (3, then 4; this room's
+       seed), then the type-change draw (N's seed).
+     Synthetic vectors: §Test vectors (rows "§9.6 C3", "§9.6 C5").
    - If m differs from R's type, or R is a floor showing
      key (30, 0): **choose (merged type, v) on N's seed** (the
      neighbour's room seed, `0x0066E8F7` passes N), set R's type to m and
@@ -1184,6 +1313,9 @@ Synthetic (rules; CI-safe):
 | list [A=(0,0,8,8), B=(8,8,8,8), C=(8,0,8,8)] | [A,C,B] | §3.2 |
 | adjacency [R, X, Y, Z]; remove X | [R, Z, Y] | §6.3 |
 | counter 0, no client, 11 passes, test true | removed on pass 11 | §7.3 |
+| §9.6 C3. N filled linked non-floor cells A = (20,10) type 1 (record W), then B = (20,11) type 3 (R, half H): N's chain H → R → W → null. This room fills B: linked + wall bits, t = 12 (`keep`), v bits 7, 26, 31 clear, layer 0, no doors | find returns R (H skipped); m = 12; W flags \|= 0x8 (W is at A, not B); collision update for W (none if N inactive); choose (12, v) on N's seed, R type 12; flag re-run on R (0x8 clear); H unchanged (type 4, visible); 0 draws on this room's seed | §9.6 C1, C3, C7 |
+| §9.6 C5. N's chain W → null, W type 1 at B = (20,11). This room fills B: t = 3 (`table`, column r1 = 3), same v | m = 3; W flags \|= 0xC008, collision update for W; this room: non-floor node, choose (3, v), S3, choose (4, v), S4 (2 draws, this room's seed; chain S4 → S3); then choose (3, v) on N's seed, W type 3; flag re-run clears W's 0x8 (v bit 31 clear), W keeps 0xC000 | §9.6 C5, C7 |
+| §9.6 C4. N's chain H → R → null (R type 3 first in its chain); this room fills R's cell with t = 12 | 1.14d faults (null P); d2rs fatal error | §9.6 C4 |
 
 Recorded:
 
@@ -1352,3 +1484,21 @@ counter (+0x0C), and per level all DRLG rooms in list order; then §3 and
     record flag 0x20 through `0x0066DB20` → `0x0066D9E0` (§9.5.1, wall
     records); the door-unit call returns nothing, the flag is written
     on the record.
+20. *Answered (2026-10-08)* (`fix-drlg-answers` Q2): the flag-rule
+    re-runs of §9.6 step 3 pass this room (not N), the cell (wx, wy)
+    and this room's v; a door R without flag 0x20 gets its unit and
+    draw in this room (§9.6 step 3, "Arguments" bullet; `0x0066E740`,
+    `0x0066DB20`, `0x0066D9E0`).
+21. *Answered (2026-10-08)* (`impl-client-drlg-2` Q1): yes,
+    `0x0061B7E0` writes status s into head s, so the status-2 head
+    reads 2 and stays the cursor; with B = 1 on entry the walk then
+    builds nothing that call (§4.6 rules 6, 9).
+22. *Answered (2026-10-08)* (`impl-client-drlg-2` Q2): `[0x007A0498]`
+    is zeroed at every game start and end (`0x0044E200`, `0x0044C890`),
+    never by 0x03 or a level load (§4.6 rule 10).
+23. *Answered (2026-10-08)* (`impl-client-drlg-2` Q3): a freed cursor
+    room reads "not status 2" in d2rs; this equals 1.14d unless the
+    freed block is reallocated with byte +0x44 = 2 before the read
+    (§4.6 rule 11). Open inside it: a client recording that logs the
+    cursor +0x460 and the byte at its +0x44 at each timed step across
+    a level free (PC 2 recording list) shows whether reuse happens.

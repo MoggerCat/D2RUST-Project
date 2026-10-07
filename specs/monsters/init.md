@@ -44,24 +44,24 @@
 |   16. Boss spawns | 506–541 |
 |   17. Choosing umods (`0x005A0760`) | 542–585 |
 |   18. Boss minions and umod init (`0x005A2120`) | 586–603 |
-|   19. Umod init functions | 604–689 |
-|   20. Superuniques (`0x005A49B0`) | 690–738 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 739–753 |
-|   22. Umod callbacks and the type-7 event | 754–805 |
-|   23. Unique names (client) | 806–815 |
-|   24. Monster assign message | 816–831 |
-|   25. Calling the spawn functions outside population (tools) | 832–922 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 923–981 |
-|   27. Class reinit (`0x00574370`) | 982–1027 |
-| Constants & data dependencies | 1028–1049 |
-| Randomness | 1050–1092 |
-| Edge cases & original bugs | 1093–1123 |
-| Test vectors | 1124–1125 |
-|   Synthetic (CI-safe) | 1126–1148 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1149–1179 |
-|   Recorded checks (monster assign 0xAC) | 1180–1192 |
-| Provenance | 1193–1271 |
-| Open questions | 1272–1328 |
+|   19. Umod init functions | 604–690 |
+|   20. Superuniques (`0x005A49B0`) | 691–739 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 740–754 |
+|   22. Umod callbacks and the type-7 event | 755–806 |
+|   23. Unique names (client) | 807–816 |
+|   24. Monster assign message | 817–868 |
+|   25. Calling the spawn functions outside population (tools) | 869–959 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 960–1019 |
+|   27. Class reinit (`0x00574370`) | 1020–1065 |
+| Constants & data dependencies | 1066–1087 |
+| Randomness | 1088–1130 |
+| Edge cases & original bugs | 1131–1162 |
+| Test vectors | 1163–1164 |
+|   Synthetic (CI-safe) | 1165–1187 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1188–1218 |
+|   Recorded checks (monster assign 0xAC) | 1219–1231 |
+| Provenance | 1232–1310 |
+| Open questions | 1311–1391 |
 <!-- /index -->
 
 ## Summary
@@ -321,7 +321,7 @@ message (client message 0x67, byte 0x11), so single player uses the
 | 1 | minHP, maxHP | `MinHP`, `MaxHP` for d | pct(monlvl `HP`/`L-HP` for d, `MinHP`, 100), same for `MaxHP` |
 | 2 | AC | `AC` | pct(monlvl `AC`/`L-AC`, `AC`, 100) |
 | 4 | XP | `Exp` | pct(monlvl `XP`/`L-XP`, `Exp`, 100) |
-| 8 | TH, A1 min/max | `A1TH`, `A1MinD`, `A1MaxD` | TH from `TH`/`L-TH`, damage from `DM`/`L-DM` |
+| 8 | TH, A1 min/max (out +0x0C, +0x14, +0x18) | `A1TH`, `A1MinD`, `A1MaxD` | pct(`TH`/`L-TH`, `A1TH`, 100); pct(`DM`/`L-DM`, `A1MinD`, 100), same with `A1MaxD` |
 | 0x10, 0x20, 0x40… | A2, S1, El1… | | owned by the combat / skills spec |
 
 monstats values are read as signed 16-bit. "pct(a, b, 100)" is §8.2 with
@@ -608,7 +608,8 @@ unique). Catalogue with every id, its init function and its callbacks:
 `monsters/umods.tsv` (columns: `id`; `uniquemod` name; `init_fn` 1.14d
 address or `-`; `unique_gate` yes = does nothing when unique = 0, no =
 ignores it, branch = different constants; `init_effect`; `cb_mode0`…
-`cb_mode5` callback addresses of §22; `status`). K[i] below is monumod row
+`cb_mode5` callback addresses of §22; `cl_phase0`…`cl_phase4` client
+hook addresses, `umod-callbacks.md` §28; `status`). K[i] below is monumod row
 i `constants` (live: 20, 100, 75, 50, 200, 150, 100, 300, 200, 100, 75,
 100, 50, 100, 75, 150, 0, 33, 33, 0, 50, 50, 33, 33, 33, 50, 50, 50, 66,
 66, 66, 100, 100, 100); B = difficultylevels `ChampionDamageBonus` (90 /
@@ -829,6 +830,42 @@ ghostly 0x40 (one bit each, in that order), hcIdx (16 bits, superunique
 only), umods (8 bits each, 0-terminated), name seed (16 bits). Bits are
 written low bit first.
 
+Full server layout (2026-10-08, builder `0x0053E2E0(client, U)`, one
+caller `0x005720D8`; the client reader is `client/msg-units.md` §1.2):
+
+1. Header: @0 0xAC, GUID u32@1 (+0x0C), class u16@5 (+0x04), x u16@7,
+   y u16@9 (position, static path for types 2, 4, 5), life u8@0xB
+   (`0x005A5650`: 128 when U is none or life ≥ max; else hitpoints ×
+   128 / maxhp, both >> 8, truncating), size u8@0xC = 0xD + stream
+   bytes. The stream (writer `0x00410E40`, at most 0xF4 bytes) starts
+   @0xD.
+2. Mode, 4 bits: U's mode when it is 0, 8, 9 or 12; else 1.
+3. Components: 1 bit = any of the 16 component bytes (monster data
+   +0x04) ≠ 0 (`0x00573AE0`); set → for i = 0…15 the byte in w bits, w
+   from the class's choice count c (`0x006647C0(U, i)`): c < 3 → 1,
+   else the bit length of c − 1. Clear → no component bits.
+4. Type block: 1 bit = umod list non-empty (`0x005A0380`: byte +0x1C ≠
+   0) **or** unit flag +0xC4 bit 0x200. Clear → nothing more of this
+   block. Set → flags 4, 8, 2, 0x10, 0x40 (1 bit each, `0x005A0180`);
+   type flag 2 → hcIdx 16 bits (`0x005A01E0`); each umod byte ≠ 0 of
+   the list (at most 9) in 8 bits, then **always** an 8-bit 0 (so a full
+   list of 9 sends 10 bytes); name seed 16 bits (`0x005A0140`); then 1
+   bit: the minion owner (`0x0058F0D0`) is a player and its pet type of
+   U's GUID (`sim/pets.md` §9) is 7 (hireable) → 1 and the owner's GUID
+   in 32 bits; else 0.
+5. Source link: 1 bit = flag-ex +0xC8 bit 0x400 and owner type +0x94 =
+   0; set → 31 bits of +0x98 & 0x8FFFFFFF.
+6. Stats: L = U's child list with state 0 and flag 0x40 (`0x006257D0(U,
+   0, 0x40)`). None → 1 bit 0. Else its first 16 base entries
+   (`0x00625C90`), in order, each sent when the stat is in range, its
+   itemstatcost row has `send other` (+0x04 bit 0) and `send bits`
+   (+0x08) > 0: before the first one 1 bit 1; stat id 9 bits; layer in
+   `send param bits` (+0x09) bits when > 0; value in `send bits` bits.
+   Any sent → 9 bits 0x1FF; none sent (or no entries) → 2 bits 0 (the
+   client reads only the first).
+7. Size: the stream is flushed (`0x00410E90`) and the message sent with
+   `0x0053B280(client, msg, 0xD + bytes)`.
+
 ### 25. Calling the spawn functions outside population (tools)
 
 For a recorder that injects a spawn into the original
@@ -967,10 +1004,11 @@ this order:
 3. M's alignment (`0x006259B0`) = 0 (evil).
 4. `0x0063EA40(M)` = 0.
 5. M's mode is 1 (NU) or 2 (WL).
-6. M's class has monstats2 mode bit 2 (`0x0046C140(class, 2)`: the
+6. M's class has monstats2 mode bit 2, WL (`0x0046C140(class, 2)`: the
    +0xF0 mode bits through monstats +0x18, `render/unit-composite.md`
    §1.1).
-7. M's monstats2 record exists (`0x00451FE0`) and its byte +0x0B ≠ 0.
+7. M's monstats2 record exists (`0x00451FE0`) and its byte +0x0B (`Height`,
+   `data/fields.tsv`) ≠ 0.
 8. v := `0x0055B7E0(M)` (monster data +0x14, dword 0) ≠ 0 and
    `0x0063E9F0(v, M)` = 0 (not a boss).
 9. `0x0063EDC0(M)` = 0 (not a prime evil).
@@ -1116,8 +1154,9 @@ Then, for bosses:
     is halved.
 12. `0x00573930` writes difficulty 2 into the game when it finds ≥ 3.
 13. The class reinit teardown (§27 step 4.3) frees the hover record
-    (unit +0xA4) but does not clear the pointer; whether a later write
-    replaces it before any read is Open question 11.
+    (unit +0xA4) but does not clear the pointer; the next hover text or
+    the death clean-up returns it to the pool again (Open question 11;
+    d2rs clears it).
 14. A reinit monster keeps its umods, type flags and name seed but gets
     the new class's stats with no umod init re-run (§27 step 6).
 
@@ -1288,8 +1327,8 @@ Bosses, Normal, Blood Moor (L-flag 1):
 3. Answered (2026-10-07): §4.1 lists the allocator's steps after the
    type init and their draws; for creation modes 1 and 12 with 1.14d
    data there are none (Randomness step 8).
-4. No RNG trace of a spawn exists: record one population pass (rng hook
-   with caller addresses) to confirm the order in Randomness.
+4. ~~No RNG trace of a spawn exists: record one population pass (rng hook
+   with caller addresses) to confirm the order in Randomness.~~ → PC 2 recording list.
 5. Answered (2026-10-07): `0x0054DC40` and its draws are owned by
    `monsters/population.md` §8.
 6. Answered (2026-10-07): every case read from the asm: boss mods §14.3
@@ -1302,8 +1341,8 @@ Bosses, Normal, Blood Moor (L-flag 1):
    in §22 (death explosions, curses, hit effects): owner to be decided
    (monster death/combat spec); catalogue in `umods.tsv`.
 9. Whether `0x00573780` (umod 41 event) draws RNG.
-10. The client name draw order of §23 assumes the C argument order seen
-    in `0x004AC870`; confirm with a client RNG trace showing a unique.
+10. ~~The client name draw order of §23 assumes the C argument order seen
+    in `0x004AC870`; confirm with a client RNG trace showing a unique.~~ → PC 2 recording list.
 
 Answered 2026-10-07: 8 → every callback body is in
 `monsters/umod-callbacks.md` (owner). 9 → `0x00573780` draws nothing
@@ -1316,6 +1355,15 @@ no `umods.tsv` row is D2MOO-only any more.
 11. After a class reinit (§27), unit +0xA4 still points at the freed
     hover record (Edge cases 13): find every reader of +0xA4 on a
     monster and whether one can run before a new record is written.
+    Answered (2026-10-08): the event-6 handler `0x00580B70` cannot run
+    (teardown step 4.5 cancels every timer); the readers that act on a
+    stale +0xA4 are the hover setter `0x0054A290` (returns a non-null
+    old record to the pool before writing the new one) and the death
+    clean-up `0x005A6520` (`sim/units.md` §4.6 DT start step 1.2). So
+    in 1.14d the freed record goes back to the pool a second time at
+    the monster's next hover text or death. d2rs design choice: the
+    teardown also clears +0xA4 (the double return is pool corruption,
+    not game state, and is not reproduced).
 12. Size: this spec is ~71 KB, over the 60 KB guideline. Split
     proposal (not done; needs every inbound `init.md` §N link updated in
     the same change): move §14–§22 (normal and boss mods, boss spawns,
@@ -1324,4 +1372,19 @@ no `umods.tsv` row is D2MOO-only any more.
     `monsters/bosses.md`, keeping section numbers as a stub table here;
     optionally move §25–§26 (tool spawns, making an existing monster
     unique; ~11 KB) to `monsters/init-tools.md`. §1–§13, §23, §24 and
-    §27 (plain creation, the class reinit) stay.
+    §27 (plain creation, the class reinit) stay. Closed (2026-10-08):
+    not a behaviour question; the split is a doc-layout task outside
+    spec-complete.
+13. Answered (2026-10-08, `docs/handoff/impl-server-join-2.md` §3
+    "Left", 0xAC server-side fields past §24): §24 rules 1–7 give the
+    whole server layout (header, mode rule, components, type block with
+    the always-written umod terminator and the hireling-owner GUID,
+    source link, `send other` stats). A recorded 0xAC of a hireling and
+    of a 9-umod boss would confirm rules 4 and 6.
+14. Answered (2026-10-08, `docs/handoff/impl-umods-cs-handlers.md` U4):
+    stats by level flag 8 is confirmed on `0x006538A0`: TH = pct(monlvl
+    `TH`/`L-TH`, `A1TH`, 100) at out +0x0C, A1 min = pct(monlvl
+    `DM`/`L-DM`, `A1MinD`, 100) at +0x14, A1 max = pct(`DM`/`L-DM`,
+    `A1MaxD`, 100) at +0x18 (monstats columns + 2d, d clamped 0…2);
+    `noRatio` → the raw `A1TH`, `A1MinD`, `A1MaxD`. So
+    `umod-callbacks.md` §22.2's p, q are these values.

@@ -32,24 +32,24 @@
 | Outputs / state changes | 79–84 |
 | Rules | 85–86 |
 |   1. Coordinates | 87–100 |
-|   2. Path records | 101–204 |
-|   3. Size, collision pattern, footprint mask | 205–245 |
-|   4. Collision queries | 246–326 |
-|   5. Footprints | 327–379 |
-|   6. Moving a footprint | 380–412 |
-|   7. Nearest free point (`0x0064DEA0`) | 413–477 |
-|   8. Coarse free-box search (`0x0064E840`) | 478–510 |
-|   9. Floor drop placement (`0x00555DA0`) | 511–533 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 534–583 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 584–631 |
-|   12. Warp tiles and warp arrival | 632–692 |
-|   13. Where a joining character stands at tick 0 | 693–737 |
-| Constants & data dependencies | 738–756 |
-| Randomness | 757–766 |
-| Edge cases & original bugs | 767–802 |
-| Test vectors | 803–840 |
-| Provenance | 841–875 |
-| Open questions | 876–965 |
+|   2. Path records | 101–208 |
+|   3. Size, collision pattern, footprint mask | 209–249 |
+|   4. Collision queries | 250–330 |
+|   5. Footprints | 331–383 |
+|   6. Moving a footprint | 384–416 |
+|   7. Nearest free point (`0x0064DEA0`) | 417–481 |
+|   8. Coarse free-box search (`0x0064E840`) | 482–514 |
+|   9. Floor drop placement (`0x00555DA0`) | 515–537 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 538–594 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 595–642 |
+|   12. Warp tiles and warp arrival | 643–703 |
+|   13. Where a joining character stands at tick 0 | 704–748 |
+| Constants & data dependencies | 749–767 |
+| Randomness | 768–777 |
+| Edge cases & original bugs | 778–813 |
+| Test vectors | 814–851 |
+| Provenance | 852–886 |
+| Open questions | 887–976 |
 <!-- /index -->
 
 ## Summary
@@ -200,7 +200,11 @@ room list insert; missile: dynamic path allocation; item: only in mode 3
 (on the floor): static set, footprint, room list insert without queueing
 (`0x0064C2C0`); tile: static set, footprint, room insert. Then hash
 insert `0x00553060` (`unit-order.md` §3.1), queue for update if the unit
-has a room, and unless `flag`: room-changed flag set (`0x00620FA0`).
+has a room, and unless `flag`: room-changed flag set (`0x00620FA0`). The
+three dynamic allocations pass `set0x10` = 0 (`0x005548CB`,
+`0x005548F1`, `0x005549AA`, last argument pushed 0); the player
+allocation is followed by the join step `0x00534AD0` (`sim/units.md`,
+timer table "join").
 
 ### 3. Size, collision pattern, footprint mask
 
@@ -536,7 +540,14 @@ query is a single cell against 0x3E01.
 `0x00554EA0(game, unit, room, x, y, exact, alt flag)` (D2MOO
 `sub_6FCBDFE0`), result 1 placed / 0 not:
 
-1. Unit null or without path → fatal assert.
+1. Unit null or without path → fatal assert. There is no type test:
+   unit +0x2C goes to the dynamic teleport `0x00650BE0` (rule 4)
+   whatever the type (`0x00554ED9`, `0x00554F5C`), so a unit with a
+   static path (objects, items, tiles; 0x20 bytes, §2.2) would be read
+   and written as a 0x200-byte dynamic path in 1.14d. Pending: whether
+   any of the 20 callers passes a static-path unit; d2rs does the
+   static set (`0x00620AE0`) with the footprint removed and stamped
+   again for such a unit (design choice).
 2. Room null: cell lookup with a null hint (always none, dead code), then
    from the unit's current room; none → 0.
 3. Unless `exact`: free point (§7, `0x0064E7B0`, size of the unit, mask

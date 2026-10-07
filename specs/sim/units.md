@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–135 |
-|   3. Lifecycle | 136–303 |
-|   4. Modes and mode schedules | 304–564 |
-|   5. Event dispatch | 565–579 |
-|   6. Events per kind | 580–702 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 703–724 |
-|   8. Collision line between two units | 725–729 |
-| Constants & data dependencies | 730–746 |
-| Randomness | 747–754 |
-| Edge cases & original bugs | 755–775 |
-| Test vectors | 776–835 |
-| Provenance | 836–886 |
-| Open questions | 887–952 |
+|   3. Lifecycle | 136–378 |
+|   4. Modes and mode schedules | 379–740 |
+|   5. Event dispatch | 741–755 |
+|   6. Events per kind | 756–878 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 879–900 |
+|   8. Collision line between two units | 901–905 |
+| Constants & data dependencies | 906–922 |
+| Randomness | 923–930 |
+| Edge cases & original bugs | 931–951 |
+| Test vectors | 952–1011 |
+| Provenance | 1012–1079 |
+| Open questions | 1080–1159 |
 <!-- /index -->
 
 ## Summary
@@ -153,6 +153,68 @@ fixed GUID):
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
 7. Per-kind init (§1 table).
+   7.1. Not linked yet (read 2026-10-07). Steps 1–7 put the unit in no
+      list and give it no room or position: `0x00620290` zero-fills the
+      record (0xF4 bytes; monster data 0x60 bytes), so the path (+0x2C)
+      of a player, monster or missile is 0, and the static path that
+      `0x00623520` allocates for an object, item or tile is zeroed
+      (room 0, x = y = 0). Room and position are written only by
+      `SUNIT_Add` (step 8): path `0x00649D00(…, room, x, y, unit, 0)`
+      (types 0, 1, 3) or static position `0x00620AE0(unit, room, x, y)`
+      (types 2, 5, item mode 3), then room-list insert, hash insert
+      `0x00553060` and update queue `0x0064C040` (`unit-order.md` §3.1).
+      During step 7 the unit's room (`0x00620BB0`) is 0 for every kind.
+   7.2. Room and level source: the allocation's `room` argument (stack
+      argument 4), the value step 3 takes the act from and step 8 passes
+      to `SUNIT_Add`; no per-kind init reads the unit's own room or
+      position.
+      - Monster `0x00574250` (ECX game, EDX room; stack unit, GUID; no
+        x/y): room → region data `0x00547BC0(game +0xF0, room, unit)`;
+        → stats and skills `0x00573CB0(game, room, …)` (level from
+        `0x0061A1B0(room)`, `monsters/init.md` §7; player-count bonus
+        `0x00573930(room, unit)`); monster data +0x58 :=
+        `0x0061A1B0(room)` (level id); mode ≠ 0, 12 → quest chain
+        `0x00545CD0(game, unit, room, 1)` (level record of
+        `0x0061A1B0(room)`). `monsters/init.md` §5 owns the steps.
+      - Object `0x0054F5D0` (ECX game, EDX unit; stack GUID, room, x,
+        y): room, x and y go only into the InitFn record {game, object,
+        room, control, objects record, x, y} (`world/objects.md` §3
+        step 6); the control getter `0x00546FA0` ignores the room. An
+        InitFn that needs the level or the position reads it from the
+        record.
+   7.3. The unit's own (empty) placement as seen by an init: a mode set
+      inside the init (`0x00624690`: monster mode 0 / 12 through
+      `0x00553570`, and many object InitFns) calls `0x0064C040`, which
+      finds room 0 and queues nothing (step 8 queues). The monster's
+      `0x005533D0` finds +0x2C = 0 and takes the `0x00620F00` branch,
+      not `0x00623F50`. HaremBlocker (InitFn 30, `0x0059B7D0`) in quest
+      mode 2 frees its footprint (`0x00623830`) at room 0, (0, 0):
+      `0x0064DC00` → `0x00463740(room 0)` returns 0, no collision change.
+   7.4. Unit lists read by a per-kind init: never a room unit list
+      (room +0x74) or the update queue; only game hash lists
+      (`unit-order.md` §2), and never for this unit except CountessChest:
+      - Monster: player count `0x00535790` walks the player hash (game
+        +0x1120, `0x005538D0`); monequip (`0x005D6B60` → `0x00573B20` →
+        `0x005606B0`) looks up the item it just created in the item hash
+        (`0x00552F60(game, 4, GUID)`).
+      - CountessChest (InitFn 47, `0x00595A50`) appends its own GUID to
+        the quest's chest list, then `0x005954F0` looks every listed
+        GUID up in the object hash (`0x00552F60(…, 2, …)`) and reads the
+        room and position (`0x00620BB0`, `0x00620870`) of each one
+        found. The new chest is not linked yet, so its own lookup fails
+        and it is skipped.
+      - HratliStart (49, `0x005B70B0`), NatalyaStart (52, `0x005BCE80`):
+        a monster by stored GUID (`0x00552F60(…, 1, …)`). Zoo (79,
+        `0x0058E830`) and `0x00544300` (CagedWussie 62, HellForge 48,
+        FrozenAnya 74): walk the player / monster hashes (`0x005537D0`,
+        game +0x1120, +0x1320).
+   7.5. Units created inside a per-kind init (monster spawns of object
+      InitFns through `0x005B2F20` / `0x005B3090` → `0x005B2A00`, which
+      adds them, `monsters/init.md` §4; GoldPlaceHolder's item; monequip
+      items) are allocated, and spawned monsters linked, before this
+      unit's step 8. This unit's GUID was drawn first (step 6); its
+      room-list insert comes after theirs (prepend: it ends up ahead of
+      them in the room list).
 8. Flags & 0x1 (`0x00555443`): `SUNIT_Add` `0x00554850(unit, x, y,
    game, room, 1)` (`unit-order.md` §3.1), after the per-kind init of
    step 7; its result is not tested. Then a player in mode 0 or 17, or a
@@ -248,10 +310,14 @@ of its list.
    0x400 node index (`+0xD0`) ≠ 11 (node index < 8 is fatal 0x56A),
    0x800 superunique; `+0x1C` / `+0x20` owner GUID and value
    (`0x0058F440`, kept when the owner exists and is of type 1; else
-   `+0x1C` = −1); `+0x28` `0x005B0D60(monster data +0x28)`; `+0x2C`
-   `0x00573520`; `+0x30` u16 `0x005A0140`; `+0x32..+0x3A` the 9 umod
-   bytes; `+0x3C` u16 superunique index; `+0x40` stat 13, `+0x44`
-   `0x00625D10`, `+0x48` stat 6 (life); `+0x54` the game frame; `+0x58`
+   `+0x1C` = −1); `+0x28` the AI special state (AI control +0x00,
+   `monsters/ai.md` §3.1; `0x005B0D60(monster data +0x28)`); `+0x2C`
+   monster data +0x58, the level id (`monsters/init.md` §5 step 6;
+   `0x00573520`, 0 without monster data); `+0x30` u16 the name seed
+   (monster data +0x14; `0x005A0140`, 0x1506 without monster data);
+   `+0x32..+0x3A` the 9 umod bytes; `+0x3C` u16 superunique index;
+   `+0x40` stat 13, `+0x44` max life (stat 7 total, layer 0;
+   `0x00625D10`, 0 without a stat list), `+0x48` stat 6 (life); `+0x54` the game frame; `+0x58`
    next.
 2. **Item** (`0x00542E30` → `0x00541B10`): the item is serialized with
    the item bit stream in save form (`0x006313E0(item, buf, 0x400, 1,
@@ -285,7 +351,16 @@ of its list.
       restored.
    2. items (`0x00541AC0`): a record whose expiry ≠ 0 and < the current
       frame is dropped; others are re-created from their stream
-      (`0x00541990`).
+      (`0x00541990`) by the record reader `0x00558CB0`
+      (`world/vendors.md` §7.3 step 3), which allocates a **new item
+      unit (new GUID)**. The item's ground expiry (item data +0x24) :=
+      the stored expiry when it is 0 or ≥ frame (game +0xA8) + 15,000,
+      else frame + 15,000. A record with socketed items (filled-socket
+      count from the header peek `0x0062E410`) reads each child record
+      in turn (a missing child is fatal 0x10C), puts it in the item's
+      inventory (+0x60, created with `0x0063ABD0` when absent;
+      `0x0063B210(inv, child, 1)`) and refreshes the item
+      (`0x0055FE60`).
    3. other records: flag-ex 0x100 (kept units: player bodies, portals
       59/60) → the unit of that type and GUID is placed again
       (`0x00554A30`) and gets unit flag 0x10; a type-0 one must be in
@@ -443,6 +518,107 @@ sets mode 1 and, unless the unit has a type-2 timer with expire > f
 none), schedules event 2: f + 45 with state 21, else f + `aidel`
 (monstats +0x4F, the Normal column, or +0x4F + difficulty (game +0x6D)
 when game +0x6A or game +0x74 is non-zero; 0 → 15).
+
+**Death and dead functions** (2026-10-08; this section owns them,
+`monsters/init.md` links here). All take ECX game, EDX the mode-change
+record R (unit U = R +4) and return 1; "set mode m" = the plain mode
+set `0x00553570(game, U, m)` (§4.1). **Mode 12 (DD) is always set by
+`0x00553570`**, from three places: DT event 0, DT event 1 and the DD
+start; `0x005A7C20` never writes it itself.
+
+1. **DT start** `0x005A6FF0`:
+   1. Set mode 0.
+   2. Death clean-up `0x005A6520(U, R byte +0x14)` (ESI U, EBX game,
+      `ret 4`): U's overhead record (+0xA4) non-null → freed
+      (`0x006611A0`), +0xA4 := 0, U queued for update (`0x0064C040`),
+      flags (+0xC4) |= 0x100; `0x0058F6C0(U)`; `0x005B1A90(game, U)`;
+      flags &= ~0x800C; `0x00627540(U)` (`stat-lists.md`);
+      `0x00639FB0(U, boss)` with boss = `0x0063E9F0(monstats row, U)`;
+      U has state group `hide` (`0x0063A320`) → flags &= ~0x2; the
+      class's monstats2 flag 0x13 (`0x004638A0(class, 0x13)`) clear →
+      dead-body footprint `0x00649F70(U, 1)` (`skills/bodies-3.md`
+      §3.9); `0x006488A0(path, R byte +0x14)`; `0x005738D0(game, U)`.
+   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1);
+      evil-killed counter `0x00547E50` (`monsters/population.md`);
+      `0x0061AFA0(U's room, U's GUID)`.
+   3.1. Helpers of steps 1.2–1.3 (read 2026-10-08):
+      - `0x0058F6C0(U)` (ECX U), pack-leader handover. C := U's AI
+        control (`monsters/ai.md` §3.1). C flags (+0x08) bit 0x1 clear
+        → nothing. Bit 0x1 set, 0x2 clear (tail at `0x0058F660`): every
+        GUID of C's minion list (+0x34, next at +4) that resolves
+        (`0x00552F60`) to a monster gets owner-ex (+0x2C, +0x30) :=
+        (−1, 1) and +0x28 := C +0x28 (the pack is released). Both set
+        → `0x0058F530`: N := the first list entry that resolves to a
+        unit (none → nothing); N a monster → N's control flags |= 0x2,
+        |= 0x1 (`0x005DD230`), owner-ex := (N's GUID, 1), +0x28 := C
+        +0x28. Then C's owner-ex := (N's GUID, 1), +0x28 := C +0x28,
+        and U joins its owner's minion list (`0x0058F100(U)`). Then,
+        from the list head, every entry resolving to a unit other than
+        N: a monster gets owner-ex (N's GUID, 1) and +0x28 := C +0x28;
+        each such unit joins its owner's list (`0x0058F100`).
+      - `0x005B1A90(game, U)`: U leaves its target-node list, +0xD0 :=
+        11 (`skills/bodies-2.md`, the slot-list paragraph).
+      - `0x00639FB0(U, boss)`: over the W words of U's state bits
+        (`stat-lists.md` §9.1; nothing without an extended list): every
+        set bit not in the keep mask is cleared and marked in the
+        changed half. Keep mask = states `bossstaydeath` (bitset 15,
+        data tables +0x108) when boss ≠ 0, else `plrstaydeath`
+        (bitset 13, +0x100) for a player, else `monstaydeath` (bitset
+        14, +0x104). U is then queued for update (`0x0064C040`). The
+        state lists are not touched here.
+      - `0x005738D0(game, U)` (ECX game, EDX U): cancel U's type-2 and
+        type-3 events (`0x00540E60(2, 0)`, `(3, 0)`).
+      - `0x0061AFA0(room, GUID)`: room +0x38 + 4 · (room byte +0x14) :=
+        GUID, then byte +0x14 := (byte + 1) & 3: a ring of the room's
+        last four dead GUIDs (null room → nothing).
+   4. U's monstats `deathDmg` (+0x0E bit 4) clear → done. Else by
+      `BaseId` (row +0x02; a non-monster takes the last branch):
+      - 212 `bonefetish1`: (x, y) = U's position; m =
+        `skill_missile(game, 117, U, 0, 1, 0, 0, x, y, 1)`
+        (`skills/bodies.md` §2.4), none → done. H = pct(maxHP of stats
+        by level (`monsters/init.md` §8.1, L-flag = game +0x74, d =
+        game +0x6D, U's `level(12)`, flags 1), difficultylevels
+        `MonsterCEDamagePercent` (+0x3C), 100); b = pct(H, 60, 100)
+        (inline); dmg = b + `roll(H − b)` on U's seed; record (zeroed
+        0x70) physical (+0x08) := dmg << 7; area damage `0x0057E090(game,
+        m, x, y, r 5, rec, 0, 0, null, 0x581)` (`monsters/umod-callbacks.md`
+        §3.2): players only.
+      - 441 `siegebeast1` (`0x005A6EB0(game, U)`): O = U's owner
+        (`0x00552FD0`, the rider); none or no monstats row → done. At
+        O's position with a free spot (`0x0064E7B0(O's room, &pos,
+        0x00620510(O, 0x3C01, 0), …)` ≠ 0) and U's alignment
+        (`0x006259B0`) = 0: skill use `0x005DEAD0(game, O, mode = O's
+        monstats +0x180, skill = `Skill1` +0x170, 0, x, y)`; success →
+        delete O's thinks (`0x00540E60(game, O, 2, 0)`). Otherwise kill
+        O (`0x0057CCB0(game, O, 0, 1)`, `combat/damage.md` §7.2).
+      - other (`0x005A6DF0`, EDI U, EBX game): for each unit P of U's
+        own room list (+0x74, next +0xE8; no neighbour rooms): P a
+        player not in mode 17, distance `0x006416D0(U, P)` ≤ 2 and
+        `0x00622B50(P, U, 0x3C01)` = 0 → record (zeroed 0x70): result
+        flags (+0x04) := 1, | 4 when P lacks state 54
+        (`uninterruptable`); physical (+0x08) := P's `hitpoints(6)` >> 5;
+        prepare `0x0057C1E0`, apply `0x0057C6C0(game, U, P, 1, rec)`,
+        reaction `0x0057CEE0` (`combat/damage.md` §5, §7.1).
+2. **DT event 0** `0x005A7350`: BaseId 78 (`0x0063E8D0(U, 0)`): path
+   step `0x00554CA0`, animation refresh `0x00623E00`, and set mode 12
+   only when the animation is complete (`0x006217C0`); any other
+   monster: set mode 12 at once. (`sim/intents-events.md` §7 rule 3
+   gives the client messages.)
+3. **DT event 1** `0x005A72B0`: set mode 12; skill event 13
+   (`0x005C0C30(game, 13, U, 0, 0)`, `skills/bodies.md` §2.18); then
+   monstats `SplEndDeath` (+0x1A4): 1 → `minion1` (+0x26, i16) in 0 …
+   class count → class reinit `0x00574370(game, U, minion1, 1)`
+   (`monsters/init.md` §27) then think restart `0x00573780`; 2 → kill
+   U's owner (`0x00552FD0`) with `0x0057CCB0(game, O, 0, 1)`; else
+   nothing.
+4. **DD start** `0x005A7390` (a mode set straight to 12, e.g. creation
+   in mode 12 or a corpse restore): U in mode ≠ 0 → death clean-up
+   `0x005A6520(U, R byte +0x14)` (step 1.2); set mode 12; cancel U's
+   events of types 8 and 9 (`0x00540E60(game, U, 8, 0)`, then 9). A U
+   already in mode 0 skips the clean-up (its DT start ran it).
+
+Draws: only the bonefetish branch (U's seed, one `roll`, plus the
+missile creation's own); the siege-beast skill use per its spec.
 
 #### 4.7 Animation rate `0x00623F50` and frame bonus `0x00623B10`
 
@@ -835,6 +1011,23 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §3.1 steps 7.1–7.5 (2026-10-07): `all.asm` `0x00555230` jump-table
+  cases (argument registers at `0x00555393`, `0x005553ED`), `0x00574250`,
+  `0x0054F5D0`, `0x00554850`, `0x00620290`, `0x00623520`, `0x00620AE0`,
+  `0x00620BB0`, `0x0064C040`, `0x005533D0`, `0x00623830`, `0x0064DC00`,
+  `0x00463740`; list reads found by a call-graph walk (depth 3–4) from
+  `0x00574250` and every InitFn of `world/object-functions.tsv` for calls
+  to `0x00620BB0`, `0x00620870`, `0x00552F60`, the room-list routines and
+  references to room +0x74 / unit +0xE4, +0xE8 / game +0x1120…+0x1B20,
+  each hit read (`0x005954F0`, `0x005B70B0`, `0x005BCE80`, `0x005537D0`,
+  `0x005538D0`, `0x005606B0`, `0x005435C0` = quest list, not a unit
+  list; `0x0058EAC0` +0xE8 = quest data).
+- §4.6 death functions (2026-10-08): `all.asm` `0x005A6FF0`,
+  `0x005A6520`, `0x005A6DF0`, `0x005A6EB0`; `disasm.py at 0x5A72B0` for
+  `0x005A72B0`, `0x005A7350`, `0x005A7390` (not in the export); monstats
+  bit `deathDmg` from `data/fields.tsv`, mask `[0x006CE278]` = 0x10
+  (mask table `0x006CE268` dumped: 1, 2, 4, …); BaseId 212 / 441 names
+  from `patch_d2` `monstats.txt`.
 - **1.14d `Game.exe`** (SHA-256 `631066c1…adaaf`): every address read
   from the disassembly (`tools/ghidra/disasm.py`) with the Ghidra
   decompile as a guide; scheduler sites by rel32 scan (`disasm.py xref`)
@@ -886,10 +1079,10 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
 
 ## Open questions
 
-1. A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
+1. ~~A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
    U4 with `anim` records and U11 with `site` on every schedule, and
    reach the unobserved combinations (combat with skills, shrines,
-   wells, a trade, a cooldown skill).
+   wells, a trade, a cooldown skill).~~ → PC 2 recording list.
 2. Answered (2026-10-07): §4.7 (owner: this spec), read from the 1.14d
    asm with its tables; still to be checked against the logged +0x4C
    and bonus of `anim` records (Open question 1).
@@ -904,8 +1097,8 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    earlier frame, and a walk step in the frame of a teleport write is
    gated, as it is in real time. A recording that moves a player with a
    hireling (positions of the 20 entries per frame) confirms it.
-4. Object delays rolled from the object-control seed (events 0, 8):
-   confirm the draw with an RNG + tick recording.
+4. ~~Object delays rolled from the object-control seed (events 0, 8):
+   confirm the draw with an RNG + tick recording.~~ → PC 2 recording list.
 5. Answered (2026-10-07): the only type-4 site of the 269
    (`0x00582595`, trap arm `0x00582510`) schedules on objects (unit +4
    of the operate record; `unit-events.tsv`, proof code); no 1.14d path
@@ -918,9 +1111,10 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    the quest event-7 sites schedule on objects except `0x0059584E`
    (the Countess, a monster); `0x0054D11F` on the hireling (monster);
    freeze `0x0057B216`, `0x0057B3E9` on monsters only; the wisp buff
-   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`. The
-   78 rows left `file` (state timers, damage, missile hits, item use,
-   most trade sites) need their callers traced; each names its owner.
+   `0x005F4268` on a player. Site `0x00586800` is in `0x005867A0`.
+   ~~The 78 rows left `file` (state timers, damage, missile hits, item
+   use, most trade sites) need their callers traced; each names its
+   owner.~~ → PC 2 recording list.
 7. Answered (2026-10-07): both are written once, by game creation
    `0x00530BF0` from C→S message 0x67 (`tools/original-hooks.md` §5.2,
    caller `0x0053F17A`). Game +0x6A (u8) is the game type, message
@@ -945,7 +1139,20 @@ checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
    (`0x005B1880`); its attached units go right after the head
    (`0x005B1900`, `skills/bodies.md` §6.3); slots 8 and 9 are filled
    newest first by `0x005B1990`. Each insert requires node index 11
-   and sets it to the slot. Open: the meaning of the fields from `0x005B0D60`,
-   `0x00573520`, `0x005A0140`, `0x00625D10`; whether a restored item
-   keeps its GUID (`0x00541990`); a recording leaving and re-entering a
-   wilderness area confirms the order (`unit-order.md` OQ3).
+   and sets it to the slot. Answered (2026-10-08): the fields from
+   `0x005B0D60`, `0x00573520`, `0x005A0140`, `0x00625D10` are the AI
+   special state, level id, name seed and max life (§3.4 rule 1); a
+   restored item does **not** keep its GUID (`0x00541990` →
+   `0x00558CB0` allocates a new unit; §3.4 rule 4.2, with the expiry
+   floor). ~~A recording leaving and re-entering a wilderness area
+   confirms the order (`unit-order.md` OQ3).~~ → PC 2 recording list.
+9. Answered (2026-10-08, `docs/handoff/e2e-night-flows.md` and
+   `docs/handoff/impl-monster-death.md` Left 5): the bodies of the DT
+   start `0x005A6FF0`, DT event 1 `0x005A72B0` and DD start `0x005A7390`
+   and the mode-12 setter (`0x00553570`, never `0x005A7C20` itself) are
+   §4.6 "Death and dead functions". Answered (2026-10-08): `0x0058F6C0`,
+   `0x005B1A90`, `0x00639FB0`, `0x0061AFA0`, `0x005738D0` are §4.6 DT
+   start step 3.1. ~~The R +0x14 byte (passed to `0x005A6520` and
+   `0x006488A0`; its writer is the mode-request builder, 54 callers of
+   `0x005A7C20`) and a recorded kill of a bonefetish1 (area damage at
+   death) confirming branch 1.4.~~ → PC 2 recording list.

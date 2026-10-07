@@ -23,18 +23,18 @@
 |   8. Reading file data | 209–239 |
 |   9. Sector decompression | 240–258 |
 |   10. PKWARE Data Compression Library ("implode") stream | 259–295 |
-|   11. Huffman (Storm adaptive Huffman) | 296–350 |
-|   12. IMA ADPCM (Storm variant) | 351–377 |
-|   13. Recovering the key of an unnamed file | 378–395 |
-|   14. Listfile | 396–401 |
-| Constants & data dependencies | 402–406 |
-| Randomness | 407–410 |
-| Edge cases & original bugs | 411–420 |
-| Archive set (D2-specific) | 421–427 |
-| Observations (1.14d install) | 428–459 |
-| Test vectors | 460–473 |
-| Provenance | 474–491 |
-| Open questions | 492–505 |
+|   11. Huffman (Storm adaptive Huffman) | 296–354 |
+|   12. IMA ADPCM (Storm variant) | 355–381 |
+|   13. Recovering the key of an unnamed file | 382–399 |
+|   14. Listfile | 400–405 |
+| Constants & data dependencies | 406–410 |
+| Randomness | 411–414 |
+| Edge cases & original bugs | 415–424 |
+| Archive set (D2-specific) | 425–431 |
+| Observations (1.14d install) | 432–463 |
+| Test vectors | 464–477 |
+| Provenance | 478–495 |
+| Open questions | 496–509 |
 <!-- /index -->
 
 ## Summary
@@ -347,6 +347,10 @@ parent, and so on up to and including the root:
 5. Append the symbol to the output. If adaptive, `Increment(n)`.
 
 Running out of input in the middle of a code is an error.
+Input that ends between codes (no 0x100, output not full) and an
+Increment whose `lead` is the root or `n`'s parent are also errors in
+d2rs (design choice: no valid stream of the shipped archives reaches
+either; the Storm behaviour on corrupt input is not reproduced).
 
 ### 12. IMA ADPCM (Storm variant)
 

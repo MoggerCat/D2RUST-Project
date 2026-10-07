@@ -189,6 +189,6 @@ L-flag 1 (expansion), values from `monlvl.txt` `L-DM`:
 
 ## Open questions
 
-1. No recording covers these bodies: record the 0xAC assign and stat
+1. ~~No recording covers these bodies: record the 0xAC assign and stat
    messages of a lightning, cold or mana-burn unique (with minions) to
-   confirm the values above.
+   confirm the values above.~~ → PC 2 recording list.
