@@ -2,15 +2,29 @@
 
 - **Status:** draft: every layout, check and error path read from the
   1.14d `Game.exe` save writer and loaders (addresses below);
-  `itemstatcost` values measured on the 1.14d `patch_d2` table. No
-  1.14d save from this PC has been compared yet (Open questions list
-  which save settles which field). The waypoint section's position
-  (0x279) and bytes match the saves measured for `world/waypoints.md`.
+  `itemstatcost` values measured on the 1.14d `patch_d2` table.
+  `tools/d2s_check.py` confirms the layout on 9 real 1.14d saves (7
+  fresh level-1 expansion characters, one per class, and 2 played
+  level-1 characters) and a new-character stub (§1 rule 7): magic,
+  version, size, checksum, every section marker and offset, the stats
+  stream, the skill bytes, every item record's length and the file end
+  all match; no layout mismatch was found. One binary reading was
+  corrected (§6 rule 3: field A has callers). The waypoint section
+  also matches the saves measured for `world/waypoints.md`. Still
+  unmeasured: a hireling's items, an Iron Golem
+  item (Open questions). A corpse was measured on the final `bdDead`
+  save (§8.3 rules 6–7). A live hired rogue's header block and its
+  empty `jf` list were measured on `bdMercTwo`, and a Clay Golem's
+  empty `kf` on `bdGolem` (§2.5 rule 3, §8.4 rule 5, §8.5 rule 4).
+  Classic saves and game re-saves of d2rs-generated files were
+  measured in the C66 run (Open question 3; §2.8, §8.2 rule 7, §9
+  rule 6).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::d2s` (byte layout, checksum, section
   framing); the load effects (§9) belong to `d2-server` character
   storage.
-- **Related specs:** `items/bitstream.md` (one item record, the
+- **Related specs:** `formats/d2s-load.md` (new-character start and load
+  effects, §9 rules 6–7); `items/bitstream.md` (one item record, the
   per-item `JM` marker and socketed children); `world/quests.md` §1
   (quest flag records, load normalisation §1.6, NPC intro bits §6.7);
   `world/waypoints.md` §2–§3 (waypoint records and the `WS` section
@@ -25,26 +39,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–64 |
-| Inputs | 65–74 |
-| Outputs / state changes | 75–80 |
-| Rules | 81–82 |
-|   1. File layout and framing | 83–118 |
-|   2. Header (335 bytes) | 119–284 |
-|   3. Checksum (`0x00411130`) | 285–295 |
-|   4. Quest section (298 bytes at 0x14F) | 296–311 |
-|   5. Waypoint section (80 bytes at 0x279) | 312–317 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 318–345 |
-|   7. Stats and skills | 346–423 |
-|   8. Item sections | 424–525 |
-|   9. Load sequence (`0x0056B180`) | 526–545 |
-|   10. Errors | 546–592 |
-| Constants & data dependencies | 593–612 |
-| Randomness | 613–617 |
-| Edge cases & original bugs | 618–647 |
-| Test vectors | 648–680 |
-| Provenance | 681–723 |
-| Open questions | 724–765 |
+| Summary | 64–78 |
+| Inputs | 79–88 |
+| Outputs / state changes | 89–94 |
+| Rules | 95–96 |
+|   1. File layout and framing | 97–142 |
+|   2. Header (335 bytes) | 143–374 |
+|   3. Checksum (`0x00411130`) | 375–385 |
+|   4. Quest section (298 bytes at 0x14F) | 386–406 |
+|   5. Waypoint section (80 bytes at 0x279) | 407–412 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 413–451 |
+|   7. Stats and skills | 452–544 |
+|   8. Item sections | 545–729 |
+|   9. Load sequence (`0x0056B180`) | 730–754 |
+|   10. Errors | 755–801 |
+| Constants & data dependencies | 802–821 |
+| Randomness | 822–826 |
+| Edge cases & original bugs | 827–893 |
+| Test vectors | 894–933 |
+| Provenance | 934–1013 |
+| Open questions | 1014–1084 |
 <!-- /index -->
 
 ## Summary
@@ -115,6 +129,16 @@ in the specs listed above.
    `0x00534020` (needs ≥ 0x82 bytes; not specified, Open question 1).
    Otherwise the loader of this spec, which rejects versions > 0x60
    (§2.2 rule 3).
+7. Measured (`tools/d2s_check.py`, Provenance): in every 1.14d save of
+   this PC, magic, version 0x60, size field = file length and the §3
+   checksum match; `Woo!`, `WS` and `01 77` sit at 0x14F, 0x279 and
+   0x2C9 and `gf` at 0x2FD; `if` starts at the byte after the stats
+   stream's last bit; the player list, corpse header, `jf` and `kf`
+   follow without gaps, and the `kf` byte is the file's last byte.
+   A level-1 character that has never left the start camp is 958
+   bytes (one starting hand item) or 980–981 bytes (two; the shield's
+   defence roll changes nothing in the length, the weapon's record
+   does).
 
 ### 2. Header (335 bytes)
 
@@ -156,6 +180,17 @@ The writer returns without writing when the player has no client or
 the name has no NUL inside its buffer (`0x00568D80`), or when fewer
 than 0x14F bytes remain.
 
+Measured on the fresh level-1 expansion saves of all seven classes
+(Provenance): +0x10 = 0; status 0x0020; +0x26 = 0; +0x29 = 0x10;
++0x2A = 30; +0x2B = 1; +0x2C = 0 (§2.2 rule 10); +0x34 = 0xFFFFFFFF;
+hotkeys and mouse skills as §2.4 rule 7; components +0x88..+0x97 all
+0xFF except +0x8D (the right-hand weapon: Amazon 0x1B, Sorceress 0x25,
+Necromancer 0x09, Paladin 0x11, Barbarian 0x04, Druid 0x0C, Assassin
+0x2D) and +0x8F (0x4F with the starting buckler; 0xFF for Sorceress and
+Necromancer); colours +0x98..+0xA7 all 0xFF; +0xA8..+0xAA = `80 00 00`
+(act 0 of Normal); map seed non-zero and different per save; hireling
+block zero; +0xCF = 0; +0xD0..+0x14E zero.
+
 #### 2.2 Header checks on load (`0x0056A090`)
 
 In this order; codes are internal (§10):
@@ -194,6 +229,12 @@ In this order; codes are internal (§10):
 9. The player unit is created, hotkeys and mouse skills are decoded
    (§2.4), client +0x480 := +0xCF, +0x481 := 0, +0x482 := 0; cursor :=
    0x14F; result 0.
+10. The client create time is set only by rule 8 (its one setter,
+    `0x00538760`, has `0x0056A090` as its only caller). Rule 7 returns
+    before it and the new-character start (`0x00569F80`) does not set
+    it, so the stub's +0x2C (§2.6) is lost: the first in-game save
+    writes +0x2C = 0, and every later load reads 0 back. Confirmed on
+    every non-stub save of this PC (all +0x2C = 0).
 
 Not read on load: +0x29, +0x2B, +0x30, +0x34, +0x88..+0xA7 (the
 character-select screen reads them, §2.7), +0xD0.. .
@@ -211,6 +252,12 @@ character-select screen reads them, §2.7), +0xD0.. .
 | bits 8–12 | progression (acts completed; §2.2 rule 5.4 thresholds) | game |
 
 Bits 0x10, 0x80 and 13–15 are kept as found (no rule reads them).
+
+Measured: bit 0x0008 is also set for a softcore character that died
+and respawned in town (status 0x0028 in the save, §8.3 rule 6); the
+writer copies the status from the client record (`0x00538640`) and
+only ORs 0x20 / 0x40, so 0x08 is set in that record by the game on a
+softcore death too (the setter is not traced).
 
 #### 2.4 Hotkeys and mouse skills
 
@@ -236,6 +283,11 @@ Bits 0x10, 0x80 and 13–15 are kept as found (no rule reads them).
    turned into the GUID of the item at that 1-based position of the
    inventory item list (`0x0056AF20`; past the end → −1), and the left
    and right skills are selected with their item (`0x005701B0`).
+7. Measured on the fresh saves: all 16 hotkeys `FF FF 00 00`; all four
+   mouse pairs `00 00 00 00` (left: no left skill, rule 3; right:
+   skill 0, no item). A Sorceress that selected Fire Bolt as right skill
+   (base level 0; +1 from the starting staff) has right = `24 00 00
+   00` (skill 36, item index 0).
 
 #### 2.5 Hireling block (+0xAF, 32 bytes)
 
@@ -257,6 +309,12 @@ Bits 0x10, 0x80 and 13–15 are kept as found (no rule reads them).
    `world/hirelings.md` §10. Written and read in classic and
    expansion games alike; only the hireling's items (§8.4) are
    expansion-only.
+3. Measured on `bdMercTwo` (Provenance; a live Act I rogue hired from
+   Kashya, hireling class 271): flags = 0; seed non-zero and equal to
+   the seed of that hireling's S→C 0x81 message; name index 21 (name
+   "Diane"); `Id` = 0 (the first `hireling.txt` row: Act I Rogue Scout,
+   subtype Fire - Normal, class 271); experience = 39,482; +0xBF..+0xCE all 0. The block
+   holds no level, life or GUID (the 0x81 GUID is not saved).
 
 #### 2.6 New-character stub
 
@@ -268,6 +326,16 @@ with magic, version 0x60, size 0x14F, name, status = creation flags |
 `0x0070CCC8` (`01 01 01 01 01 FF FF FF 01 01 FF FF FF FF FF FF`),
 +0x98..+0xA7 = 0xFF, and the checksum of those 335 bytes (computed
 with +0x0C = 0) at +0x0C.
+
+Confirmed on a real stub (an expansion Barbarian, read between
+creation and the first in-game save): size 335, checksum matches,
++0x2C = +0x30, the 16 component bytes above, every other byte zero
+(so +0x34 = 0, hotkeys `00 00 00 00`, town bytes and map seed 0).
+Its status is 0x0021: an expansion character of a classic class gets
+0x20 from the creation flags, not only classes 5 and 6. The stub stays
+on disk until the game's first save of that character, which rewrites
+the whole file (the same character's next file was 985 bytes; a second
+character's file was also 335 bytes before its first save).
 
 #### 2.7 Client-side header users
 
@@ -281,6 +349,28 @@ with +0x0C = 0) at +0x0C.
 3. Saving received data (`0x0045C520`, S→C 0xB3 `DownloadSave`):
    magic and ≥ 0x14F bytes → keep u16 +0x24 in the client, write the
    received bytes unchanged as the file.
+
+#### 2.8 Appearance bytes are rebuilt on every save
+
+1. The writer (`0x00568F20`, `0x0056923A`–`0x00569269`) fills all 32
+   bytes +0x88..+0xA7 with 0xFF and then calls `0x0063E510`(player,
+   components +0x88, colours +0x98). That function walks the player's
+   inventory item list and changes bytes only for items in mode 1
+   (equipped, unit +0x10 = 1); every other byte stays 0xFF. Nothing
+   else writes these 32 bytes, and the loader does not read them
+   (§2.2), so the bytes a file holds before a load never reach the next
+   save: they are a function of the items equipped at save time.
+2. So a character with no equipped item saves 32 × 0xFF, whatever its
+   file held before (the stub's `01` fill of §2.6 included). Measured:
+   two generated characters (`TestAma`, `TestSor`, no equipped item)
+   whose files held the stub's 16 component bytes were re-saved by the
+   game with all 16 components 0xFF; `bdDead` (weapon on the corpse,
+   nothing equipped) has all 0xFF; the fresh saves have bytes only at
+   the right-hand (+0x8D) and shield (+0x8F) slots (§2.1).
+3. A writer that builds a save of a loaded character must therefore
+   recompute these bytes from the equipped items, not copy them from
+   the loaded file. The per-item byte mapping (`0x0063DA70` and the
+   composite branch of `0x0063E510`) is Open question 17.
 
 ### 3. Checksum (`0x00411130`)
 
@@ -308,6 +398,11 @@ with +0x0C = 0) at +0x0C.
    0x216F6F57 / 6 → 15. The size at +8 is not read. Each record is
    copied in with normalisation (`world/quests.md` §1.6).
 3. Record contents: `world/quests.md` §1 (slot q = bytes 2q, 2q+1).
+4. Which bits a completed quest leaves in its slot (what a save of a
+   character that finished a quest holds, and so what a save editor
+   must write for "completed") is defined in `specs/world/quests.md`
+   (quests-core owner), not here; this section only carries the 96
+   bytes per difficulty.
 
 ### 5. Waypoint section (80 bytes at 0x279)
 
@@ -337,11 +432,22 @@ Read failures are internal code 16.
    264 → 27, 297 → 28, 511–515 → 29–33, 520 → 34; row 0 is {−1, 0}.
    A class id not in the table uses bit 0.
 3. Field B is the intro record of `world/quests.md` §6.7 (set
-   `0x00572420`, test `0x00572470`, clear `0x005724C0`). Field A: set
-   `0x00572360` (no direct caller), test `0x005723C0` (8 callers;
-   meaning Open question 10).
+   `0x00572420`, test `0x00572470`, clear `0x005724C0`; set in bulk
+   per act list on act transitions). Field A holds the per-NPC
+   first-talk bits of the act intro quests (`world/quests.md` §10.3,
+   Act I intro chain 37): set `0x00572360`(player, game, NPC class) by
+   the intro chains' event-11 callbacks (call sites `0x0058F8C2` in
+   Act I `0x0058F870`, `0x00598464` in Act II `0x005983E0`,
+   `0x005B6CCF` in Act III `0x005B6C60`, and `0x0058E9D4`,
+   `0x0058EA25` in code before the Act V intro init `0x0058EA50` that
+   Ghidra did not make a function; found with `disasm.py xref`), tested
+   by `0x005723C0` from those chains' event-0 and active functions.
+   Confirmed on a save: after the player talked to Kashya (class 150,
+   bit 3) in Normal, A of difficulty 0 is `08 00 …` and B stays zero.
 4. Read: fewer than 52 bytes left or the u16 at +0 ≠ 0x7701 → 17. The
    size at +2 is not read.
+5. Measured on the fresh saves (no NPC talked to): all 48 bytes of A
+   and B are zero.
 
 ### 7. Stats and skills
 
@@ -404,6 +510,18 @@ agree): 16 stats have `CSvBits` ≠ 0, none has `CSvParam` or
 Code reads these columns from the loaded table (mod patches change
 them); this list is a measurement, not a constant.
 
+8. Measured: the fresh saves of all seven classes hold ids 0–3 and
+   6–12 in ascending order (statpts, newskills, experience, gold and
+   goldbank are 0 and absent, rule 4), then 0x1FF; the padding bits of
+   the last byte are 0 and the stream is 281 bits = 36 bytes after
+   `gf` (ends at 0x323). Values are the class's `charstats` start values (strength,
+   energy = `int`, dexterity, vitality, `stamina`; hitpoints = maxhp =
+   `hpadd` + vitality, mana = energy) with stats 6–11 × 256 (Barbarian:
+   30, 10, 20, 25, life 14,080, mana 2,560, stamina 23,552). A
+   character after a fight adds experience (id 13, 32 bits) and has
+   hitpoints < maxhp (a fractional stored value, 11,887 = 46.43
+   points).
+
 #### 7.2 Skills (`if`)
 
 1. Writer (`0x005696F0`): needs 2 + header-count (global +0xBA8)
@@ -420,6 +538,9 @@ them); this list is a measurement, not a constant.
 3. The reader does not check that header +0x2A bytes remain.
 4. Class 7 passes the header check (§2.2 rule 6) but has no class
    list.
+5. Measured: `if` directly follows the stats byte end (no padding);
+   the 30 bytes of every level-1 save are 0 (no skill learned; item
+   skill bonuses are not base levels).
 
 ### 8. Item sections
 
@@ -456,6 +577,34 @@ them); this list is a measurement, not a constant.
    and R = the space left: T ≤ R → the player list may use all of R;
    else it may use R − (T − L). Overflow is still fatal (rule 5), so
    this only moves the failure into the player list.
+8. Measured on the fresh saves (Provenance), each record decoded with
+   `items/bitstream.md` in the save format and ending exactly where the
+   next `JM` starts: count 8 (7 for Sorceress and Necromancer, which
+   start without a shield); in file order four `hp1 ` in the belt
+   (mode 2, x 0–3), `tsc ` (inventory 9,3) and `isc ` (inventory 9,2),
+   all compact, 14 bytes each (109 bits: `JM`, flags, version 101,
+   mode, location, code, trailer bit 0); then the right hand (body 4)
+   and the left hand (body 5) as full records (weapon 23–26 bytes,
+   buckler 25 bytes), as rule 3 orders them. Every item has quality 2,
+   item level 1, no sockets, trailer bit 0; the save-only 32-bit field
+   of `items/bitstream.md` §4.1 rule 7 differs per item. The flags
+   word is stored as the item has it: the starting items carry 0x2000
+   (`items/generation.md` §1.4) in eight saves, and it was clear on
+   every item of one save of a character that had been played longer
+   (what clears it is not traced here; it is the load, §8.2 rule 7).
+9. Every save-format call of the item writer `0x006313E0` passes save =
+   1, children = 1 and alt-code = 0: `0x00531712` (`0x005316D0`), the
+   five calls of `0x005317B0` (`0x00531899`, `0x005318C3`, `0x005318F0`,
+   `0x00531929`, `0x0053195A`), `0x00541B5C` (`0x00541B10`) and
+   `0x0055A2E1` (`0x0055A2A0`); the remaining two calls are the network
+   senders (`items/bitstream.md` Open question 1). So a game-written
+   save never holds an alt-code record (header bit 0x2000000).
+10. Children are written for every item that has its own inventory
+    (`0x006312B0`: alt-code 0, children 1 and unit +0x60 ≠ 0), compact
+    or full, whatever its type's `hasinv`; the "filled sockets" count
+    the reader uses (§8.2 rule 4) is written only in a full record and
+    counts the inventory only when `hasinv` ≠ 0 (`0x0062A900`, 3 bits).
+    The writer does not compare the two (edge case 15).
 
 #### 8.2 Item list reading (`0x005337F0` → `0x005335E0`)
 
@@ -477,6 +626,30 @@ them); this list is a measurement, not a constant.
    matches a runeword (`items/properties.md` §10.1) is passed to
    `0x00563470` (refresh by item mode; Open question 13).
 6. Errors inside the player list surface as internal 20 (`0x0056A7E0`).
+7. Item flags on load. Every save item (top-level, child, corpse,
+   hireling and golem lists alike: `0x005335E0` at `0x00533665` /
+   `0x00533712` and `0x0056ACE0` both create through `0x00558CB0`)
+   gets, after its record is decoded (`0x0062E430`, which drops 0x80000
+   and the alt-code bit 0x2000000 from the stored flags): flag 0x80000
+   set and flag 0x2000 (instore) cleared (`0x00558D37`–`0x00558D4C`,
+   flag setter `0x006280D0`(item, mask, on) on item data +0x18), then
+   the replenish timers of `items/generation.md` §9 step 6
+   (`0x00558530`, `0x00558580`). So a file's 0x2000 never survives a
+   load, and the next save writes the flags without it (the writer's
+   own changes, 0x80000 cleared and 0x800000 set, are
+   `items/bitstream.md` §2 rule 1). Only items created since the last
+   load (start items, drops, vendor items) are saved with 0x2000.
+   Measured on two generated characters: a compact `hp1 ` saved with
+   flags 0x00A02010 and a full `lsd ` with 0x00802010 were re-saved by
+   the game as 0x00A00010 and 0x00800010, every other record bit
+   unchanged (record lengths 14 and 23 bytes, trailer, item level,
+   position, quality); the fresh characters' start items keep 0x2000
+   (§8.1 rule 8) because they were created, not loaded.
+8. Child count. The number of children read after an entry (rule 4)
+   comes from the record peek `0x0062AE20`: the 3-bit "filled sockets"
+   value of a full record, and 0 when the flags have 0x200000
+   (compact) or 0x2000000 (alt-code), so compact and alt-code entries
+   never have children on load.
 
 #### 8.3 Corpse section
 
@@ -496,6 +669,21 @@ them); this list is a measurement, not a constant.
    For each corpse: 12 bytes must fit, they are skipped (never read);
    a player corpse unit is created for the player's class and the
    item list is read into it, then linked to the player.
+5. Measured: every save without a corpse has `4A 4D 00 00` here.
+6. Measured (a softcore Sorceress that died in Blood Moor, respawned
+   in town and saved without touching the corpse): n = 1; the first
+   u32 is non-zero (stack data, rule 3; never write 0 as the
+   original's value); x = 0 and y = 0; the corpse list holds the
+   equipped weapon (right hand, body 4, mode 1), while the belt
+   potions and the inventory scrolls stay in the player list.
+7. x and y come from the corpse unit's path: for unit types 0, 1, 3
+   the getters (`0x0045ADF0`, `0x0045AE20`) return 0 when unit +0x2C
+   (path) is null, else the path's u16 at +2 / +6 (`0x006488C0`,
+   `0x00648900`); types 2, 4, 5 read the static path's +0x0C / +0x10.
+   The 0 measured in rule 6 means the town-respawn save sees the
+   Blood Moor corpse with no path or a zero path position (which one
+   is not traced). The reader skips the 12 bytes (rule 4), so the
+   values have no effect on load.
 
 #### 8.4 Hireling items (`jf`, expansion only)
 
@@ -507,6 +695,12 @@ them); this list is a measurement, not a constant.
    If the hireling was restored from the header (§2.5), its item list
    is read (errors → 22); else no list is read.
 3. After the list: `world/hirelings.md` §10 rule 8.
+4. Measured: an expansion save without a hireling (hireling block
+   zero) has `6A 66` and no list.
+5. Measured (`bdMercTwo`): an expansion save with a live hireling that
+   carries no items has `6A 66` followed by an empty item list
+   `4A 4D 00 00` (count 0), then `kf`; the list is present because the
+   hireling exists, not because it has items.
 
 #### 8.5 Iron Golem item (`kf`, expansion only)
 
@@ -522,6 +716,16 @@ them); this list is a measurement, not a constant.
    (`0x0056ACE0`; failure → 23); the item gets mode 3 (`0x00624690`) and
    is handed to the client for the golem's re-summon (`0x00538700`,
    Open question 15). The cursor moves past the u8 even when g = 0.
+3. Measured: a save without an Iron Golem ends `6B 66 00`; that 0 is
+   the file's last byte.
+4. Measured (`bdGolem`): a Necromancer saved with a live Clay Golem
+   (class 289, skill 75) writes g = 0 and the file ends `6B 66 00`, as
+   rule 1 requires (class ≠ 0x123): a Clay Golem is not saved.
+5. The reader checks only that the 2 marker bytes fit
+   (`0x0056AE73`–`0x0056AE78`); it then reads g at the cursor without a
+   bounds check (`0x0056AE85`). A classic game returns before any read
+   (game +0x70 = 0, `0x0056AE5B`), so rule 2 applies to expansion
+   games only. Edge case 16.
 
 ### 9. Load sequence (`0x0056B180`)
 
@@ -542,6 +746,11 @@ them); this list is a measurement, not a constant.
    68, 69 (`velocitypercent`, `attackrate`, `other_animrate`) := 100;
    stat 30 (`nextexp`) := `0x00611800`(class, level).
 5. On any error after the player unit exists, the unit is removed.
+6. New-character start (`0x00569F80`, rule 1): `formats/d2s-load.md`
+   §1 (what it creates, and why a 335-byte stub grows to a full save).
+7. Load effects in the master's order, each with its code and owner
+   spec (what `d2-server` character storage applies after
+   `d2-formats` parsed the bytes): `formats/d2s-load.md` §2.
 
 ### 10. Errors
 
@@ -644,6 +853,43 @@ draws.
 9. The writer ORs 0x20 / 0x40 into the status but never clears them.
 10. `jf` and `kf` may be missing at the end of an expansion file
     (fewer than 2 bytes left) and the load still succeeds.
+11. The creation time written into the stub never survives: the first
+    load takes the new-character path, which does not copy +0x2C, so
+    every later save stores 0 there (§2.2 rule 10). d2rs reproduces
+    the 0.
+12. The corpse's x and y can be saved as 0 even though the corpse lies
+    in Blood Moor (§8.3 rules 6–7); the loader never reads them, so
+    the corpse's saved position carries no information.
+13. A Clay Golem is not saved: `kf` count 0 (§8.5 rule 4); only an
+    Iron Golem's item is kept, so no other summon survives a save.
+14. Alt-code records (item header bit 0x2000000) never occur in a
+    game-written save (§8.1 rule 9). A hand-made one is still accepted:
+    the record ends after its base code (no unit +0x28, no trailer;
+    `items/bitstream.md` §4.1 rule 4) and it has no children (§8.2
+    rule 8). d2rs reads it the same way and never writes one.
+15. Children vs. the filled count (§8.1 rule 10): the writer writes a
+    child for every item in an item's inventory, the reader reads as
+    many as the 3-bit filled count (0 for compact records, 0 when
+    `hasinv` = 0, at most 7). A mismatch would make the reader take a
+    child as the next top-level entry. All 13 saves of this PC parse
+    to their last byte, so none has a mismatch; d2rs's
+    writer refuses an item whose child count differs from the count its
+    record carries, since the game could not read such a file back.
+16. A file that ends right after the `kf` marker (`6B 66`, no g byte)
+    makes the reader take g from the byte after the file's data (§8.5
+    rule 5). In single player that byte is uninitialised stack in the
+    8,192-byte read buffer of `0x005343A0` (filled only up to the file
+    length by `fread`), so the outcome is not defined by the file: g =
+    0 loads, anything else needs skill 90 and an item record from 0
+    remaining bytes and fails with 23 (result 10). Only a hand-made
+    file can do this (size and checksum must match); d2rs rejects it
+    with 23.
+17. Item flag 0x2000 (instore) in a file has no effect: the loader
+    clears it on every item (§8.2 rule 7). A writer may set or clear it
+    on hand-built items; the game-equivalent choice for a character
+    that was loaded at least once is clear.
+18. The 32 appearance bytes are never carried over from a loaded file
+    (§2.8); copying them makes a save differ from the game's.
 
 ## Test vectors
 
@@ -671,12 +917,19 @@ save.
 | expansion, no hireling, no golem | `6A 66 6B 66 00` | §8.4, §8.5 |
 | hotkey: skill 36, left flag, no item | `24 80 00 00` | §2.4 rule 1 |
 | hotkey: none | `FF FF 00 00`; decodes to skill −1, item −1 | §2.4 rules 1, 4 |
+| expansion, hireling present with no items, no golem | `6A 66 4A 4D 00 00 6B 66 00` | §8.4 rules 2, 5; §8.5 |
+| a compact item stored with flags 0x00A02010, loaded, saved again (nothing else changed) | flags written 0x00A00010; the rest of its record unchanged | §8.2 rule 7; `items/bitstream.md` §2 rule 1 |
+| a full item stored with flags 0x00802010, loaded, saved again | flags written 0x00800010 | §8.2 rule 7 |
+| header +0x88..+0x97 = `01 01 01 01 01 FF FF FF 01 01 FF FF FF FF FF FF`, no equipped item, loaded and saved | +0x88..+0xA7 = 32 × `FF` | §2.8 rules 1–2 |
+| a full record with flags bit 0x200000 or 0x2000000 followed by further bytes | child count 0: the next bytes are the next top-level entry | §8.2 rule 8 |
 
 Real-save checks (`#[ignore]`, `D2_GAME_DIR` or the user's save
 folder): every 1.14d `.d2s` passes §3 and §2.2 rule 2, its sections
 parse in §1 order to the file end, and re-serialising its parsed
 content reproduces the file byte for byte except +0x30 (save time)
-and the corpse's first u32.
+and the corpse's first u32. `tools/d2s_check.py <save.d2s> …` (reads
+the tables from `D2_GAME_DIR`) runs the structural part of this check
+and prints every field; it holds no save data.
 
 ## Provenance
 
@@ -712,6 +965,43 @@ and the corpse's first u32.
   agree.
 - `world/waypoints.md` §3: section bytes and position measured on the
   1.14d test characters' saves (version 96) used there.
+- Real 1.14d saves (`%USERPROFILE%\Saved Games\Diablo II`, version
+  96, read-only; no bytes copied into the repo): `bdAma`, `bdSor`,
+  `bdNec`, `bdPal`, `bdBar`, `bdDru`, `bdAss` (fresh level 1, 958–981
+  bytes); `bdMerc` (Barbarian, read as the 335-byte stub and again at
+  985 bytes after a fight and a talk with Kashya, no hireling hired yet);
+  `bdDead` (Sorceress, 958 bytes after play, alive with no corpse when
+  read).
+  Final saves, read again with `tools/d2s_check.py`: `bdDead` 974
+  bytes, 24 pass / 0 fail, corpse count 1 at 0x39B, corpse list count
+  1 at 0x3AB, status 0x0028 — §2.3 note, §8.3 rules 6–7, edge case 12
+  confirmed on bdDead (1.14d); the corpse writer `0x005697F0` and the
+  getters `0x0045ADF0`/`0x0045AE20` → `0x006488C0`/`0x00648900` read
+  with `tools/ghidra/disasm.py` (the first u32 slot `[ebp-0x2C]` is
+  never written). `bdMerc` 985 bytes, 23 pass / 0 fail, no hireling
+  (a fresh character cannot hire from Kashya); it is 5 bytes larger
+  than `bdBar` (980) only because its stats stream is 5 bytes longer
+  (ends 0x328 vs 0x323): it carries experience (stat 13, 32-bit
+  value; 41 more bits) after a fight; Kashya's first-talk bit is set
+  in NPC field A (§6 rule 3).
+  `bdMercTwo` 1,079 bytes (Barbarian level 8, live rogue hired from
+  Kashya: S→C 0x81 class 271, GUID 13, name Diane), 24 pass / 0 fail:
+  hireling block flags 0, seed = the 0x81 seed, name index 21, `Id` 0,
+  experience 39,482, 16 zero bytes; `jf` then a count-0 list; `kf`
+  g = 0 — §2.5 rule 3, §8.4 rule 5 confirmed on bdMercTwo (1.14d,
+  hired rogue). `bdGolem` 967 bytes (Necromancer level 6, saved with a
+  live Clay Golem, class 289), 23 pass / 0 fail: hireling block zero,
+  `jf` without a list, `kf` g = 0 — §8.5 rule 4, edge case 13. Both
+  have status 0x0028 (each died once).
+  Checked with `tools/d2s_check.py` and the 1.14d `patch_d2` tables:
+  all pass every structural check (§1 rule 7); field values in §2.1,
+  §2.4 rule 7, §2.6, §6 rules 3 and 5, §7.1 rule 8, §7.2 rule 5,
+  §8.1 rule 8, §8.3 rule 5, §8.4 rule 4, §8.5 rule 3. The §6 field A
+  setter call sites were found with `tools/ghidra/disasm.py xref`
+  (raw rel32 scan; the Ghidra export lists the setter with 0
+  callers).
+- Second pass (DS questions of `docs/handoff/impl-d2s.md`, local run
+  C66): addresses and saves in `formats/d2s-load.md` Provenance.
 - D2MOO 1.10f `PlrSave2.h`/`.cpp` (hint for names: `dwWeaponSwitch`,
   `dwCreateTime`, `nGuildEmblemBgColor`, `D2MercSaveDataStrc`,
   client save flags). Every rule above was read in the 1.14d code.
@@ -728,28 +1018,45 @@ and the corpse's first u32.
    `0x00532690`–`0x00533F70`.
 2. Item record decoding for save versions below 0x60 (the version is
    passed to `0x0062AE20`/`0x00558CB0`). Settle: the item reader spec.
-3. No 1.14d save has been compared on this PC. Settle with: a level-1
-   fresh save of each class (header +0x10..+0x37, +0x88..+0xA7, stats
-   at 0x2FD, 30 skill bytes, empty lists, `jf`/`kf` bytes, checksum
-   recomputation); an expansion and a classic character (status 0x20,
-   presence of `jf`/`kf`).
-4. Hireling block and `jf`: a character with a hired rogue (Kashya)
-   and one with a dead hireling (flags 0x10000) — confirms §2.5 and
-   §8.4 (`world/hirelings.md` Open question 1).
+3. **Answered except the classic part** (9 saves and a stub of this PC; §1 rule
+   7, §2.1, §7.1 rule 8, §8.1 rule 8): every fresh-character field
+   matched. Still open: a classic (non-expansion) character, to see
+   status without 0x20 and a file ending after the corpse section
+   with no `jf`/`kf`.
+   **Answered** (classic part; C66 run 2026-10-07, `local-buddy-q-saves.md`):
+   13 saves round-trip byte for byte; the classic `TestAma` and the
+   classic stub `TestStub` were loaded and re-saved by 1.14d: status
+   without 0x20 (`TestStub` 0), and the file ends after the corpse
+   header with no `jf` / `kf` (§1 rule 2, §8.5 rule 5 `0x0056AE5B`).
+   The game's re-saves differ from d2rs-generated files only as §2.8
+   and §8.2 rule 7 explain.
+4. **Answered** (confirmed on bdMercTwo (1.14d, hired rogue); §2.5
+   rule 3, §8.4 rule 5): a live Act I rogue writes flags 0, its seed,
+   name index, `Id` 0 and experience, and `jf` carries a count-0 list
+   (`world/hirelings.md` Open question 1). Still missing: a dead
+   hireling (flags 0x10000) and a hireling carrying items (the `jf`
+   item records).
 5. Item index stability (edge case 3): a save with a hotkeyed Tome of
    Town Portal and an equipped weapon, saved, reloaded and saved again.
-6. Corpse (§8.3): a dead softcore character whose corpse is on the
-   ground at save time (x, y, the first u32, its item list).
+6. **Answered** (§8.3 rules 6–7, edge case 12; bdDead, 1.14d): a
+   dead softcore character whose corpse is on the ground at save time
+   writes n = 1, a non-zero first u32 (stack data), x = y = 0, and its
+   equipped weapon as the corpse list. Still untraced: whether x, y
+   are 0 because the path is null or its position is 0 (no effect on
+   load).
 7. Header +0xCF (client +0x480): any save with a non-zero byte there
-   (Battle.net-style emblem) or Ghidra on `0x00539BE0`.
+   (Battle.net-style emblem) or Ghidra on `0x00539BE0`. Every save of
+   this PC has 0.
 8. Ladder checks (§2.2 rule 5.2): the service object `[0x00883D54]`
    and player +400 are not traced; single player never runs them.
 9. Map seed restore needs game +0x6A = 3 and +0x84 = 0: confirm that a
    single-player game has type 3 (`sim/rng.md` Open question 2): two
    loads of one save produce the same map.
-10. NPC field A (§6 rule 3): which events set it (`0x00572360` has no
-    direct caller; its 8 test callers are not read). Settle: a save
-    after talking to every Act I NPC, compared with a fresh one.
+10. **Answered** (§6 rule 3): field A is the act intro quests'
+    first-talk bits, set from five call sites the Ghidra export missed;
+    a save after talking to Kashya has her bit set in A. Still
+    unmeasured: the other Act I NPCs' bits (expected from the same
+    table, §6 rule 2).
 11. Item unit +0xC8 bit 0x8000 (items skipped by the writer, §8.1
     rule 4): which items carry it.
 12. Cache flag and the uploaded item blob (§8.1 rule 6): which callers
@@ -759,6 +1066,18 @@ and the corpse's first u32.
 14. Corpse first u32: whether any reader (client, realm) uses it; d2rs
     writes 0.
 15. Iron Golem item on load: how `0x00538700` and the re-summon use it.
-    Settle: a Necromancer with an Iron Golem made from an item.
+    Settle: a Necromancer with an Iron Golem made from an item. Still
+    missing: that save; none was produced automatically because it
+    needs a Necromancer able to cast Iron Golem (skill points and
+    level well past a fresh character). A Clay Golem save (`bdGolem`)
+    writes `kf` count 0 (§8.5 rule 4), so it does not settle this.
 16. Result texts: the strings shown for results 1–26 (character
     select error dialog).
+17. Appearance byte mapping (§2.8 rule 3): which of the 16 component
+    and 16 colour bytes each equipped item sets, and to what value
+    (`0x0063DA70`, the composite branch of `0x0063E510` via
+    `0x0064F420`/`0x0064F500`/`0x0063D900`/`0x0062C100`, and the item
+    class from `0x00627D40`). Settle: Ghidra on those functions, checked
+    against saves with a weapon, a shield, a helm, a body armour and
+    dyed or coloured items equipped. Needed for a d2rs writer to
+    reproduce +0x88..+0xA7; the loader never reads them.
