@@ -40,18 +40,18 @@ srvst	38	0x005D8F50	SrvSt38_Whirlwind	spec'd-here	Whirlwind	body: bodies-2.md §
 srvst	39	0x005D97F0	SrvSt39_Berserk	spec'd-here	Berserk	body: bodies-2.md §8.12
 srvst	40	0x005D9D50	SrvSt40_Leap	spec'd-here	Leap	body: bodies-2.md §4.6
 srvst	41	0x005DA540	SrvSt41_LeapAttack	spec'd-here	Leap Attack	body: bodies-2.md §6.11
-srvst	42	0x005CAE40	SrvSt42_FireHit	mapped	Fire Hit	
-srvst	43	0x005CAF80	SrvSt43_MaggotEgg	mapped	MaggotEgg	no function at this entry in the Ghidra export (data-only xref)
-srvst	44	0x005CB170	SrvSt44_MaggotUp	mapped	MagottUp	
-srvst	45	0x005CB270	SrvSt45_MaggotDown	mapped	MagottDown	no function at this entry in the Ghidra export (data-only xref)
+srvst	42	0x005CAE40	SrvSt42_FireHit	spec'd-here	Fire Hit	body: bodies-3.md §5.4
+srvst	43	0x005CAF80	SrvSt43_MaggotEgg	spec'd-here	MaggotEgg	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.6
+srvst	44	0x005CB170	SrvSt44_MaggotUp	spec'd-here	MagottUp	body: bodies-3.md §5.8
+srvst	45	0x005CB270	SrvSt45_MaggotDown	spec'd-here	MagottDown	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.9
 srvst	46	0x005CB4D0	SrvSt46_AndrialSpray	spec'd-here	AndrialSpray	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.10
-srvst	47	0x005CB730	SrvSt47_Jump	mapped	Jump	
+srvst	47	0x005CB730	SrvSt47_Jump	spec'd-here	Jump	body: bodies-3.md §5.13
 srvst	48	0x005CBBF0	SrvSt48_SwarmMove	mapped	Swarm Move	no function at this entry in the Ghidra export (data-only xref)
-srvst	49	0x005CBD10	SrvSt49_Nest_EvilHutSpawner	mapped	Nest,EvilHutSpawner	
+srvst	49	0x005CBD10	SrvSt49_Nest_EvilHutSpawner	spec'd-here	Nest,EvilHutSpawner	body: bodies-3.md §4.6
 srvst	50	0x005CBF30	SrvSt50_QuickStrike	mapped	Quick Strike	
 srvst	51	0x005CC1D0	SrvSt51_Submerge	mapped	Submerge	no function at this entry in the Ghidra export (data-only xref)
 srvst	52	0x005CC220	SrvSt52_Emerge	mapped	Emerge	no function at this entry in the Ghidra export (data-only xref)
-srvst	53	0x005CC240	SrvSt53_MonInferno	mapped	FetishInferno,DiabLight,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	
+srvst	53	0x005CC240	SrvSt53_MonInferno	spec'd-here	FetishInferno,DiabLight,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	body: bodies-3.md §4.1
 srvst	54	0x005CD2C0	SrvSt54_DiabRun	mapped	DiabRun	
 srvst	55	0x005CD910	SrvSt55_Mosquito	mapped	Mosquito	
 srvst	56	0x005C7690	SrvSt56_FeralRage_Maul	spec'd-here	Feral Rage,Maul	body: bodies.md §7.7
@@ -61,17 +61,17 @@ srvst	59	0x005D1280	SrvSt59_ImpInferno	mapped	Imp Inferno
 srvst	60	0x005D1570	SrvSt60_SuckBlood	mapped	Suck Blood	
 srvst	61	0x005D1BF0	SrvSt61_SelfResurrect	mapped	Self-resurrect	no function at this entry in the Ghidra export (data-only xref)
 srvst	62	0x005D2420	SrvSt62_MinionSpawner	mapped	MinionSpawner	
-srvst	63	0x005D2A10	SrvSt63_Corpse_VineCycler	mapped	CorpseCycler,VineCycler	
-srvst	64	0x005CDF00	SrvSt25_64_DragonClaw_MonFrenzy	mapped	MonFrenzy	no function at this entry in the Ghidra export (data-only xref)
+srvst	63	0x005D2A10	SrvSt63_Corpse_VineCycler	spec'd-here	CorpseCycler,VineCycler	body: bodies-3.md §4.8
+srvst	64	0x005CDF00	SrvSt25_64_DragonClaw_MonFrenzy	spec'd-here	MonFrenzy	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §4.12
 srvst	65	0x0056CAB0	SrvSt65_Throw_LeftHandThrow	spec'd-here	Throw,Left Hand Throw	no function at this entry in the Ghidra export (data-only xref); body: bodies.md §3.4
 srvst	30	null	-	null	(none)	null in both 1.10f and 1.14d
 srvst	66-90	null	-	null	(none)	table has 91 slots (bound check < 0x5B)
 srvdo	0	null	-	null	(none)	index 0 = no do function (srvmissile path may still run)
 srvdo	1	0x0056F070	SrvDo001_Attack_LeftHandSwing	spec'd-here	Attack,Left Hand Swing	ItemEffect: 69 skills (e.g. Inner Sight,Slow Missiles,Valkyrie,Fire Bolt); also the do for every skill whose ItemEffect=1 is NOT substituted (substitution needs ItemEffect>1); body: bodies.md §4.1
 srvdo	2	0x0056F1F0	SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun_Concentrate_BearSmite_Vengeance_Berserk_FireClaws	spec'd-here	12 skills (e.g. Kick,Power Strike,Impale,Vengeance)	body: bodies.md §4.2
-srvdo	3	0x0056F460	SrvDo003_Throw	mapped	Throw	
-srvdo	4	0x0056CC20	SrvDo004_Unsummon	mapped	Unsummon	no function at this entry in the Ghidra export (data-only xref)
-srvdo	5	0x0056F550	SrvDo005_LeftHandThrow	mapped	Left Hand Throw	
+srvdo	3	0x0056F460	SrvDo003_Throw	spec'd-here	Throw	body: bodies-3.md §5.1
+srvdo	4	0x0056CC20	SrvDo004_Unsummon	spec'd-here	Unsummon	no function at this entry in the Ghidra export (data-only xref); body: bodies-3.md §5.2
+srvdo	5	0x0056F550	SrvDo005_LeftHandThrow	spec'd-here	Left Hand Throw	body: bodies-3.md §5.3
 srvdo	6	0x005DB1C0	SrvDo006_InnerSight_SlowMissiles	spec'd-here	Inner Sight,Slow Missiles	body: bodies.md §8.13
 srvdo	7	0x005DB2D0	SrvDo007_Jab	spec'd-here	Jab	body: bodies-2.md §3.1
 srvdo	8	0x005DB410	SrvDo008_MultipleShot_Teeth_ShockWave	spec'd-here	Multiple Shot,Teeth,PrimePoisonball,Shock Wave	body: bodies.md §8.6
@@ -149,22 +149,22 @@ srvdo	79	0x005D0350	SrvDo079_Conversion	spec'd-here	Conversion	body: bodies-2.md
 srvdo	80	0x005D0670	SrvDo080_FistOfTheHeavens	spec'd-here	Fist of the Heavens	body: bodies-2.md §8.8
 srvdo	81	0x005D0920	SrvDo081_HolyFreeze	spec'd-here	Holy Freeze	body: bodies-2.md §6.10
 srvdo	82	0x005D0E90	SrvDo082_Redemption	spec'd-here	Redemption	body: bodies-2.md §8.9
-srvdo	83	0x005CAF30	SrvDo083_FireHit	mapped	Fire Hit	
-srvdo	84	0x005CAFA0	SrvDo084_MaggotEgg	mapped	MaggotEgg	
-srvdo	85	0x005CB0C0	SrvDo085_UnholyBolt_ShamanFire	mapped	UnHolyBolt,ShamanFire	
-srvdo	86	0x005CB300	SrvDo086_MaggotDown	mapped	MagottDown	
-srvdo	87	0x005CB3C0	SrvDo087_MaggotLay	mapped	MagottLay	
-srvdo	88	0x005CB580	SrvDo088_AndrialSpray	mapped	AndrialSpray	
-srvdo	89	0x005CB940	SrvDo089_Jump	mapped	Jump	
+srvdo	83	0x005CAF30	SrvDo083_FireHit	spec'd-here	Fire Hit	body: bodies-3.md §5.5
+srvdo	84	0x005CAFA0	SrvDo084_MaggotEgg	spec'd-here	MaggotEgg	body: bodies-3.md §5.7
+srvdo	85	0x005CB0C0	SrvDo085_UnholyBolt_ShamanFire	spec'd-here	UnHolyBolt,ShamanFire	body: bodies-3.md §4.9
+srvdo	86	0x005CB300	SrvDo086_MaggotDown	spec'd-here	MagottDown	body: bodies-3.md §5.10
+srvdo	87	0x005CB3C0	SrvDo087_MaggotLay	spec'd-here	MagottLay	body: bodies-3.md §5.11
+srvdo	88	0x005CB580	SrvDo088_AndrialSpray	spec'd-here	AndrialSpray	body: bodies-3.md §5.12
+srvdo	89	0x005CB940	SrvDo089_Jump	spec'd-here	Jump	body: bodies-3.md §5.14
 srvdo	90	0x005CBC80	SrvDo090_SwarmMove	mapped	Swarm Move	
-srvdo	91	0x005CBE00	SrvDo091_Nest_EvilHutSpawner	mapped	Nest,EvilHutSpawner	
+srvdo	91	0x005CBE00	SrvDo091_Nest_EvilHutSpawner	spec'd-here	Nest,EvilHutSpawner	body: bodies-3.md §4.7
 srvdo	92	0x005CBF90	SrvDo092_QuickStrike	mapped	Quick Strike	
 srvdo	93	0x005CC050	SrvDo093_GargoyleTrap	mapped	GargoyleTrap	
 srvdo	94	0x005CC1F0	SrvDo094_Submerge	mapped	Submerge	
-srvdo	95	0x005CC4E0	SrvDo095_MonInferno	mapped	FetishInferno,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	
-srvdo	96	0x005CC840	SrvDo096_ZakarumHeal_Bestow	mapped	ZakarumHeal,Bestow	
-srvdo	97	0x005CCB10	SrvDo097_Resurrect	mapped	Resurrect,Resurrect2	
-srvdo	98	0x005CCC80	SrvDo098_MonTeleport	mapped	MonTeleport,Teleport 2,Baal Teleport,Baal Clone Teleport	
+srvdo	95	0x005CC4E0	SrvDo095_MonInferno	spec'd-here	FetishInferno,mon inferno sentry,Baal Inferno,MegademonInferno,Horror Arctic Blast	body: bodies-3.md §4.2
+srvdo	96	0x005CC840	SrvDo096_ZakarumHeal_Bestow	spec'd-here	ZakarumHeal,Bestow	body: bodies-3.md §4.10
+srvdo	97	0x005CCB10	SrvDo097_Resurrect	spec'd-here	Resurrect,Resurrect2	body: bodies-3.md §4.11
+srvdo	98	0x005CCC80	SrvDo098_MonTeleport	spec'd-here	MonTeleport,Teleport 2,Baal Teleport,Baal Clone Teleport	body: bodies-3.md §4.3
 srvdo	99	0x005CCD10	SrvDo099_PrimePoisonNova	mapped	PrimePoisonNova	
 srvdo	100	0x005CCE80	SrvDo100_DiabCold	mapped	DiabCold	
 srvdo	101	0x005CCFA0	SrvDo101_FingerMageSpider	mapped	FingerMageSpider	
@@ -175,11 +175,11 @@ srvdo	105	0x005CD6A0	SrvDo105_DesertTurret	mapped	DesertTurret
 srvdo	106	0x005CD870	SrvDo106_ArcaneTower	mapped	ArcaneTower	
 srvdo	107	0x005CDA00	SrvDo107_Mosquito	mapped	Mosquito	
 srvdo	108	0x005CDC10	SrvDo108_RegurgitatorEat	mapped	RegurgitatorEat	
-srvdo	109	0x005CDF10	SrvDo109_MonFrenzy	mapped	MonFrenzy,BloodLordFrenzy	
-srvdo	110	0x005CE1B0	SrvDo110_Hireable_RogueMissile	mapped	MissileSkill1,HireableMissile,RogueMissile	
+srvdo	109	0x005CDF10	SrvDo109_MonFrenzy	spec'd-here	MonFrenzy,BloodLordFrenzy	body: bodies-3.md §4.13
+srvdo	110	0x005CE1B0	SrvDo110_Hireable_RogueMissile	spec'd-here	MissileSkill1,HireableMissile,RogueMissile	body: bodies-3.md §4.5
 srvdo	111	0x005CE670	SrvDo111_FetishAura	mapped	FetishAura	
 srvdo	112	0x005CE2B0	SrvDo112_MonCurseCast	mapped	MonCurseCast	
-srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	mapped	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	
+srvdo	113	0x005BF3D0	SrvDo113_Scroll_Book	spec'd-here	Scroll of Identify,Book of Identify,Scroll of Townportal,Book of Townportal	body: bodies-3.md §4.4
 srvdo	114	0x005C6910	SrvDo114_Raven	spec'd-here	Raven	body: bodies-2.md §3.6
 srvdo	115	0x005C6A80	SrvDo115_Vines	spec'd-here	Plague Poppy,Cycle of Life,Vines	body: bodies.md §8.7
 srvdo	116	0x005C6EC0	SrvDo116_Wearwolf_Wearbear	spec'd-here	Wearwolf,Wearbear,Delerium Change	hard-coded in mana check 0x00647540/0x0056C160: free while shapeshifted; body: bodies.md §8.15
