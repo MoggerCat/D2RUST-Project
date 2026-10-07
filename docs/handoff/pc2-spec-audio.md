@@ -29,6 +29,15 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | OQ2, 4–8, 11 | `sound-table.md` OQ | Pixel points per type; paused path; occlusion × (1 − occ) at the device; duck = single player + ESC/options; songs ignore blocks in the stream; river projection; −2³¹ silent. |
 | — | `sound-table.md` §5 r3, §8.1 r1 | Corrections: no-unit position (0, 0, 320.0), unit z = 640.0 (both were 0 in the draft); changes the mode-0 gain of every unit sound (e.g. (320, 0, 640) → 228, not 255). |
 | — | `sound-table.md` §6.3 r7 | Original bug: a failed fade-in start leaves volume 0; a looping request then never starts. |
+| TR1 | `triggers.md` §7 r7 | 120 null records behave as all-zero rows: no transition, loop 0 → detach looping requests (no force), U+0x70/0x74 still set. "No call" is observably the same except that detach. |
+| TR2 | `triggers.md` §7 r8 | Cairn table `0x00728338`: modes 1–5 → 413–417 `cairn_stone_1..5`, else 0. |
+| TR3 | `triggers.md` §10 r5, `npc-greetings.tsv` | 35 classes → 28 records, dumped (new TSV, own commit); records shared by classes share last/tick. |
+| TR4 | `triggers.md` §4.3 r2.2 | As implemented: >1 unit → detach with force; else fade to 0 len 6 (raised to Fade Out), U stays listed; every request of U in Neutral's group, playing or not. |
+| TR5 | `triggers.md` §5 r9 | Speed is signed i16; sums wrap i32; reduction by mask (power of two, incl. 0) or signed `idiv` remainder; distances/compares signed; elapsed tests unsigned. Not plain u32. |
+| TR6 | `triggers.md` §1 r11 | Id-0 requests return 0 at the entry with no side effect or draw; entry 74 logs many (caller `0x004D9BC7`), seed unchanged. |
+| TR7 | `triggers.md` Test vectors, §10 r6 | 115 record addresses, 106 distinct contents (wording fixed); key 506 twice (order 37 → 3,533 wins, 38 → 3,534 never); lookup scans to a zero sound, 16-bit key. |
+| TR8 (OQ 7, 11) | `triggers.md` OQ | NPC Speech flag only set by the options menu (image value 1); Init voice at client monster creation (0xAC / `0x00466730`), not first sight. |
+| — | `triggers.md` §12 | Thunder draws on the player client seed (500 + roll(1500) timer, 25 + roll(50) delay, y then x = −200 + roll(400)) and sets the position. |
 
 ## Still open
 
@@ -41,7 +50,9 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 
 ## CODE-TABLE CHANGE commits
 
-(none yet)
+| Sha | File |
+|---|---|
+| 0d617d9 | `specs/audio/npc-greetings.tsv` (new; TR-3) |
 
 ## Cross-file requests
 
