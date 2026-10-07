@@ -160,16 +160,57 @@ addresses in the specs.
 - `quality.md` OQ2 → Partly answered (constant 0 / 2 / 6 writers of
   request +0x30 listed; parameterised callers stay with their owners).
 
+### Fourth pass (worktree `w-spec-items4`, 2026-10-07)
+
+- `properties.md` OQ2 → new §13: the "quality-5 socket-filler" branch
+  is the set-item state update `0x00663CC0` (any set item placed with
+  an owner): partial lists 165–169 parked / unparked by the equipped
+  mask per `add func`, one owner list 165–170 tagged stat 71 = set id,
+  refilled by §11. d2rs's no-op differs for every equipped set item.
+- `properties.md` OQ3 → §4.2 "Register mapping": owner = dispatcher
+  argument 2, item = argument 3; modes 0–5 / 7 pass no owner, §11 the
+  player, mode 6 the socketed item with item = the inserted filler
+  (runeword rolls draw on that filler's item seed).
+- `properties.md` OQ4 → Partly answered: on insertion (`0x00562802`,
+  `0x006600A9`) the stale slots are fixed (pointers, type 4, the last
+  filler's class id in slot 3); no live runes row can match through
+  them. Load / save / writer callers stay open.
+- `affixes.md` OQ2 → new §12: format-0 roller `0x005C12F0`, rare names
+  `0x005C19A0` (= §5), rare routine `0x005C1E80`, crafted format-0 calls.
+- `vendors.md` OQ8 → new §7.3.1: fields the item decoder rebuilds
+  (weapon / armor base stats from the items row, stat-17/18 base raise,
+  stat 326 := 1, ilvl ≥ 1, unique index clamp, compact ilvl 1 / quality
+  2 / seed 0) and the resulting copy differences.
+- `generation.md` OQ1 → Answered: new §11 (pipeline, normal routine
+  `0x00556D80`, class skill mods `0x005C0D70`), `quality.md` §10
+  (roll, low, unique, set), `properties.md` §14 (legacy property table
+  `0x00745B58`, 244 codes; codes 245–267 crash).
+- `quality.md` OQ2 → rest answered: quality-0 callers (Cow King `vps`,
+  chest code drops, shrine potions, cube outputs without a quality
+  byte); every other caller listed with its constant.
+- `treasure.md` OQ6 → drop flags 0x04 / 0x10 = request flags2 always
+  ethereal / always sockets (never set by 1.14d TC data).
+- `cube.md` OQ3 → single player: game type 3, ladder 0 (ladder recipes
+  usable). OQ7 → item-use table `0x00741790` (31 two-word entries),
+  cube = entry 7 word 2 (`0x007417CC`).
+- `inventory.md` OQ20 → answered from the client code (transmute armed
+  only with an empty cursor); R7 confirms.
+- `generation.md` OQ3 → spawn mode / init flags of all 20 requests.
+
 ## Still open
 
 - `bitstream.md` OQ2: Needs recording (see Recording list).
-- `quality.md` OQ2 tail: quality values of the parameterised callers
-  (owners: treasure, cube, NPC, quest, object specs).
-- `generation.md` OQ1 tail: the format-0 branches themselves (legacy
-  items only).
+- `properties.md` OQ4 tail: stale runeword slot on the load, legacy
+  save and bit-stream writer paths (stack trace, or keep "no match" as
+  a Ruleset choice).
 - `treasure.md` OQ5: Needs recording (x87 control word at `0x0055A935`
   under each video mode), OQ12 tail (d2rs value for
   the sub-picker n = 0 result: a Ruleset choice).
+- Recording-only questions not re-listed: `affixes.md` OQ1,
+  `generation.md` OQ2, `properties.md` OQ1, `quality.md` OQ1,
+  `treasure.md` OQ1–OQ4, `inventory.md` OQ2, `vendors.md` OQ3, OQ4,
+  OQ6, OQ7, `waypoints.md` OQ1–OQ3; Ruleset / phase decisions
+  `vendors.md` OQ5, `waypoints.md` OQ6.
 - Not items: `impl-items` "stat vs base" readings; `gaps-items-stats`
   3–6.
 
