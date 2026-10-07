@@ -40,6 +40,7 @@ pub mod tile_assets;
 pub mod ui_bind;
 pub mod unit_assets;
 pub mod unit_rules;
+pub mod walk;
 
 #[cfg(test)]
 mod tests;

@@ -56,11 +56,13 @@ use super::sound::{self, AudioParts, GameAudio};
 use super::ui;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::mirror::DynLink;
+use crate::bridge::predict::{PredictLink, WalkTap};
 use crate::bridge::world::{ClientTables, LevelRow};
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
 use crate::world_view::preview::Preview;
 use crate::world_view::tile_assets::TileAssets;
+use crate::world_view::walk::{add_preview_walk, PreviewWalk};
 use crate::world_view::{
     ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
 };
@@ -157,6 +159,27 @@ pub fn add_preview(app: &mut App, levels: Vec<LevelRow>, tiles: TileAssets) {
     state.preview = true;
 }
 
+/// `link` wrapped in the walk recorder of the play preview's own-walk
+/// prediction (decision D2, `bridge::predict`; d2rs-own, unverified), and
+/// the handle on what it records. Messages pass through unchanged.
+pub fn predict_link(link: DynLink) -> (DynLink, WalkTap) {
+    let link = PredictLink::new(link);
+    let tap = link.tap();
+    (Box::new(link), tap)
+}
+
+/// Turns the play preview's walk prediction on ([`PreviewWalk`] over the
+/// walks `tap` records, at `speeds`), drawing the local player's
+/// predicted mode through the unit art when the original UI installed it.
+pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predict::Speeds>) {
+    let mut walk = PreviewWalk::new(tap, speeds);
+    walk.art = app
+        .world()
+        .get_resource::<ui::UnitArt>()
+        .map(|a| a.0.art.clone());
+    add_preview_walk(app, walk);
+}
+
 /// One log line every [`LOG_EVERY`] bridge frames.
 fn log_progress(
     bridge: Res<BridgeResource>,
@@ -219,6 +242,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let level_rows = single_player::client_level_rows(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
+    let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let (link, started) = single_player::start_with(
         config.data,
         config.seed,
@@ -238,7 +262,8 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         }),
         ..default()
     }));
-    add_game(&mut app, Box::new(link), true)?;
+    let (link, tap) = predict_link(Box::new(link));
+    add_game(&mut app, link, true)?;
     send_create_game_for(&mut app, &request)?;
     add_client_data(&mut app, drlg_source, level_rows.clone());
     app.world_mut()
@@ -273,6 +298,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     } else {
         add_preview(&mut app, level_rows, TileAssets::default());
     }
+    add_walk(&mut app, tap, speeds);
     sound::add_output(&mut app);
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))

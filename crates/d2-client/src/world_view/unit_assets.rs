@@ -24,7 +24,7 @@ use d2_data::tables::{
 use d2_formats::cof::{Cof, CofLayer};
 
 use crate::assets::path::{CanonicalPath, FileSource};
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::ClientUnit;
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::unit_composite::{
@@ -272,6 +272,25 @@ pub struct UnitArt {
     pub files: BTreeMap<String, Option<(CanonicalPath, FileFacts)>>,
     /// COF paths tried and missing or refused.
     pub missing_cofs: BTreeSet<CanonicalPath>,
+    /// The mode the local player is drawn in while the play preview's
+    /// walk prediction moves it (decision D2, `bridge::predict`: 2 walk,
+    /// 3 run). d2rs-own, unverified.
+    pub pose_mode: Option<(UnitKey, u32)>,
+}
+
+impl UnitArt {
+    /// `unit` with its drawn mode ([`Self::pose_mode`] for its key, else
+    /// the model's).
+    pub fn posed<'a>(&self, unit: &'a ClientUnit) -> std::borrow::Cow<'a, ClientUnit> {
+        match self.pose_mode {
+            Some((key, mode)) if key == unit.key && unit.mode != mode => {
+                let mut u = unit.clone();
+                u.mode = mode;
+                std::borrow::Cow::Owned(u)
+            }
+            _ => std::borrow::Cow::Borrowed(unit),
+        }
+    }
 }
 
 pub type SharedUnitArt = Arc<RwLock<UnitArt>>;
@@ -291,6 +310,8 @@ impl UnitArtLoader {
         let mut log = Vec::new();
         let mut art = self.art.write().unwrap_or_else(|e| e.into_inner());
         for unit in world.units.values() {
+            let posed = art.posed(unit).into_owned();
+            let unit = &posed;
             let Some(name) = unit_cof(&self.looks, unit) else {
                 continue;
             };

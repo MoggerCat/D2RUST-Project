@@ -73,6 +73,19 @@ pub trait ViewFeed: ViewSource {
     /// default ignores it: the feed answers [`Self::open_mode`] itself.
     fn set_ui_open_mode(&mut self, _mode: OpenMode) {}
 
+    /// The play preview's predicted position of the local player
+    /// (`bridge::predict`, decision D2; 16.16 sub-tiles), handed over
+    /// before each build. The default ignores it (strict path: the model's
+    /// cell).
+    fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
+
+    /// Whether the view places a cel cut by the frame edge and leaves it
+    /// to the frame clip (`OriginalView::with_edge_clip`, decision D1). The
+    /// default (strict) is `false`.
+    fn edge_clip(&self) -> bool {
+        false
+    }
+
     /// The shake running at this frame, if any (camera §8, started by
     /// `0x00476A80`). The starts d2rs knows are [`event_shake`]'s.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError>;
@@ -378,7 +391,7 @@ where
             world,
             ui,
             &NoWorld {
-                view: &OriginalView::new(camera, rules, &*feed),
+                view: &OriginalView::new(camera, rules, &*feed).with_edge_clip(feed.edge_clip()),
             },
             assets,
         ),
@@ -414,6 +427,7 @@ where
     S: ViewSource + ?Sized,
     F: ViewFeed + ?Sized,
 {
+    let clip = feed.edge_clip();
     match feed.light(world)? {
         Some(l) => {
             let lit = LitRules {
@@ -421,9 +435,13 @@ where
                 feed: l.look,
                 light: l.light,
             };
-            build(world, ui, &OriginalView::new(camera, &lit, source), assets)
+            let view = OriginalView::new(camera, &lit, source).with_edge_clip(clip);
+            build(world, ui, &view, assets)
         }
-        None => build(world, ui, &OriginalView::new(camera, rules, source), assets),
+        None => {
+            let view = OriginalView::new(camera, rules, source).with_edge_clip(clip);
+            build(world, ui, &view, assets)
+        }
     }
 }
 

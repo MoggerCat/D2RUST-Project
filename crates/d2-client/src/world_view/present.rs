@@ -56,7 +56,8 @@ use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
-use super::ui_bind::{run_ui_with, world_clicks, UiQueue, UiRules};
+use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
+use super::walk::PreviewWalk;
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
 
@@ -97,6 +98,10 @@ pub struct WorldViewState {
     pub preview: bool,
     /// The last logged preview frame error.
     preview_error: Option<String>,
+    /// The last drawn frame's item tags (tiles, units, UI) and UI draws,
+    /// in draw order: what the frame shows, for logs and tests.
+    pub last_tags: Vec<crate::scene::ItemTag>,
+    pub last_ui: Vec<crate::ui::UiDraw>,
 }
 
 impl WorldViewState {
@@ -116,6 +121,8 @@ impl WorldViewState {
             automap: None,
             preview: false,
             preview_error: None,
+            last_tags: Vec::new(),
+            last_ui: Vec::new(),
         }
     }
 }
@@ -148,6 +155,9 @@ pub struct WorldViewUi {
     pub bindings: Option<Bindings>,
     /// Makes the panel DC6 files of the frame's UI draws resident.
     pub art: Option<PanelArtLoader>,
+    /// Makes the UI text fonts (`.tbl` and glyph DC6) of the frame's text
+    /// draws resident (`ui_bind::TextAssetLoader`).
+    pub text: Option<TextAssetLoader>,
     /// Last cursor position sent, so moves are reported once.
     cursor: Option<FramePos>,
 }
@@ -161,6 +171,7 @@ impl WorldViewUi {
             original: None,
             bindings: None,
             art: None,
+            text: None,
             cursor: None,
         }
     }
@@ -420,13 +431,29 @@ fn ui_input(
     windows: Query<&Window, With<PrimaryWindow>>,
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
+    walk: Option<ResMut<PreviewWalk>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
     };
+    // d2rs-own, unverified (D2): Stand Still (command 36) is held while
+    // a key bound to it is down (`ui/controls.md` §4.3 r1).
+    if let (Some(mut walk), Some(bindings), Some(keys)) = (walk, &ui.bindings, keys.as_deref()) {
+        let held = bindings
+            .inputs(crate::controls::Action::StandStill)
+            .iter()
+            .any(|k| {
+                edge::KEY_CODES
+                    .iter()
+                    .any(|&(c, key)| key == *k && keys.pressed(c))
+            });
+        if walk.run.stand_still != held {
+            walk.run.stand_still = held;
+        }
+    }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
-    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys) {
+    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys.as_deref()) {
         let pressed: Vec<KeyCode> = edge::KEY_CODES
             .iter()
             .map(|&(c, _)| c)
@@ -495,6 +522,7 @@ fn world_view_frame(
     target: Option<Res<WorldViewTarget>>,
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
+    mut walk: Option<ResMut<PreviewWalk>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -535,6 +563,9 @@ fn world_view_frame(
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;
             }
+            if let Some(text) = &ui.text {
+                text.ensure(&frame.draws, &mut state.assets)?;
+            }
             let mouse = match ui.cursor {
                 Some(FramePos::Inside(p)) => (p.x, p.y),
                 _ => (0, 0),
@@ -550,7 +581,29 @@ fn world_view_frame(
                 mouse,
                 game_menu_open: false,
             };
-            for o in world_clicks(&mut bridge.0, &mut state.click, view, &frame.unhandled)? {
+            // d2rs-own, unverified (D2): the run lock (command 35) is the
+            // toggle action no panel took; the click reads the predicted
+            // position and the modifier word.
+            let (mods, local_at) = match walk.as_deref_mut() {
+                Some(w) => {
+                    let toggle = crate::controls::Action::ToggleRun.index() as u16;
+                    for e in &frame.unhandled {
+                        if *e == UiEvent::Action(crate::ui::ActionId(toggle)) {
+                            w.run.toggle_run();
+                        }
+                    }
+                    (w.run.word(), w.predict.position())
+                }
+                None => (0, None),
+            };
+            for o in world_clicks(
+                &mut bridge.0,
+                &mut state.click,
+                view,
+                &frame.unhandled,
+                mods,
+                local_at,
+            )? {
                 debug!("world click: {o:?}");
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
@@ -604,6 +657,8 @@ fn world_view_frame(
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
+    state.last_tags = frame.items.iter().map(|i| i.tag).collect();
+    state.last_ui = draws.to_vec();
     state.last = Some(FrameStats {
         bridge_frame,
         server_tick: tick,

@@ -22,16 +22,21 @@ use d2_data::tables::{decode_all, Inventory};
 use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::path::FileSource;
-use crate::bridge::mirror::mirror_units;
+use crate::bridge::mirror::{bridge_frame, mirror_units};
 use crate::bridge::BridgeResource;
 use crate::controls::Preset;
 use crate::ui::layout::Screen;
-use crate::ui::original::{InvArea, OriginalUi, OriginalUiError, UiConfig};
+use crate::ui::original::{
+    FontMeasure, InvArea, OriginalUi, OriginalUiError, UiConfig, CHARACTER_FONTS,
+};
 use crate::ui::{NoPanelRules, NoStrings, UiRoot};
-use crate::world_view::panel_art::{PanelArtLoader, PanelArtRules};
+use crate::world_view::panel_art::{PanelArtLoader, PanelArtRules, SharedTextColors};
+use crate::world_view::ui_bind::{TextAssetLoader, TextColors};
 use crate::world_view::unit_assets::{SharedUnitArt, UnitArtLoader, UnitLooks};
 use crate::world_view::unit_rules::UnitRules;
 use crate::world_view::{UiSounds, Unspecified, WorldViewState, WorldViewUi};
+
+use super::palette::ActPalettes;
 
 /// What the play mode's UI reads from the install.
 pub struct UiParts {
@@ -42,6 +47,14 @@ pub struct UiParts {
     pub inv_areas: Option<Vec<InvArea>>,
     /// `d2exp.mpq` present (§Inputs).
     pub expansion_installed: bool,
+    /// The character panel's font tables (`FontMeasure::load` of
+    /// [`CHARACTER_FONTS`]); `None`: the panel draws no text
+    /// (`ui/original.rs` fallback).
+    pub fonts: Option<FontMeasure>,
+    /// `difficultylevels` `ResistPenalty` by difficulty
+    /// (`single_player::client_resist_penalties`); `None`: an expansion
+    /// game draws no resist values (§8 r9).
+    pub resist_penalties: Option<Vec<i32>>,
 }
 
 impl UiParts {
@@ -52,10 +65,15 @@ impl UiParts {
         let table = set.table("inventory").ok_or("inventory not loaded")?;
         let rows: Vec<Inventory> = decode_all(table).map_err(|e| e.to_string())?;
         let expansion_installed = archives.has_archive("d2exp.mpq");
+        let fonts = FontMeasure::load(archives.as_ref(), &CHARACTER_FONTS)?;
+        let resist_penalties =
+            super::single_player::client_resist_penalties(&archives).map_err(|e| e.to_string())?;
         Ok(UiParts {
             source: archives,
             inv_areas: Some(rows.iter().map(inv_area).collect()),
             expansion_installed,
+            fonts: Some(fonts),
+            resist_penalties: Some(resist_penalties),
         })
     }
 }
@@ -76,11 +94,28 @@ pub fn inv_area(r: &Inventory) -> InvArea {
 /// [`UnitRules`] over the placeholder rules, with the unit art loader
 /// ([`install_unit_rules`]). The 800 × 600 frame is resolution mode 2.
 pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiError> {
+    let looks = unit_looks(parts.source.as_ref());
+    add_original_ui_with(app, parts, looks)
+}
+
+/// [`add_original_ui`] with the unit tables `looks` (instead of the ones
+/// read from `parts.source`).
+pub fn add_original_ui_with(
+    app: &mut App,
+    parts: UiParts,
+    looks: UnitLooks,
+) -> Result<(), OriginalUiError> {
     let config = UiConfig {
         screen: Screen::R800,
         expansion_installed: parts.expansion_installed,
     };
-    let original = OriginalUi::new(config, parts.inv_areas)?;
+    let mut original = OriginalUi::new(config, parts.inv_areas)?;
+    if let Some(fonts) = parts.fonts {
+        original.set_fonts(fonts);
+    }
+    if let Some(penalties) = parts.resist_penalties {
+        original.set_resist_penalties(penalties);
+    }
     // `UiStates` is the authority and the root mirrors it (§2): the
     // root's own rules are never asked.
     let mut root = UiRoot::new(Box::new(NoPanelRules));
@@ -93,14 +128,69 @@ pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiEr
         source: parts.source.clone(),
         files: files.clone(),
     });
+    ui.text = Some(TextAssetLoader {
+        source: parts.source.clone(),
+    });
     app.insert_non_send(ui).init_resource::<UiSounds>();
-    let units = install_unit_rules(app, parts.source);
+    let units = install_unit_rules_with(app, parts.source, looks);
+    let text = SharedTextColors::default();
+    app.insert_resource(TextColorMaps {
+        shared: text.clone(),
+        by_act: [None; 5],
+        shown: None,
+    })
+    .add_systems(
+        PreUpdate,
+        push_text_colors
+            .after(bridge_frame)
+            .run_if(resource_exists::<BridgeResource>)
+            .run_if(resource_exists::<WorldViewState>)
+            .run_if(resource_exists::<ActPalettes>),
+    );
     if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
         state.rules = Box::new(PanelArtRules {
             rules: units,
             files,
+            text: Some(text),
         });
     }
+    Ok(())
+}
+
+/// The PL2 text-colour maps of each act, pushed into the world view's map
+/// table once per act (`ui/text.md` §4.4), and the shared set the rules
+/// read.
+#[derive(Resource)]
+pub struct TextColorMaps {
+    pub shared: SharedTextColors,
+    by_act: [Option<TextColors>; 5],
+    shown: Option<u8>,
+}
+
+/// The text colours of the model's palette act (act 0 until 0x03 sets
+/// one, as [`ActPalettes::wanted`]); a palette without the maps is an
+/// error.
+pub fn push_text_colors(
+    bridge: Res<BridgeResource>,
+    palettes: Res<ActPalettes>,
+    mut maps: ResMut<TextColorMaps>,
+    mut state: ResMut<WorldViewState>,
+) -> Result {
+    let act = ActPalettes::wanted(bridge.0.world().palette_act);
+    if maps.shown == Some(act) {
+        return Ok(());
+    }
+    let i = if act < 5 { usize::from(act) } else { 0 };
+    let colors = match maps.by_act[i] {
+        Some(c) => c,
+        None => {
+            let c = TextColors::push(&mut state.assets.maps, palettes.of(act))?;
+            maps.by_act[i] = Some(c);
+            c
+        }
+    };
+    *maps.shared.write().unwrap_or_else(|e| e.into_inner()) = Some(colors);
+    maps.shown = Some(act);
     Ok(())
 }
 
@@ -114,13 +204,27 @@ pub struct UnitArt(pub UnitArtLoader);
 /// tables come from `source`; when they do not load, the rules draw no
 /// unit (D1: logged, not an error).
 pub fn install_unit_rules(app: &mut App, source: Arc<dyn FileSource>) -> UnitRules<Unspecified> {
-    let looks = match UnitLooks::live(source.as_ref()) {
+    let looks = unit_looks(source.as_ref());
+    install_unit_rules_with(app, source, looks)
+}
+
+/// The unit tables of `source`; when they do not load, none (logged).
+fn unit_looks(source: &dyn FileSource) -> UnitLooks {
+    match UnitLooks::live(source) {
         Ok(l) => l,
         Err(e) => {
             warn!("unit art: unit tables not loaded, no unit is drawn: {e}");
             UnitLooks::default()
         }
-    };
+    }
+}
+
+/// [`install_unit_rules`] with the unit tables `looks`.
+pub fn install_unit_rules_with(
+    app: &mut App,
+    source: Arc<dyn FileSource>,
+    looks: UnitLooks,
+) -> UnitRules<Unspecified> {
     let looks = Arc::new(looks);
     let art = SharedUnitArt::default();
     app.insert_resource(UnitArt(UnitArtLoader {
