@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
 |   5. Gambling | 254–309 |
 |   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–517 |
-|   8. Repair | 518–554 |
-|   9. Prices | 555–706 |
-| Constants & data dependencies | 707–726 |
-| Randomness | 727–742 |
-| Edge cases & original bugs | 743–772 |
-| Test vectors | 773–795 |
-| Provenance | 796–834 |
-| Open questions | 835–865 |
+|   7. Buying and selling | 342–544 |
+|   8. Repair | 545–581 |
+|   9. Prices | 582–736 |
+| Constants & data dependencies | 737–756 |
+| Randomness | 757–772 |
+| Edge cases & original bugs | 773–807 |
+| Test vectors | 808–830 |
+| Provenance | 831–869 |
+| Open questions | 870–893 |
 <!-- /index -->
 
 ## Summary
@@ -493,7 +493,10 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
    cleared; child command flag 0x1 cleared (`0x00628170`).
    fillers = 0: the children are not read; the copy keeps the stream's
    socket flags and its stat lists but has no fillers.
-6. S item flag 0x8000000 set.
+6. S item flag 0x8000000 set ("copy source", `items/generation.md`
+   §1.4: no reader; it rides in S's later streams, so a second copy
+   of the same S, e.g. a permanent store item bought twice, carries
+   it too).
 7. Replenish: for stat 252 (`item_replenish_durability`) and then 253
    (`item_replenish_quantity`), total r ≠ 0 and no type-3 timer on the
    copy (`0x005415A0`) → a type-3 timer at game frame (+0xA8) + 2500 / r
@@ -509,7 +512,31 @@ changes (§1 rule 3) and unit state outside the item record (timers
 other than step 7, owner links, unit flags) are not copied. No RNG draw
 (the stream holds the seeds, §4.1 rule 7). The decode rules of
 `0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
-of `items/bitstream.md`; their differences are Open question 8.
+of `items/bitstream.md`, except that the full-record reader rebuilds
+these base stats from the item record instead of the stream
+(`0x0062CBE0`, after the name / trailer fields):
+
+- armor (type 50): stat 31 and the durability pair are read from the
+  stream; stat 20 := items `block` (+0x111), stat 67 := −items `speed`
+  (+0xD8);
+- weapon (type 45): stat 68 := −`speed`; then quality 1 (low,
+  `0x00627E70`): for each of `maxdam` +0xFF → 22 (min 2), `mindam`
+  +0xFE → 21 (min 1), `2handmaxdam` +0x103 → 24 (min 2),
+  `2handmindam` +0x102 → 23 (min 1), set only when the byte ≠ 0, value
+  max(byte·3 >> 2, min); and when `maxmisdam` +0x101 ≠ 0: 159 :=
+  max(`minmisdam`·3 >> 2, **1**), 160 := max(`maxmisdam`·3 >> 2,
+  **2**). Other qualities: 22, 21, 24, 23 := the bytes as they are,
+  159/160 only when +0x101 ≠ 0. Ethereal (`0x0062A8D0`): each of 21,
+  22, 23, 24, 159, 160 := base·3/2. Then the durability pair from the
+  stream.
+
+Generation sets the same values (`items/generation.md` §4, low
+quality `items/quality.md` §6, ethereal §8.2) except the low-quality
+throw minima, which generation gives as 159 ≥ **2**, 160 ≥ **1**:
+the copy of a low-quality throwing weapon whose ¾ value falls under
+the minimum differs from S there. Whether the stream's own entries
+for these stats (when their `Save Bits` ≠ 0) then override the rebuilt
+values is Open question 8.
 
 Recorded: the buy of rule 10 creates the copy GUID 0x36 from store item
 0x12; the sell of §7.2 creates GUID 0x35 from GUID 7 (each the next
@@ -689,7 +716,10 @@ discount from then on in that difficulty (edge case 6).
 #### 9.4 Gamble price
 
 t = 2 (rule 1): if the item's format field (item data +0x30) is 0 →
-`gamble cost` (u32 +212) of the item's normal-code record. Else the
+`gamble cost` (u32 +212) of the item's normal-code record (never for a
+gamble-list item: §5.1 creates through `0x00559CE0`, whose request
+takes the game's format, 101 expansion / 2 classic, `items/generation.md`
+§1.2–1.3; format 0 only comes from old saves). Else the
 record of the item's normal code (`0x00629370`), L = player level:
 
 - `rin` or `amu` → `gamble cost`.
@@ -748,7 +778,12 @@ Reproduced by default.
    trade action, so it is only visible to tools.
 2. Selling to an interacting NPC without an `npc.txt` row (e.g. Kashya,
    Warriv) reaches the fatal assert of §9.2 rule 9 (0x2A is never sent;
-   the original process exits). d2rs: Open question 5.
+   the original process exits). Only a crafted 0x33 (or a crafted 0x32
+   with t ∉ {0, 2}, edge case 3) gets there: the client offers no trade
+   at those NPCs. Not reproduced. d2rs policy (Ruleset::Original): a
+   cost() call for a class without an `npc.txt` row is a handler error;
+   the handler stops at that step (§7.2 step 6, before any state
+   change) with no message and the game goes on.
 3. Buy with t ∉ {0, 2} skips the "item is offered" test: any existing
    item GUID is copied and priced with cost(t) (t = 1 gives the sell
    price).
@@ -834,31 +869,24 @@ Min 1 Max 1 MagicMin 1 MagicMax 1 MagicLvl 1).
 
 ## Open questions
 
-1. `0x00625560` (stat "bonus" used by §9.2 (B)): exact definition
-   belongs to the stat-list spec; confirm with one recorded magic-item
-   price.
-2. Item format field (item data +0x30) that selects the gamble-cost
-   column (§9.4): when it is 0 in an expansion game; check items created
-   by §5.1.
-3. Answered from the code: §7.1.1 (`0x00577D18`). A recording still
-   confirms it: buy `aqv` with a bow, then with a crossbow equipped, and
-   a helm with the head slot empty (expect 0x9D action 6, no 0x9C
-   action 4).
-4. Order of §6 rule 1 versus the player's room change: the code passes
-   the current room as `to`; confirm with a recording that leaving town
-   and returning gives a new Charsi store.
-5. Fatal path of edge case 2: decide d2rs behaviour (end the game like
-   the original, or reject); a Ruleset decision, not a fidelity fact.
-6. Price of a magic / rare / unique item: record a buy and a sell of
-   one to confirm §9.2 rules 4–5 end to end.
-7. Gamble list: record one gamble open (14 items, ring then amulet
-   first) and one gamble purchase + 0x37.
-8. §7.3 step 3: the decoder `0x0062E430` (full record `0x0062CBE0`, compact
-   record `0x0062A970`) is read only as "the inverse of
-   `items/bitstream.md`"; a field it rebuilds instead of reading (base
-   stats from the item record, list values after the clamp) would make
-   the copy differ from S. Settle: Ghidra on `0x0062CBE0`, or a buy of
-   a socketed magic item compared stat by stat with the store item.
-9. §7.3 step 6: S's item flag 0x8000000 (set on every copied source)
-   has no name in `items/generation.md` §1.4. Settle: the readers of
-   item flag 0x8000000.
+1. ~~`0x00625560` (stat "bonus" of §9.2 (B)) confirmed by one recorded
+   magic-item price.~~ The definition is the stat-list spec's; the end-to-end
+   check is recording R-NV-5 (`docs/handoff/pc2-rec-npc-vendors.md`).
+2. Answered: §9.4 (format 0 never occurs on a gamble-list item;
+   `0x00578790` creates only through `0x00559CE0`).
+3. Answered from the code: §7.1.1 (`0x00577D18`). Confirming recording:
+   R-NV-6.
+4. ~~Order of §6 rule 1 versus the player's room change.~~ Recording
+   R-NV-7.
+5. Answered: edge case 2 (d2rs policy; only crafted messages reach it).
+6. ~~Magic / rare / unique buy and sell prices end to end (§9.2 rules
+   4–5).~~ Recording R-NV-5.
+7. ~~Gamble list open (14 items, ring then amulet) and a gamble purchase
+   + 0x37.~~ Recording R-NV-8.
+8. Partly answered: §7.3 (the full-record reader rebuilds the armor and
+   weapon base stats from the item record; the low-quality throw minima
+   differ from generation). ~~Whether the stream's own entries for
+   those stats override the rebuilt values, and any other rebuilt
+   field.~~ Recording R-NV-9.
+9. Answered: flag 0x8000000 has no reader in `Game.exe`
+   (`items/generation.md` §1.4); §7.3 step 6.

@@ -31,22 +31,22 @@
 | Inputs | 67–105 |
 | Outputs / state changes | 106–118 |
 | Rules | 119–120 |
-|   1. Conventions | 121–224 |
-|   2. Seeds | 225–243 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 244–286 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 287–334 |
-|   5. Special item kinds | 335–345 |
-|   6. Normal quality and class skill mods | 346–392 |
-|   7. Sockets | 393–424 |
-|   8. Ethereal | 425–445 |
-|   9. Forced requests, ears, names, timers | 446–471 |
-|   10. Items from a code: the create wrapper and start items | 472–542 |
-| Constants & data dependencies | 543–565 |
-| Randomness | 566–584 |
-| Edge cases & original bugs | 585–599 |
-| Test vectors | 600–615 |
-| Provenance | 616–642 |
-| Open questions | 643–660 |
+|   1. Conventions | 121–226 |
+|   2. Seeds | 227–245 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 246–288 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 289–336 |
+|   5. Special item kinds | 337–347 |
+|   6. Normal quality and class skill mods | 348–394 |
+|   7. Sockets | 395–426 |
+|   8. Ethereal | 427–447 |
+|   9. Forced requests, ears, names, timers | 448–473 |
+|   10. Items from a code: the create wrapper and start items | 474–544 |
+| Constants & data dependencies | 545–567 |
+| Randomness | 568–586 |
+| Edge cases & original bugs | 587–601 |
+| Test vectors | 602–617 |
+| Provenance | 618–644 |
+| Open questions | 645–662 |
 <!-- /index -->
 
 ## Summary
@@ -190,6 +190,8 @@ specified (open question 1).
 | 0x80000 | init | every creation |
 | 0x400000 | ethereal | §8 |
 | 0x1000000 | personalized | (read: §9 step 5) |
+| 0x2000000 | (header only) | set in the stream header F for alt-code items (`items/bitstream.md` §2), not stored by creation |
+| 0x8000000 | copy source (no D2MOO name) | the item copy sets it on the **source** (`world/vendors.md` §7.3 step 6, `0x0055A476`); no reader in `Game.exe` (the only other `0x8000000` immediates are file-API flags and non-item fields); it travels in every later stream of the item (header F) |
 | 0x4000000 | runeword | `items/properties.md` §10 |
 
 #### 1.5 Request flags (flags2)
