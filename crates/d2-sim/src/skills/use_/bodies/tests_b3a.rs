@@ -41,7 +41,7 @@ fn count(log: &[String], what: &str) -> usize {
 
 // ---------------------------------------------------------------- §3.1
 
-// Covers: specs/skills/bodies-3.md §3.1 text, §3.1 r1, §3.1 r2, §3.1 r3
+// Covers: specs/skills/bodies-3.md §3.1 text, §3.1 r1, §3.1 r2, §3.1 r3; specs/monsters/population.md §14 r1
 #[test]
 fn spawn_class_columns_skill_and_fallback() {
     let mut r = body_rec();
