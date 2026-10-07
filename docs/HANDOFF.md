@@ -5910,6 +5910,78 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r46-packets.jsonl`.
 - Compare: the client_out 0x67 (seq 1) bytes @0x11–@0x14, @0x25, @0x27, @0x2B–@0x2D against §7 r9's table; S→C 0x01 u32@2 = u32@0x27 & 0x3179C7 and u8@6 = 0 (`intents-events.md` §8.1). Fold: replace the PROVISIONAL in `client/model.md` §7 r9.
 
+##### REC-110 [MANUAL] Front end: Game exit target
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-110.
+- Steps and compare: Game exit target. Capture: in single player, Save and Exit from a game. Steps: hook `0x0044B8A0` return and the next screen builder called (`0x0043B080` vs `0x004336C0`). Settles: which screen return value 4 maps to (expected character select).
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-111 [MANUAL] Front end: Control draw order
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-111.
+- Steps and compare: Control draw order. Capture: break in the D2Win list draw while the main menu shows; log the control order (types 2, 3, 3, 6…). Settles: creation order = draw order (logo over background, buttons over logo).
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-112 [MANUAL] Front end: Front-end palette
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-112.
+- Steps and compare: Front-end palette. Capture: hook the D2GFX palette load during start-up and on reaching the main menu; log the `pal.dat` path. Settles: ACT1 vs another palette for all front-end art.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-113 [MANUAL] Front end: Character-select OK condition
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-113.
+- Steps and compare: Character-select OK condition. Capture: press OK with a new character and with one that finished Normal; log whether `0x00439780` or `0x00434A00` runs and the session values compared at `0x00439A79`–`0x00439A97`. Settles: when the difficulty popup appears (owned by part 2 if it covers character select).
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-120 [MANUAL] Front end: Mouse wheel on character select
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-120.
+- Steps and compare: Mouse wheel on character select. Capture: 1.14d, ≥ 11 characters, wheel up / down over the list and over the scroll bar; log `[0x00779DC8]` and `[0x0070CC00]` per event (hook `0x00439DF0`, `0x00439E90`). Settles: whether the wheel scrolls (`first` changes) and by how much, or nothing.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-121 [MANUAL] Front end: Dead hardcore figure
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-121.
+- Steps and compare: Dead hardcore figure. Capture: a hardcore save with status 0x0C (male and female class); screenshot the slot; hook `0x005066C0` args. Settles: what class' 8 / 9 draws (token, mode, palette) and the draw flags from `0x006CE278`.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-122 [MANUAL] Front end: Legacy `Save Path` migration
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-122.
+- Steps and compare: Legacy `Save Path` migration. Capture: registry with `Save Path` → a folder with saves, no `NewSavePath`; start the game; read `NewSavePath` after; repeat with an empty folder. Hook `0x00406DE0` return. Settles: which folder is kept.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-123 [MANUAL] Front end: Slot level line text
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-123.
+- Steps and compare: Slot level line text. Capture: screenshot one slot per class; or read the string id pushed to the `D2Lang_GetStringByIndex` call after `" %d "` in `0x004380F0` (`disasm.py fn 0x004380F0`). Settles: the exact level / class line text and colour.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-130 [MANUAL] Front end: class names 10097 / 10098
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-130.
+- Steps and compare: class names 10097 / 10098. Capture: extract `data\local\lng\eng\patchstring.tbl` from `Patch_D2.mpq` (by name; the archive has no listfile) or, in the 1.14d game with expansion, hover the Druid and the Assassin on the create screen and screenshot text 197. Settles which id shows which name.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-131 [MANUAL] Front end: filter argument 2
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-131.
+- Steps and compare: filter argument 2. Capture: on the create screen, select a class, type `-` into the empty box, then `a-`; hook `0x00430590` and log its 3 arguments. Settles whether a leading separator is rejected (arg = caret position) or the argument means something else.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-132 [MANUAL] Front end: animation timing
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-132.
+- Steps and compare: animation timing. Capture: record the create screen at ≥ 50 fps; click the Paladin; count frames from click to `panu3` start (expect 79 × 40 ms ≈ 3.2 s) and check that loops skip the last frame. Settles §F3.3 rule 2/4 as implemented.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
+##### REC-133 [MANUAL] Front end: hardcore availability
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/front-end.md` PROVISIONAL REC-133.
+- Steps and compare: hardcore availability. Capture: fresh install, empty save folder, Single Player → create screen, select any class; check the Hardcore box is shown (and log `[0x00779DA4]` at `0x00435580`). Settles §F3.5 rule 2.
+- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
