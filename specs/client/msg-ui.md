@@ -35,26 +35,26 @@
 |   6. 0x4E hire offer and 0x4F hire list reset | 354–366 |
 |   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 367–407 |
 |   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 408–441 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–467 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 468–478 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 479–487 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 488–497 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 498–510 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 511–519 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 520–530 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 531–633 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 634–646 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 647–657 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 658–677 |
-|   20. 0x61 act video (`0x0045E660`) | 678–685 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 686–693 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 694–703 |
-| Constants & data dependencies | 704–715 |
-| Randomness | 716–720 |
-| Edge cases & original bugs | 721–737 |
-| Test vectors | 738–785 |
-| Provenance | 786–846 |
-| Open questions | 847–945 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–470 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 471–481 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 482–490 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 491–500 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 501–513 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 514–522 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 523–533 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 534–636 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 637–649 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 650–660 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 661–680 |
+|   20. 0x61 act video (`0x0045E660`) | 681–688 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 689–696 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 697–706 |
+| Constants & data dependencies | 707–718 |
+| Randomness | 719–723 |
+| Edge cases & original bugs | 724–740 |
+| Test vectors | 741–788 |
+| Provenance | 789–849 |
+| Open questions | 850–969 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -445,7 +445,10 @@ layer.
    Model state written: none.
 2. One `NpcInteract` output {unit key, and, captured at receive: unit
    present, its `class`, its monster-data field +0x3C (`0x004AE130`;
-   −1 when absent), and whether S holds an object of class 318
+   −1 when absent; its only writer is `0x004AE150`, called once, by the
+   0xAC create `0x00466360` at `0x004664E1` with the parsed record's
+   +0x14 = the 0xAC bit-stream `value` (−1 when "has value" is 0),
+   `client/msg-units.md` §1.2 r1; 2026-10-08 read), and whether S holds an object of class 318
    (`eunuch harem blocker`) in mode 2 (`0x004649D0` over the type-2
    heads, predicate `0x004B3360`)}.
 3. The UI layer, at delivery: unit absent → nothing. Class 534
@@ -854,7 +857,24 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    what the flag f = 1 changes.
 2. The full client unit flag word +0xC4 (initial value per kind, other
    writers), so `quest_untargetable` can become a real flag field;
-   owner `client/msg-units.md`.
+   owner `client/msg-units.md`. *Partly answered (2026-10-08, asm
+   scan of immediate writes):* **0x10000** is set only by
+   `0x00464810(U)` (callers in `0x00461010`, the monster mode machine
+   `0x004AFF60` (twice), `0x004CF300`, `0x004D1640`, `0x004D33E0`,
+   `0x004D3D00`, `0x004D59E0`, `0x004E2630`, `0x004F0590`) and cleared
+   by `0x004647D0(U)` (which then sets 4 unless U is a monster whose
+   monstats2 flag tested by `0x004638A0` is clear; callers
+   `0x00453910`, `0x0045D4B0`, `0x0045D9B0`, `0x0045DB20`,
+   `0x00461250`, `0x00463390`, `0x00478BB0` (0x81 type 7),
+   `0x004AFF60`). **0x200** is set (with 2: `|= 0x202`) only by the
+   client hireling setup `0x004B1090`, called by the 0xAC create when
+   the new monster's pet type (`0x00479180`) is 7 and by 0x81 type 7
+   (`client/model.md` §14 r3); no client clear. PROVISIONAL: the
+   per-caller conditions of the 0x10000 writers inside the mode
+   machines follow `client/model.md` OQ 1's provisional (dead modes
+   only: set on entering a death / dead mode, cleared on leaving)
+   (because the 0x15 / death flow is the only one exercised by the
+   recordings); settled by REC-51.
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
@@ -897,8 +917,12 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    machine (table `0x0070EE54`, state `[0x0070EE4C]`) ends: ≠ 0 → the
    loop returns 0 with `[0x007A0440]` := 0; 0 (written by 0x50 code 23
    and by 0xB4's `0x0044E380`, `client/model.md` §7 r8) → the result is
-   chosen by the game type byte +0x19 of the session record (table
-   `0x0044BA08` / `0x0044B9FC`; values Pending). Both are front-end
+   chosen by the game type u32 at +0x19 of the session record (read
+   as a dword, `0x0044B9C5`): ≤ 9 → byte table `0x0044BA08` = {0, 2,
+   1, 1, 2, 2, 1, 1, 0, 0} into jump table `0x0044B9FC` = {4, 3, 4}, so
+   types 2, 3, 6, 7 → `[0x007A0440]` := 3 and the loop returns 3; any
+   other type (> 9 included) → 4 and returns 4 (bytes read from the
+   1.14d image, 2026-10-08). Both are front-end
    state (where the program goes after the game), not model; the
    front-end flow is Phase 6 UI. Original question: `[0x0070EE8C]` and `[0x007A0674]` (0x50 code 23): what the client
    loop does with them after the exit (`0x0044B8A0`, `0x0044DD60`,
