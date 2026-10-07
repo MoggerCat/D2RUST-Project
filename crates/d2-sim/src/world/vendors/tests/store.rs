@@ -3,6 +3,7 @@
 use super::*;
 use crate::items::q;
 use crate::rng::Seed;
+use crate::world::vendors::price::PriceFatal;
 use crate::world::vendors::store::{
     clear_record, client_left, generate, level_changed, make_store_item, open, quality_draw, range,
     refresh_act, StoreCtx,
@@ -138,7 +139,7 @@ fn range_helper() {
 fn charsi_store(w: &mut Fake, seed: &mut Seed) -> (VendorTables, VendorRecord) {
     let t = tables();
     let mut rec = record(&t, class::CHARSI, 0);
-    generate(&mut ctx(&t, seed), &mut rec, w, p(), 77);
+    generate(&mut ctx(&t, seed), &mut rec, w, p(), 77).unwrap();
     (t, rec)
 }
 
@@ -193,7 +194,7 @@ fn classic_skips_expansion_items_after_the_draw() {
     w.expansion = false;
     w.format = 2;
     let mut seed = Seed::new(1, 666);
-    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0);
+    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0).unwrap();
     assert!(rec.store.is_empty());
     let mut s = Seed::new(1, 666);
     s.step();
@@ -208,7 +209,7 @@ fn high_level_store_draws() {
     let mut w = Fake::new(class::CHARSI);
     w.set(PLAYER, stat::LEVEL, 30);
     let mut seed = Seed::new(5, 666);
-    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0);
+    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0).unwrap();
     // ilvl 35: no normal items; jav's k draw and n_mag draw; perms.
     let mut s = Seed::new(5, 666);
     let k = range(&mut s, 1, 3) + 1;
@@ -226,7 +227,7 @@ fn failures_stop_normal_items() {
     let mut w = Fake::new(class::CHARSI);
     w.store_room = [0; 4];
     let mut seed = Seed::new(1, 666);
-    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0);
+    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0).unwrap();
     // 33 nulls: the 33rd stops; every one parked as a deferred node.
     assert_eq!(w.created.len(), 33);
     assert_eq!(rec.events.len(), 33);
@@ -254,7 +255,7 @@ fn magic_nulls_never_stop() {
     let mut w = Fake::new(class::CHARSI);
     w.store_room = [0; 4];
     let mut seed = Seed::new(1, 666);
-    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0);
+    generate(&mut ctx(&t, &mut seed), &mut rec, &mut w, p(), 0).unwrap();
     // range(0, 1) draws once; 40 magic nulls; then aqv's null (41 > 32)
     // stops before cqv.
     assert_eq!(w.created.len(), 41);
@@ -271,41 +272,54 @@ fn store_item_tries() {
     let hax = index(&t, "hax");
     // Four cracked tries, then a good one.
     w.create_queue = VecDeque::from([Some(true); 4]);
-    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1);
+    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1).unwrap();
     assert!(it.is_some());
     assert_eq!(w.destroyed.len(), 4);
     // Five cracked tries: null.
     w.create_queue = VecDeque::from([Some(true); 5]);
-    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1);
+    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1).unwrap();
     assert!(it.is_none());
-    // Code mismatch: destroyed, second round with quality 2, kept.
+    // Code mismatch: destroyed, second round with quality 2, whose
+    // mismatch also destroys the item: null (§3.1 rule 2, V7).
     w.created.clear();
+    let destroyed = w.destroyed.len();
     w.create_as.insert(hax, index(&t, "lax"));
     let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 4, 6, 1).unwrap();
+    assert_eq!(it, None);
     assert_eq!(w.created, vec![(hax, 4, 6), (hax, 2, 6)]);
-    assert_eq!(w.unit(it.0).record, index(&t, "lax"));
+    assert_eq!(w.destroyed.len(), destroyed + 2);
     w.create_as.clear();
+    // A null creation call is the fatal assert (line 0x61A).
+    w.create_queue = VecDeque::from([None]);
+    assert_eq!(
+        make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1),
+        Err(PriceFatal::NullStoreItem)
+    );
     // No store page: destroyed, null.
     let mut t2 = t.clone();
     t2.items[hax].type_ = T_NOPAGE;
     let before = w.destroyed.len();
-    let it = make_store_item(&mut ctx(&t2, &mut seed), &mut rec, &mut w, hax, 2, 6, 1);
+    let it = make_store_item(&mut ctx(&t2, &mut seed), &mut rec, &mut w, hax, 2, 6, 1).unwrap();
     assert!(it.is_none());
     assert_eq!(w.destroyed.len(), before + 1);
     // Page 1 full: page 2.
     w.store_room = [10, 0, 10, 10];
-    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1).unwrap();
+    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1)
+        .unwrap()
+        .unwrap();
     assert_eq!(w.unit(it.0).page, 2);
     // Page 0 full: parked, null.
     let cap = index(&t, "cap");
     w.store_room = [0, 10, 10, 10];
-    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, cap, 2, 6, 1);
+    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, cap, 2, 6, 1).unwrap();
     assert!(it.is_none());
     assert!(rec.events.last().unwrap().deferred);
     // Repaired before placement: durability := max.
     w.store_room = [10; 4];
     w.create_queue = VecDeque::from([Some(false)]);
-    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1).unwrap();
+    let it = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 6, 1)
+        .unwrap()
+        .unwrap();
     assert!(w.log.iter().any(|l| l == &format!("recharge {}", it.0)));
     assert_eq!(w.get(it.0, stat::DURABILITY), 20);
     assert!(w.stat_msgs.is_empty(), "no player: no 0x3E");
@@ -322,7 +336,7 @@ fn upgrades() {
         let mut w = Fake::new(class::CHARSI);
         w.difficulty = d;
         let mut seed = Seed::new(0, x);
-        make_store_item(&mut ctx(t, &mut seed), &mut rec, &mut w, hax, 2, 35, lp);
+        make_store_item(&mut ctx(t, &mut seed), &mut rec, &mut w, hax, 2, 35, lp).unwrap();
         (w.created[0].0, seed)
     };
     // Nightmare, ilvl 35: r < 35·64 + 4000 = 6240 → ubercode.
@@ -359,7 +373,8 @@ fn trade_open() {
         true,
         false,
         10,
-    );
+    )
+    .unwrap();
     assert!(rec.has_traded && rec.store_generated);
     assert_eq!(rec.last_npc, NPC);
     assert_eq!(rec.chain_node(PLAYER).map(|n| n.gamble_mode), Some(false));
@@ -380,7 +395,8 @@ fn trade_open() {
         true,
         false,
         20,
-    );
+    )
+    .unwrap();
     assert_eq!((seed, &rec.store), (s, &first));
     // Pending refresh, not single: kept.
     rec.refresh_pending = true;
@@ -393,7 +409,8 @@ fn trade_open() {
         false,
         false,
         30,
-    );
+    )
+    .unwrap();
     assert_eq!(rec.store, first);
     // Single: cleared and regenerated.
     open(
@@ -405,7 +422,8 @@ fn trade_open() {
         true,
         false,
         40,
-    );
+    )
+    .unwrap();
     assert!(!rec.refresh_pending);
     assert_ne!(rec.store, first);
     assert_eq!(w.removed.len(), 43);
@@ -431,7 +449,8 @@ fn trade_open_classes() {
         true,
         false,
         0,
-    );
+    )
+    .unwrap();
     assert_eq!(hires(&w), vec![format!("hire list {}", class::ASHEARA)]);
     // Kashya: no store refresh, no items shown.
     let mut rec = VendorRecord::new(class::KASHYA, 0, false, &g);
@@ -445,7 +464,8 @@ fn trade_open_classes() {
         true,
         false,
         0,
-    );
+    )
+    .unwrap();
     assert!(w.refreshed.is_empty() && !rec.store_generated);
     assert!(hires(&w).is_empty(), "not a trader");
     // Gamble open at a non-gambler: no list.
@@ -460,7 +480,8 @@ fn trade_open_classes() {
         true,
         true,
         0,
-    );
+    )
+    .unwrap();
     assert!(rec.gamble_lists.is_empty() && rec.chain.is_empty());
 }
 
@@ -480,7 +501,8 @@ fn refresh_rule() {
         true,
         false,
         1000,
-    );
+    )
+    .unwrap();
     let mut recs = vec![rec, record(&t, class::GHEED, 0)];
     // Not empty: the 240000 ms timer (unsigned compare).
     refresh_act(&mut recs, &mut w, 0, false, 241_000);
@@ -512,7 +534,8 @@ fn refresh_rule() {
         true,
         false,
         0,
-    );
+    )
+    .unwrap();
     w.npcs.clear();
     let mut recs = vec![rec];
     refresh_act(&mut recs, &mut w, 0, true, 0);
@@ -536,7 +559,8 @@ fn leaving_town() {
         true,
         false,
         0,
-    );
+    )
+    .unwrap();
     w.npcs.insert(NPC, (class::CHARSI, true));
     let mut recs = vec![rec];
     // Another player in town: no reset.
@@ -564,7 +588,8 @@ fn leaving_town() {
         true,
         false,
         0,
-    );
+    )
+    .unwrap();
     let mut recs = vec![rec];
     w.players_in.insert(1, 1);
     w.game_type = 3;

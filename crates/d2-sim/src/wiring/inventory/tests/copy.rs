@@ -60,10 +60,12 @@ fn copy_of_a_held_item() {
     assert_ne!(c, su);
     let cg = w.units.get(c).unwrap().guid;
     assert_eq!(cg, s + 1, "the next item GUID");
-    // The save's 32 bits (unit +0x28) become the copy's item seed
-    // (`rng.md` §5.3).
-    let seed = w.units.get(c).unwrap().item_seed.unwrap().0;
-    assert_eq!(seed, crate::rng::Seed::init_low(init));
+    // The save's 32 bits become the copy's unit +0x28 and unit seed
+    // `init_low`; the item seed is the allocation's (`rng.md` §5.3).
+    let cr = w.units.get(c).unwrap();
+    assert_eq!(cr.init_seed, init);
+    assert_eq!(cr.seed, crate::rng::Seed::init_low(init));
+    assert_ne!(cr.item_seed.unwrap().0, crate::rng::Seed::init_low(init));
     assert_eq!(w.units.get(c).unwrap().mode, w.units.get(su).unwrap().mode);
     assert_eq!(w.game.lists.unit(c).unwrap().room(), None);
     assert_eq!((w.data(cg).x, w.data(cg).y), (w.data(s).x, w.data(s).y));
@@ -123,7 +125,9 @@ fn a_stream_over_the_buffer_copies_nothing() {
 
 /// Step 5: with fillers 0 the children are not read: the copy keeps the
 /// socketed flag and its socket count, without fillers; with fillers 1
-/// the socketing call's arguments are unwritten: none, logged.
+/// each child is read, allocated (two more game-seed steps) and linked
+/// into the copy in mode 6 (provisional reading of `0x00562660(…, 0, 1,
+/// 0, 0)`).
 // Covers: specs/world/vendors-2.md §7.3 r5
 #[test]
 fn children_and_the_fillers_argument() {
@@ -146,9 +150,24 @@ fn children_and_the_fillers_argument() {
     assert_ne!(w.items.get(c).unwrap().flags & 0x800, 0);
     assert_eq!(w.stats.unit_total(c, stat::NUMSOCKETS, 0), 2);
     assert!(!w.state.inventories.contains_key(&c), "no fillers");
-    assert_eq!(w.desk(|d| d.copy_of(su, true)), None);
-    assert!(matches!(
-        w.state.errors.last(),
-        Some(InvError::Unwritten(_))
-    ));
+    let seed = w.desk(|d| d.econ.fields.seed);
+    let c2 = w
+        .desk(|d| d.copy_of(su, true))
+        .expect("copied with fillers");
+    let mut steps = seed;
+    for _ in 0..4 {
+        steps.step();
+    }
+    assert_eq!(w.desk(|d| d.econ.fields.seed), steps, "2 · (1 + 1) steps");
+    let kids = w
+        .state
+        .inventories
+        .get(&c2)
+        .expect("fillers")
+        .items()
+        .to_vec();
+    assert_eq!(kids.len(), 1);
+    assert_ne!(kids[0], ku);
+    assert_eq!(w.state.items.get(&kids[0]).unwrap().mode, 6);
+    assert_eq!(w.state.errors, Vec::new());
 }

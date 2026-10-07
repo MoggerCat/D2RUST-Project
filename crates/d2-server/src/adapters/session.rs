@@ -126,6 +126,29 @@ pub struct PlayerRecord {
     pub hands: [SkillHand; 2],
 }
 
+/// Player data +0x2C at allocation: `0x0061AE30(1)` = 1 << (position of
+/// level 1 in the portal level list); live 1 (`d2s-load.md` §8 rule 1).
+pub const PORTAL_FLAGS_AT_START: u32 = 1;
+
+impl PlayerRecord {
+    /// The record of a new character (the stub, `d2s-load.md` §8 rules 1
+    /// and 3): +0x2C = [`PORTAL_FLAGS_AT_START`]; +0x74 := 0 and +0x70 :=
+    /// `StartSkill` when load §1 rule 1 sets it (`start_skill`), else 0;
+    /// +0x78 / +0x7C keep the zero fill (item 0).
+    pub fn new_character(start_skill: Option<u16>) -> Self {
+        Self {
+            portal_flags: PORTAL_FLAGS_AT_START,
+            hands: [
+                SkillHand {
+                    skill: start_skill.unwrap_or(0),
+                    item: 0,
+                },
+                SkillHand::default(),
+            ],
+        }
+    }
+}
+
 /// What the joining character brings (its save: `path-placement.md` §13
 /// rule 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -136,11 +159,9 @@ pub struct Entry {
     pub name: [u8; 16],
     /// The client's hot-key slots.
     pub hotkeys: [HotKey; 16],
-    /// The player record's values. `None`: not given (no save loader is
-    /// wired), so 0x5F and the two 0x23 are not sent.
-    ///
-    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the
-    /// record of a new character (`0x00532590`) is not specified.
+    /// The player record's values (`d2s-load.md` §8; a new character's:
+    /// [`PlayerRecord::new_character`]). `None`: not given, so 0x5F and
+    /// the two 0x23 are not sent.
     pub record: Option<PlayerRecord>,
 }
 
@@ -384,4 +405,20 @@ pub fn load_save<D: ActionEvents, W>(
         Ok::<_, LoadError>(r)
     })?;
     Ok((Entry::new(report.act, save.header.name), report))
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::*;
+
+    // Covers: specs/formats/d2s-load.md §8 r1, §8 r3
+    #[test]
+    fn new_character_record() {
+        let r = PlayerRecord::new_character(Some(36));
+        assert_eq!(r.portal_flags, 1);
+        assert_eq!(r.hands[0], SkillHand { skill: 36, item: 0 });
+        assert_eq!(r.hands[1], SkillHand { skill: 0, item: 0 });
+        let r = PlayerRecord::new_character(None);
+        assert_eq!(r.hands, [SkillHand::default(); 2]);
+    }
 }

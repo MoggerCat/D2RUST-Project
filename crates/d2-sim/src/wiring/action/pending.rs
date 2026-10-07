@@ -778,8 +778,6 @@ pub trait Pending {
     fn corpse_loot_allowed(&self, corpse: UnitId, unit: UnitId) -> bool {
         false
     }
-    /// The corpse's item take-back `0x00562F30` (§4.7 rule 2).
-    fn corpse_take_back(&mut self, game: &mut Game, unit: UnitId, corpse: UnitId) {}
 
     /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
     /// changes and the kill `0x0057CCB0` are not specified in full).

@@ -76,6 +76,14 @@ pub enum PriceFatal {
     NoNpcRow(u16),
     #[error("no books row {0}")]
     NoBook(u16),
+    /// §3.1 rule 2: the store item creation returned none; the code read
+    /// `0x00628590(none)` asserts (line 0x61A).
+    #[error("store item creation returned none (line 0x61A)")]
+    NullStoreItem,
+    /// §9.4: the item's normal code has no record (V6: the format-0 read
+    /// faults, `0x00629370` asserts 0xB1A).
+    #[error("no record for the normal code of item record {0}")]
+    NoNormalRecord(usize),
 }
 
 /// guard(x, m) (§9.2).
@@ -171,8 +179,7 @@ fn add_unsigned(v: &mut Sbr, d: &Sbr, div: i32) {
 
 /// Magic affix id (combined index + 1) → its modifier; 0 → none.
 fn affix(t: &VendorTables, id: u16, d: &mut Sbr, v: &Sbr) {
-    // TODO(specs/world/vendors.md §9.2 rule 4): an empty slot (id 0) is
-    // read as "no delta"; the spec does not say what the original reads.
+    // §9.2 rule 4: an empty slot (id 0) adds no delta.
     if let Some(m) = usize::from(id).checked_sub(1).and_then(|i| t.magic.get(i)) {
         add_mod(d, v, m.mult, m.add);
     }
@@ -185,8 +192,7 @@ fn item_skills(t: &VendorTables, it: &PriceItem, v: &mut Sbr, div: i32) {
     }
     let mut d = Sbr::default();
     for &(skill, value) in it.item_skills.iter().take(64) {
-        // TODO(specs/world/vendors.md §9.2 (A)): a layer without a skills
-        // row is skipped; the spec does not say.
+        // §9.2 (A): a layer without a skills row is skipped.
         let Some(sk) = t.skills.get(usize::from(skill)) else {
             continue;
         };
@@ -214,8 +220,8 @@ fn item_skills(t: &VendorTables, it: &PriceItem, v: &mut Sbr, div: i32) {
 
 /// (min, max) of a packed by-time value (`0x0065CA30`, `sim/stats.md`
 /// §8): its low and high fields.
-// TODO(specs/world/vendors.md §9.2 (B) encode 4): "(min, max) of the
-// by-time value" is read as the two packed fields `stats::by_time` decodes.
+// §9.2 (B) encode 4: "(min, max) of the by-time value" are the two packed
+// fields `stats::by_time` decodes.
 fn by_time_range(v: i32) -> (i32, i32) {
     (((v >> 2) & 0x3FF) - 256, ((v >> 12) & 0x3FF) - 256)
 }
@@ -330,7 +336,7 @@ pub fn cost(
     let qty = it.quantity.max(1);
     let rp = ctx.reduced_prices.min(99);
     if txn == tx::GAMBLE {
-        return Ok(gamble_price(t, it, ctx.player_level, rp));
+        return gamble_price(t, it, ctx.player_level, rp);
     }
     let rec = t.item(it.record);
     let item_cost = rec.map_or(0, |r| r.cost as i32);
@@ -440,8 +446,7 @@ pub fn cost(
     }
     // Rule 6.
     for &s in &it.sockets {
-        // TODO(specs/world/vendors.md §9.2 rule 6): "cost/2" is read as the
-        // socketed item's record `cost` / 2.
+        // §9.2 rule 6: "cost/2" is the socketed item's record `cost` / 2.
         let c = t.item(s).map_or(0, |r| r.cost as i32) / 2;
         v.s = v.s.wrapping_add(c);
         v.b = v.b.wrapping_add(c);
@@ -536,16 +541,27 @@ pub fn cost(
     })
 }
 
-/// Gamble price (§9.4).
-pub fn gamble_price(t: &VendorTables, it: &PriceItem, player_level: i32, rp: i32) -> i32 {
+/// Gamble price (§9.4). The normal code (`0x006287D0`) is items
+/// `normcode` when ≠ 0, else `code`; one missing from the code map is
+/// fatal (V6).
+pub fn gamble_price(
+    t: &VendorTables,
+    it: &PriceItem,
+    player_level: i32,
+    rp: i32,
+) -> Result<i32, PriceFatal> {
     let normal = t
         .item(it.record)
-        .and_then(|r| t.find_code(r.normcode))
+        .and_then(|r| {
+            t.find_code(if r.normcode != [0; 4] {
+                r.normcode
+            } else {
+                r.code
+            })
+        })
         .and_then(|i| t.item(i));
     let Some(n) = normal else {
-        // TODO(specs/world/vendors.md §9.4): an item without a normal-code
-        // record is not described; read as price 0.
-        return 0;
+        return Err(PriceFatal::NoNormalRecord(it.record));
     };
     let price = if it.format == 0 || n.code == RIN || n.code == AMU {
         n.gamble_cost as i32
@@ -577,11 +593,11 @@ pub fn gamble_price(t: &VendorTables, it: &PriceItem, player_level: i32, rp: i32
             / 10000;
         base.wrapping_add(mix).wrapping_mul((2 * lp + 1) / 3 + 20) / 15
     };
-    if rp != 0 {
+    Ok(if rp != 0 {
         price.wrapping_sub(muldiv(price, rp, 100))
     } else {
         price
-    }
+    })
 }
 
 #[cfg(test)]

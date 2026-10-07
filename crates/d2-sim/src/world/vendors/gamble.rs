@@ -74,8 +74,8 @@ pub fn make_list<W: VendorWorld>(
 ) {
     let t = c.tables;
     let Some(index) = t.gamble_index.as_ref() else {
-        // TODO(specs/world/vendors.md §5.1): "requires the gamble index";
-        // without one no list is made.
+        // The gamble index is never none in 1.14d (V9); a d2rs table set
+        // without one makes no list.
         return;
     };
     let Some(odds) = t.difficulty.get(usize::from(w.difficulty())).copied() else {
@@ -100,8 +100,7 @@ pub fn make_list<W: VendorWorld>(
         let th = t.gamble_thresholds.get(lg as usize).copied().unwrap_or(0) as i32;
         let idx = if th < 1 { 0 } else { c.seed.roll(th) as usize };
         let Some(&id) = index.get(idx) else {
-            // TODO(specs/world/vendors.md §5.1 step 2): an index past the
-            // list is not described; read as the end of the list.
+            // idx < T[L_g] ≤ count always (V9): unreachable.
             break;
         };
         let mut id = id as usize;
@@ -114,12 +113,11 @@ pub fn make_list<W: VendorWorld>(
             }
         }
         // Step 4.
-        // TODO(specs/world/vendors.md §5.1 step 4): `rin` / `amu` missing
-        // from the tables keeps the drawn id.
+        // A missing `rin` / `amu` is cached as item 0 (`hax`, V9).
         if c_n == 0 {
-            id = rin.unwrap_or(id);
+            id = rin.unwrap_or(0);
         } else if c_n == 1 {
-            id = amu.unwrap_or(id);
+            id = amu.unwrap_or(0);
         }
         // Step 5.
         if expansion {

@@ -107,6 +107,13 @@ pub struct InteractInfo {
 pub const INTERACT_RESET_TYPE: u32 = 6;
 
 impl InteractInfo {
+    /// The state [`InteractInfo::reset`] leaves.
+    pub const INACTIVE: InteractInfo = InteractInfo {
+        guid: u32::MAX,
+        ty: INTERACT_RESET_TYPE,
+        active: false,
+    };
+
     /// `0x00554100`: (unit type, GUID) while active, else none.
     pub fn get(&self) -> Option<(u8, u32)> {
         self.active.then_some((self.ty as u8, self.guid))
@@ -162,9 +169,6 @@ pub struct UnitRecord {
     /// +0xD0.
     pub node_index: u32,
     /// +0x64 / +0x68 / +0x6C ([`InteractInfo`]).
-    // PROVISIONAL (sim/units.md §2): allocation writes the reset values
-    // (GUID −1, type 6, inactive; `0x00554190`); settled by a bin read of
-    // `0x00555230` (no getter reads them while inactive).
     pub interact: InteractInfo,
 }
 
@@ -186,11 +190,9 @@ impl UnitRecord {
             flags: 0,
             flags2: 0,
             node_index: INITIAL_NODE_INDEX,
-            interact: InteractInfo {
-                guid: u32::MAX,
-                ty: INTERACT_RESET_TYPE,
-                active: false,
-            },
+            // sim/units.md §2: the zeroed allocation (`0x00620290`) leaves
+            // GUID 0, type 0, inactive; nothing in `0x00555230` writes them.
+            interact: InteractInfo::default(),
         }
     }
 

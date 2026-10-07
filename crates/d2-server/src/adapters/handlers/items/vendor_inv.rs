@@ -21,12 +21,13 @@
 //! owned, placement fails (the inventory wiring's reading for a unit
 //! without an inventory, `inventory.md` §5).
 
+use d2_sim::items::moves::{deferred, MoveUnits};
 use d2_sim::rng::Seed;
 use d2_sim::units::lifecycle::LifecycleHooks;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
 use d2_sim::wiring::interaction::{NpcRest, PlayerQuestsRef, VendorDesk, VendorRest};
-use d2_sim::wiring::inventory::{InvDesk, InvState};
+use d2_sim::wiring::inventory::{InvDesk, InvError, InvState};
 use d2_sim::world::vendors::price::PriceItem;
 use d2_sim::world::vendors::{NpcLink, Transaction, VendorWorld};
 
@@ -312,14 +313,21 @@ where
     fn lower_book_skill(&mut self, player: UnitId, item: UnitId, n: i32) {
         self.inner.lower_book_skill(player, item, n)
     }
-    /// §7.2 rule 9, mode 0: removed (`0x0055DF10`): unlinked from the
-    /// player's inventory (§1.4) and freed (`0x0055DF10` → `0x00557FD0`,
-    /// `cube.md` §8 step 1).
-    ///
-    /// TODO(spec: vendors.md §7.2 r9): "item cell := page, item update
-    /// message" names no routine or layout; no message is queued.
+    /// §7.2 rule 9, mode 0 (`0x00579963`–`0x0057998F`): the item's
+    /// stored page (+0x47) := its page (+0x45), S→C 0x9D action 5 with
+    /// command flags 0x20 (`0x0053D010`, `inventory-moves.md` §6.4), then
+    /// removed (`0x0055DF10`): unlinked from the player's inventory (§1.4)
+    /// and freed (`0x0055DF10` → `0x00557FD0`, `cube.md` §8 step 1).
     fn remove_stored(&mut self, player: UnitId, item: UnitId) {
         self.with_desk(|d| {
+            let g = d.guid_of(item);
+            if let Some(o) = d.owner_of(player) {
+                let page = MoveUnits::page(d, g);
+                MoveUnits::set_stored_page(d, g, page);
+                if let Err(e) = deferred::send_item_page(d, o, g, 0x20, page) {
+                    d.state.errors.push(InvError::Move(e));
+                }
+            }
             d.remove(player, item);
             d.free(item);
         });

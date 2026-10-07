@@ -411,8 +411,9 @@ fn real_skills_table_facts() {
 /// Every skills row's `srvstfunc`, `srvdofunc`, `srvprgfunc1–3` and
 /// `ItemEffect`, and every states row's `srvactivefunc`, names a filled
 /// slot of `table::FUNCS` (or 0); the filled slots referenced are exactly
-/// the `mapped` ones, the three `unreferenced` ones are not referenced
-/// (`use.md` §8, `functions.tsv`).
+/// the `spec'd-here` and `mapped` ones (since the bodies were specified no
+/// row is `mapped`, `use.md` §8), the three `unreferenced` ones are not
+/// referenced (`functions.tsv`).
 #[test]
 #[ignore = "needs extracted 1.14d tables in D2_GAME_DIR"]
 fn every_skill_function_in_table() {
@@ -448,7 +449,7 @@ fn every_skill_function_in_table() {
     }
     let mapped: BTreeSet<(u8, u16)> = FUNCS
         .iter()
-        .filter(|f| f.status == Status::Mapped)
+        .filter(|f| matches!(f.status, Status::SpecdHere | Status::Mapped))
         .map(|f| (u8::from(f.kind == Kind::Do), f.index))
         .collect();
     assert_eq!(used, mapped);

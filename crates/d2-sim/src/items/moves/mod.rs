@@ -236,6 +236,14 @@ pub enum MoveFatal {
     /// An item message reached 0xFD bytes (§11).
     #[error("item message of {0} bytes")]
     MessageSize(usize),
+    /// An item copy or creation the spec calls fatal returned none
+    /// (§7.23 take from the hireling, line 0x19A1).
+    #[error("item copy or creation failed")]
+    Create,
+    /// §12.2 phase 1 step 5: the target body location is held (line
+    /// 0x1775).
+    #[error("corpse take-back: body location held (line 0x1775)")]
+    SlotHeld,
 }
 
 /// Helper outcome: `ok` = result 1; `out` = the refusal flag (§7: result

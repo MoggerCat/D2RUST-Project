@@ -220,9 +220,8 @@ pub fn buy<W: VendorWorld>(
         _ => None,
     };
     if offered == Some(false) {
-        // TODO(specs/world/vendors.md §7.1 rule 2): the GUID of this 0x2A
-        // is not written; −1 as rules 4–5.
-        send(w, player, 0, 7, NO_GUID);
+        // Rules 1–2 carry the requested item GUID (§7.1, V10).
+        send(w, player, 0, 7, m.item);
         return Ok(1);
     }
     // Rule 3.
@@ -477,8 +476,8 @@ pub fn sell<W: VendorWorld>(
                 rec.store.push(c);
                 let max = w.stat(c, stat::MAXDURABILITY, 0);
                 w.set_stat(c, stat::DURABILITY, 0, max);
-                // TODO(specs/world/vendors.md §7.2 rule 8): "quantity := max
-                // stack" is applied to every copy, stackable or not.
+                // §7.2 rule 8 (V11): "quantity := max stack" for every
+                // placed copy, stackable or not.
                 if let Some(ci) = w.price_item(c) {
                     let ms = max_stack(t, &ci);
                     w.set_stat(c, stat::QUANTITY, 0, ms);
@@ -554,10 +553,11 @@ fn needs_repair(t: &VendorTables, it: &PriceItem) -> bool {
         || charges_not_full(it)
 }
 
-/// Repair: `0x0054BB60` → `0x00578050` (§8.1). Returns the handler
-/// result.
-// TODO(specs/world/vendors.md §8.1): the handler result is written only
-// for rule 4's first refusal (3); every other path returns 0.
+/// Repair `0x00578050` (§8.1). Returns the routine's own result (rule 7,
+/// V12): 1 for rules 1, 2, rule 4's "not repairable" and "nothing to
+/// repair" and repair-all's failed payment; 3 for rule 4's "missing or
+/// not in the inventory"; 0 otherwise. The handler `0x0054BB60` drops it
+/// (0 for every 17-byte message).
 pub fn repair<W: VendorWorld>(
     t: &VendorTables,
     w: &mut W,
@@ -568,12 +568,12 @@ pub fn repair<W: VendorWorld>(
     let npc = w.npc_by_guid(m.npc);
     let Some(npc) = npc.filter(|&n| w.is_interact_unit(player, n)) else {
         send(w, player, 0, 9, NO_GUID);
-        return Ok(0);
+        return Ok(1);
     };
     let class = w.npc_class(npc);
     if !REPAIRERS.contains(&class) {
         send(w, player, 0, 9, NO_GUID);
-        return Ok(0);
+        return Ok(1);
     }
     let ctx = price_ctx(t, w, player, class);
     // Rule 3.
@@ -595,7 +595,7 @@ pub fn repair<W: VendorWorld>(
         }
         if !pay(w, player, total) {
             send(w, player, 0, 12, NO_GUID);
-            return Ok(0);
+            return Ok(1);
         }
         for item in todo {
             repair_item(t, w, item, Some(player));
@@ -613,7 +613,7 @@ pub fn repair<W: VendorWorld>(
     };
     let Some(it) = w.price_item(item).filter(|it| repairable(t, it)) else {
         send(w, player, 0, 9, NO_GUID);
-        return Ok(0);
+        return Ok(1);
     };
     let ms = max_stack(t, &it);
     let throw_stack = it.flags & flag::ETHEREAL == 0
@@ -625,7 +625,7 @@ pub fn repair<W: VendorWorld>(
         && !(it.max_durability != 0 && it.durability < it.max_durability)
     {
         send(w, player, 0, 9, NO_GUID);
-        return Ok(0);
+        return Ok(1);
     }
     // Rule 5.
     let c = cost(t, &ctx, Some(&it), tx::REPAIR)?;

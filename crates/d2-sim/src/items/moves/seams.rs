@@ -491,9 +491,33 @@ pub trait MovePending {
     fn pick_object(&mut self, player: Owner, guid: Guid, cursor: u32) -> u32 {
         0
     }
-    /// Corpse pickup `0x0057FB70(game, player, P)` (§7.1 type 0; corpse
-    /// spec).
-    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) {}
+    /// Corpse pickup `0x0057FB70(game, player, P)` steps 1–2 (§7.1 type 0,
+    /// §12.1: state 7, the take permission, the experience return); true
+    /// when the take-back (§12.2) follows. Default: no.
+    fn corpse_pickup(&mut self, player: Owner, corpse: Owner) -> bool {
+        false
+    }
+    /// Corpse slot fit `0x0055F2D0` (§12.3) of X for `unit` with D (the
+    /// unit's item at L) and A (its item at the paired location, or D):
+    /// (fit, L after the rule). Default: no fit.
+    fn corpse_slot_fit(
+        &self,
+        unit: Owner,
+        x: Guid,
+        d: Option<Guid>,
+        a: Option<Guid>,
+        l: u8,
+    ) -> (bool, u8) {
+        (false, l)
+    }
+    /// §12.1 step 4 after a full take-back: C off the player's corpse
+    /// list (`0x0063D4E0`), out of its room (`0x0061A270`), S→C 0x8E
+    /// `CorpseAssign` to every player (`0x0053DF80`), `0x00623830`, C
+    /// freed (`0x00555600`). Default: nothing.
+    fn corpse_taken(&mut self, player: Owner, corpse: Owner) {}
+    /// Replenish timers of an item (`0x00558530`, `0x00558580`,
+    /// `items/generation.md` §9 step 6). Default: nothing.
+    fn replenish_timers(&mut self, item: Guid) {}
     /// Player-to-player interaction `0x00566E60` (§7.1 type 0;
     /// multiplayer).
     fn player_interact(&mut self, player: Owner, other: Owner) {}
