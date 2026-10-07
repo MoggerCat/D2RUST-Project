@@ -32,15 +32,15 @@
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 294–385 |
 |   5. Application | 386–575 |
 |   6. Hit class and hit recovery | 576–606 |
-|   7. Reaction and death trigger | 607–696 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 697–760 |
-|   9. Durability `0x0057D3D0` | 761–782 |
-| Constants & data dependencies | 783–804 |
-| Randomness | 805–837 |
-| Edge cases & original bugs | 838–872 |
-| Test vectors | 873–905 |
-| Provenance | 906–931 |
-| Open questions | 932–979 |
+|   7. Reaction and death trigger | 607–698 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 699–762 |
+|   9. Durability `0x0057D3D0` | 763–784 |
+| Constants & data dependencies | 785–806 |
+| Randomness | 807–839 |
+| Edge cases & original bugs | 840–874 |
+| Test vectors | 875–907 |
+| Provenance | 908–933 |
+| Open questions | 934–981 |
 <!-- /index -->
 
 ## Summary
@@ -681,7 +681,9 @@ ECX game, EDX victim D; stack killer A, flag (1 at every caller except
    distribution `0x0057E990(game, A, D)` (`combat/vitals.md` §4.3). Arena
    kill event `0x0053F720(game, A, D)` (`sim/intents-events.md`). D's
    class < monstats count (unsigned; a player victim's class 0–6 passes
-   too) and A a player → `0x0066A220(A, D's class)`.
+   too) and A a player → `0x0066A220(A, D's class)`: an empty stdcall
+   stub (its whole body is `ret 8`; one caller, `0x0057CD78`), so the
+   call has no effect. d2rs omits it.
 3. D a monster: mode request 0 (death) with direction (req byte +0x14)
    toward A (`0x00621DC0(D, A x, A y)`), or D's current direction
    without A (`0x006487F0`), req +0x08 := A, flag 1. D unit flags lack
@@ -942,8 +944,8 @@ Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
 3. Answered: §7.1 and §7.2 are read branch by branch from the 1.14d
    disassembly (block frame test, soft-hit path, sand leaper knockback,
    barricade doors). `0x005734C0` is the AI-state setter
-   (`monsters/ai.md` §3). Still unowned: `0x0066A220(killer, class)`
-   (called, not specified).
+   (`monsters/ai.md` §3). `0x0066A220(killer, class)` is an empty stub
+   (`ret 8`, §7.2 step 2).
 4. Answered: registration, unregistration and iteration of unit events
    are `skills/bodies.md` §2.13 and §2.18.
 5. Answered: every event function other than 15 and 16 is
