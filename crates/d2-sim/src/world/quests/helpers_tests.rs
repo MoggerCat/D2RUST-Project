@@ -103,7 +103,7 @@ fn superunique_at_point() {
     assert_eq!(f.log, ["unhandled 254 0x659b80"]);
 }
 
-// Covers: specs/world/quests-helpers.md §4.1, §4.2
+// Covers: specs/world/quests-helpers.md §4.1, §4.2; specs/world/quests-act1-rest.md §4.1
 #[test]
 fn quest_missiles() {
     let mut f = world();

@@ -430,7 +430,7 @@ fn operate_active_sends_menu() {
     );
 }
 
-// Covers: specs/world/waypoints.md §5.2 r1, §5.2 r3, §5.2 r4
+// Covers: specs/world/waypoints.md §5.2 r1, §5.2 r3, §5.2 r4, §edge-cases-original-bugs r7
 #[test]
 fn operate_busy_sets_bit_only() {
     let d = data();
