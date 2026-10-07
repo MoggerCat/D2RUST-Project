@@ -464,12 +464,12 @@ Real 1.14d data (`#[ignore]`): `charstats.bin` `ToHitFactor` and
 
 ## Open questions
 
-1. No recording confirms the hit chance. Request: hook `0x0057DB61`
+1. ~~No recording confirms the hit chance. Request: hook `0x0057DB61`
    (after the draw; ESI = r, EDI = chance, EBX = attacker, [EBP−0xC] =
    defender) and `0x0057DFB0` entry/return during melee play; compare
-   with §3–§6 recomputed from logged stats.
-2. Block: hook `0x0057E04B` (EDI = r, EBX = chance, ESI = defender) to
-   confirm the /3 rule and the zero-chance draw (Edge case 1).
+   with §3–§6 recomputed from logged stats.~~ → PC 2 recording list.
+2. ~~Block: hook `0x0057E04B` (EDI = r, EBX = chance, ESI = defender) to
+   confirm the /3 rule and the zero-chance draw (Edge case 1).~~ → PC 2 recording list.
 3. Answered: hostility `0x00554200` is §7.1, melee range `0x00622C40`
    / `0x00622870` are §7.2 / §7.3 (owned here). The collision-line test
    `0x00622AA0(a, b, mask)` used by §7.2 is specified in

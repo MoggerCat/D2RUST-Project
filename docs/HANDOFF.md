@@ -6194,6 +6194,18 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
   (`client/model.md` §17 r1–r3); a character whose left skill drops to
   level 0 (§17 r4).
 
+*combat / units / spawn / pets (PC 1 pc1-done-combat, 2026-10-08)*
+- `combat/damage.md` OQ1: melee and missile play (a player hitting monsters, monsters hitting the player); hook `0x0057DBF0` entry / exit (EBX record +0x08…+0x4C before / after) and `0x0057C6C0` entry / exit (defender stat 6 before / after), log attacker and defender seeds at entry; settles when §3–§5 recomputed from the logged stats equal every logged record and life change.
+- `combat/damage.md` OQ2: a life-leech and mana-leech item on the player (and a vampire-type monster hitting the player); hook `0x0057C420` entry (EAX record, EBX attacker, [EBP+8] defender) and the calls `0x0057A980` / `0x0057AA00` (amounts); settles rules H / M and Edge case 6 when every logged amount equals the rule's value.
+- `combat/hit.md` OQ1 + OQ2: melee play with a shield-wearing player and monsters that block; hook `0x0057DB61` (ESI r, EDI chance, EBX attacker, [EBP−0xC] defender), `0x0057DFB0` entry / return and `0x0057E04B` (EDI r, EBX chance, ESI defender); settles when every chance equals §3–§6 from logged stats, the block chance shows the /3 rule while moving, and a zero chance still draws (Edge case 1).
+- `combat/vitals.md` OQ1: a level-up and spending five stat points and one skill point (0x3A, 0x3B); hook `0x00570880` entry / exit and `0x00570D60`, log stats 4–13 before / after; settles §1–§3 when every logged value matches.
+- `combat/vitals.md` OQ8: any recording with damage, potions and running (R5 of `items/inventory.md` covers gold): log every S→C 0x18 / 0x95 / 0x96 / 0x1A–0x1C with its bytes and tick; settles §5 when ours emit the same bytes on the same ticks.
+- `sim/units.md` OQ1: a 0.2.0 `record_tick.py` run of U4 with `anim` records and U11 with `site` on every schedule, covering combat with skills, a shrine, a well, a trade and a cooldown skill; settles when every scheduled event (type, unit, frame, site) matches §4–§6.
+- `sim/units.md` OQ4: operate objects with delayed events (a chest, a door, a trap, a shrine) with the rng hook (caller addresses) and tick log; settles the object-control seed draws of events 0 and 8 (`unit-events.tsv` sites) when the logged draw and scheduled frame match.
+- `sim/units.md` OQ9 (rest): kill monsters by melee, missile and spell; at `0x005A6FF0` entry log the mode-change record R (ESI) bytes +0x00…+0x1C, especially byte +0x14, and the caller chain; settles what +0x14 holds (death-cause / path flag passed to `0x005A6520` and `0x006488A0`). Same run: the bonefetish1 kill of the existing line.
+- `sim/stat-lists.md` OQ4 (and `sim/stats.md` status): run `record_stats.py` over a session with equips, a level-up, a buff and a curse; settles when `check_stats.py` passes on it.
+- `sim/stats.md` OQ1: in the same `record_stats.py` session equip and remove items with +max life / mana (MaxStat 6→7, 8→9), IAS / FRW (UpdateAnimRate 67–69) and a socketed item (itemspecific); settles when `check_stats.py` shows no stat array change outside the `stat-lists.md` §5 writes (no hidden direct writes by property or animation code).
+
 ## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |

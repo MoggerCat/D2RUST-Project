@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 494–505 |
 | Test vectors | 506–526 |
 | Provenance | 527–553 |
-| Open questions | 554–586 |
+| Open questions | 554–587 |
 <!-- /index -->
 
 ## Summary
@@ -553,15 +553,16 @@ stat points: three spends succeed, the fourth fails, result 2.
 
 ## Open questions
 
-1. No trace check. Recording request: hook `0x00570880` entry/exit and
+1. ~~No trace check. Recording request: hook `0x00570880` entry/exit and
    `0x00570D60` (log stats 4–13 before/after) during a level-up and
-   while spending points.
+   while spending points.~~ → PC 2 recording list.
 2. Answered: §4.3–§4.5 read from `0x0057E480`, `0x0057E390`,
    `0x0057E3F0`, `0x0057E990`, `0x0057E7B0`, `0x0057E6C0`, `0x0057E5A0`,
    `0x005405A0`, `0x0057E510`. Open only for the x87 party share: the
    precision-control word in force (§4.4 rule 6, as
    `sim/stat-lists.md` open question 1); settle with a party recording
-   (multiplayer, Phase 7).
+   (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
+   players).
 3. Answered: `0x0057E2F0` takes ECX = experience, EDX = alvl, EAX =
    dlvl; for dlvl > alvl ≥ 25 it calls `pct(ECX exp, EDX alvl, stack
    dlvl)`, i.e. exp × alvl / dlvl as §4.2 states.
@@ -580,6 +581,6 @@ stat points: three spends succeed, the fourth fails, result 2.
 7. Answered: §5.1 rule 4 (registry `PlayerPos`, off in a standard
    install; `0x00537FD0` and `0x0053E130` specified there; not run by
    `Ruleset::Original`).
-8. §5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
+8. ~~§5 has no trace check. Settle: R5 of `items/inventory.md` (gold) and
    any recording with damage, potions and running: every 0x18 / 0x95 /
-   0x96 / 0x1A–0x1C byte and its tick.
+   0x96 / 0x1A–0x1C byte and its tick.~~ → PC 2 recording list.

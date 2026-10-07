@@ -65,7 +65,7 @@
 |   Synthetic (CI-safe) | 893–925 |
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 926–933 |
 | Provenance | 934–992 |
-| Open questions | 993–1044 |
+| Open questions | 993–1045 |
 <!-- /index -->
 
 ## Summary
@@ -992,12 +992,12 @@ Per callback, in order (U = the monster's seed unless named):
 
 ## Open questions
 
-1. No recording covers a callback: record a fire-enchanted unique dying
+1. ~~No recording covers a callback: record a fire-enchanted unique dying
    next to a player (rng and timer hooks) to confirm §2, §4, §6 and the
-   draw order.
-2. Edge case 5: whether the death start or the event handler drops the
+   draw order.~~ → PC 2 recording list.
+2. ~~Edge case 5: whether the death start or the event handler drops the
    second suicide-minion event 7; settle with a recording of a suicide
-   minion hit into GH.
+   minion hit into GH.~~ → PC 2 recording list.
 3. Answered (2026-10-07): §3.1 is the single owner of the unit find;
    `missiles/bodies-2.md` §44 and `monsters/ai-bodies-3.md` Open
    question 3 point to it. Merged from bodies-2 §44 and re-read on
@@ -1023,15 +1023,16 @@ Per callback, in order (U = the monster's seed unless named):
    `Mod1`–`Mod3` use 1, 5–9, 17, 18, 23–28, 30 and monumod rows 40, 41
    have no `cpick` / `upick`. So 40 and 41 occur only through modded
    data or a saved list.
-6. A missile's `level(12)` (§3.4 step 2 for §18.2): `missiles.md`
+6. ~~A missile's `level(12)` (§3.4 step 2 for §18.2): `missiles.md`
    §R2.3 step 23 does not list stat 12 among a missile's stats; if it
    is 0 the monlvl row is 1. Settle with the missile stat list dump of
-   a spectral-hit unique's missile.
-7. Client §28: bodies of the client quest effects of umod 22
+   a spectral-hit unique's missile.~~ → PC 2 recording list.
+7. ~~Client §28: bodies of the client quest effects of umod 22
    (`0x0046B3C0` … `0x0046BC90`), the maggot spawn `0x0046C320` and
    class 45 (`corruptrogue3`) in the umod-22 table: owner is the client
    quest / monster spec (Phase 6). Recording: a fire-enchanted unique's
-   death on the client (missiles and 2,458 at frame 4) confirms §28.2.
+   death on the client (missiles and 2,458 at frame 4) confirms §28.2.~~ → PC 2 recording list. The client effect bodies
+   are owned by the client quest spec, not this file.
 8. Answered (2026-10-08, `docs/handoff/impl-umods-cs-handlers.md` U3):
    the excluded unit is tested only in the player branch (the literal
    reading is right), and negative r / F & 0x200 are §3.1 "Excluded

@@ -644,19 +644,19 @@ replaces it under the same comparison.
 
 ## Open questions
 
-1. §7.2 max-rescale: x87 precision control during the division and
+1. ~~§7.2 max-rescale: x87 precision control during the division and
    product (24-, 53- or 64-bit) decides the float32 result in rare cases;
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
-   call.
+   call.~~ → PC 2 recording list.
 2. Answered (2026-10-07): `0x0061AB00(room)` is "room in a town": the
    room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
    byte table `0x006426C8`); null room → 0. Also used by the unit find
    (`monsters/umod-callbacks.md` §3.1).
 3. Answered (2026-10-07): §2, table after the flag list (every
    allocation site and flag store of 1.14d).
-4. Recording: the whole spec is unverified until `record_stats.py`
-   passes `check_stats.py` (queued).
+4. ~~Recording: the whole spec is unverified until `record_stats.py`
+   passes `check_stats.py` (queued).~~ → PC 2 recording list.
 5. Answered (2026-10-07): no. All 9 extended allocations pass flags 0;
    the expiry setters `0x00625310` / `0x006260B0` are called only on
    plain lists (a fresh `0x006251F0` list or a state's list, which

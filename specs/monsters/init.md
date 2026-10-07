@@ -55,13 +55,13 @@
 |   27. Class reinit (`0x00574370`) | 1017–1062 |
 | Constants & data dependencies | 1063–1084 |
 | Randomness | 1085–1127 |
-| Edge cases & original bugs | 1128–1158 |
-| Test vectors | 1159–1160 |
-|   Synthetic (CI-safe) | 1161–1183 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1184–1214 |
-|   Recorded checks (monster assign 0xAC) | 1215–1227 |
-| Provenance | 1228–1306 |
-| Open questions | 1307–1376 |
+| Edge cases & original bugs | 1128–1159 |
+| Test vectors | 1160–1161 |
+|   Synthetic (CI-safe) | 1162–1184 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1185–1215 |
+|   Recorded checks (monster assign 0xAC) | 1216–1228 |
+| Provenance | 1229–1307 |
+| Open questions | 1308–1388 |
 <!-- /index -->
 
 ## Summary
@@ -1151,8 +1151,9 @@ Then, for bosses:
     is halved.
 12. `0x00573930` writes difficulty 2 into the game when it finds ≥ 3.
 13. The class reinit teardown (§27 step 4.3) frees the hover record
-    (unit +0xA4) but does not clear the pointer; whether a later write
-    replaces it before any read is Open question 11.
+    (unit +0xA4) but does not clear the pointer; the next hover text or
+    the death clean-up returns it to the pool again (Open question 11;
+    d2rs clears it).
 14. A reinit monster keeps its umods, type flags and name seed but gets
     the new class's stats with no umod init re-run (§27 step 6).
 
@@ -1323,8 +1324,8 @@ Bosses, Normal, Blood Moor (L-flag 1):
 3. Answered (2026-10-07): §4.1 lists the allocator's steps after the
    type init and their draws; for creation modes 1 and 12 with 1.14d
    data there are none (Randomness step 8).
-4. No RNG trace of a spawn exists: record one population pass (rng hook
-   with caller addresses) to confirm the order in Randomness.
+4. ~~No RNG trace of a spawn exists: record one population pass (rng hook
+   with caller addresses) to confirm the order in Randomness.~~ → PC 2 recording list.
 5. Answered (2026-10-07): `0x0054DC40` and its draws are owned by
    `monsters/population.md` §8.
 6. Answered (2026-10-07): every case read from the asm: boss mods §14.3
@@ -1337,8 +1338,8 @@ Bosses, Normal, Blood Moor (L-flag 1):
    in §22 (death explosions, curses, hit effects): owner to be decided
    (monster death/combat spec); catalogue in `umods.tsv`.
 9. Whether `0x00573780` (umod 41 event) draws RNG.
-10. The client name draw order of §23 assumes the C argument order seen
-    in `0x004AC870`; confirm with a client RNG trace showing a unique.
+10. ~~The client name draw order of §23 assumes the C argument order seen
+    in `0x004AC870`; confirm with a client RNG trace showing a unique.~~ → PC 2 recording list.
 
 Answered 2026-10-07: 8 → every callback body is in
 `monsters/umod-callbacks.md` (owner). 9 → `0x00573780` draws nothing
@@ -1351,6 +1352,15 @@ no `umods.tsv` row is D2MOO-only any more.
 11. After a class reinit (§27), unit +0xA4 still points at the freed
     hover record (Edge cases 13): find every reader of +0xA4 on a
     monster and whether one can run before a new record is written.
+    Answered (2026-10-08): the event-6 handler `0x00580B70` cannot run
+    (teardown step 4.5 cancels every timer); the readers that act on a
+    stale +0xA4 are the hover setter `0x0054A290` (returns a non-null
+    old record to the pool before writing the new one) and the death
+    clean-up `0x005A6520` (`sim/units.md` §4.6 DT start step 1.2). So
+    in 1.14d the freed record goes back to the pool a second time at
+    the monster's next hover text or death. d2rs design choice: the
+    teardown also clears +0xA4 (the double return is pool corruption,
+    not game state, and is not reproduced).
 12. Size: this spec is ~71 KB, over the 60 KB guideline. Split
     proposal (not done; needs every inbound `init.md` §N link updated in
     the same change): move §14–§22 (normal and boss mods, boss spawns,
@@ -1359,7 +1369,9 @@ no `umods.tsv` row is D2MOO-only any more.
     `monsters/bosses.md`, keeping section numbers as a stub table here;
     optionally move §25–§26 (tool spawns, making an existing monster
     unique; ~11 KB) to `monsters/init-tools.md`. §1–§13, §23, §24 and
-    §27 (plain creation, the class reinit) stay.
+    §27 (plain creation, the class reinit) stay. Closed (2026-10-08):
+    not a behaviour question; the split is a doc-layout task outside
+    spec-complete.
 13. Answered (2026-10-08, `docs/handoff/impl-server-join-2.md` §3
     "Left", 0xAC server-side fields past §24): §24 rules 1–7 give the
     whole server layout (header, mode rule, components, type block with
