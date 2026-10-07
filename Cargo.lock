@@ -2461,6 +2461,7 @@ dependencies = [
  "d2-data",
  "d2-formats",
  "png",
+ "test-fixtures",
  "thiserror 2.0.21",
  "toml",
 ]
