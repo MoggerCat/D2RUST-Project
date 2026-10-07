@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 204–222 |
 | Test vectors | 223–234 |
 | Provenance | 235–250 |
-| Open questions | 251–265 |
+| Open questions | 251–279 |
 <!-- /index -->
 
 ## Summary
@@ -262,3 +262,17 @@ values of the Test vectors; saves read with `tools/d2s_check.py`
    Needs a local save, not a recording: one character with a helm, a
    body armour and a coloured magic or unique item equipped (recording
    list IT-6).
+3. The bytes of the reference table `0x00744CA8` (rule 1.2.4) are not
+   in this spec. PROVISIONAL: slots 57–124 are `weap` slots and no other
+   slot is reserved (because that is the smallest table that gives rule
+   1.3's positions: weapons 4–56, `cap` 57, `buc` 79, the throwing
+   potions 125–134; it does not give the second `ktr` at 243 of edge
+   case 4, which rule 2 never returns); settled by reading the 256
+   entries from the 1.14d image (local run queue) or by the IT-6 saves
+   (`docs/handoff/pc2-rec-pc2-items.md`).
+4. An empty `alternategfx` (code 0) in rule 2. PROVISIONAL: compared
+   like any code, so it matches the first unfilled entry (98 in 1.14d)
+   before a later entry holding `code` (because rule 2 states the
+   comparison without an exception); only items whose `code` sits above
+   the first hole (the throwing potions) or in no entry are affected;
+   settled by a save with such an item in a hand (IT-6).
