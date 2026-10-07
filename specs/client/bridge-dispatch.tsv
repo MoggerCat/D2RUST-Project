@@ -40,7 +40,7 @@ id	name	owner
 0x26	Chat	specs/client/msg-ui.md
 0x27	NpcInfo	specs/client/msg-ui.md
 0x28	QuestInfo	TBD
-0x29	GameQuestInfo	TBD
+0x29	GameQuestInfo	specs/client/msg-ui.md
 0x2A	NpcTransaction	TBD
 0x2B	-	specs/client/bridge.md
 0x2C	PlaySound	specs/audio/triggers.md
@@ -81,7 +81,7 @@ id	name	owner
 0x4F	StartMercList	specs/client/msg-ui.md
 0x50	QuestSpecial	specs/client/msg-ui.md
 0x51	AssignObject	specs/client/msg-units.md
-0x52	QuestLogInfo	TBD
+0x52	QuestLogInfo	specs/client/msg-ui.md
 0x53	Darkness	specs/render/lighting.md
 0x54	Unknown54	specs/client/bridge.md
 0x55	-	specs/client/bridge.md
@@ -93,7 +93,7 @@ id	name	owner
 0x5B	PlayerJoined	TBD
 0x5C	PlayerLeft	TBD
 0x5D	QuestItemState	specs/client/msg-ui.md
-0x5E	GameQuestAvailability	TBD
+0x5E	GameQuestAvailability	specs/client/msg-ui.md
 0x5F	PortalFlags	TBD
 0x60	TownPortalState	TBD
 0x61	CanGoToAct	TBD
@@ -154,7 +154,7 @@ id	name	owner
 0x98	Unknown98	TBD
 0x99	SkillTriggered	specs/client/msg-skills.md
 0x9A	Unknown9A	specs/client/msg-skills.md
-0x9B	Unknown9B	TBD
+0x9B	Unknown9B	specs/client/msg-ui.md
 0x9C	ItemActionWorld	specs/client/msg-stats-items.md
 0x9D	ItemActionOwned	specs/client/msg-stats-items.md
 0x9E	MercStatByte	TBD
