@@ -39,14 +39,14 @@
 |   4. d2rs mapping and scope | 379–410 |
 |   5. Machine-readable tables | 411–447 |
 |   6. Exact-match comparison | 448–533 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 534–895 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 896–1012 |
-| Constants & data dependencies | 1013–1031 |
-| Randomness | 1032–1037 |
-| Edge cases & original bugs | 1038–1071 |
-| Test vectors | 1072–1135 |
-| Provenance | 1136–1211 |
-| Open questions | 1212–1268 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 534–916 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 917–1061 |
+| Constants & data dependencies | 1062–1080 |
+| Randomness | 1081–1086 |
+| Edge cases & original bugs | 1087–1120 |
+| Test vectors | 1121–1184 |
+| Provenance | 1185–1273 |
+| Open questions | 1274–1326 |
 <!-- /index -->
 
 ## Summary
@@ -722,6 +722,27 @@ that drops gold:
    queued at its creation after the kill set the monster's mode, so the
    item's 0x9C precedes the monster's 0x69 in that room. Open question
    11 asks for a recording to confirm.
+5. **0x65 kill count** (the only builder call is `0x0053FB30` →
+   `0x0053D9C0`; layout in the TSV). The kill `0x0057CCB0` calls the
+   arena event `0x0053F720(game, killer, victim)` at `0x0057CD5B`. A
+   player killer of a monster (branch `0x0053FA11`): killer's arena
+   record (player data +0x34) +0x00 += the game's `arena` row
+   `MonsterKill` (+0x0C; `0x00664AB0(arena type)`), record +0x04 := 1,
+   arena flags (game +0x1D28 → +0x08) |= 0x400, the victim queued for
+   update (`0x0064C040`). The other branches (`PlayerKill`, `PlayerKillPercent`,
+   `Suicide`, `PlayerDeath`, `PlayerDeathPercent`, `MonsterDeath`, and
+   `0x0053F630`) set the same two flags. Then in the same tick, client
+   pass (`sim/tick.md` §6 rule 5): per-client update `0x005380D0` → arena
+   sync `0x0053FC20` (at `0x005381A4`, after the unit update and stat
+   messages): flag 0x400 and the client's player record +0x04 ≠ 0
+   (`0x0053FB00`) → 0x65 for that player (`0x0053FB30`); then, when
+   `0x005388C0(client)`, `0x0053FB90(game, client, 0)`: 0x65 for each
+   other in-game player whose record +0x04 ≠ 0. Tick step 6 clears 0x400
+   (`0x0053FAE0` at `0x0053B079`), so one 0x65 per kill tick; record
+   +0x04 is never cleared. `arena.txt` row `Deathmatch` has
+   `MonsterKill` 1: the recorded counts 1, then 2. The join's 0x65
+   (`0x0053FC70`, §8.3) is the other path; `0x00538860`, its second
+   caller, has no reference in `Game.exe` (dead code).
 
 #### 7.7 Monster messages 0x67–0x6D (senders, triggers, layouts)
 
@@ -950,6 +971,22 @@ rule 3), drained in a later frame (recorded: after tick 1).
       `0x00532EB7`), 0x22 × 2 (`0x0053C520`), 0x21 (`0x0053C4A0`),
       0x23 (`0x0053C590`), 0x5E (`0x0053D830`, from `0x00546270`), 0x28
       (`0x0053D670`), 0x29 (`0x0053D700`, from `0x00544520`).
+      Static call order of the save path (`0x005344B0` → `0x005343A0` →
+      `0x00534330` → loader `0x00534020`, then `0x00546270`), which is
+      the recorded order: (a) player creation (`0x00534080` /
+      `0x00534098`) → `0x00571F90`: 0x59, 0xAA, 0x76; (b) `0x00532E90`
+      (`0x005341D5`) → 0x94 (`0x00532F03`); (c) `0x005701B0` at
+      `0x005341FD` / `0x00534210` (0x23 at `0x0057026C`; conditional,
+      not taken in the recordings); (d) items, `0x005337F0`
+      (`0x0053423F`) → … → `0x0055C110`: 0x22 (`0x0055C216`) and,
+      through `0x00570080`, 0x21 (`0x0057017B`); (e) `0x00533C70`
+      (`0x0053427C`) → inventory refresh `0x0055DF00` (`0x00533F1D`) →
+      `0x0055DBC0` → `0x0055DA70` → `0x005701B0` (`0x0055DAB3`,
+      `0x0055DAF7`): 0x23; (f) after the loader, `0x00546270`
+      (`0x005344EF`): 0x5E (`0x005465FE`), 0x28 (`0x0054662D`), 0x29
+      (`0x00544520` at `0x00544578`). 0x22 and 0x21 are reachable only
+      through the item calls of (d) and (e); their per-item conditions
+      belong to the item and save-load specs.
    2. **S→C 0x0B** (`0x00537930` → `0x0053B3D0`: type u8@1, GUID u32@2
       of P; no P → type 6, GUID −1).
    3. **S→C 0x5F** (`0x0053B400`): u32@1 = `0x00622230(P)`.
@@ -1009,6 +1046,18 @@ refresh `0x0055DF00`, the join sequence `0x0052C410` (0x5B
 `0x0053C940`, 0x65 via `0x0053FC70`), `0x0055B620` (0x8D), host
 callback, 0x5A to all. Recorded frame 2 (`-022633` seq 157–224): units,
 0x1D / 0x1E, 0x48, **0x04**, 0x48, 0x5B, 0x65, 0x8D, 0x5A.
+
+The first 0x48 is the per-client update's inventory refresh: in
+`0x005380D0` the order is removals (`0x0053A770`), unit updates
+(`0x0053A620`, where the player update `0x00580860` could send 0x48 at
+`0x005808D9`), stat messages (`0x006258D0`: the 0x1D / 0x1E), then,
+when the player's flag-ex (+0xC8) has bit 0x200000 (set by §8.2 rule
+3.5), `0x0055DF00(…, 1, 1)` at `0x00538146` → `0x0055DBC0` → 0x48 at
+`0x0055DEEB`. A 0x48 after the stat messages can only come from there.
+The second 0x48 (after 0x04) is the state-3 inventory refresh
+`0x0055DF00` (`sim/tick.md` §6 rule 4), the same function. The only
+two 0x48 senders (`0x0053D3C0` call sites) are `0x0055DEEB` and
+`0x005808D9`.
 
 ## Constants & data dependencies
 
@@ -1209,6 +1258,19 @@ each file), every 0x67–0x6D, 0x08 order (48 frames), the 0xAA vector
 against patch_d2 `states.txt` row 105 and `itemstatcost.txt` row 172
 (send bits 2), 0x7E bytes.
 
+Senders session (2026-10-07, static reads with `disasm.py` and a call
+graph of `all.asm`): masks (§6 rule 6) `0x0053C8D0` and its four call
+sites, `0x00661480`, `0x00661240`, `0x006612F0`, `0x005456A0`,
+`0x005DE330`, `0x00545780`, `0x00572C10`; `0x0053D7E0` call sites and
+`0x00546040`; `0x0053DB90`, `0x004135D0`. 0x77 call sites of
+`0x0053CAB0` (§4 rule 4). 0x65 (§7.6 rule 5): `0x0057CD5B`,
+`0x0053F720`, `0x0053F630`, `0x0053FAE0` (caller `0x0053B079`),
+`0x0053FB00`, `0x00538860` (no reference: byte search of `Game.exe` for
+its address finds none), `arena.txt`. Loader order (§8.2 rule 3.1) and
+first 0x48 (§8.3): `0x00534020`, `0x005344B0`, `0x00532EB7` (the tail of
+`0x00532E90`), `0x00533C70`, `0x0055DA70`, `0x005380D0`, `0x0055DBC0`;
+reverse call search from `0x0053C520` / `0x0053C4A0`.
+
 ## Open questions
 
 1. R1–R7 on a hosted game and with more message ids (the single-player
@@ -1247,21 +1309,17 @@ against patch_d2 `states.txt` row 105 and `itemstatcost.txt` row 172
     the life fraction (§7.4 rule 5). Open: `0x005711D0`, `0x005715A0`,
     `0x00572EE0`, and who writes the unit +0xEC records.
 11. The §7.6 order (item 0x9C before the monster's 0x69 in a kill tick
-    with a drop) and where 0x65 (`0x0053D9C0`, caller `0x0053FB30`,
-    recorded right after 0x69 code 8) is sent from: a recording of a
-    kill that drops an item. Narrowed: 0x65 = `65`, player GUID u32@1
-    (−1 without a player), kill count u16@5 (the player record's +0x34
-    → +0x00; recorded 1, then 2); `0x0053FB30`'s callers are the arena
-    sync `0x0053FC20` (per-client update; needs arena flag 0x400 and the
-    player's arena record +0x04 ≠ 0), `0x0053FB90` and `0x0053FC70`
-    (from the join sequence `0x0052C410`). The recorded arena flags
-    (0x00100004, §8.1) lack 0x400, so which path sends the kill-tick
-    0x65 needs a breakpoint on `0x0053FB30` during a kill (its return
-    address), or a write watch on arena flags.
-12. The loader's messages between 0x59 and 0x0B (§8.2 rule 3.1): their
-    order inside the save path `0x005344B0` → `0x00534020` is recorded,
-    not read; owner: the save-load spec (`formats/d2s.md` and the
-    character-load spec, not yet written).
-13. The first 0x48 of the first tick (§8.3, before 0x04): its caller
-    (`0x0055DBC0` inventory refresh or `0x00580860` player update);
-    settle with the recorder's caller field one level up.
+    with a drop): a recording of a kill that drops an item. *0x65 part
+    answered* (§7.6 rule 5, static): the kill sets arena flag 0x400
+    (`0x0053F720`), the same tick's arena sync `0x0053FC20` sends it
+    (recorded right after the monster's 0x69 code 8, both from the
+    per-client update), tick step 6 clears the flag.
+12. *Partly answered* (§8.2 rule 3.1, static call order of the save path
+    = the recorded order). Open: the per-item conditions that send 0x22
+    and 0x21 during the item load (owner: `formats/d2s.md` and the
+    character-load spec, not yet written) and when the loader's own
+    0x23 calls (`0x005341FD`, `0x00534210`) fire.
+13. *Answered* (§8.3, static): the first 0x48 is the per-client update's
+    inventory refresh (`0x00538146` → `0x0055DBC0`, 0x48 at `0x0055DEEB`);
+    the player update's 0x48 (`0x005808D9`) runs before the stat
+    messages that precede it.
