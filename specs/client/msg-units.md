@@ -24,15 +24,15 @@
 | Rules | 67–68 |
 |   1. Unit add | 69–225 |
 |   2. 0x0A RemoveUnit (`0x0045CC10`) | 226–235 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 236–272 |
-|   4. Queued movement and action messages | 273–307 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 308–329 |
-| Constants & data dependencies | 330–341 |
-| Randomness | 342–349 |
-| Edge cases & original bugs | 350–364 |
-| Test vectors | 365–398 |
-| Provenance | 399–424 |
-| Open questions | 425–443 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 236–277 |
+|   4. Queued movement and action messages | 278–312 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 313–334 |
+| Constants & data dependencies | 335–346 |
+| Randomness | 347–354 |
+| Edge cases & original bugs | 355–369 |
+| Test vectors | 370–405 |
+| Provenance | 406–435 |
+| Open questions | 436–454 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -255,9 +255,14 @@ requests (`client/model.md` §8); C→S 0x5F from the position check.
       else a non-zero flag runs `0x004DBFE0` (a player) or is a fatal
       assert 0x17D (other kinds). With room': client room change
       `0x0061ACD0(room', x, y, room' ≠ old)`, town flag to
-      `0x004F5190`, and when the area byte (+2 of `0x0061DB70`) of the
-      two levels differs, `0x004FB480` and `0x00600C00(area)` (Phase 6:
-      automap, music).
+      `0x004F5190`, and when the Levels `Pal` byte of the two levels
+      differs (record +0x02 of `0x0061DB70`, 544-byte `levels` record:
+      `data/fields.tsv` `levels` `Pal` offset 2; `Act` is offset 3 and
+      is not read here), `0x004FB480(Pal of the new level)` (CL, loaded
+      at `0x00465622`) and `0x00600C00(Pal)` (Phase 6: automap, music).
+      `Pal` ≠ `Act` in 7 of 137 levels.txt rows (125–127 Pal 3, 133 Pal
+      0, 134 Pal 1, 135 Pal 3, 136 Pal 0; all Act 4): walking from
+      Harrogath (109, Pal 4) into level 133 loads act 1's palette.
    5. Teleport to (x, y) (`0x00650BE0` → `sim/path-placement.md` §6
       rule 4); if that returns 0: nearest free point (`0x0064E7B0`,
       unit size, mask 0x1C09, fallback 1) and forced placement
@@ -395,6 +400,8 @@ From `traces/raw/20261006-022633-packets.jsonl` ("B") and
 | 0xAC with class ≥ `monstats` row count, or a row whose `MonStatsEx` is −1 | no component reads, no unit | synthetic, §1.2 rule 7 |
 | 0x51 with type 4 | handler error | synthetic, §1.3 rule 5 |
 | 0x0A type 1, GUID 0x21, pet list empty | (1, 0x21) removed (hireling GUID −1) | synthetic, §2 rule 3 |
+| local player placed from a room of level 109 (Pal 4, Act 4) into a room of level 133 (Pal 0, Act 4) | palette switch to act 1 (`act1\pal.pl2`) | §3 rule 4.4; patch_d2 `levels.txt` |
+| local player placed from level 1 (Pal 0) into level 2 (Pal 0) | no palette switch | §3 rule 4.4 |
 
 ## Provenance
 
@@ -421,6 +428,10 @@ Join-update session (2026-10-06): 0xAC table reads `0x0045F1F1`–
 `0x0053BD10` and its single caller `0x00572067` (type pushed as 2),
 type bytes counted in both recordings (206 × 2). The code bytes'
 server meaning: `sim/intents-events.md` §7.4.
+Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
+(byte +2 of both `0x0061DB70` records compared, CL = new +2 into
+`0x004FB480`, whose palette act is CL + 1); `levels` offsets from
+`data/fields.tsv`; Pal / Act counted in patch_d2 `levels.txt` (137 rows).
 
 ## Open questions
 

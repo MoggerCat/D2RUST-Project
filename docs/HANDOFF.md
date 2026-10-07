@@ -4963,11 +4963,12 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   spec).
 - `render/draw-order.md` OQ7: town river-bank cells, capture at `TownE1`
   tile (950, 933).
-- `sim/intents-events.md` OQ11: breakpoint, no new play: return address
-  one level up of `0x0053FB30` during a monster kill (which path sends the
-  0x65 in a kill tick).
-- `sim/intents-events.md` OQ13: breakpoint at join: caller of the first
-  0x48 in frame 2.
+- `sim/intents-events.md` OQ11 (order part; the 0x65 path is answered
+  statically, §7.6 rule 5): a monster kill that drops an item; log that
+  tick's 0x9C / 0x69 / 0x65 order with callers (expect 0x9C, 0x69, then
+  0x65 from `0x0053FB30` called by `0x0053FC20`).
+- `sim/intents-events.md` OQ14: type one chat line (C→S 0x15) in single
+  player; log the S→C messages of that frame with callers.
 - `client/bridge.md` OQ6: a 0x2C followed by a 0x0A in one chunk.
 - `render/lighting.md` OQ11: a day-period change with objects in sight.
 - `client/msg-skills.md` OQ1: equipping a charged item.

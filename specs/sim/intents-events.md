@@ -29,24 +29,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–68 |
-| Inputs | 69–77 |
-| Outputs / state changes | 78–84 |
-| Rules | 85–86 |
-|   1. Loop order (single player) | 87–108 |
-|   2. Client → server | 109–278 |
-|   3. Server → client | 279–378 |
-|   4. d2rs mapping and scope | 379–406 |
-|   5. Machine-readable tables | 407–443 |
-|   6. Exact-match comparison | 444–481 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 482–843 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 844–960 |
-| Constants & data dependencies | 961–979 |
-| Randomness | 980–985 |
-| Edge cases & original bugs | 986–1019 |
-| Test vectors | 1020–1083 |
-| Provenance | 1084–1159 |
-| Open questions | 1160–1216 |
+| Summary | 53–69 |
+| Inputs | 70–78 |
+| Outputs / state changes | 79–85 |
+| Rules | 86–87 |
+|   1. Loop order (single player) | 88–109 |
+|   2. Client → server | 110–279 |
+|   3. Server → client | 280–379 |
+|   4. d2rs mapping and scope | 380–411 |
+|   5. Machine-readable tables | 412–448 |
+|   6. Exact-match comparison | 449–534 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 535–917 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 918–1062 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1063–1175 |
+| Constants & data dependencies | 1176–1194 |
+| Randomness | 1195–1200 |
+| Edge cases & original bugs | 1201–1234 |
+| Test vectors | 1235–1310 |
+| Provenance | 1311–1406 |
+| Open questions | 1407–1472 |
 <!-- /index -->
 
 ## Summary
@@ -392,8 +393,12 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    Their bytes are still part of the comparison (§6).
 4. **Out of scope** (Phases 7–9 or never):
    - multiplayer only: C→S 0x5D, 0x5E (party/hostility), 0x68 (join a
-     hosted game); S→C 0x75, 0x77–0x79, 0x7F, 0x8B–0x8D, 0x90 (party,
-     trade, relations): need a second player (Phase 7 multiplayer);
+     hosted game); S→C 0x75, 0x78, 0x79, 0x7F, 0x8B–0x8D, 0x90 (party,
+     trade, relations): need a second player (Phase 7 multiplayer).
+     S→C 0x77 is a `sim` row: its builder `0x0053CAB0` (2 bytes, code
+     u8@1) has 41 call sites, among them the single-player cube paths
+     (`world/cube.md` §1: codes 0x0C, 0x11, 0x15); the trade codes are
+     the same message;
    - Battle.net / realm / anti-cheat: C→S 0x66 (warden response, handler
      does nothing), 0x6D (ping), queue 2 (0xFF); S→C 0x8F (pong), 0xAE
      (warden request), 0xAF–0xB4 (connection, game list, save download,
@@ -478,6 +483,54 @@ as in §2.1 rule 5 and §3.1 rule 1.
    to an NPC, buy and sell one item, spend a stat point if available,
    take a waypoint if available, exit. Command and expected output:
    `docs/HANDOFF.md` §5.
+6. **Keyed masks** (the exception to rule 3 for bytes the original never
+   writes; which builders leave which bytes: `tools/original-hooks.md`
+   §6.2; d2rs writes 0 there). A record carries no sender, so a mask
+   whose bytes are written in another form of the same id needs a key
+   read from bytes every form writes, or a content-dependent offset. The
+   three ids an id / offset / length row cannot express:
+
+   | Id | Key (bytes every form writes) | Masked bytes | Why the key is exact |
+   |---|---|---|---|
+   | 0x27 | count u8@6 = 1 | 7, 9, 12–39 | below |
+   | 0x50 | u16@1 = 4 | 13–14 | `0x00593CB0` writes u16 4 (`0x00593CF6`) |
+   | 0x50 | u16@1 = 2, 0x24, 13 | 5–14 | `0x00579180` (`0x005792C0`), `0x0058E120` (`0x0058E140`), `0x0059D6A0` (`0x0059D6D3`) |
+   | 0x50 | u16@1 = 0x17 | 3–14 | `0x005B4A80` (`0x005B4B37`) |
+   | 0x50 | u16@1 = 1 | none | the status reply `0x00546040` zeroes its buffer and writes u16 1 (`0x00546248`) |
+   | 0x82 | none | from the byte after the first 0 in bytes 5–20, through byte 20 | below |
+
+   - **0x27** (40 bytes, all senders copy through `0x0053C8D0`; its four
+     call sites `0x005456E4`, `0x00545811`, `0x00572D55`, `0x005DE397`):
+     unit type u8@1, GUID u32@2, entry count u8@6 (low byte of the text
+     list's u16 count), entry k < 8: kind u8@8+4k, string id
+     u16@10+4k. The one-entry senders `0x005456A0` (u8@1 = 2, count 1,
+     kind 0) and `0x005DE330` (u8@1 = 1, count 1, kind 3) leave 7, 9 and
+     12–39 unwritten. The list senders `0x00545780` and `0x00572C10`
+     zero bytes 6–39 (`0x00661480`), then write the count and the
+     entries; 7 and 9 + 4k are never written (stay 0), and more than 8
+     entries is a fatal assert (`0x00661509`). So with count 1 every
+     masked byte of a list form is 0 on both sides; count ≠ 1 is never
+     a one-entry form. Cost: a d2rs list form with one entry that wrote a
+     non-zero padding byte would pass.
+   - **0x50**: the six call sites of the copier `0x0053D7E0` (15 bytes)
+     are the five rows above; each writes a constant u16@1.
+   - **0x82** (29 bytes, `0x0053DB90`, call site `0x005720B1`): owner
+     GUID u32@1, byte 5 := 0, then the owner's name is copied to
+     bytes 5–20 by `0x004135D0` (at most 15 characters + NUL; it writes
+     exactly through the NUL, also in its dword path, never past it);
+     u32@21 and u32@25 are written. A 15-character name leaves nothing
+     unwritten.
+   - Proposed columns for the mask table (the format is
+     `tools/scenario.md` §6's): `id`, `key` (`-`, or `u8@<off>=<v>` /
+     `u16@<off>=<v>`, little-endian, v hex), `offset` (decimal, or
+     `nul@<n>` = the byte after the first 0 byte at or after n; no 0 in
+     n…last → nothing masked), `length` (decimal, `*` = to the end, or
+     `..<n>` = through byte n), `source`. Rows: `0x27 u8@6=0x01` 7 1,
+     9 1, 12 28; `0x50 u16@1=0x0004` 13 2; `0x50 u16@1=0x0002`,
+     `=0x0024`, `=0x000D` 5 10; `0x50 u16@1=0x0017` 3 12; `0x82 -`
+     `nul@5` `..20`. The present unkeyed `0x50 13 2` row becomes the
+     `u16@1=0x0004` row (unkeyed, it hides written bytes of the u16 1,
+     2, 0x24 and 13 forms).
 
 ### 7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
 
@@ -670,6 +723,27 @@ that drops gold:
    queued at its creation after the kill set the monster's mode, so the
    item's 0x9C precedes the monster's 0x69 in that room. Open question
    11 asks for a recording to confirm.
+5. **0x65 kill count** (the only builder call is `0x0053FB30` →
+   `0x0053D9C0`; layout in the TSV). The kill `0x0057CCB0` calls the
+   arena event `0x0053F720(game, killer, victim)` at `0x0057CD5B`. A
+   player killer of a monster (branch `0x0053FA11`): killer's arena
+   record (player data +0x34) +0x00 += the game's `arena` row
+   `MonsterKill` (+0x0C; `0x00664AB0(arena type)`), record +0x04 := 1,
+   arena flags (game +0x1D28 → +0x08) |= 0x400, the victim queued for
+   update (`0x0064C040`). The other branches (`PlayerKill`, `PlayerKillPercent`,
+   `Suicide`, `PlayerDeath`, `PlayerDeathPercent`, `MonsterDeath`, and
+   `0x0053F630`) set the same two flags. Then in the same tick, client
+   pass (`sim/tick.md` §6 rule 5): per-client update `0x005380D0` → arena
+   sync `0x0053FC20` (at `0x005381A4`, after the unit update and stat
+   messages): flag 0x400 and the client's player record +0x04 ≠ 0
+   (`0x0053FB00`) → 0x65 for that player (`0x0053FB30`); then, when
+   `0x005388C0(client)`, `0x0053FB90(game, client, 0)`: 0x65 for each
+   other in-game player whose record +0x04 ≠ 0. Tick step 6 clears 0x400
+   (`0x0053FAE0` at `0x0053B079`), so one 0x65 per kill tick; record
+   +0x04 is never cleared. `arena.txt` row `Deathmatch` has
+   `MonsterKill` 1: the recorded counts 1, then 2. The join's 0x65
+   (`0x0053FC70`, §8.3) is the other path; `0x00538860`, its second
+   caller, has no reference in `Game.exe` (dead code).
 
 #### 7.7 Monster messages 0x67–0x6D (senders, triggers, layouts)
 
@@ -898,6 +972,22 @@ rule 3), drained in a later frame (recorded: after tick 1).
       `0x00532EB7`), 0x22 × 2 (`0x0053C520`), 0x21 (`0x0053C4A0`),
       0x23 (`0x0053C590`), 0x5E (`0x0053D830`, from `0x00546270`), 0x28
       (`0x0053D670`), 0x29 (`0x0053D700`, from `0x00544520`).
+      Static call order of the save path (`0x005344B0` → `0x005343A0` →
+      `0x00534330` → loader `0x00534020`, then `0x00546270`), which is
+      the recorded order: (a) player creation (`0x00534080` /
+      `0x00534098`) → `0x00571F90`: 0x59, 0xAA, 0x76; (b) `0x00532E90`
+      (`0x005341D5`) → 0x94 (`0x00532F03`); (c) `0x005701B0` at
+      `0x005341FD` / `0x00534210` (0x23 at `0x0057026C`; conditional,
+      not taken in the recordings); (d) items, `0x005337F0`
+      (`0x0053423F`) → … → `0x0055C110`: 0x22 (`0x0055C216`) and,
+      through `0x00570080`, 0x21 (`0x0057017B`); (e) `0x00533C70`
+      (`0x0053427C`) → inventory refresh `0x0055DF00` (`0x00533F1D`) →
+      `0x0055DBC0` → `0x0055DA70` → `0x005701B0` (`0x0055DAB3`,
+      `0x0055DAF7`): 0x23; (f) after the loader, `0x00546270`
+      (`0x005344EF`): 0x5E (`0x005465FE`), 0x28 (`0x0054662D`), 0x29
+      (`0x00544520` at `0x00544578`). 0x22 and 0x21 are reachable only
+      through the item calls of (d) and (e); their per-item conditions
+      belong to the item and save-load specs.
    2. **S→C 0x0B** (`0x00537930` → `0x0053B3D0`: type u8@1, GUID u32@2
       of P; no P → type 6, GUID −1).
    3. **S→C 0x5F** (`0x0053B400`): u32@1 = `0x00622230(P)`.
@@ -957,6 +1047,131 @@ refresh `0x0055DF00`, the join sequence `0x0052C410` (0x5B
 `0x0053C940`, 0x65 via `0x0053FC70`), `0x0055B620` (0x8D), host
 callback, 0x5A to all. Recorded frame 2 (`-022633` seq 157–224): units,
 0x1D / 0x1E, 0x48, **0x04**, 0x48, 0x5B, 0x65, 0x8D, 0x5A.
+
+The first 0x48 is the per-client update's inventory refresh: in
+`0x005380D0` the order is removals (`0x0053A770`), unit updates
+(`0x0053A620`, where the player update `0x00580860` could send 0x48 at
+`0x005808D9`), stat messages (`0x006258D0`: the 0x1D / 0x1E), then,
+when the player's flag-ex (+0xC8) has bit 0x200000 (set by §8.2 rule
+3.5), `0x0055DF00(…, 1, 1)` at `0x00538146` → `0x0055DBC0` → 0x48 at
+`0x0055DEEB`. A 0x48 after the stat messages can only come from there.
+The second 0x48 (after 0x04) is the state-3 inventory refresh
+`0x0055DF00` (`sim/tick.md` §6 rule 4), the same function. The only
+two 0x48 senders (`0x0053D3C0` call sites) are `0x0055DEEB` and
+`0x005808D9`.
+
+### 9. C→S handlers: owners, and the small handlers owned here
+
+Handler entry (size, gate, result codes) is §2.3–2.4 for every id; this
+section names who owns what each `sim` id **does** when no system spec
+owned it yet, and states the handlers that are only message handling.
+"Player" = the dispatcher's EDX unit, "game" = ECX.
+
+1. **Owners.** Ids whose behaviour lives in another spec link there;
+   rules 2–13 own the rest.
+
+   | Id | Owner of the behaviour |
+   |---|---|
+   | 0x12 EndInferno | rule 2 |
+   | 0x14 OverheadChat | rule 3 |
+   | 0x15 Chat | §2.4 rule 6 (checks); relay: open question 14 |
+   | 0x3D HighlightDoor | rule 4 (message part); `0x005845D0`: open question 15 |
+   | 0x3E ActivateInifussScroll | `world/quests.md` §9.4 |
+   | 0x3F PlayAudio | rule 5; the event's sound: `audio/triggers.md` §3 rule 3 |
+   | 0x41 Resurrect | rule 6 |
+   | 0x44 StaffInOrifice | `world/quests-act2.md` §8.6 (entry: rule 7) |
+   | 0x46 MercInteract, 0x47 MoveMerc | rule 8; the command: `monsters/ai.md` (commands `0x005E6AE0`) |
+   | 0x48 TurnOffBusyState | rule 9 |
+   | 0x4B RequestEntityUpdate | rule 10 |
+   | 0x4C Transmogrify | `world/cube.md` §10 (item-use spec) |
+   | 0x4D PlayNpcMessage | rule 11; the intro record: `world/quests.md` §6.7 |
+   | 0x51 BindHotkey | rule 12 (fields: §2.4 rule 7) |
+   | 0x53 StaminaOn, 0x54 StaminaOff | rule 13 |
+   | 0x59 MakeEntityMove | `monsters/ai.md` §9.9 (AI params from NPC messages) |
+   | 0x5F UpdatePlayerPos | `sim/pathing.md` §1.6 |
+   | 0x60 SwapWeapons | rule 14 (message part); `0x005616A0`: open question 16 |
+
+2. **0x12** (`0x0054A260`): size 1 else 3; state 12 (`inferno`) off on
+   the player with an update-queue insert (`0x00639DB0(player, 12, 0)`,
+   `sim/stat-lists.md` §9.2); 0.
+3. **0x14** (`0x0054A290`): size 4–275 else 3 (§2.4 rule 1); text =
+   cstr @3, length n (`0x00413750`): n ≤ 0 → 0; n ≥ 256 → 2; the name
+   cstr after it is copied (≤ 16 bytes) and not used. The text test
+   `0x00413490(text, −1)` ≠ 0 → 0, nothing else. Else: free the
+   player's overhead record (unit +0xA4, `0x006611A0`), make a new one
+   (`0x00661110(game +0x1C, text, frame)`: duration d = 8·min(n, 254) +
+   0x7D frames, end = frame + d), its byte +8 := message u8@2
+   (`0x00661230`), unit +0xA4 := it, queue the player for update
+   (`0x0064C040`), unit flags +0xC4 |= 0x100, and schedule timer event
+   6 on the player at max(frame + 1, end) (`0x005417D0`, `sim/tick.md`
+   §5); 0. The update pass sends it (overhead 0x26, §7.9).
+4. **0x3D** (`0x0054BF10`): size 5 else 3; object GUID u32@1; the unit
+   test `0x00548F80` (§2.4 rule 4) with type 2 and range 10: non-zero →
+   that code; else `0x005845D0(game, player, GUID)`, 0.
+5. **0x3F** (`0x0054C070`): size 3 else 3; sound u16@1 outside 25–32 →
+   0, nothing; player unit flags (+0xC4) bit 0x400 → 1; else sound
+   event (`0x00553380(player, sound, 0)`); 0.
+6. **0x41** (`0x0054C0E0`, call level; gate: §2.3 rule 3 "dead"): size 1
+   else 3; player missing or mode ≠ 0x11 → 0. Client flag 4
+   (`0x00538670`, hardcore) → drop the client (`0x0052CAF0(game,
+   client, 3)`, `tools/original-hooks.md` §6.1 rule 3), 0. Else in
+   order: `0x0053FDF0` (returns 0; its value is the warp's last
+   argument); passive skill states re-applied (`0x0056DFA0`: each skill
+   of the player with a passive state gets the state on and
+   `0x00646D60`); stats 6, 8, 10 (life, mana, stamina) := their maxima
+   (`0x00625D10`, `0x00625D60`, `0x00625DB0`; set `0x00627260`, each
+   sent with `0x00548520`); unit flags +0xC4 |= 2; state 0x36 on then
+   off (`0x00639DB0`); level warp `0x0053AEC0(game, player, town of the
+   act of the player's current level, 0)` (act `0x006427F0`, town
+   `0x0061AB70`: `drlg/levels.md` §6 rule 3; warp
+   `sim/path-placement.md` §11); mode 1 started without the mode gate
+   (`0x005809D0(game, player, target none, mode 1, 0, 0, skip gate
+   1)`); the left skill (`0x00620190`) re-selected with EDX = 1 and the
+   right skill (`0x006201D0`) with EDX = 0 (`0x005701B0`, as in
+   `items/inventory.md` §5.5); 0. What the life / corpse rules of a player
+   death are belongs to the player-death spec (not written).
+7. **0x44** (`0x0054C380`): size 17 else 3; busy (`0x00535060`) and
+   trading (`0x005678A0(…, 1)`) → 3; else `0x00549520(game, player,
+   u32@5, u32@9, u16@13)` and its result (`world/quests-act2.md` §8.6).
+8. **0x46** (`0x0054C4B0`): size 13 else 3; merc GUID u32@1, target
+   GUID u32@5, target type u32@9 (≥ 6 → 2); the unit test `0x00548F80`
+   (range 50) non-zero → that code. **0x47** (`0x0054C520`): size 13
+   else 3; merc GUID u32@1, x u16@5, y u16@9; the point test
+   `0x00548EF0` (range 50, §2.4 rule 3) non-zero → that code. Both then
+   `0x0054C430(merc, a, b, command)` (0x46: a = target GUID, b = type,
+   command 0x0C; 0x47: a = x, b = y, command 0x0D): no monster with the
+   merc GUID → 1; it is not the player's hireling (`0x00574EC0(game,
+   player, 7, 0)`) → 1; else free its AI commands (`0x0058EDE0`), add
+   the command {command, a, b} (`0x0058EF40`), sound event 15 on the
+   merc toward the player (`0x00553380`), 0. 0x47 returns 0 whatever
+   `0x0054C430` returns; 0x46 returns its result.
+9. **0x48** (`0x0054C590`): size 1 else 3; player data +0x4C (busy,
+   `items/inventory.md` §7) = 0 → 2; else +0x4C := 0 (`0x005350B0`); 0.
+10. **0x4B** (`0x0054C6D0`): size 9 else 3; type u32@1 ≥ 6 → 2; unit :=
+    (type, GUID u32@5) (`0x00552F60`); type 0 and unit ≠ the player → 3;
+    unit missing → 1; the player's room not in the unit's room's room
+    list (`0x0065A590` → `0x00619790`) → 1; else queue the unit for
+    update (`0x0064C040`) and set its flag-ex (+0xC8) bit 0x10000, which
+    makes its next update send S→C 0x15 (§7.3 rule 2 step 1 for
+    monsters; `sim/pathing.md` §10 for players); 0.
+11. **0x4D** (`0x0054C690`): size 3 else 3; u16@1 = an NPC class id; ≥
+    the monstats row count (data tables +0xA80) → 2; else clear that
+    NPC's intro bit in the player's record for the game's difficulty
+    (`0x005724C0`; class not in the intro list → bit 0); 0.
+12. **0x51** (`0x0054C870`): size 9 else 3; fields as §2.4 rule 7; slot
+    > 15 → 3; skill > count → −1 (unbind); skill = count → 3; 0 ≤ skill
+    < count and the player lacks it (`0x006439B0(player, skill, item)`
+    = 0) → 3. Store into the client's hot-key slot (`0x005356B0` →
+    `0x005390A0`: client +0x3DC + 8·slot: skill i16, left u8 at +2, item
+    u32 at +4; read by the join's 0x7B, §8.2 rule 3.6); no client → 3;
+    else 0. Nothing is sent.
+13. **0x53** (`0x0054C940`): size 1 else 3; a player in mode 2 (walk)
+    with stamina (stat 10, `0x00625480`) ≠ 0 → mode 3 (run,
+    `0x00624690`). **0x54** (`0x0054C990`): size 1 else 3; a player in
+    mode 3 → mode 2. Both 0.
+14. **0x60** (`0x0054CE70`): size 1 else 3; classic game → 3; a used
+    skill (`0x00620250`) or dead (`0x005541B0`) → 0; else `0x005616A0(game,
+    player, &fail)`: 0, or 3 when it returns 0 with fail ≠ 0.
 
 ## Constants & data dependencies
 
@@ -1063,6 +1278,18 @@ Synthetic (from the rules; CI-safe):
 | game creation, Normal, expansion, not ladder, arena flags 0x00100004 | `01 00 04001000 01 00`, then `00`, then `02` | §8.1; recorded seq 5–7 of both |
 | hot-key slot 3, skill 36, flag set, item −1 | `7b 03 2480 ffffffff` | §8.2 rule 3.6 (synthetic) |
 | join of a character with no hot key, then the town spawn | 0x59 … 0x0B, 0x5F, …, 0x95, 0x1B, 0x03, 0x53, 0x07 × (1 + array), 0x15, 0x7E; next tick … 0x04 | §8; recorded `-022633` seq 102–219 |
+| one-entry 0x27 (count 1) vs d2rs, differing only in bytes 7, 9, 12–39 | match | §6 rule 6 (synthetic) |
+| 0x27 count 2 differing in byte 12 (second entry's kind) | mismatch at byte 12 | §6 rule 6 (synthetic) |
+| 0x50 u16 1 differing in byte 13 | mismatch (no mask) | §6 rule 6 (synthetic) |
+| 0x82 name "ab" (NUL at byte 7), differing in bytes 8–20 | match; differing in byte 21 → mismatch | §6 rule 6 (synthetic) |
+| player kills a monster in a Deathmatch game, arena record +0x00 = 0 | that tick: 0x65 `65 <player GUID> 0100` after the monster's 0x69, from the per-client update; next kill `…0200` | §7.6 rule 5; recorded counts 1, 2 |
+| C→S `48` with player data +0x4C = 0 | result 2, nothing | §9 rule 9 (synthetic) |
+| C→S `54` with the player in mode 3 | mode 2; result 0 | §9 rule 13 (synthetic) |
+| C→S `51 24 00 03 00 ff ff ff ff` (skill 36 the player has, right hand, slot 3) | client +0x3DC + 24: skill 36, left 0, item −1; result 0; nothing sent | §9 rule 12 (synthetic) |
+| C→S `51 24 00 10 00 ff ff ff ff` (slot 16) | result 3 | §9 rule 12 (synthetic) |
+| C→S `3f 1d 00` (sound 29), player flags without 0x400 | sound event 29 on the player; result 0 | §9 rule 5 (synthetic) |
+| C→S `3f 18 00` (sound 24) | result 0, nothing | §9 rule 5 (synthetic) |
+| C→S `4b 00000000 <other player GUID>` | result 3 | §9 rule 10 (synthetic) |
 
 The vectors for size rules are implemented in `check_packets.py`'s
 `size_of` (same inputs, same outputs); `--selftest` runs the packing and
@@ -1157,6 +1384,26 @@ each file), every 0x67–0x6D, 0x08 order (48 frames), the 0xAA vector
 against patch_d2 `states.txt` row 105 and `itemstatcost.txt` row 172
 (send bits 2), 0x7E bytes.
 
+Senders session (2026-10-07, static reads with `disasm.py` and a call
+graph of `all.asm`): masks (§6 rule 6) `0x0053C8D0` and its four call
+sites, `0x00661480`, `0x00661240`, `0x006612F0`, `0x005456A0`,
+`0x005DE330`, `0x00545780`, `0x00572C10`; `0x0053D7E0` call sites and
+`0x00546040`; `0x0053DB90`, `0x004135D0`. 0x77 call sites of
+`0x0053CAB0` (§4 rule 4). 0x65 (§7.6 rule 5): `0x0057CD5B`,
+`0x0053F720`, `0x0053F630`, `0x0053FAE0` (caller `0x0053B079`),
+`0x0053FB00`, `0x00538860` (no reference: byte search of `Game.exe` for
+its address finds none), `arena.txt`. Loader order (§8.2 rule 3.1) and
+first 0x48 (§8.3): `0x00534020`, `0x005344B0`, `0x00532EB7` (the tail of
+`0x00532E90`), `0x00533C70`, `0x0055DA70`, `0x005380D0`, `0x0055DBC0`;
+reverse call search from `0x0053C520` / `0x0053C4A0`.
+Handlers of §9: `0x0054A260`, `0x0054A290` (with `0x00661110`,
+`0x00661230`), `0x0054BF10`, `0x0054C070`, `0x0054C0E0` (with
+`0x0053FDF0`, `0x0056DFA0`, `0x00625D10`, `0x005809D0`, `0x006427F0`,
+`0x0061AB70`), `0x0054C380`, `0x0054C4B0`, `0x0054C520`, `0x0054C430`,
+`0x0054C590` / `0x005350B0`, `0x0054C6D0` / `0x0065A590`, `0x0054C690` /
+`0x005724C0`, `0x0054C870` / `0x005356B0` / `0x005390A0`, `0x0054C940`,
+`0x0054C990`, `0x0054CE70`, `0x0054BF60`, `0x0054C760`, `0x0054CA10`.
+
 ## Open questions
 
 1. R1–R7 on a hosted game and with more message ids (the single-player
@@ -1178,9 +1425,15 @@ against patch_d2 `states.txt` row 105 and `itemstatcost.txt` row 172
    (`0x00570E30`): §7.9 rule 1; 0x01, 0x23, 0x53, 0x7B, 0x7E: §8.
 5. S→C field layouts: only the builders in the `layout` column were read;
    every other layout is unconfirmed (one owner per system spec later).
-6. C→S field meanings marked `partial` (0x14, 0x15, 0x26, 0x2F–0x33, 0x35,
-   0x38, 0x3D, 0x3F, 0x44, 0x4D, 0x4F, 0x58, 0x59): offsets and widths
-   are 1.14d, names are D2MOO's; each system spec confirms its own.
+6. C→S field meanings marked `partial` (0x14, 0x15, 0x32, 0x33, 0x35,
+   0x44, 0x4F): offsets and widths are 1.14d, names are D2MOO's; each
+   system spec confirms its own. *Partly answered* (§9; TSV rows 0x26,
+   0x2F–0x31, 0x38, 0x3D, 0x3F, 0x4D, 0x58, 0x59 now `yes`). Known name
+   fixes for a later code-table change (the client encodes these
+   fields, so names, not bytes): 0x32 u32@9 = transaction (bits 0–15) |
+   fill (bit 31), u32@13 never read (`world/vendors.md` §7.1); 0x33
+   u16@9 = item mode, u32@13 not read (§7.2); 0x35 u16@9 not read, u32@13
+   bit 31 = repair all (§8.1); 0x14 u8@1 is not read (§9 rule 3).
 7. The odd third term of the C→S chat size rule (§2.1 rule 5): does the
    1.14d client ever send a non-zero byte there?
 8. 0x0B, 0x2E, 0x42, 0x43: does the 1.14d client ever send them?
@@ -1195,21 +1448,24 @@ against patch_d2 `states.txt` row 105 and `itemstatcost.txt` row 172
     the life fraction (§7.4 rule 5). Open: `0x005711D0`, `0x005715A0`,
     `0x00572EE0`, and who writes the unit +0xEC records.
 11. The §7.6 order (item 0x9C before the monster's 0x69 in a kill tick
-    with a drop) and where 0x65 (`0x0053D9C0`, caller `0x0053FB30`,
-    recorded right after 0x69 code 8) is sent from: a recording of a
-    kill that drops an item. Narrowed: 0x65 = `65`, player GUID u32@1
-    (−1 without a player), kill count u16@5 (the player record's +0x34
-    → +0x00; recorded 1, then 2); `0x0053FB30`'s callers are the arena
-    sync `0x0053FC20` (per-client update; needs arena flag 0x400 and the
-    player's arena record +0x04 ≠ 0), `0x0053FB90` and `0x0053FC70`
-    (from the join sequence `0x0052C410`). The recorded arena flags
-    (0x00100004, §8.1) lack 0x400, so which path sends the kill-tick
-    0x65 needs a breakpoint on `0x0053FB30` during a kill (its return
-    address), or a write watch on arena flags.
-12. The loader's messages between 0x59 and 0x0B (§8.2 rule 3.1): their
-    order inside the save path `0x005344B0` → `0x00534020` is recorded,
-    not read; owner: the save-load spec (`formats/d2s.md` and the
-    character-load spec, not yet written).
-13. The first 0x48 of the first tick (§8.3, before 0x04): its caller
-    (`0x0055DBC0` inventory refresh or `0x00580860` player update);
-    settle with the recorder's caller field one level up.
+    with a drop): a recording of a kill that drops an item. *0x65 part
+    answered* (§7.6 rule 5, static): the kill sets arena flag 0x400
+    (`0x0053F720`), the same tick's arena sync `0x0053FC20` sends it
+    (recorded right after the monster's 0x69 code 8, both from the
+    per-client update), tick step 6 clears the flag.
+12. *Partly answered* (§8.2 rule 3.1, static call order of the save path
+    = the recorded order). Open: the per-item conditions that send 0x22
+    and 0x21 during the item load (owner: `formats/d2s.md` and the
+    character-load spec, not yet written) and when the loader's own
+    0x23 calls (`0x005341FD`, `0x00534210`) fire.
+13. *Answered* (§8.3, static): the first 0x48 is the per-client update's
+    inventory refresh (`0x00538146` → `0x0055DBC0`, 0x48 at `0x0055DEEB`);
+    the player update's 0x48 (`0x005808D9`) runs before the stat
+    messages that precede it.
+14. C→S 0x15 Chat (`0x0054A5D0`) after its checks: which messages it
+    sends (0x26 through `0x0053C750`, `0x0053C850`) and to whom; one
+    chat line in a recording settles the single-player case.
+15. `0x005845D0` (0x3D, §9 rule 4): what a door highlight does to the
+    object (object spec).
+16. `0x005616A0` (0x60, §9 rule 14): the weapon switch and its fail
+    flag (item spec).

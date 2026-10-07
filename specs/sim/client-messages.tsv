@@ -37,7 +37,7 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x23	ItemToBelt	9	==9	item:u32@1 slot:u32@5	0x0054B3E0	handler	alive	put the cursor item into the belt	sim	yes
 0x24	ItemFromBelt	5	==5	item:u32@1	0x0054B450	handler	alive	take a belt item to the cursor	sim	yes
 0x25	SwitchBeltItem	9	==9	cursor:u32@1 belt:u32@5	0x0054B4E0	handler	alive	swap cursor item with a belt item	sim	yes
-0x26	UseBeltItem	13	==13	item:u32@1 on_merc:u32@5	0x0054B560	handler	alive	use a belt item	sim	partial
+0x26	UseBeltItem	13	==13	item:u32@1 on_merc:u32@5	0x0054B560	handler	alive	use a belt item	sim	yes
 0x27	UseItemAction	9	==9	target:u32@1 used:u32@5	0x0054B280	handler	alive	use an item on an item (identify, repair kit)	sim	yes
 0x28	SocketItem	9	==9	socketable:u32@1 target:u32@5	0x0054B650	handler	alive	insert a socketable	sim	yes
 0x29	ScrollToBook	9	==9	scroll:u32@1 book:u32@5	0x0054B710	handler	alive	put a scroll into a tome	sim	yes
@@ -46,23 +46,23 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x2C	Unused2C	0	-		0x0054B810	stub3	alive	rejected (handler returns 3); never queued (size table 0)	none	yes
 0x2D	Unused2D	1	-		0x0054B820	stub3	alive	rejected (handler returns 3)	none	yes
 0x2E	Unused2E	3	-		0x0054B920	stub0	alive	nothing (handler returns 0)	none	yes
-0x2F	InitEntityChat	9	==9	id:u32@5	0x0054B930	handler	alive	start talking to an NPC	sim	partial
-0x30	TerminateEntityChat	9	==9	id:u32@5	0x0054B9F0	handler	alive	stop talking to an NPC	sim	partial
-0x31	QuestMessage	9	==9	npc:u32@1 msg:u16@5	0x0054BA90	handler	alive	quest message shown by an NPC	sim	partial
+0x2F	InitEntityChat	9	==9	id:u32@5	0x0054B930	handler	alive	start talking to an NPC	sim	yes
+0x30	TerminateEntityChat	9	==9	id:u32@5	0x0054B9F0	handler	alive	stop talking to an NPC	sim	yes
+0x31	QuestMessage	9	==9	npc:u32@1 msg:u16@5	0x0054BA90	handler	alive	quest message shown by an NPC	sim	yes
 0x32	BuyItem	17	==17	npc:u32@1 item:u32@5 mode:u32@9 cost:u32@13	0x0054BAC0	handler	alive	buy from an NPC	sim	partial
 0x33	SellItem	17	==17	npc:u32@1 item:u32@5 tab:u16@9 cost:u32@13	0x0054BB20	handler	alive	sell to an NPC	sim	partial
 0x34	IdentifyWithNpc	5	==5	npc:u32@1	0x0054BBA0	handler	alive	identify all items at an NPC (Cain)	sim	yes
 0x35	Repair	17	==17	npc:u32@1 item:u32@5 tab:u16@9 cost:u32@13	0x0054BB60	handler	alive	repair at an NPC	sim	partial
 0x36	HireMerc	9	==9	npc:u32@1 merc:u16@5	0x0054BBD0	handler	alive	hire a mercenary	sim	yes
 0x37	IdentifyGamble	5	==5	item:u32@1	0x0054BC30	handler	alive	identify a gambled item	sim	yes
-0x38	EntityAction	13	==13	action:u32@1 npc:u32@5 item:u32@9	0x0054BCA0	handler	alive	NPC menu action (trade, gamble, ...)	sim	partial
+0x38	EntityAction	13	==13	action:u32@1 npc:u32@5 item:u32@9	0x0054BCA0	handler	alive	NPC menu action (trade, gamble, ...)	sim	yes
 0x39	PurchaseLife	5	-		0x0054BD00	stub3	alive	rejected (handler returns 3)	none	yes
 0x3A	AddStatPoint	3	==3	stat:u16@1	0x0054BD10	handler	alive	spend a stat point	sim	yes
 0x3B	AddSkillPoint	3	==3	skill:u16@1	0x0054BD90	handler	alive	spend a skill point	sim	yes
 0x3C	SelectSkill	9	==9	skill:u31@1 left:bit31@1 item:u32@5	0x0054BE70	handler	none	choose the left or right skill	sim	yes
-0x3D	HighlightDoor	5	==5	id:u32@1	0x0054BF10	handler	alive	door highlight hint	sim	partial
+0x3D	HighlightDoor	5	==5	id:u32@1	0x0054BF10	handler	alive	door highlight hint	sim	yes
 0x3E	ActivateInifussScroll	5	==5	item:u32@1	0x0054BF60	handler	alive	read the Inifuss scroll (quest)	sim	yes
-0x3F	PlayAudio	3	==3	sound:u16@1	0x0054C070	handler	alive	play a character speech line	sim	partial
+0x3F	PlayAudio	3	==3	sound:u16@1	0x0054C070	handler	alive	play a character speech line	sim	yes
 0x40	RequestQuestData	1	==1		0x0054C0C0	handler	alive	request quest log data	sim	yes
 0x41	Resurrect	1	==1		0x0054C0E0	handler	dead	respawn after death	sim	yes
 0x42	Unused42	1	-		0x0054C360	stub0	alive	nothing (handler returns 0)	none	yes
@@ -75,8 +75,8 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x49	TakeOrCloseWp	9	==9	wp:u32@1 level:u16@5	0x0054C5D0	handler	alive	travel by waypoint or close it	sim	yes
 0x4A	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x4B	RequestEntityUpdate	9	==9	type:u32@1 id:u32@5	0x0054C6D0	handler	alive	request a unit refresh	sim	yes
-0x4C	Transmogrify	5	==5	cube:u32@1	0x0054C760	handler	alive	transmute the cube contents	sim	yes
-0x4D	PlayNpcMessage	3	==3	msg:u16@1	0x0054C690	handler	alive	NPC speech played	sim	partial
+0x4C	Transmogrify	5	==5	item:u32@1	0x0054C760	handler	alive	use a Transmogrify item (misc.txt); not the cube	sim	yes
+0x4D	PlayNpcMessage	3	==3	npc_class:u16@1	0x0054C690	handler	alive	clear an NPC's intro bit for the player	sim	yes
 0x4E	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x4F	ClickButton	7	==7	button:u16@1 p1:u16@3 p2:u16@5	0x0054C7C0	handler	alive	UI button (trade, stash gold, ...)	sim	partial
 0x50	DropGold	9	==9	unit:u32@1 amount:u32@5	0x0054C800	handler	alive	drop gold	sim	yes
@@ -87,8 +87,8 @@ id	name	transport_size	handler_size	layout	handler	kind	gate	request	scope	confi
 0x55	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x56	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x57	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
-0x58	QuestCompleted	3	==3	quest:u16@1	0x0054C9C0	handler	alive	quest UI update request	sim	partial
-0x59	MakeEntityMove	17	==17	type:u32@1 id:u32@5 x:u32@9 y:u32@13	0x0054CA10	handler	alive	move a unit (NPC escort)	sim	partial
+0x58	QuestCompleted	3	==3	quest:u16@1	0x0054C9C0	handler	alive	quest UI update request	sim	yes
+0x59	MakeEntityMove	17	==17	type:u32@1 id:u32@5 x:u32@9 y:u32@13	0x0054CA10	handler	alive	move a unit (NPC escort)	sim	yes
 0x5A	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x5B	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes
 0x5C	-	0	-		-	none	-	no handler; never queued (size table 0)	none	yes

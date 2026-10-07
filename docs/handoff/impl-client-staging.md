@@ -78,23 +78,52 @@ a typed message with `UNWRITTEN`. **Not added** (Q4–Q7).
   `owner`; `model.md` §14 rule 2 (and its vector) reads pet GUID u32@9,
   owner u32@5. The handler follows `model.md`; the TSV names need a fix in
   a spec session.
+  **Answered** (2026-10-07, spec-senders-area): `sim/server-messages.tsv`
+  already reads `owner:u32@5 pet:u32@9` (merge `2161e5b`); no change.
 - Q3 Act palette switch test: `model.md` §11 rule 4 compares the Levels
   `Act` byte, `msg-units.md` §3 rule 4.4 the area byte (+2 of
   `0x0061DB70`) of the two levels. The code follows `model.md` (owner of
   the act); one of the two texts needs aligning.
+  **Answered**: neither. `0x004654C0` compares byte +2 of the two
+  544-byte `levels` records, which is `Pal` (`data/fields.tsv`: `Pal`
+  offset 2, `Act` offset 3), and passes the new `Pal` to `0x004FB480`.
+  `Pal` ≠ `Act` in 7 rows (125–127, 133–136, all Act 4). Fixed in
+  `client/msg-units.md` §3 rule 4.4 (with vectors). Still to align (not
+  this area): `client/model.md` §11 rules 4–5 and
+  `render/composition.md` §4 say "Levels `Act` byte (`+0x02`)"; the code
+  must switch on `Pal` (the vector: 109 → 133 loads act 1's palette).
 
 - Q4 0x27 masks (7, 9, 12–39) are keyed by sender; `scenario.md` §6
   rules 1, 3 have id / offset / length only and an `s2c` record carries
   no sender; an id-only mask would hide written bytes of the list forms.
+  **Answered** (`sim/intents-events.md` §6 rule 6): key on the entry
+  count u8@6 = 1 (the one-entry forms always write 1; a list form with
+  count 1 has 0 in every masked byte), mask 7, 9, 12–39.
 - Q5 0x50 masks are keyed by the u16 at bytes 1–2; no key column in §6
   rule 3. The existing unkeyed `0x50 13 2` row already over-masks the
   fully written u16 1 form.
+  **Answered** (§6 rule 6): the six call sites of `0x0053D7E0` each write
+  a constant u16@1: 1 → none, 4 → 13–14, 2 / 0x24 / 13 → 5–14, 0x17 →
+  3–14. The unkeyed row becomes `u16@1=0x0004`.
 - Q6 0x82 (name bytes after the NUL through 20) is content-dependent; the
   format has no way to say it.
+  **Answered** (§6 rule 6): from the byte after the first 0 in bytes 5–20
+  through byte 20 (`0x004135D0` writes exactly through the NUL). Proposed
+  columns for the cloud's format: `id key offset length source`, key `-`
+  / `u8@o=v` / `u16@o=v`, offset `nul@n`, length `..n`; rows listed there.
 - Q7 `scenario.md` names `tools/scenario-masks.tsv`; the file and reader
   use `specs/tools/scenario-masks.tsv`.
+  **Answered** (rule): the table lives in `specs/tools/` beside the spec
+  that documents it (`specs/README.md` bar 5: machine tables are sibling
+  TSVs of their `.md`, embedded with `include_str!`), so
+  `specs/tools/scenario-masks.tsv` is right. Spec text writes paths
+  relative to `specs/` (`sim/tick.md`), so `tools/scenario-masks.tsv` in
+  `scenario.md` means the same file; because the repo also has a
+  top-level `tools/`, a spec naming a file under `specs/tools/` that
+  code reads should write the full `specs/tools/…` path. `scenario.md`
+  (not this area) should change its two mentions.
 - Q8 `tbl.md` open question 3 still says "all 33 1.14d tables"; stale
-  against 29. The key-resolves vector is scoped to eng; the sweep checks
+  against 29. **Answered**: fixed to 29 (that line only). The key-resolves vector is scoped to eng; the sweep checks
   all 29 tables. Invalid UTF-8 handling belongs to `ui/text.md` §2 (not
   `tbl.rs`).
 - d2-sim note: the 0x50 u16 4 (stone order) and u16 13 (tomb) builders
