@@ -395,7 +395,7 @@ fn reset_event_needs_subclass_bit_0() {
     assert!(s.w.calls.is_empty());
 }
 
-// Covers: specs/world/objects.md §9.1 text
+// Covers: specs/world/objects.md §9.1 text; specs/world/objects-2.md §24 r4
 #[test]
 fn hover_event_frees_or_reschedules() {
     // Expired (expiry = frame): freed, queued, flag 0x100.
@@ -668,7 +668,7 @@ fn gem_shrine_without_gem_rolls_on_player_seed() {
     assert_eq!(s.w.seeds[&OBJ], u_seed);
 }
 
-// Covers: specs/world/objects.md §9.3
+// Covers: specs/world/objects.md §9.3; specs/world/objects-2.md §24 r3
 #[test]
 fn storm_shrine() {
     let got = run(19, |s| {

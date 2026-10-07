@@ -716,7 +716,7 @@ fn urn_rolls_20_inclusive() {
     }
 }
 
-// Covers: specs/world/objects.md §8.2
+// Covers: specs/world/objects.md §8.2; specs/world/objects-2.md §24 r2
 #[test]
 fn barrel_skill_draw_order_and_no_trap_arm() {
     let t = tables();

@@ -105,7 +105,7 @@ pub(crate) fn data() -> Arc<StatData> {
             stamina_per_vitality: 4,
             mana_per_magic: 8,
         }],
-        states: StateTable::synthetic(185, &[(30, 0), (40, 16), (41, 16), (50, 32)]),
+        states: StateTable::synthetic(185, &[(30, 0), (40, 16), (41, 16), (45, 12), (46, 12), (50, 32)]),
         damage_regen: vec![0, 8],
         aurastate: vec![0; 10],
         rescale_precision: DEFAULT_RESCALE_PRECISION,

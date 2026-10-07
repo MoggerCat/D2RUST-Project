@@ -664,7 +664,7 @@ fn preset_shrines() {
     assert_eq!(preset_ids(579), BTreeSet::from([14]));
 }
 
-// Covers: specs/world/objects.md §6
+// Covers: specs/world/objects.md §6; specs/world/objects-2.md §24 r1, §22 r1
 #[test]
 fn preset_bounds_and_580() {
     let t = tables();
@@ -708,6 +708,10 @@ fn preset_bounds_and_580() {
     assert_ne!(f.flags[&u] & oflags::KEEP_MODE, 0);
     assert_eq!(f.modes[&u], 0);
     assert_eq!(ctl.seed, Seed::init());
+    // objects-2 §24 r1: the final mode set (mode 0 → 0) runs no setup and
+    // draws nothing, but queues the object and sets flag 0x1.
+    assert!(f.calls.contains(&Call::Mode(u, 0, true)));
+    assert_ne!(f.flags[&u] & oflags::CHANGED, 0);
 }
 
 // ------------------------------------------------------------------ §7
@@ -987,7 +991,7 @@ fn end_anim_and_delayed_portal_events() {
 
 // ------------------------------------------------------------------ §14
 
-// Covers: specs/world/objects.md §14 text, §14 r1
+// Covers: specs/world/objects.md §14 text, §14 r1; specs/world/objects-2.md §23 r1, §23 r3
 #[test]
 fn update_message_bytes() {
     assert_eq!(

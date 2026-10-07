@@ -321,7 +321,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/world/objects-2.md §20.5
+    // Covers: specs/world/objects-2.md §20.5, §edge-cases-original-bugs r5
     #[test]
     fn pick_act_uses_the_level_as_a_level_id() {
         let got: Vec<i32> = [39, 40, 108, 109, 1024].map(pick_act).to_vec();
@@ -365,7 +365,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/world/objects-2.md §20.5 r1
+    // Covers: specs/world/objects-2.md §20.5 r1, §edge-cases-original-bugs r3
     #[test]
     fn part_pick_filters_and_draws_per_row() {
         let mut p = picks();
@@ -422,7 +422,7 @@ mod tests {
         assert!(id == 3 || id == 4);
     }
 
-    // Covers: specs/world/objects-2.md §20.2
+    // Covers: specs/world/objects-2.md §20.2, §edge-cases-original-bugs r6
     #[test]
     fn weapon_rack_keeps_bit_one_or_the_sixth_pick() {
         let p = picks();
@@ -441,7 +441,7 @@ mod tests {
         assert!(id == 0 || id == 1);
     }
 
-    // Covers: specs/world/objects-2.md §20.4 r3, §20.4 r4
+    // Covers: specs/world/objects-2.md §20.4 r3, §20.4 r4, §edge-cases-original-bugs r4
     #[test]
     fn source_class_code_and_magic_loop() {
         let p = picks();

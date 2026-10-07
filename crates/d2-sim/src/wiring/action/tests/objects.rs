@@ -12,6 +12,9 @@ use d2_data::tables::{Levels, Objects};
 
 use super::*;
 use crate::monsters::ai::{AiModes, AiTargets};
+use crate::combat::CombatWorld;
+use crate::world::objects::MiscWorld;
+use crate::skills::SkillUnits;
 use crate::units::record::flags as uflags;
 use crate::wiring::action::{ObjectCase, ObjectRoute};
 use crate::world::objects::{
@@ -821,4 +824,36 @@ fn host_quests_drop_gold_and_quest_drops_through_the_drop_helpers() {
     }
     s.hooks.items = items;
     fx.assert_clean();
+}
+
+// Covers: specs/world/objects-2.md §21
+#[test]
+fn curable_state_removal() {
+    let mut fx = fx();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    // States 45 and 46 are curable in the fixture's table, 30 is not.
+    fx.sim.combat(&mut fx.game, |w, _| {
+        for s in [30u16, 45] {
+            w.create_state_list(p, s, p, 1000);
+            w.set_state(p, s, true);
+        }
+        // 46: the state is set but has no stat list: left alone.
+        w.set_state(p, 46, true);
+    });
+    let cure = |fx: &mut Fx| {
+        fx.sim
+            .objects(&mut fx.game, |_, _, w| w.cure_states(p))
+            .unwrap()
+    };
+    assert!(cure(&mut fx));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert_eq!(w.state_list_expiry(p, 45), None, "list freed");
+        assert_eq!(w.state_list_expiry(p, 30), Some(1000), "not curable");
+        assert!(w.has_state(p, 46));
+    });
+    // Nothing left to remove: 0, and no draws on any seed.
+    let before = fx.sim.hooks().objects.as_ref().unwrap().control.seed;
+    assert!(!cure(&mut fx));
+    assert_eq!(fx.sim.hooks().objects.as_ref().unwrap().control.seed, before);
 }

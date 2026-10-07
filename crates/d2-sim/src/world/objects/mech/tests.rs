@@ -343,7 +343,7 @@ fn trapped_soul_operate_and_events() {
     assert_eq!(f.schedules(), vec![(O, mevent::SOUL, 125)]);
 }
 
-// Covers: specs/world/objects-2.md §18.1, §18.6
+// Covers: specs/world/objects-2.md §18.1, §18.6, §edge-cases-original-bugs r1
 #[test]
 fn fire_event_and_endanim_write_mode_directly() {
     let mut t = tables();
@@ -699,4 +699,40 @@ fn obelisk_insert_power_up() {
         (c, f, 0)
     };
     assert_eq!(modes(&f), vec![1]);
+}
+
+// Covers: specs/world/objects-2.md §18 text, §18.1 r2
+#[test]
+fn burn_scans_only_own_room_players_in_reach() {
+    let mut t = tables();
+    t.objects[CLASS as usize].parm0 = 4;
+    let (mut c, mut f) = setup(CLASS, 1, 0, &mut t);
+    f.positions.insert(O, (100, 100));
+    let units = [
+        // (unit, type, mode, dx): in reach, out of reach, dead, monster.
+        (41u32, 0u8, 0u8, 4i32),
+        (42, 0, 0, 6),
+        (43, 0, 17, 1),
+        (44, 1, 0, 1),
+        (45, 0, 0, 5),
+    ];
+    for (u, ty, mode, dx) in units {
+        let u = UnitId(u);
+        f.room_unit_lists.entry(ROOM).or_default().push(u);
+        f.unit_types.insert(u, ty);
+        f.modes.insert(u, mode);
+        f.positions.insert(u, (100 + dx, 100));
+    }
+    // A player in another room is not scanned.
+    let far = UnitId(46);
+    f.room_unit_lists.entry(RoomId(9)).or_default().push(far);
+    f.unit_types.insert(far, 0);
+    f.positions.insert(far, (100, 100));
+    f.adjacent.insert(ROOM, vec![RoomId(9)]);
+    object_event(&mut c, &t, &mut f, O, mevent::FIRE).unwrap();
+    // Reach = Parm0 + 1 = 5 (inclusive): units 41 and 45.
+    assert_eq!(
+        others(&f),
+        vec!["store 10 2", "damage 10 41 1", "damage 10 45 1"]
+    );
 }

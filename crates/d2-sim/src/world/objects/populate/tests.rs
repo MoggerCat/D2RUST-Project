@@ -1227,3 +1227,32 @@ fn fn9_at_most_one_object() {
     };
     assert_eq!(cx.fn9(129, 10), Err(ObjectError::Density(129)));
 }
+
+// Covers: specs/world/objects-2.md §22 r1
+#[test]
+fn population_allocates_in_mode_0() {
+    let mut x = free_room(&[3, 4, 7, 46, 10]);
+    x.t.objects[46].xspace = 2;
+    x.t.objects[46].yspace = 2;
+    x.t.objects[7].xspace = 2;
+    x.t.objects[7].yspace = 2;
+    x.t.objects[4].xspace = 2;
+    x.t.objects[4].yspace = 2;
+    cx_run(&mut x, |c| c.fn1(125, 3));
+    cx_run(&mut x, |c| c.fn3(125, 10).map(drop));
+    cx_run(&mut x, |c| c.fn4(125));
+    cx_run(&mut x, |c| c.fn5(125, 46));
+    cx_run(&mut x, |c| c.fn6(125, 10));
+    cx_run(&mut x, |c| c.fn9(125, 10).map(drop));
+    let modes: Vec<u8> = x
+        .f
+        .calls
+        .iter()
+        .filter_map(|c| match c {
+            Call::Allocate(.., m) => Some(*m),
+            _ => None,
+        })
+        .collect();
+    assert!(modes.len() > 5);
+    assert!(modes.iter().all(|&m| m == 0));
+}

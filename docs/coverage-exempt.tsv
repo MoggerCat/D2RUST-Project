@@ -415,3 +415,4 @@ specs/tools/original-hooks-spawn.md	*	trace-recorder tooling for the original ga
 specs/tools/original-hooks.md	*	trace-recorder tooling for the original game (tools/trace-recorder, local Windows), not crate code
 specs/tools/scenario.md	§2 text	heading
 specs/world/object-population.md	§edge-cases-original-bugs text	heading text only
+specs/world/objects-2.md	§edge-cases-original-bugs text	pointer line

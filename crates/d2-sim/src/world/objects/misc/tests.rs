@@ -706,3 +706,62 @@ fn torch_modes() {
         assert!(f.calls.is_empty());
     }
 }
+
+// Covers: specs/world/objects-2.md §24 r5
+#[test]
+fn well_used_is_set_by_the_write_not_by_a_changed_value() {
+    let mut t = tables();
+    // Parm1 0: the written value equals the total, and still counts.
+    t.objects[WELL as usize].parm1 = 0;
+    let (mut ctl, mut f) = well_fake(2);
+    hurt(&mut f);
+    run(&mut ctl, &t, &mut f, Some(P));
+    assert_eq!(f.stats[&(P, 6)], 100 << 8, "life unchanged");
+    assert_eq!(f.calls[0], Call::Other(format!("stat 6 {}", 100 << 8)));
+    assert_eq!(ctl.get(O).unwrap().interact, 1, "a charge was used");
+    // Nothing below its maximum, nothing removed: not used.
+    let (mut ctl, mut f) = well_fake(2);
+    run(&mut ctl, &t, &mut f, Some(P));
+    assert_eq!(ctl.get(O).unwrap().interact, 2);
+    // A removed poison list alone uses a charge.
+    let (mut ctl, mut f) = well_fake(2);
+    f.stats.insert((P, STATE + 2), 1);
+    run(&mut ctl, &t, &mut f, Some(P));
+    assert_eq!(ctl.get(O).unwrap().interact, 1);
+}
+
+// Covers: specs/world/objects-2.md §24 r6
+#[test]
+fn locked_door_with_no_operator_is_fatal() {
+    let t = tables();
+    let (mut ctl, mut f) = setup(DOOR, 6);
+    assert_eq!(
+        dispatch(&mut ctl, &t, &mut f, O, None),
+        Err(ObjectError::KeyTestNoUnit)
+    );
+    assert!(f.calls.is_empty());
+}
+
+// Covers: specs/world/objects-2.md §24 r7
+#[test]
+fn well_refill_queues_and_flags_even_without_a_mode_set() {
+    let mut t = tables();
+    // Parm2 4: modes at charges 0, 4, 8 only; c = 2 sets no mode.
+    t.objects[WELL as usize].parm2 = 4;
+    let (mut ctl, mut f) = well_fake(1);
+    f.flags.insert(O, 0);
+    well_refill(&mut ctl, &t, &mut f, O).unwrap();
+    assert_eq!(ctl.get(O).unwrap().interact, 2);
+    assert!(modes(&f).is_empty());
+    assert_eq!(f.calls, vec![Call::Queue(O)]);
+    assert_ne!(f.flags[&O] & oflags::CHANGED, 0);
+    // c = 4: the mode set (which queues and flags) and the explicit
+    // repeat.
+    let (mut ctl, mut f) = well_fake(3);
+    f.flags.insert(O, 0);
+    well_refill(&mut ctl, &t, &mut f, O).unwrap();
+    assert_eq!(ctl.get(O).unwrap().interact, 4);
+    assert_eq!(modes(&f), vec![1]);
+    assert_eq!(f.calls.iter().filter(|c| **c == Call::Queue(O)).count(), 1);
+    assert_ne!(f.flags[&O] & oflags::CHANGED, 0);
+}
