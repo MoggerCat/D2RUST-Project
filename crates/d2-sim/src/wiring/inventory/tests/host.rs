@@ -172,6 +172,7 @@ fn checks_and_targeting_reset() {
 /// `MovePending::send` to the owner: [0x9D, 5, 13, category 0, GUID,
 /// owner type 0, the player's GUID, the item bit stream with the flag
 /// argument 0x20 and page 3 (`bitstream.md`)].
+// Covers: specs/world/cube.md §8 l2 r1
 #[test]
 fn send_item_page_queues_0x9d_now() {
     let mut w = World::new();

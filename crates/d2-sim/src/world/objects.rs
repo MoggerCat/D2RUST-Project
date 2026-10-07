@@ -1013,7 +1013,9 @@ pub fn create_preset<W: ObjectHost>(
             Ok(Preset::Object(Some(obj)))
         }
         580 if level == 25 => {
-            let Some(obj) = allocate(ctl, t, w, room, 371, x, y, mode)? else {
+            // Edge case 22 / §22: 580 runs 581's handler, which allocates in
+            // mode 0 whatever the preset mode is.
+            let Some(obj) = allocate(ctl, t, w, room, 371, x, y, 0)? else {
                 return Ok(Preset::Object(None));
             };
             if let Some(d) = ctl.data.get_mut(&obj) {

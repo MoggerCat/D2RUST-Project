@@ -11,9 +11,12 @@ use std::sync::Arc;
 use d2_data::tables::{Levels, Objects};
 
 use super::*;
+use crate::combat::CombatWorld;
 use crate::monsters::ai::{AiModes, AiTargets};
+use crate::skills::SkillUnits;
 use crate::units::record::flags as uflags;
 use crate::wiring::action::{ObjectCase, ObjectRoute};
+use crate::world::objects::MiscWorld;
 use crate::world::objects::{
     self as obj, oevent, oflags, Dispatch, ObjectTables, ObjectWorld, Operate, Route,
 };
@@ -140,6 +143,51 @@ fn torch_and_door_inits_and_the_0x13_case_reach_the_operate() {
         Some(ObjectCase::Code(0))
     );
     fx.assert_clean();
+}
+
+// Covers: specs/world/objects.md §7.3 r1, §7.3 r2, §7.3 r3, §7.3 r4, §7.3 r5
+#[test]
+fn the_0x13_object_case_results() {
+    use crate::wiring::action::ObjectReach;
+    let mut fx = fx();
+    let torch = create(&mut fx, TORCH, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let g = guid(&fx, torch);
+    // r1: no object with the GUID → 1.
+    assert_eq!(
+        fx.sim.operate_object_message(&mut fx.game, p, 0xBEEF),
+        Some(ObjectCase::Code(1))
+    );
+    // r2: object mode ≥ 8 → 3 (the approach is not consulted).
+    fx.sim.sys.units.get_mut(torch).unwrap().mode = 8;
+    fx.sim.hooks().x.reach = Some(ObjectReach::TooFar);
+    assert_eq!(
+        fx.sim.operate_object_message(&mut fx.game, p, g),
+        Some(ObjectCase::Code(3))
+    );
+    fx.sim.sys.units.get_mut(torch).unwrap().mode = 0;
+    // r3: too far → 1; r4: not in range / obstructed → walk → 0, and the
+    // operate does not run.
+    assert_eq!(
+        fx.sim.operate_object_message(&mut fx.game, p, g),
+        Some(ObjectCase::Code(1))
+    );
+    fx.sim.hooks().x.reach = Some(ObjectReach::Walk);
+    assert_eq!(
+        fx.sim.operate_object_message(&mut fx.game, p, g),
+        Some(ObjectCase::Code(0))
+    );
+    assert!(fx.sim.hooks().x.ranged.borrow().is_empty());
+    // r5: in range → the operate entry runs and the case gives 0 (the
+    // entry's own result 0, object gone, maps to 3; with the same GUID
+    // lookup on both sides the wiring cannot reach it).
+    fx.sim.hooks().x.reach = Some(ObjectReach::Operate);
+    assert_eq!(
+        fx.sim.operate_object_message(&mut fx.game, p, g),
+        Some(ObjectCase::Code(0))
+    );
+    assert_eq!(fx.sim.hooks().x.ranged.borrow().len(), 1);
 }
 
 // Covers: specs/world/objects.md §7.1 r2, §7.1 r3, §7.1 r4, §7.2 r4
@@ -776,4 +824,39 @@ fn host_quests_drop_gold_and_quest_drops_through_the_drop_helpers() {
     }
     s.hooks.items = items;
     fx.assert_clean();
+}
+
+// Covers: specs/world/objects-2.md §21
+#[test]
+fn curable_state_removal() {
+    let mut fx = fx();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    // States 45 and 46 are curable in the fixture's table, 30 is not.
+    fx.sim.combat(&mut fx.game, |w, _| {
+        for s in [30u16, 45] {
+            w.create_state_list(p, s, p, 1000);
+            w.set_state(p, s, true);
+        }
+        // 46: the state is set but has no stat list: left alone.
+        w.set_state(p, 46, true);
+    });
+    let cure = |fx: &mut Fx| {
+        fx.sim
+            .objects(&mut fx.game, |_, _, w| w.cure_states(p))
+            .unwrap()
+    };
+    assert!(cure(&mut fx));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert_eq!(w.state_list_expiry(p, 45), None, "list freed");
+        assert_eq!(w.state_list_expiry(p, 30), Some(1000), "not curable");
+        assert!(w.has_state(p, 46));
+    });
+    // Nothing left to remove: 0, and no draws on any seed.
+    let before = fx.sim.hooks().objects.as_ref().unwrap().control.seed;
+    assert!(!cure(&mut fx));
+    assert_eq!(
+        fx.sim.hooks().objects.as_ref().unwrap().control.seed,
+        before
+    );
 }
