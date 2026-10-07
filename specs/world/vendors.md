@@ -34,15 +34,15 @@
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 229–253 |
 |   5. Gambling | 254–309 |
 |   6. Refresh | 310–341 |
-|   7. Buying and selling | 342–544 |
-|   8. Repair | 545–581 |
-|   9. Prices | 582–736 |
-| Constants & data dependencies | 737–756 |
-| Randomness | 757–772 |
-| Edge cases & original bugs | 773–807 |
-| Test vectors | 808–830 |
-| Provenance | 831–869 |
-| Open questions | 870–893 |
+|   7. Buying and selling | 342–548 |
+|   8. Repair | 549–585 |
+|   9. Prices | 586–740 |
+| Constants & data dependencies | 741–760 |
+| Randomness | 761–779 |
+| Edge cases & original bugs | 780–814 |
+| Test vectors | 815–837 |
+| Provenance | 838–876 |
+| Open questions | 877–900 |
 <!-- /index -->
 
 ## Summary
@@ -509,8 +509,12 @@ socketing (`world/npc.md` §8.1); 17 call sites. The owner argument (stack
 What carries over is exactly what the save stream carries
 (`items/bitstream.md` §2–§5): stats with `Save Bits` 0, values the clamp
 changes (§1 rule 3) and unit state outside the item record (timers
-other than step 7, owner links, unit flags) are not copied. No RNG draw
-(the stream holds the seeds, §4.1 rule 7). The decode rules of
+other than step 7, owner links, unit flags) are not copied. No draw of
+its own, but each unit it allocates (the copy, and each child read in
+step 5) takes the allocation's two game-seed steps (`0x00555230`:
+unit seed `0x00552DF0`, item seed `0x00552E90`; `sim/rng.md` §5.3);
+the stream then restores the unit seed (`items/bitstream.md` §4.1
+rule 7). The decode rules of
 `0x0062E430` (`0x0062CBE0` full record, `0x0062A970` compact) are the inverse
 of `items/bitstream.md`, except that the full-record reader rebuilds
 these base stats from the item record instead of the stream
@@ -768,7 +772,10 @@ game, in this order:
 
 range() and roll() never draw for an empty range (`rng.md` §3 rule 1).
 Item creation draws from item seeds (game-seed derived, `rng.md` §5.3).
-Buying, selling and repairing draw nothing.
+Buying, selling and repairing draw nothing from the NPC-control seed;
+every buy and every sell that copies an item (§7.3) takes two
+game-seed steps per allocated unit (copy and fillers). Repair draws
+nothing.
 
 ## Edge cases & original bugs
 
