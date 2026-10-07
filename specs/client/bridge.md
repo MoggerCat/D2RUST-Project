@@ -436,7 +436,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `HotkeyAssign` | slot u8, skill i32, left u8, item GUID u32 | 0x7B | UI | `client/msg-ui.md` §22 |
 | `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
 | `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
-| `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
+| `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead, hook number u8 (setfunc / remfunc, 0 = none), two hook values i32 (`client/stat-lists.md` §3 r6.7) | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
 
 ## Constants & data dependencies
 
