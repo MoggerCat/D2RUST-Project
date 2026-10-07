@@ -35,17 +35,17 @@
 |   6. Light records | 185–268 |
 |   7. Contribution of one record | 269–348 |
 |   8. Light sources | 349–413 |
-|   9. Environment (day and night) | 414–546 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 547–600 |
-|   11. Light values handed to the draws | 601–631 |
-|   12. Captures (answers `capture.md` Open question 5) | 632–669 |
-|   13. d2rs answers | 670–680 |
-| Constants & data dependencies | 681–692 |
-| Randomness | 693–699 |
-| Edge cases & original bugs | 700–716 |
-| Test vectors | 717–750 |
-| Provenance | 751–794 |
-| Open questions | 795–903 |
+|   9. Environment (day and night) | 414–571 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 572–625 |
+|   11. Light values handed to the draws | 626–656 |
+|   12. Captures (answers `capture.md` Open question 5) | 657–694 |
+|   13. d2rs answers | 695–705 |
+| Constants & data dependencies | 706–717 |
+| Randomness | 718–724 |
+| Edge cases & original bugs | 725–741 |
+| Test vectors | 742–775 |
+| Provenance | 776–824 |
+| Open questions | 825–933 |
 <!-- /index -->
 
 ## Summary
@@ -456,8 +456,9 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
    the eclipse set the received ticks are discarded: index 5 (Tainted
    Sun, r3) → type 2, ticks 240 × 128 = 30,720. Without the flag the
    setter recomputes no color (the next per-update call of r1 does). The server
-   sends it when its own cycle (same advance code, `sim/tick.md` §3 step
-   1) changes period.
+   sends it from two places only in single player: the join (once,
+   `sim/intents-events.md` §8.2 rule 4) and tick step 1 when its own
+   advance reports a change (§9.3 rule 5).
 3. `0x0044C83B` and `0x0044E16C` call the same setter with index 5, ticks
    0, eclipse 1: S→C 0x5D (`0x0045E540` → `0x004A2CB0`) with quest byte
    @1 = 10 (Tainted Sun) and flag byte @2 bit 0 jumps to `0x0044C820`;
@@ -476,10 +477,19 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
       by creation at a point, `client/model.md` §2 rule 6, and by the
       0x15 placement, `client/msg-units.md` §3 rule 2) → nothing more.
       A player created at (0, 0) and not yet placed has none, so a 0x53
-      then is ignored. Recorded joins send 0x53 in frame 2, after 0x15
-      (frame 1): `53 02000000 00000000 00` (`20261006-022633` seq 228)
-      applies index 2, ticks 0; `53 02000000 80080000 00` (seq 146616,
-      frame 2177) index 2, ticks 0x880. With no client act and a P
+      then is ignored. A join sends exactly one 0x53, and the client
+      ignores it: the join's 0x53 (`20261006-022633` s2c seq 143, caller
+      `0x0053C922`; `53 02000000 00000000 00`) is queued after 0x03 and
+      before the spawn room's 0x07 and the 0x15 placement (§8.2 rules
+      4–5 there), and all of them reach the client in frame 2's flush
+      (transport buffer seq 228, `0x0052E3B5`, the 0x53 at byte 134 after
+      `03 …`). So when it is handled the client act exists and P is not
+      placed: the acts differ, nothing. Seq 228 is that transport
+      buffer, not a second 0x53 (corrected 2026-10-08; no other s2c
+      0x53 exists before frame 2177 in either recording). The client
+      record keeps its creation values (index 2, ticks 0: the same
+      numbers). The first 0x53 applied is the tick's report `53 02000000
+      80080000 00` (s2c seq 146611, frame 2177): index 2, ticks 0x880. With no client act and a P
       without act pointer (unplaced) both are null, so the check
       **passes**; step 3 then calls the setter with act null, whose
       first step (`0x0061C247` → `0x0061AA60`, the act's environment
@@ -531,6 +541,21 @@ from the normal entry 2, then §9.3 r4 and §9.4 with `A` = 0 and `L` = 0
      180, else `s = 0.5 · sin θ`; `s` is stored as a float and reloaded;
      `I = trunc(s · 128 + 128 + 0.5)` (`0x00682FD0`), clamped to 0…`cap`,
      `cap` = 170 when `A` = 4, else 255.
+5. **Server advance** `0x0061C040(act, a)` (tick step 1, `sim/tick.md`
+   §3; `0x0052D7D2` pushes the act loop index a = 0..4 and the act
+   pointer game +0xBC + 4a): record := the act's environment record
+   (`0x0061AA60`; a null record → return 0); remember the old index and
+   type; the advance (r1–r3 only, `0x0061BEE0`) with `A` = a (ESI) and
+   the record's eclipse flag. `L` has no role: the server never runs r4
+   or §9.4, so the server record keeps `I` and R, G, B from creation.
+   Then, when speed (+0x28) ≠ 0 and |ticks / speed (signed integer
+   division) − record +0x34| > 16: +0x34 := ticks / speed, return 1.
+   Else return 1 when the index or the type changed, else 0 (+0x34
+   unchanged). So the report fires every 17 degrees as well as on a
+   period change. Recorded: act 1 (a = 0, speed 128, +1 tick per frame
+   at index 2) reports at frame 2177 with ticks 0x880 (2176 / 128 = 17,
+   the first value > 16) in both recordings (`-015956` seq 170841,
+   `-022633` seq 146611). Act 4 (a = 3) advances +16 per frame (r1).
 
 #### 9.4 Color (`0x0061BCE0`, argument `A`)
 
@@ -791,6 +816,11 @@ missile create `0x004CDA6F`–`0x004CDACD`; flicker `0x004CD1C0`; S→C 0x89
 setfunc table `0x0072A690`; environment creation `0x0061BE40`. Live
 data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
 `skills` cltdofunc / cltstfunc, `monumod` rows 1–4.
+
+§9.3 rule 5 and §9.2 rule 4.2 (2026-10-08): `0x0061C040`, `0x0052D7B0`
+(`0x0052D7C6`–`0x0052D83D`), `0x0061BFC0` (client call for comparison);
+every s2c 0x53 of both recordings listed (callers `0x0053C922`) and the
+transport buffer `-022633` seq 228 decoded.
 
 ## Open questions
 
