@@ -823,7 +823,7 @@ spawned, +0x0D minion timer exists, +0x10 wanderer GUID.
   +0x0D := 0. Wanderer exists: one quest-seed step; for i = (lo' & 1)
   … 7: spot = wanderer position + offset[i] (table `0x00741538`: (−3,
   −3), (−3, 0), (−3, 3), (0, −3), (0, 3), (3, −3), (3, 0), (−3, 3));
-  free spot (`0x00545340`, size 3, mask 0x3F11, radius 11, limit 100);
+  free spot (`0x00545340`, size 3, mask 0x3F11, radius 11 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100);
   found → object 131 there (`0x00555230`, flags 1, 0, 0). Returns 1.
   Object 131's event 7 spawns monster 301 `vilechild1` in level 76
   (`quests.md` §9.5).

@@ -35,22 +35,22 @@
 | Inputs | 75–86 |
 | Outputs / state changes | 87–93 |
 | Rules | 94–95 |
-|   1. Quest flag records | 96–198 |
-|   2. Quest control and quest records | 199–294 |
-|   3. Game entry: picking the quest set | 295–327 |
-|   4. Events and dispatch | 328–412 |
-|   5. Quest updater and timers (tick step 8) | 413–434 |
-|   6. Status reporting | 435–526 |
-|   7. NPC dialog hooks | 527–559 |
-|   8. Act transitions, warps and portals | 560–641 |
-|   9. Quest items, rewards and helpers | 642–707 |
-|   11. Acts II–V | 708–713 |
-| Constants & data dependencies | 714–728 |
-| Randomness | 729–747 |
-| Edge cases & original bugs | 748–766 |
-| Test vectors | 767–798 |
-| Provenance | 799–820 |
-| Open questions | 821–853 |
+|   1. Quest flag records | 96–237 |
+|   2. Quest control and quest records | 238–335 |
+|   3. Game entry: picking the quest set | 336–368 |
+|   4. Events and dispatch | 369–453 |
+|   5. Quest updater and timers (tick step 8) | 454–475 |
+|   6. Status reporting | 476–579 |
+|   7. NPC dialog hooks | 580–612 |
+|   8. Act transitions, warps and portals | 613–694 |
+|   9. Quest items, rewards and helpers | 695–760 |
+|   11. Acts II–V | 761–766 |
+| Constants & data dependencies | 767–781 |
+| Randomness | 782–800 |
+| Edge cases & original bugs | 801–819 |
+| Test vectors | 820–851 |
+| Provenance | 852–873 |
+| Open questions | 874–917 |
 <!-- /index -->
 
 ## Summary
@@ -196,6 +196,45 @@ Handler `0x0054C9C0`: size must be 3 (else result 3); quest = u16 @1; if
 quest < 0x2A, set bit 12 of slot quest in the player's current record
 (result 0), else result 2. Nothing is sent.
 
+#### 1.8 Completed quests and the save
+
+What a "completed" quest is in 1.14d and what the save carries of it
+(the save layout is `formats/d2s.md` §4, its load effects
+`formats/d2s-load.md`).
+
+1. **The completion test.** The only code that carries "this quest is
+   done" from one game to the next is the quest-set pick (§3 step 2a):
+   a row's flag slot counts as completed when bit 0 is set
+   (`0x005462FD`) or, failing that, bit 15 (`0x0054630F`). Gates that
+   need a particular quest test bit 0 of its slot alone: act travel
+   (§8.1: slots 7, 15, 23, 28, and 10 / 18 inside the transitions), the
+   cow portal (§8.4: slot 26 classic, 40 expansion, and slot 4 bit 10
+   against it), and the per-quest code of each act file.
+2. **Bit 1 without bit 0** (goal done, reward not collected) is saved as
+   it is; the load sets bit 15 beside it (§1.6), so the next game's pick
+   treats the quest as completed while the quest code that tests bit 1
+   still offers the reward.
+3. **What a played completion leaves.** The reward step sets bit 0 and
+   clears bit 1 (`quests-act1.md` §10.1 state 5 for the Act I shape).
+   Bits 13 and 14 are set during that game; the writer copies the record
+   out unchanged (`formats/d2s.md` §4 rule 1) and the next load clears
+   them (§1.6). Bit 12 is set only if the client sent C→S 0x58 (§1.7).
+   Bits 2–11 keep whatever the player's path set, unless the quest's own
+   code clears them (explicit clears, or `reset_progress` `0x0065C3E0`,
+   12 call sites, all in Act II–V code). So a played completion has no
+   single bit pattern per quest; the act files own which bits each path
+   sets.
+4. **The smallest record every 1.14d completion reader accepts** is
+   bit 0 of the slot (rules 1–2). Two slots are not quests: slot 41 bit 0
+   means the Akara respec was used and bit 1 that it is available
+   (`quests-act1.md` §10.3, `world/npc.md` §8.2), and slot 4 bit 10 means
+   the player killed the Cow King (no more cow portals, §8.4). Slot 34
+   is unused (§1.3) and slot 42 lies beyond the saved slots' meaning.
+5. Nothing else in the save marks completion: the difficulty unlock and
+   the character title use the progression bits of the client save flags
+   (`quests-act1-rest.md` §5, header progression in `formats/d2s.md`),
+   which only the act-end quest code raises.
+
 ### 2. Quest control and quest records
 
 #### 2.1 Quest control (game +0x10F4)
@@ -285,11 +324,13 @@ generated from the 1.14d tables above and the init functions:
 | status_fn, active_fn, seq_fn | +0xE8, +0xEC, +0xF0 (0 = null) |
 | msgs | NPC message table (+0xDC) |
 | name | quest name (D2MOO naming) |
-| spec | `specified` (`quests-act1.md` §10) or `catalogued` (row only) |
+| spec | `specified` (the state machine is written in the act's owner file: Act I `quests-act1.md` §10 and `quests-act1-rest.md`; Act II `quests-act2.md`; Act III `quests-act3.md` and `quests-act3-2.md`; Act IV `quests-act4.md`; Act V `quests-act5.md` and `quests-act5-2.md`) or `catalogued` (row only) |
 
 Values are what the init function stores (`-` = not stored, so 0 from
-the zeroed record). Row 40 (Act V intro, init `0x0058EA50`) is not
-disassembled in the exports (`?`; Open question 6). The `version` column
+the zeroed record). Row 40 (Act V intro, init `0x0058EA50`) was read
+with `tools/ghidra/disasm.py` (the function is missing from the exports;
+Open question 6), and its table `0x00732FF8` (4 states up to chain 31's
+table at `0x00733308`, state 3 empty) from `Game.exe`. The `version` column
 is never read by the 1.14d quest code found so far.
 
 ### 3. Game entry: picking the quest set
@@ -523,6 +564,18 @@ hold 6, 11, 7, 0 and 7 NPCs for acts I–V.
   slot (`0x00545090`: introduced NPCs are packed at the front; D2MOO
   1.10f writes slot i for list entry i). Sent only if at least one is
   set. Act 3 (IV) sends nothing.
+- The record holds two bit arrays by NPC class (class table
+  `0x00732738`; the save's NPC fields A and B, `formats/d2s.md` §6):
+  record +0x04, the "introduced" bits above (`0x00572420` set,
+  `0x00572470` test); record +0x00, the "first-talk text heard" bits of
+  the intro records (chains 37–40): set `0x00572360` (callers
+  `0x0058E9D4`, `0x0058EA25`, `0x0058F8C2`, `0x00598464`, `0x005B6CCF`:
+  the intros' event 11 callbacks), test `0x005723C0` (callers
+  `0x00586BC8`, `0x00586C62`, `0x005876B8`, `0x0058F94F`, `0x0058F9FC`,
+  `0x00598532`, `0x005B6D9B`, `0x005B6E42`: their event 0 and active
+  functions). The bits each intro sets are in its act file
+  (`quests-act1.md` §10.3, `quests-act2.md`, `quests-act3-2.md`,
+  `quests-act5-2.md` §9).
 
 ### 7. NPC dialog hooks
 
@@ -632,7 +685,7 @@ game record has slot 4 bit 11, or the player record slot 4 bit 10 (killed
 the Cow King); or (classic game) the player lacks slot 26 bit 0, or
 (expansion) slot 40 bit 0; or the player is not in level 1 (Rogue
 Encampment). Else free spot near the player (`0x00545340`, size 3,
-collision mask 0x400, radius 4, limit 100); if found and a portal object
+collision mask 0x400, radius 4 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100); if found and a portal object
 of class 60 to level 39 is created (`0x0056D130`), set game slot 4 bit 11
 and return 1. Its only route is the cube output-kind table `0x006E11C8`
 through `jmp` thunks (`world/cube.md` §9). The Pandemonium portal functions
@@ -650,7 +703,7 @@ count 1, the given quality) for the item (items spec); if it has max
 durability > 0 set durability to it; inventory page 0; try to place it in
 the inventory (`0x00560200`); on success identify it unless identified
 and return it; else if droppable: drop it at a free spot near the player
-(`0x00545340`, size 1, mask 0x3E01, radius 5, limit 100) and return it;
+(`0x00545340`, size 1, mask 0x3E01, radius 5 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100) and return it;
 else free it and return none.
 
 #### 9.2 Deleting a quest item
@@ -832,7 +885,12 @@ monster specs). Quest-seed sites outside Act I (for later specs):
 5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
    written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
    masks them.)
-6. Act V intro init `0x0058EA50` (not disassembled): callbacks and table.
+6. (Answered 2026-10-07: `0x0058EA50` sets event 0 `0x00586B50`, event
+   11 `0x0058E990`, table `0x00732FF8`, active 1, state 0, status 0,
+   extra none, filter 42, status fn `0x00586C40`, active fn
+   `0x00586C50`; nothing else (`0x0058EA50`–`0x0058EAB4`). `quests.tsv`
+   row 40 and the table's 15 rows in `quest-messages.tsv` hold it; the
+   behaviour is `quests-act5-2.md` §9.)
 7. (Answered: `quests-act1-rest.md` §6 states what the quest code reads
    of the party list at game +0x1D2C (`0x00554630`, `0x00540710`,
    `0x00540510`); future owner `world/party.md`. The Act I iterate tests
@@ -850,3 +908,9 @@ monster specs). Quest-seed sites outside Act I (for later specs):
     still confirm it, its Open question 3.)
 13. (Answered: `quests-act1-rest.md` §5: it raises the character
     progression in the client save flags; future owner the save spec.)
+14. Which bits a played completion of each quest leaves (§1.8 rule 3):
+    Needs recording: a 1.14d character that completed every quest on
+    Normal (expansion), saved after the last one and loaded once; dump
+    the quest section (`d2s-tool dump`) and list, per slot, the bits
+    set, against a second save of the same character after another
+    game (bits 13 / 14 must be gone).

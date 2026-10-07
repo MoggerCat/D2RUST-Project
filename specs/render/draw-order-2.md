@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–269 |
-|   12. Level backgrounds (pass 1) | 270–309 |
-|   13. Pass 8 (`0x00475B20`) | 310–318 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 319–344 |
-|   15. Sight test (`draw-order.md` §5 r3) | 345–361 |
-|   16. Line test (`0x0064E260`) | 362–391 |
-| Constants & data dependencies | 392–402 |
-| Randomness | 403–414 |
-| Edge cases & original bugs | 415–431 |
-| Test vectors | 432–447 |
-| Provenance | 448–466 |
-| Open questions | 467–480 |
+|   11. Weather (passes 4 and 9; water floors) | 68–311 |
+|   12. Level backgrounds (pass 1) | 312–351 |
+|   13. Pass 8 (`0x00475B20`) | 352–360 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 361–386 |
+|   15. Sight test (`draw-order.md` §5 r3) | 387–403 |
+|   16. Line test (`0x0064E260`) | 404–433 |
+| Constants & data dependencies | 434–444 |
+| Randomness | 445–456 |
+| Edge cases & original bugs | 457–473 |
+| Test vectors | 474–495 |
+| Provenance | 496–524 |
+| Open questions | 525–561 |
 <!-- /index -->
 
 ## Summary
@@ -102,6 +102,14 @@ constant `0x006D6F08`); wind (`[0x007A89C4]` moving toward
 `[0x007A896C]`, `[0x007A89E8]`), thunder flag `[0x00712B4C]` (`.data` 1);
 weather update mark `[0x007A8A0C]`.
 
+Initial values: every scalar above except the thunder flag lies past the
+`.data` section's file bytes (raw size 0x48000 from 0x00705000), so it is
+0 at program start, and no code resets the cycle: phase, length and
+countdown start at 0 and **carry over from game to game** (act load
+`0x00472890` sets only the cycle tables, the colors, the cels and the
+intensity). `[0x007A8A20]` has no writer at all (no instruction stores to
+it): always 0.
+
 #### 11.2 Weather update (`0x00473F50`, frame `0x0044CA5E`, before `StartDraw`)
 
 1. `r`, `m` := `Rain`, `Mud` of the local player's level (both 0 without
@@ -111,7 +119,8 @@ weather update mark `[0x007A8A0C]`.
    and the stored mud flag was set: clear the bubble pool likewise.
    Store `r`, `m` as the flags.
 3. `c` := client update count. No local player: fatal 0x547. If `c` >
-   mark: mark := `c`; if `r` = 0: target := 0; else, on the player's
+   mark: mark := `c`; if `r` = 0: intensity := 0.0 (the target is
+   kept); else, on the player's
    seed: move the particles if any are live (`0x004732C0`), update the
    splashes (§11.5), run the rain cycle (§11.3, `0x00473E50`), top up
    particles and wind (§11.4, `0x004737B0`). Then, if `m` ≠ 0, update the
@@ -123,15 +132,18 @@ frames are drawn.
 #### 11.3 Rain cycle (`0x00473E50`)
 
 Runs unless the snow lock `[0x007A8A1C]` is set and the phase is not 2
-(then, when `[0x007A8A20]` = 0, the phase becomes 2 and `0x00472400`
-runs instead).
+(then, `[0x007A8A20]` being always 0, the phase becomes 2 and
+`0x00472400` runs instead).
 
 1. When the countdown is 0: phase `p` := (`p` + 1) mod 4; length `D` :=
    `roll_range(Min[p], N[p])` (`sim/rng.md` §3) with `Min` =
    `[0x007A8970 + 4p]` = 7,500, 250, 3,000, 125 and `N` = `[0x007A8958 +
    4p]` = 7,500, 250, 3,000, 50 (set at act load; `Min[2]` × 3 in acts III
    and V, `0x006427F0` = 2 or 4); countdown := `D`; phase entry
-   `0x00473D00(p)`: 0 → target := 0; 1 → `0x004726F0(0)` (snow and
+   `0x00473D00(p)` — p > 3: fatal 0x12A; snow lock set and p ≠ 2:
+   nothing, the stored phase stays (so a locked cycle keeps phase 2
+   while this call still uses p for r3); else phase := p and: 0 →
+   target := 0; 1 → `0x004726F0(0)` (snow and
    lightning re-check, §11.8), peak := `roll_range(32, 224)`; 2 →
    `0x00472400` (level presets, §11.8); 3 → lightning off.
 2. Countdown −1.
@@ -157,32 +169,55 @@ Units are weather updates (one per client update with rain on).
    phase := step & 511; landed := 0; color := a step `mod 12` into one of
    three 12-entry tables by the act's day period (`0x0061C100`, 0–3):
    0 → `[0x007A8980]` with alpha 0x7F, 1 or 3 → `[0x007A894C]`, 2 →
-   `[0x007A89A4]` (alpha 0xFF); shape values +0x10 := 4 − f₁, +0x14 :=
-   15 − f₂, bounce count 3, with f₁, f₂ the truncations (`0x00682FD0`) of
-   two FPU values not settled here (Open question 3). Snow mode: alpha
-   0xFF, one more step, bounce count 1, +0x14 := 8 − f, size +0x10 :=
-   ((ground y − 40) × 7) / (`H` − 87) (+1 while `[0x007A8A18]` is set), size
-   outside 0–7 fatal 0x390, color from `0x00472FB0`. The size bump flag
-   `[0x007A8A18]` is set by §11.8.
-   The color tables are built at act load from `nearest` (`shading.md`
-   §5) of grey and tinted ramps (`0x00472890`).
+   `[0x007A89A4]` (alpha 0xFF; the alpha byte is never read by the GDI
+   line, `blend-modes.md` §8 r1); bounce count 3. Shape values: with
+   `t` = float32((`g` − 40) / (`H` − 87)) (x87 divide, stored as a float;
+   0 ≤ `t` < 1), +0x10 := 4 − trunc(−8.0 · `t`) and +0x14 := 15 −
+   trunc(−15.0 · `t`) (constants `0x006D6E50`, `0x006D6E48`): exactly
+   +0x10 = 4 + ⌊8(`g` − 40) / (`H` − 87)⌋ and +0x14 = 15 + ⌊15(`g` −
+   40) / (`H` − 87)⌋ (the float rounding never crosses an integer for
+   these ratios). +0x10 is the drop length (§11.7 r3).
+   Snow mode, after the phase step: one more raw step (value unused),
+   bounce count 1, +0x14 := 8 − trunc(−28.0 · `t`) = 8 + ⌊28(`g` −
+   40) / (`H` − 87)⌋ (`0x006D6E58`), size `s` +0x10 := ((`g` − 40) × 7)
+   / (`H` − 87) (+1 while `[0x007A8A18]` is set), `s` outside 0–7 fatal
+   0x390; then `0x00472FB0` (no draws) sets alpha and color by the day
+   period `p`: alpha := 200, 160, 80, 160 for `p` = 0, 1, 2, 3 (bytes
+   `0x006D6E41` + 2`p`; it replaces the 0xFF), `p` > 3 fatal 0x356;
+   `i` = (12`s`) / 8; video mode (`0x004F5140`, `ui/panels.md`) 1–3 or
+   6: color := `S[i]`, `S[i / 2]` or `S[i / 4]` for `p` = 0, 1 or 3, 2
+   (`S` = `[0x007A898C]`); other modes: `S'[i]` (`[0x007A89EC]`). The
+   size bump flag `[0x007A8A18]` is set by §11.8.
+   Color tables (act load `0x00472890`, for `i` = 0 … 11, `q` =
+   ⌊80`i` / 12⌋, `nearest` = `shading.md` §5 over the current palette
+   `0x0081E668`, `composition.md` §4):
+
+   | Table | Entry `i` = `nearest(r, g, b)` |
+   |---|---|
+   | `[0x007A8980]` (rain, `p` 0) | `v` = 98 − `q`: (`v`, `v` + 25, `v`) |
+   | `[0x007A894C]` (rain, `p` 1, 3) | `v` = 45 − ⌊40`i` / 12⌋: (`v`, `v` + 10, `v`) |
+   | `[0x007A89A4]` (rain, `p` 2) | `v` = 25 − 2`i`: (`v`, `v` + 5, `v`) |
+   | `[0x007A898C]` (snow `S`) | `v` = 120 + `q`: (`v`, `v`, `v`) |
+   | `[0x007A89EC]` (snow `S'`) | `v` = 170 + `q`: (`v`, `v`, `v`) |
 
 #### 11.5 Water floors: splashes and bubbles (`0x004DE410`, `0x00472DA0`, `0x00472EC0`)
 
 The floor pass (`draw-order.md` §6 r2) keeps a context per frame
-(`0x004DE730`): `splash` := 1 when the update count `c` > `last_s` + 3
-and int(intensity) ≠ 0 (then `last_s` := `c`); `bubble` := 1 when the
-level has `Mud` and `c` > `last_b` + 25 (then `last_b` := `c`); `last_s`,
-`last_b` persist between frames (context fields +0x14, +0x18), the flags
-are cleared at the start of each frame. int(intensity) is `0x00682FD0`
-of the §11.3 float.
+(`0x004DE730`, context `0x007C8A28`): `k` := trunc(intensity × 1000.0)
+(`0x00682FD0`; constant `0x006DB9D0` = 1000.0), stored at +0x10, so `k`
+= ⌊target × 1000 / 256⌋ (0 … 996; a rain peak of 32–224 gives 125–875);
+when the update count `c` > `last_s` + 3: `last_s` := `c` (whatever `k`
+is) and `splash` := 1 if `k` ≠ 0; when the level has `Mud` and `c` >
+`last_b` + 25: `last_b` := `c`, `bubble` := 1. `last_s`, `last_b`
+(+0x14, +0x18 = `0x007C8A3C`, `0x007C8A40`) are 0 at program start and
+never reset; the flags are cleared at the start of each frame.
 
 After **every drawn floor** whose DT1 material has bit 0x2 (water):
 
 1. `r` := `roll_range(0, 1000)` on the local player's seed — drawn
    whether or not either flag is set (this is the draw `camera.md` §8
    and `capture.md` §3.4 must count).
-2. `splash` and `r` < int(intensity): spawn a splash (`0x00472DA0`) at
+2. `splash` and `r` < `k` (signed): spawn a splash (`0x00472DA0`) at
    the floor's screen position (X, Y) of `camera.md` §6 floors.
 3. `bubble` and `r` < 100: spawn a bubble (`0x00472EC0`) there.
 
@@ -218,10 +253,12 @@ through `D2GFX_DrawCelContext` with light −1 (unlit), draw mode 3
    sound 202 with volume `roll_range(25, 50)` (`0x004B9A00`); when a
    sound starts, `roll_range(−200, 400)` twice for its position
    (`0x004B99A0`); a cleared thunder flag is set instead (first strike
-   silent). Then, when the frame rate of the last second `[0x007BB390]`
-   (written by `0x00477980`, frames counted per 1,000 ms) is > 9: a
-   rectangle of color 255, draw mode 5 over (`L`, 0)–(`R`, `H` − 47)
-   (`blend-modes.md` §8), and the pass ends (no particles that frame).
+   silent). Then (whether or not the trigger reached 0), when the frame
+   rate of the last second `[0x007BB390]` (written by `0x00477980`,
+   frames counted per 1,000 ms) is ≥ 10 (unsigned): a rectangle of color
+   255, draw mode 5 over (`L`, 0)–(`R`, `H` − 47) (`blend-modes.md` §8),
+   and the pass ends (no particles that frame). Below 10 the pass goes
+   on to r3: the particles draw, with no flash.
 3. Else, when rain is on in the level and the particle pool is live,
    draw the particles (`0x00473470`), only when the low-quality setting is
    0; records in slot order, tested against [`L`, `R`) × [0, `H` − 47)
@@ -229,13 +266,18 @@ through `D2GFX_DrawCelContext` with light −1 (unlit), draw mode 3
    - snow mode, size `s` in 0–7, origin in range: two lines (`blend-modes.md`
      §8) from the 16-byte entries `T[s]` and `T[s + 1]` of the table at
      `0x006D6E78` (x0, y0, x1, y1 offsets): (x + a, y + b)–(x + c, y + d),
-     color +0x24.
-   - rain mode, landed: a one-pixel line at (x, y) if (x, y) is in range.
+     color +0x24. `T` (9 entries, i32, read from `Game.exe`): 0 (0, 0, 0,
+     1), 1 (−1, −1, 0, 0), 2 (0, −1, 0, 1), 3 (1, 0, −1, 1), 4 (1, 0, 0,
+     1), 5 (2, −1, −1, 1), 6 (1, 1, −2, −1), 7 (2, 1, −2, −1), 8 (2, −1,
+     −2, 2).
+   - rain mode, landed: a one-pixel line at (x, y) if (x, y) is in range,
+     color +0x24 (as every particle line).
    - rain mode, falling: a line from (x, y) to (x + u, y + v), drawn when
-     either end is in range; `u`, `v` come from the wind table
-     (`0x0040B330` / `0x0040B350` of the wind value) and are cut at the
-     ground (`v` := `g − y`, `u` scaled by the same ratio, C division) —
-     the float part is Open question 3.
+     either end is in range; with `w` the wind value and `Wt` the sine
+     table of `lighting.md` §10 r1 (`0x00707800`, 512 floats): `u` =
+     trunc(`Wt[(w + 128) & 511]` × len), `v` = trunc(`Wt[w & 511]` ×
+     len), len = +0x10 (`0x0040B330`, `0x0040B350`); when `v` > `g` − y:
+     `u` := (`g` − y) × `u` / `v` (C division), `v` := `g` − y.
 
 Lightning is switched on only by `0x00472C50` (thunder flag := its
 argument, trigger 1), called from `0x004E3C50`, which has no direct
@@ -440,6 +482,12 @@ Levels 74 and 120 use their own seeds (§12), not the player's.
 | sight in level 1 (`LOSDraw` 0) | every unit passes | §15 r1 |
 | water floor drawn, rain off | 1 draw of the player's seed, no spawn | §11.5 |
 | splash spawn, `a` = 0 | `b` = 0: no x draw, x = X, y = Y | §11.5 |
+| target 128 (intensity 0.5) | `k` = 500: `r` = 499 spawns, 500 does not | §11.5 |
+| target 32 / 224 / 255 | `k` = 125 / 875 / 996 | §11.5 |
+| rain spawn, `H` 600, `g` = 296 | +0x10 = 4 + ⌊2048 / 513⌋ = 7; +0x14 = 15 + ⌊3840 / 513⌋ = 22 | §11.4 r5 |
+| snow spawn, `H` 600, `g` = 296, no bump | `s` = 1792 / 513 = 3; +0x14 = 8 + 13 = 21 | §11.4 r5 |
+| snow color, `s` = 5, day period 2, video mode 3 | `i` = 60 / 8 = 7 → `S[7 / 4]` = `S[1]`; alpha 80 | §11.4 r5 |
+| rain color tables, `i` = 11 | `[0x007A8980]`: `v` = 98 − 73 = 25 → `nearest(25, 50, 25)`; `[0x007A89A4]`: `v` = 3 → `nearest(3, 8, 3)` | §11.4 r5 |
 | star re-make, step & 7 = 3, `W` 800 | x = 802 | §12 |
 | summit, player client x 10,063 + 2,056 | `q` = 257, `c` = 1, `t` = 1, x0 = −1: frames 1, 2, 3, 0 at −1, 255, 511, 767 | §12 |
 | flash, frame rate 9 / 10, open mode 0, 800 × 600 | no rectangle / columns 0–798, rows 0–552 set to 255 | §11.7, `blend-modes.md` §8 |
@@ -460,7 +508,17 @@ rate `0x00477980`; lightning start `0x00472C50`; backgrounds
 `0x00619720`, `0x00643260`; sight `0x004DC710`, `0x00642840` (leveldefs
 +0x98 = `LOSDraw`, `data/fields.tsv`), `0x00622AA0`, `0x00622920`,
 `0x0064E260`. Register arguments (`roll_range` min in EDX, seed in ECX)
-read from the disassembly, not the decompile. Level lists from
+read from the disassembly, not the decompile. 2026-10-07 (answers
+W1–W7): `0x004DE730` (`fmul [0x006DB9D0]` before `0x00682FD0`, the
+`last_s` store before the `k` test), `0x00473F50` (rain off: `fldz` into
+the intensity), `0x00473D00` (fatal 0x12A, lock test), `0x00473090` /
+`0x00472FB0` (spawn steps, constants `0x006D6E48`–`0x006D6E58` and alpha
+bytes `0x006D6E40` read from the file), the color loop of `0x00472890`
+(`0x004FB180` → `0x00605210` over `0x0081E668`), `0x00473470` (snow
+table `0x006D6E78` read from the file, landed and falling lines),
+`0x0040B330` / `0x0040B350`, `0x00473910` (flash test `jb` 10); no
+store to `0x007A8A20` anywhere in `all.asm`; section layout from the PE
+header. Level lists from
 `patch_d2` `levels.txt`. Rain seen in run 2 (`20261006-141725`, Rogue
 Encampment): splash ripples on the river, drop lines.
 
@@ -471,9 +529,32 @@ Encampment): splash ripples on the river, drop lines.
    lightning countdown; add the three pools) checks §11 pixel for pixel.
 2. The act edge record (act `+0x18`, 0x30 bytes): who fills it and with
    which DT1 tile; Ghidra search for writes of act `+0x30`.
-3. The float parts of the particles: f₁, f₂, f of §11.4 r5, the snow
-   wind goal of r3, the drop vector of §11.7 r3 and the particle move
-   `0x004732C0` (FPU values from `0x0040B330` / `0x0040B350` and the
-   intensity). A Ghidra read of the FPU stack at each `0x00682FD0` call.
+3. Partly answered (`impl-draw-order-2` W2–W5): f₁, f₂, f of §11.4 r5,
+   the drop vector of §11.7 r3 and the splash threshold of §11.5 are
+   now exact. Open: the particle move `0x004732C0` (its FPU values from
+   `0x0040B330` / `0x0040B350`); an asm read of it settles it.
 4. Which event calls `0x004E3C50` (lightning start, sound flag 0) — a
    table-dispatched client handler; search the pointer tables for it.
+5. *Answered* (`impl-draw-order-2` W1): `[0x007A8A20]` has no writer
+   (no store to it in `Game.exe`; `.bss`), so it is always 0 (§11.1,
+   §11.3).
+6. *Answered* (W2): the snow spawn's extra step is a second raw step
+   after the phase step, value unused; `0x00472FB0` draws nothing and
+   also sets the alpha (§11.4 r5).
+7. *Answered* (W3): the snow line table `0x006D6E78` is listed in §11.7
+   r3 (9 entries).
+8. *Answered* (W4): the color-table ramps are in §11.4 r5; alpha 0x7F
+   only for rain in day period 0 (never read by the GDI line); a landed
+   drop uses color +0x24.
+9. *Answered* (W5): the spec misread the threshold. `0x004DE730`
+   multiplies the intensity (target / 256) by 1000.0 (`0x006DB9D0`)
+   before truncating, so `k` = ⌊target × 1000 / 256⌋ (125–875 for rain
+   peaks 32–224) and `r` = `roll_range(0, 1000)` < `k` spawns a splash,
+   consistent with the splashes of run 2 (`20261006-141725`). Also
+   corrected: `last_s` advances whenever `c` > `last_s` + 3, and rain
+   off sets the intensity (not the target) to 0 (§11.2 r3, §11.5).
+10. *Answered* (W6): below 10 frames per second the flash is skipped and
+    the particles draw in that frame (§11.7 r2).
+11. *Answered* (W7): phase, length, countdown, `last_s`, `last_b` are 0
+    at program start and never reset, so the rain cycle continues across
+    games (§11.1).
