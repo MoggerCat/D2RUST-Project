@@ -525,3 +525,33 @@ fn a_quest_chests_treasure_drops_through_the_lent_economy() {
     s.hooks.items = items;
     fx.assert_clean();
 }
+
+// Covers: specs/world/quests-act2.md §8.7
+#[test]
+fn host_quests_read_the_missile_range_from_the_action_tables() {
+    use crate::wiring::economy::{Economy, EconomyQuests, GameFields, HostQuests, ItemStore};
+    use crate::world::quests::QuestWorld;
+    let mut fx = fx();
+    let mut t = (*fx.sim.hooks().tables).clone();
+    let n = t.missiles.len();
+    t.missiles[n - 1].range = 20;
+    fx.sim.hooks().tables = Arc::new(t);
+    let tables = super::death::drop_tables().items;
+    let mut rest = crate::wiring::interaction::tests::Rest::new();
+    let s = &mut fx.sim.sys;
+    let mut fields = GameFields::new(s.hooks.game_seed, false);
+    let mut items = ItemStore::new();
+    let mut econ = Economy {
+        game: &mut fx.game,
+        units: &mut s.units,
+        stats: &mut s.stats,
+        data: &s.data,
+        hooks: &mut s.hooks,
+        fields: &mut fields,
+        tables: &tables,
+        items: &mut items,
+    };
+    let mut w = HostQuests::new(EconomyQuests::new(&mut econ, &mut rest));
+    assert_eq!(w.missile_range(n as u32 - 1), Some(20));
+    assert_eq!(w.missile_range(n as u32), None);
+}

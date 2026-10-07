@@ -15,6 +15,7 @@
 //! - the player's interaction (`0x00554120` / `0x00554190`) on the
 //!   host's one owner, the NPC rest (`NpcRest`);
 //! - `0x006280D0(item, 0x10)` on an item of the game's item store;
+//! - `missiles.txt` `Range` from the action tables;
 //! - the chest treasure `0x00585B90(op, kind)` on the object drop state
 //!   (`ActionHooks::object_drops`, [`super::object_chest_drop`]).
 //!
@@ -532,8 +533,11 @@ impl<X: Pending, R: QuestRest + NpcRest> QuestWorld for HostQuests<'_, '_, X, R>
     fn open_insert_dialog(&mut self, player: UnitId, object: UnitId) {
         self.inner.open_insert_dialog(player, object)
     }
+    /// `missiles.txt` `Range` (u16 +0x96) of the action tables' row
+    /// (`quests-act2.md` §8.7); a row outside the table is `None`.
     fn missile_range(&mut self, row: u32) -> Option<i32> {
-        self.inner.missile_range(row)
+        let t = &self.inner.econ.hooks.tables.missiles;
+        Some(i32::from(t.get(row as usize)?.range))
     }
     fn is_trading(&mut self, player: UnitId) -> bool {
         self.inner.is_trading(player)
