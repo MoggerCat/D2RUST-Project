@@ -490,3 +490,6 @@ specs/world/quests-act5-2.md	§edge-cases-original-bugs r10	dead code: no caller
 specs/world/quests-act5.md	§edge-cases-original-bugs r7	dead code: nothing reachable
 specs/world/quests-act5.md	§1.4	table of function numbers (pointers)
 specs/world/quests-act3-2.md	§11.7 text	record-layout narration
+specs/skills/descriptions.md	§1 r2	pointer: callers of the tables
+specs/skills/descriptions.md	§1 r3	calling convention, no behaviour
+specs/skills/descriptions.md	§1 r4	calling convention, no behaviour
