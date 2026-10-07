@@ -45,8 +45,8 @@
 | Edge cases & original bugs | 748–764 |
 | Test vectors | 765–796 |
 |   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 797–810 |
-| Provenance | 811–838 |
-| Open questions | 839–950 |
+| Provenance | 811–847 |
+| Open questions | 848–959 |
 <!-- /index -->
 
 ## Summary
@@ -809,6 +809,15 @@ log; voices then follow from `sound-table.md`. A static scene recorded
 twice must give identical logs first (`client/audio.md` §B7).
 
 ## Provenance
+
+Both TSVs re-checked against the 1.14d file image (second pass,
+2026-10-07, scratch script): `npc-speech.tsv` equals the 864 8-byte
+entries at `0x0072B0E0` (sound u32 at +0, key u32 at +4; entry 864 has
+sound 0, the end); `object-sounds.tsv` equals, for each of the 453
+classes with a non-null pointer at `[0x007295F8 + 4·c]` (the same 453
+classes), the record's 12 dwords (`mode0`–`mode7`, `loop_a`,
+`loop_a_mode`, `loop_b`, `loop_b_mode`), with `ordered` = 1 exactly when
+the pointer is the well record `0x00729328`. 0 rows differ.
 
 1.14d `Game.exe` (sha256 631066c1…adaaf), Ghidra decompile export and
 `tools/ghidra/disasm.py` (register arguments: ECX = id, EDX = unit, three
