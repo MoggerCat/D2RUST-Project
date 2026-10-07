@@ -92,3 +92,29 @@ None (no TSV changed).
   `items/generation.md` §12.1; recharge `0x0055FE80` → §12.2.
 - `sim/units.md` §6.5 event 3: "`0x0055F900` (repair path, items spec)"
   → `items/generation.md` §12.1.
+
+## Follow-up (weapon bookkeeping)
+
+Written: `items/inventory.md` §5.8 — weapon bookkeeping `0x0055C5C0`
+(EAX = unit only; players only): hands from inventory +0x60 (weapon in
+use +0x1C via `0x0063BEF0`, other hand = loc 4/5 item that is not W, kept
+only if is-a `weap`); W none → nothing. Throw-only weapon (is-a `thro`,
+not `mele`: in 1.14d data only `tpot`) while the mouse skill is not a
+ranged throw skill (`0x0055C560`: `itypea1` is-a `thro`, range 2,
+use_state ∉ {2, 7}) → save the skill to player data +0x74/+0x7C (left)
+or +0x70/+0x78 (right) and select Throw (2) left / Left Hand Throw (4)
+right, owner −1. Then use_state of the mouse skill ∈ {2, 7} → restore the
+saved (id, owner) when it exists, differs and is usable (`0x0055C4F0`).
+No stat lists, item fields or messages of its own. Callers (10) listed
+in §5.8. Linked from `generation.md` §12.1 step 5 and `inventory.md`
+§4.6 / §4.9; edge case 14 appended. Pending: none.
+
+crates/: no `TODO(spec …)` names `0x0055C5C0` or "weapon bookkeeping".
+The seams exist as no-ops / pass-throughs: `InvWorld::weapon_bookkeeping(
+unit, item)` (`crates/d2-sim/src/items/inventory/mod.rs:578`; the item
+argument has no counterpart in 1.14d — the routine takes the unit only)
+and `MovePending::weapon_bookkeeping(owner)`
+(`crates/d2-sim/src/items/moves/seams.rs:311`). The answer for code:
+implement §5.8 behind them.
+
+Cross-file requests: none.

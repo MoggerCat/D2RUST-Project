@@ -600,7 +600,7 @@ the cube (`0x005662E5`), the vendor repair `0x005761C0` (`0x00576254`).
    to U's client (`0x005531C0`: U's client when U is a player, else
    none; `0x0053D130`).
 4. Set-item state update `items/properties.md` §13(U, X, 0, 0).
-5. U given → weapon bookkeeping `0x0055C5C0`(U).
+5. U given → weapon bookkeeping `0x0055C5C0`(U) (`items/inventory.md` §5.8).
 
 #### 12.2 Recharge (`0x0055FE80`, ECX game, EDX owner U or none, stack item X) → 0 / 1
 
