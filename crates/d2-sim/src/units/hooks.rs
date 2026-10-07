@@ -104,6 +104,10 @@ pub trait UnitHooks: StatHost {
         0
     }
 
+    /// The path-velocity half of `0x00623F50` (`sim/pathing.md` §8.1),
+    /// run right after [`UnitHooks::anim_rate`]. Provider: path spec.
+    fn anim_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
     /// `0x00623B10`: the frame bonus (start index of §4.2).
     fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {
         0

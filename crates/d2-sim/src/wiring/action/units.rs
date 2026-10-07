@@ -88,6 +88,17 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.x.anim_rate(unit, speed)
     }
 
+    /// The velocity half of `0x00623F50` for monsters with the path
+    /// provider ([`crate::wiring::path::monsters`]).
+    fn anim_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        self.monster_mode_velocity(sim, unit);
+    }
+
+    /// The path part of `0x005A7C20` ([`crate::wiring::path::monsters`]).
+    fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        self.monster_path_setup(sim, unit, mode);
+    }
+
     /// `0x00623B10` (`units.md` §4.3).
     fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
         self.x.frame_bonus(unit)
@@ -123,6 +134,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// rule 3, [`super::unit_update::death_function`]); every other
     /// function keeps the default (started, nothing done: monster spec).
     fn monster_mode_function(&mut self, sim: &mut Sim<'_>, unit: UnitId, address: u32) -> bool {
+        if let Some(started) = self.monster_motion_function(sim, unit, address) {
+            return started;
+        }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
             return X::monster_death_start(self, sim, unit, target);

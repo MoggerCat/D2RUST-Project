@@ -14,6 +14,10 @@
 //!   (`PathWorld` + `WalkUnits`) and `path::footprint::PathMotion`;
 //!   the walk request, the per-tick player step (`tick.md` §3 step 4,
 //!   event 0) and the unit step.
+//! - [`missiles`]: the missile bodies' path seams (target point and
+//!   position, set type, step counts, teleport).
+//! - [`monsters`]: monster walk / run: the path part of the monster mode
+//!   set, a monster mode's velocity, the walk event 0 and the mode end.
 //! - [`place`]: `CollisionView`, `PlaceHost` and `LevelView` on a shared
 //!   [`PathCtx`]; placing a unit (§10), the level warp (§11) and the
 //!   floor drop (§9).
@@ -26,6 +30,8 @@
 //! and tests that fake positions). Nothing here decides game behaviour:
 //! each adapter maps one seam call to one call of the path code.
 
+pub mod missiles;
+pub mod monsters;
 pub mod place;
 pub mod rooms;
 pub mod units;
@@ -33,6 +39,9 @@ pub mod walk;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod motion_tests;
 
 #[cfg(test)]
 mod mutant_tests;
@@ -61,6 +70,10 @@ pub struct PathState {
     /// `path-placement.md` §10 rule 7), written by the placement and the
     /// walk step; read by monster AI (`monsters/ai.md`).
     pub history: BTreeMap<UnitId, PositionHistory>,
+    /// The AI's mode request staged for the monster mode set that follows
+    /// (the request record's target, `monsters/ai.md` §7.1), taken by
+    /// [`ActionHooks::monster_path_setup`](crate::wiring::action::ActionHooks).
+    pub mode_request: Option<(UnitId, crate::monsters::ai::ModeTarget)>,
 }
 
 impl PathState {
@@ -71,6 +84,7 @@ impl PathState {
             records: BTreeMap::new(),
             field: None,
             history: BTreeMap::new(),
+            mode_request: None,
         })
     }
 

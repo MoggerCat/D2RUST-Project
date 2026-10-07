@@ -148,6 +148,10 @@ pub trait Pending {
     }
     /// Stops the unit's path.
     fn stop_path(&mut self, unit: UnitId) {}
+    /// Monster run event 0 `0x005A84F0` (`units.md` §4.6) with the path
+    /// provider on: its body is not described (`pathing.md` §9.1 names
+    /// only walk's). Default: nothing (the monster does not move).
+    fn monster_run_event0(&mut self, unit: UnitId) {}
     /// `0x005DE6D0` → `0x005DE4E0` walk in radius; false = failed.
     fn walk_in_radius(
         &mut self,
