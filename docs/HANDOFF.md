@@ -5005,6 +5005,30 @@ with its result. Added 2026-10-07 by PC 1 from the queue-3 answers so far:
   `0x005D4150`), Overseer whip (transform rate and class, `0x005D1F70`),
   imps on a barricade tower (state 143, type-5 event, release below 10 %
   life, `0x005D1AB0`).
+- `skills/use.md` OQ3–7: hook `0x0056FAF0` (entry/return) and
+  `0x0056F7F0` (entry), cast a non-`TargetAlly` skill on a party member
+  (does the do run after start returned 0); hook `0x0056BFE0` for
+  Teleport at level ≥ 25 with < 1 mana (cast free?); two C→S 0x06 two
+  frames apart (does the second restart A1); hook `0x005A7670` (arg1,
+  arg2, unit +0x4E) on monsters; log arg1 of `0x005539B0` per type-0
+  timer during Strafe / Zeal.
+- `skills/levels.md` OQ1: hook `0x00646460`, `0x00644D50` /
+  `0x00644E40` (entry/return) with known skill levels, and
+  `0x0056BFE0` (mana before/after) for a few skills.
+- `skills/bodies.md` OQ1–3, OQ9: Paladin Might in a party (hook
+  `0x005CF010`, `0x0056E970`: duration, expiry, count, state 85 per
+  tick); Kick, Bash, Attack on a monster (`0x0057DBF0` record before /
+  after); Amplify Damage on an immune monster and Dim Vision in
+  Nightmare (expiry − F); a Druid summon and a Clay Golem (stats 12,
+  31, 19, 7, 6 on the summon, AI think at F + 25).
+- `skills/bodies-2.md` OQ1–5, 7, 8, 12: Jab / Smite monsters (stats
+  21, 22, 19 and element stats around `mode_damage`); Dragon Talon L6 /
+  L12 (kicks, last-kick knockback, E param 1); Find Potion per act and
+  difficulty (codes, seed draws); Leap and monster Leap (E flags,
+  landing frame, knockback, 0xA5); Shock Field (caster seed before /
+  after); Conversion on a higher-level monster (stats 12, 6, 7 during
+  and after); Holy Freeze pulses (state 107, target seed); Whirlwind
+  with one and two weapons (E param 4, hits per do).
 
 ## 8. Lessons (problems met, fixes)
 
