@@ -44,17 +44,30 @@ set" OB-1 … OB-24, and `objects.md` open questions.
 | OQ2 | §4 r5 | Answered (confirmed by recording `obj1`), binary agrees (`0x005553E5`, `0x00623520`, `0x00624690` same-mode no-op) |
 | OQ11 | `object-functions.tsv` | init 13 → §17, init 51 and operate 48 → §18.4 |
 | relay (quests-core) | `object-functions.tsv` init 37 | already `world/quests-act2.md` on this branch; no change needed |
+| OQ4 | objects-2.md §23 | 0x0E @6 = client mode-request code 3 (object mode change, `0x004BD6D0`); 0x4D = code 0x15, `0x004BD5C0` reads only @6; @10/@11/@13 unread, @15 not copied (pass 4, 2026-10-07) |
+| OQ5 | objects.md OQ5 | 1.14d eligibility test of `0x00582750` relayed to PC 1 (cross-file request) |
+| OQ8 | objects-2.md §22 | nothing in 1.14d gives a door mode 6: every object allocation mode is 0/1/2 or a preset (always 0) / restored mode; mode-6 sets only items and the monolith |
+| OQ9 | objects-2.md §19 | C→S 0x44 → `0x005852E0` → power-up `0x00585240`, table `0x00732EB0` (21 × {fn, chance, value}); live `subtype` = 0 → +1 max mana always |
+| OQ13 | objects-2.md §20 | the four drop helpers and the class picks `0x00555E70`/`0x00555FB0`/`0x005560F0`/`0x00556240` |
+| OQ15 | objects-2.md §21 | `0x00578C20` removes every stat list of a `curable` state (13 live states) |
+| OQ16 | objects.md §12 r8 | the 3 is the free-point size: (act, level, tile 0, &x, &y, size 3), `sim/path-placement.md` §11 |
+| pop OQ2 | object-population.md OQ2 | counts at `0x00731EB8` + 8q have no writer (reads only, no reloc, no ASLR): 0 at run time |
+| pop OQ3 | object-population.md OQ3 | maze rooms are all type 2 (`0x0066B3E0` EDX 2); `0x0066BA90` returns 0 for them before reading type data |
+| pop OQ4 | object-population.md OQ4 | region +0x0C has no writer: always 0 |
 
 ## Still open
 
-- objects.md OQ1 (no operate recording), OQ4 (0x0E @6 and 0x4D zero
-  fields: client handlers), OQ5 (warping-shrine callback: monsters spec),
-  OQ8 (door mode 6 source: DS1 survey), OQ9 (obelisk completion), OQ10
-  (needs recording), OQ13 (items drops), OQ14–16 (new).
+- objects.md OQ1, OQ10, OQ14: Needs recording (Recording list).
+- object-population.md OQ1: Needs recording. OQ5 (theme bodies
+  `0x00552000`, `0x00552140`, `0x00552200`): left open on purpose; §4
+  proves no theme runs with live 1.14d `Themes`, so they matter only for
+  a mod (theme 4 also needs the unspecified drop helper `0x00559130`).
 - WW-6 rows owned by quest specs with no stating spec: init 7
   `0x00544990`, init 9 `0x00593FC0`, init 46 `0x005506D0`, init 59
   `0x0054FE10`, init 61 `0x00594290`, operate 33 `0x00583E70`, operate 43
   `0x00584D00` (cross-file requests below).
+- `world/objects.md` is 61 KB after pass 4 (answers kept to one or two
+  lines; detail in `objects-2.md` §19–§23).
 
 ## CODE-TABLE CHANGE commits
 
@@ -83,6 +96,83 @@ set" OB-1 … OB-24, and `objects.md` open questions.
   `0x00583E70` (Wirt's body; events 1 and 7), operate 43 `0x00584D00`
   (Duriel portal: asserts a player operator, portal flags |= 5, free
   point `0x0064E7B0`).
+
+- to PC 1 (pass 4): `client/model.md` §8 rule 5 and `client/msg-units.md`
+  §4 row 0x4D — objects.md OQ4: the code-0x15 handler `0x004BD5C0`
+  reads only record[0] (operator GUID → player unit, `0x00463990`); the
+  shrine code comes from the client's own object (`0x00621B00` /
+  `0x00621B70` shrine data byte 0, else `objects` +0x16F), then the
+  client shrine function of table `0x006DA8C4` (20-byte entries, index
+  < dword `0x0072779C`, called with ECX object, EDX player, stack shrine
+  data) and `0x004BD550(object in EAX, player)`. record[2..4] (0x4D @11,
+  @13, @10) are never read and @15 is not copied; state it in both rows.
+- to PC 1 (pass 4): monsters spec (owner of "make a monster unique",
+  `0x005A4940`) — objects.md OQ5 / §9.2 effect 20 (`0x00583050`): P's
+  position (unit path +0x2C: `0x00648900` / `0x006488C0` for a player;
+  the static path's +0x10 / +0x0C for unit types 2, 4, 5) → M := `0x0065A800(P, x, y, 0, cb
+  0x00582750)`: over P's room adjacency array (`0x00619790`, rooms
+  passing `0x0065A710`), each room unit list (+0x74, next +0xE8) in
+  order, d := `0x006417F0(unit, x, y)`; keep the unit when d < 0x10000
+  (limit argument 0 → 0x10000), d < best (start 0xFFFF) and cb(unit, P)
+  ≠ 0 (first of equal d wins); found → `0x005A4940(game, M)`. cb
+  `0x00582750(M, P)` is 1 only when: M ≠ P; M type 1; `0x00650D70(P, M)`
+  ≠ 1 (alignment test); `0x006259B0(M)` = 0; `0x0063EA40(M)` = 0; M mode
+  1 or 2; `0x0046C140(class, 2)` (monstats +0x18 → monstats2 record
+  +0xF0 bitset bit 2) ≠ 0; `0x00451FE0(class)` record byte +0xB ≠ 0;
+  v := `0x0055B7E0(M)` (monster data +0x14 dword 0) ≠ 0 and
+  `0x0063E9F0(v, M)` = 0; `0x0063EDC0(M)` = 0; `0x005A0180(M, 0x1F)` = 0
+  (no type flag 1/2/4/8/0x10). Change: specify `0x005A4940` and this
+  eligibility test in the monsters spec (names of the flag columns from
+  `data/fields.tsv`).
+
+## Code: routes_match_function_table (pass 4)
+
+`crates/d2-sim/src/world/objects/tests.rs` `route_mismatches` maps an
+owner cell to a route (`-` + address 0 → Null, `world/quests.md` →
+Quest, `world/waypoints.md` → Waypoint, `todo` → NotCovered, `§…` →
+Here; anything else → no route = mismatch) and compares it with
+`init_route` / `operate_route` (`crates/d2-sim/src/world/objects.rs`
+`:444`, `:456`). Against the current `object-functions.tsv` (unchanged
+in pass 4) these rows disagree (computed by re-running that mapping on
+the file):
+
+| Row | Owner cell | Table route | Code route |
+|---|---|---|---|
+| operate 13 TorchTiki | §16.1 | Here | NotCovered |
+| operate 16 TrapDoor | §16.2 | Here | NotCovered |
+| operate 17 Obelisk | §16.3 | Here | NotCovered |
+| operate 18 SecretDoor | §16.4 | Here | NotCovered |
+| operate 19 ArmorStand | §16.5 | Here | NotCovered |
+| operate 20 WeaponRack | §16.5 | Here | NotCovered |
+| operate 26 BookShelf | §16.6 | Here | NotCovered |
+| operate 27 TeleportPad | §16.7 | Here | NotCovered |
+| operate 29 SlimeDoor | §16.8 | Here | NotCovered |
+| operate 30 ExplodingChest | §16.9 | Here | NotCovered |
+| operate 32 Bank | §16.10 | Here | NotCovered |
+| operate 47 Stair | §16.11 | Here | NotCovered |
+| operate 48 TrappedSoul | §18.4 | Here | Quest |
+| operate 50 Stair2 | §16.11 | Here | NotCovered |
+| operate 51 JungleStash | §16.12 | Here | NotCovered |
+| operate 61 HarrogathMainGate | §16.13 | Here | NotCovered |
+| init 8 Torch | §17 | Here | NotCovered |
+| init 10 Unused10 | §17 | Here | NotCovered |
+| init 13 InvisibleObject | §17 | Here | NotCovered |
+| init 14 Brazier | §17 | Here | NotCovered |
+| init 22 Fire | §17 | Here | NotCovered |
+| init 24 SpikeFloorTrap | §17 | Here | NotCovered |
+| init 26 Brazier26 | §17 | Here | NotCovered |
+| init 27 GooPile | §17 | Here | NotCovered |
+| init 28 GoldPlaceHolder | §17 | Here | NotCovered |
+| init 34 HellBrazierFire | §17 | Here | NotCovered |
+| init 37 Unused37 | world/quests-act2.md | none (the mapping knows only `world/quests.md`) | NotCovered |
+| init 51 TrappedSoul | §18.4 | Here | Quest |
+| init 58 Fissure | §17 | Here | NotCovered |
+
+29 rows. To make the test pass the code needs: those 26 `§` rows routed
+Here (implementing objects-2.md §16–§18), init 51 / operate 48 Here
+instead of Quest, and the owner mapping to accept any quest spec path
+(`world/quests*.md`) as Quest (init 37 → Quest; its route is
+`world/quests-act2.md` §8.8). Every other row already agrees.
 
 ## Recording list
 

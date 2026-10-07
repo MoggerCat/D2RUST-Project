@@ -42,24 +42,24 @@
 |   2. Object control (game +0x10F0) | 129–151 |
 |   3. Creation and init dispatch (`0x0054F5D0`) | 152–176 |
 |   4. Object animation at a mode change | 177–208 |
-|   5. Init functions | 209–282 |
-|   6. Preset object classes 574–582 (`0x0054F490`) | 283–319 |
-|   7. Operate dispatch | 320–367 |
-|   8. Chests and breakables | 368–501 |
-|   9. Shrines | 502–610 |
-|   10. Doors, operate 8 (`0x00581D40`) | 611–634 |
-|   11. Wells, operate 22 (`0x005858A0`) | 635–665 |
-|   12. Portals, operate 15 (`0x00584870`) | 666–731 |
-|   13. Torch, operate 11 (`0x005843D0`) | 732–736 |
-|   14. Client messages | 737–764 |
-|   15. Not covered yet | 765–777 |
-|   16.–18. Moved | 778–783 |
-| Constants & data dependencies | 784–830 |
-| Randomness | 831–876 |
-| Edge cases & original bugs | 877–943 |
-| Test vectors | 944–982 |
-| Provenance | 983–1040 |
-| Open questions | 1041–1074 |
+|   5. Init functions | 209–283 |
+|   6. Preset object classes 574–582 (`0x0054F490`) | 284–320 |
+|   7. Operate dispatch | 321–368 |
+|   8. Chests and breakables | 369–502 |
+|   9. Shrines | 503–611 |
+|   10. Doors, operate 8 (`0x00581D40`) | 612–635 |
+|   11. Wells, operate 22 (`0x005858A0`) | 636–667 |
+|   12. Portals, operate 15 (`0x00584870`) | 668–734 |
+|   13. Torch, operate 11 (`0x005843D0`) | 735–739 |
+|   14. Client messages | 740–767 |
+|   15. Not covered yet | 768–780 |
+|   16.–18. Moved | 781–786 |
+| Constants & data dependencies | 787–833 |
+| Randomness | 834–879 |
+| Edge cases & original bugs | 880–946 |
+| Test vectors | 947–985 |
+| Provenance | 986–1043 |
+| Open questions | 1044–1090 |
 <!-- /index -->
 
 ## Summary
@@ -256,7 +256,8 @@ charges.
 #### 5.4 Door, init 5 (`0x00550130`)
 
 Returns at once. A door's state comes only from its allocation mode and
-§3 rule 8 (13 door rows have `PreOperate`). Locked doors are mode 6.
+§3 rule 8 (13 door rows have `PreOperate`). Locked doors are mode 6;
+no 1.14d path creates one (`world/objects-2.md` §22).
 
 #### 5.5 Portals, inits 11 and 12
 
@@ -638,7 +639,8 @@ portal hostile delay (§12 rule 2: refused while (hostile + 5000) mod
 2. Heal (`0x00585720`, P = operator): life < max and `Parm3` & 2 →
    life := min(life + (max · `Parm1` >> 8), max) (unsigned), client
    update; mana the same with `Parm3` & 1; stamina the same (always);
-   remove P's states 2 (poison) and 1 (freeze) stat lists; `0x00578C20`;
+   remove P's states 2 (poison) and 1 (freeze) stat lists; `0x00578C20`
+   (curable states, `world/objects-2.md` §21);
    heal P's pets (callback `0x005856A0`). Used := any of these changed.
 3. Not used → return 0. Used: c := c − 1; M := 2 · `Parm2`; if c ≤ M and
    c mod (M / 2) = 0 → mode := 2 − c / `Parm2`. Store c; event 2 at
@@ -703,7 +705,8 @@ Classes 59 (town portal) and 60 (permanent portal). Rules read in 1.14d:
    No L skips the class-59 test.
 8. Destination: L exists → its position (`0x0045ADF0`, `0x0045AE20`)
    and room R. Else R := `0x0061B060(game +0xBC + 4 · act, InteractType,
-   0, &x, &y, 3)` (the level's arrival point; DRLG spec).
+   0, &x, &y, 3)`: tile index 0, free-point size 3
+   (`sim/path-placement.md` §11; open question 16).
 9. O's portal flags |= 5 (§1). P's room in a town (`0x0061AB00`) →
    `0x00543B90(game, level of P's room, level of R, P)` (quest
    change-level hook, `world/quests.md`).
@@ -1040,7 +1043,8 @@ lists of §2 from the live `shrines.txt`.
 
 ## Open questions
 
-1. No recording of a chest, shrine, door, well or portal yet: record
+1. **Needs recording**: no recording of a chest, shrine, door, well or
+   portal yet: record
    `packets` + RNG traces for one of each to confirm draw order and the
    0x0E/0x4D bytes.
 2. **Answered (confirmed by recording `obj1`)**: no animation setup runs
@@ -1048,15 +1052,22 @@ lists of §2 from the live `shrines.txt`.
 3. **Answered**: `0x005474C0` read in 1.14d, §8.3 "Trap monster id".
 4. Meaning of the constant 3 at 0x0E offset 6 and of 0x4D's zero fields
    (client handler `0x0045CD10` and the 0x4D client handler).
+   **Answered** for this spec: `world/objects-2.md` §23.
 5. Callback `0x00582750` and the eligibility test of the warping shrine
-   (20); owner monsters spec.
+   (20); owner monsters spec. **Answered** for this spec: the 1.14d
+   test is a cross-file request to the monsters spec
+   (`docs/handoff/pc2-spec-objects.md`).
 6. **Answered**: §6 "Preset chest 581" (`0x0054F180`).
 7. **Answered**: §12 rules 4–14 (`0x00584870`).
 8. Who sets door mode 6 (locked): DS1 preset modes or population; settled
-   by a DS1 survey of door object modes.
+   by a DS1 survey of door object modes. **Answered**: nothing in 1.14d
+   (`world/objects-2.md` §22: allocation modes, preset modes, mode-6
+   sets).
 9. Obelisk: what completes it after mode 3 (gem use, reward) lives in
    the client UI and item code; find the C→S message and its handler.
-10. Fire event 0's direct mode write (§18.1): confirm with a packets
+   **Answered**: C→S 0x44 → `0x005852E0` → power-up `0x00585240`
+   (`world/objects-2.md` §19).
+10. **Needs recording**: fire event 0's direct mode write (§18.1): confirm with a packets
     trace that clients see no 1 → 2 update for fires.
 11. **Answered**: owner cells of init 51 and operate 48 are §18.4, init
     13 is §17 (CODE-TABLE CHANGE commit).
@@ -1064,10 +1075,15 @@ lists of §2 from the live `shrines.txt`.
     row change is a cross-file request (`docs/handoff/pc2-spec-objects.md`).
 13. Drops `0x005594C0` (armor), `0x00559630` (weapon), `0x00559300`
     (gold), `0x00559A30` (by code): items spec, not yet specified.
-14. Recording `obj1`: two class-37 allocations show speed 0 at return in
+    **Answered**: `world/objects-2.md` §20 (with the class picks
+    `0x00555E70`, `0x00555FB0`, `0x005560F0`, `0x00556240`).
+14. **Needs recording** (`obj1` data): two class-37 allocations show speed 0 at return in
     mode 2; §4 rule 5 predicts an allocation mode of 2 (init 8's set is
     then a no-op). Check their mode argument in `obj1-objects.jsonl`.
 15. Well heal: what `0x00578C20(P)` removes or resets (it counts as
-    "used", §11); stat-list / states spec.
+    "used", §11); stat-list / states spec. **Answered**: it removes
+    every stat list of a `curable` state P has (`world/objects-2.md`
+    §21).
 16. `0x0061B060(…, 3)` (portal arrival point without a partner, §12
-    rule 8): the DRLG spec owns which point kind 3 is.
+    rule 8): the DRLG spec owns which point kind 3 is. **Answered**:
+    3 is the free-point size (§12 rule 8, `0x00584A59`).
