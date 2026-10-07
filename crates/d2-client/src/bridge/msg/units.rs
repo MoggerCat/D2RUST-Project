@@ -16,24 +16,38 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::world::{
-    room_of_point, ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData,
-    PlayerData, UnitKey, INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
+    ClientUnit, ClientWorld, KindData, ModeRequest, MonsterData, ObjectData, PlayerData, UnitKey,
+    INIT_SEED, MISSILE, MONSTER, OBJECT, PLAYER,
 };
 use super::Bytes;
 
 /// Common creation fields (model §2 rule 6): type, class, GUID, and the
-/// seed: {1, 666} at (0, 0); at another point the seed comes from the
-/// client room's seed, which the model does not hold (open question 5),
-/// so it is `None`.
-fn create(key: UnitKey, class: u32, x: u16, y: u16) -> ClientUnit {
+/// seed: {1, 666} at (0, 0); at another point the room of the point
+/// (§2 rule 7, fatal 0x13C when none) has its seed stepped once and the
+/// unit seed is `init_low(lo')` (§12 rule 5). Without a client DRLG the
+/// room's seed is not in the model, so the seed is `None`.
+fn create(
+    w: &mut ClientWorld,
+    key: UnitKey,
+    class: u32,
+    x: u16,
+    y: u16,
+) -> Result<ClientUnit, HandlerError> {
     let mut u = ClientUnit::new(key);
     u.class = class;
     let placed = (x, y) != (0, 0);
-    // TODO(spec: model.md open question 5): room of the point (§2 rule
-    // 7; fatal 0x13C when none), its act, and its seed step.
     u.seed = (!placed).then_some(INIT_SEED);
+    if placed && w.drlg.is_some() {
+        let room = w.room_at(x, y).ok_or(HandlerError::Fatal(0x13C))?;
+        let seed = w
+            .drlg
+            .as_mut()
+            .and_then(|d| d.unit_seed(room.room))
+            .expect("a listed room is active");
+        u.seed = Some((seed.lo, seed.hi));
+    }
     u.position = placed.then_some((x, y));
-    u
+    Ok(u)
 }
 
 /// 0x59 AssignPlayer (§1.1).
@@ -44,7 +58,7 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     }
     let key = UnitKey::new(PLAYER, b.u32(1)?);
     let (x, y) = (b.u16(0x16)?, b.u16(0x18)?);
-    let mut u = create(key, u32::from(b.u8(5)?), x, y);
+    let mut u = create(w, key, u32::from(b.u8(5)?), x, y)?;
     // Player init (`0x00460BF0`, rule 3).
     for s in [68, 67, 69] {
         u.stats.insert(s, 100);
@@ -140,7 +154,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     if class_row.is_none() {
         return Ok(());
     }
-    let mut u = create(key, u32::from(class), x, y);
+    let mut u = create(w, key, u32::from(class), x, y)?;
     // A monster's seed is init_low(+0x28), {0, 666} without a room.
     if u.position.is_none() {
         u.seed = Some((0, INIT_SEED.1));
@@ -208,7 +222,7 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     }
     let key = UnitKey::new(ty, b.u32(2)?);
     let (x, y) = (b.u16(8)?, b.u16(0xA)?);
-    let mut u = create(key, u32::from(b.u16(6)?), x, y);
+    let mut u = create(w, key, u32::from(b.u16(6)?), x, y)?;
     if ty == OBJECT {
         u.mode = u32::from(b.u8(0xC)?);
         u.kind = KindData::Object(ObjectData {
@@ -253,22 +267,15 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     if !w.units.contains_key(&key) {
         return Ok(());
     }
-    // Rule 4.2: room' := room of (x, y) (`model.md` §12 rule 2); a
+    // Rule 4.2: room' := room of (x, y) (`model.md` §12 rule 2: the cell
+    // lookup from the local player's room, then the act lookup); a
     // non-zero point with no room' is fatal 0x168. Without the client DRLG
     // (`active_rooms` none) the point is taken as in a room.
     let new_room = match &w.active_rooms {
-        Some(rooms) => {
-            let r = room_of_point(rooms, i32::from(x), i32::from(y)).copied();
-            if r.is_none() && (x, y) != (0, 0) {
-                return Err(HandlerError::Fatal(0x168));
-            }
-            r
-        }
+        Some(_) if (x, y) == (0, 0) => None,
+        Some(_) => Some(w.room_at(x, y).ok_or(HandlerError::Fatal(0x168))?),
         None => None,
     };
-    // TODO(spec: model.md §12 rule 2 a): the cell lookup from the unit's
-    // room and its adjacency array runs before the act lookup; the model
-    // has no adjacency, so only the act lookup (b) runs.
     // Rule 4.3: a dead unit stays where it is.
     if w.units[&key].is_dead() {
         return Ok(());

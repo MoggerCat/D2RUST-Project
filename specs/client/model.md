@@ -4,9 +4,12 @@
   code (addresses below) and checked against the two single-player
   recordings `traces/raw/20261006-015956-packets.jsonl` and
   `-022633-packets.jsonl` (join → town → Act I fighting); unverified:
-  no executable check runs it yet.
+  no executable check runs it yet. Implemented in `d2-client::bridge`
+  (§12 r1 client DRLG: `bridge::drlg`, `impl-client-drlg` 2026-10-07;
+  the recorded join vector on game files is `docs/HANDOFF.md` §5 C78).
 - **Target version:** 1.14d
-- **Crate/module:** `d2-client::bridge::world` (model), the handlers
+- **Crate/module:** `d2-client::bridge::world` (model),
+  `d2-client::bridge::drlg` (the client DRLG of §12), the handlers
   registered in `d2-client::bridge::dispatch::HANDLERS` for the ids this
   spec owns; ids owned by `client/msg-units.md` and
   `client/msg-stats-items.md` use the model defined here.
@@ -21,30 +24,30 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 50–67 |
-| Inputs | 68–76 |
-| Outputs / state changes | 77–83 |
-| Rules | 84–85 |
-|   1. Model contents | 86–124 |
-|   2. Unit table | 125–170 |
-|   3. Local player | 171–193 |
-|   4. Receive and the unit message queue | 194–231 |
-|   5. Client update pass | 232–266 |
-|   6. Position check (`0x004804E0`) | 267–306 |
-|   7. Session messages | 307–343 |
-|   8. Mode requests | 344–394 |
-|   9. Room-in-sight messages | 395–415 |
-|   10. Bit reader | 416–430 |
-|   11. Current act and level (join and later) | 431–472 |
-|   12. Client DRLG and the room of a point | 473–514 |
-|   13. Visibility predicate (`0x004DBF20`) | 515–542 |
-|   14. Pet list and the hireling GUID | 543–569 |
-| Constants & data dependencies | 570–582 |
-| Randomness | 583–594 |
-| Edge cases & original bugs | 595–603 |
-| Test vectors | 604–643 |
-| Provenance | 644–682 |
-| Open questions | 683–721 |
+| Summary | 53–70 |
+| Inputs | 71–79 |
+| Outputs / state changes | 80–86 |
+| Rules | 87–88 |
+|   1. Model contents | 89–127 |
+|   2. Unit table | 128–173 |
+|   3. Local player | 174–196 |
+|   4. Receive and the unit message queue | 197–234 |
+|   5. Client update pass | 235–269 |
+|   6. Position check (`0x004804E0`) | 270–309 |
+|   7. Session messages | 310–346 |
+|   8. Mode requests | 347–397 |
+|   9. Room-in-sight messages | 398–418 |
+|   10. Bit reader | 419–433 |
+|   11. Current act and level (join and later) | 434–475 |
+|   12. Client DRLG and the room of a point | 476–517 |
+|   13. Visibility predicate (`0x004DBF20`) | 518–545 |
+|   14. Pet list and the hireling GUID | 546–572 |
+| Constants & data dependencies | 573–585 |
+| Randomness | 586–597 |
+| Edge cases & original bugs | 598–606 |
+| Test vectors | 607–646 |
+| Provenance | 647–685 |
+| Open questions | 686–724 |
 <!-- /index -->
 
 ## Summary

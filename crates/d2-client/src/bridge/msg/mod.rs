@@ -14,6 +14,8 @@ pub mod stats_items;
 pub mod units;
 
 #[cfg(test)]
+mod tests_drlg;
+#[cfg(test)]
 mod tests_model;
 #[cfg(test)]
 mod tests_stats_items;

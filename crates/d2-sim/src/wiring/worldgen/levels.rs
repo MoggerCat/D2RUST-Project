@@ -46,11 +46,13 @@ pub struct WorldTypes {
     pub outdoor: BTreeMap<u8, Outdoor>,
     pub preset_data: PresetData,
     pub outdoor_data: OutdoorData,
-    /// Parsed lvlprest DS1 files (no I/O in the sim).
-    pub ds1: Box<dyn Ds1Source>,
+    /// Parsed lvlprest DS1 files (no I/O in the sim). `Send + Sync` so a
+    /// client DRLG copy (`client/model.md` §12 r1) can live in the Bevy
+    /// app's bridge resource.
+    pub ds1: Box<dyn Ds1Source + Send + Sync>,
     pub ds1_cache: Ds1Cache,
     /// Parsed lvlsub DS1 files.
-    pub subs: Box<dyn SubFiles>,
+    pub subs: Box<dyn SubFiles + Send + Sync>,
     /// Level-type errors, in order.
     pub errors: Vec<WorldgenError>,
 }
@@ -75,8 +77,8 @@ impl WorldTypes {
         maze: Maze,
         preset_data: PresetData,
         outdoor_data: OutdoorData,
-        ds1: Box<dyn Ds1Source>,
-        subs: Box<dyn SubFiles>,
+        ds1: Box<dyn Ds1Source + Send + Sync>,
+        subs: Box<dyn SubFiles + Send + Sync>,
     ) -> Self {
         Self {
             drlg_data,

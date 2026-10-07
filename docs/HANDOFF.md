@@ -2844,6 +2844,38 @@ the dev-dependency) and record results here.
     palette is wired, `play.rs`), so judge by the log only. Then the
     capture cases `ui-0001` / `ui-0002` (`ui/panels.md` §Test vectors)
     once a palette is presented.
+78. Client DRLG on the recorded join (`impl-client-drlg`): `D2_GAME_DIR=<install>
+    cargo test -p d2-client --test app_client_drlg -- --ignored`. The test
+    feeds the bridge the join of `client/model.md` §Test vectors
+    (recording `20261006-022633`: 0x03 seq 142, init seed 0x103888C4;
+    0x07 seq 144, level 1 at tile (0x3A0, 0x388); 0x15 seq 154 to
+    (4673, 4548)) with the client DRLG built from the user's tables.
+    Expect a pass: the 0x07 finds a level-1 room of origin tile (928, 904)
+    holding the player (level 1, no message refused), and the five act
+    `pal.pl2` files load. A refused 0x07 (no room at the point) or another
+    origin means the client DRLG's Act 1 town differs from the original
+    (finding for `drlg/levels.md` / `drlg/preset.md` / `drlg/outdoor.md`
+    and the level-type wiring), not a reason to skip.
+79. Act palette in `play` (`impl-client-drlg`): `D2_GAME_DIR=<install>
+    cargo run -p d2-client --release -- play --frames 500`. Expect: no
+    error from `present_act_palette`; the frame palette is act 1's
+    `pal.pl2` from the first frame (`composition.md` §4: act 0 at game
+    start), so the window is no longer all zeros where index 0 differs
+    from black. The in-process server sends no 0x03 / 0x07 / 0x15 at the
+    join yet (`docs/HANDOFF.md` §2 step 4), so `ClientWorld::drlg` stays
+    `None` and the act never changes in this run; once the session code
+    sends the join, rerun and expect no 0x07 / 0xAC / 0x15 refusal in the
+    log (a `fatal assert 0x13C` / `0x168` or a `TODO(spec: model.md §9`
+    rejection is a finding: see `impl-client-drlg` §3 Q1–Q2).
+80. Client room seeds vs the server's (`client/model.md` OQ 9, §12 r5):
+    with `tools/trace-recorder`, after a join, read the client unit seed
+    (`+0x20`) of the first monster 0xAC adds at a non-zero point and the
+    client active room's seed (`+0x6C`) before and after; record the
+    S→C stream. Expect the bridge (live `DrlgSource`, the recorded stream)
+    to give the same `ClientUnit::seed` and room seed step (one step per
+    creation at a point, `init_low(lo')`); a mismatch is either OQ 9
+    (client rooms created by other draws, e.g. the §4.6 build timer) or
+    object creation not stepping the seed (`impl-client-drlg` §3 Q3).
 
 Kept entries (unchanged):
 

@@ -62,6 +62,11 @@ pub enum HandlerError {
     /// A rule input no spec gives yet.
     #[error("TODO(spec: {0})")]
     Unspecified(&'static str),
+    /// The client DRLG (`model.md` §12 rule 1) failed: a fatal error of
+    /// the original's DRLG code, a level-type error, or a snapshot that
+    /// cannot generate.
+    #[error(transparent)]
+    Drlg(#[from] super::drlg::ClientDrlgError),
 }
 
 pub type HandlerFn = fn(&mut ClientWorld, &Message<'_>) -> Result<(), HandlerError>;
