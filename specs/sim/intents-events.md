@@ -40,19 +40,19 @@
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
 |   2. Client → server | 115–382 |
-|   3. Server → client | 383–595 |
-|   4. d2rs mapping and scope | 596–627 |
-|   5. Machine-readable tables | 628–664 |
-|   6. Exact-match comparison | 665–772 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 773–1195 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1196–1410 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1411–1567 |
-| Constants & data dependencies | 1568–1586 |
-| Randomness | 1587–1592 |
-| Edge cases & original bugs | 1593–1638 |
-| Test vectors | 1639–1725 |
-| Provenance | 1726–1842 |
-| Open questions | 1843–1962 |
+|   3. Server → client | 383–602 |
+|   4. d2rs mapping and scope | 603–634 |
+|   5. Machine-readable tables | 635–671 |
+|   6. Exact-match comparison | 672–779 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1202 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1203–1417 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1418–1574 |
+| Constants & data dependencies | 1575–1593 |
+| Randomness | 1594–1599 |
+| Edge cases & original bugs | 1600–1645 |
+| Test vectors | 1646–1732 |
+| Provenance | 1733–1849 |
+| Open questions | 1850–1969 |
 <!-- /index -->
 
 ## Summary
@@ -557,6 +557,13 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    `mode` / `tab` / `cost` are the same bytes, vendor meaning
    `world/vendors.md`); S→C 0x22 takes PC 2's `unit:u32@3
    body_state:u8@11` (`items/inventory-moves.md` §11).
+   Rows with an empty `layout` that are complete (2026-10-08): the
+   1-byte S→C messages 0x00, 0x02, 0x04, 0x05, 0x06, 0x4F, 0x97 and 0xB0
+   carry only the id (builders `0x0053B320`, `0x0053B240`, `0x0053E110`,
+   `0x0053B220` write nothing else); 0x7E (5 bytes) has no field either:
+   `0x0053DB70` writes only the id and queues 5 bytes, so bytes 1–4 are
+   stack leftovers (Edge case 10; masked in `tools/original-hooks.md`
+   §6.2). An empty layout is the correct TSV value for all nine.
 5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
    type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
    u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when
