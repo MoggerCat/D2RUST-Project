@@ -518,3 +518,102 @@ fn floor_items_stamp_by_size_and_removal_clears_each_kind() {
     assert_eq!(cell(&mut fx, 5, 5), 0x200);
     fx.assert_clean();
 }
+
+// Covers: specs/sim/pathing.md §3 r6, §3 r9
+#[test]
+fn a_walk_request_puts_the_walkers_footprint_back() {
+    // The compute removes the unit's own footprint (step 6) and puts it
+    // back at its position after the path function (step 9,
+    // `0x00649400`): right after the request, before any step, the
+    // player's cell still holds its foot mask.
+    let mut fx = fx();
+    let p = player(&mut fx, 10, 10);
+    let foot = fx
+        .sim
+        .hooks()
+        .paths
+        .as_ref()
+        .unwrap()
+        .dynamic(p)
+        .unwrap()
+        .foot_mask;
+    assert_ne!(foot, 0);
+    assert_eq!(cell(&mut fx, 10, 10) & foot, foot);
+    let r = fx
+        .sim
+        .with(&mut fx.game, |g, v| PathCtx::of(v, g).walk_to(p, 2, 20, 10));
+    assert!(r.is_some());
+    let d = fx.sim.hooks().paths.as_ref().unwrap().dynamic(p).unwrap();
+    assert_ne!(d.point_count, 0, "a path was found");
+    assert_eq!((d.x(), d.y()), (10, 10));
+    assert_eq!(cell(&mut fx, 10, 10) & foot, foot);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pathing.md §8.1 r2
+#[test]
+fn a_monsters_velocity_comes_from_its_monstats_row() {
+    // Base = monstats `Velocity` × 256, p = stat 67 (100): walk mode 2 →
+    // 5 · 256. A monster whose `npc` bit is set has the modifier in modes
+    // 2 and 15 only: mode 8 (column b set for classes < 410) keeps the
+    // velocity; without `npc` mode 8 sets it.
+    use crate::path::walk::request::set_mode_and_velocity;
+    let mut fx = fx();
+    let a = fx.a;
+    Arc::make_mut(&mut fx.sim.hooks().tables).combat.monstats[0].velocity = 5;
+    let m = fx.spawn(UnitType::Monster, 0, a, 30, 30);
+    fx.stats(m, &[(STAT_VELOCITY, 100)]);
+    let set = |fx: &mut Fx, mode: u32| {
+        let t = fx.sim.hooks().paths.as_ref().unwrap().tables.clone();
+        let mut d = fx
+            .sim
+            .hooks()
+            .paths
+            .as_ref()
+            .unwrap()
+            .dynamic(m)
+            .unwrap()
+            .clone();
+        d.velocity = 7;
+        fx.sim.with(&mut fx.game, |g, v| {
+            set_mode_and_velocity(&t, &mut PathCtx::of(v, g), m, &mut d, mode)
+        });
+        d.velocity
+    };
+    assert_eq!(set(&mut fx, 2), 5 * 256);
+    assert_eq!(set(&mut fx, 8), 5 * 256);
+    Arc::make_mut(&mut fx.sim.hooks().tables).combat.monstats[0].npc = true;
+    assert_eq!(set(&mut fx, 8), 7);
+    assert_eq!(set(&mut fx, 15), 5 * 256);
+}
+
+// Covers: specs/sim/pathing.md §2
+#[test]
+fn a_fatal_type_set_in_a_walk_request_is_reported() {
+    // Set type `0x00648CF0` asserts on a previous type of 8 (server
+    // knockback): the request's type reset (§1.5 rule 1, type 7) hits it.
+    // The wiring reports the fatal walk error and the request has no
+    // outcome; nothing moves.
+    use crate::path::walk::WalkError;
+    use crate::path::PathError;
+    let mut fx = fx();
+    let p = player(&mut fx, 10, 10);
+    fx.sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(p)
+        .unwrap()
+        .prev_path_type = 8;
+    let r = fx
+        .sim
+        .with(&mut fx.game, |g, v| PathCtx::of(v, g).walk_to(p, 2, 20, 10));
+    assert_eq!(r, None);
+    assert_eq!(
+        std::mem::take(&mut fx.sim.hooks().errors),
+        vec![WiringError::Walk(WalkError::Path(PathError::PathType(7)))]
+    );
+    assert_eq!(pos(&mut fx, p), (10, 10, Some(fx.a)));
+    fx.assert_clean();
+}
