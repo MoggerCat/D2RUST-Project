@@ -667,17 +667,6 @@ pub trait Pending {
     /// A missile parameter record's init callback (skills spec).
     fn missile_init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32) {
     }
-    /// Server-damage function `index` 1…14 (`0x0073C960`, skills spec):
-    /// adjusts the missile's damage record.
-    fn srv_dmg(
-        &mut self,
-        game: &mut Game,
-        index: i16,
-        missile: UnitId,
-        unit: UnitId,
-        damage: &mut crate::missiles::Damage,
-    ) {
-    }
     /// The curse helper `0x0056E970` (skills spec).
     #[allow(clippy::too_many_arguments)]
     fn curse(

@@ -19,6 +19,7 @@ mod create;
 mod flight;
 mod hit;
 pub mod seams;
+pub mod srv_dmg;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

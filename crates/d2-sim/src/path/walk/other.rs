@@ -856,10 +856,8 @@ pub fn wall_follow<C: PathWorld + WalkUnits + ?Sized>(
     // Rule 3.
     let mut p = w.start;
     while w.i < w.n {
-        if w.blocked(w.buf[w.i]) {
-            if !w.repair(p)? {
-                return Ok(w.compress(path, w.i));
-            }
+        if w.blocked(w.buf[w.i]) && !w.repair(p)? {
+            return Ok(w.compress(path, w.i));
         }
         // After a repair: the cell at the new i, untested.
         p = w.buf.get(w.i).copied().unwrap_or(p);
