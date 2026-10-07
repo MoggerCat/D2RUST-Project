@@ -51,7 +51,7 @@ addresses in the specs.
   test's `check_item` (`crates/d2-sim/tests/game_items.rs`) must skip
   suffix slot 0 for types `scro` / `book`; then print every remaining
   failure grouped by (item, error).
-- xpc-to-pc2 line: cube.md §1 0x77 — done in <sha1>.
+- xpc-to-pc2 line: cube.md §1 0x77 — done in 2a72110.
 
 ## Still open
 
