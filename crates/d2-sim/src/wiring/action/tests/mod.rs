@@ -68,6 +68,8 @@ pub struct TestPending {
     pub ranged: std::cell::RefCell<Vec<(UnitId, UnitId)>>,
     /// The corpse `create_corpse` answers and its owner GUID.
     pub corpse: Option<(UnitId, u32)>,
+    /// What `object_approach` answers (default: operate).
+    pub reach: Option<crate::wiring::action::ObjectReach>,
 }
 
 impl Pending for TestPending {
@@ -163,6 +165,15 @@ impl Pending for TestPending {
     }
     fn set_object_mode(&mut self, _: &mut Game, object: UnitId, mode: u8) {
         self.log.push(format!("object mode {} {mode}", object.0));
+    }
+    fn object_approach(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        _: UnitId,
+    ) -> crate::wiring::action::ObjectReach {
+        self.reach
+            .unwrap_or(crate::wiring::action::ObjectReach::Operate)
     }
     /// Every operator is in interact range of every object (logged).
     fn object_in_range(&self, _: &Game, operator: UnitId, object: UnitId) -> bool {

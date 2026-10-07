@@ -3,6 +3,7 @@ use super::super::fake::{blank_object, Call, Fake};
 use super::super::{dispatch, oevent, oflags, Dispatch, ObjectData};
 use super::*;
 use crate::rng::Seed;
+use d2_data::tables::Record;
 
 // Test conventions for the stat map of [`Fake`] (it has no fields for the
 // misc seams): keys at or above 0xF000 are not stats.
@@ -24,6 +25,14 @@ const QREC: u16 = 0xFFF9;
 const PARTY: u16 = 0xFFF8;
 /// State `s` is present when key 0xF000 + s is nonzero.
 const STATE: u16 = 0xF000;
+/// The partner portal's unit id of an object.
+const PARTNER: u16 = 0xFFF7;
+/// `player_portal_guid` of a player.
+const PUID: u16 = 0xFFF6;
+/// Nonzero on unit 0: an expansion game.
+const EXPANSION: u16 = 0xFFF5;
+/// Quest bit (q, 0) of a player is set when key 0xE000 + q is nonzero.
+const QBIT: u16 = 0xE000;
 
 impl MiscWorld for Fake {
     fn create_level_portal(&mut self, object: UnitId, row: u16) {
@@ -77,6 +86,34 @@ impl MiscWorld for Fake {
         self.calls
             .push(Call::Other(format!("walk {} {mode} {x} {y}", player.0)));
     }
+    fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
+        self.stats
+            .get(&(object, PARTNER))
+            .map(|&v| UnitId(v as u32))
+    }
+    fn player_portal_guid(&self, player: UnitId) -> u32 {
+        self.stats.get(&(player, PUID)).copied().unwrap_or(0) as u32
+    }
+    fn expansion(&self) -> bool {
+        self.stats.get(&(UnitId(0), EXPANSION)).is_some_and(|&v| v != 0)
+    }
+    fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
+        bit == 0
+            && self
+                .stats
+                .get(&(player, QBIT + quest as u16))
+                .is_some_and(|&v| v != 0)
+    }
+    fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
+        self.calls
+            .push(Call::Other(format!("qlc {} {from} {to}", player.0)));
+    }
+    fn remove_portal(&mut self, object: UnitId) {
+        self.calls.push(Call::Other(format!("remove {}", object.0)));
+    }
+    fn portal_act5_hook(&mut self, partner: UnitId) {
+        self.calls.push(Call::Other(format!("act5 {}", partner.0)));
+    }
     fn just_portaled(&mut self, player: UnitId, expire: i32) {
         self.calls
             .push(Call::Other(format!("portaled {} {expire}", player.0)));
@@ -93,7 +130,7 @@ const PORTAL: u16 = 3;
 const TORCH: u16 = 4;
 
 fn tables() -> ObjectTables {
-    let mut objects: Vec<_> = (0..8).map(|_| blank_object()).collect();
+    let mut objects: Vec<_> = (0..64).map(|_| blank_object()).collect();
     for (c, f) in [(DOOR, 8), (WELL, 22), (PORTAL, 15), (TORCH, 11)] {
         objects[c as usize].operatefn = f;
         // Sync 1: mode changes draw nothing (§4).
@@ -389,7 +426,7 @@ fn well_larger_parm2_modes() {
 
 // ------------------------------------------------------------------ §12
 
-// Covers: specs/world/objects.md §12 text, §12 r1
+// Covers: specs/world/objects.md §12 text, §12 r1, §12 r5
 #[test]
 fn portal_busy_and_owner() {
     let t = tables();
@@ -436,7 +473,7 @@ fn portal_busy_and_owner() {
     }
 }
 
-// Covers: specs/world/objects.md §12 r2, §12 r3, §edge-cases-original-bugs r9
+// Covers: specs/world/objects.md §12 r2, §12 r3, §12 r8, §12 r9, §12 r11, §12 r13, §edge-cases-original-bugs r9
 #[test]
 fn portal_hostile_delay_and_travel_seam() {
     let t = tables();
@@ -511,6 +548,138 @@ fn portal_owner_party_and_quest_gates() {
         f.calls,
         vec![Call::Sound(P, sound::PORTAL_REFUSED, Some(P), false)]
     );
+}
+
+const L: UnitId = UnitId(11);
+
+/// Object `O` (class `class`, mode `mode`) with a partner portal `L` at
+/// (70, 80) in room 5; P at level 1 with its own portal GUID `puid`.
+fn partnered(class: u16, mode: u8, puid: u32) -> (ObjectControl, Fake) {
+    let (mut ctl, mut f) = setup(class, mode);
+    f.stats.insert((O, PARTNER), L.0 as i32);
+    f.guids.insert(L, 0x66);
+    f.rooms.insert(L, RoomId(5));
+    f.positions.insert(L, (70, 80));
+    f.levels.insert(P, 1);
+    f.rooms.insert(P, RoomId(2));
+    f.stats.insert((P, PUID), puid as i32);
+    ctl.get_mut(O).unwrap().interact = 37;
+    (ctl, f)
+}
+
+fn op(class: u16) -> Operate {
+    Operate {
+        object: O,
+        operator: Some(P),
+        class,
+        operate_fn: 15,
+    }
+}
+
+// Covers: specs/world/objects.md §12 r6, §12 r8, §12 r9, §12 r10, §12 r11
+#[test]
+fn portal_partner_destination_and_quest_hook() {
+    let t = tables();
+    let (mut ctl, mut f) = partnered(PORTAL, 0, 0x99);
+    // Partner exists: no spawn lookup; destination is L's room and
+    // position; P's room is a town → the quest hook (level of P → level of
+    // the destination room, rule 9) runs before the placement.
+    assert_eq!(portal(&mut ctl, &t, &mut f, &op(PORTAL)), Ok(Some(0)));
+    assert!(!f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("spawn"))));
+    let at = |name: &str| {
+        f.calls
+            .iter()
+            .position(|c| matches!(c, Call::Other(s) if s.starts_with(name)))
+    };
+    assert_eq!(f.calls[at("qlc").unwrap()], Call::Other("qlc 20 1 0".into()));
+    assert_eq!(
+        f.calls[at("place").unwrap()],
+        Call::Other("place 20 5 70 80".into())
+    );
+    assert!(at("qlc") < at("place"));
+    assert_eq!(ctl.get(O).unwrap().portal_flags, 5);
+}
+
+// Covers: specs/world/objects.md §12 r12
+#[test]
+fn portal_removal_rules() {
+    let t = tables();
+    let removed = |f: &Fake| -> Vec<String> {
+        f.calls
+            .iter()
+            .filter_map(|c| match c {
+                Call::Other(s) if s.starts_with("remove") || s.starts_with("act5") => {
+                    Some(s.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    };
+    // Class 59, u = L's GUID: O, then the Act V hook, then L.
+    let (mut ctl, mut f) = partnered(PORTAL, 1, 0x66);
+    portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
+    assert_eq!(removed(&f), ["remove 10", "act5 11", "remove 11"]);
+    assert!(f.schedules().is_empty());
+    // Class 59, u ≠ L's GUID: nothing removed, no ENDANIM.
+    let (mut ctl, mut f) = partnered(PORTAL, 1, 0x99);
+    portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
+    assert!(removed(&f).is_empty());
+    assert!(f.schedules().is_empty());
+    // Class 60 (even with u = L's GUID): O in mode 1 → ENDANIM.
+    let (mut ctl, mut f) = partnered(PORTAL, 1, 0x66);
+    f.frame = 100;
+    portal(&mut ctl, &t, &mut f, &op(60)).unwrap();
+    assert!(removed(&f).is_empty());
+    assert_eq!(f.schedules(), [(O, oevent::END_ANIM, 101)]);
+    // Class 60, mode 0: nothing.
+    let (mut ctl, mut f) = partnered(PORTAL, 0, 0x66);
+    portal(&mut ctl, &t, &mut f, &op(60)).unwrap();
+    assert!(f.schedules().is_empty());
+}
+
+// Covers: specs/world/objects.md §12 r7
+#[test]
+fn portal_class_59_quest_flag_gate() {
+    let mut t = tables();
+    let mut row = d2_data::tables::Leveldefs::decode(&[0; d2_data::tables::Leveldefs::SIZE]);
+    (row.questflag, row.questflagex) = (5, 9);
+    t.leveldefs = vec![row; 40];
+    for (expansion, quest) in [(false, 5u16), (true, 9)] {
+        // Gate applies: u ∉ {GUID(O), GUID(L)}, flag clear → refused.
+        let (mut ctl, mut f) = partnered(PORTAL, 1, 0x99);
+        f.rooms.insert(O, RoomId(4));
+        f.stats.insert((P, QREC), 1);
+        f.stats.insert((UnitId(0), EXPANSION), i32::from(expansion));
+        portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
+        assert_eq!(
+            f.calls,
+            vec![Call::Sound(P, sound::PORTAL_REFUSED, Some(P), false)]
+        );
+        // The same flag set: goes on.
+        let (mut ctl, mut f) = partnered(PORTAL, 1, 0x99);
+        f.rooms.insert(O, RoomId(4));
+        f.stats.insert((P, QREC), 1);
+        f.stats.insert((UnitId(0), EXPANSION), i32::from(expansion));
+        f.stats.insert((P, QBIT + quest), 1);
+        portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
+        assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
+    }
+    // u = O's GUID skips the test; class 60 skips it too.
+    for (class, puid) in [(59, 0x55u32), (60, 0x99)] {
+        let (mut ctl, mut f) = partnered(PORTAL, 1, puid);
+        f.rooms.insert(O, RoomId(4));
+        f.stats.insert((P, QREC), 1);
+        portal(&mut ctl, &t, &mut f, &op(class)).unwrap();
+        assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
+    }
+    // No partner: the class-59 test is skipped.
+    let (mut ctl, mut f) = setup(PORTAL, 1);
+    f.rooms.insert(O, RoomId(4));
+    f.stats.insert((P, QREC), 1);
+    f.stats.insert((UnitId(0), SPAWN), 1);
+    ctl.get_mut(O).unwrap().interact = 37;
+    portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
+    assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
 }
 
 // ------------------------------------------------------------------ §13
