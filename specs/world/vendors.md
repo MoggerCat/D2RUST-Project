@@ -37,14 +37,14 @@
 |   5. Gambling | 293–360 |
 |   6. Refresh | 361–392 |
 |   7. Buying and selling | 393–582 |
-|   8. Repair | 583–636 |
-|   9. Prices | 637–830 |
-| Constants & data dependencies | 831–850 |
-| Randomness | 851–866 |
-| Edge cases & original bugs | 867–896 |
-| Test vectors | 897–919 |
-| Provenance | 920–958 |
-| Open questions | 959–1031 |
+|   8. Repair | 583–637 |
+|   9. Prices | 638–831 |
+| Constants & data dependencies | 832–851 |
+| Randomness | 852–867 |
+| Edge cases & original bugs | 868–897 |
+| Test vectors | 898–920 |
+| Provenance | 921–959 |
+| Open questions | 960–1032 |
 <!-- /index -->
 
 ## Summary
@@ -630,7 +630,8 @@ socket, personalize: `push 0` at `0x0057A0F3`, `0x0057A3E7`,
 
 Only if repairable (§9.2 rule 0): throwable and stackable → quantity
 := max stack (0x3E stat 70 to the player when given); recharge
-(`0x0055FE80`); broken (0x100) → `0x0055F900` (item spec), done; else
+(`0x0055FE80`, `items/generation.md` §12.2); broken (0x100) →
+`0x0055F900` (`items/generation.md` §12.1), done; else
 durability := max durability when > 0 (0x3E stat 72 when a player is
 given).
 
