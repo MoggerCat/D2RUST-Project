@@ -49,19 +49,32 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
 | triggers OQ 3 | `triggers.md` OQ 3 | Partly: the +0xB0 writers are the player / monster mode machines (sites listed); the message field is `client/msg-units.md`'s. |
 | — | `triggers.md` §1 r6 | Correction: the idle gap starts at 90 (reset each game by `0x004CA280`), not 0. |
 | — | `triggers.md` §12 | Thunder draws on the player client seed (500 + roll(1500) timer, 25 + roll(50) delay, y then x = −200 + roll(400)) and sets the position. |
+| sound-table OQ 3 (third pass) | `sound-table-2.md` §14 (new file) | Static: inside the sound tick only `0x004E40A0` steps the seed (791-function closure); between ticks the receive → client update → draw → sound tick order of `0x0044EFA0`, and the users listed (cursor, shake, weather, water floors, lightning, room-change weather, Den lights, overlay create `0x00470390`, NPC code, `cltdofunc` entries of local-player casts). Draw-phase users are frame- and wall-clock-dependent, so the interleave is not tick-exact; conformance takes the recorded seed per sound draw as input. |
+| sound-table OQ 14 | `sound-table.md` §8.3 r4 | G = 255 at every game volume send; all 15 `0x00515CE0` sites listed (init, shutdown, Bink close, stop-all, 180 ms stream-voice fade), each restoring 255 before returning. |
+| ST4 remainder | `sound-table.md` §6.6 r4 | Device side settled: 128/256 KiB looping buffers, zero padding after the data, strict played > size test per service pass; audible output exact, only the ended tick lags (OQ 12 still Needs recording). |
+| ST7 remainder | `sound-table.md` OQ 13 | Async mode is on in every run (`0x0040A390`, ECX 1); Storm `0x0041AAD0` either completes at once or queues; branch for sound files not settled statically. Still Needs recording. |
+| — | `sound-table.md` §6.2 r3 | New: `soundchaosdebug` chat toggle: random speech 2,934–4,656 every 3rd tick while on (debug, off by default). |
+| triggers OQ 3 | `triggers.md` OQ 3 | Writer scan of every `[reg+0xB0]` store in client code: list complete (three extra sites are a non-unit list link). Message field still `client/msg-units.md`'s. |
+| triggers OQ 4 | `triggers.md` OQ 4 | Event 12 = state 68 `evade` → stat 350 skill → that skill's `stsound` (Dodge/Avoid/Evade: 2,236 `amazon_dodge_1`). |
+| triggers OQ 5 | `triggers.md` OQ 5 | `cltdofunc` 16 (Jab): action frame 3 → `dosound a` (player) / `dosound b` (monster); `cltstfunc` 25 (Charge, SerpentCharge): `dosound a` / monster skill-slot sound. |
+| triggers OQ 8 | `triggers.md` OQ 8 | 0x8A handler conditions (act5pow, act2guard2 with Arcane Sanctuary bits and harem blocker); Nihlathak hurry-up plays at once (deadline test inverted, bug kept), `roll(30)` on the sound seed during a drawn frame. |
+| triggers OQ 10 | `triggers.md` §12 | Partly: 396/397, 452, 2,231, 2,671, 4,640, 4,638 conditions; correction: 4,638 has no unit. |
+| env OQ 4 | `environment.md` OQ 4 | Active = snow-mode flag 0 and the level's `Rain` byte; intensity owned by `render/draw-order-2.md` §11. |
+| wav OQ 2 | `formats/wav.md` OQ 2, §2, §3 | Storm stream path copies bytes unchanged (`0x004157C0` memcpy); correction: stream buffers take the file's own format, and the Storm chunk walk has no length bound. |
 
 ## Still open
 
 | Id | Why |
 |---|---|
-| ST4 / sound-table OQ 12 | natural-end tick depends on real audio time; recording below |
-| ST7 / sound-table OQ 13 | async read completion time; recording below |
-| sound-table OQ 3 | seed interleave confirmed by entry 74, users / order not identified |
-| sound-table OQ 14 | other writers of the device gain G |
+| ST4 / sound-table OQ 12 | natural-end tick depends on real audio time (device side settled, §6.6 r4); recording below |
+| ST7 / sound-table OQ 13 | async read completion time; Storm branch for sound files not settled statically; recording below |
 | sound-table OQ 1, 9, 10 | voice-log conformance; slider mapping (`client/ui.md`); async effect in practice (with OQ 13) |
-| triggers OQ 1, 2, 4, 5, 6, 8, 10, 12, 13 | need the request log replay or the owning features' specs (not settled by this pass); OQ 3 partly |
-| environment OQ 1, 4, 5 | recording replay (entry 74 is partial: no cave, no Blood Raven); weather intensity (weather spec); front end |
-| wav OQ 1, 2 | DirectSound buffer dump (C75, player lane) |
+| triggers OQ 1, 2, 6, 12, 13 | request log replay or the owning features' specs |
+| triggers OQ 3 | message field that fills +0xB0 (`client/msg-units.md`; write watch below) |
+| triggers OQ 10 | 2,458, the `0x004AFF60` death sounds, 2,517, 1,830 not traced this pass |
+| environment OQ 1, 5 | recording replay (entry 74 is partial: no cave, no Blood Raven); front end |
+| wav OQ 1 | DirectSound buffer dump (C75, player lane) |
+| — (size rule) | `sound-table.md` §1–§13 are all claimed by code `Covers:` lines (`crates/d2-client/src/audio/sound_table/tests.rs`), so moving a § would break `coverage.py`; the new material went into a new file `sound-table-2.md` §14 instead and `sound-table.md` stays at 59.5 KB. |
 
 ## CODE-TABLE CHANGE commits
 
@@ -88,6 +101,23 @@ in `C:\Users\zffit\Desktop\D2test\scratch-audio\` (outside the repo).
   `audio/sound-table.md` §8.3 r3); the `GainCurve` must take the
   occlusion (0 or 0.5 targets, 0.05 steps) as an input, not only v and
   pan.
+- to PC 1: `specs/sim/rng.md` §7, row "sound variants, NPC greetings,
+  …"; the same seed is also stepped by the overlay create `0x00470390`
+  for any unit's overlay (type 6: `roll(frames)`; arg a ≠ 0:
+  `roll(a × 256)`; arg b ≠ 0: `roll(b × 16)`, `0x004704DD`,
+  `0x004705B6`, `0x004705D7`), by local-player skill casts through
+  `cltdofunc` entries 5, 24, 32, 34, 54, 56, 63, 71, 77, 82, 86, 87, 89,
+  90 (table `0x00727BA8`) and by the draw-phase users; add a pointer to
+  `audio/sound-table-2.md` §14 (full list).
+- to PC 1: `specs/client/audio.md` §A3; variant / greeting / timer
+  choices cannot be compared by replaying the seed from ticks in 1.14d
+  (the draw phase steps the same seed per frame and the cursor on wall
+  clock, `audio/sound-table-2.md` §14.4); the conformance check must
+  take the recorded seed before each sound draw as input.
+- to PC 1: `specs/render/unit-composite.md` (overlay owner text, "no
+  spec yet; `0x00470390`"); when the overlay spec is written it must
+  own the three draws of `0x00470390` on the local player's seed listed
+  above (`audio/sound-table-2.md` §14.3 states them meanwhile).
 
 ## Recording list
 
