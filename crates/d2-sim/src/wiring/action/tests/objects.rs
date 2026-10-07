@@ -40,6 +40,9 @@ fn tables() -> Arc<ObjectTables> {
     let mut wp = row(17, 23, 0);
     wp.framecnt1 = 10 << 8;
     wp.mode2 = 1;
+    // A 2 × 2 footprint with `BlockMissile`: mask 0x404
+    // (`path-placement.md` §3).
+    (wp.sizex, wp.sizey, wp.blockmissile) = (2, 2, 1);
     let mut levels = vec![blank::<Levels>(); 150];
     levels[LEVEL as usize].monlvl1 = 1;
     Arc::new(ObjectTables {
@@ -169,7 +172,7 @@ fn monster_door_operate_routes_through_the_entry() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/objects.md §4 r1, §4 r2, §14 r1; specs/sim/units.md §6.4
+// Covers: specs/world/objects.md §4 r1, §4 r2, §14 r1, §5.5; specs/sim/units.md §6.4; specs/world/objects-2.md §18.6; specs/sim/path-placement.md §3, §5.1
 #[test]
 fn object_timer_event_reaches_object_event() {
     // Event 1 (ENDANIM) through the game's timer queue: mode 1 → 2 when
@@ -185,6 +188,19 @@ fn object_timer_event_reaches_object_event() {
     });
     let f = r.unwrap().unwrap();
     assert_ne!(f & oflags::CHANGED, 0);
+    // The footprint stamped at (20, 20): box (19..=20, 19..=20).
+    let a = fx.a;
+    let cell = |fx: &mut Fx, x, y| fx.sim.hooks().drlg.collision(&fx.game, a, x, y).unwrap();
+    let boxed = [(19, 19), (20, 19), (19, 20), (20, 20)];
+    let before: Vec<u16> = boxed.iter().map(|&(x, y)| cell(&mut fx, x, y)).collect();
+    let outside = cell(&mut fx, 21, 21);
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        w.stamp_footprint(o, Some(a), 20, 20);
+    });
+    for (x, y) in boxed {
+        assert_eq!(cell(&mut fx, x, y) & 0x404, 0x404, "({x}, {y})");
+    }
+    assert_eq!(cell(&mut fx, 21, 21), outside);
     let rec = fx.sim.sys.units.get(o).unwrap();
     assert_eq!((rec.mode, rec.anim.frame_count), (1, 10 << 8));
     assert!(fx.timers(o).contains(&(oevent::END_ANIM, 7)));
@@ -192,8 +208,10 @@ fn object_timer_event_reaches_object_event() {
     assert_eq!(fx.sim.sys.units.get(o).unwrap().mode, 1);
     fx.frame();
     assert_eq!(fx.sim.sys.units.get(o).unwrap().mode, 2);
-    let log = &fx.sim.hooks().x.log;
-    assert_eq!(log.last().unwrap(), &format!("free footprint {}", o.0));
+    // `0x00623830`: the box cleared at the object's room and position.
+    for (&(x, y), b) in boxed.iter().zip(&before) {
+        assert_eq!(cell(&mut fx, x, y), b & !0x404, "({x}, {y})");
+    }
     fx.assert_clean();
 }
 
@@ -561,4 +579,150 @@ fn host_quests_read_the_missile_range_from_the_action_tables() {
     let mut w = HostQuests::new(EconomyQuests::new(&mut econ, &mut rest));
     assert_eq!(w.missile_range(n as u32 - 1), Some(20));
     assert_eq!(w.missile_range(n as u32), None);
+}
+
+// ---- the drop helpers (`objects-2.md` §20) -------------------------------------------
+
+/// [`drop_fx`] with the pick rows of its one item (gold, index 0) in
+/// `part`'s place: `armor` rows before it (none) and the rest misc.
+fn picks_fx(armor: usize) -> Fx {
+    use crate::treasure::class_pick::{ClassPicks, PickRow};
+    let mut fx = drop_fx();
+    let picks = ClassPicks {
+        rows: vec![PickRow {
+            code: *b"gld ",
+            spawnable: 1,
+            level: 1,
+            rarity: 1,
+            type_: 4,
+            ..PickRow::default()
+        }],
+        weapons: 0,
+        armor,
+    };
+    let h = fx.sim.hooks();
+    let d = h.object_drops.take().unwrap();
+    // A rolled quality (request quality 0, `objects-2.md` §20) reads the
+    // itemratio divisors: 1 each.
+    let mut t = (*d.tables).clone();
+    for r in &mut t.items.itemratio {
+        (r.uniquedivisor, r.raredivisor, r.setdivisor) = (1, 1, 1);
+        (r.magicdivisor, r.hiqualitydivisor, r.normaldivisor) = (1, 1, 1);
+    }
+    let d = crate::wiring::economy::DeathDrops::new(Arc::new(t), d.fields);
+    h.object_drops = Some(Box::new(d.with_picks(Arc::new(picks))));
+    fx
+}
+
+fn room_seed(fx: &Fx) -> Seed {
+    let d = fx.sim.sys.hooks.drlg.dungeon.acts[0].as_ref().unwrap();
+    let r = d.drlg_room_of(fx.a).unwrap();
+    d.active_room(r).unwrap().seed
+}
+
+// Covers: specs/world/objects-2.md §20.3; specs/items/treasure.md §8 r1
+#[test]
+fn the_gold_helper_drops_gold_into_the_room_with_flag_0x2000_clear() {
+    let mut fx = picks_fx(0);
+    let a = fx.a;
+    let mut want_game = fx.sim.hooks().game_seed;
+    want_game.step();
+    want_game.step();
+    let before = room_seed(&fx);
+    fx.sim
+        .objects(&mut fx.game, |_, _, w| w.gold_drop(a, 20, 20));
+    let d = fx.sim.hooks().object_drops.take().unwrap();
+    assert!(
+        d.failures.is_empty() && d.pick_errors.is_empty(),
+        "{:?} {:?}",
+        d.failures,
+        d.pick_errors
+    );
+    assert_eq!(d.placed.len(), 1);
+    let (item, spot) = d.placed[0];
+    assert_eq!((spot.room, spot.x, spot.y), (Some(a), 22, 23));
+    let i = fx.sim.hooks().items.get(item).unwrap();
+    // L = area level 1 (`MonLvl1` 1; > 1 → − 1 does not apply).
+    assert_eq!((i.record, i.ilvl), (0, 1));
+    assert_eq!(i.flags & 0x2000, 0);
+    assert_eq!(fx.sim.hooks().game_seed, want_game);
+    // No pick: the gold helper does not draw on the room seed.
+    assert_eq!(room_seed(&fx), before);
+}
+
+// Covers: specs/world/objects-2.md §20.1, §20.5
+#[test]
+fn the_armor_helper_picks_on_the_room_seed_with_the_superior_flag() {
+    // The one row read as the armor part: rarity 1 − A(1) = 1 → one
+    // `roll(1)`, then the pick `roll(1)`: two room-seed steps.
+    let mut fx = picks_fx(1);
+    let o = create(&mut fx, CHEST, 20);
+    let mut want = room_seed(&fx);
+    want.step();
+    want.step();
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        crate::world::objects::MechWorld::stand_drop(w, o, false)
+    });
+    assert_eq!(room_seed(&fx), want);
+    let d = fx.sim.hooks().object_drops.take().unwrap();
+    assert_eq!(d.placed.len(), 1);
+    let item = d.placed[0].0;
+    assert_eq!(fx.sim.hooks().items.get(item).unwrap().ilvl, 1);
+    // The weapon helper with no weapon part: −1 at once, nothing drawn.
+    let mut fx = picks_fx(1);
+    let o = create(&mut fx, CHEST, 20);
+    let before = room_seed(&fx);
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        crate::world::objects::MechWorld::stand_drop(w, o, true)
+    });
+    assert_eq!(room_seed(&fx), before);
+    assert!(fx
+        .sim
+        .hooks()
+        .object_drops
+        .as_ref()
+        .unwrap()
+        .placed
+        .is_empty());
+}
+
+// Covers: specs/world/objects-2.md §20.4, §20.6; specs/world/objects.md §8 (code drop)
+#[test]
+fn source_and_code_drops_use_the_unit_seed_and_level() {
+    use crate::treasure::class_pick::PickError;
+    // The code drop `C('gld ')`: the code's index, no unit-seed draw,
+    // ilvl = the chest's area level.
+    let mut fx = picks_fx(0);
+    let o = create(&mut fx, CHEST, 20);
+    let seed = fx.sim.sys.units.get(o).unwrap().seed;
+    let gld = u32::from_le_bytes(*b"gld ");
+    let item = fx
+        .sim
+        .objects(&mut fx.game, |_, _, w| {
+            crate::world::objects::ChestWorld::code_drop(w, o, gld)
+        })
+        .flatten()
+        .expect("a gold item");
+    assert_eq!(fx.sim.sys.units.get(o).unwrap().seed, seed);
+    assert_eq!(fx.sim.hooks().items.get(item).unwrap().ilvl, 1);
+    // An unknown code: fatal 0x9EA, nothing created.
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        crate::world::objects::ChestWorld::drop_item_code(w, o, 0x2020_2020)
+    });
+    let d = fx.sim.hooks().object_drops.as_ref().unwrap();
+    assert_eq!(d.pick_errors.len(), 1);
+    assert_eq!(d.placed.len(), 1);
+    // Drop code 0: the random class; the fixture's gold row is index 0,
+    // which `0x00556240` refuses (fatal 0x17F) before its `roll(100)`:
+    // no draw, nothing created.
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        crate::world::objects::MechWorld::drop_code_quality(w, o, 0, 2)
+    });
+    assert_eq!(fx.sim.sys.units.get(o).unwrap().seed, seed);
+    let d = fx.sim.hooks().object_drops.as_ref().unwrap();
+    assert_eq!(
+        d.pick_errors,
+        [PickError::Code(0x2020_2020), PickError::NoGold]
+    );
+    assert_eq!(d.placed.len(), 1);
 }

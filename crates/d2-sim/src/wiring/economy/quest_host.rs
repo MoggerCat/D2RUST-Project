@@ -10,7 +10,7 @@
 //!   through the timer queue `0x005417D0` (event 7 for the quest event),
 //!   the Act I object allocation `0x00555230` with a mode
 //!   ([`View::create_object`]) and the collision free `0x00623830` (the
-//!   object code's footprint seam, `Pending::object_free_footprint`);
+//!   object code's footprint free, `View::free_object_footprint`);
 //! - the level of a unit in a DRLG room (`DrlgWorld::level_id`);
 //! - `0x006280D0(item, 0x10)` on an item of the game's item store;
 //! - `missiles.txt` `Range` from the action tables;
@@ -146,11 +146,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.spawn_object(room, x, y, class, mode)
     }
     /// `0x00623830`: the object code's footprint free
-    /// (`Pending::object_free_footprint`, `objects.md` §8.2, §10).
+    /// (`View::free_object_footprint`, `objects.md` §8.2, §10).
     fn free_object_collision(&mut self, object: UnitId) {
         if self.known(object) {
-            let e = &mut *self.inner.econ;
-            return e.hooks.x.object_free_footprint(e.game, object);
+            self.view(|g, v| v.free_object_footprint(g, object));
+            return;
         }
         self.inner.free_object_collision(object)
     }

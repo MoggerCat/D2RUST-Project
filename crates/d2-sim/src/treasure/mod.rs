@@ -9,6 +9,7 @@
 //! seam and staged inputs ([`GameFacts`], [`Dropper`], [`Recipient`],
 //! [`MonsterRank`], the `quest_open` callback).
 
+pub mod class_pick;
 pub mod drop;
 pub mod quality;
 pub mod runtime;

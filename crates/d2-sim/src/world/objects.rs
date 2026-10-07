@@ -386,8 +386,10 @@ pub trait ObjectWorld {
     fn schedule(&mut self, unit: UnitId, ev: u8, frame: i32);
     /// `0x00540F30`: cancel every timer of the unit.
     fn cancel_timers(&mut self, unit: UnitId);
-    /// `0x00620A70`: stamp the object's footprint (path placement).
-    fn stamp_footprint(&mut self, unit: UnitId);
+    /// `0x00620A70(O, room, x, y)`: stamp the object's footprint at the
+    /// room and point given (§5.5: an init passes its record's; the
+    /// door and the gate O's own; `sim/path-placement.md` §3, §5.1).
+    fn stamp_footprint(&mut self, unit: UnitId, room: Option<RoomId>, x: i32, y: i32);
     /// `0x00623830`: free the object's footprint (path placement).
     fn free_footprint(&mut self, unit: UnitId);
     /// Attach sound `id` to `unit` (no target when `to` is `None`); `now`:
@@ -709,8 +711,8 @@ fn run_init<W: ObjectWorld>(
             Ok(())
         }
         5 => Ok(()),
-        11 => init_town_portal(ctl, t, w, obj, level),
-        12 => init_permanent_portal(ctl, t, w, obj, level),
+        11 => init_town_portal(ctl, t, w, obj, level, room, x, y),
+        12 => init_permanent_portal(ctl, t, w, obj, level, room, x, y),
         8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => {
             mech::init(ctl, t, w, obj, n, room, x, y)
         }
@@ -841,12 +843,16 @@ fn init_chest<W: ObjectWorld>(
 }
 
 /// Init 11 (`0x00550140`, §5.5): town portal.
+#[allow(clippy::too_many_arguments)]
 fn init_town_portal<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
     obj: UnitId,
     level: u32,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
 ) -> Result<(), ObjectError> {
     let act = t.level(level).map_or(0, |l| l.act);
     let town = TOWNS.get(act as usize).copied().unwrap_or(0);
@@ -856,25 +862,29 @@ fn init_town_portal<W: ObjectWorld>(
     let class = ctl.get(obj)?.class;
     ctl.get_mut(obj)?.interact = town as u8;
     if w.mode(obj) == 1 {
-        w.stamp_footprint(obj);
+        w.stamp_footprint(obj, room, x, y);
         schedule_endanim(w, t.object(class)?, obj);
     }
     Ok(())
 }
 
 /// Init 12 (`0x0054FE70`, §5.5): permanent portal.
+#[allow(clippy::too_many_arguments)]
 fn init_permanent_portal<W: ObjectWorld>(
     ctl: &mut ObjectControl,
     t: &ObjectTables,
     w: &mut W,
     obj: UnitId,
     level: u32,
+    room: Option<RoomId>,
+    x: i32,
+    y: i32,
 ) -> Result<(), ObjectError> {
     let class = ctl.get(obj)?.class;
     let o = t.object(class)?;
     if w.mode(obj) == 0 {
         set_mode(t, w, obj, class, 1, true)?;
-        w.stamp_footprint(obj);
+        w.stamp_footprint(obj, room, x, y);
         schedule_endanim(w, o, obj);
     }
     let tomb = w.staff_tomb_level();

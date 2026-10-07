@@ -26,6 +26,9 @@
 //! - [`chest_drop`]: the chest drop `D(Q)` of the object code
 //!   (`treasure.md` §4) the same way, the object the dropper
 //!   ([`object_chest_drop`]).
+//! - [`drop_helpers`]: the object and quest drop helpers
+//!   (`objects-2.md` §20: armor, weapon, gold, by source unit; the code
+//!   drop) the same way.
 //! - [`quest_host`]: the quests' world on the wired host ([`HostQuests`]:
 //!   [`EconomyQuests`] with the object, level, interaction and identify
 //!   calls the action wiring provides).
@@ -39,6 +42,7 @@
 pub mod chest_drop;
 pub mod cube_items;
 pub mod death;
+pub mod drop_helpers;
 pub mod game_fields;
 pub mod item_records;
 pub mod item_stats;
