@@ -424,7 +424,10 @@ fn entry_needs_a_levels_record() {
         x.info.level = level;
         assert!(matches!(
             populate_room(&mut x.ctl, &x.t, &mut x.f, &x.info),
-            Err(ObjectError::NoRow { table: "levels", .. })
+            Err(ObjectError::NoRow {
+                table: "levels",
+                ..
+            })
         ));
     }
 }
@@ -631,7 +634,10 @@ fn fits_and_spot_helpers() {
     cx.info = &narrow;
     assert!(cx.random_spot(10, 1, 1).unwrap().is_none());
     assert_eq!(cx.ctl.seed, s0);
-    assert!(cx.oriented_spot(10, 1, 1, 0, Filter::Shrine).unwrap().is_none());
+    assert!(cx
+        .oriented_spot(10, 1, 1, 0, Filter::Shrine)
+        .unwrap()
+        .is_none());
     assert!(cx.spread_spot(10, 1, 1, Filter::Well).unwrap().is_none());
 }
 
@@ -739,8 +745,11 @@ fn fn1_tries_per_class_and_unknown_class() {
         assert_eq!(x.ctl.seed, e);
     }
     // The class lists: 3 → {3, 28}; 4 → urns; 1 → {79, 53, 1}.
-    for (a, list) in [(3u16, vec![3u16, 28]), (4, vec![4, 9, 52, 94, 95]), (1, vec![79, 53, 1])]
-    {
+    for (a, list) in [
+        (3u16, vec![3u16, 28]),
+        (4, vec![4, 9, 52, 94, 95]),
+        (1, vec![79, 53, 1]),
+    ] {
         let mut x = free_room(&[3, 4, 1]);
         cx_run(&mut x, |c| c.fn1(125, a));
         assert!(!allocs(&x.f).is_empty());
@@ -855,15 +864,14 @@ fn fn1_cluster_walk_matches_reference() {
                 let j = (12 * d) / 256;
                 cx_run(&mut x, |c| c.fn1(d, 4));
                 let (want, seed) = fn1_model(Seed::new(lo, 666), j, accept);
-                let got: Vec<_> = x
-                    .f
-                    .calls
-                    .iter()
-                    .filter_map(|c| match c {
-                        Call::Allocate(_, _, px, py, _) => Some((*px, *py)),
-                        _ => None,
-                    })
-                    .collect();
+                let got: Vec<_> =
+                    x.f.calls
+                        .iter()
+                        .filter_map(|c| match c {
+                            Call::Allocate(_, _, px, py, _) => Some((*px, *py)),
+                            _ => None,
+                        })
+                        .collect();
                 assert_eq!(got, want, "accept {accept} d {d} lo {lo}");
                 assert_eq!(x.ctl.seed, seed, "accept {accept} d {d} lo {lo}");
             }
@@ -1244,15 +1252,14 @@ fn population_allocates_in_mode_0() {
     cx_run(&mut x, |c| c.fn5(125, 46));
     cx_run(&mut x, |c| c.fn6(125, 10));
     cx_run(&mut x, |c| c.fn9(125, 10).map(drop));
-    let modes: Vec<u8> = x
-        .f
-        .calls
-        .iter()
-        .filter_map(|c| match c {
-            Call::Allocate(.., m) => Some(*m),
-            _ => None,
-        })
-        .collect();
+    let modes: Vec<u8> =
+        x.f.calls
+            .iter()
+            .filter_map(|c| match c {
+                Call::Allocate(.., m) => Some(*m),
+                _ => None,
+            })
+            .collect();
     assert!(modes.len() > 5);
     assert!(modes.iter().all(|&m| m == 0));
 }

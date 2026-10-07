@@ -95,7 +95,9 @@ impl MiscWorld for Fake {
         self.stats.get(&(player, PUID)).copied().unwrap_or(0) as u32
     }
     fn expansion(&self) -> bool {
-        self.stats.get(&(UnitId(0), EXPANSION)).is_some_and(|&v| v != 0)
+        self.stats
+            .get(&(UnitId(0), EXPANSION))
+            .is_some_and(|&v| v != 0)
     }
     fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
         bit == 0
@@ -585,13 +587,19 @@ fn portal_partner_destination_and_quest_hook() {
     // position; P's room is a town → the quest hook (level of P → level of
     // the destination room, rule 9) runs before the placement.
     assert_eq!(portal(&mut ctl, &t, &mut f, &op(PORTAL)), Ok(Some(0)));
-    assert!(!f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("spawn"))));
+    assert!(!f
+        .calls
+        .iter()
+        .any(|c| matches!(c, Call::Other(s) if s.starts_with("spawn"))));
     let at = |name: &str| {
         f.calls
             .iter()
             .position(|c| matches!(c, Call::Other(s) if s.starts_with(name)))
     };
-    assert_eq!(f.calls[at("qlc").unwrap()], Call::Other("qlc 20 1 0".into()));
+    assert_eq!(
+        f.calls[at("qlc").unwrap()],
+        Call::Other("qlc 20 1 0".into())
+    );
     assert_eq!(
         f.calls[at("place").unwrap()],
         Call::Other("place 20 5 70 80".into())
@@ -662,7 +670,10 @@ fn portal_class_59_quest_flag_gate() {
         f.stats.insert((UnitId(0), EXPANSION), i32::from(expansion));
         f.stats.insert((P, QBIT + quest), 1);
         portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
-        assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
+        assert!(f
+            .calls
+            .iter()
+            .any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
     }
     // u = O's GUID skips the test; class 60 skips it too.
     for (class, puid) in [(59, 0x55u32), (60, 0x99)] {
@@ -670,7 +681,10 @@ fn portal_class_59_quest_flag_gate() {
         f.rooms.insert(O, RoomId(4));
         f.stats.insert((P, QREC), 1);
         portal(&mut ctl, &t, &mut f, &op(class)).unwrap();
-        assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
+        assert!(f
+            .calls
+            .iter()
+            .any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
     }
     // No partner: the class-59 test is skipped.
     let (mut ctl, mut f) = setup(PORTAL, 1);
@@ -679,7 +693,10 @@ fn portal_class_59_quest_flag_gate() {
     f.stats.insert((UnitId(0), SPAWN), 1);
     ctl.get_mut(O).unwrap().interact = 37;
     portal(&mut ctl, &t, &mut f, &op(59)).unwrap();
-    assert!(f.calls.iter().any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
+    assert!(f
+        .calls
+        .iter()
+        .any(|c| matches!(c, Call::Other(s) if s.starts_with("place"))));
 }
 
 // ------------------------------------------------------------------ §13

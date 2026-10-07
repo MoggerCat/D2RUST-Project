@@ -16,10 +16,13 @@ impl ChestWorld for Fake {
         self.unit_types.get(&unit).copied()
     }
     fn unit_class(&self, unit: UnitId) -> Option<u32> {
-        self.unit_classes.get(&unit).copied().or_else(|| match self.operator(unit) {
-            Operator::Player(c) => Some(u32::from(c)),
-            _ => None,
-        })
+        self.unit_classes
+            .get(&unit)
+            .copied()
+            .or_else(|| match self.operator(unit) {
+                Operator::Player(c) => Some(u32::from(c)),
+                _ => None,
+            })
     }
 }
 

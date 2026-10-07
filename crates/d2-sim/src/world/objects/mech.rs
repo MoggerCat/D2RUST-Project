@@ -9,8 +9,8 @@
 
 use crate::units::{RoomId, UnitId};
 
-use super::misc::stat;
 use super::chests::{reach_distance, trap_arm, unit_type, ChestWorld};
+use super::misc::stat;
 use super::{
     clear_selectable, frame_cnt, schedule_endanim, selectable, set_mode, sound, MiscWorld,
     ObjectControl, ObjectError, ObjectTables, ObjectWorld, Operate,

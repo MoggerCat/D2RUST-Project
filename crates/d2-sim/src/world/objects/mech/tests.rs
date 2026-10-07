@@ -26,7 +26,10 @@ impl MechWorld for Fake {
     fn remove_cursor_item(&mut self, player: UnitId, item: UnitId) -> bool {
         self.calls
             .push(Call::Other(format!("uncursor {} {}", player.0, item.0)));
-        !self.stats.get(&(item, NO_UNCURSOR)).is_some_and(|&v| v != 0)
+        !self
+            .stats
+            .get(&(item, NO_UNCURSOR))
+            .is_some_and(|&v| v != 0)
     }
     fn item_subtype(&self, item: UnitId) -> u8 {
         self.stats.get(&(item, SUBTYPE)).copied().unwrap_or(0) as u8
@@ -80,7 +83,11 @@ impl MechWorld for Fake {
         _size: i32,
         _mask: u32,
     ) -> Option<(RoomId, i32, i32)> {
-        if self.stats.get(&(UnitId(0), NO_FREE_POINT)).is_some_and(|&v| v != 0) {
+        if self
+            .stats
+            .get(&(UnitId(0), NO_FREE_POINT))
+            .is_some_and(|&v| v != 0)
+        {
             return None;
         }
         Some((room, x, y))
@@ -88,7 +95,10 @@ impl MechWorld for Fake {
     fn place_unit(&mut self, unit: UnitId, room: RoomId, x: i32, y: i32) -> bool {
         self.calls
             .push(Call::Other(format!("place {} {} {x} {y}", unit.0, room.0)));
-        !self.stats.get(&(UnitId(0), PLACE_FAILS)).is_some_and(|&v| v != 0)
+        !self
+            .stats
+            .get(&(UnitId(0), PLACE_FAILS))
+            .is_some_and(|&v| v != 0)
     }
     fn recount_tomes(&mut self, player: UnitId) {
         self.calls
@@ -768,7 +778,10 @@ fn gold_placeholder_room_lookup_drifts() {
     assert!(!drift.is_empty());
     assert_ne!(drift, naive, "the vector exercises the drift");
     assert_eq!(
-        others(&f).into_iter().filter(|s| s.starts_with("gold")).collect::<Vec<_>>(),
+        others(&f)
+            .into_iter()
+            .filter(|s| s.starts_with("gold"))
+            .collect::<Vec<_>>(),
         drift
     );
     assert_eq!(c.seed, e);
@@ -831,8 +844,7 @@ fn stairs_warp_searches_own_then_adjacent_rooms() {
         // Mode 2, no tile in O's room: the adjacency rooms in order, O's
         // room skipped.
         let (mut c, mut f) = setup(CLASS, 2, fn_, &mut t);
-        f.adjacent
-            .insert(ROOM, vec![ROOM, RoomId(4), RoomId(5)]);
+        f.adjacent.insert(ROOM, vec![ROOM, RoomId(4), RoomId(5)]);
         tile(&mut f, 5, 52);
         tile(&mut f, 4, 51);
         assert_eq!(

@@ -11,12 +11,12 @@ use std::sync::Arc;
 use d2_data::tables::{Levels, Objects};
 
 use super::*;
-use crate::monsters::ai::{AiModes, AiTargets};
 use crate::combat::CombatWorld;
-use crate::world::objects::MiscWorld;
+use crate::monsters::ai::{AiModes, AiTargets};
 use crate::skills::SkillUnits;
 use crate::units::record::flags as uflags;
 use crate::wiring::action::{ObjectCase, ObjectRoute};
+use crate::world::objects::MiscWorld;
 use crate::world::objects::{
     self as obj, oevent, oflags, Dispatch, ObjectTables, ObjectWorld, Operate, Route,
 };
@@ -855,5 +855,8 @@ fn curable_state_removal() {
     // Nothing left to remove: 0, and no draws on any seed.
     let before = fx.sim.hooks().objects.as_ref().unwrap().control.seed;
     assert!(!cure(&mut fx));
-    assert_eq!(fx.sim.hooks().objects.as_ref().unwrap().control.seed, before);
+    assert_eq!(
+        fx.sim.hooks().objects.as_ref().unwrap().control.seed,
+        before
+    );
 }
