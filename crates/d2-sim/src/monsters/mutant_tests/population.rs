@@ -405,19 +405,26 @@ fn superunique_hcidx_spawns() {
         assert_eq!([276, 382, 385, 389].map(n), [1; 4]);
     }
     // hcIdx 60: owner data, then class-for-level(453) (here 454 by the mon
-    // list, §11.6 r2), 1, 10, 20, 0x40.
+    // list, §11.6 r2), mode 1, r 10, 20 spawns, 0x40 (open question 4).
     t.levels[2].mon = vec![454];
     t.monstats[454].base_id = 453;
     let (f, b) = su_hc(60, Seed::init(), &mut t);
-    let owner = f.log.iter().position(|l| *l == format!("suowner {}", b.0));
-    let group = f
-        .log
-        .iter()
-        .position(|l| *l == format!("group {} 454 1 10 20 0x40", b.0));
+    let boss_owner = format!("owner {} Guid({b:?}) 1 0 0", b.0);
+    let owner = f.log.iter().position(|l| *l == boss_owner);
+    let members: Vec<_> = (0..f.units.len())
+        .map(|i| UnitId(i as u32))
+        .filter(|&u| f.unit(u).class == 454)
+        .collect();
+    assert_eq!(members.len(), 20);
+    let first = format!("owner {} Guid({b:?}) 1 0 0", members[0].0);
+    let group = f.log.iter().position(|l| *l == first);
     assert!(owner.is_some() && owner < group);
-    // hcIdx 62: 381, 1, 20, 10, 0x40.
-    let (f, b) = su_hc(62, Seed::init(), &mut t);
-    assert!(f.log.contains(&format!("group {} 381 1 20 10 0x40", b.0)));
+    for m in &members {
+        assert!(f.log.contains(&format!("minion {} {}", b.0, m.0)));
+    }
+    // hcIdx 62: 381, mode 1, r 20, 10 spawns, 0x40.
+    let (f, _) = su_hc(62, Seed::init(), &mut t);
+    assert_eq!(f.units.iter().filter(|u| u.class == 381).count(), 10);
 }
 
 /// The preset class of special id `id` with the fake tables (M 600, S 10).

@@ -30,10 +30,10 @@ impl<X: Pending> View<'_, X> {
     /// `0x0056D2C0` (`skills/bodies.md` §2.4): the path's target unit's
     /// position, else the path target point; `Some(None)` when either
     /// coordinate is 0.
-    ///
-    /// TODO(spec: skills/bodies.md §2.4): a stale target unit (GUID no
-    /// longer found) is not described; the stored unit's position is read
-    /// only while it resolves (as `path_target`), else the point.
+    // PROVISIONAL (skills/bodies.md §2.4): a stale target unit (GUID no
+    // longer found) falls through to the path target point; the stored
+    // unit's position is read only while it resolves (as `path_target`);
+    // settled by a bin read of `0x0056D2C0`.
     pub(crate) fn path_target_position(
         &self,
         game: &Game,
@@ -67,9 +67,9 @@ impl<X: Pending> View<'_, X> {
 
     /// Step counts `0x00648E70`: distance budget (+0x90) and max path
     /// distance (+0x91) := n, capped at 77 (`skills/bodies-2.md` §2.3).
-    ///
-    /// TODO(spec: skills/bodies-2.md §2.3): a negative n is not described
-    /// (callers pass frame counts); it is stored as its low byte.
+    // PROVISIONAL (skills/bodies-2.md §2.3): a negative n is unreachable
+    // (callers pass frame counts); it would be stored as its low byte;
+    // settled by none needed.
     pub(crate) fn path_set_step_counts(&mut self, unit: UnitId, n: i32) -> Option<()> {
         let p = self.h.paths.as_mut()?;
         if let Some(d) = p.dynamic_mut(unit) {
@@ -82,13 +82,12 @@ impl<X: Pending> View<'_, X> {
 
     /// `0x00621DC0(unit, x, y)` → `0x0064FDC0` (`skills/bodies-3.md`
     /// §3.8): the direction vector's direction (`pathing.md` §8.3 rules
-    /// 1–3) from the unit's position to (x, y).
-    ///
-    /// TODO(spec: skills/bodies-3.md §3.8): the coordinates `0x0064FDC0`
-    /// feeds §8.3 (sub-tile position or the path's 16.16 one, and the
-    /// target's fraction) are not stated; sub-tiles are used (equal to
-    /// 16.16 whenever both fractions match). §8.3 rule 4 (`0x0064FED5`)
-    /// is the §8.4 caller's and is not applied.
+    /// 1–3) from the unit's position to (x, y). §8.3 rule 4
+    /// (`0x0064FED5`) is the §8.4 caller's and is not applied.
+    // PROVISIONAL (skills/bodies-3.md §3.8): `0x0064FDC0` is fed
+    // sub-tile coordinates (not the path's 16.16 ones; equal whenever
+    // both fractions match); settled by a bin read and a direction trace
+    // (RNG-free; matters only if a direction diverges).
     pub(crate) fn path_dir64(&self, unit: UnitId, at: (i32, i32)) -> Option<i32> {
         let p = self.h.paths.as_ref()?;
         let (x, y) = self.h.path_position(unit);

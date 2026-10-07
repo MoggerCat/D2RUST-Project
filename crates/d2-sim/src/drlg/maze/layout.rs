@@ -328,9 +328,9 @@ pub(super) fn stamps(gen: &mut Gen<'_>, kinds: &[&'static str]) -> Result<(), Ma
     Ok(())
 }
 
-// TODO(spec: maze.md §6): a level of the type that the spec's table does
-// not list draws r and stamps nothing here (no such maze level in 1.14d
-// data).
+// PROVISIONAL (drlg/maze.md §6): a level of a type the spec's table does
+// not list draws r and stamps nothing; settled by none (no such maze level
+// in 1.14d data).
 
 /// Cave `0x00672550`.
 pub(super) fn cave(gen: &mut Gen<'_>) -> Result<(), MazeError> {

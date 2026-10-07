@@ -243,9 +243,11 @@ pub(super) fn pet_move<W: AiHost + ?Sized>(
             for _ in 0..8 {
                 let j = PET_J[e];
                 let q = (f.0 + 8 * DIR_DX[j], f.1 + 8 * DIR_DY[j]);
-                // TODO(spec: ai-bodies-6.md §2 pet move k 0): "Else the same
-                // to the midpoint" is read as the alternative of the
-                // coordinate-index test (Q in another area → the midpoint).
+                // PROVISIONAL (monsters/ai-bodies-6.md §2 pet move k 0):
+                // "Else the same to the midpoint" is the else of the
+                // coordinate-index test (Q in another area → the midpoint);
+                // settled by a pet-move recording. HIGH-PRIORITY CAPTURE
+                // (RNG draw order).
                 if cx.world.coord_index(game, o_room, q.0, q.1) == c0 {
                     set_velocity(cx, u, 0, speed, 40);
                     if go_del(game, cx, u, run && !hire, q.0, q.1) {
@@ -744,7 +746,7 @@ pub fn evil_hole<W: AiHost + ?Sized>(
                         set_param(cx, u, 1, n - 1);
                         cx.world.set_unit_flag(c, 0x0402_0000);
                         if cx.world.class(u) == DEMONHOLE {
-                            cx.world.set_state(c, STATE_UBERMINION, true);
+                            cx.world.set_state(game, c, STATE_UBERMINION, true);
                             cx.world.start_overlay(c, OVERLAY_UBERMINION);
                         }
                     }
@@ -786,7 +788,7 @@ pub fn hireable<W: AiHost + ?Sized>(
     };
     // 2.
     if cx.world.has_state(u, STATE_12) {
-        cx.world.set_state(u, STATE_12, false);
+        cx.world.set_state(game, u, STATE_12, false);
     }
     // 3. Nothing scheduled.
     let m = cx.world.anim_mode(u);
@@ -1048,9 +1050,8 @@ pub fn quill_mother<W: AiHost + ?Sized>(
     // 1.
     if cx.ai_state_set(u) {
         let ty = t.and_then(|t| type_of(game, t)).map_or(6, |ty| ty as i32);
-        // TODO(spec: ai-bodies-6.md §8 step 1): params 3 and 4 are
-        // uninitialised stack words in 1.14d; 0 here (no minion AI reads
-        // them).
+        // Params 3 and 4 are not written (uninitialised stack words in
+        // 1.14d, read by no minion AI; `ai-bodies-6.md` §8 step 1); 0 here.
         let cmd = AiCommand {
             params: [1, ty, guid_of(game, t), 0, 0],
         };
@@ -1320,22 +1321,23 @@ pub fn desert_turret<W: AiHost + ?Sized>(
         idle(game, cx, u, 15);
         return;
     }
-    // 4.
-    // TODO(spec gap): the direction toward target 0 (target mode 1 always
-    // has one) is 0.
-    let e = dir8(p.target.map_or(0, |t| cx.world.direction64(u, t)));
+    // 4. T = 0 is unreachable (target mode 1, `ai.md` §2.3 "Target 0 in
+    // mode-1 and mode-4 bodies"): asserted, not handled.
+    let t = p
+        .target
+        .expect("DesertTurret think without a target (ai.md §2.3)");
+    let e = dir8(cx.world.direction64(u, t));
     let j = TURRET_J[e][param(cx, u, 2).rem_euclid(8) as usize];
     set_param(cx, u, 2, j);
     let a5 = cx.aip(p, 5);
     let (ox, oy) = cx.world.position(u);
     let (vx, vy) = TURRET_V[j as usize];
     let (qx, qy) = (ox.wrapping_add(a5 * vx), oy.wrapping_add(a5 * vy));
-    if let Some(t) = p.target {
-        cx.world.set_path_target(u, t);
-    }
+    cx.world.set_path_target(u, t);
     // 5.
-    // TODO(spec: ai-bodies-6.md §13 step 5): the check at the own position
-    // is read as `0x005FD470(Skill1, T, own x, own y)`.
+    // PROVISIONAL (monsters/ai-bodies-6.md §13 step 5): the check at the
+    // own position is `0x005FD470(Skill1, T, own x, own y)`; settled by a
+    // bin read of 0x005E0980.
     if s1 >= 0
         && cx.world.skill_check(game, u, s1, p.target, qx, qy)
         && cx.world.skill_check(game, u, s1, p.target, ox, oy)
@@ -1433,7 +1435,7 @@ pub fn assassin_sentry<W: AiHost + ?Sized>(
     };
     // 3.
     if cx.world.has_state(u, STATE_12) {
-        cx.world.set_state(u, STATE_12, false);
+        cx.world.set_state(game, u, STATE_12, false);
     }
     // 4.
     let (s, e2, _) = cx.world.secondary_target(game, u);
@@ -1952,8 +1954,10 @@ fn spirit_wolf<W: AiHost + ?Sized>(
             return;
         }
     }
-    // TODO(spec: ai-bodies-6.md §24.1 step 7): the pet follow is read as
-    // following the d > aip3 tests whatever d (its own sentence).
+    // PROVISIONAL (monsters/ai-bodies-6.md §24.1 step 7): the pet follow is
+    // evaluated after the d > aip3 tests whatever d (its own sentence);
+    // settled by a DruidWolf recording. HIGH-PRIORITY CAPTURE (RNG draw
+    // order).
     if pet_follow(game, cx, u, s, o, m, true, 6) {
         return;
     }
@@ -2119,9 +2123,10 @@ pub fn cycle_of_life<W: AiHost + ?Sized>(
     let mut dk = 0;
     if s1 > 0 {
         if let Some(row) = skill_row(cx, s1) {
-            // TODO(spec: ai-bodies-6.md §25 step 4): "the unit has its
-            // entry" is read as the highest entry (`0x006439F0`) and its
-            // level with bonus.
+            // PROVISIONAL (monsters/ai-bodies-6.md §25 step 4): "the unit
+            // has its entry" is the highest entry (`0x006439F0`) and its
+            // level with bonus (skills/levels.md highest_entry); settled by
+            // a bin read.
             if let Some(lvl) = cx.world.skill_level(u, s1, true) {
                 let n = cx
                     .world

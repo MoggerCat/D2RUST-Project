@@ -1847,15 +1847,29 @@ fn run_with(game_seed: u32) -> Transcript {
     // 0x07 is followed by the add messages of its units
     // (`intents-events.md` §7.8 rule 2): the waypoint's 0x51 (type 2,
     // class 0, its position, mode 1, interact 0: no object data in this
-    // game) after its room's; Akara (a monster) and the player send none
-    // (§7.2 monster part: not specified; the client's own player is
-    // skipped). This staged game sends no 0x03, so the client refuses
+    // game) after its room's. Each monster (the preset monster, GUID 2,
+    // then Akara, GUID 1, class 148) sends §7.2 part A: 0xAC
+    // (`monsters/init.md` §24: life 128, a one-byte stream of mode 1 and
+    // no optional blocks), 0xAA (its states: none), then part B's mode
+    // message (mode 1: 0x6D, §7.4 rule 5). The client's own player is
+    // skipped. This staged game sends no 0x03, so the client refuses
     // each 0x07 (fatal 0x58A).
     record(&mut fx, &mut frames, vec![]);
     let mut want: Vec<Vec<u8>> = [(8000, 8000), (8000, 8008), (8008, 8000), (8008, 8008)]
         .map(|(x, y)| map_reveal(x, y, ISLE))
         .to_vec();
     want.insert(1, assign_object(wp, 0, WP_AT, 1, 0));
+    let monster_adds: [Vec<u8>; 6] = [
+        vec![0xAC, 2, 0, 0, 0, 0, 0, 76, 156, 74, 156, 128, 14, 1],
+        vec![0xAA, 1, 2, 0, 0, 0, 8, 0xFF],
+        vec![0x6D, 2, 0, 0, 0, 76, 156, 74, 156, 128],
+        vec![0xAC, 1, 0, 0, 0, 148, 0, 86, 156, 86, 156, 128, 14, 1],
+        vec![0xAA, 1, 1, 0, 0, 0, 8, 0xFF],
+        vec![0x6D, 1, 0, 0, 0, 86, 156, 86, 156, 128],
+    ];
+    for (i, m) in monster_adds.into_iter().enumerate() {
+        want.insert(1 + i, m);
+    }
     assert_eq!(frames[0].2, want);
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 4);
     let monsters = fx.monsters();
@@ -2539,11 +2553,19 @@ fn run_with(game_seed: u32) -> Transcript {
     // join's four 0x07, the warp's one and the six of its room switch,
     // the switch's four 0x08. The NPC / quest / trade ids are handled
     // now (`client/msg-ui.md` §5, §12, §16, §18: 0x27, 0x29, 0x28, 0x2A
-    // ×2), and Akara's harness add (0xAC) too: 14 + 6.
+    // ×2), and Akara's harness add (0xAC) too: 14 + 6; the join's monster
+    // adds (`intents-events.md` §7.2) add 4: two 0xAC (the client
+    // creates nothing from them yet: no `ClientTables` monster rows,
+    // `msg-units.md` §1.2 rule 2) and two 0xAA. The preset monster's 0x6D
+    // is dropped like its 0x69s (not in the model); Akara's is queued on
+    // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
-    assert_eq!(log.handled, 20);
-    assert_eq!(log.dropped, BTreeMap::from([(0x0D, 1), (0x69, 2)]));
-    assert_eq!((log.queued, log.drained), (0, 0));
+    assert_eq!(log.handled, 24);
+    assert_eq!(
+        log.dropped,
+        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
+    );
+    assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
     let rejected: Vec<(u8, String)> = log
         .rejected

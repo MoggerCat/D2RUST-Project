@@ -111,6 +111,19 @@ pub struct SpawnPoint {
     pub active: Option<RoomId>,
 }
 
+/// The client build cursor C (drlg +0x460, `rooms.md` §4.6 rules 6–9).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BuildCursor {
+    /// Zero at allocation: rule 6 moves it to the first status-2 room.
+    #[default]
+    None,
+    /// The status-2 list's head node (drlg +0x278), which reads status 2
+    /// (rule 9) and so is kept by rule 6.
+    Head,
+    /// A DRLG room.
+    Room(DrlgRoomId),
+}
+
 /// One act's DRLG (`levels.md` §1, 0x48C bytes) and everything it owns.
 #[derive(Clone, Debug)]
 pub struct Drlg {
@@ -138,9 +151,9 @@ pub struct Drlg {
     pub builds_since_update: u8,
     /// Client build timer T (+0x45C, u8; `rooms.md` §4.6 rule 2).
     pub build_timer: u8,
-    /// Client build cursor C (+0x460; `rooms.md` §4.6 rule 2): a DRLG
-    /// room, or `None` for none and for the status-2 list's head node.
-    pub build_cursor: Option<DrlgRoomId>,
+    /// Client build cursor C (+0x460; `rooms.md` §4.6 rule 2): none at
+    /// allocation, a DRLG room, or the status-2 list's head node.
+    pub build_cursor: BuildCursor,
     /// Freed-room counter (+0x468).
     pub freed_rooms: u32,
     pub(super) levels: Vec<Level>,
@@ -173,7 +186,7 @@ impl Drlg {
             rooms_built: 0,
             builds_since_update: 0,
             build_timer: 0,
-            build_cursor: None,
+            build_cursor: BuildCursor::None,
             freed_rooms: 0,
             levels: Vec::new(),
             level_head: None,
