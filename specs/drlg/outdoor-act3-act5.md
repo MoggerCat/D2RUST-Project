@@ -31,9 +31,9 @@
 | Constants & data dependencies | 370–391 |
 | Randomness | 392–426 |
 | Edge cases & original bugs | 427–450 |
-| Test vectors | 451–504 |
-| Provenance | 505–529 |
-| Open questions | 530–557 |
+| Test vectors | 451–524 |
+| Provenance | 525–550 |
+| Open questions | 551–586 |
 <!-- /index -->
 
 ## Summary
@@ -451,7 +451,9 @@ draws only in its room pass (15 × `roll(1)` plus `preset.md`).
 ## Test vectors
 
 **Derived from these rules** (a scratch simulation of §2, §3 and
-`outdoor.md` §2/§9.2; not recorded; CI-safe once the code exists).
+`outdoor.md` §2/§9.2; CI-safe once the code exists). The creation rows
+(draw counts, seed after, rects, block ids, clearings, Kurast chain)
+are recorded below.
 Input: init seed 644409375, difficulty 0 → DRLG seed after the start
 and jungle-link draws {1406222081, 1674353446} (`levels.md` vectors);
 docks (1000, 1000, 64, 48); SX 64, SY 192.
@@ -478,6 +480,24 @@ dwStartSeed 4014346869; stamps as (cell x, cell y, P, F):
 
 Rooms then: 76 and 78: 11 preset rooms, no outdoor room; 77: 10 preset
 rooms and 32 outdoor rooms (blocks 3 and 6 have id 0).
+
+**Recorded Act III creation** (`pc2rec-d1-rng`, TestSor, `-seed`
+644409375, sha256 8ac70b456cea9732…, Act III via waypoint; block ids
+from the same seed by `autostart.py --try TestSor --seed 644409375`,
+`dumpdrlg` of the +0x1BC array, log D1b of `pc2-rec-lane.md`):
+
+| Item | Recorded | Derived row |
+|---|---|---|
+| DRLG-seed draws | 246 at `0x00677966`–`0x006784D9` = 123 server + 123 client; DRLG seed after {4015082244, 577631236} | draw counts: equal |
+| 76 | (1000, 808, 64, 192); +0x1B8 3; ids 541, 533, 543, 565, 570, 582, 571, 575, 570, 575, 537, 0 | equal |
+| 77 | (936, 744, 64, 192); +0x1B8 3; ids 554, 577, 541, 0, 539, 534, 0, 541, 576, 569, 576, 566 | equal |
+| 78 | (1000, 616, 64, 192); +0x1B8 2; ids 0, 533, 535, 565, 570, 582, 539, 534, 558, 565, 541, 581 | equal |
+| Kurast chain | 79 (992, 552, 80, 64), 80 (992, 488), 81 (992, 424), 82 (1008, 408, 48, 16), 83 (1000, 344, 64, 64) | equal |
+| level +0x08 of 76, 77, 78 (client copy, at the docks) | 192 each | not the 11 / 42 / 11 rooms above: what +0x08 counts for jungle levels is OQ 3 |
+
+Mass check: `check_drlg_acts` on 12 more seeds × Acts I–III
+(`pc2rec-d2-sweep.log`, 36 records, 271 level seeds) 0 errors; the
+jungle bit is 0 for seed 555, 1 for the others.
 
 Act V placement, same init seed (`outdoor.md` §2.4, derived): A5 copy
 draws 1406222081 (B1: R0 1 → 160×64) and 3154683627 (B2: R0 1, offset
@@ -524,19 +544,28 @@ stamp list and draw sequence equal the recording.
   return value, level 78.
 - **Live data**: `traces/raw/20261006-115547-tables/leveldefs.bin`,
   `game/extracted/patch_d2/.../lvlprest.txt`.
-- No Act III / Act V recording exists (`traces/raw/` checked: only Act I
-  DRLG draws in `20261005-232125-rng.jsonl`).
+- **Recorded** (2026-10-08): Act III creation in `pc2rec-d1-rng`
+  (PC 2 recording lane, kept on PC 2) and the D1b block-id log; no
+  Act III level build and no Act V recording yet.
 
 ## Open questions
 
 1. Record entering Act 3 (DRLG-seed draws at `0x00677966`…`0x006784D9`)
    and read levels 76..78 +0x1C..+0x28, +0x1B8, +0x1BC to confirm §2 and
    the derived vector (supersedes `outdoor.md` OQ 4 and 7).
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)*: draws, DRLG seed
+   after, rects, clearings, block ids and the Kurast chain equal the
+   derived vector (Test vectors, "Recorded Act III creation"); `outdoor.md`
+   OQ 4 and 7 are closed with it.
 2. Can any seed give a river block two attach bits (edge case 1)?
    Settle by enumerating §2 over all jungle-link-time DRLG seeds reachable
    from 32-bit init seeds, or by a recording that hits fatal 0x78C.
 3. Record a build of 76..78 (stamps, room count: are id-0 blocks 16
    outdoor rooms each?) and of 111, 112, 117 (`outdoor.md` OQ 9).
+   Still open (2026-10-08): `pc2rec-d1-rng` reads level +0x08 = 192 on
+   76, 77 and 78 at the docks (before any build), not 11 / 42 / 11, so
+   +0x08 is not the room count there; a build of 76..78 is still
+   needed. Act V is not reachable with the TestSor save.
 4. *Answered* (`impl-drlg-act3-5` Q1): lookups outside rows 1..14 of T
    (row 0, rows 545..572, a third bit) are §2.7's table "Lookups outside
    rows 1..14": 0 → fatal 0x78C, V(r) stored then a crash in §3, a third

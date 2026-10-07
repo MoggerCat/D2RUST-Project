@@ -38,9 +38,9 @@
 | Constants & data dependencies | 655–675 |
 | Randomness | 676–694 |
 | Edge cases & original bugs | 695–719 |
-| Test vectors | 720–763 |
-| Provenance | 764–796 |
-| Open questions | 797–857 |
+| Test vectors | 720–771 |
+| Provenance | 772–804 |
+| Open questions | 805–875 |
 <!-- /index -->
 
 ## Summary
@@ -724,8 +724,8 @@ Synthetic (from the rules and `rng.md`; CI-safe):
 | Input | Expected | Source |
 |---|---|---|
 | init seed 644409375 | DRLG seed {644409375, 666}; `dwStartSeed` 4014346869; DRLG seed after {4014346869, 268778232} | §3 |
-| same, act index 1 | tries: (5, 4) → staff tomb 71, boss tomb 70, 2 draws | §3.4 (computed, not yet observed) |
-| same, act index 2 | jungle bit 1 (`lo'` 1406222081) | §3.4 (computed) |
+| same, act index 1 | tries: (5, 4) → staff tomb 71, boss tomb 70, 2 draws | §3.4; recorded (`pc2rec-d1-rng`, TestSor, `-seed` 644409375, sha256 8ac70b456cea9732…): `0x00642E73` lo' 1406222081 (mod 7 = 5), `0x00642EA6` lo' 3154683627 (mod 7 = 4), one try; drlg +0x94 = 71, +0x484 = 70 |
+| same, act index 2 | jungle bit 1 (`lo'` 1406222081) | §3.4; recorded (`pc2rec-d1-rng`): one draw `0x00642EFF` lo' 1406222081, +0x474 = 1; Act IV no draw; every act's `dwStartSeed` 4014346869; server (seq 36430, 62907) and client copy (48902, 65279) equal |
 | start 4014346869, level 1 | level seed {4014346870, 666}; first room seed {2928842600, 666}, its `dwInitSeed` 4134077858; second room seed {1513463342, 666} | §4.3, `rooms.md` §2 |
 | level ids 39, 40, 109, 1024 | acts 0, 1, 4, 0 | §6.3 |
 | lvlwarp request (id 0, 'b') | row "Act 1 Wilderness to Cave Cliff L" (first row with Id 0) | §7.4 |
@@ -756,6 +756,14 @@ chaining):
 
 Resulting server level list (head first) after act creation: 16, 15, 14,
 13, 12, 11, 10, 9, 8, 5, 27, 6, 7, 26, 39, 17, 1, 2, 3, 4.
+
+Recorded spawn-room choice (§10; `pc2rec-d1-rng`, TestSor, `-seed`
+644409375, sha256 8ac70b456cea9732…, server only):
+
+| Arrival | Draws in `0x0066AC00`–`0x0066AD80` | Rule |
+|---|---|---|
+| game start, Rogue Encampment (1) | one at `0x0066ACB3` (seq 2546) on the level seed, {1946398892, 1447840265} → {2374762085, 811828125}: tile index ≠ 13 with n > 0 | §10 step 2 |
+| waypoint to Lut Gholein (40), Kurast Docks (75), Pandemonium Fortress (103) | none: tile index 13, waypoint room | §10 steps 2, 4 |
 
 Comparison (exact): for each created act, the DRLG seed state after
 creation, `dwStartSeed`, the act choices, and the level list (ids, head
@@ -799,6 +807,11 @@ first) with each level's seed state, equal the recorded game.
 1. Act II tomb choice and Act III jungle bit: record entering Act 2 and
    Act 3 (draws at `0x00642E73`–`0x00642ED5`, `0x00642F04`; read drlg
    +0x94, +0x484, +0x474) to confirm the computed vectors.
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)*: both vectors
+   observed as computed (Test vectors, act index 1 / 2); the jungle-bit
+   draw site is `0x00642EFF`. `check_drlg_acts` D1–D7 0 errors on the
+   trace and on 12 more seeds × Acts I–III (`pc2rec-d2-sweep.log`, 36
+   records, 271 level seeds).
 2. *Answered* (static): `0x00642920` never overflows in 1.14d. Its only
    callers are the link driver (`0x006772C0`, four sites: both link
    columns, both ways; skipped in Act V) and the adjacency warps
@@ -820,6 +833,11 @@ first) with each level's seed state, equal the recorded game.
 3. Does the server call the spawn-room choice (§10) with index ≠ 13 for
    levels with `Position` ≠ 0 (town arrivals)? Record a town arrival and
    an act change: draws at `0x0066ACB0`–`0x0066ACE0` on the level seed.
+   *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)* for game start
+   and waypoint arrivals (Test vectors, "Recorded spawn-room choice"):
+   the game-start town arrival uses an index ≠ 13 (one `roll(n)` draw
+   at `0x0066ACB3`), waypoint arrivals use 13 (no draw). An act change
+   by NPC (Warriv) is not recorded.
 4. *Answered:* warp-room centres (+0x1E0) are read only through
    `0x0061AC10` (§11.5 item 3), whose only caller is `0x0054DB50`, called
    only from `0x0054DC40` (`monsters/population.md` §8, owner of the
