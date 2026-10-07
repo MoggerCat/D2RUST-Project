@@ -190,11 +190,15 @@ fn game_send_limit() {
 #[test]
 fn split_and_unowned() {
     let (mut b, _) = bridge();
-    let r = b.receive_chunk(&[0x61, 0x07, 0x5F, 1, 2, 3, 4]).unwrap();
+    // 0x79 (6 bytes) and 0x8B (6 bytes): out-of-scope ids, unowned
+    // (`bridge.md` §6 rule 7).
+    let r = b
+        .receive_chunk(&[0x79, 1, 2, 3, 4, 5, 0x8B, 1, 2, 3, 4, 5])
+        .unwrap();
     assert_eq!((r.messages, r.unowned, r.handled), (2, 2, 0));
     let log = b.log();
-    assert_eq!(log.unowned.get(&0x61), Some(&1));
-    assert_eq!(log.unowned.get(&0x5F), Some(&1));
+    assert_eq!(log.unowned.get(&0x79), Some(&1));
+    assert_eq!(log.unowned.get(&0x8B), Some(&1));
     assert!(log.discarded.is_empty());
     assert_eq!(b.world(), &ClientWorld::default());
 }
@@ -370,10 +374,11 @@ fn dispatch_table_matches_spec() {
 fn dispatch_check_catches_perturbations() {
     let rows = dispatch::parse(dispatch::TSV).unwrap();
     let mut owned = rows.clone();
-    owned[0x61].owner = Some("specs/client/x.md".into());
+    // 0x75: an out-of-scope id (`bridge.md` §6 rule 7), unowned.
+    owned[0x75].owner = Some("specs/client/x.md".into());
     assert_eq!(
         dispatch::check(&owned, dispatch::HANDLERS),
-        vec![Mismatch::NoHandler { id: 0x61 }]
+        vec![Mismatch::NoHandler { id: 0x75 }]
     );
     let mut moved = rows.clone();
     moved[0x1A].owner = Some("specs/client/x.md".into());
@@ -684,24 +689,30 @@ fn owned_rows_are_exactly_the_registered_handlers() {
         .collect();
     let registered: Vec<(u8, &str)> = dispatch::HANDLERS.iter().map(|h| (h.id, h.owner)).collect();
     assert_eq!(owned, registered);
-    // The three client model specs own 53 ids (0x7A, 0x81: model §14);
-    // `msg-skills.md` 4 (0x21–0x23, 0x94), `msg-ui.md` 3 (0x5D, 0x63,
-    // 0x77), `audio/triggers.md` 0x2C and `render/lighting.md` 0x53.
-    assert_eq!(owned.len(), 62);
+    // Every id but the 14 out-of-scope ids of `bridge.md` §6 rule 7 is
+    // owned (2026-10-07, area 4): model 12, msg-units 47, msg-stats-items
+    // 26, msg-skills 9, msg-ui 23, `audio/triggers.md` 0x2C,
+    // `render/lighting.md` 0x53 and 0x89, `bridge.md` 47 (§6 rule 6).
+    assert_eq!(owned.len(), 0xB5 - 14);
     let per = |spec: &str| owned.iter().filter(|(_, o)| *o == spec).count();
     assert_eq!(
         [
+            super::msg::MODEL,
+            super::msg::UNITS,
+            super::msg::STATS_ITEMS,
             super::msg::SKILLS,
             super::msg::UI,
             super::msg::TRIGGERS,
-            super::msg::LIGHTING
+            super::msg::LIGHTING,
+            super::msg::BRIDGE,
         ]
         .map(per),
-        [4, 3, 1, 1]
+        [12, 47, 26, 9, 23, 1, 2, 47]
     );
     for (_, o) in &owned {
         assert!(
             [
+                super::msg::BRIDGE,
                 super::msg::MODEL,
                 super::msg::UNITS,
                 super::msg::STATS_ITEMS,

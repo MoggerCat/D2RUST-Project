@@ -208,7 +208,16 @@ fn client_world_holds_only_stated_fields() {
         environment,
         eclipse_pending,
         skill_tree_flag,
+        // `render/lighting.md` §10 r4; `client/msg-units.md` §8 r9;
+        // `client/msg-stats-items.md` §5 r6–r7.
+        overrides,
+        roster,
+        roster_inactive,
+        weapon_set,
+        item_table_ext,
     } = ClientWorld::default();
+    assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
+    assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
     assert!(drlg.is_none());
@@ -237,8 +246,13 @@ fn client_world_holds_only_stated_fields() {
         // `client/msg-skills.md` §1 r1; `client/msg-ui.md` §1 r4.
         skills,
         quest_untargetable,
+        // `client/msg-ui.md` §16 r4, §17 r2; `client/stat-lists.md` §3.
+        flag_2,
+        states,
+        state_lists,
     } = ClientUnit::new(key);
     assert!(skills.is_none() && !quest_untargetable);
+    assert!(flag_2.is_none() && states.is_empty() && state_lists.is_empty());
     assert_eq!(k, key);
     assert_eq!((class, mode, position, server_point), (0, 0, None, (0, 0)));
     assert_eq!(seed, Some((1, 666)));

@@ -156,6 +156,10 @@ pub mod missile {
     pub const SUICIDE_CORPSE_EXPLODE: i32 = 426;
     pub const SUICIDE_FIRE_EXPLODE: i32 = 427;
     pub const SUICIDE_ICE_EXPLODE: i32 = 428;
+    /// §15.2.
+    pub const MEPHISTO_DEATH_CONTROL: i32 = 299;
+    pub const RADAMENT_DEATH: i32 = 347;
+    pub const RADAMENT_HAND_OF_GOD: i32 = 348;
     /// `mummy1`…`mummy4` (§19 step 5).
     pub const MUMMIES: std::ops::RangeInclusive<i32> = 63..=66;
 }
@@ -233,6 +237,109 @@ pub fn quest_death_call(class: u32) -> Option<u32> {
         704 | 705 | 709 => 0x005E_0070,
         _ => return None,
     })
+}
+
+/// The quest death bodies of §15.2 (ECX game, EDX unit).
+pub fn quest_death<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, u: UnitId, call: u32) {
+    match call {
+        0x005D_FD90 => purge(cx, h, u, 35, 25, 125, true),
+        0x005D_FE00 => purge(cx, h, u, 35, 1, 51, false),
+        0x005D_FE20 => {
+            // `m` = max(missile 348 `Range` − 100, 100).
+            // TODO(spec: umod-callbacks.md §15.2): without row 348 the
+            // original reads through a null record; d2rs does nothing.
+            let Some(range) = h.missile_range(missile::RADAMENT_HAND_OF_GOD) else {
+                return;
+            };
+            let m = range.wrapping_sub(100).max(100);
+            purge(cx, h, u, 35, 40, m, false);
+            // `0x0056EDE0(game, radament, 0, 1, 347, x, y)` at its own
+            // position (`skills/bodies.md` §6.13: distance 0).
+            let (x, y) = h.position(u);
+            let at = if (x, y) == (0, 0) {
+                h.target_position(u)
+            } else {
+                Some((x, y))
+            };
+            if let Some((x, y)) = at.filter(|&p| p != (0, 0)) {
+                let _ = h.create_missile(MissileRequest {
+                    flags: 1,
+                    x,
+                    y,
+                    skill: 0,
+                    level: 1,
+                    ..MissileRequest::new(u, missile::RADAMENT_DEATH)
+                });
+            }
+        }
+        0x005E_0020 => purge(cx, h, u, 105, 1, 2, false),
+        0x005E_0040 => purge(cx, h, u, 35, 25, 125, false),
+        0x005E_0060 => {}
+        0x005D_FDB0 => {
+            let _ = h.create_missile(MissileRequest {
+                flags: 0x8000,
+                origin: Some(u),
+                level: 1,
+                range: 100,
+                ..MissileRequest::new(u, missile::MEPHISTO_DEATH_CONTROL)
+            });
+        }
+        0x005E_0070 => {
+            let slot = match class_of(h, u) {
+                704 => 0,
+                705 => 1,
+                709 => 2,
+                c => panic!("uber death of class {c} (fatal 0xE6)"),
+            };
+            if h.set_uber_death(slot) {
+                h.quest_drop(u, *b"cm2 ", 7, true);
+                for _ in 0..h.game_8c() {
+                    h.quest_drop(u, *b"std ", 2, false);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The minion purge `0x005DFBF0(r, min, max, undead)` (§15.1) around the
+/// boss `b`.
+#[allow(clippy::too_many_arguments)]
+pub fn purge<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    b: UnitId,
+    r: i32,
+    min: i32,
+    max: i32,
+    undead: bool,
+) {
+    assert!(max != 0, "minion purge: max 0 (fatal 0x20)");
+    assert!(max > min, "minion purge: max ≤ min (fatal 0x21)");
+    let (x, y) = h.position(b);
+    let found = h.find_units(
+        b,
+        FindQuery {
+            flags: finder::PLAYERS_MONSTERS_LIVE,
+            exclude: Some(b),
+            x,
+            y,
+            r,
+            ..FindQuery::default()
+        },
+    );
+    for m in found {
+        if type_of(h, m) != Some(UnitType::Monster)
+            || h.alignment(m) != 0
+            || (undead && !h.is_undead(m))
+            || class_of(h, m) == 333
+        {
+            continue;
+        }
+        let roll = seed(h, b).map_or(0, |s| s.roll(max.wrapping_sub(min)));
+        event7(h, m, min.wrapping_add(roll as i32));
+        super::create::assign_umod(cx, h, m, 21, false);
+    }
 }
 
 /// The skill-calc fields of skill 66 the curse evaluates (§5).
@@ -643,7 +750,7 @@ pub fn run<H: InitHost + ?Sized>(
         addr::QUEST_COMPLETE => {
             if mode_of(h, u) == mode::DEATH {
                 if let Some(call) = quest_death_call(class_of(h, u)) {
-                    h.quest_death(u, call);
+                    quest_death(cx, h, u, call);
                 }
             }
         }

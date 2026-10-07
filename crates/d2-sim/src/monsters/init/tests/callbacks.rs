@@ -27,7 +27,7 @@ enum Call {
     FreeMinions(UnitId),
     ClearOwner(UnitId),
     RemovePet(UnitId, UnitId),
-    Quest(UnitId, u32),
+    Drop(UnitId, [u8; 4], i32, bool),
     Steal(UnitId, UnitId),
     Spawn(UnitId, u32, u32, i32, u32),
     UseSkill(UnitId, u32, u16),
@@ -58,6 +58,7 @@ struct Cb {
     missile_flags: BTreeMap<i32, u32>,
     velocity: i32,
     missile_sl: (i32, i32),
+    uber: [bool; 3],
     found: Vec<UnitId>,
     calc: BTreeMap<SkillCalc, i32>,
     aura: Option<AuraFields>,
@@ -116,6 +117,7 @@ impl Cb {
             missile_flags: BTreeMap::new(),
             velocity: 0,
             missile_sl: (0, 0),
+            uber: [false; 3],
             found: Vec::new(),
             calc: BTreeMap::new(),
             aura: None,
@@ -303,8 +305,21 @@ impl InitHost for Cb {
     fn remove_pet(&mut self, owner: UnitId, pet: UnitId) {
         self.calls.push(Call::RemovePet(owner, pet));
     }
-    fn quest_death(&mut self, unit: UnitId, call: u32) {
-        self.calls.push(Call::Quest(unit, call));
+    fn is_undead(&self, unit: UnitId) -> bool {
+        self.udead.contains(&unit)
+    }
+    fn missile_range(&self, class: i32) -> Option<i32> {
+        (class == 348).then_some(21)
+    }
+    fn set_uber_death(&mut self, slot: usize) -> bool {
+        self.uber[slot] = true;
+        self.uber.iter().all(|&b| b)
+    }
+    fn game_8c(&self) -> i32 {
+        2
+    }
+    fn quest_drop(&mut self, unit: UnitId, code: [u8; 4], arg: i32, announce: bool) {
+        self.calls.push(Call::Drop(unit, code, arg, announce));
     }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.calls.push(Call::Steal(unit, target));
@@ -936,7 +951,7 @@ fn killself() {
     assert!(f.calls.is_empty());
 }
 
-// Covers: specs/monsters/umod-callbacks.md §15
+// Covers: specs/monsters/umod-callbacks.md §15, §15.1, §15.2
 #[test]
 fn questcomplete_calls() {
     assert_eq!(cb::quest_death_call(156), Some(0x005D_FE00));
@@ -944,13 +959,69 @@ fn questcomplete_calls() {
     assert_eq!(cb::quest_death_call(541), Some(0x005E_0060));
     assert_eq!(cb::quest_death_call(709), Some(0x005E_0070));
     assert_eq!(cb::quest_death_call(706), None);
-    let mut f = Cb::new(Tables::new(vec![mon(2, 5, 9, 32); 230]));
+    let mut f = Cb::new(Tables::new(vec![mon(2, 5, 9, 32); 710]));
     let u = f.monster(229, &[22], false, 1);
+    // An evil minion, a good one and Diablo's clone around Radament.
+    let m = f.monster(5, &[], false, 1);
+    let good = f.monster(5, &[], false, 1);
+    f.alignment.insert(good, 2);
+    let clone = f.monster(333, &[], false, 1);
+    f.found = vec![m, good, clone];
     f.run(u, None, 1);
     assert!(f.calls.is_empty());
     f.set_mode_of(u, 0);
+    let mut s = f.seed_of(u);
     f.run(u, None, 1);
-    assert_eq!(f.calls, [Call::Quest(u, 0x005D_FE20)]);
+    // Purge (35, 40, max(21 − 100, 100) = 100, 0): flags 0x583 around
+    // Radament, Radament excluded.
+    let Call::Find(near, q) = f.calls[0] else {
+        panic!("{:?}", f.calls)
+    };
+    assert_eq!((near, q.flags, q.r, q.exclude), (u, 0x583, 35, Some(u)));
+    // Only the evil non-clone monster: event 7 at F + 40 + rnd(60) on
+    // Radament's seed, then umod 21.
+    let at = f.game.frame + 40 + s.roll(60) as i32;
+    assert_eq!(f.seed_of(u), s);
+    assert!(f.timers(m).contains(&(EVENT_UMOD as u8, at)));
+    assert!(f.timers(good).is_empty() && f.timers(clone).is_empty());
+    assert_eq!(f.store.entry(m).umod_list(), [21]);
+    // Then missile 347 at Radament's position, skill 0, level 1.
+    let ms = f.missiles();
+    assert_eq!(ms.len(), 1);
+    assert_eq!(
+        (ms[0].class, ms[0].flags, ms[0].x, ms[0].y, ms[0].level),
+        (347, 1, 100, 200, 1)
+    );
+    // Mephisto: missile 299, flags 0x8000, range 100.
+    f.calls.clear();
+    f.found.clear();
+    let me = f.monster(242, &[22], false, 1);
+    f.set_mode_of(me, 0);
+    f.run(me, None, 1);
+    let ms = f.missiles();
+    assert_eq!(
+        (ms[0].class, ms[0].flags, ms[0].range, ms[0].origin),
+        (299, 0x8000, 100, Some(me))
+    );
+    // The ubers: drops only when all three died, then on every death.
+    f.calls.clear();
+    for c in [704, 705] {
+        let x = f.monster(c, &[22], false, 1);
+        f.set_mode_of(x, 0);
+        f.run(x, None, 1);
+    }
+    assert!(f.calls.is_empty());
+    let b = f.monster(709, &[22], false, 1);
+    f.set_mode_of(b, 0);
+    f.run(b, None, 1);
+    assert_eq!(
+        f.calls,
+        [
+            Call::Drop(b, *b"cm2 ", 7, true),
+            Call::Drop(b, *b"std ", 2, false),
+            Call::Drop(b, *b"std ", 2, false),
+        ]
+    );
 }
 
 // Covers: specs/monsters/umod-callbacks.md §17

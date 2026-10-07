@@ -1457,19 +1457,17 @@ pub fn core<W: EventWorld>(
                 None => ok = false,
             }
         }
-        4 => {
-            if UseWorld::target(w, u).is_none() {
-                let k = w.killer_of(u);
-                w.path_op(u, PathOp::TargetUnit(k));
-                out.unit = k.map_or(NO_UNIT, |k| ident(w, k));
-            }
+        4 if UseWorld::target(w, u).is_none() => {
+            let k = w.killer_of(u);
+            w.path_op(u, PathOp::TargetUnit(k));
+            out.unit = k.map_or(NO_UNIT, |k| ident(w, k));
         }
         _ => {}
     }
     // Steps 5–6.
-    let res = if !ok {
-        0
-    } else if check_start && start_core_no_mana(w, tb.skills, u, s, l) == 0 {
+    // The start core runs only after a target was found.
+    let started = ok && (!check_start || start_core_no_mana(w, tb.skills, u, s, l) != 0);
+    let res = if !started {
         0
     } else {
         do_core(w, tb.skills, u, s, l, false, true, aim)

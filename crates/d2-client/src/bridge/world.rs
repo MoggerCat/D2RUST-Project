@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§1, §2, §5 rule 4, §12 rule 2), specs/client/bridge.md (§5), specs/client/stat-lists.md (§1 rule 3), specs/sim/unit-order.md (§5 rules 6–8), specs/render/lighting.md (§6.4), specs/drlg/rooms.md (§4.6, §5 rule 9)
+// Spec: specs/client/model.md (§1, §2, §5 rule 4, §12 rule 2, §15 rule 1), specs/client/bridge.md (§5), specs/client/stat-lists.md (§1 rule 3, §3), specs/client/msg-units.md (§7, §8), specs/client/msg-stats-items.md (§5), specs/sim/unit-order.md (§5 rules 6–8), specs/render/lighting.md (§6.4, §10), specs/drlg/rooms.md (§4.6, §5 rule 9)
 //! Client world model: what the S→C messages have told the client. Plain
 //! Rust, no Bevy. Not game state: `d2-sim` on the server is.
 //!
@@ -8,11 +8,12 @@
 //! `msg-stats-items.md` §2–§3. The tables and the visibility predicate the
 //! message rules read are inputs ([`ModelInputs`]), not model fields.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::drlg::{ClientDrlg, DrlgRoomId, DrlgSource};
 use super::skills::SkillList;
 use crate::rules::lighting::environment::Environment;
+use crate::rules::lighting::overrides::Overrides;
 use crate::rules::lighting::records::{LightError, LightList, LightRooms, Owner, RoomId};
 use d2_proto::transport::server_message;
 
@@ -54,8 +55,12 @@ pub struct PlayerData {
     pub name: [u8; 16],
     /// The inventory's cursor item (GUID of an item unit).
     /// TODO(spec: the item stream header, `msg-stats-items.md` open
-    /// question 3): which item actions set it; only 0x42 clears it today.
+    /// question 3): which item actions set it; 0x42 and 0x58 code 5
+    /// clear it.
     pub cursor_item: Option<u32>,
+    /// Player data +0x2C, written by S→C 0x5F (`msg-units.md` §7 r4);
+    /// its reader is `msg-units.md` open question 8.
+    pub f2c: u32,
 }
 
 /// Monster data from 0xAC (`msg-units.md` §1.2 rules 1, 4, 5).
@@ -76,6 +81,9 @@ pub struct MonsterData {
     pub v31: Option<u32>,
     /// The stat list with flag 0x40: (stat, param) → value.
     pub stat_list: Option<BTreeMap<(u16, u16), i32>>,
+    /// Monster data +0x40, written by S→C 0x98 (`msg-units.md` §7 r9;
+    /// −1 for 0xFFFF); `None` until written. Meaning: open question 9.
+    pub f40: Option<i32>,
 }
 
 /// The last item message an item unit received (`msg-stats-items.md` §2
@@ -91,18 +99,47 @@ pub struct ItemRecord {
     pub stream: Vec<u8>,
 }
 
-/// Item data (`msg-stats-items.md` §2 rule 4, §3 rule 2).
+/// Item data (`msg-stats-items.md` §2 rule 4, §3 rule 2, §5).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ItemData {
     pub last: Option<ItemRecord>,
-    /// Item flag 4 (0x3F).
+    /// Item flag 4 (0x3F, 0x3E, 0x40).
     pub flags4: bool,
+    /// The other bits of the item flag word (item data +0x18) as the
+    /// model rules write them (0x3E, 0x40, 0x7D); bit 4 is `flags4`.
+    pub flags: u32,
 }
 
-/// Object data (`msg-units.md` §1.3 rule 3).
+impl ItemData {
+    /// `0x006280D0(item, mask, on)` on the item flag word.
+    pub fn set_flags(&mut self, mask: u32, on: bool) {
+        if mask & 4 != 0 {
+            self.flags4 = on;
+        }
+        let rest = mask & !4;
+        if on {
+            self.flags |= rest;
+        } else {
+            self.flags &= !rest;
+        }
+    }
+}
+
+/// Object data (`msg-units.md` §1.3 rule 3, §7 r5, §8 r7;
+/// `model.md` §15 rule 1).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ObjectData {
+    /// +0x04: interact (0x51), the destination level (0x60).
     pub interact: u8,
+    /// +0x05: the portal flags (0x60 ORs bits 0–1).
+    pub portal_flags: u8,
+    /// +0x28: the owner name of a portal (0x82, 16 bytes).
+    pub owner_name: Option<[u8; 16]>,
+    /// The shrine record's `Code` (shrine data +0x08, `model.md` §15
+    /// rule 1); `None`: no shrine record. TODO(spec: msg-units.md open
+    /// question 5): its writer `0x004BD6B0` (0x51 rule 3) is not
+    /// specified, so no model rule sets it.
+    pub shrine: Option<u8>,
 }
 
 /// The per-kind data at unit +0x14 (model §1 rule 2).
@@ -143,6 +180,17 @@ pub struct ClientUnit {
     /// Unit flag +0xC4 bit 0x2 cleared by S→C 0x5D (`msg-ui.md` §1
     /// rule 4).
     pub quest_untargetable: bool,
+    /// Unit flag +0xC4 bit 0x2 as last written by a model rule: 0x5D
+    /// clears it (with `quest_untargetable`), 0x28 and 0x62 set it
+    /// (`msg-ui.md` §16 r4, §17 r2). `None`: never written; the initial
+    /// value per kind is `msg-ui.md` open question 2.
+    pub flag_2: Option<bool>,
+    /// The state bits that are on (`client/stat-lists.md` §3 r3;
+    /// `sim/stat-lists.md` §9.2).
+    pub states: BTreeSet<u8>,
+    /// The stat list of each state (`client/stat-lists.md` §3 r2):
+    /// (stat, param) → value, attached to the unit.
+    pub state_lists: BTreeMap<u8, BTreeMap<(u16, u16), i32>>,
 }
 
 impl ClientUnit {
@@ -162,6 +210,9 @@ impl ClientUnit {
             kind: KindData::None,
             skills: None,
             quest_untargetable: false,
+            flag_2: None,
+            states: BTreeSet::new(),
+            state_lists: BTreeMap::new(),
         }
     }
 
@@ -259,6 +310,38 @@ pub struct PetRecord {
 
 /// The pet type of a hireling (§14 rule 4).
 pub const PET_HIRELING: u8 = 7;
+
+/// One player roster record (`msg-units.md` §8 r1; 0xD8 bytes in
+/// 1.14d, the UI handle +0x34 and the formatted string +0x66 are UI
+/// fields and not held).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RosterRecord {
+    /// +0x00 (16 bytes, NUL-terminated).
+    pub name: [u8; 16],
+    /// +0x10.
+    pub guid: u32,
+    /// +0x14: life percent.
+    pub life: u32,
+    /// +0x18: kill count.
+    pub kills: i32,
+    /// +0x1C.
+    pub class: u32,
+    /// +0x20, +0x22.
+    pub f20: u16,
+    pub f22: u16,
+    /// +0x30.
+    pub f30: u16,
+    /// +0x38: the corpse list, head first.
+    pub corpses: Vec<u32>,
+    /// +0x3C, +0x40: portal GUIDs.
+    pub portals: (u32, u32),
+    /// +0x44.
+    pub f44: u16,
+    /// The bytes written from +0x46 on by the two string copies of 0x5B
+    /// (string 1 at +0x46, string 2 at +0x4A, each with its NUL);
+    /// unwritten bytes are 0.
+    pub strings: Vec<u8>,
+}
 
 /// The use-item cursor of 0x3F (`msg-stats-items.md` §3 rule 2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -403,6 +486,21 @@ pub struct ClientWorld {
     /// (`msg-skills.md` §4 rule 2); no other model rule writes it
     /// (`msg-skills.md` open question 3).
     pub skill_tree_flag: Option<u32>,
+    /// The scripted ambient override globals (`render/lighting.md` §10),
+    /// written by S→C 0x89 (§10 r4).
+    pub overrides: Overrides,
+    /// The active player roster `[0x007BB5C0]`, head first
+    /// (`msg-units.md` §8 r1, r9).
+    pub roster: Vec<RosterRecord>,
+    /// The inactive roster `[0x007BB5C4]`, head first.
+    pub roster_inactive: Vec<RosterRecord>,
+    /// The active weapon set `[0x007BCC4C]` (0 / 1) of the local player
+    /// (`msg-stats-items.md` §5 r6).
+    pub weapon_set: u8,
+    /// The runtime item table `[0x0096CA9C]` as S→C 0xA6 writes it
+    /// (`msg-stats-items.md` §5 r7): entries of 0x120 bytes. Entries
+    /// built at load (`0x006394A0`) are not held (open question 7).
+    pub item_table_ext: Vec<Vec<u8>>,
 }
 
 impl ClientWorld {
@@ -552,13 +650,28 @@ impl ClientWorld {
 
     /// `total(unit, stat, layer)` (`0x00625480`, `client/stat-lists.md`
     /// §1 rule 3): the full array of the unit's list. It equals the base
-    /// until a client rule attaches a list (§2–§4), and none does yet:
-    /// item lists wait for the item stream (`stat-lists.md` open question
-    /// 2), state lists for 0xA7–0xA9 (§3 rule 5, ids `TBD`), and a
-    /// passive skill's list is refused as pending
-    /// (`super::skills::SkillError::PassiveState`).
+    /// until a client rule attaches a list (§2–§4): item lists wait for
+    /// the item stream (`stat-lists.md` open question 2), and a passive
+    /// skill's list is refused as pending
+    /// (`super::skills::SkillError::PassiveState`). The state lists of
+    /// 0xA7–0xAA are held per state (`ClientUnit::state_lists`).
+    /// TODO(spec: client/stat-lists.md §1 r2): their propagation into
+    /// the full array is the `d2-sim` list's, not built on the client
+    /// yet, so the total stays the base.
     pub fn total(&self, key: UnitKey, stat: u16, layer: u16) -> i32 {
         self.base(key, stat, layer)
+    }
+
+    /// The roster lookup `0x004792E0(GUID)` (`msg-units.md` §8 r2):
+    /// GUID −1 → none; else the first active record with that GUID or
+    /// holding it in its corpse list.
+    pub fn roster_find(&self, guid: u32) -> Option<usize> {
+        if guid == u32::MAX {
+            return None;
+        }
+        self.roster
+            .iter()
+            .position(|r| r.guid == guid || r.corpses.contains(&guid))
     }
 
     /// The local player's level (§11 rules 3, 5): the level id of its
@@ -661,11 +774,44 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 /// seam, taken as an input.
 pub type VisibleFn = fn(&ClientUnit, i32, i32) -> bool;
 
-/// One `monstats` row as 0xAC reads it (`msg-units.md` §1.2).
+/// One `monstats` row as 0xAC reads it (`msg-units.md` §1.2), with the
+/// flags 0x28 reads (`msg-ui.md` §16 r4).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MonsterClass {
     /// `monstats2` choice count of each of the 16 components.
     pub components: [u8; 16],
+    /// `monstats` flag bit 8 `npc`.
+    pub npc: bool,
+    /// `monstats` flag bit 9 `interact` (`0x00457490(class, 9)`).
+    pub interact: bool,
+}
+
+/// One `objects.txt` row as the shrine requests read it (`model.md`
+/// §15 rule 1, step 4.1).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ObjectRow {
+    /// `SubClass` (+0x167): bit 0 = shrine.
+    pub subclass: u8,
+    /// `ShrineFunction` (+0x16F).
+    pub shrine_function: u8,
+}
+
+/// One `states` row as the state messages read it
+/// (`client/stat-lists.md` §3 r3).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StateRow {
+    /// The flag `[0x006CE284]` (+0x14): on a dead unit, state on only
+    /// sets the bit.
+    pub dead_bit_only: bool,
+    /// The flag `[0x006CE278]`: state on keeps an existing list.
+    pub keep_list: bool,
+}
+
+/// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SkillDescRow {
+    /// `skillpage` (+2, read signed).
+    pub page: i8,
 }
 
 /// One `itemstatcost` row as the 0xAC stat list reads it (§1.2 rule 4).
@@ -694,6 +840,15 @@ pub struct ClientTables {
     /// One entry per `skills` row, by skill id (`msg-skills.md` Inputs);
     /// the skill count is the row count.
     pub skills: Vec<SkillRow>,
+    /// One entry per `skilldesc` row (`msg-skills.md` §9).
+    pub skilldesc: Vec<SkillDescRow>,
+    /// One entry per `objects.txt` row, by class (`model.md` §15).
+    pub objects: Vec<ObjectRow>,
+    /// One entry per `states` row, by state id
+    /// (`client/stat-lists.md` §3).
+    pub states: Vec<StateRow>,
+    /// The overlay count (data tables +0xBC0, `msg-units.md` §7 r2).
+    pub overlay_count: u32,
 }
 
 /// The `skills` fields the client skill list reads (`msg-skills.md`
@@ -708,6 +863,16 @@ pub struct SkillRow {
     pub passivestate: u16,
     /// `maxlvl` (u16 at 300, read signed).
     pub maxlvl: u16,
+    /// `charclass` (i8, +0x0C; `skills/levels.md` §1).
+    pub charclass: i8,
+    /// `srvdofunc` (+0x2E, read signed; `msg-skills.md` §10).
+    pub srvdofunc: i16,
+    /// `enhanceable` (bit 17; `msg-skills.md` §9).
+    pub enhanceable: bool,
+    /// `skilldesc` (+0x194): the `skilldesc` row.
+    pub skilldesc: u16,
+    /// `EType` (+0x1DC).
+    pub etype: u8,
 }
 
 /// The `Levels.txt` fields the client reads of the player's level
@@ -736,4 +901,6 @@ pub struct ModelInputs {
     /// What the client DRLG of 0x03 is built from (§12 rule 1). `None`:
     /// no client DRLG is built (`ClientWorld::drlg` stays `None`).
     pub drlg: Option<DrlgSource>,
+    /// The `d2exp.mpq` check `0x00408F20` (`msg-stats-items.md` §5 r6).
+    pub expansion_installed: bool,
 }

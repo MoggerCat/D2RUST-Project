@@ -362,6 +362,49 @@ pub fn monequip<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, lev
     }
 }
 
+/// Class reinit `0x00574370(game, unit, class, mode)` (§27): the monster
+/// becomes `class` in place. False (nothing changed) for a non-monster
+/// or a class outside monstats or without `enabled`.
+pub fn reinit<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    class: i32,
+    mode: u32,
+) -> bool {
+    // Step 1.
+    let monster = h
+        .units()
+        .get(unit)
+        .is_some_and(|r| r.ty == crate::units::UnitType::Monster);
+    if !monster {
+        return false;
+    }
+    // Step 2.
+    let Some(row) = u32::try_from(class).ok().and_then(|c| cx.monstats(c)) else {
+        return false;
+    };
+    if !row.enabled {
+        return false;
+    }
+    // Step 4 with the old class: an `interact` monster keeps its
+    // inventory.
+    let old = class_of(h, unit);
+    let keep = cx.monstats(old).is_some_and(|m| m.interact);
+    h.monster_teardown(unit, !keep);
+    h.game().timers.cancel_unit_timers(unit);
+    // Step 5.
+    if let Some(r) = h.units().get_mut(unit) {
+        r.class = class as u32;
+    }
+    // Step 6: the type init (§5 with §6) on the unit's room and GUID; §5
+    // step 7 reads the old mode.
+    type_init(cx, h, unit);
+    // Step 7.
+    h.set_mode_plain(unit, mode);
+    true
+}
+
 /// Normal mods `0x005B21B0` by `BaseId` (§14.1): (umod, unique arg).
 pub fn normal_mods_for(base_id: u16) -> &'static [(u8, bool)] {
     match base_id {

@@ -1,4 +1,4 @@
-// Spec: specs/monsters/init.md §16–§22; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2; specs/monsters/umod-init-bodies.md
+// Spec: specs/monsters/init.md §16–§22, §26; specs/monsters/umods.tsv; specs/monsters/umod-callbacks.md §2; specs/monsters/umod-init-bodies.md
 //! Boss spawns after the spawn (§16), umod choice (§17), boss minions
 //! and umod init (§18), the umod init functions (§19), superuniques
 //! (§20), restore paths (§21), and the umod callback dispatcher with the
@@ -928,12 +928,139 @@ pub fn superunique_finish<H: InitHost + ?Sized>(
     superunique_quest(h, unit, su.hcidx);
 }
 
+/// The per-`hcIdx` cases of `0x005A49B0` (§20.1), before the closing
+/// umod 22.
 fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32) {
-    h.superunique_quest(unit, hc_idx);
-    if hc_idx == 6 {
-        h.set_state(unit, 118);
-        h.ai_install(unit, 13);
+    match hc_idx {
+        6 => {
+            h.set_state(unit, 118);
+            h.quest_chain(unit, 5);
+            h.ai_install(unit, 13);
+        }
+        10 => {
+            // U `roll(5)` + 2 class-4 spawns, then one of each class.
+            let n = seed(h, unit).roll(5) as i32 + 2;
+            for _ in 0..n {
+                h.spawn_near_unit(unit, 4, 1, 4, 0x40);
+            }
+            for c in [276, 382, 385, 389] {
+                h.spawn_near_unit(unit, c, 1, 4, 0x40);
+            }
+        }
+        26 | 27 | 29 => {
+            h.quest_chain(unit, 19);
+            h.quest_preset_boss(unit);
+        }
+        36..=38 => h.quest_chain(unit, 23),
+        39 => h.quest_chain(unit, 4),
+        42 => {
+            h.spawn_group(unit, 453, 20, 20, 0);
+            h.quest_chain(unit, 31);
+            h.quest_preset_boss(unit);
+            h.set_state(unit, 118);
+        }
+        43..=45 => {
+            h.quest_chain(unit, 35);
+            h.quest_preset_boss(unit);
+        }
+        60 => {
+            h.owner_data_self(unit);
+            let c = h.class_for_level(unit, 453);
+            h.spawn_group(unit, c, 10, 20, 0x40);
+            h.quest_chain(unit, 34);
+        }
+        62 => h.spawn_group(unit, 381, 20, 10, 0x40),
+        _ => {}
     }
+}
+
+// ---- §26 ----
+
+/// Make unique `0x005A4940(game, unit)` (§26), the warping shrine's
+/// effect on the monster it picked: boss flag, unique mark, umods with
+/// the champion test, umod init without minions, then unit flag 0x800
+/// and monster data +0x5C bit 0.
+pub fn make_unique<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    let monster = h
+        .units()
+        .get(unit)
+        .is_some_and(|r| r.ty == crate::units::UnitType::Monster);
+    if !monster || h.monsters().get(unit).is_none() {
+        return;
+    }
+    flags_or(h, unit, type_flag::BOSS);
+    mark_unique(h, unit);
+    choose_umods(cx, h, unit, true);
+    boss_minions_and_init(cx, h, unit, 0, 0, None, false);
+    if let Some(r) = h.units().get_mut(unit) {
+        r.flags |= 0x800;
+    }
+    h.monsters().entry(unit).data_flag1 = true;
+}
+
+/// What the eligibility test `0x00582750(M, P)` reads (§26).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WarpCandidate {
+    /// M is P itself.
+    pub is_operator: bool,
+    /// M is a monster (type 1).
+    pub monster: bool,
+    /// `0x00650D70(P, M)`.
+    pub relation: i32,
+    /// `0x006259B0(M)`.
+    pub alignment: i32,
+    /// `0x0063EA40(M)` ≠ 0.
+    pub test_63ea40: bool,
+    /// M's mode.
+    pub mode: u32,
+    /// `0x0046C140(class, 2)`: the class has mode 2.
+    pub has_walk: bool,
+    /// monstats2 byte +0x0B (`None` without a record).
+    pub m2_byte_0b: Option<u8>,
+    /// Monster data dword 0 ≠ 0 (`0x0055B7E0`).
+    pub has_data: bool,
+    /// `0x0063E9F0(v, M)` boss.
+    pub boss: bool,
+    /// `0x0063EDC0` prime evil.
+    pub prime_evil: bool,
+    /// Type flags (monster data +0x16).
+    pub type_flags: u16,
+}
+
+/// Eligibility `0x00582750(M, P)` (§26): all ten tests in order.
+pub fn warp_eligible(c: &WarpCandidate) -> bool {
+    !c.is_operator
+        && c.monster
+        && c.relation != 1
+        && c.alignment == 0
+        && !c.test_63ea40
+        && matches!(c.mode, 1 | 2)
+        && c.has_walk
+        && c.m2_byte_0b.is_some_and(|b| b != 0)
+        && c.has_data
+        && !c.boss
+        && !c.prime_evil
+        && c.type_flags & 0x1F == 0
+}
+
+/// The nearest eligible monster `0x0065A800(P, x, y, limit, cb)` (§26)
+/// over `(unit, distance, eligible)` in room-list then unit-list order:
+/// limit 0 means 0x10000; the best starts at 0xFFFF; the first of equal
+/// distances wins.
+pub fn nearest_eligible<U: Copy>(
+    candidates: impl IntoIterator<Item = (U, i32, bool)>,
+    limit: i32,
+) -> Option<U> {
+    let limit = if limit == 0 { 0x10000 } else { limit };
+    let mut best = 0xFFFF;
+    let mut pick = None;
+    for (u, d, ok) in candidates {
+        if d < limit && d < best && ok {
+            pick = Some(u);
+            best = d;
+        }
+    }
+    pick
 }
 
 /// A saved boss or minion (`0x005424F0` restore, §21).

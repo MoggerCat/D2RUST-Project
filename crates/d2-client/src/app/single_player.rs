@@ -528,8 +528,10 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
 }
 
 /// The `skills` fields the client skill list reads (`client/msg-skills.md`
-/// Inputs: `anim`, `monanim`, `passivestate`; `skills/levels.md` §6:
-/// `maxlvl`), one row per skill id, from the user's `skills` table.
+/// Inputs: `anim`, `monanim`, `passivestate`; §9–§10: `enhanceable`,
+/// `EType`, `skilldesc`, `srvdofunc`; `skills/levels.md` §1, §6:
+/// `charclass`, `maxlvl`), one row per skill id, from the user's `skills`
+/// table.
 pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildError> {
     let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     let table = set
@@ -543,6 +545,11 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
             monanim: s.monanim,
             passivestate: s.passivestate,
             maxlvl: s.maxlvl,
+            charclass: s.charclass as i8,
+            srvdofunc: s.srvdofunc as i16,
+            enhanceable: s.enhanceable,
+            skilldesc: s.skilldesc,
+            etype: s.etype,
         })
         .collect())
 }
