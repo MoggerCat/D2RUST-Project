@@ -39,13 +39,13 @@
 |   9. Per-tick movement | 558–739 |
 |   10. Messages | 740–762 |
 |   11. Missile paths (`0x00649760`) | 763–815 |
-|   12. Other path types (1.14d-read 2026-10-08) | 816–1018 |
-| Constants & data dependencies | 1019–1055 |
-| Randomness | 1056–1066 |
-| Edge cases & original bugs | 1067–1114 |
-| Test vectors | 1115–1152 |
-| Provenance | 1153–1190 |
-| Open questions | 1191–1264 |
+|   12. Other path types (1.14d-read 2026-10-08) | 816–1029 |
+| Constants & data dependencies | 1030–1066 |
+| Randomness | 1067–1077 |
+| Edge cases & original bugs | 1078–1125 |
+| Test vectors | 1126–1163 |
+| Provenance | 1164–1201 |
+| Open questions | 1202–1275 |
 <!-- /index -->
 
 ## Summary
@@ -926,7 +926,12 @@ target)] (`0x00678D10`, table `0x006F1518`).
    (dir + entry (+ R[s] in random mode)) & 7 (`0x0067A630`); tries += 1;
    tries ≠ 5 → continue with N. tries = 5 → backtrack: N = root → not
    found; else N := parent, next order entry, dir := (dir + entry (+
-   R[s])) & 7, tries += 1; repeat while that also reaches 5.
+   R[s])) & 7, tries += 1; repeat while that also reaches 5. The parent
+   advance has no "tries < 4" guard: a parent at tries 4 still advances
+   its order pointer (and in random mode draws), then reaches 5 and
+   backtracks again. A reused child (rule 5.6) keeps its own child slot
+   and parent; only f, h, g, tries, order, dir and position are
+   rewritten. Confirmed 2026-10-08 (impl-pc1-s5).
 7. **Output** (`0x0067A9F0`): walk from the found node up to (not
    including) the root; a node is recorded when its step from its parent
    differs from the step of the last recorded node (the found node
@@ -1000,7 +1005,13 @@ buffer: 88 entries.
    squared distances to the target dA, dB of A's and B's last points and
    dS of S: dB > dA → A if dS ≥ dA, else fail; dB ≤ dA → B if dS ≥ dB,
    else fail (this fail leaves buf and N unchanged). The chosen points
-   are copied to buf at i; i := N := i + their count; success.
+   are copied to buf at i; i := N := i + their count; success. A
+   follower with no points has no last point: the dword read in its
+   place is the follower's own done flag, so its "last point" is (1, 0)
+   when that follower is done, else (0, 0) (not its position). Corrected
+   2026-10-08 (impl-pc1-s5 read "its position"; 1.14d `0x0067C0E2`–
+   `0x0067C11C`: point count − 1 indexed from the points array, the
+   done flag being the dword just before it).
 6. **Compression** (`0x0067C1E0`, n cells → path +0x9C): n = 1 → that
    cell; n = 0 → 0. Else p := buf[0] − S, run := 0; for k = 0 … n − 2
    with d := buf[k + 1] − buf[k]: d = p → run += 1; else run ≤ 0 and

@@ -27,10 +27,10 @@
 |   4. Bodies used by no monster skill row | 516–644 |
 | Constants & data dependencies | 645–656 |
 | Randomness | 657–672 |
-| Edge cases & original bugs | 673–697 |
-| Test vectors | 698–708 |
-| Provenance | 709–719 |
-| Open questions | 720–741 |
+| Edge cases & original bugs | 673–704 |
+| Test vectors | 705–715 |
+| Provenance | 716–726 |
+| Open questions | 727–748 |
 <!-- /index -->
 
 ## Summary
@@ -674,7 +674,14 @@ The riding imp (§2.3) follows its tower or siege beast every tick.
 
 1. The lightning fan and ring (§2.4, §2.5) step i by the progressive
    count: a count of 0 (after the `aurarangecalc` fallback) never ends
-   the loop.
+   the loop. Confirmed 2026-10-08 (impl-pc1-s5): the caller
+   (`0x005D4F40`) passes `0x005D3DA0`'s count, or when that is 0
+   `0x00646CA0(unit, aurarangecalc, skill, L)` unclamped; the loop keeps
+   4·i (32-bit, wrapping) and tests it signed against 256
+   (`0x005D4D9A`–`0x005D4DA2`), so a step ≤ 0 never ends it, and a
+   negative step also reads the ring offsets from outside their
+   64-entry tables. The original hangs or faults: no defined result
+   to reproduce (d2rs handling: Pending, user decision).
 2. MonCurseCast picks the curse from its own draw and pairs skill 91's
    state with the Decrepify stats (values from `Param7`, 0 in 1.14d, so
    nothing is applied) and skill 87's state with event handlers only

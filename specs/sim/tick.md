@@ -31,15 +31,15 @@
 |   3. Tick steps in order | 143–173 |
 |   4. Room pass (step 3) | 174–209 |
 |   5. Timer events (step 4) | 210–376 |
-|   6. Client pass (step 5) | 377–429 |
-|   7. Periodic steps, summary | 430–439 |
-|   8. Wall-clock and host-only parts | 440–452 |
-| Constants & data dependencies | 453–466 |
-| Randomness | 467–474 |
-| Edge cases & original bugs | 475–506 |
-| Test vectors | 507–595 |
-| Provenance | 596–624 |
-| Open questions | 625–672 |
+|   6. Client pass (step 5) | 377–434 |
+|   7. Periodic steps, summary | 435–444 |
+|   8. Wall-clock and host-only parts | 445–457 |
+| Constants & data dependencies | 458–471 |
+| Randomness | 472–479 |
+| Edge cases & original bugs | 480–511 |
+| Test vectors | 512–600 |
+| Provenance | 601–629 |
+| Open questions | 630–677 |
 <!-- /index -->
 
 ## Summary
@@ -395,15 +395,20 @@ Owned by `units.md`; confirmed on the recordings by `check_units.py`
 5. Per-client update `0x005380D0`: removal messages for units deleted in
    the adjacent rooms (`0x0053A770`); unit update messages for the
    adjacent rooms' update queues (`0x0053A620`, `unit-order.md` §6);
-   player stat-change messages (`0x006258D0`); inventory refresh when the
-   player's flag requires it; `0x0055F4F0`; client counter +0x1B0 += 1;
+   player stat-change messages (`0x006258D0`); when the player's flag-ex
+   +0xC8 bit 21 is set, inventory refresh (`0x0055DF00`) then
+   `0x0055F4F0` (both skipped otherwise, `0x0053812F`–`0x00538152`;
+   corrected 2026-10-08, `0x0055F4F0` read as unconditional before);
+   client counter +0x1B0 += 1;
    if the player's room (`0x00620BB0`) differs from the client's: when
    the two rooms' level ids (`0x0061A1B0`) differ, from := the client
    room's level, to := the player room's level, quest event 3
    CHANGEDLEVEL `0x00543B90`(game, from, to, player) (`world/quests.md` §4.1)
    then the town-leave refresh `0x00537340`(game, player, from, to)
    (`world/vendors.md` §6 rule 1); then, levels equal or not, the room
-   switch (`0x00537B50`, new room) (`0x0053815E`–`0x0053819A`). This
+   switch (`0x00537B50`, new room) (`0x0053815E`–`0x0053819A`; the
+   level-change calls and their argument order confirmed 2026-10-08,
+   impl-pc1-s5). This
    step has no act logic: an act change happens only through the warp
    (`0x0053AEC0`, `world/waypoints.md`), which calls `0x00537340` and
    the act change `0x0053ACC0` itself; arena sync (`0x0053FC20`); queue the player for
