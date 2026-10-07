@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §8.1, §8.2; specs/render/lighting.md §9.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
+// Spec: specs/sim/intents-events.md §3.5 r7, §8.1, §8.2; specs/sim/stat-lists.md §11; specs/render/lighting.md §9.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
 //! The single-player session sequence of a client whose player is not
 //! yet placed (`intents-events.md` §8): the game-creation messages of
 //! C→S 0x67 (`0x00530BF0`, [`create_game`]) and the join of C→S 0x6B
@@ -16,26 +16,30 @@
 //!    nowhere yet), then part B: 0xAA (its states), 0x76;
 //! 2. S→C 0x0B GameHandshake (type 0, the player's GUID, rule 3.2);
 //! 3. S→C 0x5F PortalFlags (rule 3.3), with the player record;
-//! 4. S→C 0x7B for each hot-key slot whose skill is a `skills` row (rule
+//! 4. the player's stat messages (rule 3.4: the mod-array flush
+//!    `0x006258D0`, `stat-lists.md` §11 rule 2, each value through
+//!    `0x0053BE40`'s 0x1D / 0x1E / 0x1F choice, §3.5 rule 7:
+//!    [`stat_messages`]);
+//! 5. S→C 0x7B for each hot-key slot whose skill is a `skills` row (rule
 //!    3.6);
-//! 5. two S→C 0x23 SetSkill, hand 1 then hand 0 (rule 3.7), with the
-//!    player record;
-//! 6. the join's vitals sync (rule 3.9): S→C 0x95, then the gold and
+//! 6. two S→C 0x23 SetSkill, hand 1 then hand 0 (rule 3.7), with the
+//!    player record; then the stat messages again (rule 3.8);
+//! 7. the join's vitals sync (rule 3.9): S→C 0x95, then the gold and
 //!    experience messages against the client's cache;
-//! 7. S→C 0x03 LoadAct (rule 4; `model.md` §11 rule 1, builder
+//! 8. S→C 0x03 LoadAct (rule 4; `model.md` §11 rule 1, builder
 //!    `0x0053ABE0` → `0x0053B390`): the act, game +0x7C (the act DRLG's
 //!    init seed), the act's town level id (act +0x08), game +0x80
 //!    (`dwObjSeed`), then S→C 0x53 with the act's environment record
 //!    (`render/lighting.md` §9.1, §9.2 rule 2; [`d2_sim::world::environment`]);
 //!    client state 2;
-//! 8. game entry `0x005394A0` (rule 5, `path-placement.md` §11):
+//! 9. game entry `0x005394A0` (rule 5, `path-placement.md` §11):
 //!    S→C 0x07 for the spawn room of the act's town, the room switch
 //!    (`intents-events.md` §7.8: 0x07 and the add messages for every room
 //!    of the spawn room's adjacency array), the player put in the world,
 //!    S→C 0x15 with flag 1, S→C 0x7E
 //!    (`d2_sim::wiring::path::place::game_entry`);
-//! 9. client state 3 (rule 6): the next tick's client pass sends 0x04
-//!    once the client's room is ready (`tick.md` §6 rule 6).
+//! 10. client state 3 (rule 6): the next tick's client pass sends 0x04
+//!     once the client's room is ready (`tick.md` §6 rule 6).
 //!
 //! The messages go through the action wiring's transport seam
 //! (`Pending::send`), so the host queues them with the next tick's
@@ -50,9 +54,6 @@
 //! Not sent, because no spec gives them (named, not guessed):
 //! - the loader's other messages after 0x76 (rule 3.1: 0x94, 0x22, 0x21,
 //!   0x23, 0x5E, 0x28, 0x29 from the loader's callees);
-//! - the player's stat messages (rules 3.4, 3.8: `0x006258D0` with the
-//!   sender `0x00548520`, whose 0x1D / 0x1E / 0x1F choice
-//!   (`0x0053BE40`) is not specified);
 //! - the item messages of rule 3.5 and the update-list reset of rule 3.10
 //!   (the item world is not reachable from the session), and
 //!   `0x0058A0A0` of an expansion game;
@@ -71,7 +72,7 @@ use d2_sim::wiring::path::place::game_entry;
 use d2_sim::wiring::path::walk::PathCtx;
 
 use super::character::{self, ActionCharacter, CharacterWorld, LoadContext, LoadError, LoadReport};
-use super::handlers::world::ActionEvents;
+use super::handlers::world::{ActionEvents, StartItems, WiredWorld};
 use super::SimGame;
 use crate::seams::ClientId;
 
@@ -243,6 +244,36 @@ pub fn load_act(act: u8, map_seed: u32, obj_seed: u32) -> LoadAct {
     }
 }
 
+/// `0x0053BE40(client, s, v)` (`intents-events.md` §3.5 rule 7): v as an
+/// unsigned u32 below 0xFF → S→C 0x1D (3 bytes), below 0xFFFF → 0x1E
+/// (4 bytes), else 0x1F (6 bytes). `None` for s > 0xFE (the original's
+/// fatal assert 0x3CB).
+pub fn stat_message(stat: u16, value: i32) -> Option<Vec<u8>> {
+    let s = u8::try_from(stat).ok().filter(|&s| s <= 0xFE)?;
+    let v = value as u32;
+    Some(if v < 0xFF {
+        vec![0x1D, s, v as u8]
+    } else if v < 0xFFFF {
+        let w = (v as u16).to_le_bytes();
+        vec![0x1E, s, w[0], w[1]]
+    } else {
+        let d = v.to_le_bytes();
+        vec![0x1F, s, d[0], d[1], d[2], d[3]]
+    })
+}
+
+/// The stat messages of the mod-array flush `0x006258D0` with sender
+/// `0x00548520` (`stat-lists.md` §11 rule 2): one [`stat_message`] per
+/// (key, base value) of `StatLists::mod_values`, in key order; the key's
+/// layer is not sent. A stat id above 0xFE (fatal in the original) sends
+/// nothing; 1.14d `Saved` stats are 0–15, so the array never holds one.
+pub fn stat_messages(values: &[(i32, i32)]) -> Vec<Vec<u8>> {
+    values
+        .iter()
+        .filter_map(|&(k, v)| stat_message(d2_sim::stats::key_stat(k), v))
+        .collect()
+}
+
 /// The game-creation messages of `client` (`intents-events.md` §8.1
 /// rules 3–6): S→C 0x01, 0x00 (client state := 1), 0x02, to the client's
 /// player.
@@ -333,6 +364,13 @@ pub fn enter_game<D: ActionEvents, W>(
     if let Some(r) = &entry.record {
         x.send(player, &msg::portal_flags(r.portal_flags));
     }
+    // Rule 3.4 (the array is cleared only by the room update queue,
+    // `stat-lists.md` §11 rule 3, so rule 3.8 sends the same values).
+    let stats = stat_messages(&a.sys.stats.mod_values(player));
+    let x = &mut a.sys.hooks.x;
+    for m in &stats {
+        x.send(player, m);
+    }
     for (i, k) in entry.hotkeys.iter().enumerate() {
         if usize::try_from(k.skill).is_ok_and(|sk| sk < skills) {
             x.send(
@@ -346,6 +384,10 @@ pub fn enter_game<D: ActionEvents, W>(
             let h = r.hands[usize::from(hand)];
             x.send(player, &msg::set_skill(0, guid, hand, h.skill, h.item));
         }
+    }
+    // Rule 3.8.
+    for m in &stats {
+        x.send(player, m);
     }
     // Rule 3.9.
     for m in vitals_sync::join_run(a, &s.game, id, (0, 0)) {
@@ -469,12 +511,73 @@ pub fn load_new_character<D: ActionEvents, W>(
     )
 }
 
+/// [`load_new_character`] on the wired host, with the start items
+/// (`items/generation.md` §10.3) made on its economy and inventory model
+/// ([`WiredWorld::start_items`]) in place of the action wiring's
+/// unapplied step. Start stats and start items are the load's only steps
+/// before the start-skill selection that touch the player, and neither
+/// that selection nor the mouse skills draw, so running the items after
+/// the action wiring's load keeps the game-seed order of §10.3. The
+/// "start items" entry leaves the report's unapplied list when the items
+/// ran (no fault).
+pub fn load_new_character_with_items<D: ActionEvents, R, S>(
+    s: &mut SimGame<D, WiredWorld<R, S>>,
+    player: UnitId,
+    name: [u8; 16],
+) -> (Entry, LoadReport, StartItems) {
+    let (entry, mut report) = load_new_character(s, player, name);
+    let items = s.world.start_items(&mut s.game, &mut s.events, player);
+    if items.faults.is_empty() {
+        report.unapplied.retain(|u| u.step != "start items");
+    }
+    (entry, report, items)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     /// The 1.14d portal level list (`data/runtime-maps.md` §9).
     const PORTALS: [u32; 16] = [1, 3, 5, 7, 27, 29, 33, 36, 40, 43, 45, 46, 53, 54, 74, 134];
+
+    // Covers: specs/sim/intents-events.md §3.5 r7
+    #[test]
+    fn stat_message_size_follows_the_unsigned_value() {
+        assert_eq!(stat_message(12, 1), Some(vec![0x1D, 12, 1]));
+        assert_eq!(stat_message(0, 0xFE), Some(vec![0x1D, 0, 0xFE]));
+        // 0xFF goes to 0x1E, 0xFFFF to 0x1F.
+        assert_eq!(stat_message(7, 0xFF), Some(vec![0x1E, 7, 0xFF, 0]));
+        assert_eq!(stat_message(7, 0xFFFE), Some(vec![0x1E, 7, 0xFE, 0xFF]));
+        assert_eq!(
+            stat_message(7, 0xFFFF),
+            Some(vec![0x1F, 7, 0xFF, 0xFF, 0, 0])
+        );
+        // A negative value is a large unsigned one.
+        assert_eq!(
+            stat_message(15, -1),
+            Some(vec![0x1F, 15, 0xFF, 0xFF, 0xFF, 0xFF])
+        );
+        // s > 0xFE is the fatal assert: nothing.
+        assert_eq!(stat_message(0xFE, 0), Some(vec![0x1D, 0xFE, 0]));
+        assert_eq!(stat_message(0xFF, 0), None);
+        assert_eq!(stat_message(300, 0), None);
+    }
+
+    // Covers: specs/sim/stat-lists.md §11 r2
+    #[test]
+    fn stat_messages_drop_the_layer_and_keep_key_order() {
+        use d2_sim::stats::key;
+        let v = [(key(0, 0), 15), (key(7, 0), 0x2800), (key(12, 3), 1)];
+        assert_eq!(
+            stat_messages(&v),
+            vec![
+                vec![0x1D, 0, 15],
+                vec![0x1E, 7, 0x00, 0x28],
+                vec![0x1D, 12, 1],
+            ]
+        );
+        assert!(stat_messages(&[]).is_empty());
+    }
 
     // Covers: specs/formats/d2s-load.md §8 r1
     #[test]
