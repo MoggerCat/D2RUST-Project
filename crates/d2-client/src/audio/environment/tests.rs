@@ -692,6 +692,38 @@ fn entry_line_skipped_is_lost() {
     assert!(!e.entry.is_flagged(132));
 }
 
+// Covers: specs/audio/environment.md §4 r4, §2 r9
+#[test]
+fn sound_init_clears_the_flags_but_not_the_last_level() {
+    let (mut e, mut s, mut h) = (env(), Fake::default(), Hooks::default());
+    h.quest_ok = true;
+    entry_tick(&mut e, &mut s, &mut h, 1, 1000, 0);
+    for t in 1100..=1162 {
+        entry_tick(&mut e, &mut s, &mut h, 3, t, 0);
+    }
+    assert_eq!(h.events, vec![47]);
+    e.music.cur = SONG_A;
+    // A new game: sound on, so the music reset runs; the flags are
+    // cleared, the last level checked (3) stays.
+    e.sound_init(false);
+    assert!(!e.entry.is_flagged(3) && !e.entry.is_flagged(5));
+    assert_eq!(e.entry.last_checked(), 3);
+    assert_eq!(e.music.cur, 0);
+    // The new game's first announced level equals it: no line until L
+    // changes once.
+    let (mut s, mut h2) = (Fake::default(), Hooks::default());
+    h2.quest_ok = true;
+    for t in 0..=62 {
+        entry_tick(&mut e, &mut s, &mut h2, 3, t, 0);
+    }
+    assert!(h2.events.is_empty());
+    assert!(!e.entry.is_flagged(3));
+    // `-ns`: no music reset.
+    e.music.cur = SONG_A;
+    e.sound_init(true);
+    assert_eq!(e.music.cur, SONG_A);
+}
+
 // Covers: specs/audio/environment.md §4 text, §4 row1, §4 row2, §4 row3, §4 row4, §4 row5, §4 row6, §4 row7, §4 row8, §4 row9, §4 row10, §4 row11, §4 row12, §4 row13, §4 row14
 #[test]
 fn entry_table() {
@@ -979,7 +1011,7 @@ fn cue_fires_left_or_right() {
             Call::Roll(2, 0),
             Call::Roll(301, 300),
             Call::Roll(201, 5),
-            Call::SetPosition(1, -750, -95, 640),
+            Call::SetPosition(1, -750, -95, 0),
             Call::Roll(167, 166),
         ]
     );
@@ -988,7 +1020,7 @@ fn cue_fires_left_or_right() {
     s.t = 1251 + 333;
     s.rolls.extend([1, 0, 200, 0]);
     e.tick(&mut s, &mut h, &input(1, Some(cue_row())));
-    assert!(cue_calls(&mut s).contains(&Call::SetPosition(2, 450, 100, 640)));
+    assert!(cue_calls(&mut s).contains(&Call::SetPosition(2, 450, 100, 0)));
 }
 
 // Covers: specs/audio/environment.md §7 r5
