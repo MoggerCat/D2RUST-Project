@@ -18,6 +18,7 @@ pub mod check;
 pub mod click;
 pub mod dispatch;
 pub mod drlg;
+pub mod hover;
 pub mod intent;
 pub mod link;
 pub mod local;
@@ -333,6 +334,21 @@ impl<L: ServerLink> Bridge<L> {
             .map_err(BridgeError::Click)?;
         self.send_outgoing()?;
         Ok(r)
+    }
+
+    /// The interact sender (`client/model.md` §8 rule 7) on `key`, its
+    /// messages sent at once (the `play` preview's pending interaction on
+    /// arrival, `world_view::interact`; d2rs-own, unverified).
+    pub fn interact(&mut self, key: UnitKey) -> Result<Vec<output::Output>, BridgeError> {
+        let out = objects::interact::send(
+            &mut self.world,
+            &self.inputs,
+            u16::from(key.unit_type),
+            key.guid,
+        )
+        .map_err(BridgeError::Click)?;
+        self.send_outgoing()?;
+        Ok(out)
     }
 
     pub fn npc_dialog_branch(

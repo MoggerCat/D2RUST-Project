@@ -102,6 +102,8 @@ pub struct WorldViewState {
     /// in draw order: what the frame shows, for logs and tests.
     pub last_tags: Vec<crate::scene::ItemTag>,
     pub last_ui: Vec<crate::ui::UiDraw>,
+    /// The preview's pending interaction (`super::interact`).
+    pub interact: super::interact::PreviewInteract,
 }
 
 impl WorldViewState {
@@ -123,6 +125,7 @@ impl WorldViewState {
             preview_error: None,
             last_tags: Vec::new(),
             last_ui: Vec::new(),
+            interact: Default::default(),
         }
     }
 }
@@ -580,6 +583,8 @@ fn world_view_frame(
                 skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
                 mouse,
                 game_menu_open: false,
+                // d2rs-own, unverified (D1): the preview's hover pick.
+                pick: state.preview,
             };
             // d2rs-own, unverified (D2): the run lock (command 35) is the
             // toggle action no panel took; the click reads the predicted
@@ -596,15 +601,28 @@ fn world_view_frame(
                 }
                 None => (0, None),
             };
-            for o in world_clicks(
+            let outs = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
                 view,
                 &frame.unhandled,
                 mods,
                 local_at,
-            )? {
+            )?;
+            for o in &outs {
                 debug!("world click: {o:?}");
+            }
+            if let Some(w) = walk.as_deref() {
+                // d2rs-own, unverified (D1, D2): the pending interaction.
+                let pressed = frame
+                    .unhandled
+                    .iter()
+                    .any(|e| matches!(e, UiEvent::Press { .. }));
+                state.interact.note(&outs, pressed);
+                let walking = w.predict.walking().is_some();
+                for o in state.interact.frame(&mut bridge.0, walking)? {
+                    debug!("interact: {o:?}");
+                }
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
