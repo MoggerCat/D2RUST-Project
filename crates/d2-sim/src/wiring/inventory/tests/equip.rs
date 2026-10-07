@@ -68,7 +68,7 @@ fn two_handed_swap_and_removal_from_the_other_hand() {
     let mut w = World::new();
     let s = equipped(&mut w, SHIELD, 5);
     let t = w.cursor_item(TWO_HANDER);
-    w.rest.two_handed.insert(t);
+    w.inv.items[TWO_HANDER].twohanded = 1;
     let (su, tu) = (w.unit(s).unwrap(), w.unit(t).unwrap());
 
     assert_eq!(w.handle(&body(0x1A, t, 4)), Ok(0), "§4.3 gives 2 ≠ 1");
@@ -114,7 +114,7 @@ fn two_handed_swap_and_removal_from_the_other_hand() {
 fn two_handed_swap_needs_a_blocking_other_hand() {
     let mut w = World::new();
     let t = w.cursor_item(TWO_HANDER);
-    w.rest.two_handed.insert(t);
+    w.inv.items[TWO_HANDER].twohanded = 1;
     assert_eq!(w.handle(&body(0x1B, t, 4)), Ok(3), "other hand empty");
     let mut w = World::new();
     let _s = equipped(&mut w, SWORD, 5);

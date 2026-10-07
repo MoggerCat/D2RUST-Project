@@ -10,7 +10,8 @@
 //!
 //! Wired to the model: `has_cursor_item` (§1.4 rule 3), `owns_item`,
 //! `in_inventory`, `equipped_items` (grid 0, §1.2), `place_in_backpack`
-//! (§2.4), `remove_stored` (§1.4 unlink, then the free). Still the rest's
+//! (§2.4), `remove_stored` (§1.4 unlink, then the free), `copy_item`
+//! (§7.3, `InvDesk::copy_of`). Still the rest's
 //! (no written rule for the routine): `take_from_cursor` (`0x0055EEA0`),
 //! `unequip` (`0x00560CD0` by item), `can_belt` / `put_in_belt`
 //! (`0x0055E9B0`'s arguments here), `equip_ammo` (Open question 3),
@@ -176,8 +177,14 @@ where
     ) -> Option<UnitId> {
         self.inner.create_item(npc_class, record, quality, ilvl)
     }
+    /// `0x0055A2A0` (§7.3) on the inventory model: buy and sell pass
+    /// fillers 1 (§7.1 rule 9.2, §7.2). Without inventory parts: the
+    /// wrapped world's.
     fn copy_item(&mut self, item: UnitId) -> Option<UnitId> {
-        self.inner.copy_item(item)
+        if self.inv.is_none() {
+            return self.inner.copy_item(item);
+        }
+        self.with_desk(|d| d.copy_of(item, true)).flatten()
     }
     fn destroy_item(&mut self, item: UnitId) {
         self.inner.destroy_item(item)

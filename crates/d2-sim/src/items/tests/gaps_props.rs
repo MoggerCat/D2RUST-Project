@@ -324,16 +324,19 @@ fn func11_skill_on_event() {
     t.skills = vec![
         SkillRec::default(),
         SkillRec {
+            charclass: 0xFF,
             itypea1: 0,
             reqlevel: 18,
             maxlvl: 20,
         },
         SkillRec {
+            charclass: 0xFF,
             itypea1: 0,
             reqlevel: 9,
             maxlvl: 0,
         },
         SkillRec {
+            charclass: 0xFF,
             itypea1: 0,
             reqlevel: 1,
             maxlvl: 5,

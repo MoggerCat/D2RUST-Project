@@ -151,18 +151,21 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     fn own_contribution(&self, item: UnitId, unit: UnitId, stat: u16) -> i32 {
         self.rest.own_contribution(self.g(item), self.o(unit), stat)
     }
+    /// §4.8 on the gathered values ([`InvDesk::item_level_requirement`]).
     fn level_requirement(&self, item: UnitId, unit: UnitId) -> i32 {
-        self.rest.level_requirement(self.g(item), self.o(unit))
+        self.item_level_requirement(item, Some(unit))
     }
 
+    /// `0x006289C0` ([`InvDesk::is_two_handed`]).
     fn two_handed(&self, item: UnitId) -> bool {
-        self.rest.two_handed(self.g(item))
+        self.is_two_handed(item)
     }
     fn one_or_two_handed(&self, unit: UnitId, item: UnitId) -> bool {
         self.rest.one_or_two_handed(self.o(unit), self.g(item))
     }
+    /// `0x0062E6F0` ([`InvDesk::ammo_of`]).
     fn ammo_type(&self, item: UnitId) -> Option<i16> {
-        self.rest.ammo_type(self.g(item))
+        self.ammo_of(item)
     }
     /// `0x0063CB00` "fits a free position of page 0" read as the §2.3
     /// search on page 0 (on a copy: the search may create the grid).

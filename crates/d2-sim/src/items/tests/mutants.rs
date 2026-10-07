@@ -255,6 +255,7 @@ fn staff_tables() -> (ItemTables, usize) {
     t.skill_lists.lists[30] = 36;
     t.skills = (0..80)
         .map(|k| SkillRec {
+            charclass: 0xFF,
             itypea1: [ty::STAF as i16, ty::HELM as i16, 0, 1, -1][k % 5],
             reqlevel: 1,
             maxlvl: 20,
@@ -618,6 +619,7 @@ fn skill_event_level_cap_one() {
     let i = push_item(&mut t, item_rec(RING, b"rin "));
     t.properties = vec![prop1(11, 195)];
     t.skills = vec![SkillRec {
+        charclass: 0xFF,
         itypea1: 0,
         reqlevel: 1,
         maxlvl: 1,
@@ -704,6 +706,7 @@ fn skill_event_chance_one() {
     let i = push_item(&mut t, item_rec(RING, b"rin "));
     t.properties = vec![prop1(11, 195)];
     t.skills = vec![SkillRec {
+        charclass: 0xFF,
         itypea1: 0,
         reqlevel: 1,
         maxlvl: 20,
@@ -1319,10 +1322,11 @@ fn set_candidate_version() {
 fn skill_record_projection() {
     use d2_data::tables::Skills;
     let mut s = Skills::decode(&[0u8; Skills::SIZE]);
-    (s.itypea1, s.reqlevel, s.maxlvl) = (0xFFFF, 12, 20);
+    (s.itypea1, s.reqlevel, s.maxlvl, s.charclass) = (0xFFFF, 12, 20, 3);
     assert_eq!(
         SkillRec::from(&s),
         SkillRec {
+            charclass: 3,
             itypea1: -1,
             reqlevel: 12,
             maxlvl: 20

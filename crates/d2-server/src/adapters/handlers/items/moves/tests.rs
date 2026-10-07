@@ -168,6 +168,8 @@ fn item_tables() -> ItemTables {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
             t.staffmods = 0xFF;
+            // Empty `shoots`: the link miss (link16 −1).
+            t.shoots = 0xFFFF;
             t.rare = 1;
             t
         })
@@ -1034,7 +1036,9 @@ fn swap_two_handed_item() {
     let s = t.cursor_item(SHIELD);
     assert_eq!(t.frame(&body(0x1A, s, 5)).0, Done);
     let w = t.cursor_item(TWO_HANDER);
-    t.rest.with(|r| r.two_handed.insert(w));
+    // Two-handed is the items column (`wiring::inventory::queries`).
+    let inv = t.sim().world.inventory.as_mut().unwrap();
+    inv.tables.items[TWO_HANDER].twohanded = 1;
     assert_eq!(t.frame(&body(0x1B, w, 3)), (Malformed, NO_BYTES));
     let (code, bytes) = t.frame(&body(0x1B, w, 4));
     assert_eq!(code, Done);
@@ -1252,7 +1256,9 @@ fn scroll_to_book_and_its_fatal() {
     assert_eq!(t.rest.take_log(), [format!("send_item_stat {book} 70")]);
 
     let s2 = t.cursor_item(SCROLL);
-    t.rest.with(|r| r.spells.insert(s2, 7));
+    // The spell is item data +0x3E (suffix slot 0, `queries::spell_of`).
+    let s2u = t.unit(s2).unwrap();
+    t.sim().events.sys.hooks.items.get_mut(s2u).unwrap().suffix[0] = 7;
     assert_eq!(t.frame_raw(&msg(0x29, &[s2, book])), (Malformed, NO_BYTES));
     let faults = std::mem::take(&mut t.sim().world.action.faults);
     assert_eq!(

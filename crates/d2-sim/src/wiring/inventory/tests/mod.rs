@@ -7,12 +7,16 @@
 //! which logs every call.
 
 mod belt;
+mod bits;
 mod buffer;
+mod copy;
 mod equip;
 mod gold;
 mod ground;
 mod host;
 mod mutant_tests;
+mod queries;
+mod save_index;
 mod stack;
 
 use std::cell::RefCell;
@@ -160,6 +164,9 @@ fn item_tables() -> ItemTables {
             t.class = 0xFF;
             t.staffmods = 0xFF;
             t.rare = 1;
+            // An empty `shoots` cell compiles to the link's miss value
+            // (`data/field-types.md`: link16 miss −1).
+            t.shoots = 0xFFFF;
             t
         })
         .collect();
