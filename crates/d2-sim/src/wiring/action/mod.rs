@@ -24,6 +24,7 @@ pub mod ai;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
+pub mod hirelings;
 pub mod missiles;
 pub mod monster_add;
 pub mod monsters;
@@ -63,6 +64,7 @@ use crate::units::UnitId;
 use crate::world::waypoints::WaypointRecords;
 
 pub use dispatch::ActionSim;
+pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{
     ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
@@ -178,6 +180,11 @@ pub struct ActionHooks<X> {
     /// owner, every game type). `None` (the default): nothing is
     /// recorded.
     pub owner_deaths: Option<Vec<UnitId>>,
+    /// The hireling calls met in order (save restore, join follow, act
+    /// change; [`HirelingCall`]), for the host that holds the hireling
+    /// lists (`hirelings-2.md` §19). `None` (the default): nothing is
+    /// recorded.
+    pub hireling_calls: Option<Vec<HirelingCall>>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -273,6 +280,7 @@ impl<X> ActionHooks<X> {
             pet_follows: None,
             pet_deaths: None,
             owner_deaths: None,
+            hireling_calls: None,
             anim_data: None,
             vitals: None,
             mode_target: None,

@@ -8,12 +8,11 @@
 //! [`Owner`] / [`Guid`] so that path's `equip_on_merc` seam can be served
 //! by [`swap`].
 //!
-//! TODO(hirelings-2.md §19, C→S 0x61): no provider of [`HirelingItems`]
-//! exists yet, so the 0x61 give's `equip_on_merc` seam
-//! (`wiring::inventory`) is not routed to [`swap`]. The duplicate
-//! `0x0055A2A0` exists (`wiring::inventory::copy`, `InvDesk::copy_of`,
-//! `vendors-2.md` §7.3); the provider belongs to the inventory wiring,
-//! owned by the item interaction session (impl-items-wiring).
+//! Caller (`hirelings-2.md` §19): the 0x61 give's `equip_on_merc` seam
+//! on the inventory wiring (`wiring::inventory::merc`), with the host's
+//! hireling lists lent to the inventory state; its [`HirelingItems`]
+//! provider is `wiring::inventory::merc::MercItems` (the duplicate is
+//! `InvDesk::copy_of`, `vendors-2.md` §7.3).
 
 use crate::items::moves::{Guid, Owner};
 

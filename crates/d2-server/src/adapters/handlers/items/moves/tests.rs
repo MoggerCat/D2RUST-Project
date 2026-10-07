@@ -273,6 +273,8 @@ pub(crate) struct RestState {
     pub(crate) gold: bool,
     pub(crate) spells: BTreeMap<Guid, i32>,
     pub(crate) sent: Vec<(Owner, Vec<u8>)>,
+    /// The player has no used skill (`0x00620250` = null; §7.23 rule 2).
+    pub(crate) no_used_skill: bool,
 }
 
 /// [`MoveRest`] fake, shared with the test (and the cube and vendor
@@ -293,6 +295,9 @@ impl MRest {
 }
 
 impl MovePending for MRest {
+    fn has_used_skill(&self, _: Owner) -> bool {
+        !self.with(|r| r.no_used_skill)
+    }
     fn distance(&self, _: Owner, _: Owner) -> i32 {
         self.with(|r| r.distance)
     }
@@ -1331,6 +1336,72 @@ fn merc_item() {
     let c = t.cursor_item(CAP);
     assert_eq!(t.frame(&loc16(0x61, 1)), (Done, NO_BYTES));
     assert_eq!(t.mode(c), 4);
+}
+
+/// 0x61 give (§7.23) with a hireling on the host's lists
+/// (`WiredWorld::state.hirelings`, lent to the inventory wiring): the
+/// cap on the cursor goes to the swap `0x0054CED0` (`hirelings.md` §11
+/// rule 3): a duplicate (`0x0055A2A0`, a new GUID) in mode 1 at the
+/// merc's body location 1 (`BodyLoc1` of `helm`), the merc's inventory
+/// created, the player's cursor cleared.
+// Covers: specs/items/inventory-moves.md §7.23 r2, §7.23 r3; specs/world/hirelings.md §11 r1, §11 r3; specs/world/hirelings-2.md §19
+#[test]
+fn merc_give_swaps_onto_the_hosts_hireling() {
+    use d2_sim::world::hirelings::{HirelingTables, PetNode};
+    let mut t = setup();
+    let p = t.player;
+    let room = t.room;
+    t.rest.with(|r| r.no_used_skill = true);
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: Some(room),
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let sim = t.sim();
+    // Alive (`0x005541B0`): a player in mode 1.
+    sim.events.sys.units.get_mut(p).unwrap().mode = 1;
+    sim.events.sys.data.monsters = vec![d2_sim::units::hooks::MonsterInfo {
+        enabled: true,
+        aidel: [15; 3],
+        moves: 0,
+    }];
+    let merc = sim
+        .events
+        .with(&mut sim.game, |g, v| v.allocate(g, &req, 12, 12))
+        .unwrap();
+    let mg = sim.events.sys.units.get(merc).unwrap().guid;
+    sim.world.state.hireling_tables = Some(HirelingTables {
+        rows: Default::default(),
+        exp_ratios: Default::default(),
+        max_level: 99,
+        pet_flags: HirelingTables::WARP,
+        pet_basemax: 1,
+    });
+    sim.world.state.hirelings.list_mut(p).nodes = vec![PetNode {
+        guid: mg,
+        ..PetNode::default()
+    }];
+    // The cap's requirements (`inventory.md` §4.2) on the merc.
+    t.set_stat(merc, stat::LEVEL, 1);
+    t.set_stat(merc, 0, 10);
+    t.set_stat(merc, 2, 10);
+    let c = t.cursor_item(CAP);
+    let (code, _) = t.frame_raw(&loc16(0x61, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.inv().state.errors, vec![]);
+    let inv = t.inv();
+    let merc_inv = inv.state.inventories.get(&merc).expect("§11 rule 1");
+    let copy = merc_inv.body_item(1).expect("§11 rule 3: equipped");
+    assert!(inv.state.inventories[&p].cursor().is_none());
+    let cg = t.sim().events.sys.units.get(copy).unwrap().guid;
+    assert_ne!(cg, c);
+    assert_eq!(t.mode(cg), 1);
+    // The lists stay the host's.
+    assert!(t.inv().state.hirelings.is_none());
 }
 
 // ---- host wiring ------------------------------------------------------------------------

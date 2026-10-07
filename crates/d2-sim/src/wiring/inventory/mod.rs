@@ -38,6 +38,7 @@ pub mod bits;
 pub mod copy;
 pub mod host;
 pub mod inv_world;
+pub mod merc;
 pub mod ops;
 pub mod pending;
 pub mod queries;
@@ -105,6 +106,11 @@ pub struct InvState {
     /// §4.1 rule 8, §4.3 rule 7), queued by the read-only stream seam and
     /// written by [`InvDesk::apply_write_backs`].
     write_backs: RefCell<Vec<(UnitId, WriteBack)>>,
+    /// The game's hireling lists (`world/hirelings.md` §5), lent by the
+    /// host that holds them for a call (the 0x61 give's hireling,
+    /// owner test and swap, [`merc`]); read only here. `None` (the
+    /// default): those seams stay the rest's.
+    pub hirelings: Option<crate::world::hirelings::HirelingState>,
 }
 
 impl InvState {
