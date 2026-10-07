@@ -552,10 +552,10 @@ fn cow_king_kill() {
     );
 }
 
-// From specs/world/quests.md §6.1 and §6.2 r2: of the status functions
-// `quests.tsv` registers, only Act II's chains 27 and 26 still have no
-// body (reported, nothing written); a function with no body on any
-// chain takes the same fallback.
+// From specs/world/quests.md §6.1 and §6.2 r2: every status function
+// `quests.tsv` registers has a body now (Act II's chains 26 and 27 return
+// false and write nothing, quests-act2-2.md §1 item 18); a function with
+// no body on any chain is reported and nothing is written for it.
 #[test]
 fn unspecified_status_function_is_reported() {
     let (mut ctl, _) = control();
@@ -564,7 +564,7 @@ fn unspecified_status_function_is_reported() {
         r.status = u8::from(r.status_fn.is_some());
     }
     ctl.request_quest_data(&mut f, P1).unwrap();
-    assert_eq!(f.log, ["unhandled 27 0x59e4a0", "unhandled 26 0x59e2b0"]);
+    assert!(f.log.is_empty(), "{:?}", f.log);
     let list = &f.sent.last().unwrap().1;
     assert_eq!((list[1 + 30], list[1 + 31]), (0, 0));
     // Chain 1 has no status function in 1.14d; one with no body is

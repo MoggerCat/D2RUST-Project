@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §7 (Edge cases 7, 14)
+// Spec: specs/world/quests-act2-2.md §1 items 2, 6, 8
 //! Tests for [`super::q5`]: the Summoner record on the quests' fake
 //! world.
 
@@ -73,6 +74,7 @@ fn x(ctl: &QuestControl) -> &q5::Extra {
 }
 
 // Covers: specs/world/quests-act2.md §7.2
+// Covers: specs/world/quests-act2-2.md §1 r8
 #[test]
 fn summoner_seen_hook() {
     let (mut ctl, _) = control();
@@ -169,6 +171,7 @@ fn kill(ctl: &mut QuestControl, f: &mut Fake) {
 }
 
 // Covers: specs/world/quests-act2.md §7.2, §7.1, §edge-cases-original-bugs r14
+// Covers: specs/world/quests-act2-2.md §1 r8
 #[test]
 fn summoner_killed() {
     let (mut ctl, _) = control();
@@ -225,9 +228,12 @@ fn summoner_killed() {
     f.p(P3).act = Some(0);
     kill(&mut ctl, &mut f);
     assert_eq!(f.flags(P3).word(13), 1 << 14);
-    // A second kill adds no timer.
+    // A second kill adds no timer, but +0x09 := 0 again (on every
+    // not-intro kill, act2-2 §1 item 8).
+    ctl.record_mut(12).unwrap().extra.a2.q5.phase = 1;
     kill(&mut ctl, &mut f);
     assert_eq!(ctl.timers.len(), 1);
+    assert_eq!(x(&ctl).phase, 0);
 }
 
 // Covers: specs/world/quests-act2.md §7.2
@@ -337,6 +343,7 @@ fn final_messages() {
 }
 
 // Covers: specs/world/quests-act2.md §7.2, §7.1
+// Covers: specs/world/quests-act2-2.md §1 r2, §1 r6
 #[test]
 fn level_start_and_leave() {
     let (mut ctl, _) = control();
@@ -360,7 +367,9 @@ fn level_start_and_leave() {
     ctl.record_mut(12).unwrap().not_intro = true;
     ev(&mut ctl, &mut f, lvl(40, 41));
     assert_eq!(ctl.record(12).unwrap().guids.0, [2]);
-    // Event 10.
+    // Event 10 (`0x00545530` needs 13.0 and 13.1, act2-2 §1 item 2).
+    f.p(P2).quests.flags[0].set(13, 0);
+    f.p(P2).quests.flags[0].set(13, 1);
     ev(
         &mut ctl,
         &mut f,

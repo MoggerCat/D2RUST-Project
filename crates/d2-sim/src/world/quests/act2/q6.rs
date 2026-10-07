@@ -1,4 +1,5 @@
 // Spec: specs/world/quests-act2.md §8 (A2Q6 The Seven Tombs, chain 13, slot 14), §10
+// Spec: specs/world/quests-act2-2.md §1 items 6, 9, 10, 11, 12, 17, 19; §3 (orifice, C→S 0x44, S→C 0x58)
 //! A2Q6 callback by callback: the true-tomb choice (§8.1), chat and its
 //! wants-to-talk test (§8.3), level changes (§8.4), the status function
 //! (§8.5), the orifice and the staff hand-in (§8.6, §8.7), the lair
@@ -76,11 +77,9 @@ pub const STAFF_MISSILE_ROW: u32 = 338;
 /// `0x00738FAC`: Arcane Sanctuary dummy objects for tombs 66–72.
 pub const ARCANE_BASE: [u16; 7] = [313, 312, 308, 310, 311, 309, 307];
 
-/// `0x00538680(client, 2, difficulty)` (open question 7).
-const ACT_ACCESS: u32 = 0x0053_8680;
-/// `0x0059C9A0` → `0x0059C920`: Tyrael's party credit (§8.11, "tail per
-/// D2MOO, not re-read").
-const TYRAEL_PARTY: u32 = 0x0059_C9A0;
+/// The progression step of `0x00538680(client, 2, difficulty)` (Tyrael's
+/// portal, `quests-act1-rest.md` §5).
+const PROGRESSION_STEP: u8 = 2;
 
 /// Extra data (§8.2). The staff tomb level (+0x34) is the shared
 /// `act1::Extra::tomb_level`.
@@ -212,6 +211,8 @@ fn chat<W: QuestWorld>(
     let c = args.target.and_then(|n| w.monster_class(n));
     let r = rec(w, args.player);
     if c == Some(TYRAEL1) {
+        // Table state 2 when the door mode is 2; always returns
+        // (`quests-act2-2.md` §1 item 9).
         if xr(ctl, i).door_mode == 2 {
             add_state(ctl, w, i, list, args.target, 2);
         }
@@ -389,22 +390,44 @@ pub(super) fn status<W: QuestWorld>(
 
 // ------------------------------------------------------------ §8.6
 
-/// Orifice operate 25 (`0x0059DC70`). Returns the operate function's
-/// result (0 or 1).
+/// S→C 0x58 (`0x0053D8D0`, `quests-act2-2.md` §3.3): u8 0x58, u32 object
+/// GUID, u8 result, u8 "accepted with effect". Byte 6 is not written by
+/// the original for results 0, 1 and 4 (stale stack data, open question
+/// 1 there): d2rs sends 0.
+fn send_insert<W: QuestWorld>(w: &mut W, player: UnitId, guid: u32, result: u8, effect: u8) {
+    let g = guid.to_le_bytes();
+    w.send(player, &[0x58, g[0], g[1], g[2], g[3], result, effect]);
+}
+
+/// Orifice operate 25 (`0x0059DC70`, `quests-act2-2.md` §3.1). Returns
+/// the operate function's result (0 or 1).
+pub fn orifice_operate_checked<W: QuestWorld>(
+    ctl: &QuestControl,
+    w: &mut W,
+    object: UnitId,
+    player: UnitId,
+) -> u32 {
+    if ctl.find(CHAIN).is_none() {
+        return 0;
+    }
+    orifice_operate(w, object, player)
+}
+
+/// The orifice operate after its chain-13 test (`0x0059DC70` past the
+/// record lookup; [`orifice_operate_checked`] is the whole function).
 pub fn orifice_operate<W: QuestWorld>(w: &mut W, object: UnitId, player: UnitId) -> u32 {
     let guid = w.guid(object);
     match w.object_mode(object) {
         0 => {
             if w.player_busy(player) {
-                // TODO(quests-act2 §8.6): the spec gives no result for a
-                // busy player; reported, refused without a sound.
-                w.unhandled(CHAIN, 0x0059_DC70);
+                // Busy: return 1, no sound, no mode change, no 0x58
+                // (`0x0059DCFC`, `quests-act2-2.md` §1 item 19).
                 return 1;
             }
             if w.has_item(player, *b"hst ") {
                 w.set_interact_unit(player, Some((2, guid)));
                 w.set_object_mode(object, 1);
-                w.open_insert_dialog(player, object);
+                send_insert(w, player, guid, 0, 0);
                 0
             } else {
                 w.attach_sound(player, SOUND_REFUSED);
@@ -416,36 +439,55 @@ pub fn orifice_operate<W: QuestWorld>(w: &mut W, object: UnitId, player: UnitId)
             w.set_object_mode(object, 2);
             0
         }
-        // TODO(quests-act2 §8.6): the result of the other modes is not in
-        // the spec; 0 (nothing done).
+        // Any other mode: return 0 (§3.1).
         _ => 0,
     }
 }
 
-/// C→S 0x44 (`0x0054C380` → `0x005852E0`): the 0x58 result for an object
-/// of `class` and the cursor item's code. 4: refused (an orifice with a
-/// cursor item that is not `hst `); 5: accepted. On 5 the caller (object
-/// spec) moves the item off the cursor (`0x0055EEA0`), sends 0x58 result
-/// 5 with byte 6 = 1, then calls [`staff_inserted`].
-pub fn insert_result(class: u16, cursor: [u8; 4]) -> u8 {
-    if class == ORIFICE && cursor != *b"hst " {
-        4
-    } else {
-        5
-    }
-}
+/// C→S 0x44 action 2 (cancel).
+pub const INSERT_CANCEL: u16 = 2;
+/// C→S 0x44 action 3 (insert the cursor item).
+pub const INSERT_ITEM: u16 = 3;
 
-/// C→S 0x44 accepted: orifice mode := 1 then 2, then the hand-in
-/// (`0x0059DD80`).
-pub fn staff_inserted<W: QuestWorld>(
+/// C→S 0x44 past its size / busy / `0x00549520` checks: `0x005852E0(game,
+/// player, object GUID, item, action)` (`quests-act2-2.md` §3.2 steps
+/// 2–5). `item` is the cursor item (type 4 by its GUID). An object that
+/// does not exist: nothing. Insert into an object other than the orifice
+/// (step 5: `0x0055EEA0`, `0x00585240`) is the object spec's and is
+/// reported.
+pub fn item_to_object<W: QuestWorld>(
     ctl: &mut QuestControl,
     w: &mut W,
     player: UnitId,
-    object: UnitId,
+    object_guid: u32,
+    item: Option<UnitId>,
+    action: u16,
 ) {
-    w.set_object_mode(object, 1);
-    w.set_object_mode(object, 2);
-    hand_in(ctl, w, player, object);
+    let Some((object, class)) = w.object_by_guid(object_guid) else {
+        return;
+    };
+    match action {
+        INSERT_CANCEL => {
+            send_insert(w, player, object_guid, 1, 0);
+            w.set_object_mode(object, 0);
+            w.set_interact_unit(player, None);
+        }
+        INSERT_ITEM if class == ORIFICE => {
+            if item.and_then(|t| w.item_code(t)) != Some(*b"hst ") {
+                send_insert(w, player, object_guid, 4, 0);
+                return;
+            }
+            // No `0x0055EEA0` for the orifice: the staff stays on the
+            // cursor until the hand-in deletes it.
+            w.set_interact_unit(player, None);
+            send_insert(w, player, object_guid, 5, 1);
+            w.set_object_mode(object, 1);
+            w.set_object_mode(object, 2);
+            hand_in(ctl, w, player, object);
+        }
+        INSERT_ITEM => w.unhandled(CHAIN, 0x0058_52E0),
+        _ => {}
+    }
 }
 
 // ------------------------------------------------------------ §8.7
@@ -664,6 +706,8 @@ fn messages<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
     let class = u16::try_from(args.a).ok();
     match (class, args.b) {
         (Some(TYRAEL1), 302) if ctl.records[i].not_intro && !xr(ctl, i).portal_opened => {
+            // Tyrael then falls through to the 444–452 switch, where 302
+            // matches nothing (`quests-act2-2.md` §1 item 10).
             tyrael_portal(ctl, w, i, p)
         }
         (Some(JERHYN), 430) => {
@@ -703,7 +747,11 @@ fn messages<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: Ev
             super::clear_bit(w, p, SLOT, bit::ENTER_AREA);
             add_guid(ctl, w, i, p);
         }
+        // Jerhyn and Meshif return for any other message: 444–452 count
+        // for every other NPC class (`quests-act2-2.md` §1 item 10).
+        (Some(JERHYN | npc::MESHIF1), _) => {}
         (_, m) => {
+            // Jump table `0x0059CEB4` read raw (448, 450, 451: nothing).
             if let Some(&(_, b)) = TOWNSFOLK_MSGS.iter().find(|t| t.0 == m) {
                 set_bit(w, p, SLOT, b);
             }
@@ -719,23 +767,35 @@ fn tyrael_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: 
         .is_some_and(|(px, py, _)| w.create_portal(p, px, py, PORTAL, TOWN));
     if created {
         ctl.records[i].state = 4;
+        // `0x0059C860` for each player from Tyrael: room level 73 and
+        // lacks 14.13, 14.3 and 14.4.
         for q in w.players() {
-            // `0x0059C860`.
             let f = pf(w, q);
             if w.unit_level(q) == Some(DURIEL_LAIR)
                 && !f.get(SLOT, bit::PRIMARY_GOAL_DONE)
                 && !f.get(SLOT, bit::LEAVE_TOWN)
                 && !f.get(SLOT, bit::ENTER_AREA)
             {
-                set_bit(w, q, SLOT, bit::PRIMARY_GOAL_DONE);
-                set_bit(w, q, SLOT, bit::LEAVE_TOWN);
-                w.unhandled(CHAIN, ACT_ACCESS);
+                portal_grant(w, q);
             }
-            // TODO(quests-act2 §8.11): `0x0059C9A0` → `0x0059C920` (the
-            // party members of a player with 14.13): its tests are only
-            // partly read ("tail per D2MOO, not re-read"); reported.
-            if pf(w, q).get(SLOT, bit::PRIMARY_GOAL_DONE) && w.party_members(q).is_some() {
-                w.unhandled(CHAIN, TYRAEL_PARTY);
+        }
+        // `0x0059C9A0` for each player with 14.13: every party member
+        // gets `0x0059C920` (`quests-act2-2.md` §1 item 17).
+        for q in w.players() {
+            if !pf(w, q).get(SLOT, bit::PRIMARY_GOAL_DONE) {
+                continue;
+            }
+            for m in party(w, q) {
+                let f = pf(w, m);
+                // Chain 13 exists here; the member's own 14.13 and level
+                // are not tested.
+                if !f.get(SLOT, bit::REWARD_GRANTED)
+                    && !f.get(SLOT, bit::LEAVE_TOWN)
+                    && !f.get(SLOT, bit::ENTER_AREA)
+                    && in_act2(w, m)
+                {
+                    portal_grant(w, m);
+                }
             }
         }
         completion_flag(w);
@@ -745,6 +805,16 @@ fn tyrael_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: 
         arm_chat_end(ctl, i);
     }
     x(ctl, i).portal_opening = false;
+}
+
+/// `0x0059C810`: set 14.13, 14.3 and character progression
+/// `0x00538680(client, 2, difficulty)` (`quests-act1-rest.md` §5). No
+/// 0x28 is sent.
+fn portal_grant<W: QuestWorld>(w: &mut W, p: UnitId) {
+    set_bit(w, p, SLOT, bit::PRIMARY_GOAL_DONE);
+    set_bit(w, p, SLOT, bit::LEAVE_TOWN);
+    let d = w.difficulty();
+    w.character_progression(p, PROGRESSION_STEP, d);
 }
 
 /// `0x0059C9F0`: players lacking 14.0, 14.3, 14.4 get 14.14 and
@@ -783,15 +853,19 @@ fn kill_credit<W: QuestWorld>(w: &mut W, p: UnitId) -> bool {
     true
 }
 
-/// A player's and his party's kill credit (`0x0059CF20` / `0x0059CFB0`).
-fn kill_credit_party<W: QuestWorld>(w: &mut W, p: UnitId) {
-    if kill_credit(w, p) {
-        // TODO(quests-act2 §8.11): the party function's own test is not
-        // in the spec; the player's test is applied to each member.
-        for m in party(w, p) {
+/// A player's and his party's kill credit. Each member gets the member
+/// function `0x0059CF20`: lacks 14.0, 14.3, 14.4, 14.5 and is in Act II
+/// → 14.5 (`quests-act2-2.md` §1 item 12; chain 13 exists here).
+fn kill_credit_party<W: QuestWorld>(w: &mut W, p: UnitId) -> bool {
+    if !kill_credit(w, p) {
+        return false;
+    }
+    for m in party(w, p) {
+        if in_act2(w, m) {
             kill_credit(w, m);
         }
     }
+    true
 }
 
 /// Duriel's death (event 8, `0x0059D050`).
@@ -800,8 +874,9 @@ fn duriel_killed<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
         ctl.records[i].state = 3;
         add_timer(ctl, CHAIN, Timer::DurielStatus, 8);
         if let Some(k) = args.player {
-            kill_credit_party(w, k);
-            // `0x00545990`: a `ret 4` stub (edge case 13).
+            // `0x00545990` (a `ret 4` stub, edge case 13) is called only
+            // when the killer qualified, after his party.
+            let _qualified = kill_credit_party(w, k);
         }
     }
     // Edge case 12: even in an intro game.
@@ -875,9 +950,9 @@ fn start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: Option<U
         x(ctl, i).completed_before = true;
         return;
     }
-    // TODO(quests-act2 §8.11): "status n" here is read as a plain write
-    // of the status byte (not "silent", which also zeroes flags), and the
-    // three tests as consecutive ifs (the last one set wins).
+    // "status n, state m": direct byte stores, flags kept, nothing sent
+    // (`quests-act2-2.md` §1 item 6); the three tests as consecutive ifs
+    // (the last one set wins).
     let r = &mut ctl.records[i];
     if f.get(SLOT, bit::STARTED) {
         r.status = 1;
