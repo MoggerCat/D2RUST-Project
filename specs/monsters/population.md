@@ -48,7 +48,7 @@
 | Edge cases & original bugs | 977–1017 |
 | Test vectors | 1018–1089 |
 | Provenance | 1090–1112 |
-| Open questions | 1113–1159 |
+| Open questions | 1113–1165 |
 <!-- /index -->
 
 ## Summary
@@ -1156,3 +1156,9 @@ unique with 3 minions), and placement points.
    callees (2 call levels) contain no generator step (constant
    0x6AC690C5) and no `rng.md` helper call, on any seed; §Randomness
    step 4.3 is complete for them (superunique extra spawns: §11.4).
+   Corrected 2026-10-07: wrong for `0x005B1CF0`. Its BaseId 540 case
+   (ancientbarb1, and ancientbarb2/3 whose BaseId is 540) creates four
+   items three call levels down (`0x005B1C50` → `0x00573B20` →
+   `0x00559CE0`), each taking game-seed steps (the item's unit seed and
+   item seed) and the item's own rolls (`monsters/init.md` §14.3,
+   Randomness step 9). `0x005B21B0` draws nothing (6 levels scanned).

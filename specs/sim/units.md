@@ -28,16 +28,16 @@
 |   1. Unit kinds | 76–95 |
 |   2. Unit record | 96–134 |
 |   3. Lifecycle | 135–296 |
-|   4. Modes and mode schedules | 297–439 |
-|   5. Event dispatch | 440–454 |
-|   6. Events per kind | 455–549 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 550–571 |
-| Constants & data dependencies | 572–588 |
-| Randomness | 589–596 |
-| Edge cases & original bugs | 597–615 |
-| Test vectors | 616–675 |
-| Provenance | 676–715 |
-| Open questions | 716–758 |
+|   4. Modes and mode schedules | 297–557 |
+|   5. Event dispatch | 558–572 |
+|   6. Events per kind | 573–667 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 668–689 |
+| Constants & data dependencies | 690–706 |
+| Randomness | 707–714 |
+| Edge cases & original bugs | 715–733 |
+| Test vectors | 734–793 |
+| Provenance | 794–844 |
+| Open questions | 845–895 |
 <!-- /index -->
 
 ## Summary
@@ -358,8 +358,8 @@ Speed 0 gives event 1 at f + 1 in all forms. Callers: `0x00553B10` from
 Speed +0x4C is computed by `0x00623F50` from the AnimData speed (+0x0C)
 and percentages from stats 67, 68, 69 and states (clamps 15–175 %); the
 frame bonus `0x00623B10` is non-zero only for some player modes (table
-`0x006E8E60`, by class and weapon type). Both are owned by a future
-animation-rate spec (open question 2); §4.2 takes them as inputs.
+`0x006E8E60`, by class and weapon type). Both are §4.7 (answered
+2026-10-07); §4.2 takes them as inputs.
 
 #### 4.4 Every-tick movement (event 0, every tick)
 
@@ -436,6 +436,124 @@ sets mode 1 and, unless the unit has a type-2 timer with expire > f
 none), schedules event 2: f + 45 with state 21, else f + `aidel`
 (monstats +0x4F, the Normal column, or +0x4F + difficulty (game +0x6D)
 when game +0x6A or game +0x74 is non-zero; 0 → 15).
+
+#### 4.7 Animation rate `0x00623F50` and frame bonus `0x00623B10`
+
+**Rate** `0x00623F50(unit U, file, line)` (`ret 0xC`; 23 callers: every
+mode start and animation re-init, `0x00624390`, `0x005735A0`). It
+writes the speed U +0x4C (and in the cast and attack cases also the
+sequence speed +0x3C) and, in two cases, the path velocity
+(`sim/pathing.md` §8.1 owns the velocity rules; this section owns the
+speed).
+
+Definitions:
+
+- (T, C, M) = the draw identity of (type, class, mode +0x10) after the
+  disguise substitution `0x00645270` (`render/unit-composite.md` §1.1).
+- s = the AnimData speed (+0x0C) of the record that `0x00620F00(U, T,
+  C, M)` stores in U +0x50 (`formats/animdata.md` §5).
+- E(r), the diminished item bonus of row r of table `0x006E8E24`
+  ({flag, c, stat}, 12 bytes): v = the unit's item/skill value of the
+  stat (`0x00625500(U, stat, 0)`); flag = 1 and v ≠ 0 → v := c·v / (c
+  + v) (i32, truncating; every 1.14d row has flag 1). Rows: 0 stat 93
+  `item_fasterattackrate`, c 120; 1 stat 99 `item_fastergethitrate`,
+  120; 2 stat 105 `item_fastercastrate`, 120; 3 stat 102
+  `item_fasterblockrate`, 120; 4 stat 96 `item_fastermovevelocity`, 150.
+- total(k) = the unit total of stat k (`0x00625480(U, k, 0)`).
+- D(x, f) = s·f / 100 as unsigned 32-bit (the product is taken as i32,
+  then divided unsigned), then 0 if ≤ 0 (signed) and at most 0x7FFF.
+  A negative f therefore gives 0x7FFF.
+- Mode tables (`0x006E8A00` players by mode 0–19; monsters by mode 0–15:
+  `0x006E8B90` for class < 410, `0x006E8CD0` for class ≥ 410), 5 i32 per
+  mode: V-skill, V, A-skill, A, fixed. 1.14d: players V = 2, 3, 6; A = 7,
+  8, 11, 12; V-skill = A-skill = 13–16, 18; fixed = 0, 17. Monsters
+  (< 410): V = 2, 8–11, 15; A = 4, 5; V-skill = A-skill = 8–11, 14;
+  fixed = 0, 12. Monsters ≥ 410: as < 410 without V for 8–11.
+
+Steps, first match wins:
+
+1. U none, type 4 (item) or type ≥ 5 → nothing.
+2. Look up A (above).
+3. **Cast** (`0x006216E0`): T = 0 and M = 10 (SC), or T = 0, M = 18 (SQ)
+   and the used skill's (`0x00620250`) skills `seqtrans` (+0x12) is 10;
+   or T = 1 and M = 7 (SC). Speed := D(s, min(100 + E(2), 175)); +0x3C :=
+   the same. No lower clamp.
+4. **Block**: (T, M) = (0, 9) or (1, 6). f = 50, or 100 when U has state
+   101 `holyshield`; q = D(s, f + E(3)), at least 1. Speed := q.
+5. **Get hit**: (T, M) = (0, 4) or (1, 3). Speed := D(s, 50 + E(1)).
+6. **Knockback**: (T, M) = (0, 19) or (1, 13). Speed := w clamped to
+   0..0x7FFF, w = `0x006213D0(T, C, M)`: player: 101 when M = 3, else
+   213; monster: monstats run speed u16 +0x38 when M = 15, else walk
+   speed u16 +0x36 (`data/fixups.md` §8). Velocity := 0x1000.
+7. **Velocity modes** (`0x006214A0`, `sim/pathing.md` §8.1 rule 2): U
+   without a path (+0x2C) → nothing at all. p = max(E(4) + total(67
+   `velocitypercent`), 25). Speed := w·p / 100 (i32, truncating; then 0
+   if ≤ 0, at most 0x7FFF), w as in step 6; velocity := base·p / 100
+   (`sim/pathing.md` §8.1).
+8. **Attack modes** (`0x00621580`): the mode row's A ≠ 0, or A-skill ≠ 0
+   and the used skill's skills row has `UseAttackRate` (bit 19 of the
+   flags at +0x04). Then:
+   1. Dual-wield stat toggle `0x00623C80(U, 1)` (below).
+   2. v = E(0) + total(68 `attackrate`).
+   3. U can dual-wield (`0x006235A0`: player class 4 or 6, monster class
+      417 or 418) and the items at body locations 4 and 5
+      (`0x0063BDE0`), each counted only when usable (`0x0062A4E0`), are
+      both of item type 45 `weap`: v += (a4 + a5) / 2 − a4 (i32, the
+      halving truncates toward 0), a_k = the item's total(68).
+   4. U itself (not T) is a player in mode 18 (+0x10): v −= 30.
+   5. v := clamp(v, 15, 175).
+   6. b = `0x00646170(U)` when U has a state of group 38 (`meleeonly`,
+      `0x0063A7B0`) and that value is ≠ 0; else s. `0x00646170`: only a
+      player in a were-form (`0x0063A400`): W = the attack weapon
+      (below, flag 0); n = W's attack frames `0x0062A710(U, W)`
+      (`skills/bodies-2.md` §2.25), or 19 without W; n ≤ 0 → 0; result
+      = (U +0x48 with the low byte cleared) / n (i32, truncating).
+   7. Speed := +0x3C := D with b in place of s and f = v.
+9. **Fixed** (`0x00621630`, the row's fixed ≠ 0): speed := s clamped to
+   0..0x7FFF.
+10. Otherwise: speed := D(s, clamp(total(69 `other_animrate`), 15,
+    175)).
+
+Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
+an object or missile (objects take `0x00624390`'s own branch,
+`world/objects.md`). The rate draws nothing.
+
+**Dual-wield stat toggle** `0x00623C80(U, flag)` (dual-capable units
+only): S = the attack weapon (flag), W = the weapon in use
+(`0x0063BEF0`). "Active" = `0x00625820(item, 0)` ≠ 0; "on / off" =
+`0x00627910(U, item, 1 / 0)` (`sim/stat-lists.md` §8.4).
+S none: W active → W on. S = W: W active → W on; the other weapon
+(`0x0063BF90`) active → off. S ≠ W: S active → S on; W active → W off.
+
+**Attack weapon** `0x00623990(U, flag)` (`ret 8`): no inventory → none.
+D = the weapon pick `0x0063C9B0` (`skills/bodies-3.md` §3.3: location
+4, else 5, usable and type `weap`). U not dual-capable → D. Used skill
+(`0x006439A0`) or its skills row missing → D. q(k) =
+`0x0063C050(inventory, k)`: the first of the 11 equip slots whose item
+is, for type classes 2, 3, 12 (`1hs`, `1ht`, `ht1`; `0x00629FE0`): with
+k = 5 the weapon in use, with k = 6 not the weapon in use; for other
+items: its items `component` (+0x115) = k. By the skill's `weapsel`
+(+0x168):
+
+| weapsel | X |
+|---|---|
+| 1 | q(6) |
+| 2 | A = q(5), B = q(6); A of type `weap`, B of type `weap` and the skill flag 0x2000 (`0x006446A0`) → B; A `weap` otherwise → A; A none or not `weap` → B |
+| 3 | n = U +0x38 >> 8 (arithmetic); odd = n mod 2 (signed) for a server unit (+0xC8 bit 0x4000000), else n > 5; n = 0 → q(5); flag = 0 → q(6); odd ≠ 0 → q(6); else q(5) |
+| 4 | none, and D := none |
+| other | A = q(5) when of type `weap`, else q(6) |
+
+Result: X when it is of type `weap` and usable (`0x0062A4E0`), else D.
+
+**Frame bonus** `0x00623B10(U)` (`ret 4`; start index of §4.2): (T, C,
+M) as above; T ≠ 0 → 0. M = 7 or 8 (A1, A2), or M = 15 or 16 (S3, S4)
+when `0x006235A0(U)` holds: W = `0x00623990(U, 1)`; c = W's type class
+(`0x00629FE0`; 0 without W); bonus = i32 table `0x006E8E60`[7·c + C].
+Every other mode → 0. 1.14d table (84 entries, 12 type classes × 7
+player classes): Amazon (0) and Sorceress (1): 1 for type class 0, 2
+for type classes 2–6 (`1hs`, `1ht`, `stf`, `2hs`, `2ht`); everything
+else 0. Type class 12 (`ht1`) indexes past the table into zero bytes
+(`0x006E8FB0`…): 0.
 
 ### 5. Event dispatch
 
@@ -521,7 +639,7 @@ column value), `Parm0` +0x178, `Parm1` +0x17C.
 | Type | Handler | Scheduled by (expire) |
 |---|---|---|
 | 0 | `0x00581700` (trap tick, D2MOO) | object inits `0x0054F860`, `0x0054FB40` (f + 25); handler (f + 15 + roll mod 35) |
-| 1 | `0x00581490`: mode 1 (OP) → 2 (ON) when `Mode2` ≠ 0 (no update queued), then, if `HasCollision2` = 0, `0x00623830` | operate and init functions: f + fc1 + 1 (29 sites), f + fc1 (17 sites, e.g. `0x00545850`, quest objects `0x0058BD50`…), f + 2·fc1 (`0x005B5630`) |
+| 1 | `0x00581490` (corrected 2026-10-07): only when the mode (u16 at +0x10) is 1 (OP) and objects `Mode2` (+0x141) ≠ 0: the mode field := 2 (ON) by a direct write (no mode set, no update queued, flags unchanged), then, still inside that branch, `HasCollision2` (+0x122) = 0 → footprint free `0x00623830`; otherwise nothing | operate and init functions: f + fc1 + 1 (29 sites), f + fc1 (17 sites, e.g. `0x00545850`, quest objects `0x0058BD50`…), f + 2·fc1 (`0x005B5630`) |
 | 2 | `0x00581510` (D2MOO: well refill) | `0x005858A0`: f + `Parm0` + 1; restore `0x00542B40` (site `0x00542D89`) |
 | 3 | `0x005818B0` | `0x0054FB90` (f + 25); handler (f + 15, f + fc1 + 1) |
 | 4 | `0x005817A0` (trap) | `0x00582510` (f + 35) |
@@ -713,18 +831,37 @@ Ghidra backlog (2026-10-06): store `0x00542E10` (falls through to
 `0x00541AC0`; `0x0063A770` → state-flag list 33 (`udead`, live
 `states.txt`).
 
+§4.7 (2026-10-07): 1.14d asm of `0x00623F50`, `0x00623B10`,
+`0x00623990`, `0x00623C80`, `0x006216E0`, `0x006214A0`, `0x00621580`,
+`0x00621630`, `0x00621740`, `0x006213D0`, `0x00621360`, `0x006235A0`,
+`0x00646170`, `0x0063C050`, `0x00628660`; tables read from
+`game/Game.exe`: `0x006E8E24` (animstat rows), `0x006E8A00`,
+`0x006E8B90`, `0x006E8CD0` (mode rows), `0x006E8E60` (frame bonus,
+checked zero through `0x006E8FDC`), jump tables `0x00623C04` /
+`0x00623C10`, `0x00623AFC`; stat and state names from live
+`itemstatcost.txt` / `states.txt`. Open question 3: scan of all.asm for
+`+0xA8 + 8·i` accesses.
+
 ## Open questions
 
 1. A 0.2.0 recording (`record_tick.py`, `docs/HANDOFF.md` §5) must run
    U4 with `anim` records and U11 with `site` on every schedule, and
    reach the unobserved combinations (combat with skills, shrines,
    wells, a trade, a cooldown skill).
-2. Animation rate `0x00623F50` and frame bonus `0x00623B10` (inputs of
-   §4.2): owner spec and formulas; to be checked against the logged
-   +0x4C and bonus of `anim` records.
-3. Player position history read from `GetTickCount` (edge case 4): does
-   it feed any outcome (client correction, anti-cheat), and what does
-   `d2-sim` use instead?
+2. Answered (2026-10-07): §4.7 (owner: this spec), read from the 1.14d
+   asm with its tables; still to be checked against the logged +0x4C
+   and bonus of `anim` records (Open question 1).
+3. Answered (2026-10-07): it feeds pet movement. The only readers of
+   the entries (scan of every `+0xA8 + 8·i` access) are the pet AI
+   helpers `0x005E3930` and `0x005E3EA0` (`monsters/ai-bodies-6.md`,
+   pet and hireling move); the timestamp +0xA4 is read only by the walk
+   step's 25 ms gate (`0x00580C20`) and written there and by the
+   teleport write `0x00554FD0` (`sim/path-placement.md` §10 rule 7).
+   `d2-sim` uses now = frame · 40 ms: one walk step per frame at 25
+   frames per second is always more than 25 ms after a write of an
+   earlier frame, and a walk step in the frame of a teleport write is
+   gated, as it is in real time. A recording that moves a player with a
+   hireling (positions of the 20 entries per frame) confirms it.
 4. Object delays rolled from the object-control seed (events 0, 8):
    confirm the draw with an RNG + tick recording.
 5. Answered (2026-10-07): the only type-4 site of the 269
