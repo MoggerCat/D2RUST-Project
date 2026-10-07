@@ -68,6 +68,12 @@ pub struct TestPending {
     pub ranged: std::cell::RefCell<Vec<(UnitId, UnitId)>>,
     /// The corpse `create_corpse` answers and its owner GUID.
     pub corpse: Option<(UnitId, u32)>,
+    /// Modes `class_has_mode` denies (every other mode exists).
+    pub missing_modes: Vec<u8>,
+    /// Used skills (`0x00620250`) by unit.
+    pub used: BTreeMap<UnitId, crate::skills::SkillEntry>,
+    /// What the monster skill start `0x0056FAF0` answers (logged).
+    pub skill_start: i32,
 }
 
 impl Pending for TestPending {
@@ -147,8 +153,26 @@ impl Pending for TestPending {
     fn may_attack(&self, a: UnitId, d: UnitId) -> bool {
         a != d
     }
-    fn class_has_mode(&self, _: i32, _: u8) -> bool {
-        true
+    fn class_has_mode(&self, _: i32, mode: u8) -> bool {
+        !self.missing_modes.contains(&mode)
+    }
+    fn used_skill(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
+        self.used.get(&unit).copied()
+    }
+    fn monster_skill_start(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) -> i32 {
+        h.x.log.push(format!("skill start {}", unit.0));
+        h.x.skill_start
+    }
+    fn monster_sequence_frame(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) {
+        h.x.log.push(format!("sequence frame {}", unit.0));
     }
     fn unit_event(
         &mut self,

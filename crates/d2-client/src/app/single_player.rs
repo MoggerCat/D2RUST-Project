@@ -71,14 +71,14 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::tables::{
-    decode_all, Itemstatcost, Leveldefs, Levels, Monstats, Objects, Record, Shrines, Skills,
+    decode_all, Itemstatcost, Levels, Monstats, Objects, Record, Shrines, Skills,
 };
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox, WiredWorld};
-use d2_server::adapters::session::{load_save, Entry, GameSetup, PlayerRecord, SkillHand};
+use d2_server::adapters::session::{load_new_character, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -166,37 +166,56 @@ pub const GAME_SETUP: GameSetup = GameSetup {
     ladder: false,
 };
 
-/// The local client's C→S 0x67 (`intents-events.md` §2.5): the
-/// character class and name above, game type 3 (single player's create
-/// message, `rng.md` §5 open question answered: `0x00477CDF`), Normal,
-/// expansion (flags bit 20) with bit 2 set, locale 0; passes the server's
-/// stated checks.
-///
-/// PROVISIONAL (ui/menus.md, client sender of C→S 0x67): the game name,
-/// template, arena and bytes 43–44 are zeros (no server rule d2rs runs
-/// reads them, `session_flow` module docs); settled by a packet capture
-/// of a real 0x67 from the menus (HANDOFF §7 PC 2 recording list).
+/// The local client's C→S 0x67 (`client/model.md` §7 rule 9, builder
+/// `0x00477CA0`; checks `intents-events.md` §2.5): the character class
+/// and name above, game type 3, Normal, an expansion character's flags
+/// 0x00100004, locale 0; passes the server's checks.
 pub fn create_request() -> CreateGame {
     create_request_for(&Character::New)
 }
 
-/// The local client's C→S 0x67 for `character`: [`create_request`]'s,
-/// with a save's class (+0x28) and name (+0x14) for
-/// [`Character::Save`] (the client sends the selected character's,
-/// `intents-events.md` §2.5).
+/// The 0x67 u32@0x27 of an expansion character: the builder's default
+/// 4 | 0x100000 (`client/model.md` §7 rule 9; recorded 0x00100004).
+pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
+
+/// The 0x67 u32@0x27 of a classic character.
+///
+/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
+/// expansion bit 20.
+pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
+
+/// The local client's C→S 0x67 for `character` (`client/model.md` §7
+/// rule 9): game name empty (byte 1 = 0), game type 3 (client type 0),
+/// the character's class and name ([`Character::Save`]: the save's
+/// class +0x28 and name +0x14), template 0, the game's difficulty,
+/// u16@0x25 = 0, the flags of an expansion or a classic character (save
+/// status bit 5), @0x2B = @0x2C = 0, language id 0. Bytes after a name's
+/// NUL are zero.
 pub fn create_request_for(character: &Character) -> CreateGame {
-    let (class, name) = match character {
-        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME),
-        Character::Save(save, _) => (save.header.class, save.header.name_bytes()),
+    let (class, name, expansion) = match character {
+        Character::New => (PLAYER_CLASS as u8, PLAYER_NAME, GAME_SETUP.expansion),
+        Character::Save(save, _) => (
+            save.header.class,
+            save.header.name_bytes(),
+            save.header.status & d2_formats::d2s::status::EXPANSION != 0,
+        ),
     };
     let mut char_name = [0u8; 16];
     char_name[..name.len()].copy_from_slice(name);
     CreateGame {
         game_type: GAME_TYPE,
         class,
+        template: 0,
         difficulty: GAME_SETUP.difficulty,
         char_name,
-        flags: create_flags::EXPANSION | 0x4,
+        arena: 0,
+        flags: if expansion {
+            CREATE_FLAGS_EXPANSION
+        } else {
+            CREATE_FLAGS_CLASSIC
+        },
+        unk_43: 0,
+        unk_44: 0,
         locale: 0,
         ..CreateGame::default()
     }
@@ -208,12 +227,10 @@ pub fn create_request_for(character: &Character) -> CreateGame {
 pub enum Character {
     /// A new character of the 0x67 request's class and name, as the save
     /// loader leaves a player (no room, at (0, 0), mode 1), knowing Cold
-    /// Plains' waypoint on Normal (the server tests' staging).
-    ///
-    /// Its entry carries the new-character record
-    /// ([`new_character_record`], `formats/d2s-load.md` §8 r1, r3): the
-    /// join sends 0x5F with the portal flags and the two 0x23 of the
-    /// zero-filled hands.
+    /// Plains' waypoint on Normal (the server tests' staging). It is the
+    /// stub load (`intents-events.md` §8.2 rule 7,
+    /// `d2_server::adapters::session::load_new_character`), so the join
+    /// sends 0x5F and the two 0x23.
     #[default]
     New,
     /// A parsed `.d2s` loaded onto the new player
@@ -380,15 +397,7 @@ pub struct WaypointTables {
     pub levels: Vec<Levels>,
     pub objects: Vec<Objects>,
     pub object_class: u32,
-    /// The portal level list (`data/runtime-maps.md` leveldefs: the
-    /// level indices whose `Portal` ≠ 0, in order).
-    pub portal_levels: Vec<u32>,
 }
-
-/// The 1.14d portal level list (`data/runtime-maps.md` leveldefs), for
-/// the synthetic tables.
-pub const PORTAL_LEVELS_114D: [u32; 16] =
-    [1, 3, 5, 7, 27, 29, 33, 36, 40, 43, 45, 46, 53, 54, 74, 134];
 
 impl WaypointTables {
     /// The bridge test's rows: 150 levels (act 1 from level 40),
@@ -411,7 +420,6 @@ impl WaypointTables {
             levels,
             objects: vec![o],
             object_class: 0,
-            portal_levels: PORTAL_LEVELS_114D.to_vec(),
         }
     }
 
@@ -433,19 +441,10 @@ impl WaypointTables {
             .iter()
             .position(|o| o.operatefn == 23 && o.initfn == 17)
             .ok_or(BuildError::NoWaypointObject)? as u32;
-        let leveldefs: Vec<Leveldefs> =
-            decode_all(table("leveldefs")?).map_err(|e| BuildError::Tables(e.to_string()))?;
-        let portal_levels = leveldefs
-            .iter()
-            .enumerate()
-            .filter(|(_, l)| l.portal != 0)
-            .map(|(i, _)| i as u32)
-            .collect();
         Ok(WaypointTables {
             levels,
             objects,
             object_class,
-            portal_levels,
         })
     }
 
@@ -453,37 +452,6 @@ impl WaypointTables {
     fn waypoint(&self, level: u32) -> Option<u8> {
         let wp = self.levels.get(level as usize)?.waypoint;
         (wp != NO_WAYPOINT).then_some(wp)
-    }
-
-    /// Player data +0x2C of a new player record, `0x0061AE30(1)`
-    /// (`formats/d2s-load.md` §8 r1): 1 << i, i = the position of level 1
-    /// in the portal level list ([`WaypointTables::portal_levels`]); 0
-    /// when level 1 is not in it. 1.14d: level 1 is the first, so 1.
-    pub fn portal_flags(&self) -> u32 {
-        self.portal_levels
-            .iter()
-            .position(|&l| l == 1)
-            .and_then(|i| 1u32.checked_shl(i as u32))
-            .unwrap_or(0)
-    }
-}
-
-/// The player record of a new character at the join
-/// (`formats/d2s-load.md` §8 r3): +0x2C = `portal_flags` (r1); hand 1 =
-/// (skill 0, item 0); hand 0 = (`right` or 0, item 0): the hand items
-/// (+0x78, +0x7C) are never written on this path and keep the zero fill.
-/// `right` is the `StartSkill` load §1 r1 selects (client act 0, the
-/// class's `StartSkill` ≠ 0 and owned by the unit).
-pub fn new_character_record(portal_flags: u32, right: Option<u16>) -> PlayerRecord {
-    PlayerRecord {
-        portal_flags,
-        hands: [
-            SkillHand {
-                skill: right.unwrap_or(0),
-                item: 0,
-            },
-            SkillHand { skill: 0, item: 0 },
-        ],
     }
 }
 
@@ -1186,10 +1154,7 @@ pub fn build_with(
     // state 3). The next tick populates the town's rooms, the client's room
     // is ready and the client pass sends 0x04 (`tick.md` §6 rule 6).
     let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
-    s.set_session(SessionFlow::new(
-        GAME_SETUP.arena_flags,
-        loader(character, cold_plains_wp, wp_tables.portal_flags()),
-    ));
+    s.set_session(SessionFlow::new(loader(character, cold_plains_wp)));
     Ok(LocalGame {
         sim: s,
         waypoint,
@@ -1205,7 +1170,6 @@ pub fn build_with(
 fn loader(
     character: Character,
     cold_plains_wp: Option<u8>,
-    portal_flags: u32,
 ) -> CharacterLoader<WorldSim<LocalSeams>, World> {
     Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
         let req = AllocRequest {
@@ -1254,12 +1218,16 @@ fn loader(
                             .push(format!("join: waypoint {index}: {e:?}"));
                     }
                 }
-                // Load §1 r1: this player gets no start stats, items or
-                // skill entries (the d2rs new character is not the stub
-                // path), so it does not own its `StartSkill` and no
-                // right skill is selected (no extra 0x23 in the load).
-                let mut entry = Entry::new(0, r.char_name);
-                entry.record = Some(new_character_record(portal_flags, None));
+                // §8.2 rule 7: the stub path (start stats, `StartSkill`),
+                // so the join sends 0x5F and the two 0x23.
+                let (entry, report) = load_new_character(s, player, r.char_name);
+                let log = &mut s.events.action.hooks().x.log;
+                log.extend(
+                    report
+                        .unapplied
+                        .iter()
+                        .map(|u| format!("join: new character: {u:?}")),
+                );
                 (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
@@ -1366,25 +1334,4 @@ pub fn start_with<C: Clock + Send + 'static>(
         .recv()
         .map_err(|_| BuildError::Setup("game not started".into()))?;
     Ok((link, started))
-}
-
-#[cfg(test)]
-mod record_tests {
-    use super::*;
-
-    // Covers: specs/formats/d2s-load.md §8 r1, §8 r3
-    #[test]
-    fn new_character_record_and_portal_flags() {
-        let t = WaypointTables::synthetic();
-        assert_eq!(t.portal_flags(), 1);
-        let mut t2 = t.clone();
-        t2.portal_levels = vec![3, 5, 1];
-        assert_eq!(t2.portal_flags(), 4);
-        t2.portal_levels.clear();
-        assert_eq!(t2.portal_flags(), 0);
-        let r = new_character_record(1, None);
-        assert_eq!(r.portal_flags, 1);
-        assert_eq!(r.hands, [SkillHand { skill: 0, item: 0 }; 2]);
-        assert_eq!(new_character_record(1, Some(36)).hands[0].skill, 36);
-    }
 }

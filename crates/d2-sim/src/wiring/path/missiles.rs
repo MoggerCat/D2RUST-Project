@@ -1,4 +1,4 @@
-// Spec: specs/sim/path-placement.md §2.3, §6 r4; specs/skills/bodies-3.md §3.8; specs/skills/bodies-4.md §2.4; specs/sim/pathing.md §2, §11; specs/skills/bodies.md §2.4; specs/skills/bodies-2.md §2.3; specs/missiles/bodies.md §19; specs/missiles/bodies-2.md §46 (missile-body path seams on the path provider)
+// Spec: specs/sim/path-placement.md §2.3, §6 r4; specs/skills/bodies-3.md §3.8; specs/skills/bodies-4.md §2.4; specs/sim/pathing.md §2, §11, §13.1, §13.2, §13.3; specs/skills/bodies.md §2.4; specs/skills/bodies-2.md §2.3; specs/missiles/bodies.md §19; specs/missiles/bodies-2.md §46 (missile-body path seams on the path provider)
 //! The path seams of the missile server-do / server-hit bodies
 //! ([`crate::missiles::MissileBodies`]) answered by the path provider:
 //! the target point (`0x00648A00` / `0x00648A10`), the target position
@@ -9,13 +9,29 @@
 use crate::game::Game;
 use crate::path::record::PATH_POINTS;
 use crate::path::walk::seams::PathWorld;
-use crate::units::{RoomId, UnitId};
+use crate::path::DynamicPath;
+use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::{Pending, View, WiringError};
 
 use super::PathCtx;
 
 /// The step-count cap of `0x00648E70` (`skills/bodies-2.md` §2.3: 77).
 pub const STEP_COUNT_CAP: i32 = PATH_POINTS as i32 - 1;
+
+/// Step counts `0x00648E70(path, n)` (`pathing.md` §13.1 rule 1): only
+/// the low byte of n, unsigned, capped at 77. So −1 → 255 → 77, −256 →
+/// 0, −200 → 56, 300 → 44.
+pub fn step_count_byte(n: i32) -> u8 {
+    (n as u8).min(STEP_COUNT_CAP as u8)
+}
+
+/// `0x00648E70` on a path: the distance budget (+0x90) and the max path
+/// distance (+0x91) := [`step_count_byte`].
+pub fn set_step_counts(d: &mut DynamicPath, n: i32) {
+    let b = step_count_byte(n);
+    d.dist_budget = b;
+    d.max_distance = b;
+}
 
 impl<X: Pending> View<'_, X> {
     /// The path target point (path +0x10, +0x12).
@@ -27,27 +43,46 @@ impl<X: Pending> View<'_, X> {
         )
     }
 
-    /// `0x0056D2C0` (`skills/bodies.md` §2.4): the path's target unit's
-    /// position, else the path target point; `Some(None)` when either
-    /// coordinate is 0.
-    // PROVISIONAL (skills/bodies.md §2.4): a stale target unit (GUID no
-    // longer found) falls through to the path target point; the stored
-    // unit's position is read only while it resolves (as `path_target`);
-    // settled by a bin read of `0x0056D2C0`.
+    /// `0x00553540(game, unit)` (`pathing.md` §13.2 rule 1): the target
+    /// check `0x00553490` (a target unit whose stored type and GUID no
+    /// longer resolve to the stored unit, or an item in mode 1 or 2, is
+    /// cleared to none), then the path's target unit; the unit itself
+    /// counts as none.
+    pub(crate) fn path_target_checked(&mut self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        let d = self.h.paths.as_ref()?.dynamic(unit)?;
+        let t = d.target_unit?;
+        let stale = match game.lists.find_unit(t.ty, t.guid) {
+            Some(f) if f == t.unit => self
+                .units
+                .get(f)
+                .is_some_and(|r| r.ty == UnitType::Item && matches!(r.mode, 1 | 2)),
+            _ => true,
+        };
+        if stale {
+            if let Some(d) = self.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+                d.target_unit = None;
+            }
+            return None;
+        }
+        (t.unit != unit).then_some(t.unit)
+    }
+
+    /// `0x0056D2C0` (`pathing.md` §13.2 rules 2–3): T := the checked path
+    /// target ([`View::path_target_checked`], which clears a stale one);
+    /// T present → its position, else the path's target point (+0x10,
+    /// +0x12). `Some(None)` when either coordinate is 0.
     pub(crate) fn path_target_position(
-        &self,
+        &mut self,
         game: &Game,
         unit: UnitId,
     ) -> Option<Option<(i32, i32)>> {
-        let p = self.h.paths.as_ref()?;
-        let Some(d) = p.dynamic(unit) else {
+        self.h.paths.as_ref()?;
+        let t = self.path_target_checked(game, unit);
+        let Some(d) = self.h.paths.as_ref()?.dynamic(unit) else {
             return Some(None);
         };
-        let live = d
-            .target_unit
-            .filter(|t| game.lists.find_unit(t.ty, t.guid) == Some(t.unit));
-        let (x, y) = match live {
-            Some(t) => self.h.path_position(t.unit),
+        let (x, y) = match t {
+            Some(t) => self.h.path_position(t),
             None => (i32::from(d.target_x), i32::from(d.target_y)),
         };
         Some((x != 0 && y != 0).then_some((x, y)))
@@ -65,29 +100,25 @@ impl<X: Pending> View<'_, X> {
         Some(())
     }
 
-    /// Step counts `0x00648E70`: distance budget (+0x90) and max path
-    /// distance (+0x91) := n, capped at 77 (`skills/bodies-2.md` §2.3).
-    // PROVISIONAL (skills/bodies-2.md §2.3): a negative n is unreachable
-    // (callers pass frame counts); it would be stored as its low byte;
-    // settled by none needed.
+    /// Step counts `0x00648E70` ([`set_step_counts`], `pathing.md` §13.1
+    /// rule 1).
     pub(crate) fn path_set_step_counts(&mut self, unit: UnitId, n: i32) -> Option<()> {
         let p = self.h.paths.as_mut()?;
         if let Some(d) = p.dynamic_mut(unit) {
-            let v = n.min(STEP_COUNT_CAP) as u8;
-            d.dist_budget = v;
-            d.max_distance = v;
+            set_step_counts(d, n);
         }
         Some(())
     }
 
     /// `0x00621DC0(unit, x, y)` → `0x0064FDC0` (`skills/bodies-3.md`
     /// §3.8): the direction vector's direction (`pathing.md` §8.3 rules
-    /// 1–3) from the unit's position to (x, y). §8.3 rule 4
-    /// (`0x0064FED5`) is the §8.4 caller's and is not applied.
-    // PROVISIONAL (skills/bodies-3.md §3.8): `0x0064FDC0` is fed
-    // sub-tile coordinates (not the path's 16.16 ones; equal whenever
-    // both fractions match); settled by a bin read and a direction trace
-    // (RNG-free; matters only if a direction diverges).
+    /// 1–3) from the unit's position to (x, y).
+    ///
+    /// TODO(spec: skills/bodies-3.md §3.8): the coordinates `0x0064FDC0`
+    /// feeds §8.3 (sub-tile position or the path's 16.16 one, and the
+    /// target's fraction) are not stated; sub-tiles are used (equal to
+    /// 16.16 whenever both fractions match). §8.3 rule 4 (`0x0064FED5`)
+    /// is the §8.4 caller's and is not applied.
     pub(crate) fn path_dir64(&self, unit: UnitId, at: (i32, i32)) -> Option<i32> {
         let p = self.h.paths.as_ref()?;
         let (x, y) = self.h.path_position(unit);

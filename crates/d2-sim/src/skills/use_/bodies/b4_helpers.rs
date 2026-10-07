@@ -694,11 +694,6 @@ pub fn zigzag<W: BodyWorld>(
         init: Some((cb, 0)),
         ..MissileRequest::new(u, m)
     };
-    // `bodies-4.md` Edge case 1: a step ≤ 0 never ends the original's
-    // loop (the game hangs); d2rs deliberately creates nothing.
-    if step <= 0 {
-        return;
-    }
     let p2 = param(t, 280, 2).wrapping_add(1);
     let mut i = 0;
     while i < 64 {
@@ -713,6 +708,19 @@ pub fn zigzag<W: BodyWorld>(
             if ring || m == 568 {
                 w.effect(BodyEffect::MissileData28 { missile: mm, v: p2 });
             }
+        }
+        // `bodies-4.md` Edge case 1 (d2rs decision): a step ≤ 0 never
+        // ends the original's loop (it hangs, or a negative step reads
+        // past the ring tables). d2rs stops here, after the i = 0
+        // missile the original makes first, creates no further missile
+        // and reports the fault.
+        if step <= 0 {
+            w.effect(BodyEffect::EndlessProgressive {
+                unit: u,
+                skill,
+                step,
+            });
+            return;
         }
         i += step;
     }

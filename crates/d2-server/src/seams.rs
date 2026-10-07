@@ -128,6 +128,25 @@ pub trait MessageSink {
     fn has_queued(&self, _client: ClientId) -> bool {
         false
     }
+
+    /// A direct send (spec §3.3 rule 5): straight to the client's receive
+    /// lists, ahead of anything still buffered. Default: refused (a sink
+    /// with no receive lists cannot do it; never a silent queue).
+    fn send_direct(
+        &mut self,
+        _client: ClientId,
+        msg: &[u8],
+    ) -> Result<(), crate::buffers::QueueError> {
+        Err(crate::buffers::QueueError::NoDirect(
+            msg.first().copied().unwrap_or(0),
+        ))
+    }
+
+    /// Flushes one client's buffers into its receive lists
+    /// (`0x0052E320(game, 0)`, the leave of §2.5 rule 2). Default: refused.
+    fn flush_client(&mut self, _client: ClientId) -> Result<(), crate::buffers::QueueError> {
+        Err(crate::buffers::QueueError::NoDirect(0))
+    }
 }
 
 /// Game state the dispatcher reads and the intent handlers.

@@ -43,8 +43,9 @@
 //!
 //! The values the join takes from the character (the save: name, act,
 //! hot keys, the player record's portal flags and skill hands) are
-//! [`Entry`]'s; the save loader is not wired (`path-placement.md` §13
-//! rule 2), so a caller without a record gets no 0x5F and no 0x23.
+//! [`Entry`]'s. A new character ([`Entry::new_character`], §8.2 rule 7)
+//! has its record, so it gets 0x5F and the two 0x23 (item 0), after the
+//! load's own 0x23; a caller without a record gets no 0x5F and no 0x23.
 //!
 //! Not sent, because no spec gives them (named, not guessed):
 //! - the loader's other messages after 0x76 (rule 3.1: 0x94, 0x22, 0x21,
@@ -136,12 +137,15 @@ pub struct Entry {
     pub name: [u8; 16],
     /// The client's hot-key slots.
     pub hotkeys: [HotKey; 16],
-    /// The player record's values. `None`: not given (no save loader is
-    /// wired), so 0x5F and the two 0x23 are not sent.
-    ///
-    /// TODO(spec: formats/d2s.md, intents-events.md §8.2 rule 3): the
-    /// record of a new character (`0x00532590`) is not specified.
+    /// The player record's values. `None`: not given (a full save's
+    /// record is not derived yet, `formats/d2s-load.md` §8 rule 2), so
+    /// 0x5F and the two 0x23 are not sent.
     pub record: Option<PlayerRecord>,
+    /// The new-character load's own right-skill selection
+    /// (`0x005701B0(P, hand 0, StartSkill, −1)` at `0x0056A05A`,
+    /// `formats/d2s-load.md` §1 rule 1, §8 rule 3): one S→C 0x23 sent
+    /// right after the add messages (`intents-events.md` §8.2 rule 3.1).
+    pub load_skill: Option<SkillHand>,
 }
 
 impl Entry {
@@ -152,6 +156,53 @@ impl Entry {
             name,
             hotkeys: [NO_HOT_KEY; 16],
             record: None,
+            load_skill: None,
+        }
+    }
+
+    /// A new character (the 335-byte stub's load, `formats/d2s-load.md`
+    /// §1; `intents-events.md` §8.2 rule 7): act 0, no hot keys, the
+    /// record of [`PlayerRecord::new_character`] and, when the right
+    /// skill was selected, the load's own 0x23 (hand 0, the skill, item
+    /// −1: a class skill has no owner item).
+    pub fn new_character(name: [u8; 16], portal_levels: &[u32], right: Option<u16>) -> Self {
+        Self {
+            record: Some(PlayerRecord::new_character(portal_levels, right)),
+            load_skill: right.map(|skill| SkillHand {
+                skill,
+                item: u32::MAX,
+            }),
+            ..Self::new(0, name)
+        }
+    }
+}
+
+/// `0x0061AE30(1)`: player data +0x2C at allocation, 1 << i with i the
+/// position of level 1 in the portal level list, 0 when absent
+/// (`formats/d2s-load.md` §8 rule 1; 1.14d: 1).
+pub fn initial_portal_flags(portal_levels: &[u32]) -> u32 {
+    portal_levels
+        .iter()
+        .position(|&l| l == 1)
+        .and_then(|i| 1u32.checked_shl(i as u32))
+        .unwrap_or(0)
+}
+
+impl PlayerRecord {
+    /// A new character's record (`formats/d2s-load.md` §8 rules 1, 3):
+    /// +0x2C from [`initial_portal_flags`]; hand 0 = the right skill
+    /// `StartSkill` when load §1 selected it, else 0; hand 1 = 0; both
+    /// items 0 (+0x78 / +0x7C keep the zero fill).
+    pub fn new_character(portal_levels: &[u32], right: Option<u16>) -> Self {
+        Self {
+            portal_flags: initial_portal_flags(portal_levels),
+            hands: [
+                SkillHand {
+                    skill: right.unwrap_or(0),
+                    item: 0,
+                },
+                SkillHand { skill: 0, item: 0 },
+            ],
         }
     }
 }
@@ -269,6 +320,13 @@ pub fn enter_game<D: ActionEvents, W>(
         .x
         .send(player, &assign_player(guid, class as u8, &entry.name, 0, 0));
     a.with(&mut s.game, |g, v| v.player_part_b(g, player, player));
+    // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
+    if let Some(h) = entry.load_skill {
+        a.sys
+            .hooks
+            .x
+            .send(player, &msg::set_skill(0, guid, 0, h.skill, h.item));
+    }
     // Rules 3.2–3.7.
     let x = &mut a.sys.hooks.x;
     x.send(player, &msg::unit_ref(0x0B, 0, guid));
@@ -375,5 +433,72 @@ pub fn load_save<D: ActionEvents, W>(
         }
         Ok::<_, LoadError>(r)
     })?;
-    Ok((Entry::new(report.act, save.header.name), report))
+    let entry = if report.new_character {
+        let portals = s.events.action().sys.hooks.drlg.data.portal_levels();
+        Entry::new_character(save.header.name, &portals, report.right_skill)
+    } else {
+        Entry::new(report.act, save.header.name)
+    };
+    Ok((entry, report))
+}
+
+/// A new character's load on `player` (`intents-events.md` §8.2 rule 7:
+/// the stub path, `formats/d2s-load.md` §1) and its join values
+/// ([`Entry::new_character`]).
+pub fn load_new_character<D: ActionEvents, W>(
+    s: &mut SimGame<D, W>,
+    player: UnitId,
+    name: [u8; 16],
+) -> (Entry, LoadReport) {
+    let a = s.events.action();
+    let report = a.with(&mut s.game, |_, v| {
+        character::load_new_character(&mut ActionCharacter { v, player })
+    });
+    let portals = a.sys.hooks.drlg.data.portal_levels();
+    (
+        Entry::new_character(name, &portals, report.right_skill),
+        report,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The 1.14d portal level list (`data/runtime-maps.md` §9).
+    const PORTALS: [u32; 16] = [1, 3, 5, 7, 27, 29, 33, 36, 40, 43, 45, 46, 53, 54, 74, 134];
+
+    // Covers: specs/formats/d2s-load.md §8 r1
+    #[test]
+    fn portal_flags_are_the_bit_of_level_1() {
+        assert_eq!(initial_portal_flags(&PORTALS), 1);
+        assert_eq!(initial_portal_flags(&[3, 5, 1]), 4);
+        // M08: level 1 absent → 0.
+        assert_eq!(initial_portal_flags(&[3, 5]), 0);
+        assert_eq!(initial_portal_flags(&[]), 0);
+    }
+
+    // Covers: specs/formats/d2s-load.md §8 r3; specs/sim/intents-events.md §8.2 r7
+    #[test]
+    fn a_new_character_has_its_record_and_load_skill() {
+        let e = Entry::new_character(*b"Sorc\0\0\0\0\0\0\0\0\0\0\0\0", &PORTALS, Some(36));
+        assert_eq!(e.act, 0);
+        assert_eq!(e.hotkeys, [NO_HOT_KEY; 16]);
+        let r = e.record.unwrap();
+        assert_eq!(r.portal_flags, 1);
+        // Hand 0 = `StartSkill`, hand 1 = 0; both items 0 (zero fill).
+        assert_eq!(r.hands[0], SkillHand { skill: 36, item: 0 });
+        assert_eq!(r.hands[1], SkillHand { skill: 0, item: 0 });
+        assert_eq!(
+            e.load_skill,
+            Some(SkillHand {
+                skill: 36,
+                item: u32::MAX
+            })
+        );
+        // No start skill: hand 0 is 0 and the load sends no 0x23.
+        let e = Entry::new_character([0; 16], &PORTALS, None);
+        assert_eq!(e.record.unwrap().hands[0], SkillHand::default());
+        assert_eq!(e.load_skill, None);
+    }
 }

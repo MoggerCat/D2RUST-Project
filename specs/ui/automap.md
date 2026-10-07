@@ -3,7 +3,8 @@
 - **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe` and table
   data already measured by the owners linked below; no capture yet).
   Pixel results are unverified until the capture cases of §Test vectors
-  run.
+  run. Implemented (unverified) in `d2-client::ui::automap`, not yet
+  wired into the app.
 - **Target version:** 1.14d, English install
 - **Crate/module:** `d2-client::ui::automap` (cell store, reveal, draw);
   the cell picker uses `d2-data` (`automap_runtime`,
@@ -30,30 +31,30 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 59–73 |
-| Inputs | 74–87 |
-| Outputs / state changes | 88–94 |
-| Rules | 95–96 |
-|   1. Cell store | 97–127 |
-|   2. Cell picker (`0x0061FFF0`) | 128–143 |
-|   3. Adding a tile record (`0x00457CF0`, room R, record T) | 144–156 |
-|   4. Adding units (`0x00458DC0`, room R) | 157–175 |
-|   5. Reveal | 176–207 |
-|   6. Town art (`0x004591A0`, DRLG callback +0x488) | 208–226 |
-|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 227–262 |
-|   8. State, keys and options | 263–298 |
-|   9. View geometry | 299–321 |
-|   10. Cell draw pass | 322–360 |
-|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 361–402 |
-|   12. Party roster markers (`0x0045AB60`) | 403–414 |
-|   13. Header text | 415–431 |
-|   14. Lifetime | 432–438 |
-| Constants & data dependencies | 439–452 |
-| Randomness | 453–460 |
-| Edge cases & original bugs | 461–476 |
-| Test vectors | 477–512 |
-| Provenance | 513–533 |
-| Open questions | 534–552 |
+| Summary | 60–74 |
+| Inputs | 75–88 |
+| Outputs / state changes | 89–95 |
+| Rules | 96–97 |
+|   1. Cell store | 98–128 |
+|   2. Cell picker (`0x0061FFF0`) | 129–144 |
+|   3. Adding a tile record (`0x00457CF0`, room R, record T) | 145–157 |
+|   4. Adding units (`0x00458DC0`, room R) | 158–176 |
+|   5. Reveal | 177–208 |
+|   6. Town art (`0x004591A0`, DRLG callback +0x488) | 209–227 |
+|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 228–263 |
+|   8. State, keys and options | 264–299 |
+|   9. View geometry | 300–322 |
+|   10. Cell draw pass | 323–361 |
+|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 362–403 |
+|   12. Party roster markers (`0x0045AB60`) | 404–415 |
+|   13. Header text | 416–432 |
+|   14. Lifetime | 433–439 |
+| Constants & data dependencies | 440–453 |
+| Randomness | 454–461 |
+| Edge cases & original bugs | 462–477 |
+| Test vectors | 478–513 |
+| Provenance | 514–534 |
+| Open questions | 535–553 |
 <!-- /index -->
 
 ## Summary

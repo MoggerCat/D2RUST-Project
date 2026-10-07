@@ -6,7 +6,8 @@ use crate::game::Game;
 use crate::units::UnitId;
 
 use super::{
-    delete_thinks, flag, idle, mode, state, AiCommand, AiHost, Ctx, ModeTarget, Unhandled, UnitRef,
+    delete_thinks, flag, idle, mode, request_mode, state, AiCommand, AiHost, Ctx, ModeTarget,
+    Unhandled, UnitRef,
 };
 
 /// `(2·max + min) / 2` of the axis distances, truncated (§6).
@@ -81,7 +82,7 @@ pub fn mode_at<W: AiHost + ?Sized>(
         // mode request record).
         None => ModeTarget::Point(0, 0),
     };
-    cx.world.change_mode(game, unit, m, t)
+    request_mode(game, cx, unit, m, t)
 }
 
 /// `0x005DEAD0` `AITACTICS_UseSkill` (§7.1): mode < 16: current skill,
@@ -102,7 +103,7 @@ pub fn use_skill<W: AiHost + ?Sized>(
     cx.world.set_current_skill(unit, skill);
     cx.world.set_skill_flag(unit);
     cx.world.set_path_steps(unit, 1);
-    if !cx.world.change_mode(game, unit, m, target) {
+    if !request_mode(game, cx, unit, m, target) {
         idle(game, cx, unit, 10);
         return false;
     }
@@ -122,7 +123,7 @@ pub fn use_sequence_skill<W: AiHost + ?Sized>(
         return;
     }
     cx.world.set_path_steps(unit, 1);
-    cx.world.change_mode(game, unit, mode::SEQUENCE, target);
+    request_mode(game, cx, unit, mode::SEQUENCE, target);
 }
 
 /// Failure flags of [`move_to`].
@@ -152,7 +153,7 @@ pub fn move_to<W: AiHost + ?Sized>(
         m = mode::WALK;
     }
     cx.world.set_path_steps(unit, steps);
-    if cx.world.change_mode(game, unit, m, target) {
+    if request_mode(game, cx, unit, m, target) {
         return true;
     }
     if flags & move_flag::DELETE_THINKS != 0 {

@@ -204,6 +204,17 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         Ok(())
     }
 
+    /// The transport clients with a record, in client-list order
+    /// (`unit-order.md` §7).
+    pub fn client_list(&self) -> Vec<ClientId> {
+        self.game
+            .lists
+            .clients()
+            .into_iter()
+            .filter_map(|id| self.transport_ids.get(&id).copied())
+            .collect()
+    }
+
     /// The `d2-sim` client record of a transport client.
     pub fn sim_client(&self, client: ClientId) -> Option<SimClient> {
         self.clients.get(&client).copied()

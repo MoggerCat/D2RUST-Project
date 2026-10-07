@@ -71,7 +71,11 @@ fn npc_transaction_0x2a_one_maker() {
 fn service_result_0x58_one_maker() {
     let check = |npc_guid: u32, result: u8| {
         let sim = service_result(npc_guid, result);
-        let m = OpenUi { npc_guid, result };
+        let m = OpenUi {
+            npc_guid,
+            result,
+            effect: 0,
+        };
         same(&sim, &m.encode(), parse(&sim).unwrap(), Message::OpenUi(m));
     };
     for &g in &U32S {

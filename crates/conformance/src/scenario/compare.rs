@@ -11,56 +11,148 @@ use crate::raw::encode_hex;
 /// The mask table (`specs/tools/scenario-masks.tsv`).
 pub const MASKS_TSV: &str = include_str!("../../../../specs/tools/scenario-masks.tsv");
 
-/// One masked byte range of an S→C id (§6 rule 1).
+/// The key a mask row is restricted to: bytes every form of the id
+/// writes (`sim/intents-events.md` §6 rule 6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mask {
-    pub id: u8,
+pub struct Key {
     pub offset: usize,
-    /// `None`: to the end of the message.
-    pub len: Option<usize>,
+    /// 1 (`u8@`) or 2 (`u16@`, little-endian).
+    pub width: usize,
+    pub value: u16,
 }
 
-impl Mask {
-    fn covers(&self, k: usize) -> bool {
-        k >= self.offset && self.len.is_none_or(|l| k < self.offset + l)
+impl Key {
+    fn holds(&self, m: &[u8]) -> bool {
+        let v = match self.width {
+            1 => m.get(self.offset).map(|&b| b as u16),
+            _ => m
+                .get(self.offset..self.offset + 2)
+                .map(|b| u16::from_le_bytes([b[0], b[1]])),
+        };
+        v == Some(self.value)
     }
 }
 
-/// Reads a mask table strictly (§6 rule 3).
+/// Where a masked range starts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Start {
+    At(usize),
+    /// `nul@n`: the byte after the first 0 byte at or after n; no 0 in
+    /// n…last → nothing masked.
+    AfterNul(usize),
+}
+
+/// How far a masked range reaches.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Length {
+    Bytes(usize),
+    /// `*`: to the end of the message.
+    ToEnd,
+    /// `..n`: through byte n.
+    Through(usize),
+}
+
+/// One masked byte range of an S→C id (§6 rule 1; keyed rows:
+/// `sim/intents-events.md` §6 rule 6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mask {
+    pub id: u8,
+    pub key: Option<Key>,
+    pub start: Start,
+    pub len: Length,
+}
+
+impl Mask {
+    /// The masked offsets of message `m` (an empty range when the key
+    /// does not hold).
+    fn range(&self, m: &[u8]) -> std::ops::Range<usize> {
+        if m.first() != Some(&self.id) || self.key.is_some_and(|k| !k.holds(m)) {
+            return 0..0;
+        }
+        let s = match self.start {
+            Start::At(o) => o,
+            Start::AfterNul(n) => match m.iter().skip(n).position(|&b| b == 0) {
+                Some(p) => n + p + 1,
+                None => return 0..0,
+            },
+        };
+        let e = match self.len {
+            Length::Bytes(l) => s + l,
+            Length::ToEnd => usize::MAX,
+            Length::Through(n) => n + 1,
+        };
+        s..e.max(s)
+    }
+}
+
+fn parse_hex(t: &str, max: u32) -> Option<u32> {
+    t.strip_prefix("0x")
+        .and_then(|h| u32::from_str_radix(h, 16).ok())
+        .filter(|&v| v <= max)
+}
+
+fn parse_key(t: &str) -> Option<Option<Key>> {
+    if t == "-" {
+        return Some(None);
+    }
+    let (width, rest, max) = match t.strip_prefix("u8@") {
+        Some(r) => (1, r, 0xFF),
+        None => (2, t.strip_prefix("u16@")?, 0xFFFF),
+    };
+    let (off, v) = rest.split_once('=')?;
+    Some(Some(Key {
+        offset: off.parse().ok()?,
+        width,
+        value: parse_hex(v, max)? as u16,
+    }))
+}
+
+/// Reads a mask table strictly (§6 rule 3; columns per
+/// `sim/intents-events.md` §6 rule 6).
 pub fn parse_masks(tsv: &str) -> Result<Vec<Mask>, String> {
     let mut lines = tsv.lines().enumerate();
     match lines.next() {
-        Some((_, "id\toffset\tlength\tsource")) => {}
-        _ => return Err("line 1: header id, offset, length, source".into()),
+        Some((_, "id\tkey\toffset\tlength\tsource")) => {}
+        _ => return Err("line 1: header id, key, offset, length, source".into()),
     }
     let mut out = Vec::new();
     for (k, l) in lines {
         let line = k + 1;
         let c: Vec<&str> = l.split('\t').collect();
-        let [id, off, len, source] = c.as_slice() else {
-            return Err(format!("line {line}: four columns"));
+        let [id, key, off, len, source] = c.as_slice() else {
+            return Err(format!("line {line}: five columns"));
         };
-        let id = id
-            .strip_prefix("0x")
-            .and_then(|h| u8::from_str_radix(h, 16).ok())
-            .filter(|&i| i <= 0xB4)
-            .ok_or_else(|| format!("line {line}: id {id:?} is not an S→C id"))?;
-        let offset = off
-            .parse::<usize>()
-            .map_err(|_| format!("line {line}: offset {off:?}"))?;
+        let id = parse_hex(id, 0xB4)
+            .ok_or_else(|| format!("line {line}: id {id:?} is not an S→C id"))?
+            as u8;
+        let key = parse_key(key).ok_or_else(|| format!("line {line}: key {key:?}"))?;
+        let start = match off.strip_prefix("nul@") {
+            Some(n) => n.parse().map(Start::AfterNul),
+            None => off.parse().map(Start::At),
+        }
+        .map_err(|_| format!("line {line}: offset {off:?}"))?;
+        let bad_len = || format!("line {line}: length {len:?}");
         let len = match *len {
-            "*" => None,
-            n => Some(
-                n.parse::<usize>()
-                    .ok()
-                    .filter(|&n| n > 0)
-                    .ok_or_else(|| format!("line {line}: length {n:?}"))?,
-            ),
+            "*" => Length::ToEnd,
+            n => match n.strip_prefix("..") {
+                Some(t) => Length::Through(t.parse().map_err(|_| bad_len())?),
+                None => Length::Bytes(
+                    n.parse::<usize>()
+                        .ok()
+                        .filter(|&n| n > 0)
+                        .ok_or_else(bad_len)?,
+                ),
+            },
         };
         if source.trim().is_empty() {
             return Err(format!("line {line}: no source"));
         }
-        out.push(Mask { id, offset, len });
+        out.push(Mask {
+            id,
+            key,
+            start,
+            len,
+        });
     }
     Ok(out)
 }
@@ -213,11 +305,16 @@ fn describe(r: &Record) -> String {
 /// Compares two byte strings with masks; `Err((offset, masked))` at the
 /// first difference, `Ok(masked)` otherwise.
 fn compare_bytes(a: &[u8], b: &[u8], masks: &[Mask]) -> Result<usize, (usize, usize)> {
-    let id = a.first().copied();
-    let ms: Vec<&Mask> = masks.iter().filter(|m| Some(m.id) == id).collect();
+    // Keys and NUL positions are read from the original's bytes; a key
+    // byte that differs is itself a difference (keys are never masked).
+    let rs: Vec<_> = masks
+        .iter()
+        .map(|m| m.range(a))
+        .filter(|r| !r.is_empty())
+        .collect();
     let mut masked = 0;
     for k in 0..a.len().min(b.len()) {
-        if ms.iter().any(|m| m.covers(k)) {
+        if rs.iter().any(|r| r.contains(&k)) {
             masked += 1;
             continue;
         }
@@ -563,30 +660,129 @@ mod tests {
     // Covers: specs/tools/scenario.md §6 r3, §6 row1, §6 row2, §6 row3, §6 row4, §6 row5, §6 row6, §6 row7, §6 row8
     #[test]
     fn mask_table_parses_and_is_strict() {
-        let m = |id, offset, len| Mask { id, offset, len };
-        assert_eq!(
-            masks(),
-            [
-                m(0x21, 11, Some(1)),
-                m(0x22, 2, Some(1)),
-                m(0x22, 10, Some(1)),
-                m(0x2A, 3, Some(4)),
-                m(0x50, 13, Some(2)),
-                m(0x58, 6, Some(1)),
-                m(0x62, 6, Some(1)),
-                m(0x7E, 1, Some(4)),
-                m(0x8F, 1, None),
-            ]
-        );
-        for bad in [
-            "id\toffset\tlength\n",
-            "id\toffset\tlength\tsource\n0xB5\t1\t1\tx",
-            "id\toffset\tlength\tsource\n0x2A\t1\t0\tx",
-            "id\toffset\tlength\tsource\n0x2A\t1\t1\t ",
-            "id\toffset\tlength\tsource\n2A\t1\t1\tx",
+        let m = |id, key, o, l| Mask {
+            id,
+            key,
+            start: Start::At(o),
+            len: Length::Bytes(l),
+        };
+        let k8 = |offset, value| {
+            Some(Key {
+                offset,
+                width: 1,
+                value,
+            })
+        };
+        let k16 = |value| {
+            Some(Key {
+                offset: 1,
+                width: 2,
+                value,
+            })
+        };
+        let ms = masks();
+        assert_eq!(ms.len(), 23);
+        for want in [
+            m(0x21, None, 11, 1),
+            m(0x22, None, 2, 1),
+            m(0x22, None, 10, 1),
+            m(0x2A, None, 3, 4),
+            m(0x62, None, 6, 1),
+            m(0x7E, None, 1, 4),
+            m(0x26, k8(1, 5), 8, 2),
+            m(0x26, k8(1, 6), 9, 1),
+            m(0x27, k8(6, 1), 12, 28),
+            m(0x50, k16(4), 13, 2),
+            m(0x50, k16(0x17), 3, 12),
         ] {
-            assert!(parse_masks(bad).is_err(), "{bad:?}");
+            assert!(ms.contains(&want), "{want:?}");
         }
+        // 0x58: byte 6 for every code a 1.14d caller sends but 5.
+        let codes: Vec<_> = ms
+            .iter()
+            .filter(|x| x.id == 0x58)
+            .map(|x| {
+                assert_eq!((x.start, x.len), (Start::At(6), Length::Bytes(1)));
+                x.key.unwrap().value
+            })
+            .collect();
+        assert_eq!(codes, [0, 1, 4, 6, 7]);
+        assert!(ms.contains(&Mask {
+            id: 0x82,
+            key: None,
+            start: Start::AfterNul(5),
+            len: Length::Through(20),
+        }));
+        assert!(ms.contains(&Mask {
+            id: 0x8F,
+            key: None,
+            start: Start::At(1),
+            len: Length::ToEnd,
+        }));
+        let h = "id\tkey\toffset\tlength\tsource\n";
+        for bad in [
+            "id\toffset\tlength\tsource\n0x2A\t1\t1\tx".to_owned(),
+            format!("{h}0x2A\t-\t1\t1"),
+            format!("{h}0xB5\t-\t1\t1\tx"),
+            format!("{h}0x2A\t-\t1\t0\tx"),
+            format!("{h}0x2A\t-\t1\t1\t "),
+            format!("{h}2A\t-\t1\t1\tx"),
+            format!("{h}0x2A\tu8@5=5\t1\t1\tx"),
+            format!("{h}0x2A\tu8@5=0x100\t1\t1\tx"),
+            format!("{h}0x2A\tu32@5=0x1\t1\t1\tx"),
+            format!("{h}0x2A\t\t1\t1\tx"),
+            format!("{h}0x2A\t-\tnul@\t1\tx"),
+            format!("{h}0x2A\t-\t1\t..x\tx"),
+        ] {
+            assert!(parse_masks(&bad).is_err(), "{bad:?}");
+        }
+    }
+
+    // Covers: specs/sim/intents-events.md §6 r3, §6 r6
+    #[test]
+    fn keyed_masks_follow_their_key() {
+        let ms = masks();
+        // 0x58: byte 6 (`effect`) is masked for codes 0, 1, 4, 6, 7 and
+        // compared for code 5 (M08: the same flip is found there).
+        for code in [0u8, 1, 4, 6, 7] {
+            let a = [0x58, 1, 2, 3, 4, code, 0];
+            let mut b = a;
+            b[6] = 1;
+            assert_eq!(compare_bytes(&a, &b, &ms), Ok(1), "code {code}");
+        }
+        let a = [0x58, 1, 2, 3, 4, 5, 1];
+        let mut b = a;
+        b[6] = 0;
+        assert_eq!(compare_bytes(&a, &b, &ms), Err((6, 0)));
+        // The key byte itself is compared.
+        let mut b = a;
+        b[5] = 6;
+        assert_eq!(compare_bytes(&a, &b, &ms), Err((5, 0)));
+        // 0x50: u16 1 is fully written; u16 4 masks 13–14.
+        let mut a = [0u8; 15];
+        a[0] = 0x50;
+        a[1] = 1;
+        let mut b = a;
+        b[14] = 9;
+        assert_eq!(compare_bytes(&a, &b, &ms), Err((14, 0)));
+        a[1] = 4;
+        b[1] = 4;
+        assert_eq!(compare_bytes(&a, &b, &ms), Ok(2));
+        // 0x82: the name's bytes after its NUL, through byte 20.
+        let mut a = [0u8; 29];
+        a[0] = 0x82;
+        a[5..8].copy_from_slice(b"Bob");
+        let mut b = a;
+        b[9] = 0x41;
+        b[20] = 0x41;
+        assert_eq!(compare_bytes(&a, &b, &ms), Ok(12));
+        b[8] = 0x41;
+        assert_eq!(compare_bytes(&a, &b, &ms), Err((8, 0)));
+        // A 15-character name leaves nothing masked.
+        a[5..20].copy_from_slice(b"ABCDEFGHIJKLMNO");
+        let mut b = a;
+        b[21] = 1;
+        assert_eq!(compare_bytes(&a, &b, &ms), Err((21, 0)));
     }
 
     // Covers: specs/tools/scenario.md §5 r6, §6 r1

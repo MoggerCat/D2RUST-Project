@@ -52,3 +52,15 @@ where
 {
     server.lock().unwrap().with(f).unwrap()
 }
+
+/// The synthetic client's `skills` table: one row (skill 0). The
+/// synthetic game has no `skills` rows, but the join of a new character
+/// sends two 0x23 with skill 0 (`intents-events.md` §8.2 rules 3.7, 7),
+/// and the client asserts a selected skill is inside its table
+/// (`client/msg-skills.md` §2 rule 3); every install has row 0.
+pub fn synthetic_skill_rows(app: &mut bevy::prelude::App) {
+    app.world_mut()
+        .resource_mut::<d2_client::bridge::BridgeResource>()
+        .0
+        .set_skill_rows(vec![d2_client::bridge::world::SkillRow::default()]);
+}

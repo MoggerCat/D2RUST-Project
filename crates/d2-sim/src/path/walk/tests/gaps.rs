@@ -571,6 +571,30 @@ fn wall_follow_test_vector() {
     assert!(crate::path::walk::other::wall_follow(&mut f, &mut path, &info).is_err());
 }
 
+// Covers: specs/sim/pathing.md §12.8 r5
+#[test]
+fn wall_follow_no_rejoin_reads_an_empty_followers_done_flag() {
+    // §12.8 rule 5: S (10, 10) → (15, 6), L 14; line (11, 10), (12, 9),
+    // (13, 8), (14, 7), (15, 6), D 1. (11, 10) blocked at i = 0, P = S,
+    // d0 = 2. A steps to (11, 11); B's four tries (11, 9), (10, 9),
+    // (9, 10), (10, 11) are blocked: B done with no points. Its "last
+    // point" is its done flag, (1, 0): dB = 232 > dA = 41 and dS = 41 ≥
+    // dA → A's point is taken: one point (11, 11). (Read as B's position
+    // P, dB = 41 = dA would pick the empty B: 0 points.)
+    let t = tables();
+    let mut c = other_setup(&[(11, 10), (11, 9), (10, 9), (9, 10), (10, 11)]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let mut path = owned_path(14);
+    let info = other_info(15, (10, 10), (15, 6), 14);
+    let n = crate::path::walk::other::wall_follow(&mut f, &mut path, &info).unwrap();
+    assert_eq!(n, 1);
+    assert_eq!(path.point(0), Point::new(11, 11));
+}
+
 // Covers: specs/sim/pathing.md §12.4, §12.5
 #[test]
 fn leap_and_server_knockback() {
