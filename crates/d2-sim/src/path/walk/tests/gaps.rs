@@ -20,25 +20,20 @@ use crate::path::walk::velocity::set_velocity;
 use crate::rng::Seed;
 use crate::units::{ClientId, RoomId, UnitId, UnitType};
 
-/// A context that records what the unit-side path functions receive
-/// and answers a fixed count (`0x00679B30` and the other path
-/// functions); the world is [`FakeWorld`].
+/// A context over [`FakeWorld`] with typed unit positions (targets of
+/// §3 step 4) and one seed.
 struct Recorder {
     w: FakeWorld,
     units: BTreeMap<UnitId, (UnitType, Point)>,
     seed: Seed,
-    infos: Vec<PathInfo>,
-    answer: i32,
 }
 
 impl Recorder {
-    fn new(w: FakeWorld, answer: i32) -> Recorder {
+    fn new(w: FakeWorld) -> Recorder {
         Recorder {
             w,
             units: BTreeMap::from([(P, (UnitType::Player, Point::new(0, 0)))]),
             seed: Seed::default(),
-            infos: Vec::new(),
-            answer,
         }
     }
 }
@@ -116,60 +111,39 @@ impl WalkUnits for Recorder {
     fn seed(&mut self, _unit: UnitId) -> &mut Seed {
         &mut self.seed
     }
-    fn other_path_function(&mut self, _path: &mut DynamicPath, info: &PathInfo) -> i32 {
-        self.infos.push(*info);
-        self.answer
-    }
 }
 
-// Covers: specs/sim/pathing.md §3 text
+// Covers: specs/sim/pathing.md §3 text, §12.7 r1
 #[test]
-fn path_functions_receive_the_path_info_record() {
+fn ida_star_receives_the_slack_of_step_4_doubled() {
+    // §12.7 test vector through the compute: type 0 from (10, 10) to
+    // (13, 11) on a free grid, slack r = 1 (doubled 2): (12, 10), (13,
+    // 11).
     let t = tables();
     let mut w = FakeWorld::new(40, 40);
     w.add_player(&t, P, 10, 10);
     let mut path = w.paths[&P].clone();
-    // Type 0 (IDA*) runs a function of the unit side (§2).
     path.set_path_type(&t, true, 0).unwrap();
-    path.put_target(Point::new(20, 15));
-    let mut c = Recorder::new(w, 0);
-    assert_eq!(compute(&t, &mut c, &mut path, P, false).unwrap(), 0);
-    let expect = PathInfo {
-        start: Point::new(10, 10),
-        target: Point::new(20, 15),
-        start_room: Some(ROOM),
-        target_room: Some(ROOM),
-        slack: 1,
-        max_distance: 73,
-        idastar_score: 70,
-        path_type: 0,
-        size: 2,
-        pattern: t.pattern_of_size[2],
-        move_mask: 0x1C09,
-    };
-    assert_eq!(c.infos, vec![expect]);
-
-    // An item target: target := its position, slack r = 2 (§3 step 4).
+    path.put_target(Point::new(13, 11));
+    let mut c = Recorder::new(w);
+    assert_eq!(compute(&t, &mut c, &mut path, P, false).unwrap(), 2);
+    assert_eq!(
+        (path.point(0), path.point(1)),
+        (Point::new(12, 10), Point::new(13, 11))
+    );
+    // An item target: slack r = 2 (§3 step 4), doubled 4: the search
+    // stops at (12, 10) (h 3 < 4), one recorded point, so 0.
     let item = UnitId(5);
-    c.units.insert(item, (UnitType::Item, Point::new(18, 12)));
+    c.units.insert(item, (UnitType::Item, Point::new(13, 11)));
     path.target_unit = Some(TargetUnit {
         unit: item,
         ty: UnitType::Item,
         guid: 5,
     });
-    c.infos.clear();
-    compute(&t, &mut c, &mut path, P, false).unwrap();
-    assert_eq!(
-        c.infos,
-        vec![PathInfo {
-            target: Point::new(18, 12),
-            slack: 2,
-            ..expect
-        }]
-    );
+    assert_eq!(compute(&t, &mut c, &mut path, P, false).unwrap(), 0);
 }
 
-// Covers: specs/sim/pathing.md §5.2 text
+// Covers: specs/sim/pathing.md §5.2 text, §12.1, §12.3
 #[test]
 fn toward_with_a_direction_offset_runs_the_circling_function() {
     let t = tables();
@@ -197,33 +171,54 @@ fn toward_with_a_direction_offset_runs_the_circling_function() {
         pattern: base.pattern,
         move_mask: 0x1C09,
     };
-    for (ty, off) in [(5u32, 2), (6, -2), (12, -4)] {
-        let mut path = base.clone();
-        path.set_path_type(&t, false, ty).unwrap();
-        assert_eq!(path.dir_offset, off);
-        path.cur_point = 3;
-        path.point_count = 5;
-        let mut c = Recorder::new(FakeWorld::new(40, 40), 4);
-        let mut f = Finder {
-            t: &t,
-            c: &mut c,
-            owner_ty: UnitType::Monster,
-        };
-        let info = PathInfo {
-            path_type: ty,
-            ..info
-        };
-        // The result is the circling function's; index and count are 0.
-        assert_eq!(toward(&mut f, &mut path, &info).unwrap(), 4);
-        assert_eq!((path.cur_point, path.point_count), (0, 0));
-        assert_eq!(c.infos, vec![info]);
-    }
-    // Offset 0 (type 2): no circling call; index and count still 0.
+    // Type 5 (k = +2), free grid, 14 iterations (synthetic, `testdir`
+    // rows 22, 21, 20, 15, 10 turned by 2): down from the start (which
+    // is appended), diagonal from (10, 16), right from (15, 21), tail at
+    // (18, 21). Index and count were reset first.
+    let mut path = base.clone();
+    path.set_path_type(&t, false, 5).unwrap();
+    assert_eq!(path.dir_offset, 2);
+    path.cur_point = 3;
+    path.point_count = 5;
+    let mut c = Recorder::new(FakeWorld::new(40, 40));
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    assert_eq!(toward(&mut f, &mut path, &info).unwrap(), 4);
+    assert_eq!((path.cur_point, path.point_count), (0, 4));
+    assert_eq!(
+        path.live_points(),
+        [
+            Point::new(10, 10),
+            Point::new(10, 16),
+            Point::new(15, 21),
+            Point::new(18, 21)
+        ]
+    );
+    // Type 12 (back-up turn): k is −4 again after it, and its walks
+    // append after the first (which starts with the start).
+    let mut path = base.clone();
+    path.set_path_type(&t, false, 12).unwrap();
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let info12 = PathInfo {
+        path_type: 12,
+        ..info
+    };
+    let n = crate::path::walk::other::back_up_turn(&mut f, &mut path, &info12).unwrap();
+    assert!(n > 2, "{n}");
+    assert_eq!(path.dir_offset, -4);
+    assert_eq!(path.point(0), Point::new(10, 10));
+    // Offset 0 (type 2): no circling; index and count still 0.
     let mut path = base.clone();
     path.set_path_type(&t, false, 2).unwrap();
     path.cur_point = 3;
     path.point_count = 5;
-    let mut c = Recorder::new(FakeWorld::new(40, 40), 4);
     let mut f = Finder {
         t: &t,
         c: &mut c,
@@ -236,7 +231,6 @@ fn toward_with_a_direction_offset_runs_the_circling_function() {
     assert_eq!(toward(&mut f, &mut path, &info).unwrap(), 1);
     assert_eq!((path.cur_point, path.point_count), (0, 0));
     assert_eq!(path.point(0), Point::new(20, 10));
-    assert!(c.infos.is_empty());
 }
 
 const M: UnitId = UnitId(2);
@@ -443,4 +437,190 @@ fn room_recache_can_leave_a_non_missile_without_a_room() {
         (m.precise_x, m.room, m.point_count),
         (before.0, before.1, 0)
     );
+}
+
+/// A monster [`Finder`] over a free 40 × 40 [`Recorder`] grid with
+/// `walls`, and a path info from `start` to `target` (one-cell pattern 0,
+/// move mask 0x1C09).
+fn other_setup(walls: &[(i32, i32)]) -> Recorder {
+    let mut w = FakeWorld::new(40, 40);
+    for &(x, y) in walls {
+        w.wall(x, y);
+    }
+    Recorder::new(w)
+}
+
+fn other_info(ty: u32, start: (i32, i32), target: (i32, i32), max: i32) -> PathInfo {
+    PathInfo {
+        start: Point::new(start.0, start.1),
+        target: Point::new(target.0, target.1),
+        start_room: Some(ROOM),
+        target_room: Some(ROOM),
+        slack: 0,
+        max_distance: max,
+        idastar_score: 70,
+        path_type: ty,
+        size: 1,
+        pattern: 0,
+        move_mask: 0x1C09,
+    }
+}
+
+fn owned_path(max: u8) -> DynamicPath {
+    DynamicPath {
+        owner: Some(P),
+        max_distance: max,
+        room: Some(ROOM),
+        ..DynamicPath::default()
+    }
+}
+
+// Covers: specs/sim/pathing.md §12.7 r3, §12.7 r4, §12.7 r5, §12.7 r6, §12.7 r7
+#[test]
+fn ida_star_test_vector() {
+    // §12.7 Test vector: (10, 10) → (13, 11), slack 0, score 70.
+    let t = tables();
+    let mut c = other_setup(&[]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let mut path = owned_path(14);
+    let info = other_info(0, (10, 10), (13, 11), 14);
+    let n = crate::path::walk::other::ida_star(&mut f, &mut path, &info).unwrap();
+    assert_eq!(n, 2);
+    assert_eq!(
+        (path.point(0), path.point(1)),
+        (Point::new(12, 10), Point::new(13, 11))
+    );
+    // A straight run records only the found node: 0.
+    let info = other_info(0, (10, 10), (13, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::ida_star(&mut f, &mut path, &info).unwrap(),
+        0
+    );
+    // Type 16 draws on the owner's seed; type 0 does not.
+    let before = f.c.seed;
+    let info = other_info(0, (10, 10), (13, 11), 14);
+    crate::path::walk::other::ida_star(&mut f, &mut path, &info).unwrap();
+    assert_eq!(f.c.seed, before);
+    let info = other_info(16, (10, 10), (13, 11), 14);
+    crate::path::walk::other::ida_star(&mut f, &mut path, &info).unwrap();
+    assert_ne!(f.c.seed, before);
+}
+
+// Covers: specs/sim/pathing.md §12.8 r1, §12.8 r2, §12.8 r3, §12.8 r4, §12.8 r6
+#[test]
+fn wall_follow_test_vector() {
+    // §12.8 Test vector: one-cell pattern, L 14, only (12, 10) blocked,
+    // (10, 10) → (15, 10): (11, 10), (12, 11), (13, 10), (15, 10).
+    let t = tables();
+    let mut c = other_setup(&[(12, 10)]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let mut path = owned_path(14);
+    let info = other_info(15, (10, 10), (15, 10), 14);
+    let n = crate::path::walk::other::wall_follow(&mut f, &mut path, &info).unwrap();
+    assert_eq!(n, 4);
+    assert_eq!(
+        path.points[..4]
+            .iter()
+            .map(|p| p.point())
+            .collect::<Vec<_>>(),
+        [
+            Point::new(11, 10),
+            Point::new(12, 11),
+            Point::new(13, 10),
+            Point::new(15, 10)
+        ]
+    );
+    // N ≤ 2 → 0; a line longer than L − 1 → no cells → 0.
+    let info = other_info(15, (10, 10), (12, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::wall_follow(&mut f, &mut path, &info).unwrap(),
+        0
+    );
+    let info = other_info(15, (10, 10), (25, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::wall_follow(&mut f, &mut path, &info).unwrap(),
+        0
+    );
+    // A free line compresses to its last cell.
+    let mut c = other_setup(&[]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let info = other_info(15, (10, 10), (15, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::wall_follow(&mut f, &mut path, &info).unwrap(),
+        1
+    );
+    assert_eq!(path.point(0), Point::new(15, 10));
+    // Only players and monsters own a wall-follow path.
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Object,
+    };
+    assert!(crate::path::walk::other::wall_follow(&mut f, &mut path, &info).is_err());
+}
+
+// Covers: specs/sim/pathing.md §12.4, §12.5
+#[test]
+fn leap_and_server_knockback() {
+    let t = tables();
+    let mut c = other_setup(&[(14, 10)]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    // Knockback without a target unit: the ray's last free cell, which
+    // becomes the point target; the index is not reset.
+    let mut path = owned_path(14);
+    path.cur_point = 2;
+    let info = other_info(8, (10, 10), (16, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::knockback_server(&mut f, &mut path, &info),
+        1
+    );
+    assert_eq!(path.point(0), Point::new(13, 10));
+    assert_eq!((path.target(), path.cur_point), (Point::new(13, 10), 2));
+    // A target unit: k = (budget >> 1) + 1 cells away from it.
+    let m = UnitId(7);
+    f.c.units.insert(m, (UnitType::Monster, Point::new(12, 12)));
+    path.target_unit = Some(TargetUnit {
+        unit: m,
+        ty: UnitType::Monster,
+        guid: 7,
+    });
+    path.dist_budget = 6;
+    let info = other_info(8, (10, 10), (0, 0), 14);
+    assert_eq!(
+        crate::path::walk::other::knockback_server(&mut f, &mut path, &info),
+        1
+    );
+    assert_eq!(path.point(0), Point::new(6, 6));
+    assert!(path.target_unit.is_none());
+    // Blocked at the first cell: the start, result 0.
+    let mut c = other_setup(&[(11, 10)]);
+    let mut f = Finder {
+        t: &t,
+        c: &mut c,
+        owner_ty: UnitType::Monster,
+    };
+    let info = other_info(8, (10, 10), (16, 10), 14);
+    assert_eq!(
+        crate::path::walk::other::knockback_server(&mut f, &mut path, &info),
+        0
+    );
+    // Leap with no velocity: the start (P = start → 0).
+    let info = other_info(9, (10, 10), (16, 10), 14);
+    assert_eq!(crate::path::walk::other::leap(&mut f, &mut path, &info), 0);
 }

@@ -96,6 +96,14 @@ proptest! {
             prop_assert_eq!(o, Outcome::Neutral);
             return Ok(());
         }
+        // §12.5: the type-8 point is the ray's last free cell from the
+        // start toward the target; a blocked first cell leaves the start,
+        // so no path.
+        let first = Point::new(start.x + dir.0, start.y + dir.1);
+        if !world.free(first, 1) {
+            prop_assert_eq!(o, Outcome::Neutral);
+            return Ok(());
+        }
         prop_assert_eq!(o, Outcome::Moving(1));
         let p0 = world.paths[&P].clone();
         prop_assert_eq!(world.unit(P).mode, 19);

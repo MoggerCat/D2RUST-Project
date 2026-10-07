@@ -231,12 +231,6 @@ pub trait WalkUnits {
     fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {}
     /// Unit add messages (`0x00571F90`). Owner: the unit-update spec.
     fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {}
-    /// Monster circling `0x00679B30` (direction offset ≠ 0), and the
-    /// path functions of types 0, 3, 8, 9, 11, 12, 15, 16 (pathing.md open
-    /// question 3). Returns the point count; the default finds no path.
-    fn other_path_function(&mut self, path: &mut DynamicPath, info: &PathInfo) -> i32 {
-        0
-    }
     /// The player's position history (player data +0xA0..+0x14C,
     /// `path-placement.md` §10 rule 7); `None` = not kept (nothing is
     /// written).
