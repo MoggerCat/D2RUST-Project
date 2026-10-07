@@ -6182,6 +6182,7 @@ a monster, a Druid summon, a Clay Golem, a Countess kill, a Cain rescue.
 - R2-38 `d2s-tool` characters load and re-save in 1.14d: quest bits, trailer
   bit, +0x88..+0xA7, flag 0x2000 (DS-2, DS-4, DS-5; C66 (2)).
 - `drlg/rooms.md` OQ23 (PC 1 spec-cloudq-area5, 2026-10-08): client build timer across a client level free: per client update log `[0x007A0498]`, client DRLG +0x98, +0x45C, +0x460 and the byte at (+0x460)+0x44, plus every room free address; shows whether a freed cursor room is reallocated before the next timed step (§4.6 rule 11).
+- `monsters/umod-callbacks.md` OQ7 / §28 (PC 1 spec-xpc3-umods, 2026-10-07): client side of a fire-enchanted unique's death (and a cold / lightning unique hit into GH / KB): log client missile creates (`0x004CD540` class, position), `0x004B9A00` id 2,458 and U's mode / +0x44 per client update; expect §28.2 rows (frame 4 / frame 2 tests).
 
 ## 8. Lessons (problems met, fixes)
 
