@@ -39,13 +39,13 @@
 |   6. Drop quality (`0x00558640`) | 417–448 |
 |   7. Creation inputs and placement (`0x0055A550`) | 449–473 |
 |   8. Gold amount | 474–489 |
-|   9. Quest drop helper (`0x00559A30`) | 490–531 |
-| Constants & data dependencies | 532–561 |
-| Randomness | 562–578 |
-| Edge cases & original bugs | 579–602 |
-| Test vectors | 603–632 |
-| Provenance | 633–657 |
-| Open questions | 658–703 |
+|   9. Quest drop helper (`0x00559A30`) | 490–571 |
+| Constants & data dependencies | 572–601 |
+| Randomness | 602–618 |
+| Edge cases & original bugs | 619–642 |
+| Test vectors | 643–672 |
+| Provenance | 673–697 |
+| Open questions | 698–798 |
 <!-- /index -->
 
 ## Summary
@@ -516,7 +516,7 @@ created item, or none.
      cached once, `0x008846EC`); r < (65 − `L`) + `L`/2 + 5 →
      `0x00555E70`; r < that + `L`/2 + 10 (+ 1 when `L` is odd) →
      `0x00555FB0`; r < 100 → `0x005560F0`; else fatal 0x1BA. The three
-     sub-pickers are Open question 10.
+     sub-pickers (Open question 10, answered) are §9.1.
 4. Position: `U`'s unit coordinates (`0x00620870`) and room
    (`0x00620BB0`) into the floor drop `0x00555DA0`(room, position, size 1,
    fallback 1), as §7 rule 2; no spot → return none (no request is
@@ -528,6 +528,46 @@ created item, or none.
    "use seed" 0 (`items/generation.md` §3). When `&request` ≠ none the
    whole request is copied there (after the pipeline, so with the
    written-back ilvl). Return the pipeline's item.
+
+#### 9.1 Class sub-pickers (`0x00555E70`, `0x00555FB0`, `0x005560F0`)
+
+Fastcall ECX game, EDX the unit seed; stack `L`, `p6`, `p7` (and, for
+`0x005560F0` only, the "`U` is a monster" flag `m`). The combined items
+array header `0x0096CA58` (`0x00633590`) holds count +0x00, records
++0x04, then (start, count) per part: weapons +0x08/+0x0C, armor
++0x10/+0x14, misc +0x18/+0x1C (written at load, `0x006333E8`–
+`0x0063343B`). So `0x00555FB0` = weapons, `0x00555E70` = **armor**,
+`0x005560F0` = misc (the range from the misc start to the array end).
+In the quest drop, `0x00555E70` (armor) has the band (65 − `L`) …
+(65 − `L`) + `L`/2 + 5, `0x00555FB0` (weapons) the next one, misc the
+rest; the magic retries after the eleventh call weapons.
+
+Per record of the part, in index order:
+
+1. Misc only: type (+0x11E) = 40 and `m` = 0 → skip (body parts only
+   from monsters).
+2. Filter `0x00555E00` (EAX `L`, ESI record, EDI `p6`; stack seed, `p7`):
+   `L` < 1 counts as 1; `spawnable` (+0x133) ≠ 0, `quest` (+0x12A) = 0
+   and `level` (+0xFD) ≤ `L`, else skip. If `p7` = 0: a = `0x006427F0(L)`
+   (the act of **level id** `L`: the item level is passed where a level
+   id is expected, so `L` < 40 → 0, < 75 → 1, < 103 → 2, < 109 → 3, else
+   4); d = `rarity` (+0xFC, u8) − a; d > 0 → `roll(seed, d)`
+   (`0x0045C3E0`), result ≠ 0 → skip. Then `p6` = −1, or the record's
+   `type` (+0x11E, i16) = `p6`; else skip.
+3. Expansion game (game +0x70 ≠ 0) or `version` (+0xF6) < 100, and fewer
+   than 1,023 candidates held → append the record's combined index.
+
+Pick: count n > 0 → one step of the seed; n a power of two → `lo'` &
+(n − 1), else `lo'` mod n (unsigned); return that candidate. A part
+start of 0 returns −1 at once. n = 0 → the routine returns the
+**uninitialised** first slot of its candidate array (a stack value),
+reachable whenever every record is filtered out (for example all rarity
+rolls reject at a low `L`) — d2rs: Open question 12. `p6` = item type filter (−1 = any), `p7` = skip
+the rarity roll; the quest specs pass `p6` = −1. Draws: one `roll(d)`
+per record that reaches the rarity test with d > 0, in index order, then
+the pick step. `bitfield1` (+0xDC) bit 0, tested by the §9 magic retry
+loop, is the same "may be magic" bit the stores test
+(`world/vendors.md` §3 step 5).
 
 ## Constants & data dependencies
 
@@ -672,13 +712,23 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
    for 1.14d data, §5.4; matters for mods with other nodrop/total pairs).
 6. Meaning of drop flags 0x04/0x10 (D2MOO: superior / normal) and their
    effect in creation: items spec.
-7. `0x005541B0` ("living") in the player and party counts is read as
-   D2MOO's living check, not confirmed.
+7. Answered (handoff `impl-treasure` 13): "living" = not dead by
+   `0x005541B0` (`sim/units.md` §2: unit flag 0x10000, a player in mode
+   0 or 17, a monster in mode 0 or 12; any other unit type counts as
+   dead). The player count `0x00535790` counts every player the game's
+   player walk `0x005538D0` visits with that test (callback
+   `0x00535760`). The party count `0x005408E0` → `0x005405A0`: `O`
+   without a room or without a party (`0x00554630` = 0xFFFF) → `O` alone
+   (counted when living); else each member of the party list
+   (`0x00540290`; none → 0) found as a player by GUID whose room's level
+   equals `O`'s, counted when living (callback `0x005404F0`).
 8. Answered: `sim/path-placement.md` §7 (search, no RNG draw) and §9 (floor drop, §7 step 2 here).
 9. Answered (handoff `triage-game-findings` Q3): edge case 9; the d2rs
    sweep's "`magic` ⇒ q ≥ 4" holds after creation, not for the drop
    quality when `M` ≤ −100.
-10. §9 rule 3 (quest drop with no drop code): the sub-pickers
+10. Answered: §9.1 (disassembly of the three functions and of
+    `0x00555E00`, `0x00556240`). Original text: §9 rule 3 (quest drop
+    with no drop code): the sub-pickers
     `0x00555E70`, `0x00555FB0` (a candidate list over the items records
     between table +0x08 and +0x10, filtered by `0x00555E00`, expansion
     or `version` < 100, then one unit-seed step: mask for a power-of-two
@@ -700,3 +750,48 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
     a stored 2 matches neither; the uber test's type 38 is the item's own
     `type` field (items +0x11E), its weapon / armor test is the class-index
     test with `type2`. §3.1's order is given there.
+12. Answered (handoff `impl-treasure` 1, 3, 4, 7, 9–12, 14), from the
+    1.14d code:
+    - 1 (`atol` beyond i32): `0x00681EBB` → `0x00681E95` is
+      `strtol(s, NULL, 10)` (`0x0068676E` → `strtoxl` `0x00686543`), which
+      saturates: an overflowing positive value gives 0x7FFFFFFF, a
+      negative one 0x80000000 (errno ERANGE), then §1.5 step 5 cuts to
+      u16 (0xFFFF, 0x0000). d2rs's strtol saturation is exact.
+    - 3 (NoDrop range): the conversion `0x00682FD0` takes the SSE2 path
+      when `0x00994C88` is set (`__get_sse2_info` `0x0069A8C0`, CPUID
+      SSE2 and OS support): `fstp` to a double, then `cvttsd2si`, so a
+      NaN, an infinity or a value outside i32 gives 0x80000000; the x87
+      fallback (`0x00683006`) is used only without SSE2. `n0` + `C` is an
+      i32 sum before `fild` (`0x0055A947`), and the q = 0 test
+      (`0x0055A9A1`–`0x0055A9A8`) treats an unordered (NaN) q as nonzero.
+      Default FPU exceptions are masked, so a division by zero gives an
+      infinity, not a fault. Then `T` + `N` (i32, wrapping) < 1 → `r` = 0
+      without a draw, and the NoDrop test `r` < `N` is signed
+      (`0x0055AA45`). The precision control (Open question 5) stays open.
+    - 4 (§5.6 with `get` = none): the new slot's TC pointer is stored and
+      its picks are read through it at once (`0x0055ABAE`), so none
+      faults; unreachable, as §1.5 step 4.2 builds TC entries only for an
+      index ≥ 1 below the count.
+    - 7 (itemratio divisor 0): the divisions of §6 are plain `idiv` by
+      the record fields (`0x00558733`, `0x005587AE`, `0x00558836`,
+      `0x005588CC`, `0x00558925`, `0x0055895A`), each only when its step
+      runs: a 0 divisor is an integer-divide fault (process crash). Every
+      divisor of the 6 live `itemratio` rows is ≥ 1.
+    - 9 (chest act): `act` = `0x006427F0(level id)` (`drlg/levels.md` §6
+      rule 3; table `0x006EB2F4` = 40, 75, 103, 109, 1024): always 0–4
+      (≥ 1024 → 0), never from `levels.txt`, and `0x00654E80` clamps
+      again.
+    - 10 (`treasureclassex` +0x30/+0x32): measured: the live
+      `treasureclassex.bin` (853 rows of 736 bytes) holds 0 at +0x30 and
+      +0x32 in every row.
+    - 11 (item string quotes): `0x00654440` drops one leading `"` and
+      then replaces **every** later `"` by a 0 byte, i.e. cuts at the next
+      quote whether or not a leading one was dropped.
+    - 12 (expansion search over zero entries): `lo` = `hi` = 0 → index
+      max(−1, 0) = 0, then the index-below-count test (`0x0055AB35`)
+      fails → no entry; unreachable (`T` = 0 ends the slot first).
+    - 14: the fatal paths (0xF3A, 0xF44, 0xFEA, no ratio row, bone wall,
+      > 65,534 TCs) are the original's asserts (process exit); how d2rs
+      reports them is a Ruleset choice, not a fidelity fact.
+    Still open: §9.1's n = 0 result (an uninitialised stack value; d2rs
+    must pick a value: settle only by choosing, e.g. treat as no item).
