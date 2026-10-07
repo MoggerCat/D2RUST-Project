@@ -40,19 +40,19 @@
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
 |   2. Client → server | 115–315 |
-|   3. Server → client | 316–523 |
-|   4. d2rs mapping and scope | 524–555 |
-|   5. Machine-readable tables | 556–592 |
-|   6. Exact-match comparison | 593–696 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 697–1096 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1097–1241 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1242–1386 |
-| Constants & data dependencies | 1387–1405 |
-| Randomness | 1406–1411 |
-| Edge cases & original bugs | 1412–1457 |
-| Test vectors | 1458–1544 |
-| Provenance | 1545–1646 |
-| Open questions | 1647–1766 |
+|   3. Server → client | 316–527 |
+|   4. d2rs mapping and scope | 528–559 |
+|   5. Machine-readable tables | 560–596 |
+|   6. Exact-match comparison | 597–700 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 701–1100 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1101–1245 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1246–1390 |
+| Constants & data dependencies | 1391–1409 |
+| Randomness | 1410–1415 |
+| Edge cases & original bugs | 1416–1461 |
+| Test vectors | 1462–1548 |
+| Provenance | 1549–1650 |
+| Open questions | 1651–1770 |
 <!-- /index -->
 
 ## Summary
@@ -485,6 +485,10 @@ Queue 2 (id 0xFF, 16 bytes, `0x0052CC20`) runs only when host callbacks
    `repeat:u8@2`; `0x0054BD10` spends repeat + 1 points (stat < 16,
    repeat < 100, else result 3), the same quantity PC 2 calls
    `count_minus_one` (`combat/vitals.md` owns the spend).
+   Field names taken from PC 2 (same offsets; code on staging-5 uses
+   them): C→S 0x32 `mode:u32@9 cost:u32@13`, 0x33 `tab:u16@9
+   cost:u32@13` (the vendor meaning is `world/vendors.md`'s), S→C 0x22
+   `unit:u32@3 body_state:u8@11` (`items/inventory-moves.md` §11).
 5. **0x4C / 0x4D / 0x99 / 0x9A.** `0x0053D530` (ECX client, DL unit
    type; stack: GUID, target type u8, target GUID, skill u16, w u16, b
    u8, flag): id base 0x4C (16 bytes) or 0x4D (17 bytes), + 0x4D when
