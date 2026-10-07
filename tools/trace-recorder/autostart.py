@@ -47,6 +47,7 @@ recording; the game is killed). X, Y are client pixels (800x600 window).
 import argparse
 import ctypes as C
 import hashlib
+import json
 import os
 import struct
 import sys
@@ -121,6 +122,9 @@ def player_pos(mem):
 
 VK = {"ESC": 0x1B, "TAB": 0x09, "ENTER": 0x0D, "SPACE": 0x20, "SHIFT": 0x10, "CTRL": 0x11,
       "ALT": 0x12, **{f"F{i}": 0x6F + i for i in range(1, 13)}}
+UNITS_S = 0x7A5E70        # client unit set S: 6 types x 128 bucket heads (client/model.md §2)
+U_CLASS, U_NEXT = 0x04, 0xE4
+VIEW_W, VIEW_H = 800, 600  # camera.md §3: player drawn at (W/2, H/2 - 8)
 
 
 def vk_code(k):
@@ -132,40 +136,122 @@ def vk_code(k):
     return int(k, 0)
 
 
+SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
+              "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
+              "goto": (2, 5), "dumpdrlg": (0, 1), "end": (0, 0)}
+
+
 def parse_script(text):
-    """Script text -> list of timed events (t, op, args), t relative to the
-    player's arrival. Button and key presses become separate down / up
-    events so the debugger loop never sleeps."""
-    t, out = 0.0, []
+    """Script text -> list of (op, args); unknown commands and wrong
+    argument counts are errors before the game starts."""
+    out = []
     for raw in (text or "").split(";"):
         w = raw.split()
         if not w:
             continue
         op, a = w[0].lower(), w[1:]
-        if op == "wait":
-            t += float(a[0])
-        elif op == "move":
-            out.append((t, "move", (int(a[0]), int(a[1]))))
-        elif op in ("click", "rclick"):
-            b = "l" if op == "click" else "r"
-            xy = (int(a[0]), int(a[1]))
-            out += [(t, "move", xy), (t, b + "down", xy), (t + 0.05, b + "up", xy)]
-            t += 0.1
-        elif op == "hold":
-            xy, s = (int(a[0]), int(a[1])), float(a[2])
-            out += [(t, "move", xy), (t, "ldown", xy), (t + s, "lup", xy)]
-            t += s + 0.05
-        elif op == "key":
-            s = float(a[1]) if len(a) > 1 else 0.05
-            out += [(t, "kdown", vk_code(a[0])), (t + s, "kup", vk_code(a[0]))]
-            t += s + 0.05
-        elif op == "shot":
-            out.append((t, "shot", a[0] if a else "shot"))
-        elif op == "end":
-            out.append((t, "end", None))
-        else:
+        if op not in SCRIPT_OPS:
             raise ValueError(f"input script: unknown command {raw.strip()!r}")
-    return sorted(out, key=lambda e: e[0])
+        lo, hi = SCRIPT_OPS[op]
+        if not lo <= len(a) <= hi:
+            raise ValueError(f"input script: {op} takes {lo}..{hi} arguments: {raw.strip()!r}")
+        if op == "text":
+            a = [raw.strip()[4:].strip()]
+        elif op == "key":
+            a = [vk_code(a[0])] + [float(x) for x in a[1:]]
+        elif op == "goto":
+            a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
+                 + [float(x) for x in a[2:]])
+        elif op not in ("shot", "dumpdrlg"):
+            a = [float(x) if "." in x else int(x, 0) for x in a]
+        out.append((op, a))
+    return out
+
+
+def client_px(mem, unit):
+    """Client pixel position of a unit (camera.md §2), or None."""
+    t = mem.read_u32(unit)
+    path = mem.read_u32(unit + U_PATH)
+    if not path:
+        return None
+    if t in (2, 4, 5):    # static path: client pixels at +4 / +8
+        return (struct.unpack("<i", struct.pack("<I", mem.read_u32(path + 4)))[0],
+                struct.unpack("<i", struct.pack("<I", mem.read_u32(path + 8)))[0])
+    a, b = mem.read_u32(path) >> 11, mem.read_u32(path + 4) >> 11
+    return ((a - b) >> 1, (a + b) >> 2)
+
+
+def screen_of(mem, unit):
+    """Screen point where `unit` is drawn (camera.md §3–§4, mode 0, no
+    shake, extra offsets ignored), or None."""
+    p = mem.read_u32(PLAYER)
+    pp, up = (client_px(mem, p) if p else None), client_px(mem, unit)
+    if pp is None or up is None:
+        return None
+    return (up[0] - pp[0] + VIEW_W // 2, up[1] - pp[1] + VIEW_H // 2 - 8)
+
+
+def units_of(mem, utype):
+    """Every unit of set S with this type (bucket order, chain order)."""
+    out = []
+    for b in range(128):
+        u = mem.read_u32(UNITS_S + utype * 0x200 + 4 * b)
+        n = 0
+        while u and n < 10000:
+            out.append(u)
+            u = mem.read_u32(u + U_NEXT)
+            n += 1
+    return out
+
+
+def drlg_dump(mem, label=""):
+    """The client act's DRLG and level list (`drlg/levels.md` §1 offsets).
+    The client copy is built by the same `0x00642DA0` from the same init
+    seed (flag 1), so its act choices, level rects and seeds are the
+    server's; built rooms differ (the client builds what it sees)."""
+    act = mem.read_u32(CLIENT_ACT)
+    if not act:
+        return {"label": label, "act": None}
+    d = mem.read_u32(act + 0x48)
+    r = {"label": label, "act_no": mem.read_u32(act + 0x14) & 0xFF,
+         "init_seed": mem.read_u32(act + 0x0C), "player_level": player_level(mem),
+         "player": player_pos(mem)}
+    if not d:
+        return r
+    r.update({"drlg_seed": [mem.read_u32(d), mem.read_u32(d + 4)],
+              "start_seed": mem.read_u32(d + 0x470), "init_seed_copy": mem.read_u32(d + 0x458),
+              "flags": mem.read_u32(d + 0x8C), "staff_tomb": mem.read_u32(d + 0x94),
+              "boss_tomb": mem.read_u32(d + 0x484), "jungle_bit": mem.read_u32(d + 0x474),
+              "act_byte": mem.read_u32(d + 0x480) & 0xFF})
+    levels, lv, n = [], mem.read_u32(d + 0x47C), 0
+    while lv and n < 200:
+        levels.append({"id": mem.read_u32(lv + 0x1D0), "drlg_type": mem.read_u32(lv),
+                       "flags": mem.read_u32(lv + 4), "rooms": mem.read_u32(lv + 8),
+                       "rect": [struct.unpack("<i", struct.pack("<I", mem.read_u32(lv + o)))[0]
+                                for o in (0x1C, 0x20, 0x24, 0x28)],
+                       "level_type": mem.read_u32(lv + 0x1C0),
+                       "seed": [mem.read_u32(lv + 0x1C4), mem.read_u32(lv + 0x1C8)],
+                       "jungle_clearings": mem.read_u32(lv + 0x1B8),
+                       "jungle_blocks": mem.read_u32(lv + 0x1BC),
+                       "warp_centres": mem.read_u32(lv + 0x228)})
+        lv = mem.read_u32(lv + 0x1AC)
+        n += 1
+    r["levels"] = sorted(levels, key=lambda x: x["id"])
+    return r
+
+
+def nearest(mem, utype, cls):
+    best = None
+    for u in units_of(mem, utype):
+        if mem.read_u32(u + U_CLASS) not in cls:
+            continue
+        s = screen_of(mem, u)
+        if s is None:
+            continue
+        d = (s[0] - VIEW_W // 2) ** 2 + (s[1] - VIEW_H // 2) ** 2
+        if best is None or d < best[0]:
+            best = (d, u, s)
+    return best
 
 
 class AutoStart:
@@ -174,22 +260,35 @@ class AutoStart:
     from its debug loop (the recorder has read_u32, write and h_process);
     poll returns True when the script has ended the recording."""
 
-    def __init__(self, after=DEFAULT_AFTER, script="", shot_dir=None, log=None):
+    def __init__(self, after=DEFAULT_AFTER, script="", shot_dir=None, log=None, clock=None):
         self.after = after
-        self.events = parse_script(script)
+        self.script = parse_script(script)
         self.shot_dir = shot_dir
-        self.log = log or (lambda s: print(s, flush=True))
-        self.t0 = time.perf_counter()
+        self.sink = None          # the recorder's notes list (footer), found on the first poll
+        self._log = log or (lambda s: print(s, flush=True))
+        self.clock = clock or time.perf_counter
+        self.t0 = self.clock()
         self.forced_at = None
         self.arrived_at = None
         self.level = None
         self.next_poll = 0.0
         self.hwnd = None
         self.done = False
-        self.played = []
+        self.runner = None
+        self.wake = 0.0
+        self.played = []          # (seconds after launch, op, args), for the notes / selftest
+        self.shots = []           # screenshot threads
+        self.dumps = []           # dumpdrlg records
+
+    def log(self, msg):
+        self._log(msg)
+        if self.sink is not None:
+            self.sink.append(msg)
 
     def poll(self, mem):
-        now = time.perf_counter()
+        if self.sink is None and isinstance(getattr(mem, "notes", None), list):
+            self.sink = mem.notes
+        now = self.clock()
         if now < self.next_poll or self.done:
             return self.done
         self.next_poll = now + 0.05
@@ -213,45 +312,128 @@ class AutoStart:
             self.arrived_at, self.level = el, lv
             self.log(f"autostart: player in level {lv} at {el:.1f}s, position {player_pos(mem)}, "
                      f"act init seed {act_init_seed(mem)}")
-        while self.events and self.events[0][0] <= el - self.arrived_at:
-            _, op, arg = self.events.pop(0)
-            self.do(mem, op, arg)
-            if self.done:
-                return True
-        return False
+            self.runner = self.run(mem)
+            self.wake = now
+        while not self.done and now >= self.wake:
+            try:
+                self.wake = now + next(self.runner)
+            except StopIteration:
+                self.runner = iter(())
+                self.wake = float("inf")
+        return self.done
 
     def window(self, mem):
         if not self.hwnd:
-            self.hwnd = find_window(kernel32.GetProcessId(mem.h_process))
+            self.hwnd = find_window(kernel32.GetProcessId(mem.h_process)) if mem.h_process else None
         return self.hwnd
 
-    def do(self, mem, op, arg):
-        self.played.append((round(time.perf_counter() - self.t0, 2), op, arg))
-        if op == "end":
-            self.done = True
-            self.log("autostart: input script ended the recording")
-            return
+    def send(self, mem, msg, wp, lp):
         hwnd = self.window(mem)
-        if not hwnd:
-            self.log(f"autostart: no game window for {op}")
-            return
-        if op == "move":
-            post(hwnd, WM_MOUSEMOVE, 0, lparam(*arg))
-        elif op == "ldown":
-            post(hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam(*arg))
-        elif op == "lup":
-            post(hwnd, WM_LBUTTONUP, 0, lparam(*arg))
-        elif op == "rdown":
-            post(hwnd, WM_RBUTTONDOWN, MK_RBUTTON, lparam(*arg))
-        elif op == "rup":
-            post(hwnd, WM_RBUTTONUP, 0, lparam(*arg))
-        elif op == "kdown":
-            post(hwnd, WM_KEYDOWN, arg, 1 | user32.MapVirtualKeyW(arg, 0) << 16)
-        elif op == "kup":
-            post(hwnd, WM_KEYUP, arg, 1 | user32.MapVirtualKeyW(arg, 0) << 16 | 3 << 30)
-        elif op == "shot" and self.shot_dir:
-            os.makedirs(self.shot_dir, exist_ok=True)
-            shot_async(hwnd, os.path.join(self.shot_dir, arg + ".png"))
+        if hwnd:
+            post(hwnd, msg, wp, lp)
+
+    def click(self, mem, x, y, right=False):
+        down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) if right
+                        else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
+        self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
+        yield 0.03
+        self.send(mem, down, mk, lparam(x, y))
+        yield 0.05
+        self.send(mem, up, 0, lparam(x, y))
+
+    def run(self, mem):
+        """The script as a generator: each yield is the seconds to wait."""
+        for op, a in self.script:
+            self.played.append((round(self.clock() - self.t0, 2), op, a))
+            if op == "wait":
+                yield a[0]
+            elif op == "move":
+                self.send(mem, WM_MOUSEMOVE, 0, lparam(*a))
+            elif op in ("click", "rclick"):
+                yield from self.click(mem, a[0], a[1], op == "rclick")
+                yield 0.05
+            elif op == "hold":
+                self.send(mem, WM_MOUSEMOVE, 0, lparam(a[0], a[1]))
+                self.send(mem, WM_LBUTTONDOWN, MK_LBUTTON, lparam(a[0], a[1]))
+                yield a[2]
+                self.send(mem, WM_LBUTTONUP, 0, lparam(a[0], a[1]))
+            elif op == "key":
+                sc = user32.MapVirtualKeyW(a[0], 0) if os.name == "nt" else 0
+                self.send(mem, WM_KEYDOWN, a[0], 1 | sc << 16)
+                if a[0] >= 0x30 and a[0] <= 0x5A:
+                    self.send(mem, WM_CHAR, a[0] | 0x20 if a[0] >= 0x41 else a[0], 1 | sc << 16)
+                yield a[1] if len(a) > 1 else 0.05
+                self.send(mem, WM_KEYUP, a[0], 1 | sc << 16 | 3 << 30)
+                yield 0.05
+            elif op == "text":
+                for ch in a[0]:
+                    self.send(mem, WM_CHAR, ord(ch), 1)
+                    yield 0.03
+            elif op == "shot":
+                hwnd = self.window(mem)
+                if hwnd and self.shot_dir:
+                    os.makedirs(self.shot_dir, exist_ok=True)
+                    self.shots.append(shot_async(
+                        hwnd, os.path.join(self.shot_dir, (a[0] if a else "shot") + ".png")))
+            elif op == "waitlevel":
+                limit = self.clock() + (a[1] if len(a) > 1 else 120)
+                while player_level(mem) != a[0]:
+                    if self.clock() > limit:
+                        self.log(f"autostart: waitlevel {a[0]} timed out (level {player_level(mem)})")
+                        self.done = True
+                        yield 0
+                        return
+                    yield 0.2
+                self.log(f"autostart: level {a[0]} at {self.clock() - self.t0:.1f}s, "
+                         f"position {player_pos(mem)}")
+            elif op == "goto":
+                yield from self.goto(mem, *a)
+            elif op == "dumpdrlg":
+                rec = drlg_dump(mem, a[0] if a else "")
+                self.dumps.append(rec)
+                self.log("autostart: dumpdrlg " + json.dumps(rec, separators=(",", ":")))
+            elif op == "end":
+                limit = self.clock() + 5     # let pending screenshots finish (never join:
+                while any(t.is_alive() for t in self.shots) and self.clock() < limit:
+                    yield 0.1                # the debugger thread must keep running)
+                self.log("autostart: input script ended the recording")
+                self.done = True
+                yield 0
+                return
+
+    def goto(self, mem, utype, cls, timeout=60, dx=0, dy=-8):
+        """Walk toward the nearest unit (utype, cls) of set S with clicks;
+        once it is on screen, wait for the player to stop and click it."""
+        limit = self.clock() + timeout
+        while self.clock() < limit:
+            best = nearest(mem, utype, cls)
+            if best is None:
+                yield 0.3
+                continue
+            _, u, (x, y) = best
+            if 60 <= x <= VIEW_W - 60 and 60 <= y <= VIEW_H - 120:
+                still = self.clock() + 3
+                last = player_pos(mem)
+                while self.clock() < still:
+                    yield 0.25
+                    now = player_pos(mem)
+                    if now == last:
+                        break
+                    last = now
+                x, y = screen_of(mem, u)
+                self.log(f"autostart: goto {utype}:{cls} clicks ({x + dx}, {y + dy}), "
+                         f"unit guid {mem.read_u32(u + 0x0C)}, player {player_pos(mem)}")
+                yield from self.click(mem, x + dx, y + dy)
+                yield 0.1
+                return
+            vx, vy = x - VIEW_W // 2, y - (VIEW_H // 2 - 8)
+            n = max(1.0, (vx * vx + vy * vy) ** 0.5)
+            yield from self.click(mem, int(VIEW_W // 2 + vx * 220 / n),
+                                  int(VIEW_H // 2 - 8 + vy * 180 / n))
+            yield 0.7
+        self.log(f"autostart: goto {utype}:{cls} timed out")
+        self.done = True
+        yield 0
 
 
 def add_options(ap):
@@ -279,7 +461,7 @@ def setup(a, game_args_list):
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP = 0x200, 0x201, 0x202
 WM_RBUTTONDOWN, WM_RBUTTONUP = 0x204, 0x205
-WM_KEYDOWN, WM_KEYUP = 0x100, 0x101
+WM_KEYDOWN, WM_KEYUP, WM_CHAR = 0x100, 0x101, 0x102
 MK_LBUTTON, MK_RBUTTON = 1, 2
 
 if os.name == "nt":  # import stays possible elsewhere (CI runs the selftest)
@@ -449,17 +631,15 @@ def selftest():
     assert game_args("TestAma", 77) == ["-w", "-ns", "-nosave", "-name", "TestAma", "-seed", "77"]
     assert game_args("X", None, ["-w"]) == ["-w", "-nosave", "-name", "X"]
     assert lparam(3, 5) == 0x00050003 and lparam(-1, 0) == 0xFFFF
-    ev = parse_script("wait 1; click 10 20; hold 5 6 2; key r; key F1 0.5; shot a; end")
-    want = [(1.0, "move", (10, 20)), (1.0, "ldown", (10, 20)), (1.05, "lup", (10, 20)),
-            (1.1, "move", (5, 6)), (1.1, "ldown", (5, 6)), (3.1, "lup", (5, 6)),
-            (3.15, "kdown", ord("R")), (3.2, "kup", ord("R")),
-            (3.25, "kdown", 0x70), (3.75, "kup", 0x70), (3.8, "shot", "a"), (3.8, "end", None)]
-    assert [(round(t, 2), o, x) for t, o, x in ev] == want, ev
-    try:
-        parse_script("jump 1")
-        raise AssertionError("unknown command accepted")
-    except ValueError:
-        pass
+    assert parse_script("wait 1; click 10 20; key r 0.5; text hi there; goto 2 119") == [
+        ("wait", [1]), ("click", [10, 20]), ("key", [ord("R"), 0.5]), ("text", ["hi there"]),
+        ("goto", [2, (119,)])]
+    for bad in ("jump 1", "click 1", "wait"):
+        try:
+            parse_script(bad)
+            raise AssertionError(f"accepted {bad!r}")
+        except ValueError:
+            pass
 
     class Mem:
         h_process = None
@@ -472,25 +652,65 @@ def selftest():
 
         def write(self, a, data):
             self.m[a] = struct.unpack("<I", data)[0]
-    logs = []
+
+    class Clock:
+        t = 0.0
+
+        def __call__(self):
+            return self.t
+
+    def drive(s, m, clk, until):
+        while clk.t < until and not s.done:
+            s.poll(m)
+            clk.t = round(clk.t + 0.01, 2)
+
+    sent = []
+    clk = Clock()
     m = Mem()
-    s = AutoStart(after=0, script="end", log=logs.append)
-    assert s.poll(m) is False and s.forced_at is not None
-    assert m.m[NEXT_MODE] == 1 and m.m[MENU_LOOP] == 0
-    s.next_poll = 0
-    assert s.poll(m) is False and s.arrived_at is None      # no player yet
-    m.m.update({PLAYER: 0x1000, 0x1000 + U_PATH: 0x2000, 0x2000 + 0x1C: 0x3000,
-                0x3000 + 0x10: 0x4000, 0x4000 + 0x58: 0x5000, 0x5000 + 0x1D0: 1})
-    s.next_poll = 0
-    assert s.poll(m) is True and s.level == 1                # arrived; `end` stops
-    m.m[0x5000 + 0x1D0] = 2                                  # perturbation is visible
-    assert player_level(m) == 2
-    m.m[GAME_MODE] = 1                                       # not in the menu: never forced
-    s2 = AutoStart(after=0, log=logs.append)
+    s = AutoStart(after=1, script="wait 1; click 10 20; text ab; waitlevel 2 5; goto 2 157,119; end",
+                  log=lambda x: None, clock=clk)
+    s.send = lambda mem, msg, wp, lp: sent.append((clk.t, msg, wp, lp))
+    drive(s, m, clk, 0.99)
+    assert s.forced_at is None                                # not before `after`
+    drive(s, m, clk, 1.5)
+    assert s.forced_at is not None and m.m[NEXT_MODE] == 1 and m.m[MENU_LOOP] == 0
+    assert s.arrived_at is None                               # no player yet
+    # player at subtile (5000, 4000) in level 1: unit -> path -> room -> drlg room -> level
+    m.m.update({PLAYER: 0x1000, 0x1000 + U_PATH: 0x2000, 0x2000: 5000 << 16, 0x2004: 4000 << 16,
+                0x2000 + 0x1C: 0x3000, 0x3000 + 0x10: 0x4000, 0x4000 + 0x58: 0x5000,
+                0x5000 + 0x1D0: 1})
+    drive(s, m, clk, 2.0)
+    assert s.level == 1 and abs(s.arrived_at - 1.5) < 0.06
+    drive(s, m, clk, 4.0)
+    ops = [(msg, wp) for _, msg, wp, _ in sent]
+    assert ops == [(WM_MOUSEMOVE, 0), (WM_LBUTTONDOWN, MK_LBUTTON), (WM_LBUTTONUP, 0),
+                   (WM_CHAR, ord("a")), (WM_CHAR, ord("b"))], ops
+    t_click = sent[0][0]
+    assert 2.5 <= t_click <= 2.6, t_click                     # wait 1 after the arrival
+    assert sent[1][3] == lparam(10, 20)
+    assert not s.done                                          # waitlevel 2 is waiting
+    m.m[0x5000 + 0x1D0] = 2                                    # the player changes level
+    # an object (type 2, class 119) at subtile (5003, 4001): static path client pixels
+    obj = 0x8000
+    m.m.update({UNITS_S + 2 * 0x200 + 4 * 5: obj, obj: 2, obj + U_CLASS: 119, obj + U_PATH: 0x9000,
+                0x9004: (5003 - 4001) * 16, 0x9008: (5003 + 4001) * 8})
+    drive(s, m, clk, 6.0)
+    assert s.done, "goto and end did not run"
+    x, y = sent[-1][3] & 0xFFFF, sent[-1][3] >> 16
+    # player client px: ((5000-4000)*32, (5000+4000)*16) / camera.md §2 shifts
+    assert (x, y) == (400 + (3 - 1) * 16, 292 + (3 + 1) * 8 - 8), (x, y)
+    m.m[obj + U_CLASS] = 120                                   # perturbation: wrong class is not found
+    assert nearest(m, 2, (119,)) is None
+    m.m[GAME_MODE] = 1                                         # not in the menu: never forced
+    s2 = AutoStart(after=0, log=lambda x: None)
     assert s2.poll(m) is False and s2.forced_at is None
+    s3 = AutoStart(after=0, script="waitlevel 9 1", log=lambda x: None, clock=Clock())
+    s3.clock.t = 0
+    drive(s3, m, s3.clock, 0.5)                                # forced? mode is 1: no
     assert png_rgb(1, 1, [b"\1\2\3"]).startswith(b"\x89PNG")
-    print("selftest ok: arguments, input script timing, menu force only in mode 4, "
-          "arrival from the player chain, script end")
+    print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
+          "arrival from the player chain, click / text timing, waitlevel, goto projection "
+          "(camera.md), wrong class not found, end")
 
 
 def main():

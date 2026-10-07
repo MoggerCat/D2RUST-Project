@@ -23,6 +23,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-2`) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
+| `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 
 ## Use
@@ -129,9 +130,39 @@ character" and the client returns to the menu. Characters used so far:
 Input script (`;`-separated, run in order from the arrival): `wait S`,
 `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`, `key K [S]` (letter,
 digit, ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1–F12 or a number),
-`shot NAME`, `end` (stops the recording; the game is killed as always).
-Proved: a click at (600, 300) walks the player (position changes, the
-screenshot shows the walk). Arrival takes about 6.3 s after launch.
+`text STRING` (WM_CHAR per character, e.g. chat), `shot NAME`,
+`waitlevel ID [S]` (wait until the client player is in level ID; ends the
+recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
+[DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
+type and class by clicking toward it, wait until the player stands
+still, click it at its draw point + (DX, DY), default (0, −8); screen
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
+init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
+DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp
+centre count), `end` (stops the recording; the game is killed as
+always). Every log line also goes to the recorder's footer notes.
+Arrival takes about 6.3 s after launch (about 23 s with `record_rng.py`
+inline hooks).
+
+Proved: a click at (600, 300) walks the player; `goto 2 119` opens the
+Rogue Encampment waypoint; with `TestSor` (expansion, `d2s-tool new
+--waypoints all --quests acts=4`; the panel draws the other waypoints
+grey but takes them) the script `goto 2 119; click 178 75; click 200 138;
+waitlevel 40` travels to Lut Gholein, and the same with tabs III / IV
+(`click 240 75` / `click 300 75`, first entry `click 200 138`; town
+waypoints 156, 237, 398) reaches Kurast Docks (75) and the Pandemonium
+Fortress (103): Acts I–IV in 27 s with no hooks. The panel has no Act V
+tab for this save.
+
+The waypoint panel (800 × 600): act tabs at y 75, x 115 / 178 / 240 /
+300; entries at x 200, y 138 + 35·k.
+
+`check_drlg_acts.py` checks `dumpdrlg` records (footer notes of a raw
+file, or a `--try` log) against `drlg/levels.md` §3–§4: init seed copy,
+`dwStartSeed`, Act II tombs, Act III jungle bit, zero choices in the
+other acts, `{dwStartSeed + id, 666}` for every unbuilt maze / outdoor
+level, client flags; `--perturb N` must fail at record N; `--selftest`.
 
 ## dump_tables.py: the excel tables in 1.14d memory
 
