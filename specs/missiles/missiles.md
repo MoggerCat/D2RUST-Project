@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–284 |
-|   R3. Per-tick dispatch | 285–314 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 315–445 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 446–498 |
-|   R6. Damage stage (missile-owned part) | 499–619 |
-|   R7. Lifetime and expiry | 620–643 |
-|   R8. Pierce | 644–670 |
-|   R9. Server-do and server-hit catalogues | 671–901 |
-|   R10. Behaviour of the recorded missiles | 902–935 |
-|   R11. `missiles.txt` columns and their server use | 936–976 |
-| Constants & data dependencies | 977–1003 |
-| Randomness | 1004–1036 |
-| Edge cases & original bugs | 1037–1063 |
-| Test vectors | 1064–1143 |
-| Provenance | 1144–1186 |
-| Open questions | 1187–1256 |
+|   R2. Creation | 141–285 |
+|   R3. Per-tick dispatch | 286–315 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 316–446 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 447–499 |
+|   R6. Damage stage (missile-owned part) | 500–620 |
+|   R7. Lifetime and expiry | 621–644 |
+|   R8. Pierce | 645–671 |
+|   R9. Server-do and server-hit catalogues | 672–902 |
+|   R10. Behaviour of the recorded missiles | 903–936 |
+|   R11. `missiles.txt` columns and their server use | 937–977 |
+| Constants & data dependencies | 978–1004 |
+| Randomness | 1005–1037 |
+| Edge cases & original bugs | 1038–1064 |
+| Test vectors | 1065–1144 |
+| Provenance | 1145–1187 |
+| Open questions | 1188–1257 |
 <!-- /index -->
 
 ## Summary
@@ -229,7 +229,8 @@ Missile-owned helpers: `0x005A9720` (D2MOO
     table `0x0073C720` (§R4.2) (`0x00648CE0`); `CanDestroy` → unit flag
     bit 2 set.
 16. If v ≠ 0: path velocity = v, then the path is built toward the
-    target (`0x00649970`, D2MOO `D2Common_10142`). The missile's path
+    target (`0x00649970(P, missile, 0)`, D2MOO `D2Common_10142`; the
+    third (town-access) argument is the constant 0, `0x0059FDAD`). The missile's path
     has type 4 from its allocation (`sim/path-placement.md` §2.4 calls
     set type `0x00648CF0` with 4), and set type ORs in the type's table
     flags 0x60000 (`sim/pathing.md` §2; `pathtype_flags` row 4 =

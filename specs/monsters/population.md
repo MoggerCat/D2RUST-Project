@@ -31,24 +31,24 @@
 | Rules | 92–93 |
 |   1. Entry points and order within a room | 94–132 |
 |   2. Monster regions | 133–252 |
-|   3. Room population (`0x0054EC90(game, room)`) | 253–309 |
-|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 310–336 |
-|   5. Boss or pack (`0x005BE020(region, room)`) | 337–354 |
-|   6. Random boss (champion or unique) | 355–427 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 428–454 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 455–490 |
-|   9. Placement search and creation call (`0x005B2A00`) | 491–605 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 606–649 |
-|   11. Preset monsters (DS1 presets) | 650–785 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 786–810 |
-|   13. Region bookkeeping | 811–843 |
-|   14. Other table-driven and AI spawns | 844–868 |
-| Constants & data dependencies | 869–939 |
-| Randomness | 940–983 |
-| Edge cases & original bugs | 984–1024 |
-| Test vectors | 1025–1096 |
-| Provenance | 1097–1119 |
-| Open questions | 1120–1173 |
+|   3. Room population (`0x0054EC90(game, room)`) | 253–313 |
+|   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 314–340 |
+|   5. Boss or pack (`0x005BE020(region, room)`) | 341–358 |
+|   6. Random boss (champion or unique) | 359–435 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 436–462 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 463–498 |
+|   9. Placement search and creation call (`0x005B2A00`) | 499–613 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 614–660 |
+|   11. Preset monsters (DS1 presets) | 661–799 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 800–824 |
+|   13. Region bookkeeping | 825–857 |
+|   14. Other table-driven and AI spawns | 858–882 |
+| Constants & data dependencies | 883–953 |
+| Randomness | 954–997 |
+| Edge cases & original bugs | 998–1038 |
+| Test vectors | 1039–1110 |
+| Provenance | 1111–1133 |
+| Open questions | 1134–1187 |
 <!-- /index -->
 
 ## Summary
@@ -268,6 +268,10 @@ appearance entry for a monster's class.
 
 Then: coordinate list cl = `0x0061AD50(room)` (null → done), and
 region = regions[lvl] (looked up again with the populated-room level id).
+A null region at either lookup means no population and no draws; §4
+and the steps below are only ever reached with a non-null region (the
+1.14d region array has an entry for every level, §2.1, so the case is
+unreachable; d2rs treats it as "no population").
 MonDen > 10000 is stored back as 10000.
 
 #### 3.2 Rectangles and tries
@@ -388,6 +392,10 @@ Arguments: game, room, cl, x, y, GUID, class, warp check.
    r = −1, then r = 5. Then a §8 search without warp check and r = −1.
    Last, the nearest free point from `0x0064E840` (mask 0x3C01, size 1;
    `sim/path-placement.md` §8) with r = −1.
+   PROVISIONAL: the creation mode is 1 and the room passed to the
+   creation call is the room holding the nearest free point (because
+   population creates every monster in mode 1 and §9.3 takes the
+   accepted point's room); settled by REC-80.
 5. On success, `0x005A0320(boss, game)`: if the boss has no type flag 8,
    bosses spawned (+0x2C8) of the region of the boss's level id
    (`0x00573520`) += 1. Then type flag 8 is set, and `0x005A09E0` sets
@@ -642,6 +650,9 @@ count, set = ¬(flags >> 2) & 1, flags 0x40)` runs:
    minions: point = leader position + offset[6·set + k] (table
    `0x006E2CF0`, i32 pairs); §9 with r = −1; k = (k + 5) mod 6. For each
    one created: owner data and minion list as in 10.2.3.
+   PROVISIONAL: unconditional here (no `SetBoss` test inside
+   `0x005B2570`) (because 10.3 sets the leader's owner data always);
+   settled by REC-80.
 2. Offsets, set 0: (−1,−4) (1,4) (1,−3) (−1,3) (0,2) (0,−2). Set 1:
    (−3,−1) (3,1) (2,−1) (−2,1) (1,0) (−1,0). The function accepts set = 2,
    which would read the next table (`0x006E2D50`) and then 16 bytes of
@@ -712,7 +723,7 @@ Let M = monstats count and S = superuniques count.
 
 | hcIdx | Superunique | Population effect (quest effects: quests spec) |
 |---|---|---|
-| 10 | Radament | `roll(5)` + 2 skeleton5 (4) via `0x005B23C0` (r 4, flags 0x40), then one each of 276, 382, 385, 389 (skeleton mages) |
+| 10 | Radament | `roll(5)` + 2 skeleton5 (4) via `0x005B23C0` (r 4, flags 0x40), then one each of 276, 382, 385, 389 (skeleton mages). PROVISIONAL: `roll(5)` on the boss's unit seed, each spawn in mode 1 (because every other boss-minion draw here uses the boss seed and `0x005B23C0` is called with mode 1 in §10.2); settled by REC-81 |
 | 42 | Siege boss (Shenk) | `0x005B24E0(boss, 453 minion1, 1, 20, 20, 0)` (count/radius: Open question 4) |
 | 60 | Nihlathak boss | owner data, then `0x005B24E0(boss, class-for-level(453), 1, 10, 20, 0x40)` |
 | 62 | Baal subject 2 | `0x005B24E0(boss, 381 skmage_cold3, 1, 20, 10, 0x40)` |
@@ -767,6 +778,9 @@ row:
    MaxGrp ≥ MinGrp; cl = `0x0061AD30(room, x, y)`; leader §9 with r −1
    and flags 0; then `roll(MaxGrp − MinGrp + 1)` + MinGrp − 1 members via
    `0x005B2F70` (r 3, flags 0), drawn on the leader's unit seed.
+6. **Any other id** (not a TSV row and not above): PROVISIONAL: nothing
+   is created and nothing is drawn (because every id the 1.14d DS1
+   presets use has a row or a rule here); settled by REC-80.
 
 #### 11.6 Class for level (`0x0063EC70(room, class)`, D2MOO `D2Common_11063`)
 

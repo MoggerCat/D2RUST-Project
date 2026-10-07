@@ -45,22 +45,22 @@
 |   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 323–352 |
 |   16. InvisoPet (103) `0x005EA7A0` | 353–367 |
 |   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 368–390 |
-|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 391–463 |
-|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 464–501 |
-|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 502–522 |
-|   21. DruidBear (112) `0x005ED730` | 523–549 |
-|   22. SiegeTower (113) `0x005E1860` | 550–564 |
-|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 565–593 |
-|   24. Wussie (131) `0x005EE3C0` | 594–621 |
-|   25. UberIzual (144) `0x005F8C80` | 622–637 |
-|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 638–690 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 691–825 |
-| Constants & data dependencies | 826–848 |
-| Randomness | 849–856 |
-| Edge cases & original bugs | 857–873 |
-| Test vectors | 874–891 |
-| Provenance | 892–923 |
-| Open questions | 924–935 |
+|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 391–468 |
+|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 469–507 |
+|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 508–528 |
+|   21. DruidBear (112) `0x005ED730` | 529–555 |
+|   22. SiegeTower (113) `0x005E1860` | 556–570 |
+|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 571–599 |
+|   24. Wussie (131) `0x005EE3C0` | 600–627 |
+|   25. UberIzual (144) `0x005F8C80` | 628–643 |
+|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 644–696 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 697–839 |
+| Constants & data dependencies | 840–862 |
+| Randomness | 863–870 |
+| Edge cases & original bugs | 871–887 |
+| Test vectors | 888–905 |
+| Provenance | 906–937 |
+| Open questions | 938–949 |
 <!-- /index -->
 
 ## Summary
@@ -398,7 +398,10 @@ next skill frame, 1 = mana pool m, 2 = mimic level λ. O := the minion
 owner.
 
 Init: λ := 1; O's entry of skill K0 exists → λ := its level with bonus
-(`0x006442A0(O, entry, 1)`).
+(`0x006442A0(O, entry, 1)`). "O's entry of a skill" here and in §19 /
+§27 is `highest_entry(O, skill)` `0x006439F0` (`skills/levels.md`),
+and "O's level of it" is `skill_level(O, that entry, 1)` `0x006442A0`
+(`0x005EAF7B`, `0x005ECC78`, `0x005EB4DB`, `0x005EB5F5`).
 
 1. Delete the unit's thinks. O = 0 → idle 100. End.
 2. H := K2 clamped to 1..256. m += −1 − aip4 [1]; m < 0 or m > 64H →
@@ -446,7 +449,9 @@ Init: λ := 1; O's entry of skill K0 exists → λ := its level with bonus
 
 **Allowed** `0x005EABF0`: the skill's row exists and the pet test
 `0x005EAB20` passes (skills `summon` (+0xBC) = 0 → pass; = the unit's
-class → fail; `pettype` (+0xBE) valid and O ≠ 0 → pass when the unit's
+class → fail; `pettype` (+0xBE, signed byte) valid (≥ 0 and < the
+pettype row count, data tables +0xBF0; `0x005EAB94`–`0x005EAB9E`) and O
+≠ 0 → pass when the unit's
 pet type in O's lists (`0x00574A20`, `sim/pets.md` §9) ≠ `pettype`;
 otherwise pass). t := skills `aitype` (+0x230). C = 0 and t ∈ {4, 13}
 → 0; C ≠ 0 and t ∉ {4, 13} → 0. t = 1, `aurastate` ≥ 1 and the unit
@@ -473,7 +478,8 @@ creation).
 1. O = 0 (or no monstats row) → idle 10. End.
 2. c = −1 → c := 3, and when `Skill1` ≥ 0: c := `Param5` + (lvl − 1) ×
    `Param6` of `Skill1` (`0x004EFCB0`, skills +0x158 / +0x15C; 0 when lvl
-   ≤ 0) with lvl := O's level of its `Skill1` entry. Otherwise (c was
+   ≤ 0) with lvl := O's level of its `Skill1` entry (§18 init: highest
+   entry, level with bonus). Otherwise (c was
    not −1) c = 0 (the hits are spent) → kill the unit with itself as
    killer (`0x0057CCB0(game, unit, unit, 1)`). End.
 3. dO := full-size distance unit→O. dO > 50 → pet move k 3 (0, 0, 0).
@@ -702,7 +708,7 @@ X, x, y)" = the use helper `0x005EB8B0` (below) with M := melee range
 unit→X (`0x00622C40`).
 
 **Init 106** `0x005EB490`: params 0, 1 := 0; λ := 1. O a player: λ :=
-O's level of K0 with bonus when O has it; the unit gets skill 0
+O's level of K0 with bonus when O has it (§18 init lookup); the unit gets skill 0
 (Attack) at level 1 when it lacks it; its left and right skills := skill
 0 (`0x00643BC0`, `0x00643C50`); then for each skill s of O's class
 skill list (data tables +0xBA4 counts, +0xBAC ids by class,
@@ -745,6 +751,10 @@ K0; skill 0 ensured; left and right := 0; no class skills.
    1; dO < distO → bestO := U, distO := dO. dU := squared distance
    unit→U ≤ 1024 → n += 1; dU ≤ 100 → near += 1; dU < dist → best := U,
    dist := dU; U is "notable" (below) → boss := U.
+   PROVISIONAL: the n, near, best and notable tests are independent
+   (each is applied whatever the others gave; a U beyond 1024 skips
+   only n) (because the callback has no early return after the
+   counters); settled by REC-80.
 9. C = 0: T := X if set, else bestO if set, else boss when its squared
    distance < 1024. Then T not notable, T's minion owner (`0x0058F0D0(T)`)
    alive and within squared distance 1024 → T := that leader.
@@ -765,7 +775,9 @@ K0; skill 0 ensured; left and right := 0; no class skills.
     unless noted. By `aitype` (+0x230):
     - 1: `aurastate` > 0 and the unit lacks it → s := 0. dist ≤ 25 → −6.
       Same-group state active (`0x005EB7F0`) → −10, else +10. s := pick;
-      target := **the unit**.
+      target := **the unit**. PROVISIONAL: "lacks it → s := 0" ends
+      the case (no pick, no draw) (because s = 0 is never appended);
+      settled by REC-82.
     - 2: the unit has `aurastate` (> 0) or T has `auratargetstate` (> 0)
       → s := 0. Else dist ≤ 25 → −10; s := pick.
     - 3: shadows > 5 → −2·shadows; dist ≤ 25 → −7; n < 3 → −10; s :=
@@ -778,7 +790,9 @@ K0; skill 0 ensured; left and right := 0; no class skills.
       with a stat list holding `aurastat1` = v → charges += v, v ≥ 3 →
       s := 0; otherwise (4) + A1h, s := pick; (12) s := pick, +8 when L <
       75, +12 more when L < 50. Not progressive (4 only): A1h > 0 and
-      not pg → −10, else + 4·charges + 3; s := pick.
+      not pg → −10, else + 4·charges + 3; s := pick. PROVISIONAL: a
+      non-progressive aitype 12 skill takes this same rule (because
+      the progressive test is shared by 4 and 12); settled by REC-82.
     - 5 and 11: clear, and (`srvmissile` ≥ 0, or `srvmissilea` < 0, or
       its missile row missing, or dT < (missile `Range` − 1)²);
       otherwise s := 0. dist ≤ 25 → −5; dT ≤ 25 → −5; pg → −5. (5) s :=

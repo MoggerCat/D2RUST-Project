@@ -31,19 +31,19 @@
 | Outputs / state changes | 73–80 |
 | Rules | 81–82 |
 |   1. Conventions | 83–114 |
-|   2. Shared helpers | 115–527 |
-|   3. Start functions (srvst) | 528–618 |
-|   4. Do functions (srvdo) | 619–815 |
-|   5. `srvmissile` path | 816–831 |
-|   6. Shared helpers, batch 2 | 832–1170 |
-|   7. Start functions (srvst), batch 2 | 1171–1237 |
-|   8. Do functions (srvdo), batch 2 | 1238–1640 |
-| Constants & data dependencies | 1641–1687 |
-| Randomness | 1688–1706 |
-| Edge cases & original bugs | 1707–1756 |
-| Test vectors | 1757–1777 |
-| Provenance | 1778–1815 |
-| Open questions | 1816–1841 |
+|   2. Shared helpers | 115–529 |
+|   3. Start functions (srvst) | 530–620 |
+|   4. Do functions (srvdo) | 621–817 |
+|   5. `srvmissile` path | 818–833 |
+|   6. Shared helpers, batch 2 | 834–1172 |
+|   7. Start functions (srvst), batch 2 | 1173–1239 |
+|   8. Do functions (srvdo), batch 2 | 1240–1642 |
+| Constants & data dependencies | 1643–1689 |
+| Randomness | 1690–1708 |
+| Edge cases & original bugs | 1709–1758 |
+| Test vectors | 1759–1779 |
+| Provenance | 1780–1817 |
+| Open questions | 1818–1843 |
 <!-- /index -->
 
 ## Summary
@@ -177,7 +177,9 @@ record (`missiles.md` §R2.1) and creates the missile:
 
 Steps: tx = 0 or ty = 0 → target position `0x0056D2C0(game, unit,
 &tx, &ty)` (target unit's position, else the path's target point
-`0x00648A00` / `0x00648A10`; returns 0 when either is 0) and return 0
+`0x00648A00` / `0x00648A10`; returns 0 when either is 0; a stale
+target unit is cleared and the stored point used, `sim/pathing.md`
+§13.2) and return 0
 if that fails; still tx = 0 or ty = 0 → 0. `quant ≠ 0` and the unit is
 a player: `dec_quantity` (§2.5) < 1 → 0. Return `0x0059FA30(game,
 record)` (the missile, or none).
@@ -1426,7 +1428,7 @@ calling it).
 
 Uses the used skill entry E (`0x00620250`): param 1 (+0x18) hits left,
 param 2 (+0x1C) target type, param 3 (+0x20) target GUID (set by the
-start functions srvst 37, §7.6, and srvst 9, not yet specified).
+start functions srvst 37, §7.6, and srvst 9, `bodies-2b.md` §7.4).
 
 1. R invalid → 0. E none → 0.
 2. r = melee range of the unit (`0x00622870`, `combat/hit.md`) + 4.

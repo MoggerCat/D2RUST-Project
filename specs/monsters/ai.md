@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–242 |
-|   2. Think dispatch `0x005B1740` | 243–372 |
-|   3. AI control and AI tables | 373–544 |
-|   4. AI parameters | 545–563 |
-|   5. Target selection | 564–695 |
-|   6. Distances and line tests | 696–710 |
-|   7. Tactics helpers | 711–903 |
-|   8. AI commands and minions | 904–928 |
-|   10. The catalogue `ai-functions.tsv` | 929–949 |
-| Constants & data dependencies | 950–973 |
-| Randomness | 974–995 |
-| Edge cases & original bugs | 996–1037 |
-| Test vectors | 1038–1126 |
-| Provenance | 1127–1183 |
-| Open questions | 1184–1287 |
+|   1. Think scheduling | 97–245 |
+|   2. Think dispatch `0x005B1740` | 246–382 |
+|   3. AI control and AI tables | 383–554 |
+|   4. AI parameters | 555–573 |
+|   5. Target selection | 574–705 |
+|   6. Distances and line tests | 706–720 |
+|   7. Tactics helpers | 721–913 |
+|   8. AI commands and minions | 914–938 |
+|   10. The catalogue `ai-functions.tsv` | 939–959 |
+| Constants & data dependencies | 960–983 |
+| Randomness | 984–1005 |
+| Edge cases & original bugs | 1006–1047 |
+| Test vectors | 1048–1136 |
+| Provenance | 1137–1193 |
+| Open questions | 1194–1297 |
 <!-- /index -->
 
 ## Summary
@@ -196,7 +196,10 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   class matches, the think also runs inline: base 110 (vulture1) at the
   end of mode 8, 247 (frogdemon1) mode 14, 136 (batdemon1) modes 10/11,
   230/231 (firebeast, iceglobe) any mode, 118 (willowisp1) mode 2, 403
-  (trappedsoul1) any mode;
+  (trappedsoul1) any mode. This branch is tested first and does **not**
+  set the anim mode (only the table-1 branch calls `0x00624690(unit,
+  1)`); same freeze gate, then the think (`0x005A80C5`–`0x005A80F5`); a
+  matching class whose mode does not match falls to the table test;
 - every other case requests a mode change to neutral (which schedules
   through §1.3).
 
@@ -321,8 +324,15 @@ The finders write target, distance and combat into the record.
 3. Else idle by the distance `0x005DD7F0` returned (nearest player,
    §5.2): ≥ 35 → 25; ≥ 25 → d − 10; else 10.
 
-`0x005DE9D0` (D2MOO `sub_6FCCFC00`): same collision test → wander 5;
-else delete thinks and schedule +20 (no mode change).
+`0x005DE9D0` (D2MOO `sub_6FCCFC00`): runs `0x005DD7F0` first (a target
+found → return it); else the same collision test (mask 0x40 at the
+unit's position, static path +0x0C / +0x10 for path types 2, 4, 5,
+else the dynamic x / y) **and** the class can walk (has mode 2 `WL`,
+`0x0046C140(class, 2)`, the same test as `0x005DE890`) → wander 5;
+otherwise (no collision, or no walk mode) delete thinks (`0x00540E60`
+type 2) and schedule a type-2 think at frame + 20 (`0x005417D0`; no
+mode change), return 0. No draw happens in this function besides the
+wander's own (§7.2).
 
 1.14d-confirmed (`0x005B1650`, `0x005DE890`, `0x005DE9D0`).
 
