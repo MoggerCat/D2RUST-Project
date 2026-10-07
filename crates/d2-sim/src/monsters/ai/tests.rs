@@ -1834,6 +1834,7 @@ mod act3;
 mod act4;
 mod act5;
 mod act6;
+mod act6_cov;
 mod act7;
 mod bodies;
 mod npc;
